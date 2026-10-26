@@ -266,4 +266,28 @@
       });
     },
   });
+
+  /* ================================================================ TRÉIER SÜD (Trier-Süd)
+   * Refs: ~/Library/Caches/zuch-refs/Trier-Sued (Commons: Bahnhof Trier-Süd 20130305, Blick zum Bahnhof Trier-Süd, Leoplatz 1 Bahnhof Trier-Süd, Trier-Süd station looking north / south 2016, unused platform 2016).
+   * Patch: the platform (x 1.4 .. ~8, z -76 .. 76) lies on the RIGHT of the game track and has the only used track on its other side (x 9.5, drawn here); the Art-Nouveau building stands on the LEFT at the
+   * Wasserbillig end behind the Leoplatz road.  The declared side (SIDE_FIX) was changed from 'left' to 'right' to match the platform that really touches the game track.  Long flat brown timber-ceilinged
+   * canopy on steel posts over the middle of the platform, DB plates, masts, ticket machine and glass shelter. */
+  reg('Tréier Süd', {
+    canopy: false,
+    furniture: false,
+    build(api) {
+      const { H, W, edge, col } = api;
+      const k = makeKit(api);
+      const lB = edge + W;
+      flatCanopy(api, k, 2.6, lB, -34, 22, 3.5, '#6b4f3c', lB - 0.8);
+      [-58, 52].forEach((z) => dbNameBoard(api, k, 3.4, z, 'Tréier Süd'));
+      k.sign(2.6, -26, '1', 'blue');
+      [-66, -40, 30, 56].forEach((z) => dbMast(k, 4.2, z));
+      k.glassShelter(lB - 2.4, -12, 5.0, 1.9, '#5c6368', '#6c7378');
+      k.vc.box(k.X(lB - 0.9), H + 1.0, -20, 0.5, 2.0, 0.6, col('#3a4650'));
+      k.bench(lB - 0.7, 4, '#5a5f66'); k.bench(lB - 0.7, 38, '#5a5f66');
+      k.bin(lB - 0.6, 12, '#3b4046');
+      k.track(lB + 1.8, -135, 135, { pole: true });
+    },
+  });
 })();

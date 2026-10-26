@@ -63,4 +63,16 @@
     doors: [{ z: 35.5, w: 1.1, h: 2.2, col: '#5a5f66', face: 'front' }],
     others: { w197932850: { hidden: true } },
   });
+
+  /* TRÉIER SÜD (Trier-Süd).  Refs: Commons "Bahnhof Trier-Süd 20130305", "Blick zum Bahnhof Trier-Süd 20130305", "Rheinland-Pfalz, Trier, Leoplatz 1, Bahnhof Trier-Süd", "Trier-Süd station (Germany, looking north/south)
+   * in September 2016".  The Art-Nouveau station building (Leoplatz 1, now a restaurant): white plaster with red sandstone window surrounds and portal, dark slate mansard roof with dormers, arched
+   * ground-floor windows with white glazing bars, a round clock in the shaped gable; it stands at the Wasserbillig end beside the Leoplatz road (x -20 .. -3, z -89 .. -56). */
+  reg('Tréier Süd', {
+    wall: '#f1eee6', trim: '#a8604a', plinth: { h: 1.0, col: '#a05a46' }, band: null, roof: 'tile', roofTint: '#8e939c', fascia: '#4a4d52', groundY: -5.0, floorH: 4.3, bayM: 3.4, stain: true,
+    win: { w: 1.25, h: 2.3, kind: 'arch', frame: '#f6f4ee', reveal: '#a8604a', sill: true },
+    gableWin: 'round',
+    doors: [
+      { z: -72.5, w: 2.0, h: 3.2, col: '#4a2f22', glass: true, face: 'back', arch: true }, { z: -66.0, w: 1.1, h: 2.3, col: '#4a2f22', face: 'front' },
+    ],
+  });
 })();

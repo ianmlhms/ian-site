@@ -1,0 +1,52 @@
+{
+ "route": "trier",
+ "station": "Tréier Süd",
+ "refs": "Trier-Sued",
+ "views": [
+  {
+   "photo": "Bahnhof Trier-Süd (Germany) in September 2016.jpg",
+   "pos": [
+    4.5,
+    30,
+    1.7
+   ],
+   "look": [
+    -6,
+    -75,
+    3.5
+   ],
+   "fov": 62,
+   "note": "platform towards the building"
+  },
+  {
+   "photo": "Rheinland-Pfalz, Trier, Leoplatz 1, Bahnhof Trier-Süd.jpg",
+   "pos": [
+    -24,
+    -72,
+    1.5
+   ],
+   "look": [
+    -12,
+    -72,
+    3.5
+   ],
+   "fov": 62,
+   "note": "street facade (camera on the embankment level)"
+  },
+  {
+   "photo": "Bahnhof Trier-Süd 20130305.jpg",
+   "pos": [
+    -34,
+    -35,
+    -3.3
+   ],
+   "look": [
+    -12,
+    -72,
+    -0.5
+   ],
+   "fov": 62,
+   "note": "building from the street, oblique"
+  }
+ ]
+}
