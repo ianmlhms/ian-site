@@ -43,6 +43,7 @@
   const BEND_R = 26;               // radius of a road that bends into the parallel road
   const LANE_LEN = 70;             // the asphalt ends in a gravel lane of this length
   const SMOOTH_R = 5;              // blur radius of the natural height (samples)
+  const PAR_MAX_GRADE = 0.09;      // steepest sample-to-sample grade of a parallel road / tail (the world flow allows 11 %)
   const MAX_GRADE = 0.055;         // steepest road profile (5.5 %)
   const START_RAMP = 40;           // m over which the profile joins the crossing level
   const INFLUENCE = 40;            // bounding box margin of a road for the terrain adjustment
@@ -313,14 +314,14 @@
     const lLo = Math.min(0, X2) - INFRA_RUN;     // where infra.js's crossing road ends (flat run-out beyond the outer rail)
     const lHi = Math.max(0, X2) + INFRA_RUN;
     const wat = ctx.water ? ctx.water(sc) : null;
-    const latMax = wat ? Math.max(RIVER_LAT_MIN, Math.min(RIVER_LAT_MAX, (wat.offset || RIVER_LAT_MAX + 6) - (wat.halfWidth || 0) - 6)) : 96;   // W3: a real river can run closer to the line than 58 m (metz: 41 m, bank at 35 m): the roads stop before it, else a road floats 4.5 m over the channel
+    const latMaxFor = (sd) => (!wat ? 96 : wat.side === sd ? Math.max(RIVER_LAT_MIN, Math.min(RIVER_LAT_MAX, (wat.offset || RIVER_LAT_MAX + 6) - (wat.halfWidth || 0) - 6)) : RIVER_LAT_MAX);   // W3: a real river can run closer to the line than 58 m (metz: 41 m, bank at 35 m): on ITS side the roads stop before it, else a road floats 4.5 m over the channel
     const formY = f0.y - ctx.formationDrop;
 
     const sideA = rng() < 0.5 ? -1 : 1;
     const kind = rng();
     const layout = kind < 0.42 ? 'tField' : kind < 0.78 ? 'tBend' : 'tt';
     const qBend = rng() < 0.5 ? -1 : 1;
-    const J = (sd) => Math.min(latMax - 6, JUNCTION_MIN + rng() * JUNCTION_VAR - (wat ? 14 : 0)) * sd;
+    const J = (sd) => Math.min(latMaxFor(sd) - 6, JUNCTION_MIN + rng() * JUNCTION_VAR - (wat ? 14 : 0)) * sd;
     const reachPlus = reach(ctx, sc, 1);
     const reachMinus = reach(ctx, sc, -1);
     const maxA = (q) => (q > 0 ? reachPlus : reachMinus);
@@ -407,6 +408,7 @@
       let type;
       if (first) type = tBend ? 'bend' : 'T';
       else type = tField ? 'lane' : 'T';
+      if (type === 'bend' && sharedParallel(sd, j)) type = 'T';   // W3: a road that would bend into an existing parallel road T-joins it instead
       info.sides.push({ sd, type, j });
       if (type === 'T') {
         const hwPar = HW_PARALLEL;
@@ -574,6 +576,13 @@
       q.nat = nat[i];
       q.yT = pins.length ? (lo > hi ? (lo + hi) / 2 : clamp(raw[i], lo, hi)) : raw[i];
     });
+    /* W3: the other roads (parallel roads, tails) follow the ground, which on real valley sides climbs 11 - 13 %: sample to sample never steeper than PAR_MAX_GRADE, from the pin outwards */
+    if (!(pins.length === 1 && pins[0].u === 0)) {
+      const i0 = pins.length ? nearest(pins[0].u) : 0;
+      const step = (i, from) => { const d = Math.max(0.5, Math.abs(r.pts[i].u - r.pts[from].u)); r.pts[i].yT = clamp(r.pts[i].yT, r.pts[from].yT - PAR_MAX_GRADE * d, r.pts[from].yT + PAR_MAX_GRADE * d); };
+      for (let i = i0 + 1; i < r.pts.length; i++) step(i, i - 1);
+      for (let i = i0 - 1; i >= 0; i--) step(i, i + 1);
+    }
     /* a road pinned at its start (crossing deck): sample to sample never steeper than MAX_GRADE (real arms run over steep banks) */
     if (pins.length === 1 && pins[0].u === 0) {
       for (let i = 1; i < r.pts.length; i++) {
