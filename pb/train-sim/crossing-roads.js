@@ -268,6 +268,25 @@
       q.push(pts[pts.length - 1]);
       pts = q;
     }
+    /* uniform samples (the profile smoothing works on samples: corner cutting made them uneven) */
+    {
+      const res = [pts[0]];
+      let acc = 0;
+      for (let i = 1; i < pts.length; i++) {
+        let seg = Math.hypot(pts[i].a - pts[i - 1].a, pts[i].l - pts[i - 1].l);
+        const A = pts[i - 1]; const B = pts[i];
+        let t0 = 0;
+        while (acc + seg - t0 >= ARM_SAMPLE && seg > 1e-9) {
+          t0 += ARM_SAMPLE - acc; acc = 0;
+          res.push({ a: lerp(A.a, B.a, t0 / seg), l: lerp(A.l, B.l, t0 / seg) });
+        }
+        acc += seg - t0;
+      }
+      const lastP = pts[pts.length - 1];
+      const tail = res[res.length - 1];
+      if (Math.hypot(lastP.a - tail.a, lastP.l - tail.l) > 0.8) res.push(lastP);
+      pts = res;
+    }
     /* keep clear of tunnels, viaducts and platforms along the track */
     const rp = reach(ctx, sc, 1, ARM_MARGIN_TUNNEL, ARM_MARGIN_STATION);
     const rm = reach(ctx, sc, -1, ARM_MARGIN_TUNNEL, ARM_MARGIN_STATION);
@@ -447,6 +466,7 @@
      traffic, and no terrain work (the patch relief already holds the road). */
   const PATCH_ARM_LIFT = 0.18;       // the patch roads lie this far above the terrain (painted ground lift + ribbon lift of station-roads.js)
   const PATCH_ARM_LIMIT_X = 150;
+  const PATCH_ARM_MAX_GRADE = 0.16;   // the vehicles drive on the arm: steeper real terrain is cut off at this grade
   function planPatchCrossing(ctx, cr, index, frameOf, world) {
     const sc = cr.s;
     const f0 = frameOf(sc);
@@ -468,7 +488,12 @@
         if (!seq.length) return;
         const z0 = seq[0].z;                                                          // the straightened part: the road runs at the crossing z up to the blend
         const nearEdge = { x: edgeL, z: z0 };
-        arms[sd] = [nearEdge].concat(seq).map(at).reverse();                          // far end first, deck end last
+        const arm = [nearEdge].concat(seq).map(at).reverse();                          // far end first, deck end last
+        for (let i = arm.length - 2; i >= 0; i--) {                                   // a real road never climbs more than PATCH_ARM_MAX_GRADE next to the crossing (cuttings, retaining walls)
+          const d = Math.hypot(arm[i].x - arm[i + 1].x, arm[i].z - arm[i + 1].z);
+          arm[i].y = clamp(arm[i].y, arm[i + 1].y - PATCH_ARM_MAX_GRADE * d, arm[i + 1].y + PATCH_ARM_MAX_GRADE * d);
+        }
+        arms[sd] = arm;
       });
     }
     /* the arms as road records for the checks and tools that walk plan.crossings[].roads (kind 'patch': drawn by station-roads.js, no terrain work) */
@@ -521,6 +546,13 @@
       q.nat = nat[i];
       q.yT = pins.length ? (lo > hi ? (lo + hi) / 2 : clamp(raw[i], lo, hi)) : raw[i];
     });
+    /* a road pinned at its start (crossing deck): sample to sample never steeper than MAX_GRADE (real arms run over steep banks) */
+    if (pins.length === 1 && pins[0].u === 0) {
+      for (let i = 1; i < r.pts.length; i++) {
+        const d = Math.max(0.5, r.pts[i].u - r.pts[i - 1].u);
+        r.pts[i].yT = clamp(r.pts[i].yT, r.pts[i - 1].yT - MAX_GRADE * d, r.pts[i - 1].yT + MAX_GRADE * d);
+      }
+    }
   }
 
   TS.crossingRoads = Object.freeze({
