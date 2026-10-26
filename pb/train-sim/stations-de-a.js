@@ -72,40 +72,71 @@
       k.track(sx * IG.third, -135, 135, { pole: true });
     },
   });
+  /* ---- the reopened Weststrecke stops (2024/25): low concrete platforms, dark glass shelters, DB info columns, grey LED masts ----
+   * cfg.near  = furniture of OUR platform (game side): { shelters: [z], steles: [z], masts: [z], bench: [z], bin: [z], sign: 'label' | null, signZ }
+   * cfg.far   = { track: patch x of the second track, edge, width, z0, z1, name: board text | null, ...same lists (z), shelterX: patch x of the shelter's track-side wall, mastX, steleX }
+   * cfg.tracks = patch x of further visual tracks; cfg.wall: [x, z, w] concrete end wall of the far platform */
+  const MODERN = { frame: '#3b4249', roof: '#2f353b' };
+  function simpleStop(api, cfg) {
+    const { sx, H, W, edge, col } = api;
+    const k = makeKit(api);
+    const f = mirrorKit(api);
+    const lB = edge + W;
+    const toward = (x) => -x * sx;
+    const n = cfg.near || {};
+    (n.shelters || []).forEach((z) => k.glassShelter(lB - 2.3, z, 4.0, 1.9, MODERN.frame, MODERN.roof));
+    (n.steles || []).forEach((z) => dbStele(api, k, lB - 0.7, z));
+    (n.masts || []).forEach((z) => dbMast(k, lB - 0.4, z));
+    (n.bench || []).forEach((z) => k.bench(lB - 0.7, z, '#4a4f55'));
+    (n.bin || []).forEach((z) => k.bin(lB - 0.6, z, '#3b4046'));
+    if (n.sign) k.sign(edge + 0.9, n.signZ || 0, n.sign, 'blue');
+    const fr = cfg.far;
+    (cfg.tracks || []).forEach((x) => k.track(sx * x, -135, 135, { pole: true }));
+    if (!fr) return;
+    if (fr.track !== undefined) k.track(sx * fr.track, -135, 135, { pole: true });
+    k.platformBox(sx * fr.edge, fr.width, -1, fr.z0, fr.z1);
+    const sh = fr.shelterX !== undefined ? fr.shelterX : fr.edge + 1.7;
+    (fr.shelters || []).forEach((z) => f.glassShelter(toward(sh), z, 3.8, 1.7, MODERN.frame, MODERN.roof));
+    (fr.steles || []).forEach((z) => dbStele(api, f, toward(fr.edge + fr.width - 0.7), z));
+    (fr.masts || []).forEach((z) => dbMast(f, toward(fr.edge + fr.width - 0.4), z));
+    (fr.bench || []).forEach((z) => f.bench(toward(fr.edge + fr.width - 0.7), z, '#4a4f55'));
+    (fr.bin || []).forEach((z) => f.bin(toward(fr.edge + fr.width - 0.6), z, '#3b4046'));
+    if (fr.sign) f.sign(toward(fr.edge + 0.9), fr.signZ || 0, fr.sign, 'blue');
+    if (fr.name) dbNameBoard(api, f, toward(fr.edge + 1.0), fr.nameZ || 0, fr.name);
+    if (cfg.wall) k.vc.box(k.X(sx * cfg.wall[0]), H + 0.5, cfg.wall[1], cfg.wall[2], 1.0, 0.5, col('#9c9e9b'));
+  }
+
   /* ================================================================ TRÉIER-ZEWEN (reopened Dec 2024 on the Weststrecke)
    * Refs: ~/Library/Caches/zuch-refs/Trier-Zewen (Commons: Haltepunkt Trier-Zewen / 2, "DB AG Class 1440 EMU at Haltepunkt Trier-Zewen" 24 May 2025, Trierer Weststrecke at Zewen 2024).  No
    * station building.  Two tracks (game track x 0, second track x 4.0) cross the Hermeskeiler Strasse level crossing at z ~0; staggered low concrete platforms: Gleis 1 on the LEFT behind
    * the crossing (patch x -4.0 .. -1.0, z 23 .. 193), Gleis 2 on the right beyond it (x 6.6 .. 9.9, z -193 .. -22) with a small dark glass shelter, a display case, a red/white "2" sign and
    * grey LED masts; the crossing end of the platforms is closed by a concrete wall.  Beside the crossing: the shop at x -14 .. -5.5 (z -30 .. -11), a cream apartment block behind the far platform. */
-  const ZE = { far: { edge: 6.6, width: 3.3, z0: -193, z1: -22 }, track: 4.0 };
-  const MODERN = { frame: '#3b4249', roof: '#2f353b' };
   reg('Tréier-Zewen', {
     canopy: false,
     furniture: false,
     build(api) {
-      const { sx, H, W, edge, col } = api;
-      const k = makeKit(api);
-      const f = mirrorKit(api);
-      const lB = edge + W;
-      const toward = (x) => -x * sx;
-      // Gleis 1 (our platform, behind the crossing)
-      k.glassShelter(lB - 2.3, 62, 4.0, 1.9, MODERN.frame, MODERN.roof);
-      dbStele(api, k, lB - 0.7, 38);
-      dbStele(api, k, lB - 0.7, 150);
-      k.sign(edge + 0.9, 100, '1', 'blue');
-      [34, 74, 114, 154].forEach((z) => dbMast(k, lB - 0.4, z));
-      k.bench(lB - 0.7, 92, '#4a4f55');
-      k.bin(lB - 0.6, 45, '#3b4046');
-      // second track, Gleis 2 beyond the crossing with the dark glass shelter at its crossing end
-      k.track(sx * ZE.track, -135, 135, { pole: true });
-      k.platformBox(sx * ZE.far.edge, ZE.far.width, -1, ZE.far.z0, ZE.far.z1);
-      k.vc.box(k.X(sx * 8.2), H + 0.5, -22.4, 3.3, 1.0, 0.5, col('#9c9e9b'));
-      f.glassShelter(toward(8.3), -38, 3.6, 1.7, MODERN.frame, MODERN.roof);
-      f.sign(toward(7.4), -26, '2', 'blue');
-      dbNameBoard(api, f, toward(7.6), -90, 'Zewen');
-      dbStele(api, f, toward(9.2), -60);
-      [-45, -85, -125, -165].forEach((z) => dbMast(f, toward(9.4), z));
-      f.bench(toward(9.4), -100, '#4a4f55');
+      simpleStop(api, {
+        near: { shelters: [62], steles: [38, 150], masts: [34, 74, 114, 154], bench: [92], bin: [45], sign: '1', signZ: 100 },
+        far: { track: 4.0, edge: 6.6, width: 3.3, z0: -193, z1: -22, shelters: [-38], steles: [-60], masts: [-45, -85, -125, -165], bench: [-100], sign: '2', signZ: -26, name: 'Zewen', nameZ: -90 },
+        wall: [8.2, -22.4, 3.3],
+      });
+    },
+  });
+
+  /* ================================================================ TRÉIER-EUREN (reopened Dec 2024 on the Weststrecke)
+   * Refs: ~/Library/Caches/zuch-refs/Trier-Euren (Commons: "Construction at Haltepunkt Trier-Euren station" 3 Sep 2024 looking north / south, Haltepunkt Euren 2009).  Only construction photos
+   * (the finished stop has none on Commons): the same staggered pair of low concrete platforms as Zewen around a level crossing at z ~0, i.e. Gleis 1 on the LEFT behind the crossing
+   * (patch x -3.8 .. -1.2, z 20 .. 191) and Gleis 2 on the right beyond it (x 5.3 .. 8.3, z -191 .. -20); second track at x 4.0.  Furniture follows the Zewen / Pallien photos (DB standard):
+   * no reference photo of the finished stop. */
+  reg('Tréier-Euren', {
+    canopy: false,
+    furniture: false,
+    build(api) {
+      simpleStop(api, {
+        near: { shelters: [60], steles: [36, 150], masts: [34, 74, 114, 154], bench: [90], bin: [44], sign: '1', signZ: 100 },
+        far: { track: 4.0, edge: 5.3, width: 3.0, z0: -191, z1: -20, shelters: [-36], steles: [-58], masts: [-44, -84, -124, -164], bench: [-100], sign: '2', signZ: -26, name: 'Euren', nameZ: -90 },
+        wall: [6.8, -20.4, 3.0],
+      });
     },
   });
 })();

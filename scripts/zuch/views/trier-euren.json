@@ -1,0 +1,9 @@
+{
+  "route": "wittlich", "station": "Tréier-Euren", "refs": "Trier-Euren",
+  "views": [
+    { "photo": "Construction at Haltepunkt Trier-Euren station, Germany, 3 September 2024 (looking south).jpg", "pos": [2, 6, 1.0], "look": [4, -120, 1.5], "fov": 60, "note": "looking ahead from the crossing" },
+    { "photo": "Construction at Haltepunkt Trier-Euren station, Germany, 3 September 2024 (looking north).jpg", "pos": [2, -6, 1.0], "look": [0, 120, 1.5], "fov": 60, "note": "looking back from the crossing" },
+    { "photo": "Haltepunkt Euren (Trier) Germany 2009.JPG", "pos": [2, 40, 1.7], "look": [0, -150, 2.0], "fov": 56, "note": "2009 line view" },
+    { "photo": "Gerätehaus der Freiwilligen Feuerwehr Trier-Euren 20190902.jpg", "pos": [-45, 60, 1.7], "look": [-22, 25, 5.0], "fov": 62, "note": "fire station at the crossing" }
+  ]
+}
