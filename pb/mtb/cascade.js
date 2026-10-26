@@ -208,3 +208,57 @@ export function bankBoulders(c, surface, network = null) {
   }
   return out;
 }
+
+const FINISH_LOOK_BACK = -0.8;       // m: the finish camera looks at the point this far above the lip (the falls and the arch are in the picture)
+const FINISH_LOOK_UP = 2.6;          // m above the pool level
+const FINISH_DISTANCE = 12.5;        // m downstream of the face
+const FINISH_HEIGHTS = [1.6, 2.2, 2.9];
+const FINISH_HALF_SPAN = 6.2;        // m: half the width that must be in the picture (the flank boulders)
+const FINISH_HALF_HEIGHT = 4.8;      // m: half the height (pool to the arch)
+const FINISH_RAY_STEP = 1.5, FINISH_TRUNK_R = 0.6;
+const SIGHT_STEP = 0.5, SIGHT_MARGIN = 0.25;          // m: the line of sight to the falls is clear when the terrain stays this far below it
+
+/** True when the straight line from (x, y, z) to the target is above the terrain all the way (the walls of the gorge do not hide it). */
+function seesPoint(surface, x, y, z, tx, ty, tz) {
+  const dist = Math.hypot(tx - x, tz - z);
+  for (let s = SIGHT_STEP * 2; s < dist - 0.4; s += SIGHT_STEP) { const t = s / dist; if (surface.height(x + (tx - x) * t, z + (tz - z) * t) > y + (ty - y) * t - SIGHT_MARGIN) return false; }
+  return true;
+}
+
+/** The camera of the finish view of the Schiessentümpel trail: in front of the falls over the pool, looking upstream at the cascade with the bridge arch behind, so that the falls are centred and fully
+ *  visible. Searches a grid of spots for one with no tree trunk in the way (trunkAt(x, z, r) -> bool) and an unobstructed view of the foot and the lip of every fall and both flank boulders.
+ *  Returns { x, y, z, tx, ty, tz, halfSpan, halfHeight, visible } (absolute world metres) or null. */
+export function finishView(c, surface, trunkAt) {
+  const look = toWorld(c, FINISH_LOOK_BACK, -0.2), ty = c.poolY + FINISH_LOOK_UP;
+  const p = { x: 0, z: 0 }, q = { x: 0, z: 0 }, targets = [];
+  for (const v of CHUTES.map((ch) => ch.v)) { toWorld(c, c.faceU - 0.2, v, q); targets.push([q.x, c.poolY + 0.4, q.z], [q.x, c.lipY + 0.3, q.z]); }
+  let best = null;
+  for (const du of [0, 1.5, -1.5, 3, -3, 4.5, 6, -4.5]) {
+    for (const dv of [-0.6, -2, 1, -3.2, 2.4, 3.6, -4.4, 0.2]) {
+      toWorld(c, c.faceU + FINISH_DISTANCE + du, dv, p);
+      const ground = surface.height(p.x, p.z);
+      if (ground > c.poolY + 1.0) continue;                          // not in a bank or a wall
+      for (const h of FINISH_HEIGHTS) {
+        const y = Math.max(c.poolY + h, ground + 1.5);
+        let clear = !trunkAt(p.x, p.z, FINISH_TRUNK_R + 0.4);
+        const dist = Math.hypot(look.x - p.x, look.z - p.z);
+        for (let s = FINISH_RAY_STEP; clear && s < dist - 3; s += FINISH_RAY_STEP) { const t = s / dist; q.x = p.x + (look.x - p.x) * t; q.z = p.z + (look.z - p.z) * t; if (trunkAt(q.x, q.z, FINISH_TRUNK_R)) clear = false; }
+        if (!clear) continue;
+        let seen = 0;
+        for (const t of targets) if (seesPoint(surface, p.x, y, p.z, t[0], t[1], t[2])) seen++;
+        const score = (targets.length - seen) * 3 + Math.abs(du) * 0.5 + Math.abs(dv) * 0.7 + (h - 2.0) ** 2;
+        if (!best || score < best.score) best = { score, x: p.x, y, z: p.z, seen };
+      }
+    }
+  }
+  if (!best) return null;
+  return Object.freeze({ x: best.x, y: best.y, z: best.z, tx: look.x, ty, tz: look.z, halfSpan: FINISH_HALF_SPAN, halfHeight: FINISH_HALF_HEIGHT, visible: best.seen / targets.length });
+}
+
+/** Vertical field of view (degrees) that puts the falls (halfSpan x halfHeight metres around the look point, seen from the camera) fully inside a free rectangle of a screen of W x H pixels. */
+export function finishFov(view, free, W, H) {
+  const dist = Math.hypot(view.tx - view.x, view.tz - view.z);
+  const hHalf = Math.atan(view.halfSpan * 1.08 / dist), vHalf = Math.atan(view.halfHeight * 1.08 / Math.max(1, dist));
+  const tanV = Math.max(Math.tan(vHalf) * H / Math.max(1, free.h), Math.tan(hHalf) * H / Math.max(1, free.w));
+  return Math.min(80, Math.max(38, 2 * Math.atan(tanV) * 180 / Math.PI));
+}

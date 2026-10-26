@@ -19,6 +19,7 @@ import { createHikers } from './hikers.js';
 import { SCHIESSENTUEMPEL } from './landmarks.js';
 import { buildBridge } from './bridge-model.js';
 import { buildCascadeModel } from './cascade-model.js';
+import { finishFov } from './cascade.js';
 import { createSolidMaterial } from './solid-material.js';
 import { createTerrainView } from './terrain-view.js';
 import { createForestView } from './forest-view.js';
@@ -438,19 +439,27 @@ async function boot() {
   }
 
   // ---- resize
-  let viewOffsetApplied = -1;
+  /** The picture is shifted (a lens shift of the camera) into the part of the screen that no card covers: up while the start card is open, into the free area beside / above the finish card
+   *  (ui.finishFree), and back to the centre otherwise. The shift eases in and out. */
+  const viewShift = { x: 0, y: 0, applied: false };
+  const VIEW_EASE = 6;              // 1/s
   const resize = () => {
     const w = canvas.clientWidth || window.innerWidth, h = canvas.clientHeight || window.innerHeight;
     renderer.setSize(w, h, false);
-    camera.aspect = w / h; viewOffsetApplied = -1; applyViewOffset(); camera.updateProjectionMatrix();
+    camera.aspect = w / h; viewShift.applied = false; ui.layoutChanged(); applyViewOffset(0, true); camera.updateProjectionMatrix();
   };
-  /** On the start card the picture is shifted up so the rider stays visible above the card. */
-  function applyViewOffset() {
-    const want = game.mode === 'card' ? 1 : 0;
-    if (want === viewOffsetApplied) return;
-    viewOffsetApplied = want;
+  function wantedShift(w, h) {
+    if (game.mode === 'card') return { x: 0, y: -h * CARD_SHIFT };
+    const free = game.mode === 'finished' && !replay ? ui.finishFree() : null;
+    return free ? { x: free.cx - w / 2, y: free.cy - h / 2 } : { x: 0, y: 0 };
+  }
+  function applyViewOffset(dt, snap = false) {
     const w = canvas.clientWidth || window.innerWidth, h = canvas.clientHeight || window.innerHeight;
-    if (want) camera.setViewOffset(w, h, 0, Math.round(h * CARD_SHIFT), w, h); else camera.clearViewOffset();
+    const want = wantedShift(w, h), k = snap ? 1 : 1 - Math.exp(-VIEW_EASE * dt);
+    const nx = viewShift.x + (want.x - viewShift.x) * k, ny = viewShift.y + (want.y - viewShift.y) * k;
+    if (viewShift.applied && Math.abs(nx - viewShift.x) < 0.2 && Math.abs(ny - viewShift.y) < 0.2) return;
+    viewShift.x = nx; viewShift.y = ny; viewShift.applied = true;
+    if (Math.abs(nx) < 0.5 && Math.abs(ny) < 0.5) camera.clearViewOffset(); else camera.setViewOffset(w, h, -Math.round(nx), -Math.round(ny), w, h);
     camera.updateProjectionMatrix();
   }
   resize();
@@ -524,7 +533,7 @@ async function boot() {
     last = now; elapsed += dt;
     const inp = input.read(scriptedInput);
     if (replay) { replay.t += dt * 1000; if (replay.t > replay.ghost.duration + 1500 || replay.t > REPLAY_SECONDS_MAX * 1000 * 60) { replay = null; ghostRider.root.visible = false; ui.showFinish(lastFinish()); } }
-    applyViewOffset();
+    applyViewOffset(dt);
     logic(dt, inp);
     // events from the physics (landings) for sound and feedback
     if (bike.landSeq !== lastLand) {
@@ -550,13 +559,17 @@ async function boot() {
     else if (!replay) ghostRider.root.visible = false;
 
     const c = frozenCamera || chase.update(replay ? replayBike() : bike, dt, camMode, elapsed);
-    const focus = current.trail && current.trail.focus;                  // a trail that ends at a sight (the Schiessentuempel falls): once finished, the camera glides to a spot below the bridge and looks across at the rider on the deck, the falls beside the finish card
+    // a trail that ends at a sight (the Schiessentuempel falls): once finished, the camera glides to a spot in front of the cascade and looks at it, the falls centred in the part of the screen the finish card leaves free
+    const focus = current.trail && current.trail.focus && world.finishView;
     focusBlend = !frozenCamera && focus && game.mode === 'finished' ? Math.min(1, focusBlend + dt * 0.6) : Math.max(0, focusBlend - dt * 2);
     if (focusBlend > 0 && focus) {
       const k = focusBlend * focusBlend * (3 - 2 * focusBlend);
-      const fy = surface.height(focus.camX, focus.camZ) + focus.camUp, ly = surface.height(focus.lookX, focus.lookZ) + 2.2;
-      c.x += (focus.camX - c.x) * k; c.y += (fy - c.y) * k; c.z += (focus.camZ - c.z) * k;
-      c.tx += (focus.lookX - c.tx) * k; c.ty += (ly - c.ty) * k; c.tz += (focus.lookZ - c.tz) * k;
+      const free = ui.finishFree();
+      const W = canvas.clientWidth || window.innerWidth, H = canvas.clientHeight || window.innerHeight;
+      const fov = finishFov(focus, free || { w: W, h: H }, W, H);
+      c.x += (focus.x - c.x) * k; c.y += (focus.y - c.y) * k; c.z += (focus.z - c.z) * k;
+      c.tx += (focus.tx - c.tx) * k; c.ty += (focus.ty - c.ty) * k; c.tz += (focus.tz - c.tz) * k;
+      c.fov += (fov - c.fov) * k;
     }
     camera.position.set(c.x, c.y, c.z);
     camera.lookAt(c.tx, c.ty, c.tz);
@@ -630,7 +643,7 @@ async function boot() {
     version: 'w3-play', renderer, scene, camera, field, surface, ground, groundAt, env, cascade: world.cascade, terrain, forest, trees, undergrowth, rocks, rockView, water, rider, rain, leaves, shafts, birds, insects, hikers, world, maps, bridge, quality, perf, data,
     game, ui, input, audio, props, trails, viewpoints, persistence, dailyToday, menuData,
     get trail() { return current.trail; }, get kind() { return current.kind; }, get centre() { return current.trail.centre; },
-    get bike() { return bike; }, get progress() { return progress; },
+    get bike() { return bike; }, get progress() { return progress; }, get focusBlend() { return focusBlend; }, get viewShift() { return { x: viewShift.x, y: viewShift.y }; },
     setProgress(p) { progress = p; applyLoadout(); refreshMenu(); },
     setBike(b) { bike = Object.freeze({ ...bike, ...b }); },
     reset(index) { bike = stateAt(current.trail, index ?? game.progress, ground); chase.snap(bike); },

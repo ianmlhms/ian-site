@@ -3,7 +3,7 @@
 import { buildPureWorld } from './world-build.js';
 import { buildDecks, landmarkDeck, createGround } from './decks.js';
 import { placeBridge } from './landmarks.js';
-import { cascadeCollide } from './cascade.js';
+import { cascadeCollide, finishView } from './cascade.js';
 import { groundResolver, createBikeState } from './bike.js';
 import { sampleWorldMap } from './world-map.js';
 import { BIKES, PLAY } from './config.js';
@@ -37,7 +37,9 @@ export function buildPlayWorld(data) {
     return a;
   };
   void hitA;
-  return { ...world, decks, bridge, ground, groundAt, classify, collide, trails, trailById: new Map(trails.map((t) => [t.id, t])) };
+  const trunkHit = { nx: 0, nz: 0, pen: 0 };
+  const cascadeFinish = world.cascade ? finishView(world.cascade, surface, (x, z, r) => world.trees.collide(x, z, r, trunkHit) !== null) : null;          // where the camera stands when the Schiessentuempel trail ends (null: use the trail's own focus point)
+  return { ...world, decks, bridge, ground, groundAt, classify, collide, trails, finishView: cascadeFinish, trailById: new Map(trails.map((t) => [t.id, t])) };
 }
 
 /** A trail as the game plays it. `centre` = the carved (smoothed) samples [[x, z], ...] every 1 m, `s` their arc length (m). */

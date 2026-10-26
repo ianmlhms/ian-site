@@ -54,7 +54,9 @@ try {
   }
   if (finishName) {
     const r = await ride(0, true);
-    await page.waitForTimeout(1600);
+    await page.waitForTimeout(600);
+    await page.waitForFunction(() => window.__mtb.focusBlend >= 0.999 || window.__mtb.game.mode !== "finished", null, { timeout: 60000 }).catch(() => {});        // (the glide to the sight at the end takes ~1.7 s of game time)
+    await page.waitForTimeout(900);
     await page.screenshot({ path: path.join(outDir, `${finishName}.png`) });
     console.log("saved", finishName, "mode", r.mode);
   }
