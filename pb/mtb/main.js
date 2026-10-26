@@ -157,15 +157,15 @@ async function boot() {
   const bridge = world.bridge;
   if (bridge) {
     const parts = buildBridge({ span: bridge.span, width: bridge.width, abutment: bridge.abutment, rise: bridge.rise, deck: bridge.deck - bridge.water, endL: bridge.endL - bridge.water, endR: bridge.endR - bridge.water });
-    rockView.addLandmark(parts.stone, bridge.x, bridge.water, bridge.z, bridge.yaw, 1.0, 2.0);
+    rockView.addLandmark(parts.stone, bridge.x, bridge.water, bridge.z, bridge.yaw, 1.0, 2.0, 24);
     const wood = new THREE.Mesh(parts.wood, createSolidMaterial(env));
     wood.position.set(bridge.x, bridge.water, bridge.z); wood.rotation.y = bridge.yaw; wood.frustumCulled = false; wood.name = 'footbridge railing';
     scene.add(wood);
   }
   if (world.cascade) {                                                  // the Schiessentuempel ledge: sandstone solid with mossy boulders, stones in the pool (the falls and the water are water-view's)
     const c = world.cascade, parts = buildCascadeModel(c, surface, field.network);
-    rockView.addLandmark(parts.ledge, c.x, c.lipY, c.z, c.yaw, 0.6, 3.4);
-    rockView.addLandmark(parts.stones, c.x, c.lipY, c.z, c.yaw, 0.5, 3.7);
+    rockView.addLandmark(parts.ledge, c.x, c.lipY, c.z, c.yaw, 0.6, 3.4, 30);
+    rockView.addLandmark(parts.stones, c.x, c.lipY, c.z, c.yaw, 0.5, 3.7, 40);
   }
   const water = createWaterView({ scene, network: field.network, env, quality, foamTexture: textures.foam, cascade: world.cascade });
   const town = createTownView({ scene, env, quality, houses: world.houses });

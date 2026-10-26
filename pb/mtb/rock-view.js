@@ -166,17 +166,17 @@ export function createRockView({ scene, rocks, env, quality, textures }) {
     stats.near = nNear; stats.far = nFar;
   }
 
-  /** One extra static instance of a model with the rock material (the footbridge): geometry needs the aSkirt attribute. */
-  function addLandmark(geometry, x, y, z, yaw, sink, seed) {
+  /** One extra static instance of a model with the rock material (the footbridge, the cascade ledge): geometry needs the aSkirt attribute; `radius` (m around the instance position) enables frustum culling. */
+  function addLandmark(geometry, x, y, z, yaw, sink, seed, radius = 0) {
     const g = new THREE.InstancedBufferGeometry();
     g.index = geometry.index; g.attributes = geometry.attributes;
     g.setAttribute('iPos', new THREE.InstancedBufferAttribute(new Float32Array([x, y, z]), 3));
     g.setAttribute('iRot', new THREE.InstancedBufferAttribute(new Float32Array([yaw, 0, sink, seed]), 4));
     g.setAttribute('iScale', new THREE.InstancedBufferAttribute(new Float32Array([1, 1, 1]), 3));
     g.instanceCount = 1;
-    g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e6);
+    g.boundingSphere = radius > 0 ? new THREE.Sphere(new THREE.Vector3(x, y, z), radius) : new THREE.Sphere(new THREE.Vector3(), 1e6);        // a landmark with a radius is culled like anything else (it is not drawn at all when it is out of view)
     const mesh = new THREE.Mesh(g, material);
-    mesh.frustumCulled = false; mesh.name = 'landmark stone';
+    mesh.frustumCulled = radius > 0; mesh.name = 'landmark stone';
     group.add(mesh);
     return mesh;
   }

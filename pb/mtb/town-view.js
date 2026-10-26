@@ -3,7 +3,7 @@ import { buildTownCells } from './town-model.js';
 import { createTownMaterial } from './town-material.js';
 
 const THREE = window.THREE;
-const REACH = Object.freeze({ low: 420, medium: 640, high: 900 });          // m from the camera to the middle of a cell
+const REACH = Object.freeze({ low: 300, medium: 520, high: 800 });          // m from the camera to the middle of a cell
 
 export function createTownView({ scene, env, quality, houses }) {
   const group = new THREE.Group();

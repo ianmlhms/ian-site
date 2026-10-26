@@ -4,7 +4,7 @@
 import { MeshBuilder, KIND } from './mesh-builder.js';
 import { FLAT, HIP, DORMER, OUTBUILDING, CHURCH, RENAISSANCE, RUIN, roofRise } from './town-data.js';
 
-export const CELL = 192;
+export const CELL = 256;
 const hash = (a, b = 0, c = 0) => { const x = Math.sin(a * 127.1 + b * 311.7 + c * 74.7) * 43758.5453; return x - Math.floor(x); };
 const WALLS = [[0.93, 0.9, 0.8], [0.88, 0.8, 0.62], [0.95, 0.95, 0.92], [0.86, 0.74, 0.64], [0.82, 0.86, 0.8], [0.8, 0.82, 0.84], [0.9, 0.84, 0.7]];
 const ROOFS = [[0.24, 0.27, 0.33], [0.24, 0.27, 0.33], [0.24, 0.27, 0.33], [0.22, 0.25, 0.3], [0.58, 0.28, 0.2], [0.38, 0.28, 0.24]];
