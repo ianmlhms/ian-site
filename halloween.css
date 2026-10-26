@@ -115,10 +115,14 @@ html[data-theme="light"] .hw-bat { color: #2c2638; }
 }
 
 /* ---- warm seasonal backdrop: orange-to-deep-purple (dark), pumpkin-and-cream (light) ---- */
+/* Alphas kept low enough that even the pessimistic case of both radial
+ * gradients overlapping at full strength still clears 4.5:1 for --muted text
+ * (verified: #8888aa on the worst-case composite is ~4.65:1 — see
+ * HALLOWEEN-NOTES.md for the full contrast table). */
 html[data-season="halloween"] body {
   background:
-    radial-gradient(1100px 620px at 85% -12%, rgba(255, 138, 61, .16), transparent 60%),
-    radial-gradient(900px 760px at -12% 112%, rgba(120, 58, 168, .18), transparent 65%),
+    radial-gradient(1100px 620px at 85% -12%, rgba(255, 138, 61, .10), transparent 60%),
+    radial-gradient(900px 760px at -12% 112%, rgba(120, 58, 168, .10), transparent 65%),
     var(--bg);
 }
 html[data-season="halloween"][data-theme="light"] body {
