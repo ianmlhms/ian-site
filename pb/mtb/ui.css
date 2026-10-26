@@ -26,6 +26,17 @@ select { font: inherit; color: inherit; }
 .mhud .hud-tr { position: absolute; right: calc(10px + env(safe-area-inset-right)); top: calc(8px + env(safe-area-inset-top)); display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
 .mhud .speed b { font-size: 32px; font-variant-numeric: tabular-nums; letter-spacing: -1px; }
 .mhud .speed small { font-size: 12px; color: var(--muted); margin-left: 3px; }
+.mhud .speed { text-align: right; transform-origin: 100% 0; }
+.mhud .speed b { display: inline-block; transition: color .25s, font-size .25s, text-shadow .25s; }
+.mhud .speed .gauge { display: block; width: 100%; min-width: 96px; height: 4px; border-radius: 2px; background: #ffffff2a; margin-top: 3px; overflow: hidden; }
+.mhud .speed .gauge i { display: block; height: 100%; width: 100%; transform-origin: 0 50%; transform: scaleX(0); background: var(--accent); transition: transform .12s linear, background .25s; }
+.mhud .speed[data-tier="1"] b { color: #fff7e0; } .mhud .speed[data-tier="1"] .gauge i { background: #cfe9a6; }
+.mhud .speed[data-tier="2"] b { color: var(--gold); font-size: 35px; } .mhud .speed[data-tier="2"] .gauge i { background: var(--gold); }
+.mhud .speed[data-tier="3"] b { color: #ffa25a; font-size: 38px; text-shadow: 0 0 12px #ff8a3acc, 0 1px 6px #000b; } .mhud .speed[data-tier="3"] .gauge i { background: #ffa25a; }
+.mhud .speed[data-tier="4"] b { color: #ff6b5a; font-size: 42px; text-shadow: 0 0 16px #ff4a3aee, 0 1px 6px #000b; } .mhud .speed[data-tier="4"] .gauge i { background: #ff6b5a; }
+.mhud .speed.pulse { animation: speedPulse .45s ease-out; }
+@keyframes speedPulse { 0% { transform: scale(1.22); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .mhud .speed.pulse { animation: none; } }
 .mhud .hud-btns { display: flex; gap: 6px; pointer-events: auto; flex-wrap: wrap; justify-content: flex-end; max-width: 60vw; }
 .hbtn { width: 44px; height: 44px; border-radius: 14px; border: 1px solid var(--line); background: #10201acc; font-size: 20px; display: grid; place-items: center; padding: 0; text-shadow: none; }
 .hbtn:active { transform: scale(.94); }

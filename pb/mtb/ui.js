@@ -4,6 +4,7 @@
 import { t as translate, trailName, trailBlurb, formatTime, formatSplit, LANGS, LANG_NAMES } from './i18n.js';
 import { BIKES, BIKE_IDS } from './config.js';
 import { paintValleyMap, hitTestTrail } from './map-paint.js';
+import { speedTier, gaugeFill } from './speed-feel.js';
 
 const GRADE_COLOURS = { green: '#3fbf5a', blue: '#3d8bff', red: '#e5483f', black: '#2a2a2a' };
 const MEDAL_ICON = ['—', '🥉', '🥈', '🥇'];
@@ -30,7 +31,7 @@ export function createUi({ root, lang, trails, handlers, touch = false }) {
   hud.innerHTML = `
     <div class="hud-tl"><div class="trail-line"><span class="grade" id="hudGrade"></span><span id="hudTrail"></span></div><div class="bar"><i id="hudBar"></i></div><div id="hudCp" class="sub"></div></div>
     <div class="hud-tc"><div id="hudTime" class="clock">0:00.0</div><div id="hudSplit" class="split" aria-live="polite"></div></div>
-    <div class="hud-tr"><div class="speed"><b id="hudSpeed">0</b><small id="hudSpeedUnit">km/h</small></div><div class="hud-btns" id="hudBtns"></div></div>
+    <div class="hud-tr"><div class="speed" id="hudSpeedBox" data-tier="0"><b id="hudSpeed">0</b><small id="hudSpeedUnit">km/h</small><span class="gauge"><i id="hudGauge"></i></span></div><div class="hud-btns" id="hudBtns"></div></div>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <div id="banner" class="banner"></div>`;
   root.appendChild(hud);
@@ -79,6 +80,13 @@ export function createUi({ root, lang, trails, handlers, touch = false }) {
   // ================================================================ HUD API
   function setHud(d) {
     q('hudSpeed').textContent = Math.round(d.speedKmh);
+    const tier = speedTier(d.speedKmh), box = q('hudSpeedBox');
+    q('hudGauge').style.transform = `scaleX(${gaugeFill(d.speedKmh).toFixed(3)})`;
+    if (String(tier) !== box.dataset.tier) {
+      const up = tier > Number(box.dataset.tier);
+      box.dataset.tier = String(tier);
+      if (up) { box.classList.remove('pulse'); void box.offsetWidth; box.classList.add('pulse'); }       // a new tier is a small cheer
+    }
     if (d.timeMs !== undefined) q('hudTime').textContent = formatTime(d.timeMs);
     if (d.progress !== undefined) q('hudBar').style.width = `${Math.round(d.progress * 100)}%`;
     if (d.cp) q('hudCp').textContent = T('hud.cp', d.cp);
@@ -193,7 +201,7 @@ export function createUi({ root, lang, trails, handlers, touch = false }) {
         </div>
         <div class="fin-body">
           <div class="fin-trail">${gradeDot(d.trail.grade)} ${esc(trailName(d.trail, L))}${d.daily ? ` · ${esc(T('card.daily'))}` : ''}</div>
-          <div class="fin-best">${esc(T('finish.best'))}: ${formatTime(d.isBest ? d.ms : d.bestMs, true)}${d.crashes ? ` · ${esc(T('finish.crashes'))}: ${d.crashes}` : ''}</div>
+          <div class="fin-best">${esc(T('finish.best'))}: ${formatTime(d.isBest ? d.ms : d.bestMs, true)}${d.topKmh ? ` · ${esc(T('finish.top'))}: ${Math.round(d.topKmh)} km/h` : ''}${d.crashes ? ` · ${esc(T('finish.crashes'))}: ${d.crashes}` : ''}</div>
           ${d.beatGhost ? `<div class="fin-ghost">👻 ${esc(T('finish.ghostWon'))}</div>` : d.ghostLost ? `<div class="fin-ghost lost">👻 ${esc(T('finish.ghostLost'))}</div>` : ''}
           ${d.nextMedal ? `<div class="fin-next">${esc(T('finish.nextMedal', { medal: T(`medal.${MEDAL_KEYS[d.nextMedal.medal]}`), time: formatTime(d.nextMedal.seconds * 1000) }))}</div>` : ''}
           ${(d.unlocks || []).map((u) => `<div class="fin-unlock"><span class="okmark">✓</span> ${esc(T('finish.unlocked', { what: u }))}</div>`).join('')}

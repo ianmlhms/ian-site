@@ -78,7 +78,7 @@ Ian's complaint: sudden holes in the ground in the tram simulator. The design ma
 
 A rider + bike point mass (86 kg) on the physics surface, fixed step 1/120 s, pure functions (state replaced, never mutated).
 
-- Pedal: P / v (210 W) capped by 330 N and by rear traction (0.55 mu g). Braking: front+rear blended, 7.4 m/s2 at best, limited by grip. Rolling resistance by ground (trail dirt 0.013, forest floor 0.05), drag CdA 0.52.
+- Pedal (speed pass, 26 Oct): P / v with an arcade 480 W (x 1.5 sprint boost from a standstill, fading out between 2 and 6.5 m/s) capped by 460 N and by rear traction (0.55 mu g): 35 km/h on the flat, 0-25 km/h in about 5 s. Braking: front+rear blended, 7.4 m/s2 at best, limited by grip. Rolling resistance by ground (trail dirt 0.013, forest floor 0.05), drag CdA 0.6. There is no soft speed cap: only drag, rolling resistance and grip end a descent (about 54 km/h on an 8 % fire road, 63 on 12 %); the hard cap is 86 km/h. See SPEED-NOTES.md.
 - Steering: kinematic bicycle (wheelbase 1.12 m); the bar angle halves at 5.5 m/s so high speed means leaning, not turning the bars; the lean angle is the one that balances the centripetal acceleration. Grip: the velocity is dragged toward the heading with at most grip x g; beyond that the bike slides and scrubs speed.
 - Contact: free body with gravity, pushed out of the ground; it sticks over drops up to 7 cm (suspension travel) and leaves the ground over crests and jumps; landing speeds cost energy (> 7.5 m/s normal speed).
 - Jump: hold Space to pre-load (0.32 s), release to pop (up to 3.6 m/s); in the air no steering authority.

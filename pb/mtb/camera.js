@@ -7,6 +7,9 @@ import { CAMERA } from './config.js';
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const lerp = (a, b, t) => a + (b - a) * t;
+const smoothstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+/** 0..1: how rough the ground under the wheels is (roots, rock, mud and a bike that is bouncing), so the shake is stronger on a rough trail than on smooth gravel. */
+const roughness = (state) => (state.grounded ? clamp(((state.rough || 0) * 1.4) + (state.compression || 0), 0, 1) : 0);
 
 export function createChaseCamera(surface, collide = null, pushOut = null) {
   let yaw = null;                       // smoothed heading the camera sits behind
@@ -30,10 +33,10 @@ export function createChaseCamera(surface, collide = null, pushOut = null) {
     const riderY = Math.max(state.y, ground);
     if (height === null) height = riderY;
     height += (riderY - height) * Math.min(1, dt * 5);        // vertical smoothing: no bobbing over bumps
-    const dist = (mode === 2 ? CAMERA.farDistance : CAMERA.followDistance) + Math.min(1.1, speed * 0.05);
+    const dist = (mode === 2 ? CAMERA.farDistance : CAMERA.followDistance) + Math.min(1.6, speed * 0.06);
     const rx = -sy, rz = cy;                                    // the rider's right (x east, z south)
     const wantX = state.x - cy * dist + rx * CAMERA.sideOffset, wantZ = state.z - sy * dist + rz * CAMERA.sideOffset;
-    const wantY = Math.max(height, riderY - 0.4) + (mode === 2 ? CAMERA.farHeight : CAMERA.followHeight) + Math.min(0.5, speed * 0.015);
+    const wantY = Math.max(height, riderY - 0.4) + (mode === 2 ? CAMERA.farHeight : CAMERA.followHeight) + Math.min(0.6, speed * 0.02);
     // shorten the boom until every probe clears the ground
     const eyeX = state.x, eyeY = riderY + 1.1, eyeZ = state.z;
     let t = 1;
@@ -71,12 +74,12 @@ export function createChaseCamera(surface, collide = null, pushOut = null) {
     }
     // speed sensation: a little shake that grows with speed and rough ground, a wider view when fast
     const rough = state.grounded ? clamp(state.slip * 0.06 + (state.compression || 0) * 0.5, 0, 0.5) : 0;
-    const amp = CAMERA.shake * (clamp((speed - 9) / 14, 0, 1) + rough);
+    const amp = CAMERA.shake * (clamp((speed - CAMERA.shakeFrom) / CAMERA.shakeSpan, 0, 1) * (0.55 + 1.3 * roughness(state)) + rough);
     out.y += Math.sin(time * 47) * amp * 0.6 + Math.sin(time * 71 + 1) * amp * 0.4;
     out.x += Math.sin(time * 53 + 2) * amp * 0.5; out.z += Math.cos(time * 59 + 3) * amp * 0.5;
     out.y = Math.max(out.y, surface.height(out.x, out.z) + CAMERA.minClearance);          // the shake never dips the lens into the ground
-    const targetFov = (mode === 1 ? CAMERA.helmetFov : CAMERA.fov) + clamp(speed - 6, 0, 16) * 0.85;
-    fovNow += (targetFov - fovNow) * Math.min(1, dt * 2.5);
+    const targetFov = (mode === 1 ? CAMERA.helmetFov : CAMERA.fov) + CAMERA.fovGain * smoothstep(CAMERA.fovFrom, CAMERA.fovTo, speed);
+    fovNow += (targetFov - fovNow) * Math.min(1, dt * (targetFov > fovNow ? 2.2 : 1.4));      // the view opens quickly when the bike picks up speed, and relaxes slowly
     out.fov = fovNow;
     out.boom = Math.hypot(px - state.x, pz - state.z);
     return out;
