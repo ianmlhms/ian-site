@@ -1569,7 +1569,7 @@ window.TS = window.TS || {};
 
     /* ================= streaming + per-frame update ================= */
     const lastCamera = new T.Vector3(), camPos = new T.Vector3(), camDir = new T.Vector3();
-    let lastKc = null, camVel = new T.Vector3(), haveCam = false, lastBiomeS = -1e9;
+    let lastKc = null, curKc = null, camVel = new T.Vector3(), haveCam = false, lastBiomeS = -1e9;
     const maxChunk = Math.floor(L / CHUNK) + 1;
 
     function disposeChunk(c) {
@@ -1581,6 +1581,19 @@ window.TS = window.TS || {};
       });
       for (let i = turbines.length - 1; i >= 0; i--) if (c.group.children.includes(turbines[i].group)) turbines.splice(i, 1);
       roadsAll.delete(c.k);
+    }
+    /* W2c: the scenery half of a station patch arrived after the chunks around it were built (generic scenery): rebuild them with the patch's keep-out area.  The chunks next to the
+       train at once, the others by ensureChunks. */
+    function refreshChunksAround(p) {
+      const kcNow = curKc === null ? Math.floor(clamp(p.sMid, 0, L) / CHUNK) : curKc;
+      const lo = Math.floor(clamp(p.sMid - 340, 0, L) / CHUNK), hi = Math.floor(clamp(p.sMid + 340, 0, L) / CHUNK);
+      let any = false;
+      for (let k = lo; k <= hi; k++) {
+        const c = chunks.get(k); if (!c) continue;
+        disposeChunk(c); chunks.delete(k); any = true;
+        if (Math.abs(k - kcNow) <= 1) { try { const nc = buildChunk(k); chunks.set(k, nc); roadsAll.set(k, nc.roads); } catch (e) { console.warn(TAG + 'chunk ' + k + ' failed', e); chunks.set(k, { k, group: new T.Group(), roads: [] }); } }
+      }
+      if (any) { lastKc = null; rebuildCars(); }
     }
     function ensureChunks(s, all) {
       const kc = Math.floor(clamp(s, 0, L) / CHUNK), lo = Math.max(-1, kc - Q.behind), hi = Math.min(maxChunk, kc + Q.ahead);
@@ -1616,7 +1629,7 @@ window.TS = window.TS || {};
       if (haveCam && dt > 0) camVel.copy(camPos).sub(lastCamera).divideScalar(dt).clampLength(0, 120); else camVel.set(0, 0, 0);
       lastCamera.copy(camPos); haveCam = true;
       const kcNow = Math.floor(clamp(s, 0, L) / CHUNK);
-      ensureChunks(s, firstUpdate || (lastKc !== null && Math.abs(kcNow - lastKc) > 3)); lastKc = kcNow;
+      ensureChunks(s, firstUpdate || (lastKc !== null && Math.abs(kcNow - lastKc) > 3)); lastKc = curKc = kcNow;
       // biome-driven tint of the far terrain
       if (Math.abs(s - lastBiomeS) > 40) { lastBiomeS = s; const b = biomeAt(s); if (b !== currentBiome) { currentBiome = b; const t = FAR_TINT[b] || FAR_TINT.farmland; farTintTarget.setRGB(t[0], t[1], t[2]); } }
       farTint.lerp(farTintTarget, 1 - Math.exp(-dt * 0.6));
@@ -1703,7 +1716,7 @@ window.TS = window.TS || {};
     catch (e) { console.warn(TAG + 'crossing traffic failed', e); crossTraffic = null; }
     /* the real surroundings of stations (station-surround.js): painted ground, LOD2 buildings, trees, built near the player */
     let surround = null;
-    try { surround = track.surroundPatches && track.surroundPatches.length && TS.stationSurround ? TS.stationSurround.create({ root, track, quality, width: W, materials: { water: matWater }, treeField }) : null; }
+    try { surround = track.surroundPatches && track.surroundPatches.length && TS.stationSurround ? TS.stationSurround.create({ root, track, quality, width: W, materials: { water: matWater }, treeField, onResolved: refreshChunksAround }) : null; }
     catch (e) { console.warn(TAG + 'station surround failed', e); surround = null; }
     const setCrossing = (crossingS, closed) => { if (crossTraffic) crossTraffic.setClosed(crossingS, closed); };
 

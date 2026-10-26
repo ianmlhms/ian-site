@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """W2c: builds the station patches (real surroundings, build_station_patch.py) of every Luxembourg station of the single-line routes from their layout files
 (pb/train-sim/data/real/<route>-layout.json: lat / lon / heading of the stop on the real main track).  Patches land in pb/train-sim/data/stations/<key>.json and are
-registered in index-routes.json (the Mosel line keeps index.json).  Skips stations that already have a patch (rerun with --force) and the Gare Centrale (home-line branch).
+registered in index-routes.json (the Mosel line keeps index.json).  Skips stations that already have a patch (rerun with --force); every new patch is split into <key>.c.json / <key>.h.json (split_station_patches.py) and the Gare Centrale (home-line branch).
 
     /Users/Ian/Library/Caches/luxtram-work/.venv/bin/python scripts/zuch/build_route_patches.py north south west [--only Name,Name] [--force]
 """
@@ -42,7 +42,7 @@ def main():
             if not (LUX_BBOX[0] <= st["lat"] <= LUX_BBOX[2] and LUX_BBOX[1] <= st["lon"] <= LUX_BBOX[3]):
                 continue
             key = key_of(name)
-            if os.path.exists(os.path.join(OUT, key + ".json")) and not force:
+            if (os.path.exists(os.path.join(OUT, key + ".json")) or os.path.exists(os.path.join(OUT, key + ".c.json"))) and not force:
                 print("have", name, flush=True)
                 continue
             cmd = [sys.executable, os.path.join(HERE, "build_station_patch.py"), key, "--name", name, "--lat", str(st["lat"]), "--lon", str(st["lon"]),
@@ -55,6 +55,8 @@ def main():
             else:
                 done.append(name)
                 print((res.stdout.strip().splitlines() or [""])[-1][:240], flush=True)
+    if done:      # W2c: core / heavy halves for the download size (pb/train-sim/station-surround.js); removes the full files again
+        subprocess.run([sys.executable, os.path.join(HERE, "split_station_patches.py")] + [key_of(n) for n in done], check=False)
     print("built", len(done), "failed", failed)
 
 

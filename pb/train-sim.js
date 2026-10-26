@@ -458,6 +458,11 @@
     if (!isLux && TS.stationSurround && TS.stationSurround.preload) await safe('station surround preload', () => TS.stationSurround.preload(routeDef.stations), Promise.resolve());   // real surroundings of stations (patch data), before the track is built
     const track = build('track', 'build', [routeDef]);
     if (!track) throw new Error('Track build failed');
+    // the scenery half of the first station patch (about 150 kB gzip): waited for at most 6 s, the rest streams in ahead of the train (station-surround.js)
+    if (!isLux && TS.stationSurround && TS.stationSurround.heavyNear) {
+      const s0 = resume ? resume.sim.s : keepState && keepState.warmS !== undefined ? keepState.warmS : track.stations && track.stations[0] ? track.stations[0].s : 0;
+      await safe('station surround first patches', () => TS.stationSurround.heavyNear(track.base || track, track.baseS ? track.baseS(s0) : s0, { count: 1, maxWaitMs: 6000 }), Promise.resolve());
+    }
     let resumeSim = null, resumeWorld = null;
     if (resume) {   // a saved run: checked and rebuilt before anything heavy is built, so a bad snapshot costs nothing
       resumeFits(resume, track);

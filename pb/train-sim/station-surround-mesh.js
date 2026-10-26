@@ -275,8 +275,8 @@
     const stats = { buildings: 0, trees: 0, tris: 0 };
     let treeKey = null;
 
-    /* ---- painted ground */
-    {
+    /* ---- painted ground (W2c: a patch whose heavy half did not load has no class map: roads and water only) */
+    if (data.classGrid) {
       const tex = paintGround(patch, data);
       disposables.push(tex);
       const mb = new MB(true);

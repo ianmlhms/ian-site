@@ -859,8 +859,8 @@
       terrainBaseHeightAt,
       crossingRoads: roadPlan,
       surroundPatches,
-      /* true inside the real patch of a station (the generic scenery keeps out of it) */
-      inSurround: surroundPatches.length ? (x, z) => { const q = nearest(x, z, { s: 0, d: 0, lat: 0, y: 0 }); return surroundPatches.some((p) => p.covers(q.s, q.lat)); } : () => false,
+      /* true inside the real patch of a station whose scenery is loaded (the generic scenery keeps out of it) */
+      inSurround: surroundPatches.length ? (x, z) => { const q = nearest(x, z, { s: 0, d: 0, lat: 0, y: 0 }); return surroundPatches.some((p) => p.meshReady && p.covers(q.s, q.lat)); } : () => false,   // W2c: only once the heavy half of the patch (buildings, trees) is loaded: until then the generic scenery stands there
       /* extra terrain strip vertices for the chunk [s0, s1): rows (arc lengths) and lateral columns, from the crossing roads and the real station patches */
       meshHints: {
         rows: (s0, s1) => (roadPlan ? roadPlan.extraRows(s0, s1) : []).concat(...surroundPatches.map((p) => p.extraRows(s0, s1)), valleyRows(s0, s1)),
