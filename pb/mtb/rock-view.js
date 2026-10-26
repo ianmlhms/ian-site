@@ -82,7 +82,7 @@ const FRAGMENT = `
     mossAmt = mossAmt * smoothstep(0.2, 0.75, nA * 0.5 + nB * 0.5 + 0.12 + uWet * 0.2 + (1.0 - clamp(dot(N, normalize(uSunDir)), 0.0, 1.0)) * 0.18);
     mossAmt = clamp(mossAmt, 0.0, 0.92);
     vec3 mossT = uDetail > 0.5 ? tri(uRockMoss, P, w, SCALE * 0.9) : vec3(0.36, 0.5, 0.2);
-    mossT = mix(mossT, mossT * vec3(0.78, 0.98, 0.64), 0.35);
+    mossT = mix(mossT, mossT * vec3(0.78, 0.98, 0.64), 0.18);
     vec3 albedo = mix(sand, mossT, mossAmt) * mix(vec3(1.0), vColor, 0.55) * 1.04;
     // pits and cracks darken (the painting has them; this adds fine grain from the noise)
     albedo *= 0.9 + 0.2 * nC;
@@ -106,13 +106,13 @@ const FRAGMENT = `
       float h = fract(sin((floor(col) + row * 17.0) * 12.9898) * 43758.5453);
       vec3 stone = tri(uRockWet, P, w, 0.5) * mix(vec3(0.9, 1.0, 1.0), vec3(1.5, 1.35, 1.1), h) + vec3(0.03, 0.03, 0.02);
       float ivy = smoothstep(0.35, 0.65, texture2D(uNoise, vMP.xy * 0.35 + 0.2).b + 0.25 * (1.0 - smoothstep(0.0, 2.2, vMP.y + 2.2)));
-      albedo = mix(stone, mossT * vec3(0.8, 1.0, 0.7), clamp(0.28 + ivy * 0.5 + mossAmt * 0.4, 0.0, 0.85));
+      albedo = mix(stone, mossT * vec3(0.68, 0.84, 0.58), clamp(0.28 + ivy * 0.5 + mossAmt * 0.4, 0.0, 0.85));
       albedo *= 1.0 - 0.55 * joint;
       bumpL = lum(albedo) + (1.0 - joint) * 0.2;
     }
     if (vSeed > 2.5) {                                    // stones in and by the water: dark, wet, mossy, with a lit rim
       vec3 wet = tri(uRockWet, P, w, 0.45);
-      albedo = mix(wet, mossT * vec3(0.62, 0.8, 0.5), 0.35 + 0.3 * nB) * 1.25;
+      albedo = mix(wet, mossT * vec3(0.56, 0.68, 0.46), 0.35 + 0.3 * nB) * 1.08;
       // ferns and ivy hang from the top edge down the wet face (the Schiessentuempel ledge, the bank boulders)
       albedo = mix(albedo, mossT * vec3(0.52, 0.78, 0.4), curtain * 0.6);
       bumpL = lum(wet);
