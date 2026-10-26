@@ -15,6 +15,7 @@ Record formats (game coordinates of the leg, centre `s` / `l` = along / lateral 
     {"k":"t","s","l","h","r"}                                                                                                       storage tank / silo / gas holder
     {"k":"w","s","l","h","r"}                                                                                                       cooling tower
     {"k":"p","s","l","th","len","w","h"}                                                                                           pipe rack / conveyor bridge
+    {"k":"y","s","l","p":[[ds,dl]..]}                                                                                               a 20 - 40 m piece of a yard / siding track (marshalling yards: ballast, rails, standing wagons, floodlight masts)
 """
 import argparse
 import json
@@ -25,6 +26,7 @@ import sys
 
 import numpy as np
 import shapely
+import shapely.ops
 from shapely import STRtree
 from shapely.affinity import rotate, scale, translate
 from shapely.geometry import LineString, Point, Polygon
@@ -59,6 +61,9 @@ EXPAND_MAX = 1.9
 EXPAND_STEPS = (1.9, 1.6, 1.35, 1.15, 1.0)
 EXPAND_MAX_LEN = 200.0     # m: a hall is not stretched beyond this along the track
 MAX_VERTS = 12
+YARD_MIN_ZONE = 120000.0   # landuse=railway areas this big are marshalling yards / freight areas
+YARD_LAT = (8.0, 150.0)    # tracks between these lateral distances from the main line
+YARD_PIECE = 45.0          # m of real track per record
 
 
 def hall_polygon(poly):
@@ -292,6 +297,42 @@ def main():
         if recs:
             out[lid] = recs
             print("  ", lid, g.length and "%.0f m" % g.length, len(recs), "objects", flush=True)
+
+    # marshalling yards: sidings / yard tracks inside big landuse=railway areas, cut into short pieces
+    yard_zones = [shapely.from_wkb(w["wkb"]) if "wkb" in w else w["g"] for w in []]
+    yard_zones = [w["g"] for w in res["tiles"]["landuse"] if w["t"].get("landuse") == "railway" and w["g"].area >= YARD_MIN_ZONE and line.distance(w["g"]) < 60]
+    ytree = STRtree(yard_zones) if yard_zones else None
+    n_yard = 0
+    if ytree is not None:
+        corridor = line.buffer(YARD_LAT[1]).difference(line.buffer(YARD_LAT[0]))
+        for w in res["tiles"]["rails"]:
+            t = w["t"]
+            if t.get("railway") != "rail":
+                continue
+            g = w["g"].intersection(corridor)
+            if g.is_empty or not len(ytree.query(g)):
+                continue
+            for part in ([g] if g.geom_type == "LineString" else [x for x in getattr(g, "geoms", []) if x.geom_type == "LineString"]):
+                if part.length < 10.0 or not any(z.contains(part.interpolate(part.length / 2)) for z in yard_zones):
+                    continue
+                n = max(1, int(part.length // YARD_PIECE))
+                for i in range(n):
+                    seg = shapely.ops.substring(part, part.length * i / n, part.length * (i + 1) / n)
+                    pts = [seg.interpolate(seg.length * u / 2).coords[0] for u in range(3)]
+                    sr = float(line.project(seg.centroid))
+                    if any(a <= sr <= b for a, b in patch_s) and line.distance(seg.centroid) <= PATCH_REACH_L:
+                        continue
+                    lid = mp.leg_of(sr)
+                    if lid is None:
+                        continue
+                    gp = mp.to_game(lid, pts)
+                    cs = sum(q[0] for q in gp) / len(gp)
+                    cl = sum(q[1] for q in gp) / len(gp)
+                    if abs(cl) < YARD_LAT[0] - 2:
+                        continue
+                    out.setdefault(lid, []).append({"k": "y", "s": round(cs, 1), "l": round(cl, 1), "p": [[round(q[0] - cs, 1), round(q[1] - cl, 1)] for q in gp]})
+                    n_yard += 1
+    print("yard pieces", n_yard, flush=True)
 
     path = os.path.join(OUT, "%s-features.json" % route)
     with open(path) as f:

@@ -218,6 +218,58 @@
     }
   }
 
+  /* ------------------------------------------------------------------ marshalling yard track piece: ballast, two rails, standing wagons, now and then a floodlight mast */
+  const WAGON_COLS = ['#6a4a3a', '#7d8084', '#8a3a32', '#45607a', '#2e2f31', '#a8442f', '#2f5d8c', '#b0a58a'];
+  function yardPiece(c, o, M0, groundAt) {
+    const { T, mbBlock, C } = c;
+    const mbRoad = c.mbRoad;
+    const V = (x, y, z) => new T.Vector3(x, y, z);
+    const up = { x: 0, y: 1, z: 0 };
+    const pts = o.p.map((q) => [q[0], q[1], groundAt(q[0], q[1])]);
+    const ballast = C('#9a948a'); const rail = C('#4f4b47');
+    const seg = (a, b, hw, lift, col, mb) => {
+      const dx = b[0] - a[0]; const dz = b[1] - a[1]; const l = Math.hypot(dx, dz) || 1; const nx = -dz / l * hw; const nz = dx / l * hw;
+      orient(c, mb, M0, [V(a[0] + nx, a[2] + lift, a[1] + nz), V(a[0] - nx, a[2] + lift, a[1] - nz), V(b[0] - nx, b[2] + lift, b[1] - nz), V(b[0] + nx, b[2] + lift, b[1] + nz)], col, up);
+    };
+    for (let i = 0; i + 1 < pts.length; i++) {
+      seg(pts[i], pts[i + 1], 1.9, 0.12, ballast, mbRoad);
+      const dx = pts[i + 1][0] - pts[i][0]; const dz = pts[i + 1][1] - pts[i][1]; const l = Math.hypot(dx, dz) || 1;
+      [-0.72, 0.72].forEach((off) => {
+        const ox = -dz / l * off; const oz = dx / l * off;
+        seg([pts[i][0] + ox, pts[i][1] + oz, pts[i][2]], [pts[i + 1][0] + ox, pts[i + 1][1] + oz, pts[i + 1][2]], 0.07, 0.2, rail, mbRoad);
+      });
+    }
+    // standing wagons: a run along the piece, deterministic per piece
+    const h = hash(o.s, o.l);
+    if ((h % 100) < 58) {
+      const a = pts[0]; const b = pts[pts.length - 1];
+      const dx = b[0] - a[0]; const dz = b[1] - a[1]; const len = Math.hypot(dx, dz);
+      if (len > 18) {
+        const ang = Math.atan2(dz, dx);
+        const n = Math.max(1, Math.floor(len / 15.2));
+        const type = (h >> 7) % 3;
+        const col = C(WAGON_COLS[(h >> 3) % WAGON_COLS.length]);
+        for (let k = 0; k < n; k++) {
+          const t = (k + 0.5) / n; const x = a[0] + dx * t; const z = a[1] + dz * t; const y = groundAt(x, z) + 0.22;
+          const m = M0.clone().multiply(new T.Matrix4().makeTranslation(x, y, z)).multiply(new T.Matrix4().makeRotationY(-ang));
+          const kk = type === 1 && k % 2 ? 0 : type;
+          const colK = kk === 1 ? C('#2e2f31') : kk === 2 ? C(WAGON_COLS[(h >> (3 + k)) % WAGON_COLS.length]) : col;
+          mbBlock.addGeo(new T.BoxGeometry(14.0, 0.6, 2.8), m.clone().multiply(new T.Matrix4().makeTranslation(0, 0.9, 0)), C('#3a3836'), true);   // underframe
+          if (kk === 1) mbBlock.addGeo(new T.CylinderGeometry(1.35, 1.35, 12.4, 10).rotateZ(Math.PI / 2), m.clone().multiply(new T.Matrix4().makeTranslation(0, 2.45, 0)), colK, true);
+          else if (kk === 2) { mbBlock.addGeo(new T.BoxGeometry(6.0, 2.6, 2.5), m.clone().multiply(new T.Matrix4().makeTranslation(-3.3, 2.5, 0)), colK, true); mbBlock.addGeo(new T.BoxGeometry(6.0, 2.6, 2.5), m.clone().multiply(new T.Matrix4().makeTranslation(3.3, 2.5, 0)), C(WAGON_COLS[(h >> (5 + k)) % WAGON_COLS.length]), true); }
+          else { mbBlock.addGeo(new T.BoxGeometry(13.6, 3.0, 2.9), m.clone().multiply(new T.Matrix4().makeTranslation(0, 2.7, 0)), colK, true); mbBlock.addGeo(new T.BoxGeometry(13.8, 0.3, 3.1), m.clone().multiply(new T.Matrix4().makeTranslation(0, 4.3, 0)), C('#5a5552'), true); }
+        }
+      }
+    }
+    // floodlight mast beside the track now and then
+    if ((h % 1000) < 55) {
+      const a = pts[1]; const y = groundAt(a[0] + 3.2, a[1]);
+      const m = M0.clone().multiply(new T.Matrix4().makeTranslation(a[0] + 3.2, y, a[1]));
+      mbBlock.addGeo(new T.BoxGeometry(0.5, 24, 0.5), m.clone().multiply(new T.Matrix4().makeTranslation(0, 12, 0)), C('#6a6f73'), true);
+      mbBlock.addGeo(new T.BoxGeometry(0.9, 0.9, 5.2), m.clone().multiply(new T.Matrix4().makeTranslation(0, 24.2, 0)), C('#d8d6c2'), true);
+    }
+  }
+
   /* ------------------------------------------------------------------ chunk hook */
   function fill(c) {
     const list = c.real && c.real.industryIn ? c.real.industryIn(c.s0, c.s1) : [];
@@ -239,6 +291,7 @@
         else if (o.k === 't') { tank(c, o, M0, y0); c.markOcc(o.s - o.r - 1, o.s + o.r + 1, o.l - o.r - 1, o.l + o.r + 1); }
         else if (o.k === 'w') { coolingTower(c, o, M0, y0); c.markOcc(o.s - o.r - 2, o.s + o.r + 2, o.l - o.r - 2, o.l + o.r + 2); }
         else if (o.k === 'p') { pipeRack(c, o, M0, y0); }
+        else if (o.k === 'y') yardPiece(c, o, M0, groundAt);
         n++;
       } catch (e) { console.warn('[Lokféierer] industry object failed', o.k, e && e.message); }
     });

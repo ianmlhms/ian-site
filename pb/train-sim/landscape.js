@@ -1220,7 +1220,7 @@ window.TS = window.TS || {};
 
       /* ---- W3: industrial silhouettes of the real routes (steelworks halls, chimneys ...; real-industry.js), before the real scenery so that houses and trees keep off them ---- */
       if (realMode && TS.realIndustry && track.real && track.real.industryIn) {
-        TS.realIndustry.fill({ s0, s1, real: track.real, place, placeM, yawOf, markOcc, inTunnel, T, mbBlock, mbRoof, C, mixColor });
+        TS.realIndustry.fill({ s0, s1, real: track.real, place, placeM, yawOf, markOcc, inTunnel, T, mbBlock, mbRoof, mbRoad, C, mixColor });
       }
 
       /* ---- real scenery of the Mosel line (replaces the generic villages / fields / woods / roads / trees above) ---- */
