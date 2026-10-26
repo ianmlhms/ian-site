@@ -2162,7 +2162,7 @@
   reg('Déifferdang', { canopy: false, furniture: false, build: buildDeifferdang });
   reg('Péiteng', { canopy: false, furniture: false, build: buildPeiteng });
   reg('Rodange', { canopy: false, furniture: false, build: buildRodange });
-  reg('Bartreng', { canopy: false, furniture: false, build: buildBartreng });
+  reg('Bertrange-Strassen', { canopy: false, furniture: false, build: buildBartreng });
   reg('Mamer', { canopy: false, furniture: false, build: buildMamer });
   reg('Capellen', { canopy: false, furniture: false, build: buildCapellen });
   reg('Kleinbettingen', { canopy: false, furniture: false, build: buildKleinbettingen });
