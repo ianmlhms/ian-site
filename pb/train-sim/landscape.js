@@ -720,10 +720,12 @@ window.TS = window.TS || {};
     // A1's terrainHeightAt already shapes formation, cuttings, tunnel covers, bridge valleys and the river bed.
     const riverBridges = bridges.filter(b => b.waterY !== null && b.waterY !== undefined);
     /* river channel under a river viaduct (A1 only digs a bowl): the strip mesh lies lower than terrainHeightAt there */
+    /* half width of the river under a river bridge: the real rivers of the Mosel line (Syre, Eisch ...) are narrow, the bridge itself is padded to its minimum game length */
+    function riverHalfUnder(b) { const base = Math.min(8 + (b.s1 - b.s0) * 0.1, (b.s1 - b.s0) / 2 + 3); return track.real ? Math.max(5, base * 0.62) : base; }
     function carveRiver(h, s, lat) {
       for (const b of riverBridges) {
         const du = Math.abs(s - (b.s0 + b.s1) / 2); if (du > 90) continue;
-        const hw = Math.min(8 + (b.s1 - b.s0) * 0.1, (b.s1 - b.s0) / 2 + 3);
+        const hw = riverHalfUnder(b);
         const c = (1 - smooth(hw, hw + 16, du)) * (1 - smooth(70, 125, Math.abs(lat)));
         if (c > 0) h = lerp(h, Math.min(h, b.waterY - 1.5), c);
       }
@@ -1215,7 +1217,7 @@ window.TS = window.TS || {};
         for (const [a, b] of segs) if (b - a > 10) makeWater(mbWater, a, b, s => { const w = rowInfo(s).wat; return w ? riverLat(w) : 0; }, s => { const w = rowInfo(s).wat; return w ? w.halfWidth + 7 : 1; }, s => { const w = rowInfo(s).wat; return w ? w.y : 0; });
       }
       for (const br of bridges) if (br.waterY !== null && br.waterY !== undefined) {
-        const mid = (br.s0 + br.s1) / 2, hw = Math.min(8 + (br.s1 - br.s0) * 0.1, (br.s1 - br.s0) / 2 + 3) + 4;
+        const mid = (br.s0 + br.s1) / 2, hw = riverHalfUnder(br) + 4;
         if (mid < s0 || mid >= s1) continue;  // the whole crossing belongs to the chunk holding its midpoint
         const f = frame(mid), latMax = Math.min(126, W - 6), n = Math.ceil(latMax * 2 / 8), base = mbWater.count;
         for (let i = 0; i <= n; i++) {
