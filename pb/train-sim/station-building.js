@@ -12,7 +12,7 @@
  *     TS.stationStyles.register('Roodt-Syr', { wall: '#e9e3cf', ... })
  * style = { wall, trim, plinth: { h, col }, band: col | null, roof: 'slate' | 'tile' | 'flat' | 'zinc', fascia: col, floorH, bayM,
  *           win: { w, h, kind: 'rect' | 'arch', frame, shutter, sill, ground: bool }, gableWin: 'round' | null, doors: [{ z, w, h, col, glass, face: 'front' | 'back' }],
- *           skipFaces: (face) => bool, extras: (api) => void } */
+ *           skipFaces: (face) => bool, extras: (api) => void, hidden: bool (draw nothing: the station model replaces it) } */
 (function () {
   'use strict';
   const TS = (window.TS = window.TS || {});
@@ -170,6 +170,7 @@
   /* ---- build.  api: { T, b, style, world(x, z) -> { x, z, form }, group, disposables, triangulate3, MB, roofMaterial(kind), stats } */
   function build(api) {
     const { T, b, style: st, world, group, disposables, triangulate3, MB } = api;
+    if (st.hidden) return;                // style { hidden: true }: the station model draws a replacement (e.g. a pavilion the LOD2 only has as a flat box)
     const cx = b.ground.reduce((s, p) => s + p[0], 0) / b.ground.length;
     const cz = b.ground.reduce((s, p) => s + p[1], 0) / b.ground.length;
     const baseY = b.base !== undefined ? b.base : 0;
@@ -210,22 +211,26 @@
     const skMat = new T.MeshLambertMaterial({ color: new T.Color(st.plinth ? st.plinth.col : '#8e887a'), side: T.DoubleSide });
     disposables.push(skMat);
     const skMesh = new T.Mesh(sk.geometry(), skMat); skMesh.receiveShadow = true; group.add(skMesh); disposables.push(skMesh.geometry);
-    // roofs
-    const rf = new MB();
+    // roofs: gentle slopes in the style's material, steep ones (mansards, spires) darker, the tower above `copperAbove` in green copper
+    const rfs = { main: new MB(), steep: new MB(), copper: new MB() };
     (b.roofs || []).forEach((ring) => {
       if (ring.length < 3) return;
       const { tris, normal } = triangulate3(ring);
       if (!tris.length) return;
-      let nl = Math.hypot(normal[0], normal[1], normal[2]) || 1; let nx = normal[0] / nl; let ny = normal[1] / nl; let nz = normal[2] / nl;
+      const nl = Math.hypot(normal[0], normal[1], normal[2]) || 1; let nx = normal[0] / nl; let ny = normal[1] / nl; let nz = normal[2] / nl;
       if (ny < 0) { nx = -nx; ny = -ny; nz = -nz; }
+      const ymean = ring.reduce((m, p) => m + p[1], 0) / ring.length;
+      const rf = st.copperAbove !== undefined && ymean > st.copperAbove ? rfs.copper : st.steepRoof && ny < 0.8 ? rfs.steep : rfs.main;
       const ids = ring.map((p) => { const w = world(p[0], p[2]); return rf.vert(w.x, w.form + p[1], w.z, nx, ny, nz, [1, 1, 1], p[0] / 2.4, p[2] / 2.4); });
       for (let t = 0; t < tris.length; t += 3) rf.i.push(ids[tris[t]], ids[tris[t + 1]], ids[tris[t + 2]]);
     });
-    if (!rf.empty) {
-      const rmat = new T.MeshLambertMaterial({ map: api.roofTexture(st.roof || 'slate'), color: st.roofTint ? new T.Color(st.roofTint) : 0xffffff, side: T.DoubleSide });
+    [['main', st.roof || 'slate', st.roofTint], ['steep', (st.steepRoof && st.steepRoof.kind) || 'slate', st.steepRoof && st.steepRoof.tint], ['copper', 'zinc', st.copperTint || '#5f9d8a']].forEach(([key, kind, tint]) => {
+      const rf = rfs[key];
+      if (rf.empty) return;
+      const rmat = new T.MeshLambertMaterial({ map: api.roofTexture(kind), color: tint ? new T.Color(tint) : 0xffffff, side: T.DoubleSide });
       disposables.push(rmat);
       const rmesh = new T.Mesh(rf.geometry(), rmat); rmesh.castShadow = true; rmesh.receiveShadow = true; group.add(rmesh); disposables.push(rmesh.geometry); api.stats.tris += rf.i.length / 3;
-    }
+    });
     // extras: boxes etc. in the patch frame
     if (st.extras) {
       const eb = new MB();

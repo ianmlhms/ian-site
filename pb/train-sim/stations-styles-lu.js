@@ -25,4 +25,35 @@
       'ACT_48b19d9f-e9db-4329-a7c9-5fc88b761986': { wall: '#c8a266', stone: true, noWindows: true, roof: 'tile', plinth: { h: 0.3, col: '#8a7355' }, doors: [{ z: -24.9, w: 0.95, h: 2.1, col: '#2f3438', glass: false, face: 'back' }, { z: -22.7, w: 0.95, h: 2.1, col: '#2f3438', glass: false, face: 'back' }, { z: -20.6, w: 0.95, h: 2.1, col: '#2f3438', glass: false, face: 'back' }] },   // the sandstone toilet hut
     },
   });
+  /* OETRANGE.  Refs: Commons "Contern, gare CFL Oetrange (104)/(119)/(124)" (Feb 2025).  The old (disused, boarded) station building: weathered cream-yellow plaster with ochre
+   * window surrounds, grey sandstone plinth, two storeys in the centre and to the Luxembourg end, a lower wing ahead with a big dark tiled hip roof (clock on its wall); the
+   * boarded door left of the middle.  The little tile-roofed waiting pavilion ahead of it is drawn by the station model (stations-lu-e.js). */
+  reg('Oetrange', {
+    wall: '#e4dab2', trim: '#e8d690', plinth: { h: 0.55, col: '#a39a82' }, band: '#e0cf94', roof: 'slate', roofTint: '#d2cabe', floorH: 4.2, bayM: 3.4, stain: true,
+    win: { w: 1.25, h: 2.0, kind: 'rect', frame: '#f0eee6', reveal: '#e6d38c', sill: true },
+    doors: [
+      { z: -48.6, w: 1.1, h: 2.4, col: '#8a8068', glass: false, face: 'front' }, { z: -46.0, w: 1.1, h: 2.3, col: '#4a4038', face: 'back' }, { z: -55.5, w: 1.1, h: 2.3, col: '#4a4038', face: 'back' },
+    ],
+    extras(api) {
+      // round platform clock on the wall of the low wing (photo 104), drainpipe between wing and centre block
+      api.box(4.64, 3.4, -54.2, 0.06, 0.8, 0.8, '#2b2e32');
+      api.box(4.58, 3.4, -54.2, 0.06, 0.66, 0.66, '#f1eee6');
+      api.box(5.5, 3.2, -50.3, 0.12, 6.0, 0.12, '#7a7e82');
+    },
+    others: {
+      'ACT_ed7c1963-665a-440b-8c8a-5ef19a69fde4': { hidden: true },
+    },
+  });
+
+  /* LËTZEBUERG GARE CENTRALE.  Refs: ~/Library/Caches/zuch-refs/Lux-Gare (Commons: Luxembourg City railway station 2022-12, Gare centrale tram stop,
+   * Grande vitesse, Hall Gare centrale).  Yellow-ochre sandstone building (1907-1913), arched windows, mansard slate roofs, the clock tower with its
+   * green copper spire; the real LOD2 model (667 roof faces) gives the volumes. */
+  reg('Lëtzebuerg', {
+    wall: '#d8c093', trim: '#c4a876', plinth: { h: 1.3, col: '#8b7d62' }, band: '#c9ae7c', roof: 'slate', roofTint: '#7d8288',
+    steepRoof: { kind: 'slate', tint: '#585d63' }, copperAbove: 24, copperTint: '#5f9d8a',
+    floorH: 4.4, bayM: 4.2, stain: true,
+    win: { w: 1.5, h: 2.7, kind: 'arch', frame: '#efe9dc', reveal: '#bfa570', sill: true, groundKind: 'arch' },
+    gableWin: 'round',
+    doors: [],
+  });
 })();
