@@ -105,3 +105,23 @@ In the Luxembourg city section there are none on the main line.  The crossing pl
 * South (line 60 / 6e: Lëtzebuerg - Bettembuerg - Esch - Belval - Déifferdang - Péiteng - Rodange): the Minett, blast furnaces at Belval, Esch viaduct.
 * North (line 10: Lëtzebuerg - Walfer - Lëntgen - Miersch - Ettelbréck - Kautebaach - Wëlwerwolz - Clierf): Alzette valley, Pafendall viaduct, the tunnels in the Éislek.
 * Abroad (Metz, Brussels, Paris): lowest priority.
+
+
+## W2b (26 Oct 2026): real crossings, station patches, LOD2 station buildings
+
+* **Real level crossings** (`scripts/zuch/real_line_crossings.py`, called from `build_real_line.py emit`): for every crossing the layout keeps, the roads of the OSM way through the
+  `railway=level_crossing` node are followed outward on both sides (through OSM's way splits) to the first junction with another road, to 150 m lateral, or to the way's end, and written as
+  `crossings[].arms.{l,r}` = `{ c: highway class, end: junction|lat|open|len, p: [[a, l], ...] }` (a = game metres along the track from the crossing, l = real lateral metres) into
+  `mosel-features.json`.  The ribbon pieces of those roads are dropped from `roads` (no double road).  `crossing-roads.js` builds the crossing road on exactly that polyline (class -> width, `track` -> gravel,
+  corner cutting, cut at tunnels / viaducts / platforms, terrain cut and fill as before); a crossing without a usable arm (shorter than 38 m, game crossing more than 42 m away from the real one) falls back to
+  the Wave 1 synthetic road.  Crossing windows in `build_real_line.py` are now allowed closer to station blocks / bridges / each other (CROSS_* constants) and on gentle curves (the window is made straight when it
+  loses at most 3.5 degrees of heading).  Result: 11 crossings on `wittlich` (4 in station blocks come from the station patches).  Real list: 21 (15 between stations, 6 in station blocks).
+* **Station patches for every Luxembourg stop of the line** (`build_station_patch.py`, one command each, 15-35 s): Cents-Hamm, Sandweiler-Contern, Oetrange, Betzder, Wecker, Manternach, Mertert, Wasserbëlleg, Roodt-Syr,
+  and Lëtzebuerg (heading hint 20 degrees: the platforms run NNE).  `station-surround.js` places the patches with the BASE track's frames (a reversed service now shows the same real station).
+* **Real station buildings from LOD2** (`station-building.js`, styles in `stations-styles-lu.js`): the LOD2 faces of the building flagged `station: 1` are painted per wall face (plaster, plinth, floor bands, windows by bay,
+  doors from the photos, round gable windows, green copper above `copperAbove`) with a roof material per slope; other buildings of the station area by OSM id (`others`: goods shed, toilet hut, canopies). The station models
+  (`stations-lu-d.js`) only add furniture / canopies / boards.  Tools: `scripts/zuch/fetch_refs.py` (Commons photos into ~/Library/Caches/zuch-refs, outside the repo), `contact.py`, `patch_info.py`,
+  `station_montage.mjs <views.json>` (photo | sim from the same viewpoint, views in the patch frame, files `scripts/zuch/views/*.json`).
+* **Shared-tail hills**: the generic hill noise is taken in the frame of the tail anchor (Tréier Hafestrooss platform start) on the shared tail, blended in over 700 m: `wittlich` and `trier` now have identical ground
+  there (`scripts/zuch/tail_hills_probe.mjs`: max difference 0.00 m).
+* Ribbons: road ribbons are sampled every 3 m (were 8 m); the river under a river bridge of a real line is narrower (0.62 x) and meanders.
