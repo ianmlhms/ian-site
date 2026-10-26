@@ -87,7 +87,10 @@
     const pal = PALETTES[mode];
     const root = document.documentElement;
     for (const k in pal) root.style.setProperty(k, pal[k]);
-    const accent = t.accent || (mode === "light" ? "#2563eb" : "#6ea8fe");
+    // During Halloween the seasonal orange is the DEFAULT accent, but a user's
+    // own explicit choice (t.accent) always wins — see season.js.
+    const seasonAccent = window.SEASON && window.SEASON.defaultAccent(mode);
+    const accent = t.accent || seasonAccent || (mode === "light" ? "#2563eb" : "#6ea8fe");
     root.style.setProperty("--accent", accent);
     root.style.setProperty("color-scheme", mode);
     document.documentElement.dataset.theme = mode;
@@ -126,6 +129,9 @@
   injectStylesheet(MOBILE_CSS_URL);
   apply(get()); // apply ASAP (before paint where possible)
   document.documentElement.classList.toggle("auth-in", storedSignIn());
+  // The Halloween toggle in the picker flips this live, with no reload: redo
+  // the accent-default pick (the only thing season state affects here).
+  document.addEventListener("season:change", () => apply(get()));
 
   // ---- cross-device theme sync (#19) ----
   // localStorage stays the instant source (no flash on load); when signed in we
@@ -224,6 +230,11 @@
     const pop = document.createElement("div");
     pop.id = "themePop";
     const t = get();
+    const seasonRow = window.SEASON ? `<h4 data-i18n="halloween.sectionTitle">🎃 Halloween-Look</h4>
+      <div class="th-modes th-season">
+        <button type="button" data-season-toggle="on" data-i18n="halloween.on">On</button>
+        <button type="button" data-season-toggle="off" data-i18n="halloween.off">Off</button>
+      </div>` : "";
     pop.innerHTML = `<h4>Appearance</h4>
       <div class="th-modes">
         <button data-mode="dark">🌙 Dark</button>
@@ -233,7 +244,9 @@
       <div class="th-acc">
         ${ACCENTS.map(c=>`<button type="button" class="th-sw" data-acc="${esc(c)}" style="background:${esc(c)}" aria-label="Accent ${esc(c)}"></button>`).join("")}
         <input type="color" class="th-custom" title="Custom colour" aria-label="Custom accent colour" value="${esc(t.accent||'#6ea8fe')}">
-      </div>`;
+      </div>
+      ${seasonRow}`;
+    window.I18N && window.I18N.apply(pop);
     const languageHost = document.querySelector("#langSw,[data-langsw]");
     if (languageHost) {
       fab.classList.add("theme-inline");
@@ -245,8 +258,12 @@
 
     function sync() {
       const cur = get();
-      pop.querySelectorAll(".th-modes button").forEach(b=>b.classList.toggle("on",(cur.mode||"dark")===b.dataset.mode));
+      pop.querySelectorAll(".th-modes button[data-mode]").forEach(b=>b.classList.toggle("on",(cur.mode||"dark")===b.dataset.mode));
       pop.querySelectorAll(".th-sw").forEach(s=>s.classList.toggle("on", cur.accent===s.dataset.acc));
+      if (window.SEASON) {
+        const effective = window.SEASON.getToggle() || (window.SEASON.isWithinWindow() ? "on" : "off");
+        pop.querySelectorAll("[data-season-toggle]").forEach(b=>b.classList.toggle("on", b.dataset.seasonToggle === effective));
+      }
     }
     fab.onclick = () => {
       const opening = !pop.classList.contains("open");
@@ -260,9 +277,10 @@
       }
       sync();
     };
-    pop.querySelectorAll(".th-modes button").forEach(b=> b.onclick=()=>{ save({ ...get(), mode: b.dataset.mode }); sync(); });
+    pop.querySelectorAll(".th-modes button[data-mode]").forEach(b=> b.onclick=()=>{ save({ ...get(), mode: b.dataset.mode }); sync(); });
     pop.querySelectorAll(".th-sw").forEach(s=> s.onclick=()=>{ save({ ...get(), accent: s.dataset.acc }); sync(); });
     pop.querySelector(".th-custom").oninput = (e)=>{ save({ ...get(), accent: e.target.value }); sync(); };
+    pop.querySelectorAll("[data-season-toggle]").forEach(b=> b.onclick=()=>{ window.SEASON && window.SEASON.setToggle(b.dataset.seasonToggle === "on"); sync(); });
     document.addEventListener("click",(e)=>{ if(!pop.contains(e.target) && e.target!==fab) pop.classList.remove("open"); });
   }
   // ---- home-screen (standalone) refresh button ----

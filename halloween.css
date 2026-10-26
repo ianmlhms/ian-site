@@ -1,0 +1,143 @@
+/* halloween.css — seasonal decoration layer, scoped entirely under
+ * html[data-season="halloween"] (set by season.js). Always loaded on every
+ * page season.js runs on, so the picker's toggle works instantly without a
+ * reload — every rule here that should only show up "in season" is inert
+ * until that attribute is present.
+ *
+ * Reused next year: nothing here is date-specific (the dates live in
+ * season.js). A different look would mean editing the gradients/SVGs below,
+ * not the attribute plumbing. */
+
+/* ---- decorations: hidden by default, shown only in season ---- */
+.hw-deco, .hw-hero-fx { display: none; }
+html[data-season="halloween"] .hw-deco,
+html[data-season="halloween"] .hw-hero-fx { display: block; }
+
+.hw-anchor { position: relative; }
+.hw-isolate { isolation: isolate; }
+
+.hw-deco {
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  opacity: .85;
+  color: var(--muted);
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .18));
+}
+.hw-deco--corner-tl { top: -10px; left: -6px; }
+.hw-deco--corner-tr { top: -10px; right: -6px; }
+.hw-deco--corner-br { bottom: -6px; right: 10px; }
+
+.hw-deco--cobweb { width: 46px; height: 46px; }
+.hw-deco--pumpkin { width: 40px; }
+.hw-deco--pumpkin.hw-deco--mini { width: 34px; }
+
+.hw-pumpkin-art, .hw-cobweb-art, .hw-bat-art, .hw-leaf-art {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* ---- the home-page Easter egg: clicking the footer pumpkin ---- */
+.hw-deco--interactive { pointer-events: auto; cursor: pointer; }
+.hw-deco--interactive:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.hw-deco--active { z-index: 5; } /* only while the laugh bubble is showing — briefly allowed above nearby text */
+
+.hw-pumpkin-laugh {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 6px;
+  padding: 4px 10px;
+  border-radius: 10px;
+  background: var(--glass-solid);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .25);
+}
+
+@keyframes hw-flicker {
+  0%, 100% { filter: brightness(1) drop-shadow(0 2px 6px rgba(0, 0, 0, .18)); }
+  20% { filter: brightness(1.5) drop-shadow(0 2px 6px rgba(0, 0, 0, .18)); }
+  35% { filter: brightness(.7) drop-shadow(0 2px 6px rgba(0, 0, 0, .18)); }
+  55% { filter: brightness(1.4) drop-shadow(0 2px 6px rgba(0, 0, 0, .18)); }
+  70% { filter: brightness(.85) drop-shadow(0 2px 6px rgba(0, 0, 0, .18)); }
+}
+.hw-pumpkin-art--flicker { animation: hw-flicker 1.5s ease-in-out; }
+
+/* ---- hero: drifting bats + falling leaves, confined to the hero box ---- */
+.hw-hero-fx {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: -1;
+  pointer-events: none;
+}
+.hw-bat, .hw-leaf {
+  position: absolute;
+  top: 12%;
+  left: -8%;
+  width: 34px;
+  opacity: 0;
+  color: #241f2c;
+}
+.hw-leaf { width: 20px; color: #d9661c; }
+html[data-theme="light"] .hw-bat { color: #2c2638; }
+
+.hw-bat--a { animation: hw-bat-drift 42s linear infinite; }
+.hw-bat--b { top: 30%; animation: hw-bat-drift 54s linear infinite; animation-delay: 9s; }
+.hw-leaf--a { top: -6%; left: 22%; animation: hw-leaf-fall 26s linear infinite; animation-delay: 4s; }
+.hw-leaf--b { top: -6%; left: 68%; animation: hw-leaf-fall 31s linear infinite; animation-delay: 15s; }
+
+@keyframes hw-bat-drift {
+  0%, 68% { opacity: 0; transform: translate(0, 0); }
+  72% { opacity: .85; }
+  88% { opacity: .85; transform: translate(72vw, -9vh); }
+  94% { opacity: 0; }
+  100% { opacity: 0; transform: translate(78vw, -10vh); }
+}
+@keyframes hw-leaf-fall {
+  0%, 55% { opacity: 0; transform: translate(0, 0) rotate(0deg); }
+  60% { opacity: .7; }
+  92% { opacity: .7; transform: translate(4vw, 22vh) rotate(200deg); }
+  100% { opacity: 0; transform: translate(5vw, 24vh) rotate(210deg); }
+}
+
+/* ---- warm seasonal backdrop: orange-to-deep-purple (dark), pumpkin-and-cream (light) ---- */
+html[data-season="halloween"] body {
+  background:
+    radial-gradient(1100px 620px at 85% -12%, rgba(255, 138, 61, .16), transparent 60%),
+    radial-gradient(900px 760px at -12% 112%, rgba(120, 58, 168, .18), transparent 65%),
+    var(--bg);
+}
+html[data-season="halloween"][data-theme="light"] body {
+  background:
+    radial-gradient(1100px 620px at 85% -12%, rgba(255, 170, 92, .16), transparent 60%),
+    radial-gradient(900px 760px at -12% 112%, rgba(255, 214, 168, .55), transparent 70%),
+    var(--bg);
+}
+
+/* ---- phone: smaller decorations, same corners, nothing overlapping ---- */
+@media (max-width: 480px) {
+  .hw-deco--cobweb { width: 34px; height: 34px; }
+  .hw-deco--pumpkin { width: 28px; }
+  .hw-deco--pumpkin.hw-deco--mini { width: 24px; }
+  .hw-bat { width: 26px; }
+  .hw-leaf { width: 16px; }
+}
+
+/* ---- respect the user's settings over the theme ---- */
+@media (prefers-reduced-motion: reduce) {
+  .hw-bat, .hw-leaf { display: none !important; }
+  .hw-pumpkin-art--flicker { animation: none !important; }
+}
+@media (prefers-contrast: more) {
+  .hw-deco, .hw-hero-fx { display: none !important; }
+  html[data-season="halloween"] body { background: var(--bg) !important; }
+}

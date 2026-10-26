@@ -613,4 +613,10 @@ window.I18N_DICT = {
   "nav.leaderboard": { lb: "Ranglëscht", de: "Rangliste", en: "Leaderboard" },
   "tile.leaderboard": { lb: "Ranglëscht", de: "Rangliste", en: "Leaderboard" },
   "tile.leaderboard.sub": { lb: "Siegen & Gewënnquote", de: "Siege & Gewinnquote", en: "Wins & win rate" },
+
+  // Seasonal look toggle in the theme picker (season.js / theme.js). Separate
+  // from the unrelated "arc.halloween*" arcade event strings above.
+  "halloween.sectionTitle": { lb: "🎃 Halloween-Look", de: "🎃 Halloween-Look", en: "🎃 Halloween look" },
+  "halloween.on": { lb: "Un", de: "An", en: "On" },
+  "halloween.off": { lb: "Aus", de: "Aus", en: "Off" },
 };
