@@ -1,7 +1,8 @@
 # Halloween look — implementation notes
 
 Branch: `halloween-cloud` (pushed to `origin/halloween-cloud` only; `main` was never touched).
-Final commit: **`aaff1dc0b1977165232eff1d2e012bd9e399b807`**
+Final commit (v2): **`c2094758`** — v1's final commit was `aaff1dc0b1977165232eff1d2e012bd9e399b807`;
+see the "v2" section near the bottom for what changed and why.
 
 ## What was built, and where the hook lives
 
