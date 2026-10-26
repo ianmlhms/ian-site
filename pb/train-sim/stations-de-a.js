@@ -95,14 +95,15 @@
     if (!fr) return;
     if (fr.track !== undefined) k.track(sx * fr.track, -135, 135, { pole: true });
     k.platformBox(sx * fr.edge, fr.width, -1, fr.z0, fr.z1);
-    const sh = fr.shelterX !== undefined ? fr.shelterX : fr.edge + 1.7;
+    const out = (d) => fr.edge - sx * d;                  // patch x of a point d metres behind the far platform edge (away from the tracks)
+    const sh = fr.shelterX !== undefined ? fr.shelterX : out(1.7);
     (fr.shelters || []).forEach((z) => f.glassShelter(toward(sh), z, 3.8, 1.7, MODERN.frame, MODERN.roof));
-    (fr.steles || []).forEach((z) => dbStele(api, f, toward(fr.edge + fr.width - 0.7), z));
-    (fr.masts || []).forEach((z) => dbMast(f, toward(fr.edge + fr.width - 0.4), z));
-    (fr.bench || []).forEach((z) => f.bench(toward(fr.edge + fr.width - 0.7), z, '#4a4f55'));
-    (fr.bin || []).forEach((z) => f.bin(toward(fr.edge + fr.width - 0.6), z, '#3b4046'));
-    if (fr.sign) f.sign(toward(fr.edge + 0.9), fr.signZ || 0, fr.sign, 'blue');
-    if (fr.name) dbNameBoard(api, f, toward(fr.edge + 1.0), fr.nameZ || 0, fr.name);
+    (fr.steles || []).forEach((z) => dbStele(api, f, toward(out(fr.width - 0.7)), z));
+    (fr.masts || []).forEach((z) => dbMast(f, toward(out(fr.width - 0.4)), z));
+    (fr.bench || []).forEach((z) => f.bench(toward(out(fr.width - 0.7)), z, '#4a4f55'));
+    (fr.bin || []).forEach((z) => f.bin(toward(out(fr.width - 0.6)), z, '#3b4046'));
+    if (fr.sign) f.sign(toward(out(0.9)), fr.signZ || 0, fr.sign, 'blue');
+    if (fr.name) dbNameBoard(api, f, toward(out(1.0)), fr.nameZ || 0, fr.name);
     if (cfg.wall) k.vc.box(k.X(sx * cfg.wall[0]), H + 0.5, cfg.wall[1], cfg.wall[2], 1.0, 0.5, col('#9c9e9b'));
   }
 
@@ -136,6 +137,23 @@
         near: { shelters: [60], steles: [36, 150], masts: [34, 74, 114, 154], bench: [90], bin: [44], sign: '1', signZ: 100 },
         far: { track: 4.0, edge: 5.3, width: 3.0, z0: -191, z1: -20, shelters: [-36], steles: [-58], masts: [-44, -84, -124, -164], bench: [-100], sign: '2', signZ: -26, name: 'Euren', nameZ: -90 },
         wall: [6.8, -20.4, 3.0],
+      });
+    },
+  });
+
+  /* ================================================================ TRÉIER WEST (new stop since 2025, next to the old Empfangsgebäude)
+   * Refs: ~/Library/Caches/zuch-refs/Trier-West (Commons: "Trier-West station, Germany, on 5 April 2025", "Trier, Baustelle des Bahnhaltepunkts Trier West 20241109", Trier-West am ehemaligen Bahnhof 2015,
+   * Blick zum ehemaligen Bahnhof 2021, Trier-westbahnhof, Bhf-Trier-West; old b/w photos ignored).  Three tracks (game track x 0 at the RIGHT platform, the through track x -5.5, the left platform track
+   * x -9.8) between two long side platforms of pale concrete (patch x 1.4 .. 4.2 and x -14.2 .. -11.4, z -85 .. 85) with ramps / steps at z ~17 and short glass shelters at z 15 / 32; the old two-block station
+   * building (patch x 8 .. 22, z -62 .. -22, LoD2 + style) stands behind the right platform. */
+  reg('Tréier West', {
+    canopy: false,
+    furniture: false,
+    build(api) {
+      simpleStop(api, {
+        near: { shelters: [15, 32], steles: [-8, 52], masts: [-60, -25, 10, 45, 80], bench: [-40], bin: [-15] },
+        tracks: [-5.5],
+        far: { track: -9.8, edge: -11.4, width: 2.8, z0: -85, z1: 85, shelters: [15, 32], shelterX: -12.6, steles: [-8, 52], masts: [-60, -25, 10, 45, 80], bench: [-40], name: 'Trier West', nameZ: -35 },
       });
     },
   });

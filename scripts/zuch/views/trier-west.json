@@ -1,0 +1,97 @@
+{
+ "route": "wittlich",
+ "station": "Tréier West",
+ "refs": "Trier-West",
+ "views": [
+  {
+   "photo": "Trier-West, am ehemaligen Bahnhof 20150111.jpg",
+   "pos": [
+    2.5,
+    -10,
+    1.7
+   ],
+   "look": [
+    10,
+    -50,
+    4.5
+   ],
+   "fov": 62,
+   "note": "platform along the building"
+  },
+  {
+   "photo": "Trier, Blick zum ehemaligen Bahnhof Trier West 20210701.jpg",
+   "pos": [
+    -14,
+    12,
+    3.0
+   ],
+   "look": [
+    14,
+    -40,
+    6
+   ],
+   "fov": 58,
+   "note": "across the tracks"
+  },
+  {
+   "photo": "Trier-westbahnhof.jpg",
+   "pos": [
+    -8,
+    45,
+    7
+   ],
+   "look": [
+    15,
+    -45,
+    6
+   ],
+   "fov": 62,
+   "note": "from a bridge"
+  },
+  {
+   "photo": "Bhf-Trier-West.jpg",
+   "pos": [
+    38,
+    -78,
+    1.7
+   ],
+   "look": [
+    15,
+    -42,
+    5
+   ],
+   "fov": 56,
+   "note": "forecourt side"
+  },
+  {
+   "photo": "Trier-West station, Germany, on 5 April 2025.jpg",
+   "pos": [
+    -3,
+    -90,
+    9
+   ],
+   "look": [
+    6,
+    0,
+    3
+   ],
+   "fov": 62,
+   "note": "new platforms from the bridge"
+  },
+  {
+   "photo": "Trier, Baustelle des Bahnhaltepunkts Trier West 20241109.jpg",
+   "pos": [
+    -3,
+    90,
+    9
+   ],
+   "look": [
+    4,
+    -60,
+    1
+   ],
+   "fov": 62,
+   "note": "construction 2024"
+  }
+ ]
+}

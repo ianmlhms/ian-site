@@ -26,4 +26,13 @@
       api.box(-27.0, 12.8, -100.2, 0.8, 2.0, 0.8, '#6b4638');
     },
   });
+  /* TRÉIER WEST.  Refs: Commons "Trier-West, am ehemaligen Bahnhof 20150111", "Trier, Blick zum ehemaligen Bahnhof Trier West 20210701", "Trier-westbahnhof", "Bhf-Trier-West", "Trier-West station
+   * 5 April 2025" (new platforms).  The former Empfangsgebäude (1920s, now private) behind the right platform: two joined hipped blocks, warm cream plaster, tall white-framed windows, high
+   * dark basalt plinth, steep blue-black slate roofs with pointed dormers; the low annex at the Luxembourg end has the same plaster. */
+  const WEST_BLD = { wall: '#f2ebcf', trim: '#f4f0e2', plinth: { h: 1.2, col: '#505256' }, band: null, roof: 'slate', roofTint: '#8c939e', floorH: 3.6, bayM: 2.7, stain: true,
+    win: { w: 1.05, h: 2.0, kind: 'rect', frame: '#f6f3ea', reveal: '#dcd3b4', sill: true } };
+  reg('Tréier West', Object.assign({}, WEST_BLD, {
+    otherBase: { stain: true },
+    others: { w137389334: Object.assign({}, WEST_BLD, { floorH: 3.4 }) },
+  }));
 })();
