@@ -1,5 +1,5 @@
 import { blockText, validateDocument, wordCount } from "./doc-schema.js?v=1";
-import { deleteBlock, duplicateBlock, editBlockText, insertBlock, moveBlock, retypeBlock } from "./doc-ops.js?v=1";
+import { deleteBlock, duplicateBlock, editBlockText, insertBlock, moveBlock, retypeBlock } from "./doc-ops.js?v=2";
 import { draggable, FLICK_BOUNCE, prefersReducedMotion, project, rubberband, spring } from "./ppt-motion.js?v=3";
 
 const TYPE_LABELS = Object.freeze({ heading: "Iwwerschrëft", paragraph: "Paragraf", bullets: "Punkten",
