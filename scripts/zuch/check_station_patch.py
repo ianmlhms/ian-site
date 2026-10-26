@@ -134,7 +134,11 @@ def main():
             if dem.min() < -40 or dem.max() > 60:
                 err("DEM outside -40..+60 m: %.1f .. %.1f" % (dem.min(), dem.max()))
             xs = -160 + 2 * np.arange(nx)
-            cor = dem[:, np.abs(xs) <= 4]
+            zs_ = -320 + 2 * np.arange(nz)
+            keep_rows = np.ones(nz, bool)
+            for z0_, z1_ in d.get("deckZ", []):                                   # rows under a bridge / tunnel of the main track keep the real ground
+                keep_rows &= ~((zs_ >= z0_ - 4) & (zs_ <= z1_ + 4))
+            cor = dem[keep_rows][:, np.abs(xs) <= 4]
             ty = d.get("trackY")
             if ty and max(abs(p[1]) for p in ty) > 0.5:
                 warn("track gradient kept in the heights (trackY range %.2f m)" % (max(p[1] for p in ty) - min(p[1] for p in ty)))

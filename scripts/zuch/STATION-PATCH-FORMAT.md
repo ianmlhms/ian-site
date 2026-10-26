@@ -83,3 +83,7 @@ it on every run (never overwrites other entries).
   where OSM has no tag.  Buildings without LoD2 face (new buildings) are emitted from the OSM footprint as in Luxembourg.
 * The patch gets a top level `"credit"` string (data licence dl-de/by-2-0); `station-surround.js` appends the credits of all patches on the route to its credit line.
 * `scripts/zuch/build_de_patches.py` runs all stops of the RB 83 (and Kreuz Konz / Trier Sued / Trier Hbf as stage 2).
+* `--country de` extras: `"deckZ": [[z0, z1], ...]` (optional) = z ranges where the main track is on a bridge or in a tunnel (OSM `bridge=*` / `tunnel=*` on the chain): the
+  track profile is interpolated across them and the +-5 m corridor is NOT flattened there (the valley stays open under the game's bridge); `"extrudeFaceless": true` tells the
+  renderer to extrude buildings with `roofs: []` / `walls: []` from ground ring + `h` + `roof` (gable / hip on rectangular footprints, else flat).  `--max-kb` (default 700 for de)
+  strips the LOD2 faces of the farthest buildings so the json stays small.  `--side left|right` picks the (platform, main track) pair on the side declared in real-mosel.js.

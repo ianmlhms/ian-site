@@ -993,6 +993,21 @@ def build(args):
     dem_abs = acc / 16.0
     corr = np.abs(X) <= FLAT_HALF
     row_med = np.median(dem_abs[:, corr], axis=1)
+    deck = np.zeros(len(Z), bool)
+    if COUNTRY == "de":
+        # bridges / tunnels / underpasses of the main track: the DTM below them is the valley (or the hill above), not the track.  The track profile is interpolated across
+        # them from both ends and the corridor is not flattened there (the valley stays open under the game's own bridge).
+        for f in cand:
+            t_ = f["t"]
+            if f["id"] in chain_ids and (t_.get("bridge") not in (None, "", "no") or t_.get("tunnel") not in (None, "", "no")):
+                cu = frame.forward(*np.asarray(f["g"].coords)[:, :2].T)[0]
+                zlo, zhi = -(cu.max() - u0) - 6.0, -(cu.min() - u0) + 6.0
+                deck |= (Z >= zlo) & (Z <= zhi)
+        if deck.any() and (~deck).sum() > 20:
+            row_med = np.where(deck, np.interp(Z, Z[~deck], row_med[~deck]), row_med)
+            log("main track bridges / tunnels: %d of %d rows (%.0f m) take the interpolated track profile" % (deck.sum(), len(Z), deck.sum() * DEM_RES))
+    if COUNTRY == "de":
+        row_med = ndi.grey_closing(row_med, size=31, mode="nearest")             # untagged short underpasses / culverts under the track: fill dips narrower than 62 m
     row_med = ndi.median_filter(row_med, size=9, mode="nearest")
     row_med = ndi.gaussian_filter1d(row_med, 2.0, mode="nearest")
     y0 = float(np.median(row_med[np.abs(Z) <= 60]))
@@ -1006,7 +1021,11 @@ def build(args):
     # flatten the corridor: cross-section equals the track level
     trk = row_med - (y0 + prof)                                       # 0 (grade removed) or the real profile
     w = 1.0 - smoothstep(FLAT_HALF, FLAT_HALF + 4.0, np.abs(X))
-    dem = dem * (1 - w[None, :]) + trk[:, None] * w[None, :]
+    if deck.any():
+        wd = deck.astype(float)                                               # rows under a bridge / tunnel keep the real ground in the corridor
+        dem = dem * (1 - w[None, :] * (1 - wd[:, None])) + trk[:, None] * w[None, :] * (1 - wd[:, None])
+    else:
+        dem = dem * (1 - w[None, :]) + trk[:, None] * w[None, :]
     dem = np.clip(dem, -40, 60)
     dem_q = np.round(dem * 10).astype("<i2")
     log("DEM relative range %.1f .. %.1f m" % (dem.min(), dem.max()))
@@ -1557,6 +1576,18 @@ def build(args):
         "poi": [{"t": p["t"], "x": r2(p["x"]), "z": r2(p["z"]), "y": r2(p["y"])} for p in poi],
         "trackY": track_y,
     }
+    if deck.any():
+        runs, i = [], 0
+        while i < len(Z):
+            if deck[i]:
+                j = i
+                while j + 1 < len(Z) and deck[j + 1]:
+                    j += 1
+                runs.append([r2(Z[i]), r2(Z[j])])
+                i = j + 1
+            else:
+                i += 1
+        patch["deckZ"] = runs                       # z ranges where the main track is on a bridge / in a tunnel: the corridor keeps the real ground there (not flattened)
     if CREDIT:
         patch["credit"] = CREDIT
         patch["extrudeFaceless"] = True            # the renderer extrudes buildings without LOD2 faces from ground ring + h + roof type
