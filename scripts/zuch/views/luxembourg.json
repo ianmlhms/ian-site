@@ -1,11 +1,97 @@
 {
-  "route": "wittlich", "station": "Lëtzebuerg", "refs": "Lux-Gare",
-  "views": [
-    { "photo": "Luxembourg City railway station 2022-12 ---1.jpg", "pos": [-66, 60, 2.2], "look": [-42, -24, 20], "fov": 58, "note": "forecourt: tower and tram stop" },
-    { "photo": "Luxembourg City railway station 2022-12 ---2.jpg", "pos": [-64, 22, 2.0], "look": [-42, -24, 22], "fov": 50, "note": "tower close" },
-    { "photo": "Luxembourg, Gare centrale tram stop (104).jpg", "pos": [-68, 95, 2.2], "look": [-58, -25, 3], "fov": 62, "note": "tram stop and building" },
-    { "photo": "Luxembourg, place de la Gare 11-2020 (101).jpg", "pos": [-72, 75, 2.2], "look": [-44, -24, 20], "fov": 56, "note": "place de la Gare" },
-    { "photo": "CFL Class 2000 CFL 2007 in Gare Centrale, Luxembourg.jpg", "pos": [11.5, 70, 1.8], "look": [13, -60, 4], "fov": 62, "note": "island platform and canopy" },
-    { "photo": "Luxembourg, Gare centrale - Grande vitesse (101).jpg", "pos": [-1.0, 50, 1.8], "look": [-6, -60, 3.5], "fov": 62, "note": "platform 1 along the building" }
-  ]
+ "route": "wittlich",
+ "station": "Lëtzebuerg",
+ "refs": "Lux-Gare",
+ "views": [
+  {
+   "photo": "Luxembourg City railway station 2022-12 ---1.jpg",
+   "pos": [
+    -86,
+    70,
+    2.2
+   ],
+   "look": [
+    -44,
+    -24,
+    18
+   ],
+   "fov": 55,
+   "note": "forecourt: tower and tram stop"
+  },
+  {
+   "photo": "Luxembourg City railway station 2022-12 ---2.jpg",
+   "pos": [
+    -84,
+    28,
+    2.0
+   ],
+   "look": [
+    -44,
+    -24,
+    22
+   ],
+   "fov": 46,
+   "note": "tower close"
+  },
+  {
+   "photo": "Luxembourg, Gare centrale tram stop (104).jpg",
+   "pos": [
+    -69,
+    110,
+    2.2
+   ],
+   "look": [
+    -62,
+    -30,
+    3
+   ],
+   "fov": 60,
+   "note": "tram stop"
+  },
+  {
+   "photo": "Luxembourg, place de la Gare 11-2020 (101).jpg",
+   "pos": [
+    -72,
+    150,
+    2.2
+   ],
+   "look": [
+    -50,
+    -30,
+    14
+   ],
+   "fov": 55,
+   "note": "place de la Gare"
+  },
+  {
+   "photo": "CFL Class 2000 CFL 2007 in Gare Centrale, Luxembourg.jpg",
+   "pos": [
+    11.5,
+    70,
+    1.8
+   ],
+   "look": [
+    13,
+    -60,
+    4
+   ],
+   "fov": 62,
+   "note": "island platform and canopy"
+  },
+  {
+   "photo": "Luxembourg, Gare centrale - Grande vitesse (101).jpg",
+   "pos": [
+    -1.0,
+    50,
+    1.8
+   ],
+   "look": [
+    -6,
+    -60,
+    3.5
+   ],
+   "fov": 62,
+   "note": "platform 1 along the building"
+  }
+ ]
 }

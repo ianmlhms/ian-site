@@ -91,7 +91,7 @@
    * green copper spire; the real LOD2 model (667 roof faces) gives the volumes. */
   const CANOPY_IDS = ['w362239328', 'w1312992341', 'ACT_4e24b351-eab5-4dc2-b87f-8f4802b32639'];   // not the Rotondes (w52094232 / 33), not the office tower w1289589204
   reg('Lëtzebuerg', {
-    wall: '#d8c093', trim: '#c4a876', plinth: { h: 1.3, col: '#8b7d62' }, band: '#c9ae7c', roof: 'slate', roofTint: '#7d8288',
+    wall: '#c9b891', trim: '#b4a07a', plinth: { h: 1.3, col: '#7d7360' }, band: '#bba682', roof: 'slate', roofTint: '#7d8288',
     steepRoof: { kind: 'slate', tint: '#585d63' }, copperAbove: 28, copperTint: '#5f9d8a',
     floorH: 4.4, bayM: 4.2, stain: true,
     win: { w: 1.25, h: 2.3, kind: 'rect', frame: '#efe9dc', reveal: '#b99d68', sill: true },

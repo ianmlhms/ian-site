@@ -56,7 +56,7 @@
     /* ---- benches (steel, perforated) on the platforms, facing the tracks on both sides of the platform centre line */
     {
       const mb = new MB();
-      const STEEL = [0.5, 0.53, 0.56]; const LEG = [0.25, 0.27, 0.3];
+      const STEEL = [0.25, 0.27, 0.3]; const LEG = [0.1, 0.11, 0.12];
       railPlatforms.forEach((p) => {
         const xs = p.ring.map((q) => q[0]); const zs = p.ring.map((q) => q[1]);
         const xc = (Math.min(...xs) + Math.max(...xs)) / 2 + 1.3;
@@ -76,7 +76,7 @@
     /* ---- the Luxtram at its stop and buses at the bus stops */
     {
       const mb = new MB();
-      const SILVER = [0.8, 0.82, 0.85]; const DARK = [0.1, 0.13, 0.17]; const GREY = [0.35, 0.37, 0.4]; const RED = [0.72, 0.1, 0.1]; const WHITE = [0.93, 0.93, 0.92]; const GREEN = [0.55, 0.78, 0.1];
+      const SILVER = [0.42, 0.44, 0.47]; const DARK = [0.02, 0.03, 0.04]; const GREY = [0.16, 0.17, 0.19]; const RED = [0.45, 0.04, 0.04]; const WHITE = [0.7, 0.7, 0.69]; const GREEN = [0.25, 0.5, 0.04];
       const yawAt = (x, z) => { const a = world(x, z); const b = world(x, z - 1); return Math.atan2(-(b.x - a.x), -(b.z - a.z)); };
       /* a vehicle along the track direction: parts = [dz offset, length, width, y0, y1, colour] */
       const vehicle = (x, z, yaw, parts, gy) => parts.forEach(([dz, len, wd, y0, y1, col, dx]) => {

@@ -303,10 +303,10 @@
       (data.rails || []).forEach((r) => {
         if (r.kind !== 'tram' || !r.pts || r.pts.length < 2) return;
         const rows = rowsOf(r.pts, 0).map((q) => Object.assign({}, q, { y: track.terrainHeightAt(q.x, q.z) + 0.17 }));
-        const BED = [0.3, 0.31, 0.33];
+        const BED = [0.07, 0.075, 0.085];
         ribbon(bed, rows, TRAM_BED_HALF, -TRAM_BED_HALF, 0.0, 0.0, BED, BED, 0, 1, 1);
         [-GAUGE_HALF, GAUGE_HALF].forEach((sd) => {
-          ribbon(rails, rows, sd + 0.05, sd - 0.05, 0.03, 0.03, [0.62, 0.62, 0.6], [0.62, 0.62, 0.6], 0, 0, 1);
+          ribbon(rails, rows, sd + 0.05, sd - 0.05, 0.03, 0.03, [0.3, 0.3, 0.3], [0.3, 0.3, 0.3], 0, 0, 1);
         });
       });
       if (!bed.empty) add(new T.Mesh(bed.geometry(), mat(new T.MeshLambertMaterial({ vertexColors: true, side: T.DoubleSide, polygonOffset: true, polygonOffsetFactor: -5, polygonOffsetUnits: -10 }))));
