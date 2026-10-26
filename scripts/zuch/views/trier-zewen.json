@@ -1,0 +1,10 @@
+{
+  "route": "wittlich", "station": "Tréier-Zewen", "refs": "Trier-Zewen",
+  "views": [
+    { "photo": "DB AG Class 1440 EMU at Haltepunkt Trier-Zewen, Germany, 24 May 2025.jpg", "pos": [2, 6, 1.7], "look": [4, -80, 2.2], "fov": 62, "note": "from the crossing" },
+    { "photo": "Haltepunkt Trier-Zewen 2.jpg", "pos": [-8, 16, 1.7], "look": [4, -60, 2.2], "fov": 70, "note": "shop and crossing" },
+    { "photo": "Haltepunkt Trier-Zewen.jpg", "pos": [-5, 30, 1.7], "look": [3, -60, 2.2], "fov": 66, "note": "track view" },
+    { "photo": "SNCF 37020 on the Trierer Weststrecke at Trier-Zewen, Germany, 28 November 2024.jpg", "pos": [3, -140, 1.2], "look": [0, 60, 2.0], "fov": 60, "note": "line towards Trier" },
+    { "photo": "Bahnhof Zewen (Trier) Germany 2009.JPG", "pos": [2, 120, 1.7], "look": [0, -80, 3], "fov": 56, "note": "2009" }
+  ]
+}

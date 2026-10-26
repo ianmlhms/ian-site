@@ -72,4 +72,40 @@
       k.track(sx * IG.third, -135, 135, { pole: true });
     },
   });
+  /* ================================================================ TRÉIER-ZEWEN (reopened Dec 2024 on the Weststrecke)
+   * Refs: ~/Library/Caches/zuch-refs/Trier-Zewen (Commons: Haltepunkt Trier-Zewen / 2, "DB AG Class 1440 EMU at Haltepunkt Trier-Zewen" 24 May 2025, Trierer Weststrecke at Zewen 2024).  No
+   * station building.  Two tracks (game track x 0, second track x 4.0) cross the Hermeskeiler Strasse level crossing at z ~0; staggered low concrete platforms: Gleis 1 on the LEFT behind
+   * the crossing (patch x -4.0 .. -1.0, z 23 .. 193), Gleis 2 on the right beyond it (x 6.6 .. 9.9, z -193 .. -22) with a small dark glass shelter, a display case, a red/white "2" sign and
+   * grey LED masts; the crossing end of the platforms is closed by a concrete wall.  Beside the crossing: the shop at x -14 .. -5.5 (z -30 .. -11), a cream apartment block behind the far platform. */
+  const ZE = { far: { edge: 6.6, width: 3.3, z0: -193, z1: -22 }, track: 4.0 };
+  const MODERN = { frame: '#3b4249', roof: '#2f353b' };
+  reg('Tréier-Zewen', {
+    canopy: false,
+    furniture: false,
+    build(api) {
+      const { sx, H, W, edge, col } = api;
+      const k = makeKit(api);
+      const f = mirrorKit(api);
+      const lB = edge + W;
+      const toward = (x) => -x * sx;
+      // Gleis 1 (our platform, behind the crossing)
+      k.glassShelter(lB - 2.3, 62, 4.0, 1.9, MODERN.frame, MODERN.roof);
+      dbStele(api, k, lB - 0.7, 38);
+      dbStele(api, k, lB - 0.7, 150);
+      k.sign(edge + 0.9, 100, '1', 'blue');
+      [34, 74, 114, 154].forEach((z) => dbMast(k, lB - 0.4, z));
+      k.bench(lB - 0.7, 92, '#4a4f55');
+      k.bin(lB - 0.6, 45, '#3b4046');
+      // second track, Gleis 2 beyond the crossing with the dark glass shelter at its crossing end
+      k.track(sx * ZE.track, -135, 135, { pole: true });
+      k.platformBox(sx * ZE.far.edge, ZE.far.width, -1, ZE.far.z0, ZE.far.z1);
+      k.vc.box(k.X(sx * 8.2), H + 0.5, -22.4, 3.3, 1.0, 0.5, col('#9c9e9b'));
+      f.glassShelter(toward(8.3), -38, 3.6, 1.7, MODERN.frame, MODERN.roof);
+      f.sign(toward(7.4), -26, '2', 'blue');
+      dbNameBoard(api, f, toward(7.6), -90, 'Zewen');
+      dbStele(api, f, toward(9.2), -60);
+      [-45, -85, -125, -165].forEach((z) => dbMast(f, toward(9.4), z));
+      f.bench(toward(9.4), -100, '#4a4f55');
+    },
+  });
 })();
