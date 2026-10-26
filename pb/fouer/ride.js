@@ -124,7 +124,7 @@ export function createRide({ T, r, world, fair, game, scene, ui, audio, crowd = 
       await ensureLive(pitch);
       const f = getFx();
       f.show(T_(`item.${id}`), def.icon);
-      const env = { T, ud, group: model(pitch), def, id, fx: f, snd, audio, calm, walk: w, r, world, fair, game, T_, pitch, getFairTime, hint: T_("ride.hint"), holdHint: T_("ride.holdHint") };
+      const env = { T, ud, group: model(pitch), def, id, fx: f, snd, audio, calm, walk: w, r, world, fair, crowd, game, T_, pitch, getFairTime, hint: T_("ride.hint"), holdHint: T_("ride.holdHint") };
       try {
         st.rig = def.kind === "seat" ? createSeatRig(env) : def.kind === "ghost" ? createGhostRig(env) : def.kind === "drive" ? createDriveRig(env) : createTrackRig(env);
         st.rig.start();

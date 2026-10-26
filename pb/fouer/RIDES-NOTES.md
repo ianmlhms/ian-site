@@ -51,11 +51,21 @@ Ian: "In the Riserad, you are not in a cabin but outside." Cause: not a wrong fr
 - Flow (`fouer_walk.mjs`, the wheel section): every frame of the ride the camera is inside the gondola's `box`, on the anchor's eye (< 1 mm), the shell on the anchor, seated eye height 1.1 - 1.3 m, centred, between the two rims (|z| < 0.6 where the rim starts at 0.9) and > 0.6 m from the nearest rim / spoke vertex; look limits; near plane restored; shell removed. `fouer_walk_a.mjs` checks the builder start too.
 
 ### Geeschterbunn
-The castle of the model is a solid hall (the carts vanish at painted doors), so the ride brings its own interior while it runs (added to the model group, removed afterwards; textures and geometry disposed):
-- **Look**: four airbrushed horror murals painted on canvas (graveyard with moon and bats, a vampire with red eyes and fangs, flames with a skull, a moon castle), each one mesh on the back wall and the side walls; additive coloured spotlight cones (red, green, violet, blue, orange) from the ceiling; a floor haze of soft additive points; red emergency lamps with glow; cobwebs (alpha texture) in the corners and across the track at the scares; UV tubes, glowing eyes, chains, skull-free dark shell, a floor.
-- **Track**: a 92 m path of its own: ramp -> arch -> interior circuit -> climb -> balcony in daylight -> back in through the second upper door -> down to the gate, 44 s. Four pairs of heavy doors bang open when you come and shut with a bang; at the doorways the screen blinks black (the camera passes the solid facade there). A cart nose with a lap bar is drawn in front of the camera.
-- **Scares** (ten): a pop-up skeleton (skull with sockets, jaw, teeth, spine, five ribs, pelvis, jointed arms and legs, one arm waving), two bats with flapping ribbed wings, a lit green face, a strobe corridor with a dancing skeleton, a coffin beside the track whose lid swings open with a bony hand rising and green light, a rotating vortex tube (black / white / violet stripes) around the cart, a spider on a thread, a gliding ghost sheet, hands from both walls, a green arm snatching on the way down. Every prop is dim until its scare fires, then a flash lights it (0.42 -> 1.0, fading in a second) with a stinger and a strobe. No hall of mirrors (the vortex tube is the "rotating segment").
-- **Cost**: one mesh per mural (4), decor, shell, floor, cones, haze, lamps, webs, props only while visible, 8 door leaves (merged per leaf): the ride peaks at 208 draws / 286k triangles, the tightest of all rides.
+**Rebuilt 26 Oct 2026 (Ghost wave) into a proper 10-scene dark ride: see `pb/fouer/GHOST-NOTES.md` for the full scene list, timings, performance numbers and
+screenshots.** Summary for readers of this file: the castle is still a solid hall (carts vanish at painted doors), so the ride still brings its own interior
+while it runs (added to the model group, removed afterwards; textures and geometry disposed). New this wave: ten distinct scenes (coffin + waving vampire,
+portrait gallery with following eyes, mirror room with a looming ghost, mad-scientist lab, library of flying books, a stretching column, cobwebs with a
+lens puff, a ghost that rushes the cart and bursts into sparkles, a skeleton band at the organ, a fake-out door finale into daylight), each with a build-up,
+a pop and a release; the cart turns gently towards each scene (levelled, capped at ~26°) and the ride dashes between scenes and nearly stops at each one;
+black-light UV colours, flickering lamps, ambient thunder through the windows, floor fog and dust in the light beams; **the main camera is switched to the
+ride's own dedicated layer while the cart is sealed inside the castle, so none of the fair/world/crowd is drawn at all for that span** (nothing of it is
+visible through solid walls anyway) — the ride's own geometry is the entire cost there, well inside a 120-draw budget. Outside (the approach, the balcony,
+the gate) the camera is back on the normal layer and the real fair is the backdrop, same as any other ride. Outside the ride, in walk mode, the facade now
+has one animated figure (a pale wraith waving from the clock-tower window) and the ground-gate doors bang open and shut on a loop (`models/hall-geister.js`
+`buildExtras`).
+- **Cost**: sealed inside the castle, the ride's own geometry (shell, floor, decor, 4 murals, light cones, haze/fog/dust, red glow, webs, up to ~5 scene
+  props at once, 8 door leaves, the hood) peaks well under the 120-draw budget — see GHOST-NOTES.md for the measured number. Outside the castle the ride
+  shows the ordinary fair, same budget as every other ride (DESIGN 5: walk ≤ 220 draws / 300k triangles).
 
 ### Autoscooter (drive)
 WASD / arrows / left joystick (up = throttle, right = steer right); the arrow keys steer here and do not turn the view; drag still looks. `rides/bumper.js`: circles of 0.95 m, accel 7.5 m/s^2 up to 6.4 m/s, the tyres grip sideways, steering only while rolling, restitution 0.72 (cars) / 0.5 (barrier), 7-11 AI cars (about half hunt the nearest car), reported bumps need an impact > 1.1 m/s and a cooldown of 0.4 s per pair.

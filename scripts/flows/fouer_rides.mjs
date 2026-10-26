@@ -83,7 +83,7 @@ export const flow = {
     const state = () => evalG(page, g => { const i = g.ride.info(); return { active: i.active, phase: i.phase, p: i.progress, id: i.id, rig: i.rig, cam: i.cam, left: i.left }; });
     /** samples the camera of the running ride every frame inside the page */
     const startLog = () => evalG(page, g => {
-      window.__log = { cam: [], drawn: [], max: { draws: 0, tris: 0 }, stamp: false, running: true, shake: 0, strobe: 0, drops: 0, dark: 0, sparks: false, interior: false, doorsOpen: 0, scares: 0, last: null, rigs: [] };
+      window.__log = { cam: [], drawn: [], max: { draws: 0, tris: 0 }, maxSealed: { draws: 0, tris: 0 }, stamp: false, running: true, shake: 0, strobe: 0, drops: 0, dark: 0, sparks: false, interior: false, doorsOpen: 0, scares: 0, last: null, rigs: [] };
       const L = window.__log;
       const tick = () => {
         const i = g.ride.info();
@@ -91,6 +91,8 @@ export const flow = {
         const fx = g.ride.fx; if (fx) { L.shake = Math.max(L.shake, fx.shakeValue); L.strobe = Math.max(L.strobe, fx.strobeValue); L.drops = Math.max(L.drops, fx.dropCount); }
         const stamp = document.querySelector(".wk-stamp"); if (stamp && !stamp.hidden) L.stamp = true;
         if (i.active && L.cam.length % 20 === 0) { const s = g.r.performanceSnapshot(); L.max.draws = Math.max(L.max.draws, s.drawCalls); L.max.tris = Math.max(L.max.tris, s.triangles); }
+        // the ghost train seals the camera to its own layer while the cart is inside the castle: sample every tick there so the isolated peak is not missed
+        if (i.active && i.rig && i.rig.sealed) { const s2 = g.r.performanceSnapshot(); L.maxSealed.draws = Math.max(L.maxSealed.draws, s2.drawCalls); L.maxSealed.tris = Math.max(L.maxSealed.tris, s2.triangles); }
         if (L.running) requestAnimationFrame(tick);
       };
       requestAnimationFrame(tick);
@@ -202,9 +204,12 @@ export const flow = {
       if (id === "geister") {
         const last = log.last?.rig ?? rigs[rigs.length - 1] ?? {};
         h.expect(rigs.some(r => r.inside === 1) && rigs.some(r => r.inside === 0), "geister: part of the ride is inside the castle, part outside");
-        h.expect((rigs[rigs.length - 1]?.scaresFired?.length ?? 0) >= 6, `geister: the scares fired (${(rigs[rigs.length - 1]?.scaresFired ?? []).join(",")})`);
+        h.expect(rigs.some(r => r.sealed === true) && rigs.some(r => r.sealed === false), "geister: the camera is sealed to the ride's own layer inside, and back to normal outside");
+        h.expect((rigs[rigs.length - 1]?.scaresFired?.length ?? 0) >= 8, `geister: at least 8 of the 10 scenes fired (${(rigs[rigs.length - 1]?.scaresFired ?? []).join(",")})`);
         h.expect(Math.max(...rigs.flatMap(r => r.doorsOpen ?? [0])) > 1.2, "geister: the doors banged open");
         h.expect(log.strobe > 0.5, `geister: the strobe flashed (${log.strobe.toFixed(2)})`);
+        h.expect(rigs.some(r => Math.abs(r.yaw ?? 0) > 0.08), `geister: the cart turns towards a scene (max |yaw| ${Math.max(...rigs.map(r => Math.abs(r.yaw ?? 0))).toFixed(2)} rad)`);
+        h.expect(log.maxSealed.draws > 0 && log.maxSealed.draws <= 120, `geister: sealed inside the castle, the ride's own geometry costs ${log.maxSealed.draws} draws / ${Math.round(log.maxSealed.tris / 1000)}k triangles (budget 120 draws)`);
         void last;
       }
       if (id === "bayern") {         // feedback B: the track goes up and down and is banked, the car follows both (height and roll of the camera)
