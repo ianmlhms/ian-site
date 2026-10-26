@@ -142,6 +142,27 @@ All of this is additive; nothing of the Mosel line (`build_real_line.py`, `real-
 * Result numbers (26 Oct 2026): west 6 stops 6.4 km game / 17.9 km real, south 17 stops 15.8 km / 39.4 km, north 18 stops 20.5 km / 60.5 km (19 real tunnels -> 15 game tunnels, Pfaffenthal + Clausen + Pulvermuehle viaducts,
   Alzette / Sûre / Wiltz / Clerve bridges).  Hole scans (300 m steps): north 0 / 0, west 0 / 0, south 0 poses + 6 terrain-function steps of 0.5 - 1 m (mesh vs `groundHeightAt`, no gap).
 
+## W2c: reviewer fixes (26 Oct 2026, wave 2)
+
+* **White ground (landscape.js)**: the pale flat areas with houses on them were the "safety plane" under the far terrain (`flat`, 12.5 m below the track): in the real valleys (Alzette, Kor, Chiers) the DEM drops
+  further than that over hundreds of metres, so the plane showed through as a pale quad.  On a route with `track.real` the plane now lies 3 m under the lowest far vertex of the two far levels (`level.minH`).  Other routes unchanged.
+* **Water "checkerboard" (landscape.js)**: the 128 px normal map of the river had wave numbers up to (3, -2) / (-1, 3) and repeated every 6 m, which aliased into a blue-white lattice from the air.  Only low wave numbers now, UVs
+  stretched to 16 x 28 m, softer normal scale / specular.  Shared with the Mosel line (water only).
+* **Download size (station-surround.js, `split_station_patches.py`)**: the patches of the route stations (north / south / west, `index-routes.json` with `"split": 1`) are split into `<key>.c.json` (core: 4 m relief, roads,
+  water, platforms, origin; 15 - 25 kB gzip each; fetched for all stations of the SELECTED route before the track is built, with a 15 s timeout per file) and `<key>.h.json` (class map, LOD2 buildings, trees, rails, poi;
+  fetched by `create().update()` for patches up to 3000 m ahead / 1200 m behind the train, nearest first, 2 at a time, 25 s timeout; the first patch is awaited before the start, at most 6 s).  The 4 m relief is the 2 m
+  grid sub-sampled (rms 0.2 m, only the steep valley walls differ by up to 3 m; the terrain strip samples it every 5 m anyway).  A heavy half that is slow or missing: `track.inSurround` stays false for that patch (the generic
+  scenery grows there), the light patch (crossing road, water) is still drawn from the core, `landscape.refreshChunksAround` rebuilds the chunks when the scenery half arrives late.  `data` / `state` / `meshReady` are getters
+  of the height patches.  Munsbach (index.json, Mosel line) stays one file.  Measured (`scripts/zuch/download_probe.mjs`, clean cache, medium): start of a service = cores + real data + first scenery half: west 0.73 MB raw,
+  south 1.44 MB raw / 0.40 MB gzip, north 1.80 MB raw / 0.51 MB gzip (the Mosel line: 1.4 MB raw), the rest of the 20 MB streams while driving.  Rebuilding patches: `build_route_patches.py` splits them automatically.
+* **Career (config.js, `scripts/zuch/career_probe.mjs`, `drive_bot.mjs`)**: the game's passenger model run 600 times per route (railcar): west 2.4 k per service (11.9 min, unchanged), south 5.9 k -> 8.5 k (20 -> 33 min, 255 EUR / min),
+  north 6.3 k -> 9.7 k (22 -> 39 min, 248 EUR / min), east 4.5 k (23.6 min), wittlich 12.3 k (54.6 min); EUR per minute stays in the 190 - 255 band.  North's price 16 000 -> 24 000 (the same 2.5 services as before);
+  south stays 1 800 (one west service).  `drive_bot.mjs` drives the game's own sim at 97 % of the limit (no overspeed): south / north / west / east / wittlich all keep the timetable (worst lateness 1 - 7 s, punctuality window 30 s),
+  at 80 % of the limit still <= 9 s on south / north (wittlich 20 s).
+* **WebKit / budgets (`webkit_smoke.mjs --station`, medium, 1024 x 768)**: Esch-Uelzecht 204 draws / 389 k triangles (cab), 160 / 386 k (aerial); Ettelbréck 230 / 360 k, 119 / 211 k; Mamer 196 / 343 k, 117 / 264 k; the crossing views 225 / 259 / 216
+  draws, 367 k / 421 k / 346 k triangles; Munsbach (east) 234 / 345 k.  Chrome medium scan every 400 m (`perf_probe.mjs --scan`): worst cab view north 259 draws / 433 k triangles, south 248 / 483 k, west 238 / 392 k (W1 budget:
+  about 260 draws, 680 k triangles at Munsbach).  Headless WebKit holds 16.7 ms (vsync) everywhere; no real iPad measurement.
+
 ## 3. Other lines (Wave 2+)
 
 * West (Lëtzebuerg - Kleinbettingen, line 70): Hollerich/Bertrange/Mamer/Capellen; the A6 parallel, fields of the Grand Duchy; Mamer-Lycée is not a stop.
