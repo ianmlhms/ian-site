@@ -15,6 +15,14 @@ const LINES = {
     stations: ['Lëtzebuerg', 'Houwald', 'Bettembuerg', 'Hettange-Grande', 'Thionville', 'Uckange', 'Hagondange', 'Walygator Parc', 'Metz-Ville', 'Pagny-sur-Moselle', 'Pont-à-Mousson', 'Nancy-Ville'],
     lengthKm: [12, 22], minBridges: 4, minCrossings: 3, budgetMb: 1.6,
   },
+  brussels: {
+    stations: ['Lëtzebuerg', 'Arlon', 'Marbehan', 'Libramont', 'Jemelle', 'Marloie', 'Ciney', 'Namur', 'Gembloux', 'Ottignies', 'Bruxelles-Luxembourg', 'Bruxelles-Midi'],
+    lengthKm: [14, 23], minBridges: 3, minTunnels: 8, minCrossings: 3, budgetMb: 1.8,      // the Brussels north-south tunnel + the Meuse valley tunnels
+  },
+  paris: {
+    stations: ['Lëtzebuerg', 'Thionville', 'Metz-Ville', 'Champagne-Ardenne TGV', 'Paris-Est'],
+    lengthKm: [16, 26], minBridges: 10, minTunnels: 2, minCrossings: 0, budgetMb: 1.9, hst: true,   // LGV Est: viaducts over the Meuse / Marne valleys
+  },
 };
 const MIN_SCENERY_ROADS = 200;
 
@@ -27,13 +35,14 @@ export const flow = {
       await sim.start(id);
       const rep = await sim.evalGame(({ track }) => ({
         st: track.stations.map((s) => s.name), len: track.length, tunnels: track.tunnels.length, bridges: track.bridges.length, crossings: track.crossings.length,
-        scenery: track.sceneryId, real: !!track.real, roads: track.real ? track.real.roads.length : 0, rivers: track.real ? track.real.water.length : 0,
+        hst: track.def.kind === 'hst', cruise: track.def.cruise, scenery: track.sceneryId, real: !!track.real, roads: track.real ? track.real.roads.length : 0, rivers: track.real ? track.real.water.length : 0,
         railLand: track.real ? [0, 1, 2, 3].some((k) => { for (let s = 100; s < track.length; s += 97) if (track.real.landAt(s, (k - 1.5) * 12) === track.real.CLASS.rail) return true; return false; }) : false,
       }));
       h.eq(rep.st, spec.stations, `${id}: the real stop list (${spec.stations.length} stops)`);
       h.expect(rep.len / 1000 >= spec.lengthKm[0] && rep.len / 1000 <= spec.lengthKm[1], `${id}: game length ${(rep.len / 1000).toFixed(1)} km (${spec.lengthKm.join(' - ')})`);
       h.expect(rep.real && rep.scenery === id && rep.roads >= MIN_SCENERY_ROADS && rep.rivers >= 1, `${id}: real scenery data attached (${rep.roads} roads, ${rep.rivers} water windows)`);
-      h.expect(rep.bridges >= (spec.minBridges || 0) && rep.crossings >= (spec.minCrossings || 0), `${id}: ${rep.tunnels} tunnels, ${rep.bridges} bridges, ${rep.crossings} level crossings from OSM`);
+      h.expect(rep.bridges >= (spec.minBridges || 0) && rep.crossings >= (spec.minCrossings || 0) && rep.tunnels >= (spec.minTunnels || 0), `${id}: ${rep.tunnels} tunnels, ${rep.bridges} bridges, ${rep.crossings} level crossings from OSM`);
+      if (spec.hst) h.expect(rep.hst, `${id}: a high-speed route (hst, cruise ${rep.cruise} km/h)`);
       h.expect(rep.railLand, `${id}: railway land is drawn as ballast ground (class rail), not as fields`);
       const back = await (async () => { await sim.start(id + '~r'); return sim.evalGame(({ track }) => ({ n: track.stations.length, first: track.stations[0].name, last: track.stations[track.stations.length - 1].name })); })();
       h.eq([back.n, back.first, back.last], [spec.stations.length, spec.stations[spec.stations.length - 1], 'Lëtzebuerg'], `${id}~r: starts at ${back.first}, ${back.n} stations`);

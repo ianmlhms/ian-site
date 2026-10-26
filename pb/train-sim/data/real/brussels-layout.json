@@ -766,7 +766,7 @@
     "from": "Namur",
     "to": "Gembloux",
     "length": 1006,
-    "spec": "s49:g1:v100:bsuburb r611/447:g1 s60:g0.5:v130:T:bforest s56:g1:bfarmland s28:g-1 s27:g0.5:bsuburb s26:g1:bforest s70:g0.5:X:bfarmland s49:g1 s70:g-0.75:X:bsuburb s*:g-0.5:bfarmland s60:bfarmland s27:g-0.25"
+    "spec": "s49:g1:v100:bsuburb r611/446:g1 s60:g0.5:v130:T:bforest s55:g1:bfarmland s28:g-1 s26:g0.5:bsuburb s26:g1:bforest s70:g0.5:X:bfarmland s49:g1 s70:g-0.75:X:bsuburb s*:g-0.5:bfarmland s59:bfarmland s27:g-0.25"
    },
    {
     "t": "station",
@@ -790,7 +790,7 @@
     "from": "Ottignies",
     "to": "Bruxelles-Luxembourg",
     "length": 1399,
-    "spec": "s30:g0.25:v130:bfarmland s60:g0.75:T:bsuburb s51:g1:bfarmland s30:g-0.5:bsuburb s76:g-1:T s60:g-0.25:T s*:g0.75 s30:g0.5 s28:g1:bfarmland l1163/309:bsuburb s60:g-0.25:T s52:g1:bforest s28 s31:g-0.5 r1163/306:g-1 s60:g-0.5:T:bsuburb s52:g-0.25 s69:g-1:T:bsuburb s60:g-0.5:Br,6,w"
+    "spec": "s29:g0.25:v130:bfarmland s59:g0.75:T:bsuburb s50:g1:bfarmland s29:g-0.5:bsuburb s74:g-1:T s59:g-0.25:T s*:g0.75 s29:g0.5 s27:g1:bfarmland l1163/301:bsuburb s59:g-0.25:T s51:g1:bforest s27 s30:g-0.5 r1163/299:g-1 s59:g-0.5:T:bsuburb s51:g-0.25 s68:g-1:T:bsuburb s59:g-0.5:Br,6,w"
    },
    {
     "t": "station",

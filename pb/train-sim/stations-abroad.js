@@ -661,7 +661,7 @@
     const arch = texB('namur-arch', () => archWallTex(k, 'namur', { base: CR, trim: TRIM, R: 78, top: 140, bars: 1, glass: '#4a6a7e', clock: true }));
     const pl = texB('plain-namur', () => ctex('ab-plain-namur', 64, 64, (c, w, h) => { c.fillStyle = CR; c.fillRect(0, 0, w, h); }));
     wallD(arch, d0 - 1.0, cz0, cz1, FORM_Y, cH, -1, 1, 1);
-    wallD(pl, d0 + 9, cz0, cz1, FORM_Y, cH, 1, 3, 1);
+    wallD(arch, d0 + 9, cz0, cz1, FORM_Y, cH, 1, 1, 1);   // the forecourt face carries the big arch and the round clock too (photo "Namur - Gare de Namur"): it was a plain wall
     wallZ(pl, cz0, d0 - 1.0, d0 + 9, FORM_Y, cH, -1, 3, 1);
     wallZ(pl, cz1, d0 - 1.0, d0 + 9, FORM_Y, cH, 1, 3, 1);
     vc.box(X(d0 + 4), cH + 0.2, 0, 11.4, 0.4, cz1 - cz0 + 1, col(TRIM));

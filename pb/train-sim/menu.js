@@ -218,8 +218,8 @@
     north: { name: { lb: 'Lëtzebuerg – Ettelbréck – Clierf', de: 'Luxemburg – Ettelbrück – Clervaux', en: 'Luxembourg – Ettelbruck – Clervaux' }, n: 18, km: 61, kind: 'rail' },
     trier: { name: { lb: 'Lëtzebuerg – Tréier – Koblenz', de: 'Luxemburg – Trier – Koblenz', en: 'Luxembourg – Trier – Koblenz' }, n: 12, km: 190, kind: 'rail' },
     metz: { name: { lb: 'Lëtzebuerg – Metz – Nancy', de: 'Luxemburg – Metz – Nancy', en: 'Luxembourg – Metz – Nancy' }, n: 12, km: 119, kind: 'rail' },
-    brussels: { name: { lb: 'Lëtzebuerg – Arlon – Bréissel', de: 'Luxemburg – Arlon – Brüssel', en: 'Luxembourg – Arlon – Brussels' }, n: 6, km: 220, kind: 'rail' },
-    paris: { name: { lb: 'TGV Lëtzebuerg – Paris-Est', de: 'TGV Luxemburg – Paris-Est', en: 'TGV Luxembourg – Paris-Est' }, n: 4, km: 370, kind: 'hst' },
+    brussels: { name: { lb: 'Lëtzebuerg – Arlon – Bréissel', de: 'Luxemburg – Arlon – Brüssel', en: 'Luxembourg – Arlon – Brussels' }, n: 12, km: 230, kind: 'rail' },
+    paris: { name: { lb: 'TGV Lëtzebuerg – Paris-Est', de: 'TGV Luxemburg – Paris-Est', en: 'TGV Luxembourg – Paris-Est' }, n: 5, km: 376, kind: 'hst' },
   };
   function routeInfo(id) {
     const live = TS.routes && typeof TS.routes.get === 'function' ? safeGet(id) : null;

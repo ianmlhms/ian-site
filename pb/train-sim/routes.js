@@ -206,42 +206,23 @@
     lastAsTerminus(realLineBody('metz'))
   );
 
-  /* ------------------------------------------------------------ 8 brussels */
+  /* ------------------------------------------------------------ 8 brussels (IC 16: Arlon, Marbehan, Libramont, Jemelle, Marloie, Ciney, Namur, Gembloux, Ottignies, Bruxelles-Luxembourg, Bruxelles-Midi)
+   * Real OSM geometry (real-brussels.js), the Brussels north-south tunnel included; Schuman / Nord / Central are passed underground. */
   const brussels = makeRoute(
     {
-      id: 'brussels', kind: 'rail', region: 'Belsch', cruise: 140, biomes: ['city', 'suburb', 'farmland', 'forest', 'ardennes'],
+      id: 'brussels', kind: 'rail', region: 'Belsch', cruise: 140, biomes: ['city', 'suburb', 'farmland', 'forest', 'ardennes', 'industrial'],
       name: { lb: 'Lëtzebuerg – Arlon – Namur – Bréissel', de: 'Luxemburg – Arlon – Namur – Brüssel', en: 'Luxembourg – Arlon – Namur – Brussels' },
     },
-    [
-      station('Lëtzebuerg', 3, 'right', 'city'),
-      ...leg(2400, 's300:v60:bcity r600/260 s*:v120:bsuburb l1000/300:g0.8 s400:bfarmland:v140 r1500/300 s*:X'),
-      station('Kleinbettingen', 1, 'left', 'farmland'),
-      ...leg(1600, 's300:v120:bforest l1100/300:g0.6 s*:v140 r1200/300 s200:v100'),
-      station('Arlon', 2, 'right', 'forest'),
-      ...leg(3200, 's300:v120:bforest r1000/300:g0.8 s*:v140 l1100/300:bardennes:g-0.4 s500:T:v120 r900/300:g0.6 s*:Bv,22,w'),
-      station('Libramont', 2, 'left', 'ardennes'),
-      ...leg(3400, 's300:v120:bardennes l900/300:g-0.8 s*:Br,10,w r1000/320 s500:T:v120 l1100/300:bforest s*:X:bsuburb s150:bcity'),
-      station('Namur', 3, 'right', 'city'),
-      ...leg(2800, 's300:v100:bcity r1200/300:briver s*:v140:bfarmland l1500/300:g0.3 s*:X r1400/300 s300:v100:bsuburb'),
-      station('Bruxelles-Midi', 3, 'left', 'city', true),
-    ]
+    lastAsTerminus(realLineBody('brussels'))
   );
 
-  /* --------------------------------------------------------------- 9 paris */
+  /* --------------------------------------------------------------- 9 paris (TGV 803B: Thionville, Metz, Champagne-Ardenne TGV, LGV Est) */
   const paris = makeRoute(
     {
-      id: 'paris', kind: 'hst', region: 'Frankräich', cruise: 320, biomes: ['city', 'suburb', 'highspeed', 'farmland'],
+      id: 'paris', kind: 'hst', region: 'Frankräich', cruise: 320, biomes: ['city', 'suburb', 'highspeed', 'farmland', 'forest', 'industrial', 'vineyard'],
       name: { lb: 'TGV Lëtzebuerg – Paräis-Est', de: 'TGV Luxemburg – Paris-Est', en: 'TGV Luxembourg – Paris-Est' },
     },
-    [
-      station('Lëtzebuerg', 3, 'right', 'city'),
-      ...leg(7000, 's400:v100:bcity r1200/300 s500:v160:bsuburb l3000/600:v220 s800:bhighspeed:v300 s*:v320 r6500/1200:g0.8 s350:Br,14,w s*:v320'),
-      station('Metz-Ville', 3, 'left', 'city'),
-      ...leg(8500, 's500:v160:bsuburb r3500/600:v250 s1000:bhighspeed:v320 s*:v320 l7000/1400:g-0.6 s700:T:v320 s*:v320'),
-      station('Champagne-Ardenne TGV', 2, 'right', 'highspeed'),
-      ...leg(6500, 's500:v200:bhighspeed s*:v320 r8000/1400:g0.5 s400:Bv,30,w:v320 s*:v320 l4000/900:bsuburb:v250 s500:v160'),
-      station('Paris-Est', 3, 'left', 'city', true),
-    ]
+    lastAsTerminus(realLineBody('paris'))
   );
 
   const list = [west, south, east, wittlich, north, trier, metz, brussels, paris];
