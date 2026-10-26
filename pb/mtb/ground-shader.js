@@ -38,7 +38,7 @@ export const GROUND_FRAGMENT = `
     float across = dot(P, dir), alongDir = dot(P, vec2(-dir.y, dir.x));
     vec3 c; float rows = 0.0, rowAmp = 0.0, spacing = 1.0;
     if (h1 < 0.30) { c = vec3(0.42, 0.54, 0.24); rowAmp = 0.05; spacing = 6.0; }                       // pasture, mown stripes
-    else if (h1 < 0.46) { c = vec3(0.50, 0.58, 0.27); rowAmp = 0.0; }                                  // meadow
+    else if (h1 < 0.46) { c = vec3(0.50, 0.58, 0.27); rowAmp = 0.045; spacing = 2.3; }                 // meadow: rough grass, not a mown lawn
     else if (h1 < 0.60) { c = vec3(0.76, 0.64, 0.32); rowAmp = 0.10; spacing = 0.8; }                  // ripe wheat
     else if (h1 < 0.70) { c = vec3(0.66, 0.64, 0.30); rowAmp = 0.09; spacing = 0.75; }                 // barley
     else if (h1 < 0.80) { c = vec3(0.47, 0.36, 0.25); rowAmp = 0.17; spacing = 1.1; }                  // ploughed

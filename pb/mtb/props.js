@@ -14,6 +14,21 @@ const GRADE = { green: [0.25, 0.75, 0.35], blue: [0.24, 0.55, 1.0], red: [0.9, 0
 const WOOD = [0.5, 0.36, 0.22], WOOD_DARK = [0.34, 0.24, 0.15], WOOD_LIGHT = [0.62, 0.47, 0.3], PAINT_WHITE = [0.94, 0.92, 0.84], STONE = [0.5, 0.48, 0.44];
 const mul = (c, k) => [c[0] * k, c[1] * k, c[2] * k];
 const RIBBON_LIFT = 0.03, RIBBON_STEP = 0.8;
+const TAPE_RED = [0.78, 0.1, 0.08], TAPE_WHITE = [0.92, 0.9, 0.84], TAPE_H = 0.72, TAPE_SEGMENTS = 8, TAPE_SAG = 0.07;
+
+/** The barrier across a wrong branch: two posts and a sagging red-white striped tape between them (never on the trail: `a`/`b` already stand a little way
+ *  into the wrong branch, see junctions.js). */
+function barrierTape(b, a, bb, groundY) {
+  const ya = groundY(a.x, a.z), yb = groundY(bb.x, bb.z);
+  beam(b, V3(a.x, ya - 0.15, a.z), V3(a.x, ya + 1.0, a.z), 0.07, 0.07, WOOD_DARK);
+  beam(b, V3(bb.x, yb - 0.15, bb.z), V3(bb.x, yb + 1.0, bb.z), 0.07, 0.07, WOOD_DARK);
+  const pts = [];
+  for (let k = 0; k <= TAPE_SEGMENTS; k++) {
+    const t = k / TAPE_SEGMENTS, sag = Math.sin(Math.PI * t) * TAPE_SAG;
+    pts.push(V3(a.x + (bb.x - a.x) * t, (ya + TAPE_H) * (1 - t) + (yb + TAPE_H) * t - sag, a.z + (bb.z - a.z) * t));
+  }
+  for (let k = 0; k < TAPE_SEGMENTS; k++) beam(b, pts[k], pts[k + 1], 0.15, 0.025, k % 2 === 0 ? TAPE_RED : TAPE_WHITE, V3(0, 1, 0));
+}
 
 /** An oriented box from point a to point b (centre line of its top face), `w` wide, `h` thick below the line. Flat-shaded. */
 function beam(b, a, c, w, h, color, up = V3(0, 1, 0)) {
@@ -42,7 +57,7 @@ function strip(b, left, right, color) {              // a ribbon from two polyli
   b.addArrays(pos, nor, idx, (v, n, k) => mul(color, 0.93 + 0.07 * ((k >> 1) % 2)));
 }
 
-export function createProps({ scene, env, surface, trails, decks }) {
+export function createProps({ scene, env, surface, trails, decks, junctions = [] }) {
   const mat = createSolidMaterial(env);
   const decalMat = createSolidMaterial(env);
   decalMat.polygonOffset = true; decalMat.polygonOffsetFactor = -3; decalMat.polygonOffsetUnits = -3;
@@ -76,6 +91,19 @@ export function createProps({ scene, env, surface, trails, decks }) {
   const posts = new Builder();
   for (const t of trails) for (const p of t.posts) sign(posts, p, t.grade);
   addMesh(posts, mat, 'signposts');
+
+  // ------------------------------------------------------------ junctions: an arrow sign before every fork, red-white barrier tape across every wrong branch
+  const gradeOf = new Map(trails.map((t) => [t.id, t.grade]));
+  const barriers = new Builder();
+  let junctionBranches = 0;
+  for (const j of junctions) {
+    const grade = gradeOf.get(j.trailId) || 'green';
+    const { yaw } = j.approach;
+    const rx = -Math.sin(yaw), rz = Math.cos(yaw);                         // the arrow board stands to the right of the trail, like every other signpost
+    sign(posts, { k: 'dir', x: j.approach.x + rx * 2.1, z: j.approach.z + rz * 2.1, yaw, n: 0 }, grade);
+    for (const br of j.branches) { barrierTape(barriers, br.postA, br.postB, groundY); junctionBranches++; }
+  }
+  addMesh(barriers, mat, 'junction barriers');
 
   // ------------------------------------------------------------ bridges
   const bridges = new Builder();
@@ -227,5 +255,5 @@ export function createProps({ scene, env, surface, trails, decks }) {
     vpMesh = addMesh(b, mat, 'viewpoints');
   }
 
-  return { setActiveTrail, setFlags, setViewpoints, meshes, material: mat, dispose() { for (const m of [...meshes]) dispose(m); mat.dispose(); decalMat.dispose(); } };
+  return { setActiveTrail, setFlags, setViewpoints, meshes, material: mat, junctionBranches, dispose() { for (const m of [...meshes]) dispose(m); mat.dispose(); decalMat.dispose(); } };
 }
