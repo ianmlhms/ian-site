@@ -19,7 +19,7 @@
   'use strict';
   const TS = (window.TS = window.TS || {});
   const TAG = '[Lokféierer] real line: ';
-  const DATA_VERSION = 3;
+  const DATA_VERSION = 4;
   /* W2c: the Mosel line keeps sceneryId 'mosel'; the other real lines (north, south, west, ...) are registered by their real-<id>.js layout in TS.realLines and
      use their own data file data/real/<id>-features.json (build_real_route.py).  realKey(def) -> the data set of a route, or null (generic landscape). */
   const realKey = (def) => (!def ? null : def.sceneryId === 'mosel' ? 'mosel' : TS.realLines && def.sceneryId && TS.realLines[def.sceneryId] ? def.sceneryId : null);

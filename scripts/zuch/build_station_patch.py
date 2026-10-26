@@ -46,6 +46,7 @@ CLS_RES = 1.0
 SS = 4                      # class raster supersampling
 MAX_TREES = 1500
 CORRIDOR = 4.5              # rail bed half width of the main track corridor (class 8)
+TRACK_CLEAR_M = 3.2         # an extruded (faceless) building may not reach closer than this to the player's track axis
 FLAT_HALF = 5.0             # DEM flattened to the track level within +-5 m
 PLATFORM_MAX_TRACK_DIST = 12.0
 EXT_M = 1500.0              # straight extension of the centre line beyond its ends
@@ -1658,6 +1659,13 @@ def build(args):
                 "roofs": [r for r in (clean_ring(q) for q in b["roofs"]) if r],
                 "walls": [r for r in (clean_ring(q) for q in b["walls"]) if r]}
 
+    def over_track(b):
+        """W4 (France / Belgium, extruded footprints): an OSM building whose footprint reaches the player's track corridor is a platform roof / footbridge / goods canopy mapped as a building, not a house on the rails: dropped"""
+        if not FACELESS or b["station"]:
+            return False
+        xs = np.asarray(b["ground"])[:, 0]
+        return bool(xs.min() < TRACK_CLEAR_M and xs.max() > -TRACK_CLEAR_M)
+
     png = io.BytesIO()
     Image.fromarray((cls_arr * 16).astype(np.uint8)).save(png, format="PNG", optimize=True)
     b64 = lambda b: base64.b64encode(b).decode("ascii")                                  # noqa: E731
@@ -1670,7 +1678,7 @@ def build(args):
         "classes": {"res": 1, "nx": int(XMAX - XMIN), "nz": int(ZMAX - ZMIN), "x0": XMIN, "z0": ZMIN, "png": b64(png.getvalue())},
         "roads": out_roads, "rails": out_rails,
         "platforms": [{"ring": clean_ring(p["ring"])} for p in plat_out if clean_ring(p["ring"])],
-        "water": water_out, "buildings": [bld_json(b) for b in buildings if clean_ring(b["ground"])],
+        "water": water_out, "buildings": [bld_json(b) for b in buildings if clean_ring(b["ground"]) and not over_track(b)],
         "trees": [[r2(a), r2(b), r2(c), r2(d)] for a, b, c, d in trees],
         "poi": [{"t": p["t"], "x": r2(p["x"]), "z": r2(p["z"]), "y": r2(p["y"])} for p in poi],
         "trackY": track_y,
