@@ -890,7 +890,12 @@
       const lB = edge + W;
       const l0 = lB + 0.1;
       const FL = 3.5;
-      const cz = -44;
+      /* position after the OSM / LOD2 data of the patch (26 Oct 2026): the station building (single storey in OSM, 27 x 10 m, lateral 5.4 .. 15.2 on the platform side) stands 94 .. 121 m BEHIND the stop, at the Luxembourg end
+         of the platform; the island platform 1;3 (5.3 .. 11.1) and its track (12.8) lie across the second main track (4.5).  A reversed service sees it mirrored in z. */
+      const zr = api.track && api.track.reverse ? -1 : 1;
+      const cz = 108;
+      const Z = (z) => zr * z;
+      const zz = (a, b) => [Math.min(Z(a), Z(b)), Math.max(Z(a), Z(b))];
       const wall = '#f1eee6';
       const trim = '#c7a690';
       const sp = { bayM: 3.5, floorM: FL, wall, trim, frame: '#ece7dc', glassTop: '#4b5a68', glassBot: '#8798a6', sill: true, band: true };
@@ -900,13 +905,14 @@
       const specA = Object.assign({}, sp, { floors: [{ k: 'door', ww: 1.15, wh: 2.55, sy: 0, col: '#b02a2a', panel: '#b02a2a' }] });
       const gab = { b: k.facadeBatch('clGab', Object.assign({}, sp, { floors: [{ k: 'blank' }] })), bayM: 3.5, floorM: FL };
       // main block: 6 bays, gable roof (ridge along the track), a hipped lower annex towards the front of the platform
-      const m = k.walls({ l0, l1: l0 + 9, z0: cz - 11, z1: cz + 11, floors: 2, floorM: FL, front: specF, frontKey: 'clF', back: specW, backKey: 'clB', end: specE, endKey: 'clE', baseCol: '#8f8a80' });
-      k.roof({ kind: 'gable', mat: 'slateb', l0, l1: l0 + 9, z0: cz - 11, z1: cz + 11, y: m.eaves + 0.15, rise: 3.6, ov: 0.55, gableTex: gab });
-      vc.box(X(l0 + 4.5), m.eaves + 0.05, cz, 9.6, 0.2, 22.6, col('#d8d2c4'));
+      const [mz0, mz1] = zz(cz - 11, cz + 11);
+      const m = k.walls({ l0, l1: l0 + 9, z0: mz0, z1: mz1, floors: 2, floorM: FL, front: specF, frontKey: 'clF', back: specW, backKey: 'clB', end: specE, endKey: 'clE', baseCol: '#8f8a80' });
+      k.roof({ kind: 'gable', mat: 'slateb', l0, l1: l0 + 9, z0: mz0, z1: mz1, y: m.eaves + 0.15, rise: 3.6, ov: 0.55, gableTex: gab });
+      vc.box(X(l0 + 4.5), m.eaves + 0.05, Z(cz), 9.6, 0.2, 22.6, col('#d8d2c4'));
       // round window in both gables
       [-1, 1].forEach((d) => {
-        vc.box(X(l0 + 4.5) - sx * 0.0, m.eaves + 1.35, cz + d * 11.04, 0.9, 0.9, 0.06, col('#e7e1d2'));
-        vc.box(X(l0 + 4.5), m.eaves + 1.35, cz + d * 11.08, 0.6, 0.6, 0.05, col('#37424c'));
+        vc.box(X(l0 + 4.5) - sx * 0.0, m.eaves + 1.35, Z(cz) + d * 11.04, 0.9, 0.9, 0.06, col('#e7e1d2'));
+        vc.box(X(l0 + 4.5), m.eaves + 1.35, Z(cz) + d * 11.08, 0.6, 0.6, 0.05, col('#37424c'));
       });
       const a = k.walls({ l0: l0 + 1, l1: l0 + 7, z0: cz - 19, z1: cz - 11, floors: 1, floorM: FL, front: specA, frontKey: 'clA', back: specA, backKey: 'clA', end: specE, endKey: 'clAE', baseCol: '#8f8a80' });
       k.roof({ kind: 'hip', mat: 'slateb', l0: l0 + 1, l1: l0 + 7, z0: cz - 19, z1: cz - 11, y: a.eaves + 0.1, rise: 2.0, ov: 0.45 });
