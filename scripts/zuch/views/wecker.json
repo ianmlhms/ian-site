@@ -1,0 +1,11 @@
+{
+  "route": "wittlich", "station": "Wecker", "refs": "Wecker",
+  "views": [
+    { "photo": "Biwer, gare CFL Wecker (104).jpg", "pos": [-3.0, 55, 1.6], "look": [12, 92, 3.5], "fov": 62, "note": "building from the island" },
+    { "photo": "Biwer, gare CFL Wecker (105).jpg", "pos": [-5.5, 70, 1.8], "look": [10, 78, 2.5], "fov": 62, "note": "hut + shelter" },
+    { "photo": "Biwer, gare CFL Wecker (106).jpg", "pos": [-3.7, 20, 1.8], "look": [-3.7, -60, 2.4], "fov": 62, "note": "island towards Wasserbillig" },
+    { "photo": "Biwer, gare CFL Wecker (107).jpg", "pos": [-3.7, -40, 1.8], "look": [-3.7, 60, 2.4], "fov": 62, "note": "island towards Luxembourg" },
+    { "photo": "Biwer, gare CFL Wecker (112).jpg", "pos": [-3.7, 70, 1.8], "look": [-3.7, 105, 1.2], "fov": 62, "note": "underpass roof" },
+    { "photo": "Biwer, gare CFL Wecker (115).jpg", "pos": [-5, 140, 18], "look": [0, 20, 0], "fov": 62, "note": "from above" }
+  ]
+}

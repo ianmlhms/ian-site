@@ -95,4 +95,47 @@
       f.sign(BE.far.edge + 0.9, -8, 'C', 'blue');
     },
   });
+  /* ================================================================ WECKER
+   * Refs: ~/Library/Caches/zuch-refs/Wecker (Commons: Biwer, gare CFL Wecker (103)-(115)).  The real platform is an ISLAND (patch x -5.8 .. -1.6, z -92.5 .. 92.5) between the
+   * base track (x 0) and the second main track (x -7.5), reached by an underpass whose red glass-roofed stairs end at its Luxembourg end (z ~ 96); the station building (stone,
+   * x 8 .. 17.9, z 82.6 .. 102.1) stands behind the yard track (x 8.1), with the white hut and the red bike shelter next to it.  Everything is written in PATCH x and converted
+   * to the station frame with l = sx * x, so the model is right for either declared side; the island is the game's own platform when the declared side is left.
+   * `isl` draws what stands on the island, facing the base track (x = -d); `islFar` faces the other main track. */
+  const WE = { islandEdge: 1.6, islandWidth: 4.2, z0: -92.5, z1: 92.5, mid: 3.7, tracks: [-7.5, -11.7], yard: 8.1, underpassZ: 98 };
+  const RED_STEEL = '#a8232e';
+  reg('Wecker', {
+    canopy: false,
+    furniture: false,
+    build(api) {
+      const { sx, H, col } = api;
+      const k = makeKit(api);
+      const f = mirrorKit(api);
+      const isl = sx > 0 ? f : k;                     // kit whose boards / benches face the base track from the island at distance d (argument d > 0)
+      const islFar = sx > 0 ? k : f;                  // faces the second main track (argument -d)
+      WE.tracks.forEach((x) => k.track(sx * x, -135, 135, { pole: true }));
+      if (sx < 0) k.track(sx * WE.yard, -135, 47, { pole: true });
+      if (sx > 0) f.platformBox(WE.islandEdge, WE.islandWidth, 1, WE.z0, WE.z1);
+      const m = WE.mid;
+      // brick-paver paving looks like the photos: the platform texture of the game has the yellow lines already
+      [-78, -44, -8, 28, 62].forEach((z) => isl.lamp(m, z, GREY_POLE, 6.4));
+      [-60, 15, 70].forEach((z) => isl.sign(m - 0.6, z, 'A', 'blue'));
+      [-62, 40].forEach((z) => isl.totem(2.4, z));
+      isl.yellowBoard(2.3, -24, 'Wecker');
+      isl.yellowBoard(2.3, 52, 'Wecker');
+      // red steel open shelter (photo 105) at z 9
+      isl.postShelter(m - 1.0, 9.1, 2.0, 7.5, RED_STEEL, RED_STEEL);
+      isl.bench(5.0, -20, '#7d1f26');
+      // underpass: red steel / glass gabled stair roof at the Luxembourg end of the island, stairs, orange bin, blue "VOIES 1-2" sign
+      isl.glassRoofShelter(m - 1.3, WE.underpassZ, 2.6, 7);
+      isl.stairOpening(m, WE.underpassZ, 6.2);
+      isl.bin(m + 1.4, WE.underpassZ - 4.3, '#f08a10');
+      isl.vc.box(isl.X(2.2), H + 1.0, 90.5, 0.5, 2.0, 0.6, col('#b02a6e'));
+      // red steel bike shelter beside the station building (patch x 9.8 .. 12.3, z 67 .. 73): glass sides, racks
+      const bz = 70; const bl = sx * 11.0;
+      [[-1.1, -2.9], [1.1, -2.9], [-1.1, 2.9], [1.1, 2.9]].forEach(([dx, dz]) => k.vc.box(k.X(bl) + dx, H + 1.2, bz + dz, 0.12, 2.4, 0.12, col(RED_STEEL)));
+      k.vc.box(k.X(bl), H + 2.5, bz, 2.8, 0.16, 6.4, col(RED_STEEL));
+      k.glass().box(k.X(bl) - 1.1, H + 1.2, bz, 0.03, 1.9, 5.7, api.WHITE);
+      [-2.2, -0.7, 0.8, 2.2].forEach((dz) => k.vc.box(k.X(bl) + 0.4, H + 0.45, bz + dz, 0.5, 0.9, 0.05, col('#8a9096')));
+    },
+  });
 })();

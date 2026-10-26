@@ -70,4 +70,18 @@
       api.box(-7.2, 1.4, -41.4, 0.05, 0.55, 2.4, '#6b2230');
     },
   });
+  /* WECKER.  Refs: Commons "Biwer, gare CFL Wecker (103)-(115)" (2025).  Station building behind the tracks at the Luxembourg end: sandstone ashlar with yellow-ochre stone
+   * surrounds and tall arched ground-floor windows, dark slate hip / gable roofs, a lower white plastered wing ahead of it; next to it a small white plastered hut with arched
+   * ochre-framed windows and a slate gable roof; the red steel bike shelter beside it is drawn by the station model (stations-lu-e.js). */
+  reg('Wecker', {
+    wall: '#cdb98c', trim: '#dcc36a', plinth: { h: 0.6, col: '#a79a7c' }, band: '#d6c06c', roof: 'slate', floorH: 4.8, bayM: 3.4, stain: true, stone: true,
+    wallFor: (face) => (face.zc < 88.5 ? '#eeebe1' : null),
+    win: { w: 1.25, h: 2.4, kind: 'rect', groundKind: 'arch', frame: '#33373b', reveal: '#dcc36a', sill: true },
+    doors: [{ z: 95.2, w: 1.3, h: 2.6, col: '#33373b', face: 'front' }],
+    otherBase: { stain: false },
+    others: {
+      w1414392113: { wall: '#eeebe1', trim: '#dcc36a', roof: 'slate', plinth: { h: 0.4, col: '#c9b87a' }, floorH: 3.6, bayM: 1.8, win: { w: 0.55, h: 0.9, kind: 'arch', frame: '#33373b', reveal: '#dcc36a', sill: false } },
+      w968056900: { hidden: true }, w968056901: { hidden: true }, w1414392111: { hidden: true }, w1414392112: { hidden: true },     // LOD2 placeholders (7.5 m boxes without faces): the bike shelter is in the model
+    },
+  });
 })();

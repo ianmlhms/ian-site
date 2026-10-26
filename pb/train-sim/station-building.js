@@ -12,7 +12,7 @@
  *     TS.stationStyles.register('Roodt-Syr', { wall: '#e9e3cf', ... })
  * style = { wall, trim, plinth: { h, col }, band: col | null, roof: 'slate' | 'tile' | 'flat' | 'zinc', fascia: col, floorH, bayM,
  *           win: { w, h, kind: 'rect' | 'arch', frame, shutter, sill, ground: bool }, gableWin: 'round' | null, doors: [{ z, w, h, col, glass, face: 'front' | 'back' }],
- *           skipFaces: (face) => bool, extras: (api) => void, hidden: bool (draw nothing: the station model replaces it) } */
+ *           skipFaces: (face) => bool, extras: (api) => void, wallFor: (face) => colour | null (own plaster colour of one face, e.g. a white wing of a stone building), hidden: bool (draw nothing: the station model replaces it) } */
 (function () {
   'use strict';
   const TS = (window.TS = window.TS || {});
@@ -86,12 +86,12 @@
     const g = c.getContext('2d');
     const r = mulberry(seed);
     const copper = st.copperAbove !== undefined && face.ymin > st.copperAbove - 3;
-    g.fillStyle = copper ? (st.copperTint || '#5f9d8a') : st.wall; g.fillRect(0, 0, px, py);
+    g.fillStyle = copper ? (st.copperTint || '#5f9d8a') : ((st.wallFor && st.wallFor(face)) || st.wall); g.fillRect(0, 0, px, py);
     if (copper) { for (let i = 0; i < px * py / 90; i++) { g.fillStyle = r() > 0.5 ? 'rgba(255,255,255,0.07)' : 'rgba(20,50,40,0.12)'; g.fillRect(r() * px, r() * py, 1 + r() * 2, 2 + r() * 6); } const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; }
     for (let i = 0; i < (px * py) / 220; i++) { g.fillStyle = r() > 0.5 ? 'rgba(255,255,255,0.05)' : 'rgba(70,60,40,0.06)'; g.fillRect(r() * px, r() * py, 1 + r() * 3, 1 + r() * 3); }
     if (st.boards) { for (let x = 0; x < px; x += 0.24 * sx) { g.fillStyle = 'rgba(70,58,40,' + (0.1 + r() * 0.14) + ')'; g.fillRect(x, 0, 1.5, py); } for (let i = 0; i < px * py / 900; i++) { g.fillStyle = 'rgba(60,60,60,' + (0.1 + r() * 0.2) + ')'; g.fillRect(r() * px, r() * py, 2 + r() * 3, 8 + r() * 30); } }
-    if (st.stone) { const ch = 0.32 * sx; for (let y = 0, row = 0; y < py; y += ch, row++) { for (let x = -(row % 2) * ch; x < px; x += ch * (1.4 + r())) { const f = 0.85 + r() * 0.3; g.fillStyle = 'rgba(' + (r() > 0.5 ? '255,235,190' : '60,40,20') + ',' + (0.05 + r() * 0.1) * f + ')'; g.fillRect(x + 1, y + 1, ch * 1.3, ch - 2); } g.fillStyle = 'rgba(60,45,30,0.25)'; g.fillRect(0, y, px, 1); } }
-    if (st.stain !== false && !st.boards && !st.stone) for (let i = 0; i < Math.max(2, Math.round(w / 3)); i++) { g.fillStyle = 'rgba(80,70,50,' + (0.03 + r() * 0.05) + ')'; g.fillRect(r() * px, 0, 6 + r() * 26, (0.25 + r() * 0.5) * py); }
+    if (st.stone && !(st.wallFor && st.wallFor(face))) { const ch = 0.32 * sx; for (let y = 0, row = 0; y < py; y += ch, row++) { for (let x = -(row % 2) * ch; x < px; x += ch * (1.4 + r())) { const f = 0.85 + r() * 0.3; g.fillStyle = 'rgba(' + (r() > 0.5 ? '255,235,190' : '60,40,20') + ',' + (0.05 + r() * 0.1) * f + ')'; g.fillRect(x + 1, y + 1, ch * 1.3, ch - 2); } g.fillStyle = 'rgba(60,45,30,0.25)'; g.fillRect(0, y, px, 1); } }
+    if (st.stain !== false && !st.boards && !(st.stone && !(st.wallFor && st.wallFor(face)))) for (let i = 0; i < Math.max(2, Math.round(w / 3)); i++) { g.fillStyle = 'rgba(80,70,50,' + (0.03 + r() * 0.05) + ')'; g.fillRect(r() * px, 0, 6 + r() * 26, (0.25 + r() * 0.5) * py); }
     const Y = (y) => (face.ymax - y) * sy;                      // patch y -> canvas y
     const poly = face.ring.map((p) => [(p[0] * face.hx + p[2] * face.hz - face.pmin) * sx, Y(p[1])]);
     const plinthH = st.plinth ? st.plinth.h : 0.6;
