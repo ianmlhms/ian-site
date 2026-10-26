@@ -5,7 +5,7 @@
  * (terrain height 220 m left / right of the line), villages and the real level crossings.  This module loads that file once (preload, async, before the track is
  * built) and resolves it for one track: leg ids -> absolute s.
  *
- *   TS.realLine.preload(routeDef)         fetches data/real/mosel-features.json when the route uses the Mosel line (def.sceneryId === 'mosel')
+ *   TS.realLine.preload(routeDef)         fetches data/real/<key>-features.json when the route has real data (Mosel line: sceneryId 'mosel'; W2c: TS.realLines[sceneryId])
  *   TS.realLine.resolve(def, comp)        -> real | null.  comp.legs = [{ id, s0, s1 }] from track.js
  *   real.water        [{ s0, s1, side, off, half, name }]       absolute s
  *   real.reliefAt(s)  -> { l, r }                                terrain height relative to the track 220 m left / right
@@ -18,27 +18,33 @@
   'use strict';
   const TS = (window.TS = window.TS || {});
   const TAG = '[Lokféierer] real line: ';
-  const DATA_URL = '/pb/train-sim/data/real/mosel-features.json?v=1';
+  const DATA_VERSION = 1;
+  /* W2c: the Mosel line keeps sceneryId 'mosel'; the other real lines (north, south, west, ...) are registered by their real-<id>.js layout in TS.realLines and
+     use their own data file data/real/<id>-features.json (build_real_route.py).  realKey(def) -> the data set of a route, or null (generic landscape). */
+  const realKey = (def) => (!def ? null : def.sceneryId === 'mosel' ? 'mosel' : TS.realLines && def.sceneryId && TS.realLines[def.sceneryId] ? def.sceneryId : null);
+  const dataUrl = (key) => '/pb/train-sim/data/real/' + key + '-features.json?v=' + DATA_VERSION;
   const CLASS = Object.freeze({ field: 0, meadow: 1, forest: 2, vine: 3, resid: 4, indus: 5, water: 6, orchard: 7, urban: 8, scrub: 9, quarry: 10, cemetery: 11, park: 12 });
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-  let cache = null;
-  let pending = null;
+  const caches = new Map();     // key -> parsed document
+  const pendings = new Map();   // key -> promise
 
   async function preload(def) {
-    if (!def || def.sceneryId !== 'mosel') return null;
-    if (cache) return cache;
-    if (!pending) {
-      pending = fetch(DATA_URL, { cache: 'force-cache' })
+    const key = realKey(def);
+    if (!key) return null;
+    if (caches.has(key)) return caches.get(key);
+    if (!pendings.has(key)) {
+      pendings.set(key, fetch(dataUrl(key), { cache: 'force-cache' })
         .then((res) => { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
-        .then((doc) => { cache = doc; return doc; })
-        .catch((error) => { console.warn(TAG + 'scenery data failed to load, the generic landscape is used', error); pending = null; return null; });
+        .then((doc) => { caches.set(key, doc); return doc; })
+        .catch((error) => { console.warn(TAG + 'scenery data failed to load, the generic landscape is used', error); pendings.delete(key); return null; }));
     }
-    return pending;
+    return pendings.get(key);
   }
 
   function resolve(def, comp) {
-    if (!cache || !def || def.sceneryId !== 'mosel' || !comp.legs || !comp.legs.length) return null;
-    const doc = cache;
+    const key = realKey(def);
+    const doc = key ? caches.get(key) : null;
+    if (!doc || !comp.legs || !comp.legs.length) return null;
     const legs = comp.legs.filter((l) => doc.legs[l.id]).map((l) => {
       const f = doc.legs[l.id];
       return { id: l.id, s0: l.s0, s1: l.s1, k: (l.s1 - l.s0) / f.L, f };

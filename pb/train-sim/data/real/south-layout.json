@@ -1,0 +1,797 @@
+{
+ "version": 1,
+ "stations": {
+  "Lëtzebuerg": {
+   "size": 3,
+   "side": "right",
+   "biome": "city",
+   "osm": "Luxembourg",
+   "s_real": 0.0,
+   "plat": [
+    {
+     "lat": -44.9,
+     "edge": -44.3,
+     "s0": 170.0,
+     "s1": 170.0,
+     "ref": "10"
+    },
+    {
+     "lat": -42.5,
+     "edge": -41.1,
+     "s0": 0.0,
+     "s1": 170.0,
+     "ref": "9"
+    },
+    {
+     "lat": -34.6,
+     "edge": -29.5,
+     "s0": 0.0,
+     "s1": 170.0,
+     "ref": "8"
+    },
+    {
+     "lat": -24.0,
+     "edge": -23.2,
+     "s0": 0.0,
+     "s1": 170.0,
+     "ref": "7"
+    },
+    {
+     "lat": -15.3,
+     "edge": -15.0,
+     "s0": 0.0,
+     "s1": 150.0,
+     "ref": "5"
+    },
+    {
+     "lat": -7.1,
+     "edge": -6.8,
+     "s0": 0.0,
+     "s1": 140.0,
+     "ref": "4"
+    },
+    {
+     "lat": 1.7,
+     "edge": 1.5,
+     "s0": 0.0,
+     "s1": 150.0,
+     "ref": "3"
+    },
+    {
+     "lat": 6.6,
+     "edge": 6.2,
+     "s0": 160.0,
+     "s1": 170.0,
+     "ref": "2"
+    },
+    {
+     "lat": 14.1,
+     "edge": 13.7,
+     "s0": 110.0,
+     "s1": 170.0,
+     "ref": "1"
+    }
+   ],
+   "trk": [
+    -40.8,
+    -35.5,
+    -22.8,
+    -17.8,
+    -5.0
+   ]
+  },
+  "Houwald": {
+   "size": 1,
+   "side": "left",
+   "biome": "suburb",
+   "osm": "Howald",
+   "s_real": 2282.5,
+   "plat": [
+    {
+     "lat": -12.0,
+     "edge": -6.7,
+     "s0": -162.5,
+     "s1": 117.5,
+     "ref": "4"
+    },
+    {
+     "lat": -1.6,
+     "edge": -1.4,
+     "s0": -162.5,
+     "s1": 117.5,
+     "ref": "3"
+    },
+    {
+     "lat": 12.3,
+     "edge": 11.6,
+     "s0": -162.5,
+     "s1": 127.5,
+     "ref": "2"
+    },
+    {
+     "lat": 22.8,
+     "edge": 18.8,
+     "s0": -162.5,
+     "s1": 127.5,
+     "ref": "1"
+    }
+   ],
+   "trk": [
+    -20.8,
+    -15.0,
+    4.8,
+    10.8,
+    24.8
+   ]
+  },
+  "Berchem": {
+   "size": 1,
+   "side": "left",
+   "biome": "suburb",
+   "osm": "Berchem",
+   "s_real": 7522.4,
+   "plat": [
+    {
+     "lat": -1.7,
+     "edge": -1.7,
+     "s0": -72.4,
+     "s1": 117.6,
+     "ref": ""
+    },
+    {
+     "lat": 5.8,
+     "edge": 5.8,
+     "s0": -72.4,
+     "s1": 127.6,
+     "ref": ""
+    }
+   ],
+   "trk": [
+    4.0
+   ]
+  },
+  "Bettembuerg": {
+   "size": 2,
+   "side": "right",
+   "biome": "suburb",
+   "osm": "Bettembourg",
+   "s_real": 11460.9,
+   "plat": [
+    {
+     "lat": -24.4,
+     "edge": -14.9,
+     "s0": -80.9,
+     "s1": 159.1,
+     "ref": "1"
+    },
+    {
+     "lat": -16.0,
+     "edge": -3.6,
+     "s0": -90.9,
+     "s1": 139.1,
+     "ref": "2"
+    },
+    {
+     "lat": -11.2,
+     "edge": -2.3,
+     "s0": -90.9,
+     "s1": 139.1,
+     "ref": "3"
+    },
+    {
+     "lat": 1.5,
+     "edge": 1.2,
+     "s0": -50.9,
+     "s1": 169.1,
+     "ref": "5"
+    },
+    {
+     "lat": 15.7,
+     "edge": 14.2,
+     "s0": 39.1,
+     "s1": 169.1,
+     "ref": "7"
+    }
+   ],
+   "trk": [
+    -22.5,
+    -18.2,
+    -8.5,
+    -4.2,
+    15.0
+   ]
+  },
+  "Noertzange": {
+   "size": 1,
+   "side": "right",
+   "biome": "suburb",
+   "osm": "Noertzange",
+   "s_real": 15544.6,
+   "plat": [
+    {
+     "lat": -7.0,
+     "edge": -6.3,
+     "s0": 35.4,
+     "s1": 135.4,
+     "ref": "3"
+    },
+    {
+     "lat": -5.3,
+     "edge": -2.7,
+     "s0": -164.6,
+     "s1": 35.4,
+     "ref": "1"
+    },
+    {
+     "lat": 2.0,
+     "edge": 1.5,
+     "s0": -164.6,
+     "s1": -24.6,
+     "ref": "2"
+    }
+   ],
+   "trk": [
+    -4.0,
+    3.5
+   ]
+  },
+  "Schëffleng": {
+   "size": 1,
+   "side": "left",
+   "biome": "suburb",
+   "osm": "Schifflange",
+   "s_real": 18652.3,
+   "plat": [
+    {
+     "lat": -2.0,
+     "edge": -1.7,
+     "s0": -162.3,
+     "s1": 87.7,
+     "ref": "2"
+    },
+    {
+     "lat": 5.5,
+     "edge": 5.3,
+     "s0": -162.3,
+     "s1": 87.7,
+     "ref": "1"
+    }
+   ],
+   "trk": [
+    3.8
+   ]
+  },
+  "Esch-Uelzecht": {
+   "size": 3,
+   "side": "right",
+   "biome": "city",
+   "osm": "Esch-sur-Alzette",
+   "s_real": 21046.8,
+   "plat": [
+    {
+     "lat": -13.5,
+     "edge": -11.6,
+     "s0": -166.8,
+     "s1": 93.2,
+     "ref": "3"
+    },
+    {
+     "lat": -6.6,
+     "edge": -6.3,
+     "s0": -166.8,
+     "s1": 93.2,
+     "ref": "2"
+    },
+    {
+     "lat": 2.5,
+     "edge": 2.1,
+     "s0": -166.8,
+     "s1": 93.2,
+     "ref": "1"
+    }
+   ],
+   "trk": [
+    -41.8,
+    -37.2,
+    -29.2,
+    -24.8,
+    -20.2,
+    -15.5,
+    -4.5
+   ]
+  },
+  "Belval-Université": {
+   "size": 2,
+   "side": "right",
+   "biome": "suburb",
+   "osm": "Belval-Université",
+   "s_real": 24368.1,
+   "plat": [
+    {
+     "lat": 1.3,
+     "edge": 1.2,
+     "s0": -48.1,
+     "s1": 141.9,
+     "ref": "1"
+    },
+    {
+     "lat": 12.5,
+     "edge": 10.6,
+     "s0": -58.1,
+     "s1": 141.9,
+     "ref": "2"
+    }
+   ],
+   "trk": [
+    14.0,
+    37.0,
+    41.2
+   ]
+  },
+  "Belval-Lycée": {
+   "size": 1,
+   "side": "left",
+   "biome": "farmland",
+   "osm": "Belval Lycée",
+   "s_real": 25267.5,
+   "plat": [
+    {
+     "lat": -1.8,
+     "edge": -1.8,
+     "s0": -57.5,
+     "s1": 142.5,
+     "ref": ""
+    },
+    {
+     "lat": 5.2,
+     "edge": 5.0,
+     "s0": -57.5,
+     "s1": 142.5,
+     "ref": ""
+    }
+   ],
+   "trk": [
+    3.8
+   ]
+  },
+  "Belval-Rédange": {
+   "size": 1,
+   "side": "left",
+   "biome": "farmland",
+   "osm": "Belval-Rédange",
+   "s_real": 26111.1,
+   "plat": [
+    {
+     "lat": -1.8,
+     "edge": -1.6,
+     "s0": -41.1,
+     "s1": 88.9,
+     "ref": "1"
+    },
+    {
+     "lat": 5.4,
+     "edge": 5.3,
+     "s0": -41.1,
+     "s1": 98.9,
+     "ref": "2"
+    }
+   ],
+   "trk": [
+    3.8
+   ]
+  },
+  "Belvaux-Soleuvre": {
+   "size": 1,
+   "side": "right",
+   "biome": "suburb",
+   "osm": "Belvaux-Soleuvre",
+   "s_real": 27723.9,
+   "plat": [
+    {
+     "lat": -5.5,
+     "edge": -5.4,
+     "s0": -13.9,
+     "s1": 166.1,
+     "ref": "1"
+    },
+    {
+     "lat": 1.6,
+     "edge": 1.4,
+     "s0": -3.9,
+     "s1": 166.1,
+     "ref": "2"
+    }
+   ],
+   "trk": [
+    -3.8
+   ]
+  },
+  "Uewerkuer": {
+   "size": 1,
+   "side": "left",
+   "biome": "suburb",
+   "osm": "Oberkorn",
+   "s_real": 30744.0,
+   "plat": [
+    {
+     "lat": -1.7,
+     "edge": -1.6,
+     "s0": -124.0,
+     "s1": 76.0,
+     "ref": "1"
+    },
+    {
+     "lat": 5.5,
+     "edge": 5.3,
+     "s0": -124.0,
+     "s1": 76.0,
+     "ref": "2"
+    }
+   ],
+   "trk": [
+    3.8
+   ]
+  },
+  "Déifferdang": {
+   "size": 2,
+   "side": "left",
+   "biome": "suburb",
+   "osm": "Differdange",
+   "s_real": 32135.4,
+   "plat": [
+    {
+     "lat": -1.8,
+     "edge": -1.7,
+     "s0": -65.4,
+     "s1": 124.6,
+     "ref": "1"
+    },
+    {
+     "lat": 5.3,
+     "edge": 5.2,
+     "s0": -65.4,
+     "s1": 124.6,
+     "ref": "2"
+    }
+   ],
+   "trk": [
+    3.8
+   ]
+  },
+  "Nidderkuer": {
+   "size": 1,
+   "side": "left",
+   "biome": "suburb",
+   "osm": "Niederkorn",
+   "s_real": 33765.5,
+   "plat": [
+    {
+     "lat": -1.9,
+     "edge": -1.4,
+     "s0": -25.5,
+     "s1": 154.5,
+     "ref": "1"
+    },
+    {
+     "lat": 5.4,
+     "edge": 5.3,
+     "s0": -25.5,
+     "s1": 154.5,
+     "ref": "2"
+    }
+   ],
+   "trk": [
+    3.8
+   ]
+  },
+  "Péiteng": {
+   "size": 2,
+   "side": "right",
+   "biome": "suburb",
+   "osm": "Pétange",
+   "s_real": 36819.9,
+   "plat": [
+    {
+     "lat": 1.8,
+     "edge": 1.6,
+     "s0": -169.9,
+     "s1": 80.1,
+     "ref": "3"
+    },
+    {
+     "lat": 7.2,
+     "edge": 7.1,
+     "s0": -169.9,
+     "s1": 80.1,
+     "ref": "2"
+    },
+    {
+     "lat": 15.2,
+     "edge": 14.9,
+     "s0": -169.9,
+     "s1": 80.1,
+     "ref": "1"
+    }
+   ],
+   "trk": [
+    -22.2,
+    -17.8,
+    -13.5,
+    -9.0,
+    -4.2,
+    9.0,
+    13.5
+   ]
+  },
+  "Lamadelaine": {
+   "size": 1,
+   "side": "right",
+   "biome": "suburb",
+   "osm": "Lamadelaine",
+   "s_real": 38169.2,
+   "plat": [
+    {
+     "lat": -5.5,
+     "edge": -5.4,
+     "s0": -129.2,
+     "s1": 60.8,
+     "ref": "2"
+    },
+    {
+     "lat": 1.6,
+     "edge": 1.6,
+     "s0": -129.2,
+     "s1": 60.8,
+     "ref": "1"
+    }
+   ],
+   "trk": [
+    -3.8
+   ]
+  },
+  "Rodange": {
+   "size": 2,
+   "side": "left",
+   "biome": "industrial",
+   "osm": "Rodange",
+   "s_real": 39330.1,
+   "plat": [
+    {
+     "lat": -18.6,
+     "edge": -17.1,
+     "s0": -100.1,
+     "s1": 19.9,
+     "ref": "1"
+    },
+    {
+     "lat": -11.1,
+     "edge": -9.5,
+     "s0": -110.1,
+     "s1": 19.9,
+     "ref": "2"
+    },
+    {
+     "lat": -4.5,
+     "edge": -2.3,
+     "s0": -160.1,
+     "s1": 19.9,
+     "ref": "3"
+    },
+    {
+     "lat": 16.6,
+     "edge": 16.5,
+     "s0": -160.1,
+     "s1": -90.1,
+     "ref": "7"
+    }
+   ],
+   "trk": [
+    -16.5,
+    -12.8,
+    5.2,
+    10.0,
+    15.0
+   ]
+  }
+ },
+ "segments": {
+  "main": [
+   {
+    "t": "station",
+    "name": "Lëtzebuerg"
+   },
+   {
+    "t": "leg",
+    "id": "S01",
+    "from": "Lëtzebuerg",
+    "to": "Houwald",
+    "length": 538,
+    "spec": "s61:g-0.25:v120:bcity l565/153 s* r745/90:g0.25 r745/90:g0.5:bfarmland s55:g0.5"
+   },
+   {
+    "t": "station",
+    "name": "Houwald"
+   },
+   {
+    "t": "leg",
+    "id": "S02",
+    "from": "Houwald",
+    "to": "Berchem",
+    "length": 1336,
+    "spec": "s*:g0.5:v120:bcity l587/359:g-0.5:bforest s47:g-0.75 r600/73:g-1 r600/111:g-1:bfarmland r600/174:g-0.75 s85:g-1 s89 r1003/111 s49 s45:g0.25:v140 s95:g0.5:bsuburb"
+   },
+   {
+    "t": "station",
+    "name": "Berchem"
+   },
+   {
+    "t": "leg",
+    "id": "S03",
+    "from": "Berchem",
+    "to": "Bettembuerg",
+    "length": 985,
+    "spec": "r1032/92:v140:bsuburb s57:g-0.25 s66:g-0.25:bfarmland s*:bindustrial r1096/71:g0.25 s94:g0.5:bsuburb r955/98:g-0.25:bfarmland s54:g-0.5 l513/89:g-0.25 l513/51:g0.25 l1335/77:g0.75:Br,5,w l1335/31:g0.75:bsuburb r1056/102:g0.5:T"
+   },
+   {
+    "t": "station",
+    "name": "Bettembuerg"
+   },
+   {
+    "t": "leg",
+    "id": "S04",
+    "from": "Bettembuerg",
+    "to": "Noertzange",
+    "length": 1024,
+    "spec": "r380/88:g0.25:v140:bsuburb r380/142:g0.5:v90 s38:g0.5 l527/50:g0.25 l527/88:g-0.25:bfarmland s*:g-0.25:v100 l718/79:g-0.25 s81:g-0.5 s93:g0.5 l702/71:g1 s45:g1 r589/117:g0.5"
+   },
+   {
+    "t": "station",
+    "name": "Noertzange"
+   },
+   {
+    "t": "leg",
+    "id": "S05",
+    "from": "Noertzange",
+    "to": "Schëffleng",
+    "length": 761,
+    "spec": "r631/82:v100:bsuburb s116:g0.25:bfarmland s*:g0.75 l509/68:g0.5 l509/95:g0.25:bsuburb s37:g-0.25 s64:g-0.5 r718/82:g-0.25 s95:g0.25"
+   },
+   {
+    "t": "station",
+    "name": "Schëffleng"
+   },
+   {
+    "t": "leg",
+    "id": "S06",
+    "from": "Schëffleng",
+    "to": "Esch-Uelzecht",
+    "length": 568,
+    "spec": "s59:g0.5:v100:bsuburb l562/77:g0.5 s*:g0.5 l584/77:bfarmland s40 s56:g-0.25:v90:bsuburb s115:g-0.25"
+   },
+   {
+    "t": "station",
+    "name": "Esch-Uelzecht"
+   },
+   {
+    "t": "leg",
+    "id": "S07",
+    "from": "Esch-Uelzecht",
+    "to": "Belval-Université",
+    "length": 818,
+    "spec": "s74:g0.5:v90:bsuburb r380/266:Br,5,w l408/89 s34:g0.25 s60:g0.5:bfarmland r425/73:g0.75 s*:g0.75 s58:g1:bindustrial r594/79:g1"
+   },
+   {
+    "t": "station",
+    "name": "Belval-Université"
+   },
+   {
+    "t": "leg",
+    "id": "S08",
+    "from": "Belval-Université",
+    "to": "Belval-Lycée",
+    "length": 480,
+    "spec": "l594/267:g0.25:v90:bsuburb l594/173:g1:bfarmland s*"
+   },
+   {
+    "t": "station",
+    "name": "Belval-Lycée"
+   },
+   {
+    "t": "leg",
+    "id": "S09",
+    "from": "Belval-Lycée",
+    "to": "Belval-Rédange",
+    "length": 480,
+    "spec": "s*:g1:v90:bfarmland r434/197:g1"
+   },
+   {
+    "t": "station",
+    "name": "Belval-Rédange"
+   },
+   {
+    "t": "leg",
+    "id": "S10",
+    "from": "Belval-Rédange",
+    "to": "Belvaux-Soleuvre",
+    "length": 480,
+    "spec": "r439/60:g1:v90:bsuburb s74:g1 r411/78:g1 s*:g1 l380/160:g1"
+   },
+   {
+    "t": "station",
+    "name": "Belvaux-Soleuvre"
+   },
+   {
+    "t": "leg",
+    "id": "S11",
+    "from": "Belvaux-Soleuvre",
+    "to": "Uewerkuer",
+    "length": 737,
+    "spec": "s*:g-0.75:v90:bsuburb s53:g-0.75:bfarmland s26:g-0.5:bsuburb s47 l399/103:g0.25:bfarmland l399/70:g-0.75 s30:g-1 r402/144:g-1 s38:g-1 r393/140:g-1 s28:g-0.75:bsuburb"
+   },
+   {
+    "t": "station",
+    "name": "Uewerkuer"
+   },
+   {
+    "t": "leg",
+    "id": "S12",
+    "from": "Uewerkuer",
+    "to": "Déifferdang",
+    "length": 480,
+    "spec": "s94:g-0.75:v90:bsuburb r397/145:g-1:bfarmland s54:g-1:bsuburb s70:g-1:X s*:g-1"
+   },
+   {
+    "t": "station",
+    "name": "Déifferdang"
+   },
+   {
+    "t": "leg",
+    "id": "S13",
+    "from": "Déifferdang",
+    "to": "Nidderkuer",
+    "length": 480,
+    "spec": "l594/78:g0.25:v90:bsuburb r594/74:g0.5 s38:g0.25 s*:g-0.5 l594/98:g-1 r594/47:g-1"
+   },
+   {
+    "t": "station",
+    "name": "Nidderkuer"
+   },
+   {
+    "t": "leg",
+    "id": "S14",
+    "from": "Nidderkuer",
+    "to": "Péiteng",
+    "length": 746,
+    "spec": "s75:v90:bsuburb l405/49 l405/69:g-0.25:bindustrial r435/49 r435/37:bfarmland r594/55:g-0.25 l594/63:g-0.75 l383/82:g-0.75 l380/59:g-0.5 s75:g-0.25 s*:g-0.25:bsuburb"
+   },
+   {
+    "t": "station",
+    "name": "Péiteng"
+   },
+   {
+    "t": "leg",
+    "id": "S15",
+    "from": "Péiteng",
+    "to": "Lamadelaine",
+    "length": 480,
+    "spec": "s186:g-0.5:v100:bsuburb r586/68:g-0.75 s*:g-1"
+   },
+   {
+    "t": "station",
+    "name": "Lamadelaine"
+   },
+   {
+    "t": "leg",
+    "id": "S16",
+    "from": "Lamadelaine",
+    "to": "Rodange",
+    "length": 480,
+    "spec": "l718/60:g-1:v100:bsuburb s65:g-0.75 s147:g-0.5:bindustrial s*"
+   },
+   {
+    "t": "station",
+    "name": "Rodange"
+   }
+  ]
+ }
+}
