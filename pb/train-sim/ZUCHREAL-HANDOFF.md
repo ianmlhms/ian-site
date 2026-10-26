@@ -103,3 +103,8 @@ the tram hole scan; Rodange steelworks halls (250 m) accepted in the geometry al
 W2d gates (26 Oct 2026): `run_all.mjs train` 6/6 PASS (train-sim, -audio, -touch, -career-lock, -world incl. the new patch-geometry step, -routes); check_site: only the old karttracker-ios-privacy orphan; cv_head PROBLEMS: 0;
 hole scans east 205 poses / 3164 rays, wittlich 465 / 7188, trier 530 / 8188: 0 flagged, 0 ray failures.  WebKit smoke at Lëtzebuerg (medium): 874 draws / 400k triangles, 16.7 ms mean frame; the 874 draws are mostly the
 657 single-face wall meshes of the LOD2 station building (station-building.js builds one mesh per wall face: merge per material to save draw calls).
+
+
+## W2e result (26 Oct 2026)
+Draw calls of the station patches batched (REAL-LINES.md "W2e"): WebKit medium cab at Lëtzebuerg 874 -> 213 draws (aerial 799 -> 139); Munsbach 228, Roodt 238 -> 217, Ettelbréck 233, Esch 202: all <= 260.  Place de la Gare paved
+(terminus patch frame extrapolated beyond the track end).  Gates: run_all train 6/6, check_site only the karttracker-ios-privacy orphan, cv_head PROBLEMS: 0.  Screenshots `reports/zuchreal/w2e/`.
