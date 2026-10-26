@@ -217,6 +217,7 @@
     spec.nearBenches.forEach((z) => k.bench(lB - 0.7, z, '#5a5f66'));
     k.bin(lB - 0.6, spec.nearTicket + 6, '#3b4046');
     const fa = spec.far;
+    if (!fa) return;
     k.track(-fa.track, -135, 135, { pole: true });
     k.platformBox(-fa.edge, fa.width, -1, fa.z0, fa.z1);
     fa.plates.forEach((z) => dbNameBoard(api, f, fa.edge + 0.6, z, spec.name, true));
@@ -288,6 +289,19 @@
       k.bench(lB - 0.7, 4, '#5a5f66'); k.bench(lB - 0.7, 38, '#5a5f66');
       k.bin(lB - 0.6, 12, '#3b4046');
       k.track(lB + 1.8, -135, 135, { pole: true });
+    },
+  });
+
+  /* ================================================================ KREUZ KONZ (no usable reference photo: the Commons photos found for 'Konz' show the other Konz stations; built from the patch, DB standard furniture)
+   * Patch: game track x 0, one side platform on the LEFT (x -1.2 .. -6.8, z -91 .. 64) with a shelter at z -16; the platform of the diverging Saar line curves away on the left (x -3 .. -29, z 2 .. 91;
+   * not modelled, the generic surroundings show the relief).  No station building. */
+  reg('Kreuz Konz', {
+    canopy: false,
+    furniture: false,
+    build(api) {
+      buildDbHalt(api, {
+        name: 'Kreuz Konz', nearShelters: [-16], nearTicket: -4, nearPlates: [-60, 40], nearMasts: [-80, -50, -26, 0, 26, 52], nearBenches: [-36, 18], far: null,
+      });
     },
   });
 })();

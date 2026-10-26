@@ -1,0 +1,52 @@
+{
+ "route": "trier",
+ "station": "Kreuz Konz",
+ "refs": "Kreuz-Konz",
+ "views": [
+  {
+   "photo": "noref.png",
+   "pos": [
+    -3.0,
+    60,
+    1.7
+   ],
+   "look": [
+    -4,
+    -30,
+    2.4
+   ],
+   "fov": 62,
+   "note": "platform ahead (no reference photo)"
+  },
+  {
+   "photo": "noref.png",
+   "pos": [
+    4.0,
+    40,
+    1.7
+   ],
+   "look": [
+    -6,
+    -10,
+    2.2
+   ],
+   "fov": 62,
+   "note": "across to the platform"
+  },
+  {
+   "photo": "noref.png",
+   "pos": [
+    -20,
+    20,
+    12
+   ],
+   "look": [
+    0,
+    0,
+    0
+   ],
+   "fov": 60,
+   "note": "from above"
+  }
+ ]
+}
