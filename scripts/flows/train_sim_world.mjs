@@ -46,7 +46,7 @@ export const flow = {
               if (![p.x, p.z, p.yT].every(Number.isFinite)) out.nanCount += 1;
               if (i > 0) { const q = r.pts[i - 1]; const g = Math.abs(p.yT - q.yT) / Math.max(0.5, Math.hypot(p.x - q.x, p.z - q.z)); if (r.kind === 'patch') { if (p.u <= args.patchRun) out.patchGrade = Math.max(out.patchGrade, g); } else out.maxGrade = Math.max(out.maxGrade, g); }
               const y = track.terrainHeightAt(p.x, p.z);
-              if (Math.abs(y - p.yT) > args.surfaceTol) out.surfaceProblems.push({ s: Math.round(c.s), road: r.id, u: Math.round(p.u), dy: Math.round((y - p.yT) * 100) / 100 });
+              if (Math.abs(y - p.yT) > (r.kind === 'patch' ? args.surfaceTol * 8 : args.surfaceTol))   // patch roads ARE the real relief; their traffic arm is only capped at 16 % (crossing-roads.js) out.surfaceProblems.push({ s: Math.round(c.s), road: r.id, u: Math.round(p.u), dy: Math.round((y - p.yT) * 100) / 100 });
               if (i % 4 === 0 && r.kind === 'asphalt') {
                 rc.set(new THREE.Vector3(p.x, p.yT + 40, p.z), down);
                 const hit = rc.intersectObjects(meshes, false)[0];
