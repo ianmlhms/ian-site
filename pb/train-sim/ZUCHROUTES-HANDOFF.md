@@ -82,11 +82,18 @@ node scripts/zuch/station_shots.mjs <dir> west Mamer-Lycée --tag v1
 node scripts/zuch/route_aerial.mjs south <dir> 1500 15000 3300 --up 160
 ```
 
-## W3 (26 Oct 2026, fresh agent) - items 1 - 4 done, 5 and 6 NOT started (token budget)
+## W3 (26 Oct 2026, fresh agent) - items 1 - 6 DONE (details in REAL-LINES.md "W3: steelworks ..." and "W3 (26 Oct 2026, fresh agent): Luxtram hole scan, south steps, abroad routes")
 
-Done: steelworks silhouettes (industry layer) + Belval furnaces, Bettembourg yard, Gare Centrale trains / masts / Grande Halle, staggered platforms verified (details REAL-LINES.md "W3").  Reports `website-overnight/reports/zuchreal/w3/`.
-OPEN, in order:
- 5. **Tram hole scan**: `hole_lib.mjs` / `hole_scan.mjs` are rail only (`scanRoute(sim, routeId)`, `zlib.mjs start(routeId)` -> `__tsTest.startService`).  The Luxtram world (`luxtram-world.js`, `luxtram.js`) needs its own start (tram career) and camera; extend `zlib.mjs` with a tram start and run the same ray / sky checks along the tram track (data `data/luxtram-track.json`).
- 6. **Abroad routes** (metz, brussels, paris): plan unchanged from "NOT done / open 3" above (stop lists decided, station coordinates listed, PBFs in `zuch-work/abroad/`).  Steps: (a) `fetch_route_corridor.py` two-stage fetch (rails for a wide box -> Dijkstra path -> tiles along the path), (b) `real_route_defs.py` entries with per-route length params (`PARAMS` out of `build_real_route.py`),
-    (c) DEM auto-download, (d) generic stations + silhouettes for Metz-Ville, Namur, Bruxelles-Midi, Paris-Est (models in `stations-abroad.js`), (e) Thionville stop for paris, (f) split core / heavy data so the download stays near the LU routes.  `build_industry.py` only has a `south` CFG (add communes / boxes for other LU routes; France / Belgium have no LOD2 -> OSM footprints with default heights).
- Small leftovers: wagons next to the main line at yard lat 8 m look big in the cab (raise YARD_LAT[0] to 10); the huge Differdange hall is one LOD2 polygon (72 000 m2, drawn as one slab with skylight strips); Schifflange works: no big LOD2 hall in the OSM zone (nothing drawn); the grey `indus` ground class is flat.
+Items 1 - 4 (steelworks silhouettes + Belval furnaces, Bettembourg yard, staggered platforms, Gare Centrale trains / masts / Grande Halle) were live as `a07fd078`.  This agent (branch `zuchroutes`, commits `35be5eb2` .. HEAD, NOT pushed):
+* **Item 5, Luxtram hole scan**: `scripts/zuch/tram_hole_lib.mjs` / `tram_hole_scan.mjs`, flow `train_sim_tram_holes.mjs`; the fixes were all in the trench / tunnel / pit geometry (`luxtram-world.js`, `luxtram-pits.js`), see REAL-LINES.  `tram_pose_shot.mjs [--magenta]` shoots the tram world from track poses.
+* **South steps** (s 8795 / 11675 / 15185): river crossing steeper than the row spacing: `track.js riverRows`.  South scan 0 / 0.
+* **Item 6, abroad routes**: metz (12 stops, 119 km real), brussels (12 stops, 231 km real, Brussels tunnel), paris (5 stops, 376 km real, LGV Est).  Pipeline: `fetch_route_corridor.py <id>` (two-stage, mask read), `real_route_defs.py` (params / snap_gap / rail_class / ardennes_between / highspeed_biome per route), `build_real_route.py plan|emit <id>` (emit 2 / 6 / 18 min), runtime `real-metz.js` etc. loaded in `train-sim.html`, `routes.js realLineBody`.  Re-run order after a pipeline change: fetch (once) -> emit.
+* Generic fixes found on the way: crossing planner (rivers near the line, shared parallel roads), rail land class, rail portal foot, `build_leg` fill length, `emit` crossings tuple.  Tools: `flows/train_sim_abroad.mjs`.
+Gates (26 Oct, HEAD): see the last lines of REAL-LINES.md (flows, hole scans, budgets).
+
+OPEN (priority order):
+ 1. **Station surroundings abroad**: Metz-Ville / Nancy / Namur / Bruxelles-Midi / Paris-Est stand in the generic land-class scenery (scattered houses along real roads, bare ballast yards): a patch from OSM building footprints (heights from `height` / `building:levels`, painted ground, roads) in the `build_station_patch.py` format would make the cities look like cities.  No LiDAR / LOD2 in France / Belgium (IGN BD TOPO / Wallonia LiDAR would be the sources).
+ 2. **Career pacing of premium trains**: dwell 30 - 45 s vs the exchange time of kiss / hst (see REAL-LINES): the timetable could scale the dwell with the train capacity and the station size.
+ 3. Landmarks abroad: Uckange blast furnace U4 (beside the line), Brussels Tour du Midi is in the model, Thionville steelworks; `build_industry.py` only has a `south` CFG (France / Belgium: OSM footprints with default heights).
+ 4. Metz-Ville model: tower roof / gable are simplified; Bruxelles-Midi has no forecourt building (only platforms, concourse, tower); Namur forecourt arch is a flat texture.
+ 5. Small: north s 2945 lat 68 terrain-function step 0.98 m (Dummeldeng patch fade, pre-existing); metz s 4115 step 0.72 m; wagons next to the main line at yard lat 8 m look big in the cab (raise YARD_LAT[0] to 10); the Differdange hall is one 72 000 m2 slab.
