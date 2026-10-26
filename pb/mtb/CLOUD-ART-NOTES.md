@@ -219,3 +219,14 @@ limitations, so no number could be captured for them this session.
 ## Final commit
 
 `935d4104` on `mtb-cloud`, pushed to `origin/mtb-cloud`.
+
+## Low-tier budget fix: distance-culled world props (26 Oct 2026)
+
+The junction tape (317 branches x 120 triangles = 38 k) was one world-wide mesh with `frustumCulled = false`, so every barrier on every trail was drawn every frame; that
+pushed `low` to 334 k (start) / 356 k (gorge). `props.js` now builds signposts, junction tape, bridges and roots with `rangedParts`: each piece keeps its slice of the index
+buffer and `props.update(x, z)` (called from the frame loop) rewrites the index buffer to the pieces within 200-280 m of the camera (only when the camera moved 14 m),
+still one draw call per mesh. Also fixes a bug: the arrow signs before each fork were added to the signpost builder after its mesh was built, so they never showed.
+Low: start 334.9 k -> 274.3 k, gorge 356.0 k -> 294.9 k; medium 463.6 k / 494.2 k -> 403.0 k / 433.1 k; high 721.8 k / 696.7 k -> 661.2 k / 635.7 k. Draw calls unchanged.
+Also: `findAllJunctions` ran at boot and took about 2.4 s (every trail sample scanned every other way, every candidate post scanned the whole trail). It now uses
+grids (way endpoints, trail samples): 12 ms, identical output (160 junctions, 317 branches, compared field by field). That 2.4 s long task was also what made the
+`game-cache` flow miss the 2.8 s "vum Apparat gelueden" note on the second open.

@@ -3,6 +3,7 @@
  * `track` / `road` way's endpoint landing on a trail sample IS a real fork: the rider could physically ride that way instead of the trail.
  * Pure, no THREE: shared by the renderer (barrier tape + an arrow sign before the fork) and the harness (every fork found here must be marked). */
 
+const cellKey = (gx, gz) => gx * 262144 + gz;                // integer grid cell -> map key (exact for any coordinate inside a 130 km box)
 const RIDDEN_OTHER = Object.freeze(['path', 'track', 'road']);     // kinds that are a real alternative for a bike (not a river/stream/ditch)
 
 /** Junctions of one trail: [{ x, z, approach: { x, z, yaw }, branches: [{ wayId, postA: {x,z}, postB: {x,z}, yaw }] }].
@@ -15,24 +16,44 @@ export function findTrailJunctions(network, trailWay, opt = {}) {
   const tapeSpan = opt.tapeSpan ?? 2.6;             // m: how wide the barrier is (it must reach past the branch's edges)
   const S = network.samples;
   const others = network.ways.filter((w) => RIDDEN_OTHER.includes(w.kind));
+  // the endpoints of every other way in a grid (cell = tolerance): a trail sample only looks at its 3x3 cells instead of every way (this ran on the boot path: seconds on a school iPad)
+  const endGrid = new Map();
+  others.forEach((ow, oi) => {
+    for (const endIsFirst of [true, false]) {
+      const end = endIsFirst ? ow.first : ow.first + ow.count - 1;
+      const key = cellKey(Math.floor(S.px[end] / tolerance), Math.floor(S.pz[end] / tolerance));
+      const list = endGrid.get(key);
+      if (list) list.push({ ow, oi, endIsFirst, end }); else endGrid.set(key, [{ ow, oi, endIsFirst, end }]);
+    }
+  });
   const hits = [];
   for (let i = trailWay.first; i < trailWay.first + trailWay.count; i++) {
-    const tx = S.px[i], tz = S.pz[i];
-    for (const ow of others) {
-      for (const endIsFirst of [true, false]) {
-        const end = endIsFirst ? ow.first : ow.first + ow.count - 1;
-        const dx = S.px[end] - tx, dz = S.pz[end] - tz;
-        if (dx * dx + dz * dz > tolerance * tolerance) continue;
-        hits.push({ i, way: ow, endIsFirst });
+    const tx = S.px[i], tz = S.pz[i], cx = Math.floor(tx / tolerance), cz = Math.floor(tz / tolerance);
+    for (let gx = cx - 1; gx <= cx + 1; gx++) {
+      for (let gz = cz - 1; gz <= cz + 1; gz++) {
+        const list = endGrid.get(cellKey(gx, gz));
+        if (!list) continue;
+        for (const e of list) {
+          const dx = S.px[e.end] - tx, dz = S.pz[e.end] - tz;
+          if (dx * dx + dz * dz > tolerance * tolerance) continue;
+          hits.push({ i, way: e.ow, endIsFirst: e.endIsFirst, oi: e.oi });
+        }
       }
     }
   }
   if (!hits.length) return [];
-  hits.sort((a, b) => a.i - b.i);
+  hits.sort((a, b) => a.i - b.i || a.oi - b.oi || (b.endIsFirst ? 1 : 0) - (a.endIsFirst ? 1 : 0));     // trail order, then the original way / end order (the first hit of a way wins)
   const clusters = [[hits[0]]];
   for (let k = 1; k < hits.length; k++) {
     const last = clusters[clusters.length - 1];
     if (hits[k].i - last[last.length - 1].i <= clusterGap) last.push(hits[k]); else clusters.push([hits[k]]);
+  }
+  const CLEAR_CELL = Math.max(minClear, 1);
+  const trailGrid = new Map();                      // the trail's own samples by cell: "is anything of the whole trail closer than minClear" without a scan of all of it
+  for (let k = trailWay.first; k < trailWay.first + trailWay.count; k++) {
+    const key = cellKey(Math.floor(S.px[k] / CLEAR_CELL), Math.floor(S.pz[k] / CLEAR_CELL));
+    const list = trailGrid.get(key);
+    if (list) list.push(k); else trailGrid.set(key, [k]);
   }
   const out = [];
   for (const cl of clusters) {
@@ -46,7 +67,14 @@ export function findTrailJunctions(network, trailWay, opt = {}) {
     let ai = atI, acc = 0;
     while (ai > trailWay.first && acc < approachDist) { acc += Math.hypot(S.px[ai] - S.px[ai - 1], S.pz[ai] - S.pz[ai - 1]); ai--; }
     // the whole trail, not just the samples near this fork: a trail can loop back close to itself elsewhere (hairpins, the marathon's long route)
-    const clearanceAt = (x, z) => { let best = 1e18; for (let k = trailWay.first; k < trailWay.first + trailWay.count; k++) { const d = Math.hypot(S.px[k] - x, S.pz[k] - z); if (d < best) best = d; } return best; };
+    const isClear = (x, z) => {
+      const cx = Math.floor(x / CLEAR_CELL), cz = Math.floor(z / CLEAR_CELL), r2 = minClear * minClear;
+      for (let gx = cx - 1; gx <= cx + 1; gx++) for (let gz = cz - 1; gz <= cz + 1; gz++) {
+        const list = trailGrid.get(cellKey(gx, gz));
+        if (list) for (const k of list) { const dx = S.px[k] - x, dz = S.pz[k] - z; if (dx * dx + dz * dz < r2) return false; }
+      }
+      return true;
+    };
     const branches = [];
     const half = tapeSpan / 2;
     for (const h of byWay.values()) {
@@ -62,7 +90,7 @@ export function findTrailJunctions(network, trailWay, opt = {}) {
         const tl = Math.hypot(tx, tz) || 1; tx /= tl; tz /= tl;
         const px = -tz, pz = tx;
         const a = { x: S.px[at] + px * half, z: S.pz[at] + pz * half }, b = { x: S.px[at] - px * half, z: S.pz[at] - pz * half };
-        if (clearanceAt(a.x, a.z) >= minClear && clearanceAt(b.x, b.z) >= minClear) { postA = a; postB = b; break; }
+        if (isClear(a.x, a.z) && isClear(b.x, b.z)) { postA = a; postB = b; break; }
       }
       let cleared = !!postA;
       if (!postA) {                                                   // the branch never clears within its own samples (very short spur): push straight out from the fork instead, as far as it takes
@@ -71,7 +99,7 @@ export function findTrailJunctions(network, trailWay, opt = {}) {
         for (let d = minClear + half + 0.5; d < minClear + half + 60; d += 0.5) {
           const ex = jx + tx * d, ez = jz + tz * d;
           postA = { x: ex + px * half, z: ez + pz * half }; postB = { x: ex - px * half, z: ez - pz * half };
-          if (clearanceAt(postA.x, postA.z) >= minClear && clearanceAt(postB.x, postB.z) >= minClear) { cleared = true; break; }
+          if (isClear(postA.x, postA.z) && isClear(postB.x, postB.z)) { cleared = true; break; }
         }
       }
       // a branch that runs the whole trail's length within minClear (a short connector spur right next to the trail itself) gets no barrier: there is

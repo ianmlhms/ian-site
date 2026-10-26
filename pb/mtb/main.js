@@ -609,6 +609,7 @@ async function boot() {
     forest.update(c.x, c.z, bike.vx, bike.vz, elapsed);
     rockView.update(c.x, c.z);
     town.update(c.x, c.z);
+    props.update(c.x, c.z);
     foamTimer -= dt;
     if (foamTimer <= 0) { foamTimer = 0.4; water.updateFoam(c.x, c.z, rockView.stones); }
     rain.update(); leaves.update(); shafts.update(c.x, c.z); birds.update(); insects.update(c.x, c.z);

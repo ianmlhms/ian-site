@@ -57,6 +57,44 @@ function strip(b, left, right, color) {              // a ribbon from two polyli
   b.addArrays(pos, nor, idx, (v, n, k) => mul(color, 0.93 + 0.07 * ((k >> 1) % 2)));
 }
 
+/** A merged static mesh that only draws the pieces near the camera. The world-wide props (signposts, junction tape, bridges, roots) are one mesh each so the draw-call count
+ *  stays flat, but a single mesh cannot be frustum-culled in parts: all of it was drawn every frame. Each piece records its centre and its slice of the index buffer
+ *  (`add`); `refresh(x, z)` rewrites the index buffer to the slices within `radius` metres whenever the camera has moved REFRESH_STEP, still one draw call. */
+const REFRESH_STEP = 14;
+function rangedParts(builder, radius) {
+  const parts = [];
+  let mesh = null, full = null, lastX = 1e12, lastZ = 1e12;
+  return {
+    /** Build the pieces with `fn(builder)` and remember them as one culling unit centred on (x, z). */
+    builder,
+    /** Record that everything added to the builder since index offset `a` is one piece centred on (x, z). */
+    mark(x, z, a) { const n = builder.idx.length - a; if (n > 0) parts.push({ x, z, a, n }); },
+    add(x, z, fn) { const a = builder.idx.length; fn(builder); const n = builder.idx.length - a; if (n > 0) parts.push({ x, z, a, n }); },
+    finish(material, name, scene, meshes) {
+      const geometry = builder.build();
+      full = Uint32Array.from(builder.idx);
+      geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(full.length), 1));
+      geometry.index.setUsage(THREE.DynamicDrawUsage);
+      geometry.setDrawRange(0, 0);
+      mesh = new THREE.Mesh(geometry, material); mesh.frustumCulled = false; mesh.name = name; scene.add(mesh); meshes.push(mesh);
+      return mesh;
+    },
+    refresh(x, z, force = false) {
+      if (!mesh || (!force && Math.hypot(x - lastX, z - lastZ) < REFRESH_STEP)) return;
+      lastX = x; lastZ = z;
+      const out = mesh.geometry.index.array, r2 = radius * radius;
+      let w = 0;
+      for (const p of parts) {
+        const dx = p.x - x, dz = p.z - z;
+        if (dx * dx + dz * dz > r2) continue;
+        out.set(full.subarray(p.a, p.a + p.n), w); w += p.n;
+      }
+      mesh.geometry.setDrawRange(0, w);
+      mesh.geometry.index.needsUpdate = true;
+    },
+  };
+}
+
 export function createProps({ scene, env, surface, trails, decks, junctions = [] }) {
   const mat = createSolidMaterial(env);
   const decalMat = createSolidMaterial(env);
@@ -88,27 +126,30 @@ export function createProps({ scene, env, surface, trails, decks, junctions = []
     }
     box(b, p.x, y0 + 1.95, p.z, 0.2, 0.06, 0.2, yaw, WOOD_LIGHT);        // a little roof cap
   }
-  const posts = new Builder();
-  for (const t of trails) for (const p of t.posts) sign(posts, p, t.grade);
-  addMesh(posts, mat, 'signposts');
+  const SIGN_RADIUS = 260, TAPE_RADIUS = 200, BRIDGE_RADIUS = 280, ROOT_RADIUS = 200;
+  const postParts = rangedParts(new Builder(), SIGN_RADIUS);
+  for (const t of trails) for (const p of t.posts) postParts.add(p.x, p.z, (b) => sign(b, p, t.grade));
 
   // ------------------------------------------------------------ junctions: an arrow sign before every fork, red-white barrier tape across every wrong branch
   const gradeOf = new Map(trails.map((t) => [t.id, t.grade]));
-  const barriers = new Builder();
+  const barrierParts = rangedParts(new Builder(), TAPE_RADIUS);
   let junctionBranches = 0;
   for (const j of junctions) {
     const grade = gradeOf.get(j.trailId) || 'green';
     const { yaw } = j.approach;
     const rx = -Math.sin(yaw), rz = Math.cos(yaw);                         // the arrow board stands to the right of the trail, like every other signpost
-    sign(posts, { k: 'dir', x: j.approach.x + rx * 2.1, z: j.approach.z + rz * 2.1, yaw, n: 0 }, grade);
-    for (const br of j.branches) { barrierTape(barriers, br.postA, br.postB, groundY); junctionBranches++; }
+    const sp = { k: 'dir', x: j.approach.x + rx * 2.1, z: j.approach.z + rz * 2.1, yaw, n: 0 };
+    postParts.add(sp.x, sp.z, (b) => sign(b, sp, grade));
+    for (const br of j.branches) { barrierParts.add((br.postA.x + br.postB.x) / 2, (br.postA.z + br.postB.z) / 2, (b) => barrierTape(b, br.postA, br.postB, groundY)); junctionBranches++; }
   }
-  addMesh(barriers, mat, 'junction barriers');
+  postParts.finish(mat, 'signposts', scene, meshes);
+  barrierParts.finish(mat, 'junction barriers', scene, meshes);
 
   // ------------------------------------------------------------ bridges
-  const bridges = new Builder();
+  const bridgeParts = rangedParts(new Builder(), BRIDGE_RADIUS), bridges = bridgeParts.builder;
   for (const d of decks) {
     if (d.kind === 'stone') continue;                                    // the arch footbridge is drawn by bridge-model.js
+    const a0 = bridges.idx.length;
     const ax = d.ux, az = d.uz, rx = -az, rz = ax;                       // along and right (x east, z south)
     const hw = d.w / 2;
     const at = (u, side, lift = 0) => { const t = u / d.len; return V3(d.x0 + ax * u + rx * side, d.topA + (d.topB - d.topA) * t + lift, d.z0 + az * u + rz * side); };
@@ -130,11 +171,12 @@ export function createProps({ scene, env, surface, trails, decks, junctions = []
       const y = groundY(c.x, c.z);
       box(bridges, c.x, (c.y - 0.1 + y - DECK.sink) / 2, c.z, 0.55, c.y - 0.1 - (y - DECK.sink), d.w + 0.5, Math.atan2(az, ax), STONE);
     }
+    bridgeParts.mark(d.x0 + ax * d.len / 2, d.z0 + az * d.len / 2, a0);
   }
-  addMesh(bridges, mat, 'bridges');
+  bridgeParts.finish(mat, 'bridges', scene, meshes);
 
   // ------------------------------------------------------------ roots, boardwalks, mud, slabs
-  const roots = new Builder(), walks = new Builder(), decals = new Builder();
+  const rootParts = rangedParts(new Builder(), ROOT_RADIUS), roots = rootParts.builder, walks = new Builder(), decals = new Builder();
   for (const t of trails) {
     for (const f of t.features) {
       const i0 = f.i0, i1 = f.i1;
@@ -153,7 +195,9 @@ export function createProps({ scene, env, surface, trails, decks, junctions = []
             pts.push(V3(x, groundY(x, z) + 0.012 + 0.07 * r.size * arch, z)); radii.push(0.035 * r.size * (0.5 + arch));
           }
           const tb = tube(pts, radii, 5, true);
+          const a0 = roots.idx.length;
           roots.addArrays(tb.pos, tb.nor, tb.idx, (v, n) => mul([0.36, 0.26, 0.17], 0.85 + 0.3 * (n.y * 0.5 + 0.5)));
+          rootParts.mark(fr.x, fr.z, a0);
         }
       } else if (f.k === 'boardwalk') {
         for (let i = i0; i < i1 - 1; i += 1) {
@@ -177,7 +221,7 @@ export function createProps({ scene, env, surface, trails, decks, junctions = []
       }
     }
   }
-  addMesh(roots, mat, 'roots'); addMesh(walks, mat, 'boardwalks'); addMesh(decals, decalMat, 'trail patches');
+  rootParts.finish(mat, 'roots', scene, meshes); addMesh(walks, mat, 'boardwalks'); addMesh(decals, decalMat, 'trail patches');
 
   // ------------------------------------------------------------ the active trail: gate, arch, flags
   let gateMesh = null, flagMesh = null;
@@ -255,5 +299,7 @@ export function createProps({ scene, env, surface, trails, decks, junctions = []
     vpMesh = addMesh(b, mat, 'viewpoints');
   }
 
-  return { setActiveTrail, setFlags, setViewpoints, meshes, material: mat, junctionBranches, dispose() { for (const m of [...meshes]) dispose(m); mat.dispose(); decalMat.dispose(); } };
+  /** Called every frame with the camera position: the world-wide props draw only what is near it. */
+  function update(x, z) { postParts.refresh(x, z); barrierParts.refresh(x, z); bridgeParts.refresh(x, z); rootParts.refresh(x, z); }
+  return { setActiveTrail, setFlags, setViewpoints, update, meshes, material: mat, junctionBranches, dispose() { for (const m of [...meshes]) dispose(m); mat.dispose(); decalMat.dispose(); } };
 }
