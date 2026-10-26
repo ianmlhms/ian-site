@@ -1,6 +1,7 @@
 /* Draws the water: ribbon chunks (water.js) with an animated flowing shader (two scrolling noise normal layers, sky reflection by Fresnel, sun glint, foam on the
  * steep stretches, at the banks and around the stones), plus foam rings around the stones in the stream (instanced). Transparent, drawn after the ground. */
 import { buildWaterChunks, findFalls } from './water.js';
+import { buildCascadeWater, cascadeFalls } from './cascade.js';
 import { PAINT_LIGHT_GLSL } from './light-glsl.js';
 
 const THREE = window.THREE;
@@ -61,7 +62,7 @@ const FRAGMENT = `
     for (int k = 0; k < 6; k++) { vec4 fp = uFalls[k]; float dd = length(vWorld.xz - fp.xy) / max(fp.z, 0.01); churn = max(churn, (1.0 - smoothstep(0.35, 1.0, dd)) * fp.w); }
     float boil = texture2D(uFoam, vWorld.xz * 0.5 + vec2(t * 0.09, -t * 0.13)).r * 0.6 + texture2D(uFoam, vWorld.xz * 1.1 + vec2(-t * 0.17, t * 0.07)).r * 0.5;
     float thread = smoothstep(0.62, 0.9, n2.b * 0.55 + n3.g * 0.55);
-    float foam = clamp(slope * 1.5 * (0.4 + 0.9 * thread) + smoothstep(0.78, 1.0, abs(lat)) * thread * 0.55 + flowMask * 0.7 + churn * smoothstep(0.25, 0.7, boil + churn * 0.35), 0.0, 1.0);
+    float foam = clamp(slope * 1.5 * (0.4 + 0.9 * thread) + smoothstep(0.78, 1.0, abs(lat)) * thread * 0.55 + flowMask * 0.7 + churn * smoothstep(0.42, 0.85, boil + churn * 0.22), 0.0, 1.0);
     col = mix(col, vec3(0.88, 0.94, 0.94) * (0.6 + 0.4 * uSunColor.g + 0.2 * uAmbSky.g), foam);
     col = paintLightW(col, vec3(0.0, 1.0, 0.0), 1.0, 1.0, vWorld) * 0.35 + col * 0.65;
     // around the falls and on steep stretches the sheet shrinks to the white core: its flat edges never cut across the boulders and the banks
@@ -106,7 +107,8 @@ const FALL_VERTEX = `
   void main(){
     vec3 across = vec3(iDir.x, 0.0, iDir.y);
     float v = position.y + 0.5;
-    vec3 world = vec3(iPos.x, iPos.y + v * iDir.z, iPos.z) + across * position.x * iPos.w;
+    float spread = 1.0 + 0.22 * (1.0 - v) * (1.0 - v);                 // the curtain fans out as it falls
+    vec3 world = vec3(iPos.x, iPos.y + v * iDir.z, iPos.z) + across * position.x * iPos.w * spread;
     // the water leaves the lip with some speed and arcs out over the pool: the sheet leans out as it falls
     world += vec3(iFlow.x, 0.0, iFlow.y) * (0.15 + 0.35 * sqrt(max(0.0, 1.0 - v))) * min(iDir.z, 2.0) * 0.8;
     vUv = vec2(position.x + 0.5, v); vWorld = world; vSeed = iDir.w; vH = iDir.z;
@@ -130,10 +132,15 @@ const FALL_FRAGMENT = `
     float body = clamp(f1 * 0.55 + f2 * 0.45 + (f3 - 0.5) * 0.4, 0.0, 1.0);
     float foot = 1.0 - smoothstep(0.0, 0.3, vUv.y);
     float lip = smoothstep(0.7, 1.0, vUv.y);
-    float edge = smoothstep(0.0, 0.1 + 0.08 * f3, vUv.x) * smoothstep(0.0, 0.1 + 0.08 * f3, 1.0 - vUv.x);
-    float a = clamp(0.5 + body * 0.55 + foot * 0.4 + lip * 0.15, 0.0, 0.97) * edge;
-    vec3 white = vec3(0.93, 0.97, 0.98) * (0.62 + 0.3 * uSunColor.g + 0.4 * uAmbSky.g);
-    vec3 col = mix(vec3(0.5, 0.64, 0.64) * (0.5 + 0.5 * uAmbSky.g), white, smoothstep(0.25, 0.75, body + foot * 0.5 + lip * 0.3));
+    // ragged sides: the curtain is thick in the middle, torn and threadlike at the edges (thinner towards the foot where it spreads)
+    float w = 0.5 - abs(vUv.x - 0.5);
+    float rag = (f3 - 0.5) * 0.28 + (f2 - 0.5) * 0.16;
+    float edge = smoothstep(0.01, 0.17, w + rag * (0.5 + 0.7 * (1.0 - vUv.y)));
+    float veil = 0.55 + 0.45 * smoothstep(0.0, 0.3, w + rag * 0.3);
+    float a = clamp((0.62 + body * 0.4 + foot * 0.4 + lip * 0.2) * veil, 0.0, 0.97) * edge;
+    vec3 white = vec3(0.96, 0.99, 1.0) * (0.66 + 0.3 * uSunColor.g + 0.4 * uAmbSky.g);
+    vec3 shade = vec3(0.58, 0.72, 0.72) * (0.5 + 0.5 * uAmbSky.g);
+    vec3 col = mix(shade, white, smoothstep(0.05, 0.5, body * 0.8 + foot * 0.5 + lip * 0.3 + 0.25));
     gl_FragColor = vec4(applyFogW(col, vDist, vWorld.y), a);
   }
 `;
@@ -168,7 +175,42 @@ const MIST_FRAGMENT = `
   }
 `;
 
-export function createWaterView({ scene, network, env, quality, stones = [], foamTexture }) {
+const CASCADE_OWN_RADIUS = 14;       // m: a fall this close to the Schiessentümpel ledge is replaced by the ledge's own parallel falls (cascade.js)
+const CHURN_MIN_RADIUS = 1.7;        // m: the white pool around the foot of a fall is never smaller than this
+
+const PUFF_VERTEX = `
+  attribute vec4 iBase;                    // x, y, z, seed
+  attribute vec2 iFlow;
+  uniform float uTime, uStrength;
+  varying float vAlpha; varying float vDist; varying float vSeed;
+  void main(){
+    float age = fract(uTime * 0.23 + iBase.w * 5.7);
+    float k = fract(iBase.w * 17.3);
+    vec3 world = iBase.xyz + vec3(iFlow.x, 0.0, iFlow.y) * age * (0.8 + 2.4 * k) + vec3(sin(iBase.w * 55.0), 0.0, cos(iBase.w * 43.0)) * age * 0.9;
+    world.y += 0.1 + 0.25 * sin(age * 3.14159);
+    vec4 mv = viewMatrix * vec4(world, 1.0);
+    vDist = length(mv.xyz); vSeed = iBase.w;
+    gl_Position = projectionMatrix * mv;
+    gl_PointSize = min(150.0, (0.5 + 0.9 * age) * (0.7 + 0.8 * k) * 600.0 / max(vDist, 1.0)) * uStrength;
+    vAlpha = smoothstep(0.0, 0.12, age) * (1.0 - smoothstep(0.4, 1.0, age)) * (1.0 - smoothstep(30.0, 80.0, vDist)) * 0.2;
+  }
+`;
+const PUFF_FRAGMENT = `
+  precision highp float;
+  uniform vec3 uAmbSky, uSunColor; uniform vec3 uFogColor; uniform sampler2D uNoise;
+  varying float vAlpha; varying float vDist; varying float vSeed;
+  void main(){
+    vec2 c = gl_PointCoord - 0.5;
+    float r = length(c) * 2.0;
+    float n = texture2D(uNoise, c * 1.6 + vSeed * 9.0).g;
+    float a = (1.0 - smoothstep(0.35 + 0.25 * n, 1.0, r)) * vAlpha * (0.55 + 0.7 * n);
+    if (a < 0.01) discard;
+    vec3 col = vec3(0.95, 0.98, 0.99) * (0.62 + 0.3 * uSunColor.g + 0.4 * uAmbSky.g);
+    gl_FragColor = vec4(mix(col, uFogColor, 0.15), a);
+  }
+`;
+
+export function createWaterView({ scene, network, env, quality, stones = [], foamTexture, cascade = null }) {
   const group = new THREE.Group();
   group.name = 'mtb-water';
   scene.add(group);
@@ -177,7 +219,7 @@ export function createWaterView({ scene, network, env, quality, stones = [], foa
     transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
   });
   const chunks = new Map();
-  for (const c of buildWaterChunks(network)) {
+  for (const c of buildWaterChunks(network, cascade ? { lo: cascade.sampleLo, hi: cascade.sampleHi } : null)) {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(c.positions, 3));
     g.setAttribute('normal', new THREE.BufferAttribute(c.normals, 3));
@@ -189,6 +231,20 @@ export function createWaterView({ scene, network, env, quality, stones = [], foa
     mesh.renderOrder = 5;
     group.add(mesh);
     chunks.set(`${c.bx},${c.bz}`, mesh);
+  }
+  if (cascade) {                                                       // the sheet over the ledge and the plunge pool: the same water shader as the ribbons
+    for (const [k, c] of buildCascadeWater(cascade).entries()) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(c.positions, 3));
+      g.setAttribute('normal', new THREE.BufferAttribute(c.normals, 3));
+      g.setAttribute('aux', new THREE.BufferAttribute(c.aux, 4));
+      g.setIndex(new THREE.BufferAttribute(c.indices, 1));
+      g.computeBoundingSphere();
+      const mesh = new THREE.Mesh(g, material);
+      mesh.name = k === 0 ? 'water ledge sheet' : 'water plunge pool';
+      mesh.renderOrder = 5;
+      group.add(mesh);
+    }
   }
   // foam rings around the stones in the water
   const ring = new THREE.PlaneGeometry(1, 1, 1, 1).rotateX(-Math.PI / 2);
@@ -204,7 +260,9 @@ export function createWaterView({ scene, network, env, quality, stones = [], foa
   group.add(foam);
 
   // waterfalls: vertical white curtains where the stream drops (and a big foam ring where it lands)
-  const falls = findFalls(network);
+  const mapped = findFalls(network);
+  const falls = cascade ? mapped.filter((f) => Math.hypot(f.x - cascade.x, f.z - cascade.z) >= CASCADE_OWN_RADIUS).concat(cascadeFalls(cascade)) : mapped;      // what is drawn: the ledge's falls stand side by side
+  const heard = cascade ? mapped.filter((f) => Math.hypot(f.x - cascade.x, f.z - cascade.z) < CASCADE_OWN_RADIUS ? false : true).concat(mapped.filter((f) => Math.hypot(f.x - cascade.x, f.z - cascade.z) < CASCADE_OWN_RADIUS).slice(0, 1)) : mapped;      // what is heard: one roar per cascade
   const fq = new THREE.PlaneGeometry(1, 1, 1, 8);
   const fgeo = new THREE.InstancedBufferGeometry();
   fgeo.index = fq.index; fgeo.attributes = { ...fq.attributes };
@@ -230,6 +288,19 @@ export function createWaterView({ scene, network, env, quality, stones = [], foa
   mist.frustumCulled = false; mist.renderOrder = 8; mist.name = 'waterfall spray';
   mist.geometry.setDrawRange(0, mistCount);
   group.add(mist);
+  // foam puffs: white churned foam on the water around the foot of every fall (soft sprites that swell and drift outwards)
+  const PUFFS_PER_FALL = Math.round(6 + 8 * quality.lifeDetail);
+  const puffCount = falls.length * PUFFS_PER_FALL;
+  const pBase = new Float32Array(Math.max(1, puffCount) * 4), pFlow = new Float32Array(Math.max(1, puffCount) * 2);
+  falls.forEach((f, k) => { for (let j = 0; j < PUFFS_PER_FALL; j++) { const o = k * PUFFS_PER_FALL + j, u = Math.abs((Math.sin((k * 71 + j) * 12.9898) * 43758.5453) % 1), lat = ((j * 0.6180339) % 1 - 0.5) * (f.width * 1.1 + 0.6); pBase.set([f.x + f.nx * lat + f.fx * (0.4 + 0.8 * ((j * 0.37) % 1)), f.bottom + 0.05, f.z + f.nz * lat + f.fz * (0.4 + 0.8 * ((j * 0.37) % 1)), u], o * 4); pFlow.set([f.fx, f.fz], o * 2); } });
+  const puffMat = new THREE.ShaderMaterial({ uniforms: { ...env.uniforms, uStrength: { value: 1 } }, vertexShader: PUFF_VERTEX, fragmentShader: PUFF_FRAGMENT, transparent: true, depthWrite: false });
+  const puffs = new THREE.Points(new THREE.BufferGeometry(), puffMat);
+  puffs.geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(Math.max(1, puffCount) * 3), 3));
+  puffs.geometry.setAttribute('iBase', new THREE.BufferAttribute(pBase, 4)); puffs.geometry.setAttribute('iFlow', new THREE.BufferAttribute(pFlow, 2));
+  puffs.geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e6);
+  puffs.frustumCulled = false; puffs.renderOrder = 8; puffs.name = 'waterfall foam puffs';
+  puffs.geometry.setDrawRange(0, puffCount);
+  group.add(puffs);
   const landings = falls.map((f) => ({ x: f.x - f.nz * 0.0, z: f.z, y: f.bottom, size: f.width * 0.62, seed: (f.x * 0.01) % 1 }));
 
   /** Foam rings for the stones near the camera: stones = list of { x, z, y (water level), size }. */
@@ -252,14 +323,14 @@ export function createWaterView({ scene, network, env, quality, stones = [], foa
     const near = falls.map((f) => ({ f, d: Math.hypot(f.x - cx, f.z - cz) })).filter((e) => e.d < 90).sort((a, b) => a.d - b.d).slice(0, 6);
     for (let k = 0; k < 6; k++) {
       const e = near[k];
-      if (e) material.uniforms.uFalls.value[k].set(e.f.x + e.f.fx * 1.4, e.f.z + e.f.fz * 1.4, e.f.width * 1.1, Math.min(1, 0.45 + (e.f.top - e.f.bottom) * 0.5));
+      if (e) material.uniforms.uFalls.value[k].set(e.f.x + e.f.fx * 1.4, e.f.z + e.f.fz * 1.4, Math.max(CHURN_MIN_RADIUS, e.f.width * 1.1), Math.min(0.85, 0.35 + (e.f.top - e.f.bottom) * 0.3));
       else material.uniforms.uFalls.value[k].set(0, 0, 1, 0);
     }
   }
   /** Water sound sources near (cx, cz) for the audio of the gameplay wave: [{ kind: 'fall' | 'stream', x, y, z, gain 0..1 (by distance), size }] sorted by distance. A fall roars, a stream murmurs. */
   function soundSources(cx, cz, reach = 60) {
     const out = [];
-    for (const f of falls) {
+    for (const f of heard) {
       const d = Math.hypot(f.x - cx, f.z - cz);
       if (d < reach) out.push({ kind: 'fall', x: f.x, y: f.bottom, z: f.z, gain: Math.pow(1 - d / reach, 1.6) * Math.min(1, 0.4 + (f.top - f.bottom) * 0.6), size: f.top - f.bottom });
     }

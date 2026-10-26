@@ -27,6 +27,8 @@ import { createRng } from './noise.js';
 import { STRIDE, SHAPES } from './forest.js';
 import { R_STRIDE, KIND, slabFrame, slabBottomRing } from './rocks.js';
 import { placeBridge, SCHIESSENTUEMPEL } from './landmarks.js';
+import { RUIN, RENAISSANCE, CHURCH } from './town-data.js';
+import { LEDGE, CHUTES, BOULDERS, ledgeTop, toWorld, cascadeFalls, bankBoulders } from './cascade.js';
 import { WAY_KINDS } from './config.js';
 import { WATER_KINDS } from './water.js';
 import { QUADTREE, WORLD, CAMERA } from './config.js';
@@ -575,13 +577,67 @@ section('J water');
   check('the water never runs uphill (sampled every 1.5 m along the flow)', uphill === 0, `${uphill} uphill steps`);
   check(`the ribbon edges are hidden under the banks (terrain at the edge within 0.25 m of the surface or higher: ${(100 * (1 - bankLow / edgeChecks)).toFixed(1)} %)`, bankLow / edgeChecks < 0.25, `${bankLow} of ${edgeChecks} edge points`);
   stats.waterSamples = samples;
-  // the cascade: the river falls in sharp steps at the Schiessentümpel
-  let fall = null, best = 1e18;
-  for (const info of net.ways) if (info.kind === 'river') for (let i = info.first; i < info.first + info.count; i++) { const d = (S.px[i] - SCHIESSENTUEMPEL.x) ** 2 + (S.pz[i] - SCHIESSENTUEMPEL.z) ** 2; if (d < best) { best = d; fall = { info, i }; } }
-  let drops = 0, total = 0, maxStep = 0;
-  for (let i = fall.i - 14; i < fall.i + 14; i++) { const dz = S.water[i] - S.water[i + 1]; total += Math.max(0, dz); if (dz > 0.25) { drops++; maxStep = Math.max(maxStep, dz); } }
-  stats.cascade = `${total.toFixed(2)} m over 28 samples, ${drops} steep samples, steepest ${maxStep.toFixed(2)} m per sample`;
-  check('the Schiessentümpel is a staircase: the river drops at least 2.2 m within 28 samples in at least 3 sharp steps', total >= 2.2 && drops >= 3, stats.cascade);
+  // the cascade: ONE ledge at the Schiessentümpel (cascade.js): the river drops in a single sharp step into a flat pool, and the ledge model with its parallel falls stands over the carved ramp
+  const cas = world.cascade;
+  check('the Schiessentümpel cascade is found on the river (cascade.js placeCascade)', !!cas);
+  if (cas) {
+    const drop = cas.lipY - cas.poolY;
+    let steepSamples = 0, biggest = 0, poolMin = 1e9, poolMax = -1e9;
+    for (let k = 0; k < 6; k++) { const dz = S.water[cas.at + cas.dir * k] - S.water[cas.at + cas.dir * (k + 1)]; if (dz > 0.25) steepSamples++; biggest = Math.max(biggest, dz); }
+    for (let k = 1; k <= cas.spec.span; k++) { const wv = S.water[cas.at + cas.dir * k]; poolMin = Math.min(poolMin, wv); poolMax = Math.max(poolMax, wv); }
+    stats.cascade = `drop ${drop.toFixed(2)} m in one step (${biggest.toFixed(2)} m per sample), flat pool of ${cas.spec.span} samples (range ${(poolMax - poolMin).toFixed(3)} m), face ${cas.faceU.toFixed(1)} m below the lip`;
+    check('the river drops 2.2 m or more in ONE sharp step at the ledge, no second step', drop >= 2.2 && steepSamples === 1 && biggest >= 2.2, stats.cascade);
+    check('the plunge pool below the ledge is flat (the water level varies less than 0.05 m over the pool samples)', poolMax - poolMin < 0.05, `${(poolMax - poolMin).toFixed(3)} m`);
+    // the ledge top stays above the carved ramp along the river axis, so no terrain pokes through the solid; the foot of the face reaches below the terrain
+    let poke = 0, worstPoke = 0, footGap = 1e9;
+    const w = { x: 0, z: 0 };
+    for (let u = -LEDGE.backU + 2.4; u <= cas.faceU - 0.3; u += 0.25) for (let v = -2.4; v <= 2.4; v += 0.4) { toWorld(cas, u, v, w); const top = cas.lipY + ledgeTop(u, v), terrain = surface.height(w.x, w.z); if (terrain > top + 0.04) { poke++; worstPoke = Math.max(worstPoke, terrain - top); } }
+    for (let v = -LEDGE.halfWidth; v <= LEDGE.halfWidth; v += 0.5) { toWorld(cas, cas.faceU, v, w); footGap = Math.min(footGap, surface.height(w.x, w.z) - (cas.poolY - LEDGE.baseBelow)); }
+    check(`no terrain pokes through the ledge top between the bridge and the lip (${poke} points, worst ${worstPoke.toFixed(2)} m)`, poke === 0, `${poke}`);
+    check(`the foot of the ledge face (${(cas.poolY - LEDGE.baseBelow).toFixed(2)}) is below the terrain at the face across the whole width (margin ${footGap.toFixed(2)} m)`, footGap > 0.25, footGap.toFixed(2));
+    // layout: at least three falls side by side with a boulder between each pair, all inside the ledge; the boulders stand between the chutes
+    let ok = CHUTES.length >= 3 && BOULDERS.length === CHUTES.length + 1;
+    for (let k = 0; k < CHUTES.length; k++) ok = ok && Math.abs(CHUTES[k].v) + CHUTES[k].w / 2 < LEDGE.halfWidth && (k === 0 || CHUTES[k].v - CHUTES[k - 1].v > (CHUTES[k].w + CHUTES[k - 1].w) / 2 + 0.4) && BOULDERS[k].v < CHUTES[k].v && BOULDERS[k + 1].v > CHUTES[k].v;
+    check(`the cascade has ${CHUTES.length} falls side by side with a boulder between neighbours (parallel, not in series)`, ok);
+    const falls = cascadeFalls(cas);
+    let along = 0; for (const f of falls) along = Math.max(along, Math.abs((f.x - falls[0].x) * cas.f[0] + (f.z - falls[0].z) * cas.f[1]));
+    check(`the falls sit on one line across the river (spread along the flow ${along.toFixed(2)} m), each ${(falls[0].top - falls[0].bottom).toFixed(1)} m high`, along < 0.01 && falls.every((f) => f.top - f.bottom > 2), `${along}`);
+    // the bank boulders: none on a way the bike rides (trails, paths, tracks)
+    const bank = bankBoulders(cas, surface, net), RIDE_KINDS = ['trail', 'path', 'track'];
+    let onWay = 0;
+    for (const b of bank) {
+      toWorld(cas, b.u, b.v, w);
+      const reach = b.rz + 2.4;
+      for (const info of net.ways) {
+        if (!RIDE_KINDS.includes(info.kind)) continue;
+        for (let i = info.first; i < info.first + info.count; i++) if (Math.abs(S.px[i] - w.x) < reach && Math.abs(S.pz[i] - w.z) < reach && Math.hypot(S.px[i] - w.x, S.pz[i] - w.z) < reach) { onWay++; break; }
+      }
+    }
+    check(`${bank.length} bank boulders stand around the pool, none within 2.4 m of a trail, path or track`, bank.length >= 8 && onWay === 0, `${bank.length} boulders, ${onWay} on a way`);
+    stats.cascadeBank = bank.length;
+  }
+  // the built places (town-data.js): the Berdorf village, the Beaufort houses, the two castles and the church
+  {
+    const houses = world.houses, town = world.town;
+    const finite = houses.every((h) => [h.cx, h.cz, h.hx, h.hz, h.base, h.eaveY, h.ridgeY, h.gMin].every(Number.isFinite) && h.hx >= h.hz && h.hz > 1 && h.eave >= 2.4 && h.ridge >= h.eave);
+    const outside = houses.filter((h) => h.cx < WORLD.playInset || h.cz < WORLD.playInset || h.cx > WORLD.width - WORLD.playInset || h.cz > WORLD.depth - WORLD.playInset).length;
+    check(`${houses.length} house rectangles: finite, hx >= hz > 1 m, ridge >= eave >= 2.4 m, none outside the playable box`, houses.length > 400 && finite && outside === 0, `${houses.length}, finite ${finite}, outside ${outside}`);
+    let floating = 0;
+    for (const h of houses) for (const [u, v] of [[-1, -1], [1, -1], [1, 1], [-1, 1], [0, 0]]) { const gx = h.cx + h.ax * u * h.hx + h.bx * v * h.hz, gz = h.cz + h.az * u * h.hx + h.bz * v * h.hz; if (h.base > surface.height(gx, gz) - 0.4) floating++; }
+    check('every house stands in the ground: the bottom of its walls is at least 0.4 m below the terrain at every corner and the middle', floating === 0, `${floating} corners`);
+    let onWay = 0, worst = 1e9;
+    for (const info of net.ways) {
+      if (!['trail', 'path', 'track'].includes(info.kind)) continue;
+      for (let i = info.first; i < info.first + info.count; i++) { const hit = town.insideRect(S.px[i], S.pz[i], 1.2); if (hit && !(hit.flags & (CHURCH | RENAISSANCE | RUIN))) { onWay++; worst = Math.min(worst, town.distance(hit, S.px[i], S.pz[i], null)); } }
+    }
+    check('no trail, path or track runs through a house (centre line samples within 1.2 m of a wall; the church and castles stay and the ways are cut there)', onWay === 0, `${onWay} samples, worst ${worst.toFixed(2)} m`);
+    const ruin = houses.filter((h) => h.flags & RUIN).length, ren = houses.filter((h) => h.flags & RENAISSANCE).length, churches = houses.filter((h) => h.flags & CHURCH).length;
+    check(`the Beaufort medieval ruin (${ruin} wings), the Renaissance castle (${ren} wings) and ${churches} church(es) are in the data`, ruin >= 1 && ren >= 2 && churches >= 2);
+    const probe = { nx: 0, nz: 0, pen: 0 }, h0 = houses.find((h) => !(h.flags & 1));
+    const out = town.collide(h0.cx + h0.ax * (h0.hx + 0.2), h0.cz + h0.az * (h0.hx + 0.2), 0.5, 0, probe);
+    check('a bike beside a wall is pushed away from the house (collision)', !!out && out.pen > 0.2 && (out.nx * h0.ax + out.nz * h0.az) > 0.9, JSON.stringify(out));
+    stats.town = `${houses.length} rectangles (${ruin} ruin wings, ${ren} castle wings, ${churches} churches)`;
+  }
   // the footbridge
   const br = placeBridge(net, surface);
   check('the footbridge is placed on the river upstream of the falls', !!br && Math.hypot(br.x - SCHIESSENTUEMPEL.x, br.z - SCHIESSENTUEMPEL.z) < 40);

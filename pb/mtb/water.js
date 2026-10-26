@@ -8,8 +8,8 @@ const BANK_EXTRA = 0.5;            // m the strip reaches under the bank on each
 const FADE_LENGTH = 6;             // m at the ends of a stream where the water fades in / out
 export const WATER_KINDS = ['stream', 'river', 'ditch'];
 
-/** Returns [{ bx, bz, positions, normals, aux, indices, vertexCount }] chunks. aux = (lateral -1..1, metres along the flow, slope 0..1 (drop per metre * 2), end fade 0..1). */
-export function buildWaterChunks(network) {
+/** `skip` (optional { lo, hi }): sample indices whose segments are not drawn (the cascade landmark brings its own water). Returns [{ bx, bz, positions, normals, aux, indices, vertexCount }] chunks. aux = (lateral -1..1, metres along the flow, slope 0..1 (drop per metre * 2), end fade 0..1). */
+export function buildWaterChunks(network, skip = null) {
   const S = network.samples;
   const chunks = new Map();
   const chunkOf = (x, z) => {
@@ -28,6 +28,7 @@ export function buildWaterChunks(network) {
     const y = (i) => S.water[f + i];
     for (let i = 0; i < n - 1; i++) {
       const a = f + i, b = f + i + 1;
+      if (skip && a >= skip.lo && b <= skip.hi) continue;                     // replaced by the water of a landmark (cascade.js)
       const mx = (S.px[a] + S.px[b]) / 2, mz = (S.pz[a] + S.pz[b]) / 2;
       const c = chunkOf(mx, mz);
       const base = c.pos.length / 3;

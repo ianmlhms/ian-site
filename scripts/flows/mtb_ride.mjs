@@ -38,7 +38,7 @@ export const flow = {
         frames++;
       }
       const g = m.game;
-      return { modes, frames, nan, below, vmax, result: g.result && { ms: g.result.ms, medal: g.result.medal, isBest: g.result.isBest, crashes: g.result.crashes, splits: g.result.splits.length }, cps: t.cps.length, finishVisible: !!document.querySelector(".mfinish:not(.hidden)"), medalText: (document.querySelector(".fin-medal .mn") || {}).textContent || "" };
+      return { modes, frames, nan, below, vmax, result: g.result && { ms: g.result.ms, medal: g.result.medal, isBest: g.result.isBest, crashes: g.result.crashes, splits: g.result.splits.length }, cps: t.cps.length, finishVisible: !!document.querySelector(".mfinish:not(.hidden)"), medalText: (document.querySelector(".mfinish .mn") || {}).textContent || "" };
     });
     h.eq(run.modes.join(">"), "card>countdown>run>finished", "the game goes card, countdown, run, finished");
     h.eq([run.nan, run.below], [0, 0], "no NaN and never below the ground");

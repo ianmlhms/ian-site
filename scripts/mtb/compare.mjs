@@ -17,6 +17,20 @@ fs.mkdirSync(out, { recursive: true });
 
 /* pose: { at: [x, z] | { trail: index }, up: metres above the ground, yaw: degrees (0 = east, 90 = south), pitch, fov }; hideRider: true */
 const SPECS = [
+  { name: "montage-p1-schiessentuempel-falls", ref: "schiess2020_101.jpg", caption: "Schiessentümpel: four falls side by side over one ledge", size: [1280, 960], q: "high", time: "noon", weather: "clear", season: "summer",
+    pose: { finishView: true, dy: -0.4, dty: -0.6, fov: 52 } },
+  { name: "montage-p2-schiessentuempel-photo2", ref: "schiess6020.jpg", caption: "Schiessentümpel: the falls from the side", size: [1280, 782], q: "high", time: "noon", weather: "clear", season: "summer",
+    pose: { cascade: [9, 4.0, 1.4, 0, -1.5, 1.2], fov: 52 } },
+  { name: "montage-p3-beaufort-ruin-a", ref: "beaufort_alt.jpg", caption: "Beaufort medieval castle ruin from the road", size: [1280, 900], q: "high", time: "noon", weather: "clear", season: "summer",
+    pose: { at: [585, 432], up: 4, look: [622, 380, 6], fov: 55 } },
+  { name: "montage-p4-beaufort-ruin-b", ref: "beaufort_r02.jpg", caption: "Beaufort ruin: towers and curtain wall", size: [1280, 900], q: "high", time: "noon", weather: "clear", season: "summer",
+    pose: { at: [660, 445], up: 4, look: [622, 378, 6], fov: 52 } },
+  { name: "montage-p5-beaufort-renaissance", ref: "beaufort_ren1.jpg", caption: "Beaufort Renaissance castle", size: [1280, 900], q: "high", time: "noon", weather: "clear", season: "summer",
+    pose: { at: [578, 428], up: 5, look: [562, 365, 8], fov: 58 } },
+  { name: "montage-p6-berdorf-church", ref: "berdorf_kirche01.jpg", caption: "Berdorf church", size: [1280, 900], q: "high", time: "noon", weather: "clear", season: "summer",
+    pose: { at: [5148, 1820], up: 3, look: [5110, 1785, 9], fov: 52 } },
+  { name: "montage-p7-berdorf-village", ref: "berdorf_2015.jpg", caption: "Berdorf village from the fields", size: [1280, 720], q: "high", time: "noon", weather: "clear", season: "summer",
+    pose: { at: [4950, 2030], up: 22, look: [5100, 1790, 8], fov: 58 } },
   { name: "montage-w3-1-schiessentuempel", ref: "trail1.jpg", caption: "Schiessentümpel: the cascade below the arched footbridge", size: [720, 1088], q: "high", time: "noon", weather: "clear", season: "summer",
     pose: { at: [1556.5, 5764.5], up: 2.4, yaw: 108, pitch: 8, fov: 52 } },
   { name: "montage-w3-2-rock-corridor", ref: "wolfsschlucht090.jpg", caption: "Rock corridor: sandstone walls on both sides of the way", size: [1280, 720], q: "high", time: "noon", weather: "clear", season: "summer",
@@ -41,6 +55,25 @@ try {
     await page.evaluate((p) => {
       const m = window.__mtb;
       let x, z, yaw = p.yaw;
+      if (p.finishView) {                                      // the camera of the finish view of the Schiessentuempel trail, as the game puts it
+        const f = m.world.finishView;
+        m.teleport(f.x, f.z); m.rider.setVisible(false);
+        m.setCamera({ x: f.x, y: f.y + (p.dy || 0), z: f.z, tx: f.tx, ty: f.ty + (p.dty || 0), tz: f.tz, fov: p.fov });
+        return;
+      }
+      if (p.cascade) {                                         // pose in the Schiessentuempel cascade frame [u, v, y above the pool, lookU, lookV, lookY above the pool]
+        const c = m.cascade, [u, v, y0, lu, lv, ly] = p.cascade;
+        const at = (a, b) => ({ x: c.x + c.f[0] * a + c.a[0] * b, z: c.z + c.f[1] * a + c.a[1] * b });
+        const p0 = at(u, v), p1 = at(lu, lv);
+        m.teleport(p0.x, p0.z); m.rider.setVisible(false);
+        m.setCamera({ x: p0.x, y: Math.max(c.poolY + y0, m.surface.height(p0.x, p0.z) + 1.3), z: p0.z, tx: p1.x, ty: c.poolY + ly, tz: p1.z, fov: p.fov });
+        return;
+      }
+      if (p.look) {                                            // camera at `at`, up metres above the ground, looking at [tx, tz, metres above the ground there]
+        [x, z] = p.at; m.teleport(x, z); m.rider.setVisible(false);
+        m.setCamera({ x, y: m.surface.height(x, z) + p.up, z, tx: p.look[0], ty: m.surface.height(p.look[0], p.look[1]) + p.look[2], tz: p.look[1], fov: p.fov });
+        return;
+      }
       if (p.trail !== undefined) { const c = m.centre[p.trail], d = m.centre[Math.min(m.centre.length - 1, p.trail + 6)]; x = c[0]; z = c[1]; if (p.yawFromTrail) yaw = Math.atan2(d[1] - c[1], d[0] - c[0]) * 180 / Math.PI; }
       else { x = p.at[0]; z = p.at[1]; }
       m.teleport(x, z); m.rider.setVisible(false);

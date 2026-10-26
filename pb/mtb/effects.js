@@ -161,7 +161,7 @@ export function createShafts({ scene, env, quality, surface, map }) {
       const st = env.state, sunLum = env.uniforms.uSunColor.value.y;
       const sunUp = Math.max(0, env.uniforms.uSunDir.value.y);
       const clear = (1 - env.uniforms.uCloud.value * 0.75) * (1 - env.uniforms.uRain.value);
-      const mist = Math.min(1, env.uniforms.uFogHD.value * 70);
+      const mist = Math.min(1, env.uniforms.uFogHD.value * 25);          // (in thick fog the shafts are muted: the light is diffuse)
       mat.uniforms.uIntensity.value = Math.min(1.4, sunLum * (clear + mist * 0.9)) * (1 - st.night) * Math.min(1, sunUp * 4);
       mesh.visible = mat.uniforms.uIntensity.value > 0.02 && quality.lifeDetail > 0;
       if (Math.hypot(cx - last.x, cz - last.z) > CELL * 0.6) { place(cx, cz); last = { x: cx, z: cz }; }

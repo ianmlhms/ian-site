@@ -127,7 +127,7 @@ export const GROUND_FRAGMENT = `
     float grassW = smoothstep(0.35, 0.7, mc.r + (nMid.g - 0.5) * 0.25) * (1.0 - rockW);
     float edgeNoise = (nHi.r - 0.5) * 0.3 + (nMid.r - 0.5) * 0.2;
     float trailW = smoothstep(0.52 + edgeNoise, 0.78 + edgeNoise, vCover);
-    float streamW = smoothstep(0.35, 0.8, vStream);
+    float streamW = smoothstep(0.35, 0.8, vStream) * (1.0 - steep * 0.9);           // (a steep wall beside a stream is mossy rock, not gravel: the pool walls of the Schiessentuempel)
     float bankW = smoothstep(0.02, 0.3, vStream) * (1.0 - streamW);
 
     vec3 albedo = litter;
