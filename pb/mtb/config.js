@@ -60,6 +60,8 @@ export const CARVE = Object.freeze({
   coverLow: 0.1,            // coverage smoothstep edges on the normalised kernel sum
   coverHigh: 0.8,
   kernelRadiusFactor: 1.11, // kernel radius = width * this
+  poolWiden: 1.4,           // the plunge pool below a ledge cascade carves this much wider than the stream (trails.js)
+  maxRadius: 7.9,           // m: no kernel may reach farther than this (the spatial hash looks one 8 m cell around)
 });
 
 export const SURFACE = Object.freeze({

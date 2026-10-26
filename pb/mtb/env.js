@@ -32,8 +32,8 @@ const KEYS = [
 /* weather: cloud cover, sun share, distance fog multiplier, desaturation, brightness, wetness, rain, ambient multiplier, height-fog density / fall-off, fog tint towards milky white */
 const WEATHER = Object.freeze({
   clear: { cloud: 0.28, sun: 1, fog: 1, grey: 0, dim: 1, wet: 0, rain: 0, amb: 1, hd: 0, milk: 0 },
-  cloudy: { cloud: 0.85, sun: 0.42, fog: 1.5, grey: 0.5, dim: 0.88, wet: 0.08, rain: 0, amb: 1.5, hd: 0, milk: 0 },
-  fog: { cloud: 0.75, sun: 0.28, fog: 9, grey: 0.7, dim: 0.97, wet: 0.35, rain: 0, amb: 1.7, hd: 0.011, milk: 0.55 },
+  cloudy: { cloud: 1, sun: 0.14, fog: 0.55, grey: 0.62, dim: 0.95, wet: 0.08, rain: 0, amb: 1.75, hd: 0, milk: 0 },           // clear air, a flat grey-white sky, soft shadows: no haze at all
+  fog: { cloud: 0.8, sun: 0.1, fog: 48, grey: 0.75, dim: 0.97, wet: 0.35, rain: 0, amb: 1.7, hd: 0.03, milk: 0.9 },       // soft white volume between the trunks: near things crisp, each tree row paler, the far ones gone
   rain: { cloud: 1, sun: 0.12, fog: 4.2, grey: 0.82, dim: 0.6, wet: 1, rain: 1, amb: 1.45, hd: 0.0012, milk: 0.1 },
 });
 

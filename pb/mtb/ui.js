@@ -183,17 +183,24 @@ export function createUi({ root, lang, trails, handlers, touch = false }) {
     const rows = d.splits.map((ms, i) => { const best = d.bestSplits[i]; const delta = best ? ms - best : null; return `<span class="sp ${delta === null ? '' : delta <= 0 ? 'good' : 'bad'}">${i + 1}: ${formatTime(ms)}${delta === null ? '' : ` (${formatSplit(delta)})`}</span>`; }).join('');
     finish.innerHTML = `
       <div class="fin-box">
-        <div class="fin-title">${esc(T('finish.title'))}</div>
-        <div class="fin-trail">${gradeDot(d.trail.grade)} ${esc(trailName(d.trail, L))}${d.daily ? ` · ${esc(T('card.daily'))}` : ''}</div>
-        <div class="fin-medal">${medalBadge(d.medal)}<span class="mn">${esc(T(`medal.${MEDAL_KEYS[d.medal]}`))}</span></div>
-        <div class="fin-time">${esc(T('finish.time'))} <b>${formatTime(d.ms, true)}</b>${d.isBest ? ` <span class="newbest">${esc(T('finish.newBest'))}</span>` : ''}</div>
-        <div class="fin-best">${esc(T('finish.best'))}: ${formatTime(d.isBest ? d.ms : d.bestMs, true)}${d.crashes ? ` · ${esc(T('finish.crashes'))}: ${d.crashes}` : ''}</div>
-        ${d.beatGhost ? `<div class="fin-ghost">👻 ${esc(T('finish.ghostWon'))}</div>` : d.ghostLost ? `<div class="fin-ghost lost">👻 ${esc(T('finish.ghostLost'))}</div>` : ''}
-        ${d.nextMedal ? `<div class="fin-next">${esc(T('finish.nextMedal', { medal: T(`medal.${MEDAL_KEYS[d.nextMedal.medal]}`), time: formatTime(d.nextMedal.seconds * 1000) }))}</div>` : ''}
-        ${(d.unlocks || []).map((u) => `<div class="fin-unlock"><span class="okmark">✓</span> ${esc(T('finish.unlocked', { what: u }))}</div>`).join('')}
-        ${d.valid === false ? `<div class="fin-invalid">${esc(T('finish.invalid'))}</div>` : ''}
-        ${d.daily ? `<div class="fin-daily" id="finDaily"></div>` : ''}
-        <div class="fin-splits">${rows}</div>
+        <div class="fin-head">
+          <div class="fin-medal">${medalBadge(d.medal)}</div>
+          <div class="fin-main">
+            <div class="fin-title">${esc(T('finish.title'))} <span class="mn">${esc(T(`medal.${MEDAL_KEYS[d.medal]}`))}</span></div>
+            <div class="fin-time"><b>${formatTime(d.ms, true)}</b>${d.isBest ? ` <span class="newbest">${esc(T('finish.newBest'))}</span>` : ''}</div>
+          </div>
+          <button type="button" class="fin-fold" aria-expanded="true" aria-label="${esc(T('finish.fold'))}"><span aria-hidden="true">▾</span></button>
+        </div>
+        <div class="fin-body">
+          <div class="fin-trail">${gradeDot(d.trail.grade)} ${esc(trailName(d.trail, L))}${d.daily ? ` · ${esc(T('card.daily'))}` : ''}</div>
+          <div class="fin-best">${esc(T('finish.best'))}: ${formatTime(d.isBest ? d.ms : d.bestMs, true)}${d.crashes ? ` · ${esc(T('finish.crashes'))}: ${d.crashes}` : ''}</div>
+          ${d.beatGhost ? `<div class="fin-ghost">👻 ${esc(T('finish.ghostWon'))}</div>` : d.ghostLost ? `<div class="fin-ghost lost">👻 ${esc(T('finish.ghostLost'))}</div>` : ''}
+          ${d.nextMedal ? `<div class="fin-next">${esc(T('finish.nextMedal', { medal: T(`medal.${MEDAL_KEYS[d.nextMedal.medal]}`), time: formatTime(d.nextMedal.seconds * 1000) }))}</div>` : ''}
+          ${(d.unlocks || []).map((u) => `<div class="fin-unlock"><span class="okmark">✓</span> ${esc(T('finish.unlocked', { what: u }))}</div>`).join('')}
+          ${d.valid === false ? `<div class="fin-invalid">${esc(T('finish.invalid'))}</div>` : ''}
+          ${d.daily ? `<div class="fin-daily" id="finDaily"></div>` : ''}
+          <div class="fin-splits">${rows}</div>
+        </div>
         <div class="fin-btns"></div>
       </div>`;
     const bar = finish.querySelector('.fin-btns');
@@ -201,10 +208,40 @@ export function createUi({ root, lang, trails, handlers, touch = false }) {
     if (d.hasNext) bar.appendChild(btn('sbtn', esc(T('finish.next')), () => handlers.onNext()));
     bar.appendChild(btn('sbtn', `👻 ▶`, () => handlers.onReplay(), 'replay'));
     bar.appendChild(btn('sbtn', esc(T('finish.menu')), () => handlers.onMenu('trails')));
-    finish.classList.remove('hidden');
+    const fold = finish.querySelector('.fin-fold');
+    on(fold, 'click', (e) => { e.stopPropagation(); setFinishFolded(!finish.classList.contains('folded')); });
+    finish.classList.remove('hidden', 'folded');
+    document.body.classList.add('finishing');
+    state.finishFree = null;
+  }
+  function setFinishFolded(folded) {
+    finish.classList.toggle('folded', folded);
+    const fold = finish.querySelector('.fin-fold');
+    if (fold) { fold.setAttribute('aria-expanded', String(!folded)); fold.firstElementChild.textContent = folded ? '▴' : '▾'; }
+    state.finishFree = null;
+  }
+  /** The part of the screen the finish panel leaves free, in CSS pixels of the shell: { x, y, w, h, cx, cy } (null when no finish screen is up). The panel sits at the left (wide screens) or at the
+   *  bottom (portrait), or is folded to a small pill: the shell shifts the picture into this rectangle so the sight of the trail's end is never behind the card. Cached until the layout changes. */
+  function finishFree() {
+    if (finish.classList.contains('hidden')) return null;
+    if (state.finishFree) return state.finishFree;
+    const box = finish.querySelector('.fin-box'), r0 = root.getBoundingClientRect();
+    if (!box || r0.width < 1) return null;
+    const b = box.getBoundingClientRect();
+    const W = r0.width, H = r0.height, left = b.left - r0.left, right = b.right - r0.left, top = b.top - r0.top, bottom = b.bottom - r0.top;
+    const regions = [
+      { x: right + 8, y: 0, w: W - right - 8, h: H },            // right of a panel at the left
+      { x: 0, y: 0, w: left - 8, h: H },                         // left of a panel at the right
+      { x: 0, y: 0, w: W, h: top - 8 },                          // above a panel at the bottom
+      { x: 0, y: bottom + 8, w: W, h: H - bottom - 8 },
+    ];
+    let free = regions[0];
+    for (const r of regions) if (r.w > 0 && r.h > 0 && r.w * r.h > free.w * free.h) free = r;
+    state.finishFree = { x: free.x, y: free.y, w: free.w, h: free.h, cx: free.x + free.w / 2, cy: free.y + free.h / 2, W, H };
+    return state.finishFree;
   }
   const setFinishNote = (text) => { const n = finish.querySelector('#finDaily'); if (n) n.textContent = text; };
-  const hideFinish = () => finish.classList.add('hidden');
+  const hideFinish = () => { finish.classList.add('hidden'); document.body.classList.remove('finishing'); state.finishFree = null; };
 
   // ================================================================ menu
   /** d = { progress info for the menu: trails [{trail, locked, unlockText, medal, bestMs}], bikes [{id, locked, points}], points, current {trailId, bike}, settings {...}, daily {...}, viewpoints, map } */
@@ -302,7 +339,7 @@ export function createUi({ root, lang, trails, handlers, touch = false }) {
   function setOrientation(show) { orient.textContent = T('orient.rotate'); orient.classList.toggle('hidden', !show); }
 
   return {
-    setHud, setHudMode, setHudButtons, toast, banner, split, showCard, hideCard, showHint, hideHint, showCount, hideCount, showFinish, hideFinish, setFinishNote,
+    setHud, setHudMode, setHudButtons, toast, banner, split, showCard, hideCard, showHint, hideHint, showCount, hideCount, showFinish, hideFinish, setFinishNote, finishFree, layoutChanged() { state.finishFree = null; },
     openMenu, closeMenu, refreshMenu, isMenuOpen, setLang, setOrientation, hud, T: (k, p) => T(k, p), get lang() { return L; },
   };
 }

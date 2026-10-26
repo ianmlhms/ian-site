@@ -175,8 +175,8 @@ export function rocksOfBlock(bx, bz, ctx) {
   if (ctx.falls) {
     for (const f of ctx.falls) {
       if (Math.floor(f.x / BLOCK) !== bx || Math.floor(f.z / BLOCK) !== bz) continue;
-      // big dark boulders: two heavy ones on the flanks of the lip, two smaller ones that split the water into three thick streams, and stones in the plunge pool
-      for (const [t0, big, inPool] of [[-0.52, 1.0, false], [0.5, 1.0, false], [-0.2, 0.55, false], [0.19, 0.5, false], [-0.34, 0.6, true], [0.3, 0.75, true], [0.0, 0.5, true]]) {
+      // big dark boulders: two heavy ones on the flanks of the lip, two smaller ones that split the water into three thick streams, and stones in the plunge pool (the Schiessentümpel ledge has its own: cascade-model.js)
+      if (!f.bankOnly) for (const [t0, big, inPool] of [[-0.52, 1.0, false], [0.5, 1.0, false], [-0.2, 0.55, false], [0.19, 0.5, false], [-0.34, 0.6, true], [0.3, 0.75, true], [0.0, 0.5, true]]) {
         const t = t0 + (rng() - 0.5) * 0.06, size = (inPool ? 0.9 : 1.15) * (0.6 + 0.5 * big) + rng() * 0.6 + (big >= 1 ? 0.55 : 0), lat = t * f.width;
         const along = (inPool ? -2.1 : 0) + (rng() - 0.5) * (inPool ? 1.6 : 0.8);          // along the flow (the curtain's normal)
         const x = f.x + f.nx * lat + f.fx * along, z = f.z + f.nz * lat + f.fz * along, y = (inPool ? f.bottom : f.top) - size * (big >= 1 ? 0.3 : 0.4);
