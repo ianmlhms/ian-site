@@ -28,15 +28,18 @@ Ile-de-France, Picardie, Belgium (1.4 GB, downloaded for the abroad routes), `os
 4. WebKit / Chrome medium budgets met (REAL-LINES.md numbers).  5. Career: north price 24 000, others unchanged; `career_probe.mjs` / `drive_bot.mjs`.
 Gates (27 Oct, commit 48122581): `run_all.mjs train` 6/6 PASS, hole scans north / south / west clean, check_site only the old orphan, cv_head PROBLEMS: 0.  Not pushed.
 
-## Still open (priority order) after wave 2
+## Wave 3 (26 Oct 2026, items 6 + 7) - DONE, details in REAL-LINES.md "W2c: wave 3"
 
-* **Station building side (item 6)**: the photo models put the hall right behind the served platform (`sd` = platform side) and ignore `bside` of the OSM layout (`data/real/<id>-layout.json`).  Where they differ the real hall is across other tracks:
-  Ettelbréck platform right / hall LEFT (LOD2 station building x -29 .. -20, z 20 .. 32 in the patch frame, 2 tracks away), Miersch left / left, Clierf left / left (LOD2 x -15 .. -5, z 94 .. 121: 90 m ahead of the platform middle),
-  Esch-Uelzecht right / right (x 11 .. 39, z -95 .. -42), Belval-Université right / LOD2 hall left in the patch (x -31 .. 6, z -52 .. 73: check), Bettembuerg left / left.  So only Ettelbréck (and maybe Belval) have the hall on the wrong side; the models
-  would need a lateral offset parameter (`l` in stations-lu-b.js / -a.js is relative to the platform edge) or a second building copy at `bside`.  `scripts/zuch/station_top.mjs` draws a top-down view with `TS.debugStationLod2` (the LOD2 station building next to the model) for exactly this
-  check; the first Ettelbréck montage (`reports/zuchreal/w2c/st/`) was inconclusive (camera orientation of the top-down free cam), and the photo | sim montages of the six stations are NOT made yet (`station_shots.mjs <dir> <route> <Station> --tag x`, photos in `~/Library/Caches/zuch-refs/`).
-* Landmarks (item 7) and abroad routes (item 8): not started, see the lists above (this file, "NOT done" 2 and 3 are still valid).
-* The old items 4 / 5(b) / 5(d) of the first list are unchanged; 5(a) (pale band) and 5(c) (patch download) are DONE.
+* **Station sides / positions (item 6)**: every photo-modelled big station now stands where OSM + the LOD2 station building of its patch put it: Ettelbréck hall moved to the far side (across the second track + old side platform; the served platform is the new island with the wavy canopy, lifts, next track at 13.2), Miersch hall 45 m
+  forward (z -25 .. -3), island platform from OSM; Clierf hall at the Luxembourg end (z 94 .. 121 behind the stop), island platform / footbridge from OSM; Esch-Uelzecht hall 42 .. 95 m ahead (authored apartment blocks dropped: LOD2 has the real ones); Bettembuerg hall +22 m behind;
+  Belval vault z -52 .. +62, pod at +70 over the platform end.  All mirrored in z for a reversed service.  Montages (photo | sim): `reports/zuchreal/w2c/station-montage-*.png`, raw shots + plan views in `w2c/st6/`.  Tools: `scripts/zuch/station_plan.mjs` (top-down plan with the OSM building outlines), `station_poses.mjs` (photo-match poses in the station frame).
+* **Bug found on the way (station-surround-mesh.js)**: OSM platform roofs (building=roof tagged commercial) were drawn as 250 m long windowed walls along the platforms in every patch; buildings whose centre lies in a platform polygon are no longer drawn (the stations draw their own canopies).
+* **Landmarks (item 7, partly)**: `real-landmarks.js` (+ hook in `landscape.js`, replaces the generic castle): Belval blast furnaces A / B (stack, stoves, dust catcher, hoist, chimney) at their OSM positions, Clervaux castle + Saint-Maurice abbey at their OSM bearing (hill landmarks pulled in to the strip edge: ground height unknown beyond it).
+  NOT done of item 7: Esch / Schifflange / Differdange steelworks (OSM `Site ArcelorMittal` landuse is at Differdange 49.5224 .. 49.5382 N, 5.8932 .. 5.9069 E; halls + chimneys still missing), Bettembourg marshalling-yard tracks (`landuse=railway` unclassified).
+
+## Still open (priority order) after wave 3
+
+* Steelworks + Bettembourg yard (see above), abroad routes (item 8, plan below), Esch canopy columns are plain (photo: black cast-iron historic canopy).
 
 ## NOT done / open (priority order) - written after wave 1, see above for what changed
 

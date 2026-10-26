@@ -163,6 +163,13 @@ All of this is additive; nothing of the Mosel line (`build_real_line.py`, `real-
   draws, 367 k / 421 k / 346 k triangles; Munsbach (east) 234 / 345 k.  Chrome medium scan every 400 m (`perf_probe.mjs --scan`): worst cab view north 259 draws / 433 k triangles, south 248 / 483 k, west 238 / 392 k (W1 budget:
   about 260 draws, 680 k triangles at Munsbach).  Headless WebKit holds 16.7 ms (vsync) everywhere; no real iPad measurement.
 
+## W2c: wave 3 (26 Oct 2026): station halls, landmarks
+
+* Hall positions follow the OSM / LOD2 station building of each patch (`scripts/zuch/station_plan.mjs` draws the OSM outline over the model): Ettelbréck hall across the tracks (lateral -18.6 .. -27.8, 10 .. 75 m ahead; island platform with the wave canopy on the player's side),
+  Miersch z -25 .. -3, Clierf z +94 .. +121 (behind), Esch-Uelzecht z -92 .. -42 (ahead), Bettembuerg +22 m, Belval vault -52 .. +62 / pod +70.  A reversed service mirrors z (`api.track.reverse`).
+* `station-surround-mesh.js`: buildings centred inside a platform polygon (OSM platform roofs) are not drawn (they appeared as 250 m windowed walls).
+* `real-landmarks.js` + `landscape.js` chunk hook: `TS.realLandmarks.resolve(track)` / `draw(kind, ctx)`; DEFS south: Belval furnaces A / B; north: Clervaux castle, Saint-Maurice abbey (relative to the station block, legs beyond 250 m compressed x 0.27, hill landmarks clamped to the strip).
+
 ## 3. Other lines (Wave 2+)
 
 * West (Lëtzebuerg - Kleinbettingen, line 70): Hollerich/Bertrange/Mamer/Capellen; the A6 parallel, fields of the Grand Duchy; Mamer-Lycée is not a stop.
