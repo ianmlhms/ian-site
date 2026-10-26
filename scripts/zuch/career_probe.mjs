@@ -15,7 +15,7 @@ const rows = [];
 try {
   for (const id of routes) {
     const trainId = trainFlag || TRAIN_FOR[id] || 'railcar';
-    await sim.start(id, trainId);
+    await sim.start(id, trainId, { lazy: true });
     const d = await sim.page.evaluate(() => {
       const w = __tsTest.internals().world; const t = w.track;
       const rule = (window.TS.config.routeRules || {})[w.routeId] || {};
