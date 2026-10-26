@@ -218,5 +218,4 @@ limitations, so no number could be captured for them this session.
 
 ## Final commit
 
-`d8fa1281` on `mtb-cloud`, pushed to `origin/mtb-cloud` (further small commits may follow this one before the
-session ends; the branch is always pushed after each).
+`935d4104` on `mtb-cloud`, pushed to `origin/mtb-cloud`.
