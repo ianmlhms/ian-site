@@ -72,3 +72,14 @@ it on every run (never overwrites other entries).
 * `trees` come only from the LiDAR canopy; OSM `natural=tree` nodes are added as `poi` `tree` only where no canopy tree is within 3 m.
 * The straightening is a pure projection onto the smoothed track (Gaussian sigma 8 m on the OSM way chain, ends extended straight).  Inside a curve of radius R
   features at lateral distance d are compressed along z by the factor 1 - d/R (outside: stretched); the script logs the tightest radius.
+
+## Germany (`--country de`, Wave 2b)
+`build_station_patch.py <key> --country de` builds a patch for a station in Rheinland-Pfalz with the same frame and format; only the sources change:
+* CRS EPSG:25832 (UTM 32N); `origin` carries `epsg25832: [E, N]` instead of `epsg2169`.
+* OSM from `rlp.osm.pbf` (Geofabrik Rheinland-Pfalz; same layers / tags).
+* Relief: GeoBasis-RLP open data **DGM1** (1 m GeoTIFF, 1 km tiles) as DTM and **DOM1** as DSM (canopy = DOM1 - DGM1), from `https://geobasis-rlp.de/data/{dgm1,dom1}/current/tif/`
+  (tiles cached in `~/Library/Caches/zuch-work/de/`, downloaded with the system curl because python's urllib does not trust the server chain).
+* Buildings: GeoBasis-RLP **LoD2** CityGML 1.0 (`geb3dlo/current/gml/`, 2 km tiles, axis order E, N, z); `storeysAboveGround` and the ALKIS building function fill `levels` / `kind`
+  where OSM has no tag.  Buildings without LoD2 face (new buildings) are emitted from the OSM footprint as in Luxembourg.
+* The patch gets a top level `"credit"` string (data licence dl-de/by-2-0); `station-surround.js` appends the credits of all patches on the route to its credit line.
+* `scripts/zuch/build_de_patches.py` runs all stops of the RB 83 (and Kreuz Konz / Trier Sued / Trier Hbf as stage 2).

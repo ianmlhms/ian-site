@@ -141,15 +141,22 @@
 
   /* ---------------------------------------------------------------- lifecycle */
   const CREDIT = '© OpenStreetMap contributors (ODbL, openstreetmap.org/copyright) · Geodata © ACT Luxembourg (geoportail.lu, CC0)';
-  function addCredit() {
+  /* a patch may carry its own "credit" (non Luxembourg data, e.g. GeoBasis-RLP); it is listed after the Luxembourg credit only when such a patch is on the route */
+  function addCredit(patches) {
     try {
       const help = document.getElementById('helpBody');
-      if (!help || !help.parentElement || help.parentElement.querySelector('.ts-ss-credit')) return;
-      const p = document.createElement('p');
-      p.className = 'ts-ss-credit';
-      p.style.cssText = 'display:block;margin-top:4px;opacity:.7;font-size:11px;font-weight:400';
-      p.textContent = 'Stations: ' + CREDIT;
-      help.parentElement.appendChild(p);
+      if (!help || !help.parentElement) return;
+      const extra = [];
+      (patches || []).forEach((p) => { const c = p && p.data && p.data.credit; if (c && extra.indexOf(c) < 0) extra.push(c); });
+      const text = 'Stations: ' + CREDIT + (extra.length ? ' · ' + extra.join(' · ') : '');
+      let p = help.parentElement.querySelector('.ts-ss-credit');
+      if (!p) {
+        p = document.createElement('p');
+        p.className = 'ts-ss-credit';
+        p.style.cssText = 'display:block;margin-top:4px;opacity:.7;font-size:11px;font-weight:400';
+        help.parentElement.appendChild(p);
+      }
+      p.textContent = text;
     } catch (error) { /* a missing credit line must never stop the world */ }
   }
   function create(opts) {
@@ -160,7 +167,7 @@
     const patches = track.surroundPatches || [];
     if (!patches.length || !TS.stationSurroundMesh) return null;
     const built = new Map();     // patch index -> { group, dispose }
-    addCredit();
+    addCredit(patches);
     let disposed = false;
     function update(s) {
       if (disposed) return;

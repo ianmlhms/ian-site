@@ -62,6 +62,24 @@ OUT_DIR = os.path.join(REPO, "pb", "train-sim", "data", "stations")
 TO_LUREF = pyproj.Transformer.from_crs(4326, 2169, always_xy=True)
 TO_WGS = pyproj.Transformer.from_crs(2169, 4326, always_xy=True)
 
+# --country de (Rheinland-Pfalz): EPSG:25832, rlp.osm.pbf, GeoBasis-RLP open data (DGM1 / DOM1 GeoTIFF 1 km tiles, LoD2 CityGML 2 km tiles, dl-de/by-2-0)
+DE_BASE = "https://geobasis-rlp.de/data/"
+DE_DIR = os.path.join(WORK, "de")
+DE_CREDIT = "Geodata (c) GeoBasis-RLP / Landesamt fuer Vermessung und Geobasisinformation Rheinland-Pfalz (dl-de/by-2-0)"
+COUNTRY = "lu"
+CREDIT = None
+
+
+def set_country(c):
+    """Switch the module to Germany (Rheinland-Pfalz).  The Luxembourg defaults above stay untouched when this is never called."""
+    global COUNTRY, OSM_PBF, TO_LUREF, TO_WGS, CREDIT
+    if c == "de":
+        COUNTRY = "de"
+        OSM_PBF = os.path.join(WORK, "rlp.osm.pbf")
+        TO_LUREF = pyproj.Transformer.from_crs(4326, 25832, always_xy=True)
+        TO_WGS = pyproj.Transformer.from_crs(25832, 4326, always_xy=True)
+        CREDIT = DE_CREDIT
+
 CLS_ASPHALT, CLS_PAVING, CLS_LAWN, CLS_MEADOW, CLS_FOREST, CLS_GRAVEL, CLS_WATER, CLS_BUILDING, CLS_BED = range(9)
 CLASS_RGB = [(88, 88, 94), (196, 190, 178), (118, 176, 84), (178, 194, 104), (42, 102, 52), (176, 154, 122), (70, 128, 206), (206, 96, 74),
              (122, 106, 96), (255, 0, 255)]
@@ -475,15 +493,106 @@ def fetch_lidar(key, bb):
     return Raster(out["dtm"], *geo), Raster(out["dsm"], *geo)
 
 
+# ------------------------------------------------------------------------------------------------------------------------------ GeoBasis-RLP (Germany)
+def de_listing(name):
+    """{(E_km, N_km): url} of the newest tile per 1 km / 2 km cell of an opendata directory listing (cached on disk).
+    name: dgm1 | dom1 (GeoTIFF, 1 m) | geb3dlo (LoD2 CityGML, 2 km tiles)."""
+    sub = {"dgm1": "dgm1/current/tif/", "dom1": "dom1/current/tif/", "geb3dlo": "geb3dlo/current/gml/"}[name]
+    path = os.path.join(DE_DIR, "listing-%s.txt" % name)
+    os.makedirs(DE_DIR, exist_ok=True)
+    if not os.path.exists(path):
+        curl_to(DE_BASE + sub, path)
+    with open(path, errors="replace") as fh:
+        txt = fh.read()
+    out = {}
+    for m in re.finditer(r"((?:dgm1|dom1|LoD2)_32_(\d+)_(\d+)_\d_(?:rp|RP)(?:_\d+)?\.(?:tif|gml))", txt):
+        k = (int(m.group(2)), int(m.group(3)))
+        if k not in out or m.group(1) > out[k][0]:
+            out[k] = (m.group(1), DE_BASE + sub + m.group(1))
+    return {k: v[1] for k, v in out.items()}
+
+
+def curl_to(url, dst):
+    """Download with the system curl (the geobasis-rlp.de TLS chain is only trusted by the macOS keychain, not by python's certifi-less urllib)."""
+    import subprocess
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    subprocess.run(["curl", "-sSfL", "--retry", "4", "--retry-delay", "3", "-m", "900", "-A", UA, "-o", dst + ".part", url], check=True)
+    os.replace(dst + ".part", dst)
+
+
+def de_download(url, sub):
+    dst = os.path.join(DE_DIR, sub, url.rsplit("/", 1)[-1])
+    if not os.path.exists(dst):
+        curl_to(url, dst)
+    return dst
+
+
+def fetch_dem_de(key, bb):
+    """DTM (DGM1) + DSM (DOM1) mosaics at 1 m over bb=(e0,n0,e1,n1) in EPSG:25832 from the GeoBasis-RLP open data tiles; cached as npz.
+    Gaps (tile missing / nodata) are filled from the nearest valid cell.  Returns (dtm, dsm) Raster objects."""
+    import rasterio
+    cache = os.path.join(DE_DIR, "dem", key + ".npz")
+    os.makedirs(os.path.dirname(cache), exist_ok=True)
+    if os.path.exists(cache):
+        z = np.load(cache)
+        if z["bb"][0] <= bb[0] and z["bb"][1] <= bb[1] and z["bb"][2] >= bb[2] and z["bb"][3] >= bb[3]:
+            return Raster(z["dtm"], *z["geo"]), Raster(z["dsm"], *z["geo"])
+    x0, y0, x1, y1 = [int(math.floor(bb[0] / 1000.0)), int(math.floor(bb[1] / 1000.0)), int(math.floor(bb[2] / 1000.0)), int(math.floor(bb[3] / 1000.0))]
+    nx, ny = x1 - x0 + 1, y1 - y0 + 1
+    out = {}
+    for nm in ("dgm1", "dom1"):
+        lst = de_listing(nm)
+        arr = np.full((ny * 1000, nx * 1000), -9999.0, np.float32)
+        for tx in range(x0, x1 + 1):
+            for ty in range(y0, y1 + 1):
+                url = lst.get((tx, ty))
+                if url is None:
+                    log("WARNING: no %s tile %d_%d" % (nm, tx, ty))
+                    continue
+                with rasterio.open(de_download(url, nm)) as ds:
+                    a = ds.read(1).astype(np.float32)
+                    if ds.nodata is not None:
+                        a[a == ds.nodata] = -9999.0
+                    if a.shape != (1000, 1000):
+                        raise RuntimeError("unexpected %s tile shape %s" % (nm, a.shape))
+                    r0 = (y1 - ty) * 1000
+                    c0 = (tx - x0) * 1000
+                    arr[r0:r0 + 1000, c0:c0 + 1000] = a
+        bad = arr <= -9000
+        if bad.all():
+            raise RuntimeError("no %s coverage for %s" % (nm, key))
+        if bad.any():
+            idx = ndi.distance_transform_edt(bad, return_distances=False, return_indices=True)
+            arr = arr[tuple(idx)]
+        out[nm] = arr
+        log("RLP", nm, arr.shape, "range %.1f..%.1f" % (arr.min(), arr.max()), "nodata %.2f%%" % (100 * bad.mean()))
+    geo = np.array([x0 * 1000.0, (y1 + 1) * 1000.0, 1.0])
+    np.savez_compressed(cache, dtm=out["dgm1"], dsm=out["dom1"], geo=geo, bb=np.array([x0 * 1000.0, y0 * 1000.0, (x1 + 1) * 1000.0, (y1 + 1) * 1000.0]))
+    return Raster(out["dgm1"], *geo), Raster(out["dom1"], *geo)
+
+
+def lod2_de_tiles(bb):
+    """LoD2 2 km tile URLs ({tile: url}) that intersect bb=(e0,n0,e1,n1)."""
+    lst = de_listing("geb3dlo")
+    res = {}
+    for tx in range(int(math.floor(bb[0] / 2000.0)) * 2, int(math.floor(bb[2] / 2000.0)) * 2 + 1, 2):
+        for ty in range(int(math.floor(bb[1] / 2000.0)) * 2, int(math.floor(bb[3] / 2000.0)) * 2 + 1, 2):
+            if (tx, ty) in lst:
+                res["%d_%d" % (tx, ty)] = lst[(tx, ty)]
+    return res
+
+
 # ------------------------------------------------------------------------------------------------------------------------------ LOD2
 NS_B = "{http://www.opengis.net/citygml/building/2.0}"
 NS_G = "{http://www.opengis.net/gml}"
 
 
-def parse_lod2(path, win):
-    """Buildings of a CityGML file whose ground-surface centroid is inside win=(e0,n0,e1,n1) (EPSG:2169).  Axis order in the file: N, E, z.
+def parse_lod2(path, win, ns_b=None, axis="ne"):
+    """Buildings of a CityGML file whose ground-surface centroid is inside win=(e0,n0,e1,n1) (EPSG:2169; win None = all).  Axis order in the Luxembourg
+    file: N, E, z (axis="ne"); the RLP files are E, N, z (axis="en") in CityGML 1.0 (ns_b = building namespace).
     Returns [{gid, roofs, walls, ground}] with rings as (k,3) arrays (E, N, z)."""
     from lxml import etree
+    NS_B = ns_b or globals()["NS_B"]
     out = []
     seen = 0
     for _, el in etree.iterparse(path, events=("end",), tag=NS_B + "Building", huge_tree=True):
@@ -501,8 +610,13 @@ def parse_lod2(path, win):
                 if len(a) >= 2 and np.abs(a[0] - a[-1]).max() < 1e-6:
                     a = a[:-1]
                 if len(a) >= 3:
-                    surf[kind].append(np.c_[a[:, 1], a[:, 0], a[:, 2]])
+                    surf[kind].append(np.c_[a[:, 1], a[:, 0], a[:, 2]] if axis == "ne" else a)
         gid = el.get(NS_G + "id")
+        attr = {}
+        for nm in ("measuredHeight", "storeysAboveGround", "roofType", "function"):
+            e_ = el.find(NS_B + nm)
+            if e_ is not None and e_.text:
+                attr[nm] = e_.text.strip()
         el.clear()
         while el.getprevious() is not None:
             del el.getparent()[0]
@@ -511,9 +625,9 @@ def parse_lod2(path, win):
             continue
         pts = np.vstack(allp)
         c = pts[:, :2].mean(0)
-        if not (win[0] <= c[0] <= win[2] and win[1] <= c[1] <= win[3]):
+        if win is not None and not (win[0] <= c[0] <= win[2] and win[1] <= c[1] <= win[3]):
             continue
-        out.append({"gid": gid, "roofs": surf["roof"], "walls": surf["wall"], "ground": surf["ground"]})
+        out.append({"gid": gid, "roofs": surf["roof"], "walls": surf["wall"], "ground": surf["ground"], "attr": attr, "c": (float(c[0]), float(c[1]))})
     log("LOD2", os.path.basename(path), "scanned", seen, "kept", len(out))
     return out
 
@@ -570,6 +684,35 @@ def find_station(osm_lines, polys, pts, name, node):
         if f["t"].get("railway") == "platform" and f["g"].distance(node) < 250:
             plat += [(f, f["g"].buffer(1.5))]
     return sb, plat
+
+
+def find_station_building_de(polys, node, points):
+    """Germany: the Empfangsgebaeude is usually an untagged building=yes that carries the address of the station node (addr:street + housenumber), or a
+    building named like the station / "Bahnhof" within 80 m.  Returns the OSM feature or None (halts without a building)."""
+    st = None
+    for f in points:
+        t = f["t"]
+        if t.get("railway") in ("station", "halt") and f["g"].distance(node) < 60 and (st is None or f["g"].distance(node) < st["g"].distance(node)):
+            st = f
+    best, bd = None, 1e9
+    for f in polys:
+        t = f["t"]
+        if not t.get("building") or t["building"] in ("roof", "garage", "garages", "carport", "shed", "hut"):
+            continue
+        d = f["g"].distance(node)
+        if d > 150:
+            continue
+        hit = False
+        if st is not None and st["t"].get("addr:street") and t.get("addr:street") == st["t"].get("addr:street") and t.get("addr:housenumber") == st["t"].get("addr:housenumber"):
+            hit = True
+        nm = (t.get("name") or "").lower()
+        if nm and ("bahnhof" in nm or (st is not None and (st["t"].get("name") or "").lower().split(" ")[0] in nm and "bahnhof" in nm)):
+            hit = True
+        if t.get("railway") or t.get("public_transport") or t.get("building") in ("train_station", "station"):
+            hit = True
+        if hit and d < bd:
+            best, bd = f, d
+    return best
 
 
 def road_width(t, cls):
@@ -664,6 +807,8 @@ def build(args):
     polys0 = read_osm("multipolygons", near_bb)
     lines0 = read_osm("lines", near_bb)
     sbld, plats = find_station(lines0, polys0, None, name, node)
+    if sbld is None and COUNTRY == "de":
+        sbld = find_station_building_de(polys0, node, read_osm("points", near_bb, where="other_tags LIKE '%\"railway\"=>%'"))
     log("station building:", sbld["id"] if sbld else None, "| platforms near:", len(plats))
     allrail = [f for f in read_osm("lines", (E0 - R, N0 - R, E0 + R, N0 + R), where="railway IS NOT NULL") if f["t"].get("railway") == "rail"]
     # main-line candidates only (no sidings / yards / spurs / crossovers)
@@ -755,7 +900,7 @@ def build(args):
     # ---------------------------------------------------------------------------------------------------- LiDAR
     margin = 40.0
     lbb = (math.floor(pb[0] - margin), math.floor(pb[1] - margin), math.ceil(pb[2] + margin), math.ceil(pb[3] + margin))
-    dtm, dsm = fetch_lidar(key, lbb)
+    dtm, dsm = fetch_dem_de(key, lbb) if COUNTRY == "de" else fetch_lidar(key, lbb)
     # DEM at 2 m (4x4 area average per cell), absolute heights
     nx, nz = int((XMAX - XMIN) / DEM_RES) + 1, int((ZMAX - ZMIN) / DEM_RES) + 1
     dx = np.array([-0.75, -0.25, 0.25, 0.75])
@@ -915,10 +1060,26 @@ def build(args):
     # ---------------------------------------------------------------------------------------------------- buildings
     bld_osm = [f for f in polys if f["t"].get("building") and f["t"]["building"] not in ("roof",) and f["g"].area >= 3]
     roofs_osm = [f for f in polys if f["t"].get("building") == "roof"]
-    slugs = args.communes.split(",") if args.communes else communes_for(patch_world, obb)
-    log("communes for LOD2:", slugs)
     lod = []
-    for sl in slugs:
+    if COUNTRY == "de":
+        slugs = []
+        win = (pb[0] - 40, pb[1] - 40, pb[2] + 40, pb[3] + 40)
+        for tile, url in lod2_de_tiles(win).items():
+            cpath = os.path.join(DE_DIR, "lod2", "tile-%s.pkl" % tile)
+            if os.path.exists(cpath):
+                with open(cpath, "rb") as fh:
+                    got = pickle.load(fh)
+            else:
+                got = parse_lod2(de_download(url, "lod2"), None, ns_b="{http://www.opengis.net/citygml/building/1.0}", axis="en")
+                with open(cpath, "wb") as fh:
+                    pickle.dump(got, fh)
+            lod += [b for b in got if win[0] <= b["c"][0] <= win[2] and win[1] <= b["c"][1] <= win[3]]
+            slugs.append(tile)
+        log("LoD2 tiles:", slugs, "buildings in window:", len(lod))
+    else:
+        slugs = args.communes.split(",") if args.communes else communes_for(patch_world, obb)
+        log("communes for LOD2:", slugs)
+    for sl in ([] if COUNTRY == "de" else slugs):
         cpath = os.path.join(WORK, "lod2", "%s-%s-%d_%d.pkl" % (key, sl, int(pb[0]) // 10, int(pb[1]) // 10))
         if os.path.exists(cpath):
             with open(cpath, "rb") as fh:
@@ -1051,9 +1212,20 @@ def build(args):
         height = eave - gz
         top = float(roofz.max()) - gz
         tag = t.get("building", "yes")
-        lv = parse_num(t.get("building:levels")) or max(1, round(height / 3.0))
+        attr = b.get("attr") or {}
+        lv = parse_num(t.get("building:levels")) or parse_num(attr.get("storeysAboveGround")) or max(1, round(height / 3.0))
         is_station = int(bool(station_poly is not None and b["fp"].intersection(station_poly).area / min(b["fp"].area, station_poly.area) > 0.4))
         kind = bkind(tag, area, top)
+        fn = attr.get("function", "")
+        if tag == "yes" and fn:                                                        # ALKIS building function (RLP LoD2) where OSM has no usable tag
+            if fn.startswith("31001_1"):
+                kind = "house" if area < 400 else "apartments"
+            elif fn.startswith("31001_2"):
+                kind = "industrial" if area > 1500 else "commercial"
+            elif fn.startswith("31001_3"):
+                kind = "other"
+            elif fn.startswith("51009") and area < 60:
+                kind = "shed"
         buildings.append({"id": (b["osm"]["id"] if b["osm"] else b["gid"]), "kind": kind, "levels": int(lv), "station": is_station,
                           "roof": roof_type([r for r in (np.c_[q[:, 0], q[:, 2], q[:, 1]] for q in roofs3)]), "h": r2(max(height, 0.5)), "base": r2(yb),
                           "ground": ground, "roofs": roofs3, "walls": walls3, "_area": area, "_top": top})
@@ -1293,7 +1465,8 @@ def build(args):
     b64 = lambda b: base64.b64encode(b).decode("ascii")                                  # noqa: E731
     patch = {
         "v": 1, "key": key, "name": name,
-        "origin": {"lat": round(lat, 7), "lon": round(lon, 7), "headingDeg": round(heading, 2), "epsg2169": [round(oE, 2), round(oN, 2)]},
+        "origin": dict({"lat": round(lat, 7), "lon": round(lon, 7), "headingDeg": round(heading, 2)},
+                       **({"epsg25832": [round(oE, 2), round(oN, 2)]} if COUNTRY == "de" else {"epsg2169": [round(oE, 2), round(oN, 2)]})),
         "side": side, "extent": {"x": [XMIN, XMAX], "z": [ZMIN, ZMAX]},
         "dem": {"res": 2, "nx": nx, "nz": nz, "x0": XMIN, "z0": ZMIN, "dm": b64(dem_q.astype("<i2").tobytes())},
         "classes": {"res": 1, "nx": int(XMAX - XMIN), "nz": int(ZMAX - ZMIN), "x0": XMIN, "z0": ZMIN, "png": b64(png.getvalue())},
@@ -1304,23 +1477,28 @@ def build(args):
         "poi": [{"t": p["t"], "x": r2(p["x"]), "z": r2(p["z"]), "y": r2(p["y"])} for p in poi],
         "trackY": track_y,
     }
+    if CREDIT:
+        patch["credit"] = CREDIT
     text = json.dumps(patch, separators=(",", ":"), ensure_ascii=False)
     out_path = args.out or os.path.join(OUT_DIR, key + ".json")
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, "w") as fh:
         fh.write(text)
     idx_path = os.path.join(os.path.dirname(out_path), "index.json")
-    idx = {"v": 1, "stations": {}}
-    if os.path.exists(idx_path):
-        try:
-            with open(idx_path) as fh:
-                idx = json.load(fh)
-        except Exception:  # noqa: BLE001
-            log("WARNING: could not read existing index.json, rewriting")
-    idx.setdefault("stations", {})[name] = key
-    idx["v"] = 1
-    with open(idx_path, "w") as fh:
-        json.dump(idx, fh, ensure_ascii=False, separators=(",", ":"))
+    import fcntl
+    with open(os.path.join(WORK, "index.lock"), "w") as lock:                          # several builds may run in parallel: serialise the read-modify-write
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        idx = {"v": 1, "stations": {}}
+        if os.path.exists(idx_path):
+            try:
+                with open(idx_path) as fh:
+                    idx = json.load(fh)
+            except Exception:  # noqa: BLE001
+                log("WARNING: could not read existing index.json, rewriting")
+        idx.setdefault("stations", {})[name] = key
+        idx["v"] = 1
+        with open(idx_path, "w") as fh:
+            json.dump(idx, fh, ensure_ascii=False, separators=(",", ":"))
     log("wrote %s (%.0f kB), index %s" % (out_path, len(text) / 1024, idx_path))
     summary = {"size_kB": round(len(text) / 1024), "buildings": len(buildings), "trees": len(trees), "roads": len(out_roads), "rails": len(out_rails),
                "water": len(water_out), "platforms": len(plat_out), "poi": len(poi), "dem_min": float(dem.min()), "dem_max": float(dem.max()),
@@ -1399,7 +1577,9 @@ def main():
     ap.add_argument("--debug-png", default=None)
     ap.add_argument("--communes", default=None, help="comma separated LOD2 commune slugs (default: from OSM admin boundaries)")
     ap.add_argument("--keep-grade", action="store_true", help="keep the track gradient in the heights instead of levelling the track at y=0")
+    ap.add_argument("--country", default="lu", choices=("lu", "de"), help="lu = Luxembourg (default: EPSG:2169, lux.osm.pbf, LiDAR + LOD2); de = Rheinland-Pfalz (EPSG:25832, rlp.osm.pbf, GeoBasis-RLP DGM1 / DOM1 / LoD2)")
     args = ap.parse_args()
+    set_country(args.country)
     build(args)
 
 

@@ -110,8 +110,9 @@ def main():
     for k in ("lat", "lon", "headingDeg"):
         if not finite(o.get(k)):
             err("origin." + k)
-    if not (isinstance(o.get("epsg2169"), list) and len(o["epsg2169"]) == 2 and all(finite(c) for c in o["epsg2169"])):
-        err("origin.epsg2169")
+    ek = "epsg25832" if "epsg25832" in o else "epsg2169"                       # Germany (--country de) or Luxembourg
+    if not (isinstance(o.get(ek), list) and len(o[ek]) == 2 and all(finite(c) for c in o[ek])):
+        err("origin." + ek)
     elif not (45 < o["lat"] < 55 and 4 < o["lon"] < 9 and 0 <= o["headingDeg"] < 360):
         err("origin lat/lon/heading out of range")
     if d["side"] not in ("left", "right"):
@@ -237,7 +238,7 @@ def report(path, size, d):
     print("== %s  (%.0f kB)" % (os.path.basename(path), size / 1024))
     if "origin" in d and isinstance(d["origin"], dict):
         o = d["origin"]
-        print("origin lat/lon %.6f, %.6f  heading %.1f deg  side %s  EPSG:2169 %s" % (o.get("lat", 0), o.get("lon", 0), o.get("headingDeg", 0), d.get("side"), o.get("epsg2169")))
+        print("origin lat/lon %.6f, %.6f  heading %.1f deg  side %s  %s %s" % (o.get("lat", 0), o.get("lon", 0), o.get("headingDeg", 0), d.get("side"), "EPSG:25832" if "epsg25832" in o else "EPSG:2169", o.get("epsg25832") or o.get("epsg2169")))
     if st.get("dem") is not None:
         dem = st["dem"]
         print("DEM %.1f .. %.1f m, corridor |x|<=4: max |y| %.2f m" % (dem.min(), dem.max(), np.abs(dem[:, 78:83]).max()))
