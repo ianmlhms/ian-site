@@ -86,7 +86,8 @@ export async function simOnPage(page, origin, { quality = 'high', train = 'emu' 
       await api.hideUi();
       await api.frames(2);
       const box = await page.evaluate(() => { const r = document.querySelector('canvas').getBoundingClientRect(); return { x: Math.max(0, r.x), y: Math.max(0, r.y), width: r.width, height: r.height }; });
-      await page.screenshot({ path: file, clip: box, ...opts });
+      // software-rendered headless Chromium (no GPU, e.g. a cloud sandbox) can take well over the 30 s default to composite + encode a full-scene screenshot
+      await page.screenshot({ path: file, clip: box, timeout: 90000, ...opts });
       return file;
     },
   };

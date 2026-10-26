@@ -19,10 +19,18 @@ API = "https://commons.wikimedia.org/w/api.php"
 OUT = os.path.expanduser("~/Library/Caches/zuch-refs")
 
 
-def api(params):
+def api(params, tries=6):
     url = API + "?" + urllib.parse.urlencode(dict(params, format="json"))
-    with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": UA}), timeout=40) as r:
-        return json.load(r)
+    for attempt in range(tries):
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": UA}), timeout=40) as r:
+                return json.load(r)
+        except urllib.error.HTTPError as e:
+            if e.code == 429 and attempt < tries - 1:
+                wait = float(e.headers.get("Retry-After", 8 * (attempt + 1))) if e.headers else 8 * (attempt + 1)
+                time.sleep(min(wait, 60))
+                continue
+            raise
 
 
 def main():

@@ -7,7 +7,19 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { startServer } from '../flows/lib.mjs';
 
-const { webkit } = await import(pathToFileURL('/opt/homebrew/lib/node_modules/@playwright/cli/node_modules/playwright/index.mjs').href);
+// Playwright is looked up in $PLAYWRIGHT_DIR, then as a normal "playwright" import, then in the macOS global playwright-cli install (matches scripts/flows/lib.mjs).
+const GLOBAL_PLAYWRIGHT = '/opt/homebrew/lib/node_modules/@playwright/cli/node_modules/playwright';
+async function importPlaywright() {
+  try { return await import('playwright'); } catch { /* fall through to the folders */ }
+  for (const dir of [process.env.PLAYWRIGHT_DIR, GLOBAL_PLAYWRIGHT].filter(Boolean)) {
+    for (const entry of ['index.mjs', 'index.js']) {
+      const file = path.join(dir, entry);
+      if (fs.existsSync(file)) return import(pathToFileURL(file).href);
+    }
+  }
+  throw new Error('Playwright not found — set PLAYWRIGHT_DIR to a playwright package folder.');
+}
+const { webkit } = await importPlaywright();
 const args = process.argv.slice(2);
 const flag = (n, d) => { const i = args.indexOf('--' + n); if (i < 0) return d; const v = args[i + 1]; args.splice(i, 2); return v; };
 const routeId = flag('route', 'east');

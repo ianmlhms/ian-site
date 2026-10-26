@@ -37,7 +37,7 @@ try {
     const photo = path.join(os.homedir(), 'Library/Caches/zuch-refs', spec.refs, v.photo);
     pairs.push(`photo ${n}=${photo}`, `sim ${n}${v.note ? ' ' + v.note : ''}=${shot}`);
   }
-  const py = '/Users/Ian/Library/Caches/luxtram-work/.venv/bin/python';
+  const py = process.env.ZUCH_PY || (fs.existsSync('/Users/Ian/Library/Caches/luxtram-work/.venv/bin/python') ? '/Users/Ian/Library/Caches/luxtram-work/.venv/bin/python' : 'python3');
   const out = path.join(outDir, `${key}-${tag}-montage.png`);
   execFileSync(py, [path.join(path.dirname(new URL(import.meta.url).pathname), 'montage.py'), out, '--cols', '2', '--w', '800', ...pairs]);
   console.log('montage', out, 'errors', sim.errors.filter((e) => !/404/.test(e)).slice(0, 4));
