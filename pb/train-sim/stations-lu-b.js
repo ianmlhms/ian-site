@@ -1241,11 +1241,15 @@
       const specM = Object.assign({}, sp, { floors: [{ k: 'arch', ww: 1.2, wh: 2.6, sy: 0.4 }, { k: 'rect', ww: 1.05, wh: 1.8, sy: 0.7 }] });
       const specE = Object.assign({}, sp, { floors: [{ k: 'blank' }, { k: 'rect', ww: 1.0, wh: 1.6, sy: 0.8 }] });
       const gab = { b: k.facadeBatch('mieG', Object.assign({}, sp, { floors: [{ k: 'blank' }] })), bayM: 3.2, floorM: 3.7 };
-      const cz = -62;
-      k.house({ l0, dep: 8.6, z0: cz - 8, z1: cz + 8, floors: 2, FL: 3.7, spec: specM, specEnd: specE, key: 'mieM', kind: 'gable', rise: 4.0, mat: 'slate', gab, eaveCol: '#d4be8c' });
-      k.house({ l0: l0 + 1.2, dep: 5.4, z0: cz + 8, z1: cz + 13.4, floors: 3, FL: 3.7, spec: specE, key: 'mieT', kind: 'pyr', rise: 5.8, mat: 'slate', gab, eaveCol: '#d4be8c' });
-      vc.box(X(l0 + 1.15), H + 8.8, cz + 10.7, 0.06, 1.0, 1.0, col('#efe9d8'));
-      vc.box(X(l0 + 1.1), H + 8.8, cz + 10.7, 0.05, 0.7, 0.7, col('#37424c'));
+      /* the hall stands where the LOD2 station building of the patch does (22 x 11 m, lateral 5.6 .. 16.7 on the platform side, 3 .. 25 m ahead of the stop: OSM, 26 Oct 2026); a reversed
+         service sees it mirrored in z.  The far side follows the OSM layout (data/real/north-layout.json): the second main track (infra.js, 4.5 m) and the island platform 1;3 beyond it. */
+      const zr = api.track && api.track.reverse ? -1 : 1;
+      const cz = -17.3;
+      const zz = (a, b) => ({ z0: Math.min(zr * a, zr * b), z1: Math.max(zr * a, zr * b) });
+      k.house(Object.assign({ l0, dep: 8.6, floors: 2, FL: 3.7, spec: specM, specEnd: specE, key: 'mieM', kind: 'gable', rise: 4.0, mat: 'slate', gab, eaveCol: '#d4be8c' }, zz(cz - 8, cz + 8)));
+      k.house(Object.assign({ l0: l0 + 1.2, dep: 5.4, floors: 3, FL: 3.7, spec: specE, key: 'mieT', kind: 'pyr', rise: 5.8, mat: 'slate', gab, eaveCol: '#d4be8c' }, zz(cz + 8, cz + 13.4)));
+      vc.box(X(l0 + 1.15), H + 8.8, zr * (cz + 10.7), 0.06, 1.0, 1.0, col('#efe9d8'));
+      vc.box(X(l0 + 1.1), H + 8.8, zr * (cz + 10.7), 0.05, 0.7, 0.7, col('#37424c'));
       // new gold-bronze canopy: butterfly wedge over the platform, thin steel edge, grey columns
       k.waveCanopy({ lA: edge + 0.8, lB: lB + 0.4, z0: -40, z1: 100, fn: (z, l) => 4.4 - 0.9 * ((l - (edge + 0.8)) / (W - 0.4)), step: 10, topCol: '#b49a5c', timber: '#c9b27a', colFoot: lB - 1.2, colTop: lB - 1.2, colEvery: 11, colCol: '#7d848a' });
       // gold perforated-panel lift/underpass blocks with stainless lift doors
