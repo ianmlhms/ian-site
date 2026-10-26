@@ -1,0 +1,127 @@
+{
+ "route": "wittlich",
+ "station": "Cents-Hamm",
+ "refs": "Cents-Hamm",
+ "views": [
+  {
+   "photo": "Cents-Hamm station 2018 2.jpg",
+   "pos": [
+    -1,
+    100,
+    1.7
+   ],
+   "look": [
+    3,
+    40,
+    5
+   ],
+   "fov": 62,
+   "note": "bridge, clock, platform"
+  },
+  {
+   "photo": "Cents-Hamm station 2018 3.jpg",
+   "pos": [
+    -9.5,
+    110,
+    1.7
+   ],
+   "look": [
+    -9,
+    10,
+    2
+   ],
+   "fov": 62,
+   "note": "far platform masts"
+  },
+  {
+   "photo": "Luxembourg, Halte CFL Cents-Hamm (1).JPG",
+   "pos": [
+    2,
+    20,
+    1.7
+   ],
+   "look": [
+    5.5,
+    60,
+    3.5
+   ],
+   "fov": 62,
+   "note": "clock and lift"
+  },
+  {
+   "photo": "Cents-Hamm station 2018 1.jpg",
+   "pos": [
+    -1,
+    150,
+    1.5
+   ],
+   "look": [
+    -1,
+    40,
+    2.5
+   ],
+   "fov": 62,
+   "note": "along the track"
+  },
+  {
+   "photo": "Luxembourg, Halte CFL Cents-Hamm (5).JPG",
+   "pos": [
+    8,
+    110,
+    3
+   ],
+   "look": [
+    7,
+    85,
+    0
+   ],
+   "fov": 62,
+   "note": "underpass stairs (not modelled)"
+  },
+  {
+   "photo": "Luxembourg-Hamm, Beim Fetschebuer (103).jpg",
+   "pos": [
+    8,
+    95,
+    1.7
+   ],
+   "look": [
+    15,
+    75.7,
+    1.5
+   ],
+   "fov": 62,
+   "note": "mBox"
+  },
+  {
+   "photo": "Gare Zens-Hamm 2008.jpg",
+   "pos": [
+    -9,
+    -30,
+    1.7
+   ],
+   "look": [
+    -9,
+    40,
+    2
+   ],
+   "fov": 62,
+   "note": "old halt: platform"
+  },
+  {
+   "photo": "Luxembourg, Cents, PN56 (1).jpg",
+   "pos": [
+    -30,
+    20,
+    12
+   ],
+   "look": [
+    0,
+    55,
+    4
+   ],
+   "fov": 62,
+   "note": "overview, bridge"
+  }
+ ]
+}

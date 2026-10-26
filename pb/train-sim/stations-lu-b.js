@@ -1,5 +1,5 @@
 /* Zuchsimulator Lëtzebuerg: photo-modelled stations (lu-b). Registers into TS.realStations (stations-real.js).
- * Stations: Sandweiler-Contern, Oetrange, Betzder, Manternach, Mertert, Wasserbëlleg, Pafendall-Kierchbierg, Walfer, Lëntgen,
+ * Stations: Sandweiler-Contern, Oetrange, Betzder, Pafendall-Kierchbierg, Walfer, Lëntgen,
  * Miersch, Ettelbréck, Kautebaach, Wëlwerwolz, Clierf. Everything is built relative to the platform side (sx / pf) so mirrored
  * routes work. Local frame: l = lateral distance from the track centre towards the platform side (negative = far side),
  * z = along the platform (the train drives towards -z), y up (platform top = H). */
@@ -799,82 +799,6 @@
     },
   });
 
-  /* ================================================================ WASSERBËLLEG
-   * Refs: refs/ST-LU-B/Wasserbilleg_1..5 (Commons: Wasserbillig, gare CFL (103)/(104)/(118)/(136)/(115); Gare Wasserbillig 01).
-   * Cream/ochre plastered two-storey building, steep dark slate roofs, a clock in the central roof pediment, white window surrounds with
-   * arched ground-floor windows, long light grey lean-to canopy on the platform, a 3-storey signal tower with a flat overhanging roof, the
-   * grey concrete water tower, the ochre goods shed, island platform and more tracks across (the Moselle/Sauer town behind). */
-  reg('Wasserbëlleg', {
-    canopy: false,
-    furniture: false,
-    build(api) {
-      const k = makeKit(api);
-      const { sx, H, W, edge, col, FORM_Y, WHITE } = api;
-      const { X, vc } = k;
-      const lB = edge + W;
-      const l0 = lB + 0.1;
-      const FL = 3.55;
-      const cz = -34;
-      const wall = '#f0dcae';
-      const trim = '#f3eee2';
-      const fr = '#4a3524';
-      const specG = { bayM: 3.4, floorM: FL, floors: [{ k: 'arch', ww: 1.25, wh: 2.65, sy: 0.35 }, { k: 'rect', ww: 1.05, wh: 1.75, sy: 0.65 }], wall, trim, frame: fr, glassTop: '#5b5047', glassBot: '#8f8479', sill: false, band: true };
-      const specD = { bayM: 3.4, floorM: FL, floors: [{ k: 'door', ww: 1.35, wh: 2.75, sy: 0, col: '#5a3a22', panel: '#6a4429' }, { k: 'rect', ww: 1.05, wh: 1.75, sy: 0.65 }], wall, trim, frame: fr, glassTop: '#5b5047', glassBot: '#8f8479', sill: false };
-      const specE = { bayM: 3.4, floorM: FL, floors: [{ k: 'blank' }, { k: 'rect', ww: 0.95, wh: 1.5, sy: 0.9 }], wall, trim, frame: fr, glassTop: '#5b5047', glassBot: '#8f8479', sill: false };
-      const specTop = { bayM: 3.4, floorM: FL, floors: [{ k: 'blank' }], wall, trim, frame: fr };
-      const gab = { b: k.facadeBatch('wasTop', specTop), bayM: 3.4, floorM: FL };
-      // wings + main body (z runs along the platform)
-      const parts = [
-        { z0: cz - 27, z1: cz - 13.6, dep: 8.8, spec: specG, key: 'wasL', kind: 'hip', rise: 4.4 },
-        { z0: cz - 13.6, z1: cz + 13.6, dep: 11.2, spec: specG, key: 'wasM', kind: 'gable', rise: 5.6 },
-        { z0: cz + 13.6, z1: cz + 30.6, dep: 9.6, spec: specG, key: 'wasR', kind: 'gable', rise: 5.0 },
-      ];
-      parts.forEach((p) => {
-        const w = k.walls({ l0, l1: l0 + p.dep, z0: p.z0, z1: p.z1, floors: 2, floorM: FL, front: p.spec, frontKey: p.key + 'F', back: p.spec, backKey: p.key + 'F', end: specE, endKey: 'wasE', baseCol: '#a39070' });
-        k.roof({ kind: p.kind, mat: 'slate', l0, l1: l0 + p.dep, z0: p.z0, z1: p.z1, y: w.eaves + 0.2, rise: p.rise, ov: 0.55, gableTex: gab });
-        vc.box(X(l0 + p.dep / 2), w.eaves + 0.05, (p.z0 + p.z1) / 2, p.dep + 0.5, 0.25, p.z1 - p.z0 + 0.5, col('#cdb98a'));
-      });
-      const eavesY = H + 2 * FL;
-      // central pediment (wall dormer) with the station clock, facing the platform and the street
-      k.texBox(k.plainBatch(wall), l0 - 0.4, l0 + 3.6, eavesY, eavesY + 2.4, cz - 3.6, cz + 3.6, 3);
-      k.roof({ kind: 'gableX', mat: 'slate', l0: l0 - 0.4, l1: l0 + 3.6, z0: cz - 3.6, z1: cz + 3.6, y: eavesY + 2.4, rise: 3.0, ov: 0.35, gableHex: wall });
-      k.clockFace(l0 - 0.42, eavesY + 1.15, cz, 1.7, -1);
-      k.chimney(l0 + 3, cz - 8, eavesY + 2.5, 2.4, '#a58f72');
-      k.chimney(l0 + 8, cz + 9, eavesY + 2.5, 2.4, '#a58f72');
-      k.chimney(l0 + 5, cz + 24, eavesY + 2.2, 2.2, '#a58f72');
-      // CFL plate over the door
-      vc.box(X(l0 - 0.05), H + 3.5, cz, 0.05, 0.45, 1.6, col('#f0f0ec'));
-      vc.box(X(l0 - 0.08), H + 3.5, cz, 0.05, 0.28, 0.9, col('#e0801a'));
-      // long lean-to canopy (light grey sheet roof) along the building, iron posts
-      k.leanCanopy({ lHi: l0 - 0.2, lLo: edge + 2.3, yHi: H + 3.9, yLo: H + 3.2, z0: cz - 28, z1: cz + 32, topCol: '#8f969b', timber: '#9a7a55', postCol: '#3c4147', postEvery: 5 });
-      // signal tower: three storeys, cream, flat roof overhang, window band
-      const tz = cz + 56;
-      const specT = { bayM: 3.0, floorM: 3.2, floors: [{ k: 'blank' }, { k: 'rect', ww: 1.0, wh: 1.4, sy: 0.9 }, { k: 'rect', ww: 2.4, wh: 1.5, sy: 0.7 }], wall, trim, frame: '#ece8dc', glassTop: '#3d4a52', glassBot: '#7d8b94', sill: false };
-      const tw = k.walls({ l0: lB - 1.0, l1: lB + 5.2, z0: tz - 3.2, z1: tz + 3.2, floors: 3, floorM: 3.2, front: specT, frontKey: 'wasT', back: specT, backKey: 'wasT', end: specT, endKey: 'wasT', baseCol: '#a39070' });
-      vc.box(X(lB + 2.1), tw.eaves + 0.15, tz, 8.4, 0.3, 8.4, col('#8d9296'));
-      // water tower (grey concrete cylinder with a wider tank) behind the platform
-      k.cylTower(15.5, tz + 22, 3.9, FORM_Y, 21, '#bdb9b0');
-      k.cylTower(15.5, tz + 22, 5.1, 21, 25.5, '#aaa69d');
-      // goods shed: ochre, brown timber canopy on the track side
-      const gz = cz - 66;
-      const specS = { bayM: 4, floorM: 4.6, floors: [{ k: 'rect', ww: 1.8, wh: 2.0, sy: 1.2 }], wall: '#d9b778', trim: '#b99a62', frame: '#5b3a25', sill: false, band: false };
-      const sw = k.walls({ l0: lB + 0.4, l1: lB + 9, z0: gz - 12, z1: gz + 12, floors: 1, floorM: 4.6, front: specS, frontKey: 'wasS', back: specS, backKey: 'wasS', end: specS, endKey: 'wasS', baseCol: '#a39070' });
-      k.roof({ kind: 'gable', mat: 'tile', l0: lB + 0.4, l1: lB + 9, z0: gz - 12, z1: gz + 12, y: sw.eaves + 0.1, rise: 2.4, ov: 0.6, gableHex: '#d9b778' });
-      k.leanCanopy({ lHi: lB + 0.3, lLo: edge + 3.4, yHi: H + 3.9, yLo: H + 3.3, z0: gz - 12, z1: gz + 12, topCol: '#5a4535', timber: '#8a6038', postCol: '#4a3a2e', postEvery: 6 });
-      // platform furniture
-      [-60, -34, 4, 26].forEach((z) => k.bench(l0 - 0.9, z, '#8a1f26'));
-      [-72, -48, -20, 12, 40].forEach((z) => k.totem(edge + 1.5, z));
-      [-14, 20, 44].forEach((z) => k.bin(edge + 2.6, z, '#d9631a'));
-      [-92, 88].forEach((z) => k.clockPole(edge + 3.2, z));
-      // across: island platform between two more tracks, flat steel canopy
-      k.track(-9.2, -135, 135, { pole: true });
-      k.platformBox(-10.9, 3.4, -1, -120, 100);
-      k.track(-16.0, -135, 135, { pole: true });
-      k.waveCanopy({ lA: -11.4, lB: -13.8, z0: -50, z1: 70, fn: () => 4.1, step: 8, topCol: '#9aa0a5', timber: '#8d9296', colFoot: -13.5, colTop: -13.5, colEvery: 8, colCol: '#4a5258' });
-      [-60, -10, 40, 80].forEach((z) => k.totem(-12.0, z));
-    },
-  });
-
   /* ================================================================ CLIERF (Clervaux)
    * Refs: refs/ST-LU-B/Clierf_1..4 (Commons: Clervaux, gare CFL Clervaux (102)/(103)/(105)/(106); Clervaux Gare vers sud 2022).
    * White-plastered two-storey building with sandstone window surrounds and red doors, weathered slate roof, brick chimney, low annex;
@@ -930,80 +854,6 @@
       [-60, 0, 44].forEach((z) => k.lampOld(-12.0, z));
       // concrete footbridge across the tracks at the north end
       k.footbridge(-121, -23, 14);
-    },
-  });
-
-  /* ================================================================ MANTERNACH
-   * Refs: refs/ST-LU-B/Manternach_1..2 (Commons: Manternach, gare CFL Manternach (104)/(106)).
-   * Red-brick open shelter with flat white roof, maroon steel shelter on the far platform, round clocks and blue CFL totems, tan paver
-   * platform, yellow-framed name board, the old grain silo by the crossing and the yellow village house behind, bike box. */
-  reg('Manternach', {
-    canopy: false,
-    furniture: false,
-    build(api) {
-      const k = makeKit(api);
-      const { sx, H, W, edge, col, FORM_Y } = api;
-      const { X, vc } = k;
-      const lB = edge + W;
-      // red-brick shelter with a flat white roof, dark red seats
-      k.boxShelter(lB - 3.0, -18, 5.6, 2.4, '#a85a44', '#d6d7d4', 5);
-      k.yellowBoard(edge + 3.2, 10, 'Manternach');
-      [-60, -30, 24, 56].forEach((z) => k.totem(edge + 1.5, z));
-      [-52, 4, 40, 70].forEach((z) => k.lamp(lB - 0.6, z, '#8d9296', 5.0));
-      [-44, 36].forEach((z) => k.clockPole(edge + 2.6, z));
-      [-6, 22].forEach((z) => k.bin(lB - 0.7, z, '#d9631a'));
-      // old grain silo, yellow village house, bike box behind the platform
-      k.silo(14, -66, 5.5, 9, 17);
-      const wall = '#ecd183';
-      const sp = { bayM: 3.2, floorM: 3.3, wall, trim: '#f4efe0', frame: '#f4efe0', glassTop: '#55616c', glassBot: '#8e9ba6', sill: true, band: true };
-      const specH = Object.assign({}, sp, { floors: [{ k: 'rect', ww: 1.1, wh: 1.7, sy: 0.8 }, { k: 'rect', ww: 1.0, wh: 1.6, sy: 0.7 }] });
-      k.house({ l0: lB + 6.5, dep: 8, z0: 20, z1: 34, floors: 2, FL: 3.3, spec: specH, key: 'manH', kind: 'hip', rise: 3.0, mat: 'slate', wall, eaveCol: '#d6c27a' });
-      k.bikebox(lB + 2.0, -42);
-      // across the empty track: maroon steel shelter on its own platform
-      k.track(-9.2, -135, 135, { pole: true });
-      k.platformBox(-10.9, 4.0, -1, -90, 90);
-      k.postShelter(-14.2, -10, 2.6, 6, '#7a2a30', '#6a2b3a');
-      k.postShelter(-14.2, 40, 2.6, 6, '#7a2a30', '#6a2b3a');
-      [-50, 10, 60].forEach((z) => k.totem(-12.2, z));
-    },
-  });
-
-  /* ================================================================ MERTERT
-   * Refs: refs/ST-LU-B/Mertert_1..2 (Commons: Mertert, gare CFL Mertert (111)/(106)).
-   * Square two-storey ochre-plastered building with sandstone trim, arched ground-floor openings, hipped slate roof and chimney, standing
-   * directly at the platform; small shelter, blue totem, bike box, underpass; yellow-framed name board. */
-  reg('Mertert', {
-    canopy: false,
-    furniture: false,
-    build(api) {
-      const k = makeKit(api);
-      const { sx, H, W, edge, col, FORM_Y } = api;
-      const { X, vc } = k;
-      const lB = edge + W;
-      const FL = 3.6;
-      const wall = '#dcc592';
-      const sp = { bayM: 3.3, floorM: FL, wall, trim: '#b8996a', frame: '#f1ede2', glassTop: '#4d5a66', glassBot: '#8794a0', sill: true, band: true };
-      const specG = Object.assign({}, sp, { floors: [{ k: 'arch', ww: 1.15, wh: 2.5, sy: 0.4 }, { k: 'rect', ww: 1.0, wh: 1.7, sy: 0.75 }] });
-      const specE = Object.assign({}, sp, { floors: [{ k: 'arch', ww: 1.1, wh: 2.4, sy: 0.4 }, { k: 'rect', ww: 1.0, wh: 1.6, sy: 0.75 }] });
-      const l0 = lB + 0.1;
-      const cz = -34;
-      const w = k.house({ l0, dep: 8.4, z0: cz - 5.5, z1: cz + 5.5, floors: 2, FL, spec: specG, specEnd: specE, key: 'merB', kind: 'hip', rise: 3.4, hipK: 1, mat: 'slate', wall, eaveCol: '#b8996a' });
-      k.chimney(l0 + 4.2, cz, H + 2 * FL + 3.0, 2.2, '#a98466');
-      vc.box(X(l0 - 0.1), H + 4.1, cz, 0.06, 0.5, 1.6, col('#f0f0ec'));
-      // low annex
-      k.house({ l0: l0 + 0.5, dep: 6.4, z0: cz + 5.5, z1: cz + 13, floors: 1, FL: 3.2, spec: specE, key: 'merA', kind: 'mono', rise: 1.0, high: 'far', mat: 'slate', wall });
-      // platform shelter (white block shelter, red seats), totem, bike box, yellow board
-      k.boxShelter(lB - 3.2, 20, 5.2, 2.2, '#e8e6e0', '#a4a8ab', 4);
-      k.yellowBoard(edge + 3.2, -60, 'Mertert');
-      [-70, -52, -8, 36, 56].forEach((z) => k.totem(edge + 1.5, z));
-      [-52, -14, 20, 52].forEach((z) => k.lamp(edge + 3.2, z, '#8d9296', 5.0));
-      k.clockPole(edge + 2.6, -16);
-      k.bikebox(lB + 3.5, 30);
-      // across the empty track: second platform with a small shelter
-      k.track(-9.2, -135, 135, { pole: true });
-      k.platformBox(-10.9, 4.0, -1, -90, 90);
-      k.boxShelter(-14.9, 6, 4.8, 2.0, '#e8e6e0', '#a4a8ab', 4);
-      [-40, 36].forEach((z) => k.totem(-12.2, z));
     },
   });
 

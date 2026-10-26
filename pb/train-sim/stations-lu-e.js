@@ -163,27 +163,27 @@
   }
   /* the CR 234 road bridge over the cutting (patch road with bridge = 1, deck 9.2 m above the formation, skewed 30 degrees to the track): the patch renderer skips bridge ribbons */
   const SC_BRIDGE = { a: [-33.0, 43.8], b: [29.6, 6.9], yTop: 9.24, width: 9.6, deckH: 1.4, piersX: [-14, 10, 22] };
-  function roadBridge(api, k) {
+  function roadBridge(api, k, br = SC_BRIDGE) {
     const { col, FORM_Y } = api; const { vc } = k;
-    const [ax, az] = SC_BRIDGE.a; const [bx, bz] = SC_BRIDGE.b;
+    const [ax, az] = br.a; const [bx, bz] = br.b;
     const len = Math.hypot(bx - ax, bz - az);
     const ux = (bx - ax) / len; const uz = (bz - az) / len;
     const yaw = Math.atan2(ux, uz);
-    const yTop = SC_BRIDGE.yTop + FORM_Y;
+    const yTop = br.yTop + FORM_Y;
     const at = (t) => [ax + (bx - ax) * t, az + (bz - az) * t];
     const [cx, cz] = at(0.5);
     const side = (off) => [cx + uz * off, cz - ux * off];
-    vc.box(cx, yTop - SC_BRIDGE.deckH / 2, cz, SC_BRIDGE.width, SC_BRIDGE.deckH, len, col('#9c9a94'), yaw);
+    vc.box(cx, yTop - br.deckH / 2, cz, br.width, br.deckH, len, col('#9c9a94'), yaw);
     vc.box(cx, yTop + 0.03, cz, 7.2, 0.06, len, col('#4a4c50'), yaw);
     [-1, 1].forEach((d) => {
-      const [px, pz] = side(d * (SC_BRIDGE.width / 2 - 0.15));
+      const [px, pz] = side(d * (br.width / 2 - 0.15));
       vc.box(px, yTop + 0.55, pz, 0.3, 1.1, len, col('#a8a6a0'), yaw);
-      const [rx, rz] = side(d * (SC_BRIDGE.width / 2 + 0.05));
+      const [rx, rz] = side(d * (br.width / 2 + 0.05));
       vc.box(rx, yTop + 1.2, rz, 0.06, 0.1, len, col('#b0453c'), yaw);
     });
-    SC_BRIDGE.piersX.forEach((x) => {
+    br.piersX.forEach((x) => {
       const [px, pz] = at((x - ax) / (bx - ax));
-      vc.box(px, (yTop - SC_BRIDGE.deckH - 1.5) / 2, pz, SC_BRIDGE.width - 0.8, yTop - SC_BRIDGE.deckH + 1.5, 1.4, col('#8f8d87'), yaw);
+      vc.box(px, (yTop - br.deckH - 1.5) / 2, pz, br.width - 0.8, yTop - br.deckH + 1.5, 1.4, col('#8f8d87'), yaw);
     });
   }
   reg('Sandweiler-Contern', {
@@ -362,6 +362,55 @@
       const bx = sx * WB.bikebox.x;
       k.vc.box(k.X(bx), api.FORM_Y + 1.3, WB.bikebox.z, 3.4, 2.6, 3.4, col('#d4d6d8'));
       k.vc.box(k.X(bx) - sx * 1.72, api.FORM_Y + 1.1, WB.bikebox.z, 0.06, 2.1, 1.1, col('#8e2a2a'));
+    },
+  });
+
+  /* ================================================================ CENTS-HAMM (new stop, no older model)
+   * Refs: ~/Library/Caches/zuch-refs/Cents-Hamm (Commons: Cents-Hamm station 2018 (1)-(3), Luxembourg Halte CFL Cents-Hamm (1)/(4)/(5)/(6), Luxembourg Cents PN56, Fetschebuer (103)).  The halt was rebuilt
+   * in 2018-21 in a wooded cutting: two wide side platforms of grey / black patterned pavers (patch x 1.2 .. 7.4 next to the game track, x -13.6 .. -6.0 next to the second track at x -4.65),
+   * red-brown lamp masts with a curved arm, blue CFL info totems, round clocks, small dark glass shelters, glass lift shafts and stairs up to the Rue des Alouettes road bridge (deck 7 .. 9 m
+   * above the rails, z 46 .. 62) and a pedestrian underpass at z 85 .. 100; the white perforated "mBox" bike stations with a purple fascia stand behind both platforms. */
+  const CH = { far: { edge: -6.0, width: 7.6, z0: -165, z1: 165 }, track: -4.65, liftZ: 41 };
+  const CH_BRIDGE = { a: [-22, 52.5], b: [29, 55.5], yTop: 8.1, width: 16, deckH: 1.3, piersX: [-16, 11] };
+  const CH_LAMP = '#7a3a2a';
+  const CH_LAMP_Z = [-140, -112, -84, -28, 0, 28, 84, 112, 140];
+  function mBox(api, x, z, y) {
+    const { col, FORM_Y } = api; const { vc } = makeKit(api);
+    vc.box(x, FORM_Y + y + 1.4, z, 3.0, 2.8, 6.0, col('#e3e5e6'));
+    vc.box(x, FORM_Y + y + 3.05, z, 3.5, 0.35, 6.6, col('#6b2f7a'));
+  }
+  reg('Cents-Hamm', {
+    canopy: false,
+    furniture: false,
+    build(api) {
+      const { sx, H, W, edge, col, FORM_Y } = api;
+      const k = makeKit(api);
+      const f = mirrorKit(api);
+      const lB = edge + W;
+      const toward = (x) => -x * sx;
+      roadBridge(api, k, CH_BRIDGE);
+      // our platform (right): lift shaft up to the bridge, shelters, totems, clocks, boards, bins, lamp masts
+      k.lift(lB - 1.8, CH.liftZ, FORM_Y + 6.6);
+      [-132, -73, -8.5, 147.7].forEach((z) => k.glassShelter(lB - 2.9, z, 4.2, 2.0, '#4c5258', '#3b4046'));
+      [-100, -40, 15, 100].forEach((z) => k.totem(edge + 1.5, z));
+      [-60, 30].forEach((z) => k.clockPole(edge + 2.2, z));
+      [-90, 5, 120].forEach((z) => k.yellowBoard(lB - 0.8, z, 'Cents-Hamm'));
+      [-20, 70].forEach((z) => k.bin(lB - 0.6, z, '#d9631a'));
+      CH_LAMP_Z.forEach((z) => k.lamp(lB - 0.5, z, CH_LAMP, 5.6));
+      // second track and the far platform with the same equipment
+      k.track(sx * CH.track, -135, 135, { pole: true });
+      k.platformBox(sx * CH.far.edge, CH.far.width, -1, CH.far.z0, CH.far.z1);
+      f.lift(toward(-11.4), CH.liftZ, FORM_Y + 6.6);
+      [-71, -8.7, 147.6].forEach((z) => f.glassShelter(toward(-12.0), z, 4.2, 2.0, '#4c5258', '#3b4046'));
+      [-100, -40, 20, 100].forEach((z) => f.totem(toward(-7.4), z));
+      [-60, 30].forEach((z) => f.clockPole(toward(-8.2), z));
+      [-90, 5].forEach((z) => f.yellowBoard(toward(-12.2), z, 'Cents-Hamm'));
+      f.bench(toward(-9.5), 70, '#4a4f55');
+      f.bin(toward(-7.3), 60.8, '#d9631a');
+      CH_LAMP_Z.forEach((z) => f.lamp(toward(-12.8), z, CH_LAMP, 5.6));
+      // mBox bike stations behind both platforms
+      mBox(api, 15.0, 75.7, 0.7);
+      mBox(api, -22.8, 86.1, 1.0);
     },
   });
 })();
