@@ -45,6 +45,23 @@
     },
   });
 
+  /* MERTERT.  Refs: Commons "Mertert, gare CFL Mertert (103)/(104)/(110)/(111)" (2023-2025).  The old station building (Place de la Gare 1) stands behind the far platform (patch
+   * x 12 .. 28, z 71 .. 83): two storeys, weathered warm-beige plaster, yellow sandstone surrounds, a big arched double door under the name plate, rubble-stone plinth, dark
+   * hipped slate roof with one dormer and a brick chimney, dark window frames. */
+  reg('Mertert', {
+    wall: '#bda887', trim: '#d6bd86', plinth: { h: 0.8, col: '#8d836c' }, band: null, roof: 'slate', roofTint: '#8a8e93', groundY: 0.35, floorH: 4.1, bayM: 3.8, stain: true,
+    win: { w: 1.1, h: 1.9, kind: 'rect', frame: '#2f3438', reveal: '#d9bf84', sill: true },
+    doors: [{ x: 24.0, w: 2.2, h: 3.2, col: '#3d2c22', glass: false, face: 'end', nz: -1, arch: true }, { x: 16.6, w: 2.2, h: 3.2, col: '#3d2c22', glass: false, face: 'end', nz: 1, arch: true }],
+    extras(api) {
+      // brick chimney on the ridge, the cast name plate above the arched door (photo 110)
+      api.box(19.7, 14.2, 76.9, 0.9, 2.4, 0.9, '#8c5a48');
+      api.box(24.0, 4.5, 71.15, 1.3, 0.5, 0.06, '#6b2a22');
+      api.box(24.0, 4.5, 71.11, 1.15, 0.38, 0.05, '#efe6e0');
+      api.box(16.6, 4.5, 82.76, 1.3, 0.5, 0.06, '#6b2a22');
+      api.box(16.6, 4.5, 82.80, 1.15, 0.38, 0.05, '#efe6e0');
+    },
+  });
+
   /* LËTZEBUERG GARE CENTRALE.  Refs: ~/Library/Caches/zuch-refs/Lux-Gare (Commons: Luxembourg City railway station 2022-12, Gare centrale tram stop,
    * Grande vitesse, Hall Gare centrale).  Yellow-ochre sandstone building (1907-1913), arched windows, mansard slate roofs, the clock tower with its
    * green copper spire; the real LOD2 model (667 roof faces) gives the volumes. */

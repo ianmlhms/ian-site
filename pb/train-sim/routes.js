@@ -162,7 +162,7 @@
    * See pb/train-sim/REAL-LINES.md for the real stop list and its sources. */
   const RM = window.TS.realMosel;
   if (!RM) throw new Error('[Lokféierer] routes: real-mosel.js is missing');
-  const PLATFORM_WIDTH = { Munsbach: 3.2, 'Roodt-Syr': 2.7, Oetrange: 5.7, Betzder: 2.6, Wecker: 4.1, 'Sandweiler-Contern': 3.7 };
+  const PLATFORM_WIDTH = { Munsbach: 3.2, 'Roodt-Syr': 2.7, Oetrange: 5.7, Betzder: 2.6, Wecker: 4.1, 'Sandweiler-Contern': 3.7, Mertert: 2.7 };
   /* the OSM-derived side of these stops contradicts the photos / the station patch (Wecker: the real platform is an island on the LEFT of the track that has the building
    * on its right; real-mosel.js says 'right'): corrected here until build_real_line.py learns it (real-mosel.js is generated and stays untouched) */
   const SIDE_FIX = { Wecker: 'left' };

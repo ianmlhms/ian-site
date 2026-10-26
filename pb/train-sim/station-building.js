@@ -10,8 +10,8 @@
  *     y metres above the formation level; rail head = +0.55).
  * Everything is painted; no photograph is shipped.  Registering a style:
  *     TS.stationStyles.register('Roodt-Syr', { wall: '#e9e3cf', ... })
- * style = { wall, trim, plinth: { h, col }, band: col | null, roof: 'slate' | 'tile' | 'flat' | 'zinc', fascia: col, floorH, bayM,
- *           win: { w, h, kind: 'rect' | 'arch', frame, shutter, sill, ground: bool }, gableWin: 'round' | null, doors: [{ z, w, h, col, glass, face: 'front' | 'back' }],
+ * style = { wall, trim, plinth: { h, col }, groundY: patch height of the visible ground (default: lowest LOD2 point), band: col | null, roof: 'slate' | 'tile' | 'flat' | 'zinc', fascia: col, floorH, bayM,
+ *           win: { w, h, kind: 'rect' | 'arch', frame, shutter, sill, ground: bool }, gableWin: 'round' | null, doors: [{ z (front/back faces) | x (end faces), w, h, col, glass, face: 'front' | 'back' | 'end' }],
  *           skipFaces: (face) => bool, extras: (api) => void, wallFor: (face) => colour | null (own plaster colour of one face, e.g. a white wing of a stone building), hidden: bool (draw nothing: the station model replaces it) } */
 (function () {
   'use strict';
@@ -95,9 +95,10 @@
     const Y = (y) => (face.ymax - y) * sy;                      // patch y -> canvas y
     const poly = face.ring.map((p) => [(p[0] * face.hx + p[2] * face.hz - face.pmin) * sx, Y(p[1])]);
     const plinthH = st.plinth ? st.plinth.h : 0.6;
-    const base = face.ymin;
-    // plinth
-    if (plinthH > 0) { g.fillStyle = st.plinth ? st.plinth.col : '#8e887a'; g.fillRect(0, Y(base + plinthH), px, plinthH * sy + 2); g.fillStyle = 'rgba(0,0,0,0.12)'; g.fillRect(0, Y(base + plinthH), px, 2); }
+    // style.groundY: patch height of the visible ground at the facade; the LOD2 part below it (a building sunk into a slope) is painted as plinth stone
+    const base = st.groundY !== undefined ? clamp(st.groundY, face.ymin, face.ymax - 1) : face.ymin;
+    const plinthTop = base + plinthH;
+    if (plinthTop > face.ymin) { g.fillStyle = st.plinth ? st.plinth.col : '#8e887a'; g.fillRect(0, Y(plinthTop), px, (plinthTop - face.ymin) * sy + 2); g.fillStyle = 'rgba(0,0,0,0.12)'; g.fillRect(0, Y(plinthTop), px, 2); }
     const eave = face.eave;
     const floorH = st.floorH || FLOOR_H;
     const avail = eave - base - plinthH;
@@ -113,10 +114,10 @@
     const wwid = win.w || 1.05; const whgt = win.h || 1.55;
     const bayM = st.bayM || 3.2;
     const nb = Math.max(1, Math.round(w / bayM));
-    const doorList = (doors || []).filter((d) => (d.face || 'front') === face.kind);
+    const doorList = (doors || []).filter((d) => (d.face || 'front') === face.kind && (d.nz === undefined || Math.sign(face.nz) === d.nz));       // d.nz: only the face looking towards -z (ahead) / +z
     const doorT = (d) => {
       // door centre along the face: the patch z maps to t = z * hz + x * hx (x is constant on a face parallel to the track)
-      const t = d.z * face.hz + face.xc * face.hx;
+      const t = d.x !== undefined ? d.x * face.hx + face.zc * face.hz : d.z * face.hz + face.xc * face.hx;       // d.x: door of an 'end' face (a wall across the track), positioned by patch x
       return (t - face.pmin) * sx;
     };
     const drawWindow = (cxp, cy0, kind, ww, wh, glassOnly) => {
@@ -158,8 +159,10 @@
     // doors
     doorList.forEach((d) => {
       const x = doorT(d) - (d.w * sx) / 2; const dh = d.h || 2.2; const y = Y(base + plinthH * 0.3 + dh); const wpx = d.w * sx; const hpx = dh * sy;
-      g.fillStyle = st.trim || '#d8cfae'; g.fillRect(x - 0.18 * sx, y - 0.14 * sx, wpx + 0.36 * sx, hpx + 0.14 * sx);
-      g.fillStyle = d.col || '#7d1c2d'; g.fillRect(x, y, wpx, hpx);
+      const archPath = (ax, ay, aw, ah) => { g.beginPath(); g.moveTo(ax, ay + ah); g.lineTo(ax, ay + aw / 2); g.arc(ax + aw / 2, ay + aw / 2, aw / 2, Math.PI, 0); g.lineTo(ax + aw, ay + ah); g.closePath(); };
+      g.fillStyle = st.trim || '#d8cfae';
+      if (d.arch) { archPath(x - 0.26 * sx, y - 0.26 * sx, wpx + 0.52 * sx, hpx + 0.26 * sx); g.fill(); g.fillStyle = d.col || '#7d1c2d'; archPath(x, y, wpx, hpx); g.fill(); }       // d.arch: round-headed door in a stone surround
+      else { g.fillRect(x - 0.18 * sx, y - 0.14 * sx, wpx + 0.36 * sx, hpx + 0.14 * sx); g.fillStyle = d.col || '#7d1c2d'; g.fillRect(x, y, wpx, hpx); }
       if (d.glass !== false) { const gl = g.createLinearGradient(0, y, 0, y + hpx); gl.addColorStop(0, '#9fb8c8'); gl.addColorStop(1, '#5a7184'); g.fillStyle = gl; g.fillRect(x + 0.12 * sx, y + 0.14 * sx, wpx - 0.24 * sx, hpx * 0.5); }
       g.fillStyle = 'rgba(0,0,0,0.18)'; g.fillRect(x + wpx / 2 - 1, y, 2, hpx);
       g.fillStyle = '#d8d2c0'; g.fillRect(x - 0.3 * sx, Y(base + plinthH * 0.3) , wpx + 0.6 * sx, 0.1 * sx);    // step

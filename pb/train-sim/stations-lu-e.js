@@ -1,4 +1,4 @@
-/* Zuchsimulator Lëtzebuerg: photo-modelled stations of the Mosel line (lu-e): Oetrange, Betzder (Betzdorf), Wecker, Sandweiler-Contern.
+/* Zuchsimulator Lëtzebuerg: photo-modelled stations of the Mosel line (lu-e): Oetrange, Betzder (Betzdorf), Wecker, Sandweiler-Contern, Mertert, Manternach, Wasserbëlleg, Cents-Hamm.
  * Registers into TS.realStations (stations-real.js), built with the kit of stations-lu-b.js.  The station BUILDING is the real LOD2 building of the station patch,
  * painted by stations-styles-lu.js; this module adds what stands around it (platform furniture, canopies, shelters, boards, the other tracks and platforms) at the
  * positions of the patch frame.  Registered after lu-b / lu-d, so these entries replace the older hand-made models of the same names.
@@ -213,6 +213,62 @@
       [-60, 0, 30].forEach((z) => f.totem(toward(-7.6), z));
       [-100, -64, -28, 8, 44, 80, 116].forEach((z) => f.lamp(toward(-9.2), z, '#6a2a22', 6.0));
       f.bench(toward(-9.0), -50, '#4a4f55');
+    },
+  });
+
+  /* ================================================================ MERTERT
+   * Refs: ~/Library/Caches/zuch-refs/Mertert (Commons: Mertert, gare CFL Mertert (100)-(111)).  Two side platforms with two tracks between them.  The game's track runs next to the LEFT
+   * platform (patch x -4.2 .. -1.5: asphalt, white block shelter at x -5.2 / z 24, ticket machine, blue totem, yellow name board, grey railing behind); the old station building
+   * (patch x 12 .. 28, z 71 .. 83) stands behind the RIGHT platform (x 5.9 .. 10.4, 1.5 m in front of it) which has a white block hut at z 44 and red-headed mast lamps.  The CFL bike box
+   * and the pedestrian underpass are down by the road at z 125 (x -18).  Declared side 'left' = the left platform: the building is on the far side of the game track. */
+  const ME = { far: { edge: 5.9, width: 4.5, z0: -81, z1: 111 }, track: 4.0, bikebox: { x: -18.4, z: 124.6, y: -4.1 } };
+  const ME_LAMPS_NEAR = [-77.6, 44.4, 73.5];
+  const ME_LAMPS_FAR = [-122.6, -93.9, -52.8, -14.3, 23.8, 63.1, 100.6];
+  const ME_WHITE_BLOCK = '#e9e7df';
+  reg('Mertert', {
+    canopy: false,
+    furniture: false,
+    build(api) {
+      const { sx, H, W, edge, col, FORM_Y } = api;
+      const k = makeKit(api);
+      const f = mirrorKit(api);                         // far platform: argument = patch x (sx = -1 side) = distance from the game track
+      const lB = edge + W;
+      const toward = (x) => -x * sx;                    // patch x -> argument of the mirrored kit
+      // our platform (left): block shelter, ticket machine, totem, board, clock, bin, lamps, grey railing along the back
+      k.boxShelter(3.7, 24, 3.4, 1.7, ME_WHITE_BLOCK, '#a4a8ab', 3);
+      k.vc.box(k.X(4.57), H + 0.95, 31, 0.5, 1.9, 0.7, col('#c2352e'));
+      k.vc.box(k.X(4.57) - sx * 0.27, H + 1.3, 31, 0.03, 0.6, 0.45, col('#26303a'));
+      k.totem(3.6, 34.5);
+      k.yellowBoard(3.3, 38.5, 'Mertert');
+      k.bin(4.63, 28.8, '#d9631a');
+      k.clockPole(3.0, 26);
+      ME_LAMPS_NEAR.forEach((z) => k.lamp(lB - 0.2, z, '#9aa0a4', 5.4));
+      for (let z = 34; z <= 72; z += 3) k.vc.box(k.X(lB + 0.05), H + 0.5, z, 0.05, 1.0, 0.05, col('#8f969b'));
+      k.vc.box(k.X(lB + 0.05), H + 0.98, 53, 0.05, 0.05, 38, col('#8f969b'));
+      // second track and the far platform with the station building behind it
+      k.track(sx * ME.track, -135, 135, { pole: true });
+      k.platformBox(sx * ME.far.edge, ME.far.width, -1, ME.far.z0, ME.far.z1);
+      f.boxShelter(toward(10.3), 44.1, 3.6, 1.8, ME_WHITE_BLOCK, '#a4a8ab', 3);
+      f.bin(toward(10.5), 40.5, '#d9631a');
+      ME_LAMPS_FAR.forEach((z) => f.lamp(toward(10.1), z, '#9aa0a4', 5.4));
+      f.yellowBoard(toward(9.4), 4, 'Mertert');
+      [-60, 60].forEach((z) => f.sign(toward(7.2), z, 'C', 'blue'));
+      [-30, 85].forEach((z) => f.totem(toward(7.0), z));
+      // the pedestrian underpass at z 129.5 under both tracks: concrete portals with wing walls on the road sides (x -13 / x 11.5), dark opening
+      [[-13, -1], [11.5, 1]].forEach(([x, out]) => {
+        const lx = k.X(sx * x); const yb = FORM_Y + ME.bikebox.y - 0.3; const cz = 129.5;
+        k.vc.box(lx, yb + 3.3, cz, 0.7, 0.8, 5.2, col('#a2a29b'));
+        [-1, 1].forEach((d) => {
+          k.vc.box(lx, yb + 1.5, cz + d * 2.2, 0.7, 3.0, 0.8, col('#a2a29b'));
+          k.vc.box(lx + sx * out * 1.6, yb + 1.1, cz + d * 3.0, 3.2, 2.2, 0.4, col('#9a9a93'));
+          k.vc.box(lx + sx * out * 3.0, yb + 0.5, cz + d * 3.2, 2.6, 1.0, 0.4, col('#9a9a93'));
+        });
+        k.vc.box(lx - sx * out * 0.6, yb + 1.5, cz, 0.2, 3.0, 3.6, col('#101214'));
+      });
+      // CFL bike box by the underpass, 4 m below the track: perforated grey box with red doors
+      const bx = sx * ME.bikebox.x; const by = FORM_Y + ME.bikebox.y;
+      k.vc.box(k.X(bx), by + 1.25, ME.bikebox.z, 2.6, 2.5, 4.6, col('#c9cccf'));
+      k.vc.box(k.X(bx) - sx * 1.32, by + 1.1, ME.bikebox.z, 0.06, 2.1, 1.8, col('#b52a2a'));
     },
   });
 })();
