@@ -232,3 +232,23 @@ All of this is additive; nothing of the Mosel line (`build_real_line.py`, `real-
   s < 0, and `frame(s)` clamped s to the track, so everything there (square, roads, tram tracks, platforms, buildings) collapsed onto the end point and the generic terrain showed through.
   `station-surround-mesh.js` `frame()` now continues straight along the end tangent beyond either track end.  `patch_lux_yard.py`: FORECOURT paving to the patch edge (Avenue de la Gare medians / verges).
   Patch fetch version `w2e1`.  Tool: `scripts/zuch/lux_ab.mjs` (cab / place / forecourt / air shots, `--root` for a before copy).
+
+## W3 (26 Oct 2026): steelworks, Bettembourg yard, Gare Centrale trains / masts / hall
+
+* **Industry layer (`scripts/zuch/build_industry.py <route>`, new `lod2_zone_buildings.py`, runtime `real-industry.js`)**: run AFTER `build_real_route.py emit` (it adds `legs[<id>].industry` to `data/real/<route>-features.json`; emit rewrites the file without it).  Zones = OSM
+  `landuse=industrial` polygons within 750 m of the line (>= 6000 m2); buildings = the LOD2.2 footprints / eave / ridge heights of the communes along the route that lie in a zone (parsed once per commune, cached `zuch-work/lod2/zone-*.pkl`);
+  OSM `man_made` chimney / storage_tank / silo / cooling tower.  Classification: chimney (footprint <= 14 m, ridge >= 30 m), tank (round, 30 - 2600 m2), pipe rack (long thin elevated), hall (the rest).  Objects go through the leg mapping
+  (the legs are compressed x 0.27 along s, the lateral distance is kept); a hall is stretched back along the track as far as it does not touch its neighbours (<= 1.9x, <= 200 m).  Objects inside a station patch are dropped (the patch draws the LOD2 itself).
+  South: 133 objects (halls 100+, 11 chimneys, 26 tanks, 6 cooling towers, 2 pipe racks) + 1500 yard pieces; `features.json` 485 -> 586 kB.  Differdange works (OSM `Site ArcelorMittal`, 1.4 km2 right beside the line at Uewerkuer - Nidderkuer),
+  Belval, Rodange rolling mill, Esch / Schifflange zones, Livange / Bettembourg logistics halls.
+* **Rendering (`real-industry.js`, hook in `landscape.js` before the real scenery)**: halls as extruded polygons with plinth, 6 m cladding panels in alternate shades (rust / grey / pale), a glazing band under the eave, multi-bay gable roofs (rectangles) or flat roofs with
+  skylight monitors (other shapes), pipe bundles on the long face of big halls; chimneys (red / white bands above 55 m), tanks, hyperboloid cooling towers, pipe racks on posts.  Everything goes into the chunk's merged wall mesh (no extra draw call).
+  NOTE matBlock is single sided and very bright on top faces: roofs are wound upwards and dark (x 0.34), walls wound outwards (`orient()`).
+* **Belval blast furnaces (`real-landmarks.js furnace()`)**, after the Commons photos (`zuch-refs/Belval-Furnaces`): steel tower (4 columns, platforms every 11 m, bracing, charging gantry, 105 m), furnace shell inside, inclined skip hoist, fat dust catcher, four cowper stoves with
+  domes, hot-blast pipe tangle, bustle pipe, brick chimney, black-brown rust.  Montage `reports/zuchreal/w3/belval-furnaces-photo-sim.png`.
+* **Bettembourg yard**: `yard` records (`{"k":"y"}`) = 45 m pieces of the OSM yard / siding tracks inside `landuse=railway` areas >= 120 000 m2, 8 - 150 m from the main line, outside the station patches; drawn as ballast + rails (`mbRoad`), standing wagons (boxcars, tanks,
+  flat cars with two boxes, 58 % of the pieces) and now and then a 24 m floodlight mast.  Montage `bettembourg-yard-sheet.png`.
+* **Gare Centrale** (`station-yard.js`, `station-yard-trains.js`, style `yard.hall` / `yard.trains` in `stations-styles-lu.js`): catenary masts (steel pole + cantilever, every 46 m, only where no platform stands, <= 140), Grande Halle (`w362239328`) = glass canopy, the other canopies grey
+  standing-seam sheet metal; three parked trains (CFL white / red, SNCB blue / white) on the tracks beside platforms 1 - 3, the game's own `trains.js` models baked with the Luxtram `createBake` (<= 9 meshes per train, no seats, no doors).  WebKit medium at Lëtzebuerg: 223 draws / 478 k triangles.
+* **Staggered platforms (Zewen / Euren / Ehrang Ort)**: already built as staggered pairs in `stations-de-a.js` (`simpleStop` near / far z ranges from the OSM platforms); top-down check `reports/zuchreal/w3/staggered-platforms-topdown.png`.
+* Tools: `scripts/zuch/w3_views.mjs <route> <dir> --tag t "Station:dz:lat:up:yawDeg:pitchDeg:fov:name"` (stations by name, shots with draw counts).  NOTE: `/tmp` is shared with other agents, keep scripts in the scratchpad.

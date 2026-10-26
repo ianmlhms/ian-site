@@ -81,3 +81,12 @@ node scripts/zuch/hole_scan.mjs north,south,west --step 300       # hole detecto
 node scripts/zuch/station_shots.mjs <dir> west Mamer-Lycée --tag v1
 node scripts/zuch/route_aerial.mjs south <dir> 1500 15000 3300 --up 160
 ```
+
+## W3 (26 Oct 2026, fresh agent) - items 1 - 4 done, 5 and 6 NOT started (token budget)
+
+Done: steelworks silhouettes (industry layer) + Belval furnaces, Bettembourg yard, Gare Centrale trains / masts / Grande Halle, staggered platforms verified (details REAL-LINES.md "W3").  Reports `website-overnight/reports/zuchreal/w3/`.
+OPEN, in order:
+ 5. **Tram hole scan**: `hole_lib.mjs` / `hole_scan.mjs` are rail only (`scanRoute(sim, routeId)`, `zlib.mjs start(routeId)` -> `__tsTest.startService`).  The Luxtram world (`luxtram-world.js`, `luxtram.js`) needs its own start (tram career) and camera; extend `zlib.mjs` with a tram start and run the same ray / sky checks along the tram track (data `data/luxtram-track.json`).
+ 6. **Abroad routes** (metz, brussels, paris): plan unchanged from "NOT done / open 3" above (stop lists decided, station coordinates listed, PBFs in `zuch-work/abroad/`).  Steps: (a) `fetch_route_corridor.py` two-stage fetch (rails for a wide box -> Dijkstra path -> tiles along the path), (b) `real_route_defs.py` entries with per-route length params (`PARAMS` out of `build_real_route.py`),
+    (c) DEM auto-download, (d) generic stations + silhouettes for Metz-Ville, Namur, Bruxelles-Midi, Paris-Est (models in `stations-abroad.js`), (e) Thionville stop for paris, (f) split core / heavy data so the download stays near the LU routes.  `build_industry.py` only has a `south` CFG (add communes / boxes for other LU routes; France / Belgium have no LOD2 -> OSM footprints with default heights).
+ Small leftovers: wagons next to the main line at yard lat 8 m look big in the cab (raise YARD_LAT[0] to 10); the huge Differdange hall is one LOD2 polygon (72 000 m2, drawn as one slab with skylight strips); Schifflange works: no big LOD2 hall in the OSM zone (nothing drawn); the grey `indus` ground class is flat.
