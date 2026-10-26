@@ -83,7 +83,13 @@
   /* ---------------------------------------------------------------- preload */
   async function preload(names) {
     try {
-      if (!indexPromise) indexPromise = fetchJson(DATA_DIR + 'index.json').catch((error) => { console.info(TAG + 'no station patches (' + error.message + ')'); return { stations: {} }; });
+      /* index.json (Mosel line) + index-routes.json (W2c: north, south, west, ...): the station name -> patch file maps are merged */
+      if (!indexPromise) {
+        indexPromise = Promise.all([
+          fetchJson(DATA_DIR + 'index.json').catch((error) => { console.info(TAG + 'no station patches (' + error.message + ')'); return { stations: {} }; }),
+          fetchJson(DATA_DIR + 'index-routes.json').catch(() => ({ stations: {} })),
+        ]).then(([a, b]) => ({ stations: Object.assign({}, a.stations || {}, b.stations || {}) }));
+      }
       const index = await indexPromise;
       const jobs = (names || []).filter((n) => index.stations && index.stations[n] && !prepared.has(n)).map(async (name) => {
         try {

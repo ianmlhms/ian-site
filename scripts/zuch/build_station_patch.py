@@ -1309,7 +1309,7 @@ def build(args):
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, "w") as fh:
         fh.write(text)
-    idx_path = os.path.join(os.path.dirname(out_path), "index.json")
+    idx_path = os.path.join(os.path.dirname(out_path), getattr(args, "index", None) or "index.json")
     idx = {"v": 1, "stations": {}}
     if os.path.exists(idx_path):
         try:
@@ -1396,6 +1396,7 @@ def main():
     ap.add_argument("--lon", type=float, required=True)
     ap.add_argument("--heading-hint", default=None, help="direction of travel: east|north|... or compass degrees (default: keep OSM way direction)")
     ap.add_argument("--out", default=None)
+    ap.add_argument("--index", default=None, help="name of the index file next to the patch (default index.json; W2c uses index-routes.json so branches do not collide)")
     ap.add_argument("--debug-png", default=None)
     ap.add_argument("--communes", default=None, help="comma separated LOD2 commune slugs (default: from OSM admin boundaries)")
     ap.add_argument("--keep-grade", action="store_true", help="keep the track gradient in the heights instead of levelling the track at y=0")

@@ -316,8 +316,11 @@
       const walls = {}; const roofs = {};
       const wallMB = (name) => walls[name] || (walls[name] = new MB());
       const roofMB = (name) => roofs[name] || (roofs[name] = new MB());
+      /* the station building of a station with a photo model is drawn by the model; a station of the OSM-layout kind (stations-osm.js) has none, so its real (LOD2) station building is drawn here */
+      const stationSpec = TS.realStations && TS.realStations.get(patch.name);
+      const drawStationBuilding = !!(stationSpec && stationSpec.osm);
       (data.buildings || []).forEach((b, bi) => {
-        if (b.station) return;
+        if (b.station && !drawStationBuilding) return;
         const gx = b.ground && b.ground.length ? b.ground.reduce((s, p) => s + p[0], 0) / b.ground.length : 0;
         if (Math.abs(gx) > stripW - BUILDING_MARGIN) return;
         const names = FACADE_BY_KIND[b.kind] || FACADE_BY_KIND.other;

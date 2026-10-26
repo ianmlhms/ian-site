@@ -822,13 +822,18 @@ window.TS = window.TS || {};
       }
       /* roads at level crossings (crossing-roads.js): rows and columns where the road runs, so the strip mesh follows the road exactly (rows strictly inside this chunk only) */
       const roadPlan = track.crossingRoads, hints = track.meshHints;
-      const lats = LAT.slice();
-      if (hints) {
-        for (const s of hints.rows(s0 + 0.02, s0 + CHUNK - 0.02)) if (s > s0 + 0.02 && s < s0 + CHUNK - 0.02 && !rowS.some(r => Math.abs(r - s) < 0.45)) rowS.push(s);
-        for (const lat of hints.lats(s0, s0 + CHUNK)) for (const off of ROAD_LAT_OFFSETS) { const v = lat + off; if (Math.abs(v) < W - 2 && !lats.some(l => Math.abs(l - v) < 0.6)) lats.push(v); }
-        for (const v of hints.latsAll(s0, s0 + CHUNK)) if (Math.abs(v) < W - 2 && !lats.some(l => Math.abs(l - v) < 0.9)) lats.push(v);
-        lats.sort((p, q) => p - q);
-      }
+      /* the lateral columns of the chunk starting at c0 (the base columns + the columns of the crossing roads, river trenches, valley walls and station patches that touch it) */
+      const latsFor = (c0) => {
+        const l = LAT.slice();
+        if (hints) {
+          for (const lat of hints.lats(c0, c0 + CHUNK)) for (const off of ROAD_LAT_OFFSETS) { const v = lat + off; if (Math.abs(v) < W - 2 && !l.some(q => Math.abs(q - v) < 0.6)) l.push(v); }
+          for (const v of hints.latsAll(c0, c0 + CHUNK)) if (Math.abs(v) < W - 2 && !l.some(q => Math.abs(q - v) < 0.9)) l.push(v);
+          l.sort((p, q) => p - q);
+        }
+        return l;
+      };
+      const lats = latsFor(s0);
+      if (hints) for (const s of hints.rows(s0 + 0.02, s0 + CHUNK - 0.02)) if (s > s0 + 0.02 && s < s0 + CHUNK - 0.02 && !rowS.some(r => Math.abs(r - s) < 0.45)) rowS.push(s);
       void roadPlan;
       rowS.sort((p, q) => p - q);
       const portalPad = new Set();   // the pad rows of a portal pair: the quads between them (the ground's cliff face at the mouth) get a hole so the bore stays open
@@ -838,6 +843,21 @@ window.TS = window.TS || {};
         for (let i = 0; i < lats.length; i++) {
           const lat = lats[i], x = f.x + f.rx * lat, z = f.z + f.rz * lat;
           row.push({ x, z, y: groundY(info, lat, x, z, s), lat, info });
+        }
+        /* W2c seam rows: a column this chunk has but the neighbouring chunk does not (river trench, valley wall, road or patch columns that start inside this chunk) would be a
+           T-junction on the shared edge: the neighbour's edge runs straight between its two columns, so the extra vertices are put on that line (no hairline crack at the seam) */
+        if (hints && (Math.abs(s - s0) < 1e-6 || Math.abs(s - (s0 + CHUNK)) < 1e-6)) {
+          const nb = latsFor(Math.abs(s - s0) < 1e-6 ? s0 - CHUNK : s0 + CHUNK);
+          const shared = lats.map(l => nb.some(q => Math.abs(q - l) < 1e-6));
+          for (let i = 0; i < lats.length; i++) {
+            if (shared[i]) continue;
+            let a = i - 1, b = i + 1;
+            while (a >= 0 && !shared[a]) a--;
+            while (b < lats.length && !shared[b]) b++;
+            if (a < 0 || b >= lats.length) continue;
+            const t = (lats[i] - lats[a]) / (lats[b] - lats[a]);
+            row[i].y = row[a].y + (row[b].y - row[a].y) * t;
+          }
         }
         grid.push(row);
       }

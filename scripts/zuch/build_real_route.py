@@ -59,6 +59,9 @@ def load_route_tiles(names):
 def stop_node(railpoints, osm, hint=None):
     """The OSM station / halt node called `osm`; with a (lat, lon) hint the one nearest to it (names that exist twice)."""
     cands = [p for p in railpoints if p["t"].get("railway") in ("station", "halt") and p["t"].get("name") == osm]
+    if not cands and hint:       # French / Belgian stops are often only tagged railway=stop (stop_position): the hint coordinates are the stop then
+        from osm_rail import utm
+        return Point(*utm(hint[1], hint[0]))
     if not cands:
         raise SystemExit("no OSM station node called %r" % osm)
     if hint:

@@ -118,6 +118,30 @@ CFL-50 (555543), L-12 (SNCB, 7396154), CFL-60 (8388183), RE Pétange - Mersch (2
 Not decided by data: names of the new stations are the Luxembourgish forms where the game already used them (Walfer, Lëntgen, Miersch, Ettelbréck, Kautebaach, Wëlwerwolz, Clierf, Esch-Uelzecht, Déifferdang, Péiteng) and the CFL spelling elsewhere (Dummeldeng, Heisdref, Kruchten,
 Colmer-Bierg, Giewelmillen, Houwald, Schëffleng, Uewerkuer, Nidderkuer are common lb forms, not taken from an official list).
 
+## W2c: real geometry and scenery for the single-line routes (north, south, west), pipeline changes
+
+All of this is additive; nothing of the Mosel line (`build_real_line.py`, `real-mosel.js`, its data) was changed.
+
+* **`scripts/zuch/build_real_route.py`** (+ `real_route_defs.py` = stop lists, `fetch_route_corridor.py` = OSM corridor cache): the single-line version of `build_real_line.py`.  It imports its fit / DEM / land /
+  scenery code, joins the stops with Dijkstra on the rail graph (a stop is an OSM station / halt node, with a `(lat, lon)` hint for duplicates like the two Pétanges, or just the hint when the stop is only a
+  `railway=stop` as in France), builds the legs exactly like the Mosel legs (same 0.27 compression, clamps, R_MIN, grades, speeds, crossing thinning) and emits `pb/train-sim/real-<id>.js`
+  (`TS.realLines[id]`, loaded before routes.js) + `data/real/<id>-layout.json` + `data/real/<id>-features.json`.  Differences: a long high bridge over a river is a viaduct WITH water up to 45 m
+  (Pfaffenthal 28 m, Pulvermuehle), the first station block and big stations get an urban halo (landuse=railway around the Gare is not "city"), forest / farmland beyond Ettelbruck is the
+  `ardennes` biome, and every station carries its OSM layout: platform polygons (`plat`: edge lateral, width, s0 / s1 relative to the stop), other tracks (`trk`), side of the station building (`bside`),
+  and its lat / lon / heading (for the station patch).  Platform side = the building's side when that platform is next to the track, else the nearest platform.
+  Commands: `fetch_route_corridor.py` (once; `--extra` adds the platform polygons / station buildings to an existing tile), then `build_real_route.py plan|emit north|south|west`.  `plan` prints the path, the
+  stops with platforms and the leg tokens; `--plot x.png` the heading QA sheet.  Re-run: ~5 s (west), 18 s (south), 33 s (north).
+* **`real-line.js`**: the data set of a route is `def.sceneryId` when `TS.realLines[sceneryId]` exists (its `data/real/<id>-features.json`), `mosel` for the Mosel line; several can be cached.  `routes.js`: `realLineBody(id)`.
+* **`stations-osm.js`**: every station of north / south / west without a photo model gets a model built from its OSM layout (other platforms with width / length, other tracks, a shelter, the far fence);
+  `station-surround-mesh.js` draws the LOD2 station building of such a station (a photo-modelled station draws its own).  Photo-modelled stations keep their models.
+* **Station patches**: `build_route_patches.py` builds the real surroundings (LiDAR, LOD2, OSM; `build_station_patch.py --index index-routes.json`, a new option) of every Luxembourg station of the three routes;
+  `station-surround.js` merges `index-routes.json` into `index.json`.
+* **Seam fix (`landscape.js terrainMesh`)**: extra lateral columns that exist only in one of two neighbouring chunks (river trench, valley wall, road or patch columns that start inside a chunk) made a T-junction on
+  the chunk seam = a hairline crack (found at south s 10250: the far mesh shone through).  The extra vertices of a seam row are now put on the straight line between the neighbour's columns.  Benefits every route.
+* **Flow `train_sim_routes.mjs`** (registered in `run_all.mjs`): stop lists, geometry, scenery, tunnels / viaduct, patches for every station, `~r`, OSM layout of Mamer-Lycée, hole scan on the three routes.
+* Result numbers (26 Oct 2026): west 6 stops 6.4 km game / 17.9 km real, south 17 stops 15.8 km / 39.4 km, north 18 stops 20.5 km / 60.5 km (19 real tunnels -> 15 game tunnels, Pfaffenthal + Clausen + Pulvermuehle viaducts,
+  Alzette / Sûre / Wiltz / Clerve bridges).  Hole scans (300 m steps): north 0 / 0, west 0 / 0, south 0 poses + 6 terrain-function steps of 0.5 - 1 m (mesh vs `groundHeightAt`, no gap).
+
 ## 3. Other lines (Wave 2+)
 
 * West (Lëtzebuerg - Kleinbettingen, line 70): Hollerich/Bertrange/Mamer/Capellen; the A6 parallel, fields of the Grand Duchy; Mamer-Lycée is not a stop.
