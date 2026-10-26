@@ -155,7 +155,7 @@ window.TS = window.TS || {};
     return { day, lit };
   }
   const texWaterNormal = () => canvasTexture('waterN', 128, 128, (g, w, h) => {
-    const waves = [[1, 0, 0.8, 0.3], [0, 2, 0.5, 1.1], [2, 1, 0.35, 2.0], [3, -2, 0.2, 0.4], [-1, 3, 0.18, 1.7]];
+    const waves = [[1, 0, 0.8, 0.3], [0, 1, 0.55, 1.1], [1, 1, 0.3, 2.0], [0, 2, 0.16, 0.4]];   // W2c: low wave numbers only (the 3,-2 / -1,3 terms made a blue-white lattice from the air)
     const img = g.createImageData(w, h);
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       let dx = 0, dy = 0;
@@ -777,7 +777,7 @@ window.TS = window.TS || {};
     const matLamp = new T.MeshBasicMaterial({ color: '#9a9a96' });
     const matSmoke = new T.MeshLambertMaterial({ vertexColors: true, transparent: true, opacity: 0.5, depthWrite: false });
     const waterNormal = texWaterNormal(); waterNormal.repeat.set(1, 1);
-    const matWater = new T.MeshPhongMaterial({ side: T.DoubleSide, color: '#2c5a63', specular: '#ffffff', shininess: 90, normalMap: waterNormal, normalScale: new T.Vector2(0.55, 0.55), transparent: true, opacity: 0.86, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -2 });
+    const matWater = new T.MeshPhongMaterial({ side: T.DoubleSide, color: '#2c5a63', specular: '#b8cdd4', shininess: 70, normalMap: waterNormal, normalScale: new T.Vector2(0.38, 0.38), transparent: true, opacity: 0.86, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -2 });
     const matFar = withSnow(new T.MeshLambertMaterial({ vertexColors: true, map: texGrass() }), 1);
     const mats = [matLamp, matSmoke, matTerrain, matFieldRows, matFieldVines, matFieldMeadow, matHouse, matBlock, matRoof, matRoad, matLeaf, matCar, matWater, matFar];
     const treeKit = buildTreeKit(), carGeo = buildCarGeo();
@@ -917,7 +917,7 @@ window.TS = window.TS || {};
         dist = s - sA;
         for (const sd of [-1, 1]) {
           const lat = c + sd * hw, w = worldAt(info, lat);
-          mb.p.push(w.x, y, w.z); mb.n.push(0, 1, 0); mb.c.push(1, 1, 1); mb.u.push(sd < 0 ? 0 : hw / 6, dist / 6);
+          mb.p.push(w.x, y, w.z); mb.n.push(0, 1, 0); mb.c.push(1, 1, 1); mb.u.push(sd < 0 ? 0 : hw / 16, dist / 28);   // W2c: stretched along the flow, one repeat per 16 x 28 m
         }
       }
       for (let a = 0; a < n; a++) { const i0 = base + a * 2; mb.i.push(i0, i0 + 1, i0 + 2, i0 + 1, i0 + 3, i0 + 2); }
@@ -1241,7 +1241,7 @@ window.TS = window.TS || {};
           const lat = -latMax + (latMax * 2) * i / n, wd = hw * (1 - smooth(50, latMax, Math.abs(lat))) + 0.6;
           for (const sd of [-1, 1]) {
             mbWater.p.push(f.x + f.rx * lat + f.tx * wd * sd, br.waterY, f.z + f.rz * lat + f.tz * wd * sd);
-            mbWater.n.push(0, 1, 0); mbWater.c.push(1, 1, 1); mbWater.u.push(sd < 0 ? 0 : wd / 6, lat / 6);
+            mbWater.n.push(0, 1, 0); mbWater.c.push(1, 1, 1); mbWater.u.push(sd < 0 ? 0 : wd / 16, lat / 28);
           }
         }
         for (let i = 0; i < n; i++) { const i0 = base + i * 2; mbWater.i.push(i0, i0 + 2, i0 + 1, i0 + 1, i0 + 2, i0 + 3); }
@@ -1348,11 +1348,12 @@ window.TS = window.TS || {};
       level.update = (cx, cz, force) => {
         const ox = Math.round(cx / spacing), oz = Math.round(cz / spacing);
         if (!force && level.last && level.last[0] === ox && level.last[1] === oz) return false;
-        level.last = [ox, oz]; const half = cells / 2, R = half * spacing;
+        level.last = [ox, oz]; const half = cells / 2, R = half * spacing; let minH = Infinity;
         for (let i = 0; i < nV; i++) for (let j = 0; j < nV; j++) {
           const gx = (ox + i - half) * spacing, gz = (oz + j - half) * spacing, v = i * nV + j;
           let h = farHeight(gx, gz);
           if (lowerBox && Math.abs(gx - cx) < lowerBox && Math.abs(gz - cz) < lowerBox) h -= 6;
+          if (Math.max(Math.abs(gx - cx), Math.abs(gz - cz)) < R * 0.84 && h < minH) minH = h;   // W2c: the safety plane must lie under the real valleys
           const rim = smooth(0.84, 1.0, Math.max(Math.abs(gx - cx), Math.abs(gz - cz)) / R); if (rim > 0 && !lowerBox) h = lerp(h, baseY - 12, rim); else if (rim > 0) h = lerp(h, baseY - 12, rim);
           pos[v * 3] = gx; pos[v * 3 + 1] = h; pos[v * 3 + 2] = gz; uv[v * 2] = gx / 40; uv[v * 2 + 1] = gz / 40;
         }
@@ -1363,6 +1364,7 @@ window.TS = window.TS || {};
           nor[v * 3] = -dx / sx / l; nor[v * 3 + 1] = 1 / l; nor[v * 3 + 2] = -dz / sz / l;
           const c = farColor(pos[v * 3], pos[v * 3 + 2], nor[v * 3 + 1]); col[v * 3] = c.r; col[v * 3 + 1] = c.g; col[v * 3 + 2] = c.b;
         }
+        level.minH = minH;
         geo.attributes.position.needsUpdate = geo.attributes.normal.needsUpdate = geo.attributes.color.needsUpdate = geo.attributes.uv.needsUpdate = true;
         return true;
       };
@@ -1627,6 +1629,8 @@ window.TS = window.TS || {};
       // safety plane under the far terrain: 12.5 m below the track, but well below the valley floor on bridges and viaducts (it used to hang between the deck and the valley and hid it)
       let flatTarget = baseY - 12.5;
       for (const br of (track.bridges || [])) if (s > br.s0 - 140 && s < br.s1 + 140 && Number.isFinite(br.h)) flatTarget = Math.min(flatTarget, baseY - br.h - 6);
+      /* W2c: on a real line the terrain can drop more than 12.5 m below the track over a wide area (Alzette / Kor valleys); the plane used to show there as a pale flat quad with houses on it */
+      if (track.real) for (const lv of [farL1, farL2]) if (Number.isFinite(lv.minH)) flatTarget = Math.min(flatTarget, lv.minH - 3);
       flatY = flatY === null || firstUpdate ? flatTarget : flatY + (flatTarget - flatY) * (1 - Math.exp(-dt * 2.5));
       flat.position.set(camPos.x, flatY, camPos.z); flat.material.color.copy(farTint).multiplyScalar(0.42);
       const farPlane = camera && camera.far ? camera.far : 6000, capChanged = Math.abs(visCap - farPlane * 0.8) > 1; if (capChanged) visCap = farPlane * 0.8;
