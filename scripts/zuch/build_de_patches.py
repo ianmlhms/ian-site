@@ -8,7 +8,9 @@ railway=station|halt nodes of rlp.osm.pbf (Geofabrik, 25 Oct 2026); heading hint
 in the direction of the service (Luxembourg -> Trier -> Wittlich).  Key = ascii game name, name = the game's station name (index.json).
 """
 import argparse
+import json
 import os
+import re
 import subprocess
 import sys
 
@@ -35,17 +37,29 @@ STATIONS = [
 ]
 
 
+def declared_sides():
+    """game station name -> declared platform side from pb/train-sim/real-mosel.js (generated from the OSM platforms by build_real_line.py)."""
+    path = os.path.join(HERE, "..", "..", "pb", "train-sim", "real-mosel.js")
+    txt = open(path, encoding="utf-8").read()
+    m = re.search(r"Object\.freeze\((\{.*\})\);", txt, re.S)
+    return {n: v["side"] for n, v in json.loads(m.group(1))["stations"].items()}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("keys", nargs="*")
     ap.add_argument("--png-dir", default=None)
     ap.add_argument("--stage", type=int, default=0)
     ap.add_argument("--out-dir", default=None)
+    ap.add_argument("--truth-side", action="store_true", help="do not force the platform side declared in real-mosel.js (use the side of the real station building)")
     a = ap.parse_args()
+    sides = {} if a.truth_side else declared_sides()
     todo = [s for s in STATIONS if (not a.keys or s[0] in a.keys) and (not a.stage or s[5] == a.stage)]
     for key, name, lat, lon, hint, _ in todo:
         cmd = [sys.executable, "-W", "ignore", os.path.join(HERE, "build_station_patch.py"), key, "--name", name, "--lat", str(lat), "--lon", str(lon),
                "--heading-hint", str(hint), "--country", "de"]
+        if name in sides:
+            cmd += ["--side", sides[name]]
         if a.png_dir:
             os.makedirs(a.png_dir, exist_ok=True)
             cmd += ["--debug-png", os.path.join(a.png_dir, key + ".png")]

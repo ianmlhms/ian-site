@@ -279,10 +279,10 @@ def lonlat_bbox(e0, n0, e1, n1):
     return (min(lo0, lo1), min(la0, la1), max(lo0, lo1), max(la0, la1))
 
 
-def read_osm(layer, bb2169, where=None):
-    """Features of a Geofabrik extract layer inside an EPSG:2169 bbox: [{id, g (shapely, EPSG:2169), t (merged tag dict)}]."""
+def _osm_records(layer, bbox, where=None):
+    """Raw features of a Geofabrik extract layer inside a lon/lat bbox: [(id, merged tag dict, wkb bytes)]."""
     from pyogrio.raw import read
-    meta, _, geom, fields = read(OSM_PBF, layer=layer, bbox=lonlat_bbox(*bb2169), where=where)
+    meta, _, geom, fields = read(OSM_PBF, layer=layer, bbox=bbox, where=where)
     names = [str(n) for n in meta["fields"]]
     out = []
     for i in range(len(geom)):
@@ -304,10 +304,48 @@ def read_osm(layer, bb2169, where=None):
                 continue
             elif isinstance(v, str) and v:
                 t[n] = v
-        g = shapely_transform(TO_LUREF.transform, shapely.from_wkb(geom[i]))
         oid = ("w" + way_id) if way_id else (("r" if layer == "multipolygons" else "w") + str(osm_id))
-        out.append({"id": oid, "g": g, "t": t})
+        out.append((oid, t, bytes(geom[i])))
     return out
+
+
+DE_CORRIDOR = (6.40, 49.64, 7.02, 50.02)         # lon/lat box around the whole Igel - Trier - Wittlich line (one PBF scan per layer, then cached)
+_DE_OSM = {}
+
+
+def _de_osm_layer(layer):
+    """All features of the corridor box for a layer, cached on disk as (ids, tags, wkb, bounds) so a station build needs no PBF scan."""
+    if layer in _DE_OSM:
+        return _DE_OSM[layer]
+    import fcntl
+    path = os.path.join(DE_DIR, "osm-corridor-%s.pkl" % layer)
+    os.makedirs(DE_DIR, exist_ok=True)
+    with open(os.path.join(WORK, "osm-corridor.lock"), "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        if not os.path.exists(path):
+            log("scanning rlp.osm.pbf layer %s for the corridor box (once) ..." % layer)
+            recs = _osm_records(layer, DE_CORRIDOR)
+            bounds = np.array([shapely.from_wkb(r[2]).bounds for r in recs]) if recs else np.zeros((0, 4))
+            with open(path + ".part", "wb") as fh:
+                pickle.dump((recs, bounds), fh, protocol=4)
+            os.replace(path + ".part", path)
+            log("corridor %s: %d features" % (layer, len(recs)))
+        with open(path, "rb") as fh:
+            _DE_OSM[layer] = pickle.load(fh)
+    return _DE_OSM[layer]
+
+
+def read_osm(layer, bb2169, where=None):
+    """Features of a Geofabrik extract layer inside an EPSG:2169 (Germany: EPSG:25832) bbox: [{id, g (shapely, same CRS), t (merged tag dict)}].
+    Germany reads from the cached corridor box and ignores `where` (the callers filter on the tags anyway)."""
+    bb = lonlat_bbox(*bb2169)
+    if COUNTRY == "de":
+        recs, bounds = _de_osm_layer(layer)
+        keep = np.nonzero((bounds[:, 0] <= bb[2]) & (bounds[:, 2] >= bb[0]) & (bounds[:, 1] <= bb[3]) & (bounds[:, 3] >= bb[1]))[0]
+        recs = [recs[int(k)] for k in keep]
+    else:
+        recs = _osm_records(layer, bb, where)
+    return [{"id": oid, "g": shapely_transform(TO_LUREF.transform, shapely.from_wkb(wkb)), "t": t} for oid, t, wkb in recs]
 
 
 def parse_num(v):
@@ -821,6 +859,40 @@ def build(args):
         ref_geom = main_plat[1]
     near = [f for f in cand if f["g"].distance(ref_geom) < 60]
     main = min(near or cand, key=lambda f: f["g"].distance(ref_geom))
+    side_forced = None
+    if args.side and plats:
+        # the game declares the platform side of the stop (real-mosel.js): take the (platform, adjacent main track) pair whose platform lies on that side of the
+        # track in the direction of travel; the default pair (platform next to the station building) stays when it already matches or nothing matches.
+        want = 1 if args.side == "right" else -1
+
+        def side_of(track_f, geom):
+            ch, _ = chain_track([np.asarray(f["g"].coords)[:, :2] for f in cand], [f["id"] for f in cand].index(track_f["id"]), 400.0)
+            pp = resample(ch, 1.0)
+            k_ = shapely.line_locate_point(LineString(pp), node)
+            ik_ = int(np.clip(k_, 30, len(pp) - 31))
+            hh = pp[ik_ + 25] - pp[ik_ - 25]
+            if hint is not None and math.cos(math.radians(math.degrees(math.atan2(hh[0], hh[1])) % 360 - hint)) < 0:
+                pp = pp[::-1]
+            c_ = geom.centroid
+            return 1 if float(Frame(pp).forward(c_.x, c_.y)[1]) > 0 else -1
+
+        pairs = []
+        for f_, g_ in plats:
+            for tr in cand:
+                dd = tr["g"].distance(g_)
+                if dd < 14:
+                    pairs.append((dd + 0.3 * g_.distance(ref_geom), tr, f_, g_))
+        pairs.sort(key=lambda a: a[0])
+        if side_of(main, ref_geom) == want:
+            side_forced = args.side
+        else:
+            for _, tr, f_, g_ in pairs:
+                if side_of(tr, g_) == want:
+                    main, main_plat, ref_geom, side_forced = tr, (f_, g_), g_, args.side
+                    log("declared side %s: switched to the platform / track pair on that side (track %s)" % (args.side, tr["id"]))
+                    break
+            else:
+                log("WARNING: no real platform on the declared side %s next to a main track; keeping the nearest platform" % args.side)
     log("main track way", main["id"], "distance to platform %.1f m" % main["g"].distance(ref_geom))
     ways = [np.asarray(f["g"].coords)[:, :2] for f in cand]
     start = [f["id"] for f in cand].index(main["id"])
@@ -859,7 +931,12 @@ def build(args):
     lon, lat = TO_WGS.transform(oE, oN)
     # side
     side_ref = sbld["g"] if sbld else (main_plat[1] if plats else None)
-    if side_ref is not None:
+    if side_forced:
+        side = side_forced
+        if side_ref is not None:
+            vv0 = float(frame.forward(side_ref.centroid.x, side_ref.centroid.y)[1])
+            log("side forced to the declared %s (platform pair); %s centroid lateral offset v=%.1f m" % (side, "station building" if sbld else "platform", vv0))
+    elif side_ref is not None:
         c = side_ref.centroid
         vv = float(frame.forward(c.x, c.y)[1])
         side = "left" if vv < 0 else "right"
@@ -1243,7 +1320,10 @@ def build(args):
         is_station = int(bool(station_poly is not None and o["g"].intersection(station_poly).area / o["g"].area > 0.4))
         kind = bkind(t.get("building", "yes"), o["g"].area, hh)
         yb = float(dem_at(pg.centroid.x, pg.centroid.y))
-        buildings.append({"id": o["id"], "kind": kind, "levels": int(lv or max(1, round(hh / 3))), "station": is_station, "roof": "gable" if kind in ("house", "shed") else "flat",
+        roof_o = "gable" if kind in ("house", "shed") else "flat"
+        if COUNTRY == "de" and t.get("roof:shape"):
+            roof_o = {"gabled": "gable", "gable": "gable", "hipped": "hip", "half-hipped": "hip", "pyramidal": "hip", "flat": "flat", "skillion": "flat", "round": "flat"}.get(t["roof:shape"], roof_o)
+        buildings.append({"id": o["id"], "kind": kind, "levels": int(lv or max(1, round(hh / 3))), "station": is_station, "roof": roof_o,
                           "h": r2(hh - 1.5 if kind == "house" else hh), "base": r2(yb), "ground": np.asarray(pg.simplify(0.05).exterior.coords)[:-1],
                           "roofs": [], "walls": [], "_area": o["g"].area, "_top": hh})
     log("buildings: %d with LOD2 faces, %d OSM-only footprints; station-flagged %d" % (n_lod, len(buildings) - n_lod, sum(b["station"] for b in buildings)))
@@ -1479,7 +1559,23 @@ def build(args):
     }
     if CREDIT:
         patch["credit"] = CREDIT
+        patch["extrudeFaceless"] = True            # the renderer extrudes buildings without LOD2 faces from ground ring + h + roof type
     text = json.dumps(patch, separators=(",", ":"), ensure_ascii=False)
+    budget = args.max_kb if args.max_kb is not None else (700 if COUNTRY == "de" else None)
+    if budget and len(text) > budget * 1024:
+        # size budget: the LOD2 faces of the buildings farthest from the station become plain extruded footprints (ground ring + h + roof type, like OSM-only buildings)
+        need = len(text) - int(budget * 1024 * 0.985)
+        order = sorted((b for b in patch["buildings"] if b["roofs"] and not b["station"]),
+                       key=lambda b: -math.hypot(float(np.mean([q[0] for q in b["ground"]])), 0.45 * float(np.mean([q[1] for q in b["ground"]]))))
+        saved, n_cut = 0, 0
+        for b in order:
+            if saved >= need:
+                break
+            saved += len(json.dumps([b["roofs"], b["walls"]], separators=(",", ":"))) - 6
+            b["roofs"], b["walls"] = [], []
+            n_cut += 1
+        text = json.dumps(patch, separators=(",", ":"), ensure_ascii=False)
+        log("size budget %d kB: %d far buildings reduced to extruded footprints -> %.0f kB" % (budget, n_cut, len(text) / 1024))
     out_path = args.out or os.path.join(OUT_DIR, key + ".json")
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, "w") as fh:
@@ -1577,6 +1673,8 @@ def main():
     ap.add_argument("--debug-png", default=None)
     ap.add_argument("--communes", default=None, help="comma separated LOD2 commune slugs (default: from OSM admin boundaries)")
     ap.add_argument("--keep-grade", action="store_true", help="keep the track gradient in the heights instead of levelling the track at y=0")
+    ap.add_argument("--max-kb", type=int, default=None, help="size budget of the json (default 700 for --country de, none for lu): far LOD2 buildings lose their faces")
+    ap.add_argument("--side", default=None, choices=("left", "right"), help="declared platform side (real-mosel.js): choose the platform / main track pair on that side if one exists")
     ap.add_argument("--country", default="lu", choices=("lu", "de"), help="lu = Luxembourg (default: EPSG:2169, lux.osm.pbf, LiDAR + LOD2); de = Rheinland-Pfalz (EPSG:25832, rlp.osm.pbf, GeoBasis-RLP DGM1 / DOM1 / LoD2)")
     args = ap.parse_args()
     set_country(args.country)

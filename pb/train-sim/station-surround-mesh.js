@@ -89,6 +89,48 @@
     return { tris: triangulate2(ring.map(proj)), normal: [nx, ny, nz] };
   }
 
+  /* ---------------------------------------------------------------- buildings without LOD2 faces: footprint extrusion
+   * Patches of other countries (data.extrudeFaceless) carry OSM-only footprints and far buildings as ground ring + eave height h + roof type; the walls rise to base + h and the roof is
+   * a gable / hip on the footprint's long axis when the footprint is rectangular enough, else flat.  Returns rings of [x, y, z] like the LOD2 faces. */
+  function extrudeFootprint(b) {
+    const g = b.ground;
+    if (!g || g.length < 3) return { walls: [], roofs: [] };
+    const y0 = b.base !== undefined ? b.base : 0;
+    const h = Math.max(2.2, b.h || 5);
+    const walls = [];
+    for (let i = 0; i < g.length; i++) {
+      const a = g[i]; const c = g[(i + 1) % g.length];
+      if (Math.hypot(c[0] - a[0], c[1] - a[1]) < 0.05) continue;
+      walls.push([[a[0], y0, a[1]], [c[0], y0, c[1]], [c[0], y0 + h, c[1]], [a[0], y0 + h, a[1]]]);
+    }
+    // long axis from the longest edge
+    let best = 0; let bl = 0;
+    for (let i = 0; i < g.length; i++) { const a = g[i]; const c = g[(i + 1) % g.length]; const l = Math.hypot(c[0] - a[0], c[1] - a[1]); if (l > bl) { bl = l; best = i; } }
+    const a0 = g[best]; const a1 = g[(best + 1) % g.length];
+    const dx = (a1[0] - a0[0]) / (bl || 1); const dz = (a1[1] - a0[1]) / (bl || 1);
+    let t0 = Infinity; let t1 = -Infinity; let s0 = Infinity; let s1 = -Infinity;
+    g.forEach((p) => { const t = p[0] * dx + p[1] * dz; const s = -p[0] * dz + p[1] * dx; t0 = Math.min(t0, t); t1 = Math.max(t1, t); s0 = Math.min(s0, s); s1 = Math.max(s1, s); });
+    let area = 0;
+    for (let i = 0; i < g.length; i++) { const a = g[i]; const c = g[(i + 1) % g.length]; area += a[0] * c[1] - c[0] * a[1]; }
+    area = Math.abs(area) / 2;
+    const rectArea = (t1 - t0) * (s1 - s0);
+    const wd = s1 - s0;
+    const pitched = (b.roof === 'gable' || b.roof === 'hip') && rectArea > 0 && area / rectArea > 0.8 && wd >= 3 && wd <= 16 && (t1 - t0) >= wd * 0.9;
+    if (!pitched) return { walls, roofs: [g.map((p) => [p[0], y0 + h, p[1]])] };
+    const rise = Math.min(4.5, 0.62 * wd * 0.5 + 0.4);
+    const sm = (s0 + s1) / 2;
+    const at = (t, s, y) => [t * dx - s * dz, y, t * dz + s * dx];
+    const hip = b.roof === 'hip' ? Math.min(wd * 0.5, (t1 - t0) * 0.35) : 0;
+    const r0 = at(t0 + hip, sm, y0 + h + rise); const r1 = at(t1 - hip, sm, y0 + h + rise);
+    const A = at(t0, s0, y0 + h); const B = at(t1, s0, y0 + h); const C = at(t1, s1, y0 + h); const D = at(t0, s1, y0 + h);
+    const roofs = [[A, B, r1, r0], [C, D, r0, r1]];
+    if (hip > 0) { roofs.push([D, A, r0], [B, C, r1]); } else {
+      // gable ends: triangles, also as wall faces so they take the facade
+      walls.push([A, D, r0], [B, C, r1]);
+    }
+    return { walls, roofs };
+  }
+
   /* ---------------------------------------------------------------- mesh builder with vertex colours */
   class MB {
     constructor(alpha) { this.p = []; this.n = []; this.c = []; this.u = []; this.i = []; this.alpha = !!alpha; }
@@ -369,8 +411,10 @@
           });
           for (let t = 0; t < tris.length; t += 3) mb.i.push(ids[tris[t]], ids[tris[t + 1]], ids[tris[t + 2]]);
         };
-        (b.walls || []).forEach((ring) => addFace(wmb, ring, 'wall'));
-        (b.roofs || []).forEach((ring) => addFace(roofMB(roofKind), ring, 'roof'));
+        let wallRings = b.walls || []; let roofRings = b.roofs || [];
+        if (!wallRings.length && !roofRings.length && data.extrudeFaceless) { const syn = extrudeFootprint(b); wallRings = syn.walls; roofRings = syn.roofs; }
+        wallRings.forEach((ring) => addFace(wmb, ring, 'wall'));
+        roofRings.forEach((ring) => addFace(roofMB(roofKind), ring, 'roof'));
         // foundation skirt below the LOD2 ground line (the terrain here is not the LiDAR ground to the centimetre)
         const gr = b.ground;
         for (let i = 0; i < gr.length; i++) {
