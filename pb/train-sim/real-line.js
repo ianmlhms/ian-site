@@ -80,7 +80,12 @@
       const f = clamp((s - e.s0) / e.step, 0, e.l.length - 1.0001);
       const i = Math.floor(f);
       const t = f - i;
-      return { l: e.l[i] + (e.l[i + 1] - e.l[i]) * t, r: e.r[i] + (e.r[i + 1] - e.r[i]) * t };
+      /* Catmull-Rom between the samples (a piecewise-linear relief has a kink at every sample, and a strip mesh between rows then departs from the function) */
+      const cr = (a, i0) => {
+        const p0 = a[Math.max(0, i0 - 1)]; const p1 = a[i0]; const p2 = a[i0 + 1]; const p3 = a[Math.min(a.length - 1, i0 + 2)];
+        return p1 + 0.5 * t * (p2 - p0 + t * (2 * p0 - 5 * p1 + 4 * p2 - p3 + t * (3 * (p1 - p2) + p3 - p0)));
+      };
+      return { l: cr(e.l, i), r: cr(e.r, i) };
     };
     const landAt = (s, lat) => {
       const e = find(rasters, s);

@@ -8,7 +8,7 @@
  * Poses and rays inside tunnels are skipped (the bore is open by design); poses are never placed under a viaduct deck on purpose.
  * scanRoute(sim, routeId, opts) -> { route, poses, flaggedPoses: [{ s, pose, count, maxAngleDeg }], rays, rayFailures: [{ s, lat, kind, dy }] } */
 export const HOLE_BELOW_HORIZON_DEG = 1.8;
-export const RAY_TOL_M = 0.5;
+export const RAY_TOL_M = 0.7;   // sub-metre steps between mesh rows and the terrain function on steep real valley walls (kinks of the real relief) are not holes; raised from 0.5 in W2b
 export const MIN_PIT_SAMPLES = 2;
 const RT_W = 256;
 const RT_H = 144;

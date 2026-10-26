@@ -20,6 +20,8 @@
   const FADE_Z = 80;
   const ROW_STEP = 5;             // terrain strip rows inside a patch
   const LAT_STEP = 5;
+  const FADE_ROW_STEP = 2.5;      // finer rows / columns where the real relief fades into the generic one
+  const FADE_LAT_STEP = 2.5;
   const ACTIVE_RANGE = 1100;      // patches within this distance of the train are built
   const DROP_RANGE = 1700;
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -127,12 +129,17 @@
           const out2 = [];
           const a = Math.max(s0, sMid - EXT_Z); const b = Math.min(s1, sMid + EXT_Z);
           for (let s = Math.ceil(a / ROW_STEP) * ROW_STEP; s <= b; s += ROW_STEP) out2.push(s);
+          // the fade zones at the two ends of the patch (real valley -> generic hills) get a finer row spacing: a steep blend between rows is not linear
+          [[sMid - EXT_Z, sMid - EXT_Z + FADE_Z], [sMid + EXT_Z - FADE_Z, sMid + EXT_Z]].forEach(([f0, f1]) => {
+            for (let s = Math.ceil(Math.max(a, f0) / FADE_ROW_STEP) * FADE_ROW_STEP; s <= Math.min(b, f1); s += FADE_ROW_STEP) if (s % ROW_STEP !== 0) out2.push(s);
+          });
           return out2;
         },
         extraLats(s0, s1) {
           if (s1 < sMid - EXT_Z || s0 > sMid + EXT_Z) return [];
           const out2 = [];
           for (let l = -EXT_X; l <= EXT_X; l += LAT_STEP) out2.push(l);
+          for (let l = -EXT_X + FADE_LAT_STEP; l < EXT_X; l += FADE_LAT_STEP) if (Math.abs(l) > EXT_X - FADE_X && l % LAT_STEP !== 0) out2.push(l);   // finer columns across the lateral fade
           return out2;
         },
       });
