@@ -19,7 +19,7 @@
   'use strict';
   const TS = (window.TS = window.TS || {});
   const TAG = '[Lokféierer] real line: ';
-  const DATA_VERSION = 2;
+  const DATA_VERSION = 3;
   /* W2c: the Mosel line keeps sceneryId 'mosel'; the other real lines (north, south, west, ...) are registered by their real-<id>.js layout in TS.realLines and
      use their own data file data/real/<id>-features.json (build_real_route.py).  realKey(def) -> the data set of a route, or null (generic landscape). */
   const realKey = (def) => (!def ? null : def.sceneryId === 'mosel' ? 'mosel' : TS.realLines && def.sceneryId && TS.realLines[def.sceneryId] ? def.sceneryId : null);
@@ -58,6 +58,7 @@
     const rasters = [];
     const fars = [];
     const relief = [];
+    const industry = [];     // W3: steelworks / logistics silhouettes (build_industry.py), absolute s
     legs.forEach((l) => {
       l.f.water.forEach((w) => water.push({ s0: l.s0 + w.s0 * l.k, s1: l.s0 + w.s1 * l.k, side: w.side, off: w.off, half: w.half, name: w.name, kind: w.kind }));
       l.f.roads.forEach((r) => roads.push({ c: r.c, w: r.w, n: r.n, ref: r.ref, p: r.p.map(([s, lat]) => [l.s0 + s * l.k, lat]), leg: l.id }));
@@ -67,7 +68,9 @@
       rasters.push({ s0: l.s0, s1: l.s1, ds: r.ds * l.k, n: r.n, rows: r.rows, parcels: r.parcels || null });
       if (l.f.far) fars.push({ s0: l.s0, s1: l.s1, ds: l.f.far.ds * l.k, n: l.f.far.n, rows: l.f.far.rows });
       relief.push({ s0: l.s0, s1: l.s1, step: l.f.relief.step * l.k, l: l.f.relief.l, r: l.f.relief.r });
+      (l.f.industry || []).forEach((o) => industry.push(Object.assign({}, o, { s: l.s0 + o.s * l.k })));
     });
+    industry.sort((a, b) => a.s - b.s);
     water.sort((a, b) => a.s0 - b.s0);
     crossings.sort((a, b) => a.s - b.s);
     const find = (list, s) => {
@@ -125,8 +128,10 @@
       return out;
     };
     const api = {
-      water, roads, places, crossings, reliefAt, landAt, farAt, rowsIn, CLASS, lat0: doc.lat0, col: doc.col, cols: doc.cols,
+      water, roads, places, crossings, industry, reliefAt, landAt, farAt, rowsIn, CLASS, lat0: doc.lat0, col: doc.col, cols: doc.cols,
       crossingHints: (index) => crossings[index] || null,
+      /* the industrial objects whose centre lies in [s0, s1) */
+      industryIn: (s0, s1) => industry.filter((o) => o.s >= s0 && o.s < s1),
       /* the real crossing within `tol` m of s (arms: the real roads on the left / right, see crossing-roads.js) */
       crossingNear: (s, tol) => crossings.find((c) => Math.abs(c.s - s) <= (tol || 30)) || null,
       mirrored: false,
@@ -140,6 +145,8 @@
       landAt: (s, lat) => landAt(L - s, -lat),
       farAt: (s, lat) => farAt(L - s, -lat),
       rowsIn: (s0, s1) => rowsIn(L - s1, L - s0).map((r) => ({ s: L - r.s - r.ds, ds: r.ds, text: r.text.split('').reverse().join(''), parcels: r.parcels ? r.parcels.split('').reverse().join('') : null })).reverse(),
+      industry: industry.map((o) => Object.assign({}, o, { s: L - o.s, l: -o.l, p: o.p ? o.p.map(([a, b]) => [-a, -b]) : undefined })).sort((a, b) => a.s - b.s),
+      industryIn: (s0, s1) => industry.filter((o) => L - o.s >= s0 && L - o.s < s1).map((o) => Object.assign({}, o, { s: L - o.s, l: -o.l, p: o.p ? o.p.map(([a, b]) => [-a, -b]) : undefined })),
       crossingHints: (index) => { const c = crossings[crossings.length - 1 - index]; return c ? { s: L - c.s, barrier: c.barrier, l: c.r, r: c.l } : null; },
     });
     return Object.freeze(api);

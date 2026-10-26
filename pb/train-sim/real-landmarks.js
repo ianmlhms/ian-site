@@ -17,7 +17,7 @@
   const DEFS = {
     south: [
       { kind: 'furnace', name: 'Belval hauts fourneaux A', station: 'Belval-Université', along: -17, lat: 222, yaw: 0.35 },
-      { kind: 'furnace', name: 'Belval hauts fourneaux B', station: 'Belval-Université', along: 28, lat: 300, yaw: 0.35, scale: 0.9 },
+      { kind: 'furnace', name: 'Belval hauts fourneaux B', station: 'Belval-Université', along: 28, lat: 300, yaw: 0.35, scale: 0.85 },
     ],
     north: [
       { kind: 'castle', name: 'Clervaux castle', station: 'Clierf', along: -795, lat: 387, onStrip: true },
@@ -42,37 +42,55 @@
     return out;
   }
 
-  /* ---- blast furnace (Belval): furnace stack on its hearth, dust catcher, three Cowper stoves, down-comer + bustle pipe, skip hoist, rusty steel */
+  /* ---- blast furnace (Belval, after the Commons photos "Blast furnace A / B Belval" and "Les hauts-fourneaux A et B avec cowpers"): a slim open steel tower round the furnace shell
+     (platforms every 11 m, charging gantry on top), the inclined skip hoist, four tall cowper stoves, a fat dust catcher, a brick chimney and a tangle of down-comer / hot-blast pipes,
+     all in black-brown rust */
   function furnace(c, sc) {
     const { T, mbBlock, at, C } = c;
-    const rust = C('#7b4a35'); const dark = C('#3d3a38'); const steel = C('#8d8f90'); const red = C('#a5553a');
+    const V = (x, y, z) => new T.Vector3(x * sc, y * sc, z * sc);
+    const dark = C('#3b3430'); const rust = C('#6a4333'); const rust2 = C('#7d4d38'); const steel = C('#4a4a4c'); const brick = C('#8a4b37'); const pipeC = [C('#6e4636'), C('#55504c'), C('#8a5a42')];
     const cyl = (r0, r1, h, x, y, z, col, seg) => mbBlock.addGeo(new T.CylinderGeometry(r1 * sc, r0 * sc, h * sc, seg || 14), at(x * sc, y * sc, z * sc), col, true);
-    // furnace: hearth, bosh, stack, throat
-    cyl(6.5, 6.5, 9, 0, 4.5, 0, rust);
-    cyl(6.5, 8.4, 7, 0, 12.5, 0, rust);
-    cyl(8.4, 5.4, 24, 0, 28, 0, rust);
-    cyl(5.4, 4.2, 6, 0, 43, 0, dark);
-    mbBlock.addGeo(new T.ConeGeometry(3.4 * sc, 5 * sc, 12), at(0, 48.5 * sc, 0), dark, true);
-    // bustle pipe ring and tuyere platform
-    mbBlock.addGeo(new T.TorusGeometry(8.6 * sc, 0.7 * sc, 6, 24), at(0, 10 * sc, 0, 0).multiply(new T.Matrix4().makeRotationX(Math.PI / 2)), steel, true);
-    // down-comer pipes from the top to the dust catcher
-    cyl(1.3, 1.3, 46, 7.5, 29, 0, steel, 8);
-    cyl(1.3, 1.3, 20, 11, 49, 0, steel, 8);
-    // dust catcher
-    cyl(5.2, 5.2, 24, 20, 12, 0, rust);
-    mbBlock.addGeo(new T.ConeGeometry(5.2 * sc, 8 * sc, 14), at(20 * sc, 28 * sc, 0), rust, true);
-    mbBlock.addGeo(new T.ConeGeometry(5.2 * sc, 8 * sc, 14).rotateX(Math.PI), at(20 * sc, -4 * sc, 0), rust, true);
-    // three hot-blast stoves in a row behind
-    [-16, 0, 16].forEach((dz) => {
-      cyl(5.6, 5.6, 40, -22, 20, dz, red);
-      mbBlock.addGeo(new T.SphereGeometry(5.6 * sc, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), at(-22 * sc, 40 * sc, dz * sc), red, true);
+    const box = (w, h, d, x, y, z, col, rot) => mbBlock.addGeo(new T.BoxGeometry(w * sc, h * sc, d * sc), at(x * sc, y * sc, z * sc, rot || 0), col, true);
+    const pipe = (a, b, r, col) => {            // cylinder between two local points
+      const p = V(...a); const q = V(...b); const d = new T.Vector3().subVectors(q, p); const len = d.length();
+      const m = new T.Matrix4().compose(p.clone().add(q).multiplyScalar(0.5), new T.Quaternion().setFromUnitVectors(new T.Vector3(0, 1, 0), d.normalize()), new T.Vector3(1, 1, 1));
+      mbBlock.addGeo(new T.CylinderGeometry(r * sc, r * sc, len, 8), at(0, 0, 0).multiply(m), col, true);
+    };
+    // furnace shell: hearth, bosh, stack, throat
+    cyl(8, 8, 10, 0, 5, 0, rust);
+    cyl(8, 10, 8, 0, 14, 0, rust2);
+    cyl(10, 6.2, 34, 0, 35, 0, rust);
+    cyl(6.2, 5, 8, 0, 56, 0, dark);
+    // steel tower round it: 4 columns, platforms every 11 m, cross bracing, top gantry
+    const TH = 84; const TW = 12;
+    [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([x, z]) => box(1.6, TH, 1.6, x * TW, TH / 2, z * TW, steel));
+    for (let y = 11; y <= TH - 6; y += 11) { box(TW * 2 + 3, 0.7, TW * 2 + 3, 0, y, 0, dark); box(TW * 2 + 3, 1.1, 0.3, 0, y + 1, TW + 1.4, steel); box(TW * 2 + 3, 1.1, 0.3, 0, y + 1, -TW - 1.4, steel); }
+    for (let y = 0; y < TH - 12; y += 22) { pipe([-TW, y, TW], [TW, y + 22, TW], 0.35, steel); pipe([TW, y, -TW], [-TW, y + 22, -TW], 0.35, steel); pipe([TW, y, TW], [TW, y + 22, -TW], 0.35, steel); }
+    box(TW * 2 + 6, 7, TW * 2 - 2, 0, TH + 3.5, 0, dark);                  // charging gantry house
+    box(8, 12, 8, 0, TH + 13, 0, steel);
+    mbBlock.addGeo(new T.ConeGeometry(5 * sc, 7 * sc, 10), at(0, (TH + 22) * sc, 0), dark, true);
+    // skip hoist: inclined lattice from a pit in front to the gantry
+    pipe([0, 3, -78], [0, TH + 6, -TW + 2], 0.9, steel); pipe([3, 3, -78], [3, TH + 6, -TW + 2], 0.9, steel);
+    for (let t = 0.1; t < 1; t += 0.12) { const y = 3 + (TH + 3) * t; const z = -78 + (78 - TW + 2) * t; box(3.4, 0.4, 0.4, 1.5, y, z, steel); }
+    box(14, 9, 18, 1.5, 4.5, -86, C('#5d5b59'));                           // skip pit house
+    // dust catcher + down-comer
+    cyl(9, 9, 34, 26, 17, -6, rust2, 16);
+    mbBlock.addGeo(new T.ConeGeometry(9 * sc, 9 * sc, 16), at(26 * sc, 38.5 * sc, -6 * sc), rust2, true);
+    mbBlock.addGeo(new T.ConeGeometry(9 * sc, 8 * sc, 16).rotateX(Math.PI), at(26 * sc, -4 * sc, -6 * sc), rust2, true);
+    pipe([2, TH - 4, 4], [20, TH + 4, 6], 2.0, pipeC[0]); pipe([20, TH + 4, 6], [26, 44, -6], 2.4, pipeC[0]);
+    pipe([-2, 56, 6], [10, 70, 8], 1.6, pipeC[1]);
+    // four cowper stoves in a row behind, each with a dome and a tangle of hot-blast pipes
+    [0, 1, 2, 3].forEach((k) => {
+      const z = -21 + k * 14; const hgt = 56 - (k % 2) * 4;
+      cyl(6.4, 6.4, hgt, -34, hgt / 2, z, k % 2 ? rust : dark, 14);
+      mbBlock.addGeo(new T.SphereGeometry(6.4 * sc, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), at(-34 * sc, hgt * sc, z * sc), k % 2 ? rust : dark, true);
+      pipe([-34, hgt - 6, z], [-14, 36, 0], 1.1 + (k % 2) * 0.4, pipeC[(k + 1) % 3]);
+      pipe([-34, 12, z], [-12, 22 + k * 3, 0], 0.9, pipeC[k % 3]);
     });
-    // chimney of the stoves
-    cyl(2.2, 3.4, 70, -34, 35, 0, C('#6e5a4c'), 12);
-    // skip hoist: inclined truss from the ground in front to the top
-    const hoist = new T.BoxGeometry(2.2 * sc, 0.8 * sc, 62 * sc);
-    mbBlock.addGeo(hoist, at(0, 26 * sc, -28 * sc).multiply(new T.Matrix4().makeRotationX(0.62)), steel, true);
-    mbBlock.addGeo(new T.BoxGeometry(10 * sc, 8 * sc, 14 * sc), at(0, 4 * sc, -44 * sc), C('#6a6c6e'), true);
+    pipe([-34, 46, -21], [-34, 46, 21], 1.3, pipeC[1]);                      // cold-blast main
+    mbBlock.addGeo(new T.TorusGeometry(10.5 * sc, 1.1 * sc, 6, 24), at(0, 16 * sc, 0).multiply(new T.Matrix4().makeRotationX(Math.PI / 2)), pipeC[0], true);   // bustle pipe
+    cyl(2.6, 4.2, 82, -52, 41, 4, brick, 12);                                // brick chimney of the stoves
+    cyl(4.6, 4.8, 3, -52, 1.5, 4, C('#6d6560'), 12);
   }
 
   /* ---- Saint-Maurice abbey (Clervaux): twin-towered church, long conventual wings, cream sandstone, grey slate */
