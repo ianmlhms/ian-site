@@ -1081,8 +1081,18 @@ window.TS = window.TS || {};
         }
       }
 
-      /* ---- Clervaux castle (north line, near the end) ---- */
-      if (String(track.id) === 'north' && L - 560 >= s0 && L - 560 < s1) {
+      /* ---- real landmarks (real-landmarks.js: Belval blast furnaces, Clervaux castle + abbey at their OSM positions; replaces the generic castle) ---- */
+      if (TS.realLandmarks && track.real) {
+        if (!track.realLandmarkList) track.realLandmarkList = TS.realLandmarks.resolve(track);
+        track.realLandmarkList.forEach((lm) => {
+          if (lm.s < s0 || lm.s >= s1) return;
+          const lmLat = lm.onStrip ? Math.sign(lm.lat) * Math.min(Math.abs(lm.lat), W - 28) : lm.lat;   // hill landmarks: the ground height is only known inside the strip
+          const p = place(lm.s, lmLat);
+          const M0 = placeM(p.x, p.y, p.z, yawOf(p.f) + (lm.yaw || 0));
+          TS.realLandmarks.draw(lm.kind, { T, mbHouse, mbRoof, mbBlock, C, mixColor, clamp, addCastle, scale: lm.scale, at: (x, y, z, rot) => M0.clone().multiply(placeM(x, y, z, rot || 0)) });
+          markOcc(lm.s - 60, lm.s + 60, lmLat - 60, lmLat + 60);
+        });
+      } else if (String(track.id) === 'north' && L - 560 >= s0 && L - 560 < s1) {
         const side = 1, p = place(L - 560, side * 120);
         const hill = new T.CylinderGeometry(30, 46, 46, 14);
         mbHouse.addGeo(hill, placeM(p.x, p.y - 10, p.z), (v, n) => mixColor(C('#6a7d4a'), C('#8b8a7c'), clamp(0.2 + (1 - n.y) * 1.6, 0, 1)), true);
