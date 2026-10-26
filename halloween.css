@@ -24,9 +24,14 @@ html[data-season="halloween"] .hw-hero-fx { display: block; }
   color: var(--muted);
   filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .18));
 }
-.hw-deco--corner-tl { top: -10px; left: -6px; }
-.hw-deco--corner-tr { top: -10px; right: -6px; }
-.hw-deco--corner-br { bottom: -6px; right: 10px; }
+/* Positive insets only — a negative offset on a header/footer flush with the
+ * viewport edge would push the decoration past it, inflating the page's
+ * scrollWidth even though html{overflow-x:hidden} hides it visually (a real
+ * regression the account-check flow caught: "Arcade header does not scroll
+ * sideways"). Staying inside the container's own box avoids that entirely. */
+.hw-deco--corner-tl { top: 2px; left: 4px; }
+.hw-deco--corner-tr { top: 2px; right: 4px; }
+.hw-deco--corner-br { bottom: 2px; right: 10px; }
 
 .hw-deco--cobweb { width: 46px; height: 46px; }
 .hw-deco--pumpkin { width: 40px; }
