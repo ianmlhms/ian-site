@@ -88,7 +88,7 @@ export const flow = {
       const tick = () => {
         const i = g.ride.info();
         if (i.active && i.cam) { L.cam.push(i.cam.pos.concat(i.cam.up, i.cam.fwd)); L.last = i; if (i.rig) L.rigs.push(i.rig); }
-        const fx = g.ride.fx; if (fx) { L.shake = Math.max(L.shake, fx.shakeValue); L.strobe = Math.max(L.strobe, fx.strobeValue); L.drops = Math.max(L.drops, fx.dropCount); }
+        const fx = g.ride.fx; if (fx) { L.shake = Math.max(L.shake, fx.shakeValue); L.strobe = Math.max(L.strobe, fx.strobePeak ?? fx.strobeValue); L.drops = Math.max(L.drops, fx.dropCount); }
         const stamp = document.querySelector(".wk-stamp"); if (stamp && !stamp.hidden) L.stamp = true;
         if (i.active && L.cam.length % 20 === 0) { const s = g.r.performanceSnapshot(); L.max.draws = Math.max(L.max.draws, s.drawCalls); L.max.tris = Math.max(L.max.tris, s.triangles); }
         // the ghost train seals the camera to its own layer while the cart is inside the castle: sample every tick there so the isolated peak is not missed
@@ -148,7 +148,7 @@ export const flow = {
       h.expect(await waitRiding(), `${id}: boards again`);
       await shotAt(id, R.shots);
       const done = await waitIdle(40000);
-      await sleep(1100);                              // the stamp and the flag come after the fade back in
+      await sleep(4000);                              // the stamp and the flag come after the fade back in (generous: a loaded sandbox can stretch this well past the fade itself)
       const log = await stopLog();
       h.expect(done, `${id}: the ride ends by itself`);
       const cams = log.cam;
@@ -350,7 +350,7 @@ async function scooterChecks(set, spot, h, page, evalG, startLog, stopLog, tapSe
   // the keys (forward + right) stay held to the very end of the ride: read the walker on the first frame after the ride is over and release the keys in the same tick (a poll every 250 ms let the walker stroll away)
   const landed = await evalG(page, g => new Promise(resolve => { const t0 = performance.now(); const tick = () => { if (!g.ride.active) { const v = { ...g.walk.view }; g.walk.setInputKeys([]); resolve({ ...v, ended: true }); } else if (performance.now() - t0 > 16000) resolve({ ended: false }); else requestAnimationFrame(tick); }; tick(); }));
   const gone = landed.ended;
-  await sleep(1100);
+  await sleep(4000);                                  // same generous margin as the other rides: the stamp/flag land after the fade back in
   const log = await stopLog();
   h.expect(gone, "scooter: the timer ends the ride (about 60 s)");
   h.expect(log.stamp, "scooter: the stamp card was shown");

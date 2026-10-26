@@ -515,7 +515,7 @@ export function createGhostRig(env) {
   /** the gentle turn towards the nearest scene (bell curves around every scare's arc length, summed and clamped) and the speed profile (a dash
    *  between scenes, a near-stop at each one): both pure functions of arc length s, smoothed over time so neither ever snaps */
   function yawTargetAt(s) { let total = 0; for (const sc of scares) if (sc.side) total += sc.side * bell(s - sc.s, SCENE_SPAN + 0.4); return clamp(total, -1, 1) * YAW_MAX; }
-  function paceAt(s) { let slow = 0; for (const sc of scares) slow = Math.max(slow, bell(s - sc.s, SCENE_SPAN)); return 1.32 - 0.94 * slow; }
+  function paceAt(s) { let slow = 0; for (const sc of scares) slow = Math.max(slow, bell(s - sc.s, SCENE_SPAN)); return 1.22 - 0.7 * slow; }
   function compute(dt) {
     const f = sp.at(st.s);
     const target = yawTargetAt(st.s); st.yaw += (target - st.yaw) * (1 - Math.exp(-dt / (calm() ? 0.75 : 0.45)));
