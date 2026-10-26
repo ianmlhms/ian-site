@@ -93,7 +93,7 @@ export function startServer(root = REPO, { log = null, overrides = null } = {}) 
     let rel = decodeURIComponent((req.url || "/").split("?")[0]);
     if (rel.endsWith("/")) rel += "index.html";
     const file = path.normalize(path.join(root, rel));
-    const override = overrides && overrides.get(rel);
+    const override = overrides ? overrides.get(rel) : undefined;
     if (override === undefined && (!file.startsWith(root + path.sep) || !fs.existsSync(file) || fs.statSync(file).isDirectory())) {
       res.statusCode = 404; res.end("not found"); if (log) log.push({ path: rel, status: 404, bytes: 0 }); return;
     }
