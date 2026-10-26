@@ -161,7 +161,7 @@ first, below, then the original five art-notes tasks.
 | `node pb/mtb/harness-save.js` | 301 passed, 0 failed |
 | `node pb/mtb/harness-audio.js` | 168 passed, 0 failed |
 | `python3 scripts/check_site.py` | 1 warning: the pre-existing `karttracker-ios-privacy.html` orphan only |
-| `node scripts/flows/run_all.mjs mtb` (Chromium) | partial, see Known limitations: `mtb-holes` PASS (72 poses, 0 holes, matches harness.js); `mtb-ride`'s scripted reference-rider sub-test PASS (silver medal, no crash); the real-time/keyboard sub-tests and the draw-call/triangle readback in `mtb-world` time out in this sandbox's sub-1fps software renderer, not from game logic |
+| `node scripts/flows/run_all.mjs mtb` (Chromium) | **2/6 passed** (`mtb-holes`, `mtb-trails`) — **identical to a baseline run of unmodified `main` taken at the start of this session** (same 2 flows pass, same 4 fail for the same reasons: `mtb-world`'s draw-call/triangle readback and the srcdoc-iframe/visibility-resume checks, `mtb-ride`'s live-keyboard sub-tests, `mtb-menu` and `mtb-touch`'s own-timeout aborts — all time-sensitive real-time checks that need actual frame cadence, see Known limitations). `mtb-trails` fully rides all six trails for real (medals, saves, ghost, ends 12/12 medal points) and passed cleanly on this branch. No new flow failures from this session's changes. |
 | `node scripts/flows/run_all.mjs game-cache` | not completed in this session (see Known limitations) |
 | `scripts/flows/run_webkit.mjs` | not attempted (no time left after the Chromium flows' slowness here; see Known limitations) |
 
