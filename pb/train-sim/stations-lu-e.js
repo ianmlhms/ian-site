@@ -11,6 +11,8 @@
   const makeKit = window.TS.stationKits.luB;
   const GREY_POLE = '#9aa0a4';
   const MAROON = '#6a2b3a';
+  /* the kit of the OPPOSITE side: l > 0 points away from the station's platform (towards the far platform), so furniture drawn there opens towards its own track */
+  const mirrorKit = (api) => makeKit(Object.assign({}, api, { sx: -api.sx, pf: (l) => api.pf(-l) }));
 
   /* ================================================================ OETRANGE
    * Refs: ~/Library/Caches/zuch-refs/Oetrange (Commons: Contern, gare CFL Oetrange (104)-(130)).  Five-track station: the old boarded building stands behind the
@@ -60,6 +62,37 @@
       k.sign(isl.edge - 1.0, -65, '5', 'blue');
       k.sign(isl.edge - 5.8, -65, '4', 'blue');
       k.yellowBoard(isl.edge - 1.4, -32, 'Oetrange');
+    },
+  });
+  /* ================================================================ BETZDER (Betzdorf)
+   * Refs: ~/Library/Caches/zuch-refs/Betzder (Commons: Betzdorf, gare CFL Betzdorf (101)-(105)): only five photos (yellow name board, the white timber waiting
+   * shelter from two sides, two platform views with trains) - the station building no longer exists.  Two tracks 4.1 m apart with a side platform outside each:
+   * ours on the left (patch x -1.4 .. -4.0) with the white board-and-batten waiting shelter 7 m behind it (patch x -12 .. -6.9, z -47 .. -35.7), the far one on the
+   * right (x 5.7 .. 8.7) with a ticket machine and a shelter near z -53. */
+  const BE = { far: { edge: 5.7, width: 3.0, z0: -95, z1: 95 }, track: -4.1 };
+  reg('Betzder', {
+    canopy: false,
+    furniture: false,
+    build(api) {
+      const k = makeKit(api);
+      const f = mirrorKit(api);
+      const { H, W, edge, WHITE } = api;
+      const lB = edge + W;
+      k.yellowBoard(edge + 1.3, -12, 'Betzdorf');
+      k.yellowBoard(edge + 1.3, 46, 'Betzdorf');
+      k.sign(lB - 0.5, -24, 'D', 'blue');
+      [-62, 20].forEach((z) => k.totem(edge + 0.9, z));
+      [-84, -52, -20, 14, 48, 80].forEach((z) => k.lamp(lB - 0.4, z, GREY_POLE, 6.0));
+      k.bench(lB - 0.8, -33, '#7d1f26');
+      k.bin(lB - 0.7, -6, '#d9631a');
+      // the far track and its side platform (patch x 5.7 .. 8.7) with the ticket machine and a glass shelter
+      k.track(BE.track, -135, 135, { pole: true });
+      f.platformBox(BE.far.edge, BE.far.width, 1, BE.far.z0, BE.far.z1);
+      f.glassShelter(BE.far.edge + BE.far.width - 1.6, -53.5, 4.0, 1.6, '#6b7076', '#4c5258');
+      f.vc.box(f.X(BE.far.edge + 2.2), H + 1.0, -82.4, 0.5, 2.0, 0.6, api.col('#b02a6e'));
+      [-70, -20, 25, 70].forEach((z) => f.lamp(BE.far.edge + BE.far.width - 0.5, z, GREY_POLE, 6.0));
+      [-40, 40].forEach((z) => f.totem(BE.far.edge + 0.9, z));
+      f.sign(BE.far.edge + 0.9, -8, 'C', 'blue');
     },
   });
 })();

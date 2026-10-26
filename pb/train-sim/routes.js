@@ -162,7 +162,7 @@
    * See pb/train-sim/REAL-LINES.md for the real stop list and its sources. */
   const RM = window.TS.realMosel;
   if (!RM) throw new Error('[Lokféierer] routes: real-mosel.js is missing');
-  const PLATFORM_WIDTH = { Munsbach: 3.2, 'Roodt-Syr': 2.7 };
+  const PLATFORM_WIDTH = { Munsbach: 3.2, 'Roodt-Syr': 2.7, Oetrange: 5.7, Betzder: 2.6 };
   const realStation = (name) => {
     const st = RM.stations[name];
     return station(name, st.size, st.side, st.biome, false, PLATFORM_WIDTH[name]);

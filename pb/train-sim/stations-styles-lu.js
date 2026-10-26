@@ -61,7 +61,13 @@
   /* BETZDER (Betzdorf).  Refs: Commons "Betzdorf, gare CFL Betzdorf (101)-(105)" (Feb 2025).  No station building any more; the LOD2 hut behind the platform is the old white
    * timber waiting shelter: board-and-batten walls painted white, white-framed glazing bars, open arched bay, brown-grey tiled gable roof, brick paving in front. */
   reg('Betzder', {
-    wall: '#ece9df', trim: '#f2efe6', plinth: { h: 0.35, col: '#b9b2a2' }, roof: 'tile', roofTint: '#8d8478', floorH: 3.6, bayM: 2.3, stain: true, boards: true,
-    win: { w: 1.1, h: 1.55, kind: 'rect', frame: '#f6f4ee', reveal: '#f1eee5', sill: false },
+    wall: '#f4f2ea', trim: '#faf8f1', plinth: { h: 0.35, col: '#c4beb0' }, roof: 'tile', roofTint: '#8d8478', floorH: 3.6, bayM: 3.8, stain: false, boards: true,
+    win: { w: 1.15, h: 1.6, kind: 'rect', frame: '#fbfaf5', reveal: '#efece3', sill: false },
+    doors: [{ z: -41.4, w: 2.5, h: 2.2, col: '#5d5144', glass: false, face: 'front' }],
+    extras(api) {
+      // the open bay of the shelter: a row of maroon seats under the arch (photo 102), grey-brown paving in front
+      [-42.4, -41.7, -41.0, -40.3].forEach((z) => api.box(-7.35, 1.1, z, 0.45, 0.07, 0.5, '#6b2230'));
+      api.box(-7.2, 1.4, -41.4, 0.05, 0.55, 2.4, '#6b2230');
+    },
   });
 })();
