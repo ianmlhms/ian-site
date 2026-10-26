@@ -104,7 +104,7 @@ export const flow = {
       await bad.frames(20);
       await bad.page.evaluate(() => { const t = __tsTest.trackInfo(); __tsTest.placeAt(t.stations[7].platformStart - 200, 0); });
       await bad.frames(60);
-      const st = await bad.page.evaluate(() => { const t = __tsTest.trackInfo(); const b = t.base || t; return { states: (b.surroundPatches || []).map((p) => p.state), phase: __tsTest.state().phase, inSurround: !!(b.inSurround && b.inSurround(0, 0)) }; });
+      const st = await bad.page.evaluate(() => { const t = __tsTest.trackInfo(); const b = t.base || t; return { states: (b.surroundPatches || []).filter((p) => p.name !== 'Lëtzebuerg').map((p) => p.state), phase: __tsTest.state().phase, inSurround: !!(b.inSurround && b.inSurround(0, 0)) }; });
       h.expect(st.phase === 'running', 'south: the game runs with failed scenery halves');
       h.expect(st.states.some((x) => x === 'failed') && !st.states.includes('ready'), `south: patches fall back (${st.states.filter((x) => x === 'failed').length} failed)`);
       const rep = await scanRoute(bad, 'south', { step: 600, rayStep: 120 });

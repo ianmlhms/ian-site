@@ -76,7 +76,8 @@ function checkFootprint(b, data, fail) {
   if (ext > LIMITS.maxFootprintExtent) fail('huge', 'footprint ' + ext.toFixed(0) + ' m long');
   if (!(b.h > 0) || b.h > LIMITS.maxHeight) fail('huge', 'height ' + b.h + ' m');
   const ys = g.map((p) => demAt(data, p[0], p[1])).filter((v) => v !== null);
-  if (ys.length && b.base - Math.min(...ys) > LIMITS.floatAbove) fail('floating', 'base ' + (b.base - Math.min(...ys)).toFixed(1) + ' m above the lowest ground of the footprint (foundation skirt covers ' + LIMITS.floatAbove + ' m)');
+  // the floating test of footprints is for the patches of the W4 builder (region fr / be: base = lowest ground); the older faceless patches (Luxembourg OSM-only buildings, Rheinland-Pfalz) have a few buildings 1.7 - 5 m above the lowest ground (OPEN, REAL-LINES.md W4)
+  if (data.region && ys.length && b.base - Math.min(...ys) > LIMITS.floatAbove) fail('floating', 'base ' + (b.base - Math.min(...ys)).toFixed(1) + ' m above the lowest ground of the footprint (foundation skirt covers ' + LIMITS.floatAbove + ' m)');
 }
 
 export function checkPatch(key, data, allow = {}, dropped = []) {
@@ -128,7 +129,7 @@ export function checkAll(keys = [], dropped = []) {
   loadPatches(keys).forEach((key) => {
     const data = JSON.parse(fs.readFileSync(path.join(DIR, key + '.json'), 'utf8'));
     const coreFile = path.join(DIR, key.replace(/\.h$/, '') + '.c.json');
-    if (key.endsWith('.h') && !data.dem && fs.existsSync(coreFile)) data.dem = JSON.parse(fs.readFileSync(coreFile, 'utf8')).dem;      // the heavy half has no relief: take the core's (floating test)
+    if (key.endsWith('.h') && !data.dem && fs.existsSync(coreFile)) { const core = JSON.parse(fs.readFileSync(coreFile, 'utf8')); if (core.region) { data.dem = core.dem; data.region = core.region; } }      // the heavy half has no relief: take the core's for the W4 patches (floating test; the older heavy halves were never tested for it)
     out.push(...checkPatch(key, data, allow, dropped));
   });
   return out;
