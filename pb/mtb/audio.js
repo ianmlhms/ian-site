@@ -41,7 +41,8 @@ const RAIN_HISS_LEVEL = 0.2;
 const SKID_FILTER_HZ = 320;
 const BREEZE_LEVEL = 0.02;
 const MENU_WIND_LEVEL = 0.15;
-const WIND_SPEED_LEVEL = 0.4;
+const WIND_SPEED_LEVEL = 0.45;
+const WIND_RISE = Object.freeze([3, 17]);         // m/s: the wind starts to rise at 3 m/s and is fully there at 17 m/s (61 km/h): at 40 km/h it already roars, and its pitch climbs with the speed
 const WIND_GUST_LEVEL = 0.22;
 const BRAKE_LEVEL = 0.06;
 const SKID_LEVEL = 0.03;
@@ -154,12 +155,12 @@ export function computeTargets(s, t) {
     freq: 1000 + 800 * s.wet,
   };
 
-  // wind: silent below 4 m/s (apart from a faint breeze and the gusts), strong at 20; a calm constant bed in the menu
+  // wind: silent below 4 m/s (apart from a faint breeze and the gusts), strong from 17 m/s on; a calm constant bed in the menu
   const wind = {
     gain: (s.riding
-      ? BREEZE_LEVEL + WIND_SPEED_LEVEL * smoothstep(4, 20, s.speed) + WIND_GUST_LEVEL * s.wind
+      ? BREEZE_LEVEL + WIND_SPEED_LEVEL * smoothstep(WIND_RISE[0], WIND_RISE[1], s.speed) + WIND_GUST_LEVEL * s.wind
       : MENU_WIND_LEVEL + 0.1 * s.wind) * amb,
-    freq: 250 + 1100 * smoothstep(0, 22, s.speed) + 500 * s.wind,
+    freq: 250 + 1300 * smoothstep(0, WIND_RISE[1] + 1, s.speed) + 500 * s.wind,
   };
 
   // brake squeal: 3-4 kHz with a slow wobble, louder with speed

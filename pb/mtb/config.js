@@ -89,6 +89,11 @@ export const CAMERA = Object.freeze({
   farHeight: 3.4,
   helmetForward: 0.32, helmetHeight: 1.72, helmetFov: 78,
   shake: 0.055,             // m of camera shake at full speed on rough ground
+  shakeFrom: 8,             // m/s: the shake starts here and is at full strength shakeSpan m/s later (fast descents rattle, a stroll does not)
+  shakeSpan: 9,
+  fovGain: 17,              // degrees the field of view widens at speed ...
+  fovFrom: 4,               // ... starting at 4 m/s and full at fovTo (18 m/s = 65 km/h): speed is felt as the world opening up
+  fovTo: 18,
   clearanceProbe: 6,        // ground probes along the camera boom
   bodyRadius: 0.55,         // the camera is a ball of this radius: it never sits inside a trunk, a crown or a rock
 });
@@ -98,9 +103,11 @@ export const BIKE = Object.freeze({
   mass: 86,                 // rider + bike (kg)
   gravity: 9.81,
   wheelbase: 1.12,
-  power: 270,               // W of a fit rider at full throttle (short climbs: a rider gives more than the sustained 200 W for a few seconds)
-  pedalForceMax: 330,       // N at the rear wheel (tractive limit before grip)
-  cdA: 0.52,                // m2, upright rider
+  power: 480,               // W at the rear wheel at full throttle: an arcade rider (speed pass 26 Oct: a real 270 W felt slow). With cdA 0.6 this is 35 km/h on the flat, 0-25 km/h in about 4.5 s
+  launchBoost: 0.5,         // a standing sprint gives more than the cruising power: +50 % at a standstill, fading out between launchFade[0] and [1] m/s (0-25 km/h in ~4.6 s)
+  launchFade: [2, 6.5],
+  pedalForceMax: 460,       // N at the rear wheel (tractive limit before grip; rear traction caps it at 0.55 mu g)
+  cdA: 0.6,                 // m2, upright rider: the real drag that ends the speed (no invisible soft cap any more)
   airDensity: 1.2,
   brakeDecel: 7.4,          // m/s2 at full braking on good grip (front+rear blended)
   steerMax: 0.52,           // rad of bar angle at standstill
@@ -115,8 +122,6 @@ export const BIKE = Object.freeze({
   fixedStep: 1 / 120,
   bodyRadius: 0.32,         // m: the bike's radius against tree trunks
   treeBump: 0.55,           // speed kept when the bike slides along a trunk (the part into the trunk is lost)
-  softCapStart: 15.5,       // m/s: above this a trail descent adds drag (roots, ruts, vegetation, a rider who sits up) ...
-  softCapDrag: 0.5,         // ... of this many m/s2 per m/s over the start: a 30 % drop tops out near 63 km/h, never a runaway
   maxSpeed: 24,             // m/s hard cap (86 km/h)
 });
 
@@ -154,11 +159,12 @@ export const PLAY = Object.freeze({
   perfectImpact: 2.5,                        // m/s normal speed at touch-down for a "perfect" landing
   goodImpact: 5.5,
   slideCrash: 8.5,                           // m/s of sideways slide on the ground that tips the bike over (low side)
-  hitCrash: 5.4,                             // m/s into a trunk or a rock that is a crash
+  hitCrash: 6.2,                             // m/s into a trunk or a rock that is a crash (a glancing touch at 12 m/s is a bump)
   sideLandCrash: 6.5,                        // m/s sideways at touch-down
   tumbleDecay: 2.6,                          // 1/s: speed decay while tumbling
   respawnTime: 1.4,                          // s from the crash to the rider standing at the checkpoint (< 1.5 s, never frustrating)
   pushAssist: 1.7,                           // m/s2: below walking pace the rider pushes the bike up a bank instead of stalling
+  pushSlope: 0.9,                            // the push also carries this share of the pull of the slope (a 50 % bank is walked up, never a wall)
   pushFade: [0.9, 2.4],                      // m/s: full assist below the first speed, none above the second
   respawnShield: 1.5,                        // s of invulnerability after a respawn
 });
@@ -169,10 +175,10 @@ export const PLAY = Object.freeze({
  *   (less lean wobble); pump / pop efficiency of pumping and jumping; crashImpact m/s normal speed at touch-down that is a crash; hardImpact: landings above this cost speed;
  *   rough: how much of the ground roughness reaches the bike (hardtail 1 .. downhill 0.35). */
 export const BIKES = Object.freeze({
-  hardtail: { id: 'hardtail', mass: 84.5, powerK: 1.06, travel: 0.1, grip: 0.95, crrK: 0.94, cdaK: 1.0, brakeF: 7.0, brakeR: 4.4, steerK: 1.12, steerRef: 6.2, stab: 0.85, pump: 1.2, pop: 1.1, crashImpact: 9.6, hardImpact: 5.8, rough: 1.0, stick: 0.045, color: '#2f9e6b' },
+  hardtail: { id: 'hardtail', mass: 84.5, powerK: 1.08, travel: 0.1, grip: 0.95, crrK: 0.94, cdaK: 1.0, brakeF: 7.0, brakeR: 4.4, steerK: 1.12, steerRef: 6.2, stab: 0.85, pump: 1.2, pop: 1.1, crashImpact: 9.6, hardImpact: 5.8, rough: 1.0, stick: 0.045, color: '#2f9e6b' },
   trail: { id: 'trail', mass: 86, powerK: 1.0, travel: 0.13, grip: 1.0, crrK: 1.0, cdaK: 1.0, brakeF: 7.4, brakeR: 4.8, steerK: 1.0, steerRef: 5.5, stab: 1.0, pump: 1.0, pop: 1.0, crashImpact: 11.5, hardImpact: 7.5, rough: 0.7, stick: 0.058, color: '#d8452e' },
-  enduro: { id: 'enduro', mass: 88.5, powerK: 0.94, travel: 0.17, grip: 1.06, crrK: 1.06, cdaK: 1.04, brakeF: 7.9, brakeR: 5.1, steerK: 0.94, steerRef: 5.0, stab: 1.15, pump: 0.88, pop: 0.95, crashImpact: 13.2, hardImpact: 9.0, rough: 0.5, stick: 0.07, color: '#e69a1f' },
-  downhill: { id: 'downhill', mass: 92, powerK: 0.84, travel: 0.2, grip: 1.12, crrK: 1.16, cdaK: 1.1, brakeF: 8.5, brakeR: 5.5, steerK: 0.88, steerRef: 4.6, stab: 1.35, pump: 0.78, pop: 0.9, crashImpact: 15.2, hardImpact: 11.0, rough: 0.35, stick: 0.082, color: '#7b49c8' },
+  enduro: { id: 'enduro', mass: 88.5, powerK: 0.97, travel: 0.17, grip: 1.06, crrK: 1.06, cdaK: 1.04, brakeF: 7.9, brakeR: 5.1, steerK: 0.94, steerRef: 5.0, stab: 1.15, pump: 0.88, pop: 0.95, crashImpact: 13.2, hardImpact: 9.0, rough: 0.5, stick: 0.07, color: '#e69a1f' },
+  downhill: { id: 'downhill', mass: 92, powerK: 0.9, travel: 0.2, grip: 1.12, crrK: 1.16, cdaK: 1.1, brakeF: 8.5, brakeR: 5.5, steerK: 0.88, steerRef: 4.6, stab: 1.35, pump: 0.78, pop: 0.9, crashImpact: 15.2, hardImpact: 11.0, rough: 0.35, stick: 0.082, color: '#7b49c8' },
 });
 export const BIKE_IDS = Object.freeze(['hardtail', 'trail', 'enduro', 'downhill']);
 export const CLEAN_GROUND = Object.freeze({ kind: 'dirt', ...SURFACES.dirt });

@@ -16,6 +16,7 @@ import { createRockView } from './rock-view.js';
 import { createWaterView } from './water-view.js';
 import { createRain, createLeaves, createShafts, createBirds, createInsects } from './effects.js';
 import { createHikers } from './hikers.js';
+import { createDust, createSpeedLines } from './speed-fx.js';
 import { SCHIESSENTUEMPEL } from './landmarks.js';
 import { buildBridge } from './bridge-model.js';
 import { buildCascadeModel } from './cascade-model.js';
@@ -177,6 +178,8 @@ async function boot() {
   ghostRider.root.visible = false;
   scene.add(ghostRider.root);
   const rain = createRain({ scene, env, quality }), leaves = createLeaves({ scene, env, quality }), shafts = createShafts({ scene, env, quality, surface, map: maps });
+  const dust = createDust({ scene, env, quality });
+  const speedLines = createSpeedLines(shell, { low: quality.id === 'low' });
   const birds = createBirds({ scene, env, quality }), insects = createInsects({ scene, env, quality, surface, map: maps, clearance: world.clearance });
   const hikers = createHikers({ scene, env, surface, paths: world.ways.filter((w) => w.kind === 'path') });
 
@@ -437,7 +440,7 @@ async function boot() {
     if (run.isBest && e.kind !== 'daily') reporter.submitRun(t.id, e.ms, trailName(t, lang));
     if (e.kind === 'daily') rpc.submit(e.ms).then(() => ui.setFinishNote(tr('daily.sent'))).catch((error) => ui.setFinishNote(error && error.message === 'signed-out' ? tr('daily.signin') : ''));
     const prevBest = e.bestMs;
-    ui.showFinish({ trail: t, ms: e.ms, medal: e.medal, isBest: run.isBest, bestMs: prevBest, crashes: e.crashes, splits: e.splits, bestSplits: bestSplits(before, t.id), nextMedal: game.nextMedal(e.ms), unlocks, beatGhost: e.beatGhost, ghostLost: ghostData && !e.beatGhost, hasNext: true, daily: e.kind === 'daily' });
+    ui.showFinish({ trail: t, ms: e.ms, medal: e.medal, isBest: run.isBest, bestMs: prevBest, crashes: e.crashes, splits: e.splits, bestSplits: bestSplits(before, t.id), nextMedal: game.nextMedal(e.ms), unlocks, topKmh: runTopKmh, beatGhost: e.beatGhost, ghostLost: ghostData && !e.beatGhost, hasNext: true, daily: e.kind === 'daily' });
     audio.event('finish'); setTimeout(() => audio.event('medal', { tier: e.medal }), 500);
     if (unlocks.length) setTimeout(() => audio.event('unlock'), 1100);
     setHudMode();
@@ -512,7 +515,7 @@ async function boot() {
   const wheelbase = rider.wheelbase;
   const extra = { dt: 0.016, pitch: 0, standing: false, spin: 0, brake: 0 };
   const lampPos = new THREE.Vector3(), lampDir = new THREE.Vector3();
-  let foamTimer = 0, safeT = 0;
+  let foamTimer = 0, safeT = 0, runTopKmh = 0;
   const frozen = () => game.mode === 'card' || game.mode === 'countdown';
   const poseGhost = (g, ms, tr0) => {
     const p = ghostAt(g, ms);
@@ -528,6 +531,7 @@ async function boot() {
   /** One logical step of the game: physics, game state machine, events. No rendering (the flows call it directly to ride a whole trail in a few seconds). */
   function logic(dt, inp) {
     const mode = game.mode;
+    if (mode === 'run') runTopKmh = Math.max(runTopKmh, speedKmh(bike)); else if (mode !== 'finished') runTopKmh = 0;
     if (!frozen() && !ui.isMenuOpen() && !replay) {
       physicsEnv.wet = wetNow();
       physicsEnv.shield = game.shield;
@@ -557,6 +561,7 @@ async function boot() {
     if (bike.landSeq !== lastLand) {
       lastLand = bike.landSeq;
       audio.event('land', { impact: bike.landImpact, quality: bike.landQuality });
+      if (!replay) dust.burst(bike, bike.landImpact, bike.groundKind);
       if (bike.landImpact > 3 && !bike.crashed && game.mode === 'run') ui.banner(bike.landQuality > 0.85 ? tr('hud.perfect') : bike.landQuality > 0.45 ? tr('hud.good') : tr('hud.rough'), bike.landQuality > 0.45 ? '' : 'bad', 900);
     }
     if (bike.popped && !lastPopped) audio.event('jump');
@@ -604,6 +609,10 @@ async function boot() {
     foamTimer -= dt;
     if (foamTimer <= 0) { foamTimer = 0.4; water.updateFoam(c.x, c.z, rockView.stones); }
     rain.update(); leaves.update(); shafts.update(c.x, c.z); birds.update(); insects.update(c.x, c.z);
+    const riding = !frozen() && !ui.isMenuOpen() && !replay && game.mode !== 'finished' && !frozenCamera;
+    if (riding) dust.emit(bike, dt, bike.groundKind, wetNow());
+    dust.update(dt);
+    speedLines.update(Math.hypot(bike.vx, bike.vz), dt, riding && !bike.crashed);
     hikers.update(dt, bike.x, bike.z);
     renderer.render(scene, camera);
 
@@ -644,7 +653,7 @@ async function boot() {
   }
   let lastLand = bike.landSeq, lastPopped = false, hintShown = false;
   const replayBike = () => { const p = ghostAt(replay.ghost, replay.t); const pose = poseOnTrail(replay.trail, p.s, p.o); return { ...bike, x: pose.x, z: pose.z, y: ground.height(pose.x, pose.z), heading: pose.heading, vx: Math.cos(pose.heading) * (p.speed || 5), vz: Math.sin(pose.heading) * (p.speed || 5), vy: 0, slip: 0, compression: 0, grounded: true, lean: 0 }; };
-  const lastFinish = () => ({ trail: current.trail, ms: game.result ? game.result.ms : 0, medal: game.result ? game.result.medal : 0, isBest: false, bestMs: bestMs(progress, current.trail.id), crashes: game.crashes, splits: game.result ? game.result.splits : [], bestSplits: bestSplits(progress, current.trail.id), nextMedal: game.result ? game.nextMedal(game.result.ms) : null, unlocks: [], beatGhost: false, hasNext: true, daily: current.kind === 'daily' });
+  const lastFinish = () => ({ trail: current.trail, ms: game.result ? game.result.ms : 0, medal: game.result ? game.result.medal : 0, isBest: false, bestMs: bestMs(progress, current.trail.id), crashes: game.crashes, splits: game.result ? game.result.splits : [], bestSplits: bestSplits(progress, current.trail.id), nextMedal: game.result ? game.nextMedal(game.result.ms) : null, unlocks: [], topKmh: runTopKmh, beatGhost: false, hasNext: true, daily: current.kind === 'daily' });
 
   canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); contextLost = true; console.warn('[mtb] WebGL context lost'); });
   canvas.addEventListener('webglcontextrestored', () => { console.warn('[mtb] WebGL context restored: reloading'); location.reload(); });

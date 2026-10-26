@@ -19,6 +19,7 @@ import { encodeGhost, decodeGhost, ghostAt } from './ghost.js';
 import { createProgress, recordRun, medalOf, bestMs, ghostFor, TRAIL_IDS } from './progress.js';
 import { serializeProgress } from './save.js';
 import { t as tr, LANGS, keysOf, placeholders } from './i18n.js';
+import { SPEED_FEEL, speedLineStrength, speedTier, gaugeFill, DUST, dustRate } from './speed-feel.js';
 import { featureOffset, KICKER, DROP, dropFallLength, lipFallLength } from './trail-features.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -65,7 +66,7 @@ function physicsChecks() {
 
   // pedalling
   let s = ride(flat, 'dirt', startAt(flat), () => ({ throttle: 1, brake: 0, steer: 0 }), 10, env());
-  check(`pedalling on the flat reaches a sensible speed (${(speedOf(s) * 3.6).toFixed(1)} km/h after 10 s)`, speedOf(s) > 5.5 && speedOf(s) < 9.5);
+  check(`pedalling on the flat reaches a sensible speed (${(speedOf(s) * 3.6).toFixed(1)} km/h after 10 s)`, speedOf(s) * 3.6 > 30 && speedOf(s) * 3.6 < 36);
   s = ride(flat, 'dirt', startAt(flat, 0, 0, 9), () => ({ throttle: 0, brake: 0, steer: 0 }), 20, env());
   check(`coasting on the flat loses speed slowly (${speedOf(s).toFixed(1)} m/s left of 9 after 20 s)`, speedOf(s) > 2.5 && speedOf(s) < 8.6);
 
@@ -97,7 +98,7 @@ function physicsChecks() {
   check(`a hard right turn at 7 m/s: heading changes and the bike leans (lean ${s.lean.toFixed(2)} rad)`, Math.abs(s.heading) > 0.8 && s.lean > 0.15 && !s.crashed);
   s = ride(flat, 'dirt', startAt(flat, 0, 0, 13), () => ({ throttle: 0, brake: 0, steer: 1 }), 2, env());
   check('a full lock at 13 m/s does not flip the bike (no crash, slip < slide limit)', !s.crashed || s.crashed === 'slide');
-  const slipOf = (input) => { let q = startAt(flat, 0, 0, 10); for (let i = 0; i < 90; i++) q = stepBike(q, input, DT, flat, groundOf('dirt'), env()); return Math.abs(-q.vx * Math.sin(q.heading) + q.vz * Math.cos(q.heading)); };
+  const slipOf = (input) => { let q = startAt(flat, 0, 0, 14); for (let i = 0; i < 90; i++) q = stepBike(q, input, DT, flat, groundOf('dirt'), env()); return Math.abs(-q.vx * Math.sin(q.heading) + q.vz * Math.cos(q.heading)); };
   const slipBrake = slipOf({ throttle: 0, brakeF: 1, brakeR: 0, steer: 1 }), slipCoast = slipOf({ throttle: 0, brake: 0, steer: 1 });
   check(`braking hard with the front brake in a corner washes the front wheel (drift ${slipBrake.toFixed(2)} vs ${slipCoast.toFixed(2)} m/s coasting)`, slipBrake > slipCoast);
 
@@ -184,6 +185,30 @@ function physicsChecks() {
   check(`over roots the downhill bike keeps more speed than the hardtail (${rough('downhill').toFixed(1)} m vs ${rough('hardtail').toFixed(1)} m rolled in 4 s)`, rough('downhill') > rough('hardtail') - 0.3);
   const turnGrip = (id) => { const q = ride(flat, 'dirt', startAt(flat, 0, 0, 9), () => ({ steer: 1 }), 1.5, env(id)); return q.slip; };
   check('slip stays finite for every bike in a hard turn', BIKE_IDS.every((id) => Number.isFinite(turnGrip(id))));
+
+  // speed pass (26 Oct): fast and fun, the limits are real drag and grip, not an invisible cap
+  const slopeSurf = (g) => makeSurface((x) => -g * x);
+  const kmh = (q) => speedOf(q) * 3.6;
+  const topFlat = (id, kind = 'dirt') => kmh(ride(flat, kind, startAt(flat), () => ({ throttle: 1 }), 60, env(id)));
+  const t25 = (id, kind = 'dirt') => { let q = startAt(flat), t = 0; while (kmh(q) < 25 && t < 30) { q = stepBike(q, { throttle: 1 }, DT, flat, groundOf(kind), env(id)); t += DT; } return t; };
+  check(`trail bike: full pedal on flat dirt tops out at ${topFlat('trail').toFixed(1)} km/h (32..36), hardtail ${topFlat('hardtail').toFixed(1)} a bit faster, downhill bike ${topFlat('downhill').toFixed(1)} slower`, topFlat('trail') > 32 && topFlat('trail') < 36 && topFlat('hardtail') > topFlat('trail') && topFlat('downhill') < topFlat('trail') - 1.5);
+  check(`trail bike: 0 to 25 km/h in ${t25('trail').toFixed(1)} s on dirt, ${t25('trail', 'road').toFixed(1)} s on a road (4..5.3 s)`, t25('trail') > 4 && t25('trail') < 5.3 && t25('trail', 'road') < t25('trail'));
+  check(`the other bikes accelerate in the same order (hardtail ${t25('hardtail').toFixed(1)} < trail < enduro ${t25('enduro').toFixed(1)} < downhill ${t25('downhill').toFixed(1)} s) and the downhill bike still gets there in 7 s`, t25('hardtail') < t25('trail') && t25('trail') < t25('enduro') && t25('enduro') < t25('downhill') && t25('downhill') < 7);
+  const climbAt = (g, id = 'trail') => kmh(ride(slopeSurf(-g), 'dirt', startAt(slopeSurf(-g), 0, 0, 4), () => ({ throttle: 1 }), 40, env(id)));
+  check(`climbs stay doable: ${climbAt(0.08).toFixed(1)} km/h on 8 %, ${climbAt(0.12).toFixed(1)} on 12 % with the trail bike (12..21), ${climbAt(0.12, 'downhill').toFixed(1)} with the downhill bike (not a crawl)`, climbAt(0.08) > 12 && climbAt(0.08) < 21 && climbAt(0.12) > 12 && climbAt(0.12, 'downhill') > 11);
+  const fire = (g, id = 'trail', throttle = 1, kind = 'track') => kmh(ride(slopeSurf(g), kind, startAt(slopeSurf(g), 0, 0, 3), () => ({ throttle }), 90, env(id)));
+  check(`fast fire-road descents: ${fire(0.08).toFixed(0)} km/h on 8 %, ${fire(0.12).toFixed(0)} km/h on 12 % (50..66), coasting on 12 % still ${fire(0.12, 'trail', 0).toFixed(0)} km/h`, fire(0.08) > 48 && fire(0.12) > 55 && fire(0.12) < 67 && fire(0.12, 'trail', 0) > 48);
+  check(`no invisible cap: a 12 % descent is faster than an 8 % one, a 20 % one faster still (${fire(0.08).toFixed(0)} < ${fire(0.12).toFixed(0)} < ${fire(0.2).toFixed(0)} km/h), only drag ends it (hard cap ${(BIKE.maxSpeed * 3.6).toFixed(0)} km/h)`, fire(0.08) < fire(0.12) && fire(0.12) < fire(0.2) && fire(0.2) < BIKE.maxSpeed * 3.6 + 0.5);
+  const technical = kmh(ride(slopeSurf(0.12), 'roots', startAt(slopeSurf(0.12), 0, 0, 3), () => ({ throttle: 1 }), 60, env()));
+  check(`roots and mud keep technical descents slower than the fire road (${technical.toFixed(0)} km/h on a 12 % root descent)`, technical < fire(0.12) - 8);
+  check('a full-lock turn at 15 m/s on dry dirt does not crash the bike (it scrubs speed instead of tripping)', !ride(flat, 'dirt', startAt(flat, 0, 0, 15), () => ({ throttle: 1, steer: 1 }), 5, env()).crashed);
+
+  // speed feel (pure part): streaks, speedometer tiers, dust
+  check(`speed lines: none below ${(SPEED_FEEL.linesFrom * 3.6).toFixed(0)} km/h, full from ${(SPEED_FEEL.linesFull * 3.6).toFixed(0)} km/h, rising in between`, speedLineStrength(8) === 0 && speedLineStrength(25) === 1 && speedLineStrength(13) > 0.05 && speedLineStrength(13) < speedLineStrength(16));
+  check('speedometer tiers: 0 at a walk, then a new tier at 20 / 35 / 50 / 62 km/h', speedTier(5) === 0 && speedTier(20) === 1 && speedTier(36) === 2 && speedTier(55) === 3 && speedTier(70) === 4 && gaugeFill(35) === 0.5 && gaugeFill(200) === 1);
+  check('dust: a dry gravel track at speed kicks up a lot, wood and the air nothing, rain damps it, mud and water do not care', dustRate('track', 12) > dustRate('dirt', 12) && dustRate('wood', 12) === 0 && dustRate('dirt', 12, 0, 0, false) === 0 && dustRate('dirt', 12, 1) < dustRate('dirt', 12) * 0.3 && dustRate('mud', 12, 1) === dustRate('mud', 12) && dustRate('dirt', 2) === 0);
+  check('dust: more speed, more dust, a skidding rear wheel digs in', dustRate('dirt', 15) > dustRate('dirt', 8) && dustRate('dirt', 10, 0, 1) > dustRate('dirt', 10) * 1.8);
+  check('every ground the physics knows has a dust profile', Object.keys(SURFACES).every((k) => DUST[k]));
 
   // determinism and purity
   const a = ride(flat, 'dirt', startAt(flat), () => ({ throttle: 1, steer: 0.3 }), 2, env()), b = ride(flat, 'dirt', startAt(flat), () => ({ throttle: 1, steer: 0.3 }), 2, env());
@@ -291,7 +316,7 @@ async function rideChecks(play) {
     console.log(`  ${t.id.padEnd(18)} ${res.finished ? 'finished' : 'DID NOT FINISH'} in ${res.time.toFixed(0)} s (avg ${(avg * 3.6).toFixed(1)} km/h, max ${(res.maxSpeed * 3.6).toFixed(0)}), crashes ${res.crashes}, rescues ${res.rescues}${res.rescueAt.length ? ' ' + JSON.stringify(res.rescueAt) : ''}${res.crashAt.length ? ' crashes at ' + JSON.stringify(res.crashAt) : ''}, air ${res.airTime.toFixed(1)} s, progress ${res.progress}/${res.length}  [${((Date.now() - t1) / 1000).toFixed(1)} s]`);
     check(`${t.id}: the reference rider finishes (${res.time.toFixed(0)} s)`, res.finished && res.nan === 0 && res.below === 0);
     check(`${t.id}: ... with at most 1 crash per 3 km (${res.crashes}) and 2 rescues (${res.rescues})`, res.crashes <= Math.ceil(t.length / 3000) && res.rescues <= 2);
-    check(`${t.id}: average speed ${(avg * 3.6).toFixed(1)} km/h is sensible (8..38)`, avg * 3.6 > 8 && avg * 3.6 < 38);
+    check(`${t.id}: average speed ${(avg * 3.6).toFixed(1)} km/h is sensible (14..50)`, avg * 3.6 > 14 && avg * 3.6 < 50);
     stats[`ride:${t.id}`] = { time: res.time, crashes: res.crashes, splits: res.splits };
   }
   return out;
