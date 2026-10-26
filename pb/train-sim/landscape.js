@@ -871,8 +871,9 @@ window.TS = window.TS || {};
       return mb;
     }
 
+    const RIBBON_STEP = 3;
     function ribbonMesh(mb, pointsFn, sA, sB, halfW, lift, tileV) {
-      const pts = [], step = 8, n = Math.max(2, Math.ceil((sB - sA) / step)), grid = [];
+      const pts = [], step = RIBBON_STEP, n = Math.max(2, Math.ceil((sB - sA) / step)), grid = [];   // a coarse step lets a ribbon float over a concave valley wall (the lamps stand on it)
       let dist = 0, last = null;
       for (let a = 0; a <= n; a++) {
         const s = lerp(sA, sB, a / n), p = pointsFn(s), info = rowInfo(s), f = info.f;
@@ -1218,9 +1219,11 @@ window.TS = window.TS || {};
         if (mid < s0 || mid >= s1) continue;  // the whole crossing belongs to the chunk holding its midpoint
         const f = frame(mid), latMax = Math.min(126, W - 6), n = Math.ceil(latMax * 2 / 8), base = mbWater.count;
         for (let i = 0; i <= n; i++) {
-          const lat = -latMax + (latMax * 2) * i / n, wd = hw * (1 - smooth(50, latMax, Math.abs(lat))) + 0.6;
+          // the river under the bridge meanders a little (a straight lens read as a plain slab); the carved bed is wide enough for the shift
+          const lat = -latMax + (latMax * 2) * i / n, wd = (hw * (1 - smooth(50, latMax, Math.abs(lat))) + 0.6) * (0.9 + 0.16 * Math.sin(lat * 0.11 + mid * 0.017));
+          const shift = Math.min(1, hw / 10) * (3.2 * Math.sin(lat * 0.045 + mid * 0.013) + 1.3 * Math.sin(lat * 0.14 + 2)) * (1 - smooth(60, latMax, Math.abs(lat)) * 0.4);
           for (const sd of [-1, 1]) {
-            mbWater.p.push(f.x + f.rx * lat + f.tx * wd * sd, br.waterY, f.z + f.rz * lat + f.tz * wd * sd);
+            mbWater.p.push(f.x + f.rx * lat + f.tx * (wd * sd + shift), br.waterY, f.z + f.rz * lat + f.tz * (wd * sd + shift));
             mbWater.n.push(0, 1, 0); mbWater.c.push(1, 1, 1); mbWater.u.push(sd < 0 ? 0 : wd / 6, lat / 6);
           }
         }
