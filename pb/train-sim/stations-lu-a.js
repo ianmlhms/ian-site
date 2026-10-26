@@ -565,7 +565,7 @@
     }
 
     // ---- layout (z: + = behind, - = ahead; the train drives to -z)
-    if (!(window.TS.stationStyles && window.TS.stationStyles.has(api.st.name))) {   // the real LOD2 building (stations-styles-lu.js) replaces the hand-built block
+    if (!(window.TS.stationStyles && window.TS.stationStyles.has(api.st.name) && api.track && api.track.def && api.track.def.sceneryId === 'mosel')) {   // the real LOD2 building (stations-styles-lu.js) replaces the hand-built block
       wing(-40, 70, WALL, WALL + 12, eY);
       // low service annex that closes the platform wall towards the buffer end
       annex(70, 108, WALL, WALL + 9, 7.6);

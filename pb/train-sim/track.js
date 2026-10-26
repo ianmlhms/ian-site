@@ -361,7 +361,7 @@
     const formationDrop = kind === 'tram' ? FORM_TRAM : FORM_RAIL;
     const comp = compileItems(def);
     /* real level crossings that live inside a station patch (Munsbach: Rue de Beyren) exist whatever the authored route says (patch-crossings.js) */
-    if (kind !== 'tram' && window.TS.patchCrossings) comp.crossings = window.TS.patchCrossings.merge(comp.stations, comp.crossings);
+    if (kind !== 'tram' && window.TS.patchCrossings) comp.crossings = window.TS.patchCrossings.merge(comp.stations, comp.crossings, def);
     const length = comp.length;
     const real = kind !== 'tram' && window.TS.realLine ? window.TS.realLine.resolve(def, comp) : null;   // real scenery of the Mosel line (rivers, relief, land classes, roads)
     const n = Math.floor(length / STEP) + 1;
@@ -478,7 +478,7 @@
     const second = kind === 'tram' ? null : planSecond(stations, comp.tunnels, bridges, comp.crossings, signals, kappa, length);
 
     /* Real surroundings of stations (station-surround.js): inside the patch of a station the real LiDAR relief replaces the generic hills */
-    const surroundPatches = kind !== 'tram' && window.TS.stationSurround && window.TS.stationSurround.heightPatches ? window.TS.stationSurround.heightPatches(stations, frameAt) : [];
+    const surroundPatches = kind !== 'tram' && window.TS.stationSurround && window.TS.stationSurround.heightPatches ? window.TS.stationSurround.heightPatches(stations, frameAt, def) : [];
     const applyPatches = (s, lat, h, formY) => {
       let out = h;
       for (let i = 0; i < surroundPatches.length; i++) out = surroundPatches[i].blend(s, lat, out, formY);

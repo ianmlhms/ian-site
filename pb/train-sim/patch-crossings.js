@@ -15,6 +15,7 @@
   const ADOPT_DIST = 90;           // m: an authored crossing this close to a patch crossing is the same one
   const MAX_Z = 300;               // a crossing must lie within this distance of the platform middle
   const LEVEL_TOL = 1.2;           // m: the road must be at track level where it crosses (otherwise it is a bridge / underpass)
+  const MIN_REACH_X = 8;           // the way through the tracks must reach at least this far (m) from the main track
   const MIN_X_SPAN = 5.5;          // the road must pass at least this far to the right of the main track (the second track lies at about +4)
   const STRAIGHT_X0 = -14.5;       // the road is perpendicular and straight between these lateral positions (the deck of infra.js is 13 m beyond the outer rails)
   const STRAIGHT_X1 = 18.5;
@@ -40,7 +41,7 @@
         if (Math.abs(yc) > LEVEL_TOL) continue;
         // it must also reach the far side of the second track
         const reach = pts.reduce((m, p) => Math.max(m, Math.abs(p[0] - 0)), 0);
-        if (reach < MIN_X_SPAN * 2) continue;
+        if (reach < MIN_REACH_X) continue;               // OSM splits a road at the crossing: the piece through the tracks can be short (the chain joins the rest)
         out.push({ roadIndex: ri, zc, name: rd.name || '', w: rd.w || 6, cls: rd.cls });
         break;
       }
@@ -107,13 +108,13 @@
   }
 
   /* stations: the compiled stations of the route; crossings: the authored ones.  Returns a new array (sorted by s). */
-  function merge(stations, crossings) {
+  function merge(stations, crossings, def) {
     const sd = TS.stationSurround;
     if (!sd || !sd.dataFor || !stations || !stations.length) return crossings;
     const found = [];
     stations.forEach((st) => {
       let data = null;
-      try { data = sd.dataFor(st.name); } catch (e) { data = null; }
+      try { data = sd.dataFor(st.name, def); } catch (e) { data = null; }
       if (!data || !data.roads) return;
       const sMid = (st.platformStart + st.platformEnd) / 2;
       detect(data).forEach((c) => {

@@ -98,13 +98,15 @@
       console.warn(TAG + 'preload failed', error);
     }
   }
-  const dataFor = (name) => prepared.get(name) || null;
+  /* a patch can be bound to one scenery (data.scenery, e.g. 'mosel': the patch of Lëtzebuerg is straightened along the line to the east and must not be laid along the west / south / north lines) */
+  const forRoute = (data, def) => !data.scenery || !def || def.sceneryId === data.scenery;
+  const dataFor = (name, def) => { const d = prepared.get(name); return d && forRoute(d, def) ? d : null; };
 
   /* ---------------------------------------------------------------- height patches for track.js */
-  function heightPatches(stations, frameAt) {
+  function heightPatches(stations, frameAt, def) {
     const out = [];
     stations.forEach((st, index) => {
-      const data = prepared.get(st.name);
+      const data = dataFor(st.name, def || null);
       if (!data) return;
       const sMid = (st.platformStart + st.platformEnd) / 2;
       const grid = data.demGrid;
