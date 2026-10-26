@@ -1,0 +1,52 @@
+{
+ "route": "wittlich",
+ "station": "Tréier-Pallien",
+ "refs": "Trier-Pallien",
+ "views": [
+  {
+   "photo": "Two CFL Class 2300 at Haltepunkt Trier-Pallien, 24 March 2025.jpg",
+   "pos": [
+    3,
+    -90,
+    9
+   ],
+   "look": [
+    2,
+    40,
+    1
+   ],
+   "fov": 62,
+   "note": "from the bridge"
+  },
+  {
+   "photo": "Trier, Baustelle des Bahnhaltepunkts Trier Pallien 20241109.jpg",
+   "pos": [
+    4,
+    -95,
+    9
+   ],
+   "look": [
+    2,
+    50,
+    1
+   ],
+   "fov": 62,
+   "note": "construction 2024"
+  },
+  {
+   "photo": "Construction of the Haltepunkt Trier-Pallien, Germany, 31 March 2024.jpg",
+   "pos": [
+    3,
+    -40,
+    9
+   ],
+   "look": [
+    -2,
+    70,
+    0.5
+   ],
+   "fov": 60,
+   "note": "construction 3/2024"
+  }
+ ]
+}

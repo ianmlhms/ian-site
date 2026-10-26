@@ -78,13 +78,14 @@
    * cfg.tracks = patch x of further visual tracks; cfg.wall: [x, z, w] concrete end wall of the far platform */
   const MODERN = { frame: '#3b4249', roof: '#2f353b' };
   function simpleStop(api, cfg) {
+    const look = cfg.look || MODERN;
     const { sx, H, W, edge, col } = api;
     const k = makeKit(api);
     const f = mirrorKit(api);
     const lB = edge + W;
     const toward = (x) => -x * sx;
     const n = cfg.near || {};
-    (n.shelters || []).forEach((z) => k.glassShelter(lB - 2.3, z, 4.0, 1.9, MODERN.frame, MODERN.roof));
+    (n.shelters || []).forEach((z) => k.glassShelter(lB - 2.3, z, 4.0, 1.9, look.frame, look.roof));
     (n.steles || []).forEach((z) => dbStele(api, k, lB - 0.7, z));
     (n.masts || []).forEach((z) => dbMast(k, lB - 0.4, z));
     (n.bench || []).forEach((z) => k.bench(lB - 0.7, z, '#4a4f55'));
@@ -97,7 +98,7 @@
     k.platformBox(sx * fr.edge, fr.width, -1, fr.z0, fr.z1);
     const out = (d) => fr.edge - sx * d;                  // patch x of a point d metres behind the far platform edge (away from the tracks)
     const sh = fr.shelterX !== undefined ? fr.shelterX : out(1.7);
-    (fr.shelters || []).forEach((z) => f.glassShelter(toward(sh), z, 3.8, 1.7, MODERN.frame, MODERN.roof));
+    (fr.shelters || []).forEach((z) => f.glassShelter(toward(sh), z, 3.8, 1.7, look.frame, look.roof));
     (fr.steles || []).forEach((z) => dbStele(api, f, toward(out(fr.width - 0.7)), z));
     (fr.masts || []).forEach((z) => dbMast(f, toward(out(fr.width - 0.4)), z));
     (fr.bench || []).forEach((z) => f.bench(toward(out(fr.width - 0.7)), z, '#4a4f55'));
@@ -154,6 +155,23 @@
         near: { shelters: [15, 32], steles: [-8, 52], masts: [-60, -25, 10, 45, 80], bench: [-40], bin: [-15] },
         tracks: [-5.5],
         far: { track: -9.8, edge: -11.4, width: 2.8, z0: -85, z1: 85, shelters: [15, 32], shelterX: -12.6, steles: [-8, 52], masts: [-60, -25, 10, 45, 80], bench: [-40], name: 'Trier West', nameZ: -35 },
+      });
+    },
+  });
+
+  /* ================================================================ TRÉIER-PALLIEN (reopened Dec 2024 on the Weststrecke, between the Mosel and the Maximinerstrasse)
+   * Refs: ~/Library/Caches/zuch-refs/Trier-Pallien (Commons: "Two CFL Class 2300 at Haltepunkt Trier-Pallien, 24 March 2025", "Construction of the Haltepunkt Trier-Pallien 31 March 2024", "Trier, Baustelle des
+   * Bahnhaltepunkts Trier Pallien 20241109").  Two tracks (game track x 0, second track x 3.6) squeezed between the road on the LEFT and the river path on the right.  The game platform is the narrow
+   * road-side strip (patch x -3.3 .. -1.4, white railing towards the road); the river-side platform (patch x 5.7 .. ~9.7, wider than the OSM polygon, photos show ~4 m) carries the white flat-roofed
+   * shelter with ticket machine and display case, white railings.  Light-grey LED masts, DB info columns; no station building. */
+  reg('Tréier-Pallien', {
+    canopy: false,
+    furniture: false,
+    build(api) {
+      simpleStop(api, {
+        look: { frame: '#b9bec2', roof: '#e9ecee' },
+        near: { shelters: [], steles: [-30, 60], masts: [-60, -20, 25, 65], bench: [-8], bin: [38] },
+        far: { track: 3.6, edge: 5.7, width: 4.0, z0: -87, z1: 82, shelters: [18], shelterX: 7.6, steles: [-40, 30], masts: [-65, -25, 20, 60], bench: [-12], name: 'Pallien', nameZ: -10 },
       });
     },
   });
