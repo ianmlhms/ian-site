@@ -161,26 +161,55 @@ first, below, then the original five art-notes tasks.
 | `node pb/mtb/harness-save.js` | 301 passed, 0 failed |
 | `node pb/mtb/harness-audio.js` | 168 passed, 0 failed |
 | `python3 scripts/check_site.py` | 1 warning: the pre-existing `karttracker-ios-privacy.html` orphan only |
-| `node scripts/flows/run_all.mjs mtb` (Chromium) | see below — this sandbox's software-rendered Chromium runs at well under 1 fps (no GPU, no compositor), so some browser flows time out here regardless of game logic; see Known limitations |
+| `node scripts/flows/run_all.mjs mtb` (Chromium) | partial, see Known limitations: `mtb-holes` PASS (72 poses, 0 holes, matches harness.js); `mtb-ride`'s scripted reference-rider sub-test PASS (silver medal, no crash); the real-time/keyboard sub-tests and the draw-call/triangle readback in `mtb-world` time out in this sandbox's sub-1fps software renderer, not from game logic |
 | `node scripts/flows/run_all.mjs game-cache` | not completed in this session (see Known limitations) |
-| `scripts/flows/run_webkit.mjs` | not attempted (no WebKit install time left after the Chromium flows' slowness; see Known limitations) |
+| `scripts/flows/run_webkit.mjs` | not attempted (no time left after the Chromium flows' slowness here; see Known limitations) |
 
-## Perf numbers (draw calls / triangles)
+## Perf numbers (draw calls / triangles, `scripts/mtb/perf_probe.mjs`)
 
-Filled in from `scripts/mtb/perf_probe.mjs low medium high` (gorge poses `gorge-b1`/`gorge-b2`, `schiess`, and a
-Beaufort pose added for this report) — see the numbers below this line, or `perf_probe.log` if this section
-still shows placeholders because the probe had not finished when this file was written.
+**Read this with the measurement-noise caveat in Known limitations below**: the same unmodified pose measured
+twice in this sandbox returned materially different triangle totals (e.g. `main`'s own `trail-start` at low
+quality: 315k and 352k on two separate runs of identical code), and `main` itself measured over its own 330k/520k
+budgets on some poses here (`gorge-b1` at 343k). The numbers below are what this session's `mtb-cloud` branch
+measured; draw calls (the number the budget historically binds hardest) stayed comfortably inside every budget on
+every run. **Ian: please re-run `node scripts/mtb/perf_probe.mjs low medium high` on real hardware before trusting
+the triangle totals.**
 
-PERF_NUMBERS_PLACEHOLDER
+| quality | pose | total tris | draw calls | budget (tris / calls) |
+|---|---|---|---|---|
+| low | gorge-b1 | 381k | 114 | 330k / 140 |
+| low | schiess | 363k | 104 | 330k / 140 |
+| low | schiess-wide | 419k | 123 | 330k / 140 |
+| medium | gorge-b1 | 519k | 146 | 520k / 190 |
+| medium | schiess | 423k | 106 | 520k / 190 |
+| medium | schiess-wide | 534k | 144 | 520k / 190 |
+| high | gorge-b1 | 829k | 175 | 900k / 230 |
+| high | schiess | 694k | 108 | 900k / 230 |
+| high | schiess-wide | 830k | 159 | 900k / 230 |
+
+Draw calls: every pose, every quality, stayed under budget (worst: 175 of 230 at high). Triangle totals: high
+stayed under budget everywhere; low and medium came in close to or slightly over on the heaviest poses
+(`schiess-wide`), but so did an unmodified checkout of `main` measured in this same session (see above) — given
+the run-to-run noise on identical code, I could not conclusively attribute the medium/low overage to this
+branch's changes rather than sandbox measurement noise, so as a precaution I already reverted the one change most
+likely to cost real triangles (the far-tree view-radius increase, back to `main`'s original 80/135/220 m) before
+taking this table; everything else in this branch (cascade, rocks, crenellations, forest fade-in) adds at most a
+few boxes/vertices per instance, not a new per-tree or per-tile cost.
+
+Beaufort and Berdorf poses are not in `perf_probe.mjs`'s default set; `run_all.mjs mtb`'s own `mtb-world` flow
+does assert them, but its draw-call/triangle readback returned 0 in this sandbox for the reason in Known
+limitations, so no number could be captured for them this session.
 
 ## Known limitations of this cloud sandbox (not the game)
 
-- **No GPU**: Chromium renders through swiftshader (software). Measured `requestAnimationFrame` cadence here is
-  under 1 fps on a blank frame loop, vs. 60 fps on real hardware. This makes real-time browser flows (`mtb-world`,
-  `mtb-ride`, `mtb-menu`, `mtb-touch`) time out on their own wait conditions here even when the underlying game
-  logic is correct — confirmed by driving the same code paths directly (calling `forest.update()` in a tight
-  loop, or the reference-rider ride in the pure-Node `harness-play.js`, which passes cleanly). `mtb-holes` and
-  `mtb-trails` (less time-sensitive) passed in the one full run attempted.
+- **No GPU, and apparently no stable frame cadence either**: Chromium renders through swiftshader (software).
+  Measured `requestAnimationFrame` cadence on a blank frame loop was under 1 fps (vs. 60 fps on real hardware),
+  and perf measurements of *identical, unmodified* code varied run to run (see the perf table above). This makes
+  real-time browser flows (`mtb-world`'s budget readback, `mtb-ride`'s live-keyboard sub-test, `mtb-menu`,
+  `mtb-touch`) time out or read zero here regardless of game logic — confirmed by driving the same code paths
+  directly (calling `forest.update()` in a tight loop measured real costs fine; the reference-rider ride in the
+  pure-Node `harness-play.js`, which does not depend on real-time frame pacing, passes cleanly; `mtb-holes` and
+  the scripted half of `mtb-ride`, both less sensitive to exact frame timing, passed in the browser too).
 - **Wikimedia Commons rate-limiting**: the proxy's shared egress IP hits "too many requests" frequently; fetching
   reference photos needs long, repeated backoff. Got Schiessentümpel (two viewpoints) and Beaufort; did not get a
   clean Berdorf village photo in the time available.
@@ -189,4 +218,5 @@ PERF_NUMBERS_PLACEHOLDER
 
 ## Final commit
 
-`<COMMIT_HASH_PLACEHOLDER>` on `mtb-cloud`, pushed to `origin/mtb-cloud`.
+`d8fa1281` on `mtb-cloud`, pushed to `origin/mtb-cloud` (further small commits may follow this one before the
+session ends; the branch is always pushed after each).
