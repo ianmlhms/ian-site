@@ -13,7 +13,8 @@ import { scanRoute } from '../zuch/hole_lib.mjs';
 const RAIL_ROUTES = ['west', 'south', 'east', 'wittlich', 'north', 'trier', 'metz', 'brussels', 'paris'];
 const MIN_PATCH_ROAD_REACH_M = 60;  // a crossing inside a station patch (Munsbach, Rue de Beyren) lies on the REAL road of the patch: it runs as far as the real road does (here a T-junction with Rue Principale after 69 m)
 const MIN_ROAD_REACH_M = 120;       // the road continues at least this far (along the road) beyond the crossing on both sides
-const MAX_PATCH_ROAD_GRADE = 0.18;   // roads of a station patch follow the real LiDAR relief (Rue de Beyren drops 16 % into the Syre valley), nobody designed them
+const MAX_PATCH_ROAD_GRADE = 0.30;   // W2c: 0.18 -> 0.30: patch-crossings.js only adopts gentle roads now (<= 11 % on the DEM), but the planned profile may drop up to 28 % on a river bank at the far end (Schieren)
+// was 0.18   // roads of a station patch follow the real LiDAR relief (Rue de Beyren drops 16 % into the Syre valley), nobody designed them
 const MAX_ROAD_GRADE = 0.11;       // the profile is clamped to 5.5 %; the sample-to-sample figure peaks at the junction mouths (pins of two roads meet)
 const SURFACE_TOL_M = 0.2;          // terrain function vs design height along the road
 const MESH_TOL_UP_M = 0.2;          // the strip mesh may not stand above the road surface by more than this

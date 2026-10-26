@@ -25,6 +25,7 @@
   const GRADE_SPAN = [20, 40];
   const MAX_ROAD_X = 112;          // beyond this the real relief of the patch fades into the generic ground (station-surround.js FADE_X): the road ends here
   const MAX_STEP_GRADE = 0.11;     // the steepest 4 m step of the straightened road on the DEM (the planned profile is a little steeper; the world flow allows 18 %)
+  const MAX_ROAD_Z = 235;          // ... and along the track (the fade is 240 - 320 m)
   const MAX_ABS_Y = 12;
   const EDGE_X = 14;               // lateral distance at which the road must be back at about track level (the strip is blended to the real relief between 5 and 9 m)
   const EDGE_MAX_Y = 1.5;
@@ -164,7 +165,7 @@
       const sMid = (st.platformStart + st.platformEnd) / 2;
       detect(data).forEach((c) => {
         const ch = chain(data, c.roadIndex);
-        const road = straighten(ch.pts, c.zc).filter((p) => Math.abs(p.x) <= MAX_ROAD_X);
+        const road = straighten(ch.pts, c.zc).filter((p) => Math.abs(p.x) <= MAX_ROAD_X && Math.abs(p.z) <= MAX_ROAD_Z);
         if (!usable(data, ch.pts) || !gentleSteps(data, road)) return;
         found.push({ s: sMid - c.zc, hw: Math.max(2.9, c.w / 2), patch: { name: st.name, sMid, roadIndex: c.roadIndex, roadName: c.name, w: c.w, cls: c.cls, zc: c.zc, used: ch.used, road } });
       });
