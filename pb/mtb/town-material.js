@@ -89,6 +89,19 @@ const FRAGMENT = `
       albedo = vC;
     } else if (kind < 6.5) {                                       // white trim
       albedo = vC;
+    } else if (kind > 9.5 && kind < 10.5) {                        // church wall: a plinth and a row of tall arched windows with stone surrounds
+      float len = max(vGeo.x, 0.5), v = vInfo.y;
+      albedo *= 0.92 + 0.16 * grain;
+      albedo = mix(albedo, albedo * vec3(0.66, 0.64, 0.6), 1.0 - smoothstep(0.4, 1.0, v));
+      float cells = max(1.0, floor(len / 4.6)), cw = len / cells;
+      float dx = (fract(vInfo.x / cw) - 0.5) * cw, vy = v - 5.0;
+      float rect = step(abs(dx), 0.62) * step(2.1, v) * step(v, 5.0);
+      float arch = step(length(vec2(dx, v - 5.0)), 0.62) * step(5.0, v);
+      float win = clamp(rect + arch, 0.0, 1.0);
+      float rr = step(abs(dx), 0.8) * step(1.9, v) * step(v, 5.0) + step(length(vec2(dx, v - 5.0)), 0.8) * step(5.0, v);
+      albedo = mix(albedo, vec3(0.8, 0.76, 0.64), clamp(rr, 0.0, 1.0) * (1.0 - win));
+      albedo = mix(albedo, mix(vec3(0.07, 0.1, 0.15), vec3(0.3, 0.4, 0.5), smoothstep(2.0, 5.6, v)), win * step(vDist, 160.0));
+      glow = win * step(0.5, h2(vec2(floor(vInfo.x / cw), 3.0)));
     } else if (kind > 7.5 && kind < 8.5) {                         // dormer front: white frame around dark glass
       float fx = abs(vInfo.x - vGeo.x * 0.5), fy = abs(vInfo.y - vGeo.y * 0.5);
       float inner = step(fx, vGeo.x * 0.5 - 0.14) * step(fy, vGeo.y * 0.5 - 0.14);

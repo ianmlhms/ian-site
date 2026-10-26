@@ -2,7 +2,7 @@
  * info the town material reads: aInfo = (u metres along the surface, v metres up it, kind, seed), aGeo = (wall length, eave height). Pure geometry (THREE only for the buffers). */
 const THREE = window.THREE;
 
-export const KIND = Object.freeze({ wall: 0, roof: 1, stone: 2, flat: 3, ashlar: 4, glass: 5, trim: 6, spire: 7, dormer: 8, door: 9 });
+export const KIND = Object.freeze({ wall: 0, roof: 1, stone: 2, flat: 3, ashlar: 4, glass: 5, trim: 6, spire: 7, dormer: 8, door: 9, church: 10 });
 
 export class MeshBuilder {
   constructor() { this.pos = []; this.nor = []; this.col = []; this.info = []; this.geo = []; this.idx = []; }

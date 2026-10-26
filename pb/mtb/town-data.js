@@ -24,7 +24,9 @@ export function describeHouses(rows, surface) {
 }
 
 /** The pitch of a gable or hip roof: the LiDAR ridge height above the eave, kept between 27 and 43 degrees of the half width. */
-export function roofRise(h) { return Math.min(h.hz * 0.95, Math.max(h.hz * 0.55, h.ridge - h.eave)); }
+export function roofRise(h) {
+  if (h.flags & RENAISSANCE) return h.hz * 0.62;                            // the castle's hip roofs are low
+  return Math.min(h.hz * 0.95, Math.max(h.hz * 0.55, h.ridge - h.eave)); }
 
 /** Spatial index of the houses for the collision and the harness. Returns { houses, collide(x, z, r, y, out), insideRect(x, z, margin), distance(h, x, z, out) }. */
 export function createTownIndex(houses) {

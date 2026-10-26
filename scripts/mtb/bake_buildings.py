@@ -159,11 +159,11 @@ def main():
             if kind == "pavilion":
                 pass                                               # a small house like the others (handled below)
             else:                                                  # the castles: wings as rectangles with their own style flags (32 renaissance castle, 64 medieval ruin)
-                eave, ridge = (10.5, 16.5) if kind == "renaissance" else (12.0, 12.0)
+                eave, ridge = (10.5, 16.5) if kind == "renaissance" else (14.5, 14.5)
                 for (rx, rz, hx, hz, yaw) in rectangles(poly, 0.07, 5, True):
                     if hz < MIN_RECT / 2:
                         continue
-                    houses.append([round(rx, 1), round(rz, 1), round(hx, 2), round(hz, 2), round(yaw % math.pi, 3), eave, ridge, 32 if kind == "renaissance" else 64, int(rng.integers(0, 1000))])
+                    houses.append([round(rx, 1), round(rz, 1), round(hx, 2), round(hz, 2), round(yaw % math.pi, 3), eave, ridge, (32 | 2) if kind == "renaissance" else 64, int(rng.integers(0, 1000))])
                 continue
         near = [k for k, r in VILLAGES.items() if k in centres and math.hypot(cx - centres[k][0], cz - centres[k][1]) < r]
         if not near:

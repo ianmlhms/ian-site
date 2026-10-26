@@ -10,7 +10,7 @@ const WALLS = [[0.93, 0.9, 0.8], [0.88, 0.8, 0.62], [0.95, 0.95, 0.92], [0.86, 0
 const ROOFS = [[0.24, 0.27, 0.33], [0.24, 0.27, 0.33], [0.24, 0.27, 0.33], [0.22, 0.25, 0.3], [0.58, 0.28, 0.2], [0.38, 0.28, 0.24]];
 const TRIM = [0.93, 0.92, 0.88], CHIMNEY = [0.5, 0.42, 0.38], TAR = [0.28, 0.28, 0.3], STONE = [0.72, 0.62, 0.45];
 const OVERHANG = 0.4;
-const SANDSTONE = [0.88, 0.76, 0.52], RUIN_STONE = [0.8, 0.64, 0.4], MOSS_TOP = [0.3, 0.36, 0.2], SLIT = [0.05, 0.05, 0.06];
+const SANDSTONE = [0.86, 0.73, 0.52], RUIN_STONE = [0.78, 0.68, 0.5], MOSS_TOP = [0.3, 0.36, 0.2], SLIT = [0.05, 0.05, 0.06];
 const pick = (list, seed, salt) => list[Math.floor(((seed * 7.31 + salt * 1.7) % 1) * list.length) % list.length];
 const smoothSeed = (seed, salt) => (seed * 9301 + salt * 49297) % 1;
 
@@ -29,7 +29,7 @@ export function addHouse(m, h) {
   ];
   const vOf = (y) => y - h.gMean;
   for (const [a, b, len] of sides) {
-    m.face([[a[0], base, a[2]], [b[0], base, b[2]], [b[0], topY, b[2]], [a[0], topY, a[2]]], wall, KIND.wall, h.seed, [[0, vOf(base)], [len, vOf(base)], [len, vOf(topY)], [0, vOf(topY)]], len, wallH);
+    m.face([[a[0], base, a[2]], [b[0], base, b[2]], [b[0], topY, b[2]], [a[0], topY, a[2]]], wall, h.flags & CHURCH ? KIND.church : KIND.wall, h.seed, [[0, vOf(base)], [len, vOf(base)], [len, vOf(topY)], [0, vOf(topY)]], len, wallH);
   }
   if (flat) {
     m.face([P(-hx, topY + 0.05, hz), P(hx, topY + 0.05, hz), P(hx, topY + 0.05, -hz), P(-hx, topY + 0.05, -hz)], TAR, KIND.flat, h.seed, [[0, 0], [2 * hx, 0], [2 * hx, 2 * hz], [0, 2 * hz]]);
@@ -197,9 +197,9 @@ export function buildTownCells(houses) {
   const cellOf = (h) => cells.get(`${Math.floor(h.cx / CELL)},${Math.floor(h.cz / CELL)}`);
   if (ruinWings.length) addRuinTowers(cellOf(ruinWings[0]).m, ruinWings);
   if (castleWings.length) {                                           // the Renaissance castle: a tall square tower with a steep pyramid roof on the corner furthest from its middle
-    const mx = castleWings.reduce((a, h) => a + h.cx, 0) / castleWings.length, mz = castleWings.reduce((a, h) => a + h.cz, 0) / castleWings.length;
-    let best = null;
-    for (const h of castleWings) for (const [su, sv] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) { const x = h.cx + h.ax * su * (h.hx - 2.2) + h.bx * sv * (h.hz - 2.2), z = h.cz + h.az * su * (h.hx - 2.2) + h.bz * sv * (h.hz - 2.2), d = Math.hypot(x - mx, z - mz); if (!best || d > best.d) best = { x, z, d, h }; }
+    const wing = castleWings.reduce((a, h) => (h.hx > a.hx ? h : a), castleWings[0]);
+    let best = null;                                                                  // the tower stands at the end of the longest wing that lies furthest west on its south side (as on the photo)
+    for (const su of [1, -1]) for (const sv of [1, -1]) { const x = wing.cx + wing.ax * su * (wing.hx - 2.2) + wing.bx * sv * (wing.hz - 2.2), z = wing.cz + wing.az * su * (wing.hx - 2.2) + wing.bz * sv * (wing.hz - 2.2), score = -x + z * 0.5; if (!best || score > best.score) best = { x, z, score, h: wing }; }
     addSquareTower(cellOf(best.h).m, best.x, best.z, best.h.yaw, 2.6, best.h.base, best.h.gMean, best.h.gMean + 14.5, best.h.gMean + 24, SANDSTONE, [0.2, 0.23, 0.28]);
   }
   if (churchParts.length) {
