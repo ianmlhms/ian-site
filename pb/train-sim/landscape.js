@@ -777,7 +777,7 @@ window.TS = window.TS || {};
     const matLamp = new T.MeshBasicMaterial({ color: '#9a9a96' });
     const matSmoke = new T.MeshLambertMaterial({ vertexColors: true, transparent: true, opacity: 0.5, depthWrite: false });
     const waterNormal = texWaterNormal(); waterNormal.repeat.set(1, 1);
-    const matWater = new T.MeshPhongMaterial({ side: T.DoubleSide, color: '#2c5a63', specular: '#b8cdd4', shininess: 70, normalMap: waterNormal, normalScale: new T.Vector2(0.38, 0.38), transparent: true, opacity: 0.86, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -2 });
+    const matWater = new T.MeshPhongMaterial({ side: T.DoubleSide, color: '#2c5a63', specular: '#6d868e', shininess: 60, normalMap: waterNormal, normalScale: new T.Vector2(0.38, 0.38), transparent: true, opacity: 0.86, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -2 });
     const matFar = withSnow(new T.MeshLambertMaterial({ vertexColors: true, map: texGrass() }), 1);
     const mats = [matLamp, matSmoke, matTerrain, matFieldRows, matFieldVines, matFieldMeadow, matHouse, matBlock, matRoof, matRoad, matLeaf, matCar, matWater, matFar];
     const treeKit = buildTreeKit(), carGeo = buildCarGeo();
