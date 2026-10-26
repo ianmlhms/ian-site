@@ -18,6 +18,10 @@ import { createRain, createLeaves, createShafts, createBirds, createInsects } fr
 import { createHikers } from './hikers.js';
 import { SCHIESSENTUEMPEL } from './landmarks.js';
 import { buildBridge } from './bridge-model.js';
+import { buildCascadeModel } from './cascade-model.js';
+import { createTownView } from './town-view.js';
+import { finishFov } from './cascade.js';
+import { RUIN, CHURCH } from './town-data.js';
 import { createSolidMaterial } from './solid-material.js';
 import { createTerrainView } from './terrain-view.js';
 import { createForestView } from './forest-view.js';
@@ -31,7 +35,7 @@ import { createAudio } from './audio.js';
 import { encodeGhost, decodeGhost, ghostAt } from './ghost.js';
 import {
   TRAIL_IDS, BIKE_IDS, BIKE_MEDAL_POINTS, medalPoints, medalOf, bestMs, bestSplits, ghostFor, isTrailUnlocked, isBikeUnlocked, newUnlocks, recordRun, recordViewpoint, recordDaily, addStats,
-  withLoadout, withSettings, settingsOf, viewpointCount, dayNumber, dailyChallenge, createProgress, hasViewpoint, unlockedTrails,
+  withLoadout, withSettings, settingsOf, viewpointCount, dayNumber, dailyChallenge, createProgress, hasViewpoint, unlockedTrails, MAX_VIEWPOINTS,
 } from './progress.js';
 import { loadInitialProgress, createPersistence, createScoreReporter, dailyRpc } from './save.js';
 import { LANGS, t as translate, trailName, formatTime } from './i18n.js';
@@ -75,8 +79,9 @@ function pickLang(progress) {
 
 function autoQuality() {
   const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  const ipadDesktopUa = navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform || navigator.userAgent || '');       // an iPad that says "Macintosh" (desktop mode of Safari)
+  if (coarse || ipadDesktopUa) return 'low';                              // every touch device (iPads of the school first): the low setting, the player can raise it in the menu
   const weak = (navigator.hardwareConcurrency || 4) <= 4;
-  if (coarse) return weak ? 'low' : 'medium';
   return weak ? 'medium' : 'high';
 }
 function pickQuality() {
@@ -152,12 +157,18 @@ async function boot() {
   const bridge = world.bridge;
   if (bridge) {
     const parts = buildBridge({ span: bridge.span, width: bridge.width, abutment: bridge.abutment, rise: bridge.rise, deck: bridge.deck - bridge.water, endL: bridge.endL - bridge.water, endR: bridge.endR - bridge.water });
-    rockView.addLandmark(parts.stone, bridge.x, bridge.water, bridge.z, bridge.yaw, 1.0, 2.0);
+    rockView.addLandmark(parts.stone, bridge.x, bridge.water, bridge.z, bridge.yaw, 1.0, 2.0, 24);
     const wood = new THREE.Mesh(parts.wood, createSolidMaterial(env));
     wood.position.set(bridge.x, bridge.water, bridge.z); wood.rotation.y = bridge.yaw; wood.frustumCulled = false; wood.name = 'footbridge railing';
     scene.add(wood);
   }
-  const water = createWaterView({ scene, network: field.network, env, quality, foamTexture: textures.foam });
+  if (world.cascade) {                                                  // the Schiessentuempel ledge: sandstone solid with mossy boulders, stones in the pool (the falls and the water are water-view's)
+    const c = world.cascade, parts = buildCascadeModel(c, surface, field.network);
+    rockView.addLandmark(parts.ledge, c.x, c.lipY, c.z, c.yaw, 0.6, 3.4, 30);
+    rockView.addLandmark(parts.stones, c.x, c.lipY, c.z, c.yaw, 0.5, 3.7, 40);
+  }
+  const water = createWaterView({ scene, network: field.network, env, quality, foamTexture: textures.foam, cascade: world.cascade });
+  const town = createTownView({ scene, env, quality, houses: world.houses });
   const props = createProps({ scene, env, surface, trails, decks });
   const riderLook = () => { const s = settingsOf(progress); void s; return { bike: progress.bk || 'hardtail', frame: COLOUR_HEX[progress.col] || COLOUR_HEX.red, helmet: HELMET_HEX[progress.hm] || HELMET_HEX.plain }; };
   let rider = createRider(env, riderLook());
@@ -182,6 +193,20 @@ async function boot() {
   for (const v of viewpoints) if (Math.hypot(v.x - fall.x, v.z - fall.z) < 60) v.name = tr('vp.falls');
   viewpoints.forEach((v) => { v.name = v.name || tr('vp.unnamed'); });
   if (!viewpoints.some((v) => Math.hypot(v.x - fall.x, v.z - fall.z) < 60) && viewpoints.length < 60) viewpoints.push({ x: fall.x - 14, z: fall.z + 10, name: tr('vp.falls'), kind: 'attraction' });
+  // two more collectibles at the new landmarks: a spot with a view of the Beaufort castle ruin and one at the Berdorf church (an open, flat place near, away from every house)
+  const viewSpot = (name, tx, tz, ring) => {
+    for (let a = 0; a < 360; a += 20) {
+      const x = tx + Math.cos(a * Math.PI / 180) * ring, z = tz + Math.sin(a * Math.PI / 180) * ring;
+      surface.normal(x, z, vpNormal);
+      if (!world.town.insideRect(x, z, 4) && vpNormal.y > 0.88 && viewpoints.length < MAX_VIEWPOINTS) { viewpoints.push({ x, z, name, kind: 'attraction' }); return; }
+    }
+  };
+  const vpNormal = { x: 0, y: 1, z: 0 };
+  if (world.town.houses.length) {
+    const ruin = world.houses.find((h) => h.flags & RUIN), church = world.houses.find((h) => h.flags & CHURCH && h.cx > 3000);
+    if (ruin) viewSpot(tr('vp.castle'), ruin.cx, ruin.cz, 30);
+    if (church) viewSpot(tr('vp.village'), church.cx, church.cz, 24);
+  }
   const villages = data.landmarks.filter((l) => l.kind === 'village' && l.name && l.x > 0 && l.z > 0 && l.x < WORLD.width && l.z < WORLD.depth).map((l) => ({ name: l.name, x: l.x, z: l.z }));
   const mapState = { backdrop: createMapBackdrop(data), villages, viewpoints, found: new Set(), rider: null };
 
@@ -432,19 +457,27 @@ async function boot() {
   }
 
   // ---- resize
-  let viewOffsetApplied = -1;
+  /** The picture is shifted (a lens shift of the camera) into the part of the screen that no card covers: up while the start card is open, into the free area beside / above the finish card
+   *  (ui.finishFree), and back to the centre otherwise. The shift eases in and out. */
+  const viewShift = { x: 0, y: 0, applied: false };
+  const VIEW_EASE = 6;              // 1/s
   const resize = () => {
     const w = canvas.clientWidth || window.innerWidth, h = canvas.clientHeight || window.innerHeight;
     renderer.setSize(w, h, false);
-    camera.aspect = w / h; viewOffsetApplied = -1; applyViewOffset(); camera.updateProjectionMatrix();
+    camera.aspect = w / h; viewShift.applied = false; ui.layoutChanged(); applyViewOffset(0, true); camera.updateProjectionMatrix();
   };
-  /** On the start card the picture is shifted up so the rider stays visible above the card. */
-  function applyViewOffset() {
-    const want = game.mode === 'card' ? 1 : 0;
-    if (want === viewOffsetApplied) return;
-    viewOffsetApplied = want;
+  function wantedShift(w, h) {
+    if (game.mode === 'card') return { x: 0, y: -h * CARD_SHIFT };
+    const free = game.mode === 'finished' && !replay ? ui.finishFree() : null;
+    return free ? { x: free.cx - w / 2, y: free.cy - h / 2 } : { x: 0, y: 0 };
+  }
+  function applyViewOffset(dt, snap = false) {
     const w = canvas.clientWidth || window.innerWidth, h = canvas.clientHeight || window.innerHeight;
-    if (want) camera.setViewOffset(w, h, 0, Math.round(h * CARD_SHIFT), w, h); else camera.clearViewOffset();
+    const want = wantedShift(w, h), k = snap ? 1 : 1 - Math.exp(-VIEW_EASE * dt);
+    const nx = viewShift.x + (want.x - viewShift.x) * k, ny = viewShift.y + (want.y - viewShift.y) * k;
+    if (viewShift.applied && Math.abs(nx - viewShift.x) < 0.2 && Math.abs(ny - viewShift.y) < 0.2) return;
+    viewShift.x = nx; viewShift.y = ny; viewShift.applied = true;
+    if (Math.abs(nx) < 0.5 && Math.abs(ny) < 0.5) camera.clearViewOffset(); else camera.setViewOffset(w, h, -Math.round(nx), -Math.round(ny), w, h);
     camera.updateProjectionMatrix();
   }
   resize();
@@ -518,7 +551,7 @@ async function boot() {
     last = now; elapsed += dt;
     const inp = input.read(scriptedInput);
     if (replay) { replay.t += dt * 1000; if (replay.t > replay.ghost.duration + 1500 || replay.t > REPLAY_SECONDS_MAX * 1000 * 60) { replay = null; ghostRider.root.visible = false; ui.showFinish(lastFinish()); } }
-    applyViewOffset();
+    applyViewOffset(dt);
     logic(dt, inp);
     // events from the physics (landings) for sound and feedback
     if (bike.landSeq !== lastLand) {
@@ -544,13 +577,17 @@ async function boot() {
     else if (!replay) ghostRider.root.visible = false;
 
     const c = frozenCamera || chase.update(replay ? replayBike() : bike, dt, camMode, elapsed);
-    const focus = current.trail && current.trail.focus;                  // a trail that ends at a sight (the Schiessentuempel falls): once finished, the camera glides to a spot below the bridge and looks across at the rider on the deck, the falls beside the finish card
+    // a trail that ends at a sight (the Schiessentuempel falls): once finished, the camera glides to a spot in front of the cascade and looks at it, the falls centred in the part of the screen the finish card leaves free
+    const focus = current.trail && current.trail.focus && world.finishView;
     focusBlend = !frozenCamera && focus && game.mode === 'finished' ? Math.min(1, focusBlend + dt * 0.6) : Math.max(0, focusBlend - dt * 2);
     if (focusBlend > 0 && focus) {
       const k = focusBlend * focusBlend * (3 - 2 * focusBlend);
-      const fy = surface.height(focus.camX, focus.camZ) + focus.camUp, ly = surface.height(focus.lookX, focus.lookZ) + 2.2;
-      c.x += (focus.camX - c.x) * k; c.y += (fy - c.y) * k; c.z += (focus.camZ - c.z) * k;
-      c.tx += (focus.lookX - c.tx) * k; c.ty += (ly - c.ty) * k; c.tz += (focus.lookZ - c.tz) * k;
+      const free = ui.finishFree();
+      const W = canvas.clientWidth || window.innerWidth, H = canvas.clientHeight || window.innerHeight;
+      const fov = finishFov(focus, free || { w: W, h: H }, W, H);
+      c.x += (focus.x - c.x) * k; c.y += (focus.y - c.y) * k; c.z += (focus.z - c.z) * k;
+      c.tx += (focus.tx - c.tx) * k; c.ty += (focus.ty - c.ty) * k; c.tz += (focus.tz - c.tz) * k;
+      c.fov += (fov - c.fov) * k;
     }
     camera.position.set(c.x, c.y, c.z);
     camera.lookAt(c.tx, c.ty, c.tz);
@@ -563,6 +600,7 @@ async function boot() {
     terrain.update(frozenCamera ? c.x : bike.x, frozenCamera ? c.z : bike.z);
     forest.update(c.x, c.z);
     rockView.update(c.x, c.z);
+    town.update(c.x, c.z);
     foamTimer -= dt;
     if (foamTimer <= 0) { foamTimer = 0.4; water.updateFoam(c.x, c.z, rockView.stones); }
     rain.update(); leaves.update(); shafts.update(c.x, c.z); birds.update(); insects.update(c.x, c.z);
@@ -621,10 +659,10 @@ async function boot() {
   document.documentElement.dataset.mtbReady = '1';
 
   window.__mtb = {
-    version: 'w3-play', renderer, scene, camera, field, surface, ground, groundAt, env, terrain, forest, trees, undergrowth, rocks, rockView, water, rider, rain, leaves, shafts, birds, insects, hikers, world, maps, bridge, quality, perf, data,
+    version: 'w3-play', renderer, scene, camera, field, surface, ground, groundAt, env, cascade: world.cascade, terrain, forest, trees, undergrowth, rocks, rockView, town, water, rider, rain, leaves, shafts, birds, insects, hikers, world, maps, bridge, quality, perf, data,
     game, ui, input, audio, props, trails, viewpoints, persistence, dailyToday, menuData,
     get trail() { return current.trail; }, get kind() { return current.kind; }, get centre() { return current.trail.centre; },
-    get bike() { return bike; }, get progress() { return progress; },
+    get bike() { return bike; }, get progress() { return progress; }, get focusBlend() { return focusBlend; }, get viewShift() { return { x: viewShift.x, y: viewShift.y }; },
     setProgress(p) { progress = p; applyLoadout(); refreshMenu(); },
     setBike(b) { bike = Object.freeze({ ...bike, ...b }); },
     reset(index) { bike = stateAt(current.trail, index ?? game.progress, ground); chase.snap(bike); },

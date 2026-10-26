@@ -55,6 +55,17 @@ export const flow = {
         return { calls: m.perf.drawCalls, tris: m.perf.triangles };
       });
       h.expect(g.calls <= BUDGET[q].calls && g.tris <= BUDGET[q].tris, `${q} gorge pose: ${g.calls} draw calls, ${g.tris} triangles (<= ${BUDGET[q].calls} / ${BUDGET[q].tris})`);
+      // polish wave: the built places (the Beaufort castles with their houses, the Berdorf village) and the Schiessentuempel falls must fit the same budgets
+      for (const sight of [{ name: "Beaufort castle", at: [585, 432, 4], look: [622, 380, 6], fov: 55 }, { name: "Berdorf village", at: [4950, 2030, 22], look: [5100, 1790, 8], fov: 58 }]) {
+        const t = await page.evaluate(async (s) => {
+          const m = window.__mtb;
+          m.teleport(s.at[0], s.at[1]);
+          m.setCamera({ x: s.at[0], y: m.surface.height(s.at[0], s.at[1]) + s.at[2], z: s.at[1], tx: s.look[0], ty: m.surface.height(s.look[0], s.look[1]) + s.look[2], tz: s.look[1], fov: s.fov });
+          await new Promise((r) => setTimeout(r, 2200));
+          return { calls: m.perf.drawCalls, tris: m.perf.triangles, town: m.town.stats.visible };
+        }, sight);
+        h.expect(t.town > 0 && t.calls <= BUDGET[q].calls && t.tris <= BUDGET[q].tris, `${q} ${sight.name}: ${t.calls} draw calls, ${t.tris} triangles, ${t.town} town cells (<= ${BUDGET[q].calls} / ${BUDGET[q].tris})`);
+      }
     }
 
     h.step("weather + time: the choice changes the scene and is stored; Random is the default");

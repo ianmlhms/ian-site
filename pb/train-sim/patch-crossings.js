@@ -21,6 +21,15 @@
   const STRAIGHT_X1 = 18.5;
   const BLEND = 18;                // m over which the real course is blended back in
   const STEP = 4;                  // m between the samples of the straightened road
+  const MAX_GRADE = 0.13;          // W2c: a road that climbs more than this over any 20 - 40 m (real hill roads: Kautebaach, Nidderkuer ...) is no crossing road for the game: vehicles cannot drive it
+  const MIN_REACH = 60;            // ... and neither is a stub that ends within this distance of the track on one side (yard accesses)
+  const GRADE_SPAN = [20, 40];
+  const MAX_ROAD_X = 112;          // beyond this the real relief of the patch fades into the generic ground (station-surround.js FADE_X): the road ends here
+  const MAX_STEP_GRADE = 0.11;     // the steepest 4 m step of the straightened road on the DEM (the planned profile is a little steeper; the world flow allows 18 %)
+  const MAX_ROAD_Z = 235;          // ... and along the track (the fade is 240 - 320 m)
+  const MAX_ABS_Y = 12;
+  const EDGE_X = 14;               // lateral distance at which the road must be back at about track level (the strip is blended to the real relief between 5 and 9 m)
+  const EDGE_MAX_Y = 1.5;
 
   const smooth01 = (t) => { const c = Math.max(0, Math.min(1, t)); return c * c * (3 - 2 * c); };
 
@@ -107,6 +116,44 @@
     });
   }
 
+  /* the real road must be usable by the traffic: gentle (relief from the patch DEM, outside the flattened track corridor) and long enough on both sides */
+  function usable(data, pts) {
+    const sd = TS.stationSurround;
+    if (!sd || !sd.demAt || !data.demGrid) return true;
+    const side = (sgn) => pts.reduce((m, p) => (Math.sign(p.x) === sgn ? Math.max(m, Math.abs(p.x)) : m), 0);
+    if (Math.min(side(1), side(-1)) < MIN_REACH * 0.8) return false;
+    // the road leaves the flattened track corridor (|x| <= 5 m) at track level: a cut or embankment right beside the line would make the first metres of the road a ramp
+    const edge = (sgn) => pts.reduce((best, p) => (Math.sign(p.x) === sgn && (!best || Math.abs(Math.abs(p.x) - EDGE_X) < Math.abs(Math.abs(best.x) - EDGE_X)) ? p : best), null);
+    const bad = [1, -1].some((sgn) => { const e = edge(sgn); return e && Math.abs(sd.demAt(data.demGrid, e.x, e.z)) > EDGE_MAX_Y; });
+    if (bad) return false;
+    const ys = pts.map((p) => (Math.abs(p.x) <= 8 ? null : sd.demAt(data.demGrid, p.x, p.z)));
+    const cum = [0];
+    for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z));
+    for (let i = 0; i < pts.length; i++) {
+      if (ys[i] === null) continue;
+      for (let j = i + 1; j < pts.length; j++) {
+        const d = cum[j] - cum[i];
+        if (d > GRADE_SPAN[1]) break;
+        if (d >= GRADE_SPAN[0] && ys[j] !== null && Math.abs(ys[j] - ys[i]) / d > MAX_GRADE) return false;
+      }
+    }
+    return true;
+  }
+
+  function gentleSteps(data, road) {
+    const sd = TS.stationSurround;
+    if (!sd || !sd.demAt || !data.demGrid) return true;
+    if (road.some((p) => Math.abs(p.x) >= 6 && Math.abs(sd.demAt(data.demGrid, p.x, p.z)) > MAX_ABS_Y)) return false;   // a road far above / below the track is on the valley wall, not at grade
+    for (let i = 1; i < road.length; i++) {
+      const a = road[i - 1]; const b = road[i];
+      if (Math.abs(a.x) < 6 && Math.abs(b.x) < 6) continue;
+      const d = Math.hypot(b.x - a.x, b.z - a.z);
+      if (d < 1) continue;
+      if (Math.abs(sd.demAt(data.demGrid, b.x, b.z) - sd.demAt(data.demGrid, a.x, a.z)) / d > MAX_STEP_GRADE) return false;
+    }
+    return true;
+  }
+
   /* stations: the compiled stations of the route; crossings: the authored ones.  Returns a new array (sorted by s). */
   function merge(stations, crossings, def) {
     const sd = TS.stationSurround;
@@ -119,7 +166,9 @@
       const sMid = (st.platformStart + st.platformEnd) / 2;
       detect(data).forEach((c) => {
         const ch = chain(data, c.roadIndex);
-        found.push({ s: sMid - c.zc, hw: Math.max(2.9, c.w / 2), patch: { name: st.name, sMid, roadIndex: c.roadIndex, roadName: c.name, w: c.w, cls: c.cls, zc: c.zc, used: ch.used, road: straighten(ch.pts, c.zc) } });
+        const road = straighten(ch.pts, c.zc).filter((p) => Math.abs(p.x) <= MAX_ROAD_X && Math.abs(p.z) <= MAX_ROAD_Z);
+        if (!usable(data, ch.pts) || !gentleSteps(data, road)) return;
+        found.push({ s: sMid - c.zc, hw: Math.max(2.9, c.w / 2), patch: { name: st.name, sMid, roadIndex: c.roadIndex, roadName: c.name, w: c.w, cls: c.cls, zc: c.zc, used: ch.used, road } });
       });
     });
     if (!found.length) return crossings;

@@ -14,7 +14,10 @@ const routeId = flag('route', 'east');
 const quality = flag('quality', 'medium');
 const root = flag('root', undefined);
 const tag = flag('tag', 'run');
+const stationName = flag('station', 'Munsbach');      // the station of the standard station views (W2c: e.g. Esch-Uelzecht on south)
 const outDir = args[0] || '.';
+/* mean / worst frame interval (ms) over 90 animation frames (headless WebKit with software GL: only comparable between routes, not an iPad number) */
+const frameTime = (page) => page.evaluate(() => new Promise((res) => { const t = []; let last = performance.now(); const step = () => { const n = performance.now(); t.push(n - last); last = n; if (t.length < 90) requestAnimationFrame(step); else { t.shift(); res({ mean: +(t.reduce((a, b) => a + b, 0) / t.length).toFixed(1), p95: +t.slice().sort((a, b) => a - b)[Math.floor(t.length * 0.95)].toFixed(1) }); } }; requestAnimationFrame(step); }));
 fs.mkdirSync(outDir, { recursive: true });
 const { server, origin } = await startServer(root);
 const browser = await webkit.launch();
@@ -30,14 +33,16 @@ try {
   await page.evaluate(() => { __tsTest.setSeed(1); __tsTest.setCalm(true); });
   await page.evaluate((r) => __tsTest.startService(r, 'emu', 'career'), routeId);
   await page.waitForFunction(() => __tsTest.state().phase === 'running', null, { timeout: 180000 });
-  const info = await page.evaluate(() => {
+  // the scenery halves of the station patches normally stream in ahead of the train; a jump along the route would outrun them, so load them all for the measurement
+  await page.evaluate(async () => { const t = __tsTest.trackInfo(); const b = t.base || t; await Promise.all((b.surroundPatches || []).map((p) => window.TS.stationSurround.loadHeavy(p.name))); });
+  const info = await page.evaluate((name) => {
     const track = __tsTest.trackInfo();
-    const i = track.stations.findIndex((s) => s.name === 'Munsbach');
+    const i = track.stations.findIndex((s) => s.name === name);
     const st = track.stations[i];
     const forest = [];
     for (let s = 200; s < track.length - 200; s += 100) { const b = track.biomeAt(s); if (b === 'forest' || b === 'ardennes') forest.push(s); }
     return { ps: st.platformStart, mid: (st.platformStart + st.platformEnd) / 2, side: st.side === 'right' ? 1 : -1, crossings: (track.crossings || []).map((c) => c.s), forest };
-  });
+  }, stationName);
   let best = [], cur = [];
   info.forest.forEach((s, k) => { if (k && s - info.forest[k - 1] > 150) { if (cur.length > best.length) best = cur; cur = []; } cur.push(s); });
   if (cur.length > best.length) best = cur;
@@ -50,6 +55,7 @@ try {
     await page.evaluate((ts) => { __tsTest.setFreeCam(null); __tsTest.placeAt(ts, 0); const w = __tsTest.internals().world; w.landscape.warm(ts); }, s);
     await page.waitForTimeout(2500);
     result[label] = await page.evaluate(() => { const x = __tsTest.state(); return { draws: x.draws, triangles: x.triangles, errors: x.errors }; });
+    result[label].frameMs = await frameTime(page);
     await page.screenshot({ path: path.join(outDir, `webkit-${tag}-${label}.png`) });
   }
   // aerial over the station
@@ -64,7 +70,8 @@ try {
   }, info);
   await page.waitForTimeout(2500);
   result.munsbachAir = await page.evaluate(() => { const x = __tsTest.state(); return { draws: x.draws, triangles: x.triangles, errors: x.errors }; });
+  result.munsbachAir.frameMs = await frameTime(page);
   await page.screenshot({ path: path.join(outDir, `webkit-${tag}-munsbach-air.png`) });
-  console.log(JSON.stringify({ route: routeId, quality, engine: 'webkit', result }));
+  console.log(JSON.stringify({ route: routeId, station: stationName, quality, engine: 'webkit', result }));
   console.log('errors', JSON.stringify(errors.filter((e) => !/404/.test(e)).slice(0, 6)));
 } finally { await browser.close(); server.close(); }

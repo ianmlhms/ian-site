@@ -155,7 +155,7 @@ window.TS = window.TS || {};
     return { day, lit };
   }
   const texWaterNormal = () => canvasTexture('waterN', 128, 128, (g, w, h) => {
-    const waves = [[1, 0, 0.8, 0.3], [0, 2, 0.5, 1.1], [2, 1, 0.35, 2.0], [3, -2, 0.2, 0.4], [-1, 3, 0.18, 1.7]];
+    const waves = [[1, 0, 0.8, 0.3], [0, 1, 0.55, 1.1], [1, 1, 0.3, 2.0], [0, 2, 0.16, 0.4]];   // W2c: low wave numbers only (the 3,-2 / -1,3 terms made a blue-white lattice from the air)
     const img = g.createImageData(w, h);
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       let dx = 0, dy = 0;
@@ -779,7 +779,7 @@ window.TS = window.TS || {};
     const matLamp = new T.MeshBasicMaterial({ color: '#9a9a96' });
     const matSmoke = new T.MeshLambertMaterial({ vertexColors: true, transparent: true, opacity: 0.5, depthWrite: false });
     const waterNormal = texWaterNormal(); waterNormal.repeat.set(1, 1);
-    const matWater = new T.MeshPhongMaterial({ side: T.DoubleSide, color: '#2c5a63', specular: '#ffffff', shininess: 90, normalMap: waterNormal, normalScale: new T.Vector2(0.55, 0.55), transparent: true, opacity: 0.86, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -2 });
+    const matWater = new T.MeshPhongMaterial({ side: T.DoubleSide, color: '#2c5a63', specular: '#6d868e', shininess: 60, normalMap: waterNormal, normalScale: new T.Vector2(0.38, 0.38), transparent: true, opacity: 0.86, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -2 });
     const matFar = withSnow(new T.MeshLambertMaterial({ vertexColors: true, map: texGrass() }), 1);
     const mats = [matLamp, matSmoke, matTerrain, matFieldRows, matFieldVines, matFieldMeadow, matHouse, matBlock, matRoof, matRoad, matLeaf, matCar, matWater, matFar];
     const treeKit = buildTreeKit(), carGeo = buildCarGeo();
@@ -824,13 +824,18 @@ window.TS = window.TS || {};
       }
       /* roads at level crossings (crossing-roads.js): rows and columns where the road runs, so the strip mesh follows the road exactly (rows strictly inside this chunk only) */
       const roadPlan = track.crossingRoads, hints = track.meshHints;
-      const lats = LAT.slice();
-      if (hints) {
-        for (const s of hints.rows(s0 + 0.02, s0 + CHUNK - 0.02)) if (s > s0 + 0.02 && s < s0 + CHUNK - 0.02 && !rowS.some(r => Math.abs(r - s) < 0.45)) rowS.push(s);
-        for (const lat of hints.lats(s0, s0 + CHUNK)) for (const off of ROAD_LAT_OFFSETS) { const v = lat + off; if (Math.abs(v) < W - 2 && !lats.some(l => Math.abs(l - v) < 0.6)) lats.push(v); }
-        for (const v of hints.latsAll(s0, s0 + CHUNK)) if (Math.abs(v) < W - 2 && !lats.some(l => Math.abs(l - v) < 0.9)) lats.push(v);
-        lats.sort((p, q) => p - q);
-      }
+      /* the lateral columns of the chunk starting at c0 (the base columns + the columns of the crossing roads, river trenches, valley walls and station patches that touch it) */
+      const latsFor = (c0) => {
+        const l = LAT.slice();
+        if (hints) {
+          for (const lat of hints.lats(c0, c0 + CHUNK)) for (const off of ROAD_LAT_OFFSETS) { const v = lat + off; if (Math.abs(v) < W - 2 && !l.some(q => Math.abs(q - v) < 0.6)) l.push(v); }
+          for (const v of hints.latsAll(c0, c0 + CHUNK)) if (Math.abs(v) < W - 2 && !l.some(q => Math.abs(q - v) < 0.9)) l.push(v);
+          l.sort((p, q) => p - q);
+        }
+        return l;
+      };
+      const lats = latsFor(s0);
+      if (hints) for (const s of hints.rows(s0 + 0.02, s0 + CHUNK - 0.02)) if (s > s0 + 0.02 && s < s0 + CHUNK - 0.02 && !rowS.some(r => Math.abs(r - s) < 0.45)) rowS.push(s);
       void roadPlan;
       rowS.sort((p, q) => p - q);
       const portalPad = new Set();   // the pad rows of a portal pair: the quads between them (the ground's cliff face at the mouth) get a hole so the bore stays open
@@ -840,6 +845,21 @@ window.TS = window.TS || {};
         for (let i = 0; i < lats.length; i++) {
           const lat = lats[i], x = f.x + f.rx * lat, z = f.z + f.rz * lat;
           row.push({ x, z, y: groundY(info, lat, x, z, s), lat, info });
+        }
+        /* W2c seam rows: a column this chunk has but the neighbouring chunk does not (river trench, valley wall, road or patch columns that start inside this chunk) would be a
+           T-junction on the shared edge: the neighbour's edge runs straight between its two columns, so the extra vertices are put on that line (no hairline crack at the seam) */
+        if (hints && (Math.abs(s - s0) < 1e-6 || Math.abs(s - (s0 + CHUNK)) < 1e-6)) {
+          const nb = latsFor(Math.abs(s - s0) < 1e-6 ? s0 - CHUNK : s0 + CHUNK);
+          const shared = lats.map(l => nb.some(q => Math.abs(q - l) < 1e-6));
+          for (let i = 0; i < lats.length; i++) {
+            if (shared[i]) continue;
+            let a = i - 1, b = i + 1;
+            while (a >= 0 && !shared[a]) a--;
+            while (b < lats.length && !shared[b]) b++;
+            if (a < 0 || b >= lats.length) continue;
+            const t = (lats[i] - lats[a]) / (lats[b] - lats[a]);
+            row[i].y = row[a].y + (row[b].y - row[a].y) * t;
+          }
         }
         grid.push(row);
       }
@@ -900,7 +920,7 @@ window.TS = window.TS || {};
         dist = s - sA;
         for (const sd of [-1, 1]) {
           const lat = c + sd * hw, w = worldAt(info, lat);
-          mb.p.push(w.x, y, w.z); mb.n.push(0, 1, 0); mb.c.push(1, 1, 1); mb.u.push(sd < 0 ? 0 : hw / 6, dist / 6);
+          mb.p.push(w.x, y, w.z); mb.n.push(0, 1, 0); mb.c.push(1, 1, 1); mb.u.push(sd < 0 ? 0 : hw / 16, dist / 28);   // W2c: stretched along the flow, one repeat per 16 x 28 m
         }
       }
       for (let a = 0; a < n; a++) { const i0 = base + a * 2; mb.i.push(i0, i0 + 1, i0 + 2, i0 + 1, i0 + 3, i0 + 2); }
@@ -1064,8 +1084,18 @@ window.TS = window.TS || {};
         }
       }
 
-      /* ---- Clervaux castle (north line, near the end) ---- */
-      if (String(track.id) === 'north' && L - 560 >= s0 && L - 560 < s1) {
+      /* ---- real landmarks (real-landmarks.js: Belval blast furnaces, Clervaux castle + abbey at their OSM positions; replaces the generic castle) ---- */
+      if (TS.realLandmarks && track.real) {
+        if (!track.realLandmarkList) track.realLandmarkList = TS.realLandmarks.resolve(track);
+        track.realLandmarkList.forEach((lm) => {
+          if (lm.s < s0 || lm.s >= s1) return;
+          const lmLat = lm.onStrip ? Math.sign(lm.lat) * Math.min(Math.abs(lm.lat), W - 28) : lm.lat;   // hill landmarks: the ground height is only known inside the strip
+          const p = place(lm.s, lmLat);
+          const M0 = placeM(p.x, p.y, p.z, yawOf(p.f) + (lm.yaw || 0));
+          TS.realLandmarks.draw(lm.kind, { T, mbHouse, mbRoof, mbBlock, C, mixColor, clamp, addCastle, scale: lm.scale, at: (x, y, z, rot) => M0.clone().multiply(placeM(x, y, z, rot || 0)) });
+          markOcc(lm.s - 60, lm.s + 60, lmLat - 60, lmLat + 60);
+        });
+      } else if (String(track.id) === 'north' && L - 560 >= s0 && L - 560 < s1) {
         const side = 1, p = place(L - 560, side * 120);
         const hill = new T.CylinderGeometry(30, 46, 46, 14);
         mbHouse.addGeo(hill, placeM(p.x, p.y - 10, p.z), (v, n) => mixColor(C('#6a7d4a'), C('#8b8a7c'), clamp(0.2 + (1 - n.y) * 1.6, 0, 1)), true);
@@ -1226,7 +1256,7 @@ window.TS = window.TS || {};
           const shift = Math.min(1, hw / 10) * (3.2 * Math.sin(lat * 0.045 + mid * 0.013) + 1.3 * Math.sin(lat * 0.14 + 2)) * (1 - smooth(60, latMax, Math.abs(lat)) * 0.4);
           for (const sd of [-1, 1]) {
             mbWater.p.push(f.x + f.rx * lat + f.tx * (wd * sd + shift), br.waterY, f.z + f.rz * lat + f.tz * (wd * sd + shift));
-            mbWater.n.push(0, 1, 0); mbWater.c.push(1, 1, 1); mbWater.u.push(sd < 0 ? 0 : wd / 6, lat / 6);
+            mbWater.n.push(0, 1, 0); mbWater.c.push(1, 1, 1); mbWater.u.push(sd < 0 ? 0 : wd / 16, lat / 28);
           }
         }
         for (let i = 0; i < n; i++) { const i0 = base + i * 2; mbWater.i.push(i0, i0 + 2, i0 + 1, i0 + 1, i0 + 2, i0 + 3); }
@@ -1333,11 +1363,12 @@ window.TS = window.TS || {};
       level.update = (cx, cz, force) => {
         const ox = Math.round(cx / spacing), oz = Math.round(cz / spacing);
         if (!force && level.last && level.last[0] === ox && level.last[1] === oz) return false;
-        level.last = [ox, oz]; const half = cells / 2, R = half * spacing;
+        level.last = [ox, oz]; const half = cells / 2, R = half * spacing; let minH = Infinity;
         for (let i = 0; i < nV; i++) for (let j = 0; j < nV; j++) {
           const gx = (ox + i - half) * spacing, gz = (oz + j - half) * spacing, v = i * nV + j;
           let h = farHeight(gx, gz);
           if (lowerBox && Math.abs(gx - cx) < lowerBox && Math.abs(gz - cz) < lowerBox) h -= 6;
+          if (Math.max(Math.abs(gx - cx), Math.abs(gz - cz)) < R * 0.84 && h < minH) minH = h;   // W2c: the safety plane must lie under the real valleys
           const rim = smooth(0.84, 1.0, Math.max(Math.abs(gx - cx), Math.abs(gz - cz)) / R); if (rim > 0 && !lowerBox) h = lerp(h, baseY - 12, rim); else if (rim > 0) h = lerp(h, baseY - 12, rim);
           pos[v * 3] = gx; pos[v * 3 + 1] = h; pos[v * 3 + 2] = gz; uv[v * 2] = gx / 40; uv[v * 2 + 1] = gz / 40;
         }
@@ -1348,6 +1379,7 @@ window.TS = window.TS || {};
           nor[v * 3] = -dx / sx / l; nor[v * 3 + 1] = 1 / l; nor[v * 3 + 2] = -dz / sz / l;
           const c = farColor(pos[v * 3], pos[v * 3 + 2], nor[v * 3 + 1]); col[v * 3] = c.r; col[v * 3 + 1] = c.g; col[v * 3 + 2] = c.b;
         }
+        level.minH = minH;
         geo.attributes.position.needsUpdate = geo.attributes.normal.needsUpdate = geo.attributes.color.needsUpdate = geo.attributes.uv.needsUpdate = true;
         return true;
       };
@@ -1552,7 +1584,7 @@ window.TS = window.TS || {};
 
     /* ================= streaming + per-frame update ================= */
     const lastCamera = new T.Vector3(), camPos = new T.Vector3(), camDir = new T.Vector3();
-    let lastKc = null, camVel = new T.Vector3(), haveCam = false, lastBiomeS = -1e9;
+    let lastKc = null, curKc = null, camVel = new T.Vector3(), haveCam = false, lastBiomeS = -1e9;
     const maxChunk = Math.floor(L / CHUNK) + 1;
 
     function disposeChunk(c) {
@@ -1564,6 +1596,19 @@ window.TS = window.TS || {};
       });
       for (let i = turbines.length - 1; i >= 0; i--) if (c.group.children.includes(turbines[i].group)) turbines.splice(i, 1);
       roadsAll.delete(c.k);
+    }
+    /* W2c: the scenery half of a station patch arrived after the chunks around it were built (generic scenery): rebuild them with the patch's keep-out area.  The chunks next to the
+       train at once, the others by ensureChunks. */
+    function refreshChunksAround(p) {
+      const kcNow = curKc === null ? Math.floor(clamp(p.sMid, 0, L) / CHUNK) : curKc;
+      const lo = Math.floor(clamp(p.sMid - 340, 0, L) / CHUNK), hi = Math.floor(clamp(p.sMid + 340, 0, L) / CHUNK);
+      let any = false;
+      for (let k = lo; k <= hi; k++) {
+        const c = chunks.get(k); if (!c) continue;
+        disposeChunk(c); chunks.delete(k); any = true;
+        if (Math.abs(k - kcNow) <= 1) { try { const nc = buildChunk(k); chunks.set(k, nc); roadsAll.set(k, nc.roads); } catch (e) { console.warn(TAG + 'chunk ' + k + ' failed', e); chunks.set(k, { k, group: new T.Group(), roads: [] }); } }
+      }
+      if (any) { lastKc = null; rebuildCars(); }
     }
     function ensureChunks(s, all) {
       const kc = Math.floor(clamp(s, 0, L) / CHUNK), lo = Math.max(-1, kc - Q.behind), hi = Math.min(maxChunk, kc + Q.ahead);
@@ -1599,7 +1644,7 @@ window.TS = window.TS || {};
       if (haveCam && dt > 0) camVel.copy(camPos).sub(lastCamera).divideScalar(dt).clampLength(0, 120); else camVel.set(0, 0, 0);
       lastCamera.copy(camPos); haveCam = true;
       const kcNow = Math.floor(clamp(s, 0, L) / CHUNK);
-      ensureChunks(s, firstUpdate || (lastKc !== null && Math.abs(kcNow - lastKc) > 3)); lastKc = kcNow;
+      ensureChunks(s, firstUpdate || (lastKc !== null && Math.abs(kcNow - lastKc) > 3)); lastKc = curKc = kcNow;
       // biome-driven tint of the far terrain
       if (Math.abs(s - lastBiomeS) > 40) { lastBiomeS = s; const b = biomeAt(s); if (b !== currentBiome) { currentBiome = b; const t = FAR_TINT[b] || FAR_TINT.farmland; farTintTarget.setRGB(t[0], t[1], t[2]); } }
       farTint.lerp(farTintTarget, 1 - Math.exp(-dt * 0.6));
@@ -1612,6 +1657,8 @@ window.TS = window.TS || {};
       // safety plane under the far terrain: 12.5 m below the track, but well below the valley floor on bridges and viaducts (it used to hang between the deck and the valley and hid it)
       let flatTarget = baseY - 12.5;
       for (const br of (track.bridges || [])) if (s > br.s0 - 140 && s < br.s1 + 140 && Number.isFinite(br.h)) flatTarget = Math.min(flatTarget, baseY - br.h - 6);
+      /* W2c: on a real line the terrain can drop more than 12.5 m below the track over a wide area (Alzette / Kor valleys); the plane used to show there as a pale flat quad with houses on it */
+      if (track.real) for (const lv of [farL1, farL2]) if (Number.isFinite(lv.minH)) flatTarget = Math.min(flatTarget, lv.minH - 3);
       flatY = flatY === null || firstUpdate ? flatTarget : flatY + (flatTarget - flatY) * (1 - Math.exp(-dt * 2.5));
       flat.position.set(camPos.x, flatY, camPos.z); flat.material.color.copy(farTint).multiplyScalar(0.42);
       const farPlane = camera && camera.far ? camera.far : 6000, capChanged = Math.abs(visCap - farPlane * 0.8) > 1; if (capChanged) visCap = farPlane * 0.8;
@@ -1684,7 +1731,7 @@ window.TS = window.TS || {};
     catch (e) { console.warn(TAG + 'crossing traffic failed', e); crossTraffic = null; }
     /* the real surroundings of stations (station-surround.js): painted ground, LOD2 buildings, trees, built near the player */
     let surround = null;
-    try { surround = track.surroundPatches && track.surroundPatches.length && TS.stationSurround ? TS.stationSurround.create({ root, track, quality, width: W, materials: { water: matWater }, treeField }) : null; }
+    try { surround = track.surroundPatches && track.surroundPatches.length && TS.stationSurround ? TS.stationSurround.create({ root, track, quality, width: W, materials: { water: matWater }, treeField, onResolved: refreshChunksAround }) : null; }
     catch (e) { console.warn(TAG + 'station surround failed', e); surround = null; }
     const setCrossing = (crossingS, closed) => { if (crossTraffic) crossTraffic.setClosed(crossingS, closed); };
 

@@ -5,7 +5,11 @@
  * track: x = lateral distance to the right of the track, z = -(s - sMid) along it.  The game's own curvilinear coordinates (track.nearest: s, lat) are the same
  * thing, so the patch fits the track exactly and bends with it where the line curves outside the station.
  *
- *   preload(stationNames)          async, before the track is built: fetches and decodes the patches of those stations (silently skips missing ones)
+ *   preload(stationNames)          async, before the track is built: fetches and decodes the patches of those stations (silently skips missing ones).  W2c: the patches of the
+ *                                  route stations are split (scripts/zuch/split_station_patches.py): preload fetches only the small CORE (4 m relief, roads, water: what the track build
+ *                                  needs, ~25 kB gzip each); the HEAVY half (class map, LOD2 buildings, trees, rails, poi) is fetched lazily by create().update() ahead of the train
+ *                                  (2 at a time, nearest first) and by heavyNear() for the first station.  A heavy half that is slow or fails never blocks driving: the generic scenery
+ *                                  stands there (track.inSurround is false until the patch is ready) and the crossing road of the patch is still drawn from the core.
  *   heightPatches(stations, frameAt)  -> [{ name, blend(s, lat, h, formY), extraRows, extraLats, covers(s, lat), ... }] used by track.js terrainHeightAt
  *   create({ root, track, quality, materials }) -> { update(s, camera), covers(x, z), dispose() }   builds / removes the meshes near the player
  * The meshes themselves (painted ground, LOD2 buildings, trees, water, details) are built by station-surround-mesh.js. */
@@ -31,10 +35,19 @@
   const prepared = new Map();      // station name -> prepared patch data
   let indexPromise = null;
 
-  async function fetchJson(url) {
-    const res = await fetch(url, { cache: 'force-cache' });
-    if (!res.ok) throw new Error(url + ' -> HTTP ' + res.status);
-    return res.json();
+  const CORE_TIMEOUT = 15000;     // ms: a core file that is not here by then is skipped (the station has no patch, the generic scenery stands there)
+  const HEAVY_TIMEOUT = 25000;
+  const HEAVY_AHEAD = 3000;       // m: the heavy halves of the patches up to this far ahead of the train are fetched (the chunks are built 1250 m ahead, the meshes at 1100 m)
+  const HEAVY_BEHIND = 1200;      // m: ... and behind it (the meshes stay up to DROP_RANGE 1700; a patch within ACTIVE_RANGE 1100 must be loaded)
+  const HEAVY_PARALLEL = 2;
+  async function fetchJson(url, timeoutMs) {
+    const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = ctl && timeoutMs ? setTimeout(() => ctl.abort(), timeoutMs) : null;
+    try {
+      const res = await fetch(url, ctl ? { cache: 'force-cache', signal: ctl.signal } : { cache: 'force-cache' });
+      if (!res.ok) throw new Error(url + ' -> HTTP ' + res.status);
+      return await res.json();
+    } finally { if (timer) clearTimeout(timer); }
   }
   function b64ToBytes(b64) {
     const bin = atob(b64);
@@ -60,12 +73,19 @@
       img.src = 'data:image/png;base64,' + spec.png;
     });
   }
-  async function prepare(raw) {
+  function prepareDem(raw) {
     const dm = new Int16Array(b64ToBytes(raw.dem.dm).buffer);
+    return { res: raw.dem.res, nx: raw.dem.nx, nz: raw.dem.nz, x0: raw.dem.x0, z0: raw.dem.z0, h: dm };
+  }
+  async function prepareClasses(raw) {
     const classes = await decodeClasses(raw.classes);
-    const dem = { res: raw.dem.res, nx: raw.dem.nx, nz: raw.dem.nz, x0: raw.dem.x0, z0: raw.dem.z0, h: dm };
-    const cm = { res: raw.classes.res, nx: classes.nx, nz: classes.nz, x0: raw.classes.x0, z0: raw.classes.z0, cls: classes.cls };
-    return Object.freeze(Object.assign({}, raw, { demGrid: dem, classGrid: cm }));
+    return { res: raw.classes.res, nx: classes.nx, nz: classes.nz, x0: raw.classes.x0, z0: raw.classes.z0, cls: classes.cls };
+  }
+  async function prepare(raw) {            // a whole patch (Mosel line)
+    return Object.freeze(Object.assign({}, raw, { demGrid: prepareDem(raw), classGrid: await prepareClasses(raw) }));
+  }
+  function prepareCore(raw) {              // W2c split patch: the core half
+    return Object.freeze(Object.assign({}, raw, { demGrid: prepareDem(raw), classGrid: null }));
   }
 
   /* bilinear terrain height (m, relative to the formation level) at patch coordinates */
@@ -83,14 +103,35 @@
   }
 
   /* ---------------------------------------------------------------- preload */
+  const heavyState = new Map();    // station name -> 'ready' | 'idle' | 'loading' | 'failed'  (a whole patch is 'ready' at once)
+  const heavyJobs = new Map();     // station name -> promise of the heavy half
+  const keyOf = new Map();         // station name -> file key (split patches only)
+  const listeners = new Set();     // fn(name, state): a heavy half is ready / failed
+  const stateOf = (name) => heavyState.get(name) || 'failed';
+
   async function preload(names) {
     try {
-      if (!indexPromise) indexPromise = fetchJson(DATA_DIR + 'index.json').catch((error) => { console.info(TAG + 'no station patches (' + error.message + ')'); return { stations: {} }; });
+      /* index.json (Mosel line) + index-routes.json (W2c: north, south, west, ...): the station name -> patch file maps are merged; "split": 1 = core + heavy files */
+      if (!indexPromise) {
+        indexPromise = Promise.all([
+          fetchJson(DATA_DIR + 'index.json', CORE_TIMEOUT).catch((error) => { console.info(TAG + 'no station patches (' + error.message + ')'); return { stations: {} }; }),
+          fetchJson(DATA_DIR + 'index-routes.json', CORE_TIMEOUT).catch(() => ({ stations: {} })),
+        ]).then(([a, b]) => ({ stations: Object.assign({}, a.stations || {}, b.stations || {}), routes: b.stations || {}, split: !!b.split }));
+      }
       const index = await indexPromise;
       const jobs = (names || []).filter((n) => index.stations && index.stations[n] && !prepared.has(n)).map(async (name) => {
+        const key = index.stations[name];
+        const isSplit = index.split && index.routes[name] === key;
         try {
-          const raw = await fetchJson(DATA_DIR + index.stations[name] + '.json');
-          prepared.set(name, await prepare(raw));
+          if (isSplit) {
+            const raw = await fetchJson(DATA_DIR + key + '.c.json', CORE_TIMEOUT);
+            prepared.set(name, prepareCore(raw));
+            keyOf.set(name, key); heavyState.set(name, 'idle');
+          } else {
+            const raw = await fetchJson(DATA_DIR + key + '.json', CORE_TIMEOUT);
+            prepared.set(name, await prepare(raw));
+            heavyState.set(name, 'ready');
+          }
         } catch (error) {
           console.warn(TAG + 'patch of ' + name + ' failed', error);
         }
@@ -104,6 +145,41 @@
   const forRoute = (data, def) => !data.scenery || !def || def.sceneryId === data.scenery;
   const dataFor = (name, def) => { const d = prepared.get(name); return d && forRoute(d, def) ? d : null; };
 
+  /* the heavy half of a split patch: class map, buildings, trees, rails, poi.  Never rejects; the state tells the result. */
+  function loadHeavy(name) {
+    if (heavyJobs.has(name)) return heavyJobs.get(name);
+    const st = heavyState.get(name);
+    if (st !== 'idle') return Promise.resolve(st || 'failed');
+    heavyState.set(name, 'loading');
+    const job = (async () => {
+      let result = 'failed';
+      try {
+        const raw = await fetchJson(DATA_DIR + keyOf.get(name) + '.h.json', HEAVY_TIMEOUT);
+        const core = prepared.get(name);
+        const classGrid = await prepareClasses(raw);
+        const merged = Object.assign({}, core, { buildings: raw.buildings || [], trees: raw.trees || [], rails: raw.rails || [], poi: raw.poi || [], classes: raw.classes, classGrid });
+        prepared.set(name, Object.freeze(merged));
+        result = 'ready';
+      } catch (error) {
+        console.warn(TAG + 'scenery of ' + name + ' failed (generic scenery stays)', error);
+      }
+      heavyState.set(name, result);
+      listeners.forEach((fn) => { try { fn(name, result); } catch (error) { console.warn(TAG + 'listener failed', error); } });
+      return result;
+    })();
+    heavyJobs.set(name, job);
+    return job;
+  }
+
+  /* before the first frame: the heavy halves of the patches around s (the first stations), at most maxWaitMs; whatever is not here by then streams in while the train drives */
+  async function heavyNear(track, s, opts) {
+    const o = opts || {};
+    const near = (track.surroundPatches || []).filter((p) => p.sMid > s - 500 && p.sMid < s + (o.ahead || 1600)).sort((a, b) => a.sMid - b.sMid).slice(0, o.count || 2);
+    const jobs = near.map((p) => loadHeavy(p.name));
+    if (!jobs.length) return;
+    await Promise.race([Promise.all(jobs), new Promise((res) => setTimeout(res, o.maxWaitMs || 6000))]);
+  }
+
   /* ---------------------------------------------------------------- height patches for track.js */
   function heightPatches(stations, frameAt, def) {
     const out = [];
@@ -114,7 +190,10 @@
       const grid = data.demGrid;
       const weightOf = (lat, z) => (1 - smooth01((Math.abs(lat) - (EXT_X - FADE_X)) / FADE_X)) * (1 - smooth01((Math.abs(z) - (EXT_Z - FADE_Z)) / FADE_Z));
       out.push({
-        name: st.name, index, sMid, data,
+        name: st.name, index, sMid,
+        get data() { return prepared.get(st.name); },                 // replaced by the full patch when the heavy half arrives
+        get state() { return stateOf(st.name); },
+        get meshReady() { return stateOf(st.name) === 'ready'; },    // buildings / trees / ground paint are drawn, so the generic scenery keeps out of the patch
         covers: (s, lat) => Math.abs(lat) <= EXT_X && Math.abs(s - sMid) <= EXT_Z,
         weightOf,
         /* terrain height of a point at track coordinates (s, lat) relative to the local formation level */
@@ -178,11 +257,28 @@
     const built = new Map();     // patch index -> { group, dispose }
     addCredit(patches);
     let disposed = false;
+    /* a heavy half arrives (or fails): the chunks around the patch were built without it (generic scenery there) and are rebuilt by landscape.js */
+    const onHeavy = (name, state) => {
+      if (disposed || !opts.onResolved) return;
+      const p = patches.find((q) => q.name === name);
+      if (p && state === 'ready') { try { opts.onResolved(p); } catch (error) { console.warn(TAG + 'chunk refresh failed', error); } }
+    };
+    listeners.add(onHeavy);
     function update(s) {
       if (disposed) return;
+      let loading = 0;
+      patches.forEach((p) => { if (p.state === 'loading') loading++; });
+      /* heavy halves ahead of the train, nearest first, a few at a time */
+      if (loading < HEAVY_PARALLEL) {
+        patches.filter((p) => p.state === 'idle' && p.sMid - s < HEAVY_AHEAD && s - p.sMid < HEAVY_BEHIND)
+          .sort((a, b) => Math.abs(a.sMid - s) - Math.abs(b.sMid - s)).slice(0, HEAVY_PARALLEL - loading).forEach((p) => { loadHeavy(p.name); });
+      }
       patches.forEach((p, i) => {
         const dist = Math.abs(p.sMid - (flipS ? phys.length - s : s));
-        if (!built.has(i) && dist < ACTIVE_RANGE) {
+        const state = p.state;
+        /* 'ready': the whole patch; 'failed': the light patch (road of a level crossing, water) on top of the generic scenery; 'idle' / 'loading': not yet */
+        const wantMesh = state === 'ready' || state === 'failed';
+        if (!built.has(i) && dist < ACTIVE_RANGE && wantMesh) {
           try {
             const rec = TS.stationSurroundMesh.build(p, { track: phys, quality: opts.quality, materials: opts.materials || {}, EXT_X, EXT_Z, width: opts.width, treeField: opts.treeField || null });
             if (rec && rec.group) { opts.root.add(rec.group); built.set(i, rec); }
@@ -201,11 +297,12 @@
     }
     function dispose() {
       disposed = true;
+      listeners.delete(onHeavy);
       built.forEach((rec) => { if (rec.group) opts.root.remove(rec.group); rec.dispose(); });
       built.clear();
     }
     return { update, dispose, built: () => built.size };
   }
 
-  TS.stationSurround = Object.freeze({ preload, dataFor, heightPatches, create, demAt, classAt, EXT_X, EXT_Z, FADE_X, FADE_Z, smooth01 });
+  TS.stationSurround = Object.freeze({ preload, loadHeavy, heavyNear, stateOf, dataFor, heightPatches, create, demAt, classAt, EXT_X, EXT_Z, FADE_X, FADE_Z, smooth01 });
 })();

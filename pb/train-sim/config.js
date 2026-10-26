@@ -104,7 +104,8 @@
     south: Object.freeze({ price: 1800, needs: Object.freeze(['rail']), fareBase: 26 }),
     east: Object.freeze({ price: 9000, needs: Object.freeze(['rail']), fareBase: 24 }),
     wittlich: Object.freeze({ price: 12000, needs: Object.freeze(['rail']), fareBase: 34 }),
-    north: Object.freeze({ price: 16000, needs: Object.freeze(['rail']), fareBase: 32 }),
+    // W2c: south / north run all the real stops now (17 / 18 instead of 9): a service pays 8.5 k / 9.7 k (was 5.9 k / 6.3 k) in 33 / 39 min (scripts/zuch/career_probe.mjs, drive_bot.mjs), north's price follows (16 k -> 24 k = the same 2.5 services as before)
+    north: Object.freeze({ price: 24000, needs: Object.freeze(['rail']), fareBase: 32 }),
     trier: Object.freeze({ price: 38000, needs: Object.freeze(['kiss', 'ic', 'hst']), fareBase: 55 }),
     metz: Object.freeze({ price: 52000, needs: Object.freeze(['kiss', 'ic', 'hst']), fareBase: 50 }),
     brussels: Object.freeze({ price: 72000, needs: Object.freeze(['kiss', 'ic', 'hst']), fareBase: 65 }),

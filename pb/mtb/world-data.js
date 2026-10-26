@@ -80,8 +80,10 @@ export async function loadWorldData(read, onProgress = () => {}) {
   const streams = decodeWays(await read('streams.bin'), await json('streams.json'));
   const cliffs = decodeWays(await read('cliffs.bin'), await json('cliffs.json'));
   const falls = await json('falls.json');
+  let buildings = { houses: [], castles: [], churches: [], centres: {} };
+  try { buildings = await json('buildings.json'); } catch (error) { console.warn('[mtb] buildings.json missing (no villages and castles)', error); }
   const leaf = decodeRle(await read('leaf.bin'));
   const fields = decodeRle(await read('fields.bin'));
   onProgress(1, 'done');
-  return { info, near, far, ways, trails, canopy, classes, landmarks, streams, cliffs, falls, leaf, fields, medals };
+  return { info, near, far, ways, trails, canopy, classes, landmarks, streams, cliffs, falls, leaf, fields, medals, buildings };
 }

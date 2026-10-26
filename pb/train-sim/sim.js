@@ -125,7 +125,9 @@
     for (let attempt = 0; attempt < 14 && tsr.length < wanted; attempt++) {
       const leg = Math.floor(rng() * (n - 1)), a = stations[leg], b = stations[leg + 1];
       const len = Math.round((TSR_MIN_LEN + rng() * (TSR_MAX_LEN - TSR_MIN_LEN)) / 10) * 10;
-      const lo = a.s + TSR_AFTER_STATION_M, hi = b.s - TSR_BEFORE_STATION_M - len;
+      /* W2c: the real lines have legs of 0.5 - 2 km: the clearances shrink on short stretches (30 % of the gap each, at most the old constants), so they still get restrictions */
+      const gap = b.s - a.s, after = Math.min(TSR_AFTER_STATION_M, gap * 0.3), before = Math.min(TSR_BEFORE_STATION_M, gap * 0.3);
+      const lo = a.s + after, hi = b.s - before - len;
       if (hi <= lo) continue;
       const s0 = Math.round(lo + rng() * (hi - lo)), s1 = s0 + len, kmh = 5 * Math.round((TSR_MIN_KMH + rng() * (TSR_MAX_KMH - TSR_MIN_KMH)) / 5);
       let minBase = Infinity;

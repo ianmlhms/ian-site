@@ -1162,10 +1162,14 @@
     const k = kit(api);
     const BACK = k.edge + k.W;
     platformSurface(k, 'grey');
+    /* the hall stands where the OSM station building of the patch does (lateral 5.4 .. 17.8 on the platform side, 14 m ahead to 52 m behind the stop: main block 17 .. 43 m behind); mirrored in z for a reversed service (W2c, 26 Oct 2026) */
+    const zr = api.track && api.track.reverse ? -1 : 1;
+    const DZ = 22;
+    const zs = (a, b) => ({ z0: Math.min(zr * (a + DZ), zr * (b + DZ)), z1: Math.max(zr * (a + DZ), zr * (b + DZ)) });
     const cfg = { wall: '#e4d9a4', trim: '#f2eee0', frame: '#f2eee0', glass: '#4e3a3e', arch: false, ww: 0.36, wh: 0.52, plinth: '#cdbf86', frameOuter: false, seed: 14, band: 'rgba(120,100,60,0.25)' };
-    building(k, { lat0: BACK + 3.4, lat1: BACK + 11.6, z0: -34, z1: 26, floors: 2, floorH: 3.5, cfg, trim: '#f0ead6', roof: { type: 'gable', h: 2.6, col: '#5a5f66', chimney: [-20, 4, 18] } });
-    tower(k, BACK + 5.2, -4, 5.4, -0.55, 11.5, 3.6, cfg, '#3f444b', true);
-    canopy(k, { lat0: BACK + 3.2, lat1: k.edge + 1.4, hIn: 4.9, hOut: 4.0, z0: -50, z1: 38, colLat: k.edge + 3.9, col: MAROON, roof: '#bfc6c6', fascia: '#6f1f2c', spacing: 6, colSize: 0.2, lights: true });
+    building(k, Object.assign({ lat0: BACK + 3.4, lat1: BACK + 11.6, floors: 2, floorH: 3.5, cfg, trim: '#f0ead6', roof: { type: 'gable', h: 2.6, col: '#5a5f66', chimney: [-20 + DZ, 4 + DZ, 18 + DZ] } }, zs(-34, 26)));
+    tower(k, BACK + 5.2, zr * (-4 + DZ), 5.4, -0.55, 11.5, 3.6, cfg, '#3f444b', true);
+    canopy(k, { lat0: BACK + 3.2, lat1: k.edge + 1.4, hIn: 4.9, hOut: 4.0, z0: Math.min(zr * -28, zr * 60), z1: Math.max(zr * -28, zr * 60), colLat: k.edge + 3.9, col: MAROON, roof: '#bfc6c6', fascia: '#6f1f2c', spacing: 6, colSize: 0.2, lights: true });
     furnish(k, { totems: [6], voie: [['Voie 1', -40], ['Voie 1', 34]], benches: [-30, 20], bins: [0] });
     otherPlatform(k, { width: 5.2, variant: 'grey', shelterAt: [-16, 14], shelterCol: MAROON });
     yardTracks(k, [-13.4, -17.9, -22.4], k.zB - 40, k.zA + 40);
@@ -1178,12 +1182,13 @@
     const k = kit(api);
     const BACK = k.edge + k.W;
     platformSurface(k, 'slab');
-    building(k, { lat0: BACK + 2.4, lat1: BACK + 14, z0: -24, z1: 26, floors: 2, floorH: 4.2, cfg: { wall: '#43474d', trim: '#c9672b', frame: '#23272b', glass: '#6d90a4', arch: false, ww: 0.78, wh: 0.58, plinth: '#2f3236', seed: 22, band: 'rgba(201,103,43,0.9)' }, trim: '#2f3236', roof: { type: 'flat', col: '#7d8286' } });
-    k.box(k.vc, BACK + 2.35, 4.4, 26.4, 0.4, 9.2, 0.7, k.col('#d6762a'));
-    k.box(k.vc, BACK + 2.35, 4.4, -24.4, 0.4, 9.2, 0.7, k.col('#d6762a'));
-    // colourful block
-    building(k, { lat0: BACK + 18, lat1: BACK + 28, z0: 20, z1: 70, floors: 5, floorH: 3.3, cfg: { wall: '#b24f31', trim: '#d7b6a0', frame: '#e8dcc8', glass: '#4b5560', arch: false, ww: 0.5, wh: 0.5, seed: 31, band: 'rgba(120,60,40,0.4)' }, roof: { type: 'flat', col: '#8a8f93' } });
-    building(k, { lat0: BACK + 18, lat1: BACK + 27, z0: -60, z1: -22, floors: 4, floorH: 3.3, cfg: { wall: '#c9c6bd', trim: '#e8e4da', frame: '#d6762a', glass: '#4b5560', arch: false, ww: 0.55, wh: 0.5, seed: 37 }, roof: { type: 'flat', col: '#8a8f93' } });
+    /* The hall stands where the real one does (OSM station building of the patch: lateral 10.8 .. 29.6, 42 .. 95 m AHEAD of the stop; W2c 26 Oct 2026), the apartment blocks of the earlier
+       authored version are dropped: the LOD2 buildings of the station patch are the real ones.  A reversed service sees the hall mirrored in z. */
+    const zr = api.track && api.track.reverse ? -1 : 1;
+    const zs = (a, b) => ({ z0: Math.min(zr * a, zr * b), z1: Math.max(zr * a, zr * b) });
+    building(k, Object.assign({ lat0: BACK + 2.4, lat1: BACK + 14, floors: 2, floorH: 4.2, cfg: { wall: '#43474d', trim: '#c9672b', frame: '#23272b', glass: '#6d90a4', arch: false, ww: 0.78, wh: 0.58, plinth: '#2f3236', seed: 22, band: 'rgba(201,103,43,0.9)' }, trim: '#2f3236', roof: { type: 'flat', col: '#7d8286' } }, zs(-92, -42)));
+    k.box(k.vc, BACK + 2.35, 4.4, zr * -41.6, 0.4, 9.2, 0.7, k.col('#d6762a'));
+    k.box(k.vc, BACK + 2.35, 4.4, zr * -92.4, 0.4, 9.2, 0.7, k.col('#d6762a'));
     canopy(k, { lat0: BACK + 0.2, lat1: k.edge + 1.2, hIn: 5.4, hOut: 4.5, z0: -96, z1: 96, colLat: k.edge + 4.8, col: '#4a413b', roof: '#d9dcde', fascia: '#5b4b43', spacing: 8, colSize: 0.24, lights: true });
     const op = otherPlatform(k, { width: 6, variant: 'slab', shelter: false });
     canopy(k, { lat0: op.e1 + 0.4, lat1: op.e0 - 1.0, hIn: 5.0, hOut: 4.4, z0: -90, z1: 90, colLat: (op.e0 + op.e1) / 2, col: '#4a413b', roof: '#d9dcde', fascia: '#5b4b43', spacing: 8, colSize: 0.24 });
@@ -1198,15 +1203,18 @@
     const k = kit(api);
     const BACK = k.edge + k.W;
     platformSurface(k, 'slab');
-    etfeVault(k, { z0: -78, z1: 78, ribGap: 6.5, latL: -9.4, latR: BACK + 0.6, ySpring: 5.6, rise: 4.4, rib: '#2c3338' });
-    for (let z = -72; z <= 72; z += 16) {
+    /* the station hall (OSM station building of the patch) reaches from 52 m ahead to 72 m behind the stop, the pod at its head; mirrored in z for a reversed service (W2c, 26 Oct 2026) */
+    const zr = api.track && api.track.reverse ? -1 : 1;
+    etfeVault(k, { z0: Math.min(zr * -52, zr * 62), z1: Math.max(zr * -52, zr * 62), ribGap: 6.5, latL: -9.4, latR: BACK + 0.6, ySpring: 5.6, rise: 4.4, rib: '#2c3338' });
+    for (let zq = -46; zq <= 58; zq += 16) {
+      const z = zr * zq;
       k.frust(k.vc, k.edge + 3.2, k.H, z, 0.55, 0.45, 5.1, k.col('#e6e4de'), 14);
       k.frust(k.vc, k.edge + 3.2, k.H + 5.0, z, 1.1, 0.55, 1.0, k.col('#e6e4de'), 14);
     }
     // pod-shaped station building
-    sphere(k, k.vc, BACK + 9, 5.2, 96, 7.2, 3.6, 13, k.col('#ecebe6'), 18);
-    sphere(k, k.vc, BACK + 9, 4.4, 96, 7.4, 2.0, 13.2, k.col('#5d8195'), 18);
-    k.box(k.vc, BACK + 9, 1.1, 96, 3.6, 4.0, 8, k.col('#d9d8d2'));
+    sphere(k, k.vc, BACK + 3.5, 5.2, zr * 70, 7.2, 3.6, 13, k.col('#ecebe6'), 18);
+    sphere(k, k.vc, BACK + 3.5, 4.4, zr * 70, 7.4, 2.0, 13.2, k.col('#5d8195'), 18);
+    k.box(k.vc, BACK + 3.5, 1.1, zr * 70, 3.6, 4.0, 8, k.col('#d9d8d2'));
     building(k, { lat0: BACK + 14, lat1: BACK + 24, z0: -60, z1: 40, floors: 4, floorH: 3.4, cfg: { wall: '#9a4b33', trim: '#c9a090', frame: '#2c2e30', glass: '#3f4c58', arch: false, ww: 0.5, wh: 0.46, seed: 51, band: 'rgba(60,30,20,0.35)' }, roof: { type: 'flat', col: '#767b7f' } });
     furnish(k, { totems: [10], voie: [['Voie 1', -50], ['Voie 1', 50]], benches: [-40, 0, 40], bins: [24] });
     yardTracks(k, [-4.5, -9, -13.5], k.zB - 40, k.zA + 40);
@@ -2167,7 +2175,7 @@
   reg('Déifferdang', { canopy: false, furniture: false, build: buildDeifferdang });
   reg('Péiteng', { canopy: false, furniture: false, build: buildPeiteng });
   reg('Rodange', { canopy: false, furniture: false, build: buildRodange });
-  reg('Bartreng', { canopy: false, furniture: false, build: buildBartreng });
+  reg('Bertrange-Strassen', { canopy: false, furniture: false, build: buildBartreng });
   reg('Mamer', { canopy: false, furniture: false, build: buildMamer });
   reg('Capellen', { canopy: false, furniture: false, build: buildCapellen });
   reg('Kleinbettingen', { canopy: false, furniture: false, build: buildKleinbettingen });

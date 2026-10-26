@@ -99,6 +99,77 @@ platform middle** (49.6308, 6.2686, full barrier); before Roodt (49.6544, 6.2975
 In the Luxembourg city section there are none on the main line.  The crossing planner must take the real road class and direction from the OSM road through the node
 (Wave 2: `plan.ctx.realCrossings` + the patch roads of a station with a patch: the road of the patch IS the crossing road there, no synthetic one).
 
+## W2c: stop lists of the other routes (audit of 26 Oct 2026, with sources)
+
+**Method.** Real service patterns come from the OSM public-transport route relations (`route=train`, ordered `stop` members) of the Geofabrik extracts of 25 / 26 Oct 2026 (Luxembourg, Belgium, Lorraine, Champagne-Ardenne,
+Ile-de-France), read with pyosmium (`scripts/zuch/osm_route_relations.py`), cross-checked against de.wikipedia "Bahnstrecke Luxemburg-Troisvierges" (km, tunnels,
+viaducts, "Nahverkehr ... zwischen Luxemburg und Troisvierges"), en.wikipedia "CFL Line 50 / 60", sncf-connect.com Luxembourg - Paris timetable (11 Jul 2026 sample).  Relations used: CFL-1 (all stops), RE Rodange - Troisvierges (OSM id 20663266),
+CFL-50 (555543), L-12 (SNCB, 7396154), CFL-60 (8388183), RE Pétange - Mersch (20663109), CFL-70 (572347), K59, IC-16 (3920818), IC-33, TER C40+ (1061467), TGV InOui 803B (8536525 / 8536618).  The earlier route lists were authored, not verified.
+
+| route | old stops | verified service | new stops (game names) | change |
+|---|---|---|---|---|
+| `west` (line 50) | Lëtzebuerg, **Bartreng**, Mamer, Capellen, Kleinbettingen | CFL-50: Luxembourg - Bertrange-Strassen - **Mamer Lycée** - Mamer - Capellen - Kleinbettingen - Arlon; SNCB L-12 the same up to Libramont (Kleinbettingen, Arlon, Viville, Stockem, Habay, Marbehan, Neufchâteau). Hollerich is NOT a stop of line 50 in OSM (it is on line 70). | Lëtzebuerg, Bertrange-Strassen, Mamer-Lycée, Mamer, Capellen, Kleinbettingen (6 stops, 17.9 km real, 6.4 km game) | name fixed, Mamer-Lycée added.  The service runs on to Arlon (3 km, Belgium); the game route ends at Kleinbettingen (terminus kept so saves / bests stay valid; Arlon is a stop of `brussels`). |
+| `south` (line 60) | Lëtzebuerg, **Hollerich**, Berchem, Bettembuerg, Esch-Uelzecht, Belval-Université, Déifferdang, Péiteng, Rodange | CFL-60 (every stop): Luxembourg - Howald - Berchem - Bettembourg - Noertzange - Schifflange - Esch-sur-Alzette - Belval-Université - Belval Lycée - Belval-Rédange - Belvaux-Soleuvre - Oberkorn - Differdange - Niederkorn - Pétange - Lamadelaine - Rodange.  The OSM "RE" relations (Pétange - Mersch, Rodange - Troisvierges) skip Berchem / Howald / Belval-Lycée / Belval-Rédange / Belvaux / Oberkorn / Niederkorn on some patterns.  Hollerich is on line 70 (Luxembourg - Hollerich - Leudelange - Dippach-Reckange - Schouweiler - Bascharage-Sanem - Pétange - Lamadelaine - Rodange), not on line 60. | all 17 stops of the RB pattern (15.8 km game, 39.4 km real) | Hollerich removed (line 70, its model stays registered for a later route), Howald, Noertzange, Schifflange, Belval-Lycée, Belval-Rédange, Belvaux-Soleuvre, Oberkorn, Niederkorn, Lamadelaine added. |
+| `north` (line 10) | Lëtzebuerg, Pafendall-Kierchbierg, Walfer, Lëntgen, Miersch, Ettelbréck, Kautebaach, Wëlwerwolz, Clierf | CFL-1 RB (every stop, OSM 912932 / 8387186): Luxembourg - Pfaffenthal-Kirchberg - Dommeldange - Walferdange - Heisdorf - Lorentzweiler - Lintgen - Mersch - Cruchten - Colmar-Berg - Schieren - Ettelbruck - Michelau - Goebelsmühle - Kautenbach - Wilwerwiltz - Drauffelt - Clervaux - Troisvierges.  The RE (Rodange - Troisvierges) calls at Luxembourg, Pfaffenthal-Kirchberg, Dommeldange, Walferdange, Mersch, Ettelbruck, Goebelsmühle, Kautenbach, Wilwerwiltz, Drauffelt, Clervaux, Troisvierges; the IC 33 (Liège) at Mersch, Ettelbruck, Michelau, Goebelsmühle, Kautenbach, Wilwerwiltz, Drauffelt, Clervaux, Troisvierges. | RB, all 18 stops up to Clervaux (60.5 km real, 20.5 km game) | Dommeldange, Heisdorf, Lorentzweiler, Cruchten, Colmar-Berg, Schieren, Michelau, Goebelsmühle, Drauffelt added; the route still ends at Clierf (Clervaux).  Real km of the line (Wikipedia: Luxembourg 16.65 ... Clervaux 77.17 = 60.5 km) agrees with the OSM path (60.55 km). |
+| `paris` (TGV) | Lëtzebuerg, Metz-Ville, Champagne-Ardenne TGV, Paris-Est | TGV InOui 803B: Luxembourg - **Thionville** - Metz - (Champagne-Ardenne TGV) - Paris-Est.  The reviewer's note "Champagne-Ardenne TGV is not served" is wrong: the OSM relations 8536525 / 8536617 name it, and the sncf-connect timetable of 11 Jul 2026 lists Thionville, Metz, Meuse TGV and Champagne-Ardenne TGV on Luxembourg - Paris trains; some trains run Metz - Paris direct.  Meuse TGV is served by some. | Lëtzebuerg, Thionville, Metz-Ville, Champagne-Ardenne TGV, Paris-Est | Thionville added (every 803B stops there); Champagne-Ardenne TGV stays. |
+| `metz` (TER) | Lëtzebuerg, Bettembuerg, Thionville, Metz-Ville, Pont-à-Mousson, Nancy-Ville | TER C40+ Nancy - Metz - Luxembourg (OSM 1061467): Nancy, Pont-à-Mousson, Pagny-sur-Moselle, Metz, Walygator Parc, Hagondange, Uckange, Thionville, Hettange-Grande, Bettembourg, Howald, Luxembourg (C50 / C50+ Luxembourg - Metz: Howald, Bettembourg, then the French stops). | see the abroad section below | |
+| `brussels` (IC) | Lëtzebuerg, **Kleinbettingen**, Arlon, Libramont, Namur, Bruxelles-Midi | IC 16 (OSM 3920818 / 241358): Luxembourg - Arlon - Marbehan - Libramont - Rochefort-Jemelle - Marloie - Ciney - Namur - Gembloux - Ottignies - Bruxelles-Luxembourg - Schuman - Nord - Central - Midi.  Kleinbettingen is served by the CFL-50 / L-12 regional trains, not by the IC. | see the abroad section below | Kleinbettingen is not an IC stop. |
+
+Not decided by data: names of the new stations are the Luxembourgish forms where the game already used them (Walfer, Lëntgen, Miersch, Ettelbréck, Kautebaach, Wëlwerwolz, Clierf, Esch-Uelzecht, Déifferdang, Péiteng) and the CFL spelling elsewhere (Dummeldeng, Heisdref, Kruchten,
+Colmer-Bierg, Giewelmillen, Houwald, Schëffleng, Uewerkuer, Nidderkuer are common lb forms, not taken from an official list).
+
+## W2c: real geometry and scenery for the single-line routes (north, south, west), pipeline changes
+
+All of this is additive; nothing of the Mosel line (`build_real_line.py`, `real-mosel.js`, its data) was changed.
+
+* **`scripts/zuch/build_real_route.py`** (+ `real_route_defs.py` = stop lists, `fetch_route_corridor.py` = OSM corridor cache): the single-line version of `build_real_line.py`.  It imports its fit / DEM / land /
+  scenery code, joins the stops with Dijkstra on the rail graph (a stop is an OSM station / halt node, with a `(lat, lon)` hint for duplicates like the two Pétanges, or just the hint when the stop is only a
+  `railway=stop` as in France), builds the legs exactly like the Mosel legs (same 0.27 compression, clamps, R_MIN, grades, speeds, crossing thinning) and emits `pb/train-sim/real-<id>.js`
+  (`TS.realLines[id]`, loaded before routes.js) + `data/real/<id>-layout.json` + `data/real/<id>-features.json`.  Differences: a long high bridge over a river is a viaduct WITH water up to 45 m
+  (Pfaffenthal 28 m, Pulvermuehle), the first station block and big stations get an urban halo (landuse=railway around the Gare is not "city"), forest / farmland beyond Ettelbruck is the
+  `ardennes` biome, and every station carries its OSM layout: platform polygons (`plat`: edge lateral, width, s0 / s1 relative to the stop), other tracks (`trk`), side of the station building (`bside`),
+  and its lat / lon / heading (for the station patch).  Platform side = the building's side when that platform is next to the track, else the nearest platform.
+  Commands: `fetch_route_corridor.py` (once; `--extra` adds the platform polygons / station buildings to an existing tile), then `build_real_route.py plan|emit north|south|west`.  `plan` prints the path, the
+  stops with platforms and the leg tokens; `--plot x.png` the heading QA sheet.  Re-run: ~5 s (west), 18 s (south), 33 s (north).
+* **`real-line.js`**: the data set of a route is `def.sceneryId` when `TS.realLines[sceneryId]` exists (its `data/real/<id>-features.json`), `mosel` for the Mosel line; several can be cached.  `routes.js`: `realLineBody(id)`.
+* **`stations-osm.js`**: every station of north / south / west without a photo model gets a model built from its OSM layout (other platforms with width / length, other tracks, a shelter, the far fence);
+  `station-surround-mesh.js` draws the LOD2 station building of such a station (a photo-modelled station draws its own).  Photo-modelled stations keep their models.
+* **Station patches**: `build_route_patches.py` builds the real surroundings (LiDAR, LOD2, OSM; `build_station_patch.py --index index-routes.json`, a new option) of every Luxembourg station of the three routes;
+  `station-surround.js` merges `index-routes.json` into `index.json`.
+* **Seam fix (`landscape.js terrainMesh`)**: extra lateral columns that exist only in one of two neighbouring chunks (river trench, valley wall, road or patch columns that start inside a chunk) made a T-junction on
+  the chunk seam = a hairline crack (found at south s 10250: the far mesh shone through).  The extra vertices of a seam row are now put on the straight line between the neighbour's columns.  Benefits every route.
+* **Flow `train_sim_routes.mjs`** (registered in `run_all.mjs`): stop lists, geometry, scenery, tunnels / viaduct, patches for every station, `~r`, OSM layout of Mamer-Lycée, hole scan on the three routes.
+* Result numbers (26 Oct 2026): west 6 stops 6.4 km game / 17.9 km real, south 17 stops 15.8 km / 39.4 km, north 18 stops 20.5 km / 60.5 km (19 real tunnels -> 15 game tunnels, Pfaffenthal + Clausen + Pulvermuehle viaducts,
+  Alzette / Sûre / Wiltz / Clerve bridges).  Hole scans (300 m steps): north 0 / 0, west 0 / 0, south 0 poses + 6 terrain-function steps of 0.5 - 1 m (mesh vs `groundHeightAt`, no gap).
+
+## W2c: reviewer fixes (26 Oct 2026, wave 2)
+
+* **White ground (landscape.js)**: the pale flat areas with houses on them were the "safety plane" under the far terrain (`flat`, 12.5 m below the track): in the real valleys (Alzette, Kor, Chiers) the DEM drops
+  further than that over hundreds of metres, so the plane showed through as a pale quad.  On a route with `track.real` the plane now lies 3 m under the lowest far vertex of the two far levels (`level.minH`).  Other routes unchanged.
+* **Water "checkerboard" (landscape.js)**: the 128 px normal map of the river had wave numbers up to (3, -2) / (-1, 3) and repeated every 6 m, which aliased into a blue-white lattice from the air.  Only low wave numbers now, UVs
+  stretched to 16 x 28 m, softer normal scale / specular.  Shared with the Mosel line (water only).
+* **Download size (station-surround.js, `split_station_patches.py`)**: the patches of the route stations (north / south / west, `index-routes.json` with `"split": 1`) are split into `<key>.c.json` (core: 4 m relief, roads,
+  water, platforms, origin; 15 - 25 kB gzip each; fetched for all stations of the SELECTED route before the track is built, with a 15 s timeout per file) and `<key>.h.json` (class map, LOD2 buildings, trees, rails, poi;
+  fetched by `create().update()` for patches up to 3000 m ahead / 1200 m behind the train, nearest first, 2 at a time, 25 s timeout; the first patch is awaited before the start, at most 6 s).  The 4 m relief is the 2 m
+  grid sub-sampled (rms 0.2 m, only the steep valley walls differ by up to 3 m; the terrain strip samples it every 5 m anyway).  A heavy half that is slow or missing: `track.inSurround` stays false for that patch (the generic
+  scenery grows there), the light patch (crossing road, water) is still drawn from the core, `landscape.refreshChunksAround` rebuilds the chunks when the scenery half arrives late.  `data` / `state` / `meshReady` are getters
+  of the height patches.  Munsbach (index.json, Mosel line) stays one file.  Measured (`scripts/zuch/download_probe.mjs`, clean cache, medium): start of a service = cores + real data + first scenery half: west 0.73 MB raw,
+  south 1.44 MB raw / 0.40 MB gzip, north 1.80 MB raw / 0.51 MB gzip (the Mosel line: 1.4 MB raw), the rest of the 20 MB streams while driving.  Rebuilding patches: `build_route_patches.py` splits them automatically.
+* **Career (config.js, `scripts/zuch/career_probe.mjs`, `drive_bot.mjs`)**: the game's passenger model run 600 times per route (railcar): west 2.4 k per service (11.9 min, unchanged), south 5.9 k -> 8.5 k (20 -> 33 min, 255 EUR / min),
+  north 6.3 k -> 9.7 k (22 -> 39 min, 248 EUR / min), east 4.5 k (23.6 min), wittlich 12.3 k (54.6 min); EUR per minute stays in the 190 - 255 band.  North's price 16 000 -> 24 000 (the same 2.5 services as before);
+  south stays 1 800 (one west service).  `drive_bot.mjs` drives the game's own sim at 97 % of the limit (no overspeed): south / north / west / east / wittlich all keep the timetable (worst lateness 1 - 7 s, punctuality window 30 s),
+  at 80 % of the limit still <= 9 s on south / north (wittlich 20 s).
+* **WebKit / budgets (`webkit_smoke.mjs --station`, medium, 1024 x 768)**: Esch-Uelzecht 204 draws / 389 k triangles (cab), 160 / 386 k (aerial); Ettelbréck 230 / 360 k, 119 / 211 k; Mamer 196 / 343 k, 117 / 264 k; the crossing views 225 / 259 / 216
+  draws, 367 k / 421 k / 346 k triangles; Munsbach (east) 234 / 345 k.  Chrome medium scan every 400 m (`perf_probe.mjs --scan`): worst cab view north 259 draws / 433 k triangles, south 248 / 483 k, west 238 / 392 k (W1 budget:
+  about 260 draws, 680 k triangles at Munsbach).  Headless WebKit holds 16.7 ms (vsync) everywhere; no real iPad measurement.
+
+## W2c: wave 3 (26 Oct 2026): station halls, landmarks
+
+* Hall positions follow the OSM / LOD2 station building of each patch (`scripts/zuch/station_plan.mjs` draws the OSM outline over the model): Ettelbréck hall across the tracks (lateral -18.6 .. -27.8, 10 .. 75 m ahead; island platform with the wave canopy on the player's side),
+  Miersch z -25 .. -3, Clierf z +94 .. +121 (behind), Esch-Uelzecht z -92 .. -42 (ahead), Bettembuerg +22 m, Belval vault -52 .. +62 / pod +70.  A reversed service mirrors z (`api.track.reverse`).
+* `station-surround-mesh.js`: buildings centred inside a platform polygon (OSM platform roofs) are not drawn (they appeared as 250 m windowed walls).
+* `real-landmarks.js` + `landscape.js` chunk hook: `TS.realLandmarks.resolve(track)` / `draw(kind, ctx)`; DEFS south: Belval furnaces A / B; north: Clervaux castle, Saint-Maurice abbey (relative to the station block, legs beyond 250 m compressed x 0.27, hill landmarks clamped to the strip).
+
 ## 3. Other lines (Wave 2+)
 
 * West (Lëtzebuerg - Kleinbettingen, line 70): Hollerich/Bertrange/Mamer/Capellen; the A6 parallel, fields of the Grand Duchy; Mamer-Lycée is not a stop.

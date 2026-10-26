@@ -11,6 +11,8 @@ const root = flag('root', undefined);
 const tag = flag('tag', '');
 const focusZ = Number(flag('focusZ', '0'));          // patch z (m, ahead = negative) of the station building / the thing to look at
 const fcLat = Number(flag('forecourtLat', '16'));    // lateral distance behind the platform kerb for the forecourt view
+const trainOff = Number(flag('trainOff', '160'));   // metres behind the platform middle where the train stands (600 = out of every view)
+const only = flag('only', '');                      // e.g. 4-air,5-platform-along
 const [outDir, routeId, stationName] = args;
 const sim = await openSim({ quality, root });
 try {
@@ -39,8 +41,9 @@ try {
   };
   const stats = {};
   for (const [name, v] of Object.entries(views)) {
+    if (only && !only.split(',').includes(name)) continue;
     if (v.cab) await sim.viewCab({ s: v.s });
-    else await sim.view({ trainS: st.mid - 160, settle: 30, ...v });
+    else await sim.view({ trainS: st.mid - trainOff, settle: 30, ...v });
     await sim.shot(`${base}-${name}.png`);
     stats[name] = await sim.stats();
   }

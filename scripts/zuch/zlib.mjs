@@ -34,12 +34,19 @@ export async function simOnPage(page, origin, { quality = 'high', train = 'emu' 
   const api = {
     page, errors, origin,
     async close() { /* replaced by openSim */ },
-    async start(routeId, trainId = train) {
+    /* lazy: true = leave the scenery half of the station patches to the game's own streaming (default: load them all, so that screenshots and the hole scan see the final scenery) */
+    async start(routeId, trainId = train, { lazy = false } = {}) {
       await page.evaluate(([r, t]) => __tsTest.startService(r, t, 'career'), [routeId, trainId]);
       await page.waitForFunction(() => { const s = __tsTest.state(); return s.phase === 'running' && !document.getElementById('loading')?.hidden === false; }, null, { timeout: 120000 }).catch(() => {});
       await page.waitForFunction(() => __tsTest.state().phase === 'running', null, { timeout: 120000 });
       await page.evaluate(() => { window.focus(); });
       await api.frames(10);
+      if (!lazy) await api.loadScenery();
+    },
+    /* the scenery half (buildings, trees, ground paint) of every station patch of the route; the chunks around them are rebuilt by the game */
+    async loadScenery() {
+      await page.evaluate(async () => { const t = __tsTest.trackInfo(); const b = t.base || t; await Promise.all((b.surroundPatches || []).map((p) => window.TS.stationSurround.loadHeavy(p.name))); });
+      await api.frames(6);
     },
     /* one-off evaluation against the game: fn gets ({ track, world, scene, camera, THREE }) */
     evalGame(fn, arg) { return page.evaluate(`(${fn.toString()})(Object.assign(__tsTest.internals(), { track: __tsTest.trackInfo() }), ${JSON.stringify(arg === undefined ? null : arg)})`); },
