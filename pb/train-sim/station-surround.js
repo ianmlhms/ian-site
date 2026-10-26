@@ -142,7 +142,9 @@
       console.warn(TAG + 'preload failed', error);
     }
   }
-  /* a patch can be bound to one scenery (data.scenery, e.g. 'mosel': the patch of Lëtzebuerg is straightened along the line to the east and must not be laid along the west / south / north lines) */
+  /* a patch can be bound to one scenery (data.scenery): every patch is placed purely by the CURRENT track's own frame (lateral / longitudinal offsets from
+   * sMid, see station-surround-mesh.js), so this is only for a patch that is genuinely wrong on another scenery, not a general lock (Lëtzebuerg's patch
+   * carries no `scenery` field any more: the same real Gare Centrale is used by every route). */
   const forRoute = (data, def) => !data.scenery || !def || def.sceneryId === data.scenery;
   const dataFor = (name, def) => { const d = prepared.get(name); return d && forRoute(d, def) ? d : null; };
 

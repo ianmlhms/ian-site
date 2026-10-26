@@ -97,25 +97,44 @@
       const inRange = r.p.some((q) => q[0] >= c.s0 - 40 && q[0] <= c.s1 + 40);
       if (!inRange) return;
       const dense = densify(r.p, ROAD_SAMPLE);
-      let run = [];
-      const flush = () => { if (run.length >= 2) list.push({ c: r.c, w: r.w, n: r.n, ref: r.ref, p: run }); run = []; };
-      dense.forEach((q) => {
-        if (q[0] >= c.s0 - ROAD_SAMPLE && q[0] <= c.s1 + ROAD_SAMPLE) run.push(q);
-        else flush();
+      const freeEnd = r.freeEnd || [false, false];
+      let run = [], runIdx0 = -1;
+      const flush = (lastIdx) => {
+        if (run.length >= 2) {
+          list.push({ c: r.c, w: r.w, n: r.n, ref: r.ref, p: run, taperStart: runIdx0 === 0 && freeEnd[0], taperEnd: lastIdx === dense.length - 1 && freeEnd[1] });
+        }
+        run = []; runIdx0 = -1;
+      };
+      dense.forEach((q, idx) => {
+        if (q[0] >= c.s0 - ROAD_SAMPLE && q[0] <= c.s1 + ROAD_SAMPLE) { if (!run.length) runIdx0 = idx; run.push(q); }
+        else flush(idx - 1);
       });
-      flush();
+      flush(dense.length - 1);
     });
     return list;
   }
 
+  /* ROADS_TO_NOWHERE: a free end (real-line.js r.freeEnd: no other road meets it, e.g. a field track clipped at the edge of the fetched corridor rather
+   * than at a real junction, REAL-LINES.md "roads to nowhere") is tapered into the ground over TAPER_LEN instead of ending in a hard paved rectangle. */
+  const TAPER_LEN = 12, TAPER_MIN_HW = 0.25;
   function drawRoads(c, roads) {
     const T = c.T;
     roads.forEach((rd) => {
       const hw = rd.w / 2;
+      const n = rd.p.length;
+      const cumS = [0];
+      for (let i = 1; i < n; i++) cumS.push(cumS[i - 1] + Math.hypot(rd.p[i][0] - rd.p[i - 1][0], rd.p[i][1] - rd.p[i - 1][1]));
+      const total = cumS[n - 1] || 1;
+      const hwAt = (i) => {
+        let f = 1;
+        if (rd.taperStart) f = Math.min(f, clamp(cumS[i] / TAPER_LEN, 0, 1));
+        if (rd.taperEnd) f = Math.min(f, clamp((total - cumS[i]) / TAPER_LEN, 0, 1));
+        return TAPER_MIN_HW + (hw - TAPER_MIN_HW) * f;
+      };
       // world samples with heights; pieces where the ground is too steep across the road are left out
-      const samples = rd.p.map(([s, lat]) => {
+      const samples = rd.p.map(([s, lat], i) => {
         const f = c.frame(s);
-        return { s, lat, x: f.x + f.rx * lat, z: f.z + f.rz * lat };
+        return { s, lat, x: f.x + f.rx * lat, z: f.z + f.rz * lat, hw: hwAt(i) };
       });
       let piece = [];
       const pieces = [];
@@ -128,10 +147,11 @@
         dx /= dl; dz /= dl;
         const px = -dz; const pz = dx;
         const info = c.rowInfo(clamp(q.s, 0, c.track.length));
-        const left = { x: q.x - px * hw, z: q.z - pz * hw };
-        const right = { x: q.x + px * hw, z: q.z + pz * hw };
-        left.y = c.groundY(info, q.lat - hw, left.x, left.z, q.s);
-        right.y = c.groundY(info, q.lat + hw, right.x, right.z, q.s);
+        const qhw = q.hw;
+        const left = { x: q.x - px * qhw, z: q.z - pz * qhw };
+        const right = { x: q.x + px * qhw, z: q.z + pz * qhw };
+        left.y = c.groundY(info, q.lat - qhw, left.x, left.z, q.s);
+        right.y = c.groundY(info, q.lat + qhw, right.x, right.z, q.s);
         const cy = c.groundY(info, q.lat, q.x, q.z, q.s);
         const bad = Math.abs(left.y - right.y) > STEEP_CROSS || q.s < -20 || q.s > c.track.length + 20;
         if (bad) { if (piece.length >= 2) pieces.push(piece); piece = []; return; }

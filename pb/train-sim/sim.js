@@ -93,7 +93,12 @@
       const dAB = v * v / (2 * accel) + v * v / (2 * brake);
       const travel = dist > dAB ? (dist - dAB) / v + v / accel + v / brake : 2 * Math.sqrt(dist / (1 / accel + 1 / brake));
       const arr = clock + travel, isLast = i === lastIdx;
-      const dwell = isLast ? 0 : Math.round(DWELL_MIN + rng() * (DWELL_MAX - DWELL_MIN));
+      /* a premium train (kiss / ic / hst) needs much longer than DWELL_MAX to exchange its passengers through 2 doors / side regardless of its extra
+       * cars (drive_bot.mjs's own careful-driver wait, 4 s + 0.6 s per alighting + 0.7 s per boarding passenger of the average plan): the schedule must
+       * grant at least that much, or the lateness compounds at every stop (REAL-LINES.md: kiss 573 s, brussels 339 s, hst paris 338 s on the abroad routes). */
+      const px = Math.round((train.capacity || 90) * 0.4);
+      const minExchange = train.kind === 'rail' ? Math.ceil(4 + 0.6 * px * 0.385 + 0.7 * 12) + 5 : 0;
+      const dwell = isLast ? 0 : Math.max(minExchange, Math.round(DWELL_MIN + rng() * (DWELL_MAX - DWELL_MIN)));
       stops[i].arr = Math.round(arr); stops[i].dep = Math.round(arr + dwell);
       for (let j = last + 1; j < i; j++) {                      // passed stations: interpolate by distance
         const f = (stations[j].s - prev.s) / Math.max(1, st.s - prev.s);

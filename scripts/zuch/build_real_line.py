@@ -198,8 +198,11 @@ def is_bridge(t):
     return bool(t.get("bridge")) and t.get("bridge") != "no"
 
 
+NON_BORE_TUNNEL = ("no", "building_passage", "culvert")  # OSM tunnel= subtypes that are not a real rail bore
+
+
 def is_tunnel(t):
-    return bool(t.get("tunnel")) and t.get("tunnel") not in ("no",)
+    return bool(t.get("tunnel")) and t.get("tunnel") not in NON_BORE_TUNNEL
 
 
 # ------------------------------------------------------------------------------------------------------------------------------ one leg

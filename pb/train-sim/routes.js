@@ -86,7 +86,10 @@
     return RL.segments.main.reduce((acc, it) => {
       if (it.t === 'station') {
         const st = RL.stations[it.name];
-        return acc.concat([station(it.name, st.size, st.side, st.biome, false, PLATFORM_WIDTH_LU[it.name])]);
+        /* Lëtzebuerg Gare Centrale is the same real station on every route (the patch, like the Mosel one, is bound to the LEFT
+         * side of the track); each real-<id>.js was fit independently from its own OSM platform search and may disagree. */
+        const side = it.name === 'Lëtzebuerg' ? 'left' : st.side;
+        return acc.concat([station(it.name, st.size, side, st.biome, false, PLATFORM_WIDTH_LU[it.name])]);
       }
       return acc.concat(leg(it.length, it.spec).map((x) => Object.assign({}, x, { legId: it.id })));
     }, []);

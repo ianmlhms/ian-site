@@ -410,6 +410,9 @@ def emit(route_id, res):
     wtree = STRtree([w["g"] for w in waters])
     roads = [w for w in tiles["highways"] if w["t"].get("highway") in sc.ROAD_CLASSES]
     rtree = STRtree([w["g"] for w in roads])
+    road_lines = [w["g"] for w in roads]
+    import real_line_crossings as rc
+    track_line = LineString(attrs.xy)
     all_meta = dict(legs_meta)
     for name, st in stations.items():
         all_meta["st:" + name] = {"route": route_id, "from": name, "to": name, "real": [st["s_real"] - HALF_BLOCK, st["s_real"] + HALF_BLOCK], "k": 1.0,
@@ -418,9 +421,16 @@ def emit(route_id, res):
     for lid, meta in all_meta.items():
         g = sc.LegGeom(attrs, meta)
         rd = sc.roads_of_leg(g, roads, rtree)
+        is_block = lid.startswith("st:")
+        # the real road of a level crossing, followed outward to its real junction (real_line_crossings.py): same as the Mosel pipeline (build_real_line.py
+        # write_features), wired in here too so the crossing roads of the single-line routes (west / south / north / metz / brussels / paris) stop falling
+        # back to the Wave-1 synthetic perpendicular stub on every crossing (REAL-LINES.md "roads to nowhere").
+        arm_ctx = None if is_block else {"fn": lambda gg, xy, sgc: rc.arms_of_crossing(gg, xy, sgc, roads, rtree, track_line, road_lines, rtree)}
+        crossings, arms_abs = sc.crossings_of_leg(g, res["feats"]["crossings"], rd, meta=None if is_block else all_meta[lid], arm_ctx=arm_ctx)
+        rd = rc.drop_arm_ribbons(rd, arms_abs)
         out[lid] = {
             "L": round(g.length, 1), "land": sc.land_raster(g, land), "far": sc.far_raster(g, land), "water": sc.water_windows(g, waters, wtree), "roads": rd,
-            "relief": sc.relief(g, dem), "places": sc.places_of_leg(g, tiles["places"]), "crossings": sc.crossings_of_leg(g, res["feats"]["crossings"], rd)[0],   # (records, arm polylines): the arms are only used by the Mosel pipeline
+            "relief": sc.relief(g, dem), "places": sc.places_of_leg(g, tiles["places"]), "crossings": crossings,
         }
         print("  features", lid, meta["from"], "->", meta["to"], "roads", len(rd), "water", len(out[lid]["water"]), "places", len(out[lid]["places"]), "crossings", len(out[lid]["crossings"]), flush=True)
     doc = {"version": 1, "row": sc.ROW_M, "col": sc.COL_M, "lat0": sc.LAT0, "cols": sc.COLS, "far": {"row": sc.FAR_ROW, "col": sc.FAR_COL, "lat0": sc.FAR_LAT0, "cols": sc.FAR_COLS},

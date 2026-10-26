@@ -321,6 +321,13 @@
       c.fillStyle = 'rgba(220,235,245,0.25)'; c.fillRect(60, 140, 8, h);
       c.fillStyle = 'rgba(40,30,20,0.4)'; c.fillRect(0, h - 3, w, 3);
     });
+    // Romanesque arcaded cornice frieze (a Lombard band): a row of small blind arches on corbels just under the eave, reused on every wing and the gable
+    const arcadeTex = () => ctex('ab-metz-arcade', 64, 48, (c, w, h) => {
+      c.fillStyle = STONE_LT; c.fillRect(0, 0, w, h);
+      c.fillStyle = 'rgba(40,30,20,0.4)';
+      for (let x = 2; x < w; x += 16) { c.beginPath(); c.moveTo(x, h); c.lineTo(x, 16); c.arc(x + 8, 16, 8, Math.PI, 0); c.lineTo(x + 16, h); c.closePath(); c.fill(); c.fillStyle = STONE_LT; c.fillRect(x + 6, h - 6, 4, 6); c.fillStyle = 'rgba(40,30,20,0.4)'; }
+      c.fillStyle = STONE_LT; c.fillRect(0, 0, w, 5);
+    });
     const gableTex = () => ctex('ab-metz-gable', 256, 256, (c, w, h) => {
       const r = rng(9);
       c.fillStyle = STONE; c.fillRect(0, 0, w, h);
@@ -354,6 +361,7 @@
     const wing = texB('metz-wing', wingTex);
     const gable = texB('metz-gable', gableTex);
     const tower = texB('metz-tower', towerTex);
+    const arcade = texB('metz-arcade', arcadeTex);
     const plain = texB('metz-plain', () => ctex('ab-metz-plain', 128, 128, (c, w, h) => {
       const r = rng(21); c.fillStyle = STONE; c.fillRect(0, 0, w, h);
       for (let i = 0; i < 900; i++) { const v = r() > 0.5 ? 255 : 0; c.fillStyle = 'rgba(' + v + ',' + v + ',' + v + ',' + (0.04 + r() * 0.1).toFixed(2) + ')'; c.fillRect(r() * w, r() * h, 2 + r() * 6, 2 + r() * 4); }
@@ -370,6 +378,10 @@
       wallD(wing, d0 + DEP, za, zb, y0, wallH, 1, bays, 1);   // the forecourt side of the wings: the same arched windows (it was a blank wall; photo: Commons "Gare de Metz-Ville", W3 montage)
       wallZ(plain, za, d0, d0 + DEP, y0, wallH, -1, 2, 1);
       wallZ(plain, zb, d0, d0 + DEP, y0, wallH, 1, 2, 1);
+      // Romanesque arcaded cornice (Lombard band) just under the eave, both long faces
+      const archBays = Math.round(len / 2.1);
+      wallD(arcade, d0 - 0.02, za, zb, y0 + wallH - 0.95, 0.95, -1, archBays, 1);
+      wallD(arcade, d0 + DEP + 0.02, za, zb, y0 + wallH - 0.95, 0.95, 1, archBays, 1);
       vc.box(X(d0 + DEP / 2), wallH + 0.15, (za + zb) / 2, DEP + 0.6, 0.3, len + 0.6, col(STONE_LT));
       gableZ(slate, plain, d0, d0 + DEP, za, zb, wallH + 0.3, wallH + 5.4, 0.6, WHITE, WHITE);
       // dormers: little gabled windows along the roof
@@ -422,6 +434,13 @@
     clockZ((td0 + td1) / 2, tH - 5.5, tz0 - 0.06, 4.6, -1);
     clockZ((td0 + td1) / 2, tH - 5.5, tz1 + 0.06, 4.6, 1);
     clockD(td1 + 0.06, tH - 5.5, (tz0 + tz1) / 2, 4.6, 1);
+
+    // forecourt: a paved square in front of the entrance (Place du Général-de-Gaulle side), reaching beyond the wings and the tower
+    const plat = colB('metz-plat', { roughness: 0.9, metalness: 0.02 }, false);
+    const foreD0 = d0 + DEP, foreD1 = d0 + cD + 34;
+    box(plat, foreD0, foreD1, -126, 126, y0 - 0.02, y0 + 0.1, col('#9b958a'));
+    box(vc, foreD0 - 0.15, foreD0 + 0.15, -126, 126, y0 + 0.08, y0 + 0.24, col('#75716a'));   // kerb at the building edge
+    for (let z = -116; z < 116; z += 20) { vc.box(X(foreD1 - 3), 3.1, z, 0.12, 3.1, 0.12, col('#2c2f33')); glow.box(X(foreD1 - 3), 5.9, z, 0.22, 0.22, 0.22, col('#fff2cc')); }
 
     // platform roof: a long, plain steel canopy (SNCF grey) on slender columns, over most of the platform
     const canH = 4.4;
@@ -911,6 +930,25 @@
     [-4.6, -10.4, edge + W + 2.3].forEach((d) => { k.track(d, Math.min(zBuf, zOpen), Math.max(zBuf, zOpen)); void buffer; });   // infra.js ends every declared track in a buffer stop at the terminus
     // station floor between the walls (hides the yard ground; the city road and its cars run just outside the walls)
     box(plat, -a, a, zLo, zEnd, -0.62, -0.46, col('#6f7275'));
+    // forecourt: a paved plaza outside the end wall (Place du 11-Novembre-1918 / Place du Boulingrin side), with a low street frontage facing it
+    const foreD = term * 46;
+    const foreZ = zEnd + foreD;
+    box(plat, -a - 20, a + 20, Math.min(zEnd, foreZ), Math.max(zEnd, foreZ), -0.64, -0.48, col('#8d8a80'));   // granite paving, wider than the hall
+    const frontTex = texB('pe-front', () => ctex('ab-pe-front', 512, 192, (c, w, h) => {
+      const r = rng(53); c.fillStyle = '#ddd0b2'; c.fillRect(0, 0, w, h);
+      for (let i = 0; i < 1400; i++) { const v = r() > 0.5 ? 255 : 0; c.fillStyle = 'rgba(' + v + ',' + v + ',' + v + ',0.05)'; c.fillRect(r() * w, r() * h, 3, 2); }
+      c.fillStyle = 'rgba(80,70,50,0.16)'; for (let y = 0; y < h; y += 14) c.fillRect(0, y, w, 1);
+      c.fillStyle = '#2d2a26';
+      for (let x = 16; x < w - 16; x += 48) { c.beginPath(); c.moveTo(x, h); c.lineTo(x, 60); c.arc(x + 16, 60, 16, Math.PI, 0); c.lineTo(x + 32, h); c.closePath(); c.fill(); }
+      c.fillStyle = 'rgba(190,205,215,0.3)';
+      for (let x = 20; x < w - 16; x += 48) c.fillRect(x + 3, 54, 26, h - 64);
+      c.fillStyle = '#c6b992'; c.fillRect(0, h - 10, w, 10);
+    }));
+    wallZ(frontTex, foreZ, -a - 18, a + 18, FORM_Y, 11, term, 1, 1);   // low stone frontage block across the plaza
+    box(vc, -a - 18.5, a + 18.5, Math.min(zEnd, foreZ) - 0.3, Math.min(zEnd, foreZ) + 0.3, FORM_Y + 10.7, FORM_Y + 11.3, col('#c6b992'));
+    for (let z = Math.min(zEnd, foreZ) + 8; z < Math.max(zEnd, foreZ) - 8; z += 22) {
+      [-a - 14, a + 14].forEach((d) => { vc.box(X(d), 0.35, z, 0.22, 0.22, 0.7, col('#2c2f33')); glow.box(X(d), 3.1, z, 0.14, 0.14, 0.3, col('#fff2cc')); });
+    }
   }
 
   /* ------------------------------------------------------------------ small stations */
