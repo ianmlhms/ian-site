@@ -38,4 +38,19 @@
       w267055347: { wall: CREAM, roof: 'tile', roofTint: '#6b5d54', plinth: { h: 0.4, col: '#a6a297' }, floorH: 3.2, bayM: 4.0, win: { w: 0.9, h: 1.2, kind: 'rect', frame: '#f6f4ee', reveal: '#cfc5ae', sill: false }, doors: [{ z: 65.5, w: 1.2, h: 2.1, col: '#7b2a26', face: 'front' }] },
     },
   });
+
+  /* HETZERATH.  Refs: Commons "Hetzerath, Bahnhofsgebäude 20260124", "Bahnhof Hetzerath, Durchfahrt des RE 1 nach Trier 20260124".  Old station building of red Eifel sandstone (rubble stone, dark red
+   * plinth), dark slate hip / mansard roofs with small dormers and brick chimneys, half-timbered upper gable, white window frames, a concrete flat canopy along the platform (station model). */
+  reg('Hetzerath', {
+    wall: '#8f5a47', trim: '#d9cfb8', plinth: { h: 0.7, col: '#7d4a3a' }, band: null, roof: 'slate', roofTint: '#5b6068', fascia: '#3b3f44', floorH: 3.4, bayM: 3.3, stain: true, stone: true,
+    win: { w: 1.0, h: 1.5, kind: 'rect', frame: '#ece8dc', reveal: '#7d4a3a', sill: true },
+    doors: [{ z: 4.0, w: 1.2, h: 2.3, col: '#5b3a2a', face: 'front' }, { z: 14.0, w: 1.2, h: 2.3, col: '#5b3a2a', face: 'back' }],
+    others: {
+      DERPLP100000kheY: { wall: '#8f5a47', stone: true, roof: 'slate', roofTint: '#5b6068', plinth: { h: 0.7, col: '#7d4a3a' }, floorH: 3.4, bayM: 3.6, win: { w: 0.8, h: 1.2, kind: 'rect', frame: '#ece8dc', reveal: '#7d4a3a', sill: false } },      // the sandstone goods wing with the open porch
+    },
+    extras(api) {
+      api.box(10.5, 9.0, 26.0, 0.8, 2.0, 0.8, '#8a4a3a');
+      api.box(13.5, 6.2, 4.0, 0.8, 1.6, 0.8, '#8a4a3a');
+    },
+  });
 })();

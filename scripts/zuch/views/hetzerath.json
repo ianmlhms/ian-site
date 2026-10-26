@@ -1,0 +1,8 @@
+{
+  "route": "wittlich", "station": "Hetzerath", "refs": "Hetzerath",
+  "views": [
+    { "photo": "Bahnhof Hetzerath, Durchfahrt des RE 1 nach Trier 20260124.jpg", "pos": [4.0, 38, 1.7], "look": [0, -40, 2.6], "fov": 62, "note": "platform ahead, building right" },
+    { "photo": "Hetzerath, Bahnhofsgebäude 20260124.jpg", "pos": [27, -36, 1.7], "look": [12, 10, 4.0], "fov": 62, "note": "building from the street" },
+    { "photo": "Hetzerath, Bahnhofsgebäude 20260124.jpg", "pos": [-4.0, 60, 1.7], "look": [8, 10, 3.0], "fov": 62, "note": "across the tracks" }
+  ]
+}

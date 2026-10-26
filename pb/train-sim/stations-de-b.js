@@ -87,6 +87,15 @@
     },
   });
 
+  /* flat concrete platform canopy: slab lA..lB over z0..z1 at height h above the platform, posts along the lA edge every `step` m */
+  function flatCanopy(api, k, lA, lB, z0, z1, h, hex, postL) {
+    const { H, col } = api;
+    const zc = (z0 + z1) / 2;
+    k.vc.box(k.X((lA + lB) / 2), H + h, zc, Math.abs(lB - lA), 0.28, z1 - z0, col(hex));
+    k.vc.box(k.X(lA), H + h - 0.1, zc, 0.12, 0.5, z1 - z0, col('#bdbbb4'));
+    for (let z = z0 + 1; z <= z1 - 0.5; z += 5.5) k.vc.box(k.X(postL), H + h / 2, z, 0.22, h, 0.22, col('#c9c7c0'));
+  }
+
   /* DB steel-and-glass stair / lift canopy on posts (flat roof, glass side panes), l..l+wd over z0..z1 */
   function stairCanopy(api, k, l, z0, z1, wd, h = 3.4) {
     const { H, col } = api;
@@ -155,6 +164,41 @@
       steelCanopy(api, k, -WI.far.edge - 1.2, -WI.far.edge - 5.4, -WI.far.edge - 5.2, -22, 62, 8, '#3d4a44');
       [-30, 10, 50, 90].forEach((z) => dbMast(f, WI.far.edge + 5.4, z, 5.4));
       dbNameBoard(api, f, WI.far.edge + 1.6, 20, 'Wittlich Hbf', true);
+    },
+  });
+
+  /* ================================================================ HETZERATH
+   * Refs: ~/Library/Caches/zuch-refs/Hetzerath (Commons: "Hetzerath, Bahnhofsgebäude 20260124", "Bahnhof Hetzerath, Durchfahrt des RE 1 nach Trier 20260124"; the other files of the folder are not station photos).
+   * The game track (patch x 0) runs along the platform on the RIGHT (x 2.1 .. 7.3, z -105 .. 32) with the old red-sandstone station building behind it (x 7.3 .. 19.8, z -6.5 .. 28.2); a flat white
+   * concrete canopy runs from the building along the platform, a concrete box shelter stands ahead of it; track 2 at x -4.2 and the platform of tracks 2 / 3 (x -6.3 .. -14.5, z -88 .. 105) with two
+   * concrete box shelters lie on the LEFT. */
+  const HE = { track: 4.2, far: { edge: 6.1, width: 8.0, z0: -88, z1: 105 } };
+  reg('Hetzerath', {
+    canopy: false,
+    furniture: false,
+    build(api) {
+      const { sx, H, W, edge, col } = api;
+      const k = makeKit(api);
+      const f = mirrorKit(api);
+      const lB = edge + W;
+      // building side: flat concrete canopy along the building front, concrete box shelter, plates, masts, benches, ticket machine
+      flatCanopy(api, k, 3.8, lB, -6.5, 12, 3.4, '#dddbd4', 4.2);
+      k.boxShelter(lB - 2.6, -21, 4.4, 2.1, '#dcdad3', '#bdbbb4', 3);
+      [-62, 30].forEach((z) => dbNameBoard(api, k, 3.3, z, 'Hetzerath'));
+      k.sign(2.6, -38, '1', 'blue');
+      [-84, -55, -32, 4, 24].forEach((z) => dbMast(k, 3.8, z));
+      k.bench(lB - 0.6, -2, '#5a5f66'); k.bench(lB - 0.6, -45, '#5a5f66');
+      k.bin(lB - 0.5, 8, '#3b4046');
+      k.vc.box(k.X(lB - 0.5), H + 1.0, 7.8, 0.5, 2.0, 0.6, col('#3a4650'));
+      // far side: track 2, the platform of tracks 2 / 3 with box shelters and plates
+      k.track(-HE.track, -135, 135, { pole: true });
+      k.platformBox(-HE.far.edge, HE.far.width, -1, HE.far.z0, HE.far.z1);
+      [-50, 70].forEach((z) => dbNameBoard(api, f, 3.4, z, 'Hetzerath', true));
+      f.sign(2.6, 10, '2', 'blue'); f.sign(5.2, 10, '3', 'blue');
+      f.boxShelter(HE.far.edge - 2.0, 34, 5.0, 2.2, '#dcdad3', '#bdbbb4', 3);
+      f.boxShelter(HE.far.edge - 2.0, 56, 4.4, 2.2, '#dcdad3', '#bdbbb4', 3);
+      [-70, -40, -10, 20, 50, 80].forEach((z) => dbMast(f, 3.6, z));
+      f.bench(HE.far.width - 0.4, 0, '#5a5f66');
     },
   });
 })();
