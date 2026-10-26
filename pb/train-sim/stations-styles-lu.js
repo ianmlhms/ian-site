@@ -89,6 +89,7 @@
   /* LËTZEBUERG GARE CENTRALE.  Refs: ~/Library/Caches/zuch-refs/Lux-Gare (Commons: Luxembourg City railway station 2022-12, Gare centrale tram stop,
    * Grande vitesse, Hall Gare centrale).  Yellow-ochre sandstone building (1907-1913), arched windows, mansard slate roofs, the clock tower with its
    * green copper spire; the real LOD2 model (667 roof faces) gives the volumes. */
+  const CANOPY_IDS = ['w362239328', 'w1312992341', 'ACT_4e24b351-eab5-4dc2-b87f-8f4802b32639'];   // not the Rotondes (w52094232 / 33), not the office tower w1289589204
   reg('Lëtzebuerg', {
     wall: '#d8c093', trim: '#c4a876', plinth: { h: 1.3, col: '#8b7d62' }, band: '#c9ae7c', roof: 'slate', roofTint: '#7d8288',
     steepRoof: { kind: 'slate', tint: '#585d63' }, copperAbove: 28, copperTint: '#5f9d8a',
@@ -96,7 +97,9 @@
     win: { w: 1.25, h: 2.3, kind: 'rect', frame: '#efe9dc', reveal: '#b99d68', sill: true },
     gableWin: 'round',
     doors: [],
-    others: { w362239328: { noWalls: true, roof: 'zinc', roofTint: '#c9d3da', noWindows: true } },   // the glass-and-steel platform canopies (LOD2 holds them as one flat roof building)
+    /* the glass-and-steel platform canopies (LOD2 holds them as flat-roof "buildings") are drawn by station-yard.js from their roof faces, with columns on the platforms */
+    yard: { canopies: CANOPY_IDS, platformTop: 0.77, platformFrom: -25, voie: { 0: 'Voie 1', 1: 'Voie 2-3', 2: 'Voie 4-5', 3: 'Voie 6-7', 4: 'Voie 8-9', 5: 'Voie 10-11' } },   // by platform index of the patch (x ascending)
+    skipIds: CANOPY_IDS,
   });
 
   /* BETZDER (Betzdorf).  Refs: Commons "Betzdorf, gare CFL Betzdorf (101)-(105)" (Feb 2025).  No station building any more; the LOD2 hut behind the platform is the old white

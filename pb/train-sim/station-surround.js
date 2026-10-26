@@ -18,6 +18,7 @@
   const TS = (window.TS = window.TS || {});
   const TAG = '[Lokféierer] station surround: ';
   const DATA_DIR = '/pb/train-sim/data/stations/';
+  const DATA_VERSION = 'w2d1';     // bump when the patch files change (they are fetched with force-cache)
   const EXT_X = 160;              // patch half width (m) and half length
   const EXT_Z = 320;
   const FADE_X = 45;              // the real relief fades into the generic one over the outer metres
@@ -44,7 +45,7 @@
     const ctl = typeof AbortController === 'function' ? new AbortController() : null;
     const timer = ctl && timeoutMs ? setTimeout(() => ctl.abort(), timeoutMs) : null;
     try {
-      const res = await fetch(url, ctl ? { cache: 'force-cache', signal: ctl.signal } : { cache: 'force-cache' });
+      const res = await fetch(url + (url.indexOf('?') < 0 ? '?v=' + DATA_VERSION : ''), ctl ? { cache: 'force-cache', signal: ctl.signal } : { cache: 'force-cache' });
       if (!res.ok) throw new Error(url + ' -> HTTP ' + res.status);
       return await res.json();
     } finally { if (timer) clearTimeout(timer); }

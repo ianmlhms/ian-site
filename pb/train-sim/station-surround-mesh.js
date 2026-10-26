@@ -140,7 +140,21 @@
       this.p.push(x, y, z); this.n.push(nx, ny, nz); this.c.push(col[0], col[1], col[2]); if (this.alpha) this.c.push(a === undefined ? 1 : a); this.u.push(u, v);
       return this.count - 1;
     }
+    /* every triangle is wound counter-clockwise as seen from its normal's side: a DoubleSide material flips the normal of a back face, so a roof whose triangulation came out clockwise
+     * was lit from below (black); LOD2 faces carry an arbitrary ring direction */
+    fixWinding() {
+      const p = this.p; const n = this.n; const ix = this.i;
+      for (let t = 0; t + 2 < ix.length; t += 3) {
+        const a = ix[t] * 3; const b = ix[t + 1] * 3; const c = ix[t + 2] * 3;
+        const ux = p[b] - p[a]; const uy = p[b + 1] - p[a + 1]; const uz = p[b + 2] - p[a + 2];
+        const vx = p[c] - p[a]; const vy = p[c + 1] - p[a + 1]; const vz = p[c + 2] - p[a + 2];
+        const gx = uy * vz - uz * vy; const gy = uz * vx - ux * vz; const gz = ux * vy - uy * vx;
+        const dot = gx * (n[a] + n[b] + n[c]) + gy * (n[a + 1] + n[b + 1] + n[c + 1]) + gz * (n[a + 2] + n[b + 2] + n[c + 2]);
+        if (dot < 0) { const tmp = ix[t + 1]; ix[t + 1] = ix[t + 2]; ix[t + 2] = tmp; }
+      }
+    }
     geometry() {
+      this.fixWinding();
       const g = new T.BufferGeometry();
       g.setAttribute('position', new T.Float32BufferAttribute(this.p, 3));
       g.setAttribute('normal', new T.Float32BufferAttribute(this.n, 3));
@@ -309,11 +323,13 @@
     const frame = (s) => {
       const key = Math.round(s * 4);
       let f = frameCache.get(key);
-      if (!f) { const r = track.frameAt(clamp(s, 0, track.length)); f = { x: r.pos.x, y: r.pos.y - dropN, z: r.pos.z, rx: r.right.x, rz: r.right.z }; frameCache.set(key, f); }
+      if (!f) { const r = track.frameAt(clamp(s, 0, track.length)); const tl = Math.hypot(r.tangent.x, r.tangent.z) || 1; f = { x: r.pos.x, y: r.pos.y - dropN, z: r.pos.z, rx: r.right.x, rz: r.right.z, tx: r.tangent.x / tl, tz: r.tangent.z / tl }; frameCache.set(key, f); }
       return f;
     };
     /* patch (x lateral, z along backwards) -> world */
     const world = (x, z) => { const f = frame(patch.sMid - z); return { x: f.x + f.rx * x, z: f.z + f.rz * x, form: f.y }; };
+    /* a horizontal normal (nx, nz) of the patch frame -> the world frame (the patch x axis is the track's right vector, its z axis points backwards): lighting needs world normals */
+    const rotN = (z, nx, nz) => { const f = frame(patch.sMid - z); return [nx * f.rx - nz * f.tx, nx * f.rz - nz * f.tz]; };
     const stats = { buildings: 0, trees: 0, tris: 0 };
     let treeKey = null;
 
@@ -371,7 +387,7 @@
           /* the real station building from its LOD2 faces, painted from the station's style (station-building.js); without a style the station model draws it */
           const style = TS.stationStyles && TS.stationStyles.get(patch.name);
           if (style && style.useLod2 !== false && TS.stationBuilding) {
-            try { TS.stationBuilding.build({ T, b, style, world, group, disposables, triangulate3, MB, roofTexture, stats }); stats.buildings += 1; } catch (error) { console.warn('[Lokféierer] station building of ' + patch.name + ' failed', error); }
+            try { TS.stationBuilding.build({ T, b, style, world, rotN, group, disposables, triangulate3, MB, roofTexture, stats }); stats.buildings += 1; } catch (error) { console.warn('[Lokféierer] station building of ' + patch.name + ' failed', error); }
             return;
           }
           if (!drawStationBuilding) return;
@@ -383,7 +399,7 @@
         if (sty && sty.skipIds && sty.skipIds.includes(b.id)) return;
         if (sty && sty.others && sty.others[b.id] && TS.stationBuilding) {
           /* a building of the station area that the photos show (goods shed, toilet hut ...): painted from its own style entry */
-          try { TS.stationBuilding.build({ T, b, style: Object.assign({}, sty.otherBase || {}, sty.others[b.id], { doors: sty.others[b.id].doors || [], extras: sty.others[b.id].extras || null }), world, group, disposables, triangulate3, MB, roofTexture, stats }); stats.buildings += 1; return; } catch (error) { console.warn('[Lokféierer] station-area building ' + b.id + ' failed', error); }
+          try { TS.stationBuilding.build({ T, b, style: Object.assign({}, sty.otherBase || {}, sty.others[b.id], { doors: sty.others[b.id].doors || [], extras: sty.others[b.id].extras || null }), world, rotN, group, disposables, triangulate3, MB, roofTexture, stats }); stats.buildings += 1; return; } catch (error) { console.warn('[Lokféierer] station-area building ' + b.id + ' failed', error); }
         }
         const names = FACADE_BY_KIND[b.kind] || FACADE_BY_KIND.other;
         const facade = names[Math.floor(hash2(bi, 5) * names.length) % names.length];
@@ -417,7 +433,8 @@
             let u; let v;
             if (kind === 'wall') { u = ((p[0] * hx + p[2] * hz - pmin) / width) * bays; v = (p[1] - baseY) / floorH; } else { u = p[0] / 2.4; v = p[2] / 2.4; }
             const tn = kind === 'roof' ? tint : 1;
-            return mb.vert(w.x, y, w.z, nxn, nyn, nzn, kind === 'roof' ? [tn, tn, tn] : wt, u, v);
+            const rn = rotN(p[2], nxn, nzn);
+            return mb.vert(w.x, y, w.z, rn[0], nyn, rn[1], kind === 'roof' ? [tn, tn, tn] : wt, u, v);
           });
           for (let t = 0; t < tris.length; t += 3) mb.i.push(ids[tris[t]], ids[tris[t + 1]], ids[tris[t + 2]]);
         };
@@ -470,6 +487,14 @@
         });
         group.add(rec.group); disposables.push(rec); stats.tris += rec.stats.tris;
       } catch (error) { console.warn('[Lokféierer] station roads of ' + patch.name + ' failed', error); }
+    }
+
+    /* ---- the yard of a big station (tracks, platforms, canopies; station-yard.js) */
+    {
+      const ys = TS.stationStyles && TS.stationStyles.get(patch.name);
+      if (ys && ys.yard && TS.stationYard) {
+        try { TS.stationYard.build({ patch, data, world, track, group, disposables, MB, triangulate2, triangulate3, stats, style: ys, quality }); } catch (error) { console.warn('[Lokféierer] station yard of ' + patch.name + ' failed', error); }
+      }
     }
 
     /* ---- trees (LiDAR canopy) */

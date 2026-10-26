@@ -12,7 +12,7 @@ from PIL import Image, ImageDraw
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PATCH = os.path.join(HERE, "..", "..", "pb", "train-sim", "data", "stations", "luxembourg.json")
-CANOPY_IDS = ["w362239328", "w1312992341", "ACT_4e24b351-eab5-4dc2-b87f-8f4802b32639", "w52094233", "w52094232", "w362239327", "w1289589204"]
+CANOPY_IDS = ["w362239328", "w1312992341", "ACT_4e24b351-eab5-4dc2-b87f-8f4802b32639"]
 FORECOURT = (-96.0, -6.0, -60.0, 150.0)       # x0, x1, z0, z1 (patch frame): lawn / meadow in here becomes paving
 E0, N0, HEADING = 77559.24, 73908.75, 19.78
 
@@ -80,6 +80,17 @@ def main():
     buf = io.BytesIO()
     Image.fromarray((out * 16).astype(np.uint8), "L").save(buf, "PNG", optimize=True)
     c["png"] = base64.b64encode(buf.getvalue()).decode()
+    # relief: inside the rail platforms the LiDAR holds 0.9-1.0 m (slab + furniture); the yard renderer draws the slab at 0.77 m, the terrain below it at 0.7 m
+    m = d["dem"]
+    dem = np.frombuffer(base64.b64decode(m["dm"]), dtype="<i2").reshape(m["nz"], m["nx"]).copy()
+    dim = Image.new("L", (m["nx"], m["nz"]), 0)
+    dg = ImageDraw.Draw(dim)
+    for p in d["platforms"]:
+        if all(q[0] > -25 for q in p["ring"]):
+            dg.polygon([((q[0] - m["x0"]) / m["res"], (q[1] - m["z0"]) / m["res"]) for q in p["ring"]], fill=255)
+    pm = np.array(dim) > 0
+    dem[pm & (dem > 3)] = 7
+    m["dm"] = base64.b64encode(dem.astype("<i2").tobytes()).decode()
     d["rails"] = [r for r in d["rails"] if r.get("kind") != "tram"] + tram_rails((-160, 160, -320, 320))
     log("tram rails:", sum(1 for r in d["rails"] if r.get("kind") == "tram"))
     if "--check" in sys.argv:

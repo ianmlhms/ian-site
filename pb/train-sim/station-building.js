@@ -21,6 +21,7 @@
   const MAX_TEX = 1024;
   const MIN_FACE = 0.8;              // faces smaller than this get no texture
   const FLOOR_H = 3.3;
+  const ROOF_TINT_BOOST = 1.5;       // linear multiplier of a style's roof tint
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
   TS.stationStyles = Object.freeze({
@@ -195,7 +196,8 @@
         const w = world(p[0], p[2]);
         const u = (p[0] * face.hx + p[2] * face.hz - face.pmin) / face.width;
         const v = (p[1] - face.ymin) / Math.max(0.5, face.ymax - face.ymin);
-        return mb.vert(w.x, w.form + p[1], w.z, face.nx, 0, face.nz, [1, 1, 1], u, v);
+        const rn = api.rotN ? api.rotN(p[2], face.nx, face.nz) : [face.nx, face.nz];
+        return mb.vert(w.x, w.form + p[1], w.z, rn[0], 0, rn[1], [1, 1, 1], u, v);
       });
       for (let t = 0; t < tris.length; t += 3) mb.i.push(ids[tris[t]], ids[tris[t + 1]], ids[tris[t + 2]]);
       const mat = new T.MeshLambertMaterial({ map: tex, color: tex ? 0xffffff : new T.Color(st.wall), side: T.DoubleSide });
@@ -227,13 +229,15 @@
       if (ny < 0) { nx = -nx; ny = -ny; nz = -nz; }
       const ymean = ring.reduce((m, p) => m + p[1], 0) / ring.length;
       const rf = st.copperAbove !== undefined && ymean > st.copperAbove ? rfs.copper : st.steepRoof && ny < 0.8 ? rfs.steep : rfs.main;
-      const ids = ring.map((p) => { const w = world(p[0], p[2]); return rf.vert(w.x, w.form + p[1], w.z, nx, ny, nz, [1, 1, 1], p[0] / 2.4, p[2] / 2.4); });
+      const ids = ring.map((p) => { const w = world(p[0], p[2]); const rn = api.rotN ? api.rotN(p[2], nx, nz) : [nx, nz]; return rf.vert(w.x, w.form + p[1], w.z, rn[0], ny, rn[1], [1, 1, 1], p[0] / 2.4, p[2] / 2.4); });
       for (let t = 0; t < tris.length; t += 3) rf.i.push(ids[tris[t]], ids[tris[t + 1]], ids[tris[t + 2]]);
     });
     [['main', st.roof || 'slate', st.roofTint], ['steep', (st.steepRoof && st.steepRoof.kind) || 'slate', st.steepRoof && st.steepRoof.tint], ['copper', 'zinc', st.copperTint || '#5f9d8a']].forEach(([key, kind, tint]) => {
       const rf = rfs[key];
       if (rf.empty) return;
-      const rmat = new T.MeshLambertMaterial({ map: api.roofTexture(kind), color: tint ? new T.Color(tint) : 0xffffff, side: T.DoubleSide });
+      const rcol = tint ? new T.Color(tint).multiplyScalar(ROOF_TINT_BOOST) : new T.Color(0xffffff);   // the tints were picked for a brighter sky than the sim has: LOD2 roofs rendered darker than in the photos
+      rcol.r = Math.min(1, rcol.r); rcol.g = Math.min(1, rcol.g); rcol.b = Math.min(1, rcol.b);
+      const rmat = new T.MeshLambertMaterial({ map: api.roofTexture(kind), color: rcol, side: T.DoubleSide });
       disposables.push(rmat);
       const rmesh = new T.Mesh(rf.geometry(), rmat); rmesh.castShadow = true; rmesh.receiveShadow = true; group.add(rmesh); disposables.push(rmesh.geometry); api.stats.tris += rf.i.length / 3;
     });
