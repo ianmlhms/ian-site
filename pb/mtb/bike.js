@@ -23,7 +23,7 @@ export function createBikeState(x, z, heading, surface) {
   const y = surface.height(x, z);
   return Object.freeze({
     x, y, z, vx: 0, vy: 0, vz: 0, heading, steer: 0, lean: 0, grounded: true, preload: 0, airTime: 0,
-    pedal: 0, cadence: 0, crank: 0, groundKind: 'forest', compression: 0, lastImpact: 0, odometer: 0, slip: 0,
+    pedal: 0, cadence: 0, crank: 0, groundKind: 'forest', rough: 0, compression: 0, lastImpact: 0, odometer: 0, slip: 0,
     skid: 0, brakeF: 0, brakeR: 0, kappa: 0, pumped: 0, popped: false, stall: 0, landSeq: 0, landImpact: 0, landQuality: 1, crashed: '', crashT: 0, crashSeq: 0, hitSeq: 0, shield: 0,
   });
 }
@@ -95,11 +95,12 @@ export function stepBike(s, input, dt, surface, groundAt, env = {}) {
 
     // pedalling: power limited, traction limited
     const vAbs = Math.max(0.9, Math.abs(vf));
-    let drive = throttle * Math.min(BIKE.power * spec.powerK / vAbs, BIKE.pedalForceMax) / spec.mass;
+    const sprint = 1 + BIKE.launchBoost * (1 - smoothstep(BIKE.launchFade[0], BIKE.launchFade[1], vAbs));
+    let drive = throttle * Math.min(BIKE.power * spec.powerK * sprint / vAbs, BIKE.pedalForceMax) / spec.mass;
     drive = Math.min(drive, mu * normalAccel * 0.55);
     // hike-a-bike: below walking pace the rider pushes the bike up a bank; a stall that lasts more than a second makes the push stronger (never stuck)
     stall = throttle > 0.3 && Math.abs(vf) < 0.6 ? s.stall + dt : Math.max(0, s.stall - 2 * dt);
-    if (throttle > 0.3 && vf > -0.5) drive += PLAY.pushAssist * (1 + 2.2 * smoothstep(0.4, 1.2, stall)) * (1 - smoothstep(PLAY.pushFade[0], PLAY.pushFade[1], Math.abs(vf))) * throttle;
+    if (throttle > 0.3 && vf > -0.5) drive += (PLAY.pushAssist + PLAY.pushSlope * Math.max(0, -aF)) * (1 + 2.2 * smoothstep(0.4, 1.2, stall)) * (1 - smoothstep(PLAY.pushFade[0], PLAY.pushFade[1], Math.abs(vf))) * throttle;
     aF += drive;
 
     // rolling resistance, roughness and drag
@@ -107,8 +108,7 @@ export function stepBike(s, input, dt, surface, groundAt, env = {}) {
     const wetDrag = 1 + wet * 0.35 * (ground.kind === 'mud' || ground.kind === 'dirt' || ground.kind === 'grass' || ground.kind === 'forest' ? 1 : 0.2);
     const resist = ground.crr * spec.crrK * wetDrag * normalAccel
       + ground.rough * spec.rough * 0.9 * smoothstep(1, 8, speed3)
-      + 0.5 * BIKE.airDensity * BIKE.cdA * spec.cdaK * speed3 * speed3 / spec.mass
-      + Math.max(0, speed3 - BIKE.softCapStart) * BIKE.softCapDrag;
+      + 0.5 * BIKE.airDensity * BIKE.cdA * spec.cdaK * speed3 * speed3 / spec.mass;
     if (speed3 > 1e-3) { aF -= resist * (vf / speed3); aL -= resist * (vl / speed3); }
 
     // brakes: the weight moves forward when braking (front bites, rear skids first)
@@ -256,7 +256,7 @@ export function stepBike(s, input, dt, surface, groundAt, env = {}) {
   const cadence = grounded ? clamp(speedNow * 9.5, 0, 112) * (throttle > 0.05 ? 1 : 0.0) : 0;
   return Object.freeze({
     x, y, z, vx, vy, vz, heading, steer, lean, grounded, preload, airTime,
-    pedal: throttle, cadence, crank, groundKind: ground.kind, compression, lastImpact, odometer: s.odometer + speedNow * dt, slip,
+    pedal: throttle, cadence, crank, groundKind: ground.kind, rough: grounded ? ground.rough * spec.rough : 0, compression, lastImpact, odometer: s.odometer + speedNow * dt, slip,
     skid, brakeF, brakeR, kappa, pumped, popped, stall, landSeq, landImpact, landQuality, crashed, crashT: 0, crashSeq: s.crashSeq + (crashed ? 1 : 0), hitSeq, shield: 0,
   });
 }

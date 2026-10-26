@@ -198,6 +198,7 @@ check('computeSchedule finite over 2000 fuzzed frames', scheduleOk);
 {
   const at = (patch, t = 1) => computeTargets(sanitizeFrame(frame(patch)), t);
   check('wind silent-ish below 4 m/s, strong at 20 m/s', at({ speed: 3.9 }).wind.gain < 0.03 && at({ speed: 20 }).wind.gain > 0.3);
+  check('wind keeps rising with the speed and is already loud at 40 km/h (speed pass)', at({ speed: 11 }).wind.gain > 0.18 && at({ speed: 11 }).wind.gain < at({ speed: 15 }).wind.gain && at({ speed: 15 }).wind.gain <= at({ speed: 20 }).wind.gain + 1e-9 && at({ speed: 17 }).wind.freq > at({ speed: 8 }).wind.freq + 300);
   check('wind gusts add level at standstill', at({ speed: 0, wind: 1 }).wind.gain > at({ speed: 0, wind: 0 }).wind.gain + 0.1);
   check('tyre volume rises with speed, zero in the air and at 0 m/s', at({ speed: 12 }).tyre.gain > at({ speed: 4 }).tyre.gain && at({ speed: 12, grounded: false }).tyre.gain === 0 && at({ speed: 0 }).tyre.gain === 0);
   check('every surface has its own tyre filter (centre + Q)', new Set(SURFACES.map(surface => `${at({ surface }).tyre.freq}/${at({ surface }).tyre.q}`)).size === 9);
