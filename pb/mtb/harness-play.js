@@ -204,7 +204,10 @@ function physicsChecks() {
   check('a full-lock turn at 15 m/s on dry dirt does not crash the bike (it scrubs speed instead of tripping)', !ride(flat, 'dirt', startAt(flat, 0, 0, 15), () => ({ throttle: 1, steer: 1 }), 5, env()).crashed);
 
   // speed feel (pure part): streaks, speedometer tiers, dust
-  check(`speed lines: none below ${(SPEED_FEEL.linesFrom * 3.6).toFixed(0)} km/h, full from ${(SPEED_FEEL.linesFull * 3.6).toFixed(0)} km/h, rising in between`, speedLineStrength(8) === 0 && speedLineStrength(25) === 1 && speedLineStrength(13) > 0.05 && speedLineStrength(13) < speedLineStrength(16));
+  check(`speed lines: none below ${(SPEED_FEEL.linesFrom * 3.6).toFixed(0)} km/h, full from ${(SPEED_FEEL.linesFull * 3.6).toFixed(0)} km/h, rising in between`,
+    speedLineStrength(SPEED_FEEL.linesFrom - 1) === 0 && speedLineStrength(SPEED_FEEL.linesFull + 2) === 1
+    && speedLineStrength((SPEED_FEEL.linesFrom + SPEED_FEEL.linesFull) / 2) > 0.05
+    && speedLineStrength((SPEED_FEEL.linesFrom + SPEED_FEEL.linesFull) / 2) < speedLineStrength(SPEED_FEEL.linesFull - 0.5));
   check('speedometer tiers: 0 at a walk, then a new tier at 20 / 35 / 50 / 62 km/h', speedTier(5) === 0 && speedTier(20) === 1 && speedTier(36) === 2 && speedTier(55) === 3 && speedTier(70) === 4 && gaugeFill(35) === 0.5 && gaugeFill(200) === 1);
   check('dust: a dry gravel track at speed kicks up a lot, wood and the air nothing, rain damps it, mud and water do not care', dustRate('track', 12) > dustRate('dirt', 12) && dustRate('wood', 12) === 0 && dustRate('dirt', 12, 0, 0, false) === 0 && dustRate('dirt', 12, 1) < dustRate('dirt', 12) * 0.3 && dustRate('mud', 12, 1) === dustRate('mud', 12) && dustRate('dirt', 2) === 0);
   check('dust: more speed, more dust, a skidding rear wheel digs in', dustRate('dirt', 15) > dustRate('dirt', 8) && dustRate('dirt', 10, 0, 1) > dustRate('dirt', 10) * 1.8);

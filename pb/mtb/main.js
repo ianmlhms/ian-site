@@ -498,7 +498,7 @@ async function boot() {
   else if (mode === 'free') startFree();
   else if (param('daily') === '1') startDaily();
   terrain.buildAll(bike.x, bike.z);
-  forest.update(bike.x, bike.z, true);
+  forest.update(bike.x, bike.z, 0, 0, 0, true);
   env.update(0, camera, 0);
   hudButtons();
   if (readKey('pb_muted') === '1') audio.setMuted(true);
@@ -603,7 +603,7 @@ async function boot() {
     env.update(dt, camera, elapsed);
     env.setFogBase(surface.height(c.x, c.z));
     terrain.update(frozenCamera ? c.x : bike.x, frozenCamera ? c.z : bike.z);
-    forest.update(c.x, c.z);
+    forest.update(c.x, c.z, bike.vx, bike.vz, elapsed);
     rockView.update(c.x, c.z);
     town.update(c.x, c.z);
     foamTimer -= dt;

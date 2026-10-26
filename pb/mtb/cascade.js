@@ -23,19 +23,25 @@ export const LEDGE = Object.freeze({
 });
 
 /** The parallel falls, from the left (-v) to the right bank: centre v (m across), width w (m), lip offset (m: the lip of this chute is lower than the sheet by this much) and
- *  the boulders between them: centre v, half width, how high the top stands above the lip level, depth along the flow, and the seed of the shape. */
+ *  the boulders between them: centre v, half width, how high the top stands above the lip level, depth along the flow, and the seed of the shape.
+ *  Six narrower streams (not four wide ones): the real ledge is an uneven lip that splits the river into several broken ribbons, each parting around its own small
+ *  knuckle of rock rather than one wide curtain per gap. */
 export const CHUTES = Object.freeze([
-  { v: -2.45, w: 1.0, dip: 0.34 },
-  { v: -0.45, w: 1.35, dip: 0.14 },
-  { v: 1.4, w: 0.95, dip: 0.24 },
-  { v: 2.85, w: 0.6, dip: 0.46 },
+  { v: -2.95, w: 1.0, dip: 0.42 },
+  { v: -1.625, w: 0.6, dip: 0.18 },
+  { v: -0.475, w: 0.6, dip: 0.3 },
+  { v: 0.675, w: 0.55, dip: 0.16 },
+  { v: 1.825, w: 0.5, dip: 0.34 },
+  { v: 2.975, w: 0.6, dip: 0.22 },
 ]);
 export const BOULDERS = Object.freeze([
   { v: -4.0, rv: 1.55, rz: 1.5, up: 1.05, seed: 0.13 },        // the big dark flank on the left
-  { v: -1.42, rv: 0.78, rz: 1.2, up: 1.3, seed: 0.31 },
-  { v: 0.62, rv: 0.68, rz: 1.15, up: 0.85, seed: 0.52 },
-  { v: 2.2, rv: 0.55, rz: 1.0, up: 0.95, seed: 0.68 },
-  { v: 4.15, rv: 1.35, rz: 1.5, up: 1.15, seed: 0.87 },        // and on the right
+  { v: -2.2, rv: 0.55, rz: 1.05, up: 0.85, seed: 0.27 },       // small splitters between the narrower streams
+  { v: -1.05, rv: 0.5, rz: 1.0, up: 0.95, seed: 0.38 },
+  { v: 0.1, rv: 0.52, rz: 1.0, up: 0.88, seed: 0.49 },
+  { v: 1.25, rv: 0.5, rz: 0.95, up: 0.92, seed: 0.6 },
+  { v: 2.4, rv: 0.55, rz: 1.05, up: 0.85, seed: 0.73 },
+  { v: 4.15, rv: 1.35, rz: 1.5, up: 1.15, seed: 0.87 },        // and the big flank on the right
 ]);
 /** Loose stones in the pool in front of the face: centre (v, u past the face), radius. */
 export const POOL_STONES = Object.freeze([

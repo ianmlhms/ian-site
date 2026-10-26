@@ -44,11 +44,12 @@ export function createDust({ scene, env, quality }) {
     fragmentShader: `
       precision highp float; uniform vec3 uFogColor, uAmbSky; varying float vA; varying vec3 vC; varying vec2 vUv; varying float vDist;
       void main(){
-        float r = dot(vUv, vUv) * 4.0;
-        float soft = (1.0 - r); if (soft <= 0.0 || vA < 0.01) discard;
+        float r = length(vUv) * 2.0;
+        float soft = 1.0 - smoothstep(0.35, 1.0, r);                 // a soft, feathered puff, not a hard-edged disc
+        if (soft <= 0.0 || vA < 0.01) discard;
         float f = 1.0 - exp(-pow(vDist * 0.0006, 2.0));
-        vec3 col = vC * (0.8 + 0.5 * uAmbSky.g);
-        gl_FragColor = vec4(mix(col, uFogColor, f), vA * soft * 0.8);
+        vec3 col = vC * (0.82 + 0.22 * uAmbSky.g);                   // stays the ground's own colour, never bleaches toward white
+        gl_FragColor = vec4(mix(col, uFogColor, f), vA * soft * soft * 0.55);
       }`,
   });
   const mesh = new THREE.Mesh(geo, mat);
@@ -113,8 +114,9 @@ export function createDust({ scene, env, quality }) {
 }
 
 /* ------------------------------------------------------------------ speed lines (a small 2D canvas over the picture) */
-const LINE_COUNT = 34;
-const LINE_HOLE = 0.34;           // the middle of the screen (the rider and the trail ahead) stays clear: lines start outside this share of the half-diagonal
+const LINE_COUNT = 22;
+const LINE_HOLE = 0.68;           // the middle of the screen (the rider and the trail ahead) stays clear: lines start outside this share of the half-diagonal (edges only, never the whole sky)
+const LINE_REACH = 0.22;          // how far past LINE_HOLE a line's far end can reach (share of the half-diagonal): short streaks at the rim, not full-screen rain
 export function createSpeedLines(container, { low = false } = {}) {
   const canvas = document.createElement('canvas');
   canvas.className = 'speedlines';
@@ -151,11 +153,11 @@ export function createSpeedLines(container, { low = false } = {}) {
       L.t += dt * L.v * (0.9 + 1.6 * strength);
       if (L.t >= 1) { L.t -= 1; L.a = rng() * Math.PI * 2; L.len = 0.5 + rng() * 0.9; }
       const r0 = R * (LINE_HOLE + (1 - LINE_HOLE) * L.t * L.t * 0.9 + 0.02);
-      const r1 = r0 + R * 0.11 * L.len * (0.5 + strength) * (0.4 + L.t);
-      const alpha = Math.sin(Math.PI * L.t) * 0.7 * strength;
+      const r1 = r0 + Math.min(R * LINE_REACH, R * 0.07 * L.len * (0.5 + strength) * (0.4 + L.t));
+      const alpha = Math.sin(Math.PI * L.t) * 0.4 * strength;
       const ca = Math.cos(L.a), sa = Math.sin(L.a);
       ctx.strokeStyle = `rgba(255,252,240,${alpha.toFixed(3)})`;
-      ctx.lineWidth = L.w * (0.9 + L.t) * 1.2;
+      ctx.lineWidth = L.w * (0.9 + L.t) * 0.9;
       ctx.beginPath(); ctx.moveTo(cx + ca * r0 * 1.15, cy + sa * r0 * 0.85); ctx.lineTo(cx + ca * r1 * 1.15, cy + sa * r1 * 0.85); ctx.stroke();
     }
   }

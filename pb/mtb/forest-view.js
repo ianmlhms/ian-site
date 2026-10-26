@@ -12,6 +12,12 @@ import { PAINT_LIGHT_GLSL } from './light-glsl.js';
 const THREE = window.THREE;
 const REFILL_DISTANCE = 5;
 const ALWAYS_DRAWN = 45;                // trees closer than this are drawn at every quality (the bike collides with them)
+const FADE_SECONDS = 0.5;               // a newly built instance grows from 0 to full scale over this long (hides the rebuild, never an instant pop)
+const SCAN_BUDGET_MS = 1.2;             // time-sliced block scan: a rebuild pays at most this many ms of CPU per frame, never one big hitch
+const LOOKAHEAD_SECONDS = 2.0;          // the cheap far tier leans this many seconds of travel into the heading (built and visible before the rider gets there)
+const LOOKAHEAD_MAX = 70;               // m
+const LOD_JITTER = 0.12;                // the near/mid LOD swap distance is staggered +/- this share per tree, so a whole ring never pops at once
+const now_ = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 
 const VERTEX = `
   attribute vec3 iPos; attribute vec4 iParams; attribute vec3 iShape; attribute vec3 color; attribute float aLeaf;
@@ -125,7 +131,7 @@ export function createForestView({ scene, trees, undergrowth, env, quality: Q, t
   const defs = {
     nearBeechA: [buildBroadleaf('beech', 0, 0), treeMat, 420], nearBeechB: [buildBroadleaf('beech', 1, 0), treeMat, 420], nearOak: [buildBroadleaf('oak', 0, 0), treeMat, 320], nearSpruce: [buildSpruce(2), treeMat, 300],
     midBeech: [buildBroadleaf('beech', 2, 1), treeMat, 1400], midOak: [buildBroadleaf('oak', 1, 1), treeMat, 900], midSpruce: [buildSpruce(1), treeMat, 700],
-    farBeech: [buildBlobTree('beech', 0), treeMat, 3600], farOak: [buildBlobTree('oak', 0), treeMat, 1800], farSpruce: [buildSpruce(0), treeMat, 1600],
+    farBeech: [buildBlobTree('beech', 0), treeMat, 4800], farOak: [buildBlobTree('oak', 0), treeMat, 2400], farSpruce: [buildSpruce(0), treeMat, 2200],
     sapling: [buildSapling(0), lowMat, 900],
     fern: [buildFern(), lowMat, 2600], holly: [buildShrub('holly'), lowMat, 420], bramble: [buildShrub('bramble'), lowMat, 420], hedge: [buildHedge(), lowMat, 700],
     tuft: [buildTuft(TILE_ID.grass), grassMat, 3600], herbs: [buildTuft(TILE_ID.herbs), grassMat, 900],
@@ -144,23 +150,47 @@ export function createForestView({ scene, trees, undergrowth, env, quality: Q, t
     const mesh = new THREE.Mesh(g, material);
     mesh.frustumCulled = false; mesh.name = `veg ${name}`;
     group.add(mesh);
-    sets[name] = { g, pos, par, shp, cap, n: 0 };
+    // base = the true (un-faded) scale of each live instance, spawn = the game-clock time it was first built: applyFade() grows iParams.x from 0 to base over FADE_SECONDS
+    sets[name] = { g, pos, par, shp, cap, n: 0, base: new Float32Array(cap), spawn: new Float32Array(cap) };
   }
-  function put(set, x, y, z, scale, yaw, seed, stretch = 1, pitch = 0, girth = 1) {
-    const s = sets[set];
+  /** Writes an instance straight into the live, drawn set (used for the one-off synchronous build and for grass tufts): no time-slicing, no fade. */
+  function putLive(name, x, y, z, scale, yaw, seed, stretch = 1, pitch = 0, girth = 1) {
+    const s = sets[name];
     if (s.n >= s.cap) return false;
     const o = s.n++;
     s.pos.array[o * 3] = x; s.pos.array[o * 3 + 1] = y; s.pos.array[o * 3 + 2] = z;
     s.par.array[o * 4] = scale; s.par.array[o * 4 + 1] = yaw; s.par.array[o * 4 + 2] = seed; s.par.array[o * 4 + 3] = (seed * 7.31) % 1;
     s.shp.array[o * 3] = stretch; s.shp.array[o * 3 + 1] = pitch; s.shp.array[o * 3 + 2] = girth;
+    s.base[o] = scale; s.spawn[o] = -1e9;                     // spawn far in the past: already fully faded in, no animation
     return true;
   }
 
-  let last = { x: 1e9, z: 1e9 };
+  /** The staging build (scanned over several frames): one plain-array mirror of `sets`, swapped in whole once a scan completes. */
+  function makeStage() {
+    const st = {};
+    for (const [name, s] of Object.entries(sets)) st[name] = { n: 0, cap: s.cap, pos: new Float32Array(s.cap * 3), scale: new Float32Array(s.cap), yaw: new Float32Array(s.cap), seed: new Float32Array(s.cap), stretch: new Float32Array(s.cap), pitch: new Float32Array(s.cap), girth: new Float32Array(s.cap), spawn: new Float32Array(s.cap) };
+    return st;
+  }
+  let stage = makeStage();
+  let spawnMap = new Map();                                   // world key -> the game-clock time this exact tree/fern/log was first built (persists across rebuilds)
+  function putStage(name, x, y, z, scale, yaw, seed, stretch, pitch, girth, spawnNext, now) {
+    const st = stage[name];
+    if (st.n >= st.cap) return false;
+    const o = st.n++;
+    st.pos[o * 3] = x; st.pos[o * 3 + 1] = y; st.pos[o * 3 + 2] = z;
+    st.scale[o] = scale; st.yaw[o] = yaw; st.seed[o] = seed; st.stretch[o] = stretch; st.pitch[o] = pitch; st.girth[o] = girth;
+    const key = (x * 4 | 0) + ',' + (z * 4 | 0);
+    let sp = spawnMap.get(key);
+    if (sp === undefined) sp = now;                           // never built before here: starts its fade-in now
+    spawnNext.set(key, sp);
+    st.spawn[o] = sp;
+    return true;
+  }
+
   const stats = { near: 0, mid: 0, far: 0, undergrowth: 0, blocks: 0 };
 
   const meadowScratch = { grass: 0, built: 0, water: 0, rock: 0, cover: 0, height: 0, wet: 0 };
-  /** Grass tufts and herbs on a fixed world grid around the camera (so they never swim); the meadows only. */
+  /** Grass tufts and herbs on a fixed world grid around the camera (so they never swim); the meadows only. Cheap and small-radius: filled live, not time-sliced. */
   function fillTufts(cx, cz) {
     const R = Q.tuftRadius, cs = 0.85;
     const i0 = Math.floor((cx - R) / cs), i1 = Math.floor((cx + R) / cs), j0 = Math.floor((cz - R) / cs), j1 = Math.floor((cz + R) / cs);
@@ -175,58 +205,126 @@ export function createForestView({ scene, trees, undergrowth, env, quality: Q, t
         if (meadow.clearance(x, z) > 0.03) continue;
         const k = hash2(i, j, 54), fade = 1 - Math.min(1, Math.max(0, (d - R * 0.65) / (R * 0.35)));
         if (fade <= 0.05) continue;
-        put(k < 0.18 ? 'herbs' : 'tuft', x, meadow.surface.height(x, z) - 0.02, z, (0.3 + hash2(i, j, 55) * 0.3) * fade, hash2(i, j, 56) * 6.283, k);
+        putLive(k < 0.18 ? 'herbs' : 'tuft', x, meadow.surface.height(x, z) - 0.02, z, (0.3 + hash2(i, j, 55) * 0.3) * fade, hash2(i, j, 56) * 6.283, k);
       }
     }
   }
 
-  function refill(cx, cz) {
-    for (const s of Object.values(sets)) s.n = 0;
-    const R = Q.treeRadius, nearR = Q.nearTree, midR = Q.midTree, groundR = Q.groundCover;
-    const r = Math.max(R, groundR);
-    const b0x = Math.floor((cx - r) / BLOCK), b1x = Math.floor((cx + r) / BLOCK), b0z = Math.floor((cz - r) / BLOCK), b1z = Math.floor((cz + r) / BLOCK);
-    let near = 0, mid = 0, far = 0, under = 0;
-    for (let bz = b0z; bz <= b1z; bz++) {
-      for (let bx = b0x; bx <= b1x; bx++) {
-        const t = trees.block(bx, bz);
-        for (let i = 0; i < t.length; i += STRIDE) {
-          const x = t[i], z = t[i + 2];
-          const d = Math.hypot(x - cx, z - cz);
-          const species = t[i + 4], seed = t[i + 5], h = t[i + 3], y = t[i + 1] - 0.15;
-          if (species === SPECIES.sapling) { if (d < midR * 0.7 && put('sapling', x, y, z, h, seed * 6.283, seed)) mid++; continue; }
-          const girth = girthOf(seed, species);
-          if (d > R) continue;
-          if (d > ALWAYS_DRAWN && ((seed * 7.31) % 1) > Q.treeDensity) continue;      // thinning for the quality level (never near the rider)
-          const yaw = seed * 6.283;
-          if (d < nearR) {
-            const name = species === SPECIES.spruce ? 'nearSpruce' : species === SPECIES.oak ? 'nearOak' : (seed * 3.7) % 1 < 0.5 ? 'nearBeechA' : 'nearBeechB';
-            if (put(name, x, y, z, h, yaw, seed, 1, 0, girth)) { near++; continue; }
-          }
-          if (d < midR) {
-            if (put(species === SPECIES.spruce ? 'midSpruce' : species === SPECIES.oak ? 'midOak' : 'midBeech', x, y, z, h, yaw, seed, 1, 0, girth)) { mid++; continue; }
-          }
-          if (put(species === SPECIES.spruce ? 'farSpruce' : species === SPECIES.oak ? 'farOak' : 'farBeech', x, y, z, h, yaw, seed, 1, 0, girth)) far++;
-        }
-        if (Math.hypot(bx * BLOCK + BLOCK / 2 - cx, bz * BLOCK + BLOCK / 2 - cz) > groundR + BLOCK) continue;
-        const u = undergrowth.block(bx, bz);
-        const lists = [['fern', u.ferns, Q.fernRadius], ['holly', u.holly, Q.shrubRadius], ['bramble', u.brambles, Q.shrubRadius], ['hedge', u.hedges, Q.shrubRadius * 1.3], ['log', u.logs, groundR], ['stump', u.stumps, groundR], ['root', u.roots, Q.shrubRadius]];
-        for (const [name, list, radius] of lists) {
-          for (let i = 0; i < list.length; i += U_STRIDE) {
-            if (Math.hypot(list[i] - cx, list[i + 2] - cz) > radius) continue;
-            if (put(name, list[i], list[i + 1], list[i + 2], list[i + 3], list[i + 4], list[i + 5], list[i + 6], list[i + 7])) under++;
-          }
-        }
+  /** One block's trees and undergrowth into the staging build. `s` = the scan state (see startScan). The far tier reaches past R, into the travel-ahead point `s.ax, s.az`
+   *  (cheap blob trees only: near/mid stay strictly within R of the true camera, so their triangle cost never grows). */
+  function processBlock(bx, bz, s) {
+    const t = trees.block(bx, bz);
+    for (let i = 0; i < t.length; i += STRIDE) {
+      const x = t[i], z = t[i + 2];
+      const dTrue = Math.hypot(x - s.cx, z - s.cz);
+      const species = t[i + 4], seed = t[i + 5], h = t[i + 3], y = t[i + 1] - 0.15;
+      if (species === SPECIES.sapling) {
+        if (dTrue < s.midR * 0.7 && putStage('sapling', x, y, z, h, seed * 6.283, seed, 1, 0, 1, s.spawnNext, s.now)) s.mid++;
+        continue;
+      }
+      const girth = girthOf(seed, species);
+      const jitter = 1 + LOD_JITTER * (((seed * 13.7) % 1) * 2 - 1);
+      let d = dTrue, farOnly = false;
+      if (dTrue > s.R) {                                        // beyond the normal radius: only the cheap far tier reaches ahead of travel
+        const dAhead = Math.hypot(x - s.ax, z - s.az);
+        if (dAhead > s.R) continue;
+        farOnly = true;
+      }
+      if (dTrue > ALWAYS_DRAWN && ((seed * 7.31) % 1) > Q.treeDensity) continue;      // thinning for the quality level (never near the rider)
+      const yaw = seed * 6.283;
+      if (!farOnly && d < s.nearR * jitter) {
+        const name = species === SPECIES.spruce ? 'nearSpruce' : species === SPECIES.oak ? 'nearOak' : (seed * 3.7) % 1 < 0.5 ? 'nearBeechA' : 'nearBeechB';
+        if (putStage(name, x, y, z, h, yaw, seed, 1, 0, girth, s.spawnNext, s.now)) { s.near++; continue; }
+      }
+      if (!farOnly && d < s.midR * jitter) {
+        if (putStage(species === SPECIES.spruce ? 'midSpruce' : species === SPECIES.oak ? 'midOak' : 'midBeech', x, y, z, h, yaw, seed, 1, 0, girth, s.spawnNext, s.now)) { s.mid++; continue; }
+      }
+      if (putStage(species === SPECIES.spruce ? 'farSpruce' : species === SPECIES.oak ? 'farOak' : 'farBeech', x, y, z, h, yaw, seed, 1, 0, girth, s.spawnNext, s.now)) s.far++;
+    }
+    if (Math.hypot(bx * BLOCK + BLOCK / 2 - s.cx, bz * BLOCK + BLOCK / 2 - s.cz) > s.groundR + BLOCK) return;
+    const u = undergrowth.block(bx, bz);
+    const lists = [['fern', u.ferns, Q.fernRadius], ['holly', u.holly, Q.shrubRadius], ['bramble', u.brambles, Q.shrubRadius], ['hedge', u.hedges, Q.shrubRadius * 1.3], ['log', u.logs, s.groundR], ['stump', u.stumps, s.groundR], ['root', u.roots, Q.shrubRadius]];
+    for (const [name, list, radius] of lists) {
+      for (let i = 0; i < list.length; i += U_STRIDE) {
+        if (Math.hypot(list[i] - s.cx, list[i + 2] - s.cz) > radius) continue;
+        if (putStage(name, list[i], list[i + 1], list[i + 2], list[i + 3], list[i + 4], list[i + 5], list[i + 6], list[i + 7], 1, s.spawnNext, s.now)) s.under++;
       }
     }
-    if (Q.tuftRadius > 0 && meadow) fillTufts(cx, cz);
-    for (const s of Object.values(sets)) { s.g.instanceCount = s.n; s.pos.needsUpdate = true; s.par.needsUpdate = true; s.shp.needsUpdate = true; }
-    stats.near = near; stats.mid = mid; stats.far = far; stats.undergrowth = under; stats.blocks = trees.blocks.size;
+  }
+
+  let scanning = null, last = { x: 1e9, z: 1e9 };
+  /** Begins a time-sliced rebuild: queues every block in the (possibly travel-elongated) radius, resets the staging arrays. */
+  function startScan(cx, cz, ax, az, now) {
+    const R = Q.treeRadius, groundR = Q.groundCover, r = Math.max(R, groundR);
+    const b0x = Math.floor((Math.min(cx, ax) - r) / BLOCK), b1x = Math.floor((Math.max(cx, ax) + r) / BLOCK);
+    const b0z = Math.floor((Math.min(cz, az) - r) / BLOCK), b1z = Math.floor((Math.max(cz, az) + r) / BLOCK);
+    const queue = [];
+    for (let bz = b0z; bz <= b1z; bz++) for (let bx = b0x; bx <= b1x; bx++) queue.push(bx, bz);
+    stage = makeStage();
+    scanning = { queue, qi: 0, cx, cz, ax, az, R, nearR: Q.nearTree, midR: Q.midTree, groundR, near: 0, mid: 0, far: 0, under: 0, spawnNext: new Map(), now };
+  }
+  /** Processes queued blocks for up to `budgetMs` of wall-clock time (or the whole queue when budgetMs is unbounded). Returns true once the scan is complete. */
+  function stepScan(budgetMs) {
+    const s = scanning, t0 = now_();
+    while (s.qi < s.queue.length) {
+      processBlock(s.queue[s.qi], s.queue[s.qi + 1], s);
+      s.qi += 2;
+      if (now_() - t0 > budgetMs) return false;
+    }
+    return true;
+  }
+  /** Swaps the finished staging build into the live, drawn sets; `instant` skips the fade (the very first build, behind the loading screen). */
+  function commitScan(instant) {
+    const s = scanning;
+    for (const [name, st] of Object.entries(stage)) {
+      const live = sets[name];
+      live.n = st.n;
+      live.pos.array.set(st.pos.subarray(0, st.n * 3));
+      live.base.set(st.scale.subarray(0, st.n));
+      live.spawn.set(instant ? new Float32Array(st.n).fill(-1e9) : st.spawn.subarray(0, st.n));
+      for (let o = 0; o < st.n; o++) {
+        live.par.array[o * 4 + 1] = st.yaw[o]; live.par.array[o * 4 + 2] = st.seed[o]; live.par.array[o * 4 + 3] = (st.seed[o] * 7.31) % 1;
+        live.shp.array[o * 3] = st.stretch[o]; live.shp.array[o * 3 + 1] = st.pitch[o]; live.shp.array[o * 3 + 2] = st.girth[o];
+      }
+      live.pos.needsUpdate = true; live.shp.needsUpdate = true;
+    }
+    spawnMap = s.spawnNext;
+    if (Q.tuftRadius > 0 && meadow) { sets.tuft.n = 0; sets.herbs.n = 0; fillTufts(s.cx, s.cz); }
+    stats.near = s.near; stats.mid = s.mid; stats.far = s.far; stats.undergrowth = s.under; stats.blocks = trees.blocks.size;
+    last = { x: s.cx, z: s.cz };
+    applyFade(s.now);                                         // write the correct (possibly zero) starting scale before the next render
+    for (const kg of Object.values(sets)) kg.g.instanceCount = kg.n;
+  }
+  /** Grows every instance younger than FADE_SECONDS toward its true scale; called every frame, cheap (plain array math, no block scanning). */
+  function applyFade(now) {
+    for (const s of Object.values(sets)) {
+      let fading = false;
+      for (let o = 0; o < s.n; o++) {
+        const t = Math.min(1, (now - s.spawn[o]) / FADE_SECONDS);
+        if (t < 1) fading = true;
+        const e = t * t * (3 - 2 * t);
+        s.par.array[o * 4] = s.base[o] * e;
+      }
+      if (fading) s.par.needsUpdate = true;
+    }
   }
 
   return {
     group, stats, sets,
-    update(cx, cz, force = false) {
-      if (force || Math.hypot(cx - last.x, cz - last.z) > REFILL_DISTANCE) { refill(cx, cz); last = { x: cx, z: cz }; }
+    /** cx, cz = camera position; vx, vz = the bike's velocity (m/s: used only to lean the cheap far tier ahead of travel); now = the game clock (s). */
+    update(cx, cz, vx = 0, vz = 0, now = 0, force = false) {
+      const speed = Math.hypot(vx, vz), ahead = Math.min(LOOKAHEAD_MAX, speed * LOOKAHEAD_SECONDS);
+      const ax = cx + (speed > 0.5 ? vx / speed : 0) * ahead, az = cz + (speed > 0.5 ? vz / speed : 0) * ahead;
+      if (force) {
+        startScan(cx, cz, ax, az, now);
+        while (!stepScan(Infinity)) { /* no budget on the one-off synchronous build behind the loading screen */ }
+        commitScan(true);
+        scanning = null;
+        return;
+      }
+      if (!scanning && Math.hypot(cx - last.x, cz - last.z) > REFILL_DISTANCE) startScan(cx, cz, ax, az, now);
+      if (scanning && stepScan(SCAN_BUDGET_MS)) { commitScan(false); scanning = null; }
+      applyFade(now);
     },
     dispose() { for (const s of Object.values(sets)) s.g.dispose(); treeMat.dispose(); lowMat.dispose(); deadMat.dispose(); grassMat.dispose(); },
   };

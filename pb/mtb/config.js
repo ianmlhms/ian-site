@@ -71,9 +71,9 @@ export const SURFACE = Object.freeze({
 });
 
 export const QUALITY = Object.freeze({
-  low: { pixelRatio: 1, lodScale: 0.38, treeRadius: 80, treeDensity: 0.45, nearTree: 32, midTree: 54, groundCover: 36, fernRadius: 30, shrubRadius: 40, rockRadius: 90, rockNear: 40, tuftRadius: 0, lifeDetail: 0.4, shadows: false, far: 5200, cheapGround: true },
-  medium: { pixelRatio: 1.25, lodScale: 0.7, treeRadius: 135, treeDensity: 0.7, nearTree: 36, midTree: 72, groundCover: 56, fernRadius: 44, shrubRadius: 56, rockRadius: 140, rockNear: 42, tuftRadius: 16, lifeDetail: 0.7, shadows: false, far: 7000, cheapGround: false },
-  high: { pixelRatio: 2, lodScale: 1, treeRadius: 220, treeDensity: 1, nearTree: 46, midTree: 100, groundCover: 90, fernRadius: 70, shrubRadius: 90, rockRadius: 190, rockNear: 54, tuftRadius: 24, lifeDetail: 1, shadows: true, far: 9000, cheapGround: false },
+  low: { pixelRatio: 1, lodScale: 0.38, treeRadius: 95, treeDensity: 0.45, nearTree: 32, midTree: 54, groundCover: 36, fernRadius: 30, shrubRadius: 40, rockRadius: 90, rockNear: 40, tuftRadius: 0, lifeDetail: 0.4, shadows: false, far: 5200, cheapGround: true },
+  medium: { pixelRatio: 1.25, lodScale: 0.7, treeRadius: 170, treeDensity: 0.7, nearTree: 36, midTree: 72, groundCover: 56, fernRadius: 44, shrubRadius: 56, rockRadius: 140, rockNear: 42, tuftRadius: 16, lifeDetail: 0.7, shadows: false, far: 7000, cheapGround: false },
+  high: { pixelRatio: 2, lodScale: 1, treeRadius: 260, treeDensity: 1, nearTree: 46, midTree: 100, groundCover: 90, fernRadius: 70, shrubRadius: 90, rockRadius: 190, rockNear: 54, tuftRadius: 24, lifeDetail: 1, shadows: true, far: 9000, cheapGround: false },
 });
 
 export const CAMERA = Object.freeze({
