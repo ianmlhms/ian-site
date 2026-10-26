@@ -1,0 +1,97 @@
+{
+ "route": "wittlich",
+ "station": "Igel",
+ "refs": "Igel",
+ "views": [
+  {
+   "photo": "Igel, Bahnhof mit ehemaligem Empfangsgebäude 20130704.jpg",
+   "pos": [
+    7,
+    -70,
+    1.7
+   ],
+   "look": [
+    -30,
+    -90,
+    4.5
+   ],
+   "fov": 66,
+   "note": "from the far platform"
+  },
+  {
+   "photo": "Igel, Blick zum ehemaligen Empfangsgebäude des Bahnhofs 20130704.jpg",
+   "pos": [
+    -9,
+    -18,
+    1.7
+   ],
+   "look": [
+    -29,
+    -92,
+    5
+   ],
+   "fov": 55,
+   "note": "road side"
+  },
+  {
+   "photo": "Igel, ehemaliges Empfangsgebäude des Bahnhofs 20130704.jpg",
+   "pos": [
+    -10,
+    -28,
+    2.0
+   ],
+   "look": [
+    -30,
+    -60,
+    3.0
+   ],
+   "fov": 62,
+   "note": "brick wing"
+  },
+  {
+   "photo": "Bahnhof Igel.jpg",
+   "pos": [
+    7,
+    -25,
+    1.7
+   ],
+   "look": [
+    -3,
+    60,
+    2.2
+   ],
+   "fov": 62,
+   "note": "platform"
+  },
+  {
+   "photo": "Igel during rail works in July 2014.jpg",
+   "pos": [
+    -6,
+    60,
+    9
+   ],
+   "look": [
+    3,
+    -60,
+    1
+   ],
+   "fov": 62,
+   "note": "from above"
+  },
+  {
+   "photo": "Igel Bf mit 215046 1994.jpg",
+   "pos": [
+    3,
+    100,
+    1.7
+   ],
+   "look": [
+    -25,
+    -60,
+    3
+   ],
+   "fov": 60,
+   "note": "old photo"
+  }
+ ]
+}
