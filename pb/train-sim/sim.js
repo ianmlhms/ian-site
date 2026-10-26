@@ -73,6 +73,23 @@
     return out;
   }
 
+  /* Running time of one leg along the real speed-limit profile (REAL-LINES.md "W4 premium trains"): a speed cap per PROFILE_STEP_M segment (the lower limit of the segment, times
+   * TIMETABLE_SPEED_SHARE, never above the train's top speed), standstill at both ends, forward pass with the acceleration and backward pass with the braking the timetable assumes.  The older
+   * average-of-the-limits figure let a leg with a slow stretch (curves, switch areas) look faster than any driver can run it: the premium trains arrived 200 - 250 s late on metz / paris. */
+  const PROFILE_STEP_M = 25, PROFILE_MIN_V = 1.5;
+  function legTravelSeconds(limits, s0, s1, vmax, accel, brake, fallbackKmh) {
+    const n = Math.max(2, Math.ceil((s1 - s0) / PROFILE_STEP_M)), ds = (s1 - s0) / n;
+    const segCap = [];
+    for (let k = 0; k < n; k++) segCap.push(Math.max(PROFILE_MIN_V, Math.min(vmax, limitAt(limits, s0 + ds * (k + 0.5), fallbackKmh) / KMH) * TIMETABLE_SPEED_SHARE));
+    const v = new Array(n + 1).fill(0);
+    for (let k = 1; k < n; k++) v[k] = Math.min(segCap[k - 1], segCap[k]);
+    for (let k = 1; k <= n; k++) v[k] = Math.min(v[k], Math.sqrt(v[k - 1] * v[k - 1] + 2 * accel * ds));
+    for (let k = n - 1; k >= 0; k--) v[k] = Math.min(v[k], Math.sqrt(v[k + 1] * v[k + 1] + 2 * brake * ds));
+    let t = 0;
+    for (let k = 0; k < n; k++) t += ds / Math.max(PROFILE_MIN_V * 0.5, (v[k] + v[k + 1]) / 2);
+    return t;
+  }
+
   /* Timetable: seconds from service start. Travel at ~80 % of the line speed incl. accel/brake losses.
      options.pass = indices of stations the train runs through (express): no dwell, no braking loss. */
   function buildTimetable(track, train, options = {}) {
@@ -86,12 +103,7 @@
     for (let i = 1; i < stations.length; i++) {
       if (passSet.has(i) && i < lastIdx) continue;
       const prev = stations[last], st = stations[i], dist = Math.max(50, st.s - prev.s);
-      let lineKmh = 0; const samples = 6;
-      for (let k = 0; k < samples; k++) lineKmh += limitAt(limits, prev.s + dist * (k + 0.5) / samples, train.maxKmh || 100);
-      lineKmh /= samples;
-      const v = Math.max(5, Math.min(vmax, lineKmh / KMH) * TIMETABLE_SPEED_SHARE);
-      const dAB = v * v / (2 * accel) + v * v / (2 * brake);
-      const travel = dist > dAB ? (dist - dAB) / v + v / accel + v / brake : 2 * Math.sqrt(dist / (1 / accel + 1 / brake));
+      const travel = legTravelSeconds(limits, prev.s, prev.s + dist, vmax, accel, brake, train.maxKmh || 100);
       const arr = clock + travel, isLast = i === lastIdx;
       /* a premium train (kiss / ic / hst) needs much longer than DWELL_MAX to exchange its passengers through 2 doors / side regardless of its extra
        * cars (drive_bot.mjs's own careful-driver wait, 4 s + 0.6 s per alighting + 0.7 s per boarding passenger of the average plan): the schedule must

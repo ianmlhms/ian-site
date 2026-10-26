@@ -128,6 +128,7 @@ ROUTES = {
         "tiles": ["paris"],
         "rail_class": True,
         "highspeed_biome": True,                              # farmland / forest beside a line with maxspeed >= 200 -> 'highspeed' (the LGV look)
+        "open_terminal_m": 800.0,                             # no tunnel within this real distance before the last stop: the terminal (Paris-Est) is an open hall; a 60 m bore 430 m before it became a whole 60 m game tunnel butting the hall
         "params": {"per_real": 0.05, "leg_min": 1500.0, "leg_max": 8500.0},
         "fetch": {"pbfs": ["lux", "lorraine", "champagne-ardenne", "picardie", "ile-de-france"], "box": (2.20, 48.80, 6.30, 49.65), "corridor_m": 2600},
         "stops": [

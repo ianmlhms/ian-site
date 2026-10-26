@@ -317,6 +317,8 @@ def build(route_id, dem=None):
             raise SystemExit("stop %s is not after the previous one on the path (s=%.0f <= %.0f)" % (st[1], s, prev))
         prev = s
         stops.append({"osm": st[0], "game": st[1], "size": st[2], "s": s, "off": float(line.distance(pt))})
+    if spec.get("open_terminal_m"):
+        feats["tunnels"] = [t for t in feats["tunnels"] if t[1] <= stops[-1]["s"] - spec["open_terminal_m"] or t[0] >= stops[-1]["s"]]
     biomes = brl.biome_windows(attrs, land)
     if spec.get("ardennes_after"):
         s_a = next(x["s"] for x in stops if x["osm"] == spec["ardennes_after"])
