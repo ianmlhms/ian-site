@@ -1,0 +1,11 @@
+{
+  "route": "wittlich", "station": "Roodt-Syr", "refs": "Roodt",
+  "views": [
+    { "photo": "Betzdorf, gare CFL Roodt (102).jpg", "pos": [-25, 4, 1.7], "look": [-10, 24, 3.5], "fov": 62, "note": "forecourt side" },
+    { "photo": "Betzdorf, gare CFL Roodt (103).jpg", "pos": [-3.0, -20, 1.9], "look": [-8, 30, 3.0], "fov": 62, "note": "platform side" },
+    { "photo": "Betzdorf, gare CFL Roodt (110).jpg", "pos": [-30, -40, 1.8], "look": [-10, -56, 4.0], "fov": 62, "note": "goods shed" },
+    { "photo": "Betzdorf, gare CFL Roodt (104).jpg", "pos": [-16, -10, 1.8], "look": [-6, -23, 1.5], "fov": 62, "note": "toilet hut" },
+    { "photo": "Betzdorf, gare CFL Roodt (111).jpg", "pos": [-24, -36, 1.8], "look": [-8, -56, 4.0], "fov": 62, "note": "goods shed 2" },
+    { "photo": "Betzdorf, gare CFL Roodt (119).jpg", "pos": [-20, -8, 9.0], "look": [-10, -56, 3.0], "fov": 62, "note": "from above" }
+  ]
+}

@@ -154,6 +154,9 @@
   }
   function create(opts) {
     const track = opts.track;
+    /* the patches are placed in physical world coordinates by the BASE track's frames (a reversed service drives through the same real station the other way round) */
+    const phys = track.base || track;
+    const flipS = !!track.reverse;
     const patches = track.surroundPatches || [];
     if (!patches.length || !TS.stationSurroundMesh) return null;
     const built = new Map();     // patch index -> { group, dispose }
@@ -162,10 +165,10 @@
     function update(s) {
       if (disposed) return;
       patches.forEach((p, i) => {
-        const dist = Math.abs(p.sMid - s);
+        const dist = Math.abs(p.sMid - (flipS ? phys.length - s : s));
         if (!built.has(i) && dist < ACTIVE_RANGE) {
           try {
-            const rec = TS.stationSurroundMesh.build(p, { track, quality: opts.quality, materials: opts.materials || {}, EXT_X, EXT_Z, width: opts.width, treeField: opts.treeField || null });
+            const rec = TS.stationSurroundMesh.build(p, { track: phys, quality: opts.quality, materials: opts.materials || {}, EXT_X, EXT_Z, width: opts.width, treeField: opts.treeField || null });
             if (rec && rec.group) { opts.root.add(rec.group); built.set(i, rec); }
           } catch (error) {
             console.warn(TAG + 'build of ' + p.name + ' failed', error);
