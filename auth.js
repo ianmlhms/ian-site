@@ -119,7 +119,7 @@ function startPresencePing() {
       console.warn("[presence] module failed to load", error);
     });
   if (!_g.session?.user?.id) return;
-  if (!_g.noticeModule) _g.noticeModule = import("./site-notice.js?v=1");
+  if (!_g.noticeModule) _g.noticeModule = import("./site-notice.js?v=2");
   void _g.noticeModule
     .then(({ showNotices }) => showNotices(_g.sb, () => _g.session))
     .catch((error) => console.warn("[notice] module failed to load", error));
@@ -153,7 +153,7 @@ function startInvitePop() {
 function startAccountCheck() {
   if (window.top !== window || isKartAccount()) return;
   if (!_g.accountCheckModule) {
-    _g.accountCheckModule = import("./account-check.js?v=13");
+    _g.accountCheckModule = import("./account-check.js?v=14");
   }
   void _g.accountCheckModule
     .then(({ startAccountCheck: start }) => start(_g.sb, () => _g.session))

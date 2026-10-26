@@ -1,6 +1,7 @@
 /* One-time personal popups ("notices", table user_notices). Loaded lazily by
  * auth.js once a session exists; shows the oldest unseen notice as a card and
- * marks it seen when closed. Texts come as {lb, de, en}. */
+ * marks it seen when closed. Texts come as {lb, de, en}; optional images = [{src, url, alt:{lb,de,en}}]
+ * (same-site paths only), shown as a row of clickable pictures above the title. */
 
 const LANGS = ["lb", "de", "en"];
 const OK_LABEL = Object.freeze({ lb: "OK", de: "OK", en: "OK" });
@@ -32,6 +33,21 @@ function safeUrl(url) {
   return typeof url === "string" && /^\/(?!\/)[^\s]*$/.test(url) ? url : null;
 }
 
+const MAX_IMAGES = 3;
+
+/* A row of pictures; each one may link to its own same-site page. Bad entries are skipped. */
+function imagesHtml(images) {
+  if (!Array.isArray(images)) return "";
+  const items = images.slice(0, MAX_IMAGES).map((image) => {
+    const src = safeUrl(image?.src);
+    if (!src) return "";
+    const href = safeUrl(image?.url);
+    const pic = `<img src="${esc(src)}" alt="${esc(pick(image?.alt))}" loading="eager" decoding="async">`;
+    return href ? `<a class="site-notice__img" data-act="go" data-href="${esc(href)}" href="${esc(href)}">${pic}</a>` : `<span class="site-notice__img">${pic}</span>`;
+  }).filter(Boolean);
+  return items.length ? `<div class="site-notice__imgs">${items.join("")}</div>` : "";
+}
+
 function injectCss() {
   if (document.getElementById(STYLE_ID)) return;
   const style = document.createElement("style");
@@ -40,7 +56,10 @@ function injectCss() {
     .site-notice{position:fixed;inset:0;z-index:100001;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.55)}
     .site-notice__card{width:min(420px,100%);border-radius:18px;padding:22px 20px 18px;background:var(--card-opaque,var(--card,#161625));color:var(--text,#e8e8f0);border:1px solid var(--border,rgba(255,255,255,.12));box-shadow:0 18px 50px rgba(0,0,0,.45);font-family:var(--font,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif)}
     .site-notice__title{margin:0 0 8px;font-size:19px;font-weight:800;line-height:1.3}
-    .site-notice__body{margin:0 0 18px;font-size:15px;line-height:1.5;color:var(--muted,#b8b8cc)}
+    .site-notice__body{margin:0 0 18px;font-size:15px;line-height:1.5;white-space:pre-line;color:var(--muted,#b8b8cc)}
+    .site-notice__imgs{display:flex;gap:10px;margin:0 0 14px}
+    .site-notice__img{flex:1 1 0;min-width:0;display:block;border-radius:12px;overflow:hidden;aspect-ratio:16/10;background:rgba(255,255,255,.06)}
+    .site-notice__img img{width:100%;height:100%;object-fit:cover;display:block}
     .site-notice__actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
     .site-notice__btn{min-height:44px;min-width:96px;padding:0 18px;border-radius:12px;border:1px solid var(--border,rgba(255,255,255,.14));background:transparent;color:inherit;font:inherit;font-weight:750;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
     .site-notice__btn--primary{background:var(--accent,#6c5ce7);border-color:transparent;color:#fff}
@@ -65,6 +84,7 @@ function render(sb, notice) {
   const wrap = document.createElement("div");
   wrap.className = "site-notice";
   wrap.innerHTML = `<div class="site-notice__card" role="dialog" aria-modal="true" aria-labelledby="siteNoticeTitle">
+    ${imagesHtml(notice.images)}
     <h2 class="site-notice__title" id="siteNoticeTitle">${esc(pick(notice.title))}</h2>
     <p class="site-notice__body">${esc(pick(notice.body))}</p>
     <div class="site-notice__actions">
@@ -75,12 +95,14 @@ function render(sb, notice) {
   const close = () => { wrap.remove(); document.removeEventListener("keydown", onKey); };
   const onKey = (event) => { if (event.key === "Escape") { void dismiss(sb, notice.id); close(); } };
   wrap.addEventListener("click", async (event) => {
-    const act = event.target.closest("[data-act]")?.dataset.act;
+    const target = event.target.closest("[data-act]");
+    const act = target?.dataset.act;
     if (act === "ok") { void dismiss(sb, notice.id); close(); }
     if (act === "go") {
       event.preventDefault();
+      const href = safeUrl(target.dataset.href) || url;
       await dismiss(sb, notice.id);   // mark seen before leaving the page
-      location.href = url;
+      if (href) location.href = href;
     }
   });
   document.addEventListener("keydown", onKey);
