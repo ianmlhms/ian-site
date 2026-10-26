@@ -29,7 +29,7 @@
    * window surrounds, grey sandstone plinth, two storeys in the centre and to the Luxembourg end, a lower wing ahead with a big dark tiled hip roof (clock on its wall); the
    * boarded door left of the middle.  The little tile-roofed waiting pavilion ahead of it is drawn by the station model (stations-lu-e.js). */
   reg('Oetrange', {
-    wall: '#e4dab2', trim: '#e8d690', plinth: { h: 0.55, col: '#a39a82' }, band: '#e0cf94', roof: 'slate', roofTint: '#d2cabe', floorH: 4.2, bayM: 3.4, stain: true,
+    wall: '#e4dab2', trim: '#e8d690', plinth: { h: 0.55, col: '#a39a82' }, band: '#e0cf94', roof: 'tile', roofTint: '#cdc7bd', floorH: 4.2, bayM: 3.4, stain: true,
     win: { w: 1.25, h: 2.0, kind: 'rect', frame: '#f0eee6', reveal: '#e6d38c', sill: true },
     doors: [
       { z: -48.6, w: 1.1, h: 2.4, col: '#8a8068', glass: false, face: 'front' }, { z: -46.0, w: 1.1, h: 2.3, col: '#4a4038', face: 'back' }, { z: -55.5, w: 1.1, h: 2.3, col: '#4a4038', face: 'back' },
@@ -61,13 +61,13 @@
   /* BETZDER (Betzdorf).  Refs: Commons "Betzdorf, gare CFL Betzdorf (101)-(105)" (Feb 2025).  No station building any more; the LOD2 hut behind the platform is the old white
    * timber waiting shelter: board-and-batten walls painted white, white-framed glazing bars, open arched bay, brown-grey tiled gable roof, brick paving in front. */
   reg('Betzder', {
-    wall: '#f4f2ea', trim: '#faf8f1', plinth: { h: 0.35, col: '#c4beb0' }, roof: 'tile', roofTint: '#8d8478', floorH: 3.6, bayM: 3.8, stain: false, boards: true,
+    wall: '#fffdf8', trim: '#ffffff', plinth: { h: 0.35, col: '#c4beb0' }, roof: 'tile', roofTint: '#8d8478', floorH: 3.6, bayM: 3.8, stain: false, boards: true,
     win: { w: 1.15, h: 1.6, kind: 'rect', frame: '#fbfaf5', reveal: '#efece3', sill: false },
-    doors: [{ z: -41.4, w: 2.5, h: 2.2, col: '#5d5144', glass: false, face: 'front' }],
+    doors: [{ z: -41.4, w: 2.5, h: 2.2, col: '#9a8a70', glass: false, face: 'front' }],
     extras(api) {
       // the open bay of the shelter: a row of maroon seats under the arch (photo 102), grey-brown paving in front
-      [-42.4, -41.7, -41.0, -40.3].forEach((z) => api.box(-7.35, 1.1, z, 0.45, 0.07, 0.5, '#6b2230'));
-      api.box(-7.2, 1.4, -41.4, 0.05, 0.55, 2.4, '#6b2230');
+      [-42.4, -41.7, -41.0, -40.3].forEach((z) => api.box(-6.72, 1.1, z, 0.45, 0.07, 0.5, '#6b2230'));
+      api.box(-6.85, 1.4, -41.4, 0.05, 0.55, 2.4, '#6b2230');
     },
   });
   /* WECKER.  Refs: Commons "Biwer, gare CFL Wecker (103)-(115)" (2025).  Station building behind the tracks at the Luxembourg end: sandstone ashlar with yellow-ochre stone
