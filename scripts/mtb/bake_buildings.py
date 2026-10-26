@@ -8,7 +8,7 @@ Every OSM footprint becomes 1 to 3 rectangles (a house with a wing is two): the 
 (found on a 0.5 m raster in the rectangle's frame). The height comes from the LiDAR: DSM - DTM inside the footprint (the 90th percentile is the ridge, the eave is derived from it).
 Output (compact, rounded): { "houses": [[cx, cz, hx, hz, yaw, eave, ridge, flags, seed], ...], "castles": [...], "churches": [...] }
   (cx, cz) world metres of the rectangle centre, hx >= hz the half sizes along the axis at angle `yaw` (radians, x towards z), eave / ridge heights above the ground (m),
-  flags: 1 flat roof, 2 hip roof (squarish), 4 dormer, 8 outbuilding (shed / garage)
+  flags: 1 flat roof, 2 hip roof (squarish), 4 dormer, 8 outbuilding (shed / garage), 16 church, 32 Beaufort Renaissance castle (wings), 64 Beaufort medieval ruin (wings)
 The castles are listed with their footprint polygons and the LiDAR height statistics so cascade-like landmark code (castle.js) can build them at their real positions."""
 import json
 import math
@@ -91,7 +91,7 @@ def max_rect(mask):
     return best
 
 
-def rectangles(poly):
+def rectangles(poly, min_frac=0.2, count=3, force=False):
     """The polygon as 1 to 3 rectangles: [(cx, cz, hx, hz, yaw)] with hx >= hz."""
     obb = poly.minimum_rotated_rectangle
     ratio = poly.area / max(obb.area, 1e-6)
@@ -101,7 +101,7 @@ def rectangles(poly):
     long_e, long_l, short_l = (e0, l0, l1) if l0 >= l1 else (e1, l1, l0)
     yaw = math.atan2(long_e[1], long_e[0])
     cx, cz = obb.centroid.x, obb.centroid.y
-    if ratio >= 0.8 or poly.area < 60:
+    if (ratio >= 0.8 and not force) or poly.area < 60:
         return [(cx, cz, long_l / 2, short_l / 2, yaw)]
     # raster in the rectangle's frame
     local = affinity.rotate(affinity.translate(poly, -cx, -cz), -math.degrees(yaw), origin=(0, 0))
@@ -111,9 +111,9 @@ def rectangles(poly):
     from shapely import contains_xy
     mask = contains_xy(local, np.tile(xs, (nz, 1)), np.repeat(zs[:, None], nx, axis=1))
     total = mask.sum(); out = []
-    for _ in range(3):
+    for _ in range(count):
         area, r0, c0, r1, c1 = max_rect(mask)
-        if area < max(0.2 * total, (MIN_RECT / GRID) ** 2):
+        if area < max(min_frac * total, (MIN_RECT / GRID) ** 2):
             break
         lx0, lx1, lz0, lz1 = x0 + c0 * GRID, x0 + (c1 + 1) * GRID, z0 + r0 * GRID, z0 + (r1 + 1) * GRID
         mx, mz = (lx0 + lx1) / 2, (lz0 + lz1) / 2
@@ -153,10 +153,18 @@ def main():
             continue
         if b["id"] in CASTLE_IDS:
             v = stats(poly, 0.5)
-            castles.append({"id": b["id"], "kind": CASTLE_IDS[b["id"]], "name": t.get("name", ""), "ground": round(ground(cx, cz), 1),
-                            "pts": [[round(p[0], 1), round(p[1], 1)] for p in poly.simplify(0.35).exterior.coords],
+            kind = CASTLE_IDS[b["id"]]
+            castles.append({"id": b["id"], "kind": kind, "name": t.get("name", ""), "ground": round(ground(cx, cz), 1),
                             "h": [round(float(np.percentile(v, q)), 1) for q in (10, 50, 90, 99)] if len(v) else []})
-            continue
+            if kind == "pavilion":
+                pass                                               # a small house like the others (handled below)
+            else:                                                  # the castles: wings as rectangles with their own style flags (32 renaissance castle, 64 medieval ruin)
+                eave, ridge = (10.5, 16.5) if kind == "renaissance" else (12.0, 12.0)
+                for (rx, rz, hx, hz, yaw) in rectangles(poly, 0.07, 5, True):
+                    if hz < MIN_RECT / 2:
+                        continue
+                    houses.append([round(rx, 1), round(rz, 1), round(hx, 2), round(hz, 2), round(yaw % math.pi, 3), eave, ridge, 32 if kind == "renaissance" else 64, int(rng.integers(0, 1000))])
+                continue
         near = [k for k, r in VILLAGES.items() if k in centres and math.hypot(cx - centres[k][0], cz - centres[k][1]) < r]
         if not near:
             continue

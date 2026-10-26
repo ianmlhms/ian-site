@@ -27,6 +27,7 @@ import { createRng } from './noise.js';
 import { STRIDE, SHAPES } from './forest.js';
 import { R_STRIDE, KIND, slabFrame, slabBottomRing } from './rocks.js';
 import { placeBridge, SCHIESSENTUEMPEL } from './landmarks.js';
+import { RUIN, RENAISSANCE, CHURCH } from './town-data.js';
 import { LEDGE, CHUTES, BOULDERS, ledgeTop, toWorld, cascadeFalls, bankBoulders } from './cascade.js';
 import { WAY_KINDS } from './config.js';
 import { WATER_KINDS } from './water.js';
@@ -614,6 +615,28 @@ section('J water');
     }
     check(`${bank.length} bank boulders stand around the pool, none within 2.4 m of a trail, path or track`, bank.length >= 8 && onWay === 0, `${bank.length} boulders, ${onWay} on a way`);
     stats.cascadeBank = bank.length;
+  }
+  // the built places (town-data.js): the Berdorf village, the Beaufort houses, the two castles and the church
+  {
+    const houses = world.houses, town = world.town;
+    const finite = houses.every((h) => [h.cx, h.cz, h.hx, h.hz, h.base, h.eaveY, h.ridgeY, h.gMin].every(Number.isFinite) && h.hx >= h.hz && h.hz > 1 && h.eave >= 2.4 && h.ridge >= h.eave);
+    const outside = houses.filter((h) => h.cx < WORLD.playInset || h.cz < WORLD.playInset || h.cx > WORLD.width - WORLD.playInset || h.cz > WORLD.depth - WORLD.playInset).length;
+    check(`${houses.length} house rectangles: finite, hx >= hz > 1 m, ridge >= eave >= 2.4 m, none outside the playable box`, houses.length > 400 && finite && outside === 0, `${houses.length}, finite ${finite}, outside ${outside}`);
+    let floating = 0;
+    for (const h of houses) for (const [u, v] of [[-1, -1], [1, -1], [1, 1], [-1, 1], [0, 0]]) { const gx = h.cx + h.ax * u * h.hx + h.bx * v * h.hz, gz = h.cz + h.az * u * h.hx + h.bz * v * h.hz; if (h.base > surface.height(gx, gz) - 0.4) floating++; }
+    check('every house stands in the ground: the bottom of its walls is at least 0.4 m below the terrain at every corner and the middle', floating === 0, `${floating} corners`);
+    let onWay = 0, worst = 1e9;
+    for (const info of net.ways) {
+      if (!['trail', 'path', 'track'].includes(info.kind)) continue;
+      for (let i = info.first; i < info.first + info.count; i++) { const hit = town.insideRect(S.px[i], S.pz[i], 1.2); if (hit && !(hit.flags & (CHURCH | RENAISSANCE | RUIN))) { onWay++; worst = Math.min(worst, town.distance(hit, S.px[i], S.pz[i], null)); } }
+    }
+    check('no trail, path or track runs through a house (centre line samples within 1.2 m of a wall; the church and castles stay and the ways are cut there)', onWay === 0, `${onWay} samples, worst ${worst.toFixed(2)} m`);
+    const ruin = houses.filter((h) => h.flags & RUIN).length, ren = houses.filter((h) => h.flags & RENAISSANCE).length, churches = houses.filter((h) => h.flags & CHURCH).length;
+    check(`the Beaufort medieval ruin (${ruin} wings), the Renaissance castle (${ren} wings) and ${churches} church(es) are in the data`, ruin >= 1 && ren >= 2 && churches >= 2);
+    const probe = { nx: 0, nz: 0, pen: 0 }, h0 = houses.find((h) => !(h.flags & 1));
+    const out = town.collide(h0.cx + h0.ax * (h0.hx + 0.2), h0.cz + h0.az * (h0.hx + 0.2), 0.5, 0, probe);
+    check('a bike beside a wall is pushed away from the house (collision)', !!out && out.pen > 0.2 && (out.nx * h0.ax + out.nz * h0.az) > 0.9, JSON.stringify(out));
+    stats.town = `${houses.length} rectangles (${ruin} ruin wings, ${ren} castle wings, ${churches} churches)`;
   }
   // the footbridge
   const br = placeBridge(net, surface);

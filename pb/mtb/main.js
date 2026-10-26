@@ -19,7 +19,9 @@ import { createHikers } from './hikers.js';
 import { SCHIESSENTUEMPEL } from './landmarks.js';
 import { buildBridge } from './bridge-model.js';
 import { buildCascadeModel } from './cascade-model.js';
+import { createTownView } from './town-view.js';
 import { finishFov } from './cascade.js';
+import { RUIN, CHURCH } from './town-data.js';
 import { createSolidMaterial } from './solid-material.js';
 import { createTerrainView } from './terrain-view.js';
 import { createForestView } from './forest-view.js';
@@ -33,7 +35,7 @@ import { createAudio } from './audio.js';
 import { encodeGhost, decodeGhost, ghostAt } from './ghost.js';
 import {
   TRAIL_IDS, BIKE_IDS, BIKE_MEDAL_POINTS, medalPoints, medalOf, bestMs, bestSplits, ghostFor, isTrailUnlocked, isBikeUnlocked, newUnlocks, recordRun, recordViewpoint, recordDaily, addStats,
-  withLoadout, withSettings, settingsOf, viewpointCount, dayNumber, dailyChallenge, createProgress, hasViewpoint, unlockedTrails,
+  withLoadout, withSettings, settingsOf, viewpointCount, dayNumber, dailyChallenge, createProgress, hasViewpoint, unlockedTrails, MAX_VIEWPOINTS,
 } from './progress.js';
 import { loadInitialProgress, createPersistence, createScoreReporter, dailyRpc } from './save.js';
 import { LANGS, t as translate, trailName, formatTime } from './i18n.js';
@@ -165,6 +167,7 @@ async function boot() {
     rockView.addLandmark(parts.stones, c.x, c.lipY, c.z, c.yaw, 0.5, 3.7);
   }
   const water = createWaterView({ scene, network: field.network, env, quality, foamTexture: textures.foam, cascade: world.cascade });
+  const town = createTownView({ scene, env, quality, houses: world.houses });
   const props = createProps({ scene, env, surface, trails, decks });
   const riderLook = () => { const s = settingsOf(progress); void s; return { bike: progress.bk || 'hardtail', frame: COLOUR_HEX[progress.col] || COLOUR_HEX.red, helmet: HELMET_HEX[progress.hm] || HELMET_HEX.plain }; };
   let rider = createRider(env, riderLook());
@@ -189,6 +192,20 @@ async function boot() {
   for (const v of viewpoints) if (Math.hypot(v.x - fall.x, v.z - fall.z) < 60) v.name = tr('vp.falls');
   viewpoints.forEach((v) => { v.name = v.name || tr('vp.unnamed'); });
   if (!viewpoints.some((v) => Math.hypot(v.x - fall.x, v.z - fall.z) < 60) && viewpoints.length < 60) viewpoints.push({ x: fall.x - 14, z: fall.z + 10, name: tr('vp.falls'), kind: 'attraction' });
+  // two more collectibles at the new landmarks: a spot with a view of the Beaufort castle ruin and one at the Berdorf church (an open, flat place near, away from every house)
+  const viewSpot = (name, tx, tz, ring) => {
+    for (let a = 0; a < 360; a += 20) {
+      const x = tx + Math.cos(a * Math.PI / 180) * ring, z = tz + Math.sin(a * Math.PI / 180) * ring;
+      surface.normal(x, z, vpNormal);
+      if (!world.town.insideRect(x, z, 4) && vpNormal.y > 0.88 && viewpoints.length < MAX_VIEWPOINTS) { viewpoints.push({ x, z, name, kind: 'attraction' }); return; }
+    }
+  };
+  const vpNormal = { x: 0, y: 1, z: 0 };
+  if (world.town.houses.length) {
+    const ruin = world.houses.find((h) => h.flags & RUIN), church = world.houses.find((h) => h.flags & CHURCH && h.cx > 3000);
+    if (ruin) viewSpot(tr('vp.castle'), ruin.cx, ruin.cz, 30);
+    if (church) viewSpot(tr('vp.village'), church.cx, church.cz, 24);
+  }
   const villages = data.landmarks.filter((l) => l.kind === 'village' && l.name && l.x > 0 && l.z > 0 && l.x < WORLD.width && l.z < WORLD.depth).map((l) => ({ name: l.name, x: l.x, z: l.z }));
   const mapState = { backdrop: createMapBackdrop(data), villages, viewpoints, found: new Set(), rider: null };
 
@@ -582,6 +599,7 @@ async function boot() {
     terrain.update(frozenCamera ? c.x : bike.x, frozenCamera ? c.z : bike.z);
     forest.update(c.x, c.z);
     rockView.update(c.x, c.z);
+    town.update(c.x, c.z);
     foamTimer -= dt;
     if (foamTimer <= 0) { foamTimer = 0.4; water.updateFoam(c.x, c.z, rockView.stones); }
     rain.update(); leaves.update(); shafts.update(c.x, c.z); birds.update(); insects.update(c.x, c.z);
@@ -640,7 +658,7 @@ async function boot() {
   document.documentElement.dataset.mtbReady = '1';
 
   window.__mtb = {
-    version: 'w3-play', renderer, scene, camera, field, surface, ground, groundAt, env, cascade: world.cascade, terrain, forest, trees, undergrowth, rocks, rockView, water, rider, rain, leaves, shafts, birds, insects, hikers, world, maps, bridge, quality, perf, data,
+    version: 'w3-play', renderer, scene, camera, field, surface, ground, groundAt, env, cascade: world.cascade, terrain, forest, trees, undergrowth, rocks, rockView, town, water, rider, rain, leaves, shafts, birds, insects, hikers, world, maps, bridge, quality, perf, data,
     game, ui, input, audio, props, trails, viewpoints, persistence, dailyToday, menuData,
     get trail() { return current.trail; }, get kind() { return current.kind; }, get centre() { return current.trail.centre; },
     get bike() { return bike; }, get progress() { return progress; }, get focusBlend() { return focusBlend; }, get viewShift() { return { x: viewShift.x, y: viewShift.y }; },

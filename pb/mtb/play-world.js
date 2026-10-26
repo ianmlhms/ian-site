@@ -31,12 +31,13 @@ export function buildPlayWorld(data) {
     const a = world.trees.collide(x, z, r, out);
     const wall = cascadeCollide(world.cascade, x, z, r, y, hitB);              // nobody rides up or down the Schiessentuempel falls (the carved channel there is inside the ledge)
     if (wall && (!a || wall.pen > a.pen)) { out.nx = wall.nx; out.nz = wall.nz; out.pen = wall.pen; return out; }
+    const house = world.town.collide(x, z, r, y, hitA);                         // a house is a wall (the baked footprints; the trails keep clear of them, the harness proves it)
+    if (house && (!a || house.pen > a.pen)) { out.nx = house.nx; out.nz = house.nz; out.pen = house.pen; return out; }
     if (world.clearance(x, z) > ROCK_PATH_CLEARANCE) return a;
     const b = world.rocks.collide(x, z, r, y, hitB);
     if (b && (!a || b.pen > a.pen)) { out.nx = b.nx; out.nz = b.nz; out.pen = b.pen; return out; }
     return a;
   };
-  void hitA;
   const trunkHit = { nx: 0, nz: 0, pen: 0 };
   const cascadeFinish = world.cascade ? finishView(world.cascade, surface, (x, z, r) => world.trees.collide(x, z, r, trunkHit) !== null) : null;          // where the camera stands when the Schiessentuempel trail ends (null: use the trail's own focus point)
   return { ...world, decks, bridge, ground, groundAt, classify, collide, trails, finishView: cascadeFinish, trailById: new Map(trails.map((t) => [t.id, t])) };
