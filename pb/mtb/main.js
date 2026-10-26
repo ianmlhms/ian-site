@@ -79,8 +79,9 @@ function pickLang(progress) {
 
 function autoQuality() {
   const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  const ipadDesktopUa = navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform || navigator.userAgent || '');       // an iPad that says "Macintosh" (desktop mode of Safari)
+  if (coarse || ipadDesktopUa) return 'low';                              // every touch device (iPads of the school first): the low setting, the player can raise it in the menu
   const weak = (navigator.hardwareConcurrency || 4) <= 4;
-  if (coarse) return weak ? 'low' : 'medium';
   return weak ? 'medium' : 'high';
 }
 function pickQuality() {
