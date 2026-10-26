@@ -21,4 +21,21 @@
       DERPLP1400003afg: { wall: '#3d6a97', roof: 'flat', plinth: { h: 0.4, col: '#6f7378' }, floorH: 3.6, bayM: 3.2, noWindows: true },
     },
   });
+
+  /* WITTLICH (Hbf).  Refs: Commons "Wittlich Hauptbahnhof Nord/Süd/2016 a-d", "20241015-Wittlich Hbf-01/-02", "Bahnhof Wittlich Empfangsgebäude Gleise Bahnsteige".  Two-storey 1950s station building:
+   * orange plaster (repainted since 2016), dark-brown hip roof with small dormers, white window frames, big ground-floor windows, a lean-to canopy over the entrance; the low parts (eave < 4.6 m) are cream plastered single-storey wings (parcel station, waiting hall) and a small cream shed with a red door behind the platform. */
+  const CREAM = '#e8e3d3';
+  reg('Wittlich', {
+    wall: '#dd8541', trim: '#efe9dc', plinth: { h: 0.6, col: '#b0aca1' }, band: null, roof: 'tile', roofTint: '#6b5d54', fascia: '#efe9dc', floorH: 2.8, bayM: 2.9, stain: true,
+    wallFor: (face) => (face.eave < 4.6 ? CREAM : null),
+    win: { w: 1.1, h: 1.6, kind: 'rect', frame: '#f6f4ee', reveal: '#cfc5ae', sill: true },
+    doors: [
+      { z: 2.0, w: 1.7, h: 2.4, col: '#e8e6e0', glass: true, face: 'front' }, { z: -2.5, w: 1.1, h: 2.3, col: '#6a6d70', face: 'front' },
+      { z: 2.0, w: 1.7, h: 2.4, col: '#e8e6e0', glass: true, face: 'back' }, { z: 14.0, w: 1.1, h: 2.3, col: '#6a6d70', face: 'back' },
+    ],
+    otherBase: { stain: true },
+    others: {
+      w267055347: { wall: CREAM, roof: 'tile', roofTint: '#6b5d54', plinth: { h: 0.4, col: '#a6a297' }, floorH: 3.2, bayM: 4.0, win: { w: 0.9, h: 1.2, kind: 'rect', frame: '#f6f4ee', reveal: '#cfc5ae', sill: false }, doors: [{ z: 65.5, w: 1.2, h: 2.1, col: '#7b2a26', face: 'front' }] },
+    },
+  });
 })();

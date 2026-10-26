@@ -1,0 +1,112 @@
+{
+ "route": "wittlich",
+ "station": "Wittlich",
+ "refs": "Wittlich",
+ "views": [
+  {
+   "photo": "20241015-Wittlich Hbf-01.jpg",
+   "pos": [
+    3.5,
+    85,
+    1.7
+   ],
+   "look": [
+    -17,
+    0,
+    3.5
+   ],
+   "fov": 62,
+   "note": "building across the tracks"
+  },
+  {
+   "photo": "20241015-Wittlich Hbf-02.jpg",
+   "pos": [
+    2.5,
+    25,
+    1.7
+   ],
+   "look": [
+    -17,
+    -10,
+    3.5
+   ],
+   "fov": 62,
+   "note": "building close"
+  },
+  {
+   "photo": "Bahnhof Wittlich Empfangsgebäude Gleise Bahnsteige.jpg",
+   "pos": [
+    3.0,
+    60,
+    1.8
+   ],
+   "look": [
+    -3,
+    -40,
+    3.0
+   ],
+   "fov": 62,
+   "note": "island ahead"
+  },
+  {
+   "photo": "Wittlich Hauptbahnhof 2016 c.jpg",
+   "pos": [
+    3.0,
+    60,
+    1.7
+   ],
+   "look": [
+    -17,
+    -8,
+    3.5
+   ],
+   "fov": 62,
+   "note": "building + 2/3 signs"
+  },
+  {
+   "photo": "Wittlich Hauptbahnhof 2016 d.jpg",
+   "pos": [
+    4.5,
+    60,
+    1.7
+   ],
+   "look": [
+    5.5,
+    15,
+    2.5
+   ],
+   "fov": 55,
+   "note": "lift canopy"
+  },
+  {
+   "photo": "Bahnsteig Wittlich.jpg",
+   "pos": [
+    5.0,
+    50,
+    1.7
+   ],
+   "look": [
+    22,
+    -10,
+    3.5
+   ],
+   "fov": 62,
+   "note": "far platform canopy"
+  },
+  {
+   "photo": "Wittlich Hbf.jpg",
+   "pos": [
+    2.5,
+    -50,
+    1.7
+   ],
+   "look": [
+    -12,
+    20,
+    3.0
+   ],
+   "fov": 62,
+   "note": "from the far end"
+  }
+ ]
+}
