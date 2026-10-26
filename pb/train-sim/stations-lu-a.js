@@ -1173,12 +1173,13 @@
     const k = kit(api);
     const BACK = k.edge + k.W;
     platformSurface(k, 'slab');
-    building(k, { lat0: BACK + 2.4, lat1: BACK + 14, z0: -24, z1: 26, floors: 2, floorH: 4.2, cfg: { wall: '#43474d', trim: '#c9672b', frame: '#23272b', glass: '#6d90a4', arch: false, ww: 0.78, wh: 0.58, plinth: '#2f3236', seed: 22, band: 'rgba(201,103,43,0.9)' }, trim: '#2f3236', roof: { type: 'flat', col: '#7d8286' } });
-    k.box(k.vc, BACK + 2.35, 4.4, 26.4, 0.4, 9.2, 0.7, k.col('#d6762a'));
-    k.box(k.vc, BACK + 2.35, 4.4, -24.4, 0.4, 9.2, 0.7, k.col('#d6762a'));
-    // colourful block
-    building(k, { lat0: BACK + 18, lat1: BACK + 28, z0: 20, z1: 70, floors: 5, floorH: 3.3, cfg: { wall: '#b24f31', trim: '#d7b6a0', frame: '#e8dcc8', glass: '#4b5560', arch: false, ww: 0.5, wh: 0.5, seed: 31, band: 'rgba(120,60,40,0.4)' }, roof: { type: 'flat', col: '#8a8f93' } });
-    building(k, { lat0: BACK + 18, lat1: BACK + 27, z0: -60, z1: -22, floors: 4, floorH: 3.3, cfg: { wall: '#c9c6bd', trim: '#e8e4da', frame: '#d6762a', glass: '#4b5560', arch: false, ww: 0.55, wh: 0.5, seed: 37 }, roof: { type: 'flat', col: '#8a8f93' } });
+    /* The hall stands where the real one does (OSM station building of the patch: lateral 10.8 .. 29.6, 42 .. 95 m AHEAD of the stop; W2c 26 Oct 2026), the apartment blocks of the earlier
+       authored version are dropped: the LOD2 buildings of the station patch are the real ones.  A reversed service sees the hall mirrored in z. */
+    const zr = api.track && api.track.reverse ? -1 : 1;
+    const zs = (a, b) => ({ z0: Math.min(zr * a, zr * b), z1: Math.max(zr * a, zr * b) });
+    building(k, Object.assign({ lat0: BACK + 2.4, lat1: BACK + 14, floors: 2, floorH: 4.2, cfg: { wall: '#43474d', trim: '#c9672b', frame: '#23272b', glass: '#6d90a4', arch: false, ww: 0.78, wh: 0.58, plinth: '#2f3236', seed: 22, band: 'rgba(201,103,43,0.9)' }, trim: '#2f3236', roof: { type: 'flat', col: '#7d8286' } }, zs(-92, -42)));
+    k.box(k.vc, BACK + 2.35, 4.4, zr * -41.6, 0.4, 9.2, 0.7, k.col('#d6762a'));
+    k.box(k.vc, BACK + 2.35, 4.4, zr * -92.4, 0.4, 9.2, 0.7, k.col('#d6762a'));
     canopy(k, { lat0: BACK + 0.2, lat1: k.edge + 1.2, hIn: 5.4, hOut: 4.5, z0: -96, z1: 96, colLat: k.edge + 4.8, col: '#4a413b', roof: '#d9dcde', fascia: '#5b4b43', spacing: 8, colSize: 0.24, lights: true });
     const op = otherPlatform(k, { width: 6, variant: 'slab', shelter: false });
     canopy(k, { lat0: op.e1 + 0.4, lat1: op.e0 - 1.0, hIn: 5.0, hOut: 4.4, z0: -90, z1: 90, colLat: (op.e0 + op.e1) / 2, col: '#4a413b', roof: '#d9dcde', fascia: '#5b4b43', spacing: 8, colSize: 0.24 });
