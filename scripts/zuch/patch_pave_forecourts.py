@@ -13,7 +13,7 @@ from scipy import ndimage as ndi
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DIR = os.path.join(HERE, "..", "..", "pb", "train-sim", "data", "stations")
-FORECOURT_M = 42.0
+FORECOURT_M = 60.0
 PLATFORM_M = 14.0
 LAWN, MEADOW, PAVING = 2, 3, 1
 

@@ -18,7 +18,7 @@
   const TS = (window.TS = window.TS || {});
   const TAG = '[Lokféierer] station surround: ';
   const DATA_DIR = '/pb/train-sim/data/stations/';
-  const DATA_VERSION = 'w2d1';     // bump when the patch files change (they are fetched with force-cache)
+  const DATA_VERSION = 'w2d2';     // bump when the patch files change (they are fetched with force-cache)
   const EXT_X = 160;              // patch half width (m) and half length
   const EXT_Z = 320;
   const FADE_X = 45;              // the real relief fades into the generic one over the outer metres

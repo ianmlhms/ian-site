@@ -1432,10 +1432,10 @@ def build(args):
     # re-paint on the canvas at SS resolution from the 1 m masks
     ov = Image.fromarray((lawn_fill * 255).astype(np.uint8)).resize((cv.w, cv.h), Image.NEAREST)
     cv.img.paste(CLS_LAWN, (0, 0), ov)
-    # a station square is paved (cobbles / asphalt / parking), not lawn: the uncovered ground within 42 m of the station building (W2d; patch_pave_forecourts.py does the same for finished patches)
+    # a station square is paved (cobbles / asphalt / parking), not lawn: the uncovered ground within 60 m of the station building (W2d; patch_pave_forecourts.py does the same for finished patches)
     st_polys = [Polygon(r) for r in [b["ground"] for b in buildings if b.get("station") and len(b.get("ground") or []) >= 3]]
     if st_polys:
-        paved = lawn_fill & (ndi.distance_transform_edt(~rast(st_polys, 1.0)) < 42)
+        paved = lawn_fill & (ndi.distance_transform_edt(~rast(st_polys, 1.0)) < 60)
         ov = Image.fromarray((paved * 255).astype(np.uint8)).resize((cv.w, cv.h), Image.NEAREST)
         cv.img.paste(CLS_PAVING, (0, 0), ov)
     ov = Image.fromarray((forest_mask * 255).astype(np.uint8)).resize((cv.w, cv.h), Image.NEAREST)
