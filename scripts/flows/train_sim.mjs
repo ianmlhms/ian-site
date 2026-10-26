@@ -1679,7 +1679,7 @@ export const flow = {
     await waitState(frame, () => window.__tsTest.state().phase === 'running' && window.__tsTest.state().pattern === 'RE', null, 60000);
     s = await S(frame);
     h.eq(s.passIndices, [1], 'station 1 is passed');
-    h.expect(/RE · 4/.test(s.svcLabel), 'start card / HUD shows "RE · 4 Arrêten": ' + s.svcLabel);
+    h.expect(/RE · 5/.test(s.svcLabel), 'start card / HUD shows "RE · 5 Arrêten" (west has 6 stations since W2c, one is passed): ' + s.svcLabel);
     h.expect(s.timetable[1].pass === true && s.timetable[1].arr === s.timetable[1].dep, 'timetable marks the passing station');
     await h.shot('express-start');
     await frame.evaluate(() => { __tsTest.teleport(1); });
