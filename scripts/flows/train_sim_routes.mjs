@@ -98,7 +98,7 @@ export const flow = {
 
     h.step('a scenery half that cannot be fetched: driving goes on with the generic scenery (no hole, crossings kept)');
     {
-      await h.context.route('**/data/stations/*.h.json', (route) => route.abort());
+      await h.context.route('**/data/stations/*.h.json*', (route) => route.abort());
       const bad = await simOnPage(await h.context.newPage(), h.origin, { quality: 'medium' });
       await bad.start('south', 'emu', { lazy: true });
       await bad.frames(20);
@@ -110,7 +110,7 @@ export const flow = {
       const rep = await scanRoute(bad, 'south', { step: 600, rayStep: 120 });
       h.eq([rep.flaggedPoses.slice(0, 2), rep.rayFailures.filter((f) => f.kind !== 'step').slice(0, 2)], [[], []], 'south without any scenery half: no holes');
       h.expect(!bad.errors.some((e) => /pageerror/.test(e)), 'no page errors with failed scenery halves');
-      await h.context.unroute('**/data/stations/*.h.json');
+      await h.context.unroute('**/data/stations/*.h.json*');
       await bad.page.close();
     }
 

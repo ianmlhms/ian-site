@@ -196,3 +196,27 @@ All of this is additive; nothing of the Mosel line (`build_real_line.py`, `real-
 * **Shared-tail hills**: the generic hill noise is taken in the frame of the tail anchor (Tréier Hafestrooss platform start) on the shared tail, blended in over 700 m: `wittlich` and `trier` now have identical ground
   there (`scripts/zuch/tail_hills_probe.mjs`: max difference 0.00 m).
 * Ribbons: road ribbons are sampled every 3 m (were 8 m); the river under a river bridge of a real line is narrower (0.62 x) and meanders.
+
+
+## W2d (26 Oct 2026): Gare Centrale rebuilt from its patch, LOD2 render bugs, forecourts, geometry check
+
+* **Root causes of the broken Lëtzebuerg**: (1) the station was declared on the RIGHT of the track (authored default) while the real building and platform 1 are on the LEFT
+  (patch `side: left`); `SIDE_FIX` in routes.js now has `Lëtzebuerg: 'left'` (the west / south / north services keep their authored 'right': the patch is bound to the Mosel scenery);
+  (2) the LOD2 platform roofs are "buildings" in the data and were drawn as a 250 m window wall (also fixed by the routes agent: a building centred on a platform polygon is not
+  drawn); (3) **triangle winding**: LOD2 rings have an arbitrary direction, a DoubleSide material flips the normal of a back face, so about half of all roofs of every patch were lit from
+  below (black / "LOD2 roofs render darker than in the photos"); `MB.fixWinding()` in station-surround-mesh.js now winds every triangle with its normal; (4) the normals of the LOD2
+  faces were not rotated from the patch frame into the world frame (`rotN`); (5) `triangulate3` now drops rings whose triangulation does not cover the ring's own area (warped faces
+  came out as spikes / ribbons).
+* **station-yard.js** (+ `station-yard-props.js`), called from station-surround-mesh.js for a patch whose style has `yard`: the real tracks of the patch (ballast with painted sleepers, rails,
+  contact wire; 12 tracks of the Gare Centrale converge at both ends like the real ones), the platforms as paved slabs with a tactile band, the platform roofs from their LOD2 roof faces
+  (glass / steel) with columns standing on the platforms (and on the ground under roofs with no platform: nothing floats), blue "Voie" signs, benches, the Luxtram tracks of the
+  forecourt (OSM `railway=tram`) with a tram standing at its stop and buses at the bus stops.  Style: `yard: { canopies: [LOD2 ids], platformTop, platformFrom, voie: { index: label } }`
+  (stations-styles-lu.js).  The hand-built Gare Centrale of stations-lu-a.js is only used on the authored west / south / north lines.
+* **Patch post-process** `scripts/zuch/patch_lux_yard.py` (idempotent): ground classes of the platforms / canopy footprints / track beds, the forecourt paved, the OSM tram tracks appended to
+  `rails` (kind `tram`), the LiDAR platform height (0.9-1.0 m) flattened to the slab height in the relief.
+* **Forecourts of all stations** (reviewer): `build_station_patch.py` painted every pixel near a building that OSM does not cover as lawn; `patch_pave_forecourts.py` (idempotent, run on all
+  finished patches) paves lawn / meadow within 60 m of the station building and within 14 m of a platform; the pipeline does the same for new builds (`lawn_fill`).  The patch fetch
+  carries `?v=DATA_VERSION` (station-surround.js) because the patches are fetched with `force-cache`.
+* **Geometry check**: `scripts/zuch/patch_geometry_check.mjs` (node, no browser; also step 1 of `train_sim_world.mjs`): per building face degenerate, huge (> 220 m), twisted (> 2 m off
+  its plane), outside its footprint, buildings whose walls float > 1.6 m above the highest ground of their footprint.  Reviewed exceptions in `patch_geometry_allow.json` with reasons.
+* **Cab sweep**: `scripts/zuch/cab_sweep.mjs <outDir> <route> ...` (cab at every stop, contact sheet per route and direction); sheets in `reports/zuchreal/w2d/cab/`.

@@ -87,3 +87,19 @@ Done (details: REAL-LINES.md "W2b", montages `~/Library/CloudStorage/OneDrive-Mu
 * Station sides (`SIDE_FIX` in routes.js; the generated real-mosel.js is unchanged): Wecker left, Manternach right, Tréier West right, Schweich right, Hetzerath right, Tréier Süd right (see the worker reports); proper fix = generator (`build_real_line.py platform_side`).
 * Shared-tail hills identical (tail_hills_probe: 0.00 m), road ribbons sampled at 3 m, narrower meandering water under bridges, patches placed by the BASE track (reverse services).
 Open: Gare Centrale platform canopies are still the hand-made lu-a ones (the LOD2 canopy block is hidden), tram hole scan not done (the tram world has its own renderer, hole_lib is rail only), north/brussels cracks not touched (belongs to the routes agent), Tréier Hbf, hole scan: ray failures at s 24995 (Sehlem) and 10460 on `trier`, LOD2 roofs render dark, platform paving of most stops is the generic grey, staggered platforms (Zewen/Euren/Ehrang Ort) are drawn as one 210 m platform.
+
+
+## W2d result (26 Oct 2026, fresh agent; brief scratchpad/brief-zuch-w2d.md)
+Merged `zuchroutes` into `zuchreal` first (conflicts resolved in station-surround*.js, train-sim.html, landscape.js, real-line.js, train_sim_world.mjs, build_station_patch.py, fetch_refs.py).
+Done and verified (details REAL-LINES.md "W2d"; reports `~/Library/CloudStorage/OneDrive-Mulheims/website-overnight/reports/zuchreal/w2d/`):
+* Gare Centrale: station declared LEFT (real), tracks / platforms / canopies with columns from the patch (`station-yard.js`), forecourt paved + Luxtram tracks + tram + buses, LOD2 building with the
+  fixed roofs.  Montages `gare-centrale-cab-photo-sim.png`, `luxembourg/L_tzebuerg-final-montage.png` (6 photo | sim pairs: forecourt, tower, tram stop, place de la Gare, island platform, platform 1).
+* Systemic render bugs fixed for ALL stations: triangle winding (black roofs), world-frame normals, warped-face triangulation guard, forecourt lawn -> paving (`patch_pave_forecourts.py`, before / after:
+  `roodt/before-after.png`, `ettelbreck/after-sheet.png`).
+* Geometry check `scripts/zuch/patch_geometry_check.mjs` (world flow step 1); cab sweep `scripts/zuch/cab_sweep.mjs`, sheets in `w2d/cab/` for east / wittlich / trier, both directions: no wall, ribbon, floating plane seen.
+Open: staggered platforms of Zewen / Euren / Ehrang Ort (one 210 m platform each), generic grey platform paving at most stops, Gare Centrale: no CFL trains standing at the platforms, no catenary masts / portals
+(only wires), tram / bus are plain boxes, the glass hall (Grande Halle) is not distinguished from the other canopies, platform 12 / 11 numbering of the signs is by island (2-3 ... 10-11), forecourt trees come from LiDAR only;
+the tram hole scan; Rodange steelworks halls (250 m) accepted in the geometry allowlist.
+W2d gates (26 Oct 2026): `run_all.mjs train` 6/6 PASS (train-sim, -audio, -touch, -career-lock, -world incl. the new patch-geometry step, -routes); check_site: only the old karttracker-ios-privacy orphan; cv_head PROBLEMS: 0;
+hole scans east 205 poses / 3164 rays, wittlich 465 / 7188, trier 530 / 8188: 0 flagged, 0 ray failures.  WebKit smoke at Lëtzebuerg (medium): 874 draws / 400k triangles, 16.7 ms mean frame; the 874 draws are mostly the
+657 single-face wall meshes of the LOD2 station building (station-building.js builds one mesh per wall face: merge per material to save draw calls).
