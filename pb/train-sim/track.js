@@ -857,6 +857,27 @@
         r.lats = Array.from(cols).sort((p, q) => p - q);
       });
     }
+    /* a river that crosses the line at a steep angle in game space (the legs are compressed along s, so a real crossing at 45 degrees becomes nearly perpendicular): its trench is
+       only a few metres wide ALONG s, and the regular rows (5 - 10 m) averaged it into a wide V (0.7 m off the terrain function at south s 15185, found by the hole scan).  Rows every
+       RIVER_CROSS_ROW m across the crossing resolve it. */
+    const RIVER_CROSS_SLOPE = 0.8;
+    const RIVER_CROSS_ROW = 2;
+    const RIVER_CROSS_PAD = 12;
+    const riverCross = [];
+    if (real) {
+      for (let i = 0; i + 2 < n; i += 2) {
+        if (arrAt(riverArr, i) < 0.02) continue;
+        if (Math.abs(arrAt(rivLatArr, i + 2) - arrAt(rivLatArr, i)) / (2 * STEP) <= RIVER_CROSS_SLOPE) continue;
+        const a = i * STEP - RIVER_CROSS_PAD; const b = (i + 2) * STEP + RIVER_CROSS_PAD;
+        const last = riverCross[riverCross.length - 1];
+        if (last && a <= last[1]) last[1] = b; else riverCross.push([a, b]);
+      }
+    }
+    const riverRows = (s0, s1) => {
+      const out = [];
+      riverCross.forEach(([a, b]) => { for (let s = Math.ceil(Math.max(s0, a) / RIVER_CROSS_ROW) * RIVER_CROSS_ROW; s <= Math.min(s1, b); s += RIVER_CROSS_ROW) out.push(s); });
+      return out;
+    };
     const riverLats = (s0, s1) => {
       const out = [];
       riverRegions.forEach((r) => { if (s1 > r.s0 - RIVER_REGION_MARGIN && s0 < r.s1 + RIVER_REGION_MARGIN) out.push(...r.lats); });
@@ -888,7 +909,7 @@
       inSurround: surroundPatches.length ? (x, z) => { const q = nearest(x, z, { s: 0, d: 0, lat: 0, y: 0 }); return surroundPatches.some((p) => p.meshReady && p.covers(q.s, q.lat)); } : () => false,   // W2c: only once the heavy half of the patch (buildings, trees) is loaded: until then the generic scenery stands there
       /* extra terrain strip vertices for the chunk [s0, s1): rows (arc lengths) and lateral columns, from the crossing roads and the real station patches */
       meshHints: {
-        rows: (s0, s1) => (roadPlan ? roadPlan.extraRows(s0, s1) : []).concat(...surroundPatches.map((p) => p.extraRows(s0, s1)), valleyRows(s0, s1)),
+        rows: (s0, s1) => (roadPlan ? roadPlan.extraRows(s0, s1) : []).concat(...surroundPatches.map((p) => p.extraRows(s0, s1)), valleyRows(s0, s1), riverRows(s0, s1)),
         lats: (s0, s1) => (roadPlan ? roadPlan.extraLats(s0, s1) : []),
         latsAll: (s0, s1) => [].concat(...surroundPatches.map((p) => p.extraLats(s0, s1)), valleyLats(s0, s1), riverLats(s0, s1)),
       },

@@ -28,13 +28,14 @@ def bbox_wgs(e0, n0, e1, n1, pad=0.0):
     return (min(lo0, lo1), min(la0, la1), max(lo0, lo1), max(la0, la1))
 
 
-def read_layer(layer, bbox, where=None, pbfs=None):
-    """Features of the extracts inside a lon/lat bbox: [{id, g (shapely, UTM 32N), t (tags incl. other_tags)}].  Features that appear in both extracts (border) are de-duplicated by id."""
+def read_layer(layer, bbox, where=None, pbfs=None, mask=None):
+    """Features of the extracts inside a lon/lat bbox: [{id, g (shapely, UTM 32N), t (tags incl. other_tags)}].  Features that appear in both extracts (border) are de-duplicated by id.
+    mask (W3, abroad corridors): a lon / lat shapely polygon instead of the bbox; GDAL tests every feature against it while reading, so a long thin corridor does not load the box around it."""
     out, seen = [], set()
     for pbf in pbfs or PBFS:
         if not os.path.exists(pbf):
             continue
-        meta, _, geom, fields = read(pbf, layer=layer, bbox=bbox, where=where)
+        meta, _, geom, fields = read(pbf, layer=layer, bbox=bbox, mask=mask, where=where)
         names = [str(n) for n in meta["fields"]]
         for i in range(len(geom)):
             if geom[i] is None:

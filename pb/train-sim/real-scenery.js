@@ -426,7 +426,7 @@
       const side = c.rng() < 0.5 ? -1 : 1;
       const lat = side * (c.TREE_CLEAR_LAT + 1 + c.rng() * 6);
       const cls = c.real.landAt(s, lat);
-      if (cls === K.resid || cls === K.urban || cls === K.indus) continue;
+      if (cls === K.resid || cls === K.urban || cls === K.indus || cls === K.rail) continue;
       const p = c.place(s, lat);
       if (segs.length && roadClearance(segs, p.x, p.z).d < 2) continue;
       const nm = c.pickSpecies('def', c.rng());

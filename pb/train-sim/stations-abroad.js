@@ -367,7 +367,7 @@
       const len = zb - za;
       const bays = Math.round(len / 5.5);
       wallD(wing, d0, za, zb, y0, wallH, -1, bays, 1);
-      wallD(plain, d0 + DEP, za, zb, y0, wallH, 1, 4, 1);
+      wallD(wing, d0 + DEP, za, zb, y0, wallH, 1, bays, 1);   // the forecourt side of the wings: the same arched windows (it was a blank wall; photo: Commons "Gare de Metz-Ville", W3 montage)
       wallZ(plain, za, d0, d0 + DEP, y0, wallH, -1, 2, 1);
       wallZ(plain, zb, d0, d0 + DEP, y0, wallH, 1, 2, 1);
       vc.box(X(d0 + DEP / 2), wallH + 0.15, (za + zb) / 2, DEP + 0.6, 0.3, len + 0.6, col(STONE_LT));
@@ -388,7 +388,12 @@
     wallD(plain, d0 - 1.2, cz1 - 8, cz1, y0, cH, -1, 3, 1);
     wallZ(plain, cz0, d0 - 1.2, d0 + cD, y0, cH, -1, 4, 1);
     wallZ(plain, cz1, d0 - 1.2, d0 + cD, y0, cH, 1, 4, 1);
-    wallD(plain, d0 + cD, cz0, cz1, y0, cH, 1, 6, 1);
+    wallD(plain, d0 + cD, cz0, cz0 + 8, y0, cH, 1, 3, 1);
+    wallD(plain, d0 + cD, cz1 - 8, cz1, y0, cH, 1, 3, 1);
+    wallD(gable, d0 + cD, cz0 + 8, cz1 - 8, y0, cH, 1, 1, 1);   // the big arched gable with its three tall windows faces the forecourt (photo), not only the track
+    // entrance canopy over the three doors: a flat green-grey roof on brackets
+    vc.box(X(d0 + cD + 1.6), 4.9, (cz0 + cz1) / 2, 3.2, 0.25, 15, col('#4f6258'));
+    for (let z = cz0 + 4; z <= cz1 - 3.9; z += 3.5) vc.box(X(d0 + cD + 0.2), 4.2, z, 0.14, 1.4, 0.14, col('#3d3f42'));
     gableD(slate, plain, d0 - 1.2, d0 + cD, cz0, cz1, cH, cH + 8, 0.7, WHITE, WHITE);
     // little turrets on the gable corners
     [[cz0 + 1.5], [cz1 - 1.5]].forEach(([z]) => {

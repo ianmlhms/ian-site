@@ -217,7 +217,7 @@
     wittlich: { name: { lb: 'Lëtzebuerg – Tréier – Wittlech', de: 'Luxemburg – Trier – Wittlich', en: 'Luxembourg – Trier – Wittlich' }, n: 21, km: 100, kind: 'rail' },
     north: { name: { lb: 'Lëtzebuerg – Ettelbréck – Clierf', de: 'Luxemburg – Ettelbrück – Clervaux', en: 'Luxembourg – Ettelbruck – Clervaux' }, n: 18, km: 61, kind: 'rail' },
     trier: { name: { lb: 'Lëtzebuerg – Tréier – Koblenz', de: 'Luxemburg – Trier – Koblenz', en: 'Luxembourg – Trier – Koblenz' }, n: 12, km: 190, kind: 'rail' },
-    metz: { name: { lb: 'Lëtzebuerg – Metz – Nancy', de: 'Luxemburg – Metz – Nancy', en: 'Luxembourg – Metz – Nancy' }, n: 6, km: 150, kind: 'rail' },
+    metz: { name: { lb: 'Lëtzebuerg – Metz – Nancy', de: 'Luxemburg – Metz – Nancy', en: 'Luxembourg – Metz – Nancy' }, n: 12, km: 119, kind: 'rail' },
     brussels: { name: { lb: 'Lëtzebuerg – Arlon – Bréissel', de: 'Luxemburg – Arlon – Brüssel', en: 'Luxembourg – Arlon – Brussels' }, n: 6, km: 220, kind: 'rail' },
     paris: { name: { lb: 'TGV Lëtzebuerg – Paris-Est', de: 'TGV Luxemburg – Paris-Est', en: 'TGV Luxembourg – Paris-Est' }, n: 4, km: 370, kind: 'hst' },
   };

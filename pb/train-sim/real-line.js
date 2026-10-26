@@ -24,7 +24,7 @@
      use their own data file data/real/<id>-features.json (build_real_route.py).  realKey(def) -> the data set of a route, or null (generic landscape). */
   const realKey = (def) => (!def ? null : def.sceneryId === 'mosel' ? 'mosel' : TS.realLines && def.sceneryId && TS.realLines[def.sceneryId] ? def.sceneryId : null);
   const dataUrl = (key) => '/pb/train-sim/data/real/' + key + '-features.json?v=' + DATA_VERSION;
-  const CLASS = Object.freeze({ field: 0, meadow: 1, forest: 2, vine: 3, resid: 4, indus: 5, water: 6, orchard: 7, urban: 8, scrub: 9, quarry: 10, cemetery: 11, park: 12 });
+  const CLASS = Object.freeze({ field: 0, meadow: 1, forest: 2, vine: 3, resid: 4, indus: 5, water: 6, orchard: 7, urban: 8, scrub: 9, quarry: 10, cemetery: 11, park: 12, rail: 13 });
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const caches = new Map();     // key -> parsed document
   const pendings = new Map();   // key -> promise

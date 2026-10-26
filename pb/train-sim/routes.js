@@ -196,25 +196,14 @@
     moselSlice('Koblenz Hbf')
   );
 
-  /* ---------------------------------------------------------------- 7 metz */
+  /* ---------------------------------------------------------------- 7 metz (TER C40+ Luxembourg - Metz - Nancy: Howald, Bettembourg, Hettange-Grande, Thionville, Uckange, Hagondange, Walygator Parc, Metz, Pagny-sur-Moselle, Pont-à-Mousson, Nancy)
+   * Real OSM geometry like the Luxembourg routes (real-metz.js, scripts/zuch/build_real_route.py with the two-stage corridor fetch; REAL-LINES.md "W3: abroad routes"). */
   const metz = makeRoute(
     {
-      id: 'metz', kind: 'rail', region: 'Frankräich', cruise: 140, biomes: ['city', 'suburb', 'farmland', 'industrial'],
+      id: 'metz', kind: 'rail', region: 'Frankräich', cruise: 140, biomes: ['city', 'suburb', 'farmland', 'industrial', 'forest'],
       name: { lb: 'Lëtzebuerg – Metz – Nancy', de: 'Luxemburg – Metz – Nancy', en: 'Luxembourg – Metz – Nancy' },
     },
-    [
-      station('Lëtzebuerg', 3, 'right', 'city'),
-      ...leg(2400, 's300:v60:bcity r600/260 s*:v120:bsuburb l1200/320:g-0.8 s500:bfarmland:v140 r1500/300 s*:X'),
-      station('Bettembuerg', 2, 'left', 'suburb'),
-      ...leg(2400, 's300:v120:bfarmland l1400/320 s*:v160 r1500/320:g-0.4 s*:X:v140'),
-      station('Thionville', 2, 'right', 'industrial'),
-      ...leg(2400, 's300:v100:bindustrial r1200/320 s*:v140:bfarmland l1500/320:g0.5 s300:v160 s*'),
-      station('Metz-Ville', 3, 'left', 'city'),
-      ...leg(2200, 's300:v100:bsuburb l1200/300 s*:v160:bfarmland r1600/320 s*:X'),
-      station('Pont-à-Mousson', 1, 'right', 'farmland'),
-      ...leg(2000, 's300:v120:bfarmland r1300/320:g-0.4 s*:v160 l1500/300 s200:v100'),
-      station('Nancy-Ville', 3, 'left', 'city', true),
-    ]
+    lastAsTerminus(realLineBody('metz'))
   );
 
   /* ------------------------------------------------------------ 8 brussels */

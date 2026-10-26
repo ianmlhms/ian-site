@@ -742,9 +742,9 @@ window.TS = window.TS || {};
     const yawOf = f => Math.atan2(-f.tz, f.tx);
 
     /* real line: ground colour by land class (strip) and far colour by the coarse class raster; classes in real-line.js CLASS */
-    const CLS_GROUND = ['#a3b45a', '#7ba947', '#4a7a38', '#9db056', '#7f9c5a', '#8a8a80', '#6a8a5a', '#7da24a', '#8a8c80', '#6f8d4a', '#a79e88', '#7da24e', '#80ad4c'].map(C);
+    const CLS_GROUND = ['#a3b45a', '#7ba947', '#4a7a38', '#9db056', '#7f9c5a', '#8a8a80', '#6a8a5a', '#7da24a', '#8a8c80', '#6f8d4a', '#a79e88', '#7da24e', '#80ad4c', '#8e8b82'].map(C);
     const FAR_CROPS = ['#cbb868', '#9db455', '#8aa850', '#b99f5c', '#c9c470', '#7fae4a'].map(C);
-    const CLS_FAR = ['#b9b45f', '#7fae4a', '#3b6430', '#a3ae56', '#8c9a70', '#858580', '#5d8fa6', '#74a447', '#8d8b84', '#6b8d46', '#a89f8a', '#7aa84a', '#80ad4c'].map(C);
+    const CLS_FAR = ['#b9b45f', '#7fae4a', '#3b6430', '#a3ae56', '#8c9a70', '#858580', '#5d8fa6', '#74a447', '#8d8b84', '#6b8d46', '#a89f8a', '#7aa84a', '#80ad4c', '#8f8c84'].map(C);
     function groundColor(info, x, z, nY, lat, h) {
       const pal = PAL[info.biome] || PAL.farmland, a = Math.abs(lat);
       const c = mixColor(pal.g1, pal.g2, fbm(x * 0.008, z * 0.008));

@@ -241,7 +241,7 @@ def leg_len(real_gap, par):
     return brl.clamp(par["per_real"] * real_gap, par["leg_min"], par["leg_max"])
 
 
-PARAMS = {"per_real": brl.GAME_PER_REAL, "leg_min": brl.LEG_MIN, "leg_max": brl.LEG_MAX}
+PARAMS = {"per_real": brl.GAME_PER_REAL, "leg_min": brl.LEG_MIN, "leg_max": brl.LEG_MAX}   # defaults (the Luxembourg routes); a route definition can override them with "params" (W3: abroad routes)
 
 
 def ardennes_windows(biomes, s_from):
@@ -291,7 +291,9 @@ def build(route_id, dem=None):
     spec = ROUTES[route_id]
     tiles = load_route_tiles(spec["tiles"])
     dem = dem or Dem()
-    land = LandIndex(tiles["landuse"])
+    land = LandIndex(tiles["landuse"], rail=bool(spec.get("rail_class")))
+    if spec.get("rail_class"):
+        land.add_rails([w["g"] for w in tiles["rails"] if w["t"].get("railway") == "rail"])
     route, pts = build_path(tiles, spec)
     attrs = brl.RouteAttrs(route, dem)
     feats = route_features(attrs, dem, tiles)
@@ -330,7 +332,7 @@ def build(route_id, dem=None):
         a, b = A["s"] + HALF_BLOCK, B["s"] - HALF_BLOCK
         if b - a < 120:
             raise SystemExit("leg %s -> %s too short (%d m real)" % (A["game"], B["game"], b - a))
-        Lg = leg_len(b - a, PARAMS)
+        Lg = leg_len(b - a, dict(PARAMS, **spec.get("params", {})))
         br = [x for x in feats["bridges"] if x[1] > a and x[0] < b]
         tu = [x for x in feats["tunnels"] if x[1] > a and x[0] < b]
         cr = [c["s"] for c in feats["crossings"] if a + 20 < c["s"] < b - 20 and not any(abs(c["s"] - st["s"]) < HALF_BLOCK + 20 for st in stops)]
@@ -401,7 +403,7 @@ def emit(route_id, res):
         rd = sc.roads_of_leg(g, roads, rtree)
         out[lid] = {
             "L": round(g.length, 1), "land": sc.land_raster(g, land), "far": sc.far_raster(g, land), "water": sc.water_windows(g, waters, wtree), "roads": rd,
-            "relief": sc.relief(g, dem), "places": sc.places_of_leg(g, tiles["places"]), "crossings": sc.crossings_of_leg(g, res["feats"]["crossings"], rd),
+            "relief": sc.relief(g, dem), "places": sc.places_of_leg(g, tiles["places"]), "crossings": sc.crossings_of_leg(g, res["feats"]["crossings"], rd)[0],   # (records, arm polylines): the arms are only used by the Mosel pipeline
         }
         print("  features", lid, meta["from"], "->", meta["to"], "roads", len(rd), "water", len(out[lid]["water"]), "places", len(out[lid]["places"]), "crossings", len(out[lid]["crossings"]), flush=True)
     doc = {"version": 1, "row": sc.ROW_M, "col": sc.COL_M, "lat0": sc.LAT0, "cols": sc.COLS, "far": {"row": sc.FAR_ROW, "col": sc.FAR_COL, "lat0": sc.FAR_LAT0, "cols": sc.FAR_COLS},

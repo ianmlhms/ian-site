@@ -72,4 +72,27 @@ ROUTES = {
             ("Kleinbettingen", "Kleinbettingen", 2),
         ],
     },
+    # TER C40+ Luxembourg - Metz - Nancy (OSM relation 1061467: Luxembourg, Howald, Bettembourg, Hettange-Grande, Thionville, Uckange, Hagondange, Walygator Parc, Metz, Pagny-sur-Moselle, Pont-à-Mousson, Nancy)
+    "metz": {
+        "prefix": "M",
+        "rail_class": True,                   # landuse=railway -> bare ballast ground (class "rail"), not fields
+        "first_side": "right",
+        "tiles": ["metz"],
+        "params": {"per_real": 0.15, "leg_min": 600.0, "leg_max": 2800.0},          # game metres per real metre, clamped: the old authored game length (about 11 km for 150 km real) with more stops
+        "fetch": {"pbfs": ["lux", "lorraine"], "box": (5.95, 48.60, 6.40, 49.65), "corridor_m": 2600},   # stage 1 (rails + stations) in this lon / lat box, stage 2 (the rest) within corridor_m of the path
+        "stops": [
+            ("Luxembourg", "Lëtzebuerg", 3),
+            ("Howald", "Houwald", 1),
+            ("Bettembourg", "Bettembuerg", 2),
+            ("Hettange-Grande", "Hettange-Grande", 1),
+            ("Thionville", "Thionville", 2),
+            ("Uckange", "Uckange", 1),
+            ("Hagondange", "Hagondange", 1, (49.25383, 6.16417)),
+            ("Walygator Parc", "Walygator Parc", 1),
+            ("Metz", "Metz-Ville", 3),
+            ("Pagny-sur-Moselle", "Pagny-sur-Moselle", 1, (48.98548, 6.02546)),
+            ("Pont-à-Mousson", "Pont-à-Mousson", 1),
+            ("Nancy", "Nancy-Ville", 3),
+        ],
+    },
 }
