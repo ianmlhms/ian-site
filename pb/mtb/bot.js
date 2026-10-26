@@ -7,9 +7,9 @@
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 export const BOT = Object.freeze({
   vmax: { green: 13, blue: 16, red: 14, black: 12.5 },       // m/s: how fast the reference rider goes on a clear line
-  aLat: 6.0,                      // m/s2 of cornering it asks of the tyres (about 0.6 g on dry dirt: the tyres give 1 g)
+  aLat: 5.4,                      // m/s2 of cornering it asks of the tyres (about 0.6 g on dry dirt: the tyres give 1 g)
   aBrake: 6.0,                    // m/s2 it plans to brake with
-  lookMin: 4.5, lookMax: 13, lookPerMs: 0.55,
+  lookMin: 4.5, lookMax: 13, lookPerMs: 0.45,
   steerGain: 1.9,
   curvatureWindow: 4,             // samples either side that the curvature is smoothed over
   spacing: 1.5,                   // m between plan samples

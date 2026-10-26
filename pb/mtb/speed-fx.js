@@ -47,8 +47,8 @@ export function createDust({ scene, env, quality }) {
         float r = dot(vUv, vUv) * 4.0;
         float soft = (1.0 - r); if (soft <= 0.0 || vA < 0.01) discard;
         float f = 1.0 - exp(-pow(vDist * 0.0006, 2.0));
-        vec3 col = vC * (0.55 + 0.6 * uAmbSky.g);
-        gl_FragColor = vec4(mix(col, uFogColor, f), vA * soft * soft * 0.55);
+        vec3 col = vC * (0.8 + 0.5 * uAmbSky.g);
+        gl_FragColor = vec4(mix(col, uFogColor, f), vA * soft * 0.8);
       }`,
   });
   const mesh = new THREE.Mesh(geo, mat);
@@ -152,10 +152,10 @@ export function createSpeedLines(container, { low = false } = {}) {
       if (L.t >= 1) { L.t -= 1; L.a = rng() * Math.PI * 2; L.len = 0.5 + rng() * 0.9; }
       const r0 = R * (LINE_HOLE + (1 - LINE_HOLE) * L.t * L.t * 0.9 + 0.02);
       const r1 = r0 + R * 0.11 * L.len * (0.5 + strength) * (0.4 + L.t);
-      const alpha = Math.sin(Math.PI * L.t) * 0.5 * strength;
+      const alpha = Math.sin(Math.PI * L.t) * 0.7 * strength;
       const ca = Math.cos(L.a), sa = Math.sin(L.a);
       ctx.strokeStyle = `rgba(255,252,240,${alpha.toFixed(3)})`;
-      ctx.lineWidth = L.w * (0.7 + L.t);
+      ctx.lineWidth = L.w * (0.9 + L.t) * 1.2;
       ctx.beginPath(); ctx.moveTo(cx + ca * r0 * 1.15, cy + sa * r0 * 0.85); ctx.lineTo(cx + ca * r1 * 1.15, cy + sa * r1 * 0.85); ctx.stroke();
     }
   }
