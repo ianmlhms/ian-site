@@ -137,7 +137,7 @@ export function createTrailNetwork(ways, baseHeight) {
         if (bd < 25 * 25) cascades.push({ index: best, count: Math.round(spot.length / kind.spacing), steps: spot.steps, pool: spot.pool || 0, ledge: !!spot.ledge, span: spot.span || 5, drop: spot.drop || 2.5 });
       }
       bedH = channelBed(bedH, kind.depth, cascades);
-      for (const cs of cascades) if (cs.ledge) for (let k = -2; k <= cs.span + 2; k++) { const i = cs.index + (bedH[0] >= bedH[n - 1] ? 1 : -1) * k; if (i >= 0 && i < n) widen[i] = Math.max(widen[i], 1 + (CARVE.poolWiden - 1) * Math.min(1, Math.min(k + 3, cs.span + 3 - k) / 3)); }       // the plunge pool is wider than the stream (the falls are 6 m wide)
+      for (const cs of cascades) if (cs.ledge) for (let k = 1; k <= cs.span + 2; k++) { const i = cs.index + (bedH[0] >= bedH[n - 1] ? 1 : -1) * k; if (i >= 0 && i < n) widen[i] = 0.75 + (CARVE.poolWiden - 0.75) * Math.min(1, Math.min(k / 5, (cs.span + 3 - k) / 3)); }       // the plunge pool is wider than the stream (the falls are 6 m wide), but narrower right below the ledge (the bridge bank beside it stays as it is)
       for (const cs of cascades) if (cs.ledge) for (const [k, depth] of [[1, 0.65], [2, 0.65], [3, 0.4], [4, 0.15]]) { const i = cs.index + (bedH[0] >= bedH[n - 1] ? 1 : -1) * k; if (i >= 0 && i < n) scour[i] = depth; }       // the fall scours its pool: deeper right below the face (the water surface stays level)
     }
     // signed curvature (1/m): heading change per metre, smoothed over about +-4 m

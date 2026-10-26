@@ -179,10 +179,15 @@ export function buildCascadeWater(c) {
 }
 
 const BANK_SEED = 2711;
+const RIDDEN = ['trail', 'path', 'track'];
+const KEEP_CLEAR = 2.4;          // m from a way to the edge of a boulder
 const BRIDGE_ZONE_U = -0.6, BRIDGE_ZONE_V = 7.6;       // m: upstream of this (u) and within this across (v) the stone bridge stands
 /** Big mossy boulders along both banks of the ledge and the pool (the real place is a chaos of dark boulders): [{ u, v, rx, ry, rz, seed }] in the cascade frame, placed at the water line
  *  (found by scanning the terrain outwards from the river axis) and a little up the slope. Pure and deterministic (surface = the physics surface). */
-export function bankBoulders(c, surface) {
+export function bankBoulders(c, surface, network = null) {
+  const S = network ? network.samples : null;
+  const ridden = network ? network.ways.filter((info) => RIDDEN.includes(info.kind)) : [];
+  const onWay = (x, z, reach) => { for (const info of ridden) for (let i = info.first; i < info.first + info.count; i++) if (Math.abs(S.px[i] - x) < reach && Math.abs(S.pz[i] - z) < reach && Math.hypot(S.px[i] - x, S.pz[i] - z) < reach) return true; return false; };
   const rng = createRng(BANK_SEED);
   const out = [], w = { x: 0, z: 0 };
   const uEnd = c.faceU + LEDGE.poolCentreU + LEDGE.poolRadiusU + 3;
@@ -196,7 +201,9 @@ export function bankBoulders(c, surface) {
       const v = side * (edge + (rng() - 0.3) * 2.4 + size * 0.3);
       if (u < BRIDGE_ZONE_U && Math.abs(v) < BRIDGE_ZONE_V) continue;
       if (u < c.faceU + 0.6 && Math.abs(v) < 5.3) continue;                        // (the big boulders of the ledge stand there)
-      out.push({ u: u + (rng() - 0.5) * 0.8, v, rx: size * (1 + 0.3 * rng()), ry: size * (0.65 + 0.3 * rng()), rz: size, seed: rng() });
+      const b = { u: u + (rng() - 0.5) * 0.8, v, rx: size * (1 + 0.3 * rng()), ry: size * (0.65 + 0.3 * rng()), rz: size, seed: rng() };
+      toWorld(c, b.u, b.v, w);
+      if (!onWay(w.x, w.z, b.rz + KEEP_CLEAR)) out.push(b);                         // nobody rides or walks through a boulder: they keep clear of every way
     }
   }
   return out;

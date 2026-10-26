@@ -159,7 +159,7 @@ async function boot() {
     scene.add(wood);
   }
   if (world.cascade) {                                                  // the Schiessentuempel ledge: sandstone solid with mossy boulders, stones in the pool (the falls and the water are water-view's)
-    const c = world.cascade, parts = buildCascadeModel(c, surface);
+    const c = world.cascade, parts = buildCascadeModel(c, surface, field.network);
     rockView.addLandmark(parts.ledge, c.x, c.lipY, c.z, c.yaw, 0.6, 3.4);
     rockView.addLandmark(parts.stones, c.x, c.lipY, c.z, c.yaw, 0.5, 3.7);
   }

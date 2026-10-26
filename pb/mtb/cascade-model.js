@@ -113,7 +113,7 @@ function addBoulder(m, cx, cy, cz, rx, ry, rz, seed, skirtBelow = null, groundAt
 }
 
 /** c = placeCascade() result, surface = the physics surface (the bank boulders are clamped into the slope). Returns { ledge, stones } geometries (model space, see the header). */
-export function buildCascadeModel(c, surface) {
+export function buildCascadeModel(c, surface, network) {
   const ledge = new Mesh();
   addLedge(ledge, c.faceU, c.drop);
   for (const b of BOULDERS) {
@@ -125,7 +125,7 @@ export function buildCascadeModel(c, surface) {
   for (const s of POOL_STONES) addBoulder(stones, s.v, -c.drop + s.r * 0.15, c.faceU + s.u, s.r * 1.1, s.r * 0.85, s.r, s.seed, -c.drop + s.r * 0.1);
   const world = { x: 0, z: 0 };
   const groundAt = (v, u) => { toWorld(c, u, v, world); return surface.height(world.x, world.z) - c.lipY; };          // model space (x = v, z = u) -> height above the lip level
-  for (const b of bankBoulders(c, surface)) {
+  for (const b of bankBoulders(c, surface, network)) {
     toWorld(c, b.u, b.v, world);
     const base = groundAt(b.v, b.u);
     addBoulder(stones, b.v, base + b.ry * 0.25, b.u, b.rx, b.ry, b.rz, b.seed, null, groundAt);
