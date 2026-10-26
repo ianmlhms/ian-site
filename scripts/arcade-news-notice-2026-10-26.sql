@@ -1,0 +1,11 @@
+-- One-time popup (user_notices) announcing MTB Mëllerdall + the new Schueberfouer to everyone who has ever played an arcade game (26 Oct 2026, text approved by Ian).
+insert into public.user_notices (user_id, title, body, cta, url)
+select u.user_id,
+  '{"lb":"🚵 Nei an der Arcade: MTB Mëllerdall + eng ganz nei Schueberfouer 🎡","de":"🚵 Neu in der Arcade: MTB Mëllerdall + eine ganz neue Schueberfouer 🎡","en":"🚵 New in the arcade: MTB Mëllerdall + a brand-new Schueberfouer 🎡"}',
+  '{"lb":"Fuer mam Mountainbike duerch de richtege Mëllerdall: 6 Trailen vu gréng bis schwaarz, Medaillen, de Geescht vun denger beschter Ronn a fräi Fueren bis bei de Schéissendëmpel. An d''Schueberfouer ass elo e richtegen 3D-Tycoon um Glacis: bau Karussellen a Stänn, spadséier selwer iwwer d''Fouer a fuer mam Riserad. Du has e Park am alen Theme Park Tycoon? Den Hämmi huet dir e Bréif hannerlooss. 🐑","de":"Fahr mit dem Mountainbike durch das echte Müllerthal: 6 Trails von grün bis schwarz, Medaillen, der Geist deiner besten Runde und freies Fahren bis zum Schiessentümpel. Und die Schueberfouer ist jetzt ein echter 3D-Tycoon auf dem Glacis: bau Karussells und Stände, spazier selbst über die Fouer und fahr mit dem Riesenrad. Du hattest einen Park im alten Theme Park Tycoon? Hämmi hat dir einen Brief hinterlassen. 🐑","en":"Mountain-bike through the real Mullerthal: 6 trails from green to black, medals, a ghost of your best run and free riding all the way to the Schiessentümpel. And the Schueberfouer is now a real 3D tycoon on the Glacis: build rides and stalls, walk around your fair yourself and ride the Ferris wheel. Had a park in the old Theme Park Tycoon? Hämmi left you a letter. 🐑"}',
+  '{"lb":"Elo spillen","de":"Jetzt spielen","en":"Play now"}',
+  '/pixelbreak.html'
+from (select distinct user_id from public.scores) u
+where exists (select 1 from auth.users a where a.id = u.user_id)
+  and not exists (select 1 from public.user_notices n where n.user_id = u.user_id and n.created_at > '2026-10-26' and n.url = '/pixelbreak.html' and n.title->>'en' like 'New in the arcade: MTB%' );
+select count(*) as notices from public.user_notices where created_at > '2026-10-26' and url = '/pixelbreak.html';

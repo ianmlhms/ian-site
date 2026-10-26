@@ -248,9 +248,9 @@
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-<script type="module" src="admin.js?v=47"></script>
+<script type="module" src="admin.js?v=48"></script>
 <script type="module">
-import { client } from "./auth.js?v=36";
+import { client } from "./auth.js?v=38";
 
 const username = document.getElementById("pinResetUser");
 const reset = document.getElementById("pinResetBtn");
@@ -316,7 +316,7 @@ username.addEventListener("keydown", (event) => {
   if (event.key === "Enter") resetPin();
 });
 </script>
-  <script type="module" src="rtc-ring.js?v=33"></script>
-  <script type="module" src="class-gate.js?v=34"></script>
+  <script type="module" src="rtc-ring.js?v=34"></script>
+  <script type="module" src="class-gate.js?v=35"></script>
 </body>
 </html>

@@ -76,6 +76,21 @@ export function createRideSound(audio) {
     clank: guard((c, t, power = 1) => { burst(c, t, { f: 1100, q: 4, peak: 0.45 * power, dur: 0.07 }); tone(c, t, { f: 240, slideTo: 150, dur: 0.12, peak: 0.2 * power, type: "triangle" }); }),
     bell: guard((c, t) => { [[1, 0.3], [2.76, 0.16], [5.4, 0.08]].forEach(([r, a]) => tone(c, t, { f: 980 * r, dur: 1.2, peak: a, attack: 0.002 })); }),
     horn: guard((c, t) => { tone(c, t, { f: 330, dur: 0.35, peak: 0.12, type: "square", attack: 0.02 }); tone(c, t + 0.02, { f: 415, dur: 0.35, peak: 0.1, type: "square", attack: 0.02 }); }),
+    /** a witchy cackle: a few descending warbling tones (vibrato via a fast pitch wobble baked into short segments) */
+    cackle: guard((c, t, power = 1) => {
+      for (let i = 0; i < 5; i++) {
+        const t0 = t + i * 0.1, base = 760 - i * 70;
+        for (let w = 0; w < 3; w++) tone(c, t0 + w * 0.032, { f: base * (1 + 0.06 * Math.sin(w * 2)), dur: 0.05, peak: 0.14 * power, type: "sawtooth", attack: 0.004 });
+      }
+    }),
+    /** a sustained pipe-organ chord (3 detuned square voices a fifth / octave apart) */
+    organ: guard((c, t, root = 110, dur = 1.6, power = 1) => {
+      [1, 1.5, 2, 3].forEach((r, i) => { const o = c.createOscillator(), g = c.createGain(); o.type = "square"; o.frequency.setValueAtTime(root * r * (1 + i * 0.002), t);
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(Math.max(0.0002, (0.12 - i * 0.02) * power), t + 0.18); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        o.connect(g); g.connect(out(c)); o.start(t); o.stop(t + dur + 0.05); });
+    }),
+    /** distant thunder: a low rumbling burst with a slow swell */
+    thunder: guard((c, t, power = 1) => { burst(c, t, { f: 90, q: 0.6, type: "lowpass", peak: 0.7 * power, dur: 1.8, attack: 0.25, slideTo: 40 }); burst(c, t + 0.05, { f: 220, q: 0.8, peak: 0.2 * power, dur: 0.3 }); }),
     /** a fairground dance loop (kick, clap, hats, bass, arp; 126 bpm, Am F C G) scheduled a quarter second ahead: call tickMusic() every frame */
     startMusic: guard((c, t) => { mus = { next: t + 0.05, step: 0 }; }),
     stopMusic() { mus = null; },

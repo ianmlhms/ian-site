@@ -9,7 +9,7 @@
  * The page calls: PB.chooseMode(game) (owner prompt: true = test, false = normal, null = cancelled),
  * PB.onOpenGame(game, {testMode}), PB.instrument(html), PB.onCloseGame().
  */
-import * as auth from "./auth.js?v=36";
+import * as auth from "./auth.js?v=38";
 import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=12";
 
 import { compactScore, scoreHtml, scoreKeyHtml, arcadeText } from "./score-format.js?v=10";

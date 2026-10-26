@@ -162,7 +162,9 @@ export async function verifyRides({ check, equal, near }) {
   check(gp.length > 80 && gp.length < 130, `the dark ride is ${gp.length.toFixed(0)} m long`);
   check(gp.insideLength / gp.length > 0.55, `most of it is inside the castle (${Math.round(gp.insideLength / gp.length * 100)} %)`);
   const order = gp.scares.map(s => s.s); check(order.every((s, i) => i === 0 || s > order[i - 1]) && gp.scares.length === GHOST_SCARES.length, "the scares come one after the other along the track");
-  check(gp.scares.length >= 7 && ["skeleton", "bat", "face", "strobe"].every(id => gp.scares.some(s => s.id === id)), "pop-up skeleton, bat, lit face and strobe are all there");
+  check(gp.scares.length >= 8 && gp.scares.length <= 10, `the dark ride has ${gp.scares.length} distinct scenes (8-10 expected)`);
+  check(["coffin", "gallery", "mirror", "lab", "library", "stretch", "webs", "rush", "band", "finale"].every(id => gp.scares.some(s => s.id === id)), "every scene of the sequence is there: coffin, gallery, mirror, lab, library, stretch, webs, rush, band, finale");
+  check(gp.scares.every(s => typeof s.side === "number" && Math.abs(s.side) <= 1), "every scene carries a side (0, +-1) the cart turns towards");
   const I = { x0: -13.3, x1: 13.3, z0: -7.6, z1: 2.2 };
   let ok = true; for (let s = gp.sStart; s < gp.sEnd; s += 0.5) { const f = gp.sp.at(s); if (f.p[2] < 2.0 && (f.p[0] < I.x0 + 0.5 || f.p[0] > I.x1 - 0.5 || f.p[2] < I.z0 + 0.5)) ok = false; }
   check(ok, "the inside part of the track stays inside the room");

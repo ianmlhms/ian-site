@@ -227,6 +227,43 @@ function buildStatic(b, cfg, near, sp, name) {
   if (gold) { for (const x of [-8.4, 10.4]) P.sphere([x, TOP_Y + 1.35, ZF - 0.1], 0.35, GOLD, 8, 5); P.box(1.0, BAL_Y + 1.1, bz1 + 0.05, 19.6, 0.06, 0.36, GOLD, 0); }
   return handles;
 }
+/** a small pale wraith silhouette (a handful of flat triangles, vertex-coloured): the walk-mode figure waving from the clock-tower window */
+function wraithGeo(T) {
+  const p = []; const c = [];
+  const push = (v, col) => { p.push(v[0], v[1], v[2]); c.push(((col >> 16) & 255) / 255, ((col >> 8) & 255) / 255, (col & 255) / 255); };
+  const tri = (a, b, d, col) => { push(a, col); push(b, col); push(d, col); };
+  const sheet = 0xf0eefc; const dark = 0x14101c;
+  tri([0, 1.1, 0], [-0.35, 0, 0.05], [0.35, 0, 0.05], sheet);
+  tri([0, 1.1, 0], [0.35, 0, 0.05], [0, 0.3, -0.15], sheet);
+  tri([0, 1.1, 0], [0, 0.3, -0.15], [-0.35, 0, 0.05], sheet);
+  tri([-0.1, 0.95, 0.12], [0.1, 0.95, 0.12], [0, 0.8, 0.14], dark);
+  const g = new T.BufferGeometry();
+  g.setAttribute('position', new T.BufferAttribute(new Float32Array(p), 3)); g.setAttribute('color', new T.BufferAttribute(new Float32Array(c), 3));
+  g.computeBoundingSphere();
+  return g;
+}
+/** W8 "Ghost wave": one animated figure waving from the clock-tower window, and the ground-gate doors banging open and shut on a loop, in walk mode
+ *  (the player's own ride brings a much richer interior of its own; this is only what the facade shows from the outside while nobody is riding). */
+function buildExtras(near, root, T, period) {
+  if (!near) return null;
+  const waver = new T.Mesh(wraithGeo(T), new T.MeshBasicMaterial({ vertexColors: true, side: T.DoubleSide, fog: false }));
+  const tcx = (TW.x0 + TW.x1) / 2; waver.position.set(tcx, 9.65, TW.z1 + 0.28); waver.name = 'geister-waver'; root.add(waver);
+  const gx = (G_OUT + G_IN) / 2; const gw = 4.2; const leaves = [];
+  for (const sd of [-1, 1]) {
+    const piv = new T.Group(); piv.position.set(gx + sd * gw / 2, 1.45, ZF + 0.16);
+    const mesh = new T.Mesh(new T.BoxGeometry(gw / 2, 2.3, 0.08), new T.MeshBasicMaterial({ color: 0x1a1210, fog: false }));
+    mesh.position.set(-sd * gw / 4, 0, 0); piv.add(mesh); root.add(piv); leaves.push({ piv, sd });
+  }
+  const bangEvery = Math.max(2.2, (period || 10) / 4);
+  return {
+    update(t, dt, k) {
+      waver.rotation.z = Math.sin(t * 1.4) * 0.22; waver.position.y = 9.65 + Math.sin(t * 0.9) * 0.12;
+      waver.material.color.setScalar(0.5 + 0.5 * k);
+      const ph = ((t % bangEvery) / bangEvery); const ang = Math.max(0, Math.sin(ph * Math.PI * 2)) * 1.3;
+      leaves.forEach(l => { l.piv.rotation.y = (l.sd > 0 ? 1 : -1) * ang; });
+    },
+  };
+}
 function chase(K, geo, handles, t, k) {
   for (const h of handles.lamps) { const w = (((t * 1.2 - h.k / 10) % 1) + 1) % 1; const f = 0.3 + 0.7 * Math.pow(1 - w, 2); const c = handles.led[h.k % 2]; K.setLamp(geo, h.s, h.n, [c[0] * f, c[1] * f, c[2] * f]); }
 }
@@ -248,6 +285,7 @@ function build(opts = {}) {
     trains: [...Array.from({ length: NC }, (_, i) => ({ cars: 1, spacing: 0, shift: (i * run.period) / NC, lift: 0.18, hide: (s, k, j, f) => f.p[2] < 1.2 })), ...(SMOKE ? [smoke] : [])],
     buildStatic: (b, near) => buildStatic(b, cfg, near, sp, name),
     buildCar: (b, near, ti, j) => { if (ti < NC) buildCart(b, near, pal); else b.P.sphere([0, 0, 0], 0.5, 0xb8b4b0, 7, 5); },
+    extras: (near, root) => buildExtras(near, root, T, run.period),
     chase,
   });
   // carts inside the building are hidden: a cart is visible while any part of it is in front of the facade plane
