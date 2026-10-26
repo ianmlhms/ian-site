@@ -107,9 +107,9 @@
     // W2c: south / north run all the real stops now (17 / 18 instead of 9): a service pays 8.5 k / 9.7 k (was 5.9 k / 6.3 k) in 33 / 39 min (scripts/zuch/career_probe.mjs, drive_bot.mjs), north's price follows (16 k -> 24 k = the same 2.5 services as before)
     north: Object.freeze({ price: 24000, needs: Object.freeze(['rail']), fareBase: 32 }),
     trier: Object.freeze({ price: 38000, needs: Object.freeze(['kiss', 'ic', 'hst']), fareBase: 55 }),
-    metz: Object.freeze({ price: 52000, needs: Object.freeze(['kiss', 'ic', 'hst']), fareBase: 50 }),
-    brussels: Object.freeze({ price: 72000, needs: Object.freeze(['kiss', 'ic', 'hst']), fareBase: 65 }),
-    paris: Object.freeze({ price: 140000, needs: Object.freeze(['hst']), fareBase: 120 }),
+    metz: Object.freeze({ price: 72000, needs: Object.freeze(['kiss', 'ic', 'hst']), fareBase: 50 }),
+    brussels: Object.freeze({ price: 108000, needs: Object.freeze(['kiss', 'ic', 'hst']), fareBase: 65 }),
+    paris: Object.freeze({ price: 160000, needs: Object.freeze(['hst']), fareBase: 120 }),
   });
   /* Fallback order if TS.routes isn't loaded. The Luxtram routes are appended by luxtram.js (tram career). */
   const routeOrder = Object.freeze(['west', 'south', 'east', 'wittlich', 'north', 'trier', 'metz', 'brussels', 'paris']);
