@@ -1978,7 +1978,7 @@
       [-1, 1].forEach((d) => vc.box(tp.x + d * 1.2, tp.y + H + 1.35, tp.z - 0.03, 0.07, 2.7, 0.07, col('#5a6066')));
     }
     // fences
-    if (!isTram) {
+    if (!isTram && !(real && real.fence === false)) {   // real.fence === false: the station model draws its own back edge (island platforms)
       addFence(vc, pf(edge + W + 0.45), zB - 5, zA + 5, 1.2, '#6d7378', 3);
       if (!real) addFence(vc, -pf(9.6), zB - 5, zA + 5, 1.4, '#6d7378', 3);   // real station models place their own far-side fences
     }

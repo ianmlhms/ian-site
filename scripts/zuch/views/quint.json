@@ -1,0 +1,37 @@
+{
+ "route": "wittlich",
+ "station": "Quint",
+ "refs": "Quint",
+ "views": [
+  {
+   "photo": "Haltepunkt Quint.jpg",
+   "pos": [
+    -1.5,
+    70,
+    7.5
+   ],
+   "look": [
+    4.5,
+    -40,
+    1.5
+   ],
+   "fov": 62,
+   "note": "from the bridge"
+  },
+  {
+   "photo": "Trier, Haltepunkt Quint 20141101.jpg",
+   "pos": [
+    -1.5,
+    90,
+    8.0
+   ],
+   "look": [
+    14,
+    -45,
+    4
+   ],
+   "fov": 60,
+   "note": "with the old building"
+  }
+ ]
+}

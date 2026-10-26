@@ -35,4 +35,12 @@
     otherBase: { stain: true },
     others: { w137389334: Object.assign({}, WEST_BLD, { floorH: 3.4 }) },
   }));
+
+  /* QUINT.  Refs: Commons "Trier, Haltepunkt Quint 20141101" (upper right), "Haltepunkt Quint".  The derelict old station building above the halt: gable end clad in grey slate with a white-framed window in the
+   * dormer / gable, dark steep slate roof, ground-floor windows boarded with plywood, rubble plinth. */
+  reg('Quint', {
+    wall: '#8a8e93', trim: '#c9cdd0', plinth: { h: 0.9, col: '#6b6a64' }, band: null, roof: 'slate', roofTint: '#9aa0a8', floorH: 3.2, bayM: 3.0, stain: true,
+    win: { w: 1.0, h: 1.4, kind: 'rect', frame: '#c2a77a', reveal: '#a98f66', sill: false },
+    gableWin: 'round',
+  });
 })();

@@ -82,9 +82,9 @@
     const { sx, H, W, edge, col } = api;
     const k = makeKit(api);
     const f = mirrorKit(api);
-    const lB = edge + W;
     const toward = (x) => -x * sx;
     const n = cfg.near || {};
+    const lB = n.l !== undefined ? n.l + 0.4 : edge + W;            // n.l: lateral line of the furniture (island platforms: the centre line)
     (n.shelters || []).forEach((z) => k.glassShelter(lB - 2.3, z, 4.0, 1.9, look.frame, look.roof));
     (n.steles || []).forEach((z) => dbStele(api, k, lB - 0.7, z));
     (n.masts || []).forEach((z) => dbMast(k, lB - 0.4, z));
@@ -209,6 +209,50 @@
           k.vc.box(k.X(sx * 5.95), H + 2.7, hz + 7.6, 0.06, 0.5, 1.5, col('#1d3f8c'));
         },
       });
+    },
+  });
+
+  /* ================================================================ EHRANG ORT
+   * NO reference photo: Commons has no picture of the stop (only of Ehrang Bahnhof, a different station with the big red sandstone building, which is NOT at this stop; those were removed from the refs).
+   * Built from the patch only: staggered side platforms like Zewen (left one behind the middle at x -8.3 .. -1.8, z 13 .. 153, with the OSM shelter + ticket machine at z ~48; right one beyond it
+   * at x 6.2 .. 9.2, z -153 .. -12, shelter at z -50, widening to x 11.8 at the stair), second track x 4.0; no station building; DB standard furniture (pale concrete platforms, glass shelters,
+   * LED masts, info columns). */
+  reg('Ehrang Ort', {
+    canopy: false,
+    furniture: false,
+    build(api) {
+      const { sx, H, col } = api;
+      simpleStop(api, {
+        look: { frame: '#5a6168', roof: '#6d747b' },
+        near: { shelters: [50], steles: [30, 100], masts: [25, 60, 95, 130], bench: [75], bin: [38] },
+        far: { track: 4.0, edge: 6.2, width: 3.0, z0: -153, z1: -12, shelters: [-50], steles: [-30, -100], masts: [-130, -95, -60, -25], bench: [-75], name: 'Ehrang Ort', nameZ: -85 },
+        extra({ k }) { k.vc.box(k.X(sx * -7.0), H + 1.0, 46.8, 0.5, 2.0, 0.6, col('#394650')); },
+      });
+    },
+  });
+
+  /* ================================================================ QUINT
+   * Refs: ~/Library/Caches/zuch-refs/Quint (Commons: "Trier, Haltepunkt Quint 20141101", "Haltepunkt Quint").  A small old halt in a wooded valley: ISLAND platform of grey slabs with a white edge line between the game
+   * track (x 0) and the second track (x ~9.6) (patch x 1.3 .. 9.1, z -78 .. 78), tall white LED masts and blue "1 | 2" platform cubes on the centre line, a small shelter, a steel stair with railings at the end
+   * of the platform up to the road; behind the slope (patch x 22 .. 35, z 22 .. 46) the derelict old station building: slate-clad gable with a dormer window, boarded windows, slate roof. */
+  reg('Quint', {
+    canopy: false,
+    furniture: false,
+    fence: false,
+    build(api) {
+      const { sx, H, W, edge, col } = api;
+      const k = makeKit(api);
+      const lC = edge + W / 2;
+      simpleStop(api, {
+        look: { frame: '#cfd3d6', roof: '#e1e4e6' },
+        near: { l: lC, shelters: [], steles: [-45, 30], masts: [-60, -30, 0, 30, 60], bench: [-12], bin: [14] },
+        tracks: [9.6],
+      });
+      // blue platform cubes "1 | 2" on the centre line (photo 0) and the steel stair at the Trier end of the island
+      k.sign(lC, 0, '1', 'blue');
+      k.sign(lC + 0.35, 0, '2', 'blue');
+      [-1.2, 1.2].forEach((d) => k.vc.box(k.X(lC + d), H + 0.5, 74, 0.06, 1.0, 5.0, col('#8d949a')));
+      k.vc.box(k.X(lC), H + 0.05, 74, 2.2, 0.1, 5.0, col('#6f757a'));
     },
   });
 })();
