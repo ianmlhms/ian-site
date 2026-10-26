@@ -33,7 +33,7 @@
   var DECORATED_FLAG = "hwDecorated";
 
   var HERE = new URL(".", document.currentScript ? document.currentScript.src : location.href);
-  var HALLOWEEN_CSS_URL = new URL("halloween.css?v=1", HERE).href;
+  var HALLOWEEN_CSS_URL = new URL("halloween.css?v=4", HERE).href;
 
   function monthDayIn(date, timeZone) {
     var parts = new Intl.DateTimeFormat("en-CA", { timeZone: timeZone, month: "2-digit", day: "2-digit" }).formatToParts(date);
@@ -139,6 +139,29 @@
   var svgIdCounter = 0;
   function nextId(prefix) { svgIdCounter += 1; return prefix + svgIdCounter; }
 
+  // A single jack-o'-lantern, in its own local 64x56 box, bottom-anchored
+  // (so instances can be translated/scaled onto a patch baseline). `glow`
+  // draws the carved-face glow (and gets the flicker animation hook);
+  // kept optional so only 1-2 pumpkins per patch actually animate.
+  function pumpkinMarkup(glowId, flip) {
+    var face =
+      '<path d="M18 29l7-6v12z" fill="#3a1d05"/>' +
+      '<path d="M46 29l-7-6v12z" fill="#3a1d05"/>' +
+      '<path d="M17 42q15 9 30 0l-4 5-5-3-4 4-4-4-5 3-4-4-4-1z" fill="#3a1d05"/>';
+    return (
+      '<g' + (flip ? ' transform="scale(-1,1) translate(-64,0)"' : "") + '>' +
+      '<rect x="29" y="1" width="6" height="11" rx="3" fill="#5a7d3a"/>' +
+      '<path d="M32 2c5 3 9 7 9 2" fill="none" stroke="#4a6a2f" stroke-width="2" stroke-linecap="round"/>' +
+      '<ellipse cx="32" cy="34" rx="28" ry="20" fill="#ff8a3d"/>' +
+      '<path d="M11 34c3-13 10-20 21-20s18 7 21 20" fill="none" stroke="#c6540c" stroke-width="2" opacity=".55"/>' +
+      '<path d="M20 16c2 6 2 30 0 36" fill="none" stroke="#c6540c" stroke-width="1.5" opacity=".4"/>' +
+      '<path d="M44 16c-2 6-2 30 0 36" fill="none" stroke="#c6540c" stroke-width="1.5" opacity=".4"/>' +
+      (glowId ? '<circle class="hw-pumpkin-glow" cx="32" cy="33" r="18" fill="url(#' + glowId + ')"/>' : "") +
+      face +
+      "</g>"
+    );
+  }
+
   function pumpkinSvg() {
     var glow = nextId("hwGlow");
     return (
@@ -147,27 +170,98 @@
       '<stop offset="0%" stop-color="#ffe9b0" stop-opacity=".95"/>' +
       '<stop offset="100%" stop-color="#ffb347" stop-opacity="0"/>' +
       "</radialGradient></defs>" +
-      '<rect x="29" y="2" width="6" height="11" rx="3" fill="#5a7d3a"/>' +
-      '<ellipse cx="32" cy="34" rx="28" ry="20" fill="#ff8a3d"/>' +
-      '<path d="M11 34c3-13 10-20 21-20s18 7 21 20" fill="none" stroke="#e8680f" stroke-width="2" opacity=".45"/>' +
-      '<path d="M20 16c2 6 2 30 0 36" fill="none" stroke="#e8680f" stroke-width="1.5" opacity=".35"/>' +
-      '<path d="M44 16c-2 6-2 30 0 36" fill="none" stroke="#e8680f" stroke-width="1.5" opacity=".35"/>' +
-      '<circle cx="32" cy="33" r="17" fill="url(#' + glow + ')"/>' +
-      '<path d="M18 29l7-6v12z" fill="#3a1d05"/>' +
-      '<path d="M46 29l-7-6v12z" fill="#3a1d05"/>' +
-      '<path d="M17 42q15 9 30 0l-4 5-5-3-4 4-4-4-5 3-4-4-4-1z" fill="#3a1d05"/>' +
+      pumpkinMarkup(glow, false) +
       "</svg>"
     );
   }
 
+  // A small patch of 3-5 jack-o'-lanterns of different sizes along a curly
+  // vine, for the bottom of a hero. One shot: own viewBox, own baseline, so
+  // it drops in as a single wide strip with no per-pumpkin positioning math
+  // in CSS.
+  function patchSvg(count) {
+    // BASE is the ground line. Pumpkins (tallest scale 1.15 => ~64 units
+    // tall) stay well clear of both the top of the viewBox and the bottom
+    // margin below BASE, and preserveAspectRatio="none" (set in CSS/markup
+    // below) stretches this box to exactly fill whatever strip it is given —
+    // never cropping a pumpkin, however wide or short that strip ends up.
+    var W = 920, H = 150, BASE = 118;
+    var slots = [
+      { x: 70, scale: 0.6, flip: false },
+      { x: 232, scale: 0.88, flip: true },
+      { x: 460, scale: 1.1, flip: false, glow: true },
+      { x: 682, scale: 0.82, flip: true },
+      { x: 846, scale: 0.58, flip: false },
+    ].slice(0, count);
+    var defs = "";
+    var groups = "";
+    var shadows = "";
+    var vineX = [];
+    slots.forEach(function (slot) {
+      var glowId = null;
+      if (slot.glow) {
+        glowId = nextId("hwPatchGlow");
+        defs += '<radialGradient id="' + glowId + '" cx="50%" cy="58%" r="55%">' +
+          '<stop offset="0%" stop-color="#ffe9b0" stop-opacity=".95"/>' +
+          '<stop offset="100%" stop-color="#ffb347" stop-opacity="0"/>' +
+          "</radialGradient>";
+      }
+      var tx = slot.x - 32 * slot.scale;
+      var ty = BASE - 54 * slot.scale;
+      vineX.push(slot.x);
+      shadows += '<ellipse cx="' + slot.x + '" cy="' + (BASE + 5) + '" rx="' + (26 * slot.scale) +
+        '" ry="' + (6 * slot.scale) + '" fill="#000" opacity=".22"/>';
+      groups += '<g class="hw-patch-pumpkin" transform="translate(' + tx + ' ' + ty + ') scale(' + slot.scale + ')">' +
+        pumpkinMarkup(glowId, slot.flip) + "</g>";
+    });
+    var vine = "M-10 " + (BASE + 2);
+    vineX.forEach(function (x, i) {
+      vine += " Q " + (x - 70) + " " + (BASE + (i % 2 ? 10 : -8)) + " " + x + " " + (BASE + 2);
+    });
+    vine += " Q " + (W - 60) + " " + (BASE - 6) + " " + (W + 10) + " " + (BASE + 2);
+    var leaves =
+      '<path class="hw-patch-leaf" d="M150 116c6-10 16-14 24-10-4 6-14 10-24 10z" fill="#5a8a3a" opacity=".85"/>' +
+      '<path class="hw-patch-leaf" d="M560 120c-7-9-18-11-25-6 5 6 16 9 25 6z" fill="#4a7a30" opacity=".85"/>' +
+      '<path class="hw-patch-leaf" d="M760 114c6-9 15-12 22-8-4 6-13 9-22 8z" fill="#5a8a3a" opacity=".85"/>' +
+      '<path d="M310 112q10-10 6-22" fill="none" stroke="#4a7a30" stroke-width="2.5" stroke-linecap="round" opacity=".7"/>' +
+      '<path d="M620 110q-9-9-4-20" fill="none" stroke="#4a7a30" stroke-width="2.5" stroke-linecap="round" opacity=".7"/>';
+    return (
+      '<svg class="hw-patch-art" viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="none" aria-hidden="true" focusable="false">' +
+      (defs ? "<defs>" + defs + "</defs>" : "") +
+      shadows +
+      '<path class="hw-patch-vine" d="' + vine + '" fill="none" stroke="#3f6b28" stroke-width="3" stroke-linecap="round" opacity=".55"/>' +
+      leaves + groups +
+      "</svg>"
+    );
+  }
+
+  // A clean radial + spiral cobweb (not a scribble): true straight spokes
+  // from one pivot in the corner, crossed by true concentric circular arcs
+  // (real SVG arcs, not wobbly curves) — the textbook cobweb construction,
+  // so it reads as an actual web at a glance even at a few dozen px.
   function cobwebSvg() {
     return (
-      '<svg class="hw-cobweb-art" viewBox="0 0 60 60" aria-hidden="true" focusable="false">' +
-      '<g fill="none" stroke="currentColor" stroke-width="1">' +
-      '<path d="M0 0L60 60M0 20L34 0M0 40L50 0M20 0L60 34M40 0L60 50"/>' +
-      '<path d="M3 3Q16 0 29 3M3 3Q0 16 3 29M3 29Q16 32 29 29M29 29Q32 16 29 3" opacity=".9"/>' +
-      '<path d="M8 8Q24 3 40 8M8 8Q3 24 8 40M8 40Q24 45 40 40M40 40Q45 24 40 8" opacity=".7"/>' +
-      '<path d="M14 14Q32 7 50 14M14 14Q7 32 14 50" opacity=".5"/>' +
+      '<svg class="hw-cobweb-art" viewBox="0 0 64 64" aria-hidden="true" focusable="false">' +
+      '<g fill="none" stroke="currentColor" stroke-linecap="round">' +
+      '<path stroke-width="1.3" opacity=".85" d="M0 0L61.4 8.6M0 0L56.6 25.2M0 0L47.5 39.9M0 0L34.7 51.4M0 0L19.2 59M0 0L2.2 62"/>' +
+      '<path stroke-width="1.1" opacity=".7" d="M13.9 2A14 14 0 0 1 .5 14"/>' +
+      '<path stroke-width="1.1" opacity=".7" d="M25.8 3.6A26 26 0 0 1 .9 26"/>' +
+      '<path stroke-width="1" opacity=".6" d="M39.6 5.6A40 40 0 0 1 1.4 40"/>' +
+      '<path stroke-width="1" opacity=".5" d="M55.5 7.8A56 56 0 0 1 2 56"/>' +
+      "</g></svg>"
+    );
+  }
+
+  // Small spider dangling on its own thread, drawn separately from the web
+  // so it can bob independently.
+  function spiderSvg() {
+    return (
+      '<svg class="hw-spider-art" viewBox="0 0 20 24" aria-hidden="true" focusable="false">' +
+      '<line x1="10" y1="0" x2="10" y2="9" stroke="currentColor" stroke-width="1.1" opacity=".6"/>' +
+      '<g fill="currentColor">' +
+      '<path d="M2 13q8-6 16 0M2 17q8 5 16 0M5 10l-3-3M15 10l3-3M5 18l-3 3M15 18l3 3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" opacity=".95"/>' +
+      '<ellipse cx="10" cy="15" rx="3.2" ry="4"/>' +
+      '<circle cx="10" cy="10" r="2.4"/>' +
       "</g></svg>"
     );
   }
@@ -205,14 +299,22 @@
     return holder;
   }
 
-  function addHeroFx(hero) {
+  function addHeroFx(hero, patchCount, withMoon) {
     ensureAnchor(hero);
+    if (withMoon) {
+      var moon = document.createElement("div");
+      moon.className = "hw-moon-zone";
+      moon.setAttribute("aria-hidden", "true");
+      hero.appendChild(moon);
+    }
     var layer = document.createElement("div");
     layer.className = "hw-hero-fx";
     layer.setAttribute("aria-hidden", "true");
     layer.innerHTML =
+      '<span class="hw-patch">' + patchSvg(patchCount) + "</span>" +
       '<span class="hw-bat hw-bat--a">' + batSvg() + "</span>" +
       '<span class="hw-bat hw-bat--b">' + batSvg() + "</span>" +
+      '<span class="hw-bat hw-bat--c">' + batSvg() + "</span>" +
       '<span class="hw-leaf hw-leaf--a">' + leafSvg() + "</span>" +
       '<span class="hw-leaf hw-leaf--b">' + leafSvg() + "</span>";
     hero.appendChild(layer);
@@ -262,12 +364,17 @@
     var isArcadeLobby = !!document.querySelector(".arc-hero");
     var isHomePage = document.body.classList.contains("home");
 
-    if (header) addDecoration(header, cobwebSvg(), "hw-deco--cobweb hw-deco--corner-tl");
-    if (header && isArcadeLobby) addDecoration(header, pumpkinSvg(), "hw-deco--pumpkin hw-deco--corner-tr hw-deco--mini");
+    if (header) {
+      addDecoration(
+        header,
+        cobwebSvg() + '<span class="hw-spider">' + spiderSvg() + "</span>",
+        "hw-deco--cobweb hw-deco--corner-tl"
+      );
+    }
 
     var footerPumpkin = null;
     if (footer) footerPumpkin = addDecoration(footer, pumpkinSvg(), "hw-deco--pumpkin hw-deco--corner-br hw-deco--mini");
-    if (hero) addHeroFx(hero);
+    if (hero) addHeroFx(hero, isArcadeLobby ? 3 : 5, isHomePage);
     if (isHomePage && footerPumpkin) wireEasterEgg(footerPumpkin);
   }
 

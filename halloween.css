@@ -4,6 +4,15 @@
  * reload — every rule here that should only show up "in season" is inert
  * until that attribute is present.
  *
+ * Contrast strategy (v2 — see HALLOWEEN-NOTES.md "v2" section for the full
+ * numbers): the page-wide sky tint is capped at a luminance where plain
+ * --muted text sitting directly on it still clears 4.5:1 everywhere, so
+ * ordinary page text needs nothing extra. The hero (which carries the big
+ * vivid moon-lit sky, moon and starfield) is the one place bright enough to
+ * risk that, so its text sits over its own dark/light SCRIM band — a flat,
+ * uniform overlay verified against the brightest colour the hero sky ever
+ * reaches, not the thinned-out "remove the colour" approach v1 used.
+ *
  * Reused next year: nothing here is date-specific (the dates live in
  * season.js). A different look would mean editing the gradients/SVGs below,
  * not the attribute plumbing. */
@@ -20,27 +29,39 @@ html[data-season="halloween"] .hw-hero-fx { display: block; }
   position: absolute;
   z-index: -1;
   pointer-events: none;
-  opacity: .85;
+  opacity: .92;
   color: var(--muted);
-  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .18));
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .25));
 }
 /* Positive insets only — a negative offset on a header/footer flush with the
  * viewport edge would push the decoration past it, inflating the page's
  * scrollWidth even though html{overflow-x:hidden} hides it visually (a real
  * regression the account-check flow caught: "Arcade header does not scroll
  * sideways"). Staying inside the container's own box avoids that entirely. */
-.hw-deco--corner-tl { top: 2px; left: 4px; }
-.hw-deco--corner-tr { top: 2px; right: 4px; }
+.hw-deco--corner-tl { top: 4px; left: 6px; }
 .hw-deco--corner-br { bottom: 2px; right: 10px; }
 
-.hw-deco--cobweb { width: 46px; height: 46px; }
-.hw-deco--pumpkin { width: 40px; }
-.hw-deco--pumpkin.hw-deco--mini { width: 34px; }
+.hw-deco--cobweb { width: 64px; height: 64px; }
+.hw-deco--pumpkin { width: 46px; }
+.hw-deco--pumpkin.hw-deco--mini { width: 54px; }
 
-.hw-pumpkin-art, .hw-cobweb-art, .hw-bat-art, .hw-leaf-art {
+.hw-pumpkin-art, .hw-cobweb-art, .hw-bat-art, .hw-leaf-art, .hw-spider-art {
   display: block;
   width: 100%;
   height: auto;
+}
+.hw-patch-art { display: block; width: 100%; height: 100%; }
+
+/* the cobweb's own spider, hanging on a short thread, bobbing gently */
+.hw-spider {
+  position: absolute;
+  top: 8%;
+  left: 6%;
+  width: 30%;
+  transform-origin: 50% 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  html[data-season="halloween"] .hw-spider { animation: hw-spider-bob 4.5s ease-in-out infinite; }
 }
 
 /* ---- the home-page Easter egg: clicking the footer pumpkin ---- */
@@ -68,15 +89,20 @@ html[data-season="halloween"] .hw-hero-fx { display: block; }
 }
 
 @keyframes hw-flicker {
-  0%, 100% { filter: brightness(1) drop-shadow(0 2px 6px rgba(0, 0, 0, .18)); }
-  20% { filter: brightness(1.5) drop-shadow(0 2px 6px rgba(0, 0, 0, .18)); }
-  35% { filter: brightness(.7) drop-shadow(0 2px 6px rgba(0, 0, 0, .18)); }
-  55% { filter: brightness(1.4) drop-shadow(0 2px 6px rgba(0, 0, 0, .18)); }
-  70% { filter: brightness(.85) drop-shadow(0 2px 6px rgba(0, 0, 0, .18)); }
+  0%, 100% { filter: brightness(1) drop-shadow(0 2px 6px rgba(0, 0, 0, .25)); }
+  20% { filter: brightness(1.5) drop-shadow(0 2px 6px rgba(0, 0, 0, .25)); }
+  35% { filter: brightness(.7) drop-shadow(0 2px 6px rgba(0, 0, 0, .25)); }
+  55% { filter: brightness(1.4) drop-shadow(0 2px 6px rgba(0, 0, 0, .25)); }
+  70% { filter: brightness(.85) drop-shadow(0 2px 6px rgba(0, 0, 0, .25)); }
 }
 .hw-pumpkin-art--flicker { animation: hw-flicker 1.5s ease-in-out; }
 
-/* ---- hero: drifting bats + falling leaves, confined to the hero box ---- */
+/* ambient glow flicker on the patch's one "lit" pumpkin per hero — opacity
+ * only, so it counts cheaply against the animated-element budget */
+@keyframes hw-glow-pulse { 0%, 100% { opacity: .75; } 45% { opacity: 1; } 70% { opacity: .55; } }
+@keyframes hw-spider-bob { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(5deg); } }
+
+/* ---- hero: sky, moon, stars, pumpkin patch, drifting bats + falling leaves ---- */
 .hw-hero-fx {
   position: absolute;
   inset: 0;
@@ -84,27 +110,37 @@ html[data-season="halloween"] .hw-hero-fx { display: block; }
   z-index: -1;
   pointer-events: none;
 }
+.hw-patch {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 8px;
+  height: clamp(70px, 9vw, 110px);
+}
+html[data-season="halloween"] .hw-patch-pumpkin .hw-pumpkin-glow { animation: hw-glow-pulse 3.6s ease-in-out infinite; }
+
 .hw-bat, .hw-leaf {
   position: absolute;
-  top: 12%;
+  top: 10%;
   left: -8%;
-  width: 34px;
+  width: 36px;
   opacity: 0;
   color: #241f2c;
 }
 .hw-leaf { width: 20px; color: #d9661c; }
 html[data-theme="light"] .hw-bat { color: #2c2638; }
 
-.hw-bat--a { animation: hw-bat-drift 42s linear infinite; }
-.hw-bat--b { top: 30%; animation: hw-bat-drift 54s linear infinite; animation-delay: 9s; }
+.hw-bat--a { animation: hw-bat-drift 20s linear infinite; }
+.hw-bat--b { top: 24%; animation: hw-bat-drift 22s linear infinite; animation-delay: 7s; }
+.hw-bat--c { top: 16%; animation: hw-bat-drift 24s linear infinite; animation-delay: 14s; }
 .hw-leaf--a { top: -6%; left: 22%; animation: hw-leaf-fall 26s linear infinite; animation-delay: 4s; }
 .hw-leaf--b { top: -6%; left: 68%; animation: hw-leaf-fall 31s linear infinite; animation-delay: 15s; }
 
 @keyframes hw-bat-drift {
-  0%, 68% { opacity: 0; transform: translate(0, 0); }
-  72% { opacity: .85; }
-  88% { opacity: .85; transform: translate(72vw, -9vh); }
-  94% { opacity: 0; }
+  0%, 60% { opacity: 0; transform: translate(0, 0); }
+  65% { opacity: .85; }
+  85% { opacity: .85; transform: translate(72vw, -9vh); }
+  93% { opacity: 0; }
   100% { opacity: 0; transform: translate(78vw, -10vh); }
 }
 @keyframes hw-leaf-fall {
@@ -114,39 +150,174 @@ html[data-theme="light"] .hw-bat { color: #2c2638; }
   100% { opacity: 0; transform: translate(5vw, 24vh) rotate(210deg); }
 }
 
-/* ---- warm seasonal backdrop: orange-to-deep-purple (dark), pumpkin-and-cream (light) ---- */
-/* Alphas kept low enough that even the pessimistic case of both radial
- * gradients overlapping at full strength still clears 4.5:1 for --muted text
- * (verified: #8888aa on the worst-case composite is ~4.65:1 — see
- * HALLOWEEN-NOTES.md for the full contrast table). */
+/* ---- warm seasonal backdrop ----
+ * Anchored in vh, not %, so the colour travel always fits inside roughly the
+ * first screenful (the gradient's own length is a fixed viewport multiple,
+ * not the page's full scroll height) and settles back to the plain --bg well
+ * before any typical fold, on a long page or a short one alike. Every stop
+ * here keeps the background's luminance low enough that plain --muted text
+ * sitting right on top of it (no card, no scrim) still clears 4.5:1 — see
+ * HALLOWEEN-NOTES.md for the swept numbers. */
 html[data-season="halloween"] body {
   background:
-    radial-gradient(1100px 620px at 85% -12%, rgba(255, 138, 61, .10), transparent 60%),
-    radial-gradient(900px 760px at -12% 112%, rgba(120, 58, 168, .10), transparent 65%),
+    linear-gradient(180deg,
+      #130b28 0,
+      #1f1038 22vh,
+      #30123a 46vh,
+      #30150f 68vh,
+      #2a0f08 96vh,
+      var(--bg) 124vh),
     var(--bg);
+  background-repeat: no-repeat;
 }
 html[data-season="halloween"][data-theme="light"] body {
   background:
-    radial-gradient(1100px 620px at 85% -12%, rgba(255, 170, 92, .16), transparent 60%),
-    radial-gradient(900px 760px at -12% 112%, rgba(255, 214, 168, .55), transparent 70%),
+    linear-gradient(180deg,
+      #fff6ea 0,
+      #ffeed7 28vh,
+      #ffe6c3 58vh,
+      #ffe0b3 88vh,
+      var(--bg) 124vh),
     var(--bg);
+  background-repeat: no-repeat;
+}
+
+/* thin, static drift of fog along the very bottom of the viewport — opacity
+ * only, no animation, so it is free performance-wise */
+html[data-season="halloween"] body::after {
+  content: "";
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: min(22vh, 220px);
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(0deg, rgba(20, 12, 8, .22), transparent);
+}
+html[data-season="halloween"][data-theme="light"] body::after {
+  background: linear-gradient(0deg, rgba(255, 200, 140, .22), transparent);
+}
+@media (prefers-contrast: more) {
+  html[data-season="halloween"] body::after { display: none; }
+}
+
+/* ---- the hero itself: a vivid, protected "sky" band ----
+ * The hero gets its OWN background (the purple-to-amber sky, dark mode; a
+ * warm sunset wash, light mode) layered under a flat scrim. The scrim's
+ * alpha is picked so that even the single brightest stop the sky ever
+ * reaches still clears 4.5:1 for --muted underneath it (verified — see
+ * notes), so unlike the page-wide tint above, this one is allowed to
+ * actually look like a sky. Extra top/bottom padding makes room for the
+ * moon strip and the pumpkin patch without either ever sitting under the
+ * real text. */
+html[data-season="halloween"] .today-hero,
+html[data-season="halloween"] .arc-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 26px;
+  isolation: isolate;
+  padding-bottom: calc(clamp(18px, 3vw, 28px) + 96px) !important;
+}
+html[data-season="halloween"] .today-hero {
+  padding-top: calc(clamp(28px, 7vw, 72px) + 80px) !important;
+  padding-bottom: calc(clamp(22px, 4vw, 40px) + 96px) !important;
+}
+
+html[data-season="halloween"] .today-hero,
+html[data-season="halloween"] .arc-hero {
+  background:
+    linear-gradient(180deg, transparent 0%, rgba(15, 6, 3, .85) 8%, rgba(15, 6, 3, .85) 100%),
+    linear-gradient(180deg, #241240 0%, #4a1c52 34%, #9c3a22 70%, #ffb347 100%);
+}
+html[data-season="halloween"][data-theme="light"] .today-hero,
+html[data-season="halloween"][data-theme="light"] .arc-hero {
+  background:
+    linear-gradient(180deg, transparent 0%, rgba(255, 250, 242, .82) 8%, rgba(255, 250, 242, .82) 100%),
+    linear-gradient(180deg, #fff3e0 0%, #ffd9a0 34%, #ffab5c 70%, #f2862e 100%);
+}
+
+/* ---- the moon strip: its OWN clipped band pinned to the top of the home
+ * hero, reserved by the extra padding-top above. Moon + stars are drawn
+ * inside this band's own background, ABOVE the scrim (so they stay bright,
+ * not dimmed for text contrast) — but the band's fixed height and
+ * `overflow:hidden` mean the glow can never bleed down into the text below
+ * it, at any viewport width. This is what the hero's own text-contrast
+ * guarantee does NOT have to account for the moon at all. */
+.hw-moon-zone {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 80px;
+  overflow: hidden;
+  z-index: -1;
+  pointer-events: none;
+}
+html[data-season="halloween"][data-theme="light"] .hw-moon-zone { display: none; }
+html[data-season="halloween"] .hw-moon-zone {
+  background:
+    radial-gradient(26px 26px at 15% 50%, #fffdf6 0%, #fffaed 60%, rgba(255, 250, 237, 0) 100%),
+    radial-gradient(62px 62px at 15% 50%, rgba(255, 247, 220, .85) 0%, rgba(255, 238, 194, .4) 45%, transparent 75%),
+    radial-gradient(2.2px 2.2px at 8% 30%, #fff, transparent 100%),
+    radial-gradient(1.8px 1.8px at 28% 20%, #fff, transparent 100%),
+    radial-gradient(2px 2px at 42% 55%, #fff, transparent 100%),
+    radial-gradient(1.6px 1.6px at 56% 15%, #fff, transparent 100%),
+    radial-gradient(1.9px 1.9px at 68% 45%, #fff, transparent 100%),
+    radial-gradient(1.6px 1.6px at 80% 25%, #fff, transparent 100%),
+    radial-gradient(2.2px 2.2px at 90% 60%, #fff, transparent 100%),
+    radial-gradient(1.6px 1.6px at 36% 75%, #fff, transparent 100%);
+}
+
+/* ---- section-heading glyph: a small seasonal touch, every "sec-title" ---- */
+html[data-season="halloween"] .sec-title::after {
+  content: " 🎃";
+  font-size: .78em;
+  opacity: .9;
 }
 
 /* ---- phone: smaller decorations, same corners, nothing overlapping ---- */
 @media (max-width: 480px) {
-  .hw-deco--cobweb { width: 34px; height: 34px; }
-  .hw-deco--pumpkin { width: 28px; }
-  .hw-deco--pumpkin.hw-deco--mini { width: 24px; }
+  .hw-deco--cobweb { width: 50px; height: 50px; }
+  .hw-deco--pumpkin { width: 30px; }
+  .hw-deco--pumpkin.hw-deco--mini { width: 38px; }
   .hw-bat { width: 26px; }
   .hw-leaf { width: 16px; }
+  .hw-patch { height: clamp(40px, 15vw, 56px); }
+  html[data-season="halloween"] .today-hero,
+  html[data-season="halloween"] .arc-hero { padding-bottom: calc(clamp(18px, 3vw, 28px) + 56px) !important; }
+  html[data-season="halloween"] .today-hero {
+    padding-top: calc(clamp(28px, 7vw, 72px) + 46px) !important;
+    padding-bottom: calc(clamp(22px, 4vw, 40px) + 56px) !important;
+  }
+  /* the moon strip shrinks to match the smaller reserved headroom above —
+     its own height always stays <= that padding, so it can never reach the
+     text below it, at any width */
+  .hw-moon-zone { height: 46px; }
+  html[data-season="halloween"] .hw-moon-zone {
+    background:
+      radial-gradient(16px 16px at 15% 50%, #fffdf6 0%, #fffaed 60%, rgba(255, 250, 237, 0) 100%),
+      radial-gradient(38px 38px at 15% 50%, rgba(255, 247, 220, .85) 0%, rgba(255, 238, 194, .4) 45%, transparent 75%),
+      radial-gradient(1.6px 1.6px at 8% 25%, #fff, transparent 100%),
+      radial-gradient(1.4px 1.4px at 32% 15%, #fff, transparent 100%),
+      radial-gradient(1.5px 1.5px at 50% 60%, #fff, transparent 100%),
+      radial-gradient(1.3px 1.3px at 68% 20%, #fff, transparent 100%),
+      radial-gradient(1.5px 1.5px at 84% 50%, #fff, transparent 100%),
+      radial-gradient(1.3px 1.3px at 94% 25%, #fff, transparent 100%);
+  }
 }
 
 /* ---- respect the user's settings over the theme ---- */
 @media (prefers-reduced-motion: reduce) {
   .hw-bat, .hw-leaf { display: none !important; }
   .hw-pumpkin-art--flicker { animation: none !important; }
+  html[data-season="halloween"] .hw-patch-pumpkin .hw-pumpkin-glow,
+  html[data-season="halloween"] .hw-spider { animation: none !important; }
 }
 @media (prefers-contrast: more) {
   .hw-deco, .hw-hero-fx { display: none !important; }
   html[data-season="halloween"] body { background: var(--bg) !important; }
+  html[data-season="halloween"] .today-hero,
+  html[data-season="halloween"] .arc-hero { background: none !important; padding: revert !important; }
+  html[data-season="halloween"] .sec-title::after { content: none !important; }
 }
