@@ -29,6 +29,7 @@ import { R_STRIDE, KIND, slabFrame, slabBottomRing } from './rocks.js';
 import { placeBridge, SCHIESSENTUEMPEL } from './landmarks.js';
 import { RUIN, RENAISSANCE, CHURCH } from './town-data.js';
 import { LEDGE, CHUTES, BOULDERS, ledgeTop, toWorld, cascadeFalls, bankBoulders } from './cascade.js';
+import { findAllJunctions } from './junctions.js';
 import { WAY_KINDS } from './config.js';
 import { WATER_KINDS } from './water.js';
 import { QUADTREE, WORLD, CAMERA } from './config.js';
@@ -615,6 +616,25 @@ section('J water');
     }
     check(`${bank.length} bank boulders stand around the pool, none within 2.4 m of a trail, path or track`, bank.length >= 8 && onWay === 0, `${bank.length} boulders, ${onWay} on a way`);
     stats.cascadeBank = bank.length;
+  }
+  // junctions: every fork off the six trails is barred (junctions.js), the barrier never stands on the trail it protects, the approach sign is close enough to read before the fork
+  {
+    const list = findAllJunctions(net);
+    const wayById = new Map(net.ways.map((w) => [w.id, w]));
+    let totalBranches = 0, onTheTrail = 0, approachFar = 0;
+    const distToWay = (x, z, way) => { let best = 1e18; for (let i = way.first; i < way.first + way.count; i++) best = Math.min(best, Math.hypot(S.px[i] - x, S.pz[i] - z)); return best; };
+    for (const j of list) {
+      const trailWay = wayById.get(`trail-${j.trailId}`);
+      for (const br of j.branches) {
+        totalBranches++;
+        for (const p of [br.postA, br.postB]) if (trailWay && distToWay(p.x, p.z, trailWay) < 1.3) onTheTrail++;
+      }
+      if (Math.hypot(j.approach.x - j.x, j.approach.z - j.z) > 12) approachFar++;
+    }
+    check(`${list.length} junctions found on the six trails (${totalBranches} wrong branches), every trail checked`, list.length > 0 && totalBranches > 0, `${list.length} junctions, ${totalBranches} branches`);
+    check('no junction barrier post stands on the trail it protects (checked against every trail sample, 1.3 m)', onTheTrail === 0, `${onTheTrail} of ${totalBranches * 2} posts`);
+    check('every junction has its arrow-sign approach point within 12 m of the fork (readable before the rider gets there)', approachFar === 0, `${approachFar} too far`);
+    stats.junctions = `${list.length} junctions, ${totalBranches} branches barred`;
   }
   // the built places (town-data.js): the Berdorf village, the Beaufort houses, the two castles and the church
   {

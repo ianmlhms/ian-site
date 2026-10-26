@@ -38,6 +38,20 @@ const FRAGMENT = `
   ${PAINT_LIGHT_GLSL}
   const float SCALE = 0.21;                                           // 1 / metres per texture repeat
   float lum(vec3 c){ return dot(c, vec3(0.3, 0.59, 0.11)); }
+  float hashPit(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+  // honeycomb weathering (Wabenverwitterung): small round pits typical of Mullerthal sandstone, found with a 3x3 jittered-cell search (cheap Worley noise)
+  float pits(vec2 uv){
+    vec2 g = floor(uv), f = fract(uv);
+    float d = 2.0;
+    for (int j = -1; j <= 1; j++) {
+      for (int i = -1; i <= 1; i++) {
+        vec2 o = vec2(float(i), float(j));
+        vec2 r = o + vec2(hashPit(g + o), hashPit(g + o + vec2(3.3, 1.7))) - f;
+        d = min(d, dot(r, r));
+      }
+    }
+    return sqrt(d);
+  }
   // the painted material, projected from the three world axes (faces are painted from the side they face)
   vec3 tri(sampler2D t, vec3 P, vec3 w, float s){
     vec3 c = vec3(0.0);
@@ -57,7 +71,7 @@ const FRAGMENT = `
     // sandstone: the painted wall, a little greyer and cooler than the paint (the real rock is grey-ochre, not orange), large-scale tone changes per layer
     vec3 sand = tri(uRock, P, w, SCALE);
     float tone = texture2D(uNoise, vec2(floor(P.y * 1.3 + nA * 3.0) * 0.37 + 0.11, vSeed * 0.5)).g;
-    sand = mix(vec3(lum(sand)), sand, 0.62) * mix(vec3(1.0, 0.97, 0.88), vec3(0.9, 0.9, 0.84), tone);
+    sand = mix(vec3(lum(sand)), sand, 0.52) * mix(vec3(0.97, 0.95, 0.87), vec3(0.87, 0.88, 0.85), tone);
     sand *= 0.84 + 0.3 * nB;
     float sandL = lum(sand);
     // moss cover: thick on the up-facing parts and the damp foot, patchy on the faces (north faces and shade carry more), thicker when wet
@@ -68,7 +82,7 @@ const FRAGMENT = `
     mossAmt = mossAmt * smoothstep(0.2, 0.75, nA * 0.5 + nB * 0.5 + 0.12 + uWet * 0.2 + (1.0 - clamp(dot(N, normalize(uSunDir)), 0.0, 1.0)) * 0.18);
     mossAmt = clamp(mossAmt, 0.0, 0.92);
     vec3 mossT = uDetail > 0.5 ? tri(uRockMoss, P, w, SCALE * 0.9) : vec3(0.36, 0.5, 0.2);
-    mossT = mix(mossT, mossT * vec3(0.78, 0.98, 0.64), 0.35);
+    mossT = mix(mossT, mossT * vec3(0.78, 0.98, 0.64), 0.18);
     vec3 albedo = mix(sand, mossT, mossAmt) * mix(vec3(1.0), vColor, 0.55) * 1.04;
     // pits and cracks darken (the painting has them; this adds fine grain from the noise)
     albedo *= 0.9 + 0.2 * nC;
@@ -76,6 +90,13 @@ const FRAGMENT = `
     float streak = texture2D(uNoise, vec2((P.x + P.z) * 0.8, P.y * 0.03)).g;
     albedo *= 1.0 - 0.38 * smoothstep(0.55, 0.88, streak) * (1.0 - w.y) * (1.0 - mossAmt * 0.6);
     float bumpL = mix(sandL, lum(mossT), mossAmt);
+    if (uDetail > 0.5) {                                // honeycomb pits: sheltered, drier faces only (exposed tops and mossy patches wash them out)
+      vec2 hc = (abs(N.x) > abs(N.z) ? P.yz : P.xy) * 2.2 + vSeed * 17.0;
+      float pit = smoothstep(0.3, 0.05, pits(hc));
+      float pitMask = pit * (1.0 - smoothstep(0.5, 0.88, N.y)) * (1.0 - mossAmt * 0.85);
+      albedo *= 1.0 - 0.3 * pitMask;
+      bumpL -= pitMask * 0.6;
+    }
     if (abs(vSeed - 2.0) < 0.01) {                       // old rough masonry (the footbridge): irregular courses of dark wet stone, moss and ivy
       float across = abs(N.z) > 0.5 ? vMP.x : vMP.z;
       float row = floor(vMP.y / 0.32 + 0.35 * sin(across * 0.9));
@@ -85,13 +106,15 @@ const FRAGMENT = `
       float h = fract(sin((floor(col) + row * 17.0) * 12.9898) * 43758.5453);
       vec3 stone = tri(uRockWet, P, w, 0.5) * mix(vec3(0.9, 1.0, 1.0), vec3(1.5, 1.35, 1.1), h) + vec3(0.03, 0.03, 0.02);
       float ivy = smoothstep(0.35, 0.65, texture2D(uNoise, vMP.xy * 0.35 + 0.2).b + 0.25 * (1.0 - smoothstep(0.0, 2.2, vMP.y + 2.2)));
-      albedo = mix(stone, mossT * vec3(0.8, 1.0, 0.7), clamp(0.28 + ivy * 0.5 + mossAmt * 0.4, 0.0, 0.85));
+      albedo = mix(stone, mossT * vec3(0.68, 0.84, 0.58), clamp(0.28 + ivy * 0.5 + mossAmt * 0.4, 0.0, 0.85));
       albedo *= 1.0 - 0.55 * joint;
       bumpL = lum(albedo) + (1.0 - joint) * 0.2;
     }
     if (vSeed > 2.5) {                                    // stones in and by the water: dark, wet, mossy, with a lit rim
       vec3 wet = tri(uRockWet, P, w, 0.45);
-      albedo = mix(wet, mossT * vec3(0.62, 0.8, 0.5), 0.35 + 0.3 * nB) * 1.25;
+      albedo = mix(wet, mossT * vec3(0.56, 0.68, 0.46), 0.35 + 0.3 * nB) * 1.08;
+      // ferns and ivy hang from the top edge down the wet face (the Schiessentuempel ledge, the bank boulders)
+      albedo = mix(albedo, mossT * vec3(0.52, 0.78, 0.4), curtain * 0.6);
       bumpL = lum(wet);
     }
     if (uDetail > 0.5) N = bumpNormal(N, P, bumpL, 0.035 * (1.0 - smoothstep(20.0, 70.0, vDist)));

@@ -58,7 +58,7 @@ export function treesOfBlock(bx, bz, { map, surface, clearance, ridden = null })
       const roll = rng(), sizeRoll = rng(), seed = rng(), speciesRoll = rng();
       const m = sampleWorldMap(map, x, z, scratch);
       let chance = m.cover * (1 - m.built) * (1 - m.water);
-      if (m.grass > 0.5 && m.cover < 0.4) chance = 0.02 * m.grass;               // an orchard tree, a hedge tree in a meadow
+      if (m.grass > 0.5 && m.cover < 0.4) chance = 0.1 * m.grass;                // an orchard tree, a hedge tree in a meadow (or a rocky forest clearing the cover map reads thin: still a scatter of trees, never a bare lawn)
       chance *= 1 - 0.8 * m.rock;
       if (roll > chance) continue;
       if (!wayFree(clearance, x, z, 0.3 + 0.02 * HEIGHT_MAX * (baseHeightEstimate(m) / HEIGHT_MAX) * Math.max(1, girthOf(seed, SPECIES.beech) * 0.95))) continue;     // the way network keeps its corridor free, a thick trunk keeps a little further away

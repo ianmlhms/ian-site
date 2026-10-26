@@ -37,7 +37,7 @@ export function undergrowthOfBlock(bx, bz, { map, surface, clearance, trees, rid
       const roll = rng(), seed = rng(), sizeRoll = rng();
       const m = sampleWorldMap(map, x, z, scratch);
       sampleFieldCell(map, x, z, cell);
-      const forest = Math.max(m.cover * (1 - m.grass) * (1 - m.built) * (1 - m.water) * (1 - m.rock), cell.cliff * 0.7 * (1 - m.grass) * (1 - m.water));     // ferns fill the foot of the cliffs too
+      const forest = Math.max(m.cover * (1 - m.grass * 0.6) * (1 - m.built) * (1 - m.water) * (1 - m.rock), cell.cliff * 0.7 * (1 - m.grass * 0.6) * (1 - m.water));     // ferns fill the foot of the cliffs too (a thin-cover rocky clearing still has bracken, not bare lawn)
       if (forest < 0.25) continue;
       const clump = smooth(-0.1, 0.45, fbm(x, z, 11, 2, 41)) * (0.45 + 0.9 * m.wet + 0.9 * cell.cliff);
       if (roll > clump * forest) continue;
@@ -69,7 +69,7 @@ export function undergrowthOfBlock(bx, bz, { map, surface, clearance, trees, rid
       const x = x0 + (i + 0.5) * sstep + (rng() - 0.5) * sstep * 0.8, z = z0 + (j + 0.5) * sstep + (rng() - 0.5) * sstep * 0.8;
       const roll = rng(), seed = rng(), sizeRoll = rng();
       const m = sampleWorldMap(map, x, z, scratch);
-      if (m.grass > 0.5 || m.built > 0.3 || m.water > 0.3 || m.rock > 0.5) continue;
+      if (m.grass > 0.68 || m.built > 0.3 || m.water > 0.3 || m.rock > 0.5) continue;     // a rocky clearing the cover map reads as half-grass still keeps its bramble and bracken
       if (!wayFree(clearance, x, z, 2.2) || !clearOf(x, z, CLEAR.shrub)) continue;
       surface.normal(x, z, nrm);
       if (nrm.y < 0.68) continue;
