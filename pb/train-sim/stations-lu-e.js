@@ -138,4 +138,81 @@
       [-2.2, -0.7, 0.8, 2.2].forEach((dz) => k.vc.box(k.X(bl) + 0.4, H + 0.45, bz + dz, 0.5, 0.9, 0.05, col('#8a9096')));
     },
   });
+  /* ================================================================ SANDWEILER-CONTERN
+   * Refs: ~/Library/Caches/zuch-refs/Sandweiler-Contern (Commons: Contern, gare CFL Sandweiler-Contern (101)-(113)).  Modern halt in a wooded cutting under the CR 234 road bridge:
+   * two side platforms of grey / brown pavers (patch x 1.3 .. 5.4 and -10.2 .. -6.2) with long anthracite-clad flat-roofed service buildings at z 48 .. 106 (the LOD2 boxes, painted
+   * dark grey with glazed fronts) and flat dark steel canopies over the platform, blue name boards, blue square sector signs (A / C), a dark steel bike box beside each platform. */
+  const SC = { far: { edge: -6.2, width: 4.0, z0: -126, z1: 126 }, track: -4.9, z0: 48, z1: 106, wallR: 5.1, wallL: -7.3 };
+  function blueNameBoard(api, k, l, z, line1, line2) {
+    const key = 'scbd:' + line1 + line2;
+    const { canvasTex, textQuad } = api.helpers;
+    const b = api.sets.get(key, () => api.M.sign('lub:' + key, canvasTex('lub:' + key, 512, 256, (c, w, h) => {
+      c.fillStyle = '#d8dce0'; c.fillRect(0, 0, w, h);
+      c.fillStyle = '#0a2fa8'; c.fillRect(10, 10, w - 20, h - 20);
+      c.fillStyle = '#f4f6f8'; c.font = '600 62px Arial'; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.fillText(line1, w / 2, h * 0.28); c.fillRect(w * 0.38, h * 0.5 - 3, w * 0.24, 6); c.fillText(line2, w / 2, h * 0.74);
+    }, { clampU: true, clampV: true })));
+    textQuad(b, [k.X(l) - api.sx * 0.05, api.H + 2.1, z], 2.6, 1.3, [-api.sx, 0, 0], [0, 0, api.sx], [0, 1, 0]);
+    [-1.2, 1.2].forEach((dz) => k.vc.box(k.X(l), api.H + 1.1, z + dz, 0.08, 2.2, 0.08, api.col('#b9bec2')));
+  }
+  /* flat dark steel canopy from a building wall (l = lWall) out over the platform to lFront, on slim posts */
+  function platformCanopy(k, api, lWall, lFront, z0, z1) {
+    const { H, col } = api; const { X, vc } = k;
+    vc.box(X((lWall + lFront) / 2), H + 3.3, (z0 + z1) / 2, Math.abs(lWall - lFront), 0.22, z1 - z0, col('#30353a'));
+    for (let z = z0 + 2; z <= z1; z += 7) vc.box(X(lFront), H + 1.65, z, 0.12, 3.3, 0.12, col('#6a7076'));
+  }
+  /* the CR 234 road bridge over the cutting (patch road with bridge = 1, deck 9.2 m above the formation, skewed 30 degrees to the track): the patch renderer skips bridge ribbons */
+  const SC_BRIDGE = { a: [-33.0, 43.8], b: [29.6, 6.9], yTop: 9.24, width: 9.6, deckH: 1.4, piersX: [-14, 10, 22] };
+  function roadBridge(api, k) {
+    const { col, FORM_Y } = api; const { vc } = k;
+    const [ax, az] = SC_BRIDGE.a; const [bx, bz] = SC_BRIDGE.b;
+    const len = Math.hypot(bx - ax, bz - az);
+    const ux = (bx - ax) / len; const uz = (bz - az) / len;
+    const yaw = Math.atan2(ux, uz);
+    const yTop = SC_BRIDGE.yTop + FORM_Y;
+    const at = (t) => [ax + (bx - ax) * t, az + (bz - az) * t];
+    const [cx, cz] = at(0.5);
+    const side = (off) => [cx + uz * off, cz - ux * off];
+    vc.box(cx, yTop - SC_BRIDGE.deckH / 2, cz, SC_BRIDGE.width, SC_BRIDGE.deckH, len, col('#9c9a94'), yaw);
+    vc.box(cx, yTop + 0.03, cz, 7.2, 0.06, len, col('#4a4c50'), yaw);
+    [-1, 1].forEach((d) => {
+      const [px, pz] = side(d * (SC_BRIDGE.width / 2 - 0.15));
+      vc.box(px, yTop + 0.55, pz, 0.3, 1.1, len, col('#a8a6a0'), yaw);
+      const [rx, rz] = side(d * (SC_BRIDGE.width / 2 + 0.05));
+      vc.box(rx, yTop + 1.2, rz, 0.06, 0.1, len, col('#b0453c'), yaw);
+    });
+    SC_BRIDGE.piersX.forEach((x) => {
+      const [px, pz] = at((x - ax) / (bx - ax));
+      vc.box(px, (yTop - SC_BRIDGE.deckH - 1.5) / 2, pz, SC_BRIDGE.width - 0.8, yTop - SC_BRIDGE.deckH + 1.5, 1.4, col('#8f8d87'), yaw);
+    });
+  }
+  reg('Sandweiler-Contern', {
+    canopy: false,
+    furniture: false,
+    build(api) {
+      const k = makeKit(api);
+      const f = mirrorKit(api);
+      const { sx, edge, W } = api;
+      const lB = edge + W;
+      const toward = (x) => -x * sx;                      // argument of the mirrored kit for patch x
+      roadBridge(api, k);
+      // our platform
+      platformCanopy(k, api, sx * SC.wallR, sx * (SC.wallR - 2.4), SC.z0, SC.z1);
+      [-34, 112].forEach((z) => blueNameBoard(api, k, edge + 1.1, z, 'Sandweiler', 'Contern'));
+      [-70, -8, 56, 100].forEach((z) => k.sign(edge + 0.8, z, 'A', 'blue'));
+      [-48, 12, 40, 76].forEach((z) => k.totem(edge + 1.0, z));
+      [-100, -64, -28, 8, 44, 80, 116].forEach((z) => k.lamp(lB - 0.6, z, '#6a2a22', 6.0));
+      k.bench(lB - 1.0, -50, '#4a4f55');
+      k.bin(lB - 0.7, -20, '#3b4046');
+      // the second main track and the far side platform (patch x -10.2 .. -6.2) with its canopy
+      k.track(sx * SC.track, -135, 135, { pole: true });
+      k.platformBox(sx * SC.far.edge, SC.far.width, -sx, SC.far.z0, SC.far.z1);
+      platformCanopy(f, api, toward(SC.wallL), toward(SC.wallL + 0.9), SC.z0, SC.z1);
+      [-34, 112].forEach((z) => blueNameBoard(api, f, toward(-7.4), z, 'Sandweiler', 'Contern'));
+      [-70, -8, 56, 100].forEach((z) => f.sign(toward(-7.2), z, 'C', 'blue'));
+      [-60, 0, 30].forEach((z) => f.totem(toward(-7.6), z));
+      [-100, -64, -28, 8, 44, 80, 116].forEach((z) => f.lamp(toward(-9.2), z, '#6a2a22', 6.0));
+      f.bench(toward(-9.0), -50, '#4a4f55');
+    },
+  });
 })();

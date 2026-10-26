@@ -1,0 +1,11 @@
+{
+  "route": "wittlich", "station": "Sandweiler-Contern", "refs": "Sandweiler-Contern",
+  "views": [
+    { "photo": "Contern, gare CFL Sandweiler-Contern (102).jpg", "pos": [3.0, 8, 1.8], "look": [-3, 76, 2.2], "fov": 62, "note": "platform to the building" },
+    { "photo": "Contern, gare CFL Sandweiler-Contern (104).jpg", "pos": [4.0, 45, 2.0], "look": [-6, 100, 2.4], "fov": 62, "note": "sector sign, buildings" },
+    { "photo": "Contern, gare CFL Sandweiler-Contern (103).jpg", "pos": [1.0, -25, 1.8], "look": [4, -34, 2.2], "fov": 55, "note": "name board" },
+    { "photo": "Contern, gare CFL Sandweiler-Contern (107).jpg", "pos": [-9, 4, 1.8], "look": [10, -8, 1.8], "fov": 62, "note": "bike box" },
+    { "photo": "Contern, gare CFL Sandweiler-Contern (110).jpg", "pos": [-2, -60, 14], "look": [0, 40, 0], "fov": 62, "note": "from the bridge side" },
+    { "photo": "Contern, gare CFL Sandweiler-Contern (111).jpg", "pos": [0, 75, 45], "look": [0, 75, 0], "fov": 62, "note": "from above" }
+  ]
+}

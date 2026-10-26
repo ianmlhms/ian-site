@@ -84,4 +84,20 @@
       w968056900: { hidden: true }, w968056901: { hidden: true }, w1414392111: { hidden: true }, w1414392112: { hidden: true },     // LOD2 placeholders (7.5 m boxes without faces): the bike shelter is in the model
     },
   });
+  /* SANDWEILER-CONTERN.  Refs: Commons "Contern, gare CFL Sandweiler-Contern (101)-(113)" (Feb 2025).  The platform buildings are long flat-roofed anthracite-clad boxes with
+   * glazed fronts, glass sliding doors and a dark steel canopy (drawn by the station model); the bike boxes beside the platforms are dark steel cages.  The LOD2 box of the
+   * far platform and of both bike boxes use the same dark paint. */
+  const SC_DARK = { wall: '#5e656d', trim: '#2a2e33', plinth: { h: 0.3, col: '#2a2e33' }, roof: 'zinc', roofTint: '#e6eaee', floorH: 4.8, bayM: 2.6, stain: false, win: { w: 1.9, h: 1.9, kind: 'rect', frame: '#23272b', reveal: '#2a2e33', sill: false } };
+  reg('Sandweiler-Contern', Object.assign({}, SC_DARK, {
+    doors: [{ z: 62, w: 1.6, h: 2.3, col: '#23272b', face: 'front' }, { z: 78, w: 1.6, h: 2.3, col: '#23272b', face: 'front' }, { z: 96, w: 1.6, h: 2.3, col: '#23272b', face: 'front' }],
+    otherBase: { stain: false },
+    others: {
+      'ACT_67c2ae9e-ec3d-4259-b167-8dc778819815': Object.assign({}, SC_DARK, { doors: [{ z: 60, w: 1.6, h: 2.3, col: '#23272b', face: 'front' }, { z: 88, w: 1.6, h: 2.3, col: '#23272b', face: 'front' }] }),
+      w753071774: Object.assign({}, SC_DARK, { noWindows: true, floorH: 3.4 }),
+      w939671764: Object.assign({}, SC_DARK, { noWindows: true, floorH: 3.4 }),
+      w939671768: { wall: '#8a6a4c', roof: 'zinc', roofTint: '#6a6a66', noWindows: true, stain: true, plinth: { h: 0.5, col: '#6f6a60' } },       // the rusty timber-clad silo (photo 107)
+      w939671767: { wall: '#b8bcbf', roof: 'zinc', noWindows: true, plinth: { h: 0.3, col: '#8d9195' } },                                       // water tower
+      w939671753: { hidden: true }, w939671754: { hidden: true },     // LOD2 placeholders (7.5 m boxes without faces)
+    },
+  }));
 })();
