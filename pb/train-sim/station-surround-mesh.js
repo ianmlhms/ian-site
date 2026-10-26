@@ -319,8 +319,14 @@
       /* the station building of a station with a photo model is drawn by the model; a station of the OSM-layout kind (stations-osm.js) has none, so its real (LOD2) station building is drawn here */
       const stationSpec = TS.realStations && TS.realStations.get(patch.name);
       const drawStationBuilding = !!(stationSpec && stationSpec.osm) || !!TS.debugStationLod2;   // TS.debugStationLod2 (scripts/zuch/station_top.mjs): the LOD2 station building next to the photo model, to check its side and position
+      /* an OSM platform roof (building=roof / canopy, tagged 'commercial' by the LOD2 pass) lies ON a platform polygon: drawn as a house it is a 250 m long wall of windows along the platform.  The
+         stations draw their own canopies (infra.js, the photo models, stations-osm.js), so a building whose centre is inside a platform polygon is not drawn (W2c, 26 Oct 2026). */
+      const platformRings = (data.platforms || []).map((pl) => pl.ring).filter((r) => r && r.length > 2);
+      const inRing = (r, x, z) => { let c = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { if ((r[i][1] > z) !== (r[j][1] > z) && x < ((r[j][0] - r[i][0]) * (z - r[i][1])) / (r[j][1] - r[i][1]) + r[i][0]) c = !c; } return c; };
+      const onPlatform = (b) => { if (!b.ground || b.ground.length < 3 || !platformRings.length) return false; const mx = b.ground.reduce((a, p) => a + p[0], 0) / b.ground.length; const mz = b.ground.reduce((a, p) => a + p[1], 0) / b.ground.length; return platformRings.some((r) => inRing(r, mx, mz)); };
       (data.buildings || []).forEach((b, bi) => {
         if (b.station && !drawStationBuilding) return;
+        if (onPlatform(b)) return;
         const gx = b.ground && b.ground.length ? b.ground.reduce((s, p) => s + p[0], 0) / b.ground.length : 0;
         if (Math.abs(gx) > stripW - BUILDING_MARGIN) return;
         const names = FACADE_BY_KIND[b.kind] || FACADE_BY_KIND.other;

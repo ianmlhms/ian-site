@@ -1382,7 +1382,12 @@
       const k = makeKit(api);
       const { sx, H, W, edge, col } = api;
       const { X, vc } = k;
-      const l0 = edge + W + 0.1;
+      /* Sides after the OSM layout (data/real/north-layout.json, Ettelbréck: platform right, bside -1) and the LOD2 building of the patch (lateral -31 .. -18, 10 .. 75 m ahead of the stop):
+         the player's track runs along the new island platform (wavy canopy, lifts), the old sandstone building stands on the FAR side of the tracks (across the second track and
+         the old side platform, whose lean-to canopy hugs it).  A reversed service sees it mirrored in z (the hall stays at the same place on the ground). */
+      const zr = api.track && api.track.reverse ? -1 : 1;
+      const Z = (z) => zr * z;
+      const lN = -18.6;                       // near face of the hall (toward the tracks), lateral
       const dep = 9.2;
       const cz = -44;
       const wall = '#cdb68a';
@@ -1398,40 +1403,45 @@
         { z0: cz - 12.8, z1: cz + 6.4, spec: specDoor, key: 'ettC', roof: 'gableX', rise: 3.4, proj: 0.8 },
         { z0: cz + 6.4, z1: cz + 28.8, spec: specG, key: 'ettR', roof: 'hip', rise: 2.6 },
       ];
+      const lowOf = (p) => lN - dep;
+      const highOf = (p) => lN + (p.proj || 0);
       parts.forEach((p) => {
-        const pl0 = l0 - (p.proj || 0);
-        const w = k.walls({ l0: pl0, l1: l0 + dep, z0: p.z0, z1: p.z1, floors: 2, floorM: FL, front: p.spec, frontKey: p.key + 'F', back: p.spec, backKey: p.key + 'F', end: specE, endKey: 'ettE', baseCol: '#9d8a68' });
-        k.roof({ kind: p.roof, mat: 'slate', l0: pl0, l1: l0 + dep, z0: p.z0, z1: p.z1, y: w.eaves + 0.15, rise: p.rise, ov: 0.45, gableTex: gab });
-        vc.box(X((pl0 + l0 + dep) / 2), w.eaves + 0.05, (p.z0 + p.z1) / 2, dep + 0.4, 0.22, p.z1 - p.z0 + 0.4, col('#bda673'));
+        const za = Math.min(Z(p.z0), Z(p.z1)); const zb = Math.max(Z(p.z0), Z(p.z1));
+        const w = k.walls({ l0: lowOf(p), l1: highOf(p), z0: za, z1: zb, floors: 2, floorM: FL, front: p.spec, frontKey: p.key + 'F', back: p.spec, backKey: p.key + 'F', end: specE, endKey: 'ettE', baseCol: '#9d8a68' });
+        k.roof({ kind: p.roof, mat: 'slate', l0: lowOf(p), l1: highOf(p), z0: za, z1: zb, y: w.eaves + 0.15, rise: p.rise, ov: 0.45, gableTex: gab });
+        vc.box(X((lowOf(p) + highOf(p)) / 2), w.eaves + 0.05, (za + zb) / 2, highOf(p) - lowOf(p) + 0.4, 0.22, zb - za + 0.4, col('#bda673'));
       });
+      // the north wing of the building (OSM station building 12 x 9 m, lateral -29 .. -20, 20 .. 32 m behind the stop)
+      k.house({ l0: -28.9, dep: 9.0, z0: Z(20.5) - 6, z1: Z(20.5) + 6, floors: 2, FL, spec: specG, specEnd: specE, key: 'ettW', kind: 'gable', rise: 3.0, mat: 'slate', gab, eaveCol: '#bda673' });
       const eavesY = H + 2 * FL;
-      // round window in the pediment (platform side) and CFL plate above the doors
-      vc.box(X(l0 - 0.85), eavesY + 1.7, cz - 3.2, 0.06, 1.0, 1.0, col('#e8e2d2'));
-      vc.box(X(l0 - 0.9), eavesY + 1.7, cz - 3.2, 0.05, 0.7, 0.7, col('#31475a'));
-      vc.box(X(l0 - 0.85), H + 3.55, cz - 3.2, 0.06, 0.45, 1.6, col('#f0f0ec'));
-      vc.box(X(l0 - 0.9), H + 3.55, cz - 3.2, 0.05, 0.28, 0.9, col('#e0801a'));
-      [[cz - 24, 4], [cz + 18, 5]].forEach(([z, l]) => k.chimney(l0 + l, z, eavesY + 1.2, 2.2, '#b08a68'));
-      // red cast lamp posts on the platform in front of the building
-      [-30, -14, 2, 18].forEach((z) => k.lamp(l0 - 1.4, cz + z, '#7a2a2a', 3.8));
+      // round window in the pediment (track side) and CFL plate above the doors
+      const lF = lN + 0.8;
+      vc.box(X(lF + 0.05), eavesY + 1.7, Z(cz - 3.2), 0.06, 1.0, 1.0, col('#e8e2d2'));
+      vc.box(X(lF + 0.1), eavesY + 1.7, Z(cz - 3.2), 0.05, 0.7, 0.7, col('#31475a'));
+      vc.box(X(lF + 0.05), H + 3.55, Z(cz - 3.2), 0.06, 0.45, 1.6, col('#f0f0ec'));
+      vc.box(X(lF + 0.1), H + 3.55, Z(cz - 3.2), 0.05, 0.28, 0.9, col('#e0801a'));
+      [[cz - 24, 4], [cz + 18, 5]].forEach(([z, l]) => k.chimney(lN - l, Z(z), eavesY + 1.2, 2.2, '#b08a68'));
 
-      // old timber platform canopy along the building (dark iron posts, timber soffit)
-      k.leanCanopy({ lHi: l0 - 0.9, lLo: edge + 2.15, yHi: H + 5.3, yLo: H + 3.75, z0: cz - 40, z1: cz + 38, postEvery: 6.4 });
-      [-44, -12, 12, 34].forEach((z) => k.yellowDisplay(edge + 1.3, cz + z));
-      [-58, -26, 0, 20].forEach((z) => k.totem(edge + 1.3, cz + z + 6));
-      [-30, -6, 16, 38].forEach((z) => k.bench(l0 - 1.7, cz + z, '#a2713c'));
-      [-20, 26].forEach((z) => k.bin(edge + 3.3, cz + z, '#8a8f93'));
-      [-86, 72].forEach((z) => k.clockPole(edge + 3.0, z));
+      // the old side platform in front of the building (OSM platform 1;3: lateral -6.1 .. -18) with its timber lean-to canopy, red cast lamps and benches
+      k.platformBox(-6.1, 11.9, -1, -125, 105);
+      [-30, -14, 2, 18].forEach((z) => k.lamp(lN + 1.4, Z(cz + z), '#7a2a2a', 3.8));
+      k.leanCanopy({ lHi: lN + 0.9, lLo: -8.4, yHi: H + 5.3, yLo: H + 3.75, z0: Math.min(Z(cz - 40), Z(cz + 38)), z1: Math.max(Z(cz - 40), Z(cz + 38)), postEvery: 6.4 });
+      [-44, -12, 12, 34].forEach((z) => k.yellowDisplay(-7.6, Z(cz + z)));
+      [-30, -6, 16, 38].forEach((z) => k.bench(lN + 1.7, Z(cz + z), '#a2713c'));
+      [-20, 26].forEach((z) => k.bin(-7.6, Z(cz + z), '#8a8f93'));
+      [-86, 72].forEach((z) => k.clockPole(-7.4, z));
 
-      // across the empty track: the new island platform with the wavy timber canopy, lift and stairs (visual only)
-      k.track(-9.2, -130, 130, { pole: true });
-      k.platformBox(-10.9, 5.6, -1, -125, 105);
-      k.waveCanopy({ lA: -11.8, lB: -16.2, z0: -115, z1: 95, y0: 5.1, amp: 0.8, per: 30, tilt: -0.9, colFoot: -15.2, colTop: -13.0, colEvery: 17 });
-      k.lift(-14.5, -24, 5.0);
-      k.lift(-14.5, 34, 5.0);
-      k.stairOpening(-14.0, -6, 6);
-      k.stairOpening(-14.0, 52, 6);
-      [-85, -50, -12, 14, 40, 75].forEach((z) => k.totem(-12.3, z));
-      [-66, -34, 6, 24, 60].forEach((z) => k.bench(-13.2, z, '#a2713c'));
+      // the player's platform: the new island (OSM 4;5, 1.4 .. 11.9 from the axis) with the wavy timber canopy, glass lifts and stairs; the next track lies beyond it
+      const far = 11.9;
+      k.platformBox(edge + W, far - edge - W, 1, -125, 105);
+      k.waveCanopy({ lA: edge + 0.9, lB: far - 0.5, z0: -115, z1: 95, y0: 5.1, amp: 0.8, per: 30, tilt: -0.9, colFoot: far - 1.6, colTop: edge + 3.6, colEvery: 17 });
+      k.lift(far - 3.2, -24, 5.0);
+      k.lift(far - 3.2, 34, 5.0);
+      k.stairOpening(far - 3.8, -6, 6);
+      k.stairOpening(far - 3.8, 52, 6);
+      [-85, -50, -12, 14, 40, 75].forEach((z) => k.totem(edge + 1.3, z));
+      [-66, -34, 6, 24, 60].forEach((z) => k.bench(far - 2.2, z, '#a2713c'));
+      k.track(13.2, -130, 130, { pole: true });
     },
   });
 })();
