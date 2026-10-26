@@ -31,10 +31,13 @@
   const SAMPLE = 3;                // m between profile samples
   const JUNCTION_MIN = 46;         // lateral distance of the parallel road
   const JUNCTION_VAR = 20;
-  const RIVER_LAT_MAX = 58;        // beside a river valley the roads stay on this side of the water
+  const RIVER_LAT_MAX = 58;
+  const RIVER_LAT_MIN = 30;        // ... but never closer than this to the line        // beside a river valley the roads stay on this side of the water
   const MARGIN_TUNNEL = 130;       // roads keep this far from tunnels, viaducts and stations along the track
   const MARGIN_STATION = 170;
   const MARGIN_END = 70;
+  const SEP_LAT = 24;              // parallel roads of neighbouring crossings keep this lateral distance (m) over the stretch they share
+  const SEP_S = 20;
   const INFRA_RUN = 13;            // infra.js draws the road this far beyond the outer rail; the planned road starts there
   const FILLET = 7;                // radius of the T-junction corners
   const BEND_R = 26;               // radius of a road that bends into the parallel road
@@ -310,7 +313,7 @@
     const lLo = Math.min(0, X2) - INFRA_RUN;     // where infra.js's crossing road ends (flat run-out beyond the outer rail)
     const lHi = Math.max(0, X2) + INFRA_RUN;
     const wat = ctx.water ? ctx.water(sc) : null;
-    const latMax = wat ? RIVER_LAT_MAX : 96;
+    const latMax = wat ? Math.max(RIVER_LAT_MIN, Math.min(RIVER_LAT_MAX, (wat.offset || RIVER_LAT_MAX + 6) - (wat.halfWidth || 0) - 6)) : 96;   // W3: a real river can run closer to the line than 58 m (metz: 41 m, bank at 35 m): the roads stop before it, else a road floats 4.5 m over the channel
     const formY = f0.y - ctx.formationDrop;
 
     const sideA = rng() < 0.5 ? -1 : 1;
@@ -321,6 +324,22 @@
     const reachPlus = reach(ctx, sc, 1);
     const reachMinus = reach(ctx, sc, -1);
     const maxA = (q) => (q > 0 ? reachPlus : reachMinus);
+    /* W3: crossings closer together than the length of their parallel roads (metz: 110 - 140 m apart) put two parallel roads on top of each other (46 - 66 m beside the line), and the
+       terrain cannot follow both profiles (0.4 m off the design).  A cross road whose parallel road would run within SEP_LAT of an earlier one on the same side, over the crossing
+       itself, T-joins that road instead (a real network has one parallel road, not two): returns that road's lateral position and its height where the cross road meets it. */
+    const sharedParallel = (sd, j) => {
+      for (const r of roadsOut) {
+        if ((r.role !== 'parallel' && r.role !== 'bend') || !r.pts.length) continue;
+        const l = r.pts[r.role === 'bend' ? r.pts.length - 1 : 0].l;           // a bending road ends in its parallel part
+        if (Math.sign(l) !== sd || Math.abs(l - j) >= SEP_LAT) continue;
+        const par = r.pts.filter((q) => Math.abs(q.l - l) < 1);
+        const a0 = r.crossing + Math.min(...par.map((q) => q.a)); const a1 = r.crossing + Math.max(...par.map((q) => q.a));
+        if (sc < a0 + 8 || sc > a1 - 8) continue;
+        const at = par.reduce((best, q) => (Math.abs(r.crossing + q.a - sc) < Math.abs(r.crossing + best.a - sc) ? q : best), par[0]);
+        return { l, y: at.yT };
+      }
+      return null;
+    };
 
     const polylines = [];
     const rows = [];
@@ -380,7 +399,7 @@
         info.sides.push({ sd, type: 'real', j: tip.l, end: ra.end, cls: ra.cls });
         return;
       }
-      const j = J(sd);
+      let j = J(sd);
       const tField = layout === 'tField';
       const tBend = layout === 'tBend';
       /* side A: tField -> T junction into a parallel road, tBend -> bends into a parallel road, tt -> T junction.
@@ -393,11 +412,20 @@
         const hwPar = HW_PARALLEL;
         const qa = -Math.min(maxA(-1), 130 + rng() * 170);
         const qb = Math.min(maxA(1), 130 + rng() * 170);
-        const cross = crossRoad(sd, j, j - sd * (hwPar + 0.05), HW_CROSS, 'asphalt');
-        polylines.push(cross);
-        parallelRoad('p' + index + (sd > 0 ? 'r' : 'l'), sd, j, qa, qb, hwPar, true).forEach((p) => polylines.push(p));
-        junctions.push({ sd, l: j, hwCross: HW_CROSS, hwPar, aMin: qa, aMax: qb });
-        lats.push({ lat: j, s0: sc + qa - LANE_LEN - 30, s1: sc + qb + LANE_LEN + 30 });
+        const shared = sharedParallel(sd, j);
+        if (shared) {
+          j = shared.l; info.sides[k].j = j; info.sides[k].shared = true;
+          const cross = crossRoad(sd, j, j - sd * (hwPar + 0.05), HW_CROSS, 'asphalt');
+          cross.endPin = shared.y;
+          polylines.push(cross);
+          junctions.push({ sd, l: j, hwCross: HW_CROSS, hwPar, aMin: -hwPar, aMax: hwPar });
+        } else {
+          const cross = crossRoad(sd, j, j - sd * (hwPar + 0.05), HW_CROSS, 'asphalt');
+          polylines.push(cross);
+          parallelRoad('p' + index + (sd > 0 ? 'r' : 'l'), sd, j, qa, qb, hwPar, true).forEach((p) => polylines.push(p));
+          junctions.push({ sd, l: j, hwCross: HW_CROSS, hwPar, aMin: qa, aMax: qb });
+          lats.push({ lat: j, s0: sc + qa - LANE_LEN - 30, s1: sc + qb + LANE_LEN + 30 });
+        }
       } else if (type === 'bend') {
         const q = Math.abs(maxA(qBend)) > 150 ? qBend : -qBend;
         const run = Math.min(maxA(q), 150 + rng() * 170);
@@ -434,7 +462,7 @@
     const made = polylines.map((p) => finishPolyline(p, ctx, world, frameOf, sc));
     /* profile: the cross / bending roads first (pinned to the crossing level at the start, free end), then the parallel roads (pinned to the height the
        cross road arrives with at the junction), then the gravel tails (pinned to the end of the road they continue) */
-    made.filter((r) => r.role === 'cross' || r.role === 'bend').forEach((r) => profile(r, ctx, [{ u: 0, y: formY }]));
+    made.filter((r) => r.role === 'cross' || r.role === 'bend').forEach((r) => profile(r, ctx, [{ u: 0, y: formY }].concat(r.endPin === undefined ? [] : [{ u: r.pts[r.pts.length - 1].u, y: r.endPin }])));
     made.filter((r) => r.role === 'parallel').forEach((r) => {
       const cross = made.find((m) => m.role === 'cross' && m.id.slice(1) === r.id.slice(1));
       const pins = [];
@@ -528,7 +556,7 @@
       const dx = n.x - m.x; const dz = n.z - m.z; const dl = Math.hypot(dx, dz) || 1;
       q.tx = dx / dl; q.tz = dz / dl;
     });
-    return { id: p.id, kind: p.kind, hw: p.hw, markings: p.markings, index: p.index, role: p.role, parent: p.parent, joint: p.joint, pts, len: u, crossing: sc };
+    return { id: p.id, kind: p.kind, hw: p.hw, markings: p.markings, index: p.index, role: p.role, parent: p.parent, joint: p.joint, pts, len: u, crossing: sc, endPin: p.endPin };
   }
 
   /* design height of the terrain under the road: the natural ground smoothed over ~30 m, joined to the crossing level at the start

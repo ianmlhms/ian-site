@@ -71,6 +71,7 @@ export const flow = {
             let best = 0;
             c.roads.forEach((r) => r.pts.forEach((p) => { if (Math.sign(p.l) === sd || (p.l === 0 && sd > 0)) best = Math.max(best, Math.hypot(p.a, Math.abs(p.l))); }));
             const side = c.info && c.info.sides ? c.info.sides.find((x) => x.sd === sd) : null;
+            if (side && side.shared) best = Math.max(best, 120);   // W3: the cross road T-joins the parallel road of the neighbouring crossing (the road network has one parallel road there)
             (c.patch ? out.patchReach : side && side.type === 'real' ? out.realReach : out.reach).push(Math.round(best));
           });
         });

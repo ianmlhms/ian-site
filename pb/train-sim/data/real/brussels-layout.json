@@ -1,0 +1,813 @@
+{
+ "version": 1,
+ "stations": {
+  "Lëtzebuerg": {
+   "size": 3,
+   "side": "right",
+   "biome": "city",
+   "osm": "Luxembourg",
+   "s_real": 0.0,
+   "plat": [
+    {
+     "edge": -41.2,
+     "w": 3.7,
+     "lat": -43.1,
+     "s0": 0.0,
+     "s1": 170.0,
+     "ref": "9;10"
+    },
+    {
+     "edge": -32.7,
+     "w": 3.0,
+     "lat": -34.2,
+     "s0": 0.0,
+     "s1": 170.0,
+     "ref": "8"
+    },
+    {
+     "edge": -23.1,
+     "w": 11.8,
+     "lat": -29.0,
+     "s0": 0.0,
+     "s1": 170.0,
+     "ref": "7;8"
+    },
+    {
+     "edge": -14.9,
+     "w": 3.0,
+     "lat": -16.4,
+     "s0": 0.0,
+     "s1": 150.0,
+     "ref": "5"
+    },
+    {
+     "edge": -6.8,
+     "w": 9.6,
+     "lat": -11.6,
+     "s0": 0.0,
+     "s1": 150.0,
+     "ref": "4;5"
+    },
+    {
+     "edge": 1.5,
+     "w": 12.6,
+     "lat": 7.8,
+     "s0": 0.0,
+     "s1": 170.0,
+     "ref": "1;2;3"
+    },
+    {
+     "edge": 6.8,
+     "w": 3.0,
+     "lat": 8.3,
+     "s0": 160.0,
+     "s1": 170.0,
+     "ref": "2"
+    },
+    {
+     "edge": 14.1,
+     "w": 3.0,
+     "lat": 15.6,
+     "s0": 110.0,
+     "s1": 170.0,
+     "ref": "1"
+    }
+   ],
+   "trk": [
+    -40.8,
+    -35.5,
+    -22.8,
+    -17.8,
+    -5.0
+   ],
+   "bside": 1,
+   "lat": 49.599845,
+   "lon": 6.134376,
+   "heading": 201.9
+  },
+  "Arlon": {
+   "size": 2,
+   "side": "left",
+   "biome": "suburb",
+   "osm": "Arlon",
+   "s_real": 28459.8,
+   "plat": [
+    {
+     "edge": -36.6,
+     "w": 7.7,
+     "lat": -40.4,
+     "s0": -169.8,
+     "s1": -19.8,
+     "ref": "8"
+    },
+    {
+     "edge": -14.8,
+     "w": 3.0,
+     "lat": -16.3,
+     "s0": -169.8,
+     "s1": 160.2,
+     "ref": "5"
+    },
+    {
+     "edge": -10.1,
+     "w": 13.3,
+     "lat": -16.8,
+     "s0": -169.8,
+     "s1": 160.2,
+     "ref": "4;5"
+    },
+    {
+     "edge": -3.8,
+     "w": 3.0,
+     "lat": -5.3,
+     "s0": -139.8,
+     "s1": 160.2,
+     "ref": "3"
+    },
+    {
+     "edge": -1.3,
+     "w": 7.2,
+     "lat": -4.9,
+     "s0": -139.8,
+     "s1": 160.2,
+     "ref": "2;3"
+    },
+    {
+     "edge": 5.2,
+     "w": 8.2,
+     "lat": 9.3,
+     "s0": -79.8,
+     "s1": 160.2,
+     "ref": "1"
+    }
+   ],
+   "trk": [
+    -39.0,
+    -31.6,
+    -24.0,
+    -14.0,
+    -10.0,
+    4.2
+   ],
+   "bside": 1,
+   "lat": 49.680266,
+   "lon": 5.809446,
+   "heading": 292.7
+  },
+  "Marbehan": {
+   "size": 1,
+   "side": "right",
+   "biome": "industrial",
+   "osm": "Marbehan",
+   "s_real": 49428.6,
+   "plat": [
+    {
+     "edge": -4.8,
+     "w": 6.9,
+     "lat": -8.2,
+     "s0": -48.6,
+     "s1": 71.4,
+     "ref": "1"
+    },
+    {
+     "edge": 1.2,
+     "w": 7.0,
+     "lat": 4.7,
+     "s0": -98.6,
+     "s1": 161.4,
+     "ref": "2;3"
+    }
+   ],
+   "trk": [
+    -4.2,
+    9.2
+   ],
+   "bside": -1,
+   "lat": 49.727454,
+   "lon": 5.539615,
+   "heading": 349.0
+  },
+  "Libramont": {
+   "size": 2,
+   "side": "left",
+   "biome": "suburb",
+   "osm": "Libramont",
+   "s_real": 74827.5,
+   "plat": [
+    {
+     "edge": -28.2,
+     "w": 10.0,
+     "lat": -33.2,
+     "s0": -127.5,
+     "s1": 62.5,
+     "ref": "5;6"
+    },
+    {
+     "edge": -14.6,
+     "w": 10.8,
+     "lat": -20.0,
+     "s0": -147.5,
+     "s1": 112.5,
+     "ref": "3;4"
+    },
+    {
+     "edge": -1.2,
+     "w": 9.2,
+     "lat": -5.8,
+     "s0": -167.5,
+     "s1": 162.5,
+     "ref": "1;2"
+    }
+   ],
+   "trk": [
+    -39.2,
+    -29.8,
+    -25.8,
+    -21.5,
+    -15.0,
+    -10.0
+   ],
+   "bside": 1,
+   "lat": 49.920148,
+   "lon": 5.379184,
+   "heading": 314.5
+  },
+  "Jemelle": {
+   "size": 1,
+   "side": "left",
+   "biome": "ardennes",
+   "osm": "Rochefort-Jemelle",
+   "s_real": 107341.7,
+   "plat": [
+    {
+     "edge": -5.5,
+     "w": 9.3,
+     "lat": -10.2,
+     "s0": -131.7,
+     "s1": 168.3,
+     "ref": "6;7"
+    },
+    {
+     "edge": 12.9,
+     "w": 10.2,
+     "lat": 18.0,
+     "s0": -151.7,
+     "s1": 168.3,
+     "ref": "2;3"
+    },
+    {
+     "edge": 28.3,
+     "w": 6.4,
+     "lat": 31.5,
+     "s0": -41.7,
+     "s1": 168.3,
+     "ref": "1"
+    }
+   ],
+   "trk": [
+    -16.2,
+    -4.5,
+    8.0,
+    12.2,
+    23.2,
+    27.2
+   ],
+   "bside": 1,
+   "lat": 50.160065,
+   "lon": 5.266637,
+   "heading": 18.9
+  },
+  "Marloie": {
+   "size": 1,
+   "side": "right",
+   "biome": "suburb",
+   "osm": "Marloie",
+   "s_real": 113263.2,
+   "plat": [
+    {
+     "edge": -4.7,
+     "w": 6.3,
+     "lat": -7.8,
+     "s0": -163.2,
+     "s1": 76.8,
+     "ref": "3;4"
+    },
+    {
+     "edge": 1.5,
+     "w": 6.3,
+     "lat": 4.6,
+     "s0": -163.2,
+     "s1": 86.8,
+     "ref": "1;2"
+    }
+   ],
+   "trk": [
+    -12.0,
+    -3.5,
+    8.5
+   ],
+   "bside": 1,
+   "lat": 50.202607,
+   "lon": 5.313662,
+   "heading": 34.0
+  },
+  "Ciney": {
+   "size": 1,
+   "side": "left",
+   "biome": "ardennes",
+   "osm": "Ciney",
+   "s_real": 135816.5,
+   "plat": [
+    {
+     "edge": -1.3,
+     "w": 7.0,
+     "lat": -4.8,
+     "s0": 23.5,
+     "s1": 163.5,
+     "ref": "4;5"
+    },
+    {
+     "edge": 6.0,
+     "w": 6.5,
+     "lat": 9.2,
+     "s0": 23.5,
+     "s1": 163.5,
+     "ref": "2;3"
+    },
+    {
+     "edge": 19.2,
+     "w": 8.4,
+     "lat": 23.4,
+     "s0": 43.5,
+     "s1": 163.5,
+     "ref": "1"
+    }
+   ],
+   "trk": [
+    -9.5,
+    5.0,
+    15.4
+   ],
+   "bside": 1,
+   "lat": 50.291259,
+   "lon": 5.091093,
+   "heading": 336.6
+  },
+  "Namur": {
+   "size": 3,
+   "side": "left",
+   "biome": "city",
+   "osm": "Namur",
+   "s_real": 165021.7,
+   "plat": [
+    {
+     "edge": -30.2,
+     "w": 9.6,
+     "lat": -35.0,
+     "s0": -161.7,
+     "s1": 168.3,
+     "ref": "4;5"
+    },
+    {
+     "edge": -15.8,
+     "w": 8.3,
+     "lat": -20.0,
+     "s0": -161.7,
+     "s1": 168.3,
+     "ref": "6;7"
+    },
+    {
+     "edge": -1.2,
+     "w": 8.0,
+     "lat": -5.2,
+     "s0": -161.7,
+     "s1": 168.3,
+     "ref": "8;9"
+    },
+    {
+     "edge": 5.1,
+     "w": 8.6,
+     "lat": 9.4,
+     "s0": -161.7,
+     "s1": 168.3,
+     "ref": "10;11"
+    }
+   ],
+   "trk": [
+    -44.8,
+    -41.2,
+    -29.8,
+    -26.0,
+    -14.8,
+    -11.0,
+    3.8,
+    14.8
+   ],
+   "bside": -1,
+   "lat": 50.469353,
+   "lon": 4.862411,
+   "heading": 266.7
+  },
+  "Gembloux": {
+   "size": 1,
+   "side": "right",
+   "biome": "farmland",
+   "osm": "Gembloux",
+   "s_real": 182080.4,
+   "plat": [
+    {
+     "edge": -4.4,
+     "w": 7.6,
+     "lat": -8.2,
+     "s0": -160.4,
+     "s1": 19.6,
+     "ref": "1"
+    },
+    {
+     "edge": 1.7,
+     "w": 6.9,
+     "lat": 5.2,
+     "s0": -160.4,
+     "s1": 169.6,
+     "ref": "2;3"
+    },
+    {
+     "edge": 7.5,
+     "w": 3.0,
+     "lat": 9.0,
+     "s0": -160.4,
+     "s1": 169.6,
+     "ref": "3"
+    },
+    {
+     "edge": 14.7,
+     "w": 8.1,
+     "lat": 18.8,
+     "s0": -160.4,
+     "s1": 169.6,
+     "ref": "4;5"
+    },
+    {
+     "edge": 18.8,
+     "w": 3.0,
+     "lat": 20.3,
+     "s0": -160.4,
+     "s1": 169.6,
+     "ref": "5"
+    }
+   ],
+   "trk": [
+    -3.5,
+    10.2,
+    14.2,
+    24.0
+   ],
+   "bside": -1,
+   "lat": 50.570305,
+   "lon": 4.691389,
+   "heading": 326.9
+  },
+  "Ottignies": {
+   "size": 2,
+   "side": "left",
+   "biome": "farmland",
+   "osm": "Ottignies",
+   "s_real": 196792.3,
+   "plat": [
+    {
+     "edge": -18.1,
+     "w": 7.0,
+     "lat": -21.6,
+     "s0": -142.3,
+     "s1": 167.7,
+     "ref": "A"
+    },
+    {
+     "edge": -1.7,
+     "w": 8.3,
+     "lat": -5.9,
+     "s0": -162.3,
+     "s1": 157.7,
+     "ref": "1;2"
+    },
+    {
+     "edge": 6.3,
+     "w": 7.7,
+     "lat": 10.2,
+     "s0": -162.3,
+     "s1": 137.7,
+     "ref": "3;4"
+    },
+    {
+     "edge": 21.0,
+     "w": 8.0,
+     "lat": 25.0,
+     "s0": -162.3,
+     "s1": 137.7,
+     "ref": "5;6"
+    }
+   ],
+   "trk": [
+    -16.2,
+    -11.2,
+    4.2,
+    15.5,
+    19.5,
+    30.5
+   ],
+   "bside": 0,
+   "lat": 50.674439,
+   "lon": 4.568138,
+   "heading": 341.0
+  },
+  "Bruxelles-Luxembourg": {
+   "size": 2,
+   "side": "left",
+   "biome": "city",
+   "osm": "Bruxelles-Luxembourg - Brussel-Luxemburg",
+   "s_real": 220391.2,
+   "plat": [
+    {
+     "edge": -12.6,
+     "w": 9.8,
+     "lat": -17.5,
+     "s0": -141.2,
+     "s1": 168.8,
+     "ref": "1"
+    },
+    {
+     "edge": -1.2,
+     "w": 8.6,
+     "lat": -5.5,
+     "s0": -141.2,
+     "s1": 168.8,
+     "ref": "2;3"
+    },
+    {
+     "edge": 5.0,
+     "w": 10.3,
+     "lat": 10.2,
+     "s0": -141.2,
+     "s1": 168.8,
+     "ref": "4;5"
+    },
+    {
+     "edge": 14.1,
+     "w": 13.4,
+     "lat": 20.8,
+     "s0": -141.2,
+     "s1": 168.8,
+     "ref": "6"
+    }
+   ],
+   "trk": [
+    -12.6,
+    4.2,
+    15.5,
+    19.7
+   ],
+   "bside": 0,
+   "lat": 50.838151,
+   "lon": 4.373604,
+   "heading": 19.0
+  },
+  "Bruxelles-Midi": {
+   "size": 3,
+   "side": "left",
+   "biome": "city",
+   "osm": "Bruxelles-Midi - Brussel-Zuid",
+   "s_real": 230349.0,
+   "plat": [
+    {
+     "edge": -33.1,
+     "w": 11.9,
+     "lat": -39.1,
+     "s0": -169.0,
+     "s1": 1.0,
+     "ref": "17;18"
+    },
+    {
+     "edge": -19.9,
+     "w": 10.1,
+     "lat": -25.0,
+     "s0": -169.0,
+     "s1": 1.0,
+     "ref": "15;16"
+    },
+    {
+     "edge": -5.1,
+     "w": 8.6,
+     "lat": -9.4,
+     "s0": -169.0,
+     "s1": 1.0,
+     "ref": "13;14"
+    },
+    {
+     "edge": -2.0,
+     "w": 43.2,
+     "lat": -23.6,
+     "s0": -129.0,
+     "s1": -119.0,
+     "ref": ""
+    },
+    {
+     "edge": 1.4,
+     "w": 10.0,
+     "lat": 6.4,
+     "s0": -169.0,
+     "s1": 1.0,
+     "ref": "11;12"
+    },
+    {
+     "edge": 14.4,
+     "w": 11.7,
+     "lat": 20.2,
+     "s0": -149.0,
+     "s1": 1.0,
+     "ref": "9;10"
+    },
+    {
+     "edge": 23.5,
+     "w": 18.4,
+     "lat": 32.7,
+     "s0": -169.0,
+     "s1": 1.0,
+     "ref": "7;8"
+    },
+    {
+     "edge": 40.8,
+     "w": 4.1,
+     "lat": 42.8,
+     "s0": -129.0,
+     "s1": -89.0,
+     "ref": "5;6"
+    },
+    {
+     "edge": 44.0,
+     "w": 0.7,
+     "lat": 44.4,
+     "s0": -169.0,
+     "s1": -169.0,
+     "ref": "3;4"
+    }
+   ],
+   "trk": [
+    -35.2,
+    -31.5,
+    -18.8,
+    -15.8,
+    -3.8,
+    9.0,
+    12.7,
+    16.2,
+    28.2,
+    32.0,
+    43.8
+   ],
+   "bside": -1,
+   "lat": 50.835877,
+   "lon": 4.336146,
+   "heading": 222.6
+  }
+ },
+ "segments": {
+  "main": [
+   {
+    "t": "station",
+    "name": "Lëtzebuerg"
+   },
+   {
+    "t": "leg",
+    "id": "B01",
+    "from": "Lëtzebuerg",
+    "to": "Arlon",
+    "length": 1690,
+    "spec": "s*:g-0.25:v130:bcity r1163/87:bindustrial s60:g0.5:T s32:g0.5:bindustrial l1163/113:g0.5 r854/58:g0.75:bfarmland r854/60 s73:g-0.25 s32:g0.5:bfarmland l1163/124:bforest s26:g0.25:bfarmland s57:g0.75 s31:g-1 s31:bfarmland l828/75 s54:g0.5:bfarmland s70:g0.75:X:bsuburb s31:g0.75:bfarmland l988/58:g0.25 r970/143:g0.75 r1163/95:g0.75:bfarmland r1163/117:g1 l984/95:g1 s29:bsuburb l1163/62:g-0.25"
+   },
+   {
+    "t": "station",
+    "name": "Arlon"
+   },
+   {
+    "t": "leg",
+    "id": "B02",
+    "from": "Arlon",
+    "to": "Marbehan",
+    "length": 1241,
+    "spec": "r1163/81:g-1:v130:bsuburb l1163/139:g-0.75 s*:g-1 s30:g0.75 s33:g1 s33:g-0.75 r1715/113:g-0.25 s37:g0.75:bardennes s33 l1715/136 l1715/115:g-1:bardennes s31:g-0.75 s70:X:bsuburb r1715/115:g-0.25:bsuburb r1018/139:g0.75"
+   },
+   {
+    "t": "station",
+    "name": "Marbehan"
+   },
+   {
+    "t": "leg",
+    "id": "B03",
+    "from": "Marbehan",
+    "to": "Libramont",
+    "length": 1507,
+    "spec": "l1003/45:g0.5:v120:bindustrial s29:g1:bardennes s35:g-0.25 l805/43:g-0.5 r928/46:v140 l993/71:g-0.25 s70:g0.25:X:bsuburb r1078/79:g0.5:bardennes s54:g0.5 l1519/69:g1:v150 s*:g1 l1519/46:g1 r1002/114:g1 s40:g-1:bsuburb l995/81:g-1:bardennes s28:g-1 s35:g0.5:bsuburb s40:g1:bardennes l1519/104:g1 r1519/63:g0.75 r1519/76:g-0.5 r1519/41:g-1 s30:g1 l1519/80:g-1 s61:g1:bsuburb s34:g0.5:v130"
+   },
+   {
+    "t": "station",
+    "name": "Libramont"
+   },
+   {
+    "t": "leg",
+    "id": "B04",
+    "from": "Libramont",
+    "to": "Jemelle",
+    "length": 1933,
+    "spec": "r1163/91:g-1:v130:bsuburb r1335/82:g-1:v140:bardennes s35:g-0.75:bindustrial s29:g-1:bardennes r1335/78:g-1 s69:g-1 l1335/84:g-1 s62:g-1 s35:g-0.75:bsuburb s39:g-0.75:v130:bardennes s60:g-1:Br,5,w s37:g-0.75 l1032/61:g-0.25 r507/108:g-1:v90 r594/86:g-1 l594/68:g-1 r557/53:g-1 l501/106:g-0.75 r504/109:g-1:v100:Br,5,w s28:g-0.75 l623/54:g0.25 s43:g-1:v130 r1163/66:g-0.25 s43:g0.25 s49:g-1 l1094/83:g-0.75 s41:g-0.5 l706/68:g0.5:v100 s*:g-0.5:bsuburb s50:bardennes s44:g0.25"
+   },
+   {
+    "t": "station",
+    "name": "Jemelle"
+   },
+   {
+    "t": "leg",
+    "id": "B05",
+    "from": "Jemelle",
+    "to": "Marloie",
+    "length": 700,
+    "spec": "r1163/75:g0.5:v130:bardennes r1163/73:g1:bsuburb r1163/102:g1:bardennes s*:g1 l1013/108:g1 s32:g0.75 r1163/77:g0.75 s48:g0.75 s43:g1:bindustrial s36:g0.25:bsuburb"
+   },
+   {
+    "t": "station",
+    "name": "Marloie"
+   },
+   {
+    "t": "leg",
+    "id": "B06",
+    "from": "Marloie",
+    "to": "Ciney",
+    "length": 1336,
+    "spec": "l505/68:g-0.25:v90:bindustrial s32:g-1:v130:bardennes s56:g-0.75 s27:g0.75:bsuburb s79:g0.75:bindustrial l1014/89:g1 s54:g1 s36:g1 r991/209:g1 s*:g0.25:bsuburb l1083/79:g-0.25 l1083/52:g0.5 s56:g-1 r996/51:g-1 r994/95:g-1:bsuburb s27:g-1:bardennes s27:g-0.5:bsuburb r980/79:g-0.75:bardennes s33:g-1 r1003/48:g-0.5 l935/56:g-0.25:bsuburb"
+   },
+   {
+    "t": "station",
+    "name": "Ciney"
+   },
+   {
+    "t": "leg",
+    "id": "B07",
+    "from": "Ciney",
+    "to": "Namur",
+    "length": 1735,
+    "spec": "l1003/90:g-0.25:v120:bardennes s27:g-0.25 r1519/53:g-0.75:v150:bsuburb s47:bardennes s32:g0.5 s33:g1:bsuburb s*:g1 l1005/86:g1 s56:g-1:bindustrial r1517/51:g-0.5:bsuburb r1517/54:g1:bardennes l1033/66:g0.75:v140 s110:g0.25:Bv,9,d s28:g-1:v160:bsuburb l1109/80:g-1:bardennes s60:g-1:T r1715/50:g-1:bsuburb r1715/129:g-1:bardennes l1715/108:g-0.5:bsuburb l1715/52:g0.25:bindustrial s43:g-1:bardennes r1418/56:g-1 r1418/46:g-1:bsuburb r1163/79:g-1:v130 s34:g-1:bardennes s56:g-1:bsuburb l959/100:g-0.25:bardennes:Br,11,w s28:g0.25:v80:bsuburb"
+   },
+   {
+    "t": "station",
+    "name": "Namur"
+   },
+   {
+    "t": "leg",
+    "id": "B08",
+    "from": "Namur",
+    "to": "Gembloux",
+    "length": 1006,
+    "spec": "s49:g1:v100:bsuburb r611/447:g1 s60:g0.5:v130:T:bforest s56:g1:bfarmland s28:g-1 s27:g0.5:bsuburb s26:g1:bforest s70:g0.5:X:bfarmland s49:g1 s70:g-0.75:X:bsuburb s*:g-0.5:bfarmland s60:bfarmland s27:g-0.25"
+   },
+   {
+    "t": "station",
+    "name": "Gembloux"
+   },
+   {
+    "t": "leg",
+    "id": "B09",
+    "from": "Gembloux",
+    "to": "Ottignies",
+    "length": 865,
+    "spec": "s*:g-0.5:v130:bfarmland s28:g-1 s70:X:bsuburb s86:g-0.75 r1163/513:g-1:T:bsuburb"
+   },
+   {
+    "t": "station",
+    "name": "Ottignies"
+   },
+   {
+    "t": "leg",
+    "id": "B10",
+    "from": "Ottignies",
+    "to": "Bruxelles-Luxembourg",
+    "length": 1399,
+    "spec": "s30:g0.25:v130:bfarmland s60:g0.75:T:bsuburb s51:g1:bfarmland s30:g-0.5:bsuburb s76:g-1:T s60:g-0.25:T s*:g0.75 s30:g0.5 s28:g1:bfarmland l1163/309:bsuburb s60:g-0.25:T s52:g1:bforest s28 s31:g-0.5 r1163/306:g-1 s60:g-0.5:T:bsuburb s52:g-0.25 s69:g-1:T:bsuburb s60:g-0.5:Br,6,w"
+   },
+   {
+    "t": "station",
+    "name": "Bruxelles-Luxembourg"
+   },
+   {
+    "t": "leg",
+    "id": "B11",
+    "from": "Bruxelles-Luxembourg",
+    "to": "Bruxelles-Midi",
+    "length": 700,
+    "spec": "s60:g-0.75:v50:T:bcity l380/64:g1 s60:g-1:T:bsuburb r510/105:g-1:v90 l594/138:g-0.75 s70:g-1:T s60:g-0.25:T s*:g0.75:v40 s63:v50:T:bcity s33:g-0.5:v40:bsuburb"
+   },
+   {
+    "t": "station",
+    "name": "Bruxelles-Midi"
+   }
+  ]
+ }
+}

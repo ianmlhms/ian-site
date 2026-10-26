@@ -95,4 +95,47 @@ ROUTES = {
             ("Nancy", "Nancy-Ville", 3),
         ],
     },
+    # IC 16 Luxembourg - Brussels (OSM relation 3920818: Luxembourg, Arlon, Marbehan, Libramont, Rochefort-Jemelle, Marloie, Ciney, Namur, Gembloux, Ottignies, Bruxelles-Luxembourg, Schuman, Nord, Central, Midi);
+    # Schuman / Nord / Central are underground stops of the north-south junction and are passed here (the line runs through the Brussels tunnel to Midi)
+    "brussels": {
+        "prefix": "B",
+        "first_side": "right",
+        "tiles": ["brussels"],
+        "rail_class": True,
+        "snap_gap": 8.0,                                      # dead ends within 8 m are joined (the Namur station throat has a 5.3 m mapping gap)
+        "ardennes_between": ["Arlon", "Namur"],              # forest / farmland between these stops: the 'ardennes' biome
+        "params": {"per_real": 0.06, "leg_min": 700.0, "leg_max": 3400.0},
+        "fetch": {"pbfs": ["lux", "belgium"], "box": (4.28, 49.50, 6.20, 50.90), "corridor_m": 2600},
+        "stops": [
+            ("Luxembourg", "Lëtzebuerg", 3),
+            ("Arlon", "Arlon", 2, (49.68042, 5.80953)),
+            ("Marbehan", "Marbehan", 1, (49.72742, 5.53939)),
+            ("Libramont", "Libramont", 2, (49.92024, 5.37931)),
+            ("Rochefort-Jemelle", "Jemelle", 1, (50.15998, 5.26716)),
+            ("Marloie", "Marloie", 1, (50.20250, 5.31396)),
+            ("Ciney", "Ciney", 1, (50.29138, 5.09145)),
+            ("Namur", "Namur", 3, (50.46866, 4.86253)),
+            ("Gembloux", "Gembloux", 1, (50.57018, 4.69111)),
+            ("Ottignies", "Ottignies", 2, (50.67456, 4.56856)),
+            ("Bruxelles-Luxembourg - Brussel-Luxemburg", "Bruxelles-Luxembourg", 2, (50.83820, 4.37365)),
+            ("Bruxelles-Midi - Brussel-Zuid", "Bruxelles-Midi", 3, (50.83578, 4.33605)),
+        ],
+    },
+    # TGV InOui 803B Luxembourg - Paris-Est (OSM 8536525 / 8536618): Thionville, Metz, Champagne-Ardenne TGV (Meuse TGV only some trains), LGV Est
+    "paris": {
+        "prefix": "P",
+        "first_side": "right",
+        "tiles": ["paris"],
+        "rail_class": True,
+        "highspeed_biome": True,                              # farmland / forest beside a line with maxspeed >= 200 -> 'highspeed' (the LGV look)
+        "params": {"per_real": 0.05, "leg_min": 1500.0, "leg_max": 8500.0},
+        "fetch": {"pbfs": ["lux", "lorraine", "champagne-ardenne", "picardie", "ile-de-france"], "box": (2.20, 48.80, 6.30, 49.65), "corridor_m": 2600},
+        "stops": [
+            ("Luxembourg", "Lëtzebuerg", 3),
+            ("Thionville", "Thionville", 2),
+            ("Metz", "Metz-Ville", 3),
+            ("Champagne-Ardenne TGV", "Champagne-Ardenne TGV", 2, (49.2085, 3.9890)),
+            ("Gare de l'Est", "Paris-Est", 3, (48.8767, 2.3592)),
+        ],
+    },
 }

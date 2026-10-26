@@ -76,7 +76,8 @@ def num(v):
 class RailGraph:
     """Graph of railway=rail ways (no service tracks); vertices keyed by rounded UTM coordinates (ways of the extracts share vertex coordinates)."""
 
-    def __init__(self, ways):
+    def __init__(self, ways, gap=0.0):
+        """gap (W3): dead-end nodes (one neighbour) closer than `gap` m to another node are joined too: mapping gaps of 3 - 8 m at switches (Namur station throat, 5.3 m)."""
         self.nodes = {}
         self.adj = {}
         self.way_of = {}
@@ -104,6 +105,33 @@ class RailGraph:
             if not any(v == b for v, _, _ in self.adj[a]):
                 self.adj[a].append((b, 0.5, {"t": {}, "id": "snap", "snap": True}))
                 self.adj[b].append((a, 0.5, {"t": {}, "id": "snap", "snap": True}))
+
+        if gap > SNAP:
+            comp, c = {}, 0
+            for k in self.keys:
+                if k in comp:
+                    continue
+                c += 1
+                comp[k] = c
+                stack = [k]
+                while stack:
+                    u = stack.pop()
+                    for v, _, _ in self.adj[u]:
+                        if v not in comp:
+                            comp[v] = c
+                            stack.append(v)
+            best = {}
+            for i, j in self._tree.query_pairs(gap):
+                a, b = self.keys[i], self.keys[j]
+                if comp[a] == comp[b]:
+                    continue
+                key = (min(comp[a], comp[b]), max(comp[a], comp[b]))
+                d = math.hypot(a[0] - b[0], a[1] - b[1])
+                if key not in best or d < best[key][0]:
+                    best[key] = (d, a, b)
+            for _, a, b in best.values():     # the closest pair of every two pieces that lie within `gap` of each other
+                self.adj[a].append((b, 1.0, {"t": {}, "id": "gap", "snap": True}))
+                self.adj[b].append((a, 1.0, {"t": {}, "id": "gap", "snap": True}))
 
     def nearest(self, e, n):
         d, i = self._tree.query([e, n])
