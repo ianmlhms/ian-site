@@ -24,7 +24,7 @@
     tracks: [-4.6, -9.2, -13.7, -23.3],
     shelterZ: [-20.5, -43, -100],
   };
-  reg('Oetrange', {
+  reg('Oetrange', { physical: true,
     canopy: false,
     furniture: false,
     build(api) {
@@ -70,7 +70,7 @@
    * ours on the left (patch x -1.4 .. -4.0) with the white board-and-batten waiting shelter 7 m behind it (patch x -12 .. -6.9, z -47 .. -35.7), the far one on the
    * right (x 5.7 .. 8.7) with a ticket machine and a shelter near z -53. */
   const BE = { far: { edge: 5.7, width: 3.0, z0: -95, z1: 95 }, track: -4.1 };
-  reg('Betzder', {
+  reg('Betzder', { physical: true,
     canopy: false,
     furniture: false,
     build(api) {
@@ -103,7 +103,7 @@
    * `isl` draws what stands on the island, facing the base track (x = -d); `islFar` faces the other main track. */
   const WE = { islandEdge: 1.6, islandWidth: 4.2, z0: -92.5, z1: 92.5, mid: 3.7, tracks: [-7.5, -11.7], yard: 8.1, underpassZ: 98 };
   const RED_STEEL = '#a8232e';
-  reg('Wecker', {
+  reg('Wecker', { physical: true,
     canopy: false,
     furniture: false,
     build(api) {
@@ -186,7 +186,7 @@
       vc.box(px, (yTop - br.deckH - 1.5) / 2, pz, br.width - 0.8, yTop - br.deckH + 1.5, 1.4, col('#8f8d87'), yaw);
     });
   }
-  reg('Sandweiler-Contern', {
+  reg('Sandweiler-Contern', { physical: true,
     canopy: false,
     furniture: false,
     build(api) {
@@ -225,7 +225,7 @@
   const ME_LAMPS_NEAR = [-77.6, 44.4, 73.5];
   const ME_LAMPS_FAR = [-122.6, -93.9, -52.8, -14.3, 23.8, 63.1, 100.6];
   const ME_WHITE_BLOCK = '#e9e7df';
-  reg('Mertert', {
+  reg('Mertert', { physical: true,
     canopy: false,
     furniture: false,
     build(api) {
@@ -279,7 +279,7 @@
    * sign, round clocks, orange bins, the yellow-framed name board.  The village / car-park side platform has the maroon steel-and-glass shelter at z -52 and the red / grey bike box. */
   const MA = { far: { edge: -5.6, width: 3.0, z0: -90, z1: 89 }, track: -4.2, shelterZ: -53.8, bikebox: { x: -22.7, z: -45.2 } };
   const MA_MAROON = '#6a2b3a';
-  reg('Manternach', {
+  reg('Manternach', { physical: true,
     canopy: false,
     furniture: false,
     build(api) {
@@ -326,7 +326,7 @@
    * Luxembourg end).  Across the second track (x 4.5) an island platform (x 7 .. 13.1, z -152 .. 123) with glass shelters; yard tracks further right (x 14.5, 19.2); the concrete water
    * tower (z 124, x 36) and the engine shed beside it come from the LOD2 model (style).  Forecourt, bus station and goods shed on the left. */
   const WB = { island: { edge: 7.0, width: 6.1, z0: -152, z1: 123 }, tracks: [4.5, 14.5, 19.2], shelters: [-67.7, -43.5, -37.6], bikebox: { x: -6.4, z: -150.8 } };
-  reg('Wasserbëlleg', {
+  reg('Wasserbëlleg', { physical: true,
     canopy: false,
     furniture: false,
     build(api) {
@@ -379,7 +379,7 @@
     vc.box(x, FORM_Y + y + 1.4, z, 3.0, 2.8, 6.0, col('#e3e5e6'));
     vc.box(x, FORM_Y + y + 3.05, z, 3.5, 0.35, 6.6, col('#6b2f7a'));
   }
-  reg('Cents-Hamm', {
+  reg('Cents-Hamm', { physical: true,
     canopy: false,
     furniture: false,
     build(api) {

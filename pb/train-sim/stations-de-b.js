@@ -53,7 +53,7 @@
    * old station building (cream plaster, dark tiles, red video-travel-centre mural) stands behind the house platform on the RIGHT (x 5.6 .. 9.8, track at x 4.4 in between, z -72 .. 94).  The game platform
    * (declared side right) is drawn as one wide platform from the game track to the building; the island is drawn by this model. */
   const SCH = { island: { edge: EDGE, width: 5.8, z0: -94, z1: 94 }, track: 8.7, wallAt: 13.0 };
-  reg('Schweich', {
+  reg('Schweich', { physical: true,
     canopy: false,
     furniture: false,
     build(api) {
@@ -125,7 +125,7 @@
     trackG3: 9.0, trackG4: 17.7, far: { edge: 19.2, width: 6.1, z0: -39, z1: 103 },
     houseCanopy: { lHi: 8.2, lLo: 5.4, z0: -9, z1: 13 },
   };
-  reg('Wittlich', {
+  reg('Wittlich', { physical: true,
     canopy: false,
     furniture: false,
     build(api) {
@@ -173,7 +173,7 @@
    * concrete canopy runs from the building along the platform, a concrete box shelter stands ahead of it; track 2 at x -4.2 and the platform of tracks 2 / 3 (x -6.3 .. -14.5, z -88 .. 105) with two
    * concrete box shelters lie on the LEFT. */
   const HE = { track: 4.2, far: { edge: 6.1, width: 8.0, z0: -88, z1: 105 } };
-  reg('Hetzerath', {
+  reg('Hetzerath', { physical: true,
     canopy: false,
     furniture: false,
     build(api) {
@@ -230,7 +230,7 @@
   /* ================================================================ FÖHREN (no reference photo on Commons: built from the patch, DB standard furniture)
    * Patch: the game track (x 0) runs along the platform on the LEFT (x -0.8 .. -7.7, z -96 .. 96), second track at x 3.5, platform on the RIGHT (x 5.1 .. 10.9, z -76 .. 94); the ticket machine
    * and a shelter stand on the left platform at z 37, a shelter on the right platform at z 35.  No station building (houses of the village far behind on the left). */
-  reg('Föhren', {
+  reg('Föhren', { physical: true,
     canopy: false,
     furniture: false,
     build(api) {
@@ -243,7 +243,7 @@
 
   /* ================================================================ SEHLEM (no reference photo on Commons: built from the patch, DB standard furniture)
    * Patch: game track x 0, platform on the LEFT (x -2.1 .. -9.0, z -90 .. 78, shelter at z 18), second track at x 3.4, platform on the RIGHT (x 4.8 .. 11.2, z -90 .. 90, shelter at z 19). */
-  reg('Sehlem', {
+  reg('Sehlem', { physical: true,
     canopy: false,
     furniture: false,
     build(api) {
@@ -257,7 +257,7 @@
   /* ================================================================ SALMTAL (no reference photo on Commons: built from the patch, DB standard furniture)
    * Patch: game track x 0, platform on the LEFT (x -1.6 .. -12.5, z -70 .. 69; wide at the bus stop, shelters at z 24 and 40, ticket machine z 35), second track at x 3.2, platform on the
    * RIGHT (x 5 .. 14.2, z -70 .. 70, shelter at z 29); a building spans the tracks at z 53 .. 66 (generic surroundings, unchanged). */
-  reg('Salmtal', {
+  reg('Salmtal', { physical: true,
     canopy: false,
     furniture: false,
     build(api) {
@@ -273,7 +273,7 @@
    * Patch: the platform (x 1.4 .. ~8, z -76 .. 76) lies on the RIGHT of the game track and has the only used track on its other side (x 9.5, drawn here); the Art-Nouveau building stands on the LEFT at the
    * Wasserbillig end behind the Leoplatz road.  The declared side (SIDE_FIX) was changed from 'left' to 'right' to match the platform that really touches the game track.  Long flat brown timber-ceilinged
    * canopy on steel posts over the middle of the platform, DB plates, masts, ticket machine and glass shelter. */
-  reg('Tréier Süd', {
+  reg('Tréier Süd', { physical: true,
     canopy: false,
     furniture: false,
     build(api) {
@@ -295,7 +295,7 @@
   /* ================================================================ KREUZ KONZ (no usable reference photo: the Commons photos found for 'Konz' show the other Konz stations; built from the patch, DB standard furniture)
    * Patch: game track x 0, one side platform on the LEFT (x -1.2 .. -6.8, z -91 .. 64) with a shelter at z -16; the platform of the diverging Saar line curves away on the left (x -3 .. -29, z 2 .. 91;
    * not modelled, the generic surroundings show the relief).  No station building. */
-  reg('Kreuz Konz', {
+  reg('Kreuz Konz', { physical: true,
     canopy: false,
     furniture: false,
     build(api) {

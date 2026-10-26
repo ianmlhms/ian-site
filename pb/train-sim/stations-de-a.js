@@ -44,7 +44,7 @@
    * platform on the far side (x 6.1 .. ~10, z -92 .. -25) that is part of the island towards a third track at x ~15.  The old station building (white gable houses, slate roofs, brick wing)
    * stands 20 m behind the left platform at z -116 .. -67 beside the Trierer Strasse; a blue-roofed glass waiting shelter and the ticket machine stand in front of it on the platform. */
   const IG = { far: { edge: 6.1, width: 4.2, z0: -92, z1: -25 }, track: 4.5, third: 15.0 };
-  reg('Igel', {
+  reg('Igel', { physical: true,
     canopy: false,
     furniture: false,
     build(api) {
@@ -114,7 +114,7 @@
    * station building.  Two tracks (game track x 0, second track x 4.0) cross the Hermeskeiler Strasse level crossing at z ~0; staggered low concrete platforms: Gleis 1 on the LEFT behind
    * the crossing (patch x -4.0 .. -1.0, z 23 .. 193), Gleis 2 on the right beyond it (x 6.6 .. 9.9, z -193 .. -22) with a small dark glass shelter, a display case, a red/white "2" sign and
    * grey LED masts; the crossing end of the platforms is closed by a concrete wall.  Beside the crossing: the shop at x -14 .. -5.5 (z -30 .. -11), a cream apartment block behind the far platform. */
-  reg('Tréier-Zewen', {
+  reg('Tréier-Zewen', { physical: true,
     canopy: false,
     furniture: false,
     build(api) {
@@ -131,7 +131,7 @@
    * (the finished stop has none on Commons): the same staggered pair of low concrete platforms as Zewen around a level crossing at z ~0, i.e. Gleis 1 on the LEFT behind the crossing
    * (patch x -3.8 .. -1.2, z 20 .. 191) and Gleis 2 on the right beyond it (x 5.3 .. 8.3, z -191 .. -20); second track at x 4.0.  Furniture follows the Zewen / Pallien photos (DB standard):
    * no reference photo of the finished stop. */
-  reg('Tréier-Euren', {
+  reg('Tréier-Euren', { physical: true,
     canopy: false,
     furniture: false,
     build(api) {
@@ -148,7 +148,7 @@
    * Blick zum ehemaligen Bahnhof 2021, Trier-westbahnhof, Bhf-Trier-West; old b/w photos ignored).  Three tracks (game track x 0 at the RIGHT platform, the through track x -5.5, the left platform track
    * x -9.8) between two long side platforms of pale concrete (patch x 1.4 .. 4.2 and x -14.2 .. -11.4, z -85 .. 85) with ramps / steps at z ~17 and short glass shelters at z 15 / 32; the old two-block station
    * building (patch x 8 .. 22, z -62 .. -22, LoD2 + style) stands behind the right platform. */
-  reg('Tréier West', {
+  reg('Tréier West', { physical: true,
     canopy: false,
     furniture: false,
     build(api) {
@@ -165,7 +165,7 @@
    * Bahnhaltepunkts Trier Pallien 20241109").  Two tracks (game track x 0, second track x 3.6) squeezed between the road on the LEFT and the river path on the right.  The game platform is the narrow
    * road-side strip (patch x -3.3 .. -1.4, white railing towards the road); the river-side platform (patch x 5.7 .. ~9.7, wider than the OSM polygon, photos show ~4 m) carries the white flat-roofed
    * shelter with ticket machine and display case, white railings.  Light-grey LED masts, DB info columns; no station building. */
-  reg('Tréier-Pallien', {
+  reg('Tréier-Pallien', { physical: true,
     canopy: false,
     furniture: false,
     build(api) {
@@ -188,7 +188,7 @@
   function noiseWall(k, api, x, z0, z1) {
     k.vc.box(k.X(api.sx * x), api.FORM_Y + 1.7, (z0 + z1) / 2, 0.25, 3.4, z1 - z0, api.col(NOISE_WALL));
   }
-  reg('Tréier Hafestrooss', {
+  reg('Tréier Hafestrooss', { physical: true,
     canopy: false,
     furniture: false,
     build(api) {
@@ -217,7 +217,7 @@
    * Built from the patch only: staggered side platforms like Zewen (left one behind the middle at x -8.3 .. -1.8, z 13 .. 153, with the OSM shelter + ticket machine at z ~48; right one beyond it
    * at x 6.2 .. 9.2, z -153 .. -12, shelter at z -50, widening to x 11.8 at the stair), second track x 4.0; no station building; DB standard furniture (pale concrete platforms, glass shelters,
    * LED masts, info columns). */
-  reg('Ehrang Ort', {
+  reg('Ehrang Ort', { physical: true,
     canopy: false,
     furniture: false,
     build(api) {
@@ -235,7 +235,7 @@
    * Refs: ~/Library/Caches/zuch-refs/Quint (Commons: "Trier, Haltepunkt Quint 20141101", "Haltepunkt Quint").  A small old halt in a wooded valley: ISLAND platform of grey slabs with a white edge line between the game
    * track (x 0) and the second track (x ~9.6) (patch x 1.3 .. 9.1, z -78 .. 78), tall white LED masts and blue "1 | 2" platform cubes on the centre line, a small shelter, a steel stair with railings at the end
    * of the platform up to the road; behind the slope (patch x 22 .. 35, z 22 .. 46) the derelict old station building: slate-clad gable with a dormer window, boarded windows, slate roof. */
-  reg('Quint', {
+  reg('Quint', { physical: true,
     canopy: false,
     furniture: false,
     fence: false,

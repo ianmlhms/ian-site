@@ -1993,7 +1993,24 @@
         };
         api.helpers = Object.assign({ addBuilding, addPyramid, addFence, addBench, addLampPost, textQuad, facadeTexture, signTexture, clockMat, canvasTex, addTrainShed, buildGare, buildModern, addBufferStop, stopTexture },
           isTram ? {} : railHelpers(api), isTram ? {} : bridgeHelpers(api));
+        /* A model that is written in the frame of the station PATCH (physical world, forward direction: `physical: true` in its reg()) is built as seen from the forward
+           service, then rotated half a turn about the station's vertical axis when the track runs the other way (x -> -x, z -> -z), so it stands where the real thing
+           does for a reversed service too (the patch itself is placed by the base track's frames). */
+        const flipModel = !!(real.physical && track.reverse && track.base && track.base.stations);
+        const snap = new Map();
+        if (flipModel) {
+          const bst = track.base.stations[track.base.stations.length - 1 - idx];
+          const sxF = bst && bst.side === 'right' ? 1 : -1;
+          api.sx = sxF; api.pf = (lat) => off + sxF * lat;
+          sets.map.forEach((e, key) => snap.set(key, e.batch.n));
+        }
         real.build(api);
+        if (flipModel) {
+          sets.map.forEach((e, key) => {
+            const b = e.batch;
+            for (let i = snap.get(key) || 0; i < b.n; i++) { b.pos[i * 3] = -b.pos[i * 3]; b.pos[i * 3 + 2] = -b.pos[i * 3 + 2]; b.nor[i * 3] = -b.nor[i * 3]; b.nor[i * 3 + 2] = -b.nor[i * 3 + 2]; }
+          });
+        }
         if (!isTram) {
           try { finishStationRail(api); } catch (err) { console.warn('[Lokféierer] station tracks failed', st.name, err); }
           extra.bridgeEnds = api.bridges || [];

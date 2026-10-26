@@ -13,7 +13,7 @@
   /* ================================================================ ROODT (Roodt-sur-Syre)
    * Refs: ~/Library/Caches/zuch-refs/Roodt (Commons: Betzdorf, gare CFL Roodt (102)-(122)).  Platform on the left (Luxembourg-Wasserbëlleg direction), building
    * behind it at patch z 10 .. 36, goods shed z -63 .. -50, toilet hut z -26 .. -20, red CFL bike box on the forecourt, opposite side platform with a shelter. */
-  reg('Roodt-Syr', {
+  reg('Roodt-Syr', { physical: true,
     canopy: false,
     furniture: false,
     build(api) {
