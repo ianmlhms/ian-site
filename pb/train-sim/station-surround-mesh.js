@@ -320,7 +320,7 @@
         if (b.station) {
           /* the real station building from its LOD2 faces, painted from the station's style (station-building.js); without a style the station model draws it */
           const style = TS.stationStyles && TS.stationStyles.get(patch.name);
-          if (style && TS.stationBuilding) {
+          if (style && style.useLod2 !== false && TS.stationBuilding) {
             try { TS.stationBuilding.build({ T, b, style, world, group, disposables, triangulate3, MB, roofTexture, stats }); stats.buildings += 1; } catch (error) { console.warn('[Lokféierer] station building of ' + patch.name + ' failed', error); }
           }
           return;
@@ -328,6 +328,7 @@
         const gx = b.ground && b.ground.length ? b.ground.reduce((s, p) => s + p[0], 0) / b.ground.length : 0;
         if (Math.abs(gx) > stripW - BUILDING_MARGIN) return;
         const sty = TS.stationStyles && TS.stationStyles.get(patch.name);
+        if (sty && sty.skipIds && sty.skipIds.includes(b.id)) return;
         if (sty && sty.others && sty.others[b.id] && TS.stationBuilding) {
           /* a building of the station area that the photos show (goods shed, toilet hut ...): painted from its own style entry */
           try { TS.stationBuilding.build({ T, b, style: Object.assign({}, sty.otherBase || {}, sty.others[b.id], { doors: sty.others[b.id].doors || [], extras: sty.others[b.id].extras || null }), world, group, disposables, triangulate3, MB, roofTexture, stats }); stats.buildings += 1; return; } catch (error) { console.warn('[Lokféierer] station-area building ' + b.id + ' failed', error); }

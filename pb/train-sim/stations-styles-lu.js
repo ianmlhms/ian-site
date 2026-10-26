@@ -50,10 +50,18 @@
    * green copper spire; the real LOD2 model (667 roof faces) gives the volumes. */
   reg('Lëtzebuerg', {
     wall: '#d8c093', trim: '#c4a876', plinth: { h: 1.3, col: '#8b7d62' }, band: '#c9ae7c', roof: 'slate', roofTint: '#7d8288',
-    steepRoof: { kind: 'slate', tint: '#585d63' }, copperAbove: 24, copperTint: '#5f9d8a',
+    steepRoof: { kind: 'slate', tint: '#585d63' }, copperAbove: 28, copperTint: '#5f9d8a',
     floorH: 4.4, bayM: 4.2, stain: true,
-    win: { w: 1.5, h: 2.7, kind: 'arch', frame: '#efe9dc', reveal: '#bfa570', sill: true, groundKind: 'arch' },
+    win: { w: 1.25, h: 2.3, kind: 'rect', frame: '#efe9dc', reveal: '#b99d68', sill: true },
     gableWin: 'round',
     doors: [],
+    others: { w362239328: { noWalls: true, roof: 'zinc', roofTint: '#c9d3da', noWindows: true } },   // the glass-and-steel platform canopies (LOD2 holds them as one flat roof building)
+  });
+
+  /* BETZDER (Betzdorf).  Refs: Commons "Betzdorf, gare CFL Betzdorf (101)-(105)" (Feb 2025).  No station building any more; the LOD2 hut behind the platform is the old white
+   * timber waiting shelter: board-and-batten walls painted white, white-framed glazing bars, open arched bay, brown-grey tiled gable roof, brick paving in front. */
+  reg('Betzder', {
+    wall: '#ece9df', trim: '#f2efe6', plinth: { h: 0.35, col: '#b9b2a2' }, roof: 'tile', roofTint: '#8d8478', floorH: 3.6, bayM: 2.3, stain: true, boards: true,
+    win: { w: 1.1, h: 1.55, kind: 'rect', frame: '#f6f4ee', reveal: '#f1eee5', sill: false },
   });
 })();

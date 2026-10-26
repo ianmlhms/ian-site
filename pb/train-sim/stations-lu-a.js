@@ -565,12 +565,14 @@
     }
 
     // ---- layout (z: + = behind, - = ahead; the train drives to -z)
-    wing(-40, 70, WALL, WALL + 12, eY);
-    // low service annex that closes the platform wall towards the buffer end
-    annex(70, 108, WALL, WALL + 9, 7.6);
-    hall(-72, -50, WALL, WALL + 26, 19.5, 28);
-    wing(-106, -72, WALL, WALL + 13, eY + 0.5);
-    tower(WALL + 11, -45, 8.4);
+    if (!(window.TS.stationStyles && window.TS.stationStyles.has(api.st.name))) {   // the real LOD2 building (stations-styles-lu.js) replaces the hand-built block
+      wing(-40, 70, WALL, WALL + 12, eY);
+      // low service annex that closes the platform wall towards the buffer end
+      annex(70, 108, WALL, WALL + 9, 7.6);
+      hall(-72, -50, WALL, WALL + 26, 19.5, 28);
+      wing(-106, -72, WALL, WALL + 13, eY + 0.5);
+      tower(WALL + 11, -45, 8.4);
+    }
     // central mid block between the tower and the left wing (low) and entrance canopy on the street side (stone portal)
     k.box(vc, WALL + 27.5, 3.6, -61, 3.0, 0.3, 16, dark);
     [-67, -61, -55].forEach((z) => k.box(vc, WALL + 26.4, 1.7, z, 0.3, 4.2, 0.3, dark));

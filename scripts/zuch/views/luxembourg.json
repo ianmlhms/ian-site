@@ -1,0 +1,11 @@
+{
+  "route": "wittlich", "station": "Lëtzebuerg", "refs": "Lux-Gare",
+  "views": [
+    { "photo": "Luxembourg City railway station 2022-12 ---1.jpg", "pos": [-105, 20, 2.5], "look": [-42, -23, 20], "fov": 60, "note": "front, tower" },
+    { "photo": "Luxembourg City railway station 2022-12 ---2.jpg", "pos": [-78, -4, 2.5], "look": [-42, -23, 24], "fov": 52, "note": "tower close" },
+    { "photo": "Luxembourg, Gare centrale - Grande vitesse (101).jpg", "pos": [-1.0, 50, 1.8], "look": [-6, -60, 3.5], "fov": 62, "note": "platform 1 wall" },
+    { "photo": "CFL Class 2000 CFL 2007 in Gare Centrale, Luxembourg.jpg", "pos": [-4, 30, 1.8], "look": [-6, -60, 4], "fov": 62, "note": "platform canopy" },
+    { "photo": "Luxembourg, Gare centrale tram stop (104).jpg", "pos": [-100, 70, 2.5], "look": [-45, -20, 12], "fov": 62, "note": "forecourt wing" },
+    { "photo": "Luxembourg, Hall Gare centrale (101).jpg", "pos": [-30, 0, 2.0], "look": [-45, -10, 6], "fov": 70, "note": "hall" }
+  ]
+}
