@@ -18,6 +18,7 @@ import { createRain, createLeaves, createShafts, createBirds, createInsects } fr
 import { createHikers } from './hikers.js';
 import { SCHIESSENTUEMPEL } from './landmarks.js';
 import { buildBridge } from './bridge-model.js';
+import { buildCascadeModel } from './cascade-model.js';
 import { createSolidMaterial } from './solid-material.js';
 import { createTerrainView } from './terrain-view.js';
 import { createForestView } from './forest-view.js';
@@ -157,7 +158,12 @@ async function boot() {
     wood.position.set(bridge.x, bridge.water, bridge.z); wood.rotation.y = bridge.yaw; wood.frustumCulled = false; wood.name = 'footbridge railing';
     scene.add(wood);
   }
-  const water = createWaterView({ scene, network: field.network, env, quality, foamTexture: textures.foam });
+  if (world.cascade) {                                                  // the Schiessentuempel ledge: sandstone solid with mossy boulders, stones in the pool (the falls and the water are water-view's)
+    const c = world.cascade, parts = buildCascadeModel(c, surface);
+    rockView.addLandmark(parts.ledge, c.x, c.lipY, c.z, c.yaw, 0.6, 3.4);
+    rockView.addLandmark(parts.stones, c.x, c.lipY, c.z, c.yaw, 0.5, 3.7);
+  }
+  const water = createWaterView({ scene, network: field.network, env, quality, foamTexture: textures.foam, cascade: world.cascade });
   const props = createProps({ scene, env, surface, trails, decks });
   const riderLook = () => { const s = settingsOf(progress); void s; return { bike: progress.bk || 'hardtail', frame: COLOUR_HEX[progress.col] || COLOUR_HEX.red, helmet: HELMET_HEX[progress.hm] || HELMET_HEX.plain }; };
   let rider = createRider(env, riderLook());
@@ -621,7 +627,7 @@ async function boot() {
   document.documentElement.dataset.mtbReady = '1';
 
   window.__mtb = {
-    version: 'w3-play', renderer, scene, camera, field, surface, ground, groundAt, env, terrain, forest, trees, undergrowth, rocks, rockView, water, rider, rain, leaves, shafts, birds, insects, hikers, world, maps, bridge, quality, perf, data,
+    version: 'w3-play', renderer, scene, camera, field, surface, ground, groundAt, env, cascade: world.cascade, terrain, forest, trees, undergrowth, rocks, rockView, water, rider, rain, leaves, shafts, birds, insects, hikers, world, maps, bridge, quality, perf, data,
     game, ui, input, audio, props, trails, viewpoints, persistence, dailyToday, menuData,
     get trail() { return current.trail; }, get kind() { return current.kind; }, get centre() { return current.trail.centre; },
     get bike() { return bike; }, get progress() { return progress; },

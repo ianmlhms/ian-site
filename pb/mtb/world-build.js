@@ -10,6 +10,9 @@ import { createUndergrowthIndex } from './undergrowth.js';
 import { createRockIndex, createSampleIndex } from './rocks.js';
 import { attachCascades } from './landmarks.js';
 import { findFalls } from './water.js';
+import { placeCascade, cascadeCollide } from './cascade.js';
+
+const CASCADE_OWN_RADIUS = 14;       // m: a fall this close to the Schiessentümpel ledge is the ledge itself (cascade.js poured its own falls)
 
 export const RIDDEN_KINDS = Object.freeze(['trail', 'path', 'track']);
 
@@ -28,7 +31,9 @@ export function buildPureWorld(data) {
   const undergrowth = createUndergrowthIndex({ map: maps, surface, clearance, trees, ridden });
   const walkable = createSampleIndex(field.network, ['trail', 'path']);
   const brooks = createSampleIndex(field.network, ['stream', 'river', 'ditch'], (kind) => WAY_KINDS[kind].halfWidth);
-  const falls = findFalls(field.network);
+  const cascade = placeCascade(field.network, surface);                  // the Schiessentümpel ledge with its parallel falls (null when the river is missing from the data)
+  const allFalls = findFalls(field.network);
+  const falls = cascade ? allFalls.map((f) => (Math.hypot(f.x - cascade.x, f.z - cascade.z) < CASCADE_OWN_RADIUS ? { ...f, bankOnly: true } : f)) : allFalls;      // (the boulders of the lip and the pool are the ledge model's; the strewn bank boulders stay)
   const rocks = createRockIndex({ map: maps, surface, clearance, ways: walkable, ridden, streams: brooks, falls });
-  return { ridden, ways, streams, trailWays, field, surface, groundAt, clearance, maps, trees, undergrowth, rocks, walkable, brooks, falls };
+  return { ridden, ways, streams, trailWays, field, surface, groundAt, clearance, maps, trees, undergrowth, rocks, walkable, brooks, falls, cascade };
 }

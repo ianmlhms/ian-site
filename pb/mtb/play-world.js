@@ -3,6 +3,7 @@
 import { buildPureWorld } from './world-build.js';
 import { buildDecks, landmarkDeck, createGround } from './decks.js';
 import { placeBridge } from './landmarks.js';
+import { cascadeCollide } from './cascade.js';
 import { groundResolver, createBikeState } from './bike.js';
 import { sampleWorldMap } from './world-map.js';
 import { BIKES, PLAY } from './config.js';
@@ -28,6 +29,8 @@ export function buildPlayWorld(data) {
   const hitA = { nx: 0, nz: 0, pen: 0 }, hitB = { nx: 0, nz: 0, pen: 0 };
   const collide = (x, z, r, y, out) => {
     const a = world.trees.collide(x, z, r, out);
+    const wall = cascadeCollide(world.cascade, x, z, r, y, hitB);              // nobody rides up or down the Schiessentuempel falls (the carved channel there is inside the ledge)
+    if (wall && (!a || wall.pen > a.pen)) { out.nx = wall.nx; out.nz = wall.nz; out.pen = wall.pen; return out; }
     if (world.clearance(x, z) > ROCK_PATH_CLEARANCE) return a;
     const b = world.rocks.collide(x, z, r, y, hitB);
     if (b && (!a || b.pen > a.pen)) { out.nx = b.nx; out.nz = b.nz; out.pen = b.pen; return out; }
