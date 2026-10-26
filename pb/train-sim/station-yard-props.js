@@ -15,6 +15,8 @@
 
   function build(o) {
     const { patch, data, world, track, MB, signs, railPlatforms, platTop, add, mat, canvasTexture, signTexture, inRing, style } = o;
+    const solid = o.solid || new MB();          // vertex-coloured boxes (benches, vehicles) share the mesh of the canopy columns when the yard passes it
+    const ownSolid = !o.solid;
     const Y = style.yard || {};
     const voie = Y.voie || {};
 
@@ -28,34 +30,44 @@
         if (!groups.has(label)) groups.set(label, []);
         groups.get(label).push({ s, ang });
       });
-      groups.forEach((list, label) => {
+      /* all the labels in one texture (one label per row) and one mesh */
+      const labels = Array.from(groups.keys());
+      if (labels.length) {
+        const SW = 256; const SH = 96;
+        const cv = document.createElement('canvas'); cv.width = SW; cv.height = SH * labels.length;
+        const cg = cv.getContext('2d');
+        labels.forEach((label, k) => { cg.drawImage(signTexture(label).image, 0, k * SH); });
+        const tex = new T.CanvasTexture(cv); tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = 8;
         const mb = new MB();
-        list.forEach(({ s, ang }) => {
-          const dx = Math.sin(ang); const dz = Math.cos(ang);     // forward direction in world xz (towards -z of the patch)
-          const px = -dz; const pz = dx;                          // perpendicular
-          [1, -1].forEach((side) => {
-            const cx = s.w.x + dx * 0.22 * side; const cz = s.w.z + dz * 0.22 * side; const y = s.y;
-            const hx = px * SIGN_W / 2; const hz = pz * SIGN_W / 2;
-            const nx = dx * side; const nz = dz * side;
-            const a = mb.vert(cx - hx, y - SIGN_H / 2, cz - hz, nx, 0, nz, [1, 1, 1], side > 0 ? 0 : 1, 0);
-            const b = mb.vert(cx + hx, y - SIGN_H / 2, cz + hz, nx, 0, nz, [1, 1, 1], side > 0 ? 1 : 0, 0);
-            const c = mb.vert(cx + hx, y + SIGN_H / 2, cz + hz, nx, 0, nz, [1, 1, 1], side > 0 ? 1 : 0, 1);
-            const d = mb.vert(cx - hx, y + SIGN_H / 2, cz - hz, nx, 0, nz, [1, 1, 1], side > 0 ? 0 : 1, 1);
-            mb.i.push(a, b, c, a, c, d);
+        labels.forEach((label, k) => {
+          const v0 = 1 - (k + 1) / labels.length; const vh = 1 / labels.length;
+          groups.get(label).forEach(({ s, ang }) => {
+            const dx = Math.sin(ang); const dz = Math.cos(ang);     // forward direction in world xz (towards -z of the patch)
+            const px = -dz; const pz = dx;                          // perpendicular
+            [1, -1].forEach((side) => {
+              const cx = s.w.x + dx * 0.22 * side; const cz = s.w.z + dz * 0.22 * side; const y = s.y;
+              const hx = px * SIGN_W / 2; const hz = pz * SIGN_W / 2;
+              const nx = dx * side; const nz = dz * side;
+              const ul = side > 0 ? 0 : 1; const ur = side > 0 ? 1 : 0;
+              const a = mb.vert(cx - hx, y - SIGN_H / 2, cz - hz, nx, 0, nz, [1, 1, 1], ul, v0);
+              const b = mb.vert(cx + hx, y - SIGN_H / 2, cz + hz, nx, 0, nz, [1, 1, 1], ur, v0);
+              const c = mb.vert(cx + hx, y + SIGN_H / 2, cz + hz, nx, 0, nz, [1, 1, 1], ur, v0 + vh);
+              const d = mb.vert(cx - hx, y + SIGN_H / 2, cz - hz, nx, 0, nz, [1, 1, 1], ul, v0 + vh);
+              mb.i.push(a, b, c, a, c, d);
+            });
           });
         });
         if (!mb.empty) {
-          const tex = signTexture(label);
-          const m = mat(new T.MeshLambertMaterial({ map: tex, side: T.DoubleSide, emissive: 0x16305c }));
           tex.wrapS = tex.wrapT = T.ClampToEdgeWrapping;
-          add(new T.Mesh(mb.geometry(), m));
+          add(new T.Mesh(mb.geometry(), mat(new T.MeshLambertMaterial({ map: tex, side: T.DoubleSide, emissive: 0x16305c }))));
+          o.disposables.push(tex);
         }
-      });
+      }
     }
 
     /* ---- benches (steel, perforated) on the platforms, facing the tracks on both sides of the platform centre line */
     {
-      const mb = new MB();
+      const mb = solid;
       const STEEL = [0.25, 0.27, 0.3]; const LEG = [0.1, 0.11, 0.12];
       railPlatforms.forEach((p) => {
         const xs = p.ring.map((q) => q[0]); const zs = p.ring.map((q) => q[1]);
@@ -70,12 +82,11 @@
           at(0, 0.45, 0.5, 0.06, 1.8, STEEL); at(0.25, 0.8, 0.06, 0.42, 1.8, STEEL); at(0, 0.22, 0.4, 0.44, 0.12, LEG); at(0, 0.22, 0.4, 0.44, 0.12, LEG);
         }
       });
-      if (!mb.empty) add(new T.Mesh(mb.geometry(), mat(new T.MeshLambertMaterial({ vertexColors: true }))), true);
     }
 
     /* ---- the Luxtram at its stop and buses at the bus stops */
     {
-      const mb = new MB();
+      const mb = solid;
       const SILVER = [0.42, 0.44, 0.47]; const DARK = [0.02, 0.03, 0.04]; const GREY = [0.16, 0.17, 0.19]; const RED = [0.45, 0.04, 0.04]; const WHITE = [0.7, 0.7, 0.69]; const GREEN = [0.25, 0.5, 0.04];
       const yawAt = (x, z) => { const a = world(x, z); const b = world(x, z - 1); return Math.atan2(-(b.x - a.x), -(b.z - a.z)); };
       /* a vehicle along the track direction: parts = [dz offset, length, width, y0, y1, colour] */
@@ -104,8 +115,8 @@
         const bw = world(p.x + 3.0, p.z); const gy = track.terrainHeightAt(bw.x, bw.z) + 0.2;
         vehicle(p.x + 3.0, p.z, yaw, [[0, BUS_LEN, 2.55, 0.35, 3.0, RED], [0, BUS_LEN + 0.02, 2.57, 1.0, 2.2, DARK], [0, BUS_LEN - 0.4, 2.2, 3.0, 3.2, WHITE]], gy);
       });
-      if (!mb.empty) add(new T.Mesh(mb.geometry(), mat(new T.MeshLambertMaterial({ vertexColors: true }))), true);
     }
+    if (ownSolid && !solid.empty) add(new T.Mesh(solid.geometry(), mat(new T.MeshLambertMaterial({ vertexColors: true }))), true);
     void canvasTexture;
   }
 

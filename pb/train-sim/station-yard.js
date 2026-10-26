@@ -292,9 +292,10 @@
           cols.box(w.x, gy + h / 2, w.z, 0.3, h, 0.3, dark);
         }
       }
-      if (!cols.empty) add(new T.Mesh(cols.geometry(), mat(new T.MeshLambertMaterial({ vertexColors: true }))), true);
       stats.yardColumns = cols.i.length / 36;
-      if (TS.stationYardProps) TS.stationYardProps.build(Object.assign({}, o, { signs, railPlatforms, platTop, add, mat, canvasTexture, signTexture, inRing, rowsOf, resample }));
+      /* the columns share one mesh with the benches and vehicles of the props (one material, one draw) */
+      if (TS.stationYardProps) TS.stationYardProps.build(Object.assign({}, o, { signs, railPlatforms, platTop, add, mat, canvasTexture, signTexture, inRing, rowsOf, resample, solid: cols }));
+      if (!cols.empty) add(new T.Mesh(cols.geometry(), mat(new T.MeshLambertMaterial({ vertexColors: true }))), true);
     }
 
     /* ---- the Luxtram tracks of the forecourt: rails flush in a paved bed */

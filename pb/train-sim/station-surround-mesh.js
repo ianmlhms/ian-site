@@ -333,7 +333,11 @@
     const frame = (s) => {
       const key = Math.round(s * 4);
       let f = frameCache.get(key);
-      if (!f) { const r = track.frameAt(clamp(s, 0, track.length)); const tl = Math.hypot(r.tangent.x, r.tangent.z) || 1; f = { x: r.pos.x, y: r.pos.y - dropN, z: r.pos.z, rx: r.right.x, rz: r.right.z, tx: r.tangent.x / tl, tz: r.tangent.z / tl }; frameCache.set(key, f); }
+      if (!f) {
+        // beyond either end of the track (a terminus station: the patch reaches 320 m behind the platforms) the frame continues straight along the end tangent instead of collapsing onto the end point
+        const sc = clamp(s, 0, track.length); const r = track.frameAt(sc); const tl = Math.hypot(r.tangent.x, r.tangent.z) || 1; const tx = r.tangent.x / tl; const tz = r.tangent.z / tl; const over = s - sc;
+        f = { x: r.pos.x + tx * over, y: r.pos.y - dropN, z: r.pos.z + tz * over, rx: r.right.x, rz: r.right.z, tx, tz }; frameCache.set(key, f);
+      }
       return f;
     };
     /* patch (x lateral, z along backwards) -> world */
@@ -384,6 +388,8 @@
       const walls = {}; const roofs = {};
       const wallMB = (name) => walls[name] || (walls[name] = new MB());
       const roofMB = (name) => roofs[name] || (roofs[name] = new MB());
+      /* the painted LOD2 faces of the station building and of the styled buildings are batched into texture atlases + a few meshes (W2e: 657 single-face meshes -> a handful of draws) */
+      const batch = TS.stationBuilding && TS.stationBuilding.newBatch ? TS.stationBuilding.newBatch({ T, group, disposables, stats, MB }) : null;
       /* the station building of a station with a photo model is drawn by the model; a station of the OSM-layout kind (stations-osm.js) has none, so its real (LOD2) station building is drawn here */
       const stationSpec = TS.realStations && TS.realStations.get(patch.name);
       const drawStationBuilding = !!(stationSpec && stationSpec.osm) || !!TS.debugStationLod2;   // TS.debugStationLod2 (scripts/zuch/station_top.mjs): the LOD2 station building next to the photo model, to check its side and position
@@ -397,7 +403,7 @@
           /* the real station building from its LOD2 faces, painted from the station's style (station-building.js); without a style the station model draws it */
           const style = TS.stationStyles && TS.stationStyles.get(patch.name);
           if (style && style.useLod2 !== false && TS.stationBuilding) {
-            try { TS.stationBuilding.build({ T, b, style, world, rotN, group, disposables, triangulate3, MB, roofTexture, stats }); stats.buildings += 1; } catch (error) { console.warn('[Lokféierer] station building of ' + patch.name + ' failed', error); }
+            try { TS.stationBuilding.build({ T, b, style, world, rotN, group, disposables, triangulate3, MB, roofTexture, stats, batch }); stats.buildings += 1; } catch (error) { console.warn('[Lokféierer] station building of ' + patch.name + ' failed', error); }
             return;
           }
           if (!drawStationBuilding) return;
@@ -409,7 +415,7 @@
         if (sty && sty.skipIds && sty.skipIds.includes(b.id)) return;
         if (sty && sty.others && sty.others[b.id] && TS.stationBuilding) {
           /* a building of the station area that the photos show (goods shed, toilet hut ...): painted from its own style entry */
-          try { TS.stationBuilding.build({ T, b, style: Object.assign({}, sty.otherBase || {}, sty.others[b.id], { doors: sty.others[b.id].doors || [], extras: sty.others[b.id].extras || null }), world, rotN, group, disposables, triangulate3, MB, roofTexture, stats }); stats.buildings += 1; return; } catch (error) { console.warn('[Lokféierer] station-area building ' + b.id + ' failed', error); }
+          try { TS.stationBuilding.build({ T, b, style: Object.assign({}, sty.otherBase || {}, sty.others[b.id], { doors: sty.others[b.id].doors || [], extras: sty.others[b.id].extras || null }), world, rotN, group, disposables, triangulate3, MB, roofTexture, stats, batch }); stats.buildings += 1; return; } catch (error) { console.warn('[Lokféierer] station-area building ' + b.id + ' failed', error); }
         }
         const names = FACADE_BY_KIND[b.kind] || FACADE_BY_KIND.other;
         const facade = names[Math.floor(hash2(bi, 5) * names.length) % names.length];
@@ -469,6 +475,7 @@
         }
         stats.buildings += 1;
       });
+      if (batch) batch.flush();
       Object.keys(walls).forEach((name) => {
         if (walls[name].empty) return;
         const mat = new T.MeshLambertMaterial({ map: facadeTexture(name), vertexColors: true, side: T.DoubleSide });

@@ -220,3 +220,15 @@ All of this is additive; nothing of the Mosel line (`build_real_line.py`, `real-
 * **Geometry check**: `scripts/zuch/patch_geometry_check.mjs` (node, no browser; also step 1 of `train_sim_world.mjs`): per building face degenerate, huge (> 220 m), twisted (> 2 m off
   its plane), outside its footprint, buildings whose walls float > 1.6 m above the highest ground of their footprint.  Reviewed exceptions in `patch_geometry_allow.json` with reasons.
 * **Cab sweep**: `scripts/zuch/cab_sweep.mjs <outDir> <route> ...` (cab at every stop, contact sheet per route and direction); sheets in `reports/zuchreal/w2d/cab/`.
+
+## W2e (26 Oct 2026): draw-call batching of the station patches, Place de la Gare paved
+
+* **Draw calls**: `station-building.js` painted one mesh (and one canvas texture) per LOD2 wall face: 657 draws at the Gare Centrale.  `TS.stationBuilding.newBatch()` (created per patch in
+  `station-surround-mesh.js`, flushed after the building loop) now collects the faces of the station building and of the styled buildings (`style.others`): the painted face canvases are packed into
+  texture atlases (2048 px wide, shelf packing, 4 px edge-extruded gutter), the small faces / skirts / roofs / extras are merged per material.  The pixel result is the same (before / after
+  screenshots differ in < 0.001 % of the pixels).  `station-yard-props.js`: the "Voie" signs share one label atlas and one mesh, the benches and vehicles go into the mesh of the canopy columns.
+  Station patches are now ~35 meshes at the Gare Centrale (was ~690).  Tool: `scripts/zuch/draw_census.mjs` (visible meshes of a view by owner group).
+* **Place de la Gare**: root cause of the "lawn": a terminus patch (Lëtzebuerg is the start of the Mosel services, s = 0 right behind the platforms) reaches 320 m behind the platforms, i.e. to
+  s < 0, and `frame(s)` clamped s to the track, so everything there (square, roads, tram tracks, platforms, buildings) collapsed onto the end point and the generic terrain showed through.
+  `station-surround-mesh.js` `frame()` now continues straight along the end tangent beyond either track end.  `patch_lux_yard.py`: FORECOURT paving to the patch edge (Avenue de la Gare medians / verges).
+  Patch fetch version `w2e1`.  Tool: `scripts/zuch/lux_ab.mjs` (cab / place / forecourt / air shots, `--root` for a before copy).

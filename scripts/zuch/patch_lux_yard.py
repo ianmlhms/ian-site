@@ -3,7 +3,7 @@
   patch_lux_yard.py [--check]
 What it does (everything from open data: OSM + the patch's own LOD2 / platform / rail data; no orthophoto):
   * ground classes: platform polygons -> paving (1); the footprints of the platform canopies (LOD2 holds them as 'buildings') are NOT building ground any more:
-    gravel (5) outside the platforms; the forecourt (Place de la Gare, between the station building and Avenue de la Gare) was default lawn: paving;
+    gravel (5) outside the platforms; the forecourt (Place de la Gare, between the station building and Avenue de la Gare) and the Avenue de la Gare to the patch edge (medians, verges) were default lawn: paving;
   * the Luxtram tracks of the Place de la Gare (OSM railway=tram) are appended to `rails` with kind "tram" (rigid transform into the patch frame: the track is straight there).
 """
 import base64, io, json, math, os, sys
@@ -13,7 +13,7 @@ from PIL import Image, ImageDraw
 HERE = os.path.dirname(os.path.abspath(__file__))
 PATCH = os.path.join(HERE, "..", "..", "pb", "train-sim", "data", "stations", "luxembourg.json")
 CANOPY_IDS = ["w362239328", "w1312992341", "ACT_4e24b351-eab5-4dc2-b87f-8f4802b32639"]
-FORECOURT = (-96.0, -6.0, -60.0, 150.0)       # x0, x1, z0, z1 (patch frame): lawn / meadow in here becomes paving
+FORECOURT = (-100.0, -6.0, -60.0, 320.0)       # x0, x1, z0, z1 (patch frame): lawn / meadow in here becomes paving
 E0, N0, HEADING = 77559.24, 73908.75, 19.78
 
 
