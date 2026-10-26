@@ -63,6 +63,9 @@
   const lerp = (a, b, t) => a + (b - a) * t;
 
   /* ------------------------------------------------------------- noise */
+  const TAIL_NOISE_BLEND = 700;       // m over which the hills of a shared tail take over from the world-position noise
+  const TAIL_ANCHOR = 'Tréier Hafestrooss';   // from this station on the two services of the Mosel line have the same geometry
+  const TAIL_NOISE_OFFSET = 40000;     // keeps the tail-frame noise away from the origin of the world noise
   function makeNoise(seed) {
     const hash = (ix, iz) => {
       let h = Math.imul(ix, 374761393) + Math.imul(iz, 668265263) + Math.imul(seed, 1442695041);
@@ -679,6 +682,27 @@
       return arrAt(Y, fi) - formationDrop - RIVER_BELOW;
     }
 
+    /* Services that share the tail of a real line (the Hbf branch and the Weststrecke both end on the same legs B..) must show the same hills there.  The generic hills
+       are noise of the world position, and the two services reach the tail with different poses; inside the tail (blended in over TAIL_NOISE_BLEND m) the noise is
+       therefore taken in the frame of the tail's first point, which is the same on both services. */
+    const tailStation = real ? comp.stations.find((st) => st.name === TAIL_ANCHOR) : null;
+    const tailLeg = tailStation ? { s0: tailStation.platformStart } : null;
+    let tailFrame = null;
+    function hillNoise(x, z, s) {
+      const base = noise(x, z);
+      if (!tailLeg) return base;
+      const w = smooth01((s - (tailLeg.s0 - TAIL_NOISE_BLEND)) / TAIL_NOISE_BLEND);
+      if (w <= 0) return base;
+      if (!tailFrame) {
+        const f = frameAt(tailLeg.s0);
+        const hl = Math.hypot(f.tangent.x, f.tangent.z) || 1;
+        tailFrame = { x: f.pos.x, z: f.pos.z, tx: f.tangent.x / hl, tz: f.tangent.z / hl };
+      }
+      const dx = x - tailFrame.x; const dz = z - tailFrame.z;
+      const lx = dx * tailFrame.tx + dz * tailFrame.tz; const lz = -dx * tailFrame.tz + dz * tailFrame.tx;
+      return lerp(base, noise(lx + TAIL_NOISE_OFFSET, lz + TAIL_NOISE_OFFSET), w);
+    }
+
     function terrainBaseHeightAt(x, z) {
       const q = nearest(x, z, scratch);
       const fi = q.i;
@@ -690,7 +714,7 @@
       const cov = arrAt(cover, fi);
       const dep = arrAt(depth, fi);
       const mask = Math.max(arrAt(stationMask, fi), arrAt(crossMask, fi) * 0.8);
-      const nz = noise(x, z);
+      const nz = hillNoise(x, z, q.s);
 
       let h = formY + nz * amp;
       h += valley * smooth01(q.d / width) * (0.6 + 0.4 * (nz * 0.5 + 0.5));
