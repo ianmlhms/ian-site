@@ -1427,6 +1427,10 @@ def build(args):
         buildings.append({"id": o["id"], "kind": kind, "levels": int(lv or max(1, round(hh / 3))), "station": is_station, "roof": roof_o,
                           "h": r2(hh - 1.5 if kind == "house" else hh), "base": r2(yb), "ground": np.asarray(pg.simplify(0.05).exterior.coords)[:-1],
                           "roofs": [], "walls": [], "_area": o["g"].area, "_top": hh})
+    if getattr(args, "station_building", None):          # W4: the OSM building(s) that are the station building, when the automatic pick (tag / address near the node) is wrong
+        wanted = set(args.station_building.split(","))
+        for b_ in buildings:
+            b_["station"] = int(str(b_["id"]) in wanted)
     log("buildings: %d with LOD2 faces, %d OSM-only footprints; station-flagged %d" % (n_lod, len(buildings) - n_lod, sum(b["station"] for b in buildings)))
     if sbld and not any(b["station"] for b in buildings):
         pgf = fix(geom_to_frame(shapely.segmentize(sbld["g"], 6.0)))
@@ -1532,8 +1536,15 @@ def build(args):
     for g, _ in water_polys:
         cv.poly(g, CLS_WATER)
     # rail bed: all rails 2.6 m, main corridor +-4.5 m
-    for ls in rail_geoms:
-        cv.poly(ls.buffer(2.6, cap_style="flat"), CLS_BED)
+    if FACELESS and rail_geoms:
+        # W4: a yard of 10 - 30 parallel tracks (Thionville, Metz, Nancy, Namur) is ballast from the first to the last track; a 2.6 m strip per rail left the gaps between the tracks as lawn / gravel (striped
+        # fields in the cab).  Morphological closing of the per-rail strips: gaps up to ~7 m between tracks become bed, the real lawn beyond the yard stays.
+        bed = unary_union([ls.buffer(3.4, cap_style="flat") for ls in rail_geoms]).buffer(1.8).buffer(-1.8)
+        for pg in polys_of(bed):
+            cv.poly(pg, CLS_GRAVEL)         # class 8 (bed) is not painted by the game (the terrain colour shows, i.e. grass): the yard is painted as gravel / ballast instead
+    else:
+        for ls in rail_geoms:
+            cv.poly(ls.buffer(2.6, cap_style="flat"), CLS_BED)
     cv.poly(box(-CORRIDOR, ZMIN, CORRIDOR, ZMAX), CLS_BED)
     for g in tracks + paths:
         cv.poly(g, CLS_GRAVEL)
@@ -1676,6 +1687,10 @@ def build(args):
             else:
                 i += 1
         patch["deckZ"] = runs                       # z ranges where the main track is on a bridge / in a tunnel: the corridor keeps the real ground there (not flattened)
+    flagged = [b for b in patch["buildings"] if b["station"] and b["ground"]]
+    if flagged and FACELESS:         # bounding box of the station building in the patch frame (core file: the station models of stations-abroad.js fit themselves to it before the scenery half is loaded)
+        gx = [p[0] for b in flagged for p in b["ground"]]; gz = [p[1] for b in flagged for p in b["ground"]]
+        patch["stationBox"] = {"x": [r2(min(gx)), r2(max(gx))], "z": [r2(min(gz)), r2(max(gz))]}
     if REGION:
         patch["region"] = REGION                   # regional facade table (station-surround-mesh.js FACADE_BY_KIND_REGION)
     if CREDIT:
@@ -1799,6 +1814,7 @@ def main():
     ap.add_argument("--side", default=None, choices=("left", "right"), help="declared platform side (real-mosel.js): choose the platform / main track pair on that side if one exists")
     ap.add_argument("--country", default="lu", choices=("lu", "de", "fr", "be"), help="lu = Luxembourg (default: EPSG:2169, lux.osm.pbf, LiDAR + LOD2); de = Rheinland-Pfalz (EPSG:25832, rlp.osm.pbf, GeoBasis-RLP DGM1 / DOM1 / LoD2); fr / be = France / Belgium (local transverse Mercator, --pbf extract, Copernicus GLO-30, OSM footprints only)")
     ap.add_argument("--pbf", default=None, choices=sorted(ABROAD_PBF), help="Geofabrik extract of --country fr|be")
+    ap.add_argument("--station-building", default=None, help="comma separated OSM ids (w123) of the station building(s): overrides the automatic pick")
     ap.add_argument("--main-near-node", action="store_true", help="main track = the railway=rail way nearest to --lat / --lon (the game route's own track) instead of the one next to the platform / building; --side is then taken as declared")
     args = ap.parse_args()
     set_country(args.country, args.lat, args.lon, args.pbf)

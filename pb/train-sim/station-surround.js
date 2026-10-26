@@ -27,8 +27,10 @@
   const LAT_STEP = 5;
   const FADE_ROW_STEP = 2.5;      // finer rows / columns where the real relief fades into the generic one
   const FADE_LAT_STEP = 2.5;
-  const ACTIVE_RANGE = 1100;      // patches within this distance of the train are built
+  const ACTIVE_RANGE = 1100;      // patches within this distance of the train are built (high quality; ACTIVE_RANGE_LEAN below it: W4, the next station's patch showed up in the 260-draw budget of the cab view at the first station)
+  const ACTIVE_RANGE_LEAN = 850;
   const DROP_RANGE = 1700;
+  const DROP_RANGE_LEAN = 1300;
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const lerp = (a, b, t) => a + (b - a) * t;
   const smooth01 = (t) => { const c = clamp(t, 0, 1); return c * c * (3 - 2 * c); };
@@ -266,6 +268,9 @@
     const patches = track.surroundPatches || [];
     if (!patches.length || !TS.stationSurroundMesh) return null;
     const built = new Map();     // patch index -> { group, dispose }
+    const lean = opts.quality !== 'high';
+    const activeRange = lean ? ACTIVE_RANGE_LEAN : ACTIVE_RANGE;
+    const dropRange = lean ? DROP_RANGE_LEAN : DROP_RANGE;
     addCredit(patches);
     let disposed = false;
     /* a heavy half arrives (or fails): the chunks around the patch were built without it (generic scenery there) and are rebuilt by landscape.js */
@@ -289,7 +294,7 @@
         const state = p.state;
         /* 'ready': the whole patch; 'failed': the light patch (road of a level crossing, water) on top of the generic scenery; 'idle' / 'loading': not yet */
         const wantMesh = state === 'ready' || state === 'failed';
-        if (!built.has(i) && dist < ACTIVE_RANGE && wantMesh) {
+        if (!built.has(i) && dist < activeRange && wantMesh) {
           try {
             const rec = TS.stationSurroundMesh.build(p, { track: phys, quality: opts.quality, materials: opts.materials || {}, EXT_X, EXT_Z, width: opts.width, treeField: opts.treeField || null });
             if (rec && rec.group) { opts.root.add(rec.group); built.set(i, rec); }
@@ -297,7 +302,7 @@
             console.warn(TAG + 'build of ' + p.name + ' failed', error);
             built.set(i, { group: null, dispose() {} });
           }
-        } else if (built.has(i) && dist > DROP_RANGE) {
+        } else if (built.has(i) && dist > dropRange) {
           const rec = built.get(i);
           if (rec.group) opts.root.remove(rec.group);
           rec.dispose();
