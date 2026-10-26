@@ -76,6 +76,7 @@ import { flow as mtbTouch } from "./mtb_touch.mjs";
 import { flow as gameCache } from "./game_cache.mjs";
 
 const ALL = [gameCache, mtbWorld, mtbHoles, mtbRide, mtbTrails, mtbMenu, mtbTouch, fouerWorld, fouerModels, fouerBigModels, fouerGame, fouerMigration, fouerWalk, fouerRides, fouerAccess, fouerLaunch, invitePop, invitesLight, mpLobbyConnect4, mpLobbySlf, mpLobbyQuick, mpLobbyGames, mpLobbyColor, mpLobbyParty, mpLobbyArcade, trainSim, trainSimAudio, trainSimTouch, trainSimCareerLock, trainSimWorld, trainSimRoutes, trainSimAbroad, trainSimTramHoles, paketExpress, kartLetzebuerg, kartLetzebuergMp, kartLetzebuergArcade, clientCommands, inboxCloud, busTycoon, newGroup, addMember, mediaCache, friendsAdd, slfRound, arcadePad, leaderboardTags, adminOnlineNotice, adminKartSaves, ccSigninHint, accountCheck, arcadeWeeklyStreak, idleRebirthHalloween, idleMoreContent, idleSoftcap, idleLiveGift, idleResetSafety, leaderboardBigScores, driveMadLevels, testMode, mordsfall];
+const words = process.argv.slice(2);
 const flows = words.length ? ALL.filter((f) => words.some((w) => f.name.includes(w))) : ALL;
 if (!flows.length) { console.error(`No flow matches: ${words.join(", ")}\nAvailable: ${ALL.map((f) => f.name).join(", ")}`); process.exit(2); }
 
