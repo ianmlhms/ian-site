@@ -909,32 +909,6 @@
   }
 
   /* ------------------------------------------------------------------ small stations */
-  function buildWittlich(api) {
-    const k = kit(api);
-    const { X, vc, colB, box, ctex, col, WHITE, BACK, H, W, edge, L } = k;
-    const d0 = BACK;
-    const BR = { key: 'wittlich', base: '#c98a55', speck: 0.07, win: [0.34, 0.5], winCol: '#42586a', winCol2: '#7e96a6', frame: '#efe9d8', ground: 'rect', band: '#d3c7a8' };
-    k.bldg({ d0, dep: 9.2, z0: -18, z1: 20, rows: 2, sh: 3.9, fac: BR, bayW: 4.2, roof: 'hip', roofH: 3.8, roofKey: 'wit', roofBase: '#55504c', roofOv: 0.6 });
-    k.bldg({ d0, dep: 7, z0: 20, z1: 34, rows: 1, sh: 3.9, fac: Object.assign({}, BR, { key: 'wittlich1' }), bayW: 4.2, roof: 'gable', roofH: 2.4, roofKey: 'wit', roofBase: '#55504c', roofOv: 0.5, plainKey: 'wittlich' });
-    const deck = k.deckB('wit-deck', { roughness: 0.8 });
-    k.canopy({ z0: -30, z1: 30, d0: 3.0, d1: edge + W - 0.4, y: 3.9, rise: 0.25, deck, deckCol: col('#c3c6c8'), fascia: [0.3, '#3b4a56'], colD: edge + W - 1.0, colB: vc, colCol: '#55616a', step: 7.5, round: false });
-    k.furnish(-70, 70, edge + W - 0.7, edge + W * 0.5, 28, 40);
-    k.track(-4.6, -L * 0.5, L * 0.5);
-  }
-
-  function buildSchweich(api) {
-    const k = kit(api);
-    const { X, vc, colB, box, ctex, glassB, col, WHITE, BACK, H, W, edge, L } = k;
-    const d0 = BACK;
-    const WH = { key: 'schweich', base: '#ebe7dc', speck: 0.05, win: [0.3, 0.5], winCol: '#506574', winCol2: '#8aa0ae', frame: '#43484c', ground: 'rect' };
-    k.bldg({ d0, dep: 6, z0: 6, z1: 22, rows: 1, sh: 3.6, fac: WH, bayW: 4, roof: 'gable', roofH: 2.8, roofKey: 'sch', roofBase: '#3c4044', roofOv: 0.5 });
-    const deck = k.deckB('sch-deck', { roughness: 0.7 });
-    k.canopy({ z0: -22, z1: -4, d0: 3.2, d1: edge + W - 0.6, y: 3.2, rise: 0.15, deck, deckCol: col('#e4e6e8'), fascia: [0.2, '#2f3f55'], colD: edge + W - 1.2, colB: vc, colCol: '#3f4a55', step: 6, round: false, colW: 0.14 });
-    glassB().box(X(edge + W - 0.4), H + 1.1, -13, 0.04, 2.1, 17, WHITE);
-    k.furnish(-24, 24, edge + W - 0.7, edge + W * 0.5, 14, 24);
-    k.furnish(-24, 24, edge + 1.2, edge + 1.2, 99, 99); // a couple of lamps along the edge
-  }
-
   function buildPontAMousson(api) {
     const k = kit(api);
     const { X, vc, colB, col, BACK, H, W, edge, L } = k;
@@ -1039,8 +1013,6 @@
   reg('Bruxelles-Midi', buildMidi);
   reg('Champagne-Ardenne TGV', buildChampagne);
   reg('Paris-Est', buildParisEst);
-  reg('Wittlich', buildWittlich);
-  reg('Schweich', buildSchweich);
   reg('Pont-à-Mousson', buildPontAMousson);
   reg('Arlon', buildArlon);
   reg('Libramont', buildLibramont);

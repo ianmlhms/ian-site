@@ -1,0 +1,11 @@
+{
+  "route": "wittlich", "station": "Schweich", "refs": "Schweich",
+  "views": [
+    { "photo": "Bahnhof Schweich DB 20160826.jpg", "pos": [-3.0, 105, 1.7], "look": [12, 72, 3.2], "fov": 62, "note": "platform side of the building" },
+    { "photo": "Schweich, ehemalige Bahngebäude 20160826.jpg", "pos": [34, 80, 1.7], "look": [14, 58, 2.5], "fov": 62, "note": "forecourt" },
+    { "photo": "Video-Reisezentrum • Deutsche Bahn • Schweich.JPG", "pos": [4.0, 100, 1.8], "look": [13, 78, 3.5], "fov": 50, "note": "mural gable" },
+    { "photo": "Bahnhof Schweich mit Dampfzug.jpg", "pos": [3.0, 50, 1.7], "look": [0, -40, 2.5], "fov": 62, "note": "platform ahead" },
+    { "photo": "Schweich railway station.jpg", "pos": [5.5, 30, 1.7], "look": [-5, 58, 2.0], "fov": 62, "note": "island across" },
+    { "photo": "RB71 am Bahnhof Schweich.jpg", "pos": [6.0, 20, 1.7], "look": [0, -60, 2.5], "fov": 62, "note": "platform ahead 2" }
+  ]
+}
