@@ -98,7 +98,7 @@
     gableWin: 'round',
     doors: [],
     /* the glass-and-steel platform canopies (LOD2 holds them as flat-roof "buildings") are drawn by station-yard.js from their roof faces, with columns on the platforms */
-    yard: { canopies: CANOPY_IDS, platformTop: 0.77, platformFrom: -25, voie: { 0: 'Voie 1', 1: 'Voie 2-3', 2: 'Voie 4-5', 3: 'Voie 6-7', 4: 'Voie 8-9', 5: 'Voie 10-11' } },   // by platform index of the patch (x ascending)
+    yard: { canopies: CANOPY_IDS, hall: ['w362239328'], trains: [{ plat: 1, model: 'emu', cars: 3, kind: 'cfl' }, { plat: 2, model: 'emu', cars: 2, kind: 'sncb' }, { plat: 3, model: 'emu', cars: 3, kind: 'cfl2' }], platformTop: 0.77, platformFrom: -25, voie: { 0: 'Voie 1', 1: 'Voie 2-3', 2: 'Voie 4-5', 3: 'Voie 6-7', 4: 'Voie 8-9', 5: 'Voie 10-11' } },   // by platform index of the patch (x ascending)
     skipIds: CANOPY_IDS,
   });
 

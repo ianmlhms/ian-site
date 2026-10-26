@@ -22,6 +22,8 @@
   const SKIP_MAIN_X = 2.2;              // a real track this close to the player's track everywhere is the player's own
   const WIRE_H = 5.3;                   // contact wire above the rail head
   const COLUMN_STEP = 12;
+  const MAST_STEP = 46;                 // m between catenary masts along a track
+  const MAX_MASTS = 140;
   const GRID_STEP = 14;                 // columns under a roof that has no platform or track below
   const MIN_COLUMN_H = 2.4;
   const MAX_COLUMN_H = 16;
@@ -69,6 +71,11 @@
     for (let i = 0; i < 160; i++) { c.fillStyle = r() > 0.5 ? 'rgba(255,255,255,0.10)' : 'rgba(60,80,100,0.10)'; c.fillRect(r() * w, r() * h, 12, 5); }
     c.fillStyle = '#5b6168';                               // steel frame: a grid of glazing bars
     for (let i = 0; i < 4; i++) { c.fillRect(i * (w / 4), 0, 3, h); c.fillRect(0, i * (h / 4), w, 3); }
+  });
+  /* grey standing-seam sheet metal of the ordinary platform canopies (the Grande Halle is glass) */
+  const sheetTexture = () => canvasTexture('yard:sheet', 128, 128, (c, w, h) => {
+    c.fillStyle = '#8f9397'; c.fillRect(0, 0, w, h);
+    for (let x = 0; x < w; x += 16) { c.fillStyle = 'rgba(255,255,255,0.16)'; c.fillRect(x, 0, 2, h); c.fillStyle = 'rgba(0,0,0,0.14)'; c.fillRect(x + 2, 0, 2, h); }
   });
   function signTexture(text) {
     return canvasTexture('yard:sign:' + text, 256, 96, (c, w, h) => {
@@ -176,6 +183,33 @@
         group.add(l); disposables.push(g);
       }
       stats.yardTracks = n;
+      /* catenary masts beside the tracks (steel poles with a cantilever arm over the track), only where no platform stands */
+      if (Y.masts !== false) {
+        const masts = new MB(); const steel = [0.36, 0.38, 0.4]; let count = 0;
+        const plats = (data.platforms || []).filter((p) => p.ring && p.ring.length > 2).map((p) => p.ring);
+        (data.rails || []).forEach((r) => {
+          if (r.kind === 'tram' || !r.pts || r.pts.length < 2 || r.pts.every((p) => Math.abs(p[0]) < SKIP_MAIN_X)) return;
+          const rows = rowsOf(r.pts, 0);
+          let next = 18;
+          rows.forEach((q) => {
+            if (q.v * sleeperRepeat < next || count > MAX_MASTS) return;
+            next = q.v * sleeperRepeat + MAST_STEP;
+            for (const side of [1, -1]) {
+              const px = q.px + side * 3.0;
+              if (Math.abs(px) < SKIP_MAIN_X + 0.6 || plats.some((ring) => inRing(ring, px, q.pz) || inRing(ring, px + side * 0.8, q.pz))) continue;
+              const w = world(px, q.pz); const wt = world(q.px, q.pz);
+              const h = RAIL_HEAD + WIRE_H + 0.9;
+              masts.box(w.x, w.form + h / 2, w.z, 0.3, h, 0.3, steel);
+              masts.box((w.x + wt.x) / 2, wt.form + h - 0.35, (w.z + wt.z) / 2, Math.abs(wt.x - w.x) + 0.2, 0.22, Math.abs(wt.z - w.z) + 0.2, steel);
+              count += 1;
+              break;
+            }
+          });
+        });
+        if (!masts.empty) add(new T.Mesh(masts.geometry(), mat(new T.MeshLambertMaterial({ vertexColors: true }))), true);
+        stats.yardMasts = count;
+      }
+      if (Y.trains && TS.stationYardTrains) TS.stationYardTrains.build(Object.assign({}, o, { rowsOf, resample, inRing, RAIL_HEAD }));
     }
 
     /* ---- platforms: raised paved slabs with a tactile band along the track edges */
@@ -230,7 +264,8 @@
     /* ---- canopies: the LOD2 roofs of the platform roofs, columns under them */
     {
       const ids = new Set(Y.canopies || []);
-      const roof = new MB(); const faces = [];
+      const hallIds = new Set(Y.hall || []);                         // the Grande Halle: glass and steel; every other canopy is grey sheet metal
+      const roof = new MB(); const roofPlain = new MB(); const faces = [];
       (data.buildings || []).forEach((b) => {
         if (!ids.has(b.id)) return;
         (b.roofs || []).forEach((ring) => {
@@ -241,8 +276,9 @@
           if (nl < 1e-6) return;
           let nx = normal[0] / nl; let ny = normal[1] / nl; let nz = normal[2] / nl;
           if (ny < 0) { nx = -nx; ny = -ny; nz = -nz; }
-          const vids = ring.map((p) => { const w = world(p[0], p[2]); return roof.vert(w.x, w.form + p[1], w.z, 0, 1, 0, [1, 1, 1], p[0] / 3, p[2] / 3); });
-          for (let t = 0; t < tris.length; t += 3) roof.i.push(vids[tris[t]], vids[tris[t + 1]], vids[tris[t + 2]]);
+          const target = hallIds.size && !hallIds.has(b.id) ? roofPlain : roof;
+          const vids = ring.map((p) => { const w = world(p[0], p[2]); return target.vert(w.x, w.form + p[1], w.z, 0, 1, 0, [1, 1, 1], p[0] / 3, p[2] / 3); });
+          for (let t = 0; t < tris.length; t += 3) target.i.push(vids[tris[t]], vids[tris[t + 1]], vids[tris[t + 2]]);
           if (ny > 0.2) {
             const xs = ring.map((p) => p[0]); const zs = ring.map((p) => p[2]);
             faces.push({ ring2: ring.map((p) => [p[0], p[2]]), x0: Math.min(...xs), x1: Math.max(...xs), z0: Math.min(...zs), z1: Math.max(...zs), a: nx, b: ny, c: nz, d: -(nx * ring[0][0] + ny * ring[0][1] + nz * ring[0][2]) });
@@ -250,6 +286,7 @@
         });
       });
       if (!roof.empty) add(new T.Mesh(roof.geometry(), mat(new T.MeshLambertMaterial({ map: glassTexture(), side: T.DoubleSide, color: 0xdfe6ec, emissive: 0x626b75 }))), false);
+      if (!roofPlain.empty) add(new T.Mesh(roofPlain.geometry(), mat(new T.MeshLambertMaterial({ map: sheetTexture(), side: T.DoubleSide, color: 0xb9bcc0, emissive: 0x2c2f33 }))), false);
       const roofAt = (x, z) => {
         let best = null;
         faces.forEach((f) => {
