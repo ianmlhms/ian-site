@@ -102,7 +102,7 @@ In the Luxembourg city section there are none on the main line.  The crossing pl
 ## W2c: stop lists of the other routes (audit of 26 Oct 2026, with sources)
 
 **Method.** Real service patterns come from the OSM public-transport route relations (`route=train`, ordered `stop` members) of the Geofabrik extracts of 25 / 26 Oct 2026 (Luxembourg, Belgium, Lorraine, Champagne-Ardenne,
-Ile-de-France), read with pyosmium (`scripts/zuch/` has no copy of the probe: it is 30 lines, `routes_rel.py`, see the W2c handoff for the command), cross-checked against de.wikipedia "Bahnstrecke Luxemburg-Troisvierges" (km, tunnels,
+Ile-de-France), read with pyosmium (`scripts/zuch/osm_route_relations.py`), cross-checked against de.wikipedia "Bahnstrecke Luxemburg-Troisvierges" (km, tunnels,
 viaducts, "Nahverkehr ... zwischen Luxemburg und Troisvierges"), en.wikipedia "CFL Line 50 / 60", sncf-connect.com Luxembourg - Paris timetable (11 Jul 2026 sample).  Relations used: CFL-1 (all stops), RE Rodange - Troisvierges (OSM id 20663266),
 CFL-50 (555543), L-12 (SNCB, 7396154), CFL-60 (8388183), RE Pétange - Mersch (20663109), CFL-70 (572347), K59, IC-16 (3920818), IC-33, TER C40+ (1061467), TGV InOui 803B (8536525 / 8536618).  The earlier route lists were authored, not verified.
 
