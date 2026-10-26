@@ -19,7 +19,26 @@ Ile-de-France, Picardie, Belgium (1.4 GB, downloaded for the abroad routes), `os
    `check_site.py`: only the old karttracker-ios-privacy orphan.  `cv_head.py`: PROBLEMS: 0.  Full `node scripts/flows/run_all.mjs train` (26 Oct, after the last commit): 6/6 PASS (train-sim, -audio, -touch, -career-lock, -world, -routes).  Fixes needed for that: `train_sim.mjs` expects "RE · 5" (west has 6 stations), `sim.js` TSR clearances scale with short legs (the real legs are too short for the old 800 / 900 m clearances: 0 restrictions planned), `patch-crossings.js` adopts only gentle real roads (grade / reach / valley walls / patch fade), `train_sim_world.mjs` MAX_PATCH_ROAD_GRADE 0.18 -> 0.30.
 6. Montage (cab sheets + aerial sheets per route): `reports/zuchreal/w2c/{north,south,west}-{cab,aerial}-sheet.png`; raw shots in the subfolders.
 
-## NOT done / open (priority order)
+
+## Wave 2 (27 Oct 2026, reviewer fixes 1-5) - DONE, details + numbers in REAL-LINES.md "W2c: reviewer fixes"
+
+1. White ground = the far-terrain safety plane in deep valleys: fixed in `landscape.js` (plane under `level.minH` on real routes).  2. Checkerboard river = water normal map aliasing: low wave numbers, stretched UVs, softer specular (also Mosel water).
+3. Download size: `<key>.c.json` core (all stations of the selected route, 4 m relief) + `<key>.h.json` scenery half (streamed ahead of the train, first one awaited <= 6 s), failure falls back to generic scenery; start of a service south 1.44 MB raw / 0.40 MB gzip, north 1.80 / 0.51, west 0.73 raw.
+   `scripts/zuch/split_station_patches.py` (run by `build_route_patches.py`), `download_probe.mjs`, flow steps in `train_sim_routes.mjs` (budgets, streaming after a jump, all halves blocked).  `zlib.mjs start()` loads all scenery halves unless `{ lazy: true }`.
+4. WebKit / Chrome medium budgets met (REAL-LINES.md numbers).  5. Career: north price 24 000, others unchanged; `career_probe.mjs` / `drive_bot.mjs`.
+Gates (27 Oct, commit 48122581): `run_all.mjs train` 6/6 PASS, hole scans north / south / west clean, check_site only the old orphan, cv_head PROBLEMS: 0.  Not pushed.
+
+## Still open (priority order) after wave 2
+
+* **Station building side (item 6)**: the photo models put the hall right behind the served platform (`sd` = platform side) and ignore `bside` of the OSM layout (`data/real/<id>-layout.json`).  Where they differ the real hall is across other tracks:
+  Ettelbréck platform right / hall LEFT (LOD2 station building x -29 .. -20, z 20 .. 32 in the patch frame, 2 tracks away), Miersch left / left, Clierf left / left (LOD2 x -15 .. -5, z 94 .. 121: 90 m ahead of the platform middle),
+  Esch-Uelzecht right / right (x 11 .. 39, z -95 .. -42), Belval-Université right / LOD2 hall left in the patch (x -31 .. 6, z -52 .. 73: check), Bettembuerg left / left.  So only Ettelbréck (and maybe Belval) have the hall on the wrong side; the models
+  would need a lateral offset parameter (`l` in stations-lu-b.js / -a.js is relative to the platform edge) or a second building copy at `bside`.  `scripts/zuch/station_top.mjs` draws a top-down view with `TS.debugStationLod2` (the LOD2 station building next to the model) for exactly this
+  check; the first Ettelbréck montage (`reports/zuchreal/w2c/st/`) was inconclusive (camera orientation of the top-down free cam), and the photo | sim montages of the six stations are NOT made yet (`station_shots.mjs <dir> <route> <Station> --tag x`, photos in `~/Library/Caches/zuch-refs/`).
+* Landmarks (item 7) and abroad routes (item 8): not started, see the lists above (this file, "NOT done" 2 and 3 are still valid).
+* The old items 4 / 5(b) / 5(d) of the first list are unchanged; 5(a) (pale band) and 5(c) (patch download) are DONE.
+
+## NOT done / open (priority order) - written after wave 1, see above for what changed
 
 1. **Photo | sim montage of the big stations** (Ettelbréck, Esch-Uelzecht, Belval-Université, Bettembuerg, Miersch, Clierf): photos are fetched (`~/Library/Caches/zuch-refs/{Ettelbreck,Esch-Uelzecht,Belval-Universite,Bettembuerg,Miersch,Clierf}/`, Commons, CC BY-SA, `credits.json`;
    `python3 scripts/zuch/fetch_refs.py <Dir> "search" ...` fetches more).  The models exist (stations-lu-a.js: Esch `buildEsch`, Belval `buildBelval`, Bettembuerg; stations-lu-b.js: Miersch, Ettelbréck, Clierf) from an earlier photo pass, and now stand in their real patches.
