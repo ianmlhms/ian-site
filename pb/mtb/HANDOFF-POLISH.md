@@ -11,7 +11,5 @@ Brief: scratchpad/brief-mtb-polish.md. Montages go to ~/Library/CloudStorage/One
 3. Weather: `env.js` WEATHER cloudy/fog retuned, shafts muted in fog (`effects.js`). Tool `scripts/mtb/weather-shots.mjs`.
 4. Buildings pipeline started: `scripts/mtb/bake_buildings.py` -> `pb/mtb/data/buildings.json` (791 rectangles, 3 castles, 2 churches, 37 KB). Refs downloaded in mtb-refs (beaufort_*, berdorf_*).
 
-## Open (in order)
-- 4: runtime `town.js` (houses: rendered walls + windows + slate roofs, dormers, chimneys; church with spire; chunked + distance culled), `castle.js` (medieval ruin L-shaped curtain wall with round towers + Renaissance castle at the OSM polygons), wire in main.js, viewpoint collectibles near each, harness checks (houses on ground, none on ways), montages vs refs, perf budgets.
-- 5: iPad check (scripts/mtb/ipad-check.mjs), WebKit at iPad sizes low/medium + touch, frame time, JS heap + texture memory, auto quality low on iPad (main.js autoQuality: coarse pointer + <=4 cores -> low, else medium: must be low for iPads), checklist for Ian.
-- Gates: harness, harness-play, harness-save, harness-audio, run_all.mjs mtb, run_webkit.mjs, check_site, cv_head, montages (cascade vs photo, finish desktop + iPad portrait/landscape, weather sheet, Beaufort, Berdorf).
+## Status
+All five items are done and all gates are green (see POLISH-NOTES.md for what changed, the iPad numbers and the known issues). Nothing is open except the points under Known issues there.
