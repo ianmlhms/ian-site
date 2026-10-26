@@ -1,0 +1,127 @@
+{
+ "route": "wittlich",
+ "station": "Wasserb\u00eblleg",
+ "refs": "Wasserbelleg",
+ "views": [
+  {
+   "photo": "Wasserbillig, gare CFL (101).jpg",
+   "pos": [
+    -34,
+    -100,
+    1.7
+   ],
+   "look": [
+    -12,
+    -104,
+    5
+   ],
+   "fov": 62,
+   "note": "forecourt, main block"
+  },
+  {
+   "photo": "Wasserbillig, gare CFL (103).jpg",
+   "pos": [
+    -36,
+    -75,
+    1.7
+   ],
+   "look": [
+    -12,
+    -110,
+    4
+   ],
+   "fov": 62,
+   "note": "forecourt oblique"
+  },
+  {
+   "photo": "Wasserbillig, gare CFL (109).jpg",
+   "pos": [
+    -45,
+    -60,
+    1.7
+   ],
+   "look": [
+    -12,
+    -110,
+    3.5
+   ],
+   "fov": 62,
+   "note": "forecourt wide"
+  },
+  {
+   "photo": "Wasserbillig, gare CFL (104).jpg",
+   "pos": [
+    1.5,
+    -90,
+    1.7
+   ],
+   "look": [
+    -4,
+    -125,
+    3.5
+   ],
+   "fov": 62,
+   "note": "platform side of the building"
+  },
+  {
+   "photo": "Wasserbillig, gare CFL (112).jpg",
+   "pos": [
+    1.5,
+    -150,
+    1.7
+   ],
+   "look": [
+    -6,
+    -100,
+    3.5
+   ],
+   "fov": 62,
+   "note": "platform along the canopy"
+  },
+  {
+   "photo": "Wasserbillig, gare CFL (115).jpg",
+   "pos": [
+    5,
+    60,
+    1.7
+   ],
+   "look": [
+    36,
+    124,
+    8
+   ],
+   "fov": 62,
+   "note": "water tower"
+  },
+  {
+   "photo": "Wasserbillig, gare CFL (118).jpg",
+   "pos": [
+    5,
+    10,
+    1.7
+   ],
+   "look": [
+    10,
+    -90,
+    2.5
+   ],
+   "fov": 62,
+   "note": "island platform"
+  },
+  {
+   "photo": "Wasserbillig, gare CFL (136).jpg",
+   "pos": [
+    -50,
+    -100,
+    30
+   ],
+   "look": [
+    0,
+    -60,
+    0
+   ],
+   "fov": 62,
+   "note": "overview"
+  }
+ ]
+}

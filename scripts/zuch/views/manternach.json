@@ -1,0 +1,127 @@
+{
+ "route": "wittlich",
+ "station": "Manternach",
+ "refs": "Manternach",
+ "views": [
+  {
+   "photo": "Manternach, gare CFL Manternach (102).jpg",
+   "pos": [
+    1.5,
+    85,
+    1.7
+   ],
+   "look": [
+    3,
+    40,
+    2.5
+   ],
+   "fov": 62,
+   "note": "hut, C sign and clock"
+  },
+  {
+   "photo": "Manternach, gare CFL Manternach (103).jpg",
+   "pos": [
+    -6.8,
+    75,
+    1.7
+   ],
+   "look": [
+    2,
+    -60,
+    2.0
+   ],
+   "fov": 62,
+   "note": "from the village platform"
+  },
+  {
+   "photo": "Manternach, gare CFL Manternach (104).jpg",
+   "pos": [
+    -5.5,
+    -38,
+    1.7
+   ],
+   "look": [
+    4.5,
+    -54,
+    1.8
+   ],
+   "fov": 62,
+   "note": "brick shelter across"
+  },
+  {
+   "photo": "Manternach, gare CFL Manternach (105).jpg",
+   "pos": [
+    2.5,
+    -30,
+    1.7
+   ],
+   "look": [
+    -8.5,
+    -52,
+    2.0
+   ],
+   "fov": 62,
+   "note": "maroon shelter across"
+  },
+  {
+   "photo": "Manternach, gare CFL Manternach (106).jpg",
+   "pos": [
+    -17,
+    -42,
+    1.4
+   ],
+   "look": [
+    -22.7,
+    -45.2,
+    1.3
+   ],
+   "fov": 62,
+   "note": "bike box"
+  },
+  {
+   "photo": "Manternach2294.jpg",
+   "pos": [
+    3,
+    0,
+    1.7
+   ],
+   "look": [
+    -30,
+    0,
+    5
+   ],
+   "fov": 62,
+   "note": "village across"
+  },
+  {
+   "photo": "ManternachBushaltestelle.JPG",
+   "pos": [
+    -3,
+    -90,
+    2
+   ],
+   "look": [
+    -30,
+    -100,
+    4
+   ],
+   "fov": 62,
+   "note": "crossing / village"
+  },
+  {
+   "photo": "Manternach, gare CFL Manternach (101).jpg",
+   "pos": [
+    3.0,
+    -6,
+    1.7
+   ],
+   "look": [
+    3.2,
+    10,
+    2.0
+   ],
+   "fov": 62,
+   "note": "yellow name board"
+  }
+ ]
+}

@@ -62,6 +62,30 @@
     },
   });
 
+  /* WASSERBËLLEG (Wasserbillig).  Refs: Commons "Wasserbillig, gare CFL (101)-(136)" (2023-2025).  Yellow-ochre plastered station building with white stone surrounds (arched ground-floor
+   * windows, white floor band), grey-black slate roofs with a clock gable in the middle, light sandstone plinth; the water tower is grey concrete, the engine shed beside it ochre. */
+  reg('Wasserbëlleg', {
+    wall: '#ebcf8a', trim: '#f2eee2', plinth: { h: 0.8, col: '#b4a37c' }, band: '#f2eee2', roof: 'slate', roofTint: '#aab0b6', floorH: 3.7, bayM: 3.2, stain: true,
+    win: { w: 1.15, h: 1.8, kind: 'rect', groundKind: 'arch', frame: '#46301f', reveal: '#f2eee2', sill: true },
+    gableWin: 'round',
+    // LOD2 closes the platform canopy into a solid volume (an outer wall at x -1.5 and two end walls): the canopy stays open, its posts come from the station model
+    skipFaces: (face) => face.xc > -4.0 && face.ymax < 6.5,
+    doors: [
+      { z: -104.0, w: 1.5, h: 3.0, col: '#5a3a22', face: 'front', arch: true }, { z: -104.0, w: 1.5, h: 3.0, col: '#5a3a22', face: 'back', arch: true },
+    ],
+    extras(api) {
+      // the station clock in the central gable of the forecourt side (photo 101)
+      api.box(-19.0, 8.9, -104.0, 0.06, 1.8, 1.8, '#3b3f44');
+      api.box(-19.04, 8.9, -104.0, 0.05, 1.55, 1.55, '#f4f1ea');
+    },
+    otherBase: { stain: false },
+    others: {
+      w157502178: { wall: '#bcb7ae', roof: 'zinc', roofTint: '#9a9a96', noWindows: true, plinth: { h: 0.4, col: '#9d988e' } },                                   // the concrete water tower
+      w157502180: { wall: '#dcbd7e', roof: 'tile', roofTint: '#9a8c80', noWindows: true, plinth: { h: 0.5, col: '#b4a37c' } },                                    // the ochre engine shed
+      w607789193: { wall: '#d9b778', roof: 'tile', roofTint: '#8a7468', noWindows: true, plinth: { h: 0.5, col: '#a08e6a' } },                                    // the ochre goods shed
+    },
+  });
+
   /* LËTZEBUERG GARE CENTRALE.  Refs: ~/Library/Caches/zuch-refs/Lux-Gare (Commons: Luxembourg City railway station 2022-12, Gare centrale tram stop,
    * Grande vitesse, Hall Gare centrale).  Yellow-ochre sandstone building (1907-1913), arched windows, mansard slate roofs, the clock tower with its
    * green copper spire; the real LOD2 model (667 roof faces) gives the volumes. */

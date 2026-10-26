@@ -271,4 +271,97 @@
       k.vc.box(k.X(bx) - sx * 1.32, by + 1.1, ME.bikebox.z, 0.06, 2.1, 1.8, col('#b52a2a'));
     },
   });
+
+  /* ================================================================ MANTERNACH
+   * Refs: ~/Library/Caches/zuch-refs/Manternach (Commons: Manternach, gare CFL Manternach (101)-(106), Manternach2294, ManternachBushaltestelle).  No station building any more: two side
+   * platforms of tan pavers with two tracks between them (patch x 1.1 .. 4.4 next to the game track at x 0, and x -8.6 .. -5.6 next to the second track at x -4.2).  The game platform is the
+   * RIGHT one (the declared side 'left' of real-mosel.js is corrected in routes.js SIDE_FIX): open red-brick shelter with a flat white roof at z -54 (photo 104), blue totems, a blue "A"
+   * sign, round clocks, orange bins, the yellow-framed name board.  The village / car-park side platform has the maroon steel-and-glass shelter at z -52 and the red / grey bike box. */
+  const MA = { far: { edge: -5.6, width: 3.0, z0: -90, z1: 89 }, track: -4.2, shelterZ: -53.8, bikebox: { x: -22.7, z: -45.2 } };
+  const MA_MAROON = '#6a2b3a';
+  reg('Manternach', {
+    canopy: false,
+    furniture: false,
+    build(api) {
+      const { sx, H, W, edge, col } = api;
+      const k = makeKit(api);
+      const f = mirrorKit(api);
+      const lB = edge + W;
+      const toward = (x) => -x * sx;
+      // our platform: open red-brick shelter (back wall 0.7 m behind the platform, opens to the track), totems, sign, bins, clocks, lamps
+      k.boxShelter(lB - 0.5, MA.shelterZ, 5.6, 2.4, '#a85a44', '#d6d7d4', 5);
+      [-44, -66].forEach((z) => k.totem(edge + 1.4, z));
+      k.sign(edge + 1.1, -47.5, 'A', 'blue');
+      [-36, 28].forEach((z) => k.bin(lB - 0.7, z, '#d9631a'));
+      [-30, 36].forEach((z) => k.clockPole(edge + 2.0, z));
+      k.yellowBoard(lB - 0.6, 10, 'Manternach');
+      k.yellowBoard(lB - 0.6, -76, 'Manternach');
+      [-80, -20, 20, 60].forEach((z) => k.lamp(lB - 0.2, z, '#8d9296', 5.4));
+      // the white utility hut with the blue totem, the "C" sign and the round clock at the Luxembourg end of our platform (photo 102)
+      k.vc.box(k.X(lB - 0.2), H + 1.3, 58, 2.0, 2.6, 2.6, col('#dedcd6'));
+      k.vc.box(k.X(lB - 0.2), H + 2.7, 58, 2.3, 0.14, 2.9, col('#8d9296'));
+      k.totem(edge + 1.6, 55);
+      k.sign(edge + 1.1, 61, 'C', 'blue');
+      k.clockPole(edge + 1.6, 52);
+      // second track and the far platform (village side)
+      k.track(sx * MA.track, -135, 135, { pole: true });
+      k.platformBox(sx * MA.far.edge, MA.far.width, -1, MA.far.z0, MA.far.z1);
+      f.glassShelter(toward(-8.0), -52, 5.0, 2.2, MA_MAROON, '#7a2a30');
+      f.bin(toward(-8.2), -57.7, '#d9631a');
+      [-30, 40].forEach((z) => f.totem(toward(-6.8), z));
+      f.sign(toward(-6.5), 62, 'C', 'blue');
+      f.clockPole(toward(-7.0), 66);
+      f.yellowBoard(toward(-8.2), -12, 'Manternach');
+      [-80, -20, 25, 70].forEach((z) => f.lamp(toward(-8.6), z, '#8d9296', 5.4));
+      // red / grey CFL bike box on the car park (photo 106): perforated light-grey box, red / black door side towards the platform
+      const bx = sx * MA.bikebox.x;
+      k.vc.box(k.X(bx), api.FORM_Y + 1.3, MA.bikebox.z, 3.4, 2.6, 3.4, col('#d4d6d8'));
+      k.vc.box(k.X(bx) + sx * 1.72, api.FORM_Y + 1.1, MA.bikebox.z, 0.06, 2.1, 1.1, col('#8e2a2a'));
+    },
+  });
+
+  /* ================================================================ WASSERBËLLEG (Wasserbillig)
+   * Refs: ~/Library/Caches/zuch-refs/Wasserbelleg (Commons: Wasserbillig, gare CFL (101)-(136)).  Terminus-like frontier station: the long yellow-ochre station building (patch x -19 .. -1.4,
+   * z -143 .. -85; the LOD2 model includes the long lean-to platform roof) stands behind the game platform (patch x -7.6 .. -1.8, left of the game track at x 0, 5.8 m wide towards the
+   * Luxembourg end).  Across the second track (x 4.5) an island platform (x 7 .. 13.1, z -152 .. 123) with glass shelters; yard tracks further right (x 14.5, 19.2); the concrete water
+   * tower (z 124, x 36) and the engine shed beside it come from the LOD2 model (style).  Forecourt, bus station and goods shed on the left. */
+  const WB = { island: { edge: 7.0, width: 6.1, z0: -152, z1: 123 }, tracks: [4.5, 14.5, 19.2], shelters: [-67.7, -43.5, -37.6], bikebox: { x: -6.4, z: -150.8 } };
+  reg('Wasserbëlleg', {
+    canopy: false,
+    furniture: false,
+    build(api) {
+      const { sx, H, W, edge, col } = api;
+      const k = makeKit(api);
+      const f = mirrorKit(api);
+      const lB = edge + W;
+      const toward = (x) => -x * sx;
+      // our platform (left, x -7.6 .. -1.8): pink ticket machine at the building, totems, name boards, clocks, bins, lamps
+      k.vc.box(k.X(4.8), H + 1.0, -95.5, 0.5, 2.0, 0.6, col('#b02a6e'));
+      [-60, 0, 60, 110].forEach((z) => k.totem(edge + 1.4, z));
+      [-70, 20, 100].forEach((z) => k.yellowBoard(lB - 0.9, z, 'Wasserbillig'));
+      [-45, 40].forEach((z) => k.clockPole(edge + 2.2, z));
+      [-84.6, 64.7].forEach((z) => k.bin(lB - 0.5, z, '#d9631a'));
+      [-60, -20, 20, 60, 100].forEach((z) => k.lamp(lB - 0.4, z, '#9aa0a4', 5.6));
+      k.sign(edge + 1.0, -30, 'A', 'blue');
+      k.sign(edge + 1.0, 70, 'B', 'blue');
+      // the real platform runs on under the building canopy (z -143 .. -85) while the game platform (210 m) ends at z -105 with its ramp
+      k.platformBox(edge, 2.9, 1, -146, -100);
+      // posts of the long LOD2 platform canopy (roof 5.4 .. 6.2 m above the formation along the building, x -4.6 .. -1.4, z -142.6 .. -92.7)
+      for (let z = -139; z <= -95; z += 6) k.vc.box(k.X(1.9), api.FORM_Y + 3.0, z, 0.16, 6.0, 0.16, col('#7a8086'));
+      // second track, the island platform with its glass shelters, the yard tracks
+      WB.tracks.forEach((x) => k.track(sx * x, -135, 135, { pole: true }));
+      k.platformBox(sx * WB.island.edge, WB.island.width, -1, WB.island.z0, WB.island.z1);
+      WB.shelters.slice(0, 2).forEach((z) => f.glassShelter(toward(9.0), z, 6.0, 2.2, '#5d646b', '#4c5258'));
+      [-100, -10, 40, 90].forEach((z) => f.totem(toward(8.0), z));
+      [-120, -80, -20, 20, 60, 100].forEach((z) => f.lamp(toward(12.4), z, '#9aa0a4', 5.6));
+      [-80, 80].forEach((z) => f.yellowBoard(toward(8.0), z, 'Wasserbillig'));
+      f.sign(toward(7.8), -20, 'B', 'blue');
+      f.clockPole(toward(8.6), 5);
+      [-46.9, -23.4, 64.9].forEach((z) => f.bin(toward(9.6), z, '#d9631a'));
+      // CFL bike box at the Trier end of the forecourt (grey perforated box, red doors)
+      const bx = sx * WB.bikebox.x;
+      k.vc.box(k.X(bx), api.FORM_Y + 1.3, WB.bikebox.z, 3.4, 2.6, 3.4, col('#d4d6d8'));
+      k.vc.box(k.X(bx) - sx * 1.72, api.FORM_Y + 1.1, WB.bikebox.z, 0.06, 2.1, 1.1, col('#8e2a2a'));
+    },
+  });
 })();
