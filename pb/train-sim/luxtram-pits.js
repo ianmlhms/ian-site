@@ -18,6 +18,8 @@
   const RAIL_MIN_DEPTH = 0.7;     // a railing only where the pit is deeper than this (m)
   const FACE_T = 0.6;             // thickness of the portal head wall (m)
   const PAD_A = 6.5;              // carriageway queries keep clear of the pit this far beyond its two ends (m)
+  const COPING_SINK = 0.6;        // the outer face of the coping reaches this far below the street: the terrain beside the pit lies a few cm below the street plane here and a short face left a see-through slit under the coping
+  const END_LAP = 0.6;            // the floor runs on this far under the street beyond its end (the terrain clip of the pit ends at the floor edge)
   const KEEP = 0.8;               // street-level cars keep this far clear of the coping (lateral margin of the carriageway query beside the pit)
 
   function create(ctx) {
@@ -95,15 +97,17 @@
       // ---- coping: a low concrete kerb on top of each wall, stands COPING_H above the street, tapering out where the pit ends
       [-1, 1].forEach((s) => {
         const h = (aa) => COPING_H * Math.min(1, Math.max(0.2, (p.depthAt(aa) - 0.1) / 0.5));
-        const aT = Math.min(p.a1 - 0.2, aEnd + 1.2);
+        const aT = p.a1;       // to the end of the clip footprint (it used to stop 0.2 m short: a sliver of void beside the end of the floor)
         for (let a = p.a0; a < aT - 1e-6; a += WALL_STEP) {
           const a2 = Math.min(aT, a + WALL_STEP);
           const ya = (aa, b) => p.lid(aa, s * b) + h(aa);
           // top
           quad(conc, [p.pos(a, s * hw, ya(a, hw)), p.pos(a2, s * hw, ya(a2, hw)), p.pos(a2, s * cw, ya(a2, cw)), p.pos(a, s * cw, ya(a, cw))], [0, 1, 0], [CONC_L]);
           // outer face (towards the street) down to the street level
-          quad(conc, [p.pos(a, s * cw, p.lid(a, s * cw)), p.pos(a2, s * cw, p.lid(a2, s * cw)), p.pos(a2, s * cw, ya(a2, cw)), p.pos(a, s * cw, ya(a, cw))], [s * p.nx, 0, s * p.nz], [CONC_D, CONC_D, CONC, CONC]);
+          quad(conc, [p.pos(a, s * cw, p.lid(a, s * cw) - COPING_SINK), p.pos(a2, s * cw, p.lid(a2, s * cw) - COPING_SINK), p.pos(a2, s * cw, ya(a2, cw)), p.pos(a, s * cw, ya(a, cw))], [s * p.nx, 0, s * p.nz], [CONC_D, CONC_D, CONC, CONC]);
         }
+        // the end of the coping: closed down to the same depth as the outer face
+        quad(conc, [p.pos(aT, s * hw, p.lid(aT, s * hw) - COPING_SINK), p.pos(aT, s * cw, p.lid(aT, s * cw) - COPING_SINK), p.pos(aT, s * cw, p.lid(aT, s * cw) + h(aT)), p.pos(aT, s * hw, p.lid(aT, s * hw) + h(aT))], [p.ux, 0, p.uz], [CONC_D]);
       });
       // ---- portal head wall: face over the opening, cap on top (the footprint starts at its back), side reveals
       {
@@ -155,14 +159,14 @@
         const S = new ctx.ground.Acc();
         const aT = p.a0 - p.tunnel;
         const aU = p.a1;
-        const stations = [aT, p.aLo]; for (let a = p.a0; a < aU - 1e-6; a += 4) stations.push(a); stations.push(aU);
-        const bs = [-hw, 0, hw];
+        const stations = [aT, p.aLo]; for (let a = p.a0; a < aU - 1e-6; a += 4) stations.push(a); stations.push(aU, aU + END_LAP);
+        const bs = [-cw, -hw, 0, hw, cw];       // out to the coping: the terrain clip of the pit reaches it, and the coping ends before the floor does
         const shade = (aa) => (aa < p.a0 ? 0.12 + 0.88 * Math.max(0, 1 - (p.a0 - aa) / 3.8) : 1) * 0.92;
         const base = S.count;
         // normal of the slope plane (the ramp has the same grade everywhere)
         const gr = p.c1 + p.g; const nl = Math.hypot(gr, 1);
         stations.forEach((aa) => {
-          const y = p.floorTop(aa);
+          const y = p.floorTop(aa) - (aa > aU ? 0.35 : 0);   // the lap under the street
           bs.forEach((b) => { const q = p.pos(aa, b, y); const sh = shade(aa); S.vert(q[0], q[1], q[2], -gr * p.ux / nl, 1 / nl, -gr * p.uz / nl, ctx.ground.MAT.ASPH, sh, sh, sh * 1.02); });
         });
         for (let r = 0; r < stations.length - 1; r++) for (let c = 0; c < bs.length - 1; c++) {

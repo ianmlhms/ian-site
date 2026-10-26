@@ -1415,6 +1415,9 @@
         const f0 = sl.dir === 'in' ? Math.max(sl.s0, sl.s1 - 5) : sl.s0;
         const f1 = sl.dir === 'in' ? sl.s1 : Math.min(sl.s1, sl.s0 + 5);
         flatStrip(batch.misc, f0, f1 + (sl.dir === 'in' ? 1.2 : 0), slotLatL, SLOT_IN_R, (f) => f.pos.y - 0.28, [0.46, 0.46, 0.44], true, { step: 1 });
+        // beside the walls, along the whole approach: the terrain cells that straddle a wall are culled (steep), and where they reach into the corridor beyond the concrete floor they left a notch
+        // (seen from the cab as a magenta / sky coloured gap at the wall foot).  A dark apron just above the wall foot closes it; the sunk terrain (and the tram bed on it) lies above.
+        [[slotLatL, (s) => slotLatL(s) + APRON_W], [(s) => SLOT_IN_R - APRON_W, () => SLOT_IN_R]].forEach(([l0, l1]) => flatStrip(batch.misc, sl.s0, sl.s1, l0, l1, (f) => f.pos.y - 0.45, [0.4, 0.4, 0.38], true, { step: 2 }));
       }
     }
     /* concrete box-girder deck with parapets, piers and abutments (the named Pont Rouge / Pont Adolphe leave their detail to the landmarks) */
@@ -1611,7 +1614,7 @@
       // open approaches in front of / behind a tunnel (never across a platform)
       const stationsAvoid = (a, b) => track.stations.some((st) => b > st.platformStart - 3 && a < st.platformEnd + 3);
       track.tunnels.forEach((tn) => {
-        [[tn.s0 - 28, tn.s0 - 0.2, 'in'], [tn.s1 + 0.2, tn.s1 + 28, 'out']].forEach(([a, b, dir]) => {
+        [[tn.s0 - 28, tn.s0, 'in'], [tn.s1, tn.s1 + 28, 'out']].forEach(([a, b, dir]) => {
           let aa = Math.max(lo, a); let bb = Math.min(hi, b);
           track.stations.forEach((st) => { if (bb > st.platformStart - 3 && aa < st.platformEnd + 3) { if (dir === 'in') aa = Math.max(aa, st.platformEnd + 3); else bb = Math.min(bb, st.platformStart - 3); } });
           track.tunnels.forEach((o) => { if (o !== tn) { if (dir === 'in' && o.s1 > aa && o.s1 < bb) aa = o.s1 + 0.2; if (dir === 'out' && o.s0 > aa && o.s0 < bb) bb = o.s0 - 0.2; } });
@@ -1699,6 +1702,8 @@
        - a collar COLLAR_W m wide along the outside of every wall (tunnel boxes and open approaches), following the shelf blend of blendTrack exactly.
        Painted like the tile (terrain splat material), 3 cm above the (culled) terrain. */
     const COLLAR_W = 16;
+    const APRON_W = 2.2;     // see buildSlotWalls
+    const WALL_LAP = 0.06;   // the walls end above the collar / cap, which lies 3 cm above the shelf: a wall that stopped at the shelf left a hairline slit (the sky / far ground showed through along every trench wall)
     const COLLAR_D = [0, 0.5, 1, 1.5, 2, 3, 4, 5, 6.5, 8, 10, 12, 14, COLLAR_W];
     const capY = (sl, s, lat) => { const L = slotLatL(s); const u = clamp((lat - L) / (SLOT_IN_R - L), 0, 1); return Math.max(lerp(slotShelf(sl, s, -1), slotShelf(sl, s, 1), u), frame(s).pos.y + 6.45); };
     const collarY = (sl, s, side, d, x, z) => shelfBlend(slotShelf(sl, s, side), rawG(x, z), d);
@@ -1730,20 +1735,23 @@
           // left collar (outermost first), right collar
           addStrip(mk((f, ss) => { const L = slotLatL(ss); return COLLAR_D.slice().reverse().map((d) => { const x = f.pos.x + f.right.x * (L - d); const z = f.pos.z + f.right.z * (L - d); return [x, collarY(sl, ss, -1, d, x, z) + 0.03, z]; }); }));
           addStrip(mk((f, ss) => COLLAR_D.map((d) => { const lat = SLOT_IN_R + d; const x = f.pos.x + f.right.x * lat; const z = f.pos.z + f.right.z * lat; return [x, collarY(sl, ss, 1, d, x, z) + 0.03, z]; })));
-          // walls + coping, from exactly the shelf heights the collar starts at
+          // walls + coping, from exactly the shelf heights the collar starts at.  The segment is clipped to the slot ([wa, wb]): a segment that only partly lies in the slot used to be skipped,
+          // which left up to 3 m of every approach wall missing at both ends (a see-through gap beside the portal)
+          const wa = Math.max(sa, sl.s0); const wb = Math.min(sb, sl.s1);
           const wallQuad = (side, yBot, yTop, col) => {
-            const rows = [sa, sb].map((ss) => { const f = frame(ss); const lat = side < 0 ? slotLatL(ss) : SLOT_IN_R; return { x: f.pos.x + f.right.x * lat, z: f.pos.z + f.right.z * lat, yb: yBot(f, ss), yt: yTop(f, ss), nx: -f.right.x * side, nz: -f.right.z * side }; });
+            const rows = [wa, wb].map((ss) => { const f = frame(ss); const lat = side < 0 ? slotLatL(ss) : SLOT_IN_R; return { x: f.pos.x + f.right.x * lat, z: f.pos.z + f.right.z * lat, yb: yBot(f, ss), yt: yTop(f, ss), nx: -f.right.x * side, nz: -f.right.z * side }; });
             const v = rows.map((r) => [wm.vert(r.x, r.yb, r.z, r.nx, 0, r.nz, 0, 0, col), wm.vert(r.x, r.yt, r.z, r.nx, 0, r.nz, 0, 1, col)]);
             wm.quad(v[0][0], v[1][0], v[1][1], v[0][1]);
           };
-          const mine = sa >= sl.s0 - 1e-6 && sb <= sl.s1 + 1e-6 && Math.floor((fm.pos.x + ox) / TS_) === t.info.i && Math.floor((fm.pos.z + oz) / TS_) === t.info.j;   // walls: once, by the tile that holds the segment
+          const fw = frame((wa + wb) / 2);
+          const mine = wb - wa > 1e-6 && Math.floor((fw.pos.x + ox) / TS_) === t.info.i && Math.floor((fw.pos.z + oz) / TS_) === t.info.j;   // walls: once, by the tile that holds the segment
           if (mine) [-1, 1].forEach((side) => {
             if (sl.kind === 'open') {
-              wallQuad(side, (f) => f.pos.y - 0.5, (f, ss) => slotShelf(sl, ss, side), CONC);
-              const cop = mk((f, ss) => { const L = slotLatL(ss); const l0 = side < 0 ? L - 0.45 : SLOT_IN_R; const l1 = side < 0 ? L : SLOT_IN_R + 0.45; return [P(f, l0, slotShelf(sl, ss, side) + 0.02), P(f, l1, slotShelf(sl, ss, side) + 0.02)]; });
+              wallQuad(side, (f) => f.pos.y - 0.5, (f, ss) => slotShelf(sl, ss, side) + WALL_LAP, CONC);
+              const cop = [wa, wb].map((ss) => { const f = frame(ss); const L = slotLatL(ss); const l0 = side < 0 ? L - 0.45 : SLOT_IN_R; const l1 = side < 0 ? L : SLOT_IN_R + 0.45; return [P(f, l0, slotShelf(sl, ss, side) + 0.02), P(f, l1, slotShelf(sl, ss, side) + 0.02)]; });
               const b0 = wm.count; cop.forEach((row) => row.forEach((v) => wm.vert(v[0], v[1], v[2], 0, 1, 0, 0, 0, CONC_L)));
               wm.quad(b0, b0 + 1, b0 + 3, b0 + 2);
-            } else wallQuad(side, (f) => f.pos.y + 5.6, (f, ss) => Math.max(f.pos.y + 5.7, capY(sl, ss, side < 0 ? slotLatL(ss) : SLOT_IN_R)), TUN_WALL);
+            } else wallQuad(side, (f) => f.pos.y + 5.6, (f, ss) => Math.max(f.pos.y + 5.7, capY(sl, ss, side < 0 ? slotLatL(ss) : SLOT_IN_R)) + WALL_LAP, TUN_WALL);
           });
           if (sl.kind === 'cover') addStrip(mk((f, ss) => { const L = slotLatL(ss); const out = []; for (let k = 0; k <= 6; k++) { const lat = L + ((SLOT_IN_R - L) * k) / 6; out.push(P(f, lat, capY(sl, ss, lat) + 0.03)); } return out; }));
         }
