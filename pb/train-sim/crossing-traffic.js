@@ -211,6 +211,14 @@
               arms.push(arm);
             });
           }
+        } else if (sideInfo.type === 'real') {
+          const road = c.roads.find((r) => r.id === 'x' + c.index + suffix);
+          const tail = c.roads.find((r) => r.id === 'x' + c.index + suffix + 'g');
+          if (road) {
+            const arm = (tail ? centre(tail, true) : []).concat(centre(road, true));
+            arm.narrow = road.kind === 'gravel';
+            arms.push(arm);
+          }
         } else if (sideInfo.type === 'bend') {
           const road = c.roads.find((r) => r.id === 'b' + c.index);
           const tail = c.roads.find((r) => r.id === 'b' + c.index + 'g');

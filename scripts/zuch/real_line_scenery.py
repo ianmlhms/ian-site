@@ -256,12 +256,25 @@ def places_of_leg(g, places):
     return res
 
 
-def crossings_of_leg(g, feats_crossings, roads_out):
-    out = []
-    for c in feats_crossings:
-        if not (g.a <= c["s"] <= g.b):
-            continue
-        sg = float(g.game_of(c["s"]))
+def crossings_of_leg(g, feats_crossings, roads_out, meta=None, arm_ctx=None):
+    """The level crossings the game layout kept in this leg (pieces flagged `crossing`), at their game centre: s, barrier, the hint roads left / right
+    (nearest ribbon end) and, when arm_ctx is given, the real road arms (real_line_crossings).  Without `meta` every OSM crossing of the leg is listed."""
+    if meta is None:
+        spots = [(float(g.game_of(c["s"])), c) for c in feats_crossings if g.a <= c["s"] <= g.b]
+    else:
+        spots = []
+        for pc in meta.get("pieces", []):
+            if not pc.get("crossing"):
+                continue
+            mid = (pc["real0"] + pc["real1"]) / 2
+            sg = float(np.interp(mid, g.real, g.game))
+            cand = [c for c in feats_crossings if g.a <= c["s"] <= g.b]
+            if not cand:
+                continue
+            c = min(cand, key=lambda c: abs(c["s"] - (g.a + mid)))
+            spots.append((sg, c))
+    out, arms_abs = [], []
+    for sg, c in spots:
         near = {"l": None, "r": None}
         for rd in roads_out:
             pts = np.array(rd["p"])
@@ -274,5 +287,12 @@ def crossings_of_leg(g, feats_crossings, roads_out):
                     v = float(lat[sel][np.abs(lat[sel]).argmin()])
                     if near[side] is None or abs(v) < abs(near[side][0]):
                         near[side] = (v, rd["c"])
-        out.append({"s": round(sg, 1), "barrier": c.get("barrier", ""), "l": near["l"], "r": near["r"]})
-    return out
+        rec = {"s": round(sg, 1), "barrier": c.get("barrier", ""), "l": near["l"], "r": near["r"]}
+        if arm_ctx is not None and c.get("xy"):
+            arms = arm_ctx["fn"](g, c["xy"], sg)
+            rec["arms"] = {k: v for k, v in arms.items() if v}
+            for v in arms.values():
+                if v:
+                    arms_abs.append([(sg + a, l) for a, l in v["p"]])
+        out.append(rec)
+    return out, arms_abs

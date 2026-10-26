@@ -41,9 +41,10 @@ GRADE_MAX = 1.0            # authored grade % (the sim multiplies by 2.4 and cla
 BRIDGE_MIN_REAL = 28.0
 TUNNEL_MIN_REAL = 45.0
 MIN_PIECE_GAME = 30.0
-CROSS_END_GAME = 150.0     # game metres a crossing keeps from the station blocks at the ends of its leg
-CROSS_EQUIP_GAME = 150.0   # ... from bridges and tunnels
-CROSS_CROSS_GAME = 260.0   # ... from the next crossing
+CROSS_END_GAME = 20.0     # game metres a crossing keeps from the station blocks at the ends of its leg
+CROSS_EQUIP_GAME = 35.0   # ... from bridges and tunnels
+CROSS_LOST_DEG = 3.5       # a crossing on a curve is straightened when the window loses at most this heading change
+CROSS_CROSS_GAME = 60.0   # ... from the next crossing
 SIDE_SEARCH = 90.0         # platforms within this distance of the track decide the platform side
 
 
@@ -371,6 +372,8 @@ def build_leg(attrs, a, b, length_game, bridges=(), tunnels=(), crossings=(), bi
         w["s0"], w["s1"] = clamp(w["s0"], 0, span), clamp(w["s1"], 0, span)
         if clean and w["s0"] < clean[-1]["s1"] + min_real * 0.5:
             if w["kind"] == "crossing":
+                if os.environ.get("ZUCH_DEBUG"):
+                    print("   [crossing dropped: overlaps %s] %s real %.0f" % (clean[-1]["kind"], name, (w["s0"] + w["s1"]) / 2))
                 continue          # a crossing next to a bridge / tunnel / crossing: dropped
             if clean[-1]["kind"] == "crossing":
                 clean.pop()
@@ -389,10 +392,14 @@ def build_leg(attrs, a, b, length_game, bridges=(), tunnels=(), crossings=(), bi
             gap = (o["s0"] - w["s1"]) if o["s0"] >= w["s1"] else (w["s0"] - o["s1"])
             need = CROSS_CROSS_GAME if o["kind"] == "crossing" else CROSS_EQUIP_GAME
             if gap < need * k:
+                if os.environ.get("ZUCH_DEBUG"):
+                    print("      culprit %s gap %.0f real (need %.0f) at %.0f-%.0f" % (o["kind"], gap, need * k, o["s0"], o["s1"]))
                 return False
         return True
     for w in [w for w in wins if w["kind"] == "crossing"]:
         if not far_enough(w):
+            if os.environ.get("ZUCH_DEBUG"):
+                print("   [crossing dropped: too close] %s real %.0f of %.0f" % (name, (w["s0"] + w["s1"]) / 2, span))
             wins.remove(w)
     # a crossing sits on a straight: move it to the nearest straight (within 300 real m) or drop it
     arcs = [p for p in fitp if p["kind"] == "c"]
@@ -404,8 +411,12 @@ def build_leg(attrs, a, b, length_game, bridges=(), tunnels=(), crossings=(), bi
         ctr = (w["s0"] + w["s1"]) / 2
         half = (w["s1"] - w["s0"]) / 2
         if in_arc(ctr - half) or in_arc(ctr + half):
+            # a crossing on a gentle curve stays where it is: its window is made straight (the heading change inside the window is lost, <= CROSS_LOST_DEG)
+            lost = sum(max(0.0, min(p["s1"], ctr + half) - max(p["s0"], ctr - half)) / max(p["R"], 1.0) for p in arcs)
+            if math.degrees(lost) <= CROSS_LOST_DEG:
+                continue
             moved = None
-            for d in range(10, 300, 10):
+            for d in range(10, 270, 10):
                 for sg in (-1, 1):
                     c2 = ctr + sg * d
                     if half < c2 < span - half and not in_arc(c2 - half) and not in_arc(c2 + half) and all(c2 + half < o["s0"] or c2 - half > o["s1"] for o in wins if o is not w):
@@ -414,6 +425,8 @@ def build_leg(attrs, a, b, length_game, bridges=(), tunnels=(), crossings=(), bi
                 if moved:
                     break
             if moved is None:
+                if os.environ.get("ZUCH_DEBUG"):
+                    print("   [crossing dropped: no straight] %s real %.0f of %.0f" % (name, ctr, span))
                 wins.remove(w)
                 continue
             w["s0"], w["s1"] = moved - half, moved + half
@@ -569,7 +582,7 @@ def crossings_of(attrs, railpoints):
     for p in railpoints:
         if p["t"].get("railway") == "level_crossing" and line.distance(p["g"]) < 9:
             out.append({"s": float(line.project(p["g"])), "barrier": p["t"].get("crossing:barrier") or p["t"].get("crossing") or "", "id": p["id"],
-                        "lat": 0.0})
+                        "lat": 0.0, "xy": [float(p["g"].x), float(p["g"].y)]})
     out.sort(key=lambda c: c["s"])
     merged = []
     for c in out:
@@ -888,10 +901,12 @@ def write_layout(segs, legs_meta, stations, path_json, path_meta):
 
 def write_features(segs, legs_meta, stations, res, tiles, dem, land):
     import real_line_scenery as sc
+    import real_line_crossings as rc
     waters = [w for w in tiles["waterways"] if w["t"].get("waterway") in ("river", "canal", "stream")]
     wtree = STRtree([w["g"] for w in waters])
     roads = [w for w in tiles["highways"] if w["t"].get("highway") in sc.ROAD_CLASSES]
     rtree = STRtree([w["g"] for w in roads])
+    road_lines = [w["g"] for w in roads]
     out = {}
     # the station blocks (290 m: approach + platform + approach) get their own scenery records "st:<name>": the real stretch around the stop, 1:1
     blocks = {}
@@ -904,6 +919,10 @@ def write_features(segs, legs_meta, stations, res, tiles, dem, land):
         attrs, stops, feats, legs, _, _ = res[route]
         g = sc.LegGeom(attrs, meta)
         rd = sc.roads_of_leg(g, roads, rtree)
+        is_block = lid.startswith("st:")
+        arm_ctx = None if is_block else {"fn": lambda gg, xy, sgc, _l=LineString(attrs.xy): rc.arms_of_crossing(gg, xy, sgc, roads, rtree, _l, road_lines, rtree)}
+        cross, arms_abs = sc.crossings_of_leg(g, feats["crossings"], rd, meta=None if is_block else all_meta[lid], arm_ctx=arm_ctx)
+        rd = rc.drop_arm_ribbons(rd, arms_abs)
         out[lid] = {
             "L": round(g.length, 1),
             "land": sc.land_raster(g, land),
@@ -912,7 +931,7 @@ def write_features(segs, legs_meta, stations, res, tiles, dem, land):
             "roads": rd,
             "relief": sc.relief(g, dem),
             "places": sc.places_of_leg(g, tiles["places"]),
-            "crossings": sc.crossings_of_leg(g, feats["crossings"], rd),
+            "crossings": cross,
         }
         print("  features", lid, meta["from"], "->", meta["to"], "roads", len(rd), "water", len(out[lid]["water"]), "places", len(out[lid]["places"]), "crossings", len(out[lid]["crossings"]))
     doc = {"version": 1, "row": sc.ROW_M, "col": sc.COL_M, "lat0": sc.LAT0, "cols": sc.COLS, "far": {"row": sc.FAR_ROW, "col": sc.FAR_COL, "lat0": sc.FAR_LAT0, "cols": sc.FAR_COLS}, "classes": __import__("real_line_land").CLASS_NAMES, "legs": out}

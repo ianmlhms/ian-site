@@ -13,12 +13,13 @@
  *   real.roads        [{ c, w, p: [[s, lat], ...] }]            absolute s
  *   real.places       [{ name, kind, s, lat }]
  *   real.crossingHints(index) -> { s, barrier, l, r } | null    the real crossing the index-th crossing of the track stands for
+ *   real.crossingNear(s, tol) -> { s, barrier, l, r, arms: { l, r } } | null   the real crossing at s (arms = the OSM roads of both sides, W2b)
  *   real.mirror(L)    the same data for the return direction (s -> L - s, lat -> -lat) */
 (function () {
   'use strict';
   const TS = (window.TS = window.TS || {});
   const TAG = '[Lokféierer] real line: ';
-  const DATA_URL = '/pb/train-sim/data/real/mosel-features.json?v=1';
+  const DATA_URL = '/pb/train-sim/data/real/mosel-features.json?v=2';
   const CLASS = Object.freeze({ field: 0, meadow: 1, forest: 2, vine: 3, resid: 4, indus: 5, water: 6, orchard: 7, urban: 8, scrub: 9, quarry: 10, cemetery: 11, park: 12 });
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   let cache = null;
@@ -55,7 +56,7 @@
       l.f.water.forEach((w) => water.push({ s0: l.s0 + w.s0 * l.k, s1: l.s0 + w.s1 * l.k, side: w.side, off: w.off, half: w.half, name: w.name, kind: w.kind }));
       l.f.roads.forEach((r) => roads.push({ c: r.c, w: r.w, n: r.n, ref: r.ref, p: r.p.map(([s, lat]) => [l.s0 + s * l.k, lat]), leg: l.id }));
       l.f.places.forEach((p) => places.push({ name: p.name, kind: p.kind, s: l.s0 + p.s * l.k, lat: p.lat }));
-      l.f.crossings.forEach((c) => crossings.push({ s: l.s0 + c.s * l.k, barrier: c.barrier, l: c.l, r: c.r, leg: l.id }));
+      l.f.crossings.forEach((c) => crossings.push({ s: l.s0 + c.s * l.k, barrier: c.barrier, l: c.l, r: c.r, arms: c.arms || null, leg: l.id }));
       const r = l.f.land;
       rasters.push({ s0: l.s0, s1: l.s1, ds: r.ds * l.k, n: r.n, rows: r.rows, parcels: r.parcels || null });
       if (l.f.far) fars.push({ s0: l.s0, s1: l.s1, ds: l.f.far.ds * l.k, n: l.f.far.n, rows: l.f.far.rows });
@@ -115,6 +116,8 @@
     const api = {
       water, roads, places, crossings, reliefAt, landAt, farAt, rowsIn, CLASS, lat0: doc.lat0, col: doc.col, cols: doc.cols,
       crossingHints: (index) => crossings[index] || null,
+      /* the real crossing within `tol` m of s (arms: the real roads on the left / right, see crossing-roads.js) */
+      crossingNear: (s, tol) => crossings.find((c) => Math.abs(c.s - s) <= (tol || 30)) || null,
       mirrored: false,
     };
     api.mirror = (L) => Object.assign({}, api, {

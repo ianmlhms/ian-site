@@ -43,6 +43,17 @@
   const MAX_GRADE = 0.055;         // steepest road profile (5.5 %)
   const START_RAMP = 40;           // m over which the profile joins the crossing level
   const INFLUENCE = 40;            // bounding box margin of a road for the terrain adjustment
+  /* ---- real arms (the road of the real crossing, from OSM: data/real/mosel-features.json crossings[].arms) */
+  const ARM_MARGIN_TUNNEL = 45;    // a real arm keeps this far from tunnels / viaducts along the track ...
+  const ARM_MARGIN_STATION = 60;   // ... and from platforms
+  const ARM_MIN_LEN = 38;          // shorter arms are not used (the synthetic road takes over)
+  const ARM_MAX_SHIFT = 42;        // the game crossing may sit this far from the real one along the track
+  const ARM_LAT_LIMIT = 146;       // the strip ends at +-150 m
+  const ARM_SAMPLE = 3;
+  const ARM_END_PAD = 12;          // an asphalt arm that ends in the open gets a gravel turning place of this length
+  const ARM_ROW_STEP = 3;
+  const ARM_ROW_MAX = 64;
+  const ARM_HW = { primary: 3.3, secondary: 3.1, tertiary: 2.9, unclassified: 2.7, residential: 2.6, living_street: 2.5, service: 2.3, track: 1.5 };
 
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const lerp = (a, b, t) => a + (b - a) * t;
@@ -208,16 +219,68 @@
   }
 
   /* how far along the track (direction q = +1 / -1) from sc a road may run before it meets a tunnel, a viaduct, a station or the end of the route */
-  function reach(ctx, sc, q) {
+  function reach(ctx, sc, q, mTunnel, mStation) {
+    const mT = mTunnel === undefined ? MARGIN_TUNNEL : mTunnel;
+    const mS = mStation === undefined ? MARGIN_STATION : mStation;
     let limit = q > 0 ? ctx.length - MARGIN_END - sc : sc - MARGIN_END;
     const consider = (a, b, margin) => {
       if (q > 0 && b > sc) limit = Math.min(limit, a - margin - sc);
       if (q < 0 && a < sc) limit = Math.min(limit, sc - (b + margin));
     };
-    (ctx.tunnels || []).forEach((t) => consider(t.s0, t.s1, MARGIN_TUNNEL));
-    (ctx.bridges || []).forEach((t) => consider(t.s0, t.s1, MARGIN_TUNNEL));
-    (ctx.stations || []).forEach((st) => consider(st.platformStart !== undefined ? st.platformStart : st.s - 100, st.platformEnd !== undefined ? st.platformEnd : st.s + 100, MARGIN_STATION));
+    (ctx.tunnels || []).forEach((t) => consider(t.s0, t.s1, mT));
+    (ctx.bridges || []).forEach((t) => consider(t.s0, t.s1, mT));
+    (ctx.stations || []).forEach((st) => consider(st.platformStart !== undefined ? st.platformStart : st.s - 100, st.platformEnd !== undefined ? st.platformEnd : st.s + 100, mS));
     return Math.max(0, limit);
+  }
+
+  /* The real road of a crossing (OSM arm, game metres a along the track from the crossing, l to the right) as control points for one side `sd`: it starts at the
+     end of the crossing apron (|l| = |l0|), is smoothed (corner cutting) and cut where it would run into a tunnel, viaduct or platform or beyond the strip.
+     Returns { cls, ctrl: [{ a, l }], end } or null when the arm is unusable (too short, too far from the game crossing). */
+  function realArm(ctx, arm, sd, l0, sc) {
+    if (!arm || !arm.p || arm.p.length < 2) return null;
+    const dens = [];
+    for (let i = 0; i < arm.p.length - 1; i++) {
+      const [a0, l0p] = arm.p[i]; const [a1, l1p] = arm.p[i + 1];
+      const n = Math.max(1, Math.ceil(Math.hypot(a1 - a0, l1p - l0p) / ARM_SAMPLE));
+      for (let k = 0; k < n; k++) dens.push({ a: lerp(a0, a1, k / n), l: lerp(l0p, l1p, k / n) });
+    }
+    const last = arm.p[arm.p.length - 1];
+    dens.push({ a: last[0], l: last[1] });
+    /* the part beyond the apron on this side */
+    const out = dens.filter((p) => sd * p.l > sd * l0 && sd * p.l <= ARM_LAT_LIMIT);
+    if (out.length < 3) return null;
+    const first = out[0];
+    // along-track position of the arm where it leaves the apron: the game crossing may be shifted against the real one
+    const prev = dens[Math.max(0, dens.indexOf(first) - 1)];
+    const t = (sd * l0 - sd * prev.l) / ((sd * first.l - sd * prev.l) || 1);
+    const aRef = lerp(prev.a, first.a, clamp(t, 0, 1));
+    if (Math.abs(aRef) > ARM_MAX_SHIFT) return null;
+    const blend = Math.max(26, Math.abs(aRef) * 1.2);
+    let pts = [{ a: 0, l: l0 }].concat(out.map((p) => ({ a: p.a - aRef * (1 - smooth01((Math.abs(p.l) - Math.abs(l0)) / blend)), l: p.l })));
+    /* corner cutting (keeps the ends) */
+    for (let pass = 0; pass < 2; pass++) {
+      const q = [pts[0]];
+      for (let i = 0; i < pts.length - 1; i++) {
+        const A = pts[i]; const B = pts[i + 1];
+        if (i > 0) q.push({ a: lerp(A.a, B.a, 0.25), l: lerp(A.l, B.l, 0.25) });
+        if (i < pts.length - 2) q.push({ a: lerp(A.a, B.a, 0.75), l: lerp(A.l, B.l, 0.75) });
+      }
+      q.push(pts[pts.length - 1]);
+      pts = q;
+    }
+    /* keep clear of tunnels, viaducts and platforms along the track */
+    const rp = reach(ctx, sc, 1, ARM_MARGIN_TUNNEL, ARM_MARGIN_STATION);
+    const rm = reach(ctx, sc, -1, ARM_MARGIN_TUNNEL, ARM_MARGIN_STATION);
+    let end = arm.end;
+    const cut = [];
+    for (let i = 0; i < pts.length; i++) {
+      if (pts[i].a > rp || pts[i].a < -rm) { end = 'lat'; break; }
+      cut.push(pts[i]);
+    }
+    let len = 0;
+    for (let i = 1; i < cut.length; i++) len += Math.hypot(cut[i].a - cut[i - 1].a, cut[i].l - cut[i - 1].l);
+    if (cut.length < 4 || len < ARM_MIN_LEN) return null;
+    return { cls: arm.c, ctrl: cut, end, aRef };
   }
 
   function planCrossing(ctx, cr, index, frameOf, world, roadsOut) {
@@ -276,8 +339,28 @@
     const junctions = [];       // T junctions: { sd, l, hwCross, hwPar } → fillets in the mesh stage
     const sides = [sideA, -sideA];
     const info = { layout, sides: [] };
+    const hint = ctx.realCrossing ? ctx.realCrossing(sc) : null;
     sides.forEach((sd, k) => {
       const first = k === 0;
+      /* the road of the real crossing (OSM): followed on this side to the real junction with the parallel road */
+      const ra = hint && hint.arms ? realArm(ctx, hint.arms[sd > 0 ? 'r' : 'l'], sd, sd > 0 ? lHi : lLo, sc) : null;
+      if (ra) {
+        const gravel = ra.cls === 'track';
+        const hw = ARM_HW[ra.cls] || HW_CROSS;
+        polylines.push(make('x' + index + (sd > 0 ? 'r' : 'l'), gravel ? 'gravel' : 'asphalt', hw, !gravel, ra.ctrl, 'cross'));
+        const tip = ra.ctrl[ra.ctrl.length - 1];
+        if (!gravel && ra.end === 'open') polylines.push(make('x' + index + (sd > 0 ? 'r' : 'l') + 'g', 'gravel', HW_LANE, false, straightLine(tip.a, tip.l, tip.a, tip.l + sd * ARM_END_PAD), 'tail', 'x' + index + (sd > 0 ? 'r' : 'l'), 'end'));
+        // rows across the road wherever it runs along the track, columns where it runs across
+        const aLo = Math.min(...ra.ctrl.map((q) => q.a)) - 6; const aHi = Math.max(...ra.ctrl.map((q) => q.a)) + 6;
+        const stepA = Math.max(ARM_ROW_STEP, (aHi - aLo) / ARM_ROW_MAX);
+        for (let a = aLo; a <= aHi + 1e-6; a += stepA) rows.push(sc + a);
+        ra.ctrl.forEach((q, i) => {
+          const nx = ra.ctrl[Math.min(ra.ctrl.length - 1, i + 1)]; const pv = ra.ctrl[Math.max(0, i - 1)];
+          if (i % 2 === 0 && Math.abs(nx.a - pv.a) > 0.45 * Math.abs(nx.l - pv.l)) lats.push({ lat: Math.round(q.l * 2) / 2, s0: sc + q.a - 14, s1: sc + q.a + 14 });
+        });
+        info.sides.push({ sd, type: 'real', j: tip.l, end: ra.end, cls: ra.cls });
+        return;
+      }
       const j = J(sd);
       const tField = layout === 'tField';
       const tBend = layout === 'tBend';
