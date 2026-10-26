@@ -1,0 +1,67 @@
+{
+ "route": "wittlich",
+ "station": "Tréier Hafestrooss",
+ "refs": "Trier-Hafenstrasse",
+ "views": [
+  {
+   "photo": "The first train rolls into Haltepunkt Trier-Hafenstraße, Germany, 26 February 2025.jpg",
+   "pos": [
+    4,
+    10,
+    1.7
+   ],
+   "look": [
+    6,
+    -60,
+    2.2
+   ],
+   "fov": 60,
+   "note": "platform and hall"
+  },
+  {
+   "photo": "Haltepunkt Trier-Hafenstraße under construction, 9 July 2024.jpg",
+   "pos": [
+    4,
+    60,
+    1.5
+   ],
+   "look": [
+    0,
+    -60,
+    1.8
+   ],
+   "fov": 60,
+   "note": "track with noise wall"
+  },
+  {
+   "photo": "Construction site of the Haltepunkt Trier-Hafenstraße, Germany, 9 July 2024.jpg",
+   "pos": [
+    45,
+    -60,
+    2.0
+   ],
+   "look": [
+    5,
+    -30,
+    1.5
+   ],
+   "fov": 64,
+   "note": "from the yard"
+  },
+  {
+   "photo": "Bahnhof Trier-Hafenstraße im Bau (26.08.2024).jpg",
+   "pos": [
+    -30,
+    0,
+    2.0
+   ],
+   "look": [
+    -5,
+    0,
+    1.5
+   ],
+   "fov": 64,
+   "note": "construction 8/2024"
+  }
+ ]
+}

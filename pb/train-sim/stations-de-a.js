@@ -105,6 +105,7 @@
     (fr.bin || []).forEach((z) => f.bin(toward(out(fr.width - 0.6)), z, '#3b4046'));
     if (fr.sign) f.sign(toward(out(0.9)), fr.signZ || 0, fr.sign, 'blue');
     if (fr.name) dbNameBoard(api, f, toward(out(1.0)), fr.nameZ || 0, fr.name);
+    if (cfg.extra) cfg.extra({ api, k, f, toward });
     if (cfg.wall) k.vc.box(k.X(sx * cfg.wall[0]), H + 0.5, cfg.wall[1], cfg.wall[2], 1.0, 0.5, col('#9c9e9b'));
   }
 
@@ -172,6 +173,41 @@
         look: { frame: '#b9bec2', roof: '#e9ecee' },
         near: { shelters: [], steles: [-30, 60], masts: [-60, -20, 25, 65], bench: [-8], bin: [38] },
         far: { track: 3.6, edge: 5.7, width: 4.0, z0: -87, z1: 82, shelters: [18], shelterX: 7.6, steles: [-40, 30], masts: [-65, -25, 20, 60], bench: [-12], name: 'Pallien', nameZ: -10 },
+      });
+    },
+  });
+
+  /* ================================================================ TRÉIER HAFESTROOSS (Trier-Hafenstrasse, new stop since Feb 2025 in the freight yard area)
+   * Refs: ~/Library/Caches/zuch-refs/Trier-Hafenstrasse (Commons: "The first train rolls into Haltepunkt Trier-Hafenstraße" 26 Feb 2025, "Station sign of Haltepunkt Trier-Hafenstraße", construction photos
+   * 2024).  Dark-grey concrete-paver platforms with a light tactile strip, tall maroon noise-barrier walls beside the tracks, and a perforated corten-steel (rust brown) entrance hall with the lift
+   * block ("Ausgang" sign) on the platform; no station building.  The patch has a wide left platform (x -9.7 .. -2.3, z -91 .. 95: island towards a track at x ~ -11.5) and a right platform (x 5.7 .. 8.2,
+   * z -95 .. 89) beside a track at x ~4; the OSM yard tracks are 35 m and further to the right (Trier freight yard, from the patch).  The photos do not show which side the hall belongs to
+   * (see report); it is placed on the right platform. */
+  const CORTEN = '#8b4a2b';
+  const NOISE_WALL = '#85403c';
+  function noiseWall(k, api, x, z0, z1) {
+    k.vc.box(k.X(api.sx * x), api.FORM_Y + 1.7, (z0 + z1) / 2, 0.25, 3.4, z1 - z0, api.col(NOISE_WALL));
+  }
+  reg('Tréier Hafestrooss', {
+    canopy: false,
+    furniture: false,
+    build(api) {
+      const { sx, H, col } = api;
+      simpleStop(api, {
+        near: { shelters: [-75, -90], steles: [-50, 40], masts: [-85, -50, -15, 20, 55, 85], bench: [-30], bin: [10] },
+        tracks: [-11.5],
+        far: { track: 4.0, edge: 5.7, width: 2.5, z0: -95, z1: 89, shelters: [-75, -90], steles: [-50, 40], masts: [-80, -45, -10, 25, 60], bench: [-30], name: 'Hafenstraße', nameZ: 20, sign: '2', signZ: 55 },
+        extra({ k, f, toward }) {
+          noiseWall(k, api, -14.3, -100, 100);
+          noiseWall(k, api, 12.4, -100, 100);
+          // corten-steel entrance hall on the right platform: roof slab, back wall and the lift block with its "Ausgang" board
+          const hx = 7.2; const hz = -18;
+          k.vc.box(k.X(sx * hx), H + 3.2, hz, 2.6, 0.2, 9.0, col(CORTEN));
+          k.vc.box(k.X(sx * (hx + 1.15)), H + 1.6, hz, 0.2, 3.2, 9.0, col(CORTEN));
+          [-4.4, 4.4].forEach((d) => k.vc.box(k.X(sx * hx), H + 1.6, hz + d, 2.6, 3.2, 0.2, col(CORTEN)));
+          k.vc.box(k.X(sx * 7.0), H + 1.6, hz + 7.6, 2.0, 3.2, 2.6, col('#a15a31'));
+          k.vc.box(k.X(sx * 5.95), H + 2.7, hz + 7.6, 0.06, 0.5, 1.5, col('#1d3f8c'));
+        },
       });
     },
   });
