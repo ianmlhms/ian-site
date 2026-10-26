@@ -76,3 +76,14 @@ Test hooks: `?test=1` -> `__tsTest.setFreeCam`, `placeAt`, `internals()`, `track
   which on a real-line gradient is metres off the group origin (platform middle); now relative to `group.position.y`.  Probes: `scripts/zuch/side_probe.mjs <route>` lists stations whose built platform side differs from the declared side (all routes east/wittlich/trier: none).
 * GATES (26 Oct, after commit 'stationReport ... grade-proof'): `run_all.mjs train` 5/5 PASS (train-sim, -audio, -touch, -career-lock, -world), check_site: only the pre-existing karttracker-ios-privacy orphan, cv_head PROBLEMS: 0, hole scan east: no holes.
 * NOT STARTED (per coordinator: gates first): real crossings, station sides vs photos (the sides of the photo-modelled stations now agree with the declared OSM sides in the build, but are not verified against photos), stations Roodt/Oetrange/..., Gare Centrale, leftovers.
+
+
+## W2b result (26 Oct 2026, second W2b agent)
+Done (details: REAL-LINES.md "W2b", montages `~/Library/CloudStorage/OneDrive-Mulheims/website-overnight/reports/zuchreal/w2b/<key>/`):
+* Real level crossings (OSM arms), 11 crossings on `wittlich` (real: 21; the rest are on arcs, bridges or in the station patches that have no crossing road).
+* Patches for all Luxembourg and German stops (German: GeoBasis-RLP DGM1/DOM1/LoD2, `build_station_patch.py --country de`, runner `build_de_patches.py`), real LOD2 station buildings painted per style (`station-building.js`, styles `stations-styles-*.js`), models in `stations-lu-d/e.js`, `stations-de-a/b.js`.
+  Stations with photo montage: Roodt, Oetrange, Betzder, Wecker, Sandweiler-Contern, Manternach, Mertert, Wasserbëlleg, Cents-Hamm, Igel, Tréier West, Zewen, Euren, Pallien, Hafestrooss, Quint, Schweich, Wittlich, Hetzerath, Tréier Süd; Lëtzebuerg Gare Centrale (LOD2 building + tower, hand-made platform canopies kept from lu-a).
+  NO reference photo (built from the patch + DB standard furniture, flagged): Ehrang Ort, Föhren, Sehlem, Salmtal, Kreuz Konz.  NOT done: Tréier Hbf.
+* Station sides (`SIDE_FIX` in routes.js; the generated real-mosel.js is unchanged): Wecker left, Manternach right, Tréier West right, Schweich right, Hetzerath right, Tréier Süd right (see the worker reports); proper fix = generator (`build_real_line.py platform_side`).
+* Shared-tail hills identical (tail_hills_probe: 0.00 m), road ribbons sampled at 3 m, narrower meandering water under bridges, patches placed by the BASE track (reverse services).
+Open: Gare Centrale platform canopies are still the hand-made lu-a ones (the LOD2 canopy block is hidden), tram hole scan not done (the tram world has its own renderer, hole_lib is rail only), north/brussels cracks not touched (belongs to the routes agent), Tréier Hbf, hole scan: ray failures at s 24995 (Sehlem) and 10460 on `trier`, LOD2 roofs render dark, platform paving of most stops is the generic grey, staggered platforms (Zewen/Euren/Ehrang Ort) are drawn as one 210 m platform.
