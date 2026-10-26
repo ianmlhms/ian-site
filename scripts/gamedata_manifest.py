@@ -27,6 +27,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -111,9 +112,24 @@ def stale_entries(game: str) -> list:
     return problems
 
 
+def worker_games() -> list | None:
+    """The GAMEDATA_GAMES list of sw.js (the games the worker keeps data for), or None when it cannot be read."""
+    try:
+        with open(os.path.join(REPO, "sw.js"), encoding="utf-8") as handle:
+            found = re.search(r"GAMEDATA_GAMES\s*=\s*Object\.freeze\(\[([^\]]*)\]\)", handle.read())
+    except OSError:
+        return None
+    return sorted(re.findall(r'"([^"]+)"', found.group(1))) if found else None
+
+
 def check_all() -> list:
     problems = []
     games = games_with_data()
+    listed = worker_games()
+    if listed is None:
+        problems.append("sw.js has no readable GAMEDATA_GAMES list")
+    elif listed != games:
+        problems.append(f"sw.js GAMEDATA_GAMES {listed} differs from the games with data files {games}")
     for game in games:
         problems.extend(stale_entries(game))
     for name in sorted(os.listdir(PB)):   # a manifest whose data folder is gone

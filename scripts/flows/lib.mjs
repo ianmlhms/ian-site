@@ -82,7 +82,10 @@ export async function launchBrowser({ fullChromium = false } = {}) {
   throw new Error("Could not launch Chromium:\n" + errors.join("\n"));
 }
 
-export function startServer(root = REPO) {
+/* options.log       an array: every response is appended as { path, status, bytes } (bytes = body bytes sent), so a flow can assert what really crossed the network
+ * options.overrides a Map of "/path" -> Buffer | string, served instead of the file on disk (a flow can "deploy" a changed file without touching the repo)
+ * Both are read live, a flow may change them between page loads. */
+export function startServer(root = REPO, { log = null, overrides = null } = {}) {
   // Restricted sandboxes may refuse even loopback sockets. Offline flows serve
   // these URLs through Playwright interception instead of opening a socket.
   if (process.env.FLOW_OFFLINE_SUPABASE) return Promise.resolve({ server: { close() {} }, origin: "http://127.0.0.1:8765" });
@@ -90,11 +93,14 @@ export function startServer(root = REPO) {
     let rel = decodeURIComponent((req.url || "/").split("?")[0]);
     if (rel.endsWith("/")) rel += "index.html";
     const file = path.normalize(path.join(root, rel));
-    if (!file.startsWith(root + path.sep) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
-      res.statusCode = 404; res.end("not found"); return;
+    const override = overrides && overrides.get(rel);
+    if (override === undefined && (!file.startsWith(root + path.sep) || !fs.existsSync(file) || fs.statSync(file).isDirectory())) {
+      res.statusCode = 404; res.end("not found"); if (log) log.push({ path: rel, status: 404, bytes: 0 }); return;
     }
     res.setHeader("Content-Type", MIME[path.extname(file).slice(1)] || "application/octet-stream");
-    res.end(fs.readFileSync(file));
+    const body = override !== undefined ? Buffer.from(override) : fs.readFileSync(file);
+    if (log) log.push({ path: rel, status: 200, bytes: body.length });
+    res.end(body);
   });
   return new Promise((resolve) => {
     server.listen(0, "127.0.0.1", () => resolve({ server, origin: `http://127.0.0.1:${server.address().port}` }));
@@ -308,7 +314,7 @@ export async function mockRealtime(context, options = {}) {
 /* ---------- flow runner ---------- */
 const failuresOf = (h) => h.failures;
 
-/* flow = { name, touch?: boolean, run: async (h) => void }
+/* flow = { name, touch?: boolean, serviceWorkers?: "allow" (default "block": most flows must not see the worker), run: async (h) => void }
  * h = { page, context, origin, backend, expect, eq, step, pause, shot, signIn, goto } */
 export async function runFlow(flow, { browser, origin, shotsDir = process.env.FLOW_SHOTS_DIR } = {}) {
   const ownBrowser = !browser;
@@ -317,7 +323,7 @@ export async function runFlow(flow, { browser, origin, shotsDir = process.env.FL
   const theOrigin = origin || own[1].origin;
   const tmpVideos = fs.mkdtempSync(path.join(os.tmpdir(), "flow-video-"));
   const context = await theBrowser.newContext({
-    viewport: VIEWPORT, screenSize: VIEWPORT, deviceScaleFactor: 1, serviceWorkers: "block",
+    viewport: VIEWPORT, screenSize: VIEWPORT, deviceScaleFactor: 1, serviceWorkers: flow.serviceWorkers || "block",
     hasTouch: !!flow.touch, isMobile: !!flow.touch,
     recordVideo: { dir: tmpVideos, size: VIEWPORT },
   });

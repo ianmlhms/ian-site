@@ -29,7 +29,9 @@ const CORE = [
  * that path is deleted. Files the manifest does not list, ranged requests and failed responses go to the network exactly as before.
  * The code (HTML, JS modules, CSS) stays network-first below: that is what un-freezes a game after a rewrite, and it must not change.
  */
+const GAMEDATA_GAMES = Object.freeze(["fouer", "mtb", "train-sim"]);   // the pb/<game> folders that have data-hashes.json (scripts/check_site.py keeps this list in step)
 const GAMEDATA_PATH = /^\/pb\/([a-z0-9-]+)\/data\/(.+)$/;
+const GAME_PAGE = /^\/pb\/([a-z0-9-]+)\.html$/;
 const MANIFEST_FILE = "data-hashes.json";
 const MANIFEST_FORMAT = 1;
 const HASH_LEN = 10;                       // keep equal to HASH_LEN in scripts/gamedata_manifest.py
@@ -146,6 +148,14 @@ function reportToPage(event, game, source, bytes) {
   gameStats.set(id, next);
 }
 
+/** Re-reads a game's manifest now. Called when a game page is requested, so a new deploy's data is never judged by a manifest older than the page that needs it. */
+function refreshManifest(game) {
+  const known = manifests.get(game);
+  if (known && known.pending) return known.pending;
+  manifests.delete(game);
+  return loadManifest(game);
+}
+
 /** The reply for one data file: the stored copy when its hash is the manifest's, else the network (and a new stored copy). */
 async function serveGameData(event, game, relative) {
   const req = event.request;
@@ -195,10 +205,12 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;   // let CDN/Supabase pass straight through
 
   const gameData = GAMEDATA_PATH.exec(url.pathname);
-  if (gameData && !req.headers.has("range")) {
+  if (gameData && GAMEDATA_GAMES.includes(gameData[1]) && !req.headers.has("range")) {
     event.respondWith(serveGameData(event, gameData[1], gameData[2]));
     return;
   }
+  const gamePage = GAME_PAGE.exec(url.pathname);
+  if (gamePage && GAMEDATA_GAMES.includes(gamePage[1])) event.waitUntil(refreshManifest(gamePage[1]));   // the page itself is still network-first (next rule)
 
   /* PixelBreak game payloads are versioned by CONTENT, not by URL: pb/<game>.html
    * keeps its name across rewrites and the arcade re-fetches it on every open.

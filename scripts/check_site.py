@@ -13,6 +13,10 @@ Catches the classes of bug that are invisible until someone hits the page:
              referential, canonical-agreeing, and every target present
   cache      a versioned asset (?v=N) that changed without its version being
              bumped — the change ships but users keep the cached old copy
+  gamedata   a game data file (pb/<game>/data/**) that changed without its hash in
+             pb/<game>/data-hashes.json changing: the service worker keeps these
+             files on the device by hash, so a stale hash means players keep the
+             old world (fix: python3 scripts/gamedata_manifest.py)
   orphans    public pages nothing links to (how /kaart/ shipped unreachable)
   meta       pages missing title / description / canonical
 
@@ -440,6 +444,25 @@ def check_cache_versions(problems: list) -> None:
                              f"{asset} changed in {last[:7]} but ?v={now} was never bumped since"))
 
 
+def check_game_data_hashes(problems: list) -> None:
+    """pb/<game>/data-hashes.json must list every data file with its current hash.
+
+    sw.js serves these files from the device while the stored copy's hash equals
+    the manifest's. A data file edited without regenerating the manifest would
+    therefore keep being served in its OLD version to everyone who already has it.
+    """
+    sys.path.insert(0, os.path.join(REPO, "scripts"))
+    try:
+        import gamedata_manifest
+    except ImportError as error:
+        problems.append(("warn", "gamedata", f"scripts/gamedata_manifest.py not importable: {error}"))
+        return
+    finally:
+        sys.path.pop(0)
+    for message in gamedata_manifest.check_all():
+        problems.append(("error", "gamedata", message))
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--quiet", action="store_true", help="only print problems")
@@ -454,6 +477,7 @@ def main() -> None:
     check_hreflang(problems)
     check_trail_sitemaps(problems)
     check_cache_versions(problems)
+    check_game_data_hashes(problems)
     check_invisible_chars(problems)
     listed = check_sitemap(problems)
     check_meta(pages, problems)
