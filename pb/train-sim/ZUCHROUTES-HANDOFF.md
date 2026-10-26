@@ -16,7 +16,7 @@ Ile-de-France, Picardie, Belgium (1.4 GB, downloaded for the abroad routes), `os
    `menu.js` fallback counts, `train-sim.html` scripts.  `stations-lu-a.js`: model key `Bartreng` -> `Bertrange-Strassen`.
 4. **Station patches** (real LiDAR relief, LOD2 buildings, OSM ground, trees) for all 37 Luxembourg stations of the three routes except the Gare Centrale (`build_route_patches.py`; `data/stations/*.json` 23 MB, `index-routes.json`).
 5. **Flow** `scripts/flows/train_sim_routes.mjs` (registered in `run_all.mjs`): PASS.  `train-sim-world` PASS (all routes' crossing roads reach >= 120 m).  Hole scans (step 300, `scripts/zuch/hole_scan.mjs`): north 0 / 0, west 0 / 0, south 0 poses / 6 terrain-function steps 0.5-1 m (mesh vs `groundHeightAt`, no gap).
-   `check_site.py`: only the old karttracker-ios-privacy orphan.  `cv_head.py`: PROBLEMS: 0.  Full `run_all.mjs train`: see the end of this file.
+   `check_site.py`: only the old karttracker-ios-privacy orphan.  `cv_head.py`: PROBLEMS: 0.  Full `node scripts/flows/run_all.mjs train` (26 Oct, after the last commit): 6/6 PASS (train-sim, -audio, -touch, -career-lock, -world, -routes).  Fixes needed for that: `train_sim.mjs` expects "RE · 5" (west has 6 stations), `sim.js` TSR clearances scale with short legs (the real legs are too short for the old 800 / 900 m clearances: 0 restrictions planned), `patch-crossings.js` adopts only gentle real roads (grade / reach / valley walls / patch fade), `train_sim_world.mjs` MAX_PATCH_ROAD_GRADE 0.18 -> 0.30.
 6. Montage (cab sheets + aerial sheets per route): `reports/zuchreal/w2c/{north,south,west}-{cab,aerial}-sheet.png`; raw shots in the subfolders.
 
 ## NOT done / open (priority order)
