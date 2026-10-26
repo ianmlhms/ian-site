@@ -366,6 +366,9 @@
 
   /* ================================================================== LËTZEBUERG */
   function buildLetzebuerg(api) {
+    /* on the Mosel services the real station comes from its patch (data/stations/luxembourg.json): LOD2 building (stations-styles-lu.js), tracks, platforms and canopies
+     * (station-yard.js); this hand-built block belongs to the authored west / south / north lines only */
+    if (window.TS.stationStyles && window.TS.stationStyles.has(api.st.name) && api.track && api.track.def && api.track.def.sceneryId === 'mosel') return;
     const k = kit(api);
     const { T, vc, col, FORM_Y, WHITE, H, sx, sets, M, mat, P, helpers, pf } = k;
     const stone = col(SAND);
