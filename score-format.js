@@ -1,5 +1,5 @@
 /* Shared numeric score display. Keep exact server strings for titles and expansion. */
-import "./i18n-dict.js?v=51";
+import "./i18n-dict.js?v=52";
 
 const COMPACT_MIN = 10_000;
 /* K..Dc (1e3..1e33) match the idle games' own number format. Above that the score is shown in scientific

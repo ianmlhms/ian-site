@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Admin — Messenger</title>
 <meta name="robots" content="noindex">
-<script src="season.js?v=4"></script>
+<script src="season.js?v=5"></script>
 <script src="theme.js?v=31"></script>
 <script src="i18n-dict.js?v=52"></script>
 <script src="i18n.js?v=4"></script>
@@ -249,9 +249,9 @@
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-<script type="module" src="admin.js?v=48"></script>
+<script type="module" src="admin.js?v=49"></script>
 <script type="module">
-import { client } from "./auth.js?v=38";
+import { client } from "./auth.js?v=39";
 
 const username = document.getElementById("pinResetUser");
 const reset = document.getElementById("pinResetBtn");
@@ -317,7 +317,7 @@ username.addEventListener("keydown", (event) => {
   if (event.key === "Enter") resetPin();
 });
 </script>
-  <script type="module" src="rtc-ring.js?v=34"></script>
-  <script type="module" src="class-gate.js?v=35"></script>
+  <script type="module" src="rtc-ring.js?v=35"></script>
+  <script type="module" src="class-gate.js?v=36"></script>
 </body>
 </html>

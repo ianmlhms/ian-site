@@ -33,7 +33,7 @@
   var DECORATED_FLAG = "hwDecorated";
 
   var HERE = new URL(".", document.currentScript ? document.currentScript.src : location.href);
-  var HALLOWEEN_CSS_URL = new URL("halloween.css?v=4", HERE).href;
+  var HALLOWEEN_CSS_URL = new URL("halloween.css?v=5", HERE).href;
 
   function monthDayIn(date, timeZone) {
     var parts = new Intl.DateTimeFormat("en-CA", { timeZone: timeZone, month: "2-digit", day: "2-digit" }).formatToParts(date);
@@ -139,100 +139,83 @@
   var svgIdCounter = 0;
   function nextId(prefix) { svgIdCounter += 1; return prefix + svgIdCounter; }
 
-  // A single jack-o'-lantern, in its own local 64x56 box, bottom-anchored
-  // (so instances can be translated/scaled onto a patch baseline). `glow`
-  // draws the carved-face glow (and gets the flicker animation hook);
-  // kept optional so only 1-2 pumpkins per patch actually animate.
-  function pumpkinMarkup(glowId, flip) {
-    var face =
-      '<path d="M18 29l7-6v12z" fill="#3a1d05"/>' +
-      '<path d="M46 29l-7-6v12z" fill="#3a1d05"/>' +
-      '<path d="M17 42q15 9 30 0l-4 5-5-3-4 4-4-4-5 3-4-4-4-1z" fill="#3a1d05"/>';
+  // One jack-o'-lantern, drawn in its own 120x118 box (round: body 104x84 plus
+  // stem and leaf) so it keeps its natural proportions at every size — it is
+  // always sized by width alone, never stretched to fit a strip. Five ribbed
+  // lobes, each shaded left-to-right, a curved stem, a leaf with a tendril, a
+  // warm glow carved through eyes / nose / zig-zag grin, and a soft ground
+  // shadow whose centre sits on the viewBox's bottom edge region (so CSS can
+  // stand the pumpkin ON a ground line). `glowClass` lets one pumpkin per hero
+  // pulse its inner glow (opacity only).
+  function pumpkinSvg(extraClass, glowClass) {
+    var id = nextId("hwPk");
+    var lobe = function (cx, rx, ry) {
+      return '<ellipse cx="' + cx + '" cy="68" rx="' + rx + '" ry="' + ry + '" fill="url(#' + id + 'b)" stroke="#9c3607" stroke-width="1.4" stroke-opacity=".7"/>';
+    };
+    var eyeL = "M30 66L40 50L50 66Z";
+    var eyeR = "M70 66L80 50L90 66Z";
+    var nose = "M56 74L60 67L64 74Z";
+    var mouth = "M29 79L40 84L47 79L55 86L60 80L65 86L73 79L80 84L91 79Q88 96 60 99Q32 96 29 79Z";
+    var carve = function (d) {
+      return '<path d="' + d + '" fill="url(#' + id + 'f)" stroke="#6b2203" stroke-width="1.8" stroke-linejoin="round"/>';
+    };
+    var halo = function (d) {
+      return '<path d="' + d + '" fill="none" stroke="#ffd36a" stroke-width="5" stroke-linejoin="round" opacity=".28"/>';
+    };
     return (
-      '<g' + (flip ? ' transform="scale(-1,1) translate(-64,0)"' : "") + '>' +
-      '<rect x="29" y="1" width="6" height="11" rx="3" fill="#5a7d3a"/>' +
-      '<path d="M32 2c5 3 9 7 9 2" fill="none" stroke="#4a6a2f" stroke-width="2" stroke-linecap="round"/>' +
-      '<ellipse cx="32" cy="34" rx="28" ry="20" fill="#ff8a3d"/>' +
-      '<path d="M11 34c3-13 10-20 21-20s18 7 21 20" fill="none" stroke="#c6540c" stroke-width="2" opacity=".55"/>' +
-      '<path d="M20 16c2 6 2 30 0 36" fill="none" stroke="#c6540c" stroke-width="1.5" opacity=".4"/>' +
-      '<path d="M44 16c-2 6-2 30 0 36" fill="none" stroke="#c6540c" stroke-width="1.5" opacity=".4"/>' +
-      (glowId ? '<circle class="hw-pumpkin-glow" cx="32" cy="33" r="18" fill="url(#' + glowId + ')"/>' : "") +
-      face +
-      "</g>"
-    );
-  }
-
-  function pumpkinSvg() {
-    var glow = nextId("hwGlow");
-    return (
-      '<svg class="hw-pumpkin-art" viewBox="0 0 64 56" aria-hidden="true" focusable="false">' +
-      '<defs><radialGradient id="' + glow + '" cx="50%" cy="58%" r="55%">' +
-      '<stop offset="0%" stop-color="#ffe9b0" stop-opacity=".95"/>' +
-      '<stop offset="100%" stop-color="#ffb347" stop-opacity="0"/>' +
-      "</radialGradient></defs>" +
-      pumpkinMarkup(glow, false) +
+      '<svg class="hw-pumpkin-art' + (extraClass ? " " + extraClass : "") + '" viewBox="0 0 120 118" aria-hidden="true" focusable="false">' +
+      "<defs>" +
+      '<linearGradient id="' + id + 'b" x1="0" x2="1" y1="0" y2="0">' +
+      '<stop offset="0" stop-color="#bd4709"/><stop offset=".3" stop-color="#ee741b"/><stop offset=".52" stop-color="#ff9b3d"/>' +
+      '<stop offset=".74" stop-color="#ee741b"/><stop offset="1" stop-color="#b94309"/></linearGradient>' +
+      '<radialGradient id="' + id + 's" cx=".5" cy=".4" r=".72"><stop offset=".6" stop-color="#501600" stop-opacity="0"/><stop offset="1" stop-color="#501600" stop-opacity=".5"/></radialGradient>' +
+      '<radialGradient id="' + id + 'f" cx=".5" cy=".5" r=".75"><stop offset="0" stop-color="#fff4b8"/><stop offset=".55" stop-color="#ffc23d"/><stop offset="1" stop-color="#ff8a1f"/></radialGradient>' +
+      '<radialGradient id="' + id + 'g" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffd66e" stop-opacity=".7"/><stop offset="1" stop-color="#ff9628" stop-opacity="0"/></radialGradient>' +
+      '<linearGradient id="' + id + 't" x1="0" x2="1"><stop offset="0" stop-color="#8aa63c"/><stop offset="1" stop-color="#46601d"/></linearGradient>' +
+      "</defs>" +
+      '<ellipse cx="60" cy="112.5" rx="50" ry="5" fill="#000" opacity=".38"/>' +
+      lobe(24, 21, 35) + lobe(96, 21, 35) + lobe(40, 23, 40) + lobe(80, 23, 40) + lobe(60, 21, 42) +
+      '<ellipse cx="60" cy="68" rx="54" ry="42" fill="url(#' + id + 's)"/>' +
+      '<ellipse cx="38" cy="45" rx="9" ry="5" fill="#fff" opacity=".2" transform="rotate(-25 38 45)"/>' +
+      '<circle class="hw-pumpkin-glow' + (glowClass ? " " + glowClass : "") + '" cx="60" cy="74" r="40" fill="url(#' + id + 'g)"/>' +
+      halo(eyeL) + halo(eyeR) + halo(nose) + halo(mouth) +
+      carve(eyeL) + carve(eyeR) + carve(nose) + carve(mouth) +
+      '<ellipse cx="61" cy="30" rx="9" ry="3.5" fill="#7a2c05" opacity=".6"/>' +
+      '<path d="M67 31C76 20 92 20 98 27C92 36 76 37 67 31Z" fill="#4f8a2c" stroke="#33601c" stroke-width="1"/>' +
+      '<path d="M69 30Q84 27 96 27" fill="none" stroke="#2f5a18" stroke-width="1" opacity=".8"/>' +
+      '<path d="M70 22C78 12 90 14 88 20C86 24 81 22 83 19" fill="none" stroke="#5f9a35" stroke-width="1.8" stroke-linecap="round"/>' +
+      '<path d="M55 35C52 25 56 15 65 9C69 8 72 10 70 13C64 19 64 26 67 35Z" fill="url(#' + id + 't)" stroke="#3a4d17" stroke-width="1" stroke-linejoin="round"/>' +
       "</svg>"
     );
   }
 
-  // A small patch of 3-5 jack-o'-lanterns of different sizes along a curly
-  // vine, for the bottom of a hero. One shot: own viewBox, own baseline, so
-  // it drops in as a single wide strip with no per-pumpkin positioning math
-  // in CSS.
-  function patchSvg(count) {
-    // BASE is the ground line. Pumpkins (tallest scale 1.15 => ~64 units
-    // tall) stay well clear of both the top of the viewBox and the bottom
-    // margin below BASE, and preserveAspectRatio="none" (set in CSS/markup
-    // below) stretches this box to exactly fill whatever strip it is given —
-    // never cropping a pumpkin, however wide or short that strip ends up.
-    var W = 920, H = 150, BASE = 118;
-    var slots = [
-      { x: 70, scale: 0.6, flip: false },
-      { x: 232, scale: 0.88, flip: true },
-      { x: 460, scale: 1.1, flip: false, glow: true },
-      { x: 682, scale: 0.82, flip: true },
-      { x: 846, scale: 0.58, flip: false },
-    ].slice(0, count);
-    var defs = "";
-    var groups = "";
-    var shadows = "";
-    var vineX = [];
-    slots.forEach(function (slot) {
-      var glowId = null;
-      if (slot.glow) {
-        glowId = nextId("hwPatchGlow");
-        defs += '<radialGradient id="' + glowId + '" cx="50%" cy="58%" r="55%">' +
-          '<stop offset="0%" stop-color="#ffe9b0" stop-opacity=".95"/>' +
-          '<stop offset="100%" stop-color="#ffb347" stop-opacity="0"/>' +
-          "</radialGradient>";
-      }
-      var tx = slot.x - 32 * slot.scale;
-      var ty = BASE - 54 * slot.scale;
-      vineX.push(slot.x);
-      shadows += '<ellipse cx="' + slot.x + '" cy="' + (BASE + 5) + '" rx="' + (26 * slot.scale) +
-        '" ry="' + (6 * slot.scale) + '" fill="#000" opacity=".22"/>';
-      groups += '<g class="hw-patch-pumpkin" transform="translate(' + tx + ' ' + ty + ') scale(' + slot.scale + ')">' +
-        pumpkinMarkup(glowId, slot.flip) + "</g>";
-    });
-    var vine = "M-10 " + (BASE + 2);
-    vineX.forEach(function (x, i) {
-      vine += " Q " + (x - 70) + " " + (BASE + (i % 2 ? 10 : -8)) + " " + x + " " + (BASE + 2);
-    });
-    vine += " Q " + (W - 60) + " " + (BASE - 6) + " " + (W + 10) + " " + (BASE + 2);
-    var leaves =
-      '<path class="hw-patch-leaf" d="M150 116c6-10 16-14 24-10-4 6-14 10-24 10z" fill="#5a8a3a" opacity=".85"/>' +
-      '<path class="hw-patch-leaf" d="M560 120c-7-9-18-11-25-6 5 6 16 9 25 6z" fill="#4a7a30" opacity=".85"/>' +
-      '<path class="hw-patch-leaf" d="M760 114c6-9 15-12 22-8-4 6-13 9-22 8z" fill="#5a8a3a" opacity=".85"/>' +
-      '<path d="M310 112q10-10 6-22" fill="none" stroke="#4a7a30" stroke-width="2.5" stroke-linecap="round" opacity=".7"/>' +
-      '<path d="M620 110q-9-9-4-20" fill="none" stroke="#4a7a30" stroke-width="2.5" stroke-linecap="round" opacity=".7"/>';
-    return (
-      '<svg class="hw-patch-art" viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="none" aria-hidden="true" focusable="false">' +
-      (defs ? "<defs>" + defs + "</defs>" : "") +
-      shadows +
-      '<path class="hw-patch-vine" d="' + vine + '" fill="none" stroke="#3f6b28" stroke-width="3" stroke-linecap="round" opacity=".55"/>' +
-      leaves + groups +
-      "</svg>"
-    );
+  // Pumpkin patch for the bottom of a hero: each pumpkin is its own element,
+  // positioned by % across the FULL viewport width (the hero's sky layer is
+  // full-bleed) and sized in px, so none is ever stretched or clipped. `x` is
+  // the centre as a % of the viewport, `w` the desktop width in px (48-120;
+  // halloween.css scales it down on phones), `tilt` degrees, `flip` mirrors it,
+  // `extra` hides it on narrow screens, `lit` gives it the pulsing glow.
+  var HOME_PUMPKINS = [
+    { x: 7, w: 58, tilt: -7, flip: 1 },
+    { x: 20, w: 88, tilt: 4, flip: -1 },
+    { x: 34, w: 62, tilt: 0, flip: 1, extra: true },
+    { x: 50, w: 120, tilt: -2, flip: 1, lit: true },
+    { x: 65, w: 76, tilt: -5, flip: -1 },
+    { x: 80, w: 104, tilt: 5, flip: 1 },
+    { x: 93, w: 52, tilt: 9, flip: -1, extra: true },
+  ];
+  var ARCADE_PUMPKINS = [
+    { x: 8, w: 62, tilt: -6, flip: 1 },
+    { x: 28, w: 92, tilt: 4, flip: -1 },
+    { x: 52, w: 118, tilt: -1, flip: 1, lit: true },
+    { x: 74, w: 70, tilt: -6, flip: -1, extra: true },
+    { x: 89, w: 100, tilt: 6, flip: 1 },
+  ];
+  function patchHtml(slots) {
+    return slots.map(function (slot) {
+      return '<span class="hw-pk' + (slot.extra ? " hw-pk--extra" : "") + '" style="left:' + slot.x + "%;--w:" + slot.w +
+        "px;--tilt:" + slot.tilt + "deg;--flip:" + slot.flip + '">' + pumpkinSvg("", slot.lit ? "hw-pumpkin-glow--lit" : "") + "</span>";
+    }).join("");
   }
 
   // A clean radial + spiral cobweb (not a scribble): true straight spokes
@@ -299,19 +282,15 @@
     return holder;
   }
 
-  function addHeroFx(hero, patchCount, withMoon) {
+  function addHeroFx(hero, slots, withMoon) {
     ensureAnchor(hero);
-    if (withMoon) {
-      var moon = document.createElement("div");
-      moon.className = "hw-moon-zone";
-      moon.setAttribute("aria-hidden", "true");
-      hero.appendChild(moon);
-    }
     var layer = document.createElement("div");
     layer.className = "hw-hero-fx";
     layer.setAttribute("aria-hidden", "true");
     layer.innerHTML =
-      '<span class="hw-patch">' + patchSvg(patchCount) + "</span>" +
+      (withMoon ? '<span class="hw-moon-zone"></span>' : "") +
+      '<span class="hw-ground"></span>' +
+      patchHtml(slots) +
       '<span class="hw-bat hw-bat--a">' + batSvg() + "</span>" +
       '<span class="hw-bat hw-bat--b">' + batSvg() + "</span>" +
       '<span class="hw-bat hw-bat--c">' + batSvg() + "</span>" +
@@ -360,7 +339,7 @@
 
     var header = document.querySelector("body > header, header.ui-header, header.bar");
     var footer = document.querySelector("footer");
-    var hero = document.querySelector(".today-hero, .arc-hero, .hero");
+    var hero = document.querySelector(".today-hero, .arc-hero"); // only the two heroes that carry the sky
     var isArcadeLobby = !!document.querySelector(".arc-hero");
     var isHomePage = document.body.classList.contains("home");
 
@@ -373,8 +352,8 @@
     }
 
     var footerPumpkin = null;
-    if (footer) footerPumpkin = addDecoration(footer, pumpkinSvg(), "hw-deco--pumpkin hw-deco--corner-br hw-deco--mini");
-    if (hero) addHeroFx(hero, isArcadeLobby ? 3 : 5, isHomePage);
+    if (footer) footerPumpkin = addDecoration(footer, pumpkinSvg("", ""), "hw-deco--pumpkin hw-deco--corner-br hw-deco--mini");
+    if (hero) addHeroFx(hero, isArcadeLobby ? ARCADE_PUMPKINS : HOME_PUMPKINS, isHomePage);
     if (isHomePage && footerPumpkin) wireEasterEgg(footerPumpkin);
   }
 

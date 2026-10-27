@@ -1,5 +1,5 @@
 /* Site-wide authenticated presence ping. Loaded lazily by auth.js. */
-import { commandsSafe } from "./client-commands.js?v=7";
+import { commandsSafe } from "./client-commands.js?v=8";
 
 const PING_INTERVAL_MS = 60_000;
 const MAX_PAGE_LENGTH = 120;

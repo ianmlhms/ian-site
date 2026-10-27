@@ -319,3 +319,78 @@ difference is immediately obvious side by side, which was the point.
   pass: `season.js` `?v=1 → ?v=4` (67 files) and the internal `halloween.css` asset URL
   `?v=1 → ?v=4` (season.js's own constant) — each bump covers a real content change,
   not a cosmetic touch.
+
+## v3 — full-bleed sky, round pumpkins (Ian's screenshot feedback)
+
+Ian, on the arcade in dark mode: "the Halloween is like cut off at the sides" and "the
+pumpkins look really compressed". Both were real: v2's hero sky was a rounded, `overflow:hidden`
+box exactly as wide as the content column (so the sky, the vine and the ground stopped at the
+column edges while the purple page continued), and the pumpkin patch was one SVG drawn
+in a 920x150 box with `preserveAspectRatio="none"` stretched over a `100% x clamp(70..110px)`
+strip — i.e. squashed to roughly 2:1 at any normal width.
+
+### What changed (`halloween.css`, `season.js`; nothing else)
+
+- **Sky is full-bleed.** The hero keeps its place in the column (text layout untouched), but
+  its sky is now `.today-hero::before` / `.arc-hero::before`: `left: calc(50% - 50vw); width: 100vw`,
+  with a `mask-image` that fades it in at the top and out just under the ground line — no
+  rounded box, no border-radius, no hard edge on any side. The hero lost `overflow:hidden`
+  and `border-radius`. Because 100vw can exceed the visible width (classic scrollbars),
+  `html[data-season] body` gets `overflow-x: clip` (unlike `hidden` it does not turn the body
+  into a scroll container); `scrollWidth == clientWidth` verified on every shot.
+- **Scrim only behind the text, as a gradient.** `::after` is the scrim: dark
+  `rgba(15,6,3,.78)` (light mode cream `.8`; phones `.88`), 160px feathered at the left/right
+  (horizontal mask) and ramped in/out vertically (the alpha ramp is in the gradient itself,
+  so there is no mask-composite dependency). The sky colour stops are anchored to the
+  bottom (`calc(100% - var(--hw-reserve) - Npx)`), so the bright horizon glow sits behind the
+  pumpkins and the text area stays dark/pale-dark without needing a heavy flat scrim.
+- **Layer order inside the hero** (all negative z, hero is `isolation:isolate`): sky (-3) <
+  scrim (-2) < `.hw-hero-fx` (-1: moon, ground, pumpkins, bats, leaves), so the moon and
+  pumpkins are never dimmed by the scrim. `.hw-hero-fx` is the same one-viewport-wide trick
+  and clips the bats/leaves to the viewport.
+- **Ground + vine run the whole width.** `.hw-ground` = a repeating 260x28 vine tile
+  (`background-repeat: repeat-x`, data-URI SVG, leaves and a curl in the tile, natural
+  proportions at any width; darker green in light mode) over a soft earth band that fades out
+  downward.
+- **Pumpkins redrawn and no longer stretched.** `pumpkinSvg()` is now one 120x118 art (body
+  104x84 + stem + leaf, i.e. round, not 2:1): five ribbed lobes, each shaded left-to-right with a
+  darker rib stroke, an ambient edge-shading ellipse, a highlight, a curved stem, a leaf with a
+  tendril, a warm glow carved through eyes / nose / zig-zag grin (halo stroke + radial
+  gradient, plus an inner glow circle on the body) and a soft ground shadow. Each pumpkin is
+  its own `.hw-pk` element sized by **width only** (`--w`, 48-120px desktop; `--hw-scale: .66`
+  on phones) so it can never be squashed, positioned by `left: N%` across the full width,
+  stood ON the ground line (`bottom: var(--hw-ground)` + `translateY(5%)`), tilted about
+  its base (`--tilt`) and optionally mirrored (`--flip`). Home 7 pumpkins (2 hidden on phones), arcade 5 (1 hidden on phones).
+  The footer Easter-egg pumpkin uses the same art.
+- `--hw-reserve` (bottom padding for the tallest pumpkin: 128px, phones 84px) replaces the
+  old hard-coded +96/+56. The moon moved to ~62% across so it clears the logo/cobweb and
+  the header buttons, and its strip fades out at the bottom (v2 had a faint clipped glow edge).
+- Only `.today-hero` / `.arc-hero` are decorated now. v2's `season.js` also matched a bare
+  `.hero` (buddy/countdowns/kart): those are cards (or render after DOMContentLoaded) with no
+  sky and no reserved padding, so a patch + bats dropped over their text was never right.
+- Animated elements unchanged: 3 bats + 2 leaves + 1 pumpkin glow + 1 spider = 7 (<= 8).
+  `prefers-reduced-motion` and `prefers-contrast: more` rules updated for the new selectors
+  (the pseudo-element sky/scrim are removed under `prefers-contrast: more`).
+
+### Contrast (v3)
+
+Measured on real pixels, not on the gradient maths: for every text node in the hero
+(home + arcade, 375/820/1440, dark + light) the text was made transparent, the page
+screenshotted, and the WCAG ratio taken against the *worst* pixel inside that element's box.
+- Normal-size text worst case: **4.91:1** (arcade subtitle, phone, dark) - AA (>= 4.5) pass
+  everywhere (the other hero text is 4.9 - 7+).
+- Large display accent glyphs (the "." in "Arcade." and ".lu", 60-136px) worst case **4.07:1**
+  in light mode - passes the large-text AA threshold (3:1); same accent as v1/v2.
+
+### Screenshots / gates
+
+`reports-cloud/halloween/v3` is mirrored in
+`~/Library/CloudStorage/OneDrive-Mulheims/website-overnight/reports/halloween/v3/`
+(index + pixelbreak x Chromium/WebKit x 1440x900/375x812 x dark/light, season on, plus
+`before_after_arcade_dark.jpg`). `?v=`: `season.js` 4 -> 5 (65 pages) and `halloween.css`
+4 -> 5 (inside `season.js`).
+
+Merge fallout fixed in the same commit: `auth.js`, `client-commands.js` and `score-format.js`
+(added on main after the branch point) imported `i18n-dict.js?v=51` while the branch had bumped
+it to `?v=52`, so the dictionary would have loaded twice under two URLs. They now import `?v=52`
+and were bumped (plus their importers, via the `?v=` cascade); `cv_head.py` is clean (PROBLEMS: 0).
