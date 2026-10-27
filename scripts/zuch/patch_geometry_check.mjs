@@ -15,6 +15,8 @@ export const LIMITS = Object.freeze({
   maxHeight: 90,            // m
   maxPlaneDev: 2.0,         // m: a roof or wall ring further than this from its best plane is twisted (smaller warps are normal in LOD2; the renderer drops faces its triangulation cannot cover)
   footprintMargin: 4,       // m: faces may overhang the footprint bounding box by this much (eaves, canopies)
+  maxFootprintExtent: 320,   // m: an extruded footprint may be a whole station building (Metz-Ville 293 m), nothing longer
+  minFootprintArea: 1.0,     // m2: an extruded footprint (no LOD2 faces: France / Belgium / Rheinland-Pfalz) smaller than this is a sliver
   floatAbove: 1.6,          // m: a building (with walls) whose lowest wall point is above the highest ground of its footprint by more than this floats (the renderer's foundation skirt covers 1.6 m)
 });
 
@@ -42,6 +44,42 @@ function demAt(data, x, z) {
   return d.raw.readInt16LE((iz * d.nx + ix) * 2) / 10;
 }
 
+/* segment p1p2 crosses q1q2 (proper crossing, shared end points do not count) */
+function segmentsCross(p1, p2, q1, q2) {
+  const o = (a, b, c) => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+  const d1 = o(q1, q2, p1); const d2 = o(q1, q2, p2); const d3 = o(p1, p2, q1); const d4 = o(p1, p2, q2);
+  return ((d1 > 1e-9 && d2 < -1e-9) || (d1 < -1e-9 && d2 > 1e-9)) && ((d3 > 1e-9 && d4 < -1e-9) || (d3 < -1e-9 && d4 > 1e-9));
+}
+function isSimpleRing(ring) {
+  const n = ring.length;
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 2; j < n; j++) {
+      if (i === 0 && j === n - 1) continue;
+      if (segmentsCross(ring[i], ring[(i + 1) % n], ring[j], ring[(j + 1) % n])) return false;
+    }
+  }
+  return true;
+}
+function ringArea2d(ring) {
+  let a = 0;
+  for (let i = 0; i < ring.length; i++) { const p = ring[i]; const q = ring[(i + 1) % ring.length]; a += p[0] * q[1] - q[0] * p[1]; }
+  return Math.abs(a) / 2;
+}
+
+/* a building without LOD2 faces is extruded from its footprint ring + height by the renderer: the ring must be a simple polygon, the height sane, the ground under it level enough */
+function checkFootprint(b, data, fail) {
+  const g = b.ground;
+  if (g.length < 3 || !g.every((p) => Number.isFinite(p[0]) && Number.isFinite(p[1]))) { fail('degenerate', 'footprint with ' + g.length + ' vertices / non-finite'); return; }
+  if (ringArea2d(g) < LIMITS.minFootprintArea) { fail('degenerate', 'footprint of ' + ringArea2d(g).toFixed(2) + ' m2'); return; }
+  if (!isSimpleRing(g)) fail('twisted', 'footprint ring crosses itself');
+  const ext = Math.max(Math.max(...g.map((p) => p[0])) - Math.min(...g.map((p) => p[0])), Math.max(...g.map((p) => p[1])) - Math.min(...g.map((p) => p[1])));
+  if (ext > LIMITS.maxFootprintExtent) fail('huge', 'footprint ' + ext.toFixed(0) + ' m long');
+  if (!(b.h > 0) || b.h > LIMITS.maxHeight) fail('huge', 'height ' + b.h + ' m');
+  const ys = g.map((p) => demAt(data, p[0], p[1])).filter((v) => v !== null);
+  // the floating test of footprints is for the patches of the W4 builder (region fr / be: base = lowest ground); the older faceless patches (Luxembourg OSM-only buildings, Rheinland-Pfalz) have a few buildings 1.7 - 5 m above the lowest ground (OPEN, REAL-LINES.md W4)
+  if (data.region && ys.length && b.base - Math.min(...ys) > LIMITS.floatAbove) fail('floating', 'base ' + (b.base - Math.min(...ys)).toFixed(1) + ' m above the lowest ground of the footprint (foundation skirt covers ' + LIMITS.floatAbove + ' m)');
+}
+
 export function checkPatch(key, data, allow = {}, dropped = []) {
   const problems = [];
   if (data.dem && data.dem.dm) data.dem.raw = Buffer.from(data.dem.dm, 'base64');
@@ -50,6 +88,7 @@ export function checkPatch(key, data, allow = {}, dropped = []) {
     const fail = (kind, what) => { if (!allowed.has(b.id) && !allowed.has(b.id + ':' + kind)) problems.push({ patch: key, id: b.id, kind, what }); };
     const g = b.ground || [];
     if (!g.length) return;
+    if (!(b.roofs || []).length && !(b.walls || []).length) { checkFootprint(b, data, fail); return; }
     const fx = [Math.min(...g.map((p) => p[0])) - LIMITS.footprintMargin, Math.max(...g.map((p) => p[0])) + LIMITS.footprintMargin];
     const fz = [Math.min(...g.map((p) => p[1])) - LIMITS.footprintMargin, Math.max(...g.map((p) => p[1])) + LIMITS.footprintMargin];
     let minWallY = Infinity;
@@ -89,6 +128,8 @@ export function checkAll(keys = [], dropped = []) {
   const out = [];
   loadPatches(keys).forEach((key) => {
     const data = JSON.parse(fs.readFileSync(path.join(DIR, key + '.json'), 'utf8'));
+    const coreFile = path.join(DIR, key.replace(/\.h$/, '') + '.c.json');
+    if (key.endsWith('.h') && !data.dem && fs.existsSync(coreFile)) { const core = JSON.parse(fs.readFileSync(coreFile, 'utf8')); if (core.region) { data.dem = core.dem; data.region = core.region; } }      // the heavy half has no relief: take the core's for the W4 patches (floating test; the older heavy halves were never tested for it)
     out.push(...checkPatch(key, data, allow, dropped));
   });
   return out;

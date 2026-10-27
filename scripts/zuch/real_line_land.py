@@ -5,19 +5,21 @@ import shapely
 from shapely import STRtree
 
 # raster / biome classes
-FIELD, MEADOW, FOREST, VINE, RESID, INDUS, WATER, ORCHARD, URBAN, SCRUB, QUARRY, CEMETERY, PARK = range(13)
-CLASS_NAMES = ["field", "meadow", "forest", "vine", "resid", "indus", "water", "orchard", "urban", "scrub", "quarry", "cemetery", "park"]
+FIELD, MEADOW, FOREST, VINE, RESID, INDUS, WATER, ORCHARD, URBAN, SCRUB, QUARRY, CEMETERY, PARK, RAIL = range(14)
+CLASS_NAMES = ["field", "meadow", "forest", "vine", "resid", "indus", "water", "orchard", "urban", "scrub", "quarry", "cemetery", "park", "rail"]
 # later entries win where polygons overlap
-PRIORITY = {WATER: 9, URBAN: 8, INDUS: 7, RESID: 6, QUARRY: 6, CEMETERY: 5, PARK: 5, VINE: 4, ORCHARD: 4, FOREST: 3, SCRUB: 3, MEADOW: 2, FIELD: 1}
+PRIORITY = {RAIL: 7, WATER: 9, URBAN: 8, INDUS: 7, RESID: 6, QUARRY: 6, CEMETERY: 5, PARK: 5, VINE: 4, ORCHARD: 4, FOREST: 3, SCRUB: 3, MEADOW: 2, FIELD: 1}
 
 
-def classify(t):
+def classify(t, rail=False):
     lu, nat, leis = t.get("landuse"), t.get("natural"), t.get("leisure")
     if nat == "water" or lu in ("reservoir", "basin"):
         return WATER
     if lu in ("commercial", "retail"):
         return URBAN
-    if lu == "industrial" or lu == "railway" and False:
+    if lu == "railway" and rail:
+        return RAIL            # W3 (opt-in, abroad routes): railway land is bare ballast, not a ploughed field
+    if lu == "industrial":
         return INDUS
     if lu in ("residential", "garages", "allotments") or t.get("place") in ("village", "hamlet", "town", "suburb", "neighbourhood", "city", "locality") and lu is None and nat is None:
         return RESID
@@ -41,10 +43,10 @@ def classify(t):
 
 
 class LandIndex:
-    def __init__(self, landuse_feats):
+    def __init__(self, landuse_feats, rail=False):
         self.geoms, self.cls = [], []
         for f in landuse_feats:
-            c = classify(f["t"])
+            c = classify(f["t"], rail)
             g = f["g"]
             if c is None or g is None or g.is_empty:
                 continue
@@ -57,6 +59,14 @@ class LandIndex:
         self.cls = np.array(self.cls)
         self.tree = STRtree(self.geoms)
         self.prio = np.array([PRIORITY[c] for c in self.cls])
+
+    def add_rails(self, rail_geoms, dist=14.0):
+        """W3 (abroad routes): land that no polygon covers but that lies within `dist` m of a railway=rail way (yards and sidings that nobody mapped as landuse=railway) is RAIL, not FIELD."""
+        self.rail_tree = STRtree(list(rail_geoms)) if len(rail_geoms) else None
+        self.rail_dist = dist
+
+    rail_tree = None
+    rail_dist = 14.0
 
     def at(self, e, n, default=FIELD, ids=False):
         """Class at points (vectorised): the highest-priority polygon covering each point.  ids=True also returns the polygon index (parcel id, -1 = none)."""
@@ -71,4 +81,9 @@ class LandIndex:
                 best[p] = self.prio[g]
                 out[p] = self.cls[g]
                 pid[p] = g
+        if self.rail_tree is not None and default == FIELD:
+            free = np.nonzero(pid < 0)[0]
+            if len(free):
+                hit = np.unique(self.rail_tree.query(pts[free], predicate="dwithin", distance=self.rail_dist)[0])
+                out[free[hit]] = RAIL
         return (out, pid) if ids else out

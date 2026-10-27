@@ -106,7 +106,7 @@ export function rocksOfBlock(bx, bz, ctx) {
       if (roll > chance) continue;
       const h = HEIGHT_RANGE[0] + (HEIGHT_RANGE[1] - HEIGHT_RANGE[0]) * (0.3 + 0.7 * sizeRoll) * (0.7 + 0.5 * steep);
       const w = WIDTH_RANGE[0] + (WIDTH_RANGE[1] - WIDTH_RANGE[0]) * wRoll;
-      pushSlab(x, z, nrm, h, w, kindRoll < 0.16 ? KIND.overhang : kindRoll < 0.58 ? KIND.slabA : KIND.slabB, seed);
+      pushSlab(x, z, nrm, h, w, kindRoll < 0.24 ? KIND.overhang : kindRoll < 0.6 ? KIND.slabA : KIND.slabB, seed);
     }
   }
   // ---- rock corridors: along a trail or path through rocky ground (OSM cliff lines or steep banks nearby) free-standing sandstone walls rise on both sides, with a cleft between

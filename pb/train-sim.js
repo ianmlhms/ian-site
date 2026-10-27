@@ -455,7 +455,7 @@
     if (isLux && TS.luxtram && TS.luxtram.preload) await safe('luxtram preload', () => TS.luxtram.preload((f) => loaderSet(f * 0.14)), Promise.resolve());   // track, world and landmark data: real byte progress
     loaderSet(isLux ? 0.16 : 0.15);
     if (!isLux && TS.realLine && TS.realLine.preload) await safe('real line preload', () => TS.realLine.preload(routeDef), Promise.resolve());   // scenery data of the Mosel line (rivers, relief, land, roads)
-    if (!isLux && TS.stationSurround && TS.stationSurround.preload) await safe('station surround preload', () => TS.stationSurround.preload(routeDef.stations), Promise.resolve());   // real surroundings of stations (patch data), before the track is built
+    if (!isLux && TS.stationSurround && TS.stationSurround.preload) await safe('station surround preload', () => TS.stationSurround.preload(routeDef.stations, routeDef.id), Promise.resolve());   // real surroundings of stations (patch data), before the track is built
     const track = build('track', 'build', [routeDef]);
     if (!track) throw new Error('Track build failed');
     // the scenery half of the first station patch (about 150 kB gzip): waited for at most 6 s, the rest streams in ahead of the train (station-surround.js)

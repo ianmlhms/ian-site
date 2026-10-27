@@ -24,14 +24,14 @@ export function createFx({ hud, reduce = () => false }) {
   const nodes = { dark: q(".rd-dark"), black: q(".rd-black"), vig: q(".rd-vig"), spray: q(".rd-spray"), hit: q(".rd-hit"), spark: q(".rd-spark"), strobe: q(".rd-strobe"), info: q(".rd-info"), hint: q(".rd-hint"), score: q(".rd-score") };
   const g = nodes.spray.getContext("2d");
   const drops = [];
-  const st = { spark: 0, black: 0, shake: 0, strobe: 0, hit: 0, vig: 0, dark: 0, hintUntil: 0, clock: 0 };
+  const st = { spark: 0, black: 0, shake: 0, strobe: 0, strobePeak: 0, hit: 0, vig: 0, dark: 0, hintUntil: 0, clock: 0 };
 
   function show(name, icon) {
     root.hidden = false; document.body.classList.add("rd-on");
     nodes.info.querySelector("b").textContent = `${icon} ${name}`;
     nodes.info.querySelector("span").textContent = "";
     nodes.info.querySelector("u").style.width = "0%";
-    st.shake = 0; st.strobe = 0; st.hit = 0; st.vig = 0; st.dark = 0; st.black = 0; st.spark = 0; drops.length = 0; g.clearRect(0, 0, nodes.spray.width, nodes.spray.height);
+    st.shake = 0; st.strobe = 0; st.strobePeak = 0; st.hit = 0; st.vig = 0; st.dark = 0; st.black = 0; st.spark = 0; drops.length = 0; g.clearRect(0, 0, nodes.spray.width, nodes.spray.height);
     nodes.score.hidden = true; nodes.hint.hidden = true;
     apply();
   }
@@ -87,7 +87,7 @@ export function createFx({ hud, reduce = () => false }) {
   }
   return {
     root, show, hide, setProgress, hint, score, spray, update,
-    strobe(k = 1) { st.strobe = Math.max(st.strobe, k); apply(); },
+    strobe(k = 1) { st.strobe = Math.max(st.strobe, k); st.strobePeak = Math.max(st.strobePeak, k); apply(); },
     flashHit(k = 0.6) { st.hit = Math.max(st.hit, k); apply(); },
     shake(k) { st.shake = Math.max(st.shake, clamp(k, 0, 1)); },
     setVignette(k) { st.vig = k; },
@@ -98,6 +98,8 @@ export function createFx({ hud, reduce = () => false }) {
     get shakeValue() { return st.shake; },
     get dropCount() { return drops.length; },
     get strobeValue() { return st.strobe; },
+    /** the loudest strobe call since the ride started, never decays (unlike strobeValue): for tests/telemetry, so a brief flash is never missed by an irregular sampling rate */
+    get strobePeak() { return st.strobePeak; },
     get visible() { return !root.hidden; },
     dispose() { root.remove(); },
   };

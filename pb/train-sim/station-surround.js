@@ -18,7 +18,7 @@
   const TS = (window.TS = window.TS || {});
   const TAG = '[Lokféierer] station surround: ';
   const DATA_DIR = '/pb/train-sim/data/stations/';
-  const DATA_VERSION = 'w2e1';     // bump when the patch files change (they are fetched with force-cache)
+  const DATA_VERSION = 'w4b';     // bump when the patch files change (they are fetched with force-cache)
   const EXT_X = 160;              // patch half width (m) and half length
   const EXT_Z = 320;
   const FADE_X = 45;              // the real relief fades into the generic one over the outer metres
@@ -27,8 +27,10 @@
   const LAT_STEP = 5;
   const FADE_ROW_STEP = 2.5;      // finer rows / columns where the real relief fades into the generic one
   const FADE_LAT_STEP = 2.5;
-  const ACTIVE_RANGE = 1100;      // patches within this distance of the train are built
+  const ACTIVE_RANGE = 1100;      // patches within this distance of the train are built (high quality; ACTIVE_RANGE_LEAN below it: W4, the next station's patch showed up in the 260-draw budget of the cab view at the first station)
+  const ACTIVE_RANGE_LEAN = 850;
   const DROP_RANGE = 1700;
+  const DROP_RANGE_LEAN = 1300;
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const lerp = (a, b, t) => a + (b - a) * t;
   const smooth01 = (t) => { const c = clamp(t, 0, 1); return c * c * (3 - 2 * c); };
@@ -106,11 +108,15 @@
   /* ---------------------------------------------------------------- preload */
   const heavyState = new Map();    // station name -> 'ready' | 'idle' | 'loading' | 'failed'  (a whole patch is 'ready' at once)
   const heavyJobs = new Map();     // station name -> promise of the heavy half
-  const keyOf = new Map();         // station name -> file key (split patches only)
+  const keyOf = new Map();         // patch key -> file key (split patches only)
+  /* W4: a station that two routes serve on different tracks (Thionville, Metz-Ville on the metz / paris routes) has one patch per route, registered in index-routes.json as "<route>/<Station>".
+     active: station name -> the patch key of the route that was preloaded last (every name-based function below goes through patchKey, so callers keep using the plain station name) */
+  const active = new Map();
+  const patchKey = (name) => active.get(name) || name;
   const listeners = new Set();     // fn(name, state): a heavy half is ready / failed
-  const stateOf = (name) => heavyState.get(name) || 'failed';
+  const stateOf = (name) => heavyState.get(patchKey(name)) || 'failed';
 
-  async function preload(names) {
+  async function preload(names, routeId) {
     try {
       /* index.json (Mosel line) + index-routes.json (W2c: north, south, west, ...): the station name -> patch file maps are merged; "split": 1 = core + heavy files */
       if (!indexPromise) {
@@ -120,7 +126,10 @@
         ]).then(([a, b]) => ({ stations: Object.assign({}, a.stations || {}, b.stations || {}), routes: b.stations || {}, split: !!b.split }));
       }
       const index = await indexPromise;
-      const jobs = (names || []).filter((n) => index.stations && index.stations[n] && !prepared.has(n)).map(async (name) => {
+      const baseRoute = String(routeId || '').replace(/~r$/, '');
+      (names || []).forEach((n) => { if (baseRoute && index.stations && index.stations[baseRoute + '/' + n]) active.set(n, baseRoute + '/' + n); else active.delete(n); });
+      const jobs = (names || []).filter((n) => index.stations && index.stations[patchKey(n)] && !prepared.has(patchKey(n))).map(async (n) => {
+        const name = patchKey(n);
         const key = index.stations[name];
         const isSplit = index.split && index.routes[name] === key;
         try {
@@ -142,33 +151,36 @@
       console.warn(TAG + 'preload failed', error);
     }
   }
-  /* a patch can be bound to one scenery (data.scenery, e.g. 'mosel': the patch of Lëtzebuerg is straightened along the line to the east and must not be laid along the west / south / north lines) */
+  /* a patch can be bound to one scenery (data.scenery): every patch is placed purely by the CURRENT track's own frame (lateral / longitudinal offsets from
+   * sMid, see station-surround-mesh.js), so this is only for a patch that is genuinely wrong on another scenery, not a general lock (Lëtzebuerg's patch
+   * carries no `scenery` field any more: the same real Gare Centrale is used by every route). */
   const forRoute = (data, def) => !data.scenery || !def || def.sceneryId === data.scenery;
-  const dataFor = (name, def) => { const d = prepared.get(name); return d && forRoute(d, def) ? d : null; };
+  const dataFor = (name, def) => { const d = prepared.get(patchKey(name)); return d && forRoute(d, def) ? d : null; };
 
   /* the heavy half of a split patch: class map, buildings, trees, rails, poi.  Never rejects; the state tells the result. */
   function loadHeavy(name) {
-    if (heavyJobs.has(name)) return heavyJobs.get(name);
-    const st = heavyState.get(name);
+    const pk = patchKey(name);
+    if (heavyJobs.has(pk)) return heavyJobs.get(pk);
+    const st = heavyState.get(pk);
     if (st !== 'idle') return Promise.resolve(st || 'failed');
-    heavyState.set(name, 'loading');
+    heavyState.set(pk, 'loading');
     const job = (async () => {
       let result = 'failed';
       try {
-        const raw = await fetchJson(DATA_DIR + keyOf.get(name) + '.h.json', HEAVY_TIMEOUT);
-        const core = prepared.get(name);
+        const raw = await fetchJson(DATA_DIR + keyOf.get(pk) + '.h.json', HEAVY_TIMEOUT);
+        const core = prepared.get(pk);
         const classGrid = await prepareClasses(raw);
         const merged = Object.assign({}, core, { buildings: raw.buildings || [], trees: raw.trees || [], rails: raw.rails || [], poi: raw.poi || [], classes: raw.classes, classGrid });
-        prepared.set(name, Object.freeze(merged));
+        prepared.set(pk, Object.freeze(merged));
         result = 'ready';
       } catch (error) {
         console.warn(TAG + 'scenery of ' + name + ' failed (generic scenery stays)', error);
       }
-      heavyState.set(name, result);
+      heavyState.set(pk, result);
       listeners.forEach((fn) => { try { fn(name, result); } catch (error) { console.warn(TAG + 'listener failed', error); } });
       return result;
     })();
-    heavyJobs.set(name, job);
+    heavyJobs.set(pk, job);
     return job;
   }
 
@@ -192,7 +204,7 @@
       const weightOf = (lat, z) => (1 - smooth01((Math.abs(lat) - (EXT_X - FADE_X)) / FADE_X)) * (1 - smooth01((Math.abs(z) - (EXT_Z - FADE_Z)) / FADE_Z));
       out.push({
         name: st.name, index, sMid,
-        get data() { return prepared.get(st.name); },                 // replaced by the full patch when the heavy half arrives
+        get data() { return prepared.get(patchKey(st.name)); },                 // replaced by the full patch when the heavy half arrives
         get state() { return stateOf(st.name); },
         get meshReady() { return stateOf(st.name) === 'ready'; },    // buildings / trees / ground paint are drawn, so the generic scenery keeps out of the patch
         covers: (s, lat) => Math.abs(lat) <= EXT_X && Math.abs(s - sMid) <= EXT_Z,
@@ -256,6 +268,9 @@
     const patches = track.surroundPatches || [];
     if (!patches.length || !TS.stationSurroundMesh) return null;
     const built = new Map();     // patch index -> { group, dispose }
+    const lean = opts.quality !== 'high';
+    const activeRange = lean ? ACTIVE_RANGE_LEAN : ACTIVE_RANGE;
+    const dropRange = lean ? DROP_RANGE_LEAN : DROP_RANGE;
     addCredit(patches);
     let disposed = false;
     /* a heavy half arrives (or fails): the chunks around the patch were built without it (generic scenery there) and are rebuilt by landscape.js */
@@ -279,7 +294,7 @@
         const state = p.state;
         /* 'ready': the whole patch; 'failed': the light patch (road of a level crossing, water) on top of the generic scenery; 'idle' / 'loading': not yet */
         const wantMesh = state === 'ready' || state === 'failed';
-        if (!built.has(i) && dist < ACTIVE_RANGE && wantMesh) {
+        if (!built.has(i) && dist < activeRange && wantMesh) {
           try {
             const rec = TS.stationSurroundMesh.build(p, { track: phys, quality: opts.quality, materials: opts.materials || {}, EXT_X, EXT_Z, width: opts.width, treeField: opts.treeField || null });
             if (rec && rec.group) { opts.root.add(rec.group); built.set(i, rec); }
@@ -287,7 +302,7 @@
             console.warn(TAG + 'build of ' + p.name + ' failed', error);
             built.set(i, { group: null, dispose() {} });
           }
-        } else if (built.has(i) && dist > DROP_RANGE) {
+        } else if (built.has(i) && dist > dropRange) {
           const rec = built.get(i);
           if (rec.group) opts.root.remove(rec.group);
           rec.dispose();

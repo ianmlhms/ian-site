@@ -73,7 +73,7 @@ def stop_node(railpoints, osm, hint=None):
 
 def build_path(tiles, spec):
     ways = [w for w in tiles["rails"] if w["t"].get("railway") == "rail" and w["t"].get("service") not in ("yard", "siding", "spur")]
-    G = RailGraph(ways)
+    G = RailGraph(ways, gap=spec.get("snap_gap", 0.0))
     pts = [stop_node(tiles["railpoints"], s[0], s[3] if len(s) > 3 else None) for s in spec["stops"]]
     chain, tags = [], []
     for (a, b), sa, sb in zip(zip(pts[:-1], pts[1:]), spec["stops"][:-1], spec["stops"][1:]):
@@ -241,20 +241,17 @@ def leg_len(real_gap, par):
     return brl.clamp(par["per_real"] * real_gap, par["leg_min"], par["leg_max"])
 
 
-PARAMS = {"per_real": brl.GAME_PER_REAL, "leg_min": brl.LEG_MIN, "leg_max": brl.LEG_MAX}
+PARAMS = {"per_real": brl.GAME_PER_REAL, "leg_min": brl.LEG_MIN, "leg_max": brl.LEG_MAX}   # defaults (the Luxembourg routes); a route definition can override them with "params" (W3: abroad routes)
 
 
-def ardennes_windows(biomes, s_from):
-    """Biome windows beyond s_from: forest / farmland become 'ardennes' (the hills and spruce forests of the Eislek)."""
+def ardennes_windows(biomes, s_from, s_to=float("inf")):
+    """Biome windows between s_from and s_to: forest / farmland become 'ardennes' (the hills and spruce forests of the Eislek / the Belgian Ardennes)."""
     out = []
     for a, b, name in biomes:
-        if b <= s_from:
-            out.append((a, b, name))
-        elif a >= s_from:
-            out.append((a, b, "ardennes" if name in ("forest", "farmland") else name))
-        else:
-            out.append((a, s_from, name))
-            out.append((s_from, b, "ardennes" if name in ("forest", "farmland") else name))
+        cuts = sorted({a, b} | {x for x in (s_from, s_to) if a < x < b})
+        for c0, c1 in zip(cuts[:-1], cuts[1:]):
+            mid = (c0 + c1) / 2
+            out.append((c0, c1, "ardennes" if s_from <= mid <= s_to and name in ("forest", "farmland") else name))
     merged = []
     for w in out:
         if merged and merged[-1][2] == w[2]:
@@ -262,6 +259,21 @@ def ardennes_windows(biomes, s_from):
         else:
             merged.append(w)
     return merged
+
+
+def highspeed_windows(biomes, attrs, min_kmh=200.0):
+    """W3 (paris): farmland windows along a line with maxspeed >= min_kmh (the LGV Est) become 'highspeed' (the TGV biome: wide cuttings, poplars, no villages)."""
+    out = []
+    for a, b, name in biomes:
+        if name == "farmland":
+            i0, i1 = int(a // attrs.step), max(int(a // attrs.step) + 1, int(b // attrs.step))
+            if float(np.median(attrs.maxspeed[i0:i1])) >= min_kmh:
+                name = "highspeed"
+        if out and out[-1][2] == name:
+            out[-1] = (out[-1][0], b, name)
+        else:
+            out.append((a, b, name))
+    return out
 
 
 def urban_halo(biomes, stops):
@@ -291,7 +303,9 @@ def build(route_id, dem=None):
     spec = ROUTES[route_id]
     tiles = load_route_tiles(spec["tiles"])
     dem = dem or Dem()
-    land = LandIndex(tiles["landuse"])
+    land = LandIndex(tiles["landuse"], rail=bool(spec.get("rail_class")))
+    if spec.get("rail_class"):
+        land.add_rails([w["g"] for w in tiles["rails"] if w["t"].get("railway") == "rail"])
     route, pts = build_path(tiles, spec)
     attrs = brl.RouteAttrs(route, dem)
     feats = route_features(attrs, dem, tiles)
@@ -303,10 +317,17 @@ def build(route_id, dem=None):
             raise SystemExit("stop %s is not after the previous one on the path (s=%.0f <= %.0f)" % (st[1], s, prev))
         prev = s
         stops.append({"osm": st[0], "game": st[1], "size": st[2], "s": s, "off": float(line.distance(pt))})
+    if spec.get("open_terminal_m"):
+        feats["tunnels"] = [t for t in feats["tunnels"] if t[1] <= stops[-1]["s"] - spec["open_terminal_m"] or t[0] >= stops[-1]["s"]]
     biomes = brl.biome_windows(attrs, land)
     if spec.get("ardennes_after"):
         s_a = next(x["s"] for x in stops if x["osm"] == spec["ardennes_after"])
         biomes = ardennes_windows(biomes, s_a)
+    if spec.get("ardennes_between"):
+        s_a, s_b = (next(x["s"] for x in stops if x["osm"] == o) for o in spec["ardennes_between"])
+        biomes = ardennes_windows(biomes, s_a, s_b)
+    if spec.get("highspeed_biome"):
+        biomes = highspeed_windows(biomes, attrs)
     biomes = urban_halo(biomes, stops)
     platforms = [p for p in tiles["rails"] if p["t"].get("railway") in ("platform", "platform_edge")]
     plat_geoms = [{"g": p["g"], "t": p["t"], "poly": False} for p in platforms] + [{"g": p["g"], "t": p["t"], "poly": True} for p in tiles.get("platpoly", [])]
@@ -330,7 +351,7 @@ def build(route_id, dem=None):
         a, b = A["s"] + HALF_BLOCK, B["s"] - HALF_BLOCK
         if b - a < 120:
             raise SystemExit("leg %s -> %s too short (%d m real)" % (A["game"], B["game"], b - a))
-        Lg = leg_len(b - a, PARAMS)
+        Lg = leg_len(b - a, dict(PARAMS, **spec.get("params", {})))
         br = [x for x in feats["bridges"] if x[1] > a and x[0] < b]
         tu = [x for x in feats["tunnels"] if x[1] > a and x[0] < b]
         cr = [c["s"] for c in feats["crossings"] if a + 20 < c["s"] < b - 20 and not any(abs(c["s"] - st["s"]) < HALF_BLOCK + 20 for st in stops)]
@@ -391,6 +412,9 @@ def emit(route_id, res):
     wtree = STRtree([w["g"] for w in waters])
     roads = [w for w in tiles["highways"] if w["t"].get("highway") in sc.ROAD_CLASSES]
     rtree = STRtree([w["g"] for w in roads])
+    road_lines = [w["g"] for w in roads]
+    import real_line_crossings as rc
+    track_line = LineString(attrs.xy)
     all_meta = dict(legs_meta)
     for name, st in stations.items():
         all_meta["st:" + name] = {"route": route_id, "from": name, "to": name, "real": [st["s_real"] - HALF_BLOCK, st["s_real"] + HALF_BLOCK], "k": 1.0,
@@ -399,9 +423,16 @@ def emit(route_id, res):
     for lid, meta in all_meta.items():
         g = sc.LegGeom(attrs, meta)
         rd = sc.roads_of_leg(g, roads, rtree)
+        is_block = lid.startswith("st:")
+        # the real road of a level crossing, followed outward to its real junction (real_line_crossings.py): same as the Mosel pipeline (build_real_line.py
+        # write_features), wired in here too so the crossing roads of the single-line routes (west / south / north / metz / brussels / paris) stop falling
+        # back to the Wave-1 synthetic perpendicular stub on every crossing (REAL-LINES.md "roads to nowhere").
+        arm_ctx = None if is_block else {"fn": lambda gg, xy, sgc: rc.arms_of_crossing(gg, xy, sgc, roads, rtree, track_line, road_lines, rtree)}
+        crossings, arms_abs = sc.crossings_of_leg(g, res["feats"]["crossings"], rd, meta=None if is_block else all_meta[lid], arm_ctx=arm_ctx)
+        rd = rc.drop_arm_ribbons(rd, arms_abs)
         out[lid] = {
             "L": round(g.length, 1), "land": sc.land_raster(g, land), "far": sc.far_raster(g, land), "water": sc.water_windows(g, waters, wtree), "roads": rd,
-            "relief": sc.relief(g, dem), "places": sc.places_of_leg(g, tiles["places"]), "crossings": sc.crossings_of_leg(g, res["feats"]["crossings"], rd),
+            "relief": sc.relief(g, dem), "places": sc.places_of_leg(g, tiles["places"]), "crossings": crossings,
         }
         print("  features", lid, meta["from"], "->", meta["to"], "roads", len(rd), "water", len(out[lid]["water"]), "places", len(out[lid]["places"]), "crossings", len(out[lid]["crossings"]), flush=True)
     doc = {"version": 1, "row": sc.ROW_M, "col": sc.COL_M, "lat0": sc.LAT0, "cols": sc.COLS, "far": {"row": sc.FAR_ROW, "col": sc.FAR_COL, "lat0": sc.FAR_LAT0, "cols": sc.FAR_COLS},

@@ -114,6 +114,16 @@ function addRuin(m, h) {
         const lo = Math.min(prevTop, ty), hi = Math.max(prevTop, ty);
         m.face([[p0[0], lo, p0[2]], [p0[0] - nrm[0] * 0.9, lo, p0[2] - nrm[1] * 0.9], [p0[0] - nrm[0] * 0.9, hi, p0[2] - nrm[1] * 0.9], [p0[0], hi, p0[2]]], RUIN_STONE, KIND.ashlar, h.seed, [[0, lo - g], [0.9, lo - g], [0.9, hi - g], [0, hi - g]], 0.9, H);
       }
+      if (ty > g + H * 0.84) {                                                       // crenellations: only the tallest, best-preserved stretches still carry their battlements
+        const segLen = len / n, segTx = (p1[0] - p0[0]) / segLen, segTz = (p1[2] - p0[2]) / segLen, yawSeg = Math.atan2(segTz, segTx);
+        const MERLON_W = 0.5, step = MERLON_W + 0.42, count = Math.max(1, Math.floor(segLen / step));
+        for (let k = 0; k < count; k++) {
+          if (hash(h.seed * 77, si * 13 + i, k) > 0.7) continue;                     // a merlon or two has crumbled away, like the rest of the ruin
+          const uc = (k + 0.5) / count, mx = p0[0] + (p1[0] - p0[0]) * uc, mz = p0[2] + (p1[2] - p0[2]) * uc;
+          const mh = 0.45 + 0.3 * hash(h.seed * 31, si, i * 7 + k);
+          m.box(mx, ty, mz, MERLON_W / 2, mh / 2, 0.42, yawSeg, RUIN_STONE, KIND.ashlar, h.seed);
+        }
+      }
       prevTop = ty;
     }
     const nw = Math.floor(len / 4.2);

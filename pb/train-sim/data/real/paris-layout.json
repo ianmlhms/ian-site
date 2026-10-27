@@ -1,0 +1,443 @@
+{
+ "version": 1,
+ "stations": {
+  "Lëtzebuerg": {
+   "size": 3,
+   "side": "right",
+   "biome": "city",
+   "osm": "Luxembourg",
+   "s_real": 0.0,
+   "plat": [
+    {
+     "edge": -41.2,
+     "w": 3.7,
+     "lat": -43.1,
+     "s0": 0.0,
+     "s1": 170.0,
+     "ref": "9;10"
+    },
+    {
+     "edge": -32.7,
+     "w": 3.0,
+     "lat": -34.2,
+     "s0": 0.0,
+     "s1": 170.0,
+     "ref": "8"
+    },
+    {
+     "edge": -23.1,
+     "w": 11.8,
+     "lat": -29.0,
+     "s0": 0.0,
+     "s1": 170.0,
+     "ref": "7;8"
+    },
+    {
+     "edge": -14.9,
+     "w": 3.0,
+     "lat": -16.4,
+     "s0": 0.0,
+     "s1": 150.0,
+     "ref": "5"
+    },
+    {
+     "edge": -6.8,
+     "w": 9.6,
+     "lat": -11.6,
+     "s0": 0.0,
+     "s1": 150.0,
+     "ref": "4;5"
+    },
+    {
+     "edge": 1.5,
+     "w": 12.6,
+     "lat": 7.8,
+     "s0": 0.0,
+     "s1": 170.0,
+     "ref": "1;2;3"
+    },
+    {
+     "edge": 6.8,
+     "w": 3.0,
+     "lat": 8.3,
+     "s0": 160.0,
+     "s1": 170.0,
+     "ref": "2"
+    },
+    {
+     "edge": 14.1,
+     "w": 3.0,
+     "lat": 15.6,
+     "s0": 110.0,
+     "s1": 170.0,
+     "ref": "1"
+    }
+   ],
+   "trk": [
+    -40.8,
+    -35.5,
+    -22.8,
+    -17.8,
+    -5.0
+   ],
+   "bside": 1,
+   "lat": 49.599845,
+   "lon": 6.134376,
+   "heading": 201.9
+  },
+  "Thionville": {
+   "size": 2,
+   "side": "left",
+   "biome": "farmland",
+   "osm": "Thionville",
+   "s_real": 32390.3,
+   "plat": [
+    {
+     "edge": -9.9,
+     "w": 3.0,
+     "lat": -11.4,
+     "s0": 9.7,
+     "s1": 169.7,
+     "ref": "F"
+    },
+    {
+     "edge": -1.3,
+     "w": 10.1,
+     "lat": -6.4,
+     "s0": 9.7,
+     "s1": 169.7,
+     "ref": "E;F"
+    },
+    {
+     "edge": 5.8,
+     "w": 8.0,
+     "lat": 9.8,
+     "s0": -20.3,
+     "s1": 169.7,
+     "ref": "C;D"
+    },
+    {
+     "edge": 10.6,
+     "w": 3.0,
+     "lat": 12.1,
+     "s0": -20.3,
+     "s1": 169.7,
+     "ref": "C"
+    },
+    {
+     "edge": 18.4,
+     "w": 13.7,
+     "lat": 25.2,
+     "s0": -50.3,
+     "s1": 169.7,
+     "ref": "A;B"
+    },
+    {
+     "edge": 27.5,
+     "w": 3.0,
+     "lat": 29.0,
+     "s0": 129.7,
+     "s1": 169.7,
+     "ref": "A"
+    }
+   ],
+   "trk": [
+    -41.5,
+    -36.8,
+    -16.1,
+    5.2,
+    10.5,
+    15.0,
+    19.5
+   ],
+   "bside": 1,
+   "lat": 49.353914,
+   "lon": 6.170355,
+   "heading": 229.3
+  },
+  "Metz-Ville": {
+   "size": 3,
+   "side": "right",
+   "biome": "city",
+   "osm": "Metz",
+   "s_real": 61888.9,
+   "plat": [
+    {
+     "edge": -41.8,
+     "w": 3.0,
+     "lat": -43.3,
+     "s0": -68.9,
+     "s1": 161.1,
+     "ref": ""
+    },
+    {
+     "edge": -36.1,
+     "w": 7.1,
+     "lat": -39.6,
+     "s0": -68.9,
+     "s1": 161.1,
+     "ref": ""
+    },
+    {
+     "edge": -32.4,
+     "w": 3.0,
+     "lat": -33.9,
+     "s0": -58.9,
+     "s1": 161.1,
+     "ref": "7"
+    },
+    {
+     "edge": -23.4,
+     "w": 10.3,
+     "lat": -28.6,
+     "s0": -68.9,
+     "s1": 161.1,
+     "ref": "6;7"
+    },
+    {
+     "edge": -13.7,
+     "w": 7.1,
+     "lat": -17.2,
+     "s0": -68.9,
+     "s1": 161.1,
+     "ref": "5"
+    },
+    {
+     "edge": -6.1,
+     "w": 3.0,
+     "lat": -7.6,
+     "s0": -28.9,
+     "s1": 161.1,
+     "ref": "4"
+    },
+    {
+     "edge": -2.4,
+     "w": 6.3,
+     "lat": -5.6,
+     "s0": -68.9,
+     "s1": 161.1,
+     "ref": "4"
+    },
+    {
+     "edge": 2.0,
+     "w": 10.2,
+     "lat": 7.1,
+     "s0": -68.9,
+     "s1": 161.1,
+     "ref": "2;3"
+    },
+    {
+     "edge": 11.4,
+     "w": 3.0,
+     "lat": 12.9,
+     "s0": -38.9,
+     "s1": 161.1,
+     "ref": "2"
+    },
+    {
+     "edge": 14.6,
+     "w": 6.7,
+     "lat": 18.0,
+     "s0": -58.9,
+     "s1": 161.1,
+     "ref": ""
+    },
+    {
+     "edge": 19.6,
+     "w": 3.0,
+     "lat": 21.1,
+     "s0": -58.9,
+     "s1": 161.1,
+     "ref": ""
+    },
+    {
+     "edge": 23.4,
+     "w": 12.3,
+     "lat": 29.6,
+     "s0": -58.9,
+     "s1": 161.1,
+     "ref": "1"
+    }
+   ],
+   "trk": [
+    -44.8,
+    -35.5,
+    -22.2,
+    -13.0,
+    -8.5,
+    14.2,
+    22.8
+   ],
+   "bside": 1,
+   "lat": 49.109217,
+   "lon": 6.177408,
+   "heading": 234.8
+  },
+  "Champagne-Ardenne TGV": {
+   "size": 2,
+   "side": "left",
+   "biome": "highspeed",
+   "osm": "Champagne-Ardenne TGV",
+   "s_real": 239701.4,
+   "plat": [
+    {
+     "edge": -1.0,
+     "w": 5.9,
+     "lat": -4.0,
+     "s0": -81.4,
+     "s1": 168.6,
+     "ref": "4"
+    },
+    {
+     "edge": 18.8,
+     "w": 20.8,
+     "lat": 29.2,
+     "s0": -81.4,
+     "s1": 168.6,
+     "ref": "3;7;9"
+    },
+    {
+     "edge": 26.3,
+     "w": 3.0,
+     "lat": 27.8,
+     "s0": -81.4,
+     "s1": 98.6,
+     "ref": "7"
+    },
+    {
+     "edge": 34.0,
+     "w": 3.0,
+     "lat": 35.5,
+     "s0": -81.4,
+     "s1": 98.6,
+     "ref": "9"
+    }
+   ],
+   "trk": [
+    6.5,
+    10.8,
+    17.8,
+    28.2,
+    32.2
+   ],
+   "bside": 1,
+   "lat": 49.214108,
+   "lon": 3.994521,
+   "heading": 302.5
+  },
+  "Paris-Est": {
+   "size": 3,
+   "side": "right",
+   "biome": "city",
+   "osm": "Gare de l'Est",
+   "s_real": 376419.6,
+   "plat": [
+    {
+     "edge": -31.9,
+     "w": 6.5,
+     "lat": -35.2,
+     "s0": -169.6,
+     "s1": 10.4,
+     "ref": "11;12"
+    },
+    {
+     "edge": -18.4,
+     "w": 7.0,
+     "lat": -21.9,
+     "s0": -169.6,
+     "s1": 10.4,
+     "ref": "9;10"
+    },
+    {
+     "edge": -5.2,
+     "w": 6.8,
+     "lat": -8.6,
+     "s0": -169.6,
+     "s1": 10.4,
+     "ref": "7;8"
+    },
+    {
+     "edge": 1.4,
+     "w": 6.9,
+     "lat": 4.8,
+     "s0": -169.6,
+     "s1": 10.4,
+     "ref": "5;6"
+    }
+   ],
+   "trk": [
+    -43.5,
+    -40.0,
+    -30.5,
+    -27.0,
+    -17.2,
+    -13.5,
+    -3.8,
+    9.8,
+    13.2,
+    23.0,
+    26.5
+   ],
+   "bside": -1,
+   "lat": 48.8776,
+   "lon": 2.358794,
+   "heading": 206.2
+  }
+ },
+ "segments": {
+  "main": [
+   {
+    "t": "station",
+    "name": "Lëtzebuerg"
+   },
+   {
+    "t": "leg",
+    "id": "P01",
+    "from": "Lëtzebuerg",
+    "to": "Thionville",
+    "length": 1605,
+    "spec": "s*:g0.25:v120:bcity s34:g0.5:bsuburb l590/83:g-0.5:bforest r597/99:g-1:bfarmland s40:g-0.25 s36:g0.25:v140:bsuburb s35:bfarmland s27 l1335/110:g0.25:Br,5,w s29:bsuburb l807/56:bfarmland r1335/59:g0.25:bsuburb s44:g0.5:bindustrial s46:g-1:bforest l906/89:g-1:v150:bfarmland r1059/123:g-1 l1252/155:g-1 s38:g-0.75:v140 r821/62:g-0.5 l862/69:g-1:bsuburb s36:g-0.5 r806/109:g-0.75:bfarmland s70:g-0.75:X s34:g-0.25:bsuburb s71:bfarmland:Br,6,w"
+   },
+   {
+    "t": "station",
+    "name": "Thionville"
+   },
+   {
+    "t": "leg",
+    "id": "P02",
+    "from": "Thionville",
+    "to": "Metz-Ville",
+    "length": 1500,
+    "spec": "s60:v130:bfarmland:Br,5,w s50:bcity l922/282 s76:v160:bfarmland s54:bfarmland s60:bindustrial:Br,5,w s33:g0.25:bsuburb s* s46:bsuburb s32:bfarmland s53 s31 l537/464:g0.25 s60:bfarmland:Br,9,w s32:g0.75:bcity s60:g0.25:bsuburb:Br,5,w"
+   },
+   {
+    "t": "station",
+    "name": "Metz-Ville"
+   },
+   {
+    "t": "leg",
+    "id": "P03",
+    "from": "Metz-Ville",
+    "to": "Champagne-Ardenne TGV",
+    "length": 8500,
+    "spec": "s40:g0.25:v30:bsuburb s34:v70 s29:g-0.5 s36:g-0.5:bfarmland s58:g-0.25:v120:bsuburb s31:bcity s38:g0.25:bsuburb s60:bfarmland:Br,6,w s30:bindustrial s32:bfarmland s39 s30:bsuburb s36:bfarmland s47 s36:bsuburb s32:g0.25 s28:v150:bfarmland l810/665:bsuburb:Br,5,w s62:g0.25:bfarmland s34:bsuburb s35:v120:bindustrial r703/318:g1 r703/423:g1:bhighspeed s46:g1:v160 s60:g1:v320:Br,8,w s59:g1 s29 s49:g-0.75:bforest s32:g-1:bhighspeed s54:g-0.75 s49:g-1 s110:g-0.75:bforest:Bv,16,w s50:g-1:v300:bhighspeed s74:g-0.25 s55:g-0.5 s32:g0.5 s47:g-0.25:v320 s55:g0.5:bforest s34:g0.25 s49:g-0.25 s92:g0.25:bhighspeed s89:g1 s41:g-1 s71:g1 s37:g-0.5 s52:g-1 s60:g-0.75:Br,12,w s38:g-1 s51:g1 s31:g-0.5 s55:g-1 s60:g-0.25:Br,6,w s71:g1 s31:g-1 s110:g1:Bv,13,d s29:g1:bforest s31:g0.75 s33:g-1 s31:g1:bhighspeed s29:g1:bforest s57:g-0.75 s110:g-0.75:Bv,16,d s36:g-0.5 s35:g-0.25:bhighspeed s30:g-1 s32:g-0.5 s54:g-0.25 s27:g-0.75 s40:g0.25 s40:g-0.25:bforest s38:g1:bhighspeed s33:g-0.5 s49:g-1 s60:g-0.25:Br,6,w s33:g0.25 s70:g-1 s33 s36:g-1 s104:g-0.75 s65:g-0.5 s35:g-0.75 s35:g-1 s65:g-0.25 s34 s33:g0.5 s35:g-1 s35:g-0.25 s60:g0.25:Br,5,w s41:g0.75 s26:g0.5:bforest s33:g0.25:bhighspeed s30:g-0.5 s60:Br,5,w s48:g-0.5 s33:g0.25:bforest s50:g1:bhighspeed s42 s64:g-1 s31:g-0.25 s85:g1 s47:g-0.5 s47:g-1 s47:g0.25 s28:g-1 s42:g1 s45 s49:g-0.25 s69:g0.5 s58:g-0.5 s28:g-0.75 s40:g0.5 s32:g-0.5 s37:g-1 s60:g-0.25 s37:g-1 s67:g-0.25 s42:g-0.5 s50:g-0.25 s31:g-0.5 s*:g-0.25 s46 s53:g0.5 s31:g-0.5 s60:Br,9,w s40:g-0.5 s43 s30:g-0.25 s63:g0.25 s37:g-0.5 s34 s48:g-0.5 s52:g0.25 s31 s76:g1 s34:g-1 s31 s41:g-1 s51:g-0.25 s35:g-1 s43 s28:g-0.5 s41:g0.75 s32:g-0.75 s54:g0.25 s45:bvineyard s43:g-0.25 s36:g-0.25:bhighspeed s47 s86:g1 s60:g0.5:T:bvineyard s37:g-0.75:bhighspeed s31:bvineyard s45:g-1:bhighspeed s73:g-0.25"
+   },
+   {
+    "t": "station",
+    "name": "Champagne-Ardenne TGV"
+   },
+   {
+    "t": "leg",
+    "id": "P04",
+    "from": "Champagne-Ardenne TGV",
+    "to": "Paris-Est",
+    "length": 6821,
+    "spec": "s29:g-0.25:v170:bhighspeed s32:g0.75:v320 s39:g-0.25 s65:g0.25 s35:g0.75:bvineyard s28:g-0.75:bhighspeed s56:g0.25 s155:g1 s52:g-0.25 s91:g-1 s113:g1:Bv,13,d s34:g1:v300 s36 s32:g-0.5 s108:g1 s37:g-0.75 s*:g-1 s54:g0.75:bforest s42:g1:bhighspeed s35:g1 s38:g0.25 s34:g-0.5 s52:g0.25 s47:g-1 s50:g0.25:v320 s40:g-1 s27:g-0.25 s65 s28:g0.75 s38:g1:bforest s43:g0.75 s63:g-0.5 s42:bhighspeed s61 s28:g-0.25 s35:g-1:bforest s32:g-1:bhighspeed s32 s47:g1 s33:g1:bforest s29:g-1 s29:g-1:bhighspeed s33:g-0.25 s52:g1:bforest s39:g0.5:bhighspeed s58:g-0.75 s61:g-1:bforest:Br,16,w s40:g-1 s40:bhighspeed s36 s66:g1 s38:g0.25 s33:g-1:bforest s33:g-0.25:bhighspeed s28:g1:bforest s31:g0.75:bhighspeed s36:g-1 s62:g1:bforest s31:g0.25:bhighspeed s47:g-1 s45:g-1:bforest s33:g-0.25:bhighspeed s31:g0.25 s33:g0.5 s95:g-1 s34:g0.75 s119:g-1 s113:g1:bforest:Bv,18,w s50:g0.5:bhighspeed s35:g-0.25 s35:g0.5 s70:g-1 s61:g1:bforest:Br,5,w s44:g1:bhighspeed s37 s26:g0.25 s78:g-0.25 s40 s33:g1 s38:g0.25:bforest s30:g-0.75:bindustrial s46:g-1:bhighspeed s28:g-0.25 s33:g-1 s59:g0.25 s36:g0.5 s39:g0.25:v300 s42 s38:g0.25 s40:g-1 s28:g-0.75 s142:g-0.5 s61:g-1:Br,8,w s95:g1 s76:g1:v270:T s61:g-1:T:bhighspeed s27:g-1:v230:bforest r2185/309:g-0.75 r2185/356:g-0.5:bhighspeed s61:g-0.25:v140:T s37:g-0.25:bsuburb s47:bhighspeed s35:g-0.25:v220 s31:g0.25 s45:g0.25:bsuburb s28 s58:g0.75 s32:g0.25:v160 s36 s58:g0.25 s61:v130:Br,5,w s57:g-0.25 s28:g0.25 s70:v120 s32:bfarmland s61:g-0.25:Br,5,w s56:g-0.25 s52:bindustrial s61:bsuburb:Br,8,w l1003/328:g-0.25 s30:bfarmland s37:v30:bsuburb"
+   },
+   {
+    "t": "station",
+    "name": "Paris-Est"
+   }
+  ]
+ }
+}

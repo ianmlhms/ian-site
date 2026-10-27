@@ -46,6 +46,7 @@ CLS_RES = 1.0
 SS = 4                      # class raster supersampling
 MAX_TREES = 1500
 CORRIDOR = 4.5              # rail bed half width of the main track corridor (class 8)
+TRACK_CLEAR_M = 3.2         # an extruded (faceless) building may not reach closer than this to the player's track axis
 FLAT_HALF = 5.0             # DEM flattened to the track level within +-5 m
 PLATFORM_MAX_TRACK_DIST = 12.0
 EXT_M = 1500.0              # straight extension of the centre line beyond its ends
@@ -68,17 +69,36 @@ DE_DIR = os.path.join(WORK, "de")
 DE_CREDIT = "Geodata (c) GeoBasis-RLP / Landesamt fuer Vermessung und Geobasisinformation Rheinland-Pfalz (dl-de/by-2-0)"
 COUNTRY = "lu"
 CREDIT = None
+FACELESS = False            # True outside Luxembourg: no LOD2, buildings are extruded OSM footprints (patch "extrudeFaceless")
+REGION = None               # "fr" | "be": regional facade table of station-surround-mesh.js
+# --country fr|be (W4): France / Belgium.  EPSG: a transverse Mercator centred on the station (metres, no national grid needed), OSM from the Geofabrik extract that covers the station,
+# relief from the Copernicus GLO-30 DEM (30 m, open; no LiDAR / LOD2 there, so no canopy: trees come only from OSM natural=tree nodes).
+ABROAD_PBF = {"lorraine": "abroad/lorraine.osm.pbf", "champagne-ardenne": "abroad/champagne-ardenne.osm.pbf", "ile-de-france": "abroad/ile-de-france.osm.pbf",
+              "picardie": "abroad/picardie.osm.pbf", "belgium": "abroad/belgium.osm.pbf"}
+ABROAD_CREDIT = "Geodata (c) OpenStreetMap contributors (ODbL, openstreetmap.org/copyright) - relief Copernicus GLO-30 DEM (c) ESA / Copernicus 2021"
+DEM_DIR = os.path.join(WORK, "dem")
 
 
-def set_country(c):
-    """Switch the module to Germany (Rheinland-Pfalz).  The Luxembourg defaults above stay untouched when this is never called."""
-    global COUNTRY, OSM_PBF, TO_LUREF, TO_WGS, CREDIT
+def set_country(c, lat=None, lon=None, pbf=None):
+    """Switch the module to Germany (Rheinland-Pfalz) or, with a station lat / lon and a Geofabrik extract name, France / Belgium.  The Luxembourg defaults above stay
+    untouched when this is never called."""
+    global COUNTRY, OSM_PBF, TO_LUREF, TO_WGS, CREDIT, FACELESS, REGION
     if c == "de":
         COUNTRY = "de"
+        FACELESS = True
         OSM_PBF = os.path.join(WORK, "rlp.osm.pbf")
         TO_LUREF = pyproj.Transformer.from_crs(4326, 25832, always_xy=True)
         TO_WGS = pyproj.Transformer.from_crs(25832, 4326, always_xy=True)
         CREDIT = DE_CREDIT
+    elif c in ("fr", "be"):
+        if lat is None or lon is None or pbf not in ABROAD_PBF:
+            raise SystemExit("--country %s needs --lat / --lon and --pbf one of %s" % (c, sorted(ABROAD_PBF)))
+        COUNTRY, FACELESS, REGION = c, True, c
+        OSM_PBF = os.path.join(WORK, ABROAD_PBF[pbf])
+        local = pyproj.CRS.from_proj4("+proj=tmerc +lat_0=%.6f +lon_0=%.6f +k=1 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs" % (lat, lon))
+        TO_LUREF = pyproj.Transformer.from_crs(4326, local, always_xy=True)
+        TO_WGS = pyproj.Transformer.from_crs(local, 4326, always_xy=True)
+        CREDIT = ABROAD_CREDIT
 
 CLS_ASPHALT, CLS_PAVING, CLS_LAWN, CLS_MEADOW, CLS_FOREST, CLS_GRAVEL, CLS_WATER, CLS_BUILDING, CLS_BED = range(9)
 CLASS_RGB = [(88, 88, 94), (196, 190, 178), (118, 176, 84), (178, 194, 104), (42, 102, 52), (176, 154, 122), (70, 128, 206), (206, 96, 74),
@@ -280,7 +300,25 @@ def lonlat_bbox(e0, n0, e1, n1):
 
 
 def _osm_records(layer, bbox, where=None):
-    """Raw features of a Geofabrik extract layer inside a lon/lat bbox: [(id, merged tag dict, wkb bytes)]."""
+    """Raw features of a Geofabrik extract layer inside a lon/lat bbox: [(id, merged tag dict, wkb bytes)].
+    France / Belgium (REGION): cached on disk per (extract, layer, bbox, where): the Belgian extract takes minutes per layer, a rebuild of a patch then takes seconds."""
+    if REGION:
+        import hashlib
+        tag = hashlib.sha1(repr((os.path.basename(OSM_PBF), layer, [round(v, 5) for v in bbox], where)).encode()).hexdigest()[:20]
+        cache = os.path.join(WORK, "abroad", "osm-cache", tag + ".pkl")
+        if os.path.exists(cache):
+            with open(cache, "rb") as fh:
+                return pickle.load(fh)
+        recs = _osm_records_scan(layer, bbox, where)
+        os.makedirs(os.path.dirname(cache), exist_ok=True)
+        with open(cache + ".part", "wb") as fh:
+            pickle.dump(recs, fh, protocol=4)
+        os.replace(cache + ".part", cache)
+        return recs
+    return _osm_records_scan(layer, bbox, where)
+
+
+def _osm_records_scan(layer, bbox, where=None):
     from pyogrio.raw import read
     meta, _, geom, fields = read(OSM_PBF, layer=layer, bbox=bbox, where=where)
     names = [str(n) for n in meta["fields"]]
@@ -609,6 +647,37 @@ def fetch_dem_de(key, bb):
     return Raster(out["dgm1"], *geo), Raster(out["dom1"], *geo)
 
 
+def fetch_dem_copernicus(key, bb):
+    """DTM + DSM (the same raster: Copernicus GLO-30 is a 30 m surface model, there is no LiDAR abroad, so no canopy height) over bb=(e0,n0,e1,n1) in the station's
+    local CRS, resampled bilinearly to a 10 m grid from the lat / lon GeoTIFF tiles in $ZUCH_WORK/dem (downloaded by real_line_dem.py).  Returns (dtm, dsm) Raster objects."""
+    import rasterio
+    step = 10.0
+    es = np.arange(bb[0] - step, bb[2] + 2 * step, step)
+    ns = np.arange(bb[3] + step, bb[1] - 2 * step, -step)               # top row first
+    E, N = np.meshgrid(es, ns)
+    lon, lat = TO_WGS.transform(E, N)
+    out = np.zeros(lon.shape, np.float64)
+    tiles = {}
+    for ilat in range(int(math.floor(lat.min())), int(math.floor(lat.max())) + 1):
+        for ilon in range(int(math.floor(lon.min())), int(math.floor(lon.max())) + 1):
+            name = "N%02d_E%03d.tif" % (ilat, ilon)
+            path = os.path.join(DEM_DIR, name)
+            if not os.path.exists(path):
+                raise SystemExit("missing DEM tile %s (real_line_dem.py downloads it)" % path)
+            with rasterio.open(path) as ds:
+                tiles[(ilat, ilon)] = (ds.transform, ds.read(1).astype(np.float32))
+    for (ilat, ilon), (tr, arr) in tiles.items():
+        sel = (np.floor(lat) == ilat) & (np.floor(lon) == ilon)
+        if not sel.any():
+            continue
+        col = (lon[sel] - tr.c) / tr.a - 0.5
+        row = (lat[sel] - tr.f) / tr.e - 0.5
+        out[sel] = ndi.map_coordinates(arr, [row, col], order=1, mode="nearest")
+    geo = (float(es[0] - step / 2), float(ns[0] + step / 2), step)
+    log("Copernicus", out.shape, "range %.1f..%.1f" % (out.min(), out.max()))
+    return Raster(out, *geo), Raster(out, *geo)
+
+
 def lod2_de_tiles(bb):
     """LoD2 2 km tile URLs ({tile: url}) that intersect bb=(e0,n0,e1,n1)."""
     lst = de_listing("geb3dlo")
@@ -845,7 +914,7 @@ def build(args):
     polys0 = read_osm("multipolygons", near_bb)
     lines0 = read_osm("lines", near_bb)
     sbld, plats = find_station(lines0, polys0, None, name, node)
-    if sbld is None and COUNTRY == "de":
+    if sbld is None and FACELESS:
         sbld = find_station_building_de(polys0, node, read_osm("points", near_bb, where="other_tags LIKE '%\"railway\"=>%'"))
     log("station building:", sbld["id"] if sbld else None, "| platforms near:", len(plats))
     allrail = [f for f in read_osm("lines", (E0 - R, N0 - R, E0 + R, N0 + R), where="railway IS NOT NULL") if f["t"].get("railway") == "rail"]
@@ -860,7 +929,11 @@ def build(args):
     near = [f for f in cand if f["g"].distance(ref_geom) < 60]
     main = min(near or cand, key=lambda f: f["g"].distance(ref_geom))
     side_forced = None
-    if args.side and plats:
+    if getattr(args, "main_near_node", False):
+        main = min(cand, key=lambda f: f["g"].distance(node))
+        side_forced = args.side
+        log("main track = the way nearest to the node (the game route's own track): %s, %.1f m away" % (main["id"], main["g"].distance(node)))
+    elif args.side and plats:
         # the game declares the platform side of the stop (real-mosel.js): take the (platform, adjacent main track) pair whose platform lies on that side of the
         # track in the direction of travel; the default pair (platform next to the station building) stays when it already matches or nothing matches.
         want = 1 if args.side == "right" else -1
@@ -977,7 +1050,12 @@ def build(args):
     # ---------------------------------------------------------------------------------------------------- LiDAR
     margin = 40.0
     lbb = (math.floor(pb[0] - margin), math.floor(pb[1] - margin), math.ceil(pb[2] + margin), math.ceil(pb[3] + margin))
-    dtm, dsm = fetch_dem_de(key, lbb) if COUNTRY == "de" else fetch_lidar(key, lbb)
+    if COUNTRY == "de":
+        dtm, dsm = fetch_dem_de(key, lbb)
+    elif FACELESS:
+        dtm, dsm = fetch_dem_copernicus(key, lbb)
+    else:
+        dtm, dsm = fetch_lidar(key, lbb)
     # DEM at 2 m (4x4 area average per cell), absolute heights
     nx, nz = int((XMAX - XMIN) / DEM_RES) + 1, int((ZMAX - ZMIN) / DEM_RES) + 1
     dx = np.array([-0.75, -0.25, 0.25, 0.75])
@@ -994,7 +1072,7 @@ def build(args):
     corr = np.abs(X) <= FLAT_HALF
     row_med = np.median(dem_abs[:, corr], axis=1)
     deck = np.zeros(len(Z), bool)
-    if COUNTRY == "de":
+    if FACELESS:
         # bridges / tunnels / underpasses of the main track: the DTM below them is the valley (or the hill above), not the track.  The track profile is interpolated across
         # them from both ends and the corridor is not flattened there (the valley stays open under the game's own bridge).
         for f in cand:
@@ -1006,7 +1084,7 @@ def build(args):
         if deck.any() and (~deck).sum() > 20:
             row_med = np.where(deck, np.interp(Z, Z[~deck], row_med[~deck]), row_med)
             log("main track bridges / tunnels: %d of %d rows (%.0f m) take the interpolated track profile" % (deck.sum(), len(Z), deck.sum() * DEM_RES))
-    if COUNTRY == "de":
+    if FACELESS:
         row_med = ndi.grey_closing(row_med, size=31, mode="nearest")             # untagged short underpasses / culverts under the track: fill dips narrower than 62 m
     row_med = ndi.median_filter(row_med, size=9, mode="nearest")
     row_med = ndi.gaussian_filter1d(row_med, 2.0, mode="nearest")
@@ -1157,7 +1235,9 @@ def build(args):
     bld_osm = [f for f in polys if f["t"].get("building") and f["t"]["building"] not in ("roof",) and f["g"].area >= 3]
     roofs_osm = [f for f in polys if f["t"].get("building") == "roof"]
     lod = []
-    if COUNTRY == "de":
+    if COUNTRY in ("fr", "be"):
+        slugs = []                                       # no LOD2 outside Luxembourg / Rheinland-Pfalz: every building is an extruded OSM footprint
+    elif COUNTRY == "de":
         slugs = []
         win = (pb[0] - 40, pb[1] - 40, pb[2] + 40, pb[3] + 40)
         for tile, url in lod2_de_tiles(win).items():
@@ -1175,7 +1255,7 @@ def build(args):
     else:
         slugs = args.communes.split(",") if args.communes else communes_for(patch_world, obb)
         log("communes for LOD2:", slugs)
-    for sl in ([] if COUNTRY == "de" else slugs):
+    for sl in ([] if FACELESS else slugs):
         cpath = os.path.join(WORK, "lod2", "%s-%s-%d_%d.pkl" % (key, sl, int(pb[0]) // 10, int(pb[1]) // 10))
         if os.path.exists(cpath):
             with open(cpath, "rb") as fh:
@@ -1339,12 +1419,19 @@ def build(args):
         is_station = int(bool(station_poly is not None and o["g"].intersection(station_poly).area / o["g"].area > 0.4))
         kind = bkind(t.get("building", "yes"), o["g"].area, hh)
         yb = float(dem_at(pg.centroid.x, pg.centroid.y))
+        if FACELESS:                                     # an extruded footprint stands on the LOWEST ground under it (the renderer's foundation skirt only covers 1.6 m): on a slope the high side is buried, never the low side floating
+            ring_xy = np.asarray(pg.exterior.coords)
+            yb = min(yb, float(np.min(dem_at(ring_xy[:, 0], ring_xy[:, 1]))))
         roof_o = "gable" if kind in ("house", "shed") else "flat"
-        if COUNTRY == "de" and t.get("roof:shape"):
+        if FACELESS and t.get("roof:shape"):
             roof_o = {"gabled": "gable", "gable": "gable", "hipped": "hip", "half-hipped": "hip", "pyramidal": "hip", "flat": "flat", "skillion": "flat", "round": "flat"}.get(t["roof:shape"], roof_o)
         buildings.append({"id": o["id"], "kind": kind, "levels": int(lv or max(1, round(hh / 3))), "station": is_station, "roof": roof_o,
                           "h": r2(hh - 1.5 if kind == "house" else hh), "base": r2(yb), "ground": np.asarray(pg.simplify(0.05).exterior.coords)[:-1],
                           "roofs": [], "walls": [], "_area": o["g"].area, "_top": hh})
+    if getattr(args, "station_building", None):          # W4: the OSM building(s) that are the station building, when the automatic pick (tag / address near the node) is wrong
+        wanted = set(args.station_building.split(","))
+        for b_ in buildings:
+            b_["station"] = int(str(b_["id"]) in wanted)
     log("buildings: %d with LOD2 faces, %d OSM-only footprints; station-flagged %d" % (n_lod, len(buildings) - n_lod, sum(b["station"] for b in buildings)))
     if sbld and not any(b["station"] for b in buildings):
         pgf = fix(geom_to_frame(shapely.segmentize(sbld["g"], 6.0)))
@@ -1433,7 +1520,7 @@ def build(args):
     ov = Image.fromarray((lawn_fill * 255).astype(np.uint8)).resize((cv.w, cv.h), Image.NEAREST)
     cv.img.paste(CLS_LAWN, (0, 0), ov)
     # a station square is paved (cobbles / asphalt / parking), not lawn: the uncovered ground within 60 m of the station building (W2d; patch_pave_forecourts.py does the same for finished patches)
-    st_polys = [Polygon(r) for r in [b["ground"] for b in buildings if b.get("station") and len(b.get("ground") or []) >= 3]]
+    st_polys = [Polygon(r) for r in [b["ground"] for b in buildings if b.get("station") and b.get("ground") is not None and len(b["ground"]) >= 3]]
     if st_polys:
         paved = lawn_fill & (ndi.distance_transform_edt(~rast(st_polys, 1.0)) < 60)
         ov = Image.fromarray((paved * 255).astype(np.uint8)).resize((cv.w, cv.h), Image.NEAREST)
@@ -1450,8 +1537,15 @@ def build(args):
     for g, _ in water_polys:
         cv.poly(g, CLS_WATER)
     # rail bed: all rails 2.6 m, main corridor +-4.5 m
-    for ls in rail_geoms:
-        cv.poly(ls.buffer(2.6, cap_style="flat"), CLS_BED)
+    if FACELESS and rail_geoms:
+        # W4: a yard of 10 - 30 parallel tracks (Thionville, Metz, Nancy, Namur) is ballast from the first to the last track; a 2.6 m strip per rail left the gaps between the tracks as lawn / gravel (striped
+        # fields in the cab).  Morphological closing of the per-rail strips: gaps up to ~7 m between tracks become bed, the real lawn beyond the yard stays.
+        bed = unary_union([ls.buffer(3.4, cap_style="flat") for ls in rail_geoms]).buffer(1.8).buffer(-1.8)
+        for pg in polys_of(bed):
+            cv.poly(pg, CLS_GRAVEL)         # class 8 (bed) is not painted by the game (the terrain colour shows, i.e. grass): the yard is painted as gravel / ballast instead
+    else:
+        for ls in rail_geoms:
+            cv.poly(ls.buffer(2.6, cap_style="flat"), CLS_BED)
     cv.poly(box(-CORRIDOR, ZMIN, CORRIDOR, ZMAX), CLS_BED)
     for g in tracks + paths:
         cv.poly(g, CLS_GRAVEL)
@@ -1565,19 +1659,26 @@ def build(args):
                 "roofs": [r for r in (clean_ring(q) for q in b["roofs"]) if r],
                 "walls": [r for r in (clean_ring(q) for q in b["walls"]) if r]}
 
+    def over_track(b):
+        """W4 (France / Belgium, extruded footprints): an OSM building whose footprint reaches the player's track corridor is a platform roof / footbridge / goods canopy mapped as a building, not a house on the rails: dropped"""
+        if not FACELESS or b["station"]:
+            return False
+        xs = np.asarray(b["ground"])[:, 0]
+        return bool(xs.min() < TRACK_CLEAR_M and xs.max() > -TRACK_CLEAR_M)
+
     png = io.BytesIO()
     Image.fromarray((cls_arr * 16).astype(np.uint8)).save(png, format="PNG", optimize=True)
     b64 = lambda b: base64.b64encode(b).decode("ascii")                                  # noqa: E731
     patch = {
         "v": 1, "key": key, "name": name,
         "origin": dict({"lat": round(lat, 7), "lon": round(lon, 7), "headingDeg": round(heading, 2)},
-                       **({"epsg25832": [round(oE, 2), round(oN, 2)]} if COUNTRY == "de" else {"epsg2169": [round(oE, 2), round(oN, 2)]})),
+                       **({"epsg25832": [round(oE, 2), round(oN, 2)]} if COUNTRY == "de" else ({"local": [round(oE, 2), round(oN, 2)]} if REGION else {"epsg2169": [round(oE, 2), round(oN, 2)]}))),
         "side": side, "extent": {"x": [XMIN, XMAX], "z": [ZMIN, ZMAX]},
         "dem": {"res": 2, "nx": nx, "nz": nz, "x0": XMIN, "z0": ZMIN, "dm": b64(dem_q.astype("<i2").tobytes())},
         "classes": {"res": 1, "nx": int(XMAX - XMIN), "nz": int(ZMAX - ZMIN), "x0": XMIN, "z0": ZMIN, "png": b64(png.getvalue())},
         "roads": out_roads, "rails": out_rails,
         "platforms": [{"ring": clean_ring(p["ring"])} for p in plat_out if clean_ring(p["ring"])],
-        "water": water_out, "buildings": [bld_json(b) for b in buildings if clean_ring(b["ground"])],
+        "water": water_out, "buildings": [bld_json(b) for b in buildings if clean_ring(b["ground"]) and not over_track(b)],
         "trees": [[r2(a), r2(b), r2(c), r2(d)] for a, b, c, d in trees],
         "poi": [{"t": p["t"], "x": r2(p["x"]), "z": r2(p["z"]), "y": r2(p["y"])} for p in poi],
         "trackY": track_y,
@@ -1594,11 +1695,17 @@ def build(args):
             else:
                 i += 1
         patch["deckZ"] = runs                       # z ranges where the main track is on a bridge / in a tunnel: the corridor keeps the real ground there (not flattened)
+    flagged = [b for b in patch["buildings"] if b["station"] and b["ground"]]
+    if flagged and FACELESS:         # bounding box of the station building in the patch frame (core file: the station models of stations-abroad.js fit themselves to it before the scenery half is loaded)
+        gx = [p[0] for b in flagged for p in b["ground"]]; gz = [p[1] for b in flagged for p in b["ground"]]
+        patch["stationBox"] = {"x": [r2(min(gx)), r2(max(gx))], "z": [r2(min(gz)), r2(max(gz))]}
+    if REGION:
+        patch["region"] = REGION                   # regional facade table (station-surround-mesh.js FACADE_BY_KIND_REGION)
     if CREDIT:
         patch["credit"] = CREDIT
         patch["extrudeFaceless"] = True            # the renderer extrudes buildings without LOD2 faces from ground ring + h + roof type
     text = json.dumps(patch, separators=(",", ":"), ensure_ascii=False)
-    budget = args.max_kb if args.max_kb is not None else (700 if COUNTRY == "de" else None)
+    budget = args.max_kb if args.max_kb is not None else (700 if FACELESS else None)
     if budget and len(text) > budget * 1024:
         # size budget: the LOD2 faces of the buildings farthest from the station become plain extruded footprints (ground ring + h + roof type, like OSM-only buildings)
         need = len(text) - int(budget * 1024 * 0.985)
@@ -1713,9 +1820,12 @@ def main():
     ap.add_argument("--keep-grade", action="store_true", help="keep the track gradient in the heights instead of levelling the track at y=0")
     ap.add_argument("--max-kb", type=int, default=None, help="size budget of the json (default 700 for --country de, none for lu): far LOD2 buildings lose their faces")
     ap.add_argument("--side", default=None, choices=("left", "right"), help="declared platform side (real-mosel.js): choose the platform / main track pair on that side if one exists")
-    ap.add_argument("--country", default="lu", choices=("lu", "de"), help="lu = Luxembourg (default: EPSG:2169, lux.osm.pbf, LiDAR + LOD2); de = Rheinland-Pfalz (EPSG:25832, rlp.osm.pbf, GeoBasis-RLP DGM1 / DOM1 / LoD2)")
+    ap.add_argument("--country", default="lu", choices=("lu", "de", "fr", "be"), help="lu = Luxembourg (default: EPSG:2169, lux.osm.pbf, LiDAR + LOD2); de = Rheinland-Pfalz (EPSG:25832, rlp.osm.pbf, GeoBasis-RLP DGM1 / DOM1 / LoD2); fr / be = France / Belgium (local transverse Mercator, --pbf extract, Copernicus GLO-30, OSM footprints only)")
+    ap.add_argument("--pbf", default=None, choices=sorted(ABROAD_PBF), help="Geofabrik extract of --country fr|be")
+    ap.add_argument("--station-building", default=None, help="comma separated OSM ids (w123) of the station building(s): overrides the automatic pick")
+    ap.add_argument("--main-near-node", action="store_true", help="main track = the railway=rail way nearest to --lat / --lon (the game route's own track) instead of the one next to the platform / building; --side is then taken as declared")
     args = ap.parse_args()
-    set_country(args.country)
+    set_country(args.country, args.lat, args.lon, args.pbf)
     build(args)
 
 

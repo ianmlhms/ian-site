@@ -853,13 +853,14 @@
   /* ------------------------------------------------------------ double-track tunnel + portals */
   const RT_R = 4.6;
   const RT_CY = 2.1;
+  const PORTAL_FOOT = 4;
   function railPortalGeometry(env) {
     if (env.railPortalGeo) return env.railPortalGeo;
     const depth = 2.2;
     const hw = RT_R + 6.9;   // wide enough to hide the hole in the ground's cliff face at the mouth (landscape.js PORTAL_HOLE = 9 m each side of the track, tunnel centre up to 2.25 m off it)
     const wall = new T.Shape();
-    wall.moveTo(-hw, FORM_Y);
-    wall.lineTo(hw, FORM_Y);
+    wall.moveTo(-hw, FORM_Y - PORTAL_FOOT);   // W3: the wall's foot reaches below the formation, so the ground that falls away beside the mouth does not leave a slit under it
+    wall.lineTo(hw, FORM_Y - PORTAL_FOOT);
     wall.lineTo(hw, 11.6);
     wall.lineTo(-hw, 11.6);
     wall.closePath();
@@ -902,7 +903,8 @@
     [-1, 1].forEach((sd) => {
       const a = posAt(track, s, C + sd * (RT_R + 3.3), 0);
       const bOff = posAt(track, s + dirOut * 7, C + sd * (RT_R + 9.4), 0);
-      concrete.between([a[0], a[1] + 4.2, a[2]], [bOff[0], bOff[1] + 3.5, bOff[2]], 0.9, col('#a9a69f'), 8.4);
+      // W3: the slab reaches 4 m below the rails (it was 8.4 m from the rails up): where the cutting falls away beside the portal (brussels s 947) the ground lay below its foot and a slit showed the far ground
+      concrete.between([a[0], a[1] + 2.0, a[2]], [bOff[0], bOff[1] + 1.3, bOff[2]], 0.9, col('#a9a69f'), 12.8);
     });
     const glow = sets.get('glow', M.glow);
     const lamp = posAt(track, s + (entry ? -0.2 : 0.2), C, RT_CY + RT_R + 0.9);

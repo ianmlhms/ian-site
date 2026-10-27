@@ -28,13 +28,14 @@ def bbox_wgs(e0, n0, e1, n1, pad=0.0):
     return (min(lo0, lo1), min(la0, la1), max(lo0, lo1), max(la0, la1))
 
 
-def read_layer(layer, bbox, where=None, pbfs=None):
-    """Features of the extracts inside a lon/lat bbox: [{id, g (shapely, UTM 32N), t (tags incl. other_tags)}].  Features that appear in both extracts (border) are de-duplicated by id."""
+def read_layer(layer, bbox, where=None, pbfs=None, mask=None):
+    """Features of the extracts inside a lon/lat bbox: [{id, g (shapely, UTM 32N), t (tags incl. other_tags)}].  Features that appear in both extracts (border) are de-duplicated by id.
+    mask (W3, abroad corridors): a lon / lat shapely polygon instead of the bbox; GDAL tests every feature against it while reading, so a long thin corridor does not load the box around it."""
     out, seen = [], set()
     for pbf in pbfs or PBFS:
         if not os.path.exists(pbf):
             continue
-        meta, _, geom, fields = read(pbf, layer=layer, bbox=bbox, where=where)
+        meta, _, geom, fields = read(pbf, layer=layer, bbox=bbox, mask=mask, where=where)
         names = [str(n) for n in meta["fields"]]
         for i in range(len(geom)):
             if geom[i] is None:
@@ -75,7 +76,8 @@ def num(v):
 class RailGraph:
     """Graph of railway=rail ways (no service tracks); vertices keyed by rounded UTM coordinates (ways of the extracts share vertex coordinates)."""
 
-    def __init__(self, ways):
+    def __init__(self, ways, gap=0.0):
+        """gap (W3): dead-end nodes (one neighbour) closer than `gap` m to another node are joined too: mapping gaps of 3 - 8 m at switches (Namur station throat, 5.3 m)."""
         self.nodes = {}
         self.adj = {}
         self.way_of = {}
@@ -103,6 +105,33 @@ class RailGraph:
             if not any(v == b for v, _, _ in self.adj[a]):
                 self.adj[a].append((b, 0.5, {"t": {}, "id": "snap", "snap": True}))
                 self.adj[b].append((a, 0.5, {"t": {}, "id": "snap", "snap": True}))
+
+        if gap > SNAP:
+            comp, c = {}, 0
+            for k in self.keys:
+                if k in comp:
+                    continue
+                c += 1
+                comp[k] = c
+                stack = [k]
+                while stack:
+                    u = stack.pop()
+                    for v, _, _ in self.adj[u]:
+                        if v not in comp:
+                            comp[v] = c
+                            stack.append(v)
+            best = {}
+            for i, j in self._tree.query_pairs(gap):
+                a, b = self.keys[i], self.keys[j]
+                if comp[a] == comp[b]:
+                    continue
+                key = (min(comp[a], comp[b]), max(comp[a], comp[b]))
+                d = math.hypot(a[0] - b[0], a[1] - b[1])
+                if key not in best or d < best[key][0]:
+                    best[key] = (d, a, b)
+            for _, a, b in best.values():     # the closest pair of every two pieces that lie within `gap` of each other
+                self.adj[a].append((b, 1.0, {"t": {}, "id": "gap", "snap": True}))
+                self.adj[b].append((a, 1.0, {"t": {}, "id": "gap", "snap": True}))
 
     def nearest(self, e, n):
         d, i = self._tree.query([e, n])

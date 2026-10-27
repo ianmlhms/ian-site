@@ -198,8 +198,11 @@ def is_bridge(t):
     return bool(t.get("bridge")) and t.get("bridge") != "no"
 
 
+NON_BORE_TUNNEL = ("no", "building_passage", "culvert")  # OSM tunnel= subtypes that are not a real rail bore
+
+
 def is_tunnel(t):
-    return bool(t.get("tunnel")) and t.get("tunnel") not in ("no",)
+    return bool(t.get("tunnel")) and t.get("tunnel") not in NON_BORE_TUNNEL
 
 
 # ------------------------------------------------------------------------------------------------------------------------------ one leg
@@ -528,6 +531,11 @@ def build_leg(attrs, a, b, length_game, bridges=(), tunnels=(), crossings=(), bi
     elif glen[fill_i] < need:
         others = [i for i in range(len(glen)) if i != fill_i]
         glen[others] *= (length_game - need) / glen[others].sum()
+        glen[fill_i] = need
+    # W3: the minimum lengths of tunnels / bridges / crossings can push the fixed pieces past the leg (Ottignies - Bruxelles-Luxembourg: 1392 m fixed in a 1399 m leg): routes.js warns below 30 m of fill
+    others_i = [i for i in range(len(glen)) if i != fill_i]
+    if others_i and glen[others_i].sum() > length_game - need:
+        glen[others_i] *= (length_game - need) / glen[others_i].sum()
         glen[fill_i] = need
     toks = [piece_token(p, gl, fill=(i == fill_i)) for i, (p, gl) in enumerate(zip(leg_pieces, glen))]
     return {"spec": " ".join(toks), "length": int(round(length_game)), "real": [round(a, 1), round(b, 1)], "k": round(k, 3),

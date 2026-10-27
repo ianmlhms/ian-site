@@ -4,8 +4,8 @@ const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const smoothstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 
 export const SPEED_FEEL = Object.freeze({
-  linesFrom: 8,                        // m/s (29 km/h): the first streaks at the screen edge
-  linesFull: 16,                       // m/s (58 km/h): full strength
+  linesFrom: 13,                       // m/s (47 km/h): the first, faint streaks at the screen edge (a cruising trail speed stays calm)
+  linesFull: 20,                       // m/s (72 km/h): full strength, still subtle (edges only, never the whole sky)
   tiers: Object.freeze([20, 35, 50, 62]),   // km/h: the speedometer changes colour and pulses at each
   gaugeMaxKmh: 70,                     // the bar under the number is full at this speed
   dustMinSpeed: 3,                     // m/s: slower than this the tyres kick up nothing

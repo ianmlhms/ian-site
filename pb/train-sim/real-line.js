@@ -19,12 +19,12 @@
   'use strict';
   const TS = (window.TS = window.TS || {});
   const TAG = '[Lokféierer] real line: ';
-  const DATA_VERSION = 3;
+  const DATA_VERSION = 4;
   /* W2c: the Mosel line keeps sceneryId 'mosel'; the other real lines (north, south, west, ...) are registered by their real-<id>.js layout in TS.realLines and
      use their own data file data/real/<id>-features.json (build_real_route.py).  realKey(def) -> the data set of a route, or null (generic landscape). */
   const realKey = (def) => (!def ? null : def.sceneryId === 'mosel' ? 'mosel' : TS.realLines && def.sceneryId && TS.realLines[def.sceneryId] ? def.sceneryId : null);
   const dataUrl = (key) => '/pb/train-sim/data/real/' + key + '-features.json?v=' + DATA_VERSION;
-  const CLASS = Object.freeze({ field: 0, meadow: 1, forest: 2, vine: 3, resid: 4, indus: 5, water: 6, orchard: 7, urban: 8, scrub: 9, quarry: 10, cemetery: 11, park: 12 });
+  const CLASS = Object.freeze({ field: 0, meadow: 1, forest: 2, vine: 3, resid: 4, indus: 5, water: 6, orchard: 7, urban: 8, scrub: 9, quarry: 10, cemetery: 11, park: 12, rail: 13 });
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const caches = new Map();     // key -> parsed document
   const pendings = new Map();   // key -> promise
@@ -69,6 +69,21 @@
       if (l.f.far) fars.push({ s0: l.s0, s1: l.s1, ds: l.f.far.ds * l.k, n: l.f.far.n, rows: l.f.far.rows });
       relief.push({ s0: l.s0, s1: l.s1, step: l.f.relief.step * l.k, l: l.f.relief.l, r: l.f.relief.r });
       (l.f.industry || []).forEach((o) => industry.push(Object.assign({}, o, { s: l.s0 + o.s * l.k })));
+    });
+    /* A road end is a real junction when another road's end (or the same way split into two records) meets it there; otherwise it is a dead end in the
+     * open (a field track that was only mapped / only fetched that far, or the real pipeline has no arm data for it, REAL-LINES.md "roads to nowhere"):
+     * real-scenery.js tapers the ribbon into the ground there instead of a paved edge that just stops. Grid key: 2 m is well under the shortest real arm (38 m). */
+    const GRID = 2;
+    const endCount = new Map();
+    const keyOf = (s, lat) => Math.round(s / GRID) + '|' + Math.round(lat / GRID);
+    roads.forEach((r) => {
+      if (r.p.length < 2) return;
+      [r.p[0], r.p[r.p.length - 1]].forEach(([s, lat]) => { const k = keyOf(s, lat); endCount.set(k, (endCount.get(k) || 0) + 1); });
+    });
+    roads.forEach((r) => {
+      if (r.p.length < 2) { r.freeEnd = [false, false]; return; }
+      const a = r.p[0], b = r.p[r.p.length - 1];
+      r.freeEnd = [(endCount.get(keyOf(a[0], a[1])) || 0) < 2, (endCount.get(keyOf(b[0], b[1])) || 0) < 2];
     });
     industry.sort((a, b) => a.s - b.s);
     water.sort((a, b) => a.s0 - b.s0);

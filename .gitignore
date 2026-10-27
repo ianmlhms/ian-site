@@ -17,3 +17,7 @@ undefined/
 
 # Cached Geoportail download (3.8 MB, re-fetchable with fetch_official.py --refresh)
 data/trails/official.geojson
+
+# Python bytecode cache
+__pycache__/
+*.pyc
