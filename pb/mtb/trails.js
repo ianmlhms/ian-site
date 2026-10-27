@@ -189,7 +189,8 @@ export function createTrailNetwork(ways, baseHeight) {
   const P = { px: Float32Array.from(px), pz: Float32Array.from(pz), bed: Float32Array.from(bed), tilt: Float32Array.from(tilt), nx: Float32Array.from(nxArr), nz: Float32Array.from(nzArr), berm: Float32Array.from(berm), side: Int8Array.from(side), rad: Float32Array.from(rad), inv: Float32Array.from(inv), way: Int32Array.from(wayOf), s: Float32Array.from(sOf), water: Float32Array.from(water), stream: Uint8Array.from(isStream), surf: Uint8Array.from(surfArr), kind: Uint8Array.from(kindArr) };
 
   // spatial hash (CSR): cell -> sample indices
-  const cellOf = (x, z) => `${Math.floor(x / CELL)},${Math.floor(z / CELL)}`;
+  const cellKey = (cx, cz) => (cx + 8192) * 32768 + (cz + 8192);             // numeric key: carve() runs ~10 000 x per surface block, a template string per lookup was the hot spot
+  const cellOf = (x, z) => cellKey(Math.floor(x / CELL), Math.floor(z / CELL));
   const buckets = new Map();
   for (let i = 0; i < count; i++) {
     const key = cellOf(P.px[i], P.pz[i]);
@@ -206,7 +207,7 @@ export function createTrailNetwork(ways, baseHeight) {
     let sum = 0, bedSum = 0, streamSum = 0, nearest = 1e9, nearestWay = -1, nearestI = -1;
     for (let dz = -1; dz <= 1; dz++) {
       for (let dx = -1; dx <= 1; dx++) {
-        const list = cells.get(`${cx + dx},${cz + dz}`) || EMPTY;
+        const list = cells.get(cellKey(cx + dx, cz + dz)) || EMPTY;
         for (let q = 0; q < list.length; q++) {
           const i = list[q];
           const rx = x - P.px[i], rz = z - P.pz[i];

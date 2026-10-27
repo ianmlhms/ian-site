@@ -7,9 +7,10 @@
  * renders there), corners included. A skirt hangs under every boundary vertex. */
 import { QUADTREE } from './config.js';
 import { diagonalIsMain } from './surface.js';
-import { tilesTouching } from './quadtree.js';
+import { tilesTouching, leafAt } from './quadtree.js';
 
 const EDGE_EPS = 1e-6;
+const EPS_PROBE = 1e-3;                 // same offset as quadtree.js tilesTouching
 const CELLS = QUADTREE.cells;
 const SIDE = CELLS + 1;
 const APRON_SIDE = CELLS + 3;
@@ -56,16 +57,25 @@ function polylineValue(T, x, z, field) {
   return field.heightForStep(x, z, ns);          // cannot happen for a partition; harmless fallback
 }
 
-/** The boundary vertices of a leaf that touch a coarser tile: [{ v, x, z, tile }] (v = vertex index in the grid). */
+/** The boundary vertices of a leaf that touch a coarser tile: [{ v, x, z, tile }] (v = vertex index in the grid).
+ *  An edge vertex that is not a corner touches only the leaf itself and the one tile across that edge (a coarser neighbour spans the whole edge), so the
+ *  four edges are probed once each and only the four corners need the full 4-way lookup (this scan runs for every leaf next to a changed node). */
 export function stitchesOf(leaf, split) {
-  const { x0, z0, step } = leaf;
+  const { x0, z0, step, size } = leaf;
   const out = [];
+  const coarser = (T) => (T && T.step > step ? T : null);
+  const half = size / 2;
+  const west = coarser(leafAt(split, x0 - EPS_PROBE, z0 + half)), east = coarser(leafAt(split, x0 + size + EPS_PROBE, z0 + half));
+  const north = coarser(leafAt(split, x0 + half, z0 - EPS_PROBE)), south = coarser(leafAt(split, x0 + half, z0 + size + EPS_PROBE));
   for (let j = 0; j <= CELLS; j++) {
     for (let i = 0; i <= CELLS; i++) {
       if (!(i === 0 || j === 0 || i === CELLS || j === CELLS)) { i = CELLS - 1; continue; }
       const wx = x0 + i * step, wz = z0 + j * step;
       let coarse = null;
-      for (const T of tilesTouching(split, wx, wz)) if (T.step > step && (!coarse || T.step > coarse.step)) coarse = T;
+      const cornerI = i === 0 || i === CELLS, cornerJ = j === 0 || j === CELLS;
+      if (cornerI && cornerJ) {
+        for (const T of tilesTouching(split, wx, wz)) if (T.step > step && (!coarse || T.step > coarse.step)) coarse = T;
+      } else coarse = j === 0 ? north : j === CELLS ? south : i === 0 ? west : east;
       if (coarse) out.push({ v: j * SIDE + i, x: wx, z: wz, tile: coarse });
     }
   }

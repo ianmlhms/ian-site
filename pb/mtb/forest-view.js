@@ -64,6 +64,7 @@ const FRAGMENT = `
     if (!gl_FrontFacing && tile >= 0.0) N = -N;
     vec3 albedo = vColor;
     float isLeaf = 0.0;
+    float farCrown = 0.0;
     float bump = 0.0;
     if (tile >= 0.0) {
       vec4 tex = texture2D(uAtlas, vUv);
@@ -90,8 +91,18 @@ const FRAGMENT = `
       albedo *= 0.88 + 0.24 * k;
       bump = dot(tb, vec3(0.3, 0.59, 0.11));
     } else {
+      // far tier (flat blobs and cones, no leaf cards): paint the canopy instead of a plain teal wash. Leaf-sized noise breaks the facets up, the green is warmed towards the
+      // painted leaves of the mid tier, the lower crown is darker (it sits in the shade of the stand), and the normal leans to the sky so the 20 faces of a blob do not read as flat
+      // cut-out planes in front of the trunks. (The haze that pushes the distance back is added after the lighting, below.)
       float k = texture2D(uNoise, vWorld.xz * 0.4 + vWorld.yy * 0.15).g;
+      float lf = texture2D(uNoise, vWorld.xz * 1.9 + vWorld.yy * 1.3).g, lf2 = texture2D(uNoise, vWorld.zx * 4.3 - vWorld.yy * 2.1).g;
+      farCrown = step(albedo.r, albedo.g * 0.85);                                          // a green crown (bark is grey or brown: red is not below 85 % of green)
+      albedo *= mix(vec3(1.0), vec3(1.32, 1.0, 0.66), farCrown * 0.85);
+      albedo *= mix(1.0, 0.42 + 0.46 * smoothstep(0.2, 0.95, vHeight), farCrown);
+      albedo *= (0.62 + 0.76 * lf) * (0.86 + 0.28 * lf2);
+      albedo = mix(albedo, albedo * vec3(1.35, 1.2, 0.5), farCrown * smoothstep(0.62, 0.8, lf) * 0.55 * smoothstep(0.35, 0.8, vHeight));      // sunlit yellow-green clumps near the tops
       albedo *= 0.88 + 0.24 * k;
+      N = normalize(mix(N, vec3(0.0, 1.0, 0.0), farCrown * 0.5));
     }
     // light: leaves are thin, the sun shines through them (backlit canopy glows), bark is plain
     vec3 L = normalize(uSunDir);
@@ -109,6 +120,7 @@ const FRAGMENT = `
       if (tile < -1.5) { float dist = length(cameraPosition - vWorld); N = bumpNormal(N, vWorld, bump, 0.05 * (1.0 - smoothstep(10.0, 40.0, dist))); }
       col = paintLightW(albedo * (tile < -1.5 ? 1.12 : 1.3), N, sunMul, 1.1, vWorld);                // bark: lifted out of the shade, stems read as stems, not as poles
     }
+    col = mix(col, uFogColor * vec3(0.8, 0.88, 0.8), farCrown * 0.38 * smoothstep(50.0, 220.0, vDist));          // air between you and the far stand: the distance recedes instead of standing as a flat green strip
     col = col * (1.0 - 0.22 * uWet);
     col = pow(col, vec3(0.97));
     gl_FragColor = vec4(applyFogW(col, vDist, vWorld.y), 1.0);
@@ -163,6 +175,12 @@ export function createForestView({ scene, trees, undergrowth, env, quality: Q, t
     s.shp.array[o * 3] = stretch; s.shp.array[o * 3 + 1] = pitch; s.shp.array[o * 3 + 2] = girth;
     s.base[o] = scale; s.spawn[o] = -1e9;                     // spawn far in the past: already fully faded in, no animation
     return true;
+  }
+
+  /** Marks the first n instances of an instance attribute for upload (only that range goes to the GPU, not the whole preallocated capacity). */
+  function touch(attr, n) {
+    if (n <= 0) return;
+    attr.clearUpdateRanges(); attr.addUpdateRange(0, n * attr.itemSize); attr.needsUpdate = true;
   }
 
   /** The staging build (scanned over several frames): one plain-array mirror of `sets`, swapped in whole once a scan completes. */
@@ -260,7 +278,7 @@ export function createForestView({ scene, trees, undergrowth, env, quality: Q, t
     const b0z = Math.floor((Math.min(cz, az) - r) / BLOCK), b1z = Math.floor((Math.max(cz, az) + r) / BLOCK);
     const queue = [];
     for (let bz = b0z; bz <= b1z; bz++) for (let bx = b0x; bx <= b1x; bx++) queue.push(bx, bz);
-    stage = makeStage();
+    for (const st of Object.values(stage)) st.n = 0;            // the staging arrays are reused (a scan every ~5 m of riding used to allocate about 1 MB of typed arrays each time)
     scanning = { queue, qi: 0, cx, cz, ax, az, R, nearR: Q.nearTree, midR: Q.midTree, groundR, near: 0, mid: 0, far: 0, under: 0, spawnNext: new Map(), now };
   }
   /** Processes queued blocks for up to `budgetMs` of wall-clock time (or the whole queue when budgetMs is unbounded). Returns true once the scan is complete. */
@@ -286,7 +304,7 @@ export function createForestView({ scene, trees, undergrowth, env, quality: Q, t
         live.par.array[o * 4 + 1] = st.yaw[o]; live.par.array[o * 4 + 2] = st.seed[o]; live.par.array[o * 4 + 3] = (st.seed[o] * 7.31) % 1;
         live.shp.array[o * 3] = st.stretch[o]; live.shp.array[o * 3 + 1] = st.pitch[o]; live.shp.array[o * 3 + 2] = st.girth[o];
       }
-      live.pos.needsUpdate = true; live.shp.needsUpdate = true;
+      touch(live.pos, st.n); touch(live.shp, st.n); touch(live.par, st.n);
     }
     spawnMap = s.spawnNext;
     if (Q.tuftRadius > 0 && meadow) { sets.tuft.n = 0; sets.herbs.n = 0; fillTufts(s.cx, s.cz); }
@@ -305,7 +323,7 @@ export function createForestView({ scene, trees, undergrowth, env, quality: Q, t
         const e = t * t * (3 - 2 * t);
         s.par.array[o * 4] = s.base[o] * e;
       }
-      if (fading) s.par.needsUpdate = true;
+      if (fading) touch(s.par, s.n);
     }
   }
 

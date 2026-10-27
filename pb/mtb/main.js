@@ -505,6 +505,17 @@ async function boot() {
   env.update(0, camera, 0);
   hudButtons();
   if (readKey('pb_muted') === '1') audio.setMuted(true);
+  prewarmShaders();
+
+  /** Compiles every shader program now, behind the loading screen: the dust, the town and the other quality level's ground shader used to compile on their first use mid-ride (a 10-40 ms hitch each). */
+  function prewarmShaders() {
+    const spare = [groundFull, groundCheap].find((m) => m !== groundFor(quality));
+    const tile = terrain.tiles.values().next().value;
+    let probe = null;
+    if (spare && tile) { probe = new THREE.Mesh(tile.mesh.geometry, spare); probe.frustumCulled = false; scene.add(probe); }
+    try { renderer.compile(scene, camera); } catch (error) { console.warn('[mtb] shader prewarm failed', error); }
+    if (probe) scene.remove(probe);
+  }
 
   // ---- loop
   let last = performance.now();
