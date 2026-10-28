@@ -42,7 +42,7 @@ function numericBytes(value) {
   const text = String(Math.abs(value));
   const groups = [];
   for (let end = text.length; end > 0; end -= 4) groups.unshift(text.slice(Math.max(0, end - 4), end));
-  while (groups.length && Number(groups.at(-1)) === 0) groups.pop();
+  while (groups.length && Number(groups[groups.length - 1]) === 0) groups.pop();
   return 4 + 2 + 2 * groups.length;
 }
 
@@ -92,7 +92,7 @@ export function shrinkToFit(progress, limits = DEFAULT_LIMITS) {
   let current = normalizeProgress(progress);
   if (fitsLimits(current, limits)) return current;
   const order = ghostOrder(current);
-  const focus = order.at(-1) ?? null;
+  const focus = order.length ? order[order.length - 1] : null;
   const steps = [
     ...order.slice(0, -1).map((id) => (p) => dropGhost(p, id)),
     ...TRAIL_IDS.filter((id) => id !== focus).map((id) => (p) => dropSplits(p, id)),

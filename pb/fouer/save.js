@@ -146,7 +146,7 @@ function numericBytes(value) {
   const text = String(Math.abs(value));
   const groups = [];
   for (let end = text.length; end > 0; end -= 4) groups.unshift(text.slice(Math.max(0, end - 4), end));
-  while (groups.length && Number(groups.at(-1)) === 0) groups.pop();
+  while (groups.length && Number(groups[groups.length - 1]) === 0) groups.pop();
   return 4 + 2 + 2 * groups.length;
 }
 
