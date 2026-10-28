@@ -49,9 +49,11 @@ if(!window.THREE){
   throw new Error("three.js r160 failed to load");
 }
 </script>
+<script src="/pb/boot-probe.js?v=1"></script>
 <script type="module">
   // Imports are absolute: inside the arcade this page runs as a srcdoc iframe (relative URLs inside main.js come from import.meta.url).
-  import("/pb/mtb/main.js?v=4");
+  // bootProbe = import() that shows on the loading screen which file failed when the code does not load (pb/boot-probe.js).
+  if (window.bootProbe) window.bootProbe("/pb/mtb/main.js?v=4", window.__mtbLoad); else import("/pb/mtb/main.js?v=4");
 </script>
 </body>
 </html>

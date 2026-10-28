@@ -135,13 +135,14 @@ if(!window.THREE){
 <!-- the Luxtram ground and facade renderers are reused as they are (same URLs as pb/train-sim.html: one browser cache entry) -->
 <script src="/pb/train-sim/luxtram-facades.js?v=3"></script>
 <script src="/pb/train-sim/luxtram-ground.js?v=14"></script>
+<script src="/pb/boot-probe.js?v=1"></script>
 <script type="module">
   // ?models=1 -> the W3 model preview (turntable grid / single model / full fair); ?stage=1 -> W2's empty Glacis stage; otherwise the game.
   // Imports are absolute: inside the arcade this page runs as a srcdoc iframe.
   const q = new URLSearchParams(location.search);
   const entry = q.get("models") === "1" ? "/pb/fouer/models/preview.js?v=1" : q.get("stage") === "1" ? "/pb/fouer/world/stage.js?v=1" : "/pb/fouer/main.js?v=8";
   if (entry.indexOf("main.js") < 0 && window.__fouerLoad) window.__fouerLoad.done();         // the preview pages run their own screens
-  import(entry);
+  if (window.bootProbe) window.bootProbe(entry, window.__fouerLoad); else import(entry);   // bootProbe: shows which file failed when the code does not load
 </script>
 </body>
 </html>
