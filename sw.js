@@ -4,12 +4,15 @@
  *    Safe with the site's ?v= versioning: bumped asset URLs are cache misses and
  *    fetch fresh; navigations are network-first so pages are never stale online. */
 
-/* v12 (game worlds on the device): adds the separate cache GAMEDATA_CACHE (see "Game data" below) for the big data files of pb/<game>/data/.
+/* v13 (fail-safe game data, 28 Oct 2026): players opening MTB / Schueberfouer for the FIRST time (nothing stored yet) stayed on the loading screen.
+ * Now the game-data path can never block or fail a file the network could deliver: every cache step has a time limit, waitUntil is guarded (WebKit throws
+ * when it is called after the fetch event was dispatched), and any error falls back to a plain network fetch.
+ * v12 (game worlds on the device): adds the separate cache GAMEDATA_CACHE (see "Game data" below) for the big data files of pb/<game>/data/.
  * This cache is NOT part of CACHE: activate keeps it, so a new CACHE name never throws the downloaded worlds away.
  * v11 (Schueberfouer Tycoon launch): drops every cache entry a player's browser kept of the old Theme Park Tycoon page and arcade.
  * pb/fouer.html, its modules and pb/fouer/data/glacis-world.bin (about 600 KB) are NOT precached on purpose: all /pb/ requests go to
  * the network first (see below) and the browser's own HTTP cache keeps the bundle, a second copy here would only cost storage. */
-const CACHE = "ianlu-v12";
+const CACHE = "ianlu-v13";
 const GAMEDATA_CACHE = "ianlu-gamedata-v1";
 const CORE = [
   "index.html", "favicon.svg", "apple-touch-icon.png", "site.webmanifest",
@@ -37,7 +40,9 @@ const MANIFEST_FORMAT = 1;
 const HASH_LEN = 10;                       // keep equal to HASH_LEN in scripts/gamedata_manifest.py
 const MANIFEST_FRESH_MS = 5 * 60 * 1000;   // a running worker re-reads the manifest this often (a deploy during a long session)
 const MANIFEST_RETRY_MS = 30 * 1000;       // after a failed read (offline) the stored manifest is used and the network is retried this soon
-const STATS_DELAY_MS = 250;                // the page hears about hits / misses at most this often
+const STATS_DELAY_MS = 250;
+const MANIFEST_WAIT_MS = 4000;             // a data file never waits longer than this for the manifest: after that it is fetched plainly from the network
+const CACHE_WAIT_MS = 3000;                // the same for opening / reading the device cache (a stuck storage must not stall the world)                // the page hears about hits / misses at most this often
 
 const manifests = new Map();               // game -> { files: Map<path, hash> | null, at, ttl } | { pending: Promise }
 const gameStats = new Map();               // clientId -> { game, hits, misses, missBytes, timer }
@@ -118,6 +123,18 @@ async function loadManifest(game) {
   return pending;
 }
 
+/** Resolves like `promise`, or with `fallback` after `ms` (the promise keeps running; its late result is ignored). */
+function withTimeout(promise, ms, fallback) {
+  let timer = 0;
+  const late = new Promise((resolve) => { timer = setTimeout(() => resolve(fallback), ms); });
+  return Promise.race([Promise.resolve(promise).catch(() => fallback), late]).finally(() => clearTimeout(timer));
+}
+
+/** event.waitUntil that never throws: WebKit rejects a waitUntil called after the fetch event was dispatched; the work then simply runs unguarded. */
+function keepAlive(event, promise) {
+  try { event.waitUntil(promise); } catch (error) { /* the promise still runs; only the worker's lifetime is not extended */ }
+}
+
 /** sha-256 of the body, first HASH_LEN hex characters. */
 async function hashOf(buffer) {
   const digest = await crypto.subtle.digest("SHA-256", buffer);
@@ -160,13 +177,14 @@ function refreshManifest(game) {
 async function serveGameData(event, game, relative) {
   const req = event.request;
   const url = new URL(req.url);
-  const manifest = await loadManifest(game);
-  const hash = manifest.files && manifest.files.get(decodePath(relative));
-  if (!hash) return fetch(req).catch(() => caches.match(req));   // not a listed file: as before, the network (the cache only offline)
+  const manifest = await withTimeout(loadManifest(game), MANIFEST_WAIT_MS, null);
+  const hash = manifest && manifest.files && manifest.files.get(decodePath(relative));
+  if (!hash) return fetch(req).catch(() => caches.match(req));   // not a listed file (or no manifest in time): as before, the network (the cache only offline)
 
-  const cache = await caches.open(GAMEDATA_CACHE);
+  const cache = await withTimeout(caches.open(GAMEDATA_CACHE), CACHE_WAIT_MS, null);
+  if (!cache) return fetch(req);
   const key = hashedKey(url.pathname, hash);
-  const stored = await cache.match(key);
+  const stored = await withTimeout(cache.match(key), CACHE_WAIT_MS, null);
   if (stored) { reportToPage(event, game, "device", 0); return stored; }
 
   try {
@@ -175,12 +193,12 @@ async function serveGameData(event, game, relative) {
     const buffer = await res.arrayBuffer();
     const headers = res.headers.get("content-type") ? { "content-type": res.headers.get("content-type") } : {};
     const verified = (await hashOf(buffer)) === hash;
-    if (verified) event.waitUntil(storeVersion(cache, url.pathname, key, new Response(buffer, { headers })).catch((error) => console.warn("[SW] game data not stored", error)));
+    if (verified) keepAlive(event, storeVersion(cache, url.pathname, key, new Response(buffer, { headers })).catch((error) => console.warn("[SW] game data not stored", error)));
     else { console.warn("[SW] game data does not match its hash, not stored:", url.pathname); manifests.delete(game); }
     reportToPage(event, game, "network", buffer.byteLength);
     return new Response(buffer, { headers });
   } catch (error) {
-    const older = await cache.match(new Request(`${self.location.origin}${url.pathname}`), { ignoreSearch: true });   // offline: an older copy beats no world
+    const older = await withTimeout(cache.match(new Request(`${self.location.origin}${url.pathname}`), { ignoreSearch: true }), CACHE_WAIT_MS, null);   // offline: an older copy beats no world
     if (older) return older;
     throw error;
   }
@@ -206,11 +224,14 @@ self.addEventListener("fetch", (event) => {
 
   const gameData = GAMEDATA_PATH.exec(url.pathname);
   if (gameData && GAMEDATA_GAMES.includes(gameData[1]) && !req.headers.has("range")) {
-    event.respondWith(serveGameData(event, gameData[1], gameData[2]));
+    event.respondWith(serveGameData(event, gameData[1], gameData[2]).catch((error) => {   // whatever went wrong with the device copy: the network, as without this cache
+      console.warn("[SW] game data path failed, plain fetch:", url.pathname, error);
+      return fetch(req);
+    }));
     return;
   }
   const gamePage = GAME_PAGE.exec(url.pathname);
-  if (gamePage && GAMEDATA_GAMES.includes(gamePage[1])) event.waitUntil(refreshManifest(gamePage[1]));   // the page itself is still network-first (next rule)
+  if (gamePage && GAMEDATA_GAMES.includes(gamePage[1])) keepAlive(event, refreshManifest(gamePage[1]).catch(() => null));   // the page itself is still network-first (next rule)
 
   /* PixelBreak game payloads are versioned by CONTENT, not by URL: pb/<game>.html
    * keeps its name across rewrites and the arcade re-fetches it on every open.
@@ -242,7 +263,7 @@ self.addEventListener("fetch", (event) => {
     return fetch(req).then((res) => {
       if (res.ok) {
         const copy = res.clone();
-        event.waitUntil(caches.open(CACHE).then((c) => c.put(req, copy))
+        keepAlive(event, caches.open(CACHE).then((c) => c.put(req, copy))
           .catch((error) => console.warn("[SW] cache write failed", error)));
       }
       return res;
