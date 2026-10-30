@@ -222,11 +222,12 @@ PB.onOpenGame = (g, options = {}) => {
   flushScores();                          // the previous game's scores go out before the mode flips
   dismissModeDialog(null);
   setTestMode(options.testMode === true);
-  PB.current = g; weeklyFinals = new Set(); touchStreak(); sessionBests = new Map(); activeBoard = null; renderGameBar(); resetGifts(); loadCloudSave(g); loadEventStatus();
+  PB.current = g; weeklyFinals = new Set(); touchStreak(); sessionBests = new Map(); activeBoard = null; renderGameBar(); resetGifts(); loadCloudSave(g); loadCloudResume(g); loadEventStatus();
 };
 PB.onCloseGame = () => {
   dismissModeDialog(null);
-  flushScores(); flushSave(); flushEvent(); netClose();
+  flushScores(); flushSave(); flushResume(); flushEvent(); netClose();
+  resetResumeCache();
   PB.current = null; activeBoard = null; resetGifts(); setTestMode(false); updateSaveHint();
 };
 PB.registerStandalone = (g) => {
@@ -243,8 +244,8 @@ PB.registerStandalone = (g) => {
 // Saves reach the cloud on a 3 s debounce; leaving the page inside that window
 // (closing the tab, swiping the PWA away) would otherwise drop them from the
 // cloud copy. Best effort -- the local copy is always written synchronously.
-window.addEventListener("pagehide", () => { flushScores(); if (pendingSave) flushSave(); });
-document.addEventListener("visibilitychange", () => { if (document.visibilityState !== "hidden") return; flushScores(); if (pendingSave) flushSave(); });
+window.addEventListener("pagehide", () => { flushScores(); if (pendingSave) flushSave(); flushResume(); });
+document.addEventListener("visibilitychange", () => { if (document.visibilityState !== "hidden") return; flushScores(); if (pendingSave) flushSave(); flushResume(); });
 
 /* ---------------- game-state saves (progress, not just score) ----------------
  * Games post {__pbSave:1,data:{...}} → stored in localStorage always, and
@@ -304,6 +305,8 @@ window.addEventListener("message", (e) => {
     if (sb && session && !saveTimer) saveTimer = setTimeout(flushSave, 3000);
   }
   if (d && d.__pbWantSave === 1 && !testMode && cloudSave !== undefined) sendCloudSave();
+  if (d.__pbResume === 1) onResumeMessage(g, d);
+  if (d.__pbWantResume === 1 && !testMode && g.id === RESUME_GAME && resumeRows) sendCloudResume();
   if (d.__pbGiftReady === 1 && !testMode) {   // the idle game loaded its local save and asked for the cloud save (always in that order)
     giftFrameReady = true;
     postGifts();
@@ -458,6 +461,7 @@ window.__pbFlushSave = async () => {
   await Promise.all([
     flushScores(),
     flushSave(),
+    flushResume(),
     ...Array.from(scores, ([id, score]) => saveCloud(id === board.id ? board : { ...game, id }, score)),
   ]);
 };
@@ -485,6 +489,152 @@ async function loadCloudSave(g) {
   sendCloudSave();
   giftCloudSettled = true;   // the cloud save is now posted to the frame (or the account has none): gifts may follow
   void deliverGifts();
+}
+
+/* ---------------- running-service resume (Zuch & Tram Sim "Weiderfueren") ----------------
+ * The game keeps its running service as a JSON snapshot in localStorage (pb_resume_<slot>). So that a ride started on one device
+ * can be carried on from another, the game also posts {__pbResume:1, slot, data} (data = the snapshot text, or null = gone) and we
+ * mirror it into game_resume (scripts/train-resume-v1.sql): at most once a minute per slot (latest wins), a delete at once, and
+ * whatever is pending leaves on pagehide / hidden / __pbFlushSave / closing the game. On open (and on {__pbWantResume}) the user's
+ * rows go back to the frame as {__pbLoadResume:1, rows:[{slot,data}]}; the game validates them like its own storage.
+ * We also push a local snapshot the cloud does not have or has older (an old device that still holds a ride). Never in test mode,
+ * never signed out. The table's trigger refuses an update with an older snap_at, so a late device cannot overwrite a newer ride. */
+const RESUME_GAME = "train-sim";                 // the Zuch and the Tram tile both save under this id
+const RESUME_SLOTS = ["train-sim", "train-sim_rail", "train-sim_tram"];   // localStorage key without RESUME_KEY_PREFIX (= game_resume.slot check)
+const RESUME_KEY_PREFIX = "pb_resume_";
+const RESUME_MAX_CHARS = 32768;                   // = the table's check on data
+const RESUME_SYNC_MS = 60_000;
+const RESUME_MAX_AGE_MS = 24 * 3600 * 1000;       // the game refuses older snapshots anyway: not worth a request
+const RESUME_MESSAGE_KEYS = new Set(["__pbResume", "slot", "data", "upTo"]);
+let resumeRows;                                   // undefined = fetching / not this game; else [{slot, data, at}] as last known (cloud + what we sent)
+let resumeLoadSeq = 0, resumeTimer = null, resumeChain = Promise.resolve();
+const resumePending = new Map();                  // slot -> { userId, data: string|null, at, upTo } not sent yet (latest wins)
+const resumeSentAt = new Map();                   // slot -> ms of the last request (the throttle)
+
+/* the snapshot's own time if `text` is a plausible snapshot (JSON object with a usable numeric "at"), else null */
+function resumeSnapshotAt(text) {
+  if (typeof text !== "string" || !text || text.length > RESUME_MAX_CHARS) return null;
+  try {
+    const snap = JSON.parse(text);
+    return isObject(snap) && Number.isFinite(snap.at) && Number.isFinite(new Date(snap.at).getTime()) ? snap.at : null;
+  } catch { return null; }
+}
+const isResumeTime = (ms) => Number.isFinite(ms) && Number.isFinite(new Date(ms).getTime());
+
+/* a game message -> the operation to queue, or null if it is not well formed (nothing from the frame is trusted) */
+function parseResumeMessage(d, userId) {
+  if (!Object.keys(d).every((key) => RESUME_MESSAGE_KEYS.has(key)) || !RESUME_SLOTS.includes(d.slot)) return null;
+  if (d.upTo !== undefined && !isResumeTime(d.upTo)) return null;
+  if (d.data === null) return { userId, slot: d.slot, data: null, at: null, upTo: d.upTo ?? null };
+  const at = resumeSnapshotAt(d.data);
+  return at === null ? null : { userId, slot: d.slot, data: d.data, at, upTo: null };
+}
+
+/* the cached rows after an operation (a delete with upTo only removes a row that is not newer than it) */
+function applyResumeOp(rows, op) {
+  const others = rows.filter((row) => row.slot !== op.slot);
+  const current = rows.find((row) => row.slot === op.slot);
+  if (op.data !== null) return [...others, { slot: op.slot, data: op.data, at: op.at }];
+  return current && op.upTo !== null && current.at > op.upTo ? rows : others;
+}
+
+function onResumeMessage(g, d) {
+  if (g.id !== RESUME_GAME || testMode || !sb || !session) return;
+  const op = parseResumeMessage(d, session.user.id);
+  if (!op) { console.warn("[PB] resume message ignored", { slot: d.slot }); return; }
+  queueResume(op);
+}
+function queueResume(op) {
+  resumePending.set(op.slot, op);
+  if (resumeRows) resumeRows = applyResumeOp(resumeRows, op);   // a frame that reloads and asks again must not get the row back that we just removed
+  if (op.data === null) flushResume(true, op.slot);             // a delete does not wait
+  else flushResume(false);                                      // an upload goes at once if its minute is over, else the timer takes it
+}
+/* sends what is pending: force = everything (or just `only`), otherwise only the slots whose minute is over; re-arms the timer for the rest */
+function flushResume(force = true, only = null) {
+  if (resumeTimer) { clearTimeout(resumeTimer); resumeTimer = null; }
+  const now = Date.now();
+  let nextWait = Infinity;
+  for (const [slot, op] of [...resumePending]) {
+    const wait = (resumeSentAt.get(slot) || 0) + RESUME_SYNC_MS - now;
+    if (!(only ? slot === only : force || wait <= 0)) {
+      if (wait > 0) nextWait = Math.min(nextWait, wait);
+      continue;
+    }
+    resumePending.delete(slot);
+    sendResume(op);
+  }
+  if (Number.isFinite(nextWait)) resumeTimer = setTimeout(() => flushResume(false), nextWait);
+}
+/* one request after the other, so a delete can never be overtaken by the upload before it */
+function sendResume(op) {
+  resumeSentAt.set(op.slot, Date.now());
+  resumeChain = resumeChain.then(async () => {
+    if (!sb || !session || session.user.id !== op.userId) return;   // signed out or switched account meanwhile: the next open reconciles
+    try {
+      let result;
+      if (op.data === null) {
+        let query = sb.from("game_resume").delete().eq("user_id", op.userId).eq("slot", op.slot);
+        if (op.upTo !== null) query = query.lte("snap_at", new Date(op.upTo).toISOString());
+        result = await query;
+      } else {
+        result = await sb.from("game_resume").upsert(
+          { user_id: op.userId, slot: op.slot, data: op.data, snap_at: new Date(op.at).toISOString(), updated_at: new Date().toISOString() },
+          { onConflict: "user_id,slot" });
+      }
+      if (result.error) throw result.error;
+    } catch (error) {
+      if (!resumePending.has(op.slot)) resumePending.set(op.slot, op);   // retried with the next save / flush (a newer one replaces it)
+      console.warn("[PB] resume sync failed", { slot: op.slot, delete: op.data === null, error });
+    }
+  });
+}
+
+/* rows from the database -> [{slot, data, at}], dropping everything that is not a usable snapshot */
+function cleanResumeRows(data) {
+  if (!Array.isArray(data)) return [];
+  return data.filter((row) => isObject(row) && RESUME_SLOTS.includes(row.slot)).map((row) => ({ slot: row.slot, data: row.data, at: resumeSnapshotAt(row.data) }))
+    .filter((row) => row.at !== null);
+}
+function sendCloudResume() {
+  if (!resumeRows?.length || !PB.current || PB.current.id !== RESUME_GAME || testMode) return;
+  try { document.getElementById("gf").contentWindow.postMessage({ __pbLoadResume: 1, rows: resumeRows.map(({ slot, data }) => ({ slot, data })) }, "*"); }
+  catch (error) { console.warn("[PB] resume delivery failed", error); }
+}
+function resetResumeCache() {
+  resumeLoadSeq += 1;   // a response that is still on its way belongs to a game that is gone
+  resumeRows = undefined;
+}
+async function loadCloudResume(g) {
+  const seq = ++resumeLoadSeq;
+  resumeRows = undefined;
+  if (g.id !== RESUME_GAME || testMode || !sb || !session) return;
+  const userId = session.user.id;
+  try {
+    const { data, error } = await sb.from("game_resume").select("slot,data,snap_at").eq("user_id", userId);
+    if (error) throw error;
+    if (PB.current !== g || seq !== resumeLoadSeq || session?.user?.id !== userId || testMode) return;   // the player has left / switched game or account
+    // what the frame sent while we were asking is newer than the answer
+    resumeRows = [...resumePending.values()].reduce((rows, op) => applyResumeOp(rows, op), cleanResumeRows(data));
+  } catch (error) {
+    console.warn("[PB] cloud resume load failed", { game: g.id, error });
+    return;
+  }
+  sendCloudResume();
+  reconcileLocalResume(userId);
+}
+/* a local snapshot that is newer than the cloud row (or has none) goes up: this device holds a ride the others do not know yet */
+function reconcileLocalResume(userId) {
+  for (const slot of RESUME_SLOTS) {
+    if (resumePending.has(slot)) continue;   // the frame already said something about this slot
+    let text = null;
+    try { text = localStorage.getItem(RESUME_KEY_PREFIX + slot); } catch (error) { console.warn("[PB] resume read failed", { slot, error }); }
+    const at = resumeSnapshotAt(text);
+    if (at === null || Date.now() - at > RESUME_MAX_AGE_MS) continue;
+    const row = resumeRows.find((r) => r.slot === slot);
+    if (row && row.at >= at) continue;
+    queueResume({ userId, slot, data: text, at, upTo: null });
+  }
 }
 
 /* ---------------- live gifts (admin -> the idle game that is open right now) ----------------
@@ -639,7 +789,7 @@ function applySession(s) {
     eventTimer = null;
     loadEventStatus();
   }
-  if (userId && userId !== previousUserId && PB.current) loadCloudSave(PB.current);
+  if (userId && userId !== previousUserId && PB.current) { loadCloudSave(PB.current); loadCloudResume(PB.current); }
   if (PB.current) touchStreak();
   loadWeeklyHome();
 }

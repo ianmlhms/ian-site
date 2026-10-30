@@ -243,11 +243,32 @@
      endless run come back, the train standing still at the saved position with doors closed and the parking brake on. The sim clock only
      moves while the sim runs, so the time the page was away is never delay. Nothing is credited or posted on resume; the snapshot also
      remembers how many services the career had finished, so a service that was paid after it was written can never be resumed (no double credit).
-     The storage key is not on the arcade test mode's pass-through list: test mode writes (and reads) its own copy, never the real one. */
+     The storage key is not on the arcade test mode's pass-through list: test mode writes (and reads) its own copy, never the real one.
+     Cloud resume: inside the arcade every write/removal of the snapshot is also posted to the host ({__pbResume,slot,data|null}), which mirrors it
+     into game_resume; on open the host sends the account's rows ({__pbLoadResume,rows}) and a row newer than the local snapshot is written to
+     localStorage, then goes through readSnapshot like any stored snapshot (nothing from the cloud is trusted more than the local copy). A snapshot
+     rejected with keep = true stays (the cloud career save may still be on its way: mergeIncoming re-renders the menu, which re-reads it).
+     Never in arcade test mode, never standalone. */
   const SNAPSHOT_INTERVAL_MS = 5000, SNAPSHOT_ARM_M = 30;
   let resumeOffer = null, resumeDismissed = false, resumeFocusDone = false;
   let snapshotArmed = false, snapshotDue = false, snapshotWrites = 0;
   const resumeKey = () => (TS.resume ? TS.resume.keyFor(TS.careerLock) : '');   // one slot per arcade tile (career lock)
+  const RESUME_KEY_PREFIX = 'pb_resume_';
+  const RESUME_MAX_CHARS = 32768;   // what the host and the table accept (TS.resume.MAX_BYTES, the validator's limit, is smaller)
+  const resumeSlot = () => resumeKey().replace(RESUME_KEY_PREFIX, '');
+  /* the time inside a stored snapshot text, or null if it is not a JSON object with a numeric "at" */
+  function snapshotAtOf(raw) {
+    if (typeof raw !== 'string' || !raw) return null;
+    const snap = safe('snapshot time', () => JSON.parse(raw), null);
+    return snap && typeof snap === 'object' && Number.isFinite(snap.at) ? snap.at : null;
+  }
+  /* tell the arcade about the stored snapshot (data = the text) or its removal (data = null; upTo = only if the cloud copy is not newer than that time) */
+  function postResume(data, upTo) {
+    if (ARCADE_TEST || !TS.resume) return;   // test mode stays fully local
+    const message = { __pbResume: 1, slot: resumeSlot(), data };
+    if (Number.isFinite(upTo)) message.upTo = upTo;
+    postToHost(message);
+  }
 
   /* the stored snapshot if it is valid right now (version, age, route/train exist and are owned in that career, no later service paid, ...) */
   function readSnapshot() {
@@ -257,12 +278,30 @@
     const res = safe('resume check', () => TS.resume.check(raw, { now: Date.now(), save, testMode: ARCADE_TEST, lock: TS.careerLock }), { reject: 'check failed' });
     if (res.snap) return res.snap;
     if (res.reject !== TS.resume.OTHER_CAREER) console.warn('[Lokféierer] saved service ignored: ' + res.reject);
-    if (!res.keep) removeStore(resumeKey());
+    if (!res.keep) {
+      removeStore(resumeKey());
+      const at = snapshotAtOf(raw);
+      if (at !== null) postResume(null, at);   // gone for good everywhere, unless another device has a newer ride in the cloud
+    }
     return null;
   }
   function discardSnapshot() {
-    if (TS.resume) removeStore(resumeKey());
+    if (TS.resume) { removeStore(resumeKey()); postResume(null); }
     resumeOffer = null; snapshotDue = false;
+  }
+  /* the arcade's rows of this account: a snapshot from another device that is newer than ours becomes the stored one (and is validated by readSnapshot) */
+  function mergeIncomingResume(rows) {
+    if (ARCADE_TEST || !TS.resume || !Array.isArray(rows)) return;
+    if (phase === 'running' || phase === 'paused') return;   // a service in progress is the newest truth on this device
+    const slot = resumeSlot();
+    const row = rows.find((r) => r && typeof r === 'object' && r.slot === slot);
+    if (!row || typeof row.data !== 'string' || row.data.length > RESUME_MAX_CHARS) return;
+    const cloudAt = snapshotAtOf(row.data);
+    if (cloudAt === null) { warn('cloud service ignored: no time', slot); return; }
+    const localAt = snapshotAtOf(readStore(resumeKey()));
+    if (localAt !== null && localAt >= cloudAt) return;
+    writeStore(resumeKey(), row.data);
+    if (phase === 'menu') renderMenu();   // readSnapshot checks it: valid -> the Weiderfueren card; keep -> waits for the career save; else removed here and in the cloud
   }
   function nearestStationName(sPos) {
     const list = stationsOf();
@@ -308,6 +347,7 @@
     const out = JSON.stringify(snap);
     if (out.length > TS.resume.MAX_BYTES) { warn('resume snapshot too big', out.length); return false; }
     writeStore(resumeKey(), out);
+    postResume(out);
     snapshotWrites += 1;
     return true;
   }
@@ -317,7 +357,9 @@
     const c = careerState(trainId);
     const snap = { v: TS.resume.VERSION, at: Date.now(), mode: 'endless', fresh: 1, route: routeId, train: trainId, svc: c.services || 0, life: c.lifetime || 0, cam: camMode, wxp: wxPref, todp: todPref, ni: 0, nn: '', live: 0,
       en: { order: endless.order, i: endless.index, loops: endless.loops, cash: Math.round(endless.total.cash), pts: Math.round(endless.total.points) } };
-    writeStore(resumeKey(), JSON.stringify(snap));
+    const out = JSON.stringify(snap);
+    writeStore(resumeKey(), out);
+    postResume(out);
   }
   /* the first seconds in the start station are not worth saving: armed once the train has moved or a stop is on record */
   function armSnapshot(st) {
@@ -2461,7 +2503,7 @@
       /* resume: saveSnapshot() writes now, peekSnapshot() the stored JSON text, tamperSnapshot(fn) rewrites it, resumeNow() = the card's primary button */
       saveSnapshot() { if (world) armSnapshot(world.state); return snapshotReady() ? writeSnapshot() : false; },
       peekSnapshot() { return readStore(resumeKey()); },
-      pokeSnapshot(textOut) { if (textOut === null) removeStore(resumeKey()); else writeStore(resumeKey(), textOut); return true; },
+      pokeSnapshot(textOut) { if (textOut === null) removeStore(resumeKey()); else writeStore(resumeKey(), textOut); postResume(textOut); return true; },
       resumeNow() { resumeFromMenu(); return phase; },
       start: (m, routeId, trainId) => startFromMenu(m, routeId, trainId),
       startService: (routeId, trainId, m) => startService(routeId, trainId, m || 'career'),
@@ -2606,6 +2648,7 @@
     window.addEventListener('message', (event) => {
       if (event.source !== parent || event.origin !== HOST_ORIGIN) return;
       if (event.data && event.data.__pbLoadSave === 1) mergeIncoming(event.data.data);
+      if (event.data && event.data.__pbLoadResume === 1) safe('cloud resume', () => mergeIncomingResume(event.data.rows));
       if (event.data && event.data.__pbSndMute !== undefined) applyMute(!!event.data.__pbSndMute);
     });
     window.addEventListener('resize', checkDevice);
@@ -2639,7 +2682,7 @@
     $('btnMenu').addEventListener('click', (e) => { if (phase === 'running' && !paused) pauseGame(); if (e.detail !== 0) $('btnMenu').blur(); });
     try { window.Arcade.onMute((value) => applyMute(value)); window.Arcade.onRestart(() => { if (world && !world.demo && (phase === 'running' || phase === 'summary')) startService(world.routeId, world.trainId, mode); else if (phase === 'menu') { renderMenu(); refreshDemoSoon(); } }); }
     catch (error) { warn('Arcade kit hooks', error); }
-    if (!ARCADE_TEST) postToHost({ __pbWantSave: 1 });
+    if (!ARCADE_TEST) { postToHost({ __pbWantSave: 1 }); postToHost({ __pbWantResume: 1 }); }
     try {
       const search = new URL(location.href).searchParams;
       testMode = search.get('test') === '1' || (parent !== window && new URL(parent.location.href).searchParams.get('test') === '1');

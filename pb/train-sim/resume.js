@@ -3,7 +3,10 @@
    rejected) and says how long ago it was. Reading/writing the storage and rebuilding the world stay in the shell (train-sim.js).
    TS.resume.check(rawText, { now, save, testMode, lock }) -> { snap } | { reject: 'reason', keep: boolean }
      lock = the career the page is locked to (TS.careerLock) or null: a service of the other career is rejected with keep = true.
-     keep = true: it may become valid once the (cloud) save has arrived, so the stored copy is left alone; otherwise the shell deletes it. */
+     keep = true: it may become valid once the (cloud) save has arrived, so the stored copy is left alone; otherwise the shell deletes it.
+   Cloud resume: inside the arcade the shell mirrors the stored snapshot to the account (game_resume, via pixelbreak-records.js) and receives the
+   snapshots of other devices; a cloud snapshot is written to the same key and goes through check() like any other, so this module stays the only
+   judge (a keep = true reject waits for the career save, anything else is deleted locally and in the cloud). Notes: scripts/train-resume-v1.sql. */
 (function () {
   'use strict';
   const TS = (window.TS = window.TS || {});

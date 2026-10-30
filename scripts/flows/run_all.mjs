@@ -54,6 +54,7 @@ import { flow as trainSim } from "./train_sim.mjs";
 import { flow as trainSimAudio } from "./train_sim_audio.mjs";
 import { flow as trainSimTouch } from "./train_sim_touch.mjs";
 import { flow as trainSimCareerLock } from "./train_sim_career_lock.mjs";
+import { flow as trainSimResumeCloud } from "./train_sim_resume_cloud.mjs";
 import { flow as trainSimWorld } from "./train_sim_world.mjs";
 import { flow as trainSimRoutes } from "./train_sim_routes.mjs";
 import { flow as trainSimAbroad } from "./train_sim_abroad.mjs";
@@ -77,7 +78,7 @@ import { flow as mtbSmooth } from "./mtb_smooth.mjs";
 import { flow as gameCache } from "./game_cache.mjs";
 import { flow as halloween } from "./halloween.mjs";
 
-const ALL = [gameCache, halloween, mtbWorld, mtbHoles, mtbRide, mtbTrails, mtbMenu, mtbTouch, mtbSmooth, fouerWorld, fouerModels, fouerBigModels, fouerGame, fouerMigration, fouerWalk, fouerRides, fouerAccess, fouerLaunch, invitePop, invitesLight, mpLobbyConnect4, mpLobbySlf, mpLobbyQuick, mpLobbyGames, mpLobbyColor, mpLobbyParty, mpLobbyArcade, trainSim, trainSimAudio, trainSimTouch, trainSimCareerLock, trainSimWorld, trainSimRoutes, trainSimAbroad, trainSimTramHoles, paketExpress, kartLetzebuerg, kartLetzebuergMp, kartLetzebuergArcade, clientCommands, inboxCloud, busTycoon, newGroup, addMember, mediaCache, friendsAdd, slfRound, arcadePad, leaderboardTags, adminOnlineNotice, adminKartSaves, ccSigninHint, accountCheck, arcadeWeeklyStreak, idleRebirthHalloween, idleMoreContent, idleSoftcap, idleLiveGift, idleResetSafety, leaderboardBigScores, driveMadLevels, testMode, mordsfall];
+const ALL = [gameCache, halloween, mtbWorld, mtbHoles, mtbRide, mtbTrails, mtbMenu, mtbTouch, mtbSmooth, fouerWorld, fouerModels, fouerBigModels, fouerGame, fouerMigration, fouerWalk, fouerRides, fouerAccess, fouerLaunch, invitePop, invitesLight, mpLobbyConnect4, mpLobbySlf, mpLobbyQuick, mpLobbyGames, mpLobbyColor, mpLobbyParty, mpLobbyArcade, trainSim, trainSimAudio, trainSimTouch, trainSimCareerLock, trainSimResumeCloud, trainSimWorld, trainSimRoutes, trainSimAbroad, trainSimTramHoles, paketExpress, kartLetzebuerg, kartLetzebuergMp, kartLetzebuergArcade, clientCommands, inboxCloud, busTycoon, newGroup, addMember, mediaCache, friendsAdd, slfRound, arcadePad, leaderboardTags, adminOnlineNotice, adminKartSaves, ccSigninHint, accountCheck, arcadeWeeklyStreak, idleRebirthHalloween, idleMoreContent, idleSoftcap, idleLiveGift, idleResetSafety, leaderboardBigScores, driveMadLevels, testMode, mordsfall];
 const words = process.argv.slice(2);
 const flows = words.length ? ALL.filter((f) => words.some((w) => f.name.includes(w))) : ALL;
 if (!flows.length) { console.error(`No flow matches: ${words.join(", ")}\nAvailable: ${ALL.map((f) => f.name).join(", ")}`); process.exit(2); }
