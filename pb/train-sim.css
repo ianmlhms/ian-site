@@ -9,13 +9,17 @@ button{font:inherit;color:inherit;cursor:pointer}
 [hidden]{display:none!important}
 
 /* ---------- HUD ---------- */
-#hud{position:absolute;inset:0;pointer-events:none;z-index:5;padding:max(10px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));display:flex;flex-direction:column;justify-content:space-between;font-variant-numeric:tabular-nums}
-.hud-top,.hud-bottom{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
-.hud-bottom{align-items:flex-end}
+/* One grid lays out the whole HUD (boxes, util row, touch controls), so nothing is placed by a pixel guess and nothing can overlap:
+   landscape = 5 columns (lever | speed | centre | signal | buttons), top zone = left stack (next stop + menu) | route strip | clock, util row under it;
+   portrait (below) = 3 columns and two foot rows (controls, then speed | centre | signal). #hudSlot is the free area the toasts / banner are parked over. */
+#hud{position:absolute;inset:0;pointer-events:none;z-index:5;padding:max(10px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));display:grid;gap:8px 10px;grid-template-columns:auto auto minmax(0,1fr) auto auto;grid-template-rows:auto auto auto minmax(0,1fr) auto;font-variant-numeric:tabular-nums}
+.hud-top,.hud-bottom{display:contents}
+.hud-left{grid-column:1/3;grid-row:1/5;display:flex;flex-direction:column;align-items:flex-start;gap:8px;min-width:0}
+.hud-slot{grid-column:3;grid-row:4;min-width:0;min-height:0}
 .nextbox{padding:9px 14px;min-width:236px;max-width:300px}
 .nextbox .lbl{display:block;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--soft)}
-.nextbox b{display:block;font-size:20px;font-weight:700;letter-spacing:-.01em;margin:1px 0 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.nextbox .row{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--soft)}
+.nextbox b{display:block;font-size:20px;font-weight:700;letter-spacing:-.01em;margin:1px 0 3px;line-height:1.15;overflow-wrap:anywhere}
+.nextbox .row{display:flex;gap:4px 8px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--soft)}
 .chip{font-size:11px;padding:1px 8px;border-radius:99px;background:rgba(255,194,74,.16);color:var(--amber);border:1px solid rgba(255,194,74,.35)}
 .chip:empty{display:none}
 /* timetable pills: scheduled arrival + departure of the stop in the box; the one that matters now is lit */
@@ -32,14 +36,14 @@ button{font:inherit;color:inherit;cursor:pointer}
 #nextSide{font-weight:700;font-size:12px;padding:2px 10px}
 #nextSide.left::before{content:"\25C0\00a0"}#nextSide.right::after{content:"\00a0\25B6"}
 .depbadge{margin-top:6px;padding:3px 10px 4px;border-radius:9px;background:rgba(255,194,74,.18);color:var(--amber);border:1px solid rgba(255,194,74,.5)}
-.depbadge small{display:block;font-size:10px;letter-spacing:.05em;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.nextbox .depbadge b{font-size:16px;margin:0;line-height:1.2}
+.depbadge small{display:block;font-size:10px;letter-spacing:.05em;opacity:.85;overflow-wrap:anywhere}
+.nextbox .depbadge b{font-size:16px;margin:0;line-height:1.2;overflow-wrap:anywhere}
 .depbadge.go{background:rgba(61,220,132,.18);color:var(--green);border-color:rgba(61,220,132,.55)}
 .depbadge.late{background:rgba(255,90,77,.18);color:var(--red);border-color:rgba(255,90,77,.55)}
 .delayword{display:block;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--green);margin-top:1px}
 .delayword.late{color:var(--red)}
 #stripNextLbl{position:absolute;top:30px;font-size:10px;font-weight:700;color:var(--amber);transform:translateX(-50%);white-space:nowrap;padding:0 5px;border-radius:5px;background:rgba(12,16,22,.72);z-index:2}
-.strip{flex:1;max-width:520px;height:46px;margin:0 6px;position:relative;align-self:flex-start;padding:0 18px}
+.strip{grid-column:3;grid-row:1;justify-self:center;width:100%;max-width:520px;height:46px;position:relative;padding:0 18px}
 .strip .line{position:absolute;left:18px;right:18px;top:23px;height:2px;background:rgba(255,255,255,.28);border-radius:2px}
 #stripDots{position:absolute;left:18px;right:18px;top:0;bottom:0}
 #stripDots i{position:absolute;top:18px;width:10px;height:10px;margin-left:-5px;border-radius:50%;background:#2b3440;border:2px solid rgba(255,255,255,.7)}
@@ -48,7 +52,8 @@ button{font:inherit;color:inherit;cursor:pointer}
 #stripDots span{position:absolute;top:30px;font-size:9px;color:var(--soft);transform:translateX(-50%);white-space:nowrap;max-width:70px;overflow:hidden;text-overflow:ellipsis}
 #stripDots span.first{transform:translateX(-5px)}#stripDots span.last{transform:translateX(calc(-100% + 5px))}
 #stripTrain{position:absolute;top:7px;width:0;height:0;margin-left:-6px;border-left:6px solid transparent;border-right:6px solid transparent;border-top:9px solid #fff;filter:drop-shadow(0 1px 2px #000)}
-.statsbox{padding:8px 14px;min-width:150px;text-align:right}
+.statsbox{grid-column:4/6;grid-row:1;justify-self:end;min-width:150px;max-width:100%;padding:8px 14px;text-align:right}
+.statsbox small{overflow-wrap:anywhere}
 .clockrow{display:flex;gap:10px;align-items:baseline;justify-content:flex-end}
 .clockrow b{font-size:24px;font-weight:700;letter-spacing:.02em;margin-right:-6px}
 #clockSec{font-size:13px;color:var(--soft);align-self:baseline;margin-right:4px}
@@ -57,7 +62,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .statline{display:flex;gap:14px;justify-content:flex-end;font-size:14px;color:var(--soft);margin-top:2px}
 .statline b{color:var(--ink)}
 .statsbox small{display:block;font-size:10px;color:var(--soft);margin-top:2px;letter-spacing:.06em}
-.speedbox{padding:10px 16px;display:flex;gap:16px;align-items:center}
+.speedbox{grid-column:2;grid-row:5;align-self:end;padding:10px 16px;display:flex;gap:16px;align-items:center}
 .speed{display:flex;align-items:baseline;gap:6px}
 .speed b{font-size:56px;line-height:.95;font-weight:700;letter-spacing:-.03em;min-width:2.1ch;text-align:right}
 .speed small{font-size:13px;color:var(--soft)}
@@ -65,37 +70,45 @@ button{font:inherit;color:inherit;cursor:pointer}
 .limit-sign{width:46px;height:46px;border-radius:50%;background:#fff;color:#111;border:5px solid #d6322b;display:grid;place-items:center;font-weight:800;font-size:17px;letter-spacing:-.04em}
 .limit-sign.over{animation:blink .5s steps(2) infinite}
 .nextlimit{font-size:11px;color:var(--soft);white-space:nowrap}
-.centerbox{flex:1;max-width:520px;margin:0 auto;padding:9px 14px}
-.lever-row{display:flex;gap:12px;align-items:center}
+.centerbox{grid-column:3;grid-row:5;align-self:end;justify-self:center;width:100%;max-width:520px;min-width:0;padding:9px 14px}
+.lever-row{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center}
 #leverLabel{font-size:22px;width:2.4ch;text-align:center;font-weight:800;color:var(--amber)}
 #leverLabel.brake{color:#ff8a65}#leverLabel.eb{color:var(--red)}#leverLabel.neutral{color:var(--soft)}
-#leverBar{flex:1;display:flex;gap:3px;height:14px}
+#leverBar{flex:1 1 90px;display:flex;gap:3px;height:14px}
 #leverBar i{flex:1;border-radius:3px;background:rgba(255,255,255,.14)}
 #leverBar i.on.p{background:var(--teal)}#leverBar i.on.b{background:#ff8a65}#leverBar i.on.e{background:var(--red)}#leverBar i.zero{background:rgba(255,255,255,.4)}
-.doorstate{font-size:12px;color:var(--soft);min-width:84px;text-align:right}
+.doorstate{font-size:12px;color:var(--soft);flex:1 1 84px;text-align:right;overflow-wrap:anywhere}
 .doorstate.open{color:var(--amber)}
 .hint{margin-top:6px;font-size:13px;color:var(--ink);min-height:18px;text-align:center}
 .hint kbd{font:inherit;font-weight:700;padding:1px 7px;border-radius:6px;background:rgba(255,255,255,.14);border:1px solid var(--line)}
-.xchg{display:flex;gap:16px;justify-content:center;font-size:17px;font-weight:700;margin-bottom:7px;padding-bottom:7px;border-bottom:1px solid var(--line)}
+.xchg{display:flex;flex-wrap:wrap;gap:2px 16px;justify-content:center;font-size:17px;font-weight:700;margin-bottom:7px;padding-bottom:7px;border-bottom:1px solid var(--line)}
 .xchg .out{color:#ff9f7a}.xchg .in{color:var(--teal)}.xchg .on{color:var(--soft);font-weight:600}
-.signalbox{padding:10px 14px;display:flex;gap:10px;align-items:center;min-width:140px}
+.signalbox{grid-column:4;grid-row:5;align-self:end;padding:10px 14px;display:flex;gap:10px;align-items:center;min-width:140px}
 .sig{display:flex;flex-direction:column;gap:4px;background:#07090c;border-radius:10px;padding:6px;border:1px solid var(--line)}
 .sig i{width:14px;height:14px;border-radius:50%;background:#2a2f36;display:block}
 .sig.r .r{background:var(--red);box-shadow:0 0 10px var(--red)}.sig.y .y{background:var(--yellow);box-shadow:0 0 10px var(--yellow)}.sig.g .g{background:var(--green);box-shadow:0 0 10px var(--green)}
-.sigtext{font-size:12px;color:var(--soft);line-height:1.35}
+.sigtext{font-size:12px;color:var(--soft);line-height:1.35;overflow-wrap:anywhere}
 .sigtext b{display:block;color:var(--ink);font-size:15px}
-.hud-util{position:absolute;right:max(12px,env(safe-area-inset-right));top:calc(max(10px,env(safe-area-inset-top)) + 112px);display:flex;gap:6px;pointer-events:auto}
+.hud-util{grid-column:3/6;grid-row:2;justify-self:end;position:relative;display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:6px;max-width:100%;pointer-events:none}
+.hud-util>*{pointer-events:auto}
 .chipbtn{padding:5px 11px;font-size:12px;border-radius:99px;color:var(--soft);min-height:30px;display:inline-flex;align-items:center}
+/* a finger needs 44 px: every HUD chip button grows on a touch screen (the row wraps instead of overlapping) */
+@media(pointer:coarse){.chipbtn{min-height:44px;min-width:44px;justify-content:center;font-size:13px}}
+body.touch .chipbtn{min-height:44px;min-width:44px;justify-content:center;font-size:13px}
 button.chipbtn:hover{color:var(--ink)}
 button.chipbtn.on{color:#ffd36a;background:rgba(255,196,58,.22);box-shadow:inset 0 0 0 1px rgba(255,196,58,.6)}
 .revlamp{background:rgba(255,196,58,.28);color:#ffd36a;font-weight:800;letter-spacing:.04em;box-shadow:inset 0 0 0 1px rgba(255,196,58,.7)}
 .revlamp[hidden]{display:none}
 .revlamp{display:inline-block;align-self:flex-start;margin-bottom:4px;font-size:14px;padding:3px 12px}
-#toasts{position:absolute;left:50%;top:calc(max(10px,env(safe-area-inset-top)) + 100px);transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;align-items:center;z-index:6;pointer-events:none;width:min(560px,92vw)}
+/* camera hint + banner + toasts: one stack. In the menu it hangs at the top centre; while driving the shell parks it over #hudSlot (the free area of the HUD grid) */
+.msgstack{position:absolute;left:50%;top:calc(max(10px,env(safe-area-inset-top)) + 12px);transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;align-items:center;z-index:6;pointer-events:none;width:min(560px,92vw)}
+#hud[hidden]~.msgstack .camhint{display:none}
+.msgstack.tight{gap:4px}.msgstack.tight .camhint{display:none}.msgstack.tight .toast{padding:5px 12px;font-size:12.5px}.msgstack.tight #banner{padding:7px 14px;font-size:17px}.msgstack.tight #banner small{font-size:12px;margin-top:2px}
+#toasts{display:flex;flex-direction:column;gap:6px;align-items:center;width:100%}
 .toast{padding:9px 16px;border-radius:12px;background:var(--glass-strong);border:1px solid var(--line);font-size:14px;font-weight:600;animation:toast .25s ease-out;text-align:center}
 .toast.bad{border-color:rgba(255,90,77,.6);color:#ffb3ab}.toast.good{border-color:rgba(61,220,132,.55);color:#a7f0c6}.toast.info{color:var(--ink)}
 .toast.out{opacity:0;transition:opacity .4s}
-#banner{position:absolute;left:50%;top:27%;transform:translate(-50%,-50%);z-index:9;padding:16px 28px;text-align:center;font-size:24px;font-weight:700;border-radius:18px;background:var(--glass-strong);border:1px solid var(--line);pointer-events:none}
+#banner{max-width:100%;padding:12px 22px;text-align:center;font-size:22px;font-weight:700;line-height:1.2;border-radius:18px;background:var(--glass-strong);border:1px solid var(--line);pointer-events:none;overflow-wrap:anywhere}
 #banner small{display:block;font-size:14px;color:var(--soft);margin-top:4px;font-weight:500}
 #fade{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;z-index:12;transition:opacity .6s ease}
 #fade.on{opacity:1}
@@ -122,12 +135,17 @@ button.chipbtn.on{color:#ffd36a;background:rgba(255,196,58,.22);box-shadow:inset
 .menu-scroll{width:100%;height:100%;overflow:auto;padding:max(18px,env(safe-area-inset-top)) 18px 40px;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
 #menuHost{max-width:1100px;margin:0 auto}
 #bootStatus{color:var(--soft);font-size:12px;text-align:center}
-.card{width:min(440px,100%);background:var(--glass-strong);border:1px solid var(--line);border-radius:22px;padding:24px 26px;box-shadow:0 30px 90px rgba(0,0,0,.5);max-height:100%;overflow:auto}
+.card{width:min(440px,100%);background:var(--glass-strong);border:1px solid var(--line);border-radius:22px;padding:24px 26px;box-shadow:0 30px 90px rgba(0,0,0,.5);max-height:100%;display:flex;flex-direction:column;overflow:hidden}
+.card>*{flex:none}
+/* the long part of a card (help rows, timetable, summary table) scrolls inside it: the title and the buttons never leave the screen */
+.card>.cardscroll,.card>#helpBody,.card>#ttBody{flex:1 1 auto;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch}
 .card.wide{width:min(640px,100%)}
+#helpScreen .card.wide{width:min(900px,100%)}
 .card h2{margin:0 0 6px;font-size:26px;letter-spacing:-.02em}
-.card p{margin:8px 0}
+.card p{margin:8px 0;overflow-wrap:anywhere}
 .btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
 .btns button,.card>button,button.primary{min-height:44px;padding:11px 20px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.08);font-weight:650;font-size:15px}
+.card>button{align-self:flex-start}
 .btns button:hover{background:rgba(255,255,255,.16)}
 button.primary{background:var(--amber);color:#1a1405;border-color:transparent}
 button.primary:hover{background:#ffd070}
@@ -140,10 +158,11 @@ button.primary:hover{background:#ffd070}
 .loadbar i{display:block;height:100%;width:0;border-radius:inherit;background:linear-gradient(90deg,var(--amber),#ffe3a0);box-shadow:0 0 12px rgba(255,194,74,.55);transition:width .12s linear;position:relative}
 .loadbar i::after{content:"";position:absolute;inset:0;border-radius:inherit;background:repeating-linear-gradient(115deg,rgba(255,255,255,.28) 0 7px,transparent 7px 14px);background-size:28px 100%;animation:loadstripe .8s linear infinite}
 .loadcard b{font-variant-numeric:tabular-nums}
-.aheadload{position:absolute;right:max(12px,env(safe-area-inset-right));top:calc(max(10px,env(safe-area-inset-top)) + 148px);padding:5px 12px;border-radius:99px;font-size:12px;font-weight:650;color:var(--soft);opacity:.88;pointer-events:none;z-index:5}
+.aheadload{padding:5px 12px;border-radius:99px;font-size:12px;font-weight:650;color:var(--soft);opacity:.88;pointer-events:none!important;white-space:nowrap}
 #loading{background:radial-gradient(circle at 50% 40%,rgba(30,50,70,.82),rgba(5,8,12,.94))}
 .spinner{width:34px;height:34px;border-radius:50%;border:3px solid rgba(255,255,255,.18);border-top-color:var(--amber);animation:spin .9s linear infinite}
-#helpBody{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:12px 0;font-size:14px}
+#helpBody{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:12px 0;font-size:14px;align-content:start}
+@media(min-width:760px){#helpBody{grid-template-columns:auto 1fr auto 1fr;gap:6px 14px}}
 #helpBody kbd{font:inherit;font-weight:700;padding:2px 9px;border-radius:7px;background:rgba(255,255,255,.12);border:1px solid var(--line);white-space:nowrap;justify-self:start}
 #ttBody table,#sumRows{width:100%;border-collapse:collapse;font-size:14px}
 #ttBody th,#ttBody td{padding:6px 8px;text-align:left;border-bottom:1px solid var(--line)}
@@ -166,28 +185,23 @@ button.primary:hover{background:#ffd070}
 @media(max-width:900px){
   .strip{display:none}.nextbox{min-width:0;max-width:232px}.speed b{font-size:44px}.centerbox{max-width:none}.signalbox{min-width:0}
 }
-@media(max-height:560px){.speed b{font-size:38px}.hud-util{top:calc(max(10px,env(safe-area-inset-top)) + 96px)}}
+@media(max-height:700px){.statsbox{padding:6px 12px}.clockrow b{font-size:21px}.statline{margin-top:0}}
+@media(max-height:640px){.speed b{font-size:38px}.speedbox{padding:6px 12px}.nextbox{padding:7px 12px}.toast{padding:6px 12px;font-size:13px}#banner{font-size:19px;padding:9px 16px}}
 @media(prefers-reduced-motion:reduce){.loadbar i::after{animation:none}.loadbar i{transition:none}.spinner{animation-duration:2.4s}.toast{animation:none}#fade{transition-duration:.01s}}
 
-/* ---------- cab view: the desk already shows speed, limit and signal, so only a slim info strip stays ---------- */
-body[data-cam="cab"] #hud .hud-bottom{position:absolute;left:50%;transform:translateX(-50%);top:calc(max(10px,env(safe-area-inset-top)) + 62px);width:min(520px,calc(100vw - 460px));min-width:280px;display:block}
+/* ---------- cab view: the desk already shows speed, limit and signal, so only a slim info strip stays (the centre box, moved under the util row) ---------- */
 body[data-cam="cab"] .speedbox,body[data-cam="cab"] .signalbox,body[data-cam="cab"] .lever-row{display:none}
-body[data-cam="cab"] .centerbox{padding:6px 12px;background:rgba(12,16,22,.42);box-shadow:none}
+body[data-cam="cab"] .centerbox{grid-column:3;grid-row:3;align-self:start;max-width:520px;padding:6px 12px;background:rgba(12,16,22,.42);box-shadow:none}
 body[data-cam="cab"] .centerbox.empty{display:none}
 body[data-cam="cab"] .xchg{margin-bottom:4px;padding-bottom:4px;font-size:15px}
 body[data-cam="cab"] .hint{margin-top:0;font-size:12px}
-body[data-cam="cab"] #toasts{top:calc(max(10px,env(safe-area-inset-top)) + 150px)}
-body[data-cam="cab"] #banner{top:34%}
-@media(max-width:900px){body[data-cam="cab"] .hud-util>:not(#btnWx):not(#wxPop):not(#btnInside){display:none}}
-
-/* portrait (iPad): the slim cab info strip sits below the clock box so nothing overlaps */
-@media(max-aspect-ratio:5/4){body[data-cam="cab"] #hud .hud-bottom{top:calc(max(10px,env(safe-area-inset-top)) + 96px)}body[data-cam="cab"] #toasts{top:calc(max(10px,env(safe-area-inset-top)) + 215px)}}
+@media(max-width:900px){body:not(.touch)[data-cam="cab"] .hud-util>:not(#btnWx):not(#wxPop):not(#btnInside):not(#aheadLoad){display:none}}
 
 /* ---------- weather + time of day button and popover ---------- */
 body.wx-open #hud{z-index:10}
 #btnWx{padding:5px 10px;font-size:15px;line-height:1}
 @media(pointer:coarse){#btnWx{min-width:44px;min-height:44px;justify-content:center;font-size:20px}}
-.wxpop{position:absolute;right:0;top:calc(100% + 8px);width:min(344px,calc(100vw - 24px));padding:12px 14px 14px;border-radius:18px;display:flex;flex-direction:column;gap:12px;z-index:8;box-shadow:0 18px 50px rgba(0,0,0,.5)}
+.wxpop{position:absolute;right:0;top:calc(100% + 8px);width:min(344px,calc(100vw - 24px));max-height:calc(100vh - 24px);overflow:auto;padding:12px 14px 14px;border-radius:18px;display:flex;flex-direction:column;gap:12px;z-index:8;box-shadow:0 18px 50px rgba(0,0,0,.5)}
 .wxpop[hidden]{display:none}
 .wxpop__lbl{display:block;font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--soft);margin-bottom:6px}
 .wxpop__opts{display:flex;flex-wrap:wrap;gap:6px}
@@ -196,26 +210,29 @@ body.wx-open #hud{z-index:10}
 .wxopt[aria-checked="true"]{background:var(--amber);border-color:transparent;color:#1a1405}
 .wxopt:focus-visible,#btnWx:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
 
-/* back to the menu while driving (top left, below the next-stop box) */
-#btnMenu{position:absolute;left:max(12px,env(safe-area-inset-left));top:calc(max(10px,env(safe-area-inset-top)) + 178px);pointer-events:auto;color:var(--ink);font-weight:650;font-size:13px;padding:5px 14px}
-@media(pointer:coarse){#btnMenu{min-height:44px;min-width:44px}}
-@media(max-height:560px){#btnMenu{top:calc(max(10px,env(safe-area-inset-top)) + 160px)}}
+/* back to the menu while driving (top left, under the next-stop box: the same stack) */
+#btnMenu{pointer-events:auto;color:var(--ink);font-weight:650;font-size:13px;padding:5px 14px}
 
-/* camera 3: hint + on-screen walk pad */
-.camhint{position:absolute;left:50%;top:calc(max(10px,env(safe-area-inset-top)) + 128px);transform:translateX(-50%);padding:5px 14px;font-size:12px;color:var(--soft);border-radius:99px;pointer-events:none;white-space:nowrap}
-.walkpad{position:absolute;left:max(18px,env(safe-area-inset-left));bottom:150px;width:92px;height:92px;border-radius:50%;background:rgba(12,16,22,.42);border:1px solid var(--line);pointer-events:auto;touch-action:none;display:none}
+/* camera 3: hint (in the message stack) + on-screen walk pad (beside the lever) */
+.camhint{padding:5px 14px;font-size:12px;color:var(--soft);border-radius:14px;pointer-events:none;text-align:center;max-width:100%}
+.walkpad{grid-column:2;grid-row:5;align-self:start;justify-self:start;width:92px;height:92px;border-radius:50%;background:rgba(12,16,22,.42);border:1px solid var(--line);pointer-events:auto;touch-action:none;display:none}
 @media(pointer:coarse){.walkpad{display:block}}
 .walkpad[hidden]{display:none!important}
 .walkpad i{position:absolute;left:50%;top:50%;width:38px;height:38px;margin:-19px 0 0 -19px;border-radius:50%;background:rgba(255,255,255,.28);border:1px solid var(--line)}
 
+/* standalone page: the arcade bar above the game already clears the status bar, so the game does not add the top inset a second time */
+.arcade-bar~#game #hud{padding-top:10px}
+.arcade-bar~#game .menu-scroll{padding-top:18px}
+.arcade-bar~#game .msgstack{top:12px}
+
 /* ---------- touch controls (iPad without a keyboard): lever on the left, buttons on the right, thumb-sized, below the route strip and clear of the speed / clock boxes ---------- */
-.tpad{display:none;position:absolute;pointer-events:auto;z-index:4;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:none;-webkit-tap-highlight-color:transparent}
+.tpad{display:none;position:relative;pointer-events:auto;z-index:4;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:none;-webkit-tap-highlight-color:transparent}
 body.touch .tpad{display:flex}
-.tlever{left:max(12px,env(safe-area-inset-left));bottom:calc(max(10px,env(safe-area-inset-bottom)) + 104px);width:84px;flex-direction:column;gap:8px}
-.tbtns{right:max(12px,env(safe-area-inset-right));bottom:calc(max(10px,env(safe-area-inset-bottom)) + 104px);display:none;grid-template-columns:repeat(2,84px);gap:8px}
+.tlever{grid-column:1;grid-row:5;align-self:end;width:84px;flex-direction:column;gap:8px}
+.tbtns{grid-column:5;grid-row:5;align-self:end;display:none;grid-template-columns:repeat(2,84px);gap:8px}
 body.touch .tbtns{display:grid}
-body[data-cam="cab"] .tlever,body[data-cam="cab"] .tbtns{bottom:calc(max(10px,env(safe-area-inset-bottom)) + 6px)}
-.tl-rail{position:relative;height:clamp(170px,34vh,330px);border-radius:20px;touch-action:none;cursor:ns-resize}
+.tl-rail{position:relative;height:clamp(130px,31vh,330px);border-radius:20px;touch-action:none;cursor:ns-resize}
+@media(max-height:700px){.tl-rail{height:clamp(110px,26vh,330px)}}
 .tl-ticks{position:absolute;inset:8px 0;display:flex;flex-direction:column;gap:3px;align-items:center;pointer-events:none}
 .tl-ticks i{flex:1;width:26px;border-radius:4px;background:rgba(255,255,255,.14)}
 .tl-ticks i.p{background:rgba(79,209,197,.38)}.tl-ticks i.b{background:rgba(255,138,101,.38)}.tl-ticks i.zero{background:rgba(255,255,255,.55)}
@@ -224,15 +241,32 @@ body[data-cam="cab"] .tlever,body[data-cam="cab"] .tbtns{bottom:calc(max(10px,en
 .tl-thumb.brake{background:#ff8a65}.tl-thumb.neutral{background:#dfe5ea}.tl-thumb.eb{background:var(--red)}.tl-thumb.eb b{color:#fff}
 .tbtn{min-height:64px;padding:6px 4px;border-radius:16px;color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-weight:700;touch-action:none;-webkit-tap-highlight-color:transparent}
 .tbtn .ic{font-size:22px;line-height:1;font-weight:800}
-.tbtn .lb{font-size:11px;line-height:1.1;font-weight:650;color:var(--soft);text-align:center;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tbtn .lb{font-size:11px;line-height:1.1;font-weight:650;color:var(--soft);text-align:center;max-width:100%;overflow-wrap:anywhere;hyphens:auto}
 .tbtn.tb-main{min-height:72px}
 .tbtn.tb-eb{min-height:56px;border-color:rgba(255,90,77,.65);background:rgba(255,90,77,.22)}
 .tbtn.tb-eb .ic{font-size:18px;color:#ffb3ab}
 .tbtn.on{background:rgba(255,196,58,.26);box-shadow:inset 0 0 0 2px rgba(255,196,58,.7)}
 .tbtn.tb-eb.on{background:var(--red)}
 .tbtn.down{background:rgba(255,255,255,.28);transform:scale(.97)}
-body.touch .walkpad{left:calc(max(12px,env(safe-area-inset-left)) + 100px)}
-/* the cab info strip in portrait hides most HUD buttons: with a finger the camera / reverse / pause / help buttons stay (only the quality switch hides) */
-body.touch[data-cam="cab"] .hud-util>:not(#btnQuality):not(#wxPop):not([hidden]){display:inline-flex!important}
-/* portrait + touch: the cab info strip sits below the (now visible) button row */
-@media(max-aspect-ratio:5/4){body.touch[data-cam="cab"] #hud .hud-bottom{top:calc(max(10px,env(safe-area-inset-top)) + 162px)}body.touch[data-cam="cab"] #toasts{top:calc(max(10px,env(safe-area-inset-top)) + 226px)}}
+/* the cab info strip keeps the HUD buttons of the touch screen: only the quality switch hides in the cab view */
+body.touch[data-cam="cab"] .hud-util>#btnQuality{display:none}
+
+/* ---------- portrait / near-square (iPad upright): 3 columns, the foot has two rows: controls, then speed | centre | signal ---------- */
+@media(max-aspect-ratio:5/4){
+  #hud{grid-template-columns:auto minmax(0,1fr) auto;grid-template-rows:auto auto auto minmax(0,1fr) auto auto}
+  .hud-left{grid-column:1;grid-row:1/3}
+  .strip{grid-column:2;grid-row:1}
+  .statsbox{grid-column:3;grid-row:1}
+  .hud-util{grid-column:2/4;grid-row:2;align-self:start}
+  .hud-slot{grid-column:1/4;grid-row:4}
+  .tlever{grid-column:1;grid-row:5}
+  .tbtns{grid-column:3;grid-row:5}
+  .walkpad{grid-column:2;grid-row:5}
+  .speedbox{grid-column:1;grid-row:6}
+  .centerbox{grid-column:2/4;grid-row:6}
+  .signalbox{grid-column:2;grid-row:5;min-width:0}
+  .walkpad{align-self:start}
+  body[data-cam="cab"] .centerbox{grid-column:1/4;grid-row:3;justify-self:center}
+  .tl-rail{height:clamp(120px,22vh,300px)}
+}
+@media(max-aspect-ratio:5/4) and (max-width:900px){.statsbox{grid-column:2/4}}

@@ -194,6 +194,31 @@
     applyCabFov();
     checkDevice();
   }
+  /* The camera hint, banner and toasts share one stack (#msgStack). While the HUD is up it is parked over #hudSlot, the free area of the HUD grid
+     (between the route strip / util row / cab info strip and the controls), so a toast never lands on a button or a box; in the menu CSS hangs it at the top centre. */
+  const MSG_STACK_MAX_W = 560;
+  let msgStackParked = false;
+  function parkMessages() {
+    const stack = $('msgStack'), hud = $('hud');
+    if (!stack) return;
+    if (hud.hidden) { if (msgStackParked) { stack.style.cssText = ''; stack.classList.remove('tight'); msgStackParked = false; } return; }
+    const slot = $('hudSlot').getBoundingClientRect(), game = $('game').getBoundingClientRect();
+    if (slot.width < 40) return;
+    // landscape: the centre column of the foot row is only as tall as the centre box, the rest of it above is free too
+    let bottom = slot.bottom;
+    if (matchMedia('(min-aspect-ratio: 5/4)').matches) {
+      const cb = $('centerBox'), cs = getComputedStyle(cb);
+      const hs = getComputedStyle(hud);
+      bottom = cs.display !== 'none' && cb.getBoundingClientRect().height > 0 && camMode !== 'cab' ? cb.getBoundingClientRect().top - 8 : game.bottom - parseFloat(hs.paddingBottom);
+    }
+    const w = Math.min(slot.width, MSG_STACK_MAX_W);
+    stack.style.cssText = `left:${Math.round(slot.left - game.left + (slot.width - w) / 2)}px;top:${Math.round(slot.top - game.top)}px;width:${Math.round(w)}px;transform:none`;
+    stack.classList.remove('tight');
+    if (stack.offsetHeight > bottom - slot.top) stack.classList.add('tight');
+    msgStackParked = true;
+  }
+  setInterval(parkMessages, 160);
+  window.addEventListener('resize', parkMessages);
   function showError(text) { $('errorText').textContent = text; $('errorScreen').hidden = false; }
 
   /* ------------------------------------------------------------ module access (all guarded) */
@@ -2577,6 +2602,7 @@
       },
       pointerAction(kind, x, y) { const hit = cabHit({ clientX: x, clientY: y }); return hit ? { ...hit } : null; },
       setTouchUi(on) { setTouchUi(!!on); return touchUi; },
+      setLang(next) { setLanguage(next); return lang; },   // test-only: the overlap flow switches the language of a running game
       press(key) { return handleKey(key.length === 1 ? key.toLowerCase() : key, false); },
       release(key) { handleKeyUp(key.length === 1 ? key.toLowerCase() : key); },
       finishRoute() {

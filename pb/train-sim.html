@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="dark">
 <title>Zuchsimulator Lëtzebuerg 🚆 – Arcade</title>
-<link rel="stylesheet" href="/pb/train-sim.css?v=7">
+<link rel="stylesheet" href="/pb/train-sim.css?v=8">
 <script src="/pb/train-sim/lock.js?v=1"></script><!-- career lock (rail | tram) before arcade-kit: it may retitle the page, and arcade-kit reads the title -->
-<script src="/pb/arcade-kit.js?v=38" data-arcade-id="train-sim"></script>
+<script src="/pb/arcade-kit.js?v=39" data-arcade-id="train-sim"></script>
 <script src="/pb/game-data.js?v=1" defer></script>
 </head>
 <body>
@@ -15,6 +15,7 @@
   <canvas id="world" aria-label="3D"></canvas>
   <div id="hud" hidden>
     <div class="hud-top">
+      <div class="hud-left">
       <div class="glass nextbox">
         <span class="lbl" id="nextLbl">Nächsten Arrêt</span>
         <b id="nextName">–</b>
@@ -25,6 +26,8 @@
         </div>
         <div id="depBadge" class="depbadge" hidden></div>
       </div>
+      <button id="btnMenu" class="glass chipbtn" type="button" data-test="btn-menu"></button>
+      </div>
       <div class="glass strip" id="strip" aria-hidden="true"><div class="line"></div><div id="stripDots"></div><i id="stripTrain"></i></div>
       <div class="glass statsbox">
         <div class="clockrow"><b id="clock">08:00</b><small id="clockSec">:00</small><span id="delay" class="delay">+0:00</span></div>
@@ -32,6 +35,18 @@
         <div class="statline"><span class="pax" title="Passagéier">&#128101; <b id="onboard">0</b></span><span class="eur">&euro; <b id="cashHud">0</b></span></div>
         <small id="svcLabel"></small>
       </div>
+    <div class="hud-util">
+      <div id="aheadLoad" class="glass aheadload" role="status" hidden></div>
+      <span id="camName" class="glass chipbtn"></span>
+      <button id="btnInside" class="glass chipbtn" type="button" hidden data-test="btn-inside">5</button>
+      <button id="btnQuality" class="glass chipbtn" type="button"></button>
+      <button id="btnRev" class="glass chipbtn" type="button" aria-pressed="false">R</button>
+      <button id="btnWx" class="glass chipbtn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="wxPop" data-test="btn-wx">☀️</button>
+      <button id="btnFast" class="glass chipbtn" type="button" aria-pressed="false">2×</button>
+      <button id="btnPause" class="glass chipbtn" type="button">P</button>
+      <button id="btnHelp" class="glass chipbtn" type="button">?</button>
+      <div id="wxPop" class="glass wxpop" role="dialog" aria-label="Wieder / Dageszäit" hidden></div>
+    </div>
     </div>
     <div class="hud-bottom">
       <div class="glass speedbox">
@@ -52,10 +67,8 @@
         <span id="sigText" class="sigtext"></span>
       </div>
     </div>
-    <div id="aheadLoad" class="glass aheadload" role="status" hidden></div>
-    <div id="camHint" class="glass camhint" hidden></div>
+    <div id="hudSlot" class="hud-slot" aria-hidden="true"></div>
     <div id="walkPad" class="walkpad" hidden aria-hidden="true"><i id="walkKnob"></i></div>
-    <button id="btnMenu" class="glass chipbtn" type="button" data-test="btn-menu"></button>
     <div id="touchLever" class="tpad tlever" role="group" aria-labelledby="tlTitle">
       <span id="tlTitle" hidden data-t="touchLever"></span>
       <div id="tlRail" class="glass tl-rail" role="slider" aria-orientation="vertical" aria-labelledby="tlTitle" aria-valuemin="-7" aria-valuemax="5" aria-valuenow="0" data-test="touch-lever"><div id="tlTicks" class="tl-ticks"></div><i id="tlThumb" class="tl-thumb neutral"><b id="tlLabel">0</b></i></div>
@@ -69,20 +82,8 @@
       <button id="tbTimetable" class="glass tbtn" type="button" tabindex="-1" data-test="touch-timetable"><span class="ic" aria-hidden="true">&#128339;</span><span class="lb" data-t="touchTimetable"></span></button>
       <button id="tbAnnounce" class="glass tbtn" type="button" tabindex="-1" data-test="touch-announce"><span class="ic" aria-hidden="true">&#128276;</span><span class="lb" data-t="touchAnnounce"></span></button>
     </div>
-    <div class="hud-util">
-      <span id="camName" class="glass chipbtn"></span>
-      <button id="btnInside" class="glass chipbtn" type="button" hidden data-test="btn-inside">5</button>
-      <button id="btnQuality" class="glass chipbtn" type="button"></button>
-      <button id="btnRev" class="glass chipbtn" type="button" aria-pressed="false">R</button>
-      <button id="btnWx" class="glass chipbtn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="wxPop" data-test="btn-wx">☀️</button>
-      <button id="btnFast" class="glass chipbtn" type="button" aria-pressed="false">2×</button>
-      <button id="btnPause" class="glass chipbtn" type="button">P</button>
-      <button id="btnHelp" class="glass chipbtn" type="button">?</button>
-      <div id="wxPop" class="glass wxpop" role="dialog" aria-label="Wieder / Dageszäit" hidden></div>
-    </div>
   </div>
-  <div id="toasts" role="status" aria-live="polite"></div>
-  <div id="banner" hidden></div>
+  <div id="msgStack" class="msgstack"><div id="camHint" class="glass camhint" hidden></div><div id="banner" hidden></div><div id="toasts" role="status" aria-live="polite"></div></div>
   <div id="fade"></div>
   <div id="menu" class="overlay">
     <div class="menu-scroll"><div id="menuHost"></div><p id="bootStatus" role="status"></p></div>
@@ -91,7 +92,7 @@
   <div id="pauseScreen" class="overlay center" hidden><section class="card"><h2 data-t="paused">Paus</h2><p data-t="pausedDesc"></p><div class="btns"><button id="resume" class="primary" data-t="resume"></button><button id="pauseQuality" type="button"></button><button id="quit" data-t="quit"></button></div></section></div>
   <div id="helpScreen" class="overlay center" hidden><section class="card wide"><h2 data-t="helpTitle">Steierung</h2><div id="helpBody"></div><p class="muted" data-t="helpHint"></p><button id="helpClose" class="primary" data-t="backBtn"></button></section></div>
   <div id="ttScreen" class="overlay center" hidden><section class="card wide"><h2 data-t="timetable">Fuerplang</h2><div id="ttBody"></div><p class="muted">T</p><button id="ttClose" class="primary" data-t="backBtn"></button></section></div>
-  <div id="summary" class="overlay center" hidden><section class="card wide"><span class="stamp" id="sumStamp">&#128646; ZUCHSIMULATOR L&Euml;TZEBUERG</span><h2 id="sumTitle"></h2><p id="sumRoute" class="muted"></p><div id="sumGrade" class="grade"></div><table id="sumRows"></table><div class="sumtotal"><span id="sumCash"></span><b id="sumPoints"></b></div><p id="sumNote" class="muted"></p><div class="btns"><button id="sumAgain" class="primary"></button><button id="sumMenu"></button></div></section></div>
+  <div id="summary" class="overlay center" hidden><section class="card wide"><span class="stamp" id="sumStamp">&#128646; ZUCHSIMULATOR L&Euml;TZEBUERG</span><h2 id="sumTitle"></h2><p id="sumRoute" class="muted"></p><div id="sumGrade" class="grade"></div><div class="cardscroll"><table id="sumRows"></table></div><div class="sumtotal"><span id="sumCash"></span><b id="sumPoints"></b></div><p id="sumNote" class="muted"></p><div class="btns"><button id="sumAgain" class="primary"></button><button id="sumMenu"></button></div></section></div>
   <div id="phoneBlock" class="overlay center" hidden><section class="card"><div class="bigemoji">&#128646;</div><h2 id="phoneTitle"></h2><p id="phoneText"></p><p id="phoneHint" class="muted"></p></section></div>
   <div id="errorScreen" class="overlay center" hidden><section class="card"><h2>&#9888;</h2><p id="errorText"></p></section></div>
 </main>
@@ -155,7 +156,7 @@
 <script src="/pb/train-sim/sim.js?v=13"></script>
 <script src="/pb/train-sim/career.js?v=9"></script>
 <script src="/pb/train-sim/resume.js?v=3"></script>
-<script src="/pb/train-sim/menu.js?v=10"></script>
+<script src="/pb/train-sim/menu.js?v=11"></script>
 <script src="/pb/train-sim/fallback.js?v=3"></script>
 <script src="/pb/train-sim.js?v=23"></script>
 </body>

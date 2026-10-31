@@ -25,9 +25,9 @@
 .ts-menu__stamp{font-size:12px;font-weight:850;letter-spacing:.14em;padding:7px 12px;border:2px solid var(--gold);color:var(--gold);border-radius:8px;transform:rotate(-1.5deg);text-transform:uppercase;background:rgba(255,188,66,.07)}
 .ts-menu__langs{display:flex;gap:6px}
 .ts-menu__topR{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
-.ts-menu__hints{min-height:40px;padding:0 14px;border-radius:12px;border:1px solid var(--line);background:var(--card);font-weight:750;font-size:13px}
+.ts-menu__hints{min-height:44px;padding:0 14px;border-radius:12px;border:1px solid var(--line);background:var(--card);font-weight:750;font-size:13px}
 .ts-menu__hints[aria-pressed="true"]{background:rgba(79,209,139,.18);border-color:var(--green);color:var(--green)}
-.ts-menu__langs button{min-width:46px;min-height:40px;padding:0 12px;border-radius:12px;border:1px solid var(--line);background:var(--card);font-weight:750;font-size:13px;letter-spacing:.04em}
+.ts-menu__langs button{min-width:46px;min-height:44px;padding:0 12px;border-radius:12px;border:1px solid var(--line);background:var(--card);font-weight:750;font-size:13px;letter-spacing:.04em}
 .ts-menu__langs button[aria-pressed="true"]{background:var(--gold);border-color:var(--gold);color:#2a2112}
 .ts-menu__hero{display:grid;grid-template-columns:1.35fr 1fr;gap:22px;align-items:stretch}
 .ts-menu__titlebox{position:relative;border:1px solid var(--line);border-radius:26px;padding:26px 28px 20px;background:linear-gradient(135deg,rgba(255,255,255,.1),rgba(255,255,255,.03));overflow:hidden;min-height:300px;display:flex;flex-direction:column;justify-content:space-between}
@@ -51,7 +51,7 @@
 .ts-menu__wallet{font-size:40px;font-weight:900;letter-spacing:-.02em;color:var(--gold2);font-variant-numeric:tabular-nums;line-height:1}
 .ts-menu__walletRow{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
 .ts-menu__modes{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.ts-menu__mode{position:relative;text-align:left;border:1px solid var(--line);border-radius:22px;padding:22px 24px 20px 24px;background:var(--card);min-height:122px;display:flex;flex-direction:column;gap:6px;transition:transform .15s,background .15s,border-color .15s}
+.ts-menu__mode{position:relative;text-align:left;border:1px solid var(--line);border-radius:22px;padding:22px 82px 20px 24px;background:var(--card);min-height:122px;display:flex;flex-direction:column;gap:6px;transition:transform .15s,background .15s,border-color .15s}
 .ts-menu__mode b{font-size:26px;font-weight:850;letter-spacing:-.01em}
 .ts-menu__mode small{font-size:13px;color:var(--soft);line-height:1.45;max-width:36ch}
 .ts-menu__mode .go{position:absolute;right:20px;top:18px;width:46px;height:46px;border-radius:50%;display:grid;place-items:center;font-size:22px;background:rgba(255,255,255,.12)}
@@ -101,14 +101,15 @@
 .ts-menu__grid{display:grid;gap:14px}
 .ts-menu__grid--routes{grid-template-columns:repeat(3,minmax(0,1fr))}
 .ts-menu__grid--trains{grid-template-columns:repeat(3,minmax(0,1fr))}
-.ts-menu__card{position:relative;border:1px solid var(--line);border-radius:20px;background:var(--card);display:flex;flex-direction:column;overflow:hidden;transition:border-color .15s,background .15s}
+.ts-menu__card{position:relative;border:1px solid var(--line);border-radius:20px;background:var(--card);display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:minmax(0,1fr) auto;overflow:hidden;transition:border-color .15s,background .15s}
 .ts-menu__card[data-selected="true"]{border-color:var(--gold);background:linear-gradient(180deg,rgba(255,188,66,.14),rgba(255,188,66,.04));box-shadow:0 0 0 1px var(--gold) inset}
 .ts-menu__card[data-locked="true"] .ts-menu__pick{opacity:.62}
-.ts-menu__dir{all:unset;position:absolute;top:10px;right:10px;width:34px;height:34px;border-radius:99px;display:grid;place-items:center;font-size:18px;cursor:pointer;background:rgba(255,255,255,.08);border:1px solid var(--line);color:var(--ink,#fff);z-index:2}
+.ts-menu__dir{all:unset;grid-column:2;grid-row:1;align-self:start;margin:10px 10px 0 0;width:44px;height:44px;border-radius:99px;display:grid;place-items:center;font-size:18px;cursor:pointer;background:rgba(255,255,255,.08);border:1px solid var(--line);color:var(--ink,#fff);z-index:2}
 .ts-menu__dir[aria-pressed="true"]{background:var(--gold,#f4b942);color:#1b1b1b}
 .ts-menu__dir:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
-.ts-menu__rowHead h3{padding-right:42px}
-.ts-menu__pick{all:unset;display:flex;flex-direction:column;gap:6px;padding:16px 16px 12px;cursor:pointer;flex:1;box-sizing:border-box}
+
+.ts-menu__pick{all:unset;display:flex;flex-direction:column;gap:6px;padding:16px 16px 12px;cursor:pointer;box-sizing:border-box;grid-column:1;grid-row:1;min-width:0}
+.ts-menu__card>.ts-menu__foot{grid-column:1/-1}
 .ts-menu__pick:focus-visible{outline:3px solid var(--gold);outline-offset:-3px;border-radius:20px}
 .ts-menu__card h3{font-size:17px;line-height:1.2;font-weight:800}
 .ts-menu__meta{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:12px;color:var(--soft);align-items:center}
