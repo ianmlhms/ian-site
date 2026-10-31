@@ -19,6 +19,36 @@
     };
   }
 
+  /* hall z range (model frame, as authored) of the models that are fitted: [z0, z1] */
+  const HALL_Z = { 'Thionville': [-44, 36], 'Nancy-Ville': [-85, 85], 'Arlon': [-52, 52], 'Pont-à-Mousson': [-13, 30], 'Libramont': [-38, 30], 'Champagne-Ardenne TGV': [-46, 46], 'Cochem': [-22, 14], 'Koblenz Hbf': [-90, 90], 'Metz-Ville': [-120, 120], 'Namur': [-100, 100], 'Tréier Hbf': [-112, 112] };
+  const FIT_MAX_DLAT = 30;          // m: the hall never moves further back than this (the model forecourt and fence stay readable)
+  const FIT_END_MARGIN = 6;         // m: the hall stays this far inside the platform ends
+  const FIT_MIN_SHIFT = 6;          // m: smaller z shifts are not worth moving a hall for
+  function hallFit(api, back) {
+    const none = { dLat: 0, dz: 0 };
+    try {
+      const SS = window.TS && window.TS.stationSurround;
+      const d = SS && SS.dataFor ? SS.dataFor(api.st.name) : null;
+      const box = d && d.stationBox;
+      const hall = HALL_Z[api.st.name];
+      if (!box || !hall) return none;
+      const flip = !!(api.track && api.track.reverse);
+      const xs = box.x.map((v) => (flip ? -v : v)).sort((a, b) => a - b);
+      const zs = box.z.map((v) => (flip ? -v : v)).sort((a, b) => a - b);
+      const dr = api.sx > 0 ? xs : [-xs[1], -xs[0]];                 // lateral range on the platform side of the service
+      if (dr[0] < api.edge + api.W) return none;                      // the footprint spans the platform / tracks: the model keeps its place
+      const dLat = Math.max(0, Math.min(FIT_MAX_DLAT, dr[0] - back - 1));
+      const hc = (hall[0] + hall[1]) / 2; const half = (hall[1] - hall[0]) / 2;
+      const lim = api.L / 2 - FIT_END_MARGIN - half;
+      let dz = lim > 0 ? Math.max(-lim, Math.min(lim, (zs[0] + zs[1]) / 2 - hc)) : 0;
+      if (Math.abs(dz) < FIT_MIN_SHIFT) dz = 0;
+      return { dLat, dz };
+    } catch (error) {
+      console.warn('[Lokféierer] station model fit failed for ' + (api.st && api.st.name), error);
+      return none;
+    }
+  }
+
   /* ------------------------------------------------------------------ the kit */
   function kit(api) {
     const { T, sets, M, mat, col, shade, WHITE, FORM_Y, sx, pf, H, W, edge, L, zA, zB, helpers } = api;
@@ -28,6 +58,12 @@
     const vc = sets.get('vc', M.vc, true);
     const glow = sets.get('glow', M.glow);
     const BACK = edge + W + 0.9; // first free lateral distance behind the platform (the generic fence stands at edge + W + 0.45)
+
+    /* W5: the hall of a photo model is authored "10 m behind the platform, centred on the platform middle"; the real station building (OSM flagged footprint of the patch, `stationBox`:
+       x lateral, z along, in the patch frame = the BASE track's frame) stands elsewhere (Thionville 100 m behind the stop, Metz-Ville 27 m behind the platform).  The fit moves the
+       hall back to the real lateral distance (dLat, capped) and along the platform towards the real position (dz, kept inside the platform).  The model frame is the SERVICE frame:
+       a reversed service mirrors x and z of the patch.  A box that spans the tracks (Namur, Bruxelles-Midi: the whole hall) or a station without a patch is not fitted. */
+    const fit = hallFit(api, BACK);
 
     /* batch with a cached textured material (key must be unique per texture) */
     function texB(key, make, extra, cast) {
@@ -141,7 +177,8 @@
     /* a textured block: facade (track side + back) with `rows` storeys, plain end walls, optional roof.
        o = { d0, dep, z0, z1, rows, sh (storey height), fac: {key,...facadeTex opts}, bayW, plain: colour, roof: 'hip'|'gable'|'flat'|'none',
              roofH, roofKey, roofBase, roofOv, y0 } returns { top } */
-    function bldg(o) {
+    function bldg(o0) {
+      const o = fit.dz ? Object.assign({}, o0, { z0: o0.z0 + fit.dz, z1: o0.z1 + fit.dz }) : o0;
       const y0 = o.y0 === undefined ? FORM_Y : o.y0;
       const rows = o.rows || 2;
       const sh = o.sh || 3.6;
@@ -211,7 +248,7 @@
       // declared to infra.js (helpers.addSiding): turnouts at both ends, or a buffer stop at a terminus; -4.6 is the second main track (drawn by infra.js)
       helpers.addSiding({ lat: dT });
     }
-    k = { dbPaving, deckB, bldg, canopy, furnish, paving, track, X, vc, glow, BACK, texB, colB, glassB, box, quadO, triO, wallD, wallZ, frustum, gableZ, gableD, clockD, clockZ, ctex, col, shade, WHITE, FORM_Y, sx, pf, H, W, edge, L, zA, zB, sets, M, mat, T, helpers };
+    k = { fit, hallD0: BACK + fit.dLat, dbPaving, deckB, bldg, canopy, furnish, paving, track, X, vc, glow, BACK, texB, colB, glassB, box, quadO, triO, wallD, wallZ, frustum, gableZ, gableD, clockD, clockZ, ctex, col, shade, WHITE, FORM_Y, sx, pf, H, W, edge, L, zA, zB, sets, M, mat, T, helpers };
     return k;
   }
 
@@ -366,7 +403,7 @@
       const r = rng(21); c.fillStyle = STONE; c.fillRect(0, 0, w, h);
       for (let i = 0; i < 900; i++) { const v = r() > 0.5 ? 255 : 0; c.fillStyle = 'rgba(' + v + ',' + v + ',' + v + ',' + (0.04 + r() * 0.1).toFixed(2) + ')'; c.fillRect(r() * w, r() * h, 2 + r() * 6, 2 + r() * 4); }
     }));
-    const d0 = BACK, DEP = 10;
+    const d0 = k.hallD0, DEP = 10;
     const wallH = 10.5;
     const y0 = FORM_Y;
 
@@ -484,7 +521,7 @@
   function buildTrier(api) {
     const k = kit(api);
     const { X, vc, glow, texB, colB, glassB, box, wallD, wallZ, ctex, col, WHITE, BACK, FORM_Y, sx, H, W, edge, L, helpers } = k;
-    const d0 = BACK;
+    const d0 = k.hallD0;
     const FAC = { key: 'trier', base: '#e2d8bd', speck: 0.03, win: [0.5, 0.52], winCol: '#4f6677', winCol2: '#8aa2b2', frame: '#f1ecdc', ground: 'rect', band: '#b9ac86' };
     [[18, 78, 3], [-78, -18, 3], [78, 112, 2], [-112, -78, 2]].forEach(([z0, z1, rows]) => k.bldg({ d0, dep: 12, z0, z1, rows, sh: 4, fac: FAC, bayW: 3.4, roof: 'flat', capCol: '#6e7377' }));
     // central entrance block: dark stone piers over glass
@@ -522,7 +559,7 @@
   function buildKoblenz(api) {
     const k = kit(api);
     const { X, vc, glow, texB, colB, glassB, box, wallD, wallZ, frustum, gableD, ctex, col, WHITE, BACK, FORM_Y, sx, H, W, edge, L, helpers } = k;
-    const d0 = BACK;
+    const d0 = k.hallD0;
     const OCHRE = '#d4b777', TRIM = '#e7d6a2', SLATE = '#3a3d42';
     const FAC = { key: 'koblenz', base: OCHRE, speck: 0.1, course: 12, win: [0.4, 0.5], winCol: '#40505c', winCol2: '#7d93a2', frame: TRIM, ground: 'arch', band: '#bfa468' };
     [[26, 90], [-90, -26]].forEach(([z0, z1]) => k.bldg({ d0, dep: 11, z0, z1, rows: 2, sh: 4.5, fac: FAC, bayW: 4.6, roof: 'hip', roofH: 4.2, roofKey: 'kob', roofBase: SLATE, roofOv: 0.6 }));
@@ -565,7 +602,7 @@
   function buildThionville(api) {
     const k = kit(api);
     const { X, vc, glow, texB, colB, box, wallD, wallZ, frustum, ctex, col, WHITE, BACK, FORM_Y, sx, H, W, edge, L } = k;
-    const d0 = BACK;
+    const d0 = k.hallD0;
     const OCHRE = '#d2b46e';
     const FAC = { key: 'thionville', base: OCHRE, speck: 0.09, course: 10, win: [0.36, 0.55], winCol: '#425664', winCol2: '#82989a', frame: '#e8dcae', ground: 'arch', band: '#b39a5c' };
     // long two-storey block with a taller three-storey end wing (the real one has the square clock-less tower wing at the right)
@@ -598,7 +635,7 @@
   function buildCochem(api) {
     const k = kit(api);
     const { X, vc, texB, colB, box, wallD, wallZ, frustum, gableD, ctex, col, WHITE, BACK, FORM_Y, sx, H, W, edge, L } = k;
-    const d0 = BACK;
+    const d0 = k.hallD0;
     const STONE = '#6e675b', YEL = '#dfb95f', SLATE = '#3d4247';
     const G = { key: 'cochem-g', base: STONE, speck: 0.16, course: 11, win: [0.4, 0.5], winCol: '#2e3a42', winCol2: '#50626c', frame: '#a89f8b', ground: 'arch' };
     const U = { key: 'cochem-u', base: YEL, speck: 0.06, win: [0.38, 0.52], winCol: '#3e4e5a', winCol2: '#7d93a2', frame: '#f0ead6', ground: 'rect', timber: '#4a2f1e' };
@@ -633,7 +670,7 @@
   function buildNancy(api) {
     const k = kit(api);
     const { X, vc, texB, colB, box, wallD, wallZ, frustum, gableD, ctex, col, WHITE, BACK, FORM_Y, sx, H, W, edge, L } = k;
-    const d0 = BACK;
+    const d0 = k.hallD0;
     const OC = '#c9984f', TRIM = '#e3c88b';
     const F = { key: 'nancy', base: OC, speck: 0.1, course: 11, win: [0.36, 0.55], winCol: '#3f5460', winCol2: '#7d949f', frame: TRIM, ground: 'arch', band: '#a97d3c' };
     [[17, 85], [-85, -17]].forEach(([z0, z1]) => k.bldg({ d0, dep: 9, z0, z1, rows: 2, sh: 4.6, fac: F, bayW: 4.6, roof: 'hip', roofH: 2.3, roofKey: 'nan', roofBase: '#6a6e72', roofOv: 0.5 }));
@@ -670,7 +707,7 @@
   function buildNamur(api) {
     const k = kit(api);
     const { X, vc, glow, texB, colB, box, wallD, wallZ, frustum, gableD, ctex, col, WHITE, BACK, FORM_Y, sx, H, W, edge, L, helpers } = k;
-    const d0 = BACK;
+    const d0 = k.hallD0;
     const CR = '#e4d8b0', TRIM = '#f1e8c8';
     const F = { key: 'namur', base: CR, speck: 0.06, course: 12, win: [0.34, 0.56], winCol: '#506a7a', winCol2: '#8fa5b2', frame: TRIM, ground: 'arch', band: '#c2b48a' };
     [[24, 100], [-100, -24]].forEach(([z0, z1]) => k.bldg({ d0, dep: 9, z0, z1, rows: 2, sh: 4.5, fac: F, bayW: 4.8, roof: 'hip', roofH: 3.4, roofKey: 'nam', roofBase: '#5a6470', roofOv: 0.6 }));
@@ -786,7 +823,7 @@
       const r = rng(17); c.fillStyle = '#3c3e41'; c.fillRect(0, 0, w, h);
       for (let i = 0; i < 700; i++) { const v = 40 + Math.floor(r() * 40); c.fillStyle = 'rgba(' + v + ',' + v + ',' + v + ',0.5)'; c.fillRect(r() * w, r() * h, 2, 2); }
     }), edge + 0.75, edge + W, -L / 2, L / 2, 6);
-    const d0 = BACK + 5;
+    const d0 = k.hallD0 + 5;
     const FIN = { key: 'cat', base: '#cdb68e', speck: 0.05, rows: 1, win: [0.7, 0.7], winCol: '#3a5668', winCol2: '#5f8296', frame: '#d9c9a4', ground: 'rect' };
     // the stone-finned hall: vertical fins in front of dark glass
     const fin = texB('cat-fins', () => ctex('ab-cat-fins', 128, 128, (c, w, h) => {
@@ -796,7 +833,7 @@
       c.fillStyle = 'rgba(90,70,40,0.25)'; for (let x = 0; x < w; x += 32) c.fillRect(x + 22, 0, 2, h);
     }));
     const stone = texB('cat-stone', () => ctex('ab-cat-stone', 64, 64, (c, w, h) => { const r = rng(4); c.fillStyle = '#c4ab82'; c.fillRect(0, 0, w, h); for (let i = 0; i < 200; i++) { c.fillStyle = 'rgba(0,0,0,0.05)'; c.fillRect(r() * w, r() * h, 3, 2); } }));
-    const z0 = -46, z1 = 46, hh = 8.2, dep = 9;
+    const z0 = -46 + k.fit.dz, z1 = 46 + k.fit.dz, hh = 8.2, dep = 9;
     wallD(fin, d0, z0, z1, FORM_Y, hh, -1, 46, 1);
     wallD(stone, d0 + dep, z0, z1, FORM_Y, hh, 1, 6, 1);
     wallZ(stone, z0, d0, d0 + dep, FORM_Y, hh, -1, 2, 1);
@@ -955,7 +992,7 @@
   function buildPontAMousson(api) {
     const k = kit(api);
     const { X, vc, colB, col, BACK, H, W, edge, L } = k;
-    const d0 = BACK;
+    const d0 = k.hallD0;
     const CRM = { key: 'pam', base: '#d9d1b9', speck: 0.06, win: [0.34, 0.58], winCol: '#4d6676', winCol2: '#8aa0ae', frame: '#f2ecd8', ground: 'arch', band: '#bdb394' };
     k.bldg({ d0, dep: 8.2, z0: -13, z1: 17, rows: 2, sh: 4.2, fac: CRM, bayW: 4, roof: 'hip', roofH: 3.2, roofKey: 'pam', roofBase: '#4a5058', roofOv: 0.6 });
     k.bldg({ d0, dep: 6.5, z0: 17, z1: 30, rows: 1, sh: 4.2, fac: Object.assign({}, CRM, { key: 'pam1' }), bayW: 4, roof: 'gable', roofH: 2.2, roofKey: 'pam', roofBase: '#4a5058', roofOv: 0.5, plainKey: 'pam' });
@@ -967,7 +1004,7 @@
   function buildArlon(api) {
     const k = kit(api);
     const { X, vc, texB, colB, glassB, box, wallD, wallZ, frustum, ctex, col, WHITE, BACK, FORM_Y, sx, H, W, edge, L } = k;
-    const d0 = BACK;
+    const d0 = k.hallD0;
     const OC = '#d5b97d', TRIM = '#ecdcae';
     const F = { key: 'arlon', base: OC, speck: 0.09, course: 11, win: [0.36, 0.56], winCol: '#445a68', winCol2: '#82989f', frame: TRIM, ground: 'arch', band: '#b19a63' };
     [[14, 52], [-52, -14]].forEach(([z0, z1]) => k.bldg({ d0, dep: 9, z0, z1, rows: 2, sh: 4.6, fac: F, bayW: 4.6, roof: 'hip', roofH: 3.6, roofKey: 'arl', roofBase: '#616b77', roofOv: 0.6 }));
@@ -1007,7 +1044,7 @@
   function buildLibramont(api) {
     const k = kit(api);
     const { X, vc, colB, glassB, box, ctex, col, WHITE, BACK, FORM_Y, sx, H, W, edge, L } = k;
-    const d0 = BACK;
+    const d0 = k.hallD0;
     const CRM = { key: 'libramont', base: '#e9e2cc', speck: 0.05, win: [0.3, 0.6], winCol: '#4e6574', winCol2: '#8aa0ae', frame: '#f7f2e2', ground: 'arch', band: '#c9bf9d' };
     k.bldg({ d0, dep: 7.2, z0: -38, z1: 30, rows: 1, sh: 6.4, fac: CRM, bayW: 4.4, roof: 'flat', capCol: '#a9aeb2' });
     k.bldg({ d0: d0 + 0.5, dep: 6.2, z0: -10, z1: 8, y0: 6.4, rows: 1, sh: 3.0, fac: Object.assign({}, CRM, { key: 'libramont-u', ground: 'rect' }), bayW: 4.4, roof: 'gable', roofH: 2.4, roofKey: 'lib', roofBase: '#59616a', roofOv: 0.5, plainKey: 'libramont' });

@@ -73,7 +73,7 @@ FACELESS = False            # True outside Luxembourg: no LOD2, buildings are ex
 REGION = None               # "fr" | "be": regional facade table of station-surround-mesh.js
 # --country fr|be (W4): France / Belgium.  EPSG: a transverse Mercator centred on the station (metres, no national grid needed), OSM from the Geofabrik extract that covers the station,
 # relief from the Copernicus GLO-30 DEM (30 m, open; no LiDAR / LOD2 there, so no canopy: trees come only from OSM natural=tree nodes).
-ABROAD_PBF = {"lorraine": "abroad/lorraine.osm.pbf", "champagne-ardenne": "abroad/champagne-ardenne.osm.pbf", "ile-de-france": "abroad/ile-de-france.osm.pbf",
+ABROAD_PBF = {"rlp": "rlp.osm.pbf", "lorraine": "abroad/lorraine.osm.pbf", "champagne-ardenne": "abroad/champagne-ardenne.osm.pbf", "ile-de-france": "abroad/ile-de-france.osm.pbf",
               "picardie": "abroad/picardie.osm.pbf", "belgium": "abroad/belgium.osm.pbf"}
 ABROAD_CREDIT = "Geodata (c) OpenStreetMap contributors (ODbL, openstreetmap.org/copyright) - relief Copernicus GLO-30 DEM (c) ESA / Copernicus 2021"
 DEM_DIR = os.path.join(WORK, "dem")

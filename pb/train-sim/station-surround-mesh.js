@@ -423,7 +423,7 @@
           }
           if (!drawStationBuilding) return;
         }
-        if (onPlatform(b)) return;
+        if (onPlatform(b) || (data.fit && data.fit.drop && data.fit.drop.includes(b.id))) return;      // W5: data.fit.drop = buildings that stand on the player's platform
         const gx = b.ground && b.ground.length ? b.ground.reduce((s, p) => s + p[0], 0) / b.ground.length : 0;
         if (Math.abs(gx) > stripW - BUILDING_MARGIN) return;
         const sty = TS.stationStyles && TS.stationStyles.get(patch.name);

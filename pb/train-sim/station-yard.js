@@ -286,7 +286,7 @@
         });
       });
       if (!roof.empty) add(new T.Mesh(roof.geometry(), mat(new T.MeshLambertMaterial({ map: glassTexture(), side: T.DoubleSide, color: 0xdfe6ec, emissive: 0x626b75 }))), false);
-      if (!roofPlain.empty) add(new T.Mesh(roofPlain.geometry(), mat(new T.MeshLambertMaterial({ map: sheetTexture(), side: T.DoubleSide, color: 0xb9bcc0, emissive: 0x2c2f33 }))), false);
+      if (!roofPlain.empty) add(new T.Mesh(roofPlain.geometry(), mat(new T.MeshLambertMaterial({ map: sheetTexture(), side: T.DoubleSide, color: 0xb9bcc0, emissive: 0x666b72 }))), false);
       const roofAt = (x, z) => {
         let best = null;
         faces.forEach((f) => {

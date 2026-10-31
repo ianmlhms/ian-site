@@ -27,6 +27,16 @@ STATIONS = (
     ("brussels", "Arlon", "belgium", "be"), ("brussels", "Libramont", "belgium", "be"), ("brussels", "Namur", "belgium", "be"), ("brussels", "Bruxelles-Midi", "belgium", "be"),
     ("paris", "Thionville", "lorraine", "fr"), ("paris", "Metz-Ville", "lorraine", "fr"), ("paris", "Champagne-Ardenne TGV", "champagne-ardenne", "fr"),
     ("paris", "Paris-Est", "ile-de-france", "fr"),
+    # W5: the intermediate stops (patches for every stop of the route, so that no station stands on the generic scenery)
+    ("metz", "Hettange-Grande", "lorraine", "fr"), ("metz", "Uckange", "lorraine", "fr"), ("metz", "Hagondange", "lorraine", "fr"), ("metz", "Walygator Parc", "lorraine", "fr"),
+    ("metz", "Pagny-sur-Moselle", "lorraine", "fr"),
+    ("brussels", "Marbehan", "belgium", "be"), ("brussels", "Jemelle", "belgium", "be"), ("brussels", "Marloie", "belgium", "be"), ("brussels", "Ciney", "belgium", "be"),
+    ("brussels", "Gembloux", "belgium", "be"), ("brussels", "Ottignies", "belgium", "be"), ("brussels", "Bruxelles-Luxembourg", "belgium", "be"),
+)
+# W5: the authored tail of the trier express (Cochem, Koblenz Hbf; no layout file: the game's track there is authored): name, extract, country, lat, lon, compass heading hint of the
+# service direction, declared platform side (routes.js).  Rheinland-Pfalz has no LoD2 / LiDAR in this builder (OSM footprints extruded, Copernicus relief), like France / Belgium.
+EXPLICIT = (
+    # NOT built (W5): the OSM station node / platform ways of both were not found by --main-near-node (Cochem: no platform, heading 18 instead of ~50), see ZUCHROUTES-HANDOFF W5
 )
 SHARED = {"paris": {"Thionville", "Metz-Ville"}}      # stations of this route that also exist on an earlier route of STATIONS but on another track: own patch
 
@@ -66,6 +76,22 @@ def build_one(route, name, pbf, country, png_dir):
     return key
 
 
+def build_explicit(name, pbf, country, lat, lon, heading, side, png_dir):
+    key = key_of(name)
+    cmd = [sys.executable, "-W", "ignore", os.path.join(HERE, "build_station_patch.py"), key, "--name", name, "--lat", str(lat), "--lon", str(lon),
+           "--heading-hint", str(heading), "--country", country, "--pbf", pbf, "--side", side, "--main-near-node", "--index", "index-routes.json"]
+    if png_dir:
+        os.makedirs(png_dir, exist_ok=True)
+        cmd += ["--debug-png", os.path.join(png_dir, key + ".png")]
+    print("build", name, "->", key, flush=True)
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    if res.returncode != 0:
+        print("FAILED", name, (res.stderr or res.stdout)[-1200:], flush=True)
+        return None
+    print((res.stdout.strip().splitlines() or [""])[-1][:300], flush=True)
+    return key
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", default="")
@@ -73,6 +99,7 @@ def main():
     args = ap.parse_args()
     only = {n for n in args.only.split(",") if n}
     done = [k for k in (build_one(r, n, p, c, args.png_dir) for r, n, p, c in STATIONS if not only or n in only or key_of(n) in only) if k]
+    done += [k for k in (build_explicit(n, p, c, la, lo, h, sd, args.png_dir) for n, p, c, la, lo, h, sd in EXPLICIT if not only or n in only or key_of(n) in only) if k]
     if done:
         subprocess.run([sys.executable, os.path.join(HERE, "split_station_patches.py")] + done, check=False)
     print("built", done)

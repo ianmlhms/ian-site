@@ -782,7 +782,10 @@
       const tram = kind === 'tram';
       const big = !tram && st.size >= 3;
       const edge = tram ? 1.5 : 1.7;
-      const width = st.platformWidth || (tram ? 3.0 : big ? 7.0 : 5.2);
+      // W5: the real buildings of the station patch decide how wide the platform can be (station-surround.js fitOf, scripts/zuch/patch_platform_fit.py)
+      const fit = !tram && window.TS.stationSurround && window.TS.stationSurround.fitOf ? window.TS.stationSurround.fitOf(st.name) : null;
+      const baseWidth = st.platformWidth || (tram ? 3.0 : big ? 7.0 : 5.2);
+      const width = fit && fit.w ? Math.min(baseWidth, fit.w) : baseWidth;
       return {
         edge, width, backEdge: edge + width, height: tram ? 0.3 : 0.76,
         sideSign: st.side === 'right' ? 1 : -1,

@@ -18,7 +18,7 @@
   const TS = (window.TS = window.TS || {});
   const TAG = '[Lokféierer] station surround: ';
   const DATA_DIR = '/pb/train-sim/data/stations/';
-  const DATA_VERSION = 'w4b';     // bump when the patch files change (they are fetched with force-cache)
+  const DATA_VERSION = 'w5';     // bump when the patch files change (they are fetched with force-cache)
   const EXT_X = 160;              // patch half width (m) and half length
   const EXT_Z = 320;
   const FADE_X = 45;              // the real relief fades into the generic one over the outer metres
@@ -155,6 +155,9 @@
    * sMid, see station-surround-mesh.js), so this is only for a patch that is genuinely wrong on another scenery, not a general lock (Lëtzebuerg's patch
    * carries no `scenery` field any more: the same real Gare Centrale is used by every route). */
   const forRoute = (data, def) => !data.scenery || !def || def.sceneryId === data.scenery;
+  /* W5: scripts/zuch/patch_platform_fit.py writes `fit: { w, drop }` into the patch: the width the player's platform may have without standing in a real building, and the ids of
+     buildings that are not drawn (a house / shed on the platform).  null when the station has no patch or no fit. */
+  const fitOf = (name) => { const d = prepared.get(patchKey(name)); return d && d.fit ? d.fit : null; };
   const dataFor = (name, def) => { const d = prepared.get(patchKey(name)); return d && forRoute(d, def) ? d : null; };
 
   /* the heavy half of a split patch: class map, buildings, trees, rails, poi.  Never rejects; the state tells the result. */
@@ -322,5 +325,5 @@
     return { update, dispose, built: () => built.size, isBuilt };
   }
 
-  TS.stationSurround = Object.freeze({ preload, loadHeavy, heavyNear, stateOf, dataFor, heightPatches, create, demAt, classAt, EXT_X, EXT_Z, FADE_X, FADE_Z, smooth01 });
+  TS.stationSurround = Object.freeze({ preload, loadHeavy, heavyNear, stateOf, dataFor, fitOf, heightPatches, create, demAt, classAt, EXT_X, EXT_Z, FADE_X, FADE_Z, smooth01 });
 })();

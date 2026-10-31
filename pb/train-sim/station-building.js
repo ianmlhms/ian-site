@@ -12,7 +12,7 @@
  *     TS.stationStyles.register('Roodt-Syr', { wall: '#e9e3cf', ... })
  * style = { wall, trim, plinth: { h, col }, groundY: patch height of the visible ground (default: lowest LOD2 point), band: col | null, roof: 'slate' | 'tile' | 'flat' | 'zinc', fascia: col, floorH, bayM,
  *           win: { w, h, kind: 'rect' | 'arch', frame, shutter, sill, ground: bool }, gableWin: 'round' | null, doors: [{ z (front/back faces) | x (end faces), w, h, col, glass, face: 'front' | 'back' | 'end' }],
- *           skipFaces: (face) => bool, extras: (api) => void, wallFor: (face) => colour | null (own plaster colour of one face, e.g. a white wing of a stone building), hidden: bool (draw nothing: the station model replaces it) } */
+ *           skipFaces: (face) => bool, mapWall: (ring) => ring (a wall face moved / reshaped before it is drawn: new array, never mutate), mapGround: ([x, z]) => [x, z] (the same move for the plinth skirt), canopyRoof: (ring, yMean) => bool (a roof face that is a platform canopy: light sheet metal, visible from below), extras: (api) => void, wallFor: (face) => colour | null (own plaster colour of one face, e.g. a white wing of a stone building), hidden: bool (draw nothing: the station model replaces it) } */
 (function () {
   'use strict';
   const TS = (window.TS = window.TS || {});
@@ -251,8 +251,10 @@
     const baseY = b.base !== undefined ? b.base : 0;
     const doors = st.doors || [];
     let seed = 1;
-    (st.noWalls ? [] : b.walls || []).forEach((ring, wi) => {
-      if (ring.length < 3) return;
+    (st.noWalls ? [] : b.walls || []).forEach((ring0, wi) => {
+      if (ring0.length < 3) return;
+      const ring = st.mapWall ? st.mapWall(ring0) : ring0;
+      if (!ring || ring.length < 3) return;
       const face = describeFace(ring, cx, cz);
       if (st.skipFaces && st.skipFaces(face)) return;
       const { tris } = triangulate3(ring);
@@ -277,7 +279,7 @@
     if (!st.noWalls) {
       const skCol = st.plinth ? st.plinth.col : '#8e887a';
       const sk = batch.plainMB('skirt|' + new T.Color(skCol).getHexString(), () => new T.MeshLambertMaterial({ color: new T.Color(skCol), side: T.DoubleSide }), false);
-      const gr = b.ground;
+      const gr = st.mapGround ? b.ground.map((p) => st.mapGround(p)) : b.ground;
       for (let i = 0; i < gr.length; i++) {
         const a = gr[i]; const c2 = gr[(i + 1) % gr.length];
         const wa = world(a[0], a[1]); const wc = world(c2[0], c2[1]);
@@ -288,14 +290,19 @@
     }
     // roofs: gentle slopes in the style's material, steep ones (mansards, spires) darker, the tower above `copperAbove` in green copper
     const roofSpec = (key) => {
-      const [kind, tint] = key === 'main' ? [st.roof || 'slate', st.roofTint] : key === 'steep' ? [(st.steepRoof && st.steepRoof.kind) || 'slate', st.steepRoof && st.steepRoof.tint] : ['zinc', st.copperTint || '#5f9d8a'];
+      const [kind, tint] = key === 'canopy' ? ['zinc', '#c9cdd1'] : key === 'main' ? [st.roof || 'slate', st.roofTint] : key === 'steep' ? [(st.steepRoof && st.steepRoof.kind) || 'slate', st.steepRoof && st.steepRoof.tint] : ['zinc', st.copperTint || '#5f9d8a'];
       const rcol = tint ? new T.Color(tint).multiplyScalar(ROOF_TINT_BOOST) : new T.Color(0xffffff);   // the tints were picked for a brighter sky than the sim has: LOD2 roofs rendered darker than in the photos
       rcol.r = Math.min(1, rcol.r); rcol.g = Math.min(1, rcol.g); rcol.b = Math.min(1, rcol.b);
       return { kind, rcol };
     };
     const roofMB = {};
     const roofFor = (key) => {
-      if (!roofMB[key]) { const { kind, rcol } = roofSpec(key); roofMB[key] = batch.plainMB('roof|' + kind + '|' + rcol.getHexString(), () => new T.MeshLambertMaterial({ map: api.roofTexture(kind), color: rcol, side: T.DoubleSide }), true); }
+      if (!roofMB[key]) {
+        const { kind, rcol } = roofSpec(key);
+        // a canopy is seen from below by the people on the platform: a lit-from-above slate material would render its underside black, so it gets a light sheet-metal paint and some emissive
+        const emissive = key === 'canopy' ? 0x6a7078 : 0x000000;
+        roofMB[key] = batch.plainMB('roof|' + kind + '|' + rcol.getHexString() + '|' + emissive, () => new T.MeshLambertMaterial({ map: api.roofTexture(kind), color: rcol, emissive, side: T.DoubleSide }), true);
+      }
       return roofMB[key];
     };
     (b.roofs || []).forEach((ring) => {
@@ -305,7 +312,7 @@
       const nl = Math.hypot(normal[0], normal[1], normal[2]) || 1; let nx = normal[0] / nl; let ny = normal[1] / nl; let nz = normal[2] / nl;
       if (ny < 0) { nx = -nx; ny = -ny; nz = -nz; }
       const ymean = ring.reduce((m, p) => m + p[1], 0) / ring.length;
-      const rf = roofFor(st.copperAbove !== undefined && ymean > st.copperAbove ? 'copper' : st.steepRoof && ny < 0.8 ? 'steep' : 'main');
+      const rf = roofFor(st.canopyRoof && st.canopyRoof(ring, ymean) ? 'canopy' : st.copperAbove !== undefined && ymean > st.copperAbove ? 'copper' : st.steepRoof && ny < 0.8 ? 'steep' : 'main');
       const ids = ring.map((p) => { const w = world(p[0], p[2]); const rn = api.rotN ? api.rotN(p[2], nx, nz) : [nx, nz]; return rf.vert(w.x, w.form + p[1], w.z, rn[0], ny, rn[1], [1, 1, 1], p[0] / 2.4, p[2] / 2.4); });
       for (let t = 0; t < tris.length; t += 3) rf.i.push(ids[tris[t]], ids[tris[t + 1]], ids[tris[t + 2]]);
     });

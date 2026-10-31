@@ -89,6 +89,40 @@
   /* LËTZEBUERG GARE CENTRALE.  Refs: ~/Library/Caches/zuch-refs/Lux-Gare (Commons: Luxembourg City railway station 2022-12, Gare centrale tram stop,
    * Grande vitesse, Hall Gare centrale).  Yellow-ochre sandstone building (1907-1913), arched windows, mansard slate roofs, the clock tower with its
    * green copper spire; the real LOD2 model (667 roof faces) gives the volumes. */
+  const GC_WING_X = -5.2;            // real platform-side wall of the wings (patch x; the track axis is 0, the platform edge 1.7 m left of it)
+  const GC_CANOPY_EDGE_X = -2.0;     // LOD2 canopy fascia plane (x -2.5 / -2.4)
+  const GC_CANOPY_MIN_X = -10.9;     // faces of the wings only (the hall front at x -10.1 rises above 6.5 m)
+  const GC_CANOPY_MAX_Y = 6.5;
+  const GC_COLUMN_X = -2.95;
+  const GC_COLUMN_STEP = 10;
+  const GC_PLATFORM_TOP = 0.77;
+  /* steel columns under the canopy edge of the wings: the roof height there comes from the building's own roof faces */
+  function gcCanopyColumns(api) {
+    const { b, box } = api;
+    const roofY = (x, z) => {
+      let best = null;
+      (b.roofs || []).forEach((ring) => {
+        const xs = ring.map((p) => p[0]); const zs = ring.map((p) => p[2]);
+        if (x < Math.min(...xs) || x > Math.max(...xs) || z < Math.min(...zs) || z > Math.max(...zs)) return;
+        // planar face: y by the plane through the first three vertices (flat canopy roofs are horizontal, the lean-to ones slope in x)
+        const [p0, p1, p2] = ring;
+        const ux = p1[0] - p0[0]; const uy = p1[1] - p0[1]; const uz = p1[2] - p0[2]; const vx = p2[0] - p0[0]; const vy = p2[1] - p0[1]; const vz = p2[2] - p0[2];
+        const nx = uy * vz - uz * vy; const ny = uz * vx - ux * vz; const nz = ux * vy - uy * vx;
+        if (Math.abs(ny) < 1e-6) return;
+        const y = p0[1] - (nx * (x - p0[0]) + nz * (z - p0[2])) / ny;
+        if (y < 7 && (best === null || y < best)) best = y;
+      });
+      return best;
+    };
+    [[-98, -31], [2, 57]].forEach(([z0, z1]) => {
+      for (let z = z0; z <= z1 + 0.01; z += GC_COLUMN_STEP) {
+        const y = roofY(GC_COLUMN_X, z);
+        if (y === null) continue;
+        const h = y - GC_PLATFORM_TOP - 0.1;
+        if (h > 1.5) box(GC_COLUMN_X, GC_PLATFORM_TOP + h / 2, z, 0.3, h, 0.3, '#5b6066');
+      }
+    });
+  }
   const CANOPY_IDS = ['w362239328', 'w1312992341', 'ACT_4e24b351-eab5-4dc2-b87f-8f4802b32639'];   // not the Rotondes (w52094232 / 33), not the office tower w1289589204
   reg('Lëtzebuerg', {
     wall: '#c9b891', trim: '#b4a07a', plinth: { h: 1.3, col: '#7d7360' }, band: '#bba682', roof: 'slate', roofTint: '#7d8288',
@@ -97,6 +131,14 @@
     win: { w: 1.25, h: 2.3, kind: 'rect', frame: '#efe9dc', reveal: '#b99d68', sill: true },
     gableWin: 'round',
     doors: [],
+    /* LOD2 closes the canopy of the two low platform-side wings (z -100 .. -29 and -1 .. 59) into a solid wall 2.5 m from the track axis (0.8 m beyond the platform edge: half of Voie 1 was inside the
+     * building, photos Grande vitesse (102) - (105): the real wing wall stands about 3.5 m behind the edge, the glass canopy overhangs the platform on steel columns).  The fascia plane moves back to
+     * GC_WING_X; the roof stays as the canopy and gets columns at its edge (extras). */
+    mapWall: (ring) => (ring.every((p) => p[0] > GC_CANOPY_MIN_X && p[1] < GC_CANOPY_MAX_Y) ? ring.map((p) => (p[0] > GC_CANOPY_EDGE_X ? [GC_WING_X, p[1], p[2]] : p)) : ring),
+    canopyRoof: (ring, yMean) => yMean < GC_CANOPY_MAX_Y + 0.5 && ring.every((p) => p[0] > GC_CANOPY_MIN_X),
+    wallFor: (face) => (face.xc > -6.0 && face.ymax < GC_CANOPY_MAX_Y ? '#e9e2cd' : null),      // photos Grande vitesse (102)-(105): the platform-side wings are cream plaster, not the sandstone of the hall
+    mapGround: (p) => (p[0] > GC_CANOPY_EDGE_X ? [GC_WING_X, p[1]] : p),
+    extras: gcCanopyColumns,
     /* the glass-and-steel platform canopies (LOD2 holds them as flat-roof "buildings") are drawn by station-yard.js from their roof faces, with columns on the platforms */
     yard: { canopies: CANOPY_IDS, hall: ['w362239328'], trains: [{ plat: 1, model: 'emu', cars: 3, kind: 'cfl' }, { plat: 2, model: 'emu', cars: 2, kind: 'sncb' }, { plat: 3, model: 'emu', cars: 3, kind: 'cfl2' }], platformTop: 0.77, platformFrom: -25, voie: { 0: 'Voie 1', 1: 'Voie 2-3', 2: 'Voie 4-5', 3: 'Voie 6-7', 4: 'Voie 8-9', 5: 'Voie 10-11' } },   // by platform index of the patch (x ascending)
     skipIds: CANOPY_IDS,
