@@ -16,7 +16,19 @@
   const SIGNAL_REVEAL_M = 450, HOLD_CHANCE = 0.3, HOLD_MIN_S = 8, HOLD_MAX_S = 34, SIGNAL_NEAR_STATION_M = 420;
   const SPAD_FINE = 250, OVERRUN_FINE = 40, SHORT_FINE = 10, HARSH_FINE = 6, EARLY_FINE = 12, EB_FINE = 0, BUFFER_FINE = 80;
   const PERFECT_BONUS = 50, OK_BONUS = 25, FAIR_BONUS = 10, ON_TIME_S = 30, ON_TIME_BONUS = 20, LATE_FINE_PER_MIN = 10;
-  const FIRST_DEPARTURE_S = 75, DWELL_MIN = 30, DWELL_MAX = 45, TIMETABLE_SPEED_SHARE = 0.8;
+  /* What the timetable assumes of the driver (fitted with scripts/zuch/drive_bot.mjs, see ZUCHREAL-W5-TIMING.md): 90 % of the line speed, the train's own traction, the service brake at B3.5 of 7,
+   * and 3 s per leg for the start-up and the last creep into the platform. A driver at 85 - 97 % of the limits is then within about +-5 % of the running time of every leg. */
+  const TIMETABLE_SPEED_SHARE = 0.9, TIMETABLE_SPEED_SHARE_TRAM = 0.94, TIMETABLE_ACCEL_FACTOR = 1.0, TIMETABLE_BRAKE_FACTOR = 0.5, TIMETABLE_LEG_OVERHEAD_S = 3;
+  /* Departure timing (ZUCHREAL-W5-TIMING.md): a scheduled dwell is what the stop really takes (the player opens the doors, the passengers exchange, the player closes the doors) plus a short
+   * slack; the old fixed 30 - 45 s (and 75 s at the origin) was far longer than that for small stops and shorter for big ones. EARLY_OK_S: the lever may go to power this many seconds before the
+   * scheduled departure time without an early-departure fine (EARLY_FINE); the HUD's "clear to depart" comes at the same moment. */
+  const EARLY_OK_S = 10, DEPART_FREE_BEFORE_S = EARLY_OK_S;
+  const OPEN_LAG_S = 1.5, CLOSE_LAG_S = 1.5, DEPART_SLACK_S = 1, EXCHANGE_MARGIN = 1.05, DWELL_MIN_S = 18, DWELL_JITTER_S = 2;
+  const FIRST_DEPARTURE_MIN_S = 40, FIRST_INTRO_S = 5;
+  /* The passenger model shared with train-sim.js (planFor / beginExchange draw the real counts from it): boarding by station size x sqrt(capacity / 90), alighting 22 - 55 % of the people on board */
+  const PAX_BOARD_BASE = Object.freeze({ 1: 9, 2: 20, 3: 36 }), PAX_ALIGHT_RANGE = Object.freeze([0.22, 0.55]), PAX_SIZE_ALIGHT = Object.freeze({ 1: 0.8, 2: 1, 3: 1.2 });
+  const PAX_BOARD_SPREAD_MEAN = 1.05;   // boarding is drawn x (0.7 + rand x 0.7)
+  const paxBoardScale = (capacity) => Math.min(2.4, Math.max(1, Math.sqrt((capacity || 90) / 90)));
   const SPAD_RESET_S = 4, POWER_MARGIN = 2.4;
   /* reverse gear: only at a standstill with the lever at 0 or braking, 10 km/h at most; backing up more than BACK_FREE_M before the doors open costs REVERSE_FINE */
   const REVERSE_MAX_MS = 10 / KMH, REVERSE_SWITCH_V = 0.3, BACK_FREE_M = 20, REVERSE_FINE = 15;
@@ -73,44 +85,105 @@
     return out;
   }
 
+  /* The train's traction and running resistance exactly as the simulation applies them (create() below and the timetable's acceleration both use it) */
+  function tractionModel(train) {
+    const baseMass = (train.massT || 80) * 1000, maxMs = (train.maxKmh || 100) / KMH;
+    const fMax = (train.accel || 0.8) * baseMass;
+    const kneeV = Math.max(10, maxMs * 0.42);
+    const cdA = train.model === 'hst' ? 5.5 : train.kind === 'tram' ? 6 : 7 + (train.cars || 1) * 0.6;
+    const resistAt = (speed) => baseMass * G * (ROLL_A + ROLL_B * speed) + 0.5 * AIR_RHO * cdA * speed * speed;
+    const power = Math.max(fMax * kneeV, POWER_MARGIN * resistAt(maxMs) * maxMs);   // enough power to actually reach the top speed in a compressed route
+    return { baseMass, fMax, kneeV, cdA, resistAt, power };
+  }
+
+
   /* Running time of one leg along the real speed-limit profile (REAL-LINES.md "W4 premium trains"): a speed cap per PROFILE_STEP_M segment (the lower limit of the segment, times
    * TIMETABLE_SPEED_SHARE, never above the train's top speed), standstill at both ends, forward pass with the acceleration and backward pass with the braking the timetable assumes.  The older
    * average-of-the-limits figure let a leg with a slow stretch (curves, switch areas) look faster than any driver can run it: the premium trains arrived 200 - 250 s late on metz / paris. */
   const PROFILE_STEP_M = 25, PROFILE_MIN_V = 1.5;
-  function legTravelSeconds(limits, s0, s1, vmax, accel, brake, fallbackKmh) {
+  function legTravelSeconds(limits, s0, s1, vmax, accelAt, brake, fallbackKmh, share = TIMETABLE_SPEED_SHARE, trainLen = 0, gradeAt = () => 0) {
     const n = Math.max(2, Math.ceil((s1 - s0) / PROFILE_STEP_M)), ds = (s1 - s0) / n;
     const segCap = [];
-    for (let k = 0; k < n; k++) segCap.push(Math.max(PROFILE_MIN_V, Math.min(vmax, limitAt(limits, s0 + ds * (k + 0.5), fallbackKmh) / KMH) * TIMETABLE_SPEED_SHARE));
+    for (let k = 0; k < n; k++) segCap.push(Math.max(PROFILE_MIN_V, Math.min(vmax, (trainLen > 0 ? effectiveLimit(limits, s0 + ds * (k + 0.5) - trainLen, s0 + ds * (k + 0.5), fallbackKmh) : limitAt(limits, s0 + ds * (k + 0.5), fallbackKmh)) / KMH) * share));
     const v = new Array(n + 1).fill(0);
     for (let k = 1; k < n; k++) v[k] = Math.min(segCap[k - 1], segCap[k]);
-    for (let k = 1; k <= n; k++) v[k] = Math.min(v[k], Math.sqrt(v[k - 1] * v[k - 1] + 2 * accel * ds));
+    for (let k = 1; k <= n; k++) v[k] = Math.min(v[k], Math.sqrt(v[k - 1] * v[k - 1] + 2 * Math.max(0.02, accelAt(v[k - 1]) - G * gradeAt(s0 + ds * (k - 0.5))) * ds));   // an uphill takes from the acceleration (a railcar slows down a lot on the Norden line)
     for (let k = n - 1; k >= 0; k--) v[k] = Math.min(v[k], Math.sqrt(v[k + 1] * v[k + 1] + 2 * brake * ds));
     let t = 0;
     for (let k = 0; k < n; k++) t += ds / Math.max(PROFILE_MIN_V * 0.5, (v[k] + v[k + 1]) / 2);
     return t;
   }
 
-  /* Timetable: seconds from service start. Travel at ~80 % of the line speed incl. accel/brake losses.
-     options.pass = indices of stations the train runs through (express): no dwell, no braking loss. */
+  /* How long the REAL passenger module (passengers.js) needs for one door cycle, measured with scripts/zuch/exchange_probe.mjs (medium / high quality; 'low' is a few seconds slower in a crowd).
+   * Structure follows the module: alighting people leave one per ALIGHT_GAP (0.8 s, never slower than the 16 s cap) through every door, boarding starts when the last one is out (+ 1.6 s)
+   * and lets one person per door in every BOARD_GAP (1.2 s, 22 s cap); on top come the walk along the platform (0.02 s per metre of train) and a congestion term (0.05 s per person).
+   * Fitted to 6 trains x 9 count pairs; the spread of single runs is about +-15 %. Doors: cars x doors per side, minus the locomotive of an IC and the two power cars of a TGV. */
+  const EXCHANGE_FIT = Object.freeze({ base: 2.5, perMetre: 0.02, perPax: 0.05, alightGap: 0.8, alightMaxS: 16, alightMinGap: 0.25, boardGap: 1.2, boardMaxS: 22, doorSpread: 1.15 });
+  function exchangeDoors(train) {
+    const powerCars = train.model === 'ic' ? 1 : train.model === 'hst' ? 2 : 0;
+    return Math.max(1, (train.doorsPerSide || 2) * Math.max(1, (train.cars || 1) - powerCars));
+  }
+  function exchangeSeconds(train, alighting, boarding) {
+    const F = EXCHANGE_FIT, doors = exchangeDoors(train), a = Math.max(0, alighting), b = Math.max(0, boarding);
+    const perDoorOut = Math.max(a ? 1 : 0, F.doorSpread * a / doors);
+    const tOut = a ? Math.max(F.alightMinGap * perDoorOut, Math.min(F.alightMaxS, F.alightGap * perDoorOut)) : 0;
+    const perDoorIn = Math.max(1, b / doors);
+    const tIn = perDoorIn * clamp(F.boardMaxS / perDoorIn, 0.2, F.boardGap) * 1.05;
+    const gap = a ? tOut + 1.6 : 0.6;
+    return F.base + gap + tIn + F.perMetre * trainLength(train) + F.perPax * (a + b);
+  }
+  /* seconds a stop is scheduled for, from the exchange the stop is expected to see */
+  function dwellFor(train, alighting, boarding) {
+    return Math.max(DWELL_MIN_S, Math.round(OPEN_LAG_S + EXCHANGE_MARGIN * exchangeSeconds(train, alighting, boarding) + CLOSE_LAG_S + DOOR_WARN_S + DOOR_MOVE_S + DEPART_SLACK_S));
+  }
+  /* the expected passengers at stop i (size 1 - 3) with `onboard` people already aboard: { alighting, boarding, onboard (after the stop) } */
+  function expectedExchange(train, station, onboard, { first = false, last = false, crowdFactor = 1 } = {}) {
+    const capacity = train.capacity || 90, size = PAX_BOARD_BASE[station.size] ? station.size : 2;
+    const mid = (PAX_ALIGHT_RANGE[0] + PAX_ALIGHT_RANGE[1]) / 2;
+    const alighting = first ? 0 : last ? onboard : Math.min(onboard, Math.round(onboard * mid * PAX_SIZE_ALIGHT[size]));
+    const room = Math.max(0, capacity - (onboard - alighting));
+    const boarding = last ? 0 : Math.min(room, Math.max(2, Math.round(PAX_BOARD_BASE[size] * paxBoardScale(capacity) * PAX_BOARD_SPREAD_MEAN * crowdFactor)));
+    return { alighting, boarding, onboard: onboard - alighting + boarding };
+  }
+
+  /* acceleration (m/s2) at speed v the timetable assumes: the sim's own traction (full force up to the knee, constant power above) minus the running resistance, times a factor for the
+   * driver's lever work and the traction ramp; never below a small floor so a leg always finishes */
+  function timetableAccel(train, factor) {
+    const { baseMass, fMax, power, resistAt } = tractionModel(train);
+    return (v) => Math.max(0.05, factor * (Math.min(fMax, power / Math.max(v, 0.1)) - resistAt(v)) / baseMass);
+  }
+
+  /* Timetable: seconds from service start. Travel at ~TIMETABLE_SPEED_SHARE of the line speed incl. accel/brake losses; the dwell of every stop is what the expected passenger exchange there
+     takes (dwellFor: the people on board are followed through the whole service, a crowded station of the plan counts CROWD_FACTOR x boarding).
+     options.pass = indices of stations the train runs through (express): no dwell, no braking loss. options.plan = the service plan (crowd incidents). */
   function buildTimetable(track, train, options = {}) {
     const rng = options.rng || Math.random, limits = options.limits || sortedLimits(track), stations = track.stations || [];
     const passSet = new Set(options.pass || []);
-    const vmax = (train.maxKmh || 100) / KMH, accel = Math.max(0.25, (train.accel || 0.7) * 0.5), brake = Math.max(0.3, (train.brake || 0.9) * 0.6);
+    const vmax = (train.maxKmh || 100) / KMH, accelAt = timetableAccel(train, options.accelFactor ?? TIMETABLE_ACCEL_FACTOR), brake = Math.max(0.3, (train.brake || 0.9) * (options.brakeFactor ?? TIMETABLE_BRAKE_FACTOR));
     const stops = stations.map((st, i) => ({ name: st.name, s: st.s, arr: 0, dep: 0, pass: false }));
-    let clock = options.firstDeparture ?? FIRST_DEPARTURE_S, last = 0;
-    if (stops[0]) stops[0].dep = clock;
     const lastIdx = stations.length - 1;
+    const noseRule = train.kind === 'tram' || track.kind === 'tram';   // same rule as step(): a rail train is held to a limit until its REAR has cleared the board, a tram follows its nose
+    const gradeAt = options.gradeAt || ((x) => { try { const f = track.frameAt(clamp(x, 0, track.length)); return Number.isFinite(f.grade) ? f.grade : 0; } catch (e) { return 0; } });   // as step()'s frameGrade
+    const crowds = ((options.plan && options.plan.incidents) || []).filter(x => x.kind === 'crowd');
+    const crowdAt = (i) => { const c = crowds.find(x => x.station === i); return c ? (c.factor || CROWD_FACTOR) : 1; };
+    const jitter = () => Math.round((rng() - 0.5) * 2 * DWELL_JITTER_S);   // keeps the random stream of the old fixed-range dwell: one draw per stop
+    /* the origin: the player reads the hint, opens the doors, the first people board, the doors close */
+    let aboard = 0, clock = options.firstDeparture;
+    if (stations[0]) {
+      const first = expectedExchange(train, stations[0], 0, { first: true, last: lastIdx === 0, crowdFactor: crowdAt(0) });
+      aboard = first.onboard;
+      if (clock === undefined) clock = Math.max(FIRST_DEPARTURE_MIN_S, dwellFor(train, 0, first.boarding) + FIRST_INTRO_S);
+    } else clock = clock ?? FIRST_DEPARTURE_MIN_S;
+    let last = 0;
+    if (stops[0]) stops[0].dep = clock;
     for (let i = 1; i < stations.length; i++) {
       if (passSet.has(i) && i < lastIdx) continue;
       const prev = stations[last], st = stations[i], dist = Math.max(50, st.s - prev.s);
-      const travel = legTravelSeconds(limits, prev.s, prev.s + dist, vmax, accel, brake, train.maxKmh || 100);
-      const arr = clock + travel, isLast = i === lastIdx;
-      /* a premium train (kiss / ic / hst) needs much longer than DWELL_MAX to exchange its passengers through 2 doors / side regardless of its extra
-       * cars (drive_bot.mjs's own careful-driver wait, 4 s + 0.6 s per alighting + 0.7 s per boarding passenger of the average plan): the schedule must
-       * grant at least that much, or the lateness compounds at every stop (REAL-LINES.md: kiss 573 s, brussels 339 s, hst paris 338 s on the abroad routes). */
-      const px = Math.round((train.capacity || 90) * 0.4);
-      const minExchange = train.kind === 'rail' ? Math.ceil(4 + 0.6 * px * 0.385 + 0.7 * 12) + 5 : 0;
-      const dwell = isLast ? 0 : Math.max(minExchange, Math.round(DWELL_MIN + rng() * (DWELL_MAX - DWELL_MIN)));
+      const travel = legTravelSeconds(limits, prev.s, prev.s + dist, vmax, accelAt, brake, train.maxKmh || 100, options.share ?? (noseRule ? TIMETABLE_SPEED_SHARE_TRAM : TIMETABLE_SPEED_SHARE), noseRule ? 0 : trainLength(train), gradeAt);
+      const arr = clock + travel + (options.legOverhead ?? TIMETABLE_LEG_OVERHEAD_S), isLast = i === lastIdx;
+      const ex = expectedExchange(train, st, aboard, { last: isLast, crowdFactor: crowdAt(i) });
+      aboard = ex.onboard;
+      const dwell = isLast ? 0 : dwellFor(train, ex.alighting, ex.boarding) + jitter();
       stops[i].arr = Math.round(arr); stops[i].dep = Math.round(arr + dwell);
       for (let j = last + 1; j < i; j++) {                      // passed stations: interpolate by distance
         const f = (stations[j].s - prev.s) / Math.max(1, st.s - prev.s);
@@ -187,13 +260,9 @@
     const baseMass = (train.massT || 80) * 1000;
     const maxMs = (train.maxKmh || 100) / KMH;
     const hardCapMs = train.hardCapKmh > 0 ? train.hardCapKmh / KMH : 0;
-    const fMax = (train.accel || 0.8) * baseMass;
-    const kneeV = Math.max(10, maxMs * 0.42);
-    const cdA = train.model === 'hst' ? 5.5 : train.kind === 'tram' ? 6 : 7 + (train.cars || 1) * 0.6;
-    const resistAt = (speed) => baseMass * G * (ROLL_A + ROLL_B * speed) + 0.5 * AIR_RHO * cdA * speed * speed;
-    const power = Math.max(fMax * kneeV, POWER_MARGIN * resistAt(maxMs) * maxMs);   // enough power to actually reach the top speed in a compressed route
+    const { fMax, kneeV, cdA, resistAt, power } = tractionModel(train);
     const brakeMax = train.brake || 0.9, ebMax = train.emergency || Math.max(1.2, brakeMax * 1.4);
-    const timetable = config.timetable || buildTimetable(track, train, { rng, clockStart: options.clockStart, limits, pass: [...passSet] });
+    const timetable = config.timetable || buildTimetable(track, train, { rng, clockStart: options.clockStart, limits, pass: [...passSet], plan });
     const lastIndex = stations.length - 1;
 
     const signals = (track.signals || []).map((sg, i) => ({ srcIndex: i, s: sg.s, kind: sg.kind || 'main', hold: false, revealedAt: -1, clearAfter: 0, cleared: false, passed: false }))
@@ -442,9 +511,11 @@
         if (!vis.arrived && !vis.skipped && v < 0.3 && s >= st.s - STOP_ZONE_BEHIND && s <= st.s + STOP_ZONE_AHEAD + (st.platformEnd ? Math.max(0, st.platformEnd - st.s) : 0)) {
           vis.arrived = true; vis.arriveT = t; events.push({ type: 'arrived', stationIndex: i, errorM: s - st.s });
         }
+        if (doorPhase !== 'closed' && vis.leaveT !== undefined) vis.leaveT = undefined;   // the doors opened again: judged anew after they close
+        if (vis.leaveT === undefined && vis.opened && !vis.departed && doorPhase === 'closed' && wantsMove) vis.leaveT = t;   // first power notch after the doors closed: that is when "early" is judged
         if (!vis.departed && !vis.skipped && vis.opened && doorPhase === 'closed' && s - st.s > 3 && v > 0.5 && i < lastIndex) {
           vis.departed = true; vis.depDelay = Math.round(t - timetable.stops[i].dep);
-          if (t < timetable.stops[i].dep - 8) { totals.early++; cash -= EARLY_FINE; events.push({ type: 'earlyDeparture', stationIndex: i, fine: EARLY_FINE }); }
+          if ((vis.leaveT ?? t) < timetable.stops[i].dep - EARLY_OK_S) { totals.early++; cash -= EARLY_FINE; events.push({ type: 'earlyDeparture', stationIndex: i, fine: EARLY_FINE }); }
           const delay = vis.depDelay;
           if (delay <= ON_TIME_S) cash += ON_TIME_BONUS; else cash -= Math.min(60, ((delay - ON_TIME_S) / 60) * LATE_FINE_PER_MIN);
           events.push({ type: 'departed', stationIndex: i, delaySec: delay });
@@ -483,6 +554,7 @@
         nextLimit: nextLimit ? { ...nextLimit, distance: nextLimit.s - s } : null,
         delaySec, clockSec: timetable.clockStart + t, events, score: Math.round(cash), cash, spadActive, finished,
         scheduledDep: stNext ? timetable.stops[ni].dep : 0, departureWaitSec: stNext ? Math.max(0, timetable.stops[ni].dep - t) : 0,
+        departFreeSec: stNext ? Math.max(0, timetable.stops[ni].dep - DEPART_FREE_BEFORE_S - t) : 0,
         overspeed: over > 0, totals: { ...totals },
         reverse: dir < 0, backedM, parkingBrake: parking, parkingAuto, spadHoldSec: spadActive ? Math.max(0, SPAD_RESET_S - spadStill) : 0, heldDoorsSec: Math.max(0, heldUntil - t),
         guide, pattern: plan.pattern || 'RB', passIndices: [...passSet],
@@ -648,6 +720,7 @@
   TS.sim = Object.freeze({
     create, buildTimetable, timetableFrom, planService, LEVER_MIN, LEVER_MAX, LEVER_EB,
     leverLabel(n) { return n === 0 ? '0' : n > 0 ? 'P' + n : n <= LEVER_EB ? 'EB' : 'B' + (-n); },
-    constants: Object.freeze({ PERFECT_M, OK_M, OVERRUN_M, ON_TIME_S, OVERSPEED_TOL_KMH, DOOR_MAX_SPEED, SPAD_FINE }),
+    exchangeSeconds, dwellFor, expectedExchange, exchangeDoors, paxModel: Object.freeze({ BOARD_BASE: PAX_BOARD_BASE, ALIGHT_RANGE: PAX_ALIGHT_RANGE, SIZE_ALIGHT: PAX_SIZE_ALIGHT, boardScale: paxBoardScale }),
+    constants: Object.freeze({ EARLY_OK_S, DEPART_FREE_BEFORE_S, PERFECT_M, OK_M, OVERRUN_M, ON_TIME_S, OVERSPEED_TOL_KMH, DOOR_MAX_SPEED, SPAD_FINE }),
   });
 })();

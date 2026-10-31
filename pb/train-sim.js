@@ -16,7 +16,7 @@
   const TILE_WAIT_MAX_MS = 25000, AHEAD_LOAD_SHOW_S = 0.8;
   const WHEEL_RADIUS = 0.46, HUD_INTERVAL_S = 0.1, TOD_INTERVAL_S = 3;
   const PLATFORM_SPAWN_M = 650, PLATFORM_CLEAR_M = 120, END_EXCHANGE_MIN_S = 5, END_EXCHANGE_MAX_S = 34;
-  const BOARD_BASE = { 1: 9, 2: 20, 3: 36 }, ALIGHT_RANGE = [0.22, 0.55];
+  const { BOARD_BASE, ALIGHT_RANGE } = TS.sim.paxModel;   // one passenger model for the shell and for the timetable's dwell (sim.js)
   const CHASE_UP = 3.9, CHASE_SIDE = 3.4;
   const DEMO_ORBIT_RATE = 0.12;
   const TOAST_MAX = 2, CAB_FOV = 66, CAB_FOV_PORTRAIT_MAX = 100, CAB_FOV_FIT_HALF_DEG = 44, CAB_EYE_BACK_PORTRAIT_M = 0.18, CAB_PITCH_PORTRAIT = -0.2, CAB_DRAG_PX_PER_NOTCH = 18, SPAD_TOAST_COOLDOWN_MS = 1200;
@@ -1168,7 +1168,7 @@
     if (!st) return { boarding: 0 };
     if (w.plans[i]) return w.plans[i];
     const last = i === stationsOf().length - 1;
-    const scale = clamp(Math.sqrt((w.cfg.capacity || 90) / 90), 1, 2.4);
+    const scale = TS.sim.paxModel.boardScale(w.cfg.capacity);
     const size = BOARD_BASE[st.size] ? st.size : 2;
     const crowd = ((w.sim.plan && w.sim.plan.incidents) || []).find((x) => x.kind === 'crowd' && x.station === i);
     w.plans[i] = { boarding: last ? 0 : Math.max(2, Math.round(BOARD_BASE[size] * scale * (0.7 + rand() * 0.7) * (crowd ? crowd.factor || 1.8 : 1))) };
@@ -1720,7 +1720,7 @@
     if (atPlatform && state.nextStationIndex === state.platformIndex) {
       const visited = (w.stopLog || []).some((l) => l.index === state.platformIndex) || (w.exch && w.exch.index === state.platformIndex && w.exch.finalized);
       if (!visited) return coach ? t('coachOpen') : kbd('D') + ' ' + t('hintOpen');
-      if (state.departureWaitSec > 0) return (coach ? t('coachWait') + ' ' : '') + t('hudWaitDepart', { time: shownClock(state.clockSec + state.departureWaitSec) });
+      if (state.departFreeSec > 0) return (coach ? t('coachWait') + ' ' : '') + t('hudWaitDepart', { time: shownClock(state.clockSec + state.departureWaitSec) });
       if (state.signalAspect === 'red' && state.nextSignalDistance < 300) return t('hintSignalRed');
       return coach ? t('coachDepart') : kbd('W') + ' ' + t('hintDepart');
     }
@@ -1750,7 +1750,7 @@
    *  4. delay colour: green when early or at most DELAY_LATE_S late, red when later; the word underneath says Fréi / Pünktlech / Verspéidung;
    *  5. while standing in a stop (doors open, closed, boarding) a badge counts down to the departure time, turns green when the way is free and red when the departure time is long gone;
    *  6. the box always lists the stop it names: while approaching, Ukunft is lit; standing in it, Ofaart is lit and Ukunft greyed. */
-  const DELAY_LATE_S = 30, DELAY_EARLY_S = 5, DEP_LATE_RED_S = 30;
+  const DELAY_LATE_S = 30, DELAY_EARLY_S = 5, DEP_LATE_RED_S = 30, DEP_WHY_MIN_S = 6;   // from this many seconds of waiting on, the badge says why
   function scheduleView(s, hIdx) {
     const w = world, tt = w.sim.timetable, stops = tt.stops, last = stops.length - 1;
     const stop = stops[hIdx], here = s.platformIndex >= 0 && s.v < 0.3 && s.nextStationIndex === s.platformIndex;
@@ -1762,7 +1762,9 @@
       out.delay = idx === last ? 0 : Math.max(0, Math.round(late));
       if (idx !== last) {
         const when = (stationsOf()[idx] ? stationsOf()[idx].name + ' · ' : '') + clockSecText(tt.clockStart + depAt);
-        if (late < 0) out.badge = { cls: '', left: t('hudDepIn', { t: minSec(-late) }), right: when };
+        const free = s.departFreeSec || 0;   // seconds until the train may leave without being "early" (sim.js DEPART_FREE_BEFORE_S before the scheduled time)
+        if (late < 0 && free > 0) out.badge = { cls: '', left: t('hudDepFreeIn', { t: minSec(free) }), right: (free > DEP_WHY_MIN_S ? t('hudDepEarlyWhy') + ' · ' : '') + when };
+        else if (late < 0 && !(s.readyToDepart && s.doorPhase === 'closed')) out.badge = { cls: '', left: t('hudDepIn', { t: minSec(-late) }), right: when };
         else if (s.readyToDepart && s.doorPhase === 'closed') out.badge = { cls: 'go', left: t('hudDepGo'), right: when };
         else out.badge = { cls: late > DEP_LATE_RED_S ? 'late' : '', left: t('hudDepLate', { t: '+' + minSec(late) }), right: when };
       }
@@ -2517,6 +2519,21 @@
         spawnWaiting(idx);
         input.lever = 0; w.state = w.sim.step(0, { lever: 0, passengers: w.onboard });
         return true;
+      },
+      /* test-only (scripts/zuch/exchange_probe.mjs): the seconds the REAL passenger module needs to finish one door cycle at the stop the train stands in, with the given
+       * counts, stepped with a synthetic clock (no waiting in real time). The doors of the model must already be placed (a few frames after stopAtMarker). */
+      exchangeSeconds(alighting, boarding, side) {
+        const w = world; if (!w || !w.passengers || phase !== 'running') return -1;
+        const i = w.state.platformIndex; if (i < 0) return -1;
+        w.plans[i] = { boarding };
+        spawnWaiting(i);
+        const doors = doorsWorld(side || stationsOf()[i].side || 'right');
+        w.passengers.startExchange({ doorsWorld: doors, boarding, alighting });
+        const DT = 0.05, LIMIT_S = 200; let sec = 0;
+        while (sec < LIMIT_S && !exchangeStats().done) { w.passengers.update(DT, camera); sec += DT; }
+        safe('stopExchange', () => w.passengers.stopExchange && w.passengers.stopExchange());
+        clearPlatform();
+        return { sec: Math.round(sec * 10) / 10, doors: doors.length, boarded: exchangeStats().boarded };
       },
       stopAtMarker(errorM = -0.8) {
         const w = world; if (!w || phase !== 'running') return false;
