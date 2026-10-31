@@ -116,6 +116,7 @@
     const data = o.data;
     const group = new T.Group();
     group.name = 'station-roads';
+    group.userData.road = true;      // traffic_probe.mjs: a vehicle path must have a road-tagged surface under it
     const asphalt = new MB(); const paint = new MB(); const kerbs = new MB();
     const stats = { roads: 0, tris: 0 };
     const crossing = o.crossing || null;

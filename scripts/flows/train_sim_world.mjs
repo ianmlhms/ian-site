@@ -95,6 +95,7 @@ export const flow = {
       const ls = world.landscape; const ct = ls.crossingTraffic();
       const c = track.crossings[0];
       const stepAll = (secs, trainS) => { const cam = __tsTest.internals().camera; for (let i = 0; i < secs * 10; i++) ct.update(0.1, trainS, cam); };
+      __tsTest.placeAt(c.s - 300, 0); ls.warm(c.s - 300);   // W5: vehicles only drive where the road is drawn: the chunk with the crossing must be built
       stepAll(1, c.s - 300);                      // wakes the crossing up
       stepAll(40, c.s - 300);                     // cars arrive and drive
       const before = ct.state().find((s) => Math.abs(s.s - c.s) < 3);

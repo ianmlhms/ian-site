@@ -401,6 +401,18 @@
         return;
       }
       let j = J(sd);
+      /* W5: a real road that runs beside the line here IS the parallel road: the cross road T-joins it (no second, synthetic parallel road beside / across it) */
+      const rp = ctx.realParallel ? ctx.realParallel(sc, sd, JUNCTION_MIN - 18, Math.min(latMaxFor(sd) - 4, 130)) : null;
+      if (rp) {
+        const hwReal = clamp((rp.w || 5.2) / 2, 1.5, 3.6);
+        j = rp.lat;
+        const cross = crossRoad(sd, j, j - sd * (hwReal + 0.05), HW_CROSS, 'asphalt');
+        polylines.push(cross);
+        junctions.push({ sd, l: j, hwCross: HW_CROSS, hwPar: hwReal, aMin: -hwReal, aMax: hwReal });
+        lats.push({ lat: j, s0: sc - 40, s1: sc + 40 });
+        info.sides.push({ sd, type: 'T', j, shared: true, real: true, cls: rp.c });
+        return;
+      }
       const tField = layout === 'tField';
       const tBend = layout === 'tBend';
       /* side A: tField -> T junction into a parallel road, tBend -> bends into a parallel road, tt -> T junction.

@@ -160,6 +160,7 @@
     const root = opts.root;
     const cap = CAP_PER_TYPE[opts.quality] || CAP_PER_TYPE.medium;
     const getNight = opts.getNight || (() => 0);
+    const roadsDrawn = opts.roadsDrawn || (() => true);   // W5: false while the road of a crossing is not built (patch scenery still loading, chunk not streamed in)
     const rng = mulberry(20261025);
     const nightU = { value: 0 };
     const material = luxTraffic.makeMaterial(nightU);
@@ -198,7 +199,9 @@
           const cross = c.roads.find((r) => r.id === 'x' + c.index + suffix);
           const par = c.roads.find((r) => r.id === 'p' + c.index + suffix);
           const mouth = par ? par.pts.find((p) => Math.abs(p.a) < 1.6) || par.pts[0] : null;
-          if (cross && par && mouth) {
+          if (cross && !par && (sideInfo.real || sideInfo.shared)) {
+            arms.push(centre(cross, true));                      // W5: the cross road ends at a real / shared parallel road: vehicles come from its junction edge
+          } else if (cross && par && mouth) {
             const crossRev = centre(cross, true);               // junction edge → crossing
             const jct = { x: mouth.x, y: mouth.yT + plan.ROAD_LIFT, z: mouth.z };
             const fromMinus = par.pts.filter((p) => p.a <= -1.6);              // ascending a: far end → junction
@@ -399,8 +402,9 @@
       nightU.value = getNight();
       for (const site of sites) {
         const near = Math.abs(site.s - trainS) < ACTIVE_RANGE;
-        if (near && !site.active) activate(site);
-        else if (!near && site.active && Math.abs(site.s - trainS) > ACTIVE_RANGE + 200) deactivate(site);
+        const drawn = roadsDrawn(site.c);
+        if (near && drawn && !site.active) activate(site);
+        else if (site.active && (!drawn || (!near && Math.abs(site.s - trainS) > ACTIVE_RANGE + 200))) deactivate(site);
         if (!site.active) continue;
         for (const lane of site.lanes) {
           lane.timer -= step;

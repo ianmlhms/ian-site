@@ -317,7 +317,9 @@
       built.forEach((rec) => { if (rec.group) opts.root.remove(rec.group); rec.dispose(); });
       built.clear();
     }
-    return { update, dispose, built: () => built.size };
+    /* is the mesh of the patch `name` (ground paint, roads, buildings) up?  (crossing-traffic.js: vehicles only drive on roads that are drawn) */
+    const isBuilt = (name) => patches.some((p, i) => p.name === name && built.has(i) && !!built.get(i).group);
+    return { update, dispose, built: () => built.size, isBuilt };
   }
 
   TS.stationSurround = Object.freeze({ preload, loadHeavy, heavyNear, stateOf, dataFor, heightPatches, create, demAt, classAt, EXT_X, EXT_Z, FADE_X, FADE_Z, smooth01 });

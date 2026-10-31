@@ -1572,6 +1572,12 @@ window.TS = window.TS || {};
       list.forEach((c, i) => carMesh.setColorAt(i, c.color));
       if (carMesh.instanceColor) carMesh.instanceColor.needsUpdate = true;
     }
+    /* test hook (scripts/zuch/traffic_probe.mjs): world positions of the ambient cars that drive along the drawn chunk roads */
+    const ambientCarPoses = () => carList.map((c) => {
+      let j = 1; while (j < c.road.cum.length - 1 && c.road.cum[j] < c.t) j++;
+      const a = c.road.pts[j - 1], b = c.road.pts[j], seg = c.road.cum[j] - c.road.cum[j - 1] || 1, u = (c.t - c.road.cum[j - 1]) / seg;
+      return { x: lerp(a.x, b.x, u), z: lerp(a.z, b.z, u), v: c.v, hw: c.road.hw, len: c.road.len, t: c.t };
+    });
     const carM = new T.Matrix4(), carQ = new T.Quaternion(), carP = new T.Vector3(), carS = new T.Vector3(1, 1, 1);
     function updateCars(dt) {
       for (let i = 0; i < carList.length; i++) {
@@ -1732,7 +1738,10 @@ window.TS = window.TS || {};
 
     /* traffic at the level crossings (crossing-traffic.js): vehicles queue at the barriers */
     let crossTraffic = null;
-    try { crossTraffic = track.crossingRoads && track.crossingRoads.crossings.length && TS.crossingTraffic ? TS.crossingTraffic.create({ root, plan: track.crossingRoads, quality, getNight: () => look.night }) : null; }
+    /* W5: a vehicle only drives where its road is DRAWN: the planned roads of a crossing belong to the chunk that holds the crossing, the road of a station-patch crossing is built
+       by station-surround.js only once the scenery half of the patch has arrived and the train is within its active range (else cars queued on bare rails) */
+    const crossingRoadsDrawn = (c) => (c.patch ? !!(surround && surround.isBuilt(c.patchName)) : chunks.has(Math.floor(c.s / CHUNK)));
+    try { crossTraffic = track.crossingRoads && track.crossingRoads.crossings.length && TS.crossingTraffic ? TS.crossingTraffic.create({ root, plan: track.crossingRoads, quality, getNight: () => look.night, roadsDrawn: crossingRoadsDrawn }) : null; }
     catch (e) { console.warn(TAG + 'crossing traffic failed', e); crossTraffic = null; }
     /* the real surroundings of stations (station-surround.js): painted ground, LOD2 buildings, trees, built near the player */
     let surround = null;
@@ -1741,7 +1750,7 @@ window.TS = window.TS || {};
     const setCrossing = (crossingS, closed) => { if (crossTraffic) crossTraffic.setClosed(crossingS, closed); };
 
     setWeather('clear', true); setTimeOfDay(12);
-    return { update, setTimeOfDay, setWeather, setCrossing, setHoleMode, terrainMeshes, groundHeightAt, farMeshes: () => [farL1.mesh, farL2.mesh], stripWidth: W, crossingTraffic: () => crossTraffic, treeField: () => treeField, dispose, warm, stats, sun, moon, hemi, group: root, quality, getWeather: () => weatherName, getTimeOfDay: () => timeOfDay, getLook: () => look };
+    return { update, setTimeOfDay, setWeather, setCrossing, setHoleMode, terrainMeshes, groundHeightAt, farMeshes: () => [farL1.mesh, farL2.mesh], stripWidth: W, crossingTraffic: () => crossTraffic, crossingRoadsDrawn, ambientCarPoses, treeField: () => treeField, dispose, warm, stats, sun, moon, hemi, group: root, quality, getWeather: () => weatherName, getTimeOfDay: () => timeOfDay, getLook: () => look };
   }
 
   TS.landscape = { create, CHUNK };

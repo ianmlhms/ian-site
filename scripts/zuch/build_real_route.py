@@ -25,6 +25,7 @@ from shapely.geometry import LineString, Point
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build_real_line as brl  # noqa: E402
 import real_line_scenery as sc  # noqa: E402
+import real_line_roads_tidy as tidy  # noqa: E402
 from osm_rail import TO_WGS, RailGraph, num, resample  # noqa: E402
 from real_line_dem import Dem  # noqa: E402
 from real_line_land import LandIndex  # noqa: E402
@@ -430,13 +431,14 @@ def emit(route_id, res):
         arm_ctx = None if is_block else {"fn": lambda gg, xy, sgc: rc.arms_of_crossing(gg, xy, sgc, roads, rtree, track_line, road_lines, rtree)}
         crossings, arms_abs = sc.crossings_of_leg(g, res["feats"]["crossings"], rd, meta=None if is_block else all_meta[lid], arm_ctx=arm_ctx)
         rd = rc.drop_arm_ribbons(rd, arms_abs)
+        rd, crossings, _tidy = tidy.tidy_leg(rd, crossings, float(meta.get("k", 1.0)), None)   # W5: roads beside the track (real_line_roads_tidy.py)
         out[lid] = {
             "L": round(g.length, 1), "land": sc.land_raster(g, land), "far": sc.far_raster(g, land), "water": sc.water_windows(g, waters, wtree), "roads": rd,
             "relief": sc.relief(g, dem), "places": sc.places_of_leg(g, tiles["places"]), "crossings": crossings,
         }
         print("  features", lid, meta["from"], "->", meta["to"], "roads", len(rd), "water", len(out[lid]["water"]), "places", len(out[lid]["places"]), "crossings", len(out[lid]["crossings"]), flush=True)
     doc = {"version": 1, "row": sc.ROW_M, "col": sc.COL_M, "lat0": sc.LAT0, "cols": sc.COLS, "far": {"row": sc.FAR_ROW, "col": sc.FAR_COL, "lat0": sc.FAR_LAT0, "cols": sc.FAR_COLS},
-           "classes": __import__("real_line_land").CLASS_NAMES, "legs": out}
+           "classes": __import__("real_line_land").CLASS_NAMES, "legs": out, "tidy": 1}
     path = os.path.join(OUT, "%s-features.json" % route_id)
     with open(path, "w") as f:
         json.dump(doc, f, separators=(",", ":"), ensure_ascii=False)

@@ -19,7 +19,7 @@
   'use strict';
   const TS = (window.TS = window.TS || {});
   const TAG = '[Lokféierer] real line: ';
-  const DATA_VERSION = 4;
+  const DATA_VERSION = 5;
   /* W2c: the Mosel line keeps sceneryId 'mosel'; the other real lines (north, south, west, ...) are registered by their real-<id>.js layout in TS.realLines and
      use their own data file data/real/<id>-features.json (build_real_route.py).  realKey(def) -> the data set of a route, or null (generic landscape). */
   const realKey = (def) => (!def ? null : def.sceneryId === 'mosel' ? 'mosel' : TS.realLines && def.sceneryId && TS.realLines[def.sceneryId] ? def.sceneryId : null);
@@ -61,7 +61,7 @@
     const industry = [];     // W3: steelworks / logistics silhouettes (build_industry.py), absolute s
     legs.forEach((l) => {
       l.f.water.forEach((w) => water.push({ s0: l.s0 + w.s0 * l.k, s1: l.s0 + w.s1 * l.k, side: w.side, off: w.off, half: w.half, name: w.name, kind: w.kind }));
-      l.f.roads.forEach((r) => roads.push({ c: r.c, w: r.w, n: r.n, ref: r.ref, p: r.p.map(([s, lat]) => [l.s0 + s * l.k, lat]), leg: l.id }));
+      l.f.roads.forEach((r) => roads.push({ c: r.c, w: r.w, n: r.n, ref: r.ref, f: r.f, p: r.p.map(([s, lat]) => [l.s0 + s * l.k, lat]), leg: l.id }));
       l.f.places.forEach((p) => places.push({ name: p.name, kind: p.kind, s: l.s0 + p.s * l.k, lat: p.lat }));
       l.f.crossings.forEach((c) => crossings.push({ s: l.s0 + c.s * l.k, barrier: c.barrier, l: c.l, r: c.r, arms: c.arms || null, leg: l.id }));
       const r = l.f.land;
@@ -83,7 +83,8 @@
     roads.forEach((r) => {
       if (r.p.length < 2) { r.freeEnd = [false, false]; return; }
       const a = r.p[0], b = r.p[r.p.length - 1];
-      r.freeEnd = [(endCount.get(keyOf(a[0], a[1])) || 0) < 2, (endCount.get(keyOf(b[0], b[1])) || 0) < 2];
+      /* W5: the pipeline (real_line_roads_tidy.py) marks the free ends (bit 0 start, bit 1 end) with the T-junctions onto the middle of a way counted as junctions */
+      r.freeEnd = r.f !== undefined ? [(r.f & 1) !== 0, (r.f & 2) !== 0] : [(endCount.get(keyOf(a[0], a[1])) || 0) < 2, (endCount.get(keyOf(b[0], b[1])) || 0) < 2];
     });
     industry.sort((a, b) => a.s - b.s);
     water.sort((a, b) => a.s0 - b.s0);
@@ -147,6 +148,30 @@
       crossingHints: (index) => crossings[index] || null,
       /* the industrial objects whose centre lies in [s0, s1) */
       industryIn: (s0, s1) => industry.filter((o) => o.s >= s0 && o.s < s1),
+      /* W5: a real road that runs beside the line over [s - span, s + span] on side sd (+1 right / -1 left) at a lateral distance within [lo, hi] and without drifting more than
+         DRIFT m over that stretch -> { lat, c, w } (lat at s) or null.  The crossing planner T-joins a synthetic cross road into it instead of drawing a second parallel road. */
+      parallelRoadAt: (s, sd, lo, hi, span) => {
+        const half = span === undefined ? 60 : span;
+        let best = null;
+        for (const r of roads) {
+          if (r.c === 'track' || r.c === 'service') continue;
+          let a = Infinity; let b = -Infinity; let latLo = Infinity; let latHi = -Infinity; let latAt = null; let ok = true;
+          for (let i = 0; i + 1 < r.p.length && ok; i++) {
+            const [s0, l0] = r.p[i]; const [s1, l1] = r.p[i + 1];
+            if (Math.max(s0, s1) < s - half || Math.min(s0, s1) > s + half) continue;
+            for (const [ps, pl] of [[s0, l0], [s1, l1]]) {
+              if (ps < s - half || ps > s + half) continue;
+              if (sd * pl < lo || sd * pl > hi) ok = false;
+              a = Math.min(a, ps); b = Math.max(b, ps); latLo = Math.min(latLo, pl); latHi = Math.max(latHi, pl);
+            }
+            if (Math.min(s0, s1) <= s && Math.max(s0, s1) >= s && s1 !== s0) latAt = l0 + (l1 - l0) * (s - s0) / (s1 - s0);
+          }
+          if (!ok || latAt === null || b - a < half * 1.5 || latHi - latLo > 25) continue;
+          const d = Math.abs(latAt);
+          if (!best || d < Math.abs(best.lat)) best = { lat: latAt, c: r.c, w: r.w };
+        }
+        return best;
+      },
       /* the real crossing within `tol` m of s (arms: the real roads on the left / right, see crossing-roads.js) */
       crossingNear: (s, tol) => crossings.find((c) => Math.abs(c.s - s) <= (tol || 30)) || null,
       mirrored: false,

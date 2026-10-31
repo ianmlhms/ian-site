@@ -1603,6 +1603,7 @@
   function buildCrossing(env, track, cr, closed) {
     const f = track.frameAt(cr.s);
     const group = new T.Group();
+    group.userData.road = true;      // the deck: asphalt over the rails (traffic_probe.mjs)
     group.position.copy(f.pos);
     group.rotation.y = -Math.atan2(f.tangent.x, -f.tangent.z);
     const local = new BatchSet(new T.Vector3());

@@ -227,6 +227,7 @@
     const quality = (opts && opts.quality) || 'medium';
     const mats = materials();
     const group = new T.Group();
+    group.userData.road = true;      // traffic_probe.mjs: a vehicle path must have a road-tagged surface under it
     group.name = 'crossing-road-' + crossing.index;
     const asphalt = new MB(); const gravel = new MB(); const paint = new MB(); const post = new MB(); const sign = new MB();
     const SH = TS.crossingRoads.SHOULDER;

@@ -1576,7 +1576,7 @@
         return c.i;
       },
       /* test hook: the centre lines of the ground roads (scene metres): class, half width, bridge flag, points every <= step m */
-      roadLines: (step) => roadList.map((r, i) => { const pts = []; const st = step || 4; for (let t = 0; t <= r.len; t += st) { sample(r, t, sp); pts.push([+sp.x.toFixed(2), +sp.z.toFixed(2)]); } return { i, cls: r.cls, hw: r.hw, bridge: r.bridge === true, oneway: !!r.oneway, len: r.len, pts }; }),
+      roadLines: (step) => roadList.map((r, i) => { const pts = []; const st = step || 4; for (let t = 0; t <= r.len; t += st) { sample(r, t, sp); pts.push([+sp.x.toFixed(2), +sp.z.toFixed(2)]); } return { i, cls: r.cls, hw: r.hw, bridge: r.bridge === true, oneway: !!r.oneway, len: r.len, cross: (r.cross || []).map((q) => [q.t0, q.t1]), along: r.along || [], pts }; }),
       state: () => ({
         fails, guarded: guards, conflicts, roads: roadList.length, total: cars.length, crossings: crossings.length, cars: cars.filter((c) => c.active).length, shown: writeN, types: cars.filter((c) => c.shown).reduce((o, c) => { o[c.type] = (o[c.type] || 0) + 1; return o; }, {}),
         oncoming: onc.active ? { s: onc.s, dir: onc.dir, v: onc.v, phase: onc.phase, doors: onc.doors, x: onc.x, y: onc.y, z: onc.z, still: onc.still, age: onc.age, forced: onc.forced } : null, moveSecs, nextSpawnAt, why: onc.why, baked: !!onc.baked, queue: onc.mergeQueue ? onc.mergeQueue.length : -1, tramDraws: onc.bake ? onc.bake.drawCalls() : 0, cd: onc.cd, playerDir: player.dir, rActive: R_ACT,

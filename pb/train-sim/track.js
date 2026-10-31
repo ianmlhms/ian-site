@@ -804,6 +804,7 @@
           id: def.sceneryId || def.id, length, crossings: comp.crossings, frameAt, baseHeightAt: terrainBaseHeightAt, formationDrop,
           secondLat: (s) => (second ? second.lat(s) : 0), tunnels: comp.tunnels, bridges, stations, water,
           realCrossing: real ? (s) => real.crossingNear(s, 40) : null,
+          realParallel: real ? (s, sd, lo, hi) => real.parallelRoadAt(s, sd, lo, hi) : null,   // W5
         });
       } catch (error) {
         console.warn('[Lokféierer] track: crossing roads failed', error);
