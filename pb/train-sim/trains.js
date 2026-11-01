@@ -141,17 +141,15 @@
       cabLining: 0xa9bde6,
       W: 2.9, yb: 0.62, floor: 0.8, sill: 1.15, head: 1.95, sill2: 2.72, head2: 3.5, ytop: 4.3, wheelR: 0.46, wb: 3.0, gap: 0.5,
       pillar: '#262c34', blank: '#5a616a', bay: 1.4, doorW: 1.25, doorY0: 0.66, doorMargin: 2.6, bellows: true, buffers: false, tables: true, double: true,
-      recipe: { lower: 'body', mid: 'body', upper: 'body', nose: 'body', noseRoof: 'body', doorLower: 'body', doorUpper: 'body', stripeCol: 'accent', roof: '#9ea4a9' }, noseKeepStripe: true, noseHiY: 2.72, facePanels: [{ y0: 0.98, y1: 1.4, color: '#2b3036', r: 0.12, inset: 0.04, hole: false }],
-      nose: { len: 7.2, N: 26, zPow: 1.7, capSx: 0.68, a: 3.0, b: 2.0, drop: 3.0, lift: 0.1, rake: 0.35, pd: 2.0, pl: 1.5, pr: 1, sideWin: null, roundTip: 1.0, rp: 1.0, lowIn: 0.3, lp: 1.3, roofScr: { k0: 14, k1: 21, xlim: 0.8 } },
+      recipe: { lower: 'body', mid: 'body', upper: 'body', nose: 'body', noseRoof: 'body', doorLower: 'body', doorUpper: 'body', stripeCol: 'accent', roof: '#9ea4a9' }, noseKeepStripe: true, noseHiY: 2.72,
+      nose: { len: 7.2, N: 26, zPow: 1.7, capSx: 0.68, a: 3.0, b: 2.0, drop: 3.0, lift: 0.1, rake: 0.35, pd: 2.0, pl: 1.5, pr: 1, sideWin: null, roundTip: 1.0, rp: 1.0, lowIn: 0.5, lp: 1.0, roofScr: { k0: 11, k1: 21, xlim: 0.93 } },
       lamp: { y: 1.52, d: 0.3, x: 0.62, s: 1.25 },
       /* the dark glossy mask of the TGV Duplex nose (windscreen + headlight band) is everything above the red inOui line; the chin bulb below it stays body colour, the pilot skirt is black */
       sweeps: [{ pts: [[0.4, 1.5], [1.4, 1.62], [2.6, 2.0], [4.0, 2.7], [5.5, 3.3]], w: 0.2, color: 'accent' }],
-      nosePaint: (d, ax, y, c) => {   // silver-white bonnet; dark only: the narrow headlight mask low on the nose, and the carbon-grey band that starts at the windscreen side edges and runs back above the red line
-        const L = TGV_MASK_LINE; let ly = L[L.length - 1][1];
-        for (let k = 0; k < L.length - 1; k++) if (d <= L[k + 1][0]) { ly = L[k][1] + (L[k + 1][1] - L[k][1]) * (d - L[k][0]) / (L[k + 1][0] - L[k][0]); break; }
-        if (y > 1.22 && y < 1.74 && d < 1.7) return [0.04, 0.045, 0.055];
-        if (y < 0.88 && d < 2.0) return [0.12, 0.13, 0.15];
-        if (d > 2.6 && ax > 0.5 && y > ly + 0.06 && y < ly + 0.95) return [0.11, 0.125, 0.15];
+      carbon: { low: [[2.2, 1.9], [3.2, 2.35], [4.0, 2.7], [5.5, 3.3], [7.3, 3.7]], h: 0.75, d0: 2.3, color: '#1c2128' },
+      nosePaint: (d, ax, y, c) => {   // only the narrow headlight mask low on the nose (a sharp strip) and the small dark skirt under the chin bulb
+        if (y > 1.3 && y < 1.66 && d < 1.5) return [0.04, 0.045, 0.055];
+        if (y < 0.86 && d < 2.0) return [0.12, 0.13, 0.15];
         return null;
       },
       scr: { kind: 'roof', hw: 0.72, y0: 2.35, y1: 3.3 }, cabFloor: 1.45, mirror: 0.2, tilt: true, cabFrame: { dz: 4.0, capSx: 0.66, rake: 0.1 },
@@ -1324,9 +1322,10 @@
     faceFrameMesh = faceFrameB.bake(mats, { noShadow: true });
     if (faceFrameMesh) { faceFrameMesh.userData.disposeGeo = true; group.add(faceFrameMesh); paintMeshes.push(faceFrameMesh); }   // a paint mesh: ghosted in the cab view
     /* body-colour sweeps on the nose sides (the TGV inOui line rising up the power car): S.sweeps = [{ pts: [[d, y], ...] (distance from the tip, height), w, color: 'accent' | hex }] as flat ribbons 12 mm off the hull */
-    if (S.sweeps && (noseF || noseR)) {
+    if ((S.sweeps || S.carbon) && (noseF || noseR)) {
       const sweepB = makeBuilder();
-      for (const sw of S.sweeps) {
+      const zPow = nose.zPow || 1;
+      for (const sw of S.sweeps || []) {
         const col = sw.color === 'accent' ? livery.accent : sw.color === 'stripe' ? livery.stripe : sw.color || livery.accent;
         for (const front of [true, false]) {
           if (front ? !noseF : !noseR) continue;
@@ -1347,6 +1346,40 @@
             }
             const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
             sweepB.geo('paint', g, col);
+          }
+        }
+      }
+      /* S.carbon = { low: [[d, y], ...], h, d0, color }: a sharp-edged band ABOVE the line `low` (a ribbon on the hull rows themselves, so its edges are exact curves, not vertex blends): it grows from nothing at d0 to height h over 1.3 m
+         and runs back to the end of the nose (the TGV carbon-grey band from the windscreen corner back along the side) */
+      if (S.carbon) {
+        const C0 = S.carbon, colC = C0.color || '#1c2128';
+        const lowAt = (d) => { const L = C0.low; if (d <= L[0][0]) return L[0][1]; for (let k = 0; k < L.length - 1; k++) if (d <= L[k + 1][0]) return L[k][1] + (L[k + 1][1] - L[k][1]) * (d - L[k][0]) / (L[k + 1][0] - L[k][0]); return L[L.length - 1][1]; };
+        const hullPt = (d, y0, off) => {
+          const u = clamp(1 - d / nose.len, 0, 1), row = noseShapeAt(nose, u), R = ringFor(S, bands, roofC, row, null, null);
+          const y = Math.min(y0, R[R.length - 1].y - 0.03);
+          let x = R[R.length - 2].x;
+          for (let j = 0; j < R.length - 1; j++) { const A = R[j], Bq = R[j + 1]; if (Bq.y > A.y + 1e-6 && y >= A.y - 1e-6 && y <= Bq.y + 1e-6 && A.x > 0) { x = A.x + (Bq.x - A.x) * (y - A.y) / (Bq.y - A.y); break; } }
+          return { y, x: x + off, rake: row.rake };
+        };
+        for (const front of [true, false]) {
+          if (front ? !noseF : !noseR) continue;
+          const zT = front ? zF : zR, sgn = front ? 1 : -1, rows = [];
+          for (let i = 0; i <= nose.N; i++) { const d = nose.len * Math.pow(i / nose.N, zPow); if (d >= C0.d0 - 1e-6) rows.push(d); }
+          if (rows.length < 2) continue;
+          const M = 8;   // vertical subdivisions: the strip follows every corner of the hull ring (band edges, roof arc) instead of cutting across it
+          const grid = rows.map((d) => {
+            const hgt = C0.h * smooth((d - C0.d0) / 1.3), yl = lowAt(d), col = [];
+            for (let m = 0; m <= M; m++) { const a = hullPt(d, yl + hgt * m / M, 0.016); col.push({ x: a.x, y: a.y, z: zT + sgn * (d + a.rake * (a.y - S.yb)) }); }
+            return col;
+          });
+          for (const side of [-1, 1]) {
+            const pos = [];
+            for (let i = 0; i < grid.length - 1; i++) for (let m = 0; m < M; m++) {
+              const q = [grid[i][m], grid[i][m + 1], grid[i + 1][m], grid[i + 1][m + 1]].map((v) => [v.x * side, v.y, v.z]);
+              for (const t of [[0, 1, 2], [1, 3, 2], [0, 2, 1], [1, 2, 3]]) for (const k of t) pos.push(...q[k]);
+            }
+            const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
+            sweepB.geo('paint', g, colC);
           }
         }
       }
@@ -1921,10 +1954,12 @@
     const emitOff = tramLook ? 0x1d2024 : INSIDE_EMIT, emitOn = tramLook ? 0x6a6a68 : INSIDE_EMIT_ON;   // tram cab lights: a neutral lamp glow on the white lining (a warm one turned the cheeks pink at night)
     if (S0.paintRough) { mats.paint = mats.paint.clone(); mats.paint.roughness = S0.paintRough; mats.paint.metalness = S0.paintMetal === undefined ? mats.paint.metalness : S0.paintMetal; mats.paint.userData.shared = false; mats.own.push(mats.paint); }   // a duller paint for this train (the dark glossy TGV mask caught the sun as a white sheen)
     const darkFwd = !tramLook && !!S0.cabFrame;   // the lining ahead of the driver's frame is seen through the windscreen from outside: dark, like the real glossy black glass (it is ghosted in the cab view)
-    if (!tramLook && S0.cabLining) { mats.inside.color.setHex(S0.cabLining); mats.insideFwd.color.setHex(darkFwd ? 0x23262b : S0.cabLining); }   // the cab lining takes the colour of the real cab (the TGV one is blue)
+    if (!tramLook && S0.cabLining) { mats.inside.color.setHex(S0.cabLining); mats.insideFwd.color.setHex(darkFwd ? 0x2c3036 : S0.cabLining); }   // the cab lining takes the colour of the real cab (the TGV one is blue)
     let cabViewOn = false, cabinOn = false, interiorViewOn = false;
     // tram windscreen: tinted and fairly opaque seen from outside, clear (like the other models) from the cab camera
-    const applyGlass = () => { mats.glass.opacity = tramLook ? (interiorViewOn ? 0.18 : cabViewOn ? 0.2 : 0.58) : (cabinOn ? 0.26 : 0.34); };
+    const darkScreen = !tramLook && !!S0.darkGlass;   // modern fronts: the big windscreen is dark reflective glass seen from outside, clear from the driver's seat
+    if (darkScreen) { mats.glass.color.setHex(0x2d3b47); mats.glass.metalness = 0.4; }
+    const applyGlass = () => { mats.glass.opacity = tramLook ? (interiorViewOn ? 0.18 : cabViewOn ? 0.2 : 0.58) : darkScreen ? (cabViewOn || interiorViewOn ? 0.2 : 0.78) : (cabinOn ? 0.26 : 0.34); };
     const count = (cfg && cfg.cars) || { railcar: 1, emu: 2, tram: 5, kiss: 4, ic: 7, hst: 8 }[model];
     const comp = composition(model, count);
     const group = new T.Group(); group.name = 'train:' + model;
