@@ -1232,11 +1232,22 @@ window.TS = window.TS || {};
       }
 
       /* ---- grass tufts on the verge (cab-view texture) ---- */
+      const onChunkRoad = (x, z, m) => chunkRoads.some((rd) => {
+        const r = rd.hw + m;
+        for (let i = 1; i < rd.pts.length; i++) {
+          const p = rd.pts[i - 1]; const q = rd.pts[i];
+          if (x < Math.min(p.x, q.x) - r || x > Math.max(p.x, q.x) + r || z < Math.min(p.z, q.z) - r || z > Math.max(p.z, q.z) + r) continue;
+          const dx = q.x - p.x; const dz = q.z - p.z; const t = Math.max(0, Math.min(1, ((x - p.x) * dx + (z - p.z) * dz) / (dx * dx + dz * dz || 1)));
+          if (Math.hypot(p.x + dx * t - x, p.z + dz * t - z) < r) return true;
+        }
+        return false;
+      });
       for (let n = TUFTS[quality] || 0; n > 0; n--) {
         const s = s0 + rng() * CHUNK, side = rng() < 0.5 ? -1 : 1, lat = side * (7 + Math.pow(rng(), 1.6) * 24), info = rowInfo(s);
         if (info.biome === 'city' || info.biome === 'tramcity' || info.biome === 'industrial' || inTunnel(s, 10) || riverBridgeAt(s, 40) || nearStation(s, 8) && Math.abs(lat) < 14) continue;
         if (info.wat && Math.abs(lat - riverLat(info.wat)) < info.wat.halfWidth + 4) continue;
         const f = frame(s), x = f.x + f.rx * lat, z = f.z + f.rz * lat;
+        if (onRoad(x, z, 0.8) || onChunkRoad(x, z, 1.2)) continue;      // W5: no grass tuft grows out of the asphalt (real street ribbons, planned crossing roads, station patches)
         const tint = r3(rng); trees.tuft.push({ x, y: groundY(info, lat, x, z) - 0.02, z, rot: rng() * 6.28, sc: 0.8 + rng() * 1.2, tint });
       }
 
