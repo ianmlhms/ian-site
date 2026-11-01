@@ -15,6 +15,7 @@
  *   truncated    text cut off by overflow:hidden / ellipsis (information lost)
  *   spill        text that sticks out of its own panel / button
  *   small-target an interactive atom smaller than 44 px in its short side
+ *   blocked      the "only on iPad / laptop" phone block covers the game at an iPad size
  *   scroll-lost  a modal card that needs scrolling to reach its buttons (cut off by the screen)
  * Pure measurement: nothing is changed in the page. */
 
@@ -199,6 +200,10 @@ function inPageScan(cfg) {
   const uniq = new Map();
   for (const a of atoms) if (!uniq.has(a.el)) uniq.set(a.el, a);
   atoms = [...uniq.values()];
+
+  /* an iPad window must never get the "only on iPad and laptop" block (the game thinks it is a phone when the visible area is too small) */
+  const phoneBlock = gameDoc.getElementById('phoneBlock');
+  if (phoneBlock && !phoneBlock.hidden) push('blocked', '#phoneBlock', null, `phone block shown at ${topVp.w}x${topVp.h}`);
 
   /* --- per atom checks --- */
   const safe = cfg.safe || { t: 0, r: 0, b: 0, l: 0 };

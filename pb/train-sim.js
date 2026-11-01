@@ -12,7 +12,8 @@
   const CAMERAS = ['cab', 'chase', 'platform', 'orbit', 'inside'];   // 'inside' (key 5): the passenger saloon, Luxtram only; pressing 5 again cycles front / middle / rear
   const QUALITIES = ['high', 'medium', 'low'];
   const MODULES = ['config', 'copy', 'track', 'routes', 'infra', 'landscape', 'trains', 'cab', 'passengers', 'audio', 'career', 'menu'];
-  const PHONE_MIN_SIDE = 600, PHONE_MIN_VIEW = 560;
+  /* PHONE_MIN_VIEW: the smallest visible side of an iPad window the game still runs in. An iPad mini in landscape with Safari's bar, the arcade bar and the sign-in hint leaves ~495 px of height; the biggest phones are 430 px on their short side. */
+  const PHONE_MIN_SIDE = 600, PHONE_MIN_VIEW = 460;
   const TILE_WAIT_MAX_MS = 25000, AHEAD_LOAD_SHOW_S = 0.8;
   const WHEEL_RADIUS = 0.46, HUD_INTERVAL_S = 0.1, TOD_INTERVAL_S = 3;
   const PLATFORM_SPAWN_M = 650, PLATFORM_CLEAR_M = 120, END_EXCHANGE_MIN_S = 5, END_EXCHANGE_MAX_S = 34;
