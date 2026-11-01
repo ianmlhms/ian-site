@@ -479,7 +479,7 @@
       model.setDoors(0, 'right');
       g.updateMatrixWorld(true); inv.copy(g.matrixWorld).invert();
       g.traverse((o) => {
-        if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || !o.geometry) return;
+        if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || !o.geometry || o.userData.noBake) return;   // noBake: the static closed-doors copy of a rail car (its animated leaves are baked instead)
         const geo = o.geometry; const posA = geo.attributes.position; if (!posA) return;
         relC.multiplyMatrices(inv, o.matrixWorld); nm.getNormalMatrix(relC);
         const mo = openM.get(o); if (mo) relO.copy(mo);

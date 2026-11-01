@@ -25,6 +25,7 @@
   const CAB_CEIL_EMIT = 0xa4a8ae;   // emissive of the nose lining seen from the driver's seat (modern cabs with a sloped windscreen)
   const GLASS_D_DAY = 0.9, GLASS_D_CAB = 0.84; // tram side glass opacity (day / cab lights on)
   const SEAT_COL = { railcar: '#8c3a30', emu: '#3b5a8c', tram: '#d4582f', kiss: '#9c2a3a', z2200: '#2f4f86', coradia: '#9c2a3a', ic: '#a02b3b', dosto: '#9c2a3a', hst: '#5a2a4e' };   // CFL seats: red / blue moquette; the TGV inOui seats are plum
+  const TGV_MASK_LINE = [[0, 1.5], [0.4, 1.5], [1.4, 1.62], [2.6, 2.0], [4.0, 2.7], [5.5, 3.3], [7.3, 3.95]];   // height of the lower edge of the dark mask along the TGV nose (m from the tip, m)
   const SPECS = {
     railcar: {
       W: 2.85, yb: 0.6, floor: 1.05, sill: 1.82, head: 2.95, ytop: 3.95, wheelR: 0.46, wb: 2.4, gap: 0.9,
@@ -48,38 +49,41 @@
     },
     /* CFL 2200 (Coradia Duplex): stainless grey double-deck cars, red nose and lower band, one big windscreen in a rounded face. */
     z2200: {
-      darkGlass: true,
+      darkGlass: true, cabWallCol: '#2b3036', cabWallFull: true,
+      facePanels: [{ y0: 0.95, y1: 1.2, color: '#b7bbbf', r: 0.04, w: 0.5, cx: 0, hole: false, z: 0.004 }, { y0: 0.8, y1: 0.92, color: '#4a4f54', r: 0.03, inset: 0.15, hole: false, z: 0.003 }],
       decal: 'cfl',
       cabLining: 0xdedbd0,
       W: 2.806, yb: 0.6, floor: 1.0, sill: 1.2, head: 1.95, sill2: 2.85, head2: 3.55, ytop: 4.32, wheelR: 0.43, wb: 2.6, gap: 0.75,
       pillar: '#1e2428', bay: 1.5, doorW: 1.3, doorY0: 0.62, doorMargin: 3.0, bellows: true, buffers: false, double: true,
       recipe: { lower: 'accent', mid: 'body', upper: 'body', nose: 'accent', doorLower: 'body', doorUpper: 'body', stripeCol: 'stripe', roof: '#aeb3b6' },
-      nose: { len: 2.6, N: 11, capSx: 0.75, a: 2.0, b: 2.0, drop: 2.2, lift: 0.1, rake: 0, pd: 1.6, pl: 2, pr: 1, sideWin: [3, 7], roundTip: 0.9, rp: 1.0, lowIn: 0.12, lp: 1.5, roofScr: { k0: 1, k1: 7, xlim: 0.8 } }, cabWin: { y0: 1.85, y1: 3.0 },
-      scr: { kind: 'roof', hw: 0.9, y0: 1.95, y1: 3.1 }, cabFrame: { dz: 2.0, capSx: 0.85, rake: 0.3 }, cabFloor: 1.0, mirror: 0.2,
+      nose: { len: 2.4, N: 11, zPow: 1.3, capSx: 0.8, a: 2.2, b: 2.0, drop: 1.4, lift: 0.1, rake: 0.38, pd: 2.2, pl: 2, pr: 1, sideWin: [3, 7], roundTip: 0.9, rp: 1.0, lowIn: 0.1, lp: 1.5 }, cabWin: { y0: 1.85, y1: 3.0 },
+      scr: { kind: 'single', cabWipers: true, hw: 0.9, y0: 1.95, y1: 3.05, topInset: 0.2 }, cabFrame: { dz: 2.0, capSx: 0.8, rake: 0.3 }, cabFloor: 1.0, mirror: 0.2,
       kinds: { cabF: { body: 27.0, bogie: 9.0, front: true, doors: 2 }, mid: { body: 27.0, bogie: 9.0, doors: 2 }, midP: { body: 27.0, bogie: 9.0, doors: 2, panto: [6.0] }, cabR: { body: 27.0, bogie: 9.0, rear: true, doors: 2 } },
     },
     /* CFL 2300 (Stadler KISS): silver sides, red doors and big red face under a wide windscreen with the LED destination board. */
     kiss: {
-      darkGlass: true,
+      darkGlass: true, cabWallCol: '#2b3036', cabWallFull: true,
+      facePanels: [{ y0: 1.78, y1: 2.0, color: '#5d636b', r: 0.08, inset: 0.12, hole: false, z: 0.003 }, { y0: 0.7, y1: 1.05, color: '#14171a', r: 0.07, w: 0.17, cx: -0.8, hole: false, z: 0.003 }, { y0: 0.7, y1: 1.05, color: '#14171a', r: 0.07, w: 0.17, cx: 0.8, hole: false, z: 0.003 }],
       decal: 'cfl',
       cabLining: 0xc8ccd0,
       W: 2.8, yb: 0.6, floor: 1.0, sill: 1.3, head: 2.0, sill2: 3.0, head2: 3.75, ytop: 4.6, wheelR: 0.43, wb: 2.5, gap: 0.8,
       pillar: '#20262b', bay: 1.6, doorW: 1.3, doorY0: 0.62, doorMargin: 3.7, bellows: true, buffers: false, double: true,
       recipe: { lower: 'accent', mid: 'body', upper: 'body', nose: 'accent', noseHi: 'body', doorLower: 'accent', doorUpper: 'accent', stripeCol: 'stripe', roof: '#c9ced1' }, noseHiY: 2.0,
-      nose: { len: 3.6, N: 15, capSx: 0.6, a: 2.0, b: 2.0, drop: 2.55, lift: 0.25, rake: 0, pd: 1.6, pl: 2, pr: 1, sideWin: [4, 9], roundTip: 1.0, rp: 0.9, lowIn: 0.35, lp: 1.3, roofScr: { k0: 1, k1: 9, xlim: 0.82 } }, cabWin: { y0: 1.85, y1: 2.95 },
-      scr: { kind: 'roof', hw: 0.9, y0: 2.0, y1: 3.2 }, cabFrame: { dz: 2.3, capSx: 0.8, rake: 0.3 }, cabFloor: 1.0, mirror: 0.2,
+      nose: { len: 3.0, N: 14, zPow: 1.4, capSx: 0.72, a: 2.4, b: 2.0, drop: 1.5, lift: 0.15, rake: 0.5, pd: 2.0, pl: 2, pr: 1, sideWin: [4, 9], roundTip: 1.0, rp: 1.0, lowIn: 0.15, lp: 1.3 }, cabWin: { y0: 1.85, y1: 2.95 },
+      scr: { kind: 'single', cabWipers: true, hw: 0.98, y0: 2.0, y1: 3.2, topInset: 0.3 }, cabFrame: { dz: 2.3, capSx: 0.8, rake: 0.3 }, cabFloor: 1.0, mirror: 0.2,
       kinds: { cabF: { body: 26.6, bogie: 8.6, front: true, doors: 2 }, mid: { body: 26.6, bogie: 8.6, doors: 2 }, midP: { body: 26.6, bogie: 8.6, doors: 2, panto: [6.0] }, cabR: { body: 26.6, bogie: 8.6, rear: true, doors: 2 } },
     },
     /* CFL 2400 / 2450 (Alstom Coradia Stream HC): white double-deck cars, a big sloping red face with a black windscreen surround. */
     coradia: {
-      darkGlass: true,
+      darkGlass: true, cabWallCol: '#2b3036', cabWallFull: true,
+      facePanels: [{ y0: 1.55, y1: 3.4, color: '#101316', r: 0.3, inset: 0.05, topInset: 0.25 }, { y0: 0.95, y1: 1.3, color: '#0b0d0f', r: 0.16, w: 0.3, cx: -0.82, hole: false, z: 0.004 }, { y0: 0.95, y1: 1.3, color: '#0b0d0f', r: 0.16, w: 0.3, cx: 0.82, hole: false, z: 0.004 }],
       decal: 'cfl', sweep: { len: 6.5, y0: 1.0, y1: 2.9 },
       cabLining: 0xd5d8da,
       W: 2.9, yb: 0.6, floor: 0.95, sill: 1.2, head: 1.95, sill2: 2.8, head2: 3.55, ytop: 4.3, wheelR: 0.43, wb: 2.6, gap: 0.7,
       pillar: '#14181c', bay: 1.7, doorW: 1.3, doorY0: 0.62, doorMargin: 3.0, bellows: true, buffers: false, double: true,
       recipe: { lower: 'accent', mid: 'accent', upper: 'body', nose: 'accent', noseHi: '#101316', doorLower: 'accent', doorUpper: 'accent', stripeCol: 'body', roof: '#b9bec1' }, noseHiY: 1.9,
-      nose: { len: 3.4, N: 14, capSx: 0.62, a: 1.7, b: 1.8, drop: 2.3, lift: 0.25, rake: 0, pd: 1.6, pl: 2, pr: 1, sideWin: [3, 8], roundTip: 0.98, rp: 1.0, lowIn: 0.3, lp: 1.4, roofScr: { k0: 1, k1: 8, xlim: 0.82 } }, cabWin: { y0: 1.85, y1: 3.0 },
-      scr: { kind: 'roof', hw: 0.95, y0: 1.9, y1: 3.05 }, cabFrame: { dz: 2.2, capSx: 0.8, rake: 0.3 }, cabFloor: 0.95, mirror: 0.2,
+      nose: { len: 3.2, N: 14, zPow: 1.4, capSx: 0.7, a: 2.4, b: 2.0, drop: 1.45, lift: 0.2, rake: 0.55, pd: 2.0, pl: 2, pr: 1, sideWin: [4, 9], roundTip: 1.0, rp: 1.0, lowIn: 0.25, lp: 1.3 }, cabWin: { y0: 1.85, y1: 3.0 },
+      scr: { kind: 'single', cabWipers: true, hw: 0.95, y0: 1.9, y1: 3.1, topInset: 0.3 }, cabFrame: { dz: 2.2, capSx: 0.8, rake: 0.3 }, cabFloor: 0.95, mirror: 0.2,
       kinds: { cabF: { body: 27.33, bogie: 9.2, front: true, doors: 2 }, mid: { body: 27.33, bogie: 9.2, doors: 2 }, midP: { body: 27.33, bogie: 9.2, doors: 2, panto: [6.0] }, cabR: { body: 27.33, bogie: 9.2, rear: true, doors: 2 } },
     },
     tram: {
@@ -131,13 +135,22 @@
     /* SNCF TGV inOui Euroduplex (TGV 2N2): 2 power cars + 8 articulated double-deck trailers. Silver-white, dark glazed band along the power car, the red line along the whole train,
        dark nose top and windscreen. */
     hst: {
+      paintRough: 0.9, paintMetal: 0,
       darkGlass: true,
       decal: 'tgv',
       cabLining: 0xa9bde6,
       W: 2.9, yb: 0.62, floor: 0.8, sill: 1.15, head: 1.95, sill2: 2.72, head2: 3.5, ytop: 4.3, wheelR: 0.46, wb: 3.0, gap: 0.5,
       pillar: '#262c34', blank: '#5a616a', bay: 1.4, doorW: 1.25, doorY0: 0.66, doorMargin: 2.6, bellows: true, buffers: false, tables: true, double: true,
       recipe: { lower: 'body', mid: 'body', upper: 'body', nose: 'body', noseHi: 'stripe', doorLower: 'body', doorUpper: 'body', stripeCol: 'accent', roof: '#9ea4a9' }, noseKeepStripe: true, noseHiY: 2.72, facePanels: [{ y0: 0.98, y1: 1.4, color: '#2b3036', r: 0.12, inset: 0.04, hole: false }],
-      nose: { len: 5.8, N: 16, capSx: 0.72, a: 2.8, b: 2.0, drop: 2.45, lift: 0.1, rake: 0, pd: 1.2, pl: 2, pr: 1, sideWin: null, roundTip: 1.0, rp: 1.0, lowIn: 0.4, lp: 1.4, roofScr: { k0: 4, k1: 10, xlim: 0.8 } },
+      nose: { len: 7.2, N: 26, zPow: 1.7, capSx: 0.68, a: 3.0, b: 2.0, drop: 3.0, lift: 0.1, rake: 0.35, pd: 2.0, pl: 1.5, pr: 1, sideWin: null, roundTip: 1.0, rp: 1.0, lowIn: 0.3, lp: 1.3, roofScr: { k0: 14, k1: 21, xlim: 0.8 } },
+      lamp: { y: 1.52, d: 0.3, x: 0.62, s: 1.25 },
+      /* the dark glossy mask of the TGV Duplex nose (windscreen + headlight band) is everything above the red inOui line; the chin bulb below it stays body colour, the pilot skirt is black */
+      sweeps: [{ pts: [[0.4, 1.5], [1.4, 1.62], [2.6, 2.0], [4.0, 2.7], [5.5, 3.3]], w: 0.2, color: 'accent' }],
+      nosePaint: (d, ax, y, c) => {
+        const L = TGV_MASK_LINE; let ly = L[L.length - 1][1];
+        for (let k = 0; k < L.length - 1; k++) if (d <= L[k + 1][0]) { ly = L[k][1] + (L[k + 1][1] - L[k][1]) * (d - L[k][0]) / (L[k + 1][0] - L[k][0]); break; }
+        return y > ly ? [0.035, 0.04, 0.05] : y < 0.88 && d < 2.0 ? [0.12, 0.13, 0.15] : null;
+      },
       scr: { kind: 'roof', hw: 0.72, y0: 2.35, y1: 3.3 }, cabFloor: 1.45, mirror: 0.2, tilt: true, cabFrame: { dz: 4.0, capSx: 0.66, rake: 0.1 },
       pc: { floor: 1.45, cabFloor: 1.45, wb: 3.0, wheelR: 0.46, double: false, sill: 1.75, head: 2.85 },
       kinds: { pcF: { body: 22.15, bogie: 7.4, front: true, pcar: true, doors: 0, panto: [5.5] }, trailer: { body: 18.2, bogie: 9.35, doors: 2, shared: true }, pcR: { body: 22.15, bogie: 7.4, rear: true, pcar: true, doors: 0, panto: [-5.5] } },
@@ -380,12 +393,16 @@
     return g;
   }
 
+  /* Draw-call diet for the rail cars: the plain vertex-coloured detail materials (trim, metal, steel, rubber, floor, off lenses) share ONE double-sided material, the unlit ones another.
+     A car had 10 material groups in its detail mesh; now 5 - 6. (The tram keeps its separate materials: its baked models and looks depend on them.) */
+  const RAIL_ALIAS = Object.freeze({ trim: 'detail', metal: 'detail', m: 'detail', steel: 'detail', rubber: 'detail', r: 'detail', floor: 'detail', lensOff: 'detail', litF: 'lit' });
   function trainMats() {
     const s = sharedMats();
     const m = Object.assign({}, s);
     m.headF = new T.MeshStandardMaterial({ vertexColors: true, color: 0xffffff, emissive: 0xfff3d0, emissiveIntensity: 0, roughness: 0.2, metalness: 0.2 });
     m.tailR = new T.MeshStandardMaterial({ vertexColors: true, color: 0xffffff, emissive: 0xff2a1a, emissiveIntensity: 0, roughness: 0.3, metalness: 0.1 });
     m.lamp = new T.MeshBasicMaterial({ vertexColors: true, color: 0xdad6c6 });
+    m.detail = new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.66, metalness: 0.2, side: T.DoubleSide }); m.detail.userData.shared = false;
     m.glass = shared.glass.clone();
     m.glass.userData.shared = false;
     m.glassD = shared.glass.clone(); // tinted side glazing (Luxtram: near-black, continuous band)
@@ -400,7 +417,7 @@
     m.insideFwd = m.inside.clone(); m.insideFwd.userData.shared = false;
     m.beamHead = makeBeamMaterial([0, -0.03, -1], 100, 0.1); m.beamTail = makeBeamMaterial([0, -0.05, 1], 16, 0.3);
     m.ghost = new T.MeshBasicMaterial({ colorWrite: false, depthWrite: false }); // invisible but still casts shadows
-    m.own = [m.sh, m.pax, m.insideFwd, m.ghost, m.headF, m.tailR, m.lamp, m.glass, m.glassD, m.dest, m.inside, m.seat, m.glowHead, m.glowTail, m.beamHead, m.beamTail];
+    m.own = [m.detail, m.sh, m.pax, m.insideFwd, m.ghost, m.headF, m.tailR, m.lamp, m.glass, m.glassD, m.dest, m.inside, m.seat, m.glowHead, m.glowTail, m.beamHead, m.beamTail];
     return m;
   }
 
@@ -442,8 +459,9 @@
   function makeBuilder() {
     const buckets = new Map();
     const raw = [];
-    const b = { xf: new T.Matrix4(), raw };
+    const b = { xf: new T.Matrix4(), raw, alias: null };
     b.push = (key, g, color) => {
+      if (b.alias && b.alias[key]) key = b.alias[key];
       const p = prep(g, color);
       p.applyMatrix4(b.xf);
       if (!buckets.has(key)) buckets.set(key, []);
@@ -456,6 +474,8 @@
       g.translate(x, y, z); b.push(key, g, color);
     };
     b.geo = (key, g, color) => b.push(key, g, color);
+    /* copy everything collected so far into another builder, moved by `matrix` (keys and vertex colours kept) */
+    b.copyTo = (other, matrix) => { buckets.forEach((list, key) => { for (const g of list) { const c = g.clone(); c.applyMatrix4(matrix); other.geo(key, c, null); } }); };
     b.bake = (mats, opts) => {
       const keys = [...buckets.keys()];
       if (!keys.length) return null;
@@ -592,6 +612,14 @@
       b.box('m', 1.1, 0.12, 0.16, 0, by - 0.18, wb * 0.32, '#4a4f54');
       b.cyl('m', 0.05, 0.05, 0.5, 0, by + 0.05, 0.4, '#8a8e92', 'z', 6); // traction rod
       return mergeInto(b.raw);
+    });
+  }
+  /* bogie frame + the two wheelsets in one geometry (rail cars) */
+  function bogieSolidGeo(S, R, wb, motor) {
+    return memo('bs:' + [R, wb, motor].join(':'), () => {
+      const parts = [{ g: bogieFrameGeo(S, R, wb, motor).clone() }];
+      [-wb / 2, wb / 2].forEach((z) => { const w = wheelsetGeo(R, motor && z < 0).clone(); w.translate(0, R, z); parts.push({ g: w }); });
+      return mergeInto(parts);
     });
   }
   function seatGeo() { // one seat unit (0.46 m wide), faces -Z; vertex colour = fabric shade (tinted per instance)
@@ -742,8 +770,9 @@
     const noseZs = (sign) => { for (let i = 0; i <= nose.N; i++) zsSet.add(+(sign * (L / 2 - nose.len * (1 - i / nose.N))).toFixed(4)); };
     // sign: -1 front (z from -L/2 upward), +1 rear
     const frontZs = [], rearZs = [];
-    if (noseF) for (let i = 0; i <= nose.N; i++) frontZs.push(zF + nose.len * (i / nose.N)); else frontZs.push(zF, zF + 0.6);
-    if (noseR) for (let i = 0; i <= nose.N; i++) rearZs.push(zR - nose.len * (i / nose.N)); else rearZs.push(zR, zR - 0.6);
+    const zPow = nose.zPow || 1;   // > 1: the rows crowd towards the tip, so a rounded plan (the TGV chin) is not a faceted fan
+    if (noseF) for (let i = 0; i <= nose.N; i++) frontZs.push(zF + nose.len * Math.pow(i / nose.N, zPow)); else frontZs.push(zF, zF + 0.6);
+    if (noseR) for (let i = 0; i <= nose.N; i++) rearZs.push(zR - nose.len * Math.pow(i / nose.N, zPow)); else rearZs.push(zR, zR - 0.6);
     const wzA = hasWin ? (noseF ? zF + nose.len + 0.7 : zF + 0.9) : 0;
     const wzB = hasWin ? (noseR ? zR - nose.len - 0.7 : zR - 0.9) : 0;
     // door positions (car-local z): needed before the hull rows, the saloon lining is cut open exactly at the doorways
@@ -786,7 +815,7 @@
     const strips = zList.length - 1;
     const stripMid = (k) => (zList[k] + zList[k + 1]) / 2;
     const inNose = (k, front) => front ? stripMid(k) < zF + nose.len : stripMid(k) > zR - nose.len;
-    const noseStripFromTip = (k, front) => Math.floor((front ? stripMid(k) - zF : zR - stripMid(k)) / (nose.len / nose.N));
+    const noseStripFromTip = (k, front) => Math.floor(nose.N * Math.pow(Math.max(0, (front ? stripMid(k) - zF : zR - stripMid(k)) / nose.len), 1 / zPow));
     const winOpen = (k) => {
       if (!hasWin && !(nose && nose.sideWin)) return false;
       const m = stripMid(k);
@@ -816,6 +845,19 @@
     };
     function rowSx(k) { return shapeAt(zList[k]).sx; }
     const bodyGeo = loft(rows, segSkip);
+    /* painted noses (TGV mask / chin): S.nosePaint(d, |x|, y, rgb) -> rgb | null for every hull vertex of a nose, d = distance from the tip (m) */
+    if (S.nosePaint && (noseF || noseR)) {
+      const pa = bodyGeo.attributes.position, ca = bodyGeo.attributes.color, base = [0, 0, 0]; let nPainted = 0;
+      for (let i = 0; i < pa.count; i++) {
+        const z = pa.getZ(i);
+        const d = noseF && z <= zF + nose.len + 1e-3 ? z - zF : noseR && z >= zR - nose.len - 1e-3 ? zR - z : -1;
+        if (d < 0) continue;
+        base[0] = ca.getX(i); base[1] = ca.getY(i); base[2] = ca.getZ(i);
+        const c = S.nosePaint(d, Math.abs(pa.getX(i)), pa.getY(i), base);
+        if (c) { ca.setXYZ(i, c[0], c[1], c[2]); nPainted++; }
+      }
+      if (window.__paintDebug) warn('nosePaint painted ' + nPainted + ' of ' + pa.count + ' vertices');
+    }
     const bodyMesh = new T.Mesh(bodyGeo, mats.paint);
     bodyMesh.castShadow = true; bodyMesh.receiveShadow = true;
     group.add(bodyMesh);
@@ -854,6 +896,9 @@
 
     // ---- detail builder (everything else merged)
     const B = makeBuilder();
+    if (!S.tram) B.alias = RAIL_ALIAS;
+    const doorsClosedB = makeBuilder();   // the closed doors of the whole car as static geometry (rail cars): shown instead of the animated leaves while every door is shut
+    if (!S.tram) doorsClosedB.alias = RAIL_ALIAS;
     const doorsOut = [];
     const wiperPivots = [];
     const headApex = [], tailApex = [], glowHeads = [], glowTails = [], lampPos = {};
@@ -939,6 +984,7 @@
           const g0 = rbox(leafW, split, 0.07, 0.02).rotateY(Math.PI / 2); g0.translate(0, -lh / 2 + split / 2, 0);
           const g1 = rbox(leafW, lh - split, 0.07, 0.02).rotateY(Math.PI / 2); g1.translate(0, -lh / 2 + split + (lh - split) / 2, 0);
           const pb = makeBuilder();
+          if (!S.tram) pb.alias = RAIL_ALIAS;
           if (S.tram) { // glazed leaf: black frame, big coloured panes (the door colour of this car), silver grab handle
             const dcol = (C.doors || [upCol])[idx % (C.doors || [upCol]).length];
             // frame as four borders + the split bar (a solid slab would be a black wall seen from inside the saloon)
@@ -977,11 +1023,22 @@
           mesh.rotation.y = s > 0 ? 0 : Math.PI;
           const yC = (h0 + h1) / 2;
           leaf.position.set(s * (hw + 0.03), yC, dz + e * (leafW / 2 + 0.006));
+          if (!S.tram) {   // rail: the same leaf as static geometry in the closed-doors mesh; the animated leaf is hidden until a door opens
+            pb.copyTo(doorsClosedB, new T.Matrix4().compose(leaf.position.clone(), new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), mesh.rotation.y), new T.Vector3(1, 1, 1)));
+            leaf.visible = false;
+          }
           group.add(leaf);
           doorAnim.push({ leaf, side, s, dz, e, travel: dw / 2 - 0.03, baseX: s * (hw + 0.03), baseZ: leaf.position.z });
         }
         doorsOut.push({ side, zLocal: dz, width: dw });
       }
+    }
+
+    // closed doors of a rail car: one small static mesh (3 material groups) instead of 8 animated leaves of 5 groups each (40 draw calls): the leaves show only while a door is open
+    let doorsClosedMesh = null;
+    if (!S.tram && doorAnim.length) {
+      doorsClosedMesh = doorsClosedB.bake(mats, { noShadow: true });
+      if (doorsClosedMesh) { doorsClosedMesh.userData.disposeGeo = true; doorsClosedMesh.userData.noBake = true; doorsClosedMesh.name = 'doors-closed'; group.add(doorsClosedMesh); }
     }
 
     // ----- logo decal + car number (canvas)
@@ -991,6 +1048,7 @@
       dm.userData.perTrain = true;
       const decalW = S.tram ? 2.6 : Math.min(5.6, L * 0.3), decalH = decalW / 5.6 * 0.9;
       const yLow = S.tram ? S.yb + 0.3 : S.yb + 0.12 + (S.sill - S.yb - 0.12) * 0.5;
+      const decalGeos = [];
       for (const s of [-1, 1]) {
         const free = hasWin ? carDoors : [];
         let zc = 0;
@@ -999,12 +1057,14 @@
         zc = cand.find((z) => !clash(z) && Math.abs(z) < L / 2 - decalW / 2 - 0.3);
         if (zc === undefined) zc = 0;
         if (S.tram && !hasWin) continue;
-        const m = new T.Mesh(new T.PlaneGeometry(decalW, decalH), dm);
-        m.position.set(s * (hw + 0.012), yLow, zc);
-        m.rotation.y = s > 0 ? Math.PI / 2 : -Math.PI / 2;
+        const pg = new T.PlaneGeometry(decalW, decalH); pg.rotateY(s > 0 ? Math.PI / 2 : -Math.PI / 2); pg.translate(s * (hw + 0.012), yLow, zc);
+        decalGeos.push({ g: prep(pg) });
+        group.userData.decalMat = dm;
+      }
+      if (decalGeos.length) {   // both sides in one mesh: one draw call
+        const m = new T.Mesh(mergeInto(decalGeos), dm);
         m.userData.disposeGeo = true;
         group.add(m);
-        group.userData.decalMat = dm;
       }
     }
 
@@ -1032,6 +1092,8 @@
 
     const nz = (S.cabFrame && S.cabFrame.dz) || 0;
     const apD = S.apron ? S.apron.depth : 0;
+    const faceFrameB = makeBuilder();   // the rubber surround of a front-face windscreen: hidden in the cab view when the driver's own screen is at cabFrame (scr.cabWipers), or it would float 3 m ahead
+    let faceFrameMesh = null;
     const buildNose = (front) => {
       const sign = front ? -1 : 1;
       const zEnd = front ? zF : zR;
@@ -1080,7 +1142,7 @@
       if (hole && glassPoly) {
         const outerP = roundedPoly(sc.hw + 0.02, sc.y0 - 0.02, sc.y1 + 0.02, 0.14, tIn);
         const frame = new T.Shape(outerP); frame.holes.push(new T.Path(glassPoly.slice().reverse()));
-        B.geo('rubber', planeShape(frame, zEnd - (front ? 0.008 : -0.008), capRake, S.yb, 0, '#101214', front), null);
+        (sc.cabWipers ? faceFrameB : B).geo('rubber', planeShape(frame, zEnd - (front ? 0.008 : -0.008), capRake, S.yb, 0, '#101214', front), null);
         const glassShape = new T.Shape(glassPoly);
         glassB.geo('glass', planeShape(glassShape, zEnd + (front ? 0.03 : -0.03), capRake, S.yb, 0, null, front), null);
         if (sc.kind === 'twin') B.box('rubber', sc.divX !== undefined ? 0.06 : 0.1, sc.y1 - sc.y0 + 0.04, 0.05, sc.divX !== undefined ? sc.divX : sc.hw * 0.52, (sc.y0 + sc.y1) / 2, zEnd + sign * 0.0 + capRake * ((sc.y0 + sc.y1) / 2 - S.yb), sc.pillarCol || '#d9ccb0');
@@ -1092,17 +1154,19 @@
       if (S.facePanels) {
         const keyed = { body: livery.body, accent: livery.accent, stripe: livery.stripe };
         for (const fp of S.facePanels) {
-          const wpan = hw * sh.sx - (fp.inset === undefined ? 0.03 : fp.inset);
-          const shp = new T.Shape(roundedPoly(wpan, fp.y0, fp.y1, fp.r === undefined ? 0.1 : fp.r, fp.topInset || 0));
+          const wpan = fp.w !== undefined ? fp.w : hw * sh.sx - (fp.inset === undefined ? 0.03 : fp.inset);
+          const shp = new T.Shape(roundedPoly(wpan, fp.y0, fp.y1, fp.r === undefined ? 0.1 : fp.r, fp.topInset || 0).map((q) => new T.Vector2(q.x + (fp.cx || 0), q.y)));
           if (hole && fp.hole !== false && sc) shp.holes.push(new T.Path(roundedPoly(sc.hw + 0.02, sc.y0 - 0.02, sc.y1 + 0.02, 0.14, tIn).slice().reverse()));
           B.geo('paint', planeShape(shp, zEnd, capRake, S.yb, sign * (0.006 + (fp.z || 0)), keyed[fp.color] || fp.color, front), null);
         }
       }
       // lights at the cap
-      const lensY = S.yb + sh.lift + (apD ? 0.62 : 0.42), lensX = Math.max(0.18, hw * sh.sx * 0.6);
-      const zAt = (y) => (apD ? zEnd + sign * apD : zEnd + capRake * (y - S.yb));
+      const lampOnNose = S.lamp && isNose ? S.lamp : null;   // lamps sit on the sloping nose surface at a given height / distance from the tip (the TGV mask), not on the cap plane
+      const lensY = lampOnNose ? lampOnNose.y : S.yb + sh.lift + (apD ? 0.62 : 0.42), lensX = lampOnNose ? lampOnNose.x : Math.max(0.18, hw * sh.sx * 0.6);
+      const zAt = (y) => (lampOnNose ? zEnd - sign * lampOnNose.d : apD ? zEnd + sign * apD : zEnd + capRake * (y - S.yb));
+      const LW = lampOnNose && lampOnNose.s ? lampOnNose.s : 1;
       const rb = (w, h, x, y, key, col, role) => {
-        const g = rbox(w, h, 0.05, 0.03);
+        const g = rbox(w * LW, h * LW, 0.05 * Math.max(1, LW), 0.03);
         if (!front) g.rotateY(Math.PI);
         g.translate(x, y, zAt(y) + sign * 0.012);
         (role ? B : B).geo(key, g, col);
@@ -1234,7 +1298,7 @@
           rainMesh.position.z = 0.075; wg.add(rainMesh);
         }
       };
-      if (sc && sc.kind === 'roof') { // long sloped roof screen (high-speed nose): the wipers and drops sit on the plane of the cab window (cabFrame), where the driver looks through
+      if (sc && (sc.kind === 'roof' || sc.cabWipers)) { // long sloped roof screen (high-speed nose): the wipers and drops sit on the plane of the cab window (cabFrame), where the driver looks through
         const cf = S.cabFrame || { dz: 0, rake: 0 }, rk = (front ? 1 : -1) * cf.rake, yw = sc.y0 + 0.05;
         const wg = new T.Group();
         wg.position.set(0, yw, zEnd + (front ? cf.dz : -cf.dz) + rk * (yw - S.yb) + sign * 0.02);
@@ -1243,7 +1307,7 @@
         addWipers(wg, sc.hw + 0.05, sc.y1 - sc.y0 - 0.1, 0, sc.hw + 0.07);
         group.add(wg);
       }
-      if (sc && sc.kind !== 'roof') {
+      if (sc && sc.kind !== 'roof' && !sc.cabWipers) {
         const wg = new T.Group();
         const yw = sc.y0 + 0.05;
         wg.position.set(0, yw, zEnd + capRake * (yw - S.yb) + sign * 0.03);
@@ -1254,6 +1318,38 @@
       }
     };
     buildNose(true); buildNose(false);
+    faceFrameMesh = faceFrameB.bake(mats, { noShadow: true });
+    if (faceFrameMesh) { faceFrameMesh.userData.disposeGeo = true; group.add(faceFrameMesh); paintMeshes.push(faceFrameMesh); }   // a paint mesh: ghosted in the cab view
+    /* body-colour sweeps on the nose sides (the TGV inOui line rising up the power car): S.sweeps = [{ pts: [[d, y], ...] (distance from the tip, height), w, color: 'accent' | hex }] as flat ribbons 12 mm off the hull */
+    if (S.sweeps && (noseF || noseR)) {
+      const sweepB = makeBuilder();
+      for (const sw of S.sweeps) {
+        const col = sw.color === 'accent' ? livery.accent : sw.color === 'stripe' ? livery.stripe : sw.color || livery.accent;
+        for (const front of [true, false]) {
+          if (front ? !noseF : !noseR) continue;
+          const zT = front ? zF : zR, sgn = front ? 1 : -1;
+          const P = sw.pts.map(([d, y0]) => {   // d = distance of the ring from the tip, y0 = final height; x follows the real hull ring (wall + roof arc) at that height, z includes the ring's rake
+            const u = clamp(1 - d / nose.len, 0, 1), row = noseShapeAt(nose, u), R = ringFor(S, bands, roofC, row, null, null);
+            const y = Math.min(y0, R[R.length - 1].y - 0.02);
+            let x = R[R.length - 2].x;
+            for (let j = 0; j < R.length - 1; j++) { const A = R[j], Bq = R[j + 1]; if (Bq.y > A.y + 1e-6 && y >= A.y - 1e-6 && y <= Bq.y + 1e-6 && A.x > 0) { x = A.x + (Bq.x - A.x) * (y - A.y) / (Bq.y - A.y); break; } }
+            return { z: zT + sgn * (d + row.rake * (y - S.yb)), y, x: x + 0.014 };
+          });
+          for (const side of [-1, 1]) {
+            const pos = [];
+            for (let i = 0; i < P.length - 1; i++) {
+              const a = P[i], b = P[i + 1], hwA = (sw.w || 0.2) * (1 - 0.7 * i / P.length) / 2, hwB = (sw.w || 0.2) * (1 - 0.7 * (i + 1) / P.length) / 2;
+              const q = [[a.x * side, a.y - hwA, a.z], [a.x * side, a.y + hwA, a.z], [b.x * side, b.y - hwB, b.z], [b.x * side, b.y + hwB, b.z]];
+              for (const t of [[0, 1, 2], [1, 3, 2], [0, 2, 1], [1, 2, 3]]) for (const k of t) pos.push(...q[k]);
+            }
+            const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
+            sweepB.geo('paint', g, col);
+          }
+        }
+      }
+      const sweepMesh = sweepB.bake(mats, { noShadow: true });
+      if (sweepMesh) { sweepMesh.userData.disposeGeo = true; group.add(sweepMesh); paintMeshes.push(sweepMesh); }   // a paint mesh: ghosted in the cab view like the hull
+    }
     const mkBeam = (apexes, mat, tint, name) => {
       if (!apexes.length) return null;
       const m = new T.Mesh(beamGeometry(apexes, tint), mat); m.frustumCulled = false; m.visible = false; m.renderOrder = 3; m.name = name; m.userData.disposeGeo = true;
@@ -1265,10 +1361,11 @@
     const cabWall = (front) => {
       const sign = front ? -1 : 1, zEnd = front ? zF : zR, d = 2.75;
       const dd = d + nz, sxw = dd < nose.len ? noseShapeAt(nose, 1 - dd / nose.len).sx : 1;
-      const g = new T.PlaneGeometry(S.W * 0.95 * sxw, S.head - cabFloorY + 0.3); g.translate(0, (S.head + 0.3 + cabFloorY) / 2, zEnd - sign * (d + nz));
+      const wallTop = S.cabWallFull ? S.ytop - 0.5 : S.head + 0.3;   // modern double-deck cabs: the dark bulkhead reaches the roof (the upper deck must not show through the windscreen)
+      const g = new T.PlaneGeometry(S.W * (S.cabWallFull ? 0.8 : 0.95) * sxw, wallTop - cabFloorY); g.translate(0, (wallTop + cabFloorY) / 2, zEnd - sign * (d + nz));
       return g;
     };
-    const cabWallCol = S.tram ? '#2b3138' : '#b9b6ac';
+    const cabWallCol = S.tram ? '#2b3138' : S.cabWallCol || '#b9b6ac';
     if (noseF) B.geo('floor', cabWall(true), cabWallCol);
     if (noseR) B.geo('floor', cabWall(false), cabWallCol);
 
@@ -1322,7 +1419,7 @@
         }
       }
       /* the upper deck floor starts behind the sloped nose: with a long nose its slab would hang right above the driver's head (the dark slab in the cab view) */
-      if (S.double) fl(2.47, noseF ? Math.max(wallA, zF + nose.len + 1.2) : wallA, noseR ? Math.min(wallB, zR - nose.len - 1.2) : wallB, hw * 2 - 0.12, '#a9aeb2');
+      if (S.double) fl(2.47, noseF ? Math.max(wallA, zF + nz + 2.85) : wallA, noseR ? Math.min(wallB, zR - nz - 2.85) : wallB, hw * 2 - 0.12, '#a9aeb2');
       seatInst = new T.InstancedMesh(S.tram ? seatGeoTram() : seatGeo(), mats.seat, Math.max(1, places.length));
       const m4 = new T.Matrix4(), q = new T.Quaternion(), sc3 = new T.Vector3(1, 1, 1), colr = new T.Color(), up = new T.Vector3(0, 1, 0);
       const baseFab = (lum(livery.accent) < 0.6 && lum(livery.accent) > 0.04) ? livery.accent : SEAT_COL[model] || '#2d6aa6';
@@ -1337,7 +1434,11 @@
       group.add(seatInst);
       for (const t of tables) { B.box('trim', 0.8, 0.035, 0.52, t[0], t[1], t[2], '#c9bda4'); B.box('metal', 0.05, 0.7, 0.05, t[0] + (t[0] > 0 ? 0.2 : -0.2), t[1] - 0.36, t[2], '#9aa0a5'); }
       // aisle runner + lighter floor
-      for (const fy of decks) B.box('floor', 0.6, 0.062, Math.max(1, wzB - wzA), 0, fy + 0.002, (wzA + wzB) / 2, '#7d8da2');
+      for (const fy of decks) {   // aisle runner; on the upper deck it starts behind the cab bulkhead (it would hang above the driver's head)
+        const upper = S.double && fy > 2;
+        const a0 = upper && noseF ? Math.max(wzA, zF + nz + 2.85) : wzA, b0 = upper && noseR ? Math.min(wzB, zR - nz - 2.85) : wzB;
+        if (b0 - a0 > 1) B.box('floor', 0.6, 0.062, b0 - a0, 0, fy + 0.002, (a0 + b0) / 2, '#7d8da2');
+      }
       // luggage racks (single-level cars)
       if (!S.double && !S.tram) {
         const ry = S.floor + (S.tram ? 1.55 : 1.62), segs = [];
@@ -1606,6 +1707,10 @@
     for (const sgn of [-1, 1]) {
       const bg = new T.Group(); bg.position.set(0, 0, sgn * K.bogie); bg.name = 'bogie';
       if (K.shared && sgn > 0 && idx < total - 2) { group.add(bg); bogieGroups.push(bg); continue; } // articulated: one bogie between two trailers
+      if (!S.tram) {   // rail: frame and both wheelsets are ONE static mesh (the wheels are lathe solids: their spin cannot be seen, so they need no mesh of their own: 3 draws -> 1 per bogie)
+        const solid = new T.Mesh(bogieSolidGeo(S, R, wb, motor), mats.metal); solid.castShadow = true; bg.add(solid);
+        group.add(bg); bogieGroups.push(bg); continue;
+      }
       const frame = new T.Mesh(bogieFrameGeo(S, R, wb, motor), mats.metal); frame.castShadow = true; bg.add(frame);
       for (const z of [-wb / 2, wb / 2]) {
         const w = new T.Mesh(wheelsetGeo(R, motor && z < 0), mats.metal); w.position.set(0, R, z); w.castShadow = true;
@@ -1625,7 +1730,7 @@
 
     // ----- lights
     return {
-      exhaust, ownMats, paintMeshes, fwdLinings, group, length: L + S.gap, body: L, bogieOffset: K.bogie, doors: doorsOut, bogies: bogieGroups, doorAnim, wheelsets: wsList, pantos: panto, wipers: wiperPivots,
+      exhaust, ownMats, paintMeshes, fwdLinings, group, length: L + S.gap, body: L, bogieOffset: K.bogie, doors: doorsOut, bogies: bogieGroups, doorAnim, doorsClosedMesh, wheelsets: wsList, pantos: panto, wipers: wiperPivots,
       interior: tramInterior, saloon: hasWin && mid && !S.tram ? { zA: wallA, zB: wallB, eyeY: S.double ? 3.72 : S.floor + 1.6 } : null, shell: shellMesh, lampMesh, noseFront: noseF, noseRear: noseR, S, beamHead: beamHeadMesh, beamTail: beamTailMesh, glowHeads, glowTails, lampPos, rain: rainMesh,
     };
   }
@@ -1811,6 +1916,7 @@
     const tramLook = model === 'tram'; // tram: darker windscreen tint and a dark cab lining (seen through the glass), like the real thing
     if (tramLook) { mats.glass.color.setHex(0x33434f); mats.glass.envMapIntensity = 0.2; mats.glass.metalness = 0.15; mats.glassD.envMapIntensity = 0.45; mats.inside.color.setHex(0x4a4f56); mats.insideFwd.color.setHex(0x4a4f56); }
     const emitOff = tramLook ? 0x1d2024 : INSIDE_EMIT, emitOn = tramLook ? 0x6a6a68 : INSIDE_EMIT_ON;   // tram cab lights: a neutral lamp glow on the white lining (a warm one turned the cheeks pink at night)
+    if (S0.paintRough) { mats.paint = mats.paint.clone(); mats.paint.roughness = S0.paintRough; mats.paint.metalness = S0.paintMetal === undefined ? mats.paint.metalness : S0.paintMetal; mats.paint.userData.shared = false; mats.own.push(mats.paint); }   // a duller paint for this train (the dark glossy TGV mask caught the sun as a white sheen)
     const darkFwd = !tramLook && !!S0.cabFrame;   // the lining ahead of the driver's frame is seen through the windscreen from outside: dark, like the real glossy black glass (it is ghosted in the cab view)
     if (!tramLook && S0.cabLining) { mats.inside.color.setHex(S0.cabLining); mats.insideFwd.color.setHex(darkFwd ? 0x23262b : S0.cabLining); }   // the cab lining takes the colour of the real cab (the TGV one is blue)
     let cabViewOn = false, cabinOn = false, interiorViewOn = false;
@@ -1901,6 +2007,11 @@
         const o = clamp(open01 || 0, 0, 1);
         const sides = side === 'left' || side === 'right' ? [side] : ['left', 'right'];
         for (const sd of sides) state.open[sd] = o;
+        const anyOpen = state.open.left > 0 || state.open.right > 0;
+        for (const b of built) {   // rail cars: the static closed doors while everything is shut, the animated leaves as soon as one side opens
+          if (b.doorsClosedMesh) b.doorsClosedMesh.visible = !anyOpen;
+          if (b.doorsClosedMesh) for (const d of b.doorAnim) d.leaf.visible = anyOpen;
+        }
         for (const b of built) for (const d of b.doorAnim) {
           if (!sides.includes(d.side)) continue;
           const plug = smooth(o * 4), slide = smooth((o - 0.2) / 0.8);

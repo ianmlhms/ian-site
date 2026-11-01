@@ -58,8 +58,8 @@
     /* CFL Z 2 (class 2000, Z 6400 family desk): olive-grey steel, dark brown top, round analog gauges, a small amber monochrome screen (the ETCS display fitted later). */
     emu: {
       hw: 0.88, top: '#3a3733', body: '#575c52', ramp: '#4b5046', metal: '#a9a283', trim: '#1b1a18', accent: '#b32d2d', wall: '#9fb0be', side: '#8e9aa5', visor: '#6b747c', bezel: '#2a2a28',
-      leverX: -0.22, joystick: false, seat: 'modern', pal: 'amber',
-      pupitre: { w: 0.34, color: '#2c2a27' }, stk: '#d8d2bc', layout: { announce: -0.76, light: -0.62, wiper: -0.48, eb: 0.04, park: 0.18, horn: 0.32, doorL: 0.5, doorR: 0.7 },
+      leverX: -0.3, joystick: false, seat: 'modern', pal: 'amber',
+      pupitre: { w: 0.4, h: 0.06, color: '#3a3733', top: '#4b463f', lever2: 0.2 }, stk: '#d8d2bc', layout: { announce: -0.76, light: -0.62, wiper: -0.48, eb: 0.04, park: 0.18, horn: 0.32, doorL: 0.5, doorR: 0.7 },
       ceil: '#d6dbe0', blind: false, extras: ['extinguisher', 'lantern'], seatCol: ['#6d6a86', '#5f5c78'],
       dials: [{ kind: 'gauge', x: -0.4, r: 0.042, idx: 0, v: 0.06 }, { kind: 'gauge', x: -0.31, r: 0.042, idx: 1, v: 0.06 }, { kind: 'gauge', x: -0.355, r: 0.042, idx: 2, v: 0.15 }, { kind: 'speedo', x: -0.12, r: 0.078 }],
       mfds: [{ x: 0.16, w: 0.27, h: 0.17, role: 'main' }, { x: 0.45, w: 0.14, h: 0.1, role: 'diag' }],
@@ -68,18 +68,18 @@
     /* CFL 2200 (Alstom Coradia Duplex = Z 24500 desk): charcoal console, light grey-white walls with speaker blocks, two small screens + four gauges left, a big display right. */
     z2200: {
       hw: 0.9, top: '#33363a', body: '#2f3235', ramp: '#2a2d30', metal: '#9aa0a6', trim: '#17181a', accent: '#d02a35', wall: '#dedbd0', side: '#c9c6bb', visor: '#b3b0a5', bezel: '#151618',
-      leverX: -0.12, joystick: false, seat: 'modern', pal: 'light',
-      pupitre: { w: 0.3 }, stk: '#c9ccd0', layout: { doorL: -0.72, announce: -0.57, light: -0.42, wiper: -0.28, eb: 0.3, park: 0.44, horn: 0.58, doorR: 0.72 },
-      ceil: '#ebe9e2', blind: true, blindCol: '#202225', extras: ['speaker', 'extinguisher'], seatCol: ['#2d4a9a', '#2a3f86'],
+      leverX: 0.0, joystick: false, seat: 'modern', pal: 'light',
+      pupitre: { w: 0.44, h: 0.07, color: '#101113', top: '#1b1d20', lever2: 0.22 }, stk: '#c9ccd0', layout: { doorL: -0.72, announce: -0.57, light: -0.42, wiper: -0.28, eb: 0.3, park: 0.44, horn: 0.58, doorR: 0.72 },
+      ceil: '#ebe9e2', blind: true, blindCol: '#c9c6bb', extras: ['speaker', 'extinguisher'], seatCol: ['#2d4a9a', '#2a3f86'],
       dials: [{ kind: 'gauge', x: -0.44, r: 0.04, idx: 0, v: 0.045 }, { kind: 'gauge', x: -0.35, r: 0.04, idx: 1, v: 0.045 }, { kind: 'gauge', x: -0.44, r: 0.04, idx: 2, v: 0.135 }, { kind: 'speedo', x: -0.14, r: 0.07 }, { kind: 'gauge', x: 0.04, r: 0.04, idx: 3, v: 0.1 }],
-      mfds: [{ x: 0.27, w: 0.28, h: 0.18, role: 'main' }, { x: -0.38, w: 0.11, h: 0.085, v: 0.17, role: 'diag' }, { x: 0.6, w: 0.14, h: 0.1, role: 'diag' }],
+      mfds: [{ x: 0.52, w: 0.28, h: 0.18, role: 'main' }, { x: -0.38, w: 0.11, h: 0.085, v: 0.17, role: 'diag' }, { x: 0.78, w: 0.12, h: 0.1, role: 'diag' }],
       blocks: [{ x: -0.81, u: 0.05, w: 0.15, d: 0.13, h: 0.13, color: '#e2e0d8' }, { x: 0.81, u: 0.05, w: 0.15, d: 0.13, h: 0.13, color: '#e2e0d8' }],
     },
     /* CFL 2300 (Stadler KISS): curved black console with a silver rim, a round analog speedometer, TFT screens, grey walls. */
     kiss: {
       hw: 0.88, top: '#2c2f33', body: '#26292d', ramp: '#1d2024', metal: '#c6ccd2', trim: '#15181c', accent: '#d02a35', wall: '#c4c8cc', side: '#aeb2b7', visor: '#8d9298', bezel: '#c6ccd2',
       leverX: 0.3, joystick: false, seat: 'modern',
-      pupitre: { w: 0.26, color: '#111316' }, stk: '#cfd3d8', layout: { announce: -0.74, wiper: -0.6, horn: -0.46, light: -0.32, eb: -0.16, park: 0.12, doorL: 0.52, doorR: 0.7 },
+      pupitre: { w: 0.24, h: 0.05, color: '#15171a', top: '#1f2226' }, stk: '#cfd3d8', layout: { announce: -0.74, wiper: -0.6, horn: -0.46, light: -0.32, eb: -0.16, park: 0.12, doorL: 0.52, doorR: 0.7 },
       ceil: '#d5d8dc', blind: true, blindCol: '#2a2d31', extras: ['extinguisher'], seatCol: ['#2a2c30', '#25272b'],
       dials: [{ kind: 'speedo', x: -0.22, r: 0.075 }],
       mfds: [{ x: 0.06, w: 0.27, h: 0.18, role: 'main' }, { x: 0.36, w: 0.19, h: 0.14, role: 'diag' }],
@@ -88,7 +88,7 @@
     coradia: {
       hw: 0.9, top: '#3d4146', body: '#363a3f', ramp: '#22252a', metal: '#aab1b8', trim: '#15171a', accent: '#d02a35', wall: '#d3d6d9', side: '#bfc3c7', visor: '#a4a9ae', bezel: '#101214',
       leverX: 0.0, joystick: false, seat: 'modern',
-      pupitre: { w: 0.3 }, stk: '#d6d9dc', layout: { doorL: -0.72, announce: -0.58, light: -0.44, horn: -0.3, eb: 0.3, park: 0.44, wiper: 0.58, doorR: 0.72 },
+      pupitre: { w: 0.26, h: 0.05, color: '#1a1d20', top: '#25292d' }, stk: '#d6d9dc', layout: { doorL: -0.72, announce: -0.58, light: -0.44, horn: -0.3, eb: 0.3, park: 0.44, wiper: 0.58, doorR: 0.72 },
       ceil: '#e2e4e6', blind: true, blindCol: '#c4c7cb', extras: ['speaker'], seatCol: ['#34373d', '#2e3136'],
       dials: [{ kind: 'speedo', x: 0.0, r: 0.055 }],
       mfds: [{ x: -0.26, w: 0.3, h: 0.19, role: 'main' }, { x: 0.28, w: 0.3, h: 0.19, role: 'aux' }, { x: 0.58, w: 0.1, h: 0.14, role: 'diag' }],
@@ -104,18 +104,18 @@
     /* CFL 3000 (BB 36000 desk): grey painted steel, angled instrument panels with round analog gauges, one small screen, light blue-grey cab. */
     ic: {
       hw: 0.94, top: '#6c7378', body: '#5a6166', ramp: '#2b2e31', metal: '#c0c4c8', trim: '#121417', accent: '#d09a1a', wall: '#a9b6c1', side: '#97a4af', visor: '#7d8a95', bezel: '#2a2c2e',
-      leverX: -0.3, joystick: false, seat: 'modern', pal: 'amber',
-      pupitre: { w: 0.32, color: '#0d0e10' }, stk: '#c9ced3', layout: { wiper: -0.8, light: -0.66, announce: -0.52, eb: 0.0, park: 0.14, horn: 0.28, doorL: 0.5, doorR: 0.72 },
+      leverX: 0.05, joystick: false, seat: 'modern', pal: 'amber',
+      pupitre: { w: 0.44, h: 0.06, color: '#2f3236', top: '#3b3f44', lever2: 0.22 }, stk: '#c9ced3', layout: { wiper: -0.8, light: -0.66, announce: -0.52, eb: 0.0, park: 0.14, horn: 0.28, doorL: 0.5, doorR: 0.72 },
       ceil: '#b8c2cb', blind: false, extras: ['cabinet', 'extinguisher'], seatCol: ['#3b4a5e', '#334257'],
       dials: [{ kind: 'gauge', x: -0.4, r: 0.05, idx: 0, v: 0.1 }, { kind: 'gauge', x: -0.28, r: 0.05, idx: 1, v: 0.1 }, { kind: 'speedo', x: -0.1, r: 0.072 }, { kind: 'gauge', x: 0.05, r: 0.042, idx: 3, v: 0.12 }],
-      mfds: [{ x: 0.3, w: 0.26, h: 0.17, role: 'main' }, { x: 0.62, w: 0.12, h: 0.09, role: 'diag' }],
+      mfds: [{ x: 0.56, w: 0.26, h: 0.17, role: 'main' }, { x: 0.8, w: 0.1, h: 0.09, role: 'diag' }],
       blocks: [{ x: -0.84, u: 0.05, w: 0.14, d: 0.14, h: 0.12, color: '#8a969f' }],
     },
     /* CFL 4000 (Bombardier TRAXX desk): pale blue-grey moulded console, two black-framed screens with soft keys. */
     dosto: {
       hw: 0.98, top: '#8f9fb0', body: '#7a8999', ramp: '#1b1d20', metal: '#c8ced4', trim: '#16181b', accent: '#d02a35', wall: '#bcc8d3', side: '#a8b5c1', visor: '#8f9ba7', bezel: '#101214',
-      leverX: -0.5, joystick: false, seat: 'modern', pal: 'light',
-      pupitre: { w: 0.3, color: '#16181b' }, stk: '#d4dae0', layout: { wiper: -0.82, light: -0.7, eb: -0.2, park: -0.06, horn: 0.08, announce: 0.22, doorL: 0.52, doorR: 0.72 },
+      leverX: -0.72, joystick: false, seat: 'modern', pal: 'light',
+      pupitre: { w: 0.4, h: 0.06, color: '#7c8a99', top: '#8d9aa8', lever2: 0.17 }, stk: '#d4dae0', layout: { wiper: -0.82, light: -0.7, eb: -0.2, park: -0.06, horn: 0.08, announce: 0.22, doorL: 0.52, doorR: 0.72 },
       ceil: '#d0d8df', blind: false, extras: ['switchPanel', 'extinguisher'], seatCol: ['#4a4a8a', '#42427c'],
       dials: [{ kind: 'speedo', x: -0.02, r: 0.06 }, { kind: 'gauge', x: 0.45, r: 0.04, idx: 0, v: 0.12 }, { kind: 'gauge', x: 0.45, r: 0.04, idx: 1, v: 0.05 }],
       mfds: [{ x: -0.28, w: 0.3, h: 0.2, role: 'main' }, { x: 0.22, w: 0.28, h: 0.19, role: 'aux' }],
@@ -123,11 +123,11 @@
     /* SNCF TGV Duplex (the TGV inOui Luxembourg - Paris): black desk, blue-lined cab, round gauges left, the DMI in the middle. */
     hst: {
       hw: 1.0, top: '#16181b', body: '#101214', ramp: '#0c0d0f', metal: '#6b737c', trim: '#0a0b0c', accent: '#4e9a5a', wall: '#6a90dc', side: '#4a72c4', visor: '#8aa8e6', bezel: '#2a2d31',
-      leverX: -0.42, joystick: false, seat: 'modern', pal: 'tgv',
-      pupitre: { w: 0.32, color: '#050607' }, stk: '#9aa3ad', layout: { wiper: -0.82, light: -0.7, announce: -0.58, eb: 0.0, park: 0.14, horn: 0.28, doorL: 0.55, doorR: 0.72 },
+      leverX: -0.5, joystick: false, seat: 'modern', pal: 'tgv',
+      pupitre: { w: 0.44, h: 0.07, color: '#0a0b0c', top: '#15171a', lever2: 0.22 }, stk: '#9aa3ad', layout: { wiper: -0.82, light: -0.7, announce: -0.58, eb: 0.0, park: 0.14, horn: 0.28, doorL: 0.55, doorR: 0.72 },
       ceil: '#c3d3f3', blind: false, extras: [], seatCol: ['#a42a3a', '#932535'],
-      dials: [{ kind: 'gauge', x: -0.46, r: 0.048, idx: 0, v: 0.09 }, { kind: 'gauge', x: -0.35, r: 0.048, idx: 1, v: 0.09 }, { kind: 'speedo', x: -0.2, r: 0.058 }],
-      mfds: [{ x: 0.07, w: 0.26, h: 0.19, role: 'main' }, { x: 0.38, w: 0.2, h: 0.15, role: 'aux' }, { x: 0.65, w: 0.12, h: 0.1, role: 'diag' }],
+      dials: [{ kind: 'gauge', x: -0.9, r: 0.048, idx: 0, v: 0.09 }, { kind: 'gauge', x: -0.79, r: 0.048, idx: 1, v: 0.09 }, { kind: 'speedo', x: -0.66, r: 0.058 }],
+      mfds: [{ x: 0.3, w: 0.26, h: 0.19, role: 'main' }, { x: 0.58, w: 0.2, h: 0.15, role: 'aux' }, { x: 0.83, w: 0.12, h: 0.1, role: 'diag' }],
     },
   };
 
@@ -875,6 +875,7 @@
     const plateU0 = uMinNotch - platePad, plateU1 = uMaxNotch + platePad;
     const plateW = 0.096;
     const plateX = leverX + 0.085;
+    const PUP_H = S.pupitre ? (S.pupitre.h || 0.055) : 0;   // height of the raised console block (pupitre) the lever, its gate plate and the buttons next to it stand on
     const gateCanvas = makeCanvas(isLow ? 96 : 160, Math.round((isLow ? 96 : 160) * (plateU1 - plateU0) / plateW));
     drawGatePlate(gateCanvas, kindName, tipU, plateU0, plateU1);
     const gateTex = tex(canvasTexture(gateCanvas, aniso));
@@ -886,29 +887,31 @@
     deskGroup.matrix.copy(deskFrame);
     deskGroup.matrixWorldNeedsUpdate = true;
     interior.add(deskGroup);
-    gateMesh.position.set(plateX, 0.003, (plateU0 + plateU1) / 2);
+    gateMesh.position.set(plateX, 0.003 + PUP_H, (plateU0 + plateU1) / 2);
     deskGroup.add(gateMesh);
-    // the central console block of the real desk (pupitre): a dark pad with a metal edge around the lever gate
+    // the central console block of the real desk (pupitre): a raised box with a lighter top and a metal edge, the lever(s) and the gate stand on it
     if (S.pupitre) {
-      const P = S.pupitre, pu = (plateU0 + plateU1) / 2, pd = plateU1 - plateU0 + (P.pad || 0.12), pw = P.w || 0.3, px = plateX - 0.03 + (P.dx || 0);
-      deskBox('matte', pw, 0.0018, pd, px, pu, P.color || '#0b0c0e', 0);
-      for (const sx of [-1, 1]) deskBox('metal', 0.007, 0.0026, pd, px + sx * pw / 2, pu, S.metal, 0);
-      for (const sz of [-1, 1]) deskBox('metal', pw + 0.007, 0.0026, 0.007, px, pu + sz * pd / 2, S.metal, 0);
+      const P = S.pupitre, pu = (plateU0 + plateU1) / 2, pd = plateU1 - plateU0 + (P.pad || 0.14), pw = P.w || 0.3, px = plateX - 0.03 + (P.dx !== undefined ? P.dx : (P.lever2 || 0) / 2);
+      deskBox('matte', pw, PUP_H, pd, px, pu, P.color || '#0b0c0e', -0.004);
+      deskBox('matte', pw - 0.03, 0.004, pd - 0.03, px, pu, P.top || '#17191c', PUP_H - 0.006);
+      for (const sx of [-1, 1]) deskBox('metal', 0.007, 0.004, pd, px + sx * pw / 2, pu, S.metal, PUP_H - 0.006);
+      for (const sz of [-1, 1]) deskBox('metal', pw + 0.007, 0.004, 0.007, px, pu + sz * pd / 2, S.metal, PUP_H - 0.006);
     }
     // slot guide along the lever path + frame of the plate
-    deskBox('matte', 0.02, 0.004, plateU1 - plateU0 + 0.02, leverX, (plateU0 + plateU1) / 2, '#050607', 0.0);
-    deskBox('metal', plateW + 0.014, 0.006, plateU1 - plateU0 + 0.014, plateX, (plateU0 + plateU1) / 2, S.metal, -0.004);
+    deskBox('matte', 0.02, 0.004, plateU1 - plateU0 + 0.02, leverX, (plateU0 + plateU1) / 2, '#050607', PUP_H);
+    deskBox('metal', plateW + 0.014, 0.006, plateU1 - plateU0 + 0.014, plateX, (plateU0 + plateU1) / 2, S.metal, -0.004 + PUP_H);
     // moving amber pointer on the plate (follows the lever)
     const markerMat = mat(new T.MeshStandardMaterial({ color: '#7a5a12', emissive: '#ffbf33', emissiveIntensity: 1.4, roughness: 0.4 }));
     const marker = new T.Mesh(geo(box(0.012, 0.006, 0.012)), markerMat);
-    marker.position.set(plateX - plateW / 2 + 0.002, 0.007, tipU(0));
+    marker.position.set(plateX - plateW / 2 + 0.002, 0.007 + PUP_H, tipU(0));
     deskGroup.add(marker);
 
     // lever mount (boot) static, pivot dynamic
-    deskCyl('matte', S.joystick ? 0.045 : 0.034, S.joystick ? 0.05 : 0.04, S.joystick ? 0.03 : 0.022, leverX, leverU, S.trim, 0, 20);
-    deskCyl('metal', S.joystick ? 0.034 : 0.026, S.joystick ? 0.034 : 0.026, 0.01, leverX, leverU, S.metal, S.joystick ? 0.03 : 0.022, 20);
+    deskCyl('matte', S.joystick ? 0.045 : 0.034, S.joystick ? 0.05 : 0.04, S.joystick ? 0.03 : 0.022, leverX, leverU, S.trim, PUP_H, 20);
+    deskCyl('metal', S.joystick ? 0.034 : 0.026, S.joystick ? 0.034 : 0.026, 0.01, leverX, leverU, S.metal, (S.joystick ? 0.03 : 0.022) + PUP_H, 20);
+    let lever2 = null;
     const leverPivot = new T.Group();
-    leverPivot.position.set(leverX, S.joystick ? 0.03 : 0.03, leverU);
+    leverPivot.position.set(leverX, 0.03 + PUP_H, leverU);
     deskGroup.add(leverPivot);
     {
       const parts = [];
@@ -931,7 +934,13 @@
         parts.push(colorize(box(0.052, 0.014, 0.044).translate(0, L - 0.02, 0), S.accent));
         parts.push(colorize(box(0.046, 0.012, 0.038).translate(0, L - 0.115, 0), '#2d3138'));
       }
-      leverPivot.add(new T.Mesh(geo(mergeGeos(parts)), metalOwn('lever', 0.16)));
+      const leverGeo = geo(mergeGeos(parts));
+      leverPivot.add(new T.Mesh(leverGeo, metalOwn('lever', 0.16)));
+      if (S.pupitre && S.pupitre.lever2 !== undefined) {   // two-lever desks (traction + brake handle): the second lever is the brake handle, it follows the brake notches while the first one follows the power notches
+        lever2 = new T.Group(); lever2.position.set(leverX + S.pupitre.lever2, 0.03 + PUP_H, leverU); deskGroup.add(lever2);
+        lever2.add(new T.Mesh(leverGeo, metalOwn('lever', 0.16)));
+        deskCyl('matte', 0.034, 0.04, 0.022, leverX + S.pupitre.lever2, leverU, S.trim, PUP_H, 20);
+      }
       // W/S sticker on the grip face toward the driver
       const gripY = S.joystick ? L - 0.012 : S.old ? L - 0.002 : L - 0.062;
       const gripZ = S.joystick ? 0.034 : S.old ? 0.031 : 0.0225;
@@ -1116,10 +1125,10 @@
     {
       const hu0 = plateU0 - 0.025, hu1 = plateU1 + 0.025;
       const hx0 = leverX - 0.045, hx1 = plateX + plateW / 2 + 0.02;
-      addHit('lever', hx1 - hx0, 0.02, hu1 - hu0, (hx0 + hx1) / 2, 0.012, (hu0 + hu1) / 2, deskGroup, { gate: true });
+      addHit('lever', hx1 - hx0, 0.02, hu1 - hu0, (hx0 + hx1) / 2, 0.012 + PUP_H, (hu0 + hu1) / 2, deskGroup, { gate: true });
       addHit('lever', 0.09, 0.16, 0.09, 0, lk.len - 0.07, 0, leverPivot, { grip: true });
-      addHalo('lever', plateW + 0.05, plateU1 - plateU0 + 0.05, plateX, 0.0055, (plateU0 + plateU1) / 2);
-      ctrlAt.lever = { x: plateX, y: 0.003, u: tipU(0) };
+      addHalo('lever', plateW + 0.05, plateU1 - plateU0 + 0.05, plateX, 0.0055 + PUP_H, (plateU0 + plateU1) / 2);
+      ctrlAt.lever = { x: plateX, y: 0.003 + PUP_H, u: tipU(0) };
     }
     const notchAtU = (u) => {
       let best = 0, bestD = Infinity;
@@ -1402,7 +1411,8 @@
       const k = snap ? 1 : 1 - Math.exp(-dt * LEVER_RATE);
       rt.leverDisp += (target - rt.leverDisp) * k;
       if (Math.abs(target - rt.leverDisp) < 0.002) rt.leverDisp = target;
-      leverPivot.rotation.x = leverAngleDeg(kindName, rt.leverDisp) * DEG;
+      leverPivot.rotation.x = leverAngleDeg(kindName, lever2 ? Math.max(0, rt.leverDisp) : rt.leverDisp) * DEG;
+      if (lever2) lever2.rotation.x = leverAngleDeg(kindName, Math.min(0, rt.leverDisp)) * DEG;
       marker.position.z = tipU(rt.leverDisp);
 
       // speedo
@@ -1503,7 +1513,7 @@
 
     function notchOnPlate(raycaster) {
       tmpA.set(0, 1, 0).transformDirection(deskGroup.matrixWorld);
-      tmpB.set(0, 0.003, 0).applyMatrix4(deskGroup.matrixWorld);
+      tmpB.set(0, 0.003 + PUP_H, 0).applyMatrix4(deskGroup.matrixWorld);
       tmpPlane.setFromNormalAndCoplanarPoint(tmpA, tmpB);
       const p = raycaster.ray.intersectPlane(tmpPlane, tmpA);
       return p ? notchAtU(deskGroup.worldToLocal(tmpA).z) : null;

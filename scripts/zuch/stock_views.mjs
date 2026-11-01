@@ -2,7 +2,7 @@
  * (the game's own camera: eye / eyeLookAt of the cab group, fov 66) on a plain painted backdrop with the game's lights, and prints
  * the triangle / draw-call count of every train.
  *
- *   node scripts/zuch/stock_views.mjs <outDir> [--trains id,id,..] [--views side,sidehead,front,rear,cab,saloon] [--stats] [--quality high|medium|low]
+ *   node scripts/zuch/stock_views.mjs <outDir> [--trains id,id,..] [--views side,sidehead,front,rear,cab,saloon,head,noseside] [--stats] [--quality high|medium|low]
  *
  * Writes <outDir>/<train>-<view>.png and, with --stats, prints one JSON line per train:
  *   { id, cars, meshes (draw calls of the train, cab excluded), triangles, cabMeshes, cabTriangles }.
@@ -21,7 +21,7 @@ const wantStats = hasFlag('stats');
 const variantsFile = flag('variants', '');   // JSON [{ name, id, patch }]: renders train `id` with `patch` deep-merged into its TS.trains.specs entry, files <name>-<view>.png
 const bareCab = hasFlag('bare-cab');   // debug: hide the train body, show only the cab group
 const outDir = args[0];
-if (!outDir) { console.error('usage: stock_views.mjs <outDir> [--trains a,b] [--views side,sidehead,front,rear,cab,saloon] [--stats]'); process.exit(2); }
+if (!outDir) { console.error('usage: stock_views.mjs <outDir> [--trains a,b] [--views side,sidehead,front,rear,cab,saloon,head,noseside] [--stats]'); process.exit(2); }
 fs.mkdirSync(outDir, { recursive: true });
 
 const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js';
@@ -36,6 +36,7 @@ try {
   await page.addScriptTag({ url: THREE_URL });
   for (const f of ['config.js', 'trains.js', 'cab.js']) await page.addScriptTag({ url: `${origin}/pb/train-sim/${f}?x=${Date.now()}` });
   await page.evaluate((q) => {
+    window.__paintDebug = true;
     const T = THREE, TS = window.TS;
     const renderer = new T.WebGLRenderer({ canvas: document.getElementById('c'), antialias: true, preserveDrawingBuffer: true });
     renderer.setSize(1280, 720, false);
@@ -61,10 +62,12 @@ try {
         if (cur) { if (cur.cab) cur.cab.dispose(); cur.model.dispose(); }
         const def = TS.config.trains.find((t) => t.id === id);
         const cfg = { ...def, ...(opts && opts.cfg) };
-        const spec = TS.trains.specs[def.model]; const backup = JSON.parse(JSON.stringify(spec));
+        const spec = TS.trains.specs[def.model];
         const merge = (t, p) => { for (const k of Object.keys(p)) { if (p[k] && typeof p[k] === 'object' && !Array.isArray(p[k]) && t[k] && typeof t[k] === 'object') merge(t[k], p[k]); else t[k] = p[k]; } };
-        if (opts && opts.patch) merge(spec, opts.patch);
-        window.__restore = () => { for (const k of Object.keys(spec)) delete spec[k]; Object.assign(spec, backup); };
+        // a variant patch is deep-merged into a CLONE of the spec for this one build (structuredClone cannot copy the functions, so they are carried over by reference)
+        let backup = null;
+        if (opts && opts.patch) { backup = Object.assign({}, spec); const clone = JSON.parse(JSON.stringify(spec)); for (const k of Object.keys(spec)) if (typeof spec[k] === 'function') clone[k] = spec[k]; for (const k of Object.keys(spec)) delete spec[k]; Object.assign(spec, clone); merge(spec, opts.patch); }
+        window.__restore = backup ? () => { for (const k of Object.keys(spec)) delete spec[k]; Object.assign(spec, backup); } : null;
         const model = TS.trains.create(cfg, { quality: q, livery: cfg.livery, upgrades: {}, headlight: false });
         scene.add(model.group);
         let z = 0; const ctr = [];
@@ -78,7 +81,7 @@ try {
           model.setCabView(true);
         }
         if (window.__restore) { window.__restore(); window.__restore = null; }   // model and cab are built: put the spec back
-        cur = { model, cab, total };
+        cur = { model, cab, total }; window.__cur = cur;
         if (opts && opts.night) { model.setLights({ head: 1, tail: false, cabin: true }); }
         const f0 = model.cars[0].length;
         const nose = -0 + 0;   // front of car 0 sits at z = 0 + gap/2 .. body front ~ -(length)/2 + centre
@@ -98,6 +101,9 @@ try {
         } else if (view === 'noseside') {   // pure side profile of the first 10 m (silhouette check against a side photo)
           camera.fov = 24; camera.updateProjectionMatrix();
           camera.position.set(26, 2.4, frontZ + 4.5); camera.lookAt(0, 2.4, frontZ + 4.5);
+        } else if (view === 'head') {   // head-on, a little to the side and low (the photo angle of the nose close-ups)
+          camera.fov = 24; camera.updateProjectionMatrix();
+          camera.position.set(4.2, 1.5, frontZ - 11); camera.lookAt(0, 1.9, frontZ + 1.5);
         } else if (view === 'sidehead') {   // the first ~40 m of the train from the side (details: doors, windows, pantograph)
           camera.fov = 26; camera.updateProjectionMatrix();
           camera.position.set(34, 2.4, frontZ + 17); camera.lookAt(0, 2.2, frontZ + 17);
@@ -152,13 +158,60 @@ try {
       if (view === views[0]) rows.push(r);
     }
   }
+  if (hasFlag('census')) {   // debug: per car, every visible mesh with its material count / triangles / kind (what makes the draw calls)
+    const rep = await page.evaluate((ids) => {
+      const out = {};
+      for (const id of ids) {
+        window.__h.show(id, 'side');
+        const cars = window.__cur.model.cars, res = [];
+        [0, 1, cars.length - 1].filter((v, i, a) => a.indexOf(v) === i).forEach((ci) => {
+          const rows = {};
+          cars[ci].group.traverse((o) => {
+            if (!(o.isMesh || o.isSprite || o.isPoints)) return;
+            for (let p = o; p; p = p.parent) if (!p.visible) return;
+            const m = Array.isArray(o.material) ? o.material.length : 1, g = o.geometry;
+            const tris = g ? Math.round((g.index ? g.index.count : g.attributes.position.count) / 3 * (o.isInstancedMesh ? o.count : 1)) : 0;
+            const par = o.parent && o.parent !== cars[ci].group ? (o.parent.name || 'grp') : '';
+            const key = (o.isInstancedMesh ? 'inst' : o.isSprite ? 'sprite' : 'mesh') + '/' + par + '/' + m;
+            rows[key] = rows[key] || { n: 0, draws: 0, tris: 0 }; rows[key].n++; rows[key].draws += m; rows[key].tris += tris;
+          });
+          res.push({ car: ci, rows });
+        });
+        out[id] = res;
+      }
+      return out;
+    }, pick);
+    console.log(JSON.stringify(rep, null, 1));
+  }
+  if (hasFlag('paint-probe')) {   // debug: hull vertex colours of the first car near the tip
+    const out = await page.evaluate((id) => {
+      window.__h.show(id, 'side'); const car = window.__cur.model.cars[0].group, body = car.children[0], g = body.geometry, pa = g.attributes.position, ca = g.attributes.color;
+      const zF = Math.min(...Array.from({ length: pa.count }, (_, i) => pa.getZ(i))), res = [];
+      for (let i = 0; i < pa.count; i += 3) { const d = pa.getZ(i) - zF; if (d < 3.4 && pa.getY(i) > 0.9 && pa.getX(i) > -0.3 && pa.getX(i) < 1.3 && i % 2 === 0) res.push([+d.toFixed(2), +pa.getY(i).toFixed(2), +ca.getX(i).toFixed(2), +ca.getY(i).toFixed(2), +ca.getZ(i).toFixed(2)]); }
+      return { n: pa.count, zF, np: window.TS.trains.specs.hst.nosePaint(0.5, 0, 1.64, [0, 0, 0]), name: body.name, sample: res.slice(0, 80), mat: body.material.type + ' ' + body.material.roughness };
+    }, pick[0]);
+    console.log(JSON.stringify(out));
+  }
+  if (hasFlag('ray-out')) {   // debug: first hit of rays from the head view camera towards points of the hull (name, material, vertex colour at the hit, face winding side)
+    const out = await page.evaluate((id) => {
+      window.__h.show(id, 'head'); const T = THREE, cam = window.__camera, rc = new T.Raycaster(), res = [];
+      cam.updateMatrixWorld(true); rc.camera = cam;
+      for (const [x, y, zz] of [[0, 2.0, 1.0], [0, 1.9, 0.6], [0, 2.4, 1.6], [0.5, 2.0, 1.0]]) {
+        const frontZ = window.__cur.model.cars[0].group.position.z - window.__cur.model.cars[0].length / 2 + 0.25;
+        const tgt = new T.Vector3(x, y, frontZ + zz); rc.set(cam.position, tgt.clone().sub(cam.position).normalize());
+        for (const h of rc.intersectObjects(window.__scene.children, true).slice(0, 3)) { const m = Array.isArray(h.object.material) ? h.object.material[(h.face && h.face.materialIndex) || 0] : h.object.material; res.push({ tgt: [x, y, zz], dist: +h.distance.toFixed(2), obj: h.object.name || h.object.type, par: h.object.parent && h.object.parent.name, mat: m.type, side: m.side, col: m.color && m.color.getHexString(), emi: m.emissive && m.emissive.getHexString(), vc: m.vertexColors, tr: m.transparent, vis: h.object.visible }); }
+      }
+      return res;
+    }, pick[0]);
+    console.log(JSON.stringify(out));
+  }
   if (hasFlag('ray-up')) {   // debug: what does the cab camera see straight ahead and 20 degrees up? (first hit: mesh name, material, colour, emissive)
     const out = await page.evaluate(() => {
       const T = THREE, cam = window.__camera, rc = new T.Raycaster(), res = []; rc.camera = cam;
       for (const deg of [10, 20, 30, 40]) {
         const d = new T.Vector3(0, Math.sin(deg * Math.PI / 180), -Math.cos(deg * Math.PI / 180)); rc.set(cam.position, d);
         const hit = rc.intersectObjects(window.__scene.children, true).find((h) => h.object.visible && h.object.material && !(h.object.material.colorWrite === false));
-        if (hit) { const m = Array.isArray(hit.object.material) ? hit.object.material[hit.face.materialIndex || 0] : hit.object.material; res.push({ deg, dist: +hit.distance.toFixed(2), obj: hit.object.name || hit.object.type, parent: hit.object.parent && hit.object.parent.name, mat: m.type, color: m.color && m.color.getHexString(), emissive: m.emissive && m.emissive.getHexString(), side: m.side, tr: m.transparent, op: m.opacity }); }
+        if (hit) { const m = Array.isArray(hit.object.material) ? hit.object.material[hit.face.materialIndex || 0] : hit.object.material; res.push({ deg, pt: hit.point.toArray().map((v) => +v.toFixed(2)), bb: (hit.object.geometry.computeBoundingBox(), hit.object.geometry.boundingBox.min.toArray().concat(hit.object.geometry.boundingBox.max.toArray()).map((v) => +v.toFixed(1))), nmat: Array.isArray(hit.object.material) ? hit.object.material.length : 1, dist: +hit.distance.toFixed(2), obj: hit.object.name || hit.object.type, parent: hit.object.parent && hit.object.parent.name, mat: m.type, color: m.color && m.color.getHexString(), emissive: m.emissive && m.emissive.getHexString(), side: m.side, tr: m.transparent, op: m.opacity }); }
       }
       return res;
     });
