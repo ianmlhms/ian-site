@@ -199,7 +199,10 @@ export async function runOverlapMatrix(h, opts = {}) {
       }
     }
   }
-  const wants = (name) => !wantStates || wantStates.some((w) => name.startsWith(w));
+  /* lb / en re-check only the text-heavy states (the German strings are the longest and run through every state) */
+  const DENSE_STATES = ['menu', 'cab', 'chase', 'platform', 'wxpop', 'timetable', 'summary', 'resume', 'help'];
+  let currentLang = 'de';
+  const wants = (name) => (!wantStates || wantStates.some((w) => name.startsWith(w))) && (!FULL || currentLang === 'de' || DENSE_STATES.some((d) => name.startsWith(d)));
 
   const combos = [];
   for (const mode of ['arcade', 'standalone']) for (const career of ['rail', 'tram']) combos.push({ mode, career });
@@ -207,6 +210,7 @@ export async function runOverlapMatrix(h, opts = {}) {
     if (only && !only.includes(`${combo.mode}-${combo.career}`)) continue;
     for (const lang of langs) {
       const ctx = { ...combo, lang };
+      currentLang = lang;
       h.step(`${ctx.mode} / ${ctx.career} / ${lang}: ${sizes.length} sizes per state`);
       await h.page.setViewportSize({ width: 820, height: 1180 });
       const frame = await open(h, ctx.mode, ctx.career, lang);
