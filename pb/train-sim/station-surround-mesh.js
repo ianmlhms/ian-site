@@ -541,7 +541,7 @@
         const boxes = (data.buildings || []).map((b) => { let x0 = Infinity; let x1 = -Infinity; let z0 = Infinity; let z1 = -Infinity; (b.ground || []).forEach((p) => { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); z0 = Math.min(z0, p[1]); z1 = Math.max(z1, p[1]); }); return { x0, x1, z0, z1 }; });
         const nearHouse = (x, z, r) => boxes.some((b) => x > b.x0 - r && x < b.x1 + r && z > b.z0 - r && z < b.z1 + r);
         list.forEach((t, i) => {
-          if (nearHouse(t[0], t[1], Math.min(3.2, t[3] * 0.55))) return;
+          if (nearHouse(t[0], t[1], Math.min(7, t[3] * 0.85))) return;      // W5: 3.2 m let the crown of a tall tree beside a tall block grow through its roof (north s 14400)
           const w = world(t[0], t[1]); const y = track.terrainHeightAt(w.x, w.z) - 0.15;
           const h = clamp(t[2], 3, 32); const r = clamp(t[3], 1.2, 9);
           const conifer = t[3] / Math.max(1, t[2]) < 0.26;
