@@ -1134,10 +1134,10 @@ def build(args):
             g = shapely.segmentize(g, 4.0)
         elif isinstance(g, (Polygon, MultiPolygon)):
             g = shapely.segmentize(g, 4.0)
-        gf = geom_to_frame(g)
-    if not gf.is_valid:          # the straightening can fold a thin OSM polygon onto itself (Ciney: TopologyException side location conflict)
-        gf = shapely.make_valid(gf)
-    return gf.intersection(clip_pad if pad else clip)
+        framed = geom_to_frame(g)
+        if not framed.is_valid:      # the straightening can fold a thin OSM polygon onto itself (Ciney: TopologyException side location conflict)
+            framed = shapely.make_valid(framed)
+        return framed.intersection(clip_pad if pad else clip)
 
     # ---- rails
     rails_out, rail_geoms = [], []
