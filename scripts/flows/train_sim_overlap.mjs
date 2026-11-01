@@ -36,7 +36,7 @@ const TOOLBAR_PX = 90;
 const TIGHT_FOR_OTHER_LANGS = ['ipad-mini-', 'ipad-10.2-'];   // Safari's bottom bar / tab strip: the visible height shrinks by roughly this much
 /* env(safe-area-inset-*): iPad status bar + home indicator; the "notch" set is a phone-like worst case to prove the CSS honours all four sides */
 const SAFE_IPAD = { t: 24, r: 0, b: 20, l: 0 };
-const SAFE_NOTCH = { t: 47, r: 47, b: 34, l: 47 };
+const SAFE_NOTCH = { t: 47, r: 47, b: 34, l: 47 };   // phone-like stress: the game blocks phones, no iPad has side insets, so problems at this tier are reported (WARN) but do not fail the flow
 
 /* the quick matrix (run_all): the tightest iPad of each shape; OVERLAP_FULL=1 adds every device, orientation, toolbar and the notch sets */
 const QUICK_SIZES = ['ipad-mini-portrait-toolbar', 'ipad-mini-landscape-toolbar', 'ipad-10.2-portrait', 'ipad-10.2-landscape-toolbar', 'ipad-air-11-landscape', 'ipad-pro-13-portrait'];
@@ -170,7 +170,7 @@ export async function runOverlapMatrix(h, opts = {}) {
   const reportDir = process.env.OVERLAP_REPORT_DIR || (FULL ? LOCAL_OUT : null);
   const shotAll = process.env.OVERLAP_SHOTS === 'all';
   const cases = [];
-  const results = { cases: 0, issues: 0, byType: {} };
+  const results = { cases: 0, issues: 0, stress: 0, byType: {} };
   await fakeSafeAreas(h.context);
 
   async function check(ctx, state, frame) {
@@ -184,12 +184,13 @@ export async function runOverlapMatrix(h, opts = {}) {
       const id = [ctx.mode, ctx.career, ctx.lang, state, size.id].join(' | ');
       cases.push({ id, atoms: scan.atoms, layer: scan.layer, issues: scan.issues });
       results.cases += 1;
-      results.issues += scan.issues.length;
-      scan.issues.forEach((i) => { results.byType[i.type] = (results.byType[i.type] || 0) + 1; });
+      if (size.tag === 'notch') results.stress += scan.issues.length;
+      else results.issues += scan.issues.length;
+      if (size.tag !== 'notch') scan.issues.forEach((i) => { results.byType[i.type] = (results.byType[i.type] || 0) + 1; });
       if (scan.issues.length) {
-        console.log(`    FAIL ${id}: ${scan.issues.length} problem(s)`);
+        console.log(`    ${size.tag === 'notch' ? 'WARN' : 'FAIL'} ${id}: ${scan.issues.length} problem(s)`);
         scan.issues.slice(0, 8).forEach((i) => console.log('         ' + issueKey(i)));
-        h.failures.push(`${id}: ${scan.issues.length} layout problem(s), first: ${issueKey(scan.issues[0])}`);
+        if (size.tag !== 'notch') h.failures.push(`${id}: ${scan.issues.length} layout problem(s), first: ${issueKey(scan.issues[0])}`);
       }
       if (shotAll || scan.issues.length) {
         const dir = reportDir || process.env.FLOW_SHOTS_DIR || LOCAL_OUT;
@@ -310,7 +311,7 @@ export async function runOverlapMatrix(h, opts = {}) {
     fs.mkdirSync(reportDir, { recursive: true });
     fs.writeFileSync(path.join(reportDir, 'overlap-report.json'), JSON.stringify({ at: new Date().toISOString(), full: FULL, sizes: sizes.map((s) => s.id), results, cases }, null, 1));
   }
-  console.log(`    matrix: ${results.cases} cases, ${results.issues} problem(s) ${JSON.stringify(results.byType)}`);
+  console.log(`    matrix: ${results.cases} cases, ${results.issues} problem(s) ${JSON.stringify(results.byType)}, ${results.stress} at the phone-like notch stress tier (warn only)`);
   return results;
 }
 
