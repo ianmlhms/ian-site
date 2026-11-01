@@ -28,6 +28,10 @@
   "luxembourg": "w362239328 = the 237 m platform canopy block (station-yard.js draws its roof faces with columns, its walls are skipped); w924507665 sits on a retaining wall",
   "rodange.h": "the Rodange steelworks halls are really 250-285 m long",
   "bertrange-strassen.h / lamadelaine.h / mamer-lycee.h / nidderkuer.h": "long curved industrial / school facades; triangulate3 drops any face it cannot cover, so a warped ring never renders as a ribbon",
-  "trier-hbf": "building on the raised station forecourt"
- }
+  "trier-hbf": "building on the raised station forecourt",
+  "bruxelles-luxembourg.h": "w236195168 = a 331 m long commercial OSM footprint (25 m high) along the line at Bruxelles-Luxembourg (Quartier Leopold, probably the Parliament complex); mapped as one way"
+ },
+ "bruxelles-luxembourg.h": [
+  "w236195168"
+ ]
 }
