@@ -233,7 +233,7 @@ body.touch .tpad{display:flex}
 .tbtns{grid-column:5;grid-row:5;align-self:end;display:none;grid-template-columns:repeat(2,84px);gap:8px}
 body.touch .tbtns{display:grid}
 .tl-rail{position:relative;height:clamp(130px,31vh,330px);border-radius:20px;touch-action:none;cursor:ns-resize}
-@media(max-height:700px){.tl-rail{height:clamp(110px,26vh,330px)}}
+@media(max-height:700px){.tl-rail{height:clamp(104px,24vh,330px)}}
 .tl-ticks{position:absolute;inset:8px 0;display:flex;flex-direction:column;gap:3px;align-items:center;pointer-events:none}
 .tl-ticks i{flex:1;width:26px;border-radius:4px;background:rgba(255,255,255,.14)}
 .tl-ticks i.p{background:rgba(79,209,197,.38)}.tl-ticks i.b{background:rgba(255,138,101,.38)}.tl-ticks i.zero{background:rgba(255,255,255,.55)}
