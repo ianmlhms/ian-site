@@ -75,6 +75,7 @@ async function fakeSafeAreas(context) {
 async function setSafe(h, safe) {
   const apply = (s) => { const r = document.documentElement.style; r.setProperty('--ts-sat', s.t + 'px'); r.setProperty('--ts-sar', s.r + 'px'); r.setProperty('--ts-sab', s.b + 'px'); r.setProperty('--ts-sal', s.l + 'px'); };
   await h.page.evaluate(apply, safe);
+  await h.page.evaluate(() => window.dispatchEvent(new Event('resize')));   // the arcade measures the sign-in hint on resize: let it see the new insets
   const gf = await h.page.evaluate(() => { const g = document.getElementById('gf'); if (!g || getComputedStyle(document.getElementById('overlay')).display === 'none') return null; const r = g.getBoundingClientRect(); return { top: r.top, bottom: innerHeight - r.bottom, left: r.left, right: innerWidth - r.right }; });
   for (const f of h.page.frames()) {
     if (f === h.page.mainFrame()) continue;

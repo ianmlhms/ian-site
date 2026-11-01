@@ -130,7 +130,7 @@ button.chipbtn.on{color:#ffd36a;background:rgba(255,196,58,.22);box-shadow:inset
 
 /* ---------- overlays ---------- */
 .overlay{position:absolute;inset:0;z-index:20;display:flex}
-.overlay.center{align-items:center;justify-content:center;background:rgba(5,8,12,.62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);padding:16px}
+.overlay.center{align-items:center;justify-content:center;background:rgba(5,8,12,.62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
 #menu{z-index:15;background:linear-gradient(90deg,rgba(6,10,16,.78),rgba(6,10,16,.38) 62%,rgba(6,10,16,.08));overflow:hidden}
 .menu-scroll{width:100%;height:100%;overflow:auto;padding:max(18px,env(safe-area-inset-top)) 18px 40px;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
 #menuHost{max-width:1100px;margin:0 auto}
@@ -267,6 +267,6 @@ body.touch[data-cam="cab"] .hud-util>#btnQuality{display:none}
   .signalbox{grid-column:2;grid-row:5;min-width:0}
   .walkpad{align-self:start}
   body[data-cam="cab"] .centerbox{grid-column:1/4;grid-row:3;justify-self:center}
-  .tl-rail{height:clamp(120px,22vh,300px)}
+  .tl-rail{height:clamp(110px,20vh,300px)}
 }
 @media(max-aspect-ratio:5/4) and (max-width:900px){.statsbox{grid-column:2/4}}
