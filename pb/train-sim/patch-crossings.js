@@ -28,6 +28,7 @@
   const MAX_STEP_GRADE = 0.11;     // the steepest 4 m step of the straightened road on the DEM (the planned profile is a little steeper; the world flow allows 18 %)
   const MAX_ROAD_Z = 235;          // ... and along the track (the fade is 240 - 320 m)
   const MAX_ABS_Y = 12;
+  const MIN_ARM_X = 30;            // a patch crossing road reaches at least this far to each side of the track (the world flow wants >= 30 m)
   const EDGE_X = 14;               // lateral distance at which the road must be back at about track level (the strip is blended to the real relief between 5 and 9 m)
   const EDGE_MAX_Y = 1.5;
 
@@ -168,6 +169,8 @@
         const ch = chain(data, c.roadIndex);
         const road = straighten(ch.pts, c.zc).filter((p) => Math.abs(p.x) <= MAX_ROAD_X && Math.abs(p.z) <= MAX_ROAD_Z);
         if (!usable(data, ch.pts) || !gentleSteps(data, road)) return;
+        // W5: after the clip to the patch strip the road must still run out on BOTH sides (Bruxelles-Luxembourg: a road in the cutting crossed the track with no arm left: a crossing of nothing)
+        if (!(road.some((p) => p.x > MIN_ARM_X) && road.some((p) => p.x < -MIN_ARM_X))) return;
         found.push({ s: sMid - c.zc, hw: Math.max(2.9, c.w / 2), patch: { name: st.name, sMid, roadIndex: c.roadIndex, roadName: c.name, w: c.w, cls: c.cls, zc: c.zc, used: ch.used, road } });
       });
     });

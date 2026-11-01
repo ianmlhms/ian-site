@@ -17,7 +17,7 @@ const LINES = {
   },
   brussels: {
     stations: ['Lëtzebuerg', 'Arlon', 'Marbehan', 'Libramont', 'Jemelle', 'Marloie', 'Ciney', 'Namur', 'Gembloux', 'Ottignies', 'Bruxelles-Luxembourg', 'Bruxelles-Midi'],
-    lengthKm: [14, 23], minBridges: 3, minTunnels: 8, minCrossings: 3, budgetMb: 1.8,      // the Brussels north-south tunnel + the Meuse valley tunnels
+    lengthKm: [14, 23], minBridges: 3, minTunnels: 8, minCrossings: 3, budgetMb: 2.2,      // W5: 1.8 -> 2.2 (measured 2.08 MB: seven more patch cores); the Brussels north-south tunnel + the Meuse valley tunnels
   },
   paris: {
     stations: ['Lëtzebuerg', 'Thionville', 'Metz-Ville', 'Champagne-Ardenne TGV', 'Paris-Est'],
