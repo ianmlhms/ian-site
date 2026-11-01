@@ -201,7 +201,7 @@
   function parkMessages() {
     const stack = $('msgStack'), hud = $('hud');
     if (!stack) return;
-    if (hud.hidden) { if (msgStackParked) { stack.style.cssText = ''; stack.classList.remove('tight'); msgStackParked = false; } return; }
+    if (hud.hidden) { if (msgStackParked) { stack.style.cssText = ''; stack.classList.remove('tight', 'tighter'); msgStackParked = false; } return; }
     const slot = $('hudSlot').getBoundingClientRect(), game = $('game').getBoundingClientRect();
     if (slot.width < 40) return;
     // landscape: the centre column of the foot row is only as tall as the centre box, the rest of it above is free too
@@ -213,8 +213,9 @@
     }
     const w = Math.min(slot.width, MSG_STACK_MAX_W);
     stack.style.cssText = `left:${Math.round(slot.left - game.left + (slot.width - w) / 2)}px;top:${Math.round(slot.top - game.top)}px;width:${Math.round(w)}px;transform:none`;
-    stack.classList.remove('tight');
+    stack.classList.remove('tight', 'tighter');
     if (stack.offsetHeight > bottom - slot.top) stack.classList.add('tight');
+    if (stack.offsetHeight > bottom - slot.top) stack.classList.add('tighter');
     msgStackParked = true;
   }
   setInterval(parkMessages, 160);

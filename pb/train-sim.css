@@ -104,6 +104,7 @@ button.chipbtn.on{color:#ffd36a;background:rgba(255,196,58,.22);box-shadow:inset
 .msgstack{position:absolute;left:50%;top:calc(max(10px,env(safe-area-inset-top)) + 12px);transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;align-items:center;z-index:6;pointer-events:none;width:min(560px,92vw)}
 #hud[hidden]~.msgstack .camhint{display:none}
 .msgstack.tight{gap:4px}.msgstack.tight .camhint{display:none}.msgstack.tight .toast{padding:5px 12px;font-size:12.5px}.msgstack.tight #banner{padding:7px 14px;font-size:17px}.msgstack.tight #banner small{font-size:12px;margin-top:2px}
+.msgstack.tighter{gap:3px}.msgstack.tighter .toast{padding:3px 10px;font-size:12px;border-radius:9px}.msgstack.tighter #banner{padding:4px 12px;font-size:15px;border-radius:12px}.msgstack.tighter #banner small{font-size:11px;margin-top:0}
 #toasts{display:flex;flex-direction:column;gap:6px;align-items:center;width:100%}
 .toast{padding:9px 16px;border-radius:12px;background:var(--glass-strong);border:1px solid var(--line);font-size:14px;font-weight:600;animation:toast .25s ease-out;text-align:center}
 .toast.bad{border-color:rgba(255,90,77,.6);color:#ffb3ab}.toast.good{border-color:rgba(61,220,132,.55);color:#a7f0c6}.toast.info{color:var(--ink)}
