@@ -49,7 +49,7 @@
     },
     /* CFL 2200 (Coradia Duplex): stainless grey double-deck cars, red nose and lower band, one big windscreen in a rounded face. */
     z2200: {
-      darkGlass: true, cabWallCol: '#2b3036', cabWallFull: true,
+      darkGlass: true, cabWallCol: '#59606a', cabWallFull: true,
       facePanels: [{ y0: 0.95, y1: 1.2, color: '#b7bbbf', r: 0.04, w: 0.5, cx: 0, hole: false, z: 0.004 }, { y0: 0.8, y1: 0.92, color: '#4a4f54', r: 0.03, inset: 0.15, hole: false, z: 0.003 }],
       decal: 'cfl',
       cabLining: 0xdedbd0,
@@ -62,21 +62,21 @@
     },
     /* CFL 2300 (Stadler KISS): silver sides, red doors and big red face under a wide windscreen with the LED destination board. */
     kiss: {
-      darkGlass: true, cabWallCol: '#2b3036', cabWallFull: true,
+      darkGlass: true, cabWallCol: '#59606a', cabWallFull: true,
       facePanels: [{ y0: 1.78, y1: 2.0, color: '#5d636b', r: 0.08, inset: 0.12, hole: false, z: 0.003 }, { y0: 0.7, y1: 1.05, color: '#14171a', r: 0.07, w: 0.17, cx: -0.8, hole: false, z: 0.003 }, { y0: 0.7, y1: 1.05, color: '#14171a', r: 0.07, w: 0.17, cx: 0.8, hole: false, z: 0.003 }],
       decal: 'cfl',
       cabLining: 0xc8ccd0,
       W: 2.8, yb: 0.6, floor: 1.0, sill: 1.3, head: 2.0, sill2: 3.0, head2: 3.75, ytop: 4.6, wheelR: 0.43, wb: 2.5, gap: 0.8,
       pillar: '#20262b', bay: 1.6, doorW: 1.3, doorY0: 0.62, doorMargin: 3.7, bellows: true, buffers: false, double: true,
-      recipe: { lower: 'accent', mid: 'body', upper: 'body', nose: 'accent', noseHi: 'body', doorLower: 'accent', doorUpper: 'accent', stripeCol: 'stripe', roof: '#c9ced1' }, noseHiY: 3.3,
+      recipe: { lower: 'accent', mid: 'body', upper: 'body', nose: 'accent', noseHi: 'body', noseRoof: 'accent', doorLower: 'accent', doorUpper: 'accent', stripeCol: 'stripe', roof: '#c9ced1' }, noseHiY: 4.4,
       nose: { len: 3.0, N: 14, zPow: 1.4, capSx: 0.72, a: 2.4, b: 2.0, drop: 1.5, lift: 0.15, rake: 0.5, pd: 2.0, pl: 2, pr: 1, sideWin: [4, 9], roundTip: 1.0, rp: 1.0, lowIn: 0.15, lp: 1.3 }, cabWin: { y0: 1.85, y1: 2.95 },
       scr: { kind: 'single', cabWipers: true, hw: 0.98, y0: 2.0, y1: 3.2, topInset: 0.3 }, cabFrame: { dz: 2.3, capSx: 0.8, rake: 0.3 }, cabFloor: 1.0, mirror: 0.2,
       kinds: { cabF: { body: 26.6, bogie: 8.6, front: true, doors: 2 }, mid: { body: 26.6, bogie: 8.6, doors: 2 }, midP: { body: 26.6, bogie: 8.6, doors: 2, panto: [6.0] }, cabR: { body: 26.6, bogie: 8.6, rear: true, doors: 2 } },
     },
     /* CFL 2400 / 2450 (Alstom Coradia Stream HC): white double-deck cars, a big sloping red face with a black windscreen surround. */
     coradia: {
-      darkGlass: true, cabWallCol: '#2b3036', cabWallFull: true,
-      facePanels: [{ y0: 1.8, y1: 3.35, color: '#101316', r: 0.28, inset: 0.3, topInset: 0.25 }, { y0: 0.95, y1: 1.3, color: '#0b0d0f', r: 0.16, w: 0.3, cx: -0.82, hole: false, z: 0.004 }, { y0: 0.95, y1: 1.3, color: '#0b0d0f', r: 0.16, w: 0.3, cx: 0.82, hole: false, z: 0.004 }],
+      darkGlass: true, cabWallCol: '#59606a', cabWallFull: true,
+      facePanels: [{ y0: 0.95, y1: 1.3, color: '#0b0d0f', r: 0.16, w: 0.3, cx: -0.82, hole: false, z: 0.004 }, { y0: 0.95, y1: 1.3, color: '#0b0d0f', r: 0.16, w: 0.3, cx: 0.82, hole: false, z: 0.004 }],
       decal: 'cfl', sweep: { len: 6.5, y0: 1.0, y1: 2.9 },
       cabLining: 0xd5d8da,
       W: 2.9, yb: 0.6, floor: 0.95, sill: 1.2, head: 1.95, sill2: 2.8, head2: 3.55, ytop: 4.3, wheelR: 0.43, wb: 2.6, gap: 0.7,
@@ -141,15 +141,18 @@
       cabLining: 0xa9bde6,
       W: 2.9, yb: 0.62, floor: 0.8, sill: 1.15, head: 1.95, sill2: 2.72, head2: 3.5, ytop: 4.3, wheelR: 0.46, wb: 3.0, gap: 0.5,
       pillar: '#262c34', blank: '#5a616a', bay: 1.4, doorW: 1.25, doorY0: 0.66, doorMargin: 2.6, bellows: true, buffers: false, tables: true, double: true,
-      recipe: { lower: 'body', mid: 'body', upper: 'body', nose: 'body', noseHi: 'stripe', doorLower: 'body', doorUpper: 'body', stripeCol: 'accent', roof: '#9ea4a9' }, noseKeepStripe: true, noseHiY: 2.72, facePanels: [{ y0: 0.98, y1: 1.4, color: '#2b3036', r: 0.12, inset: 0.04, hole: false }],
+      recipe: { lower: 'body', mid: 'body', upper: 'body', nose: 'body', noseRoof: 'body', doorLower: 'body', doorUpper: 'body', stripeCol: 'accent', roof: '#9ea4a9' }, noseKeepStripe: true, noseHiY: 2.72, facePanels: [{ y0: 0.98, y1: 1.4, color: '#2b3036', r: 0.12, inset: 0.04, hole: false }],
       nose: { len: 7.2, N: 26, zPow: 1.7, capSx: 0.68, a: 3.0, b: 2.0, drop: 3.0, lift: 0.1, rake: 0.35, pd: 2.0, pl: 1.5, pr: 1, sideWin: null, roundTip: 1.0, rp: 1.0, lowIn: 0.3, lp: 1.3, roofScr: { k0: 14, k1: 21, xlim: 0.8 } },
       lamp: { y: 1.52, d: 0.3, x: 0.62, s: 1.25 },
       /* the dark glossy mask of the TGV Duplex nose (windscreen + headlight band) is everything above the red inOui line; the chin bulb below it stays body colour, the pilot skirt is black */
       sweeps: [{ pts: [[0.4, 1.5], [1.4, 1.62], [2.6, 2.0], [4.0, 2.7], [5.5, 3.3]], w: 0.2, color: 'accent' }],
-      nosePaint: (d, ax, y, c) => {
+      nosePaint: (d, ax, y, c) => {   // silver-white bonnet; dark only: the narrow headlight mask low on the nose, and the carbon-grey band that starts at the windscreen side edges and runs back above the red line
         const L = TGV_MASK_LINE; let ly = L[L.length - 1][1];
         for (let k = 0; k < L.length - 1; k++) if (d <= L[k + 1][0]) { ly = L[k][1] + (L[k + 1][1] - L[k][1]) * (d - L[k][0]) / (L[k + 1][0] - L[k][0]); break; }
-        return y > ly ? [0.035, 0.04, 0.05] : y < 0.88 && d < 2.0 ? [0.12, 0.13, 0.15] : null;
+        if (y > 1.22 && y < 1.74 && d < 1.7) return [0.04, 0.045, 0.055];
+        if (y < 0.88 && d < 2.0) return [0.12, 0.13, 0.15];
+        if (d > 2.6 && ax > 0.5 && y > ly + 0.06 && y < ly + 0.95) return [0.11, 0.125, 0.15];
+        return null;
       },
       scr: { kind: 'roof', hw: 0.72, y0: 2.35, y1: 3.3 }, cabFloor: 1.45, mirror: 0.2, tilt: true, cabFrame: { dz: 4.0, capSx: 0.66, rake: 0.1 },
       pc: { floor: 1.45, cabFloor: 1.45, wb: 3.0, wheelR: 0.46, double: false, sill: 1.75, head: 2.85 },
