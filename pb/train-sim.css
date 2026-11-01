@@ -164,7 +164,7 @@ button.primary:hover{background:#ffd070}
 .spinner{width:34px;height:34px;border-radius:50%;border:3px solid rgba(255,255,255,.18);border-top-color:var(--amber);animation:spin .9s linear infinite}
 #helpBody{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:12px 0;font-size:14px;align-content:start}
 @media(min-width:760px){#helpBody{grid-template-columns:auto 1fr auto 1fr;gap:6px 14px}}
-#helpBody kbd{font:inherit;font-weight:700;padding:2px 9px;border-radius:7px;background:rgba(255,255,255,.12);border:1px solid var(--line);white-space:nowrap;justify-self:start}
+#helpBody kbd{font:inherit;font-weight:700;padding:2px 9px;border-radius:7px;background:rgba(255,255,255,.12);border:1px solid var(--line);white-space:nowrap;justify-self:start;align-self:start}
 #ttBody table,#sumRows{width:100%;border-collapse:collapse;font-size:14px}
 #ttBody th,#ttBody td{padding:6px 8px;text-align:left;border-bottom:1px solid var(--line)}
 #ttBody th{color:var(--soft);font-weight:600;font-size:11px;letter-spacing:.08em;text-transform:uppercase}
