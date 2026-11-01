@@ -121,11 +121,11 @@
   /* How long the REAL passenger module (passengers.js) needs for one door cycle, measured with scripts/zuch/exchange_probe.mjs (medium / high quality; 'low' is a few seconds slower in a crowd).
    * Structure follows the module: alighting people leave one per ALIGHT_GAP (0.8 s, never slower than the 16 s cap) through every door, boarding starts when the last one is out (+ 1.6 s)
    * and lets one person per door in every BOARD_GAP (1.2 s, 22 s cap); on top come the walk along the platform (0.02 s per metre of train) and a congestion term (0.05 s per person).
-   * Fitted to 6 trains x 9 count pairs; the spread of single runs is about +-15 %. Doors: cars x doors per side, minus the locomotive of an IC and the two power cars of a TGV. */
+   * Fitted to 6 trains x 9 count pairs; the spread of single runs is about +-15 %. Doors: cars x doors per side, minus the locomotive of an IC or a Dosto set and the two power cars of a TGV. */
   const EXCHANGE_FIT = Object.freeze({ base: 2.5, perMetre: 0.02, perPax: 0.05, alightGap: 0.8, alightMaxS: 16, alightMinGap: 0.25, boardGap: 1.2, boardMaxS: 22, doorSpread: 1.15 });
   const MAX_EXCHANGE_DOORS = 12;
   function exchangeDoors(train) {
-    const powerCars = train.model === 'ic' ? 1 : train.model === 'hst' ? 2 : 0;
+    const powerCars = train.model === 'ic' || train.model === 'dosto' ? 1 : train.model === 'hst' ? 2 : 0;   // IC and Dosto: a CFL 3000 / 4000 locomotive without passenger doors
     const doors = Math.max(1, (train.doorsPerSide || 2) * Math.max(1, (train.cars || 1) - powerCars));
     /* the real passenger module does not get faster with more than ~12 usable doors (exchange_probe.mjs: the 10-car TGV with 16 doors needs 53.9 s for 150 / 80, the old 8-car one with 12 doors 54.4 s) */
     return Math.min(doors, MAX_EXCHANGE_DOORS);
