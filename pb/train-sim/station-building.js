@@ -290,7 +290,7 @@
     }
     // roofs: gentle slopes in the style's material, steep ones (mansards, spires) darker, the tower above `copperAbove` in green copper
     const roofSpec = (key) => {
-      const [kind, tint] = key === 'canopy' ? ['zinc', '#c9cdd1'] : key === 'main' ? [st.roof || 'slate', st.roofTint] : key === 'steep' ? [(st.steepRoof && st.steepRoof.kind) || 'slate', st.steepRoof && st.steepRoof.tint] : ['zinc', st.copperTint || '#5f9d8a'];
+      const [kind, tint] = key === 'canopy' ? [st.canopyGlass ? 'glass' : 'zinc', st.canopyGlass ? '#ffffff' : '#c9cdd1'] : key === 'main' ? [st.roof || 'slate', st.roofTint] : key === 'steep' ? [(st.steepRoof && st.steepRoof.kind) || 'slate', st.steepRoof && st.steepRoof.tint] : ['zinc', st.copperTint || '#5f9d8a'];
       const rcol = tint ? new T.Color(tint).multiplyScalar(ROOF_TINT_BOOST) : new T.Color(0xffffff);   // the tints were picked for a brighter sky than the sim has: LOD2 roofs rendered darker than in the photos
       rcol.r = Math.min(1, rcol.r); rcol.g = Math.min(1, rcol.g); rcol.b = Math.min(1, rcol.b);
       return { kind, rcol };
@@ -300,8 +300,10 @@
       if (!roofMB[key]) {
         const { kind, rcol } = roofSpec(key);
         // a canopy is seen from below by the people on the platform: a lit-from-above slate material would render its underside black, so it gets a light sheet-metal paint and some emissive
-        const emissive = key === 'canopy' ? 0x6a7078 : 0x000000;
-        roofMB[key] = batch.plainMB('roof|' + kind + '|' + rcol.getHexString() + '|' + emissive, () => new T.MeshLambertMaterial({ map: api.roofTexture(kind), color: rcol, emissive, side: T.DoubleSide }), true);
+        const emissive = key === 'canopy' ? (kind === 'glass' ? 0x8a929a : 0x6a7078) : 0x000000;
+        // W5 roads3: a glazed canopy is translucent and casts no shadow (the platform under it stays light, the sky shows through)
+        const glass = kind === 'glass';
+        roofMB[key] = batch.plainMB('roof|' + kind + '|' + rcol.getHexString() + '|' + emissive, () => new T.MeshLambertMaterial({ map: api.roofTexture(kind), color: rcol, emissive, side: T.DoubleSide, transparent: glass, depthWrite: !glass }), !glass);
       }
       return roofMB[key];
     };

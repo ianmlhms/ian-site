@@ -43,6 +43,9 @@
   const END_BLEND = 14;             // m before the claimed end over which the profile joins the ground
   const SMOOTH_PASSES = 2;
   /* ---- reservation (trees, houses keep off) */
+  const FILL_MIN = 0.5;             // ramp footprint = where the fill is higher than this (reconcile)
+  const CLIP_MARGIN = 4;            // a synthetic road stops this far from the toe of a ramp
+  const KEEP_REACH = 125;           // ... and keeps at least this much on its crossing's side (the 120 m reach rule of the world flow), else the overbridge is handed back
   const RESERVE_PAD = 1.2;
   const FLIP_PAD = 25;              // not within the diamond crossing of the second track (the masts are different there)
   const TRACK_PAD = 45;             // nor within this far of a tunnel / bridge of the layout
@@ -256,7 +259,44 @@
     }
 
     const ownerOf = (s0, s1) => obs.filter((ob) => ob.s >= s0 && ob.s < s1);
-    return { obs, skipped, reserved, design, ownerOf, frameOf, world, groundAt: ctx.groundAt, constants: { OVER_CLEAR, SLAB_T, VERGE, WALL_T, SLOPE_RUN, WING_LEN, TOE_SINK, EDGE_CLEAR } };
+    /* W5 roads3: a synthetic road of a level crossing (parallel road, gravel tail, bend, cross road) must not dip into the fill of an overbridge ramp.  Per overbridge every such road is
+       tested against the footprint of the ramp (where the fill is higher than FILL_MIN):
+         parallel road  -> cut before the ramp (CLIP_MARGIN m clear of it) when at least KEEP_REACH m of it are left on that side of its crossing, else the overbridge is handed back
+         tail           -> cut before the ramp
+         cross / bend   -> the overbridge is handed back (those roads lead from the crossing itself)
+       The ramp then stands free and the roads keep the 120 m reach of the world flow.  Called by track.js once both plans exist. */
+    function reconcile(crossingPlan) {
+      if (!crossingPlan || !crossingPlan.crossings.length) return;
+      const handBack = [];
+      obs.forEach((ob) => {
+        const d = design(ob, 112);
+        const foot = d.smp.filter((q) => !q.deck && q.y - Math.min(q.gl, q.gr) > FILL_MIN);
+        if (!foot.length) return;
+        const hits = (q) => foot.some((f) => Math.hypot(q.x - f.x, q.z - f.z) < d.hc + WALL_T + Math.max(f.toe[0], f.toe[1]) + CLIP_MARGIN);
+        let back = false;
+        const clips = [];
+        crossingPlan.crossings.forEach((c) => (c.roads || []).forEach((road) => {
+          if (road.kind === 'patch' || !road.pts.length) return;
+          const idx = [];
+          road.pts.forEach((q, i) => { if (hits(q)) idx.push(i); });
+          if (!idx.length) return;
+          if (road.role === 'cross' || road.role === 'bend') { back = true; return; }
+          if (road.role === 'tail') { clips.push({ road, i0: 0, i1: Math.max(0, idx[0] - 1) }); return; }
+          // parallel road: keep the part between the ramps (the road runs through the crossing at a = 0)
+          const pivot = road.pts.findIndex((q) => Math.abs(q.a) < 1.6);
+          const minus = idx.filter((i) => i < pivot); const plus = idx.filter((i) => i > pivot);
+          if (pivot < 0 || idx.some((i) => i === pivot)) { back = true; return; }
+          const keepLo = minus.length ? Math.max(...minus) + 1 : 0;
+          const keepHi = plus.length ? Math.min(...plus) - 1 : road.pts.length - 1;
+          if ((minus.length && -road.pts[keepLo].a < KEEP_REACH) || (plus.length && road.pts[keepHi].a < KEEP_REACH)) { back = true; return; }
+          clips.push({ road, i0: keepLo, i1: keepHi });
+        }));
+        if (back) { handBack.push(ob); return; }
+        clips.forEach(({ road, i0, i1 }) => { if (i1 - i0 >= 2) crossingPlan.clipRoad(road, i0, i1); else crossingPlan.clipRoad(road, 0, 0); });
+      });
+      handBack.forEach((ob) => { obs.splice(obs.indexOf(ob), 1); skipped.push({ ob: { s: ob.s, c: ob.c, w: ob.w, n: ob.n, r: ob.r, p: ob.p }, why: 'crossing-road', need: ob.need }); });
+    }
+    return { obs, skipped, reconcile, reserved, design, ownerOf, frameOf, world, groundAt: ctx.groundAt, constants: { OVER_CLEAR, SLAB_T, VERGE, WALL_T, SLOPE_RUN, WING_LEN, TOE_SINK, EDGE_CLEAR } };
   }
 
   /* roads of the overbridges that could not be built (tunnel, station, diamond crossing next to them): drawn as ordinary ribbons, cut where they would run over the rails */

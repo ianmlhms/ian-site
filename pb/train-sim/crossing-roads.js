@@ -207,7 +207,19 @@
       crossings.forEach((c) => c.lats.forEach((e) => { if (e.s1 >= s0 - 1 && e.s0 <= s1 + 1) out.push(e.lat); }));
       return out;
     }
-    return { crossings, roads, adjust, surfaceAt, reserved, extraRows, extraLats, frameOf, world, ROAD_LIFT, patchArmLift: PATCH_ARM_LIFT };
+    /* W5 roads3: an overbridge ramp stands where a synthetic road runs: the road is cut to the samples [i0, i1] (its end then gets the usual turning place) and the gravel tails
+       that continued it are removed; the ground follows the shortened road only (grid and box are rebuilt) */
+    function clipRoad(road, i0, i1) {
+      road.pts = road.pts.slice(i0, i1 + 1);
+      const u0 = road.pts.length ? road.pts[0].u : 0;
+      road.pts.forEach((q) => { q.u -= u0; });
+      road.len = road.pts.length ? road.pts[road.pts.length - 1].u : 0;
+      road.box = bbox(road); road.grid = buildGrid(road);
+      const gone = new Set(roads.filter((r) => r.parent === road.id).map((r) => r.id));
+      for (let i = roads.length - 1; i >= 0; i--) if (gone.has(roads[i].id)) roads.splice(i, 1);
+      crossings.forEach((c) => { if (c.roads) c.roads = c.roads.filter((r) => !gone.has(r.id)); });
+    }
+    return { crossings, roads, adjust, surfaceAt, reserved, extraRows, extraLats, frameOf, world, ROAD_LIFT, patchArmLift: PATCH_ARM_LIFT, clipRoad };
   }
 
   /* ----------------------------------------------------------------- one crossing */

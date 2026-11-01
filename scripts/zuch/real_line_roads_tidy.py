@@ -25,6 +25,7 @@ import os
 import sys
 
 import numpy as np
+import real_line_roads_ends as ends
 from shapely.geometry import LineString, Point
 from shapely.strtree import STRtree
 
@@ -111,7 +112,7 @@ def clip_band(p, half):
     return [pc for pc in pieces if len(pc) >= 2]
 
 
-def tidy_leg(roads, crossings, k, report, obs=None):
+def tidy_leg(roads, crossings, k, report, obs=None, builtup=None):
     """roads: [{c, w, p, n, ref}], crossings: [{s, arms: {l|r: {c, n, end, p: [[a, l]]}}}] of one leg (game coordinates), obs: the overbridges of the leg
     ([{p: [[s, lat], ...]}], real_line_overbridges.py: their road is drawn by overbridges.js, the ribbons that meet it count as joined).  Returns (roads, crossings) as new objects."""
     # 0. a road that spans the rail corridor (consecutive vertices on both sides of the line, or inside the corridor) is split: no road over the rails
@@ -301,7 +302,7 @@ def tidy_leg(roads, crossings, k, report, obs=None):
         _real, game = weighted_real_angle(p, 1.0)
         if game < PERP_MIN_DEG or near_arm(p):
             continue
-        if k >= HI_K and far_end_free(i):
+        if k >= HI_K and far_end_free(i) and not (builtup and builtup(*(p[-1] if abs(p[0, 1]) < abs(p[-1, 1]) else p[0]))):
             keep[i] = False
             stats["stub_dropped"] = stats.get("stub_dropped", 0) + 1
             continue
@@ -324,23 +325,15 @@ def tidy_leg(roads, crossings, k, report, obs=None):
         if not keep[i]:
             continue
         res.append(dict(r, p=[[round(float(x), 1), round(float(y), 1)] for x, y in arr[i]]))
-    # free ends: an end is a real junction when ANOTHER road passes within JOIN_TOL of it (T-junction or end to end) or it lies on a crossing arm; the sim tapers the free
-    # ends into the ground (real-line.js; it only knew end-to-end meetings before, so every T-junction onto the middle of a way was drawn as a tapered stub)
-    lines = [LineString(r["p"]) for r in res] + arm_lines
-    tree = STRtree(lines) if lines else None
-    for i, r in enumerate(res):
-        code = 0
-        for bit, e in ((1, r["p"][0]), (2, r["p"][-1])):
-            pt = Point(e)
-            joined = False
-            for j in tree.query(pt.buffer(JOIN_TOL + 0.5)):
-                j = int(j)
-                if j != i and lines[j].distance(pt) <= JOIN_TOL:
-                    joined = True
-                    break
-            if not joined:
-                code |= bit
-        r["f"] = code
+    # free ends: an end is a real junction when ANOTHER road passes within JOIN_TOL of it (T-junction or end to end) or it lies on a crossing arm / overbridge; the sim tapers the
+    # free ends into the ground (real-line.js).  W5 roads3: with the land raster (builtup) every free end in the open field is joined / snapped / extended / dropped first
+    # (real_line_roads_ends.py)
+    if builtup is not None:
+        res, est = ends.fix_ends(res, arm_lines, builtup)
+        for key, v in est.items():
+            stats["ends_" + key] = v
+    else:
+        res = ends.mark_free_ends(res, arm_lines)
     # a short road that touches nothing at both ends is a dark lens in the field (both ends taper): dropped
     before = len(res)
     res = [r for r in res if not (r["f"] == 3 and path_len(np.array(r["p"], float)) < ISOLATED_MIN_LEN)]
@@ -367,7 +360,7 @@ def run(route, dry=False):
     total = {}
     for lid, leg in doc["legs"].items():
         k = float((meta.get(lid) or {}).get("k", 1.0))
-        roads, crossings, st = tidy_leg(leg["roads"], leg["crossings"], k, None, leg.get("ob"))
+        roads, crossings, st = tidy_leg(leg["roads"], leg["crossings"], k, None, leg.get("ob"), None if lid.startswith("st:") else ends.builtup_fn(leg["land"], doc["lat0"], doc["col"], doc["cols"]))
         for key, v in st.items():
             total[key] = total.get(key, 0) + v
         leg["roads"] = roads

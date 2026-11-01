@@ -438,9 +438,11 @@ def emit(route_id, res, features_only=False):
         obs, n_under = [], 0
         if not is_block:   # W5 roads2: roads that cross the line on a bridge are carried across (overbridges.js), their ribbons leave the road list
             rd, obs, n_under = obr.process_leg(g, roads, rtree, track_line, all_meta[lid], float(meta.get("k", 1.0)), rd, [c["s"] for c in crossings], sc.ROAD_CLASSES)
-        rd, crossings, _tidy = tidy.tidy_leg(rd, crossings, float(meta.get("k", 1.0)), None, obs)   # W5: roads beside the track (real_line_roads_tidy.py)
+        land_r = sc.land_raster(g, land)
+        builtup = None if is_block else tidy.ends.builtup_fn(land_r, sc.LAT0, sc.COL_M, sc.COLS)   # W5 roads3: every free road end in the open field is fixed or dropped
+        rd, crossings, _tidy = tidy.tidy_leg(rd, crossings, float(meta.get("k", 1.0)), None, obs, builtup)   # W5: roads beside the track (real_line_roads_tidy.py)
         out[lid] = {
-            "L": round(g.length, 1), "land": sc.land_raster(g, land), "far": sc.far_raster(g, land), "water": sc.water_windows(g, waters, wtree), "roads": rd,
+            "L": round(g.length, 1), "land": land_r, "far": sc.far_raster(g, land), "water": sc.water_windows(g, waters, wtree), "roads": rd,
             "relief": sc.relief(g, dem), "places": sc.places_of_leg(g, tiles["places"]), "crossings": crossings, "ob": obs,
         }
         print("  features", lid, meta["from"], "->", meta["to"], "roads", len(rd), "water", len(out[lid]["water"]), "places", len(out[lid]["places"]), "crossings", len(out[lid]["crossings"]), "overbridges", len(obs), "(underpasses %d)" % n_under, flush=True)

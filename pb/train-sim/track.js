@@ -825,6 +825,7 @@
           id: def.sceneryId || def.id, length, frameAt, groundAt: terrainHeightAt, secondLat: (s) => (second ? second.lat(s) : 0), obs: real.overbridges,
           tunnels: comp.tunnels, bridges, stations, flips: second ? second.flips : [],
         });
+        obPlan.reconcile(roadPlan);   // synthetic crossing roads stop before a ramp (or the overbridge is handed back)
         window.TS.overbridges.fallbackRoads(obPlan.skipped).forEach((r) => real.roads.push(r));
       } catch (error) {
         console.warn('[Lokféierer] track: overbridges failed', error);

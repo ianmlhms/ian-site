@@ -72,6 +72,15 @@
     c.fillStyle = '#5b6168';                               // steel frame: a grid of glazing bars
     for (let i = 0; i < 4; i++) { c.fillRect(i * (w / 4), 0, 3, h); c.fillRect(0, i * (h / 4), w, 3); }
   });
+  /* W5 roads3: the ordinary platform canopies were opaque grey sheet: from the cab of the paris train a huge slanted slab beside the track.  They are now glazed too, but with a
+     translucent pane (light sky shows through, the view stays open) in a grey steel frame; the hall keeps its opaque glass-and-steel look */
+  const canopyPaneTexture = () => canvasTexture('yard:canopy-pane', 128, 128, (c, w, h) => {
+    c.clearRect(0, 0, w, h);
+    c.fillStyle = 'rgba(190,200,210,0.30)'; c.fillRect(0, 0, w, h);
+    c.fillStyle = 'rgba(96,104,112,0.95)';
+    for (let i = 0; i < 4; i++) { c.fillRect(i * (w / 4), 0, 4, h); }
+    c.fillRect(0, 0, w, 4); c.fillRect(0, h / 2, w, 3);
+  });
   /* grey standing-seam sheet metal of the ordinary platform canopies (the Grande Halle is glass) */
   const sheetTexture = () => canvasTexture('yard:sheet', 128, 128, (c, w, h) => {
     c.fillStyle = '#8f9397'; c.fillRect(0, 0, w, h);
@@ -286,7 +295,7 @@
         });
       });
       if (!roof.empty) add(new T.Mesh(roof.geometry(), mat(new T.MeshLambertMaterial({ map: glassTexture(), side: T.DoubleSide, color: 0xdfe6ec, emissive: 0x626b75 }))), false);
-      if (!roofPlain.empty) add(new T.Mesh(roofPlain.geometry(), mat(new T.MeshLambertMaterial({ map: sheetTexture(), side: T.DoubleSide, color: 0xb9bcc0, emissive: 0x666b72 }))), false);
+      if (!roofPlain.empty) add(new T.Mesh(roofPlain.geometry(), mat(new T.MeshLambertMaterial({ map: canopyPaneTexture(), side: T.DoubleSide, color: 0xffffff, emissive: 0x8a929a, transparent: true, depthWrite: false }))), false);
       const roofAt = (x, z) => {
         let best = null;
         faces.forEach((f) => {

@@ -119,7 +119,10 @@
         const y = roofY(GC_COLUMN_X, z);
         if (y === null) continue;
         const h = y - GC_PLATFORM_TOP - 0.1;
-        if (h > 1.5) box(GC_COLUMN_X, GC_PLATFORM_TOP + h / 2, z, 0.3, h, 0.3, '#5b6066');
+        if (h > 1.5) {
+          box(GC_COLUMN_X, GC_PLATFORM_TOP + h / 2, z, 0.3, h, 0.3, '#5b6066');
+          box(GC_COLUMN_X, y - 0.18, z + GC_COLUMN_STEP / 2, 0.34, 0.36, GC_COLUMN_STEP, '#5b6066');      // edge girder to the next column: the canopy has a visible edge
+        }
       }
     });
   }
@@ -136,6 +139,7 @@
      * GC_WING_X; the roof stays as the canopy and gets columns at its edge (extras). */
     mapWall: (ring) => (ring.every((p) => p[0] > GC_CANOPY_MIN_X && p[1] < GC_CANOPY_MAX_Y) ? ring.map((p) => (p[0] > GC_CANOPY_EDGE_X ? [GC_WING_X, p[1], p[2]] : p)) : ring),
     canopyRoof: (ring, yMean) => yMean < GC_CANOPY_MAX_Y + 0.5 && ring.every((p) => p[0] > GC_CANOPY_MIN_X),
+    canopyGlass: true,      // W5 roads3: the wing canopies are glazed like the platform canopies of the yard, translucent: they were opaque grey slabs (paris cab spawn)
     wallFor: (face) => (face.xc > -6.0 && face.ymax < GC_CANOPY_MAX_Y ? '#e9e2cd' : null),      // photos Grande vitesse (102)-(105): the platform-side wings are cream plaster, not the sandstone of the hall
     mapGround: (p) => (p[0] > GC_CANOPY_EDGE_X ? [GC_WING_X, p[1]] : p),
     extras: gcCanopyColumns,

@@ -254,6 +254,15 @@
     }, true);
   }
   function roofTexture(kind) {
+    /* W5 roads3: 'glass' = the glazed platform canopy (steel glazing bars round panes of light glass, translucent: the sky shows through, it does not close the view) */
+    if (kind === 'glass') {
+      return canvasTexture('surf:roof:glass', 128, 128, (c, w, h) => {
+        c.clearRect(0, 0, w, h);
+        c.fillStyle = 'rgba(196,212,226,0.34)'; c.fillRect(0, 0, w, h);
+        c.fillStyle = 'rgba(70,78,88,0.95)';
+        for (let i = 0; i < 4; i++) { c.fillRect(i * (w / 4), 0, 3, h); c.fillRect(0, i * (h / 4), w, 3); }
+      }, true);
+    }
     return canvasTexture('surf:roof:' + kind, 128, 128, (c, w, h) => {
       const r = mulberry(hashStr(kind));
       const base = { slate: '#80868e', tile: '#b4694c', flat: '#8c8f93', zinc: '#a6adb3' }[kind];
