@@ -13,7 +13,7 @@ import { scanRoute } from '../zuch/hole_lib.mjs';
 const LINES = {
   metz: {
     stations: ['Lëtzebuerg', 'Houwald', 'Bettembuerg', 'Hettange-Grande', 'Thionville', 'Uckange', 'Hagondange', 'Walygator Parc', 'Metz-Ville', 'Pagny-sur-Moselle', 'Pont-à-Mousson', 'Nancy-Ville'],
-    lengthKm: [12, 22], minBridges: 4, minCrossings: 3, budgetMb: 1.75,
+    lengthKm: [12, 22], minBridges: 4, minCrossings: 3, budgetMb: 1.95,      // W5: 1.75 -> 1.95, the five intermediate stops got their own patch cores (measured 1.90 MB)
   },
   brussels: {
     stations: ['Lëtzebuerg', 'Arlon', 'Marbehan', 'Libramont', 'Jemelle', 'Marloie', 'Ciney', 'Namur', 'Gembloux', 'Ottignies', 'Bruxelles-Luxembourg', 'Bruxelles-Midi'],
