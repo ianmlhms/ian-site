@@ -54,12 +54,15 @@
   const lerp = (a, b, k) => a + (b - a) * k;
   const smooth = (x) => { const c = clamp(x, 0, 1); return c * c * (3 - 2 * c); };
 
+  const VEHICLE_ALIAS = { z2200: 'emu', c2400: 'kiss', c2450: 'kiss', dosto: 'ic' };   // train id -> sound profile
+
   function resolveVehicle(p, prev) {
     const id = p.train, snd = p.sound;
     if (snd === 'tram' || id === 'tram') return 'tram';
     if (snd === 'diesel' || id === 'railcar') return 'railcar';
     if (snd === 'hst' || id === 'hst') return 'hst';
     if (id === 'kiss' || id === 'ic' || id === 'emu') return id;
+    if (VEHICLE_ALIAS[id]) return VEHICLE_ALIAS[id];   // the real CFL units added later sound like the closest older profile
     return snd ? 'emu' : prev || 'emu';
   }
 

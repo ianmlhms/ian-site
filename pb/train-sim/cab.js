@@ -30,6 +30,7 @@
   const HOVER_TINT = '#ffd27a';          // emissive tint of a hovered control
   const HOVER_EMISSIVE = 0.75;           // emissive floor of a hovered control
   const HIT_W = 0.092;                   // width of a button hit box (m), a bit larger than the button + sticker
+  const GAUGE_NEEDLE = [0.52, 0.58, 0.8, 0.35];   // resting needle of the static gauges (fraction of the scale)
   const CONTROL_IDS = ['lever', 'doorLeft', 'doorRight', 'horn', 'lights', 'eb', 'parking', 'wipers', 'announce'];
 
   /* Fallback geometry per model when TS.trains.specs is not there. */
@@ -39,6 +40,9 @@
     kiss: { frontL: 25.0, floor: 1.00, W: 2.80, windHW: 0.95, windY0: 1.85, windY1: 3.15 },
     tram: { frontL: 8.8, floor: 0.62, W: 2.40, windHW: 0.95, windY0: 1.40, windY1: 2.75 },
     ic: { frontL: 19.0, floor: 1.35, W: 3.0, windHW: 0.98, windY0: 2.2, windY1: 3.5 },
+    dosto: { frontL: 18.9, floor: 1.35, W: 2.97, windHW: 1.1, windY0: 2.3, windY1: 3.45 },
+    z2200: { frontL: 27.0, floor: 1.00, W: 2.81, windHW: 0.9, windY0: 1.95, windY1: 3.15 },
+    coradia: { frontL: 27.3, floor: 0.95, W: 2.9, windHW: 0.95, windY0: 1.95, windY1: 3.3 },
     hst: { frontL: 22.0, floor: 1.45, W: 2.9, windHW: 0.82, windY0: 2.3, windY1: 3.35 },
   };
 
@@ -47,20 +51,48 @@
     railcar: {
       old: true, hw: 0.80, top: '#4c3f2e', body: '#2f3a32', ramp: '#3a4439', metal: '#b69a52', trim: '#2a2824',
       leverX: -0.52, joystick: false, seat: 'old', retro: true,
+      ceil: '#d9d2bc', blind: false, extras: ['extinguisher'],
       dials: [{ kind: 'speedo', x: 0.0, r: 0.1 }, { kind: 'gauge', x: -0.27, r: 0.055, idx: 0 }, { kind: 'gauge', x: 0.26, r: 0.055, idx: 1 }],
       mfds: [{ x: 0.5, w: 0.17, h: 0.125, role: 'main' }],
     },
+    /* CFL Z 2 (class 2000, Z 6400 family desk): olive-grey steel, dark brown top, round analog gauges, a small amber monochrome screen (the ETCS display fitted later). */
     emu: {
-      hw: 0.85, top: '#7d848c', body: '#3c4148', ramp: '#23272d', metal: '#9aa3ad', trim: '#171a1e', accent: '#c8312b',
-      leverX: -0.46, joystick: false, seat: 'modern',
-      dials: [{ kind: 'speedo', x: -0.21, r: 0.075 }],
-      mfds: [{ x: 0.12, w: 0.34, h: 0.212, role: 'main' }],
+      hw: 0.88, top: '#3a3733', body: '#575c52', ramp: '#4b5046', metal: '#a9a283', trim: '#1b1a18', accent: '#b32d2d', wall: '#9fb0be', side: '#8e9aa5', visor: '#6b747c', bezel: '#2a2a28',
+      leverX: -0.22, joystick: false, seat: 'modern', pal: 'amber',
+      pupitre: { w: 0.34, color: '#2c2a27' }, stk: '#d8d2bc', layout: { announce: -0.76, light: -0.62, wiper: -0.48, eb: 0.04, park: 0.18, horn: 0.32, doorL: 0.5, doorR: 0.7 },
+      ceil: '#d6dbe0', blind: false, extras: ['extinguisher', 'lantern'], seatCol: ['#6d6a86', '#5f5c78'],
+      dials: [{ kind: 'gauge', x: -0.4, r: 0.042, idx: 0, v: 0.06 }, { kind: 'gauge', x: -0.31, r: 0.042, idx: 1, v: 0.06 }, { kind: 'gauge', x: -0.355, r: 0.042, idx: 2, v: 0.15 }, { kind: 'speedo', x: -0.12, r: 0.078 }],
+      mfds: [{ x: 0.16, w: 0.27, h: 0.17, role: 'main' }, { x: 0.45, w: 0.14, h: 0.1, role: 'diag' }],
+      blocks: [{ x: -0.8, u: 0.08, w: 0.16, d: 0.12, h: 0.11, color: '#7d8a96' }],
     },
+    /* CFL 2200 (Alstom Coradia Duplex = Z 24500 desk): charcoal console, light grey-white walls with speaker blocks, two small screens + four gauges left, a big display right. */
+    z2200: {
+      hw: 0.9, top: '#33363a', body: '#2f3235', ramp: '#2a2d30', metal: '#9aa0a6', trim: '#17181a', accent: '#d02a35', wall: '#dedbd0', side: '#c9c6bb', visor: '#b3b0a5', bezel: '#151618',
+      leverX: -0.12, joystick: false, seat: 'modern', pal: 'light',
+      pupitre: { w: 0.3 }, stk: '#c9ccd0', layout: { doorL: -0.72, announce: -0.57, light: -0.42, wiper: -0.28, eb: 0.3, park: 0.44, horn: 0.58, doorR: 0.72 },
+      ceil: '#ebe9e2', blind: true, blindCol: '#202225', extras: ['speaker', 'extinguisher'], seatCol: ['#2d4a9a', '#2a3f86'],
+      dials: [{ kind: 'gauge', x: -0.44, r: 0.04, idx: 0, v: 0.045 }, { kind: 'gauge', x: -0.35, r: 0.04, idx: 1, v: 0.045 }, { kind: 'gauge', x: -0.44, r: 0.04, idx: 2, v: 0.135 }, { kind: 'speedo', x: -0.14, r: 0.07 }, { kind: 'gauge', x: 0.04, r: 0.04, idx: 3, v: 0.1 }],
+      mfds: [{ x: 0.27, w: 0.28, h: 0.18, role: 'main' }, { x: -0.38, w: 0.11, h: 0.085, v: 0.17, role: 'diag' }, { x: 0.6, w: 0.14, h: 0.1, role: 'diag' }],
+      blocks: [{ x: -0.81, u: 0.05, w: 0.15, d: 0.13, h: 0.13, color: '#e2e0d8' }, { x: 0.81, u: 0.05, w: 0.15, d: 0.13, h: 0.13, color: '#e2e0d8' }],
+    },
+    /* CFL 2300 (Stadler KISS): curved black console with a silver rim, a round analog speedometer, TFT screens, grey walls. */
     kiss: {
-      hw: 0.85, top: '#6f767e', body: '#353a41', ramp: '#1f2328', metal: '#98a1ab', trim: '#15181c', accent: '#1b4f9c',
-      leverX: -0.46, joystick: false, seat: 'modern',
-      dials: [{ kind: 'speedo', x: -0.2, r: 0.072 }],
-      mfds: [{ x: 0.1, w: 0.28, h: 0.18, role: 'main' }],
+      hw: 0.88, top: '#2c2f33', body: '#26292d', ramp: '#1d2024', metal: '#c6ccd2', trim: '#15181c', accent: '#d02a35', wall: '#c4c8cc', side: '#aeb2b7', visor: '#8d9298', bezel: '#c6ccd2',
+      leverX: 0.3, joystick: false, seat: 'modern',
+      pupitre: { w: 0.26, color: '#111316' }, stk: '#cfd3d8', layout: { announce: -0.74, wiper: -0.6, horn: -0.46, light: -0.32, eb: -0.16, park: 0.12, doorL: 0.52, doorR: 0.7 },
+      ceil: '#d5d8dc', blind: true, blindCol: '#2a2d31', extras: ['extinguisher'], seatCol: ['#2a2c30', '#25272b'],
+      dials: [{ kind: 'speedo', x: -0.22, r: 0.075 }],
+      mfds: [{ x: 0.06, w: 0.27, h: 0.18, role: 'main' }, { x: 0.36, w: 0.19, h: 0.14, role: 'diag' }],
+    },
+    /* CFL 2400 / 2450 (Alstom Coradia Stream): all-digital desk, two big screens, a small backup speedometer, light grey cab. */
+    coradia: {
+      hw: 0.9, top: '#3d4146', body: '#363a3f', ramp: '#22252a', metal: '#aab1b8', trim: '#15171a', accent: '#d02a35', wall: '#d3d6d9', side: '#bfc3c7', visor: '#a4a9ae', bezel: '#101214',
+      leverX: 0.0, joystick: false, seat: 'modern',
+      pupitre: { w: 0.3 }, stk: '#d6d9dc', layout: { doorL: -0.72, announce: -0.58, light: -0.44, horn: -0.3, eb: 0.3, park: 0.44, wiper: 0.58, doorR: 0.72 },
+      ceil: '#e2e4e6', blind: true, blindCol: '#c4c7cb', extras: ['speaker'], seatCol: ['#34373d', '#2e3136'],
+      dials: [{ kind: 'speedo', x: 0.0, r: 0.055 }],
+      mfds: [{ x: -0.26, w: 0.3, h: 0.19, role: 'main' }, { x: 0.28, w: 0.3, h: 0.19, role: 'aux' }, { x: 0.58, w: 0.1, h: 0.14, role: 'diag' }],
+      blocks: [{ x: 0.83, u: 0.04, w: 0.12, d: 0.1, h: 0.09, color: '#c9ccd0' }],
     },
     tram: {
       hw: 0.8, top: '#33373d', body: '#22252a', ramp: '#14171a', metal: '#aab1b8', trim: '#101215', accent: '#19a9c4',
@@ -69,17 +101,33 @@
       mfds: [{ x: -0.065, w: 0.32, h: 0.2, v: 0.205, role: 'main' }, { x: 0.225, w: 0.2, h: 0.125, v: 0.215, role: 'aux' }],
       hood: true,
     },
+    /* CFL 3000 (BB 36000 desk): grey painted steel, angled instrument panels with round analog gauges, one small screen, light blue-grey cab. */
     ic: {
-      hw: 0.92, top: '#555b63', body: '#2c3036', ramp: '#1c1f24', metal: '#929ba5', trim: '#121417', accent: '#e9742c',
-      leverX: -0.6, joystick: false, seat: 'modern',
-      dials: [{ kind: 'speedo', x: -0.01, r: 0.068 }],
-      mfds: [{ x: -0.26, w: 0.26, h: 0.17, role: 'main' }, { x: 0.27, w: 0.26, h: 0.17, role: 'aux' }],
+      hw: 0.94, top: '#6c7378', body: '#5a6166', ramp: '#2b2e31', metal: '#c0c4c8', trim: '#121417', accent: '#d09a1a', wall: '#a9b6c1', side: '#97a4af', visor: '#7d8a95', bezel: '#2a2c2e',
+      leverX: -0.3, joystick: false, seat: 'modern', pal: 'amber',
+      pupitre: { w: 0.32, color: '#0d0e10' }, stk: '#c9ced3', layout: { wiper: -0.8, light: -0.66, announce: -0.52, eb: 0.0, park: 0.14, horn: 0.28, doorL: 0.5, doorR: 0.72 },
+      ceil: '#b8c2cb', blind: false, extras: ['cabinet', 'extinguisher'], seatCol: ['#3b4a5e', '#334257'],
+      dials: [{ kind: 'gauge', x: -0.4, r: 0.05, idx: 0, v: 0.1 }, { kind: 'gauge', x: -0.28, r: 0.05, idx: 1, v: 0.1 }, { kind: 'speedo', x: -0.1, r: 0.072 }, { kind: 'gauge', x: 0.05, r: 0.042, idx: 3, v: 0.12 }],
+      mfds: [{ x: 0.3, w: 0.26, h: 0.17, role: 'main' }, { x: 0.62, w: 0.12, h: 0.09, role: 'diag' }],
+      blocks: [{ x: -0.84, u: 0.05, w: 0.14, d: 0.14, h: 0.12, color: '#8a969f' }],
     },
+    /* CFL 4000 (Bombardier TRAXX desk): pale blue-grey moulded console, two black-framed screens with soft keys. */
+    dosto: {
+      hw: 0.98, top: '#8f9fb0', body: '#7a8999', ramp: '#1b1d20', metal: '#c8ced4', trim: '#16181b', accent: '#d02a35', wall: '#bcc8d3', side: '#a8b5c1', visor: '#8f9ba7', bezel: '#101214',
+      leverX: -0.5, joystick: false, seat: 'modern', pal: 'light',
+      pupitre: { w: 0.3, color: '#16181b' }, stk: '#d4dae0', layout: { wiper: -0.82, light: -0.7, eb: -0.2, park: -0.06, horn: 0.08, announce: 0.22, doorL: 0.52, doorR: 0.72 },
+      ceil: '#d0d8df', blind: false, extras: ['switchPanel', 'extinguisher'], seatCol: ['#4a4a8a', '#42427c'],
+      dials: [{ kind: 'speedo', x: -0.02, r: 0.06 }, { kind: 'gauge', x: 0.45, r: 0.04, idx: 0, v: 0.12 }, { kind: 'gauge', x: 0.45, r: 0.04, idx: 1, v: 0.05 }],
+      mfds: [{ x: -0.28, w: 0.3, h: 0.2, role: 'main' }, { x: 0.22, w: 0.28, h: 0.19, role: 'aux' }],
+    },
+    /* SNCF TGV Duplex (the TGV inOui Luxembourg - Paris): black desk, blue-lined cab, round gauges left, the DMI in the middle. */
     hst: {
-      hw: 1.0, top: '#4a5059', body: '#272b31', ramp: '#1a1d22', metal: '#8d96a0', trim: '#101215', accent: '#2f6fcf',
-      leverX: -0.58, joystick: false, seat: 'modern',
-      dials: [{ kind: 'speedo', x: 0.0, r: 0.058 }],
-      mfds: [{ x: -0.21, w: 0.28, h: 0.19, role: 'main' }, { x: 0.21, w: 0.28, h: 0.19, role: 'aux' }],
+      hw: 1.0, top: '#16181b', body: '#101214', ramp: '#0c0d0f', metal: '#6b737c', trim: '#0a0b0c', accent: '#4e9a5a', wall: '#6a90dc', side: '#4a72c4', visor: '#8aa8e6', bezel: '#2a2d31',
+      leverX: -0.42, joystick: false, seat: 'modern', pal: 'tgv',
+      pupitre: { w: 0.32, color: '#050607' }, stk: '#9aa3ad', layout: { wiper: -0.82, light: -0.7, announce: -0.58, eb: 0.0, park: 0.14, horn: 0.28, doorL: 0.55, doorR: 0.72 },
+      ceil: '#c3d3f3', blind: false, extras: [], seatCol: ['#a42a3a', '#932535'],
+      dials: [{ kind: 'gauge', x: -0.46, r: 0.048, idx: 0, v: 0.09 }, { kind: 'gauge', x: -0.35, r: 0.048, idx: 1, v: 0.09 }, { kind: 'speedo', x: -0.2, r: 0.058 }],
+      mfds: [{ x: 0.07, w: 0.26, h: 0.19, role: 'main' }, { x: 0.38, w: 0.2, h: 0.15, role: 'aux' }, { x: 0.65, w: 0.12, h: 0.1, role: 'diag' }],
     },
   };
 
@@ -90,6 +138,7 @@
   };
 
   const SIGNAL_ORDER = ['red', 'yellow', 'green'];
+  const LOCO_CABS = ['ic', 'dosto'];   // cab types whose front car is a locomotive (its own spec block TS.trains.specs[model].loco)
 
   /* ---------------------------------------------------------------- small helpers */
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -103,6 +152,7 @@
   const NOSE_FALLBACK = {
     railcar: { yb: 0.6, rake: 0.05, capSx: 0.88 }, emu: { yb: 0.6, rake: 0.2, capSx: 0.78 }, kiss: { yb: 0.6, rake: 0.12, capSx: 0.8 },
     tram: { yb: 0.3, rake: 0.1, capSx: 0.86 }, ic: { yb: 0.75, rake: 0.1, capSx: 0.8 }, hst: { yb: 0.62, rake: 0, capSx: 0.4 },
+    dosto: { yb: 0.75, rake: 0.03, capSx: 0.97 }, z2200: { yb: 0.6, rake: 0.32, capSx: 0.88 }, coradia: { yb: 0.6, rake: 0.85, capSx: 0.78 },
   };
 
   /* Geometry of the cab opening: from TS.trains.specs when present, else the fallback tables. */
@@ -112,7 +162,7 @@
     const model = (cfg && (cfg.model || cfg.cab)) || type;
     const specs = TS.trains && TS.trains.specs;
     const raw = specs && specs[model];
-    const spec = raw && type === 'ic' && raw.loco ? raw.loco : raw;
+    const spec = raw && LOCO_CABS.includes(type) && raw.loco ? raw.loco : raw;
     let frontL = fb.frontL;
     try { if (TS.trains && typeof TS.trains.frontCarLength === 'function') frontL = num(TS.trains.frontCarLength(cfg), frontL); } catch (e) { console.warn('[Lokféierer] cab: frontCarLength failed', e); }
     const scr = (spec && spec.scr) || null, nose = (spec && spec.nose) || null;
@@ -128,6 +178,7 @@
       rake: pick(cabFrame, ['rake'], pick(nose, ['rake'], nf.rake)),
       capSx: pick(cabFrame, ['capSx'], pick(nose, ['capSx'], nf.capSx)),
       twin: !!(scr && scr.kind === 'twin'),
+      divX: scr && typeof scr.divX === 'number' ? scr.divX : undefined,
     };
   }
 
@@ -216,7 +267,13 @@
 
   /* ---------------------------------------------------------------- MFD drawing */
   const PAL_MODERN = { bg: '#0a111e', panel: '#14203a', fg: '#f2f5fa', dim: '#7f8da6', ok: '#35e08a', warn: '#ffc233', bad: '#ff4b4b', blue: '#4fa3ff', line: '#2a3a5c' };
+  /* more screen looks: amber monochrome (Z 2 / BB 36000 era), light LCD (Alstom 2200 / TRAXX displays are white-grounded), TGV DMI (black, blue-white) */
+  const PAL_AMBER = { bg: '#0b0905', panel: '#1d1608', fg: '#ffd27a', dim: '#a07c36', ok: '#ffcf5a', warn: '#ffb02e', bad: '#ff6a3d', blue: '#ffcf5a', line: '#5a4310' };
+  const PAL_LIGHT = { bg: '#e9ecef', panel: '#c9d0d7', fg: '#10151b', dim: '#5c6772', ok: '#168a47', warn: '#b87500', bad: '#c9261c', blue: '#1c5fb8', line: '#9aa6b0' };
+  const PAL_TGV = { bg: '#04070c', panel: '#0b1a2c', fg: '#e8f1ff', dim: '#6f87a8', ok: '#3df08f', warn: '#ffc233', bad: '#ff4b4b', blue: '#4fd0ff', line: '#1f3a5c' };
   const PAL_RETRO = { bg: '#040b06', panel: '#0a1c0f', fg: '#9bff9b', dim: '#3f9a45', ok: '#9bff9b', warn: '#ffd24a', bad: '#ff7050', blue: '#9bff9b', line: '#1f5a27' };
+
+  const PALS = { modern: PAL_MODERN, retro: PAL_RETRO, amber: PAL_AMBER, light: PAL_LIGHT, tgv: PAL_TGV };
 
   function pad2(n) { return (n < 10 ? '0' : '') + n; }
 
@@ -339,6 +396,21 @@
     drawPowerBar(ctx, 16, 238, 480, 20, v.brake01, v.power01, pal);
   }
 
+  /* A static diagnostics screen (list of subsystems with status lamps): the extra displays of the real desks, drawn once. */
+  function drawDiag(ctx, pal, seed) {
+    ctx.fillStyle = pal.bg; ctx.fillRect(0, 0, 512, 320);
+    ctx.fillStyle = pal.panel; ctx.fillRect(0, 0, 512, 44);
+    ctx.fillStyle = pal.fg; ctx.font = '700 28px ' + FONT; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    ctx.fillText(['TRAIN', 'DIAG', 'ETCS', 'AUX'][seed % 4], 14, 32);
+    const rows = 7, rowH = 38;
+    for (let i = 0; i < rows; i++) {
+      const y = 62 + i * rowH, ok = (i * 5 + seed * 3) % 7 !== 3;
+      ctx.fillStyle = pal.line; ctx.fillRect(14, y + 22, 484, 2);
+      ctx.fillStyle = pal.dim; ctx.fillRect(14, y + 4, 90 + ((i * 53 + seed * 29) % 170), 14);
+      ctx.beginPath(); ctx.arc(470, y + 11, 10, 0, Math.PI * 2); ctx.fillStyle = ok ? pal.ok : pal.warn; ctx.fill();
+    }
+  }
+
   /* ---------------------------------------------------------------- speedometer face */
   function dialScale(maxKmh) {
     const major = maxKmh <= 100 ? 10 : maxKmh <= 200 ? 20 : 40;
@@ -377,7 +449,7 @@
   function drawGaugeAtlas(canvas, old) {
     const ctx = canvas.getContext('2d'), s = canvas.height;
     ctx.clearRect(0, 0, canvas.width, s);
-    const faces = [{ max: 10, major: 2, red: 8 }, { max: 120, major: 20, red: 100 }];
+    const faces = [{ max: 10, major: 2, red: 8, unit: 'bar' }, { max: 120, major: 20, red: 100, unit: '°C' }, { max: 30, major: 5, red: 27, unit: 'kV' }, { max: 1000, major: 200, red: 850, unit: 'A' }];
     faces.forEach((f, i) => {
       const c = s / 2, R = c * 0.96, ox = i * s;
       ctx.beginPath(); ctx.arc(ox + c, c, R, 0, Math.PI * 2); ctx.fillStyle = old ? '#e9e2c9' : '#0b0d11'; ctx.fill();
@@ -394,7 +466,7 @@
         }
       }
       ctx.fillStyle = ink; ctx.font = '700 ' + Math.round(s * 0.09) + 'px ' + FONT; ctx.textAlign = 'center';
-      ctx.fillText(i === 0 ? 'bar' : '°C', ox + c, c + R * 0.42);
+      ctx.fillText(f.unit, ox + c, c + R * 0.42);
     });
   }
 
@@ -445,7 +517,11 @@
     const S = STYLES[fr.type];
     const zF = -fr.frontL / 2;
     const floor = fr.floor;
-    const eyeY = floor + 1.22, eyeZ = zF + 1.55;
+    /* the eye sits 1.15 m behind the front edge of the desk (which stands behind the raked cap plane): the strongly raked noses (KISS, Coradia) push the desk back by up to 1.1 m.
+       Twin-windscreen cabs (Z 2, locomotives): the driver sits left of the central pillar, so the pillar does not stand in front of the eye. */
+    const deskFrontEarly = Math.max(DESK_FRONT_MIN, fr.rake * (floor + 0.84 - fr.yb) + 0.12);
+    const eyeY = floor + 1.22, eyeZ = zF + Math.max(1.55, deskFrontEarly + 1.15);
+    const eyeX = fr.twin && fr.divX === 0 ? -0.3 : 0;
     const eyeDz = eyeZ - zF;
     const maxKmh = num(cfg.maxKmh, 140);
     const scale = dialScale(maxKmh);
@@ -625,6 +701,9 @@
     deskBox('metal', hw * 2, 0.012, 0.016, 0, DESK_DEPTH - 0.006, S.metal, -0.004);
     deskBox('matte', hw * 2, 0.02, 0.05, 0, DESK_DEPTH + 0.024, S.trim, -0.03);
 
+    /* side blocks of the real consoles (speaker / junction boxes at the corners of the desk) */
+    for (const b of S.blocks || []) deskBox('matte', b.w, b.h, b.d, clamp(b.x, -hw - 0.02, hw + 0.02), b.u, b.color, 0);
+
     /* ---- speedometer dials ------------------------------------------------------------------ */
     const dialCanvasSize = isLow ? 256 : 512;
     const dialFaceTex = tex(canvasTexture(makeCanvas(dialCanvasSize, dialCanvasSize), aniso));
@@ -633,13 +712,13 @@
     const markerGroups = [];
     let needlePivot = null, limitPivot = null, targetPivot = null;
     const dialFaceMat = mat(new T.MeshBasicMaterial({ map: dialFaceTex, toneMapped: true }));
-    const gaugeAtlasTex = tex(canvasTexture(makeCanvas(isLow ? 256 : 512, isLow ? 128 : 256), aniso));
+    const gaugeAtlasTex = tex(canvasTexture(makeCanvas(isLow ? 512 : 1024, isLow ? 128 : 256), aniso));   // 4 square faces: bar, deg C, kV, A
     drawGaugeAtlas(gaugeAtlasTex.image, !!S.old);
     const gaugeFaceMat = mat(new T.MeshBasicMaterial({ map: gaugeAtlasTex }));
     const dialGroup = new T.Group();
     dialGroup.name = 'dials';
     interior.add(dialGroup);
-    const bezelHex = S.old ? '#b69a52' : '#20242a';
+    const bezelHex = S.old ? '#b69a52' : (S.bezel || '#20242a');
 
     for (const d of dials) {
       const cy = d.v != null ? d.v : rampLen / 2;
@@ -677,11 +756,11 @@
         // small static gauge from the atlas
         const g = new T.PlaneGeometry(d.r * 1.96, d.r * 1.96);
         const uv = g.attributes.uv;
-        for (let i = 0; i < uv.count; i++) uv.setX(i, d.idx * 0.5 + uv.getX(i) * 0.5);
+        for (let i = 0; i < uv.count; i++) uv.setX(i, d.idx * 0.25 + uv.getX(i) * 0.25);
         const face = new T.Mesh(geo(g), gaugeFaceMat);
         face.applyMatrix4(M);
         dialGroup.add(face);
-        const ang = (d.idx === 0 ? -135 + 270 * 0.52 : -135 + 270 * 0.58) * DEG;
+        const ang = (-135 + 270 * (GAUGE_NEEDLE[d.idx] || 0.5)) * DEG;
         addTo('metal', box(d.r * 0.04, d.r * 0.82, 0.003), M.clone().multiply(compose(0, 0, 0.003, 0, 0, -ang)).multiply(compose(0, d.r * 0.35, 0)), '#14110c');
       }
     }
@@ -702,7 +781,14 @@
       mfdGroup.add(screen);
       addTo('matte', box(m.w + 0.03, m.h + 0.03, 0.02), panelM(m.x, m.v != null ? m.v : rampLen / 2, -0.004), '#0a0b0d');
       addTo('metal', box(m.w + 0.034, 0.004, 0.008), panelM(m.x, (m.v != null ? m.v : rampLen / 2) + (m.h + 0.03) / 2, 0.008), S.metal);
-      mfdList.push({ canvas, texture, role: m.role, sig: '' });
+      const entry = { canvas, texture, role: m.role, sig: '', pal: PALS[m.pal || S.pal || (S.retro ? 'retro' : 'modern')] || PAL_MODERN, static: m.role === 'diag' };
+      if (entry.static) {   // a diagnostics / secondary display that only has to look alive: drawn once
+        const sctx = canvas.getContext('2d');
+        sctx.setTransform(canvas.width / 512, 0, 0, canvas.width / 512, 0, 0);
+        drawDiag(sctx, entry.pal, mfdList.length);
+        texture.needsUpdate = true;
+      }
+      mfdList.push(entry);
     }
     // Urbos console: framed screens + glass sheen + round backlit buttons along the lower edge of the panel + the radio / door-key block on the right
     if (S.hood) {
@@ -775,7 +861,7 @@
     const deskSticker = (cell, x, u, lift, scaleK) => {
       const k = scaleK || 1;
       const g = stickerGeo(cell, STICKER_W * k, STICKER_W * k * (128 / 120)).rotateX(-Math.PI / 2);
-      addTo('sticker', g, deskM(x, u, lift == null ? 0.0025 : lift), '#ffffff');
+      addTo('sticker', g, deskM(x, u, lift == null ? 0.0025 : lift), S.stk || '#ffffff');
     };
 
     /* ---- gate plate + lever -------------------------------------------------------------------- */
@@ -802,6 +888,13 @@
     interior.add(deskGroup);
     gateMesh.position.set(plateX, 0.003, (plateU0 + plateU1) / 2);
     deskGroup.add(gateMesh);
+    // the central console block of the real desk (pupitre): a dark pad with a metal edge around the lever gate
+    if (S.pupitre) {
+      const P = S.pupitre, pu = (plateU0 + plateU1) / 2, pd = plateU1 - plateU0 + (P.pad || 0.12), pw = P.w || 0.3, px = plateX - 0.03 + (P.dx || 0);
+      deskBox('matte', pw, 0.0018, pd, px, pu, P.color || '#0b0c0e', 0);
+      for (const sx of [-1, 1]) deskBox('metal', 0.007, 0.0026, pd, px + sx * pw / 2, pu, S.metal, 0);
+      for (const sz of [-1, 1]) deskBox('metal', pw + 0.007, 0.0026, 0.007, px, pu + sz * pd / 2, S.metal, 0);
+    }
     // slot guide along the lever path + frame of the plate
     deskBox('matte', 0.02, 0.004, plateU1 - plateU0 + 0.02, leverX, (plateU0 + plateU1) / 2, '#050607', 0.0);
     deskBox('metal', plateW + 0.014, 0.006, plateU1 - plateU0 + 0.014, plateX, (plateU0 + plateU1) / 2, S.metal, -0.004);
@@ -853,15 +946,17 @@
     /* ---- buttons, switches, lamps ------------------------------------------------------------ */
     const btnU = 0.4 * LK;
     const stickerU = 0.465 * LK;
-    const doorX = Math.min(hw - 0.2, 0.6);
+    /* S.layout: where the real desk has its controls (x on the desk, m): doorL, doorR, eb, light, horn, wiper, park, announce. Unset = the one common row. */
+    const LY = S.layout || {}, lay = (k, v) => (typeof LY[k] === 'number' ? clamp(LY[k], -(hw - 0.06), hw - 0.06) : v);
+    const doorX = lay('doorR', Math.min(hw - 0.2, 0.6));
     const narrow = hw < 0.8 || -doorX < plateX + 0.09;
-    const doorLX = narrow ? plateX + 0.125 : -doorX;
-    const ebX = narrow ? doorLX + 0.14 : leverX + 0.27;
-    const lightX = ebX + 0.2;
-    const hornX = lightX + 0.28;
-    const wiperX = hornX + 0.14;
-    const parkingX = (ebX + lightX) / 2;
-    const announceX = (lightX + hornX) / 2;
+    const doorLX = lay('doorL', narrow ? plateX + 0.125 : -doorX);
+    const ebX = lay('eb', narrow ? doorLX + 0.14 : leverX + 0.27);
+    const lightX = lay('light', ebX + 0.2);
+    const hornX = lay('horn', lightX + 0.28);
+    const wiperX = lay('wiper', hornX + 0.14);
+    const parkingX = lay('park', (ebX + lightX) / 2);
+    const announceX = lay('announce', (lightX + hornX) / 2);
 
     // door buttons (square, lit)
     const doorMats = {}, doorMeshes = {};
@@ -909,7 +1004,7 @@
     deskGroup.add(ebCap);
     {
       const g = stickerGeo(STK.eb, 0.05, 0.05 * (128 / 120)).rotateX(-Math.PI / 2);
-      addTo('sticker', g, deskM(ebX, btnU, 0.0505), '#ffffff');
+      addTo('sticker', g, deskM(ebX, btnU, 0.0505), S.stk || '#ffffff');
     }
 
     // wiper rotary + extra dummy switches (non-low only)
@@ -921,7 +1016,7 @@
     wiperKnob.position.set(wiperX, 0.005, btnU);
     deskGroup.add(wiperKnob);
     if (!isLow) {
-      for (let i = 0; i < 4; i++) {
+      for (let i = 0; i < (S.layout ? 0 : 4); i++) {
         const x = lightX + 0.1 + i * 0.045;
         if (x > hornX - 0.07) break;
         if (Math.abs(x - announceX) < 0.065) continue;
@@ -1034,30 +1129,80 @@
 
     /* ---- pillars, seals, visor (all follow the raked cap plane) ---------------------------------- */
     if (fr.type === 'tram') buildTramFrame();
-    else {
-      const pillar = '#3b4047';
-      const innerHW = fr.windHW;
-      const h = fr.windY1 - fr.windY0;
-      const ym = (fr.windY0 + fr.windY1) / 2;
-      const rk = rakeAng;
+    else buildTrainFrame();
+
+    /* The cab frame of the trains, in the same spirit as the Urbos one below: bowed A-pillars in the colour of the real cab, a black rubber gasket round the screen, the header with
+       its roller sun blind (or the flip-up visor of the older cabs), a ceiling panel with an LED strip (lit when it is dark), the side panels under the pillars and the small things that
+       make each real cab recognisable (S.extras: fire extinguisher, hand lantern, speaker blocks, the orange cabinet of the BB 36000, the switch panel of the TRAXX pillar).
+       Colours per type from the Wikimedia Commons photos of the real cabs (see STYLES). Everything goes into the merged static buckets: no extra draw calls. */
+    function buildTrainFrame() {
+      const pillar = S.side || '#3b4047', wallCol = S.wall || '#6d737a', visorCol = S.visor || '#5a6068', rubber = '#07080a';
+      const dim = (hex, k) => '#' + new T.Color(hex).multiplyScalar(k).getHexString();
+      const innerHW = fr.windHW, h = fr.windY1 - fr.windY0, ym = (fr.windY0 + fr.windY1) / 2, rk = rakeAng;
+      const sideX = Math.min(fr.W / 2 * 0.92, fr.W / 2 - 0.12);
       for (const sx of [-1, 1]) {
-        boxAt('matte', 0.09, h + 0.1, 0.07, sx * (innerHW - 0.02), ym, capZ(ym) + 0.06, pillar, rk, 0, sx * 0.03);
-        boxAt('matte', 0.03, h + 0.05, 0.4, sx * (innerHW + 0.012), ym, capZ(ym) + 0.22, '#6d737a', rk);
-        boxAt('matte', 0.018, h, 0.02, sx * (innerHW - 0.065), ym, capZ(ym) + 0.035, '#050607', rk);
+        // A-pillar: a slightly bowed tube in the cab colour, a thin black rubber lip along the glass
+        const y0 = fr.windY0 - 0.08, y1 = fr.windY1 + 0.06, bow = 0.03;
+        const pts = [0, 0.25, 0.5, 0.75, 1].map((t) => { const y = y0 + (y1 - y0) * t; return new T.Vector3(sx * (innerHW + 0.03 + bow * Math.sin(Math.PI * t) - 0.03 * t), y, capZ(y) + 0.075); });
+        addTo('matte', new T.TubeGeometry(new T.CatmullRomCurve3(pts), 10, S.pillarR || 0.034, 8, false), new T.Matrix4(), pillar, dim(pillar, 0.78));
+        boxAt('matte', 0.022, h + 0.02, 0.022, sx * (innerHW - 0.04), ym, capZ(ym) + 0.035, rubber, rk);
+        // side panel from the pillar back to the cab door, dark dado under the side window
+        const zA = capZ(ym) + 0.12, zD = zF + 1.12;
+        if (zD > zA) {
+          boxAt('matte', 0.035, h + 0.08, zD - zA, sx * (sideX + 0.01), ym + 0.02, (zA + zD) / 2, wallCol, 0, 0, 0, dim(wallCol, 0.8));
+          boxAt('matte', 0.04, fr.windY0 - floor - 0.05, zD - zA, sx * (sideX + 0.01), (fr.windY0 + floor + 0.05) / 2 - 0.02, (zA + zD) / 2, dim(pillar, 0.6), 0, 0, 0, '#1a1c20');
+        }
+        boxAt('matte', 0.015, h, 0.012, sx * (innerHW - 0.07), ym, capZ(ym) + 0.012, '#050607', rk);
       }
-      boxAt('matte', innerHW * 2 + 0.04, 0.07, 0.07, 0, fr.windY1 - 0.01, capZ(fr.windY1) + 0.06, pillar);
-      boxAt('matte', innerHW * 2 + 0.04, 0.04, 0.3, 0, fr.windY1 + 0.025, capZ(fr.windY1) + 0.2, '#5a6068');
-      boxAt('matte', innerHW * 2, 0.018, 0.02, 0, fr.windY1 - 0.058, capZ(fr.windY1) + 0.035, '#050607');
-      boxAt('matte', innerHW * 2, 0.02, 0.026, 0, fr.windY0 + 0.012, capZ(fr.windY0) + 0.04, '#050607');
-      if (fr.type === 'railcar' || fr.twin) {
-        const px = innerHW * 0.52; // divider offset to the right, so the driver looks through clear glass
+      // gasket along the bottom and top edge of the glass
+      boxAt('matte', innerHW * 2 + 0.08, 0.035, 0.03, 0, fr.windY0 + 0.012, capZ(fr.windY0) + 0.035, rubber);
+      boxAt('matte', innerHW * 2 + 0.08, 0.035, 0.03, 0, fr.windY1 - 0.045, capZ(fr.windY1) + 0.035, rubber);
+      // header over the screen
+      boxAt('lens', innerHW * 2 + 0.3, 0.11, 0.38, 0, fr.windY1 + 0.02, capZ(fr.windY1) + 0.2, visorCol, 0, 0, 0, dim(visorCol, 0.8));   // unlit: its underside is what the driver sees above the screen
+      if (S.blind) {   // roller sun blind: cassette tube and the blind half rolled down with a stiff bottom bar
+        const blindCol = S.blindCol || '#d9d6cc';
+        addTo('matte', cyl(0.034, 0.034, innerHW * 2 + 0.08, 14).rotateZ(Math.PI / 2), compose(0, fr.windY1 - 0.085, capZ(fr.windY1) + 0.075), blindCol, dim(blindCol, 0.85));
+        boxAt('matte', innerHW * 2 + 0.05, 0.07, 0.006, 0, fr.windY1 - 0.155, capZ(fr.windY1) + 0.075, blindCol, rk, 0, 0, dim(blindCol, 0.9));
+        boxAt('matte', innerHW * 2 + 0.06, 0.024, 0.022, 0, fr.windY1 - 0.2, capZ(fr.windY1) + 0.07, dim(blindCol, 0.7), rk);
+      } else {         // flip-up sun visor and its hinge
+        const vw = Math.min(innerHW * 2 - 0.2, 1.05);
+        boxAt('matte', vw, 0.014, 0.3, -vw * 0.05, fr.windY1 + 0.16, capZ(fr.windY1) + 0.25, visorCol, -0.5);
+        boxAt('metal', vw, 0.02, 0.02, -vw * 0.05, fr.windY1 + 0.05, capZ(fr.windY1) + 0.12, S.metal);
+      }
+      if (['kiss', 'coradia', 'z2200'].includes(fr.type)) {   // sloped-windscreen cabs: a pale inner roof lining running up from the header, unlit (the hull lining there reads as a dark slab from the seat)
+        boxAt('lens', fr.W * 0.78, 0.02, 1.5, 0, fr.windY1 + 0.32, capZ(fr.windY1) + 0.8, S.ceil || '#d8dadc', -0.42);
+      }
+      // ceiling above the driver, with a long LED strip
+      const zC0 = capZ(fr.windY1) + 0.1, zC1 = zF + 2.5, yC = fr.windY1 + 0.07;
+      if (zC1 > zC0 + 0.3) {
+        boxAt('lens', fr.W - 0.3, 0.04, zC1 - zC0, 0, yC, (zC0 + zC1) / 2, S.ceil || '#d8dadc');   // the unlit 'lens' bucket: a lit matte ceiling only gets the dark floor bounce (hemisphere ground colour) and reads as a black slab
+        boxAt('led', 0.12, 0.014, zC1 - zC0 - 0.5, 0, yC - 0.03, (zC0 + zC1) / 2, '#ffffff');
+      }
+      if (fr.type === 'railcar' || fr.twin) {   // central divider of a twin windscreen (offset to the right of the driver's eye unless the eye was moved left)
+        const px = fr.divX !== undefined ? fr.divX : innerHW * 0.52;
         boxAt('matte', 0.05, h, 0.06, px, ym, capZ(ym) + 0.05, pillar, rk);
         boxAt('matte', 0.012, h, 0.012, px, ym, capZ(ym) + 0.015, '#050607', rk);
       }
-      // flip-up sun visor and hinge
-      const vw = Math.min(innerHW * 2 - 0.2, 1.05);
-      boxAt('matte', vw, 0.014, 0.3, -vw * 0.05, fr.windY1 + 0.16, capZ(fr.windY1) + 0.25, '#4a5057', -0.5);
-      boxAt('metal', vw, 0.02, 0.02, -vw * 0.05, fr.windY1 + 0.05, capZ(fr.windY1) + 0.12, S.metal);
+      // grab handle on the left pillar
+      boxAt('metal', 0.026, 0.4, 0.026, -(innerHW + 0.12), ym - 0.1, capZ(ym) + 0.22, '#c7ccd1', rk);
+      // the small things of each real cab
+      for (const ex of S.extras || []) {
+        if (ex === 'extinguisher') {   // red extinguisher with its bracket on the left wall behind the pillar
+          addTo('matte', cyl(0.045, 0.045, 0.34, 12), compose(-(sideX - 0.08), floor + 0.6, zF + 0.8), '#c4241c', '#9a1a14');
+          boxAt('matte', 0.04, 0.04, 0.08, -(sideX - 0.03), floor + 0.72, zF + 0.8, '#1a1c20');
+        } else if (ex === 'lantern') {   // the red / white hand lantern of the old SNCF-type cabs on the right wing of the desk
+          deskBox('matte', 0.1, 0.17, 0.08, hw - 0.08, 0.1, '#5b3a2a', 0);
+          addTo('lens', box(0.055, 0.055, 0.006), deskM(hw - 0.08, 0.145, 0.125), '#e0261f');
+          addTo('lens', box(0.055, 0.055, 0.006), deskM(hw - 0.08, 0.145, 0.055), '#f0f0e0');
+        } else if (ex === 'speaker') {   // the pale speaker / junction blocks in the upper corners of the cab (Alstom)
+          for (const sx of [-1, 1]) boxAt('matte', 0.28, 0.3, 0.2, sx * (innerHW + 0.12), fr.windY1 - 0.1, capZ(fr.windY1) + 0.3, S.ceil || '#e6e4de', 0, 0, 0, dim(S.ceil || '#e6e4de', 0.8));
+        } else if (ex === 'cabinet') {   // the orange cabinet at the driver's right elbow (BB 36000)
+          boxAt('matte', 0.3, 0.75, 0.5, sideX - 0.18, floor + 0.38, zF + 1.5, '#d98a2b', 0, 0, 0, '#a86418');
+        } else if (ex === 'switchPanel') {   // switch panel with the red cap on the right pillar (TRAXX)
+          boxAt('matte', 0.1, 0.36, 0.03, innerHW + 0.16, ym + 0.1, capZ(ym) + 0.2, '#0f1113', rk, -0.4);
+          addTo('lens', cyl(0.014, 0.014, 0.012, 12).rotateX(Math.PI / 2), compose(innerHW + 0.145, ym + 0.2, capZ(ym) + 0.235, 0, -0.4), '#e0261f');
+        }
+      }
     }
 
     /* The CAF Urbos cab frame (Luxtram): warm-white painted A-pillars and side panels, a black rubber gasket round the screen, the cream roller sun blind in its
@@ -1142,7 +1287,7 @@
     /* ---- driver's seat and dead-man pedal ------------------------------------------------------- */
     {
       const old = S.seat === 'old';
-      const cushion = old ? '#5b3a22' : '#2f3a52', back = old ? '#6a4529' : '#2b3447';
+      const cushion = old ? '#5b3a22' : S.seatCol ? S.seatCol[0] : '#2f3a52', back = old ? '#6a4529' : S.seatCol ? S.seatCol[1] : '#2b3447';
       const sz = zF + 1.78;
       addTo('matte', cyl(0.05, 0.07, 0.4, 12), compose(0, floor + 0.22, sz), '#1b1c1f');
       addTo('matte', cyl(0.22, 0.22, 0.02, 18), compose(0, floor + 0.03, sz), '#1b1c1f');
@@ -1177,8 +1322,8 @@
     addMerged('sticker', matSticker);
     addMerged('glass', matGlass);
 
-    group.userData.eye = new T.Vector3(0, eyeY, eyeZ);
-    group.userData.eyeLookAt = new T.Vector3(0, eyeY, eyeZ - 10);
+    group.userData.eye = new T.Vector3(eyeX, eyeY, eyeZ);
+    group.userData.eyeLookAt = new T.Vector3(eyeX, eyeY, eyeZ - 10);
     group.userData.frame = {
       type: fr.type, zF, floor, eyeY, eyeZ, windHW: fr.windHW, windY0: fr.windY0, windY1: fr.windY1,
       deskFrontY: yFront, deskRearZ: rearZ,
@@ -1189,7 +1334,6 @@
       last: 0, leverDisp: 0, needle: 0, mfdAt: 0, snapNext: true, hornLit: 0, powerMax: 500,
       night: -1, applied: { lever: null, head: null, horn: null, door: {}, lamp: {} },
     };
-    const palette = S.retro ? PAL_RETRO : PAL_MODERN;
 
     const setEmissive = (m, v) => {
       baseEm.set(m, v);
@@ -1223,11 +1367,11 @@
       const v = snapshotForMfd(state);
       const sigMain = [v.speed, v.limit, v.target, v.aspect, v.delay, v.clock, v.dist, v.station, v.brake01, v.power01, v.doorPhase, v.doorSide].join('|');
       for (const m of mfdList) {
-        if (m.sig === sigMain) continue;
+        if (m.static || m.sig === sigMain) continue;
         m.sig = sigMain;
         const ctx = m.canvas.getContext('2d');
         ctx.setTransform(m.canvas.width / 512, 0, 0, m.canvas.width / 512, 0, 0);
-        if (m.role === 'aux') drawAux(ctx, v, palette); else drawMain(ctx, v, palette);
+        if (m.role === 'aux') drawAux(ctx, v, m.pal); else drawMain(ctx, v, m.pal);
         m.texture.needsUpdate = true;
       }
     }

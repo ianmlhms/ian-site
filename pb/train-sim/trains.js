@@ -22,8 +22,9 @@
   /* ------------------------------------------------------------------ specs */
   const INSIDE_EMIT = 0x45443f, INSIDE_EMIT_ON = 0x80796a, SEAT_EMIT = 0x4a4a50, SEAT_EMIT_ON = 0x62626a, SHELL_EMIT = 0x44464a, SHELL_EMIT_ON = 0x5a5c60;
   const WIN_DARK = '#161d23';
+  const CAB_CEIL_EMIT = 0xa4a8ae;   // emissive of the nose lining seen from the driver's seat (modern cabs with a sloped windscreen)
   const GLASS_D_DAY = 0.9, GLASS_D_CAB = 0.84; // tram side glass opacity (day / cab lights on)
-  const SEAT_COL = { railcar: '#8c3a30', emu: '#2d6aa6', tram: '#d4582f', kiss: '#2f8466', ic: '#a02b3b', hst: '#2b4e9a' };
+  const SEAT_COL = { railcar: '#8c3a30', emu: '#3b5a8c', tram: '#d4582f', kiss: '#9c2a3a', z2200: '#2f4f86', coradia: '#9c2a3a', ic: '#a02b3b', dosto: '#9c2a3a', hst: '#5a2a4e' };   // CFL seats: red / blue moquette; the TGV inOui seats are plum
   const SPECS = {
     railcar: {
       W: 2.85, yb: 0.6, floor: 1.05, sill: 1.82, head: 2.95, ytop: 3.95, wheelR: 0.46, wb: 2.4, gap: 0.9,
@@ -33,13 +34,53 @@
       scr: { kind: 'twin', hw: 1.05, y0: 1.95, y1: 3.15 }, cabFloor: 1.05, mirror: 0.18,
       kinds: { rc: { body: 22.0, bogie: 7.2, front: true, rear: true, doors: 2 } },
     },
+    /* CFL Z 2 (class 2000): bordeaux nose with the yellow upper face and two separate windscreens, cream sides with yellow doors, 25.1 m cars. */
     emu: {
-      W: 2.88, yb: 0.6, floor: 1.0, sill: 1.78, head: 3.0, ytop: 4.1, wheelR: 0.43, wb: 2.5, gap: 0.8,
-      pillar: '#20262b', bay: 1.7, doorW: 1.3, doorY0: 0.62, doorMargin: 3.7, bellows: true, buffers: false,
-      recipe: { lower: 'body', mid: 'accent', upper: 'body', nose: 'accent', doorLower: 'accent', doorUpper: 'body', stripeCol: 'stripe', roof: '#c9ced1' },
-      nose: { len: 2.6, N: 8, capSx: 0.78, a: 1.5, b: 1.6, drop: 0.5, lift: 0.0, rake: 0.2, pd: 2, pl: 2, pr: 1, sideWin: [2, 5] },
-      scr: { kind: 'single', hw: 0.95, y0: 1.85, y1: 3.15 }, cabFloor: 1.0, mirror: 0.2,
-      kinds: { cabF: { body: 25.0, bogie: 8.6, front: true, doors: 3 }, mid: { body: 25.0, bogie: 8.6, doors: 3 }, cabR: { body: 25.0, bogie: 8.6, rear: true, doors: 3, panto: [5.8] } },
+      decal: 'cfl',
+      cabLining: 0xa7b3bd,
+      W: 2.85, yb: 0.6, floor: 1.05, sill: 1.72, head: 2.78, ytop: 4.0, wheelR: 0.43, wb: 2.6, gap: 0.6,
+      pillar: '#252a2e', bay: 1.2, doorW: 1.0, doorY0: 0.66, doorMargin: 2.2, bellows: true, buffers: false,
+      recipe: { lower: 'accent', mid: 'body', upper: 'body', nose: 'accent', doorLower: 'stripe', doorUpper: 'stripe', stripeCol: 'accent', roof: '#9a9ea0' },
+      nose: { len: 1.3, N: 5, capSx: 0.94, a: 2.2, b: 2, drop: 0.6, lift: 0, rake: 0.2, pd: 1.8, pl: 2, pr: 1, sideWin: null },
+      facePanels: [{ y0: 1.95, y1: 3.2, color: 'stripe', r: 0.22, inset: 0.0 }],
+      scr: { kind: 'twin', hw: 1.0, y0: 2.12, y1: 3.0, topInset: 0, divX: 0, pillarCol: '#e0a22a' }, cabFloor: 1.05, mirror: 0.2,
+      kinds: { cabF: { body: 25.1, bogie: 8.6, front: true, doors: 2 }, mid: { body: 25.1, bogie: 8.6, doors: 2 }, cabR: { body: 25.1, bogie: 8.6, rear: true, doors: 2, panto: [5.8] } },
+    },
+    /* CFL 2200 (Coradia Duplex): stainless grey double-deck cars, red nose and lower band, one big windscreen in a rounded face. */
+    z2200: {
+      darkGlass: true,
+      decal: 'cfl',
+      cabLining: 0xdedbd0,
+      W: 2.806, yb: 0.6, floor: 1.0, sill: 1.2, head: 1.95, sill2: 2.85, head2: 3.55, ytop: 4.32, wheelR: 0.43, wb: 2.6, gap: 0.75,
+      pillar: '#1e2428', bay: 1.5, doorW: 1.3, doorY0: 0.62, doorMargin: 3.0, bellows: true, buffers: false, double: true,
+      recipe: { lower: 'accent', mid: 'body', upper: 'body', nose: 'accent', doorLower: 'body', doorUpper: 'body', stripeCol: 'stripe', roof: '#aeb3b6' },
+      nose: { len: 2.6, N: 11, capSx: 0.75, a: 2.0, b: 2.0, drop: 2.2, lift: 0.1, rake: 0, pd: 1.6, pl: 2, pr: 1, sideWin: [3, 7], roundTip: 0.9, rp: 1.0, lowIn: 0.12, lp: 1.5, roofScr: { k0: 1, k1: 7, xlim: 0.8 } }, cabWin: { y0: 1.85, y1: 3.0 },
+      scr: { kind: 'roof', hw: 0.9, y0: 1.95, y1: 3.1 }, cabFrame: { dz: 2.0, capSx: 0.85, rake: 0.3 }, cabFloor: 1.0, mirror: 0.2,
+      kinds: { cabF: { body: 27.0, bogie: 9.0, front: true, doors: 2 }, mid: { body: 27.0, bogie: 9.0, doors: 2 }, midP: { body: 27.0, bogie: 9.0, doors: 2, panto: [6.0] }, cabR: { body: 27.0, bogie: 9.0, rear: true, doors: 2 } },
+    },
+    /* CFL 2300 (Stadler KISS): silver sides, red doors and big red face under a wide windscreen with the LED destination board. */
+    kiss: {
+      darkGlass: true,
+      decal: 'cfl',
+      cabLining: 0xc8ccd0,
+      W: 2.8, yb: 0.6, floor: 1.0, sill: 1.3, head: 2.0, sill2: 3.0, head2: 3.75, ytop: 4.6, wheelR: 0.43, wb: 2.5, gap: 0.8,
+      pillar: '#20262b', bay: 1.6, doorW: 1.3, doorY0: 0.62, doorMargin: 3.7, bellows: true, buffers: false, double: true,
+      recipe: { lower: 'accent', mid: 'body', upper: 'body', nose: 'accent', noseHi: 'body', doorLower: 'accent', doorUpper: 'accent', stripeCol: 'stripe', roof: '#c9ced1' }, noseHiY: 2.0,
+      nose: { len: 3.6, N: 15, capSx: 0.6, a: 2.0, b: 2.0, drop: 2.55, lift: 0.25, rake: 0, pd: 1.6, pl: 2, pr: 1, sideWin: [4, 9], roundTip: 1.0, rp: 0.9, lowIn: 0.35, lp: 1.3, roofScr: { k0: 1, k1: 9, xlim: 0.82 } }, cabWin: { y0: 1.85, y1: 2.95 },
+      scr: { kind: 'roof', hw: 0.9, y0: 2.0, y1: 3.2 }, cabFrame: { dz: 2.3, capSx: 0.8, rake: 0.3 }, cabFloor: 1.0, mirror: 0.2,
+      kinds: { cabF: { body: 26.6, bogie: 8.6, front: true, doors: 2 }, mid: { body: 26.6, bogie: 8.6, doors: 2 }, midP: { body: 26.6, bogie: 8.6, doors: 2, panto: [6.0] }, cabR: { body: 26.6, bogie: 8.6, rear: true, doors: 2 } },
+    },
+    /* CFL 2400 / 2450 (Alstom Coradia Stream HC): white double-deck cars, a big sloping red face with a black windscreen surround. */
+    coradia: {
+      darkGlass: true,
+      decal: 'cfl', sweep: { len: 6.5, y0: 1.0, y1: 2.9 },
+      cabLining: 0xd5d8da,
+      W: 2.9, yb: 0.6, floor: 0.95, sill: 1.2, head: 1.95, sill2: 2.8, head2: 3.55, ytop: 4.3, wheelR: 0.43, wb: 2.6, gap: 0.7,
+      pillar: '#14181c', bay: 1.7, doorW: 1.3, doorY0: 0.62, doorMargin: 3.0, bellows: true, buffers: false, double: true,
+      recipe: { lower: 'accent', mid: 'accent', upper: 'body', nose: 'accent', noseHi: '#101316', doorLower: 'accent', doorUpper: 'accent', stripeCol: 'body', roof: '#b9bec1' }, noseHiY: 1.9,
+      nose: { len: 3.4, N: 14, capSx: 0.62, a: 1.7, b: 1.8, drop: 2.3, lift: 0.25, rake: 0, pd: 1.6, pl: 2, pr: 1, sideWin: [3, 8], roundTip: 0.98, rp: 1.0, lowIn: 0.3, lp: 1.4, roofScr: { k0: 1, k1: 8, xlim: 0.82 } }, cabWin: { y0: 1.85, y1: 3.0 },
+      scr: { kind: 'roof', hw: 0.95, y0: 1.9, y1: 3.05 }, cabFrame: { dz: 2.2, capSx: 0.8, rake: 0.3 }, cabFloor: 0.95, mirror: 0.2,
+      kinds: { cabF: { body: 27.33, bogie: 9.2, front: true, doors: 2 }, mid: { body: 27.33, bogie: 9.2, doors: 2 }, midP: { body: 27.33, bogie: 9.2, doors: 2, panto: [6.0] }, cabR: { body: 27.33, bogie: 9.2, rear: true, doors: 2 } },
     },
     tram: {
       W: 2.4, yb: 0.3, floor: 0.4, sill: 0.95, head: 2.45, ytop: 3.35, wheelR: 0.3, wb: 1.8, gap: 0.55,
@@ -50,36 +91,56 @@
       scr: { kind: 'single', hw: 0.92, y0: 1.24, y1: 2.6, topInset: 0.28 }, cabFloor: 0.62, mirror: 0.22,
       kinds: { cabF: { body: 9.2, bogie: 2.6, front: true, doors: 1 }, mid: { body: 8.0, bogie: 2.4, doors: 1 }, midP: { body: 8.0, bogie: 2.4, doors: 1, panto: [0.4] }, cabR: { body: 9.2, bogie: 2.6, rear: true, doors: 1 } },
     },
-    kiss: {
-      W: 2.8, yb: 0.6, floor: 1.0, sill: 1.15, head: 2.05, sill2: 2.95, head2: 3.85, ytop: 4.6, wheelR: 0.43, wb: 2.5, gap: 0.8,
-      pillar: '#20262b', bay: 1.6, doorW: 1.3, doorY0: 0.62, doorMargin: 3.7, bellows: true, buffers: false, double: true,
-      recipe: { lower: 'body', mid: 'accent', upper: 'body', nose: 'accent', doorLower: 'accent', doorUpper: 'body', stripeCol: 'stripe', roof: '#c9ced1' },
-      nose: { len: 2.8, N: 8, capSx: 0.8, a: 2.2, b: 2, drop: 0.55, lift: 0, rake: 0.12, pd: 2, pl: 2, pr: 1, sideWin: [2, 5] }, cabWin: { y0: 1.85, y1: 2.95 },
-      scr: { kind: 'single', hw: 0.95, y0: 1.85, y1: 3.15 }, cabFloor: 1.0, mirror: 0.2,
-      kinds: { cabF: { body: 25.0, bogie: 8.6, front: true, doors: 2 }, mid: { body: 25.0, bogie: 8.6, doors: 2 }, midP: { body: 25.0, bogie: 8.6, doors: 2, panto: [6.0] }, cabR: { body: 25.0, bogie: 8.6, rear: true, doors: 2 } },
-    },
+    /* CFL 3000 (Alstom, 200 km/h) with grey single-deck coaches; the driving trailer at the other end. */
     ic: {
+      decal: 'cfl',
+      cabLining: 0xa9b6c1,
       W: 2.82, yb: 0.62, floor: 1.12, sill: 1.85, head: 3.0, ytop: 4.2, wheelR: 0.46, wb: 2.6, gap: 1.0,
       pillar: '#20262b', bay: 1.5, doorW: 1.2, doorY0: 0.66, doorMargin: 3.3, bellows: true, buffers: true, tables: true,
-      recipe: { lower: 'accent', mid: 'accent', upper: 'accent', nose: 'body', doorLower: 'accent', doorUpper: 'accent', stripeCol: 'body', roof: '#c4c8cb' },
+      recipe: { lower: 'accent', mid: 'body', upper: 'body', nose: 'body', doorLower: 'stripe', doorUpper: 'stripe', stripeCol: 'stripe', roof: '#c4c8cb' },
       nose: { len: 2.4, N: 8, capSx: 0.8, a: 2.2, b: 2, drop: 0.5, lift: 0, rake: 0.1, pd: 2, pl: 2, pr: 1, sideWin: [2, 5] },
       scr: { kind: 'single', hw: 0.95, y0: 1.95, y1: 3.15 }, cabFloor: 1.12, mirror: 0.2,
       loco: {
-        W: 3.0, yb: 0.75, floor: 1.35, sill: 2.0, head: 3.3, ytop: 4.25, wheelR: 0.6, wb: 2.8, cabFloor: 1.35,
-        nose: { len: 0.9, N: 4, capSx: 0.95, a: 3, b: 2, drop: 0.1, lift: 0, rake: 0.07, pd: 2, pl: 2, pr: 1, sideWin: null },
-        scr: { kind: 'twin', hw: 1.15, y0: 2.25, y1: 3.4, pillarCol: '#14171a' }, apron: { depth: 0.3 }, cabDoor: true,
-        recipe: { lower: 'body', mid: 'body', upper: 'body', nose: 'body', doorLower: 'body', doorUpper: 'body', stripeCol: 'stripe', roof: '#b4babd' },
+        W: 2.9, yb: 0.75, floor: 1.35, sill: 2.0, head: 3.3, ytop: 4.2, wheelR: 0.6, wb: 2.8, cabFloor: 1.35,
+        nose: { len: 1.9, N: 7, capSx: 0.86, a: 2, b: 2, drop: 0.35, lift: 0, rake: 0.42, pd: 2, pl: 2, pr: 1, sideWin: null },
+        scr: { kind: 'twin', hw: 1.0, y0: 2.3, y1: 3.25, topInset: 0.08, divX: 0, pillarCol: '#14171a' }, apron: { depth: 0.3 }, cabDoor: true,
+        facePanels: [{ y0: 2.1, y1: 3.5, color: 'stripe', r: 0.2, inset: 0.0 }],
+        recipe: { lower: 'body', mid: 'body', upper: 'body', nose: 'body', noseHi: 'stripe', doorLower: 'body', doorUpper: 'body', stripeCol: 'accent', roof: '#b4babd' },
       },
-      kinds: { loco: { body: 19.0, bogie: 5.2, front: true, loco: true, doors: 0, panto: [-3.6, 3.6] }, coach: { body: 26.4, bogie: 9.0, doors: 2 }, dt: { body: 26.4, bogie: 9.0, rear: true, doors: 2 } },
+      kinds: { loco: { body: 19.1, bogie: 5.2, front: true, loco: true, doors: 0, panto: [-3.6, 3.6] }, coach: { body: 26.4, bogie: 9.0, doors: 2 }, dt: { body: 26.4, bogie: 9.0, rear: true, doors: 2 } },
     },
+    /* CFL 4000 (Bombardier TRAXX) + Dosto double-deck coaches + a driving trailer. */
+    dosto: {
+      darkGlass: true,
+      decal: 'cfl',
+      cabLining: 0xbcc8d3,
+      W: 2.8, yb: 0.6, floor: 0.95, sill: 1.05, head: 1.9, sill2: 2.75, head2: 3.6, ytop: 4.32, wheelR: 0.43, wb: 2.6, gap: 0.75,
+      pillar: '#1e2428', bay: 1.5, doorW: 1.3, doorY0: 0.62, doorMargin: 3.0, bellows: true, buffers: false, double: true,
+      recipe: { lower: 'accent', mid: 'body', upper: 'body', nose: 'accent', doorLower: 'body', doorUpper: 'body', stripeCol: 'stripe', roof: '#aeb3b6' },
+      nose: { len: 2.4, N: 8, capSx: 0.85, a: 1.8, b: 2, drop: 0.8, lift: 0.05, rake: 0.45, pd: 1.7, pl: 2, pr: 1, sideWin: [3, 6] }, cabWin: { y0: 1.85, y1: 3.0 },
+      scr: { kind: 'single', hw: 0.92, y0: 1.95, y1: 3.2, topInset: 0.18 }, cabFloor: 0.95, mirror: 0.2,
+      loco: {
+        W: 2.97, yb: 0.75, floor: 1.35, sill: 2.0, head: 3.3, ytop: 4.25, wheelR: 0.6, wb: 2.8, cabFloor: 1.35,
+        nose: { len: 0.8, N: 3, capSx: 0.97, a: 3, b: 2, drop: 0.05, lift: 0, rake: 0.03, pd: 2, pl: 2, pr: 1, sideWin: null },
+        scr: { kind: 'twin', hw: 1.15, y0: 2.3, y1: 3.45, divX: 0, pillarCol: '#14171a' }, apron: { depth: 0.3 }, cabDoor: true,
+        facePanels: [{ y0: 1.95, y1: 3.75, color: 'body', r: 0.15, inset: 0.0 }],
+        recipe: { lower: 'accent', mid: 'body', upper: 'body', nose: 'accent', doorLower: 'body', doorUpper: 'body', stripeCol: 'accent', roof: '#b4babd' },
+      },
+      kinds: { loco: { body: 18.9, bogie: 5.2, front: true, loco: true, doors: 0, panto: [-3.6, 3.6] }, coach: { body: 26.4, bogie: 9.0, doors: 2 }, dt: { body: 26.4, bogie: 9.0, rear: true, doors: 2 } },
+    },
+    /* SNCF TGV inOui Euroduplex (TGV 2N2): 2 power cars + 8 articulated double-deck trailers. Silver-white, dark glazed band along the power car, the red line along the whole train,
+       dark nose top and windscreen. */
     hst: {
-      W: 2.9, yb: 0.62, floor: 1.1, sill: 1.85, head: 3.05, ytop: 4.1, wheelR: 0.46, wb: 3.0, gap: 0.5,
-      pillar: '#20262b', bay: 1.4, doorW: 1.25, doorY0: 0.66, doorMargin: 2.6, bellows: true, buffers: false, tables: true,
-      recipe: { lower: 'body', mid: 'accent', upper: 'body', nose: 'body', doorLower: 'accent', doorUpper: 'body', stripeCol: 'stripe', roof: '#c9ced1' },
-      nose: { len: 9.0, N: 18, capSx: 0.22, a: 1.0, b: 1.15, drop: 1.9, lift: 0.4, rake: 0.0, pd: 1.3, pl: 1.6, pr: 1, sideWin: null, roofScr: { k0: 1, k1: 8, xlim: 0.85 } },
-      scr: { kind: 'roof', hw: 0.72, y0: 2.35, y1: 3.3 }, cabFloor: 1.45, mirror: 0.2, tilt: true, cabFrame: { dz: 4.4, capSx: 0.66, rake: 0.1 },
-      pc: { floor: 1.45, cabFloor: 1.45, wb: 3.0, wheelR: 0.46 },
-      kinds: { pcF: { body: 22.0, bogie: 7.4, front: true, pcar: true, doors: 0, panto: [5.5] }, trailer: { body: 18.2, bogie: 9.35, doors: 2, shared: true }, pcR: { body: 22.0, bogie: 7.4, rear: true, pcar: true, doors: 0, panto: [-5.5] } },
+      darkGlass: true,
+      decal: 'tgv',
+      cabLining: 0xa9bde6,
+      W: 2.9, yb: 0.62, floor: 0.8, sill: 1.15, head: 1.95, sill2: 2.72, head2: 3.5, ytop: 4.3, wheelR: 0.46, wb: 3.0, gap: 0.5,
+      pillar: '#262c34', blank: '#5a616a', bay: 1.4, doorW: 1.25, doorY0: 0.66, doorMargin: 2.6, bellows: true, buffers: false, tables: true, double: true,
+      recipe: { lower: 'body', mid: 'body', upper: 'body', nose: 'body', noseHi: 'stripe', doorLower: 'body', doorUpper: 'body', stripeCol: 'accent', roof: '#9ea4a9' }, noseKeepStripe: true, noseHiY: 2.72, facePanels: [{ y0: 0.98, y1: 1.4, color: '#2b3036', r: 0.12, inset: 0.04, hole: false }],
+      nose: { len: 5.8, N: 16, capSx: 0.72, a: 2.8, b: 2.0, drop: 2.45, lift: 0.1, rake: 0, pd: 1.2, pl: 2, pr: 1, sideWin: null, roundTip: 1.0, rp: 1.0, lowIn: 0.4, lp: 1.4, roofScr: { k0: 4, k1: 10, xlim: 0.8 } },
+      scr: { kind: 'roof', hw: 0.72, y0: 2.35, y1: 3.3 }, cabFloor: 1.45, mirror: 0.2, tilt: true, cabFrame: { dz: 4.0, capSx: 0.66, rake: 0.1 },
+      pc: { floor: 1.45, cabFloor: 1.45, wb: 3.0, wheelR: 0.46, double: false, sill: 1.75, head: 2.85 },
+      kinds: { pcF: { body: 22.15, bogie: 7.4, front: true, pcar: true, doors: 0, panto: [5.5] }, trailer: { body: 18.2, bogie: 9.35, doors: 2, shared: true }, pcR: { body: 22.15, bogie: 7.4, rear: true, pcar: true, doors: 0, panto: [-5.5] } },
     },
   };
 
@@ -89,8 +150,9 @@
     if (model === 'railcar') return [mk('rc', 0)];
     if (model === 'emu') return Array.from({ length: Math.max(2, n) }, (_, i) => mk(i === 0 ? 'cabF' : i === n - 1 ? 'cabR' : 'mid', i));
     if (model === 'tram') return Array.from({ length: Math.max(2, n) }, (_, i, a) => mk(i === 0 ? 'cabF' : i === n - 1 ? 'cabR' : i === 1 ? 'midP' : 'mid', i));
-    if (model === 'kiss') return Array.from({ length: Math.max(2, n) }, (_, i) => mk(i === 0 ? 'cabF' : i === n - 1 ? 'cabR' : i === 1 ? 'midP' : 'mid', i));
-    if (model === 'ic') return Array.from({ length: Math.max(2, n) }, (_, i) => mk(i === 0 ? 'loco' : i === n - 1 ? 'dt' : 'coach', i));
+    if (model === 'kiss' || model === 'z2200') return Array.from({ length: Math.max(2, n) }, (_, i) => mk(i === 0 ? 'cabF' : i === n - 1 ? 'cabR' : i === 1 ? 'midP' : 'mid', i));
+    if (model === 'coradia') return Array.from({ length: Math.max(2, n) }, (_, i) => mk(i === 0 ? 'cabF' : i === n - 1 ? 'cabR' : i === 1 || (n > 4 && i === n - 2) ? 'midP' : 'mid', i));   // the long 2450 carries two pantographs
+    if (model === 'ic' || model === 'dosto') return Array.from({ length: Math.max(2, n) }, (_, i) => mk(i === 0 ? 'loco' : i === n - 1 ? 'dt' : 'coach', i));
     if (model === 'hst') return Array.from({ length: Math.max(2, n) }, (_, i) => mk(i === 0 ? 'pcF' : i === n - 1 ? 'pcR' : 'trailer', i));
     return [mk('rc', 0)];
   }
@@ -584,7 +646,7 @@
     const map = { body: livery.body, accent: livery.accent, stripe: livery.stripe };
     const r = S.recipe, g = (k) => map[k] || k;
     const doors = livery.doors && livery.doors.length ? livery.doors : null;
-    return { doors, lower: g(r.lower), mid: g(r.mid), upper: g(r.upper), nose: g(r.nose), doorLower: g(r.doorLower), doorUpper: g(r.doorUpper), stripe: g(r.stripeCol), roof: g(r.roof), skirt: S.tram ? '#0d1013' : '#2a2e32', body: livery.body, accent: livery.accent };
+    return { doors, lower: g(r.lower), mid: g(r.mid), upper: g(r.upper), nose: g(r.nose), noseHi: r.noseHi ? g(r.noseHi) : null, noseRoof: r.noseRoof ? g(r.noseRoof) : null, doorLower: g(r.doorLower), doorUpper: g(r.doorUpper), stripe: g(r.stripeCol), roof: g(r.roof), skirt: S.tram ? '#0d1013' : '#2a2e32', body: livery.body, accent: livery.accent };
   }
   function buildBands(S, C, win) {
     const bands = [];
@@ -595,12 +657,12 @@
     add(y0 + t * 0.62, y0 + t * 0.7, C.stripe);
     add(y0 + t * 0.7, S.sill, C.mid);
     if (S.double) {
-      add(S.sill, S.head, win ? S.pillar : C.mid, win);
+      add(S.sill, S.head, win ? S.pillar : (S.blank || C.mid), win);
       add(S.head, S.sill2, C.upper);
-      add(S.sill2, S.head2, S.pillar, win);
+      add(S.sill2, S.head2, win ? S.pillar : (S.blank2 || S.blank || C.mid), win);
       add(S.head2, S.head2 + 0.24, C.mid);
     } else {
-      add(S.sill, S.head, win ? S.pillar : C.mid, win);
+      add(S.sill, S.head, win ? S.pillar : (S.blank || C.mid), win);
       add(S.head, S.head + 0.26, C.upper);
     }
     return bands;
@@ -609,11 +671,16 @@
     return {
       sx: nose.capSx + (1 - nose.capSx) * Math.pow(Math.max(0, 1 - Math.pow(u, nose.a)), 1 / nose.b),
       lift: nose.lift * Math.pow(u, nose.pl), drop: nose.drop * Math.pow(u, nose.pd), rake: nose.rake * Math.pow(u, nose.pr),
+      /* smooth noses: ro = radius of the roof arc as a fraction of the half width (0.62 on a normal car, up to 1 = a half round cross-section at the tip), lowIn = how much the
+         lower side is drawn in at the skirt (a chamfered / duck-bill hull instead of a box), both growing towards the tip */
+      ro: nose.roundTip === undefined ? 0.62 : 0.62 + (nose.roundTip - 0.62) * Math.pow(u, nose.rp || 1.2),
+      lowIn: (nose.lowIn || 0) * Math.pow(u, nose.lp || 1.5),
     };
   }
   /* Build body ring (right half bottom->top, mirrored) for a row shape. Returns { pts, nR } */
-  function ringFor(S, bands, roofC, row, noseC) {
+  function ringFor(S, bands, roofC, row, noseC, noseHiC) {
     const hw = (S.W / 2) * row.sx, yb = S.yb + row.lift;
+    const lowIn = row.lowIn || 0, lowF = (y) => 1 - lowIn * Math.pow(clamp(1 - (y - S.yb) / (S.head - S.yb), 0, 1), 2);   // hull drawn in towards the skirt
     const mapY = (y) => {
       if (y < S.sill) return yb + (y - S.yb) * (S.sill - yb) / (S.sill - S.yb);
       const ytop2 = S.ytop - row.drop, k = (ytop2 - S.sill) / (S.ytop - S.sill);
@@ -621,12 +688,12 @@
     };
     const R = [];
     R.push({ x: 0, y: yb, c: bands[0].c });
-    R.push({ x: hw * 0.84, y: yb, c: bands[0].c });
-    bands.forEach((b, bi) => { const c = noseC && bi > 0 ? noseC : b.c; R.push({ x: hw, y: mapY(b.y0), c }); R.push({ x: hw, y: mapY(b.y1), c }); });
-    const lastY = R[R.length - 1].y, top = S.ytop - row.drop, rx = hw * 0.62, steps = 6;
+    R.push({ x: hw * 0.84 * lowF(S.yb), y: yb, c: bands[0].c });
+    bands.forEach((b, bi) => { const c = noseC && bi > 0 && !(S.noseKeepStripe && bi === 2) ? (noseHiC && b.y0 >= (S.noseHiY !== undefined ? S.noseHiY : S.sill) - 1e-6 ? noseHiC : noseC) : b.c; R.push({ x: hw * lowF(b.y0), y: mapY(b.y0), c }); R.push({ x: hw * lowF(b.y1), y: mapY(b.y1), c }); });
+    const lastY = R[R.length - 1].y, top = S.ytop - row.drop, hwTop = R[R.length - 1].x, rx = hwTop * (row.ro === undefined ? 0.62 : row.ro), steps = 6;
     for (let k = 1; k <= steps; k++) {
       const a = (k / steps) * Math.PI / 2;
-      R.push({ x: hw - rx + rx * Math.cos(a), y: lastY + Math.max(0.05, top - lastY) * Math.sin(a), c: roofC });
+      R.push({ x: hwTop - rx + rx * Math.cos(a), y: lastY + Math.max(0.05, top - lastY) * Math.sin(a), c: roofC });
     }
     R[R.length - 1].x = 0;
     return R;
@@ -704,13 +771,13 @@
     const JD = 0.002;
     if (noseF) { const i = zList.findIndex((z) => Math.abs(z - (zF + nose.len)) < 0.011); if (i >= 0) zList.splice(i + 1, 0, zList[i] + JD); }
     if (noseR) { const i = zList.findIndex((z) => Math.abs(z - (zR - nose.len)) < 0.011); if (i >= 0) zList.splice(i, 0, zList[i] - JD); }
-    const noseCArr = toRGB(C.nose);
+    const noseCArr = toRGB(C.nose), noseHiArr = C.noseHi ? toRGB(C.noseHi) : null, noseRoofArr = C.noseRoof ? toRGB(C.noseRoof) : null;
     const buildRows = (zl) => {
       const rR = [], rr = [];
       zl.forEach((z) => {
         const sh = shapeAt(z);
         const nc = (noseF && z <= zF + nose.len + 1e-6) || (noseR && z >= zR - nose.len - 1e-6) ? noseCArr : null;
-        const Rr = ringFor(S, sh.nz && cabBands ? cabBands : bands, roofC, sh, nc);
+        const Rr = ringFor(S, sh.nz && cabBands ? cabBands : bands, nc && noseRoofArr ? noseRoofArr : roofC, sh, nc, nc ? noseHiArr : null);
         rR.push(Rr); rr.push(fullRing(Rr, z, sh.rake, S.yb));
       });
       return { rR, rr };
@@ -822,7 +889,7 @@
           addBandQuad(rows[k], rows[k + 1], i, 0, 1, 0, 'glass', null, glassB);
           continue;
         }
-        addBandQuad(rows[k], rows[k + 1], i, 0, 1, -0.03, S.tram ? 'glassD' : 'glass', null, glassB);
+        addBandQuad(rows[k], rows[k + 1], i, 0, 1, -0.03, (S.tram || S.darkGlass) ? 'glassD' : 'glass', null, glassB);
         addBandQuad(rows[k], rows[k + 1], i, 0, 0.07, 0.006, 'trim', S.pillar, B);
         addBandQuad(rows[k], rows[k + 1], i, 0.93, 1, 0.006, 'trim', S.pillar, B);
       }
@@ -945,6 +1012,24 @@
     const bogieGroups = [];
     const noseApi = [];
     const ownMats = [];
+    /* the black glossy sweep behind the cab of the Coradia (CFL 2400 / 2450): a gradient decal on both sides of the end cars, darkest at the nose, fading out along the first car */
+    if (S.sweep && mid && (noseF || noseR)) {
+      const sw = S.sweep, sm = new T.MeshBasicMaterial({ map: sweepTexture(), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
+      sm.userData.perTrain = true; ownMats.push(sm);
+      for (const front of [true, false]) {
+        if (front ? !noseF : !noseR) continue;
+        for (const s of [-1, 1]) {
+          const g = new T.PlaneGeometry(sw.len, sw.y1 - sw.y0);
+          if (front === (s > 0)) { const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, 1 - uv.getX(i)); }
+          const m = new T.Mesh(g, sm);
+          const zc = front ? zF + nose.len + sw.len / 2 - 0.4 : zR - nose.len - sw.len / 2 + 0.4;
+          m.position.set(s * (hw + 0.016), (sw.y0 + sw.y1) / 2, zc);
+          m.rotation.y = s > 0 ? Math.PI / 2 : -Math.PI / 2;
+          m.userData.disposeGeo = true; m.renderOrder = 1; group.add(m);
+        }
+      }
+    }
+
     const nz = (S.cabFrame && S.cabFrame.dz) || 0;
     const apD = S.apron ? S.apron.depth : 0;
     const buildNose = (front) => {
@@ -998,9 +1083,20 @@
         B.geo('rubber', planeShape(frame, zEnd - (front ? 0.008 : -0.008), capRake, S.yb, 0, '#101214', front), null);
         const glassShape = new T.Shape(glassPoly);
         glassB.geo('glass', planeShape(glassShape, zEnd + (front ? 0.03 : -0.03), capRake, S.yb, 0, null, front), null);
-        if (sc.kind === 'twin') B.box('rubber', 0.1, sc.y1 - sc.y0 + 0.04, 0.05, sc.hw * 0.52, (sc.y0 + sc.y1) / 2, zEnd + sign * 0.0 + capRake * ((sc.y0 + sc.y1) / 2 - S.yb), sc.pillarCol || '#d9ccb0');
+        if (sc.kind === 'twin') B.box('rubber', sc.divX !== undefined ? 0.06 : 0.1, sc.y1 - sc.y0 + 0.04, 0.05, sc.divX !== undefined ? sc.divX : sc.hw * 0.52, (sc.y0 + sc.y1) / 2, zEnd + sign * 0.0 + capRake * ((sc.y0 + sc.y1) / 2 - S.yb), sc.pillarCol || '#d9ccb0');
       }
       if (sc && sc.kind === 'roof') { // sloped glass shows its own frame via glass quads already; add thin rubber frame
+      }
+      /* livery panels on the front face (the CFL black windscreen surround, the yellow upper face of the old Z 2, grey visors): flat coloured shapes 6 mm in front of the cap, the windscreen
+         opening cut out of them. S.facePanels = [{ y0, y1, color: 'body' | 'accent' | 'stripe' | '#hex', inset, r, topInset, hole }] */
+      if (S.facePanels) {
+        const keyed = { body: livery.body, accent: livery.accent, stripe: livery.stripe };
+        for (const fp of S.facePanels) {
+          const wpan = hw * sh.sx - (fp.inset === undefined ? 0.03 : fp.inset);
+          const shp = new T.Shape(roundedPoly(wpan, fp.y0, fp.y1, fp.r === undefined ? 0.1 : fp.r, fp.topInset || 0));
+          if (hole && fp.hole !== false && sc) shp.holes.push(new T.Path(roundedPoly(sc.hw + 0.02, sc.y0 - 0.02, sc.y1 + 0.02, 0.14, tIn).slice().reverse()));
+          B.geo('paint', planeShape(shp, zEnd, capRake, S.yb, sign * (0.006 + (fp.z || 0)), keyed[fp.color] || fp.color, front), null);
+        }
       }
       // lights at the cap
       const lensY = S.yb + sh.lift + (apD ? 0.62 : 0.42), lensX = Math.max(0.18, hw * sh.sx * 0.6);
@@ -1048,7 +1144,7 @@
         }
       }
       if (mid && !S.tram) { // made-up badge + number plate on the nose
-        const bt = badgeTexture(numberText);
+        const bt = badgeTexture(numberText, S.decal);
         const bm = new T.MeshStandardMaterial({ map: bt, transparent: true, roughness: 0.5, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
         bm.userData.perTrain = true; ownMats.push(bm);
         const by = lensY + 0.02, bw = 0.5;
@@ -1225,7 +1321,8 @@
           }
         }
       }
-      if (S.double) fl(2.47, wallA, wallB, hw * 2 - 0.12, '#a9aeb2');
+      /* the upper deck floor starts behind the sloped nose: with a long nose its slab would hang right above the driver's head (the dark slab in the cab view) */
+      if (S.double) fl(2.47, noseF ? Math.max(wallA, zF + nose.len + 1.2) : wallA, noseR ? Math.min(wallB, zR - nose.len - 1.2) : wallB, hw * 2 - 0.12, '#a9aeb2');
       seatInst = new T.InstancedMesh(S.tram ? seatGeoTram() : seatGeo(), mats.seat, Math.max(1, places.length));
       const m4 = new T.Matrix4(), q = new T.Quaternion(), sc3 = new T.Vector3(1, 1, 1), colr = new T.Color(), up = new T.Vector3(0, 1, 0);
       const baseFab = (lum(livery.accent) < 0.6 && lum(livery.accent) > 0.04) ? livery.accent : SEAT_COL[model] || '#2d6aa6';
@@ -1529,14 +1626,27 @@
     // ----- lights
     return {
       exhaust, ownMats, paintMeshes, fwdLinings, group, length: L + S.gap, body: L, bogieOffset: K.bogie, doors: doorsOut, bogies: bogieGroups, doorAnim, wheelsets: wsList, pantos: panto, wipers: wiperPivots,
-      interior: tramInterior, shell: shellMesh, lampMesh, noseFront: noseF, noseRear: noseR, S, beamHead: beamHeadMesh, beamTail: beamTailMesh, glowHeads, glowTails, lampPos, rain: rainMesh,
+      interior: tramInterior, saloon: hasWin && mid && !S.tram ? { zA: wallA, zB: wallB, eyeY: S.double ? 3.72 : S.floor + 1.6 } : null, shell: shellMesh, lampMesh, noseFront: noseF, noseRear: noseR, S, beamHead: beamHeadMesh, beamTail: beamTailMesh, glowHeads, glowTails, lampPos, rain: rainMesh,
     };
   }
 
   /* ---------------------------------------------------------------- decals */
+  let sweepTex = null;
+  function sweepTexture() {   // black -> transparent gradient along u (dark at u = 0), soft top and bottom edges
+    if (sweepTex) return sweepTex;
+    const cv = document.createElement('canvas'); cv.width = 256; cv.height = 64;
+    const x = cv.getContext('2d');
+    const g = x.createLinearGradient(0, 0, 256, 0); g.addColorStop(0, 'rgba(12,14,18,0.92)'); g.addColorStop(0.4, 'rgba(12,14,18,0.6)'); g.addColorStop(1, 'rgba(12,14,18,0)');
+    x.fillStyle = g; x.fillRect(0, 0, 256, 64);
+    x.globalCompositeOperation = 'destination-in';
+    const v = x.createLinearGradient(0, 0, 0, 64); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(0.18, 'rgba(0,0,0,1)'); v.addColorStop(0.82, 'rgba(0,0,0,1)'); v.addColorStop(1, 'rgba(0,0,0,0)');
+    x.fillStyle = v; x.fillRect(0, 0, 256, 64);
+    sweepTex = new T.CanvasTexture(cv); sweepTex.colorSpace = T.SRGBColorSpace; sweepTex.userData = { shared: true };
+    return sweepTex;
+  }
   const decalCache = new Map();
   function decalTexture(numberText, C, S) {
-    const key = numberText + C.lower + C.mid + (S && S.tram ? 'T' : '');
+    const key = numberText + C.lower + C.mid + (S && S.tram ? 'T' : '') + (S && S.decal || '') + C.accent;
     if (decalCache.has(key)) return decalCache.get(key);
     const cv = document.createElement('canvas'); cv.width = 1024; cv.height = 164;
     const x = cv.getContext('2d');
@@ -1547,6 +1657,28 @@
       [['#19a9c4', 0, 0], ['#7cc242', 1, 0], ['#d6338a', 0, 1], ['#f28c1e', 1, 1]].forEach(([c, i, j]) => { x.fillStyle = c; x.beginPath(); x.arc(46 + i * 44, 52 + j * 44, 19, 0, Math.PI * 2); x.fill(); });
       x.fillStyle = bg; x.font = '700 84px Helvetica, Arial, sans-serif'; x.fillText('LUXTRAM', 128, 62);
       x.font = '600 36px Helvetica, Arial, sans-serif'; x.fillText(numberText, 700, 62);
+      const tex = new T.CanvasTexture(cv); tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = 4;
+      tex.userData = { shared: true };
+      decalCache.set(key, tex);
+      return tex;
+    }
+    if (S && S.decal === 'cfl') { // the CFL wordmark (red italic letters + the three swoosh bars) and the unit number beside it
+      const ink = lum(C.lower) > 0.3 && lum(C.lower) < 0.75 ? C.accent : lum(C.lower) >= 0.75 ? C.accent : '#ffffff';
+      x.textBaseline = 'middle'; x.fillStyle = ink;
+      x.font = 'italic 900 108px Helvetica, Arial, sans-serif'; x.fillText('CFL', 40, 66);
+      for (let k = 0; k < 3; k++) { x.save(); x.transform(1, 0, -0.3, 1, 0, 0); x.fillRect(250 + k * 12 + 0, 36 + k * 18, 130 - k * 14, 11); x.restore(); }
+      x.fillStyle = lum(C.lower) > 0.45 ? '#16202b' : '#f4f1ea';
+      x.font = '700 44px Helvetica, Arial, sans-serif'; x.fillText(numberText, 560, 60);
+      const tex = new T.CanvasTexture(cv); tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = 4;
+      tex.userData = { shared: true };
+      decalCache.set(key, tex);
+      return tex;
+    }
+    if (S && S.decal === 'tgv') { // "TGV inOui" in the SNCF TGV inOui style
+      x.textBaseline = 'middle';
+      x.fillStyle = '#16202b'; x.font = '700 40px Helvetica, Arial, sans-serif'; x.fillText('TGV', 40, 40);
+      x.fillStyle = C.accent; x.font = '800 96px Helvetica, Arial, sans-serif'; x.fillText('inOui', 40, 100);
+      x.fillStyle = '#16202b'; x.font = '700 40px Helvetica, Arial, sans-serif'; x.fillText(numberText, 560, 60);
       const tex = new T.CanvasTexture(cv); tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = 4;
       tex.userData = { shared: true };
       decalCache.set(key, tex);
@@ -1564,15 +1696,16 @@
   }
 
   const badgeCache = new Map();
-  function badgeTexture(num) {
-    if (badgeCache.has(num)) return badgeCache.get(num);
+  function badgeTexture(num, kind) {
+    const bkey = num + (kind || '');
+    if (badgeCache.has(bkey)) return badgeCache.get(bkey);
     const cv = document.createElement('canvas'); cv.width = 256; cv.height = 128;
     const x = cv.getContext('2d');
     x.fillStyle = '#f4f2ea'; x.beginPath(); x.roundRect ? x.roundRect(4, 4, 248, 120, 14) : x.rect(4, 4, 248, 120); x.fill();
     x.fillStyle = '#16202b'; x.textBaseline = 'middle'; x.textAlign = 'center';
-    x.font = 'italic 800 52px Helvetica, Arial, sans-serif'; x.fillText('LUX RAIL', 128, 42);
+    x.font = 'italic 800 52px Helvetica, Arial, sans-serif'; x.fillStyle = kind === 'cfl' ? '#c4202c' : kind === 'tgv' ? '#c2143c' : '#16202b'; x.fillText(kind === 'cfl' ? 'CFL' : kind === 'tgv' ? 'SNCF' : 'LUX RAIL', 128, 42); x.fillStyle = '#16202b';
     x.font = '700 38px Helvetica, Arial, sans-serif'; x.fillText(num.replace('No ', ''), 128, 92);
-    const t = new T.CanvasTexture(cv); t.colorSpace = T.SRGBColorSpace; badgeCache.set(num, t); return t;
+    const t = new T.CanvasTexture(cv); t.colorSpace = T.SRGBColorSpace; badgeCache.set(bkey, t); return t;
   }
 
   const PLATE_ASPECT = 4;
@@ -1662,8 +1795,9 @@
 
   /* ---------------------------------------------------------------- public create */
   function numberFor(model, i) {
-    const base = { railcar: 2201, emu: 2310, tram: 108, kiss: 2410, ic: 5601, hst: 4701 }[model] || 1000;
-    return model === 'tram' ? 'TW ' + (base + i) : 'No ' + (base + i * 3);
+    const base = { railcar: 2201, emu: 2010, tram: 108, kiss: 2305, z2200: 2214, coradia: 2410, ic: 3012, dosto: 4007, hst: 4704 }[model] || 1000;
+    if (model === 'tram') return 'TW ' + (base + i);
+    return String(base);   // the unit number printed on the nose (one per train: the numbers of the CFL sets are 2010, 2305, 2214, 2410, 3012, 4007 ...)
   }
 
   function create(cfg, opts) {
@@ -1677,6 +1811,8 @@
     const tramLook = model === 'tram'; // tram: darker windscreen tint and a dark cab lining (seen through the glass), like the real thing
     if (tramLook) { mats.glass.color.setHex(0x33434f); mats.glass.envMapIntensity = 0.2; mats.glass.metalness = 0.15; mats.glassD.envMapIntensity = 0.45; mats.inside.color.setHex(0x4a4f56); mats.insideFwd.color.setHex(0x4a4f56); }
     const emitOff = tramLook ? 0x1d2024 : INSIDE_EMIT, emitOn = tramLook ? 0x6a6a68 : INSIDE_EMIT_ON;   // tram cab lights: a neutral lamp glow on the white lining (a warm one turned the cheeks pink at night)
+    const darkFwd = !tramLook && !!S0.cabFrame;   // the lining ahead of the driver's frame is seen through the windscreen from outside: dark, like the real glossy black glass (it is ghosted in the cab view)
+    if (!tramLook && S0.cabLining) { mats.inside.color.setHex(S0.cabLining); mats.insideFwd.color.setHex(darkFwd ? 0x23262b : S0.cabLining); }   // the cab lining takes the colour of the real cab (the TGV one is blue)
     let cabViewOn = false, cabinOn = false, interiorViewOn = false;
     // tram windscreen: tinted and fairly opaque seen from outside, clear (like the other models) from the cab camera
     const applyGlass = () => { mats.glass.opacity = tramLook ? (interiorViewOn ? 0.18 : cabViewOn ? 0.2 : 0.58) : (cabinOn ? 0.26 : 0.34); };
@@ -1688,7 +1824,7 @@
       const c = buildCar(model, S0, def, i, comp.length, livery, mats, quality, i === 0, i === comp.length - 1, numberFor(model, i));
       group.add(c.group);
       built.push(c);
-      cars.push({ group: c.group, length: c.length, bogieOffset: c.bogieOffset, doors: c.doors, bogies: c.bogies, nose: { front: c.noseFront, rear: c.noseRear }, interior: c.interior });
+      cars.push({ group: c.group, length: c.length, bogieOffset: c.bogieOffset, doors: c.doors, bogies: c.bogies, nose: { front: c.noseFront, rear: c.noseRear }, interior: c.interior, saloon: c.saloon });
     });
     // passenger information screens (tram): two quads back to back at every screen housing
     for (const c of cars) {
@@ -1783,7 +1919,7 @@
         mats.lamp.color.setHex(cab ? 0xffffff : 0xdad6c6);
         cabinOn = cab; applyGlass();
         mats.glassD.opacity = interiorViewOn ? 0.3 : cab ? GLASS_D_CAB : GLASS_D_DAY;
-        mats.inside.emissive.setHex(cab ? emitOn : emitOff); mats.insideFwd.emissive.setHex(cab ? emitOn : emitOff);
+        mats.inside.emissive.setHex(cabViewOn && darkFwd ? CAB_CEIL_EMIT : cab ? emitOn : emitOff); mats.insideFwd.emissive.setHex(darkFwd ? 0x0b0c0e : cab ? emitOn : emitOff);
         mats.seat.emissive.setHex(tramLook ? (cab ? 0x3a3c40 : 0x2c2e32) : cab ? SEAT_EMIT_ON : SEAT_EMIT);   // tram: a gentler glow keeps the turquoise saturated
         mats.sh.emissive.setHex(cab ? SHELL_EMIT_ON : SHELL_EMIT);
         applyLightFx();
@@ -1814,6 +1950,7 @@
       },
       setCabView(on) { // cab camera: hide the outside skin of the front car's nose (keeps lining + shadows) so the track stays visible
         cabViewOn = !!on; applyGlass(); applyLightFx();
+        if (darkFwd) mats.inside.emissive.setHex(cabViewOn ? CAB_CEIL_EMIT : cabinOn ? emitOn : emitOff);   // the hood over the driver is the lining of the nose: lit like a cab ceiling, not the dim saloon grey
         // tram: the cab lining is dark seen from outside (through the tinted screen) but warm-white painted from the driver's seat, like the real Urbos cab
         if (tramLook && !interiorViewOn) { const c = on ? 0xcfcdc5 : 0x4a4f56; mats.inside.color.setHex(c); mats.insideFwd.color.setHex(c); }
         if (rainMesh) rainMesh.visible = cabViewOn && rainMesh.material.uniforms.uWet.value > 0.01;

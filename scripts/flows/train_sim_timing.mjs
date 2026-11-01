@@ -14,7 +14,7 @@ import { driveService, summarize } from '../zuch/bot_lib.mjs';
 const SAMPLE = [['west', 'railcar'], ['south', 'emu'], ['metz', 'kiss'], ['luxtram-stad', 'tram'], ['luxtram-sud', 'tram']];
 const MEDIAN_WAIT_MAX = 5, WAIT_MAX = 12, LATE_MAX_90 = 30, LATE_MAX_85 = 60, EARLY_FREE_S = 10;
 /* measured with scripts/zuch/exchange_probe.mjs (medium quality, means of 8 runs): [train, alighting, boarding, seconds]; the model must stay within 30 % */
-const MEASURED = [['railcar', 25, 25, 31.9], ['railcar', 10, 12, 14.6], ['emu', 25, 25, 15.2], ['emu', 60, 50, 27.1], ['kiss', 40, 40, 18.2], ['ic', 100, 60, 29.5], ['hst', 150, 80, 54.4], ['tram', 25, 25, 24], ['tram', 100, 60, 46.8]];
+const MEASURED = [['railcar', 25, 25, 31.9], ['railcar', 10, 12, 14.6], ['emu', 25, 25, 15.2], ['emu', 60, 50, 27.1], ['kiss', 40, 40, 18.2], ['ic', 100, 60, 29.5], ['hst', 150, 80, 53.9], ['tram', 25, 25, 24], ['tram', 100, 60, 46.8]];
 
 export const flow = {
   name: 'train-sim-timing', fullChromium: true,

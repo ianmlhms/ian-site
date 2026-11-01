@@ -123,9 +123,12 @@
    * and lets one person per door in every BOARD_GAP (1.2 s, 22 s cap); on top come the walk along the platform (0.02 s per metre of train) and a congestion term (0.05 s per person).
    * Fitted to 6 trains x 9 count pairs; the spread of single runs is about +-15 %. Doors: cars x doors per side, minus the locomotive of an IC and the two power cars of a TGV. */
   const EXCHANGE_FIT = Object.freeze({ base: 2.5, perMetre: 0.02, perPax: 0.05, alightGap: 0.8, alightMaxS: 16, alightMinGap: 0.25, boardGap: 1.2, boardMaxS: 22, doorSpread: 1.15 });
+  const MAX_EXCHANGE_DOORS = 12;
   function exchangeDoors(train) {
     const powerCars = train.model === 'ic' ? 1 : train.model === 'hst' ? 2 : 0;
-    return Math.max(1, (train.doorsPerSide || 2) * Math.max(1, (train.cars || 1) - powerCars));
+    const doors = Math.max(1, (train.doorsPerSide || 2) * Math.max(1, (train.cars || 1) - powerCars));
+    /* the real passenger module does not get faster with more than ~12 usable doors (exchange_probe.mjs: the 10-car TGV with 16 doors needs 53.9 s for 150 / 80, the old 8-car one with 12 doors 54.4 s) */
+    return Math.min(doors, MAX_EXCHANGE_DOORS);
   }
   function exchangeSeconds(train, alighting, boarding) {
     const F = EXCHANGE_FIT, doors = exchangeDoors(train), a = Math.max(0, alighting), b = Math.max(0, boarding);

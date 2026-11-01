@@ -9,7 +9,7 @@
   const HOST_ORIGIN = new URL(document.baseURI).origin;
   const SIM_STEP = 1 / 60, MAX_SIM_STEPS = 40, MAX_FRAME_S = 0.25;
   const LEVER_REPEAT_MS = 180, LEVER_MIN = -8, LEVER_MAX = 5, LEVER_EB = -8, LEVER_BRAKE_MAX = -7;
-  const CAMERAS = ['cab', 'chase', 'platform', 'orbit', 'inside'];   // 'inside' (key 5): the passenger saloon, Luxtram only; pressing 5 again cycles front / middle / rear
+  const CAMERAS = ['cab', 'chase', 'platform', 'orbit', 'inside'];   // 'inside' (key 5): the passenger saloon (Luxtram with people, the trains empty of people); pressing 5 again cycles front / middle / rear
   const QUALITIES = ['high', 'medium', 'low'];
   const MODULES = ['config', 'copy', 'track', 'routes', 'infra', 'landscape', 'trains', 'cab', 'passengers', 'audio', 'career', 'menu'];
   /* PHONE_MIN_VIEW: the smallest visible side of an iPad window the game still runs in. An iPad mini in landscape with Safari's bar, the arcade bar and the sign-in hint leaves ~495 px of height; the biggest phones are 430 px on their short side. */
@@ -724,7 +724,7 @@
   let sideSpot = null, chaseSign = 1, chaseStationFor = -9;
   function setCamera(next) {
     if (!CAMERAS.includes(next)) return;
-    if (next === 'inside' && !isTramWorld()) { if (camMode !== 'inside') return; next = 'cab'; }
+    if (next === 'inside' && !hasSaloonCam()) { if (camMode !== 'inside') return; next = 'cab'; }
     camMode = next;
     document.body.dataset.cam = next;
     camSmooth = { pos: null, look: null };
@@ -747,7 +747,7 @@
     const wp = $('walkPad');
     if (wp) wp.hidden = camMode !== 'platform';
     const bi = $('btnInside');
-    if (bi) { bi.hidden = !isTramWorld(); bi.classList.toggle('on', camMode === 'inside'); bi.textContent = camMode === 'inside' ? '5 · ' + t(['camPosFront', 'camPosMid', 'camPosRear'][insidePos]) + ' ↻' : '5 · ' + t('cam5'); }
+    if (bi) { bi.hidden = !hasSaloonCam(); bi.classList.toggle('on', camMode === 'inside'); bi.textContent = camMode === 'inside' ? '5 · ' + t(['camPosFront', 'camPosMid', 'camPosRear'][insidePos]) + ' ↻' : '5 · ' + t('cam5'); }
   }
   /* the saloon's own light: one point light at the ceiling above the camera (only while the saloon camera is on), so seats and people are not black in the car's shadow and the cab
      lamps really light the inside at night */
@@ -758,15 +758,17 @@
     if (interiorLight) { interiorLight.visible = !!on; interiorLight.intensity = on ? interiorLightLevel() : 0; }
   }
   const interiorLightLevel = () => 2.4 + 2.6 * (world && Number.isFinite(world.darkK) ? clamp(world.darkK, 0, 1) : 0);
+  /* the saloon camera: the Luxtram (with its people) or any train whose passenger cars carry a saloon (trains.js car.saloon; not built at low quality) */
+  const hasSaloonCam = () => !!(world && quality !== 'low' && (isTramWorld() || (world.track && world.track.kind !== 'tram' && world.model && world.model.cars.some((c) => c.saloon))));
   const isTramWorld = () => !!(world && world.track && world.track.kind === 'tram' && quality !== 'low');   // (low quality builds no saloon)
   /* key 5 / the HUD button: into the saloon, and inside again = the next of the three viewpoints */
   function pressInside() {
-    if (!isTramWorld()) return;
+    if (!hasSaloonCam()) return;
     if (camMode === 'inside') { insidePos = (insidePos + 1) % 3; camSmooth.pos = null; refreshCamLabel(); } else setCamera('inside');
   }
   const cycleCamera = () => {
     let i = CAMERAS.indexOf(camMode);
-    do { i = (i + 1) % CAMERAS.length; } while (CAMERAS[i] === 'inside' && !isTramWorld());
+    do { i = (i + 1) % CAMERAS.length; } while (CAMERAS[i] === 'inside' && !hasSaloonCam());
     setCamera(CAMERAS[i]);
   };
 
@@ -889,14 +891,26 @@
     if (!cars || !cars.length) return;
     const n = cars.length, last = cars[n - 1], first = cars[0];
     const vp = w.cabin && w.cabin.viewpoint ? w.cabin.viewpoint(insidePos) : null;
-    const car = vp ? cars[vp.car] : cars[[0, Math.floor(n / 2), n - 1][insidePos]], inf = car.interior;
-    car.group.updateMatrixWorld(true); first.group.updateMatrixWorld(true); last.group.updateMatrixWorld(true);
-    const floorY = inf ? inf.floorY : 0.4, eyeY = floorY + 1.7;
-    camTmp.eye.set(vp ? vp.x : 0.1, vp ? vp.y : eyeY, vp ? vp.z : 0); car.group.localToWorld(camTmp.eye);
-    // aim down the length of the train: at the far end (front viewpoint) or at the front of the train (the others)
-    const tgtCar = vp ? cars[vp.look.car] : (insidePos === 0 ? last : first);
-    camTmp.t.set(0, (vp ? vp.y : eyeY) - 0.05, vp ? vp.look.z : 0);
-    tgtCar.group.updateMatrixWorld(true); tgtCar.group.localToWorld(camTmp.t);
+    const pax = vp ? [] : cars.filter((c) => c.saloon);   // trains: the passenger cars (a locomotive has no saloon)
+    if (pax.length) {
+      // front end of the first passenger car looking back down the train, the middle of a middle car and the rear end of the last one looking forward
+      const a = pax[0], z = pax[pax.length - 1], m = pax[Math.floor(pax.length / 2)];
+      const from = insidePos === 0 ? a : insidePos === 1 ? m : z, to = insidePos === 0 ? z : a;
+      const ez = insidePos === 0 ? from.saloon.zA + 1.1 : insidePos === 1 ? (from.saloon.zA + from.saloon.zB) / 2 : from.saloon.zB - 1.1;
+      const tz = insidePos === 0 ? to.saloon.zB - 0.5 : to.saloon.zA + 0.5;
+      from.group.updateMatrixWorld(true); to.group.updateMatrixWorld(true);
+      camTmp.eye.set(0, from.saloon.eyeY, ez); from.group.localToWorld(camTmp.eye);
+      camTmp.t.set(0, from.saloon.eyeY - 0.05, tz); to.group.localToWorld(camTmp.t);
+    } else {
+      const car = vp ? cars[vp.car] : cars[[0, Math.floor(n / 2), n - 1][insidePos]], inf = car.interior;
+      car.group.updateMatrixWorld(true); first.group.updateMatrixWorld(true); last.group.updateMatrixWorld(true);
+      const floorY = inf ? inf.floorY : 0.4, eyeY = floorY + 1.7;
+      camTmp.eye.set(vp ? vp.x : 0.1, vp ? vp.y : eyeY, vp ? vp.z : 0); car.group.localToWorld(camTmp.eye);
+      // aim down the length of the train: at the far end (front viewpoint) or at the front of the train (the others)
+      const tgtCar = vp ? cars[vp.look.car] : (insidePos === 0 ? last : first);
+      camTmp.t.set(0, (vp ? vp.y : eyeY) - 0.05, vp ? vp.look.z : 0);
+      tgtCar.group.updateMatrixWorld(true); tgtCar.group.localToWorld(camTmp.t);
+    }
     if (interiorLight) interiorLight.intensity = interiorLightLevel();
     const speed = state ? clamp(state.v / 28, 0, 1) : 0, tt = elapsedReal;
     camTmp.eye.y += Math.sin(tt * 9.7) * 0.0025 * speed;

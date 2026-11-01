@@ -7,7 +7,7 @@ import { openSim } from './zlib.mjs';
 const args = process.argv.slice(2);
 const flag = (n, d) => { const i = args.indexOf('--' + n); if (i < 0) return d; const v = args[i + 1]; args.splice(i, 2); return v; };
 const root = flag('root', undefined); const trainFlag = flag('train', '');
-const TRAIN_FOR = { trier: 'kiss', metz: 'kiss', brussels: 'kiss', paris: 'hst', 'luxtram-kierchbierg': 'tram', 'luxtram-stad': 'tram', 'luxtram-sud': 'tram', luxtram: 'tram' };   // the cheapest train the route accepts (config.js routeRules.needs); the others take the free railcar
+const TRAIN_FOR = { trier: 'kiss', metz: 'z2200', brussels: 'kiss', paris: 'hst', 'luxtram-kierchbierg': 'tram', 'luxtram-stad': 'tram', 'luxtram-sud': 'tram', luxtram: 'tram' };   // the cheapest train the route accepts (config.js routeRules.needs); the others take the free railcar
 const BOARD_BASE = { 1: 9, 2: 20, 3: 36 }; const ALIGHT = [0.22, 0.55];
 const sim = await openSim({ quality: 'low', root });
 const routes = args.length ? args : ['west', 'south', 'east', 'wittlich', 'north', 'trier', 'metz', 'brussels', 'paris', 'luxtram-kierchbierg', 'luxtram-stad', 'luxtram-sud', 'luxtram'];
