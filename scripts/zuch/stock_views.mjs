@@ -2,7 +2,7 @@
  * (the game's own camera: eye / eyeLookAt of the cab group, fov 66) on a plain painted backdrop with the game's lights, and prints
  * the triangle / draw-call count of every train.
  *
- *   node scripts/zuch/stock_views.mjs <outDir> [--trains id,id,..] [--views side,sidehead,front,rear,cab,saloon,head,noseside] [--stats] [--quality high|medium|low]
+ *   node scripts/zuch/stock_views.mjs <outDir> [--trains id,id,..] [--views side,sidehead,front,rear,cab,saloon,head,headL,noseside,noseL] [--stats] [--quality high|medium|low]
  *
  * Writes <outDir>/<train>-<view>.png and, with --stats, prints one JSON line per train:
  *   { id, cars, meshes (draw calls of the train, cab excluded), triangles, cabMeshes, cabTriangles }.
@@ -104,6 +104,12 @@ try {
         } else if (view === 'head') {   // head-on, a little to the side and low (the photo angle of the nose close-ups)
           camera.fov = 24; camera.updateProjectionMatrix();
           camera.position.set(4.2, 1.5, frontZ - 11); camera.lookAt(0, 1.9, frontZ + 1.5);
+        } else if (view === 'headL') {   // the same as 'head' from the other side of the track: the sun of this harness comes from -X, so this is the lit side (compare with sunny photos)
+          camera.fov = 24; camera.updateProjectionMatrix();
+          camera.position.set(-4.2, 1.5, frontZ - 11); camera.lookAt(0, 1.9, frontZ + 1.5);
+        } else if (view === 'noseL') {   // lit side profile of the first 10 m
+          camera.fov = 24; camera.updateProjectionMatrix();
+          camera.position.set(-26, 2.4, frontZ + 4.5); camera.lookAt(0, 2.4, frontZ + 4.5);
         } else if (view === 'sidehead') {   // the first ~40 m of the train from the side (details: doors, windows, pantograph)
           camera.fov = 26; camera.updateProjectionMatrix();
           camera.position.set(34, 2.4, frontZ + 17); camera.lookAt(0, 2.2, frontZ + 17);

@@ -73,17 +73,31 @@
       scr: { kind: 'single', cabWipers: true, hw: 0.98, y0: 2.0, y1: 3.2, topInset: 0.3 }, cabFrame: { dz: 2.3, capSx: 0.8, rake: 0.3 }, cabFloor: 1.0, mirror: 0.2,
       kinds: { cabF: { body: 26.6, bogie: 8.6, front: true, doors: 2 }, mid: { body: 26.6, bogie: 8.6, doors: 2 }, midP: { body: 26.6, bogie: 8.6, doors: 2, panto: [6.0] }, cabR: { body: 26.6, bogie: 8.6, rear: true, doors: 2 } },
     },
-    /* CFL 2400 / 2450 (Alstom Coradia Stream HC): white double-deck cars, a big sloping red face with a black windscreen surround. */
+    /* CFL 2400 / 2450 (Alstom Coradia Stream HC): white double-deck cars with a red roof stripe and a red lower band, red doors. The end car has the long, low, raked red nose of the real train
+       (measured on the Wikimedia photos of 2405 / 2409 / 2410): chin at the rail, a nearly upright face with the headlight pods at the corners, a cowl at 2.3 m, the huge windscreen rising at ~48 degrees
+       to the red roof dome, and a black visor around the windscreen that sweeps back along the side over the cab door as a wedge fading out into the white wall.
+       nose.prof = keyframes [d from the tip (m), sx (width), roof height, lift, rake, ro (roof arc), lowIn (chamfer)], blended with a monotone cubic. */
     coradia: {
       darkGlass: true, cabWallCol: '#59606a', cabWallFull: true,
-      facePanels: [{ y0: 0.95, y1: 1.3, color: '#0b0d0f', r: 0.16, w: 0.3, cx: -0.82, hole: false, z: 0.004 }, { y0: 0.95, y1: 1.3, color: '#0b0d0f', r: 0.16, w: 0.3, cx: 0.82, hole: false, z: 0.004 }],
-      decal: 'cfl', sweep: { len: 6.5, y0: 1.0, y1: 2.9 },
+      facePanels: [{ y0: 0.64, y1: 0.98, color: '#15181b', r: 0.12, w: 0.3, cx: 0, hole: false, z: 0.004 }],
+      decal: 'cfl', noseSkirt: true, arcSteps: 9, winFromTip: 8.3, doorFromTip: 7.2, capBlack: { y0: 2.1 }, pods: { d: 0.2, y: 1.65, w: 0.66, h: 0.29 }, cabDoorAt: { d: 3.95 }, roofGear: { d0: 3.7, d1: 7.0 }, numberX: 0.4,
       cabLining: 0xd5d8da,
       W: 2.9, yb: 0.6, floor: 0.95, sill: 1.2, head: 1.95, sill2: 2.8, head2: 3.55, ytop: 4.3, wheelR: 0.43, wb: 2.6, gap: 0.7,
       pillar: '#14181c', bay: 1.7, doorW: 1.3, doorY0: 0.62, doorMargin: 3.0, bellows: true, buffers: false, double: true,
       recipe: { lower: 'accent', mid: 'accent', upper: 'body', nose: 'accent', noseHi: 'accent', noseRoof: 'accent', doorLower: 'accent', doorUpper: 'accent', stripeCol: 'body', roof: '#b9bec1' }, noseHiY: 1.9,
-      nose: { len: 3.2, N: 14, zPow: 1.4, capSx: 0.7, a: 2.4, b: 2.0, drop: 1.45, lift: 0.2, rake: 0.55, pd: 2.0, pl: 2, pr: 1, sideWin: [4, 9], roundTip: 1.0, rp: 1.0, lowIn: 0.25, lp: 1.3 }, cabWin: { y0: 1.85, y1: 3.0 },
-      scr: { kind: 'single', cabWipers: true, hw: 0.95, y0: 1.9, y1: 3.1, topInset: 0.3 }, cabFrame: { dz: 2.2, capSx: 0.8, rake: 0.3 }, cabFloor: 0.95, mirror: 0.2,
+      nose: {
+        len: 3.4, N: 20, zPow: 1.5, ytop: 4.3, capSx: 0.8, a: 2.4, b: 2.0, drop: 2.0, lift: -0.15, rake: 0.12, pd: 2.0, pl: 2, pr: 1, sideWin: null, roundTip: 1.0, rp: 1.0, lowIn: 0.3, lp: 1.3,
+        prof: [[0, 0.64, 2.3, -0.15, 0.12, 1.0, 0.3, 0.62], [0.1, 0.76, 2.4, -0.14, 0.11, 1.0, 0.28, 0.62], [0.3, 0.84, 2.62, -0.12, 0.1, 1.0, 0.24, 0.62], [0.6, 0.89, 3.05, -0.08, 0.08, 1.0, 0.18, 0.6], [1.0, 0.94, 3.6, -0.03, 0.05, 0.98, 0.12, 0.56], [1.5, 0.97, 4.0, 0, 0.03, 0.92, 0.06, 0.54], [2.0, 0.99, 4.18, 0, 0.015, 0.8, 0.02, 0.52], [2.7, 1.0, 4.27, 0, 0.005, 0.68, 0, 0.51], [3.4, 1.0, 4.3, 0, 0, 0.62, 0, 0.51]],
+      },
+      patches: [
+        { d: [0, 2.0], M: 16, off: 0.05, col: '#07090b', a: { k: 'x', v: [[0, 0], [1.38, 0], [1.57, 0.7], [1.8, 1.1], [2.0, 1.6]] }, b: { k: 'y', v: [[0, 2.0], [0.43, 2.2], [1.2, 2.35], [2.0, 2.38]] } },
+        { d: [1.99, 3.4], M: 10, off: 0.05, col: '#07090b', a: { k: 'y', v: [[1.99, 3.7], [3.4, 3.5]] }, b: { k: 'y', v: [[1.99, 2.38], [3.4, 2.4]] } },
+        { d: [3.4, 3.4], extra: [3.5, 4.4], M: 8, col: '#07090b', a: { k: 'y', v: [[3.4, 3.5], [4.4, 3.3]] }, b: { k: 'y', v: [[3.4, 2.4], [3.5, 2.97], [4.4, 2.97]] } },
+        { d: [0.2, 1.38], M: 12, off: 0.065, col: [[0.2, '#4a5b6a'], [1.38, '#b3c5d4']], a: { k: 'y', v: [[0, 9]] }, b: { k: 'x', v: [[0.2, 0.86], [0.3, 1.0], [0.43, 1.05], [0.71, 1.0], [1.03, 0.88], [1.2, 0.74], [1.38, 0.58]] } },
+        { extra: [4.4, 5.4, 6.4, 7.4, 8.3], M: 8, off: 0.012, col: 'body', a: { k: 'y', v: [[4.4, 1.96]] }, b: { k: 'y', v: [[4.4, 1.62], [5.4, 1.4], [6.4, 1.1], [7.4, 0.9], [8.3, 0.85]] } },
+        { extra: [4.4, 4.9, 5.4, 6.0, 6.7, 7.4], M: 14, col: '#07090b', a: { k: 'y', v: [[4.4, 3.0]] }, b: { k: 'y', v: [[4.4, 1.65]] }, fade: { d0: 5.0, d1: 7.4, yRef: 1.95, lo: 'lower', hi: 'upper' } },
+      ],
+      scr: { kind: 'roof', cabWipers: true, hw: 0.95, y0: 1.9, y1: 3.1, topInset: 0.3 }, cabFrame: { dz: 2.2, capSx: 0.8, rake: 0.3 }, cabFloor: 0.95, mirror: 0.2,
       kinds: { cabF: { body: 27.33, bogie: 9.2, front: true, doors: 2 }, mid: { body: 27.33, bogie: 9.2, doors: 2 }, midP: { body: 27.33, bogie: 9.2, doors: 2, panto: [6.0] }, cabR: { body: 27.33, bogie: 9.2, rear: true, doors: 2 } },
     },
     tram: {
@@ -696,7 +710,29 @@
     }
     return bands;
   }
+  /* monotone cubic (Fritsch-Carlson) blend of keyframe rows [d, v1, v2, ...] at d: the smooth per-row shape of a modelled nose (no overshoot between keys) */
+  function profAt(keys, d) {
+    const n = keys.length;
+    if (d <= keys[0][0]) return keys[0].slice(1);
+    if (d >= keys[n - 1][0]) return keys[n - 1].slice(1);
+    let i = 0; while (d > keys[i + 1][0]) i++;
+    const h = keys[i + 1][0] - keys[i][0], t = (d - keys[i][0]) / h, t2 = t * t, t3 = t2 * t;
+    return keys[i].slice(1).map((_, c) => {
+      const v = (j) => keys[j][c + 1], xd = (j) => keys[j][0];
+      const tangent = (j) => {
+        if (j <= 0) return (v(1) - v(0)) / (xd(1) - xd(0));
+        if (j >= n - 1) return (v(j) - v(j - 1)) / (xd(j) - xd(j - 1));
+        const dl = (v(j) - v(j - 1)) / (xd(j) - xd(j - 1)), dr = (v(j + 1) - v(j)) / (xd(j + 1) - xd(j));
+        return dl * dr <= 0 ? 0 : 2 * dl * dr / (dl + dr);
+      };
+      return (2 * t3 - 3 * t2 + 1) * v(i) + (t3 - 2 * t2 + t) * h * tangent(i) + (-2 * t3 + 3 * t2) * v(i + 1) + (t3 - t2) * h * tangent(i + 1);
+    });
+  }
   function noseShapeAt(nose, u) {
+    if (nose.prof) {   // modelled nose: u = 1 at the tip, 0 where the nose joins the body
+      const [sx, top, lift, rake, ro, lowIn, rise] = profAt(nose.prof, (1 - u) * nose.len);
+      return { sx, lift, drop: nose.ytop - top, rake, ro, lowIn, rise };
+    }
     return {
       sx: nose.capSx + (1 - nose.capSx) * Math.pow(Math.max(0, 1 - Math.pow(u, nose.a)), 1 / nose.b),
       lift: nose.lift * Math.pow(u, nose.pl), drop: nose.drop * Math.pow(u, nose.pd), rake: nose.rake * Math.pow(u, nose.pr),
@@ -712,14 +748,15 @@
     const lowIn = row.lowIn || 0, lowF = (y) => 1 - lowIn * Math.pow(clamp(1 - (y - S.yb) / (S.head - S.yb), 0, 1), 2);   // hull drawn in towards the skirt
     const mapY = (y) => {
       if (y < S.sill) return yb + (y - S.yb) * (S.sill - yb) / (S.sill - S.yb);
-      const ytop2 = S.ytop - row.drop, k = (ytop2 - S.sill) / (S.ytop - S.sill);
+      const ytop2 = S.ytop - row.drop, baseTop = bands[bands.length - 1].y1;
+      const k = row.rise === undefined ? (ytop2 - S.sill) / (S.ytop - S.sill) : (ytop2 - row.rise - S.sill) / (baseTop - S.sill);   // rise: height of the roof arc above the top of the wall (a modelled nose: rounder shoulders)
       return S.sill + (y - S.sill) * k;
     };
     const R = [];
     R.push({ x: 0, y: yb, c: bands[0].c });
     R.push({ x: hw * 0.84 * lowF(S.yb), y: yb, c: bands[0].c });
-    bands.forEach((b, bi) => { const c = noseC && bi > 0 && !(S.noseKeepStripe && bi === 2) ? (noseHiC && b.y0 >= (S.noseHiY !== undefined ? S.noseHiY : S.sill) - 1e-6 ? noseHiC : noseC) : b.c; R.push({ x: hw * lowF(b.y0), y: mapY(b.y0), c }); R.push({ x: hw * lowF(b.y1), y: mapY(b.y1), c }); });
-    const lastY = R[R.length - 1].y, top = S.ytop - row.drop, hwTop = R[R.length - 1].x, rx = hwTop * (row.ro === undefined ? 0.62 : row.ro), steps = 6;
+    bands.forEach((b, bi) => { const c = noseC && (bi > 0 || S.noseSkirt) && !(S.noseKeepStripe && bi === 2) ? (noseHiC && b.y0 >= (S.noseHiY !== undefined ? S.noseHiY : S.sill) - 1e-6 ? noseHiC : noseC) : b.c; R.push({ x: hw * lowF(b.y0), y: mapY(b.y0), c }); R.push({ x: hw * lowF(b.y1), y: mapY(b.y1), c }); });
+    const lastY = R[R.length - 1].y, top = S.ytop - row.drop, hwTop = R[R.length - 1].x, rx = hwTop * (row.ro === undefined ? 0.62 : row.ro), steps = S.arcSteps || 6;
     for (let k = 1; k <= steps; k++) {
       const a = (k / steps) * Math.PI / 2;
       R.push({ x: hwTop - rx + rx * Math.cos(a), y: lastY + Math.max(0.05, top - lastY) * Math.sin(a), c: roofC });
@@ -760,7 +797,7 @@
     const winSegR = winBandIdx >= 0 ? 2 + 2 * winBandIdx : -1;
     const winBand2 = S.double ? bands.findIndex((b, i) => b.win && i > winBandIdx) : -1;
     const winSegR2 = winBand2 >= 0 ? 2 + 2 * winBand2 : -1;
-    const nR = 2 + 2 * bands.length + 5;
+    const nR = 2 + 2 * bands.length + (S.arcSteps || 6) - 1;
     let cabBands = null;
     if (S.cabWin && winBandIdx > 0) {
       cabBands = bands.map((b) => ({ ...b })); const wi = winBandIdx, cw = S.cabWin;
@@ -774,14 +811,14 @@
     const zPow = nose.zPow || 1;   // > 1: the rows crowd towards the tip, so a rounded plan (the TGV chin) is not a faceted fan
     if (noseF) for (let i = 0; i <= nose.N; i++) frontZs.push(zF + nose.len * Math.pow(i / nose.N, zPow)); else frontZs.push(zF, zF + 0.6);
     if (noseR) for (let i = 0; i <= nose.N; i++) rearZs.push(zR - nose.len * Math.pow(i / nose.N, zPow)); else rearZs.push(zR, zR - 0.6);
-    const wzA = hasWin ? (noseF ? zF + nose.len + 0.7 : zF + 0.9) : 0;
-    const wzB = hasWin ? (noseR ? zR - nose.len - 0.7 : zR - 0.9) : 0;
+    const wzA = hasWin ? (noseF ? zF + (S.winFromTip || nose.len + 0.7) : zF + 0.9) : 0;   // winFromTip: the end car of the Coradia has a long blank wall (cab door, black wedge) before its first passenger door and window
+    const wzB = hasWin ? (noseR ? zR - (S.winFromTip || nose.len + 0.7) : zR - 0.9) : 0;
     // door positions (car-local z): needed before the hull rows, the saloon lining is cut open exactly at the doorways
     const carDoors = [];
     const doorN = K.doors || 0;
     if (doorN > 0) {
-      const za = (noseF ? zF + Math.max(nose.len, 2.7) + S.doorMargin * 0.55 : zF + S.doorMargin) + S.doorW / 2;
-      const zb = (noseR ? zR - Math.max(nose.len, 2.7) - S.doorMargin * 0.55 : zR - S.doorMargin) - S.doorW / 2;
+      const za = noseF && S.doorFromTip ? zF + S.doorFromTip : (noseF ? zF + Math.max(nose.len, 2.7) + S.doorMargin * 0.55 : zF + S.doorMargin) + S.doorW / 2;
+      const zb = noseR && S.doorFromTip ? zR - S.doorFromTip : (noseR ? zR - Math.max(nose.len, 2.7) - S.doorMargin * 0.55 : zR - S.doorMargin) - S.doorW / 2;
       for (let d = 0; d < doorN; d++) carDoors.push(doorN === 1 ? (za + zb) / 2 : za + (zb - za) * d / (doorN - 1));
     }
     const DOOR_EDGE = S.doorW / 2 + 0.01;
@@ -801,13 +838,26 @@
     const JD = 0.002;
     if (noseF) { const i = zList.findIndex((z) => Math.abs(z - (zF + nose.len)) < 0.011); if (i >= 0) zList.splice(i + 1, 0, zList[i] + JD); }
     if (noseR) { const i = zList.findIndex((z) => Math.abs(z - (zR - nose.len)) < 0.011); if (i >= 0) zList.splice(i, 0, zList[i] - JD); }
+    /* the blank wall between the nose and the first window (S.winFromTip): no window bands, the upper deck band is white under a red roof stripe, the lower one red. Same band count as the
+       normal rows (the loft needs it), with a duplicate row at the window start so the change of band edges is 2 mm wide. */
+    let bandsBlank = null;
+    if (S.winFromTip && S.double && hasWin) {
+      bandsBlank = bands.map((b) => ({ ...b, win: false }));
+      const iW1 = bands.findIndex((b) => b.win), iW2 = bands.findIndex((b, i) => b.win && i > iW1);
+      bandsBlank[iW1].c = toRGB(C.lower);
+      bandsBlank[iW2].c = toRGB(C.upper); bandsBlank[iW2].y1 = S.head2 - 0.35;
+      bandsBlank[iW2 + 1].y0 = S.head2 - 0.35; bandsBlank[iW2 + 1].c = toRGB(C.mid);
+      if (noseF) { const i = zList.findIndex((z) => Math.abs(z - wzA) < 0.011); if (i >= 0) zList.splice(i + 1, 0, zList[i] + JD); }
+      if (noseR) { const i = zList.findIndex((z) => Math.abs(z - wzB) < 0.011); if (i >= 0) zList.splice(i, 0, zList[i] - JD); }
+    }
+    const isBlankZ = (z) => !!bandsBlank && ((noseF && z > zF + nose.len + 1e-6 && z <= wzA + 1e-6) || (noseR && z < zR - nose.len - 1e-6 && z >= wzB - 1e-6));
     const noseCArr = toRGB(C.nose), noseHiArr = C.noseHi ? toRGB(C.noseHi) : null, noseRoofArr = C.noseRoof ? toRGB(C.noseRoof) : null;
     const buildRows = (zl) => {
       const rR = [], rr = [];
       zl.forEach((z) => {
         const sh = shapeAt(z);
         const nc = (noseF && z <= zF + nose.len + 1e-6) || (noseR && z >= zR - nose.len - 1e-6) ? noseCArr : null;
-        const Rr = ringFor(S, sh.nz && cabBands ? cabBands : bands, nc && noseRoofArr ? noseRoofArr : roofC, sh, nc, nc ? noseHiArr : null);
+        const Rr = ringFor(S, sh.nz && cabBands ? cabBands : isBlankZ(z) ? bandsBlank : bands, nc && noseRoofArr ? noseRoofArr : roofC, sh, nc, nc ? noseHiArr : null);
         rR.push(Rr); rr.push(fullRing(Rr, z, sh.rake, S.yb));
       });
       return { rR, rr };
@@ -1091,6 +1141,38 @@
       }
     }
 
+    /* ---- hull ring tools of a modelled nose (the black patches, the lamp pods and the cab door sit on the real hull rows) */
+    const zPowN = nose.zPow || 1;
+    const keyAt = (keys, d) => { if (d <= keys[0][0]) return keys[0][1]; for (let i = 0; i < keys.length - 1; i++) if (d <= keys[i + 1][0]) return lerp(keys[i][1], keys[i + 1][1], (d - keys[i][0]) / (keys[i + 1][0] - keys[i][0])); return keys[keys.length - 1][1]; };
+    const named = (n) => (n === 'lower' ? C.lower : n === 'upper' ? C.upper : n === 'body' ? livery.body : n === 'accent' ? livery.accent : n);
+    const colAt = (c, d) => { if (typeof c === 'string') return toRGB(named(c)); const A = c.map(([dd, h]) => [dd, toRGB(h)]); return [0, 1, 2].map((ch) => keyAt(A.map(([dd, v]) => [dd, v[ch]]), d)); };
+    const ringAtD = (d) => {   // the right half of the hull ring at distance d from the nose tip, from the roof centre (s = 0) down to the skirt, with the arc length s
+      const row = noseShapeAt(nose, clamp(1 - d / nose.len, 0, 1)), R = ringFor(S, bands, roofC, row, null, null), pts = [];
+      let acc = 0;
+      for (let j = R.length - 1; j >= 0; j--) { if (pts.length) acc += Math.hypot(R[j].x - pts[pts.length - 1].x, R[j].y - pts[pts.length - 1].y); pts.push({ x: R[j].x, y: R[j].y, s: acc }); }
+      return { pts, row };
+    };
+    const sOf = (pts, k, v) => {
+      if (k === 'y' && v >= pts[0].y) return 0;
+      if (k === 'x') { const xm = pts.reduce((m, q) => Math.max(m, q.x), 0), jn = pts.find((q) => q.x >= xm - 1e-6); if (v >= xm - 1e-6) return jn.s; }   // wider than the roof arc: the arc / wall junction
+      for (let i = 0; i < pts.length - 1; i++) { const A = pts[i], Bq = pts[i + 1]; if ((A[k] - v) * (Bq[k] - v) <= 0 && A[k] !== Bq[k]) return lerp(A.s, Bq.s, (v - A[k]) / (Bq[k] - A[k])); }
+      return pts[pts.length - 1].s;
+    };
+    const onRing = (pts, s) => {
+      let i = 0; while (i < pts.length - 2 && pts[i + 1].s < s) i++;
+      const A = pts[i], Bq = pts[i + 1], t = Bq.s > A.s ? clamp((s - A.s) / (Bq.s - A.s), 0, 1) : 0, tx = Bq.x - A.x, ty = Bq.y - A.y, tl = Math.hypot(tx, ty) || 1;
+      return { x: lerp(A.x, Bq.x, t), y: lerp(A.y, Bq.y, t), nx: -ty / tl, ny: tx / tl };   // outward normal of the ring (downwards along the right half = +x on the wall, +y on the roof)
+    };
+
+    const hullPoint = (front, d, y) => {   // a point of the right half of the hull at distance d from the nose tip and height y (car coordinates)
+      const ring = ringAtD(d), q = onRing(ring.pts, sOf(ring.pts, 'y', y));
+      return { x: q.x, y: q.y, z: (front ? zF : zR) + (front ? 1 : -1) * (d + ring.row.rake * (q.y - S.yb)) };
+    };
+    const hullFacing = (front, d, y) => {   // outward unit normal of the hull in plan (x, z) there, and the plan tangent towards the body side
+      const A = hullPoint(front, Math.max(0, d - 0.08), y), Bq = hullPoint(front, d + 0.08, y), dx = Bq.x - A.x, dz = Bq.z - A.z, l = Math.hypot(dx, dz) || 1;
+      return front ? { nx: dz / l, nz: -dx / l, tx: dx / l, tz: dz / l } : { nx: -dz / l, nz: dx / l, tx: dx / l, tz: dz / l };
+    };
+
     const nz = (S.cabFrame && S.cabFrame.dz) || 0;
     const apD = S.apron ? S.apron.depth : 0;
     const faceFrameB = makeBuilder();   // the rubber surround of a front-face windscreen: hidden in the cab view when the driver's own screen is at cabFrame (scr.cabWipers), or it would float 3 m ahead
@@ -1161,6 +1243,17 @@
           B.geo('paint', planeShape(shp, zEnd, capRake, S.yb, sign * (0.006 + (fp.z || 0)), keyed[fp.color] || fp.color, front), null);
         }
       }
+      /* S.capBlack = { y0 }: the black cowl bar across the nose face, cut exactly along the tip ring (the visor ribbons continue it up the windscreen) */
+      if (S.capBlack && isNose) {
+        const yc = S.capBlack.y0, pts = ringAtD(0).pts, right = [];
+        for (let i = 0; i < pts.length; i++) {
+          const q = onRing(pts, pts[i].s), o = 0.016;   // 1.6 cm out along the ring normal: it meets the visor ribbons, which sit that far off the hull
+          if (pts[i].y >= yc) { right.push(new T.Vector2(i === 0 ? 0 : pts[i].x + q.nx * o, pts[i].y + q.ny * o)); continue; }
+          const A = pts[i - 1]; right.push(new T.Vector2(A.x + (pts[i].x - A.x) * (A.y - yc) / (A.y - pts[i].y) + o, yc)); break;
+        }
+        const outline = [...right, ...right.slice(1).reverse().map((q) => new T.Vector2(-q.x, q.y))].filter((q, i, a) => i === 0 || Math.hypot(q.x - a[i - 1].x, q.y - a[i - 1].y) > 1e-4);
+        B.geo('paint', planeShape(new T.Shape(outline), zEnd, capRake, S.yb, sign * 0.007, S.capBlack.color || '#07090b', front), null);
+      }
       // lights at the cap
       const lampOnNose = S.lamp && isNose ? S.lamp : null;   // lamps sit on the sloping nose surface at a given height / distance from the tip (the TGV mask), not on the cap plane
       const lensY = lampOnNose ? lampOnNose.y : S.yb + sh.lift + (apD ? 0.62 : 0.42), lensX = lampOnNose ? lampOnNose.x : Math.max(0.18, hw * sh.sx * 0.6);
@@ -1172,7 +1265,24 @@
         g.translate(x, y, zAt(y) + sign * 0.012);
         (role ? B : B).geo(key, g, col);
       };
-      if (!S.tram) for (const s of [-1, 1]) {
+      /* S.pods = { d, y, w, h }: black oval lamp housings low on the corners of the nose, turned to follow the hull there, with the round head lamp (white; the tail lamp at the other end) at the outer end */
+      if (S.pods && isNose) for (const s of [-1, 1]) {
+        const hp = hullPoint(front, S.pods.d, S.pods.y), hf = hullFacing(front, S.pods.d, S.pods.y), nxs = s * hf.nx, txs = s * hf.tx, yaw = Math.atan2(nxs, hf.nz);
+        const at = (o, tt) => [s * hp.x + nxs * o + txs * tt, hp.z + hf.nz * o + hf.tz * tt];
+        const put = (g, o, tt, y) => { g.rotateY(yaw); const [x, z] = at(o, tt); g.translate(x, y, z); return g; };
+        // in the face-detail mesh (ghosted in the cab view, or the black housings would stand in the driver's view)
+        faceFrameB.geo('trim', put(rbox(S.pods.w, S.pods.h, 0.1, 0.1), 0.02, 0, hp.y), '#0a0b0d');
+        faceFrameB.geo(front ? 'headF' : 'tailR', put(rbox(S.pods.h * 0.72, S.pods.h * 0.72, 0.05, 0.08), 0.06, S.pods.w * 0.2, hp.y), front ? '#fff6dc' : '#ff3c28');
+        faceFrameB.geo('trim', put(rbox(S.pods.w * 0.34, S.pods.h * 0.36, 0.04, 0.05), 0.06, -S.pods.w * 0.22, hp.y), '#1c1f23');
+        const [lx, lz] = at(0.16, S.pods.w * 0.2);
+        (front ? headApex : tailApex).push([lx, hp.y, lz]);
+        lampPos[front ? 'front' : 'rear'] = { y: hp.y, z: lz };
+        if (mid) {
+          const sp = new T.Sprite(front ? mats.glowHead : mats.glowTail); const [gx, gz] = at(0.24, S.pods.w * 0.2);
+          sp.scale.set(front ? 0.8 : 0.5, front ? 0.8 : 0.5, 1); sp.position.set(gx, hp.y, gz); group.add(sp); (front ? glowHeads : glowTails).push(sp);
+        }
+      }
+      else if (!S.tram) for (const s of [-1, 1]) {
         const headKey = front ? 'headF' : 'lensOff', tailKey = front ? 'lensOff' : 'tailR';
         (front ? headApex : tailApex).push([s * lensX, lensY + (front ? 0.12 : -0.07), zAt(lensY + (front ? 0.12 : -0.07)) + sign * 0.06]);
         lampPos[front ? 'front' : 'rear'] = { y: lensY + (front ? 0.12 : -0.07), z: zAt(lensY + 0.1) + sign * 0.06 };
@@ -1208,7 +1318,14 @@
           dm.rotation.set(front ? tilt : tilt, front ? Math.PI : 0, 0); dm.userData.disposeGeo = true; group.add(dm);
         }
       }
-      if (mid && !S.tram) { // made-up badge + number plate on the nose
+      if (mid && S.pods && isNose) {   // the white unit number low on the right of the nose face and the small CFL mark on the black cowl bar (one plane)
+        const nt = noseNumberTexture(numberText), nm = new T.MeshStandardMaterial({ map: nt, transparent: true, roughness: 0.5, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, depthWrite: false });
+        nm.userData.perTrain = true; ownMats.push(nm);
+        const ny = 1.75, g = new T.PlaneGeometry(0.9, 1.0);
+        const pm = new T.Mesh(g, nm); pm.position.set(S.numberX || 0.42, ny, zEnd + capRake * (ny - S.yb) + sign * 0.016);
+        pm.rotation.set(Math.atan(capRake), front ? Math.PI : 0, 0); pm.userData.disposeGeo = true; group.add(pm);
+      }
+      if (mid && !S.tram && !S.pods) { // made-up badge + number plate on the nose
         const bt = badgeTexture(numberText, S.decal);
         const bm = new T.MeshStandardMaterial({ map: bt, transparent: true, roughness: 0.5, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
         bm.userData.perTrain = true; ownMats.push(bm);
@@ -1238,6 +1355,19 @@
             side.userData.disposeGeo = true; group.add(side);
           }
         }
+      }
+      if (S.cabDoorAt && isNose) for (const s of [-1, 1]) {   // the narrow red cab door behind the nose, with its two handrails and a small window
+        const zc = zEnd - sign * S.cabDoorAt.d, xo = s * (hw + 0.012);
+        B.box('trim', 0.03, 2.1, 1.0, xo, 1.98, zc, '#0a0b0d');
+        B.geo('paint', rbox(0.88, 1.98, 0.03, 0.03).rotateY(Math.PI / 2).translate(s * (hw + 0.03), 1.98, zc), C.doorLower);
+        B.box('trim', 0.02, 0.5, 0.36, s * (hw + 0.047), 2.5, zc, '#10171c');
+        B.box('trim', 0.03, 0.12, 0.05, s * (hw + 0.05), 1.3, zc + sign * -0.3, '#c9ccd0');
+        for (const e of [-1, 1]) B.cyl('m', 0.017, 0.017, 1.95, s * (hw + 0.06), 1.98, zc + e * 0.5, '#c9ccd0', null, 8);
+      }
+      if (S.roofGear && isNose) {   // the grey roof equipment cases right behind the red roof dome
+        const g0 = S.roofGear.d0, g1 = S.roofGear.d1, zc = zEnd - sign * (g0 + g1) / 2;
+        B.geo('trim', rbox(1.7, 0.36, g1 - g0, 0.12).translate(0, S.ytop + 0.0, zc), '#b6bcc0');
+        for (let q = 0; q < 4; q++) B.box('trim', 1.0, 0.03, 0.12, 0, S.ytop + 0.19, zc - (g1 - g0) / 2 + 0.35 + q * ((g1 - g0 - 0.7) / 3), '#4a5056');
       }
       // buffers + screw-coupling hook (buffer-fitted units only). Units without buffers (EMU, double-decker, tram,
       // high-speed) carry no separate coupler box: a floating pilot block under the nose looked detached.
@@ -1320,7 +1450,7 @@
     };
     buildNose(true); buildNose(false);
     faceFrameMesh = faceFrameB.bake(mats, { noShadow: true });
-    if (faceFrameMesh) { faceFrameMesh.userData.disposeGeo = true; group.add(faceFrameMesh); paintMeshes.push(faceFrameMesh); }   // a paint mesh: ghosted in the cab view
+    if (faceFrameMesh) { faceFrameMesh.userData.disposeGeo = true; if (Array.isArray(faceFrameMesh.material)) faceFrameMesh.userData.mat0 = faceFrameMesh.material; group.add(faceFrameMesh); paintMeshes.push(faceFrameMesh); }   // a paint mesh: ghosted in the cab view
     /* body-colour sweeps on the nose sides (the TGV inOui line rising up the power car): S.sweeps = [{ pts: [[d, y], ...] (distance from the tip, height), w, color: 'accent' | hex }] as flat ribbons 12 mm off the hull */
     if ((S.sweeps || S.carbon) && (noseF || noseR)) {
       const sweepB = makeBuilder();
@@ -1385,6 +1515,50 @@
       }
       const sweepMesh = sweepB.bake(mats, { noShadow: true });
       if (sweepMesh) { sweepMesh.userData.disposeGeo = true; group.add(sweepMesh); paintMeshes.push(sweepMesh); }   // a paint mesh: ghosted in the cab view like the hull
+    }
+    /* S.patches: black / glass areas painted ON the hull of a modelled nose, as ribbons that follow the hull rows (their edges are exact curves, unlike vertex colours, which blur). A patch is
+       { d: [d0, d1] (the nose rows in that range) + extra: [d, ...] (rows behind the nose end), a / b: { k: 'y' | 'x', v: [[d, value], ...] } the two edges on the ring of each row as a height (y) or a
+       half width on the roof arc (x): a towards the roof centre, b towards the skirt; col: '#hex' or [[d, '#hex'], ...]; fade: { d0, d1, yRef, lo, hi } melts the colour into the wall colours behind the nose }.
+       Mirrored to both sides, one merged paint mesh per end car. */
+    if (S.patches && (noseF || noseR)) {
+      const patchB = makeBuilder();
+      const fadeTo = (name) => toRGB(named(name));
+      for (const P of S.patches) {
+        const dRows = [];
+        for (let i = 0; i <= nose.N; i++) { const d = nose.len * Math.pow(i / nose.N, zPowN); if (P.d && d >= P.d[0] - 1e-6 && d <= P.d[1] + 1e-6) dRows.push(d); }
+        for (const d of P.extra || []) dRows.push(d);
+        dRows.sort((x, y) => x - y);
+        if (dRows.length < 2) continue;
+        const M = P.M || 14, off = P.off || 0.016;
+        for (const front of [true, false]) {
+          if (front ? !noseF : !noseR) continue;
+          const zT = front ? zF : zR, sgn = front ? 1 : -1;
+          const grid = dRows.map((d) => {
+            const ring = ringAtD(d), sa = sOf(ring.pts, P.a.k, keyAt(P.a.v, d)), sb0 = sOf(ring.pts, P.b.k, keyAt(P.b.v, d)), sb = Math.max(sb0, sa + 1e-3), base = colAt(P.col, d), col = [];
+            const tf = P.fade ? smooth((d - P.fade.d0) / (P.fade.d1 - P.fade.d0)) : 0;
+            for (let m = 0; m <= M; m++) {
+              const q = onRing(ring.pts, lerp(sa, sb, m / M)), c = base.slice();
+              if (tf > 0) { const tgt = fadeTo(q.y < P.fade.yRef ? P.fade.lo : P.fade.hi); for (let ch = 0; ch < 3; ch++) c[ch] = lerp(c[ch], tgt[ch], tf); }
+              col.push({ c0: Math.abs(q.x) < 1e-6, x: q.x + q.nx * off, y: q.y + q.ny * off, z: zT + sgn * (d + ring.row.rake * (q.y - S.yb)), nx: q.nx, ny: q.ny, c });
+            }
+            return col;
+          });
+          for (const side of [-1, 1]) {
+            const K = grid.length, pos = new Float32Array(K * (M + 1) * 3), colr = new Float32Array(K * (M + 1) * 3), idx = [];
+            grid.forEach((col, r) => col.forEach((v, m) => { const o = (r * (M + 1) + m) * 3; pos[o] = v.c0 ? -side * 0.004 : v.x * side; pos[o + 1] = v.y; pos[o + 2] = v.z; colr[o] = v.c[0]; colr[o + 1] = v.c[1]; colr[o + 2] = v.c[2]; }));
+            for (let r = 0; r < K - 1; r++) for (let m = 0; m < M; m++) { const a = r * (M + 1) + m, b = a + 1, c = a + M + 1, e = c + 1; idx.push(a, b, c, b, e, c); }
+            const g = new T.BufferGeometry();
+            g.setAttribute('position', new T.BufferAttribute(pos, 3)); g.setAttribute('color', new T.BufferAttribute(colr, 3)); g.setIndex(idx); g.computeVertexNormals();
+            const nrm = g.attributes.normal;
+            for (let r = 0; r < K; r++) { const o = r * (M + 1); if (grid[r][0].c0) { const l = Math.hypot(0, nrm.getY(o), nrm.getZ(o)) || 1; nrm.setXYZ(o, 0, nrm.getY(o) / l, nrm.getZ(o) / l); } }   // the two mirrored halves meet at the roof centre: the same normal on both, or a dark line shows
+            const n0 = g.attributes.normal, v0 = grid[0][0];
+            if (n0.getX(0) * side * v0.nx + n0.getY(0) * v0.ny < 0) { const ix = g.index.array; for (let i = 0; i < ix.length; i += 3) { const t = ix[i + 1]; ix[i + 1] = ix[i + 2]; ix[i + 2] = t; } g.computeVertexNormals(); }
+            patchB.geo('paint', g, null);
+          }
+        }
+      }
+      const patchMesh = patchB.bake(mats, { noShadow: true });
+      if (patchMesh) { patchMesh.userData.disposeGeo = true; group.add(patchMesh); paintMeshes.push(patchMesh); }
     }
     const mkBeam = (apexes, mat, tint, name) => {
       if (!apexes.length) return null;
@@ -1767,7 +1941,7 @@
     // ----- lights
     return {
       exhaust, ownMats, paintMeshes, fwdLinings, group, length: L + S.gap, body: L, bogieOffset: K.bogie, doors: doorsOut, bogies: bogieGroups, doorAnim, doorsClosedMesh, wheelsets: wsList, pantos: panto, wipers: wiperPivots,
-      interior: tramInterior, saloon: hasWin && mid && !S.tram ? { zA: wallA, zB: wallB, eyeY: S.double ? 3.72 : S.floor + 1.6 } : null, shell: shellMesh, lampMesh, noseFront: noseF, noseRear: noseR, S, beamHead: beamHeadMesh, beamTail: beamTailMesh, glowHeads, glowTails, lampPos, rain: rainMesh,
+      interior: tramInterior, saloon: hasWin && mid && !S.tram ? { zA: S.winFromTip && noseF ? wzA - 1.6 : wallA, zB: S.winFromTip && noseR ? wzB + 1.6 : wallB, eyeY: S.double ? 3.72 : S.floor + 1.6 } : null, shell: shellMesh, lampMesh, noseFront: noseF, noseRear: noseR, S, beamHead: beamHeadMesh, beamTail: beamTailMesh, glowHeads, glowTails, lampPos, rain: rainMesh,
     };
   }
 
@@ -1836,6 +2010,18 @@
     return tex;
   }
 
+  const noseNumCache = new Map();
+  function noseNumberTexture(num) {   // one tall transparent plane on the nose face: the small CFL wordmark at the top (on the black cowl bar), the big white unit number at the bottom (y 1.25 - 2.25 m, 0.9 m wide)
+    const key = String(num);
+    if (noseNumCache.has(key)) return noseNumCache.get(key);
+    const cv = document.createElement('canvas'); cv.width = 320; cv.height = 356;
+    const x = cv.getContext('2d');
+    x.fillStyle = '#ffffff'; x.textBaseline = 'middle'; x.textAlign = 'left';
+    x.font = 'italic 900 50px Helvetica, Arial, sans-serif'; x.fillText('CFL', 26, 30);
+    x.font = '800 84px Helvetica, Arial, sans-serif'; x.fillText(String(num).replace('No ', ''), 6, 318);
+    const t = new T.CanvasTexture(cv); t.colorSpace = T.SRGBColorSpace; t.anisotropy = 4; t.userData = { shared: true };
+    noseNumCache.set(key, t); return t;
+  }
   const badgeCache = new Map();
   function badgeTexture(num, kind) {
     const bkey = num + (kind || '');
@@ -2103,7 +2289,7 @@
         // tram: the cab lining is dark seen from outside (through the tinted screen) but warm-white painted from the driver's seat, like the real Urbos cab
         if (tramLook && !interiorViewOn) { const c = on ? 0xcfcdc5 : 0x4a4f56; mats.inside.color.setHex(c); mats.insideFwd.color.setHex(c); }
         if (rainMesh) rainMesh.visible = cabViewOn && rainMesh.material.uniforms.uWet.value > 0.01;
-        for (const m of built[0].paintMeshes) m.material = on ? mats.ghost : mats.paint;
+        for (const m of built[0].paintMeshes) m.material = on ? mats.ghost : (m.userData.mat0 || mats.paint);   // mat0: a face-detail mesh with several materials (lamp pods)
         for (const m of built[0].fwdLinings) { if (Array.isArray(m.material)) m.material[0] = on ? mats.ghost : mats.insideFwd; else m.material = on ? mats.ghost : mats.insideFwd; }
       },
       /* Passenger-saloon camera (trams): the lining becomes the light saloon wall, the side glazing clear enough to look out of, the screens are drawn by setPaxDisplay. */
