@@ -126,7 +126,9 @@ async function stressFill(frame, { camera }) {
     $('sched').hidden = false;
     $('schedArrT').textContent = '17:16:15'; $('schedDepT').textContent = '17:18:45';
     const dep = $('depBadge'); dep.hidden = false; dep.className = 'depbadge late';
-    dep.innerHTML = '<small></small><b></b>'; dep.querySelector('small').textContent = names[0] + ' · 17:16:15'; dep.querySelector('b').textContent = TS.t('hudDepLate', { t: '12:08' });
+    dep.innerHTML = '<small></small><b></b>'; const why = copy.hudDepEarlyWhy || '';   // "Fréi do · <stop> · time" over "Ofaart fräi an m:ss" / "Ofaartszäit eriwwer +m:ss": the longest of each pair
+    dep.querySelector('small').textContent = why + ' · ' + names[0] + ' · 17:16:15';
+    dep.querySelector('b').textContent = [TS.t('hudDepLate', { t: '+12:08' }), TS.t('hudDepFreeIn', { t: '12:08' }), TS.t('hudDepIn', { t: '12:08' })].sort((a, b) => b.length - a.length)[0];
     $('clock').textContent = '23:59'; $('clockSec').textContent = ':59'; $('delay').textContent = '+12:08'; $('delay').className = 'delay late';
     $('delayWord').textContent = TS.t('hudDelay'); $('delayWord').className = 'delayword late';
     $('onboard').textContent = '888'; $('cashHud').textContent = '88 888 888';
@@ -139,7 +141,7 @@ async function stressFill(frame, { camera }) {
     $('revLamp').hidden = false;
     const pk = $('parkLamp'); pk.hidden = false; pk.textContent = 'B · ' + TS.t('hudParking');
     const g = $('guide'); g.hidden = false; g.className = 'guide late'; g.textContent = TS.t('guideLate');
-    $('hint').innerHTML = longest(/^coach.*T$|^coach/, 1)[0] || ''; $('hint').classList.add('coach');
+    $('hint').innerHTML = longest(/^coach|^hudWaitDepart$/, 1)[0] || '';   // incl. "Du bass fréi do: waart op d'Ofaartszäit hh:mm:ss" $('hint').classList.add('coach');
     $('centerBox').classList.remove('empty');
     const al = $('aheadLoad'); al.hidden = false; al.textContent = TS.t('loadingAhead', { n: 88, pct: 88 });
     const toasts = $('toasts'); toasts.replaceChildren();
