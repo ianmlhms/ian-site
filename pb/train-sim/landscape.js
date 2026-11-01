@@ -19,6 +19,10 @@ window.TS = window.TS || {};
     low:    { ahead: 4, behind: 1, strip: 90,  trees: 0.3, shadow: 0,    rain: 1800, houses: 0.6, rowStep: 25, cars: 16, far: true }
   };
   const LAT_OFFSETS = [0, 3, 6, 9, 13, 18, 24, 31, 40, 52, 66, 82, 100, 120, 150];
+  const ROW_ERR = 0.3;             // adaptive strip rows (terrainMesh): the mesh may depart this far from the terrain function in the middle of two rows
+  const ROW_MIN = 1.6;             // ... down to this row spacing
+  const ROW_DEPTH = 4;
+  const ROW_PROBE_EVERY = 2;       // ... probing every second column
   const ROAD_LAT_OFFSETS = [-12, -8, -5.2, -3.6, -2, 0, 2, 3.6, 5.2, 8, 12];   // extra terrain columns beside a road that runs parallel to the line (crossing-roads.js)
 
   /* ---------- small math helpers ---------- */
@@ -838,6 +842,29 @@ window.TS = window.TS || {};
       if (hints) for (const s of hints.rows(s0 + 0.02, s0 + CHUNK - 0.02)) if (s > s0 + 0.02 && s < s0 + CHUNK - 0.02 && !rowS.some(r => Math.abs(r - s) < 0.45)) rowS.push(s);
       void roadPlan;
       rowS.sort((p, q) => p - q);
+      /* W5 roads2: adaptive rows.  Where the terrain function bends faster than the regular rows can follow (a river bank that crosses the line at a steep angle, a real wall edge in the
+         LiDAR, a steep valley side) the strip mesh is up to 1 m off it between two rows (hole scan "step" findings: metz s 15320 lat -54).  An interval of two rows whose middle differs
+         from the straight line between the rows by more than ROW_ERR at one of the probed columns gets a row in the middle, down to ROW_MIN m.  Only rows INSIDE the chunk are added, so the
+         shared edge with the neighbouring chunk stays as it is. */
+      {
+        const probeCols = lats.map((l, i) => i).filter((i) => i % ROW_PROBE_EVERY === 0);
+        const heightsAt = (s, cols) => { const info = rowInfo(s), f = frame(s); return cols.map((i) => { const lat = lats[i], x = f.x + f.rx * lat, z = f.z + f.rz * lat; return groundY(info, lat, x, z, s); }); };
+        const bends = (a, b, ha, hb, depth) => {
+          if (b - a < 2 * ROW_MIN || depth >= ROW_DEPTH || inTunnel((a + b) / 2, 40)) return [];
+          const m = (a + b) / 2, hm = heightsAt(m, probeCols);
+          const off = hm.some((h, i) => Math.abs(h - (ha[i] + hb[i]) / 2) > ROW_ERR);
+          if (!off) return [];
+          return bends(a, m, ha, hm, depth + 1).concat([m], bends(m, b, hm, hb, depth + 1));
+        };
+        const extra = [];
+        let prevH = heightsAt(rowS[0], probeCols);
+        for (let j = 1; j < rowS.length; j++) {
+          const curH = heightsAt(rowS[j], probeCols);
+          if (rowS[j - 1] > s0 - 1e-6 && rowS[j] < s0 + CHUNK + 1e-6) extra.push(...bends(rowS[j - 1], rowS[j], prevH, curH, 0));
+          prevH = curH;
+        }
+        if (extra.length) { for (const e of extra) if (e > s0 + 0.02 && e < s0 + CHUNK - 0.02) rowS.push(e); rowS.sort((p, q) => p - q); }
+      }
       const portalPad = new Set();   // the pad rows of a portal pair: the quads between them (the ground's cliff face at the mouth) get a hole so the bore stays open
       if (track.kind !== 'tram') for (const tn of tunnels) for (const ps of [tn.s0, tn.s1]) if (ps >= s0 - 0.5 && ps <= s0 + CHUNK + 0.5) for (let a = 0; a + 2 < rowS.length; a++) if (rowS[a + 1] >= ps - 0.3 - 1e-6 && rowS[a + 2] <= ps + 0.3 + 1e-6) portalPad.add(a);
       for (let jj = 0; jj < rowS.length; jj++) {
@@ -958,7 +985,8 @@ window.TS = window.TS || {};
       const place = (s, lat) => { const f = frame(s), info = rowInfo(s), x = f.x + f.rx * lat, z = f.z + f.rz * lat; return { f, info, x, z, y: groundY(info, lat, x, z) }; };
       const r3 = r => { const c = r() < 0.15 ? C('#f2e2a0') : C('#ffffff'); return c.multiplyScalar(0.75 + r() * 0.4); };
       const roadPlanC = track.crossingRoads;
-      const onRoad = (x, z, m) => (!!roadPlanC && roadPlanC.reserved(x, z, m)) || (!!track.inSurround && track.inSurround(x, z));   // crossing roads (crossing-roads.js) and the real station patches (station-surround.js): nothing generic grows or stands there
+      const obPlanC = track.overbridges;   // W5 roads2: road overbridges (overbridges.js) with their embankments
+      const onRoad = (x, z, m) => (!!roadPlanC && roadPlanC.reserved(x, z, m)) || (!!obPlanC && obPlanC.reserved(x, z, m)) || (!!track.inSurround && track.inSurround(x, z));   // crossing roads (crossing-roads.js) and the real station patches (station-surround.js): nothing generic grows or stands there
       const addTree = (name, x, y, z, sc, r) => {
         if (onRoad(x, z, name === 'bush' ? 1.6 : 3.4)) return;
         const tint = r() < 0.12 ? C('#e6e4a8') : C('#ffffff'); tint.multiplyScalar(0.82 + r() * 0.32);
@@ -1319,6 +1347,15 @@ window.TS = window.TS || {};
           try { group.add(TS.crossingRoadsMesh.build(c, roadPlanC, { quality })); } catch (e) { console.warn(TAG + 'crossing road ' + c.index + ' failed', e); }
         }
       }
+      /* ---- road overbridges: the chunk that holds the crossing builds the whole structure (deck, abutments, embankment ramps, asphalt) */
+      if (obPlanC && TS.overbridgesMesh) {
+        const mine = obPlanC.ownerOf(s0, s1);
+        if (mine.length) {
+          try {
+            group.add(TS.overbridgesMesh.buildMany(mine, obPlanC, { quality, strip: W, terrainMat: matTerrain, chunkRoads, groundColorAt: (sx, lat, x, z, y) => groundColor(rowInfo(sx), x, z, 1, lat, y) }));
+          } catch (e) { console.warn(TAG + 'overbridges of chunk ' + k + ' failed', e); }
+        }
+      }
       root.add(group);
       return { k, group, roads: chunkRoads };
     }
@@ -1587,7 +1624,7 @@ window.TS = window.TS || {};
     const ambientCarPoses = () => carList.map((c) => {
       let j = 1; while (j < c.road.cum.length - 1 && c.road.cum[j] < c.t) j++;
       const a = c.road.pts[j - 1], b = c.road.pts[j], seg = c.road.cum[j] - c.road.cum[j - 1] || 1, u = (c.t - c.road.cum[j - 1]) / seg;
-      return { x: lerp(a.x, b.x, u), z: lerp(a.z, b.z, u), v: c.v, hw: c.road.hw, len: c.road.len, t: c.t };
+      return { x: lerp(a.x, b.x, u), y: lerp(a.y, b.y, u), z: lerp(a.z, b.z, u), v: c.v, hw: c.road.hw, len: c.road.len, t: c.t };
     });
     const carM = new T.Matrix4(), carQ = new T.Quaternion(), carP = new T.Vector3(), carS = new T.Vector3(1, 1, 1);
     function updateCars(dt) {
@@ -1752,7 +1789,7 @@ window.TS = window.TS || {};
     /* W5: a vehicle only drives where its road is DRAWN: the planned roads of a crossing belong to the chunk that holds the crossing, the road of a station-patch crossing is built
        by station-surround.js only once the scenery half of the patch has arrived and the train is within its active range (else cars queued on bare rails) */
     const crossingRoadsDrawn = (c) => (c.patch ? !!(surround && surround.isBuilt(c.patchName)) : chunks.has(Math.floor(c.s / CHUNK)));
-    try { crossTraffic = track.crossingRoads && track.crossingRoads.crossings.length && TS.crossingTraffic ? TS.crossingTraffic.create({ root, plan: track.crossingRoads, quality, getNight: () => look.night, roadsDrawn: crossingRoadsDrawn }) : null; }
+    try { crossTraffic = track.crossingRoads && track.crossingRoads.crossings.length && TS.crossingTraffic ? TS.crossingTraffic.create({ root, plan: track.crossingRoads, quality, getNight: () => look.night, roadsDrawn: crossingRoadsDrawn, groundAt: (x, z) => track.terrainHeightAt(x, z) }) : null; }
     catch (e) { console.warn(TAG + 'crossing traffic failed', e); crossTraffic = null; }
     /* the real surroundings of stations (station-surround.js): painted ground, LOD2 buildings, trees, built near the player */
     let surround = null;

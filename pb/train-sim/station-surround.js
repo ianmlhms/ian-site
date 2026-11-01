@@ -23,10 +23,12 @@
   const EXT_Z = 320;
   const FADE_X = 45;              // the real relief fades into the generic one over the outer metres
   const FADE_Z = 80;
-  const ROW_STEP = 5;             // terrain strip rows inside a patch
-  const LAT_STEP = 5;
-  const FADE_ROW_STEP = 2.5;      // finer rows / columns where the real relief fades into the generic one
-  const FADE_LAT_STEP = 2.5;
+  /* W5 roads2: the LiDAR grid of a patch has 4 m cells (data demGrid.res).  Strip rows / columns every 5 m did not hit its nodes: on a real wall or cutting edge (1 m of height within one
+     4 m cell: north s 2945 lat 68) the mesh could not follow the bilinear function, 0.9 - 1.3 m off.  Rows (relative to the patch centre) and columns now lie ON the grid lines. */
+  const ROW_STEP = 4;             // terrain strip rows inside a patch
+  const LAT_STEP = 4;
+  const FADE_ROW_STEP = 2;        // finer rows / columns where the real relief fades into the generic one (half a cell)
+  const FADE_LAT_STEP = 2;
   const ACTIVE_RANGE = 1100;      // patches within this distance of the train are built (high quality; ACTIVE_RANGE_LEAN below it: W4, the next station's patch showed up in the 260-draw budget of the cab view at the first station)
   const ACTIVE_RANGE_LEAN = 850;
   const DROP_RANGE = 1700;
@@ -223,10 +225,11 @@
         extraRows(s0, s1) {
           const out2 = [];
           const a = Math.max(s0, sMid - EXT_Z); const b = Math.min(s1, sMid + EXT_Z);
-          for (let s = Math.ceil(a / ROW_STEP) * ROW_STEP; s <= b; s += ROW_STEP) out2.push(s);
+          const onGrid = (from, step) => Math.ceil((from - sMid) / step - 1e-9) * step + sMid;     // rows on the grid lines of this patch (z = k * cell from the centre)
+          for (let s = onGrid(a, ROW_STEP); s <= b + 1e-6; s += ROW_STEP) out2.push(s);
           // the fade zones at the two ends of the patch (real valley -> generic hills) get a finer row spacing: a steep blend between rows is not linear
           [[sMid - EXT_Z, sMid - EXT_Z + FADE_Z], [sMid + EXT_Z - FADE_Z, sMid + EXT_Z]].forEach(([f0, f1]) => {
-            for (let s = Math.ceil(Math.max(a, f0) / FADE_ROW_STEP) * FADE_ROW_STEP; s <= Math.min(b, f1); s += FADE_ROW_STEP) if (s % ROW_STEP !== 0) out2.push(s);
+            for (let s = onGrid(Math.max(a, f0), FADE_ROW_STEP); s <= Math.min(b, f1) + 1e-6; s += FADE_ROW_STEP) if (Math.abs(((s - sMid) / ROW_STEP) % 1) > 1e-6) out2.push(s);
           });
           return out2;
         },
@@ -234,7 +237,7 @@
           if (s1 < sMid - EXT_Z || s0 > sMid + EXT_Z) return [];
           const out2 = [];
           for (let l = -EXT_X; l <= EXT_X; l += LAT_STEP) out2.push(l);
-          for (let l = -EXT_X + FADE_LAT_STEP; l < EXT_X; l += FADE_LAT_STEP) if (Math.abs(l) > EXT_X - FADE_X && l % LAT_STEP !== 0) out2.push(l);   // finer columns across the lateral fade
+          for (let l = -EXT_X + FADE_LAT_STEP; l < EXT_X; l += FADE_LAT_STEP) if (Math.abs(l) > EXT_X - FADE_X && Math.abs((l / LAT_STEP) % 1) > 1e-6) out2.push(l);   // finer columns across the lateral fade
           return out2;
         },
       });

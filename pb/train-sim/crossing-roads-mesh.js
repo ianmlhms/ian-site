@@ -359,5 +359,5 @@
     return group;
   }
 
-  TS.crossingRoadsMesh = Object.freeze({ build, MB });
+  TS.crossingRoadsMesh = Object.freeze({ build, MB, materials });
 })();

@@ -160,6 +160,8 @@
     const root = opts.root;
     const cap = CAP_PER_TYPE[opts.quality] || CAP_PER_TYPE.medium;
     const getNight = opts.getNight || (() => 0);
+    const groundAt = opts.groundAt || null;               // W5 roads2: terrain function of the track (patch lanes follow the drawn road)
+    const patchLift = plan.patchArmLift !== undefined ? plan.patchArmLift : 0.18;
     const roadsDrawn = opts.roadsDrawn || (() => true);   // W5: false while the road of a crossing is not built (patch scenery still loading, chunk not streamed in)
     const rng = mulberry(20261025);
     const nightU = { value: 0 };
@@ -194,7 +196,9 @@
         const centre = (road, reverse) => (reverse ? road.pts.slice().reverse() : road.pts).map((p) => ({ x: p.x, y: p.yT + plan.ROAD_LIFT, z: p.z }));
         if (sideInfo.type === 'patch') {
           const arm = c.arms && c.arms[sd];
-          if (arm && arm.length > 2) arms.push(arm.map((p) => ({ x: p.x, y: p.y, z: p.z })));
+          /* W5 roads2: the road of the patch is drawn on track.terrainHeightAt (which includes the cuts and fills of the synthetic crossing roads next to it); the plan was made on the
+             base terrain, so the lane is put on the same ground as the road it drives on (it hung 0.7 - 1.0 m off it: north s 10329, wittlich s 15891) */
+          if (arm && arm.length > 2) arms.push(arm.map((p) => ({ x: p.x, y: groundAt ? groundAt(p.x, p.z) + patchLift : p.y, z: p.z })));
         } else if (sideInfo.type === 'T') {
           const cross = c.roads.find((r) => r.id === 'x' + c.index + suffix);
           const par = c.roads.find((r) => r.id === 'p' + c.index + suffix);

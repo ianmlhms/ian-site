@@ -888,6 +888,47 @@
     env.railPortalGeo = { wallGeo, ringGeo };
     return env.railPortalGeo;
   }
+  /* W5 roads2: the wing walls of a tunnel portal.  They were two 12.8 m tall slabs that stood out of the ground like flat tilted boards (brussels s 400, north s 16400).  A real wing wall
+     is a retaining wall: it leaves the edge of the portal face at 45 degrees, its top follows the ground it holds back (0.5 m above it, never lower than 1.5 m over the rail), its foot
+     reaches below the formation (W3: no slit where the cutting falls away beside the mouth).  Two faces, a coping and an end face; the concrete texture is repeated every 4 m. */
+  const WING_FLARE = 9;             // m the wall runs out along the track, and as many sideways
+  const WING_STEPS = 7;
+  const WING_T = 0.7;
+  const WING_ABOVE_GROUND = 0.5;
+  const WING_MIN_TOP = 1.5;
+  function addPortalWings(track, concrete, s, dirOut, C) {
+    const color = col('#a9a69f');
+    const coping = col('#c3c0b8');
+    const hw = RT_R + 6.9;      // the half width of the portal face wall (railPortalGeometry)
+    [-1, 1].forEach((sd) => {
+      const base = [];
+      for (let i = 0; i <= WING_STEPS; i++) {
+        const t = i / WING_STEPS;
+        const p = posAt(track, s + dirOut * WING_FLARE * t, C + sd * (hw - 0.4 + WING_FLARE * t), 0);
+        const ground = track.terrainHeightAt ? track.terrainHeightAt(p[0], p[2]) : p[1];
+        const top = clamp(ground + WING_ABOVE_GROUND, p[1] + WING_MIN_TOP, p[1] + 11.6);
+        base.push({ x: p[0], z: p[2], top, foot: p[1] + FORM_Y - PORTAL_FOOT });
+      }
+      // thickness direction: the horizontal normal of the wall path
+      const tang = (i) => { const a = base[Math.max(0, i - 1)]; const b = base[Math.min(WING_STEPS, i + 1)]; const dx = b.x - a.x; const dz = b.z - a.z; const l = Math.hypot(dx, dz) || 1; return [dx / l, dz / l]; };
+      const nrm = (i) => { const t = tang(i); return [-t[1], t[0]]; };
+      const face = (i, k, y) => { const n = nrm(i); return [base[i].x + n[0] * k * WING_T / 2, y, base[i].z + n[1] * k * WING_T / 2]; };
+      let run = 0;
+      for (let i = 0; i < WING_STEPS; i++) {
+        const len = Math.hypot(base[i + 1].x - base[i].x, base[i + 1].z - base[i].z);
+        const u0 = run / 4; const u1 = (run + len) / 4; run += len;
+        const mid = nrm(i);
+        for (const k of [-1, 1]) {
+          concrete.quad(face(i, k, base[i].foot), face(i + 1, k, base[i + 1].foot), face(i + 1, k, base[i + 1].top), face(i, k, base[i].top), [mid[0] * k, 0, mid[1] * k], color,
+            [[u0, 0], [u1, 0], [u1, (base[i + 1].top - base[i + 1].foot) / 4], [u0, (base[i].top - base[i].foot) / 4]]);
+        }
+        concrete.quad(face(i, -1, base[i].top), face(i + 1, -1, base[i + 1].top), face(i + 1, 1, base[i + 1].top), face(i, 1, base[i].top), [0, 1, 0], coping, [[u0, 0], [u1, 0], [u1, 0.2], [u0, 0.2]]);
+      }
+      // the free end of the wall
+      const e = WING_STEPS; const te = tang(e);
+      concrete.quad(face(e, -1, base[e].foot), face(e, 1, base[e].foot), face(e, 1, base[e].top), face(e, -1, base[e].top), [te[0], 0, te[1]], color);
+    });
+  }
   function addRailPortal(ctx, s, entry, C) {
     const { track, sets, env } = ctx;
     const f = track.frameAt(s);
@@ -899,13 +940,7 @@
     concrete.geom(wallGeo, m, col('#b4b1aa'), 0.2);
     const stone = sets.get('stone', () => M.tex('stone', tex.stone()), true);
     stone.geom(ringGeo, m, col('#e6dcc4'), 0.25);
-    const dirOut = entry ? -1 : 1;
-    [-1, 1].forEach((sd) => {
-      const a = posAt(track, s, C + sd * (RT_R + 3.3), 0);
-      const bOff = posAt(track, s + dirOut * 7, C + sd * (RT_R + 9.4), 0);
-      // W3: the slab reaches 4 m below the rails (it was 8.4 m from the rails up): where the cutting falls away beside the portal (brussels s 947) the ground lay below its foot and a slit showed the far ground
-      concrete.between([a[0], a[1] + 2.0, a[2]], [bOff[0], bOff[1] + 1.3, bOff[2]], 0.9, col('#a9a69f'), 12.8);
-    });
+    addPortalWings(track, concrete, s, entry ? -1 : 1, C);
     const glow = sets.get('glow', M.glow);
     const lamp = posAt(track, s + (entry ? -0.2 : 0.2), C, RT_CY + RT_R + 0.9);
     glow.box(lamp[0], lamp[1], lamp[2], 0.3, 0.3, 0.3, col('#ffe9b0'));

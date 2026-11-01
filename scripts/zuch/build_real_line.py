@@ -23,6 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import real_line_fit as fit  # noqa: E402
 import real_line_path as rp  # noqa: E402
 import real_line_roads_tidy as tidy  # noqa: E402
+import real_line_overbridges as obr  # noqa: E402
 from osm_rail import num, resample  # noqa: E402
 from real_line_dem import Dem  # noqa: E402
 
@@ -908,7 +909,8 @@ def write_layout(segs, legs_meta, stations, path_json, path_meta):
         json.dump(legs_meta, f)
 
 
-def write_features(segs, legs_meta, stations, res, tiles, dem, land):
+def write_features(segs, legs_meta, stations, res, tiles, dem, land, keep_old=False):
+    """keep_old (W5 roads2, `emit --features-only`): layers that later scripts add to the file (build_industry.py: "industry") are carried over from the committed file"""
     import real_line_scenery as sc
     import real_line_crossings as rc
     waters = [w for w in tiles["waterways"] if w["t"].get("waterway") in ("river", "canal", "stream")]
@@ -932,7 +934,10 @@ def write_features(segs, legs_meta, stations, res, tiles, dem, land):
         arm_ctx = None if is_block else {"fn": lambda gg, xy, sgc, _l=LineString(attrs.xy): rc.arms_of_crossing(gg, xy, sgc, roads, rtree, _l, road_lines, rtree)}
         cross, arms_abs = sc.crossings_of_leg(g, feats["crossings"], rd, meta=None if is_block else all_meta[lid], arm_ctx=arm_ctx)
         rd = rc.drop_arm_ribbons(rd, arms_abs)
-        rd, cross, _tidy = tidy.tidy_leg(rd, cross, float(meta.get("k", 1.0)), None)   # W5: roads beside the track (real_line_roads_tidy.py)
+        obs, n_under = [], 0
+        if not is_block:   # W5 roads2: roads that cross the line on a bridge are carried across (overbridges.js), their ribbons leave the road list
+            rd, obs, n_under = obr.process_leg(g, roads, rtree, LineString(attrs.xy), all_meta[lid], float(meta.get("k", 1.0)), rd, [c["s"] for c in cross], sc.ROAD_CLASSES)
+        rd, cross, _tidy = tidy.tidy_leg(rd, cross, float(meta.get("k", 1.0)), None, obs)   # W5: roads beside the track (real_line_roads_tidy.py)
         out[lid] = {
             "L": round(g.length, 1),
             "land": sc.land_raster(g, land),
@@ -942,10 +947,25 @@ def write_features(segs, legs_meta, stations, res, tiles, dem, land):
             "relief": sc.relief(g, dem),
             "places": sc.places_of_leg(g, tiles["places"]),
             "crossings": cross,
+            "ob": obs,
         }
-        print("  features", lid, meta["from"], "->", meta["to"], "roads", len(rd), "water", len(out[lid]["water"]), "places", len(out[lid]["places"]), "crossings", len(out[lid]["crossings"]))
+        print("  features", lid, meta["from"], "->", meta["to"], "roads", len(rd), "water", len(out[lid]["water"]), "places", len(out[lid]["places"]), "crossings", len(out[lid]["crossings"]), "overbridges", len(obs), "(underpasses %d)" % n_under)
     doc = {"version": 1, "row": sc.ROW_M, "col": sc.COL_M, "lat0": sc.LAT0, "cols": sc.COLS, "far": {"row": sc.FAR_ROW, "col": sc.FAR_COL, "lat0": sc.FAR_LAT0, "cols": sc.FAR_COLS}, "classes": __import__("real_line_land").CLASS_NAMES, "legs": out, "tidy": 1}
     path = os.path.join(OUT, "mosel-features.json")
+    if keep_old and os.path.exists(path):
+        with open(path) as f:
+            old = json.load(f)
+        for key in old:
+            if key not in doc:
+                doc[key] = old[key]
+        for lid, leg in out.items():
+            prev = old.get("legs", {}).get(lid)
+            if prev is None:
+                raise SystemExit("features-only: leg %s is not in the committed file (the layout changed: run a full emit)" % lid)
+            if abs(prev["L"] - leg["L"]) > 0.6:
+                raise SystemExit("features-only: leg %s is %.1f m long, the committed layout says %.1f m (the layout changed: run a full emit)" % (lid, leg["L"], prev["L"]))
+            if "industry" in prev:
+                leg["industry"] = prev["industry"]
     with open(path, "w") as f:
         json.dump(doc, f, separators=(",", ":"), ensure_ascii=False)
     print("features ->", path, os.path.getsize(path) // 1024, "kB")
@@ -957,6 +977,7 @@ def main():
     ap.add_argument("--plot", default="")
     ap.add_argument("--route", default="wittlich")
     ap.add_argument("--only", default="")
+    ap.add_argument("--features-only", action="store_true", help="emit: only the features JSON (layout and real-mosel.js stay as committed)")
     args = ap.parse_args()
     routes, pts, tiles = build_routes()
     dem = Dem()
@@ -965,6 +986,9 @@ def main():
     if args.stage == "emit":
         segs, legs_meta, stations, res = emit(routes, pts, tiles, dem, land)
         segs = order_segments(segs, res)
+        if args.features_only:      # W5 roads2: layout JSON / real-mosel.js stay as committed, only the scenery / road / crossing stage is rebuilt
+            write_features(segs, legs_meta, stations, res, tiles, dem, land, keep_old=True)
+            return
         write_layout(segs, legs_meta, stations, os.path.join(OUT, "mosel-layout.json"), os.path.join(rp.CACHE, "mosel-legs-meta.json"))
         write_features(segs, legs_meta, stations, res, tiles, dem, land)
         for seg, items in segs.items():

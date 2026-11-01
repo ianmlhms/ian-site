@@ -47,6 +47,9 @@ PERP_MIN_DEG = 68.0       # game angle from which a road is a "rung" of the comb
 JOIN_TOL = 2.2            # another road within this distance of an end = a junction
 SNAP_TOL = 3.2            # an end this close to a sheared road follows it
 MINOR = ("unclassified", "residential", "living_street", "service", "track")
+HI_K = 6.0                # legs squashed this much along the track (brussels 8 - 17, paris 19 - 21): a perpendicular street is a stripe across the strip, see below
+HI_K_MIN_SPACING = 70.0   # ... so the minor perpendicular roads are thinned much harder,
+HI_K_KEEP_FREE_LEN = 0.0  # ... and a perpendicular minor road whose far end touches nothing (a stub that only runs to the edge of the fetched corridor) is dropped
 RANK = {c: i for i, c in enumerate(["motorway", "motorway_link", "trunk", "trunk_link", "primary", "primary_link", "secondary", "secondary_link", "tertiary", "tertiary_link", "unclassified", "residential", "living_street", "service", "track"])}
 
 
@@ -108,8 +111,9 @@ def clip_band(p, half):
     return [pc for pc in pieces if len(pc) >= 2]
 
 
-def tidy_leg(roads, crossings, k, report):
-    """roads: [{c, w, p, n, ref}], crossings: [{s, arms: {l|r: {c, n, end, p: [[a, l]]}}}] of one leg (game coordinates).  Returns (roads, crossings) as new objects."""
+def tidy_leg(roads, crossings, k, report, obs=None):
+    """roads: [{c, w, p, n, ref}], crossings: [{s, arms: {l|r: {c, n, end, p: [[a, l]]}}}] of one leg (game coordinates), obs: the overbridges of the leg
+    ([{p: [[s, lat], ...]}], real_line_overbridges.py: their road is drawn by overbridges.js, the ribbons that meet it count as joined).  Returns (roads, crossings) as new objects."""
     # 0. a road that spans the rail corridor (consecutive vertices on both sides of the line, or inside the corridor) is split: no road over the rails
     split = []
     for r in roads:
@@ -222,6 +226,10 @@ def tidy_leg(roads, crossings, k, report):
             if len(pts) >= 2:
                 arm_lines.append(LineString(pts))
 
+    for ob in obs or []:
+        if len(ob["p"]) >= 2:
+            arm_lines.append(LineString(ob["p"]))
+
     keep_skew = [True] * n
 
     # ---- 3. trim the cut ends beside the track
@@ -276,12 +284,26 @@ def tidy_leg(roads, crossings, k, report):
                     return True
         return False
 
+    spacing = HI_K_MIN_SPACING if k >= HI_K else MIN_SPACING
+    # a perpendicular minor road that touches no other road at its far end (the corridor end does not count) runs to the edge of the fetched corridor: on a squashed leg it is a stripe to nowhere
+    def far_end_free(i):
+        p = arr[i]
+        e = p[-1] if abs(p[0, 1]) < abs(p[-1, 1]) else p[0]          # the end away from the track
+        pt = Point(e)
+        for j in range(n):
+            if j != i and keep[j] and len(arr[j]) >= 2 and LineString(arr[j]).distance(pt) <= JOIN_TOL:
+                return False
+        return not any(a.distance(pt) <= JOIN_TOL for a in arm_lines)
     rungs = []
     for i, p in enumerate(arr):
         if not keep[i] or out[i]["c"] not in MINOR:
             continue
         _real, game = weighted_real_angle(p, 1.0)
         if game < PERP_MIN_DEG or near_arm(p):
+            continue
+        if k >= HI_K and far_end_free(i):
+            keep[i] = False
+            stats["stub_dropped"] = stats.get("stub_dropped", 0) + 1
             continue
         rungs.append((RANK.get(out[i]["c"], 99), -path_len(p), i))
     rungs.sort()
@@ -291,7 +313,7 @@ def tidy_leg(roads, crossings, k, report):
         s_mid = float((p[:, 0].min() + p[:, 0].max()) / 2)
         lo, hi = float(p[:, 1].min()), float(p[:, 1].max())
         side = 1 if (lo + hi) / 2 >= 0 else -1
-        if any(sd == side and abs(sm - s_mid) < MIN_SPACING and not (hi < l0 or lo > l1) for sd, sm, l0, l1 in kept):
+        if any(sd == side and abs(sm - s_mid) < spacing and not (hi < l0 or lo > l1) for sd, sm, l0, l1 in kept):
             keep[i] = False
             stats["thinned"] += 1
         else:
@@ -345,7 +367,7 @@ def run(route, dry=False):
     total = {}
     for lid, leg in doc["legs"].items():
         k = float((meta.get(lid) or {}).get("k", 1.0))
-        roads, crossings, st = tidy_leg(leg["roads"], leg["crossings"], k, None)
+        roads, crossings, st = tidy_leg(leg["roads"], leg["crossings"], k, None, leg.get("ob"))
         for key, v in st.items():
             total[key] = total.get(key, 0) + v
         leg["roads"] = roads

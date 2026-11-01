@@ -19,7 +19,7 @@
   'use strict';
   const TS = (window.TS = window.TS || {});
   const TAG = '[Lokféierer] real line: ';
-  const DATA_VERSION = 5;
+  const DATA_VERSION = 6;
   /* W2c: the Mosel line keeps sceneryId 'mosel'; the other real lines (north, south, west, ...) are registered by their real-<id>.js layout in TS.realLines and
      use their own data file data/real/<id>-features.json (build_real_route.py).  realKey(def) -> the data set of a route, or null (generic landscape). */
   const realKey = (def) => (!def ? null : def.sceneryId === 'mosel' ? 'mosel' : TS.realLines && def.sceneryId && TS.realLines[def.sceneryId] ? def.sceneryId : null);
@@ -59,6 +59,7 @@
     const fars = [];
     const relief = [];
     const industry = [];     // W3: steelworks / logistics silhouettes (build_industry.py), absolute s
+    const overbridges = [];  // W5 roads2: roads that cross the line on a bridge (real_line_overbridges.py), absolute s
     legs.forEach((l) => {
       l.f.water.forEach((w) => water.push({ s0: l.s0 + w.s0 * l.k, s1: l.s0 + w.s1 * l.k, side: w.side, off: w.off, half: w.half, name: w.name, kind: w.kind }));
       l.f.roads.forEach((r) => roads.push({ c: r.c, w: r.w, n: r.n, ref: r.ref, f: r.f, p: r.p.map(([s, lat]) => [l.s0 + s * l.k, lat]), leg: l.id }));
@@ -69,6 +70,7 @@
       if (l.f.far) fars.push({ s0: l.s0, s1: l.s1, ds: l.f.far.ds * l.k, n: l.f.far.n, rows: l.f.far.rows });
       relief.push({ s0: l.s0, s1: l.s1, step: l.f.relief.step * l.k, l: l.f.relief.l, r: l.f.relief.r });
       (l.f.industry || []).forEach((o) => industry.push(Object.assign({}, o, { s: l.s0 + o.s * l.k })));
+      (l.f.ob || []).forEach((o) => overbridges.push({ s: l.s0 + o.s * l.k, c: o.c, w: o.w, n: o.n, r: o.r, p: o.p.map(([s, lat]) => [l.s0 + s * l.k, lat]), leg: l.id }));
     });
     /* A road end is a real junction when another road's end (or the same way split into two records) meets it there; otherwise it is a dead end in the
      * open (a field track that was only mapped / only fetched that far, or the real pipeline has no arm data for it, REAL-LINES.md "roads to nowhere"):
@@ -87,6 +89,7 @@
       r.freeEnd = r.f !== undefined ? [(r.f & 1) !== 0, (r.f & 2) !== 0] : [(endCount.get(keyOf(a[0], a[1])) || 0) < 2, (endCount.get(keyOf(b[0], b[1])) || 0) < 2];
     });
     industry.sort((a, b) => a.s - b.s);
+    overbridges.sort((a, b) => a.s - b.s);
     water.sort((a, b) => a.s0 - b.s0);
     crossings.sort((a, b) => a.s - b.s);
     const find = (list, s) => {
@@ -99,9 +102,7 @@
       const e = list[lo];
       return e && s >= e.s0 - 1e-6 && s <= e.s1 + 1e-6 ? e : null;
     };
-    const reliefAt = (s) => {
-      const e = find(relief, s);
-      if (!e) return { l: 0, r: 0 };
+    const rawReliefAt = (e, s) => {
       const f = clamp((s - e.s0) / e.step, 0, e.l.length - 1.0001);
       const i = Math.floor(f);
       const t = f - i;
@@ -111,6 +112,31 @@
         return p1 + 0.5 * t * (p2 - p0 + t * (2 * p0 - 5 * p1 + 4 * p2 - p3 + t * (3 * (p1 - p2) + p3 - p0)));
       };
       return { l: cr(e.l, i), r: cr(e.r, i) };
+    };
+    /* W5 roads2: where one relief record ends and the next one starts (a leg and the 290 m block of the station beside it, sampled 50 real m / 50 game m apart and smoothed over
+     * their own end rows) the two do not agree: 1 - 2 m of valley wall at 220 m beside the line, a step of 0.9 m in the ground on a steep valley side (hole scan: north s 2945,
+     * metz s 15320).  The mismatch is split half and half and faded out over JOIN_BLEND m on both sides, so the ground is continuous there. */
+    const JOIN_BLEND = 40;
+    const joins = [];
+    for (let i = 0; i + 1 < relief.length; i++) {
+      const a = relief[i]; const b = relief[i + 1];
+      if (Math.abs(a.s1 - b.s0) > 2) continue;
+      const va = rawReliefAt(a, a.s1); const vb = rawReliefAt(b, b.s0);
+      if (Math.abs(vb.l - va.l) < 0.05 && Math.abs(vb.r - va.r) < 0.05) continue;
+      joins.push({ s: (a.s1 + b.s0) / 2, dl: vb.l - va.l, dr: vb.r - va.r });
+    }
+    const smooth01 = (t) => { const c = clamp(t, 0, 1); return c * c * (3 - 2 * c); };
+    const reliefAt = (s) => {
+      const e = find(relief, s);
+      if (!e) return { l: 0, r: 0 };
+      const v = rawReliefAt(e, s);
+      for (let k = 0; k < joins.length; k++) {
+        const j = joins[k];
+        if (s < j.s - JOIN_BLEND || s > j.s + JOIN_BLEND) continue;
+        const w = s < j.s ? smooth01((s - (j.s - JOIN_BLEND)) / JOIN_BLEND) / 2 : -(1 - smooth01((s - j.s) / JOIN_BLEND)) / 2;
+        v.l += j.dl * w; v.r += j.dr * w;
+      }
+      return v;
     };
     const landAt = (s, lat) => {
       const e = find(rasters, s);
@@ -144,7 +170,7 @@
       return out;
     };
     const api = {
-      water, roads, places, crossings, industry, reliefAt, landAt, farAt, rowsIn, CLASS, lat0: doc.lat0, col: doc.col, cols: doc.cols,
+      water, roads, places, crossings, industry, overbridges, reliefAt, landAt, farAt, rowsIn, CLASS, lat0: doc.lat0, col: doc.col, cols: doc.cols,
       crossingHints: (index) => crossings[index] || null,
       /* the industrial objects whose centre lies in [s0, s1) */
       industryIn: (s0, s1) => industry.filter((o) => o.s >= s0 && o.s < s1),
@@ -185,6 +211,7 @@
       landAt: (s, lat) => landAt(L - s, -lat),
       farAt: (s, lat) => farAt(L - s, -lat),
       rowsIn: (s0, s1) => rowsIn(L - s1, L - s0).map((r) => ({ s: L - r.s - r.ds, ds: r.ds, text: r.text.split('').reverse().join(''), parcels: r.parcels ? r.parcels.split('').reverse().join('') : null })).reverse(),
+      overbridges: overbridges.map((o) => Object.assign({}, o, { s: L - o.s, p: o.p.map(([s, lat]) => [L - s, -lat]).reverse() })).sort((a, b) => a.s - b.s),
       industry: industry.map((o) => Object.assign({}, o, { s: L - o.s, l: -o.l, p: o.p ? o.p.map(([a, b]) => [-a, -b]) : undefined })).sort((a, b) => a.s - b.s),
       industryIn: (s0, s1) => industry.filter((o) => L - o.s >= s0 && L - o.s < s1).map((o) => Object.assign({}, o, { s: L - o.s, l: -o.l, p: o.p ? o.p.map(([a, b]) => [-a, -b]) : undefined })),
       crossingHints: (index) => { const c = crossings[crossings.length - 1 - index]; return c ? { s: L - c.s, barrier: c.barrier, l: c.r, r: c.l } : null; },

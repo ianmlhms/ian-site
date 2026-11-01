@@ -207,7 +207,7 @@
       crossings.forEach((c) => c.lats.forEach((e) => { if (e.s1 >= s0 - 1 && e.s0 <= s1 + 1) out.push(e.lat); }));
       return out;
     }
-    return { crossings, roads, adjust, surfaceAt, reserved, extraRows, extraLats, frameOf, world, ROAD_LIFT };
+    return { crossings, roads, adjust, surfaceAt, reserved, extraRows, extraLats, frameOf, world, ROAD_LIFT, patchArmLift: PATCH_ARM_LIFT };
   }
 
   /* ----------------------------------------------------------------- one crossing */
@@ -508,7 +508,7 @@
      traffic, and no terrain work (the patch relief already holds the road). */
   const PATCH_ARM_LIFT = 0.18;       // the patch roads lie this far above the terrain (painted ground lift + ribbon lift of station-roads.js)
   const PATCH_ARM_LIMIT_X = 150;
-  const PATCH_ARM_MAX_GRADE = 0.16;   // the vehicles drive on the arm: steeper real terrain is cut off at this grade
+  const PATCH_ARM_MAX_GRADE = 0.45;   // W5 roads2: the drawn road of the patch follows the ground exactly (station-roads.js), so the lane does too; only LiDAR spikes (walls) are cut off at this grade (it was 0.16: the lane hung up to 1 m over / under the road at the far end of an arm)
   function planPatchCrossing(ctx, cr, index, frameOf, world) {
     const sc = cr.s;
     const f0 = frameOf(sc);

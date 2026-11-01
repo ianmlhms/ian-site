@@ -534,16 +534,22 @@
     {
       const share = TREE_SHARE[quality] || 0.6;
       const list = (data.trees || []).filter((t, i) => Math.abs(t[0]) < stripW - 6 && hash2(i, 77) < share);
+      /* W5 roads2: a crown must not reach into a building.  The LiDAR canopy beside a tall block has crowns 6 - 9 m wide; dropping every tree closer than 7 m left crowns that still cut a roof
+         (north s 14400).  A tree now keeps its place and its height but its crown radius is cut to the distance to the nearest footprint box (minus 0.3 m); too small a crown = no tree. */
+      const footBoxes = (data.buildings || []).map((b) => { let x0 = Infinity; let x1 = -Infinity; let z0 = Infinity; let z1 = -Infinity; (b.ground || []).forEach((p) => { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); z0 = Math.min(z0, p[1]); z1 = Math.max(z1, p[1]); }); return { x0, x1, z0, z1 }; });
+      const crownRadius = (t) => {
+        let near = Infinity;
+        for (const b of footBoxes) near = Math.min(near, Math.hypot(Math.max(b.x0 - t[0], 0, t[0] - b.x1), Math.max(b.z0 - t[1], 0, t[1] - b.z1)));
+        return Math.min(clamp(t[3], 1.2, 9), near - 0.3);
+      };
       if (list.length && o.treeField) {
         /* the pooled, LOD-sorted tree field (tree-field.js) draws them: LiDAR height / crown radius pick the species and the scale */
         const lists = { oak: [], beech: [], spruce: [] }; const meta = o.treeField.meta;
-        // boxes of the buildings: a crown must not reach into a roof (the LiDAR canopy of a tree beside a house overlaps the footprint)
-        const boxes = (data.buildings || []).map((b) => { let x0 = Infinity; let x1 = -Infinity; let z0 = Infinity; let z1 = -Infinity; (b.ground || []).forEach((p) => { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); z0 = Math.min(z0, p[1]); z1 = Math.max(z1, p[1]); }); return { x0, x1, z0, z1 }; });
-        const nearHouse = (x, z, r) => boxes.some((b) => x > b.x0 - r && x < b.x1 + r && z > b.z0 - r && z < b.z1 + r);
         list.forEach((t, i) => {
-          if (nearHouse(t[0], t[1], Math.min(7, t[3] * 0.85))) return;      // W5: 3.2 m let the crown of a tall tree beside a tall block grow through its roof (north s 14400)
+          const r = crownRadius(t);
+          if (r < 1.2) return;
           const w = world(t[0], t[1]); const y = track.terrainHeightAt(w.x, w.z) - 0.15;
-          const h = clamp(t[2], 3, 32); const r = clamp(t[3], 1.2, 9);
+          const h = clamp(t[2], 3, 32);
           const conifer = t[3] / Math.max(1, t[2]) < 0.26;
           const name = conifer ? 'spruce' : (r / h > 0.36 ? 'oak' : 'beech');
           const sc = r / meta[name].r; const sy = clamp(h / (meta[name].h * sc), 0.6, 1.8);

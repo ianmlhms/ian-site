@@ -815,7 +815,23 @@
       }
     }
     const terrainHeightAt = roadPlan ? (x, z) => roadPlan.adjust(x, z, terrainBaseHeightAt(x, z)) : terrainBaseHeightAt;
-    const isReservedWithRoads = roadPlan ? (x, z) => isReserved(x, z) || roadPlan.reserved(x, z, 1.5) : isReserved;
+
+    /* Road overbridges (overbridges.js): the real roads that cross the line on a bridge, designed on the finished ground.  The ground is not changed (the embankment is a solid mesh on
+       it), so the plan comes last.  A bridge that cannot be built (tunnel / station / diamond crossing close by) hands its road back to the ordinary ribbons. */
+    let obPlan = null;
+    if (kind !== 'tram' && real && real.overbridges && real.overbridges.length && window.TS.overbridges) {
+      try {
+        obPlan = window.TS.overbridges.plan({
+          id: def.sceneryId || def.id, length, frameAt, groundAt: terrainHeightAt, secondLat: (s) => (second ? second.lat(s) : 0), obs: real.overbridges,
+          tunnels: comp.tunnels, bridges, stations, flips: second ? second.flips : [],
+        });
+        window.TS.overbridges.fallbackRoads(obPlan.skipped).forEach((r) => real.roads.push(r));
+      } catch (error) {
+        console.warn('[Lokféierer] track: overbridges failed', error);
+        obPlan = null;
+      }
+    }
+    const isReservedWithRoads = roadPlan || obPlan ? (x, z) => isReserved(x, z) || (!!roadPlan && roadPlan.reserved(x, z, 1.5)) || (!!obPlan && obPlan.reserved(x, z, 1.5)) : isReserved;
 
     const passFixed = stations.map((st, i) => (i > 0 && i < stations.length - 1 && (def.passNames || []).includes(st.name) ? i : -1)).filter((i) => i >= 0);
 
@@ -908,6 +924,7 @@
       terrainHeightAt,
       terrainBaseHeightAt,
       crossingRoads: roadPlan,
+      overbridges: obPlan,
       surroundPatches,
       /* true inside the real patch of a station whose scenery is loaded (the generic scenery keeps out of it) */
       inSurround: surroundPatches.length ? (x, z) => { const q = nearest(x, z, { s: 0, d: 0, lat: 0, y: 0 }); return surroundPatches.some((p) => p.meshReady && p.covers(q.s, q.lat)); } : () => false,   // W2c: only once the heavy half of the patch (buildings, trees) is loaded: until then the generic scenery stands there

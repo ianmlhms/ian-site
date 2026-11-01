@@ -113,23 +113,25 @@ const probe = ({ track, world }, GAP_MAX) => {
 
 /* ---- ambient cars (landscape.js carMesh: cars on the drawn chunk roads of the real scenery): sampled along the route, none may be inside the rail corridor, none
    may stand more than ROAD_SLACK off the nearest planned / drawn road of its own chunk (they share the polyline, so this catches a stale road list) */
+const OVERBRIDGE_UP = 4;   // m above / under the rail head: the deck of an overbridge lies 8.2 m over it, the road of an underpass 6.7 m under it
 const ambient = async (sim, id) => {
   const info = await sim.evalGame(({ track }) => ({ length: (track.base || track).length }));
-  const flags = []; let cars = 0;
+  const flags = []; let cars = 0; let overBridge = 0;
   for (let s = 100; s < info.length; s += 400) {
     await sim.page.evaluate((ts) => { __tsTest.placeAt(ts, 0); const w = __tsTest.internals().world; w.landscape.warm(w.track.baseS ? w.track.baseS(ts) : ts); }, s);
     await sim.frames(2);
     const res = await sim.evalGame(({ track, world }, ts) => {
       const base = track.base || track;
-      return world.landscape.ambientCarPoses().map((c) => { const q = base.nearest(c.x, c.z); const x2 = base.second ? base.second.lat(q.s) : 0; return { s: Math.round(q.s), lat: Math.round(q.lat * 10) / 10, x2: Math.round(x2 * 10) / 10, hw: c.hw, len: Math.round(c.len), x: Math.round(c.x), z: Math.round(c.z) }; }).filter((c) => Math.abs(c.s - ts) < 700);
+      return world.landscape.ambientCarPoses().map((c) => { const q = base.nearest(c.x, c.z); const x2 = base.second ? base.second.lat(q.s) : 0; return { s: Math.round(q.s), lat: Math.round(q.lat * 10) / 10, x2: Math.round(x2 * 10) / 10, hw: c.hw, len: Math.round(c.len), x: Math.round(c.x), z: Math.round(c.z), up: Math.round((c.y - q.y) * 10) / 10 }; }).filter((c) => Math.abs(c.s - ts) < 700);
     }, s);
     cars += res.length;
     res.forEach((c) => {
       const lo = Math.min(0, c.x2) - 2.6; const hi = Math.max(0, c.x2) + 2.6;
+      if (Math.abs(c.up) > OVERBRIDGE_UP) { overBridge += 1; return; }      // W5 roads2: a car on the deck of a road overbridge (or in an underpass box) is metres above (under) the rails, not on them
       if (c.lat > lo && c.lat < hi) flags.push(Object.assign({ kind: 'ambient-on-rails' }, c));
     });
   }
-  return { cars, flags };
+  return { cars, flags, overBridge };
 };
 
 /* ---- streaming: the game starts lazily (the scenery half of a station patch arrives while the train drives).  For every patch crossing the train approaches from
