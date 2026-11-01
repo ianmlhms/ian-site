@@ -36,7 +36,9 @@ STATIONS = (
 # W5: the authored tail of the trier express (Cochem, Koblenz Hbf; no layout file: the game's track there is authored): name, extract, country, lat, lon, compass heading hint of the
 # service direction, declared platform side (routes.js).  Rheinland-Pfalz has no LoD2 / LiDAR in this builder (OSM footprints extruded, Copernicus relief), like France / Belgium.
 EXPLICIT = (
-    # NOT built (W5): the OSM station node / platform ways of both were not found by --main-near-node (Cochem: no platform, heading 18 instead of ~50), see ZUCHROUTES-HANDOFF W5
+    # the OSM railway=station nodes (rlp.osm.pbf, looked up by name: "Cochem (Mosel)" 50.15307 / 7.16677, "Koblenz Hbf" 50.35082 / 7.58926)
+    ("Cochem", "rlp", "fr", 50.1530731, 7.1667697, 55.0, "left"),
+    ("Koblenz Hbf", "rlp", "fr", 50.3508227, 7.5892636, 350.0, "right"),
 )
 SHARED = {"paris": {"Thionville", "Metz-Ville"}}      # stations of this route that also exist on an earlier route of STATIONS but on another track: own patch
 
