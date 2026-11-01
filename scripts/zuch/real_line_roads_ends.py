@@ -169,6 +169,14 @@ def _fix_one_pass(roads, extra_lines, built, stats):
                 taken.add((i, end))
                 stats["reached"] += 1
                 continue
+        # 3b. an important road that points at the line goes on to the rail corridor (the road that the game does not carry over / under it)
+        if r["c"] in MAJOR and abs(d[1]) > 0.3 and d[1] * e[1] < 0:
+            t = (math.copysign(NEAR_LAT - 8.0, e[1]) - e[1]) / d[1]
+            if 0 < t <= REACH_MAX:
+                new_p.setdefault(i, {})[end] = [round(float(e[0] + d[0] * t), 1), round(float(e[1] + d[1] * t), 1)]
+                taken.add((i, end))
+                stats["reached"] += 1
+                continue
         # 4. DROP the minor road (an important road that cannot be extended stays, the sim tapers its end)
         if r["c"] not in MAJOR:
             drop.add(i)

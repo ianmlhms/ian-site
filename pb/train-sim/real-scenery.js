@@ -23,6 +23,7 @@
   const STEEP_CROSS = 1.7;            // m of height difference across a road ribbon above which the piece is not drawn (the strip mesh is too coarse there: it would float)
   const HOUSE_SPACING = 17;
   const HOUSE_SETBACK = 6;
+  const INFILL_ROAD_MAX = 45;         // infill houses (built-up cells away from a street) must have a street this close
   const MAX_HOUSES = 90;
   const OBJ_LAT = 290;                // houses and trees stand up to here; fields / road ribbons only inside the strip (the far ground carries the land colours beyond)
   const FAR_LIFT = 0.3;               // ribbons on the coarse far ground sit this much higher (its triangles are 24 m wide)
@@ -374,6 +375,9 @@
       const s = cell.s0 + c.rng() * (cell.s1 - cell.s0);
       const lat = cell.l0 + c.rng() * (cell.l1 - cell.l0);
       if (Math.abs(lat) > OBJ_LAT) return;
+      // W5 roads3: a house of the infill stands within INFILL_ROAD_MAX of a drawn street (no row of houses floating in a field without a road)
+      const q = c.place(s, lat);
+      if (!segs.length || roadClearance(segs, q.x, q.z).d > INFILL_ROAD_MAX) return;
       const f = c.frame(s);
       put(s, lat, c.yawOf(f) + (c.rng() < 0.3 ? Math.PI / 2 : 0), cell.cls === K.urban);
     }));
