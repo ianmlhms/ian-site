@@ -48,7 +48,9 @@
               const cx = s.w.x + dx * 0.22 * side; const cz = s.w.z + dz * 0.22 * side; const y = s.y;
               const hx = px * SIGN_W / 2; const hz = pz * SIGN_W / 2;
               const nx = dx * side; const nz = dz * side;
-              const ul = side > 0 ? 0 : 1; const ur = side > 0 ? 1 : 0;
+              // the face looking along +n (n = side * forward) has the viewer's RIGHT at -perpendicular for side +1 (vertex a) and at +perpendicular for side -1 (vertex b): that vertex takes u = 1,
+              // else the text read mirrored from the chase camera ("Voie 2-3" as "E-2 eioV", W5)
+              const ul = side > 0 ? 1 : 0; const ur = side > 0 ? 0 : 1;
               const a = mb.vert(cx - hx, y - SIGN_H / 2, cz - hz, nx, 0, nz, [1, 1, 1], ul, v0);
               const b = mb.vert(cx + hx, y - SIGN_H / 2, cz + hz, nx, 0, nz, [1, 1, 1], ur, v0);
               const c = mb.vert(cx + hx, y + SIGN_H / 2, cz + hz, nx, 0, nz, [1, 1, 1], ur, v0 + vh);
