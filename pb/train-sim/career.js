@@ -389,7 +389,8 @@
     const fareMult = effective ? effective.fareMult : num(r.fareMult) ? r.fareMult : 1;
     const harshMult = effective ? effective.harshMult : 1;
 
-    const baseFare = num(r.passengersDelivered) * rr.fareBase + (Number.isFinite(r.passengerKm) ? Math.max(0, r.passengerKm) : 0) * E.farePerPassengerKm;
+    // fareScale (config.js routeRules): keeps the money per scheduled minute of a route when its timetable gets shorter (W5 timing); 1 = untouched
+    const baseFare = (num(r.passengersDelivered) * rr.fareBase + (Number.isFinite(r.passengerKm) ? Math.max(0, r.passengerKm) : 0) * E.farePerPassengerKm) * (Number.isFinite(rr.fareScale) && rr.fareScale > 0 ? rr.fareScale : 1);
     const punctualityAvg = avg((r.delaySecAtStations || []).map(punctualityScore));
     const accuracyAvg = avg((r.stopErrors || []).map(accuracyScore));
 

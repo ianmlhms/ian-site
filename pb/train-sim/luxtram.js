@@ -89,13 +89,13 @@
   const APPROX_LENGTH = { luxtram: 16.3, 'luxtram-kierchbierg': 7.7, 'luxtram-stad': 3.7, 'luxtram-sud': 5.1 };
 
   const SECTIONS = [
-    { id: 'luxtram-kierchbierg', from: 0, to: 9, price: 10000, fareBase: 14,
+    { id: 'luxtram-kierchbierg', from: 0, to: 9, price: 10000, fareBase: 14, fareScale: 0.85,
       name: { lb: 'Luxtram T1: Findel – Kierchbierg', de: 'Luxtram T1: Findel – Kirchberg', en: 'Luxtram T1: Findel – Kirchberg' } },
-    { id: 'luxtram-stad', from: 9, to: 16, price: 0, fareBase: 14,
+    { id: 'luxtram-stad', from: 9, to: 16, price: 0, fareBase: 14, fareScale: 0.87,
       name: { lb: 'Luxtram T1: Kierchbierg – Gare', de: 'Luxtram T1: Kirchberg – Hauptbahnhof', en: 'Luxtram T1: Kirchberg – Central Station' } },
-    { id: 'luxtram-sud', from: 16, to: 23, price: 14000, fareBase: 14,
+    { id: 'luxtram-sud', from: 16, to: 23, price: 14000, fareBase: 14, fareScale: 0.84,
       name: { lb: 'Luxtram T1: Gare – Stadion', de: 'Luxtram T1: Hauptbahnhof – Stadion', en: 'Luxtram T1: Central Station – Stadium' } },
-    { id: 'luxtram', from: 0, to: 23, price: 40000, fareBase: 16, requires: ['luxtram-kierchbierg', 'luxtram-sud'],
+    { id: 'luxtram', from: 0, to: 23, price: 40000, fareBase: 16, fareScale: 0.88, requires: ['luxtram-kierchbierg', 'luxtram-sud'],
       name: { lb: 'Luxtram T1: Findel – Stadion (ganzt Linn)', de: 'Luxtram T1: Findel – Stadion (ganze Linie)', en: 'Luxtram T1: Findel – Stadium (full line)' } },
   ];
 
@@ -1064,7 +1064,7 @@
     // Tram career: sections are bought with tram money (stad is free, the full line needs the other sections first).
     const rules = {};
     SECTIONS.forEach((s) => {
-      rules[s.id] = Object.freeze({ price: s.price, needs: Object.freeze(['tram']), fareBase: s.fareBase, requires: Object.freeze(s.requires || []) });
+      rules[s.id] = Object.freeze({ price: s.price, needs: Object.freeze(['tram']), fareBase: s.fareBase, fareScale: s.fareScale, requires: Object.freeze(s.requires || []) });
     });
     const order = TS.config.routeOrder.filter((id) => id !== 'tram').concat(SECTIONS.map((s) => s.id));
     const cleanRules = Object.assign({}, TS.config.routeRules);

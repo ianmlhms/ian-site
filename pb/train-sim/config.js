@@ -98,18 +98,20 @@
     )
   );
 
-  /* needs: tokens matched against the train's id OR kind ('rail' | 'tram') */
+  /* needs: tokens matched against the train's id OR kind ('rail' | 'tram').
+   * fareScale: multiplies the whole fare of a service (career.js reward). W5 timing cut the scheduled minutes of every route by 10 - 26 % (no more dead waiting at the stops);
+   * the scale = new / old scheduled minutes keeps the money per minute of play where it was (scripts/zuch/career_probe.mjs), prices unchanged. */
   const routeRules = Object.freeze({
-    west: Object.freeze({ price: 0, needs: Object.freeze(['rail']), fareBase: 20 }),
-    south: Object.freeze({ price: 1800, needs: Object.freeze(['rail']), fareBase: 26 }),
-    east: Object.freeze({ price: 9000, needs: Object.freeze(['rail']), fareBase: 24 }),
-    wittlich: Object.freeze({ price: 12000, needs: Object.freeze(['rail']), fareBase: 34 }),
+    west: Object.freeze({ price: 0, needs: Object.freeze(['rail']), fareBase: 20, fareScale: 0.88 }),
+    south: Object.freeze({ price: 1800, needs: Object.freeze(['rail']), fareBase: 26, fareScale: 0.91 }),
+    east: Object.freeze({ price: 9000, needs: Object.freeze(['rail']), fareBase: 24, fareScale: 0.87 }),
+    wittlich: Object.freeze({ price: 12000, needs: Object.freeze(['rail']), fareBase: 34, fareScale: 0.88 }),
     // W2c: south / north run all the real stops now (17 / 18 instead of 9): a service pays 8.5 k / 9.7 k (was 5.9 k / 6.3 k) in 33 / 39 min (scripts/zuch/career_probe.mjs, drive_bot.mjs), north's price follows (16 k -> 24 k = the same 2.5 services as before)
-    north: Object.freeze({ price: 24000, needs: Object.freeze(['rail']), fareBase: 32 }),
-    trier: Object.freeze({ price: 38000, needs: Object.freeze(['kiss', 'ic', 'hst']), fareBase: 55 }),
-    metz: Object.freeze({ price: 72000, needs: Object.freeze(['kiss', 'ic', 'hst']), fareBase: 50 }),
-    brussels: Object.freeze({ price: 108000, needs: Object.freeze(['kiss', 'ic', 'hst']), fareBase: 65 }),
-    paris: Object.freeze({ price: 160000, needs: Object.freeze(['hst']), fareBase: 120 }),
+    north: Object.freeze({ price: 24000, needs: Object.freeze(['rail']), fareBase: 32, fareScale: 0.89 }),
+    trier: Object.freeze({ price: 38000, needs: Object.freeze(['kiss', 'ic', 'hst']), fareBase: 55, fareScale: 0.78 }),
+    metz: Object.freeze({ price: 72000, needs: Object.freeze(['kiss', 'ic', 'hst']), fareBase: 50, fareScale: 0.74 }),
+    brussels: Object.freeze({ price: 108000, needs: Object.freeze(['kiss', 'ic', 'hst']), fareBase: 65, fareScale: 0.74 }),
+    paris: Object.freeze({ price: 160000, needs: Object.freeze(['hst']), fareBase: 120, fareScale: 0.8 }),
   });
   /* Fallback order if TS.routes isn't loaded. The Luxtram routes are appended by luxtram.js (tram career). */
   const routeOrder = Object.freeze(['west', 'south', 'east', 'wittlich', 'north', 'trier', 'metz', 'brussels', 'paris']);

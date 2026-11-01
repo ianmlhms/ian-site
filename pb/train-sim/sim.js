@@ -17,8 +17,8 @@
   const SPAD_FINE = 250, OVERRUN_FINE = 40, SHORT_FINE = 10, HARSH_FINE = 6, EARLY_FINE = 12, EB_FINE = 0, BUFFER_FINE = 80;
   const PERFECT_BONUS = 50, OK_BONUS = 25, FAIR_BONUS = 10, ON_TIME_S = 30, ON_TIME_BONUS = 20, LATE_FINE_PER_MIN = 10;
   /* What the timetable assumes of the driver (fitted with scripts/zuch/drive_bot.mjs, see ZUCHREAL-W5-TIMING.md): 90 % of the line speed, the train's own traction, the service brake at B3.5 of 7,
-   * and 3 s per leg for the start-up and the last creep into the platform. A driver at 85 - 97 % of the limits is then within about +-5 % of the running time of every leg. */
-  const TIMETABLE_SPEED_SHARE = 0.9, TIMETABLE_SPEED_SHARE_TRAM = 0.94, TIMETABLE_ACCEL_FACTOR = 1.0, TIMETABLE_BRAKE_FACTOR = 0.5, TIMETABLE_LEG_OVERHEAD_S = 3;
+   * and 5 s per leg (tram 3 s) for the start-up and the last creep into the platform. A driver at 85 - 97 % of the limits is then within about +-5 % of the running time of every leg. */
+  const TIMETABLE_SPEED_SHARE = 0.9, TIMETABLE_SPEED_SHARE_TRAM = 0.96, TIMETABLE_ACCEL_FACTOR = 1.0, TIMETABLE_BRAKE_FACTOR = 0.5, TIMETABLE_LEG_OVERHEAD_S = 5, TIMETABLE_LEG_OVERHEAD_TRAM_S = 3;
   /* Departure timing (ZUCHREAL-W5-TIMING.md): a scheduled dwell is what the stop really takes (the player opens the doors, the passengers exchange, the player closes the doors) plus a short
    * slack; the old fixed 30 - 45 s (and 75 s at the origin) was far longer than that for small stops and shorter for big ones. EARLY_OK_S: the lever may go to power this many seconds before the
    * scheduled departure time without an early-departure fine (EARLY_FINE); the HUD's "clear to depart" comes at the same moment. */
@@ -107,8 +107,12 @@
     for (let k = 0; k < n; k++) segCap.push(Math.max(PROFILE_MIN_V, Math.min(vmax, (trainLen > 0 ? effectiveLimit(limits, s0 + ds * (k + 0.5) - trainLen, s0 + ds * (k + 0.5), fallbackKmh) : limitAt(limits, s0 + ds * (k + 0.5), fallbackKmh)) / KMH) * share));
     const v = new Array(n + 1).fill(0);
     for (let k = 1; k < n; k++) v[k] = Math.min(segCap[k - 1], segCap[k]);
-    for (let k = 1; k <= n; k++) v[k] = Math.min(v[k], Math.sqrt(v[k - 1] * v[k - 1] + 2 * Math.max(0.02, accelAt(v[k - 1]) - G * gradeAt(s0 + ds * (k - 0.5))) * ds));   // an uphill takes from the acceleration (a railcar slows down a lot on the Norden line)
-    for (let k = n - 1; k >= 0; k--) v[k] = Math.min(v[k], Math.sqrt(v[k + 1] * v[k + 1] + 2 * brake * ds));
+    /* the gradient under the train's centre (like step()'s frameGrade): an uphill takes from the traction and can pull the speed below the cap (the sustainable speed where the
+     * traction equals running resistance + slope: a railcar on the Norden line), a downhill helps the brake */
+    const slope = (k) => gradeAt(s0 + ds * (k - 0.5) - trainLen / 2);
+    const vFloor2 = PROFILE_MIN_V * PROFILE_MIN_V;
+    for (let k = 1; k <= n; k++) v[k] = Math.min(v[k], Math.sqrt(Math.max(vFloor2, v[k - 1] * v[k - 1] + 2 * (accelAt(v[k - 1]) - G * slope(k)) * ds)));
+    for (let k = n - 1; k >= 0; k--) v[k] = Math.min(v[k], Math.sqrt(v[k + 1] * v[k + 1] + 2 * Math.max(0.1 * brake, brake + G * slope(k + 1)) * ds));
     let t = 0;
     for (let k = 0; k < n; k++) t += ds / Math.max(PROFILE_MIN_V * 0.5, (v[k] + v[k + 1]) / 2);
     return t;
@@ -180,7 +184,7 @@
       if (passSet.has(i) && i < lastIdx) continue;
       const prev = stations[last], st = stations[i], dist = Math.max(50, st.s - prev.s);
       const travel = legTravelSeconds(limits, prev.s, prev.s + dist, vmax, accelAt, brake, train.maxKmh || 100, options.share ?? (noseRule ? TIMETABLE_SPEED_SHARE_TRAM : TIMETABLE_SPEED_SHARE), noseRule ? 0 : trainLength(train), gradeAt);
-      const arr = clock + travel + (options.legOverhead ?? TIMETABLE_LEG_OVERHEAD_S), isLast = i === lastIdx;
+      const arr = clock + travel + (options.legOverhead ?? (noseRule ? TIMETABLE_LEG_OVERHEAD_TRAM_S : TIMETABLE_LEG_OVERHEAD_S)), isLast = i === lastIdx;
       const ex = expectedExchange(train, st, aboard, { last: isLast, crowdFactor: crowdAt(i) });
       aboard = ex.onboard;
       const dwell = isLast ? 0 : dwellFor(train, ex.alighting, ex.boarding) + jitter();

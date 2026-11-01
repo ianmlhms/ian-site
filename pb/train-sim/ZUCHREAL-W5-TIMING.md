@@ -12,7 +12,7 @@ Complaint (Ian): even at a normal pace you stand ~30 s at a stop after the passe
 ## What changed (`sim.js`)
 * `exchangeSeconds(train, alighting, boarding)`: fit of `passengers.js` (`scripts/zuch/exchange_probe.mjs`, 6 trains x 9 count pairs, medium quality; +-15 % single-run spread; `low` quality is a few seconds slower in a crowd).
 * `buildTimetable`: follows the expected passengers through the service (`expectedExchange`, same constants as `planFor`; `TS.sim.paxModel` is shared with the shell) and sets `dwell = 1.5 s open lag + 1.05 x exchange + 1.5 s close lag + 4.2 s door cycle + 1 s`, min 18 s, +-2 s jitter (keeps the random stream). A crowd incident of the plan lengthens its stop. Origin: dwell of the first boarding + 5 s, min 40 s.
-* Leg times: `legTravelSeconds` uses the sim's own traction (`tractionModel`: full force to the knee, constant power above, running resistance), the gradient, the rail train's length against limit increases, 90 % of the limit (tram 94 %), the service brake at 0.5 and 3 s per leg for start-up and the last creep. Fitted so that a driver at 85 - 97 % is within about +-5 % of each leg.
+* Leg times: `legTravelSeconds` uses the sim's own traction (`tractionModel`: full force to the knee, constant power above, running resistance), the gradient, the rail train's length against limit increases, 90 % of the limit (tram 94 %), the service brake at 0.5 and 5 s per leg (tram 3 s) for start-up and the last creep. Fitted so that a driver at 85 - 97 % is within about +-5 % of each leg.
 * Early departure: the lever may go to power `EARLY_OK_S` = 10 s before the scheduled time without the `EARLY_FINE` (was: 8 s at the moment the train had moved 3 m, i.e. ~4 s on the lever). Judged at the first power notch after the doors closed (`vis.leaveT`). Late departure is unchanged (fine only above `ON_TIME_S` = 30 s). Lateness of arrival and its payment (`career.js` punctuality) are untouched.
 * `departFreeSec` in the step state; the HUD badge counts down to "Ofaart fräi" (`hudDepFreeIn`) and, when the wait is longer than 6 s, says why ("Fréi do" = ahead of time) next to the scheduled time; the hint line says "you are ahead of time: wait for ...".
 
@@ -21,3 +21,9 @@ Snapshots store the timetable rows (`tt`) and `timetableFrom` restores them verb
 
 ## Not changed
 AI trams (`luxtram-traffic.js` `ONC_DWELL_MS`) keep their own dwell; passengers.js untouched.
+
+## Fares (follow-up)
+The schedules got 10-26 % shorter, so `routeRules.fareScale` (config.js; Luxtram sections in luxtram.js) scales the whole fare of a service (career.js `reward`) by new / old scheduled minutes: EUR per scheduled minute stays within +-1 % on every rail route and tram section (`scripts/zuch/career_probe.mjs` now covers the tram). Prices are unchanged, so runs-to-buy rise by the same factor. Nothing is stored in save data.
+
+## Gradient (follow-up)
+`legTravelSeconds` now lets an uphill pull the speed below the cap (sustainable speed from traction curve - resistance - slope, evaluated under the train's centre) and a downhill helps the brake. The remaining railcar lateness on north / wittlich was not the grade but the per-leg start-up / creep overhead of a slow-accelerating train on short legs: 3 s -> 5 s per leg for rail.
