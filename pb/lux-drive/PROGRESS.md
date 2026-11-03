@@ -147,8 +147,8 @@ Milestone 4 harnesses — it is already a gate):
 | the camera | never below the ground (3.82 m above it) |
 | draw calls / triangles | low 67 / 230 k, medium 74 / 248 k, high 93 / 296 k |
 
-**Still to do in Milestone 2:** the ride height and the kerb behaviour, the check that the car
-cannot drive off the edge of the area, and the black gashes in the ground (see the open bugs).
+**Still to do in Milestone 2:** the ride height and the kerb behaviour, and the check that the car
+cannot drive off the edge of the area.
 
 **How a road is carved in.** There is no ribbon: the ground under the carriageway is mixed towards
 the road bed (the LiDAR DTM along the centre line, smoothed), the kerb is a 13 cm ridge at the edge
@@ -193,14 +193,19 @@ covered (no hole in a road), and the carved road never leaves the ground under i
 `bake_terrain.py` and re-baked: the canopy is now really 16 m (1057 × 929 nodes), which costs
 1 MB more (still 36 % of the budget).
 
-**Open bugs in Milestone 2:**
+**Open bugs in Milestone 2:** none known. The black gashes are fixed (see below), the ride height,
+the kerb behaviour and the edge of the area still have to be measured.
 
-* **Black gashes in the ground.** Seen from the air (the camera 150 m above Place de l'Europe),
-  long thin black strips cut through the ground: they follow the roads and the hillsides. They are
-  not holes in the mesh (the ground behind them is there), but the shading of the very steep quads
-  that the carve produces: a wall of several metres between the road bed and the ground beside it
-  gets a normal that points away from the sun and is painted black. To find out: the normal of the
-  quads next to a carved road, and the light term of the ground shader.
+**The black gashes in the ground — fixed.** Long thin black strips cut through the ground, on the
+roads and on the hillsides. They were not holes in the mesh and not the shading of the steep quads:
+the LOD 0 tiles (the 32 m tiles at 1 m) built their road attributes with a **flat** index over the
+nodes of the physics block, while the mesh reads every node with the **apron** index
+(`(j + 1) * 35 + (i + 1)`, the block carries one node of apron around the tile). The flat array was
+also cut short at 33 × 33 nodes, while the block has 35 × 35 — so the last three rows of every LOD 0
+tile read past the end of the array and came back as **NaN**. The NaN went into the mark flag, then
+into the lane markings, then into the albedo, and `tonemapPaint` turns a NaN into black. The fix is
+in `tile-mesh.js`: the road attributes of a LOD 0 tile are written with the same index the mesh
+reads. Measured after the fix: **0 black pixels** in the whole frame (10 513 before).
 
 ## Milestone 3 — city: NOT STARTED
 

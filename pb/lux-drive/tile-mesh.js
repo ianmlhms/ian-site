@@ -26,15 +26,16 @@ const APRON_SIDE = CELLS + 3;
 /** Node data of a tile (cached by the caller): the heights, the road coverage and the road geometry. */
 export function computeTileNodes(leaf, surface, field) {
   const { x0, z0, step } = leaf;
-  const n = SIDE * SIDE;
   if (step === 1) {
     const b = surface.block(x0 / QUADTREE.minSize, z0 / QUADTREE.minSize);       // same lattice as the physics
-    const road2 = new Float32Array(n * 4);
-    for (let i = 0; i < n; i++) {
-      road2[i * 4] = b.cover[i];
-      road2[i * 4 + 1] = b.lines[i];
-      road2[i * 4 + 2] = 0;                                    // the material is filled in by buildTileMesh (it needs the kind)
-      road2[i * 4 + 3] = 1;                                    // the 1 m lattice draws the markings exactly
+    // the block carries an apron of one node around the tile: the arrays must be read with the same index the mesh uses
+    // (buildTileMesh reads every node with the apron index), otherwise the last rows read past the end and come back as NaN
+    const road2 = new Float32Array(APRON_SIDE * APRON_SIDE * 4);
+    for (let o = 0; o < APRON_SIDE * APRON_SIDE; o++) {
+      road2[o * 4] = b.cover[o];
+      road2[o * 4 + 1] = b.lines[o];
+      road2[o * 4 + 2] = 0;                                    // the material is filled in by buildTileMesh (it needs the kind)
+      road2[o * 4 + 3] = 1;                                    // the 1 m lattice draws the markings exactly
     }
     return { h: b.h, lat: b.lat, hw: b.hw, a0: b.a0, kind: b.kind, along: b.along, road2, shared: true };
   }
