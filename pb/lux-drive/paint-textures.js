@@ -194,6 +194,25 @@ function litter(size, seed) {
   return c;
 }
 
+/** The clouds of the sky: soft white cumulus on the blue of the sky. The painted tile (data/tex/sky.webp, the same
+ *  file the MTB engine uses) replaces this canvas before the first frame; this is the fallback when it is missing. */
+function sky(size, seed) {
+  const rng = createRng(seed), c = canvas(size), ctx = c.getContext('2d');
+  ctx.fillStyle = 'rgb(112,166,214)'; ctx.fillRect(0, 0, size, size);
+  for (let i = 0; i < 90; i++) {
+    const x = rng() * size, y = rng() * size, r = size * (0.04 + rng() * 0.10);
+    wrapped(ctx, size, x, y, r, (g, px, py) => {
+      const grad = g.createRadialGradient(px, py - r * 0.22, r * 0.08, px, py, r);
+      grad.addColorStop(0, 'rgba(255,255,255,0.95)');
+      grad.addColorStop(0.55, 'rgba(238,240,246,0.62)');
+      grad.addColorStop(1, 'rgba(214,220,232,0)');
+      g.fillStyle = grad;
+      g.beginPath(); g.ellipse(px, py, r, r * 0.72, 0, 0, TAU); g.fill();
+    });
+  }
+  return c;
+}
+
 /** Tileable noise: R fbm(low) G fbm(mid) B fbm(high) A ridged. Periodic value noise. */
 function noiseData(size, seed) {
   const rng = createRng(seed);
@@ -221,6 +240,22 @@ function noiseData(size, seed) {
   return data;
 }
 
+/* The painted sky tile (data/tex/sky.webp): a hand-painted sky with white cumulus clouds, the same file the MTB engine
+ * uses (pb/mtb/data/tex/sky.webp - it is a copy of it, the file is committed with the repo). The sky shader reads it as
+ * uSkyPaint; with the RGB noise texture instead the clouds were the coloured specks (purple, red, blue) the reviewer saw:
+ * the channels of the noise are independent, so every cloud got a colour of its own. */
+const TEX_URL = new URL('./data/tex/', import.meta.url);
+
+function loadImage(name) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.decoding = 'async';
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(`texture ${name} failed to load`));
+    img.src = new URL(`${name}.webp?v=1`, TEX_URL).href;
+  });
+}
+
 /** Builds all textures. `renderer` supplies the anisotropy limit. */
 export function createPaintTextures(renderer, quality) {
   const THREE = T();
@@ -244,10 +279,13 @@ export function createPaintTextures(renderer, quality) {
   const textures = {
     asphalt: make(asphalt(size, 21)), pavement: make(pavement(size, 22)), cobble: make(cobble(size, 23)),
     gravel: make(gravel(size, 24)), ground: make(ground(size, 25)), litter: make(litter(size, 26)),
-    stone: make(stone(size, 27)), noise, size,
+    stone: make(stone(size, 27)), sky: make(sky(size, 28)), noise, size,
   };
-  textures.ready = Promise.resolve(textures);
+  // the painted cloud tile replaces the canvas before the first frame; a missing file never breaks the game
+  textures.ready = loadImage('sky')
+    .then((img) => { textures.sky.image = img; textures.sky.needsUpdate = true; return textures; })
+    .catch((error) => { console.warn('[luxdrive] painted sky missing, using the canvas fallback:', error); return textures; });
   return textures;
 }
 
-export { asphalt as drawAsphalt, pavement as drawPavement, cobble as drawCobble, gravel as drawGravel, ground as drawGround, litter as drawLitter, stone as drawStone };
+export { asphalt as drawAsphalt, pavement as drawPavement, cobble as drawCobble, gravel as drawGravel, ground as drawGround, litter as drawLitter, stone as drawStone, sky as drawSky };

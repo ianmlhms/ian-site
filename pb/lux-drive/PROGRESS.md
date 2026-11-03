@@ -292,6 +292,21 @@ The flow `luxdrive-world` still passes after the change: the baked data 10.88 MB
 the painted width of 14 sampled roads, the kerb, the three bridges, the edge of the area and the
 draw calls (67 / 74 / 93 at low / medium / high).
 
+### Fix 3 — the sky: the clouds were coloured specks: DONE
+
+The sky shader of Lux Drive is the MTB one, line for line (the two `env.js` files differ only in the season, the lamp
+and the storage keys). The difference was the *texture* behind `uSkyPaint`: the MTB paints its clouds from the
+hand-painted tile `pb/mtb/data/tex/sky.webp` (a blue sky with white cumulus), Lux Drive left the RGB **noise**
+texture in the uniform. The three channels of the noise are independent, so every cloud got a colour of its own —
+the purple, red and blue specks of the reviewer's screenshot.
+
+That file is now copied to `pb/lux-drive/data/tex/sky.webp` (26 926 B) and bound to the uniform in `main.js`
+(`env.uniforms.uSkyPaint.value = textures.sky`, as the MTB does). `paint-textures.js` loads it before the first
+frame; if the file is missing the canvas fallback (white cumulus on the blue of the sky) stays and the game runs.
+
+The check: the flow `luxdrive-world` reads the uniform back and asks the texture whether it is the painted picture
+(`IMG`, 512 px) or the noise (`data`).
+
 ## Milestone 3 — city: NOT STARTED
 ## Milestone 4 — gates: NOT STARTED
 

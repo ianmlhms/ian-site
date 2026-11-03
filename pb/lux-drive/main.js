@@ -121,6 +121,7 @@ async function boot() {
     noiseTexture: textures.noise,
     params: { time: param('time') || undefined, weather: param('weather') || undefined },
   });
+  env.uniforms.uSkyPaint.value = textures.sky;                      // the painted cloud tile (the noise texture made coloured specks)
   scene.add(env.sky);
   const groundFull = createGroundMaterial(THREE, env, textures, worldMaps, WORLD, false);
   const groundCheap = createGroundMaterial(THREE, env, textures, worldMaps, WORLD, true);

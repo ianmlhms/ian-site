@@ -41,6 +41,15 @@ export const flow = {
     h.expect(info.y >= info.ground - 0.01 && info.y <= info.ground + 1.2, `the car stands on the ground (${info.y.toFixed(2)} vs ${info.ground.toFixed(2)})`);
     await h.shot("boot");
 
+    h.step("the sky: the clouds are the painted white tile, not the coloured noise");
+    const sky = await page.evaluate(() => {
+      const paint = window.__lux.env.uniforms.uSkyPaint.value;
+      const img = paint.image;
+      return { kind: img && img.tagName ? img.tagName : "data", w: (img && img.width) || 0 };
+    });
+    h.eq(sky.kind, "IMG", "the cloud tile is the painted picture (data/tex/sky.webp)");
+    h.expect(sky.w >= 256, `the cloud tile is ${sky.w} px wide`);
+
     h.step("the car drives: the throttle moves it forward on the road");
     const drive = await page.evaluate(async () => {
       const m = window.__lux;
