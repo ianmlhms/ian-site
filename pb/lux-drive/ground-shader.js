@@ -26,7 +26,7 @@ export const GROUND_VERTEX = `
 
 export const GROUND_FRAGMENT = `
   precision highp float;
-  uniform sampler2D uAsphalt, uPavement, uCobble, uGravel, uGround, uLitter, uNoise, uClass, uCanopy;
+  uniform sampler2D uAsphalt, uPavement, uCobble, uGravel, uStone, uGround, uLitter, uNoise, uClass, uCanopy;
   uniform vec2 uWorldSize;
   uniform vec2 uWind;
   uniform float uKerbWidth;
@@ -79,8 +79,12 @@ export const GROUND_FRAGMENT = `
     vec3 pave = texture2D(uPavement, P * 0.46).rgb;
     vec3 cob = texture2D(uCobble, P * 0.40).rgb;
     vec3 grav = texture2D(uGravel, P * 0.55).rgb;
-    vec3 surf = surface < 0.5 ? tar : surface < 1.5 ? cob : surface < 2.5 ? pave : grav;
-    float kerbW = (surface < 1.5) ? uKerbWidth : 0.0;
+    // the paved stone of the squares: the slow noise breaks the tiling up, a square is a calm surface
+    vec3 stn = texture2D(uStone, P * 0.30).rgb * (0.93 + 0.14 * nLo.g);
+    // the material of the way the node is on: 0 tarmac, 1 cobbles, 2 concrete, 3 gravel, 4 earth, 5 paved stone
+    vec3 surf = surface < 0.5 ? tar : surface < 1.5 ? cob : surface < 2.5 ? pave : surface < 4.5 ? grav : stn;
+    // the kerb belongs to the materials that have one (the tarmac, the cobbles, the concrete)
+    float kerbW = (surface < 2.5) ? uKerbWidth : 0.0;
     float onCarriage = 1.0 - smoothstep(hw - 0.05, hw + 0.05, al);
     float onKerb = smoothstep(hw - 0.02, hw + 0.04, al) * (1.0 - smoothstep(hw + kerbW - 0.02, hw + kerbW + 0.04, al));
     float onPave = smoothstep(hw + kerbW - 0.02, hw + kerbW + 0.04, al) * (1.0 - smoothstep(a0 - 0.06, a0 + 0.06, al));
@@ -119,7 +123,8 @@ export function createGroundMaterial(THREE, env, textures, worldMaps, worldSize,
   const uniforms = {
     ...env.uniforms,
     uAsphalt: { value: textures.asphalt }, uPavement: { value: textures.pavement }, uCobble: { value: textures.cobble },
-    uGravel: { value: textures.gravel }, uGround: { value: textures.ground }, uLitter: { value: textures.litter },
+    uGravel: { value: textures.gravel }, uStone: { value: textures.stone },
+    uGround: { value: textures.ground }, uLitter: { value: textures.litter },
     uNoise: { value: textures.noise }, uClass: { value: worldMaps.class }, uCanopy: { value: worldMaps.canopy },
     uKerbWidth: { value: ROAD.kerbWidth },
     uWorldSize: { value: new THREE.Vector2(worldSize.width, worldSize.depth) },

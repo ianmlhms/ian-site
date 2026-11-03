@@ -68,6 +68,7 @@ export const SURFACES = Object.freeze({
   asphalt: { crr: 0.013, grip: 1.0, rough: 0.0, wetLoss: 0.3 },
   cobble: { crr: 0.02, grip: 0.92, rough: 0.12, wetLoss: 0.32 },
   concrete: { crr: 0.015, grip: 0.96, rough: 0.03, wetLoss: 0.28 },
+  stone: { crr: 0.014, grip: 0.97, rough: 0.02, wetLoss: 0.29 },
   gravel: { crr: 0.022, grip: 0.82, rough: 0.14, wetLoss: 0.2 },
   grass: { crr: 0.055, grip: 0.68, rough: 0.16, wetLoss: 0.24 },
   dirt: { crr: 0.045, grip: 0.72, rough: 0.14, wetLoss: 0.18 },

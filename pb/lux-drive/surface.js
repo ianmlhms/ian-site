@@ -31,22 +31,23 @@ export function createSurface(field) {
     const hw = new Float32Array(SIDE * SIDE);            // the half width of its carriageway
     const a0 = new Float32Array(SIDE * SIDE);            // the outer edge of its pavement
     const kind = new Uint8Array(SIDE * SIDE);           // the class of that road
+    const surface = new Uint8Array(SIDE * SIDE);        // the material of that road (the code the shader switches on)
     const road = new Int32Array(SIDE * SIDE);            // its index in the road list (-1: no road)
     const lines = new Uint8Array(SIDE * SIDE);           // the style of its lane markings
     const lanes = new Uint8Array(SIDE * SIDE);           // how many lanes it has
     const along = new Float32Array(SIDE * SIDE);         // the distance along its centre line
     const x0 = bx * BLOCK, z0 = bz * BLOCK;
-    const info = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, lines: 0, lanes: 0, s: 0 };
+    const info = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, lines: 0, lanes: 0, s: 0, surface: 0 };
     for (let j = 0; j < SIDE; j++) {
       for (let i = 0; i < SIDE; i++) {
         const o = j * SIDE + i;
         h[o] = field.height(x0 + i - APRON, z0 + j - APRON, info);
         cover[o] = info.coverage; lat[o] = info.lat; hw[o] = info.hw; a0[o] = info.a0;
-        kind[o] = info.kind; road[o] = info.road; lines[o] = info.lines;
+        kind[o] = info.kind; road[o] = info.road; lines[o] = info.lines; surface[o] = info.surface;
         lanes[o] = info.lanes; along[o] = info.s;
       }
     }
-    b = { bx, bz, x0, z0, h, cover, lat, hw, a0, kind, road, lines, lanes, along, side: SIDE, apron: APRON };
+    b = { bx, bz, x0, z0, h, cover, lat, hw, a0, kind, surface, road, lines, lanes, along, side: SIDE, apron: APRON };
     blocks.set(k, b);
     if (blocks.size > MAX_BLOCKS) blocks.delete(blocks.keys().next().value);
     return b;
@@ -85,7 +86,7 @@ export function createSurface(field) {
     return out;
   }
 
-  /** The road at (x, z), read from the nearest lattice node: { coverage, lat, hw, a0, kind, road, lines, lanes, s }. */
+  /** The road at (x, z), read from the nearest lattice node: { coverage, lat, hw, a0, kind, surface, road, lines, lanes, s }. */
   function roadInfoAt(x, z, out) {
     const gx = Math.floor(x), gz = Math.floor(z);
     const bx = Math.floor(gx / BLOCK), bz = Math.floor(gz / BLOCK);
@@ -93,7 +94,7 @@ export function createSurface(field) {
     const i = gx - bx * BLOCK + APRON, j = gz - bz * BLOCK + APRON;
     const o = j * SIDE + i;
     out.coverage = b.cover[o]; out.lat = b.lat[o]; out.hw = b.hw[o]; out.a0 = b.a0[o];
-    out.kind = b.kind[o]; out.road = b.road[o]; out.lines = b.lines[o];
+    out.kind = b.kind[o]; out.surface = b.surface[o]; out.road = b.road[o]; out.lines = b.lines[o];
     out.lanes = b.lanes[o]; out.s = b.along[o];
     return out;
   }

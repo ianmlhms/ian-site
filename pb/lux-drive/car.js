@@ -7,7 +7,7 @@
  * The heading convention: forward = (cos h, sin h) in (x east, z south) - the same as the MTB engine and the baked road yaw.
  * A positive steer input turns right (from +x towards +z). */
 import { CAR, SURFACES } from './config.js';
-import { ROAD_KINDS, kindInfo } from './roads.js';
+import { ROAD_KINDS, SURFACE_NAMES, kindInfo } from './roads.js';
 
 const GRAVITY = 9.81;
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
@@ -15,8 +15,6 @@ const lerp = (a, b, t) => a + (b - a) * t;
 /** Moves `v` towards `target` by at most `maxDelta`. */
 const approach = (v, target, maxDelta) => (v < target ? Math.min(v + maxDelta, target) : Math.max(v - maxDelta, target));
 const wrapAngle = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
-/** The material of the tyres on a road class (and off the roads). */
-const SURFACE_OF = Object.freeze(Object.fromEntries(ROAD_KINDS.map((k) => [k, kindInfo(k).surface])));
 
 export function createCar({ ground, roadInfoAt, collide = null, start = null }) {
   const state = {
@@ -28,7 +26,7 @@ export function createCar({ ground, roadInfoAt, collide = null, start = null }) 
     onRoad: false, surface: 'grass', speedLimit: CAR.maxSpeed, gear: 0, rpm: 0.1,
     crashed: false, crashTime: 0,
   };
-  const info = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, lines: 0, lanes: 0, s: 0 };
+  const info = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, surface: 0, road: -1, lines: 0, lanes: 0, s: 0 };
   const normal = { x: 0, y: 1, z: 0 };
   let steerAngle = 0;
   let accumulator = 0;
@@ -52,7 +50,8 @@ export function createCar({ ground, roadInfoAt, collide = null, start = null }) 
     roadInfoAt(state.x, state.z, info);
     const onRoad = info.coverage > 0.35;
     const kindName = onRoad ? ROAD_KINDS[info.kind] : null;
-    const surfaceName = onRoad ? (SURFACE_OF[kindName] || 'asphalt') : 'grass';
+    // the material under the tyres is the material of the way itself (the OSM surface tag), not the class default
+    const surfaceName = onRoad ? (SURFACE_NAMES[info.surface] || 'asphalt') : 'grass';
     const surf = SURFACES[surfaceName] || SURFACES.asphalt;
     const limitShare = onRoad ? (kindInfo(kindName).speed || 0.5) : 0.4;      // off the roads the car is slow
     const topSpeed = CAR.maxSpeed * limitShare;

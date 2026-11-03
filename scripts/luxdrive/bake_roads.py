@@ -14,7 +14,8 @@ roads.bin layout (little endian):
     u32 count
     per road:
       u16 kind        (see ROAD_KINDS below)
-      u16 flags       bit0 bridge, bit1 tunnel, bit2 oneway, bit3 roundabout
+      u16 flags       bit0 bridge, bit1 tunnel, bit2 oneway, bit3 roundabout,
+                     bits 4-7 the material of the way (0 = the default of the class, else the code + 1)
       i16 layer       (OSM layer: +1 above the ground, -1 below)
       u16 lanes       (total lanes of the way, both directions unless one-way)
       u16 nameId      (index into names.json, 0xffff = none)
@@ -76,6 +77,21 @@ FLAG_BRIDGE = 1
 FLAG_TUNNEL = 2
 FLAG_ONEWAY = 4
 FLAG_ROUNDABOUT = 8
+FLAG_SURFACE_SHIFT = 4        # bits 4-7 hold the material of the way (0 = the default of the class)
+
+# The material of a way: the OSM surface tag says what it is really made of.  The classes have a default
+# (the browser knows it), the tag overrides it: a street with surface=sett is cobbled, a pedestrian area with
+# surface=paving_stones is paved.  The codes are the ones the ground shader switches on.
+SURFACE_CODES = {'asphalt': 0, 'cobble': 1, 'concrete': 2, 'gravel': 3, 'dirt': 4, 'stone': 5}
+SURFACE_BY_TAG = {
+    'asphalt': 'asphalt', 'bitumen': 'asphalt', 'tarmac': 'asphalt',
+    'cobblestone': 'cobble', 'cobble': 'cobble', 'sett': 'cobble', 'setts': 'cobble',
+    'unhewn_cobblestone': 'cobble', 'pebblestone': 'cobble',
+    'concrete': 'concrete', 'concrete:lanes': 'concrete', 'concrete:plates': 'concrete',
+    'paving_stones': 'stone', 'paved': 'stone', 'tiles': 'stone', 'slabs': 'stone', 'brick': 'stone',
+    'gravel': 'gravel', 'fine_gravel': 'gravel', 'unpaved': 'gravel', 'compacted': 'gravel',
+    'dirt': 'dirt', 'earth': 'dirt', 'ground': 'dirt', 'mud': 'dirt', 'grass': 'dirt', 'sand': 'dirt',
+}
 SIMPLIFY_M = 0.3
 NO_NAME = 0xffff
 
@@ -265,6 +281,10 @@ def main():
             stats["oneway"] += 1
         if tags.get("junction") == "roundabout":
             flags |= FLAG_ROUNDABOUT
+        # the material of the way: the OSM surface tag (0 = the default of the class, the browser knows it)
+        surf_name = SURFACE_BY_TAG.get((tags.get("surface") or "").strip().lower())
+        if surf_name:
+            flags |= (SURFACE_CODES[surf_name] + 1) << FLAG_SURFACE_SHIFT
         layer = int(tags.get("layer", 0) or 0)
         # the name: Luxembourgish first
         nm = tags.get("name:lb") or tags.get("name") or tags.get("name:de") or tags.get("name:fr") or ""

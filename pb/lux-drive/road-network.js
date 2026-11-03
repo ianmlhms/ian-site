@@ -69,7 +69,7 @@ function gaussianSmooth(values, sigmaSamples) {
 export function createRoadNetwork(roads, baseHeight) {
   const segAx = [], segAz = [], segBx = [], segBz = [], segB0 = [], segB1 = [];
   const segHw = [], segKerbH = [], segKerbW = [], segPw = [], segA0 = [], segR = [];
-  const segKind = [], segRoad = [], segKerbOn = [], segLines = [], segS0 = [], segS1 = [];
+  const segKind = [], segRoad = [], segKerbOn = [], segLines = [], segS0 = [], segS1 = [], segSurf = [];
   const sampleX = [], sampleZ = [], sampleRoad = [];
   const info = [];
   const firstSample = [];            // the index of a road's first sample in the sample arrays
@@ -85,7 +85,8 @@ export function createRoadNetwork(roads, baseHeight) {
     if (!road.info.drivable || road.tunnel || road.bridge) continue;
     const kind = kindInfo(road.kind);
     const hw = Math.max(0.8, road.width / 2);
-    const kerbH = KERB_SURFACES.has(kind.surface) ? ROAD.kerbHeight : 0;
+    // the kerb belongs to the material of the way itself: a cobbled street has one, a paved area has none
+    const kerbH = KERB_SURFACES.has(road.surface || kind.surface) ? ROAD.kerbHeight : 0;
     const kerbW = kerbH > 0 ? ROAD.kerbWidth : 0;
     const pw = Math.max(0, road.sidewalk);
     const a0 = hw + kerbW + pw;
@@ -122,6 +123,7 @@ export function createRoadNetwork(roads, baseHeight) {
       segA0.push(a0); segR.push(radius);
       segKind.push(kindCode); segRoad.push(ri); segKerbOn.push(1);
       segLines.push(kind.lines); segS0.push(along[i]); segS1.push(along[i + 1]);
+      segSurf.push(road.surfaceCode ?? 0);
     }
     for (let i = 0; i < n; i++) { sampleX.push(rs.x[i]); sampleZ.push(rs.z[i]); sampleRoad.push(ri); }
     segCount[ri] = n - 1;
@@ -134,6 +136,7 @@ export function createRoadNetwork(roads, baseHeight) {
   const HW = Float32Array.from(segHw), KERBH = Float32Array.from(segKerbH), KERBW = Float32Array.from(segKerbW);
   const PW = Float32Array.from(segPw), A0 = Float32Array.from(segA0), RAD = Float32Array.from(segR);
   const KIND = Uint8Array.from(segKind), ROADOF = Int32Array.from(segRoad);
+  const SURF = Uint8Array.from(segSurf);
   const KERBON = Uint8Array.from(segKerbOn);
   const LINES = Uint8Array.from(segLines);
   const S0 = Float32Array.from(segS0), S1 = Float32Array.from(segS1);
@@ -199,7 +202,7 @@ export function createRoadNetwork(roads, baseHeight) {
   }
 
   // ---- the query ---------------------------------------------------------
-  const scratch = { coverage: 0, bed: 0, kerb: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, dist: 0, lines: 0, lanes: 0, s: 0 };
+  const scratch = { coverage: 0, bed: 0, kerb: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, dist: 0, lines: 0, lanes: 0, s: 0, surface: 0 };
   const LEVEL_FULL = 2.5;           // m: a road shapes the ground that lies at its own level (within this)
   const LEVEL_FADE = 5.0;           // m: ... and its influence is gone at this distance (a road on the ledge 30 m
                                     // above must not cover the ground below it). The fade is soft: a hard cut would
@@ -214,6 +217,7 @@ export function createRoadNetwork(roads, baseHeight) {
    *   hw       the half width of the carriageway of that road
    *   a0       the outer edge of the pavement (the carriageway + the kerb + the pavement)
    *   kind     the class code of that road, road its index, dist the distance to it
+   *   surface  the material of that road (the code the ground shader switches on)
    *
    * The contributions of the roads near the point are SUMMED, not "the nearest one wins" (the way the MTB engine
    * carves its trails): where two roads meet their beds are averaged, so a junction has no step, and where one road
@@ -266,7 +270,7 @@ export function createRoadNetwork(roads, baseHeight) {
     }
     if (best < 0) {
       out.coverage = 0; out.bed = 0; out.kerb = 0; out.lat = 0; out.hw = 0; out.a0 = 0; out.kind = 0; out.road = -1;
-      out.dist = Infinity; out.lines = 0; out.lanes = 0; out.s = 0;
+      out.dist = Infinity; out.lines = 0; out.lanes = 0; out.s = 0; out.surface = 0;
       return out;
     }
     out.coverage = Math.min(1, covSum);
@@ -282,6 +286,7 @@ export function createRoadNetwork(roads, baseHeight) {
     out.a0 = A0[best];
     out.kind = KIND[best];
     out.road = ROADOF[best];
+    out.surface = SURF[best];
     out.lines = LINES[best];
     out.lanes = info[ROADOF[best]].lanes;
     out.s = S0[best] + (S1[best] - S0[best]) * bestT;      // the distance along the centre line of that road
@@ -303,7 +308,7 @@ export function createRoadNetwork(roads, baseHeight) {
 
   return {
     carve, nearestRoad, roads, info, count, scratch,
-    segments: { X0, Z0, X1, Z1, BED0, BED1, HW, KERBH, KERBW, PW, A0, RAD, KIND, ROADOF, KERBON, LINES, S0, S1 },
+    segments: { X0, Z0, X1, Z1, BED0, BED1, HW, KERBH, KERBW, PW, A0, RAD, KIND, ROADOF, KERBON, LINES, S0, S1, SURF },
     // the centre lines as they are carved (resampled and rounded): the game, the minimap and the probes follow these
     samples: { x: SAMPLES_X, z: SAMPLES_Z, road: SAMPLES_ROAD, first: firstSample, segs: segCount },
   };

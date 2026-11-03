@@ -13,6 +13,7 @@ export const FLAG_BRIDGE = 1;
 export const FLAG_TUNNEL = 2;
 export const FLAG_ONEWAY = 4;
 export const FLAG_ROUNDABOUT = 8;
+export const FLAG_SURFACE_SHIFT = 4;       // bits 4-7 hold the material of the way (0 = the default of the class)
 const NO_NAME = 0xffff;
 const DECIMETRE = 0.1;
 
@@ -34,7 +35,7 @@ const INFO = {
   unclassified: { drivable: true, surface: 'asphalt', lines: 0, speed: 0.6 },
   residential: { drivable: true, surface: 'asphalt', lines: 0, speed: 0.55 },
   living_street: { drivable: true, surface: 'cobble', lines: 0, speed: 0.28 },
-  pedestrian: { drivable: true, surface: 'cobble', lines: 3, speed: 0.25 },
+  pedestrian: { drivable: true, surface: 'stone', lines: 3, speed: 0.25 },
   service: { drivable: true, surface: 'asphalt', lines: 0, speed: 0.4 },
   busway: { drivable: true, surface: 'asphalt', lines: 0, speed: 0.45 },
   road: { drivable: true, surface: 'asphalt', lines: 0, speed: 0.5 },
@@ -48,8 +49,12 @@ const INFO = {
 
 export const kindInfo = (kind) => INFO[kind] || { drivable: false, surface: 'dirt', lines: 3, speed: 0 };
 
-/* The material of a road, as the number the ground shader switches on. */
-export const SURFACE_CODES = Object.freeze({ asphalt: 0, cobble: 1, concrete: 2, gravel: 3, dirt: 4 });
+/* The material of a road, as the number the ground shader switches on.  The OSM surface tag of the way
+ * overrides the default of its class: a street with surface=sett is cobbled, a pedestrian area with
+ * surface=paving_stones is paved. */
+export const SURFACE_CODES = Object.freeze({ asphalt: 0, cobble: 1, concrete: 2, gravel: 3, dirt: 4, stone: 5 });
+/* The same materials, the other way round. */
+export const SURFACE_NAMES = Object.freeze(Object.keys(SURFACE_CODES));
 /* The material of every class, indexed by the class code the road network carries. */
 export const KIND_SURFACE = Object.freeze(ROAD_KINDS.map((k) => SURFACE_CODES[kindInfo(k).surface] ?? 0));
 
@@ -67,9 +72,11 @@ const unzigzag = (n) => (n % 2 === 0 ? n / 2 : -(n + 1) / 2);
 
 /**
  * roads.bin + names.json -> [{ id, kind, info, bridge, tunnel, oneway, roundabout, layer, lanes, name,
- *                             width, sidewalk, offset, length, pts: [[x, z], ...] }]
+ *                             width, sidewalk, offset, length, pts: [[x, z], ...], surface, surfaceCode }]
  * `offset` is the distance from the centre line to the centre of the right-hand lane (Luxembourg drives on the right);
  * a car travelling against the way drives on the other side, at -offset.
+ * `surface` is the material of the way ('asphalt', 'stone', 'cobble', ...): the OSM surface tag of the way, or the
+ * default of its class.
  */
 export function decodeRoads(bin, names) {
   const view = new DataView(bin.buffer, bin.byteOffset, bin.byteLength);
@@ -97,13 +104,17 @@ export function decodeRoads(bin, names) {
     }
     const kind = ROAD_KINDS[kindCode] || 'road';
     const info = kindInfo(kind);
+    // the material of the way: the OSM surface tag of the way, else the default of its class
+    const surfBits = (flags >> FLAG_SURFACE_SHIFT) & 15;
+    const surfaceCode = surfBits ? surfBits - 1 : (SURFACE_CODES[info.surface] ?? 0);
+    const surface = SURFACE_NAMES[surfaceCode] || 'asphalt';
     let length = 0;
     for (let i = 1; i < pts.length; i++) length += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
     roads.push({
       id: r, kind, info, bridge: (flags & FLAG_BRIDGE) !== 0, tunnel: (flags & FLAG_TUNNEL) !== 0,
       oneway: (flags & FLAG_ONEWAY) !== 0, roundabout: (flags & FLAG_ROUNDABOUT) !== 0,
       layer, lanes, name: nameId === NO_NAME ? '' : (names[nameId] || ''),
-      width, sidewalk, offset, length, pts,
+      width, sidewalk, offset, length, pts, surface, surfaceCode,
     });
   }
   return roads;

@@ -30,7 +30,7 @@ export function createHeightField({ near, far, roads }) {
   }
 
   /** Full height and, through `info`, the road at this point (coverage 0..1, the signed offset from the centre
-   *  line, the half width of the carriageway, the outer edge of the pavement, the class of the road). */
+   *  line, the half width of the carriageway, the outer edge of the pavement, the class and the material of the road). */
   function height(x, z, info) {
     const g = groundHeight(x, z);
     network.carve(x, z, scratch, g);
@@ -38,7 +38,7 @@ export function createHeightField({ near, far, roads }) {
     if (info) {
       info.coverage = c; info.lat = scratch.lat; info.hw = scratch.hw; info.a0 = scratch.a0;
       info.kind = scratch.kind; info.road = scratch.road; info.lines = scratch.lines;
-      info.lanes = scratch.lanes; info.s = scratch.s;
+      info.lanes = scratch.lanes; info.s = scratch.s; info.surface = scratch.surface;
     }
     if (c <= 0) return g;
     return g * (1 - c) + scratch.bed * c + scratch.kerb;
@@ -57,7 +57,7 @@ export function createHeightField({ near, far, roads }) {
       info.coverage = c * paintK;
       info.lat = scratch.lat; info.hw = scratch.hw; info.a0 = scratch.a0;
       info.kind = scratch.kind; info.road = scratch.road; info.lines = scratch.lines;
-      info.lanes = scratch.lanes; info.s = scratch.s;
+      info.lanes = scratch.lanes; info.s = scratch.s; info.surface = scratch.surface;
     }
     const cc = c * carveK;
     if (cc <= 0) return g;

@@ -13,7 +13,6 @@
  *                             exactly the fine markings are drawn (a 4 m lattice cannot resolve a 15 cm line) */
 import { QUADTREE, ROAD } from './config.js';
 import { diagonalIsMain } from './surface.js';
-import { KIND_SURFACE } from './roads.js';
 import { tilesTouching, leafAt } from './quadtree.js';
 import { fadeOf } from './heightfield.js';
 
@@ -34,29 +33,31 @@ export function computeTileNodes(leaf, surface, field) {
     for (let o = 0; o < APRON_SIDE * APRON_SIDE; o++) {
       road2[o * 4] = b.cover[o];
       road2[o * 4 + 1] = b.lines[o];
-      road2[o * 4 + 2] = 0;                                    // the material is filled in by buildTileMesh (it needs the kind)
+      road2[o * 4 + 2] = b.surface[o];                         // the material of the road the node is on
       road2[o * 4 + 3] = 1;                                    // the 1 m lattice draws the markings exactly
     }
-    return { h: b.h, lat: b.lat, hw: b.hw, a0: b.a0, kind: b.kind, along: b.along, road2, shared: true };
+    return { h: b.h, lat: b.lat, hw: b.hw, a0: b.a0, kind: b.kind, surface: b.surface, along: b.along, road2, shared: true };
   }
   const h = new Float32Array(APRON_SIDE * APRON_SIDE);
   const lat = new Float32Array(APRON_SIDE * APRON_SIDE);
   const hw = new Float32Array(APRON_SIDE * APRON_SIDE);
   const a0 = new Float32Array(APRON_SIDE * APRON_SIDE);
   const kind = new Uint8Array(APRON_SIDE * APRON_SIDE);
+  const surf = new Uint8Array(APRON_SIDE * APRON_SIDE);      // the material of the road the node is on
   const along = new Float32Array(APRON_SIDE * APRON_SIDE);
   const road2 = new Float32Array(APRON_SIDE * APRON_SIDE * 4);
-  const info = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, lines: 0, lanes: 0, s: 0 };
+  const info = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, lines: 0, lanes: 0, s: 0, surface: 0 };
   const mark = fadeOf(step, ROAD.markFullStep, ROAD.markFadeStep);
   for (let j = 0; j < APRON_SIDE; j++) {
     for (let i = 0; i < APRON_SIDE; i++) {
       const o = j * APRON_SIDE + i;
       h[o] = field.heightForStep(x0 + (i - 1) * step, z0 + (j - 1) * step, step, info);
       lat[o] = info.lat; hw[o] = info.hw; a0[o] = info.a0; kind[o] = info.kind; along[o] = info.s;
+      surf[o] = info.surface;
       road2[o * 4] = info.coverage; road2[o * 4 + 1] = info.lines; road2[o * 4 + 3] = mark;
     }
   }
-  return { h, lat, hw, a0, kind, along, road2, shared: false };
+  return { h, lat, hw, a0, kind, surface: surf, along, road2, shared: false };
 }
 
 /** Value of the coarser tile T's edge polyline at the boundary point (x, z) (T's spacing grid is aligned to multiples of its step). */
@@ -115,7 +116,7 @@ export function stitchSignature(leaf, split) {
  */
 export function buildTileMesh(leaf, nodes, split, field) {
   const { x0, z0, step, size } = leaf;
-  const h = nodes.h, lat = nodes.lat, hw = nodes.hw, a0 = nodes.a0, kind = nodes.kind, along = nodes.along;
+  const h = nodes.h, lat = nodes.lat, hw = nodes.hw, a0 = nodes.a0, surface = nodes.surface, along = nodes.along;
   const vertexCount = SIDE * SIDE;
   const skirtVerts = 4 * SIDE;
   const positions = new Float32Array((vertexCount + skirtVerts) * 3);
@@ -140,7 +141,7 @@ export function buildTileMesh(leaf, nodes, split, field) {
       normals[v * 3] = -dhdx * inv; normals[v * 3 + 1] = inv; normals[v * 3 + 2] = -dhdz * inv;
       road[v * 4] = lat[a]; road[v * 4 + 1] = hw[a]; road[v * 4 + 2] = a0[a]; road[v * 4 + 3] = along[a];
       road2[v * 4] = nodes.road2[a * 4]; road2[v * 4 + 1] = nodes.road2[a * 4 + 1];
-      road2[v * 4 + 2] = KIND_SURFACE[kind[a]];
+      road2[v * 4 + 2] = surface[a];                        // the material of the road the node is on
       road2[v * 4 + 3] = nodes.road2[a * 4 + 3];
     }
   }

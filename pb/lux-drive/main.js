@@ -137,7 +137,7 @@ async function boot() {
 
   // ---- the car, the camera, the interface
   const start = data.places.start || { x: WORLD.width / 2, z: WORLD.depth / 2, yaw: 0 };
-  const roadInfo = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, lines: 0, lanes: 0, s: 0 };
+  const roadInfo = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, surface: 0, road: -1, lines: 0, lanes: 0, s: 0 };
   const collide = (x, z, radius) => buildings.collide(x, z, radius) || portals.collide(x, z, radius) || playArea.collide(x, z, radius);
   const car = createCar({ ground, roadInfoAt: (x, z, out) => surface.roadInfoAt(x, z, out), collide, start });
   const chase = createChaseCamera(ground, (x, z, radius) => buildings.collide(x, z, radius));

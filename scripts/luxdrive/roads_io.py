@@ -18,6 +18,18 @@ FLAG_BRIDGE = 1
 FLAG_TUNNEL = 2
 FLAG_ONEWAY = 4
 FLAG_ROUNDABOUT = 8
+FLAG_SURFACE_SHIFT = 4        # bits 4-7 hold the material of the way (0 = the default of the class)
+
+# the material of a way, as the number the ground shader switches on
+SURFACE_NAMES = ['asphalt', 'cobble', 'concrete', 'gravel', 'dirt', 'stone']
+CLASS_SURFACE = {              # the default of every class (the same table as the browser, roads.js)
+    'motorway': 'asphalt', 'motorway_link': 'asphalt', 'trunk': 'asphalt', 'trunk_link': 'asphalt',
+    'primary': 'asphalt', 'primary_link': 'asphalt', 'secondary': 'asphalt', 'secondary_link': 'asphalt',
+    'tertiary': 'asphalt', 'tertiary_link': 'asphalt', 'unclassified': 'asphalt', 'residential': 'asphalt',
+    'living_street': 'cobble', 'pedestrian': 'stone', 'service': 'asphalt', 'busway': 'asphalt',
+    'road': 'asphalt', 'track': 'gravel', 'cycleway': 'concrete', 'path': 'gravel', 'footway': 'concrete',
+    'bridleway': 'dirt', 'steps': 'concrete',
+}
 
 # the classes a car may drive on: the foot ways are painted on the ground, not carved
 DRIVABLE = {'motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary', 'primary_link',
@@ -100,13 +112,17 @@ def decode_roads(path=None, names_path=None):
             px += dx / 10.0
             pz += dz / 10.0
             pts.append((px, pz))
+        kind = KIND_NAMES[kind] if kind < len(KIND_NAMES) else "road"
+        # the material of the way: the OSM surface tag, else the default of its class
+        surf_bits = (flags >> FLAG_SURFACE_SHIFT) & 15
+        surface = SURFACE_NAMES[surf_bits - 1] if surf_bits else CLASS_SURFACE.get(kind, "asphalt")
         roads.append({
-            "kind": KIND_NAMES[kind] if kind < len(KIND_NAMES) else "road",
+            "kind": kind,
             "kindCode": kind, "flags": flags, "layer": layer, "lanes": lanes,
             "nameId": name_id, "name": names[name_id] if name_id < len(names) else "",
             "width": width, "sidewalk": sidewalk, "offset": offset, "pts": pts,
             "bridge": bool(flags & FLAG_BRIDGE), "tunnel": bool(flags & FLAG_TUNNEL),
-            "oneway": bool(flags & FLAG_ONEWAY),
+            "oneway": bool(flags & FLAG_ONEWAY), "surface": surface,
         })
     return roads, names
 

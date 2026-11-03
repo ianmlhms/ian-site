@@ -258,6 +258,40 @@ street 6.75 m painted against 6.40 m real, a primary 7.50 against 7.60, a second
 a living street 4.50 against 4.00 — the width of the 1 m lattice is the rest. The check fails when a
 road is painted more than 1.5 m wider or narrower than it is.
 
+### Fix 2 — the paving of the squares: DONE
+
+The square at Place de l'Europe was one huge blob of the *pavement* texture: concrete slabs with a
+strong speckle, drawn at 0.46 m per texel — the "candy dots" — and the tarmac of the streets around it
+was painted with the same material, so asphalt and paving looked the same.
+
+**The material of a way is now its OSM `surface` tag.** `bake_roads.py` reads `surface=` (and
+`surface:unpaved=`) and writes it into the flags of the way (bits 4-7, the material code + 1); the
+browser decodes it in `roads.js` and hands it to the shader per node, so a way is tarmac, cobbles,
+concrete, gravel, earth or paved stone — whatever it is in the ground truth. The default of a class
+stays for the ways without a tag (a `pedestrian` area is stone, a `living_street` is cobble, a
+`track` is gravel). The bake now reads:
+
+| the material | ways | km |
+|---|---:|---:|
+| asphalt | 10 444 | 1 112.4 |
+| gravel | 1 315 | 179.1 |
+| paved stone | 2 867 | 156.2 |
+| earth | 1 761 | 327.8 |
+| cobbles | 737 | 68.3 |
+| concrete | 2 190 | 132.8 |
+
+**The textures are calm.** A new `stone` texture (big slabs, one tone, a faint grain, a soft joint)
+paints the squares; the `cobble` texture lost its glitter (the stones stay within 12 tones of each
+other, the lit edge is a whisper). The pavement texture stays for the kerb and the footway of a
+street, but the asphalt roads never use it: the shader picks the material of the way from the node.
+
+**Place de l'Europe** is a `pedestrian` way: 10.00 m wide (fix 1 gave it the real width), paved with
+stone. The car stands on it and the flow reads `the car is on the tarmac (stone)`.
+
+The flow `luxdrive-world` still passes after the change: the baked data 10.88 MB, 133 terrain tiles,
+the painted width of 14 sampled roads, the kerb, the three bridges, the edge of the area and the
+draw calls (67 / 74 / 93 at low / medium / high).
+
 ## Milestone 3 — city: NOT STARTED
 ## Milestone 4 — gates: NOT STARTED
 

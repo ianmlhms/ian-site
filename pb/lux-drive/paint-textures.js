@@ -86,7 +86,8 @@ function pavement(size, seed) {
   return c;
 }
 
-/** The cobbles of the old town: rounded stones in rows, each with a lit edge. */
+/** The cobbles of the old town: rounded stones in rows, each with a soft lit edge.  The stones stay close in tone:
+ *  a cobble street that glitters with coloured dots reads as a toy, not as a street. */
 function cobble(size, seed) {
   const rng = createRng(seed), c = canvas(size), ctx = c.getContext('2d');
   ctx.fillStyle = 'rgb(96,93,88)'; ctx.fillRect(0, 0, size, size);
@@ -96,16 +97,41 @@ function cobble(size, seed) {
     for (let k = 0; k < cols; k++) {
       const x = k * w + (r % 2) * w * 0.5 + (rng() - 0.5) * 1.6, y = r * h + (rng() - 0.5) * 1.6;
       const rx = w * 0.46, ry = h * 0.46;
-      const tone = 118 + rng() * 40;
+      const tone = 116 + rng() * 12;
       ctx.globalAlpha = 0.9;
-      ctx.fillStyle = rgb([tone, tone - 4, tone - 10], 10, rng);
+      ctx.fillStyle = rgb([tone, tone - 4, tone - 10], 5, rng);
       ctx.beginPath(); ctx.ellipse(x, y, rx, ry, (rng() - 0.5) * 0.3, 0, TAU); ctx.fill();
-      ctx.globalAlpha = 0.4;                                    // the lit top edge of the stone
-      ctx.fillStyle = rgb([tone + 34, tone + 30, tone + 24], 8, rng);
+      ctx.globalAlpha = 0.22;                                   // the lit top edge of the stone
+      ctx.fillStyle = rgb([tone + 18, tone + 16, tone + 12], 5, rng);
       ctx.beginPath(); ctx.ellipse(x - rx * 0.22, y - ry * 0.22, rx * 0.62, ry * 0.5, 0, 0, TAU); ctx.fill();
     }
   }
   ctx.globalAlpha = 1;
+  return c;
+}
+
+/** The paved stone of a square: big calm slabs, a soft joint between them, a fine grain.  The slabs are almost
+ *  the same tone - a square is a calm surface, not a pattern of coloured dots. */
+function stone(size, seed) {
+  const rng = createRng(seed), c = canvas(size), ctx = c.getContext('2d');
+  ctx.fillStyle = 'rgb(150,145,136)'; ctx.fillRect(0, 0, size, size);
+  const rows = 6, h = size / rows;
+  for (let r = 0; r < rows; r++) {
+    const cols = 6 + (r % 2), w = size / cols;
+    for (let k = 0; k < cols; k++) {
+      const x = k * w + (r % 2) * w * 0.5, y = r * h;
+      const shade = 146 + rng() * 12;
+      ctx.fillStyle = `rgb(${shade | 0},${(shade - 4) | 0},${(shade - 11) | 0})`;
+      ctx.fillRect(x + 1.2, y + 1.2, w - 2.4, h - 2.4);         // the joint is the ground between the slabs
+      ctx.globalAlpha = 0.16 + rng() * 0.12;                     // the grain of the stone
+      for (let i = 0; i < 10; i++) {
+        const px = x + rng() * w, py = y + rng() * h;
+        ctx.fillStyle = rgb([shade - 6, shade - 10, shade - 16], 8, rng);
+        ctx.fillRect(px, py, 1 + rng() * 2.2, 1 + rng() * 2.2);
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
   return c;
 }
 
@@ -217,10 +243,11 @@ export function createPaintTextures(renderer, quality) {
   noise.colorSpace = THREE.NoColorSpace; noise.needsUpdate = true;
   const textures = {
     asphalt: make(asphalt(size, 21)), pavement: make(pavement(size, 22)), cobble: make(cobble(size, 23)),
-    gravel: make(gravel(size, 24)), ground: make(ground(size, 25)), litter: make(litter(size, 26)), noise, size,
+    gravel: make(gravel(size, 24)), ground: make(ground(size, 25)), litter: make(litter(size, 26)),
+    stone: make(stone(size, 27)), noise, size,
   };
   textures.ready = Promise.resolve(textures);
   return textures;
 }
 
-export { asphalt as drawAsphalt, pavement as drawPavement, cobble as drawCobble, gravel as drawGravel, ground as drawGround, litter as drawLitter };
+export { asphalt as drawAsphalt, pavement as drawPavement, cobble as drawCobble, gravel as drawGravel, ground as drawGround, litter as drawLitter, stone as drawStone };
