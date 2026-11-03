@@ -1,0 +1,33 @@
+{
+ "terrainBytes": 6738985,
+ "terrain": {
+  "nx": 4225,
+  "nz": 3713,
+  "step": 4.0,
+  "quant": 0.1,
+  "checksum": 915916497954,
+  "min": 176.8000030517578,
+  "max": 432.1000061035156,
+  "despiked": 18
+ },
+ "farBytes": 499770,
+ "far": {
+  "nx": 1041,
+  "nz": 977,
+  "step": 32.0,
+  "margin": 8192.0,
+  "quant": 0.25,
+  "checksum": 214045010646,
+  "min": 137.0,
+  "max": 435.0
+ },
+ "canopyBytes": 376178,
+ "canopy": {
+  "nx": 529,
+  "nz": 465,
+  "step": 16,
+  "checksumHeight": 877837386049,
+  "checksumCover": 212860414111,
+  "meanCover": 0.4582369646648633
+ }
+}

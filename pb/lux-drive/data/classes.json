@@ -1,0 +1,26 @@
+{
+ "nx": 2113,
+ "nz": 1857,
+ "step": 8.0,
+ "classes": [
+  "grass",
+  "forest",
+  "water",
+  "park",
+  "urban",
+  "farmland",
+  "sand",
+  "scrub"
+ ],
+ "counts": {
+  "grass": 695140,
+  "forest": 1438422,
+  "water": 9632,
+  "park": 45250,
+  "urban": 534267,
+  "farmland": 1115028,
+  "sand": 378,
+  "scrub": 85724
+ },
+ "bytes": 881975
+}
