@@ -81,17 +81,40 @@ physics and the LOD 0 tiles), `world-data.js` (the loaders), plus verbatim copie
 **How a road is carved in.** There is no ribbon: the ground under the carriageway is mixed towards
 the road bed (the LiDAR DTM along the centre line, smoothed), the kerb is a 13 cm ridge at the edge
 of the carriageway and the pavement lies outside it. The distance to a road is the distance to its
-*polyline*, so a straight road has a straight edge; where two roads meet, their beds are blended,
-so a junction has no step.
+*polyline*, so a straight road has a straight edge.
 
-Three rules came out of measuring the carve on the real data (see `PROGRESS` below):
+Four rules came out of measuring the carve on the real data (2 504 575 half-metre steps along every
+carved centre line of the 19 314 ways):
 
 * Only the roads a car may drive on are carved. A footpath that follows a 40 % slope is not a road:
   carving it cuts a trench into the hillside.
-* A road only shapes the ground that lies at its own level (within 2.5 m). Without this, a street on
-  the ledge 30 m above a valley street covered the valley street from above and pulled its bed up
-  the cliff — a 9 m step in the middle of the road.
-* Two road beds further apart than 2.5 m are not blended: a junction blends, a cliff does not.
+* The contributions of the roads near a point are **summed**, not "the nearest one wins" (the way the
+  MTB engine carves its trails): where two roads meet their beds are averaged, so a junction has no
+  step, and where one road ends the other one takes over. Two roads that meet on a steep slope have
+  beds that differ by metres — each was smoothed along its own direction — and the average puts them
+  back together.
+* The bed may not leave the ground under it by more than **1.5 m**: a street that runs over a cliff
+  must not be smoothed into the cliff face, and a road that climbs a hill must not cut 5 m into it.
+* A road only shapes the ground that lies at its **own level**: its influence fades out between 2.5 m
+  and 5 m. Without this, a street on the ledge 30 m above a valley street covered the valley street
+  from above and pulled its bed up the cliff — a 9 m step in the middle of the road. The fade is soft
+  on purpose: a hard cut steps the bed at the foot of a cliff, where the ground passes the road's
+  level.
+
+**Measured on the real data** (the carve must not be rougher than the ground it lies on):
+
+| how much rougher the road is than the ground below it | steps |
+|---|---:|
+| under 5 cm | 2 464 961 |
+| under 20 cm | 39 073 |
+| under 50 cm | 517 |
+| under 1 m | 16 |
+| under 2 m | 7 |
+| over 2 m | 1 (2.41 m, a track that crosses a cliff at the east edge) |
+
+Six of the 19 314 ways have a step above 1 m; every point of every carved centre line is fully
+covered (no hole in a road), and the carved road never leaves the ground under it by more than
+1.63 m (99.9th percentile: 1.49 m).
 
 **The canopy lattice.** The bake wrote the canopy on a 32 m lattice while `terrain.json` said 16 m
 (the window and the decimation were counted in 4 m steps, not in metres). Fixed in

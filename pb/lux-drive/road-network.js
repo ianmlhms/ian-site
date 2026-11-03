@@ -105,6 +105,12 @@ export function createRoadNetwork(roads, baseHeight) {
     // the bed: the terrain along the centre line, smoothed (a road is smoother than the ground it lies on)
     const ground = rs.x.map((x, i) => baseHeight(x, rs.z[i]));
     const bed = gaussianSmooth(ground, ROAD.bedSmoothing / ROAD.sampleSpacing);
+    // ... but never further than bedClamp from the ground: a street that runs over a cliff must not be smoothed
+    // into the cliff face, and a road that climbs a hill must not cut 5 m into it.
+    for (let i = 0; i < n; i++) {
+      const lo = ground[i] - ROAD.bedClamp, hi = ground[i] + ROAD.bedClamp;
+      bed[i] = Math.min(hi, Math.max(lo, bed[i]));
+    }
     const kindCode = ROAD_KINDS.indexOf(road.kind);
     for (let i = 0; i < n - 1; i++) {
       segAx.push(rs.x[i]); segAz.push(rs.z[i]); segBx.push(rs.x[i + 1]); segBz.push(rs.z[i + 1]);
@@ -188,14 +194,10 @@ export function createRoadNetwork(roads, baseHeight) {
 
   // ---- the query ---------------------------------------------------------
   const scratch = { coverage: 0, bed: 0, kerb: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, dist: 0 };
-  // the candidates of the current query, kept so that the beds can be blended only between roads that lie at the
-  // same level: a road 20 m above on the other side of a cliff must not pull the bed of this road up the cliff.
-  const MAX_CANDIDATES = 128;
-  const candBed = new Float64Array(MAX_CANDIDATES);
-  const candCov = new Float64Array(MAX_CANDIDATES);
-  const BED_BLEND = 2.5;             // m: two road beds further apart than this are not the same surface
-  const LEVEL_WINDOW = 2.5;          // m: a road only shapes the ground that lies at its own level (a road on the
-                                    // ledge 30 m above does not cover the ground below it)
+  const LEVEL_FULL = 2.5;           // m: a road shapes the ground that lies at its own level (within this)
+  const LEVEL_FADE = 5.0;           // m: ... and its influence is gone at this distance (a road on the ledge 30 m
+                                    // above must not cover the ground below it). The fade is soft: a hard cut would
+                                    // step the bed at the foot of a cliff, where the ground passes the road's level.
 
   /**
    * Writes the road influence at (x, z) into `out`:
@@ -206,11 +208,16 @@ export function createRoadNetwork(roads, baseHeight) {
    *   hw       the half width of the carriageway of that road
    *   a0       the outer edge of the pavement (the carriageway + the kerb + the pavement)
    *   kind     the class code of that road, road its index, dist the distance to it
+   *
+   * The contributions of the roads near the point are SUMMED, not "the nearest one wins" (the way the MTB engine
+   * carves its trails): where two roads meet their beds are averaged, so a junction has no step, and where one road
+   * ends the other one simply takes over.
    */
   function carve(x, z, out, groundY) {
     const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
     const ground = groundY === undefined ? baseHeight(x, z) : groundY;
-    let best = -1, bestCov = 0, bestLat = 0, bestDist = 0, bestBed = 0, ncand = 0;
+    let best = -1, bestW = 0, bestLat = 0, bestDist = 0;
+    let covSum = 0, bedSum = 0;
     for (let dz = -1; dz <= 1; dz++) {
       for (let dx = -1; dx <= 1; dx++) {
         const list = cells.get(cellKey(cx + dx, cz + dz)) || EMPTY;
@@ -232,9 +239,12 @@ export function createRoadNetwork(roads, baseHeight) {
           if (d <= a0) cov = 1;
           else { const u = (d - a0) / (R - a0); cov = (1 - u) * (1 - u); }
           const bed = BED0[i] + (BED1[i] - BED0[i]) * t;
-          if (Math.abs(bed - ground) > LEVEL_WINDOW) continue;   // a road on another level does not reach here
-          if (ncand < MAX_CANDIDATES) { candBed[ncand] = bed; candCov[ncand] = cov; ncand++; }
-          if (cov > bestCov) { bestCov = cov; best = i; bestLat = lat; bestDist = d; bestBed = bed; }
+          const away = Math.abs(bed - ground);
+          if (away >= LEVEL_FADE) continue;               // a road on another level does not reach here
+          const w = cov * (1 - smoothstep(LEVEL_FULL, LEVEL_FADE, away));
+          if (w <= 0) continue;
+          covSum += w; bedSum += w * bed;
+          if (w > bestW) { bestW = w; best = i; bestLat = lat; bestDist = d; }
         }
       }
     }
@@ -242,16 +252,13 @@ export function createRoadNetwork(roads, baseHeight) {
       out.coverage = 0; out.bed = 0; out.kerb = 0; out.lat = 0; out.hw = 0; out.a0 = 0; out.kind = 0; out.road = -1; out.dist = Infinity;
       return out;
     }
-    // the bed: the weighted average of the beds that lie at the same level as the best one (a junction blends, a
-    // cliff does not)
-    const bestBedValue = bestBed;
-    let bedSum = 0, wSum = 0;
-    for (let c = 0; c < ncand; c++) {
-      if (Math.abs(candBed[c] - bestBedValue) > BED_BLEND) continue;
-      bedSum += candCov[c] * candBed[c]; wSum += candCov[c];
-    }
-    out.coverage = bestCov;
-    out.bed = wSum > 1e-6 ? bedSum / wSum : bestBedValue;
+    out.coverage = Math.min(1, covSum);
+    let bed = bedSum / covSum;
+    // The bed may not leave the ground under it: two roads that meet on a steep slope have beds that differ by
+    // metres (each was smoothed along its own direction), and the average above puts them back together.
+    if (bed > ground + ROAD.bedClamp) bed = ground + ROAD.bedClamp;
+    else if (bed < ground - ROAD.bedClamp) bed = ground - ROAD.bedClamp;
+    out.bed = bed;
     out.lat = bestLat;
     out.dist = bestDist;
     out.hw = HW[best];
