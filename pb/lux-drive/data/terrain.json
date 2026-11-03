@@ -21,13 +21,13 @@
   "min": 137.0,
   "max": 435.0
  },
- "canopyBytes": 376178,
+ "canopyBytes": 1400912,
  "canopy": {
-  "nx": 529,
-  "nz": 465,
+  "nx": 1057,
+  "nz": 929,
   "step": 16,
-  "checksumHeight": 877837386049,
-  "checksumCover": 212860414111,
-  "meanCover": 0.4582369646648633
+  "checksumHeight": 229734353808,
+  "checksumCover": 796681069425,
+  "meanCover": 0.4584256883985286
  }
 }

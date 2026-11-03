@@ -16,13 +16,13 @@ the union and the buffer from `scripts/luxdrive/bake_area.py` (LUREF / EPSG:2169
 **World frame.** `x = LUREF easting − originE` (east), `z = originNTop − LUREF northing` (south),
 metres. World box 16 896 × 14 848 m, aligned to a 512 m block grid.
 
-**Shipped data — 10 364 754 B = 9.88 MB of the 30 MB budget (33 %).**
+**Shipped data — 11 389 488 B = 10.86 MB of the 30 MB budget (36 %).**
 
 | file | bytes | what |
 |---|---:|---|
 | terrain.bin | 6 738 985 | MBG1 grid, 4 m nodes (4225 × 3713), 0.1 m quantisation, de-spiked LiDAR DTM |
 | far.bin | 499 770 | MBG1 grid, 32 m nodes, box + 8 km, the distant hills |
-| canopy.bin | 376 178 | MBG1 grids, 16 m nodes: the tree height and the tree cover |
+| canopy.bin | 1 400 912 | MBG1 grids, 16 m nodes: the tree height and the tree cover |
 | roads.bin | 862 486 | 19 314 OSM ways: real widths, lanes, one-way, bridge / tunnel / layer |
 | classes.bin | 881 975 | the land classes on an 8 m grid (RLE): grass, forest, water, park, urban, farmland, sand, scrub |
 | buildings.bin | 849 945 | 25 336 LOD2 buildings: footprint, eaves, ridge, roof |
@@ -71,6 +71,32 @@ browser decoder reads the grids without changes; the Python side also has a vect
 The MTB engine is copied into `pb/lux-drive/` and adapted: the world constants (16.9 × 14.8 km,
 4 m near grid), the way network (roads instead of trails), the bridge decks, the car physics and
 the chase camera.
+
+**Done so far.** `config.js` (every constant), `codec.js` (MBG1 + the class raster), `roads.js`
+(the road decoder and the class table), `road-network.js` (the carve), `decks.js` (the bridge
+decks), `heightfield.js` (the height function), `surface.js` (the 1 m lattice shared by the
+physics and the LOD 0 tiles), `world-data.js` (the loaders), plus verbatim copies of `noise.js`,
+`base-field.js`, `quadtree.js`, `light-glsl.js`, `solid-material.js`, `mesh-builder.js`.
+
+**How a road is carved in.** There is no ribbon: the ground under the carriageway is mixed towards
+the road bed (the LiDAR DTM along the centre line, smoothed), the kerb is a 13 cm ridge at the edge
+of the carriageway and the pavement lies outside it. The distance to a road is the distance to its
+*polyline*, so a straight road has a straight edge; where two roads meet, their beds are blended,
+so a junction has no step.
+
+Three rules came out of measuring the carve on the real data (see `PROGRESS` below):
+
+* Only the roads a car may drive on are carved. A footpath that follows a 40 % slope is not a road:
+  carving it cuts a trench into the hillside.
+* A road only shapes the ground that lies at its own level (within 2.5 m). Without this, a street on
+  the ledge 30 m above a valley street covered the valley street from above and pulled its bed up
+  the cliff — a 9 m step in the middle of the road.
+* Two road beds further apart than 2.5 m are not blended: a junction blends, a cliff does not.
+
+**The canopy lattice.** The bake wrote the canopy on a 32 m lattice while `terrain.json` said 16 m
+(the window and the decimation were counted in 4 m steps, not in metres). Fixed in
+`bake_terrain.py` and re-baked: the canopy is now really 16 m (1057 × 929 nodes), which costs
+1 MB more (still 36 % of the budget).
 
 ## Milestone 3 — city: NOT STARTED
 

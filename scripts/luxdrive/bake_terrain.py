@@ -72,10 +72,12 @@ def main():
                    "max": float(dec_far.max())}
 
     # canopy: the mean height of the covered cells of each 16 m square and the covered fraction
+    # (the source rasters are on the 4 m lattice, so the window and the decimation are counted in 4 m steps:
+    #  a window of k nodes covers k * NEAR_STEP m and taking every sub-th node leaves a CANOPY_STEP lattice)
     chm = np.clip(dsm - ground, 0, 45)
     covered = (chm > CANOPY_MIN).astype(np.float64)
-    k = CANOPY_STEP // 2 + 1
-    sub = CANOPY_STEP // 2
+    k = int(CANOPY_STEP // NEAR_STEP) + 1
+    sub = int(CANOPY_STEP // NEAR_STEP)
     num = uniform_filter(chm * covered, size=k, mode="nearest")
     cover = uniform_filter(covered, size=k, mode="nearest")
     height = np.where(cover > 0.02, num / np.maximum(cover, 1e-6), 0.0)

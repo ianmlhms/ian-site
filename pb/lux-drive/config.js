@@ -1,0 +1,142 @@
+/* Lux Drive: every tunable number in one place (named constants, no magic numbers elsewhere).
+ * Frame: x = east, y = up, z = south, metres, origin = the NORTH-WEST corner of the world box
+ * (scripts/luxdrive/common.py maps the OSM admin boundaries of Luxembourg and Niederanven onto that box). */
+
+export const WORLD = Object.freeze({
+  width: 16896,            // m (x): the two communes plus a 300 m buffer
+  depth: 14848,            // m (z)
+  block: 512,
+  featherDist: 192,         // m: the 4 m LiDAR grid fades into the 32 m distant-hills grid over this distance from its edge
+  farMargin: 8192,          // m: the distant-hills grid reaches this far beyond the box
+  nearStep: 4,              // m between nodes of terrain.bin
+  farStep: 32,              // m between nodes of far.bin
+});
+
+/* Terrain tiles: ONE quadtree (CDLOD style) over a square root that covers the box and the distant hills. Every tile is a
+ * (cells x cells) grid, so a tile of size s has node spacing s / cells: 32 m tiles are the 1 m physics lattice (LOD 0), 64 m tiles 2 m,
+ * ... 8192 m tiles 256 m. A node is split while the rider is closer than size * splitFactor (distance to its bounds), so the tiles around
+ * the rider are always the finest ones and neighbours differ by about one level. Tile corners and spacings are powers of two, which makes
+ * edge stitching exact: a fine tile's edge vertices are moved onto the polyline of the coarser neighbour's lattice nodes (T-junction free),
+ * and a skirt hangs under every edge as a second line of defence. */
+export const QUADTREE = Object.freeze({
+  cells: 32,
+  minSize: 32,
+  maxSize: 8192,
+  rootSize: 65536,
+  rootX: -16384,           // multiple of rootSize / 8; the box (0..16896, 0..14848) and its 8 km margin lie inside
+  rootZ: -16384,
+  splitFactor: 1.0,         // a 64 m node splits when the rider is within 64 m: LOD 0 tiles (32 m, 1 m spacing) cover every tile within 64 m
+  splitHysteresis: 0.08,
+  protectedSize: 128,       // nodes up to this size always use the full split factor; a quality setting only coarsens the bigger, farther nodes
+  skirtDepth: 2.5,          // m the skirt hangs below its edge (belt and braces behind the exact stitching)
+  skirtPerStep: 0.6,        // + this many m per m of node spacing
+  carveFullStep: 1,         // the road is carved into the height in full up to this node spacing ...
+  carveFadeStep: 4,         // ... fades out until here (a kerb cannot be sampled by a 4 m lattice)
+  maxBuiltPerFrame: 3,      // tile meshes (re)built per frame at most (iPad)
+  keepSeconds: 4,           // cached tile data lives this long after its last use
+});
+
+/* The roads: the OSM network is carved INTO the terrain - there is no ribbon floating over the ground.
+ * A road sample carries the height of its bed, the half width of the carriageway, the width of the kerb and of the pavement,
+ * and the offset of the right-hand lane (Luxembourg drives on the right). */
+export const ROAD = Object.freeze({
+  sampleSpacing: 4,        // m between the samples of a centre line
+  lineSmoothing: 3.0,      // m, sigma of the Gaussian that rounds the corners of the OSM polyline
+  bedSmoothing: 6.0,       // m, sigma of the Gaussian that smooths the road surface along the centre line
+  kerbHeight: 0.13,        // m, the kerb at the edge of the carriageway
+  kerbWidth: 0.35,         // m, the width of the kerb face
+  falloff: 2.2,            // m, how far the road reaches past its pavement before the ground is untouched again
+  paintFullStep: 4,        // the road paint is exact up to this node spacing ...
+  paintFadeStep: 16,       // ... and gone at this one (a 16 m lattice cannot resolve a 6 m street)
+  markFullStep: 1,         // the kerb and the lane markings are exact on the 1 m lattice ...
+  markFadeStep: 4,         // ... and gone at this one (a 4 m lattice cannot resolve a 15 cm line)
+  maxRadius: 22,           // m: no kernel reaches farther than this (the spatial hash looks one cell around)
+  cell: 22,                // m, the spatial hash cell; the biggest kernel radius fits inside it
+  junctionClear: 2.0,      // m: a sample this close to another road's centre line gets no kerb (junctions are flat)
+});
+
+/* The ground itself: the 1 m lattice the physics and the LOD 0 tiles share. */
+export const GROUND = Object.freeze({
+  lattice: 1,               // m between the nodes
+  microAmplitude: 0.035,    // m of small undulation on top of the LiDAR (the road bed is carved over it)
+});
+
+/* The ground materials the physics knows (dry values): rolling resistance, tyre grip and roughness.
+ * Rain (the weather choice) multiplies the grip by (1 - wet * wetLoss). */
+export const SURFACES = Object.freeze({
+  asphalt: { crr: 0.013, grip: 1.0, rough: 0.0, wetLoss: 0.3 },
+  cobble: { crr: 0.02, grip: 0.92, rough: 0.12, wetLoss: 0.32 },
+  concrete: { crr: 0.015, grip: 0.96, rough: 0.03, wetLoss: 0.28 },
+  gravel: { crr: 0.022, grip: 0.82, rough: 0.14, wetLoss: 0.2 },
+  grass: { crr: 0.055, grip: 0.68, rough: 0.16, wetLoss: 0.24 },
+  dirt: { crr: 0.045, grip: 0.72, rough: 0.14, wetLoss: 0.18 },
+  forest: { crr: 0.05, grip: 0.66, rough: 0.2, wetLoss: 0.22 },
+  sand: { crr: 0.07, grip: 0.6, rough: 0.1, wetLoss: 0.1 },
+  water: { crr: 0.09, grip: 0.5, rough: 0.1, wetLoss: 0 },
+});
+
+export const QUALITY = Object.freeze({
+  low: { pixelRatio: 1, lodScale: 0.4, far: 4200, buildingRadius: 320, treeRadius: 90, treeDensity: 0.4, cheapGround: true, shadows: false },
+  medium: { pixelRatio: 1.25, lodScale: 0.7, far: 6000, buildingRadius: 520, treeRadius: 150, treeDensity: 0.7, cheapGround: false, shadows: false },
+  high: { pixelRatio: 2, lodScale: 1, far: 8000, buildingRadius: 800, treeRadius: 240, treeDensity: 1, cheapGround: false, shadows: true },
+});
+
+export const CAMERA = Object.freeze({
+  fov: 62,
+  near: 0.1,
+  followDistance: 7.2,       // m behind the car
+  followHeight: 3.1,
+  sideOffset: 0,             // the car sits in the middle of the picture
+  lookAhead: 8.0,            // m the camera looks this far ahead along the heading
+  lookHeight: 1.2,           // ... at this height above the car's ground
+  minClearance: 0.6,         // m: the camera never gets closer than this to the ground
+  farDistance: 11.5,         // the far chase camera
+  farHeight: 4.6,
+  bonnetForward: 1.35, bonnetHeight: 1.15, bonnetFov: 74,
+  shake: 0.05,               // m of camera shake at full speed
+  shakeFrom: 12,             // m/s: the shake starts here (95 km/h)
+  shakeSpan: 22,
+  fovGain: 16,               // degrees the field of view widens at speed ...
+  fovFrom: 8,                // ... starting at 8 m/s and full at fovTo (30 m/s = 108 km/h)
+  fovTo: 30,
+  clearanceProbe: 6,         // ground probes along the camera boom
+  bodyRadius: 0.6,           // the camera is a ball of this radius: it never sits inside a building
+});
+
+/* Car physics (SI units). One car body on the physics surface; arcade, but it never drives through a building
+ * and never leaves the play area. */
+export const CAR = Object.freeze({
+  mass: 1350,                // kg
+  wheelbase: 2.62,
+  trackWidth: 1.72,
+  power: 118000,             // W at the wheels at full throttle (about 160 hp)
+  reversePower: 42000,       // W in reverse
+  maxSpeed: 56,              // m/s (200 km/h) - the hard cap on a motorway
+  maxReverse: 12,            // m/s
+  brakeDecel: 12.5,          // m/s2 at full braking on asphalt
+  engineBrake: 1.6,          // m/s2 when the throttle is closed
+  steerMax: 0.56,            // rad of the road wheel angle at standstill
+  steerSpeedRef: 13,         // m/s: the steering authority falls off with the speed
+  steerRate: 7,              // 1/s: how fast the wheel follows the input
+  grip: 1.45,                // the friction coefficient of the tyres (mu)
+  cdA: 0.68,                 // m2, the drag that ends the speed
+  airDensity: 1.2,
+  crr: 0.014,                // the rolling resistance of the tyres
+  bodyRadius: 1.35,          // m: the collision circle of the car against the buildings
+  fixedStep: 1 / 120,        // s: the physics step
+  slopeAssist: 1.0,          // the gravity along the slope is applied in full
+  handbrakeGrip: 0.42,       // the grip left on the rear axle with the handbrake pulled
+  handbrakeDrag: 5.5,        // m/s2 of extra braking with the handbrake
+  bumpiness: 0.55,           // how much of the ground roughness reaches the car
+  rideHeight: 0.42,          // m: the bottom of the body above the ground
+  restitution: 0.12,         // the vertical bounce of the suspension
+  respawnTime: 1.2,          // s from a crash to the car standing again
+  pushAssist: 2.2,           // m/s2: below walking pace the car creeps forward instead of stalling
+  hitSpeedLoss: 0.45,        // the share of the speed kept after a glancing hit on a building
+  crashSpeed: 9.0,           // m/s into a building that is a crash
+});
+
+export const CAR_COLOURS = Object.freeze({
+  red: '#c0392b', blue: '#2d6ca2', white: '#e8e8e4', black: '#2b2b2e', green: '#3d7a4a', yellow: '#d9a327', grey: '#7d8288', orange: '#d4691f',
+});
+export const CAR_COLOUR_IDS = Object.freeze(Object.keys(CAR_COLOURS));
