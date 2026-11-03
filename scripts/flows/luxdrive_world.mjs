@@ -92,8 +92,61 @@ export const flow = {
     h.expect(ride.maxGap < 0.7, `the body never floated above the ground (${ride.maxGap.toFixed(2)} m)`);
     h.eq(ride.air, 0, "the car stayed on its wheels for the whole drive");
 
-    h.step("the kerb: the car rides over the edge of the carriageway");
-    const kerb = await page.evaluate(async () => {
+    h.step("the painted asphalt follows the real width of the road");
+    const paint = await page.evaluate(async () => {
+      const m = window.__lux;
+      const net = m.field.network;
+      const s = net.samples;
+      const info = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, lines: 0, lanes: 0, s: 0 };
+      const st = m.state();
+      const rows = [];
+      for (let ri = 0; ri < net.roads.length && rows.length < 14; ri++) {
+        const r = net.roads[ri];
+        if (!r.info.drivable || r.tunnel || r.bridge) continue;
+        if (r.width < 3 || r.width > 20) continue;
+        const first = s.first[ri], count = s.segs[ri];
+        if (count < 3) continue;
+        // a point on the road where no other road comes near: at a junction the band of the two roads merges
+        let pick = -1;
+        for (let i = first; i < first + count; i++) {
+          const x = s.x[i], z = s.z[i];
+          if (Math.hypot(x - st.x, z - st.z) > 700) continue;
+          let near = false;
+          for (let j = 0; j < s.x.length && !near; j++) {
+            if (s.road[j] === ri) continue;
+            if (Math.abs(s.x[j] - x) > 30 || Math.abs(s.z[j] - z) > 30) continue;
+            if (Math.hypot(s.x[j] - x, s.z[j] - z) < 25) near = true;
+          }
+          if (!near) { pick = i; break; }
+        }
+        if (pick < 0) continue;
+        // across the road: the painted tarmac is the set of points where this road is the road the point is
+        // on and the point lies within its carriageway - that is exactly what the shader paints as asphalt
+        const ax = s.x[Math.max(first, pick - 1)], az = s.z[Math.max(first, pick - 1)];
+        const bx = s.x[Math.min(first + count - 1, pick + 1)], bz = s.z[Math.min(first + count - 1, pick + 1)];
+        const ex = bx - ax, ez = bz - az, len = Math.hypot(ex, ez) || 1;
+        const nx = -ez / len, nz = ex / len;
+        const x = s.x[pick], z = s.z[pick];
+        let run = 0, painted = 0;
+        for (let d = -25; d <= 25; d += 0.25) {
+          m.surface.roadInfoAt(x + nx * d, z + nz * d, info);
+          const mine = info.road === ri && Math.abs(info.lat) <= info.hw;
+          if (mine) run += 0.25;
+          else { if (run > painted) painted = run; run = 0; }
+        }
+        painted = Math.max(painted, run);
+        rows.push({ name: r.name || "", kind: r.kind, osm: r.width, painted });
+      }
+      return rows;
+    });
+    h.expect(paint.length >= 5, `${paint.length} roads measured`);
+    for (const p of paint) {
+      const over = p.painted - p.osm;
+      h.expect(p.painted > 0 && over < 1.5 && over > -1.5,
+        `${p.kind} ${p.name}: the painted asphalt is ${p.painted.toFixed(2)} m, the real road is ${p.osm.toFixed(2)} m`);
+    }
+
+    h.step("the kerb: the car rides over the edge of the carriageway");    const kerb = await page.evaluate(async () => {
       const m = window.__lux;
       const net = m.field.network, S = net.segments;
       const st = m.state();

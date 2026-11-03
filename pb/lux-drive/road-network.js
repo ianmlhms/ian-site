@@ -217,12 +217,14 @@ export function createRoadNetwork(roads, baseHeight) {
    *
    * The contributions of the roads near the point are SUMMED, not "the nearest one wins" (the way the MTB engine
    * carves its trails): where two roads meet their beds are averaged, so a junction has no step, and where one road
-   * ends the other one simply takes over.
+   * ends the other one simply takes over.  The sum is the HEIGHT blend only: the geometry (lat, hw, a0) that the
+   * shader paints comes from the one road the point is on, so the painted tarmac follows the real edge of the
+   * carriageway and the sum of the neighbouring roads never paints asphalt where the kernel only blends the height.
    */
   function carve(x, z, out, groundY) {
     const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
     const ground = groundY === undefined ? baseHeight(x, z) : groundY;
-    let best = -1, bestW = 0, bestLat = 0, bestDist = 0, bestT = 0;
+    let best = -1, bestScore = -1, bestLat = 0, bestDist = 0, bestT = 0;
     let covSum = 0, bedSum = 0;
     for (let dz = -1; dz <= 1; dz++) {
       for (let dx = -1; dx <= 1; dx++) {
@@ -247,10 +249,18 @@ export function createRoadNetwork(roads, baseHeight) {
           const bed = BED0[i] + (BED1[i] - BED0[i]) * t;
           const away = Math.abs(bed - ground);
           if (away >= LEVEL_FADE) continue;               // a road on another level does not reach here
-          const w = cov * (1 - smoothstep(LEVEL_FULL, LEVEL_FADE, away));
+          const level = 1 - smoothstep(LEVEL_FULL, LEVEL_FADE, away);
+          const w = cov * level;
           if (w <= 0) continue;
           covSum += w; bedSum += w * bed;
-          if (w > bestW) { bestW = w; best = i; bestLat = lat; bestDist = d; bestT = t; }
+          // The paint belongs to ONE road, and it is the road the point is really on: the one whose
+          // carriageway contains the point, and among those the most central one.  Without this rule a wide
+          // road (a square) swallows the street that crosses it and the street is painted with its surface.
+          // The narrowness is the last tie break: at a crossing the minor road keeps its own surface.
+          const hw = HW[i];
+          const score = ((d <= hw ? 2 : 1) + 1 - Math.min(1, Math.abs(lat) / Math.max(hw, 0.5))
+                         - Math.min(hw, 12) * 0.02) * level;
+          if (score > bestScore) { bestScore = score; best = i; bestLat = lat; bestDist = d; bestT = t; }
         }
       }
     }

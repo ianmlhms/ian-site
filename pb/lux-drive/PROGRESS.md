@@ -215,8 +215,50 @@ into the lane markings, then into the albedo, and `tonemapPaint` turns a NaN int
 in `tile-mesh.js`: the road attributes of a LOD 0 tile are written with the same index the mesh
 reads. Measured after the fix: **0 black pixels** in the whole frame (10 513 before).
 
-## Milestone 3 — city: NOT STARTED
+## The reviewer fix list (`REVIEW.md`) — in progress
 
+The reviewer looked at two screenshots (the world from the medium quality and the hills to the north) and
+wrote six fixes. They come before the new milestone work; each one is a commit of its own.
+
+### Fix 1 — the roads were blobs, far too wide: DONE
+
+Two causes, both real.
+
+**The data: the width table read the class index as "lanes per direction".** `bake_roads.py` had one
+number per road class and used it as the number of lanes of one direction, so a residential street
+became 12.4 m wide, a service road 27.2 m and a pedestrian square 30 m (the clamp). The median width
+of the 19 314 ways was **21.8 m** and 14 966 of them were wider than 12 m. The table now carries the
+real numbers (the lanes per direction, the directions, the lane width, the shoulder, the pavement) and
+the width of a way is its lanes times the lane width of its class plus the shoulder on each side; the
+OSM `width` tag still wins (it is surveyed). Measured after the re-bake:
+
+| | before | after |
+|---|---:|---:|
+| the median width of the 19 314 ways | 21.8 m | **3.2 m** |
+| wider than 8 m | 15 310 | **1 092** |
+| wider than 12 m | 14 966 | **223** |
+| the widest | 30 m (clamped) | **21.2 m** |
+
+A residential street is now 6.40 m, a primary 7.60 m, a service road 6.40 m, a footway 2.00 m, a
+pedestrian area 10.00 m and a motorway carriageway 9.80 m.
+
+**The paint: the sum of the neighbours painted the asphalt.** The carve sums the contributions of the
+roads near a point (that is the *height* blend: where two roads meet their beds are averaged, so a
+junction has no step), but the geometry that the shader paints — the offset from the centre line, the
+half width of the carriageway, the outer edge of the pavement — came from an arbitrary "best" segment
+among the ties. A 30 m wide square therefore swallowed the street that crossed it, and the street was
+painted with the surface of the square. The paint now belongs to one road: the one whose carriageway
+contains the point, and among those the most central one (the narrowest breaks the last tie). The sum
+still blends the height, it no longer paints anything.
+
+**The check.** The flow `luxdrive-world` measures the painted tarmac of 14 sampled roads against their
+real width (the painted band = the points where the road is the road the point is on and the point
+lies within its carriageway — exactly what the shader paints as asphalt). Measured: a residential
+street 6.75 m painted against 6.40 m real, a primary 7.50 against 7.60, a secondary 8.00 against 7.20,
+a living street 4.50 against 4.00 — the width of the 1 m lattice is the rest. The check fails when a
+road is painted more than 1.5 m wider or narrower than it is.
+
+## Milestone 3 — city: NOT STARTED
 ## Milestone 4 — gates: NOT STARTED
 
 ## Milestone 5 — UI: NOT STARTED

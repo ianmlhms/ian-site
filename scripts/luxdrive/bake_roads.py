@@ -35,34 +35,42 @@ from common import OUT_DIR, RAW_DIR, lonlat_to_luref, luref_to_world  # noqa: E4
 from shapely.geometry import LineString, Point, Polygon, MultiPolygon, box  # noqa: E402
 from shapely.ops import unary_union  # noqa: E402
 
-# kind code -> (default lanes per direction, lane width, shoulder per side, pavement per side)
+# kind code -> (lanes per direction, directions, lane width, shoulder per side, pavement per side)
+#
+# The width of a road is NOT a free number: it is the lanes of the way times the lane width of its class,
+# plus the shoulder on each side.  A residential street is one lane per direction at 3.00 m plus a 20 cm
+# shoulder: 6.40 m.  The classes with 0 lanes (a pedestrian way) are not carriageways at all: they are paved
+# areas of a fixed width (PEDESTRIAN_WIDTH).
 ROAD_KINDS = {
-    'motorway':    (0, 2, 3.65, 2.5, 0.0),
+    'motorway':    (2, 2, 3.65, 2.5, 0.0),
     'trunk':       (1, 2, 3.50, 1.2, 0.0),
-    'primary':     (2, 2, 3.40, 0.4, 2.5),
-    'secondary':   (3, 2, 3.30, 0.3, 2.0),
-    'tertiary':    (4, 2, 3.20, 0.2, 1.8),
-    'unclassified':(5, 2, 3.10, 0.2, 1.6),
-    'residential': (6, 2, 3.00, 0.2, 1.5),
-    'living_street':(7, 2, 3.50, 0.0, 0.0),
-    'pedestrian':  (8, 1, 4.00, 0.0, 0.0),
-    'service':     (9, 1, 3.00, 0.2, 0.0),
-    'busway':      (10, 1, 3.20, 0.2, 0.0),
-    'track':       (11, 1, 2.60, 0.6, 0.0),
-    'cycleway':    (12, 1, 1.80, 0.3, 0.0),
-    'path':        (13, 1, 1.50, 0.4, 0.0),
-    'footway':     (14, 1, 1.50, 0.4, 0.0),
-    'bridleway':   (15, 1, 2.40, 0.5, 0.0),
-    'steps':       (16, 1, 1.20, 0.2, 0.0),
-    'road':        (17, 2, 3.00, 0.2, 1.0),
+    'primary':     (1, 2, 3.40, 0.4, 2.5),
+    'secondary':   (1, 2, 3.30, 0.3, 2.0),
+    'tertiary':    (1, 2, 3.20, 0.2, 1.8),
+    'unclassified':(1, 2, 3.10, 0.2, 1.6),
+    'residential': (1, 2, 3.00, 0.2, 1.5),
+    'living_street':(1, 2, 3.50, 0.0, 0.0),
+    'pedestrian':  (0, 1, 4.00, 0.0, 0.0),
+    'service':     (1, 2, 3.00, 0.2, 0.0),
+    'busway':      (1, 2, 3.20, 0.2, 0.0),
+    'track':       (1, 1, 2.60, 0.6, 0.0),
+    'cycleway':    (1, 1, 1.80, 0.3, 0.0),
+    'path':        (1, 1, 1.50, 0.4, 0.0),
+    'footway':     (1, 1, 1.50, 0.4, 0.0),
+    'bridleway':   (1, 1, 2.40, 0.5, 0.0),
+    'steps':       (1, 1, 1.20, 0.2, 0.0),
+    'road':        (1, 2, 3.00, 0.2, 1.0),
 }
-# the *_link classes are the slip roads of their parent class: one lane per direction
+# the *_link classes are the slip roads of their parent class: one lane, one way
 for _link, _parent in (('motorway_link', 'motorway'), ('trunk_link', 'trunk'),
                        ('primary_link', 'primary'), ('secondary_link', 'secondary'),
                        ('tertiary_link', 'tertiary')):
-    ROAD_KINDS[_link] = (ROAD_KINDS[_parent][0], 1) + ROAD_KINDS[_parent][2:]
+    ROAD_KINDS[_link] = (1, 1) + ROAD_KINDS[_parent][2:]
 KIND_NAMES = sorted(ROAD_KINDS)
 KIND_CODE = {k: i for i, k in enumerate(KIND_NAMES)}
+
+# the width of a paved area (a pedestrian way): the OSM width tag when it is there, else this
+PEDESTRIAN_WIDTH = 10.0
 
 FLAG_BRIDGE = 1
 FLAG_TUNNEL = 2
@@ -197,24 +205,32 @@ def main():
         wx, wz = luref_to_world([p[0] for p in luref], [p[1] for p in luref])
         pts = list(zip(wx.tolist(), wz.tolist()))
 
-        default_lanes, default_dir, lane_w, shoulder, pavement = ROAD_KINDS[hw]
+        lanes_per_dir, dirs, lane_w, shoulder, pavement = ROAD_KINDS[hw]
         ow = one_way(tags)
-        total_lanes = lane_count(tags) or (default_lanes * default_dir)
-        if ow:
-            dir_lanes = max(1, total_lanes)
-        else:
-            dir_lanes = max(1, total_lanes // 2)
-        # the width: the OSM width tag wins (it is surveyed), then the lanes, then the class default
+        # the width: the OSM width tag wins (it is surveyed), then the lanes of the way
         width_tag = None
         if "width" in tags:
             vals = parse_float_list(tags["width"])
             if vals:
                 width_tag = max(vals)
+        tagged_lanes = lane_count(tags)
         if width_tag is not None:
             width = width_tag
+            total_lanes = tagged_lanes or max(1, lanes_per_dir * dirs)
+        elif lanes_per_dir == 0:
+            # a paved area (a pedestrian way): it has no lanes, it has a width
+            width = PEDESTRIAN_WIDTH
+            total_lanes = 1
         else:
-            carriage = dir_lanes * lane_w + shoulder
-            width = carriage if ow else carriage * 2
+            # The OSM lanes tag counts the lanes of the whole way (both directions unless it is one way);
+            # the class default counts the lanes of ONE direction.
+            if tagged_lanes:
+                per_dir = float(tagged_lanes) if ow else tagged_lanes / 2.0
+            else:
+                per_dir = float(lanes_per_dir)
+            sides = 1 if ow else dirs
+            width = (per_dir * lane_w + shoulder) * sides
+            total_lanes = max(1, int(round(per_dir * sides)))
         if width < 2.0:
             width = 2.0
         if width > 30.0:
@@ -231,12 +247,9 @@ def main():
                 vals = parse_float_list(v)
                 if vals:
                     sw = vals[0]
-        # The right-hand lane centre, relative to the centre line. Luxembourg drives on the right, so
-        # the car sits in the rightmost lane: +offset when it travels with the way, -offset against it.
-        if ow:
-            offset = width / 2 - width / (2 * dir_lanes)
-        else:
-            offset = width / 2 - width / (4 * dir_lanes)
+        # The right-hand lane centre, relative to the centre line. Luxembourg drives on the right, so the
+        # car sits in the rightmost lane: +offset when it travels with the way, -offset against it.
+        offset = max(0.0, width / 2 - lane_w / 2)
 
         bridge = tags.get("bridge") not in (None, "no", "false")
         tunnel = tags.get("tunnel") not in (None, "no", "false")
