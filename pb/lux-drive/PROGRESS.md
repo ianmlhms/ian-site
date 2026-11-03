@@ -66,7 +66,7 @@ browser decoder reads the grids without changes; the Python side also has a vect
 
 **Open bugs:** none known in the bake. The gates of Milestone 4 still have to run.
 
-## Milestone 2 — drive: IN PROGRESS
+## Milestone 2 — drive: DONE
 
 The MTB engine is copied into `pb/lux-drive/` and adapted: the world constants (16.9 × 14.8 km,
 4 m near grid), the way network (roads instead of trails), the bridge decks, the car physics and
@@ -145,10 +145,18 @@ Milestone 4 harnesses — it is already a gate):
 | the start | Place de l'Europe, Kirchberg (5906, 7999), the car stands on the ground |
 | driving | 30.8 m, 51 km/h, on the tarmac |
 | the camera | never below the ground (3.82 m above it) |
+| the ride height | 0.42 m above the ground for the whole drive, never sunk, never floated, never left the wheels |
+| the kerb | the car rides over the edge of the carriageway (17.1 m from the centre line) without sinking or flying |
+| the bridges | Nei Bréck (Pont Adolphe) 3.1 m above the valley, Roud Bréck (Pont Rouge) 14.2 m, the A1 at Grünewald 2.9 m: solid decks, the car stands on them |
+| the edge of the area | the car drove up to the border and was pushed back: it never left the play area |
 | draw calls / triangles | low 67 / 230 k, medium 74 / 248 k, high 93 / 296 k |
 
-**Still to do in Milestone 2:** the ride height and the kerb behaviour, and the check that the car
-cannot drive off the edge of the area.
+**The kerb.** The kerb is a 13 cm ridge at the edge of the carriageway, and the pavement lies 13 cm
+above the road. It is switched off where a road runs into another road (a real junction is flat):
+of the 316 288 carved segments, 90 091 carry no kerb at all (their surface is not tarmac, cobble or
+concrete), 140 547 have the kerb on and 85 650 have it off at a junction. The 1 m lattice of the
+physics carries the ridge: measured over 4 000 segments, the ground 1.2 m outside the carriageway
+stands a median of **12.7 cm** above the ground 1.2 m inside it.
 
 **How a road is carved in.** There is no ribbon: the ground under the carriageway is mixed towards
 the road bed (the LiDAR DTM along the centre line, smoothed), the kerb is a 13 cm ridge at the edge
@@ -193,8 +201,8 @@ covered (no hole in a road), and the carved road never leaves the ground under i
 `bake_terrain.py` and re-baked: the canopy is now really 16 m (1057 × 929 nodes), which costs
 1 MB more (still 36 % of the budget).
 
-**Open bugs in Milestone 2:** none known. The black gashes are fixed (see below), the ride height,
-the kerb behaviour and the edge of the area still have to be measured.
+**Open bugs in Milestone 2:** none known. The black gashes are fixed (see below), and the ride
+height, the kerb, the bridges and the edge of the area are measured by the flow.
 
 **The black gashes in the ground — fixed.** Long thin black strips cut through the ground, on the
 roads and on the hillsides. They were not holes in the mesh and not the shading of the steep quads:

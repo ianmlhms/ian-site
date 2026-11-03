@@ -288,7 +288,7 @@ async function boot() {
 
   // the API for the harness (the checks read the state of the game from here)
   window.__lux = {
-    scene, camera, renderer, car, env, terrain, surface, ground, field, portals, quality: () => quality,
+    scene, camera, renderer, car, env, terrain, surface, ground, field, portals, playArea, buildings, quality: () => quality,
     state: () => car.state,
     setInput: (o) => { scripted = o; },
     /** The harness can hold the camera at a pose of its own (null gives it back to the chase camera). */
