@@ -15,5 +15,5 @@ window.RDR_CONFIG = Object.freeze({
   // DEMO ONLY. Skips the admin login. Requires supabase/demo_open.sql to be
   // applied, and must be turned off together with supabase/relock.sql before
   // the shop takes real orders.
-  adminOpenMode: true,
+  adminOpenMode: false,
 });
