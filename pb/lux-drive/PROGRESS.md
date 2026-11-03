@@ -78,6 +78,78 @@ decks), `heightfield.js` (the height function), `surface.js` (the 1 m lattice sh
 physics and the LOD 0 tiles), `world-data.js` (the loaders), plus verbatim copies of `noise.js`,
 `base-field.js`, `quadtree.js`, `light-glsl.js`, `solid-material.js`, `mesh-builder.js`.
 
+**The render core** (adapted from `pb/mtb/`): `terrain-view.js` (the tile manager), `tile-mesh.js`
+(the geometry of a tile), `ground-shader.js` (the painted ground), `paint-textures.js` (the
+hand-drawn canvas textures), `world-map.js` (the land class and the canopy as DataTextures),
+`deck-view.js` (the bridge decks as solid meshes with their parapets).
+
+**The road is painted, not laid on top.** There is no ribbon mesh: the ground *is* the road (the
+height function carves it in) and the ground shader paints the tarmac, the kerb, the pavement and
+the lane markings over the land classes.  The road geometry rides in the vertex attributes
+(`aRoad` = the offset from the centre line, the half width of the carriageway, the outer edge of
+the pavement, the distance along the centre line; `aRoad2` = the coverage, the markings, the
+material, the detail), computed in `tile-mesh.js` from the *same* 1 m lattice the car drives on.
+So the paint and the physics can never disagree.
+
+**The car** (`car.js`): arcade physics on a fixed 1/120 s step — the velocity split into forward
+and lateral, the friction circle (the lateral force is limited by the grip), the drive (capped at
+9 m/s², the soft top speed depends on the class of the road: 0.4 of it off-road), the brakes, the
+engine brake, the drag and the rolling resistance, the slope from the ground normal, the bicycle
+model for the yaw, and a vertical suspension with an airborne state.  The body has a pitch and a
+roll.  `car-model.js` draws the painted low-poly car (the body, the glass band, the lights, the
+mirrors and the four wheels) and feeds the headlight to the environment.
+
+**The chase camera** (`camera.js`): the boom shortens when the ground rises under it (the
+clearance probes), the swing round after a turn lags, the height follows the car with a lag, and
+the field of view opens with the speed.
+
+**The rest of the world.** `play-area.js` (the baked boundary, the car cannot drive out of the
+area), `buildings.js` (the LOD2 footprints as collision), `minimap.js` (the Kaart), `env.js` (the
+sky, the sun, the weather, the time of day), `ui.js` + `ui.css` + `i18n.js` (the menu and the HUD
+in Luxembourgish first: lb/de/en/fr), `input.js` (the keyboard, the gamepad and the touch
+controls), `main.js` (the boot and the loop).
+
+**The portals of the tunnels** (`portals.js` + `portal-view.js`). A tunnel cannot be a trench in a
+single-valued height field — the René Konen / Hellege-Geescht tunnel runs 600 m under the streets
+of Kirchberg — so the tunnel ways stay out of the carve and out of the drivable network, and every
+mouth that a surface road leads to gets a **portal**: a concrete headwall across the carriageway
+with the dark mouth of the tunnel in it. The car stops at the wall (the wall is in the collision
+chain of the car, like the buildings and the edge of the area).
+
+* The mouths are found in the road network itself: the tunnel ways are chained into runs (two ways
+  that share an end belong to the same tunnel), and the ends of a run that a surface road leads to
+  are the mouths. A tunnel no road leads to gets no portal: the car cannot get there anyway.
+* A mouth that a street runs *over* gets no portal either: there is no open mouth there and a wall
+  would block the street. 250 candidates → **189 portals** (12 motorway, 6 trunk, 7 secondary,
+  114 service, 3 motorway_link, 11 unclassified, 9 residential, 2 primary, 17 pedestrian,
+  3 track, 1 trunk_link, 4 living_street).
+* The wall stands on the ground (it is buried 2 m under the lowest ground sample across its width,
+  so it never floats), it is as wide as the carriageway plus a shoulder, and the mouth is as high as
+  the road is wide (a garage 2.7 m, a motorway 5.2 m). The dark mouth is a plug *inside* the
+  opening of the wall, not a tube that recedes into the hill: the René Konen runs under a plateau
+  and a tunnel that goes in would have the ground poke through it.
+* Measured in the browser: the car drove into the north portal of the René Konen (Hellege-Geescht)
+  and stopped 1.35 m in front of the wall, in the middle of the carriageway, at a speed of 0.015 m/s.
+
+**The canvas fills the screen.** The CSS gave the size to `canvas#view`, but the canvas of the
+page is `canvas#luxCanvas` — so the game rendered in the default 300 × 150 box in the corner of
+the page. The rule is now `canvas#luxCanvas` and `#shell` is fixed to the screen. The flows also
+run in the landscape of an iPad (1180 × 820), the way the game is played.
+
+**Measured by the flow `luxdrive-world`** (`scripts/flows/luxdrive_world.mjs`, the first of the
+Milestone 4 harnesses — it is already a gate):
+
+| what | result |
+|---|---|
+| the baked data | 10.88 MB (≤ 30 MB) |
+| the start | Place de l'Europe, Kirchberg (5906, 7999), the car stands on the ground |
+| driving | 30.8 m, 51 km/h, on the tarmac |
+| the camera | never below the ground (3.82 m above it) |
+| draw calls / triangles | low 67 / 230 k, medium 74 / 248 k, high 93 / 296 k |
+
+**Still to do in Milestone 2:** the ride height and the kerb behaviour, the check that the car
+cannot drive off the edge of the area, and the black gashes in the ground (see the open bugs).
+
 **How a road is carved in.** There is no ribbon: the ground under the carriageway is mixed towards
 the road bed (the LiDAR DTM along the centre line, smoothed), the kerb is a 13 cm ridge at the edge
 of the carriageway and the pavement lies outside it. The distance to a road is the distance to its
@@ -120,6 +192,15 @@ covered (no hole in a road), and the carved road never leaves the ground under i
 (the window and the decimation were counted in 4 m steps, not in metres). Fixed in
 `bake_terrain.py` and re-baked: the canopy is now really 16 m (1057 × 929 nodes), which costs
 1 MB more (still 36 % of the budget).
+
+**Open bugs in Milestone 2:**
+
+* **Black gashes in the ground.** Seen from the air (the camera 150 m above Place de l'Europe),
+  long thin black strips cut through the ground: they follow the roads and the hillsides. They are
+  not holes in the mesh (the ground behind them is there), but the shading of the very steep quads
+  that the carve produces: a wall of several metres between the road bed and the ground beside it
+  gets a normal that points away from the sun and is painted black. To find out: the normal of the
+  quads next to a carved road, and the light term of the ground shader.
 
 ## Milestone 3 — city: NOT STARTED
 

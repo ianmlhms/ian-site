@@ -29,7 +29,9 @@ html, body {
   touch-action: none;
 }
 
-canvas#view { display: block; width: 100%; height: 100%; }
+/* the shell fills the screen and the canvas fills the shell: a canvas without a size stays at its default 300x150 */
+#shell { position: fixed; inset: 0; }
+canvas#luxCanvas { display: block; width: 100%; height: 100%; }
 
 /* ---- the loading screen */
 #loading {

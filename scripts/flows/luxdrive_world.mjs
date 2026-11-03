@@ -11,11 +11,14 @@ async function boot(h, url = PAGE) {
   await h.goto(url);
   await h.page.waitForFunction(() => document.documentElement.dataset.luxReady === "1" || document.documentElement.dataset.bootError, null, { timeout: 180000 });
   await h.pause(1500);
+  await h.page.click('[data-act="drive"]');        // close the menu: the shots must show the world, not the panel
+  await h.pause(600);
 }
 
 export const flow = {
   name: "luxdrive-world",
   fullChromium: true,
+  viewport: { width: 1180, height: 820 },          // an iPad in landscape: the game is played in landscape
   async run(h) {
     const { page } = h;
     const errors = [];

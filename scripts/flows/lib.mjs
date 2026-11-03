@@ -322,10 +322,11 @@ export async function runFlow(flow, { browser, origin, shotsDir = process.env.FL
   const theBrowser = browser || own[0];
   const theOrigin = origin || own[1].origin;
   const tmpVideos = fs.mkdtempSync(path.join(os.tmpdir(), "flow-video-"));
+  const viewport = flow.viewport || VIEWPORT;          // a flow may ask for another size (a game in landscape)
   const context = await theBrowser.newContext({
-    viewport: VIEWPORT, screenSize: VIEWPORT, deviceScaleFactor: 1, serviceWorkers: flow.serviceWorkers || "block",
+    viewport, screenSize: viewport, deviceScaleFactor: 1, serviceWorkers: flow.serviceWorkers || "block",
     hasTouch: !!flow.touch, isMobile: !!flow.touch,
-    recordVideo: { dir: tmpVideos, size: VIEWPORT },
+    recordVideo: { dir: tmpVideos, size: viewport },
   });
   const base = flow.backend || {};
   const backend = createBackend({

@@ -139,6 +139,22 @@ export const CAR = Object.freeze({
   crashSpeed: 9.0,           // m/s into a building that is a crash
 });
 
+/* The tunnel portals: a tunnel cannot be a trench in a single valued height field, so the tunnels are kept out of the carve
+ * and out of the drivable network, and each of them gets a portal: a concrete headwall across the road with the dark
+ * mouth of the tunnel in it. The car stops at the wall. */
+export const PORTAL = Object.freeze({
+  joinTolerance: 4.0,       // m: two tunnel ways whose ends are this close belong to the same tunnel
+  approachTolerance: 7.0,   // m: the surface road that leads to the mouth of the tunnel
+  cell: 32,                 // m, the spatial hash cell of the walls
+  shoulder: 1.3,            // m, the wall reaches this far past the carriageway on each side
+  boreInset: 0.25,          // m, the mouth of the tunnel is this much narrower than the carriageway
+  boreMin: 2.1,             // m, a mouth narrower than this is a garage, not a tunnel
+  recess: 0.85,             // m, how deep the dark mouth of the tunnel goes into the wall
+  lintel: 1.0,              // m, the concrete above the mouth
+  cornice: 0.22,            // m, the slab on top of the wall
+  base: 2.0,                // m, the wall goes this far under the ground (it never floats)
+});
+
 export const CAR_COLOURS = Object.freeze({
   red: '#c0392b', blue: '#2d6ca2', white: '#e8e8e4', black: '#2b2b2e', green: '#3d7a4a', yellow: '#d9a327', grey: '#7d8288', orange: '#d4691f',
 });
