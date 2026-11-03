@@ -102,6 +102,8 @@ export const CAMERA = Object.freeze({
   fovTo: 30,
   clearanceProbe: 6,         // ground probes along the camera boom
   bodyRadius: 0.6,           // the camera is a ball of this radius: it never sits inside a building
+  turnLag: 3.2,              // 1/s: how quickly the camera swings round after a turn
+  heightLag: 5,              // 1/s: how quickly the camera follows the height of the car
 });
 
 /* Car physics (SI units). One car body on the physics surface; arcade, but it never drives through a building

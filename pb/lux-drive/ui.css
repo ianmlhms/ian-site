@@ -1,0 +1,160 @@
+/* The look of the interface of Lux Drive: warm paper panels over the painted world, a clean HUD that never covers the road. */
+
+:root {
+  --paper: #f2ead9;
+  --paper-2: #e6dcc6;
+  --ink: #2b2620;
+  --ink-soft: #5d5548;
+  --accent: #b4472f;
+  --shadow: rgba(30, 24, 16, 0.32);
+  --hud-bg: rgba(28, 26, 22, 0.58);
+  --hud-ink: #f4efe4;
+}
+
+* { box-sizing: border-box; }
+
+/* the hidden attribute must win over the display rules below (the panels are flex / grid) */
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #10151a;
+  color: var(--ink);
+  font-family: 'Avenir Next', 'Segoe UI', system-ui, sans-serif;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
+canvas#view { display: block; width: 100%; height: 100%; }
+
+/* ---- the loading screen */
+#loading {
+  position: fixed; inset: 0; z-index: 40;
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(circle at 50% 38%, #4c5a52 0%, #222a2b 70%, #14191b 100%);
+  color: var(--hud-ink);
+}
+#loading .loadBox { text-align: center; max-width: 30rem; padding: 1.5rem; }
+#loading h1 { font-size: 2.6rem; letter-spacing: 0.06em; margin: 0 0 0.4rem; font-weight: 600; }
+#loading p { margin: 0 0 1rem; color: #d8d2c4; min-height: 1.4em; }
+#loading .bar { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.16); overflow: hidden; }
+#loading #loadBar { height: 100%; width: 0; background: linear-gradient(90deg, #e0b062, #b4472f); transition: width 0.18s ease; }
+
+/* ---- the HUD */
+#hud { position: fixed; inset: 0; pointer-events: none; z-index: 20; }
+#hud > * { pointer-events: auto; }
+
+#speedo {
+  position: absolute; left: 1rem; bottom: 1rem;
+  background: var(--hud-bg); color: var(--hud-ink);
+  border-radius: 0.9rem; padding: 0.5rem 0.9rem;
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  min-width: 8.2rem;
+}
+#speedo .row { display: flex; align-items: baseline; gap: 0.35rem; }
+#speedo #speedValue { font-size: 2.3rem; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.05; }
+#speedo small { font-size: 0.85rem; opacity: 0.78; }
+#speedo #gearValue { font-size: 1.15rem; font-weight: 600; min-width: 1.2rem; }
+
+#minimap {
+  position: absolute; right: 1rem; bottom: 1rem;
+  width: 168px; height: 168px; border-radius: 50%;
+  border: 3px solid rgba(242, 234, 217, 0.82);
+  box-shadow: 0 6px 20px var(--shadow);
+  background: #2b3a2c;
+}
+
+#roadName {
+  position: absolute; left: 50%; top: 0.9rem; transform: translateX(-50%);
+  background: var(--hud-bg); color: var(--hud-ink);
+  padding: 0.28rem 0.9rem; border-radius: 1rem;
+  font-size: 0.95rem; letter-spacing: 0.02em;
+  max-width: 70vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+#toast {
+  position: absolute; left: 50%; top: 3.6rem; transform: translate(-50%, -0.6rem);
+  background: var(--paper); color: var(--ink);
+  padding: 0.4rem 1rem; border-radius: 0.7rem;
+  box-shadow: 0 4px 14px var(--shadow);
+  opacity: 0; transition: opacity 0.25s ease, transform 0.25s ease;
+}
+#toast.on { opacity: 1; transform: translate(-50%, 0); }
+
+#hudButtons { position: absolute; right: 1rem; top: 1rem; display: flex; gap: 0.4rem; }
+.hbtn {
+  width: 2.6rem; height: 2.6rem; border-radius: 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: var(--hud-bg); color: var(--hud-ink);
+  font-size: 1.1rem; cursor: pointer;
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+.hbtn:active { transform: translateY(1px); }
+
+/* ---- the menu and the help */
+#menu, #help {
+  position: fixed; inset: 0; z-index: 30;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(18, 16, 13, 0.52);
+  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+}
+.panel {
+  background: var(--paper);
+  border-radius: 1.1rem;
+  padding: 1.6rem 1.8rem;
+  box-shadow: 0 18px 50px rgba(20, 16, 10, 0.45);
+  max-width: 34rem; width: min(92vw, 34rem);
+  color: var(--ink);
+}
+.panel h1 { margin: 0 0 0.9rem; font-size: 2rem; letter-spacing: 0.05em; }
+.panel h2 { margin: 0 0 0.8rem; font-size: 1.35rem; }
+.panel p { color: var(--ink-soft); line-height: 1.45; font-size: 0.95rem; }
+.panel .note { font-size: 0.85rem; margin: 0.2rem 0 1rem; }
+.settings { display: grid; grid-template-columns: 1fr 1fr; gap: 0.55rem 1rem; margin-bottom: 0.8rem; }
+.settings label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; color: var(--ink-soft); }
+.settings select {
+  font: inherit; padding: 0.4rem 0.5rem; border-radius: 0.5rem;
+  border: 1px solid var(--paper-2); background: #fbf6ea; color: var(--ink);
+}
+.buttons { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.6rem; }
+.buttons button {
+  font: inherit; padding: 0.55rem 1.1rem; border-radius: 0.6rem; cursor: pointer;
+  border: 1px solid var(--paper-2); background: #fbf6ea; color: var(--ink);
+}
+.buttons button.primary { background: var(--accent); border-color: var(--accent); color: #fff6ec; font-weight: 600; }
+.buttons button:active { transform: translateY(1px); }
+
+/* ---- the touch controls (left thumb steers, right thumb drives) */
+#touchControls { position: fixed; inset: 0; z-index: 25; pointer-events: none; }
+#touchControls .pad {
+  position: absolute; left: 1.2rem; bottom: 6.5rem; width: 8.5rem; height: 3.4rem;
+  border-radius: 1.7rem; background: rgba(28, 26, 22, 0.34);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  pointer-events: auto; touch-action: none;
+}
+#touchControls .knob {
+  position: absolute; left: 50%; top: 50%; width: 3rem; height: 3rem; margin: -1.5rem 0 0 -1.5rem;
+  border-radius: 50%; background: rgba(244, 239, 228, 0.78);
+}
+#touchControls .lbl { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0.5; font-size: 0.9rem; }
+#touchControls .btns { position: absolute; right: 1.2rem; bottom: 6.5rem; display: flex; gap: 0.6rem; align-items: flex-end; pointer-events: auto; }
+#touchControls .tbtn {
+  width: 3.6rem; height: 3.6rem; border-radius: 50%;
+  background: rgba(28, 26, 22, 0.42); color: var(--hud-ink);
+  border: 1px solid rgba(255, 255, 255, 0.22); font-size: 1.2rem;
+  touch-action: none; display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+#touchControls .tbtn small { font-size: 0.55rem; opacity: 0.75; }
+#touchControls .tbtn.big { width: 4.6rem; height: 4.6rem; }
+#touchControls .tbtn.on { background: rgba(180, 71, 47, 0.72); }
+
+@media (max-width: 700px) {
+  .settings { grid-template-columns: 1fr; }
+  #minimap { width: 118px; height: 118px; }
+  #speedo { padding: 0.4rem 0.7rem; min-width: 6.6rem; }
+  #speedo #speedValue { font-size: 1.8rem; }
+}

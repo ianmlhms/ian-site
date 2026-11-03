@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="lb">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#222a2b">
+<meta name="robots" content="noindex">
+<title>Lux Drive</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/pb/lux-drive/ui.css?v=1">
+</head>
+<body>
+<main id="shell">
+  <canvas id="luxCanvas" tabindex="0" role="img" aria-label="Driving through Luxembourg City: a chase view of a car on the roads."></canvas>
+</main>
+<script>
+/* The loading screen: honest progress (main.js calls set(p, label) between its real steps). */
+(function () {
+  var STR = {
+    lb: { code: 'Luxemburg gëtt gelueden …', slow: 'Dauert méi laang wéi gewinnt …', retry: 'Nei probéieren' },
+    de: { code: 'Luxemburg wird geladen …', slow: 'Dauert länger als sonst …', retry: 'Nochmal versuchen' },
+    en: { code: 'Loading Luxembourg …', slow: 'Taking longer than usual …', retry: 'Try again' },
+    fr: { code: 'Chargement du Luxembourg …', slow: 'Cela prend plus de temps que d’habitude …', retry: 'Réessayer' }
+  };
+  var lang = "lb";
+  try { var own = localStorage.getItem("pb_luxdrive_lang"), site = localStorage.getItem("site_lang"); lang = STR[own] ? own : STR[site] ? site : "lb"; } catch (e) { /* the storage is blocked */ }
+  var T = STR[lang];
+  var loadBox = document.createElement("div");
+  loadBox.id = "loading";
+  loadBox.innerHTML = '<div class="loadBox"><h1>Lux Drive</h1><p id="loadLabel"></p><div class="bar"><div id="loadBar"></div></div></div>';
+  document.body.appendChild(loadBox);
+  var bar = document.getElementById("loadBar"), msg = document.getElementById("loadLabel");
+  var value = 0, done = false;
+  msg.textContent = T.code;
+  window.__luxLoad = {
+    set: function (p, label) { if (done) return; value = Math.max(value, p); bar.style.width = (value * 100) + "%"; if (label) msg.textContent = label; },
+    done: function () { if (done) return; done = true; bar.style.width = "100%"; loadBox.hidden = true; },
+    fail: function (text) { done = true; if (text) msg.textContent = text; }
+  };
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+window.addEventListener("error", function (event) { document.documentElement.dataset.bootError = event.message || "script-error"; });
+if (!window.THREE) {
+  document.documentElement.dataset.bootError = "three-missing";
+  if (window.__luxLoad) window.__luxLoad.fail("three.js r160 failed to load");
+  throw new Error("three.js r160 failed to load");
+}
+</script>
+<script src="/pb/boot-probe.js?v=1"></script>
+<script type="module">
+  // The imports are absolute: inside the arcade this page runs as a srcdoc iframe (the relative URLs of main.js would come from import.meta.url).
+  if (window.bootProbe) window.bootProbe("/pb/lux-drive/main.js?v=1", window.__luxLoad); else import("/pb/lux-drive/main.js?v=1");
+</script>
+</body>
+</html>

@@ -37,7 +37,8 @@ export function createHeightField({ near, far, roads }) {
     const c = scratch.coverage;
     if (info) {
       info.coverage = c; info.lat = scratch.lat; info.hw = scratch.hw; info.a0 = scratch.a0;
-      info.kind = scratch.kind; info.road = scratch.road;
+      info.kind = scratch.kind; info.road = scratch.road; info.lines = scratch.lines;
+      info.lanes = scratch.lanes; info.s = scratch.s;
     }
     if (c <= 0) return g;
     return g * (1 - c) + scratch.bed * c + scratch.kerb;
@@ -55,7 +56,8 @@ export function createHeightField({ near, far, roads }) {
     if (info) {
       info.coverage = c * paintK;
       info.lat = scratch.lat; info.hw = scratch.hw; info.a0 = scratch.a0;
-      info.kind = scratch.kind; info.road = scratch.road;
+      info.kind = scratch.kind; info.road = scratch.road; info.lines = scratch.lines;
+      info.lanes = scratch.lanes; info.s = scratch.s;
     }
     const cc = c * carveK;
     if (cc <= 0) return g;

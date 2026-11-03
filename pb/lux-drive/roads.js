@@ -48,6 +48,11 @@ const INFO = {
 
 export const kindInfo = (kind) => INFO[kind] || { drivable: false, surface: 'dirt', lines: 3, speed: 0 };
 
+/* The material of a road, as the number the ground shader switches on. */
+export const SURFACE_CODES = Object.freeze({ asphalt: 0, cobble: 1, concrete: 2, gravel: 3, dirt: 4 });
+/* The material of every class, indexed by the class code the road network carries. */
+export const KIND_SURFACE = Object.freeze(ROAD_KINDS.map((k) => SURFACE_CODES[kindInfo(k).surface] ?? 0));
+
 function readVarint(bytes, state) {
   let result = 0, shift = 0;
   for (;;) {

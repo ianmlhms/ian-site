@@ -69,7 +69,7 @@ function gaussianSmooth(values, sigmaSamples) {
 export function createRoadNetwork(roads, baseHeight) {
   const segAx = [], segAz = [], segBx = [], segBz = [], segB0 = [], segB1 = [];
   const segHw = [], segKerbH = [], segKerbW = [], segPw = [], segA0 = [], segR = [];
-  const segKind = [], segRoad = [], segKerbOn = [];
+  const segKind = [], segRoad = [], segKerbOn = [], segLines = [], segS0 = [], segS1 = [];
   const sampleX = [], sampleZ = [], sampleRoad = [];
   const info = [];
   const firstSample = [];            // the index of a road's first sample in the sample arrays
@@ -90,7 +90,7 @@ export function createRoadNetwork(roads, baseHeight) {
     const pw = Math.max(0, road.sidewalk);
     const a0 = hw + kerbW + pw;
     const radius = Math.min(ROAD.maxRadius, a0 + ROAD.falloff);
-    info[ri] = { hw, kerbH, kerbW, pw, a0, radius, kind, road };
+    info[ri] = { hw, kerbH, kerbW, pw, a0, radius, kind, road, lines: kind.lines, lanes: road.lanes };
     firstSample[ri] = sampleX.length;
     firstSeg[ri] = segAx.length;
 
@@ -111,6 +111,9 @@ export function createRoadNetwork(roads, baseHeight) {
       const lo = ground[i] - ROAD.bedClamp, hi = ground[i] + ROAD.bedClamp;
       bed[i] = Math.min(hi, Math.max(lo, bed[i]));
     }
+    // the distance along the centre line: the shader draws the lane markings as dashes along it
+    const along = new Float64Array(n);
+    for (let i = 1; i < n; i++) along[i] = along[i - 1] + Math.hypot(rs.x[i] - rs.x[i - 1], rs.z[i] - rs.z[i - 1]);
     const kindCode = ROAD_KINDS.indexOf(road.kind);
     for (let i = 0; i < n - 1; i++) {
       segAx.push(rs.x[i]); segAz.push(rs.z[i]); segBx.push(rs.x[i + 1]); segBz.push(rs.z[i + 1]);
@@ -118,6 +121,7 @@ export function createRoadNetwork(roads, baseHeight) {
       segHw.push(hw); segKerbH.push(kerbH); segKerbW.push(kerbW); segPw.push(pw);
       segA0.push(a0); segR.push(radius);
       segKind.push(kindCode); segRoad.push(ri); segKerbOn.push(1);
+      segLines.push(kind.lines); segS0.push(along[i]); segS1.push(along[i + 1]);
     }
     for (let i = 0; i < n; i++) { sampleX.push(rs.x[i]); sampleZ.push(rs.z[i]); sampleRoad.push(ri); }
     segCount[ri] = n - 1;
@@ -131,6 +135,8 @@ export function createRoadNetwork(roads, baseHeight) {
   const PW = Float32Array.from(segPw), A0 = Float32Array.from(segA0), RAD = Float32Array.from(segR);
   const KIND = Uint8Array.from(segKind), ROADOF = Int32Array.from(segRoad);
   const KERBON = Uint8Array.from(segKerbOn);
+  const LINES = Uint8Array.from(segLines);
+  const S0 = Float32Array.from(segS0), S1 = Float32Array.from(segS1);
   const SAMPLES_X = Float32Array.from(sampleX), SAMPLES_Z = Float32Array.from(sampleZ);
   const SAMPLES_ROAD = Int32Array.from(sampleRoad);
 
@@ -193,7 +199,7 @@ export function createRoadNetwork(roads, baseHeight) {
   }
 
   // ---- the query ---------------------------------------------------------
-  const scratch = { coverage: 0, bed: 0, kerb: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, dist: 0 };
+  const scratch = { coverage: 0, bed: 0, kerb: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, dist: 0, lines: 0, lanes: 0, s: 0 };
   const LEVEL_FULL = 2.5;           // m: a road shapes the ground that lies at its own level (within this)
   const LEVEL_FADE = 5.0;           // m: ... and its influence is gone at this distance (a road on the ledge 30 m
                                     // above must not cover the ground below it). The fade is soft: a hard cut would
@@ -216,7 +222,7 @@ export function createRoadNetwork(roads, baseHeight) {
   function carve(x, z, out, groundY) {
     const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
     const ground = groundY === undefined ? baseHeight(x, z) : groundY;
-    let best = -1, bestW = 0, bestLat = 0, bestDist = 0;
+    let best = -1, bestW = 0, bestLat = 0, bestDist = 0, bestT = 0;
     let covSum = 0, bedSum = 0;
     for (let dz = -1; dz <= 1; dz++) {
       for (let dx = -1; dx <= 1; dx++) {
@@ -244,12 +250,13 @@ export function createRoadNetwork(roads, baseHeight) {
           const w = cov * (1 - smoothstep(LEVEL_FULL, LEVEL_FADE, away));
           if (w <= 0) continue;
           covSum += w; bedSum += w * bed;
-          if (w > bestW) { bestW = w; best = i; bestLat = lat; bestDist = d; }
+          if (w > bestW) { bestW = w; best = i; bestLat = lat; bestDist = d; bestT = t; }
         }
       }
     }
     if (best < 0) {
-      out.coverage = 0; out.bed = 0; out.kerb = 0; out.lat = 0; out.hw = 0; out.a0 = 0; out.kind = 0; out.road = -1; out.dist = Infinity;
+      out.coverage = 0; out.bed = 0; out.kerb = 0; out.lat = 0; out.hw = 0; out.a0 = 0; out.kind = 0; out.road = -1;
+      out.dist = Infinity; out.lines = 0; out.lanes = 0; out.s = 0;
       return out;
     }
     out.coverage = Math.min(1, covSum);
@@ -265,6 +272,9 @@ export function createRoadNetwork(roads, baseHeight) {
     out.a0 = A0[best];
     out.kind = KIND[best];
     out.road = ROADOF[best];
+    out.lines = LINES[best];
+    out.lanes = info[ROADOF[best]].lanes;
+    out.s = S0[best] + (S1[best] - S0[best]) * bestT;      // the distance along the centre line of that road
     const a = Math.abs(bestLat);
     const kerbH = KERBH[best];
     if (kerbH <= 0 || !KERBON[best] || a <= HW[best]) out.kerb = 0;
@@ -283,7 +293,7 @@ export function createRoadNetwork(roads, baseHeight) {
 
   return {
     carve, nearestRoad, roads, info, count, scratch,
-    segments: { X0, Z0, X1, Z1, BED0, BED1, HW, KERBH, KERBW, PW, A0, RAD, KIND, ROADOF, KERBON },
+    segments: { X0, Z0, X1, Z1, BED0, BED1, HW, KERBH, KERBW, PW, A0, RAD, KIND, ROADOF, KERBON, LINES, S0, S1 },
     // the centre lines as they are carved (resampled and rounded): the game, the minimap and the probes follow these
     samples: { x: SAMPLES_X, z: SAMPLES_Z, road: SAMPLES_ROAD, first: firstSample, segs: segCount },
   };
