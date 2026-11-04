@@ -169,11 +169,11 @@ const CATHEDRAL = Object.freeze({
   at: [5164, 8965], hideRadius: 30, hideMinArea: 800,
   nave: [5154, 5178, 8929, 8976],          // m: x0, x1, z0, z1 of the narrow nave (north)
   transept: [5142, 5185, 8975, 9008],      // m: the wide part (south)
-  eave: 19, naveRise: 13, transeptRise: 12, crossingRise: 17,
+  eave: 19, naveRise: 17, transeptRise: 17, crossingRise: 22,    // steep: the slate roofs of the photographs rise at ~55 degrees
   // the front towers: centre, the belfry's stone reaches `wall`, the spire's tip is `tip` above the ground at the foot; `crown` = the shorter one with four gables
-  frontTowers: [{ at: [5158.4, 8936.5], crown: true, tip: 58 }, { at: [5173.6, 8936.5], crown: false, tip: 68 }],
+  frontTowers: [{ at: [5158.4, 8936.5], crown: true, tip: 64 }, { at: [5173.6, 8936.5], crown: false, tip: 72 }],
   towerHalf: 3.2, towerWall: 31, hipHeight: 5,
-  crossing: [5163, 8987], crossingHalf: 12, crossingTip: 52,
+  crossing: [5163, 8987], crossingHalf: 12, crossingTip: 60,
   buttressPitch: 6, lancetW: 1.7, lancetH: 7.5,
 });
 
