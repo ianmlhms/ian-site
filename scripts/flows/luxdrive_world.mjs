@@ -417,11 +417,13 @@ export const flow = {
             if (Math.hypot(cx - pose.x, cz - pose.z) <= NEAR_TRIS_M) trisNear++;
           }
         }
-        return { nearCells, nearCheap, trisNear, carFar: Math.hypot(car.x - pose.x, car.z - pose.z) };
+        return { nearCells, nearCheap, trisNear, detail: m.city.material.uniforms.uDetail.value, carFar: Math.hypot(car.x - pose.x, car.z - pose.z) };
       }, { x: 4440.0, z: 7915.8, h: 3.2, yaw: 137.5, pitch: -6 });
       h.expect(held.carFar > 500, `${q}: the camera is held ${held.carFar.toFixed(0)} m away from the car`);
       h.expect(held.nearCells > 0, `${q}: ${held.nearCells} building cells lie within 100 m of the held camera`);
       h.eq(held.nearCheap, 0, `${q}: every cell within 100 m of the held camera has the full building material (windows)`);
+      // low quality is LITE (windows and doors, no shutters / sills / bars), not plain: uDetail 0 drew every house near the camera as a blank box
+      h.expect(held.detail > 0 && (q === "low" ? held.detail < 1 : held.detail === 1), `${q}: the near houses are drawn with windows (building detail ${held.detail}; low 0 < d < 1, else 1)`);
       h.expect(held.trisNear > 0, `${q}: ${held.trisNear} building triangles within 60 m of the held camera (houses at every quality)`);
       await h.shot("held-camera-" + q);
     }
