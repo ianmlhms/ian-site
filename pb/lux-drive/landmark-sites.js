@@ -161,8 +161,8 @@ export function buildBock({ ground }) {
     }
     walls.push({ ax: e.x, az: e.z, bx: f.x, bz: f.z, r: 0.9, id: 'bock-parapet' });
     if (n % K.bastionEvery === 0) {
-      const bx = e.x + e.dx * 4.0, bz = e.z + e.dz * 4.0;
-      const yb = ground(bx + e.dx * 4, bz + e.dz * 4) - SINK, yt = ground(e.x, e.z) + 3.0;
+      const bx = e.x - e.dx * 3.0, bz = e.z - e.dz * 3.0;               // a stubby round bastion on the rim of the plateau (it hung over the cliff as a pillar)
+      const yb = ground(bx, bz) - SINK, yt = ground(e.x, e.z) + 3.0;
       soup.frustum(bx, bz, 5.0, 4.4, yb, yt, 12, paint(C.fortWall, i + 3, 0.05), { capColor: C.sandstoneDark });
     }
   });
