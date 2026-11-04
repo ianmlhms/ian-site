@@ -29,22 +29,30 @@ function median(values, i, radius) {
   return win[win.length >> 1];
 }
 
-/** Solves (W + lambda * D'D) z = W y for a series: D is the second difference.  The matrix is symmetric and pentadiagonal; it is
- *  factorised as L D L' in O(n).  A straight line is a fixed point of the smoother (D line = 0), also at the ends. */
-export function whittaker(y, w, lambda) {
+/** Solves (W + lambda * D'C D) z = W y for a series: D is the second DIVIDED difference (it is zero for any straight slope, whatever the spacing of the
+ *  samples), C the mean spacing of the rows, so lambda keeps its meaning of "per sample of ROAD.sampleSpacing" and the penalty does not depend on how the samples
+ *  are spaced.  `arc` is the distance of every sample along the way; the samples of a bend are closer than their nominal spacing (2.6 .. 4 m on a way sampled every
+ *  4 m), and with the plain difference in index space a straight 22 % slope was a zigzag of 10 cm that the curvature limiter then tried to repair.
+ *  The matrix is symmetric and pentadiagonal; it is factorised as L D L' in O(n).  A straight line is a fixed point of the smoother, also at the ends. */
+export function whittaker(y, w, lambda, arc = null) {
   const n = y.length;
   if (n < 4) {                                     // too short to have a curvature: a straight line from end to end
     const line = new Float64Array(n);
     for (let i = 0; i < n; i++) line[i] = n > 1 ? y[0] + (y[n - 1] - y[0]) * (i / (n - 1)) : y[0];
     return line;
   }
-  // the entries of A = W + lambda * D'D: main diagonal a0, first off-diagonal a1, second off-diagonal a2
+  // the entries of A = W + lambda * D'C D: main diagonal a0, first off-diagonal a1, second off-diagonal a2
   const a0 = new Float64Array(n), a1 = new Float64Array(n), a2 = new Float64Array(n);
-  for (let i = 0; i < n; i++) {
-    const m = i === 0 || i === n - 1 ? 1 : i === 1 || i === n - 2 ? 5 : 6;
-    a0[i] = w[i] + lambda * m;
-    if (i < n - 1) a1[i] = lambda * (i === 0 || i === n - 2 ? -2 : -4);
-    if (i < n - 2) a2[i] = lambda;
+  for (let i = 0; i < n; i++) a0[i] = w[i];
+  for (let r = 1; r < n - 1; r++) {                // row r of D: the second divided difference at sample r
+    const hl = arc ? Math.max(1e-6, arc[r] - arc[r - 1]) : 1, hr = arc ? Math.max(1e-6, arc[r + 1] - arc[r]) : 1;
+    const c = arc ? ((hl + hr) / 2) / ROAD.sampleSpacing : 1;
+    const scale = arc ? ROAD.sampleSpacing * ROAD.sampleSpacing : 1;      // (the divided difference has the unit 1/m2: bring it back to the unit of a plain difference)
+    const dl = 2 / (hl * (hl + hr)) * scale, dc = -2 / (hl * hr) * scale, dr = 2 / (hr * (hl + hr)) * scale;
+    const q = lambda * c;
+    a0[r - 1] += q * dl * dl; a0[r] += q * dc * dc; a0[r + 1] += q * dr * dr;
+    a1[r - 1] += q * dl * dc; a1[r] += q * dc * dr;
+    a2[r - 1] += q * dl * dr;
   }
   const d = new Float64Array(n), l1 = new Float64Array(n), l2 = new Float64Array(n);
   for (let i = 0; i < n; i++) {
@@ -138,7 +146,7 @@ function designOpenBed(ground, arc, pins) {
   const y = new Float64Array(n);
   for (let i = 0; i < n; i++) y[i] = median(ground, i, SPIKE_WINDOW);
   if (pins) for (const [i, h] of pins) { w[i] = PIN_WEIGHT; y[i] = h; }
-  let bed = whittaker(y, w, ROAD.bedStiffness);
+  let bed = whittaker(y, w, ROAD.bedStiffness, arc);
   // a street must not leave the land by more than bedClamp (it would cut a trench into a hill or stand on a wall): clamp, then
   // round the kinks the clamp made with a lighter pass
   let clamped = false;
@@ -148,6 +156,42 @@ function designOpenBed(ground, arc, pins) {
     c[i] = pins && pins.has(i) ? pins.get(i) : Math.min(hi, Math.max(lo, bed[i]));
     if (c[i] !== bed[i]) clamped = true;
   }
-  if (clamped) bed = whittaker(c, w, ROAD.bedStiffness * ROAD.bedRelax);
-  return limitCurvature(bed, arc, pins, ROAD.bedDeviation);
+  if (clamped) bed = whittaker(c, w, ROAD.bedStiffness * ROAD.bedRelax, arc);
+  return holdToLand(limitCurvature(bed, arc, pins, ROAD.bedDeviation), ground, pins);
+}
+
+const BLEND_REACH = 6;                   // samples each side of a clamped sample that are rounded again
+const BLEND_PASSES = 12;
+
+/** The curvature limiter alone flattens crests and fills sags without bound: where the land has a cliff or a crest (the edge of a bridge, a ridge) it carried a
+ *  road 6 .. 7 m away from the land - a cutting under a bridge deck, an embankment in a field.  A free sample of the bed is held within bedHardClamp of the
+ *  land; the samples around a clamped one are rounded again (a binomial blur, the clamped and pinned samples stay) so the clamp leaves no corner. */
+function holdToLand(bed, ground, pins) {
+  const n = bed.length;
+  const out = Float64Array.from(bed);
+  const fixed = new Uint8Array(n);
+  let any = false;
+  for (let i = 0; i < n; i++) {
+    if (pins && pins.has(i)) { fixed[i] = 1; continue; }
+    const lo = ground[i] - ROAD.bedHardClamp, hi = ground[i] + ROAD.bedHardClamp;
+    if (out[i] < lo) { out[i] = lo; fixed[i] = 1; any = true; } else if (out[i] > hi) { out[i] = hi; fixed[i] = 1; any = true; }
+  }
+  if (!any) return out;
+  const near = new Uint8Array(n);                      // the samples around a clamped one (not the pins)
+  for (let i = 0; i < n; i++) {
+    if (!fixed[i] || (pins && pins.has(i))) continue;
+    for (let k = Math.max(0, i - BLEND_REACH); k <= Math.min(n - 1, i + BLEND_REACH); k++) near[k] = 1;
+  }
+  let cur = out, next = new Float64Array(n);
+  for (let pass = 0; pass < BLEND_PASSES; pass++) {
+    for (let i = 0; i < n; i++) {
+      const isPin = pins && pins.has(i);
+      if (isPin || !near[i] || i === 0 || i === n - 1) { next[i] = cur[i]; continue; }
+      let v = 0.25 * cur[i - 1] + 0.5 * cur[i] + 0.25 * cur[i + 1];
+      v = Math.min(ground[i] + ROAD.bedHardClamp, Math.max(ground[i] - ROAD.bedHardClamp, v));
+      next[i] = v;
+    }
+    [cur, next] = [next, cur];
+  }
+  return cur;
 }

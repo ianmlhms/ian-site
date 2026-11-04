@@ -50,6 +50,7 @@ export const ROAD = Object.freeze({
                             // A stricter limit (the first version: 1.5 cm = R 1100 m) flattened every crest and filled every sag of a hill road by metres:
                             // cuttings and embankments of 2 .. 6 m (Rue Principale, Hostert) and walls beside the roads
   bedRelax: 0.25,          // the second, lighter pass that rounds the kinks the clamp to the land makes
+  bedHardClamp: 1.0,       // m: ... and the final bed (after the curvature limiter) never leaves the land by more than this (a pit under a bridge deck, an embankment in a field)
   bedClamp: 1.2,           // m, how far the bed of a road may leave the ground along its own centre line
   kerbHeight: 0.13,        // m, the kerb at the edge of the carriageway
   kerbWidth: 0.35,         // m, the width of the kerb face
