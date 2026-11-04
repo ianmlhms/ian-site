@@ -202,6 +202,53 @@ export const flow = {
     h.expect(kerb.minGap > 0.35, `the body never sank into the kerb (${kerb.minGap.toFixed(2)} m above the ground)`);
     h.expect(kerb.maxGap < 1.2, `the car did not fly over the kerb (${kerb.maxGap.toFixed(2)} m above the ground)`);
 
+    h.step("the ground beside the roads is never a wall (the reviewer's max slope beside roads)");
+    const slope = await page.evaluate(async () => {
+      const m = window.__lux;
+      const net = m.field.network;
+      const S = net.segments;
+      const rows = [];
+      // the segments are sampled with an even stride over the WHOLE network: the first few hundred segments are one
+      // corner of the map and say nothing about the rest
+      const STRIDE = 41;
+      for (let i = 0; i < net.count; i += STRIDE) {
+        const ax = S.X0[i], az = S.Z0[i], bx = S.X1[i], bz = S.Z1[i];
+        const len = Math.hypot(bx - ax, bz - az);
+        if (len < 1) continue;
+        const px = (ax + bx) / 2, pz = (az + bz) / 2;
+        const nx = -(bz - az) / len, nz = (bx - ax) / len;    // across the road
+        const a0 = S.A0[i], reach = S.REACH[i];
+        for (const s of [1, -1]) {
+          let carved = 0, natural = 0;
+          for (let d = a0 + 0.5; d <= reach; d += 0.5) {
+            const x = px + nx * s * d, z = pz + nz * s * d;
+            if (!isFinite(x) || !isFinite(z)) continue;
+            const h0 = m.field.height(x, z), h1 = m.field.height(x + nx * s * 0.5, z + nz * s * 0.5);
+            const g0 = m.field.groundHeight(x, z), g1 = m.field.groundHeight(x + nx * s * 0.5, z + nz * s * 0.5);
+            carved = Math.max(carved, Math.abs(h1 - h0) / 0.5);
+            natural = Math.max(natural, Math.abs(g1 - g0) / 0.5);
+          }
+          rows.push({ carved, natural });
+        }
+      }
+      const sorted = rows.slice().sort((a, b) => a.carved - b.carved);
+      const q = (p) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))].carved;
+      // the carve may not make the ground beside a road steeper than the land beside it is (a cliff stays a cliff),
+      // and where the land is flat it may not be steeper than the slope limit (0.84 = 40 degrees)
+      const over = rows.filter((r) => r.carved > Math.max(0.84, r.natural + 0.25)).length;
+      return {
+        total: rows.length,
+        p50: q(0.5), p90: q(0.9), p99: q(0.99),
+        over, share: over / rows.length,
+        walls: rows.filter((r) => r.carved > 3).length,
+      };
+    });
+    h.expect(slope.total > 5000, `${slope.total} sides of roads measured`);
+    h.expect(slope.p90 <= 0.85, `the ground beside the roads is at most ${slope.p90.toFixed(2)} (90th percentile, the limit is 0.84)`);
+    h.expect(slope.p99 <= 1.6, `the ground beside the roads is at most ${slope.p99.toFixed(2)} (99th percentile)`);
+    h.expect(slope.share <= 0.02, `${(slope.share * 100).toFixed(2)}% of the sides are steeper than the land (the limit is 2%)`);
+    h.expect(slope.walls <= 6, `${slope.walls} sides of roads are a wall (the limit is 6)`);
+
     h.step("the bridges of the brief are solid decks the car can drive on");
     const bridges = await page.evaluate(async () => {
       const m = window.__lux;

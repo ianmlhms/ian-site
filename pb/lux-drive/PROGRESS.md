@@ -307,6 +307,43 @@ frame; if the file is missing the canvas fallback (white cumulus on the blue of 
 The check: the flow `luxdrive-world` reads the uniform back and asks the texture whether it is the painted picture
 (`IMG`, 512 px) or the noise (`data`).
 
+### Fix 4 — the cliffs and the walls next to the roads: DONE (the batter is a slope limited ramp)
+
+The reviewer: *"Road carving must never create vertical walls: limit the side slope (max ~35-40 degrees, 1:1.5
+embankment), use the real terrain otherwise. Add it to the harness (max slope beside roads)."*
+
+**What the ground beside a road is.** The batter is no longer a fade of the bed towards the ground (that built a
+wall at the foot of every slope) and no longer a straight ramp to a point sampled at the far end of the
+embankment (that tore the ground open where a curved road fans its samples out). It is now the **land, limited
+to a ramp of at most the slope limit**: at a distance `e` past the edge of the pavement the ground may be at
+most `0.8 · e` (39 degrees, the reviewer's 1:1.5) away from the level of the road. Where the land is gentler
+than that, the land itself is the ground; where it is steeper, the ramp is the ground (a cliff beside a road
+stays a cliff). The batter ends where the ramp reaches the land again, so the ground of the carve meets the
+land there and leaves no step behind it — the length of the batter is found per centre line sample (not per
+segment), so it is continuous along the road.
+
+A road that stands far above the ground is a viaduct: the level of the road fades its influence out between
+4 m and 14 m, so the carve does not fill the valley under it.
+
+**The slit was the LOD fade, not the batter.** The ground beside the road used to be faded out with the LOD of
+the tile, so two neighbouring tiles disagreed on the height of the ground and the ground tore open where they
+met. The batter is applied at every LOD now; only the kerb (a 13 cm ridge) fades with the lattice.
+
+**Measured** over 15 430 sides of roads (every 41st segment of the whole network, both sides, from the edge of
+the pavement out to the end of the batter), the steepest slope of the carved ground against the steepest slope
+of the land over the same walk:
+
+| | the old carve | the slope limited batter |
+|---|---:|---:|
+| the median | 0.146 | 0.181 |
+| the 90th percentile | 0.601 | 0.682 |
+| the 99th percentile | 1.394 | **1.305** |
+| steeper than the land (or than 0.84 where the land is flat) | 409 (2.6 %) | **102 (0.66 %)** |
+
+**The check** is now in the harness: the flow `luxdrive-world` measures the same thing and fails when the 90th
+percentile is over 0.85, the 99th over 1.6, more than 2 % of the sides are steeper than the land beside them,
+or more than 6 sides are a wall (a slope over 3). The old carve fails the 2 % rule; the new one passes it.
+
 ## Milestone 3 — city: NOT STARTED
 ## Milestone 4 — gates: NOT STARTED
 

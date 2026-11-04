@@ -30,8 +30,8 @@ export const QUADTREE = Object.freeze({
   protectedSize: 128,       // nodes up to this size always use the full split factor; a quality setting only coarsens the bigger, farther nodes
   skirtDepth: 2.5,          // m the skirt hangs below its edge (belt and braces behind the exact stitching)
   skirtPerStep: 0.6,        // + this many m per m of node spacing
-  carveFullStep: 1,         // the road is carved into the height in full up to this node spacing ...
-  carveFadeStep: 4,         // ... fades out until here (a kerb cannot be sampled by a 4 m lattice)
+  kerbFullStep: 1,          // the kerb is exact up to this node spacing ...
+  kerbFadeStep: 4,          // ... and gone at this one (a kerb cannot be sampled by a 4 m lattice)
   maxBuiltPerFrame: 3,      // tile meshes (re)built per frame at most (iPad)
   keepSeconds: 4,           // cached tile data lives this long after its last use
 });
@@ -43,10 +43,16 @@ export const ROAD = Object.freeze({
   sampleSpacing: 4,        // m between the samples of a centre line
   lineSmoothing: 3.0,      // m, sigma of the Gaussian that rounds the corners of the OSM polyline
   bedSmoothing: 6.0,       // m, sigma of the Gaussian that smooths the road surface along the centre line
-  bedClamp: 1.5,           // m, how far the bed may leave the ground it lies on (a road is never 5 m under the terrain)
+  bedClamp: 1.2,           // m, how far the bed of a road may leave the ground along its own centre line
   kerbHeight: 0.13,        // m, the kerb at the edge of the carriageway
   kerbWidth: 0.35,         // m, the width of the kerb face
-  falloff: 2.2,            // m, how far the road reaches past its pavement before the ground is untouched again
+  falloff: 2.2,            // m, how far the road PAINTS past its pavement before the ground is untouched again
+  embankment: 18.0,        // m, how far the BATTER reaches past the pavement before the real terrain takes over.
+                            // The face of the batter is a straight ramp from the level of the road back to the
+                            // terrain, so the longer it is the flatter the ground beside the road is
+  maxBatterSlope: 0.8,    // m up per m out (39 degrees, the reviewer's 1:1.5 embankment): the ground the carve
+                            // makes beside a road must never be steeper than this.  Where the land itself is
+                            // steeper, the land is used as it is (a cliff beside a road stays a cliff)
   paintFullStep: 4,        // the road paint is exact up to this node spacing ...
   paintFadeStep: 16,       // ... and gone at this one (a 16 m lattice cannot resolve a 6 m street)
   markFullStep: 1,         // the kerb and the lane markings are exact on the 1 m lattice ...

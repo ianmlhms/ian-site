@@ -24,3 +24,20 @@ Review 1 (3 Nov, 22:30), from `luxdrive-world.quality-medium.png` and `luxdrive-
    bands). Use the MTB ground shader colours and the land classes; no colour by height.
 
 Keep going with M2 / M3 after these. Commit each fix separately with a clear message.
+
+---
+Review 2 (4 Nov, 00:25), from `luxdrive-wall.wall-c.png`. Roads now look right (A1 width + markings: good).
+You spent a whole chunk on item 4 without a commit. **Commit your current work now**, then:
+
+7. **Overpass = pit (root cause of the "walls").** Where Rue du Grünewald crosses OVER the A1, the A1's
+   cut is carved into the crossing road, so the bridge road dives into a dark pit. Rule: a way with
+   `bridge=*` / `layer>=1` is NEVER carved into the height function and the lower road's carve must not
+   lower the ground under the upper road's approach. The upper road crosses on a solid deck (decks.bin,
+   with abutments) at its own height; the ground stays the ground. Look at how `pb/train-sim`
+   `overbridges.js` / `overbridges-mesh.js` (W5 roads2) solved exactly this for roads over the railway.
+8. **Jagged edges** (staircase along the A1 median and verges): the edge is decided per 1 m lattice
+   vertex. Paint the carriageway edge per PIXEL in the shader from a smooth distance (signed distance to
+   the road centreline minus half width, interpolated), so edges are straight lines.
+9. **Time box:** if 7 is not solved within ~80 turns, write what you found in PROGRESS.md, leave it, and
+   START MILESTONE 3 (city buildings). The reviewer will take the remaining wall cases. Buildings are now
+   more important than perfection on item 4.
