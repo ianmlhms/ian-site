@@ -6,7 +6,7 @@
  *
  * The loading screen shows the real progress (the loader API of the page) and the tiles around the car are built while the
  * first frames run, so the game starts quickly. */
-import { QUALITY, WORLD } from './config.js';
+import { QUALITY, WORLD, TRAM } from './config.js';
 import { loadWorldData } from './world-data.js';
 import { createHeightField } from './heightfield.js';
 import { createSurface } from './surface.js';
@@ -23,6 +23,9 @@ import { createTerrainView } from './terrain-view.js';
 import { createBuildingView } from './building-view.js';
 import { createDeckView } from './deck-view.js';
 import { createPortalView } from './portal-view.js';
+import { createTramNetwork } from './tram-network.js';          // the Luxtram (city finish)
+import { createTramSim } from './tram-sim.js';
+import { createTramView } from './tram-view.js';
 import { createSolidMaterial } from './solid-material.js';
 import { createEnv, TIME_PRESETS, WEATHER_IDS } from './env.js';
 import { createChaseCamera } from './camera.js';
@@ -110,7 +113,7 @@ async function boot() {
   const buildings = createBuildingIndex(data.buildings);
   const portals = createPortals(data.roads);
   const playArea = createPlayArea(area);
-  const maps = buildWorldMap({ classes: data.classes, classInfo: data.classInfo, canopy: data.canopy });
+  const maps = buildWorldMap({ classes: data.classes, classInfo: data.classInfo, canopy: data.canopy, buildings: data.buildings });
   // the trees: the woods (placed from the canopy) and the trees of OSM (the street trees, the trees of the parks)
   const forest = createTreeIndex({ map: maps, field, network: field.network, buildings, trees: data.trees });
 
@@ -126,7 +129,7 @@ async function boot() {
     tex.colorSpace = THREE.NoColorSpace; tex.needsUpdate = true;
     return tex;
   };
-  const worldMaps = { class: mapTexture(maps.cover, maps.nx, maps.nz), canopy: mapTexture(maps.canopy, maps.canopyNx, maps.canopyNz) };
+  const worldMaps = { class: mapTexture(maps.coverGpu, maps.nx, maps.nz), canopy: mapTexture(maps.canopy, maps.canopyNx, maps.canopyNz) };
   const env = createEnv({
     noiseTexture: textures.noise,
     params: { time: param('time') || undefined, weather: param('weather') || undefined },
@@ -146,13 +149,17 @@ async function boot() {
   const trees = createTreeView({ scene, forest, baked: data.trees, field, env, quality });
   const decks = createDeckView({ scene, decks: ground.decks, material: solid, ground: ground.surface });
   const portalView = createPortalView({ scene, portals, ground, material: solid });
+  // the Luxtram: the rails and the vehicles of the line (tram-network.js builds the two tracks from lines.bin, tram-sim.js runs the vehicles on them)
+  const tramNetwork = createTramNetwork(data.lines, data.stops, TRAM);
+  const tramSim = createTramSim(tramNetwork, TRAM);
+  const trams = createTramView({ scene, network: tramNetwork, sim: tramSim, surface, deckNetwork, env, camera, maps });
   const model = createCarModel({ colourId: 'red', material: solid });
   scene.add(model.group);
 
   // ---- the car, the camera, the interface
   const start = data.places.start || { x: WORLD.width / 2, z: WORLD.depth / 2, yaw: 0 };
   const roadInfo = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, surface: 0, road: -1, lines: 0, lanes: 0, s: 0 };
-  const collide = (x, z, radius) => buildings.collide(x, z, radius) || portals.collide(x, z, radius) || forest.collide(x, z, radius) || playArea.collide(x, z, radius);
+  const collide = (x, z, radius) => buildings.collide(x, z, radius) || portals.collide(x, z, radius) || forest.collide(x, z, radius) || tramSim.collide(x, z, radius) || playArea.collide(x, z, radius);
   const car = createCar({ ground, roadInfoAt: (x, z, out) => surface.roadInfoAt(x, z, out), collide, start });
   const chase = createChaseCamera(ground, (x, z, radius) => buildings.collide(x, z, radius));
 
@@ -276,6 +283,7 @@ async function boot() {
     terrain.update(frozenCamera ? camera.position.x : car.state.x, frozenCamera ? camera.position.z : car.state.z);
     city.update(car.state.x, car.state.z);
     trees.update(camera.position.x, camera.position.z, elapsed);
+    trams.update(dt, camera.position.x, camera.position.z);
 
     // the interface
     ui.setSpeed(Math.abs(car.state.speed) * 3.6, car.state.gear);
@@ -311,7 +319,7 @@ async function boot() {
 
   // the API for the harness (the checks read the state of the game from here)
   window.__lux = {
-    scene, camera, renderer, car, env, terrain, city, trees, surface, ground, field, portals, playArea, buildings, quality: () => quality,
+    trams, tramSim, tramNetwork, scene, camera, renderer, car, env, terrain, city, trees, surface, ground, field, portals, playArea, buildings, quality: () => quality,
     state: () => car.state,
     setInput: (o) => { scripted = o; },
     /** The harness can hold the camera at a pose of its own (null gives it back to the chase camera). */

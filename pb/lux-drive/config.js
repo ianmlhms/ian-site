@@ -162,6 +162,28 @@ export const PORTAL = Object.freeze({
   base: 2.0,                // m, the wall goes this far under the ground (it never floats)
 });
 
+/* The Luxtram (CAF Urbos 100, 45 m, 2.65 m wide): the rails are the OSM tram ways of the bake (lines.bin, kind 2), the vehicles
+ * run on them in a simulation of their own (tram-sim.js).  Rails and vehicles are drawn by tram-view.js. */
+export const TRAM = Object.freeze({
+  gauge: 1.435,             // m between the inner faces of the rails
+  railWidth: 0.07, railHeight: 0.11, lift: 0.045,     // m: the head of the rail, and how far the track stands over the ground it is laid in
+  bedWidth: 2.9,            // m: the slab / grass bed the two rails lie in
+  chunk: 600,               // m of track per mesh (the frustum culls the rest)
+  sampleSpacing: 2.0,       // m between the cross sections of the track mesh
+  maxSpeed: 17.0,           // m/s (61 km/h): the line speed in the city
+  accel: 1.1, decel: 1.0,   // m/s2
+  dwell: 11,                // s at a stop
+  turnback: 16,             // s the tram is out of sight at a terminus (it changes tracks there)
+  stopSnap: 2.0,            // m: a tram stop is a node ON the rails of its track (the other track's stop node is 3-4 m away)
+  stopMerge: 45,            // m: two platform nodes of one stop closer than this along the track are one stop
+  sections: 5, sectionLength: 8.6, gap: 0.5,          // the 45 m vehicle: five articulated sections
+  width: 2.65, height: 3.55, floor: 0.45,
+  vehicles: 3,
+  bodyHalfWidth: 1.35,      // m: the collision capsule of a section
+  catenary: { spacing: 38, height: 5.6, arm: 1.9 },   // m between the poles, the height of the contact wire, the reach of the arm
+  platform: { length: 46, width: 3.0, height: 0.28, setback: 0.35 },
+});
+
 export const CAR_COLOURS = Object.freeze({
   red: '#c0392b', blue: '#2d6ca2', white: '#e8e8e4', black: '#2b2b2e', green: '#3d7a4a', yellow: '#d9a327', grey: '#7d8288', orange: '#d4691f',
 });
