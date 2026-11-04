@@ -119,20 +119,31 @@ export const CAR = Object.freeze({
   mass: 1350,                // kg
   wheelbase: 2.62,
   trackWidth: 1.72,
-  power: 118000,             // W at the wheels at full throttle (about 160 hp)
+  power: 100000,             // W at the wheels at full throttle (about 135 hp)
   reversePower: 42000,       // W in reverse
   maxSpeed: 56,              // m/s (200 km/h) - the hard cap on a motorway
   maxReverse: 12,            // m/s
-  brakeDecel: 12.5,          // m/s2 at full braking on asphalt
+  brakeDecel: 10.5,          // m/s2 at full braking on asphalt
   engineBrake: 1.6,          // m/s2 when the throttle is closed
   steerMax: 0.56,            // rad of the road wheel angle at standstill
   steerSpeedRef: 13,         // m/s: the steering authority falls off with the speed
+  limitOvershoot: 1.7,       // the soft top speed on a road is this many times its speed limit (never above the class top speed)
+  slideScrub: 0.7,           // 1/s: how fast a sliding car loses speed (at full slip)
+  launchCap: 6.5,            // m/s2: the most the drive pushes at low speed (no rocket launch)
   steerRate: 7,              // 1/s: how fast the wheel follows the input
+  steerGripShare: 0.95,      // the share of the tyre grip that full lock may ask for in a corner (the rest is the margin before a slide)
+  steerMin: 0.035,           // rad: the wheel always keeps this much authority, even at 200 km/h
+  squatGain: 0.006,          // rad of body pitch per m/s2 of acceleration (negative acceleration = the nose dives)
+  squatMax: 0.05,            // rad
+  leanMax: 0.12,             // rad: the most the body leans in a corner
+  leanGain: 0.02,            // rad of body roll per (rad of steer x m/s)
+  handbrakeYaw: 1.5,         // the yaw gain with the handbrake pulled: the tail steps out
   grip: 1.45,                // the friction coefficient of the tyres (mu)
   cdA: 0.68,                 // m2, the drag that ends the speed
   airDensity: 1.2,
   crr: 0.014,                // the rolling resistance of the tyres
-  bodyRadius: 1.35,          // m: the collision circle of the car against the buildings
+  bodyRadius: 1.0,           // m: the radius of the two collision circles of the car (the half width is 0.9 m)
+  bodyCircles: [1.25, -1.25], // m: the circles sit this far in front of / behind the centre (4.4 m long body: nose and tail)
   fixedStep: 1 / 120,        // s: the physics step
   slopeAssist: 1.0,          // the gravity along the slope is applied in full
   handbrakeGrip: 0.42,       // the grip left on the rear axle with the handbrake pulled

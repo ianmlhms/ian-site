@@ -1,17 +1,25 @@
-/* The look of the interface of Lux Drive: warm paper panels over the painted world, a clean HUD that never covers the road. */
+/* The look of the interface of Lux Drive: the dark rounded panels of the other ian.lu arcade games (pb/mtb/ui.css) over the
+ * painted world, a clean HUD that never covers the road, and touch controls sized for the thumbs of a school iPad. */
 
 :root {
-  --paper: #f2ead9;
-  --paper-2: #e6dcc6;
-  --ink: #2b2620;
-  --ink-soft: #5d5548;
-  --accent: #b4472f;
-  --shadow: rgba(30, 24, 16, 0.32);
-  --hud-bg: rgba(28, 26, 22, 0.58);
-  --hud-ink: #f4efe4;
+  color-scheme: dark;
+  --ink: #fff7e0;
+  --muted: #b8c4b4;
+  --panel: #10201ae8;
+  --panel2: #162b22f2;
+  --line: #ffffff26;
+  --gold: #ffcf5c;
+  --accent: #7bd88f;
+  --accent2: #4fb870;
+  --warn: #ff8a6b;
+  --hud-bg: rgba(16, 32, 26, 0.66);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
 }
 
-* { box-sizing: border-box; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
 /* the hidden attribute must win over the display rules below (the panels are flex / grid) */
 [hidden] { display: none !important; }
@@ -21,142 +29,217 @@ html, body {
   padding: 0;
   height: 100%;
   overflow: hidden;
-  background: #10151a;
+  background: #0e1a14;
   color: var(--ink);
-  font-family: 'Avenir Next', 'Segoe UI', system-ui, sans-serif;
+  font-family: ui-rounded, 'SF Pro Rounded', 'Avenir Next', 'Segoe UI', system-ui, sans-serif;
   -webkit-text-size-adjust: 100%;
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
   overscroll-behavior: none;
   touch-action: none;
 }
+button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulation; }
 
 /* the shell fills the screen and the canvas fills the shell: a canvas without a size stays at its default 300x150 */
 #shell { position: fixed; inset: 0; }
-canvas#luxCanvas { display: block; width: 100%; height: 100%; }
+canvas#luxCanvas { display: block; width: 100%; height: 100%; outline: none; touch-action: none; }
 
 /* ---- the loading screen */
 #loading {
-  position: fixed; inset: 0; z-index: 40;
+  position: fixed; inset: 0; z-index: 90;
   display: flex; align-items: center; justify-content: center;
-  background: radial-gradient(circle at 50% 38%, #4c5a52 0%, #222a2b 70%, #14191b 100%);
-  color: var(--hud-ink);
+  background: radial-gradient(circle at 50% 38%, #2c4a3a 0%, #16271f 70%, #0e1a14 100%);
+  color: var(--ink);
 }
 #loading .loadBox { text-align: center; max-width: 30rem; padding: 1.5rem; }
-#loading h1 { font-size: 2.6rem; letter-spacing: 0.06em; margin: 0 0 0.4rem; font-weight: 600; }
-#loading p { margin: 0 0 1rem; color: #d8d2c4; min-height: 1.4em; }
+#loading h1 { font-size: 2.6rem; letter-spacing: 0.06em; margin: 0 0 0.4rem; font-weight: 800; }
+#loading p { margin: 0 0 1rem; color: var(--muted); min-height: 1.4em; }
 #loading .bar { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.16); overflow: hidden; }
-#loading #loadBar { height: 100%; width: 0; background: linear-gradient(90deg, #e0b062, #b4472f); transition: width 0.18s ease; }
+#loading #loadBar { height: 100%; width: 0; background: linear-gradient(90deg, var(--gold), var(--accent)); transition: width 0.18s ease; }
 
-/* ---- the HUD */
-#hud { position: fixed; inset: 0; pointer-events: none; z-index: 20; }
-#hud > * { pointer-events: auto; }
+/* ---- the HUD (the corners; the middle of the screen stays the road) */
+#hud { position: fixed; inset: 0; pointer-events: none; z-index: 20; text-shadow: 0 1px 6px #000b; }
+#hud > * { pointer-events: none; }
+#hud button, #hud canvas, #hud #chooser { pointer-events: auto; }
 
-#speedo {
-  position: absolute; left: 1rem; bottom: 1rem;
-  background: var(--hud-bg); color: var(--hud-ink);
-  border-radius: 0.9rem; padding: 0.5rem 0.9rem;
-  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-  min-width: 8.2rem;
+#hudTL { position: absolute; left: calc(14px + var(--safe-l)); top: calc(10px + var(--safe-t)); display: flex; align-items: center; gap: 12px; }
+#speedo { display: flex; align-items: baseline; gap: 6px; }
+#speedo #speedValue { font-size: 2.9rem; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -1px; line-height: 1; min-width: 3.2ch; text-align: right; transition: color 0.2s; }
+#speedo small { font-size: 0.9rem; color: var(--muted); }
+#speedo.over #speedValue { color: #ffa25a; }
+
+/* the speed-limit sign: a white disc with a red ring */
+#limitSign {
+  width: 3.5rem; height: 3.5rem; border-radius: 50%; flex: none;
+  background: #fff; border: 0.42rem solid #d2262b;
+  display: grid; place-items: center;
+  color: #141414; text-shadow: none; box-shadow: 0 2px 10px #0008;
 }
-#speedo .row { display: flex; align-items: baseline; gap: 0.35rem; }
-#speedo #speedValue { font-size: 2.3rem; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.05; }
-#speedo small { font-size: 0.85rem; opacity: 0.78; }
-#speedo #gearValue { font-size: 1.15rem; font-weight: 600; min-width: 1.2rem; }
-
-#minimap {
-  position: absolute; right: 1rem; bottom: 1rem;
-  width: 168px; height: 168px; border-radius: 50%;
-  border: 3px solid rgba(242, 234, 217, 0.82);
-  box-shadow: 0 6px 20px var(--shadow);
-  background: #2b3a2c;
-}
+#limitSign span { font-size: 1.35rem; font-weight: 900; letter-spacing: -0.5px; }
 
 #roadName {
-  position: absolute; left: 50%; top: 0.9rem; transform: translateX(-50%);
-  background: var(--hud-bg); color: var(--hud-ink);
-  padding: 0.28rem 0.9rem; border-radius: 1rem;
-  font-size: 0.95rem; letter-spacing: 0.02em;
-  max-width: 70vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  position: absolute; left: 50%; top: calc(10px + var(--safe-t)); transform: translateX(-50%);
+  background: var(--hud-bg); border: 1px solid var(--line);
+  padding: 0.3rem 0.95rem; border-radius: 1rem;
+  font-size: 0.98rem; font-weight: 700; letter-spacing: 0.01em;
+  max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  opacity: 0; transition: opacity 0.3s;
+}
+#roadName.on { opacity: 1; }
+
+#hudTR { position: absolute; right: calc(12px + var(--safe-r)); top: calc(10px + var(--safe-t)); display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+#hudButtons { display: flex; gap: 8px; }
+.hbtn {
+  width: 3rem; height: 3rem; border-radius: 0.95rem; padding: 0;
+  border: 1px solid var(--line); background: var(--hud-bg);
+  font-size: 1.3rem; display: grid; place-items: center; text-shadow: none;
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+.hbtn:active { transform: scale(0.94); }
+
+#minimap {
+  width: 9.4rem; height: 9.4rem; border-radius: 50%;
+  border: 3px solid rgba(255, 247, 224, 0.85);
+  box-shadow: 0 6px 20px #0008;
+  background: #9fb184; cursor: pointer;
 }
 
+#chooser {
+  position: absolute; right: calc(12px + var(--safe-r)); top: calc(66px + var(--safe-t));
+  width: min(31rem, 62vw); padding: 0.7rem 0.8rem; border-radius: 1.2rem;
+  background: var(--panel2); border: 1px solid var(--line); box-shadow: 0 10px 40px #0009;
+  display: flex; flex-direction: column; gap: 0.5rem; text-shadow: none; z-index: 5;
+}
+#chooser .chRow { display: flex; flex-direction: column; gap: 0.25rem; }
+#chooser .chRow > b { font-size: 0.78rem; color: var(--muted); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+
 #toast {
-  position: absolute; left: 50%; top: 3.6rem; transform: translate(-50%, -0.6rem);
-  background: var(--paper); color: var(--ink);
-  padding: 0.4rem 1rem; border-radius: 0.7rem;
-  box-shadow: 0 4px 14px var(--shadow);
+  position: absolute; left: 50%; top: calc(58px + var(--safe-t)); transform: translate(-50%, -8px);
+  background: var(--panel); border: 1px solid var(--line); color: var(--ink);
+  padding: 0.45rem 1.1rem; border-radius: 1.2rem; font-weight: 700; text-shadow: none;
+  max-width: 60vw; text-align: center;
   opacity: 0; transition: opacity 0.25s ease, transform 0.25s ease;
 }
 #toast.on { opacity: 1; transform: translate(-50%, 0); }
 
-#hudButtons { position: absolute; right: 1rem; top: 1rem; display: flex; gap: 0.4rem; }
-.hbtn {
-  width: 2.6rem; height: 2.6rem; border-radius: 0.7rem;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  background: var(--hud-bg); color: var(--hud-ink);
-  font-size: 1.1rem; cursor: pointer;
-  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+/* the rain on the screen: streaks falling with the GPU (no script) */
+#rainFx {
+  position: absolute; inset: -20% 0 0 0; opacity: 0; transition: opacity 1.2s ease; z-index: -1;
+  background:
+    repeating-linear-gradient(105deg, transparent 0 46px, rgba(220, 235, 245, 0.22) 46px 47px, transparent 47px 91px),
+    repeating-linear-gradient(103deg, transparent 0 71px, rgba(220, 235, 245, 0.16) 71px 72px, transparent 72px 133px);
+  background-size: 100% 220px, 100% 340px;
+  animation: rainFall 0.55s linear infinite;
+  pointer-events: none;
 }
-.hbtn:active { transform: translateY(1px); }
+@keyframes rainFall { from { background-position: 0 0, 0 0; } to { background-position: -40px 220px, -60px 340px; } }
+@media (prefers-reduced-motion: reduce) { #rainFx { animation: none; } }
 
-/* ---- the menu and the help */
-#menu, #help {
-  position: fixed; inset: 0; z-index: 30;
-  display: flex; align-items: center; justify-content: center;
-  background: rgba(18, 16, 13, 0.52);
+/* ---- the overlays: start, pause, settings, help */
+.overlay {
+  position: fixed; inset: 0; z-index: 60;
+  display: grid; place-items: center; padding: 10px;
+  background: radial-gradient(ellipse at 50% 40%, rgba(10, 22, 17, 0.5), rgba(8, 16, 12, 0.82));
   backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
 }
-.panel {
-  background: var(--paper);
-  border-radius: 1.1rem;
-  padding: 1.6rem 1.8rem;
-  box-shadow: 0 18px 50px rgba(20, 16, 10, 0.45);
-  max-width: 34rem; width: min(92vw, 34rem);
-  color: var(--ink);
+.overlay .box {
+  width: min(100%, 52rem); max-height: 100%; overflow: auto; -webkit-overflow-scrolling: touch;
+  padding: 1.2rem 1.4rem 1.1rem; border-radius: 1.5rem;
+  background: var(--panel2); border: 1px solid var(--line); box-shadow: 0 14px 50px #000a;
+  touch-action: pan-y;
 }
-.panel h1 { margin: 0 0 0.9rem; font-size: 2rem; letter-spacing: 0.05em; }
-.panel h2 { margin: 0 0 0.8rem; font-size: 1.35rem; }
-.panel p { color: var(--ink-soft); line-height: 1.45; font-size: 0.95rem; }
-.panel .note { font-size: 0.85rem; margin: 0.2rem 0 1rem; }
-.settings { display: grid; grid-template-columns: 1fr 1fr; gap: 0.55rem 1rem; margin-bottom: 0.8rem; }
-.settings label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; color: var(--ink-soft); }
-.settings select {
-  font: inherit; padding: 0.4rem 0.5rem; border-radius: 0.5rem;
-  border: 1px solid var(--paper-2); background: #fbf6ea; color: var(--ink);
+.overlay .box.narrow { width: min(100%, 28rem); }
+.overlay h1 { margin: 0; font-size: 2.3rem; letter-spacing: 0.05em; font-weight: 800; color: var(--gold); }
+.overlay h2 { margin: 0 0 0.8rem; font-size: 1.5rem; }
+.overlay h3 { margin: 0 0 0.35rem; font-size: 0.78rem; font-weight: 700; color: var(--muted); letter-spacing: 0.05em; text-transform: uppercase; }
+.overlay p { margin: 0.2rem 0 0.6rem; color: var(--muted); line-height: 1.45; font-size: 0.95rem; }
+.overlay .tagline { margin: 0.1rem 0 0.9rem; font-size: 1.05rem; color: var(--ink); }
+.overlay .note { font-size: 0.82rem; margin: 0.7rem 0 0.2rem; }
+.overlay .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem 1.2rem; }
+.overlay .grid section:nth-child(3), .overlay .grid section:nth-child(4) { grid-column: auto; }
+.overlay .actions { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.9rem; }
+.overlay .stack { display: flex; flex-direction: column; gap: 0.55rem; }
+
+.overlay button:not(.chip):not(.dot) {
+  min-height: 3.1rem; padding: 0 1.3rem; border-radius: 1rem; font-weight: 700;
+  border: 1px solid var(--line); background: #ffffff14; color: var(--ink);
 }
-.buttons { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.6rem; }
-.buttons button {
-  font: inherit; padding: 0.55rem 1.1rem; border-radius: 0.6rem; cursor: pointer;
-  border: 1px solid var(--paper-2); background: #fbf6ea; color: var(--ink);
+.overlay button.primary:not(.chip):not(.dot) { background: linear-gradient(180deg, var(--accent), var(--accent2)); border-color: transparent; color: #08210f; }
+.overlay button.big { min-height: 3.6rem; font-size: 1.2rem; padding: 0 2rem; }
+.overlay button:active { transform: translateY(1px); }
+
+.chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.chip {
+  min-height: 2.7rem; padding: 0 0.8rem; border-radius: 0.95rem; display: inline-flex; align-items: center; gap: 0.4rem;
+  border: 1px solid var(--line); background: #ffffff12; color: var(--ink); font-size: 0.92rem; font-weight: 700;
 }
-.buttons button.primary { background: var(--accent); border-color: var(--accent); color: #fff6ec; font-weight: 600; }
-.buttons button:active { transform: translateY(1px); }
+.chip .ico { font-size: 1.15rem; line-height: 1; }
+.chip[aria-pressed='true'] { background: #7bd88f33; border-color: var(--accent); color: #d5ffdf; }
+#chooser .chip { min-height: 2.5rem; padding: 0 0.6rem; font-size: 0.85rem; }
+.chips.dots { gap: 0.5rem; }
+.dot { width: 2.4rem; height: 2.4rem; border-radius: 50%; border: 3px solid transparent; background: var(--c); box-shadow: 0 0 0 1px #0008 inset; padding: 0; }
+.dot[aria-pressed='true'] { border-color: var(--gold); box-shadow: 0 0 0 2px #0008; }
+
+/* ---- the full-screen Kaart */
+#mapOverlay { position: fixed; inset: 0; z-index: 55; background: #8fa3b0; }
+#mapCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
+.mapBar {
+  position: absolute; left: calc(12px + var(--safe-l)); right: calc(12px + var(--safe-r)); top: calc(10px + var(--safe-t));
+  display: flex; align-items: center; gap: 0.8rem; padding: 0.4rem 0.5rem 0.4rem 1rem; border-radius: 1.1rem;
+  background: var(--hud-bg); border: 1px solid var(--line); pointer-events: none;
+}
+.mapBar b { font-size: 1.15rem; }
+.mapBar span { flex: 1; color: var(--muted); font-size: 0.92rem; }
+.mapBar .hbtn { pointer-events: auto; }
+.mapZoom { position: absolute; right: calc(12px + var(--safe-r)); bottom: calc(16px + var(--safe-b)); display: flex; flex-direction: column; gap: 8px; }
 
 /* ---- the touch controls (left thumb steers, right thumb drives) */
 #touchControls { position: fixed; inset: 0; z-index: 25; pointer-events: none; }
+body[class*='open-'] #touchControls { display: none; }
 #touchControls .pad {
-  position: absolute; left: 1.2rem; bottom: 6.5rem; width: 8.5rem; height: 3.4rem;
-  border-radius: 1.7rem; background: rgba(28, 26, 22, 0.34);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  position: absolute; left: calc(18px + var(--safe-l)); bottom: calc(18px + var(--safe-b));
+  width: clamp(13rem, 33vw, 20rem); height: 6.6rem; border-radius: 3.3rem;
+  background: rgba(16, 32, 26, 0.46); border: 2px solid rgba(255, 247, 224, 0.28);
   pointer-events: auto; touch-action: none;
+  display: flex; align-items: center; justify-content: space-between; padding: 0 1.3rem;
 }
+#touchControls .pad .arrow { font-size: 1.6rem; opacity: 0.55; pointer-events: none; }
 #touchControls .knob {
-  position: absolute; left: 50%; top: 50%; width: 3rem; height: 3rem; margin: -1.5rem 0 0 -1.5rem;
-  border-radius: 50%; background: rgba(244, 239, 228, 0.78);
+  position: absolute; left: 50%; top: 50%; width: 4.6rem; height: 4.6rem; margin: -2.3rem 0 0 -2.3rem;
+  border-radius: 50%; background: rgba(255, 247, 224, 0.82); box-shadow: 0 3px 10px #0007; pointer-events: none;
 }
-#touchControls .lbl { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0.5; font-size: 0.9rem; }
-#touchControls .btns { position: absolute; right: 1.2rem; bottom: 6.5rem; display: flex; gap: 0.6rem; align-items: flex-end; pointer-events: auto; }
+#touchControls .pad.on { background: rgba(16, 32, 26, 0.62); }
+#touchControls .pedals {
+  position: absolute; right: calc(18px + var(--safe-r)); bottom: calc(18px + var(--safe-b));
+  width: 17.5rem; height: 11.4rem; pointer-events: none;
+}
 #touchControls .tbtn {
-  width: 3.6rem; height: 3.6rem; border-radius: 50%;
-  background: rgba(28, 26, 22, 0.42); color: var(--hud-ink);
-  border: 1px solid rgba(255, 255, 255, 0.22); font-size: 1.2rem;
-  touch-action: none; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  width: 6rem; height: 6rem; border-radius: 50%; padding: 0;
+  background: rgba(16, 32, 26, 0.5); color: var(--ink);
+  border: 2px solid rgba(255, 247, 224, 0.3); font-size: 1.6rem;
+  touch-action: none; pointer-events: auto;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.15rem;
 }
-#touchControls .tbtn small { font-size: 0.55rem; opacity: 0.75; }
-#touchControls .tbtn.big { width: 4.6rem; height: 4.6rem; }
-#touchControls .tbtn.on { background: rgba(180, 71, 47, 0.72); }
+#touchControls .tbtn i { font-style: normal; line-height: 1; }
+#touchControls .tbtn small { font-size: 0.72rem; font-weight: 700; opacity: 0.85; letter-spacing: 0.03em; }
+#touchControls .tbtn.big { width: 8rem; height: 8rem; font-size: 2.2rem; background: rgba(79, 184, 112, 0.46); }
+#touchControls .tbtn.on { background: rgba(255, 207, 92, 0.7); color: #2a1d00; }
+#touchControls .tbtn.big.on { background: rgba(123, 216, 143, 0.8); color: #06210f; }
+#touchControls .tbtn[data-btn='brake'] { position: absolute; right: 8.9rem; bottom: 0; }
+#touchControls .tbtn[data-btn='throttle'] { position: absolute; right: 0; bottom: 0; }
+#touchControls .tbtn[data-btn='handbrake'] { position: absolute; right: 9.7rem; bottom: 6.4rem; margin: 0; width: 4.4rem; height: 4.4rem; }
 
-@media (max-width: 700px) {
-  .settings { grid-template-columns: 1fr; }
-  #minimap { width: 118px; height: 118px; }
-  #speedo { padding: 0.4rem 0.7rem; min-width: 6.6rem; }
-  #speedo #speedValue { font-size: 1.8rem; }
+#orient {
+  position: fixed; left: 50%; top: 42%; transform: translateX(-50%); z-index: 80;
+  padding: 0.8rem 1.2rem; border-radius: 1.1rem; background: var(--panel); border: 1px solid var(--line);
+  text-align: center; max-width: 80vw; font-weight: 700;
+}
+
+@media (max-width: 760px) {
+  .overlay .grid { grid-template-columns: 1fr; }
+}
+@media (max-height: 560px) {
+  #minimap { width: 7rem; height: 7rem; }
+  .overlay .box { padding: 0.8rem 1rem; }
+  .overlay h1 { font-size: 1.7rem; }
 }

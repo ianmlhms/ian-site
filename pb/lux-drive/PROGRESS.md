@@ -781,3 +781,69 @@ Open in this part: see the honest list in `reports-cloud/lux-drive/lux-drive-cit
 way at Place de l'Europe, tram crossovers shared by two tracks, nothing measured on a GPU / iPad).
 
 Boot cost added by this branch (Node, desktop): tram network 0.3 s, street lamps 0.2 s, benches 0.05 s, built-up density raster 0.2 s; an iPad takes 2-3x.
+
+## Milestone 5 — UI + car feel: see the section "Milestone 5 (branch `lux-drive-ui`)" below
+
+
+## Milestone 5 (branch `lux-drive-ui`) — UI + car feel: DONE (cloud session)
+
+Scope of this branch: the interface, the touch controls, the Kaart, the quality step, the car and its handling, the
+Luxembourgish texts.  The world (roads, buildings, trees, the look) is untouched; `main.js` and `lux-drive.html` got small,
+marked hooks only.
+
+### What is new
+
+| piece | files | what it does |
+|---|---|---|
+| texts | `i18n.js` | the Luxembourgish rewritten in LOD spelling (Ufank, Beem, Brécken, Fueren, Owend, Wollekeg, Haftung ...), 106 keys in lb / de / en / fr; the flow checks that no key is missing and no placeholder differs |
+| menus | `ui.js`, `ui.css` | the dark rounded panels of the MTB game; **start menu** (language, weather, time of day, quality, "Fueren"), **pause menu** (Weider, Kaart, Wieder, Astellungen, Hëllef, Nei starten), **settings** (+ camera, car colour, fullscreen), help. The language changes live. The car waits behind every menu |
+| weather / time | `ui.js`, `main.js` | chips with **Random first and selected by default**, in the start menu, the settings AND in the game (the ⛅ button opens a small chooser at the top right, it closes itself). Rain takes 28 % of the grip, fog thickens the air (both from `env.js`); the screen gets rain streaks (CSS only) and a "Naass Strooss" hint |
+| HUD | `ui.js`, `speed-limit.js` | speed, the **speed-limit sign** (white disc, red ring), road name, buttons, the minimap |
+| touch | `input.js`, `ui.css` | a wide analog **steering pad** (the wheel follows the thumb on the pad), **gas 128 px, brake 96 px, handbrake 70 px**, multi-touch (steer + gas + brake + handbrake at once), no scroll, no zoom (`touch-action: none`, `user-scalable=no`, gesture events blocked), safe-area insets, a "turn the iPad" hint in portrait |
+| Kaart | `road-index.js`, `basemap.js`, `minimap.js`, `fullmap.js`, `placement.js` | one road index for everything; a painted base map from the land class raster (woods, fields, town, rivers - no data file); the minimap turns with the car; the **full-screen map** (M or the 🗺 button or a tap on the minimap): pan, pinch / wheel / buttons to zoom, street names (main roads first, no overlaps), the towns, the car; **a tap on a road puts the car on that road**: nearest point of the nearest road, right-hand lane, facing along the road (the direction closest to where the car looked; one-way streets with the traffic); bridges are set down on their deck |
+| quality | `quality-step.js` | frame-time running average; 2.5 s slow (> 27 ms) steps down, 25 s fast (< 15 ms) steps back up - never above what the player chose, never into a level that was too slow before; hitches (background tab, teleport) are not a trend; `?q=` in the URL pins the quality (tests) |
+| car model | `car-model.js` | a low-poly hatchback: rounded hull, greenhouse with pillars, bumpers, grille, plates, mirrors, wheel arches; **12-sided wheels that roll and (front) steer**; headlamps that follow the headlights, **tail lamps that flare when braking**, reversing lamps; 10 meshes; 8 paint colours (settings) |
+| handling | `car.js`, `config.js` | see below |
+
+### Handling - what was wrong and what changed
+
+* **Reverse never worked**: the brake pedal reversed only while `|v| < 0.7 m/s`, so the car crept at 0.7 m/s backwards and then
+  the brake took over: a car wedged against a wall could not get out.  Now it reverses while it rolls backwards too (7 m/s in 3 s).
+* **The car was on rails in corners**: the velocity was turned with the heading, so the tyres never had anything to hold and
+  the handbrake did nothing.  Now the velocity keeps its direction when the car turns; the tyres take the sideways speed away
+  up to the grip (95 % of it is what full lock may ask for, so the car does not spin), beyond that it slides and scrubs speed.
+  **Handbrake** = rear grip x 0.42 and yaw x 1.5: a drift (slip 0.96 in the flow).
+* **Steering authority** is capped by the lateral grip: full lock at 90 km/h turns 40 deg in 2 s (was 100 deg), at 30 km/h 99 deg.
+  Rain lowers the cap, the braking and the drive (grip scale), so rain really is slippery: 50 -> 0 km/h takes 6.4 m dry, 8.4 m wet.
+* **Pace follows the speed limit**: the soft top speed of a road is 1.7 x its limit (50 -> 85 km/h, 90 -> 150 km/h), motorways
+  keep the 200 km/h cap.  Launch cap 6.5 m/s2, 100 kW: 0 -> 50 in 2.4 s, 0 -> 90 in 5.7 s.
+* **Collision**: two circles (nose and tail, r = 1.0 m) instead of one circle of 1.35 m at the centre: the bonnet does not
+  enter a wall any more; the car slides along a wall (only the speed into it is lost).
+* **Stuck**: pedal down and not moving for 3.5 s (a wall, a tree, a slope too steep to climb backwards) -> the car is put back on
+  the nearest road within 60 m (a toast tells the player).  Kerbs cannot stick: the ride follows the 1 m lattice and a 13 cm
+  kerb never airborne-triggers (the world flow's kerb check passes).
+* **Attitude**: the whole car lies on the slope (pitch / roll of the ground normal), the body squats, dives and leans on top of
+  that.  The old model rolled the body about the ground point, which made it sink into the wheels on a cambered road.
+* **Speed limit sign**: the baked roads carry no `maxspeed` and Overpass is not reachable from the cloud container, so the limit
+  is the Luxembourg default of the class: 50 in a town (class raster **or** a crowd of buildings - Kirchberg is open ground
+  between big blocks), 90 outside, motorway 130 (110 in rain, 90 inside the city), links 70, living street 20, service / track 30,
+  pedestrian 10.  `road.maxspeed` (km/h) wins when a future bake provides it.
+
+### Gates (cloud container, software WebGL: 3 frames a second)
+
+
+| gate | result |
+|---|---|
+| `node pb/lux-drive/harness.js` | **PASS - 44 checks passed, 0 failed** (212 s); 0 road ends in nowhere, 0 houses floating / buried / inside each other, 0 decks floating, 0 trees in a house or on the road, the car stays finite and on the ground, the camera never under the ground |
+| `node scripts/flows/luxdrive_world.mjs` | **PASS** (cloud): the start on Av. J.F. Kennedy, the car drives 27.6 m / 60 km/h, the paint follows the real width, kerb ridden without flying, bridges solid, the edge of the area holds, **draw calls low 42 / medium 51 / high 54** (the brief: medium <= 260), triangles 154k / 174k / 201k |
+| `node scripts/flows/luxdrive_holes.mjs` | **PASS** - 0 hole pixels over 72 poses, >= 126 tiles at every pose, the detector self-test sees 42 741 hole pixels with one tile removed |
+| `node scripts/flows/luxdrive_ui.mjs` (new) | **PASS** - menus, languages (live), Random default for weather + time, chooser in the menu and in the game, the pause freezes the car, rain / fog change grip / view, touch at 1180x820 and 1024x768 (sizes, multi-touch with 2 and 3 fingers, no scroll / zoom), map + three teleports (on the carriageway, along the road, grounded), the quality stepper (down, never above the choice, no oscillation, hitches ignored), the car (4 wheels turn, front ones steer, brake lights, headlights at night, 8 draw calls), handling (no spin, no flip, handbrake slide, reverse, pace by limit, braking 7.4 m dry / 9.7 m wet from 50 km/h), a wedged car is put back on a road, no console errors |
+
+Measured by the gates (and fixed on the way): the brake pedal reversed only while |v| < 0.7 m/s; the teleport put the car into a
+tunnel portal wall (the collision then threw it 7 m off a bridge deck); the old flow loops counted frames (10x too far on a slow
+renderer).  The flows count game seconds now (`window.__lux.clock()`).  Pictures and an honest list of what still looks wrong:
+`reports-cloud/lux-drive/lux-drive-ui/REPORT.md`.
+
+**New files:** `road-index.js`, `basemap.js`, `fullmap.js`, `placement.js`, `speed-limit.js`, `quality-step.js`,
+`scripts/flows/luxdrive_ui.mjs`.  **Rewritten:** `ui.js`, `ui.css`, `input.js`, `minimap.js`, `car-model.js`, `i18n.js`.
+**Changed:** `car.js`, `config.js` (CAR), `main.js` (wiring), `lux-drive.html` (viewport, `?v=`), `scripts/flows/luxdrive_world.mjs`.
