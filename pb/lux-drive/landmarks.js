@@ -8,7 +8,7 @@
  * ctx: { buildings: the decoded LOD2 footprints, decks: the decks the physics reads, ground: (x, z) -> y of the land }. */
 import { buildPontAdolphe, buildPontRouge, fixLandmarkDecks } from './landmark-bridges.js';
 
-import { buildPhilharmonie, buildEcj, buildCathedral, buildPalais, buildGelleFra } from './landmark-buildings.js';
+import { buildPhilharmonie, buildEcj, buildCathedral, buildPalais, buildGelleFra, buildOberanven } from './landmark-buildings.js';
 
 export { fixLandmarkDecks };
 
@@ -21,6 +21,7 @@ const BUILDERS = [
   { id: 'cathedrale', build: buildCathedral },
   { id: 'palais-grand-ducal', build: buildPalais },
   { id: 'gelle-fra', build: buildGelleFra },
+  { id: 'oberanven-kierch', build: buildOberanven },
 ];
 
 /** The closest point of a segment to (x, z). */

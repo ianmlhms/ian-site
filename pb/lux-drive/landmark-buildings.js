@@ -144,9 +144,20 @@ export function buildCathedral({ buildings, ground }) {
     const { high } = groundRange(ground, b.pts);
     block(soup, ground, b.pts, high + K.eave, paint(C.limestone, b.id, 0.04), C.slate);
     walls.push(...edgeWalls(b.pts, 0.3, 'cathedral'));
-    const [a0, a1, b0, b1] = K.nave, [t0, t1, u0, u1] = K.transept;
-    gable(soup, a0, a1, b0, b1, high + K.eave, K.naveRise, true, C.slate);
+    const [t0, t1, u0, u1] = K.transept;
+    gable(soup, K.nave[0], K.nave[1], K.nave[2], K.nave[3], high + K.eave, K.naveRise, true, C.slate);
     gable(soup, t0, t1, u0, u1, high + K.eave, K.transeptRise, false, C.slate);
+    // the wall is not blank: buttresses and tall pointed windows along the nave, a portal in the front
+    const [a0, a1, b0, b1] = K.nave;
+    for (const side of [a0, a1]) {
+      const out = side === a0 ? -0.9 : 0.9;
+      for (let z = b0 + 5; z < b1 - 3; z += 6) {
+        soup.box(side + out / 2, high - 0.5, z, 0.9, K.eave + 0.5, 1.1, 0, paint(C.sandstoneLight, Math.round(z)));
+        soup.box(side + out * 0.45 + (side === a0 ? -0.05 : 0.05), high + 5, z + 3, 0.2, 9, 1.8, 0, C.glassDark);
+      }
+    }
+    soup.box((a0 + a1) / 2, high - 0.5, b0 - 0.6, 6, 8, 1.2, 0, C.sandstoneLight);
+    soup.box((a0 + a1) / 2, high + 0.2, b0 - 1.25, 2.4, 5, 0.2, 0, C.glassDark);
     for (const [x, z] of K.frontTowers) spireTower(soup, ground, x, z, K.towerHalf, high + K.towerWall, high + K.towerTip, C.limestone, C.copperGreen);
     // the spire over the crossing: an octagon with a very tall needle
     const [cx, cz] = K.crossing;
@@ -210,4 +221,22 @@ export function buildGelleFra({ ground }) {
   soup.frustum(x, z, 0.28, 0.0, yTop + 2.6, yTop + 3.2, 8, paint(C.gold, 3, 0.05));
   soup.box(x + 0.9, yTop + 2.3, z, 1.6, 0.18, 0.18, 0.3, C.gold);                 // the arm with the wreath
   return { soup, walls: [{ ax: x - 4, az: z, bx: x + 4, bz: z, r: 1.0, id: 'gelle-fra' }], hideBuildings: [], info: { top: Math.round(yTop + K.figureHeight - high) } };
+}
+
+/* ------------------------------------------------------------------------------------------------ Oberanven church */
+const OBERANVEN = Object.freeze({ at: [13285, 3652], hideRadius: 8, hideMinArea: 150, eave: 9, rise: 5.5, tower: { half: 2.6, wall: 17, tip: 29 } });
+
+export function buildOberanven({ buildings, ground }) {
+  const K = OBERANVEN;
+  const hidden = requireBlocks(buildings, 'Oberanven church', K.at[0], K.at[1], K.hideRadius, K.hideMinArea);
+  const soup = new Soup();
+  const b = hidden[0];
+  const { high } = groundRange(ground, b.pts);
+  block(soup, ground, b.pts, high + K.eave, paint(C.sandstoneLight, b.id, 0.04), C.slate);
+  const xs = b.pts.map((p) => p[0]), zs = b.pts.map((p) => p[1]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), z0 = Math.min(...zs), z1 = Math.max(...zs);
+  gable(soup, x0 + 1, x1 - 1, z0 + 1, z1 - 1, high + K.eave, K.rise, (z1 - z0) > (x1 - x0), C.slate);
+  const tx = (x0 + x1) / 2, tz = z0 - K.tower.half + 1;
+  spireTower(soup, ground, tx, tz, K.tower.half, high + K.tower.wall, high + K.tower.tip, C.sandstone, C.slate);
+  return { soup, walls: edgeWalls(b.pts, 0.3, 'oberanven'), hideBuildings: [b.id], info: { id: b.id } };
 }
