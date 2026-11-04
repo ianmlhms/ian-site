@@ -11,7 +11,7 @@ import { CAR_COLOURS } from './config.js';
 
 const THREE = window.THREE;
 
-const WHEEL_RADIUS = 0.31;
+const WHEEL_RADIUS = 0.335;
 const WHEEL_HALF_WIDTH = 0.105;
 const WHEEL_SEGMENTS = 12;
 const WHEEL_X = 1.28;             // m: the axles sit this far in front of / behind the centre (wheelbase 2.56)
@@ -186,9 +186,9 @@ function buildBody(paint) {
 
 /** A wheel: the tyre, the sidewall and the rim, with the axle along z. Both faces are built (the wheel is shared by both sides of the car). */
 function buildWheel() {
-  const tyre = [0.09, 0.09, 0.1], wall = [0.14, 0.14, 0.15], rim = [0.72, 0.73, 0.76], hub = [0.3, 0.3, 0.33];
+  const tyre = [0.09, 0.09, 0.1], wall = [0.14, 0.14, 0.15], rim = [0.26, 0.27, 0.3], hub = [0.62, 0.63, 0.66];   // dark alloys, a light hub cap
   const b = new FaceBuilder();
-  const R = WHEEL_RADIUS, W = WHEEL_HALF_WIDTH, Rr = R * 0.62, Rh = R * 0.2;
+  const R = WHEEL_RADIUS, W = WHEEL_HALF_WIDTH, Rr = R * 0.66, Rh = R * 0.2;
   const at = (k, r, z) => [Math.cos(2 * Math.PI * k / WHEEL_SEGMENTS) * r, Math.sin(2 * Math.PI * k / WHEEL_SEGMENTS) * r, z];
   for (let k = 0; k < WHEEL_SEGMENTS; k++) {
     const k1 = k + 1;
