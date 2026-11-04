@@ -1119,3 +1119,53 @@ Cost: the carve is ~35 % slower (196 lattice blocks: 530 -> 720 ms in Node), the
   carriageway).  The brief's "no step over 2 cm" is not met everywhere: the probes find 1386 places over 2 cm, almost all slope changes of a few cm at the foot of a face.
 * Two ways at different levels that run side by side (no crossing, so neither rides over the other) still end in a wall of 2 .. 4 m/m between their benches; PIN_FADE 3 m only softens it.
 * Gate J's worst point is 3.8 cm of the 4 cm allowed (was 2.4); not measured on a real GPU or an iPad.
+
+## Terrain fix 2 (branch `lux-drive-terrain2`, Mac mini): the remaining humps, carriageways owned by their way, retaining walls, cracks
+
+Started from `lux-drive` 7c188699.  Tools: `scripts/luxdrive/terrain_report.mjs` (now also prints road index + arc of every hump, the bed's own acceleration against the surface deviation, `--near=x,z,r;...` for a fast look),
+`cross_section.mjs`, `way_profile.mjs`, `ways_near.mjs`, `bake_walls.mjs`.  Pictures and logs: `~/Library/Caches/luxdrive-work/terrain2/` (`pairs/pair_*.jpg` = before | after, evening sun, side view, medium: the three worst
+humps, Boulevard de la Foire, two retaining walls; singles in `shots_side_before/` and `shots_side_after/`).
+
+| | before (7c188699) | after |
+|---|---|---|
+| stretches over 1.5 m/s2 (class design speed, ends of ways excepted) | 113 (11 over 5, worst 42.6) | **8 (none over 3, worst 2.7)** |
+| Boulevard de la Foire / Rocade de Bonnevoie link | 14.8 / 8.0 m/s2 | gone (< 1.5) |
+| cracks over 2 cm (new probe, see 4) | not measured (old probe: 1386 "steps" over 2 cm, 86 over 5, 2 over 20) | **1 (2.2 cm)**, none over 5 cm |
+| creases (slope change > 1 m/m within 30 cm, outside walls) | (inside the 1386) | 72, worst 5.2 m/m: curvature, not steps |
+| ground beside the roads (world flow): p99 / steeper than land / walls / deepest | 1.42 / 1.16 % / 3 / 3.94 | 1.44 / 1.30 % / 6 / 4.74 (limits 1.6 / 2 % / 8 / 8: original) |
+| gate J worst mesh vs height (default 24 places per quality) | 3.8 cm | 1.4 / 1.6 / 1.35 cm |
+| deepest cutting / samples cut over 2.5 m / embankments over 1 m | 4.0 m / 28 / 579 | 5.0 m / 31 / 676 |
+
+### 1. Humps (`road-bed.js`, `config.js`)
+* Cliff roads: `bedHardLimit` 4 m split into `bedHardCut` 5 m and `bedHardFill` 9 m (a fill is held by a retaining wall, a deeper cutting would eat the houses).  The track at (15785,5438) was clamped 4 m over the land and had to climb 4 m in 4 m (42 m/s2).
+* A way that stops inside the carriageway of another way is a T junction whatever the levels the land gives them (`reconcileJunctions`, end samples only; the track ended 2.6 m under the plateau road it joins).
+* `limitCurvature` also limits the LOCAL curvature (a point never lies farther from the line through its neighbours than a curve of the class radius puts it): the 20 m mean let a kink of 9 % in one sample through (4 m/s2).  `bedLift` 1.3 -> 1.0 (the surface adds 0.2 .. 0.4 to the design value).
+* The carriageway pin no longer fades with `level` (a way on a cliff edge sank into the valley: -0.55 m); `level` only scales the fill of the batter.
+
+### 2. A carriageway belongs to its own way (`road-network.js` carve)
+* The pin of a way is now exactly 1 on its bench (it was a mean over all its segments, and the far ones pulled it to 0.94: 1 .. 8 cm over a cutting 2.5 m deep), measured from the NEAREST segment with a window mean (`MAG_WINDOW`); the level it pulls toward is the bed inside the bench of the nearest segment, the face beyond (a tight bend: the far side of the bend pulled the carriageway toward the face, a 0.5 m dimple).
+* Ways are laid in the order of their rank; a way is now HELD BACK by every smaller way laid below it that has a pin here: at one level its fade is held off the bench of the smaller one (`own`, `OWN_FADE`), at two levels the hand-over is centred on the line of equal distance from the two benches and as wide as `RAMP_SLOPE` 1.9 allows (`RAMP_MIN/MAX`).  Bd de la Foire (two carriageways 3.5 m apart in level and touching) is now a flat 1683 and a ramp.
+* Rings have no end caps (`closedRoad`): the cap of the seam of a pedestrian ring made 10 .. 26 cm cracks.  `FACE_JOIN_PER_M`: the join of the bed and the face of a fill is at least 0.79 m per m of their difference (a terrace on a cliff dropped 5 m in 0.4 m).
+* Tried and dropped: pinning the smaller way to the bigger one along the whole stretch where two benches touch (it copied the noisy pinned ends of the neighbours: 408 humps), and treating every arm of a way as a way of its own (every straight road has a "second arm" 12 m away: 11 828 cracks).
+
+### 3. Retaining walls (`retaining-walls.js`, `wall-view.js`, `scripts/luxdrive/bake_walls.mjs`, `data/walls.bin`, gate K)
+The height field cannot hold a vertical face, so the ground between two levels is a ramp of 2 .. 3 m/m (the carve keeps it from being steeper).  Drawn as ground it is a stretched stripe; now it is hidden in a block of stone: a vertical face in courses at the
+foot of the ramp, a flat top flush with the high ground, a coping.  `bake_walls.mjs` reads a profile across every way (both sides, every sample) in the real height function, finds ramps (steeper than 2 m/m, 0.8 .. 6 m high, steeper than the land by 1.5x + 0.5, land under it not steeper than 1.4: no hillsides, no rock faces), joins them
+along the way (two samples at least) and writes 143 walls / 1017 points / 2.9 km / 29 KB.  Game: `world-data.js` loads them, `main.js` draws them in 1024 m chunks within 0.6 x the far building radius (a few more draw calls: medium 146 -> 150).  **Re-run `node scripts/luxdrive/bake_walls.mjs` after any change of the carve.**
+Gate K (harness): every wall point is a sane block, stands on its ramp (foot and back within 0.9 m of the ground: none in the air, none buried), the draw budget (40 000 triangles, at most 10 chunks in view), and every ramp the scan finds beside a way has a wall (at most 4 % bare: 9 of 268).
+
+### 4. Steps (`terrain_report.mjs`)
+The old probe compared a 4 cm difference with the 2 m slope and so measured any change of slope by more than 0.5 m/m as a "step" (almost all of the 1386 were the foot of a face).  The new probe measures a CRACK: the height jump within 4 mm beyond what the slope on both sides (+-30 cm) predicts (> 2 cm), and a CREASE
+(the slope changes by more than 1 m/m within 30 cm) separately, as curvature.  Cracks inside a wall are counted as walls.  The remaining 1 crack (2.2 cm) is a 1.6 m ramp of 3.6 m/m between two arms of the ring at the plateau of Hellege-Geescht (5435,9217).
+
+### Gates (Mac mini)
+`node pb/lux-drive/harness.js` PASS, 90 checks (gate I: bob 1.41 m/s2, crossfall 0.75 %, kerb 0.6 cm; J: 1.4 / 1.6 / 1.35 cm; new K); `luxdrive_world.mjs` PASS (112 / 150 / 213 draw calls, limits 140 / 200 / 240, original ground limits); `luxdrive_holes.mjs` 0 hole pixels at medium and `HOLES_Q=low`;
+`luxdrive_ui.mjs` PASS.  `pb/lux-drive.html`: main.js `?v=34`.  The humps probe skips the first and last 2 m of a way (its 2 m base looks past the end, where the cap fades).
+
+### Still wrong (honest)
+* Gate J with MANY places (`node pb/lux-drive/harness.js --only=J --j-samples=500`): worst 3.95 cm (4 cm allowed).  They are inside bends of steep streets (service roads of 20 % at a 6 m radius, lateral probe at half the width), where the field itself bends 5 .. 10 cm within a metre and a 1 m lattice cannot follow; the default sample (24 per quality) shows 1.6.
+* 8 hump stretches over 1.5 m/s2 remain (worst 2.7 at (11608,5404), a service road on a 3 m cut); 72 creases over 1 m/m, worst 5.2 (Eecherfeld, a hairpin).
+* Hairpins and rings whose two arms are at different levels still blend by distance (a ramp of 3.6 m/m at the plateau of Hellege-Geescht, 2.2 cm crack): arms are not separate carriageways in the carve.
+* Walls are boxes of stone with flat ends: short ones (2 .. 3 samples) beside a track on a steep bank read as crates (`pairs/pair_hump1_*`); no collision with the wall (the car feels the ramp, which is too steep to climb, but can drive off the top); no texture detail beyond courses.  Walls of ramps over 6 m and on hillsides steeper than 1.4 m/m are left to the ground shader (rock).
+* Cuttings up to 5 m and embankments up to 9 m now exist where the land has a cliff beside a street (Clausener Bierg start: 5 m cut, a 5 m wall where it meets the road above); their houses are checked by gate C only.
+* Not measured on a real GPU or an iPad.

@@ -13,9 +13,10 @@ export const WALL = Object.freeze({
   steepSlope: 2.0,         // m/m: a ramp has a place this steep ...
   toeSlope: 0.45,          // m/m: ... and reaches as far as the ground is steeper than this (the toe and the shoulder of the ramp)
   minRise: 0.8,            // m: a ramp lower than this is a kerb or a bank, not a wall
-  maxRise: 8,              // m: a ramp higher than this is a rock face (the Alzette valley), not a wall: the ground shader paints it as rock
-  naturalFactor: 1.25,     // a ramp is the land's own cliff when it is not steeper than the land by more than this factor + naturalMargin
-  naturalMargin: 0.3,
+  maxRise: 6,              // m: a ramp higher than this is a rock face (the Alzette valley), not a wall: the ground shader paints it as rock
+  naturalFactor: 1.5,      // a ramp is the land's own cliff when it is not steeper than the land by more than this factor + naturalMargin
+  naturalMargin: 0.5,
+  maxLandSlope: 1.4,       // m/m: where the land itself is steeper than this the ground is a hillside, and a block of stone on it reads as a crate (a wall stands where the carve made the ramp)
   skirt: 0.5,              // m: the face of the wall goes this far below the foot of the ramp (buried), so nothing shows under it
   coping: 0.12,            // m: the coping stands this far above the high ground, and overhangs the face by copingLip
   copingLip: 0.07,
@@ -62,7 +63,7 @@ export function findRamp(heights, lands, step = WALL.scanStep) {
     }
     const rise = heights[m] - heights[k];
     const isRamp = maxSlope >= WALL.steepSlope && Math.abs(rise) >= WALL.minRise && Math.abs(rise) <= WALL.maxRise
-      && maxSlope > WALL.naturalFactor * landSlope + WALL.naturalMargin;
+      && landSlope <= WALL.maxLandSlope && maxSlope > WALL.naturalFactor * landSlope + WALL.naturalMargin;
     if (isRamp && (!best || Math.abs(rise) > Math.abs(best.rise))) best = { first: k, last: m, rise, maxSlope };
     k = m + 1;
   }

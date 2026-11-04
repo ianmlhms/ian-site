@@ -63,7 +63,8 @@ try {
       m.setCamera({ x, y, z, tx, ty, tz, fov: p.fov || 62 });
     }, pose);
     // let the tiles / cells / trees build around the new pose (software GL is slow: wait on the pending counters)
-    for (let i = 0; i < 40; i++) {
+    const WAIT_ITER = Number(process.env.SHOT_WAIT_ITER) || 40;             // SHOT_WAIT_ITER=160: wait up to 80 s for the tiles (a loaded machine builds them slowly)
+    for (let i = 0; i < WAIT_ITER; i++) {
       await page.waitForTimeout(500);
       const s = await page.evaluate(() => window.__lux.stats());
       if (i > 3 && s.pending === 0 && s.cityPending === 0) break;

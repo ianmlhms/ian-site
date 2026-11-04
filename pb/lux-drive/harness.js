@@ -1219,6 +1219,7 @@ if (wants('J')) {
             measured++;
             if (dv > MAX_MESH_DEV) { bad++; if (VERBOSE) console.log(`   mesh ${qid} ${(dv * 100).toFixed(2)} cm at ${px.toFixed(1)},${pz.toFixed(1)} step ${leaf.step} road ${data.roads[way.road].name || data.roads[way.road].kind} sdCar=${li.sdCar.toFixed(2)}`); }
             if (dv > worst) { worst = dv; worstAt = `${Math.round(px)},${Math.round(pz)} step ${leaf.step}`; }
+            if (VERBOSE && dv > 0.02) console.log(`   mesh ${qid} ${(dv * 100).toFixed(2)} cm at ${px.toFixed(1)},${pz.toFixed(1)} step ${leaf.step} road ${data.roads[way.road].name || data.roads[way.road].kind} sdCar=${li.sdCar.toFixed(2)} lat=${li.lat.toFixed(2)} bend ${(Math.max(bendX, bendZ, bendD1, bendD2) * 100).toFixed(1)} cm`);
           }
         }
       }
@@ -1277,7 +1278,6 @@ if (wants('K')) {
   let scanned = 0, ramps = 0, bare = 0;
   const bareList = [];
   const STRIDE = QUICK ? 25 : 5;
-  const BIG_RISE = 3;                                         // (bake_walls.mjs: a ramp seen at one sample only is noise, unless it is this high)
   /** The ramp across a way at sample i on one side (side = +1 right, -1 left): the same scan the baker makes. */
   const rampAt = (chain, i, side) => {
     const a = Math.max(0, i - 1), b = Math.min(chain.x.length - 1, i + 1);
@@ -1301,7 +1301,7 @@ if (wants('K')) {
         const r = rampAt(chain, i, side);
         if (!r) continue;
         // a ramp that persists: the neighbouring sample has one too (or it is a big one)
-        const persists = r.rise >= BIG_RISE || (i + 1 < chain.x.length && rampAt(chain, i + 1, side)) || (i > 0 && rampAt(chain, i - 1, side));
+        const persists = (i + 1 < chain.x.length && rampAt(chain, i + 1, side)) || (i > 0 && rampAt(chain, i - 1, side));
         if (!persists) continue;
         ramps++;
         if (!coveredBy(r.x, r.z, r.nx, r.nz, r.top)) { bare++; if (bareList.length < 5) bareList.push(`${Math.round(r.x)},${Math.round(r.z)} rise ${r.rise.toFixed(1)} slope ${r.slope.toFixed(1)}`); }
@@ -1309,7 +1309,7 @@ if (wants('K')) {
     }
   }
   stats.wallCoverage = { scanned, ramps, bare };
-  // a ramp seen at a single sample is noise that the baker drops (a wall needs two samples in a row, or a rise of 3 m): a few bare ramps are allowed, a stretch of them is not
+  // a ramp seen at a single sample is noise that the baker drops (a wall needs two samples in a row): a few bare ramps are allowed, a stretch of them is not
   check('retaining walls: every ramp steeper than 2 m/m beside a way has a wall (the data is not stale: re-run scripts/luxdrive/bake_walls.mjs)', bare <= Math.max(3, Math.round(ramps * 0.04)), `${bare} of ${ramps} ramps bare (${scanned} profiles), e.g. ${bareList.join('; ')}`);
 }
 

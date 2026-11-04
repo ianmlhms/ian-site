@@ -21,8 +21,8 @@ const LINK_FACING = 0.6;       // ... and they face the same way (cosine of the 
 const COVER_CELL = 2;          // m: a ramp that is already in a wall of an earlier way (a point of it this close, same facing, same top) is not written again
 const COVER_DIST = 1.4;
 const COVER_TOP = 1.2;
-const MIN_SAMPLES = 2;         // a ramp seen at a single sample is noise of the scan (a bend, a driveway), unless it is a big one
-const BIG_RISE = 3;            // m
+const MIN_SAMPLES = 2;         // a ramp seen at a single sample is noise of the scan (a bend, a driveway) and a lone block of stone looks like a crate: a wall is at least two samples long
+const GAP_SAMPLES = 1;         // a wall goes on across a sample where the scan found nothing (the ramp flickers around its thresholds), if the ground under the middle of the bridge fits
 
 const { field, surface } = await loadWorld();
 const net = field.network;
@@ -72,7 +72,7 @@ function wallPointAt(chain, i, side) {
   };
 }
 
-const link = (p, q) => Math.hypot(p.x - q.x, p.z - q.z) <= LINK_FRONT && Math.abs(p.top - q.top) <= LINK_HEIGHT && Math.abs(p.bottom - q.bottom) <= LINK_HEIGHT && p.nx * q.nx + p.nz * q.nz >= LINK_FACING;
+const link = (p, q, gap = 1) => Math.hypot(p.x - q.x, p.z - q.z) <= LINK_FRONT * gap && Math.abs(p.top - q.top) <= LINK_HEIGHT && Math.abs(p.bottom - q.bottom) <= LINK_HEIGHT && p.nx * q.nx + p.nz * q.nz >= LINK_FACING;
 
 const ON_RAMP = 0.9;           // m: the foot of the face stands within this of the bottom of the ramp and the back of the block within this of its top (harness gate K proves it)
 
@@ -102,21 +102,22 @@ for (const chain of chains) {
   for (const side of [1, -1]) {
     let run = [];
     const flush = () => {
-      if (run.length >= MIN_SAMPLES || (run.length === 1 && run[0].rise >= BIG_RISE)) {
+      if (run.length >= MIN_SAMPLES) {
         const pts = extend(run).map((p) => ({ x: p.x, z: p.z, top: p.top, bottom: p.bottom, depth: p.depth, nx: p.nx, nz: p.nz }));
         walls.push({ pts, slope: Math.max(...run.map((p) => p.slope)), rise: Math.max(...run.map((p) => p.rise)), way: chain.road });
       }
       run = [];
     };
+    let misses = 0;                                              // samples in a row without a ramp since the last point of the run
     for (let i = 0; i < chain.x.length; i++) {
       probed++;
       const p = wallPointAt(chain, i, side);
-      if (!p) { flush(); continue; }
-      if (isCovered(p)) { duplicate++; flush(); continue; }
-      if (!fits(p)) { flush(); continue; }
+      if (!p || !fits(p)) { misses++; if (misses > GAP_SAMPLES) { flush(); misses = 0; } continue; }
+      if (isCovered(p)) { duplicate++; flush(); misses = 0; continue; }
       found++;
-      if (run.length && !link(run[run.length - 1], p)) flush();
+      if (run.length && !link(run[run.length - 1], p, misses + 1)) flush();
       run.push(p);
+      misses = 0;
     }
     flush();
   }
