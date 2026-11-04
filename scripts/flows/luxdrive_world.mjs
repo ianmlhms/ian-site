@@ -385,6 +385,41 @@ export const flow = {
       h.expect(s.calls > 5 && s.calls <= BUDGET[q].calls, `${q}: ${s.calls} draw calls (<= ${BUDGET[q].calls})`);
       h.expect(s.tris > 10000 && s.tris <= BUDGET[q].tris, `${q}: ${s.tris} triangles (<= ${BUDGET[q].tris})`);
       await h.shot("quality-" + q);
+
+      // The houses follow the CAMERA when it is held away from the car (the shot tool, the hole detector): the city used to follow the car
+      // alone, so a camera in another quarter saw houses with the cheap far material (medium) or no houses at all (low).
+      const held = await page.evaluate(async (pose) => {
+        const m = window.__lux;
+        const y = m.ground.height(pose.x, pose.z) + pose.h;
+        const yaw = pose.yaw * Math.PI / 180, pitch = pose.pitch * Math.PI / 180;
+        m.setCamera({ x: pose.x, y, z: pose.z, tx: pose.x + Math.cos(yaw) * Math.cos(pitch) * 100, ty: y + Math.sin(pitch) * 100, tz: pose.z + Math.sin(yaw) * Math.cos(pitch) * 100, fov: 62 });
+        for (let i = 0; i < 400; i++) {                                  // let the tiles and the cells build around the held camera
+          await new Promise((r) => setTimeout(r, 100));
+          const st = m.stats();
+          if (i > 5 && st.pending === 0 && st.cityPending === 0) break;
+        }
+        const car = m.state();
+        const HALF_CELL = 128, NEAR_CELL_M = 100, NEAR_TRIS_M = 60;
+        let nearCells = 0, nearCheap = 0, trisNear = 0;
+        for (const mesh of m.city.group.children) {
+          const c = mesh.userData.centre;
+          const gap = Math.hypot(Math.max(Math.abs(c[0] - pose.x) - HALF_CELL, 0), Math.max(Math.abs(c[1] - pose.z) - HALF_CELL, 0));
+          if (gap <= NEAR_CELL_M) { nearCells++; if (mesh.material !== m.city.material) nearCheap++; }
+          if (gap > NEAR_TRIS_M) continue;
+          const pos = mesh.geometry.getAttribute("position"), idx = mesh.geometry.index;
+          for (let t = 0; t + 2 < idx.count; t += 3) {
+            const a = idx.getX(t), b = idx.getX(t + 1), d = idx.getX(t + 2);
+            const cx = (pos.getX(a) + pos.getX(b) + pos.getX(d)) / 3, cz = (pos.getZ(a) + pos.getZ(b) + pos.getZ(d)) / 3;
+            if (Math.hypot(cx - pose.x, cz - pose.z) <= NEAR_TRIS_M) trisNear++;
+          }
+        }
+        return { nearCells, nearCheap, trisNear, carFar: Math.hypot(car.x - pose.x, car.z - pose.z) };
+      }, { x: 4440.0, z: 7915.8, h: 3.2, yaw: 137.5, pitch: -6 });
+      h.expect(held.carFar > 500, `${q}: the camera is held ${held.carFar.toFixed(0)} m away from the car`);
+      h.expect(held.nearCells > 0, `${q}: ${held.nearCells} building cells lie within 100 m of the held camera`);
+      h.eq(held.nearCheap, 0, `${q}: every cell within 100 m of the held camera has the full building material (windows)`);
+      h.expect(held.trisNear > 0, `${q}: ${held.trisNear} building triangles within 60 m of the held camera (houses at every quality)`);
+      await h.shot("held-camera-" + q);
     }
 
     h.eq(errors, [], "zero console errors in the whole flow");

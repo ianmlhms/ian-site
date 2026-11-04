@@ -45,8 +45,10 @@ export const ROAD = Object.freeze({
   bedStiffness: 200,       // the penalty on the second difference of the road profile (road-bed.js): a 4 m sample spacing and 200 pass
                             // wavelengths above about 90 m and take out everything wavier (the first version, a 6 m Gaussian, left waves
                             // of 10 .. 30 m: the road that "lies on a blanket")
-  bedDeviation: 0.015,     // m: the most a point of the profile may leave its 20 m moving mean (the harness gate allows 3 cm: the margin
-                            // is for the rounding of the lattice and of the junction pins)
+  bedDeviation: 0.03,      // m: the most a point of the profile may leave its 20 m moving mean = a vertical curve of radius >= 100 / (6 * 0.03) = 550 m
+                            // (0.5 m/s2 at 50 km/h: nobody feels it; the harness gate allows 4 cm for the rounding of the lattice and of the junction pins).
+                            // A stricter limit (the first version: 1.5 cm = R 1100 m) flattened every crest and filled every sag of a hill road by metres:
+                            // cuttings and embankments of 2 .. 6 m (Rue Principale, Hostert) and walls beside the roads
   bedRelax: 0.25,          // the second, lighter pass that rounds the kinks the clamp to the land makes
   bedClamp: 1.2,           // m, how far the bed of a road may leave the ground along its own centre line
   kerbHeight: 0.13,        // m, the kerb at the edge of the carriageway

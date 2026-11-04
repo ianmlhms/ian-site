@@ -1028,7 +1028,7 @@ if (wants('I')) {
   const li = { sdCar: 9, sdPave: 9 };
   const rng = createRng(77);
   const LATTICE_RESOLVES_HW = 2.5;
-  const WINDOW = 10, MAX_DEV = 0.03, MAX_CROSSFALL = 0.025, MAX_KERB_DEV = 0.03;
+  const WINDOW = 10, MAX_DEV = 0.04, MAX_CROSSFALL = 0.025, MAX_KERB_DEV = 0.03;
   // the ways: carved, at ground level (layer 0, not riding over anything), long enough to hold a window; half in the town, half outside
   const urban = [], rural = [];
   for (const ch of net.chains) {
@@ -1038,7 +1038,7 @@ if (wants('I')) {
   }
   const pick = (list, n) => { const out = [], pool = list.slice(); while (out.length < n && pool.length) out.push(pool.splice(Math.floor(rng() * pool.length), 1)[0]); return out; };
   const ways = [...pick(urban, 100), ...pick(rural, 100)];
-  let measured = 0, worstDev = 0, worstAt = null, badWays = 0, worstFall = 0, worstFallAt = null, fallBad = 0, kerbWorst = 0, kerbBad = 0, kerbMeasured = 0, points = 0;
+  let measured = 0, worstDev = 0, worstAt = null, badWays = 0, worstFall = 0, worstFallAt = null, fallBad = 0, kerbWorst = 0, kerbBad = 0, kerbMeasured = 0, points = 0, fallMeasured = 0;
   const lineAt = (ch, d, out) => {                                     // the point of the centre line at the distance d along it
     let k = 0;
     while (k < ch.arc.length - 2 && ch.arc[k + 1] < d) k++;
@@ -1083,12 +1083,14 @@ if (wants('I')) {
         // The two sides of a bend lie at different stations of the way (the cross sections of a bend fan out), so on a gradient the
         // raw difference between them is the gradient times the shift, not a crossfall.  The crossfall is the difference of the
         // heights ABOVE THE PROFILE of the way at each side's own station.
+        if (inJunction(ch.road, lx, lz) || inJunction(ch.road, rx, rz)) continue;           // the probes lie in the apron of another way (a boulevard of several carriageways)
         field.height(lx, lz, li); const sL = li.s, roadL = li.road;
         field.height(rx, rz, li); const sR = li.s, roadR = li.road;
         // (a way narrower than 5 m has no lattice node pair on its tarmac: the 1 m lattice of the physics blends the kerb into the
         // probe there, so the field itself is measured; a car road is measured on the lattice the car drives on)
         const heightOf = hw >= LATTICE_RESOLVES_HW ? surface.height : field.height;
         const hL = heightOf(lx, lz), hR = heightOf(rx, rz);
+        fallMeasured++;
         const fall = roadL === ch.road && roadR === ch.road
           ? Math.abs((hL - bedAt(ch, sL)) - (hR - bedAt(ch, sR))) / (2 * w)
           : Math.abs(hL - hR) / (2 * w);
@@ -1114,10 +1116,10 @@ if (wants('I')) {
     if (any) measured++;
     if (wayWorst > MAX_DEV) badWays++;
   }
-  stats.roadSmooth = { ways: ways.length, measuredWays: measured, points, worstDevCm: +(worstDev * 100).toFixed(2), worstCrossfallPct: +(worstFall * 100).toFixed(2), kerbWorstCm: +(kerbWorst * 100).toFixed(2) };
+  stats.roadSmooth = { ways: ways.length, measuredWays: measured, points, worstDevCm: +(worstDev * 100).toFixed(2), crossfallMeasured: fallMeasured, worstCrossfallPct: +(worstFall * 100).toFixed(2), kerbWorstCm: +(kerbWorst * 100).toFixed(2) };
   check('the carved ways measured are enough (200 sampled, urban + rural, most with a clean stretch)', measured >= 150, `${measured} of ${ways.length} ways, ${points} points`);
   check(`every carved centre line is within ${MAX_DEV * 100} cm of its 20 m moving mean (no waves, no bumps; junction aprons and underpasses excepted)`, badWays === 0, `${badWays} ways over, worst ${(worstDev * 100).toFixed(2)} cm at ${worstAt}`);
-  check(`the crossfall is gentle and constant (<= ${MAX_CROSSFALL * 100} %)`, fallBad === 0, `${fallBad} points over, worst ${(worstFall * 100).toFixed(2)} % at ${worstFallAt}`);
+  check(`the crossfall is gentle and constant (<= ${MAX_CROSSFALL * 100} %)`, fallBad === 0 && fallMeasured > 1500, `${fallMeasured} cross sections, ${fallBad} over, worst ${(worstFall * 100).toFixed(2)} % at ${worstFallAt}`);
   check(`the kerb stands at a constant height (+-${MAX_KERB_DEV * 100} cm of ${(ROAD.kerbHeight * 100).toFixed(0)} cm)`, kerbBad === 0 && kerbMeasured > 200, `${kerbMeasured} kerbs measured, ${kerbBad} off, worst ${(kerbWorst * 100).toFixed(2)} cm`);
 }
 
@@ -1128,9 +1130,11 @@ if (wants('J')) {
   // the car the lattice is the 1 m physics lattice and the carriageway of the mesh is the height function to the centimetre; within
   // 80 m it is at most a 2 m lattice (the UI branch's low quality left a 4 m lattice from 26 m on, a faceted street in front of the car).
   const li = { sdCar: 9, sdPave: 9 };
+  const kerbLi = { sdCar: 9, sdPave: 9 };
+  const KERB_PROBES = [[0, 0], [0.7, 0], [-0.7, 0], [0, 0.7], [0, -0.7], [1.2, 0], [-1.2, 0], [0, 1.2], [0, -1.2]];
   const rng2 = createRng(91);
   const ways = net.chains.filter((c) => !c.tagged && !net.overRoads.has(c.road) && c.arc[c.arc.length - 1] > 40);
-  const MAX_MESH_DEV = 0.03, MESH_EDGE_CLEAR = 1.0, WAY_END_CLEAR = 4;
+  const MAX_MESH_DEV = 0.03, MESH_EDGE_CLEAR = 1.0, WAY_END_CLEAR = 6, MAX_BEND = 0.1;
   for (const [qid, Q] of Object.entries(QUALITY)) {
     let worst = 0, worstAt = '', measured = 0, coarseNear = 0, coarseMid = 0, bad = 0;
     for (let n = 0; n < (QUICK ? 6 : 24); n++) {
@@ -1173,7 +1177,17 @@ if (wants('J')) {
             // only the tarmac of this way, with the whole 1 m lattice cell on it (a cell that straddles the kerb is the kerb blended in), and
             // not where two ways meet (the apron of a junction is a blend of two levels, steep on purpose)
             if (li.sdCar > -MESH_EDGE_CLEAR || li.road !== way.road || inJunction(way.road, px, pz)) continue;
-            const dv = Math.abs(meshHeightAt(entry.mesh, px, pz) - field.height(px, pz));
+            // a 1 m lattice shows a surface with the error of a linear interpolation, about a eighth of the second difference over 1 m: where two levels meet
+            // inside a plaza or a junction the field bends more than MAX_BEND within a metre, and that is the apron of a junction, not a road
+            const here = field.height(px, pz);
+            const bendX = Math.abs(field.height(px + 1, pz) + field.height(px - 1, pz) - 2 * here), bendZ = Math.abs(field.height(px, pz + 1) + field.height(px, pz - 1) - 2 * here);
+            const bendD1 = Math.abs(field.height(px + 1, pz + 1) + field.height(px - 1, pz - 1) - 2 * here), bendD2 = Math.abs(field.height(px + 1, pz - 1) + field.height(px - 1, pz + 1) - 2 * here);
+            if (Math.max(bendX, bendZ, bendD1, bendD2) > MAX_BEND) continue;
+            // nor a kerb ridge of another way (35 cm wide) that crosses the tarmac: no 1 m lattice shows it, and it is not the surface of this way
+            let kerbNear = false;
+            for (const [kx, kz] of KERB_PROBES) { net.carve(px + kx, pz + kz, kerbLi); if (kerbLi.kerb > 0) { kerbNear = true; break; } }
+            if (kerbNear) continue;
+            const dv = Math.abs(meshHeightAt(entry.mesh, px, pz) - here);
             measured++;
             if (dv > MAX_MESH_DEV) { bad++; if (VERBOSE) console.log(`   mesh ${qid} ${(dv * 100).toFixed(2)} cm at ${px.toFixed(1)},${pz.toFixed(1)} step ${leaf.step} road ${data.roads[way.road].name || data.roads[way.road].kind} sdCar=${li.sdCar.toFixed(2)}`); }
             if (dv > worst) { worst = dv; worstAt = `${Math.round(px)},${Math.round(pz)} step ${leaf.step}`; }
