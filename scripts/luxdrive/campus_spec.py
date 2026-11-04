@@ -265,7 +265,7 @@ building("quilvest", "Quilvest Banque Privée", "E", [
     part("quilvest", Polygon(QUILVEST), [0.80, 0.77, 0.70], "curtain", {"floorH": 3.7, "inset": 0.4, "pitch": 3.4, "spandrel": 1.2, "glass": [0.36, 0.48, 0.58], "dark": [0.30, 0.31, 0.32],
                                                                        "frameColor": [0.32, 0.33, 0.35]}),
 ], lod2=[15925, 21561])
-APT_FP = {"floorH": 3.0, "inset": 0.3, "pitch": 3.2, "sill": 0.9, "h": 1.5, "w": 1.4, "glass": [0.34, 0.44, 0.56], "rail": [0.62, 0.72, 0.76], "slab": [0.82, 0.82, 0.80]}
+APT_FP = {"floorH": 3.0, "inset": 0.3, "pitch": 3.2, "sill": 0.9, "h": 1.5, "w": 1.4, "glass": [0.34, 0.44, 0.56], "rail": [0.84, 0.86, 0.86], "slab": [0.80, 0.80, 0.78]}
 for key, lod, wall in (("apt-a", 16796, [0.92, 0.90, 0.82]), ("apt-b", 20511, [0.90, 0.80, 0.62]), ("apt-c", 17891, [0.90, 0.88, 0.84]), ("apt-d", 18618, [0.80, 0.70, 0.60]),
                        ("apt-e", 20802, [0.88, 0.86, 0.80])):
     building(key, "Apartments (Rue de Merl)", "E", [part(key, lod2_poly(lod), wall, "balcony", APT_FP)], lod2=[lod])
