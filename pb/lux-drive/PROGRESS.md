@@ -862,3 +862,6 @@ What changed (the reviewer's list 1-6):
 | 5 | **Kirchberg verges** | `world-map.js`: the class `urban` is only hard ground within ~12 m of a building (`builtCover`, polygon fill, 24 m window) as well as in the 72 m neighbourhood; the lawns / verges between the big blocks are the meadow again.  Roads keep their painted kerb / pavement. |
 
 Gates: see the end of this section (filled in by the last run).
+
+Gates (round 2, cloud, software GL): `luxdrive_world.mjs` PASS; `luxdrive_holes.mjs` PASS (0 hole pixels, 72 poses, detector self-test 42 741); `harness.js --quick` PASS, 61 checks, 0 failed (0 floating / buried buildings, 0 road ends in nowhere).
+Draw calls (medium, steady state): Gare 124, Ernster 102, Av. JFK 138-146, Hamilius 138 (limit 260).
