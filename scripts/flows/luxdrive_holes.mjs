@@ -7,7 +7,8 @@
  * the picture the player sees. */
 import { runIfMain } from "./lib.mjs";
 
-const PAGE = "/pb/lux-drive.html?holes=1&q=medium&time=noon&weather=clear";
+const QUALITY = process.env.HOLES_Q || "medium";        // HOLES_Q=low checks the cheap level too (coarser terrain near the car)
+const PAGE = `/pb/lux-drive.html?holes=1&q=${QUALITY}&time=noon&weather=clear`;
 const POSES = 72;
 const WORLD_W = 16896;                    // m: the width of the world box (the x axis runs east)
 const WORLD_D = 14848;                    // m: the depth of the world box (the z axis runs south)
