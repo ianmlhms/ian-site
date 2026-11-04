@@ -593,7 +593,7 @@ export function createRoadNetwork(roads, baseHeight) {
           // nearest way wins out there, and the offset is the distance to the polyline: a straight street has a
           // straight edge, because that distance is a linear function of the place.
           const hw = HW[i];
-          const score = ((d <= hw ? 2 : 1) + 1 - Math.min(1, d / Math.max(hw, 0.5))
+          const score = ((d <= hw ? 2 : 1) + 1 - d / Math.max(R, 1)
                          - Math.min(hw, 12) * 0.02) * level;
           if (score > bestScore) { bestScore = score; best = i; bestLat = lat >= 0 ? d : -d; bestDist = d; bestT = t; }
         }
