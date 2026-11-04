@@ -18,6 +18,7 @@ import { buildWorldMap } from './world-map.js';
 import { createPaintTextures } from './paint-textures.js';
 import { createGroundMaterial } from './ground-shader.js';
 import { createTerrainView } from './terrain-view.js';
+import { createBuildingView } from './building-view.js';
 import { createDeckView } from './deck-view.js';
 import { createPortalView } from './portal-view.js';
 import { createSolidMaterial } from './solid-material.js';
@@ -131,6 +132,7 @@ async function boot() {
   await new Promise((r) => setTimeout(r, 0));
   const solid = createSolidMaterial(env);
   const terrain = createTerrainView({ scene, surface, field, material: quality.cheapGround ? groundCheap : groundFull, quality });
+  const city = createBuildingView({ scene, buildings, field, env, noiseTexture: textures.noise, quality });
   const decks = createDeckView({ scene, decks: data.decks, material: solid, ground: ground.surface });
   const portalView = createPortalView({ scene, portals, ground, material: solid });
   const model = createCarModel({ colourId: 'red', material: solid });
@@ -197,7 +199,9 @@ async function boot() {
   }
   function applyQuality(id) {
     qualityId = id;
-    quality = { ...QUALITY[id], id };
+    // the same object, changed in place: the views keep a reference to it
+    Object.assign(quality, QUALITY[id]);
+    quality.id = id;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, quality.pixelRatio));
     terrain.setMaterial(quality.cheapGround ? groundCheap : groundFull);
     camera.far = quality.far;
@@ -255,6 +259,7 @@ async function boot() {
     env.update(dt, camera, elapsed);
     env.setFogBase(ground.height(c.x, c.z));
     terrain.update(car.state.x, car.state.z);
+    city.update(car.state.x, car.state.z);
 
     // the interface
     ui.setSpeed(Math.abs(car.state.speed) * 3.6, car.state.gear);
@@ -289,7 +294,7 @@ async function boot() {
 
   // the API for the harness (the checks read the state of the game from here)
   window.__lux = {
-    scene, camera, renderer, car, env, terrain, surface, ground, field, portals, playArea, buildings, quality: () => quality,
+    scene, camera, renderer, car, env, terrain, city, surface, ground, field, portals, playArea, buildings, quality: () => quality,
     state: () => car.state,
     setInput: (o) => { scripted = o; },
     /** The harness can hold the camera at a pose of its own (null gives it back to the chase camera). */
@@ -298,7 +303,11 @@ async function boot() {
       if (!frozenCamera) chase.snap(car.state);
     },
     step: (dt, o) => car.update(dt, { ...(o || {}), gripScale: env.gripScale() }),
-    stats: () => ({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, tiles: terrain.tiles.size, pending: terrain.stats.pending }),
+    stats: () => ({
+      calls: renderer.info.render.calls, triangles: renderer.info.render.triangles,
+      tiles: terrain.tiles.size, pending: terrain.stats.pending,
+      cells: city.stats.visible, cityPending: city.stats.pending,
+    }),
   };
 }
 

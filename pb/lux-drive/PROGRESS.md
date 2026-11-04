@@ -391,7 +391,53 @@ The 23 ways with a hole under them are the ones the reviewer saw: the A1 at (195
 field cannot hold them. The "Rue du Grünewald" goes under the A6 in a tunnel and the mouth of the tunnel is a
 step of 4.3 m: the portal is drawn (a headwall with a bore) but the road does not go through it.
 
-## Milestone 3 — city: NOT STARTED
+## Milestone 3 — city: IN PROGRESS
+
+**The buildings are in.** The 25 336 LOD2 buildings of `buildings.bin` become real houses: the walls
+follow the footprint of the house, the roof follows the direction of the ridge that the bake measured,
+and both are painted in the MTB low-poly look (the window bands, the shutters, the door, the plinth
+and the roof tiles are drawn by the shader, no picture files, no satellite photos).
+
+Three new modules, in the style of the MTB town:
+
+* `building-mesh.js` — the geometry, **pure** (no THREE), so the browser and the Node harness build
+  exactly the same shapes and the checks can measure them without a browser.
+* `building-material.js` — the painted material, cut from the MTB town material to the three kinds of
+  surface that Lux Drive needs (the wall, the roof, the flat roof).
+* `building-view.js` — the cells: one mesh per 256 m cell, one draw call per cell, built when the car
+  comes near and thrown away when it goes away, with a budget of 2.5 ms per frame so the game never
+  stops for a city.
+
+**A building never floats and never hangs over a slope.** The bottom of the walls stands on the ground
+*as the game draws it* (the land with the roads carved into it) and the top of the walls is flat, at the
+height of the eaves above the *land* (the height the bake measured). The two are not the same: the
+carve deviates from the DTM under 656 of the 180 771 building corners by more than 0.3 m, and under 194
+of them by more than 1 m (the worst 3.96 m) — a wall that stood on the DTM would float 4 m in the air
+over a road cut.
+
+**The roof: the ridge is shorter than the house.** The first version made the ridge as long as the
+footprint, so the hip triangles at the ends of the house stood straight up like a wall: 6 126 of the
+41 690 roof faces were steeper than 72°. The ridge is now inset by the width of the house (the classic
+hip: a house as wide as it is long gets a point instead of a ridge), which brings the blades down to
+**997 of the 24 424 roof faces (4 %)** — the rest are the slivers of the courtyards, where the LOD2
+footprint has a notch and the ridge passes over it.
+
+**Measured** (the flow `luxdrive-city`, at the medium quality, in the three neighbourhoods):
+
+| | Kirchberg | the old town | Limpertsberg |
+|---|---:|---:|---:|
+| the building cells in the scene | 22 | 24 | 25 |
+| the draw calls | 113 | 115 | 120 |
+| the triangles | 328 065 | 350 220 | 362 189 |
+| the cells still to build | 0 | 0 | 0 |
+
+The budget of the brief is 260 draw calls at the medium quality ✓. The whole city is 784 cells; the
+grouping of the buildings into the cells takes 4 ms and the whole city (1.27 M vertices, 542 k
+triangles) is built in 184 ms, so the lazy build has room to spare.
+
+**Still to come in this milestone:** the trees, the parks, the Luxtram along Avenue J.F. Kennedy, the
+street lights and the distance LOD.
+
 ## Milestone 4 — gates: NOT STARTED
 
 ## Milestone 5 — UI: NOT STARTED
