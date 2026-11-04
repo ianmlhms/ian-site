@@ -17,6 +17,7 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { createRequire } from "node:module";
 
 export const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 export const VIEWPORT = { width: 820, height: 1180 };
@@ -44,6 +45,8 @@ export function videoDir() {
 async function importPlaywright() {
   const dirs = [process.env.PLAYWRIGHT_DIR, GLOBAL_PLAYWRIGHT].filter(Boolean);
   try { return await import("playwright"); } catch { /* fall through to the folders */ }
+  // a global install found through NODE_PATH (the cloud container): ESM imports ignore NODE_PATH, require does not
+  try { const mod = await import(pathToFileURL(createRequire(import.meta.url).resolve("playwright")).href); return mod.chromium ? mod : mod.default; } catch { /* fall through to the folders */ }
   for (const dir of dirs) {
     for (const entry of ["index.mjs", "index.js"]) {
       const file = path.join(dir, entry);
@@ -73,7 +76,7 @@ export async function launchBrowser({ fullChromium = false } = {}) {
   // WebGL flows need Chromium's full headless compositor. Headless Shell forces
   // SwiftShader on macOS and can stall rendering/input for tens of seconds.
   const attempts = fullChromium
-    ? [...cachedChromiumPaths(true).map(executablePath => ({ executablePath })), { channel: "chromium" }, { channel: "chrome" }]
+    ? [...cachedChromiumPaths(true).map(executablePath => ({ executablePath })), { channel: "chromium" }, { channel: "chrome" }, {}]
     : [{}, ...cachedChromiumPaths().map(executablePath => ({ executablePath })), { channel: "chrome" }];
   for (const opts of attempts) {
     // --mute-audio: the games' sound must never play on the machine running the tests

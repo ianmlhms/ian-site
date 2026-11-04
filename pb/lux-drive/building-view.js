@@ -8,7 +8,7 @@ const THREE = window.THREE;
 const BUILD_BUDGET_MS = 2.5;         // the wall-clock time per frame spent building the cells (at least one per frame)
 const CELL_RADIUS = CELL * 0.71;     // m, the half diagonal of a cell (the distance from the middle to its corner)
 
-export function createBuildingView({ scene, buildings, field, env, noiseTexture, quality }) {
+export function createBuildingView({ scene, buildings, field, env, noiseTexture, quality, hidden = null }) {
   const group = new THREE.Group();
   group.name = 'luxdrive-buildings';
   scene.add(group);
@@ -25,7 +25,9 @@ export function createBuildingView({ scene, buildings, field, env, noiseTexture,
   /** Builds one cell: the mesh of the buildings of that cell. */
   function buildCell(key) {
     const cell = cells.get(key);
-    const data = buildCellMesh(cell.ids, buildings.buildings, heightAt, landAt);
+    // a landmark replaces some blocks: they are not drawn
+    const ids = hidden && hidden.size ? cell.ids.filter((id) => !hidden.has(id)) : cell.ids;
+    const data = buildCellMesh(ids, buildings.buildings, heightAt, landAt);
     if (!data.idx.length) { live.set(key, null); return; }
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(data.pos, 3));
