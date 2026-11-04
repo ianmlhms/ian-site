@@ -69,7 +69,7 @@ const field = createHeightField({ near: data.near, far: data.far, roads: data.ro
 const surface = createSurface(field);
 const deckNetwork = createDeckNetwork(fixLandmarkDecks(data.decks, (x, z) => surface.height(x, z)), surface);
 const ground = createGround(surface, deckNetwork);
-const landmarks = createLandmarks({ buildings: data.buildings, decks: deckNetwork.decks, ground: (x, z) => surface.height(x, z) });
+const landmarks = createLandmarks({ buildings: data.buildings, decks: deckNetwork.decks, ground: (x, z) => surface.height(x, z), roads: data.roads });
 const buildings = createBuildingIndex(data.buildings, { hidden: landmarks.hiddenBuildings });
 const portals = createPortals(data.roads);
 const playArea = createPlayArea(area);

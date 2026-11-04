@@ -131,7 +131,7 @@ async function boot() {
   const deckNetwork = createDeckNetwork(fixLandmarkDecks(data.decks, (x, z) => surface.height(x, z)), surface);
   const ground = createGround(surface, deckNetwork);
   // the landmarks (the famous places) replace some blocks and some bridge decks of the bake and have collision of their own
-  const landmarks = createLandmarks({ buildings: data.buildings, decks: ground.decks, ground: (x, z) => surface.height(x, z) });
+  const landmarks = createLandmarks({ buildings: data.buildings, decks: ground.decks, ground: (x, z) => surface.height(x, z), roads: data.roads });
   const buildings = createBuildingIndex(data.buildings, { hidden: landmarks.hiddenBuildings });
   const portals = createPortals(data.roads);
   const playArea = createPlayArea(area);

@@ -37,8 +37,8 @@ function closestOnSegment(w, x, z, out) {
 /** Do two bounding boxes [minX, minZ, maxX, maxZ] overlap? */
 const overlaps = (a, b) => a[0] <= b[2] && a[2] >= b[0] && a[1] <= b[3] && a[3] >= b[1];
 
-export function createLandmarks({ buildings, decks, ground, only = null }) {
-  const ctx = { buildings, decks, ground };
+export function createLandmarks({ buildings, decks, ground, roads = [], only = null }) {
+  const ctx = { buildings, decks, ground, roads };
   const list = [];
   const hiddenBuildings = new Set();
   const hiddenDecks = new Set();

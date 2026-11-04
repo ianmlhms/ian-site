@@ -19,7 +19,7 @@ const SIGHT_STEP = 3;             // m along the sight line
 
 export async function createPicker() {
   const w = await loadWorld();
-  const lm = createLandmarks({ buildings: w.data.buildings, decks: w.deckNetwork.decks, ground: (x, z) => w.surface.height(x, z) });
+  const lm = createLandmarks({ buildings: w.data.buildings, decks: w.deckNetwork.decks, ground: (x, z) => w.surface.height(x, z), roads: w.data.roads });
   const index = createBuildingIndex(w.data.buildings, { hidden: lm.hiddenBuildings });
   const roads = createRoadIndex(w.data.roads);
   const maps = buildWorldMap({ classes: w.data.classes, classInfo: w.data.classInfo, canopy: w.data.canopy, buildings: w.data.buildings });
@@ -28,11 +28,12 @@ export async function createPicker() {
   const ground = (x, z) => w.surface.height(x, z);
 
   /** The nearest thing of the world within `r` of (x, z) (a house, a baked tree, a wood tree, a landmark wall), or null. */
-  function obstacle(x, z, r) {
-    if (index.collide(x, z, r)) return 'building';
+  function obstacle(x, z, r, rb = r) {
+    if (index.collide(x, z, rb)) return 'building';
     if (lm.collide(x, z, r)) return 'landmark';
     if (forest.collide(x, z, r)) return 'tree';
-    for (const i of forest.near(x, z, r + 4)) { const t = w.data.trees[i]; if (t && Math.hypot(t.x - x, t.z - z) < r) return 'osm-tree'; }
+    // a tree is a crown: its radius (~0.4 of the height) counts, not only the trunk
+    for (const i of forest.near(x, z, r + 14)) { const t = w.data.trees[i]; if (t && Math.hypot(t.x - x, t.z - z) < Math.max(r, t.height * 0.45 + 2)) return 'osm-tree'; }
     return null;
   }
 
@@ -51,7 +52,7 @@ export async function createPicker() {
   }
 
   /** The best road point for a target. Returns the pose object or throws (a landmark nobody can see is an error). */
-  function pick({ name, tx, tz, ty = 12, dist = 60, bearing = null, height = EYE, fov = 60, clearance = 8, sightStop = 12 }) {
+  function pick({ name, tx, tz, ty = 12, dist = 60, bearing = null, height = EYE, fov = 60, clearance = 8, buildingClearance = clearance, sightStop = 12 }) {
     let best = null;
     for (let r = dist * 0.55; r <= dist * 1.6; r += 6) {
       for (let a = 0; a < 360; a += 6) {
@@ -59,7 +60,7 @@ export async function createPicker() {
         const hit = roads.nearest(x, z, 8);
         if (!hit || hit.road.bridge || hit.road.tunnel) continue;
         const px = hit.x, pz = hit.z;
-        if (obstacle(px, pz, clearance)) continue;
+        if (obstacle(px, pz, clearance, buildingClearance)) continue;
         const y = ground(px, pz) + height;
         if (!sightClear(px, pz, y, tx, tz, ground(tx, tz) + ty, sightStop)) continue;
         const d = Math.hypot(px - tx, pz - tz);
@@ -80,8 +81,8 @@ if (process.argv[1].endsWith('pick_pose.mjs')) {
   if (args[0] === '--all') {
     const out = args.slice(1).map((spec) => {
       const [name, rest] = spec.split(':');
-      const [tx, tz, ty, dist, bearing] = rest.split(',').map(Number);
-      return picker.pick({ name, tx, tz, ty, dist, bearing: Number.isFinite(bearing) ? bearing : null });
+      const [tx, tz, ty, dist, bearing, bc, sstop] = rest.split(',').map(Number);
+      return picker.pick({ name, tx, tz, ty, dist, bearing: Number.isFinite(bearing) ? bearing : null, buildingClearance: Number.isFinite(bc) ? bc : undefined, sightStop: Number.isFinite(sstop) ? sstop : undefined });
     });
     console.log(JSON.stringify(out, null, 1));
   } else {

@@ -22,6 +22,14 @@ export const PALETTE = Object.freeze({
   gold: [0.92, 0.74, 0.25],             // the Gëlle Fra
   slate: [0.28, 0.30, 0.34],            // pitched roofs
   copperGreen: [0.45, 0.62, 0.55],      // the roofs of the Palais and the cathedral spires' crowns
+  stoneWarm: [0.82, 0.78, 0.62],        // the pale yellow-grey sandstone of the cathedral and the palace
+  stoneBand: [0.58, 0.54, 0.44],        // the darker courses of the palace
+  slateBlack: [0.15, 0.16, 0.19],       // the cathedral's spires: dark slate, almost black
+  slateGrey: [0.30, 0.32, 0.36],
+  anodised: [0.58, 0.42, 0.20],         // the bronze fins of the Cour de justice towers
+  anodisedDark: [0.36, 0.25, 0.12],
+  blackGlass: [0.09, 0.08, 0.08],       // the podium of the Cour de justice
+  paleGlass: [0.62, 0.66, 0.67],        // the barely visible drum of the Philharmonie
   lampGreen: [0.17, 0.25, 0.20],
   lampLight: [0.98, 0.93, 0.72],
 });
