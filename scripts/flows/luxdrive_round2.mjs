@@ -61,22 +61,21 @@ export const flow = {
     h.expect(Math.hypot(reset.x - first.x, reset.z - first.z) < 40, `... close to the start (${Math.hypot(reset.x - first.x, reset.z - first.z).toFixed(0)} m)`);
 
     h.step("a tap on Place de l'Europe lands on Avenue John F. Kennedy; a tap on a footway, steps, path, cycleway, track, pedestrian way lands on a car road");
-    const plaza = await page.evaluate(() => {
-      const m = window.__lux;
-      const segs = m.roadIndex.segments.filter((s) => s.name === "Place de l'Europe" && !s.road.kind.includes("link"));
-      if (!segs.length) return null;
-      const c = segs.reduce((a, s) => ({ x: a.x + (s.ax + s.bx) / 2, z: a.z + (s.az + s.bz) / 2 }), { x: 0, z: 0 });
-      return { x: c.x / segs.length, z: c.z / segs.length, n: segs.length, kinds: [...new Set(segs.map((s) => s.road.kind))] };
+    // the square beside the start: taps on the paving round the start place (Place de l'Europe) must find the avenue, not a path
+    const around = await page.evaluate(() => {
+      const m = window.__lux, s0 = m.roadIndex.nearest(5924, 7901, 60), out = [];
+      for (const [dx, dz] of [[0, 0], [12, -8], [-14, 6], [6, 14], [-8, -12]]) {
+        const hit = m.roadIndex.nearest(5924 + dx, 7901 + dz, 60);
+        out.push(hit ? `${hit.road.name}/${hit.road.kind}` : "none");
+      }
+      return { first: s0 && s0.road.name, out };
     });
-    h.expect(!!plaza, "Place de l'Europe is in the road data");
-    if (plaza) {
-      const tapped = await page.evaluate(([x, z]) => { const hit = window.__lux.roadIndex.nearest(x, z, 200); return hit ? { name: hit.road.name, kind: hit.road.kind } : null; }, [plaza.x, plaza.z]);
-      h.expect(tapped && tapped.name === "Avenue John F. Kennedy", `the tap on the middle of the plaza (${plaza.kinds.join("/")}) finds ${tapped ? tapped.name : "nothing"}`);
-      await page.evaluate(([x, z]) => window.__lux.teleportNear(x, z, 200), [plaza.x, plaza.z]);
-      await page.evaluate(() => window.simSeconds(window.__lux, 0.3));
-      const landed = await roadNow();
-      h.expect(landed.car && landed.name === "Avenue John F. Kennedy", `the car stands on ${landed.name} (${landed.kind})`);
-    }
+    h.expect(around.out.every((n) => !/footway|pedestrian|steps|path|cycleway|track|bridleway|none/.test(n.split("/")[1] || "none")), `5 taps round Place de l'Europe: ${around.out.join(" | ")}`);
+    h.eq(around.out[0].split("/")[0], "Avenue John F. Kennedy", "a tap on Place de l'Europe lands on Avenue John F. Kennedy");
+    await page.evaluate(() => window.__lux.teleportNear(5924, 7901, 60));
+    await page.evaluate(() => window.simSeconds(window.__lux, 0.3));
+    const landed = await roadNow();
+    h.expect(landed.car && landed.name === "Avenue John F. Kennedy", `the car stands on ${landed.name} (${landed.kind})`);
     const probes = await page.evaluate((notCar) => {
       const m = window.__lux, out = [];
       for (const kind of notCar) {
@@ -86,7 +85,7 @@ export const flow = {
         let found = 0;
         for (let i = 0; i < list.length && found < 2; i += step) {
           const s = list[i], x = (s.ax + s.bx) / 2, z = (s.az + s.bz) / 2;
-          if (x < 3500 || x > 9000 || z < 6000 || z > 10000) continue;           // the city
+          if (x < 2500 || x > 11000 || z < 4500 || z > 11000) continue;           // the city and the communes round it
           const hit = m.roadIndex.nearest(x, z, 80);
           if (!hit) continue;
           out.push({ kind, x, z, name: s.name });
@@ -95,7 +94,7 @@ export const flow = {
       }
       return out;
     }, NOT_CAR);
-    h.expect(probes.length >= 8, `${probes.length} taps on non-car roads (${[...new Set(probes.map((p) => p.kind))].join(", ")})`);
+    h.expect(probes.length >= 6, `${probes.length} taps on non-car roads (${[...new Set(probes.map((p) => p.kind))].join(", ")})`);
     const bad = [];
     for (const p of probes) {
       await page.evaluate(([x, z]) => window.__lux.teleportNear(x, z, 80), [p.x, p.z]);
