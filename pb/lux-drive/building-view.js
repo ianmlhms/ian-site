@@ -33,6 +33,7 @@ export function createBuildingView({ scene, buildings, field, env, noiseTexture,
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(data.col, 3));
     geometry.setAttribute('aInfo', new THREE.Float32BufferAttribute(data.info, 4));
     geometry.setAttribute('aGeo', new THREE.Float32BufferAttribute(data.geo, 2));
+    geometry.setAttribute('aStyle', new THREE.Float32BufferAttribute(data.sty, 2));
     geometry.setIndex(data.idx);
     geometry.computeBoundingSphere();
     const mesh = new THREE.Mesh(geometry, material);

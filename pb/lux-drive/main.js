@@ -128,8 +128,8 @@ async function boot() {
   });
   env.uniforms.uSkyPaint.value = textures.sky;                      // the painted cloud tile (the noise texture made coloured specks)
   scene.add(env.sky);
-  const groundFull = createGroundMaterial(THREE, env, textures, worldMaps, WORLD, false);
-  const groundCheap = createGroundMaterial(THREE, env, textures, worldMaps, WORLD, true);
+  const groundFull = createGroundMaterial(THREE, env, textures, worldMaps, WORLD, false, quality.treeRadius);
+  const groundCheap = createGroundMaterial(THREE, env, textures, worldMaps, WORLD, true, quality.treeRadius);
 
   // ---- the views
   setLoad(0.82, 'load.build');
@@ -209,6 +209,9 @@ async function boot() {
     quality.id = id;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, quality.pixelRatio));
     terrain.setMaterial(quality.cheapGround ? groundCheap : groundFull);
+    // the ground paints the wood as its canopy beyond the reach of the trees: the radius follows the quality
+    groundFull.uniforms.uTreeRadius.value = quality.treeRadius;
+    groundCheap.uniforms.uTreeRadius.value = quality.treeRadius;
     camera.far = quality.far;
     camera.updateProjectionMatrix();
     resize();

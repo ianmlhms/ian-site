@@ -15,7 +15,8 @@ buildings.bin layout (little endian):
     u32 count
     per building:
       u8  roof        0 = flat, 1 = pitched (a hip roof along the ridge direction)
-      u8  style       0 = house, 1 = apartment block, 2 = office, 3 = industrial / shed
+      u8  style       0 = house, 1 = apartment block, 2 = office, 3 = industrial / shed,
+                      4 = modern (a tower), 5 = stone (a church); the bit 8: a shop on the ground floor
       u8  ridgeDir    the direction of the ridge, 0..255 = 0..360 degrees
       u8  levels      the number of storeys (for the window bands), 0 = unknown
       u16 eave        (decimetres, the height of the eaves above the ground)
@@ -35,10 +36,11 @@ from lxml import etree
 from shapely.geometry import Point, Polygon
 from shapely.ops import unary_union
 from shapely.prepared import prep
+from shapely.strtree import STRtree
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import codec  # noqa: E402
-from common import (NEAR_STEP, OUT_DIR, RAW_DIR, luref_to_world, sample_bicubic)  # noqa: E402
+from common import (NEAR_STEP, OUT_DIR, RAW_DIR, lonlat_to_luref, luref_to_world, sample_bicubic)  # noqa: E402
 
 LOD2_DIR = os.path.expanduser("~/Library/Caches/luxtram-work/geo/lod2")
 COMMUNES = tuple(os.environ.get("LUXDRIVE_COMMUNES", "luxembourg,niederanven").split(","))
@@ -48,6 +50,122 @@ SIMPLIFY_M = 0.4          # m, the Douglas-Peucker tolerance of the footprint
 MAX_PTS = 16              # a building with more corners than this is simplified harder
 MIN_AREA = 8.0            # m2, smaller footprints are sheds, not buildings
 FLAT_ROOF = 0.7           # m, a roof lower than this is flat
+
+# ---- the style of the façade ------------------------------------------------
+# The LOD2 model knows the shape of a building but not what it is: the OSM knows.  The bake joins the two
+# (the footprint of the LOD2 building on the footprint of the OSM building) and reads the function from the
+# tags: a house has shutters and small windows, an office has glass bands, a church is dressed stone.
+STYLE_HOUSE, STYLE_APARTMENT, STYLE_OFFICE, STYLE_INDUSTRIAL, STYLE_MODERN, STYLE_STONE = 0, 1, 2, 3, 4, 5
+STYLE_SHOP = 8             # a bit of the style byte: the ground floor of the house is a shop
+MODERN_HEIGHT = 25.0       # m, above this a building is a tower and not a house
+HOUSE_LEVELS = 5           # storeys: a house has shutters, a block of flats has not
+
+OFFICE_BUILDINGS = {"office", "commercial", "retail", "hotel", "supermarket", "department_store", "kiosk",
+                     "civic", "public", "school", "hospital", "train_station", "government"}
+INDUSTRIAL_BUILDINGS = {"industrial", "warehouse", "factory", "manufacture", "industrial_unit", "service",
+                        "hangar", "silo", "storage_tank", "bunker", "garage", "garages", "shed", "greenhouse",
+                        "carport", "stable", "barn", "farm_auxiliary"}
+STONE_BUILDINGS = {"church", "cathedral", "chapel", "monument", "memorial", "mausoleum", "castle", "ruins",
+                   "temple", "synagogue", "mosque", "shrine"}
+APARTMENT_BUILDINGS = {"apartments", "apartment", "residential", "dormitory", "block"}
+HOUSE_BUILDINGS = {"yes", "house", "detached", "semidetached_house", "terrace", "bungalow", "hut", "cabin",
+                   "farm", "farmhouse", "static_caravan", "allotment_house", "chalet"}
+PUBLIC_AMENITIES = {"school", "university", "college", "hospital", "bank", "townhall", "courthouse", "police",
+                    "fire_station", "kindergarten", "community_centre", "place_of_worship", "townhall"}
+BUSINESS_AMENITIES = {"restaurant", "cafe", "bar", "pub", "fast_food", "bank", "atm", "pharmacy", "ice_cream",
+                      "food_court", "nightclub", "biergrotte", "alcohol", "beverages"}
+
+
+def classify(tags, eave, ridge, levels, area):
+    """The style of the façade of a building: what it is for (the OSM) and how big it is.
+
+    A house (a small building of up to five storeys) has shutters and small windows, a block of flats has
+    the same windows but no shutters, an office has bands of glass and a tower is glass from the ground up."""
+    b = tags.get("building", "")
+    amenity = tags.get("amenity", "")
+    if b in STONE_BUILDINGS or amenity == "place_of_worship":
+        return STYLE_STONE
+    if b in INDUSTRIAL_BUILDINGS:
+        return STYLE_INDUSTRIAL
+    if ridge > MODERN_HEIGHT:
+        return STYLE_MODERN
+    office = (b in OFFICE_BUILDINGS or tags.get("office") or tags.get("public")
+              or amenity in PUBLIC_AMENITIES or tags.get("tourism") == "hotel")
+    if office:
+        return STYLE_OFFICE
+    if b in APARTMENT_BUILDINGS:
+        return STYLE_APARTMENT
+    if b in HOUSE_BUILDINGS and levels <= HOUSE_LEVELS and area <= 900.0:
+        return STYLE_HOUSE
+    return STYLE_APARTMENT if (levels > HOUSE_LEVELS or area > 900.0) else STYLE_HOUSE
+
+
+def is_business(tags):
+    """True when the ground floor of the building is a shop, a café or a bank."""
+    if tags.get("shop"):
+        return True
+    if tags.get("amenity") in BUSINESS_AMENITIES:
+        return True
+    if tags.get("craft"):
+        return True
+    return False
+
+
+def read_osm_buildings(osm):
+    """The building ways of the OSM as polygons in LUREF, with their tags."""
+    nodes = osm["nodes"]
+    shapes = []
+    for w in osm["ways"]:
+        t = w["t"]
+        if "building" not in t and "building:part" not in t:
+            continue
+        lons, lats = [], []
+        for nid in w["n"]:
+            p = nodes.get(str(nid))
+            if p:
+                lons.append(p[0])
+                lats.append(p[1])
+        if len(lons) < 3:
+            continue
+        e, n = lonlat_to_luref(lons, lats)
+        pts = list(zip(e.tolist(), n.tolist()))
+        if abs(pts[0][0] - pts[-1][0]) > 1e-6 or abs(pts[0][1] - pts[-1][1]) > 1e-6:
+            continue                       # an open way is not a footprint
+        try:
+            poly = Polygon(pts)
+        except Exception:
+            continue
+        if not poly.is_valid:
+            poly = poly.buffer(0)
+        if poly.is_empty or poly.geom_type != "Polygon":
+            continue
+        shapes.append((poly, t))
+    return shapes
+
+
+def read_business_points(osm):
+    """The points of the shops, the cafés and the banks: a building with one inside has a shop below."""
+    out = []
+    for p in osm.get("pois", []):
+        t = p.get("t", {})
+        if t.get("shop") or t.get("amenity") in BUSINESS_AMENITIES or t.get("craft"):
+            e, n = lonlat_to_luref([p["lon"]], [p["lat"]])
+            out.append(Point(float(e[0]), float(n[0])))
+    return out
+
+
+def match_tags(tree, shapes, poly):
+    """The tags of the OSM building that covers this footprint (the one with the biggest overlap)."""
+    if tree is None or poly.is_empty:
+        return {}
+    best, best_area = {}, 0.0
+    for i in tree.query(poly):
+        s = shapes[i]
+        area = poly.intersection(s[0]).area
+        if area > best_area:
+            best_area = area
+            best = s[1]
+    return best
 
 
 def rings_of(el):
@@ -235,6 +353,19 @@ def main():
     def terrain(x, z):
         return sample_bicubic((nx, nz, flat), x / NEAR_STEP, z / NEAR_STEP)
 
+    # ---- the OSM: what the buildings are for ------------------------------
+    osm_path = os.path.join(RAW_DIR, "osm.json")
+    osm_shapes, osm_tree, shops, shop_tree = [], None, [], None
+    if os.path.exists(osm_path):
+        osm = json.load(open(osm_path, encoding="utf-8"))
+        osm_shapes = read_osm_buildings(osm)
+        osm_tree = STRtree([s[0] for s in osm_shapes])
+        shops = read_business_points(osm)
+        shop_tree = STRtree(shops)
+        print("osm: %d buildings, %d businesses" % (len(osm_shapes), len(shops)), flush=True)
+    else:
+        print("osm: no osm.json, the styles come from the shape alone", flush=True)
+
     out = []
     names_out = {}
     stats = {"seen": 0, "in": 0, "kept": 0}
@@ -296,10 +427,27 @@ def main():
                     dxs = [p[0] for p in pts]
                     dzs = [p[1] for p in pts]
                     d = math.atan2(dzs[-1] - dzs[0], dxs[-1] - dxs[0])
+            # ---- the style of the façade: the OSM says what the building is, the height says how it looks
+            area = abs(ring_area(fp))
+            poly = Polygon(fp)
+            if not poly.is_valid:
+                poly = poly.buffer(0)
+            tags = match_tags(osm_tree, osm_shapes, poly)
+            lv = tags.get("building:levels", "")
+            levels = int(lv) if lv.isdigit() else int(round(eave / 3.0))
+            style = classify(tags, eave, ridge, levels, area)
+            shop = is_business(tags)
+            if not shop and shop_tree is not None and not poly.is_empty:
+                for i in shop_tree.query(poly):
+                    if poly.contains(shops[i]):
+                        shop = True
+                        break
+            if shop and style in (STYLE_HOUSE, STYLE_APARTMENT):
+                style |= STYLE_SHOP
             out.append({
                 "pts": pts, "eave": eave, "ridge": ridge, "dir": d,
                 "roof": 0 if (ridge - eave) < FLAT_ROOF else 1,
-                "area": abs(ring_area(fp)), "name": rec["name"],
+                "area": area, "name": rec["name"], "style": style, "levels": levels,
             })
             if rec["name"]:
                 names_out[len(names_out)] = rec["name"]
@@ -312,16 +460,15 @@ def main():
 
     blob = bytearray()
     blob += (len(out)).to_bytes(4, "little")
+    styles = {}
     for o in out:
         pts = o["pts"]
-        style = 0
-        area = o["area"]
-        if area > 900:
-            style = 1
+        style = o["style"]
+        styles[style] = styles.get(style, 0) + 1
         blob += o["roof"].to_bytes(1, "little")
         blob += style.to_bytes(1, "little")
         blob += (int(round((o["dir"] % (2 * math.pi)) / (2 * math.pi) * 256)) % 256).to_bytes(1, "little")
-        blob += min(255, max(0, int(round(o["eave"] / 3.0)))).to_bytes(1, "little")
+        blob += min(255, max(0, o["levels"])).to_bytes(1, "little")
         blob += int(round(o["eave"] * 10)).to_bytes(2, "little")
         blob += int(round(o["ridge"] * 10)).to_bytes(2, "little")
         blob += len(pts).to_bytes(2, "little")
@@ -338,6 +485,9 @@ def main():
         fh.write(blob)
     with open(os.path.join(OUT_DIR, "building-names.json"), "w", encoding="utf-8") as fh:
         json.dump(names_out, fh, ensure_ascii=False, separators=(",", ":"))
+    names = ["house", "apartment", "office", "industrial", "modern", "stone"]
+    print("styles: %s" % ", ".join("%s %d" % (names[s & 7], n) for s, n in sorted(styles.items())))
+    print("  with a shop on the ground floor: %d" % sum(n for s, n in styles.items() if s & STYLE_SHOP))
     print("buildings.bin %.2f MB" % (len(blob) / 1048576.0))
     print("total %.0fs" % (time.time() - t0))
 

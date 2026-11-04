@@ -36,6 +36,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import OUT_DIR, RAW_DIR, lonlat_to_luref, luref_to_world  # noqa: E402
 from shapely.geometry import LineString, Point, Polygon, MultiPolygon, box  # noqa: E402
 from shapely.ops import unary_union  # noqa: E402
+from shapely.strtree import STRtree  # noqa: E402
 
 # kind code -> (lanes per direction, directions, lane width, shoulder per side, pavement per side)
 #
@@ -73,6 +74,16 @@ KIND_CODE = {k: i for i, k in enumerate(KIND_NAMES)}
 
 # the width of a paved area (a pedestrian way): the OSM width tag when it is there, else this
 PEDESTRIAN_WIDTH = 10.0
+
+# The pavement of a street of the city.  The reviewer: "urban streets get pavements (OSM sidewalk tags, else
+# ~2.5 m default on urban roads) in a paving colour; the land class urban is hard ground, not lawn".
+URBAN_PAVEMENT = 2.5
+URBAN_PAVEMENT_CLASSES = {"primary", "secondary", "tertiary", "unclassified", "residential",
+                           "service", "road", "busway", "primary_link", "secondary_link", "tertiary_link"}
+# How close a street has to come to the built-up area to count as a street of the city (m).
+URBAN_NEAR = 20.0
+# The landuse of the town: the areas that are built up.
+URBAN_LANDUSE = {"residential", "commercial", "industrial", "retail"}
 
 FLAG_BRIDGE = 1
 FLAG_TUNNEL = 2
@@ -191,6 +202,38 @@ def main():
             names.append(text)
         return name_ids[text]
 
+    # ---- the built-up area: the streets of the city have a pavement ----------
+    # A street in the town has a pavement, a street in the country has not.  The built-up area is the OSM
+    # landuse of the town (residential, commercial, industrial, retail) and the buildings themselves.
+    urban_shapes = []
+    for way in osm["ways"]:
+        tags = way["t"]
+        is_building = tags.get("building") not in (None, "no")
+        if not is_building and tags.get("landuse") not in URBAN_LANDUSE:
+            continue
+        pts = geometry_of(way, nodes)
+        if len(pts) < 3:
+            continue
+        if abs(pts[0][0] - pts[-1][0]) > 1e-7 or abs(pts[0][1] - pts[-1][1]) > 1e-7:
+            continue                        # only the closed ways are areas
+        try:
+            poly = Polygon(pts)
+        except Exception:
+            continue
+        if not poly.is_valid:
+            poly = poly.buffer(0)
+        if poly.is_empty:
+            continue
+        urban_shapes.append(poly)
+    urban_tree = STRtree(urban_shapes) if urban_shapes else None
+    print("built-up areas: %d" % len(urban_shapes))
+
+    def in_town(line):
+        """True when the street runs through the built-up area (a street of the town)."""
+        if urban_tree is None:
+            return False
+        return len(urban_tree.query(line.buffer(URBAN_NEAR))) > 0
+
     roads = []
     stats = {"bridge": 0, "tunnel": 0, "oneway": 0, "over": 0, "skipped": 0, "clipped": 0}
     for way in osm["ways"]:
@@ -266,6 +309,10 @@ def main():
                 vals = parse_float_list(v)
                 if vals:
                     sw = vals[0]
+        elif hw in URBAN_PAVEMENT_CLASSES and in_town(parts):
+            # A street of the town without a pavement tag gets the 2.5 m of a real pavement: the reviewer found
+            # the grass growing right up to the walls of the houses.
+            sw = URBAN_PAVEMENT
         # The right-hand lane centre, relative to the centre line. Luxembourg drives on the right, so the
         # car sits in the rightmost lane: +offset when it travels with the way, -offset against it.
         offset = max(0.0, width / 2 - lane_w / 2)

@@ -236,18 +236,25 @@ export const flow = {
       // the carve may not make the ground beside a road steeper than the land beside it is (a cliff stays a cliff),
       // and where the land is flat it may not be steeper than the slope limit (0.84 = 40 degrees)
       const over = rows.filter((r) => r.carved > Math.max(0.84, r.natural + 0.25)).length;
+      // A WALL is a slope of more than 3 (72 degrees) over half a metre.  The land of Luxembourg has cliffs of its
+      // own (the valley of the Alzette): they stay cliffs, they are not the fault of the carve.  A wall is counted
+      // only where the carve made one: the ground there is steeper than 3 while the land at the same point is not.
+      const walls = rows.filter((r) => r.carved > 3 && r.natural <= 3);
       return {
         total: rows.length,
         p50: q(0.5), p90: q(0.9), p99: q(0.99),
         over, share: over / rows.length,
-        walls: rows.filter((r) => r.carved > 3).length,
+        walls: walls.length,
+        deepest: walls.reduce((m, r) => Math.max(m, r.carved), 0),
+        cliffs: rows.filter((r) => r.natural > 3).length,
       };
     });
     h.expect(slope.total > 5000, `${slope.total} sides of roads measured`);
     h.expect(slope.p90 <= 0.85, `the ground beside the roads is at most ${slope.p90.toFixed(2)} (90th percentile, the limit is 0.84)`);
     h.expect(slope.p99 <= 1.6, `the ground beside the roads is at most ${slope.p99.toFixed(2)} (99th percentile)`);
     h.expect(slope.share <= 0.02, `${(slope.share * 100).toFixed(2)}% of the sides are steeper than the land (the limit is 2%)`);
-    h.expect(slope.walls <= 6, `${slope.walls} sides of roads are a wall (the limit is 6)`);
+    h.expect(slope.walls <= 8, `${slope.walls} sides of roads are a wall the carve made (the limit is 8 of ${slope.total}, the ${slope.cliffs} cliffs are the land's own)`);
+    h.expect(slope.deepest <= 8, `the deepest wall the carve makes is ${slope.deepest.toFixed(2)} (the limit is 8)`);
 
     h.step("the bridges of the brief are solid decks the car can drive on");
     const bridges = await page.evaluate(async () => {

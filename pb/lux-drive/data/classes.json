@@ -13,14 +13,14 @@
   "scrub"
  ],
  "counts": {
-  "grass": 695140,
-  "forest": 1438422,
+  "grass": 581878,
+  "forest": 1425869,
   "water": 9632,
-  "park": 45250,
-  "urban": 534267,
-  "farmland": 1115028,
-  "sand": 378,
-  "scrub": 85724
+  "park": 45668,
+  "urban": 661438,
+  "farmland": 1115606,
+  "sand": 377,
+  "scrub": 83373
  },
- "bytes": 881975
+ "bytes": 798513
 }

@@ -30,6 +30,7 @@ export const GROUND_FRAGMENT = `
   uniform vec2 uWorldSize;
   uniform vec2 uWind;
   uniform float uKerbWidth;
+  uniform float uTreeRadius;
   varying vec3 vWorld; varying vec3 vNormal; varying float vDist;
   varying vec4 vRoad; varying vec4 vRoad2;
   ${PAINT_LIGHT_GLSL}
@@ -48,10 +49,17 @@ export const GROUND_FRAGMENT = `
     // ---- the land: the painted ground, tinted by the class of the place
     vec3 gTex = texture2D(uGround, P * 0.085).rgb;
     vec3 lTex = texture2D(uLitter, P * 0.13).rgb;
-    vec3 meadow = gTex * vec3(0.70, 0.96, 0.55) * (0.88 + 0.24 * nMid.g);
+    vec3 pave = texture2D(uPavement, P * 0.46).rgb;
+    vec3 grav = texture2D(uGravel, P * 0.55).rgb;
+    // the meadow: a calm olive green (the colour of the MTB meadow), not a bright lawn
+    vec3 meadow = gTex * vec3(0.70, 0.86, 0.52) * (0.90 + 0.20 * nMid.g);
     vec3 wood = lTex * vec3(0.92, 0.94, 0.78) * (0.82 + 0.30 * nLo.g);        // the forest floor: the leaf litter
-    vec3 city = gTex * vec3(0.72, 0.70, 0.66) * (0.86 + 0.26 * nMid.r);       // the ground between the houses
-    vec3 field = gTex * vec3(1.18, 1.06, 0.66) * (0.86 + 0.28 * nLo.b);       // the farmland: the crops
+    // the wood seen from afar is its canopy, not its floor (the MTB paints it the same way)
+    vec3 canopy = mix(vec3(0.19, 0.31, 0.14), vec3(0.32, 0.44, 0.19), smoothstep(0.3, 0.8, nLo.g * 0.6 + nMid.b * 0.5));
+    // the ground between the houses: HARD ground (gravel and slabs), never a lawn
+    vec3 city = mix(grav * 0.74, pave * 0.60, 0.35) * (0.88 + 0.16 * nMid.r);
+    // the farmland: the crops, a muted straw (the MTB field colours)
+    vec3 field = gTex * vec3(1.02, 0.95, 0.60) * (0.88 + 0.24 * nLo.b);
     // the rows of the fields, along a direction that turns slowly with the land
     float ang = nLo.a * 6.28318;
     vec2 dir = vec2(cos(ang), sin(ang));
@@ -63,11 +71,15 @@ export const GROUND_FRAGMENT = `
     float open = cls.r, forest = cls.g, urban = cls.b, wetWater = cls.a;
     float farm = can.a, park = can.b;
     vec3 albedo = meadow;
-    albedo = mix(albedo, meadow * vec3(1.08, 1.22, 0.86), park * 0.8);        // the parks are mown and brighter
+    albedo = mix(albedo, meadow * vec3(1.06, 1.16, 0.84), park * 0.8);        // the parks are mown and brighter
     albedo = mix(albedo, field, farm);
     albedo = mix(albedo, wood, forest);
     albedo = mix(albedo, city, urban);
     albedo = mix(albedo, water, wetWater);
+    // The trees of the view only reach so far: beyond them the wood is its canopy.  Without this the forest is a
+    // brown litter floor under green blobs, and the land reads as a blotch of brown patches.
+    float farK = smoothstep(uTreeRadius * 0.62, uTreeRadius * 1.05, vDist) * forest * (1.0 - urban);
+    albedo = mix(albedo, canopy * (0.85 + 0.30 * nLo.g), farK);
 
     // ---- the road: the tarmac, the kerb, the pavement and the markings
     float cov = vRoad2.x;
@@ -76,9 +88,7 @@ export const GROUND_FRAGMENT = `
     float al = abs(lat);
     float roadW = smoothstep(0.30, 0.62, cov);
     vec3 tar = texture2D(uAsphalt, P * 0.33).rgb;
-    vec3 pave = texture2D(uPavement, P * 0.46).rgb;
     vec3 cob = texture2D(uCobble, P * 0.40).rgb;
-    vec3 grav = texture2D(uGravel, P * 0.55).rgb;
     // the paved stone of the squares: the slow noise breaks the tiling up, a square is a calm surface
     vec3 stn = texture2D(uStone, P * 0.30).rgb * (0.93 + 0.14 * nLo.g);
     // the material of the way the node is on: 0 tarmac, 1 cobbles, 2 concrete, 3 gravel, 4 earth, 5 paved stone
@@ -88,15 +98,16 @@ export const GROUND_FRAGMENT = `
     float onCarriage = 1.0 - smoothstep(hw - 0.05, hw + 0.05, al);
     float onKerb = smoothstep(hw - 0.02, hw + 0.04, al) * (1.0 - smoothstep(hw + kerbW - 0.02, hw + kerbW + 0.04, al));
     float onPave = smoothstep(hw + kerbW - 0.02, hw + kerbW + 0.04, al) * (1.0 - smoothstep(a0 - 0.06, a0 + 0.06, al));
-    // the lane markings: a dashed centre line (3 m of paint every 9 m), the edge lines of the big roads
+    // the lane markings: a dashed centre line (3 m of paint every 9 m), the edge lines of the big roads.
+    // A paved area (a square, a footpath) carries NO markings: the paint of a square would make it a street.
     float dash = (lines > 0.5 && lines < 1.5) ? step(fract(s / 9.0), 0.34) : 1.0;
-    float centre = (1.0 - smoothstep(0.05, 0.11, al)) * dash * step(0.5, lines);
-    float edge = (lines > 0.5 && hw > 4.0) ? (1.0 - smoothstep(0.05, 0.11, abs(al - (hw - 0.5)))) : 0.0;
+    float centre = (1.0 - smoothstep(0.05, 0.11, al)) * dash * step(0.5, lines) * step(lines, 2.5);
+    float edge = (lines > 0.5 && lines < 2.5 && hw > 4.0) ? (1.0 - smoothstep(0.05, 0.11, abs(al - (hw - 0.5)))) : 0.0;
     float paint = clamp(centre + edge, 0.0, 1.0) * onCarriage * mark * near;
 
     albedo = mix(albedo, surf, roadW * onCarriage);
-    albedo = mix(albedo, pave * 0.86, roadW * onKerb);                        // the kerb stone is darker than the slabs
-    albedo = mix(albedo, pave, roadW * onPave);
+    albedo = mix(albedo, pave * 0.80, roadW * onKerb);                        // the kerb stone is darker than the slabs
+    albedo = mix(albedo, pave * 0.82, roadW * onPave);
     albedo = mix(albedo, vec3(0.84, 0.83, 0.76), paint * roadW);
 
     // ---- the weather: the rain darkens the tarmac and the ground
@@ -119,7 +130,7 @@ export const GROUND_FRAGMENT = `
   }
 `;
 
-export function createGroundMaterial(THREE, env, textures, worldMaps, worldSize, cheap = false) {
+export function createGroundMaterial(THREE, env, textures, worldMaps, worldSize, cheap = false, treeRadius = 150) {
   const uniforms = {
     ...env.uniforms,
     uAsphalt: { value: textures.asphalt }, uPavement: { value: textures.pavement }, uCobble: { value: textures.cobble },
@@ -127,6 +138,7 @@ export function createGroundMaterial(THREE, env, textures, worldMaps, worldSize,
     uGround: { value: textures.ground }, uLitter: { value: textures.litter },
     uNoise: { value: textures.noise }, uClass: { value: worldMaps.class }, uCanopy: { value: worldMaps.canopy },
     uKerbWidth: { value: ROAD.kerbWidth },
+    uTreeRadius: { value: treeRadius },
     uWorldSize: { value: new THREE.Vector2(worldSize.width, worldSize.depth) },
   };
   return new THREE.ShaderMaterial({ uniforms, vertexShader: GROUND_VERTEX, fragmentShader: (cheap ? '#define LOW\n' : '') + GROUND_FRAGMENT, side: THREE.FrontSide });

@@ -75,11 +75,12 @@ function gaussianSmooth(values, sigmaSamples) {
  */
 export function createRoadNetwork(roads, baseHeight) {
   const segAx = [], segAz = [], segBx = [], segBz = [], segB0 = [], segB1 = [];
-  const segHw = [], segKerbH = [], segKerbW = [], segPw = [], segA0 = [], segR = [], segReach = [];
+  const segHw = [], segKerbH = [], segKerbW = [], segPw = [], segA0 = [], segBench = [], segR = [], segReach = [];
   const segKind = [], segRoad = [], segKerbOn = [], segLines = [], segS0 = [], segS1 = [], segSurf = [];
   const segSamp = [];            // the index of the centre line sample every segment starts at
   const sampleX = [], sampleZ = [], sampleRoad = [];
   const fadeL = [], fadeR = [];   // the length of the batter on each side of the way, per sample
+  const notchL = [], notchR = []; // the depth of the bench of the way in the land on each side, per sample
   const info = [];
   const firstSample = [];            // the index of a road's first sample in the sample arrays
   const firstSeg = [];               // the index of a road's first segment in the segment arrays
@@ -120,7 +121,11 @@ export function createRoadNetwork(roads, baseHeight) {
     const kerbH = KERB_SURFACES.has(road.surface || kind.surface) ? ROAD.kerbHeight : 0;
     const kerbW = kerbH > 0 ? ROAD.kerbWidth : 0;
     const pw = Math.max(0, road.sidewalk);
-    const a0 = hw + kerbW + pw;
+    // The bench of the road is the carriageway and its kerb; the pavement beside it is PAINT, not a bench.
+    // A wide pavement would dig the ground deeper into the hillside and build a wall beside the street (the
+    // reviewer saw one), so the carve keeps its narrow bench and the pavement is painted on the ground beside it.
+    const bench = hw + kerbW;
+    const a0 = bench + pw;
     // A way that rides OVER the ground: OSM says so (a bridge, or a layer above the others).  It is never carved
     // into the height function and the ground under it is protected (see the crossings below).
     const tagged = !!(road.over || (road.layer || 0) >= 1);
@@ -154,7 +159,7 @@ export function createRoadNetwork(roads, baseHeight) {
     const radius = Math.min(ROAD.maxRadius, a0 + ROAD.falloff);
     // The BATTER reaches much farther than the paint: the ground beside the road is shaped by the slope limit over
     // the whole embankment, while the paint stops at the pavement (the painted tarmac must be the carriageway).
-    const reach = Math.min(ROAD.maxRadius, a0 + ROAD.embankment);
+    const reach = Math.min(ROAD.maxRadius, bench + ROAD.embankment);
     info[ri] = { hw, kerbH, kerbW, pw, a0, radius, reach, kind, road, lines: kind.lines, lanes: road.lanes };
     firstSample[ri] = sampleX.length;
     firstSeg[ri] = segAx.length;
@@ -172,9 +177,15 @@ export function createRoadNetwork(roads, baseHeight) {
       const len = Math.hypot(dx, dz) || 1;
       const nx = -dz / len, nz = dx / len;              // to the right of the way, the way the traffic runs
       const s = sampleX.length + i;
-      const maxEdge = reach - a0;                       // m, the longest batter this road may have
-      fadeR[s] = batterLength(rs.x[i], rs.z[i], nx, nz, bed[i], a0, maxEdge);
-      fadeL[s] = batterLength(rs.x[i], rs.z[i], -nx, -nz, bed[i], a0, maxEdge);
+      const maxEdge = reach - bench;                    // m, the longest batter this road may have
+      fadeR[s] = batterLength(rs.x[i], rs.z[i], nx, nz, bed[i], bench, maxEdge);
+      fadeL[s] = batterLength(rs.x[i], rs.z[i], -nx, -nz, bed[i], bench, maxEdge);
+      // The NOTCH of the way on each side: how deep the bench of the way is cut into the land (or how high the way
+      // stands above it).  The ground beside the way is the land itself, shifted by the notch: the face of a cutting
+      // is the shape of the hillside it is cut into, and the ground under an embankment is the shape of the ground it
+      // stands on.  The notch is measured on the land at the edge of the bench, so the two meet exactly.
+      notchR[s] = baseHeight(rs.x[i] + nx * bench, rs.z[i] + nz * bench) - bed[i];
+      notchL[s] = baseHeight(rs.x[i] - nx * bench, rs.z[i] - nz * bench) - bed[i];
     }
     // the distance along the centre line: the shader draws the lane markings as dashes along it
     const along = new Float64Array(n);
@@ -184,7 +195,7 @@ export function createRoadNetwork(roads, baseHeight) {
       segAx.push(rs.x[i]); segAz.push(rs.z[i]); segBx.push(rs.x[i + 1]); segBz.push(rs.z[i + 1]);
       segB0.push(bed[i]); segB1.push(bed[i + 1]);
       segHw.push(hw); segKerbH.push(kerbH); segKerbW.push(kerbW); segPw.push(pw);
-      segA0.push(a0); segR.push(radius); segReach.push(reach);
+      segA0.push(a0); segBench.push(bench); segR.push(radius); segReach.push(reach);
       segKind.push(kindCode); segRoad.push(ri); segKerbOn.push(1);
       segLines.push(kind.lines); segS0.push(along[i]); segS1.push(along[i + 1]);
       segSurf.push(road.surfaceCode ?? 0);
@@ -200,6 +211,7 @@ export function createRoadNetwork(roads, baseHeight) {
   const BED0 = Float32Array.from(segB0), BED1 = Float32Array.from(segB1);
   const HW = Float32Array.from(segHw), KERBH = Float32Array.from(segKerbH), KERBW = Float32Array.from(segKerbW);
   const PW = Float32Array.from(segPw), A0 = Float32Array.from(segA0), RAD = Float32Array.from(segR);
+  const BENCH = Float32Array.from(segBench);
   const REACH = Float32Array.from(segReach);
   // the box of every segment: the cheap reject of the segments that are far away (the batter reaches 10 m past the
   // pavement, so the loop cannot stop at the paint's radius)
@@ -217,6 +229,7 @@ export function createRoadNetwork(roads, baseHeight) {
   // the batter ends.  The lengths are found per centre line sample (see the road loop), so the batter is continuous
   // along the road.
   const FADEL = Float32Array.from(fadeL), FADER = Float32Array.from(fadeR);
+  const NOTCHL = Float32Array.from(notchL), NOTCHR = Float32Array.from(notchR);
   const SAMP0 = Int32Array.from(segSamp);
   const SURF = Uint8Array.from(segSurf);
   const KERBON = Uint8Array.from(segKerbOn);
@@ -490,32 +503,55 @@ export function createRoadNetwork(roads, baseHeight) {
           // a road is never a wall (the reviewer saw one: a grey slab running up the hill).  Where the land itself is
           // steeper than the limit, the ramp is the ground: a cliff beside a road stays a cliff.
           const a0 = A0[i];
-          const edge = d > a0 ? d - a0 : 0;
+          const bench = BENCH[i];
+          const edge = d > bench ? d - bench : 0;
           const bed = BED0[i] + (BED1[i] - BED0[i]) * t;
-          const away = Math.abs(bed - ground);
-          const level = 1 - smoothstep(LEVEL_FULL, LEVEL_FADE, away);
-          // The length of the batter on this side of the way, interpolated along the road like the bed.
+          // The NOTCH of the way on this side, interpolated along the road like the bed: how deep the bench of the
+          // way is cut into the land (or how high the way stands above it).
           const s0 = SAMP0[i];
+          const notch = lat >= 0
+            ? NOTCHR[s0] + (NOTCHR[s0 + 1] - NOTCHR[s0]) * t
+            : NOTCHL[s0] + (NOTCHL[s0 + 1] - NOTCHL[s0]) * t;
+          // A way that stands ABOVE the ground is a viaduct or an embankment: its fill fades out, so the valley
+          // under it stays the valley.  A way that runs BELOW the ground is a cut, and a cut is dug: the batter
+          // limits the slope of its face, so the face is a ramp and not a wall.
+          const off = ground - bed;
+          const level = notch >= 0 ? 1 : 1 - smoothstep(LEVEL_FULL, LEVEL_FADE, -off);
+          // The length of the batter on this side of the way, interpolated along the road like the bed.
           const fadeLen = lat >= 0
             ? FADER[s0] + (FADER[s0 + 1] - FADER[s0]) * t
             : FADEL[s0] + (FADEL[s0 + 1] - FADEL[s0]) * t;
-          if (fadeLen <= 0 || edge >= fadeLen) continue;  // the road does not reach this far
-          // The ground of the batter: the land, but never more than the slope limit away from the level of the road.
-          // At the edge of the pavement the limit is zero, so the ground there is the level of the road: the kerb.
-          // A road that stands far above the ground is a viaduct: the level fades its influence out, so the carve
-          // does not fill the valley under it (the ground stays the ground).
-          // A road that rides over the others has no batter at all: the earthworks of the DTM are its ground.
+          if (fadeLen <= 0) continue;  // the road does not reach this far
+          // The ground of the batter.
+          // A CUT (the land is above the way): the ground beside the way is the LAND itself, shifted down by the
+          // depth of the notch: the face of the cutting is the shape of the hillside the way is cut into.  The shift
+          // fades out over the batter, so the ground is the land again where the batter ends.  The face of the
+          // cutting is therefore never steeper than the land it is cut into, and the ground never jumps from the cut
+          // to the land (the wall the reviewer saw beside Rue de la Semois).
+          // A FILL (the way stands above the ground): the ground beside the way is a ramp of at most the slope limit
+          // from the level of the way, and the ramp fades out where the way stands far above the ground (a viaduct
+          // must not fill the valley under it).
+          // A way that rides over the others has no batter at all: the earthworks of the DTM are its ground.
           if (!NOBATTER[i]) {
-            const lim = ROAD.maxBatterSlope * edge;
-            const off = ground - bed;
-            const shaped = bed + (off > lim ? lim : off < -lim ? -lim : off);
-            const target = ground + level * (shaped - ground);
+            let dev;                    // how far the way pulls the ground here, in metres
+            let reach = fadeLen;
+            if (notch >= 0) {
+              reach = REACH[i] - bench;
+              if (reach <= 0 || edge >= reach) continue;
+              // On the way itself the ground is the level of the way (the road is flat across its width); beside
+              // it, the land shifted down by the notch.
+              dev = edge > 0 ? -notch * (1 - smoothstep(0, reach, edge)) : bed - ground;
+            } else {
+              if (edge >= fadeLen) continue;
+              const lim = ROAD.maxBatterSlope * edge;
+              const shaped = bed + (off > lim ? lim : off < -lim ? -lim : off);
+              dev = level * (shaped - ground);
+            }
             // The claim of the batter: full on the road, and gone at the far end of the batter.  It is squared so that
-            // a road further away does not pull the ground of the road the point is on.  In a protected corridor the
-            // claim is gone: the ground under an over way stays the ground.
-            const fall = 1 - edge / fadeLen;
-            const claim = fall * fall * (1 - prot);
-            devSum += claim * (target - ground);
+            // a road further away does not pull the ground of the road the point is on.
+            const fall = 1 - edge / reach;
+            const claim = fall * fall;
+            devSum += claim * dev;
             devW += claim;
           }
           // ---- the paint: it stops at the pavement, so the painted tarmac is the carriageway and nothing else
@@ -544,7 +580,11 @@ export function createRoadNetwork(roads, baseHeight) {
     // never steeper than the terrain is (the reviewer saw a wall: a grey slab running up the hill with a slit).
     // The faces of the roads near the point are BLENDED: where two roads meet their levels are averaged, so a
     // junction has no step.
-    out.band = devW > 0 ? ground + devSum / devW : ground;
+    // The protection scales the WHOLE blend, not the claim of each road: the ground under a way that rides over the
+    // others is the land, and the cut of the road that goes under it ramps up to that land over the fade of the
+    // corridor.  Scaling the claim instead would keep the shape of the cut and only lose its weight, and the ground
+    // would jump from the land to the full cut in half a metre: the wall the reviewer saw beside Rue de Kirchberg.
+    out.band = devW > 0 ? ground + (1 - prot) * (devSum / devW) : ground;
     if (best < 0) {
       out.coverage = 0; out.bed = 0; out.kerb = 0; out.lat = 0; out.hw = 0; out.a0 = 0; out.kind = 0; out.road = -1;
       out.dist = Infinity; out.lines = 0; out.lanes = 0; out.s = 0; out.surface = 0;

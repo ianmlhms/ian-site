@@ -26,6 +26,23 @@ from common import (ORIGIN_E, ORIGIN_N_TOP, OUT_DIR, RAW_DIR, WORLD_H, WORLD_W,
 STEP = 8.0
 CLASS_NAMES = ["grass", "forest", "water", "park", "urban", "farmland", "sand", "scrub"]
 C_GRASS, C_FOREST, C_WATER, C_PARK, C_URBAN, C_FARM, C_SAND, C_SCRUB = range(8)
+# How far the built-up area reaches past the houses (in cells of 8 m): the streets between the houses belong to
+# the town, not to the meadow.
+URBAN_GROWTH_CELLS = 2
+
+
+def dilate(mask, radius):
+    """The mask grows by `radius` cells.  A square dilation, done with slices (no wrap around at the border)."""
+    out = mask.copy()
+    nz, nx = mask.shape
+    for dx in range(-radius, radius + 1):
+        for dz in range(-radius, radius + 1):
+            if dx == 0 and dz == 0:
+                continue
+            xs0, xs1 = max(0, dx), min(nx, nx + dx)
+            zs0, zs1 = max(0, dz), min(nz, nz + dz)
+            out[zs0:zs1, xs0:xs1] |= mask[zs0 - dz:zs1 - dz, xs0 - dx:xs1 - dx]
+    return out
 
 # the OSM tags of each class, in the order they are painted (later wins)
 RULES = [
@@ -139,8 +156,12 @@ def main():
     if shapes:
         burned = rasterize([(s, 1) for s in shapes], out_shape=(nz, nx), transform=transform,
                            fill=0, dtype=np.uint8)
-        dense = burned > 0
-        urban = dense & (grid != C_WATER)
+        # The built-up area is the houses AND the streets between them: the class grows by two cells (16 m), so
+        # the ground of the town is hard ground and not the lawn of the fields.  The parks and the water keep
+        # their class: a park in the middle of the city is a park.
+        dense = dilate(burned > 0, URBAN_GROWTH_CELLS)
+        keep = (grid != C_WATER) & (grid != C_PARK) & (grid != C_FOREST) & (grid != C_FARM)
+        urban = dense & keep
         grid[urban] = C_URBAN
         print("  urban from the buildings: %d cells" % int(urban.sum()))
 

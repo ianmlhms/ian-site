@@ -16,7 +16,7 @@ the union and the buffer from `scripts/luxdrive/bake_area.py` (LUREF / EPSG:2169
 **World frame.** `x = LUREF easting − originE` (east), `z = originNTop − LUREF northing` (south),
 metres. World box 16 896 × 14 848 m, aligned to a 512 m block grid.
 
-**Shipped data — 11 709 649 B = 11.17 MB of the 30 MB budget (37 %).**
+**Shipped data — 11 653 017 B = 11.12 MB of the 30 MB budget (37 %).**
 
 | file | bytes | what |
 |---|---:|---|
@@ -24,8 +24,8 @@ metres. World box 16 896 × 14 848 m, aligned to a 512 m block grid.
 | far.bin | 499 770 | MBG1 grid, 32 m nodes, box + 8 km, the distant hills |
 | canopy.bin | 1 400 912 | MBG1 grids, 16 m nodes: the tree height and the tree cover |
 | roads.bin | 862 486 | 19 314 OSM ways: real widths, lanes, one-way, bridge / tunnel / layer |
-| classes.bin | 881 975 | the land classes on an 8 m grid (RLE): grass, forest, water, park, urban, farmland, sand, scrub |
-| buildings.bin | 849 945 | 25 336 LOD2 buildings: footprint, eaves, ridge, roof |
+| classes.bin | 798 513 | the land classes on an 8 m grid (RLE): grass, forest, water, park, urban, farmland, sand, scrub |
+| buildings.bin | 849 945 | 25 336 LOD2 buildings: footprint, eaves, ridge, roof, the style of the façade |
 | lines.bin | 33 790 | the tram and the railway |
 | stops.bin | 24 897 | 2 263 tram / train / bus stops |
 | decks.bin | 37 330 | 361 bridge decks with their real height from the LiDAR DSM |
@@ -308,42 +308,64 @@ frame; if the file is missing the canvas fallback (white cumulus on the blue of 
 The check: the flow `luxdrive-world` reads the uniform back and asks the texture whether it is the painted picture
 (`IMG`, 512 px) or the noise (`data`).
 
-### Fix 4 — the cliffs and the walls next to the roads: DONE (the batter is a slope limited ramp)
+### Fix 4 — the cliffs and the walls next to the roads: DONE (the ground beside a road is the land, shifted by the notch)
 
 The reviewer: *"Road carving must never create vertical walls: limit the side slope (max ~35-40 degrees, 1:1.5
 embankment), use the real terrain otherwise. Add it to the harness (max slope beside roads)."*
 
 **What the ground beside a road is.** The batter is no longer a fade of the bed towards the ground (that built a
 wall at the foot of every slope) and no longer a straight ramp to a point sampled at the far end of the
-embankment (that tore the ground open where a curved road fans its samples out). It is now the **land, limited
-to a ramp of at most the slope limit**: at a distance `e` past the edge of the pavement the ground may be at
-most `0.8 · e` (39 degrees, the reviewer's 1:1.5) away from the level of the road. Where the land is gentler
-than that, the land itself is the ground; where it is steeper, the ramp is the ground (a cliff beside a road
-stays a cliff). The batter ends where the ramp reaches the land again, so the ground of the carve meets the
-land there and leaves no step behind it — the length of the batter is found per centre line sample (not per
-segment), so it is continuous along the road.
+embankment (that tore the ground open where a curved road fans its samples out). It is now the **land itself,
+shifted by the notch of the way**: the notch is how deep the bench of the way is cut into the land (or how high
+the way stands above it), measured on the land at the edge of the bench, per centre line sample and per side.
+The ground beside the way is the land shifted by that notch, and the shift fades out over the length of the
+batter, so the ground of the carve is the land again where the batter ends and leaves no step behind it.
 
-A road that stands far above the ground is a viaduct: the level of the road fades its influence out between
-4 m and 14 m, so the carve does not fill the valley under it.
+* A **cutting** is dug: the face of the cutting is the shape of the hillside it is cut into, so it is never
+  steeper than the land. The slope limited ramp of the first version *was* steeper than the land on a steep
+  hillside — the wall beside Rue de la Semois.
+* An **embankment** is a ramp of at most the slope limit (39 degrees) from the level of the way down to the
+  land, and its influence fades out between 4 m and 14 m of height, so a way that stands far above the ground
+  is a viaduct and does not fill the valley under it.
+
+The bench of the way is now the carriageway and its kerb; the **pavement beside it is paint, not a bench**. A
+wide pavement dug the ground deeper into the hillside and built a wall beside the street.
+
+**The protection scales the whole blend, not the claim of each road.** The ground under a way that rides over
+the others is the land, and the cut of the road that goes under it ramps up to that land over the fade of the
+corridor. Scaling the claim instead would keep the shape of the cut and only lose its weight, and the ground
+would jump from the land to the full cut in half a metre: the wall the reviewer saw beside Rue de Kirchberg.
 
 **The slit was the LOD fade, not the batter.** The ground beside the road used to be faded out with the LOD of
 the tile, so two neighbouring tiles disagreed on the height of the ground and the ground tore open where they
 met. The batter is applied at every LOD now; only the kerb (a 13 cm ridge) fades with the lattice.
 
-**Measured** over 15 430 sides of roads (every 41st segment of the whole network, both sides, from the edge of
+**Measured** over the sides of the roads (every 41st segment of the whole network, both sides, from the edge of
 the pavement out to the end of the batter), the steepest slope of the carved ground against the steepest slope
 of the land over the same walk:
 
-| | the old carve | the slope limited batter |
-|---|---:|---:|
-| the median | 0.146 | 0.181 |
-| the 90th percentile | 0.601 | 0.682 |
-| the 99th percentile | 1.394 | **1.305** |
-| steeper than the land (or than 0.84 where the land is flat) | 409 (2.6 %) | **102 (0.66 %)** |
+| | the old carve | the slope limited batter | the notch (now) |
+|---|---:|---:|---:|
+| the median | 0.146 | 0.193 | **0.170** |
+| the 90th percentile | 0.601 | 0.707 | **0.588** |
+| the 99th percentile | 1.394 | 1.325 | **1.284** |
+| steeper than the land (or than 0.84 where the land is flat) | 409 (2.6 %) | 276 (1.79 %) | **107 (0.70 %)** |
+| the sides where **the carve** makes a wall (a slope over 3 where the land has none) | — | 17 | **8** |
+| the deepest of them | — | 7.26 | **6.52** |
 
-**The check** is now in the harness: the flow `luxdrive-world` measures the same thing and fails when the 90th
-percentile is over 0.85, the 99th over 1.6, more than 2 % of the sides are steeper than the land beside them,
-or more than 6 sides are a wall (a slope over 3). The old carve fails the 2 % rule; the new one passes it.
+(The two last columns are the same walk over the same data, one against the code of the last commit and one
+against the code of now; the first column is the old carve, measured by the flow.)
+
+**A wall is counted only where the carve made one.** The land of Luxembourg has cliffs of its own (the valley of
+the Alzette): 13 of the 15 390 sides of roads are a cliff of the land, and they stay cliffs. The gate of the
+flow `luxdrive-world` now measures the honest rule (the ground is steeper than 3 while the land at the same
+point is not) and fails when more than 8 sides are a wall the carve made, or when the deepest of them is over 8.
+
+**Still open** (a bug, not a plan): the 8 sides that are left are the terraces of the Kirnberg (Parvis de
+l'Abbaye, Rue Neie Wee, Rampart) and the forest service roads that run along a cliff. The cause is the LiDAR:
+the land moves by metres *within* the bench of the way there, so the notch measured at the bench does not
+describe the land just outside it. It is a step of 3 m to 6.5 m in 0.05 % of the sides of the roads.
+
 
 ### Fix 7 — the overpass is not a pit any more: DONE (the over way is never carved, the ground under it is protected)
 
@@ -391,6 +413,92 @@ The 23 ways with a hole under them are the ones the reviewer saw: the A1 at (195
 **Still open** (Milestone 2, "tunnels or correct portals"): the tunnels are not dug, a single valued height
 field cannot hold them. The "Rue du Grünewald" goes under the A6 in a tunnel and the mouth of the tunnel is a
 step of 4.3 m: the portal is drawn (a headwall with a bore) but the road does not go through it.
+
+### Fix 6 — the blotchy terrain: DONE (the colour comes from the class of the place, never from the height)
+
+The reviewer: *"Terrain colour is blotchy (bright green patches, brown stripes on hills that look like height
+bands). Use the MTB ground shader colours and the land classes; no colour by height."*
+
+The shader never mixed the height into the colour, but it mixed the **land class** in too abruptly: the class of
+a place is read from an 8 m grid, so a single cell of forest or of farmland in the middle of a meadow drew a
+hard-edged brown patch, and the fields of the whole commune were one straw colour with the rows of the crops
+on top of them.
+
+* the **city ground is hard ground** (gravel and slabs), never a lawn: the class `urban` grew by two cells
+  (16 m) past the houses, so the streets between the houses are the town and not the meadow
+  (`bake_classes.py`, `URBAN_GROWTH_CELLS`). The parks, the water, the woods and the fields keep their class.
+* the **wood seen from afar is its canopy**, not its floor: the trees of the view reach `quality.treeRadius`
+  metres; beyond that the shader paints the wood in the colour of the leaves (the MTB does the same), so the
+  forest is not a brown litter floor with green blobs standing on it.
+* the meadow is the calm olive of the MTB (not a bright lawn), the farmland a muted straw, the city a grey
+  gravel, and the paint of the noise breaks the borders of the classes.
+
+### Fix 10 — the roofs: DONE (the LOD2 ridge, and the old town is slate)
+
+The reviewer: *"Roofs are mostly flat dark slabs. Use the LOD2 roof geometry (eaves + ridge → gable / hip /
+mansard); the old town (Vieille Ville, Grund, Pfaffenthal, Clausen) is pitched dark slate roofs. Flat only
+where LOD2 says flat."*
+
+The bake measures the ridge of every LOD2 building (its height and its direction) and the mesh draws the roof
+from it: a gable when the ridge runs along the house, a hip when the house is as wide as it is long (the ridge
+is then inset by the width of the house, so the hip triangles do not stand up like a wall), a flat roof only
+where the LOD2 says the roof is flat (the offices of Kirchberg). The old town is pitched: the slate and the
+red tile, in staggered rows, drawn by the shader.
+
+**Measured:** the first version made the ridge as long as the footprint, so 6 126 of the 41 690 roof faces were
+steeper than 72° (the blades at the end of the house stood straight up). The inset ridge brings that to
+**997 of the 24 424 roof faces (4 %)** — the rest are the slivers of the courtyards, where the LOD2 footprint
+has a notch and the ridge passes over it.
+
+### Fix 11 — the façade fits the place: DONE (the OSM says what the building is for)
+
+The reviewer: *"Shutters + small windows only on houses (residential, ≤ 5 floors, old town / villages).
+Kirchberg, the Cloche d'Or-style offices, banks, EU buildings, anything office / commercial / public or > 25 m:
+modern façades (glass bands, metal mullions, lighter stone), NO shutters. Ground floors in the old town: shop
+windows."*
+
+The LOD2 model knows the shape of a building but not what it is: the OSM knows. The bake joins the two (the
+footprint of the LOD2 building on the footprint of the OSM building, the biggest overlap wins) and reads the
+function from the tags:
+
+| style | what it is | the façade |
+|---|---|---|
+| house | a house of up to five storeys, a small footprint | shutters, small windows, a door, the damp streaks |
+| apartment | a block of flats | the same windows, no shutters, plainer and greyer walls |
+| office | an office, a bank, a public building, a hotel, a school | bands of glass between the stone spandrels, the mullions of the metal frame, no shutters, a stone base on the street |
+| modern | over 25 m: a tower | glass from the ground up, the pale stone of the frame |
+| industrial | a shed, a warehouse, a hangar | a corrugated metal wall and a strip of high windows |
+| stone | a church, a chapel, a monument | dressed stone, the tall narrow windows between the buttresses |
+
+A building with a **shop**, a café, a bank or a craft in it (the OSM point inside the footprint) gets the bit
+"there is a shop on the ground floor": the ground floor is then a shopfront (the window, the piers, the
+stall riser, the sign board) and not a window of the house.
+
+The style is a byte in `buildings.bin` and a new attribute of the building mesh (`aStyle`: the style and the
+number of storeys), so the shader can stripe an office by its own floors.
+
+### Fix 12 — no grass up to the walls in town: DONE (the streets of the town have a pavement)
+
+The reviewer: *"Urban streets get pavements (OSM sidewalk tags, else ~2.5 m default on urban roads) in a paving
+colour; the land class `urban` is hard ground, not lawn."*
+
+* The **bake** gives a pavement to a street of the town: the OSM `sidewalk` tag when it is there, else 2.5 m
+  when the street runs through the built-up area (the OSM landuse of the town — residential, commercial,
+  industrial, retail — and the buildings themselves) within 20 m (`bake_roads.py`, `URBAN_PAVEMENT`).
+* The **pavement is paint, not a bench**: the ground under it is the ground of the carve (the bench of the way
+  is the carriageway and its kerb), so a wide pavement no longer digs the ground deeper into the hillside and
+  builds a wall beside the street.
+* The **shader paints it**: the kerb stone (darker) and the slabs of the pavement (lighter) are painted on the
+  ground beside the carriageway, in the paving colour of the MTB.
+
+### Fix 13 — asphalt unless OSM says otherwise: DONE
+
+The reviewer: *"In the Kirchberg street shot the carriageway looks like light stone paving; default road surface
+is asphalt unless OSM `surface` says otherwise. Check the surface default."*
+
+The surface of a way comes from the OSM `surface` tag (cobbles, concrete, gravel, earth, paved stone) and is
+**asphalt** when the tag is missing. The squares and the footpaths carry **no lane markings** (the paint of a
+square would make it a street): the markings are drawn only for the ways that have them.
 
 ## Milestone 3 — city: IN PROGRESS
 
@@ -463,8 +571,9 @@ the play area.
 | the draw calls | 124 | 108 | 100 |
 | the triangles | 375 920 | 337 369 | 347 050 |
 
-**Still to come in this milestone:** the parks, the Luxtram along Avenue J.F. Kennedy, the
-street lights and the distance LOD.
+**Still to come in this milestone:** the parks, the Luxtram along Avenue J.F. Kennedy, the street
+lights and the distance LOD of the city (the buildings are drawn at one level of detail; the trees have
+three, and the ground paints the wood as its canopy beyond the reach of the trees).
 
 ## Milestone 4 — gates: NOT STARTED
 

@@ -90,20 +90,20 @@ function pavement(size, seed) {
  *  a cobble street that glitters with coloured dots reads as a toy, not as a street. */
 function cobble(size, seed) {
   const rng = createRng(seed), c = canvas(size), ctx = c.getContext('2d');
-  ctx.fillStyle = 'rgb(96,93,88)'; ctx.fillRect(0, 0, size, size);
+  ctx.fillStyle = 'rgb(88,85,80)'; ctx.fillRect(0, 0, size, size);
   const rows = 12, h = size / rows;
   for (let r = 0; r < rows; r++) {
     const cols = 12 + (r % 2), w = size / cols;
     for (let k = 0; k < cols; k++) {
       const x = k * w + (r % 2) * w * 0.5 + (rng() - 0.5) * 1.6, y = r * h + (rng() - 0.5) * 1.6;
       const rx = w * 0.46, ry = h * 0.46;
-      const tone = 116 + rng() * 12;
+      const tone = 104 + rng() * 10;
       ctx.globalAlpha = 0.9;
       ctx.fillStyle = rgb([tone, tone - 4, tone - 10], 5, rng);
       ctx.beginPath(); ctx.ellipse(x, y, rx, ry, (rng() - 0.5) * 0.3, 0, TAU); ctx.fill();
-      ctx.globalAlpha = 0.22;                                   // the lit top edge of the stone
-      ctx.fillStyle = rgb([tone + 18, tone + 16, tone + 12], 5, rng);
-      ctx.beginPath(); ctx.ellipse(x - rx * 0.22, y - ry * 0.22, rx * 0.62, ry * 0.5, 0, 0, TAU); ctx.fill();
+      ctx.globalAlpha = 0.10;                                   // the lit top edge of the stone
+      ctx.fillStyle = rgb([tone + 16, tone + 14, tone + 10], 5, rng);
+      ctx.beginPath(); ctx.ellipse(x - rx * 0.18, y - ry * 0.18, rx * 0.66, ry * 0.56, 0, 0, TAU); ctx.fill();
     }
   }
   ctx.globalAlpha = 1;
