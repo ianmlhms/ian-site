@@ -150,7 +150,7 @@ export const flow = {
       const s = m.state();
       // aim the car at the nearest house: 16 m out along the line to its footprint, speed 12 m/s towards it
       let target = null, best = 1e9;
-      for (const b of m.buildings.buildings) { const p = b.pts[0]; const d = Math.hypot(p[0] - s.x, p[1] - s.z); if (d > 25 && d < best && d < 160) { best = d; target = p; } }
+      for (const b of m.buildings.buildings) { const p = [b.pts[0], b.pts[1]]; const d = Math.hypot(p[0] - s.x, p[1] - s.z); if (d > 25 && d < best && d < 160) { best = d; target = p; } }
       if (!target) return { skipped: true };
       const dx = target[0] - s.x, dz = target[1] - s.z, len = Math.hypot(dx, dz);
       const heading = Math.atan2(dz, dx);
@@ -250,6 +250,22 @@ export const flow = {
       minBoom = Math.min(minBoom, r.minB); insideHouse += r.house; insideTree += r.tree; frames += r.n;
       await h.shot(`narrow-${narrow.indexOf(n)}`);
     }
+    // the hard case: the car stands across the street, so the boom points straight into the houses behind it
+    let crossInside = 0, crossShort = 0;
+    for (const n of narrow.slice(0, 4)) {
+      await page.evaluate(([x, z]) => window.__lux.teleportNear(x, z, 30), [n.x, n.z]);
+      const r = await page.evaluate(async (heading) => {
+        const m = window.__lux, s = m.state();
+        m.car.reset(s.x, s.z, heading + Math.PI / 2);
+        m.setCamera(null);
+        let house = 0, tree = 0, minB = 99;
+        await window.simSeconds(m, 2.5, () => { const c = m.camera.position, st = m.state(); if (m.buildings.collide(c.x, c.z, 0.3)) house += 1; if (m.forest.collide(c.x, c.z, 0.3)) tree += 1; minB = Math.min(minB, Math.hypot(c.x - st.x, c.z - st.z)); });
+        return { house: house + tree, minB };
+      }, n.heading);
+      crossInside += r.house; if (r.minB < 6.5) crossShort += 1;
+    }
+    h.eq(crossInside, 0, "car across a narrow street (boom into the houses): the camera was never inside a house or tree");
+    h.expect(crossShort >= 1, `... because the boom was pulled in (${crossShort} of 4 streets shorter than 6.5 m)`);
     h.eq(insideHouse, 0, `${frames} frames in narrow streets: the camera was never inside a house`);
     h.eq(insideTree, 0, "... and never inside a tree");
     h.expect(minBoom >= 2.0, `... and never closer than ${minBoom.toFixed(1)} m to the car (the car does not fill the lens)`);
