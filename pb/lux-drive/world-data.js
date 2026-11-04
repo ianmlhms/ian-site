@@ -3,6 +3,7 @@
 import { decodeGrid, decodeClassRle, gridChecksum } from './codec.js';
 import { decodeRoads } from './roads.js';
 import { decodeDecks } from './decks.js';
+import { restyleBuildings } from './quarters.js';
 
 const DECIMETRE = 0.1;
 
@@ -141,13 +142,15 @@ export async function loadWorldData(read, onProgress = () => {}) {
   const classInfo = await json('classes.json');
   const classes = decodeClassRle(await read('classes.bin'), classInfo.nx, classInfo.nz);
   onProgress(0.85, 'city');
-  const buildings = decodeBuildings(await read('buildings.bin'));
+  const decoded = decodeBuildings(await read('buildings.bin'));
   const lines = decodeLines(await read('lines.bin'));
   onProgress(0.88, 'trees');
   const trees = decodeTrees(await read('trees.bin'));
   const stopNames = await json('stopnames.json');
   const stops = decodeStops(await read('stops.bin'), stopNames);
   const places = await json('places.json');
+  // the style of a building depends on where it stands (the stone city, the sandstone valley, the villages): quarters.js
+  const buildings = restyleBuildings(decoded, places);
   onProgress(1, 'done');
   return { info, near, far, roads, decks, canopy, classes, classInfo, buildings, lines, stops, trees, places, names };
 }

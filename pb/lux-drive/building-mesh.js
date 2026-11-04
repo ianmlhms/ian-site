@@ -11,16 +11,16 @@
  *
  * Pure (no THREE), so the browser and the Node harness build exactly the same shapes. */
 
+import {
+  STYLE, STYLE_SHOP, PALETTE, WALLS, BLOCKS, CITY_WALLS, SANDSTONE_WALLS, VILLAGE_WALLS, SLATE, DARK_SLATE, TILE, DARK_TILE,
+  OFFICE, MODERN, INDUSTRIAL, LIMESTONE, TAR,
+} from './building-style.js';
+
 /** The kinds of surface, the same numbers as the MTB town material. */
 export const KIND = Object.freeze({ wall: 0, roof: 1, stone: 2, flat: 3 });
 
-/**
- * The style of a building: what its façade is made of.  The bake reads it from the OSM (the function of the
- * building) and from its height: a house has shutters and small windows, an office has glass bands and no
- * shutters, a shed has nothing but a metal wall.
- */
-export const STYLE = Object.freeze({ house: 0, apartment: 1, office: 2, industrial: 3, modern: 4, stone: 5 });
-export const STYLE_SHOP = 8;              // a bit of the style byte: the ground floor is a shop
+
+export { STYLE, STYLE_SHOP };
 
 export const CELL = 256;            // m, the cell of the building mesh (one draw call per cell)
 
@@ -33,24 +33,6 @@ const EDGE_STEP = 1.0;      // m, the spacing of the points along one edge of th
 const EDGE_TOL = 0.15;      // m, how far the ground may leave the line between two corners before a point is kept
 const MIN_WALL = 0.3;       // m, the shortest wall a house may keep where the ground climbs over its eaves
 
-/** The walls of the houses: cream, ochre, white, pink, pale green, blue grey, beige. */
-const WALLS = [
-  [0.93, 0.90, 0.80], [0.88, 0.80, 0.62], [0.95, 0.95, 0.92], [0.86, 0.74, 0.64],
-  [0.82, 0.86, 0.80], [0.80, 0.82, 0.84], [0.90, 0.84, 0.70],
-];
-/** The walls of the blocks of flats: the same render, but plainer and greyer than the houses. */
-const BLOCKS = [
-  [0.86, 0.85, 0.80], [0.84, 0.79, 0.70], [0.88, 0.87, 0.84], [0.78, 0.78, 0.76],
-  [0.83, 0.80, 0.73], [0.80, 0.82, 0.81],
-];
-const SLATE = [0.24, 0.27, 0.33];         // the roof of a house
-const TILE = [0.58, 0.28, 0.20];          // the roof of a house, the red one
-const OFFICE = [0.72, 0.76, 0.80];        // the glass towers of Kirchberg
-const MODERN = [0.80, 0.82, 0.84];        // the pale stone of a modern façade
-const INDUSTRIAL = [0.70, 0.70, 0.68];    // the sheds of the industrial belt
-const LIMESTONE = [0.84, 0.79, 0.68];     // the dressed stone of the churches
-const TAR = [0.22, 0.22, 0.24];           // the flat roof
-
 /** A stable number out of the id of a building: the same building always looks the same. */
 function hash01(n) {
   let h = Math.imul((n | 0) ^ 0x9e3779b9, 0x85ebca6b);
@@ -58,23 +40,34 @@ function hash01(n) {
   return (h >>> 0) / 4294967296;
 }
 
-/** The colour of the walls of a building: the palette of its style, varied a little so that a street is not one colour. */
-function wallColour(style, seed) {
-  let base;
-  if (style === STYLE.office) base = OFFICE;
-  else if (style === STYLE.modern) base = MODERN;
-  else if (style === STYLE.industrial) base = INDUSTRIAL;
-  else if (style === STYLE.stone) base = LIMESTONE;
-  else if (style === STYLE.apartment) base = BLOCKS[Math.floor(seed * BLOCKS.length) % BLOCKS.length];
-  else base = WALLS[Math.floor(seed * WALLS.length) % WALLS.length];
+/** The wall colours of a building: the palette of its place for the town and house façades, the fixed colour of the others. */
+function wallBase(style, seed, palette) {
+  if (style === STYLE.office) return OFFICE;
+  if (style === STYLE.modern) return MODERN;
+  if (style === STYLE.industrial) return INDUSTRIAL;
+  if (style === STYLE.stone) return LIMESTONE;
+  let list;
+  if (palette === PALETTE.sandstone) list = SANDSTONE_WALLS;
+  else if (palette === PALETTE.city) list = CITY_WALLS;
+  else if (palette === PALETTE.village) list = VILLAGE_WALLS;
+  else list = style === STYLE.apartment ? BLOCKS : WALLS;
+  return list[Math.floor(seed * list.length) % list.length];
+}
+
+/** The colour of the walls of a building: the palette of its style and place, varied a little so that a street is not one colour. */
+function wallColour(style, seed, palette) {
+  const base = wallBase(style, seed, palette);
   const k = 0.92 + 0.16 * hash01(Math.floor(seed * 1000) + 7);
   return [base[0] * k, base[1] * k, base[2] * k];
 }
 
-/** The colour of the roof of a building: slate, tile or tar. */
-function roofColour(style, roof, seed) {
+/** The colour of the roof of a building: slate, tile or tar.  The stone city has dark slate (mansards), a village mostly tile. */
+function roofColour(style, roof, seed, palette) {
   if (roof !== 1) return TAR;
   if (style === STYLE.industrial) return [0.42, 0.43, 0.44];
+  if (palette === PALETTE.sandstone || (palette === PALETTE.city && style === STYLE.town)) return DARK_SLATE;
+  if (palette === PALETTE.city) return seed > 0.8 ? TILE : SLATE;
+  if (palette === PALETTE.village) return seed > 0.62 ? DARK_TILE : (seed > 0.3 ? TILE : SLATE);
   return seed > 0.62 ? TILE : SLATE;
 }
 
@@ -172,8 +165,8 @@ export function addBuilding(m, b, heightAt, landAt, drop = 0) {
   // the style byte carries the kind of façade and the bit "there is a shop on the ground floor"
   const style = (b.style | 0) & 7;
   const sty = [b.style | 0, Math.max(1, b.levels | 0)];
-  const wall = wallColour(style, seed);
-  const roof = roofColour(style, b.roof, seed);
+  const wall = wallColour(style, seed, b.palette);
+  const roof = roofColour(style, b.roof, seed, b.palette);
 
   // the walls: every edge of the footprint, from the land under it up to the flat eave
   let along = 0;
