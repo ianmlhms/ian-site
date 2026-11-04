@@ -29,8 +29,9 @@ function shelter(soup, ground, s) {
 /** A stop pole: a thin post with a yellow plate. */
 function pole(soup, ground, s) {
   const y = ground(s.x, s.z) - SINK;
-  soup.frustum(s.x, s.z, 0.05, 0.05, y, y + 2.9, 6, STEEL, { cap: true });
-  soup.box(s.x, y + 2.3, s.z, 0.5, 0.6, 0.05, -s.yaw + Math.PI / 2, SIGN);
+  soup.frustum(s.x, s.z, 0.07, 0.07, y, y + 3.4, 6, STEEL, { cap: true });
+  soup.box(s.x, y + 2.4, s.z, 0.9, 0.95, 0.07, -s.yaw + Math.PI / 2, SIGN);
+  soup.box(s.x, y + 2.4, s.z, 0.6, 0.55, 0.09, -s.yaw + Math.PI / 2, [0.12, 0.40, 0.26]);
 }
 
 /** A row of bike loops: n hoops of 0.7 m. */

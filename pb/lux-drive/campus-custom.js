@@ -9,11 +9,11 @@ const TAU = Math.PI * 2;
 const SINK = 1.0;
 const SIDES = 36;                      // the facets of the cylinder (and the petals of the canopy)
 
-const GLASS_LOWER = [0.20, 0.27, 0.34];
-const GLASS_UPPER = [0.34, 0.46, 0.58];
+const GLASS_LOWER = [0.27, 0.36, 0.45];
+const GLASS_UPPER = [0.44, 0.58, 0.72];
 const BLIND = [0.82, 0.82, 0.80];
 const BAND = [0.74, 0.74, 0.72];
-const PETAL = [0.12, 0.18, 0.40];
+const PETAL = [0.16, 0.24, 0.50];
 const PETAL_RIB = [0.86, 0.88, 0.90];
 const ROOF = [0.62, 0.64, 0.67];
 const DRUM = [0.58, 0.60, 0.64];

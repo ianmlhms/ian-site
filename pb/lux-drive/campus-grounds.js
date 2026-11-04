@@ -75,6 +75,7 @@ export function drapeLine(soup, ground0, line) {
 export function buildGrounds(campus, ground) {
   const soup = new Soup();
   for (const area of campus.areas) drapeArea(soup, ground, area);
+  for (const path of campus.paths) drapeLine(soup, ground, { ...path, lift: 0.5 });          // the footpaths: over the areas, under the painted lines
   for (const line of campus.lines) drapeLine(soup, ground, line);
-  return { soup, walls: [], hideBuildings: [], info: { decal: true, areas: campus.areas.length, lines: campus.lines.length } };
+  return { soup, walls: [], hideBuildings: [], info: { decal: true, areas: campus.areas.length, lines: campus.lines.length, paths: campus.paths.length } };
 }

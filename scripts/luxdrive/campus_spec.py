@@ -11,6 +11,8 @@ from shapely import affinity
 
 from campus_osm import OSM
 NEVER_HIDE = set()
+CAMPUS_WAY = 26245561
+HIDDEN_PATH_BLOCKS = set()      # LOD2 blocks that also cut the paths (none: the building parts do
 
 
 def OV(way, *idx):
@@ -70,12 +72,12 @@ def part(key, poly, wall, fx="blank", fp=None, top=None, roof=None, rf=None, cli
 # ====================================================================================================================
 # ATHÉNÉE DE LUXEMBOURG (OSM way 29050030; the LOD2 block 21024 also covers the sports plaza, which is ground: not built)
 ATH = 29050030
-RIBBON_ATH = {"floorH": 3.5, "sill": 0.8, "h": 2.0, "pier": 1.0, "mull": 2.6, "glass": GLASS, "frame": [0.82, 0.78, 0.62], "blind": [0.95, 0.55, 0.12], "blindEvery": 2}
+RIBBON_ATH = {"gf": {"h": 4.0, "glass": [0.18, 0.26, 0.34], "pier": [0.80, 0.76, 0.62], "pitch": 3.6}, "floorH": 3.5, "sill": 0.8, "h": 2.0, "pier": 1.0, "mull": 2.6, "glass": GLASS, "frame": [0.82, 0.78, 0.62], "blind": [0.95, 0.55, 0.12], "blindEvery": 2}
 building("athenee", "Athénée de Luxembourg", "N", [
     part("ath-west", OV(ATH, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21), CREAM, "ribbon", RIBBON_ATH,
          rf={"solar": [[3606, 9586, 44, 11, -26]]}),
     part("ath-spine", OV(ATH, 21, 22, 23, 24, 25, 26, 33, 34, (3700, 9648), 2, 3, 4, 5, 6, 7, 8, 9, 10), CREAM, "ribbon", RIBBON_ATH),
-    part("ath-green", OV(ATH, 26, 27, 28, 29, 30, 31, 32, 33), SANDSTONE, "blank", top=293.0),
+    part("ath-green", OV(ATH, 26, 27, 28, 29, 30, 31, 32, 33), SANDSTONE, "ribbon", {"floorH": 4.2, "pitch": 2.9, "sill": 0.6, "h": 3.2, "pier": 2.2, "glass": [0.30, 0.46, 0.70], "frame": SANDSTONE}, top=293.0),
     part("ath-sewing", OV(ATH, 34, 35, 36, 37, 38, 39, 40) , CREAM, "ribbon", RIBBON_ATH, rf={"solar": [[3726, 9630, 28, 7, -30]]}),
     part("ath-link", OV(ATH, 41, 42, 43, 56, 57, 58), CONCRETE, "blank", top=None),
     part("ath-gym", OV(ATH, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56), CONCRETE, "blank"),
@@ -159,7 +161,9 @@ building("hall-150", "Hall 41424150", "C", [
 # LYCÉE ALINE MAYRISCH (OSM way 37764733): a long white block on a concrete plinth along the boulevard, ribbon windows, pilotis entrance
 LA = 37764733
 building("laml", "Lycée Aline Mayrisch", "S", [
-    part("laml", whole(LA), [0.92, 0.91, 0.86], "ribbon", {"floorH": 3.5, "pitch": 3.0, "sill": 0.9, "h": 2.1, "glass": [0.30, 0.42, 0.56], "frame": [0.82, 0.82, 0.78], "pier": 1.4, "plinth": {"h": 4.2, "color": [0.70, 0.70, 0.68]}}),
+    part("laml", whole(LA), [0.92, 0.91, 0.86], "ribbon", {"floorH": 3.5, "pitch": 3.0, "sill": 0.8, "h": 2.2, "glass": [0.40, 0.54, 0.68], "frame": [0.82, 0.82, 0.78], "pier": 1.4,
+                                                          "plinth": {"h": 4.2, "color": [0.70, 0.70, 0.68], "facing": "south"},
+                                                          "gf": {"h": 4.0, "glass": [0.20, 0.28, 0.36], "pier": [0.80, 0.80, 0.76], "pitch": 3.6}}),
 ], lod2=[19798])
 
 # FORUM (OSM way 29050032): the round hall with its solar petals (custom model campus-custom.js)
@@ -307,9 +311,6 @@ def bake_grounds(osm, ortho_color):
     plaza = Pg([(3687, 9906), (3702, 9906), (3702, 9898), (3722, 9898), (3722, 9909), (3860, 9909), (3868, 9925), (3866, 9950), (3838, 9955), (3690, 9955), (3687, 9930)])
     plaza = plaza.difference(Point(FOREST_CENTER).buffer(41))
     area("schoolyard", plaza, PAVE)
-    # the four ramps down to the underground car park (dark mouths) and the play markings
-    for rx in (3695, 3748, 3795, 3836):
-        area("ramp", rect(rx, 9917, 4, 9), [0.28, 0.29, 0.30], lift=1)
     for ln in ([(3721, 9918), (3733, 9918), (3733, 9929), (3721, 9929), (3721, 9918)], [(3745, 9928), (3745, 9940), (3757, 9940), (3757, 9928), (3745, 9928)]):
         line(ln, 0.1, [0.88, 0.88, 0.8])
     # -- the plaza of the Athénée (tiled concrete over the sports hall), its west courtyard, the paved square at the Blumm ----------

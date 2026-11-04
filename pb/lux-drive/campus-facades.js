@@ -33,6 +33,22 @@ function drawPlinth(soup, run, ground, { h, color }) {
   }
 }
 
+/** A glazed ground floor on slim piers (pilotis): dark glass in a recess-looking band, a pier of `color` every second bay, a fascia on top. */
+function drawGroundFloor(soup, run, ground, { h, glass, pier, pitch = 3.2 }) {
+  const f = run.frame;
+  const n = Math.max(1, Math.round((run.s1 - run.s0) / pitch));
+  const bay = (run.s1 - run.s0) / n;
+  for (let k = 0; k < n; k++) {
+    const sa = run.s0 + k * bay, sb = sa + bay, sm = (sa + sb) / 2;
+    const base = wallBase(run, ground, sm);
+    quad({ soup, f }, sa + 0.3, sb - 0.3, base - 0.3, base + h - 0.5, OUT_1, paint(glass, k + run.i * 3, 0.1));
+    if (k % 2 === 0) quad({ soup, f }, sa - 0.25, sa + 0.25, base - 0.3, base + h, OUT_2, pier);
+  }
+  const sa = run.s0, sb = run.s1;
+  const ya = wallBase(run, ground, sa) + h - 0.5, yb = wallBase(run, ground, sb) + h - 0.5;
+  soup.quad(f.at(sa, ya, OUT_2), f.at(sb, yb, OUT_2), f.at(sb, yb + 0.5, OUT_2), f.at(sa, ya + 0.5, OUT_2), pier);
+}
+
 /** The ground (or neighbour roof) under the wall at s. */
 export const wallBase = (run, ground, s) => {
   const [x, , z] = run.frame.at(s, 0);
@@ -142,7 +158,11 @@ export function drawFacade(soup, run, part, ground) {
   if (part.fx === 'blank') return;
   const p = part.fp;
   const pitch = p.pitch || p.mull || 2.8;
-  const plinth = p.plinth ? p.plinth.h : 0;
+  // a plinth (the grey concrete base of the Lycée Aline Mayrisch) may be only on the walls that face south (`facing: 'south'`), the others get the glazed ground floor
+  const plinthHere = p.plinth && (p.plinth.facing !== 'south' || run.frame.nz > 0.5);
+  const gfHere = p.gf && !plinthHere;
+  const plinth = plinthHere ? p.plinth.h : gfHere ? p.gf.h : 0;
   bayGrid(soup, run, part, ground, { floorH: p.floorH || 3.4, pitch, margin: p.pier ?? 0.8, inset: p.inset ?? 0.5, plinth }, (cell) => style(cell, p, part));
-  if (plinth) drawPlinth(soup, run, ground, p.plinth);
+  if (plinthHere) drawPlinth(soup, run, ground, p.plinth);
+  if (gfHere) drawGroundFloor(soup, run, ground, p.gf);
 }
