@@ -1119,3 +1119,54 @@ Cost: the carve is ~35 % slower (196 lattice blocks: 530 -> 720 ms in Node), the
   carriageway).  The brief's "no step over 2 cm" is not met everywhere: the probes find 1386 places over 2 cm, almost all slope changes of a few cm at the foot of a face.
 * Two ways at different levels that run side by side (no crossing, so neither rides over the other) still end in a wall of 2 .. 4 m/m between their benches; PIN_FADE 3 m only softens it.
 * Gate J's worst point is 3.8 cm of the 4 cm allowed (was 2.4); not measured on a real GPU or an iPad.
+
+## Look fix 2 (branch `lux-drive-look2`, Mac mini): Palais, Cathédrale, Adolphe, Bock, Passerelle, Philharmonie, ground / asphalt / markings, trees
+
+Started from `lux-drive` 7c188699.  Montages (photo | before | after, and before | after for the ground): `~/Library/Caches/luxdrive-work/look2/montages/`; the single frames in `look2/before`, `look2/final`, `look2/gbefore`, `look2/gfinal`, night in `look2/nbefore`, `look2/nafter`.
+Reference photos: `luxdrive-work/look/refs/` (credits there, never in the repo).  Tools: `look_views.json` (new views `cathedral_e`, `mudam_c`, `palais_b`) -> `look_poses.mjs` -> `shot.mjs`; `montage.py`.
+
+### Ground and roads
+* **Dark blotches near buildings** (campus agent's report): cause found in `world-map.js` + `ground-shader.js`.  The class weight `urban` is a blurred 24 m / 72 m cover; the shader mixed it straight into the lawn, so every wall had a wide smoky brown-grey penumbra
+  (hard-ground colour at 0.60-0.74 of the slab / gravel texture).  Now `urbanW = smoothstep(0.42, 0.62, urban)` (a clean border a few metres wide) and the hard ground is a calmer, lighter grey-beige.  The cloud shadow was a 55 % dip: now 30 %, softer edge.
+  NOT the cause: AO (there is none), the canopy raster (the shader does not read it for shade).  **Still there**: dark angular patches between the houses of the big estates seen from above are real tarmac of narrow service ways / car parks; their jagged borders are the coarse
+  LOD lattice (the edge is the zero of an interpolated distance on a 2-4 m lattice) - that lives in the terrain / road files, not in the shader.
+* **Asphalt** (`paint-textures.js`): the old texture had 5-28 px blobs of lighter and darker tar (they read as bumps from the driver's seat).  Now a per-pixel grain (stone chips, a few lighter ones), four very soft clouds of +-2 %, hairline cracks; in the shader the grain fades to the plain mean colour from 30 to 110 m
+  (from above the 3 m tile made a pattern) and a very slow noise varies the grey.
+* **Markings**: the edge line is no longer the offset (lat, hw) of the nearest road (it jumped where the nearest road changed: ragged pieces) but the contour `sdC = -0.5` of the union of the carriageways: continuous round bends and corners, never across a side street, constant width on screen.  The centre line still uses the
+  offset of the nearest road: a small wobble remains where two ways meet at a shallow angle (`ground_g_mark.jpg`).
+* **Night** (`night_*.jpg`): not too blue, the headlamp cone works on the new asphalt, lit windows of the town read.  Not changed except the asphalt.  The landmark windows are dark at night (the landmark material has no lit windows) and the street lamps are only visible from close by.
+
+### Landmarks
+| landmark | change |
+|---|---|
+| Palais grand-ducal | the front is the OSM / LOD2 outline's three runs along the Marché-aux-Herbes (30.7 + 15.7 + 18.9 m = 65 m, the street is found by name, edges within 3 m of it), `landmark-renaissance.js`: rusticated ground floor with barred windows and an arched door, string courses, pediment windows, carved panels as painted relief (darker panel + lighter diamond), two-storey oriels on stepped corbels with slate roofs, the iron balcony, dormers with pointed gables and finials, spired corner turrets, the two blue sentry boxes and the bollards (decoration only: the street runs 1 m from the wall, a collision line would close it) |
+| Cathédrale | the footprint is walled to the aisle eave (11 m); over it separate volumes: a clerestory with its own windows under the steep nave roof (ridge cap), lean-to aisle roofs with dormers, the transept as its own box and roof with a rose window at each end, a west front with a three-part portal, a gallery of lancets, a big window, a rose and a stone gable, belfries with string courses, paired louvred openings, corner buttresses with pinnacles |
+| Pont Adolphe | the two small arches: a round-headed opening (8.4 m wide, 5.2 m springing) in each abutment wall, a dark vault 4.5 m deep, a lighter archivolt; the arcade openings they overlap are removed |
+| Bock | ONE smooth skin (`Soup.grid`: vertex normals averaged, colour per vertex) instead of flat facets; strata 5 m thick blended into each other (the old 1.7 m bands aliased against the 2.4 m vertices into random patches), vertical weathering streaks; the tower is a ruin: 22 m, four walls of different heights with stepped broken tops, mortar courses, slits, an arched window; bastions sit on the rim (they hung over the cliff as pillars) |
+| Passerelle | one tier of tall round arches (2.3 m piers at the springing), each pier is TWO battered columns (3.6 m across the bridge) under the sides of the deck, the vault spans across; no belt slab / long pier slabs |
+| Philharmonie | the white shell is a smooth bell-shaped wave (grid skin, 25 m onto the plaza, 13 m high) instead of a cone; the columns and the roof are 3x white (a plain 0.93 read grey wherever the sun is behind) |
+| Coque | the roof is one smooth skin; transoms on the glazing, courses of dressed stone on the plinth |
+| Mudam | panel joints on the limestone, glazing bars on the glass pyramid and the lantern |
+| Fort Thüngen | ashlar courses on the curtain wall and the towers (battered foot: rough dark courses), round-headed doors and windows |
+| Trees | `landmarks.clearings`: the generated woods (`trees.js treesOfBlock`) leave a 40 m margin round the Philharmonie, the ECJ, the Cathédrale, the Palais, the Coque, Thüngen, Mudam, BCEE.  Thüngen 817 -> 548 trees in view, Mudam 610 -> 424.  The trees OSM maps one by one stay (as asked): the avenue in front of the Coque and the park trees in front of the Mudam are those |
+
+New helpers: `Soup.grid` / `triSmooth` (smooth shading), `joints`, `roundArch` (`landmark-facade.js`), `landmark-renaissance.js`.  `pb/lux-drive.html`: main.js `?v=36`.
+
+### Budgets and gates (Mac mini)
+Landmarks 40 131 triangles in total (campus 32 594, the other 14 landmarks 7 537; limit 60 000), no new mesh (draw calls unchanged: low 111 / medium 148 / high 210).
+
+| gate | result |
+|---|---|
+| `node pb/lux-drive/harness.js` | PASS, 86 checks, 0 failed |
+| `luxdrive_world.mjs` | PASS (draw calls 111 / 148 / 210, zero console errors) |
+| `luxdrive_holes.mjs` | PASS (self-test 42 741 hole pixels) |
+| `luxdrive_ui.mjs` | PASS |
+| `FLOW_BROWSER=webkit luxdrive_webkit.mjs` | PASS |
+
+### Still wrong (honest)
+* Palais: it is a painted-relief facade; no real depth in the carved panels, the roof has few spires, the 65 m front follows the street in three straight runs (the real one is straighter).  The street runs 1 m from the wall in the data: the bollards and the sentry boxes stand on the carriageway.
+* Cathédrale: the roofs are separate now and the nave / aisle / transept volumes read from the east, but the slate is flat colour (no scale pattern), the apse and the choir chapels are not modelled, the west towers' crown spire is the old one.
+* Philharmonie: the columns are brighter but still grey-blue in the shade of the sun; the reference photographs are white.  All camera views near it end up in the office slabs of Kirchberg, so the montage view is the plaza edge only.  The shell is a fair wave but its curve is estimated from two photographs.
+* Bock: it is smooth and ruined-tower-like now, but the cliff is the DTM slope (no overhangs, no vertical faces, no casemate arches deep in the rock): from afar a smooth tan hill.
+* Coque / Mudam: stone courses and glazing bars exist but are small; the Mudam wing and the curved glass shell are still rough shapes; the trees mapped in OSM still stand in front of both.
+* Ground: the angular dark service ways between the houses (see above) are not fixed; the centre line wobbles where two ways meet; nothing measured on a real GPU or an iPad.

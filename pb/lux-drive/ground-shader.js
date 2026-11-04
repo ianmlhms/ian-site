@@ -158,7 +158,8 @@ export const GROUND_FRAGMENT = `
 
     // ---- light: the clouds drift over the land
     vec2 cw = P * 0.0019 + uWind * uTime * 0.0012;
-    float cloudShadow = mix(1.0, smoothstep(0.38, 0.7, texture2D(uNoise, cw).b) * 0.55 + 0.45, uCloud * 0.8);
+    // the shadow of a cloud is a soft 30 % dip, not the 55 % that read as dark blotches drifting over the lawns and the city
+    float cloudShadow = mix(1.0, smoothstep(0.30, 0.78, texture2D(uNoise, cw).b) * 0.30 + 0.70, uCloud * 0.8);
     float shade = 0.82 + 0.18 * smoothstep(0.1, 0.9, N.y);
     vec3 col = paintLightW(albedo, N, cloudShadow, shade, vWorld);
     // the wet tarmac holds the sky
