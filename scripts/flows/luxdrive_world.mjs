@@ -108,6 +108,15 @@ export const flow = {
       const s = net.samples;
       const info = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, lines: 0, lanes: 0, s: 0 };
       const st = m.state();
+      // the samples of the network in a grid of 32 m cells, so that the neighbourhood of a sample is found fast
+      const CELL = 32;
+      const grid = new Map();
+      const key = (cx, cz) => cx * 8192 + cz;
+      for (let i = 0; i < s.x.length; i++) {
+        const k = key(Math.floor(s.x[i] / CELL), Math.floor(s.z[i] / CELL));
+        const list = grid.get(k);
+        if (list) list.push(i); else grid.set(k, [i]);
+      }
       const rows = [];
       for (let ri = 0; ri < net.roads.length && rows.length < 14; ri++) {
         const r = net.roads[ri];
@@ -115,36 +124,58 @@ export const flow = {
         if (r.width < 3 || r.width > 20) continue;
         const first = s.first[ri], count = s.segs[ri];
         if (count < 3) continue;
-        // a point on the road where no other road comes near: at a junction the band of the two roads merges
-        let pick = -1;
+        // A closed way (a square, a street that loops round a block) is an AREA: its paint covers the ground
+        // inside it, so it has no width to compare with.  The harness measures those with the area they enclose.
+        const raw = r.pts || [];
+        if (raw.length > 2 && Math.hypot(raw[0][0] - raw[raw.length - 1][0], raw[0][1] - raw[raw.length - 1][1]) < 12) continue;
+        // The width of the tarmac: the run of points AROUND the centre line that the way paints as its own
+        // carriageway.  The run has to END at the edge of the ribbon: where another way takes the paint over the
+        // sample is not measured (a junction has no width), and a run that never ends is a blob.
+        const band = (i) => {
+          const ax = s.x[Math.max(first, i - 1)], az = s.z[Math.max(first, i - 1)];
+          const bx = s.x[Math.min(first + count - 1, i + 1)], bz = s.z[Math.min(first + count - 1, i + 1)];
+          const ex = bx - ax, ez = bz - az, len = Math.hypot(ex, ez) || 1;
+          const nx = -ez / len, nz = ex / len;
+          const x = s.x[i], z = s.z[i];
+          const walk = (sign) => {
+            let last = 0;
+            for (let d = 0.25; d <= 30; d += 0.25) {
+              m.surface.roadInfoAt(x + nx * d * sign, z + nz * d * sign, info);
+              if (info.road !== ri) return -1;                  // a neighbour took the paint over
+              if (Math.abs(info.lat) > info.hw) return last;    // the edge of the ribbon of this way
+              last = d;
+            }
+            return -2;                                          // the paint runs on: the way is a blob
+          };
+          const up = walk(1), down = walk(-1);
+          if (up <= 0 || down <= 0) return 0;
+          return up + down;
+        };
+        // the samples of the way that stand clear of every other way: at a junction the bands merge
+        const bands = [];
         for (let i = first; i < first + count; i++) {
           const x = s.x[i], z = s.z[i];
           if (Math.hypot(x - st.x, z - st.z) > 700) continue;
           let near = false;
-          for (let j = 0; j < s.x.length && !near; j++) {
-            if (s.road[j] === ri) continue;
-            if (Math.abs(s.x[j] - x) > 30 || Math.abs(s.z[j] - z) > 30) continue;
-            if (Math.hypot(s.x[j] - x, s.z[j] - z) < 25) near = true;
+          const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
+          for (let dz = -1; dz <= 1 && !near; dz++) {
+            for (let dx = -1; dx <= 1 && !near; dx++) {
+              const list = grid.get(key(cx + dx, cz + dz)) || [];
+              for (const j of list) {
+                if (j >= i - 2 && j <= i + 2) continue;             // the way itself, here
+                if (Math.abs(s.x[j] - x) > 30 || Math.abs(s.z[j] - z) > 30) continue;
+                if (Math.hypot(s.x[j] - x, s.z[j] - z) < 25) { near = true; break; }
+              }
+            }
           }
-          if (!near) { pick = i; break; }
+          if (near) continue;
+          const b = band(i);
+          if (b > 0) bands.push(b);
         }
-        if (pick < 0) continue;
-        // across the road: the painted tarmac is the set of points where this road is the road the point is
-        // on and the point lies within its carriageway - that is exactly what the shader paints as asphalt
-        const ax = s.x[Math.max(first, pick - 1)], az = s.z[Math.max(first, pick - 1)];
-        const bx = s.x[Math.min(first + count - 1, pick + 1)], bz = s.z[Math.min(first + count - 1, pick + 1)];
-        const ex = bx - ax, ez = bz - az, len = Math.hypot(ex, ez) || 1;
-        const nx = -ez / len, nz = ex / len;
-        const x = s.x[pick], z = s.z[pick];
-        let run = 0, painted = 0;
-        for (let d = -25; d <= 25; d += 0.25) {
-          m.surface.roadInfoAt(x + nx * d, z + nz * d, info);
-          const mine = info.road === ri && Math.abs(info.lat) <= info.hw;
-          if (mine) run += 0.25;
-          else { if (run > painted) painted = run; run = 0; }
-        }
-        painted = Math.max(painted, run);
-        rows.push({ name: r.name || "", kind: r.kind, osm: r.width, painted });
+        if (!bands.length) continue;
+        bands.sort((a, b) => a - b);
+        // the median: one bad corner must not decide the width of a whole street
+        rows.push({ name: r.name || "", kind: r.kind, osm: r.width, painted: bands[Math.floor(bands.length / 2)], n: bands.length });
       }
       return rows;
     });
