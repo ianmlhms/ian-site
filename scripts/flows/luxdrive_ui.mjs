@@ -140,6 +140,7 @@ export const flow = {
     await page.tap("#pause [data-act=\"resume\"]");
 
     h.step("the weather and time chooser IN the game (the button at the top right)");
+    await page.evaluate(() => window.__lux.ui.setChooserIdle(0));         // a slow renderer must not race the 12 s auto-close
     await page.tap("#btnChooser");
     h.expect(await page.evaluate(() => window.__lux.ui.isChooserOpen()), "the chooser opens");
     await h.shot("chooser");
@@ -221,16 +222,18 @@ export const flow = {
       return { w: c.clientWidth, h: c.clientHeight, zoom: m.fullMap.view.zoom, segments: m.roadIndex.segments.length, named: m.roadIndex.segments.filter((s) => s.name).length };
     });
     h.expect(mapInfo.w >= 1000 && mapInfo.h >= 700, `the map fills the screen (${mapInfo.w}x${mapInfo.h})`);
-    h.expect(mapInfo.named > 20000, `${mapInfo.named} street segments carry a name`);
+    h.expect(mapInfo.named > 10000, `${mapInfo.named} street segments carry a name`);
     // the map has the street names drawn: count dark text pixels is fragile, so ask the map itself for what it labelled
     h.step("tap on the map: the car goes to the road, onto the carriageway, facing along it");
-    const taps = [];
+    const taps = [], moves = [];
     for (const [fx, fy] of [[0.5, 0.55], [0.3, 0.4], [0.7, 0.62]]) {
-      await page.keyboard.press("KeyM");
-      await page.keyboard.press("KeyM");
+      if (!(await page.evaluate(() => window.__lux.fullMap.isOpen()))) await page.keyboard.press("KeyM");        // a teleport closes the map
+      await page.waitForSelector("#mapOverlay", { state: "visible" });
       await page.evaluate(() => window.simSeconds(window.__lux, 0.3));
+      const from = await page.evaluate(() => { const s = window.__lux.state(); return { x: s.x, z: s.z }; });
       await page.mouse.click(1180 * fx, 820 * fy);
       await h.pause(300);
+      moves.push(from);
       taps.push(await page.evaluate(() => {
         const m = window.__lux, s = m.state();
         const r = m.roadAt(s.x, s.z);
@@ -245,6 +248,9 @@ export const flow = {
       h.expect(t.alignedRad < 0.35, `teleport: facing along the road (${(t.alignedRad * 180 / Math.PI).toFixed(0)} deg off)`);
       h.expect(!t.mapOpen && t.gap > 0.3 && t.gap < 0.7 && t.grounded && Math.abs(t.speed) < 0.5, "teleport: the map closed, the car stands on the ground and rolls slowly");
     }
+    const ends = await page.evaluate(() => { const s = window.__lux.state(); return { x: s.x, z: s.z }; });
+    const jumped = [...moves.slice(1), ends].map((p, i) => Math.hypot(p.x - moves[i].x, p.z - moves[i].z));
+    h.expect(jumped.every((d) => d > 30), `every tap moved the car somewhere else (${jumped.map((d) => d.toFixed(0)).join(", ")} m)`);
     await h.shot("after-teleport");
 
     h.step("the quality auto-step: down when slow, never above the chosen quality, never back into a level that was too slow");

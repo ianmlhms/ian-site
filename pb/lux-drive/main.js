@@ -48,7 +48,6 @@ const CAMERA_IDS = ['chase', 'far', 'bonnet'];
 const TELEPORT_REACH_M = 60;          // m: "I am stuck" looks for a road this close
 const STUCK_SECONDS = 3.5;            // s of pushing the pedal without moving before the car is put back on the road
 const STUCK_SPEED = 0.6;              // m/s
-const TELEPORT_WARM_TILES = 60;       // terrain tile builds forced after a teleport so that the landing has ground
 const TIME_IDS = Object.keys(TIME_PRESETS);
 
 const readKey = (key) => { try { return localStorage.getItem(key); } catch (error) { console.warn('[luxdrive] storage blocked', error); return null; } };
@@ -332,9 +331,7 @@ async function boot() {
     car.reset(x, z, yaw);
     ground.hint(car.state.y);
     chase.snap(car.state);
-    let guard = 0;
-    terrain.update(x, z, 0);
-    while (terrain.stats.pending > 0 && guard++ < TELEPORT_WARM_TILES) terrain.update(x, z);
+    terrain.buildAll(x, z);                    // every tile at once: the landing never sees a hole (one short hitch, on purpose)
     city.update(x, z);
     trees.update(x, z, elapsed, true);
     stuckFor = 0;

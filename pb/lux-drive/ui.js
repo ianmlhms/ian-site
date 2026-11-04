@@ -16,6 +16,7 @@ const WEATHER_ICON = Object.freeze({ random: '🎲', clear: '☀️', cloudy: '�
 const TIME_ICON = Object.freeze({ random: '🎲', dawn: '🌅', morning: '🌄', noon: '☀️', evening: '🌇', dusk: '🌆', night: '🌙' });
 const CAMERA_ICON = Object.freeze({ chase: '🚗', far: '🔭', bonnet: '👁️' });
 const TOAST_S = 2.4;
+const CHOOSER_IDLE_MS = 12000;         // the in-game chooser closes itself after this long without a tap (0 = never: the flows)
 const OVERLAYS = ['start', 'pause', 'settings', 'help'];       // the overlays that stop the car
 
 const chip = (group, value, icon, key) =>
@@ -122,7 +123,7 @@ export function createUI({ root, lang = 'lb', onAction = () => {} }) {
   const all = (sel) => [...el.querySelectorAll(sel)];
   const hud = q('#hud'), toastEl = q('#toast'), chooser = q('#chooser');
   const settings = { lang, quality: 'auto', weather: 'random', time: 'random', camera: 'chase', colour: 'red' };
-  let toastTimer = 0, chooserTimer = 0;
+  let toastTimer = 0, chooserTimer = 0, chooserIdleMs = CHOOSER_IDLE_MS;
 
   /** Marks the chips of a group: the one with `value` is pressed. */
   function markChips(group, value) {
@@ -163,10 +164,11 @@ export function createUI({ root, lang = 'lb', onAction = () => {} }) {
     if (button) onAction(button.dataset.act);
   });
   q('#minimap').addEventListener('click', () => onAction('map'));
+  chooser.addEventListener('pointerdown', () => armChooserTimer());          // a finger on the chooser keeps it open
 
   function armChooserTimer() {
     clearTimeout(chooserTimer);
-    if (!chooser.hidden) chooserTimer = setTimeout(() => { chooser.hidden = true; }, 7000);
+    if (!chooser.hidden && chooserIdleMs > 0) chooserTimer = setTimeout(() => { chooser.hidden = true; }, chooserIdleMs);
   }
 
   // ---- the page must never scroll, zoom or select while it is played (iPad Safari)
@@ -193,6 +195,8 @@ export function createUI({ root, lang = 'lb', onAction = () => {} }) {
     showHelp(v) { show(q('#help'), v); },
     showChooser(v) { chooser.hidden = !v; armChooserTimer(); },
     isChooserOpen: () => !chooser.hidden,
+    /** How long the in-game chooser stays open without a tap (ms, 0 = until the button is tapped again). */
+    setChooserIdle(ms) { chooserIdleMs = ms; clearTimeout(chooserTimer); armChooserTimer(); },
     showMap(v) { show(q('#mapOverlay'), v); },
     isMapOpen: () => !q('#mapOverlay').hidden,
     isOpen: (id) => !q(`#${id}`).hidden,
