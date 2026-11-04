@@ -81,6 +81,25 @@ export function decodeLines(bytes) {
   return out;
 }
 
+/** The trees: the ones OSM knows and the rows of trees along the streets. */
+export function decodeTrees(bytes) {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const count = view.getUint32(0, true);
+  const out = [];
+  for (let i = 0; i < count; i++) {
+    const o = 4 + i * 12;
+    out.push({
+      x: view.getInt32(o, true) * DECIMETRE,
+      z: view.getInt32(o + 4, true) * DECIMETRE,
+      height: view.getUint8(o + 8) * DECIMETRE,
+      kind: view.getUint8(o + 9),
+      girth: view.getUint8(o + 10) / 100,
+      inStreet: (view.getUint8(o + 11) & 1) !== 0,
+    });
+  }
+  return out;
+}
+
 /** The public transport stops (tram, train, bus) with their names. */
 export function decodeStops(bytes, names) {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -124,9 +143,11 @@ export async function loadWorldData(read, onProgress = () => {}) {
   onProgress(0.85, 'city');
   const buildings = decodeBuildings(await read('buildings.bin'));
   const lines = decodeLines(await read('lines.bin'));
+  onProgress(0.88, 'trees');
+  const trees = decodeTrees(await read('trees.bin'));
   const stopNames = await json('stopnames.json');
   const stops = decodeStops(await read('stops.bin'), stopNames);
   const places = await json('places.json');
   onProgress(1, 'done');
-  return { info, near, far, roads, decks, canopy, classes, classInfo, buildings, lines, stops, places, names };
+  return { info, near, far, roads, decks, canopy, classes, classInfo, buildings, lines, stops, trees, places, names };
 }

@@ -16,7 +16,7 @@ the union and the buffer from `scripts/luxdrive/bake_area.py` (LUREF / EPSG:2169
 **World frame.** `x = LUREF easting − originE` (east), `z = originNTop − LUREF northing` (south),
 metres. World box 16 896 × 14 848 m, aligned to a 512 m block grid.
 
-**Shipped data — 11 389 488 B = 10.86 MB of the 30 MB budget (36 %).**
+**Shipped data — 11 709 649 B = 11.17 MB of the 30 MB budget (37 %).**
 
 | file | bytes | what |
 |---|---:|---|
@@ -29,6 +29,7 @@ metres. World box 16 896 × 14 848 m, aligned to a 512 m block grid.
 | lines.bin | 33 790 | the tram and the railway |
 | stops.bin | 24 897 | 2 263 tram / train / bus stops |
 | decks.bin | 37 330 | 361 bridge decks with their real height from the LiDAR DSM |
+| trees.bin | 297 748 | the trees OSM knows one by one and the rows of trees along the streets |
 | names.json | 21 772 | the 1 079 road names (Luxembourgish first) |
 | stopnames.json | 16 581 | the stop names |
 | places.json | 20 098 | the start point (Place de l'Europe, Kirchberg) and the landmarks |
@@ -435,7 +436,34 @@ The budget of the brief is 260 draw calls at the medium quality ✓. The whole c
 grouping of the buildings into the cells takes 4 ms and the whole city (1.27 M vertices, 542 k
 triangles) is built in 184 ms, so the lazy build has room to spare.
 
-**Still to come in this milestone:** the trees, the parks, the Luxtram along Avenue J.F. Kennedy, the
+**The trees.** Two kinds, and they are told apart by where they come from:
+
+* The **trees OSM knows one by one** are baked (`scripts/luxdrive/bake_trees.py` → `trees.bin`,
+  291 kB): **16 172 individual trees** (the old trees of the villages, the trees of the parks),
+  **1 102 rows of trees** along the streets, spread at 9 m (**8 545 trees**), and 95 shrubs.
+* The **woods** are not baked: a wood is a cover, not a list of trees. They are placed per 32 m block
+  from the LiDAR canopy (`trees.js`, pure, no THREE): five candidates per 6.4 m, each one kept with
+  the probability of the tree cover of its cell, kept back from the carriageway (2.5 m past the
+  pavement) and out of the houses (2 m), and as tall as the canopy is high there. The block is
+  deterministic (a seeded RNG out of the block number), so a block always grows the same forest and
+  the harness sees the very same trees as the game.
+
+The trees are drawn as **instanced meshes** in the painted low-poly look (`tree-models.js`,
+`tree-view.js`): one draw call per kind and level of detail, the crown a perturbed icosahedron, the
+trunk a tapered prism, the wind in the vertex shader. Three levels of detail (the full tree near, the
+two blobs in the middle, one blob far) and the tree that is new grows into its place over 0.45 s
+instead of popping. The car stops at a trunk: the collision chain is buildings → portals → trees →
+the play area.
+
+**Measured** (the flow `luxdrive-trees`, at the medium quality):
+
+| | the avenue (Kirchberg) | the parc | the wood |
+|---|---:|---:|---:|
+| the trees in the scene | 429 | 265 | 611 |
+| the draw calls | 124 | 108 | 100 |
+| the triangles | 375 920 | 337 369 | 347 050 |
+
+**Still to come in this milestone:** the parks, the Luxtram along Avenue J.F. Kennedy, the
 street lights and the distance LOD.
 
 ## Milestone 4 — gates: NOT STARTED

@@ -41,3 +41,20 @@ You spent a whole chunk on item 4 without a commit. **Commit your current work n
 9. **Time box:** if 7 is not solved within ~80 turns, write what you found in PROGRESS.md, leave it, and
    START MILESTONE 3 (city buildings). The reviewer will take the remaining wall cases. Buildings are now
    more important than perfection on item 4.
+
+---
+Review 3 (4 Nov, 02:30), from `luxdrive-city.vieilleville-high.png` and `luxdrive-city.kirchberg-street.png`.
+Walls + overpass fixed, the city exists: good progress. Next, in this order:
+
+10. **Roofs are mostly flat dark slabs.** Use the LOD2 roof geometry (eaves + ridge -> gable / hip /
+    mansard); the old town (Vieille Ville, Grund, Pfaffenthal, Clausen) is pitched dark slate roofs.
+    Flat only where LOD2 says flat (offices, Kirchberg).
+11. **Façade style must fit the place.** Shutters + small windows only on houses (residential, <= 5
+    floors, old town / villages). Kirchberg, the Cloche d'Or-style offices, banks, EU buildings,
+    anything office / commercial / public or > 25 m: modern façades (glass bands, metal mullions,
+    lighter stone), NO shutters. Ground floors in the old town: shop windows.
+12. **No grass up to the walls in town.** Urban streets get pavements (OSM sidewalk tags, else ~2.5 m
+    default on urban roads) in a paving colour; the land class `urban` is hard ground, not lawn.
+13. In the Kirchberg street shot the carriageway looks like light stone paving; default road surface is
+    asphalt unless OSM `surface` says otherwise. Check the surface default.
+Then trees (you are on it), then Milestone 4 (gates).

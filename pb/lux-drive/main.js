@@ -12,6 +12,8 @@ import { createHeightField } from './heightfield.js';
 import { createSurface } from './surface.js';
 import { createDeckNetwork, createGround } from './decks.js';
 import { createBuildingIndex } from './buildings.js';
+import { createTreeIndex } from './trees.js';
+import { createTreeView } from './tree-view.js';
 import { createPortals } from './portals.js';
 import { createPlayArea } from './play-area.js';
 import { buildWorldMap } from './world-map.js';
@@ -104,6 +106,8 @@ async function boot() {
   const portals = createPortals(data.roads);
   const playArea = createPlayArea(area);
   const maps = buildWorldMap({ classes: data.classes, classInfo: data.classInfo, canopy: data.canopy });
+  // the trees: the woods (placed from the canopy) and the trees of OSM (the street trees, the trees of the parks)
+  const forest = createTreeIndex({ map: maps, field, network: field.network, buildings, trees: data.trees });
 
   // ---- the painted textures, the world maps, the sky
   setLoad(0.72, 'load.build');
@@ -133,6 +137,7 @@ async function boot() {
   const solid = createSolidMaterial(env);
   const terrain = createTerrainView({ scene, surface, field, material: quality.cheapGround ? groundCheap : groundFull, quality });
   const city = createBuildingView({ scene, buildings, field, env, noiseTexture: textures.noise, quality });
+  const trees = createTreeView({ scene, forest, baked: data.trees, field, env, quality });
   const decks = createDeckView({ scene, decks: data.decks, material: solid, ground: ground.surface });
   const portalView = createPortalView({ scene, portals, ground, material: solid });
   const model = createCarModel({ colourId: 'red', material: solid });
@@ -141,7 +146,7 @@ async function boot() {
   // ---- the car, the camera, the interface
   const start = data.places.start || { x: WORLD.width / 2, z: WORLD.depth / 2, yaw: 0 };
   const roadInfo = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, surface: 0, road: -1, lines: 0, lanes: 0, s: 0 };
-  const collide = (x, z, radius) => buildings.collide(x, z, radius) || portals.collide(x, z, radius) || playArea.collide(x, z, radius);
+  const collide = (x, z, radius) => buildings.collide(x, z, radius) || portals.collide(x, z, radius) || forest.collide(x, z, radius) || playArea.collide(x, z, radius);
   const car = createCar({ ground, roadInfoAt: (x, z, out) => surface.roadInfoAt(x, z, out), collide, start });
   const chase = createChaseCamera(ground, (x, z, radius) => buildings.collide(x, z, radius));
 
@@ -260,6 +265,7 @@ async function boot() {
     env.setFogBase(ground.height(c.x, c.z));
     terrain.update(car.state.x, car.state.z);
     city.update(car.state.x, car.state.z);
+    trees.update(camera.position.x, camera.position.z, elapsed);
 
     // the interface
     ui.setSpeed(Math.abs(car.state.speed) * 3.6, car.state.gear);
@@ -289,12 +295,13 @@ async function boot() {
 
   // the game is ready: the first frames build the tiles around the car
   chase.snap(car.state);
+  trees.update(car.state.x, car.state.z, 0, true);       // the first forest is built at once, behind the loading screen
   ui.showMenu(true);
   requestAnimationFrame(frame);
 
   // the API for the harness (the checks read the state of the game from here)
   window.__lux = {
-    scene, camera, renderer, car, env, terrain, city, surface, ground, field, portals, playArea, buildings, quality: () => quality,
+    scene, camera, renderer, car, env, terrain, city, trees, surface, ground, field, portals, playArea, buildings, quality: () => quality,
     state: () => car.state,
     setInput: (o) => { scripted = o; },
     /** The harness can hold the camera at a pose of its own (null gives it back to the chase camera). */
@@ -307,6 +314,7 @@ async function boot() {
       calls: renderer.info.render.calls, triangles: renderer.info.render.triangles,
       tiles: terrain.tiles.size, pending: terrain.stats.pending,
       cells: city.stats.visible, cityPending: city.stats.pending,
+      trees: trees.stats.trees,
     }),
   };
 }

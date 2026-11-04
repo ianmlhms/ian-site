@@ -6,7 +6,7 @@ export const LANG_NAMES = Object.freeze({ lb: 'Lëtzebuergesch', de: 'Deutsch', 
 
 const STR = {
   lb: {
-    title: 'Lux Drive', loading: 'Luxemburg gëtt gelueden …', 'load.terrain': 'Gelände', 'load.roads': 'Stroossen', 'load.city': 'Stad', 'load.build': 'D\'Welt gëtt gebaut …', 'load.hills': 'Hiwwelen', 'load.bridges': 'Brücken', 'load.canopy': 'Bësch', 'load.classes': 'Land',
+    title: 'Lux Drive', loading: 'Luxemburg gëtt gelueden …', 'load.terrain': 'Gelände', 'load.roads': 'Stroossen', 'load.city': 'Stad', 'load.build': 'D\'Welt gëtt gebaut …', 'load.hills': 'Hiwwelen', 'load.bridges': 'Brücken', 'load.canopy': 'Bësch', 'load.trees': 'Beaumen', 'load.classes': 'Land',
     'load.done': 'Fäerdeg', 'load.slow': 'Et dauert méi laang wéi gewinnt …', 'load.retry': 'Nei probéieren', 'load.error': 'D\'Spill konnt net gelueden ginn. Iwwerpréif d\'Verbindung.',
     'hud.speed': 'km/h', 'hud.gear': 'Gang', 'hud.road': 'Strooss', 'hud.menu': 'Menü', 'hud.weather': 'Wieder', 'hud.timeOfDay': 'Dageszäit', 'hud.camera': 'Kamera', 'hud.sound': 'Toun', 'hud.quality': 'Qualitéit', 'hud.reset': 'Zréck op den Ueufank', 'hud.area': 'Gebäit',
     'menu.title': 'Menü', 'menu.drive': 'Féieren', 'menu.settings': 'Astellungen', 'menu.help': 'Hëllef', 'menu.close': 'Zou', 'menu.resume': 'Weider', 'menu.start': 'Start', 'menu.restart': 'Nei starten', 'menu.language': 'Sprooch', 'menu.map': 'Kaart',
@@ -22,7 +22,7 @@ const STR = {
     'hud.crash': 'Hoppla!', 'hud.onRoad': 'Op de Strooss', 'hud.offRoad': ' ausserhalb vun der Strooss',
   },
   de: {
-    title: 'Lux Drive', loading: 'Luxemburg wird geladen …', 'load.terrain': 'Gelände', 'load.roads': 'Straßen', 'load.city': 'Stadt', 'load.build': 'Die Welt wird gebaut …', 'load.hills': 'Hügel', 'load.bridges': 'Brücken', 'load.canopy': 'Wald', 'load.classes': 'Land',
+    title: 'Lux Drive', loading: 'Luxemburg wird geladen …', 'load.terrain': 'Gelände', 'load.roads': 'Straßen', 'load.city': 'Stadt', 'load.build': 'Die Welt wird gebaut …', 'load.hills': 'Hügel', 'load.bridges': 'Brücken', 'load.canopy': 'Wald', 'load.trees': 'Bäume', 'load.classes': 'Land',
     'load.done': 'Fertig', 'load.slow': 'Dauert länger als sonst …', 'load.retry': 'Nochmal versuchen', 'load.error': 'Das Spiel konnte nicht geladen werden. Prüfe die Verbindung.',
     'hud.speed': 'km/h', 'hud.gear': 'Gang', 'hud.road': 'Straße', 'hud.menu': 'Menü', 'hud.weather': 'Wetter', 'hud.timeOfDay': 'Tageszeit', 'hud.camera': 'Kamera', 'hud.sound': 'Ton', 'hud.quality': 'Qualität', 'hud.reset': 'Zurück zum Start', 'hud.area': 'Gebiet',
     'menu.title': 'Menü', 'menu.drive': 'Fahren', 'menu.settings': 'Einstellungen', 'menu.help': 'Hilfe', 'menu.close': 'Schließen', 'menu.resume': 'Weiter', 'menu.start': 'Start', 'menu.restart': 'Neu starten', 'menu.language': 'Sprache', 'menu.map': 'Karte',
@@ -38,7 +38,7 @@ const STR = {
     'hud.crash': 'Hoppla!', 'hud.onRoad': 'Auf der Straße', 'hud.offRoad': ' neben der Straße',
   },
   en: {
-    title: 'Lux Drive', loading: 'Loading Luxembourg …', 'load.terrain': 'Terrain', 'load.roads': 'Roads', 'load.city': 'City', 'load.build': 'Building the world …', 'load.hills': 'Hills', 'load.bridges': 'Bridges', 'load.canopy': 'Trees', 'load.classes': 'Land',
+    title: 'Lux Drive', loading: 'Loading Luxembourg …', 'load.terrain': 'Terrain', 'load.roads': 'Roads', 'load.city': 'City', 'load.build': 'Building the world …', 'load.hills': 'Hills', 'load.bridges': 'Bridges', 'load.canopy': 'Trees', 'load.trees': 'Trees', 'load.classes': 'Land',
     'load.done': 'Done', 'load.slow': 'Taking longer than usual …', 'load.retry': 'Try again', 'load.error': 'The game could not be loaded. Check your connection.',
     'hud.speed': 'km/h', 'hud.gear': 'Gear', 'hud.road': 'Road', 'hud.menu': 'Menu', 'hud.weather': 'Weather', 'hud.timeOfDay': 'Time of day', 'hud.camera': 'Camera', 'hud.sound': 'Sound', 'hud.quality': 'Quality', 'hud.reset': 'Back to the start', 'hud.area': 'Area',
     'menu.title': 'Menu', 'menu.drive': 'Drive', 'menu.settings': 'Settings', 'menu.help': 'Help', 'menu.close': 'Close', 'menu.resume': 'Resume', 'menu.start': 'Start', 'menu.restart': 'Restart', 'menu.language': 'Language', 'menu.map': 'Map',
@@ -54,7 +54,7 @@ const STR = {
     'hud.crash': 'Oops!', 'hud.onRoad': 'On the road', 'hud.offRoad': ' off the road',
   },
   fr: {
-    title: 'Lux Drive', loading: 'Chargement du Luxembourg …', 'load.terrain': 'Relief', 'load.roads': 'Routes', 'load.city': 'Ville', 'load.build': 'Construction du monde …', 'load.hills': 'Collines', 'load.bridges': 'Ponts', 'load.canopy': 'Arbres', 'load.classes': 'Terrain',
+    title: 'Lux Drive', loading: 'Chargement du Luxembourg …', 'load.terrain': 'Relief', 'load.roads': 'Routes', 'load.city': 'Ville', 'load.build': 'Construction du monde …', 'load.hills': 'Collines', 'load.bridges': 'Ponts', 'load.canopy': 'Arbres', 'load.trees': 'Arbres', 'load.classes': 'Terrain',
     'load.done': 'Prêt', 'load.slow': 'Cela prend plus de temps que d’habitude …', 'load.retry': 'Réessayer', 'load.error': 'Le jeu n’a pas pu être chargé. Vérifie la connexion.',
     'hud.speed': 'km/h', 'hud.gear': 'Vitesse', 'hud.road': 'Route', 'hud.menu': 'Menu', 'hud.weather': 'Météo', 'hud.timeOfDay': 'Heure du jour', 'hud.camera': 'Caméra', 'hud.sound': 'Son', 'hud.quality': 'Qualité', 'hud.reset': 'Retour au départ', 'hud.area': 'Zone',
     'menu.title': 'Menu', 'menu.drive': 'Rouler', 'menu.settings': 'Réglages', 'menu.help': 'Aide', 'menu.close': 'Fermer', 'menu.resume': 'Continuer', 'menu.start': 'Départ', 'menu.restart': 'Recommencer', 'menu.language': 'Langue', 'menu.map': 'Carte',
