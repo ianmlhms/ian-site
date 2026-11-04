@@ -971,3 +971,73 @@ Ian: "the road is really bumpy and not level at all".  Measured on the branch th
 * Inside a ring (a pedestrian square whose two arms are 10 m apart) the nearest-arm switch leaves a 9 cm step along the medial axis (4913,8339).  Two overlapping ways of equal class at different levels (service lots) leave a 15-35 cm step.
 * `world-flow` batter numbers are worse than on `lux-drive` (3 % of the sides steeper than the land, was 0.3 %); the cause is in the carve (nearest segment, flat bench then face), not in the bed.
 * Not measured on a real GPU or an iPad.
+
+## Terrain fix (branch `lux-drive-terrain`, Mac mini): hill-crest humps, steep road sides, the loosened gates, steps on level ground
+
+Started from `lux-drive` 30a0435d (the "Road fix" above).  Measuring tool: `node scripts/luxdrive/terrain_report.mjs <pb/lux-drive/ folder> [--only=humps,sides,steps] [--verbose]` (runs on any checkout; the numbers
+below are "before" = 30a0435d, "after" = this branch).  Pictures and logs: `~/Library/Caches/luxdrive-work/terrain/` (`pair-hump1..3.jpg`, `pair-side1..3.jpg` = before | after in low evening sun, medium quality; the
+single frames are in `before-humps/ after-humps/ before-sides/ after-sides/`).
+
+### 1. Hill-crest humps (`road-bed.js`, `config.js` ROAD.bed*)
+Cause: the bed was a Whittaker fit, a curvature limit of R = 550 m for EVERY way, then clamped to +-1 m of the land.  Where the land has a crest tighter than that, the clamp won and the bed followed the crest (a hump).
+* **A vertical curve of the class, a cutting through the crest, a fill in the sag.**  R = v2 / 1.3 m/s2 at the design speed of the class (`ROAD.bedSpeed`: motorway 100, trunk 90, primary 80, secondary 70, tertiary 60, every other way
+  50 km/h; R = 595 / 480 / 380 / 290 / 215 / 150 m).  `designOpenBed` alternates "limit the curvature" and "keep the bed within `bedMaxCut` 2.5 m below / `bedMaxFill` 2.0 m above the land" (8 rounds; the two sets are convex),
+  then limits the curvature once more and caps at `bedHardLimit` 4 m (a cliff beside the road: smooth wins over following the spike).
+* **Hermite bed** (`bedSlopes`, `hermite`, `bedAtArc`): the carve interpolates a cubic between samples.  With the linear interpolation the whole change of slope of a vertical curve sat in the samples 4 m apart (twice the lift of the
+  curve at every sample), so R = 150 m measured 3 m/s2 at the knots.
+* **Bridge ends / tunnel mouths** (`chain.ends`, `endStretches`): the DTM next to a bridge abutment is the edge of a valley (the street ran 13 m under the land / 6 m over a cliff), so the first 16 m of a street that runs onto a bridge
+  continue its gradient (weight 0.02, no soft clamp).  The last 12 m before a tunnel mouth follow the land (weight 20) - the portal gap is a property of the land there.
+* Gate I measures with the design speed and the vertical curve of the class (`deviationOf(radiusOf(kind))` + 1 cm, no more "held to the land" exclusions: there is nothing held any more).  The kerb check measures the kerb term of the carve
+  (the ground beside the kerb is now the face of the cutting, it rises with the hillside).
+
+| | before | after |
+|---|---|---|
+| stretches over 1.5 m/s2 (whole network, every way, junction aprons and tight bends excepted; class design speed after, 50 km/h before) | 249 | **113** (of which 11 over 5 m/s2: cliffs where the 4 m hard limit holds, see below) |
+| share of the points over 1.5 m/s2 | 0.13 % | 0.05 % |
+| median vertical acceleration | 0.026 | 0.042 m/s2 |
+| gate I: bob over 1.5 m/s2 / worst | 0.00 % / 1.28 | 0.004 % / 1.67 m/s2 (limit 0.3 % / 4) |
+| the eight worst named hill streets (m/s2 at 50 km/h) | Neie Wee 9.8, Plättisgaass 9.8, Av. J.F. Kennedy (dip) 7.9, Plätzerbierg 5.9, Rue Principale 4.7, Crispinusbierg 4.4, Rue des Pruniers 4.0, Rue de la Semois 3.9 | 1.6, 0.5, 0.9, 1.0, 0.6, 0.8, 0.6, 0.8 |
+| deepest cutting | 1.5 m | 4.0 m (hard limit); samples cut more than 2.5 m: 0 -> 28 of 312 702; embankments over 1 m: 12 -> 579 |
+
+### 2. Steep road sides in the Alzette valley (`road-network.js` carve) - cause was in the carve, not in the bed
+* **The pin pulled toward a flat bed.**  The carriageway pin (1 on the road, fading over PIN_FADE beyond the bench) blended the ground toward the FLAT bed; on a hillside that multiplies the slope of the face by 1 + e |pin'| = 1.75
+  (the face of a cutting up to twice as steep as the land).  The pin now pulls toward the surface of its own way: bed within the bench, the face of its own batter beyond it (FACE_JOIN 0.4 m).
+* **A fill on a cliff** (`fillDeviation`): the 0.8 ramp never catches a land that falls faster, it filled up to 6 m above the cliff and then dropped 7 m in a metre.  The fill is now the lower of the ramp and "the land lifted by the
+  overhang of the bench, sinking back at `fillSlope` 0.25 per m" (the ground is steeper than the land by 0.25 at most).  The viaduct fade (`level`) is a function of the overhang at the edge of the bench (it used the drop at the point,
+  and jumped where the notch changes sign), a taper closes the fill (the scan that finds its end is coarse).  `maxBatterSlope` 0.8 -> 0.6 (1:1.67): the house at (3383,7407) beside an embankment kept its eaves above the ground only
+  with the fatter fill.
+* **Neighbouring segments blend** (`segmentState`, Shepard weights, see 4).
+* `luxdrive_world.mjs`: the ORIGINAL limits are back: p99 1.6, steeper than the land 2 %, walls 8, deepest wall 8.
+
+| ground beside the roads (15 510 sides, as the world flow measures) | original (32ac3524) | before | after | limit |
+|---|---|---|---|---|
+| p99 slope | 1.29 | 1.62 | **1.42** | 1.6 |
+| steeper than the land | 0.32 % | 2.91 % | **1.16 %** | 2 % |
+| walls the carve made / deepest | 7 / 4.47 | 16 / 5.72 | **3 / 3.94** | 8 / 8 |
+
+### 3. The other loosened gates are restored
+* bridge pit 1.0 m (harness D; was 1.3): 0 points.  The 41 pits of the first design were one place: the street at the abutment of the Pont Rouge (a 4 m cutting dragged down by the DTM cliff at its end) - fixed by the bridge-end rule.
+* portal approach gap 2.0 m (harness D2; was 3.0): worst 1.87 m (the portal at 8491,6042: the land itself rises 1.4 m between the end of the road and the wall).
+
+### 4. Steps on level ground
+* **Cause 1: the nearest segment jumps.**  On the inner side of a bend the nearest segment changes along the bisector and the beds at the two feet of the perpendiculars differ by the gradient times their distance; where a ring or a hairpin
+  comes back past the point the nearest ARM changes (only the nearest arm pinned the road: the 9 cm step at (4913,8339)); the side of the way (`lat` sign) flips on the extension of a segment (the notch of the other side: up to metres).
+  The ground is now computed way by way from ALL segments of the way near the point (`segmentState`, weights ((d_nearest+0.5)/(d+0.5))^4 times a foot-in-the-middle factor so that the neighbour of a straight road does not pull
+  its bed), the side is a smooth function of the direction, and `continue`s that skipped the pin when the batter ended are gone (a pin of weight 0.27 appeared and vanished in 4 cm).
+* Measured (largest height change within 4 cm in a +-0.8 m window, cm): the ring at (4913,8339) 6.1 -> 1.0; eight sampled service-lot overlaps 22 .. 38 -> 0.7 .. 3 (e.g. (9611,9348) 37.9 -> 0.7, (9375,3676) 25.7 -> 3.2).
+* Whole network (6 M probes on the carriageways, sides of the step flat): steps over 20 cm 21 -> 2, over 10 cm 50 -> 22, over 5 cm 141 -> 86; **the 2 .. 5 cm class grew** (423 -> 1300 places): they are slope changes within a metre where the
+  pin hands over to the face of the batter (FACE_JOIN), not steps.
+
+### Gates (Mac mini, software GL)
+`node pb/lux-drive/harness.js` PASS, 85 checks (208 s; gate I: worst deviation 11.8 cm of an allowed 11 + 1 cm per class curve ... see gate text, bob 1.67 m/s2, crossfall 1.07 %, kerb 0.6 cm; J: mesh vs height worst 3.8 cm of 4 - it was 1.5 / 2.4 / 1.5
+before: the faces are steeper near the blends, the margin is thin); `luxdrive_world.mjs` PASS (draw calls 109 / 146 / 208, same as before); `luxdrive_holes.mjs` 0 hole pixels over 72 poses at medium AND `HOLES_Q=low`; `luxdrive_ui.mjs` PASS.
+Cost: the carve is ~35 % slower (196 lattice blocks: 530 -> 720 ms in Node), the network build is the same (2.1 s).
+
+### Still wrong (honest)
+* 113 stretches still over 1.5 m/s2; 11 of them over 5 m/s2: a track at (15785,5438), service roads at (11226,6237), (11593,5399), the Échangeur de Kirchberg link at (8671,5998), Merl roundabout: a cliff or a wall of the DTM beside the
+  street where a cutting of 4 m (the hard limit) is still not enough.  Boulevard de la Foire (4718,8175) and the Rocade de Bonnevoie link (5278,10632): 15 / 8 m/s2 although the bed is smooth - another way at another level lies 5 m beside them and
+  its fade reaches the carriageway.
+* Steps: 86 places over 5 cm remain (47 of them are two levels of a motorway interchange / terrace lying 2 .. 10 m apart: a retaining wall, Échangeur de Merl, Hellege-Geescht plateau; 33 on one way, mostly steep cut faces next to the
+  carriageway).  The brief's "no step over 2 cm" is not met everywhere: the probes find 1386 places over 2 cm, almost all slope changes of a few cm at the foot of a face.
+* Two ways at different levels that run side by side (no crossing, so neither rides over the other) still end in a wall of 2 .. 4 m/m between their benches; PIN_FADE 3 m only softens it.
+* Gate J's margin is 0.2 mm of 4 cm at the worst place; not measured on a real GPU or an iPad.
