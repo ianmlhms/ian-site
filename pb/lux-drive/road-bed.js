@@ -20,8 +20,8 @@ const MIN_WINDOW = 2;                    // m: no limit where the way is shorter
 const LIMIT_GAIN = 0.8;                  // the share of the excess one sweep removes (below 1: the sweeps converge)
 const FREE_END_RUN = 16;                 // m: the stretch of a way next to a bridge that the DTM cannot be trusted on (the valley edge begins at the abutment)
 const FREE_END_WEIGHT = 0.02;            // the weight of a terrain sample there against 1 elsewhere: the profile continues the gradient of the street into the bridge
-const TIGHT_END_RUN = 12;                // m: the stretch of a way next to a tunnel mouth that follows the land (TIGHT_END_CAP)
-const TIGHT_END_CAP = 0.3;               // m: ... within this of it
+const TIGHT_END_RUN = 12;                // m: the stretch of a way next to a tunnel mouth that follows the land ...
+const TIGHT_END_WEIGHT = 20;             // ... with this weight of a terrain sample against 1 elsewhere (a hard clamp to the land carried the street over the wall of the hillside at the portal: 330 m/s2)
 const PIN_WEIGHT = 1e4;                  // the weight of a junction constraint against the weight 1 of a terrain sample
 
 /** Median of a window (a small array, sorted in place). */
@@ -156,7 +156,7 @@ export function designBed(ground, arc, pins, closed = false, kind = '', ends = n
 }
 
 /** The stretches of a way next to a bridge (`free`: the terrain there is the edge of a valley, the street does not follow it) and next to a tunnel (`tight`: the
- *  mouth of the tunnel is cut into the hillside at the level of the street, the street follows the land closely).  `ends` = { start, end }, each 'bridge', 'tunnel' or null. */
+ *  mouth of the tunnel is cut into the hillside at the level of the street, the street follows the land).  `ends` = { start, end }, each 'bridge', 'tunnel' or null. */
 function endStretches(arc, ends) {
   const n = arc.length;
   const free = new Uint8Array(n), tight = new Uint8Array(n);
@@ -176,7 +176,7 @@ function clampToLand(bed, ground, pins, maxCut, maxFill, stretch) {
   const out = new Float64Array(bed.length);
   let clamped = false;
   for (let i = 0; i < bed.length; i++) {
-    out[i] = pins && pins.has(i) ? pins.get(i) : stretch && stretch.free[i] ? bed[i] : stretch && stretch.tight[i] ? Math.min(ground[i] + TIGHT_END_CAP, Math.max(ground[i] - TIGHT_END_CAP, bed[i])) : Math.min(ground[i] + maxFill, Math.max(ground[i] - maxCut, bed[i]));
+    out[i] = pins && pins.has(i) ? pins.get(i) : stretch && stretch.free[i] ? bed[i] : Math.min(ground[i] + maxFill, Math.max(ground[i] - maxCut, bed[i]));
     if (out[i] !== bed[i]) clamped = true;
   }
   return { bed: out, clamped };
@@ -195,7 +195,10 @@ function designOpenBed(ground, arc, pins, kind, ends) {
   const y = new Float64Array(n);
   for (let i = 0; i < n; i++) y[i] = median(ground, i, SPIKE_WINDOW);
   const stretch = endStretches(arc, ends);
-  for (let i = 0; i < n; i++) if (stretch.free[i]) w[i] = FREE_END_WEIGHT;      // (a bridge abutment: the DTM drops into the valley there, the street does not)
+  for (let i = 0; i < n; i++) {
+    if (stretch.free[i]) w[i] = FREE_END_WEIGHT;                // (a bridge abutment: the DTM drops into the valley there, the street does not)
+    else if (stretch.tight[i]) w[i] = TIGHT_END_WEIGHT;         // (a tunnel mouth: the street arrives at the level of the hillside it enters)
+  }
   if (pins) for (const [i, h] of pins) { w[i] = PIN_WEIGHT; y[i] = h; }
   const limit = deviationOf(radiusOf(kind));
   let bed = whittaker(y, w, ROAD.bedStiffness, arc);
@@ -204,7 +207,7 @@ function designOpenBed(ground, arc, pins, kind, ends) {
     bed = clamped.bed;
     if (!clamped.clamped) break;
   }
-  return clampToLand(limitCurvature(bed, arc, pins, limit), ground, pins, ROAD.bedHardLimit, ROAD.bedHardLimit, { free: new Uint8Array(n), tight: stretch.tight }).bed;
+  return clampToLand(limitCurvature(bed, arc, pins, limit), ground, pins, ROAD.bedHardLimit, ROAD.bedHardLimit).bed;
 }
 
 /** The slope of the bed at every sample (m per m along the way): the central difference, one-sided at the two ends.  The surface between two samples is the cubic

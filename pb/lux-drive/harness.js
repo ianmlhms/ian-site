@@ -583,7 +583,7 @@ if (wants('D')) {
   // The ground under a bridge is the ground: no road may cut a pit under the deck (the reviewer's overpass = pit).
   // The ends of the deck are where the approach road is, and a road on an embankment has the land beside it:
   // that is the bench of the road, not a pit, so the ends are not measured.
-  // (a bed is held within bedHardClamp of the land; a deck beside a cutting stands 0.1 - 0.2 m beyond the centre line of the road, where the land is higher)
+  // (the street that runs onto a bridge continues the gradient of the street and does not follow the valley edge, designBed; the original limit of 1.0 m)
   const MAX_PIT = 1.0;
   let pits = 0, worstPit = 0;
   for (const d of decks) {
