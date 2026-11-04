@@ -356,6 +356,45 @@ export const flow = {
     h.expect(hand.top50 > 40 && hand.top50 < 100, `a street of 50 km/h tops out at ${hand.top50.toFixed(0)} km/h`);
     h.expect(hand.brake.wet > hand.brake.dry * 1.15 && hand.brake.dry < 14, `braking from 50 km/h: ${hand.brake.dry.toFixed(1)} m dry, ${hand.brake.wet.toFixed(1)} m wet`);
 
+    h.step("stuck against a wall: the pedal is down, the car does not move -> it is put back on the road");
+    const stuck = await page.evaluate(async () => {
+      const m = window.__lux, car = m.car;
+      // a house wall near the start with free ground in front of it
+      const start = { x: 5924, z: 7901 };
+      const b = m.buildings.buildings.find((q) => Math.hypot(q.pts[0] - start.x, q.pts[1] - start.z) < 300 && q.pts.length >= 8 && (() => {
+        const n = q.pts.length / 2; return Array.from({ length: n }, (_, e) => e).some((e) => { const ax = q.pts[e * 2], az = q.pts[e * 2 + 1], bx = q.pts[((e + 1) % n) * 2], bz = q.pts[((e + 1) % n) * 2 + 1]; return Math.hypot(bx - ax, bz - az) > 10; });
+      })());
+      if (!b) return { found: false };
+      const n = b.pts.length / 2;
+      for (let e = 0; e < n; e++) {
+        const ax = b.pts[e * 2], az = b.pts[e * 2 + 1], bx = b.pts[((e + 1) % n) * 2], bz = b.pts[((e + 1) % n) * 2 + 1];
+        const L = Math.hypot(bx - ax, bz - az); if (L < 10) continue;
+        let nx = -(bz - az) / L, nz = (bx - ax) / L; const mx = (ax + bx) / 2, mz = (az + bz) / 2;
+        if (m.buildings.collide(mx + nx * 2, mz + nz * 2, 0.5)) { nx = -nx; nz = -nz; }
+        if (m.collide(mx + nx * 3, mz + nz * 3, 1.5) || m.collide(mx + nx * 8, mz + nz * 8, 1.5) || !m.roadIndex.nearest(mx, mz, 60)) continue;
+        const heading = Math.atan2(-nz, -nx);
+        car.reset(mx + nx * 4, mz + nz * 4, heading);
+        m.setInput({ throttle: 1, brake: 0, steer: 0, handbrake: false });
+        const t0 = m.clock();
+        let pushedFor = 0, moved = false, wedged = null;
+        while (m.clock() - t0 < 9) {
+          await new Promise((r) => requestAnimationFrame(r));
+          const s = m.state(), t = m.clock() - t0;
+          if (!wedged && t > 2.5) wedged = { x: s.x, z: s.z };                       // by now the car has hit the wall and stands there
+          if (wedged && Math.hypot(s.x - wedged.x, s.z - wedged.z) > 2.5) { moved = true; pushedFor = t; break; }
+        }
+        m.setInput(null);
+        const s = m.state(), road = m.roadAt(s.x, s.z);
+        return { found: true, moved, seconds: pushedFor, onRoad: !!road && Math.abs(road.lat) <= road.width / 2, wallDist: (s.x - mx) * nx + (s.z - mz) * nz };
+      }
+      return { found: false };
+    });
+    h.expect(stuck.found, "a house wall with free ground in front of it was found");
+    if (stuck.found) {
+      h.expect(stuck.moved && stuck.seconds > 3, `the wedged car was moved after ${stuck.seconds.toFixed(1)} s of pushing`);
+      h.expect(stuck.onRoad, "and it stands on a carriageway again");
+    }
+
     h.eq(errors, [], "zero console errors in the whole flow");
   },
 };
