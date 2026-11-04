@@ -14,7 +14,7 @@
  * Pure functions: the same code feeds the render mesh, the physics lattice and the Node harness. */
 import { ROAD } from './config.js';
 import { ROAD_KINDS, kindInfo } from './roads.js';
-import { designBed } from './road-bed.js';
+import { designBed, bedSlopes, hermite } from './road-bed.js';
 
 const CELL = ROAD.cell;                 // m, the spatial hash cell (the biggest kernel radius fits inside it)
 const BATTER_STEP = 2.0;               // m, the step of the walk that finds where the batter gives up
@@ -29,7 +29,9 @@ const MAX_PINS = 16;                   // carriageways that lie over one point, 
 const MAX_CAND = 192;                  // segments that reach one point, at most
 const ARM_GAP = 3;                     // segments: two stretches of one way this far apart are different arms (a hairpin)
 const CAP_SOFT = 2.0;                  // m: the carriageway pin ends this softly past the END of a way (no flat disc at the end of a street)
-const PIN_FADE = 3.0;                  // m: the carriageway level fades into the batter over this distance beyond the pavement
+const PIN_FADE = 5.0;                  // m: the carriageway level fades into the batter over this distance beyond the pavement
+const FILL_TAPER = 3.0;                // m: the last stretch of a fill face where it sinks to the land (the scan that finds the end of the face is coarse)
+const FACE_JOIN = 0.4;                 // m: the pinned surface runs from the bed to the face of the batter over this distance past the bench (they meet to within the noise of the land)
 const JUNCTION_LEVEL = 0.6;            // m: two ways meet at a junction when their beds differ by less than this where they meet (more: one is over the other)
 const CLOSED_MIN_SAMPLES = 6;          // a ring has at least this many samples (a way shorter than 20 m that ends where it starts is a stub)
 const END_JOIN = 3.0;                  // m: the ends of ways this close to one another meet at one node
@@ -87,6 +89,7 @@ export function createRoadNetwork(roads, baseHeight) {
   const segAx = [], segAz = [], segBx = [], segBz = [], segB0 = [], segB1 = [];
   const segHw = [], segKerbH = [], segKerbW = [], segPw = [], segA0 = [], segBench = [], segR = [], segReach = [];
   const segKind = [], segRoad = [], segKerbOn = [], segLines = [], segS0 = [], segS1 = [], segSurf = [];
+  const segTan0 = [], segTan1 = [];   // the tangents of the bed at the two ends of every segment (slope times length: the cubic Hermite curve, road-bed.js)
   const segSamp = [];            // the index of the centre line sample every segment starts at
   const sampleX = [], sampleZ = [], sampleRoad = [];
   const fadeL = [], fadeR = [];   // the length of the batter on each side of the way, per sample
@@ -99,6 +102,22 @@ export function createRoadNetwork(roads, baseHeight) {
   const overCorridors = [];          // the corridors of the ways that ride over the ground: their ground is protected
 
   /**
+   * How far a FILL (the bench stands above the land at its edge) lifts the ground at `edge` m past the bench, in metres above the land.
+   * Two shapes, and the ground follows the one that hugs the land closer:
+   *   - the RAMP: the slope limit from the level of the way (an embankment over flat land: 0.8 down per m);
+   *   - the SHIFT: the land itself, lifted by the overhang of the bench and sinking back at `fillSlope` per m (a way on the edge of a cliff).
+   * The ramp alone never catches a land that falls faster than the limit: it carried the ground up to 6 m above a cliff and ended in a wall of
+   * 6 m/m (the pedestrian way above the Alzette: land 2.3, ground 6.7).  The shift is steeper than the land by only `fillSlope`.
+   * `overhang` is how far the bench stands above the land at the edge of the bench (>= 0); `level` fades out the fill of a viaduct.
+   */
+  function fillDeviation(bed, ground, overhang, edge, level) {
+    const ramp = Math.max(0, bed - ground - ROAD.maxBatterSlope * edge);
+    if (edge <= 0) return level * ramp;                          // (on the way itself the ground is the level of the way)
+    const shift = Math.max(0, overhang - ROAD.fillSlope * edge);
+    return level * Math.min(ramp, shift);
+  }
+
+  /**
    * Where the batter on one side of a way ends, in metres past the edge of the pavement.
    * The ground beside a road is the land, but the carve may never make it steeper than the slope limit, so the
    * ground follows a ramp of at most that slope from the level of the road until the ramp reaches the land again.
@@ -107,12 +126,13 @@ export function createRoadNetwork(roads, baseHeight) {
    * to its full length.
    * `nx, nz` points away from the way, `bed` is the level of the road, `a0` the edge of the pavement.
    */
-  function batterLength(px, pz, nx, nz, bed, a0, maxEdge) {
+  function batterLength(px, pz, nx, nz, bed, a0, maxEdge, overhang) {
+    if (overhang <= 0) return maxEdge;                 // (a cut: its face is the land shifted down, see carve())
     let lastFail = -1;
     for (let e = 0; e <= maxEdge + 1e-6; e += BATTER_STEP) {
       const g = baseHeight(px + nx * (a0 + e), pz + nz * (a0 + e));
-      // the ramp of the batter reaches the land when the land is not more than the slope limit away from the road
-      if (Math.abs(g - bed) > ROAD.maxBatterSlope * e + BATTER_TOL) lastFail = e;
+      // the fill reaches the land when it no longer lifts the ground
+      if (fillDeviation(bed, g, overhang, e, 1) > BATTER_TOL) lastFail = e;
     }
     if (lastFail < 0) return maxEdge;
     return Math.min(maxEdge, lastFail + BATTER_STEP);
@@ -289,7 +309,7 @@ export function createRoadNetwork(roads, baseHeight) {
         if (bestD < Infinity) pins.set(k, bestH);
       }
       chain.pins = pins;                                  // (the harness reads them: the profile is free of curvature limits only there)
-      if (pins.size) chain.bed = designBed(chain.ground, chain.arc, pins, chain.closed);
+      if (pins.size) chain.bed = designBed(chain.ground, chain.arc, pins, chain.closed, chain.kind);
       for (let i = 1; i < n; i++) {
         const x0 = Math.floor(Math.min(chain.x[i - 1], chain.x[i]) / GC), x1 = Math.floor(Math.max(chain.x[i - 1], chain.x[i]) / GC);
         const z0 = Math.floor(Math.min(chain.z[i - 1], chain.z[i]) / GC), z1 = Math.floor(Math.max(chain.z[i - 1], chain.z[i]) / GC);
@@ -351,19 +371,20 @@ export function createRoadNetwork(roads, baseHeight) {
     for (let i = 1; i < n; i++) arc[i] = arc[i - 1] + Math.hypot(rs.x[i] - rs.x[i - 1], rs.z[i] - rs.z[i - 1]);
     // a ring (the last sample at the first one): its profile is periodic, see designBed
     const closed = n >= CLOSED_MIN_SAMPLES && Math.hypot(rs.x[0] - rs.x[n - 1], rs.z[0] - rs.z[n - 1]) <= END_JOIN;
-    const chain = { road: ri, x: rs.x, z: rs.z, arc, ground, bed: null, tagged, hw, rank: roadRank(road, hw), closed };
+    const chain = { road: ri, kind: road.kind, x: rs.x, z: rs.z, arc, ground, bed: null, tagged, hw, rank: roadRank(road, hw), closed };
     chains.push(chain);
     prep.push({ ri, road, rs, n, hw, kerbH, kerbW, pw, bench, a0, kind, chain });
   }
 
   // ---- the bed of every way: designed on its own first (this decides which way rides over which), then again with the
   // junctions pinned to the ways that were designed before ----
-  for (const chain of chains) chain.bed = designBed(chain.ground, chain.arc, null, chain.closed);
+  for (const chain of chains) chain.bed = designBed(chain.ground, chain.arc, null, chain.closed, chain.kind);
   findCrossings();
   reconcileJunctions();
 
   for (const { ri, road, rs, n, hw, kerbH, kerbW, pw, bench, a0, kind, chain } of prep) {
     const bed = chain.bed;
+    const slope = bedSlopes(bed, chain.arc);
     const radius = Math.min(ROAD.maxRadius, a0 + ROAD.falloff);
     // The BATTER reaches much farther than the paint: the ground beside the road is shaped by the slope limit over
     // the whole embankment, while the paint stops at the pavement (the painted tarmac must be the carriageway).
@@ -386,14 +407,14 @@ export function createRoadNetwork(roads, baseHeight) {
       const nx = -dz / len, nz = dx / len;              // to the right of the way, the way the traffic runs
       const s = sampleX.length + i;
       const maxEdge = reach - bench;                    // m, the longest batter this road may have
-      fadeR[s] = batterLength(rs.x[i], rs.z[i], nx, nz, bed[i], bench, maxEdge);
-      fadeL[s] = batterLength(rs.x[i], rs.z[i], -nx, -nz, bed[i], bench, maxEdge);
       // The NOTCH of the way on each side: how deep the bench of the way is cut into the land (or how high the way
       // stands above it).  The ground beside the way is the land itself, shifted by the notch: the face of a cutting
       // is the shape of the hillside it is cut into, and the ground under an embankment is the shape of the ground it
       // stands on.  The notch is measured on the land at the edge of the bench, so the two meet exactly.
       notchR[s] = baseHeight(rs.x[i] + nx * bench, rs.z[i] + nz * bench) - bed[i];
       notchL[s] = baseHeight(rs.x[i] - nx * bench, rs.z[i] - nz * bench) - bed[i];
+      fadeR[s] = batterLength(rs.x[i], rs.z[i], nx, nz, bed[i], bench, maxEdge, -notchR[s]);
+      fadeL[s] = batterLength(rs.x[i], rs.z[i], -nx, -nz, bed[i], bench, maxEdge, -notchL[s]);
     }
     // the distance along the centre line: the shader draws the lane markings as dashes along it
     const along = new Float64Array(n);
@@ -402,6 +423,7 @@ export function createRoadNetwork(roads, baseHeight) {
     for (let i = 0; i < n - 1; i++) {
       segAx.push(rs.x[i]); segAz.push(rs.z[i]); segBx.push(rs.x[i + 1]); segBz.push(rs.z[i + 1]);
       segB0.push(bed[i]); segB1.push(bed[i + 1]);
+      segTan0.push(slope[i] * (chain.arc[i + 1] - chain.arc[i])); segTan1.push(slope[i + 1] * (chain.arc[i + 1] - chain.arc[i]));
       segHw.push(hw); segKerbH.push(kerbH); segKerbW.push(kerbW); segPw.push(pw);
       segA0.push(a0); segBench.push(bench); segR.push(radius); segReach.push(reach);
       segKind.push(kindCode); segRoad.push(ri); segKerbOn.push(1);
@@ -417,6 +439,7 @@ export function createRoadNetwork(roads, baseHeight) {
   const X0 = Float32Array.from(segAx), Z0 = Float32Array.from(segAz);
   const X1 = Float32Array.from(segBx), Z1 = Float32Array.from(segBz);
   const BED0 = Float32Array.from(segB0), BED1 = Float32Array.from(segB1);
+  const TAN0 = Float32Array.from(segTan0), TAN1 = Float32Array.from(segTan1);
   const HW = Float32Array.from(segHw), KERBH = Float32Array.from(segKerbH), KERBW = Float32Array.from(segKerbW);
   const PW = Float32Array.from(segPw), A0 = Float32Array.from(segA0), RAD = Float32Array.from(segR);
   const BENCH = Float32Array.from(segBench);
@@ -694,7 +717,7 @@ export function createRoadNetwork(roads, baseHeight) {
           const a0 = A0[i];
           const bench = BENCH[i];
           const edge = d > bench ? d - bench : 0;
-          const bed = BED0[i] + (BED1[i] - BED0[i]) * t;
+          const bed = hermite(BED0[i], BED1[i], TAN0[i], TAN1[i], t);
           // The NOTCH of the way on this side, interpolated along the road like the bed: how deep the bench of the
           // way is cut into the land (or how high the way stands above it).
           const s0 = SAMP0[i];
@@ -706,13 +729,6 @@ export function createRoadNetwork(roads, baseHeight) {
           // limits the slope of its face, so the face is a ramp and not a wall.
           const off = ground - bed;
           const level = notch >= 0 ? 1 : 1 - smoothstep(LEVEL_FULL, LEVEL_FADE, -off);
-          // The CARRIAGEWAY (and the pavement beside it) lies exactly at the bed of its way: a pin that is 1 on the road and fades
-          // out over PIN_FADE metres.  The batter below shapes the ground beside the road; it must not shape the road.  A way
-          // that rides over the others keeps the DTM (its fill) and is not pinned.
-          if (!NOBATTER[i] && armFirst[ar]) {      // (only the nearest arm of a way pins the road: the other arm only shapes the batter)
-            const pin = (1 - smoothstep(bench, bench + PIN_FADE, d)) * level * (1 - smoothstep(0, CAP_SOFT, over));
-            if (pin > 0 && nPins < MAX_PINS) { pinPri[nPins] = priority[ROADOF[i]]; pinVal[nPins] = bed; pinWt[nPins] = pin; nPins++; }
-          }
           if (level >= 0.5) {                      // a road that is far from the ground here (a cutting above, a viaduct) is not painted
             const eCar = d - HW[i], ePave = d - a0;
             if (eCar < sdCar) sdCar = eCar;
@@ -736,6 +752,7 @@ export function createRoadNetwork(roads, baseHeight) {
           // from the level of the way, and the ramp fades out where the way stands far above the ground (a viaduct
           // must not fill the valley under it).
           // A way that rides over the others has no batter at all: the earthworks of the DTM are its ground.
+          let faceDev = 0;                        // what this way alone makes of the ground beside it (m above the land); 0 where the batter does not reach
           if (!NOBATTER[i]) {
             let dev;                    // how far the way pulls the ground here, in metres
             let reach = fadeLen;
@@ -747,15 +764,10 @@ export function createRoadNetwork(roads, baseHeight) {
               dev = edge > 0 ? -notch * (1 - smoothstep(0, reach, edge)) : bed - ground;
             } else {
               if (edge >= fadeLen) continue;
-              const lim = ROAD.maxBatterSlope * edge;
-              let shaped = bed + (off > lim ? lim : off < -lim ? -lim : off);
-              // The ramp of the fill may fill the ground up to the level of the way, but it may never dig the ground
-              // below the land beside it: where the land is steeper than the slope limit (a cliff beside the road),
-              // the cliff stays a cliff and the ground of the carve is the land.  Without this the ramp ended in
-              // the air and the ground jumped back to the land at the far end of the batter: the wall of seven
-              // metres the flow found beside Val de Hamm.
-              if (shaped < ground) { shaped = ground; dev = 0; }
-              else dev = level * (shaped - ground);
+              // The fill of a way far above the land (a viaduct) must not fill the valley under it: it fades with the overhang of the bench, which is the same
+              // all along the face.  (Fading it with the drop of the land at THIS point, `level`, made the face of a fill on a steep hillside a stair: the more the land
+              // fell away, the less was filled, and the ground dropped 7 m in a metre beside a way on the edge of a cliff.)
+              dev = fillDeviation(bed, ground, -notch, edge, 1 - smoothstep(LEVEL_FULL, LEVEL_FADE, -notch)) * (1 - smoothstep(fadeLen - FILL_TAPER, fadeLen, edge));
             }
             // The claim of the batter: full on the road, and gone at the far end of the batter.  It is squared so that
             // a road further away does not pull the ground of the road the point is on.
@@ -763,6 +775,20 @@ export function createRoadNetwork(roads, baseHeight) {
             const claim = fall * fall;
             devSum += claim * dev;
             devW += claim;
+            if (armFirst[ar]) faceDev = dev;
+          }
+          // The CARRIAGEWAY (and the pavement beside it) lies exactly at the bed of its way: a pin that is 1 on the road and fades out over
+          // PIN_FADE metres.  What the pin pulls the ground toward is the surface of THIS way: the bed within the bench, and beside it the
+          // face of its own batter (the land shifted by the notch, a ramp of the fill).  Pulling toward the flat bed (the first version)
+          // multiplied the slope of the ground by 1 + e * |pin'| = 1.75 over the whole fade whenever the hillside was not flat - the
+          // face of a cutting was up to twice as steep as the land it was cut into.  A way that rides over the others keeps the DTM
+          // (its fill) and is not pinned.
+          if (!NOBATTER[i] && armFirst[ar]) {      // (only the nearest arm of a way pins the road: the other arm only shapes the batter)
+            const pin = (1 - smoothstep(bench, bench + PIN_FADE, d)) * level * (1 - smoothstep(0, CAP_SOFT, over));
+            if (pin > 0 && nPins < MAX_PINS) {
+              const face = ground + faceDev;
+              pinPri[nPins] = priority[ROADOF[i]]; pinVal[nPins] = face + (bed - face) * (1 - smoothstep(bench, bench + FACE_JOIN, d)); pinWt[nPins] = pin; nPins++;
+            }
           }
           // ---- the paint: it stops at the pavement, so the painted tarmac is the carriageway and nothing else
           const R = RAD[i];
@@ -861,7 +887,7 @@ export function createRoadNetwork(roads, baseHeight) {
 
   return {
     carve, nearestRoad, roads, info, count, scratch, overRoads, crossings, chains, protection,
-    segments: { X0, Z0, X1, Z1, BED0, BED1, HW, KERBH, KERBW, PW, A0, RAD, REACH, KIND, ROADOF, KERBON, LINES, S0, S1, SURF },
+    segments: { X0, Z0, X1, Z1, BED0, BED1, TAN0, TAN1, HW, KERBH, KERBW, PW, A0, RAD, REACH, KIND, ROADOF, KERBON, LINES, S0, S1, SURF },
     // the centre lines as they are carved (resampled and rounded): the game, the minimap and the probes follow these
     samples: { x: SAMPLES_X, z: SAMPLES_Z, road: SAMPLES_ROAD, first: firstSample, segs: segCount },
   };

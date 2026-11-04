@@ -45,19 +45,25 @@ export const ROAD = Object.freeze({
   bedStiffness: 200,       // the penalty on the second difference of the road profile (road-bed.js): a 4 m sample spacing and 200 pass
                             // wavelengths above about 90 m and take out everything wavier (the first version, a 6 m Gaussian, left waves
                             // of 10 .. 30 m: the road that "lies on a blanket")
-  bedDeviation: 0.03,      // m: the most a point of the profile may leave its 20 m moving mean = a vertical curve of radius >= 100 / (6 * 0.03) = 550 m
-                            // (0.5 m/s2 at 50 km/h: nobody feels it; the harness gate allows 4 cm for the rounding of the lattice and of the junction pins).
-                            // A stricter limit (the first version: 1.5 cm = R 1100 m) flattened every crest and filled every sag of a hill road by metres:
-                            // cuttings and embankments of 2 .. 6 m (Rue Principale, Hostert) and walls beside the roads
-  bedRelax: 0.25,          // the second, lighter pass that rounds the kinks the clamp to the land makes
-  bedHardClamp: 1.0,       // m: ... and the final bed (after the curvature limiter) never leaves the land by more than this (a pit under a bridge deck, an embankment in a field)
-  bedClamp: 1.2,           // m, how far the bed of a road may leave the ground along its own centre line
+  // The vertical curves of a street: a crest or a sag is never tighter than R = v2 / bedLift, so the car is lifted by at most bedLift (m/s2) at the design speed of
+  // the class.  The profile is cut through a crest and filled in a sag (bedMaxCut / bedMaxFill) rather than followed over it: the land of a hill town has crests
+  // of 20 .. 60 m that no street follows.
+  bedLift: 1.3,            // m/s2: the harness gate allows 1.5
+  bedSpeed: Object.freeze({    // km/h, the design speed of a class (every other way: bedSpeedDefault)
+    motorway: 100, trunk: 90, primary: 80, secondary: 70, tertiary: 60,
+  }),
+  bedSpeedDefault: 50,
+  bedMaxCut: 2.5,          // m: the bed may lie this far BELOW the land (a cutting; the face of it follows the hillside, see road-network.js)
+  bedMaxFill: 2.0,         // m: ... and this far ABOVE it (an embankment in a sag)
+  bedHardLimit: 4.0,       // m: the curvature limit may carry the bed this far from the land where the two demands cannot both be met (a cliff beside the road)
+  bedRounds: 8,            // rounds of "limit the curvature, then keep the cut and the fill within their limits"
   kerbHeight: 0.13,        // m, the kerb at the edge of the carriageway
   kerbWidth: 0.35,         // m, the width of the kerb face
   falloff: 2.2,            // m, how far the road PAINTS past its pavement before the ground is untouched again
   embankment: 18.0,        // m, how far the BATTER reaches past the pavement before the real terrain takes over.
                             // The face of the batter is a straight ramp from the level of the road back to the
                             // terrain, so the longer it is the flatter the ground beside the road is
+  fillSlope: 0.25,        // m per m: a fill on a steep hillside or a cliff sinks back into the land at this rate (the ground is then steeper than the land by this much at most)
   maxBatterSlope: 0.8,    // m up per m out (39 degrees, the reviewer's 1:1.5 embankment): the ground the carve
                             // makes beside a road must never be steeper than this.  Where the land itself is
                             // steeper, the land is used as it is (a cliff beside a road stays a cliff)
