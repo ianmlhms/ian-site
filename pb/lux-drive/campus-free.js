@@ -146,7 +146,15 @@ const STEP_LIFT = 0.04;                // m: a tread lies this far over the high
 const STEP_MIN = 0.07;                 // m: no riser is lower than this
 const STEP_RISER = [0.48, 0.47, 0.45];
 
-const DRAW = { steps, bridge, pergola, sign: freeSign, bench, table, bin, bollard, seat, playground };
+/** A tall yard lamp: a slim grey pole with a bent arm and a lamp head (4 sides, 14 triangles). */
+function lamp(soup, ground, l) {
+  const y = ground(l.x, l.z) - 0.2;
+  soup.frustum(l.x, l.z, 0.11, 0.07, y, y + l.h, 4, [0.50, 0.52, 0.54], { cap: false });
+  bx(soup, l.x, y + l.h - 0.1, l.z - 0.55, 0.12, 0.12, 1.3, 0, STEEL);
+  bx(soup, l.x, y + l.h - 0.2, l.z - 1.1, 0.28, 0.18, 0.5, 0, [0.74, 0.74, 0.72]);
+}
+
+const DRAW = { steps, lamp, bridge, pergola, sign: freeSign, bench, table, bin, bollard, seat, playground };
 
 /** Draws one free item (a record of the bake: `k` = what it is); unknown kinds are an error (the bake and the game must agree). */
 export function drawFree(soup, ground, item) {

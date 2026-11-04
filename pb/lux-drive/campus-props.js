@@ -72,19 +72,41 @@ function rack(soup, ground, s) {
   soup.box(s.x, y + 0.8, s.z, 3.0, 0.04, 0.05, 0, STEEL);
 }
 
-/** A wall (stone) with a hedge on top, along a polyline: { pts, h, w, c, hedge }. */
+const WALL_SEG = 3.0;                 // m: a piece of the stone wall and its hedge
+const WALL_SINK = 0.4;                // m: the wall stands this far under the ground
+const COURSES = [0.34, 0.68];         // where the dark joints of the sandstone courses lie (share of the wall height)
+const unit = (seed) => (((Math.imul(seed | 0, 0x9e3779b1) ^ 0x85ebca6b) >>> 8) & 0xffff) / 0xffff;
+
+/** A wall of rough sandstone courses with a hedge on top, along a polyline: { pts, h, w, c, hedge } (photo Luxembourg_Athénée_101: ochre-brown blocks in
+ * long courses, a flat coping, a dense lumpy hedge twice as thick as it is high). */
 function wallWithHedge(soup, ground, wall) {
+  let seed = 0;
   for (let i = 0; i + 1 < wall.pts.length; i++) {
     const [ax, az] = wall.pts[i], [bx, bz] = wall.pts[i + 1];
     const len = Math.hypot(bx - ax, bz - az);
+    const dx = (bx - ax) / len, dz = (bz - az) / len, nx = -dz, nz = dx;
     const yaw = -Math.atan2(bz - az, bx - ax);
-    const steps = Math.max(1, Math.ceil(len / 6));
+    const steps = Math.max(1, Math.ceil(len / WALL_SEG));
+    const seg = len / steps;
     for (let k = 0; k < steps; k++) {
-      const t = (k + 0.5) / steps;
-      const x = ax + (bx - ax) * t, z = az + (bz - az) * t;
-      const y0 = Math.min(ground(x - (bx - ax) / steps / 2, z - (bz - az) / steps / 2), ground(x + (bx - ax) / steps / 2, z + (bz - az) / steps / 2)) - 0.5;
-      soup.box(x, y0, z, len / steps + 0.1, wall.h + 0.5, wall.w, yaw, paint(wall.c, k, 0.05), { topColor: wall.c });
-      soup.box(x, y0 + wall.h + 0.5, z, len / steps + 0.1, 1.0, wall.w * 0.8, yaw, paint(wall.hedge, k, 0.08), { topColor: wall.hedge });
+      seed += 1;
+      const u0 = k * seg, u1 = u0 + seg, um = (u0 + u1) / 2;
+      const x = ax + dx * um, z = az + dz * um;
+      const y0 = Math.min(ground(ax + dx * u0, az + dz * u0), ground(ax + dx * u1, az + dz * u1), ground(x, z)) - WALL_SINK;
+      const top = Math.max(ground(ax + dx * u0, az + dz * u0), ground(ax + dx * u1, az + dz * u1)) + wall.h;
+      const tint = 0.9 + unit(seed) * 0.2;
+      const stone = [wall.c[0] * tint, wall.c[1] * tint, wall.c[2] * tint];
+      soup.box(x, y0, z, seg + 0.04, top - y0, wall.w, yaw, stone, { topColor: [Math.min(1, stone[0] * 1.12), Math.min(1, stone[1] * 1.12), Math.min(1, stone[2] * 1.1)] });
+      for (const side of [-1, 1]) {                                         // the joints of the courses, on both faces
+        for (const c of COURSES) {
+          const y = y0 + WALL_SINK + (top - y0 - WALL_SINK) * c;
+          const o = side * (wall.w / 2 + 0.012);
+          soup.quad([ax + dx * u0 + nx * o, y, az + dz * u0 + nz * o], [ax + dx * u1 + nx * o, y, az + dz * u1 + nz * o], [ax + dx * u1 + nx * o, y + 0.07, az + dz * u1 + nz * o], [ax + dx * u0 + nx * o, y + 0.07, az + dz * u0 + nz * o], [stone[0] * 0.66, stone[1] * 0.64, stone[2] * 0.6]);
+        }
+      }
+      const hh = 0.95 + unit(seed * 7 + 3) * 0.2, hw = wall.w * (1.05 + unit(seed * 5 + 1) * 0.2);
+      const leaf = paint(wall.hedge, seed, 0.1);
+      soup.box(x, top - 0.05, z, seg + 0.08, hh, hw, yaw, leaf, { topColor: [Math.min(1, leaf[0] * 1.25), Math.min(1, leaf[1] * 1.25), Math.min(1, leaf[2] * 1.15)] });
     }
   }
 }
@@ -93,7 +115,7 @@ function wallWithHedge(soup, ground, wall) {
 const PHI = (1 + Math.sqrt(5)) / 2;
 const ICO = [[-1, PHI, 0], [1, PHI, 0], [-1, -PHI, 0], [1, -PHI, 0], [0, -1, PHI], [0, 1, PHI], [0, -1, -PHI], [0, 1, -PHI], [PHI, 0, -1], [PHI, 0, 1], [-PHI, 0, -1], [-PHI, 0, 1]];
 const ICO_FACES = [[0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8], [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9], [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]];
-const BIRCH_BARK = [0.90, 0.88, 0.82], BIRCH_LEAF = [0.50, 0.68, 0.28], ORANGE_LEAF = [0.90, 0.46, 0.12], ORANGE_BARK = [0.38, 0.30, 0.24];
+const BIRCH_BARK = [0.90, 0.88, 0.82], BIRCH_LEAF = [0.42, 0.58, 0.25], ORANGE_LEAF = [0.90, 0.46, 0.12], ORANGE_BARK = [0.38, 0.30, 0.24];
 
 /** A lumpy leaf blob (a jittered icosahedron, 20 triangles), lighter on top. */
 function blob(soup, cx, cy, cz, rx, ry, color, seed) {
@@ -110,8 +132,9 @@ function blob(soup, cx, cy, cz, rx, ry, color, seed) {
 /** A birch: a slim white trunk, a narrow airy crown (the young birches in front of the Athénée, photo Luxembourg_Athénée_101). */
 function birch(soup, ground, t) {
   const y = ground(t.x, t.z) - 0.2, h = t.height;
-  soup.frustum(t.x, t.z, 0.13, 0.06, y, y + h * 0.7, 5, BIRCH_BARK, { cap: false });
-  blob(soup, t.x, y + h * 0.7, t.z, h * 0.2, h * 0.3, BIRCH_LEAF, Math.round(t.x * 7 + t.z));
+  soup.frustum(t.x, t.z, 0.15, 0.06, y, y + h * 0.78, 5, BIRCH_BARK, { cap: false });
+  blob(soup, t.x, y + h * 0.66, t.z, h * 0.15, h * 0.3, BIRCH_LEAF, Math.round(t.x * 7 + t.z));          // slim and airy: the real ones are 4 m wide with a white trunk
+  blob(soup, t.x + h * 0.06, y + h * 0.86, t.z - h * 0.04, h * 0.1, h * 0.17, BIRCH_LEAF, Math.round(t.x * 3 + t.z * 5));
 }
 
 /** A small round ornamental tree in autumn orange (the row south of the Forum, the trees of the Blumm square). */
@@ -134,7 +157,7 @@ export function buildProps(campus, ground) {
     else if (FREE_KINDS.includes(s.k)) drawFree(soup, ground, s);
     else throw new Error(`campus: unknown furniture '${s.k}'`);
   }
-  for (const item of campus.free) drawFree(soup, ground, item);
+  for (const item of campus.free) (item.k === 'birch' ? birch : drawFree)(soup, ground, item);          // a birch placed by hand (the Athénée forecourt) is a free item too
   for (const w of campus.walls) {
     wallWithHedge(soup, ground, w);
     walls.push(...edgeWalls([...w.pts, ...[...w.pts].reverse().slice(1, -1)], 0.3, 'campus-wall'));

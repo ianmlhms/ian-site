@@ -10,6 +10,7 @@ import { drawWallFeatures } from './campus-wallfx.js';
 
 const WALL_STEP = 6;               // m: the wall base follows the ground at least this often
 const COPING = 0.3;                // m: the roof edge stands this far out of the wall
+const RAIL_POST = 2.4;             // m: the posts of a railing
 const END_PIER = 1.2;              // m: the recessed floor stops this far from the end of a wall (a corner pier)
 
 /** The wall of a run over the interval [sa, sb] from y(sa) to y(sb) at the bottom to `top`, in steps that follow the ground. */
@@ -68,7 +69,8 @@ export function planRun(run, part, ground) {
     const lift = gf.lift ?? 0;
     for (const [s0, s1] of spans) {
       const base = wallBase(run, ground, (s0 + s1) / 2);
-      gaps.push({ kind: 'gf', s0, s1, yb: base + lift, yt: base + lift + gf.h, depth: gf.depth ?? 0, base, cells: lift > 0.5 });
+      const [yb, yt] = gf.abs || [base + lift, base + lift + gf.h];          // `abs`: absolute levels (a flat deck whose floors line up with the rows of the grid)
+      gaps.push({ kind: 'gf', s0, s1, yb, yt, depth: gf.depth ?? 0, base, cells: yb - base > 0.5 });
     }
   }
   for (const { ft, m } of recesses) {
@@ -95,15 +97,28 @@ function drawRecessedFloor(ctx, run, g, ground, gf) {
     if (depth > 0.3) {
       quad(ctx, sa + 0.12, sb - 0.12, base - 0.2, g.yt - 0.45, -depth + 0.05, paint(gf.glass, k + run.i * 3, 0.1));
       quad(ctx, sa - 0.04, sa + 0.04, base - 0.2, g.yt - 0.45, -depth + 0.1, gf.mullion || gf.pier);
-      if (gf.rail) { quad(ctx, sa + 0.3, sb - 0.3, base, base + 1.0, -0.25, gf.rail); quad(ctx, sa + 0.3, sb - 0.3, base + 1.0, base + 1.08, -0.24, shade(gf.rail, 1.25)); }
+      if (gf.rail && gf.railOut === undefined) { quad(ctx, sa + 0.3, sb - 0.3, base, base + 1.0, -0.25, gf.rail); quad(ctx, sa + 0.3, sb - 0.3, base + 1.0, base + 1.08, -0.24, shade(gf.rail, 1.25)); }
     } else {
       quad(ctx, sa + 0.3, sb - 0.3, base - 0.3, g.yt - 0.5, OUT_1, paint(gf.glass, k + run.i * 3, 0.1));
     }
-    if (k % (gf.every || 2) === 0) pier(ctx, sa - 0.3, sa + 0.3, base - 0.3, g.yt, depth > 0.3 ? Math.min(depth, 1.0) : 0.3, gf.pier, null, depth > 0.3 ? -Math.min(depth, 1.0) + 0.05 : OUT_1);
+    if (k % (gf.every || 2) === 0) pier(ctx, sa - (gf.pierW ?? 0.6) / 2, sa + (gf.pierW ?? 0.6) / 2, base - 0.3, g.yt, depth > 0.3 ? Math.min(depth, 1.0) : 0.3, gf.pier, null, depth > 0.3 ? -Math.min(depth, 1.0) + 0.05 : OUT_1);
   }
-  pier(ctx, g.s1 - 0.3, g.s1 + 0.3, lowest - 0.3, g.yt, depth > 0.3 ? Math.min(depth, 1.0) : 0.3, gf.pier, null, depth > 0.3 ? -Math.min(depth, 1.0) + 0.05 : OUT_1);
+  pier(ctx, g.s1 - (gf.pierW ?? 0.6) / 2, g.s1 + (gf.pierW ?? 0.6) / 2, lowest - 0.3, g.yt, depth > 0.3 ? Math.min(depth, 1.0) : 0.3, gf.pier, null, depth > 0.3 ? -Math.min(depth, 1.0) + 0.05 : OUT_1);
+  if (gf.rail && gf.railOut !== undefined && lifted) drawRailing(ctx, g, gf);
   // the fascia of the floor above: a pale band on the edge of the slab
   ledge(ctx, g.s0, g.s1, g.yt - 0.5, g.yt, 0.25, gf.pier, shade(gf.pier, 1.06));
+}
+
+/** The railing along the edge of a yard deck in front of a recessed floor (photo LAML_04): a low concrete kerb, mesh panels between slim posts, a light top rail. */
+function drawRailing(ctx, g, gf) {
+  const out = gf.railOut, y0 = g.yb;
+  const mesh = gf.rail, kerb = shade(gf.pier, 0.9);
+  const a = g.s0 + 0.5, b = g.s1 - 0.5;
+  quad(ctx, a, b, y0 - 0.25, y0 + 0.4, out, kerb);                                         // the concrete foot
+  quad(ctx, a, b, y0 + 0.4, y0 + 1.2, out + 0.02, mesh);                                  // the mesh
+  quad(ctx, a, b, y0 + 1.16, y0 + 1.26, out + 0.04, shade(mesh, 1.3));                    // the top rail
+  const n = Math.max(1, Math.round((b - a) / RAIL_POST));
+  for (let k = 0; k <= n; k++) { const s = a + ((b - a) * k) / n; quad(ctx, s - 0.04, s + 0.04, y0 + 0.4, y0 + 1.26, out + 0.06, shade(mesh, 0.72)); }
 }
 
 /** A plinth: a band of another material (concrete) along the foot of the wall, `h` high, with a capping course on top. */
@@ -170,6 +185,6 @@ export function drawFacade(soup, run, part, ground) {
     bayGrid(soup, run, part, ground, { floorH: p.floorH || 3.4, pitch, margin: p.pier ?? 0.8, inset: p.inset ?? 0.5, plinth }, (cell) => style.cell && style.cell(cell, p, part), style.row && ((row) => style.row(row, p, part)));
   }
   if (run.plinthHere) drawPlinth(ctx, run, ground, p.plinth);
-  if (gf) drawRecessedFloor(ctx, run, gf, ground, p.gf);
+  for (const g of (run.gaps || [])) if (g.kind === 'gf') drawRecessedFloor(ctx, run, g, ground, p.gf);       // every span of the recessed floor, not only the first
   drawWallFeatures(ctx, run, part, ground);
 }
