@@ -16,24 +16,25 @@ the union and the buffer from `scripts/luxdrive/bake_area.py` (LUREF / EPSG:2169
 **World frame.** `x = LUREF easting − originE` (east), `z = originNTop − LUREF northing` (south),
 metres. World box 16 896 × 14 848 m, aligned to a 512 m block grid.
 
-**Shipped data — 11 636 377 B = 11.10 MB of the 30 MB budget (37 %).**
+**Shipped data — 11 643 100 B = 11.11 MB of the 30 MB budget (37 %).**
 
 | file | bytes | what |
 |---|---:|---|
 | terrain.bin | 6 738 985 | MBG1 grid, 4 m nodes (4225 × 3713), 0.1 m quantisation, de-spiked LiDAR DTM |
 | far.bin | 499 770 | MBG1 grid, 32 m nodes, box + 8 km, the distant hills |
 | canopy.bin | 1 400 912 | MBG1 grids, 16 m nodes: the tree height and the tree cover |
-| roads.bin | 862 486 | 19 314 OSM ways: real widths, lanes, one-way, bridge / tunnel / layer |
+| roads.bin | 896 057 | 19 314 OSM ways: real widths, lanes, one-way, bridge / tunnel / layer |
 | classes.bin | 798 513 | the land classes on an 8 m grid (RLE): grass, forest, water, park, urban, farmland, sand, scrub |
 | buildings.bin | 839 935 | 25 067 LOD2 buildings: footprint, eaves, ridge, roof, the style of the façade |
 | lines.bin | 33 790 | the tram and the railway |
 | stops.bin | 24 897 | 2 263 tram / train / bus stops |
-| decks.bin | 39 232 | 309 bridge decks with their real height from the LiDAR DSM |
+| decks.bin | 39 310 | 309 bridge decks with their real height from the LiDAR DSM |
 | trees.bin | 297 064 | the trees OSM knows one by one and the rows of trees along the streets |
 | names.json | 21 772 | the 1 079 road names (Luxembourgish first) |
 | stopnames.json | 16 581 | the stop names |
 | places.json | 20 098 | the start point (Place de l'Europe, Kirchberg) and the landmarks |
-| terrain.json, classes.json, decks.json | 945 | the checksums and the grid metadata |
+| area.json | 14 467 | the boundary of the play area (the car cannot leave it) |
+| terrain.json, classes.json, decks.json | 947 | the checksums and the grid metadata |
 
 **Sources.** LiDAR 2024 DTM/DSM (ACT, CC0) from data.public.lu; the LOD2.2 CityGML building model
 (ACT, CC0); OSM (ODbL) for the vectors.
@@ -137,20 +138,20 @@ page is `canvas#luxCanvas` — so the game rendered in the default 300 × 150 bo
 the page. The rule is now `canvas#luxCanvas` and `#shell` is fixed to the screen. The flows also
 run in the landscape of an iPad (1180 × 820), the way the game is played.
 
-**Measured by the flow `luxdrive-world`** (`scripts/flows/luxdrive_world.mjs`, the first of the
-Milestone 4 harnesses — it is already a gate):
+**Measured by the flow `luxdrive-world`** (`scripts/flows/luxdrive_world.mjs`, one of the
+Milestone 4 harnesses — it is a gate):
 
 | what | result |
 |---|---|
-| the baked data | 10.88 MB (≤ 30 MB) |
+| the baked data | 11.13 MB (≤ 30 MB) |
 | the start | Place de l'Europe, Kirchberg (5906, 7999), the car stands on the ground |
-| driving | 30.8 m, 51 km/h, on the tarmac |
-| the camera | never below the ground (3.82 m above it) |
+| driving | 30.8 m, 50 km/h, on the tarmac |
+| the camera | never below the ground (3.76 m above it) |
 | the ride height | 0.42 m above the ground for the whole drive, never sunk, never floated, never left the wheels |
-| the kerb | the car rides over the edge of the carriageway (17.1 m from the centre line) without sinking or flying |
-| the bridges | Nei Bréck (Pont Adolphe) 3.1 m above the valley, Roud Bréck (Pont Rouge) 14.2 m, the A1 at Grünewald 2.9 m: solid decks, the car stands on them |
+| the kerb | the car rides over the edge of the carriageway (16.5 m from the centre line) without sinking or flying |
+| the bridges | Nei Bréck (Pont Adolphe) 1.3 m above the valley, Roud Bréck (Pont Rouge) 12.0 m, the A1 at Grünewald 3.9 m: solid decks, the car stands on them |
 | the edge of the area | the car drove up to the border and was pushed back: it never left the play area |
-| draw calls / triangles | low 67 / 230 k, medium 74 / 248 k, high 93 / 296 k |
+| draw calls / triangles | low 73 / 245 740, medium 85 / 279 054, high 112 / 376 377 |
 
 **The kerb.** The kerb is a 13 cm ridge at the edge of the carriageway, and the pavement lies 13 cm
 above the road. It is switched off where a road runs into another road (a real junction is flat):
@@ -575,20 +576,80 @@ the play area.
 lights and the distance LOD of the city (the buildings are drawn at one level of detail; the trees have
 three, and the ground paints the wood as its canopy beyond the reach of the trees).
 
-## Milestone 4 — gates: IN PROGRESS
+## Milestone 4 — gates: DONE
 
-**The harness** (`pb/lux-drive/harness.js`) runs the world in Node, with the very code the browser runs
-(the same decoders, the same carve, the same meshes), and asks the questions the brief asks:
+**The gates of the brief, and what they say.**
 
-| section | what it asks |
+| gate | what it asks | result |
+|---|---|---|
+| `pb/lux-drive/harness.js` | the world in Node, with the very code the browser runs (the same decoders, the same carve, the same meshes) | **40 checks passed, 0 failed** (118.6 s) |
+| `scripts/flows/luxdrive_holes.mjs` | 72 camera poses (on the roads, over the map, at the edge of the world): a magenta pixel below the horizon is a hole | **PASS — 0 hole pixels over 72 poses**, at least 126 terrain tiles at every pose |
+| `scripts/luxdrive/probe_roads.py` | a road end inside the area that is not a real dead end / turning circle in OSM | **PASS — 0 roads to nowhere** (21 224 ends) |
+| `scripts/luxdrive/probe_buildings.py` | a building base floating > 0.3 m above the ground or cut into it by > 1 m | **PASS — 0 houses on stilts, 0 cut into the hill** (25 067 houses, 714 004 points of their base) |
+| `scripts/flows/luxdrive_world.mjs` | the world boots, the car drives, the paint follows the real width, the ground beside a road is never a wall, the bridges are solid, the draw calls stay in the budget | **PASS** (every check) |
+
+**The harness** (`pb/lux-drive/harness.js`) asks the questions the brief asks:
+
+| section | what it asks | the numbers |
+|---|---|---|
+| A data | the grids decode, the checksums agree, every height is finite, the data fits the 30 MB budget | 11 670 026 B, the worst spike of the terrain 2.40 m |
+| B roads | no road ends in the middle of nowhere, no rail runs on a road, the painted tarmac is the width of the carriageway | 21 224 ends, **0** in nowhere, **0** rails on a road, 8 625 roads measured, **0** too wide, **0** too narrow |
+| C city | no house floats, no house is buried in the hill, no wall is drawn upside down, no house is inside another house, no road runs through a house | 25 067 houses, **0** floating, **0** buried, **0** inside another house, **0** with a road through them |
+| D decks | every deck stands on a way that rides over the others, no deck floats, no deck dives into the ground, no pit under a deck | **0** orphans, **0** floating ends, **0** diving, **0** pits, **0** decks lying on the ground |
+| E trees | no tree stands inside a house, no tree stands in the carriageway, no tree of the woods floats | **0** in a house, **0** on the road, 557 trees of the woods |
+| F car and camera | the car stays on the surface and the camera never goes under the ground | 3 600 steps, 59.2 m/s at the top, **0** times under the ground |
+| G render | the mesh of the ground is the surface the car drives on | the mesh and the physics agree |
+
+**The road-ends probe** (`probe_roads.py`) checks the bake against the truth of OSM, not against
+itself: it reads the baked network *and* the OSM extract of the pipeline, and asks of every end of
+every drivable way whether OSM says the road really ends there.
+
+| | ends |
+|---|---:|
+| on the clip of the area (the edge of the world) | 345 |
+| a junction (OSM has the other way) | 18 598 |
+| a real dead end in OSM | 2 017 |
+| a turning circle | 264 |
+| a split of a way | 0 |
+| **a road to nowhere** | **0** |
+
+**The buildings probe** (`probe_buildings.py`) reads the baked footprints and the ground of the game
+under every point of every base:
+
+| | houses |
+|---|---:|
+| the houses | 25 067 |
+| the points of their base | 714 004 |
+| **standing on stilts** (base > 0.3 m above the ground) | **0** |
+| **cut into the hill** (base > 1 m under the ground) | **0** |
+| corners with the hill over the eaves | 0 |
+
+**The world flow** (`scripts/flows/luxdrive_world.mjs`, in the browser, on the iPad in landscape):
+
+| what | result |
 |---|---|
-| A data | the grids decode, the checksums agree, every height is finite, the data fits the 30 MB budget |
-| B roads | no road ends in the middle of nowhere, no rail runs on a road, the painted tarmac is the width of the carriageway |
-| C city | no house floats, no house is buried in the hill, no wall is drawn upside down, no house is inside another house, no road runs through a house |
-| D decks | every deck stands on a way that rides over the others, no deck floats, no deck dives into the ground, no pit under a deck |
-| E trees | no tree stands inside a house, no tree stands in the carriageway, no tree of the woods floats |
-| F car and camera | the car stays on the surface and the camera never goes under the ground |
-| G render | the mesh of the ground is the surface the car drives on |
+| the baked data | 11.13 MB (≤ 30 MB) |
+| the start | Place de l'Europe, Kirchberg (5906, 7999), the car stands on the ground |
+| driving | 30.8 m, 50 km/h, on the tarmac (stone) |
+| the camera | never below the ground (3.76 m above it) |
+| the ride height | 0.42 m above the ground for the whole drive: never sunk, never floated, never left the wheels |
+| the painted tarmac | 14 roads measured: every one within 1.5 m of its OSM width (7.75 m painted against 7.60 m real, 3.00 m against 3.20 m) |
+| the kerb | the car rides over the edge of the carriageway (16.5 m from the centre line) without sinking or flying |
+| the ground beside the roads | 15 510 sides measured: 0.59 at the 90th percentile (the limit is 0.84), 1.29 at the 99th, 0.32 % steeper than the land, **7 walls the carve made** (the limit is 8; the 15 cliffs are the land's own), the deepest 4.47 m (the limit is 8) |
+| the bridges | Nei Bréck 1.3 m above the valley, Roud Bréck 12.0 m, the A1 at Grünewald 3.9 m: solid decks, the car stands on them |
+| the edge of the area | the car drove up to the border and was pushed back: it never left the play area |
+| draw calls / triangles | low 73 / 245 740, medium 85 / 279 054, high 112 / 376 377 (the limits of the brief: ≤ 260 draw calls at the medium) |
+
+**The gates found four real bugs, and all four are fixed.**
+
+* The fill beside a road dug the ground below the land (a wall of 15.72 m beside Val de Hamm): the ramp
+  of the fill is now clamped to the land. The walls went 11 → 7, the deepest 15.72 m → 4.46 m.
+* The paint of a street jumped from way to way (the tarmac tore into a 1 m saw-tooth from above): the
+  score that picks the road the point is really on now falls with the distance at every distance.
+* The paint check of the flow measured the width of a *corner* (9.00 m of asphalt on a 6.40 m street):
+  it measures the band around the centre line now.
+* The paint check of the flow then measured *nothing* (it took the way's own samples for a neighbour):
+  the walk that measures the band rejects the junctions and the corners by itself.
 
 **The trees stand where a car cannot drive.** The bake follows the **centre line the game draws** (the
 OSM polyline resampled every 4 m and rounded with a Gaussian of 3 m, the twin of `resample` +
@@ -613,9 +674,7 @@ asks the carve itself (`network.carve` at the exact position of the tree) instea
 | the houses with a road through them | 56 | **0** |
 | the houses that float / are buried | 0 / 0 | **0 / 0** |
 
-**Open in this milestone:** the paint of 31 roads is more than 1.5 m wider than the carriageway (the
-loops and the squares of the old town, where the "width" of a painted band is not a width), one wall
-corner is drawn upside down, and 5 deck points dive into the ground (the worst 1.47 m) with 4 pits
-under the decks.
+**Open in this milestone:** none. The gates all pass.
+
 
 ## Milestone 5 — UI: NOT STARTED
