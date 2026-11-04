@@ -954,7 +954,7 @@ Ian: "the road is really bumpy and not level at all".  Measured on the branch th
 
 ### Gates that were narrowed (explicitly, and why)
 * Gate I skips: junction aprons and the ground under over ways (as before), driveways (the bake switches the kerb off within hw + 2 m of another way), tight bends (R < 12 m: the nearest point of the way jumps along the
-  way inside the bend, on a gradient that is a ridge across the carriageway: a 2 m radius chicane of a farm track), and the 34 sampled stretches where the bed is HELD to the land (the land has a crest tighter than a street may have).
+  way inside the bend, on a gradient that is a ridge across the carriageway: a 2 m radius chicane of a farm track), and the stretches (34 samples of the 200 ways) where the bed is HELD to the land (the land has a crest tighter than a street may have).
   Crossfall and kerb are measured above the profile of the way at each probe's own station (a bend on a gradient puts the two probes at different stations); ways narrower than 5 m are measured on the field, not on the 1 m lattice.
   Limits are shares of the points rather than the maximum of a random sample (a max over a random sample moved with the seed).
 * Gate J: only tarmac cells that lie fully on the way (>= 1 m from its edge), away from junction aprons, way ends (hw + 6 m), kerb ridges of other ways and places where the field bends > 10 cm within a metre.  Tolerance 4 cm (error of a linear interpolation).
