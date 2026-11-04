@@ -84,7 +84,7 @@ export const SURFACES = Object.freeze({
 });
 
 export const QUALITY = Object.freeze({
-  low: { pixelRatio: 1, lodScale: 0.3, protectedSize: 64, railRadius: 300, far: 4200, buildingRadius: 300, buildingFarRadius: 760, treeRadius: 90, treeDensity: 0.4, cheapGround: true, shadows: false },
+  low: { pixelRatio: 1, lodScale: 0.2, protectedSize: 64, railRadius: 300, far: 4200, buildingRadius: 300, buildingFarRadius: 760, treeRadius: 90, treeDensity: 0.4, cheapGround: true, shadows: false },
   medium: { pixelRatio: 1.25, lodScale: 0.7, protectedSize: 128, railRadius: 500, far: 6000, buildingRadius: 420, buildingFarRadius: 1300, treeRadius: 150, treeDensity: 0.7, cheapGround: false, shadows: false },
   high: { pixelRatio: 2, lodScale: 1, protectedSize: 128, railRadius: 700, far: 8000, buildingRadius: 700, buildingFarRadius: 2100, treeRadius: 240, treeDensity: 1, cheapGround: false, shadows: true },
 });
