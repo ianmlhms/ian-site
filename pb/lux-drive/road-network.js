@@ -33,6 +33,8 @@ const ARM_GAP = 3;                     // segments: two stretches of one way thi
 const CAP_SOFT = 2.0;                  // m: the carriageway pin ends this softly past the END of a way (no flat disc at the end of a street)
 const PIN_FADE = 3.0;                  // m: the carriageway level fades into the batter over this distance beyond the pavement
 const FILL_TAPER = 3.0;                // m: the last stretch of a fill face where it sinks to the land (the scan that finds the end of the face is coarse)
+const MAG_WINDOW = [0.3, 1.2];         // m: the strength of the pin of a way is the mean of the pins of the segments that are about as near as the nearest one (a ring comes back past its own seam:
+                                       // the pin of one arbitrary segment of the two jumped where the nearest one changed)
 const SEP_LOW = 0.4, SEP_HIGH = 0.8;   // m: two carriageways whose beds differ by less than SEP_LOW are one level (a junction), by more than SEP_HIGH two levels
 const RAMP_SLOPE = 1.9;                // m per m: the steepest ground between two carriageways at different levels (a retaining wall hides it, see retaining-walls.js)
 const OWN_FADE = 0.5;                  // m: the carriageway of a way is its own from its bench edge to this far past it: a bigger way's fade is not laid over it (same level)
@@ -147,6 +149,7 @@ export function createRoadNetwork(roads, baseHeight) {
     return Math.min(maxEdge, lastFail + BATTER_STEP);
   }
 
+  const closedRoad = new Uint8Array(roads.length);     // the rings (a pedestrian square, a loop): they have no ends, so no end cap
   const priority = new Float32Array(roads.length);     // the order of the design: the bigger way has the higher number (it wins at a junction)
   const prep = [];                   // the ways that are carved, with everything the second pass needs
   // ---- the crossings: which way rides over which -------------------------
@@ -397,6 +400,7 @@ export function createRoadNetwork(roads, baseHeight) {
     const ends = closed ? null : { start: endOf(rs.x[0], rs.z[0]), end: endOf(rs.x[n - 1], rs.z[n - 1]) };
     const chain = { road: ri, kind: road.kind, x: rs.x, z: rs.z, arc, ground, bed: null, tagged, hw, rank: roadRank(road, hw), closed, ends };
     chains.push(chain);
+    if (closed) closedRoad[ri] = 1;
     prep.push({ ri, road, rs, n, hw, kerbH, kerbW, pw, bench, a0, kind, chain });
   }
 
@@ -711,7 +715,8 @@ export function createRoadNetwork(roads, baseHeight) {
           if (d >= reach || nCand >= MAX_CAND) continue;
           // how far the point lies beyond the END of the way (0 along the way): the carriageway ends at the end of the way
           let over = 0;
-          if (t0 < 0 && i === firstSeg[ROADOF[i]]) over = -t0 * len;
+          if (closedRoad[ROADOF[i]]) over = 0;
+          else if (t0 < 0 && i === firstSeg[ROADOF[i]]) over = -t0 * len;
           else if (t0 > 1 && i === firstSeg[ROADOF[i]] + segCount[ROADOF[i]] - 1) over = (t0 - 1) * len;
           candI[nCand] = i; candD[nCand] = d; candT[nCand] = t; candLat[nCand] = lat; candOver[nCand] = over; nCand++;
         }
@@ -809,7 +814,7 @@ export function createRoadNetwork(roads, baseHeight) {
       const road = slotRoad[sl];
       const dMin = candD[slotArm1[sl]];
       if (NOBATTER[candI[slotArm1[sl]]]) continue;             // a way that rides over the others keeps the DTM (its fill): no batter, no pin
-      let wAll = 0, claimSum = 0, devAcc = 0, pinSum = 0, pinValSum = 0, pinBedSum = 0, pinNear = 0;   // (pinNear: the pin of the nearest segment, the strength of the pin of the way here)   // (a segment that does not reach the point counts with zero claim and zero pin: the weights of a way fade out where its batter ends)
+      let wAll = 0, claimSum = 0, devAcc = 0, pinSum = 0, pinValSum = 0, pinBedSum = 0, pinMagSum = 0, pinMagW = 0;   // (pinMag: the strength of the pin of the way here)   // (a segment that does not reach the point counts with zero claim and zero pin: the weights of a way fade out where its batter ends)
       for (let k = 0; k < nCand; k++) {
         const i = candI[k];
         if (ROADOF[i] !== road) continue;
@@ -859,13 +864,13 @@ export function createRoadNetwork(roads, baseHeight) {
           // segment.  (Per segment, a segment on the far side of a tight bend had its own distance beyond the bench and pulled the carriageway toward the face of its batter.)
           const face = ground + (applies ? dev : 0);
           pinSum += w * pin; pinValSum += w * pin * (face + (bed - face) * (1 - smoothstep(bench, bench + Math.max(FACE_JOIN, FACE_JOIN_PER_M * Math.abs(bed - face)), dMin))); pinBedSum += w * pin * bed;
-          if (k === slotArm1[sl]) pinNear = pin;
         }
+        { const wm = w * (1 - smoothstep(MAG_WINDOW[0], MAG_WINDOW[1], d - dMin)); pinMagSum += wm * pin; pinMagW += wm; }
       }
       if (claimSum > 0 || pinSum > 0) {
         devSum += devAcc / wAll; devW += claimSum / wAll;
         if (pinSum > 0 && nPins < MAX_PINS) {
-          pinPri[nPins] = priority[road]; pinVal[nPins] = pinValSum / pinSum; pinWt[nPins] = pinNear;
+          pinPri[nPins] = priority[road]; pinVal[nPins] = pinValSum / pinSum; pinWt[nPins] = pinMagSum / pinMagW;
           pinBed[nPins] = pinBedSum / pinSum; pinEdge[nPins] = dMin - BENCH[candI[slotArm1[sl]]];
           nPins++;
         }
@@ -893,7 +898,8 @@ export function createRoadNetwork(roads, baseHeight) {
         // one level: the fade of the bigger way (a) is held off the bench of the smaller one (b), where a's own bench does not hold the point; two levels: the hand-over is centred between the two
         const own = (1 - smoothstep(0, OWN_FADE, pinEdge[b])) * smoothstep(0, OWN_FADE, pinEdge[a]);
         const half = Math.min(RAMP_MAX, Math.max(RAMP_MIN, (1.5 * apart) / RAMP_SLOPE));
-        hold *= (1 - sep) * (1 - own) + sep * (1 - smoothstep(-half, half, pinEdge[a] - pinEdge[b]));
+        // (a rival that has no pin here - the end of a way, the far side of its fade - takes nothing from this way: scaled by the pin of the rival)
+        hold *= 1 - pinWt[b] * (1 - ((1 - sep) * (1 - own) + sep * (1 - smoothstep(-half, half, pinEdge[a] - pinEdge[b]))));
       }
       bandY += (pinVal[a] - bandY) * pinWt[a] * hold;
     }

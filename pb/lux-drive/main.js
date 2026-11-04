@@ -22,6 +22,8 @@ import { createGroundMaterial } from './ground-shader.js';
 import { createTerrainView } from './terrain-view.js';
 import { createBuildingView } from './building-view.js';
 import { createDeckView } from './deck-view.js';
+import { createWallView } from './wall-view.js';
+import { WALL_DRAW_FACTOR } from './retaining-walls.js';              // TERRAIN2: the retaining walls
 import { createLandmarks, fixLandmarkDecks } from './landmarks.js';
 import { createLandmarkView } from './landmark-view.js';
 import { createPortalView } from './portal-view.js';
@@ -173,6 +175,7 @@ async function boot() {
   const city = createBuildingView({ scene, buildings, field, env, noiseTexture: textures.noise, quality, hidden: landmarks.hiddenBuildings });
   const trees = createTreeView({ scene, forest, baked: data.trees, field, env, quality });
   const decks = createDeckView({ scene, decks: ground.decks.filter((d) => !landmarks.hiddenDecks.has(d.id)), material: solid, ground: ground.surface });
+  const walls = createWallView({ scene, walls: data.walls, material: solid });
   const landmarkView = createLandmarkView({ scene, landmarks, material: solid });
   const portalView = createPortalView({ scene, portals, ground, material: solid });
   // the Luxtram: the rails and the vehicles of the line (tram-network.js builds the two tracks from lines.bin, tram-sim.js runs the vehicles on them)
@@ -468,6 +471,7 @@ async function boot() {
     terrain.update(focusX, focusZ);
     city.update(focusX, focusZ);
     decks.update(camera.position.x, camera.position.z, quality.buildingFarRadius * BUILT_DRAW_FACTOR);
+    walls.update(camera.position.x, camera.position.z, quality.buildingFarRadius * WALL_DRAW_FACTOR);
     portalView.update(camera.position.x, camera.position.z, quality.buildingFarRadius * BUILT_DRAW_FACTOR);
     trees.update(camera.position.x, camera.position.z, elapsed);
     tramSim.setObstacle(car.state.x, car.state.z);

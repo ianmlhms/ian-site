@@ -48,7 +48,7 @@ export const ROAD = Object.freeze({
   // The vertical curves of a street: a crest or a sag is never tighter than R = v2 / bedLift, so the car is lifted by at most bedLift (m/s2) at the design speed of
   // the class.  The profile is cut through a crest and filled in a sag (bedMaxCut / bedMaxFill) rather than followed over it: the land of a hill town has crests
   // of 20 .. 60 m that no street follows.
-  bedLift: 1.3,            // m/s2: the harness gate allows 1.5
+  bedLift: 1.0,            // m/s2: the harness gate allows 1.5; the surface the car drives (a cubic through the bed, then the 1 m lattice) adds 0.2 .. 0.4 to the design value
   bedSpeed: Object.freeze({    // km/h, the design speed of a class (every other way: bedSpeedDefault)
     motorway: 100, trunk: 90, primary: 80, secondary: 70, tertiary: 60,
   }),

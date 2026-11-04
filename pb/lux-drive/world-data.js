@@ -3,6 +3,7 @@
 import { decodeGrid, decodeClassRle, gridChecksum } from './codec.js';
 import { decodeRoads } from './roads.js';
 import { decodeDecks } from './decks.js';
+import { decodeWalls } from './retaining-walls.js';        // TERRAIN2: the retaining walls (data/walls.bin, scripts/luxdrive/bake_walls.mjs)
 import { restyleBuildings } from './quarters.js';
 import { withCampusTrees } from './campus-trees.js';       // CAMPUS: the trees of Campus Geesseknäppchen
 
@@ -135,6 +136,7 @@ export async function loadWorldData(read, onProgress = () => {}) {
   const roads = decodeRoads(await read('roads.bin'), names);
   onProgress(0.65, 'bridges');
   const decks = decodeDecks(await read('decks.bin'));
+  const walls = decodeWalls(await read('walls.bin'));
   onProgress(0.7, 'canopy');
   const canopy = decodeCanopy(await read('canopy.bin'));
   if (gridChecksum(canopy.height.data) !== info.canopy.checksumHeight) throw new Error('canopy.bin: the height grid does not match terrain.json');
@@ -153,5 +155,5 @@ export async function loadWorldData(read, onProgress = () => {}) {
   // the style of a building depends on where it stands (the stone city, the sandstone valley, the villages): quarters.js
   const buildings = restyleBuildings(decoded, places);
   onProgress(1, 'done');
-  return { info, near, far, roads, decks, canopy, classes, classInfo, buildings, lines, stops, trees: withCampusTrees(trees), places, names };
+  return { info, near, far, roads, decks, walls, canopy, classes, classInfo, buildings, lines, stops, trees: withCampusTrees(trees), places, names };
 }
