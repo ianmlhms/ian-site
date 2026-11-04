@@ -45,6 +45,7 @@ import { createTramSim } from './tram-sim.js';
 import { placeStreetLights } from './street-lights.js';
 import { placeParkBenches } from './park-benches.js';
 import { createPropCollider } from './props.js';
+import { WALL, WALL_DRAW_FACTOR, findRamp, wallQuads } from './retaining-walls.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DATA = path.join(HERE, 'data');
@@ -53,6 +54,7 @@ const QUICK = args.has('--quick');
 const VERBOSE = args.has('--verbose');
 const ONLY = (process.argv.find((a) => a.startsWith('--only=')) || '').slice(7).split(',').filter(Boolean);   // --only=I,J: just those sections (the others cost two minutes)
 const wants = (id) => ONLY.length === 0 || ONLY.includes(id);
+const J_SAMPLES = Number((process.argv.find((a) => a.startsWith('--j-samples=')) || '').slice(12)) || 0;   // --j-samples=200: more random places for gate J (the default is 24 per quality, 6 with --quick)
 
 const results = { pass: 0, fail: 0, failures: [] };
 const stats = {};
@@ -1163,7 +1165,7 @@ if (wants('J')) {
   const MAX_MESH_DEV = 0.04, MESH_EDGE_CLEAR = 1.0, WAY_END_CLEAR = 6, MAX_BEND = 0.1;
   for (const [qid, Q] of Object.entries(QUALITY)) {
     let worst = 0, worstAt = '', measured = 0, coarseNear = 0, coarseMid = 0, bad = 0;
-    for (let n = 0; n < (QUICK ? 6 : 24); n++) {
+    for (let n = 0; n < (J_SAMPLES || (QUICK ? 6 : 24)); n++) {
       const ch = ways[Math.floor(rng2() * ways.length)];
       const d = rng2() * ch.arc[ch.arc.length - 1];
       let k = 0;
@@ -1217,6 +1219,7 @@ if (wants('J')) {
             measured++;
             if (dv > MAX_MESH_DEV) { bad++; if (VERBOSE) console.log(`   mesh ${qid} ${(dv * 100).toFixed(2)} cm at ${px.toFixed(1)},${pz.toFixed(1)} step ${leaf.step} road ${data.roads[way.road].name || data.roads[way.road].kind} sdCar=${li.sdCar.toFixed(2)}`); }
             if (dv > worst) { worst = dv; worstAt = `${Math.round(px)},${Math.round(pz)} step ${leaf.step}`; }
+            if (VERBOSE && dv > 0.02) console.log(`   mesh ${qid} ${(dv * 100).toFixed(2)} cm at ${px.toFixed(1)},${pz.toFixed(1)} step ${leaf.step} road ${data.roads[way.road].name || data.roads[way.road].kind} sdCar=${li.sdCar.toFixed(2)} lat=${li.lat.toFixed(2)} bend ${(Math.max(bendX, bendZ, bendD1, bendD2) * 100).toFixed(1)} cm`);
           }
         }
       }
@@ -1225,6 +1228,89 @@ if (wants('J')) {
     check(`${qid}: the lattice within 40 m of the car is 1 m, within 80 m at most 2 m (a road is never faceted near the car)`, coarseNear === 0 && coarseMid === 0, `${coarseNear} tiles near coarser than 1 m, ${coarseMid} within 80 m coarser than 2 m`);
     check(`${qid}: the tile mesh within 40 m is the height function on the carriageway (<= ${MAX_MESH_DEV * 100} cm: the error of a linear interpolation on a 1 m lattice)`, measured > 100 && bad === 0, `${measured} points, ${bad} off, worst ${(worst * 100).toFixed(2)} cm at ${worstAt}`);
   }
+}
+
+/* ---------------------------------------------------------------- K: the retaining walls */
+if (wants('K')) {
+  section('K retaining walls');
+  // A ramp steeper than 2 m/m beside a way is a crack in the ground if it is drawn as ground: the carve keeps it from being steeper than about 3 m/m and the baked walls
+  // (data/walls.bin, scripts/luxdrive/bake_walls.mjs) hide every one of them.  Three things are proven: a wall is a sane block that stands on a ramp (not in the air, not buried);
+  // every ramp the scan finds beside the ways has a wall (the data is not stale: re-bake after any change of the carve); and the walls fit the draw budget.
+  const walls = data.walls;
+  const MAX_TRIANGLES = 40000, MAX_VISIBLE_CHUNKS = 10, CHUNK = 1024, ON_RAMP = 0.9, COVER_RADIUS = 3.2;
+  let insane = 0, floating = 0, buried = 0, points = 0, triangles = 0;
+  const chunks = new Set();
+  const gridW = new Map();                                    // the points of the walls, in a 4 m grid
+  const wkey = (x, z) => Math.floor(x / 4) * 100003 + Math.floor(z / 4);
+  for (const w of walls) {
+    const mid = w.pts[w.pts.length >> 1];
+    chunks.add(`${Math.floor(mid.x / CHUNK)}:${Math.floor(mid.z / CHUNK)}`);
+    triangles += wallQuads(w).length * 2;
+    for (const p of w.pts) {
+      points++;
+      const ok = [p.x, p.z, p.top, p.bottom, p.depth, p.nx, p.nz].every(Number.isFinite) && p.top - p.bottom >= WALL.minRise * 0.5 && p.top - p.bottom <= WALL.maxRise * 1.5 && p.depth >= WALL.minDepth * 0.9 && p.depth <= 14 && Math.abs(Math.hypot(p.nx, p.nz) - 1) < 1e-3;
+      if (!ok) { insane++; continue; }
+      const foot = surface.height(p.x, p.z), head = surface.height(p.x + p.nx * p.depth, p.z + p.nz * p.depth);
+      if (Math.abs(foot - p.bottom) > ON_RAMP || Math.abs(head - p.top) > ON_RAMP) { if (foot - p.bottom < -ON_RAMP || p.top - head < -ON_RAMP) buried++; else floating++; }
+      const k = wkey(p.x, p.z), l = gridW.get(k); if (l) l.push(p); else gridW.set(k, [p]);
+    }
+  }
+  // the draw calls: the walls are drawn within WALL_DRAW_FACTOR * the far building radius (main.js); how many chunks hold a wall within that of the busiest place
+  const wallRadius = QUALITY.medium.buildingFarRadius * WALL_DRAW_FACTOR;
+  let visibleChunks = 0;
+  for (const w of walls) {
+    const c = w.pts[w.pts.length >> 1], seen = new Set();
+    for (const o of walls) { const m = o.pts[o.pts.length >> 1]; if (Math.hypot(m.x - c.x, m.z - c.z) < wallRadius + CHUNK / 2) seen.add(`${Math.floor(m.x / CHUNK)}:${Math.floor(m.z / CHUNK)}`); }
+    visibleChunks = Math.max(visibleChunks, seen.size);
+  }
+  stats.walls = { walls: walls.length, points, triangles, chunks: chunks.size, mostChunksInView: visibleChunks };
+  check('retaining walls: every wall point is a sane block (finite, 0.4 .. 12 m high, a unit direction)', insane === 0, `${insane} of ${points}`);
+  check('retaining walls: every wall stands on a ramp (the foot at the bottom of the ground, the back at the top, within 0.9 m): none in the air, none buried', floating === 0 && buried === 0, `${floating} in the air, ${buried} buried`);
+  check(`retaining walls: at most ${MAX_TRIANGLES} triangles and ${MAX_VISIBLE_CHUNKS} chunks (draw calls) in view at medium quality`, triangles <= MAX_TRIANGLES && visibleChunks <= MAX_VISIBLE_CHUNKS, `${triangles} triangles; up to ${visibleChunks} chunks in view`);
+  // every ramp beside a way has a wall: the scan of the baker, at every 5th sample of every way, on both sides
+  const coveredBy = (x, z, nx, nz, top) => {
+    const cx = Math.floor(x / 4), cz = Math.floor(z / 4);
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (const p of gridW.get((cx + a) * 100003 + (cz + b)) || []) {
+      if (Math.hypot(p.x - x, p.z - z) <= COVER_RADIUS + p.depth && p.nx * nx + p.nz * nz > 0.3 && Math.abs(p.top - top) <= 2.5) return true;
+    }
+    return false;
+  };
+  let scanned = 0, ramps = 0, bare = 0;
+  const bareList = [];
+  const STRIDE = QUICK ? 25 : 5;
+  /** The ramp across a way at sample i on one side (side = +1 right, -1 left): the same scan the baker makes. */
+  const rampAt = (chain, i, side) => {
+    const a = Math.max(0, i - 1), b = Math.min(chain.x.length - 1, i + 1);
+    let dx = chain.x[b] - chain.x[a], dz = chain.z[b] - chain.z[a];
+    const len = Math.hypot(dx, dz) || 1; dx /= len; dz /= len;
+    const info = net.info[chain.road], bench = info.hw + info.kerbW;
+    const nx = -dz * side, nz = dx * side;
+    const t0 = Math.max(0.3, info.hw * WALL.scanFrom), t1 = bench + WALL.scanReach, count = Math.floor((t1 - t0) / WALL.scanStep) + 1;
+    const heights = new Float64Array(count), lands = new Float64Array(count);
+    for (let k = 0; k < count; k++) { const t = t0 + k * WALL.scanStep; heights[k] = field.height(chain.x[i] + nx * t, chain.z[i] + nz * t); lands[k] = field.groundHeight(chain.x[i] + nx * t, chain.z[i] + nz * t); }
+    scanned++;
+    const ramp = findRamp(heights, lands);
+    if (!ramp) return null;
+    const rising = ramp.rise > 0, tFoot = t0 + (rising ? ramp.first : ramp.last) * WALL.scanStep, toHigh = rising ? 1 : -1;
+    return { rise: Math.abs(ramp.rise), slope: ramp.maxSlope, x: chain.x[i] + nx * tFoot, z: chain.z[i] + nz * tFoot, nx: nx * toHigh, nz: nz * toHigh, top: Math.max(heights[ramp.first], heights[ramp.last]) };
+  };
+  const ways = net.chains.filter((c) => !c.tagged && !net.overRoads.has(c.road));
+  for (const chain of ways) {
+    for (let i = 0; i < chain.x.length; i += STRIDE) {
+      for (const side of [1, -1]) {
+        const r = rampAt(chain, i, side);
+        if (!r) continue;
+        // a ramp that persists: the neighbouring sample has one too (or it is a big one)
+        const persists = (i + 1 < chain.x.length && rampAt(chain, i + 1, side)) || (i > 0 && rampAt(chain, i - 1, side));
+        if (!persists) continue;
+        ramps++;
+        if (!coveredBy(r.x, r.z, r.nx, r.nz, r.top)) { bare++; if (bareList.length < 5) bareList.push(`${Math.round(r.x)},${Math.round(r.z)} rise ${r.rise.toFixed(1)} slope ${r.slope.toFixed(1)}`); }
+      }
+    }
+  }
+  stats.wallCoverage = { scanned, ramps, bare };
+  // a ramp seen at a single sample is noise that the baker drops (a wall needs two samples in a row): a few bare ramps are allowed, a stretch of them is not
+  check('retaining walls: every ramp steeper than 2 m/m beside a way has a wall (the data is not stale: re-run scripts/luxdrive/bake_walls.mjs)', bare <= Math.max(3, Math.round(ramps * 0.04)), `${bare} of ${ramps} ramps bare (${scanned} profiles), e.g. ${bareList.join('; ')}`);
 }
 
 /* ---------------------------------------------------------------- the summary */

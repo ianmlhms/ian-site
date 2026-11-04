@@ -78,7 +78,7 @@ export function whittaker(y, w, lambda, arc = null) {
  *  A junction pin never moves (the free points around it give way).  Jacobi sweeps, so the result does not depend on the direction
  *  of the way.  The window is measured in METRES: the samples of a bend are closer than their nominal spacing, and a window counted
  *  in samples would see a straight slope as a curve (it bent the steep tracks it was meant to keep straight). */
-export function limitCurvature(bed, arc, pinned, limit, sweeps = 4000) {
+export function limitCurvature(bed, arc, pinned, limit, sweeps = 4000, curvature = Infinity) {
   const n = bed.length;
   if (n < 3) return bed;
   let cur = Float64Array.from(bed);
@@ -101,13 +101,28 @@ export function limitCurvature(bed, arc, pinned, limit, sweeps = 4000) {
     for (let i = 0; i < n; i++) {
       next[i] = cur[i];
       const w = half[i];
-      if (w < MIN_WINDOW || (pinned && pinned.has(i))) continue;
+      if (pinned && pinned.has(i)) continue;
+      // The LOCAL curvature: the 20 m mean below lets a kink through (a change of gradient of 9 % in one sample is only 5 cm from the mean, but it is 4 m/s2 for the car).  A point never lies
+      // farther from the line through its two neighbours than a vertical curve of the radius of the class would put it.
+      let localExcess = 0, localDev = 0;
+      if (curvature < Infinity && i > 0 && i < n - 1) {
+        const hl = arc[i] - arc[i - 1], hr = arc[i + 1] - arc[i];
+        if (hl > 1e-6 && hr > 1e-6) {
+          localDev = cur[i] - (cur[i - 1] * hr + cur[i + 1] * hl) / (hl + hr);
+          localExcess = Math.abs(localDev) - (curvature * hl * hr) / 2;
+        }
+      }
+      if (w < MIN_WINDOW) {
+        if (localExcess > 0) { next[i] = cur[i] - Math.sign(localDev) * localExcess * LIMIT_GAIN; moved += localExcess; }
+        continue;
+      }
       while (lo + 1 < n - 1 && arc[lo + 1] <= arc[i] - w) lo++;
       while (hi + 1 < n - 1 && arc[hi + 1] <= arc[i] + w) hi++;
       const mean = (integral(arc[i] + w, hi) - integral(arc[i] - w, lo)) / (2 * w);
       const dev = cur[i] - mean;
       const excess = Math.abs(dev) - limit * (w / LIMIT_METRES) * (w / LIMIT_METRES);   // a shorter window sees a proportionally smaller deviation of the same curvature
-      if (excess > 0) { next[i] = cur[i] - Math.sign(dev) * excess * LIMIT_GAIN; moved += excess; }
+      if (localExcess > Math.max(0, excess)) { next[i] = cur[i] - Math.sign(localDev) * localExcess * LIMIT_GAIN; moved += localExcess; }
+      else if (excess > 0) { next[i] = cur[i] - Math.sign(dev) * excess * LIMIT_GAIN; moved += excess; }
     }
     [cur, next] = [next, cur];
     if (moved < 1e-6) break;
@@ -172,7 +187,7 @@ function endStretches(arc, ends) {
 }
 
 /** The levels a bed may keep from the land: between `ground - maxCut` and `ground + maxFill`; a pin keeps its level. */
-function clampToLand(bed, ground, pins, maxCut, maxFill, stretch) {
+function clampToLand(bed, ground, pins, maxCut, maxFill, stretch) {   // (cut: below the land, fill: above it)
   const out = new Float64Array(bed.length);
   let clamped = false;
   for (let i = 0; i < bed.length; i++) {
@@ -201,13 +216,14 @@ function designOpenBed(ground, arc, pins, kind, ends) {
   }
   if (pins) for (const [i, h] of pins) { w[i] = PIN_WEIGHT; y[i] = h; }
   const limit = deviationOf(radiusOf(kind));
+  const curvature = 1 / radiusOf(kind);
   let bed = whittaker(y, w, ROAD.bedStiffness, arc);
   for (let round = 0; round < ROAD.bedRounds; round++) {
-    const clamped = clampToLand(limitCurvature(bed, arc, pins, limit), ground, pins, ROAD.bedMaxCut, ROAD.bedMaxFill, stretch);
+    const clamped = clampToLand(limitCurvature(bed, arc, pins, limit, 4000, curvature), ground, pins, ROAD.bedMaxCut, ROAD.bedMaxFill, stretch);
     bed = clamped.bed;
     if (!clamped.clamped) break;
   }
-  return clampToLand(limitCurvature(bed, arc, pins, limit), ground, pins, ROAD.bedHardLimit, ROAD.bedHardLimit).bed;
+  return clampToLand(limitCurvature(bed, arc, pins, limit, 4000, curvature), ground, pins, ROAD.bedHardCut, ROAD.bedHardFill).bed;
 }
 
 /** The slope of the bed at every sample (m per m along the way): the central difference, one-sided at the two ends.  The surface between two samples is the cubic

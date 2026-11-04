@@ -48,14 +48,15 @@ export const ROAD = Object.freeze({
   // The vertical curves of a street: a crest or a sag is never tighter than R = v2 / bedLift, so the car is lifted by at most bedLift (m/s2) at the design speed of
   // the class.  The profile is cut through a crest and filled in a sag (bedMaxCut / bedMaxFill) rather than followed over it: the land of a hill town has crests
   // of 20 .. 60 m that no street follows.
-  bedLift: 1.3,            // m/s2: the harness gate allows 1.5
+  bedLift: 1.0,            // m/s2: the harness gate allows 1.5; the surface the car drives (a cubic through the bed, then the 1 m lattice) adds 0.2 .. 0.4 to the design value
   bedSpeed: Object.freeze({    // km/h, the design speed of a class (every other way: bedSpeedDefault)
     motorway: 100, trunk: 90, primary: 80, secondary: 70, tertiary: 60,
   }),
   bedSpeedDefault: 50,
   bedMaxCut: 2.5,          // m: the bed may lie this far BELOW the land (a cutting; the face of it follows the hillside, see road-network.js)
   bedMaxFill: 2.0,         // m: ... and this far ABOVE it (an embankment in a sag)
-  bedHardLimit: 4.0,       // m: the curvature limit may carry the bed this far from the land where the two demands cannot both be met (a cliff beside the road)
+  bedHardCut: 5.0,         // m: the curvature limit may carry the bed this far BELOW the land where the two demands cannot both be met (a rock wall beside the road; a deeper trench would eat the houses beside it)
+  bedHardFill: 9.0,        // m: ... and this far ABOVE it (a street on a bank above a valley: the fill is held by a retaining wall, retaining-walls.js)
   bedRounds: 8,            // rounds of "limit the curvature, then keep the cut and the fill within their limits"
   kerbHeight: 0.13,        // m, the kerb at the edge of the carriageway
   kerbWidth: 0.35,         // m, the width of the kerb face

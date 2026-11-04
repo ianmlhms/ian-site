@@ -5,7 +5,9 @@
  *           with the deepest cutting / highest embankment of the bed against the land
  *   beds    how far the beds leave the land (cuttings over 2.5 m, embankments over 1 m)
  *   sides   the ground beside the roads, measured exactly like the world flow (luxdrive_world.mjs): p90 / p99 slope, the share of sides steeper than the land, walls
- *   steps   a step on the carriageway: the height field jumps by more than 2 cm within 4 cm (a lattice-free probe of the nearest-arm switch of overlapping ways) */
+ *   steps   a CRACK in the carriageway: the height field jumps by more than 2 cm within 4 mm, beyond what the slope on both sides predicts (a lattice-free probe of the nearest-arm switch
+ *           of overlapping ways, a pin that ends).  Cracks inside a retaining wall (data/walls.bin: the ramp is hidden in the wall) are counted as walls, not as steps.
+ *           A CREASE (the slope changes by more than 1 m/m within 30 cm: the foot of a face) is curvature, counted apart: the old probe called both a step. */
 import fs from 'node:fs'; import path from 'node:path';
 const R = process.argv[2];
 const VERBOSE = process.argv.includes('--verbose');
@@ -24,9 +26,14 @@ const nameOf = (c) => data.roads[c.road].name || data.roads[c.road].kind;
 const TIGHT_BEND_R = 12;                                   // m: a tight bend fans its cross sections out; gate I does not measure it either
 let designSpeed = () => 14;                                // m/s; the checkouts that predate the class radii drive every way at 50 km/h
 try { designSpeed = (await import(R + 'road-bed.js')).designSpeed ?? designSpeed; } catch { /* old checkout */ }
-const MAX_BOB = 1.5, STRETCH_GAP = 30;
+const MAX_BOB = 1.5, STRETCH_GAP = 30, END_SKIP = 2;
+let bedAtArcFn = null; try { bedAtArcFn = (await import(R + 'road-bed.js')).bedAtArc; } catch { /* old checkout */ }
+const SPEEDC = (ch) => designSpeed(ch.kind ?? data.roads[ch.road].kind);
 const withArc = (c) => { if (c.arc) return c; const arc = new Float64Array(c.x.length); for (let i = 1; i < c.x.length; i++) arc[i] = arc[i - 1] + Math.hypot(c.x[i] - c.x[i - 1], c.z[i] - c.z[i - 1]); return { ...c, arc }; };   // (old checkouts have no arc)
-const chains = net.chains.map(withArc).filter((c) => !c.tagged && !net.overRoads.has(c.road) && c.arc[c.arc.length - 1] >= 30).filter((c, i) => i % STRIDE === 0);
+// --near=x,z,r;x,z,r : only the ways that have a sample within r m of one of the points (a fast look at the known trouble spots)
+const NEAR = ((process.argv.find((a) => a.startsWith('--near=')) || '').slice(7)).split(';').filter(Boolean).map((t) => t.split(',').map(Number));
+const isNear = (c) => !NEAR.length || NEAR.some(([x, z, r]) => c.x.some((cx, i) => Math.hypot(cx - x, c.z[i] - z) <= r));
+const chains = net.chains.map(withArc).filter((c) => !c.tagged && !net.overRoads.has(c.road) && c.arc[c.arc.length - 1] >= 30).filter((c, i) => i % STRIDE === 0).filter(isNear);
 
 // ---- junction aprons (as the harness gate I)
 const GC = 32, gk = (a, b) => a * 4096 + b, segGrid = new Map();
@@ -81,7 +88,8 @@ for (const ch of chains) {
     if (-cut > 1.0) fillOver1++;
   }
   let cur = null;
-  for (let q = 2; q <= m - 2; q++) {
+  // (the first and the last 2 m of a way are not measured: the probe of a point 2 m from the end of a way looks past the end, where the carriageway ends and the cap of the way fades)
+  for (let q = END_SKIP + 2; q <= m - END_SKIP - 2; q++) {
     if (!ok[q - 2] || !ok[q] || !ok[q + 2]) continue;
     const acc = SPEED * SPEED * Math.abs(h[q + 2] + h[q - 2] - 2 * h[q]) / 4;
     points++; accAll.push(acc);
@@ -98,7 +106,17 @@ const humpRows = stretches.map((s) => {
   lineAt(s.ch, s.at, pt);
   let cut = 0; for (let q = Math.max(0, Math.floor(s.first - 25)); q <= Math.min(Math.floor(s.ch.arc[s.ch.arc.length - 1]), s.last + 25); q += 2) { lineAt(s.ch, q, pt); let k = pt.k; cut = Math.max(cut, Math.abs(s.ch.ground[k] - s.ch.bed[k])); }
   lineAt(s.ch, s.at, pt);
-  return `${nameOf(s.ch)} (${data.roads[s.ch.road].kind}) at ${pt.x.toFixed(0)},${pt.z.toFixed(0)} peak ${s.peak.toFixed(1)} m/s2, ${s.last - s.first + 1} m long, bed-land up to ${cut.toFixed(2)} m`;
+  // the cause: the acceleration of the bed itself at the peak (a profile that is too tight) against the deviation of the surface from the bed (another way's influence, an end, a wall)
+  let bedAcc = 0, dev = 0;
+  if (bedAtArcFn) {
+    for (let q = Math.max(2, s.first); q <= Math.min(s.last, Math.floor(s.ch.arc[s.ch.arc.length - 1]) - 2); q++) {
+      bedAcc = Math.max(bedAcc, SPEEDC(s.ch) ** 2 * Math.abs(bedAtArcFn(s.ch, q + 2) + bedAtArcFn(s.ch, q - 2) - 2 * bedAtArcFn(s.ch, q)) / 4);
+      lineAt(s.ch, q, pt); dev = Math.max(dev, Math.abs(surface.height(pt.x, pt.z) - bedAtArcFn(s.ch, q)));
+    }
+    lineAt(s.ch, s.at, pt);
+  }
+  const L = s.ch.arc[s.ch.arc.length - 1], endNote = s.at < 8 ? ' [start of the way]' : L - s.at < 8 ? ' [end of the way]' : '';
+  return `${bedAtArcFn ? `bed ${bedAcc.toFixed(1)} dev ${(dev * 100).toFixed(0)} cm${endNote} ` : ''}${nameOf(s.ch)} (${data.roads[s.ch.road].kind}) road ${s.ch.road} arc ${s.at} at ${pt.x.toFixed(0)},${pt.z.toFixed(0)} peak ${s.peak.toFixed(1)} m/s2, ${s.last - s.first + 1} m long, bed-land up to ${cut.toFixed(2)} m`;
 });
 for (const r of humpRows.slice(0, VERBOSE ? 200 : 12)) console.log('   ' + r);
 console.log(`beds: deepest cutting ${deepCut.toFixed(2)} m (${deepCutAt}); samples cut > 2.5 m: ${cutOver25}; embankment > 1 m: ${fillOver1}; of ${samples}`);
@@ -135,10 +153,30 @@ if (wants('sides')) {
 
 // ---- steps on the carriageway
 if (wants('steps')) {
-  const D = 0.02, LIMIT = 0.02, FLAT_SIDE = 0.35, info = { sdCar: 9, sdPave: 9 };
-  const hits = [];
-  let measured = 0;
-  const seen = new Set();
+  const EPS = 0.002, NEAR = 0.3, LIMIT = 0.02, CREASE = 1.0, CREASE_WIN = 0.15, info = { sdCar: 9, sdPave: 9 };
+  // the retaining walls: a crack that lies inside one is a wall (the ramp is hidden in it)
+  let walls = [];
+  try { walls = (await import(R + 'retaining-walls.js')).decodeWalls(new Uint8Array(fs.readFileSync(path.join(R, 'data', 'walls.bin')))); } catch { /* an old checkout has no walls */ }
+  const wallSegs = [];
+  for (const w of walls) for (let i = 0; i + 1 < w.pts.length; i++) wallSegs.push([w.pts[i], w.pts[i + 1]]);
+  const WALL_MARGIN = 0.8;
+  const inWall = (x, z) => {
+    for (const [a, b] of wallSegs) {
+      const ex = b.x - a.x, ez = b.z - a.z, l2 = ex * ex + ez * ez;
+      if (l2 < 1e-9) continue;
+      const t = ((x - a.x) * ex + (z - a.z) * ez) / l2;
+      if (t < -0.1 || t > 1.1) continue;
+      const nx = a.nx + (b.nx - a.nx) * t, nz = a.nz + (b.nz - a.nz) * t, depth = a.depth + (b.depth - a.depth) * t;
+      const px = x - (a.x + ex * t), pz = z - (a.z + ez * t);
+      const across = px * nx + pz * nz;                   // 0 at the foot of the face, depth at the back of the block
+      if (across >= -WALL_MARGIN && across <= depth + WALL_MARGIN && Math.abs(px * -nz + pz * nx) < Math.sqrt(l2) * 0.6 + WALL_MARGIN) return true;
+    }
+    return false;
+  };
+  const f = (a, b) => field.height(a, b);
+  const hits = [], creases = [];
+  let measured = 0, wallCracks = 0, wallCreases = 0;
+  const seen = new Set(), seenCrease = new Set();
   for (const ch of chains) {
     const hw = net.info[ch.road].hw, L = ch.arc[ch.arc.length - 1];
     for (let s = 0; s <= L; s += 1) {
@@ -150,21 +188,27 @@ if (wants('steps')) {
         field.height(x, z, info);
         if (info.sdCar > -0.5 || net.protection(x, z) > 0) continue;      // (ground under a way that rides over it is the DTM itself, steps of the DTM included)
         measured++;
-        const f = (a, b) => field.height(a, b);
-        const jx = f(x + D, z) - f(x - D, z) - D * (f(x + 1, z) - f(x - 1, z)) / 1, jz = f(x, z + D) - f(x, z - D) - D * (f(x, z + 1) - f(x, z - 1)) / 1;
-        const jump = Math.max(Math.abs(jx), Math.abs(jz));
-        // a step on LEVEL ground: the surface on both sides of it is nearly flat (a wall between two levels of a ramp is the business of the side-slope gate)
-        if (jump > LIMIT) {
-          const horizontal = Math.abs(jx) >= Math.abs(jz);
-          const [ux, uz] = horizontal ? [1, 0] : [0, 1];
-          const flat = (sign) => Math.abs(f(x + ux * sign * (D + 0.3), z + uz * sign * (D + 0.3)) - f(x + ux * sign * (D + 0.5), z + uz * sign * (D + 0.5))) / 0.2 < FLAT_SIDE;
-          if (!flat(1) || !flat(-1)) continue;
+        const h0 = f(x, z);
+        let crack = 0, crease = 0;
+        for (const [ux, uz] of [[1, 0], [0, 1]]) {
+          const lo = f(x - ux * NEAR, z - uz * NEAR), hi = f(x + ux * NEAR, z + uz * NEAR);
+          const ref = (hi - lo) / (2 * NEAR);                              // the slope on both sides
+          const c = Math.abs(f(x + ux * EPS, z + uz * EPS) - f(x - ux * EPS, z - uz * EPS) - 2 * EPS * ref);
+          if (c > crack) crack = c;
+          const before = (h0 - f(x - ux * CREASE_WIN, z - uz * CREASE_WIN)) / CREASE_WIN, after = (f(x + ux * CREASE_WIN, z + uz * CREASE_WIN) - h0) / CREASE_WIN;
+          if (Math.abs(after - before) > crease) crease = Math.abs(after - before);
         }
-        if (jump > LIMIT) { const key = `${Math.round(x / 6)},${Math.round(z / 6)}`; if (!seen.has(key)) { seen.add(key); hits.push({ x, z, jump, name: nameOf(ch) }); } }
+        if (crack > LIMIT) {
+          const key = `${Math.round(x / 6)},${Math.round(z / 6)}`;
+          if (!seen.has(key)) { seen.add(key); if (inWall(x, z)) wallCracks++; else hits.push({ x, z, jump: crack, name: nameOf(ch), road: ch.road }); }
+        } else if (crease > CREASE) {
+          const key = `${Math.round(x / 6)},${Math.round(z / 6)}`;
+          if (!seenCrease.has(key)) { seenCrease.add(key); if (inWall(x, z)) wallCreases++; else creases.push({ x, z, jump: crease, name: nameOf(ch) }); }
+        }
       }
     }
   }
-  // the levels of the ways that reach a step: ways whose beds differ by more than LEVEL_APART are two levels (a retaining wall between two carriageways, not a step on level ground)
+  // the levels of the ways that reach a crack: ways whose beds differ by more than LEVEL_APART are two levels
   const LEVEL_APART = 0.6;
   let bedAtArc = null;
   try { bedAtArc = (await import(R + 'road-bed.js')).bedAtArc; } catch { /* old checkout */ }
@@ -185,12 +229,12 @@ if (wants('steps')) {
     h.apart = levels.length > 1 ? Math.max(...levels) - Math.min(...levels) : 0;
     h.ways = levels.length;
   }
-  const level = hits.filter((h) => h.apart === undefined || h.apart <= LEVEL_APART);
   hits.sort((a, b) => b.jump - a.jump);
-  if (bedAtArc) { const big = hits.filter((h) => h.jump > 0.05); console.log(`steps > 5 cm by the ways that reach them: one way ${big.filter((h) => h.ways <= 1).length}, several ways at one level ${big.filter((h) => h.ways > 1 && h.apart <= LEVEL_APART).length}, at two levels (> ${LEVEL_APART} m apart) ${big.filter((h) => h.apart > LEVEL_APART).length}`); }
-  if (bedAtArc) console.log(`steps by the ways that reach them: one way ${hits.filter((h) => h.ways <= 1).length}, several ways at one level (<= ${LEVEL_APART} m apart) ${hits.filter((h) => h.ways > 1 && h.apart <= LEVEL_APART).length}, at two levels ${hits.filter((h) => h.apart > LEVEL_APART).length}`);
-  console.log(`steps by size: > 2 cm ${hits.length}, > 5 cm ${hits.filter((h) => h.jump > 0.05).length}, > 10 cm ${hits.filter((h) => h.jump > 0.1).length}, > 20 cm ${hits.filter((h) => h.jump > 0.2).length}`);
-  console.log(`steps: ${hits.length} places with a jump > ${LIMIT * 100} cm within ${D * 200} cm on the carriageway (${measured} probes); worst ${hits[0] ? (hits[0].jump * 100).toFixed(1) + ' cm' : '-'}`);
-  if (process.argv.includes('--small')) for (const h of hits.filter((q) => q.jump < 0.05).filter((q, i) => i % 40 === 0).slice(0, 25)) console.log(`   small ${(h.jump * 100).toFixed(1)} cm at ${h.x.toFixed(1)},${h.z.toFixed(1)} ${h.name} [${h.ways} way(s), ${h.apart.toFixed(2)} m apart]`);
+  creases.sort((a, b) => b.jump - a.jump);
+  if (bedAtArc) console.log(`cracks by the ways that reach them: one way ${hits.filter((h) => h.ways <= 1).length}, several ways at one level (<= ${LEVEL_APART} m apart) ${hits.filter((h) => h.ways > 1 && h.apart <= LEVEL_APART).length}, at two levels ${hits.filter((h) => h.apart > LEVEL_APART).length}`);
+  console.log(`steps by size: > 2 cm ${hits.length}, > 5 cm ${hits.filter((h) => h.jump > 0.05).length}, > 10 cm ${hits.filter((h) => h.jump > 0.1).length}, > 20 cm ${hits.filter((h) => h.jump > 0.2).length}; inside retaining walls (not steps) ${wallCracks}`);
+  console.log(`steps: ${hits.length} cracks of more than ${LIMIT * 100} cm within ${EPS * 2000} mm on the carriageway (${measured} probes, ${walls.length} walls loaded); worst ${hits[0] ? (hits[0].jump * 100).toFixed(1) + ' cm' : '-'}`);
+  console.log(`creases: ${creases.length} places where the slope changes by more than ${CREASE} m/m within ${CREASE_WIN * 200} cm (curvature, not steps; ${wallCreases} more inside walls); worst ${creases[0] ? creases[0].jump.toFixed(1) + ' m/m' : '-'}`);
   for (const h of hits.slice(0, VERBOSE ? 40 : 8)) console.log(`   step ${(h.jump * 100).toFixed(1)} cm at ${h.x.toFixed(1)},${h.z.toFixed(1)} ${h.name}${h.ways !== undefined ? ` [${h.ways} way${h.ways === 1 ? '' : 's'}, ${h.apart.toFixed(2)} m apart]` : ''}`);
+  for (const h of creases.slice(0, VERBOSE ? 20 : 4)) console.log(`   crease ${h.jump.toFixed(1)} m/m at ${h.x.toFixed(1)},${h.z.toFixed(1)} ${h.name}`);
 }
