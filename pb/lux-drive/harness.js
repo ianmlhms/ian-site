@@ -34,6 +34,7 @@ import { createRoadIndex, isCarRoad } from './road-index.js';
 import { createGearbox, ENGINE, squealLevel, thudLevel } from './sound-model.js';
 import { createQualityStepper } from './quality-step.js';
 import { roadDirectionAt } from './roads.js';
+import { bedAtArc, designSpeed, deviationOf, radiusOf } from './road-bed.js';
 import { addBuilding, createBuildingMesh, KIND } from './building-mesh.js';
 import { computeTileNodes, buildTileMesh, meshHeightAt } from './tile-mesh.js';
 import { leafAt, selectTiles } from './quadtree.js';
@@ -582,8 +583,8 @@ if (wants('D')) {
   // The ground under a bridge is the ground: no road may cut a pit under the deck (the reviewer's overpass = pit).
   // The ends of the deck are where the approach road is, and a road on an embankment has the land beside it:
   // that is the bench of the road, not a pit, so the ends are not measured.
-  // (a bed is held within bedHardClamp of the land; a deck beside a cutting stands 0.1 - 0.2 m beyond the centre line of the road, where the land is higher)
-  const MAX_PIT = ROAD.bedHardClamp + 0.3;
+  // (the street that runs onto a bridge continues the gradient of the street and does not follow the valley edge, designBed; the original limit of 1.0 m)
+  const MAX_PIT = 1.0;
   let pits = 0, worstPit = 0;
   for (const d of decks) {
     for (let i = 1; i < d.pts.length - 1; i++) {
@@ -669,9 +670,7 @@ if (wants('D2')) {
   //
   // The road that leads to the mouth ends up to seven metres before it, so the two levels differ by the
   // slope of the road: two metres of difference is a steep approach, more than that is a mouth in the air.
-  // (2.0 m before the bed of a road was held to the land only by the noisy DTM; the bed is a smooth street profile now, up to bedHardClamp from the
-  // land, and a mouth in a hillside of 45 % falls 2.5 m within the 5 m between the end of the road and the wall: 3.0 m is still a steep approach, not a mouth in the air)
-  const MAX_PORTAL_GAP = 3.0;
+  const MAX_PORTAL_GAP = 2.0;
   let floating = 0, worst = 0;
   const floatList = [];
   for (const p of portals.list) {
@@ -1035,12 +1034,12 @@ if (wants('I')) {
   // a gentle constant crossfall and a kerb of constant height; and what the player SEES (the render tile of the lattice the game
   // uses at that distance) is the same surface as the height function, at every quality level.
   const li = { sdCar: 9, sdPave: 9 };
+  const kerbLi = { sdCar: 9, sdPave: 9 };
   const rng = createRng(77);
   const LATTICE_RESOLVES_HW = 2.5;
   const TIGHT_BEND_R = 12;                              // m
-  const HELD_CLEAR = 15;                                // m each side of a sample of the bed that is held to the land
-  const TOWN_SPEED = 14, MAX_BOB = 1.5, HARD_BOB = 4.0, MAX_SHARE = 0.003;                 // m/s (50 km/h); m/s2: the most a street may lift the body (0.15 g, a swell over a crest, not a bump; at most 0.3 % of the points, none above 4).  Before the fix the median point of a way gave 1.2 and 56 % of all points more than 1.0
-  const WINDOW = 10, MAX_DEV = 0.04, HARD_DEV = 0.08, MAX_CROSSFALL = 0.025, MAX_KERB_DEV = 0.03;
+  const MAX_BOB = 1.5, HARD_BOB = 4.0, MAX_SHARE = 0.003;                 // m/s2: the most a street may lift the body at the design speed of its class (50 km/h for a town street, 100 km/h for a motorway; 0.15 g, a swell over a crest, not a bump; at most 0.3 % of the points, none above 4).  Before the fix the median point of a way gave 1.2 and 56 % of all points more than 1.0
+  const WINDOW = 10, DEV_SLACK = 0.01, HARD_DEV_RATIO = 2, MAX_CROSSFALL = 0.025, MAX_KERB_DEV = 0.03;   // (a vertical curve of the radius of its class leaves its 20 m mean by deviationOf(R): 11 cm for a town street, 3 cm for a motorway; + 1 cm for the rounding of the lattice and of the junction pins)
   // the ways: carved, at ground level (layer 0, not riding over anything), long enough to hold a window; half in the town, half outside
   const urban = [], rural = [];
   for (const ch of net.chains) {
@@ -1050,7 +1049,7 @@ if (wants('I')) {
   }
   const pick = (list, n) => { const out = [], pool = list.slice(); while (out.length < n && pool.length) out.push(pool.splice(Math.floor(rng() * pool.length), 1)[0]); return out; };
   const ways = [...pick(urban, 100), ...pick(rural, 100)];
-  let measured = 0, worstDev = 0, worstAt = null, badWays = 0, devBad = 0, worstFall = 0, worstFallAt = null, fallBad = 0, kerbWorst = 0, kerbBad = 0, kerbMeasured = 0, points = 0, heldSamples = 0, fallMeasured = 0, worstAcc = 0, worstAccAt = '', bobBad = 0;
+  let measured = 0, worstDevRatio = 0, worstDev = 0, worstAt = null, badWays = 0, devBad = 0, worstFall = 0, worstFallAt = null, fallBad = 0, kerbWorst = 0, kerbBad = 0, kerbMeasured = 0, points = 0, fallMeasured = 0, worstAcc = 0, worstAccAt = '', bobBad = 0;
   const lineAt = (ch, d, out) => {                                     // the point of the centre line at the distance d along it
     let k = 0;
     while (k < ch.arc.length - 2 && ch.arc[k + 1] < d) k++;
@@ -1060,12 +1059,7 @@ if (wants('I')) {
     out.nx = -(ch.z[k + 1] - ch.z[k]) / l; out.nz = (ch.x[k + 1] - ch.x[k]) / l;
     return out;
   };
-  const bedAt = (ch, d) => {                                           // the designed profile of the way at the distance d along it
-    let k = 0;
-    while (k < ch.arc.length - 2 && ch.arc[k + 1] < d) k++;
-    const t = Math.min(1, Math.max(0, (d - ch.arc[k]) / Math.max(1e-9, ch.arc[k + 1] - ch.arc[k])));
-    return ch.bed[k] + (ch.bed[k + 1] - ch.bed[k]) * t;
-  };
+  const bedAt = bedAtArc;                                              // the designed profile of the way at the distance d along it (the curve the carve uses)
   const pt = { x: 0, z: 0, nx: 0, nz: 0 };
   for (const ch of ways) {
     const L = ch.arc[ch.arc.length - 1], m = Math.floor(L);
@@ -1085,13 +1079,7 @@ if (wants('I')) {
       if (R >= TIGHT_BEND_R) continue;
       for (let q = Math.max(0, Math.floor(ch.arc[i] - hw - 4)); q <= Math.min(m, Math.ceil(ch.arc[i] + hw + 4)); q++) clean[q] = 0;
     }
-    // Where the bed is held to the land (bedHardClamp: a crest or a sag of the LAND tighter than a street may have), the road follows the land, and
-    // the land there is not smooth.  A road that is not held anywhere is smooth; a held stretch is counted, not gated.
-    for (let i = 0; i < ch.x.length; i++) {
-      if ((ch.pins && ch.pins.has(i)) || Math.abs(ch.bed[i] - ch.ground[i]) < ROAD.bedHardClamp - 0.02) continue;
-      heldSamples++;
-      for (let q = Math.max(0, Math.floor(ch.arc[i] - HELD_CLEAR)); q <= Math.min(m, Math.ceil(ch.arc[i] + HELD_CLEAR)); q++) clean[q] = 0;
-    }
+    const speed = designSpeed(ch.kind), devMax = deviationOf(radiusOf(ch.kind)) + DEV_SLACK;
     let wayWorst = 0, any = false;
     for (let q = WINDOW; q <= m - WINDOW; q++) {
       let ok = true;
@@ -1101,11 +1089,12 @@ if (wants('I')) {
       let sum = 0;
       for (let j = -WINDOW; j <= WINDOW; j++) sum += h[q + j];
       const dev = Math.abs(h[q] - sum / (2 * WINDOW + 1));
-      // what the car feels: the vertical acceleration of a body that follows the profile at the speed of a town street (h'' over a 2 m base)
-      const acc = TOWN_SPEED * TOWN_SPEED * Math.abs(h[q + 2] + h[q - 2] - 2 * h[q]) / 4;
+      // what the car feels: the vertical acceleration of a body that follows the profile at the design speed of the class (h'' over a 2 m base)
+      const acc = speed * speed * Math.abs(h[q + 2] + h[q - 2] - 2 * h[q]) / 4;
       if (acc > worstAcc) { worstAcc = acc; lineAt(ch, q, pt); worstAccAt = `${data.roads[ch.road].name || data.roads[ch.road].kind} at ${Math.round(pt.x)},${Math.round(pt.z)}`; }
       if (acc > MAX_BOB) bobBad++;
-      if (dev > MAX_DEV) devBad++;
+      if (dev > devMax) devBad++;
+      if (dev / devMax > worstDevRatio) worstDevRatio = dev / devMax;
       if (dev > wayWorst) wayWorst = dev;
       if (dev > worstDev) { worstDev = dev; worstAt = `${data.roads[ch.road].name || data.roads[ch.road].kind} ${Math.round(pt.x)},${Math.round(pt.z)}`; lineAt(ch, q, pt); worstAt = `${data.roads[ch.road].name || data.roads[ch.road].kind} at ${Math.round(pt.x)},${Math.round(pt.z)}`; }
       if (q % 3 === 0) {
@@ -1138,21 +1127,24 @@ if (wants('I')) {
           // (in a bend the probes along the normal of the segment can lie on the ramp of the kerb: only a probe on the tarmac and one on the flat top count)
           if (aRoad === ch.road && li.road === ch.road && aLat <= hw && Math.abs(li.lat) >= hw + kerbW + 0.02 && !kerbFree) {
             kerbMeasured++;
-            // above the profile of the way at each probe's own station (a bend on a gradient puts the two probes at different stations)
-            const dk = Math.abs((b - bedAt(ch, li.s)) - (a - bedAt(ch, aS)) - kerbH);
+            // The kerb stands kerbH above the ground it stands on.  (The ground beside the kerb is the face of the cutting, which rises with the hillside from the
+            // edge of the kerb on: the top of the kerb above the CARRIAGEWAY is kerbH plus that rise, a slope and not a kerb.  So the kerb term of the carve is measured,
+            // and the rise is the business of the ground-beside-the-road gate of the world flow.)
+            net.carve(pt.x + pt.nx * (hw + kerbW + 0.1), pt.z + pt.nz * (hw + kerbW + 0.1), kerbLi);
+            const dk = Math.abs(kerbLi.kerb - kerbH);
             if (dk > kerbWorst) kerbWorst = dk;
-            if (dk > MAX_KERB_DEV) { kerbBad++; if (VERBOSE) console.log(`   kerb ${(dk * 100).toFixed(2)} cm ${data.roads[ch.road].name || data.roads[ch.road].kind} at ${pt.x.toFixed(1)},${pt.z.toFixed(1)} a=${a.toFixed(3)} b=${b.toFixed(3)} sdCar=${li.sdCar.toFixed(2)}`); }
+            if (dk > MAX_KERB_DEV) { kerbBad++; if (VERBOSE) console.log(`   kerb ${(dk * 100).toFixed(2)} cm ${data.roads[ch.road].name || data.roads[ch.road].kind} at ${pt.x.toFixed(1)},${pt.z.toFixed(1)} kerb=${kerbLi.kerb.toFixed(3)} sdCar=${li.sdCar.toFixed(2)}`); }
           }
         }
       }
     }
     if (any) measured++;
-    if (wayWorst > MAX_DEV) badWays++;
+    if (wayWorst > devMax) badWays++;
   }
-  stats.roadSmooth = { ways: ways.length, measuredWays: measured, points, worstDevCm: +(worstDev * 100).toFixed(2), heldSamples, devOverShare: +(devBad / Math.max(1, points)).toFixed(5), bobOverShare: +(bobBad / Math.max(1, points)).toFixed(5), bobWorstMs2: +worstAcc.toFixed(2), crossfallMeasured: fallMeasured, worstCrossfallPct: +(worstFall * 100).toFixed(2), kerbWorstCm: +(kerbWorst * 100).toFixed(2) };
+  stats.roadSmooth = { ways: ways.length, measuredWays: measured, points, worstDevCm: +(worstDev * 100).toFixed(2), devOverShare: +(devBad / Math.max(1, points)).toFixed(5), bobOverShare: +(bobBad / Math.max(1, points)).toFixed(5), bobWorstMs2: +worstAcc.toFixed(2), crossfallMeasured: fallMeasured, worstCrossfallPct: +(worstFall * 100).toFixed(2), kerbWorstCm: +(kerbWorst * 100).toFixed(2) };
   check('the carved ways measured are enough (200 sampled, urban + rural, most with a clean stretch)', measured >= 120, `${measured} of ${ways.length} ways, ${points} points`);
-  check(`the carved centre lines are within ${MAX_DEV * 100} cm of their 20 m moving mean (no waves, no bumps; at most ${MAX_SHARE * 100} % of the points over, none above ${HARD_DEV * 100} cm; junction aprons, tight bends and stretches held to the land excepted)`, devBad <= MAX_SHARE * points && worstDev <= HARD_DEV, `${devBad} of ${points} points over, ${badWays} ways, worst ${(worstDev * 100).toFixed(2)} cm at ${worstAt}`);
-  check(`the car does not bob: the vertical acceleration at 50 km/h along the centre line is <= ${MAX_BOB} m/s2 (at most ${MAX_SHARE * 100} % of the points, none above ${HARD_BOB})`, bobBad <= MAX_SHARE * points && worstAcc <= HARD_BOB, `${bobBad} of ${points} points over, worst ${worstAcc.toFixed(2)} m/s2 at ${worstAccAt}`);
+  check(`the carved centre lines are within the vertical curve of their class of their 20 m moving mean (no waves, no bumps; at most ${MAX_SHARE * 100} % of the points over, none above ${HARD_DEV_RATIO} times; junction aprons and tight bends excepted)`, devBad <= MAX_SHARE * points && worstDevRatio <= HARD_DEV_RATIO, `${devBad} of ${points} points over, ${badWays} ways, worst ${(worstDev * 100).toFixed(2)} cm at ${worstAt}`);
+  check(`the car does not bob: the vertical acceleration at the design speed along the centre line is <= ${MAX_BOB} m/s2 (at most ${MAX_SHARE * 100} % of the points, none above ${HARD_BOB})`, bobBad <= MAX_SHARE * points && worstAcc <= HARD_BOB, `${bobBad} of ${points} points over, worst ${worstAcc.toFixed(2)} m/s2 at ${worstAccAt}`);
   check(`the crossfall is gentle and constant (<= ${MAX_CROSSFALL * 100} %)`, fallBad === 0 && fallMeasured > 1500, `${fallMeasured} cross sections, ${fallBad} over, worst ${(worstFall * 100).toFixed(2)} % at ${worstFallAt}`);
   check(`the kerb stands at a constant height (+-${MAX_KERB_DEV * 100} cm of ${(ROAD.kerbHeight * 100).toFixed(0)} cm)`, kerbBad === 0 && kerbMeasured > 200, `${kerbMeasured} kerbs measured, ${kerbBad} off, worst ${(kerbWorst * 100).toFixed(2)} cm`);
 }

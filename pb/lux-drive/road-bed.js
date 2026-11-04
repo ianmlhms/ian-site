@@ -18,6 +18,10 @@ const SPIKE_WINDOW = 1;                  // samples each side of the median that
 const LIMIT_METRES = 10;                 // m each side of a point for the curvature limit (the 20 m moving mean of the gate)
 const MIN_WINDOW = 2;                    // m: no limit where the way is shorter than this on one side (its end)
 const LIMIT_GAIN = 0.8;                  // the share of the excess one sweep removes (below 1: the sweeps converge)
+const FREE_END_RUN = 16;                 // m: the stretch of a way next to a bridge that the DTM cannot be trusted on (the valley edge begins at the abutment)
+const FREE_END_WEIGHT = 0.02;            // the weight of a terrain sample there against 1 elsewhere: the profile continues the gradient of the street into the bridge
+const TIGHT_END_RUN = 12;                // m: the stretch of a way next to a tunnel mouth that follows the land ...
+const TIGHT_END_WEIGHT = 20;             // ... with this weight of a terrain sample against 1 elsewhere (a hard clamp to the land carried the street over the wall of the hillside at the portal: 330 m/s2)
 const PIN_WEIGHT = 1e4;                  // the weight of a junction constraint against the weight 1 of a terrain sample
 
 /** Median of a window (a small array, sorted in place). */
@@ -113,17 +117,28 @@ export function limitCurvature(bed, arc, pinned, limit, sweeps = 4000) {
 
 const CLOSED_COPIES = 3;                 // a closed way is designed as this many laps in a row; the middle lap is the bed (no seam, no end effects)
 
+/** The deviation from the 20 m mean that a vertical curve of radius R has at its apex: the mean of x2 / 2R over +-LIMIT_METRES is L2 / 6R with L = LIMIT_METRES. */
+export const deviationOf = (radius) => (LIMIT_METRES * LIMIT_METRES) / (6 * radius);
+
+/** The design speed of a class (m/s). */
+export const designSpeed = (kind) => (ROAD.bedSpeed[kind] ?? ROAD.bedSpeedDefault) / 3.6;
+
+/** The radius of the tightest vertical curve a way of this class may have (m): the car is lifted by at most bedLift at the design speed. */
+export const radiusOf = (kind) => designSpeed(kind) ** 2 / ROAD.bedLift;
+
 /**
  * The bed of a way.  `ground`: the terrain under the samples of the centre line; `arc`: the distance along the way of every sample (m); `pins`: optional Map(sample index -> the height
- * the surface must have there, a junction with a way that is already designed).  Returns Float64Array of the heights.
+ * the surface must have there, a junction with a way that is already designed); `kind`: the class of the way (its vertical curves are never tighter than the radius of the class).
+ * `ends`: optional { start, end }, what each end of the way meets: 'bridge' (the terrain next to it is a valley edge and counts for little), 'tunnel' (the street follows the land), or null.
+ * Returns Float64Array of the heights.
  *
  * `closed`: the last sample is (about) the first (a ring road, a pedestrian square, a loop of a service road).  An open design leaves the two ends at two
  * different levels - a step of up to 2.5 m across the carriageway where the ring closes (measured: Parvis de l'Abbaye) - so a closed way is designed as three laps
  * in a row and the middle lap is kept: the profile is periodic, the seam is as smooth as any other place of the ring, and the last sample takes the level of the first.
  */
-export function designBed(ground, arc, pins, closed = false) {
+export function designBed(ground, arc, pins, closed = false, kind = '', ends = null) {
   const n = ground.length;
-  if (!closed || n < 6) return designOpenBed(ground, arc, pins);
+  if (!closed || n < 6) return designOpenBed(ground, arc, pins, kind, ends);
   const m = n - 1;                                                       // the last sample repeats the first: one lap is m samples
   const lap = arc[n - 1];                                                // the length of a lap (the last sample is the first again)
   const total = m * CLOSED_COPIES;
@@ -133,65 +148,93 @@ export function designBed(ground, arc, pins, closed = false) {
     for (let i = 0; i < m; i++) { g[c * m + i] = ground[i]; a[c * m + i] = arc[i] + c * lap; }
     if (pins) for (const [i, h] of pins) wrapPins.set(c * m + (i === n - 1 ? 0 : i), h);   // the pin of the last sample is the pin of the first
   }
-  const bed = designOpenBed(g, a, wrapPins);
+  const bed = designOpenBed(g, a, wrapPins, kind);
   const out = new Float64Array(n);
   for (let i = 0; i < m; i++) out[i] = bed[m + i];
   out[n - 1] = out[0];
   return out;
 }
 
-function designOpenBed(ground, arc, pins) {
+/** The stretches of a way next to a bridge (`free`: the terrain there is the edge of a valley, the street does not follow it) and next to a tunnel (`tight`: the
+ *  mouth of the tunnel is cut into the hillside at the level of the street, the street follows the land).  `ends` = { start, end }, each 'bridge', 'tunnel' or null. */
+function endStretches(arc, ends) {
+  const n = arc.length;
+  const free = new Uint8Array(n), tight = new Uint8Array(n);
+  if (!ends) return { free, tight };
+  for (let i = 0; i < n; i++) {
+    const fromStart = arc[i] - arc[0], fromEnd = arc[n - 1] - arc[i];
+    if (ends.start === 'bridge' && fromStart <= FREE_END_RUN) free[i] = 1;
+    if (ends.end === 'bridge' && fromEnd <= FREE_END_RUN) free[i] = 1;
+    if (ends.start === 'tunnel' && fromStart <= TIGHT_END_RUN) tight[i] = 1;
+    if (ends.end === 'tunnel' && fromEnd <= TIGHT_END_RUN) tight[i] = 1;
+  }
+  return { free, tight };
+}
+
+/** The levels a bed may keep from the land: between `ground - maxCut` and `ground + maxFill`; a pin keeps its level. */
+function clampToLand(bed, ground, pins, maxCut, maxFill, stretch) {
+  const out = new Float64Array(bed.length);
+  let clamped = false;
+  for (let i = 0; i < bed.length; i++) {
+    out[i] = pins && pins.has(i) ? pins.get(i) : stretch && stretch.free[i] ? bed[i] : Math.min(ground[i] + maxFill, Math.max(ground[i] - maxCut, bed[i]));
+    if (out[i] !== bed[i]) clamped = true;
+  }
+  return { bed: out, clamped };
+}
+
+/**
+ * A street is cut through a crest and filled in a sag; it does not follow them.  Two demands pull against each other: a vertical curve never tighter than the
+ * radius of the class (the car is not thrown), and a cutting or an embankment that is no deeper than bedMaxCut / bedMaxFill (a street is not a trench and
+ * not a dam).  The bed is the Whittaker fit of the land, then alternately projected on one demand and the other (the two sets are convex, so the rounds converge on a profile
+ * that has both wherever one exists).  Where none does (a cliff beside the road, a wall of the DTM) the curvature limit wins - a smooth street 3 m below the
+ * crest is better than a street that follows a spike - but never by more than bedHardLimit.
+ */
+function designOpenBed(ground, arc, pins, kind, ends) {
   const n = ground.length;
   const w = new Float64Array(n).fill(1);
   const y = new Float64Array(n);
   for (let i = 0; i < n; i++) y[i] = median(ground, i, SPIKE_WINDOW);
-  if (pins) for (const [i, h] of pins) { w[i] = PIN_WEIGHT; y[i] = h; }
-  let bed = whittaker(y, w, ROAD.bedStiffness, arc);
-  // a street must not leave the land by more than bedClamp (it would cut a trench into a hill or stand on a wall): clamp, then
-  // round the kinks the clamp made with a lighter pass
-  let clamped = false;
-  const c = new Float64Array(n);
+  const stretch = endStretches(arc, ends);
   for (let i = 0; i < n; i++) {
-    const lo = ground[i] - ROAD.bedClamp, hi = ground[i] + ROAD.bedClamp;
-    c[i] = pins && pins.has(i) ? pins.get(i) : Math.min(hi, Math.max(lo, bed[i]));
-    if (c[i] !== bed[i]) clamped = true;
+    if (stretch.free[i]) w[i] = FREE_END_WEIGHT;                // (a bridge abutment: the DTM drops into the valley there, the street does not)
+    else if (stretch.tight[i]) w[i] = TIGHT_END_WEIGHT;         // (a tunnel mouth: the street arrives at the level of the hillside it enters)
   }
-  if (clamped) bed = whittaker(c, w, ROAD.bedStiffness * ROAD.bedRelax, arc);
-  return holdToLand(limitCurvature(bed, arc, pins, ROAD.bedDeviation), ground, pins);
+  if (pins) for (const [i, h] of pins) { w[i] = PIN_WEIGHT; y[i] = h; }
+  const limit = deviationOf(radiusOf(kind));
+  let bed = whittaker(y, w, ROAD.bedStiffness, arc);
+  for (let round = 0; round < ROAD.bedRounds; round++) {
+    const clamped = clampToLand(limitCurvature(bed, arc, pins, limit), ground, pins, ROAD.bedMaxCut, ROAD.bedMaxFill, stretch);
+    bed = clamped.bed;
+    if (!clamped.clamped) break;
+  }
+  return clampToLand(limitCurvature(bed, arc, pins, limit), ground, pins, ROAD.bedHardLimit, ROAD.bedHardLimit).bed;
 }
 
-const BLEND_REACH = 6;                   // samples each side of a clamped sample that are rounded again
-const BLEND_PASSES = 12;
-
-/** The curvature limiter alone flattens crests and fills sags without bound: where the land has a cliff or a crest (the edge of a bridge, a ridge) it carried a
- *  road 6 .. 7 m away from the land - a cutting under a bridge deck, an embankment in a field.  A free sample of the bed is held within bedHardClamp of the
- *  land; the samples around a clamped one are rounded again (a binomial blur, the clamped and pinned samples stay) so the clamp leaves no corner. */
-function holdToLand(bed, ground, pins) {
+/** The slope of the bed at every sample (m per m along the way): the central difference, one-sided at the two ends.  The surface between two samples is the cubic
+ *  Hermite curve through their heights and slopes (`hermite`), so the profile has no kinks at the samples: a linear interpolation put the whole change of slope of
+ *  a vertical curve into the samples 4 m apart, twice the lift of the curve at every one of them. */
+export function bedSlopes(bed, arc) {
   const n = bed.length;
-  const out = Float64Array.from(bed);
-  const fixed = new Uint8Array(n);
-  let any = false;
-  for (let i = 0; i < n; i++) {
-    if (pins && pins.has(i)) { fixed[i] = 1; continue; }
-    const lo = ground[i] - ROAD.bedHardClamp, hi = ground[i] + ROAD.bedHardClamp;
-    if (out[i] < lo) { out[i] = lo; fixed[i] = 1; any = true; } else if (out[i] > hi) { out[i] = hi; fixed[i] = 1; any = true; }
+  const slope = new Float64Array(n);
+  for (let k = 0; k < n; k++) {
+    const a = Math.max(0, k - 1), b = Math.min(n - 1, k + 1);
+    slope[k] = b > a ? (bed[b] - bed[a]) / Math.max(1e-6, arc[b] - arc[a]) : 0;
   }
-  if (!any) return out;
-  const near = new Uint8Array(n);                      // the samples around a clamped one (not the pins)
-  for (let i = 0; i < n; i++) {
-    if (!fixed[i] || (pins && pins.has(i))) continue;
-    for (let k = Math.max(0, i - BLEND_REACH); k <= Math.min(n - 1, i + BLEND_REACH); k++) near[k] = 1;
-  }
-  let cur = out, next = new Float64Array(n);
-  for (let pass = 0; pass < BLEND_PASSES; pass++) {
-    for (let i = 0; i < n; i++) {
-      const isPin = pins && pins.has(i);
-      if (isPin || !near[i] || i === 0 || i === n - 1) { next[i] = cur[i]; continue; }
-      let v = 0.25 * cur[i - 1] + 0.5 * cur[i] + 0.25 * cur[i + 1];
-      v = Math.min(ground[i] + ROAD.bedHardClamp, Math.max(ground[i] - ROAD.bedHardClamp, v));
-      next[i] = v;
-    }
-    [cur, next] = [next, cur];
-  }
-  return cur;
+  return slope;
+}
+
+/** The height of the cubic Hermite curve between two samples at t (0 .. 1): heights b0 and b1, tangents tan0 and tan1 (slope times the length of the segment). */
+export function hermite(b0, b1, tan0, tan1, t) {
+  const t2 = t * t, t3 = t2 * t;
+  return (2 * t3 - 3 * t2 + 1) * b0 + (t3 - 2 * t2 + t) * tan0 + (3 * t2 - 2 * t3) * b1 + (t3 - t2) * tan1;
+}
+
+/** The height of the bed of a chain at the distance d along it (the same curve the carve uses). */
+export function bedAtArc(chain, d) {
+  const { arc, bed } = chain;
+  const slope = chain.slope || (chain.slope = bedSlopes(bed, arc));
+  let k = 0;
+  while (k < arc.length - 2 && arc[k + 1] < d) k++;
+  const len = Math.max(1e-9, arc[k + 1] - arc[k]);
+  return hermite(bed[k], bed[k + 1], slope[k] * len, slope[k + 1] * len, Math.min(1, Math.max(0, (d - arc[k]) / len)));
 }

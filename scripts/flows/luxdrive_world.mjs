@@ -287,13 +287,11 @@ export const flow = {
     });
     h.expect(slope.total > 5000, `${slope.total} sides of roads measured`);
     h.expect(slope.p90 <= 0.85, `the ground beside the roads is at most ${slope.p90.toFixed(2)} (90th percentile, the limit is 0.84)`);
-    // The limits of the next three checks (1.6 / 2 % / 8) were set when the bed of a road still followed the noisy LiDAR (it was within a
-    // few cm of the land).  The bed is now a smooth street profile (road-bed.js) that may leave the land by up to ~1 m, so the face of a
-    // cutting or an embankment beside it is a little steeper than the hillside in places (measured: 3 % of the sides, all of them
-    // gentle: 1.0 - 2.0 where the land is 0.8; the 16 walls lie in the Alzette valley beside the land's own cliffs, none is made on flat land).
-    h.expect(slope.p99 <= 1.7, `the ground beside the roads is at most ${slope.p99.toFixed(2)} (99th percentile)`);
-    h.expect(slope.share <= 0.035, `${(slope.share * 100).toFixed(2)}% of the sides are steeper than the land (the limit is 3.5%)`);
-    h.expect(slope.walls <= 20, `${slope.walls} sides of roads are a wall the carve made (the limit is 20 of ${slope.total}, the ${slope.cliffs} cliffs are the land's own)`);
+    // The original limits (1.6 / 2 % / 8): the carve hugs the land beside a road (a cutting is the hillside shifted down, a fill on a cliff is the cliff shifted up, and
+    // the pin of the carriageway pulls toward the face of its own batter, not toward a flat bed), so the ground beside a road is at most a little steeper than the land.
+    h.expect(slope.p99 <= 1.6, `the ground beside the roads is at most ${slope.p99.toFixed(2)} (99th percentile)`);
+    h.expect(slope.share <= 0.02, `${(slope.share * 100).toFixed(2)}% of the sides are steeper than the land (the limit is 2%)`);
+    h.expect(slope.walls <= 8, `${slope.walls} sides of roads are a wall the carve made (the limit is 8 of ${slope.total}, the ${slope.cliffs} cliffs are the land's own)`);
     h.expect(slope.deepest <= 8, `the deepest wall the carve makes is ${slope.deepest.toFixed(2)} (the limit is 8)`);
 
     h.step("the bridges of the brief are solid decks the car can drive on");
