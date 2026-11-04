@@ -34,11 +34,12 @@ import { addBuilding, createBuildingMesh, KIND } from './building-mesh.js';
 import { computeTileNodes, buildTileMesh, meshHeightAt } from './tile-mesh.js';
 import { leafAt, selectTiles } from './quadtree.js';
 import { createRng } from './noise.js';
-import { WORLD, QUADTREE, CAMERA, PORTAL, TRAM } from './config.js';
+import { WORLD, QUADTREE, CAMERA, PORTAL, TRAM, CAR } from './config.js';
 import { createTramNetwork } from './tram-network.js';
 import { createTramSim } from './tram-sim.js';
 import { placeStreetLights } from './street-lights.js';
 import { placeParkBenches } from './park-benches.js';
+import { createPropCollider } from './props.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DATA = path.join(HERE, 'data');
@@ -874,6 +875,11 @@ section('H tram + lights');
   check('no street light stands inside a house', lampInHouse === 0, `${lampInHouse}`);
   check('no street light stands in a carriageway', lampInRoad === 0, `${lampInRoad}`);
   check('every street light is inside the world', lampOut === 0, `${lampOut}`);
+  // the lamps are solid: a car that drives at a lamp post is pushed out of it
+  const propBox = createPropCollider();
+  for (let i = 0; i < lights.count; i++) propBox.add(lights.x[i], lights.z[i], 0.22);
+  const lampHit = propBox.collide(lights.x[0] + 0.3, lights.z[0], CAR.bodyRadius);
+  check('the car stops at a street lamp (the props are solid)', !!lampHit && lampHit.pen > 0.5 && propBox.collide(lights.x[0] + 30, lights.z[0] + 30, CAR.bodyRadius) === null, lampHit ? `${lampHit.pen.toFixed(2)} m` : 'no hit');
   // the park benches
   const benches = placeParkBenches({ roads: data.roads, network: net, buildings, map: maps });
   stats.parkBenches = benches.count;

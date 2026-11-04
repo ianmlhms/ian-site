@@ -28,10 +28,18 @@ async function load(query) {
   await page.click('[data-act="drive"]');
 }
 async function settle() {
-  for (let i = 0; i < 60; i++) {
-    await page.waitForTimeout(400);
-    const s = await page.evaluate(() => window.__lux.stats());
-    if (i > 2 && s.pending === 0 && s.cityPending === 0) break;
+  // build the world around the camera NOW (a software-GL frame takes a second, the game builds 3 tiles per frame): the terrain tiles, the
+  // city cells and the trees are built in plain loops, then a few frames are drawn so the numbers are the steady state
+  await page.evaluate(() => {
+    const m = window.__lux, p = m.camera.position, s = m.state();
+    for (let k = 0; k < 800; k++) { m.terrain.update(p.x, p.z); if (m.terrain.stats.pending === 0 && k > 3) break; }
+    m.city.buildAll(s.x, s.z);
+    m.trees.update(p.x, p.z, 0, true);
+  });
+  for (let i = 0; i < 40; i++) {
+    await page.waitForTimeout(300);
+    const st = await page.evaluate(() => window.__lux.stats());
+    if (i > 2 && st.pending === 0 && st.cityPending === 0) break;
   }
   await page.waitForTimeout(500);
 }
@@ -64,9 +72,10 @@ async function shot(pose, out) {
     m.setCamera({ x, y, z, tx, ty, tz, fov: p.fov || 62 });
   }, pose);
   await settle();
+  if (pose.wait) await page.waitForTimeout(pose.wait);          // e.g. the trees grow in over 0.45 s of game time: a software-GL frame is 0.1 s of it
   const stats = await page.evaluate(() => window.__lux.stats());
   fs.mkdirSync(out, { recursive: true });
-  await page.screenshot({ path: path.join(out, `${pose.name}.png`) });
+  await page.screenshot({ path: path.join(out, `${pose.name}.png`), timeout: 180000 });
   return stats;
 }
 

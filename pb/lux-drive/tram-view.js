@@ -24,7 +24,7 @@ const GROOVE = 0.16;                // m: the dark groove around a rail
 const BED_LIFT = 0.03;              // m: the bed over the ground (the ground is a 1 m lattice, the bed a 2 m ribbon)
 const COL = {
   slab: [0.60, 0.61, 0.60], slabDark: [0.50, 0.51, 0.51], grass: [0.35, 0.50, 0.24], groove: [0.24, 0.25, 0.26], rail: [0.40, 0.41, 0.43],
-  railTop: [0.66, 0.67, 0.69], wire: [0.10, 0.10, 0.11], platform: [0.74, 0.73, 0.70], platformEdge: [0.88, 0.80, 0.30], platformSide: [0.58, 0.57, 0.55],
+  railTop: [0.66, 0.67, 0.69], wire: [0.17, 0.17, 0.19], platform: [0.74, 0.73, 0.70], platformEdge: [0.88, 0.80, 0.30], platformSide: [0.58, 0.57, 0.55],
 };
 
 const lerp3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
@@ -50,7 +50,7 @@ function createRailGround(surface, deckNetwork) {
   };
 }
 
-export function createTramView({ scene, network, sim, surface, deckNetwork, env, camera, maps }) {
+export function createTramView({ scene, network, sim, surface, deckNetwork, env, camera, maps, props }) {
   const material = createPartMaterial(env);
   const bedMaterial = createPartMaterial(env, { offset: -2 });
   const railGround = createRailGround(surface, deckNetwork);
@@ -158,7 +158,7 @@ export function createTramView({ scene, network, sim, surface, deckNetwork, env,
         const s0 = sections[k], s1 = sections[k + 1];
         {                                                                         // the wire: a flat ribbon, seen from the side and from above
           const w0 = [s0.x, s0.yc + H, s0.z], w1 = [s1.x, s1.yc + H, s1.z];
-          const wl = 0.035;
+          const wl = 0.022;
           wire.quad([w0[0], w0[1] - wl, w0[2]], [w1[0], w1[1] - wl, w1[2]], [w1[0], w1[1] + wl, w1[2]], [w0[0], w0[1] + wl, w0[2]], COL.wire);
           wire.quad([w0[0] + s0.rx * wl, w0[1], w0[2] + s0.rz * wl], [w1[0] + s1.rx * wl, w1[1], w1[2] + s1.rz * wl], [w1[0] - s1.rx * wl, w1[1], w1[2] - s1.rz * wl], [w0[0] - s0.rx * wl, w0[1], w0[2] - s0.rz * wl], COL.wire);
         }
@@ -169,6 +169,7 @@ export function createTramView({ scene, network, sim, surface, deckNetwork, env,
           if (!(surface.roadInfoAt(px, pz, road), road.sdCar < 0.3)) {            // never in a carriageway
             const py = s0.yc;                                                         // the level of the track (a pole on a bridge stands on the deck)
             wire.append(poleGeom, { x: px, y: py + TRAM.lift + TRAM.railHeight, z: pz, yaw: Math.atan2(-s0.rx, -s0.rz) });
+            if (props) props.add(px, pz, TRAM.poleRadius);
           }
         }
       }

@@ -28,6 +28,7 @@ import { createTramSim } from './tram-sim.js';
 import { createTramView } from './tram-view.js';
 import { placeStreetLights } from './street-lights.js';        // the street lights (city finish)
 import { createStreetLightView } from './street-light-view.js';
+import { createPropCollider } from './props.js';              // lamps, poles and benches stop the car
 import { placeParkBenches } from './park-benches.js';          // the benches of the parks (city finish)
 import { createBenchView } from './bench-view.js';
 import { createSolidMaterial } from './solid-material.js';
@@ -41,6 +42,8 @@ import { createMinimap } from './minimap.js';
 import { roadDirectionAt } from './roads.js';
 import { t, LANGS } from './i18n.js';
 
+const LAMP_POST_RADIUS = 0.22;        // m: a street lamp, a catenary pole (the car stops at it like at a tree)
+const BENCH_RADIUS = 0.8;             // m: a park bench
 const MAX_FRAME_S = 0.1;              // s: a long frame (a tab in the background) never jumps the car
 const LANG_KEY = 'pb_luxdrive_lang';
 const QUALITY_KEY = 'pb_luxdrive_quality';
@@ -156,16 +159,21 @@ async function boot() {
   // the Luxtram: the rails and the vehicles of the line (tram-network.js builds the two tracks from lines.bin, tram-sim.js runs the vehicles on them)
   const tramNetwork = createTramNetwork(data.lines, data.stops, TRAM);
   const tramSim = createTramSim(tramNetwork, TRAM);
-  const trams = createTramView({ scene, network: tramNetwork, sim: tramSim, surface, deckNetwork, env, camera, maps });
-  const streetLights = createStreetLightView({ scene, lights: placeStreetLights({ roads: data.roads, network: field.network, buildings, map: maps }), ground, env });
-  const benchView = createBenchView({ scene, benches: placeParkBenches({ roads: data.roads, network: field.network, buildings, map: maps }), ground, env });
+  const props = createPropCollider();                       // lamps, catenary poles and benches: small solid circles the car stops at
+  const trams = createTramView({ scene, network: tramNetwork, sim: tramSim, surface, deckNetwork, env, camera, maps, props });
+  const lamps = placeStreetLights({ roads: data.roads, network: field.network, buildings, map: maps });
+  for (let i = 0; i < lamps.count; i++) props.add(lamps.x[i], lamps.z[i], LAMP_POST_RADIUS);
+  const streetLights = createStreetLightView({ scene, lights: lamps, ground, env });
+  const parkBenches = placeParkBenches({ roads: data.roads, network: field.network, buildings, map: maps });
+  for (let i = 0; i < parkBenches.count; i++) props.add(parkBenches.x[i], parkBenches.z[i], BENCH_RADIUS);
+  const benchView = createBenchView({ scene, benches: parkBenches, ground, env });
   const model = createCarModel({ colourId: 'red', material: solid });
   scene.add(model.group);
 
   // ---- the car, the camera, the interface
   const start = data.places.start || { x: WORLD.width / 2, z: WORLD.depth / 2, yaw: 0 };
   const roadInfo = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, surface: 0, road: -1, lines: 0, lanes: 0, s: 0 };
-  const collide = (x, z, radius) => buildings.collide(x, z, radius) || portals.collide(x, z, radius) || forest.collide(x, z, radius) || tramSim.collide(x, z, radius) || playArea.collide(x, z, radius);
+  const collide = (x, z, radius) => buildings.collide(x, z, radius) || portals.collide(x, z, radius) || forest.collide(x, z, radius) || tramSim.collide(x, z, radius) || props.collide(x, z, radius) || playArea.collide(x, z, radius);
   const car = createCar({ ground, roadInfoAt: (x, z, out) => surface.roadInfoAt(x, z, out), collide, start });
   const chase = createChaseCamera(ground, (x, z, radius) => buildings.collide(x, z, radius));
 

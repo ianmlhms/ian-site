@@ -678,3 +678,77 @@ asks the carve itself (`network.carve` at the exact position of the tree) instea
 
 
 ## Milestone 5 — UI: NOT STARTED
+
+
+## City finish — branch `lux-drive-city` (cloud session, Claude)
+
+Scope: the start, the Luxtram, the parks, street lights, the distance LOD of the city, and the look fixes of REVIEW.md items 15-16
+(+ the fields).  Worked from the shipped data only (the raw LiDAR / LOD2 / OSM `.pbf` are not in the cloud container, so no re-bake).
+
+### 1. The start: VERIFIED (the flow measures it)
+
+`luxdrive_world.mjs` runs on this machine now.  The car starts at (5924.1, 7901.9) on **Avenue John F. Kennedy** (asphalt), **1.02 m to the
+right of the centre line** of the 7.20 m carriageway (the right-hand lane), the heading equals the direction of the way (-0.236 rad, within the
+0.25 rad of the flow), 91 m from the middle of Place de l'Europe.  It is not on the plaza.
+
+### 2. Look fixes (REVIEW 15 / 16 and the fields)
+
+* **Straight kerbs and pavements.**  The ground shader used to paint the carriageway, the kerb and the pavement from the offset of ONE nearest road
+  (`lat`, `hw`, `a0`), and that offset jumps where the nearest road changes between two nodes of the lattice: the ragged blotches.  The carve now
+  also returns the signed distance to the **union** of all the carriageways (`sdCar` = min over the roads of `d - hw`) and of all the pavements
+  (`sdPave` = min of `d - a0`), only for roads that lie at the level of the ground there.  A min over the roads is continuous, the 1 m / 2 m / 4 m
+  lattices interpolate it into straight edges, and the shader cuts at its zero **per pixel** with one pixel of anti-aliasing (`fwidth`).  The
+  values travel in a new vertex attribute `aRoad3` (`sdCar`, `sdPave`, paint fade), `tile-mesh.js` / `surface.js` / `heightfield.js` carry them.
+  The cap of the distance (8 m) is positive on both nodes of a quad that no road touches, so it can never put an edge into empty ground.
+* **Markings cut before junctions.**  `carve` finds the marked roads whose carriageway (+ 3.5 m) holds the node; if two *different ways* that cross at more
+  than 20 degrees meet there (two ways that continue one street meet end to end at a small angle and are NOT a junction) the node is a junction:
+  its `mark` weight is 0 and the shader draws no lane line there (`smoothstep(0.5, 0.9, mark)` cuts it within the quad).  Dashes end cleanly in front
+  of the crossing street instead of breaking into fragments.
+* **Fields read as fields.**  The farmland is now a patchwork of **parcels** (78-128 m rectangles, turned by a different angle in every 900 m block, each with its
+  own crop: young wheat, ripe grain, ploughed earth with strong furrows, rape, stubble), a thin hedge on some borders, painted greens / yellows / browns.
+  The grey wash had a second cause: the class `urban` also covers plots that nobody has built on (112 km2 of which 37 % is `urban`).  `world-map.js` now
+  measures how built-up the 72 m neighbourhood of every class cell is (footprint area of the LOD2 buildings, a blurred raster) and the ground shader
+  only paints hard ground where the houses are (smoothstep 3 % - 10 %); an empty plot is lawn or field.  The tree placement still reads the raw class.
+* **Parks.**  The mown lawn of the class `park` has soft mowing stripes and large calm patches; the OSM footpaths of the park are painted by the road
+  paint; 594 **benches** stand beside the park paths (`park-benches.js` places them from the roads + the park class, `bench-view.js` draws the ones
+  within 170 m as one instanced mesh).
+
+### 3. The Luxtram
+
+* **The network** (`tram-network.js`, pure).  `lines.bin` kind 2 (482 ways, the real line Luxexpo - Kirchberg - Pont Rouge - Pfaffenthal - Theater - Hamilius -
+  Place de Metz - Gare - Howald - Stadion, + the Findel branch) becomes a graph.  The two **tracks** of the line (A: Luxexpo -> Stadion, B: back) are found by
+  Dijkstra between the terminal ends named by the stops; edge costs make the path stay on the right-hand rail of its direction of travel (the other track
+  of a parallel pair lies on its left) and avoid the crossovers, otherwise the shortest path hops between the two rails to cut corners and the vehicle
+  would run on the left for kilometres (the harness caught exactly that).  2 x 12.5 km, 22 stops per track, merged platform nodes.
+* **The vehicles** (`tram-sim.js`, pure).  3 CAF Urbos vehicles, 45 m, 5 articulated sections, each section is two points of the track: the vehicle is on its
+  rails by construction.  Line speed 17 m/s (61 km/h), slower in curves (lateral acceleration 1.1 m/s2), braking to stop with the middle of the vehicle at the
+  stop, 11 s with the doors open, turn-back out of sight at the terminus, a safety distance to the vehicle in front.  **A car on the track stops the vehicle**
+  (it brakes to 9 m from the car); the car also collides with the sections (capsules) like with a house.  The vehicles start at Philharmonie (30 m from the
+  start of the game), Hamilius and Gare.
+* **The track** (`tram-view.js`): built from the SAME centre lines as the vehicles, in chunks of ~300 m when the camera is within 760 m (3 ms budget per frame),
+  drawn within 700 m.  Two steel rails (7 cm head, 1.435 m gauge) in dark grooves in a 2.9 m bed; the bed is a **slab where the tram shares the street, the
+  city or a bridge**, and a **grass bed in the open** (the Kirchberg grass track).  Rails on a bridge follow the **deck that runs along them** (a deck that
+  crosses over the track at an angle is a bridge the tram runs under: the ground stays the ground), measured: Pont Rouge, Pont Adolphe.
+  **Catenary**: a pole every 38 m on the outer side with an arm and an insulator, and the contact wire at 5.6 m.  **Platforms** 46 m x 3 m x 0.28 m at all 44
+  stops, with a shelter (glass back wall, bench, Luxtram-blue stop sign), skipped where they would stand in a carriageway.
+* **The look**, after the photographs (Wikimedia Commons, `reports-cloud/lux-drive/lux-drive-city/`): silver-grey body, one long band of dark glass for
+  windows and doors, a dark windscreen, the Luxtram turquoise on the chin of the nose and as a thin stripe low on the side, pantographs on the 2nd and 4th
+  section, air-conditioning boxes, lit windows at night.  The 3 vehicles are 3 instanced draw calls in total.
+
+### 4. Street lights
+
+`street-lights.js` places **7 119+ lamps** along the urban streets (primary / secondary / tertiary / residential / living streets / trunk, 26-30 m, alternating
+sides, only where the neighbourhood is built-up, never in a carriageway, on a bridge, in a tunnel or in a house); `street-light-view.js` draws the 520
+nearest within 230 m as one instanced mesh with the head glowing at dusk and night (part material `glow`), plus one additive instanced mesh of warm light
+pools on the ground that is switched on from `uNight > 0.06`.
+
+### 5. Distance LOD of the city
+
+The building cells (256 m) up to `quality.buildingRadius` (low 300 / medium 420 / high 700 m) are painted by the full building shader (windows, shutters,
+roof tiles); the cells beyond, up to `quality.buildingFarRadius` (760 / 1300 / 2100 m), are the SAME mesh with the cheap vertex-colour material (no window
+bands, flat painted walls and roofs): a fraction of the per-pixel cost, which lets the city reach about 3x as far.  The material of a cell follows the
+distance with a 40 m hysteresis.  The walls go 2.5 m below the ground (the far cells stand on coarse terrain tiles that differ from the exact ground by a metre
+on a slope); the window rows keep their origin at the true ground.
+
+### 6. Gates (this session)
+

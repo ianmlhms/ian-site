@@ -180,6 +180,7 @@ export const TRAM = Object.freeze({
   width: 2.65, height: 3.55, floor: 0.45,
   vehicles: 3,
   bodyHalfWidth: 1.35,      // m: the collision capsule of a section
+  poleRadius: 0.22,         // m: the collision circle of a catenary pole
   catenary: { spacing: 38, height: 5.6, arm: 1.9 },   // m between the poles, the height of the contact wire, the reach of the arm
   platform: { length: 46, width: 3.0, height: 0.28, setback: 0.35 },
 });
