@@ -15,7 +15,7 @@ import urllib.request
 from pyproj import Transformer
 
 ORIGIN_E, ORIGIN_N_TOP = 72192.0, 83968.0
-UA = "ian-site-luxdrive/1.0 (konto@ian.lu)"
+UA = "ian-site-luxdrive/1.0 (https://ian.lu)"
 MIRRORS = ["https://overpass-api.de/api/interpreter",
            "https://overpass.kumi.systems/api/interpreter", "https://overpass.private.coffee/api/interpreter"]
 _to = Transformer.from_crs(4326, 2169, always_xy=True)

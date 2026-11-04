@@ -32,10 +32,13 @@ def main():
     rows = [scaled[i:i + a.cols] for i in range(0, len(scaled), a.cols)]
     heights = [max(im.height for _, im in r) for r in rows]
     sheet = Image.new("RGB", (tw * a.cols, sum(heights)), (24, 24, 26))
-    try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
-    except OSError:
-        font = ImageFont.load_default()
+    font = ImageFont.load_default()
+    for path in ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/System/Library/Fonts/Helvetica.ttc"):   # Linux (cloud) or the Mac
+        try:
+            font = ImageFont.truetype(path, 18)
+            break
+        except OSError:
+            continue
     y = 0
     for r, h in zip(rows, heights):
         for c, (label, im) in enumerate(r):

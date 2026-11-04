@@ -1,0 +1,21 @@
+[
+ {"name":"adolphe","tx":4829,"tz":9101,"ty":24,"dist":120,"bearing":180,"height":3.2,"fov":50,"hide":["trees"]},
+ {"name":"adolphe_e","tx":4829,"tz":9101,"ty":24,"dist":120,"bearing":0,"height":3.2,"fov":50,"hide":["trees"]},
+ {"name":"rouge","tx":5179,"tz":8061,"ty":55,"dist":230,"bearing":90,"height":3.2,"fov":50,"hide":["trees"]},
+ {"name":"rouge_n","tx":5179,"tz":8061,"ty":55,"dist":230,"bearing":270,"height":3.2,"fov":50,"hide":["trees"]},
+ {"name":"philharmonie","tx":5962,"tz":7992,"ty":12,"dist":100,"bearing":200,"height":3.2,"fov":58,"hide":["trees"]},
+ {"name":"philharmonie_n","tx":5962,"tz":7992,"ty":12,"dist":100,"bearing":300,"height":3.2,"fov":58,"hide":["trees"]},
+ {"name":"ecj","tx":6050,"tz":7595,"ty":60,"dist":260,"bearing":135,"height":3.2,"fov":50,"hide":["trees"]},
+ {"name":"ecj_hi","tx":6050,"tz":7595,"ty":50,"dist":300,"bearing":135,"height":60,"fov":50,"free":true,"hide":["trees"]},
+ {"name":"cathedral","tx":5164,"tz":8965,"ty":30,"dist":90,"bearing":225,"height":3.2,"fov":55,"hide":["trees"]},
+ {"name":"cathedral_s","tx":5164,"tz":8965,"ty":30,"dist":90,"bearing":60,"height":3.2,"fov":55,"hide":["trees"]},
+ {"name":"palais","tx":5265,"tz":8815,"ty":10,"dist":45,"bearing":143,"height":3.2,"fov":60,"buildingClearance":2.5,"hide":["trees"]},
+ {"name":"gellefra","tx":4970,"tz":8985,"ty":12,"dist":50,"bearing":20,"height":3.2,"fov":55,"hide":["trees"]},
+ {"name":"bock","tx":5540,"tz":8738,"ty":0,"dist":130,"bearing":60,"height":3.2,"fov":55,"hide":["trees"]},
+ {"name":"passerelle","tx":5312,"tz":9390,"ty":10,"dist":120,"bearing":180,"height":3.2,"fov":55,"hide":["trees"]},
+ {"name":"coque","tx":6633,"tz":7440,"ty":5,"dist":110,"bearing":200,"height":3.2,"fov":55,"hide":["trees"]},
+ {"name":"thuengen","tx":5745,"tz":8185,"ty":6,"dist":100,"bearing":121,"height":3.2,"fov":55,"hide":["trees"]},
+ {"name":"mudam","tx":5775,"tz":8160,"ty":10,"dist":90,"bearing":300,"height":3.2,"fov":55,"hide":["trees"]},
+ {"name":"bcee","tx":4949,"tz":9211,"ty":35,"dist":120,"bearing":20,"height":3.2,"fov":50,"hide":["trees"]},
+ {"name":"oberanven","tx":13285,"tz":3652,"ty":10,"dist":50,"bearing":90,"height":3.2,"fov":55,"hide":["trees"]}
+]
