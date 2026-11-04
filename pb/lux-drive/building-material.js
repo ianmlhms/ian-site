@@ -49,7 +49,8 @@ const FRAGMENT = `
     bool isOffice = style > 1.5 && style < 2.5;                     // an office: a stone base and bands of glass
     bool isModern = style > 3.5 && style < 4.5;                     // a tower: glass from the ground up
     bool isShed = style > 2.5 && style < 3.5;                       // a shed: a corrugated metal wall
-    bool isStone = style > 4.5;                                     // a church: dressed stone
+    bool isStone = style > 4.5 && style < 5.5;                      // a church: dressed stone
+    bool isTown = style > 5.5;                                      // the 19th-century stone façade of the old town and the stone city
     if (kind < 0.5) {                                              // the wall
       float len = max(vGeo.x, 0.5), eave = vGeo.y, v = vInfo.y;
       if (isOffice || isModern) {
@@ -86,6 +87,65 @@ const FRAGMENT = `
         float win = step(dx, 0.42) * step(1.6, v) * step(v, min(head, eave - 0.8));
         albedo = mix(albedo, vec3(0.10, 0.13, 0.16), win * 0.85);
         albedo = mix(albedo, albedo * 0.84, step(dx, 0.24) * 0.6);  // the buttress between the bays
+      } else if (isTown) {
+        // The stone façade of the 19th / early 20th century: a rusticated ground floor (or a shopfront), tall windows with stone
+        // frames, a lintel and a sill, a string course between the floors, a wrought-iron rail on the first floor, a cornice.
+        albedo *= 0.94 + 0.12 * grain;
+        albedo *= 1.0 - 0.16 * smoothstep(0.55, 0.9, grain2) * (1.0 - smoothstep(0.0, 4.0, v));      // the damp streaks low on the wall
+        float floors = max(1.0, floor(eave / 3.4 + 0.5));
+        float fh = eave / floors;                                    // the real floor height of this wall
+        float row = floor(v / fh), ly = v - row * fh;                // the floor and the height inside it
+        vec3 stoneCol = clamp(albedo * 1.07 + vec3(0.035), 0.0, 1.0);                                  // the dressed stone of frames and bands
+        float cornice = step(eave - 0.55, v);
+        float cornShadow = step(eave - 0.95, v) * (1.0 - cornice);
+        float course = step(ly, 0.13) * step(0.5, row) * (1.0 - cornice);                             // the string course
+        albedo = mix(albedo, stoneCol, clamp(cornice + course, 0.0, 1.0));
+        albedo *= 1.0 - 0.2 * cornShadow;
+        albedo = mix(albedo, albedo * vec3(0.8, 0.78, 0.76), 1.0 - smoothstep(0.2, 0.7, v));          // the plinth
+        if (uDetail > 0.5 && eave > 2.2 && vDist < 140.0) {
+          float cells = max(1.0, floor(len / 2.6 + 0.5)), cw = len / cells;
+          float cu = vInfo.x / cw, fi = floor(cu), dx = (fract(cu) - 0.5) * cw;
+          float fx = abs(dx);
+          float groundRow = step(row, 0.5);
+          float shopFloor = shop * groundRow * step(0.25, v);
+          float topRow = step(floors - 1.5, row);                                                    // the top floor under the cornice has lower windows
+          float winH = mix(1.95, 1.55, topRow);
+          float wy = ly - 0.5;                                                                        // the sill is half a metre over the floor
+          float present = step(h2(vec2(fi + row * 5.0, seed * 17.0)), 0.97);
+          float hasRow = step(0.0, row) * step(row, floors - 0.999) * step(0.3, v) * (1.0 - shopFloor) * present;
+          float inner = step(fx, 0.5) * step(0.0, wy) * step(wy, winH);
+          float surround = step(fx, 0.66) * step(-0.16, wy) * step(wy, winH + 0.22) * (1.0 - inner);
+          float lintel = step(winH, wy) * step(wy, winH + 0.22) * step(fx, 0.72);
+          albedo = mix(albedo, stoneCol, clamp(surround + lintel, 0.0, 1.0) * hasRow);
+          float bars = step(abs(fx - 0.25), 0.02) + step(abs(wy - winH * 0.62), 0.03);                // the glazing bars
+          vec3 glass = mix(vec3(0.07, 0.1, 0.14), vec3(0.36, 0.46, 0.56), smoothstep(0.0, winH, wy));
+          albedo = mix(albedo, mix(glass, vec3(0.88, 0.88, 0.84), clamp(bars, 0.0, 1.0) * 0.8), inner * hasRow);
+          float lit = step(0.6, h2(vec2(fi + row * 3.0, seed * 7.0)));
+          glow = inner * hasRow * lit * (1.0 - clamp(bars, 0.0, 1.0));
+          // the wrought-iron rail of the first floor, in front of the tall windows
+          float rail = step(abs(row - 1.0), 0.5) * step(0.32, wy) * step(wy, 0.95) * step(fx, 0.85) * hasRow * step(0.5, h1(seed * 19.0));
+          float railBars = step(0.5, fract(vInfo.x * 5.0)) * 0.55 + step(abs(wy - 0.9), 0.04) * 0.6;
+          albedo = mix(albedo, vec3(0.1, 0.11, 0.12), rail * clamp(railBars, 0.0, 1.0) * step(0.45, wy) * 0.85);
+          // the ground floor: grooves of the rustication, a door, or the shopfront
+          float groove = groundRow * step(abs(fract(v / 0.55) - 0.5), 0.02) * (1.0 - shopFloor);
+          albedo *= 1.0 - 0.1 * groove;
+          float doorCell = floor(mod(seed * 97.0, cells));
+          float isDoor = groundRow * step(abs(fi - doorCell), 0.5) * (1.0 - shopFloor);
+          float door = isDoor * step(fx, 0.6) * step(0.0, v) * step(v, 2.5);
+          albedo = mix(albedo, mix(vec3(0.25, 0.16, 0.1), vec3(0.14, 0.22, 0.2), step(0.5, h1(seed * 53.0))), door * 0.95);
+          albedo = mix(albedo, stoneCol, isDoor * step(fx, 0.75) * step(fx, 0.75) * step(2.5, v) * step(v, 2.75));
+          if (shopFloor > 0.5) {
+            float bay = 2.6;
+            float bx = abs(fract(vInfo.x / bay) - 0.5) * bay;
+            float pier = step(bx, 1.0);
+            float riser = step(v, 0.7) * pier;
+            float sign = step(3.0, v) * step(v, 3.45) * pier;
+            albedo = mix(albedo, vec3(0.12, 0.16, 0.2), pier * step(0.8, v) * step(v, 3.0) * 0.92);
+            albedo = mix(albedo, vec3(0.42, 0.4, 0.36), riser * 0.9);
+            albedo = mix(albedo, mix(vec3(0.55, 0.2, 0.18), vec3(0.14, 0.3, 0.26), step(0.5, h1(seed * 71.0))), sign * 0.85);
+            glow += pier * step(0.8, v) * step(v, 3.0) * step(0.55, h2(vec2(floor(vInfo.x / bay), seed * 41.0))) * 0.6;
+          }
+        }
       } else {
         // The house: a plinth, the windows, the shutters, the door.
         albedo *= 0.9 + 0.2 * grain;

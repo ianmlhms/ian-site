@@ -171,8 +171,10 @@ export function createTreeView({ scene, forest, baked = [], field, env, quality 
       const seed = (t.x * 0.37 + t.z * 0.71) % 1;
       const yaw = seed * 6.283;
       const name = t.kind === 2 ? 'bush' : tierFor(d, 1);
-      const girth = t.girth / 100;
-      const scale = t.kind === 2 ? t.height : t.height;
+      // decodeTrees already turned the girth byte into a factor (0.5 .. 1.0): dividing it by 100 again squashed every OSM tree
+      // to a 1 % wide pole (the thin sticks on the façades and in the lawns)
+      const girth = t.girth;
+      const scale = t.height;
       if (put(name, t.x, field.height(t.x, t.z) - 0.15, t.z, scale, yaw, seed, girth, s.now, s.spawnNext)) s.count++;
     }
     return true;
