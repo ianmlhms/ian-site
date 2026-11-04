@@ -16,6 +16,7 @@ const SCAN_BUDGET_MS = 1.5;        // the wall-clock time per frame spent scanni
 const NEAR_RADIUS = 42;            // m: the trees nearer than this get the full model
 const MID_RADIUS = 110;            // m: the trees up to here get the middle model
 const FADE_SECONDS = 0.45;         // s: a new tree grows into its place
+const CROWN_WIDTH = 0.66;          // the width of the crown of the models at scale 1 (two blobs of radius ~0.32): the baked girth is the crown width / the height
 const LOD_JITTER = 0.12;           // the near/mid swap is staggered, so a whole ring never pops at once
 const now_ = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 
@@ -171,7 +172,10 @@ export function createTreeView({ scene, forest, baked = [], field, env, quality 
       const seed = (t.x * 0.37 + t.z * 0.71) % 1;
       const yaw = seed * 6.283;
       const name = t.kind === 2 ? 'bush' : tierFor(d, 1);
-      const girth = t.girth / 100;
+      // world-data.js already turned the baked byte into a fraction (0.52 .. 0.95).  It was divided by 100 a second time here: every
+      // street / park tree of OSM was a 0.5 % wide needle, 20 m tall (the 'stray poles' of the reviewer).  The vertex shader wants a
+      // factor on the width of the model.
+      const girth = t.kind === 2 ? 1 : t.girth / CROWN_WIDTH;
       const scale = t.kind === 2 ? t.height : t.height;
       if (put(name, t.x, field.height(t.x, t.z) - 0.15, t.z, scale, yaw, seed, girth, s.now, s.spawnNext)) s.count++;
     }
