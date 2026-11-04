@@ -187,7 +187,10 @@ if (wants('steps')) {
   }
   const level = hits.filter((h) => h.apart === undefined || h.apart <= LEVEL_APART);
   hits.sort((a, b) => b.jump - a.jump);
+  if (bedAtArc) { const big = hits.filter((h) => h.jump > 0.05); console.log(`steps > 5 cm by the ways that reach them: one way ${big.filter((h) => h.ways <= 1).length}, several ways at one level ${big.filter((h) => h.ways > 1 && h.apart <= LEVEL_APART).length}, at two levels (> ${LEVEL_APART} m apart) ${big.filter((h) => h.apart > LEVEL_APART).length}`); }
   if (bedAtArc) console.log(`steps by the ways that reach them: one way ${hits.filter((h) => h.ways <= 1).length}, several ways at one level (<= ${LEVEL_APART} m apart) ${hits.filter((h) => h.ways > 1 && h.apart <= LEVEL_APART).length}, at two levels ${hits.filter((h) => h.apart > LEVEL_APART).length}`);
+  console.log(`steps by size: > 2 cm ${hits.length}, > 5 cm ${hits.filter((h) => h.jump > 0.05).length}, > 10 cm ${hits.filter((h) => h.jump > 0.1).length}, > 20 cm ${hits.filter((h) => h.jump > 0.2).length}`);
   console.log(`steps: ${hits.length} places with a jump > ${LIMIT * 100} cm within ${D * 200} cm on the carriageway (${measured} probes); worst ${hits[0] ? (hits[0].jump * 100).toFixed(1) + ' cm' : '-'}`);
+  if (process.argv.includes('--small')) for (const h of hits.filter((q) => q.jump < 0.05).filter((q, i) => i % 40 === 0).slice(0, 25)) console.log(`   small ${(h.jump * 100).toFixed(1)} cm at ${h.x.toFixed(1)},${h.z.toFixed(1)} ${h.name} [${h.ways} way(s), ${h.apart.toFixed(2)} m apart]`);
   for (const h of hits.slice(0, VERBOSE ? 40 : 8)) console.log(`   step ${(h.jump * 100).toFixed(1)} cm at ${h.x.toFixed(1)},${h.z.toFixed(1)} ${h.name}${h.ways !== undefined ? ` [${h.ways} way${h.ways === 1 ? '' : 's'}, ${h.apart.toFixed(2)} m apart]` : ''}`);
 }
