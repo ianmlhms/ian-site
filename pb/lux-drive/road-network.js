@@ -449,7 +449,9 @@ export function createRoadNetwork(roads, baseHeight) {
    *   bed      the height of the road surface
    *   band     the height of the ground beside the road: the land, reached by the slope limited ramp of the batter
    *   kerb     the height of the kerb / pavement above the bed (0 on the carriageway)
-   *   lat      the signed offset from the centre line of the nearest road (positive = to the right of the way)
+   *   lat      the signed distance to the way (positive = to the right of it): the paint of the carriageway is
+   *            the band within the half width of this distance, so the edge of the tarmac follows the way itself
+   *            and not the infinite line of one of its segments
    *   hw       the half width of the carriageway of that road
    *   a0       the outer edge of the pavement (the carriageway + the kerb + the pavement)
    *   kind     the class code of that road, road its index, dist the distance to it
@@ -493,8 +495,8 @@ export function createRoadNetwork(roads, baseHeight) {
           t = t < 0 ? 0 : t > 1 ? 1 : t;
           const rx = x - (ax + ex * t), rz = z - (az + ez * t);
           const len = Math.sqrt(ll) || 1;
-          const lat = (rx * -ez + rz * ex) / len;         // the signed offset from the centre line (right is positive)
-          const d = Math.hypot(rx, rz);
+          const lat = (rx * -ez + rz * ex) / len;         // the signed offset from the LINE of the way (right is positive)
+          const d = Math.hypot(rx, rz);                  // the distance to the SEGMENT of the way
           if (d >= reach) continue;
           // ---- the batter: the face of the cutting or of the embankment beside the road.
           // The ground beside a road is the LAND, and the road is cut into it.  The face of the cutting (or of the
@@ -567,10 +569,13 @@ export function createRoadNetwork(roads, baseHeight) {
           // carriageway contains the point, and among those the most central one.  Without this rule a wide
           // road (a square) swallows the street that crosses it and the street is painted with its surface.
           // The narrowness is the last tie break: at a crossing the minor road keeps its own surface.
+          // The distance that decides it is the distance to the SEGMENT, not the offset from the infinite
+          // line of the segment: a street that curls into a loop paints a disc when the paint follows the
+          // line, and a disc is not a street.
           const hw = HW[i];
-          const score = ((d <= hw ? 2 : 1) + 1 - Math.min(1, Math.abs(lat) / Math.max(hw, 0.5))
+          const score = ((d <= hw ? 2 : 1) + 1 - Math.min(1, d / Math.max(hw, 0.5))
                          - Math.min(hw, 12) * 0.02) * level;
-          if (score > bestScore) { bestScore = score; best = i; bestLat = lat; bestDist = d; bestT = t; }
+          if (score > bestScore) { bestScore = score; best = i; bestLat = lat >= 0 ? d : -d; bestDist = d; bestT = t; }
         }
       }
     }

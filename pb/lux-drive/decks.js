@@ -55,10 +55,22 @@ export function decodeDecks(bytes) {
 /**
  * The deck network: the segments of every deck in a spatial hash, so the ground function can ask
  * "is there a deck over this point, and how high is it?".
+ *
+ * surface: the ground the game draws (the land with the roads carved into it).  The two ends of a deck stand
+ * on it: the approach road is cut into the land, so the end of the deck has to be at the level of that road
+ * and not at the level of the land above it, or the bridge hangs in the air over its own approach.
  */
-export function createDeckNetwork(decks) {
+export function createDeckNetwork(decks, surface = null) {
+  const list = decks.map((d) => {
+    if (!surface || d.pts.length < 2) return d;
+    const tops = Float32Array.from(d.tops);
+    const last = d.pts.length - 1;
+    tops[0] = surface.height(d.pts[0][0], d.pts[0][1]);
+    tops[last] = surface.height(d.pts[last][0], d.pts[last][1]);
+    return { ...d, tops };
+  });
   const ax = [], az = [], bx = [], bz = [], t0 = [], t1 = [], half = [];
-  for (const d of decks) {
+  for (const d of list) {
     for (let i = 0; i + 1 < d.pts.length; i++) {
       ax.push(d.pts[i][0]); az.push(d.pts[i][1]);
       bx.push(d.pts[i + 1][0]); bz.push(d.pts[i + 1][1]);
@@ -124,7 +136,7 @@ export function createDeckNetwork(decks) {
     return best;
   }
 
-  return { deckAt, count, decks };
+  return { deckAt, count, decks: list };
 }
 
 /** The ground the car, the camera and the renderer see: the terrain surface, with the bridge decks on top.

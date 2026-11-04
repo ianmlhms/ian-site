@@ -24,6 +24,15 @@ export const STYLE_SHOP = 8;              // a bit of the style byte: the ground
 
 export const CELL = 256;            // m, the cell of the building mesh (one draw call per cell)
 
+/** The bottom of a wall follows the ground along the whole edge of the footprint: a wall that only touches
+ *  the ground at its two corners hangs over a slope in the middle and is eaten by the hill on the other side.
+ *  The points are taken every EDGE_STEP metres and only kept where the ground leaves the line between the
+ *  corners by more than EDGE_TOL, so a house on flat ground keeps its four corners and a house on a slope
+ *  gets the points it needs and no more. */
+const EDGE_STEP = 1.0;      // m, the spacing of the points along one edge of the footprint
+const EDGE_TOL = 0.15;      // m, how far the ground may leave the line between two corners before a point is kept
+const MIN_WALL = 0.3;       // m, the shortest wall a house may keep where the ground climbs over its eaves
+
 /** The walls of the houses: cream, ochre, white, pink, pale green, blue grey, beige. */
 const WALLS = [
   [0.93, 0.90, 0.80], [0.88, 0.80, 0.62], [0.95, 0.95, 0.92], [0.86, 0.74, 0.64],
@@ -114,6 +123,30 @@ function faceUp(m, points, colour, kind, seed, uvs, wallLen, eave, sty) {
 }
 
 /**
+ * The bottom of one wall: the points where the ground leaves the line between the two corners of the edge.
+ * The height of every point is the ground as the game draws it, but never above the eaves: a wall that the
+ * hill climbs over would be drawn upside down.
+ */
+function wallBottom(ax, az, bx, bz, ay, by, eaveY, heightAt) {
+  const len = Math.hypot(bx - ax, bz - az);
+  const steps = Math.max(1, Math.round(len / EDGE_STEP));
+  const keep = [[ax, ay, az]];
+  if (steps > 1) {
+    for (let s = 1; s < steps; s++) {
+      const t = s / steps;
+      const x = ax + (bx - ax) * t, z = az + (bz - az) * t;
+      const h = heightAt(x, z);
+      const line = ay + (by - ay) * t;
+      if (Math.abs(h - line) > EDGE_TOL) keep.push([x, h, z]);
+    }
+  }
+  keep.push([bx, by, bz]);
+  const limit = eaveY - MIN_WALL;
+  for (const p of keep) if (p[1] > limit) p[1] = limit;
+  return keep;
+}
+
+/**
  * Adds one building to the mesh.
  * b: the decoded LOD2 building { id, roof, style, levels, eave, ridge, ridgeDir, pts }.
  * heightAt(x, z): the height of the ground as the game draws it (the land with the roads carved into it).
@@ -135,7 +168,7 @@ export function addBuilding(m, b, heightAt, landAt) {
   const wall = wallColour(style, seed);
   const roof = roofColour(style, b.roof, seed);
 
-  // the walls: every edge of the footprint, from the land under its corners up to the flat eave
+  // the walls: every edge of the footprint, from the land under it up to the flat eave
   let along = 0;
   for (let i = 0; i < n; i++) {
     const j = (i + 1) % n;
@@ -147,13 +180,22 @@ export function addBuilding(m, b, heightAt, landAt) {
     const ex = (bx - ax) / len, ez = (bz - az) / len;
     const mx = (ax + bx) / 2 - cx, mz = (az + bz) / 2 - cz;
     const outward = (ex * mz - ez * mx) > 0;
-    const wallH = eaveY - (ay + by) / 2;
-    const a = [ax, ay, az], b2 = [bx, by, bz], c = [bx, eaveY, bz], d = [ax, eaveY, az];
-    const uvs = outward
-      ? [[along, 0], [along + len, 0], [along + len, eaveY - by], [along, eaveY - ay]]
-      : [[along + len, 0], [along, 0], [along, eaveY - ay], [along + len, eaveY - by]];
-    const pts4 = outward ? [a, b2, c, d] : [d, c, b2, a];
-    face(m, pts4, wall, KIND.wall, seed, uvs, len, wallH, sty);
+    const bottom = wallBottom(ax, az, bx, bz, ay, by, eaveY, heightAt);
+    let u = along;
+    for (let k = 0; k + 1 < bottom.length; k++) {
+      const p0 = bottom[k], p1 = bottom[k + 1];
+      const segLen = Math.hypot(p1[0] - p0[0], p1[2] - p0[2]);
+      if (segLen < 0.05) continue;
+      const a = [p0[0], p0[1], p0[2]], b2 = [p1[0], p1[1], p1[2]];
+      const c = [p1[0], eaveY, p1[2]], d = [p0[0], eaveY, p0[2]];
+      const wallH = eaveY - (p0[1] + p1[1]) / 2;
+      const uvs = outward
+        ? [[u, 0], [u + segLen, 0], [u + segLen, eaveY - p1[1]], [u, eaveY - p0[1]]]
+        : [[u + segLen, eaveY - p0[1]], [u, eaveY - p1[1]], [u, 0], [u + segLen, 0]];
+      const pts4 = outward ? [a, b2, c, d] : [d, c, b2, a];
+      face(m, pts4, wall, KIND.wall, seed, uvs, segLen, wallH, sty);
+      u += segLen;
+    }
     along += len;
   }
 

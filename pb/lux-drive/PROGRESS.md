@@ -16,7 +16,7 @@ the union and the buffer from `scripts/luxdrive/bake_area.py` (LUREF / EPSG:2169
 **World frame.** `x = LUREF easting − originE` (east), `z = originNTop − LUREF northing` (south),
 metres. World box 16 896 × 14 848 m, aligned to a 512 m block grid.
 
-**Shipped data — 11 653 017 B = 11.12 MB of the 30 MB budget (37 %).**
+**Shipped data — 11 636 377 B = 11.10 MB of the 30 MB budget (37 %).**
 
 | file | bytes | what |
 |---|---:|---|
@@ -25,11 +25,11 @@ metres. World box 16 896 × 14 848 m, aligned to a 512 m block grid.
 | canopy.bin | 1 400 912 | MBG1 grids, 16 m nodes: the tree height and the tree cover |
 | roads.bin | 862 486 | 19 314 OSM ways: real widths, lanes, one-way, bridge / tunnel / layer |
 | classes.bin | 798 513 | the land classes on an 8 m grid (RLE): grass, forest, water, park, urban, farmland, sand, scrub |
-| buildings.bin | 849 945 | 25 336 LOD2 buildings: footprint, eaves, ridge, roof, the style of the façade |
+| buildings.bin | 839 935 | 25 067 LOD2 buildings: footprint, eaves, ridge, roof, the style of the façade |
 | lines.bin | 33 790 | the tram and the railway |
 | stops.bin | 24 897 | 2 263 tram / train / bus stops |
-| decks.bin | 37 330 | 361 bridge decks with their real height from the LiDAR DSM |
-| trees.bin | 297 748 | the trees OSM knows one by one and the rows of trees along the streets |
+| decks.bin | 39 232 | 309 bridge decks with their real height from the LiDAR DSM |
+| trees.bin | 297 064 | the trees OSM knows one by one and the rows of trees along the streets |
 | names.json | 21 772 | the 1 079 road names (Luxembourgish first) |
 | stopnames.json | 16 581 | the stop names |
 | places.json | 20 098 | the start point (Place de l'Europe, Kirchberg) and the landmarks |
@@ -575,6 +575,47 @@ the play area.
 lights and the distance LOD of the city (the buildings are drawn at one level of detail; the trees have
 three, and the ground paints the wood as its canopy beyond the reach of the trees).
 
-## Milestone 4 — gates: NOT STARTED
+## Milestone 4 — gates: IN PROGRESS
+
+**The harness** (`pb/lux-drive/harness.js`) runs the world in Node, with the very code the browser runs
+(the same decoders, the same carve, the same meshes), and asks the questions the brief asks:
+
+| section | what it asks |
+|---|---|
+| A data | the grids decode, the checksums agree, every height is finite, the data fits the 30 MB budget |
+| B roads | no road ends in the middle of nowhere, no rail runs on a road, the painted tarmac is the width of the carriageway |
+| C city | no house floats, no house is buried in the hill, no wall is drawn upside down, no house is inside another house, no road runs through a house |
+| D decks | every deck stands on a way that rides over the others, no deck floats, no deck dives into the ground, no pit under a deck |
+| E trees | no tree stands inside a house, no tree stands in the carriageway, no tree of the woods floats |
+| F car and camera | the car stays on the surface and the camera never goes under the ground |
+| G render | the mesh of the ground is the surface the car drives on |
+
+**The trees stand where a car cannot drive.** The bake follows the **centre line the game draws** (the
+OSM polyline resampled every 4 m and rounded with a Gaussian of 3 m, the twin of `resample` +
+`gaussianSmooth` in `road-network.js`), and moves every tree that stands in a carriageway to the
+pavement beside it.  The move is a small search: both sides of the way are tried, and the tree is put
+where no carriageway is left — a tree in the middle of a square that is ringed by streets has no place
+off the tarmac and is dropped (57 of them).  The position is rounded to the decimetre *before* the
+clearance is measured, because that is the position the file holds and the game reads.
+
+**The test is the exact position, not the lattice.** The 1 m lattice that the physics reads holds the
+value of the road at the *node* of the tree, and a node lies up to 1.4 m away from the tree: a tree that
+stands half a metre outside the kerb of a square was counted as standing in the road.  The harness
+asks the carve itself (`network.carve` at the exact position of the tree) instead.
+
+**Measured** (the harness, after the fixes):
+
+| | before | now |
+|---|---:|---:|
+| the trees in the carriageway | 613 | **0** |
+| the trees inside a house | 16 | **0** |
+| the houses inside another house | 32 | **0** |
+| the houses with a road through them | 56 | **0** |
+| the houses that float / are buried | 0 / 0 | **0 / 0** |
+
+**Open in this milestone:** the paint of 31 roads is more than 1.5 m wider than the carriageway (the
+loops and the squares of the old town, where the "width" of a painted band is not a width), one wall
+corner is drawn upside down, and 5 deck points dive into the ground (the worst 1.47 m) with 4 pits
+under the decks.
 
 ## Milestone 5 — UI: NOT STARTED

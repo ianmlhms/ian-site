@@ -58,3 +58,16 @@ Walls + overpass fixed, the city exists: good progress. Next, in this order:
 13. In the Kirchberg street shot the carriageway looks like light stone paving; default road surface is
     asphalt unless OSM `surface` says otherwise. Check the surface default.
 Then trees (you are on it), then Milestone 4 (gates).
+
+---
+Review 4 (4 Nov, 04:20), from `luxdrive-facade.kirchberg-facade.png` and `luxdrive-facade.grund-facade.png`.
+Big improvement: Kirchberg glass façades and Grund (church, shuttered houses, asphalt) now read as real.
+14. **Start position**: the car starts on the paved plaza between office blocks. Start on the carriageway of
+    Avenue John F. Kennedy next to Place de l'Europe, facing along the road.
+15. **Ragged pavement edges**: pavements / kerbs are blotchy light-grey shapes spilling into yards. Same
+    per-pixel distance treatment as the carriageway (item 8): straight kerb lines, constant width.
+16. **Road markings break into fragments** (stray dashes / arrow pieces near junctions). Markings only
+    along the continuous centreline / lane lines of a way, cut cleanly before junction areas.
+PRIORITY NOW: finish M3 with 14-16 quickly, then **Milestone 4 (gates) is the top priority**: the
+reviewer needs the hole flow, the road-end probe, the building float probe and the draw-call numbers
+before 08:00. Milestone 5 (UI) after that.

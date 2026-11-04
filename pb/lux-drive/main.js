@@ -100,7 +100,7 @@ async function boot() {
   await new Promise((r) => setTimeout(r, 0));
   const field = createHeightField({ near: data.near, far: data.far, roads: data.roads });
   const surface = createSurface(field);
-  const deckNetwork = createDeckNetwork(data.decks);
+  const deckNetwork = createDeckNetwork(data.decks, surface);
   const ground = createGround(surface, deckNetwork);
   const buildings = createBuildingIndex(data.buildings);
   const portals = createPortals(data.roads);
@@ -138,7 +138,7 @@ async function boot() {
   const terrain = createTerrainView({ scene, surface, field, material: quality.cheapGround ? groundCheap : groundFull, quality });
   const city = createBuildingView({ scene, buildings, field, env, noiseTexture: textures.noise, quality });
   const trees = createTreeView({ scene, forest, baked: data.trees, field, env, quality });
-  const decks = createDeckView({ scene, decks: data.decks, material: solid, ground: ground.surface });
+  const decks = createDeckView({ scene, decks: ground.decks, material: solid, ground: ground.surface });
   const portalView = createPortalView({ scene, portals, ground, material: solid });
   const model = createCarModel({ colourId: 'red', material: solid });
   scene.add(model.group);

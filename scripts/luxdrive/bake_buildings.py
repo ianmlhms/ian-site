@@ -41,6 +41,7 @@ from shapely.strtree import STRtree
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import codec  # noqa: E402
 from common import (NEAR_STEP, OUT_DIR, RAW_DIR, lonlat_to_luref, luref_to_world, sample_bicubic)  # noqa: E402
+from roads_io import DRIVABLE, decode_roads  # noqa: E402
 
 LOD2_DIR = os.path.expanduser("~/Library/Caches/luxtram-work/geo/lod2")
 COMMUNES = tuple(os.environ.get("LUXDRIVE_COMMUNES", "luxembourg,niederanven").split(","))
@@ -50,6 +51,7 @@ SIMPLIFY_M = 0.4          # m, the Douglas-Peucker tolerance of the footprint
 MAX_PTS = 16              # a building with more corners than this is simplified harder
 MIN_AREA = 8.0            # m2, smaller footprints are sheds, not buildings
 FLAT_ROOF = 0.7           # m, a roof lower than this is flat
+THROUGH = 3.0             # m, how deep the centre line of a road may cut into a house
 
 # ---- the style of the façade ------------------------------------------------
 # The LOD2 model knows the shape of a building but not what it is: the OSM knows.  The bake joins the two
@@ -286,8 +288,11 @@ def parse_building(b):
     if not (ground or roof or wall):
         return None
     fp = None
+    holes = []
     if ground:
-        fp = max(ground, key=lambda r: abs(ring_area(r[0])))[0]
+        # the biggest ground ring of the building: the holes of that ring are the courtyards
+        ring, holes = max(ground, key=lambda r: abs(ring_area(r[0])))
+        fp = ring
     else:
         base = []
         for ring, _h in wall:
@@ -331,8 +336,113 @@ def parse_building(b):
             direction = ang
     names = [n.text.strip() for n in b.iter(NS_G + "name")
              if n.text and n.text.strip() and n.text.strip() not in ("Commune Luxembourg", "Commune Niederanven")]
-    return {"fp": fp, "z0": z0, "eave": eave, "ridge": ridge, "dir": direction,
+    return {"fp": fp, "holes": holes, "z0": z0, "eave": eave, "ridge": ridge, "dir": direction,
             "name": names[0] if names else None}
+
+
+def simple_polygon(poly):
+    """A polygon without holes: the biggest piece of it.
+
+    A building with a courtyard is a ring of walls around a yard, not a slab over it: the courtyards of
+    the LOD2 (the interior rings of the ground surface) are cut out, and what is left may be in pieces
+    (a courtyard that cuts a building in two) - the biggest piece is the building.
+    """
+    if poly.is_empty:
+        return poly
+    if poly.geom_type == "MultiPolygon":
+        poly = max(poly.geoms, key=lambda p: p.area)
+    if not poly.interiors:
+        return poly
+    cut = unary_union([Polygon(h) for h in poly.interiors])
+    rest = Polygon(poly.exterior).difference(cut)
+    if rest.is_empty:
+        return poly
+    if rest.geom_type == "MultiPolygon":
+        rest = max(rest.geoms, key=lambda p: p.area)
+    return rest
+
+
+def drop_nested(out):
+    """A house whose middle lies inside another house is the same house twice.
+
+    The LOD2 has buildings that are made of several parts, and the parts are also buildings of their own:
+    the small one stands inside the big one.  The big one stays, the small one goes: nothing floats and
+    nothing is inside something else.
+    """
+    for o in out:
+        p = Polygon(o["pts"])
+        if not p.is_valid:
+            p = p.buffer(0)
+        o["poly"] = p
+        o["mid"] = p.representative_point() if not p.is_empty else None
+        o["mid2"] = Point(sum(q[0] for q in o["pts"]) / len(o["pts"]),
+                          sum(q[1] for q in o["pts"]) / len(o["pts"]))
+    tree = STRtree([o["poly"] for o in out])
+    keep = []
+    for i, o in enumerate(out):
+        nested = False
+        if o["mid"] is not None:
+            for k in tree.query(o["poly"]):
+                if k == i:
+                    continue
+                p = out[k]
+                # the bigger house wins; of two houses of the same size the first one wins
+                if p["area"] < o["area"] or (p["area"] == o["area"] and k > i):
+                    continue
+                if (p["poly"].contains(o["mid"]) or p["poly"].contains(o["mid2"]) or
+                        o["poly"].contains(p["mid"]) or o["poly"].contains(p["mid2"])):
+                    nested = True
+                    break
+        if not nested:
+            keep.append(o)
+    return keep
+
+
+def drop_with_road(out, roads):
+    """A house a road runs through is a mapping error: the road wins.
+
+    The house was drawn wider than it is, or it is gone and the road took its place.  The house goes:
+    a car that drives into a wall is worse than a missing house.  A road that runs along the kerb does
+    not count: the centre line has to be three metres inside the footprint (the same rule as the gate in
+    `pb/lux-drive/harness.js`, so the bake and the gate always agree).
+    """
+    # the points of the centre line of every way a car may drive on, every two metres
+    points = []
+    for r in roads:
+        if r["kind"] not in DRIVABLE or r.get("tunnel"):
+            continue
+        pts = r["pts"]
+        for i in range(len(pts) - 1):
+            ax, az = pts[i]
+            bx, bz = pts[i + 1]
+            steps = max(1, int(math.ceil(math.hypot(bx - ax, bz - az) / 2.0)))
+            for s in range(steps + 1):
+                t = s / float(steps)
+                points.append(Point(ax + (bx - ax) * t, az + (bz - az) * t))
+    if not points:
+        return out, 0
+    tree = STRtree(points)
+    keep = []
+    dead = 0
+    for o in out:
+        p = o.get("poly")
+        if p is None or p.is_empty:
+            keep.append(o)
+            continue
+        hit = False
+        for i in tree.query(p):
+            q = points[i]
+            if not p.contains(q):
+                continue
+            if p.exterior.distance(q) >= THROUGH:
+                hit = True
+                break
+        if hit:
+            dead += 1
+        else:
+            keep.append(o)
+    return keep, dead
+
 
 
 def main():
@@ -368,7 +478,7 @@ def main():
 
     out = []
     names_out = {}
-    stats = {"seen": 0, "in": 0, "kept": 0}
+    stats = {"seen": 0, "in": 0, "kept": 0, "swallowed": 0}
     for slug in COMMUNES:
         path = os.path.join(LOD2_DIR, slug + ".gml")
         if not os.path.exists(path):
@@ -384,7 +494,13 @@ def main():
                 del elem.getparent()[0]
             if rec is None:
                 continue
-            fp = rec["fp"]
+            poly = Polygon(rec["fp"], rec["holes"])
+            if not poly.is_valid:
+                poly = poly.buffer(0)
+            poly = simple_polygon(poly)
+            if poly.is_empty or poly.geom_type != "Polygon":
+                continue
+            fp = list(poly.exterior.coords)[:-1]
             xs = [p[0] for p in fp]
             ys = [p[1] for p in fp]
             cx = sum(xs) / len(xs)
@@ -419,6 +535,23 @@ def main():
                 ridge = eave + 25.0
             if ridge < eave:
                 ridge = eave
+            # The ground may not climb over the eaves.  The LOD2 and the LiDAR do not always agree: where a
+            # house of the LOD2 stands on a ledge that the LiDAR sees as a rock face of twenty metres, the house
+            # would be drawn inside the hill.  Such a house is not drawn at all: a missing house is better than a
+            # house under a mountain.
+            over = -1e9
+            for k in range(len(pts)):
+                ax, az = pts[k]
+                bx, bz = pts[(k + 1) % len(pts)]
+                steps = max(1, int(math.hypot(bx - ax, bz - az) / 2.0))
+                for s in range(steps + 1):
+                    t = s / float(steps)
+                    over = max(over, terrain(ax + (bx - ax) * t, az + (bz - az) * t) - rec["eave"])
+            if over > -1.0:
+                # the ground is less than a metre below the eaves (or above them): the house would be a
+                # bunker with a wall of a few centimetres, or a wall drawn upside down
+                stats["swallowed"] += 1
+                continue
             d = rec["dir"]
             if d is None:
                 # no roof: use the long axis of the footprint
@@ -429,9 +562,6 @@ def main():
                     d = math.atan2(dzs[-1] - dzs[0], dxs[-1] - dxs[0])
             # ---- the style of the façade: the OSM says what the building is, the height says how it looks
             area = abs(ring_area(fp))
-            poly = Polygon(fp)
-            if not poly.is_valid:
-                poly = poly.buffer(0)
             tags = match_tags(osm_tree, osm_shapes, poly)
             lv = tags.get("building:levels", "")
             levels = int(lv) if lv.isdigit() else int(round(eave / 3.0))
@@ -453,7 +583,22 @@ def main():
                 names_out[len(names_out)] = rec["name"]
         print("  %s: %d buildings seen (%.0fs)" % (slug, stats["seen"], time.time() - t0), flush=True)
 
-    print("seen %d  in area %d  kept %d" % (stats["seen"], stats["in"], len(out)))
+    print("seen %d  in area %d  kept %d  swallowed by the hill %d" %
+          (stats["seen"], stats["in"], len(out), stats["swallowed"]))
+
+    # ---- nothing inside something else: a house inside a house goes, the bigger one stays
+    before = len(out)
+    out = drop_nested(out)
+    stats["nested"] = before - len(out)
+    print("houses inside another house: %d dropped" % stats["nested"])
+
+    # ---- and no road runs through a house: the road wins
+    roads, _names = decode_roads()
+    out, dead = drop_with_road(out, roads)
+    stats["crossed"] = dead
+    print("houses with a road through them: %d dropped" % dead)
+
+    print("kept %d houses" % len(out))
     print("height: min %.1f max %.1f mean %.1f" %
           (min(o["eave"] for o in out), max(o["eave"] for o in out),
            sum(o["eave"] for o in out) / len(out)))

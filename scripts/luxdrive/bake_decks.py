@@ -62,8 +62,13 @@ def resample(pts, step):
     return out
 
 
-def sample_dsm_max(grid, west, north, step, px, py, radius=2.5):
-    """The highest DSM value within `radius` metres of the LUREF point (px, py)."""
+def sample_dsm_median(grid, west, north, step, px, py, radius=2.5):
+    """The middle DSM value within `radius` metres of the LUREF point (px, py).
+
+    The median, not the maximum: a tree that stands beside the bridge is higher than the deck, and
+    the maximum would lift the whole bridge to the top of the tree (a slab floating in the air).  The
+    middle value is the deck itself, as long as the canopy covers less than the half of the window.
+    """
     gx = (px - west) / step
     gy = (north - py) / step
     i0 = int(math.floor(gx - radius / step))
@@ -74,7 +79,7 @@ def sample_dsm_max(grid, west, north, step, px, py, radius=2.5):
     i1 = min(grid.shape[1] - 1, i1); j1 = min(grid.shape[0] - 1, j1)
     if i1 < i0 or j1 < j0:
         return None
-    return float(grid[j0:j1 + 1, i0:i1 + 1].max())
+    return float(np.median(grid[j0:j1 + 1, i0:i1 + 1]))
 
 
 def smooth(values, window):
@@ -88,6 +93,27 @@ def smooth(values, window):
         a = max(0, i - half)
         b = min(n, i + half + 1)
         out[i] = sum(values[a:b]) / (b - a)
+    out[0] = values[0]
+    out[-1] = values[-1]
+    return out
+
+
+def median_filter(values, window):
+    """A median filter along the deck: the deck is a ramp, a tree over it is a local bump.
+
+    A median filter keeps a straight ramp (the middle of a straight line is the line) and it removes
+    a bump that is shorter than the half of the window, which is what a canopy is.  The ends are
+    pinned: the deck meets the ground there.
+    """
+    n = len(values)
+    if n < 3:
+        return list(values)
+    out = list(values)
+    half = window // 2
+    for i in range(n):
+        a = max(0, i - half)
+        b = min(n, i + half + 1)
+        out[i] = float(np.median(values[a:b]))
     out[0] = values[0]
     out[-1] = values[-1]
     return out
@@ -148,7 +174,7 @@ def main():
                 for pi, p in enumerate(prepared):
                     for k, (px, py) in enumerate(zip(p["e"], p["n"])):
                         if bot <= py <= top:
-                            v = sample_dsm_max(grid, west, top, DSM_STEP, px, py)
+                            v = sample_dsm_median(grid, west, top, DSM_STEP, px, py)
                             if v is not None:
                                 tops[pi][k] = v
                 print("  strip %d / %d" % (r0 + nr, rows), flush=True)
@@ -167,6 +193,9 @@ def main():
             if v is None or (v - g[k]) > MAX_CLEARANCE or (v - g[k]) < -2.0:
                 v = g[k]
             vals.append(max(v, g[k]))
+        # a tree over the bridge is a bump in the profile, the deck is a ramp: the median filter
+        # takes the bump away and keeps the ramp
+        vals = median_filter(vals, 9)
         vals = smooth(vals, 5)
         # the deck meets the ground at its two ends
         vals[0] = g[0] + LIFT
@@ -176,8 +205,15 @@ def main():
             if vals[k] < g[k] + LIFT:
                 vals[k] = g[k] + LIFT
         clear = max(vals[k] - g[k] for k in range(len(vals)))
-        if clear < 0.5:
+        if clear < 1.2:
             skipped += 1        # not really a bridge: the road runs on the ground
+            continue
+        length = sum(math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1])
+                     for i in range(1, len(line)))
+        if clear > 0.7 * max(length, 1.0):
+            # a deck that stands higher than the half of its own length is not a bridge: the DSM
+            # read something else (a tree, a roof).  It would float in the air.
+            skipped += 1
             continue
         w = r["width"] + 1.2
         decks.append({"road": r, "pts": line, "tops": vals, "w": w,
