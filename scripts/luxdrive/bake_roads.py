@@ -235,7 +235,7 @@ def main():
         return len(urban_tree.query(line.buffer(URBAN_NEAR))) > 0
 
     roads = []
-    stats = {"bridge": 0, "tunnel": 0, "oneway": 0, "over": 0, "skipped": 0, "clipped": 0}
+    stats = {"bridge": 0, "tunnel": 0, "oneway": 0, "over": 0, "skipped": 0, "clipped": 0, "split": 0}
     for way in osm["ways"]:
         tags = way["t"]
         hw = tags.get("highway")
@@ -253,19 +253,18 @@ def main():
         if parts.is_empty:
             continue
         if parts.geom_type == "MultiLineString":
-            parts = max(parts.geoms, key=lambda g: g.length)
-        elif parts.geom_type != "LineString":
+            # A way that leaves the area and comes back is several roads inside the area, one for every
+            # piece of it.  The bake used to keep only the longest piece and throw the others away: 10.6 km
+            # of road inside the area was missing, and the streets that met those pieces ended in nowhere.
+            pieces = [g for g in parts.geoms if g.length >= 4]
+        elif parts.geom_type == "LineString":
+            pieces = [parts]
+        else:
             continue
-        if parts.length < 4:
+        if not pieces:
             continue
-        if parts.length < line.length - 0.5:
-            stats["clipped"] += 1
-        parts = parts.simplify(SIMPLIFY_M, preserve_topology=False)
-        luref = list(parts.coords)
-        if len(luref) < 2:
-            continue
-        wx, wz = luref_to_world([p[0] for p in luref], [p[1] for p in luref])
-        pts = list(zip(wx.tolist(), wz.tolist()))
+        if len(pieces) > 1:
+            stats["split"] += 1
 
         lanes_per_dir, dirs, lane_w, shoulder, pavement = ROAD_KINDS[hw]
         ow = one_way(tags)
@@ -297,25 +296,6 @@ def main():
             width = 2.0
         if width > 30.0:
             width = 30.0        # a "street" 30 m wide is a square, not a road
-        # the pavement: from the OSM tag when it is there, else the class default
-        sw = pavement
-        if "sidewalk" in tags:
-            v = tags["sidewalk"]
-            if v in ("both", "left", "right", "yes"):
-                sw = max(sw, 1.8)
-            elif v in ("no", "none"):
-                sw = 0.0
-            else:
-                vals = parse_float_list(v)
-                if vals:
-                    sw = vals[0]
-        elif hw in URBAN_PAVEMENT_CLASSES and in_town(parts):
-            # A street of the town without a pavement tag gets the 2.5 m of a real pavement: the reviewer found
-            # the grass growing right up to the walls of the houses.
-            sw = URBAN_PAVEMENT
-        # The right-hand lane centre, relative to the centre line. Luxembourg drives on the right, so the
-        # car sits in the rightmost lane: +offset when it travels with the way, -offset against it.
-        offset = max(0.0, width / 2 - lane_w / 2)
 
         bridge = tags.get("bridge") not in (None, "no", "false")
         tunnel = tags.get("tunnel") not in (None, "no", "false")
@@ -343,11 +323,41 @@ def main():
             flags |= (SURFACE_CODES[surf_name] + 1) << FLAG_SURFACE_SHIFT
         # the name: Luxembourgish first
         nm = tags.get("name:lb") or tags.get("name") or tags.get("name:de") or tags.get("name:fr") or ""
-        roads.append({
-            "kind": KIND_CODE[hw], "flags": flags, "layer": layer, "lanes": total_lanes,
-            "nameId": name_id(nm), "width": round(width, 2), "sidewalk": round(sw, 2),
-            "offset": round(offset, 2), "pts": pts, "id": way["id"], "highway": hw,
-        })
+        nid = name_id(nm)
+
+        for part in pieces:
+            if part.length < line.length - 0.5:
+                stats["clipped"] += 1
+            # the pavement: from the OSM tag when it is there, else the class default
+            sw = pavement
+            if "sidewalk" in tags:
+                v = tags["sidewalk"]
+                if v in ("both", "left", "right", "yes"):
+                    sw = max(sw, 1.8)
+                elif v in ("no", "none"):
+                    sw = 0.0
+                else:
+                    vals = parse_float_list(v)
+                    if vals:
+                        sw = vals[0]
+            elif hw in URBAN_PAVEMENT_CLASSES and in_town(part):
+                # A street of the town without a pavement tag gets the 2.5 m of a real pavement: the reviewer found
+                # the grass growing right up to the walls of the houses.
+                sw = URBAN_PAVEMENT
+            # The right-hand lane centre, relative to the centre line. Luxembourg drives on the right, so the
+            # car sits in the rightmost lane: +offset when it travels with the way, -offset against it.
+            offset = max(0.0, width / 2 - lane_w / 2)
+            part = part.simplify(SIMPLIFY_M, preserve_topology=False)
+            luref = list(part.coords)
+            if len(luref) < 2:
+                continue
+            wx, wz = luref_to_world([p[0] for p in luref], [p[1] for p in luref])
+            pts = list(zip(wx.tolist(), wz.tolist()))
+            roads.append({
+                "kind": KIND_CODE[hw], "flags": flags, "layer": layer, "lanes": total_lanes,
+                "nameId": nid, "width": round(width, 2), "sidewalk": round(sw, 2),
+                "offset": round(offset, 2), "pts": pts, "id": way["id"], "highway": hw,
+            })
 
     blob = bytearray()
     blob += (len(roads)).to_bytes(4, "little")
