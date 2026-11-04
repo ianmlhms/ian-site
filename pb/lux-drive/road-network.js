@@ -111,10 +111,20 @@ export function createRoadNetwork(roads, baseHeight) {
   for (let ri = 0; ri < roads.length; ri++) {
     const road = roads[ri];
     firstSample[ri] = -1; firstSeg[ri] = -1; segCount[ri] = 0; info[ri] = null;
-    // Only the roads a car may drive on are carved. A footpath or a staircase is not a road: carving it would cut a
-    // trench into the hillside where the path follows a steep slope. A tunnel cannot be a trench in a single valued
-    // height field (it gets a portal instead) and a way that rides over the ground is a deck (decks.js).
-    if (!road.info.drivable) continue;
+    // A way that rides OVER the ground: OSM says so (a bridge, or a layer above the others).  It is never carved
+    // into the height function and the ground under it is protected (see the crossings below).
+    const tagged = !!(road.over || (road.layer || 0) >= 1);
+    // The centre line of the way, as the game draws it: the polyline resampled and its corners rounded.
+    // Every way needs it: the drivable ones are carved along it, and the ones that ride over the ground
+    // protect the ground under them along it.
+    const rs = resample(road.pts, ROAD.sampleSpacing);
+    const n = rs.x.length;
+    if (n < 2) continue;
+    if (n > 4) {                                     // round the corners of the (sparse) OSM polyline; the two end points stay where they are
+      const sx = gaussianSmooth(rs.x, ROAD.lineSmoothing / ROAD.sampleSpacing);
+      const sz = gaussianSmooth(rs.z, ROAD.lineSmoothing / ROAD.sampleSpacing);
+      for (let i = 1; i < n - 1; i++) { rs.x[i] = sx[i]; rs.z[i] = sz[i]; }
+    }
     const kind = kindInfo(road.kind);
     const hw = Math.max(0.8, road.width / 2);
     // the kerb belongs to the material of the way itself: a cobbled street has one, a paved area has none
@@ -126,17 +136,17 @@ export function createRoadNetwork(roads, baseHeight) {
     // reviewer saw one), so the carve keeps its narrow bench and the pavement is painted on the ground beside it.
     const bench = hw + kerbW;
     const a0 = bench + pw;
-    // A way that rides OVER the ground: OSM says so (a bridge, or a layer above the others).  It is never carved
-    // into the height function and the ground under it is protected (see the crossings below).
-    const tagged = !!(road.over || (road.layer || 0) >= 1);
-
-    const rs = resample(road.pts, ROAD.sampleSpacing);
-    const n = rs.x.length;
-    if (n < 2) continue;
-    if (n > 4) {                                     // round the corners of the (sparse) OSM polyline; the two end points stay where they are
-      const sx = gaussianSmooth(rs.x, ROAD.lineSmoothing / ROAD.sampleSpacing);
-      const sz = gaussianSmooth(rs.z, ROAD.lineSmoothing / ROAD.sampleSpacing);
-      for (let i = 1; i < n - 1; i++) { rs.x[i] = sx[i]; rs.z[i] = sz[i]; }
+    // A way that rides over the ground protects it, whether a car may drive on it or not: the footpath bridge
+    // of a park stands over a street, and the street may not dig a pit under it.
+    if (tagged && !road.tunnel) overCorridors.push({ x: rs.x, z: rs.z, half: a0 + PROTECT_MARGIN });
+    // Only the roads a car may drive on are carved. A footpath or a staircase is not a road: carving it would cut a
+    // trench into the hillside where the path follows a steep slope. A tunnel cannot be a trench in a single valued
+    // height field (it gets a portal instead) and a way that rides over the ground is a deck (decks.js).
+    if (!road.info.drivable) continue;
+    if (road.tunnel || tagged) {
+      // A tunnel and an over way are not carved.  The ground under an over way is protected: the way that goes
+      // under it may not dig a hole in it (the reviewer saw the bridge road dive into a dark pit).
+      continue;
     }
     // the bed: the terrain along the centre line, smoothed (a road is smoother than the ground it lies on)
     const ground = rs.x.map((x, i) => baseHeight(x, rs.z[i]));
@@ -151,9 +161,7 @@ export function createRoadNetwork(roads, baseHeight) {
     // which.  That is how an overpass that OSM does not tag as a bridge (a slip road on a viaduct) is found.
     chains.push({ road: ri, x: rs.x, z: rs.z, bed, tagged });
     if (road.tunnel || tagged) {
-      // A tunnel and an over way are not carved.  The ground under an over way is protected: the way that goes
-      // under it may not dig a hole in it (the reviewer saw the bridge road dive into a dark pit).
-      if (tagged) overCorridors.push({ x: rs.x, z: rs.z, half: a0 + PROTECT_MARGIN });
+      // A tunnel and an over way are not carved.  The ground under an over way is protected (the corridor above).
       continue;
     }
     const radius = Math.min(ROAD.maxRadius, a0 + ROAD.falloff);

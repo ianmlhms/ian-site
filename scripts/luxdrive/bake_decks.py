@@ -29,8 +29,10 @@ from rasterio.enums import Resampling
 from rasterio.windows import from_bounds
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from common import (OUT_DIR, RAW_DIR, ORIGIN_E, ORIGIN_N_TOP, world_to_luref)  # noqa: E402
+from common import (NEAR_STEP, OUT_DIR, RAW_DIR, ORIGIN_E, ORIGIN_N_TOP, sample_bicubic,
+                    world_to_luref)  # noqa: E402
 from roads_io import FLAG_OVER, FLAG_TUNNEL, decode_roads, road_length  # noqa: E402
+import codec  # noqa: E402
 
 COG_BASE = ("https://download.data.public.lu/resources/bd-l-lidar2024-releve-3d-du-territoire-"
             "luxembourgeois/20241223-093912/")
@@ -121,17 +123,19 @@ def median_filter(values, window):
 
 def main():
     roads, names = decode_roads()
-    ground = np.load(os.path.join(RAW_DIR, "dtm4.npy")).astype(np.float64)
+
+    # The terrain the game draws: the de-spiked DTM of terrain.bin, read with the same bicubic the browser
+    # uses.  The deck meets the ground at its two ends, so it has to stand on the ground the player sees
+    # and not on the raw LiDAR: the de-spiking and the bicubic move the ground by up to a metre, and a
+    # deck that is a metre under the ground is a deck that dives into the hill.
+    blob = open(os.path.join(OUT_DIR, "terrain.bin"), "rb").read()
+    grid = codec.decode_np(blob)
+    nx, nz = grid.shape[1], grid.shape[0]
+    flat = grid.astype(np.float64).ravel().tolist()
 
     def ground_at(x, z):
-        """The game's terrain height (the 4 m DTM, bilinear)."""
-        gx = min(ground.shape[1] - 1.001, max(0.0, x / 4.0))
-        gz = min(ground.shape[0] - 1.001, max(0.0, z / 4.0))
-        i = int(gx); j = int(gz)
-        tx = gx - i; tz = gz - j
-        a = ground[j, i] * (1 - tx) + ground[j, i + 1] * tx
-        b = ground[j + 1, i] * (1 - tx) + ground[j + 1, i + 1] * tx
-        return a * (1 - tz) + b * tz
+        """The game's terrain height (the de-spiked 4 m DTM, bicubic)."""
+        return sample_bicubic((nx, nz, flat), x / NEAR_STEP, z / NEAR_STEP)
 
     bridges = [r for r in roads if r["flags"] & FLAG_OVER and not (r["flags"] & FLAG_TUNNEL)]
     # group the ways of one bridge: parallel ways of the same bridge (a road and its footpath)
