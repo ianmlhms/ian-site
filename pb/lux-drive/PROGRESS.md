@@ -752,3 +752,32 @@ on a slope); the window rows keep their origin at the true ground.
 
 ### 6. Gates (this session)
 
+| gate | result |
+|---|---|
+| `node scripts/flows/luxdrive_world.mjs` | **PASS**, 73 checks, 0 failures (the start on Av. J.F. Kennedy, drive 33.7 m / 70 km/h, camera 3.65 m over the ground, ride height, 14 sampled roads painted within 1.5 m of the OSM width, kerb, ground beside roads, three bridge decks, the edge of the area, three quality levels, zero console errors) |
+| `node scripts/flows/luxdrive_holes.mjs` | **PASS**, **0 hole pixels** over 72 poses, self-test with a missing tile reports 42 741 hole pixels |
+| `node pb/lux-drive/harness.js --quick` | **PASS**, 61 checks: A-G unchanged (data 11.13 MB, 0 roads to nowhere, 0 rails on a road, 0 houses floating / buried / inside each other, 0 decks diving, 0 trees in a house or on a road, 0 camera under the ground) + the new section H below |
+
+Section H of the harness (the new checks of this branch, all green):
+
+| check | measured |
+|---|---|
+| two tracks of >= 8 km | A 12 498 m, B 12 500 m |
+| right-hand running: B lies on the left of A at every measured place | 0 of 78 samples wrong (before the cost fix: 35 of 78 - the shortest path hopped between the rails at the crossovers) |
+| every track has >= 18 stops, in order, >= 35 m apart, all on the rails | 22 + 22 |
+| no vehicle body stands inside a house (3 m steps along both tracks; a viaduct that carries the track is not tested in 2D) | 0 |
+| the vehicles never run into each other in 20 min of the line | free distance > 5 m |
+| line speed, smooth motion along the rails (no jump), stops served, turn-back | top speed 17.0 m/s, max step < 0.85 m per 50 ms, >= 6 stops served |
+| the car collides with a tram | pen > 0.5 m |
+| a car on the track stops the vehicle | the vehicle stops 9 m before it |
+| street lights: > 3000, none in a house, none in a carriageway, all inside the world | 9 054 lamps, 0 / 0 / 0 |
+| the car stops at a lamp post (props are solid) | yes |
+| park benches: > 100, none in a house or a carriageway | 594 benches, 0 |
+
+**Draw calls / triangles at steady state, medium quality** (every tile and cell built; `scripts/luxdrive/shotd.mjs`): 74 (field near Ernster) ... 139 (Avenue J.F.
+Kennedy, 103 building cells in reach) draw calls, 225 k ... 387 k triangles, all <= 260 draw calls.  Full table in `reports-cloud/lux-drive/lux-drive-city/REPORT.md`.
+
+Open in this part: see the honest list in `reports-cloud/lux-drive/lux-drive-city/REPORT.md` (Grund walls grey, the lumpy outline of the pedestrian
+way at Place de l'Europe, tram crossovers shared by two tracks, nothing measured on a GPU / iPad).
+
+Boot cost added by this branch (Node, desktop): tram network 0.3 s, street lamps 0.2 s, benches 0.05 s, built-up density raster 0.2 s; an iPad takes 2-3x.

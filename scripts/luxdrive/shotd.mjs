@@ -27,15 +27,19 @@ async function load(query) {
   if (be) throw new Error("boot error: " + be + "\n" + errors.join("\n"));
   await page.click('[data-act="drive"]');
 }
-async function settle() {
+async function settle(useCar) {
+  // two frames first: the camera (and the car) take their new pose in the frame, the build below reads them
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   // build the world around the camera NOW (a software-GL frame takes a second, the game builds 3 tiles per frame): the terrain tiles, the
   // city cells and the trees are built in plain loops, then a few frames are drawn so the numbers are the steady state
-  await page.evaluate(() => {
+  await page.evaluate((useCar) => {
     const m = window.__lux, p = m.camera.position, s = m.state();
-    for (let k = 0; k < 800; k++) { m.terrain.update(p.x, p.z); if (m.terrain.stats.pending === 0 && k > 3) break; }
+    // the game follows the car (chase camera) or the held camera: build the tiles round the same point
+    const fx = useCar ? s.x : p.x, fz = useCar ? s.z : p.z;
+    m.terrain.buildAll(fx, fz);
     m.city.buildAll(s.x, s.z);
     m.trees.update(p.x, p.z, 0, true);
-  });
+  }, useCar);
   for (let i = 0; i < 40; i++) {
     await page.waitForTimeout(300);
     const st = await page.evaluate(() => window.__lux.stats());
@@ -48,13 +52,13 @@ async function shot(pose, out) {
     const m = window.__lux;
     if (p.car) m.car.reset(p.car[0], p.car[1], p.car[2] || 0);
     if (p.carRoad) {                        // the nearest drivable road to a point: the car stands on it, facing along it, in its right-hand half
-      const [qx, qz] = p.carRoad, want = p.kind || null;
+      const [qx, qz] = p.carRoad, want = p.kind || null, nameHas = (p.road || '').toLowerCase();
       let found = null;
       for (let r = 0; r <= 90 && !found; r += 3) {
         for (let a = 0; a < (r ? 16 : 1) && !found; a++) {
           const x = qx + Math.cos(a * Math.PI / 8) * r, z = qz + Math.sin(a * Math.PI / 8) * r;
           const info = m.roadAt(x, z);
-          if (info && info.dir && !['footway', 'path', 'steps', 'cycleway', 'pedestrian'].includes(info.kind) && (!want || info.kind === want)) found = { x, z, info };
+          if (info && info.dir && !['footway', 'path', 'steps', 'cycleway', 'pedestrian'].includes(info.kind) && (!want || info.kind === want) && (!nameHas || (info.name || '').toLowerCase().includes(nameHas)) && Math.abs(info.lat) < info.width * 0.4) found = { x, z, info };
         }
       }
       if (found) { const d = found.info.dir; m.car.reset(found.x, found.z, Math.atan2(d.z, d.x)); }
@@ -71,7 +75,7 @@ async function shot(pose, out) {
     }
     m.setCamera({ x, y, z, tx, ty, tz, fov: p.fov || 62 });
   }, pose);
-  await settle();
+  await settle(pose.mode === 'chase');
   if (pose.wait) await page.waitForTimeout(pose.wait);          // e.g. the trees grow in over 0.45 s of game time: a software-GL frame is 0.1 s of it
   const stats = await page.evaluate(() => window.__lux.stats());
   fs.mkdirSync(out, { recursive: true });

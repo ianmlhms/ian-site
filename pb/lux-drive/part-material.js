@@ -26,7 +26,10 @@ const FRAGMENT = `
     vec3 N = normalize(vN); if (!gl_FrontFacing) N = -N;
     vec3 c = paintLightW(vC * (1.0 - 0.2 * uWet), N, mix(1.0, 0.8, uCloud * 0.6), 1.15, vWorld);
     // a lit window / lamp: at night it keeps (and warms) its colour instead of going dark
-    c = mix(c, max(c, vC * vec3(1.35, 1.2, 0.9)), vGlow * uNight);
+    // (a bright glowing face - a lamp head, a destination board - keeps its colour; a dark one - a window - shows the warm light inside)
+    float bright = max(vC.r, max(vC.g, vC.b));
+    vec3 lit = bright > 0.5 ? vC * vec3(1.35, 1.2, 0.9) : vec3(0.95, 0.80, 0.48) * 0.72;
+    c = mix(c, max(c, lit), vGlow * uNight);
     gl_FragColor = vec4(applyFogW(pow(c, vec3(0.97)), vDist, vWorld.y), 1.0);
   }
 `;

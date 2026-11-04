@@ -56,16 +56,17 @@ export function createTramSim(network, cfg, { vehicles = cfg.vehicles, seed = 11
     tram.mode = 'dwell'; tram.timer = wait; tram.hidden = false;
   }
 
-  // the vehicles start spread over the line, standing at stops: the first one at the stop nearest the start of the game
-  const names = ['Philharmonie - MUDAM', 'Hamilius', 'Gare Centrale', 'Rout Bréck - Pafendall', 'Place de Metz'];
+  // the vehicles start spread over the line, standing at stops: the first one at the stop next to the start of the game (Philharmonie),
+  // on the track that runs EAST like the player does, so that it pulls out in front of the car; the others at Hamilius and Gare
+  const starts = [['Philharmonie - MUDAM', 1], ['Hamilius', 0], ['Gare Centrale', 1], ['Rout Bréck - Pafendall', 0], ['Place de Metz', 1]];
   for (let i = 0; i < vehicles; i++) {
-    const want = names[i % names.length];
-    let track = i % 2, idx = stops[track].findIndex((s) => s.name === want);
+    const [want, preferred] = starts[i % starts.length];
+    let track = preferred, idx = stops[track].findIndex((s) => s.name === want);
     if (idx < 0) { track = 1 - track; idx = stops[track].findIndex((s) => s.name === want); }
     if (idx < 0) { track = 0; idx = Math.min(stops[0].length - 1, 1 + i * 3); }
     const tram = { id: i, track, s: 0, v: 0, stop: 0, mode: 'dwell', timer: 0, hidden: false, sections: [] };
     for (let k = 0; k < cfg.sections; k++) tram.sections.push({ fx: 0, fz: 0, rx: 0, rz: 0 });
-    place(tram, track, idx, 4 + i * 5);
+    place(tram, track, idx, 6 + i * 5);
     trams.push(tram);
   }
 

@@ -801,16 +801,21 @@ section('H tram + lights');
   let offRail = 0; const pj = { s: 0, dist: 0, side: 0 };
   tramNet.tracks.forEach((t, i) => { for (const st of tramNet.stops[i]) { t.project(st.x, st.z, pj); if (pj.dist > 2.5) offRail++; } });
   check('every tram stop lies on its rails (within 2.5 m)', offRail === 0, `${offRail} off`);
-  // nothing is inside something else: the rails and the vehicle body run through no house
-  let inHouse = 0, firstAt = null;
+  // nothing is inside something else: the rails and the vehicle body run through no house.  A viaduct runs OVER the houses of the
+  // valley (the Pont Rouge over Pfaffenthal), so a place where the rails ride more than 4 m above the ground is not tested in 2D.
+  let inHouse = 0, firstAt = null, onViaduct = 0;
+  const dsc = { top: 0, slope: 0, ux: 1, uz: 0, along: 0 };
   for (const t of tramNet.tracks) {
     for (let s = 0; s < t.length; s += 3) {
       t.at(s, p);
+      const g = surface.height(p.x, p.z), deck = deckNetwork.deckAt(p.x, p.z, 1e9, dsc);
+      // a viaduct CARRIES the track: the deck runs along it (a deck across the track is a bridge the tram runs under: the houses are tested)
+      if (deck && deck.top > g + 4 && Math.abs(deck.ux * p.dz - deck.uz * p.dx) < 0.42) { onViaduct++; continue; }
       if (buildings.collide(p.x, p.z, TRAM.bodyHalfWidth)) { inHouse++; if (!firstAt) firstAt = `${p.x.toFixed(0)},${p.z.toFixed(0)}`; }
     }
   }
-  stats.tramInHouse = inHouse;
-  check('no vehicle of the Luxtram would stand inside a house (3 m steps along both tracks)', inHouse <= 6, `${inHouse} samples, first at ${firstAt}`);
+  stats.tramInHouse = inHouse; stats.tramOnViaduct = onViaduct;
+  check('no vehicle of the Luxtram would stand inside a house (3 m steps along both tracks, viaducts excluded)', inHouse === 0, `${inHouse} samples, first at ${firstAt}; ${onViaduct} samples ride on a viaduct`);
   // the vehicles on their rails, for 20 minutes of the line
   const sim = createTramSim(tramNet, TRAM);
   let minGap = Infinity, vTop = 0, stopsServed = 0, maxStep = 0, seenModes = new Set();

@@ -37,9 +37,10 @@ export const flow = {
           const y = m.surface.height(p.x, p.z) + p.up;
           const yr = p.yaw * Math.PI / 180, pr = p.pitch * Math.PI / 180;
           m.setCamera({ x: p.x, y, z: p.z, tx: p.x + Math.cos(yr) * Math.cos(pr) * 50, ty: y + Math.sin(pr) * 50, tz: p.z + Math.sin(yr) * Math.cos(pr) * 50, fov: 70 });
-          // wait until the terrain has caught up with the new pose (the pending builds are done) and two frames were drawn
-          for (let k = 0; k < 180; k++) { await new Promise((r) => requestAnimationFrame(r)); if (m.terrain.stats.pending === 0 && k >= 3) break; }
-          await new Promise((r) => requestAnimationFrame(r));
+          // the terrain catches up with the new pose: the pending tiles are built in a plain loop (the game builds 3 per frame, which takes
+          // seconds on a machine without a GPU: the tiles are the same, only the waiting is not), then two frames are drawn
+          for (let k = 0; k < 800; k++) { m.terrain.update(p.x, p.z); if (m.terrain.stats.pending === 0 && k >= 3) break; }
+          for (let k = 0; k < 2; k++) await new Promise((r) => requestAnimationFrame(r));
           m.renderer.render(m.scene, m.camera);
           gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, buf);
           m.camera.updateMatrixWorld(); inv.copy(m.camera.projectionMatrixInverse);
