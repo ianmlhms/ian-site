@@ -20,9 +20,10 @@ const ADOLPHE = Object.freeze({
   crownRing: 3.0,                 // m, the thickness of the arch ring at the crown ...
   springRing: 4.6,                // m, ... and at the springing
   clearCrown: 4.0,                // m of solid between the extrados and the slab at the crown
-  openingHalf: 2.5,               // m, half the width of an opening of the spandrel arcade
-  openingPitch: 7.5,              // m between the middles of two openings
-  openingCount: 5,                // openings on each side of the crown (so 2 * 5 + 1 in all)
+  openingHalf: 1.6,               // m, half the width of an opening of the spandrel arcade (3.2 m: the photographs)
+  openingPitch: 5.6,              // m between the middles of two openings
+  openingCount: 14,               // openings are tried this far either side of the crown; only the tall ones over the springing and the abutments are kept
+  openingMinHeight: 5.0,          // m of wall the opening needs between the arch (or the ground) and its springing line
   wallThickness: 1.4,             // m, the thickness of the spandrel wall (the jambs of the openings)
   balustrade: 1.1,                // m, the height of the stone balustrade
   pillarEvery: 7.5,               // m, a taller pillar in the balustrade
@@ -89,7 +90,7 @@ export function buildPontAdolphe({ decks, ground }) {
   for (const sign of [1, -1]) {
     // the pavement, a little higher than the road, with the kerb face between them
     deckStrip(soup, F, sign * K.roadHalf, sign * (K.half - 0.5), 0, L, top, C.paving, Math.ceil(L / 3), 2 + (sign > 0 ? 0 : 1), K.kerb);
-    wallFace(soup, F, sign * K.roadHalf, 0, L, (s) => top(s), (s) => top(s) + K.kerb, C.sandstoneDark, Math.ceil(L / 4), 5);
+    wallFace(soup, F, sign * K.roadHalf, 0, L, (s) => top(s), (s) => top(s) + K.kerb, C.bridgeStoneDark, Math.ceil(L / 4), 5);
   }
   for (let s = 3; s + 3 < L; s += 9) {                                // the dashed centre line
     deckStrip(soup, F, -0.09, 0.09, s, s + 3, top, C.line, 1, 7, 0.02);
@@ -99,12 +100,12 @@ export function buildPontAdolphe({ decks, ground }) {
   for (const sign of SIGNS) {
     const inner = sign * (K.half - 0.5), outer = sign * K.half;
     const base = (s) => top(s) + K.kerb;
-    wallFace(soup, F, outer, 0, L, base, (s) => base(s) + K.balustrade, C.sandstoneLight, Math.ceil(L / 4), 11);
-    wallFace(soup, F, inner, 0, L, base, (s) => base(s) + K.balustrade, C.sandstone, Math.ceil(L / 4), 12);
-    deckStrip(soup, F, inner, outer, 0, L, (s) => base(s) + K.balustrade, C.sandstoneLight, Math.ceil(L / 4), 13);
+    wallFace(soup, F, outer, 0, L, base, (s) => base(s) + K.balustrade, C.bridgeStoneLight, Math.ceil(L / 4), 11);
+    wallFace(soup, F, inner, 0, L, base, (s) => base(s) + K.balustrade, C.bridgeStone, Math.ceil(L / 4), 12);
+    deckStrip(soup, F, inner, outer, 0, L, (s) => base(s) + K.balustrade, C.bridgeStoneLight, Math.ceil(L / 4), 13);
     for (let s = 2; s < L - 1; s += K.pillarEvery) {
       const [x, z] = F.xz(s, (inner + outer) / 2);
-      soup.box(x, base(s), z, 0.9, K.balustrade + 0.55, 1.0, Math.atan2(-F.dz, F.dx), paint(C.sandstoneLight, Math.round(s) + 40), { topColor: C.sandstoneLight });
+      soup.box(x, base(s), z, 0.9, K.balustrade + 0.55, 1.0, Math.atan2(-F.dz, F.dx), paint(C.bridgeStoneLight, Math.round(s) + 40), { topColor: C.bridgeStoneLight });
     }
     for (let s = 10; s < L - 8; s += K.lampEvery) {
       const [x, z] = F.xz(s, sign * (K.half - 0.45));
@@ -116,68 +117,68 @@ export function buildPontAdolphe({ decks, ground }) {
 
   // ---- the slab: the fascia on both sides, the cornice that overhangs it, and the underside
   const SLAB_STEP = Math.ceil(L / 3);
-  deckStrip(soup, F, -K.half, K.half, 0, L, under, C.sandstoneDark, SLAB_STEP, 20);
+  deckStrip(soup, F, -K.half, K.half, 0, L, under, C.bridgeStoneDark, SLAB_STEP, 20);
   for (const sign of SIGNS) {
-    wallFace(soup, F, sign * K.half, 0, L, under, (s) => top(s) - 0.45, C.sandstoneLight, SLAB_STEP, 21);
+    wallFace(soup, F, sign * K.half, 0, L, under, (s) => top(s) - 0.45, C.bridgeStoneLight, SLAB_STEP, 21);
     // the cornice: a ledge over the fascia
     const out = sign * (K.half + 0.3);
-    wallFace(soup, F, out, 0, L, (s) => top(s) - 0.45, top, C.sandstone, SLAB_STEP, 22);
-    deckStrip(soup, F, sign * K.half, out, 0, L, (s) => top(s) - 0.45, C.sandstoneDark, SLAB_STEP, 23);
-    deckStrip(soup, F, sign * (K.half - 0.5), out, 0, L, top, C.sandstoneLight, SLAB_STEP, 24, K.kerb * 0);
+    wallFace(soup, F, out, 0, L, (s) => top(s) - 0.45, top, C.bridgeStone, SLAB_STEP, 22);
+    deckStrip(soup, F, sign * K.half, out, 0, L, (s) => top(s) - 0.45, C.bridgeStoneDark, SLAB_STEP, 23);
+    deckStrip(soup, F, sign * (K.half - 0.5), out, 0, L, top, C.bridgeStoneLight, SLAB_STEP, 24, K.kerb * 0);
   }
 
-  // ---- the approach abutments: stone walls from the ground to the slab, closed at both ends so nothing hollow shows
-  for (const sign of SIGNS) {
-    const u = sign * K.half;
-    wallFace(soup, F, u, 0, sa, (s) => g(s, u) - 1.2, under, C.sandstone, Math.ceil(sa / 2.5), 30);
-    wallFace(soup, F, u, sb, L, (s) => g(s, u) - 1.2, under, C.sandstone, Math.ceil((L - sb) / 2.5), 31);
-  }
+  // ---- the approach abutments: their side walls are the same spandrel wall as the arcade (drawn below, with its openings), closed at the ends so nothing hollow shows
   for (const [s, dir] of [[sa, 1], [sb, -1]]) {
     // the end wall of the abutment, facing the arch, down to the lowest ground across its width
     const low = Math.min(...[-K.half, -K.half / 2, 0, K.half / 2, K.half].map((u) => g(s, u))) - 1.2;
-    soup.quad(F.at(s, low, -K.half), F.at(s, low, K.half), F.at(s, springY, K.half), F.at(s, springY, -K.half), paint(C.sandstoneDark, 77));
+    soup.quad(F.at(s, low, -K.half), F.at(s, low, K.half), F.at(s, springY, K.half), F.at(s, springY, -K.half), paint(C.bridgeStoneDark, 77));
     void dir;
   }
 
   // ---- the arch ring (voussoirs), the soffit, the spandrel wall with its arcade
   const archSteps = 64;
   for (const sign of SIGNS) {
-    wallFace(soup, F, sign * K.half, sa, sb, intrados, extrados, C.sandstoneLight, archSteps, 40);
+    wallFace(soup, F, sign * K.half, sa, sb, intrados, extrados, C.bridgeStoneLight, archSteps, 40);
   }
   for (let i = 0; i < archSteps; i++) {                             // the soffit: the underside of the arch
     const s0 = sa + (K.span * i) / archSteps, s1 = sa + (K.span * (i + 1)) / archSteps;
-    soup.quad(F.at(s0, intrados(s0), -K.half), F.at(s1, intrados(s1), -K.half), F.at(s1, intrados(s1), K.half), F.at(s0, intrados(s0), K.half), paint(C.sandstoneDark, 50 + i, 0.05));
+    soup.quad(F.at(s0, intrados(s0), -K.half), F.at(s1, intrados(s1), -K.half), F.at(s1, intrados(s1), K.half), F.at(s0, intrados(s0), K.half), paint(C.bridgeStoneDark, 50 + i, 0.05));
   }
-  // the openings of the arcade (centres relative to the crown); where an opening has no height the wall stays solid
+  // the openings of the arcade (centres relative to the crown): tall arches over the springing of the great arch AND over the abutments, none where the
+  // arch comes close to the slab (the crown is solid: the photographs show four openings on each side and a plain wall between the two groups)
+  const floorAt = (s) => (s >= sa && s <= sb ? extrados(s) : Math.max(g(s, -K.half), g(s, 0), g(s, K.half)) + 0.4);
   const openings = [];
   for (let k = -K.openingCount; k <= K.openingCount; k++) {
     const sk = sc + k * K.openingPitch;
-    if (sk - K.openingHalf < sa + 1 || sk + K.openingHalf > sb - 1) continue;
+    const left = sk - K.openingHalf, right = sk + K.openingHalf;
+    if (left < 2 || right > L - 2) continue;
+    if ((left < sa && right > sa) || (left < sb && right > sb)) continue;       // an opening never straddles the springing line
     const springLine = under(sk) - 0.8 - K.openingHalf;
-    const floor = Math.max(extrados(sk - K.openingHalf), extrados(sk + K.openingHalf), extrados(sk));
-    if (springLine - floor < 0.2) continue;
-    openings.push({ sk, springLine });
+    const floor = Math.max(floorAt(left), floorAt(right), floorAt(sk));
+    if (springLine - floor < K.openingMinHeight) continue;
+    openings.push({ sk, springLine, floor });
   }
   const head = (o, s) => o.springLine + Math.sqrt(Math.max(0, K.openingHalf ** 2 - (s - o.sk) ** 2));
   for (const sign of SIGNS) {
-    let cursor = sa;
-    const wall = (s0, s1, lower, steps) => wallFace(soup, F, sign * K.half, s0, s1, lower, under, C.sandstone, steps, 60);
+    let cursor = 0;
+    const bottomOf = (s) => (s >= sa && s <= sb ? extrados(s) : g(s, sign * K.half) - 1.2);   // the wall stands on the arch, or on the ground beside it
+    const wall = (s0, s1, lower, steps) => wallFace(soup, F, sign * K.half, s0, s1, lower, under, C.bridgeStone, steps, 60);
     for (const o of openings) {
       const left = o.sk - K.openingHalf, right = o.sk + K.openingHalf;
-      wall(cursor, left, extrados, Math.max(1, Math.ceil((left - cursor) / 2)));
-      wall(left, right, (s) => Math.max(extrados(s), head(o, s)), 10);
+      wall(cursor, left, bottomOf, Math.max(1, Math.ceil((left - cursor) / 2)));
+      wall(left, right, (s) => Math.max(floorAt(s), head(o, s)), 10);
       // the jambs and the soffit of the opening, so the wall has the thickness it really has
       const inner = sign * (K.half - K.wallThickness);
       for (const s of [left, right]) {
-        soup.quad(F.at(s, extrados(s), sign * K.half), F.at(s, extrados(s), inner), F.at(s, o.springLine, inner), F.at(s, o.springLine, sign * K.half), paint(C.sandstoneDark, 90));
+        soup.quad(F.at(s, o.floor, sign * K.half), F.at(s, o.floor, inner), F.at(s, o.springLine, inner), F.at(s, o.springLine, sign * K.half), paint(C.bridgeStoneDark, 90));
       }
       for (let i = 0; i < 10; i++) {
         const s0 = left + ((right - left) * i) / 10, s1 = left + ((right - left) * (i + 1)) / 10;
-        soup.quad(F.at(s0, head(o, s0), sign * K.half), F.at(s1, head(o, s1), sign * K.half), F.at(s1, head(o, s1), inner), F.at(s0, head(o, s0), inner), paint(C.sandstoneDark, 91 + i));
+        soup.quad(F.at(s0, head(o, s0), sign * K.half), F.at(s1, head(o, s1), sign * K.half), F.at(s1, head(o, s1), inner), F.at(s0, head(o, s0), inner), paint(C.bridgeStoneDark, 91 + i));
       }
       cursor = right;
     }
-    wall(cursor, sb, extrados, Math.max(1, Math.ceil((sb - cursor) / 2)));
+    wall(cursor, L, bottomOf, Math.max(1, Math.ceil((sb - cursor) / 2)));
   }
 
   // ---- the cycle footbridge hung beside the bridge, with the brackets that carry it
