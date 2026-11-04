@@ -554,8 +554,14 @@ export function createRoadNetwork(roads, baseHeight) {
             } else {
               if (edge >= fadeLen) continue;
               const lim = ROAD.maxBatterSlope * edge;
-              const shaped = bed + (off > lim ? lim : off < -lim ? -lim : off);
-              dev = level * (shaped - ground);
+              let shaped = bed + (off > lim ? lim : off < -lim ? -lim : off);
+              // The ramp of the fill may fill the ground up to the level of the way, but it may never dig the ground
+              // below the land beside it: where the land is steeper than the slope limit (a cliff beside the road),
+              // the cliff stays a cliff and the ground of the carve is the land.  Without this the ramp ended in
+              // the air and the ground jumped back to the land at the far end of the batter: the wall of seven
+              // metres the flow found beside Val de Hamm.
+              if (shaped < ground) { shaped = ground; dev = 0; }
+              else dev = level * (shaped - ground);
             }
             // The claim of the batter: full on the road, and gone at the far end of the batter.  It is squared so that
             // a road further away does not pull the ground of the road the point is on.
@@ -580,6 +586,12 @@ export function createRoadNetwork(roads, baseHeight) {
           // The distance that decides it is the distance to the SEGMENT, not the offset from the infinite
           // line of the segment: a street that curls into a loop paints a disc when the paint follows the
           // line, and a disc is not a street.
+          // The score has to keep falling with the distance at EVERY distance.  It used to stop falling at the
+          // edge of the carriageway (the offset from the line was clamped to the half width), so past the
+          // carriageway every way scored the same and an arbitrary one won: the offset of the paint jumped
+          // from way to way, and the edge of the tarmac tore into the ragged steps the reviewer saw.  Now the
+          // nearest way wins out there, and the offset is the distance to the polyline: a straight street has a
+          // straight edge, because that distance is a linear function of the place.
           const hw = HW[i];
           const score = ((d <= hw ? 2 : 1) + 1 - Math.min(1, d / Math.max(hw, 0.5))
                          - Math.min(hw, 12) * 0.02) * level;
