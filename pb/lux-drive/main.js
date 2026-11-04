@@ -79,11 +79,15 @@ async function boot() {
   let qualityId = param('q') && QUALITY[param('q')] ? param('q') : (QUALITY[readKey(QUALITY_KEY)] ? readKey(QUALITY_KEY) : autoQuality());
   let quality = { ...QUALITY[qualityId], id: qualityId };
 
+  // ---- the hole detector: the sky is switched off and the clear colour is magenta, so every pixel that
+  // shows the clear colour is a place where the ground is missing (the flow scripts/flows/luxdrive_holes.mjs)
+  const holeMode = param('holes') === '1';
+
   // ---- the renderer
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: qualityId === 'high', powerPreference: 'high-performance' });
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: qualityId === 'high', powerPreference: 'high-performance', preserveDrawingBuffer: holeMode });
   renderer.outputColorSpace = THREE.LinearSRGBColorSpace;         // the whole game shades in display space (the painted look)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, quality.pixelRatio));
-  renderer.setClearColor(0x9ab6c8, 1);
+  renderer.setClearColor(holeMode ? 0xff00ff : 0x9ab6c8, 1);
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(62, 1, 0.1, quality.far);
   scene.add(camera);
@@ -127,6 +131,7 @@ async function boot() {
     params: { time: param('time') || undefined, weather: param('weather') || undefined },
   });
   env.uniforms.uSkyPaint.value = textures.sky;                      // the painted cloud tile (the noise texture made coloured specks)
+  if (holeMode) env.sky.visible = false;                             // the hole detector: the sky would hide the gaps
   scene.add(env.sky);
   const groundFull = createGroundMaterial(THREE, env, textures, worldMaps, WORLD, false, quality.treeRadius);
   const groundCheap = createGroundMaterial(THREE, env, textures, worldMaps, WORLD, true, quality.treeRadius);
@@ -266,7 +271,8 @@ async function boot() {
     // the world
     env.update(dt, camera, elapsed);
     env.setFogBase(ground.height(c.x, c.z));
-    terrain.update(car.state.x, car.state.z);
+    // the world follows the camera when the harness holds it (the hole detector walks the camera over the map)
+    terrain.update(frozenCamera ? camera.position.x : car.state.x, frozenCamera ? camera.position.z : car.state.z);
     city.update(car.state.x, car.state.z);
     trees.update(camera.position.x, camera.position.z, elapsed);
 
