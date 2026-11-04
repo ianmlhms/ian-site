@@ -873,7 +873,7 @@ renderer).  The flows count game seconds now (`window.__lux.clock()`).  Pictures
 | `luxdrive_holes.mjs` | PASS 0 hole pixels, 72 poses, at medium AND (`HOLES_Q=low`) at low |
 | `luxdrive_ui.mjs` | PASS |
 | `luxdrive_round2.mjs` (new) | see REPORT.md |
-| `luxdrive_world.mjs` | see REPORT.md |
+| `luxdrive_world.mjs` | PASS; low 65 / 133 k, medium 109 / 246 k, high 133 / 316 k (calls / triangles, flow's own camera) |
 
 Draw calls / triangles at Kirchberg (start place, `scripts/luxdrive/perf.mjs`): before the merge fixes low 108 / 301 k, medium 127 / 348 k,
 high 137 / 399 k; now **low 80 / 156 k, medium 130 / 277 k, high 148 / 335 k** (medium budget 260). Auto-step with a fake slow clock:

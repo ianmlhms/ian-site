@@ -12,6 +12,7 @@
 * harness `--quick`: PASS 71 checks. holes: 0 pixels at medium and at low. ui flow: PASS.
 * round-2 flow (new): all checks passed in the last full run except one test expectation that I then corrected (the road index never
   contains footways, so the probe count was lowered 6 -> 4); that corrected line was not re-run end to end.
+* `luxdrive_world.mjs`: PASS (its own budget run: low 65 calls / 133 k, medium 109 / 246 k, high 133 / 316 k).
 * Draw calls / triangles at Kirchberg: low 80 / 156 k, medium 130 / 277 k, high 148 / 335 k.
 * Auto-step with a fake slow clock: low after 3.8 s (35 ms) and 3.9 s (60 ms).
 
