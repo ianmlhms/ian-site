@@ -38,13 +38,15 @@ function closestOnPolygon(pts, x, z, out) {
 
 /**
  * buildings: the decoded LOD2 footprints [{ id, roof, style, ridgeDir, levels, eave, ridge, pts }]
+ * `hidden`: ids of the blocks a landmark replaces (they are not indexed: no invisible wall where a landmark stands).
  * Returns { count, collide(x, z, radius), near(x, z, radius), boxes }.
  */
-export function createBuildingIndex(buildings, { cell = CELL } = {}) {
+export function createBuildingIndex(buildings, { cell = CELL, hidden = null } = {}) {
   const boxes = new Map();                       // id -> the bounding box
   const cells = new Map();                       // cell key -> the ids inside
   const key = (cx, cz) => cx * 100003 + cz;
   for (const b of buildings) {
+    if (hidden && hidden.has(b.id)) continue;      // a landmark replaces this block: it has its own collision
     const box = boundsOf(b.pts);
     boxes.set(b.id, box);
     const cx0 = Math.floor(box.minX / cell), cx1 = Math.floor(box.maxX / cell);

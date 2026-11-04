@@ -22,6 +22,8 @@ import { createGroundMaterial } from './ground-shader.js';
 import { createTerrainView } from './terrain-view.js';
 import { createBuildingView } from './building-view.js';
 import { createDeckView } from './deck-view.js';
+import { createLandmarks, fixLandmarkDecks } from './landmarks.js';
+import { createLandmarkView } from './landmark-view.js';
 import { createPortalView } from './portal-view.js';
 import { createTramNetwork } from './tram-network.js';          // the Luxtram (city finish)
 import { createTramSim } from './tram-sim.js';
@@ -130,9 +132,11 @@ async function boot() {
   await new Promise((r) => setTimeout(r, 0));
   const field = createHeightField({ near: data.near, far: data.far, roads: data.roads });
   const surface = createSurface(field);
-  const deckNetwork = createDeckNetwork(data.decks, surface);
+  const deckNetwork = createDeckNetwork(fixLandmarkDecks(data.decks, (x, z) => surface.height(x, z)), surface);
   const ground = createGround(surface, deckNetwork);
-  const buildings = createBuildingIndex(data.buildings);
+  // the landmarks (the famous places) replace some blocks and some bridge decks of the bake and have collision of their own
+  const landmarks = createLandmarks({ buildings: data.buildings, decks: ground.decks, ground: (x, z) => surface.height(x, z), roads: data.roads });
+  const buildings = createBuildingIndex(data.buildings, { hidden: landmarks.hiddenBuildings });
   const portals = createPortals(data.roads);
   const playArea = createPlayArea(area);
   const maps = buildWorldMap({ classes: data.classes, classInfo: data.classInfo, canopy: data.canopy, buildings: data.buildings });
@@ -167,9 +171,10 @@ async function boot() {
   await new Promise((r) => setTimeout(r, 0));
   const solid = createSolidMaterial(env);
   const terrain = createTerrainView({ scene, surface, field, material: quality.cheapGround ? groundCheap : groundFull, quality });
-  const city = createBuildingView({ scene, buildings, field, env, noiseTexture: textures.noise, quality });
+  const city = createBuildingView({ scene, buildings, field, env, noiseTexture: textures.noise, quality, hidden: landmarks.hiddenBuildings });
   const trees = createTreeView({ scene, forest, baked: data.trees, field, env, quality });
-  const decks = createDeckView({ scene, decks: ground.decks, material: solid, ground: ground.surface });
+  const decks = createDeckView({ scene, decks: ground.decks.filter((d) => !landmarks.hiddenDecks.has(d.id)), material: solid, ground: ground.surface });
+  const landmarkView = createLandmarkView({ scene, landmarks, material: solid });
   const portalView = createPortalView({ scene, portals, ground, material: solid });
   // the Luxtram: the rails and the vehicles of the line (tram-network.js builds the two tracks from lines.bin, tram-sim.js runs the vehicles on them)
   const tramNetwork = createTramNetwork(data.lines, data.stops, TRAM);
@@ -189,7 +194,7 @@ async function boot() {
   // ---- the car, the camera, the interface
   const start = data.places.start || { x: WORLD.width / 2, z: WORLD.depth / 2, yaw: 0 };
   const roadInfo = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, surface: 0, road: -1, lines: 0, lanes: 0, s: 0 };
-  const collide = (x, z, radius) => buildings.collide(x, z, radius) || portals.collide(x, z, radius) || forest.collide(x, z, radius) || tramSim.collide(x, z, radius) || props.collide(x, z, radius) || playArea.collide(x, z, radius);
+  const collide = (x, z, radius) => buildings.collide(x, z, radius) || landmarks.collide(x, z, radius) || portals.collide(x, z, radius) || forest.collide(x, z, radius) || tramSim.collide(x, z, radius) || props.collide(x, z, radius) || playArea.collide(x, z, radius);
   const car = createCar({ ground, roadInfoAt: (x, z, out) => surface.roadInfoAt(x, z, out), collide, start });
   const chase = createChaseCamera(ground, (x, z, radius) => buildings.collide(x, z, radius) || forest.collide(x, z, radius) || portals.collide(x, z, radius));
 
@@ -508,7 +513,7 @@ async function boot() {
 
   // the API for the harness (the checks read the state of the game from here)
   window.__lux = {
-    trams, tramSim, tramNetwork, streetLights, benchView, scene, camera, renderer, car, env, terrain, city, trees, surface, ground, field, portals, playArea, buildings, quality: () => quality,
+    landmarks, landmarkView, trams, tramSim, tramNetwork, streetLights, benchView, scene, camera, renderer, car, env, terrain, city, trees, surface, ground, field, portals, playArea, buildings, quality: () => quality,
     ui, fullMap, roadIndex, sound, stepper, model, limits, input, forest, collide, placeAt, blockedAt,
     /** The Kaart and the teleport for the flows: open the map, put the car on the road nearest to (x, z). */
     toggleMap: () => toggleMap(), startDriving: () => startDriving(), isStarted: () => started,
