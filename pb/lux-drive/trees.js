@@ -29,8 +29,10 @@ const world = { open: 0, forest: 0, urban: 0, water: 0, cover: 0, height: 0, par
  * field: the height field (the ground as the game draws it).
  * network: the road network (the roads keep their corridor free).
  * buildings: the building index (a tree does not stand in a house).
+ * clearings: rectangles [x0, z0, x1, z1] around the landmarks that people come to see: the generated woods leave them free (the trees hid the Coque, the Mudam and
+ *   the Fort Thüngen from the roads).  The trees OSM maps one by one are baked and stay.
  */
-export function treesOfBlock(bx, bz, { map, field, network, buildings }) {
+export function treesOfBlock(bx, bz, { map, field, network, buildings, clearings = [] }) {
   const rng = createRng((bx * 73856093) ^ (bz * 19349663) ^ 0x5bd1e995);
   const out = [];
   const x0 = bx * BLOCK, z0 = bz * BLOCK, step = BLOCK / CANDIDATES;
@@ -40,6 +42,7 @@ export function treesOfBlock(bx, bz, { map, field, network, buildings }) {
       const x = x0 + (i + 0.5) * step + (rng() - 0.5) * 2 * JITTER;
       const z = z0 + (j + 0.5) * step + (rng() - 0.5) * 2 * JITTER;
       const roll = rng(), sizeRoll = rng(), seed = rng();
+      if (clearings.some((c) => x >= c[0] && x <= c[2] && z >= c[1] && z <= c[3])) continue;
       const m = sampleWorldMap(map, x, z, world);
       // The canopy cover is the density of the wood; the city and the water carry no trees (the LiDAR sees the
       // roofs of the city as a canopy, so the class map has to overrule it).
@@ -68,7 +71,7 @@ export function trunkRadius(height) {
  * trees: the baked trees [{ x, z, height, kind, girth, inStreet }].
  * Returns { block(bx, bz), collide(x, z, radius), near(x, z, radius), blocks }.
  */
-export function createTreeIndex({ map, field, network, buildings, trees = [] }) {
+export function createTreeIndex({ map, field, network, buildings, trees = [], clearings = [] }) {
   const blocks = new Map();
   const LIMIT = 800;                    // the number of cached blocks (the car drives through a lot of them)
   const CELL = 64;                      // m, the cell of the spatial hash of the baked trees
@@ -87,7 +90,7 @@ export function createTreeIndex({ map, field, network, buildings, trees = [] }) 
     const k = bx * 100003 + bz;
     let b = blocks.get(k);
     if (!b) {
-      b = treesOfBlock(bx, bz, { map, field, network, buildings });
+      b = treesOfBlock(bx, bz, { map, field, network, buildings, clearings });
       blocks.set(k, b);
       if (blocks.size > LIMIT) blocks.delete(blocks.keys().next().value);
     } else {

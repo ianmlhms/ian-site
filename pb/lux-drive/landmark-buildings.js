@@ -7,9 +7,11 @@
 import { Soup, paint } from './landmark-soup.js';
 import { PALETTE as C } from './landmark-palette.js';
 import { requireBlocks, edgeWalls, scalePoly, insidePoly, groundRange } from './landmark-util.js';
-import { edgeFrame, windowGrid, lancet, portal, course, slab, fins, turret, panel } from './landmark-facade.js';
+import { edgeFrame, windowGrid, lancet, portal, course, slab, fins, turret, panel, joints, roundArch } from './landmark-facade.js';
+import { renaissanceFront, sentryBox, bollard } from './landmark-renaissance.js';
 
 const TAU = Math.PI * 2;
+const BOLLARD_OUT = 0.6, SENTRY_OUT = 0.9;    // m in front of the wall (the street runs right along it)
 const SINK = 1.0;                         // m, the walls go this far under the ground (the ground is a carved lattice: no cracks)
 
 /** The bottoms of a wall that follows the ground: one y per corner of the footprint. */
@@ -28,6 +30,12 @@ function ellipse(cx, cz, rx, rz, n, yaw = 0) {
     const x = Math.cos(a) * rx, z = Math.sin(a) * rz;
     return [cx + x * c - z * s, cz + x * s + z * c];
   });
+}
+
+/** The point of an ellipse (rx, rz, turned by yaw) at the parameter a. */
+function ellipse1(cx, cz, rx, rz, a, yaw = 0) {
+  const x = Math.cos(a) * rx, z = Math.sin(a) * rz, c = Math.cos(yaw), s = Math.sin(yaw);
+  return [cx + x * c - z * s, cz + x * s + z * c];
 }
 
 /** A square tower with a pyramid spire; (cx, cz) its middle, half the side h, the walls up to yWall, the spire up to yTip. */
@@ -61,7 +69,10 @@ const PHILHARMONIE = Object.freeze({
   centre: [5960, 7990], rx: 36, rz: 53, yaw: 0.12,       // m, the ellipse of the colonnade (OSM: the hall is ~96 x 117 m with its wings)
   columns: 190, columnTangent: 0.55, columnRadial: 0.95, columnHeight: 22,   // the real hall has ~800 slim fins: every 1.5 m reads as the same dense ring
   drumInset: 2.6, roofThickness: 1.5, roofOverhang: 1.6, podium: 0.8,
-  shell: { at: [5999, 8016], radius: 13, tip: [5990, 8009], height: 8.5, sides: 14 },   // the white shell: a low cone leaning on the colonnade
+  // the white shell (photographs: a smooth wave of white panels that rises from the plaza and leans against the colonnade): `toward` = where it lies seen from the middle
+  // of the hall, `halfArc` its half width as an angle of the ellipse, `reach` how far it runs out onto the plaza, `height` where it meets the columns
+  shell: { toward: [5999, 8016], halfArc: 0.62, reach: 17, height: 10.5, rows: 22, cols: 9 },
+  white: [1.45, 1.45, 1.40],                    // brighter than white: the columns in the shade of the other side are still lit by the sky only, and read grey at 0.93
 });
 
 export function buildPhilharmonie({ buildings, ground }) {
@@ -82,18 +93,40 @@ export function buildPhilharmonie({ buildings, ground }) {
   for (const [i, p] of colonnade.entries()) {
     const q = colonnade[(i + 1) % colonnade.length], o = colonnade[(i + colonnade.length - 1) % colonnade.length];
     const yaw = Math.atan2(-(q[1] - o[1]), q[0] - o[0]);
-    soup.box(p[0], y0, p[1], K.columnTangent, K.columnHeight, K.columnRadial, yaw, paint(C.white, i, 0.015), { topColor: C.white });
+    soup.box(p[0], y0, p[1], K.columnTangent, K.columnHeight, K.columnRadial, yaw, paint(K.white, i, 0.015), { topColor: K.white });
   }
   const roofOuter = ellipse(cx, cz, K.rx + K.roofOverhang, K.rz + K.roofOverhang, 56, K.yaw);
   const yRoof = y0 + K.columnHeight;
-  soup.prism(roofOuter, yRoof, yRoof + K.roofThickness, C.white, { topColor: paint(C.white, 9, 0.02) });
+  soup.prism(roofOuter, yRoof, yRoof + K.roofThickness, K.white, { topColor: paint(K.white, 9, 0.02) });
   const roofInner = ellipse(cx, cz, K.rx - 10, K.rz - 14, 32, K.yaw);
   soup.prism(roofInner, yRoof + K.roofThickness, yRoof + K.roofThickness + 2.2, C.concrete, { topColor: C.paving });
-  // the white shell: a low cone from the plaza up against the colonnade
-  const S = K.shell, [sx, sz] = S.at, [tx, tz] = S.tip;
-  const base = Array.from({ length: S.sides }, (_, i) => [sx + Math.cos((i / S.sides) * TAU) * S.radius, sz + Math.sin((i / S.sides) * TAU) * S.radius]);
-  const yShell = Math.max(...base.map(([x, z]) => ground(x, z)));
-  soup.pyramid(base, yShell - 1.5, [tx, yShell + S.height, tz], paint(C.white, 77, 0.03));
+  // the white shell: one smooth skin, from the podium (outer rim, flat) up to the colonnade; its height follows a bell along the arc (the wave of the photographs)
+  const S = K.shell;
+  const rim = (a, k) => ellipse1(cx, cz, K.rx * k, K.rz * k, a, K.yaw);
+  const [dx0, dz0] = [S.toward[0] - cx, S.toward[1] - cz];
+  let aC = 0, best = Infinity;
+  for (let a = 0; a < TAU; a += 0.01) {
+    const [px, pz] = rim(a, 1);
+    const d = Math.abs(Math.atan2((pz - cz) * dx0 - (px - cx) * dz0, (px - cx) * dx0 + (pz - cz) * dz0));
+    if (d < best) { best = d; aC = a; }
+  }
+  const rows = [], cols = [];
+  for (let i = 0; i <= S.rows; i++) {
+    const t = i / S.rows, a = aC - S.halfArc + 2 * S.halfArc * t;
+    const bell = Math.pow(Math.sin(Math.PI * t), 0.9);                    // 0 at the two ends of the arc, 1 in the middle
+    const row = [], crow = [];
+    for (let j = 0; j <= S.cols; j++) {
+      const u = j / S.cols;                                               // 0 on the plaza ... 1 against the columns
+      const k = 1 + (S.reach / K.rx) * (1 - u) * (0.35 + 0.65 * bell) + 0.012;
+      const [px, pz] = rim(a, k * 1.0);
+      const wGround = Math.min(1, u * 3), yBase = ground(px, pz) * (1 - wGround) + y0 * wGround;          // the outer rim lies on the plaza, not on the podium
+      const y = yBase + S.height * bell * (Math.pow(u, 1.5) * (0.55 + 0.45 * u));
+      row.push([px, y + 0.02, pz]);
+      crow.push(paint(K.white, i * 13 + j, 0.015));
+    }
+    rows.push(row); cols.push(crow);
+  }
+  soup.grid(rows, cols, { flip: 'auto' });
   return { soup, walls: edgeWalls(ellipse(cx, cz, K.rx + 3.0, K.rz + 3.0, 32, K.yaw), 0.5, 'philharmonie'), hideBuildings: hidden.map((b) => b.id), info: { blocks: hidden.length, y0, columns: K.columns } };
 }
 
@@ -169,7 +202,8 @@ const CATHEDRAL = Object.freeze({
   at: [5164, 8965], hideRadius: 30, hideMinArea: 800,
   nave: [5154, 5178, 8929, 8976],          // m: x0, x1, z0, z1 of the narrow nave (north)
   transept: [5142, 5185, 8975, 9008],      // m: the wide part (south)
-  eave: 19, naveRise: 17, transeptRise: 17, crossingRise: 22,    // steep: the slate roofs of the photographs rise at ~55 degrees
+  eave: 19, naveRise: 15, transeptRise: 13, crossingRise: 20,    // steep: the slate roofs of the photographs rise at ~55 degrees
+  aisleEave: 11, aisleRise: 5, aisleWidth: 6,                      // the aisles: lower walls, lean-to roofs that rise to the clerestory
   // the front towers: centre, the belfry's stone reaches `wall`, the spire's tip is `tip` above the ground at the foot; `crown` = the shorter one with four gables
   frontTowers: [{ at: [5158.4, 8936.5], crown: true, tip: 64 }, { at: [5173.6, 8936.5], crown: false, tip: 72 }],
   towerHalf: 3.2, towerWall: 31, hipHeight: 5,
@@ -184,7 +218,19 @@ function needle(soup, x, z, r, y0, yTip, color, yaw = Math.PI / 8) {
   soup.frustum(x, z, r, 0, y0, yTip, 8, paint(color, Math.round(x * 3 + yTip), 0.04), { yaw, cap: false });
 }
 
-/** A front tower: square belfry, a hip of slate, then the spire (with the crown of gables on the shorter one). */
+/** A round rose window on the wall plane of frame f: a stone ring and a dark glass disc with eight spokes. */
+function rose(soup, f, sc, yc, r, frame, glass) {
+  const n = 16;
+  for (let i = 0; i < n; i++) {
+    const a0 = (i / n) * TAU, a1 = ((i + 1) / n) * TAU;
+    const at = (rr, a, out) => f.at(sc + Math.cos(a) * rr, yc + Math.sin(a) * rr, out);
+    soup.tri(at(0, 0, 0.07), at(r, a0, 0.07), at(r, a1, 0.07), paint(glass, i, 0.05));
+    soup.quad(at(r, a0, 0.05), at(r + 0.5, a0, 0.05), at(r + 0.5, a1, 0.05), at(r, a1, 0.05), paint(frame, i, 0.03));
+    if (i % 2 === 0) soup.quad(at(0.1, a0, 0.1), at(r, a0 - 0.05, 0.1), at(r, a0 + 0.05, 0.1), at(0.1, a0 + 0.03, 0.1), frame);   // a spoke
+  }
+}
+
+/** A front tower: square belfry with corner buttresses and pinnacles, string courses, paired louvred openings, a hip of slate, then the spire (with the crown of gables on the shorter one). */
 function cathedralTower(soup, ground, high, t, K) {
   const [x, z] = t.at, half = K.towerHalf;
   const pts = [[-half, -half], [half, -half], [half, half], [-half, half]].map(([a, c]) => [x + a, z + c]);
@@ -192,9 +238,21 @@ function cathedralTower(soup, ground, high, t, K) {
   soup.prism(pts, bottomsOf(ground, pts), yWall, paint(C.cathedralStone, 3, 0.03), { topColor: C.slateGrey });
   for (let e = 0; e < 4; e++) {
     const f = edgeFrame(pts, e);
-    course(soup, f, yWall - 1.0, yWall, 0.35, C.sandstoneLight, e);
-    lancet(soup, f, f.len / 2, yWall - 8.5, 1.3, 5, C.sandstoneLight, C.slateBlack);        // the belfry opening
-    lancet(soup, f, f.len / 2, yWall - 19, 0.9, 2.8, C.sandstoneLight, C.slateBlack);       // a narrower one lower down
+    course(soup, f, yWall - 1.0, yWall, 0.35, C.sandstoneLight, e);                          // the cornice
+    course(soup, f, yWall - 12.5, yWall - 12.0, 0.3, C.sandstoneLight, e + 20);             // a string course under the belfry
+    course(soup, f, yWall - 23.5, yWall - 23.0, 0.3, C.sandstoneLight, e + 30);             // and another lower down
+    for (const dx of [-0.95, 0.95]) {                                                       // the belfry: two tall paired openings, dark louvres
+      lancet(soup, f, f.len / 2 + dx, yWall - 10.8, 1.1, 5.4, C.sandstoneLight, C.slateBlack);
+      for (let k = 0; k < 5; k++) panel(soup, f, f.len / 2 + dx - 0.5, f.len / 2 + dx + 0.5, yWall - 10.4 + k * 1.1, yWall - 10.2 + k * 1.1, 0.12, [0.32, 0.31, 0.30]);   // the slats
+    }
+    lancet(soup, f, f.len / 2, yWall - 22.5, 0.9, 3.2, C.sandstoneLight, C.slateBlack);       // narrower ones lower down
+    lancet(soup, f, f.len / 2, yWall - 31.0, 0.8, 2.4, C.sandstoneLight, C.slateBlack);
+    joints(soup, f, { y0: high + 1, y1: yWall - 1.2, rowH: 1.3, colW: 2.2, color: C.sandstoneDark, key: e * 59 + 7, vertical: false });
+  }
+  for (const [a, c] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {                               // the corner buttresses with a pinnacle cap
+    const px = x + a * half, pz = z + c * half;
+    soup.box(px, Math.min(ground(px, pz), high) - 0.5, pz, 1.3, yWall - 2.5 - (Math.min(ground(px, pz), high) - 0.5), 1.3, 0, paint(C.sandstoneLight, a * 3 + c, 0.03), { topColor: C.sandstoneLight });
+    soup.pyramid([[px - 0.65, pz - 0.65], [px + 0.65, pz - 0.65], [px + 0.65, pz + 0.65], [px - 0.65, pz + 0.65]], yWall - 2.5, [px, yWall + 0.6, pz], C.slateBlack);
   }
   // the hip: the square of the tower narrows to the octagon of the spire in one slate roof
   soup.frustum(x, z, half * 1.45, K.towerHalf * 0.62, yWall, yHip, 8, paint(C.slateRoof, 11, 0.05), { yaw: Math.PI / 8, cap: false });
@@ -218,46 +276,92 @@ function cathedralTower(soup, ground, high, t, K) {
   }
 }
 
+/** The stone gable end of a gabled roof, on the wall plane of frame f (s0..s1 along, y0 the eave, `rise` to the ridge). */
+function stoneGable(soup, f, s0, s1, y0, rise, color) {
+  soup.tri(f.at(s0, y0, 0.02), f.at(s1, y0, 0.02), f.at((s0 + s1) / 2, y0 + rise, 0.02), paint(color, 5, 0.02));
+  const mid = (s0 + s1) / 2;
+  soup.quad(f.at(s0, y0, 0.15), f.at(mid, y0 + rise, 0.15), f.at(mid, y0 + rise + 0.5, 0.15), f.at(s0, y0 + 0.5, 0.15), C.slateBlack);          // the coping along both slopes
+  soup.quad(f.at(mid, y0 + rise, 0.15), f.at(s1, y0, 0.15), f.at(s1, y0 + 0.5, 0.15), f.at(mid, y0 + rise + 0.5, 0.15), C.slateBlack);
+}
+
 export function buildCathedral({ buildings, ground }) {
   const K = CATHEDRAL;
   const hidden = requireBlocks(buildings, 'Cathédrale', K.at[0], K.at[1], K.hideRadius, K.hideMinArea);
   const soup = new Soup();
   const walls = [];
+  const AISLE = K.aisleEave, NAVE = K.eave;
   for (const b of hidden) {
     const { high } = groundRange(ground, b.pts);
-    block(soup, ground, b.pts, high + K.eave, paint(C.cathedralStone, b.id, 0.03), C.slateRoof);
+    // the whole footprint is walled up to the eave of the aisles; over it the lower roofs, the nave and the transept rise as separate volumes
+    block(soup, ground, b.pts, high + AISLE, paint(C.cathedralStone, b.id, 0.03), C.slateGrey);
     walls.push(...edgeWalls(b.pts, 0.3, 'cathedral'));
-    const [t0, t1, u0, u1] = K.transept;
-    gable(soup, K.nave[0], K.nave[1], K.nave[2], K.nave[3], high + K.eave, K.naveRise, true, C.slateRoof);
-    gable(soup, t0, t1, u0, u1, high + K.eave, K.transeptRise, false, C.slateRoof);
-    // the walls are not blank: a plinth, a cornice, buttresses and tall pointed windows between them on every edge
+    const [n0, n1, nz0, nz1] = K.nave, [t0, t1, u0, u1] = K.transept;
+    const cx0 = n0 + K.aisleWidth, cx1 = n1 - K.aisleWidth, yA = high + AISLE, yN = high + NAVE;
+    // ---- the nave: a clerestory (a stone box with its own lancets) under a steep slate roof; the aisles are lower, their lean-to roofs rise to the clerestory
+    const clere = [[cx0, nz0 + 3.5], [cx1, nz0 + 3.5], [cx1, nz1], [cx0, nz1]];
+    soup.prism(clere, yA - 0.2, yN, paint(C.cathedralStone, 61, 0.03), { top: false });
+    for (let e = 1; e <= 3; e += 2) {                                                       // the long sides of the clerestory: paired windows, a cornice
+      const f = edgeFrame(clere, e);
+      course(soup, f, yN - 0.8, yN, 0.45, C.sandstoneLight, 70 + e);
+      for (let sc = 3; sc < f.len - 2; sc += 4.6) lancet(soup, f, sc, yA + 1.6, 1.5, 3.4, C.sandstoneLight, C.glassDark);
+    }
+    gable(soup, cx0 - 0.5, cx1 + 0.5, nz0 + 3.0, nz1 + 0.5, yN, K.naveRise, true, C.slateRoof);
+    soup.box((cx0 + cx1) / 2, yN + K.naveRise - 0.1, (nz0 + nz1 + 3.5) / 2, 0.5, 0.5, nz1 - nz0 - 2.5, 0, C.copperGreen, { topColor: C.copperGreen });              // the ridge cap
+    for (const side of [-1, 1]) {                                                           // the lean-to roofs of the aisles
+      const xo = side < 0 ? n0 - 0.4 : n1 + 0.4, xi = side < 0 ? cx0 : cx1;
+      const A = [xo, yA + 0.2, nz0 + 2.0], B = [xo, yA + 0.2, nz1], Cc = [xi, yA + K.aisleRise, nz1], D = [xi, yA + K.aisleRise, nz0 + 2.0];
+      soup.quad(A, B, Cc, D, paint(C.slateGrey, 80 + side, 0.05));
+      soup.quad(D, Cc, B, A, paint(C.slateGrey, 82 + side, 0.05));
+      for (let z = nz0 + 6; z < nz1 - 3; z += 8) soup.box((xo + xi) / 2, yA + K.aisleRise * 0.5 + 0.2, z, 1.1, 0.9, 1.1, 0, paint(C.sandstoneLight, z, 0.03));   // a roof dormer on every aisle roof
+    }
+    // ---- the transept: a stone box with a roof of its own, a rose window at each end
+    soup.prism([[t0, u0], [t1, u0], [t1, u1], [t0, u1]], yA - 0.2, yN, paint(C.cathedralStone, 62, 0.03), { top: false });
+    gable(soup, t0 - 0.4, t1 + 0.4, u0 - 0.4, u1 + 0.4, yN, K.transeptRise, false, C.slateRoof);
+    soup.box((t0 + t1) / 2, yN + K.transeptRise - 0.1, (u0 + u1) / 2, t1 - t0, 0.5, 0.5, 0, C.copperGreen, { topColor: C.copperGreen });
+    for (const [px, nx] of [[t0, -1], [t1, 1]]) {
+      const pts = nx < 0 ? [[t0, u1], [t0, u0], [t0 + 1, u0], [t0 + 1, u1]] : [[t1, u0], [t1, u1], [t1 - 1, u1], [t1 - 1, u0]];    // a strip INSIDE the wall: its outer side is the outside of the building
+      const f = edgeFrame(pts, 0);
+      rose(soup, f, f.len / 2, yA + 7.5, 3.0, C.sandstoneLight, C.glassDark);
+      lancet(soup, f, f.len / 2 - 4.5, yA + 2.0, 1.3, 4.2, C.sandstoneLight, C.glassDark);
+      lancet(soup, f, f.len / 2 + 4.5, yA + 2.0, 1.3, 4.2, C.sandstoneLight, C.glassDark);
+      void px;
+    }
+    // ---- the walls of the aisles: a plinth, a cornice, buttresses with flying arches up to the clerestory, tall pointed windows between them
     for (let e = 0; e < b.pts.length; e++) {
       const f = edgeFrame(b.pts, e);
       if (f.len < 4) continue;
       const groundAt = (s) => { const q = f.at(s, 0, 0); return ground(q[0], q[2]); };
       course(soup, f, high - 0.6, high + 1.2, 0.35, C.sandstoneDark, e);                // the plinth
-      course(soup, f, high + K.eave - 0.9, high + K.eave, 0.5, C.sandstoneLight, e + 7);   // the cornice
+      course(soup, f, yA - 0.8, yA, 0.5, C.sandstoneLight, e + 7);                      // the cornice of the aisle
+      joints(soup, f, { y0: high + 1.2, y1: yA - 0.8, rowH: 1.4, colW: 2.6, color: C.sandstoneDark, key: e * 37, vertical: false });
       const n = Math.max(1, Math.round(f.len / K.buttressPitch));
       for (let i = 0; i <= n; i++) {                                                // buttresses at both ends and between
         const s = (i / n) * f.len;
         const [x, , z] = f.at(s, 0, 0.45);
         const yb = Math.min(groundAt(s), high) - 0.5;
-        soup.box(x, yb, z, 1.0, high + K.eave + 1.5 - yb, 0.9, f.yaw, paint(C.sandstoneLight, e * 11 + i), { topColor: C.sandstoneLight });
+        soup.box(x, yb, z, 1.0, yA + 1.2 - yb, 0.9, f.yaw, paint(C.sandstoneLight, e * 11 + i), { topColor: C.sandstoneLight });
       }
       for (let i = 0; i < n; i++) {
         const sc = ((i + 0.5) / n) * f.len;
-        lancet(soup, f, sc, high + 5.2, K.lancetW, K.lancetH, C.sandstoneLight, C.glassDark);
+        lancet(soup, f, sc, high + 3.4, K.lancetW, K.lancetH - 2.5, C.sandstoneLight, C.glassDark);
       }
     }
-    // the front (the north end): a pointed portal with a tall window over it, between the two towers
+    // ---- the west front (the north end): three stepped portals under a gallery of lancets and a big window, in a stone gable between the towers
     const front = b.pts.map((_, i) => edgeFrame(b.pts, i)).filter((f) => f.len > 10 && Math.abs(f.nz) > 0.8 && f.nz < 0).sort((p, q) => q.len - p.len)[0];
     if (front) {
-      portal(soup, front, front.len / 2, high, 2.6, 5.6, C.sandstoneLight, C.glassDark);
-      lancet(soup, front, front.len / 2, high + 9.5, 2.8, 8, C.sandstoneLight, C.glassDark);
+      const mid = front.len / 2;
+      portal(soup, front, mid, high, 3.4, 6.4, C.sandstoneLight, C.glassDark);
+      portal(soup, front, mid - 3.9, high, 1.5, 3.8, C.sandstoneLight, C.glassDark);
+      portal(soup, front, mid + 3.9, high, 1.5, 3.8, C.sandstoneLight, C.glassDark);
+      course(soup, front, high + 11.6, high + 12.2, 0.4, C.sandstoneLight, 90);
+      for (let k = -2; k <= 2; k++) lancet(soup, front, mid + k * 1.5, high + 13.0, 0.8, 3.6, C.sandstoneLight, C.glassDark);   // the gallery
+      lancet(soup, front, mid, high + 19.6, 3.2, 7.2, C.sandstoneLight, C.glassDark);                                         // the big window
+      rose(soup, front, mid, high + 31.2, 1.7, C.sandstoneLight, C.glassDark);
+      stoneGable(soup, front, mid - 6.6, mid + 6.6, yN, K.naveRise, C.cathedralStone);
     }
     for (const t of K.frontTowers) cathedralTower(soup, ground, high, t, K);
-    // the crossing: the high hipped roof with the green copper needle on its apex (lantern, balcony, needle)
-    const [cx, cz] = K.crossing, h = K.crossingHalf, yBase = high + K.eave, yApex = yBase + K.crossingRise;
+    // ---- the crossing: the high hipped roof with the green copper needle on its apex (lantern, balcony, needle)
+    const [cx, cz] = K.crossing, h = K.crossingHalf, yBase = yN + K.transeptRise * 0.35, yApex = yN + K.crossingRise + K.transeptRise * 0.35;
     soup.pyramid([[cx - h, cz - h], [cx + h, cz - h], [cx + h, cz + h], [cx - h, cz + h]], yBase, [cx, yApex, cz], C.slateRoof);
     soup.frustum(cx, cz, 2.6, 2.1, yApex - 1.2, yApex + 1.2, 8, paint(C.copperGreen, 4, 0.04), { cap: false });         // the balcony ring
     soup.frustum(cx, cz, 1.6, 1.4, yApex + 1.2, yApex + 4.8, 8, paint(C.copperGreen, 5, 0.04), { cap: false });         // the lantern
@@ -280,22 +384,23 @@ const PALAIS = Object.freeze({
   eave: 15.5, roofRise: 8.5, roofScale: 0.66,
   floor: 4.6, windowW: 1.5, windowH: 2.6, windowPitch: 4.0,
   turretR: 2.0, dormerPitch: 6.0,
+  frontMinLength: 8, frontDistance: 3,           // an edge of the outline is part of the front when it is longer than this and its middle lies within this of the street
 });
 
-/** The edge of the main block that faces the street: the long edge whose middle is nearest to the named road (else the longest edge). */
-function streetEdge(poly, roads, name) {
-  const named = roads.filter((r) => r.name && name.test(r.name));
-  const candidates = poly.map((_, i) => edgeFrame(poly, i)).filter((f) => f.len > 18);
-  if (!candidates.length) throw new Error('Palais: no edge long enough for the facade');
-  let best = null, bestScore = Infinity;
-  for (const f of candidates) {
-    const mx = (f.a[0] + f.b[0]) / 2, mz = (f.a[1] + f.b[1]) / 2;
-    let d = Infinity;
-    for (const r of named) for (const p of r.pts) d = Math.min(d, Math.hypot(p[0] - mx, p[1] - mz));
-    const score = (Number.isFinite(d) ? d : 100) - f.len * 0.3;
-    if (score < bestScore) { bestScore = score; best = f; }
+/** The nearest point of a road named `name` to (x, z): { d, dx, dz } (the vector to it); d is Infinity when there is no such road. */
+function nearestStreet(roads, name, x, z) {
+  let d = Infinity, dx = 0, dz = 0;
+  for (const r of roads) {
+    if (!r.name || !name.test(r.name)) continue;
+    for (let i = 0; i + 1 < r.pts.length; i++) {
+      const [ax, az] = r.pts[i], [bx, bz] = r.pts[i + 1];
+      const ex = bx - ax, ez = bz - az, ll = ex * ex + ez * ez;
+      const t = ll > 1e-9 ? Math.min(1, Math.max(0, ((x - ax) * ex + (z - az) * ez) / ll)) : 0;
+      const h = Math.hypot(x - (ax + ex * t), z - (az + ez * t));
+      if (h < d) { d = h; dx = ax + ex * t - x; dz = az + ez * t - z; }
+    }
   }
-  return best;
+  return { d, dx, dz };
 }
 
 export function buildPalais({ buildings, ground, roads = [] }) {
@@ -303,8 +408,23 @@ export function buildPalais({ buildings, ground, roads = [] }) {
   const hidden = requireBlocks(buildings, 'Palais grand-ducal', K.at[0], K.at[1], K.hideRadius, K.hideMinArea);
   const soup = new Soup();
   const walls = [];
-  const main = hidden.reduce((m, b) => (b.area > m.area ? b : m), hidden[0]);
-  const info = { blocks: hidden.length };
+  const info = { blocks: hidden.length, fronts: [] };
+  // The front is not one edge: the OSM / LOD2 outline of the palace turns twice along the Rue du Marché-aux-Herbes (a 31 m, a 16 m and, in the neighbouring block, a 19 m run:
+  // about 65 m in all).  Every long edge whose middle is within FRONT_DISTANCE of the street gets the Renaissance front.
+  const fronts = [];
+  for (const b of hidden) {
+    for (let e = 0; e < b.pts.length; e++) {
+      const f = edgeFrame(b.pts, e);
+      const mx = (f.a[0] + f.b[0]) / 2, mz = (f.a[1] + f.b[1]) / 2;
+      if (f.len <= K.frontMinLength) continue;
+      const st = nearestStreet(roads, K.streetName, mx, mz);
+      if (st.d < K.frontDistance) fronts.push({ f, b, mx, mz });                   // the street runs right along the wall (the middle of the edge is within 1 m of its centre line)
+    }
+  }
+  if (!fronts.length) throw new Error('Palais: no edge of the outline lies on the Marché-aux-Herbes: the footprint or the street moved');
+  // the two ends of the whole front: the edges farthest apart
+  let endA = fronts[0], endB = fronts[0], far = -1;
+  for (const p of fronts) for (const q of fronts) { const d = Math.hypot(p.mx - q.mx, p.mz - q.mz); if (d > far) { far = d; endA = p; endB = q; } }
   for (const b of hidden) {
     const { high } = groundRange(ground, b.pts);
     const yEave = high + K.eave;
@@ -317,44 +437,58 @@ export function buildPalais({ buildings, ground, roads = [] }) {
     }
     soup.prism(upper, yEave + K.roofRise, yEave + K.roofRise + 0.1, C.slateRoof, { top: true });
     walls.push(...edgeWalls(b.pts, 0.3, 'palais'));
-    // every edge gets the bands; the street edge of the main block gets the whole facade
     for (let e = 0; e < b.pts.length; e++) {
       const f = edgeFrame(b.pts, e);
       if (f.len < 5) continue;
-      course(soup, f, high + 0.0, high + 1.0, 0.25, C.stoneBand, e);
-      for (let r = 1; r <= 3; r++) course(soup, f, high + r * K.floor - 0.35, high + r * K.floor + 0.25, 0.3, C.stoneBand, e + r * 5);
-      course(soup, f, yEave - 0.7, yEave, 0.6, C.sandstoneLight, e + 40);
+      const isFront = fronts.some((p) => p.f.a === f.a || (p.f.a[0] === f.a[0] && p.f.a[1] === f.a[1] && p.f.b[0] === f.b[0]));
+      course(soup, f, high + 0.0, high + 0.9, 0.25, C.stoneBand, e);                    // the plinth
+      course(soup, f, yEave - 0.7, yEave, 0.6, C.sandstoneLight, e + 40);              // the cornice
+      if (isFront) continue;                                                          // the front gets its own storeys below
+      for (let r = 1; r <= 2; r++) course(soup, f, high + r * K.floor - 0.2, high + r * K.floor + 0.2, 0.2, C.stoneBand, e + r * 5);
+      if (f.len > 9) windowGrid(soup, f, { s0: 2.5, s1: f.len - 2.5, y0: high + 1.0, rows: 3, floorH: K.floor, w: K.windowW, h: K.windowH, pitch: K.windowPitch, frame: C.sandstoneLight, glass: C.glassDark, key: 100 + e * 7 });
     }
-    if (b !== main) continue;
-    const f = streetEdge(b.pts, roads, K.streetName);
-    info.facade = { a: f.a.map((v) => +v.toFixed(1)), b: f.b.map((v) => +v.toFixed(1)), n: [+f.nx.toFixed(2), +f.nz.toFixed(2)], len: +f.len.toFixed(1) };
-    // ground floor: low arches (dark openings with a stone frame), above them two storeys of windows with stone surrounds
-    windowGrid(soup, f, { s0: 5, s1: f.len - 5, y0: high + 0.9, rows: 1, floorH: K.floor, w: 2.0, h: 2.8, pitch: K.windowPitch, frame: C.sandstoneLight, glass: C.glassDark, key: 100 });
-    windowGrid(soup, f, { s0: 5, s1: f.len - 5, y0: high + K.floor + 0.7, rows: 2, floorH: K.floor, w: K.windowW, h: K.windowH, pitch: K.windowPitch, frame: C.sandstoneLight, glass: C.glassDark, key: 200 });
-    // the oriel turrets at the two ends of the facade: corbelled round towers with pointed slate caps, and a central pavilion
-    for (const s of [0.6, f.len - 0.6]) {
-      const [x, , z] = f.at(s, 0, 0.9);
-      turret(soup, x, z, K.turretR, high + 5.5, yEave + 1.0, yEave + 12, paint(C.palaisStone, 77, 0.03), C.slateBlack);
-      soup.frustum(x, z, K.turretR * 0.55, K.turretR, high + 3.6, high + 5.5, 8, C.sandstoneDark, { cap: false });
-    }
-    const mid = f.len / 2;
-    slab(soup, f, mid - 3.5, mid + 3.5, high, yEave + 3.2, 1.4, paint(C.sandstoneLight, 91, 0.03), { topColor: C.sandstoneLight });
-    windowGrid(soup, f, { s0: mid - 3.4, s1: mid + 3.4, y0: high + K.floor + 0.7, rows: 2, floorH: K.floor, w: 1.8, h: 2.8, pitch: 3.4, frame: C.stoneBand, glass: C.glassDark, key: 300 });
-    const xz = (sv, out) => { const q = f.at(sv, 0, out); return [q[0], q[2]]; };
-    soup.pyramid([xz(mid - 3.6, -0.2), xz(mid + 3.6, -0.2), xz(mid + 3.6, 1.6), xz(mid - 3.6, 1.6)], yEave + 3.2, f.at(mid, yEave + 8.2, 0.7), C.slateRoof);
-    // dormers on the roof slope above the facade: a stone box with a dark window and a little gable
+  }
+  // the fronts: the Renaissance facade, the sentry boxes at the two ends of the whole run, the roof above it
+  for (const { f, b } of fronts) {
+    const { high } = groundRange(ground, b.pts);
+    const yEave = high + K.eave;
+    const along = (s) => { const q = f.at(s, 0, 0); return ground(q[0], q[2]); };
+    const isEnd = f === endA.f || f === endB.f;
+    const front = renaissanceFront(soup, f, { high, yEave, floor: K.floor, ground: along, key: Math.round(f.a[0] * 3 + f.a[1]), sentries: isEnd && false });
+    info.fronts.push({ len: +f.len.toFixed(1), columns: front.columns.length, oriels: front.columns.filter((c) => c.kind === 'oriel').length });
+    // the dormers above every front: a stone box with a dark window and a little pointed gable (same rhythm as the windows)
     let cx = 0, cz = 0; for (const p of b.pts) { cx += p[0]; cz += p[1]; } cx /= b.pts.length; cz /= b.pts.length;
     const dc = Math.abs((cx - f.a[0]) * f.nx + (cz - f.a[1]) * f.nz);
     const D = (1 - K.roofScale) * dc;
     if (D > 2.5) {
       const inset = 1.2, yBase = yEave + K.roofRise * (inset / D);
-      for (let s = K.dormerPitch; s < f.len - K.dormerPitch * 0.6; s += K.dormerPitch) {
+      for (const c of front.columns) {
+        if (c.kind === 'oriel') continue;
+        const s = c.sc;
         const [x, , z] = f.at(s, 0, -inset);
         soup.box(x, yBase - 0.3, z, 1.9, 2.6, 1.3, f.yaw, paint(C.palaisStone, Math.round(s), 0.04), { topColor: C.palaisStone });
         panel(soup, f, s - 0.6, s + 0.6, yBase + 0.2, yBase + 2.0, -inset + 0.68, C.glassDark);
-        soup.tri(f.at(s - 1.0, yBase + 2.3, -inset + 0.67), f.at(s + 1.0, yBase + 2.3, -inset + 0.67), f.at(s, yBase + 3.6, -inset + 0.67), C.sandstoneLight);
+        soup.tri(f.at(s - 1.1, yBase + 2.3, -inset + 0.67), f.at(s + 1.1, yBase + 2.3, -inset + 0.67), f.at(s, yBase + 4.3, -inset + 0.67), paint(C.slateBlack, Math.round(s), 0.05));
+        soup.frustum(f.at(s, 0, -inset + 0.4)[0], f.at(s, 0, -inset + 0.4)[2], 0.12, 0.0, yBase + 4.0, yBase + 5.6, 4, C.slateBlack, { cap: false });       // the finial
       }
     }
+  }
+  // the turrets: round corbelled towers with tall slate spires at the two ends of the whole front (the photographs: the spired corners)
+  for (const end of [endA, endB]) {
+    const { f, b } = end;
+    const { high } = groundRange(ground, b.pts);
+    const yEave = high + K.eave;
+    const farthest = Math.hypot(f.a[0] - (endA.mx + endB.mx) / 2, f.a[1] - (endA.mz + endB.mz) / 2) > Math.hypot(f.b[0] - (endA.mx + endB.mx) / 2, f.b[1] - (endA.mz + endB.mz) / 2) ? 0.6 : f.len - 0.6;
+    const [x, , z] = f.at(farthest, 0, 0.9);
+    turret(soup, x, z, K.turretR, high + 5.5, yEave + 1.0, yEave + 14, paint(C.palaisStone, 77, 0.03), C.slateBlack);
+    soup.frustum(x, z, K.turretR * 0.55, K.turretR, high + 3.6, high + 5.5, 8, C.sandstoneDark, { cap: false });
+    for (let y = high + 6.5; y < yEave; y += 3.2) soup.box(x + f.nx * K.turretR * 0.98, y, z + f.nz * K.turretR * 0.98, 0.5, 1.4, 0.15, f.yaw, C.glassDark);                // a window on every floor
+    // the sentry boxes stand at the foot of the corner turrets, in front of the wall, and the bollards run between them
+    { const sc = farthest < f.len / 2 ? 2.8 : f.len - 2.8, q = f.at(sc, 0, SENTRY_OUT); sentryBox(soup, f, sc, ground(q[0], q[2]), SENTRY_OUT); }
+  }
+  // the bollards along the whole front.  No collision: the street runs right along the wall (its centre line is within 1 m of it), a wall of posts would close the street.
+  for (const { f } of fronts) {
+    for (let s = 3.5; s < f.len - 2.5; s += 3.1) { const q = f.at(s, 0, BOLLARD_OUT); bollard(soup, f, s, ground(q[0], q[2]), BOLLARD_OUT, Math.round(s * 5)); }
   }
   return { soup, walls, hideBuildings: hidden.map((b) => b.id), info };
 }

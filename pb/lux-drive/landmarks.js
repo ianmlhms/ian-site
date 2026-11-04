@@ -17,21 +17,22 @@ import { CAMPUS_BUILDERS } from './campus.js';   // CAMPUS: Campus Geesseknäppc
 export { fixLandmarkDecks };
 
 /** The builders in the order of the brief (the bridges first). A landmark that cannot be built is an error, never a silent gap. */
+const TREE_CLEARING = 40;          // m: the generated woods keep this far from the walls of the buildings people come to see (`clearTrees`)
 const BUILDERS = [
   { id: 'pont-adolphe', build: buildPontAdolphe },
   { id: 'pont-rouge', build: buildPontRouge },
-  { id: 'philharmonie', build: buildPhilharmonie },
-  { id: 'cour-de-justice', build: buildEcj },
-  { id: 'cathedrale', build: buildCathedral },
-  { id: 'palais-grand-ducal', build: buildPalais },
+  { id: 'philharmonie', build: buildPhilharmonie, clearTrees: true },
+  { id: 'cour-de-justice', build: buildEcj, clearTrees: true },
+  { id: 'cathedrale', build: buildCathedral, clearTrees: true },
+  { id: 'palais-grand-ducal', build: buildPalais, clearTrees: true },
   { id: 'gelle-fra', build: buildGelleFra },
   { id: 'oberanven-kierch', build: buildOberanven },
   { id: 'bock', build: buildBock },
   { id: 'passerelle', build: buildPasserelle },
-  { id: 'coque', build: buildCoque },
-  { id: 'fort-thuengen', build: buildThuengen },
-  { id: 'mudam', build: buildMudam },
-  { id: 'bcee', build: buildBcee },
+  { id: 'coque', build: buildCoque, clearTrees: true },
+  { id: 'fort-thuengen', build: buildThuengen, clearTrees: true },
+  { id: 'mudam', build: buildMudam, clearTrees: true },
+  { id: 'bcee', build: buildBcee, clearTrees: true },
   ...CAMPUS_BUILDERS,                                  // CAMPUS: the schools of Geesseknäppchen (one model per zone)
 ];
 
@@ -54,11 +55,13 @@ export function createLandmarks({ buildings, decks, ground, roads = [], only = n
   const hiddenBuildings = new Set();
   const hiddenDecks = new Set();
   const walls = [];
+  const clearings = [];
   for (const spec of BUILDERS) {
     if (only && !only.includes(spec.id)) continue;
     let model;
     try { model = spec.build(ctx); } catch (error) { throw new Error(`landmark ${spec.id}: ${error.message}`, { cause: error }); }
     const b = model.soup.bounds();
+    if (spec.clearTrees) clearings.push([b[0] - TREE_CLEARING, b[2] - TREE_CLEARING, b[3] + TREE_CLEARING, b[5] + TREE_CLEARING]);
     list.push({ id: spec.id, soup: model.soup, info: model.info || {}, bounds: [b[0], b[2], b[3], b[5]], top: b[4], bottom: b[1] });
     for (const id of model.hideBuildings || []) hiddenBuildings.add(id);
     for (const id of model.hideDecks || []) hiddenDecks.add(id);
@@ -82,5 +85,5 @@ export function createLandmarks({ buildings, decks, ground, roads = [], only = n
     return best;
   }
 
-  return { list, hiddenBuildings, hiddenDecks, walls, collide, overlaps };
+  return { list, hiddenBuildings, hiddenDecks, walls, collide, overlaps, clearings };
 }

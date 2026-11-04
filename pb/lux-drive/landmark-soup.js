@@ -79,6 +79,55 @@ export class Soup {
     this.faces += 1;
   }
 
+  /** One triangle with the normals and colours of its three corners (smooth shading: the faces of a rock or a shell do not show as facets). */
+  triSmooth(p, n, c) {
+    const base = this.vertexCount;
+    for (let k = 0; k < 3; k++) { this.pos.push(p[k][0], p[k][1], p[k][2]); this.nor.push(n[k][0], n[k][1], n[k][2]); this.col.push(c[k][0], c[k][1], c[k][2]); }
+    this.idx.push(base, base + 1, base + 2);
+    this.faces += 1;
+  }
+
+  /**
+   * A smooth skin over a grid of points: rows[r] is a list of [x, y, z] (rows may differ in length; a missing row is null), colours[r][c] the colour of
+   * every vertex.  Rows r and r + 1 (and the last with the first when `loop`) are joined by quads.  The normal of a vertex is the mean of the normals of
+   * the faces around it, so the light changes smoothly over the skin and only the silhouette stays polygonal.  `flip` (true, false or 'auto') turns the faces over.
+   */
+  grid(rows, colours, { loop = false, flip = false } = {}) {
+    const R = rows.length;
+    const next = (r) => (r + 1 < R ? r + 1 : loop ? 0 : -1);
+    const acc = rows.map((row) => (row ? row.map(() => [0, 0, 0]) : null));
+    const quads = [];
+    for (let r = 0; r < R; r++) {
+      const q = next(r);
+      if (q < 0 || !rows[r] || !rows[q]) continue;
+      const n = Math.min(rows[r].length, rows[q].length);
+      for (let c = 0; c + 1 < n; c++) quads.push([r, c, q]);
+    }
+    const nrm = (a, b, d) => {
+      const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = d[0] - a[0], vy = d[1] - a[1], vz = d[2] - a[2];
+      return [uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx];
+    };
+    const add = (r, c, v) => { const t = acc[r][c]; t[0] += v[0]; t[1] += v[1]; t[2] += v[2]; };
+    for (const [r, c, q] of quads) {
+      const a = rows[r][c], b = rows[q][c], d = rows[r][c + 1], e = rows[q][c + 1];
+      const f = nrm(a, b, e), g = nrm(a, e, d);          // the two triangles of the quad, area-weighted by their cross products
+      for (const [rr, cc] of [[r, c], [q, c], [q, c + 1]]) add(rr, cc, f);
+      for (const [rr, cc] of [[r, c], [q, c + 1], [r, c + 1]]) add(rr, cc, g);
+    }
+    // 'auto': a skin that faces up (a hillside, a rock) is turned over when its faces came out facing down
+    let sumY = 0;
+    for (const row of acc) if (row) for (const v of row) sumY += v[1];
+    const turn = flip === 'auto' ? sumY < 0 : flip;
+    const unit = (v) => { const l = Math.hypot(v[0], v[1], v[2]) || 1; const s = turn ? -1 / l : 1 / l; return [v[0] * s, v[1] * s, v[2] * s]; };
+    for (const [r, c, q] of quads) {
+      const P = [rows[r][c], rows[q][c], rows[q][c + 1], rows[r][c + 1]];
+      const N = [[r, c], [q, c], [q, c + 1], [r, c + 1]].map(([rr, cc]) => unit(acc[rr][cc]));
+      const Cc = [[r, c], [q, c], [q, c + 1], [r, c + 1]].map(([rr, cc]) => colours[rr][cc]);
+      const order = turn ? [[0, 2, 1], [0, 3, 2]] : [[0, 1, 2], [0, 2, 3]];
+      for (const [i, j, k] of order) this.triSmooth([P[i], P[j], P[k]], [N[i], N[j], N[k]], [Cc[i], Cc[j], Cc[k]]);
+    }
+  }
+
   /** A quad a-b-c-d (counter-clockwise seen from the side the normal points to). */
   quad(a, b, c, d, color) {
     this.tri(a, b, c, color);

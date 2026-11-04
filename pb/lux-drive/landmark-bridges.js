@@ -32,6 +32,7 @@ const ADOLPHE = Object.freeze({
   guardRadius: 0.4,
   footbridgeHalf: 1.6,            // m, half the width of the cycle footbridge
   bracketEvery: 14,               // m between the brackets that carry the footbridge
+  sideArch: { half: 4.2, height: 5.2, offset: 13, depth: 4.5, minRoof: 2.4 },   // the two small arches at the abutments (the photographs: a round-headed opening on each side of the great arch); offset = from the springing
 });
 
 /** The point of the axis where the valley is lowest: the middle of the great arch stands over it. */
@@ -156,23 +157,51 @@ export function buildPontAdolphe({ decks, ground }) {
     const springLine = under(sk) - 0.8 - K.openingHalf;
     const floor = Math.max(floorAt(left), floorAt(right), floorAt(sk));
     if (springLine - floor < K.openingMinHeight) continue;
-    openings.push({ sk, springLine, floor });
+    openings.push({ sk, springLine, floor, half: K.openingHalf, deep: false });
   }
-  const head = (o, s) => o.springLine + Math.sqrt(Math.max(0, K.openingHalf ** 2 - (s - o.sk) ** 2));
+  // the two small arches of the abutments: a wide round-headed opening in the wall, a dark vault behind it.  They replace the arcade openings they overlap.
+  const sideArches = [];
+  for (const [s, dir] of [[sa, -1], [sb, 1]]) {
+    const A = K.sideArch, sk = s + dir * A.offset;
+    const floor = Math.max(floorAt(sk - A.half), floorAt(sk + A.half), floorAt(sk)) - 0.3;
+    const springLine = floor + A.height;
+    if (springLine + A.half > under(sk) - A.minRoof) continue;                // no room under the slab: the opening is left out (reported in info)
+    sideArches.push({ sk, springLine, floor, half: A.half, deep: true });
+  }
+  for (let i = openings.length - 1; i >= 0; i--) {
+    if (sideArches.some((a) => Math.abs(openings[i].sk - a.sk) < a.half + openings[i].half + 0.8)) openings.splice(i, 1);
+  }
+  openings.push(...sideArches);
+  openings.sort((p, q) => p.sk - q.sk);
+  const head = (o, s) => o.springLine + Math.sqrt(Math.max(0, o.half ** 2 - (s - o.sk) ** 2));
   for (const sign of SIGNS) {
     let cursor = 0;
     const bottomOf = (s) => (s >= sa && s <= sb ? extrados(s) : g(s, sign * K.half) - 1.2);   // the wall stands on the arch, or on the ground beside it
     const wall = (s0, s1, lower, steps) => wallFace(soup, F, sign * K.half, s0, s1, lower, under, C.bridgeStone, steps, 60);
     for (const o of openings) {
-      const left = o.sk - K.openingHalf, right = o.sk + K.openingHalf;
+      const left = o.sk - o.half, right = o.sk + o.half;
       wall(cursor, left, bottomOf, Math.max(1, Math.ceil((left - cursor) / 2)));
       wall(left, right, (s) => Math.max(floorAt(s), head(o, s)), 10);
       // the jambs and the soffit of the opening, so the wall has the thickness it really has
-      const inner = sign * (K.half - K.wallThickness);
+      const inner = sign * (K.half - (o.deep ? K.sideArch.depth : K.wallThickness));
+      if (o.deep) {                                                     // the vault behind a small arch: a dark back wall with the round head
+        const n = 10;
+        const hd = (s) => head(o, s);
+        soup.quad(F.at(left, o.floor, inner), F.at(right, o.floor, inner), F.at(right, o.springLine, inner), F.at(left, o.springLine, inner), C.blackGlass);
+        for (let i = 0; i < n; i++) {
+          const s0 = left + ((right - left) * i) / n, s1 = left + ((right - left) * (i + 1)) / n;
+          soup.quad(F.at(s0, o.springLine, inner), F.at(s1, o.springLine, inner), F.at(s1, hd(s1), inner), F.at(s0, hd(s0), inner), C.blackGlass);
+        }
+        const rim = paint(C.bridgeStoneLight, 330);
+        for (let i = 0; i < n; i++) {                                   // the archivolt: a lighter stone ring round the head of the arch
+          const s0 = left + ((right - left) * i) / n, s1 = left + ((right - left) * (i + 1)) / n;
+          soup.quad(F.at(s0, hd(s0), sign * (K.half + 0.1)), F.at(s1, hd(s1), sign * (K.half + 0.1)), F.at(s1, hd(s1) + 0.55, sign * (K.half + 0.1)), F.at(s0, hd(s0) + 0.55, sign * (K.half + 0.1)), rim);
+        }
+      }
       for (const s of [left, right]) {
         soup.quad(F.at(s, o.floor, sign * K.half), F.at(s, o.floor, inner), F.at(s, o.springLine, inner), F.at(s, o.springLine, sign * K.half), paint(C.bridgeStoneDark, 90));
       }
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < 10; i++) {                                    // the soffit of the head
         const s0 = left + ((right - left) * i) / 10, s1 = left + ((right - left) * (i + 1)) / 10;
         soup.quad(F.at(s0, head(o, s0), sign * K.half), F.at(s1, head(o, s1), sign * K.half), F.at(s1, head(o, s1), inner), F.at(s0, head(o, s0), inner), paint(C.bridgeStoneDark, 91 + i));
       }
@@ -213,7 +242,7 @@ export function buildPontAdolphe({ decks, ground }) {
     const [bx, bz] = F.xz(L, sign * K.guardOffset);
     return { ax, az, bx, bz, r: K.guardRadius, id: 'pont-adolphe' };
   });
-  return { soup, walls, hideDecks, frame: F, info: { sc, sa, sb, springY, crownRise, openings: openings.length } };
+  return { soup, walls, hideDecks, frame: F, info: { sc, sa, sb, springY, crownRise, openings: openings.length, sideArches: sideArches.length } };
 }
 
 

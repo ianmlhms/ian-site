@@ -23,7 +23,7 @@ export async function createPicker() {
   const index = createBuildingIndex(w.data.buildings, { hidden: lm.hiddenBuildings });
   const roads = createRoadIndex(w.data.roads);
   const maps = buildWorldMap({ classes: w.data.classes, classInfo: w.data.classInfo, canopy: w.data.canopy, buildings: w.data.buildings });
-  const forest = createTreeIndex({ map: maps, field: w.field, network: w.field.network, buildings: index, trees: w.data.trees });
+  const forest = createTreeIndex({ map: maps, field: w.field, network: w.field.network, buildings: index, trees: w.data.trees, clearings: lm.clearings });
   const byId = new Map(w.data.buildings.map((b) => [b.id, b]));
   const ground = (x, z) => w.surface.height(x, z);
 

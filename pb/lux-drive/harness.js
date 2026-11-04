@@ -80,7 +80,7 @@ const buildings = createBuildingIndex(data.buildings, { hidden: landmarks.hidden
 const portals = createPortals(data.roads);
 const playArea = createPlayArea(area);
 const maps = buildWorldMap({ classes: data.classes, classInfo: data.classInfo, canopy: data.canopy, buildings: data.buildings });
-const forest = createTreeIndex({ map: maps, field, network: field.network, buildings, trees: data.trees });
+const forest = createTreeIndex({ map: maps, field, network: field.network, buildings, trees: data.trees, clearings: landmarks.clearings });
 const net = field.network;
 
 /* ---------------------------------------------------------------- shared: where the carved ways meet (gates I and J) */
@@ -740,7 +740,7 @@ if (wants('E')) {
   let woodFloating = 0, woodWorst = 0, woodCount = 0, woodInHouse = 0;
   for (let i = 0; i < (QUICK ? 20 : 120); i++) {
     const bx = Math.floor(rng() * 400), bz = Math.floor(rng() * 400);
-    const list = treesOfBlock(bx, bz, { map: maps, field, network: field.network, buildings });
+    const list = treesOfBlock(bx, bz, { map: maps, field, network: field.network, buildings, clearings: landmarks.clearings });
     for (let k = 0; k < list.length; k += 6) {
       woodCount++;
       const x = list[k], y = list[k + 1], z = list[k + 2];

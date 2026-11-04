@@ -5,13 +5,31 @@
 import { Soup, axisFrame, paint, linspace } from './landmark-soup.js';
 import { PALETTE as C } from './landmark-palette.js';
 import { requireBlocks, edgeWalls, scalePoly, groundRange, decksAlong, pickDeck, wallFace, deckStrip, stationsOf } from './landmark-util.js';
-import { edgeFrame, windowGrid, course, slab, turret, panel } from './landmark-facade.js';
+import { edgeFrame, windowGrid, course, slab, turret, panel, joints, roundArch } from './landmark-facade.js';
 import { SITE_FOOTPRINTS as FOOT, FORT_TOWERS } from './landmark-site-data.js';
 
 const TAU = Math.PI * 2;
 const SINK = 1.0;
 const bottomsOf = (ground, pts) => pts.map((p) => ground(p[0], p[1]) - SINK);
 const centroid = (pts) => [pts.reduce((a, p) => a + p[0], 0) / pts.length, pts.reduce((a, p) => a + p[1], 0) / pts.length];
+
+/** Glazing bars on a triangular glass face A-B-P (P the apex): `ribs` bars from the apex to the base and `rings` bars parallel to the base, 0.18 m wide, 0.07 m proud. */
+function glazeTriangle(soup, A, B, P, ribs, rings, color) {
+  const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  let n = cross(sub(B, A), sub(P, A));
+  const nl = Math.hypot(...n) || 1; n = n.map((v) => v / nl);
+  const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+  const bar = (p, q) => {
+    const d = sub(q, p); const side = cross(d, n); const sl = Math.hypot(...side) || 1;
+    const w = 0.09, o = [n[0] * 0.07, n[1] * 0.07, n[2] * 0.07], k = w / sl;
+    const s = [side[0] * k, side[1] * k, side[2] * k];
+    const add = (a, b, c) => [a[0] + b[0] + c[0], a[1] + b[1] + c[1], a[2] + b[2] + c[2]];
+    soup.quad(add(p, s, o), add(q, s, o), add(q, [-s[0], -s[1], -s[2]], o), add(p, [-s[0], -s[1], -s[2]], o), color);
+  };
+  for (let i = 1; i < ribs; i++) bar(lerp(A, B, i / ribs), P);
+  for (let j = 1; j <= rings; j++) { const t = j / (rings + 1); bar(lerp(A, P, t), lerp(B, P, t)); }
+}
 
 /* ------------------------------------------------------------------------------------------------ Bock: cliffs and fortress walls */
 // The Bock is a natural cliff of ochre and grey sandstone in rough bands, with a dark blue-grey fortress wall along its top edge (stepped, with a coping),
@@ -24,7 +42,7 @@ const BOCK = Object.freeze({
   stratum: 1.7,                  // m: the height of one band of the rock
   wallHeight: 4.2, wallThick: 1.6, merlonEvery: 3.2, merlon: 1.1,
   bastionEvery: 12, casemates: 9,
-  tower: { half: 3.4, height: 15 },
+  tower: { half: 2.6, aspect: 1.25, height: 22 },
 });
 
 /** The edge of the rock as [{ x, z, dx, dz }] per ray (null where the plateau runs on without a cliff). */
@@ -46,13 +64,57 @@ function hash01(a, b) {
   return ((h ^ (h >>> 13)) >>> 0) / 4294967296;
 }
 
-/** The colour of the rock at height y: a band of ochre or grey per stratum, a little darker the lower it lies (shade of the overhangs). */
+/** The colour of the rock at height y: a band of ochre or grey per stratum (the bands blend into each other over a third of their height, so the strata
+ *  are soft gradients and not hard stripes), a little darker the lower it lies (shade of the overhangs), a mottling that is different at every vertex. */
 function rockColour(y, key, depth) {
-  const band = Math.floor(y / BOCK.stratum);
-  const t = hash01(band, 7);                                  // one value per band: the strata run round the whole rock
+  const f = y / BOCK.stratum, band = Math.floor(f), frac = f - band;
+  const blend = Math.min(1, Math.max(0, (frac - 0.66) / 0.34));
+  const t0 = hash01(band, 7), t1 = hash01(band + 1, 7);
+  const t = (t0 + (t1 - t0) * blend * blend * (3 - 2 * blend));
   const base = [0, 1, 2].map((k) => C.rockGrey[k] + (C.rockOchre[k] - C.rockGrey[k]) * t);
   const shade = 1 - depth * 0.28;
-  return paint([base[0] * shade, base[1] * shade, base[2] * shade], key, 0.09);
+  return paint([base[0] * shade, base[1] * shade, base[2] * shade], key, 0.11);
+}
+
+/** A ruined tower: four walls of different heights (the top is broken away in steps), mortar courses, slits, an arched window, a fallen corner, moss on the stumps. */
+function buildRuinTower(soup, ground, towerEdge, T) {
+  const tx = towerEdge.x - towerEdge.dx * (T.half + 1), tz = towerEdge.z - towerEdge.dz * (T.half + 1);
+  const yaw = Math.atan2(towerEdge.dz, towerEdge.dx);
+  const c = Math.cos(yaw), sn = Math.sin(yaw);
+  const hx = T.half * T.aspect, hz = T.half;                       // the tower is longer than it is wide
+  const corner = (u, v) => [tx + u * c - v * sn, tz + u * sn + v * c];
+  const poly = [corner(-hx, -hz), corner(hx, -hz), corner(hx, hz), corner(-hx, hz)];
+  const base = ground(tx, tz), top = base + T.height;
+  const stone = [0.47, 0.43, 0.36], stoneDark = [0.34, 0.31, 0.26], moss = [0.34, 0.42, 0.22];
+  // each wall rises to its own height; the corners between are stepped (a prism per wall, thick 1.1 m)
+  const wallTops = [top, top - 5.5, top - 2.2, top - 8.0];
+  for (let e = 0; e < 4; e++) {
+    const f = edgeFrame(poly, e);
+    const yBottom = Math.min(ground(f.a[0], f.a[1]), ground(f.b[0], f.b[1])) - SINK;
+    const yTop = wallTops[e];
+    const thick = 1.1;
+    const cx = (f.a[0] + f.b[0]) / 2 - f.nx * thick / 2, cz = (f.a[1] + f.b[1]) / 2 - f.nz * thick / 2;
+    // the broken top: three stepped boxes of different heights along the wall
+    const parts = 3;
+    for (let k = 0; k < parts; k++) {
+      const s0 = (f.len * k) / parts, s1 = (f.len * (k + 1)) / parts;
+      const drop = [0, 1.9, 0.7][(k + e) % 3] + hash01(e, k) * 1.2;
+      const [px, , pz] = f.at((s0 + s1) / 2, 0, -thick / 2);
+      soup.box(px, yBottom, pz, s1 - s0 + (k + 1 < parts ? 0.05 : 0), yTop - drop - yBottom, thick, f.yaw, paint(stone, e * 7 + k, 0.08), { topColor: paint(moss, e + k, 0.1) });
+    }
+    void cx; void cz;
+    // mortar courses: thin darker bands every 1.3 m up the outer face
+    for (let y = yBottom + 2.0; y < yTop - 2.4; y += 1.3) panel(soup, f, 0, f.len, y, y + 0.14, 0.04, paint(stoneDark, Math.round(y * 5) + e, 0.05));
+    // slits and the arched window
+    const sc = f.len * (e % 2 ? 0.35 : 0.62);
+    panel(soup, f, sc - 0.14, sc + 0.14, yTop - 9.5, yTop - 7.0, 0.06, C.blackGlass);
+    if (e === 0) {
+      panel(soup, f, f.len / 2 - 0.5, f.len / 2 + 0.5, yTop - 8.0, yTop - 5.6, 0.07, C.blackGlass);
+      soup.tri(f.at(f.len / 2 - 0.5, yTop - 5.6, 0.07), f.at(f.len / 2 + 0.5, yTop - 5.6, 0.07), f.at(f.len / 2, yTop - 4.7, 0.07), C.blackGlass);
+    }
+  }
+  // the inside of the ruin: a floor-high dark core so the open top shows no sky through the stumps
+  soup.prism(scalePoly(poly, 0.7), base - SINK, top - 7.0, paint(stoneDark, 5, 0.04), { topColor: stoneDark });
 }
 
 export function buildBock({ ground }) {
@@ -76,19 +138,11 @@ export function buildBock({ ground }) {
     return pts;
   };
   const skins = new Map(edge.map((e, i) => [i, e ? skinOf(e, i) : null]));
-  let placed = 0;
-  edge.forEach((e, i) => {
-    const j = (i + 1) % edge.length;
-    const sa = skins.get(i), sb = skins.get(j);
-    if (!e || !edge[j]) return;
-    const n = Math.min(sa.length, sb.length);
-    for (let k = 0; k + 1 < n; k++) {
-      const depth = k / Math.max(1, n - 2);
-      const ym = (sa[k][1] + sb[k + 1][1]) / 2;
-      soup.quad(sa[k], sb[k], sb[k + 1], sa[k + 1], rockColour(ym, i * 131 + k * 17, depth));
-    }
-    placed += 1;
-  });
+  // ONE smooth skin: the normal of every vertex is the mean of its faces, the colour is per vertex (strata + mottling): no flat facets
+  const rows = edge.map((e, i) => (e ? skins.get(i) : null));
+  const colours = rows.map((row, i) => (row ? row.map((p, k) => rockColour(p[1], i * 131 + k * 17, k / Math.max(1, row.length - 1))) : null));
+  soup.grid(rows, colours, { loop: true, flip: 'auto' });
+  const placed = arcs.length;
   // the fortress wall along the edge: blue-grey masonry with a coping and merlons, standing on the rim of the rock
   const edgeIdx = edge.map((e, i) => (e ? i : -1)).filter((i) => i >= 0);
   edgeIdx.forEach((i, n) => {
@@ -110,19 +164,9 @@ export function buildBock({ ground }) {
       soup.frustum(bx, bz, 5.0, 4.4, yb, yt, 12, paint(C.fortWall, i + 3, 0.05), { capColor: C.sandstoneDark });
     }
   });
-  // the ruined square tower on the rim of the rock (the medieval tower of the castle): grey-brown stone, two slits, a broken crenellated top
+  // the ruined tower on the rim of the rock (photographs: a tall narrow keep of grey-brown stone, slits, an arched window, the top broken away in steps)
   const towerEdge = edge[edgeIdx[Math.floor(edgeIdx.length / 3)]];
-  if (towerEdge) {
-    const T = K.tower, tx = towerEdge.x - towerEdge.dx * (T.half + 1), tz = towerEdge.z - towerEdge.dz * (T.half + 1);
-    const poly = [[-T.half, -T.half], [T.half, -T.half], [T.half, T.half], [-T.half, T.half]].map(([a, b]) => [tx + a, tz + b]);
-    const base = ground(tx, tz), top = base + T.height;
-    soup.prism(poly, bottomsOf(ground, poly), top, paint([0.50, 0.46, 0.38], 41, 0.05), { topColor: C.sandstoneDark });
-    for (let e = 0; e < 4; e++) {
-      const f = edgeFrame(poly, e);
-      panel(soup, f, f.len / 2 - 0.3, f.len / 2 + 0.3, top - 8, top - 5.6, 0.05, C.blackGlass);
-      for (let m = 0.8; m < f.len - 0.5; m += 2.0) if (hash01(e, Math.round(m)) > 0.3) slab(soup, f, m, m + 1.0, top, top + 1.1, 0.9, paint([0.50, 0.46, 0.38], e * 9 + Math.round(m), 0.06));
-    }
-  }
+  if (towerEdge) buildRuinTower(soup, ground, towerEdge, K.tower);
   // the casemate openings: dark arched mouths in the rock, a few metres under the edge
   let door = 0;
   for (const i of edgeIdx) {
@@ -140,9 +184,9 @@ export function buildBock({ ground }) {
 /* ------------------------------------------------------------------------------------------------ Passerelle (the stone viaduct) */
 const PASSERELLE = Object.freeze({
   at: [5312, 9390],
-  pitch: 9.3, pier: 3.0,            // m between the axes of the piers, the thickness of a pier
-  beltDepth: 13.0,                  // m under the deck: the horizontal belt between the two tiers of arches
-  upperRadius: 2.7, lowerRadius: 3.0,
+  pitch: 9.3, pier: 2.3,            // m between the axes of the piers, the thickness of a pier at the springing line
+  columnWidth: 3.6, batter: 0.045,  // m: a column of a pier is this wide across the bridge, and widens by this much per metre of height toward the foot
+  archRise: 1.0,                    // the arches are round: the rise over the half span
   balustrade: 1.1, fascia: 1.3, kerb: 0.14,
   roadHalf: 5.9, maxHalf: 10.5,
 });
@@ -171,8 +215,7 @@ export function buildPasserelle({ decks, ground }) {
     return tArr[lo] + ((tArr[hi] - tArr[lo]) * (s - sArr[lo])) / (sArr[hi] - sArr[lo] || 1);
   };
   const under = (s) => top(s) - K.fascia;
-  const belt = (s) => top(s) - K.beltDepth;
-  // the full width: the roadway and the footways of the baked decks beside it
+    // the full width: the roadway and the footways of the baked decks beside it
   let half = K.roadHalf + 2.9;
   for (const d of along) d.pts.forEach((p, i) => { if (d.tops[i] < road.tops[0] - 3) return; const [, u] = F.local(p[0], p[1]); half = Math.max(half, Math.min(Math.abs(u) + d.width / 2 + 0.3, K.maxHalf)); });   // the pinned, dipping ends of a footway do not widen the bridge
   const g = (s, u) => ground(...F.xz(s, u));
@@ -199,53 +242,62 @@ export function buildPasserelle({ decks, ground }) {
     wallFace(soup, F, sign * half, 0, L, under, (s) => top(s) - 0.3, C.bridgeStoneLight, Math.ceil(L / 3), 21);
     wallFace(soup, F, sign * (half + 0.3), 0, L, (s) => top(s) - 0.7, (s) => top(s) - 0.3, C.bridgeStone, Math.ceil(L / 3), 22);
   }
-  // the two-storey arcade: the bays, between the ends where the ground rises into the slope
+  // The arcade (the photographs): ONE tier of tall round arches carried by slim battered piers.  The piers are not slabs across the whole width: at each side
+  // of the bridge stands a column (pier x column), and between the two columns the arches' vault spans across, open to the valley underneath.
   const bays = Math.max(4, Math.round(L / K.pitch));
   const P = L / bays;
+  const ho = (P - K.pier) / 2;                                   // half the span of an arch
+  const springAt = (s) => under(s) - ho * K.archRise - 1.0;      // the line where the arch leaves the pier
   let open = 0;
+  const archY = (s, sc, spring) => spring + K.archRise * Math.sqrt(Math.max(0, ho * ho - (s - sc) ** 2));
   for (const sign of [1, -1]) {
     const u = sign * half;
-    // the belt course and the solid walls above and below the openings, bay by bay
-    for (let b = 0; b < bays; b++) {
-      const sc = (b + 0.5) * P, ho = (P - K.pier) / 2;
-      const s0 = b * P, s1 = (b + 1) * P;
-      const lowOpen = lowestGround(sc) < belt(sc) - K.lowerRadius * 1.5;
-      // lower tier: pier faces + the wall over the arch (or the whole wall when the ground is too high for an opening)
-      if (lowOpen) {
-        const yb = lowestGround(sc);
-        const spring = belt(sc) - K.lowerRadius - 0.6;
-        const arch = (s) => spring + Math.sqrt(Math.max(0, K.lowerRadius ** 2 - ((s - sc) / ho * K.lowerRadius) ** 2));
-        wallFace(soup, F, u, s0, sc - ho, (s) => g(s, u) - SINK, belt, C.bridgeStone, 2, b * 7 + 1);
-        wallFace(soup, F, u, sc + ho, s1, (s) => g(s, u) - SINK, belt, C.bridgeStone, 2, b * 7 + 2);
-        wallFace(soup, F, u, sc - ho, sc + ho, arch, belt, C.bridgeStoneDark, 6, b * 7 + 3);
-        // the passage: the two sides of the pier and the vault, across the whole width
-        for (const sv of [sc - ho, sc + ho]) soup.quad(F.at(sv, yb, -half), F.at(sv, yb, half), F.at(sv, spring, half), F.at(sv, spring, -half), paint(C.bridgeStoneDark, b + 91));
-        const ss2 = linspace(sc - ho, sc + ho, 8);
-        const vault = (uu) => ss2.map((s) => F.at(s, arch(s), uu));
-        soup.strip(vault(-half), vault(half), paint(C.bridgeStoneDark, b + 5, 0.05));
+    const uIn = sign * (half - K.columnWidth);
+    // the piers: columns at s = b * P (the two ends are the abutments, solid)
+    for (let b = 0; b <= bays; b++) {
+      const sp = b * P, spring = springAt(sp);
+      const sa = Math.max(0, sp - K.pier / 2), sb = Math.min(L, sp + K.pier / 2);
+      const ground0 = Math.min(g(sp, u), g(sp, uIn)) - SINK;
+      if (ground0 < spring - 1.0) {
+        const batter = K.batter * Math.max(0, spring - ground0);        // wider at the foot: a tapered shaft
+        const topQuad = (uu) => [F.at(sa, spring, uu), F.at(sb, spring, uu)];
+        const foot = (uu, db) => [F.at(sa - db, ground0, uu), F.at(sb + db, ground0, uu)];
+        const [ta0, ta1] = topQuad(u), [tb0, tb1] = topQuad(uIn);
+        const [fa0, fa1] = foot(u + sign * batter, batter), [fb0, fb1] = foot(uIn - sign * batter, batter);
+        const stone = paint(C.bridgeStone, b * 11 + (sign > 0 ? 1 : 2));
+        soup.quad(fa0, fa1, ta1, ta0, stone);                               // the outer face
+        soup.quad(fb1, fb0, tb0, tb1, paint(C.bridgeStoneDark, b + 301));   // the inner face
+        soup.quad(fa0, ta0, tb0, fb0, paint(C.bridgeStoneDark, b + 302));  // the two flanks
+        soup.quad(fa1, fb1, tb1, ta1, paint(C.bridgeStoneDark, b + 303));
         open += 1;
-      } else {
-        wallFace(soup, F, u, s0, s1, (s) => g(s, u) - SINK, belt, C.bridgeStone, 2, b * 7 + 4);
       }
-      // upper tier: the wall over the arch and the pier faces; the opening floor is the belt slab
-      const sillUp = belt(sc) + 1.0;
-      const springUp = under(sc) - K.upperRadius - 1.4;
-      const archUp = (s) => springUp + Math.sqrt(Math.max(0, K.upperRadius ** 2 - ((s - sc) / ho * K.upperRadius) ** 2));
-      wallFace(soup, F, u, s0, sc - ho, belt, under, C.bridgeStoneLight, 2, b * 7 + 5);
-      wallFace(soup, F, u, sc + ho, s1, belt, under, C.bridgeStoneLight, 2, b * 7 + 6);
-      wallFace(soup, F, u, sc - ho, sc + ho, archUp, under, C.bridgeStoneLight, 6, b * 7 + 7);
-      wallFace(soup, F, u, sc - ho, sc + ho, belt, (s) => sillUp, C.bridgeStone, 1, b * 7 + 8);
-      for (const sv of [sc - ho, sc + ho]) soup.quad(F.at(sv, sillUp, -half), F.at(sv, sillUp, half), F.at(sv, springUp, half), F.at(sv, springUp, -half), paint(C.bridgeStone, b + 191));
-      const ss3 = linspace(sc - ho, sc + ho, 8);
-      const vaultUp = (uu) => ss3.map((s) => F.at(s, archUp(s), uu));
-      soup.strip(vaultUp(-half), vaultUp(half), paint(C.bridgeStone, b + 55, 0.05));
-      void sillUp;
+      // the wall of the pier above the springing line, up to the slab
+      wallFace(soup, F, u, sa, sb, () => spring, under, C.bridgeStoneLight, 1, b * 7 + 1);
     }
-    // the belt course: a projecting stone band between the tiers
-    wallFace(soup, F, u + sign * 0.25, 0, L, (s) => belt(s) - 0.35, (s) => belt(s) + 0.35, C.bridgeStoneLight, Math.ceil(L / 3), 40);
+    // the arches between the piers: the spandrel wall over each one, or the plain wall where the slope rises above the springing line
+    for (let b = 0; b < bays; b++) {
+      const sc = (b + 0.5) * P, spring = springAt(sc);
+      const l = b * P + K.pier / 2, r = (b + 1) * P - K.pier / 2;
+      const lowest = Math.min(g(sc, u), g(sc, uIn));
+      if (lowest < spring - 1.0) {
+        wallFace(soup, F, u, l, r, (s) => archY(s, sc, spring), under, C.bridgeStoneLight, 8, b * 7 + 3);
+        // the head of the arch: a ring of dressed stone
+        wallFace(soup, F, u + sign * 0.12, l, r, (s) => archY(s, sc, spring), (s) => archY(s, sc, spring) + 0.45, C.bridgeStoneDark, 8, b * 7 + 4);
+      } else {
+        wallFace(soup, F, u, l, r, (s) => g(s, u) - SINK, under, C.bridgeStone, 2, b * 7 + 5);
+      }
+    }
+    // the belt: a stone band along the springing line, over the piers and the arches alike
+    wallFace(soup, F, u + sign * 0.2, 0, L, (s) => springAt(s) - 0.25, (s) => springAt(s) + 0.25, C.bridgeStoneLight, Math.ceil(L / 3), 40);
   }
-  for (let b = 0; b < bays; b++) {         // the belt slab: the floor of the upper passages and the ceiling of the lower ones
-    deckStrip(soup, F, -half, half, b * P, (b + 1) * P, belt, C.bridgeStoneDark, 2, 50 + b);
+  for (let b = 0; b < bays; b++) {         // the vaults between the two sides: the soffit of every arch, across the whole width
+    const sc = (b + 0.5) * P, spring = springAt(sc);
+    const l = b * P + K.pier / 2, r = (b + 1) * P - K.pier / 2;
+    const steps = 8;
+    for (let i = 0; i < steps; i++) {
+      const s0 = l + ((r - l) * i) / steps, s1 = l + ((r - l) * (i + 1)) / steps;
+      soup.quad(F.at(s0, archY(s0, sc, spring), -half), F.at(s1, archY(s1, sc, spring), -half), F.at(s1, archY(s1, sc, spring), half), F.at(s0, archY(s0, sc, spring), half), paint(C.bridgeStoneDark, 600 + b * 9 + i, 0.05));
+    }
   }
   // the ends: closed so that nothing hollow shows
   for (const s of [0, L]) soup.quad(F.at(s, lowestGround(s), -half), F.at(s, lowestGround(s), half), F.at(s, under(s), half), F.at(s, under(s), -half), paint(C.bridgeStoneDark, 99));
@@ -271,22 +323,20 @@ export function buildCoque({ buildings, ground }) {
     if (f.len < 3) continue;
     panel(soup, f, 0.4, f.len - 0.4, high + K.glassBottom, high + K.glassTop, 0.06, paint(C.glassTeal, e, 0.06));
     for (let m = 3; m < f.len - 1; m += 3.2) panel(soup, f, m - 0.07, m + 0.07, high + K.glassBottom, high + K.glassTop, 0.09, C.steelDark);   // the mullions
+    for (const yT of [high + 2.7, high + 4.2]) panel(soup, f, 0.4, f.len - 0.4, yT, yT + 0.12, 0.09, C.steelDark);                          // the transoms: with the mullions a grid of panes
+    joints(soup, f, { y0: high - 0.5, y1: high + K.glassBottom, rowH: 0.45, colW: 1.2, color: C.concreteDark, key: e * 31, width: 0.06 });   // the dressed stone of the plinth under the glass
   }
   // the overhanging rim of the roof: a thick dark band all round
   const rim = scalePoly(poly, K.overhang);
   soup.prism(rim, yRim - 0.2, yRim + 1.6, C.roofDark, { topColor: C.roofDark });
-  // the shell: concentric rings of the outline, drawn smaller and higher on a steep curve (an upturned hull)
-  const rings = Array.from({ length: K.rings + 1 }, (_, k) => {
-    const s = 1 - k / K.rings;
-    return { pts: scalePoly(rim, Math.max(s, 0.03)), y: yRim + 1.6 + K.rise * (1 - Math.pow(s, 2.2)) };
+  // the shell: concentric rings of the outline, drawn smaller and higher on a steep curve (an upturned hull), as ONE smooth skin (no facets)
+  const levels = Array.from({ length: K.rings + 1 }, (_, k) => {
+    const sc = 1 - k / K.rings;
+    return { pts: scalePoly(rim, Math.max(sc, 0.03)), y: yRim + 1.6 + K.rise * (1 - Math.pow(sc, 2.2)) };
   });
-  for (let k = 0; k < K.rings; k++) {
-    const a = rings[k], b = rings[k + 1];
-    for (let i = 0; i < rim.length; i++) {
-      const j = (i + 1) % rim.length;
-      soup.quad([a.pts[i][0], a.y, a.pts[i][1]], [a.pts[j][0], a.y, a.pts[j][1]], [b.pts[j][0], b.y, b.pts[j][1]], [b.pts[i][0], b.y, b.pts[i][1]], paint(C.roofDark, k * 3 + i % 3, 0.07));
-    }
-  }
+  const rows = rim.map((_, i) => levels.map((lv) => [lv.pts[i][0], lv.y, lv.pts[i][1]]));
+  const cols = rim.map((_, i) => levels.map((_lv, k) => paint(C.roofDark, i * 7 + k, 0.05)));
+  soup.grid(rows, cols, { loop: true, flip: 'auto' });
   return { soup, walls: edgeWalls(poly, 0.4, 'coque'), hideBuildings: hidden.map((b) => b.id), hideDecks: [], info: { blocks: hidden.length, rise: K.rise } };
 }
 
@@ -313,6 +363,11 @@ function fortTower(soup, ground, at, r, height, key) {
     const a = (k / 6) * TAU + 0.5;
     soup.box(x + Math.cos(a) * (r + 0.05), yFoot - 3.0, z + Math.sin(a) * (r + 0.05), 0.5, 1.1, 0.3, -a + Math.PI / 2, C.blackGlass);
   }
+  for (let y = yFoot + 1.6; y < yTop - 3.6; y += 1.1) soup.frustum(x, z, r + 0.03, r + 0.03, y, y + 0.1, 16, paint(C.sandstoneDark, Math.round(y * 9) + key, 0.04), { cap: false });   // the courses of the drum
+  for (let y = yb + 1.3; y < yFoot - 0.5; y += 1.3) {                                                                  // the courses of the battered foot (rough, darker)
+    const rr = r + 0.1 + (K.batter - 0.1) * (1 - (y - yb) / (yFoot - yb));
+    soup.frustum(x, z, rr + 0.03, rr + 0.03, y, y + 0.12, 16, paint([0.30, 0.27, 0.22], Math.round(y * 7) + key, 0.05), { cap: false });
+  }
   soup.frustum(x, z, r + 0.6, r + 0.6, yTop - 0.5, yTop + 0.3, 16, C.sandstoneLight, { cap: false });                  // the cornice
   soup.frustum(x, z, r + 0.5, r * 0.55, yTop + 0.3, yTop + 1.6, 16, C.slateGrey, { cap: true });                      // the low lid
   soup.frustum(x, z, 0.5, 0.3, yTop + 1.6, yTop + 2.7, 8, C.gold, { cap: true });                                     // the golden acorn
@@ -331,6 +386,8 @@ export function buildThuengen({ buildings, ground }) {
     if (f.len < 3) continue;
     course(soup, f, yTop - 0.4, yTop + 1.1, 0.6, C.sandstoneLight, e);       // the parapet
     course(soup, f, high - 0.3, high + 2.2, 0.4, C.fortFoot, e + 5);          // the dark foot of the walls
+    joints(soup, f, { y0: high + 2.2, y1: yTop - 0.4, rowH: 1.1, colW: 2.3, color: C.sandstoneDark, key: e * 101 });   // the ashlar of the curtain wall
+    if (f.len > 9) for (let sc = 4.5; sc < f.len - 3; sc += 9) roundArch(soup, f, sc, high + 1.0, 1.9, 2.6, C.sandstoneLight, C.glassDark);   // the arched doors and windows of the museum
   }
   FORT_TOWERS.big.forEach((t, i) => fortTower(soup, ground, t.at, t.r, K.bigHeight, 40 + i * 5));
   fortTower(soup, ground, FORT_TOWERS.small.at, FORT_TOWERS.small.r, K.smallHeight, 60);
@@ -353,6 +410,7 @@ export function buildMudam({ ground }) {
     const f = edgeFrame(poly, e);
     if (f.len < 5) continue;
     course(soup, f, yTop - 0.5, yTop + 0.4, 0.5, C.white, e);
+    joints(soup, f, { y0: high, y1: yTop - 0.5, rowH: 1.6, colW: 3.2, color: [0.72, 0.70, 0.62], key: e * 77, width: 0.07 });     // the big panels of the ivory limestone
     if (f.len > 20) windowGrid(soup, f, { s0: 3, s1: f.len - 3, y0: high + 6.5, rows: 1, floorH: 4.6, w: 5.0, h: 1.6, pitch: 9, frame: C.ivory, glass: C.glassTeal, key: e * 9 });   // a few long slits: the walls are mostly blank
   }
   const [cx, cz] = centroid(poly);
@@ -366,6 +424,7 @@ export function buildMudam({ ground }) {
   for (let i = 0; i < 4; i++) {
     const [ax, az] = sq[i], [bx, bz] = sq[(i + 1) % 4];
     soup.tri(P(ax, yTop, az), P(bx, yTop, bz), P(0, apex, 0), paint(C.glassTeal, 11 + i, 0.07));
+    glazeTriangle(soup, P(ax, yTop, az), P(bx, yTop, bz), P(0, apex, 0), 6, 4, C.steelDark);
     soup.quad(P(ax, yTop - 0.01, az), P(bx, yTop - 0.01, bz), P(bx * 0.97, yTop + 0.9, bz * 0.97), P(ax * 0.97, yTop + 0.9, az * 0.97), C.steelDark);   // the dark sill
   }
   // ... the square glass lantern tower on its apex ...
@@ -374,6 +433,7 @@ export function buildMudam({ ground }) {
   for (let i = 0; i < 4; i++) {
     const [ax, az] = lq[i], [bx, bz] = lq[(i + 1) % 4];
     soup.quad(P(ax, apex - 1, az), P(bx, apex - 1, bz), P(bx, yL, bz), P(ax, yL, az), paint(C.glassTeal, 21 + i, 0.07));
+    glazeTriangle(soup, P(ax, apex - 1, az), P(bx, apex - 1, bz), P(bx, yL, bz), 4, 5, C.steelDark);
   }
   soup.pyramid(lq.map(([a, b]) => { const p = P(a, 0, b); return [p[0], p[2]]; }), yL, P(0, yL + 2.6, 0), C.glassDark);
   // ... a slanted glass wing leaning on the hall, and the long curved glass shell (a low barrel) beside it

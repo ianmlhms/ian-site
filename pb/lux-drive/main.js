@@ -140,7 +140,7 @@ async function boot() {
   const playArea = createPlayArea(area);
   const maps = buildWorldMap({ classes: data.classes, classInfo: data.classInfo, canopy: data.canopy, buildings: data.buildings });
   // the trees: the woods (placed from the canopy) and the trees of OSM (the street trees, the trees of the parks)
-  const forest = createTreeIndex({ map: maps, field, network: field.network, buildings, trees: data.trees });
+  const forest = createTreeIndex({ map: maps, field, network: field.network, buildings, trees: data.trees, clearings: landmarks.clearings });
 
   // ---- the painted textures, the world maps, the sky
   setLoad(0.72, 'load.build');

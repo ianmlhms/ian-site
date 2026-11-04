@@ -37,27 +37,37 @@ function stroke(ctx, x, y, len, wid, angle, color, alpha) {
   ctx.restore();
 }
 
-/** The tarmac: a dark grey with a fine grain, a few lighter patches and the odd crack. */
+/** The tarmac: a calm dark grey of fine grain.  From the driver's seat a tile is only 3 m wide, so any blob larger than a few centimetres reads as a
+ *  bump in the road: the grain is per pixel (the size of a stone chip), the variation is a few very soft, very low-contrast clouds, and the cracks are rare hairlines. */
+const ASPHALT_BASE = [63, 64, 67];
+const ASPHALT_GRAIN = 9;                     // +- levels of the per-pixel grain
+const ASPHALT_CLOUDS = 7;                    // soft low-contrast clouds that break the repetition without making blobs
 function asphalt(size, seed) {
   const rng = createRng(seed), c = canvas(size), ctx = c.getContext('2d');
-  ctx.fillStyle = 'rgb(62,63,66)'; ctx.fillRect(0, 0, size, size);
-  const palette = [[74, 75, 78], [58, 59, 62], [82, 83, 86], [66, 66, 70], [54, 55, 58]];
-  for (let i = 0; i < size * 3.4; i++) {                       // the grain of the tar
-    const x = rng() * size, y = rng() * size, r = 1 + rng() * 4.5;
-    const col = rgb(palette[(rng() * palette.length) | 0], 7, rng);
-    wrapped(ctx, size, x, y, r + 2, (g, px, py) => stroke(g, px, py, r, r * (0.5 + rng() * 0.5), rng() * TAU, col, 0.22 + rng() * 0.25));
+  const img = ctx.createImageData(size, size);
+  for (let i = 0; i < size * size; i++) {
+    // two uniform numbers make a triangular distribution: most chips are close to the base, a few are lighter or darker
+    const g = ((rng() + rng()) - 1) * ASPHALT_GRAIN;
+    const chip = rng() < 0.02 ? 12 + rng() * 10 : 0;                        // the odd light stone chip
+    img.data[i * 4] = ASPHALT_BASE[0] + g + chip; img.data[i * 4 + 1] = ASPHALT_BASE[1] + g + chip; img.data[i * 4 + 2] = ASPHALT_BASE[2] + g + chip; img.data[i * 4 + 3] = 255;
   }
-  for (let i = 0; i < size * 0.35; i++) {                      // the patches where the tar is older
-    const x = rng() * size, y = rng() * size, r = 6 + rng() * 22;
-    const col = rgb([86, 86, 88], 10, rng);
-    wrapped(ctx, size, x, y, r + 2, (g, px, py) => stroke(g, px, py, r, r * (0.5 + rng() * 0.4), rng() * TAU, col, 0.12 + rng() * 0.12));
+  ctx.putImageData(img, 0, 0);
+  for (let i = 0; i < ASPHALT_CLOUDS; i++) {                               // old and new tar: a difference of 2-3 levels, no edge
+    const x = rng() * size, y = rng() * size, r = size * (0.18 + rng() * 0.22), light = rng() < 0.5;
+    wrapped(ctx, size, x, y, r, (g, px, py) => {
+      const grad = g.createRadialGradient(px, py, 0, px, py, r);
+      const rgbv = light ? '255,255,255' : '0,0,0';
+      grad.addColorStop(0, `rgba(${rgbv},0.045)`); grad.addColorStop(1, `rgba(${rgbv},0)`);
+      g.fillStyle = grad; g.fillRect(px - r, py - r, r * 2, r * 2);
+    });
   }
   ctx.lineCap = 'round';
-  for (let i = 0; i < size * 0.25; i++) {                      // the cracks
-    const x = rng() * size, y = rng() * size, l = 5 + rng() * 18, a = rng() * TAU;
-    ctx.strokeStyle = 'rgb(44,44,47)'; ctx.globalAlpha = 0.35 + rng() * 0.3; ctx.lineWidth = 0.6 + rng() * 0.7;
+  for (let i = 0; i < size * 0.04; i++) {                                  // hairline cracks, rare and faint
+    const x = rng() * size, y = rng() * size, l = 12 + rng() * 30, a = rng() * TAU;
+    ctx.strokeStyle = 'rgb(48,48,51)'; ctx.globalAlpha = 0.18 + rng() * 0.15; ctx.lineWidth = 0.7;
     wrapped(ctx, size, x, y, l, (g, px, py) => { g.beginPath(); g.moveTo(px, py); g.lineTo(px + Math.cos(a) * l, py + Math.sin(a) * l); g.stroke(); });
   }
+  ctx.globalAlpha = 1;
   return c;
 }
 

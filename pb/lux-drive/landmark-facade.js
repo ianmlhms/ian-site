@@ -87,3 +87,32 @@ export function turret(soup, x, z, r, y0, y1, yTip, wall, roof, { sides = 8, eav
   soup.frustum(x, z, r, r, y0, y1, sides, wall, { cap: false });
   soup.frustum(x, z, r + eaves, r * 0.12, y1, yTip, sides, roof, { cap: false });
 }
+
+/**
+ * The joints of dressed stone on a wall: thin darker bands, one per course (rowH apart) the whole length, and short vertical joints in every course, staggered
+ * by half a block from one course to the next (colW = the length of a block).  Painted relief only (0.03 m proud of the wall): no depth, but the wall stops being one flat colour.
+ */
+export function joints(soup, f, { s0 = 0, s1 = f.len, y0, y1, rowH, colW, color, key = 0, width = 0.09, vertical = true }) {
+  const rows = Math.max(0, Math.floor((y1 - y0) / rowH));
+  for (let r = 0; r < rows; r++) {
+    const ya = y0 + r * rowH, yb = ya + rowH;
+    if (r > 0) panel(soup, f, s0, s1, ya - width / 2, ya + width / 2, EPS_OUT, paint(color, key + r, 0.04));
+    if (!vertical) continue;
+    for (let s = s0 + (r % 2 ? colW / 2 : colW); s < s1 - 0.2; s += colW) panel(soup, f, s - width / 2, s + width / 2, ya, yb, EPS_OUT, paint(color, key + r * 53 + Math.round(s * 3), 0.04));
+  }
+}
+
+/** A round-headed (semicircular) window or door: stone surround, dark leaves; w wide, the rectangle h high, a half disc on top. */
+export function roundArch(soup, f, sc, y0, w, h, frame, glass, steps = 8) {
+  const hw = w / 2;
+  const one = (inset, out, color, key) => {
+    const a = hw + inset;
+    soup.quad(f.at(sc - a, y0 - inset, out), f.at(sc + a, y0 - inset, out), f.at(sc + a, y0 + h, out), f.at(sc - a, y0 + h, out), paint(color, key, 0.03));
+    for (let i = 0; i < steps; i++) {
+      const t0 = Math.PI * (i / steps), t1 = Math.PI * ((i + 1) / steps);
+      soup.tri(f.at(sc, y0 + h, out), f.at(sc + Math.cos(t0) * a, y0 + h + Math.sin(t0) * a, out), f.at(sc + Math.cos(t1) * a, y0 + h + Math.sin(t1) * a, out), paint(color, key + i, 0.03));
+    }
+  };
+  one(0.3, EPS_OUT, frame, 11);
+  one(0, EPS_OUT * 2, glass, 13);
+}

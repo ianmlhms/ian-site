@@ -59,7 +59,7 @@ export const GROUND_FRAGMENT = `
     // the wood seen from afar is its canopy, not its floor (the MTB paints it the same way)
     vec3 canopy = mix(vec3(0.19, 0.31, 0.14), vec3(0.32, 0.44, 0.19), smoothstep(0.3, 0.8, nLo.g * 0.6 + nMid.b * 0.5));
     // the ground between the houses: HARD ground (gravel and slabs), never a lawn
-    vec3 city = mix(grav * 0.74, pave * 0.60, 0.35) * (0.88 + 0.16 * nMid.r);
+    vec3 city = mix(grav * 0.86, pave * 0.78, 0.45) * (0.94 + 0.08 * nMid.r);
     // the farmland: painted parcels of crops (young wheat, ripe grain, ploughed earth, rape, stubble).  The parcel is a slow
     // noise cut into bands, so it reads as a patchwork of fields from above and never as one grey-brown wash.
     float lum = dot(gTex, vec3(0.30, 0.59, 0.11));
@@ -98,7 +98,10 @@ export const GROUND_FRAGMENT = `
     albedo *= 1.0 + park * near * ((mow - 0.5) * 0.07 + (nLo.b - 0.5) * 0.10);
     albedo = mix(albedo, field, farm);
     albedo = mix(albedo, wood, forest);
-    albedo = mix(albedo, city, urban);
+    // The hard ground is a calm light grey-beige and it has a CLEAN border: the class weight is a blurred 24 m / 72 m cover, and mixed straight into the
+    // lawn it made a wide smoky brown-grey penumbra beside every wall (the dark blotches).  The weight is sharpened to a band of a few metres.
+    float urbanW = smoothstep(0.42, 0.62, urban);
+    albedo = mix(albedo, city, urbanW);
     albedo = mix(albedo, water, wetWater);
     // The trees of the view only reach so far: beyond them the wood is its canopy.  Without this the forest is a
     // brown litter floor under green blobs, and the land reads as a blotch of brown patches.
@@ -115,7 +118,9 @@ export const GROUND_FRAGMENT = `
     float sdC = vRoad3.x, sdP = vRoad3.y;
     float roadW = smoothstep(0.0, 0.5, vRoad3.z);
     float aaC = max(fwidth(sdC), 0.04), aaP = max(fwidth(sdP), 0.04);
-    vec3 tar = texture2D(uAsphalt, P * 0.33).rgb;
+    // the grain of the tarmac is a stone chip: from a distance it averages to the plain colour (from above the 3 m tile would show as a pattern), and a
+    // very slow noise keeps a long road from being one flat grey
+    vec3 tar = mix(texture2D(uAsphalt, P * 0.33).rgb, vec3(0.248, 0.252, 0.263), smoothstep(30.0, 110.0, vDist)) * (0.965 + 0.07 * nMid.g);
     vec3 cob = texture2D(uCobble, P * 0.40).rgb;
     // the paved stone of the squares: the slow noise breaks the tiling up, a square is a calm surface
     vec3 stn = texture2D(uStone, P * 0.30).rgb * (0.93 + 0.14 * nLo.g);
@@ -132,7 +137,13 @@ export const GROUND_FRAGMENT = `
     float markOn = smoothstep(0.5, 0.9, mark);
     float dash = (lines > 0.5 && lines < 1.5) ? step(fract(s / 9.0), 0.34) : 1.0;
     float centre = (1.0 - smoothstep(0.05, 0.11, al)) * dash * step(0.5, lines) * step(lines, 2.5);
-    float edge = (lines > 0.5 && lines < 2.5 && hw > 4.0) ? (1.0 - smoothstep(0.05, 0.11, abs(al - (hw - 0.5)))) : 0.0;
+    // The edge line is the contour sdC = -EDGE_INSET of the union of the carriageways, NOT the offset (lat, hw) of the nearest road: that offset
+    // jumps where the nearest road changes, and the line broke into ragged pieces at bends, junctions and cuttings.  The contour of the union is
+    // continuous: it follows the carriageway round a corner and never crosses the mouth of a side street.  The width is constant on screen
+    // (fwidth), so the line stays one clean stroke from the driver's seat and from afar.
+    float edgeGate = step(0.5, lines) * step(lines, 2.5) * smoothstep(3.6, 4.4, hw);
+    float edgeHalf = max(0.07, aaC * 0.9);
+    float edge = edgeGate * (1.0 - smoothstep(edgeHalf * 0.5, edgeHalf * 1.5, abs(sdC + 0.5)));
     float paint = clamp(centre + edge, 0.0, 1.0) * onCarriage * markOn * near;
 
     albedo = mix(albedo, surf, roadW * onCarriage);
