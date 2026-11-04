@@ -37,7 +37,6 @@ export function createUI({ root, lang = 'lb', onAction = () => {} }) {
     <div id="hud" hidden>
       <div id="hudTL">
         <div id="speedo"><span id="speedValue">0</span><small id="speedUnit">km/h</small></div>
-        <div id="limitSign" hidden aria-live="off"><span id="limitValue">50</span></div>
       </div>
       <div id="roadName"></div>
       <div id="hudTR">
@@ -143,7 +142,6 @@ export function createUI({ root, lang = 'lb', onAction = () => {} }) {
     q('#btnCamera').setAttribute('aria-label', t(next, 'hud.camera'));
     q('#btnReset').setAttribute('aria-label', t(next, 'hud.reset'));
     q('#mapCanvas').setAttribute('aria-label', t(next, 'map.title'));
-    q('#limitSign').setAttribute('title', t(next, 'speed.limit'));
     markChips('lang', next);
     document.documentElement.lang = next;
   }
@@ -205,15 +203,8 @@ export function createUI({ root, lang = 'lb', onAction = () => {} }) {
     /** True while an overlay that stops the car is up (the start menu, the pause menu, the settings, the help, the map). */
     isBlocking: () => OVERLAYS.some((id) => !q(`#${id}`).hidden) || !q('#mapOverlay').hidden,
     closeOverlays() { for (const id of OVERLAYS) show(q(`#${id}`), false); },
-    setSpeed(kmh, limit) {
+    setSpeed(kmh) {
       q('#speedValue').textContent = String(Math.round(kmh));
-      q('#speedo').classList.toggle('over', limit > 0 && kmh > limit + 6);
-    },
-    /** The speed-limit sign (0 = off the roads: no sign). */
-    setLimit(kmh) {
-      const sign = q('#limitSign');
-      sign.hidden = !(kmh > 0);
-      if (kmh > 0) q('#limitValue').textContent = String(kmh);
     },
     setRoad(name) { q('#roadName').textContent = name || ''; q('#roadName').classList.toggle('on', !!name); },
     setToast(text, seconds = TOAST_S) {

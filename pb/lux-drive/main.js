@@ -46,7 +46,6 @@ import { createFullMap } from './fullmap.js';
 import { createRoadIndex } from './road-index.js';
 import { createBasemap } from './basemap.js';
 import { placeClear } from './placement.js';
-import { createSpeedLimit } from './speed-limit.js';
 import { createQualityStepper } from './quality-step.js';
 import { roadDirectionAt } from './roads.js';
 import { t, LANGS } from './i18n.js';
@@ -201,7 +200,6 @@ async function boot() {
   // the Kaart: one road index and one painted base for the minimap, the full map and the teleport
   const roadIndex = createRoadIndex(data.roads);
   const basemap = createBasemap({ nx: maps.nx, nz: maps.nz, classData: maps.classData });
-  const limits = createSpeedLimit(maps, buildings);
 
   const sound = createSound({ muted: readKey(SOUND_KEY) === 'off' });         // starts on the first tap or key (iOS)
   const ui = createUI({ root: document.body, lang, onAction: handleAction });
@@ -232,7 +230,6 @@ async function boot() {
   let started = false;                 // false while the start menu is up
   let stuckFor = 0;
   let wasCrashed = false;
-  let lastLimit = 0;                   // km/h: the limit of the road under the car, from the last frame
 
   const WEATHER_ICON = { clear: '☀️', cloudy: '☁️', fog: '🌫️', rain: '🌧️' };
   const label = (group, id) => (id === 'random' ? tr('set.random') : tr(`${group}.${id}`));
@@ -436,7 +433,7 @@ async function boot() {
     const paused = ui.isBlocking();
     const inp = input.read(scripted);
     ground.hint(car.state.y);
-    if (!paused) car.update(dt, { ...inp, gripScale: env.gripScale(), limitKmh: lastLimit });
+    if (!paused) car.update(dt, { ...inp, gripScale: env.gripScale() });
 
     // a hard hit on a building or a tree: a short "Hoppla!"
     if (car.state.crashed && !wasCrashed) ui.setToast(tr('hud.crash'), 1.2);
@@ -481,11 +478,8 @@ async function boot() {
     // the interface
     surface.roadInfoAt(car.state.x, car.state.z, roadInfo);
     const road = roadInfo.coverage > 0.35 && roadInfo.road >= 0 ? data.roads[roadInfo.road] : null;
-    const limit = limits.update(road, car.state.x, car.state.z, env.state.rain > 0.5 ? 1 : 0);
-    const kmhNow = Math.abs(car.state.speed) * 3.6;
-    lastLimit = limit;
-    ui.setSpeed(kmhNow, limit);
-    if (frames % 10 === 0) { ui.setLimit(limit); ui.setRain(env.state.rain); }
+    ui.setSpeed(Math.abs(car.state.speed) * 3.6);
+    if (frames % 10 === 0) ui.setRain(env.state.rain);
     const roadName = road && road.name ? road.name : '';
     if (roadName !== showRoad) { showRoad = roadName; ui.setRoad(roadName); }
     if (frames % 6 === 0) minimap.draw(car.state.x, car.state.z, car.state.heading);
@@ -518,7 +512,7 @@ async function boot() {
   // the API for the harness (the checks read the state of the game from here)
   window.__lux = {
     landmarks, landmarkView, trams, tramSim, tramNetwork, streetLights, benchView, scene, camera, renderer, car, env, terrain, city, trees, surface, ground, field, portals, playArea, buildings, quality: () => quality,
-    ui, fullMap, roadIndex, sound, stepper, model, limits, input, forest, collide, placeAt, blockedAt,
+    ui, fullMap, roadIndex, sound, stepper, model, input, forest, collide, placeAt, blockedAt,
     /** The Kaart and the teleport for the flows: open the map, put the car on the road nearest to (x, z). */
     toggleMap: () => toggleMap(), startDriving: () => startDriving(), isStarted: () => started,
     teleportNear: (x, z, reach = 200) => { const hit = roadIndex.nearest(x, z, reach); if (hit) teleportTo(hit); return !!hit; },
@@ -543,7 +537,7 @@ async function boot() {
         lat: roadInfo.lat, dir: dir ? { x: dir.x, z: dir.z } : null,
       };
     },
-    step: (dt, o) => car.update(dt, { ...(o || {}), gripScale: env.gripScale(), limitKmh: lastLimit }),
+    step: (dt, o) => car.update(dt, { ...(o || {}), gripScale: env.gripScale() }),
     stats: () => ({
       calls: renderer.info.render.calls, triangles: renderer.info.render.triangles,
       tiles: terrain.tiles.size, pending: terrain.stats.pending,

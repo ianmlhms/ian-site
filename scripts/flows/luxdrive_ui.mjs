@@ -111,13 +111,11 @@ export const flow = {
     await page.waitForSelector("#hud", { state: "visible" });
     const hud = await page.evaluate(() => {
       const m = window.__lux;
-      return { blocking: m.ui.isBlocking(), started: m.isStarted(), limit: !document.querySelector("#limitSign").hidden, limitText: document.querySelector("#limitValue").textContent };
+      return { blocking: m.ui.isBlocking(), started: m.isStarted() };
     });
     h.expect(!hud.blocking && hud.started, "the menu is closed and the game runs");
     await page.evaluate(() => window.simSeconds(window.__lux, 0.6));
-    const sign = await page.evaluate(() => ({ shown: !document.querySelector("#limitSign").hidden, v: document.querySelector("#limitValue").textContent, road: document.querySelector("#roadName").textContent }));
-    h.expect(sign.shown, "the speed-limit sign is shown on the road");
-    h.eq(sign.v, "50", `the limit on ${sign.road || "the start road"} is 50 (a town)`);
+    h.expect(!(await page.evaluate(() => !!document.querySelector("#limitSign"))), "no speed-limit sign in the HUD (no speed limits in the game)");
 
     h.step("the pause menu: Esc pauses the car, Weider continues");
     const before = await page.evaluate(() => { const s = window.__lux.state(); return { x: s.x, z: s.z }; });
@@ -185,8 +183,8 @@ export const flow = {
       h.expect(inside, "every control is on the screen");
       const apart = (a, b) => a.r <= b.l || b.r <= a.l || a.b <= b.t || b.b <= a.t;
       h.expect(apart(gas, brake) && apart(brake, hb) && apart(gas, hb) && apart(pad, brake), "the controls do not overlap each other");
-      const hudBoxes = await page.evaluate(() => ["#minimap", "#speedo", "#limitSign"].map((s) => { const r = document.querySelector(s).getBoundingClientRect(); return { s, l: r.left, r: r.right, t: r.top, b: r.bottom }; }));
-      h.expect(hudBoxes.every((b) => b.b < pad.t && b.b < gas.t), "the HUD (map, speed, limit) never sits on a control");
+      const hudBoxes = await page.evaluate(() => ["#minimap", "#speedo"].map((s) => { const r = document.querySelector(s).getBoundingClientRect(); return { s, l: r.left, r: r.right, t: r.top, b: r.bottom }; }));
+      h.expect(hudBoxes.every((b) => b.b < pad.t && b.b < gas.t), "the HUD (map, speed) never sits on a control");
 
       const cdp = await h.context.newCDPSession(page);
       await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: pad.l + pad.w * 0.85, y: pad.y, id: 1 }, { x: gas.x, y: gas.y, id: 2 }] });
@@ -294,14 +292,14 @@ export const flow = {
       const colour = (name) => { let c = null; mdl.group.traverse((o) => { if (o.name === name) c = o.material.color.getHex(); }); return c; };
       // roll on at 30 km/h and steer right
       car.state.vx = Math.cos(-0.236) * 8.3; car.state.vz = Math.sin(-0.236) * 8.3;
-      for (let i = 0; i < 20; i++) car.update(DT, { throttle: 0.3, steer: 1, gripScale: 1, limitKmh: 50 });
+      for (let i = 0; i < 20; i++) car.update(DT, { throttle: 0.3, steer: 1, gripScale: 1 });
       mdl.apply(car.state, DT, { head: window.__lux.env.state.lamp, night: window.__lux.env.state.night });
       const a = read();
-      for (let i = 0; i < 20; i++) car.update(DT, { throttle: 0.3, steer: 1, gripScale: 1, limitKmh: 50 });
+      for (let i = 0; i < 20; i++) car.update(DT, { throttle: 0.3, steer: 1, gripScale: 1 });
       mdl.apply(car.state, DT, { head: window.__lux.env.state.lamp, night: window.__lux.env.state.night });
       const b = read();
       const tailRolling = colour("car-taillamps");
-      for (let i = 0; i < 30; i++) car.update(DT, { brake: 1, gripScale: 1, limitKmh: 50 });
+      for (let i = 0; i < 30; i++) car.update(DT, { brake: 1, gripScale: 1 });
       const braking = car.state.braking;
       mdl.apply(car.state, DT, { head: window.__lux.env.state.lamp, night: window.__lux.env.state.night });
       const tailBraking = colour("car-taillamps");
@@ -317,7 +315,7 @@ export const flow = {
     await h.shot("car-night");
     await page.evaluate(() => window.__lux.env.setTime("noon"));
 
-    h.step("the handling: no spinning, no flipping, the brake reverses, the limit sets the pace");
+    h.step("the handling: no spinning, no flipping, the brake reverses, no speed limits");
     const hand = await page.evaluate(() => {
       const m = window.__lux, car = m.car;
       const DT = 1 / 60;
@@ -326,23 +324,23 @@ export const flow = {
       for (const v of [30, 50, 90]) {
         at(v); const h0 = car.state.heading; let maxYaw = 0, prev = h0;
         for (let i = 0; i < 120; i++) {
-          car.update(DT, { throttle: 0.3, steer: 1, gripScale: 1, limitKmh: 90 });
+          car.update(DT, { throttle: 0.3, steer: 1, gripScale: 1 });
           maxYaw = Math.max(maxYaw, Math.abs(car.state.heading - prev) / DT); prev = car.state.heading;
           out.tilt = Math.max(out.tilt, Math.abs(car.state.roll), Math.abs(car.state.pitch), Math.abs(car.state.lean), Math.abs(car.state.squat));
         }
         out.turn[v] = { deg: (car.state.heading - h0) * 180 / Math.PI, maxYaw, kmh: Math.abs(car.state.speed) * 3.6 };
       }
       at(60); const h1 = car.state.heading; let slip = 0;
-      for (let i = 0; i < 90; i++) { car.update(DT, { steer: 0.8, handbrake: i > 10 && i < 60, gripScale: 1, limitKmh: 90 }); slip = Math.max(slip, car.state.slip); }
+      for (let i = 0; i < 90; i++) { car.update(DT, { steer: 0.8, handbrake: i > 10 && i < 60, gripScale: 1 }); slip = Math.max(slip, car.state.slip); }
       out.drift = { deg: (car.state.heading - h1) * 180 / Math.PI, slip, kmh: Math.abs(car.state.speed) * 3.6 };
       // reverse: from a standstill the brake pedal drives the car backwards
       car.reset(5924.1, 7901.9, -0.236); const x0 = car.state.x, z0 = car.state.z;
-      for (let i = 0; i < 180; i++) car.update(DT, { brake: 1, gripScale: 1, limitKmh: 50 });
+      for (let i = 0; i < 180; i++) car.update(DT, { brake: 1, gripScale: 1 });
       out.reverse = { m: Math.hypot(car.state.x - x0, car.state.z - z0), speed: car.state.speed };
-      // the limit sets the pace: full throttle on a road of 50 km/h tops out well below the motorway speed
+      // no speed limits: full throttle on a town street runs far past the old 85 km/h cap
       car.reset(5924.1, 7901.9, -0.236); let top = 0;
-      for (let i = 0; i < 60 * 14; i++) { car.update(DT, { throttle: 1, gripScale: 1, limitKmh: 50 }); top = Math.max(top, car.state.speed * 3.6); if (i > 120 && Math.abs(car.state.speed) < 0.3) break; }
-      out.top50 = top;
+      for (let i = 0; i < 60 * 14; i++) { car.update(DT, { throttle: 1, gripScale: 1 }); top = Math.max(top, car.state.speed * 3.6); if (i > 120 && Math.abs(car.state.speed) < 0.3) break; }
+      out.top = top;
       // braking: dry and wet
       out.brake = {};
       for (const [name, g] of [["dry", 1], ["wet", 0.72]]) { at(50); const x = car.state.x, z = car.state.z; let i = 0; for (; i < 600 && Math.abs(car.state.speed) > 0.3; i++) car.update(DT, { brake: 1, gripScale: g }); out.brake[name] = Math.hypot(car.state.x - x, car.state.z - z); }
@@ -353,7 +351,7 @@ export const flow = {
     h.expect(hand.tilt < 0.4, `the body never tilts more than ${(hand.tilt * 180 / Math.PI).toFixed(0)} degrees: no flipping`);
     h.expect(hand.drift.slip > 0.2 && hand.drift.kmh > 10, `the handbrake starts a slide (${hand.drift.slip.toFixed(2)}) and the car keeps rolling (${hand.drift.kmh.toFixed(0)} km/h)`);
     h.expect(hand.reverse.m > 3 && hand.reverse.speed < -1, `the brake reverses the car from a standstill (${hand.reverse.m.toFixed(1)} m in 3 s)`);
-    h.expect(hand.top50 > 40 && hand.top50 < 100, `a street of 50 km/h tops out at ${hand.top50.toFixed(0)} km/h`);
+    h.expect(hand.top > 120, `full throttle in town reaches ${hand.top.toFixed(0)} km/h (no speed limits)`);
     h.expect(hand.brake.wet > hand.brake.dry * 1.15 && hand.brake.dry < 14, `braking from 50 km/h: ${hand.brake.dry.toFixed(1)} m dry, ${hand.brake.wet.toFixed(1)} m wet`);
 
     h.step("stuck against a wall: the pedal is down, the car does not move -> it is put back on the road");

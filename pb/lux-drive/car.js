@@ -7,7 +7,7 @@
  * The heading convention: forward = (cos h, sin h) in (x east, z south) - the same as the MTB engine and the baked road yaw.
  * A positive steer input turns right (from +x towards +z). */
 import { CAR, SURFACES } from './config.js';
-import { ROAD_KINDS, SURFACE_NAMES, kindInfo } from './roads.js';
+import { SURFACE_NAMES } from './roads.js';
 
 const GRAVITY = 9.81;
 const HIT_SOUND_SPEED = 1.5;      // m/s into a wall that the ears notice
@@ -56,16 +56,11 @@ export function createCar({ ground, roadInfoAt, collide = null, start = null }) 
     // the road under the car: its class decides the grip and the top speed
     roadInfoAt(state.x, state.z, info);
     const onRoad = info.coverage > 0.35;
-    const kindName = onRoad ? ROAD_KINDS[info.kind] : null;
     // the material under the tyres is the material of the way itself (the OSM surface tag), not the class default
     const surfaceName = onRoad ? (SURFACE_NAMES[info.surface] || 'asphalt') : 'grass';
     const surf = SURFACES[surfaceName] || SURFACES.asphalt;
-    const limitShare = onRoad ? (kindInfo(kindName).speed || 0.5) : 0.4;      // off the roads the car is slow
-    const classTop = CAR.maxSpeed * limitShare;
-    // the speed limit of the road (the sign in the HUD) sets the pace: the car tops out at CAR.limitOvershoot times the limit,
-    // so a street of 50 km/h is a street for 30-80 km/h, and the motorway is still the place for the top speed
-    const limitMps = (input.limitKmh || 0) / 3.6;
-    const topSpeed = onRoad && limitMps > 0 ? Math.min(classTop, limitMps * CAR.limitOvershoot) : classTop;
+    // No speed limits (Ian): every road lets the car run to its top speed; only off the roads the grass holds it back
+    const topSpeed = onRoad ? CAR.maxSpeed : CAR.maxSpeed * CAR.offRoadShare;
 
     // --- steering: the road wheel follows the input, its authority falls with the speed
     // The authority also falls with the speed so that full lock never asks for more sideways acceleration than the tyres give
@@ -105,7 +100,7 @@ export function createCar({ ground, roadInfoAt, collide = null, start = null }) 
       drive = (CAR.power * throttle) / Math.max(Math.abs(vf), 8) / CAR.mass;
       drive = Math.min(drive, CAR.launchCap);                                    // no rocket launch
       drive *= clamp(1 - slip * 0.8, 0.25, 1);                                   // the friction circle takes from the drive
-      if (vf >= topSpeed) drive = 0;                                            // the top speed of the road class
+      if (vf >= topSpeed) drive = 0;                                            // the top speed of the car (lower on grass)
     } else if (reversing) {
       drive = -(CAR.reversePower * brake) / Math.max(Math.abs(vf), 4) / CAR.mass;
       drive = Math.max(drive, -6);
@@ -127,7 +122,7 @@ export function createCar({ ground, roadInfoAt, collide = null, start = null }) 
     state.longAccel = accel;
     vf += accel * dt;
     if (brake > 0 && !reversing && Math.abs(vf) < 0.25) vf = 0;
-    if (vf > topSpeed * 1.15) vf = topSpeed * 1.15;                     // the limit is soft: the car can overshoot downhill
+    if (vf > topSpeed * 1.15) vf = topSpeed * 1.15;                     // the cap is soft: the car can overshoot downhill
     if (vf < -CAR.maxReverse) vf = -CAR.maxReverse;
 
     // --- the yaw: the bicycle model (a car standing still does not turn)

@@ -134,15 +134,15 @@ export const CAR = Object.freeze({
   mass: 1350,                // kg
   wheelbase: 2.62,
   trackWidth: 1.72,
-  power: 100000,             // W at the wheels at full throttle (about 135 hp)
+  power: 140000,             // W at the wheels at full throttle (about 190 hp): quick enough to reach the top speed on a straight
   reversePower: 42000,       // W in reverse
-  maxSpeed: 56,              // m/s (200 km/h) - the hard cap on a motorway
+  maxSpeed: 69,              // m/s (250 km/h) - the top speed on every road (no speed limits in the game)
+  offRoadShare: 0.5,         // off the roads (grass, fields) the car tops out at this share of the top speed (125 km/h)
   maxReverse: 12,            // m/s
   brakeDecel: 10.5,          // m/s2 at full braking on asphalt
   engineBrake: 1.6,          // m/s2 when the throttle is closed
   steerMax: 0.56,            // rad of the road wheel angle at standstill
   steerSpeedRef: 13,         // m/s: the steering authority falls off with the speed
-  limitOvershoot: 1.7,       // the soft top speed on a road is this many times its speed limit (never above the class top speed)
   slideScrub: 0.7,           // 1/s: how fast a sliding car loses speed (at full slip)
   launchCap: 6.5,            // m/s2: the most the drive pushes at low speed (no rocket launch)
   steerRate: 7,              // 1/s: how fast the wheel follows the input
