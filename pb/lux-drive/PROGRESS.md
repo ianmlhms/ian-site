@@ -971,3 +971,62 @@ Ian: "the road is really bumpy and not level at all".  Measured on the branch th
 * Inside a ring (a pedestrian square whose two arms are 10 m apart) the nearest-arm switch leaves a 9 cm step along the medial axis (4913,8339).  Two overlapping ways of equal class at different levels (service lots) leave a 15-35 cm step.
 * `world-flow` batter numbers are worse than on `lux-drive` (3 % of the sides steeper than the land, was 0.3 %); the cause is in the carve (nearest segment, flat bench then face), not in the bed.
 * Not measured on a real GPU or an iPad.
+
+## Look fix (branch `lux-drive-look`, Mac mini): landmarks from photographs, windows at low quality, WebKit
+
+Ian: "fix all these bugs".  Reference photos (Wikimedia Commons, 1-3 per landmark, CC / public domain, credits in `look/refs/credits.txt`, never in the repo or the game) were fetched this
+time; every landmark was compared with them in a side-by-side montage (photo | before | after) and rebuilt where it was wrong.  Montages: `~/Library/Caches/luxdrive-work/look/best/`.
+Tools: `scripts/luxdrive/look_views.json` + `look_poses.mjs` (camera poses on a road or a free bearing that is never inside a house) -> `shot.mjs` (new: orbit poses, `hide` meshes
+such as the trees, no HUD in the picture) -> `montage.py`.
+
+| landmark | what was wrong | what changed |
+|---|---|---|
+| Cour de justice | towers 120 m from where they stand | the three towers now sit on the OSM ways of Comenius / Montesquieu / Rocca (centres + the 47 deg direction of the 15 x 49 m slabs); two gold-bronze, the third black and taller; the LOD2 lump (block 3959, eave 70 m) is a low base |
+| Cathédrale | three black spires, crossing the tallest | per the photos: steep blue-grey slate roofs, the crossing is a hipped pyramid with the GREEN copper lantern + needle, front: the shorter left tower with a crown of four gables + corner spires, the taller plain right spire; tan sandstone |
+| Pont Adolphe | arcade of 2 x 5 wide openings, yellow stone | tall narrow arches over the springings AND the abutments (16), plain wall over the crown, grey-tan stone (`bridgeStone*`) |
+| Pont Rouge | signal red; the tram bed hung 60 m down under the bridge as a grey wall | duller wine red; **`tram-view.js`**: a bed edge that falls off the baked deck is held level with it (the grey curtain under the whole bridge is gone) |
+| Philharmonie | pale grey drum behind the columns (read as haze) | DARK glass behind 190 white columns, thicker white roof with an overhang, the white shell leaning on the east side |
+| Palais grand-ducal | pale cream, steep roof too low | ochre ashlar (`palaisStone`), blue-grey slate; facade, turrets, dormers as before (see "still wrong") |
+| Gëlle Fra | yellow, thick | slim pink-brown granite obelisk, stepped plinth, bronze-green figures, gold inscription band, golden woman |
+| Bock | "pale slabs" | the skin is rough: 72 rays, 2.4 m facets, noisy lift, ochre / grey strata by height, a blue-grey fortress wall with coping + merlons on the rim, a ruined square tower, casemate mouths, bastions |
+| Passerelle | lower footway decks 11 / 14 left to the generic view (grey slabs seen through the arcade) | decks of the corridor whose median top is on the bridge (8, 11, 14, 16) are hidden and the model draws the viaduct; width ignores their dipping pinned ends; grey-tan stone |
+| Coque | flat pale shell | dark thick roof curving up like an upturned hull over teal glass with mullions |
+| Fort Thüngen | three towers on the three farthest corners | two big round towers on the two OSM circles (fitted: 5709 / 8215 r 5.3, 5724 / 8231 r 5.2) and a small third behind the wall; dark battered foot, corbel, arched frieze, slits, gold acorns |
+| Mudam | grey box with a plain glass gable | ivory limestone; Pei's glass pyramid with a square lantern tower, a slanted glass wing, a curved glass shell |
+| BCEE | square tower, black pyramid | ROUND stone tower with two gold clocks, belfry ring and a green copper cone with four dormers; slate roof on the wing |
+| Oberanven church | thick spire | slimmer, taller spire (not compared closely: the photos on Commons show the village, not the church) |
+
+**Budgets**: 14 landmark meshes (unchanged: no extra draw call), 31 703 triangles of 60 000 (harness D1).
+
+### Houses at low quality
+`uDetail` was 0 at low: every house wall was a blank box (the bake's windows are painted in the fragment shader).  Now low is LITE (`uDetail` 0.5, `rich` switch in `building-material.js`):
+the windows, the doors, the shopfronts and the stone bands stay within 140 m (the `vDist` limit that already existed), the shutters, sills, lintels, glazing bars and rails go.
+Same mesh, same draw calls, no new texture.  `luxdrive_world.mjs` checks `uDetail` (low 0 < d < 1, medium / high 1).  Budgets: low 111 draw calls / 226 630 triangles (<= 140 / 330 000), medium 148 / 314 506, high 210 / 455 688.
+Montage `look/best/low_quality_windows.jpg` (Oberanven and an old-town street, before / after).
+
+### WebKit (iPad engine)
+`FLOW_BROWSER=webkit` in `scripts/flows/lib.mjs` (Chromium stays the default; the other luxdrive flows use CDP and stay Chromium-only) and the new flow `scripts/flows/luxdrive_webkit.mjs`:
+WebKit 26.6 (Playwright 2368, Mac, hardware GL) at 1180x820 with touch, low and medium: no boot error, no console error, 209 / 218 distinct colours on the canvas (the city is drawn), no WebGL
+error, a real touchscreen tap starts the game, pointer multi-touch (gas + steer, brake + steer), all released on pointerup, no scroll / zoom, the car drives 35 m under the gas pedal.
+Frame rate 55-59 fps in this headless WebKit: that says nothing about an iPad (different GPU, no throttling).  What is NOT covered: real iOS Safari behaviour of the on-screen touch (CDP touch events are not available in WebKit: the flow
+dispatches pointer events), memory limits, audio.
+
+### Gates (Mac mini)
+| gate | result |
+|---|---|
+| `node pb/lux-drive/harness.js` | PASS, 85 checks, 0 failed (140 s) |
+| `luxdrive_world.mjs` | PASS (+ the new LITE check) |
+| `luxdrive_holes.mjs` | PASS, 0 hole pixels over 72 poses, self-test 42 741 |
+| `luxdrive_ui.mjs` | PASS |
+| `FLOW_BROWSER=webkit luxdrive_webkit.mjs` | PASS |
+
+`pb/lux-drive.html`: main.js `?v=28`.  The User-Agent of `fetch_ref.py` / `osm_query.py` no longer contains an e-mail address.
+
+### Still wrong (honest)
+* Palais grand-ducal: the facade is a plain ochre wall with bands and dormers; the photos show bay windows, carved panels and a longer front (the LOD2 block is 31 m) - not a Renaissance facade.
+* Cathédrale: seen from the sides the roofs read as one grey slab; the two spires and the crossing are right, the belfries are plain; the front (portal, rose window) is simple.
+* Cour de justice: heights (108 / 108 / 142 m) are from memory; no glass fins pattern like the photos, the black tower is a plain dark box.  Pont Adolphe: the arcade is closer but the real bridge has TWO arches (a small one each side) that are not modelled.
+* Bock: facets are visible (flat shaded triangles); the rock reads as rock but not as the layered cliff of the photo; the tower is a plain box.  Passerelle: the piers are long slabs that fall to the ground (the real ones are slim and stand on the slope).
+* Philharmonie: the columns read well from the front, from the side the whole ring is grey in shade; the white shell is a cone, not the smooth wave of the photo.  Coque / Mudam / Thüngen: right silhouette, no detail (no stone courses, no glazing grid).
+* Oberanven church and the BCEE wing are simple.  Trees hide Thüngen / Mudam / Coque from the roads (the montages hide the trees to see the buildings).
+* Nothing measured on a real iPad; WebKit fps is not meaningful on this Mac.

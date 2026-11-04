@@ -1,0 +1,16 @@
+[
+ {"name":"adolphe","at":[4829,9101,-14],"az":180,"dist":150,"h":10,"fov":50,"hide":["trees"]},
+ {"name":"rouge","at":[5179,8061,-8],"az":90,"dist":210,"h":25,"fov":48,"hide":["trees"]},
+ {"name":"philharmonie","at":[5962,7992,10],"az":60,"dist":115,"h":4,"fov":55,"hide":["trees"]},
+ {"name":"ecj","at":[6050,7600,50],"az":135,"dist":280,"h":60,"fov":50,"hide":["trees"]},
+ {"name":"cathedral","at":[5164,8965,30],"az":225,"dist":95,"h":3,"fov":55,"hide":["trees"]},
+ {"name":"palais","at":[5265,8815,10],"az":143,"dist":45,"h":3,"fov":60,"hide":["trees"]},
+ {"name":"gellefra","at":[4970,8985,12],"az":20,"dist":55,"h":2,"fov":55,"hide":["trees"]},
+ {"name":"bock","at":[5540,8738,-5],"az":60,"dist":130,"h":8,"fov":55,"hide":["trees"]},
+ {"name":"passerelle","at":[5312,9390,-10],"az":180,"dist":130,"h":10,"fov":55,"hide":["trees"]},
+ {"name":"coque","at":[6633,7440,5],"az":200,"dist":120,"h":3,"fov":55,"hide":["trees"]},
+ {"name":"thuengen","at":[5745,8185,6],"az":121,"dist":100,"h":4,"fov":55,"hide":["trees"]},
+ {"name":"mudam","at":[5775,8160,10],"az":300,"dist":90,"h":4,"fov":55,"hide":["trees"]},
+ {"name":"bcee","at":[4949,9211,35],"az":20,"dist":130,"h":10,"fov":50,"hide":["trees"]},
+ {"name":"oberanven","at":[13285,3652,10],"az":90,"dist":60,"h":3,"fov":55,"hide":["trees"]}
+]

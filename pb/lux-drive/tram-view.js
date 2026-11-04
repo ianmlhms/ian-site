@@ -21,6 +21,7 @@ const SECTION_STEP = 2;             // m between the cross sections of the track
 const WIRE_STEP = 4;                // m between the points of the contact wire
 const HALF_BED = 1.45;              // m: half the width of the slab / grass bed
 const GROOVE = 0.16;                // m: the dark groove around a rail
+const BED_EDGE_TOLERANCE = 0.6;     // m: on a deck, an edge of the bed that differs from the middle by more than this is off the deck
 const BED_LIFT = 0.03;              // m: the bed over the ground (the ground is a 1 m lattice, the bed a 2 m ribbon)
 const COL = {
   slab: [0.60, 0.61, 0.60], slabDark: [0.50, 0.51, 0.51], grass: [0.35, 0.50, 0.24], groove: [0.24, 0.25, 0.26], rail: [0.40, 0.41, 0.43],
@@ -111,11 +112,14 @@ export function createTramView({ scene, network, sim, surface, deckNetwork, env,
       const x = pts[i * 2], z = pts[i * 2 + 1];
       const rx = -tz, rz = tx;                                                   // to the right of the travel direction
       const yc = railGround(x, z, tx, tz);
-      const yl = railGround(x - rx * HALF_BED, z - rz * HALF_BED, tx, tz), yr = railGround(x + rx * HALF_BED, z + rz * HALF_BED, tx, tz);
+      const onDeck = yc - surface.height(x, z) > 0.4;                             // on a bridge: a slab, never a lawn in the air
+      // the bed is 2.9 m wide, the baked deck of a bridge may be narrower than the track's offset: an edge that falls off the deck finds the
+      // valley floor 60 m down and the slab would hang there as a grey wall under the whole bridge (the Pont Rouge).  On a deck the bed is level with it.
+      const edgeY = (ex, ez) => { const y = railGround(ex, ez, tx, tz); return onDeck && Math.abs(y - yc) > BED_EDGE_TOLERANCE ? yc : y; };
+      const yl = edgeY(x - rx * HALF_BED, z - rz * HALF_BED), yr = edgeY(x + rx * HALF_BED, z + rz * HALF_BED);
       surface.roadInfoAt(x, z, road);
       sampleWorldMap(maps, x, z, land);
       // the tram shares the street (a slab, the rails are embedded) or runs on paving in the city; only in the open it has a grass bed
-      const onDeck = yc - surface.height(x, z) > 0.4;                             // on a bridge: a slab, never a lawn in the air
       const onRoad = onDeck || road.sdCar < 0.6 || road.sdPave < 0.3 || land.urban > 0.5;
       sections.push({ x, z, tx, tz, rx, rz, yc, yl, yr, onRoad, along: last });
       if (k > 0) last += Math.hypot(x - sections[k - 1].x, z - sections[k - 1].z);

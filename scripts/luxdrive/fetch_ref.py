@@ -3,7 +3,7 @@
 
     python3 -I scripts/luxdrive/fetch_ref.py "Category:Cathédrale Notre-Dame de Luxembourg" outdir [--n 4] [--list]
 
-One request per 5 seconds, a User-Agent with a contact (the rules of the Wikimedia API).  Saves thumbnails (900 px wide jpg) and a
+One request per 3.5 seconds, a User-Agent that names the site (no personal address).  Saves thumbnails (900 px wide jpg) and a
 credits.txt (title, author, licence) next to them.  --list only prints the files of the category."""
 import argparse
 import json
@@ -14,9 +14,9 @@ import time
 import urllib.parse
 import urllib.request
 
-UA = "ian-site-luxdrive/1.0 (konto@ian.lu)"
+UA = "ian-site-luxdrive/1.0 (https://ian.lu)"
 API = "https://commons.wikimedia.org/w/api.php"
-GAP = 5.0
+GAP = 3.5
 _last = [0.0]
 
 

@@ -11,6 +11,7 @@
 import { PAINT_LIGHT_GLSL } from './light-glsl.js';
 
 const THREE = window.THREE;
+const LITE_DETAIL = 0.5;            // uDetail at low quality: see the `rich` switch of the fragment shader
 
 const VERTEX = `
   attribute vec3 color; attribute vec4 aInfo; attribute vec2 aGeo; attribute vec2 aStyle;
@@ -25,7 +26,7 @@ const VERTEX = `
 `;
 const FRAGMENT = `
   precision highp float;
-  uniform float uDetail;
+  uniform float uDetail;                                           // 1 = everything, 0.5 = LITE (low quality): windows and doors, no shutters / sills / lintels / bars / rails
   uniform sampler2D uNoise;
   varying vec3 vN; varying vec3 vC; varying vec3 vWorld; varying vec4 vInfo; varying vec2 vGeo; varying float vDist;
   varying vec2 vStyle;
@@ -36,6 +37,7 @@ const FRAGMENT = `
     vec3 N = normalize(vN); if (!gl_FrontFacing) N = -N;
     vec3 P = vWorld;
     float kind = vInfo.z, seed = vInfo.w;
+    float rich = step(0.75, uDetail);                               // the small parts that cost fragment time: only at medium and high quality
     vec2 gp = vInfo.xy * 0.5 + seed * 13.0;                         // the noise in the surface's own coordinates (no stretched streaks on the walls)
     float grain = texture2D(uNoise, gp).g;
     float grain2 = texture2D(uNoise, gp * 0.21 + 0.3).b;
@@ -102,7 +104,7 @@ const FRAGMENT = `
         albedo = mix(albedo, stoneCol, clamp(cornice + course, 0.0, 1.0));
         albedo *= 1.0 - 0.2 * cornShadow;
         albedo = mix(albedo, albedo * vec3(0.8, 0.78, 0.76), 1.0 - smoothstep(0.2, 0.7, v));          // the plinth
-        if (uDetail > 0.5 && eave > 2.2 && vDist < 140.0) {
+        if (uDetail > 0.25 && eave > 2.2 && vDist < 140.0) {
           float cells = max(1.0, floor(len / 2.6 + 0.5)), cw = len / cells;
           float cu = vInfo.x / cw, fi = floor(cu), dx = (fract(cu) - 0.5) * cw;
           float fx = abs(dx);
@@ -116,8 +118,8 @@ const FRAGMENT = `
           float inner = step(fx, 0.5) * step(0.0, wy) * step(wy, winH);
           float surround = step(fx, 0.66) * step(-0.16, wy) * step(wy, winH + 0.22) * (1.0 - inner);
           float lintel = step(winH, wy) * step(wy, winH + 0.22) * step(fx, 0.72);
-          albedo = mix(albedo, stoneCol, clamp(surround + lintel, 0.0, 1.0) * hasRow);
-          float bars = step(abs(fx - 0.25), 0.02) + step(abs(wy - winH * 0.62), 0.03);                // the glazing bars
+          albedo = mix(albedo, stoneCol, clamp(surround + lintel, 0.0, 1.0) * hasRow * rich);
+          float bars = (step(abs(fx - 0.25), 0.02) + step(abs(wy - winH * 0.62), 0.03)) * rich;       // the glazing bars
           vec3 glass = mix(vec3(0.07, 0.1, 0.14), vec3(0.36, 0.46, 0.56), smoothstep(0.0, winH, wy));
           albedo = mix(albedo, mix(glass, vec3(0.88, 0.88, 0.84), clamp(bars, 0.0, 1.0) * 0.8), inner * hasRow);
           float lit = step(0.6, h2(vec2(fi + row * 3.0, seed * 7.0)));
@@ -125,7 +127,7 @@ const FRAGMENT = `
           // the wrought-iron rail of the first floor, in front of the tall windows
           float rail = step(abs(row - 1.0), 0.5) * step(0.32, wy) * step(wy, 0.95) * step(fx, 0.85) * hasRow * step(0.5, h1(seed * 19.0));
           float railBars = step(0.5, fract(vInfo.x * 5.0)) * 0.55 + step(abs(wy - 0.9), 0.04) * 0.6;
-          albedo = mix(albedo, vec3(0.1, 0.11, 0.12), rail * clamp(railBars, 0.0, 1.0) * step(0.45, wy) * 0.85);
+          albedo = mix(albedo, vec3(0.1, 0.11, 0.12), rail * clamp(railBars, 0.0, 1.0) * step(0.45, wy) * 0.85 * rich);
           // the ground floor: grooves of the rustication, a door, or the shopfront
           float groove = groundRow * step(abs(fract(v / 0.55) - 0.5), 0.02) * (1.0 - shopFloor);
           albedo *= 1.0 - 0.1 * groove;
@@ -151,7 +153,7 @@ const FRAGMENT = `
         albedo *= 0.9 + 0.2 * grain;
         albedo = mix(albedo, albedo * vec3(0.6, 0.58, 0.56), 1.0 - smoothstep(0.3, 0.75, v));
         albedo *= 1.0 - 0.18 * smoothstep(0.55, 0.9, grain2) * (1.0 - smoothstep(0.0, 5.0, v));        // the damp streaks low on the wall
-        if (uDetail > 0.5 && eave > 2.2 && vDist < 140.0) {
+        if (uDetail > 0.25 && eave > 2.2 && vDist < 140.0) {
           float cells = max(1.0, floor(len / 2.7)), cw = len / cells;
           float cu = vInfo.x / cw, fi = floor(cu), dx = (fract(cu) - 0.5) * cw;
           float rowH = 2.75, row = floor((v - 0.05) / rowH), rows = floor((eave - 0.3) / rowH);
@@ -166,11 +168,11 @@ const FRAGMENT = `
           float fx = abs(dx), fy = abs(v - vc);
           float inner = step(fx, 0.42) * step(fy, 0.62), frame = step(fx, 0.52) * step(fy, 0.72) * (1.0 - inner);
           float shut = step(0.55, h2(vec2(fi * 3.0 + row, seed * 5.0))) * step(0.52, fx) * step(fx, 0.82) * step(fy, 0.72)
-                     * (isHouse ? 1.0 : 0.0) * (1.0 - shopFloor);
+                     * (isHouse ? 1.0 : 0.0) * (1.0 - shopFloor) * rich;
           float on = hasRow * present * (1.0 - isDoor) * (1.0 - shopFloor);
           vec3 glass = mix(vec3(0.07, 0.1, 0.14), vec3(0.34, 0.44, 0.54), smoothstep(-0.6, 0.6, v - vc));
           vec3 shutterCol = mix(vec3(0.2, 0.36, 0.24), mix(vec3(0.42, 0.2, 0.16), vec3(0.3, 0.34, 0.4), step(0.5, h1(seed * 31.0))), step(0.45, h1(seed * 13.0)));
-          float bars = step(fx, 0.025) + step(fy, 0.025);
+          float bars = (step(fx, 0.025) + step(fy, 0.025)) * rich;
           albedo = mix(albedo, vec3(0.93, 0.92, 0.88), frame * on);
           albedo = mix(albedo, shutterCol, shut * on);
           albedo = mix(albedo, mix(glass, vec3(0.9, 0.9, 0.86), clamp(bars, 0.0, 1.0)), inner * on);
@@ -217,7 +219,8 @@ export function createBuildingMaterial(env, noiseTexture, quality) {
     uniforms: {
       ...env.uniforms,
       uNoise: { value: noiseTexture },
-      uDetail: { value: quality && quality.id === 'low' ? 0 : 1 },
+      // low quality is LITE, not plain: the windows and the doors of the near houses stay (a street of blank boxes was the bug); only the small parts go
+      uDetail: { value: quality && quality.id === 'low' ? LITE_DETAIL : 1 },
     },
     vertexShader: VERTEX,
     fragmentShader: FRAGMENT,
