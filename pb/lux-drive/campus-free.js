@@ -112,7 +112,41 @@ function playground(soup, ground, p) {
   soup.box(cx + 6, y, cz, 4.0, 0.25, 3.2, 0, [0.80, 0.72, 0.52], { topColor: [0.85, 0.77, 0.56] });                                                           // the sandpit
 }
 
-const DRAW = { bridge, pergola, sign: freeSign, bench, table, bin, bollard, seat, playground };
+/** A flight of wide steps over a quadrilateral [A, B, C, D] (A-B and D-C the two long edges): treads and risers rise from the lower edge to the higher one, following the ground along it. */
+function steps(soup, ground, s) {
+  const lerp = (p, q, t) => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
+  const [A, B, C, D] = s.quad;
+  const mid = (p, q) => ground((p[0] + q[0]) / 2, (p[1] + q[1]) / 2);
+  const lowFirst = mid(A, B) <= mid(D, C);
+  const [L0, L1, U0, U1] = lowFirst ? [A, B, D, C] : [D, C, A, B];
+  const rise = mid(U0, U1) - mid(L0, L1);
+  const n = Math.max(4, Math.min(24, Math.round(rise / STEP_RISE)));
+  const len = Math.hypot(L1[0] - L0[0], L1[1] - L0[1]);
+  const segs = Math.max(1, Math.ceil(len / STEP_SEGMENT));
+  for (let j = 0; j < segs; j++) {
+    const u0 = j / segs, u1 = (j + 1) / segs;
+    let yPrev = null;
+    for (let i = 0; i < n; i++) {
+      const t0 = i / n, t1 = (i + 1) / n;
+      const pa = lerp(lerp(L0, L1, u0), lerp(U0, U1, u0), t0), pb = lerp(lerp(L0, L1, u1), lerp(U0, U1, u1), t0);
+      const pc = lerp(lerp(L0, L1, u1), lerp(U0, U1, u1), t1), pd = lerp(lerp(L0, L1, u0), lerp(U0, U1, u0), t1);
+      const top = Math.max(...[pa, pb, pc, pd, lerp(pa, pc, 0.5)].map((p) => ground(p[0], p[1]))) + STEP_LIFT;
+      const y = yPrev === null ? top : Math.max(top, yPrev + STEP_MIN);
+      const yLow = yPrev === null ? Math.min(...[pa, pb].map((p) => ground(p[0], p[1]))) - 0.3 : yPrev;
+      soup.quad([pa[0], yLow, pa[1]], [pb[0], yLow, pb[1]], [pb[0], y, pb[1]], [pa[0], y, pa[1]], paint(STEP_RISER, i + j * 7, 0.03));
+      soup.quad([pa[0], y, pa[1]], [pb[0], y, pb[1]], [pc[0], y, pc[1]], [pd[0], y, pd[1]], paint(s.color, i + j * 5, 0.03));
+      yPrev = y;
+    }
+  }
+}
+
+const STEP_RISE = 0.16;                // m: a step is this high (the number of steps follows from the height of the flight)
+const STEP_SEGMENT = 14;               // m: the flight is cut into pieces this long, each follows the ground on its own
+const STEP_LIFT = 0.04;                // m: a tread lies this far over the highest ground under it
+const STEP_MIN = 0.07;                 // m: no riser is lower than this
+const STEP_RISER = [0.48, 0.47, 0.45];
+
+const DRAW = { steps, bridge, pergola, sign: freeSign, bench, table, bin, bollard, seat, playground };
 
 /** Draws one free item (a record of the bake: `k` = what it is); unknown kinds are an error (the bake and the game must agree). */
 export function drawFree(soup, ground, item) {

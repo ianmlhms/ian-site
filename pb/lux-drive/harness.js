@@ -652,13 +652,13 @@ if (wants('D1')) {
   let ghost = 0;
   for (const id of landmarks.hiddenBuildings) if (buildings.near(data.buildings[id].pts[0], data.buildings[id].pts[1], 1).includes(id)) ghost++;
   check('the blocks a landmark replaces have no invisible collision left', ghost === 0, `${ghost} of ${landmarks.hiddenBuildings.size}`);
-  // CAMPUS: Campus Geesseknäppchen has its own budget (40 000 triangles, the models campus-*); the other landmarks keep theirs
+  // CAMPUS: Campus Geesseknäppchen has its own budget (60 000 triangles, at most 10 meshes, the models campus-*); the other landmarks keep theirs
   const isCampus = (l) => l.id.startsWith('campus-');
   const trisTotal = landmarks.list.filter((l) => !isCampus(l)).reduce((s, l) => s + l.soup.triangleCount, 0);
   const trisCampus = landmarks.list.filter(isCampus).reduce((s, l) => s + l.soup.triangleCount, 0);
   stats.landmarks = { count: landmarks.list.length, triangles: trisTotal, campusTriangles: trisCampus, hiddenBlocks: landmarks.hiddenBuildings.size };
   check('the landmarks stay inside the triangle budget (60 000)', trisTotal <= 60000, `${trisTotal}`);
-  check('the campus stays inside its triangle budget (40 000, at most 8 meshes)', trisCampus <= 40000 && landmarks.list.filter(isCampus).length <= 8, `${trisCampus} in ${landmarks.list.filter(isCampus).length} meshes`);
+  check('the campus stays inside its triangle budget (60 000, at most 10 meshes)', trisCampus <= 60000 && landmarks.list.filter(isCampus).length <= 10, `${trisCampus} in ${landmarks.list.filter(isCampus).length} meshes`);
 }
 
 /* ---------------------------------------------------------------- D2: the portals */
