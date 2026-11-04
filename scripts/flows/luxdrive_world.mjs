@@ -72,11 +72,10 @@ export const flow = {
     const drive = await page.evaluate(async () => {
       const m = window.__lux;
       const before = { x: m.state().x, z: m.state().z };
-      m.setInput({ throttle: 1, brake: 0, steer: 0, handbrake: false });
-      await new Promise((r) => setTimeout(r, 3000));
+      // the physics is STEPPED (3 s of the fixed step), not timed: a machine without a GPU renders a frame a second
+      for (let i = 0; i < 180; i++) m.step(1 / 60, { throttle: 1, brake: 0, steer: 0, handbrake: false });
       const s = m.state();
       const after = { x: s.x, z: s.z, speed: s.speed, onRoad: s.onRoad, surface: s.surface };
-      m.setInput(null);
       return { before, after, moved: Math.hypot(after.x - before.x, after.z - before.z) };
     });
     h.expect(drive.moved > 8, `the car drove ${drive.moved.toFixed(1)} m`);
@@ -87,7 +86,7 @@ export const flow = {
     const cam = await page.evaluate(async () => {
       const m = window.__lux;
       let worst = 1e9;
-      for (let i = 0; i < 60; i++) {
+      for (let i = 0; i < 30; i++) {
         m.setInput({ throttle: 1, brake: 0, steer: (i % 30 < 15 ? 0.4 : -0.4), handbrake: false });
         await new Promise((r) => requestAnimationFrame(r));
         const c = m.camera.position;
@@ -102,10 +101,9 @@ export const flow = {
     const ride = await page.evaluate(async (start) => {
       const m = window.__lux;
       m.car.reset(start.x, start.z, start.heading);
-      m.setInput({ throttle: 0.7, brake: 0, steer: 0, handbrake: false });
       let minGap = 1e9, maxGap = -1e9, air = 0;
       for (let i = 0; i < 180; i++) {
-        await new Promise((r) => requestAnimationFrame(r));
+        m.step(1 / 60, { throttle: 0.7, brake: 0, steer: 0, handbrake: false });
         const st = m.state();
         const gap = st.y - m.ground.height(st.x, st.z);
         if (gap < minGap) minGap = gap;
@@ -212,10 +210,9 @@ export const flow = {
       if (seg < 0) return { found: false };
       // the car starts on the carriageway, 2 m inside the kerb, and drives across it
       m.car.reset(mx - nx * (hw - 2), mz - nz * (hw - 2), Math.atan2(nz, nx));
-      m.setInput({ throttle: 0.45, brake: 0, steer: 0, handbrake: false });
       let minGap = 1e9, maxGap = -1e9, air = 0, crossed = 0;
       for (let i = 0; i < 180; i++) {
-        await new Promise((r) => requestAnimationFrame(r));
+        m.step(1 / 60, { throttle: 0.45, brake: 0, steer: 0, handbrake: false });
         const s = m.state();
         const gap = s.y - m.ground.height(s.x, s.z);
         if (gap < minGap) minGap = gap;
@@ -312,7 +309,7 @@ export const flow = {
         // the car stands on the deck
         m.ground.hint(1e9);
         m.car.reset(mid[0], mid[1], 0);
-        for (let i = 0; i < 20; i++) await new Promise((r) => requestAnimationFrame(r));
+        for (let i = 0; i < 60; i++) { m.ground.hint(m.state().y); m.step(1 / 60, { throttle: 0, brake: 1, steer: 0, handbrake: false }); }     // stepped, not timed (see the drive step)
         const st = m.state();
         out.push({
           name, found: true, len: best.len, deck, clearance: top - terrain,
@@ -350,10 +347,10 @@ export const flow = {
       // the car sits 5 m inside the border and drives straight out of the area
       const sx = start.x + start.nx * 5, sz = start.z + start.nz * 5;
       m.car.reset(sx, sz, Math.atan2(-start.nz, -start.nx));
-      m.setInput({ throttle: 1, brake: 0, steer: 0, handbrake: false });
       let outside = 0, reached = 0;
       for (let i = 0; i < 240; i++) {
-        await new Promise((r) => requestAnimationFrame(r));
+        m.ground.hint(m.state().y);
+        m.step(1 / 60, { throttle: 1, brake: 0, steer: 0, handbrake: false });
         const s = m.state();
         if (!m.playArea.inside(s.x, s.z)) outside++;
         const d = (s.x - sx) * -start.nx + (s.z - sz) * -start.nz;    // how far it got towards the border

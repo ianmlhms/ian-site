@@ -39,6 +39,19 @@ async function shot(pose, out) {
   await page.evaluate((p) => {
     const m = window.__lux;
     if (p.car) m.car.reset(p.car[0], p.car[1], p.car[2] || 0);
+    if (p.carRoad) {                        // the nearest drivable road to a point: the car stands on it, facing along it, in its right-hand half
+      const [qx, qz] = p.carRoad, want = p.kind || null;
+      let found = null;
+      for (let r = 0; r <= 90 && !found; r += 3) {
+        for (let a = 0; a < (r ? 16 : 1) && !found; a++) {
+          const x = qx + Math.cos(a * Math.PI / 8) * r, z = qz + Math.sin(a * Math.PI / 8) * r;
+          const info = m.roadAt(x, z);
+          if (info && info.dir && !['footway', 'path', 'steps', 'cycleway', 'pedestrian'].includes(info.kind) && (!want || info.kind === want)) found = { x, z, info };
+        }
+      }
+      if (found) { const d = found.info.dir; m.car.reset(found.x, found.z, Math.atan2(d.z, d.x)); }
+      else console.error('no road near', qx, qz);
+    }
     if (p.mode === "chase") { m.setCamera(null); return; }
     const x = p.x, z = p.z;
     const y = p.y !== undefined ? p.y : m.ground.height(x, z) + (p.h || 40);

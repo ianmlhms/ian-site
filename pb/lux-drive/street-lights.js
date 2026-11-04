@@ -9,7 +9,7 @@ import { sampleDensity } from './world-map.js';
 import { ROAD } from './config.js';
 
 export const LIGHT = Object.freeze({
-  spacing: { primary: 30, secondary: 30, trunk: 32, tertiary: 34, unclassified: 36, residential: 36, living_street: 30, service: 0, pedestrian: 0 },
+  spacing: { primary: 26, secondary: 26, trunk: 30, tertiary: 28, unclassified: 32, residential: 30, living_street: 26, service: 0, pedestrian: 0 },
   minDensity: 0.045,            // the built share of the neighbourhood from which the street is lit
   clearAhead: 0.45,             // m between the foot of the lamp and the kerb
   keepOffBuildings: 0.5,        // m: a lamp never stands closer than this to a house

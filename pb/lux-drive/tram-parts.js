@@ -3,7 +3,9 @@
  * Pure geometry on a PartBuilder: the view wraps it, the Node probes can count its faces. */
 import { TRAM } from './config.js';
 
-const WHITE = [0.90, 0.92, 0.92], GREY_LOW = [0.66, 0.70, 0.72], GLASS = [0.12, 0.19, 0.26], ROOF = [0.74, 0.78, 0.80];
+/* The livery of the Luxtram (CAF Urbos 100), after the photographs: a silver-grey body, a long band of dark glass (the windows and the
+ * doors together), a dark mask round the windscreen, and the Luxtram turquoise on the chin of the nose and as a thin stripe low on the side. */
+const WHITE = [0.79, 0.82, 0.83], GREY_LOW = [0.63, 0.66, 0.68], GLASS = [0.10, 0.16, 0.22], ROOF = [0.72, 0.76, 0.78], DOOR_GLASS = [0.07, 0.12, 0.18];
 const ROOF_BOX = [0.50, 0.54, 0.57], DARK = [0.16, 0.17, 0.19], TURQUOISE = [0.04, 0.60, 0.68], TURQ_DARK = [0.03, 0.46, 0.54];
 const LAMP = [1.0, 0.95, 0.75], PAN = [0.2, 0.21, 0.23];
 const FLOOR = 0.40;                          // m: the underside of the body above the rail (the vehicle is low-floor)
@@ -30,11 +32,14 @@ function sideWalls(b, x0, x1, w, h, doors) {
       const px = x0 + ((x1 - x0) * i) / n;
       b.box(px - 0.06, px + 0.06, 1.05, 2.55, z - 0.015 * side - 0.0, z + 0.03 * side, WHITE);
     }
-    // the doors: two wide turquoise leaves, proud of the wall by a hair
+    // the doors: two wide leaves of dark glass in a silver frame (the real doors are glazed: from outside they are windows that open)
     for (const dx of doors) {
-      b.box(dx - 0.62, dx + 0.62, 0.48, 2.5, side > 0 ? z : z - 0.04, side > 0 ? z + 0.04 : z, TURQUOISE);
-      b.box(dx - 0.02, dx + 0.02, 0.55, 2.45, side > 0 ? z + 0.04 : z - 0.05, side > 0 ? z + 0.05 : z - 0.04, TURQ_DARK);
+      b.box(dx - 0.64, dx + 0.64, 0.48, 2.52, side > 0 ? z : z - 0.05, side > 0 ? z + 0.05 : z, WHITE);
+      b.box(dx - 0.56, dx + 0.56, 0.62, 2.45, side > 0 ? z + 0.04 : z - 0.06, side > 0 ? z + 0.06 : z - 0.04, DOOR_GLASS, 1);
+      b.box(dx - 0.015, dx + 0.015, 0.62, 2.45, side > 0 ? z + 0.05 : z - 0.07, side > 0 ? z + 0.07 : z - 0.05, WHITE);
     }
+    // the turquoise stripe along the foot of the side
+    b.quad([x0, 0.80, z + side * 0.004], [x1, 0.80, z + side * 0.004], [x1, 0.97, z + side * 0.004], [x0, 0.97, z + side * 0.004], TURQUOISE, 0, inside);
   }
 }
 
@@ -90,7 +95,7 @@ export function buildEndSection(b) {
   const inside = [(xn + x1) / 2, 1.8, 0];
   for (let i = 0; i < 6; i++) {
     const j = (i + 1) % 6;
-    const colour = i === 3 ? ROOF : i === 2 || i === 4 ? TURQUOISE : TURQUOISE;
+    const colour = i === 3 ? ROOF : i === 0 ? TURQUOISE : WHITE;
     b.quad([xn, A[i][1], A[i][0]], [xn, A[j][1], A[j][0]], [x1, B[j][1], B[j][0]], [x1, B[i][1], B[i][0]], colour, 0, inside);
   }
   // the front face: turquoise below the belt line, the dark windscreen above, a lamp in each lower corner

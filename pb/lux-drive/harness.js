@@ -38,6 +38,7 @@ import { WORLD, QUADTREE, CAMERA, PORTAL, TRAM } from './config.js';
 import { createTramNetwork } from './tram-network.js';
 import { createTramSim } from './tram-sim.js';
 import { placeStreetLights } from './street-lights.js';
+import { placeParkBenches } from './park-benches.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DATA = path.join(HERE, 'data');
@@ -835,6 +836,29 @@ section('H tram + lights');
   const mid = t0v.sections[2];
   const hit = sim.collide((mid.fx + mid.rx) / 2, (mid.fz + mid.rz) / 2, 1.35);
   check('the car collides with a tram', !!hit && hit.pen > 0.5, hit ? `${hit.pen.toFixed(2)} m` : 'no hit');
+  // a car that stands on the track ahead stops the vehicle (it never drives into it)
+  {
+    const sim2 = createTramSim(tramNet, TRAM);
+    const v = sim2.trams[0];
+    sim2.update(0.05);
+    for (let i = 0; i < 20 * 120 && v.mode !== 'run'; i++) sim2.update(0.05);          // wait for the doors to close: it runs
+    let blocked = null;
+    for (let i = 0; i < 20 * 60 && !blocked; i++) {
+      sim2.update(0.05);
+      if (v.mode === 'run' && v.v > 8) blocked = tramNet.tracks[v.track].at(v.s + 80, { x: 0, z: 0, dx: 0, dz: 0 });
+    }
+    let hitSeen = false, closest = Infinity;
+    if (blocked) {
+      sim2.setObstacle(blocked.x, blocked.z);
+      for (let i = 0; i < 20 * 60; i++) {
+        sim2.update(0.05);
+        const gapNow = Math.hypot(v.sections[0].fx - blocked.x, v.sections[0].fz - blocked.z);
+        closest = Math.min(closest, gapNow);
+        if (sim2.collide(blocked.x, blocked.z, 1.35)) hitSeen = true;
+      }
+    }
+    check('a vehicle brakes for a car on its track and stops before it', !!blocked && !hitSeen && closest > 4, blocked ? `closest ${closest.toFixed(1)} m` : 'no run found');
+  }
   // the street lights
   const lights = placeStreetLights({ roads: data.roads, network: net, buildings, map: maps });
   stats.streetLights = lights.count;
@@ -850,6 +874,12 @@ section('H tram + lights');
   check('no street light stands inside a house', lampInHouse === 0, `${lampInHouse}`);
   check('no street light stands in a carriageway', lampInRoad === 0, `${lampInRoad}`);
   check('every street light is inside the world', lampOut === 0, `${lampOut}`);
+  // the park benches
+  const benches = placeParkBenches({ roads: data.roads, network: net, buildings, map: maps });
+  stats.parkBenches = benches.count;
+  let benchBad = 0;
+  for (let i = 0; i < benches.count; i++) { net.carve(benches.x[i], benches.z[i], li); if (buildings.collide(benches.x[i], benches.z[i], 0.3) || li.sdCar < 0) benchBad++; }
+  check('the parks have benches (> 100), none in a house or in a carriageway', benches.count > 100 && benchBad === 0, `${benches.count} benches, ${benchBad} in a house or a road`);
 }
 
 /* ---------------------------------------------------------------- the summary */

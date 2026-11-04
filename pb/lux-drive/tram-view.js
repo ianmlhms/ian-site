@@ -7,6 +7,7 @@
  * The vehicles are three instanced meshes (the end sections, the sections with a pantograph, the plain ones): all the
  * trams of the line are three draw calls. */
 import { TRAM } from './config.js';
+import { DECK } from './decks.js';
 import { sampleWorldMap } from './world-map.js';
 import { PartBuilder } from './part-builder.js';
 import { createPartMaterial } from './part-material.js';
@@ -28,14 +29,24 @@ const COL = {
 
 const lerp3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 
-/** The ground the tram runs on: the terrain with the decks of the bridges; `ref` tells which level (a track under a bridge stays under it). */
+/** The ground the tram runs on: the terrain, or the deck of a bridge that CARRIES the track.  A deck carries the track when it runs
+ *  along it (the Pont Rouge, the viaducts); a deck that crosses over the track at an angle is a bridge the tram runs UNDER, and the
+ *  ground stays the ground there.  (Telling them apart by the direction needs no memory of the height before: a chunk of track
+ *  can be built on its own.)  (tx, tz) is the direction of the track at the point. */
+const ALIGNED = 0.42;                   // sine of the largest angle (25 degrees) between a deck and the track it carries
 function createRailGround(surface, deckNetwork) {
   const scratch = { top: 0, slope: 0, ux: 1, uz: 0, along: 0 };
-  return (x, z, ref) => {
+  return (x, z, tx, tz) => {
     const g = surface.height(x, z);
     if (!deckNetwork || deckNetwork.count === 0) return g;
-    const hit = deckNetwork.deckAt(x, z, ref, scratch);
-    return hit && hit.top > g ? hit.top : g;
+    let y = 1e9;
+    for (let k = 0; k < 3; k++) {                  // the highest deck first, then the ones below it
+      const hit = deckNetwork.deckAt(x, z, y, scratch);
+      if (!hit) break;
+      if (Math.abs(hit.ux * tz - hit.uz * tx) < ALIGNED) return hit.top > g ? hit.top : g;
+      y = hit.top - DECK.stickBelow - 0.01;
+    }
+    return g;
   };
 }
 
@@ -91,7 +102,6 @@ export function createTramView({ scene, network, sim, surface, deckNetwork, env,
     }
     const prevI = (k) => idx[Math.max(0, k - 1)], nextI = (k) => idx[Math.min(idx.length - 1, k + 1)];
     const sections = [];
-    let refY = surface.height(pts[a * 2], pts[a * 2 + 1]) + 0.6;
     let last = 0;
     for (let k = 0; k < idx.length; k++) {
       const i = idx[k];
@@ -100,13 +110,13 @@ export function createTramView({ scene, network, sim, surface, deckNetwork, env,
       const tl = Math.hypot(tx, tz) || 1; tx /= tl; tz /= tl;
       const x = pts[i * 2], z = pts[i * 2 + 1];
       const rx = -tz, rz = tx;                                                   // to the right of the travel direction
-      const yc = railGround(x, z, refY);
-      const yl = railGround(x - rx * HALF_BED, z - rz * HALF_BED, yc + 0.6), yr = railGround(x + rx * HALF_BED, z + rz * HALF_BED, yc + 0.6);
-      refY = yc + 0.6;
+      const yc = railGround(x, z, tx, tz);
+      const yl = railGround(x - rx * HALF_BED, z - rz * HALF_BED, tx, tz), yr = railGround(x + rx * HALF_BED, z + rz * HALF_BED, tx, tz);
       surface.roadInfoAt(x, z, road);
       sampleWorldMap(maps, x, z, land);
       // the tram shares the street (a slab, the rails are embedded) or runs on paving in the city; only in the open it has a grass bed
-      const onRoad = road.sdCar < 0.6 || road.sdPave < 0.3 || land.urban > 0.5;
+      const onDeck = yc - surface.height(x, z) > 0.4;                             // on a bridge: a slab, never a lawn in the air
+      const onRoad = onDeck || road.sdCar < 0.6 || road.sdPave < 0.3 || land.urban > 0.5;
       sections.push({ x, z, tx, tz, rx, rz, yc, yl, yr, onRoad, along: last });
       if (k > 0) last += Math.hypot(x - sections[k - 1].x, z - sections[k - 1].z);
       if (k % 8 === 7) yield;
@@ -157,7 +167,7 @@ export function createTramView({ scene, network, sim, surface, deckNetwork, env,
           const lat = TRAM.catenary.arm + 0.4;                                    // the pole stands this far to the right of the track, its arm reaches left over it
           const px = s0.x + s0.rx * lat, pz = s0.z + s0.rz * lat;
           if (!(surface.roadInfoAt(px, pz, road), road.sdCar < 0.3)) {            // never in a carriageway
-            const py = railGround(px, pz, s0.yc + 0.8);
+            const py = s0.yc;                                                         // the level of the track (a pole on a bridge stands on the deck)
             wire.append(poleGeom, { x: px, y: py + TRAM.lift + TRAM.railHeight, z: pz, yaw: Math.atan2(-s0.rx, -s0.rz) });
           }
         }
@@ -190,7 +200,7 @@ export function createTramView({ scene, network, sim, surface, deckNetwork, env,
           const xi = pos.x + rx * cfgInner, zi = pos.z + rz * cfgInner, xo = pos.x + rx * (cfgInner + spec.width), zo = pos.z + rz * (cfgInner + spec.width);
           surface.roadInfoAt((xi + xo) / 2, (zi + zo) / 2, road);
           if (road.sdCar < -0.2) blocked++;
-          const y = railGround(pos.x, pos.z, surface.height(pos.x, pos.z) + 1.5);
+          const y = railGround(pos.x, pos.z, pos.dx, pos.dz);
           samples.push({ xi, zi, xo, zo, y, rx, rz });
         }
         if (samples.length < 4 || blocked > samples.length * 0.35) continue;
@@ -236,7 +246,6 @@ export function createTramView({ scene, network, sim, surface, deckNetwork, env,
   /** Which instanced mesh draws section k of a vehicle, and which of its instances: [kind, local index]. */
   const last = TRAM.sections - 1;
   const slotFor = (k) => (k === 0 ? ['end', 0] : k === last ? ['end', 1] : k % 2 === 1 ? ['pan', (k - 1) / 2] : ['mid', k / 2 - 1]);
-  const refs = sim.trams.map((tram) => tram.sections.map(() => ({ f: 0, r: 0 })));
   const m4 = new THREE.Matrix4(), X = new THREE.Vector3(), Y = new THREE.Vector3(), Z = new THREE.Vector3(), T = new THREE.Vector3();
   const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
 
@@ -247,10 +256,8 @@ export function createTramView({ scene, network, sim, surface, deckNetwork, env,
         const slot = ti * perTram[kind] + local;
         if (tram.hidden) { inst[kind].setMatrixAt(slot, ZERO); continue; }
         const sec = tram.sections[k];
-        const ref = refs[ti][k];
-        if (ref.f === 0 || ref.hidden) { ref.f = surface.height(sec.fx, sec.fz) + 0.6; ref.r = surface.height(sec.rx, sec.rz) + 0.6; }
-        const yf = railGround(sec.fx, sec.fz, ref.f), yr = railGround(sec.rx, sec.rz, ref.r);
-        ref.f = yf + 0.6; ref.r = yr + 0.6;
+        const dx = sec.fx - sec.rx, dz = sec.fz - sec.rz, dl = Math.hypot(dx, dz) || 1;
+        const yf = railGround(sec.fx, sec.fz, dx / dl, dz / dl), yr = railGround(sec.rx, sec.rz, dx / dl, dz / dl);
         X.set(sec.fx - sec.rx, yf - yr, sec.fz - sec.rz);
         if (k === last) X.negate();                              // the rear end section faces backwards: its nose is the rear of the vehicle
         X.normalize();

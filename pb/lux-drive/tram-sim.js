@@ -16,6 +16,10 @@ const MIN_CURVE_SPEED = 4.5;        // m/s: the slowest curve speed (a hairpin o
 const LOOK_AHEAD = 90;              // m: how far ahead the braking for a curve looks
 const HEADWAY = 14;                 // m: the free distance two vehicles keep when the front one stands
 const STOP_MARGIN = 0.4;            // m: the vehicle is "at the stop" this close to its mark
+const OBSTACLE_LOOK = 75;           // m: how far ahead the driver sees a car on the track
+const OBSTACLE_STEP = 3;            // m between the points of the track that are tested
+const OBSTACLE_CLEAR = 2.9;         // m: a car this close to the centre line of the track is in the way (half the body + the car + a margin)
+const OBSTACLE_STOP_GAP = 9;        // m: the vehicle stops this far from the car in its way
 
 /** The speed limit of the curves along a track: [limit per CURVE_STEP metres]. */
 function curveLimits(track, maxSpeed) {
@@ -41,6 +45,7 @@ export function createTramSim(network, cfg, { vehicles = cfg.vehicles, seed = 11
   const pitch = cfg.sectionLength + cfg.gap;
   const trams = [];
   const tmp = { x: 0, z: 0, dx: 0, dz: 0 };
+  const obstacle = { active: false, x: 0, z: 0 };       // the player's car: a vehicle brakes for it when it stands on the track ahead
 
   const frontMark = (track, stopIdx) => stops[track][stopIdx].s + length / 2;     // the vehicle stands with its middle at the stop
   const limitAt = (track, s) => { const f = Math.max(0, s) / CURVE_STEP, i = Math.min(limits[track].length - 2, Math.floor(f)); return limits[track][i] * (1 - (f - i)) + limits[track][i + 1] * (f - i); };
@@ -105,6 +110,15 @@ export function createTramSim(network, cfg, { vehicles = cfg.vehicles, seed = 11
       const lim = limitAt(tram.track, tram.s + d);
       vMax = Math.min(vMax, Math.sqrt(lim * lim + 2 * cfg.decel * d));
     }
+    if (obstacle.active) {
+      for (let d = 0; d <= OBSTACLE_LOOK; d += OBSTACLE_STEP) {
+        track.at(tram.s + d, tmp);
+        if (Math.hypot(tmp.x - obstacle.x, tmp.z - obstacle.z) < OBSTACLE_CLEAR) {
+          vMax = Math.min(vMax, Math.sqrt(2 * cfg.decel * 1.4 * Math.max(0, d - OBSTACLE_STOP_GAP)));
+          break;
+        }
+      }
+    }
     const gap = gapAhead(tram);
     if (gap < Infinity) vMax = Math.min(vMax, Math.sqrt(2 * cfg.decel * Math.max(0, gap - HEADWAY)));
     tram.v = tram.v < vMax ? Math.min(vMax, tram.v + cfg.accel * dt) : Math.max(vMax, tram.v - cfg.decel * 1.5 * dt);
@@ -146,5 +160,8 @@ export function createTramSim(network, cfg, { vehicles = cfg.vehicles, seed = 11
     return best;
   }
 
-  return { trams, update, collide, length, tracks, stops, pitch };
+  /** The player's car (null: nothing in the way): the vehicles brake for it when it stands on their track. */
+  function setObstacle(x, z) { obstacle.active = x !== null; obstacle.x = x; obstacle.z = z; }
+
+  return { trams, update, collide, setObstacle, length, tracks, stops, pitch };
 }

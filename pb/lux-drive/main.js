@@ -28,6 +28,8 @@ import { createTramSim } from './tram-sim.js';
 import { createTramView } from './tram-view.js';
 import { placeStreetLights } from './street-lights.js';        // the street lights (city finish)
 import { createStreetLightView } from './street-light-view.js';
+import { placeParkBenches } from './park-benches.js';          // the benches of the parks (city finish)
+import { createBenchView } from './bench-view.js';
 import { createSolidMaterial } from './solid-material.js';
 import { createEnv, TIME_PRESETS, WEATHER_IDS } from './env.js';
 import { createChaseCamera } from './camera.js';
@@ -156,6 +158,7 @@ async function boot() {
   const tramSim = createTramSim(tramNetwork, TRAM);
   const trams = createTramView({ scene, network: tramNetwork, sim: tramSim, surface, deckNetwork, env, camera, maps });
   const streetLights = createStreetLightView({ scene, lights: placeStreetLights({ roads: data.roads, network: field.network, buildings, map: maps }), ground, env });
+  const benchView = createBenchView({ scene, benches: placeParkBenches({ roads: data.roads, network: field.network, buildings, map: maps }), ground, env });
   const model = createCarModel({ colourId: 'red', material: solid });
   scene.add(model.group);
 
@@ -286,8 +289,10 @@ async function boot() {
     terrain.update(frozenCamera ? camera.position.x : car.state.x, frozenCamera ? camera.position.z : car.state.z);
     city.update(car.state.x, car.state.z);
     trees.update(camera.position.x, camera.position.z, elapsed);
+    tramSim.setObstacle(car.state.x, car.state.z);
     trams.update(dt, camera.position.x, camera.position.z);
     streetLights.update(camera.position.x, camera.position.z);
+    benchView.update(camera.position.x, camera.position.z);
 
     // the interface
     ui.setSpeed(Math.abs(car.state.speed) * 3.6, car.state.gear);
@@ -323,7 +328,7 @@ async function boot() {
 
   // the API for the harness (the checks read the state of the game from here)
   window.__lux = {
-    trams, tramSim, tramNetwork, streetLights, scene, camera, renderer, car, env, terrain, city, trees, surface, ground, field, portals, playArea, buildings, quality: () => quality,
+    trams, tramSim, tramNetwork, streetLights, benchView, scene, camera, renderer, car, env, terrain, city, trees, surface, ground, field, portals, playArea, buildings, quality: () => quality,
     state: () => car.state,
     setInput: (o) => { scripted = o; },
     /** The harness can hold the camera at a pose of its own (null gives it back to the chase camera). */

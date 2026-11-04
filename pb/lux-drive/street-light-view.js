@@ -16,15 +16,15 @@ const POOL_RADIUS = 4.6;               // m, the pool of light on the ground
 const SMALL_SCALE = 0.8;               // the lamps of the side streets are lower
 const NIGHT_ON = 0.06;                 // the pools are drawn from this much night
 
-const POLE = [0.24, 0.28, 0.27], HEAD = [0.95, 0.90, 0.68], HOUSING = [0.30, 0.31, 0.31];
+const POLE = [0.24, 0.28, 0.27], HEAD = [1.0, 0.93, 0.68], HOUSING = [0.30, 0.31, 0.31];
 
 function lampGeometry() {
   const b = new PartBuilder();
   b.box(-0.16, 0.16, -0.05, 0.25, -0.16, 0.16, [0.36, 0.38, 0.37]);          // the foot
   b.box(-0.055, 0.055, 0.2, 6.15, -0.055, 0.055, POLE);                          // the pole
   b.box(-0.04, 0.04, 6.05, 6.2, 0.0, 1.55, POLE);                                // the arm
-  b.box(-0.16, 0.16, 5.9, 6.0, 1.05, 1.8, HEAD, 1);                              // the lit head (it keeps its colour at night)
-  b.box(-0.18, 0.18, 6.0, 6.1, 1.0, 1.85, HOUSING);                              // its cap
+  b.box(-0.22, 0.22, 5.86, 6.0, 0.95, 1.95, HEAD, 1);                            // the lit head (it keeps its colour at night)
+  b.box(-0.26, 0.26, 6.0, 6.12, 0.9, 2.0, HOUSING);                              // its cap
   return b.build(THREE);
 }
 
