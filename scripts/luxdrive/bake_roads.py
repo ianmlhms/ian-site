@@ -177,6 +177,24 @@ def geometry_of(way, nodes):
     return list(zip(e.tolist(), n.tolist()))
 
 
+# km/h of the Luxembourg zone tags (OSM maxspeed=LU:urban etc.)
+ZONE_SPEEDS = {"LU:urban": 50, "LU:rural": 90, "LU:motorway": 130, "LU:living_street": 20, "walk": 10}
+
+
+def max_speed(tags):
+    """The posted limit of a way in km/h from OSM `maxspeed` (or the slower of forward / backward), 0 = not tagged."""
+    found = []
+    for key in ("maxspeed", "maxspeed:forward", "maxspeed:backward"):
+        v = tags.get(key, "").strip()
+        if not v:
+            continue
+        if v in ZONE_SPEEDS:
+            found.append(ZONE_SPEEDS[v])
+        elif v.split(" ")[0].isdigit():
+            found.append(int(v.split(" ")[0]))
+    return min(255, min(found)) if found else 0
+
+
 def main():
     osm = json.load(open(os.path.join(RAW_DIR, "osm.json"), encoding="utf-8"))
     nodes = osm["nodes"]
@@ -356,7 +374,7 @@ def main():
             roads.append({
                 "kind": KIND_CODE[hw], "flags": flags, "layer": layer, "lanes": total_lanes,
                 "nameId": nid, "width": round(width, 2), "sidewalk": round(sw, 2),
-                "offset": round(offset, 2), "pts": pts, "id": way["id"], "highway": hw,
+                "offset": round(offset, 2), "pts": pts, "id": way["id"], "highway": hw, "maxspeed": max_speed(tags),
             })
 
     blob = bytearray()
@@ -386,6 +404,9 @@ def main():
 
     with open(os.path.join(OUT_DIR, "roads.bin"), "wb") as fh:
         fh.write(blob)
+    # the posted limits, one byte per road in the order of roads.bin (0 = not tagged): a side file, so roads.bin keeps its format
+    with open(os.path.join(OUT_DIR, "maxspeed.bin"), "wb") as fh:
+        fh.write(bytes(r["maxspeed"] for r in roads))
     with open(os.path.join(OUT_DIR, "names.json"), "w", encoding="utf-8") as fh:
         json.dump(names, fh, ensure_ascii=False, separators=(",", ":"))
 

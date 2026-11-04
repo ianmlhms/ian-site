@@ -35,7 +35,8 @@ export function isUrban(map, x, z, buildings = null) {
 
 /** The limit in km/h for a road kind in a town (`urban`) or outside (`wet` is the wetness of the weather, 0..1). */
 export function limitFor(road, urban, wet = 0) {
-  if (road.maxspeed > 0) return road.maxspeed;
+  // the posted limit wins, except that a wet motorway in Luxembourg is 110 whatever the sign says
+  if (road.maxspeed > 0) return road.maxspeed === MOTORWAY_KMH && wet > WET_FROM ? MOTORWAY_WET_KMH : road.maxspeed;
   const kind = road.kind;
   if (kind === 'motorway') return urban ? MOTORWAY_URBAN_KMH : (wet > WET_FROM ? MOTORWAY_WET_KMH : MOTORWAY_KMH);
   if (kind === 'motorway_link' || kind === 'trunk_link') return urban ? URBAN_KMH : LINK_KMH;

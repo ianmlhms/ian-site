@@ -130,7 +130,9 @@ export async function loadWorldData(read, onProgress = () => {}) {
   const far = { nx: farGrid.nx, nz: farGrid.nz, data: farGrid.data };
   onProgress(0.5, 'roads');
   const names = await json('names.json');
-  const roads = decodeRoads(await read('roads.bin'), names);
+  const limits = await read('maxspeed.bin');                // km/h per road (OSM maxspeed, 0 = not tagged), in the order of roads.bin
+  const roads = decodeRoads(await read('roads.bin'), names).map((road, i) => ({ ...road, maxspeed: limits[i] || 0 }));
+  if (limits.length !== roads.length) throw new Error(`maxspeed.bin: ${limits.length} limits for ${roads.length} roads (bake roads again)`);
   onProgress(0.65, 'bridges');
   const decks = decodeDecks(await read('decks.bin'));
   onProgress(0.7, 'canopy');
