@@ -1028,6 +1028,7 @@ if (wants('I')) {
   const li = { sdCar: 9, sdPave: 9 };
   const rng = createRng(77);
   const LATTICE_RESOLVES_HW = 2.5;
+  const TOWN_SPEED = 14, MAX_BOB = 1.5;                 // m/s (50 km/h); m/s2: the most a street may lift the body (0.15 g, a swell over a crest, not a bump).  Before the fix the median point of a way gave 1.2 and 56 % of all points more than 1.0
   const WINDOW = 10, MAX_DEV = 0.04, MAX_CROSSFALL = 0.025, MAX_KERB_DEV = 0.03;
   // the ways: carved, at ground level (layer 0, not riding over anything), long enough to hold a window; half in the town, half outside
   const urban = [], rural = [];
@@ -1038,7 +1039,7 @@ if (wants('I')) {
   }
   const pick = (list, n) => { const out = [], pool = list.slice(); while (out.length < n && pool.length) out.push(pool.splice(Math.floor(rng() * pool.length), 1)[0]); return out; };
   const ways = [...pick(urban, 100), ...pick(rural, 100)];
-  let measured = 0, worstDev = 0, worstAt = null, badWays = 0, worstFall = 0, worstFallAt = null, fallBad = 0, kerbWorst = 0, kerbBad = 0, kerbMeasured = 0, points = 0, fallMeasured = 0;
+  let measured = 0, worstDev = 0, worstAt = null, badWays = 0, worstFall = 0, worstFallAt = null, fallBad = 0, kerbWorst = 0, kerbBad = 0, kerbMeasured = 0, points = 0, fallMeasured = 0, worstAcc = 0, worstAccAt = '', bobBad = 0;
   const lineAt = (ch, d, out) => {                                     // the point of the centre line at the distance d along it
     let k = 0;
     while (k < ch.arc.length - 2 && ch.arc[k + 1] < d) k++;
@@ -1073,6 +1074,10 @@ if (wants('I')) {
       let sum = 0;
       for (let j = -WINDOW; j <= WINDOW; j++) sum += h[q + j];
       const dev = Math.abs(h[q] - sum / (2 * WINDOW + 1));
+      // what the car feels: the vertical acceleration of a body that follows the profile at the speed of a town street (h'' over a 2 m base)
+      const acc = TOWN_SPEED * TOWN_SPEED * Math.abs(h[q + 2] + h[q - 2] - 2 * h[q]) / 4;
+      if (acc > worstAcc) { worstAcc = acc; lineAt(ch, q, pt); worstAccAt = `${data.roads[ch.road].name || data.roads[ch.road].kind} at ${Math.round(pt.x)},${Math.round(pt.z)}`; }
+      if (acc > MAX_BOB) bobBad++;
       if (dev > wayWorst) wayWorst = dev;
       if (dev > worstDev) { worstDev = dev; worstAt = `${data.roads[ch.road].name || data.roads[ch.road].kind} ${Math.round(pt.x)},${Math.round(pt.z)}`; lineAt(ch, q, pt); worstAt = `${data.roads[ch.road].name || data.roads[ch.road].kind} at ${Math.round(pt.x)},${Math.round(pt.z)}`; }
       if (q % 3 === 0) {
@@ -1116,9 +1121,10 @@ if (wants('I')) {
     if (any) measured++;
     if (wayWorst > MAX_DEV) badWays++;
   }
-  stats.roadSmooth = { ways: ways.length, measuredWays: measured, points, worstDevCm: +(worstDev * 100).toFixed(2), crossfallMeasured: fallMeasured, worstCrossfallPct: +(worstFall * 100).toFixed(2), kerbWorstCm: +(kerbWorst * 100).toFixed(2) };
+  stats.roadSmooth = { ways: ways.length, measuredWays: measured, points, worstDevCm: +(worstDev * 100).toFixed(2), bobWorstMs2: +worstAcc.toFixed(2), crossfallMeasured: fallMeasured, worstCrossfallPct: +(worstFall * 100).toFixed(2), kerbWorstCm: +(kerbWorst * 100).toFixed(2) };
   check('the carved ways measured are enough (200 sampled, urban + rural, most with a clean stretch)', measured >= 150, `${measured} of ${ways.length} ways, ${points} points`);
   check(`every carved centre line is within ${MAX_DEV * 100} cm of its 20 m moving mean (no waves, no bumps; junction aprons and underpasses excepted)`, badWays === 0, `${badWays} ways over, worst ${(worstDev * 100).toFixed(2)} cm at ${worstAt}`);
+  check(`the car does not bob: the vertical acceleration at 50 km/h along the centre line is <= ${MAX_BOB} m/s2`, bobBad === 0, `${bobBad} points over, worst ${worstAcc.toFixed(2)} m/s2 at ${worstAccAt}`);
   check(`the crossfall is gentle and constant (<= ${MAX_CROSSFALL * 100} %)`, fallBad === 0 && fallMeasured > 1500, `${fallMeasured} cross sections, ${fallBad} over, worst ${(worstFall * 100).toFixed(2)} % at ${worstFallAt}`);
   check(`the kerb stands at a constant height (+-${MAX_KERB_DEV * 100} cm of ${(ROAD.kerbHeight * 100).toFixed(0)} cm)`, kerbBad === 0 && kerbMeasured > 200, `${kerbMeasured} kerbs measured, ${kerbBad} off, worst ${(kerbWorst * 100).toFixed(2)} cm`);
 }
