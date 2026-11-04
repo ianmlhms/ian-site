@@ -50,7 +50,7 @@ CONCRETE = [0.72, 0.71, 0.68]
 CONCRETE_DARK = [0.52, 0.52, 0.51]
 WHITE = [0.93, 0.92, 0.88]
 BEIGE = [0.80, 0.74, 0.60]            # Lycée Michel Rodange: beige concrete
-GLASS = [0.30, 0.42, 0.58]
+GLASS = [0.36, 0.50, 0.64]
 GLASS_DARK = [0.20, 0.27, 0.36]
 RED_FRAME = [0.70, 0.12, 0.10]
 YELLOW = [0.92, 0.76, 0.18]
@@ -132,7 +132,7 @@ building("piscine", "Piscine", "C", [
 # LYCÉE MICHEL RODANGE (OSM way 37764513): beige concrete, deep window bays with red frames and white / orange blinds,
 # brown flat roofs with solar panels (LOD2 block 21934)
 LM = 37764513
-LM_FP = {"floorH": 3.2, "pitch": 2.6, "w": 1.5, "h": 1.7, "sill": 0.75, "frame": [0.74, 0.24, 0.16], "pane": [0.22, 0.32, 0.42], "blind": [0.92, 0.90, 0.84], "blindShare": 0.45, "pier": 0.5}
+LM_FP = {"floorH": 3.2, "pitch": 2.6, "w": 1.5, "h": 1.7, "sill": 0.75, "frame": [0.62, 0.30, 0.22], "pane": [0.22, 0.32, 0.42], "blind": [0.92, 0.90, 0.84], "blindShare": 0.45, "pier": 0.5}
 def lm(key, rc, order, **kw):
     return part(key, rect(*rc), BEIGE, "punched", LM_FP, clip=True, order=order, **kw)
 fp_lm = whole(LM).buffer(0.5)
@@ -207,10 +207,10 @@ building("skate", "Skate Park Hollerich", "S", [
 # ====================================================================================================================
 # THE GROUNDS: paved squares, car parks, sports grounds (flat coloured areas draped on the terrain), their painted lines, the bus
 # shelters and the small furniture.  Polygons are traced on the orthophoto (SURVEY.md); the OSM ones are used where OSM has them.
-PAVE = [0.64, 0.64, 0.62]
-PAVE_LIGHT = [0.72, 0.72, 0.70]
-ASPHALT = [0.33, 0.34, 0.36]
-TURF = [0.20, 0.31, 0.25]
+PAVE = [0.52, 0.52, 0.50]
+PAVE_LIGHT = [0.60, 0.60, 0.58]
+ASPHALT = [0.27, 0.28, 0.30]
+TURF = [0.13, 0.22, 0.17]
 TRACK = [0.66, 0.31, 0.23]
 COURT = [0.40, 0.58, 0.53]
 LINE = [0.92, 0.92, 0.88]

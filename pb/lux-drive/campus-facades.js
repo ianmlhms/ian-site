@@ -98,7 +98,7 @@ const STYLES = {
     if (wy1 - wy0 < 0.6) return;
     quad(cell, sm - hw, sm + hw, wy0, wy1, cell.out1, paint(p.frame, cell.seed, 0.05));
     const pane = hashUnit(cell.seed) < (p.blindShare ?? 0.3) ? p.blind : p.pane;
-    quad(cell, sm - hw + 0.2, sm + hw - 0.2, wy0 + 0.2, wy1 - 0.2, cell.out2, paint(pane, cell.seed + 1, 0.06));
+    quad(cell, sm - hw + 0.13, sm + hw - 0.13, wy0 + 0.13, wy1 - 0.13, cell.out2, paint(pane, cell.seed + 1, 0.06));
   },
 
   /** Coloured cladding panels (Blumm, Gaston Thorn, ENAD): every bay is a panel of the palette, a window in some. */

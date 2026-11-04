@@ -30,6 +30,7 @@ DTM = np.load(os.path.join(WORK, "raw", "dtm4.npy"), mmap_mode="r")
 ORTHO = np.asarray(Image.open(os.path.join(REFS, "ortho_campus.jpg")).convert("RGB"))
 MIN_PART_AREA = 6.0   # m2: smaller slivers of a cut are dropped
 SIMPLIFY = 0.12       # m: collinear and doubled points of a cut are removed
+ROOF_DARKEN = 0.82    # the game's painted light brightens flat colours: the orthophoto's roof grey would read pale
 SHRINK = 1.6          # m: the roof samples keep away from the walls (the 4 m LiDAR grid blurs edges)
 
 
@@ -81,7 +82,7 @@ def ortho_color(poly):
             cols.append(ORTHO[pz, px])
     if not cols:
         return None
-    m = np.median(np.array(cols, dtype=float), axis=0) / 255.0
+    m = np.median(np.array(cols, dtype=float), axis=0) / 255.0 * ROOF_DARKEN
     return [round(float(v), 3) for v in m]
 
 

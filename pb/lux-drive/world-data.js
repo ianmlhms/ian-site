@@ -4,6 +4,7 @@ import { decodeGrid, decodeClassRle, gridChecksum } from './codec.js';
 import { decodeRoads } from './roads.js';
 import { decodeDecks } from './decks.js';
 import { restyleBuildings } from './quarters.js';
+import { withCampusTrees } from './campus-trees.js';       // CAMPUS: the trees of Campus Geesseknäppchen
 
 const DECIMETRE = 0.1;
 
@@ -152,5 +153,5 @@ export async function loadWorldData(read, onProgress = () => {}) {
   // the style of a building depends on where it stands (the stone city, the sandstone valley, the villages): quarters.js
   const buildings = restyleBuildings(decoded, places);
   onProgress(1, 'done');
-  return { info, near, far, roads, decks, canopy, classes, classInfo, buildings, lines, stops, trees, places, names };
+  return { info, near, far, roads, decks, canopy, classes, classInfo, buildings, lines, stops, trees: withCampusTrees(trees), places, names };
 }
