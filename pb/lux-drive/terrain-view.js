@@ -20,7 +20,7 @@ export function createTerrainView({ scene, surface, field, material: initialMate
   const sigCache = new Map();               // leaf key -> stitch signature, valid for the current split set (only leaves next to a changed node are recomputed)
   let last = { x: 1e9, z: 1e9 };
   let frame = 0;
-  let lastScale = quality.lodScale;
+  let lastScale = `${quality.lodScale}:${quality.protectedSize}`;       // what the current selection was made for
   const stats = { leaves: 0, built: 0, rebuilt: 0, pending: 0 };
 
   function makeGeometry(mesh) {
@@ -75,9 +75,9 @@ export function createTerrainView({ scene, surface, field, material: initialMate
    *  every call then builds from the queue for at most `budgetMs` of wall-clock time (always at least one tile), so a tile build never stacks into one long frame. */
   function update(px, pz, budgetMs = TILE_BUDGET_MS) {
     frame += 1;
-    if (Math.hypot(px - last.x, pz - last.z) > RESELECT_DISTANCE || lastScale !== quality.lodScale) {
-      lastScale = quality.lodScale;
-      const sel = selectTiles(px, pz, { previous: split, scale: quality.lodScale, maxDistance: quality.far * 1.45 });
+    if (Math.hypot(px - last.x, pz - last.z) > RESELECT_DISTANCE || lastScale !== `${quality.lodScale}:${quality.protectedSize}`) {
+      lastScale = `${quality.lodScale}:${quality.protectedSize}`;
+      const sel = selectTiles(px, pz, { previous: split, scale: quality.lodScale, protectedSize: quality.protectedSize, maxDistance: quality.far * 1.45 });
       const dirty = changedBoxes(split, sel.split);
       split = sel.split;
       last = { x: px, z: pz };

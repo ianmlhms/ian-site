@@ -26,6 +26,7 @@ const weatherChips = (g) => chipRow(g, ['random', ...WEATHER_IDS], (id) => WEATH
 const timeChips = (g) => chipRow(g, ['random', ...TIME_IDS], (id) => TIME_ICON[id], (id) => `time.${id}`);
 const langChips = (g) => LANGS.map((l) => `<button type="button" class="chip" data-group="${g}" data-value="${l}" aria-pressed="false"><span class="lbl">${LANG_NAMES[l]}</span></button>`).join('');
 const qualityChips = (g) => chipRow(g, QUALITY_IDS, () => '', (id) => (id === 'auto' ? 'set.auto' : `quality.${id}`));
+const soundChips = (g) => chip(g, 'on', '🔊', 'set.on') + chip(g, 'off', '🔇', 'set.off');
 const cameraChips = (g) => chipRow(g, CAMERA_IDS, (id) => CAMERA_ICON[id], (id) => `cam.${id}`);
 const colourDots = (g) => CAR_COLOUR_IDS.map((id) => `<button type="button" class="dot" data-group="${g}" data-value="${id}" aria-pressed="false" aria-label="${id}" style="--c:${CAR_COLOURS[id]}"></button>`).join('');
 
@@ -94,6 +95,7 @@ export function createUI({ root, lang = 'lb', onAction = () => {} }) {
           <section><h3 data-i18n="set.weather"></h3><div class="chips">${weatherChips('weather')}</div></section>
           <section><h3 data-i18n="set.time"></h3><div class="chips">${timeChips('time')}</div></section>
           <section><h3 data-i18n="set.camera"></h3><div class="chips">${cameraChips('camera')}</div></section>
+          <section><h3 data-i18n="set.sound"></h3><div class="chips">${soundChips('sound')}</div></section>
           <section><h3 data-i18n="set.colour"></h3><div class="chips dots">${colourDots('colour')}</div></section>
         </div>
         <p class="note" data-i18n="set.note"></p>
@@ -122,7 +124,7 @@ export function createUI({ root, lang = 'lb', onAction = () => {} }) {
   const q = (sel) => el.querySelector(sel);
   const all = (sel) => [...el.querySelectorAll(sel)];
   const hud = q('#hud'), toastEl = q('#toast'), chooser = q('#chooser');
-  const settings = { lang, quality: 'auto', weather: 'random', time: 'random', camera: 'chase', colour: 'red' };
+  const settings = { lang, quality: 'auto', weather: 'random', time: 'random', camera: 'chase', colour: 'red', sound: 'on' };
   let toastTimer = 0, chooserTimer = 0, chooserIdleMs = CHOOSER_IDLE_MS;
 
   /** Marks the chips of a group: the one with `value` is pressed. */

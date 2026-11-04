@@ -29,6 +29,9 @@ import { createPlayArea } from './play-area.js';
 import { buildWorldMap } from './world-map.js';
 import { createCar } from './car.js';
 import { createChaseCamera } from './camera.js';
+import { createRoadIndex, isCarRoad } from './road-index.js';
+import { createGearbox, ENGINE, squealLevel, thudLevel } from './sound-model.js';
+import { createQualityStepper } from './quality-step.js';
 import { roadDirectionAt } from './roads.js';
 import { addBuilding, createBuildingMesh, KIND } from './building-mesh.js';
 import { computeTileNodes, buildTileMesh, meshHeightAt } from './tile-mesh.js';
@@ -679,7 +682,7 @@ section('F car and camera');
     forest.collide(x, z, radius) || playArea.collide(x, z, radius);
   const start = data.places.start;
   const car = createCar({ ground, roadInfoAt: (x, z, out) => surface.roadInfoAt(x, z, out), collide, start });
-  const chase = createChaseCamera(surface, (x, z, radius) => buildings.collide(x, z, radius));
+  const chase = createChaseCamera(surface, (x, z, radius) => buildings.collide(x, z, radius) || forest.collide(x, z, radius) || portals.collide(x, z, radius));
   car.reset(start.x, start.z, start.yaw || 0);
   chase.snap(car.state);
 
@@ -698,7 +701,7 @@ section('F car and camera');
       onWay && along, r ? `${r.name || r.kind}: ${info.lat.toFixed(2)} m from the centre line of ${r.width.toFixed(2)} m` : 'no road under the start');
     stats.startRoad = r ? (r.name || r.kind) : '';
   }
-  let bad = 0, below = 0, worstBelow = 0, maxSpeed = 0, camUnder = 0, worstCam = 0;
+  let bad = 0, below = 0, worstBelow = 0, maxSpeed = 0, camUnder = 0, worstCam = 0, camInside = 0, camMinBoom = 99;
   const dt = 1 / 60;
   for (let step = 0; step < (QUICK ? 600 : 3600); step++) {
     const steer = Math.sin(step * 0.01) * 0.5;
@@ -712,6 +715,8 @@ section('F car and camera');
     const c = chase.update(s, dt, 0, step * dt);
     const cg = surface.height(c.x, c.z) + CAMERA.minClearance;
     if (c.y < cg - 0.05) { camUnder++; worstCam = Math.max(worstCam, cg - c.y); }
+    if (buildings.collide(c.x, c.z, 0.25) || forest.collide(c.x, c.z, 0.25) || portals.collide(c.x, c.z, 0.25)) camInside++;
+    camMinBoom = Math.min(camMinBoom, Math.hypot(c.x - s.x, c.z - s.z));
   }
   stats.carSteps = QUICK ? 600 : 3600;
   stats.carMaxSpeed = maxSpeed * 3.6;
@@ -720,6 +725,56 @@ section('F car and camera');
   check('the car drives (it is not stuck)', maxSpeed > 5, `max ${(maxSpeed * 3.6).toFixed(0)} km/h`);
   stats.cameraUnder = camUnder;
   check('the camera is never under the ground', camUnder === 0, `${camUnder} frames, worst ${worstCam.toFixed(2)} m`);
+  check('the chase camera is never inside a house, a tree or a tunnel portal', camInside === 0, `${camInside} frames, closest to the car ${camMinBoom.toFixed(1)} m`);
+}
+
+/* ---------------------------------------------------------------- F2: the Kaart taps, the sound numbers, the auto-step */
+section('F2 kaart, sound, auto-step');
+{
+  const index = createRoadIndex(data.roads);
+  const start = data.places.start;
+  const startHit = index.nearest(start.x, start.z, 80);
+  check('the start place has a CAR road within 80 m (the reset puts the car there)', !!startHit && isCarRoad(startHit.road), startHit ? `${startHit.road.name || startHit.road.kind} ${startHit.dist.toFixed(1)} m away` : 'none');
+  const rng = createRng(77);
+  let hits = 0, wrong = 0;
+  for (let i = 0; i < 600; i++) {
+    const hit = index.nearest(rng() * 16000, rng() * 14000, 200);
+    if (!hit) continue;
+    hits += 1; if (!isCarRoad(hit.road)) wrong += 1;
+  }
+  check('a tap on the Kaart only ever finds a car road (never footway, steps, path, cycleway, track, pedestrian, bridleway)', hits > 100 && wrong === 0, `${hits} taps found a road, ${wrong} wrong`);
+  const NOT_CAR = ['footway', 'pedestrian', 'steps', 'path', 'cycleway', 'track', 'bridleway', 'busway'];
+  let onNot = 0, onNotWrong = 0;
+  for (const seg of index.segments) {
+    if (!NOT_CAR.includes(seg.road.kind) || seg.i % 7 !== 0) continue;
+    const hit = index.nearest((seg.ax + seg.bx) / 2, (seg.az + seg.bz) / 2, 120);
+    if (!hit) continue;
+    onNot += 1; if (!isCarRoad(hit.road)) onNotWrong += 1;
+  }
+  check('a tap exactly on a non-car way lands on a car road', onNot > 100 && onNotWrong === 0, `${onNot} taps, ${onNotWrong} wrong`);
+
+  // the engine note: a gearbox that changes up, drops the revs at a change, stays between idle and the redline
+  const box = createGearbox();
+  let maxRpm = 0, minRpm = 1e9, shifts = 0, lastGear = 1, dropped = 0, prevRpm = ENGINE.idleRpm;
+  for (let step = 0; step < 60 * 14; step++) {
+    const v = Math.min(45, step / 60 * 4);
+    const g = box.update(1 / 60, v, 1);
+    maxRpm = Math.max(maxRpm, g.rpm); minRpm = Math.min(minRpm, g.rpm);
+    if (g.gear !== lastGear) { shifts += 1; if (g.rpm < prevRpm - 100) dropped += 1; lastGear = g.gear; }
+    prevRpm = g.rpm;
+  }
+  check('the gearbox of the sound changes up and the revs stay between idle and the redline', shifts >= 3 && minRpm >= ENGINE.idleRpm - 1 && maxRpm <= ENGINE.redlineRpm + 1 && lastGear >= 4, `${shifts} shifts, top gear ${lastGear}, ${minRpm.toFixed(0)}..${maxRpm.toFixed(0)} rpm`);
+  check('a gear change drops the revs', dropped >= 2, `${dropped} drops`);
+  check('the tyre squeal needs slip AND speed (no squeal at a standstill, none while the grip holds)', squealLevel(0.5, 0.5) === 0 && squealLevel(0, 20) === 0 && squealLevel(0.5, 15) > 0.9 && squealLevel(0.5, 15, false) === 0, `${squealLevel(0.5, 15).toFixed(2)}`);
+  check('the thud grows with the speed into the wall, none for a touch', thudLevel(1) === 0 && thudLevel(4) < thudLevel(12) && thudLevel(12) <= 1, `${thudLevel(4).toFixed(2)} / ${thudLevel(12).toFixed(2)}`);
+
+  // the auto-step: slow frames drop the game to low within a few seconds
+  for (const [ms, limit] of [[35, 10], [60, 7]]) {
+    const s = createQualityStepper({ initial: 'high', max: 'high' });
+    let t = 0, lowAt = null;
+    for (; t < 30 && lowAt === null; t += ms / 1000) if (s.frame(ms / 1000) === 'low') lowAt = t;
+    check(`the auto-step reaches low within ${limit} s of ${ms} ms frames`, lowAt !== null && lowAt <= limit, lowAt === null ? 'never' : `${lowAt.toFixed(1)} s`);
+  }
 }
 
 /* ---------------------------------------------------------------- G: render == physics */

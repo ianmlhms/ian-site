@@ -14,8 +14,8 @@ import { createPartMaterial } from './part-material.js';
 import { buildMiddleSection, buildEndSection, buildPole, buildShelter } from './tram-parts.js';
 
 const THREE = window.THREE;
-const BUILD_RADIUS = 760;           // m: a chunk is built when the camera is this close
-const SHOW_RADIUS = 700;            // m: and drawn while it is this close
+const DEFAULT_SHOW_RADIUS = 700;    // m: a chunk of track is drawn while the camera is this close (the quality level sets it: quality.railRadius)
+const BUILD_MARGIN = 60;            // m: and built a little earlier, so it is there when it is needed
 const BUDGET_MS = 3.0;              // ms of building per frame
 const SECTION_STEP = 2;             // m between the cross sections of the track mesh
 const WIRE_STEP = 4;                // m between the points of the contact wire
@@ -50,7 +50,7 @@ function createRailGround(surface, deckNetwork) {
   };
 }
 
-export function createTramView({ scene, network, sim, surface, deckNetwork, env, camera, maps, props }) {
+export function createTramView({ scene, network, sim, surface, deckNetwork, env, camera, maps, props, quality = {} }) {
   const material = createPartMaterial(env);
   const bedMaterial = createPartMaterial(env, { offset: -2 });
   const railGround = createRailGround(surface, deckNetwork);
@@ -284,10 +284,11 @@ export function createTramView({ scene, network, sim, surface, deckNetwork, env,
     frame++;
     // the chunks: show the near ones, build the nearest unbuilt one(s) within the time budget
     let wanted = null, wantedD = Infinity;
+    const showRadius = quality.railRadius || DEFAULT_SHOW_RADIUS, buildRadius = showRadius + BUILD_MARGIN;
     for (const c of chunks) {
       const d = Math.hypot(c.cx - camX, c.cz - camZ) - c.radius;
-      if (c.mesh) { const vis = d < SHOW_RADIUS; for (const m of c.mesh) m.visible = vis; }
-      else if (c.state === 'idle' && d < BUILD_RADIUS && d < wantedD) { wanted = c; wantedD = d; }
+      if (c.mesh) { const vis = d < showRadius; for (const m of c.mesh) m.visible = vis; }
+      else if (c.state === 'idle' && d < buildRadius && d < wantedD) { wanted = c; wantedD = d; }
     }
     const t0 = performance.now();
     if (wanted && !chunks.some((c) => c.state === 'building')) { wanted.state = 'building'; wanted.job = buildChunk(wanted); }

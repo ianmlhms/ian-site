@@ -12,14 +12,19 @@ const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const lerp = (a, b, t) => a + (b - a) * t;
 const smoothstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 
+/**
+ * @param surface the ground (height, and overheadAt for the bridge decks above the car)
+ * @param collide (x, z, radius) => { nx, nz, pen } | null: anything the lens must not sit in (houses, trees, tunnel portals)
+ */
 export function createChaseCamera(surface, collide = null) {
   let yaw = null;                       // the smoothed heading the camera sits behind
   let fovNow = CAMERA.fov;
   let height = null;
+  let boomShare = 1;                    // the share of the boom that is free: it drops at once at an obstacle and grows back slowly
   const out = { x: 0, y: 0, z: 0, tx: 0, ty: 0, tz: 0, fov: CAMERA.fov, shake: 0, boom: CAMERA.followDistance };
 
   /** Reset (respawn / start): snap behind the car. */
-  function snap(state) { yaw = state.heading; height = null; }
+  function snap(state) { yaw = state.heading; height = null; boomShare = 1; }
 
   /**
    * state: { x, y, z, heading, vx, vz, vy, speed, roll, grounded }
@@ -49,6 +54,20 @@ export function createChaseCamera(surface, collide = null) {
       const px = lerp(eyeX, wantX, u), pz = lerp(eyeZ, wantZ, u), py = lerp(eyeY, wantY, u);
       if (py < surface.height(px, pz) + 0.45) t = Math.min(t, (k - 1) / CAMERA.clearanceProbe);
     }
+    // the obstacles: houses, trees and tunnel portals on the boom, and the deck of a bridge the car drives under (the lens must
+    // stay below it).  The boom is cut before the first one, but never shorter than minBoom (then the push-out below takes over).
+    const boom = Math.hypot(wantX - eyeX, wantZ - eyeZ) || 1;
+    const minT = Math.min(1, CAMERA.minBoom / boom);
+    for (let k = 1; k <= CAMERA.occlusionProbe; k++) {
+      const u = k / CAMERA.occlusionProbe;
+      if (u > t) break;
+      const px = lerp(eyeX, wantX, u), pz = lerp(eyeZ, wantZ, u), py = lerp(eyeY, wantY, u);
+      const blocked = (collide && collide(px, pz, CAMERA.bodyRadius)) || (surface.overheadAt && py > surface.overheadAt(px, pz, carY + 0.9) - CAMERA.deckClearance);
+      if (blocked) { t = Math.max(minT, Math.min(t, (k - 1) / CAMERA.occlusionProbe)); break; }
+    }
+    // the boom shortens at once and grows back gently, so the camera never pops in and out along a row of trees
+    boomShare = t < boomShare ? t : boomShare + (t - boomShare) * Math.min(1, dt * CAMERA.boomRelax);
+    t = Math.min(t, boomShare);
     const cx = lerp(eyeX, wantX, t), cz = lerp(eyeZ, wantZ, t);
     const floor = surface.height(cx, cz) + CAMERA.minClearance;
     let py = Math.max(lerp(eyeY, wantY, t), floor);
@@ -61,6 +80,10 @@ export function createChaseCamera(surface, collide = null) {
       }
     }
     py = Math.max(py, surface.height(px, pz) + CAMERA.minClearance);
+    if (surface.overheadAt) {            // under a bridge: never above the underside of the deck (the ground floor wins when the headroom is tiny)
+      const ceiling = surface.overheadAt(px, pz, carY + 0.9) - CAMERA.deckClearance;
+      if (py > ceiling) py = Math.max(ceiling, surface.height(px, pz) + CAMERA.minClearance);
+    }
     out.x = px; out.y = py; out.z = pz;
     out.tx = state.x + cy * CAMERA.lookAhead; out.tz = state.z + sy * CAMERA.lookAhead; out.ty = carY + CAMERA.lookHeight;
     if (mode === 1) {                  // the bonnet camera: the eye over the hood, looking down the road
