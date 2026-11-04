@@ -110,6 +110,7 @@ export const flow = {
     const ride = await page.evaluate(async (start) => {
       const m = window.__lux;
       m.car.reset(start.x, start.z, start.heading);
+      m.setInput({ throttle: 0.7, brake: 0, steer: 0, handbrake: false });
       let minGap = 1e9, maxGap = -1e9, air = 0;
       await simSeconds(m, 3, () => {
         const st = m.state();
@@ -218,6 +219,7 @@ export const flow = {
       if (seg < 0) return { found: false };
       // the car starts on the carriageway, 2 m inside the kerb, and drives across it
       m.car.reset(mx - nx * (hw - 2), mz - nz * (hw - 2), Math.atan2(nz, nx));
+      m.setInput({ throttle: 0.45, brake: 0, steer: 0, handbrake: false });
       let minGap = 1e9, maxGap = -1e9, air = 0, crossed = 0;
       await simSeconds(m, 3, () => {
         const s = m.state();
@@ -354,6 +356,7 @@ export const flow = {
       // the car sits 5 m inside the border and drives straight out of the area
       const sx = start.x + start.nx * 5, sz = start.z + start.nz * 5;
       m.car.reset(sx, sz, Math.atan2(-start.nz, -start.nx));
+      m.setInput({ throttle: 1, brake: 0, steer: 0, handbrake: false });
       let outside = 0, reached = 0;
       await simSeconds(m, 4, () => {
         const s = m.state();
