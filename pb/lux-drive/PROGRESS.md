@@ -726,4 +726,19 @@ marked hooks only.
 
 ### Gates (cloud container, software WebGL: 3 frames a second)
 
-Results are recorded at the end of this section (see "Gate results").
+
+| gate | result |
+|---|---|
+| `node pb/lux-drive/harness.js` | **PASS - 44 checks passed, 0 failed** (212 s); 0 road ends in nowhere, 0 houses floating / buried / inside each other, 0 decks floating, 0 trees in a house or on the road, the car stays finite and on the ground, the camera never under the ground |
+| `node scripts/flows/luxdrive_world.mjs` | **PASS** (cloud): the start on Av. J.F. Kennedy, the car drives 27.6 m / 60 km/h, the paint follows the real width, kerb ridden without flying, bridges solid, the edge of the area holds, **draw calls low 42 / medium 51 / high 54** (the brief: medium <= 260), triangles 154k / 174k / 201k |
+| `node scripts/flows/luxdrive_holes.mjs` | **PASS** - 0 hole pixels over 72 poses, >= 126 tiles at every pose, the detector self-test sees 42 741 hole pixels with one tile removed |
+| `node scripts/flows/luxdrive_ui.mjs` (new) | **PASS** - menus, languages (live), Random default for weather + time, chooser in the menu and in the game, the pause freezes the car, rain / fog change grip / view, touch at 1180x820 and 1024x768 (sizes, multi-touch with 2 and 3 fingers, no scroll / zoom), map + three teleports (on the carriageway, along the road, grounded), the quality stepper (down, never above the choice, no oscillation, hitches ignored), the car (4 wheels turn, front ones steer, brake lights, headlights at night, 8 draw calls), handling (no spin, no flip, handbrake slide, reverse, pace by limit, braking 7.4 m dry / 9.7 m wet from 50 km/h), a wedged car is put back on a road, no console errors |
+
+Measured by the gates (and fixed on the way): the brake pedal reversed only while |v| < 0.7 m/s; the teleport put the car into a
+tunnel portal wall (the collision then threw it 7 m off a bridge deck); the old flow loops counted frames (10x too far on a slow
+renderer).  The flows count game seconds now (`window.__lux.clock()`).  Pictures and an honest list of what still looks wrong:
+`reports-cloud/lux-drive/lux-drive-ui/REPORT.md`.
+
+**New files:** `road-index.js`, `basemap.js`, `fullmap.js`, `placement.js`, `speed-limit.js`, `quality-step.js`,
+`scripts/flows/luxdrive_ui.mjs`.  **Rewritten:** `ui.js`, `ui.css`, `input.js`, `minimap.js`, `car-model.js`, `i18n.js`.
+**Changed:** `car.js`, `config.js` (CAR), `main.js` (wiring), `lux-drive.html` (viewport, `?v=`), `scripts/flows/luxdrive_world.mjs`.
