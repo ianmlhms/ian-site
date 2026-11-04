@@ -108,15 +108,6 @@ export const flow = {
       const s = net.samples;
       const info = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, lines: 0, lanes: 0, s: 0 };
       const st = m.state();
-      // the samples of the network in a grid of 32 m cells, so that the neighbourhood of a sample is found fast
-      const CELL = 32;
-      const grid = new Map();
-      const key = (cx, cz) => cx * 8192 + cz;
-      for (let i = 0; i < s.x.length; i++) {
-        const k = key(Math.floor(s.x[i] / CELL), Math.floor(s.z[i] / CELL));
-        const list = grid.get(k);
-        if (list) list.push(i); else grid.set(k, [i]);
-      }
       const rows = [];
       for (let ri = 0; ri < net.roads.length && rows.length < 14; ri++) {
         const r = net.roads[ri];
@@ -129,8 +120,10 @@ export const flow = {
         const raw = r.pts || [];
         if (raw.length > 2 && Math.hypot(raw[0][0] - raw[raw.length - 1][0], raw[0][1] - raw[raw.length - 1][1]) < 12) continue;
         // The width of the tarmac: the run of points AROUND the centre line that the way paints as its own
-        // carriageway.  The run has to END at the edge of the ribbon: where another way takes the paint over the
-        // sample is not measured (a junction has no width), and a run that never ends is a blob.
+        // carriageway.  The walk has to END at the edge of the ribbon, and that is what rejects the places
+        // where the width of the way says nothing: where another way takes the paint over the sample (a
+        // junction has no width) and where the walk runs on (the corner of a loop, a blob).  A sample that
+        // cannot be measured is not measured: it is left out, not guessed.
         const band = (i) => {
           const ax = s.x[Math.max(first, i - 1)], az = s.z[Math.max(first, i - 1)];
           const bx = s.x[Math.min(first + count - 1, i + 1)], bz = s.z[Math.min(first + count - 1, i + 1)];
@@ -151,24 +144,12 @@ export const flow = {
           if (up <= 0 || down <= 0) return 0;
           return up + down;
         };
-        // the samples of the way that stand clear of every other way: at a junction the bands merge
+        // the samples of the way that stand near the player: the paint of the roads far away is the same
+        // paint, but the ones under the eyes are the ones the player judges
         const bands = [];
         for (let i = first; i < first + count; i++) {
           const x = s.x[i], z = s.z[i];
           if (Math.hypot(x - st.x, z - st.z) > 700) continue;
-          let near = false;
-          const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
-          for (let dz = -1; dz <= 1 && !near; dz++) {
-            for (let dx = -1; dx <= 1 && !near; dx++) {
-              const list = grid.get(key(cx + dx, cz + dz)) || [];
-              for (const j of list) {
-                if (j >= i - 2 && j <= i + 2) continue;             // the way itself, here
-                if (Math.abs(s.x[j] - x) > 30 || Math.abs(s.z[j] - z) > 30) continue;
-                if (Math.hypot(s.x[j] - x, s.z[j] - z) < 25) { near = true; break; }
-              }
-            }
-          }
-          if (near) continue;
           const b = band(i);
           if (b > 0) bands.push(b);
         }
