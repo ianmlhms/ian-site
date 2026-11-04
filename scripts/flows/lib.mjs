@@ -57,6 +57,11 @@ async function importPlaywright() {
 }
 
 function cachedChromiumPaths(fullChromium = false) {
+  // Linux cloud sessions (Claude Code on the web): the preinstalled Chromium of the image, found next to the node tools
+  if (process.platform === "linux") {
+    const linux = ["/opt/pw-browsers/chromium/chrome-linux64/chrome", "/opt/pw-browsers/chromium-1243/chrome-linux64/chrome"].filter((file) => fs.existsSync(file));
+    if (linux.length) return linux;
+  }
   const base = path.join(os.homedir(), "Library/Caches/ms-playwright");
   if (!fs.existsSync(base)) return [];
   const found = [];
@@ -70,13 +75,18 @@ function cachedChromiumPaths(fullChromium = false) {
   return found.filter((file) => fs.existsSync(file));
 }
 
+/* Software WebGL for a machine without a GPU (Linux cloud sessions): the WebGL games render in SwiftShader. */
+function linuxGlArgs() {
+  return process.platform === "linux" ? ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] : [];
+}
+
 export async function launchBrowser({ fullChromium = false } = {}) {
   const { chromium } = await importPlaywright();
   const errors = [];
   // WebGL flows need Chromium's full headless compositor. Headless Shell forces
   // SwiftShader on macOS and can stall rendering/input for tens of seconds.
   const attempts = fullChromium
-    ? [...cachedChromiumPaths(true).map(executablePath => ({ executablePath })), { channel: "chromium" }, { channel: "chrome" }, {}]
+    ? [...cachedChromiumPaths(true).map(executablePath => ({ executablePath, args: linuxGlArgs() })), { channel: "chromium" }, { channel: "chrome" }, { args: linuxGlArgs() }]
     : [{}, ...cachedChromiumPaths().map(executablePath => ({ executablePath })), { channel: "chrome" }];
   for (const opts of attempts) {
     // --mute-audio: the games' sound must never play on the machine running the tests

@@ -21,10 +21,12 @@ export function createCar({ ground, roadInfoAt, collide = null, start = null }) 
     x: 0, y: 0, z: 0, heading: 0, vx: 0, vz: 0, vy: 0,
     speed: 0,               // the forward speed (m/s), signed
     steer: 0,               // the road wheel angle (rad)
-    roll: 0, pitch: 0,      // the attitude of the body
+    roll: 0, pitch: 0,      // the attitude of the car on the slope (rad)
+    squat: 0, lean: 0,      // the movement of the body on its suspension (rad)
     grounded: true, slip: 0, bump: 0,
     onRoad: false, surface: 'grass', speedLimit: CAR.maxSpeed, gear: 0, rpm: 0.1,
     crashed: false, crashTime: 0,
+    braking: false, reversing: false, longAccel: 0,    // for the brake lights and the reversing lights of the model
   };
   const info = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, surface: 0, road: -1, lines: 0, lanes: 0, s: 0 };
   const normal = { x: 0, y: 1, z: 0 };
@@ -37,7 +39,7 @@ export function createCar({ ground, roadInfoAt, collide = null, start = null }) 
     state.vx = 0; state.vz = 0; state.vy = 0; state.speed = 0; state.steer = 0;
     state.y = ground.height(x, z) + CAR.rideHeight;
     state.grounded = true; state.crashed = false; state.crashTime = 0;
-    state.roll = 0; state.pitch = 0;
+    state.roll = 0; state.pitch = 0; state.squat = 0; state.lean = 0;
     steerAngle = 0;
     accumulator = 0;
     return state;
@@ -54,10 +56,19 @@ export function createCar({ ground, roadInfoAt, collide = null, start = null }) 
     const surfaceName = onRoad ? (SURFACE_NAMES[info.surface] || 'asphalt') : 'grass';
     const surf = SURFACES[surfaceName] || SURFACES.asphalt;
     const limitShare = onRoad ? (kindInfo(kindName).speed || 0.5) : 0.4;      // off the roads the car is slow
-    const topSpeed = CAR.maxSpeed * limitShare;
+    const classTop = CAR.maxSpeed * limitShare;
+    // the speed limit of the road (the sign in the HUD) sets the pace: the car tops out at CAR.limitOvershoot times the limit,
+    // so a street of 50 km/h is a street for 30-80 km/h, and the motorway is still the place for the top speed
+    const limitMps = (input.limitKmh || 0) / 3.6;
+    const topSpeed = onRoad && limitMps > 0 ? Math.min(classTop, limitMps * CAR.limitOvershoot) : classTop;
 
     // --- steering: the road wheel follows the input, its authority falls with the speed
-    const steerLimit = CAR.steerMax / (1 + Math.abs(state.speed) / CAR.steerSpeedRef);
+    // The authority also falls with the speed so that full lock never asks for more sideways acceleration than the tyres give
+    // (a keyboard is all or nothing: without this cap full lock at 90 km/h spins the car).
+    const speedAbs = Math.abs(state.speed);
+    const gripNow = surf.grip * (input.gripScale === undefined ? 1 : input.gripScale);
+    const lateralCap = Math.atan((CAR.steerGripShare * gripNow * GRAVITY * CAR.wheelbase) / Math.max(speedAbs * speedAbs, 1));
+    const steerLimit = Math.min(CAR.steerMax / (1 + speedAbs / CAR.steerSpeedRef), Math.max(lateralCap, CAR.steerMin));
     const steerTarget = clamp(input.steer || 0, -1, 1) * steerLimit;
     steerAngle = approach(steerAngle, steerTarget, CAR.steerRate * steerLimit * dt);
     state.steer = steerAngle;
@@ -67,7 +78,8 @@ export function createCar({ ground, roadInfoAt, collide = null, start = null }) 
     let vl = -state.vx * sy + state.vz * cy;        // to the right
     const handbrake = input.handbrake ? 1 : 0;
     // the tyres hold the car sideways, up to the limit of the friction circle
-    const grip = surf.grip * (input.gripScale === undefined ? 1 : input.gripScale);
+    // the handbrake locks the rear wheels: the car keeps its direction of travel and the tail steps out (a drift)
+    const grip = gripNow * (handbrake ? CAR.handbrakeGrip : 1);
     const latLimit = grip * GRAVITY * dt;
     let slip = 0;
     if (Math.abs(vl) <= latLimit) {
@@ -80,11 +92,13 @@ export function createCar({ ground, roadInfoAt, collide = null, start = null }) 
     // --- the drive: the power divided by the speed, so the car pulls away strongly and tops out
     const throttle = clamp(input.throttle || 0, 0, 1);
     const brake = clamp(input.brake || 0, 0, 1);
-    const reversing = brake > 0 && Math.abs(vf) < 0.7 && throttle < 0.05;
+    // The brake pedal reverses the car once it is (nearly) standing - and keeps reversing while it rolls backwards (the old test on
+    // |vf| < 0.7 stopped the car at 0.7 m/s backwards: the brake took over and a wedged car could never get out)
+    const reversing = brake > 0 && vf < 0.7 && throttle < 0.05;
     let drive = 0;
     if (throttle > 0) {
       drive = (CAR.power * throttle) / Math.max(Math.abs(vf), 8) / CAR.mass;
-      drive = Math.min(drive, 9);                                                // no rocket launch
+      drive = Math.min(drive, CAR.launchCap);                                    // no rocket launch
       drive *= clamp(1 - slip * 0.8, 0.25, 1);                                   // the friction circle takes from the drive
       if (vf >= topSpeed) drive = 0;                                            // the top speed of the road class
     } else if (reversing) {
@@ -95,7 +109,7 @@ export function createCar({ ground, roadInfoAt, collide = null, start = null }) 
     // --- the brakes, the engine brake, the drag, the rolling resistance and the slope
     const dir = Math.sign(vf) || 0;
     let brakeDecel = 0;
-    if (brake > 0 && !reversing) brakeDecel = CAR.brakeDecel * brake * surf.grip * (handbrake ? 1.25 : 1);
+    if (brake > 0 && !reversing) brakeDecel = CAR.brakeDecel * brake * gripNow * (handbrake ? 1.25 : 1);
     const engineBrake = throttle < 0.05 ? CAR.engineBrake : 0;
     const drag = (0.5 * CAR.airDensity * CAR.cdA * vf * Math.abs(vf)) / CAR.mass;
     const roll = surf.crr * GRAVITY * (handbrake ? 2.5 : 1);
@@ -104,37 +118,53 @@ export function createCar({ ground, roadInfoAt, collide = null, start = null }) 
     const slope = GRAVITY * normal.y * (cy * normal.x + sy * normal.z);
     const handbrakeDecel = handbrake ? CAR.handbrakeDrag * (1 - CAR.handbrakeGrip) : 0;
 
-    vf += (drive - brakeDecel * dir - drag - roll * dir - engineBrake * dir + slope - handbrakeDecel * dir) * dt;
+    const accel = drive - brakeDecel * dir - drag - roll * dir - engineBrake * dir + slope - handbrakeDecel * dir;
+    state.longAccel = accel;
+    vf += accel * dt;
     if (brake > 0 && !reversing && Math.abs(vf) < 0.25) vf = 0;
     if (vf > topSpeed * 1.15) vf = topSpeed * 1.15;                     // the limit is soft: the car can overshoot downhill
     if (vf < -CAR.maxReverse) vf = -CAR.maxReverse;
 
     // --- the yaw: the bicycle model (a car standing still does not turn)
-    const yawRate = (Math.abs(vf) > 0.15 ? (vf / CAR.wheelbase) * Math.tan(steerAngle) : 0) * (1 - slip * 0.5);
+    const yawGain = handbrake ? CAR.handbrakeYaw : 1;                                // the locked rear wheels turn the car more eagerly
+    const yawRate = (Math.abs(vf) > 0.15 ? (vf / CAR.wheelbase) * Math.tan(steerAngle) * yawGain : 0) * (1 - slip * 0.5);
     state.heading = wrapAngle(state.heading + yawRate * dt);
 
-    // --- back to the world
+    // --- back to the world.  The velocity is rebuilt in the OLD frame: turning the car does not turn the velocity with it, the
+    // angle between the two is the lateral speed the tyres have to take away next step (up to the grip: a slide beyond it).
     const ncy = Math.cos(state.heading), nsy = Math.sin(state.heading);
-    state.vx = ncy * vf - nsy * vl;
-    state.vz = nsy * vf + ncy * vl;
+    state.vx = cy * vf - sy * vl;
+    state.vz = sy * vf + cy * vl;
     state.x += state.vx * dt;
     state.z += state.vz * dt;
 
     // --- the collisions: the buildings and the play area push the car back
+    // The body is two circles (the nose and the tail), not one at the centre: a 4.4 m car with one circle of 1.35 m drives its
+    // bonnet into a wall.  Walls push along the normal only, so the car slides along a wall instead of sticking to it.
     if (collide) {
-      for (let pass = 0; pass < 2; pass++) {
-        const hit = collide(state.x, state.z, CAR.bodyRadius);
+      for (let pass = 0; pass < 3; pass++) {
+        let hit = null;
+        for (const offset of CAR.bodyCircles) {
+          hit = collide(state.x + ncy * offset, state.z + nsy * offset, CAR.bodyRadius);
+          if (hit) break;
+        }
         if (!hit) break;
         state.x += hit.nx * hit.pen; state.z += hit.nz * hit.pen;
         // the speed into the wall is lost, a little of it comes back as a bounce
         const into = state.vx * hit.nx + state.vz * hit.nz;
-        state.vx -= into * hit.nx * (1 + CAR.hitSpeedLoss);
-        state.vz -= into * hit.nz * (1 + CAR.hitSpeedLoss);
-        if (-into > CAR.crashSpeed && state.crashTime <= 0) { state.crashed = true; state.crashTime = CAR.respawnTime; }
+        if (into < 0) {
+          state.vx -= into * hit.nx * (1 + CAR.hitSpeedLoss);
+          state.vz -= into * hit.nz * (1 + CAR.hitSpeedLoss);
+          if (-into > CAR.crashSpeed && state.crashTime <= 0) { state.crashed = true; state.crashTime = CAR.respawnTime; }
+        }
       }
     }
+    // sliding scrubs the speed: the tyres that cannot hold the car drag it
+    if (slip > 0) { const scrub = 1 - Math.min(0.5, slip * CAR.slideScrub * dt); state.vx *= scrub; state.vz *= scrub; }
     state.speed = state.vx * ncy + state.vz * nsy;
     state.slip = slip;
+    state.braking = brake > 0.05 && !reversing && vf > 0.3;
+    state.reversing = vf < -0.3 || (reversing && brake > 0);
     state.onRoad = onRoad;
     state.surface = surfaceName;
     state.speedLimit = topSpeed;
@@ -164,14 +194,17 @@ export function createCar({ ground, roadInfoAt, collide = null, start = null }) 
         if (Math.abs(state.vy) < 0.6) { state.vy = 0; state.grounded = true; }
       }
     }
-    // the attitude of the body: it lies on the slope, it rolls into the corners
+    // The attitude: the whole car lies on the slope (pitch / roll, the wheels follow), and the body moves on its suspension
+    // on top of that (squat when the car accelerates, dive when it brakes, lean outwards in a corner).
     ground.normal(state.x, state.z, normal);
     const cy = Math.cos(state.heading), sy = Math.sin(state.heading);
     const along = normal.x * cy + normal.z * sy;
-    state.pitch = lerp(state.pitch, Math.atan2(-along, Math.max(normal.y, 0.2)), Math.min(1, dt * 8));
     const lateral = normal.x * -sy + normal.z * cy;
-    const targetRoll = clamp(-lateral * 1.6 - state.steer * Math.abs(state.speed) * 0.02, -0.35, 0.35);
-    state.roll = lerp(state.roll, targetRoll, Math.min(1, dt * 6));
+    const ny = Math.max(normal.y, 0.2);
+    state.pitch = lerp(state.pitch, Math.atan2(-along, ny), Math.min(1, dt * 8));
+    state.roll = lerp(state.roll, Math.atan2(lateral, ny), Math.min(1, dt * 6));      // positive roll leans the right side down
+    state.squat = lerp(state.squat, clamp(state.longAccel * CAR.squatGain, -CAR.squatMax, CAR.squatMax), Math.min(1, dt * 8));
+    state.lean = lerp(state.lean, clamp(-state.steer * state.speed * CAR.leanGain, -CAR.leanMax, CAR.leanMax), Math.min(1, dt * 6));
     if (state.crashTime > 0) {
       state.crashTime -= dt;
       if (state.crashTime <= 0) state.crashed = false;

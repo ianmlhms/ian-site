@@ -442,7 +442,15 @@ export function createRoadNetwork(roads, baseHeight) {
   }
 
   // ---- the query ---------------------------------------------------------
-  const scratch = { coverage: 0, bed: 0, band: 0, kerb: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, dist: 0, lines: 0, lanes: 0, s: 0, surface: 0 };
+  /** The signed distances of the paint are capped here: beyond it no road is near, and a cap that is positive on both
+   *  nodes of a quad can never put an edge in the quad (the zero crossing of a lerp needs a node on each side). */
+  const SD_FAR = 8;
+  /** The lane markings stop this far before the carriageway of a road that crosses (m past its half width), and the
+   *  roads count as crossing when their directions differ by more than this (sine): two ways that continue one street
+   *  meet end to end at a small angle and are not a junction. */
+  const MARK_CLEAR = 3.5, CROSS_SIN = 0.35, MAX_PARTNERS = 6;
+  const partnerId = new Int32Array(MAX_PARTNERS), partnerDx = new Float32Array(MAX_PARTNERS), partnerDz = new Float32Array(MAX_PARTNERS);
+  const scratch = { coverage: 0, bed: 0, band: 0, kerb: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, dist: 0, lines: 0, lanes: 0, s: 0, surface: 0, sdCar: SD_FAR, sdPave: SD_FAR, junction: 0 };
 
   const LEVEL_FULL = 4.0;           // m: a road shapes the ground that lies at its own level (within this).  A road
                                     // that stands far above the ground is a viaduct and must not fill the valley
@@ -488,6 +496,12 @@ export function createRoadNetwork(roads, baseHeight) {
     let covSum = 0, bedSum = 0;     // the paint: the coverage of the road the point is on (the tight radius) and the
                                     // flat level of a junction (the roads that meet are blended)
     let devSum = 0, devW = 0;       // the batter: how far the roads pull the ground here, and how much they claim it
+    // The UNION of the carriageways and of the pavements, as signed distances (negative = inside).  The edge of the paint
+    // is the zero of these, and a min over all the roads is continuous in the place: the lattice interpolates it into
+    // a straight line.  The offset of ONE nearest road (lat, hw, a0) jumps where the nearest road changes, and the jump
+    // was the ragged kerb and pavement the reviewer saw.
+    let sdCar = SD_FAR, sdPave = SD_FAR;
+    let partners = 0;               // the marked roads whose carriageway (plus the clearance) holds this point
     for (let dz = -1; dz <= 1; dz++) {
       for (let dx = -1; dx <= 1; dx++) {
         const list = cells.get(cellKey(cx + dx, cz + dz)) || EMPTY;
@@ -527,6 +541,14 @@ export function createRoadNetwork(roads, baseHeight) {
           // limits the slope of its face, so the face is a ramp and not a wall.
           const off = ground - bed;
           const level = notch >= 0 ? 1 : 1 - smoothstep(LEVEL_FULL, LEVEL_FADE, -off);
+          if (level >= 0.5) {                      // a road that is far from the ground here (a cutting above, a viaduct) is not painted
+            const eCar = d - HW[i], ePave = d - a0;
+            if (eCar < sdCar) sdCar = eCar;
+            if (ePave < sdPave) sdPave = ePave;
+            if (LINES[i] > 0 && eCar < MARK_CLEAR && partners < MAX_PARTNERS) {
+              partnerId[partners] = ROADOF[i]; partnerDx[partners] = ex / len; partnerDz[partners] = ez / len; partners++;
+            }
+          }
           // The length of the batter on this side of the way, interpolated along the road like the bed.
           const fadeLen = lat >= 0
             ? FADER[s0] + (FADER[s0 + 1] - FADER[s0]) * t
@@ -610,11 +632,22 @@ export function createRoadNetwork(roads, baseHeight) {
     // corridor.  Scaling the claim instead would keep the shape of the cut and only lose its weight, and the ground
     // would jump from the land to the full cut in half a metre: the wall the reviewer saw beside Rue de Kirchberg.
     out.band = devW > 0 ? ground + (1 - prot) * (devSum / devW) : ground;
+    // A junction: two marked roads of different ways that cross at an angle meet here.  The lane markings are cut
+    // before it (a dash that ends in the middle of the crossing street is the fragment the reviewer saw).
+    let junction = 0;
+    for (let a = 0; a < partners && !junction; a++) {
+      for (let b = a + 1; b < partners; b++) {
+        if (partnerId[a] !== partnerId[b] && Math.abs(partnerDx[a] * partnerDz[b] - partnerDz[a] * partnerDx[b]) > CROSS_SIN) { junction = 1; break; }
+      }
+    }
+    out.junction = junction;
     if (best < 0) {
       out.coverage = 0; out.bed = 0; out.kerb = 0; out.lat = 0; out.hw = 0; out.a0 = 0; out.kind = 0; out.road = -1;
       out.dist = Infinity; out.lines = 0; out.lanes = 0; out.s = 0; out.surface = 0;
+      out.sdCar = sdCar; out.sdPave = sdPave;
       return out;
     }
+    out.sdCar = sdCar; out.sdPave = sdPave;
     out.coverage = Math.min(1, covSum);
     out.bed = covSum > 0 ? bedSum / covSum : 0;
     out.lat = bestLat;

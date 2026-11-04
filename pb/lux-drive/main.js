@@ -6,7 +6,7 @@
  *
  * The loading screen shows the real progress (the loader API of the page) and the tiles around the car are built while the
  * first frames run, so the game starts quickly. */
-import { QUALITY, WORLD } from './config.js';
+import { QUALITY, WORLD, TRAM, CAR_COLOURS, CAR } from './config.js';
 import { loadWorldData } from './world-data.js';
 import { createHeightField } from './heightfield.js';
 import { createSurface } from './surface.js';
@@ -25,6 +25,14 @@ import { createDeckView } from './deck-view.js';
 import { createLandmarks, fixLandmarkDecks } from './landmarks.js';
 import { createLandmarkView } from './landmark-view.js';
 import { createPortalView } from './portal-view.js';
+import { createTramNetwork } from './tram-network.js';          // the Luxtram (city finish)
+import { createTramSim } from './tram-sim.js';
+import { createTramView } from './tram-view.js';
+import { placeStreetLights } from './street-lights.js';        // the street lights (city finish)
+import { createStreetLightView } from './street-light-view.js';
+import { createPropCollider } from './props.js';              // lamps, poles and benches stop the car
+import { placeParkBenches } from './park-benches.js';          // the benches of the parks (city finish)
+import { createBenchView } from './bench-view.js';
 import { createSolidMaterial } from './solid-material.js';
 import { createEnv, TIME_PRESETS, WEATHER_IDS } from './env.js';
 import { createChaseCamera } from './camera.js';
@@ -33,15 +41,27 @@ import { createCarModel } from './car-model.js';
 import { createInput } from './input.js';
 import { createUI } from './ui.js';
 import { createMinimap } from './minimap.js';
+import { createFullMap } from './fullmap.js';
+import { createRoadIndex } from './road-index.js';
+import { createBasemap } from './basemap.js';
+import { placeClear } from './placement.js';
+import { createSpeedLimit } from './speed-limit.js';
+import { createQualityStepper } from './quality-step.js';
 import { roadDirectionAt } from './roads.js';
 import { t, LANGS } from './i18n.js';
 
+const LAMP_POST_RADIUS = 0.22;        // m: a street lamp, a catenary pole (the car stops at it like at a tree)
+const BENCH_RADIUS = 0.8;             // m: a park bench
 const MAX_FRAME_S = 0.1;              // s: a long frame (a tab in the background) never jumps the car
 const LANG_KEY = 'pb_luxdrive_lang';
 const QUALITY_KEY = 'pb_luxdrive_quality';
+const COLOUR_KEY = 'pb_luxdrive_colour';
+const CAMERA_IDS = ['chase', 'far', 'bonnet'];
+const TELEPORT_REACH_M = 60;          // m: "I am stuck" looks for a road this close
+const STUCK_SECONDS = 3.5;            // s of pushing the pedal without moving before the car is put back on the road
+const STUCK_SPEED = 0.6;              // m/s
+const PLACE_MARGIN_M = 0.12;          // m: a teleport keeps this much air round the car circles (a Grund street is 6 m wide)
 const TIME_IDS = Object.keys(TIME_PRESETS);
-const WEATHER_CYCLE = ['random', ...WEATHER_IDS];
-const TIME_CYCLE = ['random', ...TIME_IDS];
 
 const readKey = (key) => { try { return localStorage.getItem(key); } catch (error) { console.warn('[luxdrive] storage blocked', error); return null; } };
 const writeKey = (key, value) => { try { localStorage.setItem(key, value); } catch (error) { console.warn('[luxdrive] storage blocked', error); } };
@@ -73,7 +93,7 @@ const reader = (base) => async (name) => {
 async function boot() {
   const loader = window.__luxLoad || { set() {}, done() {}, fail() {} };
   const canvas = document.getElementById('luxCanvas');
-  const lang = pickLang();
+  let lang = pickLang();
   document.documentElement.lang = lang;
   const tr = (key, params) => t(lang, key, params);
   const setLoad = (p, key) => loader.set(p, key ? tr(key) : '');
@@ -81,6 +101,7 @@ async function boot() {
   // ---- the quality
   let qualityId = param('q') && QUALITY[param('q')] ? param('q') : (QUALITY[readKey(QUALITY_KEY)] ? readKey(QUALITY_KEY) : autoQuality());
   let quality = { ...QUALITY[qualityId], id: qualityId };
+  const qualityPinned = !!(param('q') && QUALITY[param('q')]);        // a q= in the URL is a test or a developer: no automatic step
 
   // ---- the hole detector: the sky is switched off and the clear colour is magenta, so every pixel that
   // shows the clear colour is a place where the ground is missing (the flow scripts/flows/luxdrive_holes.mjs)
@@ -114,7 +135,7 @@ async function boot() {
   const buildings = createBuildingIndex(data.buildings, { hidden: landmarks.hiddenBuildings });
   const portals = createPortals(data.roads);
   const playArea = createPlayArea(area);
-  const maps = buildWorldMap({ classes: data.classes, classInfo: data.classInfo, canopy: data.canopy });
+  const maps = buildWorldMap({ classes: data.classes, classInfo: data.classInfo, canopy: data.canopy, buildings: data.buildings });
   // the trees: the woods (placed from the canopy) and the trees of OSM (the street trees, the trees of the parks)
   const forest = createTreeIndex({ map: maps, field, network: field.network, buildings, trees: data.trees });
 
@@ -130,7 +151,7 @@ async function boot() {
     tex.colorSpace = THREE.NoColorSpace; tex.needsUpdate = true;
     return tex;
   };
-  const worldMaps = { class: mapTexture(maps.cover, maps.nx, maps.nz), canopy: mapTexture(maps.canopy, maps.canopyNx, maps.canopyNz) };
+  const worldMaps = { class: mapTexture(maps.coverGpu, maps.nx, maps.nz), canopy: mapTexture(maps.canopy, maps.canopyNx, maps.canopyNz) };
   const env = createEnv({
     noiseTexture: textures.noise,
     params: { time: param('time') || undefined, weather: param('weather') || undefined },
@@ -151,21 +172,48 @@ async function boot() {
   const decks = createDeckView({ scene, decks: ground.decks.filter((d) => !landmarks.hiddenDecks.has(d.id)), material: solid, ground: ground.surface });
   const landmarkView = createLandmarkView({ scene, landmarks, material: solid });
   const portalView = createPortalView({ scene, portals, ground, material: solid });
-  const model = createCarModel({ colourId: 'red', material: solid });
+  // the Luxtram: the rails and the vehicles of the line (tram-network.js builds the two tracks from lines.bin, tram-sim.js runs the vehicles on them)
+  const tramNetwork = createTramNetwork(data.lines, data.stops, TRAM);
+  const tramSim = createTramSim(tramNetwork, TRAM);
+  const props = createPropCollider();                       // lamps, catenary poles and benches: small solid circles the car stops at
+  const trams = createTramView({ scene, network: tramNetwork, sim: tramSim, surface, deckNetwork, env, camera, maps, props });
+  const lamps = placeStreetLights({ roads: data.roads, network: field.network, buildings, map: maps });
+  for (let i = 0; i < lamps.count; i++) props.add(lamps.x[i], lamps.z[i], LAMP_POST_RADIUS);
+  const streetLights = createStreetLightView({ scene, lights: lamps, ground, env });
+  const parkBenches = placeParkBenches({ roads: data.roads, network: field.network, buildings, map: maps });
+  for (let i = 0; i < parkBenches.count; i++) props.add(parkBenches.x[i], parkBenches.z[i], BENCH_RADIUS);
+  const benchView = createBenchView({ scene, benches: parkBenches, ground, env });
+  const colourId = CAR_COLOURS[readKey(COLOUR_KEY)] ? readKey(COLOUR_KEY) : 'red';
+  const model = createCarModel({ colourId, material: solid });
   scene.add(model.group);
 
   // ---- the car, the camera, the interface
   const start = data.places.start || { x: WORLD.width / 2, z: WORLD.depth / 2, yaw: 0 };
   const roadInfo = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, surface: 0, road: -1, lines: 0, lanes: 0, s: 0 };
-  const collide = (x, z, radius) => buildings.collide(x, z, radius) || landmarks.collide(x, z, radius) || portals.collide(x, z, radius) || forest.collide(x, z, radius) || playArea.collide(x, z, radius);
+  const collide = (x, z, radius) => buildings.collide(x, z, radius) || landmarks.collide(x, z, radius) || portals.collide(x, z, radius) || forest.collide(x, z, radius) || tramSim.collide(x, z, radius) || props.collide(x, z, radius) || playArea.collide(x, z, radius);
   const car = createCar({ ground, roadInfoAt: (x, z, out) => surface.roadInfoAt(x, z, out), collide, start });
   const chase = createChaseCamera(ground, (x, z, radius) => buildings.collide(x, z, radius));
 
+  // the Kaart: one road index and one painted base for the minimap, the full map and the teleport
+  const roadIndex = createRoadIndex(data.roads);
+  const basemap = createBasemap({ nx: maps.nx, nz: maps.nz, classData: maps.classData });
+  const limits = createSpeedLimit(maps, buildings);
+
   const ui = createUI({ root: document.body, lang, onAction: handleAction });
-  const minimap = createMinimap({ canvas: ui.minimap, roads: data.roads, area });
+  const minimap = createMinimap({ canvas: ui.minimap, index: roadIndex, basemap, area });
+  const towns = (data.places.landmarks || []).filter((p) => p.kind === 'town');
+  const fullMap = createFullMap({
+    container: ui.mapContainer, index: roadIndex, basemap, world: WORLD, places: towns,
+    onPick: (hit) => (hit ? teleportTo(hit) : ui.setToast(tr('map.noRoad'))),
+    labels: () => ({ here: tr('map.here') }),
+  });
   const isTouch = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || navigator.maxTouchPoints > 1;
-  const input = createInput({ root: document.body, onAction: handleAction, labels: { throttle: tr('touch.throttle'), brake: tr('touch.brake'), handbrake: tr('touch.handbrake') } });
+  const touchLabels = () => ({ throttle: tr('touch.throttle'), brake: tr('touch.brake'), handbrake: tr('touch.handbrake'), steer: tr('touch.steer') });
+  const input = createInput({ root: document.body, onAction: handleAction, labels: touchLabels() });
   input.showTouchUi(isTouch);
+  const stepper = createQualityStepper({ initial: qualityId, enabled: !qualityPinned && !holeMode });
+  const fullscreenAvailable = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+  ui.setFullscreenAvailable(fullscreenAvailable);
 
   // ---- the state of the game
   let camMode = 0;
@@ -173,45 +221,113 @@ async function boot() {
   let last = performance.now();
   let elapsed = 0;
   let frames = 0;
-  let slowTime = 0;
   let showRoad = '';
   let scripted = null;
   let loadingDone = false;
+  let started = false;                 // false while the start menu is up
+  let stuckFor = 0;
+  let wasCrashed = false;
+  let lastLimit = 0;                   // km/h: the limit of the road under the car, from the last frame
+
+  const WEATHER_ICON = { clear: '☀️', cloudy: '☁️', fog: '🌫️', rain: '🌧️' };
+  const label = (group, id) => (id === 'random' ? tr('set.random') : tr(`${group}.${id}`));
+  const syncPlayState = () => input.setBlocked(ui.isBlocking());
 
   function handleAction(action, value) {
+    const id = typeof value === 'string' ? value : null;         // a keyboard action passes the event, a control passes an id
     switch (action) {
-      case 'menu': ui.showMenu(!ui.isMenuOpen()); break;
-      case 'drive': ui.showMenu(false); break;
-      case 'close': ui.showMenu(false); break;
-      case 'closeHelp': ui.showHelp(false); break;
-      case 'help': ui.showHelp(true); break;
-      case 'camera': camMode = (camMode + 1) % 3; break;
+      case 'menu': toggleMenu(); break;
+      case 'confirm': if (ui.isOpen('start')) handleAction('drive'); break;
+      case 'drive': startDriving(); break;
+      case 'resume': ui.showPause(false); syncPlayState(); break;
+      case 'settings': ui.showPause(false); ui.showSettings(true); syncPlayState(); break;
+      case 'back': ui.showSettings(false); ui.showPause(true); syncPlayState(); break;
+      case 'restart': ui.closeOverlays(); resetCar(); syncPlayState(); break;
+      case 'help': ui.showHelp(true); syncPlayState(); break;
+      case 'closeHelp': ui.showHelp(false); syncPlayState(); break;
+      case 'map': toggleMap(); break;
+      case 'closeMap': closeMap(); break;
+      case 'chooser':
+        if (ui.isBlocking() && !ui.isOpen('start')) { ui.closeOverlays(); closeMap(); }
+        if (started) ui.showChooser(!ui.isChooserOpen());
+        syncPlayState();
+        break;
+      case 'camera': setCamera(id ? CAMERA_IDS.indexOf(id) : (camMode + 1) % CAMERA_IDS.length, !id); break;
       case 'reset': resetCar(); break;
-      case 'weather': cycleWeather(); break;
-      case 'time': cycleTime(); break;
-      case 'language':
-        if (value && LANGS.includes(value)) { writeKey(LANG_KEY, value); location.reload(); }
-        break;
-      case 'quality':
-        if (value === 'auto') { writeKey(QUALITY_KEY, ''); applyQuality(autoQuality()); }
-        else if (QUALITY[value]) { writeKey(QUALITY_KEY, value); applyQuality(value); }
-        break;
+      case 'weather': chooseWeather(id); break;
+      case 'time': chooseTime(id); break;
+      case 'colour': if (CAR_COLOURS[id]) { writeKey(COLOUR_KEY, id); model.setColour(id); } break;
+      case 'language': changeLanguage(id); break;
+      case 'quality': chooseQuality(id); break;
+      case 'fullscreen': toggleFullscreen(); break;
       default: break;
     }
   }
-  function cycleWeather() {
-    const current = env.getChoice().weatherMode;
-    const next = WEATHER_CYCLE[(WEATHER_CYCLE.indexOf(current) + 1) % WEATHER_CYCLE.length];
-    env.setWeather(next);
-    ui.setWeatherValue(next);
-    ui.setToast(`${tr('hud.weather')}: ${next === 'random' ? tr('set.random') : tr(`weather.${next}`)}`);
+
+  function startDriving() {
+    if (started) { ui.closeOverlays(); syncPlayState(); return; }
+    started = true;
+    ui.closeOverlays();
+    syncPlayState();
+    if (env.getChoice().weatherId === 'rain') ui.setToast(tr('toast.wet'), 3.2);
   }
-  function cycleTime() {
-    const current = env.getChoice().timeMode;
-    const next = TIME_CYCLE[(TIME_CYCLE.indexOf(current) + 1) % TIME_CYCLE.length];
+  /** Esc / the menu button: map -> closes the map; settings and help -> back; the game -> the pause menu. */
+  function toggleMenu() {
+    if (fullMap.isOpen()) closeMap();
+    else if (ui.isOpen('help')) ui.showHelp(false);
+    else if (ui.isOpen('settings')) { ui.showSettings(false); ui.showPause(true); } else if (ui.isOpen('start')) { /* the start menu has no Esc */ } else if (ui.isOpen('pause')) ui.showPause(false);
+    else { ui.showChooser(false); ui.showPause(true); }
+    syncPlayState();
+  }
+  function toggleMap() {
+    if (!started) return;
+    if (fullMap.isOpen()) { closeMap(); return; }
+    ui.closeOverlays();
+    ui.showChooser(false);
+    fullMap.open(car.state);
+    ui.showMap(true);
+    syncPlayState();
+  }
+  function closeMap() { if (!fullMap.isOpen()) return; fullMap.close(); ui.showMap(false); syncPlayState(); }
+
+  function setCamera(mode, announce) {
+    camMode = Math.max(0, mode);
+    ui.setValue('camera', CAMERA_IDS[camMode]);
+    if (announce) ui.setToast(`${tr('hud.camera')}: ${tr(`cam.${CAMERA_IDS[camMode]}`)}`);
+  }
+  function chooseWeather(id) {
+    const cycle = ['random', ...WEATHER_IDS];
+    const next = id && cycle.includes(id) ? id : cycle[(cycle.indexOf(env.getChoice().weatherMode) + 1) % cycle.length];
+    env.setWeather(next);
+    ui.setValue('weather', next);
+    const now = env.getChoice().weatherId;
+    ui.setChooserIcon(WEATHER_ICON[now] || '⛅');
+    ui.setToast(`${tr('hud.weather')}: ${label('weather', next)}${next === 'random' ? ` (${tr(`weather.${now}`)})` : ''}`);
+    if (now === 'rain' && started) ui.setToast(tr('toast.wet'), 3);
+  }
+  function chooseTime(id) {
+    const cycle = ['random', ...TIME_IDS];
+    const next = id && cycle.includes(id) ? id : cycle[(cycle.indexOf(env.getChoice().timeMode) + 1) % cycle.length];
     env.setTime(next);
-    ui.setTimeValue(next);
-    ui.setToast(`${tr('hud.timeOfDay')}: ${next === 'random' ? tr('set.random') : tr(`time.${next}`)}`);
+    ui.setValue('time', next);
+    const now = env.getChoice().timeId;
+    ui.setToast(`${tr('hud.timeOfDay')}: ${label('time', next)}${next === 'random' ? ` (${tr(`time.${now}`)})` : ''}`);
+  }
+  function changeLanguage(next) {
+    if (!next || !LANGS.includes(next)) return;
+    lang = next;
+    writeKey(LANG_KEY, next);
+    ui.setLanguage(next);
+    input.setLabels(touchLabels());
+    showRoad = '\u0000';                      // the road name is written again in the frame
+  }
+  /** The player's choice becomes the ceiling of the auto-step. 'auto' = the quality picked for this device. */
+  function chooseQuality(id) {
+    if (id === 'auto') { writeKey(QUALITY_KEY, ''); const next = autoQuality(); stepper.choose(next); applyQuality(next); return; }
+    if (!QUALITY[id]) return;
+    writeKey(QUALITY_KEY, id);
+    stepper.choose(id);
+    applyQuality(id);
   }
   function applyQuality(id) {
     qualityId = id;
@@ -227,10 +343,51 @@ async function boot() {
     camera.updateProjectionMatrix();
     resize();
   }
-  function resetCar() {
-    car.reset(start.x, start.z, start.yaw || 0);
+  function toggleFullscreen() {
+    const doc = document, el = document.documentElement;
+    const active = doc.fullscreenElement || doc.webkitFullscreenElement;
+    const enter = el.requestFullscreen || el.webkitRequestFullscreen, leave = doc.exitFullscreen || doc.webkitExitFullscreen;
+    const call = active ? leave : enter;
+    if (!call) return;
+    Promise.resolve(call.call(active ? doc : el)).catch((error) => console.warn('[luxdrive] fullscreen refused', error));
+  }
+
+  /** Puts the car back on the ground and warms the tiles under it, so that a jump never lands on a hole. */
+  function landCar(x, z, yaw, hint) {
+    ground.hint(hint);
+    car.reset(x, z, yaw);
+    ground.hint(car.state.y);
     chase.snap(car.state);
+    terrain.buildAll(x, z);                    // every tile at once: the landing never sees a hole (one short hitch, on purpose)
+    city.update(x, z);
+    trees.update(x, z, elapsed, true);
+    stuckFor = 0;
+  }
+  function resetCar() {
+    landCar(start.x, start.z, start.yaw || 0, 1e9);
     ui.setToast(tr('toast.reset'));
+  }
+  /** True when the car at this pose would touch a house, a tunnel portal, a tree or the edge of the area. */
+  function blockedAt(x, z, yaw) {
+    const cy = Math.cos(yaw), sy = Math.sin(yaw);
+    return CAR.bodyCircles.concat(0).some((o) => !!collide(x + cy * o, z + sy * o, CAR.bodyRadius + PLACE_MARGIN_M));
+  }
+  const placeAt = (hit) => placeClear(roadIndex, hit, car.state.heading, (x, z) => surface.height(x, z), blockedAt);
+  /** A tap on the Kaart: the car stands on that road, in the right-hand lane, facing along the road - and clear of everything. */
+  function teleportTo(hit) {
+    const p = placeAt(hit);
+    landCar(p.x, p.z, p.yaw, p.hint);
+    fullMap.setCar(car.state);
+    ui.setToast(tr('map.teleport', { name: p.road.name || tr('map.unnamed') }));
+    closeMap();
+  }
+  /** The car pushes against something and does not move: back onto the nearest road. */
+  function unstick() {
+    const hit = roadIndex.nearest(car.state.x, car.state.z, TELEPORT_REACH_M);
+    if (!hit) { stuckFor = 0; return; }
+    const p = placeAt(hit);
+    landCar(p.x, p.z, p.yaw, p.hint);
+    ui.setToast(tr('toast.unstuck'));
   }
   function resize() {
     const w = canvas.clientWidth || window.innerWidth;
@@ -244,12 +401,16 @@ async function boot() {
 
   // the settings of the menu follow the stored choices
   const choice = env.getChoice();
-  ui.setWeatherValue(choice.weatherMode);
-  ui.setTimeValue(choice.timeMode);
-  ui.setQualityValue(readKey(QUALITY_KEY) || 'auto');
+  ui.setValue('weather', choice.weatherMode);
+  ui.setValue('time', choice.timeMode);
+  ui.setValue('quality', readKey(QUALITY_KEY) || 'auto');
+  ui.setValue('colour', colourId);
+  ui.setValue('camera', CAMERA_IDS[0]);
+  ui.setChooserIcon(WEATHER_ICON[choice.weatherId] || '⛅');
 
   // ---- the loop
   const lampPos = new THREE.Vector3(), lampDir = new THREE.Vector3();
+  const lights = { head: 0, night: 0 };
   let frozenCamera = null;              // the harness can hold the camera at a pose of its own
   function frame(now) {
     if (!running) return;
@@ -259,9 +420,19 @@ async function boot() {
     elapsed += dt;
     frames += 1;
 
+    // the start menu, the pause menu, the settings and the map stop the car (the world keeps drawing behind them)
+    const paused = ui.isBlocking();
     const inp = input.read(scripted);
     ground.hint(car.state.y);
-    car.update(dt, { ...inp, gripScale: env.gripScale() });
+    if (!paused) car.update(dt, { ...inp, gripScale: env.gripScale(), limitKmh: lastLimit });
+
+    // a hard hit on a building or a tree: a short "Hoppla!"
+    if (car.state.crashed && !wasCrashed) ui.setToast(tr('hud.crash'), 1.2);
+    wasCrashed = car.state.crashed;
+
+    // stuck against something: the pedal is down, the car does not move
+    if (!paused && (inp.throttle > 0.5 || inp.brake > 0.5) && Math.abs(car.state.speed) < STUCK_SPEED) stuckFor += dt; else stuckFor = 0;
+    if (stuckFor > STUCK_SECONDS) unstick();
 
     // the camera
     const c = frozenCamera || chase.update(car.state, dt, camMode, elapsed);
@@ -269,8 +440,9 @@ async function boot() {
     camera.lookAt(c.tx, c.ty, c.tz);
     if (Math.abs(camera.fov - c.fov) > 0.05) { camera.fov = c.fov; camera.updateProjectionMatrix(); }
 
-    // the car and its headlight
-    model.apply(car.state, dt);
+    // the car and its lights
+    lights.head = env.state.lamp; lights.night = env.state.night;
+    model.apply(car.state, dt, lights);
     model.headlight(car.state, lampPos, lampDir);
     env.setLamp(lampPos, lampDir);
 
@@ -281,21 +453,29 @@ async function boot() {
     terrain.update(frozenCamera ? camera.position.x : car.state.x, frozenCamera ? camera.position.z : car.state.z);
     city.update(car.state.x, car.state.z);
     trees.update(camera.position.x, camera.position.z, elapsed);
+    tramSim.setObstacle(car.state.x, car.state.z);
+    trams.update(dt, camera.position.x, camera.position.z);
+    streetLights.update(camera.position.x, camera.position.z);
+    benchView.update(camera.position.x, camera.position.z);
 
     // the interface
-    ui.setSpeed(Math.abs(car.state.speed) * 3.6, car.state.gear);
     surface.roadInfoAt(car.state.x, car.state.z, roadInfo);
-    const road = roadInfo.road >= 0 ? data.roads[roadInfo.road] : null;
+    const road = roadInfo.coverage > 0.35 && roadInfo.road >= 0 ? data.roads[roadInfo.road] : null;
+    const limit = limits.update(road, car.state.x, car.state.z, env.state.rain > 0.5 ? 1 : 0);
+    const kmhNow = Math.abs(car.state.speed) * 3.6;
+    lastLimit = limit;
+    ui.setSpeed(kmhNow, limit);
+    if (frames % 10 === 0) { ui.setLimit(limit); ui.setRain(env.state.rain); }
     const roadName = road && road.name ? road.name : '';
     if (roadName !== showRoad) { showRoad = roadName; ui.setRoad(roadName); }
     if (frames % 6 === 0) minimap.draw(car.state.x, car.state.z, car.state.heading);
+    if (fullMap.isOpen()) fullMap.setCar(car.state);
 
-    // the quality auto-step: a slow game steps the quality down (never up: that would oscillate)
-    if (dt > 0.034) slowTime += dt; else slowTime = Math.max(0, slowTime - dt * 0.5);
-    if (slowTime > 4 && qualityId !== 'low') {
-      slowTime = 0;
-      applyQuality(qualityId === 'high' ? 'medium' : 'low');
-      ui.setToast(`${tr('hud.quality')}: ${tr(`quality.${qualityId}`)}`);
+    // the quality auto-step: a slow game steps down (never above the choice of the player), a long fast stretch may step back up
+    const stepped = stepper.frame(dt);
+    if (stepped) {
+      applyQuality(stepped);
+      ui.setToast(tr('toast.quality', { q: tr(`quality.${stepped}`) }));
     }
 
     renderer.render(scene, camera);
@@ -311,13 +491,20 @@ async function boot() {
   // the game is ready: the first frames build the tiles around the car
   chase.snap(car.state);
   trees.update(car.state.x, car.state.z, 0, true);       // the first forest is built at once, behind the loading screen
-  ui.showMenu(true);
+  ui.showStart(true);
+  syncPlayState();
   requestAnimationFrame(frame);
 
   // the API for the harness (the checks read the state of the game from here)
   window.__lux = {
-    scene, camera, renderer, car, env, terrain, city, trees, landmarks, landmarkView, surface, ground, field, portals, playArea, buildings, quality: () => quality,
+    landmarks, landmarkView, trams, tramSim, tramNetwork, streetLights, benchView, scene, camera, renderer, car, env, terrain, city, trees, surface, ground, field, portals, playArea, buildings, quality: () => quality,
+    ui, fullMap, roadIndex, stepper, model, limits, input, forest, collide, placeAt, blockedAt,
+    /** The Kaart and the teleport for the flows: open the map, put the car on the road nearest to (x, z). */
+    toggleMap: () => toggleMap(), startDriving: () => startDriving(), isStarted: () => started,
+    teleportNear: (x, z, reach = 200) => { const hit = roadIndex.nearest(x, z, reach); if (hit) teleportTo(hit); return !!hit; },
     state: () => car.state,
+    /** The game clock in seconds (the frames are capped at 0.1 s): the flows count their loops in game time, not in frames. */
+    clock: () => elapsed,
     setInput: (o) => { scripted = o; },
     /** The harness can hold the camera at a pose of its own (null gives it back to the chase camera). */
     setCamera: (pose) => {
@@ -336,7 +523,7 @@ async function boot() {
         lat: roadInfo.lat, dir: dir ? { x: dir.x, z: dir.z } : null,
       };
     },
-    step: (dt, o) => car.update(dt, { ...(o || {}), gripScale: env.gripScale() }),
+    step: (dt, o) => car.update(dt, { ...(o || {}), gripScale: env.gripScale(), limitKmh: lastLimit }),
     stats: () => ({
       calls: renderer.info.render.calls, triangles: renderer.info.render.triangles,
       tiles: terrain.tiles.size, pending: terrain.stats.pending,

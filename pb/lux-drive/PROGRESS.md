@@ -694,3 +694,171 @@ World origin (found from the decks): `originE = 72192`, `originNTop = 83968`.
 | `luxdrive_holes.mjs` | **PASS: 0 hole pixels over 72 poses** (detector self-test ok) |
 
 Not done: Bock walls, Viaduc, Coque, Mudam, Grund bridge, BCEE. Details and honest problems: `reports-cloud/lux-drive/lux-drive-landmarks/REPORT.md`.
+
+## City finish — branch `lux-drive-city` (cloud session, Claude)
+
+Scope: the start, the Luxtram, the parks, street lights, the distance LOD of the city, and the look fixes of REVIEW.md items 15-16
+(+ the fields).  Worked from the shipped data only (the raw LiDAR / LOD2 / OSM `.pbf` are not in the cloud container, so no re-bake).
+
+### 1. The start: VERIFIED (the flow measures it)
+
+`luxdrive_world.mjs` runs on this machine now.  The car starts at (5924.1, 7901.9) on **Avenue John F. Kennedy** (asphalt), **1.02 m to the
+right of the centre line** of the 7.20 m carriageway (the right-hand lane), the heading equals the direction of the way (-0.236 rad, within the
+0.25 rad of the flow), 91 m from the middle of Place de l'Europe.  It is not on the plaza.
+
+### 2. Look fixes (REVIEW 15 / 16 and the fields)
+
+* **Straight kerbs and pavements.**  The ground shader used to paint the carriageway, the kerb and the pavement from the offset of ONE nearest road
+  (`lat`, `hw`, `a0`), and that offset jumps where the nearest road changes between two nodes of the lattice: the ragged blotches.  The carve now
+  also returns the signed distance to the **union** of all the carriageways (`sdCar` = min over the roads of `d - hw`) and of all the pavements
+  (`sdPave` = min of `d - a0`), only for roads that lie at the level of the ground there.  A min over the roads is continuous, the 1 m / 2 m / 4 m
+  lattices interpolate it into straight edges, and the shader cuts at its zero **per pixel** with one pixel of anti-aliasing (`fwidth`).  The
+  values travel in a new vertex attribute `aRoad3` (`sdCar`, `sdPave`, paint fade), `tile-mesh.js` / `surface.js` / `heightfield.js` carry them.
+  The cap of the distance (8 m) is positive on both nodes of a quad that no road touches, so it can never put an edge into empty ground.
+* **Markings cut before junctions.**  `carve` finds the marked roads whose carriageway (+ 3.5 m) holds the node; if two *different ways* that cross at more
+  than 20 degrees meet there (two ways that continue one street meet end to end at a small angle and are NOT a junction) the node is a junction:
+  its `mark` weight is 0 and the shader draws no lane line there (`smoothstep(0.5, 0.9, mark)` cuts it within the quad).  Dashes end cleanly in front
+  of the crossing street instead of breaking into fragments.
+* **Fields read as fields.**  The farmland is now a patchwork of **parcels** (78-128 m rectangles, turned by a different angle in every 900 m block, each with its
+  own crop: young wheat, ripe grain, ploughed earth with strong furrows, rape, stubble), a thin hedge on some borders, painted greens / yellows / browns.
+  The grey wash had a second cause: the class `urban` also covers plots that nobody has built on (112 km2 of which 37 % is `urban`).  `world-map.js` now
+  measures how built-up the 72 m neighbourhood of every class cell is (footprint area of the LOD2 buildings, a blurred raster) and the ground shader
+  only paints hard ground where the houses are (smoothstep 3 % - 10 %); an empty plot is lawn or field.  The tree placement still reads the raw class.
+* **Parks.**  The mown lawn of the class `park` has soft mowing stripes and large calm patches; the OSM footpaths of the park are painted by the road
+  paint; 594 **benches** stand beside the park paths (`park-benches.js` places them from the roads + the park class, `bench-view.js` draws the ones
+  within 170 m as one instanced mesh).
+
+### 3. The Luxtram
+
+* **The network** (`tram-network.js`, pure).  `lines.bin` kind 2 (482 ways, the real line Luxexpo - Kirchberg - Pont Rouge - Pfaffenthal - Theater - Hamilius -
+  Place de Metz - Gare - Howald - Stadion, + the Findel branch) becomes a graph.  The two **tracks** of the line (A: Luxexpo -> Stadion, B: back) are found by
+  Dijkstra between the terminal ends named by the stops; edge costs make the path stay on the right-hand rail of its direction of travel (the other track
+  of a parallel pair lies on its left) and avoid the crossovers, otherwise the shortest path hops between the two rails to cut corners and the vehicle
+  would run on the left for kilometres (the harness caught exactly that).  2 x 12.5 km, 22 stops per track, merged platform nodes.
+* **The vehicles** (`tram-sim.js`, pure).  3 CAF Urbos vehicles, 45 m, 5 articulated sections, each section is two points of the track: the vehicle is on its
+  rails by construction.  Line speed 17 m/s (61 km/h), slower in curves (lateral acceleration 1.1 m/s2), braking to stop with the middle of the vehicle at the
+  stop, 11 s with the doors open, turn-back out of sight at the terminus, a safety distance to the vehicle in front.  **A car on the track stops the vehicle**
+  (it brakes to 9 m from the car); the car also collides with the sections (capsules) like with a house.  The vehicles start at Philharmonie (30 m from the
+  start of the game), Hamilius and Gare.
+* **The track** (`tram-view.js`): built from the SAME centre lines as the vehicles, in chunks of ~300 m when the camera is within 760 m (3 ms budget per frame),
+  drawn within 700 m.  Two steel rails (7 cm head, 1.435 m gauge) in dark grooves in a 2.9 m bed; the bed is a **slab where the tram shares the street, the
+  city or a bridge**, and a **grass bed in the open** (the Kirchberg grass track).  Rails on a bridge follow the **deck that runs along them** (a deck that
+  crosses over the track at an angle is a bridge the tram runs under: the ground stays the ground), measured: Pont Rouge, Pont Adolphe.
+  **Catenary**: a pole every 38 m on the outer side with an arm and an insulator, and the contact wire at 5.6 m.  **Platforms** 46 m x 3 m x 0.28 m at all 44
+  stops, with a shelter (glass back wall, bench, Luxtram-blue stop sign), skipped where they would stand in a carriageway.
+* **The look**, after the photographs (Wikimedia Commons, `reports-cloud/lux-drive/lux-drive-city/`): silver-grey body, one long band of dark glass for
+  windows and doors, a dark windscreen, the Luxtram turquoise on the chin of the nose and as a thin stripe low on the side, pantographs on the 2nd and 4th
+  section, air-conditioning boxes, lit windows at night.  The 3 vehicles are 3 instanced draw calls in total.
+
+### 4. Street lights
+
+`street-lights.js` places **7 119+ lamps** along the urban streets (primary / secondary / tertiary / residential / living streets / trunk, 26-30 m, alternating
+sides, only where the neighbourhood is built-up, never in a carriageway, on a bridge, in a tunnel or in a house); `street-light-view.js` draws the 520
+nearest within 230 m as one instanced mesh with the head glowing at dusk and night (part material `glow`), plus one additive instanced mesh of warm light
+pools on the ground that is switched on from `uNight > 0.06`.
+
+### 5. Distance LOD of the city
+
+The building cells (256 m) up to `quality.buildingRadius` (low 300 / medium 420 / high 700 m) are painted by the full building shader (windows, shutters,
+roof tiles); the cells beyond, up to `quality.buildingFarRadius` (760 / 1300 / 2100 m), are the SAME mesh with the cheap vertex-colour material (no window
+bands, flat painted walls and roofs): a fraction of the per-pixel cost, which lets the city reach about 3x as far.  The material of a cell follows the
+distance with a 40 m hysteresis.  The walls go 2.5 m below the ground (the far cells stand on coarse terrain tiles that differ from the exact ground by a metre
+on a slope); the window rows keep their origin at the true ground.
+
+### 6. Gates (this session)
+
+| gate | result |
+|---|---|
+| `node scripts/flows/luxdrive_world.mjs` | **PASS**, 73 checks, 0 failures (the start on Av. J.F. Kennedy, drive 33.7 m / 70 km/h, camera 3.65 m over the ground, ride height, 14 sampled roads painted within 1.5 m of the OSM width, kerb, ground beside roads, three bridge decks, the edge of the area, three quality levels, zero console errors) |
+| `node scripts/flows/luxdrive_holes.mjs` | **PASS**, **0 hole pixels** over 72 poses, self-test with a missing tile reports 42 741 hole pixels |
+| `node pb/lux-drive/harness.js --quick` | **PASS**, 61 checks: A-G unchanged (data 11.13 MB, 0 roads to nowhere, 0 rails on a road, 0 houses floating / buried / inside each other, 0 decks diving, 0 trees in a house or on a road, 0 camera under the ground) + the new section H below |
+
+Section H of the harness (the new checks of this branch, all green):
+
+| check | measured |
+|---|---|
+| two tracks of >= 8 km | A 12 498 m, B 12 500 m |
+| right-hand running: B lies on the left of A at every measured place | 0 of 78 samples wrong (before the cost fix: 35 of 78 - the shortest path hopped between the rails at the crossovers) |
+| every track has >= 18 stops, in order, >= 35 m apart, all on the rails | 22 + 22 |
+| no vehicle body stands inside a house (3 m steps along both tracks; a viaduct that carries the track is not tested in 2D) | 0 |
+| the vehicles never run into each other in 20 min of the line | free distance > 5 m |
+| line speed, smooth motion along the rails (no jump), stops served, turn-back | top speed 17.0 m/s, max step < 0.85 m per 50 ms, >= 6 stops served |
+| the car collides with a tram | pen > 0.5 m |
+| a car on the track stops the vehicle | the vehicle stops 9 m before it |
+| street lights: > 3000, none in a house, none in a carriageway, all inside the world | 9 054 lamps, 0 / 0 / 0 |
+| the car stops at a lamp post (props are solid) | yes |
+| park benches: > 100, none in a house or a carriageway | 594 benches, 0 |
+
+**Draw calls / triangles at steady state, medium quality** (every tile and cell built; `scripts/luxdrive/shotd.mjs`): 74 (field near Ernster) ... 139 (Avenue J.F.
+Kennedy, 103 building cells in reach) draw calls, 225 k ... 387 k triangles, all <= 260 draw calls.  Full table in `reports-cloud/lux-drive/lux-drive-city/REPORT.md`.
+
+Open in this part: see the honest list in `reports-cloud/lux-drive/lux-drive-city/REPORT.md` (Grund walls grey, the lumpy outline of the pedestrian
+way at Place de l'Europe, tram crossovers shared by two tracks, nothing measured on a GPU / iPad).
+
+Boot cost added by this branch (Node, desktop): tram network 0.3 s, street lamps 0.2 s, benches 0.05 s, built-up density raster 0.2 s; an iPad takes 2-3x.
+
+## Milestone 5 — UI + car feel: see the section "Milestone 5 (branch `lux-drive-ui`)" below
+
+
+## Milestone 5 (branch `lux-drive-ui`) — UI + car feel: DONE (cloud session)
+
+Scope of this branch: the interface, the touch controls, the Kaart, the quality step, the car and its handling, the
+Luxembourgish texts.  The world (roads, buildings, trees, the look) is untouched; `main.js` and `lux-drive.html` got small,
+marked hooks only.
+
+### What is new
+
+| piece | files | what it does |
+|---|---|---|
+| texts | `i18n.js` | the Luxembourgish rewritten in LOD spelling (Ufank, Beem, Brécken, Fueren, Owend, Wollekeg, Haftung ...), 106 keys in lb / de / en / fr; the flow checks that no key is missing and no placeholder differs |
+| menus | `ui.js`, `ui.css` | the dark rounded panels of the MTB game; **start menu** (language, weather, time of day, quality, "Fueren"), **pause menu** (Weider, Kaart, Wieder, Astellungen, Hëllef, Nei starten), **settings** (+ camera, car colour, fullscreen), help. The language changes live. The car waits behind every menu |
+| weather / time | `ui.js`, `main.js` | chips with **Random first and selected by default**, in the start menu, the settings AND in the game (the ⛅ button opens a small chooser at the top right, it closes itself). Rain takes 28 % of the grip, fog thickens the air (both from `env.js`); the screen gets rain streaks (CSS only) and a "Naass Strooss" hint |
+| HUD | `ui.js`, `speed-limit.js` | speed, the **speed-limit sign** (white disc, red ring), road name, buttons, the minimap |
+| touch | `input.js`, `ui.css` | a wide analog **steering pad** (the wheel follows the thumb on the pad), **gas 128 px, brake 96 px, handbrake 70 px**, multi-touch (steer + gas + brake + handbrake at once), no scroll, no zoom (`touch-action: none`, `user-scalable=no`, gesture events blocked), safe-area insets, a "turn the iPad" hint in portrait |
+| Kaart | `road-index.js`, `basemap.js`, `minimap.js`, `fullmap.js`, `placement.js` | one road index for everything; a painted base map from the land class raster (woods, fields, town, rivers - no data file); the minimap turns with the car; the **full-screen map** (M or the 🗺 button or a tap on the minimap): pan, pinch / wheel / buttons to zoom, street names (main roads first, no overlaps), the towns, the car; **a tap on a road puts the car on that road**: nearest point of the nearest road, right-hand lane, facing along the road (the direction closest to where the car looked; one-way streets with the traffic); bridges are set down on their deck |
+| quality | `quality-step.js` | frame-time running average; 2.5 s slow (> 27 ms) steps down, 25 s fast (< 15 ms) steps back up - never above what the player chose, never into a level that was too slow before; hitches (background tab, teleport) are not a trend; `?q=` in the URL pins the quality (tests) |
+| car model | `car-model.js` | a low-poly hatchback: rounded hull, greenhouse with pillars, bumpers, grille, plates, mirrors, wheel arches; **12-sided wheels that roll and (front) steer**; headlamps that follow the headlights, **tail lamps that flare when braking**, reversing lamps; 10 meshes; 8 paint colours (settings) |
+| handling | `car.js`, `config.js` | see below |
+
+### Handling - what was wrong and what changed
+
+* **Reverse never worked**: the brake pedal reversed only while `|v| < 0.7 m/s`, so the car crept at 0.7 m/s backwards and then
+  the brake took over: a car wedged against a wall could not get out.  Now it reverses while it rolls backwards too (7 m/s in 3 s).
+* **The car was on rails in corners**: the velocity was turned with the heading, so the tyres never had anything to hold and
+  the handbrake did nothing.  Now the velocity keeps its direction when the car turns; the tyres take the sideways speed away
+  up to the grip (95 % of it is what full lock may ask for, so the car does not spin), beyond that it slides and scrubs speed.
+  **Handbrake** = rear grip x 0.42 and yaw x 1.5: a drift (slip 0.96 in the flow).
+* **Steering authority** is capped by the lateral grip: full lock at 90 km/h turns 40 deg in 2 s (was 100 deg), at 30 km/h 99 deg.
+  Rain lowers the cap, the braking and the drive (grip scale), so rain really is slippery: 50 -> 0 km/h takes 6.4 m dry, 8.4 m wet.
+* **Pace follows the speed limit**: the soft top speed of a road is 1.7 x its limit (50 -> 85 km/h, 90 -> 150 km/h), motorways
+  keep the 200 km/h cap.  Launch cap 6.5 m/s2, 100 kW: 0 -> 50 in 2.4 s, 0 -> 90 in 5.7 s.
+* **Collision**: two circles (nose and tail, r = 1.0 m) instead of one circle of 1.35 m at the centre: the bonnet does not
+  enter a wall any more; the car slides along a wall (only the speed into it is lost).
+* **Stuck**: pedal down and not moving for 3.5 s (a wall, a tree, a slope too steep to climb backwards) -> the car is put back on
+  the nearest road within 60 m (a toast tells the player).  Kerbs cannot stick: the ride follows the 1 m lattice and a 13 cm
+  kerb never airborne-triggers (the world flow's kerb check passes).
+* **Attitude**: the whole car lies on the slope (pitch / roll of the ground normal), the body squats, dives and leans on top of
+  that.  The old model rolled the body about the ground point, which made it sink into the wheels on a cambered road.
+* **Speed limit sign**: the baked roads carry no `maxspeed` and Overpass is not reachable from the cloud container, so the limit
+  is the Luxembourg default of the class: 50 in a town (class raster **or** a crowd of buildings - Kirchberg is open ground
+  between big blocks), 90 outside, motorway 130 (110 in rain, 90 inside the city), links 70, living street 20, service / track 30,
+  pedestrian 10.  `road.maxspeed` (km/h) wins when a future bake provides it.
+
+### Gates (cloud container, software WebGL: 3 frames a second)
+
+
+| gate | result |
+|---|---|
+| `node pb/lux-drive/harness.js` | **PASS - 44 checks passed, 0 failed** (212 s); 0 road ends in nowhere, 0 houses floating / buried / inside each other, 0 decks floating, 0 trees in a house or on the road, the car stays finite and on the ground, the camera never under the ground |
+| `node scripts/flows/luxdrive_world.mjs` | **PASS** (cloud): the start on Av. J.F. Kennedy, the car drives 27.6 m / 60 km/h, the paint follows the real width, kerb ridden without flying, bridges solid, the edge of the area holds, **draw calls low 42 / medium 51 / high 54** (the brief: medium <= 260), triangles 154k / 174k / 201k |
+| `node scripts/flows/luxdrive_holes.mjs` | **PASS** - 0 hole pixels over 72 poses, >= 126 tiles at every pose, the detector self-test sees 42 741 hole pixels with one tile removed |
+| `node scripts/flows/luxdrive_ui.mjs` (new) | **PASS** - menus, languages (live), Random default for weather + time, chooser in the menu and in the game, the pause freezes the car, rain / fog change grip / view, touch at 1180x820 and 1024x768 (sizes, multi-touch with 2 and 3 fingers, no scroll / zoom), map + three teleports (on the carriageway, along the road, grounded), the quality stepper (down, never above the choice, no oscillation, hitches ignored), the car (4 wheels turn, front ones steer, brake lights, headlights at night, 8 draw calls), handling (no spin, no flip, handbrake slide, reverse, pace by limit, braking 7.4 m dry / 9.7 m wet from 50 km/h), a wedged car is put back on a road, no console errors |
+
+Measured by the gates (and fixed on the way): the brake pedal reversed only while |v| < 0.7 m/s; the teleport put the car into a
+tunnel portal wall (the collision then threw it 7 m off a bridge deck); the old flow loops counted frames (10x too far on a slow
+renderer).  The flows count game seconds now (`window.__lux.clock()`).  Pictures and an honest list of what still looks wrong:
+`reports-cloud/lux-drive/lux-drive-ui/REPORT.md`.
+
+**New files:** `road-index.js`, `basemap.js`, `fullmap.js`, `placement.js`, `speed-limit.js`, `quality-step.js`,
+`scripts/flows/luxdrive_ui.mjs`.  **Rewritten:** `ui.js`, `ui.css`, `input.js`, `minimap.js`, `car-model.js`, `i18n.js`.
+**Changed:** `car.js`, `config.js` (CAR), `main.js` (wiring), `lux-drive.html` (viewport, `?v=`), `scripts/flows/luxdrive_world.mjs`.

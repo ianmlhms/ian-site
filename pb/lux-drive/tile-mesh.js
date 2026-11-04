@@ -9,6 +9,8 @@
  * Every node also carries the road it lies on, so the shader can paint the tarmac, the kerb, the pavement and the lane markings:
  *   aRoad  (lat, hw, a0, s)   the offset from the centre line, the half width of the carriageway, the outer edge of the
  *                             pavement, the distance along the centre line (the dashes of the lane markings)
+ *   aRoad3 (sdCar, sdPave, paint, -)  the signed distance to the UNION of the carriageways and of the pavements (negative =
+ *                             inside) and the fade of the paint: the edges of the paint are the zero of these
  *   aRoad2 (coverage, lines, surface, mark)  how much road there is, the style of the markings, the material, and how
  *                             exactly the fine markings are drawn (a 4 m lattice cannot resolve a 15 cm line) */
 import { QUADTREE, ROAD } from './config.js';
@@ -34,9 +36,9 @@ export function computeTileNodes(leaf, surface, field) {
       road2[o * 4] = b.cover[o];
       road2[o * 4 + 1] = b.lines[o];
       road2[o * 4 + 2] = b.surface[o];                         // the material of the road the node is on
-      road2[o * 4 + 3] = 1;                                    // the 1 m lattice draws the markings exactly
+      road2[o * 4 + 3] = b.junction[o] ? 0 : 1;                // the 1 m lattice draws the markings exactly (not at a junction)
     }
-    return { h: b.h, lat: b.lat, hw: b.hw, a0: b.a0, kind: b.kind, surface: b.surface, along: b.along, road2, shared: true };
+    return { h: b.h, lat: b.lat, hw: b.hw, a0: b.a0, kind: b.kind, surface: b.surface, along: b.along, sdCar: b.sdCar, sdPave: b.sdPave, road2, shared: true };
   }
   const h = new Float32Array(APRON_SIDE * APRON_SIDE);
   const lat = new Float32Array(APRON_SIDE * APRON_SIDE);
@@ -45,6 +47,7 @@ export function computeTileNodes(leaf, surface, field) {
   const kind = new Uint8Array(APRON_SIDE * APRON_SIDE);
   const surf = new Uint8Array(APRON_SIDE * APRON_SIDE);      // the material of the road the node is on
   const along = new Float32Array(APRON_SIDE * APRON_SIDE);
+  const sdCar = new Float32Array(APRON_SIDE * APRON_SIDE), sdPave = new Float32Array(APRON_SIDE * APRON_SIDE);
   const road2 = new Float32Array(APRON_SIDE * APRON_SIDE * 4);
   const info = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, lines: 0, lanes: 0, s: 0, surface: 0 };
   const mark = fadeOf(step, ROAD.markFullStep, ROAD.markFadeStep);
@@ -53,11 +56,11 @@ export function computeTileNodes(leaf, surface, field) {
       const o = j * APRON_SIDE + i;
       h[o] = field.heightForStep(x0 + (i - 1) * step, z0 + (j - 1) * step, step, info);
       lat[o] = info.lat; hw[o] = info.hw; a0[o] = info.a0; kind[o] = info.kind; along[o] = info.s;
-      surf[o] = info.surface;
-      road2[o * 4] = info.coverage; road2[o * 4 + 1] = info.lines; road2[o * 4 + 3] = mark;
+      surf[o] = info.surface; sdCar[o] = info.sdCar; sdPave[o] = info.sdPave;
+      road2[o * 4] = info.coverage; road2[o * 4 + 1] = info.lines; road2[o * 4 + 3] = info.junction ? 0 : mark;
     }
   }
-  return { h, lat, hw, a0, kind, surface: surf, along, road2, shared: false };
+  return { h, lat, hw, a0, kind, surface: surf, along, sdCar, sdPave, road2, shared: false };
 }
 
 /** Value of the coarser tile T's edge polyline at the boundary point (x, z) (T's spacing grid is aligned to multiples of its step). */
@@ -123,6 +126,8 @@ export function buildTileMesh(leaf, nodes, split, field) {
   const normals = new Float32Array((vertexCount + skirtVerts) * 3);
   const road = new Float32Array((vertexCount + skirtVerts) * 4);
   const road2 = new Float32Array((vertexCount + skirtVerts) * 4);
+  const road3 = new Float32Array((vertexCount + skirtVerts) * 4);      // aRoad3: the signed distances of the paint (see the vertex shader)
+  const paintK = fadeOf(step, ROAD.paintFullStep, ROAD.paintFadeStep);
   const skirtDepth = QUADTREE.skirtDepth + QUADTREE.skirtPerStep * step;
   const stitchAt = new Map();
   for (const st of stitchesOf(leaf, split)) stitchAt.set(st.v, st);
@@ -143,6 +148,7 @@ export function buildTileMesh(leaf, nodes, split, field) {
       road2[v * 4] = nodes.road2[a * 4]; road2[v * 4 + 1] = nodes.road2[a * 4 + 1];
       road2[v * 4 + 2] = surface[a];                        // the material of the road the node is on
       road2[v * 4 + 3] = nodes.road2[a * 4 + 3];
+      road3[v * 4] = nodes.sdCar[a]; road3[v * 4 + 1] = nodes.sdPave[a]; road3[v * 4 + 2] = paintK;
     }
   }
   // skirts: duplicate every boundary vertex lower down (order: north row, south row, west column, east column)
@@ -151,7 +157,7 @@ export function buildTileMesh(leaf, nodes, split, field) {
   const addSkirt = (v) => {
     positions[sv * 3] = positions[v * 3]; positions[sv * 3 + 1] = positions[v * 3 + 1] - skirtDepth; positions[sv * 3 + 2] = positions[v * 3 + 2];
     normals[sv * 3] = normals[v * 3]; normals[sv * 3 + 1] = normals[v * 3 + 1]; normals[sv * 3 + 2] = normals[v * 3 + 2];
-    for (let c = 0; c < 4; c++) { road[sv * 4 + c] = road[v * 4 + c]; road2[sv * 4 + c] = road2[v * 4 + c]; }
+    for (let c = 0; c < 4; c++) { road[sv * 4 + c] = road[v * 4 + c]; road2[sv * 4 + c] = road2[v * 4 + c]; road3[sv * 4 + c] = road3[v * 4 + c]; }
     skirtOf[v] = sv++;
   };
   for (let i = 0; i <= CELLS; i++) addSkirt(i);
@@ -181,7 +187,7 @@ export function buildTileMesh(leaf, nodes, split, field) {
   for (let i = 0; i < CELLS; i++) wall(CELLS * SIDE + i + 1, CELLS * SIDE + i);             // south edge
   for (let j = 0; j < CELLS; j++) wall((j + 1) * SIDE, j * SIDE);                           // west edge
   for (let j = 0; j < CELLS; j++) wall(j * SIDE + CELLS, (j + 1) * SIDE + CELLS);           // east edge
-  return { positions, normals, road, road2, indices: indices.subarray(0, n), vertexCount: vertexCount + skirtVerts, gridVertexCount: vertexCount, signature: [...stitchAt.values()].map((st) => `${st.v}@${st.tile.key}`).join('|'), size, x0, z0, step };
+  return { positions, normals, road, road2, road3, indices: indices.subarray(0, n), vertexCount: vertexCount + skirtVerts, gridVertexCount: vertexCount, signature: [...stitchAt.values()].map((st) => `${st.v}@${st.tile.key}`).join('|'), size, x0, z0, step };
 }
 
 /** Exact height of the built mesh (grid triangles only, no skirts) at a world point inside the tile, by vertical ray vs triangle. */

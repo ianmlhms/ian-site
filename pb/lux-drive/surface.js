@@ -36,18 +36,21 @@ export function createSurface(field) {
     const lines = new Uint8Array(SIDE * SIDE);           // the style of its lane markings
     const lanes = new Uint8Array(SIDE * SIDE);           // how many lanes it has
     const along = new Float32Array(SIDE * SIDE);         // the distance along its centre line
+    const sdCar = new Float32Array(SIDE * SIDE);         // the signed distance to the union of the carriageways (negative = on one)
+    const sdPave = new Float32Array(SIDE * SIDE);        // ... and to the union of the pavements
+    const junction = new Uint8Array(SIDE * SIDE);        // 1 where marked roads cross: the lane markings are cut there
     const x0 = bx * BLOCK, z0 = bz * BLOCK;
-    const info = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, lines: 0, lanes: 0, s: 0, surface: 0 };
+    const info = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, lines: 0, lanes: 0, s: 0, surface: 0, sdCar: 0, sdPave: 0, junction: 0 };
     for (let j = 0; j < SIDE; j++) {
       for (let i = 0; i < SIDE; i++) {
         const o = j * SIDE + i;
         h[o] = field.height(x0 + i - APRON, z0 + j - APRON, info);
         cover[o] = info.coverage; lat[o] = info.lat; hw[o] = info.hw; a0[o] = info.a0;
         kind[o] = info.kind; road[o] = info.road; lines[o] = info.lines; surface[o] = info.surface;
-        lanes[o] = info.lanes; along[o] = info.s;
+        lanes[o] = info.lanes; along[o] = info.s; sdCar[o] = info.sdCar; sdPave[o] = info.sdPave; junction[o] = info.junction;
       }
     }
-    b = { bx, bz, x0, z0, h, cover, lat, hw, a0, kind, surface, road, lines, lanes, along, side: SIDE, apron: APRON };
+    b = { bx, bz, x0, z0, h, cover, lat, hw, a0, kind, surface, road, lines, lanes, along, sdCar, sdPave, junction, side: SIDE, apron: APRON };
     blocks.set(k, b);
     if (blocks.size > MAX_BLOCKS) blocks.delete(blocks.keys().next().value);
     return b;
@@ -95,7 +98,7 @@ export function createSurface(field) {
     const o = j * SIDE + i;
     out.coverage = b.cover[o]; out.lat = b.lat[o]; out.hw = b.hw[o]; out.a0 = b.a0[o];
     out.kind = b.kind[o]; out.surface = b.surface[o]; out.road = b.road[o]; out.lines = b.lines[o];
-    out.lanes = b.lanes[o]; out.s = b.along[o];
+    out.lanes = b.lanes[o]; out.s = b.along[o]; out.sdCar = b.sdCar[o]; out.sdPave = b.sdPave[o];
     return out;
   }
 

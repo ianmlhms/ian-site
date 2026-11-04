@@ -84,9 +84,9 @@ export const SURFACES = Object.freeze({
 });
 
 export const QUALITY = Object.freeze({
-  low: { pixelRatio: 1, lodScale: 0.4, far: 4200, buildingRadius: 320, treeRadius: 90, treeDensity: 0.4, cheapGround: true, shadows: false },
-  medium: { pixelRatio: 1.25, lodScale: 0.7, far: 6000, buildingRadius: 520, treeRadius: 150, treeDensity: 0.7, cheapGround: false, shadows: false },
-  high: { pixelRatio: 2, lodScale: 1, far: 8000, buildingRadius: 800, treeRadius: 240, treeDensity: 1, cheapGround: false, shadows: true },
+  low: { pixelRatio: 1, lodScale: 0.4, far: 4200, buildingRadius: 300, buildingFarRadius: 760, treeRadius: 90, treeDensity: 0.4, cheapGround: true, shadows: false },
+  medium: { pixelRatio: 1.25, lodScale: 0.7, far: 6000, buildingRadius: 420, buildingFarRadius: 1300, treeRadius: 150, treeDensity: 0.7, cheapGround: false, shadows: false },
+  high: { pixelRatio: 2, lodScale: 1, far: 8000, buildingRadius: 700, buildingFarRadius: 2100, treeRadius: 240, treeDensity: 1, cheapGround: false, shadows: true },
 });
 
 export const CAMERA = Object.freeze({
@@ -119,20 +119,31 @@ export const CAR = Object.freeze({
   mass: 1350,                // kg
   wheelbase: 2.62,
   trackWidth: 1.72,
-  power: 118000,             // W at the wheels at full throttle (about 160 hp)
+  power: 100000,             // W at the wheels at full throttle (about 135 hp)
   reversePower: 42000,       // W in reverse
   maxSpeed: 56,              // m/s (200 km/h) - the hard cap on a motorway
   maxReverse: 12,            // m/s
-  brakeDecel: 12.5,          // m/s2 at full braking on asphalt
+  brakeDecel: 10.5,          // m/s2 at full braking on asphalt
   engineBrake: 1.6,          // m/s2 when the throttle is closed
   steerMax: 0.56,            // rad of the road wheel angle at standstill
   steerSpeedRef: 13,         // m/s: the steering authority falls off with the speed
+  limitOvershoot: 1.7,       // the soft top speed on a road is this many times its speed limit (never above the class top speed)
+  slideScrub: 0.7,           // 1/s: how fast a sliding car loses speed (at full slip)
+  launchCap: 6.5,            // m/s2: the most the drive pushes at low speed (no rocket launch)
   steerRate: 7,              // 1/s: how fast the wheel follows the input
+  steerGripShare: 0.95,      // the share of the tyre grip that full lock may ask for in a corner (the rest is the margin before a slide)
+  steerMin: 0.035,           // rad: the wheel always keeps this much authority, even at 200 km/h
+  squatGain: 0.006,          // rad of body pitch per m/s2 of acceleration (negative acceleration = the nose dives)
+  squatMax: 0.05,            // rad
+  leanMax: 0.12,             // rad: the most the body leans in a corner
+  leanGain: 0.02,            // rad of body roll per (rad of steer x m/s)
+  handbrakeYaw: 1.5,         // the yaw gain with the handbrake pulled: the tail steps out
   grip: 1.45,                // the friction coefficient of the tyres (mu)
   cdA: 0.68,                 // m2, the drag that ends the speed
   airDensity: 1.2,
   crr: 0.014,                // the rolling resistance of the tyres
-  bodyRadius: 1.35,          // m: the collision circle of the car against the buildings
+  bodyRadius: 1.0,           // m: the radius of the two collision circles of the car (the half width is 0.9 m)
+  bodyCircles: [1.25, -1.25], // m: the circles sit this far in front of / behind the centre (4.4 m long body: nose and tail)
   fixedStep: 1 / 120,        // s: the physics step
   slopeAssist: 1.0,          // the gravity along the slope is applied in full
   handbrakeGrip: 0.42,       // the grip left on the rear axle with the handbrake pulled
@@ -160,6 +171,29 @@ export const PORTAL = Object.freeze({
   lintel: 1.0,              // m, the concrete above the mouth
   cornice: 0.22,            // m, the slab on top of the wall
   base: 2.0,                // m, the wall goes this far under the ground (it never floats)
+});
+
+/* The Luxtram (CAF Urbos 100, 45 m, 2.65 m wide): the rails are the OSM tram ways of the bake (lines.bin, kind 2), the vehicles
+ * run on them in a simulation of their own (tram-sim.js).  Rails and vehicles are drawn by tram-view.js. */
+export const TRAM = Object.freeze({
+  gauge: 1.435,             // m between the inner faces of the rails
+  railWidth: 0.07, railHeight: 0.11, lift: 0.045,     // m: the head of the rail, and how far the track stands over the ground it is laid in
+  bedWidth: 2.9,            // m: the slab / grass bed the two rails lie in
+  chunk: 600,               // m of track per mesh (the frustum culls the rest)
+  sampleSpacing: 2.0,       // m between the cross sections of the track mesh
+  maxSpeed: 17.0,           // m/s (61 km/h): the line speed in the city
+  accel: 1.1, decel: 1.0,   // m/s2
+  dwell: 11,                // s at a stop
+  turnback: 16,             // s the tram is out of sight at a terminus (it changes tracks there)
+  stopSnap: 2.0,            // m: a tram stop is a node ON the rails of its track (the other track's stop node is 3-4 m away)
+  stopMerge: 45,            // m: two platform nodes of one stop closer than this along the track are one stop
+  sections: 5, sectionLength: 8.6, gap: 0.5,          // the 45 m vehicle: five articulated sections
+  width: 2.65, height: 3.55, floor: 0.45,
+  vehicles: 3,
+  bodyHalfWidth: 1.35,      // m: the collision capsule of a section
+  poleRadius: 0.22,         // m: the collision circle of a catenary pole
+  catenary: { spacing: 38, height: 5.6, arm: 1.9 },   // m between the poles, the height of the contact wire, the reach of the arm
+  platform: { length: 46, width: 3.0, height: 0.28, setback: 0.35 },
 });
 
 export const CAR_COLOURS = Object.freeze({

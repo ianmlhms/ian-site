@@ -13,11 +13,12 @@ export { PAINT_LIGHT_GLSL };
 export const GROUND_VERTEX = `
   attribute vec4 aRoad;        // the offset from the centre line, the half width of the carriageway, the outer edge of the pavement, the distance along the centre line
   attribute vec4 aRoad2;       // the coverage of the road, the style of the markings, its material, how exactly the fine markings are drawn
+  attribute vec4 aRoad3;       // the signed distance to the union of the carriageways, to the union of the pavements, the fade of the paint
   varying vec3 vWorld; varying vec3 vNormal; varying float vDist;
-  varying vec4 vRoad; varying vec4 vRoad2;
+  varying vec4 vRoad; varying vec4 vRoad2; varying vec4 vRoad3;
   void main(){
     vec4 wp = modelMatrix * vec4(position, 1.0);
-    vWorld = wp.xyz; vNormal = normal; vRoad = aRoad; vRoad2 = aRoad2;
+    vWorld = wp.xyz; vNormal = normal; vRoad = aRoad; vRoad2 = aRoad2; vRoad3 = aRoad3;
     vec4 mv = viewMatrix * wp;
     vDist = length(mv.xyz);
     gl_Position = projectionMatrix * mv;
@@ -32,8 +33,9 @@ export const GROUND_FRAGMENT = `
   uniform float uKerbWidth;
   uniform float uTreeRadius;
   varying vec3 vWorld; varying vec3 vNormal; varying float vDist;
-  varying vec4 vRoad; varying vec4 vRoad2;
+  varying vec4 vRoad; varying vec4 vRoad2; varying vec4 vRoad3;
   ${PAINT_LIGHT_GLSL}
+  float hash21(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
 
   void main(){
     vec3 N = normalize(vNormal);
@@ -58,13 +60,32 @@ export const GROUND_FRAGMENT = `
     vec3 canopy = mix(vec3(0.19, 0.31, 0.14), vec3(0.32, 0.44, 0.19), smoothstep(0.3, 0.8, nLo.g * 0.6 + nMid.b * 0.5));
     // the ground between the houses: HARD ground (gravel and slabs), never a lawn
     vec3 city = mix(grav * 0.74, pave * 0.60, 0.35) * (0.88 + 0.16 * nMid.r);
-    // the farmland: the crops, a muted straw (the MTB field colours)
-    vec3 field = gTex * vec3(1.02, 0.95, 0.60) * (0.88 + 0.24 * nLo.b);
-    // the rows of the fields, along a direction that turns slowly with the land
+    // the farmland: painted parcels of crops (young wheat, ripe grain, ploughed earth, rape, stubble).  The parcel is a slow
+    // noise cut into bands, so it reads as a patchwork of fields from above and never as one grey-brown wash.
+    float lum = dot(gTex, vec3(0.30, 0.59, 0.11));
+    float detail = clamp(0.90 + 0.26 * (lum / 0.45 - 1.0), 0.72, 1.18);
+    // the parcels: rectangles of 70-120 m, turned by a different angle in every kilometre block, each with its own crop
+    vec2 blk = floor(P / 900.0);
+    float ba = hash21(blk) * 3.14159;
+    vec2 R = vec2(cos(ba) * P.x + sin(ba) * P.y, -sin(ba) * P.x + cos(ba) * P.y);
+    vec2 cellSize = vec2(78.0, 128.0) * (0.8 + 0.5 * hash21(blk + 3.1));
+    vec2 cellF = R / cellSize;
+    vec2 cid = floor(cellF);
+    float pick = hash21(cid + blk * 17.0);
+    float pid = floor(pick * 4.999);
+    vec3 crop = pid < 0.5 ? vec3(0.44, 0.58, 0.26) : pid < 1.5 ? vec3(0.80, 0.68, 0.26) : pid < 2.5 ? vec3(0.55, 0.40, 0.27) : pid < 3.5 ? vec3(0.52, 0.66, 0.26) : vec3(0.72, 0.62, 0.32);
+    vec3 field = crop * detail * (0.94 + 0.12 * nMid.b);
+    // a hedge / grass strip along some of the borders of the parcels
+    vec2 inCell = fract(cellF) * cellSize;
+    float edgeD = min(min(inCell.x, cellSize.x - inCell.x), min(inCell.y, cellSize.y - inCell.y));
+    float hedge = (1.0 - smoothstep(0.6, 1.8, edgeD)) * step(0.55, hash21(cid + 7.7)) * near;
+    field = mix(field, vec3(0.30, 0.42, 0.20), hedge * 0.7);
+    // the rows of the fields, along a direction that turns slowly with the land (the ploughed earth shows them strongest)
     float ang = nLo.a * 6.28318;
     vec2 dir = vec2(cos(ang), sin(ang));
     float row = sin(dot(P, dir) * 1.1) * 0.5 + 0.5;
-    field *= 0.93 + 0.12 * row * near;
+    float plough = pid > 1.5 && pid < 2.5 ? 1.0 : 0.0;
+    field *= 1.0 - (0.05 + 0.10 * plough) * (1.0 - row) * near;
     vec3 water = vec3(0.20, 0.30, 0.36) * (0.9 + 0.2 * nMid.b);
     water += vec3(0.10, 0.13, 0.14) * (sin(P.x * 0.9 + uTime * 0.6) * sin(P.y * 0.7 - uTime * 0.4) * 0.5 + 0.5) * near;
 
@@ -72,6 +93,9 @@ export const GROUND_FRAGMENT = `
     float farm = can.a, park = can.b;
     vec3 albedo = meadow;
     albedo = mix(albedo, meadow * vec3(1.06, 1.16, 0.84), park * 0.8);        // the parks are mown and brighter
+    // the parks: mown lawn, a slightly richer green with soft mowing stripes and large calm patches (no two lawns alike)
+    float mow = sin(dot(P, vec2(0.66, 0.34)) * 1.55) * 0.5 + 0.5;
+    albedo *= 1.0 + park * near * ((mow - 0.5) * 0.07 + (nLo.b - 0.5) * 0.10);
     albedo = mix(albedo, field, farm);
     albedo = mix(albedo, wood, forest);
     albedo = mix(albedo, city, urban);
@@ -82,11 +106,15 @@ export const GROUND_FRAGMENT = `
     albedo = mix(albedo, canopy * (0.85 + 0.30 * nLo.g), farK);
 
     // ---- the road: the tarmac, the kerb, the pavement and the markings
-    float cov = vRoad2.x;
     float lat = vRoad.x, hw = vRoad.y, a0 = vRoad.z, s = vRoad.w;
     float lines = vRoad2.y, surface = vRoad2.z, mark = vRoad2.w;
     float al = abs(lat);
-    float roadW = smoothstep(0.30, 0.62, cov);
+    // The edges of the paint are the zero of the signed distance to the UNION of the carriageways / pavements (aRoad3):
+    // the lattice interpolates a continuous distance into a straight edge of constant width, per pixel.  The offset of
+    // the one nearest road (lat, hw) is only for the markings.  The edge is one pixel wide (fwidth), never a staircase.
+    float sdC = vRoad3.x, sdP = vRoad3.y;
+    float roadW = smoothstep(0.0, 0.5, vRoad3.z);
+    float aaC = max(fwidth(sdC), 0.04), aaP = max(fwidth(sdP), 0.04);
     vec3 tar = texture2D(uAsphalt, P * 0.33).rgb;
     vec3 cob = texture2D(uCobble, P * 0.40).rgb;
     // the paved stone of the squares: the slow noise breaks the tiling up, a square is a calm surface
@@ -95,15 +123,17 @@ export const GROUND_FRAGMENT = `
     vec3 surf = surface < 0.5 ? tar : surface < 1.5 ? cob : surface < 2.5 ? pave : surface < 4.5 ? grav : stn;
     // the kerb belongs to the materials that have one (the tarmac, the cobbles, the concrete)
     float kerbW = (surface < 2.5) ? uKerbWidth : 0.0;
-    float onCarriage = 1.0 - smoothstep(hw - 0.05, hw + 0.05, al);
-    float onKerb = smoothstep(hw - 0.02, hw + 0.04, al) * (1.0 - smoothstep(hw + kerbW - 0.02, hw + kerbW + 0.04, al));
-    float onPave = smoothstep(hw + kerbW - 0.02, hw + kerbW + 0.04, al) * (1.0 - smoothstep(a0 - 0.06, a0 + 0.06, al));
+    float onCarriage = 1.0 - smoothstep(-aaC, aaC, sdC);
+    float onKerb = smoothstep(-aaC, aaC, sdC) * (1.0 - smoothstep(kerbW - aaC, kerbW + aaC, sdC));
+    float onPave = smoothstep(kerbW - aaC, kerbW + aaC, sdC) * (1.0 - smoothstep(-aaP, aaP, sdP));
     // the lane markings: a dashed centre line (3 m of paint every 9 m), the edge lines of the big roads.
     // A paved area (a square, a footpath) carries NO markings: the paint of a square would make it a street.
+    // The markings are cut before a junction (mark is 0 there): a dash that ends in the crossing street is a fragment.
+    float markOn = smoothstep(0.5, 0.9, mark);
     float dash = (lines > 0.5 && lines < 1.5) ? step(fract(s / 9.0), 0.34) : 1.0;
     float centre = (1.0 - smoothstep(0.05, 0.11, al)) * dash * step(0.5, lines) * step(lines, 2.5);
     float edge = (lines > 0.5 && lines < 2.5 && hw > 4.0) ? (1.0 - smoothstep(0.05, 0.11, abs(al - (hw - 0.5)))) : 0.0;
-    float paint = clamp(centre + edge, 0.0, 1.0) * onCarriage * mark * near;
+    float paint = clamp(centre + edge, 0.0, 1.0) * onCarriage * markOn * near;
 
     albedo = mix(albedo, surf, roadW * onCarriage);
     albedo = mix(albedo, pave * 0.80, roadW * onKerb);                        // the kerb stone is darker than the slabs
@@ -111,7 +141,8 @@ export const GROUND_FRAGMENT = `
     albedo = mix(albedo, vec3(0.84, 0.83, 0.76), paint * roadW);
 
     // ---- the weather: the rain darkens the tarmac and the ground
-    float wetness = uWet * (0.55 + 0.45 * roadW);
+    float onRoadAny = roadW * max(onCarriage, max(onKerb, onPave));
+    float wetness = uWet * (0.55 + 0.45 * onRoadAny);
     albedo *= 1.0 - 0.30 * wetness;
 
     // ---- light: the clouds drift over the land
@@ -123,7 +154,7 @@ export const GROUND_FRAGMENT = `
     if (wetness > 0.02) {
       vec3 V = normalize(cameraPosition - vWorld);
       float fr = pow(1.0 - clamp(V.y, 0.0, 1.0), 4.0);
-      col = mix(col, uFogColor * 0.95, wetness * (0.12 + 0.4 * fr) * roadW);
+      col = mix(col, uFogColor * 0.95, wetness * (0.12 + 0.4 * fr) * onRoadAny);
     }
     col = applyFogW(col, vDist, vWorld.y);
     gl_FragColor = vec4(col, 1.0);

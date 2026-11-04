@@ -151,8 +151,11 @@ function wallBottom(ax, az, bx, bz, ay, by, eaveY, heightAt) {
  * b: the decoded LOD2 building { id, roof, style, levels, eave, ridge, ridgeDir, pts }.
  * heightAt(x, z): the height of the ground as the game draws it (the land with the roads carved into it).
  * landAt(x, z): the height of the land itself (the DTM): the top of the walls is the height of the eaves above it.
+ * drop: how far the walls go down below the ground (m).  The cells far from the car stand on COARSE terrain tiles (up to 16 m
+ *   spacing) that differ from the exact ground by a metre or two on a slope: a wall that ends at the exact ground would show a gap
+ *   under it or a ledge.  The part below the ground is never seen; the window rows keep their origin at the true ground (v < 0 below it).
  */
-export function addBuilding(m, b, heightAt, landAt) {
+export function addBuilding(m, b, heightAt, landAt, drop = 0) {
   const pts = b.pts;
   const n = pts.length / 2;
   if (n < 3) return;
@@ -190,12 +193,12 @@ export function addBuilding(m, b, heightAt, landAt) {
       const p0 = bottom[k], p1 = bottom[k + 1];
       const segLen = Math.hypot(p1[0] - p0[0], p1[2] - p0[2]);
       if (segLen < 0.05) continue;
-      const a = [p0[0], p0[1], p0[2]], b2 = [p1[0], p1[1], p1[2]];
+      const a = [p0[0], p0[1] - drop, p0[2]], b2 = [p1[0], p1[1] - drop, p1[2]];
       const c = [p1[0], eaveY, p1[2]], d = [p0[0], eaveY, p0[2]];
       const wallH = eaveY - (p0[1] + p1[1]) / 2;
       const uvs = outward
-        ? [[u, 0], [u + segLen, 0], [u + segLen, eaveY - p1[1]], [u, eaveY - p0[1]]]
-        : [[u + segLen, eaveY - p0[1]], [u, eaveY - p1[1]], [u, 0], [u + segLen, 0]];
+        ? [[u, -drop], [u + segLen, -drop], [u + segLen, eaveY - p1[1]], [u, eaveY - p0[1]]]
+        : [[u + segLen, eaveY - p0[1]], [u, eaveY - p1[1]], [u, -drop], [u + segLen, -drop]];
       const pts4 = outward ? [a, b2, c, d] : [d, c, b2, a];
       face(m, pts4, wall, KIND.wall, seed, uvs, segLen, wallH, sty);
       u += segLen;
@@ -297,11 +300,11 @@ export function groupByCell(buildings) {
  * heightAt(x, z): the height of the ground as the game draws it.
  * landAt(x, z): the height of the land itself.
  */
-export function buildCellMesh(ids, buildings, heightAt, landAt) {
+export function buildCellMesh(ids, buildings, heightAt, landAt, drop = 0) {
   const m = createBuildingMesh();
   for (const id of ids) {
     const b = buildings[id];
-    if (b) addBuilding(m, b, heightAt, landAt);
+    if (b) addBuilding(m, b, heightAt, landAt, drop);
   }
   return { pos: m.pos, nor: m.nor, col: m.col, info: m.info, geo: m.geo, sty: m.sty, idx: m.idx };
 }

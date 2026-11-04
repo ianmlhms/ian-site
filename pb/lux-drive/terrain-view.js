@@ -29,6 +29,7 @@ export function createTerrainView({ scene, surface, field, material: initialMate
     g.setAttribute('normal', new THREE.BufferAttribute(mesh.normals, 3));
     g.setAttribute('aRoad', new THREE.BufferAttribute(mesh.road, 4));
     g.setAttribute('aRoad2', new THREE.BufferAttribute(mesh.road2, 4));
+    g.setAttribute('aRoad3', new THREE.BufferAttribute(mesh.road3, 4));
     g.setIndex(new THREE.BufferAttribute(mesh.indices, 1));
     let lo = Infinity, hi = -Infinity;
     for (let i = 1; i < mesh.positions.length; i += 3) { const y = mesh.positions[i]; if (y < lo) lo = y; if (y > hi) hi = y; }
