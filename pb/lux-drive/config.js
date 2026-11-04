@@ -42,7 +42,12 @@ export const QUADTREE = Object.freeze({
 export const ROAD = Object.freeze({
   sampleSpacing: 4,        // m between the samples of a centre line
   lineSmoothing: 3.0,      // m, sigma of the Gaussian that rounds the corners of the OSM polyline
-  bedSmoothing: 6.0,       // m, sigma of the Gaussian that smooths the road surface along the centre line
+  bedStiffness: 200,       // the penalty on the second difference of the road profile (road-bed.js): a 4 m sample spacing and 200 pass
+                            // wavelengths above about 90 m and take out everything wavier (the first version, a 6 m Gaussian, left waves
+                            // of 10 .. 30 m: the road that "lies on a blanket")
+  bedDeviation: 0.015,     // m: the most a point of the profile may leave its 20 m moving mean (the harness gate allows 3 cm: the margin
+                            // is for the rounding of the lattice and of the junction pins)
+  bedRelax: 0.25,          // the second, lighter pass that rounds the kinks the clamp to the land makes
   bedClamp: 1.2,           // m, how far the bed of a road may leave the ground along its own centre line
   kerbHeight: 0.13,        // m, the kerb at the edge of the carriageway
   kerbWidth: 0.35,         // m, the width of the kerb face

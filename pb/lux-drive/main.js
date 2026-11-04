@@ -459,8 +459,12 @@ async function boot() {
     env.update(dt, camera, elapsed);
     env.setFogBase(ground.height(c.x, c.z));
     // the world follows the camera when the harness holds it (the hole detector walks the camera over the map)
-    terrain.update(frozenCamera ? camera.position.x : car.state.x, frozenCamera ? camera.position.z : car.state.z);
-    city.update(car.state.x, car.state.z);
+    // The tiles AND the houses follow the same point: the car, or the camera when the harness holds it elsewhere.  The city
+    // used to follow the car alone, so a camera held in another quarter saw houses with the cheap far material (their cell was
+    // far from the CAR) or no houses at all (beyond the reach of the quality level, measured from the car).
+    const focusX = frozenCamera ? camera.position.x : car.state.x, focusZ = frozenCamera ? camera.position.z : car.state.z;
+    terrain.update(focusX, focusZ);
+    city.update(focusX, focusZ);
     decks.update(camera.position.x, camera.position.z, quality.buildingFarRadius * BUILT_DRAW_FACTOR);
     portalView.update(camera.position.x, camera.position.z, quality.buildingFarRadius * BUILT_DRAW_FACTOR);
     trees.update(camera.position.x, camera.position.z, elapsed);

@@ -37,7 +37,7 @@ import { addBuilding, createBuildingMesh, KIND } from './building-mesh.js';
 import { computeTileNodes, buildTileMesh, meshHeightAt } from './tile-mesh.js';
 import { leafAt, selectTiles } from './quadtree.js';
 import { createRng } from './noise.js';
-import { WORLD, QUADTREE, CAMERA, PORTAL, TRAM, CAR } from './config.js';
+import { WORLD, QUADTREE, CAMERA, PORTAL, TRAM, CAR, ROAD, QUALITY } from './config.js';
 import { createTramNetwork } from './tram-network.js';
 import { createTramSim } from './tram-sim.js';
 import { placeStreetLights } from './street-lights.js';
@@ -946,6 +946,174 @@ section('H tram + lights');
   let benchBad = 0;
   for (let i = 0; i < benches.count; i++) { net.carve(benches.x[i], benches.z[i], li); if (buildings.collide(benches.x[i], benches.z[i], 0.3) || li.sdCar < 0) benchBad++; }
   check('the parks have benches (> 100), none in a house or in a carriageway', benches.count > 100 && benchBad === 0, `${benches.count} benches, ${benchBad} in a house or a road`);
+}
+
+/* ---------------------------------------------------------------- I: the roads are smooth, level ribbons */
+section('I smooth roads');
+{
+  // Ian: "the road is really bumpy and not level at all".  A real street is smooth along its length (only its real gradient), has
+  // a gentle constant crossfall and a kerb of constant height; and what the player SEES (the render tile of the lattice the game
+  // uses at that distance) is the same surface as the height function, at every quality level.
+  const li = { sdCar: 9, sdPave: 9 };
+  const rng = createRng(77);
+  const WINDOW = 10, MAX_DEV = 0.03, MAX_CROSSFALL = 0.025, MAX_KERB_DEV = 0.03;
+  const GC = 32, gk = (a, b) => a * 4096 + b, segGrid = new Map();
+  for (const ch of net.chains) for (let i = 1; i < ch.x.length; i++) {
+    const x0 = Math.floor(Math.min(ch.x[i - 1], ch.x[i]) / GC), x1 = Math.floor(Math.max(ch.x[i - 1], ch.x[i]) / GC);
+    const z0 = Math.floor(Math.min(ch.z[i - 1], ch.z[i]) / GC), z1 = Math.floor(Math.max(ch.z[i - 1], ch.z[i]) / GC);
+    for (let a = x0; a <= x1; a++) for (let b = z0; b <= z1; b++) { const k = gk(a, b); const l = segGrid.get(k); if (l) l.push(ch, i); else segGrid.set(k, [ch, i]); }
+  }
+  /** A junction apron: the point lies on or beside the carriageway + pavement (+ 3 m) of another carved way, where the two surfaces are
+   *  blended on purpose; or under a way that rides over it (the ground there is the DTM). */
+  const JUNCTION_MARGIN = 3;
+  function inJunction(roadIndexOf, x, z) {
+    if (net.protection(x, z) > 0) return true;
+    const cx = Math.floor(x / GC), cz = Math.floor(z / GC);
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
+      const l = segGrid.get(gk(cx + a, cz + b));
+      if (!l) continue;
+      for (let q = 0; q < l.length; q += 2) {
+        const o = l[q], j = l[q + 1];
+        if (o.road === roadIndexOf) continue;
+        const ax = o.x[j - 1], az = o.z[j - 1], ex = o.x[j] - ax, ez = o.z[j] - az, ll = ex * ex + ez * ez;
+        let t = ll > 1e-9 ? ((x - ax) * ex + (z - az) * ez) / ll : 0;
+        t = t < 0 ? 0 : t > 1 ? 1 : t;
+        if (Math.hypot(x - ax - ex * t, z - az - ez * t) < net.info[o.road].a0 + JUNCTION_MARGIN) return true;
+      }
+    }
+    return false;
+  }
+  // the ways: carved, at ground level (layer 0, not riding over anything), long enough to hold a window; half in the town, half outside
+  const urban = [], rural = [];
+  for (const ch of net.chains) {
+    if (ch.tagged || net.overRoads.has(ch.road) || ch.arc[ch.arc.length - 1] < 3 * WINDOW) continue;
+    const mid = Math.floor(ch.x.length / 2);
+    (buildings.near(ch.x[mid], ch.z[mid], 60).length > 6 ? urban : rural).push(ch);
+  }
+  const pick = (list, n) => { const out = [], pool = list.slice(); while (out.length < n && pool.length) out.push(pool.splice(Math.floor(rng() * pool.length), 1)[0]); return out; };
+  const ways = [...pick(urban, 100), ...pick(rural, 100)];
+  let measured = 0, worstDev = 0, worstAt = null, badWays = 0, worstFall = 0, worstFallAt = null, fallBad = 0, kerbWorst = 0, kerbBad = 0, kerbMeasured = 0, points = 0;
+  const lineAt = (ch, d, out) => {                                     // the point of the centre line at the distance d along it
+    let k = 0;
+    while (k < ch.arc.length - 2 && ch.arc[k + 1] < d) k++;
+    const t = (d - ch.arc[k]) / Math.max(1e-9, ch.arc[k + 1] - ch.arc[k]);
+    out.x = ch.x[k] + (ch.x[k + 1] - ch.x[k]) * t; out.z = ch.z[k] + (ch.z[k + 1] - ch.z[k]) * t;
+    const l = Math.hypot(ch.x[k + 1] - ch.x[k], ch.z[k + 1] - ch.z[k]) || 1;
+    out.nx = -(ch.z[k + 1] - ch.z[k]) / l; out.nz = (ch.x[k + 1] - ch.x[k]) / l;
+    return out;
+  };
+  const pt = { x: 0, z: 0, nx: 0, nz: 0 };
+  for (const ch of ways) {
+    const L = ch.arc[ch.arc.length - 1], m = Math.floor(L);
+    const hw = net.info[ch.road].hw, kerbW = net.info[ch.road].kerbW, kerbH = net.info[ch.road].kerbH;
+    const h = new Float64Array(m + 1), clean = new Uint8Array(m + 1);
+    for (let q = 0; q <= m; q++) {
+      lineAt(ch, q, pt);
+      h[q] = surface.height(pt.x, pt.z);
+      clean[q] = inJunction(ch.road, pt.x, pt.z) ? 0 : 1;
+    }
+    let wayWorst = 0, any = false;
+    for (let q = WINDOW; q <= m - WINDOW; q++) {
+      let ok = true;
+      for (let j = -WINDOW; j <= WINDOW; j++) if (!clean[q + j]) { ok = false; break; }
+      if (!ok) continue;
+      any = true; points++;
+      let sum = 0;
+      for (let j = -WINDOW; j <= WINDOW; j++) sum += h[q + j];
+      const dev = Math.abs(h[q] - sum / (2 * WINDOW + 1));
+      if (dev > wayWorst) wayWorst = dev;
+      if (dev > worstDev) { worstDev = dev; worstAt = `${data.roads[ch.road].name || data.roads[ch.road].kind} ${Math.round(pt.x)},${Math.round(pt.z)}`; lineAt(ch, q, pt); worstAt = `${data.roads[ch.road].name || data.roads[ch.road].kind} at ${Math.round(pt.x)},${Math.round(pt.z)}`; }
+      if (q % 3 === 0) {
+        lineAt(ch, q, pt);
+        // the crossfall: left and right of the centre line, inside the carriageway
+        const w = hw * 0.8;
+        const fall = Math.abs(surface.height(pt.x - pt.nx * w, pt.z - pt.nz * w) - surface.height(pt.x + pt.nx * w, pt.z + pt.nz * w)) / (2 * w);
+        if (fall > worstFall) { worstFall = fall; worstFallAt = `${data.roads[ch.road].name || data.roads[ch.road].kind} at ${Math.round(pt.x)},${Math.round(pt.z)}`; }
+        if (fall > MAX_CROSSFALL) fallBad++;
+        // the kerb: its height over the carriageway beside it is the same all along the street
+        if (kerbH > 0) {
+          const a = field.height(pt.x + pt.nx * (hw - 0.15), pt.z + pt.nz * (hw - 0.15), li), onKerb = li.road === ch.road;
+          const b = field.height(pt.x + pt.nx * (hw + kerbW + 0.1), pt.z + pt.nz * (hw + kerbW + 0.1), li);
+          if (onKerb && li.sdCar > 0.05) {
+            kerbMeasured++;
+            const dk = Math.abs((b - a) - kerbH);
+            if (dk > kerbWorst) kerbWorst = dk;
+            if (dk > MAX_KERB_DEV) kerbBad++;
+          }
+        }
+      }
+    }
+    if (any) measured++;
+    if (wayWorst > MAX_DEV) badWays++;
+  }
+  stats.roadSmooth = { ways: ways.length, measuredWays: measured, points, worstDevCm: +(worstDev * 100).toFixed(2), worstCrossfallPct: +(worstFall * 100).toFixed(2), kerbWorstCm: +(kerbWorst * 100).toFixed(2) };
+  check('the carved ways measured are enough (200 sampled, urban + rural, most with a clean stretch)', measured >= 150, `${measured} of ${ways.length} ways, ${points} points`);
+  check(`every carved centre line is within ${MAX_DEV * 100} cm of its 20 m moving mean (no waves, no bumps; junction aprons and underpasses excepted)`, badWays === 0, `${badWays} ways over, worst ${(worstDev * 100).toFixed(2)} cm at ${worstAt}`);
+  check(`the crossfall is gentle and constant (<= ${MAX_CROSSFALL * 100} %)`, fallBad === 0, `${fallBad} points over, worst ${(worstFall * 100).toFixed(2)} % at ${worstFallAt}`);
+  check(`the kerb stands at a constant height (+-${MAX_KERB_DEV * 100} cm of ${(ROAD.kerbHeight * 100).toFixed(0)} cm)`, kerbBad === 0 && kerbMeasured > 200, `${kerbMeasured} kerbs measured, ${kerbBad} off, worst ${(kerbWorst * 100).toFixed(2)} cm`);
+}
+
+/* ---------------------------------------------------------------- J: what is drawn near the car is the surface, at every quality */
+section('J render lattice');
+{
+  // The tile the game builds for the car at each quality level (the same quadtree selection, the same tile builder): within 40 m of
+  // the car the lattice is the 1 m physics lattice and the carriageway of the mesh is the height function to the centimetre; within
+  // 80 m it is at most a 2 m lattice (the UI branch's low quality left a 4 m lattice from 26 m on, a faceted street in front of the car).
+  const li = { sdCar: 9, sdPave: 9 };
+  const rng2 = createRng(91);
+  const ways = net.chains.filter((c) => !c.tagged && !net.overRoads.has(c.road) && c.arc[c.arc.length - 1] > 40);
+  const MAX_MESH_DEV = 0.03;
+  for (const [qid, Q] of Object.entries(QUALITY)) {
+    let worst = 0, worstAt = '', measured = 0, coarseNear = 0, coarseMid = 0, bad = 0;
+    for (let n = 0; n < (QUICK ? 6 : 24); n++) {
+      const ch = ways[Math.floor(rng2() * ways.length)];
+      const d = rng2() * ch.arc[ch.arc.length - 1];
+      let k = 0;
+      while (k < ch.arc.length - 2 && ch.arc[k + 1] < d) k++;
+      const t = (d - ch.arc[k]) / Math.max(1e-9, ch.arc[k + 1] - ch.arc[k]);
+      const cx = ch.x[k] + (ch.x[k + 1] - ch.x[k]) * t, cz = ch.z[k] + (ch.z[k + 1] - ch.z[k]) * t;
+      const sel = selectTiles(cx, cz, { scale: Q.lodScale, protectedSize: Q.protectedSize });
+      const near = sel.leaves.filter((l) => Math.hypot(Math.max(l.x0 - cx, 0, cx - l.x0 - l.size), Math.max(l.z0 - cz, 0, cz - l.z0 - l.size)) <= 80);
+      for (const l of near) {
+        const dist = Math.hypot(Math.max(l.x0 - cx, 0, cx - l.x0 - l.size), Math.max(l.z0 - cz, 0, cz - l.z0 - l.size));
+        if (dist <= 40 && l.step > 1) coarseNear++;
+        if (l.step > 2) coarseMid++;
+      }
+      // the carriageway points of the roads within 40 m of the car, read from the mesh of their tile
+      const meshes = new Map();
+      for (const l of near) {
+        if (Math.hypot(Math.max(l.x0 - cx, 0, cx - l.x0 - l.size), Math.max(l.z0 - cz, 0, cz - l.z0 - l.size)) > 40) continue;
+        meshes.set(l.key, { l, mesh: buildTileMesh(l, computeTileNodes(l, surface, field), sel.split, field) });
+      }
+      for (const way of net.chains) {
+        if (way.tagged || net.overRoads.has(way.road)) continue;
+        const hwW = net.info[way.road].hw;
+        for (let i = 0; i < way.x.length; i++) {
+          if (Math.hypot(way.x[i] - cx, way.z[i] - cz) > 40) continue;
+          const nx = i + 1 < way.x.length ? -(way.z[i + 1] - way.z[i]) : -(way.z[i] - way.z[i - 1]);
+          const nz = i + 1 < way.x.length ? (way.x[i + 1] - way.x[i]) : (way.x[i] - way.x[i - 1]);
+          const nl = Math.hypot(nx, nz) || 1;
+          for (const lat of [-0.8, 0, 0.8]) {
+            const px = way.x[i] + (nx / nl) * lat * hwW, pz = way.z[i] + (nz / nl) * lat * hwW;
+            const leaf = leafAt(sel.split, px, pz);
+            const entry = leaf && meshes.get(leaf.key);
+            if (!entry) continue;
+            // a point near the border of its tile is stitched to the coarser neighbour: the mesh there is the neighbour's polyline
+            if (px - leaf.x0 < leaf.step * 1.5 || leaf.x0 + leaf.size - px < leaf.step * 1.5 || pz - leaf.z0 < leaf.step * 1.5 || leaf.z0 + leaf.size - pz < leaf.step * 1.5) continue;
+            net.carve(px, pz, li);
+            if (li.sdCar > -0.3 || li.road !== way.road) continue;              // only the tarmac of this way (a junction is the blend of two)
+            const dv = Math.abs(meshHeightAt(entry.mesh, px, pz) - field.height(px, pz));
+            measured++;
+            if (dv > MAX_MESH_DEV) bad++;
+            if (dv > worst) { worst = dv; worstAt = `${Math.round(px)},${Math.round(pz)} step ${leaf.step}`; }
+          }
+        }
+      }
+    }
+    stats[`renderLattice_${qid}`] = { measured, worstCm: +(worst * 100).toFixed(2) };
+    check(`${qid}: the lattice within 40 m of the car is 1 m, within 80 m at most 2 m (a road is never faceted near the car)`, coarseNear === 0 && coarseMid === 0, `${coarseNear} tiles near coarser than 1 m, ${coarseMid} within 80 m coarser than 2 m`);
+    check(`${qid}: the tile mesh within 40 m is the height function on the carriageway (<= ${MAX_MESH_DEV * 100} cm)`, measured > 100 && bad === 0, `${measured} points, ${bad} off, worst ${(worst * 100).toFixed(2)} cm at ${worstAt}`);
+  }
 }
 
 /* ---------------------------------------------------------------- the summary */

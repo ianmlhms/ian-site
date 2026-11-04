@@ -14,6 +14,7 @@
  * Pure functions: the same code feeds the render mesh, the physics lattice and the Node harness. */
 import { ROAD } from './config.js';
 import { ROAD_KINDS, kindInfo } from './roads.js';
+import { designBed } from './road-bed.js';
 
 const CELL = ROAD.cell;                 // m, the spatial hash cell (the biggest kernel radius fits inside it)
 const BATTER_STEP = 2.0;               // m, the step of the walk that finds where the batter gives up
@@ -24,6 +25,14 @@ const PROTECT_MARGIN = 4.0;            // m: the ground beside an over way is pr
 const PROTECT_FADE = 10.0;             // m: the protection fades out over this distance, so the ground is never a wall
 const PROTECT_CELL = 64;               // m, the cell of the spatial hash of the protected corridors
 const smoothstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const MAX_PINS = 16;                   // carriageways that lie over one point, at most
+const MAX_CAND = 192;                  // segments that reach one point, at most
+const ARM_GAP = 3;                     // segments: two stretches of one way this far apart are different arms (a hairpin)
+const CAP_SOFT = 2.0;                  // m: the carriageway pin ends this softly past the END of a way (no flat disc at the end of a street)
+const PIN_FADE = 1.5;                  // m: the carriageway level fades into the batter over this distance beyond the pavement
+const JUNCTION_LEVEL = 0.6;            // m: two ways meet at a junction when their beds differ by less than this where they meet (more: one is over the other)
+const END_JOIN = 3.0;                  // m: the ends of ways this close to one another meet at one node
+const JUNCTION_TOUCH = 0.6;           // m: a way whose centre line lies within the pavement (+ this) of another way runs into it: the apron of the junction is the level of that way
 const KERB_SURFACES = new Set(['asphalt', 'cobble', 'concrete']);
 
 /** Resamples a polyline (array of [x, z]) every `spacing` m, keeping its shape. Returns { x: number[], z: number[] }. */
@@ -108,6 +117,190 @@ export function createRoadNetwork(roads, baseHeight) {
     return Math.min(maxEdge, lastFail + BATTER_STEP);
   }
 
+  const priority = new Float32Array(roads.length);     // the order of the design: the bigger way has the higher number (it wins at a junction)
+  const prep = [];                   // the ways that are carved, with everything the second pass needs
+  // ---- the crossings: which way rides over which -------------------------
+  // At a crossing the two ways are at their own level.  If one of them is more than OVER_LEVEL higher than the
+  // other, it rides OVER it: its earthworks (the fill of the DTM) are the ground there, so it is never carved, and
+  // the ground under it is protected.  The way that goes under it may not dig a hole in it: the reviewer saw the cut
+  // of the lower road carved into the crossing road, so the bridge road dived into a dark pit.
+  const overRoads = new Set();
+  const crossings = [];            // the crossings of two ways where one of them rides over the other
+  const crossingKeys = new Set();
+
+  /** Where the segment AB crosses the segment CD: the parameters t (on AB) and u (on CD), or null. */
+  function crossing(ax, az, bx, bz, cx, cz, dx, dz) {
+    const rx = bx - ax, rz = bz - az, sx = dx - cx, sz = dz - cz;
+    const den = rx * sz - rz * sx;
+    if (Math.abs(den) < 1e-9) return null;
+    const qx = cx - ax, qz = cz - az;
+    const t = (qx * sz - qz * sx) / den;
+    const u = (qx * rz - qz * rx) / den;
+    if (t < 0 || t > 1 || u < 0 || u > 1) return null;
+    return [t, u];
+  }
+
+  function findCrossings() {
+    for (const chain of chains) if (chain.tagged) overRoads.add(chain.road);
+    // the ways that OSM does not tag: their crossings are the ones that have to be found
+    const cands = chains.filter((chain) => !chain.tagged);
+    const GC = 32;                                   // m, the cell of the grid of the centre lines
+    const gkey = (cx, cz) => cx * 4096 + cz;
+    const grid = new Map();
+    const cellRange = (ax, az, bx, bz) => [
+      Math.floor(Math.min(ax, bx) / GC), Math.floor(Math.max(ax, bx) / GC),
+      Math.floor(Math.min(az, bz) / GC), Math.floor(Math.max(az, bz) / GC),
+    ];
+    for (const chain of cands) {
+      for (let i = 1; i < chain.x.length; i++) {
+        const [cx0, cx1, cz0, cz1] = cellRange(chain.x[i - 1], chain.z[i - 1], chain.x[i], chain.z[i]);
+        for (let cx = cx0; cx <= cx1; cx++) {
+          for (let cz = cz0; cz <= cz1; cz++) {
+            const k = gkey(cx, cz);
+            const list = grid.get(k);
+            if (list) list.push(chain, i); else grid.set(k, [chain, i]);
+          }
+        }
+      }
+    }
+    for (const chain of cands) {
+      for (let i = 1; i < chain.x.length; i++) {
+        const ax = chain.x[i - 1], az = chain.z[i - 1], bx = chain.x[i], bz = chain.z[i];
+        const [cx0, cx1, cz0, cz1] = cellRange(ax, az, bx, bz);
+        for (let cx = cx0; cx <= cx1; cx++) {
+          for (let cz = cz0; cz <= cz1; cz++) {
+            const list = grid.get(gkey(cx, cz));
+            if (!list) continue;
+            for (let q = 0; q < list.length; q += 2) {
+              const other = list[q], j = list[q + 1];
+              if (other.road <= chain.road) continue;      // every crossing is looked at once
+              const hit = crossing(ax, az, bx, bz, other.x[j - 1], other.z[j - 1], other.x[j], other.z[j]);
+              if (!hit) continue;
+              const bedA = chain.bed[i - 1] + (chain.bed[i] - chain.bed[i - 1]) * hit[0];
+              const bedB = other.bed[j - 1] + (other.bed[j] - other.bed[j - 1]) * hit[1];
+              if (bedA > bedB + OVER_LEVEL) overRoads.add(chain.road);
+              else if (bedB > bedA + OVER_LEVEL) overRoads.add(other.road);
+              else continue;
+              // the crossing is recorded: the harness checks that the over way does not dive into a pit there
+              const px = ax + (bx - ax) * hit[0], pz = az + (bz - az) * hit[0];
+              const key = Math.round(px) * 100000 + Math.round(pz);
+              if (crossingKeys.has(key)) continue;
+              crossingKeys.add(key);
+              crossings.push({
+                x: px, z: pz,
+                over: bedA > bedB ? chain.road : other.road,
+                under: bedA > bedB ? other.road : chain.road,
+                bedOver: Math.max(bedA, bedB), bedUnder: Math.min(bedA, bedB),
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+
+  /** The class of a way for the order of the design: the bigger way is designed first and the smaller ones meet it. */
+  const CLASS_RANK = { motorway: 9, motorway_link: 8.5, trunk: 8, trunk_link: 7.5, primary: 7, primary_link: 6.5, secondary: 6, secondary_link: 5.5,
+    tertiary: 5, tertiary_link: 4.5, unclassified: 4, residential: 4, living_street: 3, road: 3, pedestrian: 2, busway: 2, service: 2, track: 1 };
+  const roadRank = (road, hw) => (CLASS_RANK[road.kind] ?? 1) + hw * 0.01;
+
+  /** The junctions.  Two kinds, and both give ONE level surface at the meeting point:
+   *   - the ENDS of ways that meet at a node (a street that OSM splits into two ways, with a side street ending at the same
+   *     node): the bed of every one of them at the end is the mean of the beds that were designed for them on their own;
+   *   - a way that runs INTO the carriageway of another way (a side street ends on the main road, two roads cross): it is pinned
+   *     to the bed of the way that was designed before it (a bigger class, or the same class and longer).  The end cap of a
+   *     way is not a junction of this kind (the through street beside it passes it, it does not cross it).
+   *  The pins are heavy weights in the smoother (road-bed.js), so a profile reaches its junction smoothly instead of with a hump
+   *  (the reviewer's "rides on a blanket" was, among other things, the beds of a crossing differing by a hand's breadth and being
+   *  averaged into a bump on the carriageway). */
+  function reconcileJunctions() {
+    const GC = 32;
+    const gkey = (cx, cz) => cx * 4096 + cz;
+    // ---- 1. the ends that meet
+    const endGrid = new Map();
+    const ends = [];
+    for (const chain of chains) {
+      const n = chain.x.length;
+      for (const k of n > 1 ? [0, n - 1] : [0]) {
+        const e = { chain, k, x: chain.x[k], z: chain.z[k], h: chain.bed[k], cluster: -1 };
+        ends.push(e);
+        const kk = gkey(Math.floor(e.x / GC), Math.floor(e.z / GC));
+        const list = endGrid.get(kk);
+        if (list) list.push(e); else endGrid.set(kk, [e]);
+      }
+    }
+    const endPins = new Map();                  // chain -> Map(sample index -> level)
+    const pinOf = (chain) => { let m = endPins.get(chain); if (!m) { m = new Map(); endPins.set(chain, m); } return m; };
+    for (const e of ends) {
+      if (e.cluster >= 0) continue;
+      const members = [e];
+      e.cluster = 1;
+      for (let qi = 0; qi < members.length; qi++) {              // the ends within END_JOIN of one another (transitively)
+        const m = members[qi];
+        const cx = Math.floor(m.x / GC), cz = Math.floor(m.z / GC);
+        for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+          for (const o of endGrid.get(gkey(cx + dx, cz + dz)) || []) {
+            if (o.cluster >= 0 || o.chain === m.chain && o.k === m.k) continue;
+            if (Math.hypot(o.x - m.x, o.z - m.z) <= END_JOIN) { o.cluster = 1; members.push(o); }
+          }
+        }
+      }
+      if (members.length < 2) continue;
+      const hs = members.map((m) => m.h).sort((a, b) => a - b);
+      const mid = hs[hs.length >> 1];
+      const same = members.filter((m) => Math.abs(m.h - mid) <= JUNCTION_LEVEL);       // the way at another level rides over or under
+      if (same.length < 2) continue;
+      const mean = same.reduce((sum, m) => sum + m.h, 0) / same.length;
+      for (const m of same) pinOf(m.chain).set(m.k, mean);
+    }
+    // ---- 2. the ways that run into the carriageway of a way designed before them
+    const order = chains.slice().sort((a, b) => b.rank - a.rank || b.x.length - a.x.length || a.road - b.road);
+    order.forEach((chain, idx) => { priority[chain.road] = order.length - idx; });
+    const grid = new Map();
+    for (const chain of order) {
+      const pins = endPins.get(chain) || new Map();
+      const n = chain.x.length;
+      for (let k = 0; k < n; k++) {
+        const x = chain.x[k], z = chain.z[k];
+        let bestD = Infinity, bestH = 0;
+        const cx = Math.floor(x / GC), cz = Math.floor(z / GC);
+        for (let dz = -1; dz <= 1; dz++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const list = grid.get(gkey(cx + dx, cz + dz));
+            if (!list) continue;
+            for (let q = 0; q < list.length; q += 2) {
+              const other = list[q], j = list[q + 1];
+              const ax = other.x[j - 1], az = other.z[j - 1];
+              const ex = other.x[j] - ax, ez = other.z[j] - az;
+              const ll = ex * ex + ez * ez;
+              const t0 = ll > 1e-9 ? ((x - ax) * ex + (z - az) * ez) / ll : 0;
+              // the end cap of the other way is not a crossing (the foot of the perpendicular falls off its end)
+              if ((j === 1 && t0 < 0) || (j === other.x.length - 1 && t0 > 1)) continue;
+              const t = t0 < 0 ? 0 : t0 > 1 ? 1 : t0;
+              const d = Math.hypot(x - (ax + ex * t), z - (az + ez * t));
+              if (d > other.hw + JUNCTION_TOUCH || d >= bestD) continue;
+              const h = other.bed[j - 1] + (other.bed[j] - other.bed[j - 1]) * t;
+              if (Math.abs(h - chain.bed[k]) > JUNCTION_LEVEL) continue;    // a crossing at another level: one of them rides over the other
+              bestD = d; bestH = h;
+            }
+          }
+        }
+        if (bestD < Infinity) pins.set(k, bestH);
+      }
+      chain.pins = pins;                                  // (the harness reads them: the profile is free of curvature limits only there)
+      if (pins.size) chain.bed = designBed(chain.ground, chain.arc, pins);
+      for (let i = 1; i < n; i++) {
+        const x0 = Math.floor(Math.min(chain.x[i - 1], chain.x[i]) / GC), x1 = Math.floor(Math.max(chain.x[i - 1], chain.x[i]) / GC);
+        const z0 = Math.floor(Math.min(chain.z[i - 1], chain.z[i]) / GC), z1 = Math.floor(Math.max(chain.z[i - 1], chain.z[i]) / GC);
+        for (let cx = x0; cx <= x1; cx++) for (let cz = z0; cz <= z1; cz++) {
+          const kk = gkey(cx, cz);
+          const list = grid.get(kk);
+          if (list) list.push(chain, i); else grid.set(kk, [chain, i]);
+        }
+      }
+    }
+  }
+
   for (let ri = 0; ri < roads.length; ri++) {
     const road = roads[ri];
     firstSample[ri] = -1; firstSeg[ri] = -1; segCount[ri] = 0; info[ri] = null;
@@ -148,22 +341,26 @@ export function createRoadNetwork(roads, baseHeight) {
       // under it may not dig a hole in it (the reviewer saw the bridge road dive into a dark pit).
       continue;
     }
-    // the bed: the terrain along the centre line, smoothed (a road is smoother than the ground it lies on)
+    // the terrain under the centre line; the bed (the profile of the surface) is designed below, once every way is known,
+    // because the ways that meet must agree on the level of their junction
     const ground = rs.x.map((x, i) => baseHeight(x, rs.z[i]));
-    const bed = gaussianSmooth(ground, ROAD.bedSmoothing / ROAD.sampleSpacing);
-    // ... but never further than bedClamp from the ground: a street that runs over a cliff must not be smoothed
-    // into the cliff face, and a road that climbs a hill must not cut 5 m into it.
-    for (let i = 0; i < n; i++) {
-      const lo = ground[i] - ROAD.bedClamp, hi = ground[i] + ROAD.bedClamp;
-      bed[i] = Math.min(hi, Math.max(lo, bed[i]));
-    }
     // Every drivable way keeps its centre line and its bed: the crossings of the ways decide which one rides over
     // which.  That is how an overpass that OSM does not tag as a bridge (a slip road on a viaduct) is found.
-    chains.push({ road: ri, x: rs.x, z: rs.z, bed, tagged });
-    if (road.tunnel || tagged) {
-      // A tunnel and an over way are not carved.  The ground under an over way is protected (the corridor above).
-      continue;
-    }
+    const arc = new Float64Array(n);
+    for (let i = 1; i < n; i++) arc[i] = arc[i - 1] + Math.hypot(rs.x[i] - rs.x[i - 1], rs.z[i] - rs.z[i - 1]);
+    const chain = { road: ri, x: rs.x, z: rs.z, arc, ground, bed: null, tagged, hw, rank: roadRank(road, hw) };
+    chains.push(chain);
+    prep.push({ ri, road, rs, n, hw, kerbH, kerbW, pw, bench, a0, kind, chain });
+  }
+
+  // ---- the bed of every way: designed on its own first (this decides which way rides over which), then again with the
+  // junctions pinned to the ways that were designed before ----
+  for (const chain of chains) chain.bed = designBed(chain.ground, chain.arc);
+  findCrossings();
+  reconcileJunctions();
+
+  for (const { ri, road, rs, n, hw, kerbH, kerbW, pw, bench, a0, kind, chain } of prep) {
+    const bed = chain.bed;
     const radius = Math.min(ROAD.maxRadius, a0 + ROAD.falloff);
     // The BATTER reaches much farther than the paint: the ground beside the road is shaped by the slope limit over
     // the whole embankment, while the paint stops at the pavement (the painted tarmac must be the carriageway).
@@ -263,86 +460,6 @@ export function createRoadNetwork(roads, baseHeight) {
   const cells = new Map();
   for (const [key, list] of buckets) cells.set(key, Int32Array.from(list));
   const EMPTY = new Int32Array(0);
-
-  // ---- the crossings: which way rides over which -------------------------
-  // At a crossing the two ways are at their own level.  If one of them is more than OVER_LEVEL higher than the
-  // other, it rides OVER it: its earthworks (the fill of the DTM) are the ground there, so it is never carved, and
-  // the ground under it is protected.  The way that goes under it may not dig a hole in it: the reviewer saw the cut
-  // of the lower road carved into the crossing road, so the bridge road dived into a dark pit.
-  const overRoads = new Set();
-  const crossings = [];            // the crossings of two ways where one of them rides over the other
-  const crossingKeys = new Set();
-  for (const chain of chains) if (chain.tagged) overRoads.add(chain.road);
-
-  /** Where the segment AB crosses the segment CD: the parameters t (on AB) and u (on CD), or null. */
-  function crossing(ax, az, bx, bz, cx, cz, dx, dz) {
-    const rx = bx - ax, rz = bz - az, sx = dx - cx, sz = dz - cz;
-    const den = rx * sz - rz * sx;
-    if (Math.abs(den) < 1e-9) return null;
-    const qx = cx - ax, qz = cz - az;
-    const t = (qx * sz - qz * sx) / den;
-    const u = (qx * rz - qz * rx) / den;
-    if (t < 0 || t > 1 || u < 0 || u > 1) return null;
-    return [t, u];
-  }
-
-  {
-    // the ways that OSM does not tag: their crossings are the ones that have to be found
-    const cands = chains.filter((chain) => !chain.tagged);
-    const GC = 32;                                   // m, the cell of the grid of the centre lines
-    const gkey = (cx, cz) => cx * 4096 + cz;
-    const grid = new Map();
-    const cellRange = (ax, az, bx, bz) => [
-      Math.floor(Math.min(ax, bx) / GC), Math.floor(Math.max(ax, bx) / GC),
-      Math.floor(Math.min(az, bz) / GC), Math.floor(Math.max(az, bz) / GC),
-    ];
-    for (const chain of cands) {
-      for (let i = 1; i < chain.x.length; i++) {
-        const [cx0, cx1, cz0, cz1] = cellRange(chain.x[i - 1], chain.z[i - 1], chain.x[i], chain.z[i]);
-        for (let cx = cx0; cx <= cx1; cx++) {
-          for (let cz = cz0; cz <= cz1; cz++) {
-            const k = gkey(cx, cz);
-            const list = grid.get(k);
-            if (list) list.push(chain, i); else grid.set(k, [chain, i]);
-          }
-        }
-      }
-    }
-    for (const chain of cands) {
-      for (let i = 1; i < chain.x.length; i++) {
-        const ax = chain.x[i - 1], az = chain.z[i - 1], bx = chain.x[i], bz = chain.z[i];
-        const [cx0, cx1, cz0, cz1] = cellRange(ax, az, bx, bz);
-        for (let cx = cx0; cx <= cx1; cx++) {
-          for (let cz = cz0; cz <= cz1; cz++) {
-            const list = grid.get(gkey(cx, cz));
-            if (!list) continue;
-            for (let q = 0; q < list.length; q += 2) {
-              const other = list[q], j = list[q + 1];
-              if (other.road <= chain.road) continue;      // every crossing is looked at once
-              const hit = crossing(ax, az, bx, bz, other.x[j - 1], other.z[j - 1], other.x[j], other.z[j]);
-              if (!hit) continue;
-              const bedA = chain.bed[i - 1] + (chain.bed[i] - chain.bed[i - 1]) * hit[0];
-              const bedB = other.bed[j - 1] + (other.bed[j] - other.bed[j - 1]) * hit[1];
-              if (bedA > bedB + OVER_LEVEL) overRoads.add(chain.road);
-              else if (bedB > bedA + OVER_LEVEL) overRoads.add(other.road);
-              else continue;
-              // the crossing is recorded: the harness checks that the over way does not dive into a pit there
-              const px = ax + (bx - ax) * hit[0], pz = az + (bz - az) * hit[0];
-              const key = Math.round(px) * 100000 + Math.round(pz);
-              if (crossingKeys.has(key)) continue;
-              crossingKeys.add(key);
-              crossings.push({
-                x: px, z: pz,
-                over: bedA > bedB ? chain.road : other.road,
-                under: bedA > bedB ? other.road : chain.road,
-                bedOver: Math.max(bedA, bedB), bedUnder: Math.min(bedA, bedB),
-              });
-            }
-          }
-        }
-      }
-    }
-  }
 
   // ---- the protected corridors: the ground under a way that rides over the others stays the ground -----
   const protX0 = [], protZ0 = [], protX1 = [], protZ1 = [], protHalf = [];
@@ -449,6 +566,9 @@ export function createRoadNetwork(roads, baseHeight) {
    *  roads count as crossing when their directions differ by more than this (sine): two ways that continue one street
    *  meet end to end at a small angle and are not a junction. */
   const MARK_CLEAR = 3.5, CROSS_SIN = 0.35, MAX_PARTNERS = 6;
+  const candI = new Int32Array(MAX_CAND), candD = new Float32Array(MAX_CAND), candT = new Float32Array(MAX_CAND), candLat = new Float32Array(MAX_CAND), candOver = new Float32Array(MAX_CAND);
+  const pinPri = new Float32Array(MAX_PINS), pinVal = new Float32Array(MAX_PINS), pinWt = new Float32Array(MAX_PINS);
+  const armOf = new Int32Array(MAX_CAND), armFirst = new Uint8Array(MAX_CAND), slotRoad = new Int32Array(MAX_CAND), slotArm1 = new Int32Array(MAX_CAND), slotArm2 = new Int32Array(MAX_CAND);
   const partnerId = new Int32Array(MAX_PARTNERS), partnerDx = new Float32Array(MAX_PARTNERS), partnerDz = new Float32Array(MAX_PARTNERS);
   const scratch = { coverage: 0, bed: 0, band: 0, kerb: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, dist: 0, lines: 0, lanes: 0, s: 0, surface: 0, sdCar: SD_FAR, sdPave: SD_FAR, junction: 0 };
 
@@ -502,6 +622,12 @@ export function createRoadNetwork(roads, baseHeight) {
     // was the ragged kerb and pavement the reviewer saw.
     let sdCar = SD_FAR, sdPave = SD_FAR;
     let partners = 0;               // the marked roads whose carriageway (plus the clearance) holds this point
+    // ---- pass 1: the segments that reach this point.  Only the NEAREST segment of every way takes part (and, where the same way
+    // comes back past this point - a hairpin, a loop - the nearest segment of the other arm): the ground at a point is the
+    // ground of the way as it passes THIS point.  Summing every segment in reach (the first version) mixed in the bed of
+    // the segments 5 .. 20 m along the same road, and their batter is the noisy LAND, so the noise of the land leaked into
+    // the carriageway with a weight of a third: the ripples a driver felt.
+    let nCand = 0;
     for (let dz = -1; dz <= 1; dz++) {
       for (let dx = -1; dx <= 1; dx++) {
         const list = cells.get(cellKey(cx + dx, cz + dz)) || EMPTY;
@@ -513,13 +639,49 @@ export function createRoadNetwork(roads, baseHeight) {
           const ax = X0[i], az = Z0[i];
           const ex = X1[i] - ax, ez = Z1[i] - az;
           const ll = ex * ex + ez * ez;
-          let t = ll > 1e-9 ? ((x - ax) * ex + (z - az) * ez) / ll : 0;
-          t = t < 0 ? 0 : t > 1 ? 1 : t;
+          const t0 = ll > 1e-9 ? ((x - ax) * ex + (z - az) * ez) / ll : 0;
+          const t = t0 < 0 ? 0 : t0 > 1 ? 1 : t0;
           const rx = x - (ax + ex * t), rz = z - (az + ez * t);
           const len = Math.sqrt(ll) || 1;
           const lat = (rx * -ez + rz * ex) / len;         // the signed offset from the LINE of the way (right is positive)
           const d = Math.hypot(rx, rz);                  // the distance to the SEGMENT of the way
-          if (d >= reach) continue;
+          if (d >= reach || nCand >= MAX_CAND) continue;
+          // how far the point lies beyond the END of the way (0 along the way): the carriageway ends at the end of the way
+          let over = 0;
+          if (t0 < 0 && i === firstSeg[ROADOF[i]]) over = -t0 * len;
+          else if (t0 > 1 && i === firstSeg[ROADOF[i]] + segCount[ROADOF[i]] - 1) over = (t0 - 1) * len;
+          candI[nCand] = i; candD[nCand] = d; candT[nCand] = t; candLat[nCand] = lat; candOver[nCand] = over; nCand++;
+        }
+      }
+    }
+    // ---- pass 2: pick the arms (the nearest segment of a way; the nearest segment of its other arm, 3+ segments away)
+    let nArms = 0, nSlots = 0;
+    for (let c = 0; c < nCand; c++) {
+      const r = ROADOF[candI[c]];
+      let sl = 0;
+      while (sl < nSlots && slotRoad[sl] !== r) sl++;
+      if (sl === nSlots) { slotRoad[sl] = r; slotArm1[sl] = c; slotArm2[sl] = -1; nSlots++; }
+      else if (candD[c] < candD[slotArm1[sl]]) slotArm1[sl] = c;
+    }
+    for (let c = 0; c < nCand; c++) {
+      let sl = 0;
+      while (slotRoad[sl] !== ROADOF[candI[c]]) sl++;
+      const a1 = slotArm1[sl];
+      if (c === a1 || Math.abs(candI[c] - candI[a1]) < ARM_GAP) continue;
+      if (slotArm2[sl] < 0 || candD[c] < candD[slotArm2[sl]]) slotArm2[sl] = c;
+    }
+    for (let sl = 0; sl < nSlots; sl++) {
+      armOf[nArms] = slotArm1[sl]; armFirst[nArms++] = 1;
+      if (slotArm2[sl] >= 0) { armOf[nArms] = slotArm2[sl]; armFirst[nArms++] = 0; }
+    }
+    let nPins = 0;     // the carriageway: the bed of the ways whose carriageway (plus the pavement) holds this point
+    for (let ar = 0; ar < nArms; ar++) {
+      const c = armOf[ar];
+      const i = candI[c], t = candT[c], lat = candLat[c], d = candD[c], over = candOver[c];
+      {
+        {
+          const ex = X1[i] - X0[i], ez = Z1[i] - Z0[i];
+          const len = Math.sqrt(ex * ex + ez * ez) || 1;
           // ---- the batter: the face of the cutting or of the embankment beside the road.
           // The ground beside a road is the LAND, and the road is cut into it.  The face of the cutting (or of the
           // embankment) starts at the edge of the pavement, at the level of the road, and it goes back to the land
@@ -541,6 +703,13 @@ export function createRoadNetwork(roads, baseHeight) {
           // limits the slope of its face, so the face is a ramp and not a wall.
           const off = ground - bed;
           const level = notch >= 0 ? 1 : 1 - smoothstep(LEVEL_FULL, LEVEL_FADE, -off);
+          // The CARRIAGEWAY (and the pavement beside it) lies exactly at the bed of its way: a pin that is 1 on the road and fades
+          // out over PIN_FADE metres.  The batter below shapes the ground beside the road; it must not shape the road.  A way
+          // that rides over the others keeps the DTM (its fill) and is not pinned.
+          if (!NOBATTER[i] && armFirst[ar]) {      // (only the nearest arm of a way pins the road: the other arm only shapes the batter)
+            const pin = (1 - smoothstep(bench, bench + PIN_FADE, d)) * level * (1 - smoothstep(0, CAP_SOFT, over));
+            if (pin > 0 && nPins < MAX_PINS) { pinPri[nPins] = priority[ROADOF[i]]; pinVal[nPins] = bed; pinWt[nPins] = pin; nPins++; }
+          }
           if (level >= 0.5) {                      // a road that is far from the ground here (a cutting above, a viaduct) is not painted
             const eCar = d - HW[i], ePave = d - a0;
             if (eCar < sdCar) sdCar = eCar;
@@ -631,7 +800,18 @@ export function createRoadNetwork(roads, baseHeight) {
     // others is the land, and the cut of the road that goes under it ramps up to that land over the fade of the
     // corridor.  Scaling the claim instead would keep the shape of the cut and only lose its weight, and the ground
     // would jump from the land to the full cut in half a metre: the wall the reviewer saw beside Rue de Kirchberg.
-    out.band = devW > 0 ? ground + (1 - prot) * (devSum / devW) : ground;
+    let bandY = devW > 0 ? ground + devSum / devW : ground;
+    // The ways lay their carriageway over the ground in the order of their rank: the smallest way first, the biggest last, so
+    // that at a junction the surface IS the bed of the bigger way (flat across, smooth along) and the side street joins it.
+    // Averaging the beds of the ways that meet (the first version) made a hump of a hand's breadth on the main road.
+    for (let a = 1; a < nPins; a++) {                          // insertion sort by priority, ascending (a handful of entries)
+      const pr = pinPri[a], v = pinVal[a], wt = pinWt[a];
+      let b = a - 1;
+      while (b >= 0 && pinPri[b] > pr) { pinPri[b + 1] = pinPri[b]; pinVal[b + 1] = pinVal[b]; pinWt[b + 1] = pinWt[b]; b--; }
+      pinPri[b + 1] = pr; pinVal[b + 1] = v; pinWt[b + 1] = wt;
+    }
+    for (let a = 0; a < nPins; a++) bandY += (pinVal[a] - bandY) * pinWt[a];
+    out.band = ground + (1 - prot) * (bandY - ground);
     // A junction: two marked roads of different ways that cross at an angle meet here.  The lane markings are cut
     // before it (a dash that ends in the middle of the crossing street is the fragment the reviewer saw).
     let junction = 0;
@@ -677,7 +857,7 @@ export function createRoadNetwork(roads, baseHeight) {
   }
 
   return {
-    carve, nearestRoad, roads, info, count, scratch, overRoads, crossings, chains,
+    carve, nearestRoad, roads, info, count, scratch, overRoads, crossings, chains, protection,
     segments: { X0, Z0, X1, Z1, BED0, BED1, HW, KERBH, KERBW, PW, A0, RAD, REACH, KIND, ROADOF, KERBON, LINES, S0, S1, SURF },
     // the centre lines as they are carved (resampled and rounded): the game, the minimap and the probes follow these
     samples: { x: SAMPLES_X, z: SAMPLES_Z, road: SAMPLES_ROAD, first: firstSample, segs: segCount },
