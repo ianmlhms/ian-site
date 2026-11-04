@@ -1029,8 +1029,8 @@ Cause: the bed was a Whittaker fit, a curvature limit of R = 550 m for EVERY way
   pin hands over to the face of the batter (FACE_JOIN), not steps.
 
 ### Gates (Mac mini, software GL)
-`node pb/lux-drive/harness.js` PASS, 85 checks (208 s; gate I: worst deviation 11.8 cm of an allowed 11 + 1 cm per class curve ... see gate text, bob 1.67 m/s2, crossfall 1.07 %, kerb 0.6 cm; J: mesh vs height worst 3.8 cm of 4 - it was 1.5 / 2.4 / 1.5
-before: the faces are steeper near the blends, the margin is thin); `luxdrive_world.mjs` PASS (draw calls 109 / 146 / 208, same as before); `luxdrive_holes.mjs` 0 hole pixels over 72 poses at medium AND `HOLES_Q=low`; `luxdrive_ui.mjs` PASS.
+`node pb/lux-drive/harness.js` PASS, 85 checks (208 s; gate I: bob 1.67 m/s2, no point over the vertical curve of its class by more than twice, crossfall 1.07 %, kerb 0.6 cm; J: mesh vs height worst 3.8 cm of 4 - it was 1.5 / 2.4 / 1.5
+before, so the margin is thin); `luxdrive_world.mjs` PASS (draw calls 109 / 146 / 208, same as before); `luxdrive_holes.mjs` 0 hole pixels over 72 poses at medium AND `HOLES_Q=low`; `luxdrive_ui.mjs` PASS.
 Cost: the carve is ~35 % slower (196 lattice blocks: 530 -> 720 ms in Node), the network build is the same (2.1 s).
 
 ### Still wrong (honest)
@@ -1040,4 +1040,4 @@ Cost: the carve is ~35 % slower (196 lattice blocks: 530 -> 720 ms in Node), the
 * Steps: 86 places over 5 cm remain (47 of them are two levels of a motorway interchange / terrace lying 2 .. 10 m apart: a retaining wall, Échangeur de Merl, Hellege-Geescht plateau; 33 on one way, mostly steep cut faces next to the
   carriageway).  The brief's "no step over 2 cm" is not met everywhere: the probes find 1386 places over 2 cm, almost all slope changes of a few cm at the foot of a face.
 * Two ways at different levels that run side by side (no crossing, so neither rides over the other) still end in a wall of 2 .. 4 m/m between their benches; PIN_FADE 3 m only softens it.
-* Gate J's margin is 0.2 mm of 4 cm at the worst place; not measured on a real GPU or an iPad.
+* Gate J's worst point is 3.8 cm of the 4 cm allowed (was 2.4); not measured on a real GPU or an iPad.
