@@ -991,7 +991,7 @@ such as the trees, no HUD in the picture) -> `montage.py`.
 | Bock | "pale slabs" | the skin is rough: 72 rays, 2.4 m facets, noisy lift, ochre / grey strata by height, a blue-grey fortress wall with coping + merlons on the rim, a ruined square tower, casemate mouths, bastions |
 | Passerelle | lower footway decks 11 / 14 left to the generic view (grey slabs seen through the arcade) | decks of the corridor whose median top is on the bridge (8, 11, 14, 16) are hidden and the model draws the viaduct; width ignores their dipping pinned ends; grey-tan stone |
 | Coque | flat pale shell | dark thick roof curving up like an upturned hull over teal glass with mullions |
-| Fort Thüngen | three towers on the three farthest corners | two big round towers on the two OSM circles (fitted: 5693 / 8215 r 5.3, 5724 / 8231 r 5.2) and a small third behind the wall; dark battered foot, corbel, arched frieze, slits, gold acorns |
+| Fort Thüngen | three towers on the three farthest corners | two big round towers on the two OSM circles (fitted: 5709 / 8215 r 5.3, 5724 / 8231 r 5.2) and a small third behind the wall; dark battered foot, corbel, arched frieze, slits, gold acorns |
 | Mudam | grey box with a plain glass gable | ivory limestone; Pei's glass pyramid with a square lantern tower, a slanted glass wing, a curved glass shell |
 | BCEE | square tower, black pyramid | ROUND stone tower with two gold clocks, belfry ring and a green copper cone with four dormers; slate roof on the wing |
 | Oberanven church | thick spire | slimmer, taller spire (not compared closely: the photos on Commons show the village, not the church) |
