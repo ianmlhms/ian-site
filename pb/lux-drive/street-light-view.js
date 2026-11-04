@@ -12,7 +12,7 @@ const SHOW_RADIUS = 230;               // m
 const CAPACITY = 520;                  // lamps drawn at most (the nearest ones)
 const REFRESH = 25;                    // m the camera moves before the set is rebuilt
 const CELL = 64;                       // m, the cell of the spatial hash
-const POOL_RADIUS = 4.6;               // m, the pool of light on the ground
+const POOL_RADIUS = 6.2;               // m, the pool of light on the ground
 const SMALL_SCALE = 0.8;               // the lamps of the side streets are lower
 const NIGHT_ON = 0.06;                 // the pools are drawn from this much night
 
@@ -42,7 +42,7 @@ export function createStreetLightView({ scene, lights, ground, env }) {
   const poolMaterial = new THREE.ShaderMaterial({
     uniforms: { uNight: env.uniforms.uNight },
     vertexShader: `varying float vR; void main(){ mat4 M = modelMatrix * instanceMatrix; vR = length(position.xz); gl_Position = projectionMatrix * viewMatrix * M * vec4(position, 1.0); }`,
-    fragmentShader: `precision highp float; uniform float uNight; varying float vR; void main(){ float a = pow(clamp(1.0 - vR, 0.0, 1.0), 2.0) * 0.42 * smoothstep(0.0, 0.5, uNight); gl_FragColor = vec4(vec3(1.0, 0.80, 0.46) * a, 1.0); }`,
+    fragmentShader: `precision highp float; uniform float uNight; varying float vR; void main(){ float a = pow(clamp(1.0 - vR, 0.0, 1.0), 2.0) * 0.8 * smoothstep(0.0, 0.5, uNight); gl_FragColor = vec4(vec3(1.0, 0.80, 0.46) * a, 1.0); }`,
     blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
   });
   const pools = new THREE.InstancedMesh(poolGeometry(), poolMaterial, CAPACITY);

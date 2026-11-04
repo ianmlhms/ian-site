@@ -23,7 +23,7 @@ const byte = (v) => Math.round(Math.min(1, Math.max(0, v)) * 255);
  *  The class `urban` of the bake also covers the plots of a village that nobody has built on and the parcels of a planned
  *  neighbourhood: from above they read as grey washes in the middle of the fields.  Hard ground belongs where the houses are. */
 const DENSITY_RADIUS = 4;             // cells (8 m): the window is 72 m wide
-export function builtDensity(buildings, nx, nz) {
+export function builtDensity(buildings, nx, nz, radius = DENSITY_RADIUS) {
   const area = new Float32Array(nx * nz);
   for (const b of buildings) {
     const pts = b.pts;
@@ -37,9 +37,48 @@ export function builtDensity(buildings, nx, nz) {
     const ci = Math.min(nx - 1, Math.max(0, Math.floor(cx / n / CLASS_CELL))), cj = Math.min(nz - 1, Math.max(0, Math.floor(cz / n / CLASS_CELL)));
     area[cj * nx + ci] += Math.abs(a) / 2;
   }
-  // a separable box blur through running sums
+  return boxBlur(area, nx, nz, radius);
+}
+
+/** Is (x, z) inside the polygon (even-odd rule)? */
+function insidePolygon(pts, x, z) {
+  let inside = false;
+  const n = pts.length / 2;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const xi = pts[i * 2], zi = pts[i * 2 + 1], xj = pts[j * 2], zj = pts[j * 2 + 1];
+    if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+/** The built share of the close neighbourhood of every cell.  Unlike builtDensity the area is put where the building IS (every cell
+ *  whose middle is inside the footprint counts in full), because a window of 3 cells would otherwise see a 100 m long block only in
+ *  the one cell of its centre and call the ground along its wall empty. */
+export function builtCover(buildings, nx, nz, radius = NEAR_RADIUS) {
+  const cover = new Float32Array(nx * nz);
+  const cellArea = CLASS_CELL * CLASS_CELL;
+  for (const b of buildings) {
+    const pts = b.pts;
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (let i = 0; i < pts.length; i += 2) {
+      if (pts[i] < x0) x0 = pts[i]; if (pts[i] > x1) x1 = pts[i];
+      if (pts[i + 1] < z0) z0 = pts[i + 1]; if (pts[i + 1] > z1) z1 = pts[i + 1];
+    }
+    const i0 = Math.max(0, Math.floor(x0 / CLASS_CELL)), i1 = Math.min(nx - 1, Math.floor(x1 / CLASS_CELL));
+    const j0 = Math.max(0, Math.floor(z0 / CLASS_CELL)), j1 = Math.min(nz - 1, Math.floor(z1 / CLASS_CELL));
+    for (let j = j0; j <= j1; j++) {
+      for (let i = i0; i <= i1; i++) {
+        if (insidePolygon(pts, (i + 0.5) * CLASS_CELL, (j + 0.5) * CLASS_CELL)) cover[j * nx + i] = cellArea;
+      }
+    }
+  }
+  return boxBlur(cover, nx, nz, radius);
+}
+
+/** A separable box blur through running sums; the result is the sum in the (2 R + 1)^2 window divided by its area (m2). */
+function boxBlur(area, nx, nz, R) {
   const tmp = new Float32Array(nx * nz), out = new Float32Array(nx * nz);
-  const R = DENSITY_RADIUS, win = (2 * R + 1) * CLASS_CELL;
+  const win = (2 * R + 1) * CLASS_CELL;
   for (let j = 0; j < nz; j++) {
     let sum = 0;
     for (let i = 0; i < R; i++) sum += area[j * nx + i];
@@ -61,7 +100,13 @@ export function builtDensity(buildings, nx, nz) {
   return out;
 }
 const smooth01 = (a, b, v) => { const t = Math.min(1, Math.max(0, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
-const URBAN_FROM = 0.03, URBAN_FULL = 0.10;      // the built share of the window under which `urban` is open ground, and over which it is the city
+const URBAN_FROM = 0.03, URBAN_FULL = 0.10;      // the built share of the 72 m window under which `urban` is open ground, and over which it is the city
+/** The close neighbourhood (a 24 m window): hard ground belongs next to the walls.  The verges and the lawns between the big blocks of
+ *  Kirchberg (class `urban` in the bake, because the landuse is commercial) are grass: where almost nothing is built within 12 m, the
+ *  ground is the meadow, whatever the class says.  The pavement of the road is painted separately (the road network), so the street
+ *  keeps its kerbs and slabs. */
+const NEAR_RADIUS = 1;
+const NEAR_FROM = 0.05, NEAR_FULL = 0.17;      // the built share of the 24 m window under which `urban` is open ground, and over which it is the city
 
 export function buildWorldMap({ classes, classInfo, canopy, buildings = null }) {
   const nx = classInfo.nx, nz = classInfo.nz;
@@ -72,6 +117,7 @@ export function buildWorldMap({ classes, classInfo, canopy, buildings = null }) 
   const cover = new Uint8Array(nx * nz * 4);
   const coverGpu = new Uint8Array(nx * nz * 4);          // the same, with the urban weight scaled by how built-up the place is (the ground shader reads this)
   const density = buildings ? builtDensity(buildings, nx, nz) : null;
+  const near = buildings ? builtCover(buildings, nx, nz, NEAR_RADIUS) : null;
   const cx = canopy.cover.nx, cz = canopy.cover.nz;
   const can = new Uint8Array(cx * cz * 4);
   const ch = canopy.height, cc = canopy.cover;
@@ -85,7 +131,9 @@ export function buildWorldMap({ classes, classInfo, canopy, buildings = null }) 
       cover[o + 2] = cls === CLASS.urban ? 255 : 0;
       cover[o + 3] = cls === CLASS.water ? 255 : 0;
       coverGpu[o] = cover[o]; coverGpu[o + 1] = cover[o + 1]; coverGpu[o + 3] = cover[o + 3];
-      coverGpu[o + 2] = density && cls === CLASS.urban ? Math.round(255 * smooth01(URBAN_FROM, URBAN_FULL, density[j * nx + i])) : cover[o + 2];
+      coverGpu[o + 2] = density && cls === CLASS.urban
+        ? Math.round(255 * Math.min(smooth01(URBAN_FROM, URBAN_FULL, density[j * nx + i]), smooth01(NEAR_FROM, NEAR_FULL, near[j * nx + i])))
+        : cover[o + 2];
     }
   }
   for (let j = 0; j < cz; j++) {

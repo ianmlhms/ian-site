@@ -847,3 +847,18 @@ renderer).  The flows count game seconds now (`window.__lux.clock()`).  Pictures
 **New files:** `road-index.js`, `basemap.js`, `fullmap.js`, `placement.js`, `speed-limit.js`, `quality-step.js`,
 `scripts/flows/luxdrive_ui.mjs`.  **Rewritten:** `ui.js`, `ui.css`, `input.js`, `minimap.js`, `car-model.js`, `i18n.js`.
 **Changed:** `car.js`, `config.js` (CAR), `main.js` (wiring), `lux-drive.html` (viewport, `?v=`), `scripts/flows/luxdrive_world.mjs`.
+
+
+## Round 2 — city (branch `lux-drive-city`, cloud session)
+
+What changed (the reviewer's list 1-6):
+
+| # | what | how |
+|---|---|---|
+| 1, 2 | **building style by quarter** | new pure module `quarters.js`: the named quarters / villages of `places.json` (landmarks) with a character (`sandstone`: Grund, Clausen, Pfaffenthal, Rham; `city`: Ville Haute, Gare, Limpertsberg, Belair, Bonnevoie, Hollerich, Merl, Rollingergrund, Bock; `village`: Ernster, Oberanven, Niederanven, Senningen, Hostert, Rameldange, Senningerberg, Cents, Hamm, Sandweiler, ...; `modern`: Kirchberg, Plateau Bourbon, Cloche d'Or, Ban de Gasperich, quarters européens = the bake's own style).  `world-data.js` runs `restyleBuildings` after the decode (new objects, nothing mutated).  City / sandstone: office / modern / apartment / house up to 38 m eave become the new style `STYLE.town` (6), glass only above 38 m or in the modern places; houses below 6.5 m stay shuttered houses.  Villages: everything up to 25 m is a house (or a block in village render), never glass bands / balcony rows.  Churches and sheds are untouched. |
+| 1 | **town façade** | `building-material.js`: rusticated ground floor or shopfront (30 % of the city buildings get a shop unless the bake says so), tall windows with stone frames, lintels, glazing bars, first-floor wrought-iron rail, string courses, cornice with its shadow; floor height from the eave (`eave / 3.4`), so a tall block is not striped by a wrong `levels` byte.  Palettes in `building-style.js` (cream / ochre / light grey / pale yellow for the city, honey-ochre sandstone for the valley, render + tile for villages); dark slate roofs in the stone city, red / brown tile mix in villages. |
+| 3 | **thin vertical sticks** | root cause: `decodeTrees` already turns the girth byte into a factor (0.5-1.0) and `tree-view.js` divided it by 100 once more, so all 24 755 OSM street / park trees were squashed to a 0.5-1 % wide pole of their full height (dark trunk, green tip).  Fixed in `tree-view.js` (the girth is used as it is).  Not the grow-in animation, as round 1 guessed. |
+| 4 | **night** | `env.js`: ambient / ground / fog / sky of the night keys neutral and dark blue-grey (amb 0.17 0.19 0.25 instead of 0.38 0.48 0.76), moonlight 0.4 0.46 0.6 instead of 0.5 0.64 1.0; lamp pools 1.9x brighter and wider. |
+| 5 | **Kirchberg verges** | `world-map.js`: the class `urban` is only hard ground within ~12 m of a building (`builtCover`, polygon fill, 24 m window) as well as in the 72 m neighbourhood; the lawns / verges between the big blocks are the meadow again.  Roads keep their painted kerb / pavement. |
+
+Gates: see the end of this section (filled in by the last run).
