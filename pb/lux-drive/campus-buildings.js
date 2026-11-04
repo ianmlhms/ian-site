@@ -8,11 +8,12 @@
 import { Soup, paint, triangulate } from './landmark-soup.js';
 import { edgeWalls } from './landmark-util.js';
 import { wallRuns, boundsOfPoly } from './campus-walls.js';
-import { drawWall, drawFacade } from './campus-facades.js';
+import { drawWall, drawCoping, drawFacade, planRun } from './campus-facades.js';
 import { drawRoofExtras, hippedRoof } from './campus-roofs.js';
 import { CUSTOM } from './campus-custom.js';
 
 const PARAPET = 0.45;              // m: the wall stands this far over the roof edge
+const COPING_DEFAULT = [0.78, 0.78, 0.76];  // m: the colour of a concrete roof edge
 const WALL_RADIUS = 0.4;           // m: the collision wall of the car stands this far out of the outline (landmark.js adds the car's radius)
 
 /** A part with what the builders need: its bounds, a stable seed, the lowest ground under it. */
@@ -32,8 +33,10 @@ function drawRoof(soup, part) {
 
 /** One plain part: walls with facade, roof, roof extras. */
 function buildPart(soup, ground, part, all) {
-  for (const run of wallRuns(part, all)) {
+  for (const bare of wallRuns(part, all)) {
+    const run = planRun(bare, part, ground);
     drawWall(soup, run, ground, part.top + PARAPET, part.wall, part.seed * 53 + run.i);
+    if (run.lowerY === null || run.s1 - run.s0 > 6) drawCoping(soup, run, part.top + PARAPET, part.coping || COPING_DEFAULT);
     drawFacade(soup, run, part, ground);
   }
   if (part.rf && part.rf.hip) {

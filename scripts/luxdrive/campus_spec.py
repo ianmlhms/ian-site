@@ -5,11 +5,13 @@ the colours are read from), with its own roof elevation (from the LiDAR surface 
 facade style.  The facade styles (fx) and their parameters (fp) are drawn by pb/lux-drive/campus-facades.js, the roof extras (rf)
 by campus-roofs.js.  Colours are painted flat colours chosen from the reference photos (Wikimedia Commons, see SURVEY.md).
 Coordinates: world frame (x east, z south, metres)."""
+import json
 import math
+import os
 from shapely.geometry import Polygon, Point, box
 from shapely import affinity
 
-from campus_osm import OSM
+from campus_osm import OSM, REFS
 NEVER_HIDE = set()
 CAMPUS_WAY = 26245561
 HIDDEN_PATH_BLOCKS = set()      # LOD2 blocks that also cut the paths (none: the building parts do
@@ -65,19 +67,29 @@ def building(key, name, zone, parts, lod2=(), footprint=None, custom=None):
     BUILDINGS.append({"key": key, "name": name, "zone": zone, "parts": parts, "lod2": list(lod2), "footprint": footprint, "custom": custom})
 
 
-def part(key, poly, wall, fx="blank", fp=None, top=None, roof=None, rf=None, clip=False, order=0, pct=35, dtop=0.0, dh=None):
-    return {"key": key, "poly": poly, "wall": wall, "fx": fx, "fp": fp or {}, "top": top, "roof": roof, "rf": rf or {}, "clip": clip, "order": order, "pct": pct, "dtop": dtop, "dh": dh}
+def part(key, poly, wall, fx="blank", fp=None, top=None, roof=None, rf=None, clip=False, order=0, pct=35, dtop=0.0, dh=None, ft=None):
+    """ft: the features that stand on the walls of the part (signs, entrance recesses, canopies, logos: campus-wallfx.js), with world positions."""
+    return {"key": key, "poly": poly, "wall": wall, "fx": fx, "fp": fp or {}, "top": top, "roof": roof, "rf": rf or {}, "clip": clip, "order": order, "pct": pct, "dtop": dtop, "dh": dh, "ft": ft or []}
+
+
+# things that stand free on the campus (not on a wall): signs on their own boards, bridges, pergolas, seats ...; drawn by campus-free.js
+FREE = []
 
 
 # ====================================================================================================================
 # ATHÉNÉE DE LUXEMBOURG (OSM way 29050030; the LOD2 block 21024 also covers the sports plaza, which is ground: not built)
 ATH = 29050030
-RIBBON_ATH = {"gf": {"h": 4.0, "glass": [0.18, 0.26, 0.34], "pier": [0.80, 0.76, 0.62], "pitch": 3.6}, "floorH": 3.5, "sill": 0.8, "h": 2.0, "pier": 1.0, "mull": 2.6, "glass": GLASS, "frame": [0.82, 0.78, 0.62], "blind": [0.95, 0.55, 0.12], "blindEvery": 2}
+ORANGE = [0.96, 0.56, 0.10]           # Athénée: the sun blinds
+RIBBON_ATH = {"gf": {"h": 4.0, "depth": 1.6, "glass": [0.18, 0.26, 0.34], "pier": [0.80, 0.74, 0.58], "pitch": 3.6}, "floorH": 3.5, "sill": 0.8, "h": 2.0, "pier": 1.0, "mull": 2.6,
+              "glass": GLASS, "frame": [0.90, 0.86, 0.70], "blind": ORANGE, "blindDrops": [0.7, 1.1, 1.5, 2.0], "blindShare": 0.72}
+# the big glazed block (photo Luxembourg_Athénée_101): two storeys of blue reflective panes in white frames over a dark spandrel, standing on a recessed ground floor
+CURTAIN_ATH = {"floorH": 4.2, "inset": 0.3, "pitch": 3.4, "spandrel": 0.9, "glass": [0.30, 0.44, 0.72], "dark": [0.10, 0.16, 0.32], "frameColor": [0.95, 0.95, 0.92],
+               "gf": {"h": 4.2, "depth": 2.6, "glass": [0.20, 0.28, 0.36], "pier": [0.84, 0.78, 0.60], "pitch": 3.4, "every": 2, "mullion": [0.9, 0.9, 0.88]}}
 building("athenee", "Athénée de Luxembourg", "N", [
     part("ath-west", OV(ATH, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21), CREAM, "ribbon", RIBBON_ATH,
          rf={"solar": [[3606, 9586, 44, 11, -26]]}),
     part("ath-spine", OV(ATH, 21, 22, 23, 24, 25, 26, 33, 34, (3700, 9648), 2, 3, 4, 5, 6, 7, 8, 9, 10), CREAM, "ribbon", RIBBON_ATH),
-    part("ath-green", OV(ATH, 26, 27, 28, 29, 30, 31, 32, 33), CREAM, "ribbon", {"gf": {"h": 4.2, "glass": [0.20, 0.28, 0.36], "pier": [0.85, 0.80, 0.64], "pitch": 3.6}, "floorH": 4.2, "pitch": 2.9, "sill": 0.5, "h": 3.4, "pier": 1.6, "glass": [0.34, 0.50, 0.74], "frame": CREAM}, top=293.0),
+    part("ath-green", OV(ATH, 26, 27, 28, 29, 30, 31, 32, 33), CREAM, "curtain", CURTAIN_ATH, top=293.0),
     part("ath-sewing", OV(ATH, 34, 35, 36, 37, 38, 39, 40) , CREAM, "ribbon", RIBBON_ATH, rf={"solar": [[3726, 9630, 28, 7, -30]]}),
     part("ath-link", OV(ATH, 41, 42, 43, 56, 57, 58), CONCRETE, "blank", top=None),
     part("ath-gym", OV(ATH, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56), CONCRETE, "blank"),
@@ -96,7 +108,7 @@ PAN_GREEN = [[0.20, 0.62, 0.34], [0.93, 0.78, 0.18], [0.16, 0.30, 0.70], [0.20, 
 PAN_MIX = [[0.80, 0.14, 0.12], [0.16, 0.30, 0.70], [0.93, 0.78, 0.18], [0.20, 0.62, 0.34]]
 def blumm_arm(key, a0, a1, palette):
     return part(key, wedge(BLC[0], BLC[1], a0, a1), [0.66, 0.66, 0.66], "panels",
-                {"floorH": 3.3, "pitch": 2.2, "palette": palette, "w": 1.0, "sill": 1.0, "h": 1.5, "glass": GLASS_DARK, "windowEvery": 2, "pier": 0.6},
+                {"floorH": 3.3, "pitch": 2.2, "palette": palette, "w": 1.0, "sill": 1.0, "h": 1.5, "glass": GLASS_DARK, "windowEvery": 2, "pier": 0.6, "columns": True, "colorSeed": len(key), "slab": [0.55, 0.55, 0.56], "frame": [0.9, 0.9, 0.88]},
                 clip=True, order=0)
 building("blumm", "Blumm (Athénée, Gaston Thorn, ENAD)", "N", [
     blumm_arm("blumm-w", 124, 199, PAN_RED),
@@ -104,8 +116,12 @@ building("blumm", "Blumm (Athénée, Gaston Thorn, ENAD)", "N", [
     blumm_arm("blumm-ne", 272.5, 336.5, PAN_RED),
     blumm_arm("blumm-ese", 336.5, 407, PAN_BLUE),
     blumm_arm("blumm-s", 47, 124, PAN_GREEN),
-    part("blumm-core", Point(BLC).buffer(11.5, 5), [0.62, 0.62, 0.62], "glass", {"floorH": 3.3, "pitch": 3.0, "glass": GLASS_DARK, "pier": 0.5}, clip=True, order=2),
+    part("blumm-core", Point(BLC).buffer(11.5, 5), [0.62, 0.62, 0.62], "glass", {"floorH": 3.3, "pitch": 3.0, "glass": [0.20, 0.30, 0.38], "pier": 0.5, "mullion": [0.86, 0.87, 0.86]}, clip=True, order=2),
 ], lod2=[16312], footprint=whole(BL).buffer(1.5))
+
+# the white fascia of the entrance hall with its name (photo Athénée_structure_provisoire): on the hall between the west and the north-west arm, facing the paved square
+FREE.append({"k": "sign", "x": 3597.6, "z": 9682.6, "nx": -0.945, "nz": -0.326, "y": 3.3, "text": "ATHÉNÉE DE LUXEMBOURG", "cap": 0.42, "color": [0.12, 0.13, 0.14], "weight": 0.13,
+             "board": {"color": [0.95, 0.95, 0.93], "pad": 0.45}})
 
 # ====================================================================================================================
 # ÉCOLE DE COMMERCE ET DE GESTION (OSM way 26737970, the hall 41424144): yellow panels between grey pebbled pilasters with red window
@@ -113,7 +129,10 @@ building("blumm", "Blumm (Athénée, Gaston Thorn, ENAD)", "N", [
 ECG = 26737970
 ECG_FP = {"floorH": 3.3, "pitch": 3.6, "pilaster": [0.66, 0.66, 0.62], "panel": [0.94, 0.76, 0.14], "frame": [0.72, 0.12, 0.10], "glass": [0.30, 0.38, 0.46], "sill": 0.9, "h": 1.7, "pier": 0.4}
 building("ecg", "École de Commerce et de Gestion", "N", [
-    part("ecg-main", whole(ECG).buffer(1.0), [0.66, 0.66, 0.62], "ecg", ECG_FP, clip=True, rf={"sawtooth": [[3530, 9756, 8, 36, 90, 2.4]]}),
+    part("ecg-main", whole(ECG).buffer(1.0), [0.66, 0.66, 0.62], "ecg", ECG_FP, clip=True, rf={"sawtooth": [[3530, 9756, 8, 36, 90, 2.4]]},
+         ft=[{"k": "canopy", "x": 3551.0, "z": 9738.7, "w": 8.0, "depth": 2.8, "y": 3.1, "t": 0.7, "color": [0.80, 0.10, 0.10], "post": [0.26, 0.26, 0.28],
+              "sign": {"text": "ECG", "cap": 0.36, "color": [0.96, 0.94, 0.90], "weight": 0.13, "y": 0.0}},
+             {"k": "logo", "x": 3520.0, "z": 9738.7, "w": 7.2, "h": 4.6, "y": 4.2}]),
     part("ecg-fan", P((3470, 9738), (3500, 9738), (3500, 9760), (3470, 9760)), [0.66, 0.66, 0.62], "glass", {"floorH": 3.3, "pitch": 3.0, "glass": [0.45, 0.58, 0.66]}, clip=True, dh=7.0, roof=[0.55, 0.65, 0.70]),
 ], lod2=[20060], footprint=whole(ECG).buffer(1.0))
 building("ecg-hall", "ECG hall", "N", [
@@ -134,7 +153,7 @@ building("piscine", "Piscine", "C", [
 # LYCÉE MICHEL RODANGE (OSM way 37764513): beige concrete, deep window bays with red frames and white / orange blinds,
 # brown flat roofs with solar panels (LOD2 block 21934)
 LM = 37764513
-LM_FP = {"floorH": 3.2, "pitch": 2.6, "w": 1.5, "h": 1.7, "sill": 0.75, "frame": [0.62, 0.30, 0.22], "pane": [0.22, 0.32, 0.42], "blind": [0.92, 0.90, 0.84], "blindShare": 0.45, "pier": 0.5}
+LM_FP = {"floorH": 3.2, "pitch": 2.6, "w": 1.5, "h": 1.7, "sill": 0.75, "frame": [0.64, 0.46, 0.22], "pane": [0.22, 0.32, 0.42], "blind": [0.93, 0.92, 0.88], "blindEdge": [0.82, 0.28, 0.20], "blindShare": 0.45, "pier": 0.5, "slab": [0.80, 0.74, 0.58], "sillColor": [0.80, 0.74, 0.58]}
 def lm(key, rc, order, **kw):
     return part(key, rect(*rc), BEIGE, "punched", LM_FP, clip=True, order=order, **kw)
 fp_lm = whole(LM).buffer(0.5)
@@ -160,11 +179,19 @@ building("hall-150", "Hall 41424150", "C", [
 # ====================================================================================================================
 # LYCÉE ALINE MAYRISCH (OSM way 37764733): a long white block on a concrete plinth along the boulevard, ribbon windows, pilotis entrance
 LA = 37764733
+LAML_FP = {"floorH": 3.78, "inset": 0.25, "pitch": 3.0, "sill": 0.85, "h": 2.2, "pier": 2.0, "mull": 2.4, "surround": 0.25, "groups": [9, 12, 15, 18], "gapMin": 2.4, "gapMax": 4.6,
+           "band": [0.66, 0.66, 0.64], "frame": [0.60, 0.62, 0.64], "glass": [0.42, 0.58, 0.78], "mullion": [0.92, 0.92, 0.90],
+           "plinth": {"h": 5.0, "color": [0.70, 0.70, 0.68], "facing": "south", "holes": 5.5},
+           "gf": {"h": 3.85, "lift": 3.9, "depth": 1.8, "facing": "north", "glass": [0.30, 0.40, 0.50], "pier": [0.84, 0.84, 0.80], "pitch": 4.5, "every": 2, "rail": [0.56, 0.60, 0.62]}}
 building("laml", "Lycée Aline Mayrisch", "S", [
-    part("laml", whole(LA), [0.98, 0.97, 0.93], "ribbon", {"floorH": 3.5, "pitch": 3.0, "sill": 0.8, "h": 2.1, "glass": [0.50, 0.62, 0.76], "frame": [0.86, 0.86, 0.82], "pier": 1.4, "sillBand": True,
-                                                          "plinth": {"h": 4.2, "color": [0.76, 0.76, 0.74], "facing": "south"},
-                                                          "gf": {"h": 4.0, "glass": [0.36, 0.46, 0.56], "pier": [0.86, 0.86, 0.82], "pitch": 3.6}}),
+    part("laml", whole(LA), [0.97, 0.96, 0.92], "laml", LAML_FP,
+         ft=[{"k": "recess", "x": 3725.0, "z": 9966.5, "w": 12.0, "h": 7.7, "lift": 3.9, "depth": 3.2, "glass": [0.30, 0.42, 0.54], "frame": [0.82, 0.84, 0.82], "doors": 6.0,
+              "transoms": [2.5, 5.4], "cheek": [0.95, 0.95, 0.92], "soffit": [1.0, 1.0, 0.98],
+              "sign": {"text": "Lycée Aline Mayrisch", "cap": 0.36, "y": 2.9, "color": [0.97, 0.97, 0.97], "weight": 0.14, "board": {"color": [0.10, 0.44, 0.72], "pad": 0.3}}},
+             {"k": "panel", "x": 3792.0, "z": 9966.5, "w": 3.4, "y0": 7.8, "y1": 15.1, "color": [0.93, 0.62, 0.14]},
+             {"k": "sign", "x": 3654.0, "z": 9985.0, "text": "Lycée Aline Mayrisch Luxembourg", "cap": 0.2, "y": 2.6, "color": [0.30, 0.32, 0.34], "weight": 0.14}]),
 ], lod2=[19798])
+FREE.append({"k": "bridge", "x": 3725.0, "z0": 9952.5, "z1": 9966.5, "w": 6.0, "wall": [0.72, 0.72, 0.70]})
 
 # FORUM (OSM way 29050032): the round hall with its solar petals (custom model campus-custom.js)
 building("forum", "Forum Geesseknäppchen", "S", [
@@ -178,25 +205,33 @@ building("forum", "Forum Geesseknäppchen", "S", [
 # International School of Luxembourg (grey and cream panels with a red stair tower)
 CO = 37826860
 BRICK = [0.60, 0.37, 0.27]
-CO_FP = {"floorH": 3.4, "pitch": 3.4, "w": 1.6, "h": 1.5, "sill": 0.9, "frame": [0.32, 0.30, 0.30], "pane": [0.22, 0.27, 0.32], "blind": [0.55, 0.50, 0.45], "blindShare": 0.2, "pier": 0.8}
+CO_FP = {"floorH": 3.4, "pitch": 3.4, "w": 1.6, "h": 1.5, "sill": 0.9, "frame": [0.32, 0.30, 0.30], "pane": [0.22, 0.27, 0.32], "blind": [0.55, 0.50, 0.45], "blindShare": 0.2, "pier": 0.8, "sillColor": [0.55, 0.52, 0.48]}
 building("conservatoire", "Conservatoire", "W", [
     part("cons-ring", whole(CO), BRICK, "punched", CO_FP, order=-1),
     part("cons-hall", Point(3380, 9783).buffer(17.5, 2), [0.72, 0.68, 0.60], "glass", {"floorH": 4.0, "pitch": 4.0, "glass": [0.28, 0.34, 0.38]}, order=2, clip=True,
          rf={"hip": {"rise": 4.0, "inset": 0.45, "color": [0.40, 0.52, 0.47]}}),
     part("cons-east", rect(3410, 9795, 24, 26), BRICK, "punched", CO_FP, order=1, clip=True),
 ], lod2=[15944], footprint=whole(CO).buffer(1.0))
+# the long steel pergola on the west side of the Conservatoire (OSM building=roof 1010952448; photo Conservatoire_de_musique_entrée)
+FREE.append({"k": "pergola", "x0": 3321.5, "z0": 9800.0, "x1": 3352.5, "z1": 9800.0, "w": 4.6, "h": 3.3, "color": [0.24, 0.26, 0.28]})
 
-ISL_PAN = [[0.46, 0.50, 0.55], [0.46, 0.50, 0.55], [0.88, 0.84, 0.72], [0.34, 0.37, 0.42]]
-ISL_FP = {"floorH": 3.4, "pitch": 3.0, "palette": ISL_PAN, "w": 1.1, "sill": 0.9, "h": 1.6, "glass": [0.24, 0.30, 0.38], "windowEvery": 2, "pier": 0.6}
+ISL_GREY = [0.44, 0.48, 0.53]
+ISL_FP = {"floorH": 3.4, "pitch": 3.0, "w": 1.1, "sill": 0.9, "h": 1.6, "glass": [0.24, 0.30, 0.38], "windowEvery": 2, "pier": 0.6, "band": [0.80, 0.80, 0.78], "bandAt": 1.5, "bandH": 1.0, "joints": 3.0}
 IL = 195220844
 building("isl-lower", "International School of Luxembourg (Lower)", "W", [
-    part("isl-lower-low", whole(IL), [0.60, 0.60, 0.58], "panels", ISL_FP, order=-1, pct=50),
-    part("isl-lower-tall", rect(3288, 9917, 84, 28), [0.60, 0.60, 0.58], "panels", ISL_FP, order=1, clip=True),
-    part("isl-lower-west", rect(3222, 9918, 52, 30), [0.60, 0.60, 0.58], "panels", ISL_FP, order=0, clip=True, rf={"solar": [[3212, 9915, 36, 10, 24]]}),
+    part("isl-lower-low", whole(IL), ISL_GREY, "bands", ISL_FP, order=-1, pct=50),
+    part("isl-lower-tall", rect(3288, 9917, 84, 28), ISL_GREY, "bands", ISL_FP, order=1, clip=True),
+    part("isl-lower-west", rect(3222, 9918, 52, 30), ISL_GREY, "bands", ISL_FP, order=0, clip=True, rf={"solar": [[3212, 9915, 36, 10, 24]]}),
 ], lod2=[19243], footprint=whole(IL).buffer(0.5))
+
 building("isl-upper", "International School of Luxembourg (Upper)", "W", [
-    part("isl-upper", whole(26481167), [0.60, 0.60, 0.58], "panels", ISL_FP),
+    part("isl-upper", whole(26481167), ISL_GREY, "bands", ISL_FP),
 ], lod2=[18817, 21604])
+# the red concrete stair tower of the Lower School with its round windows (photo ISL 101): its middle is read off the orthophoto (a red roof at 3334, 9942)
+building("isl-tower", "ISL stair tower", "W", [
+    part("isl-tower", rect(3334.0, 9942.5, 8.0, 8.0), [0.78, 0.16, 0.10], "portholes", {"floorH": 3.4, "pitch": 4.0, "r": 1.0, "hole": [0.20, 0.26, 0.34], "white": [0.92, 0.92, 0.90], "pier": 0.0, "inset": 0.4, "rail": [0.30, 0.32, 0.34]}, top=None, dtop=2.0,
+         ft=[{"k": "sign", "x": 3334.0, "z": 9947.0, "text": "WELCOME", "cap": 0.5, "y": 3.0, "color": [0.12, 0.30, 0.70], "weight": 0.15, "board": {"color": [0.97, 0.97, 0.97], "pad": 0.3}}]),
+], lod2=[])
 building("isl-admin", "ISL Administration", "W", [
     part("isl-admin", whole(151609630), [0.84, 0.82, 0.76], "ribbon", {"floorH": 3.4, "pitch": 3.0, "sill": 0.9, "h": 1.6, "glass": GLASS, "frame": CONCRETE}),
 ], lod2=[19393])
@@ -206,6 +241,28 @@ building("tent", "Hall 193599947", "W", [
 building("skate", "Skate Park Hollerich", "S", [
     part("skate", whole(171231027), [0.60, 0.62, 0.66], "blank"),
 ], lod2=[])
+
+
+# ====================================================================================================================
+# THE NEIGHBOURS (zone E): the Quilvest bank west of the Conservatoire (OSM way 97672784) and the apartment blocks of the Rue de Merl east of the
+# campus, which the LOD2 of the bake draws as plain blocks.  Their own styles: an office with a stone skin and ribbon glazing, render with balconies.
+LOD2_BLOCKS = {b["id"]: b for b in json.load(open(os.path.join(REFS, "lod2_campus.json")))}
+
+
+def lod2_poly(block_id):
+    return Polygon(LOD2_BLOCKS[block_id]["pts"]).buffer(0)
+
+
+QUILVEST = [(3313.4, 9753.3), (3331.2, 9741.9), (3327.6, 9736.3), (3333.1, 9732.8), (3326.5, 9723.5), (3325.9, 9722.7), (3324.0, 9723.5), (3321.6, 9716.0), (3327.5, 9712.9),
+            (3319.6, 9690.6), (3311.2, 9696.5), (3289.8, 9711.2), (3285.9, 9713.8)]
+building("quilvest", "Quilvest Banque Privée", "E", [
+    part("quilvest", Polygon(QUILVEST), [0.80, 0.77, 0.70], "curtain", {"floorH": 3.7, "inset": 0.4, "pitch": 3.4, "spandrel": 1.2, "glass": [0.36, 0.48, 0.58], "dark": [0.30, 0.31, 0.32],
+                                                                       "frameColor": [0.32, 0.33, 0.35]}),
+], lod2=[15925, 21561])
+APT_FP = {"floorH": 3.0, "inset": 0.3, "pitch": 3.2, "sill": 0.9, "h": 1.5, "w": 1.4, "glass": [0.34, 0.44, 0.56], "rail": [0.62, 0.72, 0.76], "slab": [0.82, 0.82, 0.80]}
+for key, lod, wall in (("apt-a", 16796, [0.92, 0.90, 0.82]), ("apt-b", 20511, [0.90, 0.80, 0.62]), ("apt-c", 17891, [0.90, 0.88, 0.84]), ("apt-d", 18618, [0.80, 0.70, 0.60]),
+                       ("apt-e", 20802, [0.88, 0.86, 0.80])):
+    building(key, "Apartments (Rue de Merl)", "E", [part(key, lod2_poly(lod), wall, "balcony", APT_FP)], lod2=[lod])
 
 
 # ====================================================================================================================
@@ -294,7 +351,7 @@ def bake_grounds(osm, ortho_color):
     from shapely.geometry import Polygon as Pg
     areas, lines, furniture, walls = [], [], [], []
 
-    def area(key, poly, color, lift=0, spacing=7.0):
+    def area(key, poly, color, lift=0, spacing=8.5):
         poly = poly if isinstance(poly, Pg) else Pg(poly)
         poly = poly.buffer(0)
         geoms = list(poly.geoms) if poly.geom_type == "MultiPolygon" else [poly]
@@ -379,4 +436,73 @@ def bake_grounds(osm, ortho_color):
             x, z = o["pts"][0]
             if 3150 < x < 4000 and 9450 < z < 10060:
                 furniture.append({"k": "rack", "x": round(x, 1), "z": round(z, 1), "yaw": 0.0})
+    furniture.extend(bake_furniture(osm))
     return {"areas": areas, "lines": lines, "furniture": furniture, "walls": walls}
+
+
+BENCH_GREEN = [0.20, 0.38, 0.28]
+BENCH_BROWN = [0.50, 0.36, 0.22]
+BENCH_GREY = [0.56, 0.57, 0.58]
+SEAT_COLORS = [[0.20, 0.62, 0.32], [0.80, 0.18, 0.16], [0.16, 0.34, 0.78], [0.95, 0.78, 0.15]]    # the zig-zag seats of the Forum square (photo Forum_Geesseknäppchen_101)
+FURNITURE_BOX = (3150.0, 9450.0, 4120.0, 10062.0)                                                  # the campus and the edge of the Parc de Merl
+
+
+def path_directions():
+    """The segments of the footpaths of the game's own network (roads_campus.json) as [(x0, z0, x1, z1), ...]: a bench stands along the path it is beside."""
+    out = []
+    for r in json.load(open(os.path.join(REFS, "roads_campus.json"))):
+        if r["kind"] in ("footway", "path", "pedestrian", "cycleway"):
+            pts = r["pts"]
+            out.extend((pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]) for i in range(len(pts) - 1))
+    return out
+
+
+def along_nearest(segs, x, z):
+    """The direction (radians, atan2(dz, dx)) of the nearest path segment to (x, z); 0 when there is none within 25 m."""
+    best, ang = 25.0, 0.0
+    for x0, z0, x1, z1 in segs:
+        dx, dz = x1 - x0, z1 - z0
+        ll = dx * dx + dz * dz
+        t = 0.0 if ll < 1e-9 else max(0.0, min(1.0, ((x - x0) * dx + (z - z0) * dz) / ll))
+        d = math.hypot(x - (x0 + dx * t), z - (z0 + dz * t))
+        if d < best:
+            best, ang = d, math.atan2(dz, dx)
+    return ang
+
+
+def bake_furniture(osm):
+    """Benches, picnic tables, bins and the playgrounds of OSM inside the campus and the park edge; the coloured seats and the bollards of the Forum square."""
+    segs = path_directions()
+    x0, z0, x1, z1 = FURNITURE_BOX
+    out = []
+    for o in osm.values():
+        if o["type"] != "node":
+            continue
+        x, z = o["pts"][0]
+        if not (x0 < x < x1 and z0 < z < z1):
+            continue
+        t = o["tags"]
+        if t.get("amenity") == "bench":
+            color = BENCH_GREEN if t.get("colour") == "green" else BENCH_BROWN if t.get("colour") == "brown" else BENCH_GREY
+            out.append({"k": "bench", "x": round(x, 1), "z": round(z, 1), "yaw": round(along_nearest(segs, x, z), 3), "color": color})
+        elif t.get("leisure") == "picnic_table":
+            out.append({"k": "table", "x": round(x, 1), "z": round(z, 1), "yaw": round(along_nearest(segs, x, z), 3)})
+        elif t.get("amenity") == "waste_basket":
+            out.append({"k": "bin", "x": round(x, 1), "z": round(z, 1)})
+        elif t.get("leisure") == "playground":
+            out.append({"k": "playground", "bounds": [round(x - 9, 1), round(z - 6, 1), round(x + 9, 1), round(z + 6, 1)]})
+    for o in osm.values():                                        # the playgrounds of the park are mapped as areas
+        if o["type"] == "way" and o["tags"].get("leisure") == "playground":
+            xs, zs = [p[0] for p in o["pts"]], [p[1] for p in o["pts"]]
+            if x0 < sum(xs) / len(xs) < x1:
+                out.append({"k": "playground", "bounds": [round(min(xs), 1), round(min(zs), 1), round(max(xs), 1), round(max(zs), 1)]})
+    # the seats in front of the Forum: groups of three slabs on the schoolyard side, in the four colours of the photo (positions read off the orthophoto, approximate)
+    fx, fz = FOREST_CENTER
+    for i, ang in enumerate([196, 204, 212, 221, 229, 238]):
+        a = math.radians(ang)
+        r = 44.0 + (3.0 if i % 2 else 0.0)
+        out.append({"k": "seat", "x": round(fx + math.cos(a) * r, 1), "z": round(fz + math.sin(a) * r, 1), "yaw": round(a + math.pi / 2, 3), "color": SEAT_COLORS[i % 4]})
+    for i in range(14):                                           # the concrete cubes along the edge of the plaza
+        a = math.radians(184 + i * 5.5)
+        out.append({"k": "bollard", "x": round(fx + math.cos(a) * 41.5, 1), "z": round(fz + math.sin(a) * 41.5, 1)})
+    return out
