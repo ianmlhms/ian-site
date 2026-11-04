@@ -8,12 +8,19 @@
  * ctx: { buildings: the decoded LOD2 footprints, decks: the decks the physics reads, ground: (x, z) -> y of the land }. */
 import { buildPontAdolphe, buildPontRouge, fixLandmarkDecks } from './landmark-bridges.js';
 
+import { buildPhilharmonie, buildEcj, buildCathedral, buildPalais, buildGelleFra } from './landmark-buildings.js';
+
 export { fixLandmarkDecks };
 
 /** The builders in the order of the brief (the bridges first). A landmark that cannot be built is an error, never a silent gap. */
 const BUILDERS = [
   { id: 'pont-adolphe', build: buildPontAdolphe },
   { id: 'pont-rouge', build: buildPontRouge },
+  { id: 'philharmonie', build: buildPhilharmonie },
+  { id: 'cour-de-justice', build: buildEcj },
+  { id: 'cathedrale', build: buildCathedral },
+  { id: 'palais-grand-ducal', build: buildPalais },
+  { id: 'gelle-fra', build: buildGelleFra },
 ];
 
 /** The closest point of a segment to (x, z). */
