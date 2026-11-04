@@ -1,6 +1,7 @@
 /* Flow: Lux Drive "the world" (pb/lux-drive.html).
- * The game boots with no console errors, the baked data stays inside the budget of the brief (30 MB), the car starts at Place de l'Europe
- * (Kirchberg), it drives, the camera never goes under the ground and the draw calls / triangles stay inside the budget of the quality levels. */
+ * The game boots with no console errors, the baked data stays inside the budget of the brief (30 MB), the car starts on the
+ * carriageway of Avenue J.F. Kennedy next to Place de l'Europe (Kirchberg), it drives, the camera never goes under the ground
+ * and the draw calls / triangles stay inside the budget of the quality levels. */
 import { runIfMain } from "./lib.mjs";
 
 const PAGE = "/pb/lux-drive.html?q=medium&time=noon&weather=clear";
@@ -37,8 +38,25 @@ export const flow = {
     });
     h.expect(info.bytes > 5e6 && info.bytes <= DATA_BUDGET, `baked data ${(info.bytes / 1048576).toFixed(2)} MB (<= 30 MB)`);
     h.expect(info.tiles > 40, `${info.tiles} terrain tiles`);
-    h.expect(Math.abs(info.x - 5905.76) < 30 && Math.abs(info.z - 7999.2) < 30, `the car starts at Place de l'Europe (${info.x.toFixed(0)}, ${info.z.toFixed(0)})`);
     h.expect(info.y >= info.ground - 0.01 && info.y <= info.ground + 1.2, `the car stands on the ground (${info.y.toFixed(2)} vs ${info.ground.toFixed(2)})`);
+
+    h.step("the start: the carriageway of Avenue J.F. Kennedy, next to Place de l'Europe");
+    const start = await page.evaluate(() => {
+      const m = window.__lux;
+      const s = m.state();
+      const road = m.roadAt(s.x, s.z);
+      // the square itself: the centre of Place de l'Europe in world coordinates
+      const square = { x: 5953.2, z: 7988.5 };
+      return { x: s.x, z: s.z, heading: s.heading, road, toSquare: Math.hypot(s.x - square.x, s.z - square.z) };
+    });
+    h.expect(start.road && start.road.name === "Avenue John F. Kennedy",
+      `the car stands on ${start.road ? start.road.name : "no road at all"}`);
+    h.expect(start.road.surface === "asphalt", `the start is on tarmac (${start.road.surface}), not on the paving of the square`);
+    h.expect(start.road.lat > 0 && start.road.lat < start.road.width / 2,
+      `the car is in the right-hand lane of the carriageway (${start.road.lat.toFixed(2)} m from the centre line of ${start.road.width.toFixed(2)} m)`);
+    h.expect(start.toSquare < 120, `the start is next to Place de l'Europe (${start.toSquare.toFixed(0)} m from its centre)`);
+    h.expect(start.road.dir && Math.abs(Math.atan2(start.road.dir.z, start.road.dir.x) - start.heading) < 0.25,
+      "the car faces along the road");
     await h.shot("boot");
 
     h.step("the sky: the clouds are the painted white tile, not the coloured noise");

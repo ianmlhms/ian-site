@@ -31,6 +31,7 @@ import { createCarModel } from './car-model.js';
 import { createInput } from './input.js';
 import { createUI } from './ui.js';
 import { createMinimap } from './minimap.js';
+import { roadDirectionAt } from './roads.js';
 import { t, LANGS } from './i18n.js';
 
 const MAX_FRAME_S = 0.1;              // s: a long frame (a tab in the background) never jumps the car
@@ -317,6 +318,18 @@ async function boot() {
     setCamera: (pose) => {
       frozenCamera = pose ? { x: pose.x, y: pose.y, z: pose.z, tx: pose.tx, ty: pose.ty, tz: pose.tz, fov: pose.fov || 70 } : null;
       if (!frozenCamera) chase.snap(car.state);
+    },
+    /** The road under a point: its name, its class, its material, how far the point is to the right of its centre
+     *  line and the direction of the way there (the flow asks where the car stands). */
+    roadAt: (x, z) => {
+      surface.roadInfoAt(x, z, roadInfo);
+      const r = roadInfo.road >= 0 ? data.roads[roadInfo.road] : null;
+      if (!r) return null;
+      const dir = roadDirectionAt(r, x, z);
+      return {
+        name: r.name, kind: r.kind, surface: r.surface, width: r.width, oneway: r.oneway,
+        lat: roadInfo.lat, dir: dir ? { x: dir.x, z: dir.z } : null,
+      };
     },
     step: (dt, o) => car.update(dt, { ...(o || {}), gripScale: env.gripScale() }),
     stats: () => ({

@@ -29,6 +29,7 @@ import { createPlayArea } from './play-area.js';
 import { buildWorldMap } from './world-map.js';
 import { createCar } from './car.js';
 import { createChaseCamera } from './camera.js';
+import { roadDirectionAt } from './roads.js';
 import { addBuilding, createBuildingMesh, KIND } from './building-mesh.js';
 import { computeTileNodes, buildTileMesh, meshHeightAt } from './tile-mesh.js';
 import { leafAt, selectTiles } from './quadtree.js';
@@ -676,6 +677,22 @@ section('F car and camera');
   const chase = createChaseCamera(surface, (x, z, radius) => buildings.collide(x, z, radius));
   car.reset(start.x, start.z, start.yaw || 0);
   chase.snap(car.state);
+
+  // The start: the car must stand on the carriageway of a road, in a lane, facing along the road (the reviewer
+  // found it on the paving of the plaza between the office blocks).
+  {
+    const info = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, lines: 0, lanes: 0, s: 0 };
+    surface.roadInfoAt(start.x, start.z, info);
+    const r = info.road >= 0 ? data.roads[info.road] : null;
+    const dir = r ? roadDirectionAt(r, start.x, start.z) : null;
+    const onWay = !!r && r.info.drivable && Math.abs(info.lat) <= r.width / 2;
+    // the heading must be along the way: with the traffic or against it, but never across it
+    const diff = dir ? Math.atan2(Math.sin(Math.atan2(dir.z, dir.x) - (start.yaw || 0)), Math.cos(Math.atan2(dir.z, dir.x) - (start.yaw || 0))) : Math.PI;
+    const along = Math.abs(diff) < 0.25 || Math.abs(Math.abs(diff) - Math.PI) < 0.25;
+    check('the car starts on the carriageway of a road, facing along it',
+      onWay && along, r ? `${r.name || r.kind}: ${info.lat.toFixed(2)} m from the centre line of ${r.width.toFixed(2)} m` : 'no road under the start');
+    stats.startRoad = r ? (r.name || r.kind) : '';
+  }
   let bad = 0, below = 0, worstBelow = 0, maxSpeed = 0, camUnder = 0, worstCam = 0;
   const dt = 1 / 60;
   for (let step = 0; step < (QUICK ? 600 : 3600); step++) {

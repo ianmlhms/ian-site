@@ -3,8 +3,10 @@
 
     ~/Library/Caches/luxtram-work/.venv/bin/python scripts/luxdrive/bake_places.py
 
-The car starts on Place de l'Europe in Kirchberg (the brief): the square itself is a pedestrian
-area, so the start point is the point of the surrounding road network closest to the square.
+The car starts on the carriageway of Avenue John F. Kennedy in Kirchberg, next to Place de l'Europe
+(the brief and the reviewer): the square itself is a pedestrian area paved with stone, so a car that
+starts on it stands on the plaza between the office blocks.  The start point is on the tarmac of the
+avenue, in the right-hand lane, facing along the road.
 """
 import json
 import math
@@ -14,6 +16,17 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import OUT_DIR, RAW_DIR, lonlat_to_world, luref_to_world  # noqa: E402
 from roads_io import DRIVABLE, decode_roads  # noqa: E402
+
+# The street the car starts on (the brief: next to Place de l'Europe, on the carriageway).
+START_STREET = "Avenue John F. Kennedy"
+# m: the start must be this far from the end of its way, so the car does not wake up in a junction.
+CLEAR_OF_JUNCTION = 25.0
+# The avenue carries the name on several ways: the service road beside it carries it too.  The car starts
+# on the avenue itself, so the class decides: the biggest one wins.
+CLASS_RANK = {
+    "primary": 6, "primary_link": 5, "secondary": 4, "secondary_link": 3,
+    "tertiary": 2, "tertiary_link": 1,
+}
 
 # the landmarks the game names in the HUD / the minimap
 LANDMARK_TAGS = (
@@ -68,28 +81,80 @@ def main():
     sx = float(sx); sz = float(sz)
     print("Place de l'Europe centre: world %.1f %.1f" % (sx, sz))
 
-    # the start point is on the road: the closest point of the drivable network
+    # ---- the start: the carriageway of the avenue, next to the square ------------------
     roads, _ = decode_roads()
-    best = None
-    for r in roads:
-        if r["kind"] not in DRIVABLE:
-            continue
-        p = r["pts"]
-        for i in range(len(p) - 1):
-            ax, az = p[i]
-            bx, bz = p[i + 1]
+
+    # the ring of the square, in world coordinates: the start must stand next to it
+    ring = []
+    for p in pts:
+        x, z = lonlat_to_world(p[0], p[1])
+        ring.append((float(x), float(z)))
+    if len(ring) > 2 and ring[0] != ring[-1]:
+        ring.append(ring[0])
+
+    def dist_to_ring(x, z):
+        """The distance from (x, z) to the edge of the square."""
+        best = 1e18
+        for i in range(len(ring) - 1):
+            ax, az = ring[i]
+            bx, bz = ring[i + 1]
             dx, dz = bx - ax, bz - az
             ll = dx * dx + dz * dz
             if ll < 1e-9:
                 continue
-            t = max(0.0, min(1.0, ((sx - ax) * dx + (sz - az) * dz) / ll))
-            px, pz = ax + dx * t, az + dz * t
-            d = math.hypot(px - sx, pz - sz)
-            if best is None or d < best[0]:
-                yaw = math.atan2(dz, dx)
-                best = (d, px, pz, yaw, r["name"], r["kind"])
-    d, px, pz, yaw, name, kind = best
-    print("start on %r (%s), %.1f m from the square, yaw %.3f" % (name, kind, d, yaw))
+            t = max(0.0, min(1.0, ((x - ax) * dx + (z - az) * dz) / ll))
+            d = math.hypot(x - (ax + dx * t), z - (az + dz * t))
+            if d < best:
+                best = d
+        return best
+
+    # the point of the avenue that lies closest to the square, on a stretch that is clear of the junctions
+    best = None
+    rank = 0
+    for r in roads:
+        if r["name"] != START_STREET or r["kind"] not in DRIVABLE:
+            continue
+        if r["bridge"] or r["tunnel"] or r["over"]:
+            continue
+        r_rank = CLASS_RANK.get(r["kind"], 0)
+        if r_rank < rank:
+            continue
+        p = r["pts"]
+        # the length of the way and the distance from its start to every point: the ends of a way are its
+        # junctions, and the car must not wake up on one of them
+        prefix = [0.0]
+        for i in range(len(p) - 1):
+            prefix.append(prefix[-1] + math.hypot(p[i + 1][0] - p[i][0], p[i + 1][1] - p[i][1]))
+        total = prefix[-1]
+        for i in range(len(p) - 1):
+            ax, az = p[i]
+            bx, bz = p[i + 1]
+            dx, dz = bx - ax, bz - az
+            ll = math.hypot(dx, dz)
+            if ll < 1e-9:
+                continue
+            steps = max(1, int(ll / 2.0))
+            for k in range(steps + 1):
+                u = k / steps
+                s = prefix[i] + ll * u
+                if min(s, total - s) < CLEAR_OF_JUNCTION:
+                    continue
+                px, pz = ax + dx * u, az + dz * u
+                d = dist_to_ring(px, pz)
+                if best is None or r_rank > rank or (r_rank == rank and d < best["d"]):
+                    best = {"d": d, "x": px, "z": pz, "yaw": math.atan2(dz, dx), "road": r}
+                    rank = r_rank
+    if best is None:
+        raise SystemExit("no stretch of %r next to the square" % START_STREET)
+    r = best["road"]
+    yaw = best["yaw"]
+    # the right-hand lane: Luxembourg drives on the right, and the car faces along the way
+    off = r["offset"]
+    px = best["x"] + math.cos(yaw + math.pi / 2) * off
+    pz = best["z"] + math.sin(yaw + math.pi / 2) * off
+    start_road, start_kind = r["name"], r["kind"]
+    print("start on %r (%s), %.1f m from the edge of the square, %.2f m right of the centre line, yaw %.3f"
+          % (start_road, start_kind, best["d"], off, yaw))
 
     # ---- the landmarks ----------------------------------------------------
     marks = []
@@ -130,7 +195,8 @@ def main():
 
     out = {
         "start": {"x": round(px, 2), "z": round(pz, 2), "yaw": round(yaw, 4),
-                  "name": "Place de l'Europe, Kirchberg", "road": name},
+                  "name": "Avenue John F. Kennedy, Kirchberg", "road": start_road,
+                  "square": "Place de l'Europe"},
         "landmarks": marks,
     }
     with open(os.path.join(OUT_DIR, "places.json"), "w", encoding="utf-8") as fh:

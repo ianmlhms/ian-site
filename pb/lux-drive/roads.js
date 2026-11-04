@@ -129,6 +129,26 @@ export const drivableRoads = (roads) => roads.filter((r) => r.info.drivable && !
 /** The length of a road in metres. */
 export const roadLength = (road) => road.length;
 
+/**
+ * The direction of the way at a point: the unit vector of the nearest segment of its polyline, in the order of
+ * the way (the direction the traffic runs when the way is one way).  null when the way has no length.
+ */
+export function roadDirectionAt(road, x, z) {
+  const p = road.pts;
+  let best = null;
+  for (let i = 0; i + 1 < p.length; i++) {
+    const ax = p[i][0], az = p[i][1], bx = p[i + 1][0], bz = p[i + 1][1];
+    const dx = bx - ax, dz = bz - az;
+    const ll = dx * dx + dz * dz;
+    if (ll < 1e-9) continue;
+    const len = Math.sqrt(ll);
+    const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / ll));
+    const d = Math.hypot(x - (ax + dx * t), z - (az + dz * t));
+    if (!best || d < best.dist) best = { dist: d, x: dx / len, z: dz / len };
+  }
+  return best;
+}
+
 /** The half width of the carriageway of a road (m). */
 export const carriageHalf = (road) => Math.max(0.8, road.width / 2);
 
