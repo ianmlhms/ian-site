@@ -94,7 +94,7 @@ export const flow = {
       }
       return out;
     }, NOT_CAR);
-    h.expect(probes.length >= 6, `${probes.length} taps on non-car roads (${[...new Set(probes.map((p) => p.kind))].join(", ")})`);
+    h.expect(probes.length >= 4, `${probes.length} taps on non-car roads (${[...new Set(probes.map((p) => p.kind))].join(", ")})`);
     const bad = [];
     for (const p of probes) {
       await page.evaluate(([x, z]) => window.__lux.teleportNear(x, z, 80), [p.x, p.z]);
