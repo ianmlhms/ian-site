@@ -1066,7 +1066,7 @@ Ian: "fix ... the campus façades".  Built on the first rebuild (7c188699); only
 
 **Gates**: `harness.js` 86 passed, 0 failed; `luxdrive_world` PASS (111 / 148 / 210 draw calls low / medium / high); `luxdrive_holes` PASS (0 hole pixels, 72 poses); `luxdrive_ui` PASS.
 
-**Report for the ground-shader owner**: in `it4_aerial.jpg` / `it4_oblique_*` the ground shader paints dark grey-green blotches (soft, 10-30 m) on the lawns beside buildings all over the campus and the neighbourhood (e.g. east of the Forum, around the Rue de Merl blocks, around the hall of the Piscine).  They are not geometry of the campus.  Not touched.
+**Report for the ground-shader owner**: in `it4_aerial.jpg` / `it4_oblique_*` the ground shader paints dark grey-green blotches (soft, 10-30 m) on the lawns beside buildings, most visible in the top view round the houses of the neighbourhood and beside the campus halls.  They are not geometry of the campus.  Not touched.
 
 **What still differs from reality (honest list)**
 * Window frames are flat painted quads: only the storey edges, sills, blinds and pilasters stand out; the Lycée Michel Rodange has none of its deep concrete bay frames (cost: 6 triangles a bay) and no logo banner.
