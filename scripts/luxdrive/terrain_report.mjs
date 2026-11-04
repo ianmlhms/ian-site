@@ -25,8 +25,13 @@ const TIGHT_BEND_R = 12;                                   // m: a tight bend fa
 let designSpeed = () => 14;                                // m/s; the checkouts that predate the class radii drive every way at 50 km/h
 try { designSpeed = (await import(R + 'road-bed.js')).designSpeed ?? designSpeed; } catch { /* old checkout */ }
 const MAX_BOB = 1.5, STRETCH_GAP = 30;
+let bedAtArcFn = null; try { bedAtArcFn = (await import(R + 'road-bed.js')).bedAtArc; } catch { /* old checkout */ }
+const SPEEDC = (ch) => designSpeed(ch.kind ?? data.roads[ch.road].kind);
 const withArc = (c) => { if (c.arc) return c; const arc = new Float64Array(c.x.length); for (let i = 1; i < c.x.length; i++) arc[i] = arc[i - 1] + Math.hypot(c.x[i] - c.x[i - 1], c.z[i] - c.z[i - 1]); return { ...c, arc }; };   // (old checkouts have no arc)
-const chains = net.chains.map(withArc).filter((c) => !c.tagged && !net.overRoads.has(c.road) && c.arc[c.arc.length - 1] >= 30).filter((c, i) => i % STRIDE === 0);
+// --near=x,z,r;x,z,r : only the ways that have a sample within r m of one of the points (a fast look at the known trouble spots)
+const NEAR = ((process.argv.find((a) => a.startsWith('--near=')) || '').slice(7)).split(';').filter(Boolean).map((t) => t.split(',').map(Number));
+const isNear = (c) => !NEAR.length || NEAR.some(([x, z, r]) => c.x.some((cx, i) => Math.hypot(cx - x, c.z[i] - z) <= r));
+const chains = net.chains.map(withArc).filter((c) => !c.tagged && !net.overRoads.has(c.road) && c.arc[c.arc.length - 1] >= 30).filter((c, i) => i % STRIDE === 0).filter(isNear);
 
 // ---- junction aprons (as the harness gate I)
 const GC = 32, gk = (a, b) => a * 4096 + b, segGrid = new Map();
@@ -98,7 +103,17 @@ const humpRows = stretches.map((s) => {
   lineAt(s.ch, s.at, pt);
   let cut = 0; for (let q = Math.max(0, Math.floor(s.first - 25)); q <= Math.min(Math.floor(s.ch.arc[s.ch.arc.length - 1]), s.last + 25); q += 2) { lineAt(s.ch, q, pt); let k = pt.k; cut = Math.max(cut, Math.abs(s.ch.ground[k] - s.ch.bed[k])); }
   lineAt(s.ch, s.at, pt);
-  return `${nameOf(s.ch)} (${data.roads[s.ch.road].kind}) at ${pt.x.toFixed(0)},${pt.z.toFixed(0)} peak ${s.peak.toFixed(1)} m/s2, ${s.last - s.first + 1} m long, bed-land up to ${cut.toFixed(2)} m`;
+  // the cause: the acceleration of the bed itself at the peak (a profile that is too tight) against the deviation of the surface from the bed (another way's influence, an end, a wall)
+  let bedAcc = 0, dev = 0;
+  if (bedAtArcFn) {
+    for (let q = Math.max(2, s.first); q <= Math.min(s.last, Math.floor(s.ch.arc[s.ch.arc.length - 1]) - 2); q++) {
+      bedAcc = Math.max(bedAcc, SPEEDC(s.ch) ** 2 * Math.abs(bedAtArcFn(s.ch, q + 2) + bedAtArcFn(s.ch, q - 2) - 2 * bedAtArcFn(s.ch, q)) / 4);
+      lineAt(s.ch, q, pt); dev = Math.max(dev, Math.abs(surface.height(pt.x, pt.z) - bedAtArcFn(s.ch, q)));
+    }
+    lineAt(s.ch, s.at, pt);
+  }
+  const L = s.ch.arc[s.ch.arc.length - 1], endNote = s.at < 8 ? ' [start of the way]' : L - s.at < 8 ? ' [end of the way]' : '';
+  return `${bedAtArcFn ? `bed ${bedAcc.toFixed(1)} dev ${(dev * 100).toFixed(0)} cm${endNote} ` : ''}${nameOf(s.ch)} (${data.roads[s.ch.road].kind}) road ${s.ch.road} arc ${s.at} at ${pt.x.toFixed(0)},${pt.z.toFixed(0)} peak ${s.peak.toFixed(1)} m/s2, ${s.last - s.first + 1} m long, bed-land up to ${cut.toFixed(2)} m`;
 });
 for (const r of humpRows.slice(0, VERBOSE ? 200 : 12)) console.log('   ' + r);
 console.log(`beds: deepest cutting ${deepCut.toFixed(2)} m (${deepCutAt}); samples cut > 2.5 m: ${cutOver25}; embankment > 1 m: ${fillOver1}; of ${samples}`);

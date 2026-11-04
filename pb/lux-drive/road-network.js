@@ -33,6 +33,12 @@ const ARM_GAP = 3;                     // segments: two stretches of one way thi
 const CAP_SOFT = 2.0;                  // m: the carriageway pin ends this softly past the END of a way (no flat disc at the end of a street)
 const PIN_FADE = 3.0;                  // m: the carriageway level fades into the batter over this distance beyond the pavement
 const FILL_TAPER = 3.0;                // m: the last stretch of a fill face where it sinks to the land (the scan that finds the end of the face is coarse)
+const SEP_LOW = 0.4, SEP_HIGH = 0.8;   // m: two carriageways whose beds differ by less than SEP_LOW are one level (a junction), by more than SEP_HIGH two levels
+const RAMP_SLOPE = 1.9;                // m per m: the steepest ground between two carriageways at different levels (a retaining wall hides it, see retaining-walls.js)
+const OWN_FADE = 0.5;                  // m: the carriageway of a way is its own from its bench edge to this far past it: a bigger way's fade is not laid over it (same level)
+const RAMP_MIN = 0.8, RAMP_MAX = 4.0;  // m: half width of the hand-over from one carriageway to the other, bounds
+const FACE_JOIN_PER_M = 0.79;         // the join of the bed and the face is at least as wide as this per m of their difference: a smoothstep is at most 1.5 times as steep as its mean, so the
+                                       // ground between a terrace and the face under it never rises faster than RAMP_SLOPE (a terrace on a cliff dropped 5 m in 0.4 m: a crack)
 const FACE_JOIN = 0.4;                 // m: the pinned surface runs from the bed to the face of the batter over this distance past the bench (they meet to within the noise of the land)
 const JUNCTION_LEVEL = 0.6;            // m: two ways meet at a junction when their beds differ by less than this where they meet (more: one is over the other)
 const CLOSED_MIN_SAMPLES = 6;          // a ring has at least this many samples (a way shorter than 20 m that ends where it starts is a stub)
@@ -302,9 +308,12 @@ export function createRoadNetwork(roads, baseHeight) {
               if ((j === 1 && t0 < 0) || (j === other.x.length - 1 && t0 > 1)) continue;
               const t = t0 < 0 ? 0 : t0 > 1 ? 1 : t0;
               const d = Math.hypot(x - (ax + ex * t), z - (az + ez * t));
-              if (d > other.hw + JUNCTION_TOUCH || d >= bestD) continue;
+              if (d >= bestD || d > other.hw + JUNCTION_TOUCH) continue;
               const h = other.bed[j - 1] + (other.bed[j] - other.bed[j - 1]) * t;
-              if (Math.abs(h - chain.bed[k]) > JUNCTION_LEVEL) continue;    // a crossing at another level: one of them rides over the other
+              // A crossing at another level: one of them rides over the other.  The END of a way that stops inside the carriageway of another way is no crossing, it is a T junction
+              // whatever the levels its land would give them (a track that climbs out of a pit onto a plateau ended 2.6 m under the road it joins, and the ground climbed a wall there).
+              const endsHere = (k <= 1 || k >= n - 2) && d <= other.hw + JUNCTION_TOUCH;
+              if (Math.abs(h - chain.bed[k]) > JUNCTION_LEVEL && !(endsHere && !overRoads.has(other.road))) continue;
               bestD = d; bestH = h;
             }
           }
@@ -609,6 +618,7 @@ export function createRoadNetwork(roads, baseHeight) {
   const MARK_CLEAR = 3.5, CROSS_SIN = 0.35, MAX_PARTNERS = 6;
   const candI = new Int32Array(MAX_CAND), candD = new Float32Array(MAX_CAND), candT = new Float32Array(MAX_CAND), candLat = new Float32Array(MAX_CAND), candOver = new Float32Array(MAX_CAND);
   const pinPri = new Float32Array(MAX_PINS), pinVal = new Float32Array(MAX_PINS), pinWt = new Float32Array(MAX_PINS);
+  const pinEdge = new Float32Array(MAX_PINS), pinBed = new Float32Array(MAX_PINS);   // per pin: the distance to the edge of its bench (negative inside) and the level of its carriageway
   const armOf = new Int32Array(MAX_CAND), armFirst = new Uint8Array(MAX_CAND), slotRoad = new Int32Array(MAX_CAND), slotArm1 = new Int32Array(MAX_CAND), slotArm2 = new Int32Array(MAX_CAND);
   const partnerId = new Int32Array(MAX_PARTNERS), partnerDx = new Float32Array(MAX_PARTNERS), partnerDz = new Float32Array(MAX_PARTNERS);
   // What one segment of a way gives a point: the bed under the foot of the perpendicular, the NOTCH of the way on this side (how deep the bench of the way is cut
@@ -799,7 +809,7 @@ export function createRoadNetwork(roads, baseHeight) {
       const road = slotRoad[sl];
       const dMin = candD[slotArm1[sl]];
       if (NOBATTER[candI[slotArm1[sl]]]) continue;             // a way that rides over the others keeps the DTM (its fill): no batter, no pin
-      let wAll = 0, claimSum = 0, devAcc = 0, pinSum = 0, pinValSum = 0;   // (a segment that does not reach the point counts with zero claim and zero pin: the weights of a way fade out where its batter ends)
+      let wAll = 0, claimSum = 0, devAcc = 0, pinSum = 0, pinValSum = 0, pinBedSum = 0, pinNear = 0;   // (pinNear: the pin of the nearest segment, the strength of the pin of the way here)   // (a segment that does not reach the point counts with zero claim and zero pin: the weights of a way fade out where its batter ends)
       for (let k = 0; k < nCand; k++) {
         const i = candI[k];
         if (ROADOF[i] !== road) continue;
@@ -843,15 +853,22 @@ export function createRoadNetwork(roads, baseHeight) {
         // What the pin pulls the ground toward is the surface of THIS way: the bed within the bench, and beside it the face of its own batter.  Pulling toward the flat
         // bed (the first version) multiplied the slope of the ground by 1 + e * |pin'| = 1.75 over the whole fade whenever the hillside was not flat.
         const over = candOver[k];
-        const pin = (1 - smoothstep(bench, bench + PIN_FADE, d)) * level * (1 - smoothstep(0, CAP_SOFT, over));
+        const pin = (1 - smoothstep(bench, bench + PIN_FADE, d)) * (1 - smoothstep(0, CAP_SOFT, over));
         if (pin > 0) {
+          // The level the pin pulls toward is the bed within the bench of the NEAREST segment of the way (dMin) and its face beyond: it is a property of the point and of the way, not of the
+          // segment.  (Per segment, a segment on the far side of a tight bend had its own distance beyond the bench and pulled the carriageway toward the face of its batter.)
           const face = ground + (applies ? dev : 0);
-          pinSum += w * pin; pinValSum += w * pin * (face + (bed - face) * (1 - smoothstep(bench, bench + FACE_JOIN, d)));
+          pinSum += w * pin; pinValSum += w * pin * (face + (bed - face) * (1 - smoothstep(bench, bench + Math.max(FACE_JOIN, FACE_JOIN_PER_M * Math.abs(bed - face)), dMin))); pinBedSum += w * pin * bed;
+          if (k === slotArm1[sl]) pinNear = pin;
         }
       }
       if (claimSum > 0 || pinSum > 0) {
         devSum += devAcc / wAll; devW += claimSum / wAll;
-        if (pinSum > 0 && nPins < MAX_PINS) { pinPri[nPins] = priority[road]; pinVal[nPins] = pinValSum / pinSum; pinWt[nPins] = pinSum / wAll; nPins++; }
+        if (pinSum > 0 && nPins < MAX_PINS) {
+          pinPri[nPins] = priority[road]; pinVal[nPins] = pinValSum / pinSum; pinWt[nPins] = pinNear;
+          pinBed[nPins] = pinBedSum / pinSum; pinEdge[nPins] = dMin - BENCH[candI[slotArm1[sl]]];
+          nPins++;
+        }
       }
     }
     let bandY = devW > 0 ? ground + devSum / devW : ground;
@@ -859,12 +876,27 @@ export function createRoadNetwork(roads, baseHeight) {
     // that at a junction the surface IS the bed of the bigger way (flat across, smooth along) and the side street joins it.
     // Averaging the beds of the ways that meet (the first version) made a hump of a hand's breadth on the main road.
     for (let a = 1; a < nPins; a++) {                          // insertion sort by priority, ascending (a handful of entries)
-      const pr = pinPri[a], v = pinVal[a], wt = pinWt[a];
+      const pr = pinPri[a], v = pinVal[a], wt = pinWt[a], ed = pinEdge[a], bd = pinBed[a];
       let b = a - 1;
-      while (b >= 0 && pinPri[b] > pr) { pinPri[b + 1] = pinPri[b]; pinVal[b + 1] = pinVal[b]; pinWt[b + 1] = pinWt[b]; b--; }
-      pinPri[b + 1] = pr; pinVal[b + 1] = v; pinWt[b + 1] = wt;
+      while (b >= 0 && pinPri[b] > pr) { pinPri[b + 1] = pinPri[b]; pinVal[b + 1] = pinVal[b]; pinWt[b + 1] = pinWt[b]; pinEdge[b + 1] = pinEdge[b]; pinBed[b + 1] = pinBed[b]; b--; }
+      pinPri[b + 1] = pr; pinVal[b + 1] = v; pinWt[b + 1] = wt; pinEdge[b + 1] = ed; pinBed[b + 1] = bd;
     }
-    for (let a = 0; a < nPins; a++) bandY += (pinVal[a] - bandY) * pinWt[a];
+    // A carriageway belongs to its own way.  Where two ways lie side by side (or one inside the other) at different levels, the bigger way used to lay its pin - and its 3 m fade -
+    // over the carriageway of the smaller one, and a bed that is smooth was cut up by 1 .. 8 cm (Boulevard de la Foire: 15 m/s2).  Now a way is held back by every way laid BELOW it
+    // (a smaller one) whose carriageway is at another level and which this point is farther from: the hand-over from one level to the other is centred on the line of equal distance
+    // from the two benches and as wide as the steepest allowed ground between two levels (RAMP_SLOPE).  Ways at one level (junctions) are not held back at all.
+    for (let a = 0; a < nPins; a++) {
+      let hold = 1;
+      for (let b = 0; b < a; b++) {
+        const apart = Math.abs(pinBed[a] - pinBed[b]);
+        const sep = smoothstep(SEP_LOW, SEP_HIGH, apart);
+        // one level: the fade of the bigger way (a) is held off the bench of the smaller one (b), where a's own bench does not hold the point; two levels: the hand-over is centred between the two
+        const own = (1 - smoothstep(0, OWN_FADE, pinEdge[b])) * smoothstep(0, OWN_FADE, pinEdge[a]);
+        const half = Math.min(RAMP_MAX, Math.max(RAMP_MIN, (1.5 * apart) / RAMP_SLOPE));
+        hold *= (1 - sep) * (1 - own) + sep * (1 - smoothstep(-half, half, pinEdge[a] - pinEdge[b]));
+      }
+      bandY += (pinVal[a] - bandY) * pinWt[a] * hold;
+    }
     out.band = ground + (1 - prot) * (bandY - ground);
     // A junction: two marked roads of different ways that cross at an angle meet here.  The lane markings are cut
     // before it (a dash that ends in the middle of the crossing street is the fragment the reviewer saw).

@@ -55,7 +55,8 @@ export const ROAD = Object.freeze({
   bedSpeedDefault: 50,
   bedMaxCut: 2.5,          // m: the bed may lie this far BELOW the land (a cutting; the face of it follows the hillside, see road-network.js)
   bedMaxFill: 2.0,         // m: ... and this far ABOVE it (an embankment in a sag)
-  bedHardLimit: 4.0,       // m: the curvature limit may carry the bed this far from the land where the two demands cannot both be met (a cliff beside the road)
+  bedHardCut: 5.0,         // m: the curvature limit may carry the bed this far BELOW the land where the two demands cannot both be met (a rock wall beside the road; a deeper trench would eat the houses beside it)
+  bedHardFill: 9.0,        // m: ... and this far ABOVE it (a street on a bank above a valley: the fill is held by a retaining wall, retaining-walls.js)
   bedRounds: 8,            // rounds of "limit the curvature, then keep the cut and the fill within their limits"
   kerbHeight: 0.13,        // m, the kerb at the edge of the carriageway
   kerbWidth: 0.35,         // m, the width of the kerb face
