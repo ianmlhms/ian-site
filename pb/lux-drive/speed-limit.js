@@ -16,8 +16,8 @@ const FIXED_KMH = Object.freeze({ living_street: 20, pedestrian: 10, service: 30
 const WET_FROM = 0.4;                // the wetness (0..1) from which the motorway limit drops
 const PROBE_M = 24;                  // m: the town probe looks this far to each side
 const URBAN_VOTES = 3;               // of 5 probes (the point and four around it) must be built-up
-const CROWD_RADIUS_M = 80;           // m: the buildings within this reach (the index counts whole 32 m cells) ...
-const CROWD_BUILDINGS = 12;          // ... this many of them make a town (a farm has three or four)
+const CROWD_RADIUS_M = 150;          // m: the buildings within this reach (the index counts whole 32 m cells) ...
+const CROWD_BUILDINGS = 10;          // ... this many of them make a town (a farm has three or four, Kirchberg has fourteen big blocks)
 
 /**
  * Is (x, z) in a town?  Two witnesses: five samples of the class raster (a park or a car park inside a town must not turn the

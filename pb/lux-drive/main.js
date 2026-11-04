@@ -200,6 +200,8 @@ async function boot() {
   let loadingDone = false;
   let started = false;                 // false while the start menu is up
   let stuckFor = 0;
+  let wasCrashed = false;
+  let lastLimit = 0;                   // km/h: the limit of the road under the car, from the last frame
 
   const WEATHER_ICON = { clear: '☀️', cloudy: '☁️', fog: '🌫️', rain: '🌧️' };
   const label = (group, id) => (id === 'random' ? tr('set.random') : tr(`${group}.${id}`));
@@ -392,7 +394,11 @@ async function boot() {
     const paused = ui.isBlocking();
     const inp = input.read(scripted);
     ground.hint(car.state.y);
-    if (!paused) car.update(dt, { ...inp, gripScale: env.gripScale() });
+    if (!paused) car.update(dt, { ...inp, gripScale: env.gripScale(), limitKmh: lastLimit });
+
+    // a hard hit on a building or a tree: a short "Hoppla!"
+    if (car.state.crashed && !wasCrashed) ui.setToast(tr('hud.crash'), 1.2);
+    wasCrashed = car.state.crashed;
 
     // stuck against something: the pedal is down, the car does not move
     if (!paused && (inp.throttle > 0.5 || inp.brake > 0.5) && Math.abs(car.state.speed) < STUCK_SPEED) stuckFor += dt; else stuckFor = 0;
@@ -423,6 +429,7 @@ async function boot() {
     const road = roadInfo.coverage > 0.35 && roadInfo.road >= 0 ? data.roads[roadInfo.road] : null;
     const limit = limits.update(road, car.state.x, car.state.z, env.state.rain > 0.5 ? 1 : 0);
     const kmhNow = Math.abs(car.state.speed) * 3.6;
+    lastLimit = limit;
     ui.setSpeed(kmhNow, limit);
     if (frames % 10 === 0) { ui.setLimit(limit); ui.setRain(env.state.rain); }
     const roadName = road && road.name ? road.name : '';
@@ -457,11 +464,13 @@ async function boot() {
   // the API for the harness (the checks read the state of the game from here)
   window.__lux = {
     scene, camera, renderer, car, env, terrain, city, trees, surface, ground, field, portals, playArea, buildings, quality: () => quality,
-    ui, fullMap, roadIndex, stepper, model, limits,
+    ui, fullMap, roadIndex, stepper, model, limits, input, forest, collide,
     /** The Kaart and the teleport for the flows: open the map, put the car on the road nearest to (x, z). */
     toggleMap: () => toggleMap(), startDriving: () => startDriving(), isStarted: () => started,
     teleportNear: (x, z, reach = 200) => { const hit = roadIndex.nearest(x, z, reach); if (hit) teleportTo(hit); return !!hit; },
     state: () => car.state,
+    /** The game clock in seconds (the frames are capped at 0.1 s): the flows count their loops in game time, not in frames. */
+    clock: () => elapsed,
     setInput: (o) => { scripted = o; },
     /** The harness can hold the camera at a pose of its own (null gives it back to the chase camera). */
     setCamera: (pose) => {
@@ -480,7 +489,7 @@ async function boot() {
         lat: roadInfo.lat, dir: dir ? { x: dir.x, z: dir.z } : null,
       };
     },
-    step: (dt, o) => car.update(dt, { ...(o || {}), gripScale: env.gripScale() }),
+    step: (dt, o) => car.update(dt, { ...(o || {}), gripScale: env.gripScale(), limitKmh: lastLimit }),
     stats: () => ({
       calls: renderer.info.render.calls, triangles: renderer.info.render.triangles,
       tiles: terrain.tiles.size, pending: terrain.stats.pending,

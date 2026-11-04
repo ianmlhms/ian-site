@@ -56,7 +56,11 @@ export function createCar({ ground, roadInfoAt, collide = null, start = null }) 
     const surfaceName = onRoad ? (SURFACE_NAMES[info.surface] || 'asphalt') : 'grass';
     const surf = SURFACES[surfaceName] || SURFACES.asphalt;
     const limitShare = onRoad ? (kindInfo(kindName).speed || 0.5) : 0.4;      // off the roads the car is slow
-    const topSpeed = CAR.maxSpeed * limitShare;
+    const classTop = CAR.maxSpeed * limitShare;
+    // the speed limit of the road (the sign in the HUD) sets the pace: the car tops out at CAR.limitOvershoot times the limit,
+    // so a street of 50 km/h is a street for 30-80 km/h, and the motorway is still the place for the top speed
+    const limitMps = (input.limitKmh || 0) / 3.6;
+    const topSpeed = onRoad && limitMps > 0 ? Math.min(classTop, limitMps * CAR.limitOvershoot) : classTop;
 
     // --- steering: the road wheel follows the input, its authority falls with the speed
     // The authority also falls with the speed so that full lock never asks for more sideways acceleration than the tyres give
@@ -88,11 +92,13 @@ export function createCar({ ground, roadInfoAt, collide = null, start = null }) 
     // --- the drive: the power divided by the speed, so the car pulls away strongly and tops out
     const throttle = clamp(input.throttle || 0, 0, 1);
     const brake = clamp(input.brake || 0, 0, 1);
-    const reversing = brake > 0 && Math.abs(vf) < 0.7 && throttle < 0.05;
+    // The brake pedal reverses the car once it is (nearly) standing - and keeps reversing while it rolls backwards (the old test on
+    // |vf| < 0.7 stopped the car at 0.7 m/s backwards: the brake took over and a wedged car could never get out)
+    const reversing = brake > 0 && vf < 0.7 && throttle < 0.05;
     let drive = 0;
     if (throttle > 0) {
       drive = (CAR.power * throttle) / Math.max(Math.abs(vf), 8) / CAR.mass;
-      drive = Math.min(drive, 9);                                                // no rocket launch
+      drive = Math.min(drive, CAR.launchCap);                                    // no rocket launch
       drive *= clamp(1 - slip * 0.8, 0.25, 1);                                   // the friction circle takes from the drive
       if (vf >= topSpeed) drive = 0;                                            // the top speed of the road class
     } else if (reversing) {
@@ -124,10 +130,11 @@ export function createCar({ ground, roadInfoAt, collide = null, start = null }) 
     const yawRate = (Math.abs(vf) > 0.15 ? (vf / CAR.wheelbase) * Math.tan(steerAngle) * yawGain : 0) * (1 - slip * 0.5);
     state.heading = wrapAngle(state.heading + yawRate * dt);
 
-    // --- back to the world
+    // --- back to the world.  The velocity is rebuilt in the OLD frame: turning the car does not turn the velocity with it, the
+    // angle between the two is the lateral speed the tyres have to take away next step (up to the grip: a slide beyond it).
     const ncy = Math.cos(state.heading), nsy = Math.sin(state.heading);
-    state.vx = ncy * vf - nsy * vl;
-    state.vz = nsy * vf + ncy * vl;
+    state.vx = cy * vf - sy * vl;
+    state.vz = sy * vf + cy * vl;
     state.x += state.vx * dt;
     state.z += state.vz * dt;
 
@@ -152,6 +159,8 @@ export function createCar({ ground, roadInfoAt, collide = null, start = null }) 
         }
       }
     }
+    // sliding scrubs the speed: the tyres that cannot hold the car drag it
+    if (slip > 0) { const scrub = 1 - Math.min(0.5, slip * CAR.slideScrub * dt); state.vx *= scrub; state.vz *= scrub; }
     state.speed = state.vx * ncy + state.vz * nsy;
     state.slip = slip;
     state.braking = brake > 0.05 && !reversing && vf > 0.3;

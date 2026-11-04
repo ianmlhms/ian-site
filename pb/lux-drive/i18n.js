@@ -6,12 +6,12 @@ export const LANG_NAMES = Object.freeze({ lb: 'Lëtzebuergesch', de: 'Deutsch', 
 
 const STR = {
   lb: {
-    title: 'Lux Drive', loading: 'Luxemburg gëtt gelueden …', 'load.terrain': 'Gelände', 'load.roads': 'Stroossen', 'load.city': 'Stad', 'load.build': 'D\'Welt gëtt gebaut …', 'load.hills': 'Hiwwelen', 'load.bridges': 'Brécken', 'load.canopy': 'Bësch', 'load.trees': 'Beem', 'load.classes': 'Land',
+    title: 'Lux Drive', loading: 'Luxemburg gëtt gelueden …', 'load.terrain': 'Terrain', 'load.roads': 'Stroossen', 'load.city': 'Stad', 'load.build': 'D\'Welt gëtt gebaut …', 'load.hills': 'Hiwwelen', 'load.bridges': 'Brécken', 'load.canopy': 'Bësch', 'load.trees': 'Beem', 'load.classes': 'Land',
     'load.done': 'Fäerdeg', 'load.slow': 'Et dauert méi laang wéi gewinnt …', 'load.retry': 'Nei probéieren', 'load.error': 'D\'Spill konnt net gelueden ginn. Kuck d\'Verbindung no.',
     'hud.speed': 'km/h', 'hud.gear': 'Gang', 'hud.road': 'Strooss', 'hud.menu': 'Menü', 'hud.weather': 'Wieder', 'hud.timeOfDay': 'Dageszäit', 'hud.camera': 'Kamera', 'hud.sound': 'Toun', 'hud.quality': 'Qualitéit', 'hud.reset': 'Zréck zum Ufank', 'hud.area': 'Gebitt',
     'menu.title': 'Menü', 'menu.drive': 'Fueren', 'menu.settings': 'Astellungen', 'menu.help': 'Hëllef', 'menu.close': 'Zou', 'menu.resume': 'Weider', 'menu.start': 'Start', 'menu.restart': 'Nei starten', 'menu.language': 'Sprooch', 'menu.map': 'Kaart',
     'set.time': 'Dageszäit', 'set.weather': 'Wieder', 'set.quality': 'Qualitéit', 'set.language': 'Sprooch', 'set.sound': 'Toun', 'set.random': 'Zoufall', 'set.auto': 'Automatesch', 'set.on': 'un', 'set.off': 'aus',
-    'time.dawn': 'Moies fréi', 'time.morning': 'Moies', 'time.noon': 'Mëttes', 'time.evening': 'Owes', 'time.dusk': 'Owenddämmerung', 'time.night': 'Nuecht',
+    'time.dawn': 'Moies fréi', 'time.morning': 'Moies', 'time.noon': 'Mëttes', 'time.evening': 'Owend', 'time.dusk': 'Owenddämmerung', 'time.night': 'Nuecht',
     'weather.clear': 'Klor', 'weather.cloudy': 'Wollekeg', 'weather.fog': 'Niwwel', 'weather.rain': 'Reen',
     'quality.low': 'Niddereg', 'quality.medium': 'Mëttel', 'quality.high': 'Héich',
     'set.note': 'Wieder an Dageszäit änneren d\'Sicht an d\'Haftung op der Strooss.',
@@ -21,10 +21,10 @@ const STR = {
     'map.title': 'Kaart', 'map.legend': 'Stroossen', 'speed.limit': 'Vitesslimit', 'toast.reset': 'Zréck op d\'Place de l\'Europe', 'orient.rotate': 'Dréi den iPad op d\'Säit, da gesäis de besser.', 'fs.enter': 'Ganze Bildschierm',
     'set.colour': 'Faarf', 
     'toast.unstuck': 'Zréck op d\'Strooss gesat.', 
-    'start.tagline': 'Fuer duerch Lëtzebuerg-Stad an Nidderaanwen.', 'start.hint': 'Wieder an Dageszäit si pro Fahrt anescht, ausser du wiels se.', 'menu.pause': 'Pause', 'menu.settings2': 'Astellungen', 'menu.back': 'Zréck', 'menu.fullscreen': 'Ganze Bildschierm',
+    'start.tagline': 'Fuer duerch Lëtzebuerg-Stad an Nidderaanwen.', 'start.hint': 'Wieder an Dageszäit änneren all Kéier, ausser s de se wielt.', 'menu.pause': 'Pause', 'menu.settings2': 'Astellungen', 'menu.back': 'Zréck', 'menu.fullscreen': 'Ganze Bildschierm',
     'weather.random': 'Zoufall', 'time.random': 'Zoufall', 'set.camera': 'Kamera', 'cam.chase': 'Hannert dem Auto', 'cam.far': 'Wäit hannendrun', 'cam.bonnet': 'Motorhaub',
     'map.hint': 'Tipp op eng Strooss, fir dohinner ze kommen.', 'map.here': 'Hei bass du', 'map.zoomIn': 'Méi no', 'map.zoomOut': 'Méi wäit', 'map.teleport': 'Elo op {name}', 'map.unnamed': 'Strooss ouni Numm', 'map.noRoad': 'Do ass keng Strooss.',
-    'toast.wet': 'Naass Strooss: manner Haftung', 'toast.quality': 'Qualitéit gesenkt: {q}', 'touch.left': 'Lénks', 'touch.right': 'Riets', 'help.touchText': 'Lénks lenken, riets Gas, Brems an Handbrems.', 'hud.limit': 'Limit',
+    'toast.wet': 'Naass Strooss: manner Haftung', 'toast.quality': 'Qualitéit: {q}', 'touch.left': 'Lénks', 'touch.right': 'Riets', 'help.touchText': 'Lénks lenken, riets Gas, Brems an Handbrems.', 'hud.limit': 'Limit',
     'hud.crash': 'Hoppla!', 'hud.onRoad': 'Op der Strooss', 'hud.offRoad': 'Niewent der Strooss',
   },
   de: {
@@ -46,7 +46,7 @@ const STR = {
     'start.tagline': 'Fahr durch Luxemburg-Stadt und Niederanven.', 'start.hint': 'Wetter und Tageszeit sind bei jeder Fahrt anders, außer du wählst sie.', 'menu.pause': 'Pause', 'menu.settings2': 'Einstellungen', 'menu.back': 'Zurück', 'menu.fullscreen': 'Vollbild',
     'weather.random': 'Zufall', 'time.random': 'Zufall', 'set.camera': 'Kamera', 'cam.chase': 'Hinter dem Auto', 'cam.far': 'Weit dahinter', 'cam.bonnet': 'Motorhaube',
     'map.hint': 'Tippe auf eine Straße, um dorthin zu fahren.', 'map.here': 'Hier bist du', 'map.zoomIn': 'Näher', 'map.zoomOut': 'Weiter', 'map.teleport': 'Jetzt auf {name}', 'map.unnamed': 'Straße ohne Namen', 'map.noRoad': 'Dort ist keine Straße.',
-    'toast.wet': 'Nasse Straße: weniger Grip', 'toast.quality': 'Qualität gesenkt: {q}', 'touch.left': 'Links', 'touch.right': 'Rechts', 'help.touchText': 'Links lenken, rechts Gas, Bremse und Handbremse.', 'hud.limit': 'Limit',
+    'toast.wet': 'Nasse Straße: weniger Grip', 'toast.quality': 'Qualität: {q}', 'touch.left': 'Links', 'touch.right': 'Rechts', 'help.touchText': 'Links lenken, rechts Gas, Bremse und Handbremse.', 'hud.limit': 'Limit',
     'hud.crash': 'Hoppla!', 'hud.onRoad': 'Auf der Straße', 'hud.offRoad': ' neben der Straße',
   },
   en: {
@@ -68,7 +68,7 @@ const STR = {
     'start.tagline': 'Drive through Luxembourg City and Niederanven.', 'start.hint': 'Weather and time of day change every drive, unless you pick them.', 'menu.pause': 'Paused', 'menu.settings2': 'Settings', 'menu.back': 'Back', 'menu.fullscreen': 'Fullscreen',
     'weather.random': 'Random', 'time.random': 'Random', 'set.camera': 'Camera', 'cam.chase': 'Behind the car', 'cam.far': 'Far behind', 'cam.bonnet': 'Bonnet',
     'map.hint': 'Tap a road to drive there.', 'map.here': 'You are here', 'map.zoomIn': 'Closer', 'map.zoomOut': 'Farther', 'map.teleport': 'Now on {name}', 'map.unnamed': 'Unnamed road', 'map.noRoad': 'There is no road there.',
-    'toast.wet': 'Wet road: less grip', 'toast.quality': 'Quality lowered: {q}', 'touch.left': 'Left', 'touch.right': 'Right', 'help.touchText': 'Left thumb steers, right thumb gas, brake and handbrake.', 'hud.limit': 'Limit',
+    'toast.wet': 'Wet road: less grip', 'toast.quality': 'Quality: {q}', 'touch.left': 'Left', 'touch.right': 'Right', 'help.touchText': 'Left thumb steers, right thumb gas, brake and handbrake.', 'hud.limit': 'Limit',
     'hud.crash': 'Oops!', 'hud.onRoad': 'On the road', 'hud.offRoad': ' off the road',
   },
   fr: {
@@ -90,7 +90,7 @@ const STR = {
     'start.tagline': 'Roule à travers la Ville de Luxembourg et Niederanven.', 'start.hint': 'La météo et l’heure changent à chaque partie, sauf si tu les choisis.', 'menu.pause': 'Pause', 'menu.settings2': 'Réglages', 'menu.back': 'Retour', 'menu.fullscreen': 'Plein écran',
     'weather.random': 'Aléatoire', 'time.random': 'Aléatoire', 'set.camera': 'Caméra', 'cam.chase': 'Derrière la voiture', 'cam.far': 'Loin derrière', 'cam.bonnet': 'Capot',
     'map.hint': 'Touche une route pour t’y rendre.', 'map.here': 'Tu es ici', 'map.zoomIn': 'Plus près', 'map.zoomOut': 'Plus loin', 'map.teleport': 'Maintenant sur {name}', 'map.unnamed': 'Route sans nom', 'map.noRoad': 'Il n’y a pas de route ici.',
-    'toast.wet': 'Route mouillée : moins d’adhérence', 'toast.quality': 'Qualité réduite : {q}', 'touch.left': 'Gauche', 'touch.right': 'Droite', 'help.touchText': 'Pouce gauche : diriger ; pouce droit : gaz, frein, frein à main.', 'hud.limit': 'Limite',
+    'toast.wet': 'Route mouillée : moins d’adhérence', 'toast.quality': 'Qualité : {q}', 'touch.left': 'Gauche', 'touch.right': 'Droite', 'help.touchText': 'Pouce gauche : diriger ; pouce droit : gaz, frein, frein à main.', 'hud.limit': 'Limite',
     'hud.crash': 'Oups !', 'hud.onRoad': 'Sur la route', 'hud.offRoad': ' hors de la route',
   },
 };

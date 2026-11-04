@@ -119,14 +119,17 @@ export const CAR = Object.freeze({
   mass: 1350,                // kg
   wheelbase: 2.62,
   trackWidth: 1.72,
-  power: 118000,             // W at the wheels at full throttle (about 160 hp)
+  power: 100000,             // W at the wheels at full throttle (about 135 hp)
   reversePower: 42000,       // W in reverse
   maxSpeed: 56,              // m/s (200 km/h) - the hard cap on a motorway
   maxReverse: 12,            // m/s
-  brakeDecel: 12.5,          // m/s2 at full braking on asphalt
+  brakeDecel: 10.5,          // m/s2 at full braking on asphalt
   engineBrake: 1.6,          // m/s2 when the throttle is closed
   steerMax: 0.56,            // rad of the road wheel angle at standstill
   steerSpeedRef: 13,         // m/s: the steering authority falls off with the speed
+  limitOvershoot: 1.7,       // the soft top speed on a road is this many times its speed limit (never above the class top speed)
+  slideScrub: 0.7,           // 1/s: how fast a sliding car loses speed (at full slip)
+  launchCap: 6.5,            // m/s2: the most the drive pushes at low speed (no rocket launch)
   steerRate: 7,              // 1/s: how fast the wheel follows the input
   steerGripShare: 0.95,      // the share of the tyre grip that full lock may ask for in a corner (the rest is the margin before a slide)
   steerMin: 0.035,           // rad: the wheel always keeps this much authority, even at 200 km/h

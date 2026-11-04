@@ -12,9 +12,17 @@ async function boot(h, url = PAGE) {
   await h.goto(url);
   await h.page.waitForFunction(() => document.documentElement.dataset.luxReady === "1" || document.documentElement.dataset.bootError, null, { timeout: 180000 });
   await h.pause(1500);
-  await h.page.click('[data-act="drive"]');        // close the menu: the shots must show the world, not the panel
+  await h.page.waitForSelector('#start [data-act="drive"]', { state: "visible", timeout: 60000 });
+  await h.page.click('#start [data-act="drive"]');        // the start menu: close it, the shots must show the world, not the panel
   await h.pause(600);
 }
+
+/* The loops of this flow are counted in SIMULATED seconds (the game clock, capped at 0.1 s per frame), not in frames or wall
+ * time: a software renderer (a cloud container) draws 3 frames a second and a frame-counted loop would drive 10x further. */
+const SIM_HELPERS = `window.simSeconds = async (m, secs, each) => {
+  const t0 = m.clock();
+  for (let g = 0; m.clock() - t0 < secs && g < 4000; g++) { await new Promise((r) => requestAnimationFrame(r)); if (each) each(); }
+};`;
 
 export const flow = {
   name: "luxdrive-world",
@@ -22,6 +30,7 @@ export const flow = {
   viewport: { width: 1180, height: 820 },          // an iPad in landscape: the game is played in landscape
   async run(h) {
     const { page } = h;
+    await page.addInitScript(SIM_HELPERS);
     const errors = [];
     page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
 
@@ -73,7 +82,7 @@ export const flow = {
       const m = window.__lux;
       const before = { x: m.state().x, z: m.state().z };
       m.setInput({ throttle: 1, brake: 0, steer: 0, handbrake: false });
-      await new Promise((r) => setTimeout(r, 3000));
+      await simSeconds(m, 3);
       const s = m.state();
       const after = { x: s.x, z: s.z, speed: s.speed, onRoad: s.onRoad, surface: s.surface };
       m.setInput(null);
@@ -87,12 +96,12 @@ export const flow = {
     const cam = await page.evaluate(async () => {
       const m = window.__lux;
       let worst = 1e9;
-      for (let i = 0; i < 60; i++) {
-        m.setInput({ throttle: 1, brake: 0, steer: (i % 30 < 15 ? 0.4 : -0.4), handbrake: false });
-        await new Promise((r) => requestAnimationFrame(r));
+      let i = 0;
+      await simSeconds(m, 1.5, () => {
+        m.setInput({ throttle: 1, brake: 0, steer: (i++ % 8 < 4 ? 0.4 : -0.4), handbrake: false });
         const c = m.camera.position;
         worst = Math.min(worst, c.y - m.ground.height(c.x, c.z));
-      }
+      });
       m.setInput(null);
       return worst;
     });
@@ -104,14 +113,13 @@ export const flow = {
       m.car.reset(start.x, start.z, start.heading);
       m.setInput({ throttle: 0.7, brake: 0, steer: 0, handbrake: false });
       let minGap = 1e9, maxGap = -1e9, air = 0;
-      for (let i = 0; i < 180; i++) {
-        await new Promise((r) => requestAnimationFrame(r));
+      await simSeconds(m, 3, () => {
         const st = m.state();
         const gap = st.y - m.ground.height(st.x, st.z);
         if (gap < minGap) minGap = gap;
         if (gap > maxGap) maxGap = gap;
         if (!st.grounded) air++;
-      }
+      });
       m.setInput(null);
       return { minGap, maxGap, air };
     }, { x: info.x, z: info.z, heading: info.heading });
@@ -214,8 +222,7 @@ export const flow = {
       m.car.reset(mx - nx * (hw - 2), mz - nz * (hw - 2), Math.atan2(nz, nx));
       m.setInput({ throttle: 0.45, brake: 0, steer: 0, handbrake: false });
       let minGap = 1e9, maxGap = -1e9, air = 0, crossed = 0;
-      for (let i = 0; i < 180; i++) {
-        await new Promise((r) => requestAnimationFrame(r));
+      await simSeconds(m, 3, () => {
         const s = m.state();
         const gap = s.y - m.ground.height(s.x, s.z);
         if (gap < minGap) minGap = gap;
@@ -223,7 +230,7 @@ export const flow = {
         if (!s.grounded) air++;
         const d = (s.x - mx) * nx + (s.z - mz) * nz;               // how far across the kerb the car is
         if (d > crossed) crossed = d;
-      }
+      });
       m.setInput(null);
       return { found: true, hw, minGap, maxGap, air, crossed };
     });
@@ -352,13 +359,12 @@ export const flow = {
       m.car.reset(sx, sz, Math.atan2(-start.nz, -start.nx));
       m.setInput({ throttle: 1, brake: 0, steer: 0, handbrake: false });
       let outside = 0, reached = 0;
-      for (let i = 0; i < 240; i++) {
-        await new Promise((r) => requestAnimationFrame(r));
+      await simSeconds(m, 4, () => {
         const s = m.state();
         if (!m.playArea.inside(s.x, s.z)) outside++;
         const d = (s.x - sx) * -start.nx + (s.z - sz) * -start.nz;    // how far it got towards the border
         if (d > reached) reached = d;
-      }
+      });
       m.setInput(null);
       const s = m.state();
       return { found: true, outside, reached, inside: m.playArea.inside(s.x, s.z) };
