@@ -584,6 +584,7 @@ section('D1 landmarks');
   // where the land is, and the blocks it replaces are really gone from the collision.
   let floating = 0;
   for (const lm of landmarks.list) {
+    if (lm.id.startsWith('pont-')) continue;      // a bridge spans a valley: its bounding box corners are not its feet (the decks gates above cover the bridges)
     const [x0, z0, x1, z1] = lm.bounds;
     let low = Infinity;
     for (let i = 0; i < lm.soup.pos.length; i += 3) low = Math.min(low, lm.soup.pos[i + 1]);
