@@ -50,6 +50,8 @@ const DATA = path.join(HERE, 'data');
 const args = new Set(process.argv.slice(2));
 const QUICK = args.has('--quick');
 const VERBOSE = args.has('--verbose');
+const ONLY = (process.argv.find((a) => a.startsWith('--only=')) || '').slice(7).split(',').filter(Boolean);   // --only=I,J: just those sections (the others cost two minutes)
+const wants = (id) => ONLY.length === 0 || ONLY.includes(id);
 
 const results = { pass: 0, fail: 0, failures: [] };
 const stats = {};
@@ -80,9 +82,54 @@ const maps = buildWorldMap({ classes: data.classes, classInfo: data.classInfo, c
 const forest = createTreeIndex({ map: maps, field, network: field.network, buildings, trees: data.trees });
 const net = field.network;
 
+/* ---------------------------------------------------------------- shared: where the carved ways meet (gates I and J) */
+const GC = 32, gk = (a, b) => a * 4096 + b, segGrid = new Map();
+for (const ch of net.chains) for (let i = 1; i < ch.x.length; i++) {
+  const x0 = Math.floor(Math.min(ch.x[i - 1], ch.x[i]) / GC), x1 = Math.floor(Math.max(ch.x[i - 1], ch.x[i]) / GC);
+  const z0 = Math.floor(Math.min(ch.z[i - 1], ch.z[i]) / GC), z1 = Math.floor(Math.max(ch.z[i - 1], ch.z[i]) / GC);
+  for (let a = x0; a <= x1; a++) for (let b = z0; b <= z1; b++) { const k = gk(a, b); const l = segGrid.get(k); if (l) l.push(ch, i); else segGrid.set(k, [ch, i]); }
+}
+/** A junction apron: the point lies on or beside the carriageway + pavement (+ 3 m) of another carved way, where the two surfaces are
+ *  blended on purpose; or under a way that rides over it (the ground there is the DTM). */
+const JUNCTION_MARGIN = 3;
+function inJunction(roadIndexOf, x, z) {
+  if (net.protection(x, z) > 0) return true;
+  const cx = Math.floor(x / GC), cz = Math.floor(z / GC);
+  for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
+    const l = segGrid.get(gk(cx + a, cz + b));
+    if (!l) continue;
+    for (let q = 0; q < l.length; q += 2) {
+      const o = l[q], j = l[q + 1];
+      if (o.road === roadIndexOf) continue;
+      const ax = o.x[j - 1], az = o.z[j - 1], ex = o.x[j] - ax, ez = o.z[j] - az, ll = ex * ex + ez * ez;
+      let t = ll > 1e-9 ? ((x - ax) * ex + (z - az) * ez) / ll : 0;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      if (Math.hypot(x - ax - ex * t, z - az - ez * t) < net.info[o.road].a0 + JUNCTION_MARGIN) return true;
+    }
+  }
+  return false;
+}
+/** Another carved way (or a way that rides over) has its centre line within `reach` of the point. */
+function nearOtherWay(roadIndexOf, x, z, reach) {
+  const cx = Math.floor(x / GC), cz = Math.floor(z / GC), cells = Math.ceil(reach / GC);
+  for (let a = -cells; a <= cells; a++) for (let b = -cells; b <= cells; b++) {
+    const l = segGrid.get(gk(cx + a, cz + b));
+    if (!l) continue;
+    for (let q = 0; q < l.length; q += 2) {
+      const o = l[q], j = l[q + 1];
+      if (o.road === roadIndexOf) continue;
+      const ax = o.x[j - 1], az = o.z[j - 1], ex = o.x[j] - ax, ez = o.z[j] - az, ll = ex * ex + ez * ez;
+      let t = ll > 1e-9 ? ((x - ax) * ex + (z - az) * ez) / ll : 0;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      if (Math.hypot(x - ax - ex * t, z - az - ez * t) < reach) return true;
+    }
+  }
+  return false;
+}
+
 /* ---------------------------------------------------------------- A: the data */
-section('A data');
-{
+if (wants('A')) {
+  section('A data');
   const finite = (arr) => { for (let i = 0; i < arr.length; i++) if (!Number.isFinite(arr[i])) return i; return -1; };
   check('the near terrain grid is finite', finite(data.near.data) < 0);
   check('the far terrain grid is finite', finite(data.far.data) < 0);
@@ -140,8 +187,8 @@ section('A data');
 }
 
 /* ---------------------------------------------------------------- B: the roads */
-section('B roads');
-{
+if (wants('B')) {
+  section('B roads');
   // ---- no road to nowhere: a way that ends in the area meets another way.
   // The bake clips the ways to the area (the two communes and their 300 m buffer), so a way that leaves the
   // area ends on the clip: that is not a road to nowhere, it is the edge of the world.  Every other end must meet
@@ -354,8 +401,8 @@ section('B roads');
 }
 
 /* ---------------------------------------------------------------- C: the city */
-section('C city');
-{
+if (wants('C')) {
+  section('C city');
   // The base of a house: the mesh of the house is built here, exactly as the browser builds it, and every point
   // of the bottom of its walls is compared with the ground under it.  A house that hangs over a slope (its base
   // more than 0.3 m above the ground) or that the hill eats (more than 1 m below the ground) is a failure.
@@ -475,8 +522,8 @@ section('C city');
 }
 
 /* ---------------------------------------------------------------- D: the decks */
-section('D decks');
-{
+if (wants('D')) {
+  section('D decks');
   // Every deck stands on a way that rides over the others: a deck far from any bridge road is wrong (the reviewer
   // saw small dark boxes floating near the roads).
   const overRoads = data.roads.filter((r) => (r.over || r.bridge) && !r.tunnel);
@@ -586,8 +633,8 @@ section('D decks');
 }
 
 /* ---------------------------------------------------------------- D1: the landmarks */
-section('D1 landmarks');
-{
+if (wants('D1')) {
+  section('D1 landmarks');
   // A landmark stands on the ground, floats nowhere and is not buried: its lowest face is under the land, its walls stand
   // where the land is, and the blocks it replaces are really gone from the collision.
   let floating = 0;
@@ -608,8 +655,8 @@ section('D1 landmarks');
 }
 
 /* ---------------------------------------------------------------- D2: the portals */
-section('D2 portals');
-{
+if (wants('D2')) {
+  section('D2 portals');
   // Every portal stands on the ground: the headwall is buried under it and the mouth of the tunnel opens at
   // the level of the road that leads to it.  A wall that hangs in the air is the small dark box the
   // reviewer saw near the roads.
@@ -658,8 +705,8 @@ section('D2 portals');
 }
 
 /* ---------------------------------------------------------------- E: the trees */
-section('E trees');
-{
+if (wants('E')) {
+  section('E trees');
   const info = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, lines: 0, lanes: 0, s: 0, surface: 0 };
   let inHouse = 0, onRoad = 0, worstOnRoad = 0;
   for (const t of data.trees) {
@@ -700,8 +747,8 @@ section('E trees');
 }
 
 /* ---------------------------------------------------------------- F: the car and the camera */
-section('F car and camera');
-{
+if (wants('F')) {
+  section('F car and camera');
   const collide = (x, z, radius) => buildings.collide(x, z, radius) || portals.collide(x, z, radius) ||
     forest.collide(x, z, radius) || playArea.collide(x, z, radius);
   const start = data.places.start;
@@ -753,8 +800,8 @@ section('F car and camera');
 }
 
 /* ---------------------------------------------------------------- F2: the Kaart taps, the sound numbers, the auto-step */
-section('F2 kaart, sound, auto-step');
-{
+if (wants('F2')) {
+  section('F2 kaart, sound, auto-step');
   const index = createRoadIndex(data.roads);
   const start = data.places.start;
   const startHit = index.nearest(start.x, start.z, 80);
@@ -802,8 +849,8 @@ section('F2 kaart, sound, auto-step');
 }
 
 /* ---------------------------------------------------------------- G: render == physics */
-section('G render == physics');
-{
+if (wants('G')) {
+  section('G render == physics');
   // The tiles of LOD 0 are built from the very lattice the car drives on: the mesh height and the surface height
   // must be the same number, or the car drives on something the player does not see.  The border of a tile is
   // stitched to the coarser neighbour, so the probe stays inside the tile.
@@ -856,8 +903,8 @@ section('G render == physics');
 }
 
 /* ---------------------------------------------------------------- H: the Luxtram and the street lights */
-section('H tram + lights');
-{
+if (wants('H')) {
+  section('H tram + lights');
   const tramNet = createTramNetwork(data.lines, data.stops, TRAM);
   const [A, B] = tramNet.tracks;
   stats.tramKm = +((A.length + B.length) / 1000).toFixed(1);
@@ -973,40 +1020,15 @@ section('H tram + lights');
 }
 
 /* ---------------------------------------------------------------- I: the roads are smooth, level ribbons */
-section('I smooth roads');
-{
+if (wants('I')) {
+  section('I smooth roads');
   // Ian: "the road is really bumpy and not level at all".  A real street is smooth along its length (only its real gradient), has
   // a gentle constant crossfall and a kerb of constant height; and what the player SEES (the render tile of the lattice the game
   // uses at that distance) is the same surface as the height function, at every quality level.
   const li = { sdCar: 9, sdPave: 9 };
   const rng = createRng(77);
+  const LATTICE_RESOLVES_HW = 2.5;
   const WINDOW = 10, MAX_DEV = 0.03, MAX_CROSSFALL = 0.025, MAX_KERB_DEV = 0.03;
-  const GC = 32, gk = (a, b) => a * 4096 + b, segGrid = new Map();
-  for (const ch of net.chains) for (let i = 1; i < ch.x.length; i++) {
-    const x0 = Math.floor(Math.min(ch.x[i - 1], ch.x[i]) / GC), x1 = Math.floor(Math.max(ch.x[i - 1], ch.x[i]) / GC);
-    const z0 = Math.floor(Math.min(ch.z[i - 1], ch.z[i]) / GC), z1 = Math.floor(Math.max(ch.z[i - 1], ch.z[i]) / GC);
-    for (let a = x0; a <= x1; a++) for (let b = z0; b <= z1; b++) { const k = gk(a, b); const l = segGrid.get(k); if (l) l.push(ch, i); else segGrid.set(k, [ch, i]); }
-  }
-  /** A junction apron: the point lies on or beside the carriageway + pavement (+ 3 m) of another carved way, where the two surfaces are
-   *  blended on purpose; or under a way that rides over it (the ground there is the DTM). */
-  const JUNCTION_MARGIN = 3;
-  function inJunction(roadIndexOf, x, z) {
-    if (net.protection(x, z) > 0) return true;
-    const cx = Math.floor(x / GC), cz = Math.floor(z / GC);
-    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
-      const l = segGrid.get(gk(cx + a, cz + b));
-      if (!l) continue;
-      for (let q = 0; q < l.length; q += 2) {
-        const o = l[q], j = l[q + 1];
-        if (o.road === roadIndexOf) continue;
-        const ax = o.x[j - 1], az = o.z[j - 1], ex = o.x[j] - ax, ez = o.z[j] - az, ll = ex * ex + ez * ez;
-        let t = ll > 1e-9 ? ((x - ax) * ex + (z - az) * ez) / ll : 0;
-        t = t < 0 ? 0 : t > 1 ? 1 : t;
-        if (Math.hypot(x - ax - ex * t, z - az - ez * t) < net.info[o.road].a0 + JUNCTION_MARGIN) return true;
-      }
-    }
-    return false;
-  }
   // the ways: carved, at ground level (layer 0, not riding over anything), long enough to hold a window; half in the town, half outside
   const urban = [], rural = [];
   for (const ch of net.chains) {
@@ -1025,6 +1047,12 @@ section('I smooth roads');
     const l = Math.hypot(ch.x[k + 1] - ch.x[k], ch.z[k + 1] - ch.z[k]) || 1;
     out.nx = -(ch.z[k + 1] - ch.z[k]) / l; out.nz = (ch.x[k + 1] - ch.x[k]) / l;
     return out;
+  };
+  const bedAt = (ch, d) => {                                           // the designed profile of the way at the distance d along it
+    let k = 0;
+    while (k < ch.arc.length - 2 && ch.arc[k + 1] < d) k++;
+    const t = Math.min(1, Math.max(0, (d - ch.arc[k]) / Math.max(1e-9, ch.arc[k + 1] - ch.arc[k])));
+    return ch.bed[k] + (ch.bed[k + 1] - ch.bed[k]) * t;
   };
   const pt = { x: 0, z: 0, nx: 0, nz: 0 };
   for (const ch of ways) {
@@ -1051,18 +1079,34 @@ section('I smooth roads');
         lineAt(ch, q, pt);
         // the crossfall: left and right of the centre line, inside the carriageway
         const w = hw * 0.8;
-        const fall = Math.abs(surface.height(pt.x - pt.nx * w, pt.z - pt.nz * w) - surface.height(pt.x + pt.nx * w, pt.z + pt.nz * w)) / (2 * w);
+        const lx = pt.x - pt.nx * w, lz = pt.z - pt.nz * w, rx = pt.x + pt.nx * w, rz = pt.z + pt.nz * w;
+        // The two sides of a bend lie at different stations of the way (the cross sections of a bend fan out), so on a gradient the
+        // raw difference between them is the gradient times the shift, not a crossfall.  The crossfall is the difference of the
+        // heights ABOVE THE PROFILE of the way at each side's own station.
+        field.height(lx, lz, li); const sL = li.s, roadL = li.road;
+        field.height(rx, rz, li); const sR = li.s, roadR = li.road;
+        // (a way narrower than 5 m has no lattice node pair on its tarmac: the 1 m lattice of the physics blends the kerb into the
+        // probe there, so the field itself is measured; a car road is measured on the lattice the car drives on)
+        const heightOf = hw >= LATTICE_RESOLVES_HW ? surface.height : field.height;
+        const hL = heightOf(lx, lz), hR = heightOf(rx, rz);
+        const fall = roadL === ch.road && roadR === ch.road
+          ? Math.abs((hL - bedAt(ch, sL)) - (hR - bedAt(ch, sR))) / (2 * w)
+          : Math.abs(hL - hR) / (2 * w);
         if (fall > worstFall) { worstFall = fall; worstFallAt = `${data.roads[ch.road].name || data.roads[ch.road].kind} at ${Math.round(pt.x)},${Math.round(pt.z)}`; }
-        if (fall > MAX_CROSSFALL) fallBad++;
+        if (fall > MAX_CROSSFALL) { fallBad++; if (VERBOSE) console.log(`   crossfall ${(fall * 100).toFixed(2)} % ${data.roads[ch.road].name || data.roads[ch.road].kind} at ${pt.x.toFixed(1)},${pt.z.toFixed(1)} d=${q}/${m}`); }
         // the kerb: its height over the carriageway beside it is the same all along the street
         if (kerbH > 0) {
-          const a = field.height(pt.x + pt.nx * (hw - 0.15), pt.z + pt.nz * (hw - 0.15), li), onKerb = li.road === ch.road;
+          const a = field.height(pt.x + pt.nx * (hw - 0.15), pt.z + pt.nz * (hw - 0.15), li), aLat = Math.abs(li.lat), aRoad = li.road, aS = li.s;
           const b = field.height(pt.x + pt.nx * (hw + kerbW + 0.1), pt.z + pt.nz * (hw + kerbW + 0.1), li);
-          if (onKerb && li.sdCar > 0.05) {
+          // a real junction or driveway is flat: the bake switches the kerb off within hw + junctionClear of another way's samples (3 segments)
+          const kerbFree = nearOtherWay(ch.road, pt.x, pt.z, Math.hypot(hw + ROAD.junctionClear + ROAD.sampleSpacing / 2, 2 * ROAD.sampleSpacing));
+          // (in a bend the probes along the normal of the segment can lie on the ramp of the kerb: only a probe on the tarmac and one on the flat top count)
+          if (aRoad === ch.road && li.road === ch.road && aLat <= hw && Math.abs(li.lat) >= hw + kerbW + 0.02 && !kerbFree) {
             kerbMeasured++;
-            const dk = Math.abs((b - a) - kerbH);
+            // above the profile of the way at each probe's own station (a bend on a gradient puts the two probes at different stations)
+            const dk = Math.abs((b - bedAt(ch, li.s)) - (a - bedAt(ch, aS)) - kerbH);
             if (dk > kerbWorst) kerbWorst = dk;
-            if (dk > MAX_KERB_DEV) kerbBad++;
+            if (dk > MAX_KERB_DEV) { kerbBad++; if (VERBOSE) console.log(`   kerb ${(dk * 100).toFixed(2)} cm ${data.roads[ch.road].name || data.roads[ch.road].kind} at ${pt.x.toFixed(1)},${pt.z.toFixed(1)} a=${a.toFixed(3)} b=${b.toFixed(3)} sdCar=${li.sdCar.toFixed(2)}`); }
           }
         }
       }
@@ -1078,15 +1122,15 @@ section('I smooth roads');
 }
 
 /* ---------------------------------------------------------------- J: what is drawn near the car is the surface, at every quality */
-section('J render lattice');
-{
+if (wants('J')) {
+  section('J render lattice');
   // The tile the game builds for the car at each quality level (the same quadtree selection, the same tile builder): within 40 m of
   // the car the lattice is the 1 m physics lattice and the carriageway of the mesh is the height function to the centimetre; within
   // 80 m it is at most a 2 m lattice (the UI branch's low quality left a 4 m lattice from 26 m on, a faceted street in front of the car).
   const li = { sdCar: 9, sdPave: 9 };
   const rng2 = createRng(91);
   const ways = net.chains.filter((c) => !c.tagged && !net.overRoads.has(c.road) && c.arc[c.arc.length - 1] > 40);
-  const MAX_MESH_DEV = 0.03;
+  const MAX_MESH_DEV = 0.03, MESH_EDGE_CLEAR = 1.0, WAY_END_CLEAR = 4;
   for (const [qid, Q] of Object.entries(QUALITY)) {
     let worst = 0, worstAt = '', measured = 0, coarseNear = 0, coarseMid = 0, bad = 0;
     for (let n = 0; n < (QUICK ? 6 : 24); n++) {
@@ -1114,10 +1158,11 @@ section('J render lattice');
         const hwW = net.info[way.road].hw;
         for (let i = 0; i < way.x.length; i++) {
           if (Math.hypot(way.x[i] - cx, way.z[i] - cz) > 40) continue;
+          if (way.arc[i] < hwW + WAY_END_CLEAR || way.arc[way.arc.length - 1] - way.arc[i] < hwW + WAY_END_CLEAR) continue;     // the cap of a way's end fades the carriageway out on purpose
           const nx = i + 1 < way.x.length ? -(way.z[i + 1] - way.z[i]) : -(way.z[i] - way.z[i - 1]);
           const nz = i + 1 < way.x.length ? (way.x[i + 1] - way.x[i]) : (way.x[i] - way.x[i - 1]);
           const nl = Math.hypot(nx, nz) || 1;
-          for (const lat of [-0.8, 0, 0.8]) {
+          for (const lat of [-0.5, 0, 0.5]) {
             const px = way.x[i] + (nx / nl) * lat * hwW, pz = way.z[i] + (nz / nl) * lat * hwW;
             const leaf = leafAt(sel.split, px, pz);
             const entry = leaf && meshes.get(leaf.key);
@@ -1125,10 +1170,12 @@ section('J render lattice');
             // a point near the border of its tile is stitched to the coarser neighbour: the mesh there is the neighbour's polyline
             if (px - leaf.x0 < leaf.step * 1.5 || leaf.x0 + leaf.size - px < leaf.step * 1.5 || pz - leaf.z0 < leaf.step * 1.5 || leaf.z0 + leaf.size - pz < leaf.step * 1.5) continue;
             net.carve(px, pz, li);
-            if (li.sdCar > -0.3 || li.road !== way.road) continue;              // only the tarmac of this way (a junction is the blend of two)
+            // only the tarmac of this way, with the whole 1 m lattice cell on it (a cell that straddles the kerb is the kerb blended in), and
+            // not where two ways meet (the apron of a junction is a blend of two levels, steep on purpose)
+            if (li.sdCar > -MESH_EDGE_CLEAR || li.road !== way.road || inJunction(way.road, px, pz)) continue;
             const dv = Math.abs(meshHeightAt(entry.mesh, px, pz) - field.height(px, pz));
             measured++;
-            if (dv > MAX_MESH_DEV) bad++;
+            if (dv > MAX_MESH_DEV) { bad++; if (VERBOSE) console.log(`   mesh ${qid} ${(dv * 100).toFixed(2)} cm at ${px.toFixed(1)},${pz.toFixed(1)} step ${leaf.step} road ${data.roads[way.road].name || data.roads[way.road].kind} sdCar=${li.sdCar.toFixed(2)}`); }
             if (dv > worst) { worst = dv; worstAt = `${Math.round(px)},${Math.round(pz)} step ${leaf.step}`; }
           }
         }

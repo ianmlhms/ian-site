@@ -31,6 +31,7 @@ const ARM_GAP = 3;                     // segments: two stretches of one way thi
 const CAP_SOFT = 2.0;                  // m: the carriageway pin ends this softly past the END of a way (no flat disc at the end of a street)
 const PIN_FADE = 1.5;                  // m: the carriageway level fades into the batter over this distance beyond the pavement
 const JUNCTION_LEVEL = 0.6;            // m: two ways meet at a junction when their beds differ by less than this where they meet (more: one is over the other)
+const CLOSED_MIN_SAMPLES = 6;          // a ring has at least this many samples (a way shorter than 20 m that ends where it starts is a stub)
 const END_JOIN = 3.0;                  // m: the ends of ways this close to one another meet at one node
 const JUNCTION_TOUCH = 0.6;           // m: a way whose centre line lies within the pavement (+ this) of another way runs into it: the apron of the junction is the level of that way
 const KERB_SURFACES = new Set(['asphalt', 'cobble', 'concrete']);
@@ -288,7 +289,7 @@ export function createRoadNetwork(roads, baseHeight) {
         if (bestD < Infinity) pins.set(k, bestH);
       }
       chain.pins = pins;                                  // (the harness reads them: the profile is free of curvature limits only there)
-      if (pins.size) chain.bed = designBed(chain.ground, chain.arc, pins);
+      if (pins.size) chain.bed = designBed(chain.ground, chain.arc, pins, chain.closed);
       for (let i = 1; i < n; i++) {
         const x0 = Math.floor(Math.min(chain.x[i - 1], chain.x[i]) / GC), x1 = Math.floor(Math.max(chain.x[i - 1], chain.x[i]) / GC);
         const z0 = Math.floor(Math.min(chain.z[i - 1], chain.z[i]) / GC), z1 = Math.floor(Math.max(chain.z[i - 1], chain.z[i]) / GC);
@@ -348,14 +349,16 @@ export function createRoadNetwork(roads, baseHeight) {
     // which.  That is how an overpass that OSM does not tag as a bridge (a slip road on a viaduct) is found.
     const arc = new Float64Array(n);
     for (let i = 1; i < n; i++) arc[i] = arc[i - 1] + Math.hypot(rs.x[i] - rs.x[i - 1], rs.z[i] - rs.z[i - 1]);
-    const chain = { road: ri, x: rs.x, z: rs.z, arc, ground, bed: null, tagged, hw, rank: roadRank(road, hw) };
+    // a ring (the last sample at the first one): its profile is periodic, see designBed
+    const closed = n >= CLOSED_MIN_SAMPLES && Math.hypot(rs.x[0] - rs.x[n - 1], rs.z[0] - rs.z[n - 1]) <= END_JOIN;
+    const chain = { road: ri, x: rs.x, z: rs.z, arc, ground, bed: null, tagged, hw, rank: roadRank(road, hw), closed };
     chains.push(chain);
     prep.push({ ri, road, rs, n, hw, kerbH, kerbW, pw, bench, a0, kind, chain });
   }
 
   // ---- the bed of every way: designed on its own first (this decides which way rides over which), then again with the
   // junctions pinned to the ways that were designed before ----
-  for (const chain of chains) chain.bed = designBed(chain.ground, chain.arc);
+  for (const chain of chains) chain.bed = designBed(chain.ground, chain.arc, null, chain.closed);
   findCrossings();
   reconcileJunctions();
 

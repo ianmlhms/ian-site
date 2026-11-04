@@ -88,8 +88,11 @@ export const SURFACES = Object.freeze({
   water: { crr: 0.09, grip: 0.5, rough: 0.1, wetLoss: 0 },
 });
 
+/* lodScale / protectedSize (quadtree.js): a node up to protectedSize splits at its full distance, so the 1 m lattice reaches 59 m and the 2 m lattice 118 m
+ * around the car at EVERY quality: a street in front of the car is never a faceted ribbon (the first low quality, 0.2 / 64, gave a 4 m lattice from 26 m
+ * on).  The quality only coarsens the bigger, farther nodes. */
 export const QUALITY = Object.freeze({
-  low: { pixelRatio: 1, lodScale: 0.2, protectedSize: 64, railRadius: 300, far: 4200, buildingRadius: 300, buildingFarRadius: 760, treeRadius: 90, treeDensity: 0.4, cheapGround: true, shadows: false },
+  low: { pixelRatio: 1, lodScale: 0.4, protectedSize: 128, railRadius: 300, far: 4200, buildingRadius: 300, buildingFarRadius: 760, treeRadius: 90, treeDensity: 0.4, cheapGround: true, shadows: false },
   medium: { pixelRatio: 1.25, lodScale: 0.7, protectedSize: 128, railRadius: 500, far: 6000, buildingRadius: 420, buildingFarRadius: 1300, treeRadius: 150, treeDensity: 0.7, cheapGround: false, shadows: false },
   high: { pixelRatio: 2, lodScale: 1, protectedSize: 128, railRadius: 700, far: 8000, buildingRadius: 700, buildingFarRadius: 2100, treeRadius: 240, treeDensity: 1, cheapGround: false, shadows: true },
 });

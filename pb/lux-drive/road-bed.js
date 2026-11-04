@@ -103,11 +103,36 @@ export function limitCurvature(bed, arc, pinned, limit, sweeps = 4000) {
   return cur;
 }
 
+const CLOSED_COPIES = 3;                 // a closed way is designed as this many laps in a row; the middle lap is the bed (no seam, no end effects)
+
 /**
  * The bed of a way.  `ground`: the terrain under the samples of the centre line; `arc`: the distance along the way of every sample (m); `pins`: optional Map(sample index -> the height
  * the surface must have there, a junction with a way that is already designed).  Returns Float64Array of the heights.
+ *
+ * `closed`: the last sample is (about) the first (a ring road, a pedestrian square, a loop of a service road).  An open design leaves the two ends at two
+ * different levels - a step of up to 2.5 m across the carriageway where the ring closes (measured: Parvis de l'Abbaye) - so a closed way is designed as three laps
+ * in a row and the middle lap is kept: the profile is periodic, the seam is as smooth as any other place of the ring, and the last sample takes the level of the first.
  */
-export function designBed(ground, arc, pins) {
+export function designBed(ground, arc, pins, closed = false) {
+  const n = ground.length;
+  if (!closed || n < 6) return designOpenBed(ground, arc, pins);
+  const m = n - 1;                                                       // the last sample repeats the first: one lap is m samples
+  const lap = arc[n - 1];                                                // the length of a lap (the last sample is the first again)
+  const total = m * CLOSED_COPIES;
+  const g = new Float64Array(total), a = new Float64Array(total);
+  const wrapPins = pins ? new Map() : null;
+  for (let c = 0; c < CLOSED_COPIES; c++) {
+    for (let i = 0; i < m; i++) { g[c * m + i] = ground[i]; a[c * m + i] = arc[i] + c * lap; }
+    if (pins) for (const [i, h] of pins) wrapPins.set(c * m + (i === n - 1 ? 0 : i), h);   // the pin of the last sample is the pin of the first
+  }
+  const bed = designOpenBed(g, a, wrapPins);
+  const out = new Float64Array(n);
+  for (let i = 0; i < m; i++) out[i] = bed[m + i];
+  out[n - 1] = out[0];
+  return out;
+}
+
+function designOpenBed(ground, arc, pins) {
   const n = ground.length;
   const w = new Float64Array(n).fill(1);
   const y = new Float64Array(n);
