@@ -15,7 +15,8 @@ roads.bin layout (little endian):
     per road:
       u16 kind        (see ROAD_KINDS below)
       u16 flags       bit0 bridge, bit1 tunnel, bit2 oneway, bit3 roundabout,
-                     bits 4-7 the material of the way (0 = the default of the class, else the code + 1)
+                     bits 4-7 the material of the way (0 = the default of the class, else the code + 1),
+                     bit 8 the way rides over the ground (a bridge or a layer above the others)
       i16 layer       (OSM layer: +1 above the ground, -1 below)
       u16 lanes       (total lanes of the way, both directions unless one-way)
       u16 nameId      (index into names.json, 0xffff = none)
@@ -78,6 +79,8 @@ FLAG_TUNNEL = 2
 FLAG_ONEWAY = 4
 FLAG_ROUNDABOUT = 8
 FLAG_SURFACE_SHIFT = 4        # bits 4-7 hold the material of the way (0 = the default of the class)
+FLAG_OVER = 256               # bit 8: the way rides OVER the ground: it is never carved into the height function,
+                              # it gets a deck (decks.bin) at its own height and the ground under it stays the ground
 
 # The material of a way: the OSM surface tag says what it is really made of.  The classes have a default
 # (the browser knows it), the tag overrides it: a street with surface=sett is cobbled, a pedestrian area with
@@ -189,7 +192,7 @@ def main():
         return name_ids[text]
 
     roads = []
-    stats = {"bridge": 0, "tunnel": 0, "oneway": 0, "skipped": 0, "clipped": 0}
+    stats = {"bridge": 0, "tunnel": 0, "oneway": 0, "over": 0, "skipped": 0, "clipped": 0}
     for way in osm["ways"]:
         tags = way["t"]
         hw = tags.get("highway")
@@ -269,6 +272,7 @@ def main():
 
         bridge = tags.get("bridge") not in (None, "no", "false")
         tunnel = tags.get("tunnel") not in (None, "no", "false")
+        layer = int(tags.get("layer", 0) or 0)
         flags = 0
         if bridge:
             flags |= FLAG_BRIDGE
@@ -281,11 +285,15 @@ def main():
             stats["oneway"] += 1
         if tags.get("junction") == "roundabout":
             flags |= FLAG_ROUNDABOUT
+        # A way that rides over the ground: a bridge, or a way that OSM puts on a layer above the others.  It is
+        # never carved into the height function (the ground under it stays the ground), it gets a deck instead.
+        if bridge or layer >= 1:
+            flags |= FLAG_OVER
+            stats["over"] += 1
         # the material of the way: the OSM surface tag (0 = the default of the class, the browser knows it)
         surf_name = SURFACE_BY_TAG.get((tags.get("surface") or "").strip().lower())
         if surf_name:
             flags |= (SURFACE_CODES[surf_name] + 1) << FLAG_SURFACE_SHIFT
-        layer = int(tags.get("layer", 0) or 0)
         # the name: Luxembourgish first
         nm = tags.get("name:lb") or tags.get("name") or tags.get("name:de") or tags.get("name:fr") or ""
         roads.append({

@@ -131,7 +131,7 @@ async function boot() {
   await new Promise((r) => setTimeout(r, 0));
   const solid = createSolidMaterial(env);
   const terrain = createTerrainView({ scene, surface, field, material: quality.cheapGround ? groundCheap : groundFull, quality });
-  const decks = createDeckView({ scene, decks: data.decks, material: solid });
+  const decks = createDeckView({ scene, decks: data.decks, material: solid, ground: ground.surface });
   const portalView = createPortalView({ scene, portals, ground, material: solid });
   const model = createCarModel({ colourId: 'red', material: solid });
   scene.add(model.group);

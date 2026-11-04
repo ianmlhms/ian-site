@@ -344,6 +344,53 @@ of the land over the same walk:
 percentile is over 0.85, the 99th over 1.6, more than 2 % of the sides are steeper than the land beside them,
 or more than 6 sides are a wall (a slope over 3). The old carve fails the 2 % rule; the new one passes it.
 
+### Fix 7 — the overpass is not a pit any more: DONE (the over way is never carved, the ground under it is protected)
+
+The reviewer: *"Where Rue du Grünewald crosses OVER the A1, the A1's cut is carved into the crossing road, so the
+bridge road dives into a dark pit. Rule: a way with `bridge=*` / `layer>=1` is NEVER carved into the height
+function and the lower road's carve must not lower the ground under the upper road's approach. The upper road
+crosses on a solid deck (decks.bin, with abutments) at its own height; the ground stays the ground."*
+
+**What was wrong.** Three things, all in the code:
+
+1. `road-network.js` skipped only the ways tagged `bridge=yes` from the carve, never the ones that OSM puts on
+   a layer above the others (`layer>=1`: the slip roads of the interchanges).
+2. The ground beside a road is the *batter*, and the batters of all the roads near a point are **summed and
+   averaged**. So the cut of the road that goes under a bridge pulled the ground down under the bridge as well:
+   the bridge road dived into the hole that the lower road's cut had dug.
+3. The deck of a bridge was a 0.6 m slab with parapets, hanging in the air where the bridge stands above the
+   ground (the reviewer's "small dark boxes floating near the roads").
+
+**What it is now.**
+
+- A new flag bit 8 (`FLAG_OVER`) in `roads.bin`: the way rides over the ground (`bridge=*` or `layer>=1`).
+  458 ways carry it (374 of them are bridges). Such a way is never carved into the height function and it gets a
+  deck in `decks.bin` at its own height (the bake reads the 2 m DSM along it, as it did for the bridges).
+- The ground under a way that rides over the others is **protected**: no road may dig into it. The protection is
+  a corridor (the pavement of the over way + 4 m) and it fades out over 10 m, so the ground is never a wall
+  where the protection ends.
+- The ways that OSM does not tag are found by their **crossings**: two ways that cross more than 1.5 m apart in
+  level — one is on a viaduct or on an embankment, the other one goes under it. 220 ways are over that way
+  (182 tagged + 38 found at a crossing) and the corridors of all of them are protected.
+- The deck is **solid**: its sides reach from the top of the deck down to the ground (the abutments), so a bridge
+  is a wall and not a slab hanging in the air.
+
+**Measured** (Node, the same code the game runs): the depth of the hole that the carve digs under the over ways
+— how much lower the ground is under the bridge than the land around it:
+
+| | before | after |
+|---|---:|---:|
+| the ways tagged `bridge=*` / `layer>=1` (182) with a hole under them | 23 | **0** |
+| the deepest hole (Schlassbréck, over the A1) | 3.45 m | **0 m** |
+| the holes at the crossings that the tag misses (46 of them) | 1 (0.24 m) | **0** |
+
+The 23 ways with a hole under them are the ones the reviewer saw: the A1 at (1952, 11597) over the
+"Autoroute d'Esch" (1.69 m), "Nei Bréck", "Roud Bréck", "Val de Hamm", "Pont Jean-Pierre Buchler".
+
+**Still open** (Milestone 2, "tunnels or correct portals"): the tunnels are not dug, a single valued height
+field cannot hold them. The "Rue du Grünewald" goes under the A6 in a tunnel and the mouth of the tunnel is a
+step of 4.3 m: the portal is drawn (a headwall with a bore) but the road does not go through it.
+
 ## Milestone 3 — city: NOT STARTED
 ## Milestone 4 — gates: NOT STARTED
 

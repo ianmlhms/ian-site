@@ -18,6 +18,11 @@ import { ROAD_KINDS, kindInfo } from './roads.js';
 const CELL = ROAD.cell;                 // m, the spatial hash cell (the biggest kernel radius fits inside it)
 const BATTER_STEP = 2.0;               // m, the step of the walk that finds where the batter gives up
 const BATTER_TOL = 0.05;               // m, how close the land must be to the road for the batter to end
+const OVER_LEVEL = 1.5;                // m: at a crossing, the way whose bed is this much higher than the other one
+                                    // rides OVER it: it keeps its own earthworks and the ground under it is protected
+const PROTECT_MARGIN = 4.0;            // m: the ground beside an over way is protected this far past its pavement
+const PROTECT_FADE = 10.0;             // m: the protection fades out over this distance, so the ground is never a wall
+const PROTECT_CELL = 64;               // m, the cell of the spatial hash of the protected corridors
 const smoothstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const KERB_SURFACES = new Set(['asphalt', 'cobble', 'concrete']);
 
@@ -79,6 +84,8 @@ export function createRoadNetwork(roads, baseHeight) {
   const firstSample = [];            // the index of a road's first sample in the sample arrays
   const firstSeg = [];               // the index of a road's first segment in the segment arrays
   const segCount = [];               // the number of segments of a road
+  const chains = [];                 // the centre line and the bed of every drivable way (the crossings decide what is over what)
+  const overCorridors = [];          // the corridors of the ways that ride over the ground: their ground is protected
 
   /**
    * Where the batter on one side of a way ends, in metres past the edge of the pavement.
@@ -104,9 +111,9 @@ export function createRoadNetwork(roads, baseHeight) {
     const road = roads[ri];
     firstSample[ri] = -1; firstSeg[ri] = -1; segCount[ri] = 0; info[ri] = null;
     // Only the roads a car may drive on are carved. A footpath or a staircase is not a road: carving it would cut a
-    // trench into the hillside where the path follows a steep slope. A bridge is a deck (decks.js), a tunnel cannot be
-    // a trench in a single valued height field (it gets a portal instead).
-    if (!road.info.drivable || road.tunnel || road.bridge) continue;
+    // trench into the hillside where the path follows a steep slope. A tunnel cannot be a trench in a single valued
+    // height field (it gets a portal instead) and a way that rides over the ground is a deck (decks.js).
+    if (!road.info.drivable) continue;
     const kind = kindInfo(road.kind);
     const hw = Math.max(0.8, road.width / 2);
     // the kerb belongs to the material of the way itself: a cobbled street has one, a paved area has none
@@ -114,13 +121,9 @@ export function createRoadNetwork(roads, baseHeight) {
     const kerbW = kerbH > 0 ? ROAD.kerbWidth : 0;
     const pw = Math.max(0, road.sidewalk);
     const a0 = hw + kerbW + pw;
-    const radius = Math.min(ROAD.maxRadius, a0 + ROAD.falloff);
-    // The BATTER reaches much farther than the paint: the ground beside the road is shaped by the slope limit over
-    // the whole embankment, while the paint stops at the pavement (the painted tarmac must be the carriageway).
-    const reach = Math.min(ROAD.maxRadius, a0 + ROAD.embankment);
-    info[ri] = { hw, kerbH, kerbW, pw, a0, radius, reach, kind, road, lines: kind.lines, lanes: road.lanes };
-    firstSample[ri] = sampleX.length;
-    firstSeg[ri] = segAx.length;
+    // A way that rides OVER the ground: OSM says so (a bridge, or a layer above the others).  It is never carved
+    // into the height function and the ground under it is protected (see the crossings below).
+    const tagged = !!(road.over || (road.layer || 0) >= 1);
 
     const rs = resample(road.pts, ROAD.sampleSpacing);
     const n = rs.x.length;
@@ -139,6 +142,22 @@ export function createRoadNetwork(roads, baseHeight) {
       const lo = ground[i] - ROAD.bedClamp, hi = ground[i] + ROAD.bedClamp;
       bed[i] = Math.min(hi, Math.max(lo, bed[i]));
     }
+    // Every drivable way keeps its centre line and its bed: the crossings of the ways decide which one rides over
+    // which.  That is how an overpass that OSM does not tag as a bridge (a slip road on a viaduct) is found.
+    chains.push({ road: ri, x: rs.x, z: rs.z, bed, tagged });
+    if (road.tunnel || tagged) {
+      // A tunnel and an over way are not carved.  The ground under an over way is protected: the way that goes
+      // under it may not dig a hole in it (the reviewer saw the bridge road dive into a dark pit).
+      if (tagged) overCorridors.push({ x: rs.x, z: rs.z, half: a0 + PROTECT_MARGIN });
+      continue;
+    }
+    const radius = Math.min(ROAD.maxRadius, a0 + ROAD.falloff);
+    // The BATTER reaches much farther than the paint: the ground beside the road is shaped by the slope limit over
+    // the whole embankment, while the paint stops at the pavement (the painted tarmac must be the carriageway).
+    const reach = Math.min(ROAD.maxRadius, a0 + ROAD.embankment);
+    info[ri] = { hw, kerbH, kerbW, pw, a0, radius, reach, kind, road, lines: kind.lines, lanes: road.lanes };
+    firstSample[ri] = sampleX.length;
+    firstSeg[ri] = segAx.length;
     // The BATTER on each side of the way: how far past the pavement the ground beside the road is shaped.
     // The ground beside a road is the LAND, but the carve may never make it steeper than the slope limit, so the
     // ground follows a ramp of at most that slope until the ramp reaches the land again.  The batter ends there:
@@ -224,6 +243,143 @@ export function createRoadNetwork(roads, baseHeight) {
   for (const [key, list] of buckets) cells.set(key, Int32Array.from(list));
   const EMPTY = new Int32Array(0);
 
+  // ---- the crossings: which way rides over which -------------------------
+  // At a crossing the two ways are at their own level.  If one of them is more than OVER_LEVEL higher than the
+  // other, it rides OVER it: its earthworks (the fill of the DTM) are the ground there, so it is never carved, and
+  // the ground under it is protected.  The way that goes under it may not dig a hole in it: the reviewer saw the cut
+  // of the lower road carved into the crossing road, so the bridge road dived into a dark pit.
+  const overRoads = new Set();
+  const crossings = [];            // the crossings of two ways where one of them rides over the other
+  const crossingKeys = new Set();
+  for (const chain of chains) if (chain.tagged) overRoads.add(chain.road);
+
+  /** Where the segment AB crosses the segment CD: the parameters t (on AB) and u (on CD), or null. */
+  function crossing(ax, az, bx, bz, cx, cz, dx, dz) {
+    const rx = bx - ax, rz = bz - az, sx = dx - cx, sz = dz - cz;
+    const den = rx * sz - rz * sx;
+    if (Math.abs(den) < 1e-9) return null;
+    const qx = cx - ax, qz = cz - az;
+    const t = (qx * sz - qz * sx) / den;
+    const u = (qx * rz - qz * rx) / den;
+    if (t < 0 || t > 1 || u < 0 || u > 1) return null;
+    return [t, u];
+  }
+
+  {
+    // the ways that OSM does not tag: their crossings are the ones that have to be found
+    const cands = chains.filter((chain) => !chain.tagged);
+    const GC = 32;                                   // m, the cell of the grid of the centre lines
+    const gkey = (cx, cz) => cx * 4096 + cz;
+    const grid = new Map();
+    const cellRange = (ax, az, bx, bz) => [
+      Math.floor(Math.min(ax, bx) / GC), Math.floor(Math.max(ax, bx) / GC),
+      Math.floor(Math.min(az, bz) / GC), Math.floor(Math.max(az, bz) / GC),
+    ];
+    for (const chain of cands) {
+      for (let i = 1; i < chain.x.length; i++) {
+        const [cx0, cx1, cz0, cz1] = cellRange(chain.x[i - 1], chain.z[i - 1], chain.x[i], chain.z[i]);
+        for (let cx = cx0; cx <= cx1; cx++) {
+          for (let cz = cz0; cz <= cz1; cz++) {
+            const k = gkey(cx, cz);
+            const list = grid.get(k);
+            if (list) list.push(chain, i); else grid.set(k, [chain, i]);
+          }
+        }
+      }
+    }
+    for (const chain of cands) {
+      for (let i = 1; i < chain.x.length; i++) {
+        const ax = chain.x[i - 1], az = chain.z[i - 1], bx = chain.x[i], bz = chain.z[i];
+        const [cx0, cx1, cz0, cz1] = cellRange(ax, az, bx, bz);
+        for (let cx = cx0; cx <= cx1; cx++) {
+          for (let cz = cz0; cz <= cz1; cz++) {
+            const list = grid.get(gkey(cx, cz));
+            if (!list) continue;
+            for (let q = 0; q < list.length; q += 2) {
+              const other = list[q], j = list[q + 1];
+              if (other.road <= chain.road) continue;      // every crossing is looked at once
+              const hit = crossing(ax, az, bx, bz, other.x[j - 1], other.z[j - 1], other.x[j], other.z[j]);
+              if (!hit) continue;
+              const bedA = chain.bed[i - 1] + (chain.bed[i] - chain.bed[i - 1]) * hit[0];
+              const bedB = other.bed[j - 1] + (other.bed[j] - other.bed[j - 1]) * hit[1];
+              if (bedA > bedB + OVER_LEVEL) overRoads.add(chain.road);
+              else if (bedB > bedA + OVER_LEVEL) overRoads.add(other.road);
+              else continue;
+              // the crossing is recorded: the harness checks that the over way does not dive into a pit there
+              const px = ax + (bx - ax) * hit[0], pz = az + (bz - az) * hit[0];
+              const key = Math.round(px) * 100000 + Math.round(pz);
+              if (crossingKeys.has(key)) continue;
+              crossingKeys.add(key);
+              crossings.push({
+                x: px, z: pz,
+                over: bedA > bedB ? chain.road : other.road,
+                under: bedA > bedB ? other.road : chain.road,
+                bedOver: Math.max(bedA, bedB), bedUnder: Math.min(bedA, bedB),
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // ---- the protected corridors: the ground under a way that rides over the others stays the ground -----
+  const protX0 = [], protZ0 = [], protX1 = [], protZ1 = [], protHalf = [];
+  for (const corridor of overCorridors) {              // the ways that OSM tags as over
+    for (let i = 1; i < corridor.x.length; i++) {
+      protX0.push(corridor.x[i - 1]); protZ0.push(corridor.z[i - 1]);
+      protX1.push(corridor.x[i]); protZ1.push(corridor.z[i]);
+      protHalf.push(corridor.half);
+    }
+  }
+  for (let i = 0; i < count; i++) {                     // the ways the crossings found to be over
+    if (!overRoads.has(ROADOF[i])) continue;
+    protX0.push(X0[i]); protZ0.push(Z0[i]); protX1.push(X1[i]); protZ1.push(Z1[i]);
+    protHalf.push(A0[i] + PROTECT_MARGIN);
+  }
+  const pKey = (cx, cz) => cx * 4096 + cz;
+  const pBuckets = new Map();
+  for (let s = 0; s < protX0.length; s++) {
+    const minX = Math.min(protX0[s], protX1[s]), maxX = Math.max(protX0[s], protX1[s]);
+    const minZ = Math.min(protZ0[s], protZ1[s]), maxZ = Math.max(protZ0[s], protZ1[s]);
+    for (let cx = Math.floor(minX / PROTECT_CELL); cx <= Math.floor(maxX / PROTECT_CELL); cx++) {
+      for (let cz = Math.floor(minZ / PROTECT_CELL); cz <= Math.floor(maxZ / PROTECT_CELL); cz++) {
+        const k = pKey(cx, cz);
+        const list = pBuckets.get(k);
+        if (list) list.push(s); else pBuckets.set(k, [s]);
+      }
+    }
+  }
+  const pCells = new Map();
+  for (const [key, list] of pBuckets) pCells.set(key, Int32Array.from(list));
+
+  /** How much of the ground at (x, z) is protected: 1 inside a corridor of an over way, 0 outside it. */
+  function protection(x, z) {
+    const cx = Math.floor(x / PROTECT_CELL), cz = Math.floor(z / PROTECT_CELL);
+    let p = 0;
+    for (let dz = -1; dz <= 1; dz++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const list = pCells.get(pKey(cx + dx, cz + dz)) || EMPTY;
+        for (let q = 0; q < list.length; q++) {
+          const s = list[q];
+          const ax = protX0[s], az = protZ0[s];
+          const ex = protX1[s] - ax, ez = protZ1[s] - az;
+          const ll = ex * ex + ez * ez;
+          let t = ll > 1e-9 ? ((x - ax) * ex + (z - az) * ez) / ll : 0;
+          t = t < 0 ? 0 : t > 1 ? 1 : t;
+          const d = Math.hypot(x - (ax + ex * t), z - (az + ez * t)) - protHalf[s];
+          if (d <= 0) return 1;
+          if (d < PROTECT_FADE) { const v = 1 - d / PROTECT_FADE; if (v > p) p = v; }
+        }
+      }
+    }
+    return p;
+  }
+
+  // A way that rides over the others keeps the earthworks of the DTM: its batter never shapes the ground.
+  const NOBATTER = new Uint8Array(count);
+  for (let i = 0; i < count; i++) if (overRoads.has(ROADOF[i])) NOBATTER[i] = 1;
+
   // ---- the junctions: no kerb where a road runs into another road --------
   {
     const sKey = (cx, cz) => (cx + 8192) * 32768 + (cz + 8192);
@@ -302,6 +458,9 @@ export function createRoadNetwork(roads, baseHeight) {
   function carve(x, z, out, groundY) {
     const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
     const ground = groundY === undefined ? baseHeight(x, z) : groundY;
+    // The ground under a way that rides over the others is protected: no road may cut into it, so the bridge road
+    // does not dive into a dark pit where the road below it was cut into the hill.
+    const prot = protection(x, z);
     let best = -1, bestScore = -1, bestLat = 0, bestDist = 0, bestT = 0;
     let covSum = 0, bedSum = 0;     // the paint: the coverage of the road the point is on (the tight radius) and the
                                     // flat level of a junction (the roads that meet are blended)
@@ -345,15 +504,20 @@ export function createRoadNetwork(roads, baseHeight) {
           // At the edge of the pavement the limit is zero, so the ground there is the level of the road: the kerb.
           // A road that stands far above the ground is a viaduct: the level fades its influence out, so the carve
           // does not fill the valley under it (the ground stays the ground).
-          const lim = ROAD.maxBatterSlope * edge;
-          const off = ground - bed;
-          const shaped = bed + (off > lim ? lim : off < -lim ? -lim : off);
-          const target = ground + level * (shaped - ground);
-          // The claim of the batter: full on the road, and gone at the far end of the batter.  It is squared so that
-          // a road further away does not pull the ground of the road the point is on.
-          const fall = 1 - edge / fadeLen;
-          devSum += fall * fall * (target - ground);
-          devW += fall * fall;
+          // A road that rides over the others has no batter at all: the earthworks of the DTM are its ground.
+          if (!NOBATTER[i]) {
+            const lim = ROAD.maxBatterSlope * edge;
+            const off = ground - bed;
+            const shaped = bed + (off > lim ? lim : off < -lim ? -lim : off);
+            const target = ground + level * (shaped - ground);
+            // The claim of the batter: full on the road, and gone at the far end of the batter.  It is squared so that
+            // a road further away does not pull the ground of the road the point is on.  In a protected corridor the
+            // claim is gone: the ground under an over way stays the ground.
+            const fall = 1 - edge / fadeLen;
+            const claim = fall * fall * (1 - prot);
+            devSum += claim * (target - ground);
+            devW += claim;
+          }
           // ---- the paint: it stops at the pavement, so the painted tarmac is the carriageway and nothing else
           const R = RAD[i];
           if (d >= R) continue;
@@ -415,7 +579,7 @@ export function createRoadNetwork(roads, baseHeight) {
   }
 
   return {
-    carve, nearestRoad, roads, info, count, scratch,
+    carve, nearestRoad, roads, info, count, scratch, overRoads, crossings, chains,
     segments: { X0, Z0, X1, Z1, BED0, BED1, HW, KERBH, KERBW, PW, A0, RAD, REACH, KIND, ROADOF, KERBON, LINES, S0, S1, SURF },
     // the centre lines as they are carved (resampled and rounded): the game, the minimap and the probes follow these
     samples: { x: SAMPLES_X, z: SAMPLES_Z, road: SAMPLES_ROAD, first: firstSample, segs: segCount },

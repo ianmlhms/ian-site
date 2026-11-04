@@ -19,6 +19,8 @@ FLAG_TUNNEL = 2
 FLAG_ONEWAY = 4
 FLAG_ROUNDABOUT = 8
 FLAG_SURFACE_SHIFT = 4        # bits 4-7 hold the material of the way (0 = the default of the class)
+FLAG_OVER = 256               # bit 8: the way rides over the ground (a bridge, or a layer above it): it is never
+                              # carved into the height function, it gets a deck (decks.bin) instead
 
 # the material of a way, as the number the ground shader switches on
 SURFACE_NAMES = ['asphalt', 'cobble', 'concrete', 'gravel', 'dirt', 'stone']
@@ -122,6 +124,7 @@ def decode_roads(path=None, names_path=None):
             "nameId": name_id, "name": names[name_id] if name_id < len(names) else "",
             "width": width, "sidewalk": sidewalk, "offset": offset, "pts": pts,
             "bridge": bool(flags & FLAG_BRIDGE), "tunnel": bool(flags & FLAG_TUNNEL),
+            "over": bool(flags & FLAG_OVER),
             "oneway": bool(flags & FLAG_ONEWAY), "surface": surface,
         })
     return roads, names

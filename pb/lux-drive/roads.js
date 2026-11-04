@@ -14,6 +14,7 @@ export const FLAG_TUNNEL = 2;
 export const FLAG_ONEWAY = 4;
 export const FLAG_ROUNDABOUT = 8;
 export const FLAG_SURFACE_SHIFT = 4;       // bits 4-7 hold the material of the way (0 = the default of the class)
+export const FLAG_OVER = 256;              // bit 8: the way rides over the ground (a bridge, or a layer above it)
 const NO_NAME = 0xffff;
 const DECIMETRE = 0.1;
 
@@ -112,6 +113,7 @@ export function decodeRoads(bin, names) {
     for (let i = 1; i < pts.length; i++) length += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
     roads.push({
       id: r, kind, info, bridge: (flags & FLAG_BRIDGE) !== 0, tunnel: (flags & FLAG_TUNNEL) !== 0,
+      over: (flags & FLAG_OVER) !== 0,
       oneway: (flags & FLAG_ONEWAY) !== 0, roundabout: (flags & FLAG_ROUNDABOUT) !== 0,
       layer, lanes, name: nameId === NO_NAME ? '' : (names[nameId] || ''),
       width, sidewalk, offset, length, pts, surface, surfaceCode,

@@ -30,7 +30,7 @@ from rasterio.windows import from_bounds
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import (OUT_DIR, RAW_DIR, ORIGIN_E, ORIGIN_N_TOP, world_to_luref)  # noqa: E402
-from roads_io import FLAG_BRIDGE, FLAG_TUNNEL, decode_roads, road_length  # noqa: E402
+from roads_io import FLAG_OVER, FLAG_TUNNEL, decode_roads, road_length  # noqa: E402
 
 COG_BASE = ("https://download.data.public.lu/resources/bd-l-lidar2024-releve-3d-du-territoire-"
             "luxembourgeois/20241223-093912/")
@@ -107,7 +107,7 @@ def main():
         b = ground[j + 1, i] * (1 - tx) + ground[j + 1, i + 1] * tx
         return a * (1 - tz) + b * tz
 
-    bridges = [r for r in roads if r["flags"] & FLAG_BRIDGE and not (r["flags"] & FLAG_TUNNEL)]
+    bridges = [r for r in roads if r["flags"] & FLAG_OVER and not (r["flags"] & FLAG_TUNNEL)]
     # group the ways of one bridge: parallel ways of the same bridge (a road and its footpath)
     # are separate decks; they share the DSM profile, so they are read together.
     prepared = []

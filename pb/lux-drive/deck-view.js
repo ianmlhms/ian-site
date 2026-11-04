@@ -15,11 +15,18 @@ const COLOUR_PARAPET = [0.68, 0.67, 0.64];
 
 /**
  * decks: the decoded decks [{ id, parapet, width, pts: [[x, z]], tops: [y] }]
+ * ground: the height of the terrain under the deck (the abutments reach down to it, so nothing floats).
  * Returns { mesh, count }.
  */
-export function createDeckView({ scene, decks, material }) {
+export function createDeckView({ scene, decks, material, ground }) {
   const b = new FlatBuilder();
   let count = 0;
+  // the ground under a point of the deck: the abutment goes down to it, so the deck is never a floating slab.
+  const groundAt = (x, z, y) => {
+    if (!ground) return y - DECK.thickness;
+    const g = ground.height(x, z);
+    return Math.min(y - DECK.thickness, g);
+  };
   for (const deck of decks) {
     const n = deck.pts.length;
     if (n < 2) continue;
@@ -41,11 +48,16 @@ export function createDeckView({ scene, decks, material }) {
       // the underside
       b.quad([ax - sx * half, ay - DECK.thickness, az - sz * half], [bx - sx * half, by - DECK.thickness, bz - sz * half],
         [bx + sx * half, by - DECK.thickness, bz + sz * half], [ax + sx * half, ay - DECK.thickness, az + sz * half], COLOUR_SIDE);
-      // the sides of the deck (the thickness)
+      // the sides of the deck: they are the ABUTMENTS, they reach from the top of the deck down to the ground, so the
+      // deck is a solid wall and not a slab floating over the valley (the reviewer saw it float).
+      const al = groundAt(ax + sx * half, az + sz * half, ay);
+      const bl = groundAt(bx + sx * half, bz + sz * half, by);
+      const ar = groundAt(ax - sx * half, az - sz * half, ay);
+      const br = groundAt(bx - sx * half, bz - sz * half, by);
       b.quad([ax + sx * half, ay, az + sz * half], [bx + sx * half, by, bz + sz * half],
-        [bx + sx * half, by - DECK.thickness, bz + sz * half], [ax + sx * half, ay - DECK.thickness, az + sz * half], COLOUR_SIDE);
+        [bx + sx * half, bl, bz + sz * half], [ax + sx * half, al, az + sz * half], COLOUR_SIDE);
       b.quad([bx - sx * half, by, bz - sz * half], [ax - sx * half, ay, az - sz * half],
-        [ax - sx * half, ay - DECK.thickness, az - sz * half], [bx - sx * half, by - DECK.thickness, bz - sz * half], COLOUR_SIDE);
+        [ax - sx * half, ar, az - sz * half], [bx - sx * half, br, bz - sz * half], COLOUR_SIDE);
       // the parapets: a low wall on both sides
       if (deck.parapet) {
         const ph = PARAPET_HEIGHT, pw = PARAPET_WIDTH;
@@ -71,8 +83,9 @@ export function createDeckView({ scene, decks, material }) {
       const sx = -dz, sz = dx, half = deck.width / 2;
       const a = [x + sx * half, y, z + sz * half];
       const c = [x - sx * half, y, z - sz * half];
-      if (end === 0) b.quad(a, [a[0], a[1] - DECK.thickness, a[2]], [c[0], c[1] - DECK.thickness, c[2]], c, COLOUR_SIDE);
-      else b.quad(c, [c[0], c[1] - DECK.thickness, c[2]], [a[0], a[1] - DECK.thickness, a[2]], a, COLOUR_SIDE);
+      const al = groundAt(a[0], a[2], y), cl = groundAt(c[0], c[2], y);
+      if (end === 0) b.quad(a, [a[0], al, a[2]], [c[0], cl, c[2]], c, COLOUR_SIDE);
+      else b.quad(c, [c[0], cl, c[2]], [a[0], al, a[2]], a, COLOUR_SIDE);
     }
   }
   const geometry = b.build();
