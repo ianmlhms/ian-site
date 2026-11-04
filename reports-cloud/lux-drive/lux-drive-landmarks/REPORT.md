@@ -22,7 +22,7 @@ New modules (all pure geometry, no THREE except the view): `landmark-soup.js` (f
 * `luxdrive_world.mjs`: all checks ok except two that fail **identically on the untouched `lux-drive` branch** in this container
   ("the car drove 1.6 m" / "did not fly over the kerb": the scripted drive is time-dependent and software GL runs at a few fps).
   Draw calls: low 45 / medium 48 / high 49; triangles medium 162 871. Landmark meshes cost at most 8 draw calls.
-* `luxdrive_holes.mjs`: see PROGRESS.md.
+* `luxdrive_holes.mjs`: **PASS, 0 hole pixels over 72 poses**.
 
 ## Honest list of what is wrong / missing
 * **No reference photos**: Wikimedia was rate-limiting this container, so no side-by-side photo comparison was done. Pont Rouge pylon shape,

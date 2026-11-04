@@ -691,6 +691,6 @@ World origin (found from the decks): `originE = 72192`, `originNTop = 83968`.
 |---|---|
 | `pb/lux-drive/harness.js` | **47 passed, 0 failed** (new section D1: no landmark floats, no ghost collision on replaced blocks, <= 60 000 triangles; 13 997 used, 9 blocks replaced) |
 | `luxdrive_world.mjs` | all ok except "car drove 1.6 m" and "did not fly over the kerb", which fail the same way on the base `lux-drive` branch in this container (software GL) ; draw calls low 45 / medium 48 / high 49 |
-| `luxdrive_holes.mjs` | see the line below |
+| `luxdrive_holes.mjs` | **PASS: 0 hole pixels over 72 poses** (detector self-test ok) |
 
 Not done: Bock walls, Viaduc, Coque, Mudam, Grund bridge, BCEE. Details and honest problems: `reports-cloud/lux-drive/lux-drive-landmarks/REPORT.md`.
