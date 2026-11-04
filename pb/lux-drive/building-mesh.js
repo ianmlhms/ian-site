@@ -159,8 +159,12 @@ export function addBuilding(m, b, heightAt, landAt) {
   let cx = 0, cz = 0;
   for (let i = 0; i < n; i++) { cx += pts[i * 2]; cz += pts[i * 2 + 1]; }
   cx /= n; cz /= n;
-  const eaveY = landAt(cx, cz) + b.eave;
-  const ridgeY = landAt(cx, cz) + b.ridge;
+  // The eaves stand on the ground the player sees, not on the bare land: a house beside a road that runs on
+  // an embankment must not sink into it.  The ground is the land with the roads carved into it, so the higher
+  // of the two is the ground here.
+  const groundY = Math.max(landAt(cx, cz), heightAt(cx, cz));
+  const eaveY = groundY + b.eave;
+  const ridgeY = groundY + b.ridge;
   const seed = hash01(b.id);
   // the style byte carries the kind of façade and the bit "there is a shop on the ground floor"
   const style = (b.style | 0) & 7;

@@ -252,11 +252,54 @@ section('B roads');
   // ---- the painted tarmac follows the real width of the carriageway (the reviewer's first complaint:
   // the roads were blobs far too wide).  The paint is measured on the carve itself: the asphalt is the ground
   // whose road is this road and whose offset from the centre line is inside the half width of the carriageway.
+  //
+  // The band of tarmac around a sample is measured outwards in both directions, and it is only good where the
+  // paint ENDS at the edge of the ribbon of this way.  Two places say nothing about the width of the way:
+  // where a neighbour takes the paint over (a junction, or the second carriageway of a divided road), and
+  // where the walk runs along the road instead of across it (the corner of a loop).  The width of the way is
+  // the MEDIAN of the good bands.
+  //
+  // A closed way (a square, or a street that loops) is an AREA: the paint covers the ground inside it, so the
+  // band there is the width of the area as well.  Its reference is the width of the way plus the width of the
+  // area it encloses (the width of a disc of the same area), and the paint may not be narrower than the way.
   const s = net.samples;
   let tooWide = 0, tooNarrow = 0, worstWide = 0, worstNarrow = 0;
   const rng = createRng(77);
   const info = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, lines: 0, lanes: 0, s: 0, surface: 0 };
-  let measured = 0;
+  let measured = 0, notMeasured = 0, closedWays = 0;
+  const PAINT_WALK = 30;                       // m: the paint of a road longer than this is a blob
+  /** The band of tarmac around a sample.  -1 when the paint does not end at the edge of the ribbon. */
+  const paintBand = (ri, i) => {
+    const first = s.first[ri], count = s.segs[ri];
+    const ax = s.x[Math.max(first, i - 1)], az = s.z[Math.max(first, i - 1)];
+    const bx = s.x[Math.min(first + count - 1, i + 1)], bz = s.z[Math.min(first + count - 1, i + 1)];
+    const ex = bx - ax, ez = bz - az, len = Math.hypot(ex, ez) || 1;
+    const nx = -ez / len, nz = ex / len;
+    const x = s.x[i], z = s.z[i];
+    const walk = (sign) => {
+      let last = 0;
+      for (let d = 0.25; d <= PAINT_WALK; d += 0.25) {
+        surface.roadInfoAt(x + nx * d * sign, z + nz * d * sign, info);
+        if (info.road !== ri) return -1;                 // a neighbour took the paint over
+        if (Math.abs(info.lat) > info.hw) return last;   // the edge of the ribbon of this way
+        last = d;
+      }
+      return -2;                                          // the paint runs on: the way is a blob
+    };
+    const up = walk(1), down = walk(-1);
+    if (up === -2 || down === -2) return -2;
+    if (up < 0 || down < 0) return -1;
+    return up + down;
+  };
+  /** The area of the polygon a closed way encloses (the shoelace formula). */
+  const enclosedArea = (pts) => {
+    let a = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i], q = pts[(i + 1) % pts.length];
+      a += p[0] * q[1] - q[0] * p[1];
+    }
+    return Math.abs(a) / 2;
+  };
   const order = [];
   for (let i = 0; i < net.roads.length; i++) order.push(i);
   for (let k = 0; k < order.length; k++) {
@@ -267,48 +310,36 @@ section('B roads');
     if (r.width < 3 || r.width > 20) continue;
     const first = s.first[ri], count = s.segs[ri];
     if (count < 4) continue;
-    // a point of the road where no other road comes near: at a junction the two bands merge
-    let pick = -1;
-    for (let i = first; i < first + count; i++) {
-      const x = s.x[i], z = s.z[i];
-      let near = false;
-      for (let q = 0; q < s.x.length && !near; q++) {
-        if (s.road[q] === ri) continue;
-        if (Math.abs(s.x[q] - x) > 30 || Math.abs(s.z[q] - z) > 30) continue;
-        if (Math.hypot(s.x[q] - x, s.z[q] - z) < 25) near = true;
-      }
-      if (!near) { pick = i; break; }
+    // the width of the area a closed way encloses: the diameter of the disc of the same area
+    const raw = data.roads[ri].pts;
+    const closed = raw.length > 2
+      && Math.hypot(raw[0][0] - raw[raw.length - 1][0], raw[0][1] - raw[raw.length - 1][1]) < 12;
+    const areaW = closed ? 2 * Math.sqrt(enclosedArea(raw) / Math.PI) : 0;
+    if (closed) closedWays++;
+    const bands = [];
+    for (let i = first; i < first + count; i += 2) {         // every other sample: 8 m apart
+      const b = paintBand(ri, i);
+      if (b > 0) bands.push(b);
     }
-    if (pick < 0) continue;
-    const ax = s.x[Math.max(first, pick - 1)], az = s.z[Math.max(first, pick - 1)];
-    const bx = s.x[Math.min(first + count - 1, pick + 1)], bz = s.z[Math.min(first + count - 1, pick + 1)];
-    const ex = bx - ax, ez = bz - az, len = Math.hypot(ex, ez) || 1;
-    const nx = -ez / len, nz = ex / len;
-    const x = s.x[pick], z = s.z[pick];
-    // The width of the band of tarmac around the sample point: the band is measured from the sample outwards in
-    // both directions, and it stops at the first place where the paint belongs to another road.  The longest run
-    // would be wrong: a street that curls into a loop paints a disc, and the disc is not a wide street.
-    const mine = (d) => {
-      surface.roadInfoAt(x + nx * d, z + nz * d, info);
-      return info.road === ri && Math.abs(info.lat) <= info.hw;
-    };
-    let up = 0, down = 0;
-    for (let d = 0.25; d <= 25; d += 0.25) { if (!mine(d)) break; up = d; }
-    for (let d = 0.25; d <= 25; d += 0.25) { if (!mine(-d)) break; down = d; }
-    const painted = up + down;
-    if (painted <= 0) continue;
+    if (!bands.length) { notMeasured++; continue; }
+    bands.sort((a, b) => a - b);
+    const painted = bands[Math.floor(bands.length / 2)];
     measured++;
-    const over = painted - r.width;
+    const over = painted - (r.width + areaW);
     if (over > 1.5) { tooWide++; worstWide = Math.max(worstWide, over); }
-    else if (over < -1.5) { tooNarrow++; worstNarrow = Math.min(worstNarrow, over); }
+    else if (painted - r.width < -1.5) { tooNarrow++; worstNarrow = Math.min(worstNarrow, painted - r.width); }
   }
   stats.paintTooWide = tooWide;
   stats.paintTooNarrow = tooNarrow;
   stats.paintMeasured = measured;
+  stats.paintNotMeasured = notMeasured;
+  stats.paintClosedWays = closedWays;
   check('the painted tarmac is not wider than the carriageway of OSM', tooWide === 0,
     `${tooWide} of ${measured} roads paint more than 1.5 m too wide (worst ${worstWide.toFixed(2)} m)`);
   check('the painted tarmac is not narrower than the carriageway of OSM', tooNarrow === 0,
     `${tooNarrow} of ${measured} roads paint more than 1.5 m too narrow (worst ${worstNarrow.toFixed(2)} m)`);
+  check('the paint of every road can be measured', notMeasured * 4 < measured,
+    `${notMeasured} ways have no place where the paint can be measured (the paint of a neighbour covers them), ${closedWays} of them enclose an area`);
 }
 
 /* ---------------------------------------------------------------- C: the city */
@@ -330,7 +361,9 @@ section('C city');
     let cx = 0, cz = 0;
     for (let k = 0; k < n; k++) { cx += b.pts[k * 2]; cz += b.pts[k * 2 + 1]; }
     cx /= n; cz /= n;
-    const eaveY = landAt(cx, cz) + b.eave;
+    // The eaves of the house: on the ground the player sees (the same rule as the mesh of the house), so a
+    // house beside a road on an embankment does not sink into it.
+    const eaveY = Math.max(landAt(cx, cz), heightAt(cx, cz)) + b.eave;
     // the ground may not climb over the eaves: the wall would be drawn upside down
     for (let k = 0; k < n; k++) {
       const g = heightAt(b.pts[k * 2], b.pts[k * 2 + 1]);
