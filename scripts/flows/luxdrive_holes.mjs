@@ -103,7 +103,7 @@ export const flow = {
     }, { N: POSES, w: WORLD_W, d: WORLD_D });
     h.eq(result.rendered, POSES, `${POSES} poses rendered`);
     h.eq(result.holes, 0, `0 hole pixels below the horizon over ${result.rendered} poses${result.holes ? " " + JSON.stringify(result.worst.slice(0, 4)) : ""}`);
-    h.expect(result.minTiles > 60, `at least ${result.minTiles} terrain tiles at every pose`);
+    h.expect(result.minTiles > (QUALITY === "low" ? 30 : 60), `at least ${result.minTiles} terrain tiles at every pose`);
 
     h.step("self-test: with one tile removed the detector DOES report holes");
     const hidden = await page.evaluate(async () => {
