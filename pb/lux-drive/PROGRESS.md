@@ -911,3 +911,9 @@ Draw calls (medium, steady state): Gare 124, Ernster 102, Av. JFK 138-146, Hamil
 Draw calls / triangles at Kirchberg (start place, `scripts/luxdrive/perf.mjs`): before the merge fixes low 108 / 301 k, medium 127 / 348 k,
 high 137 / 399 k; now **low 80 / 156 k, medium 130 / 277 k, high 148 / 335 k** (medium budget 260). Auto-step with a fake slow clock:
 high -> low after 3.8 s (35 ms frames) / 3.9 s (60 ms frames).
+
+## Landmarks round 2 (branch `lux-drive-landmarks`)
+Root cause of the stray poles: `tree-view.js` divided the baked tree girth by 100 twice (needle trees); fixed. New modules: `landmark-facade.js` (windows, lancets,
+fins, turrets on footprint edges), `landmark-sites.js` (Bock, Passerelle, Coque, Fort Thüngen, Mudam, BCEE) + `landmark-site-data.js` (OSM outlines); Cour de justice, Cathédrale,
+Philharmonie, Palais rebuilt. Tools: `scripts/luxdrive/{pick_pose,osm_query,fetch_ref}`. Gates: harness 64/0, luxdrive_world PASS (draw calls 49/50/43), luxdrive_holes 0 hole pixels,
+landmarks 35 127 triangles. Details, positions that are estimates, and what is still wrong: `reports-cloud/lux-drive/lux-drive-landmarks/REPORT.md`.

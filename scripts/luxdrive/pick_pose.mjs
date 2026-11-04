@@ -42,6 +42,10 @@ export async function createPicker() {
     const len = Math.hypot(tx - x, tz - z);
     for (let s = SIGHT_STEP; s < len - stopShort; s += SIGHT_STEP) {
       const px = x + ((tx - x) * s) / len, pz = z + ((tz - z) * s) / len, py = y + ((ty - y) * s) / len;
+      for (const i of forest.near(px, pz, 12)) {          // the crowns of the baked trees stand in the way too
+        const t = w.data.trees[i];
+        if (t && Math.hypot(t.x - px, t.z - pz) < t.height * 0.4 && ground(t.x, t.z) + t.height * 0.9 > py && ground(t.x, t.z) + t.height * 0.3 < py + 4) return false;
+      }
       for (const id of index.near(px, pz, 2)) {
         const b = byId.get(id);
         const pts = []; for (let i = 0; i < b.pts.length; i += 2) pts.push([b.pts[i], b.pts[i + 1]]);
