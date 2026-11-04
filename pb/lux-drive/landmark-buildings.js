@@ -58,7 +58,7 @@ const PHILHARMONIE = Object.freeze({
   at: [5958, 7990], hideRadius: 40, hideMinArea: 1500,   // the block of the bake (the elliptical hall) is found here
   centre: [5962, 7992], rx: 33, rz: 51, yaw: 0.12,       // m, the ellipse of the colonnade
   columns: 168, columnTangent: 0.42, columnRadial: 0.9, columnHeight: 21,   // the real hall: ~800 slim white fins; every 1.6 m reads as the same dense ring
-  drumInset: 2.6, roofThickness: 1.3, podium: 0.8,
+  drumInset: 3.0, roofThickness: 1.3, podium: 0.8,
 });
 
 export function buildPhilharmonie({ buildings, ground }) {
@@ -73,9 +73,7 @@ export function buildPhilharmonie({ buildings, ground }) {
   soup.prism(ring, bottomsOf(ground, ring), y0, C.concrete, { topColor: C.paving });
   // the building behind the columns is LIGHT (pale concrete), with a low band of pale glass: the drum is barely visible
   const drum = ellipse(cx, cz, K.rx - K.drumInset, K.rz - K.drumInset, 48, K.yaw);
-  soup.prism(drum, y0, y0 + K.columnHeight, paint(C.paleGlass, 1, 0.02), { top: false });
-  const upper = ellipse(cx, cz, K.rx - K.drumInset + 0.15, K.rz - K.drumInset + 0.15, 48, K.yaw);
-  soup.prism(upper, y0 + K.columnHeight * 0.62, y0 + K.columnHeight, C.white, { top: false });
+  soup.prism(drum, y0, y0 + K.columnHeight, paint(C.drumGrey, 1, 0.02), { top: false });
   // the ring of slim white columns: tangent to the ellipse, so each one faces outwards
   const colonnade = ellipse(cx, cz, K.rx - 0.7, K.rz - 0.7, K.columns, K.yaw);
   for (const [i, p] of colonnade.entries()) {
@@ -261,6 +259,7 @@ export function buildPalais({ buildings, ground, roads = [] }) {
   const soup = new Soup();
   const walls = [];
   const main = hidden.reduce((m, b) => (b.area > m.area ? b : m), hidden[0]);
+  const info = { blocks: hidden.length };
   for (const b of hidden) {
     const { high } = groundRange(ground, b.pts);
     const yEave = high + K.eave;
@@ -283,6 +282,7 @@ export function buildPalais({ buildings, ground, roads = [] }) {
     }
     if (b !== main) continue;
     const f = streetEdge(b.pts, roads, K.streetName);
+    info.facade = { a: f.a.map((v) => +v.toFixed(1)), b: f.b.map((v) => +v.toFixed(1)), n: [+f.nx.toFixed(2), +f.nz.toFixed(2)], len: +f.len.toFixed(1) };
     // ground floor: low arches (dark openings with a stone frame), above them two storeys of windows with stone surrounds
     windowGrid(soup, f, { s0: 5, s1: f.len - 5, y0: high + 0.9, rows: 1, floorH: K.floor, w: 2.0, h: 2.8, pitch: K.windowPitch, frame: C.sandstoneLight, glass: C.glassDark, key: 100 });
     windowGrid(soup, f, { s0: 5, s1: f.len - 5, y0: high + K.floor + 0.7, rows: 2, floorH: K.floor, w: K.windowW, h: K.windowH, pitch: K.windowPitch, frame: C.sandstoneLight, glass: C.glassDark, key: 200 });
@@ -311,7 +311,7 @@ export function buildPalais({ buildings, ground, roads = [] }) {
       }
     }
   }
-  return { soup, walls, hideBuildings: hidden.map((b) => b.id), info: { blocks: hidden.length } };
+  return { soup, walls, hideBuildings: hidden.map((b) => b.id), info };
 }
 
 /* ------------------------------------------------------------------------------------------------ Gëlle Fra */

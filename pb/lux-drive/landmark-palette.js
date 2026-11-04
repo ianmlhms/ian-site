@@ -26,8 +26,9 @@ export const PALETTE = Object.freeze({
   stoneBand: [0.58, 0.54, 0.44],        // the darker courses of the palace
   slateBlack: [0.15, 0.16, 0.19],       // the cathedral's spires: dark slate, almost black
   slateGrey: [0.30, 0.32, 0.36],
-  anodised: [0.58, 0.42, 0.20],         // the bronze fins of the Cour de justice towers
-  anodisedDark: [0.36, 0.25, 0.12],
+  drumGrey: [0.50, 0.53, 0.54],         // the building behind the colonnade of the Philharmonie
+  anodised: [0.50, 0.36, 0.17],         // the bronze fins of the Cour de justice towers
+  anodisedDark: [0.30, 0.21, 0.10],
   blackGlass: [0.09, 0.08, 0.08],       // the podium of the Cour de justice
   paleGlass: [0.62, 0.66, 0.67],        // the barely visible drum of the Philharmonie
   lampGreen: [0.17, 0.25, 0.20],

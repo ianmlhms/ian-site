@@ -10,6 +10,8 @@ import { buildPontAdolphe, buildPontRouge, fixLandmarkDecks } from './landmark-b
 
 import { buildPhilharmonie, buildEcj, buildCathedral, buildPalais, buildGelleFra, buildOberanven } from './landmark-buildings.js';
 
+import { buildBock, buildPasserelle, buildCoque, buildThuengen, buildMudam, buildBcee } from './landmark-sites.js';
+
 export { fixLandmarkDecks };
 
 /** The builders in the order of the brief (the bridges first). A landmark that cannot be built is an error, never a silent gap. */
@@ -22,6 +24,12 @@ const BUILDERS = [
   { id: 'palais-grand-ducal', build: buildPalais },
   { id: 'gelle-fra', build: buildGelleFra },
   { id: 'oberanven-kierch', build: buildOberanven },
+  { id: 'bock', build: buildBock },
+  { id: 'passerelle', build: buildPasserelle },
+  { id: 'coque', build: buildCoque },
+  { id: 'fort-thuengen', build: buildThuengen },
+  { id: 'mudam', build: buildMudam },
+  { id: 'bcee', build: buildBcee },
 ];
 
 /** The closest point of a segment to (x, z). */
