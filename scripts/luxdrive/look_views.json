@@ -67,20 +67,6 @@
   ]
  },
  {
-  "name": "philharmonie_n",
-  "tx": 5962,
-  "tz": 7992,
-  "ty": 12,
-  "dist": 100,
-  "bearing": 300,
-  "height": 3.2,
-  "fov": 58,
-  "hide": [
-   "trees"
-  ],
-  "free": true
- },
- {
   "name": "ecj",
   "tx": 6050,
   "tz": 7595,
@@ -271,5 +257,77 @@
   "hide": [
    "trees"
   ]
+ },
+ {
+  "name": "cathedral_e",
+  "tx": 5166,
+  "tz": 8955,
+  "ty": 16,
+  "dist": 70,
+  "bearing": 0,
+  "height": 16,
+  "fov": 50,
+  "hide": [
+   "trees"
+  ],
+  "free": true
+ },
+ {
+  "name": "mudam_c",
+  "tx": 5775,
+  "tz": 8160,
+  "ty": 14,
+  "dist": 55,
+  "bearing": 300,
+  "height": 8,
+  "fov": 50,
+  "hide": [
+   "trees"
+  ],
+  "free": true
+ },
+ {
+  "name": "palais_b",
+  "tx": 5256,
+  "tz": 8828,
+  "ty": 10,
+  "dist": 30,
+  "bearing": 190,
+  "height": 4,
+  "fov": 50,
+  "hide": [
+   "trees"
+  ],
+  "free": true
+ },
+ {
+  "name": "philharmonie_hi60",
+  "tx": 5975,
+  "tz": 8000,
+  "ty": 8,
+  "dist": 110,
+  "bearing": 60,
+  "height": 70,
+  "fov": 55,
+  "hide": [
+   "trees"
+  ],
+  "free": true,
+  "sightStop": 200
+ },
+ {
+  "name": "philharmonie_hi20",
+  "tx": 5975,
+  "tz": 8000,
+  "ty": 8,
+  "dist": 110,
+  "bearing": 20,
+  "height": 70,
+  "fov": 55,
+  "hide": [
+   "trees"
+  ],
+  "free": true,
+  "sightStop": 200
  }
 ]

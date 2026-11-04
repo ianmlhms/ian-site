@@ -39,7 +39,7 @@ const BOCK = Object.freeze({
   centre: [5540, 8738],          // m, on the plateau of the rock
   rays: 72, reach: 70, edgeDrop: 4,   // the edge of the cliff: the first point 4 m under the plateau
   maxSkin: 75, skinStep: 2.4, lift: 0.8, liftNoise: 0.9, flatSlope: 0.3,   // the stone skin runs down until the slope is gentler than this (rise / run)
-  stratum: 1.7,                  // m: the height of one band of the rock
+  stratum: 5.0,                  // m: the height of one band of the rock (the vertices of the skin are ~2.4 m apart: a thinner band would alias into random patches)
   wallHeight: 4.2, wallThick: 1.6, merlonEvery: 3.2, merlon: 1.1,
   bastionEvery: 12, casemates: 9,
   tower: { half: 2.6, aspect: 1.25, height: 22 },
@@ -66,14 +66,16 @@ function hash01(a, b) {
 
 /** The colour of the rock at height y: a band of ochre or grey per stratum (the bands blend into each other over a third of their height, so the strata
  *  are soft gradients and not hard stripes), a little darker the lower it lies (shade of the overhangs), a mottling that is different at every vertex. */
-function rockColour(y, key, depth) {
+function rockColour(y, key, depth, ray = 0) {
   const f = y / BOCK.stratum, band = Math.floor(f), frac = f - band;
   const blend = Math.min(1, Math.max(0, (frac - 0.66) / 0.34));
   const t0 = hash01(band, 7), t1 = hash01(band + 1, 7);
   const t = (t0 + (t1 - t0) * blend * blend * (3 - 2 * blend));
   const base = [0, 1, 2].map((k) => C.rockGrey[k] + (C.rockOchre[k] - C.rockGrey[k]) * t);
-  const shade = 1 - depth * 0.28;
-  return paint([base[0] * shade, base[1] * shade, base[2] * shade], key, 0.11);
+  // vertical streaks (the cracks and weathering lines of the cliff): a darker or lighter column per pair of rays, blended between neighbours
+  const streak = 0.9 + 0.2 * (hash01(Math.floor(ray / 2), 3) * (1 - (ray % 2) * 0.5) + hash01(Math.floor(ray / 2) + 1, 3) * (ray % 2) * 0.5);
+  const shade = (1 - depth * 0.28) * streak;
+  return paint([base[0] * shade, base[1] * shade, base[2] * shade], key, 0.06);
 }
 
 /** A ruined tower: four walls of different heights (the top is broken away in steps), mortar courses, slits, an arched window, a fallen corner, moss on the stumps. */
@@ -140,7 +142,7 @@ export function buildBock({ ground }) {
   const skins = new Map(edge.map((e, i) => [i, e ? skinOf(e, i) : null]));
   // ONE smooth skin: the normal of every vertex is the mean of its faces, the colour is per vertex (strata + mottling): no flat facets
   const rows = edge.map((e, i) => (e ? skins.get(i) : null));
-  const colours = rows.map((row, i) => (row ? row.map((p, k) => rockColour(p[1], i * 131 + k * 17, k / Math.max(1, row.length - 1))) : null));
+  const colours = rows.map((row, i) => (row ? row.map((p, k) => rockColour(p[1], i * 131 + k * 17, k / Math.max(1, row.length - 1), i)) : null));
   soup.grid(rows, colours, { loop: true, flip: 'auto' });
   const placed = arcs.length;
   // the fortress wall along the edge: blue-grey masonry with a coping and merlons, standing on the rim of the rock
@@ -185,7 +187,7 @@ export function buildBock({ ground }) {
 const PASSERELLE = Object.freeze({
   at: [5312, 9390],
   pitch: 9.3, pier: 2.3,            // m between the axes of the piers, the thickness of a pier at the springing line
-  columnWidth: 3.6, batter: 0.045,  // m: a column of a pier is this wide across the bridge, and widens by this much per metre of height toward the foot
+  columnWidth: 3.6, batter: 0.022,  // m: a column of a pier is this wide across the bridge, and widens by this much per metre of height toward the foot
   archRise: 1.0,                    // the arches are round: the rise over the half span
   balustrade: 1.1, fascia: 1.3, kerb: 0.14,
   roadHalf: 5.9, maxHalf: 10.5,

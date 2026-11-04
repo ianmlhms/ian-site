@@ -41,7 +41,7 @@ function stroke(ctx, x, y, len, wid, angle, color, alpha) {
  *  bump in the road: the grain is per pixel (the size of a stone chip), the variation is a few very soft, very low-contrast clouds, and the cracks are rare hairlines. */
 const ASPHALT_BASE = [63, 64, 67];
 const ASPHALT_GRAIN = 9;                     // +- levels of the per-pixel grain
-const ASPHALT_CLOUDS = 7;                    // soft low-contrast clouds that break the repetition without making blobs
+const ASPHALT_CLOUDS = 4;                    // soft low-contrast clouds that break the repetition without making blobs
 function asphalt(size, seed) {
   const rng = createRng(seed), c = canvas(size), ctx = c.getContext('2d');
   const img = ctx.createImageData(size, size);
@@ -57,7 +57,7 @@ function asphalt(size, seed) {
     wrapped(ctx, size, x, y, r, (g, px, py) => {
       const grad = g.createRadialGradient(px, py, 0, px, py, r);
       const rgbv = light ? '255,255,255' : '0,0,0';
-      grad.addColorStop(0, `rgba(${rgbv},0.045)`); grad.addColorStop(1, `rgba(${rgbv},0)`);
+      grad.addColorStop(0, `rgba(${rgbv},0.02)`); grad.addColorStop(1, `rgba(${rgbv},0)`);
       g.fillStyle = grad; g.fillRect(px - r, py - r, r * 2, r * 2);
     });
   }

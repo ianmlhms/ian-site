@@ -71,8 +71,8 @@ const PHILHARMONIE = Object.freeze({
   drumInset: 2.6, roofThickness: 1.5, roofOverhang: 1.6, podium: 0.8,
   // the white shell (photographs: a smooth wave of white panels that rises from the plaza and leans against the colonnade): `toward` = where it lies seen from the middle
   // of the hall, `halfArc` its half width as an angle of the ellipse, `reach` how far it runs out onto the plaza, `height` where it meets the columns
-  shell: { toward: [5999, 8016], halfArc: 0.62, reach: 17, height: 10.5, rows: 22, cols: 9 },
-  white: [1.45, 1.45, 1.40],                    // brighter than white: the columns in the shade of the other side are still lit by the sky only, and read grey at 0.93
+  shell: { toward: [5999, 8016], halfArc: 0.85, reach: 25, height: 13, rows: 26, cols: 11 },
+  white: [2.1, 2.1, 2.0],                    // brighter than white: the columns in the shade of the other side are still lit by the sky only, and read grey at 0.93
 });
 
 export function buildPhilharmonie({ buildings, ground }) {
