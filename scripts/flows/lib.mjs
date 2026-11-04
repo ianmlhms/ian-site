@@ -80,8 +80,16 @@ function linuxGlArgs() {
   return process.platform === "linux" ? ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] : [];
 }
 
+/* FLOW_BROWSER=webkit runs the flow in Playwright WebKit (the engine of the school iPads) instead of Chromium (the default).
+ * WebKit has no --mute-audio: the games of this repo only make sound after a tap, which a headless flow never makes unless it says so. */
 export async function launchBrowser({ fullChromium = false } = {}) {
-  const { chromium } = await importPlaywright();
+  const playwright = await importPlaywright();
+  if (process.env.FLOW_BROWSER === "webkit") {
+    if (!playwright.webkit) throw new Error("FLOW_BROWSER=webkit: this Playwright has no webkit");
+    try { return await playwright.webkit.launch(); } catch (error) { throw new Error(`FLOW_BROWSER=webkit: WebKit did not start (npx playwright install webkit?): ${String(error.message).split("\n")[0]}`, { cause: error }); }
+  }
+  if (process.env.FLOW_BROWSER && process.env.FLOW_BROWSER !== "chromium") throw new Error(`FLOW_BROWSER must be chromium or webkit, got ${process.env.FLOW_BROWSER}`);
+  const { chromium } = playwright;
   const errors = [];
   // WebGL flows need Chromium's full headless compositor. Headless Shell forces
   // SwiftShader on macOS and can stall rendering/input for tens of seconds.
