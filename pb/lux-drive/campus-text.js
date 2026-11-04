@@ -98,6 +98,15 @@ function glyphOf(ch) {
   return { w: base.w, p: [...base.p, ...ACCENT_MARKS[accented[1]](base.w / 2, top)] };
 }
 
+/** A name from the map data made drawable: upper case, accents the font does not have stripped, anything else turned into a blank. */
+export function printable(name) {
+  return [...name.toUpperCase().normalize('NFC')].map((ch) => {
+    if (GLYPHS[ch] || ACCENTED[ch]) return ch;
+    const plain = ch.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return GLYPHS[plain] ? plain : ' ';
+  }).join('').replace(/\s+/g, ' ').trim();
+}
+
 /** The width of a text in units of a cap height of 1 (so the width in metres is textWidth(...) * capHeight). */
 export function textWidth(text) {
   let w = 0;

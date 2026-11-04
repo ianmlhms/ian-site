@@ -14,14 +14,14 @@ const SINK = 1.0;
 const SIDES = 36;                       // the facets of the cylinder
 const PETALS = 24;                      // the petals of the canopy
 
-const GLASS_LOWER = [0.33, 0.47, 0.58];
+const GLASS_LOWER = [0.42, 0.56, 0.68];
 const GLASS_UPPER = [0.46, 0.66, 0.84];
 const BLIND = [0.82, 0.82, 0.79];
 const RIM = [0.72, 0.73, 0.74];
 const RIM_TOP = [0.84, 0.85, 0.86];
 const MULLION = [0.88, 0.89, 0.90];
-const PETAL_DARK = [0.10, 0.24, 0.62];
-const PETAL_LIGHT = [0.26, 0.44, 0.84];
+const PETAL_DARK = [0.14, 0.32, 0.78];
+const PETAL_LIGHT = [0.34, 0.54, 0.95];
 const PETAL_RIB = [0.90, 0.92, 0.94];
 const ROOF = [0.62, 0.64, 0.67];
 const DRUM = [0.58, 0.60, 0.64];

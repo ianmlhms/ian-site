@@ -5,8 +5,12 @@ import { Soup, paint } from './landmark-soup.js';
 import { edgeWalls } from './landmark-util.js';
 import { drawFree, FREE_KINDS } from './campus-free.js';
 import { campusSpeciesTrees } from './campus-trees.js';
+import { freeFrame } from './campus-wallfx.js';
+import { drawText, printable } from './campus-text.js';
 
-const FRAME = [0.20, 0.22, 0.24];          // the dark anthracite aluminium of the Luxembourg bus shelters
+const FRAME = [0.24, 0.20, 0.18];          // the dark brown steel of the shelters of the city of Luxembourg
+const BOARD = [0.30, 0.25, 0.22];
+const MAP_CASE = [0.88, 0.90, 0.88];
 const GLASS = [0.60, 0.74, 0.80];
 const PANEL = [0.92, 0.95, 0.97];          // the lit timetable panel
 const STEEL = [0.34, 0.36, 0.38];
@@ -18,23 +22,27 @@ const BENCH = [0.46, 0.34, 0.22];
 const SINK = 0.4;
 
 /**
- * A bus shelter of the Luxembourg type (RGTR / AVL): a thin flat roof on a dark frame, three glass panels at the back, glass ends, a slat bench,
- * a lit panel at one end.  It faces `yaw` (the direction of the road).
+ * A bus shelter of the city of Luxembourg (photo Busheltejo_en_Luksemburgo): dark brown steel, a flat roof that overhangs, a name board over a lit
+ * map case on the back, glass ends, a slat bench, open towards the road.  It faces `yaw` (the direction of the road); the stop sign stands beside it.
  */
 function shelter(soup, ground, s) {
   const y = ground(s.x, s.z) - SINK;
   const c = Math.cos(s.yaw), n = Math.sin(s.yaw);
   const at = (u, v) => [s.x + u * c - v * n, s.z + u * n + v * c];             // u along the facing direction, v across it
   const place = (u, v, w, d, h, y0, color, topColor) => { const [px, pz] = at(u, v); soup.box(px, y0, pz, w, h, d, -s.yaw, color, { topColor: topColor || color }); };
-  place(0, 0, 2.0, 4.0, 0.14, y + 2.5, FRAME, [0.30, 0.32, 0.34]);                                  // the roof, a hand thick, overhanging the frame
-  for (const v of [-1.8, 1.8]) for (const u of [-0.8, 0.8]) place(u, v, 0.09, 0.09, 2.5, y, FRAME);   // four posts
-  for (const v of [-1.2, 0, 1.2]) place(-0.8, v, 0.04, 1.1, 2.1, y + 0.3, paint(GLASS, Math.round(v * 3), 0.04));   // the glass back: three panels
-  for (const v of [-0.6, 0.6]) place(-0.8, v, 0.07, 0.07, 2.2, y + 0.3, FRAME);                      // their mullions
-  for (const v of [-1.8, 1.8]) place(0, v, 1.6, 0.04, 2.1, y + 0.3, paint(GLASS, 7, 0.04));          // the glass ends
-  place(-0.35, 0, 0.45, 2.8, 0.07, y + 0.5, BENCH);                                                    // the bench
-  place(-0.35, 0, 0.08, 2.6, 0.5, y, FRAME);
-  place(0.1, 1.5, 0.05, 0.9, 1.3, y + 0.7, PANEL);                                                      // the timetable panel at the front
-  stopSign(soup, ...at(0.9, -2.4), y, s.yaw);                                                            // the stop sign beside it
+  place(0, 0, 2.1, 4.0, 0.16, y + 2.55, FRAME, [0.32, 0.28, 0.26]);                                 // the roof, a hand thick, overhanging the frame
+  for (const v of [-1.8, 1.8]) for (const u of [-0.85, 0.85]) place(u, v, 0.1, 0.1, 2.55, y, FRAME);   // four posts
+  place(-0.85, 0, 0.1, 3.7, 0.55, y + 1.95, BOARD);                                                   // the name board
+  place(-0.85, 0, 0.09, 3.4, 1.15, y + 0.78, MAP_CASE);                                                // the lit map case
+  place(-0.85, 0, 0.05, 3.7, 0.5, y + 0.28, paint(GLASS, 1, 0.04));                                   // glass under it
+  for (const v of [-1.8, 1.8]) place(0, v, 1.7, 0.04, 2.2, y + 0.3, paint(GLASS, 7, 0.04));          // the glass ends
+  place(-0.4, 0, 0.45, 2.8, 0.07, y + 0.5, BENCH);                                                     // the bench
+  place(-0.4, 0, 0.08, 2.6, 0.5, y, FRAME);
+  stopSign(soup, ...at(0.9, -2.4), y, s.yaw);                                                          // the stop sign beside it
+  if (s.name) {                                                                                         // the name of the stop on the board, facing the pavement
+    const f = freeFrame(...at(-0.93, 0), -c, -n);
+    drawText(soup, printable(s.name), { x: f.at(0, 0, 0)[0], z: f.at(0, 0, 0)[2], dir: [f.dx, f.dz], normal: [f.nx, f.nz], y: y + 2.12, cap: 0.2, out: 0.02, color: [0.96, 0.96, 0.94], align: 'center', weight: 0.14 });
+  }
 }
 
 /** A stop sign on a pole (photo Luxembourg_arrêt_de_bus_Jean_Piret): a silver pole, the blue square bus sign with its white field and bus, the round quay disc on top, the stop-name plate with its coloured stripes. */

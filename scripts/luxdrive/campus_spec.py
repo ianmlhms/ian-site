@@ -53,7 +53,7 @@ SANDSTONE = [0.80, 0.72, 0.55]        # Athénée: the rough sandstone of the ha
 CONCRETE = [0.72, 0.71, 0.68]
 CONCRETE_DARK = [0.52, 0.52, 0.51]
 WHITE = [0.93, 0.92, 0.88]
-BEIGE = [0.76, 0.66, 0.48]            # Lycée Michel Rodange: beige concrete
+BEIGE = [0.70, 0.58, 0.40]            # Lycée Michel Rodange: beige concrete
 GLASS = [0.36, 0.50, 0.64]
 GLASS_DARK = [0.30, 0.38, 0.48]
 RED_FRAME = [0.70, 0.12, 0.10]
@@ -434,7 +434,7 @@ def bake_grounds(osm, ortho_color):
             continue
         sx, sz = min(same, key=lambda p: (p[0] - x) ** 2 + (p[1] - z) ** 2)
         yaw = math.atan2(sz - z, sx - x)
-        furniture.append({"k": "shelter" if st["tags"].get("shelter") == "yes" else "pole", "x": round(x, 1), "z": round(z, 1), "yaw": round(yaw, 3), "bench": st["tags"].get("bench") == "yes"})
+        furniture.append({"k": "shelter" if st["tags"].get("shelter") == "yes" else "pole", "x": round(x, 1), "z": round(z, 1), "yaw": round(yaw, 3), "bench": st["tags"].get("bench") == "yes", "name": st["tags"].get("name", "")})
     for n in osm:
         o = osm[n]
         if o["type"] == "node" and o["tags"].get("amenity") == "bicycle_parking":
