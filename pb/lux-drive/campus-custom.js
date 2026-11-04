@@ -13,7 +13,8 @@ const GLASS_LOWER = [0.27, 0.36, 0.45];
 const GLASS_UPPER = [0.44, 0.58, 0.72];
 const BLIND = [0.82, 0.82, 0.80];
 const BAND = [0.74, 0.74, 0.72];
-const PETAL = [0.16, 0.24, 0.50];
+const PETAL = [0.12, 0.20, 0.50];
+const PETAL_LIGHT = [0.24, 0.36, 0.66];
 const PETAL_RIB = [0.86, 0.88, 0.90];
 const ROOF = [0.62, 0.64, 0.67];
 const DRUM = [0.58, 0.60, 0.64];
@@ -70,14 +71,23 @@ function forum(soup, ground, b) {
   // the facade: glass ground floor, a pale band, then glass with white blinds on every third facet
   wallRing(soup, ground, cx, cz, r - 0.6, gf, (i) => paint(GLASS_LOWER, i, 0.1));
   bandRing(soup, cx, cz, r - 0.6, gf, gf + 0.9, () => BAND, 0.7);
-  bandRing(soup, cx, cz, r - 0.6, gf + 0.9, eave - 1.2, (i) => (i % 3 === 1 ? paint(BLIND, i, 0.03) : paint(GLASS_UPPER, i, 0.1)), 0.05);
+  const mezz = gf + 4.4;                                   // the first gallery: a slim ring in the glass
+  bandRing(soup, cx, cz, r - 0.6, gf + 0.9, mezz, (i) => paint(GLASS_UPPER, i + 40, 0.1), 0.05);
+  bandRing(soup, cx, cz, r - 0.6, mezz, mezz + 0.35, () => BAND, 0.35);
+  bandRing(soup, cx, cz, r - 0.6, mezz + 0.35, eave - 1.2, (i) => (i % 4 < 2 ? paint(BLIND, i, 0.03) : paint(GLASS_UPPER, i, 0.1)), 0.05);
+  // white mullions every facet: thin pale strips over the glass of the lower storeys
+  for (let i = 0; i < SIDES; i++) {
+    const a = (i / SIDES) * TAU, x = cx + Math.cos(a) * (r - 0.5), z = cz + Math.sin(a) * (r - 0.5);
+    const y0 = ground(x, z);
+    soup.box(x, y0 - 0.5, z, 0.22, mezz - y0 + 0.5, 0.22, -a, BAND);
+  }
   bandRing(soup, cx, cz, r - 0.6, eave - 1.2, eave + 0.2, () => BAND, 0.4);
   // the canopy of solar petals: slanting facets that reach out over the facade, with a pale rib between two petals
   const wallTop = ring(cx, cz, r - 0.2, eave - 0.6), outer = ring(cx, cz, r + 3.4, eave + 0.9);
   for (let i = 0; i < SIDES; i++) {
     const j = (i + 1) % SIDES;
-    soup.quad(wallTop[i], wallTop[j], outer[j], outer[i], paint(PETAL, i, 0.12));
-    soup.quad(outer[i], outer[j], [outer[j][0], outer[j][1] - 0.35, outer[j][2]], [outer[i][0], outer[i][1] - 0.35, outer[i][2]], PETAL_RIB);
+    soup.quad(wallTop[i], wallTop[j], outer[j], outer[i], paint(i % 2 ? PETAL : PETAL_LIGHT, i, 0.06));
+    soup.quad(outer[i], outer[j], [outer[j][0], outer[j][1] - 0.6, outer[j][2]], [outer[i][0], outer[i][1] - 0.6, outer[i][2]], PETAL_RIB);
   }
   // the roofs: a flat outer ring (inside the petals), the inner ring, the drum with the oculus
   const outerRing = r - 5;

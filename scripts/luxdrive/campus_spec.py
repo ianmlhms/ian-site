@@ -46,14 +46,14 @@ def whole(way):
 
 
 # ---- colours (painted, from the photos; see SURVEY.md) ------------------------------------------------------------------
-CREAM = [0.90, 0.85, 0.68]            # Athénée: the pale yellow render
+CREAM = [0.94, 0.89, 0.72]            # Athénée: the pale yellow render
 SANDSTONE = [0.80, 0.72, 0.55]        # Athénée: the rough sandstone of the hall wall and the retaining walls
 CONCRETE = [0.72, 0.71, 0.68]
 CONCRETE_DARK = [0.52, 0.52, 0.51]
 WHITE = [0.93, 0.92, 0.88]
-BEIGE = [0.80, 0.74, 0.60]            # Lycée Michel Rodange: beige concrete
+BEIGE = [0.84, 0.78, 0.64]            # Lycée Michel Rodange: beige concrete
 GLASS = [0.36, 0.50, 0.64]
-GLASS_DARK = [0.20, 0.27, 0.36]
+GLASS_DARK = [0.30, 0.38, 0.48]
 RED_FRAME = [0.70, 0.12, 0.10]
 YELLOW = [0.92, 0.76, 0.18]
 
@@ -77,7 +77,7 @@ building("athenee", "Athénée de Luxembourg", "N", [
     part("ath-west", OV(ATH, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21), CREAM, "ribbon", RIBBON_ATH,
          rf={"solar": [[3606, 9586, 44, 11, -26]]}),
     part("ath-spine", OV(ATH, 21, 22, 23, 24, 25, 26, 33, 34, (3700, 9648), 2, 3, 4, 5, 6, 7, 8, 9, 10), CREAM, "ribbon", RIBBON_ATH),
-    part("ath-green", OV(ATH, 26, 27, 28, 29, 30, 31, 32, 33), SANDSTONE, "ribbon", {"floorH": 4.2, "pitch": 2.9, "sill": 0.6, "h": 3.2, "pier": 2.2, "glass": [0.30, 0.46, 0.70], "frame": SANDSTONE}, top=293.0),
+    part("ath-green", OV(ATH, 26, 27, 28, 29, 30, 31, 32, 33), CREAM, "ribbon", {"gf": {"h": 4.2, "glass": [0.20, 0.28, 0.36], "pier": [0.85, 0.80, 0.64], "pitch": 3.6}, "floorH": 4.2, "pitch": 2.9, "sill": 0.5, "h": 3.4, "pier": 1.6, "glass": [0.34, 0.50, 0.74], "frame": CREAM}, top=293.0),
     part("ath-sewing", OV(ATH, 34, 35, 36, 37, 38, 39, 40) , CREAM, "ribbon", RIBBON_ATH, rf={"solar": [[3726, 9630, 28, 7, -30]]}),
     part("ath-link", OV(ATH, 41, 42, 43, 56, 57, 58), CONCRETE, "blank", top=None),
     part("ath-gym", OV(ATH, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56), CONCRETE, "blank"),
@@ -161,9 +161,9 @@ building("hall-150", "Hall 41424150", "C", [
 # LYCÉE ALINE MAYRISCH (OSM way 37764733): a long white block on a concrete plinth along the boulevard, ribbon windows, pilotis entrance
 LA = 37764733
 building("laml", "Lycée Aline Mayrisch", "S", [
-    part("laml", whole(LA), [0.92, 0.91, 0.86], "ribbon", {"floorH": 3.5, "pitch": 3.0, "sill": 0.8, "h": 2.2, "glass": [0.40, 0.54, 0.68], "frame": [0.82, 0.82, 0.78], "pier": 1.4,
-                                                          "plinth": {"h": 4.2, "color": [0.70, 0.70, 0.68], "facing": "south"},
-                                                          "gf": {"h": 4.0, "glass": [0.20, 0.28, 0.36], "pier": [0.80, 0.80, 0.76], "pitch": 3.6}}),
+    part("laml", whole(LA), [0.98, 0.97, 0.93], "ribbon", {"floorH": 3.5, "pitch": 3.0, "sill": 0.8, "h": 2.1, "glass": [0.50, 0.62, 0.76], "frame": [0.86, 0.86, 0.82], "pier": 1.4, "sillBand": True,
+                                                          "plinth": {"h": 4.2, "color": [0.76, 0.76, 0.74], "facing": "south"},
+                                                          "gf": {"h": 4.0, "glass": [0.36, 0.46, 0.56], "pier": [0.86, 0.86, 0.82], "pitch": 3.6}}),
 ], lod2=[19798])
 
 # FORUM (OSM way 29050032): the round hall with its solar petals (custom model campus-custom.js)
@@ -211,10 +211,10 @@ building("skate", "Skate Park Hollerich", "S", [
 # ====================================================================================================================
 # THE GROUNDS: paved squares, car parks, sports grounds (flat coloured areas draped on the terrain), their painted lines, the bus
 # shelters and the small furniture.  Polygons are traced on the orthophoto (SURVEY.md); the OSM ones are used where OSM has them.
-PAVE = [0.52, 0.52, 0.50]
-PAVE_LIGHT = [0.60, 0.60, 0.58]
-ASPHALT = [0.27, 0.28, 0.30]
-TURF = [0.13, 0.22, 0.17]
+PAVE = [0.40, 0.39, 0.38]
+PAVE_LIGHT = [0.50, 0.49, 0.47]
+ASPHALT = [0.22, 0.22, 0.24]
+TURF = [0.10, 0.19, 0.14]
 TRACK = [0.66, 0.31, 0.23]
 COURT = [0.40, 0.58, 0.53]
 LINE = [0.92, 0.92, 0.88]
@@ -319,7 +319,14 @@ def bake_grounds(osm, ortho_color):
     for seg in hatch(ath_plaza, 58, 10.0) + hatch(ath_plaza, 148, 10.0):
         line(seg, 0.3, [0.76, 0.76, 0.75], 1)
     court = Pg([(3598, 9612), (3640, 9585), (3660, 9600), (3672, 9660), (3650, 9672), (3620, 9648), (3600, 9632)])
-    area("athenee-court", court, PAVE_LIGHT)
+    area("athenee-court", court, [0.38, 0.38, 0.38])
+    for seg in hatch(court, 20, 8.0) + hatch(court, 110, 9.0):
+        line(seg, 0.4, [0.58, 0.58, 0.56], 1)
+    # the grand staircase from the boulevard up to the plaza (the lighter diagonal band of the orthophoto), drawn as a strip with a step line every 1.3 m
+    stairs = Pg([(3696, 9562), (3753, 9621), (3760, 9614), (3703, 9555)])
+    area("athenee-steps", stairs, [0.62, 0.61, 0.58], lift=1)
+    for seg in hatch(stairs, 47, 1.3):
+        line(seg, 0.14, [0.78, 0.77, 0.74], 2)
     square = Pg([(3535, 9640), (3580, 9640), (3598, 9668), (3598, 9690), (3560, 9690), (3545, 9672), (3532, 9655)])
     area("blumm-square", square, PAVE_LIGHT)
     for seg in hatch(square, 0, 6.0) + hatch(square, 90, 7.0):
@@ -352,7 +359,7 @@ def bake_grounds(osm, ortho_color):
     area("basketball", bb, [0.50, 0.55, 0.62])
     line(box_outline(3683.6, 9877.0, 3701.0, 9892.6), 0.1, [0.95, 0.95, 0.9])
     # -- the stone wall and the hedge in front of the Athénée ---------------------------------------------------------------
-    walls.append({"pts": [(3694, 9558), (3706, 9572), (3730, 9602), (3752, 9622)], "h": 1.1, "w": 0.7, "c": [0.58, 0.54, 0.44], "hedge": [0.24, 0.40, 0.22]})
+    walls.append({"pts": [(3694, 9558), (3706, 9572), (3730, 9602), (3752, 9622)], "h": 1.1, "w": 0.7, "c": [0.58, 0.54, 0.44], "hedge": [0.34, 0.48, 0.24]})
     # -- the bus stops of the campus: a shelter where OSM says shelter=yes, otherwise a pole with the sign ---------------------------
     stops = [(n, osm[n]) for n in osm if osm[n]["type"] == "node" and osm[n]["tags"].get("public_transport") == "platform"]
     positions = [(osm[n]["pts"][0], osm[n]["tags"].get("name")) for n in osm if osm[n]["type"] == "node" and osm[n]["tags"].get("public_transport") == "stop_position"]

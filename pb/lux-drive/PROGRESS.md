@@ -971,3 +971,22 @@ Ian: "the road is really bumpy and not level at all".  Measured on the branch th
 * Inside a ring (a pedestrian square whose two arms are 10 m apart) the nearest-arm switch leaves a 9 cm step along the medial axis (4913,8339).  Two overlapping ways of equal class at different levels (service lots) leave a 15-35 cm step.
 * `world-flow` batter numbers are worse than on `lux-drive` (3 % of the sides steeper than the land, was 0.3 %); the cause is in the carve (nearest segment, flat bench then face), not in the bed.
 * Not measured on a real GPU or an iPad.
+
+
+## Campus Geesseknäppchen — branch `lux-drive-campus`
+
+Ian: "fully rebuild the campus Geesseknäppchen". Survey: `~/Library/Caches/luxdrive-work/campus/SURVEY.md` (+ refs, montages there).
+
+**Sources**: OSM (Overpass, ODbL), the LOD2 blocks of `buildings.bin`, the LiDAR DSM/DTM of the bake (roof elevations), the geoportail.lu orthophoto (layout and colours only, never drawn), Wikimedia Commons photos (references only).
+
+**Pipeline** (all baked, deterministic): `scripts/luxdrive/campus_spec.py` (what every building is made of: parts cut from the OSM footprints, wall colour, facade style, roof extras; grounds and furniture), `campus_bake.py` -> `pb/lux-drive/campus-data.js` (buildings, parts, hidden LOD2 ids, areas, lines, paths, furniture), `campus_trees.py` -> `campus-trees-data.js` (LiDAR crowns + OSM, merged into `data.trees` by `campus-trees.js`, a one-line change in `world-data.js`), `campus_osm.py` (OSM helper).
+**Game modules**: `campus.js` (registry: 4 building zones N/C/S/W, `campus-ground`, `campus-props` = 6 meshes), `campus-buildings.js`, `campus-walls.js` (visible wall runs between parts of different height), `campus-facades.js` (ribbon, punched, panels, ecg, glass; glazed ground floor, plinth), `campus-roofs.js` (solar, sawtooth, hip), `campus-custom.js` (Forum), `campus-grounds.js` (baked triangle meshes draped on the terrain over its upper envelope, drawn with a polygon offset: `landmark-view.js` has a 3-line `info.decal` branch), `campus-props.js` (bus shelters/poles, bike racks, wall + hedge). Hooks outside campus-*: `landmarks.js` (2 marked lines), `landmark-view.js` (decal material), `world-data.js` (1 line, trees), `harness.js` (campus budget check), `pb/lux-drive.html` (v=30).
+The car collides with every building outline (`edgeWalls`), the 16 replaced LOD2 blocks are hidden and un-indexed, the stone wall is solid; car parks, schoolyard and plaza are drivable ground (nothing carved, footpaths stay uncarved).
+
+**Budgets**: campus 32 658 triangles (limit 40 000) in 6 meshes (limit 8 extra draw calls); the other landmarks total 35 119 (unchanged limit 60 000). Harness gained a check "campus <= 40 000 triangles, <= 8 meshes". Medium quality with the camera on the campus: 80-150 draw calls (luxdrive_world budget 200; brief 260), 250-410 k triangles.
+
+**Gates**: `harness.js` 86 passed, 0 failed (no tree on a road/in a house, nothing floats, no ghost collision); `luxdrive_world` PASS (109 / 146 / 208 draw calls low / medium / high); `luxdrive_holes` PASS (0 hole pixels, 72 poses); `luxdrive_ui` PASS.
+
+**Montages**: `~/Library/Caches/luxdrive-work/campus/montages/it1_*` (first pass) and `it2_*` (second pass): Athénée x2, LAML x2, ECG, Forum, Blumm, Lycée Michel Rodange, Conservatoire, two obliques, ortho vs game top view.
+
+**What still differs from reality** (honest list): see the final report; main points: facade detail is flat quads (no depth), no signage/logos, Athénée entrance staircase and the Forum canopy are approximations, interior courts of the Conservatoire and ISL are simplified, no cars/people, trees are generic low-poly, pitch/track colours are ortho estimates, the ground shader still shows its own dark blotches near buildings.

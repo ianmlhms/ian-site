@@ -15,7 +15,7 @@ import random
 import sys
 
 import numpy as np
-from shapely.geometry import Point, Polygon, LineString
+from shapely.geometry import Point, Polygon, LineString, box
 from shapely.ops import unary_union
 from shapely.strtree import STRtree
 
@@ -40,7 +40,8 @@ def n_dsm(x, z):
 
 def main():
     lod2 = json.load(open(os.path.join(REFS, "lod2_campus.json")))
-    campus = Polygon(OSM[CAMPUS_WAY]["pts"][:-1]).buffer(REACH)
+    # the campus grown by REACH, plus the boulevard rows south of it (the box): the park the pupils walk through
+    campus = unary_union([Polygon(OSM[CAMPUS_WAY]["pts"][:-1]).buffer(REACH), box(3150, 9480, 4000, 10100)])
     mine = json.load(open(os.path.join(REFS, "..", "parts.json")))
     blocked = [Polygon(b["pts"]).buffer(BUILDING_MARGIN) for b in lod2] + [Polygon(p["pts"]).buffer(BUILDING_MARGIN) for p in mine]
     for o in OSM.values():
@@ -55,6 +56,10 @@ def main():
     block = unary_union(blocked)
     tree_block = STRtree([block])
     kept = []                              # (x, z, h)
+    # the street trees the game already has (trees.bin, dumped by tools/dump_trees.mjs) take their place: none of ours stands on or beside them
+    game = [(x, z, 9.0) for x, z in json.load(open(os.path.join(REFS, "trees_game.json")))]
+    # the street trees the game already has (trees.bin, dumped by tools/dump_trees.mjs) take their place: none of ours stands on or beside them
+    game = [(x, z, 9.0) for x, z in json.load(open(os.path.join(REFS, "trees_game.json")))]
 
     def free(x, z):
         p = Point(x, z)
@@ -73,6 +78,7 @@ def main():
             h = float(str(o["tags"].get("height", "")).replace(",", ".") or 0) or max(MIN_HEIGHT + 2, min(MAX_HEIGHT, n_dsm(x, z)))
             kept.append((x, z, min(MAX_HEIGHT, max(4.0, h))))
     n_osm = len(kept)
+    kept = game + kept
     minx, minz, maxx, maxz = campus.bounds
     cells = []
     z = minz
@@ -94,7 +100,7 @@ def main():
         if spaced(x, z, height):
             kept.append((x, z, height))
     out = []
-    for x, z, h in kept:
+    for x, z, h in kept[len(game):]:
         crown = 0.5 * h + 2.2
         girth = max(0.52, min(0.95, crown / h))
         out.append([round(x, 1), round(z, 1), round(h, 1), RNG.randint(0, 1), round(girth * 100)])

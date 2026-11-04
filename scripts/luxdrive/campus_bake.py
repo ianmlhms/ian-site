@@ -28,6 +28,7 @@ ORTHO_X0, ORTHO_Z0, ORTHO_PPM = 3100.0, 9450.0, 4.0
 DSM = np.load(os.path.join(WORK, "raw", "dsm4.npy"), mmap_mode="r")
 DTM = np.load(os.path.join(WORK, "raw", "dtm4.npy"), mmap_mode="r")
 ORTHO = np.asarray(Image.open(os.path.join(REFS, "ortho_campus.jpg")).convert("RGB"))
+MIN_PART_WIDTH = 1.6  # m: mean width (area / half the perimeter): a thinner cut is a sliver of two nearly equal outlines and would double a wall
 MIN_PART_AREA = 6.0   # m2: smaller slivers of a cut are dropped
 SIMPLIFY = 0.12       # m: collinear and doubled points of a cut are removed
 ROOF_DARKEN = 0.52    # the game's painted light brightens flat colours: the orthophoto's roof grey would read pale
@@ -91,7 +92,7 @@ def rings(geom):
     polys = list(geom.geoms) if isinstance(geom, MultiPolygon) else [geom]
     out = []
     for p in polys:
-        if p.geom_type != "Polygon" or p.is_empty or p.area < MIN_PART_AREA:
+        if p.geom_type != "Polygon" or p.is_empty or p.area < MIN_PART_AREA or p.area / (p.length / 2) < MIN_PART_WIDTH:
             continue
         ring = [[round(x, 1), round(z, 1)] for x, z in list(p.simplify(SIMPLIFY).exterior.coords)[:-1]]
         clean = [q for i, q in enumerate(ring) if i == 0 or (abs(q[0] - ring[i - 1][0]) + abs(q[1] - ring[i - 1][1])) > 0.25]
