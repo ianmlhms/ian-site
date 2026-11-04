@@ -15,7 +15,7 @@ const GROUND_HINT_LIFT = 0.5;       // m above the ground: a deck higher than th
  * @param {number} heading the heading the car had (rad); null/undefined = along the way
  * @param {(x:number, z:number)=>number} groundHeight the height of the bare terrain
  */
-export function placeOnRoad(hit, heading, groundHeight) {
+export function placeOnRoad(hit, heading, groundHeight, laneShare = 1) {
   if (!hit || !hit.road) throw new Error('placeOnRoad: no road to put the car on');
   const along = Math.atan2(hit.dz, hit.dx);
   let yaw = along;
@@ -24,9 +24,36 @@ export function placeOnRoad(hit, heading, groundHeight) {
     if (!same) yaw = along + Math.PI;
   }
   // the right-hand lane: the right of the heading is (-sin h, cos h)
-  const lane = hit.road.offset || 0;
+  const lane = (hit.road.offset || 0) * laneShare;
   const x = hit.x - Math.sin(yaw) * lane;
   const z = hit.z + Math.cos(yaw) * lane;
   const hint = hit.road.over || hit.road.bridge ? NO_HINT_LIMIT : groundHeight(x, z) + GROUND_HINT_LIFT;
   return { x, z, yaw, hint, road: hit.road };
+}
+
+const CLEAR_STEP_M = 3;             // m between the candidates along the road
+const CLEAR_REACH_M = 60;           // m: how far along the road the search goes
+const SNAP_M = 6;                   // m: a candidate is snapped back to the nearest road within this distance
+
+/**
+ * placeOnRoad, but never inside something: a road that ends in a tunnel portal, runs through a gap between houses or has a
+ * tree at the kerb would put the car into the obstacle (and the collision would push it off the carriageway, off a bridge
+ * deck, down a slope).  The candidates go outwards along the road: the tapped point, then 3 m ahead, 3 m back, 6 m ahead ...
+ * and the first one where the whole body is clear wins.  When nothing is clear within 60 m the tapped point is used.
+ *
+ * @param {object} index the road index (nearest)
+ * @param {(x:number, z:number, yaw:number) => boolean} blocked true when the car at that pose would touch something
+ */
+export function placeClear(index, hit, heading, groundHeight, blocked) {
+  const first = placeOnRoad(hit, heading, groundHeight);
+  const poses = (h) => [placeOnRoad(h, heading, groundHeight), placeOnRoad(h, heading, groundHeight, 0)];   // the lane, then the centre line
+  for (const p of poses(hit)) if (!blocked(p.x, p.z, p.yaw)) return p;
+  for (let s = CLEAR_STEP_M; s <= CLEAR_REACH_M; s += CLEAR_STEP_M) {
+    for (const sign of [1, -1]) {
+      const near = index.nearest(hit.x + hit.dx * s * sign, hit.z + hit.dz * s * sign, SNAP_M);
+      if (!near) continue;
+      for (const p of poses(near)) if (!blocked(p.x, p.z, p.yaw)) return p;
+    }
+  }
+  return first;
 }

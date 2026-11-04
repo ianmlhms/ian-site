@@ -6,7 +6,7 @@
  *
  * The loading screen shows the real progress (the loader API of the page) and the tiles around the car are built while the
  * first frames run, so the game starts quickly. */
-import { QUALITY, WORLD, CAR_COLOURS } from './config.js';
+import { QUALITY, WORLD, CAR_COLOURS, CAR } from './config.js';
 import { loadWorldData } from './world-data.js';
 import { createHeightField } from './heightfield.js';
 import { createSurface } from './surface.js';
@@ -34,7 +34,7 @@ import { createMinimap } from './minimap.js';
 import { createFullMap } from './fullmap.js';
 import { createRoadIndex } from './road-index.js';
 import { createBasemap } from './basemap.js';
-import { placeOnRoad } from './placement.js';
+import { placeClear } from './placement.js';
 import { createSpeedLimit } from './speed-limit.js';
 import { createQualityStepper } from './quality-step.js';
 import { roadDirectionAt } from './roads.js';
@@ -48,6 +48,7 @@ const CAMERA_IDS = ['chase', 'far', 'bonnet'];
 const TELEPORT_REACH_M = 60;          // m: "I am stuck" looks for a road this close
 const STUCK_SECONDS = 3.5;            // s of pushing the pedal without moving before the car is put back on the road
 const STUCK_SPEED = 0.6;              // m/s
+const PLACE_MARGIN_M = 0.12;          // m: a teleport keeps this much air round the car circles (a Grund street is 6 m wide)
 const TIME_IDS = Object.keys(TIME_PRESETS);
 
 const readKey = (key) => { try { return localStorage.getItem(key); } catch (error) { console.warn('[luxdrive] storage blocked', error); return null; } };
@@ -340,9 +341,15 @@ async function boot() {
     landCar(start.x, start.z, start.yaw || 0, 1e9);
     ui.setToast(tr('toast.reset'));
   }
-  /** A tap on the Kaart: the car stands on that road, in the right-hand lane, facing along the road. */
+  /** True when the car at this pose would touch a house, a tunnel portal, a tree or the edge of the area. */
+  function blockedAt(x, z, yaw) {
+    const cy = Math.cos(yaw), sy = Math.sin(yaw);
+    return CAR.bodyCircles.concat(0).some((o) => !!collide(x + cy * o, z + sy * o, CAR.bodyRadius + PLACE_MARGIN_M));
+  }
+  const placeAt = (hit) => placeClear(roadIndex, hit, car.state.heading, (x, z) => surface.height(x, z), blockedAt);
+  /** A tap on the Kaart: the car stands on that road, in the right-hand lane, facing along the road - and clear of everything. */
   function teleportTo(hit) {
-    const p = placeOnRoad(hit, car.state.heading, (x, z) => surface.height(x, z));
+    const p = placeAt(hit);
     landCar(p.x, p.z, p.yaw, p.hint);
     fullMap.setCar(car.state);
     ui.setToast(tr('map.teleport', { name: p.road.name || tr('map.unnamed') }));
@@ -352,7 +359,7 @@ async function boot() {
   function unstick() {
     const hit = roadIndex.nearest(car.state.x, car.state.z, TELEPORT_REACH_M);
     if (!hit) { stuckFor = 0; return; }
-    const p = placeOnRoad(hit, car.state.heading, (x, z) => surface.height(x, z));
+    const p = placeAt(hit);
     landCar(p.x, p.z, p.yaw, p.hint);
     ui.setToast(tr('toast.unstuck'));
   }
@@ -461,7 +468,7 @@ async function boot() {
   // the API for the harness (the checks read the state of the game from here)
   window.__lux = {
     scene, camera, renderer, car, env, terrain, city, trees, surface, ground, field, portals, playArea, buildings, quality: () => quality,
-    ui, fullMap, roadIndex, stepper, model, limits, input, forest, collide,
+    ui, fullMap, roadIndex, stepper, model, limits, input, forest, collide, placeAt, blockedAt,
     /** The Kaart and the teleport for the flows: open the map, put the car on the road nearest to (x, z). */
     toggleMap: () => toggleMap(), startDriving: () => startDriving(), isStarted: () => started,
     teleportNear: (x, z, reach = 200) => { const hit = roadIndex.nearest(x, z, reach); if (hit) teleportTo(hit); return !!hit; },

@@ -240,12 +240,15 @@ export const flow = {
         const dir = r && r.dir ? Math.atan2(r.dir.z, r.dir.x) : null;
         let d = dir === null ? 9 : Math.abs(((s.heading - dir + Math.PI * 3) % (2 * Math.PI)) - Math.PI);
         d = Math.min(d, Math.PI - d);
-        return { onRoad: !!r, lat: r ? r.lat : null, width: r ? r.width : null, alignedRad: d, mapOpen: m.fullMap.isOpen(), gap: s.y - m.ground.height(s.x, s.z), grounded: s.grounded, speed: s.speed };
+        // a closed way (a square, a ring road) is an area: its "direction" depends on which side of it the car stands
+        const pts = (m.roadIndex.nearest(s.x, s.z, 8) || { road: { pts: [] } }).road.pts;
+        const closed = pts.length > 2 && Math.hypot(pts[0][0] - pts[pts.length - 1][0], pts[0][1] - pts[pts.length - 1][1]) < 12;
+        return { closed, onRoad: !!r, lat: r ? r.lat : null, width: r ? r.width : null, alignedRad: d, mapOpen: m.fullMap.isOpen(), gap: s.y - m.ground.height(s.x, s.z), grounded: s.grounded, speed: s.speed };
       }));
     }
     for (const t of taps) {
       h.expect(t.onRoad && Math.abs(t.lat) <= t.width / 2, `teleport: on the carriageway (${t.lat === null ? "no road" : t.lat.toFixed(2)} m from the centre line of ${t.width ? t.width.toFixed(1) : "?"} m)`);
-      h.expect(t.alignedRad < 0.35, `teleport: facing along the road (${(t.alignedRad * 180 / Math.PI).toFixed(0)} deg off)`);
+      h.expect(t.closed || t.alignedRad < 0.35, `teleport: facing along the road (${(t.alignedRad * 180 / Math.PI).toFixed(0)} deg off${t.closed ? ", a closed way: not checked" : ""})`);
       h.expect(!t.mapOpen && t.gap > 0.3 && t.gap < 0.7 && t.grounded && Math.abs(t.speed) < 0.5, "teleport: the map closed, the car stands on the ground and rolls slowly");
     }
     const ends = await page.evaluate(() => { const s = window.__lux.state(); return { x: s.x, z: s.z }; });
