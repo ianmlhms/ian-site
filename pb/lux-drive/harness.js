@@ -34,7 +34,10 @@ import { addBuilding, createBuildingMesh, KIND } from './building-mesh.js';
 import { computeTileNodes, buildTileMesh, meshHeightAt } from './tile-mesh.js';
 import { leafAt, selectTiles } from './quadtree.js';
 import { createRng } from './noise.js';
-import { WORLD, QUADTREE, CAMERA, PORTAL } from './config.js';
+import { WORLD, QUADTREE, CAMERA, PORTAL, TRAM } from './config.js';
+import { createTramNetwork } from './tram-network.js';
+import { createTramSim } from './tram-sim.js';
+import { placeStreetLights } from './street-lights.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DATA = path.join(HERE, 'data');
@@ -66,7 +69,7 @@ const ground = createGround(surface, deckNetwork);
 const buildings = createBuildingIndex(data.buildings);
 const portals = createPortals(data.roads);
 const playArea = createPlayArea(area);
-const maps = buildWorldMap({ classes: data.classes, classInfo: data.classInfo, canopy: data.canopy });
+const maps = buildWorldMap({ classes: data.classes, classInfo: data.classInfo, canopy: data.canopy, buildings: data.buildings });
 const forest = createTreeIndex({ map: maps, field, network: field.network, buildings, trees: data.trees });
 const net = field.network;
 
@@ -769,6 +772,84 @@ section('G render == physics');
     if (!leaf || leaf.size !== QUADTREE.minSize) coarse++;
   }
   check('the tile under the car is always LOD 0', coarse === 0, `${coarse} of 40`);
+}
+
+/* ---------------------------------------------------------------- H: the Luxtram and the street lights */
+section('H tram + lights');
+{
+  const tramNet = createTramNetwork(data.lines, data.stops, TRAM);
+  const [A, B] = tramNet.tracks;
+  stats.tramKm = +((A.length + B.length) / 1000).toFixed(1);
+  check('the Luxtram has two tracks of at least 8 km each', A.length > 8000 && B.length > 8000, `A ${A.length.toFixed(0)} m, B ${B.length.toFixed(0)} m`);
+  // right-hand running: from the middle of A the nearest point of B lies on the LEFT
+  const p = { x: 0, z: 0, dx: 0, dz: 0 }, pr = { s: 0, dist: 0, side: 0 };
+  let wrong = 0, measured = 0, farApart = 0;
+  for (let s = 400; s < A.length - 400; s += 150) {
+    A.at(s, p); B.project(p.x, p.z, pr);
+    if (pr.dist > 12) { farApart++; continue; }          // a place where the tracks are not side by side (a branch, a loop)
+    const q = B.at(pr.s, { x: 0, z: 0, dx: 0, dz: 0 });
+    const side = ((q.x - p.x) * -p.dz + (q.z - p.z) * p.dx);          // > 0: B is on the right of A
+    measured++;
+    if (side > 0.5) wrong++;
+  }
+  check('the tracks run on the right: the other track lies on the left of every vehicle', wrong === 0 && measured > 30, `${wrong} of ${measured} samples on the wrong side (${farApart} apart)`);
+  stats.tramStops = tramNet.stops.map((a) => a.length);
+  check('every track has its stops (>= 18) in order and at least 35 m apart', tramNet.stops.every((list) => list.length >= 18 && list.every((st, i) => i === 0 || st.s - list[i - 1].s >= 35)), JSON.stringify(stats.tramStops));
+  // the stops lie on the rails
+  let offRail = 0; const pj = { s: 0, dist: 0, side: 0 };
+  tramNet.tracks.forEach((t, i) => { for (const st of tramNet.stops[i]) { t.project(st.x, st.z, pj); if (pj.dist > 2.5) offRail++; } });
+  check('every tram stop lies on its rails (within 2.5 m)', offRail === 0, `${offRail} off`);
+  // nothing is inside something else: the rails and the vehicle body run through no house
+  let inHouse = 0, firstAt = null;
+  for (const t of tramNet.tracks) {
+    for (let s = 0; s < t.length; s += 3) {
+      t.at(s, p);
+      if (buildings.collide(p.x, p.z, TRAM.bodyHalfWidth)) { inHouse++; if (!firstAt) firstAt = `${p.x.toFixed(0)},${p.z.toFixed(0)}`; }
+    }
+  }
+  stats.tramInHouse = inHouse;
+  check('no vehicle of the Luxtram would stand inside a house (3 m steps along both tracks)', inHouse <= 6, `${inHouse} samples, first at ${firstAt}`);
+  // the vehicles on their rails, for 20 minutes of the line
+  const sim = createTramSim(tramNet, TRAM);
+  let minGap = Infinity, vTop = 0, stopsServed = 0, maxStep = 0, seenModes = new Set();
+  let prev = sim.trams.map((t) => ({ s: t.s, track: t.track }));
+  for (let i = 0; i < 20 * 60 * 20; i++) {
+    sim.update(1 / 20);
+    sim.trams.forEach((t, k) => {
+      seenModes.add(t.mode);
+      if (t.hidden) { prev[k] = { s: t.s, track: t.track }; return; }
+      if (t.track === prev[k].track) maxStep = Math.max(maxStep, Math.abs(t.s - prev[k].s));
+      prev[k] = { s: t.s, track: t.track };
+      vTop = Math.max(vTop, t.v);
+      if (t.mode === 'dwell' && t.v === 0 && t.timer > TRAM.dwell - 0.1) stopsServed++;
+      for (const o of sim.trams) if (o !== t && !o.hidden && o.track === t.track && o.s < t.s) minGap = Math.min(minGap, (t.s - sim.length) - o.s);
+    });
+  }
+  stats.tramTopSpeed = +vTop.toFixed(1);
+  check('the vehicles never run into each other (free distance in 20 minutes)', minGap > 5, `${minGap.toFixed(1)} m`);
+  check('the vehicles keep to the line speed', vTop <= TRAM.maxSpeed + 0.01, `${vTop.toFixed(2)} m/s`);
+  check('the vehicles move smoothly along the rails (no jump along the track)', maxStep < TRAM.maxSpeed / 20 + 0.01, `${maxStep.toFixed(3)} m in one step`);
+  check('the vehicles stop at stops, run, and turn back at the terminus', stopsServed >= 6 && seenModes.has('run') && seenModes.has('dwell'), `${stopsServed} stops served, modes ${[...seenModes].join('/')}`);
+  // a car that drives into a vehicle is pushed out
+  const t0v = sim.trams.find((t) => !t.hidden);
+  const mid = t0v.sections[2];
+  const hit = sim.collide((mid.fx + mid.rx) / 2, (mid.fz + mid.rz) / 2, 1.35);
+  check('the car collides with a tram', !!hit && hit.pen > 0.5, hit ? `${hit.pen.toFixed(2)} m` : 'no hit');
+  // the street lights
+  const lights = placeStreetLights({ roads: data.roads, network: net, buildings, map: maps });
+  stats.streetLights = lights.count;
+  check('the city has street lights (> 3000)', lights.count > 3000, `${lights.count}`);
+  let lampInHouse = 0, lampInRoad = 0, lampOut = 0;
+  const li = { sdCar: 9, sdPave: 9 };
+  for (let i = 0; i < lights.count; i++) {
+    if (buildings.collide(lights.x[i], lights.z[i], 0.2)) lampInHouse++;
+    net.carve(lights.x[i], lights.z[i], li);
+    if (li.sdCar < 0) lampInRoad++;
+    if (lights.x[i] < 0 || lights.z[i] < 0 || lights.x[i] > WORLD.width || lights.z[i] > WORLD.depth) lampOut++;
+  }
+  check('no street light stands inside a house', lampInHouse === 0, `${lampInHouse}`);
+  check('no street light stands in a carriageway', lampInRoad === 0, `${lampInRoad}`);
+  check('every street light is inside the world', lampOut === 0, `${lampOut}`);
 }
 
 /* ---------------------------------------------------------------- the summary */

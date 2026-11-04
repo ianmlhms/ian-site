@@ -35,6 +35,7 @@ export const GROUND_FRAGMENT = `
   varying vec3 vWorld; varying vec3 vNormal; varying float vDist;
   varying vec4 vRoad; varying vec4 vRoad2; varying vec4 vRoad3;
   ${PAINT_LIGHT_GLSL}
+  float hash21(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
 
   void main(){
     vec3 N = normalize(vNormal);
@@ -63,18 +64,27 @@ export const GROUND_FRAGMENT = `
     // noise cut into bands, so it reads as a patchwork of fields from above and never as one grey-brown wash.
     float lum = dot(gTex, vec3(0.30, 0.59, 0.11));
     float detail = clamp(0.90 + 0.26 * (lum / 0.45 - 1.0), 0.72, 1.18);
-    float parcel = texture2D(uNoise, P * 0.0021 + 0.11).r * 4.999;
-    float pid = floor(parcel);
-    float pmix = smoothstep(0.90, 1.0, fract(parcel));
-    vec3 crop0 = pid < 0.5 ? vec3(0.40, 0.57, 0.22) : pid < 1.5 ? vec3(0.73, 0.65, 0.31) : pid < 2.5 ? vec3(0.49, 0.37, 0.25) : pid < 3.5 ? vec3(0.55, 0.67, 0.28) : vec3(0.67, 0.59, 0.37);
-    float pid1 = min(pid + 1.0, 4.0);
-    vec3 crop1 = pid1 < 0.5 ? vec3(0.40, 0.57, 0.22) : pid1 < 1.5 ? vec3(0.73, 0.65, 0.31) : pid1 < 2.5 ? vec3(0.49, 0.37, 0.25) : pid1 < 3.5 ? vec3(0.55, 0.67, 0.28) : vec3(0.67, 0.59, 0.37);
-    vec3 field = mix(crop0, crop1, pmix) * detail * (0.94 + 0.12 * nMid.b);
+    // the parcels: rectangles of 70-120 m, turned by a different angle in every kilometre block, each with its own crop
+    vec2 blk = floor(P / 900.0);
+    float ba = hash21(blk) * 3.14159;
+    vec2 R = vec2(cos(ba) * P.x + sin(ba) * P.y, -sin(ba) * P.x + cos(ba) * P.y);
+    vec2 cellSize = vec2(78.0, 128.0) * (0.8 + 0.5 * hash21(blk + 3.1));
+    vec2 cellF = R / cellSize;
+    vec2 cid = floor(cellF);
+    float pick = hash21(cid + blk * 17.0);
+    float pid = floor(pick * 4.999);
+    vec3 crop = pid < 0.5 ? vec3(0.44, 0.58, 0.26) : pid < 1.5 ? vec3(0.80, 0.68, 0.26) : pid < 2.5 ? vec3(0.55, 0.40, 0.27) : pid < 3.5 ? vec3(0.52, 0.66, 0.26) : vec3(0.72, 0.62, 0.32);
+    vec3 field = crop * detail * (0.94 + 0.12 * nMid.b);
+    // a hedge / grass strip along some of the borders of the parcels
+    vec2 inCell = fract(cellF) * cellSize;
+    float edgeD = min(min(inCell.x, cellSize.x - inCell.x), min(inCell.y, cellSize.y - inCell.y));
+    float hedge = (1.0 - smoothstep(0.6, 1.8, edgeD)) * step(0.55, hash21(cid + 7.7)) * near;
+    field = mix(field, vec3(0.30, 0.42, 0.20), hedge * 0.7);
     // the rows of the fields, along a direction that turns slowly with the land (the ploughed earth shows them strongest)
     float ang = nLo.a * 6.28318;
     vec2 dir = vec2(cos(ang), sin(ang));
     float row = sin(dot(P, dir) * 1.1) * 0.5 + 0.5;
-    float plough = pid < 2.5 && pid > 1.5 ? 1.0 : 0.0;
+    float plough = pid > 1.5 && pid < 2.5 ? 1.0 : 0.0;
     field *= 1.0 - (0.05 + 0.10 * plough) * (1.0 - row) * near;
     vec3 water = vec3(0.20, 0.30, 0.36) * (0.9 + 0.2 * nMid.b);
     water += vec3(0.10, 0.13, 0.14) * (sin(P.x * 0.9 + uTime * 0.6) * sin(P.y * 0.7 - uTime * 0.4) * 0.5 + 0.5) * near;
@@ -83,6 +93,9 @@ export const GROUND_FRAGMENT = `
     float farm = can.a, park = can.b;
     vec3 albedo = meadow;
     albedo = mix(albedo, meadow * vec3(1.06, 1.16, 0.84), park * 0.8);        // the parks are mown and brighter
+    // the parks: mown lawn, a slightly richer green with soft mowing stripes and large calm patches (no two lawns alike)
+    float mow = sin(dot(P, vec2(0.66, 0.34)) * 1.55) * 0.5 + 0.5;
+    albedo *= 1.0 + park * near * ((mow - 0.5) * 0.07 + (nLo.b - 0.5) * 0.10);
     albedo = mix(albedo, field, farm);
     albedo = mix(albedo, wood, forest);
     albedo = mix(albedo, city, urban);

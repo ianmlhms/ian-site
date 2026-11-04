@@ -105,7 +105,7 @@ export function buildWorldMap({ classes, classInfo, canopy, buildings = null }) 
       can[o + 3] = cls === CLASS.farmland ? 255 : 0;
     }
   }
-  return { nx, nz, cover, coverGpu, canopy: can, canopyNx: cx, canopyNz: cz, classData: classes.data };
+  return { nx, nz, cover, coverGpu, density, canopy: can, canopyNx: cx, canopyNz: cz, classData: classes.data };
 }
 
 /** CPU sample of the maps (bilinear on the cell grid): { open, forest, urban, water, cover, height, park, farm }. */
@@ -132,4 +132,12 @@ export function sampleClass(map, x, z) {
   const i = Math.min(map.nx - 1, Math.max(0, Math.floor(x / CLASS_CELL)));
   const j = Math.min(map.nz - 1, Math.max(0, Math.floor(z / CLASS_CELL)));
   return map.classData[j * map.nx + i];
+}
+
+/** How built-up the place is (0 .. about 0.4, the share of the 72 m neighbourhood that the buildings cover); 0 when the map has no buildings. */
+export function sampleDensity(map, x, z) {
+  if (!map.density) return 0;
+  const i = Math.min(map.nx - 1, Math.max(0, Math.floor(x / CLASS_CELL)));
+  const j = Math.min(map.nz - 1, Math.max(0, Math.floor(z / CLASS_CELL)));
+  return map.density[j * map.nx + i];
 }

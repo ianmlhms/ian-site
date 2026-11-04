@@ -42,7 +42,7 @@ export function buildGraph(lines) {
 const edgeKey = (a, b) => (a < b ? `${a}_${b}` : `${b}_${a}`);
 
 /** Dijkstra from `src` to `dst` (node ids); an edge in `penalised` costs PENALTY more.  Returns { length, nodes: [ids] } or null. */
-export function shortestPath(graph, src, dst, penalised = null) {
+export function shortestPath(graph, src, dst, penalised = null, edgeCost = null) {
   const n = graph.nodes.length;
   const dist = new Float64Array(n).fill(Infinity), prev = new Int32Array(n).fill(-1), done = new Uint8Array(n);
   dist[src] = 0;
@@ -60,7 +60,7 @@ export function shortestPath(graph, src, dst, penalised = null) {
     done[u] = 1;
     if (u === dst) break;
     for (const [v, len] of graph.nodes[u].adj) {
-      const cost = len + (penalised && penalised.has(edgeKey(u, v)) ? PENALTY : 0);
+      const cost = (edgeCost ? edgeCost(u, v, len) : len) + (penalised && penalised.has(edgeKey(u, v)) ? PENALTY : 0);
       if (d + cost < dist[v]) { dist[v] = d + cost; prev[v] = u; push([dist[v], v]); }
     }
   }
@@ -148,6 +148,53 @@ export function createTrack(pts, name) {
   return { name, pts, cum, length, at, project };
 }
 
+/**
+ * The cost of driving an edge of the graph in a direction: its length, times a heavy factor where the edge is the LEFT-hand
+ * track of the direction of travel, plus a fee for every junction node (the crossovers between the two tracks).
+ * Without it the shortest path hops between the two tracks at the crossovers to cut a corner, and a vehicle would run on the
+ * left for a few kilometres.  The role of an edge comes from the geometry: the other track of the line is a parallel edge 2-9 m
+ * to the side of it; if that lies on the LEFT of the direction of travel, the edge is the right-hand track of that direction.
+ */
+export function sideCosts(graph) {
+  const edges = [];
+  const seen = new Set();
+  for (const n of graph.nodes) for (const [m, len] of n.adj) {
+    const k = edgeKey(n.id, m);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    const a = n, b = graph.nodes[m];
+    edges.push({ a: a.id, b: b.id, len, mx: (a.x + b.x) / 2, mz: (a.z + b.z) / 2, dx: (b.x - a.x) / (len || 1), dz: (b.z - a.z) / (len || 1), left: false, right: false });
+  }
+  const CELL = 12;
+  const grid = new Map();
+  const key = (x, z) => Math.floor(x / CELL) * 100003 + Math.floor(z / CELL);
+  for (const e of edges) { const k = key(e.mx, e.mz); const l = grid.get(k); if (l) l.push(e); else grid.set(k, [e]); }
+  for (const e of edges) {
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+      for (const o of grid.get(key(e.mx + dx * CELL, e.mz + dz * CELL)) || []) {
+        if (o === e || Math.abs(e.dx * o.dz - e.dz * o.dx) > 0.25) continue;               // not parallel
+        const ox = o.mx - e.mx, oz = o.mz - e.mz;
+        const along = ox * e.dx + oz * e.dz, side = ox * -e.dz + oz * e.dx;               // side > 0: the other edge is on the right of a -> b
+        if (Math.abs(along) > 25 || Math.abs(side) < 1.6 || Math.abs(side) > 9) continue;
+        if (side > 0) e.right = true; else e.left = true;
+      }
+    }
+  }
+  const byKey = new Map(edges.map((e) => [edgeKey(e.a, e.b), e]));
+  const JUNCTION_FEE = 150, WRONG_SIDE = 40;
+  return (u, v, len) => {
+    const e = byKey.get(edgeKey(u, v));
+    let cost = len;
+    if (e) {
+      const forward = e.a === u;                                  // travelling a -> b
+      const neighbourOnRight = forward ? e.right : e.left, neighbourOnLeft = forward ? e.left : e.right;
+      if (neighbourOnRight && !neighbourOnLeft) cost = len * WRONG_SIDE;      // the other track is on my right: this is the left track
+    }
+    if (graph.nodes[v].adj.length >= 3) cost += JUNCTION_FEE;
+    return cost;
+  };
+}
+
 function terminalEnds(graph, stops, stopName) {
   const marks = stops.filter((s) => s.kind === 0 && s.name === stopName);
   if (!marks.length) throw new Error(`tram network: no tram stop called ${stopName}`);
@@ -185,16 +232,17 @@ function stopsOfTrack(track, stops, cfg) {
  */
 export function createTramNetwork(lines, stops, cfg, { north = 'Luxexpo', south = 'Stadion' } = {}) {
   const graph = buildGraph(lines.filter((l) => l.kind === 2));
+  const cost = sideCosts(graph);
   const [n0, n1] = terminalEnds(graph, stops, north);
   const [s0, s1] = terminalEnds(graph, stops, south);
   // two ends at each terminal: pair them so that the second track is the cheaper one
   let best = null;
   for (const [nA, sA, nB, sB] of [[n0, s0, n1, s1], [n0, s1, n1, s0]]) {
-    const a = shortestPath(graph, nA.id, sA.id);
+    const a = shortestPath(graph, nA.id, sA.id, null, cost);
     if (!a) continue;
     const used = new Set();
     for (let i = 1; i < a.nodes.length; i++) used.add(edgeKey(a.nodes[i - 1], a.nodes[i]));
-    const b = shortestPath(graph, sB.id, nB.id, used);
+    const b = shortestPath(graph, sB.id, nB.id, used, cost);
     if (!b) continue;
     if (!best || a.length + b.length < best.cost) best = { a, b, cost: a.length + b.length };
   }
