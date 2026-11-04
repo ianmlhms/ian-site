@@ -8,7 +8,9 @@ import path from "node:path";
 import { createRequire } from "node:module";
 
 const REPO = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
-const require = createRequire("/opt/node-tools/");
+// the cloud container keeps Playwright in /opt/node-tools, the Mac in the global playwright-cli install
+const PW_HOME = fs.existsSync("/opt/node-tools/node_modules/playwright") ? "/opt/node-tools/" : "/opt/homebrew/lib/node_modules/@playwright/cli/";
+const require = createRequire(PW_HOME);
 const { chromium } = require("playwright");
 const MIME = { html: "text/html", js: "text/javascript", json: "application/json", css: "text/css", webp: "image/webp", png: "image/png", bin: "application/octet-stream" };
 
