@@ -18,6 +18,10 @@ const SPIKE_WINDOW = 1;                  // samples each side of the median that
 const LIMIT_METRES = 10;                 // m each side of a point for the curvature limit (the 20 m moving mean of the gate)
 const MIN_WINDOW = 2;                    // m: no limit where the way is shorter than this on one side (its end)
 const LIMIT_GAIN = 0.8;                  // the share of the excess one sweep removes (below 1: the sweeps converge)
+const FREE_END_RUN = 16;                 // m: the stretch of a way next to a bridge that the DTM cannot be trusted on (the valley edge begins at the abutment)
+const FREE_END_WEIGHT = 0.02;            // the weight of a terrain sample there against 1 elsewhere: the profile continues the gradient of the street into the bridge
+const TIGHT_END_RUN = 12;                // m: the stretch of a way next to a tunnel mouth that follows the land (TIGHT_END_CAP)
+const TIGHT_END_CAP = 0.3;               // m: ... within this of it
 const PIN_WEIGHT = 1e4;                  // the weight of a junction constraint against the weight 1 of a terrain sample
 
 /** Median of a window (a small array, sorted in place). */
@@ -125,15 +129,16 @@ export const radiusOf = (kind) => designSpeed(kind) ** 2 / ROAD.bedLift;
 /**
  * The bed of a way.  `ground`: the terrain under the samples of the centre line; `arc`: the distance along the way of every sample (m); `pins`: optional Map(sample index -> the height
  * the surface must have there, a junction with a way that is already designed); `kind`: the class of the way (its vertical curves are never tighter than the radius of the class).
+ * `ends`: optional { start, end }, what each end of the way meets: 'bridge' (the terrain next to it is a valley edge and counts for little), 'tunnel' (the street follows the land), or null.
  * Returns Float64Array of the heights.
  *
  * `closed`: the last sample is (about) the first (a ring road, a pedestrian square, a loop of a service road).  An open design leaves the two ends at two
  * different levels - a step of up to 2.5 m across the carriageway where the ring closes (measured: Parvis de l'Abbaye) - so a closed way is designed as three laps
  * in a row and the middle lap is kept: the profile is periodic, the seam is as smooth as any other place of the ring, and the last sample takes the level of the first.
  */
-export function designBed(ground, arc, pins, closed = false, kind = '') {
+export function designBed(ground, arc, pins, closed = false, kind = '', ends = null) {
   const n = ground.length;
-  if (!closed || n < 6) return designOpenBed(ground, arc, pins, kind);
+  if (!closed || n < 6) return designOpenBed(ground, arc, pins, kind, ends);
   const m = n - 1;                                                       // the last sample repeats the first: one lap is m samples
   const lap = arc[n - 1];                                                // the length of a lap (the last sample is the first again)
   const total = m * CLOSED_COPIES;
@@ -150,12 +155,28 @@ export function designBed(ground, arc, pins, closed = false, kind = '') {
   return out;
 }
 
+/** The stretches of a way next to a bridge (`free`: the terrain there is the edge of a valley, the street does not follow it) and next to a tunnel (`tight`: the
+ *  mouth of the tunnel is cut into the hillside at the level of the street, the street follows the land closely).  `ends` = { start, end }, each 'bridge', 'tunnel' or null. */
+function endStretches(arc, ends) {
+  const n = arc.length;
+  const free = new Uint8Array(n), tight = new Uint8Array(n);
+  if (!ends) return { free, tight };
+  for (let i = 0; i < n; i++) {
+    const fromStart = arc[i] - arc[0], fromEnd = arc[n - 1] - arc[i];
+    if (ends.start === 'bridge' && fromStart <= FREE_END_RUN) free[i] = 1;
+    if (ends.end === 'bridge' && fromEnd <= FREE_END_RUN) free[i] = 1;
+    if (ends.start === 'tunnel' && fromStart <= TIGHT_END_RUN) tight[i] = 1;
+    if (ends.end === 'tunnel' && fromEnd <= TIGHT_END_RUN) tight[i] = 1;
+  }
+  return { free, tight };
+}
+
 /** The levels a bed may keep from the land: between `ground - maxCut` and `ground + maxFill`; a pin keeps its level. */
-function clampToLand(bed, ground, pins, maxCut, maxFill) {
+function clampToLand(bed, ground, pins, maxCut, maxFill, stretch) {
   const out = new Float64Array(bed.length);
   let clamped = false;
   for (let i = 0; i < bed.length; i++) {
-    out[i] = pins && pins.has(i) ? pins.get(i) : Math.min(ground[i] + maxFill, Math.max(ground[i] - maxCut, bed[i]));
+    out[i] = pins && pins.has(i) ? pins.get(i) : stretch && stretch.free[i] ? bed[i] : stretch && stretch.tight[i] ? Math.min(ground[i] + TIGHT_END_CAP, Math.max(ground[i] - TIGHT_END_CAP, bed[i])) : Math.min(ground[i] + maxFill, Math.max(ground[i] - maxCut, bed[i]));
     if (out[i] !== bed[i]) clamped = true;
   }
   return { bed: out, clamped };
@@ -168,20 +189,22 @@ function clampToLand(bed, ground, pins, maxCut, maxFill) {
  * that has both wherever one exists).  Where none does (a cliff beside the road, a wall of the DTM) the curvature limit wins - a smooth street 3 m below the
  * crest is better than a street that follows a spike - but never by more than bedHardLimit.
  */
-function designOpenBed(ground, arc, pins, kind) {
+function designOpenBed(ground, arc, pins, kind, ends) {
   const n = ground.length;
   const w = new Float64Array(n).fill(1);
   const y = new Float64Array(n);
   for (let i = 0; i < n; i++) y[i] = median(ground, i, SPIKE_WINDOW);
+  const stretch = endStretches(arc, ends);
+  for (let i = 0; i < n; i++) if (stretch.free[i]) w[i] = FREE_END_WEIGHT;      // (a bridge abutment: the DTM drops into the valley there, the street does not)
   if (pins) for (const [i, h] of pins) { w[i] = PIN_WEIGHT; y[i] = h; }
   const limit = deviationOf(radiusOf(kind));
   let bed = whittaker(y, w, ROAD.bedStiffness, arc);
   for (let round = 0; round < ROAD.bedRounds; round++) {
-    const clamped = clampToLand(limitCurvature(bed, arc, pins, limit), ground, pins, ROAD.bedMaxCut, ROAD.bedMaxFill);
+    const clamped = clampToLand(limitCurvature(bed, arc, pins, limit), ground, pins, ROAD.bedMaxCut, ROAD.bedMaxFill, stretch);
     bed = clamped.bed;
     if (!clamped.clamped) break;
   }
-  return clampToLand(limitCurvature(bed, arc, pins, limit), ground, pins, ROAD.bedHardLimit, ROAD.bedHardLimit).bed;
+  return clampToLand(limitCurvature(bed, arc, pins, limit), ground, pins, ROAD.bedHardLimit, ROAD.bedHardLimit, { free: new Uint8Array(n), tight: stretch.tight }).bed;
 }
 
 /** The slope of the bed at every sample (m per m along the way): the central difference, one-sided at the two ends.  The surface between two samples is the cubic

@@ -666,9 +666,7 @@ if (wants('D2')) {
   //
   // The road that leads to the mouth ends up to seven metres before it, so the two levels differ by the
   // slope of the road: two metres of difference is a steep approach, more than that is a mouth in the air.
-  // (2.0 m before the bed of a road was held to the land only by the noisy DTM; the bed is a smooth street profile now, up to bedHardClamp from the
-  // land, and a mouth in a hillside of 45 % falls 2.5 m within the 5 m between the end of the road and the wall: 3.0 m is still a steep approach, not a mouth in the air)
-  const MAX_PORTAL_GAP = 3.0;
+  const MAX_PORTAL_GAP = 2.0;
   let floating = 0, worst = 0;
   const floatList = [];
   for (const p of portals.list) {

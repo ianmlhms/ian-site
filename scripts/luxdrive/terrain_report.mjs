@@ -11,6 +11,7 @@ const R = process.argv[2];
 const VERBOSE = process.argv.includes('--verbose');
 const ONLY = (process.argv.find((a) => a.startsWith('--only=')) || '').slice(7).split(',').filter(Boolean);   // humps, sides, steps (default: all)
 const wants = (name) => !ONLY.length || ONLY.includes(name);
+const STRIDE = Number((process.argv.find((a) => a.startsWith('--stride=')) || '--stride=1').slice(9));   // every Nth way only (a quick look)
 const { loadWorldData } = await import(R + 'world-data.js');
 const { createHeightField } = await import(R + 'heightfield.js');
 const { createSurface } = await import(R + 'surface.js');
@@ -20,9 +21,12 @@ const surface = createSurface(field);
 const net = field.network;
 const nameOf = (c) => data.roads[c.road].name || data.roads[c.road].kind;
 
-const SPEED = 14, MAX_BOB = 1.5, STRETCH_GAP = 30;
+const TIGHT_BEND_R = 12;                                   // m: a tight bend fans its cross sections out; gate I does not measure it either
+let designSpeed = () => 14;                                // m/s; the checkouts that predate the class radii drive every way at 50 km/h
+try { designSpeed = (await import(R + 'road-bed.js')).designSpeed ?? designSpeed; } catch { /* old checkout */ }
+const MAX_BOB = 1.5, STRETCH_GAP = 30;
 const withArc = (c) => { if (c.arc) return c; const arc = new Float64Array(c.x.length); for (let i = 1; i < c.x.length; i++) arc[i] = arc[i - 1] + Math.hypot(c.x[i] - c.x[i - 1], c.z[i] - c.z[i - 1]); return { ...c, arc }; };   // (old checkouts have no arc)
-const chains = net.chains.map(withArc).filter((c) => !c.tagged && !net.overRoads.has(c.road) && c.arc[c.arc.length - 1] >= 30);
+const chains = net.chains.map(withArc).filter((c) => !c.tagged && !net.overRoads.has(c.road) && c.arc[c.arc.length - 1] >= 30).filter((c, i) => i % STRIDE === 0);
 
 // ---- junction aprons (as the harness gate I)
 const GC = 32, gk = (a, b) => a * 4096 + b, segGrid = new Map();
@@ -62,7 +66,14 @@ const accAll = [];
 for (const ch of chains) {
   const L = ch.arc[ch.arc.length - 1], m = Math.floor(L);
   const h = new Float64Array(m + 1), ok = new Uint8Array(m + 1);
+  const SPEED = designSpeed(ch.kind ?? data.roads[ch.road].kind);
   for (let q = 0; q <= m; q++) { lineAt(ch, q, pt); h[q] = surface.height(pt.x, pt.z); ok[q] = inJunction(ch.road, pt.x, pt.z) ? 0 : 1; }
+  for (let i = 1; i < ch.x.length - 1; i++) {
+    const ax = ch.x[i - 1], az = ch.z[i - 1], bx = ch.x[i], bz = ch.z[i], cx = ch.x[i + 1], cz = ch.z[i + 1];
+    const area2 = Math.abs((bx - ax) * (cz - az) - (bz - az) * (cx - ax));
+    const Rb = area2 < 1e-9 ? Infinity : (Math.hypot(bx - ax, bz - az) * Math.hypot(cx - bx, cz - bz) * Math.hypot(cx - ax, cz - az)) / (2 * area2);
+    if (Rb < TIGHT_BEND_R) for (let q = Math.max(0, Math.floor(ch.arc[i] - 8)); q <= Math.min(m, Math.ceil(ch.arc[i] + 8)); q++) ok[q] = 0;
+  }
   for (let i = 0; i < ch.x.length; i++) {
     const cut = ch.ground[i] - ch.bed[i]; samples++;
     if (cut > deepCut) { deepCut = cut; deepCutAt = `${nameOf(ch)} ${Math.round(ch.x[i])},${Math.round(ch.z[i])}`; }
@@ -137,7 +148,7 @@ if (wants('steps')) {
       for (let lat = -hw + 0.5; lat <= hw - 0.5 + 1e-9; lat += 1) {
         const x = pt.x + nx * lat, z = pt.z + nz * lat;
         field.height(x, z, info);
-        if (info.sdCar > -0.5) continue;
+        if (info.sdCar > -0.5 || net.protection(x, z) > 0) continue;      // (ground under a way that rides over it is the DTM itself, steps of the DTM included)
         measured++;
         const f = (a, b) => field.height(a, b);
         const g0 = f(x, z), jx = f(x + D, z) - f(x - D, z) - D * (f(x + 1, z) - f(x - 1, z)) / 1, jz = f(x, z + D) - f(x, z - D) - D * (f(x, z + 1) - f(x, z - 1)) / 1;
