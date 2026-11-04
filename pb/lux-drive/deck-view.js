@@ -21,17 +21,22 @@ const COLOUR_PARAPET = [0.68, 0.67, 0.64];
 export function createDeckView({ scene, decks, material, ground }) {
   const b = new FlatBuilder();
   let count = 0;
-  // the ground under a point of the deck: the abutment goes down to it, so the deck is never a floating slab.
-  const groundAt = (x, z, y) => {
-    if (!ground) return y - DECK.thickness;
-    const g = ground.height(x, z);
-    return Math.min(y - DECK.thickness, g);
-  };
   for (const deck of decks) {
     const n = deck.pts.length;
     if (n < 2) continue;
     const half = deck.width / 2;
     count += 1;
+    // The bottom of the side of the deck.
+    //
+    // A deck that SPANS the land is a bridge over a valley: its side stops at its own underside and the
+    // valley shows under it.  A deck that stands on the land (a road on an embankment) reaches the
+    // ground: it is a solid wall of roadbed, never a slab in the air.
+    const groundAt = (x, z, y) => {
+      if (!ground) return y - DECK.thickness;
+      const g = ground.height(x, z);
+      if (!deck.spans) return Math.min(g, y);
+      return Math.max(y - DECK.thickness, Math.min(g, y));
+    };
     // the direction of every segment and the side normal of the deck
     for (let i = 0; i + 1 < n; i++) {
       const [ax, az] = deck.pts[i];
@@ -48,8 +53,8 @@ export function createDeckView({ scene, decks, material, ground }) {
       // the underside
       b.quad([ax - sx * half, ay - DECK.thickness, az - sz * half], [bx - sx * half, by - DECK.thickness, bz - sz * half],
         [bx + sx * half, by - DECK.thickness, bz + sz * half], [ax + sx * half, ay - DECK.thickness, az + sz * half], COLOUR_SIDE);
-      // the sides of the deck: they are the ABUTMENTS, they reach from the top of the deck down to the ground, so the
-      // deck is a solid wall and not a slab floating over the valley (the reviewer saw it float).
+      // the sides of the deck: they are the ABUTMENTS where the deck meets the land.  Over a valley they stop
+      // under the deck, so the bridge spans the ground instead of walling it off.
       const al = groundAt(ax + sx * half, az + sz * half, ay);
       const bl = groundAt(bx + sx * half, bz + sz * half, by);
       const ar = groundAt(ax - sx * half, az - sz * half, ay);

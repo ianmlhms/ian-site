@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { loadWorldData } from './world-data.js';
 import { createHeightField } from './heightfield.js';
 import { createSurface } from './surface.js';
-import { createDeckNetwork, createGround } from './decks.js';
+import { createDeckNetwork, createGround, DECK } from './decks.js';
 import { createBuildingIndex } from './buildings.js';
 import { createTreeIndex, treesOfBlock } from './trees.js';
 import { createPortals } from './portals.js';
@@ -33,7 +33,7 @@ import { addBuilding, createBuildingMesh, KIND } from './building-mesh.js';
 import { computeTileNodes, buildTileMesh, meshHeightAt } from './tile-mesh.js';
 import { leafAt, selectTiles } from './quadtree.js';
 import { createRng } from './noise.js';
-import { WORLD, QUADTREE, CAMERA } from './config.js';
+import { WORLD, QUADTREE, CAMERA, PORTAL } from './config.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DATA = path.join(HERE, 'data');
@@ -548,6 +548,80 @@ section('D decks');
   }
   stats.decksOnTheGround = flat;
   check('no deck lies on the ground (every deck is a bridge)', flat === 0, `${flat} of ${decks.length} decks`);
+
+  // The flag of the deck must match the land under it.  A deck that spans a dip in the land is drawn as a
+  // slab over the dip (the valley shows under it); a deck over land that does not dip is drawn as a solid
+  // wall of roadbed.  The bake decides this from the same dip, so the two must agree - otherwise the
+  // bridge over the Alzette is a grey wedge from the valley floor up.
+  let wrongFlag = 0;
+  const flagList = [];
+  for (const d of decks) {
+    const n = d.pts.length;
+    let lowest = Infinity;
+    for (let i = 1; i < n - 1; i++) {
+      lowest = Math.min(lowest, field.baseHeight(d.pts[i][0], d.pts[i][1]));
+    }
+    const endHigh = Math.max(field.baseHeight(d.pts[0][0], d.pts[0][1]),
+      field.baseHeight(d.pts[n - 1][0], d.pts[n - 1][1]));
+    const dip = n > 2 ? endHigh - lowest : 0;
+    if (d.spans !== (dip >= DECK.spanDip)) {
+      wrongFlag++;
+      if (flagList.length < 6) flagList.push({ x: Math.round(d.pts[0][0]), z: Math.round(d.pts[0][1]), dip: +dip.toFixed(1), spans: d.spans });
+    }
+  }
+  stats.deckFlags = wrongFlag;
+  check('every deck knows whether it spans the land or stands on it', wrongFlag === 0,
+    `${wrongFlag} of ${decks.length} decks${flagList.length ? ' ' + JSON.stringify(flagList) : ''}`);
+}
+
+/* ---------------------------------------------------------------- D2: the portals */
+section('D2 portals');
+{
+  // Every portal stands on the ground: the headwall is buried under it and the mouth of the tunnel opens at
+  // the level of the road that leads to it.  A wall that hangs in the air is the small dark box the
+  // reviewer saw near the roads.
+  //
+  // The road that leads to the mouth ends up to seven metres before it, so the two levels differ by the
+  // slope of the road: two metres of difference is a steep approach, more than that is a mouth in the air.
+  let floating = 0, worst = 0;
+  const floatList = [];
+  for (const p of portals.list) {
+    const y0 = ground.height(p.x, p.z);
+    // the ground under the three points of the wall: the mouth and the two ends of it
+    let lowest = y0;
+    for (const s of [-1, 1]) {
+      lowest = Math.min(lowest, ground.height(p.x + p.sx * p.half * s, p.z + p.sz * p.half * s));
+    }
+    // the wall is drawn from the base, which is under the lowest of them: it can never float
+    const base = lowest - PORTAL.base;
+    // the mouth must open at the level of the road that leads to it
+    const approach = data.roads.find((r) => r.id === p.approach);
+    let yRoad = y0;
+    if (approach) {
+      const ends = [approach.pts[0], approach.pts[approach.pts.length - 1]];
+      let best = ends[0], bd = Infinity;
+      for (const e of ends) {
+        const d = Math.hypot(e[0] - p.x, e[1] - p.z);
+        if (d < bd) { bd = d; best = e; }
+      }
+      yRoad = ground.height(best[0], best[1]);
+    }
+    const gap = Math.abs(y0 - yRoad);
+    if (gap > 2.0 || base > y0) {
+      floating++;
+      worst = Math.max(worst, gap);
+      if (floatList.length < 6) floatList.push({ name: p.name, x: Math.round(p.x), z: Math.round(p.z), gap: +gap.toFixed(2) });
+    }
+  }
+  stats.portalsFloating = floating;
+  check('every portal stands on the ground at the level of its road', floating === 0,
+    `${floating} of ${portals.list.length} portals, worst ${worst.toFixed(2)} m${floatList.length ? ' ' + JSON.stringify(floatList) : ''}`);
+
+  // The mouth of a tunnel is in the open: no house grows through the wall.
+  let inHouse = 0;
+  for (const p of portals.list) if (buildings.collide(p.x, p.z, 0)) inHouse++;
+  stats.portalsInHouses = inHouse;
+  check('no portal grows through a house', inHouse === 0, `${inHouse} of ${portals.list.length} portals`);
 }
 
 /* ---------------------------------------------------------------- E: the trees */

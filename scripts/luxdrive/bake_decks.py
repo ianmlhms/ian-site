@@ -8,10 +8,17 @@ the road surface of the bridge is the LiDAR DSM (the deck).  So every OSM way ta
 becomes a solid deck: a polyline with the real deck height at every point (from the 2 m DSM),
 pinned to the ground at its two ends so the deck meets the approach road exactly.
 
+Two rules decide whether the DSM really found a bridge or something else:
+
+  * the deck stands ALONE: the land beside it is far below its top.  A canopy over a road is not a
+    bridge: the trees beside the road are as high as the road itself, so the DSM measures the trees.
+  * the deck is not a wall: a deck that stands higher than the half of its own length is not a
+    bridge, it would float in the air.
+
 decks.bin layout (little endian):
     u32 count
     per deck:
-      u16 flags        bit0 = has a parapet
+      u16 flags        bit0 = has a parapet, bit1 = the deck spans the land under it
       u16 width        (decimetres, the width of the solid deck)
       u16 npts
       i32 x0 (decimetres), i32 z0 (decimetres)
@@ -39,7 +46,13 @@ COG_BASE = ("https://download.data.public.lu/resources/bd-l-lidar2024-releve-3d-
 COG = COG_BASE + "MNS_Lidar2024.tif"
 DSM_STEP = 2.0            # m, the resolution the deck heights are read at
 SAMPLE_M = 4.0            # m, the spacing of the deck centre line points
-MAX_CLEARANCE = 40.0      # m: a DSM value further above the ground is a tree, not a deck
+MAX_CLEARANCE = 150.0     # m: a DSM value further above the ground is not a deck (a reading gone wrong)
+STAND_ALONE = 4.0         # m: a deck stands at least this far above the land beside it
+DIP = 1.0                 # m: the land dips at least this far under the way (a bridge over a gully)
+SPAN_DIP = 3.0            # m: the land dips this far under the way, so the deck spans it and not the ground
+                           # (DECK.spanDip in pb/lux-drive/decks.js is the same number)
+SURFACE_ROUGH = 1.0       # m: a road surface is this smooth, the top of a canopy is not
+SIDE_OFFSET = 10.0        # m, the distance from the edge of the deck where the land beside it is read
 LIFT = 0.05               # m: the deck sits this far above the ground where it meets it
 STRIP_ROWS = 2048         # rows of the 2 m DSM read at once (memory)
 
@@ -64,12 +77,14 @@ def resample(pts, step):
     return out
 
 
-def sample_dsm_median(grid, west, north, step, px, py, radius=2.5):
+def sample_dsm_median(grid, west, north, step, px, py, radius=1.5):
     """The middle DSM value within `radius` metres of the LUREF point (px, py).
 
     The median, not the maximum: a tree that stands beside the bridge is higher than the deck, and
     the maximum would lift the whole bridge to the top of the tree (a slab floating in the air).  The
     middle value is the deck itself, as long as the canopy covers less than the half of the window.
+    The window is small (1.5 m), so a tree that stands beside the way is not in it at all, and a narrow
+    bridge (4 m) is still read on the deck and not on the ground under it.
     """
     gx = (px - west) / step
     gy = (north - py) / step
@@ -150,7 +165,23 @@ def main():
             continue
         e, n = world_to_luref([p[0] for p in line], [p[1] for p in line])
         e = np.asarray(e); n = np.asarray(n)
+        # The land beside the deck: the same line, pushed to both sides.  A bridge stands alone over the
+        # ground; a canopy over a road does not, because the trees beside the road are as high as it.
+        half = (r["width"] + 1.2) / 2 + SIDE_OFFSET
+        left, right = [], []
+        for k, (x, z) in enumerate(line):
+            ax, az = line[max(0, k - 1)]
+            bx, bz = line[min(len(line) - 1, k + 1)]
+            dx, dz = bx - ax, bz - az
+            ll = math.hypot(dx, dz) or 1.0
+            ox, oz = -dz / ll, dx / ll
+            left.append((x + ox * half, z + oz * half))
+            right.append((x - ox * half, z - oz * half))
+        le, ln = world_to_luref([p[0] for p in left], [p[1] for p in left])
+        re, rn = world_to_luref([p[0] for p in right], [p[1] for p in right])
         prepared.append({"road": r, "line": line, "e": e, "n": n,
+                         "le": np.asarray(le), "ln": np.asarray(ln),
+                         "re": np.asarray(re), "rn": np.asarray(rn),
                          "g": [ground_at(p[0], p[1]) for p in line]})
     if not prepared:
         print("no bridges")
@@ -164,6 +195,7 @@ def main():
 
     # read the DSM at 2 m in strips and sample every bridge that falls into the strip
     tops = [[None] * len(p["line"]) for p in prepared]
+    sides = [[None] * len(p["line"]) for p in prepared]
     rows = int((north - south) / DSM_STEP) + 1
     with rasterio.Env(GDAL_DISABLE_READDIR_ON_OPEN="EMPTY_DIR", VSI_CACHE="TRUE",
                        VSI_CACHE_SIZE="134217728", GDAL_HTTP_MAX_RETRY="6"):
@@ -181,10 +213,14 @@ def main():
                             v = sample_dsm_median(grid, west, top, DSM_STEP, px, py)
                             if v is not None:
                                 tops[pi][k] = v
+                                # the land beside the deck, on both sides
+                                lv = sample_dsm_median(grid, west, top, DSM_STEP, p["le"][k], p["ln"][k])
+                                rv = sample_dsm_median(grid, west, top, DSM_STEP, p["re"][k], p["rn"][k])
+                                sides[pi][k] = (lv, rv)
                 print("  strip %d / %d" % (r0 + nr, rows), flush=True)
 
     decks = []
-    skipped = 0
+    rejects = []
     for pi, p in enumerate(prepared):
         r = p["road"]
         line = p["line"]
@@ -209,21 +245,66 @@ def main():
             if vals[k] < g[k] + LIFT:
                 vals[k] = g[k] + LIFT
         clear = max(vals[k] - g[k] for k in range(len(vals)))
-        if clear < 1.2:
-            skipped += 1        # not really a bridge: the road runs on the ground
-            continue
         length = sum(math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1])
                      for i in range(1, len(line)))
+        # The deck stands alone: the land beside it is far below its top.  A canopy over the road is
+        # not a bridge: the trees beside the road are as high as the road itself, and the deck would
+        # hang in the leaves.
+        alone = 0.0
+        for k in range(1, len(vals) - 1):
+            if vals[k] - g[k] < 1.2:
+                continue
+            s = sides[pi][k]
+            if s is None:
+                continue
+            near = [v for v in s if v is not None]
+            if not near:
+                continue
+            alone = max(alone, vals[k] - min(near))
+        # The land dips under the way: a bridge spans a gully, a road with trees over it does not - the
+        # land under that road is the road itself.
+        dip = max(g[0], g[-1]) - min(g[1:-1]) if len(g) > 2 else 0.0
+        # The surface of the deck is smooth: a road surface is, the top of a canopy is not.  The second
+        # difference does not see a ramp (a bridge climbs to its deck), it sees the bumps: a few trees
+        # that stand on the bridge do not move the median.
+        diffs = []
+        for k in range(1, len(raw) - 1):
+            if raw[k] is None or raw[k - 1] is None or raw[k + 1] is None:
+                continue
+            diffs.append(abs(raw[k + 1] - 2 * raw[k] + raw[k - 1]))
+        rough = float(np.median(diffs)) if len(diffs) >= 3 else 0.0
+        if clear < 1.2:
+            rejects.append(("the road runs on the ground", r, clear, alone, dip, rough))
+            continue
         if clear > 0.7 * max(length, 1.0):
             # a deck that stands higher than the half of its own length is not a bridge: the DSM
             # read something else (a tree, a roof).  It would float in the air.
-            skipped += 1
+            rejects.append(("too high for its own length", r, clear, alone, dip, rough))
+            continue
+        # A way that stands on the land and does not span it is either a road on an embankment or a
+        # canopy over a road.  The surface tells the two apart: an embankment carries the road, a canopy
+        # carries the trees.
+        if alone < STAND_ALONE and dip < DIP and rough > SURFACE_ROUGH:
+            rejects.append(("the DSM read a canopy", r, clear, alone, dip, rough))
             continue
         w = r["width"] + 1.2
         decks.append({"road": r, "pts": line, "tops": vals, "w": w,
-                      "clear": clear, "kind": r["kind"], "name": r["name"]})
+                      "clear": clear, "kind": r["kind"], "name": r["name"],
+                      # a deck that spans a dip in the land is a bridge over it; a deck over land that
+                      # does not dip stands on the ground (a road on an embankment)
+                      "spans": dip >= SPAN_DIP})
 
-    print("decks %d  skipped %d" % (len(decks), skipped))
+    print("decks %d  skipped %d" % (len(decks), len(rejects)))
+    reasons = {}
+    for reason, r, clear, alone, dip, rough in rejects:
+        reasons.setdefault(reason, []).append((clear, alone, dip, rough, r["name"], r["kind"]))
+    for reason, rows in reasons.items():
+        rows.sort(reverse=True)
+        print("  %s: %d" % (reason, len(rows)))
+        for clear, alone, dip, rough, name, kind in rows[:5]:
+            print("     %-24s %-10s the clearance %6.1f m, the land beside %6.1f m below, "
+                  "the dip %5.1f m, the surface %4.2f m rough"
+                  % (name[:24], kind, clear, alone, dip, rough))
     decks.sort(key=lambda d: -d["clear"])
     for d in decks[:8]:
         print("  %-22s %-14s len %5.0f  clearance %4.1f m  width %4.1f" %
@@ -238,6 +319,8 @@ def main():
     for d in decks:
         pts = d["pts"]
         flags = 1 if d["kind"] in ("motorway", "trunk", "primary", "secondary") else 0
+        if d["spans"]:
+            flags |= 2                      # the deck spans the land under it (a bridge), it does not stand on it
         blob += flags.to_bytes(2, "little")
         blob += int(round(d["w"] * 10)).to_bytes(2, "little")
         blob += len(pts).to_bytes(2, "little")
