@@ -64,7 +64,7 @@ export const ROAD = Object.freeze({
                             // The face of the batter is a straight ramp from the level of the road back to the
                             // terrain, so the longer it is the flatter the ground beside the road is
   fillSlope: 0.25,        // m per m: a fill on a steep hillside or a cliff sinks back into the land at this rate (the ground is then steeper than the land by this much at most)
-  maxBatterSlope: 0.8,    // m up per m out (39 degrees, the reviewer's 1:1.5 embankment): the ground the carve
+  maxBatterSlope: 0.6,    // m up per m out (31 degrees, 1:1.67: flatter than the reviewer's 1:1.5 embankment, so a house beside an embankment keeps its eaves above the ground): the ground the carve
                             // makes beside a road must never be steeper than this.  Where the land itself is
                             // steeper, the land is used as it is (a cliff beside a road stays a cliff)
   paintFullStep: 4,        // the road paint is exact up to this node spacing ...

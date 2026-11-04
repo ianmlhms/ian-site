@@ -28,7 +28,7 @@ const smoothstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b
 const MAX_PINS = 16;                   // carriageways that lie over one point, at most
 const MAX_CAND = 192;                  // segments that reach one point, at most
 const FOOT_FADE = 1.0, FOOT_FLOOR = 0.01;   // m: a segment counts fully when the foot of the perpendicular is this far from its ends; the floor of its weight (so the weights never all vanish)
-const HEIGHT_SOFT = 1.0;               // m: the segments of a way that are this much farther than its nearest one still count for the ground (weighted by how much nearer the nearest is)
+const SHEPARD_OFFSET = 0.5, SHEPARD_MIN = 1e-4;   // the weight of a segment of a way is ((d_nearest + 0.5) / (d + 0.5))^4: equal at equal distance, a few per cent at twice the distance               // m: the segments of a way that are this much farther than its nearest one still count for the ground (weighted by how much nearer the nearest is)
 const ARM_GAP = 3;                     // segments: two stretches of one way this far apart are different arms (a hairpin)
 const CAP_SOFT = 2.0;                  // m: the carriageway pin ends this softly past the END of a way (no flat disc at the end of a street)
 const PIN_FADE = 3.0;                  // m: the carriageway level fades into the batter over this distance beyond the pavement
@@ -789,7 +789,7 @@ export function createRoadNetwork(roads, baseHeight) {
     // others is the land, and the cut of the road that goes under it ramps up to that land over the fade of the
     // corridor.  Scaling the claim instead would keep the shape of the cut and only lose its weight, and the ground
     // would jump from the land to the full cut in half a metre: the wall the reviewer saw beside Rue de Kirchberg.
-    // ---- the ground, way by way.  Every segment of a way that is about as near as the nearest one counts, weighted by how much nearer the nearest is (HEIGHT_SOFT):
+    // ---- the ground, way by way.  Every segment of a way that is about as near as the nearest one counts, weighted by how much nearer the nearest is (Shepard weights):
     // the nearest segment alone jumps along a line - on the inner side of a bend the feet of the perpendiculars of two segments differ by the gradient times their
     // distance, and where a ring or a hairpin comes back past the point the nearest arm changes - and the bed, the face and the pin of the way are means, so nothing
     // jumps where the nearest segment changes.
@@ -805,8 +805,9 @@ export function createRoadNetwork(roads, baseHeight) {
         if (ROADOF[i] !== road) continue;
         // how much this segment counts: the nearer it is to the nearest one the more, and the farther its foot is from its ends the more (the foot of a perpendicular
         // that is a corner of the way is the corner itself, and the neighbour of the nearest segment would pull the bed of a straight road toward its own end)
-        const nearness = 1 - (candD[k] - dMin) / HEIGHT_SOFT;
-        if (nearness <= 0) continue;
+        const q = (dMin + SHEPARD_OFFSET) / (candD[k] + SHEPARD_OFFSET);
+        const nearness = q * q * q * q;
+        if (nearness < SHEPARD_MIN) continue;
         const along = Math.min(candT[k], 1 - candT[k]) * Math.hypot(X1[i] - X0[i], Z1[i] - Z0[i]);
         const w = nearness * (FOOT_FLOOR + smoothstep(0, FOOT_FADE, along));
         wAll += w;

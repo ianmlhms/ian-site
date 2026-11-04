@@ -135,7 +135,7 @@ if (wants('sides')) {
 
 // ---- steps on the carriageway
 if (wants('steps')) {
-  const D = 0.02, LIMIT = 0.02, info = { sdCar: 9, sdPave: 9 };
+  const D = 0.02, LIMIT = 0.02, FLAT_SIDE = 0.35, info = { sdCar: 9, sdPave: 9 };
   const hits = [];
   let measured = 0;
   const seen = new Set();
@@ -151,13 +151,43 @@ if (wants('steps')) {
         if (info.sdCar > -0.5 || net.protection(x, z) > 0) continue;      // (ground under a way that rides over it is the DTM itself, steps of the DTM included)
         measured++;
         const f = (a, b) => field.height(a, b);
-        const g0 = f(x, z), jx = f(x + D, z) - f(x - D, z) - D * (f(x + 1, z) - f(x - 1, z)) / 1, jz = f(x, z + D) - f(x, z - D) - D * (f(x, z + 1) - f(x, z - 1)) / 1;
+        const jx = f(x + D, z) - f(x - D, z) - D * (f(x + 1, z) - f(x - 1, z)) / 1, jz = f(x, z + D) - f(x, z - D) - D * (f(x, z + 1) - f(x, z - 1)) / 1;
         const jump = Math.max(Math.abs(jx), Math.abs(jz));
+        // a step on LEVEL ground: the surface on both sides of it is nearly flat (a wall between two levels of a ramp is the business of the side-slope gate)
+        if (jump > LIMIT) {
+          const horizontal = Math.abs(jx) >= Math.abs(jz);
+          const [ux, uz] = horizontal ? [1, 0] : [0, 1];
+          const flat = (sign) => Math.abs(f(x + ux * sign * (D + 0.3), z + uz * sign * (D + 0.3)) - f(x + ux * sign * (D + 0.5), z + uz * sign * (D + 0.5))) / 0.2 < FLAT_SIDE;
+          if (!flat(1) || !flat(-1)) continue;
+        }
         if (jump > LIMIT) { const key = `${Math.round(x / 6)},${Math.round(z / 6)}`; if (!seen.has(key)) { seen.add(key); hits.push({ x, z, jump, name: nameOf(ch) }); } }
       }
     }
   }
+  // the levels of the ways that reach a step: ways whose beds differ by more than LEVEL_APART are two levels (a retaining wall between two carriageways, not a step on level ground)
+  const LEVEL_APART = 0.6;
+  let bedAtArc = null;
+  try { bedAtArc = (await import(R + 'road-bed.js')).bedAtArc; } catch { /* old checkout */ }
+  if (bedAtArc) for (const h of hits) {
+    const levels = [];
+    for (const c of chains) {
+      const bench = net.info[c.road].hw + net.info[c.road].kerbW;
+      let best = Infinity, bs = 0, bt = 0;
+      for (let k = 0; k + 1 < c.x.length; k++) {
+        if (Math.abs(c.x[k] - h.x) > 40 || Math.abs(c.z[k] - h.z) > 40) continue;
+        const ex = c.x[k + 1] - c.x[k], ez = c.z[k + 1] - c.z[k], ll = ex * ex + ez * ez;
+        let t = ll > 1e-9 ? ((h.x - c.x[k]) * ex + (h.z - c.z[k]) * ez) / ll : 0; t = Math.max(0, Math.min(1, t));
+        const d = Math.hypot(h.x - c.x[k] - ex * t, h.z - c.z[k] - ez * t);
+        if (d < best) { best = d; bs = k; bt = t; }
+      }
+      if (best < bench + 4) levels.push(bedAtArc(c, c.arc[bs] + bt * (c.arc[bs + 1] - c.arc[bs])));
+    }
+    h.apart = levels.length > 1 ? Math.max(...levels) - Math.min(...levels) : 0;
+    h.ways = levels.length;
+  }
+  const level = hits.filter((h) => h.apart === undefined || h.apart <= LEVEL_APART);
   hits.sort((a, b) => b.jump - a.jump);
+  if (bedAtArc) console.log(`steps by the ways that reach them: one way ${hits.filter((h) => h.ways <= 1).length}, several ways at one level (<= ${LEVEL_APART} m apart) ${hits.filter((h) => h.ways > 1 && h.apart <= LEVEL_APART).length}, at two levels ${hits.filter((h) => h.apart > LEVEL_APART).length}`);
   console.log(`steps: ${hits.length} places with a jump > ${LIMIT * 100} cm within ${D * 200} cm on the carriageway (${measured} probes); worst ${hits[0] ? (hits[0].jump * 100).toFixed(1) + ' cm' : '-'}`);
-  for (const h of hits.slice(0, VERBOSE ? 40 : 8)) console.log(`   step ${(h.jump * 100).toFixed(1)} cm at ${h.x.toFixed(1)},${h.z.toFixed(1)} ${h.name}`);
+  for (const h of hits.slice(0, VERBOSE ? 40 : 8)) console.log(`   step ${(h.jump * 100).toFixed(1)} cm at ${h.x.toFixed(1)},${h.z.toFixed(1)} ${h.name}${h.ways !== undefined ? ` [${h.ways} way${h.ways === 1 ? '' : 's'}, ${h.apart.toFixed(2)} m apart]` : ''}`);
 }
