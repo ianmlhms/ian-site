@@ -862,3 +862,9 @@ renderer).  The flows count game seconds now (`window.__lux.clock()`).  Pictures
 **New files:** `road-index.js`, `basemap.js`, `fullmap.js`, `placement.js`, `speed-limit.js`, `quality-step.js`,
 `scripts/flows/luxdrive_ui.mjs`.  **Rewritten:** `ui.js`, `ui.css`, `input.js`, `minimap.js`, `car-model.js`, `i18n.js`.
 **Changed:** `car.js`, `config.js` (CAR), `main.js` (wiring), `lux-drive.html` (viewport, `?v=`), `scripts/flows/luxdrive_world.mjs`.
+
+## Landmarks round 2 (branch `lux-drive-landmarks`)
+Root cause of the stray poles: `tree-view.js` divided the baked tree girth by 100 twice (needle trees); fixed. New modules: `landmark-facade.js` (windows, lancets,
+fins, turrets on footprint edges), `landmark-sites.js` (Bock, Passerelle, Coque, Fort Thüngen, Mudam, BCEE) + `landmark-site-data.js` (OSM outlines); Cour de justice, Cathédrale,
+Philharmonie, Palais rebuilt. Tools: `scripts/luxdrive/{pick_pose,osm_query,fetch_ref}`. Gates: harness 64/0, luxdrive_world PASS (draw calls 49/50/43), luxdrive_holes 0 hole pixels,
+landmarks 35 127 triangles. Details, positions that are estimates, and what is still wrong: `reports-cloud/lux-drive/lux-drive-landmarks/REPORT.md`.

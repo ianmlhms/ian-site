@@ -590,11 +590,10 @@ section('D1 landmarks');
   let floating = 0;
   for (const lm of landmarks.list) {
     if (lm.id.startsWith('pont-')) continue;      // a bridge spans a valley: its bounding box corners are not its feet (the decks gates above cover the bridges)
-    const [x0, z0, x1, z1] = lm.bounds;
-    let low = Infinity;
-    for (let i = 0; i < lm.soup.pos.length; i += 3) low = Math.min(low, lm.soup.pos[i + 1]);
-    const groundLow = Math.min(...[[x0, z0], [x1, z0], [x0, z1], [x1, z1], [(x0 + x1) / 2, (z0 + z1) / 2]].map(([x, z]) => field.height(x, z)));
-    if (low > groundLow + 1.0) { floating++; console.log('  landmark above the ground:', lm.id, low.toFixed(1), groundLow.toFixed(1)); }
+    // the lowest face relative to the land UNDER IT (not to the corners of the bounding box: a skin on a cliff or a ring on a slope has feet at different heights)
+    let lowest = Infinity;
+    for (let i = 0; i < lm.soup.pos.length; i += 3) lowest = Math.min(lowest, lm.soup.pos[i + 1] - field.height(lm.soup.pos[i], lm.soup.pos[i + 2]));
+    if (lowest > 1.0) { floating++; console.log('  landmark above the ground:', lm.id, `lowest face ${lowest.toFixed(1)} m over the land under it`); }
   }
   check('no landmark floats (its lowest face reaches the ground)', floating === 0, `${floating} of ${landmarks.list.length}`);
   let ghost = 0;
