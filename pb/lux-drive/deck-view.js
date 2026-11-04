@@ -4,9 +4,8 @@
  * sides, and it is pinned to the ground at its two ends. The car drives on the top of it (the physics reads the same
  * heights from decks.js). */
 import { DECK } from './decks.js';
-import { FlatBuilder } from './flat-builder.js';
+import { createChunkedFlat } from './chunked-flat.js';
 
-const THREE = window.THREE;
 const PARAPET_HEIGHT = 1.05;        // m, the height of the railing
 const PARAPET_WIDTH = 0.28;         // m, the thickness of the railing
 const COLOUR_DECK = [0.62, 0.61, 0.58];
@@ -16,14 +15,15 @@ const COLOUR_PARAPET = [0.68, 0.67, 0.64];
 /**
  * decks: the decoded decks [{ id, parapet, width, pts: [[x, z]], tops: [y] }]
  * ground: the height of the terrain under the deck (the abutments reach down to it, so nothing floats).
- * Returns { mesh, count }.
+ * Returns { meshes, count, update(x, z, radius) }: one mesh per 512 m chunk (chunked-flat.js), culled by the frustum and by distance.
  */
 export function createDeckView({ scene, decks, material, ground }) {
-  const b = new FlatBuilder();
+  const chunks = createChunkedFlat({ scene, material, name: 'luxdrive-decks' });
   let count = 0;
   for (const deck of decks) {
     const n = deck.pts.length;
     if (n < 2) continue;
+    const b = chunks.builderAt(deck.pts[n >> 1][0], deck.pts[n >> 1][1]);          // the whole deck goes to the chunk of its middle
     const half = deck.width / 2;
     count += 1;
     // The bottom of the side of the deck.
@@ -93,10 +93,6 @@ export function createDeckView({ scene, decks, material, ground }) {
       else b.quad(c, [c[0], cl, c[2]], [a[0], al, a[2]], a, COLOUR_SIDE);
     }
   }
-  const geometry = b.build();
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.name = 'luxdrive-decks';
-  mesh.matrixAutoUpdate = false;
-  scene.add(mesh);
-  return { mesh, count };
+  chunks.finish();
+  return { meshes: chunks.meshes, count, update: chunks.update };
 }

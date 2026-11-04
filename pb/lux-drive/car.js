@@ -10,6 +10,8 @@ import { CAR, SURFACES } from './config.js';
 import { ROAD_KINDS, SURFACE_NAMES, kindInfo } from './roads.js';
 
 const GRAVITY = 9.81;
+const HIT_SOUND_SPEED = 1.5;      // m/s into a wall that the ears notice
+const HIT_COOLDOWN_S = 0.3;       // s between two counted hits
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const lerp = (a, b, t) => a + (b - a) * t;
 /** Moves `v` towards `target` by at most `maxDelta`. */
@@ -26,12 +28,14 @@ export function createCar({ ground, roadInfoAt, collide = null, start = null }) 
     grounded: true, slip: 0, bump: 0,
     onRoad: false, surface: 'grass', speedLimit: CAR.maxSpeed, gear: 0, rpm: 0.1,
     crashed: false, crashTime: 0,
+    hits: 0, lastHitSpeed: 0,   // every collision counts: the sound makes a thud when the count changes
     braking: false, reversing: false, longAccel: 0,    // for the brake lights and the reversing lights of the model
   };
   const info = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, surface: 0, road: -1, lines: 0, lanes: 0, s: 0 };
   const normal = { x: 0, y: 1, z: 0 };
   let steerAngle = 0;
   let accumulator = 0;
+  let hitCool = 0;                  // s: sliding along a wall is one hit for the ears, not one per physics step
 
   /** Places the car on the ground at (x, z), pointing along `heading`. */
   function reset(x, z, heading = 0) {
@@ -47,6 +51,7 @@ export function createCar({ ground, roadInfoAt, collide = null, start = null }) 
 
   /** The physics step (fixed, 1/120 s): the tyres, the brakes, the slope and the collisions. */
   function step(dt, input) {
+    hitCool -= dt;
     const cy = Math.cos(state.heading), sy = Math.sin(state.heading);
     // the road under the car: its class decides the grip and the top speed
     roadInfoAt(state.x, state.z, info);
@@ -153,6 +158,7 @@ export function createCar({ ground, roadInfoAt, collide = null, start = null }) 
         // the speed into the wall is lost, a little of it comes back as a bounce
         const into = state.vx * hit.nx + state.vz * hit.nz;
         if (into < 0) {
+          if (-into > HIT_SOUND_SPEED && hitCool <= 0) { state.hits += 1; state.lastHitSpeed = -into; hitCool = HIT_COOLDOWN_S; }
           state.vx -= into * hit.nx * (1 + CAR.hitSpeedLoss);
           state.vz -= into * hit.nz * (1 + CAR.hitSpeedLoss);
           if (-into > CAR.crashSpeed && state.crashTime <= 0) { state.crashed = true; state.crashTime = CAR.respawnTime; }

@@ -137,7 +137,36 @@ export function createDeckNetwork(decks, surface = null) {
     return best;
   }
 
-  return { deckAt, count, decks: list };
+  /**
+   * The underside of the lowest deck that lies ABOVE height `y` over (x, z) (or Infinity): the camera keeps below it when the
+   * car drives under a bridge, so the lens never ends up inside or on top of a deck it is not on.
+   */
+  function overheadAt(x, z, y) {
+    if (count === 0) return Infinity;
+    const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
+    let lowest = Infinity;
+    for (let dz = -1; dz <= 1; dz++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const bucket = cells.get(cellKey(cx + dx, cz + dz)) || EMPTY;
+        for (let q = 0; q < bucket.length; q++) {
+          const i = bucket[q];
+          const ax0 = AX[i], az0 = AZ[i];
+          const ex = BX[i] - ax0, ez = BZ[i] - az0;
+          const ll = ex * ex + ez * ez;
+          if (ll < 1e-9) continue;
+          let t = ((x - ax0) * ex + (z - az0) * ez) / ll;
+          t = t < 0 ? 0 : t > 1 ? 1 : t;
+          const side = Math.abs((x - (ax0 + ex * t)) * -ez + (z - (az0 + ez * t)) * ex) / Math.sqrt(ll);
+          if (side > HALF[i] + DECK.margin) continue;
+          const bottom = T0[i] + (T1[i] - T0[i]) * t - DECK.thickness;
+          if (bottom > y && bottom < lowest) lowest = bottom;
+        }
+      }
+    }
+    return lowest;
+  }
+
+  return { deckAt, overheadAt, count, decks: list };
 }
 
 /** The ground the car, the camera and the renderer see: the terrain surface, with the bridge decks on top.
@@ -166,6 +195,8 @@ export function createGround(surface, deckNetwork) {
       return surface.normal(x, z, o);
     },
     hint(y) { hintY = y; },
+    /** The underside of the lowest deck above height y over (x, z), Infinity when the sky is free. */
+    overheadAt(x, z, y) { return deckNetwork ? deckNetwork.overheadAt(x, z, y) : Infinity; },
     onDeck(x, z) { return !!deckNetwork && deckNetwork.count > 0 && deckNetwork.deckAt(x, z, hintY, scratch) !== null; },
     surface, decks: deckNetwork ? deckNetwork.decks : [],
   };

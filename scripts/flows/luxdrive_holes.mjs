@@ -7,7 +7,8 @@
  * the picture the player sees. */
 import { runIfMain } from "./lib.mjs";
 
-const PAGE = "/pb/lux-drive.html?holes=1&q=medium&time=noon&weather=clear";
+const QUALITY = process.env.HOLES_Q || "medium";        // HOLES_Q=low checks the cheap level too (coarser terrain near the car)
+const PAGE = `/pb/lux-drive.html?holes=1&q=${QUALITY}&time=noon&weather=clear`;
 const POSES = 72;
 const WORLD_W = 16896;                    // m: the width of the world box (the x axis runs east)
 const WORLD_D = 14848;                    // m: the depth of the world box (the z axis runs south)
@@ -102,7 +103,7 @@ export const flow = {
     }, { N: POSES, w: WORLD_W, d: WORLD_D });
     h.eq(result.rendered, POSES, `${POSES} poses rendered`);
     h.eq(result.holes, 0, `0 hole pixels below the horizon over ${result.rendered} poses${result.holes ? " " + JSON.stringify(result.worst.slice(0, 4)) : ""}`);
-    h.expect(result.minTiles > 60, `at least ${result.minTiles} terrain tiles at every pose`);
+    h.expect(result.minTiles > (QUALITY === "low" ? 30 : 60), `at least ${result.minTiles} terrain tiles at every pose`);
 
     h.step("self-test: with one tile removed the detector DOES report holes");
     const hidden = await page.evaluate(async () => {

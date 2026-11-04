@@ -5,9 +5,8 @@
  * is as high as the road is wide: a garage is low, a motorway is high.  The dark plug of the mouth goes back into the
  * wall, so the opening reads as a hole and not as a painted rectangle. */
 import { PORTAL } from './config.js';
-import { FlatBuilder } from './flat-builder.js';
+import { createChunkedFlat } from './chunked-flat.js';
 
-const THREE = window.THREE;
 const COLOUR_WALL = [0.70, 0.68, 0.63];      // the concrete of the headwall
 const COLOUR_CORNICE = [0.78, 0.76, 0.71];    // the slab on top of it
 const COLOUR_LINING = [0.17, 0.17, 0.18];     // the walls of the mouth
@@ -18,11 +17,12 @@ const LINING_GAP = 0.02;                      // m, the frame of concrete that s
 /**
  * portals: the portals of the tunnels (portals.js)
  * ground:  the ground of the world (decks.js), for the height of the mouth
- * Returns { mesh, count }.
+ * Returns { meshes, count, update(x, z, radius) }: one mesh per 512 m chunk (chunked-flat.js).
  */
 export function createPortalView({ scene, portals, ground, material }) {
-  const b = new FlatBuilder();
+  const chunks = createChunkedFlat({ scene, material, name: 'luxdrive-portals' });
   for (const p of portals.list) {
+    const b = chunks.builderAt(p.x, p.z);
     const y0 = ground.height(p.x, p.z);
     const ix = -p.nx, iz = -p.nz;                     // into the tunnel
     const P = (u, v, y) => [p.x + p.sx * u + ix * v, y, p.z + p.sz * u + iz * v];
@@ -58,9 +58,6 @@ export function createPortalView({ scene, portals, ground, material }) {
     // the cornice on top of the wall
     box(-half - 0.25, half + 0.25, -0.15, depth, wallTop, wallTop + PORTAL.cornice, COLOUR_CORNICE);
   }
-  const mesh = new THREE.Mesh(b.build(), material);
-  mesh.name = 'luxdrive-portals';
-  mesh.matrixAutoUpdate = false;
-  scene.add(mesh);
-  return { mesh, count: portals.list.length };
+  chunks.finish();
+  return { meshes: chunks.meshes, count: portals.list.length, update: chunks.update };
 }

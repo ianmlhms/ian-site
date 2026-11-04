@@ -36,6 +36,7 @@ import { createEnv, TIME_PRESETS, WEATHER_IDS } from './env.js';
 import { createChaseCamera } from './camera.js';
 import { createCar } from './car.js';
 import { createCarModel } from './car-model.js';
+import { createSound } from './sound.js';
 import { createInput } from './input.js';
 import { createUI } from './ui.js';
 import { createMinimap } from './minimap.js';
@@ -50,11 +51,14 @@ import { t, LANGS } from './i18n.js';
 
 const LAMP_POST_RADIUS = 0.22;        // m: a street lamp, a catenary pole (the car stops at it like at a tree)
 const BENCH_RADIUS = 0.8;             // m: a park bench
+const BUILT_DRAW_FACTOR = 1.5;        // bridge decks and tunnel portals are drawn out to this many times the far building radius
 const MAX_FRAME_S = 0.1;              // s: a long frame (a tab in the background) never jumps the car
 const LANG_KEY = 'pb_luxdrive_lang';
 const QUALITY_KEY = 'pb_luxdrive_quality';
 const COLOUR_KEY = 'pb_luxdrive_colour';
+const SOUND_KEY = 'pb_luxdrive_sound';       // 'off' = muted
 const CAMERA_IDS = ['chase', 'far', 'bonnet'];
+const START_REACH_M = 80;             // m: the start place is moved onto the nearest car road within this distance
 const TELEPORT_REACH_M = 60;          // m: "I am stuck" looks for a road this close
 const STUCK_SECONDS = 3.5;            // s of pushing the pedal without moving before the car is put back on the road
 const STUCK_SPEED = 0.6;              // m/s
@@ -171,7 +175,7 @@ async function boot() {
   const tramNetwork = createTramNetwork(data.lines, data.stops, TRAM);
   const tramSim = createTramSim(tramNetwork, TRAM);
   const props = createPropCollider();                       // lamps, catenary poles and benches: small solid circles the car stops at
-  const trams = createTramView({ scene, network: tramNetwork, sim: tramSim, surface, deckNetwork, env, camera, maps, props });
+  const trams = createTramView({ scene, network: tramNetwork, sim: tramSim, surface, deckNetwork, env, camera, maps, props, quality });
   const lamps = placeStreetLights({ roads: data.roads, network: field.network, buildings, map: maps });
   for (let i = 0; i < lamps.count; i++) props.add(lamps.x[i], lamps.z[i], LAMP_POST_RADIUS);
   const streetLights = createStreetLightView({ scene, lights: lamps, ground, env });
@@ -187,13 +191,14 @@ async function boot() {
   const roadInfo = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, surface: 0, road: -1, lines: 0, lanes: 0, s: 0 };
   const collide = (x, z, radius) => buildings.collide(x, z, radius) || portals.collide(x, z, radius) || forest.collide(x, z, radius) || tramSim.collide(x, z, radius) || props.collide(x, z, radius) || playArea.collide(x, z, radius);
   const car = createCar({ ground, roadInfoAt: (x, z, out) => surface.roadInfoAt(x, z, out), collide, start });
-  const chase = createChaseCamera(ground, (x, z, radius) => buildings.collide(x, z, radius));
+  const chase = createChaseCamera(ground, (x, z, radius) => buildings.collide(x, z, radius) || forest.collide(x, z, radius) || portals.collide(x, z, radius));
 
   // the Kaart: one road index and one painted base for the minimap, the full map and the teleport
   const roadIndex = createRoadIndex(data.roads);
   const basemap = createBasemap({ nx: maps.nx, nz: maps.nz, classData: maps.classData });
   const limits = createSpeedLimit(maps, buildings);
 
+  const sound = createSound({ muted: readKey(SOUND_KEY) === 'off' });         // starts on the first tap or key (iOS)
   const ui = createUI({ root: document.body, lang, onAction: handleAction });
   const minimap = createMinimap({ canvas: ui.minimap, index: roadIndex, basemap, area });
   const towns = (data.places.landmarks || []).filter((p) => p.kind === 'town');
@@ -251,6 +256,7 @@ async function boot() {
       case 'reset': resetCar(); break;
       case 'weather': chooseWeather(id); break;
       case 'time': chooseTime(id); break;
+      case 'sound': { const off = id === 'off'; writeKey(SOUND_KEY, off ? 'off' : 'on'); sound.setMuted(off); ui.setValue('sound', off ? 'off' : 'on'); break; }
       case 'colour': if (CAR_COLOURS[id]) { writeKey(COLOUR_KEY, id); model.setColour(id); } break;
       case 'language': changeLanguage(id); break;
       case 'quality': chooseQuality(id); break;
@@ -359,7 +365,7 @@ async function boot() {
     stuckFor = 0;
   }
   function resetCar() {
-    landCar(start.x, start.z, start.yaw || 0, 1e9);
+    landCar(startPose.x, startPose.z, startPose.yaw, startPose.hint);
     ui.setToast(tr('toast.reset'));
   }
   /** True when the car at this pose would touch a house, a tunnel portal, a tree or the edge of the area. */
@@ -368,6 +374,11 @@ async function boot() {
     return CAR.bodyCircles.concat(0).some((o) => !!collide(x + cy * o, z + sy * o, CAR.bodyRadius + PLACE_MARGIN_M));
   }
   const placeAt = (hit) => placeClear(roadIndex, hit, car.state.heading, (x, z) => surface.height(x, z), blockedAt);
+  // the start and the reset follow the same rule as a tap on the Kaart: a CAR road (never the plaza beside it), clear of everything
+  const startHit = roadIndex.nearest(start.x, start.z, START_REACH_M);
+  const startPose = startHit
+    ? (() => { const p = placeClear(roadIndex, startHit, start.yaw || 0, (x, z) => surface.height(x, z), blockedAt); return { x: p.x, z: p.z, yaw: p.yaw, hint: p.hint }; })()
+    : { x: start.x, z: start.z, yaw: start.yaw || 0, hint: 1e9 };
   /** A tap on the Kaart: the car stands on that road, in the right-hand lane, facing along the road - and clear of everything. */
   function teleportTo(hit) {
     const p = placeAt(hit);
@@ -400,6 +411,7 @@ async function boot() {
   ui.setValue('time', choice.timeMode);
   ui.setValue('quality', readKey(QUALITY_KEY) || 'auto');
   ui.setValue('colour', colourId);
+  ui.setValue('sound', sound.muted ? 'off' : 'on');
   ui.setValue('camera', CAMERA_IDS[0]);
   ui.setChooserIcon(WEATHER_ICON[choice.weatherId] || '⛅');
 
@@ -429,6 +441,8 @@ async function boot() {
     if (!paused && (inp.throttle > 0.5 || inp.brake > 0.5) && Math.abs(car.state.speed) < STUCK_SPEED) stuckFor += dt; else stuckFor = 0;
     if (stuckFor > STUCK_SECONDS) unstick();
 
+    sound.update(dt, car.state, inp, env.state.rain, !paused);
+
     // the camera
     const c = frozenCamera || chase.update(car.state, dt, camMode, elapsed);
     camera.position.set(c.x, c.y, c.z);
@@ -447,6 +461,8 @@ async function boot() {
     // the world follows the camera when the harness holds it (the hole detector walks the camera over the map)
     terrain.update(frozenCamera ? camera.position.x : car.state.x, frozenCamera ? camera.position.z : car.state.z);
     city.update(car.state.x, car.state.z);
+    decks.update(camera.position.x, camera.position.z, quality.buildingFarRadius * BUILT_DRAW_FACTOR);
+    portalView.update(camera.position.x, camera.position.z, quality.buildingFarRadius * BUILT_DRAW_FACTOR);
     trees.update(camera.position.x, camera.position.z, elapsed);
     tramSim.setObstacle(car.state.x, car.state.z);
     trams.update(dt, camera.position.x, camera.position.z);
@@ -484,7 +500,7 @@ async function boot() {
   }
 
   // the game is ready: the first frames build the tiles around the car
-  chase.snap(car.state);
+  landCar(startPose.x, startPose.z, startPose.yaw, startPose.hint);       // the first pose: on a car road beside the start place
   trees.update(car.state.x, car.state.z, 0, true);       // the first forest is built at once, behind the loading screen
   ui.showStart(true);
   syncPlayState();
@@ -493,7 +509,7 @@ async function boot() {
   // the API for the harness (the checks read the state of the game from here)
   window.__lux = {
     trams, tramSim, tramNetwork, streetLights, benchView, scene, camera, renderer, car, env, terrain, city, trees, surface, ground, field, portals, playArea, buildings, quality: () => quality,
-    ui, fullMap, roadIndex, stepper, model, limits, input, forest, collide, placeAt, blockedAt,
+    ui, fullMap, roadIndex, sound, stepper, model, limits, input, forest, collide, placeAt, blockedAt,
     /** The Kaart and the teleport for the flows: open the map, put the car on the road nearest to (x, z). */
     toggleMap: () => toggleMap(), startDriving: () => startDriving(), isStarted: () => started,
     teleportNear: (x, z, reach = 200) => { const hit = roadIndex.nearest(x, z, reach); if (hit) teleportTo(hit); return !!hit; },

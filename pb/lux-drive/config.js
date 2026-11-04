@@ -84,9 +84,9 @@ export const SURFACES = Object.freeze({
 });
 
 export const QUALITY = Object.freeze({
-  low: { pixelRatio: 1, lodScale: 0.4, far: 4200, buildingRadius: 300, buildingFarRadius: 760, treeRadius: 90, treeDensity: 0.4, cheapGround: true, shadows: false },
-  medium: { pixelRatio: 1.25, lodScale: 0.7, far: 6000, buildingRadius: 420, buildingFarRadius: 1300, treeRadius: 150, treeDensity: 0.7, cheapGround: false, shadows: false },
-  high: { pixelRatio: 2, lodScale: 1, far: 8000, buildingRadius: 700, buildingFarRadius: 2100, treeRadius: 240, treeDensity: 1, cheapGround: false, shadows: true },
+  low: { pixelRatio: 1, lodScale: 0.2, protectedSize: 64, railRadius: 300, far: 4200, buildingRadius: 300, buildingFarRadius: 760, treeRadius: 90, treeDensity: 0.4, cheapGround: true, shadows: false },
+  medium: { pixelRatio: 1.25, lodScale: 0.7, protectedSize: 128, railRadius: 500, far: 6000, buildingRadius: 420, buildingFarRadius: 1300, treeRadius: 150, treeDensity: 0.7, cheapGround: false, shadows: false },
+  high: { pixelRatio: 2, lodScale: 1, protectedSize: 128, railRadius: 700, far: 8000, buildingRadius: 700, buildingFarRadius: 2100, treeRadius: 240, treeDensity: 1, cheapGround: false, shadows: true },
 });
 
 export const CAMERA = Object.freeze({
@@ -108,6 +108,10 @@ export const CAMERA = Object.freeze({
   fovFrom: 8,                // ... starting at 8 m/s and full at fovTo (30 m/s = 108 km/h)
   fovTo: 30,
   clearanceProbe: 6,         // ground probes along the camera boom
+  occlusionProbe: 12,        // probes along the boom for houses, trees, tunnel portals and bridge decks
+  minBoom: 3.2,              // m: the camera never comes closer to the car than this (then it is pushed out of the obstacle instead)
+  boomRelax: 2.2,            // 1/s: how quickly the boom grows back after an obstacle has pulled it in (it shortens at once)
+  deckClearance: 0.35,       // m: the lens stays this far under the deck of a bridge the car drives under
   bodyRadius: 0.6,           // the camera is a ball of this radius: it never sits inside a building
   turnLag: 3.2,              // 1/s: how quickly the camera swings round after a turn
   heightLag: 5,              // 1/s: how quickly the camera follows the height of the car

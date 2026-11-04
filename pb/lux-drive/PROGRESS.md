@@ -865,3 +865,34 @@ Gates: see the end of this section (filled in by the last run).
 
 Gates (round 2, cloud, software GL): `luxdrive_world.mjs` PASS; `luxdrive_holes.mjs` PASS (0 hole pixels, 72 poses, detector self-test 42 741); `harness.js --quick` PASS, 61 checks, 0 failed (0 floating / buried buildings, 0 road ends in nowhere).
 Draw calls (medium, steady state): Gare 124, Ernster 102, Av. JFK 138-146, Hamilius 138 (limit 260).
+
+## Round 2 (branch `claude/lux-drive-ui-rotf97`, from `lux-drive-ui`) — UI + car: DONE (cloud session)
+
+1. **The Kaart taps only onto car roads** (`road-index.js`): `nearest()` ignores footway / pedestrian / steps / path / cycleway /
+   track / bridleway / busway; a service lane counts 6 m farther than it is. The start and the reset (`main.js`, `startPose`) use the
+   same rule (`placeClear` on the nearest car road). Note: the road index only holds the ways the bake marks drivable, so footway /
+   steps / path / cycleway never reach it; in the data the non-car kinds present are `pedestrian`, `track`, `busway`. Taps on the
+   paving round the start place all land on Avenue John F. Kennedy.
+2. **Sound** (`sound.js`, `sound-model.js`): synthesised WebAudio; engine from an imaginary gearbox (rpm / gear, shift dips), tyre
+   squeal on slip, rolling roar, collision thud (`car.state.hits`), rain ambience; created on the first tap / key (iOS), mute chip in
+   the settings, remembered (`pb_luxdrive_sound`). Help text lists every key of `input.js` (R C T G M H, Esc / P) in lb / de / en / fr.
+3. **Car** (`car-model.js`): one lofted body (stations x rings: bevelled sill, shoulder, belt, roof rail), shorter higher bonnet,
+   raked windscreen, taller greenhouse, belt line rising to the tail, spoiler lip, door lines, bigger wheels (r 0.36). 1 body mesh.
+4. **Chase camera** (`camera.js`): 12 probes along the boom against houses, trees, tunnel portals and the underside of decks
+   (`ground.overheadAt`); the boom shortens at once (never under 3.2 m) and grows back at 2.2 / s.
+5. **Performance**: bridge decks and tunnel portals were one world-wide mesh each (68 k + 11 k triangles in EVERY frame): now 1 km
+   chunks (`chunked-flat.js`) culled by frustum and by distance. Low: terrain `lodScale` 0.2 with `protectedSize` 64, tram track drawn
+   to 300 m (`railRadius`). Auto-step: down after 2.0 s slow (very slow frames count double), 1.0 s settle after a step.
+
+### Gates (cloud container, software WebGL)
+| gate | result |
+|---|---|
+| `node pb/lux-drive/harness.js --quick` | PASS, 71 checks (new: car-only taps, camera never inside house / tree / portal, gearbox, auto-step timing) |
+| `luxdrive_holes.mjs` | PASS 0 hole pixels, 72 poses, at medium AND (`HOLES_Q=low`) at low |
+| `luxdrive_ui.mjs` | PASS |
+| `luxdrive_round2.mjs` (new) | see REPORT.md |
+| `luxdrive_world.mjs` | PASS; low 65 / 133 k, medium 109 / 246 k, high 133 / 316 k (calls / triangles, flow's own camera) |
+
+Draw calls / triangles at Kirchberg (start place, `scripts/luxdrive/perf.mjs`): before the merge fixes low 108 / 301 k, medium 127 / 348 k,
+high 137 / 399 k; now **low 80 / 156 k, medium 130 / 277 k, high 148 / 335 k** (medium budget 260). Auto-step with a fake slow clock:
+high -> low after 3.8 s (35 ms frames) / 3.9 s (60 ms frames).
