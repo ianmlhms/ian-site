@@ -12,6 +12,8 @@ import { buildPhilharmonie, buildEcj, buildCathedral, buildPalais, buildGelleFra
 
 import { buildBock, buildPasserelle, buildCoque, buildThuengen, buildMudam, buildBcee } from './landmark-sites.js';
 
+import { CAMPUS_BUILDERS } from './campus.js';   // CAMPUS: Campus Geesseknäppchen (campus.js)
+
 export { fixLandmarkDecks };
 
 /** The builders in the order of the brief (the bridges first). A landmark that cannot be built is an error, never a silent gap. */
@@ -30,6 +32,7 @@ const BUILDERS = [
   { id: 'fort-thuengen', build: buildThuengen },
   { id: 'mudam', build: buildMudam },
   { id: 'bcee', build: buildBcee },
+  ...CAMPUS_BUILDERS,                                  // CAMPUS: the schools of Geesseknäppchen (one model per zone)
 ];
 
 /** The closest point of a segment to (x, z). */

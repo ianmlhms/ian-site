@@ -3,6 +3,11 @@
 const THREE = window.THREE;
 
 export function createLandmarkView({ scene, landmarks, material }) {
+  // CAMPUS: flat painted ground (info.decal) is drawn with a polygon offset, so it never flickers against the terrain tiles; it shares the uniforms
+  const decalMaterial = new THREE.ShaderMaterial({
+    uniforms: material.uniforms, vertexShader: material.vertexShader, fragmentShader: material.fragmentShader, side: THREE.DoubleSide,
+    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4,
+  });
   const group = new THREE.Group();
   group.name = 'luxdrive-landmarks';
   const meshes = [];
@@ -15,7 +20,7 @@ export function createLandmarkView({ scene, landmarks, material }) {
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(s.col, 3));
     geometry.setIndex(s.idx.length > 65535 ? new THREE.Uint32BufferAttribute(s.idx, 1) : new THREE.Uint16BufferAttribute(s.idx, 1));
     geometry.computeBoundingSphere();
-    const mesh = new THREE.Mesh(geometry, material);
+    const mesh = new THREE.Mesh(geometry, lm.info.decal ? decalMaterial : material);
     mesh.name = `landmark ${lm.id}`;
     mesh.matrixAutoUpdate = false;
     group.add(mesh);
