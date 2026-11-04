@@ -23,6 +23,7 @@ import { createHeightField } from './heightfield.js';
 import { createSurface } from './surface.js';
 import { createDeckNetwork, createGround, DECK } from './decks.js';
 import { createBuildingIndex } from './buildings.js';
+import { createLandmarks, fixLandmarkDecks } from './landmarks.js';
 import { createTreeIndex, treesOfBlock } from './trees.js';
 import { createPortals } from './portals.js';
 import { createPlayArea } from './play-area.js';
@@ -69,9 +70,10 @@ const area = JSON.parse(fs.readFileSync(path.join(DATA, 'area.json'), 'utf8'));
 
 const field = createHeightField({ near: data.near, far: data.far, roads: data.roads });
 const surface = createSurface(field);
-const deckNetwork = createDeckNetwork(data.decks, surface);
+const deckNetwork = createDeckNetwork(fixLandmarkDecks(data.decks, (x, z) => surface.height(x, z)), surface);
 const ground = createGround(surface, deckNetwork);
-const buildings = createBuildingIndex(data.buildings);
+const landmarks = createLandmarks({ buildings: data.buildings, decks: deckNetwork.decks, ground: (x, z) => surface.height(x, z), roads: data.roads });
+const buildings = createBuildingIndex(data.buildings, { hidden: landmarks.hiddenBuildings });
 const portals = createPortals(data.roads);
 const playArea = createPlayArea(area);
 const maps = buildWorldMap({ classes: data.classes, classInfo: data.classInfo, canopy: data.canopy, buildings: data.buildings });
@@ -581,6 +583,28 @@ section('D decks');
   stats.deckFlags = wrongFlag;
   check('every deck knows whether it spans the land or stands on it', wrongFlag === 0,
     `${wrongFlag} of ${decks.length} decks${flagList.length ? ' ' + JSON.stringify(flagList) : ''}`);
+}
+
+/* ---------------------------------------------------------------- D1: the landmarks */
+section('D1 landmarks');
+{
+  // A landmark stands on the ground, floats nowhere and is not buried: its lowest face is under the land, its walls stand
+  // where the land is, and the blocks it replaces are really gone from the collision.
+  let floating = 0;
+  for (const lm of landmarks.list) {
+    if (lm.id.startsWith('pont-')) continue;      // a bridge spans a valley: its bounding box corners are not its feet (the decks gates above cover the bridges)
+    // the lowest face relative to the land UNDER IT (not to the corners of the bounding box: a skin on a cliff or a ring on a slope has feet at different heights)
+    let lowest = Infinity;
+    for (let i = 0; i < lm.soup.pos.length; i += 3) lowest = Math.min(lowest, lm.soup.pos[i + 1] - field.height(lm.soup.pos[i], lm.soup.pos[i + 2]));
+    if (lowest > 1.0) { floating++; console.log('  landmark above the ground:', lm.id, `lowest face ${lowest.toFixed(1)} m over the land under it`); }
+  }
+  check('no landmark floats (its lowest face reaches the ground)', floating === 0, `${floating} of ${landmarks.list.length}`);
+  let ghost = 0;
+  for (const id of landmarks.hiddenBuildings) if (buildings.near(data.buildings[id].pts[0], data.buildings[id].pts[1], 1).includes(id)) ghost++;
+  check('the blocks a landmark replaces have no invisible collision left', ghost === 0, `${ghost} of ${landmarks.hiddenBuildings.size}`);
+  const trisTotal = landmarks.list.reduce((s, l) => s + l.soup.triangleCount, 0);
+  stats.landmarks = { count: landmarks.list.length, triangles: trisTotal, hiddenBlocks: landmarks.hiddenBuildings.size };
+  check('the landmarks stay inside the triangle budget (60 000)', trisTotal <= 60000, `${trisTotal}`);
 }
 
 /* ---------------------------------------------------------------- D2: the portals */

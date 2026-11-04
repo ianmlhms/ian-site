@@ -680,6 +680,21 @@ asks the carve itself (`network.carve` at the exact position of the tree) instea
 ## Milestone 5 — UI: NOT STARTED
 
 
+## Landmarks (cloud session, branch `lux-drive-landmarks`)
+
+Modules: `landmarks.js` (registry, hides blocks and decks, collision walls), `landmark-bridges.js` (Pont Adolphe, Pont Rouge,
+`fixLandmarkDecks`), `landmark-buildings.js` (Philharmonie, Cour de justice, Cathédrale, Palais, Gëlle Fra, Oberanven church),
+`landmark-soup.js`, `landmark-util.js`, `landmark-palette.js`, `landmark-view.js`. Tools: `scripts/luxdrive/{plan_map,shoot,world_node,landmarks_node}.mjs`.
+World origin (found from the decks): `originE = 72192`, `originNTop = 83968`.
+
+| gate | result |
+|---|---|
+| `pb/lux-drive/harness.js` | **47 passed, 0 failed** (new section D1: no landmark floats, no ghost collision on replaced blocks, <= 60 000 triangles; 13 997 used, 9 blocks replaced) |
+| `luxdrive_world.mjs` | all ok except "car drove 1.6 m" and "did not fly over the kerb", which fail the same way on the base `lux-drive` branch in this container (software GL) ; draw calls low 45 / medium 48 / high 49 |
+| `luxdrive_holes.mjs` | **PASS: 0 hole pixels over 72 poses** (detector self-test ok) |
+
+Not done: Bock walls, Viaduc, Coque, Mudam, Grund bridge, BCEE. Details and honest problems: `reports-cloud/lux-drive/lux-drive-landmarks/REPORT.md`.
+
 ## City finish — branch `lux-drive-city` (cloud session, Claude)
 
 Scope: the start, the Luxtram, the parks, street lights, the distance LOD of the city, and the look fixes of REVIEW.md items 15-16
@@ -896,3 +911,9 @@ Draw calls (medium, steady state): Gare 124, Ernster 102, Av. JFK 138-146, Hamil
 Draw calls / triangles at Kirchberg (start place, `scripts/luxdrive/perf.mjs`): before the merge fixes low 108 / 301 k, medium 127 / 348 k,
 high 137 / 399 k; now **low 80 / 156 k, medium 130 / 277 k, high 148 / 335 k** (medium budget 260). Auto-step with a fake slow clock:
 high -> low after 3.8 s (35 ms frames) / 3.9 s (60 ms frames).
+
+## Landmarks round 2 (branch `lux-drive-landmarks`)
+Root cause of the stray poles: `tree-view.js` divided the baked tree girth by 100 twice (needle trees); fixed. New modules: `landmark-facade.js` (windows, lancets,
+fins, turrets on footprint edges), `landmark-sites.js` (Bock, Passerelle, Coque, Fort Thüngen, Mudam, BCEE) + `landmark-site-data.js` (OSM outlines); Cour de justice, Cathédrale,
+Philharmonie, Palais rebuilt. Tools: `scripts/luxdrive/{pick_pose,osm_query,fetch_ref}`. Gates: harness 64/0, luxdrive_world PASS (draw calls 49/50/43), luxdrive_holes 0 hole pixels,
+landmarks 35 127 triangles. Details, positions that are estimates, and what is still wrong: `reports-cloud/lux-drive/lux-drive-landmarks/REPORT.md`.
