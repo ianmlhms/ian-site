@@ -1632,3 +1632,60 @@ Gate I's random street sample leaves the opened ways out (O3 drives them), so it
 * The rule is conservative: most car-park and garage "tunnels" stay closed (191 runs), and 47 portals were dropped where no drawn road reaches the mouth: there a car crossing the grass reaches an uncarved tunnel line with no wall (not a hole, the ground is the DTM).
 * Eecherfeld 5070,6192 crossfall 16.7 % (pre-existing, see above); the Grouft south mouth 5767 has no portal now.
 * The A1 cut under deck 32 has no retaining walls of its own (the bake found no ramp steep enough); its sides are the batter.  Not checked on a real GPU / iPad.
+
+## Roads 9 (branch `lux-drive-roads9`, Mac mini): crossfall everywhere, width tapers, single-lane edge lines, portals, the opened cuts
+
+Started from v48 (498084fe).  Round folder `~/Library/Caches/luxdrive-work/roads9/` (tools in `tools/`: `xfall.mjs` the crossfall of EVERY carved way every 3 m, `xs.mjs` a cross section with the pins,
+`widthalong.mjs` the painted width along a way, `chainw.mjs` the widths of a carriageway chain, `dropped.mjs` the mouths without a portal, `portals2.mjs` what blocks a portal; `v48/` = the live
+snapshot for the before shots and the before numbers).
+
+### 1. Crossfall (Eecherfeld and everywhere) - `road-network.js`
+* Root causes, measured over every carved way (not the 200-way sample): (a) the two ARMS of one way (a hairpin, a loop) were one Shepard blend by distance, so the lower arm's carriageway
+  leaned toward the upper one (Eecherfeld 5070,6192: 16.7 % sampled, 20.7 % worst); (b) the junction SHEET (a plane per contact) carried the main road's gradient, or the level difference
+  of two ways side by side, across the side street for up to 16 m past the apron (tracks 13-22 %, Rue de la Vallée 13.7 %, a motorway link 11 %).
+* Fix (a): every candidate segment gets a share in the OTHER arm of its way (the detour along the way minus the chord between the feet, 6 -> 12 m); the other arm is a pin of its own (its
+  own Shepard weights about its own nearest segment) and the existing two-level hold keeps each arm on its bed; two arms of one way hand over inside the gap between their benches
+  (the step is the hairpin's retaining wall, baked: Eecherfeld wall 5.3 m).
+* Fix (b): away from the other ways of the junction (0.5 -> 3 m past their benches) the sheet tilts the carriageway it lies on by at most 2 % across (the sheet at the foot on the centre
+  line + 2 % x the offset; continuous).
+* Every way, every 3 m: over 2.5 % 2654 -> 201, over 6 % 341 (228 places) -> 6 (3 places).  New harness check (gate I) over every carved way every 6 m: 105 over 2.5 % (limit 0.12 %),
+  4 over 6 % (limit 4).  Gate L worst old-town box 10.25 -> 11.43 (its own bound 12; median 0.53 unchanged).
+
+### 2. Width steps (Av. J.F. Kennedy, Jonction Grunewald) - `road-network.js`, `lane-flicker.js` (new)
+* The half width of the tarmac along a carriageway chain is the lower envelope of slope 1/12 of the widths of its ways (the narrowing lies in the wider way, as markings.js lays its line
+  tapers); the carve reads it per segment end (DHW0/DHW1).  Gate B's "not narrower than OSM" measures against the tapered width there.
+* Lane-count flicker: a run of ways < 60 m NARROWER than the carriageway on both sides takes the narrower neighbour's width and lanes (data level, in loadWorldData, so the tarmac and the
+  lines agree; 27 runs); a short WIDER run (a turning lane) is real and tapered; an OSM tree inside the would-be road vetoes the fill (Route de Trèves, Boulevard Royal).
+* Harness P1: joints of a chain whose widths differ: steps 472 of 472 (v48) -> 1 of 437 (Echangeur de Merl 3128,9998: the link's paint is pushed in where it merges off its level, not a width step).
+
+### 3. Lines - `markings.js`
+* A one-way main road of a single lane (>= 3.2 m) has its two edge lines (Route d'Esch near 4065,11551).  Harness P2: 202 such ways, 76 % lined on both sides (junction mouths cut the rest), 2 bare (v48: 0 %).
+* Residential bridges: the class rule is the ground's (residential streets carry no lines, on a deck or not).  Harness P3 proves every marked way on a drawn deck carries its lines over it (60 of 60; v48 already 60/60).
+
+### 4. Portals - `portals.js`, `portal-view.js`, `road-network.js`
+* B09 north mouth: the "street over the mouth" test took the side offset of a crossing segment's FIRST POINT, not of the crossing: a service lane crossing the wall line 22 m away removed it.  Fixed; the mouth is back.
+* Headwalls: at most a parapet (1 m) over the highest road BEHIND the wall, flush under a road OVER the wall (no cornice); the lintel thins, then the mouth gets lower (>= 2.7 m, >= 2.0 m under a road).  B09 south: 5.1 m -> 2.7 m (flush under Route de Longwy).  Harness P4.
+* Grouft south (bore 5767): its mouth lies outside the play area (the A7 beyond it was clipped); a border mouth keeps its portal with any drawn road ending at it (gate O2 follows the rule).
+* QA2 N-U01: a portal whose box stands within 1 m of a house (5 m in front, 3 m behind) or under a deck (within 2.5 m over it, 6 m behind) is dropped: 116 -> 69 portals (mostly garage mouths at house fronts).  The real tunnels keep a mouth (O4).
+* The 47 dropped mouths: looked at with `dropped.mjs`: no paint runs into them; the DTM pit of a garage ramp inside its tunnel line (up to 4 m) is now filled to the mouth level for 25 m (garage pads along the tunnel way).
+
+### 5. The opened cuts - `road-network.js`, `retaining-walls.js`, `bake_walls.mjs`
+* The A1 under deck 32 had a 1.2 m hump with no tarmac where deck 32 crosses: the deck's protected corridor kept the land over the cut.  The carriageway of an opened cut is not protected (cutCover, like the approach pinCover).
+* The faces of a cut are steep (<= 3.5 m/m, mean 2.3) and baked as walls with the cut's own limits (CUT_RAMP: any land slope, up to 12 m; the face ends where the ground meets the land): walls 144 -> 159.  Harness P5: every opened cut >= 10 m deeper than 2 m is walled.
+
+### 6. Kerbs / abutments
+* Kerbs inside a lane: gate M's "false kerbs inside a carriageway" stays 0 of 25958.  Interchange abutments: not touched (see below).
+
+### Gates at HANDOFF (token budget reached)
+* `harness.js`: **130 of 131 PASS** (run 5, walls rebaked after the last carve change).  FAIL: **P5** - the Rue Godchaux cut (7243, 15 m, 7301,9135) has no wall: it runs along the foot of a
+  1.6 m/m hillside; its own face is short and the bake (CUT_RAMP, face cut off where the ground meets the land) finds no place >= 2 m/m there.  The car can still climb that bank (QA2 N-U03).
+* NOT RUN yet: `luxdrive_world.mjs`, `luxdrive_holes.mjs` (medium + low), `luxdrive_ui.mjs`, `luxdrive_webkit.mjs`; no before / after shots taken (poses ready: `roads9/poses.json`, v48 snapshot `roads9/v48/`).
+* `pb/lux-drive.html` main.js `?v=49` (bumped).
+
+### Still wrong / next builder (see `roads9/HANDOFF.md`)
+1. P5 / N-U03 Rue Godchaux: either give an opened cut a wall wherever the ground beside it rises more than ~1.5 m within 3 m (bake rule for cut chains independent of findRamp), or keep runs along a
+   hillside closed (a side-cover rule was tried: it also closed one A1 bore because the twin bore's hill is "beside" it - reverted).  The QA2 A1 stop at 13044,5906 and the 0.8 m entry step were not re-checked.
+2. Run the four browser gates and the shots (left v48 = `roads9/v48` with `node scripts/luxdrive/shot.mjs`, right = this branch), montage with `terrain5/tools/montage.py`.
+3. Neie Wee 5437,8831 (9.8 % across: the 1 m lattice blurs the Corniche cliff into the lane), a service loop 9630,9356 whose arms overlap at two levels (6.5 %), Rue de la Vallée 4296,10041 (6.1 %).
+4. 4 portals capped at the lowest mouth still stand under / over a road (P4 lists them as floored); 47 garage mouths lost their portals (houses / decks) - the road ends at the facade.
+5. Interchange abutments (~100 steep grass banks at skewed motorway deck ends): not touched.  Gate L's steep old-town box 10.25 -> 11.43 (bound 12).

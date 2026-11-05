@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadWorld } from './world_node.mjs';
-import { WALL, findRamp, encodeWalls, rampTolerance } from '../../pb/lux-drive/retaining-walls.js';
+import { WALL, CUT_RAMP, findRamp, encodeWalls, rampTolerance } from '../../pb/lux-drive/retaining-walls.js';
 
 const OUT_DEFAULT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../pb/lux-drive/data/walls.bin');
 const outArg = process.argv.find((a) => a.startsWith('--out='));
@@ -21,6 +21,7 @@ const LINK_FACING = 0.6;       // ... and they face the same way (cosine of the 
 const COVER_CELL = 2;          // m: a ramp that is already in a wall of an earlier way (a point of it this close, same facing, same top) is not written again
 const COVER_DIST = 1.4;
 const COVER_TOP = 1.2;
+const CUT_MEETS_LAND = 0.15;   // m: the face of a cut ends where the ground is this close to the land
 const MIN_SAMPLES = 2;         // a ramp seen at a single sample is noise of the scan (a bend, a driveway) and a lone block of stone looks like a crate: a wall is at least two samples long
 const CAR_CLEAR = -0.6;        // the foot of the face and the back of the block lie outside every carriageway (signed distance to the union of the carriageways; -0.6 = the face may stand on the edge line, which lies 0.5 m inside the carriageway): a wall never stands on tarmac
 const MAX_PULL_IN = 0.6;       // m: the back of the block is pulled in at most this far to get off a carriageway (a sliver of the lane edge); a ramp whose head lies deeper in the road has no wall
@@ -70,7 +71,12 @@ function wallPointAt(chain, i, side) {
     const t = t0 + k * WALL.scanStep, x = chain.x[i] + nx * t, z = chain.z[i] + nz * t;
     heights[k] = field.height(x, z); lands[k] = field.groundHeight(x, z);
   }
-  const ramp = findRamp(heights, lands);
+  // (the cut of an opened tunnel: a wall wherever its face is steep, retaining-walls.js CUT_RAMP; the face ends where the ground meets the land again - the hillside above it
+  // is the land's own, Rue Godchaux: 15 m of hill over a 3 m cut)
+  const cut = !!net.roads[chain.road].openCut;
+  let end = count;
+  if (cut) { let k = 1; while (k < count && heights[k] < lands[k] - CUT_MEETS_LAND) k++; end = Math.min(count, k + 1); }
+  const ramp = findRamp(end < count ? heights.subarray(0, end) : heights, end < count ? lands.subarray(0, end) : lands, WALL.scanStep, cut ? CUT_RAMP : WALL);
   if (!ramp) return null;
   // the foot of the face is the low end of the ramp; the block reaches back to its high end
   const rising = ramp.rise > 0;

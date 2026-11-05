@@ -14,7 +14,7 @@ import { createDeckNetwork, createGround } from './decks.js';
 import { createBuildingIndex } from './buildings.js';
 import { createTreeIndex, keepWaysClear } from './trees.js';
 import { createTreeView } from './tree-view.js';
-import { createPortals, portalRoadAt } from './portals.js';
+import { createPortals, portalRoadAt, portalBlocked } from './portals.js';
 import { createPlayArea } from './play-area.js';
 import { buildWorldMap } from './world-map.js';
 import { createPaintTextures } from './paint-textures.js';
@@ -143,7 +143,7 @@ async function boot() {
   const landmarks = createLandmarks({ buildings: data.buildings, decks: ground.decks, ground: (x, z) => surface.height(x, z), roads: data.roads });
   const buildings = createBuildingIndex(data.buildings, { hidden: landmarks.hiddenBuildings });
   const playArea = createPlayArea(area);
-  const portals = createPortals(data.roads, (x, z) => surface.height(x, z), (r) => field.network.isDrawn(r.id), (x, z) => playArea.inside(x, z), portalRoadAt(field.network));
+  const portals = createPortals(data.roads, (x, z) => surface.height(x, z), (r) => field.network.isDrawn(r.id), (x, z) => playArea.inside(x, z), portalRoadAt(field.network), portalBlocked(buildings, deckNetwork));
   const maps = buildWorldMap({ classes: data.classes, classInfo: data.classInfo, canopy: data.canopy, buildings: data.buildings });
   // the trees: the woods (placed from the canopy) and the trees of OSM (the street trees, the trees of the parks)
   // no tree grows on a bridge or hangs its crown over a lane (the bridges as decks, with the full width of the landmark models)

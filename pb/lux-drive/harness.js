@@ -27,7 +27,7 @@ import { createWallCollider } from './wall-collider.js';
 import { createBuildingIndex } from './buildings.js';
 import { createLandmarks, fixLandmarkDecks } from './landmarks.js';
 import { createTreeIndex, treesOfBlock, keepWaysClear, bakedCrownRadius, wayMargin, crownShare } from './trees.js';
-import { createPortals, portalRoadAt } from './portals.js';
+import { createPortals, portalRoadAt, portalBlocked } from './portals.js';
 import { createPlayArea } from './play-area.js';
 import { buildWorldMap } from './world-map.js';
 import { createCar } from './car.js';
@@ -87,7 +87,7 @@ const ground = createGround(surface, deckNetwork);
 const landmarks = createLandmarks({ buildings: data.buildings, decks: deckNetwork.decks, ground: (x, z) => surface.height(x, z), roads: data.roads });
 const buildings = createBuildingIndex(data.buildings, { hidden: landmarks.hiddenBuildings });
 const playArea = createPlayArea(area);
-const portals = createPortals(data.roads, (x, z) => surface.height(x, z), (r) => field.network.isDrawn(r.id), (x, z) => playArea.inside(x, z), portalRoadAt(field.network));
+const portals = createPortals(data.roads, (x, z) => surface.height(x, z), (r) => field.network.isDrawn(r.id), (x, z) => playArea.inside(x, z), portalRoadAt(field.network), portalBlocked(buildings, deckNetwork));
 const maps = buildWorldMap({ classes: data.classes, classInfo: data.classInfo, canopy: data.canopy, buildings: data.buildings });
 const treeDecks = createDeckNetwork([...ground.decks, ...landmarks.footprints]);      // the same trees as the game plants (main.js)
 const bakedTrees = keepWaysClear(data.trees, { network: field.network, field, treeDecks, treeFree: landmarks.treeFree });

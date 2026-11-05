@@ -14,7 +14,27 @@
 import { PORTAL } from './config.js';
 
 const PUSH_MAX = 0.8;          // m: the most a wall pushes the car back in one pass
+const BLOCK_HOUSE = 1.0;        // m: a house this close to the box (in front, beside or behind it) takes the portal away
+const BLOCK_FRONT = 5.0;        // m in front of the wall a house takes the portal away (the box would stand against its facade, QA2 N-U01)
+const BLOCK_BEHIND = 3.0;       // m behind the wall a house still takes the portal away (portalBlocked)
+const BLOCK_DECK_BEHIND = 6.0;  // m behind the wall a deck that low over the box still reads as lying on it (QA2 N-U01, 5242,10299)
+const BLOCK_DECK_OVER = 2.5;    // m over the top of the wall a deck still takes it away
 const LEVEL_BELOW = 1.5;       // m: a car this far under the mouth is on another road (a portal on a bridge end, a road under it)
+
+/** blocked for createPortals: the wall box of a portal (its width, its recess, from its road to its top) touches a house (buildings.js collide) or a deck (decks.js overheadAt: the underside of a deck over it). */
+export function portalBlocked(buildings, decks) {
+  return (p) => {
+    if (!Number.isFinite(p.y)) return false;
+    for (let u = -p.half - 0.3; u <= p.half + 0.3 + 1e-6; u += (2 * p.half + 0.6) / 8) {
+      for (const v of [-BLOCK_FRONT, 0.1, p.depth / 2, p.depth, p.depth + BLOCK_BEHIND / 2, p.depth + BLOCK_BEHIND, p.depth + BLOCK_DECK_BEHIND]) {
+        const x = p.x + p.sx * u - p.nx * v, z = p.z + p.sz * u - p.nz * v;
+        if (v <= p.depth + BLOCK_BEHIND && buildings && buildings.collide(x, z, BLOCK_HOUSE)) return true;                                  // (behind the wall too: the house the mouth would be cut into)
+        if (v >= 0 && decks && decks.overheadAt(x, z, p.y) <= p.y + p.wallTop + BLOCK_DECK_OVER) return true;   // (a slab just over the box sits on it)
+      }
+    }
+    return false;
+  };
+}
 
 /** roadAt for createPortals from a road network (road-network.js): the way whose carriageway holds (x, z), or -1. */
 export function portalRoadAt(network) {
@@ -43,6 +63,8 @@ const CARRIAGEWAY = new Set([
  * drawn road ends at it from any side (the Grouft south mouth: Rue du Grünewald runs back up along the tunnel from the mouth).
  * roadAt(x, z) (optional): the index of the drawn way whose carriageway holds the point (-1: none).  A road that runs behind / over the wall (an underpass under a street) caps the
  * headwall to a parapet over that road.
+ * blocked(p) (optional): does the wall of portal p stand in something solid (a house, a deck)?  Then there is no portal: a mouth cut into a house front or a box under a
+ * deck slab (QA2 N-U01) is worse than the road ending at the facade.
  * Returns { list, at(x, z), collide(x, z, radius, y) }.
  *
  * A portal is { x, z, nx, nz, sx, sz, half, bore, top, depth, width, name, road }:
@@ -54,7 +76,7 @@ const CARRIAGEWAY = new Set([
  *   top    the height of the mouth above the ground
  *   depth  how deep the wall goes into the tunnel
  */
-export function createPortals(roads, heightAt = null, isDrawn = () => true, inPlay = null, roadAt = null) {
+export function createPortals(roads, heightAt = null, isDrawn = () => true, inPlay = null, roadAt = null, blocked = null) {
   const tunnels = roads.filter((r) => r.tunnel && r.info.drivable);
   const surface = roads.filter((r) => !r.tunnel && r.info.drivable);
 
@@ -209,7 +231,7 @@ export function createPortals(roads, heightAt = null, isDrawn = () => true, inPl
       }
     }
   }
-  const mouths = list.filter((p) => !underRoad.has(p));
+  const mouths = list.filter((p) => !underRoad.has(p) && !(blocked && blocked(p)));
 
   // ---- the spatial hash of the walls
   const buckets = new Map();

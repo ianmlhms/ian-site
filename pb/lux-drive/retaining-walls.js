@@ -55,7 +55,12 @@ function tint(course, x, z) {
  * A ramp is a run of ground steeper than toeSlope that has a place steeper than steepSlope and rises (or falls) by at least minRise, and is steeper than the land under it:
  * a cliff that the land has anyway is the shader's business, not a wall.
  */
-export function findRamp(heights, lands, step = WALL.scanStep) {
+/** The face of the cut of an opened shallow tunnel (tunnel-cover.js) is a retaining wall wherever it is steep, however steep the hillside it is cut into and up to the height of the
+ *  cut (QA2 N-U03: the car climbed the 60 deg grass bank of the Rue Godchaux cut, 12 m into a hillside of 1.6 m/m): findRamp with these limits for the ways of a cut (bake_walls.mjs). */
+export const CUT_RAMP = Object.freeze({ maxRise: 12, maxLandSlope: Infinity, naturalFactor: 0, naturalMargin: 0 });
+
+export function findRamp(heights, lands, step = WALL.scanStep, limits = WALL) {
+  const lim = limits === WALL ? WALL : { ...WALL, ...limits };
   const n = heights.length;
   let best = null;
   let k = 0;
@@ -72,8 +77,8 @@ export function findRamp(heights, lands, step = WALL.scanStep) {
       m++;
     }
     const rise = heights[m] - heights[k];
-    const isRamp = maxSlope >= WALL.steepSlope && Math.abs(rise) >= WALL.minRise && Math.abs(rise) <= WALL.maxRise
-      && landSlope <= WALL.maxLandSlope && maxSlope > WALL.naturalFactor * landSlope + WALL.naturalMargin;
+    const isRamp = maxSlope >= lim.steepSlope && Math.abs(rise) >= lim.minRise && Math.abs(rise) <= lim.maxRise
+      && landSlope <= lim.maxLandSlope && maxSlope > lim.naturalFactor * landSlope + lim.naturalMargin;
     if (isRamp && (!best || Math.abs(rise) > Math.abs(best.rise))) best = { first: k, last: m, rise, maxSlope };
     k = m + 1;
   }
