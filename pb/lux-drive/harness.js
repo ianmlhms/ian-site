@@ -558,11 +558,19 @@ if (wants('D')) {
   check('every deck stands on a way that rides over the others', orphan === 0,
     `${orphan} of ${decks.length} decks${orphanList.length ? ' ' + JSON.stringify(orphanList) : ''}`);
 
+  // The ends of the decks that meet one another (one bridge in pieces, a joint): every piece ends at the same level there.  A joint is not an end of the bridge: it hangs over the valley
+  // with the bridge (before, the pieces were pinned to the valley floor under the joint: 16 m spikes at Rue de Neudorf), so it is checked as a joint below, not for the ground.
+  const deckEndList = [];
+  for (const d of decks) if (d.pts.length > 1) deckEndList.push({ d, k: 0, j: 1 }, { d, k: d.pts.length - 1, j: d.pts.length - 2 });
+  const jointOf = (e) => (landmarks.hiddenDecks.has(e.d.id) ? [] : deckEndList.filter((o) => o.d !== e.d && !landmarks.hiddenDecks.has(o.d.id) && Math.hypot(o.d.pts[o.k][0] - e.d.pts[e.k][0], o.d.pts[o.k][1] - e.d.pts[e.k][1]) <= DECK.joinTolerance));
+  const isJoint = (e) => { const others = jointOf(e); return others.length > 0 && others.every((o) => Math.abs(o.d.tops[o.k] - e.d.tops[e.k]) <= 0.05); };
+
   // The deck meets the ground at its two ends: it is pinned to the approach road, not floating in the air.
   let floating = 0, worst = 0;
   const floatList = [];
   for (const d of decks) {
     for (const i of [0, d.pts.length - 1]) {
+      if (d.pts.length > 1 && isJoint({ d, k: i })) continue;
       const x = d.pts[i][0], z = d.pts[i][1];
       const gap = d.tops[i] - field.height(x, z);
       if (Math.abs(gap) > 1.5) {
@@ -587,6 +595,58 @@ if (wants('D')) {
   }
   stats.deckDiving = through;
   check('no deck dives into the ground', through === 0, `${through} points, worst ${worstThrough.toFixed(2)} m`);
+
+  // Every road runs flush onto its deck (Rue de Neudorf: the decks started 2 m above the approach road with a vertical face).  At every end of a deck where a carved way runs onto it
+  // (its end within DECK.approachJoin, leaving it toward the deck): the deck starts at the road the car drives on (step <= 5 cm), the road does not sag before the bridge (its surface
+  // over the last 16 m within 0.3 m of its bed), and the first metres of a carriageway deck never climb or fall faster than a steep street (no face).  The joints of a bridge in pieces
+  // lie at the level of the bridge (within the end grade of the pieces' own first points), not at the valley floor.
+  {
+    const MAX_STEP = 0.05, MAX_SAG = 0.3, MAX_FIRST_GRADE = 0.2, APPROACH_RUN = 16;
+    let approaches = 0, steps = 0, worstStep = 0, sags = 0, worstSag = 0, faces = 0, worstGrade = 0, joints = 0, badJoints = 0;
+    const list = [];
+    for (const e of deckEndList) {
+      if (landmarks.hiddenDecks.has(e.d.id)) continue;                 // (the landmark models meet their roads themselves)
+      const p = e.d.pts[e.k], q = e.d.pts[e.j];
+      const l1 = Math.hypot(q[0] - p[0], q[1] - p[1]) || 1;
+      const inX = (q[0] - p[0]) / l1, inZ = (q[1] - p[1]) / l1;
+      const grade = (e.d.tops[e.j] - e.d.tops[e.k]) / l1;
+      let any = false;
+      for (const c of net.chains) {
+        if (net.overRoads.has(c.road) || c.x.length < 2) continue;
+        for (const [a, b] of [[0, 1], [c.x.length - 1, c.x.length - 2]]) {
+          if (Math.hypot(c.x[a] - p[0], c.z[a] - p[1]) > DECK.approachJoin) continue;
+          const ux = c.x[a] - c.x[b], uz = c.z[a] - c.z[b], ul = Math.hypot(ux, uz) || 1;
+          if ((ux * inX + uz * inZ) / ul < DECK.approachAlign) continue;  // (a way that only ends near the deck, at an angle, does not run onto it)
+          any = true; approaches++;
+          const step = Math.abs(e.d.tops[e.k] - surface.height(p[0], p[1]));
+          let sag = 0;
+          for (let i = a, run = 0; i >= 0 && i < c.x.length && run <= APPROACH_RUN; i += a === 0 ? 1 : -1, run = Math.abs(c.arc[i] - c.arc[a])) sag = Math.max(sag, Math.abs(surface.height(c.x[i], c.z[i]) - c.bed[i]));
+          if (step > MAX_STEP) steps++;
+          if (sag > MAX_SAG) sags++;
+          worstStep = Math.max(worstStep, step); worstSag = Math.max(worstSag, sag);
+          if (step > MAX_STEP || sag > MAX_SAG) if (list.length < 6) list.push({ id: e.d.id, x: Math.round(p[0]), z: Math.round(p[1]), step: +step.toFixed(3), sag: +sag.toFixed(2) });
+        }
+      }
+      if (any && e.d.width >= 5) {
+        worstGrade = Math.max(worstGrade, Math.abs(grade));
+        if (Math.abs(grade) > MAX_FIRST_GRADE) { faces++; if (list.length < 6) list.push({ id: e.d.id, x: Math.round(p[0]), z: Math.round(p[1]), grade: +grade.toFixed(2) }); }
+      }
+      if (!any && jointOf(e).length) {
+        joints++;
+        // the pieces end at one level, and that level is the level of the bridge: within a metre of where the first two points of every piece lead (the DSM of the bake: the valley floor
+        // under the joint is metres below it)
+        const lead = (o) => { const n = o.d.pts.length; if (n < 3) return o.d.tops[o.j]; const j2 = o.k === 0 ? 2 : n - 3; const a = o.d.pts[o.j], b = o.d.pts[j2], c0 = o.d.pts[o.k];
+          const g = (o.d.tops[o.j] - o.d.tops[j2]) / (Math.hypot(b[0] - a[0], b[1] - a[1]) || 1); return o.d.tops[o.j] + Math.max(-DECK.endGrade, Math.min(DECK.endGrade, g)) * Math.hypot(a[0] - c0[0], a[1] - c0[1]); };
+        const pieces = [e, ...jointOf(e)];
+        const level = pieces.reduce((sum, o) => sum + lead(o), 0) / pieces.length;
+        if (!isJoint(e) || Math.abs(e.d.tops[e.k] - level) > 1.0) { badJoints++; if (list.length < 6) list.push({ joint: e.d.id, x: Math.round(p[0]), z: Math.round(p[1]), off: +(e.d.tops[e.k] - level).toFixed(2) }); }
+      }
+    }
+    stats.deckApproach = { approaches, steps, worstStep: +worstStep.toFixed(3), sags, worstSag: +worstSag.toFixed(2), faces, worstGrade: +worstGrade.toFixed(2), joints, badJoints };
+    check(`every road runs flush onto its deck (step <= ${MAX_STEP * 100} cm, approach sag <= ${MAX_SAG} m, carriageway deck start <= ${MAX_FIRST_GRADE * 100} %, joints at deck level)`,
+      steps === 0 && sags === 0 && faces === 0 && badJoints === 0,
+      `${approaches} approaches: steps ${steps} (worst ${(worstStep * 100).toFixed(1)} cm), sags ${sags} (worst ${worstSag.toFixed(2)} m), faces ${faces} (worst ${(worstGrade * 100).toFixed(0)} %), joints ${badJoints} of ${joints} off ${JSON.stringify(list)}`);
+  }
 
   // The ground under a bridge is the ground: no road may cut a pit under the deck (the reviewer's overpass = pit).
   // The ends of the deck are where the approach road is, and a road on an embankment has the land beside it:

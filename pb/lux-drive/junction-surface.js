@@ -71,6 +71,7 @@ export function createJunctionSurface(chains, skip, hwOf, opts = JUNCTION_SURFAC
   const px = [], pz = [], ph = [];
   for (const c of live) {
     for (const [k, level] of c.pins || []) {
+      if (c.deckPins && c.deckPins.has(k)) continue;                 // (the end of a way that runs onto a bridge is pinned to the deck, not to another way: no junction)
       const x = c.x[k], z = c.z[k];
       const key = `${Math.round(x / opts.dedupe)},${Math.round(z / opts.dedupe)},${Math.round(level / opts.levelTol)}`;
       if (seen.has(key)) continue;

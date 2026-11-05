@@ -43,6 +43,7 @@ const APPROACH_ALIGN = 0.7;            // the cosine between the direction a way
 const GROUNDED_MATCH = 2.0;            // m: a deck belongs to a way when both its ends lie this close to the ends of the way
 const GROUNDED_MAX_LENGTH = 16.0;      // m: a narrow deck at most this long ...
 const GROUNDED_MAX_DIP = 1.0;          // m: ... over land that dips less than this under it spans nothing (see groundedDeckOf)
+const APPROACH_FREE = 20.0;            // m: the last metres of a way that runs onto a bridge are its approach: its carriageway there is not protected (see carve(), protHere)
 const ABUT_HOLD = 2.0;                 // m: ... and its carriageway is held at its own level this far under the bridge (the cap of the way starts fading only there, the protection only ramps up
                                        // from there): the 1 m lattice under the first metres of the deck is the road, so the deck starts flush on a level surface, not on the edge of the drop
 const smoothstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -218,7 +219,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     return Math.min(maxEdge, lastFail + BATTER_STEP);
   }
 
-  const approachRoad = new Uint8Array(roads.length);   // 1: the way runs onto a bridge at one of its ends (its carriageway may be a fill under the first metres of the deck)
+  const roadLength = new Float32Array(roads.length);   // m, the length of every carved way (the distance along it from its far end)
   const capHoldA = new Float32Array(roads.length), capHoldB = new Float32Array(roads.length);   // m: how far past its first / last point the carriageway of a way is held before its cap fades (a way that runs onto a bridge)
   const closedRoad = new Uint8Array(roads.length);     // the rings (a pedestrian square, a loop): they have no ends, so no end cap
   const priority = new Float32Array(roads.length);     // the order of the design: the bigger way has the higher number (it wins at a junction)
@@ -373,7 +374,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
       // an end that runs onto a bridge: the deck (the DSM of the bridge) sets the level of the node, and every way at that node meets it
       const deckLevel = deckLevelAt(e.x, e.z);
       if (deckLevel !== null) {
-        for (const m of members) pinOf(m.chain).set(m.k, deckLevel);
+        for (const m of members) { pinOf(m.chain).set(m.k, deckLevel); (m.chain.deckPins || (m.chain.deckPins = new Set())).add(m.k); }
         continue;
       }
       if (members.length < 2) continue;
@@ -668,8 +669,9 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   for (const chain of chains) {
     if (overRoads.has(chain.road) || chain.closed) continue;
     const m = chain.x.length;
-    if (atBridgeEnd(chain.x[0], chain.z[0])) { capHoldA[chain.road] = ABUT_HOLD; approachRoad[chain.road] = 1; }
-    if (atBridgeEnd(chain.x[m - 1], chain.z[m - 1])) { capHoldB[chain.road] = ABUT_HOLD; approachRoad[chain.road] = 1; }
+    if (atBridgeEnd(chain.x[0], chain.z[0])) capHoldA[chain.road] = ABUT_HOLD;
+    if (atBridgeEnd(chain.x[m - 1], chain.z[m - 1])) capHoldB[chain.road] = ABUT_HOLD;
+    roadLength[chain.road] = chain.arc[m - 1];
   }
   for (let i = 0; i < count; i++) {                     // the ways the crossings found to be over
     if (!overRoads.has(ROADOF[i])) continue;
@@ -774,7 +776,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   const MARK_CLEAR = 3.5, CROSS_SIN = 0.35, MAX_PARTNERS = 6;
   const candI = new Int32Array(MAX_CAND), candD = new Float32Array(MAX_CAND), candT = new Float32Array(MAX_CAND), candLat = new Float32Array(MAX_CAND), candOver = new Float32Array(MAX_CAND);
   const pinPri = new Float32Array(MAX_PINS), pinVal = new Float32Array(MAX_PINS), pinWt = new Float32Array(MAX_PINS);
-  const pinEdge = new Float32Array(MAX_PINS), pinBed = new Float32Array(MAX_PINS), slotPinRoad = new Int32Array(MAX_PINS);
+  const pinEdge = new Float32Array(MAX_PINS), pinBed = new Float32Array(MAX_PINS), slotPinRoad = new Int32Array(MAX_PINS), pinAlong = new Float32Array(MAX_PINS);
   const wayEdge = new Float32Array(MAX_CAND), wayBed = new Float32Array(MAX_CAND);   // per way near the point: the distance past the edge of its bench (its end cap included) and its bed there   // per pin: the distance to the edge of its bench (negative inside) and the level of its carriageway
   const armOf = new Int32Array(MAX_CAND), armFirst = new Uint8Array(MAX_CAND), slotRoad = new Int32Array(MAX_CAND), slotArm1 = new Int32Array(MAX_CAND), slotArm2 = new Int32Array(MAX_CAND);
   const partnerId = new Int32Array(MAX_PARTNERS), partnerDx = new Float32Array(MAX_PARTNERS), partnerDz = new Float32Array(MAX_PARTNERS);
@@ -1032,6 +1034,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
         if (pinSum > 0 && nPins < MAX_PINS) {
           pinPri[nPins] = priority[road]; pinVal[nPins] = pinValSum / pinSum; pinWt[nPins] = pinMagSum / pinMagW;
           pinBed[nPins] = pinBedSum / pinSum; pinEdge[nPins] = dMin - BENCH[candI[slotArm1[sl]]]; slotPinRoad[nPins] = road;
+          { const i1 = candI[slotArm1[sl]]; pinAlong[nPins] = S0[i1] + (S1[i1] - S0[i1]) * candT[slotArm1[sl]]; }
           nPins++;
         }
       }
@@ -1041,10 +1044,10 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     // that at a junction the surface IS the bed of the bigger way (flat across, smooth along) and the side street joins it.
     // Averaging the beds of the ways that meet (the first version) made a hump of a hand's breadth on the main road.
     for (let a = 1; a < nPins; a++) {                          // insertion sort by priority, ascending (a handful of entries)
-      const pr = pinPri[a], v = pinVal[a], wt = pinWt[a], ed = pinEdge[a], bd = pinBed[a], rr = slotPinRoad[a];
+      const pr = pinPri[a], v = pinVal[a], wt = pinWt[a], ed = pinEdge[a], bd = pinBed[a], rr = slotPinRoad[a], al = pinAlong[a];
       let b = a - 1;
-      while (b >= 0 && pinPri[b] > pr) { pinPri[b + 1] = pinPri[b]; pinVal[b + 1] = pinVal[b]; pinWt[b + 1] = pinWt[b]; pinEdge[b + 1] = pinEdge[b]; pinBed[b + 1] = pinBed[b]; slotPinRoad[b + 1] = slotPinRoad[b]; b--; }
-      pinPri[b + 1] = pr; pinVal[b + 1] = v; pinWt[b + 1] = wt; pinEdge[b + 1] = ed; pinBed[b + 1] = bd; slotPinRoad[b + 1] = rr;
+      while (b >= 0 && pinPri[b] > pr) { pinPri[b + 1] = pinPri[b]; pinVal[b + 1] = pinVal[b]; pinWt[b + 1] = pinWt[b]; pinEdge[b + 1] = pinEdge[b]; pinBed[b + 1] = pinBed[b]; slotPinRoad[b + 1] = slotPinRoad[b]; pinAlong[b + 1] = pinAlong[b]; b--; }
+      pinPri[b + 1] = pr; pinVal[b + 1] = v; pinWt[b + 1] = wt; pinEdge[b + 1] = ed; pinBed[b + 1] = bd; slotPinRoad[b + 1] = rr; pinAlong[b + 1] = al;
     }
     // A carriageway belongs to its own way.  Where two ways lie side by side (or one inside the other) at different levels, the bigger way used to lay its pin - and its 3 m fade -
     // over the carriageway of the smaller one, and a bed that is smooth was cut up by 1 .. 8 cm (Boulevard de la Foire: 15 m/s2).  Now a way is held back by every way laid BELOW it
@@ -1064,7 +1067,9 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
       }
       if (out.debug) out.debug.push({ road: slotPinRoad[a], pri: pinPri[a], val: pinVal[a], wt: pinWt[a], hold, edge: pinEdge[a], bed: pinBed[a], before: bandY });
       bandY += (pinVal[a] - bandY) * pinWt[a] * hold;
-      if (approachRoad[slotPinRoad[a]]) pinCover += (1 - pinCover) * pinWt[a] * hold;
+      const r = slotPinRoad[a];
+      const nearAbutment = (capHoldA[r] > 0 && pinAlong[a] <= APPROACH_FREE) || (capHoldB[r] > 0 && roadLength[r] - pinAlong[a] <= APPROACH_FREE);
+      if (nearAbutment) pinCover += (1 - pinCover) * pinWt[a] * hold;
     }
     // The junction sheet: where ways meet at one level the carriageways (and the gaps of up to 2 x SHEET_GAP_HOLD between them) lie on one smooth surface, not on the layered beds.
     // A way at another level (a ramp beside the junction) keeps its own surface: the sheet lets go of its bench.
@@ -1079,14 +1084,14 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
         const inside = (1 - same) * (1 - smoothstep(0, OWN_FADE, wayEdge[sl]));
         if (inside > apart) apart = inside;
       }
-      bandY += (sheet.level - bandY) * sheet.weight * near * (1 - apart);
+      bandY += (sheet.level - bandY) * sheet.weight * near * (1 - apart) * (1 - pinCover);   // (the approach of a bridge keeps its own bed: the deck starts there)
     }
     // The protection keeps the ground under a bridge from being CUT (a pit under the deck) and from being buried under the batter of a road beside it; the CARRIAGEWAY of a way that
     // rises onto a bridge (its approach on a fill, lifted to the deck) is neither, and the corridor of the other carriageway's deck beside it - whose end lies 10 .. 20 m along on a skewed
     // bridge - flattened the end of the approach road into the valley.
-    const protHere = bandY >= ground ? prot * (1 - pinCover) : prot;
+    const protHere = bandY >= ground ? prot * (1 - pinCover) : prot * (1 - pinCover);
     out.band = ground + (1 - protHere) * (bandY - ground);
-    if (out.debug) out.debug.push({ ground, batter: devW > 0 ? ground + devSum / devW : ground, prot, sheetLevel: sheet.level, sheetW: sheet.weight, ways: Array.from({ length: nSlots }, (_, q) => [slotRoad[q], wayEdge[q], wayBed[q]]) });
+    if (out.debug) out.debug.push({ ground, batter: devW > 0 ? ground + devSum / devW : ground, prot, pinCover, protHere, sheetLevel: sheet.level, sheetW: sheet.weight, ways: Array.from({ length: nSlots }, (_, q) => [slotRoad[q], wayEdge[q], wayBed[q]]) });
     // A junction: two marked roads of different ways that cross at an angle meet here.  The lane markings are cut
     // before it (a dash that ends in the middle of the crossing street is the fragment the reviewer saw).
     let junction = 0;

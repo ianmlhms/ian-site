@@ -14,7 +14,8 @@ export const DECK = Object.freeze({
   landmarkSites: [[4829, 9101], [5179, 8061]],   // m: the Pont Adolphe and the Pont Rouge (landmark-bridges.js ADOLPHE.at / ROUGE.at): their models shape their decks and meet their roads themselves ...
   landmarkRadius: 30,      // m: ... whose middle lies within this of the site (the ends of those decks keep their plain pin to the ground; road-network.js does not lift their approaches)
   joinTolerance: 1.5,      // m: the ends of two decks this close are one bridge in two pieces (a joint): they meet at the level of the bridge, not at the valley floor under the joint
-  approachJoin: 3.0,       // m: a carved way whose end lies this close to the end of a deck runs onto it there
+  approachJoin: 3.0,       // m: a carved way whose end lies this close to the end of a deck runs onto it there ...
+  approachAlign: 0.7,      // ... when it leaves through that end toward the deck (the cosine of the two directions at least this)
   endGrade: 0.12,          // m/m: the steepest a deck climbs or falls away from the level of its end (the DSM next to an abutment is the bank, a parapet or the canopy of a wood: used as it is, the
                            // deck began with a vertical face at the end of its approach road)
   treeAbove: 1.5,          // m: a tree whose foot is less than this above a deck surface stands on it (the ground under it is a metre or two off the LiDAR deck)
@@ -117,18 +118,30 @@ function innerLevel(d, k, j, j2) {
 function deckEndTops(decks, surface) {
   const net = surface.field && surface.field.network;
   const approach = [];
-  if (net) for (const c of net.chains) if (!net.overRoads.has(c.road)) approach.push([c.x[0], c.z[0]], [c.x[c.x.length - 1], c.z[c.z.length - 1]]);
+  if (net) {
+    for (const c of net.chains) {
+      if (net.overRoads.has(c.road) || c.x.length < 2) continue;
+      const m = c.x.length;
+      for (const [a, b] of [[0, 1], [m - 1, m - 2]]) {                 // the end of the way and the direction it leaves through it
+        const ux = c.x[a] - c.x[b], uz = c.z[a] - c.z[b], ul = Math.hypot(ux, uz) || 1;
+        approach.push([c.x[a], c.z[a], ux / ul, uz / ul]);
+      }
+    }
+  }
   const ends = [];
   decks.forEach((d, k) => {
     const n = d.pts.length;
-    if (n < 2) return;
-    ends.push({ k, side: 0, p: d.pts[0], inner: n >= 3 ? innerLevel(d, 0, 1, 2) : d.tops[0] });
-    ends.push({ k, side: 1, p: d.pts[n - 1], inner: n >= 3 ? innerLevel(d, n - 1, n - 2, n - 3) : d.tops[n - 1] });
+    if (n < 2 || isLandmarkDeck(d)) return;                           // (a landmark deck keeps its plain pin and is nobody's joint)
+    const into = (a, b) => { const dx = d.pts[b][0] - d.pts[a][0], dz = d.pts[b][1] - d.pts[a][1], l = Math.hypot(dx, dz) || 1; return [dx / l, dz / l]; };
+    ends.push({ k, side: 0, p: d.pts[0], into: into(0, 1), inner: n >= 3 ? innerLevel(d, 0, 1, 2) : d.tops[0] });
+    ends.push({ k, side: 1, p: d.pts[n - 1], into: into(n - 1, n - 2), inner: n >= 3 ? innerLevel(d, n - 1, n - 2, n - 3) : d.tops[n - 1] });
   });
   const out = decks.map(() => [0, 0, false, false]);
   for (const e of ends) {
     const [x, z] = e.p;
-    const isApproach = approach.some((q) => Math.abs(q[0] - x) <= DECK.approachJoin && Math.abs(q[1] - z) <= DECK.approachJoin && Math.hypot(q[0] - x, q[1] - z) <= DECK.approachJoin);
+    // a way runs onto the deck here: its end is near and it leaves through it toward the deck (a way that only ends beside the deck, at an angle, does not)
+    const isApproach = approach.some((q) => Math.abs(q[0] - x) <= DECK.approachJoin && Math.abs(q[1] - z) <= DECK.approachJoin && Math.hypot(q[0] - x, q[1] - z) <= DECK.approachJoin &&
+      q[2] * e.into[0] + q[3] * e.into[1] >= DECK.approachAlign);
     const joint = isApproach ? [] : ends.filter((o) => o.k !== e.k && Math.hypot(o.p[0] - x, o.p[1] - z) <= DECK.joinTolerance);
     let level, envelope;
     if (joint.length) { level = (e.inner + joint.reduce((sum, o) => sum + o.inner, 0)) / (joint.length + 1); envelope = true; }
@@ -152,9 +165,11 @@ function endEnvelope(pts, tops, lo, hi, envLo, envHi, surface) {
   for (let i = 1; i < n; i++) arc[i] = arc[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
   const total = arc[n - 1];
   for (let i = 1; i < n - 1; i++) {
-    let top = tops[i];
-    if (envLo) top = Math.min(lo + DECK.endGrade * arc[i], Math.max(lo - DECK.endGrade * arc[i], top));
-    if (envHi) top = Math.min(hi + DECK.endGrade * (total - arc[i]), Math.max(hi - DECK.endGrade * (total - arc[i]), top));
+    let below = -Infinity, above = Infinity;               // the envelope of the two ends here
+    if (envLo) { below = Math.max(below, lo - DECK.endGrade * arc[i]); above = Math.min(above, lo + DECK.endGrade * arc[i]); }
+    if (envHi) { below = Math.max(below, hi - DECK.endGrade * (total - arc[i])); above = Math.min(above, hi + DECK.endGrade * (total - arc[i])); }
+    // two ends too far apart in level for the grade between them (a short deck between a low and a high bank): the straight line from one to the other
+    const top = below <= above ? Math.min(above, Math.max(below, tops[i])) : lo + (hi - lo) * (arc[i] / (total || 1));
     out[i] = Math.max(top, surface.height(pts[i][0], pts[i][1]));
   }
   return out;
