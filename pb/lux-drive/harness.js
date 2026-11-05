@@ -47,7 +47,7 @@ import { createTramSim } from './tram-sim.js';
 import { placeStreetLights } from './street-lights.js';
 import { placeParkBenches } from './park-benches.js';
 import { createPropCollider } from './props.js';
-import { WALL, WALL_DRAW_FACTOR, findRamp, wallQuads, rampTolerance } from './retaining-walls.js';
+import { WALL, WALL_DRAW_FACTOR, findRamp, wallQuads, rampTolerance, createWallFootprint } from './retaining-walls.js';
 import { JUNCTION, junctionClusters, driveLine } from './junction-probe.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -1194,19 +1194,23 @@ if (wants('H')) {
     check('a vehicle brakes for a car on its track and stops before it', !!blocked && !hitSeen && closest > 4, blocked ? `closest ${closest.toFixed(1)} m` : 'no run found');
   }
   // the street lights
-  const lights = placeStreetLights({ roads: data.roads, network: net, buildings, map: maps });
+  const lights = placeStreetLights({ roads: data.roads, network: net, buildings, map: maps, walls: data.walls });
   stats.streetLights = lights.count;
   check('the city has street lights (> 3000)', lights.count > 3000, `${lights.count}`);
-  let lampInHouse = 0, lampInRoad = 0, lampOut = 0;
+  let lampInHouse = 0, lampInRoad = 0, lampOut = 0, lampInWall = 0;
   const li = { sdCar: 9, sdPave: 9 };
+  const inWall = createWallFootprint(data.walls);
+  const LAMP_ROAD_CLEAR = 0.5;           // m: the foot of a lamp (0.22 m post) stands at least this far outside every carriageway (QA TR02)
   for (let i = 0; i < lights.count; i++) {
     if (buildings.collide(lights.x[i], lights.z[i], 0.2)) lampInHouse++;
     net.carve(lights.x[i], lights.z[i], li);
-    if (li.sdCar < 0) lampInRoad++;
+    if (li.sdCar < LAMP_ROAD_CLEAR) lampInRoad++;
+    if (inWall(lights.x[i], lights.z[i], 0.22)) lampInWall++;
     if (lights.x[i] < 0 || lights.z[i] < 0 || lights.x[i] > WORLD.width || lights.z[i] > WORLD.depth) lampOut++;
   }
   check('no street light stands inside a house', lampInHouse === 0, `${lampInHouse}`);
-  check('no street light stands in a carriageway', lampInRoad === 0, `${lampInRoad}`);
+  check(`no street light stands in a carriageway or within ${LAMP_ROAD_CLEAR} m of one`, lampInRoad === 0, `${lampInRoad}`);
+  check('no street light stands in a retaining wall', lampInWall === 0, `${lampInWall}`);
   check('every street light is inside the world', lampOut === 0, `${lampOut}`);
   // the lamps are solid: a car that drives at a lamp post is pushed out of it
   const propBox = createPropCollider();

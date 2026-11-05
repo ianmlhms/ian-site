@@ -187,7 +187,7 @@ async function boot() {
   const tramSim = createTramSim(tramNetwork, TRAM);
   const props = createPropCollider();                       // lamps, catenary poles and benches: small solid circles the car stops at
   const trams = createTramView({ scene, network: tramNetwork, sim: tramSim, surface, deckNetwork, env, camera, maps, props, quality });
-  const lamps = placeStreetLights({ roads: data.roads, network: field.network, buildings, map: maps });
+  const lamps = placeStreetLights({ roads: data.roads, network: field.network, buildings, map: maps, walls: data.walls });
   for (let i = 0; i < lamps.count; i++) props.add(lamps.x[i], lamps.z[i], LAMP_POST_RADIUS);
   const streetLights = createStreetLightView({ scene, lights: lamps, ground, env });
   const parkBenches = placeParkBenches({ roads: data.roads, network: field.network, buildings, map: maps });

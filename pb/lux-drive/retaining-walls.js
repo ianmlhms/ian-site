@@ -156,3 +156,44 @@ export function wallQuads(wall) {
 function front(s, y, over = 0) { return [s.x - s.nx * over, y, s.z - s.nz * over]; }
 /** A point of the back of the block (buried in the high ground) at height y. */
 function back(s, y) { return [s.x + s.nx * s.depth, y, s.z + s.nz * s.depth]; }
+
+/**
+ * A test "does a thing of radius r at (x, z) stand in a retaining wall": the block of every stretch (face line to back line, in plan) of every wall, in a spatial hash.
+ * The street lamps and the benches keep out of the walls (QA W03: a lamp stood inside the block of wall 54 at Hostert).
+ * Returns (x, z, r) => boolean.
+ */
+export function createWallFootprint(walls, cell = 16) {
+  const quads = [], grid = new Map();
+  const key = (cx, cz) => cx * 65536 + cz;
+  for (const wall of walls) {
+    for (let i = 0; i + 1 < wall.pts.length; i++) {
+      const p = wall.pts[i], q = wall.pts[i + 1];
+      const poly = [[p.x, p.z], [q.x, q.z], [q.x + q.nx * q.depth, q.z + q.nz * q.depth], [p.x + p.nx * p.depth, p.z + p.nz * p.depth]];
+      const k = quads.push(poly) - 1;
+      const xs = poly.map((v) => v[0]), zs = poly.map((v) => v[1]);
+      for (let cx = Math.floor((Math.min(...xs) - 2) / cell); cx <= Math.floor((Math.max(...xs) + 2) / cell); cx++) {
+        for (let cz = Math.floor((Math.min(...zs) - 2) / cell); cz <= Math.floor((Math.max(...zs) + 2) / cell); cz++) {
+          const l = grid.get(key(cx, cz)); if (l) l.push(k); else grid.set(key(cx, cz), [k]);
+        }
+      }
+    }
+  }
+  /** The distance from (x, z) to a convex quad (0 inside). */
+  const distTo = (poly, x, z) => {
+    let inside = true, best = Infinity;
+    for (let i = 0; i < 4; i++) {
+      const [ax, az] = poly[i], [bx, bz] = poly[(i + 1) % 4], ex = bx - ax, ez = bz - az, ll = ex * ex + ez * ez;
+      const t = ll > 1e-9 ? Math.max(0, Math.min(1, ((x - ax) * ex + (z - az) * ez) / ll)) : 0;
+      best = Math.min(best, Math.hypot(x - ax - ex * t, z - az - ez * t));
+      if (ex * (z - az) - ez * (x - ax) < 0) inside = false;
+    }
+    // (the winding of a wall quad depends on the side its back lies on: inside means all on one side)
+    if (!inside) { inside = true; for (let i = 0; i < 4; i++) { const [ax, az] = poly[i], [bx, bz] = poly[(i + 1) % 4]; if ((bx - ax) * (z - az) - (bz - az) * (x - ax) > 0) inside = false; } }
+    return inside ? 0 : best;
+  };
+  return (x, z, r) => {
+    for (const k of grid.get(key(Math.floor(x / cell), Math.floor(z / cell))) || []) if (distTo(quads[k], x, z) <= r) return true;
+    return false;
+  };
+}
+

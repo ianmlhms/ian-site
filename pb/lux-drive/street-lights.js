@@ -7,19 +7,24 @@
  * there are no lamps. */
 import { sampleDensity } from './world-map.js';
 import { ROAD } from './config.js';
+import { createWallFootprint } from './retaining-walls.js';
 
 export const LIGHT = Object.freeze({
   spacing: { primary: 26, secondary: 26, trunk: 30, tertiary: 28, unclassified: 32, residential: 30, living_street: 26, service: 0, pedestrian: 0 },
   minDensity: 0.045,            // the built share of the neighbourhood from which the street is lit
   clearAhead: 0.45,             // m between the foot of the lamp and the kerb
   keepOffBuildings: 0.5,        // m: a lamp never stands closer than this to a house
+  roadClear: 0.6,               // m: the foot of a lamp stands at least this far outside EVERY carriageway (its own street puts it ~0.9 m out; another street's carriageway once had a
+                                // lamp 0.13 m beside it, on the paint of the 1 m lattice: QA TR02, the roundabout of Rue Johannes Gutenberg)
+  keepOffWalls: 0.4,            // m: a lamp never stands in (or this close to) the block of a retaining wall (QA W03)
 });
 
 /**
- * roads: decoded roads, network: field.network (carve), buildings: the building index, map: buildWorldMap result.
+ * roads: decoded roads, network: field.network (carve), buildings: the building index, map: buildWorldMap result, walls: the retaining walls (optional).
  * Returns { count, x, z, yaw, size }: typed arrays; yaw is the direction the arm reaches (towards the street), size 0 = a small lamp, 1 = a tall one.
  */
-export function placeStreetLights({ roads, network, buildings, map }) {
+export function placeStreetLights({ roads, network, buildings, map, walls = [] }) {
+  const inWall = createWallFootprint(walls);
   const xs = [], zs = [], yaws = [], sizes = [];
   const info = { coverage: 0, sdCar: 9, sdPave: 9, band: 0 };
   for (const road of roads) {
@@ -42,7 +47,8 @@ export function placeStreetLights({ roads, network, buildings, map }) {
         // right of the way = (-dz, dx) in this frame (x east, z south); the lamp stands on `side` of it
         const px = cx - dz * lat * side, pz = cz + dx * lat * side;
         network.carve(px, pz, info);
-        if (info.sdCar < 0.1) continue;                            // a carriageway (this street's own side, or another street's)
+        if (info.sdCar < LIGHT.roadClear) continue;                 // a carriageway (this street's own side, or another street's)
+        if (inWall(px, pz, LIGHT.keepOffWalls)) continue;
         if (buildings.collide(px, pz, LIGHT.keepOffBuildings)) continue;
         xs.push(px); zs.push(pz);
         yaws.push(Math.atan2(dz * side, -dx * side));              // the arm reaches towards the street: the opposite of the side the lamp stands on
