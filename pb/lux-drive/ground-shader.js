@@ -10,17 +10,36 @@ import { ROAD } from './config.js';
 
 export { PAINT_LIGHT_GLSL };
 
+const MEDIAN_WIDTH = 3.0;       // m: road-network.js MEDIAN_WIDTH (a gap between two carriageways up to this wide is paved as a whole)
+const MARK_PIXEL = 0.0006;      // rad: a line ribbon is at least this wide per metre of distance (about a pixel at the medium quality) ...
+const MARK_BIAS = 0.03;         // m: ... and pulled this far toward the camera,
+const MARK_BIAS_PER_M = 0.0012; // plus this per metre of distance,
+const MARK_BIAS_MAX = 0.4;      // at most this (a line never shows through a car or a kerb)
+
 export const GROUND_VERTEX = `
   attribute vec4 aRoad;        // the offset from the centre line, the half width of the carriageway, the outer edge of the pavement, the distance along the centre line
   attribute vec4 aRoad2;       // the coverage of the road, the style of the markings, its material, how exactly the fine markings are drawn
   attribute vec4 aRoad3;       // the signed distance to the union of the carriageways, to the union of the pavements, the fade of the paint, to the union of the STREET carriageways
+  attribute vec4 aRoad4;       // the distances to the three nearest carriageways (exact planes per cell) and their weight (tile-mesh.js carriagewayChannels)
+  attribute vec4 aRoad5;       // the distances to the outer edges of their pavements, and to the nearest of them that is a street
+  attribute vec4 aMark;        // a lane marking ribbon (tile-mesh.js appendMarkings): the unit normal of the line (x, z), its half width, the side (-1 / +1) times the strength; 0 on the ground
   varying vec3 vWorld; varying vec3 vNormal; varying float vDist;
-  varying vec4 vRoad; varying vec4 vRoad2; varying vec4 vRoad3;
+  varying vec4 vRoad; varying vec4 vRoad2; varying vec4 vRoad3; varying vec4 vRoad4; varying vec4 vRoad5;
+  varying vec3 vMark;          // across the line (-1 .. 1), the share of the ribbon that is paint, 1 on a ribbon
   void main(){
     vec4 wp = modelMatrix * vec4(position, 1.0);
-    vWorld = wp.xyz; vNormal = normal; vRoad = aRoad; vRoad2 = aRoad2; vRoad3 = aRoad3;
+    // The ribbon of a line is laid on the ground with zero width: it is widened here, to its half width or to about a pixel at a distance (a 15 cm line is a fraction of a
+    // pixel at 100 m and would flicker in and out); the paint is thinned in proportion, so a distant line keeps its weight instead of growing.
+    float isMark = step(1e-4, aMark.z);
+    float halfW = max(aMark.z, length(cameraPosition - wp.xyz) * ${MARK_PIXEL.toFixed(5)});
+    wp.xz += aMark.xy * sign(aMark.w) * halfW * isMark;
+    vMark = vec3(sign(aMark.w), isMark * abs(aMark.w) * aMark.z / max(halfW, 1e-4), isMark);
+    vWorld = wp.xyz; vNormal = normal; vRoad = aRoad; vRoad2 = aRoad2; vRoad3 = aRoad3; vRoad4 = aRoad4; vRoad5 = aRoad5;
     vec4 mv = viewMatrix * wp;
     vDist = length(mv.xyz);
+    // the ribbon lies ON the triangles it was sampled from; it wins the depth test by being pulled a few centimetres toward the camera (more with the distance, where the depth is coarse).
+    // Along the ray of sight: the line does not move on the screen.
+    mv.xyz *= 1.0 - isMark * min(${MARK_BIAS_MAX.toFixed(2)}, ${MARK_BIAS.toFixed(3)} + ${MARK_BIAS_PER_M.toFixed(4)} * vDist) / max(vDist, 1.0);
     gl_Position = projectionMatrix * mv;
   }
 `;
@@ -33,7 +52,8 @@ export const GROUND_FRAGMENT = `
   uniform float uKerbWidth;
   uniform float uTreeRadius;
   varying vec3 vWorld; varying vec3 vNormal; varying float vDist;
-  varying vec4 vRoad; varying vec4 vRoad2; varying vec4 vRoad3;
+  varying vec4 vRoad; varying vec4 vRoad2; varying vec4 vRoad3; varying vec4 vRoad4; varying vec4 vRoad5;
+  varying vec3 vMark;
   ${PAINT_LIGHT_GLSL}
   float hash21(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
 
@@ -102,20 +122,26 @@ export const GROUND_FRAGMENT = `
     // lawn it made a wide smoky brown-grey penumbra beside every wall (the dark blotches).  The weight is sharpened to a band of a few metres.
     float urbanW = smoothstep(0.42, 0.62, urban);
     albedo = mix(albedo, city, urbanW);
-    albedo = mix(albedo, water, wetWater);
+    // the water class is a blurred 8 m cover as well: mixed straight in, the river was a teal smear far over the lawns of its banks (QA T10).  Sharpened like the city.
+    albedo = mix(albedo, water, smoothstep(0.35, 0.65, wetWater));
     // The trees of the view only reach so far: beyond them the wood is its canopy.  Without this the forest is a
     // brown litter floor under green blobs, and the land reads as a blotch of brown patches.
     float farK = smoothstep(uTreeRadius * 0.62, uTreeRadius * 1.05, vDist) * forest * (1.0 - urban);
     albedo = mix(albedo, canopy * (0.85 + 0.30 * nLo.g), farK);
 
     // ---- the road: the tarmac, the kerb, the pavement and the markings
-    float lat = vRoad.x, hw = vRoad.y, a0 = vRoad.z, s = vRoad.w;
-    float lines = vRoad2.y, surface = vRoad2.z, mark = vRoad2.w;
-    float al = abs(lat);
+    float surface = vRoad2.z;
     // The edges of the paint are the zero of the signed distance to the UNION of the carriageways / pavements (aRoad3):
-    // the lattice interpolates a continuous distance into a straight edge of constant width, per pixel.  The offset of
-    // the one nearest road (lat, hw) is only for the markings.  The edge is one pixel wide (fwidth), never a staircase.
-    float sdC = vRoad3.x, sdP = vRoad3.y;
+    // the lattice interpolates a continuous distance into a straight edge of constant width, per pixel.  The edge is one
+    // pixel wide (fwidth), never a staircase.
+    // The carriageway edge per pixel is the minimum of the CHANNELS (each a plane over the cell: the median between two carriageways is two straight kerbs, not a sawtooth
+    // of the lattice); where more carriageways meet (weight 0) the blurred union of the lattice.
+    // The pavement the same way: the nearest pavement, and the median between two carriageways (a gap of up to MEDIAN_WIDTH) paved as a whole.
+    float wC = clamp(vRoad4.w, 0.0, 1.0);
+    float sdC = mix(vRoad3.x, min(vRoad4.x, min(vRoad4.y, vRoad4.z)), wC);
+    float medianP = min(min(vRoad4.x > 0.0 && vRoad4.y > 0.0 ? vRoad4.x + vRoad4.y : 99.0, vRoad4.x > 0.0 && vRoad4.z > 0.0 ? vRoad4.x + vRoad4.z : 99.0),
+                        vRoad4.y > 0.0 && vRoad4.z > 0.0 ? vRoad4.y + vRoad4.z : 99.0) - ${MEDIAN_WIDTH.toFixed(1)};
+    float sdP = mix(vRoad3.y, min(min(vRoad5.x, min(vRoad5.y, vRoad5.z)), medianP), wC);
     float roadW = smoothstep(0.0, 0.5, vRoad3.z);
     float aaC = max(fwidth(sdC), 0.04), aaP = max(fwidth(sdP), 0.04);
     // the grain of the tarmac is a stone chip: from a distance it averages to the plain colour (from above the 3 m tile would show as a pattern), and a
@@ -133,45 +159,29 @@ export const GROUND_FRAGMENT = `
     // read as a blotch.  They get a soft border (a wider blend, so the angles round off) and a calmer, lighter grey.  Streets of 6 m and more are not touched.
     // (minor = on a carriageway but outside every street carriageway: the signed distance to those is continuous, so the pale tar of a service way that runs into the avenue ends in a
     // straight line along the avenue's edge, not in the sawtooth of the half width of the nearest way switching per node)
-    float minorW = smoothstep(0.0, 0.8, vRoad3.w) * step(surface, 0.5) * step(0.5, roadW);
-    onCarriage = mix(onCarriage, 1.0 - smoothstep(-0.5, 0.5, sdC), minorW);
+    // (where the channels hold, the distance to the street carriageways is theirs too: aRoad5.w, the nearest street among them)
+    float sdMaj = vRoad5.w;
+    float minorW = smoothstep(0.0, 0.8, mix(vRoad3.w, min(sdMaj, 8.0), wC)) * step(surface, 0.5) * step(0.5, roadW);
+    // (the soft border is a few decimetres: a wider one let the lawn under it show through as a light green halo along every narrow road, QA T09)
+    onCarriage = mix(onCarriage, 1.0 - smoothstep(-0.2, 0.2, sdC), minorW);
     surf = mix(surf, mix(surf, vec3(0.40, 0.40, 0.40) * (0.96 + 0.08 * nMid.g), 0.55), minorW);
-    float onKerb = smoothstep(-aaC, aaC, sdC) * (1.0 - smoothstep(kerbW - aaC, kerbW + aaC, sdC));
+    // (the kerb takes what the carriageway leaves: under the soft border of a service way it is the kerb, not the lawn, that shows - the green halo, QA T09)
+    float onKerb = (1.0 - onCarriage) * (1.0 - smoothstep(kerbW - aaC, kerbW + aaC, sdC));
     float onPave = smoothstep(kerbW - aaC, kerbW + aaC, sdC) * (1.0 - smoothstep(-aaP, aaP, sdP));
     // A kerb and a pavement lie on level ground: on a ramp steeper than 1.3 m/m (the foot of a retaining wall, a cutting beside a junction) the slab texture is a stretched
     // stripe with ragged teeth along the lattice, so the ramp keeps the paint of the land and only the carriageway stays painted.
     float levelK = smoothstep(0.30, 0.62, N.y);
     onKerb *= levelK; onPave *= levelK;
-    // the lane markings: a dashed centre line (3 m of paint every 9 m), the edge lines of the big roads.
-    // A paved area (a square, a footpath) carries NO markings: the paint of a square would make it a street.
-    // The markings are cut before a junction (mark is 0 there): a dash that ends in the crossing street is a fragment.
-    float markOn = smoothstep(0.5, 0.9, mark);
-    float dash = (lines > 0.5 && lines < 1.5) ? step(fract(s / 9.0), 0.34) : 1.0;
-    float centre = (1.0 - smoothstep(0.05, 0.11, al)) * dash * step(0.5, lines) * step(lines, 2.5);
-    // Where two ways meet at a shallow angle the offset lat of the nearest way is interpolated between vertices that belong to DIFFERENT ways: its gradient is no longer 1 per metre
-    // (a true offset from a centre line has a gradient of exactly 1) and the zero of lat wobbles.  The centre line fades out there: it ends cleanly instead of wobbling.
-    vec2 Jx = dFdx(P), Jy = dFdy(P), sl = vec2(dFdx(lat), dFdy(lat));           // the world gradient of lat from its screen derivatives: M g = sl with the rows Jx, Jy of M
-    float detJ = Jx.x * Jy.y - Jx.y * Jy.x;
-    float latSlope = abs(detJ) > 1e-9 ? length(vec2(Jy.y * sl.x - Jx.y * sl.y, -Jy.x * sl.x + Jx.x * sl.y)) / abs(detJ) : 1.0;
-    centre *= 1.0 - smoothstep(1.3, 1.9, latSlope);
-    // The edge line is the contour sdC = -EDGE_INSET of the union of the carriageways, NOT the offset (lat, hw) of the nearest road: that offset
-    // jumps where the nearest road changes, and the line broke into ragged pieces at bends, junctions and cuttings.  The contour of the union is
-    // continuous: it follows the carriageway round a corner and never crosses the mouth of a side street.  The width is constant on screen
-    // (fwidth), so the line stays one clean stroke from the driver's seat and from afar.
-    float edgeGate = step(0.5, lines) * step(lines, 2.5) * smoothstep(3.6, 4.4, hw);
-    float edgeHalf = max(0.07, aaC * 0.9);
-    float edge = edgeGate * (1.0 - smoothstep(edgeHalf * 0.5, edgeHalf * 1.5, abs(sdC + 0.5)));
-    // Where two carriageways overlap (a wide road with its slip road laid over it) the union has a flat RIDGE between them whose level is about -0.5: the contour sdC = -0.5 there is not an edge, it
-    // is a wide unstable streak, and it was drawn as scattered white dashes lying diagonally on the tarmac (Escher Strooss).  A real edge has a distance field of gradient 1; on the ridge it is near 0.
-    vec2 sdl = vec2(dFdx(sdC), dFdy(sdC));
-    float sdSlope = abs(detJ) > 1e-9 ? length(vec2(Jy.y * sdl.x - Jx.y * sdl.y, -Jy.x * sdl.x + Jx.x * sdl.y)) / abs(detJ) : 1.0;
-    edge *= smoothstep(0.55, 0.85, sdSlope);
-    float paint = clamp(centre + edge, 0.0, 1.0) * onCarriage * markOn * near;
+    // The lane markings are not painted from the lattice any more: they are RIBBONS (markings.js plans them per carriageway, tile-mesh.js drapes them over the triangles of the
+    // tile) drawn with this very shader, so the ground under a line is computed exactly as beside it and the paint is laid over it.  Across the ribbon vMark.x runs from -1 to 1:
+    // the edge of the paint is one pixel wide (fwidth), the line is a clean stroke from the driver's seat and from above.
+    float fwM = max(fwidth(vMark.x), 1e-3);
+    float paint = vMark.z > 0.5 ? clamp(vMark.y, 0.0, 1.0) * (1.0 - smoothstep(1.0 - 1.5 * fwM, 1.0, abs(vMark.x))) : 0.0;
 
     albedo = mix(albedo, surf, roadW * onCarriage);
     albedo = mix(albedo, pave * 0.80, roadW * onKerb);                        // the kerb stone is darker than the slabs
     albedo = mix(albedo, pave * 0.82, roadW * onPave);
-    albedo = mix(albedo, vec3(0.84, 0.83, 0.76), paint * roadW);
+    albedo = mix(albedo, vec3(0.84, 0.83, 0.76), paint);
 
     // ---- the weather: the rain darkens the tarmac and the ground
     float onRoadAny = roadW * max(onCarriage, max(onKerb, onPave));

@@ -100,9 +100,10 @@ function beamOffsets(width) {
 /**
  * decks: the decoded decks [{ id, parapet, width, pts: [[x, z]], tops: [y] }]
  * ground: the surface under the decks ({ height(x, z), roadInfoAt(x, z, out) }): the abutments reach down to it, the piers stand on it and keep out of its carriageways.
+ * laneLinesOn: false when the lane lines of the roads are laid onto the decks by the marking plan (deck-marking-view.js)
  * Returns { meshes, count, piers, update(x, z, radius) }: one mesh per chunk (chunked-flat.js), culled by the frustum and by distance.
  */
-export function createDeckView({ scene, decks, material, ground }) {
+export function createDeckView({ scene, decks, material, ground, laneLinesOn = true }) {
   const chunks = createChunkedFlat({ scene, material, name: 'luxdrive-decks' });
   const info = { sdCar: 9 };
   const sdCarAt = (x, z) => (ground && ground.roadInfoAt ? ground.roadInfoAt(x, z, info).sdCar : 9);
@@ -156,7 +157,7 @@ export function createDeckView({ scene, decks, material, ground }) {
       if (deck.abut[i]) return Math.min(y - DECK.thickness, ground.height(x, z) - ABUT.skirt);       // the wing wall of an abutment
       return y - sideDepth(y - ground.height(x, z));
     };
-    const lines = isRoad ? laneLines(deck.width) : [];
+    const lines = isRoad && laneLinesOn ? laneLines(deck.width) : [];      // (laneLinesOn false: the lines of the roads are laid on the decks by deck-marking-view.js)
     // The side vector at every point: the mitre of the two segments that meet there (scaled by 1 / cos of half the bend), so the quads of two segments share
     // their corners.  With the plain normal of each segment the outside of every bend was an open wedge: a hairline crack across the deck and its parapets at
     // every point where the deck turns (QA B07).

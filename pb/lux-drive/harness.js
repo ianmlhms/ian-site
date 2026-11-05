@@ -50,6 +50,7 @@ import { createPropCollider } from './props.js';
 import { WALL, WALL_DRAW_FACTOR, findRamp, wallQuads, rampTolerance, createWallFootprint } from './retaining-walls.js';
 import { JUNCTION, junctionClusters, driveLine } from './junction-probe.js';
 import { runBridgeChecks } from './harness-bridges.js';          // section M (bridges7)
+import { runMarkingChecks } from './marking-checks.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DATA = path.join(HERE, 'data');
@@ -1680,8 +1681,13 @@ if (wants('L')) {
   }
 }
 
-/* ---------------------------------------------------------------- M: the bridges, the portals, the ride (harness-bridges.js) */
-if (wants('M')) runBridgeChecks({ check, section, stats, data, surface, ground, net, portals, buildings, forest, playArea });
+/* ---------------------------------------------------------------- M: the lane markings (marking-checks.js) */
+if (wants('M')) {
+  section('M markings');
+  runMarkingChecks({ data, net, surface, field, decks: deckNetwork.decks.filter((d) => !landmarks.hiddenDecks.has(d.id)), check, stats, quick: QUICK });
+}
+/* ---------------------------------------------------------------- N: the bridges, the portals, the ride (harness-bridges.js) */
+if (wants('N')) runBridgeChecks({ check, section, stats, data, surface, ground, net, portals, buildings, forest, playArea });
 
 /* ---------------------------------------------------------------- the summary */
 console.log(`\n${results.fail === 0 ? 'PASS' : 'FAIL'}  ${results.pass} checks passed, ${results.fail} failed  (${((Date.now() - t0) / 1000).toFixed(1)} s)`);

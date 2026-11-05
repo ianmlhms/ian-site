@@ -1531,6 +1531,54 @@ EVERY segment, `walls2.mjs` / `dline.mjs` pins along a line, `classify.mjs`, `pi
 * Junction: the minor-tar area is now smooth but large and soft-edged; stone/concrete service ways still switch material per node.
 * Escher Strooss faint diagonal streaks (task 5): not done.  Hairpins at two levels, remaining humps: not touched.
 
+## Paint 7 (branch `lux-drive-paint7`, Mac mini): lane markings per carriageway, the edges of the paint as exact channels
+
+Started from v45 (69a705d5).  Input: QA round 1 (`~/Library/Caches/luxdrive-work/qa1/BUGS.md`).  Montages (left = v45, right = this branch, noon, medium):
+`~/Library/Caches/luxdrive-work/paint7/montages/` (`terrain.jpg` T01-T11, `marks.jpg` M01-M08 + Neudorf + Escher Strooss, `study_topdown.jpg` the ten roads of the QA markings study,
+25 m top-down); singles in `paint7/before/`, `paint7/after/` (poses `paint7/poses_all.json`).
+
+### 1. Markings are geometry, planned per carriageway (`carriageways.js`, `markings.js`, `tile-mesh.js appendMarkings`, `deck-marking-view.js`, `ground-shader.js`)
+* Root cause of M01-M07 and the Escher streaks: the shader drew the centre line from (lat, s) of the ONE nearest way interpolated over the 1 m lattice and the edge line as the contour
+  sdC = -0.5 of the union; every hand-over, slip road, junction or narrow median put two ways into one lattice cell (scribbles, jogs, lines following a ragged median).
+* Now: consecutive ways of one road are joined into CHAINS (`carriageways.js`: way ends within 1 m, < 35 deg, same name / class at a fork; 2108 marked ways -> 535 chains).  Every way
+  has a lane layout (`laneLayout`): one-way = solid edge lines + DASHED dividers (a single lane: no centre line; motorway / trunk / their links: lanes on the left, hard shoulder on
+  the right), two-way = centre (dashed; solid on trunk roads and 4+ lanes), dashed dividers, edge lines from 7 m.  Lines run as TRACKS along the chain: one continuous offset (a lane
+  count change is a 1:12 taper laid in the wider way), one continuous distance along (the 3 m / 9 m dashes keep their rhythm across hand-overs).  A line is CUT where it lies inside
+  another carriageway at its own level (side-street mouths, junction boxes, slip-road noses; beds within 1.2 m); solid pieces < 3 m are dropped.
+* Render: the tile builder drapes the visible pieces as ribbons over the tile's OWN triangles (exact height at every LOD, appended to the tile geometry: 0 extra draw calls); the
+  vertex shader widens them to ~1 px at a distance and pulls them toward the camera along the view ray (no z-fight, no screen shift).  A ribbon is laid only where the tile paints
+  carriageway (1 m lattice) and the ground is level (normal y >= 0.94): no lines up walls (M08).  On bridges the same tracks are laid on the deck (`deck-marking-view.js`, the deck
+  view draws no lane lines of its own now: `laneLinesOn: false`), so road and deck lines meet at the same offsets (M02).  Plan build 0.6 s in Node.
+* `road-network.js`: exports `gaussianSmooth`, `carriageways`, `CHANNELS`; marked roads are never the pale "minor" tar.
+
+### 2. The edges of the paint as exact channels (T01, T07, M01, Neudorf median, T02)
+* The median between two carriageways (0.5 - 2 m) fell between the 1 m lattice nodes: the union's zero contour was a sawtooth.  The carve now reports the 3 nearest CARRIAGEWAYS
+  (groups) per point with their distances, pavement distances and street flag; `tile-mesh.js carriagewayChannels` orders them per node (near ones by group, then by distance), the
+  shader takes min() of the interpolated channels per pixel (each a plane: a median is two straight kerbs) wherever a node agrees with its 8 neighbours, else the blurred union as
+  before.  The pavement (median paved as a whole) and the street distance (pale service tar) use the same channels.
+* T09: the soft border of service tar shows the kerb, not the lawn.  T10: the water class is sharpened (smoothstep 0.35-0.65).  T11: service ways have no PAINTED pavement (their
+  ground keeps the shelf: changing the shape added 3 carve walls in the world flow, so only the paint goes).
+
+### Gate M (new, `marking-checks.js`, 8 checks)
+hand-overs 1527, jumps 0, gaps 0; solid dividers on one-way carriageways 0 (was: every motorway); strays 0 / km; painted points inside another carriageway at the 20 biggest junctions
+0 of 7681; GPU ribbons vs plan 0.09 cm; line wobble on the ten study roads 0.00 cm (1383 samples, tapers aside); false kerbs inside a carriageway 0 of 25958; median edge deviation
+from its 10 m mean p95 7.1 cm / worst 17.4 cm (v45 union: 23.5 / 44.4 cm).
+
+### Gates (Mac mini)
+`harness.js` 113 PASS (105 + gate M); `luxdrive_world` PASS (walls 6, draw calls 112 / 150 / 212); holes 0 at medium and low; `luxdrive_ui` PASS; `luxdrive_webkit` PASS.
+`pb/lux-drive.html`: main.js `?v=46`.
+
+### Still wrong (honest)
+* OSM lane counts / widths jump every 50-100 m on Av. J.F. Kennedy (2 / 3 / 4 lanes): the TARMAC steps in width at those hand-overs and the lines taper with it; a taper of the tarmac
+  itself (carve) is not done.  A width step between two ways of a slip road (Jonction Grunewald, M05) is still a visible step of the tarmac.
+* Where four carriageways meet the paint falls back to the blurred union over a few metres (median worst 17 cm at JFK x 6700,7604).  Service road beside JFK (T02): the strip between
+  the two tars is clean but a faint green line remains where the two roads lie at different levels (the slope fade of kerb / pavement).
+* Single-lane one-way primaries (Route d'Esch near 4065,11551) now have no lines at all (correct rule, looks bare).  Rocade de Bonnevoie loop end: edge lines are not painted where
+  the carriageway itself lies off its level (the tarmac is narrower there than the way: M07 / T04 - no ink blot seen on v45).  T10 water: crisper, but the class map still puts
+  water on that lawn.  Lane lines on residential bridges are gone with the deck's own lines (only marked classes carry lines now).
+* The QA screenshot measurement (`qa1/run_marks.py`) was not re-run (its expected positions assume the old centre / edge layout); gate M measures the GPU arrays instead.
+* Portals, deck seams, deck median teeth (M06 white bar, B07) are the bridges7 round's.  Not measured on a real GPU / iPad.
+
 ## Bridges 7 (branch `lux-drive-bridges7`, Mac mini): bridges, tunnels, steps in the road, walls, the washboard, the camera (QA round 1)
 
 Started from v45 (69a705d5).  Input: `~/Library/Caches/luxdrive-work/qa1/BUGS.md`.  Round folder `~/Library/Caches/luxdrive-work/bridges7/`: montages (left = v45, right = this branch, noon, medium)

@@ -1,4 +1,4 @@
-/* Lux Drive harness, section M (bridges7): the bridges, the tunnel portals and the ride, as the QA round 1 found them broken.
+/* Lux Drive harness, section N (bridges7, was M before the merge with paint7): the bridges, the tunnel portals and the ride, as the QA round 1 found them broken.
  *   M1  the deck surface is one smooth profile: no step along any deck or across its two ends (B01 .. B04, T05, T06)
  *   M2  the portals: drawn at the level of their road (never on a bridge over the mouth, B10), they stop a car that drives at them and do not push a car on the
  *       land behind them or on a bridge above them (B05: thrown 50 m), no abutment wall stands in a carriageway
@@ -109,7 +109,7 @@ export function deckStepScan(ground) {
 }
 
 export function runBridgeChecks({ check, section, stats, data, surface, ground, net, portals, buildings, forest, playArea }) {
-  section('M bridges, portals, the ride (bridges7)');
+  section('N bridges, portals, the ride (bridges7; was M)');
   const o = {};
 
   // ---- M1: the deck surface (deckStepScan)

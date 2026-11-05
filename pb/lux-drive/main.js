@@ -20,6 +20,8 @@ import { buildWorldMap } from './world-map.js';
 import { createPaintTextures } from './paint-textures.js';
 import { createGroundMaterial } from './ground-shader.js';
 import { createTerrainView } from './terrain-view.js';
+import { buildMarkingPlan } from './markings.js';                 // the lane markings, planned per carriageway (paint7)
+import { createDeckMarkingView } from './deck-marking-view.js';
 import { createBuildingView } from './building-view.js';
 import { createDeckView } from './deck-view.js';
 import { createWallCollider } from './wall-collider.js';
@@ -56,6 +58,7 @@ import { t, LANGS } from './i18n.js';
 const LAMP_POST_RADIUS = 0.22;        // m: a street lamp, a catenary pole (the car stops at it like at a tree)
 const BENCH_RADIUS = 0.8;             // m: a park bench
 const BUILT_DRAW_FACTOR = 1.5;        // bridge decks and tunnel portals are drawn out to this many times the far building radius
+const DECK_MARK_RADIUS = 700;         // m: the lane lines on the bridge decks are drawn out to this distance (a 15 cm line is far below a pixel beyond)
 const MAX_FRAME_S = 0.1;              // s: a long frame (a tab in the background) never jumps the car
 const LANG_KEY = 'pb_luxdrive_lang';
 const QUALITY_KEY = 'pb_luxdrive_quality';
@@ -175,10 +178,13 @@ async function boot() {
   setLoad(0.82, 'load.build');
   await new Promise((r) => setTimeout(r, 0));
   const solid = createSolidMaterial(env);
-  const terrain = createTerrainView({ scene, surface, field, material: quality.cheapGround ? groundCheap : groundFull, quality });
+  const shownDecks = ground.decks.filter((d) => !landmarks.hiddenDecks.has(d.id));
+  const markPlan = buildMarkingPlan(data.roads, field.network, shownDecks);
+  const terrain = createTerrainView({ scene, surface, field, material: quality.cheapGround ? groundCheap : groundFull, quality, marks: markPlan });
   const city = createBuildingView({ scene, buildings, field, env, noiseTexture: textures.noise, quality, hidden: landmarks.hiddenBuildings });
   const trees = createTreeView({ scene, forest, baked: bakedTrees, field, env, quality });
-  const decks = createDeckView({ scene, decks: ground.decks.filter((d) => !landmarks.hiddenDecks.has(d.id)), material: solid, ground: ground.surface });
+  const decks = createDeckView({ scene, decks: shownDecks, material: solid, ground: ground.surface, laneLinesOn: false });
+  const deckMarks = createDeckMarkingView({ scene, plan: markPlan, material: solid });
   const walls = createWallView({ scene, walls: data.walls, material: solid });
   const landmarkView = createLandmarkView({ scene, landmarks, material: solid });
   const portalView = createPortalView({ scene, portals, ground, material: solid });
@@ -480,6 +486,7 @@ async function boot() {
     terrain.update(focusX, focusZ);
     city.update(focusX, focusZ);
     decks.update(camera.position.x, camera.position.z, quality.buildingFarRadius * BUILT_DRAW_FACTOR);
+    deckMarks.update(camera.position.x, camera.position.z, DECK_MARK_RADIUS);
     walls.update(camera.position.x, camera.position.z, quality.buildingFarRadius * WALL_DRAW_FACTOR);
     portalView.update(camera.position.x, camera.position.z, quality.buildingFarRadius * BUILT_DRAW_FACTOR);
     trees.update(camera.position.x, camera.position.z, elapsed);
@@ -524,7 +531,7 @@ async function boot() {
 
   // the API for the harness (the checks read the state of the game from here)
   window.__lux = {
-    landmarks, landmarkView, trams, tramSim, tramNetwork, streetLights, benchView, scene, camera, renderer, car, env, terrain, city, trees, surface, ground, field, portals, playArea, buildings, quality: () => quality,
+    landmarks, landmarkView, trams, tramSim, tramNetwork, streetLights, benchView, scene, camera, renderer, car, env, terrain, city, trees, surface, ground, field, portals, playArea, buildings, markPlan, quality: () => quality,
     ui, fullMap, roadIndex, sound, stepper, model, input, forest, collide, placeAt, blockedAt,
     /** The Kaart and the teleport for the flows: open the map, put the car on the road nearest to (x, z). */
     toggleMap: () => toggleMap(), startDriving: () => startDriving(), isStarted: () => started,
