@@ -1402,6 +1402,39 @@ if (wants('K')) {
     stats.wallCollision = { stretches, openLow, openHigh, segments: collider.count };
     check('retaining walls are solid for the car from the low side and from the high side', openLow === 0 && openHigh === 0, `${openLow} stretches open from the low side, ${openHigh} from the high side, of ${stretches}`);
   }
+  // The car itself: driven at a wall at full throttle for 4 s from 8 m away, from the low side (at the face) and from the high side (at the back of the block), it never gets across.
+  {
+    const collider = createWallCollider(walls, (x, z) => surface.height(x, z));
+    const tested = [];
+    for (const w of walls) {
+      if (tested.length >= 14) break;
+      if (w.pts.length < 5) continue;
+      const k = w.pts.length >> 1, p = w.pts[k], q = w.pts[k + 1];
+      if (Math.min(p.top - p.bottom, q.top - q.bottom) < WALL.shortRise) continue;
+      tested.push({ w, p, q });
+    }
+    let crossed = 0, runs = 0;
+    for (const { p, q } of tested) {
+      const mx = (p.x + q.x) / 2, mz = (p.z + q.z) / 2, nl = Math.hypot(p.nx + q.nx, p.nz + q.nz) || 1;
+      const nx = (p.nx + q.nx) / nl, nz = (p.nz + q.nz) / nl, dep = (p.depth + q.depth) / 2;
+      for (const side of ['low', 'high']) {
+        // low side: stands 8 m in front of the face and drives toward the high ground (+n); high side: 8 m behind the back and drives toward the face (-n)
+        const sx = side === 'low' ? mx - nx * 8 : mx + nx * (dep + 8), sz = side === 'low' ? mz - nz * 8 : mz + nz * (dep + 8);
+        const dir = side === 'low' ? 1 : -1;
+        if (collider.collide(sx, sz, CAR.bodyRadius)) continue;
+        const c = createCar({ ground: { height: (x, z) => surface.height(x, z), normal: (x, z, o) => surface.normal(x, z, o), hint() {} }, roadInfoAt: (x, z, out) => surface.roadInfoAt(x, z, out), collide: collider.collide, start: null });
+        c.reset(sx, sz, Math.atan2(nz * dir, nx * dir));
+        for (let i = 0; i < 240; i++) c.step(1 / 60, { throttle: 1, brake: 0, steer: 0 });
+        runs++;
+        const st = c.state;
+        // the position across the wall: along n from the face (low side: must stay < 0) / from the back (high side: must stay > 0)
+        const across = side === 'low' ? (st.x - mx) * nx + (st.z - mz) * nz : (st.x - (mx + nx * dep)) * nx + (st.z - (mz + nz * dep)) * nz;
+        if (side === 'low' ? across > 0.2 : across < -0.2) crossed++;
+      }
+    }
+    stats.wallDrive = { runs, crossed };
+    check('retaining walls: a car driven at a wall at full throttle (from the low side and from the high side) never gets across', runs >= 8 && crossed === 0, `${crossed} of ${runs} runs crossed`);
+  }
   check('retaining walls: every ramp steeper than 2 m/m beside a way has a wall (the data is not stale: re-run scripts/luxdrive/bake_walls.mjs)', bare <= Math.max(3, Math.round(ramps * 0.04)), `${bare} of ${ramps} ramps bare (${scanned} profiles), e.g. ${bareList.join('; ')}`);
 }
 
