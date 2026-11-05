@@ -1265,3 +1265,51 @@ The old probe compared a 4 cm difference with the 2 m slope and so measured any 
 * Walls are boxes of stone with flat ends: short ones (2 .. 3 samples) beside a track on a steep bank read as crates (`pairs/pair_hump1_*`); no collision with the wall (the car feels the ramp, which is too steep to climb, but can drive off the top); no texture detail beyond courses.  Walls of ramps over 6 m and on hillsides steeper than 1.4 m/m are left to the ground shader (rock).
 * Cuttings up to 5 m and embankments up to 9 m now exist where the land has a cliff beside a street (Clausener Bierg start: 5 m cut, a 5 m wall where it meets the road above); their houses are checked by gate C only.
 * Not measured on a real GPU or an iPad.
+
+## Terrain fix 3 (branch `lux-drive-terrain3`, Mac mini): grey slabs (bridge decks), walls on tarmac and solid for the car, ragged pavement at the start, junction markings
+
+Started from `lux-drive` 7529b959.  Ian's five screenshots (spawn pavement, junction markings, Escher Strooss, A1, Rue de Neudorf) were three bugs.  Montages (before | after, noon, medium): `~/Library/Caches/luxdrive-work/terrain3/montages/`
+(`r1_spawn`, `r2_junction`, `r3_esch`, `r4_a1a`, `r5_a1b`, `r6_neudorf`, `r7_neudorf_deck`, `r8_junction_top`; singles in `ref_before/`, `ref_after/`).  New tools: `scripts/luxdrive/bake_deck_fixes.mjs`, `junction_bump.mjs`,
+`shot.mjs` (`SHOT_EVAL=<file.js>` runs JS in the page after each pose), `bake_walls.mjs --debug-at=x,z`.
+
+### 1. The grey slabs were the BRIDGE DECKS (not the retaining walls)  (`deck-view.js`, `deck-shape.js`, `decks.js`, `bake_deck_fixes.mjs`, `data/decks.bin`)
+* **Cause 1: a lid over every bridge.**  The "top of the parapet" quad of `deck-view.js` ran from one parapet to the other, i.e. across the whole deck, at parapet height (grey 0.68): every deck with `parapet` (the A1 bridges, Rue de Neudorf, ...) was
+  covered by a light-grey lid with no asphalt and no markings.  The standing-on-a-plateau view of Rue de Neudorf was the lid of deck 21 / 22.
+* **Cause 2: 74 decks drawn as walls of roadbed.**  A deck that does not span a dip of the land ("stands on it") reached the ground with its sides: a footbridge 8 m over flat land at Geesseknäppchen (deck 71, 170 m long) was a grey wall 8 m high, a
+  viaduct ramp of the A1 a block 8 m high across the carriageways.
+* **Cause 3: 9 decks lie on a carriageway** (OSM bridges at road level: deck 278 11 m wide with parapets on the tarmac of Kirchberg, 285, 289 Escher Strooss; six walkways that cross a street at grade): a grey slab with parapets across the road.
+* Now: a bridge is a bridge: asphalt with edge lines and dashed lane lines at road width (a footbridge: pale concrete), a girder of 1 m (`DECK.thickness` 1.0), parapets (railings on footbridges) that are walls of 0.3 m, and piers (`piersOf`: every 26 m where the deck
+  is 2.6+ m over the ground, 1.5 m square, two columns under a deck 9+ m wide, moved along the deck out of any carriageway: 674 piers + the landmarks' own).  The side of the deck reaches the ground only within 2 m clearance and thins to the girder by 3 m
+  (`sideDepth`, continuous: no step).  Cost: draw calls unchanged (same chunk meshes), 6.4 k triangles.
+* `bake_deck_fixes.mjs` (idempotent, re-run after the carve changes): decks on a carriageway at road level (ON_ROAD_CLEAR 1.5 m, first/last 8 m excepted, landmark decks excepted) are removed (clearance < 3 m: 278, 285, 289) or split there (28, 29, 38, 57, 76, 160;
+  3 extra pieces; pieces < 12 m or < 0.5 m clear dropped).  A removed deck keeps its slot (flag bit 2) so every id that a landmark knows stays valid.  `decks.bin` 38 914 -> 38 458 bytes.
+* Gate D (new): **no deck lies on a carriageway at road level** (before: 11 decks, 9 not hidden by a landmark -> 0), **no pier stands in a carriageway** (0 of 674).
+
+### 2. Retaining walls: never on tarmac, no boxes, solid  (`retaining-walls.js`, `bake_walls.mjs`, `wall-collider.js`, gate K)
+* **On tarmac:** 76 of 143 walls had their face or back line inside a carriageway (784 points, up to 3.2 m deep: an interchange where two levels overlap in plan).  The baker now drops a ramp whose foot or head lies in a carriageway (the edge line, 0.5 m inside, aside), pulls
+  the back of the block in by at most 0.6 m, and the harness checks it (**0 of 121 walls**).  Ramps in roads: 75 (reported, `rampsInRoads`).  Walls 143 -> 121, 29 KB.
+* **Crates:** the ends of every wall run out into the ground over 2.5 m (a tip 12 cm over the ground: a wedge, not a box); a LOW ramp (< 2 m) that is only two samples long is not baked (5), higher ones keep their wall as a wedge; coping and stone darker.
+* **Solid:** `wall-collider.js` (thin walls on the face line, the back line and the ends of every stretch higher than 0.5 m, spatial hash; a car on a bridge above is not blocked): the car can neither climb the face from the low side nor drive off the top at the back.
+  Gate K: 0 of 891 stretches open, and **a car driven at 14 walls at full throttle for 4 s from 8 m, from both sides, never gets across (25 runs; 25 of 25 cross without the collider)**.
+* Gate K coverage now says what it measures: ramps in a road and ramps the 1 m lattice cannot show (a 5 m face in 2 m at a hairpin: 5) are counted apart, `rampTolerance` for faces steeper than 3 m/m, low two-sample ramps not demanded (bare 2 of 148).
+
+### 3. The start (Avenue John F. Kennedy)  (`tile-mesh.js`, `ground-shader.js`)
+* The ragged pavement: the zero contour of `sdCar` / `sdPave` (a minimum over many ways: creases) on a 1 m lattice is a sawtooth of 1 m triangles where a slip road meets the avenue.  The node values are blurred ([1 2 1]^2 / 16, `blurField`): the creases round, a straight edge does not move.
+  Kerb and pavement paint is faded out on ground steeper than 1.3 m/m (the foot of a wall: a stretched stripe).  What stays at the start: the service road that dives into a tunnel beside the avenue (a real trench with a wall), and the slab texture is large.
+* The white slab was the coping of wall 44 (a sliver of the lane); the wall now keeps off the carriageway and is a dark stone coping.
+
+### 4. Junctions  (`tile-mesh.js`, `junction-probe.js`, `junction_bump.mjs`, gate L)
+* **Marking fragments:** the dashes are drawn per pixel from the offset and the distance along of the ONE nearest road, interpolated over the lattice; where the nearest road changes inside a cell (a merge, a junction of several ways, the arms of a hairpin) the interpolation
+  draws stray dashes and diagonal bits.  Nodes on or beside a carriageway that have a neighbour on another road (or arm) now draw no markings (`maskMarkBorders`).  Gate L: painted lattice cells that hold two roads around the 20 biggest junctions **1816 of 26 324 -> 0**.
+* **Bumpiness:** measured, not fixed.  `junction_bump.mjs` drives a straight line along every way through the 20 biggest junctions at 50 km/h over the tarmac: median worst vertical acceleration in the box 5.7 m/s2 (a road is 0.04, target 1.5), worst 44 (Waassergaass).
+  Cause (Avenue J.F. Kennedy at Rue Johannes Kepler): two parallel carriageways whose designed beds differ by 22 cm, a side road between them is pinned to both and the hand-over (`OWN_FADE` 0.5 m) is a 10 .. 18 % ramp; widening it (tried: 14 and 30 m per m) made the median worse and was reverted.
+  Gate L only guards the level (median <= 8, worst <= 60 m/s2).
+
+### Gates (Mac mini)
+`harness.js` 97 checks (new: D 2, K 3, L 2), `luxdrive_world` PASS (112 / 150 / 213 draw calls), holes 0 at medium and low, `luxdrive_ui` / WebKit: see the final report.  `pb/lux-drive.html`: main.js `?v=40`.
+
+### Still wrong (honest)
+* Junction boxes are still bumpy (above).  Gate J with 500 places: worst 3.95 cm (unchanged; the points are service roads of 20 % in bends where two carriageways overlap).  8 hump stretches over 1.5 m/s2 remain (7 are single metres; the 2.7 one is the end of a way on a cliff).
+* Hairpins / rings with arms at different levels (Eecherfeld, Hellege-Geescht) and the 5 m cuts / 9 m fills beside cliffs are untouched.
+* Walls are left off where the ramp lies in a road (75 ramps): the ground shows a steep ramp there (the Nei Escher Strooss slip road).  Footbridge decks 8 m over flat land are now thin decks on piers; whether such a deck is real is for the bake (`bake_decks.py`) to say.
+* The start still has the stone-slab texture patch on the trench; not measured on a real GPU or an iPad.
