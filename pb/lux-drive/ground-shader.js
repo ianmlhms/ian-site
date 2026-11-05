@@ -129,6 +129,11 @@ export const GROUND_FRAGMENT = `
     // the kerb belongs to the materials that have one (the tarmac, the cobbles, the concrete)
     float kerbW = (surface < 2.5) ? uKerbWidth : 0.0;
     float onCarriage = 1.0 - smoothstep(-aaC, aaC, sdC);
+    // The narrow service ways between the houses are tarmac of 3-5 m: their border is the zero of a distance interpolated on a 2-4 m lattice (angular), and the dark tar beside a pale wall
+    // read as a blotch.  They get a soft border (a wider blend, so the angles round off) and a calmer, lighter grey.  Streets of 6 m and more are not touched.
+    float minorW = (1.0 - smoothstep(2.4, 3.4, hw)) * step(surface, 0.5) * step(0.5, roadW);
+    onCarriage = mix(onCarriage, 1.0 - smoothstep(-0.5, 0.5, sdC), minorW);
+    surf = mix(surf, mix(surf, vec3(0.40, 0.40, 0.40) * (0.96 + 0.08 * nMid.g), 0.55), minorW);
     float onKerb = smoothstep(-aaC, aaC, sdC) * (1.0 - smoothstep(kerbW - aaC, kerbW + aaC, sdC));
     float onPave = smoothstep(kerbW - aaC, kerbW + aaC, sdC) * (1.0 - smoothstep(-aaP, aaP, sdP));
     // the lane markings: a dashed centre line (3 m of paint every 9 m), the edge lines of the big roads.
@@ -137,6 +142,12 @@ export const GROUND_FRAGMENT = `
     float markOn = smoothstep(0.5, 0.9, mark);
     float dash = (lines > 0.5 && lines < 1.5) ? step(fract(s / 9.0), 0.34) : 1.0;
     float centre = (1.0 - smoothstep(0.05, 0.11, al)) * dash * step(0.5, lines) * step(lines, 2.5);
+    // Where two ways meet at a shallow angle the offset `lat` of the nearest way is interpolated between vertices that belong to DIFFERENT ways: its gradient is no longer 1 per metre
+    // (a true offset from a centre line has a gradient of exactly 1) and the zero of `lat` wobbles.  The centre line fades out there: it ends cleanly instead of wobbling.
+    vec2 Jx = dFdx(P), Jy = dFdy(P), sl = vec2(dFdx(lat), dFdy(lat));           // the world gradient of `lat` from its screen derivatives: M g = sl with the rows Jx, Jy of M
+    float detJ = Jx.x * Jy.y - Jx.y * Jy.x;
+    float latSlope = abs(detJ) > 1e-9 ? length(vec2(Jy.y * sl.x - Jx.y * sl.y, -Jy.x * sl.x + Jx.x * sl.y)) / abs(detJ) : 1.0;
+    centre *= 1.0 - smoothstep(1.3, 1.9, latSlope);
     // The edge line is the contour sdC = -EDGE_INSET of the union of the carriageways, NOT the offset (lat, hw) of the nearest road: that offset
     // jumps where the nearest road changes, and the line broke into ragged pieces at bends, junctions and cuttings.  The contour of the union is
     // continuous: it follows the carriageway round a corner and never crosses the mouth of a side street.  The width is constant on screen

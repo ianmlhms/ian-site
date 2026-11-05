@@ -9,6 +9,7 @@
  */
 import { createRng } from './noise.js';
 import { sampleWorldMap } from './world-map.js';
+import { distanceToPolygon } from './landmark-util.js';
 
 export const BLOCK = 32;            // m, the block of the tree placement
 export const STRIDE = 6;            // x, y, z, height, species, seed
@@ -83,12 +84,13 @@ export const crownShare = (t, carve) => (isAvenueTree(t, carve) ? STREET_CROWN_S
  * The trees OSM maps one by one, without the ones that stand where nothing may grow: on a bridge, through its slab, or so near a
  * carriageway that the crown hangs over a lane (the forest trees of OSM along the motorway closed the road).  The avenue trees on the pavement
  * of a street keep half of their crown over the kerb.  Returns a NEW list (the baked one stays as it is); the harness and the game use the same.
- * { network, field, treeDecks } as in treesOfBlock.
+ * { network, field, treeDecks } as in treesOfBlock; treeFree: [{ poly, margin }] the footprints whose façades stay free of trees (landmarks.treeFree).
  */
-export function keepWaysClear(trees, { network, field, treeDecks = null }) {
+export function keepWaysClear(trees, { network, field, treeDecks = null, treeFree = [] }) {
   const scratch = network.scratch;
   return trees.filter((t) => {
     const crown = bakedCrownRadius(t);
+    if (treeFree.some((f) => distanceToPolygon(f.poly, t.x, t.z) < f.margin)) return false;
     if (t.kind !== 2) {
       network.carve(t.x, t.z, scratch);
       if (scratch.road >= 0 && scratch.lines < FOOTPATH_LINES) {

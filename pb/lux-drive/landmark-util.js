@@ -162,3 +162,16 @@ export function deckFootprint(frame, top, u0, u1, step = 8) {
   }
   return { id: -1, parapet: false, spans: true, width: u1 - u0, pts, tops: Float32Array.from(tops) };
 }
+
+/** The distance from (x, z) to the outline of a polygon [[x, z], ...] (0 inside it). */
+export function distanceToPolygon(poly, x, z) {
+  if (insidePoly(poly, x, z)) return 0;
+  let best = Infinity;
+  for (let i = 0; i < poly.length; i++) {
+    const [ax, az] = poly[i], [bx, bz] = poly[(i + 1) % poly.length];
+    const ex = bx - ax, ez = bz - az, ll = ex * ex + ez * ez;
+    const t = ll > 1e-9 ? Math.min(1, Math.max(0, ((x - ax) * ex + (z - az) * ez) / ll)) : 0;
+    best = Math.min(best, Math.hypot(x - ax - ex * t, z - az - ez * t));
+  }
+  return best;
+}

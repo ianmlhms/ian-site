@@ -10,6 +10,7 @@ import { SITE_FOOTPRINTS as FOOT, FORT_TOWERS } from './landmark-site-data.js';
 
 const TAU = Math.PI * 2;
 const SINK = 1.0;
+const FACADE_TREE_FREE = 9;      // m: no tree OSM maps stands this near the walls of the Coque or the Mudam (the photographs show their façades and the sky behind the roof line, not a trunk)
 const bottomsOf = (ground, pts) => pts.map((p) => ground(p[0], p[1]) - SINK);
 const centroid = (pts) => [pts.reduce((a, p) => a + p[0], 0) / pts.length, pts.reduce((a, p) => a + p[1], 0) / pts.length];
 
@@ -392,7 +393,7 @@ export function buildCoque({ buildings, ground }) {
   const rows = rim.map((_, i) => levels.map((lv) => [lv.pts[i][0], lv.y, lv.pts[i][1]]));
   const cols = rim.map((_, i) => levels.map((_lv, k) => paint(C.roofDark, i * 7 + k, 0.05)));
   soup.grid(rows, cols, { loop: true, flip: 'auto' });
-  return { soup, walls: edgeWalls(poly, 0.4, 'coque'), hideBuildings: hidden.map((b) => b.id), hideDecks: [], info: { blocks: hidden.length, rise: K.rise } };
+  return { soup, walls: edgeWalls(poly, 0.4, 'coque'), hideBuildings: hidden.map((b) => b.id), hideDecks: [], treeFree: [{ poly, margin: FACADE_TREE_FREE }], info: { blocks: hidden.length, rise: K.rise } };
 }
 
 /* ------------------------------------------------------------------------------------------------ Fort Thüngen (Dräi Eechelen) */
@@ -504,7 +505,7 @@ export function buildMudam({ ground }) {
     soup.quad(...b1, paint(C.glassTeal, 41 + k, 0.06)); soup.quad(...b2, paint(C.glassTeal, 51 + k, 0.06));
     glazeQuad(soup, ...b1, 2, 4, C.steelDark); glazeQuad(soup, ...b2, 2, 4, C.steelDark);
   }
-  return { soup, walls: edgeWalls(poly, 0.4, 'mudam'), hideBuildings: [], hideDecks: [], info: { height: K.wall + K.pyramidRise + K.lantern.height + 2.6 } };
+  return { soup, walls: edgeWalls(poly, 0.4, 'mudam'), hideBuildings: [], hideDecks: [], treeFree: [{ poly, margin: FACADE_TREE_FREE }], info: { height: K.wall + K.pyramidRise + K.lantern.height + 2.6 } };
 }
 
 /* ------------------------------------------------------------------------------------------------ BCEE (Place de Metz) */

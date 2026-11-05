@@ -83,7 +83,7 @@ const portals = createPortals(data.roads);
 const playArea = createPlayArea(area);
 const maps = buildWorldMap({ classes: data.classes, classInfo: data.classInfo, canopy: data.canopy, buildings: data.buildings });
 const treeDecks = createDeckNetwork([...ground.decks, ...landmarks.footprints]);      // the same trees as the game plants (main.js)
-const bakedTrees = keepWaysClear(data.trees, { network: field.network, field, treeDecks });
+const bakedTrees = keepWaysClear(data.trees, { network: field.network, field, treeDecks, treeFree: landmarks.treeFree });
 const forest = createTreeIndex({ map: maps, field, network: field.network, buildings, trees: bakedTrees, clearings: landmarks.clearings, treeDecks });
 const net = field.network;
 

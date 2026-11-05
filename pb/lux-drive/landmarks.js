@@ -55,6 +55,7 @@ export function createLandmarks({ buildings, decks, ground, roads = [], only = n
   const hiddenBuildings = new Set();
   const hiddenDecks = new Set();
   const walls = [];
+  const treeFree = [];            // [{ poly, margin }]: the trees OSM maps one by one keep this far from the walls of these footprints (the façades the photographs show without a tree in front)
   const footprints = [];         // the bridges as decks for the trees: no tree grows on or through them
   const clearings = [];
   for (const spec of BUILDERS) {
@@ -68,6 +69,7 @@ export function createLandmarks({ buildings, decks, ground, roads = [], only = n
     for (const id of model.hideDecks || []) hiddenDecks.add(id);
     for (const w of model.walls || []) walls.push(w);
     for (const f of model.footprints || []) footprints.push(f);
+    for (const t of model.treeFree || []) treeFree.push(t);
   }
   const scratch = { qx: 0, qz: 0 };
 
@@ -87,5 +89,5 @@ export function createLandmarks({ buildings, decks, ground, roads = [], only = n
     return best;
   }
 
-  return { list, hiddenBuildings, hiddenDecks, walls, collide, overlaps, clearings, footprints };
+  return { list, hiddenBuildings, hiddenDecks, walls, collide, overlaps, clearings, footprints, treeFree };
 }

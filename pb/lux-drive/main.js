@@ -144,7 +144,7 @@ async function boot() {
   // the trees: the woods (placed from the canopy) and the trees of OSM (the street trees, the trees of the parks)
   // no tree grows on a bridge or hangs its crown over a lane (the bridges as decks, with the full width of the landmark models)
   const treeDecks = createDeckNetwork([...ground.decks, ...landmarks.footprints]);
-  const bakedTrees = keepWaysClear(data.trees, { network: field.network, field, treeDecks });
+  const bakedTrees = keepWaysClear(data.trees, { network: field.network, field, treeDecks, treeFree: landmarks.treeFree });
   const forest = createTreeIndex({ map: maps, field, network: field.network, buildings, trees: bakedTrees, clearings: landmarks.clearings, treeDecks });
 
   // ---- the painted textures, the world maps, the sky
