@@ -200,20 +200,24 @@ export function createDeckNetwork(decks, surface = null) {
     const [lo, hi, envLo, envHi] = levels[k];
     return { ...d, tops: endEnvelope(d.pts, d.tops, lo, hi, envLo, envHi, surface) };
   });
-  const ax = [], az = [], bx = [], bz = [], t0 = [], t1 = [], half = [];
-  for (const d of list) {
+  const ax = [], az = [], bx = [], bz = [], t0 = [], t1 = [], half = [], deckOf = [], ends = [];
+  list.forEach((d, k) => {
+    const last = d.pts.length - 2;
     for (let i = 0; i + 1 < d.pts.length; i++) {
       ax.push(d.pts[i][0]); az.push(d.pts[i][1]);
       bx.push(d.pts[i + 1][0]); bz.push(d.pts[i + 1][1]);
       t0.push(d.tops[i]); t1.push(d.tops[i + 1]);
       half.push(d.width / 2);
+      deckOf.push(k);
+      ends.push((i === 0 ? 1 : 0) | (i === last ? 2 : 0));       // bit 0: the first segment of its deck, bit 1: the last
     }
-  }
+  });
   const count = ax.length;
   const AX = Float32Array.from(ax), AZ = Float32Array.from(az);
   const BX = Float32Array.from(bx), BZ = Float32Array.from(bz);
   const T0 = Float32Array.from(t0), T1 = Float32Array.from(t1);
   const HALF = Float32Array.from(half);
+  const DECK_OF = Int32Array.from(deckOf), ENDS = Uint8Array.from(ends);
   const CELL = DECK.cell;
   const cellKey = (cx, cz) => (cx + 8192) * 32768 + (cz + 8192);
   const buckets = new Map();
@@ -232,11 +236,17 @@ export function createDeckNetwork(decks, surface = null) {
   for (const [key, list] of buckets) cells.set(key, Int32Array.from(list));
   const EMPTY = new Int32Array(0);
 
-  /** The deck over (x, z) whose surface the car can stand on (or null). out = { top, slope, ux, uz, along }. */
-  function deckAt(x, z, y, out) {
-    if (count === 0) return null;
+  // Per query: the nearest segment of every deck within reach of (x, z).  One deck answers with ONE segment, the one the point lies on: with "the highest
+  // segment within reach" a climbing deck answered with the start of the span ahead (its round end cap reaches 5 m forward: a step of the grade x 5 m at
+  // every point of the deck, QA B01 / B04), and with the distance to the infinite LINE of a segment a straight viaduct answered with whichever span 60 m
+  // ahead was highest (B04: a step at every 32 m hash cell; T05 / T06: a deck lifted the road beyond its end by up to 1 m).  The two ends of a deck are
+  // square (no cap over the approach road); between two segments the clamp covers the outside of the bend.
+  const MAX_CAND = 32;
+  const candDeck = new Int32Array(MAX_CAND), candSeg = new Int32Array(MAX_CAND), candT = new Float64Array(MAX_CAND), candSide = new Float64Array(MAX_CAND);
+  let candCount = 0;
+  function gather(x, z) {
+    candCount = 0;
     const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
-    let best = null;
     for (let dz = -1; dz <= 1; dz++) {
       for (let dx = -1; dx <= 1; dx++) {
         const list = cells.get(cellKey(cx + dx, cz + dz)) || EMPTY;
@@ -247,21 +257,37 @@ export function createDeckNetwork(decks, surface = null) {
           const ll = ex * ex + ez * ez;
           if (ll < 1e-9) continue;
           let t = ((x - ax0) * ex + (z - az0) * ez) / ll;
+          if ((t < 0 && (ENDS[i] & 1)) || (t > 1 && (ENDS[i] & 2))) continue;      // beyond the end of the deck: square
           t = t < 0 ? 0 : t > 1 ? 1 : t;
-          const qx = ax0 + ex * t, qz = az0 + ez * t;
-          const side = Math.abs((x - qx) * -ez + (z - qz) * ex) / Math.sqrt(ll);
+          const side = Math.hypot(x - (ax0 + ex * t), z - (az0 + ez * t));
           if (side > HALF[i] + DECK.margin) continue;
-          const top = T0[i] + (T1[i] - T0[i]) * t;
-          if (y < top - DECK.stickBelow) continue;              // the car is under the deck: the ground stays the ground
-          if (!best || top > best.top) {
-            const len = Math.sqrt(ll);
-            out.top = top;
-            out.slope = (T1[i] - T0[i]) / len;
-            out.ux = ex / len; out.uz = ez / len;
-            out.along = (x - ax0) * out.ux + (z - az0) * out.uz;
-            best = out;
-          }
+          const dk = DECK_OF[i];
+          let c = 0;
+          while (c < candCount && candDeck[c] !== dk) c++;
+          if (c < candCount) { if (side < candSide[c]) { candSeg[c] = i; candT[c] = t; candSide[c] = side; } continue; }
+          if (candCount === MAX_CAND) continue;
+          candDeck[c] = dk; candSeg[c] = i; candT[c] = t; candSide[c] = side; candCount++;
         }
+      }
+    }
+  }
+
+  /** The deck over (x, z) whose surface the car can stand on (or null). out = { top, slope, ux, uz, along }. */
+  function deckAt(x, z, y, out) {
+    if (count === 0) return null;
+    gather(x, z);
+    let best = null;
+    for (let c = 0; c < candCount; c++) {
+      const i = candSeg[c], t = candT[c];
+      const top = T0[i] + (T1[i] - T0[i]) * t;
+      if (y < top - DECK.stickBelow) continue;              // the car is under the deck: the ground stays the ground
+      if (!best || top > best.top) {
+        const ax0 = AX[i], az0 = AZ[i], ex = BX[i] - ax0, ez = BZ[i] - az0, len = Math.hypot(ex, ez);
+        out.top = top;
+        out.slope = (T1[i] - T0[i]) / len;
+        out.ux = ex / len; out.uz = ez / len;
+        out.along = (x - ax0) * out.ux + (z - az0) * out.uz;
+        best = out;
       }
     }
     return best;
@@ -273,25 +299,12 @@ export function createDeckNetwork(decks, surface = null) {
    */
   function overheadAt(x, z, y) {
     if (count === 0) return Infinity;
-    const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
+    gather(x, z);
     let lowest = Infinity;
-    for (let dz = -1; dz <= 1; dz++) {
-      for (let dx = -1; dx <= 1; dx++) {
-        const bucket = cells.get(cellKey(cx + dx, cz + dz)) || EMPTY;
-        for (let q = 0; q < bucket.length; q++) {
-          const i = bucket[q];
-          const ax0 = AX[i], az0 = AZ[i];
-          const ex = BX[i] - ax0, ez = BZ[i] - az0;
-          const ll = ex * ex + ez * ez;
-          if (ll < 1e-9) continue;
-          let t = ((x - ax0) * ex + (z - az0) * ez) / ll;
-          t = t < 0 ? 0 : t > 1 ? 1 : t;
-          const side = Math.abs((x - (ax0 + ex * t)) * -ez + (z - (az0 + ez * t)) * ex) / Math.sqrt(ll);
-          if (side > HALF[i] + DECK.margin) continue;
-          const bottom = T0[i] + (T1[i] - T0[i]) * t - DECK.thickness;
-          if (bottom > y && bottom < lowest) lowest = bottom;
-        }
-      }
+    for (let c = 0; c < candCount; c++) {
+      const i = candSeg[c];
+      const bottom = T0[i] + (T1[i] - T0[i]) * candT[c] - DECK.thickness;
+      if (bottom > y && bottom < lowest) lowest = bottom;
     }
     return lowest;
   }
