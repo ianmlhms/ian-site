@@ -61,8 +61,8 @@ const xz = (p) => [p[0], p[2]];
  * from the end to the front wall (their side faces go down to the ground), `fronts` lists the points where a front wall stands.  The surface is unchanged (the inserted
  * points lie on it).  Pure: returns a new deck.
  */
-function withAbutments(deck, ground) {
-  const list = abutmentsOf(deck, ground);
+function withAbutments(deck, ground, sdCarAt) {
+  const list = abutmentsOf(deck, ground, sdCarAt);
   const n = deck.pts.length;
   if (!list.length) return { ...deck, abut: new Uint8Array(n), fronts: [] };
   const cum = [0];
@@ -144,7 +144,7 @@ export function createDeckView({ scene, decks, material, ground }) {
   };
   for (const source of decks) {
     if (source.pts.length < 2) continue;
-    const deck = withAbutments(source, ground);
+    const deck = withAbutments(source, ground, sdCarAt);
     const n = deck.pts.length;
     const b = chunks.builderAt(deck.pts[n >> 1][0], deck.pts[n >> 1][1]);          // the whole deck goes to the chunk of its middle
     const half = deck.width / 2;

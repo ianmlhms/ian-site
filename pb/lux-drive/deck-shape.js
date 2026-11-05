@@ -92,24 +92,32 @@ export const ABUT = Object.freeze({
   footShare: 0.85,         // the foot of the bank: the first station where the clearance reaches this share of the largest clearance within `reach`
   bankMax: 0.8,            // the bank is steep: from FILL_FULL of clearance to the foot within this many metres per metre of clearance (gentler: a valley, no abutment)
   skirt: 0.5,              // m: the walls go this far under the ground
+  roadClear: 0.3,          // m: the front wall stands at least this far outside every carriageway (the signed distance of the ground's road field)
 });
 
 /**
  * The abutments of a deck: [{ end: 0 | 1, s }] (s: the arc length of the front wall, from the start of the deck).  Only an end that lies on the ground (within
  * FILL_FULL) has one.  Pure (the view draws them, the harness can count them).
  */
-export function abutmentsOf(deck, ground) {
+export function abutmentsOf(deck, ground, sdCarAt = null) {
   const n = deck.pts.length;
   if (n < 2 || !ground || deck.width < ROAD_MIN_WIDTH) return [];          // (a footbridge lands on stairs and ramps)
   const cum = [0];
   for (let i = 1; i < n; i++) cum.push(cum[i - 1] + Math.hypot(deck.pts[i][0] - deck.pts[i - 1][0], deck.pts[i][1] - deck.pts[i - 1][1]));
   const total = cum[n - 1];
-  const sample = (s) => {
+  const place = (s) => {
     let i = 1;
     while (i < n - 1 && cum[i] < s) i++;
     const f = Math.min(1, Math.max(0, (s - cum[i - 1]) / Math.max(cum[i] - cum[i - 1], 1e-6)));
-    const x = deck.pts[i - 1][0] + (deck.pts[i][0] - deck.pts[i - 1][0]) * f, z = deck.pts[i - 1][1] + (deck.pts[i][1] - deck.pts[i - 1][1]) * f;
-    return deck.tops[i - 1] + (deck.tops[i] - deck.tops[i - 1]) * f - ground.height(x, z);
+    const dx = deck.pts[i][0] - deck.pts[i - 1][0], dz = deck.pts[i][1] - deck.pts[i - 1][1], l = Math.hypot(dx, dz) || 1;
+    return { x: deck.pts[i - 1][0] + dx * f, z: deck.pts[i - 1][1] + dz * f, top: deck.tops[i - 1] + (deck.tops[i] - deck.tops[i - 1]) * f, sx: -dz / l, sz: dx / l };
+  };
+  const sample = (s) => { const p = place(s); return p.top - ground.height(p.x, p.z); };
+  // the front wall keeps out of the carriageway under the bridge (its foot is often the edge of that road): it moves up the bank until it does
+  const inRoad = (s) => {
+    if (!sdCarAt) return false;
+    const p = place(s);
+    return [-1, -0.5, 0, 0.5, 1].some((k) => sdCarAt(p.x + p.sx * k * deck.width / 2, p.z + p.sz * k * deck.width / 2) < ABUT.roadClear);
   };
   const out = [];
   for (const end of [0, 1]) {
@@ -120,9 +128,11 @@ export function abutmentsOf(deck, ground) {
     for (let d = 0; d <= reach; d += ABUT.step) cl.push(sample(from(d)));
     const cmax = Math.max(...cl);
     if (cmax < ABUT.clear || cmax > ABUT.clearMax) continue;
-    const foot = cl.findIndex((c) => c >= cmax * ABUT.footShare);
+    let foot = cl.findIndex((c) => c >= cmax * ABUT.footShare);
     const bank = cl.findIndex((c) => c > FILL_FULL);
     if (foot < 0 || bank < 0 || (foot - bank) * ABUT.step > ABUT.bankMax * cmax) continue;    // a gentle valley side: the ground is drawn as it is
+    while (foot > bank && inRoad(from(foot * ABUT.step))) foot--;
+    if (inRoad(from(foot * ABUT.step))) continue;                                                // (no room for a wall outside the road)
     out.push({ end, s: from(foot * ABUT.step), cmax, bank: (foot - bank) * ABUT.step });
   }
   return out;

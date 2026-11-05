@@ -49,6 +49,7 @@ import { placeParkBenches } from './park-benches.js';
 import { createPropCollider } from './props.js';
 import { WALL, WALL_DRAW_FACTOR, findRamp, wallQuads, rampTolerance, createWallFootprint } from './retaining-walls.js';
 import { JUNCTION, junctionClusters, driveLine } from './junction-probe.js';
+import { runBridgeChecks } from './harness-bridges.js';          // section M (bridges7)
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DATA = path.join(HERE, 'data');
@@ -562,7 +563,8 @@ if (wants('D')) {
   // with the bridge (before, the pieces were pinned to the valley floor under the joint: 16 m spikes at Rue de Neudorf), so it is checked as a joint below, not for the ground.
   const deckEndList = [];
   for (const d of decks) if (d.pts.length > 1) deckEndList.push({ d, k: 0, j: 1 }, { d, k: d.pts.length - 1, j: d.pts.length - 2 });
-  const jointOf = (e) => (landmarks.hiddenDecks.has(e.d.id) ? [] : deckEndList.filter((o) => o.d !== e.d && !landmarks.hiddenDecks.has(o.d.id) && Math.hypot(o.d.pts[o.k][0] - e.d.pts[e.k][0], o.d.pts[o.k][1] - e.d.pts[e.k][1]) <= DECK.joinTolerance));
+  // (a ring's two ends meet each other: its closing point is a joint with itself, not an end - bridges7, deck 33 over the Kirchberg interchange)
+  const jointOf = (e) => (landmarks.hiddenDecks.has(e.d.id) ? [] : deckEndList.filter((o) => (o.d !== e.d || o.k !== e.k) && !landmarks.hiddenDecks.has(o.d.id) && Math.hypot(o.d.pts[o.k][0] - e.d.pts[e.k][0], o.d.pts[o.k][1] - e.d.pts[e.k][1]) <= DECK.joinTolerance));
   const isJoint = (e) => { const others = jointOf(e); return others.length > 0 && others.every((o) => Math.abs(o.d.tops[o.k] - e.d.tops[e.k]) <= 0.05); };
 
   // The deck meets the ground at its two ends: it is pinned to the approach road, not floating in the air.
@@ -1677,6 +1679,9 @@ if (wants('L')) {
       `${steep} of ${pts} points (${(100 * steep / Math.max(1, pts)).toFixed(2)} %), e.g. ${steepList.join('; ')}`);
   }
 }
+
+/* ---------------------------------------------------------------- M: the bridges, the portals, the ride (harness-bridges.js) */
+if (wants('M')) runBridgeChecks({ check, section, stats, data, surface, ground, net, portals, buildings, forest, playArea });
 
 /* ---------------------------------------------------------------- the summary */
 console.log(`\n${results.fail === 0 ? 'PASS' : 'FAIL'}  ${results.pass} checks passed, ${results.fail} failed  (${((Date.now() - t0) / 1000).toFixed(1)} s)`);

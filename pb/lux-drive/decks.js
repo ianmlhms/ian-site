@@ -142,7 +142,9 @@ function deckEndTops(decks, surface) {
     // a way runs onto the deck here: its end is near and it leaves through it toward the deck (a way that only ends beside the deck, at an angle, does not)
     const isApproach = approach.some((q) => Math.abs(q[0] - x) <= DECK.approachJoin && Math.abs(q[1] - z) <= DECK.approachJoin && Math.hypot(q[0] - x, q[1] - z) <= DECK.approachJoin &&
       q[2] * e.into[0] + q[3] * e.into[1] >= DECK.approachAlign);
-    const joint = isApproach ? [] : ends.filter((o) => o.k !== e.k && Math.hypot(o.p[0] - x, o.p[1] - z) <= DECK.joinTolerance);
+    // (a RING closes on itself, its two ends at one point: the ring over the Kirchberg interchange, deck 33.  Its closing point is a joint with itself: pinned to the
+    // ground under it, the ring had a 13 m cliff 4 m from its "end")
+    const joint = isApproach ? [] : ends.filter((o) => (o.k !== e.k || o.side !== e.side) && Math.hypot(o.p[0] - x, o.p[1] - z) <= DECK.joinTolerance);
     let level, envelope;
     if (joint.length) { level = (e.inner + joint.reduce((sum, o) => sum + o.inner, 0)) / (joint.length + 1); envelope = true; }
     else { level = isApproach || !surface.field ? surface.height(x, z) : Math.max(surface.height(x, z), surface.field.height(x, z)); envelope = isApproach; }   // (a bank: on the 1 m lattice and on the ground itself, whichever is higher - an end on the edge of a drop dived into the continuous ground)
@@ -217,7 +219,23 @@ export function createDeckNetwork(decks, surface = null) {
   const BX = Float32Array.from(bx), BZ = Float32Array.from(bz);
   const T0 = Float32Array.from(t0), T1 = Float32Array.from(t1);
   const HALF = Float32Array.from(half);
-  const DECK_OF = Int32Array.from(deckOf), ENDS = Uint8Array.from(ends);
+  const DECK_OF = Int32Array.from(deckOf), ENDS = Uint8Array.from(ends), ENDS_RAW = Uint8Array.from(ends);
+  // An end of a deck where another deck goes on (a joint of one bridge in pieces, a ramp that meets the side of another deck) keeps its round cap: a square end
+  // there opened a wedge between two pieces that meet at an angle, 16 m deep (decks 22 / 37 at Neudorf).  Only a free end (an abutment) is square.
+  for (let i = 0; i < count; i++) {
+    for (const [bit, x, z] of [[1, AX[i], AZ[i]], [2, BX[i], BZ[i]]]) {
+      if ((ENDS[i] & bit) === 0) continue;
+      let joined = false;
+      for (let j = 0; j < count && !joined; j++) {
+        if (DECK_OF[j] === DECK_OF[i]) continue;
+        const ex = BX[j] - AX[j], ez = BZ[j] - AZ[j], ll = ex * ex + ez * ez;
+        const t = ll > 1e-9 ? Math.max(0, Math.min(1, ((x - AX[j]) * ex + (z - AZ[j]) * ez) / ll)) : 0;
+        const endOfJ = ((ENDS_RAW[j] & 1) && Math.hypot(x - AX[j], z - AZ[j]) <= DECK.joinTolerance) || ((ENDS_RAW[j] & 2) && Math.hypot(x - BX[j], z - BZ[j]) <= DECK.joinTolerance);
+        if (endOfJ || Math.hypot(x - AX[j] - ex * t, z - AZ[j] - ez * t) <= HALF[j]) joined = true;     // end to end, or this end lies on the other deck
+      }
+      if (joined) ENDS[i] &= ~bit;
+    }
+  }
   const CELL = DECK.cell;
   const cellKey = (cx, cz) => (cx + 8192) * 32768 + (cz + 8192);
   const buckets = new Map();
@@ -244,8 +262,8 @@ export function createDeckNetwork(decks, surface = null) {
   // two segments the clamp covers the outside of the bend.
   const MAX_CAND = 32;
   const candDeck = new Int32Array(MAX_CAND), candSeg = new Int32Array(MAX_CAND), candT = new Float64Array(MAX_CAND), candSide = new Float64Array(MAX_CAND);
-  const candOut = new Uint8Array(MAX_CAND);       // 1: the nearest segment of that deck is its end segment and the point lies past the end: no deck here (a short end
-                                                  // segment let the round start of the next one reach 5 m back past the abutment)
+  const candOut = new Uint8Array(MAX_CAND);       // the nearest segment of that deck is its end segment and the point lies past the end: 2 a free end, no deck here (a short
+                                                  // end segment let the round start of the next one reach 5 m back past the abutment); 1 a joint, see gather
   let candCount = 0;
   function gather(x, z) {
     candCount = 0;
@@ -260,16 +278,19 @@ export function createDeckNetwork(decks, surface = null) {
           const ll = ex * ex + ez * ez;
           if (ll < 1e-9) continue;
           let t = ((x - ax0) * ex + (z - az0) * ez) / ll;
-          const beyond = (t < 0 && (ENDS[i] & 1) !== 0) || (t > 1 && (ENDS[i] & 2) !== 0);     // past an end of the deck (it is square there)
+          // past an end of the deck: 2 a free end (square: no deck there), 1 a joint (the round cap bridges to the next piece, but only where no deck lies under the point
+          // itself: the cap of one piece reached 6 m over the next and held the car at its own level, a 30 cm step on the A1 deck 18)
+          const pastEnd = (t < 0 && (ENDS_RAW[i] & 1) !== 0) || (t > 1 && (ENDS_RAW[i] & 2) !== 0);
+          const beyond = !pastEnd ? 0 : (t < 0 && (ENDS[i] & 1) !== 0) || (t > 1 && (ENDS[i] & 2) !== 0) ? 2 : 1;
           t = t < 0 ? 0 : t > 1 ? 1 : t;
           const side = Math.hypot(x - (ax0 + ex * t), z - (az0 + ez * t));
           if (side > HALF[i] + DECK.margin) continue;
           const dk = DECK_OF[i];
           let c = 0;
           while (c < candCount && candDeck[c] !== dk) c++;
-          if (c < candCount) { if (side < candSide[c]) { candSeg[c] = i; candT[c] = t; candSide[c] = side; candOut[c] = beyond ? 1 : 0; } continue; }
+          if (c < candCount) { if (side < candSide[c]) { candSeg[c] = i; candT[c] = t; candSide[c] = side; candOut[c] = beyond; } continue; }
           if (candCount === MAX_CAND) continue;
-          candDeck[c] = dk; candSeg[c] = i; candT[c] = t; candSide[c] = side; candOut[c] = beyond ? 1 : 0; candCount++;
+          candDeck[c] = dk; candSeg[c] = i; candT[c] = t; candSide[c] = side; candOut[c] = beyond; candCount++;
         }
       }
     }
@@ -280,8 +301,9 @@ export function createDeckNetwork(decks, surface = null) {
     if (count === 0) return null;
     gather(x, z);
     let best = null;
-    for (let c = 0; c < candCount; c++) {
-      if (candOut[c]) continue;
+    for (let pass = 0; pass < 2 && !best; pass++) for (let c = 0; c < candCount; c++) {
+      if (candOut[c] !== pass) continue;                    // a deck under the point first; the cap of a joint only where none is
+      if (candOut[c] === 2) continue;
       const i = candSeg[c], t = candT[c];
       const top = T0[i] + (T1[i] - T0[i]) * t;
       if (y < top - DECK.stickBelow) continue;              // the car is under the deck: the ground stays the ground
@@ -305,8 +327,8 @@ export function createDeckNetwork(decks, surface = null) {
     if (count === 0) return Infinity;
     gather(x, z);
     let lowest = Infinity;
-    for (let c = 0; c < candCount; c++) {
-      if (candOut[c]) continue;
+    for (let pass = 0; pass < 2 && lowest === Infinity; pass++) for (let c = 0; c < candCount; c++) {
+      if (candOut[c] !== pass) continue;
       const i = candSeg[c];
       const bottom = T0[i] + (T1[i] - T0[i]) * candT[c] - DECK.thickness;
       if (bottom > y && bottom < lowest) lowest = bottom;
