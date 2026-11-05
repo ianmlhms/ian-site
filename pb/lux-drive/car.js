@@ -145,7 +145,7 @@ export function createCar({ ground, roadInfoAt, collide = null, start = null }) 
       for (let pass = 0; pass < 3; pass++) {
         let hit = null;
         for (const offset of CAR.bodyCircles) {
-          hit = collide(state.x + ncy * offset, state.z + nsy * offset, CAR.bodyRadius);
+          hit = collide(state.x + ncy * offset, state.z + nsy * offset, CAR.bodyRadius, state.y - CAR.rideHeight);   // (the level of the wheels: a car on a bridge is not stopped by a wall under it)
           if (hit) break;
         }
         if (!hit) break;

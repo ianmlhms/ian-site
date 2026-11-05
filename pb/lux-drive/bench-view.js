@@ -20,6 +20,7 @@ function benchGeometry() {
 }
 
 export function createBenchView({ scene, benches, ground, env }) {
+  const land = ground.surface || ground;          // a bench stands on the land, never on the deck over it (see street-light-view.js)
   const mesh = new THREE.InstancedMesh(benchGeometry(), createPartMaterial(env), CAPACITY);
   mesh.frustumCulled = false; mesh.count = 0;
   scene.add(mesh);
@@ -43,7 +44,7 @@ export function createBenchView({ scene, benches, ground, env }) {
     for (let k = 0; k < n; k++) {
       const i = picks[k][1];
       q.setFromAxisAngle(up, benches.yaw[i]);
-      pos.set(benches.x[i], ground.height(benches.x[i], benches.z[i]), benches.z[i]);
+      pos.set(benches.x[i], land.height(benches.x[i], benches.z[i]), benches.z[i]);
       m4.compose(pos, q, sc);
       mesh.setMatrixAt(k, m4);
     }

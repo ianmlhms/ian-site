@@ -139,7 +139,7 @@ async function boot() {
   // the landmarks (the famous places) replace some blocks and some bridge decks of the bake and have collision of their own
   const landmarks = createLandmarks({ buildings: data.buildings, decks: ground.decks, ground: (x, z) => surface.height(x, z), roads: data.roads });
   const buildings = createBuildingIndex(data.buildings, { hidden: landmarks.hiddenBuildings });
-  const portals = createPortals(data.roads);
+  const portals = createPortals(data.roads, (x, z) => surface.height(x, z));
   const playArea = createPlayArea(area);
   const maps = buildWorldMap({ classes: data.classes, classInfo: data.classInfo, canopy: data.canopy, buildings: data.buildings });
   // the trees: the woods (placed from the canopy) and the trees of OSM (the street trees, the trees of the parks)
@@ -201,9 +201,13 @@ async function boot() {
   const start = data.places.start || { x: WORLD.width / 2, z: WORLD.depth / 2, yaw: 0 };
   const roadInfo = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, surface: 0, road: -1, lines: 0, lanes: 0, s: 0 };
   const wallCollider = createWallCollider(data.walls, (x, z) => ground.height(x, z));        // the retaining walls are solid from both sides (wall-collider.js)
-  const collide = (x, z, radius) => buildings.collide(x, z, radius) || landmarks.collide(x, z, radius) || wallCollider.collide(x, z, radius) || portals.collide(x, z, radius) || forest.collide(x, z, radius) || tramSim.collide(x, z, radius) || props.collide(x, z, radius) || playArea.collide(x, z, radius);
+  // On a bridge deck the trees and the street lamps of the land below are not in the way (no tree and no lamp stands on a deck: harness E, H): they
+  // have no height, and a car on the A1 viaduct was stopped by the trees of the valley 13 m under it and pushed off the edge (QA drive test, deck 35).
+  // The portals know their level (portals.js): `y` is the level of the car's wheels.
+  const collide = (x, z, radius, y) => buildings.collide(x, z, radius) || landmarks.collide(x, z, radius) || wallCollider.collide(x, z, radius) || portals.collide(x, z, radius, y) ||
+    (ground.onDeck(x, z) ? null : forest.collide(x, z, radius) || props.collide(x, z, radius)) || tramSim.collide(x, z, radius) || playArea.collide(x, z, radius);
   const car = createCar({ ground, roadInfoAt: (x, z, out) => surface.roadInfoAt(x, z, out), collide, start });
-  const chase = createChaseCamera(ground, (x, z, radius) => buildings.collide(x, z, radius) || forest.collide(x, z, radius) || portals.collide(x, z, radius));
+  const chase = createChaseCamera(ground, (x, z, radius, y) => buildings.collide(x, z, radius) || (ground.onDeck(x, z) ? null : forest.collide(x, z, radius)) || portals.collide(x, z, radius, y));
 
   // the Kaart: one road index and one painted base for the minimap, the full map and the teleport
   const roadIndex = createRoadIndex(data.roads);

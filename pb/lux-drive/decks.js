@@ -240,9 +240,12 @@ export function createDeckNetwork(decks, surface = null) {
   // segment within reach" a climbing deck answered with the start of the span ahead (its round end cap reaches 5 m forward: a step of the grade x 5 m at
   // every point of the deck, QA B01 / B04), and with the distance to the infinite LINE of a segment a straight viaduct answered with whichever span 60 m
   // ahead was highest (B04: a step at every 32 m hash cell; T05 / T06: a deck lifted the road beyond its end by up to 1 m).  The two ends of a deck are
-  // square (no cap over the approach road); between two segments the clamp covers the outside of the bend.
+  // square (no cap over the approach road): a point whose nearest segment of a deck is an end segment and that lies past that end is off the deck; between
+  // two segments the clamp covers the outside of the bend.
   const MAX_CAND = 32;
   const candDeck = new Int32Array(MAX_CAND), candSeg = new Int32Array(MAX_CAND), candT = new Float64Array(MAX_CAND), candSide = new Float64Array(MAX_CAND);
+  const candOut = new Uint8Array(MAX_CAND);       // 1: the nearest segment of that deck is its end segment and the point lies past the end: no deck here (a short end
+                                                  // segment let the round start of the next one reach 5 m back past the abutment)
   let candCount = 0;
   function gather(x, z) {
     candCount = 0;
@@ -257,16 +260,16 @@ export function createDeckNetwork(decks, surface = null) {
           const ll = ex * ex + ez * ez;
           if (ll < 1e-9) continue;
           let t = ((x - ax0) * ex + (z - az0) * ez) / ll;
-          if ((t < 0 && (ENDS[i] & 1)) || (t > 1 && (ENDS[i] & 2))) continue;      // beyond the end of the deck: square
+          const beyond = (t < 0 && (ENDS[i] & 1) !== 0) || (t > 1 && (ENDS[i] & 2) !== 0);     // past an end of the deck (it is square there)
           t = t < 0 ? 0 : t > 1 ? 1 : t;
           const side = Math.hypot(x - (ax0 + ex * t), z - (az0 + ez * t));
           if (side > HALF[i] + DECK.margin) continue;
           const dk = DECK_OF[i];
           let c = 0;
           while (c < candCount && candDeck[c] !== dk) c++;
-          if (c < candCount) { if (side < candSide[c]) { candSeg[c] = i; candT[c] = t; candSide[c] = side; } continue; }
+          if (c < candCount) { if (side < candSide[c]) { candSeg[c] = i; candT[c] = t; candSide[c] = side; candOut[c] = beyond ? 1 : 0; } continue; }
           if (candCount === MAX_CAND) continue;
-          candDeck[c] = dk; candSeg[c] = i; candT[c] = t; candSide[c] = side; candCount++;
+          candDeck[c] = dk; candSeg[c] = i; candT[c] = t; candSide[c] = side; candOut[c] = beyond ? 1 : 0; candCount++;
         }
       }
     }
@@ -278,6 +281,7 @@ export function createDeckNetwork(decks, surface = null) {
     gather(x, z);
     let best = null;
     for (let c = 0; c < candCount; c++) {
+      if (candOut[c]) continue;
       const i = candSeg[c], t = candT[c];
       const top = T0[i] + (T1[i] - T0[i]) * t;
       if (y < top - DECK.stickBelow) continue;              // the car is under the deck: the ground stays the ground
@@ -302,6 +306,7 @@ export function createDeckNetwork(decks, surface = null) {
     gather(x, z);
     let lowest = Infinity;
     for (let c = 0; c < candCount; c++) {
+      if (candOut[c]) continue;
       const i = candSeg[c];
       const bottom = T0[i] + (T1[i] - T0[i]) * candT[c] - DECK.thickness;
       if (bottom > y && bottom < lowest) lowest = bottom;

@@ -35,6 +35,7 @@ function poolGeometry() {
 }
 
 export function createStreetLightView({ scene, lights, ground, env }) {
+  const land = ground.surface || ground;          // a lamp stands on the land (none stands on a bridge): ground.height would put a lamp under a deck on the deck when the car is up there
   const material = createPartMaterial(env);
   const lamps = new THREE.InstancedMesh(lampGeometry(), material, CAPACITY);
   lamps.frustumCulled = false; lamps.count = 0;
@@ -79,7 +80,7 @@ export function createStreetLightView({ scene, lights, ground, env }) {
     const n = Math.min(CAPACITY, picks.length);
     for (let k = 0; k < n; k++) {
       const i = picks[k][1];
-      if (Number.isNaN(foot[i])) foot[i] = ground.height(lights.x[i], lights.z[i]);
+      if (Number.isNaN(foot[i])) foot[i] = land.height(lights.x[i], lights.z[i]);
       const s = lights.size[i] ? 1 : SMALL_SCALE;
       q.setFromAxisAngle(up, lights.yaw[i]);
       pos.set(lights.x[i], foot[i], lights.z[i]); sc.set(s, s, s);

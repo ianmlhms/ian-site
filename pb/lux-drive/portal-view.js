@@ -16,14 +16,17 @@ const LINING_GAP = 0.02;                      // m, the frame of concrete that s
 
 /**
  * portals: the portals of the tunnels (portals.js)
- * ground:  the ground of the world (decks.js), for the height of the mouth
+ * ground:  the ground of the world (decks.js); the mouth stands on its land (ground.surface) at the level of its road (portals.js p.y)
  * Returns { meshes, count, update(x, z, radius) }: one mesh per 512 m chunk (chunked-flat.js).
  */
 export function createPortalView({ scene, portals, ground, material }) {
   const chunks = createChunkedFlat({ scene, material, name: 'luxdrive-portals' });
+  // the land, never a deck: ground.height answers with whatever deck the car stood on last (at the start: the highest one), so a mouth under a bridge was
+  // drawn ON the bridge, a concrete block in the lane of the deck over it (QA B10, deck 32 over the A1)
+  const land = ground.surface || ground;
   for (const p of portals.list) {
     const b = chunks.builderAt(p.x, p.z);
-    const y0 = ground.height(p.x, p.z);
+    const y0 = Number.isFinite(p.y) ? p.y : land.height(p.x, p.z);
     const ix = -p.nx, iz = -p.nz;                     // into the tunnel
     const P = (u, v, y) => [p.x + p.sx * u + ix * v, y, p.z + p.sz * u + iz * v];
     const half = p.half, bore = p.bore;
@@ -31,8 +34,8 @@ export function createPortalView({ scene, portals, ground, material }) {
     const wallTop = y0 + p.top + PORTAL.lintel;
     // the ground under the two ends of the wall: the wall is buried under the lowest of them, so it never floats
     const base = Math.min(y0,
-      ground.height(p.x + p.sx * half, p.z + p.sz * half),
-      ground.height(p.x - p.sx * half, p.z - p.sz * half)) - PORTAL.base;
+      land.height(p.x + p.sx * half, p.z + p.sz * half),
+      land.height(p.x - p.sx * half, p.z - p.sz * half)) - PORTAL.base;
     const floor = y0 - 0.25;
 
     /** A box in the frame of the portal: u to the side, v into the tunnel, y up. */

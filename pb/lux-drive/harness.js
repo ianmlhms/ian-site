@@ -82,7 +82,7 @@ const deckNetwork = createDeckNetwork(fixLandmarkDecks(data.decks, (x, z) => sur
 const ground = createGround(surface, deckNetwork);
 const landmarks = createLandmarks({ buildings: data.buildings, decks: deckNetwork.decks, ground: (x, z) => surface.height(x, z), roads: data.roads });
 const buildings = createBuildingIndex(data.buildings, { hidden: landmarks.hiddenBuildings });
-const portals = createPortals(data.roads);
+const portals = createPortals(data.roads, (x, z) => surface.height(x, z));
 const playArea = createPlayArea(area);
 const maps = buildWorldMap({ classes: data.classes, classInfo: data.classInfo, canopy: data.canopy, buildings: data.buildings });
 const treeDecks = createDeckNetwork([...ground.decks, ...landmarks.footprints]);      // the same trees as the game plants (main.js)
@@ -951,11 +951,11 @@ if (wants('E')) {
 /* ---------------------------------------------------------------- F: the car and the camera */
 if (wants('F')) {
   section('F car and camera');
-  const collide = (x, z, radius) => buildings.collide(x, z, radius) || portals.collide(x, z, radius) ||
-    forest.collide(x, z, radius) || playArea.collide(x, z, radius);
+  const collide = (x, z, radius, y) => buildings.collide(x, z, radius) || portals.collide(x, z, radius, y) ||
+    (ground.onDeck(x, z) ? null : forest.collide(x, z, radius)) || playArea.collide(x, z, radius);      // (as main.js)
   const start = data.places.start;
   const car = createCar({ ground, roadInfoAt: (x, z, out) => surface.roadInfoAt(x, z, out), collide, start });
-  const chase = createChaseCamera(surface, (x, z, radius) => buildings.collide(x, z, radius) || forest.collide(x, z, radius) || portals.collide(x, z, radius));
+  const chase = createChaseCamera(surface, (x, z, radius, y) => buildings.collide(x, z, radius) || forest.collide(x, z, radius) || portals.collide(x, z, radius, y));
   car.reset(start.x, start.z, start.yaw || 0);
   chase.snap(car.state);
 

@@ -14,7 +14,7 @@ const smoothstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); retu
 
 /**
  * @param surface the ground (height, and overheadAt for the bridge decks above the car)
- * @param collide (x, z, radius) => { nx, nz, pen } | null: anything the lens must not sit in (houses, trees, tunnel portals)
+ * @param collide (x, z, radius, y) => { nx, nz, pen } | null: anything the lens at height y must not sit in (houses, trees, tunnel portals)
  */
 export function createChaseCamera(surface, collide = null) {
   let yaw = null;                       // the smoothed heading the camera sits behind
@@ -62,7 +62,7 @@ export function createChaseCamera(surface, collide = null) {
       const u = k / CAMERA.occlusionProbe;
       if (u > t) break;
       const px = lerp(eyeX, wantX, u), pz = lerp(eyeZ, wantZ, u), py = lerp(eyeY, wantY, u);
-      const blocked = (collide && collide(px, pz, CAMERA.bodyRadius)) || (surface.overheadAt && py > surface.overheadAt(px, pz, carY + 0.9) - CAMERA.deckClearance);
+      const blocked = (collide && collide(px, pz, CAMERA.bodyRadius, py)) || (surface.overheadAt && py > surface.overheadAt(px, pz, carY + 0.9) - CAMERA.deckClearance);
       if (blocked) { t = Math.max(minT, Math.min(t, (k - 1) / CAMERA.occlusionProbe)); break; }
     }
     // the boom shortens at once and grows back gently, so the camera never pops in and out along a row of trees
@@ -74,7 +74,7 @@ export function createChaseCamera(surface, collide = null) {
     let px = cx, pz = cz;
     if (collide) {                      // never inside a building: two passes push the camera out of up to two neighbours
       for (let pass = 0; pass < 2; pass++) {
-        const hit = collide(px, pz, CAMERA.bodyRadius);
+        const hit = collide(px, pz, CAMERA.bodyRadius, py);
         if (!hit) break;
         px += hit.nx * hit.pen; pz += hit.nz * hit.pen;
       }

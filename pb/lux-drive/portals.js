@@ -13,6 +13,9 @@
  * Pure (no THREE): the browser, the probes and the harness read the same portals. */
 import { PORTAL } from './config.js';
 
+const PUSH_MAX = 0.8;          // m: the most a wall pushes the car back in one pass
+const LEVEL_BELOW = 1.5;       // m: a car this far under the mouth is on another road (a portal on a bridge end, a road under it)
+
 const dist2 = (ax, az, bx, bz) => (ax - bx) * (ax - bx) + (az - bz) * (az - bz);
 const endsOf = (road) => [road.pts[0], road.pts[road.pts.length - 1]];
 
@@ -26,7 +29,9 @@ const CARRIAGEWAY = new Set([
 
 /**
  * The portals of the tunnels of a road network.
- * Returns { list, at(x, z), collide(x, z, radius) }.
+ * heightAt(x, z) (optional): the ground of the carve (surface.height, never the decks: a mouth under a bridge opens at the road under it).  It
+ * gives every portal its level `y` (the road at the mouth); without it the walls are as high as the sky (the old behaviour, for tools).
+ * Returns { list, at(x, z), collide(x, z, radius, y) }.
  *
  * A portal is { x, z, nx, nz, sx, sz, half, bore, top, depth, width, name, road }:
  *   x, z   the mouth, on the centre line of the road
@@ -37,7 +42,7 @@ const CARRIAGEWAY = new Set([
  *   top    the height of the mouth above the ground
  *   depth  how deep the wall goes into the tunnel
  */
-export function createPortals(roads) {
+export function createPortals(roads, heightAt = null) {
   const tunnels = roads.filter((r) => r.tunnel && r.info.drivable);
   const surface = roads.filter((r) => !r.tunnel && r.info.drivable);
 
@@ -111,6 +116,8 @@ export function createPortals(roads) {
   // ---- the height of the mouth: it grows with the width of the road (a garage is lower than a motorway)
   for (const p of list) {
     p.top = Math.min(5.2, Math.max(2.7, 2.5 + p.width * 0.2));
+    p.y = heightAt ? heightAt(p.x, p.z) : NaN;
+    p.wallTop = p.top + PORTAL.lintel + PORTAL.cornice;      // m above y: the top of the headwall
   }
 
   // ---- a mouth under a street has no portal: there is no open mouth there, and a wall would block the street
@@ -182,25 +189,30 @@ export function createPortals(roads) {
   }
 
   /**
-   * The wall of a portal as a collision: the car cannot cross the wall of the mouth.
+   * The wall of a portal as a collision: the car cannot cross the wall of the mouth.  The wall is a block: as wide as the portal, PORTAL.recess deep and
+   * from under the road to its top.  A car behind it (on the hill over the tunnel) or above it (on a bridge over the mouth) is not in it: the old wall was a
+   * half plane as deep as the world and as high as the sky, so a car on the land over a tunnel was pushed out through the mouth, 0.8 m per pass, and thrown
+   * 50 m off the top of the portal (QA B05), and a car on a bridge over a mouth stopped at the wall below it (B10).
+   * y (optional): the height of the car's body; without it (or without heightAt) every height counts.
    * Returns { nx, nz, pen } (the direction to push the car and how far) or null.
    */
-  function collide(x, z, radius) {
+  function collide(x, z, radius, y = NaN) {
     const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
     for (let dz = -1; dz <= 1; dz++) {
       for (let dx = -1; dx <= 1; dx++) {
         const bucket = buckets.get(key(cx + dx, cz + dz));
         if (!bucket) continue;
         for (const p of bucket) {
+          if (heightAt && (y > p.y + p.wallTop || y < p.y - LEVEL_BELOW)) continue;   // over the wall or on a road under it
           const lat = (x - p.x) * p.sx + (z - p.z) * p.sz;      // the side of the mouth
           if (lat < -p.half - radius || lat > p.half + radius) continue;
-          const dep = (x - p.x) * p.nx + (z - p.z) * p.nz;      // the distance in front of the wall
-          if (dep > radius) continue;
-          if (Math.abs(lat) > p.half) {                          // beside the wall: push the car to the side
-            const s = lat > 0 ? 1 : -1;
-            return { nx: p.sx * s, nz: p.sz * s, pen: Math.min(Math.abs(lat) - p.half + radius, 0.8) };
-          }
-          return { nx: p.nx, nz: p.nz, pen: Math.min(radius - dep, 0.8) };
+          const dep = (x - p.x) * p.nx + (z - p.z) * p.nz;      // the distance in front of the wall (negative: into the tunnel)
+          if (dep > radius || dep < -p.depth - radius) continue;
+          // out through the nearest face of the block: the front, the back or a side
+          const front = radius - dep, back = dep + p.depth + radius, side = p.half + radius - Math.abs(lat);
+          if (side < front && side < back) { const s = lat > 0 ? 1 : -1; return { nx: p.sx * s, nz: p.sz * s, pen: Math.min(side, PUSH_MAX) }; }
+          if (front <= back) return { nx: p.nx, nz: p.nz, pen: Math.min(front, PUSH_MAX) };
+          return { nx: -p.nx, nz: -p.nz, pen: Math.min(back, PUSH_MAX) };
         }
       }
     }
