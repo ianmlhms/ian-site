@@ -210,7 +210,8 @@ async function boot() {
   // On a bridge deck the trees and the street lamps of the land below are not in the way (no tree and no lamp stands on a deck: harness E, H): they
   // have no height, and a car on the A1 viaduct was stopped by the trees of the valley 13 m under it and pushed off the edge (QA drive test, deck 35).
   // The portals know their level (portals.js): `y` is the level of the car's wheels.
-  const collide = (x, z, radius, y) => buildings.collide(x, z, radius) || landmarks.collide(x, z, radius) || wallCollider.collide(x, z, radius) || portals.collide(x, z, radius, y) ||
+  // The bank under the end of a bridge stops a car that drives under the deck (decks.js bankCollide).
+  const collide = (x, z, radius, y) => buildings.collide(x, z, radius) || landmarks.collide(x, z, radius) || wallCollider.collide(x, z, radius) || portals.collide(x, z, radius, y) || ground.bankCollide(x, z, radius, y) ||
     (ground.onDeck(x, z) ? null : forest.collide(x, z, radius) || props.collide(x, z, radius)) || tramSim.collide(x, z, radius) || playArea.collide(x, z, radius);
   const car = createCar({ ground, roadInfoAt: (x, z, out) => surface.roadInfoAt(x, z, out), collide, start });
   const chase = createChaseCamera(ground, (x, z, radius, y) => buildings.collide(x, z, radius) || (ground.onDeck(x, z) ? null : forest.collide(x, z, radius)) || portals.collide(x, z, radius, y));
