@@ -4,7 +4,7 @@
  * real geometry that reads from the road: floor-slab edges and sills project from the wall, sun blinds are boxes, pilasters stand out,
  * and a darker strip under every overhang and beside every reveal is the painted shadow.  Pure (no THREE). */
 import { paint } from './landmark-soup.js';
-import { quad, ledge, pier, shelf, shade, hashUnit, gradientQuad, disc, OUT_1 } from './campus-kit.js';
+import { quad, ledge, pier, shelf, shade, hashUnit, gradientQuad, disc, bar, transom, OUT_1 } from './campus-kit.js';
 
 const GAP = 0.12;                                       // m: the mullion between two panes
 const OUT_1_PANEL = 0.05;                               // m: the spandrel band of the École de Commerce, behind its windows
@@ -245,18 +245,30 @@ export const STYLES = {
 };
 
 
-/** One window group: a light surround standing out of the wall, the glass set back inside it with a transom, slim light mullions, a pilaster at each end. */
+/** One window group of the Lycée Aline Mayrisch (photos Aline_Mayrisch_101..103): a chunky light aluminium surround standing 0.24 m out of the wall, the glass
+ * set 0.18 m back inside it, real mullion bars with depth, a transom with a row of opening lights above it (some tilted open: a lighter sash), a pilaster at
+ * each end.  The glass is sky blue at the top and dark room below (it reflects the sky in sunshine).  About 90 triangles for a 14 m group. */
 function groupWindow(row, s0, s1, y0, y1, yMin, yMax, p, seed) {
-  const sur = p.surround;
-  ledge(row, s0 - sur, s1 + sur, y1, y1 + sur, 0.22, p.frame, shade(p.frame, 1.06));              // the head
-  shelf(row, s0 - sur, s1 + sur, y0, 0.24, sur, p.frame, shade(p.frame, 1.08));                    // the sill
-  quad(row, s0 - sur, s0, y0 - 0.02, y1 + 0.02, 0.22, p.frame);                                   // the jambs
-  quad(row, s1, s1 + sur, y0 - 0.02, y1 + 0.02, 0.22, p.frame);
-  const glass = paint(p.glass, seed, 0.08);
-  gradientQuad(row, s0, s1, y0, y1, 0.08, shade(glass, 1.25), shade(glass, 0.5));                 // the reflected sky above the dark room
-  const tr = y0 + (y1 - y0) * 0.68;
-  quad(row, s0, s1, tr - 0.04, tr + 0.04, 0.14, p.frame);                                          // the transom
+  const sur = p.surround, bw = p.frameW ?? 0.11;
+  const depth = p.surroundDepth ?? 0.24, back = depth - (p.reveal ?? 0.15);
+  ledge(row, s0 - sur, s1 + sur, y1, y1 + sur, depth, p.frame, shade(p.frame, 1.06));                // the head
+  quad(row, s0, s1, y1 - 0.02, y1, back + 0.02, shade(p.frame, 0.6));                                // the shadow under it (soffit seen from below)
+  shelf(row, s0 - sur, s1 + sur, y0, depth + 0.04, sur, p.frame, shade(p.frame, 1.1));               // the sill
+  bar(row, s0 - sur, s0, y0 - 0.02, y1 + 0.02, depth, p.frame, { sides: 'hi' });                    // the jambs
+  bar(row, s1, s1 + sur, y0 - 0.02, y1 + 0.02, depth, p.frame, { sides: 'lo' });
+  const tr = y0 + (y1 - y0) * 0.66;                                                                 // the transom: below it the big panes, above the opening lights
+  const sky = paint(p.sky, seed, 0.05), room = paint(p.room, seed + 3, 0.05);
+  gradientQuad(row, s0, s1, y0, tr - bw / 2, back, shade(sky, 0.85), room);                         // lower panes: the sky in the upper part of the glass, the dark room below
+  gradientQuad(row, s0, s1, tr + bw / 2, y1, back, shade(sky, 1.1), sky);                           // opening lights: the brighter sky
+  transom(row, s0, s1, tr - bw / 2, tr + bw / 2, depth - 0.03, p.mullion, back);
   const n = Math.max(1, Math.round((s1 - s0) / p.mull));
-  for (let k = 1; k < n; k++) quad(row, s0 + ((s1 - s0) * k) / n - 0.04, s0 + ((s1 - s0) * k) / n + 0.04, y0, y1, 0.14, p.mullion);
+  const step = (s1 - s0) / n;
+  for (let k = 1; k < n; k++) bar(row, s0 + step * k - bw / 2, s0 + step * k + bw / 2, y0, y1, depth - 0.04, p.mullion, { out0: back });
+  for (let k = 0; k < n; k++) {                                                                     // a tilted-open sash in some of the upper lights
+    if (hashUnit(seed * 3 + k * 7) > 0.4) continue;
+    const a = s0 + step * k + bw, b = s0 + step * (k + 1) - bw;
+    quad(row, a, b, tr + bw / 2, y1 - 0.02, back + 0.05, shade(p.mullion, 0.96));
+    quad(row, a + 0.09, b - 0.09, tr + bw / 2 + 0.09, y1 - 0.11, back + 0.06, shade(sky, 0.8));
+  }
   quad(row, s0 - sur - 0.7, s0 - sur, yMin + 0.1, yMax - 0.4, 0.1, p.pilaster);                   // the narrow pilasters of the grey panels
 }

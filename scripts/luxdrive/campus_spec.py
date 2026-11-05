@@ -110,7 +110,7 @@ PAN_GREEN = [[0.20, 0.62, 0.34], [0.93, 0.78, 0.18], [0.16, 0.30, 0.70], [0.20, 
 PAN_MIX = [[0.80, 0.14, 0.12], [0.16, 0.30, 0.70], [0.93, 0.78, 0.18], [0.20, 0.62, 0.34]]
 def blumm_arm(key, a0, a1, palette):
     return part(key, wedge(BLC[0], BLC[1], a0, a1), [0.66, 0.66, 0.66], "panels",
-                {"floorH": 3.3, "pitch": 2.2, "palette": palette, "w": 1.35, "sill": 0.9, "h": 1.7, "glass": GLASS_DARK, "windowEvery": 2, "pier": 0.6, "columns": True, "colorSeed": len(key), "slab": [0.55, 0.55, 0.56], "frame": [0.9, 0.9, 0.88]},
+                {"floorH": 3.3, "pitch": 3.0, "palette": palette, "w": 1.35, "sill": 0.9, "h": 1.7, "glass": GLASS_DARK, "windowEvery": 2, "pier": 0.6, "columns": True, "colorSeed": len(key), "slab": [0.55, 0.55, 0.56], "frame": [0.9, 0.9, 0.88]},
                 clip=True, order=0)
 building("blumm", "Blumm (Athénée, Gaston Thorn, ENAD)", "N", [
     blumm_arm("blumm-w", 124, 199, PAN_RED),
@@ -132,7 +132,7 @@ FREE.append({"k": "sign", "x": 3584.8, "z": 9673.7, "nx": math.cos(BL_HALL), "nz
 # ÉCOLE DE COMMERCE ET DE GESTION (OSM way 26737970, the hall 41424144): yellow panels between grey pebbled pilasters with red window
 # frames, a row of sawtooth skylights in the roof, the lecture theatre as a glazed fan on the west side.
 ECG = 26737970
-ECG_FP = {"floorH": 3.0, "pitch": 3.6, "pilaster": [0.66, 0.66, 0.62], "panel": [0.94, 0.76, 0.14], "frame": [0.72, 0.12, 0.10], "glass": [0.30, 0.38, 0.46], "sill": 0.9, "h": 1.7, "pier": 0.4}
+ECG_FP = {"floorH": 3.0, "pitch": 4.4, "pilaster": [0.66, 0.66, 0.62], "panel": [0.94, 0.76, 0.14], "frame": [0.72, 0.12, 0.10], "glass": [0.30, 0.38, 0.46], "sill": 0.9, "h": 1.7, "pier": 0.4}
 building("ecg", "École de Commerce et de Gestion", "N", [
     part("ecg-main", whole(ECG).buffer(1.0), [0.66, 0.66, 0.62], "ecg", ECG_FP, clip=True, rf={"sawtooth": [[3530, 9756, 8, 36, 90, 2.4]]},
          ft=[{"k": "canopy", "x": 3551.0, "z": 9738.7, "w": 8.0, "depth": 2.8, "y": 3.1, "t": 0.7, "color": [0.80, 0.10, 0.10], "post": [0.26, 0.26, 0.28],
@@ -158,7 +158,7 @@ building("piscine", "Piscine", "C", [
 # LYCÉE MICHEL RODANGE (OSM way 37764513): beige concrete, deep window bays with red frames and white / orange blinds,
 # brown flat roofs with solar panels (LOD2 block 21934)
 LM = 37764513
-LM_FP = {"floorH": 3.2, "pitch": 2.8, "w": 1.5, "h": 1.7, "sill": 0.75, "frame": [0.64, 0.46, 0.22], "pane": [0.22, 0.32, 0.42], "blind": [0.93, 0.92, 0.88], "blindEdge": [0.82, 0.28, 0.20], "blindShare": 0.45, "pier": 0.5, "slab": [0.80, 0.74, 0.58], "sillColor": [0.80, 0.74, 0.58]}
+LM_FP = {"floorH": 3.2, "pitch": 4.0, "w": 1.5, "h": 1.7, "sill": 0.75, "frame": [0.64, 0.46, 0.22], "pane": [0.22, 0.32, 0.42], "blind": [0.93, 0.92, 0.88], "blindEdge": [0.82, 0.28, 0.20], "blindShare": 0.45, "pier": 0.5, "slab": [0.80, 0.74, 0.58], "sillColor": [0.80, 0.74, 0.58]}
 def lm(key, rc, order, **kw):
     return part(key, rect(*rc), BEIGE, "punched", LM_FP, clip=True, order=order, **kw)
 fp_lm = whole(LM).buffer(0.5)
@@ -184,14 +184,16 @@ building("hall-150", "Hall 41424150", "C", [
 # ====================================================================================================================
 # LYCÉE ALINE MAYRISCH (OSM way 37764733): a long white block on a concrete plinth along the boulevard, ribbon windows, pilotis entrance
 LA = 37764733
-LAML_WALL = [1.0, 0.92, 0.76]          # pale greige render panels (photos LAML_04, Aline_Mayrisch_101): the game's shade on a north wall needs the brightest paint
-LAML_FP = {"floorH": 3.78, "inset": 0.25, "pitch": 3.0, "sill": 0.95, "h": 2.35, "pier": 1.0, "mull": 1.5, "surround": 0.22, "endWall": 13.0,
+LAML_WALL = [0.92, 0.88, 0.78]         # pale greige render panels (photos LAML_04, Aline_Mayrisch_101); the north faces get `northLift` on top (the game's light on a north wall)
+LAML_FP = {"floorH": 3.78, "inset": 0.25, "pitch": 3.0, "sill": 0.95, "h": 2.35, "pier": 1.0, "mull": 1.7, "surround": 0.2, "frameW": 0.11, "surroundDepth": 0.24, "reveal": 0.15, "endWall": 13.0,
            "groups": [10, 14, 20, 26], "groupsTop": [7, 8.5, 10], "gapMin": 1.6, "gapMax": 3.2, "gapTop": 0.9,
-           "band": [0.88, 0.82, 0.68], "spandrel": [0.80, 0.75, 0.62], "pilaster": [0.94, 0.88, 0.74], "frame": [0.96, 0.94, 0.86],
-           "glass": [0.50, 0.50, 0.48], "mullion": [0.96, 0.95, 0.90],
+           "band": [0.88, 0.84, 0.74], "spandrel": [0.80, 0.76, 0.66], "pilaster": [0.94, 0.90, 0.80], "frame": [0.90, 0.91, 0.90],
+           "glass": [0.50, 0.50, 0.48], "mullion": [0.92, 0.93, 0.92],
+           "sky": [0.52, 0.72, 0.98], "room": [0.10, 0.14, 0.20],     # the glass reflects the sky in the sun (photos 101-103): sky blue over the dark rooms
+           "northLift": 1.4, "edge": {"h": 0.2, "out": 0.1},          # the thin roof edge of the photos instead of the thick coping
            "plinth": {"h": 5.0, "color": [0.80, 0.79, 0.76], "facing": "south", "holes": 5.5},
-           "gf": {"h": 3.7, "lift": 3.9, "abs": [273.85, 277.55], "depth": 1.8, "facing": "north", "glass": [0.26, 0.28, 0.29], "pier": [1.0, 0.92, 0.76], "pitch": 3.4, "every": 2, "pierW": 1.1,
-                  "rail": [0.62, 0.64, 0.65], "railOut": 2.2}}
+           "gf": {"h": 3.7, "lift": 3.9, "abs": [273.85, 277.55], "depth": 1.8, "facing": "north", "glass": [0.22, 0.30, 0.38], "pier": [0.76, 0.74, 0.70], "stone": [0.74, 0.72, 0.68], "pitch": 3.4, "every": 2, "pierW": 1.2,
+                  "mullion": [0.90, 0.91, 0.90], "rail": [0.64, 0.66, 0.68], "railOut": 2.2}}
 # the entrances, read off the orthophoto (bridges over the sunken court at x 3685.6 / 3747.5 / 3792.5 and the projecting lobby at 3716) and checked against the
 # photo LAML_04 (the main entrance with the sign is the third bridge from the west end: 19 % of the length from the east end; the ochre block is the lobby at 3716)
 PORCH = {"lift": 3.9, "glass": [0.28, 0.34, 0.40], "frame": [0.95, 0.93, 0.86], "cheek": [1.0, 0.92, 0.76], "soffit": [1.0, 0.95, 0.84]}
@@ -206,8 +208,11 @@ building("laml", "Lycée Aline Mayrisch", "S", [
 ], lod2=[19798])
 for lx in (3662, 3707, 3724, 3769, 3814):         # the yard lamps along the edge of the court (orthophoto: poles at z 9945..9947; photo LAML_04)
     FREE.append({"k": "lamp", "x": float(lx), "z": 9946.0, "h": 7.5})
-for bx_, bw in ((3792.5, 5.0), (3747.5, 4.0), (3716.0, 5.0), (3685.6, 4.4)):
+for bx_, bw in ((3792.5, 5.0), (3747.5, 4.0), (3685.6, 4.4)):
     FREE.append({"k": "bridge", "x": bx_, "z0": 9952.5, "z1": 9966.5, "w": bw, "wall": [0.90, 0.84, 0.70]})
+
+# the glazed lobby at 3716 (orthophoto: a block 16 m wide filling the sunken court up to the edge of the yard, no bridge there)
+FREE.append({"k": "lobby", "x": 3716.0, "z0": 9952.5, "z1": 9964.3, "w": 16.0, "frame": [0.92, 0.93, 0.92], "fascia": [0.80, 0.80, 0.78]})
 
 # FORUM (OSM way 29050032): the round hall with its solar petals (custom model campus-custom.js)
 building("forum", "Forum Geesseknäppchen", "S", [
@@ -221,7 +226,7 @@ building("forum", "Forum Geesseknäppchen", "S", [
 # International School of Luxembourg (grey and cream panels with a red stair tower)
 CO = 37826860
 BRICK = [0.60, 0.37, 0.27]
-CO_FP = {"floorH": 3.4, "pitch": 3.8, "w": 1.6, "h": 1.5, "sill": 0.9, "frame": [0.32, 0.30, 0.30], "pane": [0.22, 0.27, 0.32], "blind": [0.55, 0.50, 0.45], "blindShare": 0.2, "pier": 0.8, "sillColor": [0.55, 0.52, 0.48]}
+CO_FP = {"floorH": 3.4, "pitch": 4.8, "w": 1.6, "h": 1.5, "sill": 0.9, "frame": [0.32, 0.30, 0.30], "pane": [0.22, 0.27, 0.32], "blind": [0.55, 0.50, 0.45], "blindShare": 0.2, "pier": 0.8, "sillColor": [0.55, 0.52, 0.48]}
 building("conservatoire", "Conservatoire", "W", [
     part("cons-ring", whole(CO), BRICK, "punched", CO_FP, order=-1),
     part("cons-hall", Point(3380, 9783).buffer(17.5, 2), [0.72, 0.68, 0.60], "glass", {"floorH": 4.0, "pitch": 4.0, "glass": [0.28, 0.34, 0.38]}, order=2, clip=True,
@@ -232,7 +237,7 @@ building("conservatoire", "Conservatoire", "W", [
 FREE.append({"k": "pergola", "x0": 3321.5, "z0": 9800.0, "x1": 3352.5, "z1": 9800.0, "w": 4.6, "h": 3.3, "color": [0.24, 0.26, 0.28]})
 
 ISL_GREY = [0.44, 0.48, 0.53]
-ISL_FP = {"floorH": 3.4, "pitch": 3.6, "w": 1.1, "sill": 0.9, "h": 1.6, "glass": [0.24, 0.30, 0.38], "windowEvery": 2, "pier": 0.6, "band": [0.80, 0.80, 0.78], "bandAt": 1.5, "bandH": 1.0, "joints": 3.0}
+ISL_FP = {"floorH": 3.4, "pitch": 5.0, "w": 1.1, "sill": 0.9, "h": 1.6, "glass": [0.24, 0.30, 0.38], "windowEvery": 2, "pier": 0.6, "band": [0.80, 0.80, 0.78], "bandAt": 1.5, "bandH": 1.0, "joints": 3.0}
 IL = 195220844
 building("isl-lower", "International School of Luxembourg (Lower)", "W", [
     part("isl-lower-low", whole(IL), ISL_GREY, "bands", ISL_FP, order=-1, pct=50),
@@ -274,10 +279,10 @@ def lod2_poly(block_id):
 QUILVEST = [(3313.4, 9753.3), (3331.2, 9741.9), (3327.6, 9736.3), (3333.1, 9732.8), (3326.5, 9723.5), (3325.9, 9722.7), (3324.0, 9723.5), (3321.6, 9716.0), (3327.5, 9712.9),
             (3319.6, 9690.6), (3311.2, 9696.5), (3289.8, 9711.2), (3285.9, 9713.8)]
 building("quilvest", "Quilvest Banque Privée", "E", [
-    part("quilvest", Polygon(QUILVEST), [0.80, 0.77, 0.70], "curtain", {"floorH": 3.7, "inset": 0.4, "pitch": 3.4, "spandrel": 1.2, "glass": [0.36, 0.48, 0.58], "dark": [0.30, 0.31, 0.32],
+    part("quilvest", Polygon(QUILVEST), [0.80, 0.77, 0.70], "curtain", {"floorH": 3.7, "inset": 0.4, "pitch": 5.2, "spandrel": 1.2, "glass": [0.36, 0.48, 0.58], "dark": [0.30, 0.31, 0.32],
                                                                        "frameColor": [0.32, 0.33, 0.35]}),
 ], lod2=[15925, 21561])
-APT_FP = {"floorH": 3.0, "inset": 0.3, "pitch": 3.2, "sill": 0.9, "h": 1.5, "w": 1.4, "glass": [0.34, 0.44, 0.56], "rail": [0.84, 0.86, 0.86], "slab": [0.80, 0.80, 0.78]}
+APT_FP = {"floorH": 3.0, "inset": 0.3, "pitch": 4.2, "sill": 0.9, "h": 1.5, "w": 1.4, "glass": [0.34, 0.44, 0.56], "rail": [0.84, 0.86, 0.86], "slab": [0.80, 0.80, 0.78]}
 for key, lod, wall in (("apt-a", 16796, [0.92, 0.90, 0.82]), ("apt-b", 20511, [0.90, 0.80, 0.62]), ("apt-c", 17891, [0.90, 0.88, 0.84]), ("apt-d", 18618, [0.80, 0.70, 0.60]),
                        ("apt-e", 20802, [0.88, 0.86, 0.80])):
     building(key, "Apartments (Rue de Merl)", "E", [part(key, lod2_poly(lod), wall, "balcony", APT_FP)], lod2=[lod])

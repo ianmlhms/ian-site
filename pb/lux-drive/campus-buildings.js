@@ -11,9 +11,11 @@ import { wallRuns, boundsOfPoly } from './campus-walls.js';
 import { drawWall, drawCoping, drawFacade, planRun } from './campus-facades.js';
 import { drawRoofExtras, hippedRoof } from './campus-roofs.js';
 import { CUSTOM } from './campus-custom.js';
+import { lit } from './campus-kit.js';
 
 const PARAPET = 0.45;              // m: the wall stands this far over the roof edge
 const COPING_DEFAULT = [0.78, 0.78, 0.76];  // m: the colour of a concrete roof edge
+const NORTH_FACE = -0.3;            // a wall whose outward normal has nz below this faces north: the sun (south) never reaches it
 const WALL_RADIUS = 0.4;           // m: the collision wall of the car stands this far out of the outline (landmark.js adds the car's radius)
 
 /** A part with what the builders need: its bounds, a stable seed, the lowest ground under it. */
@@ -35,8 +37,10 @@ function drawRoof(soup, part) {
 function buildPart(soup, ground, part, all) {
   for (const bare of wallRuns(part, all)) {
     const run = planRun(bare, part, ground);
-    drawWall(soup, run, ground, part.top + PARAPET, part.wall, part.seed * 53 + run.i);
-    if (run.lowerY === null || run.s1 - run.s0 > 6) drawCoping(soup, run, part.top + PARAPET, part.coping || COPING_DEFAULT);
+    // `northLift`: the render of a north face is brighter than its paint (the game's ambient light alone makes it far darker than in the photos)
+    const wall = part.fp.northLift && run.frame.nz < NORTH_FACE ? lit(part.wall, part.fp.northLift) : part.wall;
+    drawWall(soup, run, ground, part.top + PARAPET, wall, part.seed * 53 + run.i);
+    if (run.lowerY === null || run.s1 - run.s0 > 6) drawCoping(soup, run, part.top + PARAPET, part.coping || COPING_DEFAULT, part.fp.edge || null);
     drawFacade(soup, run, part, ground);
   }
   if (part.rf && part.rf.hip) {

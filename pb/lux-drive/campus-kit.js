@@ -39,6 +39,35 @@ export function shelf(ctx, s0, s1, y, depth, thick, color, topColor = null, out0
   soup.quad(f.at(s0, y - thick, out0 + depth), f.at(s1, y - thick, out0 + depth), f.at(s1, y, out0 + depth), f.at(s0, y, out0 + depth), color);
 }
 
+/** A frame bar standing out of the wall (s0..s1, y0..y1) from `out0` to `out0 + depth`: the front and the two sides that face the opening
+ * (`sides`: 'both' | 'lo' | 'hi' | 'none' = which side faces, along s, are drawn).  Aluminium window frames are real bars with depth (6 triangles). */
+export function bar(ctx, s0, s1, y0, y1, depth, color, { out0 = 0, sides = 'both' } = {}) {
+  const { soup, f } = ctx;
+  const o = out0 + depth;
+  soup.quad(f.at(s0, y0, o), f.at(s1, y0, o), f.at(s1, y1, o), f.at(s0, y1, o), color);
+  const side = shade(color, 0.8);
+  if (sides === 'both' || sides === 'lo') soup.quad(f.at(s0, y0, out0), f.at(s0, y0, o), f.at(s0, y1, o), f.at(s0, y1, out0), side);
+  if (sides === 'both' || sides === 'hi') soup.quad(f.at(s1, y0, out0), f.at(s1, y0, o), f.at(s1, y1, o), f.at(s1, y1, out0), side);
+}
+
+/** A horizontal frame bar (a transom, a sill): front, underside and top (6 triangles). */
+export function transom(ctx, s0, s1, y0, y1, depth, color, out0 = 0) {
+  const { soup, f } = ctx;
+  const o = out0 + depth;
+  soup.quad(f.at(s0, y0, o), f.at(s1, y0, o), f.at(s1, y1, o), f.at(s0, y1, o), color);
+  soup.quad(f.at(s0, y1, out0), f.at(s1, y1, out0), f.at(s1, y1, o), f.at(s0, y1, o), shade(color, 1.08));
+  soup.quad(f.at(s0, y0, out0), f.at(s0, y0, o), f.at(s1, y0, o), f.at(s1, y0, out0), shade(color, 0.7));
+}
+
+/** `paint` of landmark-soup without the clamp to 1: a lifted wall colour (see `lit`) keeps its excess. */
+export const paintLit = (base, key, amount = 0.035) => {
+  const k = 1 + (hashUnit(key) * 2 - 1) * amount;
+  return [base[0] * k, base[1] * k, base[2] * k];
+};
+
+/** A colour scaled by k and NOT clamped to 1: a wall in the shade of a north face reads as lit as in the photo (the shader tone-maps the excess). */
+export const lit = (c, k) => [c[0] * k, c[1] * k, c[2] * k];
+
 /** A colour scaled by k (k < 1 darkens): the painted shadow under an overhang and beside a reveal. */
 export const shade = (c, k) => [Math.min(1, c[0] * k), Math.min(1, c[1] * k), Math.min(1, c[2] * k)];
 

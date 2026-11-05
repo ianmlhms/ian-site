@@ -5,7 +5,7 @@
  * Pure (no THREE). */
 import { paint } from './landmark-soup.js';
 import { STYLES } from './campus-styles.js';
-import { SINK, MIN_VISIBLE, OUT_1, OUT_2, quad, ledge, pier, shade, inGap, wallBase, recessBox, matchOnRun } from './campus-kit.js';
+import { SINK, MIN_VISIBLE, OUT_1, OUT_2, quad, ledge, pier, shade, inGap, wallBase, recessBox, matchOnRun, paintLit } from './campus-kit.js';
 import { drawWallFeatures } from './campus-wallfx.js';
 
 const WALL_STEP = 6;               // m: the wall base follows the ground at least this often
@@ -22,7 +22,7 @@ function wallStrip(soup, run, sa, sb, bottomAt, top, color, key) {
     const [xa, , za] = f.at(a, 0), [xb, , zb] = f.at(b, 0);
     const ya = bottomAt(a, xa, za), yb = bottomAt(b, xb, zb);
     if (ya >= top && yb >= top) continue;
-    soup.quad([xa, ya, za], [xb, yb, zb], [xb, top, zb], [xa, top, za], paint(color, key * 31 + k + Math.round(sa), 0.025));
+    soup.quad([xa, ya, za], [xb, yb, zb], [xb, top, zb], [xa, top, za], paintLit(color, key * 31 + k + Math.round(sa), 0.025));
   }
 }
 
@@ -46,9 +46,10 @@ export function drawWall(soup, run, ground, top, color, key) {
 }
 
 /** The roof edge: a thin projecting course (concrete coping or a fascia) over the top of the wall. */
-export function drawCoping(soup, run, top, color) {
+export function drawCoping(soup, run, top, color, edge = null) {
   const ctx = { soup, f: run.frame };
-  ledge(ctx, run.s0 - 0.1, run.s1 + 0.1, top - 0.45, top + 0.05, COPING, color, shade(color, 1.08));
+  const h = edge ? edge.h : 0.5, out = edge ? edge.out : COPING;                        // `edge`: a thin lip (the Lycée Aline Mayrisch) instead of the thick coping
+  ledge(ctx, run.s0 - 0.1, run.s1 + 0.1, top + 0.05 - h, top + 0.05, out, color, shade(color, 1.08));
 }
 
 /** The gaps of a run: recessed floors on pilotis and entrance porches (the features of kind 'recess', drawn by campus-wallfx.js). */
@@ -80,6 +81,20 @@ export function planRun(run, part, ground) {
   return { ...run, gaps, plinthHere, wallColor: part.wall };
 }
 
+const STONE_COURSE = 1.0;          // m: the height of a course of the stone cladding of the pilotis
+
+/** A pilotis pier.  With `gf.stone` it is clad in slabs: the front in courses of slightly different stone (photo Aline_Mayrisch_101: light grey granite slabs), a dark base. */
+function drawPier(ctx, s0, s1, y0, y1, depth, gf, out0, key) {
+  if (!gf.stone) { pier(ctx, s0, s1, y0, y1, depth, gf.pier, out0); return; }
+  const o = out0 + depth;
+  const n = Math.max(1, Math.round((y1 - y0) / STONE_COURSE));
+  for (let c = 0; c < n; c++) quad(ctx, s0, s1, y0 + ((y1 - y0) * c) / n, y0 + ((y1 - y0) * (c + 1)) / n, o, paint(gf.stone, key * 13 + c, 0.07));
+  const side = shade(gf.stone, 0.82);
+  ctx.soup.quad(ctx.f.at(s0, y0, out0), ctx.f.at(s0, y0, o), ctx.f.at(s0, y1, o), ctx.f.at(s0, y1, out0), side);
+  ctx.soup.quad(ctx.f.at(s1, y0, out0), ctx.f.at(s1, y0, o), ctx.f.at(s1, y1, o), ctx.f.at(s1, y1, out0), side);
+  quad(ctx, s0, s1, y0, y0 + 0.35, o + 0.02, shade(gf.stone, 0.62));                                // the dark base course
+}
+
 /** The recessed floor of a gap of kind 'gf': back glass, mullions, pilotis piers, cheeks and soffit. */
 function drawRecessedFloor(ctx, run, g, ground, gf) {
   const { soup, f } = ctx;
@@ -101,24 +116,31 @@ function drawRecessedFloor(ctx, run, g, ground, gf) {
     } else {
       quad(ctx, sa + 0.3, sb - 0.3, base - 0.3, g.yt - 0.5, OUT_1, paint(gf.glass, k + run.i * 3, 0.1));
     }
-    if (k % (gf.every || 2) === 0) pier(ctx, sa - (gf.pierW ?? 0.6) / 2, sa + (gf.pierW ?? 0.6) / 2, base - 0.3, g.yt, depth > 0.3 ? Math.min(depth, 1.0) : 0.3, gf.pier, null, depth > 0.3 ? -Math.min(depth, 1.0) + 0.05 : OUT_1);
+    if (k % (gf.every || 2) === 0) drawPier(ctx, sa - (gf.pierW ?? 0.6) / 2, sa + (gf.pierW ?? 0.6) / 2, base - 0.3, g.yt, depth > 0.3 ? Math.min(depth, 1.0) : 0.3, gf, depth > 0.3 ? -Math.min(depth, 1.0) + 0.05 : OUT_1, k + run.i);
   }
-  pier(ctx, g.s1 - (gf.pierW ?? 0.6) / 2, g.s1 + (gf.pierW ?? 0.6) / 2, lowest - 0.3, g.yt, depth > 0.3 ? Math.min(depth, 1.0) : 0.3, gf.pier, null, depth > 0.3 ? -Math.min(depth, 1.0) + 0.05 : OUT_1);
+  drawPier(ctx, g.s1 - (gf.pierW ?? 0.6) / 2, g.s1 + (gf.pierW ?? 0.6) / 2, lowest - 0.3, g.yt, depth > 0.3 ? Math.min(depth, 1.0) : 0.3, gf, depth > 0.3 ? -Math.min(depth, 1.0) + 0.05 : OUT_1, run.i + 99);
   if (gf.rail && gf.railOut !== undefined && lifted) drawRailing(ctx, g, gf);
   // the fascia of the floor above: a pale band on the edge of the slab
   ledge(ctx, g.s0, g.s1, g.yt - 0.5, g.yt, 0.25, gf.pier, shade(gf.pier, 1.06));
 }
 
-/** The railing along the edge of a yard deck in front of a recessed floor (photo LAML_04): a low concrete kerb, mesh panels between slim posts, a light top rail. */
+/** The railing along the edge of a yard deck in front of a recessed floor (photos Aline_Mayrisch_101, LAML_04): a concrete kerb with a coping, slim steel posts every
+ * 2.4 m, grey perforated panels in a frame between them, a round top rail.  Real boxes (about 12 triangles a bay), not one grey quad. */
 function drawRailing(ctx, g, gf) {
   const out = gf.railOut, y0 = g.yb;
-  const mesh = gf.rail, kerb = shade(gf.pier, 0.9);
+  const mesh = gf.rail, kerb = shade(gf.pier, 0.92), steel = shade(mesh, 0.62);
   const a = g.s0 + 0.5, b = g.s1 - 0.5;
-  quad(ctx, a, b, y0 - 0.25, y0 + 0.4, out, kerb);                                         // the concrete foot
-  quad(ctx, a, b, y0 + 0.4, y0 + 1.2, out + 0.02, mesh);                                  // the mesh
-  quad(ctx, a, b, y0 + 1.16, y0 + 1.26, out + 0.04, shade(mesh, 1.3));                    // the top rail
+  ledge(ctx, a, b, y0 - 0.25, y0 + 0.38, 0.3, kerb, shade(kerb, 1.1), out - 0.15);                  // the concrete foot with its top
   const n = Math.max(1, Math.round((b - a) / RAIL_POST));
-  for (let k = 0; k <= n; k++) { const s = a + ((b - a) * k) / n; quad(ctx, s - 0.04, s + 0.04, y0 + 0.4, y0 + 1.26, out + 0.06, shade(mesh, 0.72)); }
+  const step = (b - a) / n;
+  for (let k = 0; k < n; k++) {
+    const s0 = a + step * k, s1 = s0 + step;
+    quad(ctx, s0 + 0.05, s1 - 0.05, y0 + 0.4, y0 + 1.14, out + 0.03, shade(mesh, 1.06));              // the panel
+    quad(ctx, s0 + 0.14, s1 - 0.14, y0 + 0.5, y0 + 1.04, out + 0.05, shade(mesh, 0.82));             // the perforated field inside its frame
+    pier(ctx, s0 - 0.04, s0 + 0.04, y0 + 0.38, y0 + 1.26, 0.07, steel, out);                          // the post
+  }
+  pier(ctx, b - 0.04, b + 0.04, y0 + 0.38, y0 + 1.26, 0.07, steel, out);
+  ledge(ctx, a - 0.04, b + 0.04, y0 + 1.16, y0 + 1.26, 0.09, shade(mesh, 1.3), null, out);          // the top rail
 }
 
 /** A plinth: a band of another material (concrete) along the foot of the wall, `h` high, with a capping course on top. */

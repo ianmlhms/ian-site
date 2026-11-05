@@ -3,6 +3,7 @@
  * Each is a few boxes drawn into the props soup; items come from the bake (campus-data.js: `free` and `furniture`).  Pure (no THREE). */
 import { paint } from './landmark-soup.js';
 import { drawSign, freeFrame } from './campus-wallfx.js';
+import { gradientTri } from './campus-kit.js';
 
 const STEEL = [0.30, 0.32, 0.34];
 const WOOD = [0.52, 0.38, 0.24];
@@ -11,13 +12,57 @@ const SINK = 0.3;
 /** A box along the direction `theta` (radians, atan2(dz, dx)): `along` long, `across` wide, `h` high, its base middle at (x, y0, z). */
 const bx = (soup, x, y0, z, along, h, across, theta, color, topColor = null) => soup.box(x, y0, z, along, h, across, -theta, color, { topColor: topColor || color });
 
-/** The walkway to the porch of the Lycée Aline Mayrisch: a deck at the level of the schoolyard on two concrete cheek walls over the sunken court. */
+const HEATHER = [[0.78, 0.30, 0.52], [0.66, 0.22, 0.46], [0.84, 0.44, 0.60]];     // the heather in the troughs (photo Aline_Mayrisch_101: pink and purple)
+const PLANTER_STEP = 2.2;                                                              // m: one heather trough every this far along a bridge wall
+const PLANTER_LEN = 1.1;
+
+/** The walkway to the porch of the Lycée Aline Mayrisch: a deck at the level of the schoolyard between two concrete planter walls over the sunken court, each wall
+ * with a row of heather troughs on top and a slim steel rail beside them (photo Aline_Mayrisch_101). */
 function bridge(soup, ground, b) {
   const deck = ground(b.x, b.z0 - 1.0);
   const zm = (b.z0 + b.z1) / 2, len = Math.abs(b.z1 - b.z0);
   const foot = Math.min(ground(b.x - b.w / 2, zm), ground(b.x + b.w / 2, zm)) - 0.5;
-  for (const side of [-1, 1]) bx(soup, b.x + side * (b.w / 2 - 0.22), foot, zm, len, deck + 1.1 - foot, 0.45, Math.PI / 2, paint(b.wall, side + 3, 0.04), [0.82, 0.82, 0.80]);
+  const top = deck + 1.1;
+  for (const side of [-1, 1]) {
+    const x = b.x + side * (b.w / 2 - 0.22);
+    bx(soup, x, foot, zm, len, top - foot, 0.45, Math.PI / 2, paint(b.wall, side + 3, 0.04), [0.82, 0.82, 0.80]);
+    const n = Math.max(1, Math.floor(len / PLANTER_STEP));
+    for (let k = 0; k < n; k++) {                                                            // the heather troughs on the wall
+      const z = Math.min(b.z0, b.z1) + ((k + 0.5) * len) / n;
+      bx(soup, x, top, z, PLANTER_LEN, 0.26, 0.4, Math.PI / 2, [0.30, 0.31, 0.32], HEATHER[(k + (side > 0 ? 1 : 0)) % HEATHER.length]);
+    }
+    bx(soup, x + side * 0.28, top, zm, len, 0.05, 0.05, Math.PI / 2, STEEL);                // the rail on the outer side
+    for (const z of [Math.min(b.z0, b.z1) + 0.3, zm, Math.max(b.z0, b.z1) - 0.3]) bx(soup, x + side * 0.28, top, z, 0.05, 0.9, 0.05, 0, STEEL);
+  }
   soup.box(b.x, deck - 0.45, zm, b.w - 0.9, 0.45, len, 0, [0.50, 0.50, 0.50], { topColor: [0.62, 0.60, 0.56] });   // the deck: brick pavers
+}
+
+/** The glazed lobby of the Lycée Aline Mayrisch (orthophoto: a block 16 m wide that fills the sunken court from the building to the edge of the yard; photo
+ * LAML_04): a one-storey glass pavilion with white mullions whose flat roof is level with the yard, a dark skylight strip at the yard edge and two roof lights. */
+function lobby(soup, ground, l) {
+  const deck = ground(l.x, l.z0 - 1.0);
+  const zm = (l.z0 + l.z1) / 2, len = Math.abs(l.z1 - l.z0);
+  const foot = Math.min(ground(l.x - l.w / 2, zm), ground(l.x + l.w / 2, zm)) - 0.4;
+  const roof = deck - 0.05, glassTop = roof - 0.55;
+  const zFront = Math.min(l.z0, l.z1) + 0.2;
+  const GLASS_SKY = [0.46, 0.62, 0.80], GLASS_ROOM = [0.14, 0.18, 0.22];
+  const gy = (x0, z0, x1, z1) => {                                       // one pane run: sky above, dark room below (a gradient quad)
+    const A = [x0, foot, z0], B = [x1, foot, z1], C = [x1, glassTop, z1], D = [x0, glassTop, z0];
+    gradientTri(soup, A, B, C, GLASS_ROOM, GLASS_ROOM, GLASS_SKY);
+    gradientTri(soup, A, C, D, GLASS_ROOM, GLASS_SKY, GLASS_SKY);
+  };
+  const x0 = l.x - l.w / 2, x1 = l.x + l.w / 2, zBack = Math.max(l.z0, l.z1) - 0.2;
+  gy(x0, zFront, x1, zFront);                                           // the front, towards the yard
+  gy(x0, zFront, x0, zBack);                                            // both sides
+  gy(x1, zFront, x1, zBack);
+  const MULL = 1.9;
+  const nx = Math.max(1, Math.round(l.w / MULL)), nz = Math.max(1, Math.round(len / MULL));
+  for (let k = 0; k <= nx; k++) bx(soup, x0 + (l.w * k) / nx, foot, zFront - 0.03, 0.12, glassTop - foot, 0.14, 0, l.frame);
+  for (const x of [x0, x1]) for (let k = 1; k <= nz; k++) bx(soup, x - 0.03 * Math.sign(x - l.x), foot, zFront + ((zBack - zFront) * k) / nz - 0.12, 0.14, glassTop - foot, 0.12, 0, l.frame);
+  bx(soup, l.x, glassTop - 0.1, zFront - 0.03, l.w + 0.3, 0.14, 0.14, 0, l.frame);                    // the transom under the fascia
+  soup.box(l.x, glassTop, zm, l.w + 0.5, roof - glassTop, len + 0.2, 0, l.fascia, { topColor: [0.62, 0.60, 0.56] });   // the roof slab, level with the yard
+  soup.box(l.x, roof, zFront + 1.1, l.w - 1.0, 0.06, 1.8, 0, [0.12, 0.16, 0.22], { topColor: [0.34, 0.46, 0.62] });   // the dark skylight strip at the yard edge
+  for (const dx of [-3.2, 3.2]) soup.box(l.x + dx, roof, zm + 1.5, 2.2, 0.22, 1.4, 0, [0.70, 0.72, 0.74], { topColor: [0.46, 0.60, 0.78] });   // two roof lights
 }
 
 /** The long steel pergola: posts on both sides, cross beams, a pale glazed roof. */
@@ -154,7 +199,7 @@ function lamp(soup, ground, l) {
   bx(soup, l.x, y + l.h - 0.2, l.z - 1.1, 0.28, 0.18, 0.5, 0, [0.74, 0.74, 0.72]);
 }
 
-const DRAW = { steps, lamp, bridge, pergola, sign: freeSign, bench, table, bin, bollard, seat, playground };
+const DRAW = { steps, lamp, bridge, lobby, pergola, sign: freeSign, bench, table, bin, bollard, seat, playground };
 
 /** Draws one free item (a record of the bake: `k` = what it is); unknown kinds are an error (the bake and the game must agree). */
 export function drawFree(soup, ground, item) {
