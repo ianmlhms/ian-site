@@ -136,6 +136,10 @@ export const GROUND_FRAGMENT = `
     surf = mix(surf, mix(surf, vec3(0.40, 0.40, 0.40) * (0.96 + 0.08 * nMid.g), 0.55), minorW);
     float onKerb = smoothstep(-aaC, aaC, sdC) * (1.0 - smoothstep(kerbW - aaC, kerbW + aaC, sdC));
     float onPave = smoothstep(kerbW - aaC, kerbW + aaC, sdC) * (1.0 - smoothstep(-aaP, aaP, sdP));
+    // A kerb and a pavement lie on level ground: on a ramp steeper than 1.3 m/m (the foot of a retaining wall, a cutting beside a junction) the slab texture is a stretched
+    // stripe with ragged teeth along the lattice, so the ramp keeps the paint of the land and only the carriageway stays painted.
+    float levelK = smoothstep(0.30, 0.62, N.y);
+    onKerb *= levelK; onPave *= levelK;
     // the lane markings: a dashed centre line (3 m of paint every 9 m), the edge lines of the big roads.
     // A paved area (a square, a footpath) carries NO markings: the paint of a square would make it a street.
     // The markings are cut before a junction (mark is 0 there): a dash that ends in the crossing street is a fragment.

@@ -82,6 +82,7 @@ try {
     const stats = await page.evaluate(() => window.__lux.stats());
     if (process.env.SHOT_LIST) console.log("meshes:", JSON.stringify(await page.evaluate(() => { const c = {}; window.__lux.scene.traverse((o) => { if (o.isMesh && o.visible) { const k = o.name.replace(/[ _-]?[-0-9,.]+$/, "") || "(unnamed)"; c[k] = (c[k] || 0) + 1; } }); return c; })));
     if (process.env.SHOT_UNNAMED) console.log("unnamed:", JSON.stringify(await page.evaluate(() => { const out = []; window.__lux.scene.traverse((o) => { if (o.isMesh && o.name === "") { const g = o.geometry; g.computeBoundingBox(); const b = g.boundingBox; out.push({ type: o.type, parent: o.parent && o.parent.name, verts: g.attributes.position.count, vis: o.visible, pos: [o.position.x, o.position.y, o.position.z].map(Math.round), bb: [b.min.x, b.min.y, b.min.z, b.max.x, b.max.y, b.max.z].map(Math.round) }); } }); return out; })));
+    if (process.env.SHOT_EVAL) console.log("eval:", JSON.stringify(await page.evaluate(new Function("pose", "return (async () => {" + fs.readFileSync(process.env.SHOT_EVAL, "utf8") + "})()"), pose)));   // SHOT_EVAL=<file.js>: JS run in the page after each pose (window.__lux is the game), its returned value printed
     const file = path.join(outDir, `${pose.name}.png`);
     await page.screenshot({ path: file });
     console.log(pose.name, JSON.stringify(stats));

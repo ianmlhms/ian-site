@@ -21,15 +21,25 @@ export const WALL = Object.freeze({
   coping: 0.12,            // m: the coping stands this far above the high ground, and overhangs the face by copingLip
   copingLip: 0.07,
   courseHeight: 0.42,      // m: the height of a course of stone
-  minDepth: 0.6,           // m: the block is at least this thick (the ramp inside it is narrower, but the coping needs a seat)
+  minDepth: 0.45,          // m: the block is at least this thick (the ramp inside it is narrower, but the coping needs a seat)
+  shortRise: 2,            // m: a ramp lower than this that is only a couple of samples long is carried by the ground (a short wall of 1 .. 2 m on a bank reads as a crate): bake_walls.mjs drops it, gate K does not ask for it
   endExtend: 2,            // m: a wall found at a sample of the way covers this far along the way on both sides of it
 });
+
+/**
+ * How far the drawn ground (the 1 m lattice of the physics surface) may lie from the foot / the head of a wall point and still be "the ramp": 0.9 m, and on a ramp steeper than 3 m/m
+ * (rise / depth) the lattice itself cannot follow the face - bilinear cells of 1 m across a 4 m/m ramp are off by a metre - so 0.3 m more per m/m beyond 3.
+ */
+export function rampTolerance(rise, depth) {
+  const slope = depth > 1e-6 ? rise / depth : 0;
+  return 0.9 + 0.3 * Math.max(0, slope - 3);
+}
 
 /** The walls are drawn out to this many times the far building radius of the quality level (a wall is a small thing: a bridge deck is drawn out to 1.5 times). */
 export const WALL_DRAW_FACTOR = 0.6;
 
-const STONE = [0.60, 0.56, 0.48];
-const COPING = [0.76, 0.73, 0.67];
+const STONE = [0.56, 0.52, 0.45];
+const COPING = [0.55, 0.53, 0.49];
 const MAGIC = 0x4c4c4157;              // 'WALL'
 const FLOATS_PER_POINT = 7;            // x, z, top, bottom, depth, nx, nz
 

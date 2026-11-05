@@ -22,6 +22,8 @@ import { loadWorldData } from './world-data.js';
 import { createHeightField } from './heightfield.js';
 import { createSurface } from './surface.js';
 import { createDeckNetwork, createGround, DECK } from './decks.js';
+import { DECK_ON_ROAD, piersOf } from './deck-shape.js';
+import { createWallCollider } from './wall-collider.js';
 import { createBuildingIndex } from './buildings.js';
 import { createLandmarks, fixLandmarkDecks } from './landmarks.js';
 import { createTreeIndex, treesOfBlock, keepWaysClear, bakedCrownRadius, wayMargin, crownShare } from './trees.js';
@@ -45,7 +47,8 @@ import { createTramSim } from './tram-sim.js';
 import { placeStreetLights } from './street-lights.js';
 import { placeParkBenches } from './park-benches.js';
 import { createPropCollider } from './props.js';
-import { WALL, WALL_DRAW_FACTOR, findRamp, wallQuads } from './retaining-walls.js';
+import { WALL, WALL_DRAW_FACTOR, findRamp, wallQuads, rampTolerance } from './retaining-walls.js';
+import { JUNCTION, junctionClusters, driveLine } from './junction-probe.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DATA = path.join(HERE, 'data');
@@ -670,6 +673,45 @@ if (wants('D')) {
   }
   stats.hiddenDecksUncovered = uncovered;
   check('every deck a landmark model replaces lies inside that model (no invisible bridge)', uncovered === 0, JSON.stringify(uncoveredList));
+  // A deck is a bridge OVER whatever lies under it: no slab lies on a carriageway at road level (the grey slabs across Escher Strooss).  Samples every 1.5 m, the approach (first and
+  // last 8 m) left out; the decks a landmark replaces are not drawn.  scripts/luxdrive/bake_deck_fixes.mjs removes / splits the decks that fail this.
+  {
+    const { STEP, END_MARGIN, ON_ROAD_CLEAR, ROAD_SD } = DECK_ON_ROAD;
+    const probe = { sdCar: 9, sdPave: 9 };
+    let onRoad = 0;
+    const roadList = [];
+    for (const d of decks) {
+      if (landmarks.hiddenDecks.has(d.id)) continue;
+      const n = d.pts.length, cum = [0];
+      for (let i = 1; i < n; i++) cum.push(cum[i - 1] + Math.hypot(d.pts[i][0] - d.pts[i - 1][0], d.pts[i][1] - d.pts[i - 1][1]));
+      let hits = 0, at = null;
+      for (let i = 0; i < n - 1; i++) {
+        const L = cum[i + 1] - cum[i], m = Math.max(1, Math.ceil(L / STEP));
+        for (let k = 0; k < m; k++) {
+          const f = k / m, s = cum[i] + L * f;
+          if (s < END_MARGIN || s > cum[n - 1] - END_MARGIN) continue;
+          const x = d.pts[i][0] + (d.pts[i + 1][0] - d.pts[i][0]) * f, z = d.pts[i][1] + (d.pts[i + 1][1] - d.pts[i][1]) * f;
+          net.carve(x, z, probe);
+          if (probe.sdCar < ROAD_SD && d.tops[i] + (d.tops[i + 1] - d.tops[i]) * f - surface.height(x, z) < ON_ROAD_CLEAR) { hits++; at = at || [Math.round(x), Math.round(z)]; }
+        }
+      }
+      if (hits) { onRoad++; if (roadList.length < 6) roadList.push({ id: d.id, at, hits }); }
+    }
+    stats.decksOnCarriageway = onRoad;
+    check('no deck lies on a carriageway at road level', onRoad === 0, `${onRoad} decks${roadList.length ? ' ' + JSON.stringify(roadList) : ''}`);
+  }
+
+  // A high deck stands on piers, never on a wall of roadbed: where the deck is 3+ m over the ground and a carriageway lies under it, no pier stands in the carriageway.
+  {
+    const probe = { sdCar: 9, sdPave: 9 };
+    let inRoad = 0, piers = 0;
+    for (const d of decks) {
+      if (landmarks.hiddenDecks.has(d.id)) continue;
+      for (const p of piersOf(d, surface, (x, z) => { net.carve(x, z, probe); return probe.sdCar; })) { piers++; net.carve(p.x, p.z, probe); if (probe.sdCar < 0) inRoad++; }
+    }
+    stats.deckPiers = piers;
+    check('no bridge pier stands in a carriageway', inRoad === 0, `${inRoad} of ${piers} piers`);
+  }
 }
 
 /* ---------------------------------------------------------------- D1: the landmarks */
@@ -1338,10 +1380,14 @@ if (wants('K')) {
     triangles += wallQuads(w).length * 2;
     for (const p of w.pts) {
       points++;
-      const ok = [p.x, p.z, p.top, p.bottom, p.depth, p.nx, p.nz].every(Number.isFinite) && p.top - p.bottom >= WALL.minRise * 0.5 && p.top - p.bottom <= WALL.maxRise * 1.5 && p.depth >= WALL.minDepth * 0.9 && p.depth <= 14 && Math.abs(Math.hypot(p.nx, p.nz) - 1) < 1e-3;
+      // the tapered tip of a wall (a few cm over the ground, bake_walls.mjs) is a point of its own kind: no ramp to stand on, only a small height
+      const tip = p.top - p.bottom < WALL.minRise * 0.5;
+      const ok = [p.x, p.z, p.top, p.bottom, p.depth, p.nx, p.nz].every(Number.isFinite) && (tip ? p.top - p.bottom >= 0.02 && p.top - p.bottom <= 0.3 : p.top - p.bottom <= WALL.maxRise * 1.5) && p.depth >= WALL.minDepth * 0.9 && p.depth <= 14 && Math.abs(Math.hypot(p.nx, p.nz) - 1) < 1e-3;
       if (!ok) { insane++; continue; }
+      if (tip) { const k = wkey(p.x, p.z), l = gridW.get(k); if (l) l.push(p); else gridW.set(k, [p]); continue; }
       const foot = surface.height(p.x, p.z), head = surface.height(p.x + p.nx * p.depth, p.z + p.nz * p.depth);
-      if (Math.abs(foot - p.bottom) > ON_RAMP || Math.abs(head - p.top) > ON_RAMP) { if (foot - p.bottom < -ON_RAMP || p.top - head < -ON_RAMP) buried++; else floating++; }
+      const tol = Math.max(ON_RAMP, rampTolerance(p.top - p.bottom, p.depth));       // (a ramp steeper than 3 m/m is off by more on the 1 m lattice)
+      if (Math.abs(foot - p.bottom) > tol || Math.abs(head - p.top) > tol) { if (foot - p.bottom < -tol || p.top - head < -tol) buried++; else floating++; }
       const k = wkey(p.x, p.z), l = gridW.get(k); if (l) l.push(p); else gridW.set(k, [p]);
     }
   }
@@ -1365,7 +1411,8 @@ if (wants('K')) {
     }
     return false;
   };
-  let scanned = 0, ramps = 0, bare = 0;
+  let scanned = 0, ramps = 0, bare = 0, inRoad = 0, latticeLimited = 0;
+  const wprobe = { sdCar: 9, sdPave: 9 };
   const bareList = [];
   const STRIDE = QUICK ? 25 : 5;
   /** The ramp across a way at sample i on one side (side = +1 right, -1 left): the same scan the baker makes. */
@@ -1382,25 +1429,152 @@ if (wants('K')) {
     const ramp = findRamp(heights, lands);
     if (!ramp) return null;
     const rising = ramp.rise > 0, tFoot = t0 + (rising ? ramp.first : ramp.last) * WALL.scanStep, toHigh = rising ? 1 : -1;
-    return { rise: Math.abs(ramp.rise), slope: ramp.maxSlope, x: chain.x[i] + nx * tFoot, z: chain.z[i] + nz * tFoot, nx: nx * toHigh, nz: nz * toHigh, top: Math.max(heights[ramp.first], heights[ramp.last]) };
+    const tHead = t0 + (rising ? ramp.last : ramp.first) * WALL.scanStep;
+    return { rise: Math.abs(ramp.rise), slope: ramp.maxSlope, depth: Math.max(WALL.minDepth, Math.abs(tHead - tFoot)), x: chain.x[i] + nx * tFoot, z: chain.z[i] + nz * tFoot, nx: nx * toHigh, nz: nz * toHigh, top: Math.max(heights[ramp.first], heights[ramp.last]), bottom: Math.min(heights[ramp.first], heights[ramp.last]) };
   };
   const ways = net.chains.filter((c) => !c.tagged && !net.overRoads.has(c.road));
   for (const chain of ways) {
     for (let i = 0; i < chain.x.length; i += STRIDE) {
       for (const side of [1, -1]) {
+        // a ramp whose foot or head lies on tarmac (two carriageways of different levels that overlap in plan, an interchange) cannot have a wall: a wall is never built on a carriageway; counted apart
+        const usable = (q) => {
+          wprobe.sdCar = 9; net.carve(q.x, q.z, wprobe);
+          if (wprobe.sdCar < -0.6) return false;
+          net.carve(q.x + q.nx * q.depth, q.z + q.nz * q.depth, wprobe);                    // the head of the ramp, or (the baker pulls the back of the block in by at most 0.6 m) just short of it
+          if (wprobe.sdCar >= -0.6) return true;
+          net.carve(q.x + q.nx * Math.max(WALL.minDepth, q.depth - 0.6), q.z + q.nz * Math.max(WALL.minDepth, q.depth - 0.6), wprobe);
+          return wprobe.sdCar >= -0.6;
+        };
         const r = rampAt(chain, i, side);
         if (!r) continue;
+        if (!usable(r)) { inRoad++; continue; }
+        // a ramp the 1 m lattice cannot show (the drawn ground at its foot / head is more than the wall tolerance from the carve's own heights: a face of 5 m in 2 m at a hairpin) has no wall to stand on
+        const tolR = Math.max(ON_RAMP, rampTolerance(r.rise, r.depth));
+        if (Math.abs(surface.height(r.x, r.z) - r.bottom) > tolR || Math.abs(surface.height(r.x + r.nx * r.depth, r.z + r.nz * r.depth) - r.top) > tolR) { latticeLimited++; continue; }
         // a ramp that persists: the neighbouring sample has one too (or it is a big one)
-        const persists = (i + 1 < chain.x.length && rampAt(chain, i + 1, side)) || (i > 0 && rampAt(chain, i - 1, side));
+        const neighbour = (k) => { if (k < 0 || k >= chain.x.length) return false; const q = rampAt(chain, k, side); return !!q && usable(q); };
+        const persists = r.rise >= WALL.shortRise ? neighbour(i + 1) || neighbour(i - 1) : neighbour(i + 1) && neighbour(i - 1);   // (a low ramp that is only two samples long is carried by the ground, see bake_walls.mjs)
         if (!persists) continue;
         ramps++;
         if (!coveredBy(r.x, r.z, r.nx, r.nz, r.top)) { bare++; if (bareList.length < 5) bareList.push(`${Math.round(r.x)},${Math.round(r.z)} rise ${r.rise.toFixed(1)} slope ${r.slope.toFixed(1)}`); }
       }
     }
   }
-  stats.wallCoverage = { scanned, ramps, bare };
+  stats.wallCoverage = { scanned, ramps, bare, rampsInRoads: inRoad, latticeLimited };
   // a ramp seen at a single sample is noise that the baker drops (a wall needs two samples in a row): a few bare ramps are allowed, a stretch of them is not
+  // A wall is never built on tarmac: the foot of its face and the back of its block (the two lines that carry the coping) lie outside every carriageway.
+  {
+    let onTarmac = 0, wallsOnTarmac = 0;
+    for (const w of walls) {
+      let hit = 0;
+      for (const p of w.pts) for (const t of [0, p.depth]) { net.carve(p.x + p.nx * t, p.z + p.nz * t, wprobe); if (wprobe.sdCar < -0.7) hit++; }
+      if (hit) { wallsOnTarmac++; onTarmac += hit; }
+    }
+    stats.wallsOnTarmac = wallsOnTarmac;
+    check('retaining walls: no wall stands on a carriageway (face and back lines outside every carriageway, the edge line aside)', wallsOnTarmac === 0, `${wallsOnTarmac} of ${walls.length} walls, ${onTarmac} points`);
+  }
+  // A wall is solid for the car from both sides (wall-collider.js): 0.5 m in front of the face and 0.5 m behind the back of the block a body circle of the car collides, at every stretch
+  // that is higher than half a metre (the tapered tips are not obstacles).
+  {
+    const collider = createWallCollider(walls, (x, z) => surface.height(x, z));       // the car on the ground (a bridge above a wall is another level)
+    let stretches = 0, openLow = 0, openHigh = 0;
+    for (const w of walls) {
+      for (let i = 0; i + 1 < w.pts.length; i++) {
+        const p = w.pts[i], q = w.pts[i + 1];
+        if ((p.top - p.bottom + q.top - q.bottom) / 2 < 0.5) continue;
+        stretches++;
+        const mx = (p.x + q.x) / 2, mz = (p.z + q.z) / 2, nx = (p.nx + q.nx) / 2, nz = (p.nz + q.nz) / 2, nl = Math.hypot(nx, nz) || 1, dep = (p.depth + q.depth) / 2;
+        if (!collider.collide(mx - nx / nl * 0.5, mz - nz / nl * 0.5, 1.35)) openLow++;
+        if (!collider.collide(mx + nx / nl * (dep + 0.5), mz + nz / nl * (dep + 0.5), 1.35)) openHigh++;
+      }
+    }
+    stats.wallCollision = { stretches, openLow, openHigh, segments: collider.count };
+    check('retaining walls are solid for the car from the low side and from the high side', openLow === 0 && openHigh === 0, `${openLow} stretches open from the low side, ${openHigh} from the high side, of ${stretches}`);
+  }
+  // The car itself: driven at a wall at full throttle for 4 s from 8 m away, from the low side (at the face) and from the high side (at the back of the block), it never gets across.
+  {
+    const collider = createWallCollider(walls, (x, z) => surface.height(x, z));
+    const tested = [];
+    for (const w of walls) {
+      if (tested.length >= 14) break;
+      if (w.pts.length < 5) continue;
+      const k = w.pts.length >> 1, p = w.pts[k], q = w.pts[k + 1];
+      if (Math.min(p.top - p.bottom, q.top - q.bottom) < WALL.shortRise) continue;
+      tested.push({ w, p, q });
+    }
+    let crossed = 0, runs = 0;
+    for (const { p, q } of tested) {
+      const mx = (p.x + q.x) / 2, mz = (p.z + q.z) / 2, nl = Math.hypot(p.nx + q.nx, p.nz + q.nz) || 1;
+      const nx = (p.nx + q.nx) / nl, nz = (p.nz + q.nz) / nl, dep = (p.depth + q.depth) / 2;
+      for (const side of ['low', 'high']) {
+        // low side: stands 8 m in front of the face and drives toward the high ground (+n); high side: 8 m behind the back and drives toward the face (-n)
+        const sx = side === 'low' ? mx - nx * 8 : mx + nx * (dep + 8), sz = side === 'low' ? mz - nz * 8 : mz + nz * (dep + 8);
+        const dir = side === 'low' ? 1 : -1;
+        if (collider.collide(sx, sz, CAR.bodyRadius)) continue;
+        const c = createCar({ ground: { height: (x, z) => surface.height(x, z), normal: (x, z, o) => surface.normal(x, z, o), hint() {} }, roadInfoAt: (x, z, out) => surface.roadInfoAt(x, z, out), collide: collider.collide, start: null });
+        c.reset(sx, sz, Math.atan2(nz * dir, nx * dir));
+        for (let i = 0; i < 240; i++) c.step(1 / 60, { throttle: 1, brake: 0, steer: 0 });
+        runs++;
+        const st = c.state;
+        // the position across the wall: along n from the face (low side: must stay < 0) / from the back (high side: must stay > 0)
+        const across = side === 'low' ? (st.x - mx) * nx + (st.z - mz) * nz : (st.x - (mx + nx * dep)) * nx + (st.z - (mz + nz * dep)) * nz;
+        if (side === 'low' ? across > 0.2 : across < -0.2) crossed++;
+      }
+    }
+    stats.wallDrive = { runs, crossed };
+    check('retaining walls: a car driven at a wall at full throttle (from the low side and from the high side) never gets across', runs >= 8 && crossed === 0, `${crossed} of ${runs} runs crossed`);
+  }
   check('retaining walls: every ramp steeper than 2 m/m beside a way has a wall (the data is not stale: re-run scripts/luxdrive/bake_walls.mjs)', bare <= Math.max(3, Math.round(ramps * 0.04)), `${bare} of ${ramps} ramps bare (${scanned} profiles), e.g. ${bareList.join('; ')}`);
+}
+
+/* ---------------------------------------------------------------- L: junctions (markings and the drive across) */
+if (wants('L')) {
+  section('L junctions');
+  const clusters = junctionClusters(net).slice(0, QUICK ? 8 : 20);
+  // (1) No fragments: a cell of the lattice whose nodes lie on two DIFFERENT roads (or arms of one) draws no markings.  The markings are interpolated from the lat / s of the nearest road
+  // at each node: where the nearest road changes inside a cell the interpolation draws stray dashes and diagonal bits (what the junction beside the start looked like).
+  const SIDE_N = QUADTREE.cells + 3;
+  let cellsChecked = 0, fragmentCells = 0;
+  const fragList = [];
+  for (const c of clusters) {
+    const ex = Math.floor(c.x / QUADTREE.minSize) * QUADTREE.minSize, ez = Math.floor(c.z / QUADTREE.minSize) * QUADTREE.minSize;
+    for (const [ox, oz] of [[0, 0], [-QUADTREE.minSize, 0], [QUADTREE.minSize, 0], [0, -QUADTREE.minSize], [0, QUADTREE.minSize]]) {
+      const leaf = { x0: ex + ox, z0: ez + oz, step: 1, size: QUADTREE.minSize };
+      const nodes = computeTileNodes(leaf, surface, field);
+      const b = surface.block(leaf.x0 / QUADTREE.minSize, leaf.z0 / QUADTREE.minSize);
+      for (let j = 0; j < QUADTREE.cells; j++) {
+        for (let i = 0; i < QUADTREE.cells; i++) {
+          const idx = [(j + 1) * SIDE_N + i + 1, (j + 1) * SIDE_N + i + 2, (j + 2) * SIDE_N + i + 1, (j + 2) * SIDE_N + i + 2];
+          const painted = idx.some((o) => nodes.road2[o * 4 + 3] > 0.5 && nodes.road2[o * 4 + 1] > 0.5 && b.sdCar[o] <= 1.0);
+          if (!painted) continue;
+          cellsChecked++;
+          const roads = new Set(idx.filter((o) => b.sdCar[o] < 0.3).map((o) => b.road[o]));
+          if (roads.size >= 2) { fragmentCells++; if (fragList.length < 4) fragList.push(`${Math.round(leaf.x0 + i)},${Math.round(leaf.z0 + j)}`); }
+        }
+      }
+    }
+  }
+  stats.junctionMarks = { junctions: clusters.length, cellsChecked, fragmentCells };
+  check('junctions: no marking fragments (no painted lattice cell holds two roads) around the biggest junctions', fragmentCells === 0, `${fragmentCells} of ${cellsChecked} cells, e.g. ${fragList.join('; ')}`);
+  // (2) The drive straight across: along every way of the biggest junctions, at 50 km/h, over the tarmac of the junction box.  Reported as stats (the vertical acceleration of a car that follows
+  // the surface); the check is a guard against the ridge: the median over the junctions and the worst single box.
+  const boxBobs = [], pitches = [];
+  let worstBox = 0, worstAt = '';
+  for (const c of clusters) {
+    let cBob = 0;
+    for (const way of c.ways) {
+      const r = driveLine(surface, c, way);
+      if (r.boxBob > cBob) cBob = r.boxBob;
+      pitches.push(r.boxPitch);
+    }
+    boxBobs.push(cBob);
+    if (cBob > worstBox) { worstBox = cBob; worstAt = `${Math.round(c.x)},${Math.round(c.z)}`; }
+  }
+  const sorted = boxBobs.slice().sort((a, b) => a - b);
+  const median = sorted[sorted.length >> 1] || 0;
+  stats.junctionDrive = { junctions: clusters.length, medianBoxBob: +median.toFixed(2), worstBoxBob: +worstBox.toFixed(2), worstAt };
+  const MAX_MEDIAN_BOX_BOB = 8, MAX_WORST_BOX_BOB = 60;                       // m/s2 at 50 km/h: a guard at today's level (a road is 0.04; the target for a junction box is JUNCTION.maxBob = 1.5)
+  check(`junctions: driving straight across the ${clusters.length} biggest junctions (median over the junctions <= ${MAX_MEDIAN_BOX_BOB}, worst <= ${MAX_WORST_BOX_BOB} m/s2; target ${JUNCTION.maxBob})`, median <= MAX_MEDIAN_BOX_BOB && worstBox <= MAX_WORST_BOX_BOB, `median ${median.toFixed(2)}, worst ${worstBox.toFixed(2)} at ${worstAt}`);
 }
 
 /* ---------------------------------------------------------------- the summary */
