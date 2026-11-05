@@ -25,6 +25,8 @@ export const DECK = Object.freeze({
   apronCut: 1.0,           // ... somewhere at least this deep (the cut of the road below) ...
   apronMax: 6.0,           // ... up to this far back; the slab ends this far under the road on the axis
   apronTuck: 0.02,
+  trustWidth: 5.0,         // m: the DSM of a narrower deck is smoothed (smoothTops; road-network.js DECK_TRUST_WIDTH is the same number) ...
+  smoothSigma: 4.0,        // ... over this (m)
   endHold: 3.0,            // m: from an end that a way runs onto the deck does not fall below the level of that end for this long (road-network.js holds the approach's carriageway at the
                            // level of its end ABUT_HOLD = 2 m under the deck: a deck that fell away from its end at once lay 5 - 15 cm under that held road - a step onto the road and off it)
   endGrade: 0.12,          // m/m: the steepest a deck climbs or falls away from the level of its end (the DSM next to an abutment is the bank, a parapet or the canopy of a wood: used as it is, the
@@ -199,6 +201,29 @@ function endEnvelope(pts, tops, lo, hi, envLo, envHi, surface, holdLo = false, h
 }
 
 /**
+ * The DSM of a narrow deck (a track, a lane, a footbridge: under DECK.trustWidth) is often the canopy over it or a parapet: smoothed along the deck (a Gaussian of DECK.smoothSigma
+ * in arc length) - the track over the gully on deck 28 had kinks of 50 % between two points 4 m apart.  Pure: a new array (the ends are set by the caller).
+ */
+function smoothTops(d) {
+  const n = d.pts.length;
+  const arc = new Float64Array(n);
+  for (let i = 1; i < n; i++) arc[i] = arc[i - 1] + Math.hypot(d.pts[i][0] - d.pts[i - 1][0], d.pts[i][1] - d.pts[i - 1][1]);
+  const out = Float32Array.from(d.tops);
+  const sg = DECK.smoothSigma;
+  for (let i = 1; i < n - 1; i++) {
+    let sum = 0, wsum = 0;
+    for (let j = 1; j < n - 1; j++) {
+      const u = (arc[j] - arc[i]) / sg;
+      if (u * u > 9) continue;
+      const w = Math.exp(-0.5 * u * u);
+      sum += w * d.tops[j]; wsum += w;
+    }
+    out[i] = wsum > 0 ? sum / wsum : d.tops[i];
+  }
+  return out;
+}
+
+/**
  * The ends of a deck carry their stub points: an inner point that lies within DECK.endStub of an end takes the level the end gets (the bake resamples every 4 m and adds the
  * last point: a last segment of a few centimetres whose inner point kept the DSM while the end was pinned to the ground - a vertical step of 0.3 - 0.4 m at the end of the
  * deck, decks 255 / 160).  Returns, per deck, [index of the stub at the start or -1, at the end or -1].
@@ -267,7 +292,7 @@ export function createDeckNetwork(decks, surface = null) {
       return { ...d, tops };
     }
     const [lo, hi, envLo, envHi, holdLo, holdHi] = levels[k];
-    const tops = endEnvelope(d.pts, d.tops, lo, hi, envLo, envHi, surface, holdLo, holdHi);
+    const tops = endEnvelope(d.pts, d.width < DECK.trustWidth ? smoothTops(d) : d.tops, lo, hi, envLo, envHi, surface, holdLo, holdHi);
     const [stubA, stubB] = endStubs(d);
     if (stubA >= 0) tops[stubA] = lo;
     if (stubB >= 0) tops[stubB] = hi;
