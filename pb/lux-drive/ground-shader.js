@@ -19,9 +19,10 @@ export const GROUND_VERTEX = `
   attribute vec4 aRoad;        // the offset from the centre line, the half width of the carriageway, the outer edge of the pavement, the distance along the centre line
   attribute vec4 aRoad2;       // the coverage of the road, the style of the markings, its material, how exactly the fine markings are drawn
   attribute vec4 aRoad3;       // the signed distance to the union of the carriageways, to the union of the pavements, the fade of the paint, to the union of the STREET carriageways
+  attribute vec4 aRoad4;       // the distances to the two nearest carriageways (exact planes per cell) and their weight (tile-mesh.js carriagewayChannels)
   attribute vec4 aMark;        // a lane marking ribbon (tile-mesh.js appendMarkings): the unit normal of the line (x, z), its half width, the side (-1 / +1) times the strength; 0 on the ground
   varying vec3 vWorld; varying vec3 vNormal; varying float vDist;
-  varying vec4 vRoad; varying vec4 vRoad2; varying vec4 vRoad3;
+  varying vec4 vRoad; varying vec4 vRoad2; varying vec4 vRoad3; varying vec3 vRoad4;
   varying vec3 vMark;          // across the line (-1 .. 1), the share of the ribbon that is paint, 1 on a ribbon
   void main(){
     vec4 wp = modelMatrix * vec4(position, 1.0);
@@ -31,7 +32,7 @@ export const GROUND_VERTEX = `
     float halfW = max(aMark.z, length(cameraPosition - wp.xyz) * ${MARK_PIXEL.toFixed(5)});
     wp.xz += aMark.xy * sign(aMark.w) * halfW * isMark;
     vMark = vec3(sign(aMark.w), isMark * abs(aMark.w) * aMark.z / max(halfW, 1e-4), isMark);
-    vWorld = wp.xyz; vNormal = normal; vRoad = aRoad; vRoad2 = aRoad2; vRoad3 = aRoad3;
+    vWorld = wp.xyz; vNormal = normal; vRoad = aRoad; vRoad2 = aRoad2; vRoad3 = aRoad3; vRoad4 = aRoad4.xyz;
     vec4 mv = viewMatrix * wp;
     vDist = length(mv.xyz);
     // the ribbon lies ON the triangles it was sampled from; it wins the depth test by being pulled a few centimetres toward the camera (more with the distance, where the depth is coarse).
@@ -49,7 +50,7 @@ export const GROUND_FRAGMENT = `
   uniform float uKerbWidth;
   uniform float uTreeRadius;
   varying vec3 vWorld; varying vec3 vNormal; varying float vDist;
-  varying vec4 vRoad; varying vec4 vRoad2; varying vec4 vRoad3;
+  varying vec4 vRoad; varying vec4 vRoad2; varying vec4 vRoad3; varying vec3 vRoad4;
   varying vec3 vMark;
   ${PAINT_LIGHT_GLSL}
   float hash21(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
@@ -130,7 +131,9 @@ export const GROUND_FRAGMENT = `
     // The edges of the paint are the zero of the signed distance to the UNION of the carriageways / pavements (aRoad3):
     // the lattice interpolates a continuous distance into a straight edge of constant width, per pixel.  The edge is one
     // pixel wide (fwidth), never a staircase.
-    float sdC = vRoad3.x, sdP = vRoad3.y;
+    // The carriageway edge per pixel is the minimum of the TWO channels (each a plane over the cell: the median between two carriageways is two straight kerbs, not a sawtooth
+    // of the lattice); where three carriageways meet (weight 0) the blurred union of the lattice.
+    float sdC = mix(vRoad3.x, min(vRoad4.x, vRoad4.y), clamp(vRoad4.z, 0.0, 1.0)), sdP = vRoad3.y;
     float roadW = smoothstep(0.0, 0.5, vRoad3.z);
     float aaC = max(fwidth(sdC), 0.04), aaP = max(fwidth(sdP), 0.04);
     // the grain of the tarmac is a stone chip: from a distance it averages to the plain colour (from above the 3 m tile would show as a pattern), and a

@@ -30,6 +30,7 @@ export function createTerrainView({ scene, surface, field, material: initialMate
     g.setAttribute('aRoad', new THREE.BufferAttribute(mesh.road, 4));
     g.setAttribute('aRoad2', new THREE.BufferAttribute(mesh.road2, 4));
     g.setAttribute('aRoad3', new THREE.BufferAttribute(mesh.road3, 4));
+    g.setAttribute('aRoad4', new THREE.BufferAttribute(mesh.road4, 4));        // the two carriageway channels of the paint (tile-mesh.js carriagewayChannels)
     g.setAttribute('aMark', new THREE.BufferAttribute(mesh.mark, 4));          // the lane marking ribbons (0 on the ground)
     g.setIndex(new THREE.BufferAttribute(mesh.indices, 1));
     let lo = Infinity, hi = -Infinity;

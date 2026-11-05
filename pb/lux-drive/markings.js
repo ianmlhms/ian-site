@@ -15,6 +15,9 @@
 import { ROAD } from './config.js';
 import { kindInfo } from './roads.js';
 import { resample, gaussianSmooth } from './road-network.js';
+import { isMarkedWay, JOIN } from './carriageways.js';
+
+export { isMarkedWay };
 
 export const MARK = Object.freeze({
   lineHalf: 0.075,          // m: half the width of a line (15 cm of paint)
@@ -26,8 +29,6 @@ export const MARK = Object.freeze({
   shoulderLeftMax: 0.6,     // m
   dashPeriod: 9,            // m: a dashed line is DASH_LENGTH of paint every DASH_PERIOD
   dashLength: 3,
-  joinDist: 1.0,            // m: two way ends this close are one node
-  joinCos: Math.cos(35 * Math.PI / 180),   // two ways continue each other when they meet at a node at less than this angle
   taperRatio: 25,           // m of length per m of lateral shift: a line that moves (a lane is added / dropped) moves at 1 : 25 ...
   taperMin: 12,             // ... over at least this length
   cutStep: 0.5,             // m: the resolution of the cut along a line
@@ -46,7 +47,6 @@ const LANE_WIDTH = { motorway: 3.65, trunk: 3.5, primary: 3.4, secondary: 3.3, t
 const SHOULDER_CLASSES = new Set(['motorway', 'trunk', 'motorway_link', 'trunk_link']);
 const parentClass = (kind) => kind.replace(/_link$/, '');
 
-export const isMarkedWay = (road) => !!(road && road.info && road.info.drivable && !road.tunnel && road.pts && road.pts.length >= 2 && (road.info.lines === 1 || road.info.lines === 2));
 
 /**
  * The lines of ONE way, in the frame of the way (offset positive = to the right of the way's direction): [{ role: 'edge' | 'centre' | 'divider', o, dashed }].
@@ -119,43 +119,10 @@ function wayLine(road, carved) {
   return { x: rs.x, z: rs.z, bed: null };
 }
 
-/** The ends of every drivable way at the nodes of the network: node key -> [{ road, atStart, dx, dz }] (d: the direction OUT of the way at that end). */
-function wayEnds(roads, lineOf) {
-  const nodes = [];
-  const grid = new Map();
-  const cellOf = (x, z) => `${Math.floor(x / 2)}:${Math.floor(z / 2)}`;
-  const nodeAt = (x, z) => {
-    const cx = Math.floor(x / 2), cz = Math.floor(z / 2);
-    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
-      for (const nd of grid.get(`${cx + dx}:${cz + dz}`) || []) if (Math.hypot(nd.x - x, nd.z - z) <= MARK.joinDist) return nd;
-    }
-    const nd = { x, z, ends: [] };
-    nodes.push(nd);
-    const k = cellOf(x, z);
-    const l = grid.get(k);
-    if (l) l.push(nd); else grid.set(k, [nd]);
-    return nd;
-  };
-  for (const road of roads) {
-    if (!road.info || !road.info.drivable || road.tunnel || !road.pts || road.pts.length < 2) continue;
-    const line = lineOf(road);
-    if (!line || line.x.length < 2) continue;
-    const n = line.x.length;
-    for (const atStart of [true, false]) {
-      const i = atStart ? 0 : n - 1, j = atStart ? 1 : n - 2;
-      let dx = line.x[i] - line.x[j], dz = line.z[i] - line.z[j];
-      const l = Math.hypot(dx, dz) || 1;
-      dx /= l; dz /= l;
-      nodeAt(line.x[i], line.z[i]).ends.push({ road: road.id, atStart, dx, dz });
-    }
-  }
-  return nodes;
-}
-
 /**
  * The marking plan of the network.
  *   roads    the decoded roads (roads.js; road.id = the index)
- *   network  the road network (road-network.js): the carved centre lines (chainOf), the beds and the segments of the carriageways (the cut)
+ *   network  the road network (road-network.js): its carriageway chains, the carved centre lines and beds, and the segments of the carriageways (the cut)
  *   decks    the bridge decks that are drawn (decks.js, without the landmark models): a piece on a deck is laid on the deck (deckMarkingQuads), not on the terrain
  * Returns { chains, tracks, pieces, grid, stats } (see the module comment); `piecesIn(x0, z0, x1, z1)` lists the pieces that may touch a box.
  */
@@ -170,65 +137,9 @@ export function buildMarkingPlan(roads, network, decks = []) {
   const marked = roads.filter(isMarkedWay);
   const isMarked = new Uint8Array(roads.length);
   for (const r of marked) isMarked[r.id] = 1;
-  const nodes = wayEnds(roads, lineOf);
-
-  // ---- the joins: at every node the pairs of marked ways that continue each other (one partner per end)
-  const partner = new Map();             // `${road}:${atStart}` -> { road, atStart }
-  const endKey = (e) => `${e.road}:${e.atStart ? 1 : 0}`;
-  const plainNeighbours = new Map();     // road -> Set of the roads it meets end to end at a node of two ends only (one carriageway in two ways, chained or not)
-  const addPlain = (a, b) => { for (const [p, q] of [[a, b], [b, a]]) { let s = plainNeighbours.get(p); if (!s) { s = new Set(); plainNeighbours.set(p, s); } s.add(q); } };
-  for (const nd of nodes) {
-    if (nd.ends.length === 2 && nd.ends[0].road !== nd.ends[1].road) addPlain(nd.ends[0].road, nd.ends[1].road);
-    const ms = nd.ends.filter((e) => isMarked[e.road]);
-    if (ms.length < 2) continue;
-    const pairs = [];
-    for (let a = 0; a < ms.length; a++) {
-      for (let b = a + 1; b < ms.length; b++) {
-        const ea = ms[a], eb = ms[b];
-        if (ea.road === eb.road) continue;
-        const cos = -(ea.dx * eb.dx + ea.dz * eb.dz);           // the way out of one and the way into the other
-        if (cos < MARK.joinCos) continue;
-        const ra = roads[ea.road], rb = roads[eb.road];
-        const sameName = !!ra.name && ra.name === rb.name;
-        const sameKind = ra.kind === rb.kind;
-        // at a fork (three ends and more) the carriageway goes on into the way of its own name / class; at a plain node of two ends anything that goes on straight is the same carriageway
-        if (nd.ends.length > 2 && !sameName && !sameKind) continue;
-        // a one-way way continues a one-way way in its own direction (the end of one is the start of the other)
-        if (ra.oneway && rb.oneway && ea.atStart === eb.atStart) continue;
-        const score = (1 - cos) + (sameName ? 0 : 0.3) + (sameKind ? 0 : 0.2) + Math.abs(ra.width - rb.width) * 0.02;
-        pairs.push({ ea, eb, score });
-      }
-    }
-    pairs.sort((p, q) => p.score - q.score);
-    for (const { ea, eb } of pairs) {
-      if (partner.has(endKey(ea)) || partner.has(endKey(eb))) continue;
-      partner.set(endKey(ea), eb); partner.set(endKey(eb), ea);
-    }
-  }
-
-  // ---- the chains: follow the joins (orientation: `rev` = the way is walked from its end to its start)
-  const visited = new Uint8Array(roads.length);
-  const chainWays = [];
-  const walk = (road, rev) => {
-    const list = [];
-    let cur = road, curRev = rev;
-    while (cur >= 0 && !visited[cur]) {
-      visited[cur] = 1;
-      list.push({ road: cur, rev: curRev });
-      const exit = { road: cur, atStart: curRev };          // walked forward, the way is left at its end
-      const next = partner.get(endKey(exit));
-      if (!next) break;
-      cur = next.road; curRev = !next.atStart;                // entered at its start: walked forward
-    }
-    return list;
-  };
-  for (const r of marked) {
-    if (visited[r.id]) continue;
-    const startFree = !partner.has(`${r.id}:1`), endFree = !partner.has(`${r.id}:0`);
-    if (startFree) chainWays.push(walk(r.id, false));
-    else if (endFree) chainWays.push(walk(r.id, true));
-  }
-  for (const r of marked) if (!visited[r.id]) chainWays.push(walk(r.id, false));     // rings
+  const cw = network.carriageways;
+  const chainWays = cw.chainWays.filter((ws) => isMarked[ws[0].road]);
+  const plainNeighbours = cw.plainNeighbours;
 
   // ---- the chain polylines and the line tracks
   const chains = [], tracks = [];
@@ -243,8 +154,8 @@ export function buildMarkingPlan(roads, network, decks = []) {
         const i = order[q];
         if (q === 0 && X.length) {
           const gap = Math.hypot(l.x[i] - X[X.length - 1], l.z[i] - Z[Z.length - 1]);
-          joints.push(ARC[ARC.length - 1] + (gap <= MARK.joinDist ? 0 : gap));
-          if (gap <= MARK.joinDist) { WAY[WAY.length - 1] = w; continue; }        // the shared node: kept once (it starts the first segment of the new way)
+          joints.push(ARC[ARC.length - 1] + (gap <= JOIN.dist ? 0 : gap));
+          if (gap <= JOIN.dist) { WAY[WAY.length - 1] = w; continue; }        // the shared node: kept once (it starts the first segment of the new way)
         }
         const a = X.length ? ARC[ARC.length - 1] + Math.hypot(l.x[i] - X[X.length - 1], l.z[i] - Z[Z.length - 1]) : 0;
         X.push(l.x[i]); Z.push(l.z[i]); ARC.push(a); BED.push(l.bed ? l.bed[i] : NaN); WAY.push(w);
