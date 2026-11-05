@@ -50,6 +50,7 @@ def whole(way):
 # ---- colours (painted, from the photos; see SURVEY.md) ------------------------------------------------------------------
 CREAM = [0.94, 0.89, 0.72]            # Athénée: the pale yellow render
 CREAM_FRONT = [1.0, 0.92, 0.70]       # ... of the glass block (a warmer paint: the cloudy ambient is blue)
+SANDSTONE_WALL = [0.84, 0.72, 0.50]  # the big sandstone wall: warm ochre ashlar (it reads darker in the game than in the photos)
 SANDSTONE = [0.80, 0.72, 0.55]        # Athénée: the rough sandstone of the hall wall and the retaining walls
 CONCRETE = [0.72, 0.71, 0.68]
 CONCRETE_DARK = [0.52, 0.52, 0.51]
@@ -81,8 +82,9 @@ FREE = []
 # ATHÉNÉE DE LUXEMBOURG (OSM way 29050030; the LOD2 block 21024 also covers the sports plaza, which is ground: not built)
 ATH = 29050030
 ORANGE = [0.96, 0.56, 0.10]           # Athénée: the sun blinds
-RIBBON_ATH = {"gf": {"h": 4.0, "depth": 1.6, "glass": [0.18, 0.26, 0.34], "pier": [0.80, 0.74, 0.58], "pitch": 3.6}, "floorH": 3.5, "sill": 0.8, "h": 2.0, "pier": 1.0, "mull": 2.6,
-              "glass": GLASS, "frame": [0.90, 0.86, 0.70], "blind": ORANGE, "blindDrops": [0.7, 1.1, 1.5, 2.0], "blindShare": 0.72}
+MURAL = {"share": 0.4, "palette": [[0.80, 0.18, 0.14], [0.16, 0.30, 0.66], [0.94, 0.78, 0.20], [0.20, 0.55, 0.40], [0.90, 0.88, 0.80]]}      # the abstract murals under the pilotis (photos Athénée_01, Dez_07)
+RIBBON_ATH = {"gf": {"h": 4.0, "depth": 1.6, "glass": [0.18, 0.26, 0.34], "pier": [0.80, 0.74, 0.58], "pitch": 3.6, "mural": MURAL}, "floorH": 3.5, "sill": 0.8, "h": 2.0, "pier": 1.0, "mull": 2.6,
+              "glass": GLASS, "frame": [0.90, 0.86, 0.70], "blind": ORANGE, "blindDrops": [0.7, 1.1, 1.5, 2.0], "blindShare": 0.72, "floors": 2}
 # the big glazed block (photo Luxembourg_Athénée_101): two storeys of blue reflective panes in white frames over a dark spandrel, standing on a recessed ground floor
 CURTAIN_ATH = {"floorH": 3.0, "inset": 2.3, "pitch": 3.4, "spandrel": 0.55, "glass": [0.46, 0.55, 0.74], "dark": [0.14, 0.20, 0.40], "frameColor": [0.98, 0.97, 0.93], "slab": [0.96, 0.90, 0.72], "gfTop": 284.6,
                "gf": {"h": 3.6, "abs": [281.0, 284.6], "depth": 2.6, "glass": [0.34, 0.38, 0.44], "pier": [0.98, 0.90, 0.68], "pitch": 1.7, "every": 4, "pierW": 0.9, "mullion": [0.98, 0.98, 0.96]}}
@@ -90,7 +92,10 @@ building("athenee", "Athénée de Luxembourg", "N", [
     part("ath-west", OV(ATH, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21), CREAM, "ribbon", RIBBON_ATH,
          rf={"solar": [[3606, 9586, 44, 11, -26]]}),
     part("ath-spine", OV(ATH, 21, 22, 23, 24, 25, 26, 33, 34, (3700, 9648), 2, 3, 4, 5, 6, 7, 8, 9, 10), CREAM, "ribbon", RIBBON_ATH),
-    part("ath-green", OV(ATH, 26, 27, 28, 29, 30, 31, 32, 33), CREAM_FRONT, "curtain", CURTAIN_ATH, top=293.0),
+    part("ath-green", OV(ATH, 26, 27, 28, 29, 30, 31, 32, 33), CREAM_FRONT, "curtain", CURTAIN_ATH, top=293.0,
+         ft=[{"k": "stonewall", "x": 3681.4, "z": 9560.9, "color": SANDSTONE_WALL},       # the blank sandstone south face of the hall block, towards the stairs (photos Athénée_01, Dez_07)
+             {"k": "sign", "x": 3684.75, "z": 9559.0, "text": "ATHENEE", "cap": 0.85, "y": 5.3, "color": [0.26, 0.22, 0.18], "weight": 0.16},
+             {"k": "panel", "x": 3684.75, "z": 9559.0, "w": 0.8, "y0": 6.8, "y1": 8.4, "color": [0.24, 0.27, 0.25]}]),      # the small bronze relief above the name
     part("ath-sewing", OV(ATH, 34, 35, 36, 37, 38, 39, 40) , CREAM, "ribbon", RIBBON_ATH, rf={"solar": [[3726, 9630, 28, 7, -30]]}),
     part("ath-link", OV(ATH, 41, 42, 43, 56, 57, 58), CONCRETE, "blank", top=None),
     part("ath-gym", OV(ATH, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56), CONCRETE, "blank"),
@@ -184,16 +189,16 @@ building("hall-150", "Hall 41424150", "C", [
 # ====================================================================================================================
 # LYCÉE ALINE MAYRISCH (OSM way 37764733): a long white block on a concrete plinth along the boulevard, ribbon windows, pilotis entrance
 LA = 37764733
-LAML_WALL = [0.92, 0.88, 0.78]         # pale greige render panels (photos LAML_04, Aline_Mayrisch_101); the north faces get `northLift` on top (the game's light on a north wall)
+LAML_WALL = [0.95, 0.93, 0.88]         # pale greige render panels (photos LAML_04, Aline_Mayrisch_101); the north faces get `northLift` on top (the game's light on a north wall)
 LAML_FP = {"floorH": 3.78, "inset": 0.25, "pitch": 3.0, "sill": 0.95, "h": 2.35, "pier": 1.0, "mull": 1.7, "surround": 0.2, "frameW": 0.11, "surroundDepth": 0.24, "reveal": 0.15, "endWall": 13.0,
            "groups": [10, 14, 20, 26], "groupsTop": [7, 8.5, 10], "gapMin": 1.6, "gapMax": 3.2, "gapTop": 0.9,
            "band": [0.88, 0.84, 0.74], "spandrel": [0.80, 0.76, 0.66], "pilaster": [0.94, 0.90, 0.80], "frame": [0.90, 0.91, 0.90],
            "glass": [0.50, 0.50, 0.48], "mullion": [0.92, 0.93, 0.92],
-           "sky": [0.52, 0.72, 0.98], "room": [0.10, 0.14, 0.20],     # the glass reflects the sky in the sun (photos 101-103): sky blue over the dark rooms
-           "northLift": 1.4, "edge": {"h": 0.2, "out": 0.1},          # the thin roof edge of the photos instead of the thick coping
+           "sky": [0.58, 0.78, 1.0], "room": [0.20, 0.32, 0.50],     # the glass reflects the sky in the sun (photos 101-103): sky blue over the dark rooms
+           "northLift": 1.9, "edge": {"h": 0.2, "out": 0.1},          # the thin roof edge of the photos instead of the thick coping
            "plinth": {"h": 5.0, "color": [0.80, 0.79, 0.76], "facing": "south", "holes": 5.5},
-           "gf": {"h": 3.7, "lift": 3.9, "abs": [273.85, 277.55], "depth": 1.8, "facing": "north", "glass": [0.22, 0.30, 0.38], "pier": [0.76, 0.74, 0.70], "stone": [0.74, 0.72, 0.68], "pitch": 3.4, "every": 2, "pierW": 1.2,
-                  "mullion": [0.90, 0.91, 0.90], "rail": [0.64, 0.66, 0.68], "railOut": 2.2}}
+           "gf": {"h": 3.7, "lift": 3.9, "abs": [273.85, 277.55], "depth": 1.8, "facing": "north", "glass": [0.22, 0.30, 0.38], "skyTop": 1.9, "pier": [0.80, 0.78, 0.74], "stone": [0.80, 0.78, 0.74], "pitch": 3.4, "every": 2, "pierW": 1.2,
+                  "mullion": [0.90, 0.91, 0.90], "rail": [0.64, 0.66, 0.68], "railOut": 2.2, "railBreaks": [{"x": 3716.0, "w": 16.0}]}}
 # the entrances, read off the orthophoto (bridges over the sunken court at x 3685.6 / 3747.5 / 3792.5 and the projecting lobby at 3716) and checked against the
 # photo LAML_04 (the main entrance with the sign is the third bridge from the west end: 19 % of the length from the east end; the ochre block is the lobby at 3716)
 PORCH = {"lift": 3.9, "glass": [0.28, 0.34, 0.40], "frame": [0.95, 0.93, 0.86], "cheek": [1.0, 0.92, 0.76], "soffit": [1.0, 0.95, 0.84]}
@@ -395,7 +400,7 @@ def bake_grounds(osm, ortho_color):
     for ln in ([(3721, 9918), (3733, 9918), (3733, 9929), (3721, 9929), (3721, 9918)], [(3745, 9928), (3745, 9940), (3757, 9940), (3757, 9928), (3745, 9928)]):
         line(ln, 0.1, [0.88, 0.88, 0.8])
     # -- the plaza of the Athénée (tiled concrete over the sports hall), its west courtyard, the paved square at the Blumm ----------
-    ath_plaza = Pg([(3664, 9568), (3694, 9560), (3752, 9620), (3744, 9634), (3700, 9640)])
+    ath_plaza = Pg([(3664, 9568), (3690.0, 9557.8), (3717.1, 9597.8), (3744, 9634), (3700, 9640)])
     area("athenee-plaza", ath_plaza, [0.66, 0.66, 0.65])
     for seg in hatch(ath_plaza, 58, 10.0) + hatch(ath_plaza, 148, 10.0):
         line(seg, 0.3, [0.76, 0.76, 0.75], 1)
@@ -404,10 +409,10 @@ def bake_grounds(osm, ortho_color):
     for seg in hatch(court, 20, 8.0) + hatch(court, 110, 9.0):
         line(seg, 0.4, [0.58, 0.58, 0.56], 1)
     # the grand staircase from the boulevard up to the plaza (the lighter diagonal band of the orthophoto), drawn as a strip with a step line every 1.3 m
-    stairs = Pg([(3696, 9562), (3753, 9621), (3760, 9614), (3703, 9555)])
-    free.append({"k": "steps", "quad": [[round(x, 1), round(z, 1)] for x, z in stairs.exterior.coords[:4]], "color": [0.70, 0.69, 0.66]})
+    stairs = Pg([(3690.0, 9557.8), (3717.1, 9597.8), (3732.0, 9587.8), (3704.9, 9547.8)])        # the broad stairs down the slope the terrain has along the plaza edge (DSM: 283.2 -> 279.8 over 18 m), between the plaza and the planters
+    free.append({"k": "steps", "quad": [[round(x, 1), round(z, 1)] for x, z in stairs.exterior.coords[:4]], "color": [0.78, 0.77, 0.74]})
     square = Pg([(3535, 9640), (3580, 9640), (3598, 9668), (3598, 9690), (3560, 9690), (3545, 9672), (3532, 9655)])
-    area("blumm-square", square, PAVE_LIGHT)
+    area("blumm-square", square, [0.40, 0.39, 0.38])        # photo Athénée_structure_provisoire: dark grey-brown paving with pale joints
     for seg in hatch(square, 0, 6.0) + hatch(square, 90, 7.0):
         line(seg, 0.22, [0.92, 0.92, 0.90], 1)
     # -- car parks ---------------------------------------------------------------------------------------------------------
@@ -438,7 +443,12 @@ def bake_grounds(osm, ortho_color):
     area("basketball", bb, [0.50, 0.55, 0.62])
     line(box_outline(3683.6, 9877.0, 3701.0, 9892.6), 0.1, [0.95, 0.95, 0.9])
     # -- the stone wall and the hedge in front of the Athénée ---------------------------------------------------------------
-    walls.append({"pts": [(3694, 9558), (3706, 9572), (3730, 9602), (3752, 9622)], "h": 1.1, "w": 0.7, "c": [0.60, 0.50, 0.34], "hedge": [0.17, 0.30, 0.12]})
+    # the two planter islands beside the stairs (orthophoto: dark-green rectangles at the foot of the stairs; photos Athénée_01, Dez_07): stone-faced beds with a clipped hedge
+    for (ax, az), (bx2, bz2) in (((3714.4, 9556.25), (3718.4, 9563.75)), ((3723.5, 9572.75), (3727.5, 9580.25))):
+        walls.append({"pts": [(ax, az), (bx2, bz2)], "h": 1.1, "w": 4.2, "hedgeW": 3.8, "c": [0.40, 0.38, 0.32], "hedge": [0.17, 0.30, 0.12]})
+    free.append({"k": "cabinet", "x": 3730.2, "z": 9575.5, "yaw": math.radians(-30)})
+    free.append({"k": "tlight", "x": 3722.0, "z": 9553.5, "yaw": math.radians(-35)})
+    free.append({"k": "tlight", "x": 3741.5, "z": 9568.5, "yaw": math.radians(145)})
     for bx_, bz_, bh in ((3695.0, 9523.6, 7.5), (3698.8, 9531.0, 5.0), (3703.5, 9541.6, 6.8)):      # the three birches between the wall and the glass block (photo Luxembourg_Athénée_101)
         free.append({"k": "birch", "x": bx_, "z": bz_, "height": bh})
     # the same wall along the pavement of the boulevard in front of the glass block (photo Luxembourg_Athénée_101): the road's west pavement edge + 0.7 m

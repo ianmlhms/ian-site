@@ -29,6 +29,10 @@ function blindDrop(cell, p) {
   return p.blindDrops[Math.floor(hashUnit(cell.seed + 3) * p.blindDrops.length) % p.blindDrops.length];
 }
 
+/** A storey of a ribbon-window building that is the blank attic band (photo Athénée Dez_07: two storeys of windows over the pilotis, the rest is plain cream wall):
+ * `above` = the height of the storey over the top of the recessed floor; `p.floors` = how many storeys of windows there are. */
+const isAttic = (above, p) => p.floors !== undefined && above >= p.floors * (p.floorH || 3.4) - 0.1;
+
 export const STYLES = {
   /** Nothing but the wall (a hall, a plinth). */
   blank: {},
@@ -37,6 +41,7 @@ export const STYLES = {
   ribbon: {
     row(row, p) {
       const { y1, s0, s1, run } = row;
+      if (isAttic(row.y0 - row.cells[0].base, p)) return;
       const frame = p.frame || [0.8, 0.8, 0.78];
       const wy0 = row.y0 + p.sill;
       const wy1 = Math.min(y1 - 0.5, wy0 + p.h);
@@ -47,6 +52,11 @@ export const STYLES = {
     },
     cell(cell, p) {
       const { s0, s1, y0, y1 } = cell;
+      if (isAttic(y0 - cell.base, p)) {                                                           // the blank cream band under the roof: a row of small square slit windows
+        const sm = (s0 + s1) / 2, yc = y0 + (y1 - y0) * 0.62;
+        quad(cell, sm - 0.25, sm + 0.25, yc - 0.28, yc + 0.28, cell.out1, shade(p.glass, 0.5));
+        return;
+      }
       const wy0 = y0 + p.sill, wy1 = Math.min(y1 - 0.55, y0 + p.sill + p.h);
       if (wy1 - wy0 < 0.5) return;
       recessedGlass(cell, s0 + GAP, s1 - GAP, wy0, wy1, p.glass);
@@ -73,7 +83,12 @@ export const STYLES = {
       const blind = hashUnit(cell.seed) < (p.blindShare ?? 0.3);
       const pane = blind ? p.blind : mix(p.pane, p.frame, 0.22);
       const paneColor = paint(pane, cell.seed + 1, 0.06);
-      gradientQuad(cell, sm - hw, sm + hw, wy0, wy1, cell.out1, blind && p.blindEdge ? p.blindEdge : shade(paneColor, SHADOW_TOP), paneColor);
+      if (blind && p.blindEdge) {                                                                 // a roller blind: white with a red valance box at the top (not a gradient)
+        quad(cell, sm - hw, sm + hw, wy0, wy1, cell.out1, paneColor);
+        quad(cell, sm - hw, sm + hw, wy1 - 0.22, wy1, cell.out1 + 0.01, p.blindEdge);
+      } else {
+        gradientQuad(cell, sm - hw, sm + hw, wy0, wy1, cell.out1, shade(paneColor, SHADOW_TOP), paneColor);
+      }
       quad(cell, sm - hw - 0.1, sm + hw + 0.1, wy0 - 0.14, wy0, cell.out2 + 0.03, p.sillColor || cell.run.wallColor);      // the sill: a lit band under the window
     },
   },
@@ -223,7 +238,7 @@ export const STYLES = {
       quad(row, run.s0 + (p.endWall ?? 0), run.s1 - 0.8, y0, wy0 - 0.02, OUT_1, p.spandrel);                  // the grey sill panels, one band along the storey
       ledge(row, run.s0, run.s1, y1 - 0.34, y1 - 0.02, 0.16, p.band, shade(p.band, 1.08));                 // the slab-edge band
       // the porches (gaps of the wall that reach into this storey) stay free: the groups stop beside them
-      const blocked = (run.gaps || []).filter((g) => g.kind === 'recess' && g.yt > y0 + 0.1 && g.yb < y1 - 0.1).map((g) => [g.s0 - PORCH_MARGIN, g.s1 + PORCH_MARGIN]).sort((a, b) => a[0] - b[0]);
+      const blocked = [...(run.gaps || []).filter((g) => g.kind === 'recess'), ...(run.blocks || [])].filter((g) => g.yt > y0 + 0.1 && g.yb < y1 - 0.1).map((g) => [g.s0 - PORCH_MARGIN, g.s1 + PORCH_MARGIN]).sort((a, b) => a[0] - b[0]);
       let s = run.s0 + (p.endWall ?? 0) + p.pier;
       let n = 0;
       while (s < run.s1 - p.pier - 3) {

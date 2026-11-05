@@ -38,7 +38,7 @@ function buildPart(soup, ground, part, all) {
   for (const bare of wallRuns(part, all)) {
     const run = planRun(bare, part, ground);
     // `northLift`: the render of a north face is brighter than its paint (the game's ambient light alone makes it far darker than in the photos)
-    const wall = part.fp.northLift && run.frame.nz < NORTH_FACE ? lit(part.wall, part.fp.northLift) : part.wall;
+    const wall = run.stone ? run.stone.color : part.fp.northLift && run.frame.nz < NORTH_FACE ? lit(part.wall, part.fp.northLift) : part.wall;
     drawWall(soup, run, ground, part.top + PARAPET, wall, part.seed * 53 + run.i);
     if (run.lowerY === null || run.s1 - run.s0 > 6) drawCoping(soup, run, part.top + PARAPET, part.coping || COPING_DEFAULT, part.fp.edge || null);
     drawFacade(soup, run, part, ground);

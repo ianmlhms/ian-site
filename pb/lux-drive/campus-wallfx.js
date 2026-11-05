@@ -98,7 +98,7 @@ function drawPanel(ctx, run, ft, s, ground) {
 export function drawWallFeatures(ctx, run, part, ground) {
   for (const g of run.gaps || []) if (g.kind === 'recess') drawRecess(ctx, run, g, ground);
   for (const ft of part.ft || []) {
-    if (ft.k === 'recess') continue;
+    if (ft.k === 'recess' || ft.k === 'stonewall') continue;     // both are drawn by the facade itself (a gap in the wall, the sandstone courses)
     const m = matchOnRun(run, ft);
     if (!m) continue;
     if (ft.k === 'sign') drawSign(ctx, ft, m.s, wallBase(run, ground, m.s));

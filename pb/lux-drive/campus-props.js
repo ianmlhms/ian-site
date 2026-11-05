@@ -85,28 +85,32 @@ function wallWithHedge(soup, ground, wall) {
     const [ax, az] = wall.pts[i], [bx, bz] = wall.pts[i + 1];
     const len = Math.hypot(bx - ax, bz - az);
     const dx = (bx - ax) / len, dz = (bz - az) / len, nx = -dz, nz = dx;
-    const yaw = -Math.atan2(bz - az, bx - ax);
     const steps = Math.max(1, Math.ceil(len / WALL_SEG));
     const seg = len / steps;
+    const at = (u, v) => [ax + dx * u + nx * v, az + dz * u + nz * v];                              // u along the wall, v across it
+    // the ground of an end of a piece across the whole thickness: the wall reaches the lowest point and stands `h` over the highest
+    const endGround = (u) => [-wall.w / 2, 0, wall.w / 2].map((v) => { const [x, z] = at(u, v); return ground(x, z); });
     for (let k = 0; k < steps; k++) {
       seed += 1;
-      const u0 = k * seg, u1 = u0 + seg, um = (u0 + u1) / 2;
-      const x = ax + dx * um, z = az + dz * um;
-      const y0 = Math.min(ground(ax + dx * u0, az + dz * u0), ground(ax + dx * u1, az + dz * u1), ground(x, z)) - WALL_SINK;
-      const top = Math.max(ground(ax + dx * u0, az + dz * u0), ground(ax + dx * u1, az + dz * u1)) + wall.h;
+      const u0 = k * seg, u1 = u0 + seg;
+      const g0 = endGround(u0), g1 = endGround(u1);
+      const bottoms = [Math.min(...g0), Math.min(...g1), Math.min(...g1), Math.min(...g0)].map((g) => g - WALL_SINK);
+      const tops = [Math.max(...g0), Math.max(...g1), Math.max(...g1), Math.max(...g0)].map((g) => g + wall.h);   // a sloped top: the wall follows the ground instead of stepping
       const tint = 0.9 + unit(seed) * 0.2;
       const stone = [wall.c[0] * tint, wall.c[1] * tint, wall.c[2] * tint];
-      soup.box(x, y0, z, seg + 0.04, top - y0, wall.w, yaw, stone, { topColor: [Math.min(1, stone[0] * 1.12), Math.min(1, stone[1] * 1.12), Math.min(1, stone[2] * 1.1)] });
-      for (const side of [-1, 1]) {                                         // the joints of the courses, on both faces
+      const plan = (half) => [at(u0 - 0.02, -half), at(u1 + 0.02, -half), at(u1 + 0.02, half), at(u0 - 0.02, half)];
+      soup.prism(plan(wall.w / 2), bottoms, tops, stone, { topColor: [Math.min(1, stone[0] * 1.12), Math.min(1, stone[1] * 1.12), Math.min(1, stone[2] * 1.1)] });
+      for (const side of [-1, 1]) {                                         // the joints of the courses, on both long faces
+        const o = side * (wall.w / 2 + 0.012);
         for (const c of COURSES) {
-          const y = y0 + WALL_SINK + (top - y0 - WALL_SINK) * c;
-          const o = side * (wall.w / 2 + 0.012);
-          soup.quad([ax + dx * u0 + nx * o, y, az + dz * u0 + nz * o], [ax + dx * u1 + nx * o, y, az + dz * u1 + nz * o], [ax + dx * u1 + nx * o, y + 0.07, az + dz * u1 + nz * o], [ax + dx * u0 + nx * o, y + 0.07, az + dz * u0 + nz * o], [stone[0] * 0.66, stone[1] * 0.64, stone[2] * 0.6]);
+          const yA = bottoms[0] + WALL_SINK + (tops[0] - bottoms[0] - WALL_SINK) * c, yB = bottoms[1] + WALL_SINK + (tops[1] - bottoms[1] - WALL_SINK) * c;
+          const [pa, pb] = [at(u0, o), at(u1, o)];
+          soup.quad([pa[0], yA, pa[1]], [pb[0], yB, pb[1]], [pb[0], yB + 0.07, pb[1]], [pa[0], yA + 0.07, pa[1]], [stone[0] * 0.66, stone[1] * 0.64, stone[2] * 0.6]);
         }
       }
-      const hh = 0.95 + unit(seed * 7 + 3) * 0.2, hw = wall.w * (1.05 + unit(seed * 5 + 1) * 0.2);
+      const hh = 0.95 + unit(seed * 7 + 3) * 0.2, hw = wall.hedgeW ?? wall.w * (1.05 + unit(seed * 5 + 1) * 0.2);
       const leaf = paint(wall.hedge, seed, 0.1);
-      soup.box(x, top - 0.05, z, seg + 0.08, hh, hw, yaw, leaf, { topColor: [Math.min(1, leaf[0] * 1.25), Math.min(1, leaf[1] * 1.25), Math.min(1, leaf[2] * 1.15)] });
+      soup.prism(plan(hw / 2), tops.map((t) => t - 0.05), tops.map((t) => t + hh), leaf, { topColor: [Math.min(1, leaf[0] * 1.25), Math.min(1, leaf[1] * 1.25), Math.min(1, leaf[2] * 1.15)] });
     }
   }
 }
@@ -129,12 +133,28 @@ function blob(soup, cx, cy, cz, rx, ry, color, seed) {
   }
 }
 
-/** A birch: a slim white trunk, a narrow airy crown (the young birches in front of the Athénée, photo Luxembourg_Athénée_101). */
+/** A leaf cluster: a jittered octahedron (8 triangles), lighter on top.  Several small ones read as foliage with gaps; one big blob reads as a lollipop. */
+function lump(soup, cx, cy, cz, r, color, seed) {
+  const jit = (i) => 0.75 + 0.5 * (((Math.imul(seed + i * 977, 0x9e3779b1) >>> 9) & 255) / 255);
+  const P = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -0.8, 0], [0, 0, 1], [0, 0, -1]].map(([x, y, z], i) => [cx + x * r * jit(i), cy + y * r * 0.85 * jit(i + 6), cz + z * r * jit(i + 12)]);
+  const [px, nx, py, ny, pz, nz] = P;
+  const faces = [[px, py, pz], [pz, py, nx], [nx, py, nz], [nz, py, px], [pz, ny, px], [nx, ny, pz], [nz, ny, nx], [px, ny, nz]];
+  faces.forEach(([a, b, c], i) => soup.tri(a, b, c, paint(color, seed + i, 0.08).map((v) => v * (i < 4 ? 1.12 : 0.8))));
+}
+
+/** A birch (the young birches in front of the Athénée, photo Luxembourg_Athénée_101): a white trunk that leans a little, and seven small leaf clusters spread over a
+ * conical crown, wide at the bottom and thin at the top, so the trunk shows through and it reads as an airy tree.  About 76 triangles. */
 function birch(soup, ground, t) {
   const y = ground(t.x, t.z) - 0.2, h = t.height;
-  soup.frustum(t.x, t.z, 0.15, 0.06, y, y + h * 0.78, 5, BIRCH_BARK, { cap: false });
-  blob(soup, t.x, y + h * 0.66, t.z, h * 0.15, h * 0.3, BIRCH_LEAF, Math.round(t.x * 7 + t.z));          // slim and airy: the real ones are 4 m wide with a white trunk
-  blob(soup, t.x + h * 0.06, y + h * 0.86, t.z - h * 0.04, h * 0.1, h * 0.17, BIRCH_LEAF, Math.round(t.x * 3 + t.z * 5));
+  const seed = Math.round(t.x * 7 + t.z);
+  const lean = (((Math.imul(seed, 0x9e3779b1) >>> 9) & 255) / 255 - 0.5) * 0.14 * h;       // the top of the trunk stands off the foot by up to 7 % of the height
+  soup.frustum(t.x, t.z, 0.14, 0.09, y, y + h * 0.5, 5, BIRCH_BARK, { cap: false });
+  soup.frustum(t.x + lean * 0.5, t.z, 0.09, 0.04, y + h * 0.5, y + h * 0.9, 5, BIRCH_BARK, { cap: false });
+  for (let i = 0; i < 7; i++) {
+    const k = i / 6, a = seed * 0.9 + i * 2.4;                                       // up the crown: height and (shrinking) distance from the trunk
+    const r = h * 0.16 * (1 - k * 0.7);
+    lump(soup, t.x + lean * 0.5 * k + Math.cos(a) * r, y + h * (0.46 + 0.5 * k), t.z + Math.sin(a) * r, h * (0.12 - 0.04 * k), BIRCH_LEAF, seed + i * 13);
+  }
 }
 
 /** A small round ornamental tree in autumn orange (the row south of the Forum, the trees of the Blumm square). */
@@ -160,7 +180,7 @@ export function buildProps(campus, ground) {
   for (const item of campus.free) (item.k === 'birch' ? birch : drawFree)(soup, ground, item);          // a birch placed by hand (the Athénée forecourt) is a free item too
   for (const w of campus.walls) {
     wallWithHedge(soup, ground, w);
-    walls.push(...edgeWalls([...w.pts, ...[...w.pts].reverse().slice(1, -1)], 0.3, 'campus-wall'));
+    walls.push(...edgeWalls([...w.pts, ...[...w.pts].reverse().slice(1, -1)], Math.max(0.3, w.w / 2 - 0.05), 'campus-wall'));     // a planter island is as thick as it is wide: the car keeps off its whole width
   }
   for (const t of campusSpeciesTrees()) SPECIES_DRAW[t.kind](soup, ground, t);
   return { soup, walls, hideBuildings: [], info: { furniture: campus.furniture.length, free: campus.free.length } };

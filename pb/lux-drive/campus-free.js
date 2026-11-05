@@ -12,9 +12,9 @@ const SINK = 0.3;
 /** A box along the direction `theta` (radians, atan2(dz, dx)): `along` long, `across` wide, `h` high, its base middle at (x, y0, z). */
 const bx = (soup, x, y0, z, along, h, across, theta, color, topColor = null) => soup.box(x, y0, z, along, h, across, -theta, color, { topColor: topColor || color });
 
-const HEATHER = [[0.78, 0.30, 0.52], [0.66, 0.22, 0.46], [0.84, 0.44, 0.60]];     // the heather in the troughs (photo Aline_Mayrisch_101: pink and purple)
-const PLANTER_STEP = 2.2;                                                              // m: one heather trough every this far along a bridge wall
-const PLANTER_LEN = 1.1;
+const HEATHER = [[0.62, 0.30, 0.46], [0.52, 0.24, 0.42], [0.70, 0.40, 0.54]];     // the heather in the troughs (photo Aline_Mayrisch_101: pink and purple)
+const PLANTER_STEP = 1.7;                                                              // m: one heather trough every this far along a bridge wall
+const PLANTER_LEN = 0.7;
 
 /** The walkway to the porch of the Lycée Aline Mayrisch: a deck at the level of the schoolyard between two concrete planter walls over the sunken court, each wall
  * with a row of heather troughs on top and a slim steel rail beside them (photo Aline_Mayrisch_101). */
@@ -29,7 +29,7 @@ function bridge(soup, ground, b) {
     const n = Math.max(1, Math.floor(len / PLANTER_STEP));
     for (let k = 0; k < n; k++) {                                                            // the heather troughs on the wall
       const z = Math.min(b.z0, b.z1) + ((k + 0.5) * len) / n;
-      bx(soup, x, top, z, PLANTER_LEN, 0.26, 0.4, Math.PI / 2, [0.30, 0.31, 0.32], HEATHER[(k + (side > 0 ? 1 : 0)) % HEATHER.length]);
+      bx(soup, x, top, z, PLANTER_LEN, 0.2, 0.3, Math.PI / 2, [0.30, 0.31, 0.32], HEATHER[(k + (side > 0 ? 1 : 0)) % HEATHER.length]);
     }
     bx(soup, x + side * 0.28, top, zm, len, 0.05, 0.05, Math.PI / 2, STEEL);                // the rail on the outer side
     for (const z of [Math.min(b.z0, b.z1) + 0.3, zm, Math.max(b.z0, b.z1) - 0.3]) bx(soup, x + side * 0.28, top, z, 0.05, 0.9, 0.05, 0, STEEL);
@@ -186,10 +186,10 @@ function steps(soup, ground, s) {
 }
 
 const STEP_RISE = 0.16;                // m: a step is this high (the number of steps follows from the height of the flight)
-const STEP_SEGMENT = 14;               // m: the flight is cut into pieces this long, each follows the ground on its own
+const STEP_SEGMENT = 8;                // m: the flight is cut into pieces this long, each follows the ground on its own (longer pieces leave tall risers where the ground bends)
 const STEP_LIFT = 0.04;                // m: a tread lies this far over the highest ground under it
 const STEP_MIN = 0.07;                 // m: no riser is lower than this
-const STEP_RISER = [0.48, 0.47, 0.45];
+const STEP_RISER = [0.62, 0.61, 0.58];
 
 /** A tall yard lamp: a slim grey pole with a bent arm and a lamp head (4 sides, 14 triangles). */
 function lamp(soup, ground, l) {
@@ -199,7 +199,29 @@ function lamp(soup, ground, l) {
   bx(soup, l.x, y + l.h - 0.2, l.z - 1.1, 0.28, 0.18, 0.5, 0, [0.74, 0.74, 0.72]);
 }
 
-const DRAW = { steps, lamp, bridge, lobby, pergola, sign: freeSign, bench, table, bin, bollard, seat, playground };
+const RED = [0.80, 0.14, 0.12], POLE_WHITE = [0.92, 0.92, 0.90], BLACK = [0.08, 0.08, 0.09];
+
+/** A traffic light of the city of Luxembourg (photo Athénée Dez_07): a red-and-white striped pole, two black signal heads with hoods facing the road, one lit green. */
+function tlight(soup, ground, l) {
+  const y = ground(l.x, l.z) - 0.1, H = 3.1, SEG = 4;
+  for (let i = 0; i < SEG; i++) soup.frustum(l.x, l.z, 0.07, 0.07, y + (H * i) / SEG, y + (H * (i + 1)) / SEG, 4, i % 2 ? POLE_WHITE : RED, { cap: i === SEG - 1 });
+  const nx = Math.cos(l.yaw), nz = Math.sin(l.yaw);                                            // the way the heads face
+  const th = -l.yaw + Math.PI / 2;
+  for (const [dy, g] of [[0, [0.2, 0.85, 0.35]], [-0.62, [0.3, 0.05, 0.05]]]) {
+    const cy = y + H - 0.2 + dy;
+    soup.box(l.x + nx * 0.2, cy - 0.3, l.z + nz * 0.2, 0.3, 0.6, 0.26, th, BLACK, { topColor: BLACK });
+    const lx = l.x + nx * 0.34, lz = l.z + nz * 0.34, sx = Math.cos(th) * 0.1, sz = -Math.sin(th) * 0.1;
+    soup.quad([lx - sx, cy - 0.06, lz - sz], [lx + sx, cy - 0.06, lz + sz], [lx + sx, cy + 0.14, lz + sz], [lx - sx, cy + 0.14, lz - sz], g);          // the lamp
+  }
+}
+
+/** Two grey electrical cabinets side by side on the pavement (photo Athénée Dez_07). */
+function cabinet(soup, ground, c) {
+  const y = ground(c.x, c.z) - 0.1, nx = Math.cos(c.yaw + Math.PI / 2), nz = Math.sin(c.yaw + Math.PI / 2);
+  for (const k of [-0.5, 0.5]) bx(soup, c.x + nx * k * 0.85, y, c.z + nz * k * 0.85, 0.8, 1.35, 0.4, c.yaw + Math.PI / 2, [0.78, 0.79, 0.78], [0.86, 0.87, 0.86]);
+}
+
+const DRAW = { tlight, cabinet, steps, lamp, bridge, lobby, pergola, sign: freeSign, bench, table, bin, bollard, seat, playground };
 
 /** Draws one free item (a record of the bake: `k` = what it is); unknown kinds are an error (the bake and the game must agree). */
 export function drawFree(soup, ground, item) {

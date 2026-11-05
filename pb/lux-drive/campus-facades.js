@@ -5,12 +5,14 @@
  * Pure (no THREE). */
 import { paint } from './landmark-soup.js';
 import { STYLES } from './campus-styles.js';
-import { SINK, MIN_VISIBLE, OUT_1, OUT_2, quad, ledge, pier, shade, inGap, wallBase, recessBox, matchOnRun, paintLit } from './campus-kit.js';
+import { SINK, MIN_VISIBLE, OUT_1, OUT_2, quad, ledge, pier, shade, inGap, wallBase, recessBox, matchOnRun, paintLit, gradientQuad, hashUnit } from './campus-kit.js';
 import { drawWallFeatures } from './campus-wallfx.js';
 
 const WALL_STEP = 6;               // m: the wall base follows the ground at least this often
 const COPING = 0.3;                // m: the roof edge stands this far out of the wall
 const RAIL_POST = 2.4;             // m: the posts of a railing
+const PARAPET_STONE = 0.45;        // m: the wall stands this far over the roof (as campus-buildings.js)
+const STONE_TOL = 3.0;             // m: a stone wall feature is matched to the wall run that lies this close to its position
 const END_PIER = 1.2;              // m: the recessed floor stops this far from the end of a wall (a corner pier)
 
 /** The wall of a run over the interval [sa, sb] from y(sa) to y(sb) at the bottom to `top`, in steps that follow the ground. */
@@ -56,6 +58,8 @@ export function drawCoping(soup, run, top, color, edge = null) {
 export function planRun(run, part, ground) {
   const p = part.fp || {};
   const gaps = [];
+  const stone = (part.ft || []).filter((ft) => ft.k === 'stonewall').map((ft) => ({ ft, m: matchOnRun(run, ft, STONE_TOL) })).find((r) => r.m);
+  if (stone) return { ...run, gaps, plinthHere: false, wallColor: stone.ft.color, stone: stone.ft };      // a blank sandstone wall: no bays, no recessed floor
   const plinthHere = p.plinth && (p.plinth.facing !== 'south' || run.frame.nz > 0.5);
   const gfFacing = !p.gf || p.gf.facing !== 'north' || run.frame.nz < -0.5;
   const gf = p.gf && gfFacing && !plinthHere && run.lowerY === null && run.s1 - run.s0 > END_PIER * 2 + 3 ? p.gf : null;
@@ -78,7 +82,10 @@ export function planRun(run, part, ground) {
     const base = wallBase(run, ground, m.s);
     gaps.push({ kind: 'recess', ft, s0: m.s - ft.w / 2, s1: m.s + ft.w / 2, yb: base + (ft.lift ?? 0), yt: base + (ft.lift ?? 0) + ft.h, depth: ft.depth, base, cells: true });
   }
-  return { ...run, gaps, plinthHere, wallColor: part.wall };
+  // coloured panels standing out of the wall (the ochre block of the Lycée Aline Mayrisch): no window groups behind them
+  const blocks = (part.ft || []).filter((ft) => ft.k === 'panel').map((ft) => ({ ft, m: matchOnRun(run, ft) })).filter((r) => r.m)
+    .map(({ ft, m }) => { const base = wallBase(run, ground, m.s); return { s0: m.s - ft.w / 2, s1: m.s + ft.w / 2, yb: base + ft.y0, yt: base + ft.y1 }; });
+  return { ...run, gaps, blocks, plinthHere, wallColor: part.wall };
 }
 
 const STONE_COURSE = 1.0;          // m: the height of a course of the stone cladding of the pilotis
@@ -95,6 +102,17 @@ function drawPier(ctx, s0, s1, y0, y1, depth, gf, out0, key) {
   quad(ctx, s0, s1, y0, y0 + 0.35, o + 0.02, shade(gf.stone, 0.62));                                // the dark base course
 }
 
+/** A mural on the back wall of a pilotis bay (the Athénée: abstract painted panels in red, blue, yellow and white under the building): a pale ground and three blocks of colour (8 triangles). */
+function drawMural(ctx, s0, s1, y0, y1, out, palette, key) {
+  quad(ctx, s0, s1, y0, y1, out, paintLit(palette[palette.length - 1], key, 0.04));
+  const w = (s1 - s0) / 3;
+  for (let i = 0; i < 3; i++) {
+    const a = hashUnit(key * 5 + i), b = hashUnit(key * 11 + i * 3);
+    const ya = y0 + (y1 - y0) * (0.05 + 0.3 * a), yb = y0 + (y1 - y0) * (0.55 + 0.4 * b);
+    quad(ctx, s0 + w * i + 0.05, s0 + w * (i + 1) - 0.05, ya, yb, out + 0.03, palette[Math.floor(hashUnit(key * 3 + i * 17) * (palette.length - 1))]);
+  }
+}
+
 /** The recessed floor of a gap of kind 'gf': back glass, mullions, pilotis piers, cheeks and soffit. */
 function drawRecessedFloor(ctx, run, g, ground, gf) {
   const { soup, f } = ctx;
@@ -109,8 +127,10 @@ function drawRecessedFloor(ctx, run, g, ground, gf) {
   for (let k = 0; k < n; k++) {
     const sa = g.s0 + k * bay, sb = sa + bay;
     const base = lifted ? g.yb : wallBase(run, ground, (sa + sb) / 2);
-    if (depth > 0.3) {
-      quad(ctx, sa + 0.12, sb - 0.12, base - 0.2, g.yt - 0.45, -depth + 0.05, paint(gf.glass, k + run.i * 3, 0.1));
+    if (depth > 0.3 && gf.mural && hashUnit(k * 7 + run.i * 13 + 5) < gf.mural.share) {
+      drawMural(ctx, sa + 0.12, sb - 0.12, base - 0.2, g.yt - 0.45, -depth + 0.06, gf.mural.palette, k * 31 + run.i);
+    } else if (depth > 0.3) {
+      { const gl = paint(gf.glass, k + run.i * 3, 0.1); gradientQuad(ctx, sa + 0.12, sb - 0.12, base - 0.2, g.yt - 0.45, -depth + 0.05, shade(gl, gf.skyTop ?? 1.0), gl); }   // the sky reflected in the upper part of the glass
       quad(ctx, sa - 0.04, sa + 0.04, base - 0.2, g.yt - 0.45, -depth + 0.1, gf.mullion || gf.pier);
       if (gf.rail && gf.railOut === undefined) { quad(ctx, sa + 0.3, sb - 0.3, base, base + 1.0, -0.25, gf.rail); quad(ctx, sa + 0.3, sb - 0.3, base + 1.0, base + 1.08, -0.24, shade(gf.rail, 1.25)); }
     } else {
@@ -124,23 +144,47 @@ function drawRecessedFloor(ctx, run, g, ground, gf) {
   ledge(ctx, g.s0, g.s1, g.yt - 0.5, g.yt, 0.25, gf.pier, shade(gf.pier, 1.06));
 }
 
+const STONE_COURSE_H = 0.55;       // m: the height of one course of ashlar in the sandstone wall
+
+/** A blank wall of rough sandstone (photos Athénée_de_Luxembourg_01, Athénée Dez_07): long courses of slightly different ochre ashlar from the ground to the roof edge, a darker foot. */
+function drawStoneWall(ctx, run, part, ground) {
+  const ft = run.stone;
+  const steps = Math.max(1, Math.ceil((run.s1 - run.s0) / WALL_STEP));
+  const base = Math.min(...Array.from({ length: steps + 1 }, (_, k) => wallBase(run, ground, run.s0 + ((run.s1 - run.s0) * k) / steps)));
+  const top = part.top + PARAPET_STONE;
+  const n = Math.max(1, Math.round((top - base) / STONE_COURSE_H));
+  for (let c = 0; c < n; c++) quad(ctx, run.s0, run.s1, base + ((top - base) * c) / n, base + ((top - base) * (c + 1)) / n, OUT_1 * 0.5, paintLit(ft.color, c * 7 + run.i, 0.09));
+  for (let c = 1; c < n; c++) quad(ctx, run.s0, run.s1, base + ((top - base) * c) / n - 0.025, base + ((top - base) * c) / n + 0.025, OUT_1 * 0.8, shade(ft.color, 0.55));   // the dark joints of the courses
+  quad(ctx, run.s0, run.s1, base, base + 0.5, OUT_1, shade(ft.color, 0.7));                           // the foot
+}
+
 /** The railing along the edge of a yard deck in front of a recessed floor (photos Aline_Mayrisch_101, LAML_04): a concrete kerb with a coping, slim steel posts every
  * 2.4 m, grey perforated panels in a frame between them, a round top rail.  Real boxes (about 12 triangles a bay), not one grey quad. */
 function drawRailing(ctx, g, gf) {
   const out = gf.railOut, y0 = g.yb;
   const mesh = gf.rail, kerb = shade(gf.pier, 0.92), steel = shade(mesh, 0.62);
   const a = g.s0 + 0.5, b = g.s1 - 0.5;
-  ledge(ctx, a, b, y0 - 0.25, y0 + 0.38, 0.3, kerb, shade(kerb, 1.1), out - 0.15);                  // the concrete foot with its top
   const n = Math.max(1, Math.round((b - a) / RAIL_POST));
   const step = (b - a) / n;
+  const open = (s) => (gf.railBreaks || []).some((br) => Math.abs(ctx.f.at(s, 0)[0] - br.x) < br.w / 2);          // `railBreaks`: where a lobby joins the deck there is no railing
+  let runStart = null;
+  const closeRun = (k) => {                                                                          // the foot, the last post and the top rail of a run of bays k0..k
+    if (runStart === null) return;
+    const s0 = a + step * runStart, s1 = a + step * k;
+    ledge(ctx, s0, s1, y0 - 0.25, y0 + 0.38, 0.3, kerb, shade(kerb, 1.1), out - 0.15);               // the concrete foot with its top
+    pier(ctx, s1 - 0.04, s1 + 0.04, y0 + 0.38, y0 + 1.26, 0.07, steel, out);
+    ledge(ctx, s0 - 0.04, s1 + 0.04, y0 + 1.16, y0 + 1.26, 0.09, shade(mesh, 1.3), null, out);       // the top rail
+    runStart = null;
+  };
   for (let k = 0; k < n; k++) {
     const s0 = a + step * k, s1 = s0 + step;
+    if (open((s0 + s1) / 2)) { closeRun(k); continue; }
+    if (runStart === null) runStart = k;
     quad(ctx, s0 + 0.05, s1 - 0.05, y0 + 0.4, y0 + 1.14, out + 0.03, shade(mesh, 1.06));              // the panel
     quad(ctx, s0 + 0.14, s1 - 0.14, y0 + 0.5, y0 + 1.04, out + 0.05, shade(mesh, 0.82));             // the perforated field inside its frame
     pier(ctx, s0 - 0.04, s0 + 0.04, y0 + 0.38, y0 + 1.26, 0.07, steel, out);                          // the post
   }
-  pier(ctx, b - 0.04, b + 0.04, y0 + 0.38, y0 + 1.26, 0.07, steel, out);
-  ledge(ctx, a - 0.04, b + 0.04, y0 + 1.16, y0 + 1.26, 0.09, shade(mesh, 1.3), null, out);          // the top rail
+  closeRun(n);
 }
 
 /** A plinth: a band of another material (concrete) along the foot of the wall, `h` high, with a capping course on top. */
@@ -200,6 +244,7 @@ export function drawFacade(soup, run, part, ground) {
   if (!style) throw new Error(`campus: unknown facade style '${part.fx}' of part ${part.key}`);
   const ctx = { soup, f: run.frame };
   const p = part.fp;
+  if (run.stone) { drawStoneWall(ctx, run, part, ground); drawWallFeatures(ctx, run, part, ground); return; }
   const gf = (run.gaps || []).find((g) => g.kind === 'gf');
   const plinth = run.plinthHere ? p.plinth.h : gf && !(gf.yb - gf.base > 0.5) ? p.gf.h : 0;
   if (part.fx !== 'blank') {
