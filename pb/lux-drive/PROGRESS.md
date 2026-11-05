@@ -1423,3 +1423,61 @@ Started from `lux-drive` 867a7db9 (v42).  Montages (before | after, noon, medium
 
 ### Gates (Mac mini)
 `harness.js` 103 checks PASS; `luxdrive_world` PASS (112 / 150 / 213 draw calls); holes 0 at medium and low; `luxdrive_ui` PASS; `luxdrive_webkit` PASS.  `pb/lux-drive.html`: main.js `?v=43`.
+
+## Terrain fix 5 (branch `lux-drive-terrain5`, Mac mini): decks flush with their roads, junction sheets, asphalt only on the level carriageway — HANDOFF (not finished)
+
+Started from `lux-drive-terrain5` = v43 (5f6fbf7a).  Tools (scratch, not shipped): `~/Library/Caches/luxdrive-work/terrain5/tools/` (`jworst.mjs` the 20 junctions with the pins/sheet at the worst point,
+`deckgrade.mjs` every deck end by kind, `gated.mjs` the gate D failures with ids, `xauto.mjs` / `xsec.mjs` cross sections with pins, `sidewalls.mjs` the world-flow "walls the carve made",
+`asphaltslope.mjs`).  `road-network.js` carve() pushes `{ road, val, wt, hold, ... }` and a tail record into `out.debug` when the caller passes an array there (diagnostics only).
+Montages (left = v43 live, right = this branch at commit "sheet acts only where two ways meet", noon, medium): `~/Library/Caches/luxdrive-work/terrain5/m1/` (r1 spawn, r2 junction, r3 esch,
+r4/r5 A1, r6/r7/r7b Neudorf).  NOTE: m1 was shot before the last three commits (sheet gap rule, protection of crossing-found over ways); re-shoot with `poses_ref.json` there.
+
+### 1. Decks start flush with their road (`road-network.js`, `decks.js`, `heightfield.js` + all callers pass `decks`)
+* Root cause (terrain4) confirmed and fixed at the source: the protected corridor of a bridge was a disc of half width + 10 m round its FIRST POINT, so the approach road lost its bed for its last
+  ~15 m.  Now (a) at an end of a bridge where a carved way runs on (end within 3 m, leaving toward the bridge) the protection is nothing before the abutment and ramps up from ABUT_HOLD (2 m)
+  over PROTECT_RAMP (1.5 m) along the bridge; (b) that way's carriageway is held 2 m under the deck before its end cap fades (the 1 m lattice under the deck start is the road); (c) the
+  carriageway of a way within APPROACH_FREE (20 m) of the bridge it runs onto is never protected (the deck of the other carriageway of a skewed bridge protected it).
+* The approach road is PINNED to the deck level (`deckEndLevels`: the DSM of the deck's first two inner points continued to its end, carriageway decks >= 5 m only, not the Pont Rouge /
+  Pont Adolphe) in reconcileJunctions; a deck is used only if all its approach ends accept (lift <= 7 m, lower <= 4 m, not > 1 m under the land at its end).  A1 Grünewald was 2.7 m short
+  of its deck, Neudorf 5.4 m, Kockelscheuer 6 m.
+* `createDeckNetwork` (decks.js): approach ends take the road surface, joints of a bridge in pieces (ends within 1.5 m, no road) take the mean DSM level of the pieces (not the valley
+  floor: 16 m spikes at Neudorf 22/37), and from those ends the deck runs at <= 12 % (envelope; a straight line where the two ends cannot both be met); no deck runs under the ground.
+* Narrow short decks over land that does not dip (tracks over a ditch: DSM = canopy, up to 25 m) are not decks: the way is carved (`groundedDeckOf`, 5 decks: 51, 208, 259, 267, 277).
+* Protection of the crossing-found over ways: full only within 30 m of a crossing (bench + 1 m, fading 4 m); elsewhere only their own bench (fade 2 m).  Protection keeps CUTS and batter
+  fills out from under bridges; approach carriageways pass.
+* Gate D: new check "every road runs flush onto its deck": 228 approaches, step 0 (worst 0.0 cm), sag 0 (worst <= 0.3), carriageway deck start <= 20 % (worst 15 %), joints 0 of 50 off.
+  The floating-ends check skips JOINTS (ends of pieces at one level) — they are checked as joints instead (that is where the 16 m spikes were).  All 11 D checks pass, no limit loosened.
+
+### 2. Junctions: the sheet (`junction-surface.js`, new; used by carve())
+* Why co-levelling the beds did not help: the bumps are NOT bed differences, they are the HAND-OVERS of the layered carve (measured: lattice 4.89 / continuous field 5.74 / band without
+  kerb 5.74, so neither the lattice nor the kerb): (a) OWN_FADE hands the surface from one way to the next within 0.5 m, (b) the ground between two carriageways a metre apart falls to the
+  land (both pins fade toward their face), (c) the end cap of a way stops pinning 2 m past its end while its tarmac disc is still painted, (d) a crossing street meets a flat-across main road
+  with a kink of its grade.
+* Fix: at every junction pin and wherever two same-level carriageways overlap, a plane is fitted to the beds around (14 m, Gaussian 8 m, a soft "flat across" wish, two passes against
+  flyovers, rms quality weight); the sheet is the Gaussian blend (sigma 6 m) of these planes with a soft saturation.  The carve pulls the carriageways onto it where two ways at the sheet's
+  level meet (second way within 16 m), on benches and in gaps between two ways on opposite sides (<= 3 m), never the approach of a bridge, never a way at another level.  Build: +0.45 s, but
+  the end lookups now use spatial grids (`pointGrid`), so the field builds in 2.44 s as before (2.46 s).
+* Gate L (20 biggest junctions, 50 km/h): median 4.89 -> **0.53**, worst 21.8 -> **1.9** apart from two steep old-town boxes (Pafendaller Bierg 10.2: 32 % pitch, two way ends 37 cm apart;
+  Waassergaass 3.5: ways at two levels 29 cm apart).  Gate tightened to median <= 1.0, worst <= 2.5, the two old-town boxes <= 12.
+
+### 3. Asphalt only on the level carriageway (carve paint, gate L)
+* Nei Escher Strooss: the "asphalt hillside" was the carriageway paint of the overpass way 3013 (crossing-found over way, not carved) lying on the side of its own embankment, and the
+  trunk road's right lane held on that slope by 3013's protection.  Now every way paints only where the ground is within 0.2 m of its bed (its edge is pushed in 8 m per m beyond), and
+  over ways protect as in 1.  New check: painted carriageway on ground steeper than 15 % across the road: 0.77 % of points (v43) -> 0.50 %; guard <= 0.6 % (not zero: lanes squeezed
+  between the land and a neighbour at another level).
+
+### Gates at HANDOFF
+* `harness.js`: **106 checks PASS** (run before the last commit: D, I, L re-run after it, PASS; K walls re-baked after it — re-run the full harness).
+* `luxdrive_world.mjs`: **FAIL** before the last commit: (1) p99 ground beside roads 1.61 (limit 1.6) -> now 1.51 (fixed by the "between" rule); (2) **9 carve walls (limit 8)**, still
+  9 after the last commit (`sidewalls.mjs`): v43 had 6; new ones: Rue Cents 8576,7851; Autoroute de Dudelange 4678,12640 (road 17084 on the deck-level approach 5 m above road 7412
+  1-2 m beside it); Hellege-Geescht Plateau 5452,9212; Bisserwée 5480,9070; Montée du Grund 5338,8973 (old town, check whether the sheet or the crossing protection did it);
+  (3) the A1 bridge "stands 0.7 m above the ground" was measured at the END of a 2-point way (the abutment, now flush): the flow now takes the middle by length.  Draw calls 112/150/212 OK.
+* NOT RUN yet: `luxdrive_holes.mjs` (medium + low), `luxdrive_ui.mjs`, `luxdrive_webkit.mjs`.  `pb/lux-drive.html` main.js `?v=44` (bumped).
+
+### Next builder
+1. Get the world flow to <= 8 carve walls (list above) without touching its limit; then run holes x2, ui, webkit; re-shoot `terrain5/poses_ref.json` and montage against `terrain4/after`.
+2. Spawn (task 4) NOT done: the grey wedge is the retaining wall at the start of the garage-ramp trench (way 2089, 27.5 m, the DTM has the trench).  Proposal: don't carve short service
+   ways that dive into a tunnel (no portal is drawn there) and fill the trench (or keep the carve and make the wall flush with the grass).
+3. Escher Strooss: the faint diagonal marking streaks on the left lane remain (shader edge contour on the ridge of two overlapping carriageways).
+4. Junction r2 (Ian's view): the big pale paved area with a sawtooth edge right of the road is the pavement paint (sdPave) — not touched.
+5. Hairpins at two levels (Eecherfeld), remaining humps: not touched.
