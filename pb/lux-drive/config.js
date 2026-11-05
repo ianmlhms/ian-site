@@ -207,6 +207,8 @@ export const TUNNEL_OPEN = Object.freeze({
   coverShare: 0.8,          // the share of the run that has to be that shallow
   cutMax: 6.0,              // m: never opened where the land over it reaches this (no canyon is dug)
   sample: 2.0,              // m: the step of the measure along the ways
+  lanesNear: 30.0,          // m: a car park lane with another tunnel this close is part of an underground network and stays a tunnel
+  gradeMax: 0.10,           // the floor of the cut (mouth to mouth) is not steeper than this: a car park ramp stays a tunnel
   deckEndNear: 8.0,         // m: an end of a run this close to the end of a deck: the deck lands there (road-network BRIDGE_JOIN)
   stackedShare: 0.5,        // a run that much under a deck that lands at its mouth is stacked under it and stays a tunnel
 });

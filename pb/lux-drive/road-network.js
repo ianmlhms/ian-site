@@ -81,7 +81,7 @@ const CLOSED_MIN_SAMPLES = 6;          // a ring has at least this many samples 
 const BRIDGE_JOIN = 8.0;               // m: a street whose end lies this close to the end of a bridge (or a tunnel) runs onto it
 const END_JOIN = 3.0;                  // m: the ends of ways this close to one another meet at one node
 const JUNCTION_TOUCH = 0.6;           // m: a way whose centre line lies within the pavement (+ this) of another way runs into it: the apron of the junction is the level of that way
-const GARAGE_RAMP_MAX = 40.0;          // m: a service way at most this long that dives into a tunnel (a garage ramp, ~60 in the city) is not a road of the game: it is neither carved nor painted, and
+export const GARAGE_RAMP_MAX = 40.0;          // m: a service way at most this long that dives into a tunnel (a garage ramp, ~60 in the city) is not a road of the game: it is neither carved nor painted, and
                                        // the trench the DTM has for it is filled to the level of its mouth (GARAGE_PAD_FADE).  Carved, it was a pit with a wall beside the avenue at the very start of the game
                                        // (Avenue J.F. Kennedy: a grey wedge rising from the road edge and a patch of pavement), and no portal leads into the garage anyway
 const GARAGE_PAD_FADE = 2.0;           // m: the fill of a garage ramp runs out into the land over this past its half width

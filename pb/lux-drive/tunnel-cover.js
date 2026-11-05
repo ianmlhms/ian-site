@@ -12,14 +12,26 @@
  * level.  A run is opened when
  *   - most of it (TUNNEL_OPEN.coverShare) has less than TUNNEL_OPEN.cover of land over it, and nowhere more than
  *     TUNNEL_OPEN.cutMax (no canyon is dug), and
+ *   - the floor of its cut is a road a car can take: not steeper than TUNNEL_OPEN.gradeMax from mouth to mouth (the ramps between the levels of a car
+ *     park, 23 % over 13 m at Kirchberg, stay tunnels: opened, their ends met the streets with a 1 m step), and
+ *   - a lane of a car park (a service, pedestrian or track way) has no other tunnel within TUNNEL_OPEN.lanesNear: the lanes under the plazas of
+ *     Kirchberg are a network of tunnels that ramp between levels, and opening some of them left 1.5 m pits and steps where they meet, and
+ *   - it is a through way: a street meets each of its (two or more) mouths, and not a garage ramp (a short service way, road-network
+ *     GARAGE_RAMP_MAX, that the game does not draw while it dives into a tunnel: opened, such a ramp became a street with a new junction on Bd Royal and
+ *     moved its markings).  A stub that leads to a garage door stays a tunnel, and its portal is the door, and
  *   - no house stands over it (the passage under a building stays a tunnel: the building is solid in the game), and
- *   - no carved way crosses over it (a street over a tunnel needs its ground: the underpass of a roundabout stays one), and
+ *   - no carved way crosses over it (a street over a tunnel needs its ground: the underpass of a roundabout stays one), and no other tunnel crosses
+ *     it (the lanes of an underground car park on two levels: one height field cannot hold both), and
  *   - it is not stacked under a deck: most of it under a deck that lands at one of its mouths (the deck would be pinned to the opened way there, 9 m
  *     down: Bonnevoie, service 16062 under decks 53 / 64).
  * A bridge deck that crosses over it does not count: the deck rides over the cut (the A1 under deck 32).
  *
  * Pure (no THREE): loadWorldData applies it, so the browser, the harness and the bakers read the same roads. */
 import { TUNNEL_OPEN, PORTAL } from './config.js';
+import { GARAGE_RAMP_MAX } from './road-network.js';
+
+/* The classes of the lanes of a car park and of the passages (see lanesNear). */
+const LANE_KINDS = new Set(['service', 'pedestrian', 'track', 'living_street']);
 
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const endsOf = (road) => [road.pts[0], road.pts[road.pts.length - 1]];
@@ -43,6 +55,11 @@ function segmentsCross(a, b, c, d) {
   const t = ((c[0] - a[0]) * sz - (c[1] - a[1]) * sx) / den;
   const u = ((c[0] - a[0]) * rz - (c[1] - a[1]) * rx) / den;
   return t > 0.02 && t < 0.98 && u >= 0 && u <= 1;
+}
+
+/** The mouths of a run: the ends of its ways that no other way of the run shares. */
+function mouthsOf(run) {
+  return run.flatMap((t) => endsOf(t).filter((e) => !run.some((u) => u !== t && endsOf(u).some((b) => dist(e, b) <= PORTAL.joinTolerance))));
 }
 
 /** The runs of tunnel ways: two ways whose ends are within PORTAL.joinTolerance belong to the same tunnel. */
@@ -147,6 +164,22 @@ function crossingWays(run, carved) {
   return out;
 }
 
+/** The steepest stretch of the floor of a run (rise over run between two points of a way). */
+function floorGrade(run, levels) {
+  let worst = 0;
+  for (const road of run) {
+    const pts = road.pts, lv = levels.get(road);
+    let s = 0, s0 = 0, l0 = lv[0];
+    for (let i = 1; i < pts.length; i++) {
+      s += dist(pts[i - 1], pts[i]);
+      if (s - s0 < TUNNEL_OPEN.sample && i < pts.length - 1) continue;      // (two points a few cm apart say nothing about the grade)
+      if (s - s0 > 0) worst = Math.max(worst, Math.abs(lv[i] - l0) / (s - s0));
+      s0 = s; l0 = lv[i];
+    }
+  }
+  return worst;
+}
+
 /** The share of a run (every TUNNEL_OPEN.sample m) that lies under a deck (within its half width of its centre line). */
 function underDeckShare(run, decks) {
   let under = 0, total = 0;
@@ -163,6 +196,11 @@ function underDeckShare(run, decks) {
     }
   }
   return total ? under / total : 0;
+}
+
+/** Do two polylines come within `r` of each other (a point of one within r of the other)? */
+function polylinesNear(a, b, r) {
+  return a.some(([x, z]) => nearPolyline(b, x, z, r)) || b.some(([x, z]) => nearPolyline(a, x, z, r));
 }
 
 /** Is (x, z) within `r` of the polyline pts ([[x, z], ...])? */
@@ -221,7 +259,12 @@ export function openShallowTunnels(roads, groundAt, buildings, decks = []) {
     const levels = runLevels(run, groundAt);
     const m = measureRun(run, levels, groundAt, housesNear);
     if (m.cover >= TUNNEL_OPEN.cover || m.coverMax >= TUNNEL_OPEN.cutMax || m.housed) continue;
-    if (crossingWays(run, carved).length > 0) continue;
+    if (floorGrade(run, levels) > TUNNEL_OPEN.gradeMax) continue;
+    const mouths = mouthsOf(run);
+    const street = (r) => !(r.kind === 'service' && r.length <= GARAGE_RAMP_MAX);
+    if (mouths.length < 2 || !mouths.every((m) => carved.some((r) => street(r) && endsOf(r).some((e) => dist(e, m) <= PORTAL.mouthGap)))) continue;
+    if (LANE_KINDS.has(run[0].kind) && tunnels.some((t) => !run.includes(t) && run.some((r) => polylinesNear(r.pts, t.pts, TUNNEL_OPEN.lanesNear)))) continue;
+    if (crossingWays(run, carved).length > 0 || crossingWays(run, tunnels).length > 0) continue;
     if (run.some((r) => endsOf(r).some(atDeckEnd)) && underDeckShare(run, realDecks) > TUNNEL_OPEN.stackedShare) continue;
     for (const road of run) cutOf.set(road, levels.get(road));
     const named = run.find((r) => r.name) || run[0];
