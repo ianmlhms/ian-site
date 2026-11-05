@@ -7,7 +7,7 @@ import { ROAD } from './config.js';
 
 export const DECK = Object.freeze({
   margin: 0.8,             // m beside the deck that still counts as deck (the parapet keeps the car on it)
-  thickness: 0.6,          // m of solid under the deck surface (a deck is not a floating ribbon)
+  thickness: 1.0,          // m of solid under the deck surface (a deck is not a floating ribbon)
   stickBelow: 0.6,         // the car counts as "on" the deck when it is at most this far below the surface
   spanDip: 3.0,            // m: the land dips this far under the way, so the deck spans it (the bake writes the same number)
   cell: 32,                // m, the spatial hash cell
