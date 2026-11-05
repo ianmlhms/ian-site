@@ -23,6 +23,7 @@ import { createHeightField } from './heightfield.js';
 import { createSurface } from './surface.js';
 import { createDeckNetwork, createGround, DECK } from './decks.js';
 import { DECK_ON_ROAD, piersOf } from './deck-shape.js';
+import { createWallCollider } from './wall-collider.js';
 import { createBuildingIndex } from './buildings.js';
 import { createLandmarks, fixLandmarkDecks } from './landmarks.js';
 import { createTreeIndex, treesOfBlock } from './trees.js';
@@ -1289,8 +1290,11 @@ if (wants('K')) {
     triangles += wallQuads(w).length * 2;
     for (const p of w.pts) {
       points++;
-      const ok = [p.x, p.z, p.top, p.bottom, p.depth, p.nx, p.nz].every(Number.isFinite) && p.top - p.bottom >= WALL.minRise * 0.5 && p.top - p.bottom <= WALL.maxRise * 1.5 && p.depth >= WALL.minDepth * 0.9 && p.depth <= 14 && Math.abs(Math.hypot(p.nx, p.nz) - 1) < 1e-3;
+      // the tapered tip of a wall (a few cm over the ground, bake_walls.mjs) is a point of its own kind: no ramp to stand on, only a small height
+      const tip = p.top - p.bottom < WALL.minRise * 0.5;
+      const ok = [p.x, p.z, p.top, p.bottom, p.depth, p.nx, p.nz].every(Number.isFinite) && (tip ? p.top - p.bottom >= 0.02 && p.top - p.bottom <= 0.3 : p.top - p.bottom <= WALL.maxRise * 1.5) && p.depth >= WALL.minDepth * 0.9 && p.depth <= 14 && Math.abs(Math.hypot(p.nx, p.nz) - 1) < 1e-3;
       if (!ok) { insane++; continue; }
+      if (tip) { const k = wkey(p.x, p.z), l = gridW.get(k); if (l) l.push(p); else gridW.set(k, [p]); continue; }
       const foot = surface.height(p.x, p.z), head = surface.height(p.x + p.nx * p.depth, p.z + p.nz * p.depth);
       if (Math.abs(foot - p.bottom) > ON_RAMP || Math.abs(head - p.top) > ON_RAMP) { if (foot - p.bottom < -ON_RAMP || p.top - head < -ON_RAMP) buried++; else floating++; }
       const k = wkey(p.x, p.z), l = gridW.get(k); if (l) l.push(p); else gridW.set(k, [p]);
@@ -1316,7 +1320,8 @@ if (wants('K')) {
     }
     return false;
   };
-  let scanned = 0, ramps = 0, bare = 0;
+  let scanned = 0, ramps = 0, bare = 0, inRoad = 0;
+  const wprobe = { sdCar: 9, sdPave: 9 };
   const bareList = [];
   const STRIDE = QUICK ? 25 : 5;
   /** The ramp across a way at sample i on one side (side = +1 right, -1 left): the same scan the baker makes. */
@@ -1339,18 +1344,55 @@ if (wants('K')) {
   for (const chain of ways) {
     for (let i = 0; i < chain.x.length; i += STRIDE) {
       for (const side of [1, -1]) {
+        // a ramp whose foot or head lies on tarmac (two carriageways of different levels that overlap in plan, an interchange) cannot have a wall: a wall is never built on a carriageway; counted apart
+        const usable = (q) => {
+          wprobe.sdCar = 9; net.carve(q.x, q.z, wprobe);
+          if (wprobe.sdCar < -0.15) return false;
+          net.carve(q.x + q.nx * WALL.minDepth, q.z + q.nz * WALL.minDepth, wprobe);
+          return wprobe.sdCar >= -0.15;
+        };
         const r = rampAt(chain, i, side);
         if (!r) continue;
+        if (!usable(r)) { inRoad++; continue; }
         // a ramp that persists: the neighbouring sample has one too (or it is a big one)
-        const persists = (i + 1 < chain.x.length && rampAt(chain, i + 1, side)) || (i > 0 && rampAt(chain, i - 1, side));
+        const persists = [i + 1, i - 1].some((k) => { if (k < 0 || k >= chain.x.length) return false; const q = rampAt(chain, k, side); return q && usable(q); });
         if (!persists) continue;
         ramps++;
         if (!coveredBy(r.x, r.z, r.nx, r.nz, r.top)) { bare++; if (bareList.length < 5) bareList.push(`${Math.round(r.x)},${Math.round(r.z)} rise ${r.rise.toFixed(1)} slope ${r.slope.toFixed(1)}`); }
       }
     }
   }
-  stats.wallCoverage = { scanned, ramps, bare };
+  stats.wallCoverage = { scanned, ramps, bare, rampsInRoads: inRoad };
   // a ramp seen at a single sample is noise that the baker drops (a wall needs two samples in a row): a few bare ramps are allowed, a stretch of them is not
+  // A wall is never built on tarmac: the foot of its face and the back of its block (the two lines that carry the coping) lie outside every carriageway.
+  {
+    let onTarmac = 0, wallsOnTarmac = 0;
+    for (const w of walls) {
+      let hit = 0;
+      for (const p of w.pts) for (const t of [0, p.depth]) { net.carve(p.x + p.nx * t, p.z + p.nz * t, wprobe); if (wprobe.sdCar < -0.2) hit++; }
+      if (hit) { wallsOnTarmac++; onTarmac += hit; }
+    }
+    stats.wallsOnTarmac = wallsOnTarmac;
+    check('retaining walls: no wall stands on a carriageway (face and back lines outside every carriageway)', wallsOnTarmac === 0, `${wallsOnTarmac} of ${walls.length} walls, ${onTarmac} points`);
+  }
+  // A wall is solid for the car from both sides (wall-collider.js): 0.5 m in front of the face and 0.5 m behind the back of the block a body circle of the car collides, at every stretch
+  // that is higher than half a metre (the tapered tips are not obstacles).
+  {
+    const collider = createWallCollider(walls, (x, z) => surface.height(x, z));       // the car on the ground (a bridge above a wall is another level)
+    let stretches = 0, openLow = 0, openHigh = 0;
+    for (const w of walls) {
+      for (let i = 0; i + 1 < w.pts.length; i++) {
+        const p = w.pts[i], q = w.pts[i + 1];
+        if ((p.top - p.bottom + q.top - q.bottom) / 2 < 0.5) continue;
+        stretches++;
+        const mx = (p.x + q.x) / 2, mz = (p.z + q.z) / 2, nx = (p.nx + q.nx) / 2, nz = (p.nz + q.nz) / 2, nl = Math.hypot(nx, nz) || 1, dep = (p.depth + q.depth) / 2;
+        if (!collider.collide(mx - nx / nl * 0.5, mz - nz / nl * 0.5, 1.35)) openLow++;
+        if (!collider.collide(mx + nx / nl * (dep + 0.5), mz + nz / nl * (dep + 0.5), 1.35)) openHigh++;
+      }
+    }
+    stats.wallCollision = { stretches, openLow, openHigh, segments: collider.count };
+    check('retaining walls are solid for the car from the low side and from the high side', openLow === 0 && openHigh === 0, `${openLow} stretches open from the low side, ${openHigh} from the high side, of ${stretches}`);
+  }
   check('retaining walls: every ramp steeper than 2 m/m beside a way has a wall (the data is not stale: re-run scripts/luxdrive/bake_walls.mjs)', bare <= Math.max(3, Math.round(ramps * 0.04)), `${bare} of ${ramps} ramps bare (${scanned} profiles), e.g. ${bareList.join('; ')}`);
 }
 

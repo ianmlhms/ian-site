@@ -22,6 +22,7 @@ import { createGroundMaterial } from './ground-shader.js';
 import { createTerrainView } from './terrain-view.js';
 import { createBuildingView } from './building-view.js';
 import { createDeckView } from './deck-view.js';
+import { createWallCollider } from './wall-collider.js';
 import { createWallView } from './wall-view.js';
 import { WALL_DRAW_FACTOR } from './retaining-walls.js';              // TERRAIN2: the retaining walls
 import { createLandmarks, fixLandmarkDecks } from './landmarks.js';
@@ -196,7 +197,8 @@ async function boot() {
   // ---- the car, the camera, the interface
   const start = data.places.start || { x: WORLD.width / 2, z: WORLD.depth / 2, yaw: 0 };
   const roadInfo = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, surface: 0, road: -1, lines: 0, lanes: 0, s: 0 };
-  const collide = (x, z, radius) => buildings.collide(x, z, radius) || landmarks.collide(x, z, radius) || portals.collide(x, z, radius) || forest.collide(x, z, radius) || tramSim.collide(x, z, radius) || props.collide(x, z, radius) || playArea.collide(x, z, radius);
+  const wallCollider = createWallCollider(data.walls, (x, z) => ground.height(x, z));        // the retaining walls are solid from both sides (wall-collider.js)
+  const collide = (x, z, radius) => buildings.collide(x, z, radius) || landmarks.collide(x, z, radius) || wallCollider.collide(x, z, radius) || portals.collide(x, z, radius) || forest.collide(x, z, radius) || tramSim.collide(x, z, radius) || props.collide(x, z, radius) || playArea.collide(x, z, radius);
   const car = createCar({ ground, roadInfoAt: (x, z, out) => surface.roadInfoAt(x, z, out), collide, start });
   const chase = createChaseCamera(ground, (x, z, radius) => buildings.collide(x, z, radius) || forest.collide(x, z, radius) || portals.collide(x, z, radius));
 

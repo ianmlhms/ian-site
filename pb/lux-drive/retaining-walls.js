@@ -21,7 +21,7 @@ export const WALL = Object.freeze({
   coping: 0.12,            // m: the coping stands this far above the high ground, and overhangs the face by copingLip
   copingLip: 0.07,
   courseHeight: 0.42,      // m: the height of a course of stone
-  minDepth: 0.6,           // m: the block is at least this thick (the ramp inside it is narrower, but the coping needs a seat)
+  minDepth: 0.45,          // m: the block is at least this thick (the ramp inside it is narrower, but the coping needs a seat)
   endExtend: 2,            // m: a wall found at a sample of the way covers this far along the way on both sides of it
 });
 
@@ -29,7 +29,7 @@ export const WALL = Object.freeze({
 export const WALL_DRAW_FACTOR = 0.6;
 
 const STONE = [0.60, 0.56, 0.48];
-const COPING = [0.76, 0.73, 0.67];
+const COPING = [0.66, 0.63, 0.57];
 const MAGIC = 0x4c4c4157;              // 'WALL'
 const FLOATS_PER_POINT = 7;            // x, z, top, bottom, depth, nx, nz
 

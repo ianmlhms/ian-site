@@ -22,6 +22,10 @@ const COVER_CELL = 2;          // m: a ramp that is already in a wall of an earl
 const COVER_DIST = 1.4;
 const COVER_TOP = 1.2;
 const MIN_SAMPLES = 2;         // a ramp seen at a single sample is noise of the scan (a bend, a driveway) and a lone block of stone looks like a crate: a wall is at least two samples long
+const CAR_CLEAR = -0.15;        // the foot of the face and the back of the block lie outside every carriageway (signed distance to the union of the carriageways): a wall never stands on tarmac
+const MIN_LENGTH = 6;          // m: a wall shorter than this (2 samples on a short bend) reads as a crate lying on the bank: not baked, the ground carries it
+const TAPER_LENGTH = 2.5;      // m: the ends of a wall run out into the ground over this length (a sloped end, not a box)
+const TAPER_HEIGHT = 0.12;     // m: the height of the tip of a tapered end above the ground
 const GAP_SAMPLES = 1;         // a wall goes on across a sample where the scan found nothing (the ramp flickers around its thresholds), if the ground under the middle of the bridge fits
 
 const { field, surface } = await loadWorld();
@@ -40,6 +44,11 @@ function isCovered(p) {
   return false;
 }
 function cover(p) { const k = cellKey(p.x, p.z); const l = covered.get(k); if (l) l.push(p); else covered.set(k, [p]); }
+
+const rejected = { foot: 0, back: 0 };       // ramps left without a wall: the foot of the face / the back of the block would lie on a carriageway
+const roadProbe = { sdCar: 9, sdPave: 9 };
+/** True when (x, z) lies outside every carriageway of the carved ground. */
+function clearOfRoads(x, z) { net.carve(x, z, roadProbe); return roadProbe.sdCar >= CAR_CLEAR; }
 
 /** The wall point at sample i of a way on one side (side = +1 right, -1 left), or null. */
 function wallPointAt(chain, i, side) {
@@ -63,8 +72,13 @@ function wallPointAt(chain, i, side) {
   const rising = ramp.rise > 0;
   const tFoot = t0 + (rising ? ramp.first : ramp.last) * WALL.scanStep;
   const tHead = t0 + (rising ? ramp.last : ramp.first) * WALL.scanStep;
-  const depth = Math.max(WALL.minDepth, Math.abs(tHead - tFoot));
   const toHigh = rising ? 1 : -1;                              // the direction toward the high ground, along (nx, nz)
+  const fx = chain.x[i] + nx * tFoot, fz = chain.z[i] + nz * tFoot;
+  // never on tarmac: the foot of the face outside every carriageway; the back of the block is pulled in until it is (the coping is a sliver on the lip, the ramp behind it stays ground)
+  if (!clearOfRoads(fx, fz)) { rejected.foot++; return null; }
+  let depth = Math.max(WALL.minDepth, Math.abs(tHead - tFoot));
+  while (depth > WALL.minDepth && !clearOfRoads(fx + nx * toHigh * depth, fz + nz * toHigh * depth)) depth = Math.max(WALL.minDepth, depth - 0.15);
+  if (!clearOfRoads(fx + nx * toHigh * depth, fz + nz * toHigh * depth)) { rejected.back++; return null; }
   const top = Math.max(heights[ramp.first], heights[ramp.last]), bottom = Math.min(heights[ramp.first], heights[ramp.last]);
   return {
     x: chain.x[i] + nx * tFoot, z: chain.z[i] + nz * tFoot, top, bottom, depth,
@@ -87,7 +101,7 @@ function extend(pts) {
   const reach = (p, sign) => {
     for (const e of [WALL.endExtend, WALL.endExtend / 2, WALL.endExtend / 4]) {
       const q = { ...p, x: p.x + sign * p.tx * e, z: p.z + sign * p.tz * e };
-      if (fits(q)) return q;
+      if (fits(q) && clearOfRoads(q.x, q.z) && clearOfRoads(q.x + q.nx * q.depth, q.z + q.nz * q.depth)) return q;
     }
     return null;
   };
@@ -95,15 +109,34 @@ function extend(pts) {
   return [...(head ? [head] : []), ...pts, ...(tail ? [tail] : [])];
 }
 
+/** The ends of a wall run out into the ground: a tip TAPER_LENGTH beyond the last point, 12 cm over the ground there, so the wall is a wedge on the bank and never a box with flat ends. */
+function taper(pts) {
+  const tip = (p, q) => {                                       // p the end point, q its neighbour: the tip lies beyond p, away from q (shorter where the road is in the way)
+    const dx = p.x - q.x, dz = p.z - q.z, len = Math.hypot(dx, dz) || 1;
+    for (const reach of [TAPER_LENGTH, TAPER_LENGTH * 0.6, TAPER_LENGTH * 0.3]) {
+      const x = p.x + dx / len * reach, z = p.z + dz / len * reach;
+      if (!clearOfRoads(x, z) || !clearOfRoads(x + p.nx * WALL.minDepth, z + p.nz * WALL.minDepth)) continue;
+      const g = surface.height(x, z);
+      return { x, z, top: g + TAPER_HEIGHT, bottom: g, depth: WALL.minDepth, nx: p.nx, nz: p.nz };
+    }
+    return null;
+  };
+  const a = tip(pts[0], pts[1]), b = tip(pts[pts.length - 1], pts[pts.length - 2]);
+  return [...(a ? [a] : []), ...pts, ...(b ? [b] : [])];
+}
+const wallLength = (pts) => pts.reduce((s, p, i) => (i ? s + Math.hypot(p.x - pts[i - 1].x, p.z - pts[i - 1].z) : 0), 0);
+
 const walls = [];
-let probed = 0, found = 0, duplicate = 0;
+let probed = 0, found = 0, duplicate = 0, short = 0;
 for (const chain of chains) {
   const firstOfChain = walls.length;
   for (const side of [1, -1]) {
     let run = [];
     const flush = () => {
       if (run.length >= MIN_SAMPLES) {
-        const pts = extend(run).map((p) => ({ x: p.x, z: p.z, top: p.top, bottom: p.bottom, depth: p.depth, nx: p.nx, nz: p.nz }));
+        const body = extend(run).map((p) => ({ x: p.x, z: p.z, top: p.top, bottom: p.bottom, depth: p.depth, nx: p.nx, nz: p.nz }));
+        if (wallLength(body) < MIN_LENGTH) { short++; run = []; return; }
+        const pts = taper(body);
         walls.push({ pts, slope: Math.max(...run.map((p) => p.slope)), rise: Math.max(...run.map((p) => p.rise)), way: chain.road });
       }
       run = [];
@@ -129,7 +162,7 @@ fs.writeFileSync(OUT, encodeWalls(walls));
 const points = walls.reduce((s, w) => s + w.pts.length, 0);
 let length = 0;
 for (const w of walls) for (let i = 1; i < w.pts.length; i++) length += Math.hypot(w.pts[i].x - w.pts[i - 1].x, w.pts[i].z - w.pts[i - 1].z);
-console.log(`walls: ${walls.length} walls, ${points} points, ${length.toFixed(0)} m long -> ${OUT} (${fs.statSync(OUT).size} bytes); ${probed} samples probed, ${found} ramps, ${duplicate} seen twice`);
+console.log(`walls: ${walls.length} walls, ${points} points, ${length.toFixed(0)} m long -> ${OUT} (${fs.statSync(OUT).size} bytes); ${probed} samples probed, ${found} ramps, ${duplicate} seen twice, ${short} too short, ramps on tarmac: ${rejected.foot} at the foot / ${rejected.back} at the back`);
 if (process.argv.includes('--stats')) {
   const bins = [0.8, 1.5, 2.5, 4, 6, 8.01];
   console.log('   by rise: ' + bins.slice(0, -1).map((b, i) => `${b}-${bins[i + 1]} m: ${walls.filter((w) => w.rise >= b && w.rise < bins[i + 1]).length}`).join(', '));
