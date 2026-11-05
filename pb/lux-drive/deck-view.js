@@ -90,13 +90,12 @@ export function createDeckView({ scene, decks, material, ground }) {
       const ph = isRoad ? PARAPET_HEIGHT : RAILING_HEIGHT, pw = isRoad ? PARAPET_WIDTH : RAILING_WIDTH;
       const pc = isRoad ? COLOUR_PARAPET : COLOUR_RAILING;
       for (const side of [1, -1]) {
-        const ox = sx * side * (half - pw / 2), oz = sz * side * (half - pw / 2);
-        b.quad([ax + ox, ay + ph, az + oz], [bx + ox, by + ph, bz + oz],
-          [bx + ox, by, bz + oz], [ax + ox, ay, az + oz], pc);
-        b.quad([bx - ox, by + ph, bz - oz], [ax - ox, ay + ph, az - oz],
-          [ax - ox, ay, az - oz], [bx - ox, by, bz - oz], pc);
-        b.quad([ax - ox, ay + ph, az - oz], [bx - ox, by + ph, bz - oz],
-          [bx + ox, by + ph, bz + oz], [ax + ox, ay + ph, az + oz], pc);   // the top of the wall
+        // the parapet is a wall of thickness pw along the edge: its outer face, its inner face and the strip of its top (the top must NOT span the deck: that was a lid over the whole bridge)
+        const o0 = side * half, o1 = side * (half - pw);
+        const at = (x, y, z, o) => [x + sx * o, y, z + sz * o];
+        b.quad(at(ax, ay + ph, az, o0), at(bx, by + ph, bz, o0), at(bx, by, bz, o0), at(ax, ay, az, o0), pc);          // the outer face
+        b.quad(at(bx, by + ph, bz, o1), at(ax, ay + ph, az, o1), at(ax, ay, az, o1), at(bx, by, bz, o1), pc);          // the inner face
+        b.quad(at(ax, ay + ph, az, o1), at(bx, by + ph, bz, o1), at(bx, by + ph, bz, o0), at(ax, ay + ph, az, o0), pc);   // the top of the wall
       }
     }
     // the caps at the two ends
