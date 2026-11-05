@@ -537,18 +537,19 @@ if (wants('D')) {
   const orphanList = [];
   for (const d of decks) {
     let best = Infinity;
+    const mid = d.pts[d.pts.length >> 1];            // the middle: the ends of a landmark bridge are carried on to the approach road (fixLandmarkDecks), which does not ride over anything
     for (const r of overRoads) {
       for (let k = 0; k + 1 < r.pts.length; k++) {
         const ax = r.pts[k][0], az = r.pts[k][1], bx = r.pts[k + 1][0], bz = r.pts[k + 1][1];
         const ex = bx - ax, ez = bz - az;
         const ll = ex * ex + ez * ez;
         if (ll < 1e-9) continue;
-        let t = ((d.pts[0][0] - ax) * ex + (d.pts[0][1] - az) * ez) / ll;
+        let t = ((mid[0] - ax) * ex + (mid[1] - az) * ez) / ll;
         t = t < 0 ? 0 : t > 1 ? 1 : t;
-        best = Math.min(best, Math.hypot(d.pts[0][0] - (ax + ex * t), d.pts[0][1] - (az + ez * t)));
+        best = Math.min(best, Math.hypot(mid[0] - (ax + ex * t), mid[1] - (az + ez * t)));
       }
     }
-    if (best > 6) { orphan++; if (orphanList.length < 6) orphanList.push({ x: Math.round(d.pts[0][0]), z: Math.round(d.pts[0][1]), near: +best.toFixed(1) }); }
+    if (best > 6) { orphan++; if (orphanList.length < 6) orphanList.push({ x: Math.round(mid[0]), z: Math.round(mid[1]), near: +best.toFixed(1) }); }
   }
   stats.deckOrphans = orphan;
   check('every deck stands on a way that rides over the others', orphan === 0,
@@ -637,6 +638,38 @@ if (wants('D')) {
   stats.deckFlags = wrongFlag;
   check('every deck knows whether it spans the land or stands on it', wrongFlag === 0,
     `${wrongFlag} of ${decks.length} decks${flagList.length ? ' ' + JSON.stringify(flagList) : ''}`);
+
+  // A deck runs one way: no segment turns back on the one before (the Pont Rouge was carried on to its approach roads with the extension points in the wrong
+  // order: the deck zigzagged over its own end, the model stopped short of it and the car drove over 12 m of invisible bridge).
+  let folded = 0;
+  const foldList = [];
+  for (const d of decks) {
+    if (d.width < 5) continue;                       // a footway deck may be a hairpin of a ramp (3.2 m wide); a carriageway is never
+    for (let i = 1; i + 1 < d.pts.length; i++) {
+      const ax = d.pts[i][0] - d.pts[i - 1][0], az = d.pts[i][1] - d.pts[i - 1][1];
+      const bx = d.pts[i + 1][0] - d.pts[i][0], bz = d.pts[i + 1][1] - d.pts[i][1];
+      if (ax * bx + az * bz < -0.5 * Math.hypot(ax, az) * Math.hypot(bx, bz)) {          // a turn of more than 120 degrees
+        folded++;
+        if (foldList.length < 6) foldList.push({ id: d.id, x: Math.round(d.pts[i][0]), z: Math.round(d.pts[i][1]) });
+        break;
+      }
+    }
+  }
+  stats.decksFolded = folded;
+  check('no deck folds back on itself', folded === 0, `${folded} of ${decks.length} decks ${JSON.stringify(foldList)}`);
+
+  // A bridge the landmarks draw replaces its baked decks: every point of such a deck lies inside the model (no stretch of road the car drives and nobody sees).
+  let uncovered = 0;
+  const uncoveredList = [];
+  for (const d of decks) {
+    if (!landmarks.hiddenDecks.has(d.id)) continue;
+    const sorted = Array.from(d.tops).sort((p, q) => p - q), median = sorted[sorted.length >> 1];
+    // the pinned ends of a footway dip to the ground under them (a bake artefact the models ignore: passerelle.js): points more than 3 m under the median are not the bridge, and a deck that lies on the land (within 0.6 m of it) hides nothing
+    const bad = d.pts.filter(([x, z], i) => d.tops[i] > median - 3 && d.tops[i] - surface.height(x, z) > 0.6 && !landmarks.list.some((m) => x >= m.bounds[0] - 0.5 && x <= m.bounds[2] + 0.5 && z >= m.bounds[1] - 0.5 && z <= m.bounds[3] + 0.5));
+    if (bad.length) { uncovered++; uncoveredList.push({ id: d.id, points: bad.length, first: bad[0].map(Math.round) }); }
+  }
+  stats.hiddenDecksUncovered = uncovered;
+  check('every deck a landmark model replaces lies inside that model (no invisible bridge)', uncovered === 0, JSON.stringify(uncoveredList));
 }
 
 /* ---------------------------------------------------------------- D1: the landmarks */

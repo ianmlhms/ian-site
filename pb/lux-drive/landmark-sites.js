@@ -197,14 +197,19 @@ export function buildPasserelle({ decks, ground }) {
   const K = PASSERELLE;
   const road = pickDeck(decks, K.at[0], K.at[1], { width: 11.8, tolerance: 0.6, minLength: 120 });
   const p0 = road.pts[0], p1 = road.pts[road.pts.length - 1];
-  const F = axisFrame(p0[0], p0[1], p1[0], p1[1]);
-  const L = F.length;
+  const F0 = axisFrame(p0[0], p0[1], p1[0], p1[1]);
   // the decks of the bridge itself (the road and its footway); the lower footways of the bake that run along the slope stay as they are
   // (the footway decks beside the road ride on the bridge, but their pinned ends dip to the ground 10 m below: the MEDIAN of the tops tells a bridge deck from a path
   // down the slope.  They used to be left to the generic deck view and hung as grey slabs inside the arcade, seen through the openings.)
   const median = (a) => { const v = Array.from(a).sort((p, q) => p - q); return v[v.length >> 1]; };
-  const inCorridor = (d) => d.pts.filter((p) => { const [s, u] = F.local(p[0], p[1]); return Math.abs(u) <= 12 && s >= -25 && s <= F.length + 25; }).length >= d.pts.length * 0.85;
+  const inCorridor = (d) => d.pts.filter((p) => { const [s, u] = F0.local(p[0], p[1]); return Math.abs(u) <= 12 && s >= -25 && s <= F0.length + 25; }).length >= d.pts.length * 0.85;
   const along = decks.filter((d) => inCorridor(d) && median(d.tops) > road.tops[0] - 4);
+  // The footways of the bridge run on past the end of the road deck (the north end: 17 m of footway at deck level over the slope).  The model covers them too, or the car
+  // would walk over a bridge nobody draws (the decks the model replaces are not drawn by the generic view).  The pinned, dipping ends of a footway are not the bridge.
+  let sLo = 0, sHi = F0.length;
+  for (const d of along) d.pts.forEach((p, i) => { if (d.tops[i] < road.tops[0] - 3) return; const [s] = F0.local(p[0], p[1]); sLo = Math.min(sLo, s); sHi = Math.max(sHi, s); });
+  const F = axisFrame(...F0.xz(sLo, 0), ...F0.xz(sHi, 0));
+  const L = F.length;
   // the profile of the road deck by station
   const ss = stationsOf(F, road.pts);
   const flip = ss[0] > ss[ss.length - 1];
