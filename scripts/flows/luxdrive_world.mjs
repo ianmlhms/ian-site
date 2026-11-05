@@ -246,8 +246,14 @@ export const flow = {
       const rows = [];
       // the segments are sampled with an even stride over the WHOLE network: the first few hundred segments are one
       // corner of the map and say nothing about the rest
+      // (bridges8: the opened shallow tunnels are left out of the stride, so the stride samples the same sides as before they were opened; every side of them is
+      // measured on its own below and may have no wall at all)
       const STRIDE = 41;
-      for (let i = 0; i < net.count; i += STRIDE) {
+      const opened = [];
+      let k = -1;
+      for (let i = 0; i < net.count; i++) {
+        if (net.roads[S.ROADOF[i]].openCut) { opened.push(i); continue; }
+        if (++k % STRIDE) continue;
         const ax = S.X0[i], az = S.Z0[i], bx = S.X1[i], bz = S.Z1[i];
         const len = Math.hypot(bx - ax, bz - az);
         if (len < 1) continue;
@@ -267,6 +273,24 @@ export const flow = {
           rows.push({ carved, natural });
         }
       }
+      // every side of the opened tunnels (a cut, 2-4 m deep under deck 32 on the A1): never a wall
+      let openedSides = 0, openedWalls = 0;
+      for (const i of opened) {
+        const ax = S.X0[i], az = S.Z0[i], bx = S.X1[i], bz = S.Z1[i];
+        const len = Math.hypot(bx - ax, bz - az);
+        if (len < 1) continue;
+        const px = (ax + bx) / 2, pz = (az + bz) / 2, nx = -(bz - az) / len, nz = (bx - ax) / len;
+        for (const s of [1, -1]) {
+          let carved = 0, natural = 0;
+          for (let d = S.A0[i] + 0.5; d <= S.REACH[i]; d += 0.5) {
+            const x = px + nx * s * d, z = pz + nz * s * d;
+            carved = Math.max(carved, Math.abs(m.field.height(x + nx * s * 0.5, z + nz * s * 0.5) - m.field.height(x, z)) / 0.5);
+            natural = Math.max(natural, Math.abs(m.field.groundHeight(x + nx * s * 0.5, z + nz * s * 0.5) - m.field.groundHeight(x, z)) / 0.5);
+          }
+          openedSides++;
+          if (carved > 3 && natural <= 3) openedWalls++;
+        }
+      }
       const sorted = rows.slice().sort((a, b) => a.carved - b.carved);
       const q = (p) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))].carved;
       // the carve may not make the ground beside a road steeper than the land beside it is (a cliff stays a cliff),
@@ -283,6 +307,7 @@ export const flow = {
         walls: walls.length,
         deepest: walls.reduce((m, r) => Math.max(m, r.carved), 0),
         cliffs: rows.filter((r) => r.natural > 3).length,
+        openedSides, openedWalls,
       };
     });
     h.expect(slope.total > 5000, `${slope.total} sides of roads measured`);
@@ -292,6 +317,7 @@ export const flow = {
     h.expect(slope.p99 <= 1.6, `the ground beside the roads is at most ${slope.p99.toFixed(2)} (99th percentile)`);
     h.expect(slope.share <= 0.02, `${(slope.share * 100).toFixed(2)}% of the sides are steeper than the land (the limit is 2%)`);
     h.expect(slope.walls <= 8, `${slope.walls} sides of roads are a wall the carve made (the limit is 8 of ${slope.total}, the ${slope.cliffs} cliffs are the land's own)`);
+    h.expect(slope.openedSides > 50 && slope.openedWalls === 0, `${slope.openedWalls} of ${slope.openedSides} sides of the opened shallow tunnels are a wall the carve made (none may be)`);
     h.expect(slope.deepest <= 8, `the deepest wall the carve makes is ${slope.deepest.toFixed(2)} (the limit is 8)`);
 
     h.step("the bridges of the brief are solid decks the car can drive on");
