@@ -1338,7 +1338,8 @@ if (wants('K')) {
     const ramp = findRamp(heights, lands);
     if (!ramp) return null;
     const rising = ramp.rise > 0, tFoot = t0 + (rising ? ramp.first : ramp.last) * WALL.scanStep, toHigh = rising ? 1 : -1;
-    return { rise: Math.abs(ramp.rise), slope: ramp.maxSlope, x: chain.x[i] + nx * tFoot, z: chain.z[i] + nz * tFoot, nx: nx * toHigh, nz: nz * toHigh, top: Math.max(heights[ramp.first], heights[ramp.last]) };
+    const tHead = t0 + (rising ? ramp.last : ramp.first) * WALL.scanStep;
+    return { rise: Math.abs(ramp.rise), slope: ramp.maxSlope, depth: Math.max(WALL.minDepth, Math.abs(tHead - tFoot)), x: chain.x[i] + nx * tFoot, z: chain.z[i] + nz * tFoot, nx: nx * toHigh, nz: nz * toHigh, top: Math.max(heights[ramp.first], heights[ramp.last]) };
   };
   const ways = net.chains.filter((c) => !c.tagged && !net.overRoads.has(c.road));
   for (const chain of ways) {
@@ -1348,7 +1349,9 @@ if (wants('K')) {
         const usable = (q) => {
           wprobe.sdCar = 9; net.carve(q.x, q.z, wprobe);
           if (wprobe.sdCar < -0.15) return false;
-          net.carve(q.x + q.nx * WALL.minDepth, q.z + q.nz * WALL.minDepth, wprobe);
+          net.carve(q.x + q.nx * q.depth, q.z + q.nz * q.depth, wprobe);                    // the head of the ramp, or (the baker pulls the back of the block in by at most 0.6 m) just short of it
+          if (wprobe.sdCar >= -0.15) return true;
+          net.carve(q.x + q.nx * Math.max(WALL.minDepth, q.depth - 0.6), q.z + q.nz * Math.max(WALL.minDepth, q.depth - 0.6), wprobe);
           return wprobe.sdCar >= -0.15;
         };
         const r = rampAt(chain, i, side);

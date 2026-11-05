@@ -23,7 +23,9 @@ const COVER_DIST = 1.4;
 const COVER_TOP = 1.2;
 const MIN_SAMPLES = 2;         // a ramp seen at a single sample is noise of the scan (a bend, a driveway) and a lone block of stone looks like a crate: a wall is at least two samples long
 const CAR_CLEAR = -0.15;        // the foot of the face and the back of the block lie outside every carriageway (signed distance to the union of the carriageways): a wall never stands on tarmac
-const MIN_LENGTH = 6;          // m: a wall shorter than this (2 samples on a short bend) reads as a crate lying on the bank: not baked, the ground carries it
+const MAX_PULL_IN = 0.6;       // m: the back of the block is pulled in at most this far to get off a carriageway (a sliver of the lane edge); a ramp whose head lies deeper in the road has no wall
+const MIN_LENGTH = 6;          // m: a LOW wall (rise < MIN_RISE_SHORT) shorter than this (2 samples on a short bend) reads as a crate lying on the bank: not baked, the ground carries the step
+const MIN_RISE_SHORT = 2.0;    // m: a higher ramp keeps its wall however short: with its tapered ends it is a wedge on the bank, and the bare ramp would be a crack
 const TAPER_LENGTH = 2.5;      // m: the ends of a wall run out into the ground over this length (a sloped end, not a box)
 const TAPER_HEIGHT = 0.12;     // m: the height of the tip of a tapered end above the ground
 const GAP_SAMPLES = 1;         // a wall goes on across a sample where the scan found nothing (the ramp flickers around its thresholds), if the ground under the middle of the bridge fits
@@ -76,9 +78,10 @@ function wallPointAt(chain, i, side) {
   const fx = chain.x[i] + nx * tFoot, fz = chain.z[i] + nz * tFoot;
   // never on tarmac: the foot of the face outside every carriageway; the back of the block is pulled in until it is (the coping is a sliver on the lip, the ramp behind it stays ground)
   if (!clearOfRoads(fx, fz)) { rejected.foot++; return null; }
-  let depth = Math.max(WALL.minDepth, Math.abs(tHead - tFoot));
-  while (depth > WALL.minDepth && !clearOfRoads(fx + nx * toHigh * depth, fz + nz * toHigh * depth)) depth = Math.max(WALL.minDepth, depth - 0.15);
-  if (!clearOfRoads(fx + nx * toHigh * depth, fz + nz * toHigh * depth)) { rejected.back++; return null; }
+  const full = Math.max(WALL.minDepth, Math.abs(tHead - tFoot));
+  let depth = full;
+  while (depth > WALL.minDepth && full - depth < MAX_PULL_IN && !clearOfRoads(fx + nx * toHigh * depth, fz + nz * toHigh * depth)) depth = Math.max(WALL.minDepth, depth - 0.15);
+  if (!clearOfRoads(fx + nx * toHigh * depth, fz + nz * toHigh * depth)) { rejected.back++; return null; }       // the head of the ramp lies in a carriageway: the ramp is part of the road
   const top = Math.max(heights[ramp.first], heights[ramp.last]), bottom = Math.min(heights[ramp.first], heights[ramp.last]);
   return {
     x: chain.x[i] + nx * tFoot, z: chain.z[i] + nz * tFoot, top, bottom, depth,
@@ -126,6 +129,8 @@ function taper(pts) {
 }
 const wallLength = (pts) => pts.reduce((s, p, i) => (i ? s + Math.hypot(p.x - pts[i - 1].x, p.z - pts[i - 1].z) : 0), 0);
 
+const DEBUG_AT = (process.argv.find((a) => a.startsWith('--debug-at=')) || '').slice(11).split(',').map(Number);   // --debug-at=x,z: why a ramp near there has no wall
+const debugOn = DEBUG_AT.length === 2 && !DEBUG_AT.some(Number.isNaN);
 const walls = [];
 let probed = 0, found = 0, duplicate = 0, short = 0;
 for (const chain of chains) {
@@ -135,7 +140,7 @@ for (const chain of chains) {
     const flush = () => {
       if (run.length >= MIN_SAMPLES) {
         const body = extend(run).map((p) => ({ x: p.x, z: p.z, top: p.top, bottom: p.bottom, depth: p.depth, nx: p.nx, nz: p.nz }));
-        if (wallLength(body) < MIN_LENGTH) { short++; run = []; return; }
+        if (wallLength(body) < MIN_LENGTH && Math.max(...run.map((p) => p.rise)) < MIN_RISE_SHORT) { short++; run = []; return; }
         const pts = taper(body);
         walls.push({ pts, slope: Math.max(...run.map((p) => p.slope)), rise: Math.max(...run.map((p) => p.rise)), way: chain.road });
       }
@@ -145,6 +150,7 @@ for (const chain of chains) {
     for (let i = 0; i < chain.x.length; i++) {
       probed++;
       const p = wallPointAt(chain, i, side);
+      if (debugOn && Math.hypot(chain.x[i] - DEBUG_AT[0], chain.z[i] - DEBUG_AT[1]) < 12) console.log('debug', chain.road, i, side, p ? `point rise ${p.rise.toFixed(1)} depth ${p.depth.toFixed(2)} fits ${fits(p)} covered ${isCovered(p)}` : 'none');
       if (!p || !fits(p)) { misses++; if (misses > GAP_SAMPLES) { flush(); misses = 0; } continue; }
       if (isCovered(p)) { duplicate++; flush(); misses = 0; continue; }
       found++;
