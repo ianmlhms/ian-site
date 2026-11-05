@@ -1481,3 +1481,52 @@ r4/r5 A1, r6/r7/r7b Neudorf).  NOTE: m1 was shot before the last three commits (
 3. Escher Strooss: the faint diagonal marking streaks on the left lane remain (shader edge contour on the ridge of two overlapping carriageways).
 4. Junction r2 (Ian's view): the big pale paved area with a sawtooth edge right of the road is the pavement paint (sdPave) — not touched.
 5. Hairpins at two levels (Eecherfeld), remaining humps: not touched.
+
+## Terrain fix 6 (branch `lux-drive-terrain5`, Mac mini): the world flow's carve walls, Neudorf deck start, the spawn, the junction sawtooth
+
+Started from 1353c527 (v44).  Montages (left = v43 live code, right = this branch, noon, medium): `~/Library/Caches/luxdrive-work/terrain5/m2/` (`r1`..`r7b` = `poses_ref.json`, plus `x1_neudorf_close`,
+`x2_neudorf_top`, `x3_spawn_top`, `x4_dudelange`; singles in `m2/before`, `m2/after`).  Scratch tools: `~/Library/Caches/luxdrive-work/terrain6/` (`wallscan.mjs` = the world flow's wall measure over
+EVERY segment, `walls2.mjs` / `dline.mjs` pins along a line, `classify.mjs`, `pitwall.mjs`, `endline.mjs`).
+
+### 1. World flow "walls the carve made" 9 -> 6 (limit 8 unchanged)
+* The flow samples every 41st segment by INDEX: when a change adds or drops segments the sample shifts.  Of the five "new" walls of the HANDOFF only two were new: Rue Cents, Hellege-Geescht and
+  Montée du Grund were walls of v43 that the shifted sample now hit.  Measured over all segments instead (`wallscan.mjs`): v43 346, v44 562 (216 more, 153 of them at deck ends).
+* Abutments (`road-network.js` ABUT_FADE_MAX): past the 2 m hold the ground under a deck fell to the land over the fixed CAP_SOFT 2 m (a 6 m face under every lifted motorway approach).  It now
+  falls over 1.5 x drop / RAMP_SLOPE (2 .. 6 m) - the cap of the approach and the protection ramp-up both - so an earth abutment under the deck end.  The protection against a CUT keeps the
+  short ramp (no pit under a deck end, gate D), only the FILL passes (`protFill`).
+* Pin fade spans the face join: a pin that let go (PIN_FADE 3 m) while the join from bed to face was still half way multiplied the two fades (Boulevard Roosevelt over the Pétrusse, Schiggrisgaass).
+* All segments: 562 -> 413 (v43 346).  Tried and reverted: one near-linear ramp across the gap between two carriageways at two levels (more walls: three-way switching), RAMP_MAX 6,
+  FACE_JOIN_PER_M 1.0 (an 8.5 m wall at Rampart), ABUT_HOLD 1 m.
+* `bake_walls.mjs`: a wall whose ground 1 m in front of its foot lies > 1.5 m under its bottom stands in the air on the slope (open for the car, gate K failed at Cloche d'Or): not baked (`FOOT_PROBE`, 10 such).
+* The previous builder's test changes, reviewed and KEPT: (a) the world flow takes the middle of a bridge by length - the middle POINT of a 2-point way is its end, the abutment, which is now flush
+  by design, so the old probe measured the wrong place; (b) gate D's "deck ends reach the ground" skips JOINTS (ends of pieces of one bridge at one level, hanging over the valley) - they are checked
+  by the joint check instead (all pieces within 1 m of the bridge level, 0 of 50 off).  Both are correct refinements, not loosenings.
+
+### 2. Rue de Neudorf deck start (`road-network.js`, `deck-view.js`)
+* The median beside the bridge was a ditch 0.4-0.5 m under both carriageways (the approach keeps its own bed, not the junction sheet): now a gap of up to MEDIAN_WIDTH between two carriageways at one
+  level is the straight line from bench to bench (`MEDIAN_FLAT_FADE`), so it is paved level.
+* Approach ways end SQUARE under their deck (no rounded corner and no grass wedge at the deck corners from the blurred paint field).
+* The seam: the deck surface and the held road under it were one plane (z-fight, ragged line).  The carriageway is tucked 8 cm under the deck from 0.4 m past the deck end (`DECK_TUCK*`, counted from
+  the deck end, not the way end); a flush deck end has a tarmac end face, not the girder grey; deck asphalt = the far tar of the ground shader.
+* Two road decks side by side (gap <= 1.6 m) get a concrete median over the gap (the valley showed through as a green line) and no side faces on that side (teeth in front of the deck start).
+* Tried and reverted: deck end level extrapolated from the road (gate D: 34 steps), deck end level from the continuous field (7 steps on steep approaches).
+
+### 3. The spawn (`road-network.js` GARAGE_RAMP_MAX)
+* A service way <= 40 m with one end at a tunnel (a garage ramp) is not a road of the game: not carved, not painted, and its DTM trench is filled to the level of its mouth (`garageFill`).  The grey
+  wedge (retaining wall of the trench) and the pavement patch at the start are gone: grass and a straight kerb (`m2/r1_spawn`, `x3_spawn_top`).
+
+### 4. Junction (Ian's view)
+* The pale sawtooth was the "minor road" tar (lighter grey for narrow service ways) switched by the half width of the ONE nearest way per lattice node.  Now `sdMajor` (signed distance to the union of
+  the street carriageways, hw >= 3.4) goes road-network -> heightfield -> surface -> tile-mesh (aRoad3.w) -> shader: minor = outside every street carriageway, continuous: no sawtooth (`m2/r2_junction`).
+
+### Gates (Mac mini)
+`harness.js` 105 PASS (gate D: 228 approaches, steps 0, pits 0; K: bare 4 of 175, collider 0 open; L: median 0.53 / worst 10.25 at the old-town box; asphalt on slope 0.49 %); `luxdrive_world` PASS
+(walls 6 of 15486, deepest 3.49, p99 1.53, 1.32 %; draw calls 112 / 150 / 212); holes 0 at medium and low; `luxdrive_ui` PASS; `luxdrive_webkit` PASS.  `pb/lux-drive.html`: main.js `?v=45`.
+
+### Still wrong (honest)
+* The carve-wall POPULATION is still above v43 (413 vs 346 over all segments): ~100 deck ends at skewed motorway interchanges (Croix de Gasperich / Cloche d'Or / Dudelange) where the lifted approach's
+  bench TOUCHES the carriageway passing under (6-7 m in 0-2 m: a real abutment wall).  They render as steep grass banks; a concrete abutment face would be right.  The gate passes on its sample (6).
+* Neudorf: the road median is level and paved but its edges still follow the two ways' own centre lines (a few cm of wobble, not one constant width); the deck-start line still shows a little z-fight in
+  the first 0.4 m from above (`x2_neudorf_top`); lane lines of road and deck do not line up.
+* Junction: the minor-tar area is now smooth but large and soft-edged; stone/concrete service ways still switch material per node.
+* Escher Strooss faint diagonal streaks (task 5): not done.  Hairpins at two levels, remaining humps: not touched.
