@@ -123,10 +123,13 @@ function taper(pts) {
       const g = surface.height(x, z);
       return { x, z, top: g + TAPER_HEIGHT, bottom: g, depth: WALL.minDepth, nx: p.nx, nz: p.nz };
     }
-    return null;
+    // a road is in the way at every reach (the end of the wall is at a carriageway): the end point itself runs out into the ground instead, over the last segment
+    return { ...p, top: p.bottom + TAPER_HEIGHT, own: true };
   };
   const a = tip(pts[0], pts[1]), b = tip(pts[pts.length - 1], pts[pts.length - 2]);
-  return [...(a ? [a] : []), ...pts, ...(b ? [b] : [])];
+  const body = pts.slice(a && a.own ? 1 : 0, b && b.own ? pts.length - 1 : pts.length);
+  const strip = ({ own, ...rest }) => rest;
+  return [...(a ? [strip(a)] : []), ...body, ...(b ? [strip(b)] : [])];
 }
 const wallLength = (pts) => pts.reduce((s, p, i) => (i ? s + Math.hypot(p.x - pts[i - 1].x, p.z - pts[i - 1].z) : 0), 0);
 

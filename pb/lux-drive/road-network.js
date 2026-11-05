@@ -23,10 +23,6 @@ const OVER_LEVEL = 1.5;                // m: at a crossing, the way whose bed is
                                     // rides OVER it: it keeps its own earthworks and the ground under it is protected
 const PROTECT_MARGIN = 4.0;            // m: the ground beside an over way is protected this far past its pavement
 const PROTECT_FADE = 10.0;             // m: the protection fades out over this distance, so the ground is never a wall
-const PROTECT_END_TRIM = 24.0;         // m: the protected corridor of an over way stops this far short of each end of the way (at most PROTECT_END_SHARE of its length): the road that runs onto the
-                                    // bridge keeps its own bed up to the abutment.  The corridor is a disc of half + PROTECT_FADE round its first point, and the approach road lost its bed there
-                                    // and followed the valley edge: the deck then started 2 m above it (a raised box, Rue de Neudorf).
-const PROTECT_END_SHARE = 0.5;        // (a way shorter than twice the trim has no protected corridor at all: it is all abutment)
 const MEDIAN_WIDTH = 3.0;             // m: a gap of at most this between the carriageways of two ROADS (the median of a dual carriageway, the nose of a slip road) is paved as a whole: the grass left in a gap that
                                     // narrow was a wobbling green sliver between two ragged kerbs (the paint edge of each side is a contour on a 1 m lattice)
 const PROTECT_CELL = 64;               // m, the cell of the spatial hash of the protected corridors
@@ -75,30 +71,6 @@ export function resample(points, spacing) {
   const last = points[points.length - 1];
   if (Math.hypot(last[0] - xs[xs.length - 1], last[1] - zs[zs.length - 1]) > spacing * 0.35) { xs.push(last[0]); zs.push(last[1]); }
   return { x: xs, z: zs };
-}
-
-/**
- * The polyline (x, z) without its first and last `trim` metres (never more than PROTECT_END_SHARE of its length at each end), with new end points on the line.  Pure: returns new arrays;
- * null when nothing is left.
- */
-function trimEnds(x, z, trim = PROTECT_END_TRIM) {
-  const n = x.length;
-  const arc = new Float64Array(n);
-  for (let i = 1; i < n; i++) arc[i] = arc[i - 1] + Math.hypot(x[i] - x[i - 1], z[i] - z[i - 1]);
-  const cut = Math.min(trim, PROTECT_END_SHARE * arc[n - 1]);
-  const from = cut, to = arc[n - 1] - cut;
-  if (to - from < 1) return null;
-  const at = (d) => {
-    let k = 0;
-    while (k < n - 2 && arc[k + 1] < d) k++;
-    const t = (d - arc[k]) / Math.max(1e-9, arc[k + 1] - arc[k]);
-    return [x[k] + (x[k + 1] - x[k]) * t, z[k] + (z[k + 1] - z[k]) * t];
-  };
-  const [sx, sz] = at(from), [ex, ez] = at(to);
-  const outX = [sx], outZ = [sz];
-  for (let i = 0; i < n; i++) if (arc[i] > from && arc[i] < to) { outX.push(x[i]); outZ.push(z[i]); }
-  outX.push(ex); outZ.push(ez);
-  return { x: outX, z: outZ };
 }
 
 /** A Gaussian smoothing of a series of values (the ends are renormalised, so a value keeps its end). */
@@ -411,8 +383,7 @@ export function createRoadNetwork(roads, baseHeight) {
     const a0 = bench + pw;
     // A way that rides over the ground protects it, whether a car may drive on it or not: the footpath bridge
     // of a park stands over a street, and the street may not dig a pit under it.
-    const corridor = tagged && !road.tunnel ? trimEnds(rs.x, rs.z) : null;
-    if (corridor) overCorridors.push({ ...corridor, half: a0 + PROTECT_MARGIN });
+    if (tagged && !road.tunnel) overCorridors.push({ x: rs.x, z: rs.z, half: a0 + PROTECT_MARGIN });
     // Only the roads a car may drive on are carved. A footpath or a staircase is not a road: carving it would cut a
     // trench into the hillside where the path follows a steep slope. A tunnel cannot be a trench in a single valued
     // height field (it gets a portal instead) and a way that rides over the ground is a deck (decks.js).

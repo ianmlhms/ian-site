@@ -1573,7 +1573,7 @@ if (wants('L')) {
   const sorted = boxBobs.slice().sort((a, b) => a - b);
   const median = sorted[sorted.length >> 1] || 0;
   stats.junctionDrive = { junctions: clusters.length, medianBoxBob: +median.toFixed(2), worstBoxBob: +worstBox.toFixed(2), worstAt };
-  const MAX_MEDIAN_BOX_BOB = 8, MAX_WORST_BOX_BOB = 60;                       // m/s2 at 50 km/h: a guard at today's level (a road is 0.04; the target for a junction box is JUNCTION.maxBob = 1.5)
+  const MAX_MEDIAN_BOX_BOB = 5.5, MAX_WORST_BOX_BOB = 25;                       // m/s2 at 50 km/h: a guard at today's level (a road is 0.04; the target for a junction box is JUNCTION.maxBob = 1.5)
   check(`junctions: driving straight across the ${clusters.length} biggest junctions (median over the junctions <= ${MAX_MEDIAN_BOX_BOB}, worst <= ${MAX_WORST_BOX_BOB} m/s2; target ${JUNCTION.maxBob})`, median <= MAX_MEDIAN_BOX_BOB && worstBox <= MAX_WORST_BOX_BOB, `median ${median.toFixed(2)}, worst ${worstBox.toFixed(2)} at ${worstAt}`);
 }
 

@@ -159,6 +159,11 @@ export const GROUND_FRAGMENT = `
     float edgeGate = step(0.5, lines) * step(lines, 2.5) * smoothstep(3.6, 4.4, hw);
     float edgeHalf = max(0.07, aaC * 0.9);
     float edge = edgeGate * (1.0 - smoothstep(edgeHalf * 0.5, edgeHalf * 1.5, abs(sdC + 0.5)));
+    // Where two carriageways overlap (a wide road with its slip road laid over it) the union has a flat RIDGE between them whose level is about -0.5: the contour sdC = -0.5 there is not an edge, it
+    // is a wide unstable streak, and it was drawn as scattered white dashes lying diagonally on the tarmac (Escher Strooss).  A real edge has a distance field of gradient 1; on the ridge it is near 0.
+    vec2 sdl = vec2(dFdx(sdC), dFdy(sdC));
+    float sdSlope = abs(detJ) > 1e-9 ? length(vec2(Jy.y * sdl.x - Jx.y * sdl.y, -Jy.x * sdl.x + Jx.x * sdl.y)) / abs(detJ) : 1.0;
+    edge *= smoothstep(0.55, 0.85, sdSlope);
     float paint = clamp(centre + edge, 0.0, 1.0) * onCarriage * markOn * near;
 
     albedo = mix(albedo, surf, roadW * onCarriage);
