@@ -12,7 +12,7 @@ import { fixLandmarkDecks } from '../../pb/lux-drive/landmarks.js';
 const DATA = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../pb/lux-drive/data');
 export async function loadWorld() {
   const data = await loadWorldData(async (name) => new Uint8Array(fs.readFileSync(path.join(DATA, name))));
-  const field = createHeightField({ near: data.near, far: data.far, roads: data.roads });
+  const field = createHeightField({ near: data.near, far: data.far, roads: data.roads, decks: data.decks });
   const surface = createSurface(field);
   const deckNetwork = createDeckNetwork(fixLandmarkDecks(data.decks, (x, z) => surface.height(x, z)), surface);
   const ground = createGround(surface, deckNetwork);

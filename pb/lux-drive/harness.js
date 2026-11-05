@@ -76,7 +76,7 @@ const read = async (name) => new Uint8Array(fs.readFileSync(path.join(DATA, name
 const data = await loadWorldData(read);          // the checksums are verified inside: a mismatch throws
 const area = JSON.parse(fs.readFileSync(path.join(DATA, 'area.json'), 'utf8'));
 
-const field = createHeightField({ near: data.near, far: data.far, roads: data.roads });
+const field = createHeightField({ near: data.near, far: data.far, roads: data.roads, decks: data.decks });
 const surface = createSurface(field);
 const deckNetwork = createDeckNetwork(fixLandmarkDecks(data.decks, (x, z) => surface.height(x, z)), surface);
 const ground = createGround(surface, deckNetwork);

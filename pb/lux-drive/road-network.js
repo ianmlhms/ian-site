@@ -16,6 +16,7 @@ import { ROAD } from './config.js';
 import { ROAD_KINDS, kindInfo } from './roads.js';
 import { designBed, bedSlopes, hermite } from './road-bed.js';
 import { createJunctionSurface, JUNCTION_SURFACE } from './junction-surface.js';
+import { isLandmarkDeck } from './decks.js';
 const JS_OPTS = globalThis.process?.env?.JS_OPTS ? { ...JUNCTION_SURFACE, ...JSON.parse(globalThis.process.env.JS_OPTS) } : JUNCTION_SURFACE;   // TEMP experiment hook
 
 const CELL = ROAD.cell;                 // m, the spatial hash cell (the biggest kernel radius fits inside it)
@@ -28,6 +29,22 @@ const PROTECT_FADE = 10.0;             // m: the protection fades out over this 
 const MEDIAN_WIDTH = 3.0;             // m: a gap of at most this between the carriageways of two ROADS (the median of a dual carriageway, the nose of a slip road) is paved as a whole: the grass left in a gap that
                                     // narrow was a wobbling green sliver between two ragged kerbs (the paint edge of each side is a contour on a 1 m lattice)
 const PROTECT_CELL = 64;               // m, the cell of the spatial hash of the protected corridors
+const PROTECT_RAMP = 1.5;              // m: where a carved way runs onto a bridge, the protection of the ground under the bridge grows from nothing at the abutment to its full strength over this
+                                       // distance along the bridge, and is nothing BEFORE the abutment.  The approach road keeps its own bed right up to the deck (the ground under the deck drops
+                                       // away from there, hidden by the deck).  With full protection in a disc round the first point of the bridge the approach road followed the valley edge for the last
+                                       // 15 m and sagged up to 7 m (110 ends), and the deck, pinned to that surface at its end, started metres above it: a raised box with a vertical face (Rue de Neudorf).
+const APPROACH_JOIN = 3.0;             // m: a carved way whose end lies this close to an end of a bridge runs onto it at that end
+const DECK_TRUST_WIDTH = 5.0;          // m: the DSM of a deck at least this wide (a carriageway) is its level; a narrower one (a track, a footbridge) is often the canopy over it
+const DECK_END_GRADE = 0.12;           // m/m: the deck is continued from its first two points to its end at no steeper grade than this
+const APPROACH_LIFT_MAX = 7.0;         // m: a way is lifted onto the deck at its end by at most this; more is a DSM that is not the deck (a canopy)
+const APPROACH_LOWER_MAX = 4.0;        // m: ... and lowered to it by at most this (a steep street whose bed ran on past the bank in the air)
+const DECK_BELOW_BANK = 1.0;           // m: a deck level more than this under the land at the end of the deck is not the deck (the DSM is the top of everything: a deck under its bank is one under a structure)
+const APPROACH_ALIGN = 0.7;            // the cosine between the direction a way leaves through its end and the direction into a bridge: at least this, and the way runs onto the bridge
+const GROUNDED_MATCH = 2.0;            // m: a deck belongs to a way when both its ends lie this close to the ends of the way
+const GROUNDED_MAX_LENGTH = 16.0;      // m: a narrow deck at most this long ...
+const GROUNDED_MAX_DIP = 1.0;          // m: ... over land that dips less than this under it spans nothing (see groundedDeckOf)
+const ABUT_HOLD = 2.0;                 // m: ... and its carriageway is held at its own level this far under the bridge (the cap of the way starts fading only there, the protection only ramps up
+                                       // from there): the 1 m lattice under the first metres of the deck is the road, so the deck starts flush on a level surface, not on the edge of the drop
 const smoothstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const MAX_PINS = 16;                   // carriageways that lie over one point, at most
 const MAX_CAND = 192;                  // segments that reach one point, at most
@@ -55,6 +72,28 @@ const KERB_SURFACES = new Set(['asphalt', 'cobble', 'concrete']);
 const SHEET_GAP_HOLD = 1.5;            // m: in a junction the sheet (junction-surface.js) holds the ground this far past the bench of a way at its level: a gap of up to 2 x this between two carriageways
                                        // (a median, the nose of a slip road, the wedge where a dual carriageway splits) is at road level, not a dip to the land
 const SHEET_GAP_FADE = 2.0;            // m: ... and lets go of it over this distance
+
+/**
+ * The level at the two ends of every bridge deck a car drives onto, from the DSM of the deck itself: the first two points inside the deck, continued to its end (the DSM AT the end is
+ * the abutment or the bank, the bake writes the land there).  Only the decks of a carriageway (DECK_TRUST_WIDTH): the DSM of a track or a footbridge in a wood is the canopy.
+ * The Pont Rouge and the Pont Adolphe are left out: their landmark models meet their approach roads themselves (landmark-bridges.js fixLandmarkDecks).
+ * Returns [{ deck, x, z, level }].
+ */
+export function deckEndLevels(decks) {
+  const out = [];
+  for (const d of decks) {
+    const n = d.pts.length;
+    if (n < 3 || d.width < DECK_TRUST_WIDTH) continue;
+    if (isLandmarkDeck(d)) continue;
+    for (const [k, j, j2] of [[0, 1, 2], [n - 1, n - 2, n - 3]]) {
+      const l1 = Math.hypot(d.pts[j][0] - d.pts[k][0], d.pts[j][1] - d.pts[k][1]);
+      const l2 = Math.hypot(d.pts[j2][0] - d.pts[j][0], d.pts[j2][1] - d.pts[j][1]) || 1;
+      const grade = Math.max(-DECK_END_GRADE, Math.min(DECK_END_GRADE, (d.tops[j] - d.tops[j2]) / l2));
+      out.push({ deck: d.id, x: d.pts[k][0], z: d.pts[k][1], level: d.tops[j] + grade * l1 });
+    }
+  }
+  return out;
+}
 
 /** Resamples a polyline (array of [x, z]) every `spacing` m, keeping its shape. Returns { x: number[], z: number[] }. */
 export function resample(points, spacing) {
@@ -103,7 +142,30 @@ function gaussianSmooth(values, sigmaSamples) {
  * roads: the decoded road network (roads.js).  baseHeight(x, z): the terrain without any road.
  * Returns { carve, nearestRoad, roads, segments, count }.
  */
-export function createRoadNetwork(roads, baseHeight) {
+export function createRoadNetwork(roads, baseHeight, decks = []) {
+  const deckEnds = deckEndLevels(decks);
+  let usableDeckEnds = [];               // (decided in reconcileJunctions, once the ways have their own beds)
+  // A drivable way tagged as a bridge whose deck spans nothing: a narrow deck (its DSM is the canopy of a wood, not a deck), no dip of the land under it, and short (a track over a ditch).
+  // It is carved like any way and its deck is not drawn (decks.js): a deck lifted off such a way was a box 2 .. 25 m high in the wood, and a deck laid onto it lay on the ground
+  // with the cut of the track under its ends.  Returns the deck or null.
+  const groundedDecks = new Set();
+  function groundedDeckOf(road) {
+    if (!road.info || !road.info.drivable || road.tunnel || !(road.over || (road.layer || 0) >= 1) || !road.pts || road.pts.length < 2) return null;
+    const a = road.pts[0], b = road.pts[road.pts.length - 1];
+    const deck = decks.find((d) => {
+      const p = d.pts[0], q = d.pts[d.pts.length - 1];
+      return (Math.hypot(p[0] - a[0], p[1] - a[1]) <= GROUNDED_MATCH && Math.hypot(q[0] - b[0], q[1] - b[1]) <= GROUNDED_MATCH) ||
+        (Math.hypot(p[0] - b[0], p[1] - b[1]) <= GROUNDED_MATCH && Math.hypot(q[0] - a[0], q[1] - a[1]) <= GROUNDED_MATCH);
+    });
+    if (!deck || deck.width >= DECK_TRUST_WIDTH || deck.spans) return null;
+    let len = 0;
+    for (let i = 1; i < deck.pts.length; i++) len += Math.hypot(deck.pts[i][0] - deck.pts[i - 1][0], deck.pts[i][1] - deck.pts[i - 1][1]);
+    if (len > GROUNDED_MAX_LENGTH) return null;
+    const p = deck.pts[0], q = deck.pts[deck.pts.length - 1];
+    const endLand = Math.min(baseHeight(p[0], p[1]), baseHeight(q[0], q[1]));
+    const dip = Math.max(...deck.pts.map(([x, z]) => endLand - baseHeight(x, z)));
+    return dip < GROUNDED_MAX_DIP ? deck : null;
+  }
   const segAx = [], segAz = [], segBx = [], segBz = [], segB0 = [], segB1 = [];
   const segHw = [], segKerbH = [], segKerbW = [], segPw = [], segA0 = [], segBench = [], segR = [], segReach = [];
   const segKind = [], segRoad = [], segKerbOn = [], segLines = [], segS0 = [], segS1 = [], segSurf = [];
@@ -156,6 +218,8 @@ export function createRoadNetwork(roads, baseHeight) {
     return Math.min(maxEdge, lastFail + BATTER_STEP);
   }
 
+  const approachRoad = new Uint8Array(roads.length);   // 1: the way runs onto a bridge at one of its ends (its carriageway may be a fill under the first metres of the deck)
+  const capHoldA = new Float32Array(roads.length), capHoldB = new Float32Array(roads.length);   // m: how far past its first / last point the carriageway of a way is held before its cap fades (a way that runs onto a bridge)
   const closedRoad = new Uint8Array(roads.length);     // the rings (a pedestrian square, a loop): they have no ends, so no end cap
   const priority = new Float32Array(roads.length);     // the order of the design: the bigger way has the higher number (it wins at a junction)
   const prep = [];                   // the ways that are carved, with everything the second pass needs
@@ -253,6 +317,16 @@ export function createRoadNetwork(roads, baseHeight) {
    *  The pins are heavy weights in the smoother (road-bed.js), so a profile reaches its junction smoothly instead of with a hump
    *  (the reviewer's "rides on a blanket" was, among other things, the beds of a crossing differing by a hand's breadth and being
    *  averaged into a bump on the carriageway). */
+  /** The level of the deck whose end lies at (x, z) (within APPROACH_JOIN), or null. */
+  function deckLevelAt(x, z) {
+    let best = null, bestD = APPROACH_JOIN;
+    for (const e of usableDeckEnds) {
+      const d = Math.hypot(e.x - x, e.z - z);
+      if (d <= bestD) { bestD = d; best = e.level; }
+    }
+    return best;
+  }
+
   function reconcileJunctions() {
     const GC = 32;
     const gkey = (cx, cz) => cx * 4096 + cz;
@@ -269,6 +343,17 @@ export function createRoadNetwork(roads, baseHeight) {
         if (list) list.push(e); else endGrid.set(kk, [e]);
       }
     }
+    // The decks whose DSM level the ways at their ends are pinned to: all ends of a deck agree, or none is used (a deck lifted at one end only was a ramp of 30 %).  A deck level more
+    // than DECK_BELOW_BANK under the land at its end, or more than the limits away from the bed a way had on its own, is not the deck (a canopy, a structure over the way).
+    const rejected = new Set();
+    for (const de of deckEnds) {
+      if (de.level < baseHeight(de.x, de.z) - DECK_BELOW_BANK) { rejected.add(de.deck); continue; }
+      for (const e of ends) {
+        if (Math.hypot(e.x - de.x, e.z - de.z) > APPROACH_JOIN) continue;
+        if (de.level - e.h > APPROACH_LIFT_MAX || e.h - de.level > APPROACH_LOWER_MAX) rejected.add(de.deck);
+      }
+    }
+    usableDeckEnds = deckEnds.filter((de) => !rejected.has(de.deck));
     const endPins = new Map();                  // chain -> Map(sample index -> level)
     const pinOf = (chain) => { let m = endPins.get(chain); if (!m) { m = new Map(); endPins.set(chain, m); } return m; };
     for (const e of ends) {
@@ -284,6 +369,12 @@ export function createRoadNetwork(roads, baseHeight) {
             if (Math.hypot(o.x - m.x, o.z - m.z) <= END_JOIN) { o.cluster = 1; members.push(o); }
           }
         }
+      }
+      // an end that runs onto a bridge: the deck (the DSM of the bridge) sets the level of the node, and every way at that node meets it
+      const deckLevel = deckLevelAt(e.x, e.z);
+      if (deckLevel !== null) {
+        for (const m of members) pinOf(m.chain).set(m.k, deckLevel);
+        continue;
       }
       if (members.length < 2) continue;
       const hs = members.map((m) => m.h).sort((a, b) => a - b);
@@ -360,7 +451,9 @@ export function createRoadNetwork(roads, baseHeight) {
     firstSample[ri] = -1; firstSeg[ri] = -1; segCount[ri] = 0; info[ri] = null;
     // A way that rides OVER the ground: OSM says so (a bridge, or a layer above the others).  It is never carved
     // into the height function and the ground under it is protected (see the crossings below).
-    const tagged = !!(road.over || (road.layer || 0) >= 1);
+    const grounded = groundedDeckOf(road);
+    if (grounded) groundedDecks.add(grounded.id);
+    const tagged = !grounded && !!(road.over || (road.layer || 0) >= 1);
     // The centre line of the way, as the game draws it: the polyline resampled and its corners rounded.
     // Every way needs it: the drivable ones are carved along it, and the ones that ride over the ground
     // protect the ground under them along it.
@@ -530,17 +623,59 @@ export function createRoadNetwork(roads, baseHeight) {
 
   // ---- the protected corridors: the ground under a way that rides over the others stays the ground -----
   const protX0 = [], protZ0 = [], protX1 = [], protZ1 = [], protHalf = [];
+  // per segment: the distance along its way at its start and the distances along the way at which the protection starts / ends ramping (-Infinity / Infinity: an end that no road runs onto
+  // keeps the full protection up to it and the disc round it)
+  const protArc = [], protRampA = [], protRampB = [];
+  const approachEnds = [];                             // the ends of the carved ways (not over): an end of a bridge near one of them is an abutment
+  for (const chain of chains) {
+    if (overRoads.has(chain.road) || chain.x.length < 2) continue;
+    const m = chain.x.length;
+    for (const [e, f] of [[0, 1], [m - 1, m - 2]]) {               // the end, and the direction the way leaves through it (toward the bridge)
+      const dx = chain.x[e] - chain.x[f], dz = chain.z[e] - chain.z[f], l = Math.hypot(dx, dz) || 1;
+      approachEnds.push([chain.x[e], chain.z[e], dx / l, dz / l]);
+    }
+  }
+  // An end of a bridge is an abutment when a carved way ends there (APPROACH_JOIN) and runs on in the direction of the bridge.  (The ends of the pavement decks beside a road bridge also
+  // protected the end of the road between them; the protection now only keeps the ground from being CUT - see carve() - and a road lifted onto its bridge is a fill.)
+  const isAbutment = (x, z, ux, uz) => approachEnds.some((p) => Math.abs(p[0] - x) <= APPROACH_JOIN && Math.abs(p[1] - z) <= APPROACH_JOIN && Math.hypot(p[0] - x, p[1] - z) <= APPROACH_JOIN && p[2] * ux + p[3] * uz >= APPROACH_ALIGN);
   for (const corridor of overCorridors) {              // the ways that OSM tags as over
-    for (let i = 1; i < corridor.x.length; i++) {
+    const m = corridor.x.length;
+    if (isLandmarkDeck({ pts: corridor.x.map((x, i) => [x, corridor.z[i]]) })) {     // (the Pont Rouge / Pont Adolphe models meet their roads themselves: full protection, as before)
+      for (let i = 1; i < m; i++) {
+        protX0.push(corridor.x[i - 1]); protZ0.push(corridor.z[i - 1]); protX1.push(corridor.x[i]); protZ1.push(corridor.z[i]);
+        protHalf.push(corridor.half); protArc.push(0); protRampA.push(-Infinity); protRampB.push(Infinity);
+      }
+      continue;
+    }
+    let total = 0;
+    for (let i = 1; i < m; i++) total += Math.hypot(corridor.x[i] - corridor.x[i - 1], corridor.z[i] - corridor.z[i - 1]);
+    const inA = [corridor.x[1] - corridor.x[0], corridor.z[1] - corridor.z[0]], inB = [corridor.x[m - 2] - corridor.x[m - 1], corridor.z[m - 2] - corridor.z[m - 1]];   // into the bridge at each end
+    const lA = Math.hypot(inA[0], inA[1]) || 1, lB = Math.hypot(inB[0], inB[1]) || 1;
+    const rampA = isAbutment(corridor.x[0], corridor.z[0], inA[0] / lA, inA[1] / lA) ? 0 : -Infinity;
+    const rampB = isAbutment(corridor.x[m - 1], corridor.z[m - 1], inB[0] / lB, inB[1] / lB) ? total : Infinity;
+    let arc = 0;
+    for (let i = 1; i < m; i++) {
       protX0.push(corridor.x[i - 1]); protZ0.push(corridor.z[i - 1]);
       protX1.push(corridor.x[i]); protZ1.push(corridor.z[i]);
       protHalf.push(corridor.half);
+      protArc.push(arc); protRampA.push(rampA); protRampB.push(rampB);
+      arc += Math.hypot(corridor.x[i] - corridor.x[i - 1], corridor.z[i] - corridor.z[i - 1]);
     }
+  }
+  // the ways that run onto a bridge: their carriageway is held at its level ABUT_HOLD under the deck (see the cap in carve())
+  const corridorEnds = overCorridors.filter((c) => !isLandmarkDeck({ pts: c.x.map((x, i) => [x, c.z[i]]) })).flatMap((c) => [[c.x[0], c.z[0]], [c.x[c.x.length - 1], c.z[c.z.length - 1]]]);
+  const atBridgeEnd = (x, z) => corridorEnds.some((p) => Math.hypot(p[0] - x, p[1] - z) <= APPROACH_JOIN);
+  for (const chain of chains) {
+    if (overRoads.has(chain.road) || chain.closed) continue;
+    const m = chain.x.length;
+    if (atBridgeEnd(chain.x[0], chain.z[0])) { capHoldA[chain.road] = ABUT_HOLD; approachRoad[chain.road] = 1; }
+    if (atBridgeEnd(chain.x[m - 1], chain.z[m - 1])) { capHoldB[chain.road] = ABUT_HOLD; approachRoad[chain.road] = 1; }
   }
   for (let i = 0; i < count; i++) {                     // the ways the crossings found to be over
     if (!overRoads.has(ROADOF[i])) continue;
     protX0.push(X0[i]); protZ0.push(Z0[i]); protX1.push(X1[i]); protZ1.push(Z1[i]);
     protHalf.push(A0[i] + PROTECT_MARGIN);
+    protArc.push(0); protRampA.push(-Infinity); protRampB.push(Infinity);
   }
   const pKey = (cx, cz) => cx * 4096 + cz;
   const pBuckets = new Map();
@@ -571,10 +706,14 @@ export function createRoadNetwork(roads, baseHeight) {
           const ex = protX1[s] - ax, ez = protZ1[s] - az;
           const ll = ex * ex + ez * ez;
           let t = ll > 1e-9 ? ((x - ax) * ex + (z - az) * ez) / ll : 0;
+          // at an abutment the protection ramps up along the bridge from its end (and is nothing before it, where the approach road is)
+          const along = protArc[s] + t * Math.sqrt(ll);
+          const ramp = smoothstep(ABUT_HOLD, ABUT_HOLD + PROTECT_RAMP, Math.min(along - protRampA[s], protRampB[s] - along));
           t = t < 0 ? 0 : t > 1 ? 1 : t;
           const d = Math.hypot(x - (ax + ex * t), z - (az + ez * t)) - protHalf[s];
-          if (d <= 0) return 1;
-          if (d < PROTECT_FADE) { const v = 1 - d / PROTECT_FADE; if (v > p) p = v; }
+          const v = (d <= 0 ? 1 : d < PROTECT_FADE ? 1 - d / PROTECT_FADE : 0) * ramp;
+          if (v >= 1) return 1;
+          if (v > p) p = v;
         }
       }
     }
@@ -731,8 +870,8 @@ export function createRoadNetwork(roads, baseHeight) {
           // how far the point lies beyond the END of the way (0 along the way): the carriageway ends at the end of the way
           let over = 0;
           if (closedRoad[ROADOF[i]]) over = 0;
-          else if (t0 < 0 && i === firstSeg[ROADOF[i]]) over = -t0 * len;
-          else if (t0 > 1 && i === firstSeg[ROADOF[i]] + segCount[ROADOF[i]] - 1) over = (t0 - 1) * len;
+          else if (t0 < 0 && i === firstSeg[ROADOF[i]]) over = Math.max(0, -t0 * len - capHoldA[ROADOF[i]]);
+          else if (t0 > 1 && i === firstSeg[ROADOF[i]] + segCount[ROADOF[i]] - 1) over = Math.max(0, (t0 - 1) * len - capHoldB[ROADOF[i]]);
           candI[nCand] = i; candD[nCand] = d; candT[nCand] = t; candLat[nCand] = lat; candOver[nCand] = over; nCand++;
         }
       }
@@ -911,6 +1050,7 @@ export function createRoadNetwork(roads, baseHeight) {
     // over the carriageway of the smaller one, and a bed that is smooth was cut up by 1 .. 8 cm (Boulevard de la Foire: 15 m/s2).  Now a way is held back by every way laid BELOW it
     // (a smaller one) whose carriageway is at another level and which this point is farther from: the hand-over from one level to the other is centred on the line of equal distance
     // from the two benches and as wide as the steepest allowed ground between two levels (RAMP_SLOPE).  Ways at one level (junctions) are not held back at all.
+    let pinCover = 0;                                          // how much of the point is the carriageway of a way that runs onto a bridge (its pins), not a batter
     for (let a = 0; a < nPins; a++) {
       let hold = 1;
       for (let b = 0; b < a; b++) {
@@ -924,6 +1064,7 @@ export function createRoadNetwork(roads, baseHeight) {
       }
       if (out.debug) out.debug.push({ road: slotPinRoad[a], pri: pinPri[a], val: pinVal[a], wt: pinWt[a], hold, edge: pinEdge[a], bed: pinBed[a], before: bandY });
       bandY += (pinVal[a] - bandY) * pinWt[a] * hold;
+      if (approachRoad[slotPinRoad[a]]) pinCover += (1 - pinCover) * pinWt[a] * hold;
     }
     // The junction sheet: where ways meet at one level the carriageways (and the gaps of up to 2 x SHEET_GAP_HOLD between them) lie on one smooth surface, not on the layered beds.
     // A way at another level (a ramp beside the junction) keeps its own surface: the sheet lets go of its bench.
@@ -940,7 +1081,11 @@ export function createRoadNetwork(roads, baseHeight) {
       }
       bandY += (sheet.level - bandY) * sheet.weight * near * (1 - apart);
     }
-    out.band = ground + (1 - prot) * (bandY - ground);
+    // The protection keeps the ground under a bridge from being CUT (a pit under the deck) and from being buried under the batter of a road beside it; the CARRIAGEWAY of a way that
+    // rises onto a bridge (its approach on a fill, lifted to the deck) is neither, and the corridor of the other carriageway's deck beside it - whose end lies 10 .. 20 m along on a skewed
+    // bridge - flattened the end of the approach road into the valley.
+    const protHere = bandY >= ground ? prot * (1 - pinCover) : prot;
+    out.band = ground + (1 - protHere) * (bandY - ground);
     if (out.debug) out.debug.push({ ground, batter: devW > 0 ? ground + devSum / devW : ground, prot, sheetLevel: sheet.level, sheetW: sheet.weight, ways: Array.from({ length: nSlots }, (_, q) => [slotRoad[q], wayEdge[q], wayBed[q]]) });
     // A junction: two marked roads of different ways that cross at an angle meet here.  The lane markings are cut
     // before it (a dash that ends in the middle of the crossing street is the fragment the reviewer saw).
@@ -988,7 +1133,7 @@ export function createRoadNetwork(roads, baseHeight) {
   }
 
   return {
-    carve, nearestRoad, roads, info, count, scratch, overRoads, crossings, chains, protection,
+    carve, nearestRoad, roads, info, count, scratch, overRoads, crossings, chains, protection, groundedDecks,
     segments: { X0, Z0, X1, Z1, BED0, BED1, TAN0, TAN1, HW, KERBH, KERBW, PW, A0, RAD, REACH, KIND, ROADOF, KERBON, LINES, S0, S1, SURF },
     // the centre lines as they are carved (resampled and rounded): the game, the minimap and the probes follow these
     samples: { x: SAMPLES_X, z: SAMPLES_Z, road: SAMPLES_ROAD, first: firstSample, segs: segCount },

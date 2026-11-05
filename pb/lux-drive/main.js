@@ -132,7 +132,7 @@ async function boot() {
   // ---- the pure world
   setLoad(0.62, 'load.build');
   await new Promise((r) => setTimeout(r, 0));
-  const field = createHeightField({ near: data.near, far: data.far, roads: data.roads });
+  const field = createHeightField({ near: data.near, far: data.far, roads: data.roads, decks: data.decks });
   const surface = createSurface(field);
   const deckNetwork = createDeckNetwork(fixLandmarkDecks(data.decks, (x, z) => surface.height(x, z)), surface);
   const ground = createGround(surface, deckNetwork);

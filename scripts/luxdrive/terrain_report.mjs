@@ -18,7 +18,7 @@ const { loadWorldData } = await import(R + 'world-data.js');
 const { createHeightField } = await import(R + 'heightfield.js');
 const { createSurface } = await import(R + 'surface.js');
 const data = await loadWorldData(async (name) => new Uint8Array(fs.readFileSync(path.join(R, 'data', name))));
-const field = createHeightField({ near: data.near, far: data.far, roads: data.roads });
+const field = createHeightField({ near: data.near, far: data.far, roads: data.roads, decks: data.decks });
 const surface = createSurface(field);
 const net = field.network;
 const nameOf = (c) => data.roads[c.road].name || data.roads[c.road].kind;

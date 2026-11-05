@@ -11,7 +11,7 @@ const { createHeightField } = await import(R + 'heightfield.js');
 const { createSurface } = await import(R + 'surface.js');
 const read = async (name) => new Uint8Array(fs.readFileSync(path.join(R+'data', name)));
 const data = await loadWorldData(read);
-const field = createHeightField({ near: data.near, far: data.far, roads: data.roads });
+const field = createHeightField({ near: data.near, far: data.far, roads: data.roads, decks: data.decks });
 const surface = createSurface(field); const net = field.network;
 const lineAt=(ch,d,o)=>{let k=0;while(k<ch.arc.length-2&&ch.arc[k+1]<d)k++;const t=(d-ch.arc[k])/Math.max(1e-9,ch.arc[k+1]-ch.arc[k]);o.x=ch.x[k]+(ch.x[k+1]-ch.x[k])*t;o.z=ch.z[k]+(ch.z[k+1]-ch.z[k])*t;return o;};
 const chains = (net.chains||[]).filter((c)=>!net.overRoads || !net.overRoads.has(c.road));

@@ -11,6 +11,12 @@ export const DECK = Object.freeze({
   stickBelow: 0.6,         // the car counts as "on" the deck when it is at most this far below the surface
   spanDip: 3.0,            // m: the land dips this far under the way, so the deck spans it (the bake writes the same number)
   cell: 32,                // m, the spatial hash cell
+  landmarkSites: [[4829, 9101], [5179, 8061]],   // m: the Pont Adolphe and the Pont Rouge (landmark-bridges.js ADOLPHE.at / ROUGE.at): their models shape their decks and meet their roads themselves ...
+  landmarkRadius: 30,      // m: ... whose middle lies within this of the site (the ends of those decks keep their plain pin to the ground; road-network.js does not lift their approaches)
+  joinTolerance: 1.5,      // m: the ends of two decks this close are one bridge in two pieces (a joint): they meet at the level of the bridge, not at the valley floor under the joint
+  approachJoin: 3.0,       // m: a carved way whose end lies this close to the end of a deck runs onto it there
+  endGrade: 0.12,          // m/m: the steepest a deck climbs or falls away from the level of its end (the DSM next to an abutment is the bank, a parapet or the canopy of a wood: used as it is, the
+                           // deck began with a vertical face at the end of its approach road)
   treeAbove: 1.5,          // m: a tree whose foot is less than this above a deck surface stands on it (the ground under it is a metre or two off the LiDAR deck)
   treeBelow: 0.3,          // m: a crown that comes within this of the underside of a deck touches it
 });
@@ -87,6 +93,73 @@ export function encodeDecks(decks) {
   return Uint8Array.from(bytes);
 }
 
+/** A deck that a landmark model shapes (DECK.landmarkSites). */
+export const isLandmarkDeck = (d) => {
+  const m = d.pts[d.pts.length >> 1];
+  return DECK.landmarkSites.some(([x, z]) => Math.hypot(m[0] - x, m[1] - z) <= DECK.landmarkRadius);
+};
+
+/** The DSM level of a deck continued from its first two inner points to its end k (j, j2: the next two points inward), at no steeper grade than DECK.endGrade. */
+function innerLevel(d, k, j, j2) {
+  const l1 = Math.hypot(d.pts[j][0] - d.pts[k][0], d.pts[j][1] - d.pts[k][1]);
+  const l2 = Math.hypot(d.pts[j2][0] - d.pts[j][0], d.pts[j2][1] - d.pts[j][1]) || 1;
+  const grade = Math.max(-DECK.endGrade, Math.min(DECK.endGrade, (d.tops[j] - d.tops[j2]) / l2));
+  return d.tops[j] + grade * l1;
+}
+
+/**
+ * The level of the two ends of every deck: [startTop, endTop, envelopeAtStart, envelopeAtEnd] per deck.
+ *   - an end where a carved way runs onto the deck (an abutment): the surface there, i.e. the road (road-network.js lifts the road onto the level of a carriageway deck and holds its
+ *     carriageway under the first metres of the deck), and the deck runs off it at no more than DECK.endGrade (envelope);
+ *   - a JOINT (the ends of two or more decks meet: one bridge in pieces): the mean of the DSM levels of the pieces there (the bake writes the valley floor under the joint), envelope;
+ *   - any other end (a footbridge on its bank): the surface, as before, no envelope.
+ */
+function deckEndTops(decks, surface) {
+  const net = surface.field && surface.field.network;
+  const approach = [];
+  if (net) for (const c of net.chains) if (!net.overRoads.has(c.road)) approach.push([c.x[0], c.z[0]], [c.x[c.x.length - 1], c.z[c.z.length - 1]]);
+  const ends = [];
+  decks.forEach((d, k) => {
+    const n = d.pts.length;
+    if (n < 2) return;
+    ends.push({ k, side: 0, p: d.pts[0], inner: n >= 3 ? innerLevel(d, 0, 1, 2) : d.tops[0] });
+    ends.push({ k, side: 1, p: d.pts[n - 1], inner: n >= 3 ? innerLevel(d, n - 1, n - 2, n - 3) : d.tops[n - 1] });
+  });
+  const out = decks.map(() => [0, 0, false, false]);
+  for (const e of ends) {
+    const [x, z] = e.p;
+    const isApproach = approach.some((q) => Math.abs(q[0] - x) <= DECK.approachJoin && Math.abs(q[1] - z) <= DECK.approachJoin && Math.hypot(q[0] - x, q[1] - z) <= DECK.approachJoin);
+    const joint = isApproach ? [] : ends.filter((o) => o.k !== e.k && Math.hypot(o.p[0] - x, o.p[1] - z) <= DECK.joinTolerance);
+    let level, envelope;
+    if (joint.length) { level = (e.inner + joint.reduce((sum, o) => sum + o.inner, 0)) / (joint.length + 1); envelope = true; }
+    else { level = isApproach || !surface.field ? surface.height(x, z) : Math.max(surface.height(x, z), surface.field.height(x, z)); envelope = isApproach; }   // (a bank: on the 1 m lattice and on the ground itself, whichever is higher - an end on the edge of a drop dived into the continuous ground)
+    out[e.k][e.side] = level; out[e.k][2 + e.side] = envelope;
+  }
+  return out;
+}
+
+/**
+ * The tops of a deck with its ends at `lo` / `hi`.  Where an end has an envelope the deck climbs or falls away from that end at no more than DECK.endGrade (the DSM inside the envelope is kept).
+ * The deck never runs under the ground (it then lies on it).  Pure: returns a new array.
+ */
+function endEnvelope(pts, tops, lo, hi, envLo, envHi, surface) {
+  const n = pts.length;
+  const out = Float32Array.from(tops);
+  out[0] = lo; out[n - 1] = hi;
+  // a deck never runs under the ground it stands on (the fill of a road lifted onto the bridge beside a pavement deck, a bank): it lies on it there
+  if (!envLo && !envHi) { for (let i = 1; i < n - 1; i++) out[i] = Math.max(out[i], surface.height(pts[i][0], pts[i][1])); return out; }
+  const arc = new Float64Array(n);
+  for (let i = 1; i < n; i++) arc[i] = arc[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+  const total = arc[n - 1];
+  for (let i = 1; i < n - 1; i++) {
+    let top = tops[i];
+    if (envLo) top = Math.min(lo + DECK.endGrade * arc[i], Math.max(lo - DECK.endGrade * arc[i], top));
+    if (envHi) top = Math.min(hi + DECK.endGrade * (total - arc[i]), Math.max(hi - DECK.endGrade * (total - arc[i]), top));
+    out[i] = Math.max(top, surface.height(pts[i][0], pts[i][1]));
+  }
+  return out;
+}
+
 /**
  * The deck network: the segments of every deck in a spatial hash, so the ground function can ask
  * "is there a deck over this point, and how high is it?".
@@ -96,13 +169,21 @@ export function encodeDecks(decks) {
  * and not at the level of the land above it, or the bridge hangs in the air over its own approach.
  */
 export function createDeckNetwork(decks, surface = null) {
-  const list = decks.map((d) => {
+  // the decks of the ways the road network carves instead (a narrow deck that spans nothing: road-network.js groundedDeckOf) are not decks
+  const grounded = surface && surface.field && surface.field.network ? surface.field.network.groundedDecks : null;
+  const kept = grounded && grounded.size ? decks.filter((d) => !grounded.has(d.id)) : decks;
+  const levels = surface ? deckEndTops(kept, surface) : null;
+  const list = kept.map((d, k) => {
     if (!surface || d.pts.length < 2) return d;
-    const tops = Float32Array.from(d.tops);
-    const last = d.pts.length - 1;
-    tops[0] = surface.height(d.pts[0][0], d.pts[0][1]);
-    tops[last] = surface.height(d.pts[last][0], d.pts[last][1]);
-    return { ...d, tops };
+    if (isLandmarkDeck(d)) {                                    // (the landmark models: the plain pin of the two ends, see DECK.landmarkSites)
+      const tops = Float32Array.from(d.tops);
+      const last = d.pts.length - 1;
+      tops[0] = surface.height(d.pts[0][0], d.pts[0][1]);
+      tops[last] = surface.height(d.pts[last][0], d.pts[last][1]);
+      return { ...d, tops };
+    }
+    const [lo, hi, envLo, envHi] = levels[k];
+    return { ...d, tops: endEnvelope(d.pts, d.tops, lo, hi, envLo, envHi, surface) };
   });
   const ax = [], az = [], bx = [], bz = [], t0 = [], t1 = [], half = [];
   for (const d of list) {

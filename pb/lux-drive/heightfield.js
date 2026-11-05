@@ -20,9 +20,9 @@ const MICRO_OCTAVES = 2;
 /** The fade of a feature that is exact up to `full` and gone at `fade` (1 .. 0 in between). */
 export const fadeOf = (step, full, fade) => (step <= full ? 1 : step >= fade ? 0 : 1 - (step - full) / (fade - full));
 
-export function createHeightField({ near, far, roads }) {
+export function createHeightField({ near, far, roads, decks = [] }) {
   const base = createBaseField(near, far);
-  const network = createRoadNetwork(roads, base.baseHeight);
+  const network = createRoadNetwork(roads, base.baseHeight, decks);   // (the decks: the level of the bridge a way runs onto)
   const scratch = network.scratch;
 
   /** The terrain without any road. */
