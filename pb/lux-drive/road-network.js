@@ -531,7 +531,9 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     // A service way that dives into a tunnel is a garage ramp: the class default of 2.5 m of pavement (bake_roads URBAN_PAVEMENT) is for streets, and on a ramp it is a grey slab
     // field lying over the verge and the trench (the start of the game).  A ramp has no pavement.
     const isGarageRamp = road.kind === 'service' && (endOf(rs.x[0], rs.z[0]) === 'tunnel' || endOf(rs.x[n - 1], rs.z[n - 1]) === 'tunnel');
-    const pw = isGarageRamp ? 0 : Math.max(0, road.sidewalk);
+    // A service way (a lane to a car park, a farm, a petrol station) has no pavement of its own either: the bake's urban default of 2.5 m on both sides joined the pavement of
+    // the street it leaves into an apron of 6 - 8 m of slabs beside every junction mouth (QA T11).
+    const pw = isGarageRamp || road.kind === 'service' ? 0 : Math.max(0, road.sidewalk);
     // The bench of the road is the carriageway and its kerb; the pavement beside it is PAINT, not a bench.
     // A wide pavement would dig the ground deeper into the hillside and build a wall beside the street (the
     // reviewer saw one), so the carve keeps its narrow bench and the pavement is painted on the ground beside it.
@@ -907,7 +909,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     sNotch = right * (NOTCHR[s0] + (NOTCHR[s0 + 1] - NOTCHR[s0]) * t) + (1 - right) * (NOTCHL[s0] + (NOTCHL[s0 + 1] - NOTCHL[s0]) * t);
     sFade = right * (FADER[s0] + (FADER[s0 + 1] - FADER[s0]) * t) + (1 - right) * (FADEL[s0] + (FADEL[s0 + 1] - FADEL[s0]) * t);
   }
-  const scratch = { coverage: 0, bed: 0, band: 0, kerb: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, dist: 0, lines: 0, lanes: 0, s: 0, surface: 0, sdCar: SD_FAR, sdPave: SD_FAR, sdMajor: SD_FAR, junction: 0, sdA: SD_FAR, grpA: -1, sdB: SD_FAR, grpB: -1 };
+  const scratch = { coverage: 0, bed: 0, band: 0, kerb: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, dist: 0, lines: 0, lanes: 0, s: 0, surface: 0, sdCar: SD_FAR, sdPave: SD_FAR, sdMajor: SD_FAR, junction: 0, sdA: SD_FAR, grpA: -1, sdB: SD_FAR, grpB: -1, pvA: SD_FAR, pvB: SD_FAR };
 
   const LEVEL_FULL = 4.0;           // m: a road shapes the ground that lies at its own level (within this).  A road
                                     // that stands far above the ground is a viaduct and must not fill the valley
@@ -1069,7 +1071,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
             const eCar = d - HW[i];
             // (the union of the carriageways and pavements is taken below, once the level of the ground here is known)
             if (nPaint < MAX_CAND) {
-              paintECar[nPaint] = eCar; paintEPave[nPaint] = d - a0; paintBed[nPaint] = bed; paintRoad[nPaint] = ROADOF[i]; paintMajor[nPaint] = HW[i] >= MINOR_HW ? 1 : 0;
+              paintECar[nPaint] = eCar; paintEPave[nPaint] = d - a0; paintBed[nPaint] = bed; paintRoad[nPaint] = ROADOF[i]; paintMajor[nPaint] = HW[i] >= MINOR_HW || LINES[i] === 1 || LINES[i] === 2 ? 1 : 0;   // (a marked road - a slip road of 6 m - is never the pale tar of a service way)
               paintOffX[nPaint] = -lat * ez / len; paintOffZ[nPaint] = lat * ex / len; nPaint++;
             }
             if (LINES[i] > 0 && eCar < MARK_CLEAR && partners < MAX_PARTNERS) {
@@ -1290,6 +1292,13 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
       if (ePave < sdPave) sdPave = ePave;
       if (paintMajor[q] && eCar < sdMajor) sdMajor = eCar;
     }
+    // the pavements of the two channels (the carriageways sdCar / sdCar2 belong to)
+    let pvA = SD_FAR, pvB = SD_FAR;
+    for (let q = 0; q < nPaint; q++) {
+      const g = GROUP[paintRoad[q]], ePave = paintEPave[q] + PAINT_LEVEL_PUSH * Math.max(0, Math.abs(out.band - paintBed[q]) - PAINT_LEVEL_TOL);
+      if (g === sdCarRoad && ePave < pvA) pvA = ePave;
+      else if (g === sdCar2Road && ePave < pvB) pvB = ePave;
+    }
     out.sdMajor = sdMajor;
     if (out.debug) out.debug.push({ ground, batter: devW > 0 ? ground + devSum / devW : ground, prot, pinCover, protHere, sheetLevel: sheet.level, sheetW: sheet.weight, ways: Array.from({ length: nSlots }, (_, q) => [slotRoad[q], wayEdge[q], wayBed[q]]) });
     // A junction: two marked roads of different ways that cross at an angle meet here.  The lane markings are cut
@@ -1303,6 +1312,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     out.junction = junction;
     if (sdCar2 < SD_FAR && sdCar >= 0 && dispX * disp2X + dispZ * disp2Z < 0) sdPave = Math.min(sdPave, sdCar + sdCar2 - MEDIAN_WIDTH);   // the median between two carriageways: paved as a whole, the edges are the kerbs
     out.sdA = sdCar; out.grpA = sdCarRoad; out.sdB = sdCar2; out.grpB = sdCar2Road;      // the two channels of the paint (tile-mesh.js carriagewayChannels)
+    out.pvA = pvA; out.pvB = pvB;
     if (best < 0) {
       out.coverage = 0; out.bed = 0; out.kerb = 0; out.lat = 0; out.hw = 0; out.a0 = 0; out.kind = 0; out.road = -1;
       out.dist = Infinity; out.lines = 0; out.lanes = 0; out.s = 0; out.surface = 0;

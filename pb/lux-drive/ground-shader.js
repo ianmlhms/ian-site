@@ -10,6 +10,7 @@ import { ROAD } from './config.js';
 
 export { PAINT_LIGHT_GLSL };
 
+const MEDIAN_WIDTH = 3.0;       // m: road-network.js MEDIAN_WIDTH (a gap between two carriageways up to this wide is paved as a whole)
 const MARK_PIXEL = 0.0006;      // rad: a line ribbon is at least this wide per metre of distance (about a pixel at the medium quality) ...
 const MARK_BIAS = 0.03;         // m: ... and pulled this far toward the camera,
 const MARK_BIAS_PER_M = 0.0012; // plus this per metre of distance,
@@ -20,9 +21,10 @@ export const GROUND_VERTEX = `
   attribute vec4 aRoad2;       // the coverage of the road, the style of the markings, its material, how exactly the fine markings are drawn
   attribute vec4 aRoad3;       // the signed distance to the union of the carriageways, to the union of the pavements, the fade of the paint, to the union of the STREET carriageways
   attribute vec4 aRoad4;       // the distances to the two nearest carriageways (exact planes per cell) and their weight (tile-mesh.js carriagewayChannels)
+  attribute vec4 aRoad5;       // the distances to the outer edges of the pavements of those two carriageways
   attribute vec4 aMark;        // a lane marking ribbon (tile-mesh.js appendMarkings): the unit normal of the line (x, z), its half width, the side (-1 / +1) times the strength; 0 on the ground
   varying vec3 vWorld; varying vec3 vNormal; varying float vDist;
-  varying vec4 vRoad; varying vec4 vRoad2; varying vec4 vRoad3; varying vec3 vRoad4;
+  varying vec4 vRoad; varying vec4 vRoad2; varying vec4 vRoad3; varying vec3 vRoad4; varying vec2 vRoad5;
   varying vec3 vMark;          // across the line (-1 .. 1), the share of the ribbon that is paint, 1 on a ribbon
   void main(){
     vec4 wp = modelMatrix * vec4(position, 1.0);
@@ -32,7 +34,7 @@ export const GROUND_VERTEX = `
     float halfW = max(aMark.z, length(cameraPosition - wp.xyz) * ${MARK_PIXEL.toFixed(5)});
     wp.xz += aMark.xy * sign(aMark.w) * halfW * isMark;
     vMark = vec3(sign(aMark.w), isMark * abs(aMark.w) * aMark.z / max(halfW, 1e-4), isMark);
-    vWorld = wp.xyz; vNormal = normal; vRoad = aRoad; vRoad2 = aRoad2; vRoad3 = aRoad3; vRoad4 = aRoad4.xyz;
+    vWorld = wp.xyz; vNormal = normal; vRoad = aRoad; vRoad2 = aRoad2; vRoad3 = aRoad3; vRoad4 = aRoad4.xyz; vRoad5 = aRoad5.xy;
     vec4 mv = viewMatrix * wp;
     vDist = length(mv.xyz);
     // the ribbon lies ON the triangles it was sampled from; it wins the depth test by being pulled a few centimetres toward the camera (more with the distance, where the depth is coarse).
@@ -50,7 +52,7 @@ export const GROUND_FRAGMENT = `
   uniform float uKerbWidth;
   uniform float uTreeRadius;
   varying vec3 vWorld; varying vec3 vNormal; varying float vDist;
-  varying vec4 vRoad; varying vec4 vRoad2; varying vec4 vRoad3; varying vec3 vRoad4;
+  varying vec4 vRoad; varying vec4 vRoad2; varying vec4 vRoad3; varying vec3 vRoad4; varying vec2 vRoad5;
   varying vec3 vMark;
   ${PAINT_LIGHT_GLSL}
   float hash21(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
@@ -120,7 +122,8 @@ export const GROUND_FRAGMENT = `
     // lawn it made a wide smoky brown-grey penumbra beside every wall (the dark blotches).  The weight is sharpened to a band of a few metres.
     float urbanW = smoothstep(0.42, 0.62, urban);
     albedo = mix(albedo, city, urbanW);
-    albedo = mix(albedo, water, wetWater);
+    // the water class is a blurred 8 m cover as well: mixed straight in, the river was a teal smear far over the lawns of its banks (QA T10).  Sharpened like the city.
+    albedo = mix(albedo, water, smoothstep(0.35, 0.65, wetWater));
     // The trees of the view only reach so far: beyond them the wood is its canopy.  Without this the forest is a
     // brown litter floor under green blobs, and the land reads as a blotch of brown patches.
     float farK = smoothstep(uTreeRadius * 0.62, uTreeRadius * 1.05, vDist) * forest * (1.0 - urban);
@@ -133,7 +136,11 @@ export const GROUND_FRAGMENT = `
     // pixel wide (fwidth), never a staircase.
     // The carriageway edge per pixel is the minimum of the TWO channels (each a plane over the cell: the median between two carriageways is two straight kerbs, not a sawtooth
     // of the lattice); where three carriageways meet (weight 0) the blurred union of the lattice.
-    float sdC = mix(vRoad3.x, min(vRoad4.x, vRoad4.y), clamp(vRoad4.z, 0.0, 1.0)), sdP = vRoad3.y;
+    // The pavement the same way: the nearer of the two pavements, and the median between two carriageways (a gap of up to MEDIAN_WIDTH) paved as a whole.
+    float wC = clamp(vRoad4.z, 0.0, 1.0);
+    float sdC = mix(vRoad3.x, min(vRoad4.x, vRoad4.y), wC);
+    float medianP = (vRoad4.x > 0.0 && vRoad4.y > 0.0) ? vRoad4.x + vRoad4.y - ${MEDIAN_WIDTH.toFixed(1)} : 99.0;
+    float sdP = mix(vRoad3.y, min(min(vRoad5.x, vRoad5.y), medianP), wC);
     float roadW = smoothstep(0.0, 0.5, vRoad3.z);
     float aaC = max(fwidth(sdC), 0.04), aaP = max(fwidth(sdP), 0.04);
     // the grain of the tarmac is a stone chip: from a distance it averages to the plain colour (from above the 3 m tile would show as a pattern), and a
@@ -152,7 +159,8 @@ export const GROUND_FRAGMENT = `
     // (minor = on a carriageway but outside every street carriageway: the signed distance to those is continuous, so the pale tar of a service way that runs into the avenue ends in a
     // straight line along the avenue's edge, not in the sawtooth of the half width of the nearest way switching per node)
     float minorW = smoothstep(0.0, 0.8, vRoad3.w) * step(surface, 0.5) * step(0.5, roadW);
-    onCarriage = mix(onCarriage, 1.0 - smoothstep(-0.5, 0.5, sdC), minorW);
+    // (the soft border is a few decimetres: a wider one let the lawn under it show through as a light green halo along every narrow road, QA T09)
+    onCarriage = mix(onCarriage, 1.0 - smoothstep(-0.2, 0.2, sdC), minorW);
     surf = mix(surf, mix(surf, vec3(0.40, 0.40, 0.40) * (0.96 + 0.08 * nMid.g), 0.55), minorW);
     float onKerb = smoothstep(-aaC, aaC, sdC) * (1.0 - smoothstep(kerbW - aaC, kerbW + aaC, sdC));
     float onPave = smoothstep(kerbW - aaC, kerbW + aaC, sdC) * (1.0 - smoothstep(-aaP, aaP, sdP));

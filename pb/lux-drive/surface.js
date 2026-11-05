@@ -42,8 +42,9 @@ export function createSurface(field) {
     const sdMajor = new Float32Array(SIDE * SIDE);       // the signed distance to the union of the street carriageways (road-network.js MINOR_HW)
     const sdA = new Float32Array(SIDE * SIDE), sdB = new Float32Array(SIDE * SIDE);    // the signed distances to the nearest carriageway and to the nearest OTHER carriageway ...
     const grpA = new Int32Array(SIDE * SIDE), grpB = new Int32Array(SIDE * SIDE);      // ... and which carriageways they are (carriageways.js groups; -1 none)
+    const pvA = new Float32Array(SIDE * SIDE), pvB = new Float32Array(SIDE * SIDE);    // ... and the distances to their pavements
     const x0 = bx * BLOCK, z0 = bz * BLOCK;
-    const info = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, lines: 0, lanes: 0, s: 0, surface: 0, sdCar: 0, sdPave: 0, sdMajor: 0, junction: 0, sdA: 0, sdB: 0, grpA: -1, grpB: -1 };
+    const info = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, lines: 0, lanes: 0, s: 0, surface: 0, sdCar: 0, sdPave: 0, sdMajor: 0, junction: 0, sdA: 0, sdB: 0, grpA: -1, grpB: -1, pvA: 0, pvB: 0 };
     for (let j = 0; j < SIDE; j++) {
       for (let i = 0; i < SIDE; i++) {
         const o = j * SIDE + i;
@@ -51,10 +52,10 @@ export function createSurface(field) {
         cover[o] = info.coverage; lat[o] = info.lat; hw[o] = info.hw; a0[o] = info.a0;
         kind[o] = info.kind; road[o] = info.road; lines[o] = info.lines; surface[o] = info.surface;
         lanes[o] = info.lanes; along[o] = info.s; sdCar[o] = info.sdCar; sdPave[o] = info.sdPave; junction[o] = info.junction; sdMajor[o] = info.sdMajor;
-        sdA[o] = info.sdA; sdB[o] = info.sdB; grpA[o] = info.grpA; grpB[o] = info.grpB;
+        sdA[o] = info.sdA; sdB[o] = info.sdB; grpA[o] = info.grpA; grpB[o] = info.grpB; pvA[o] = info.pvA; pvB[o] = info.pvB;
       }
     }
-    b = { bx, bz, x0, z0, h, cover, lat, hw, a0, kind, surface, road, lines, lanes, along, sdCar, sdPave, sdMajor, junction, sdA, sdB, grpA, grpB, side: SIDE, apron: APRON };
+    b = { bx, bz, x0, z0, h, cover, lat, hw, a0, kind, surface, road, lines, lanes, along, sdCar, sdPave, sdMajor, junction, sdA, sdB, grpA, grpB, pvA, pvB, side: SIDE, apron: APRON };
     blocks.set(k, b);
     if (blocks.size > MAX_BLOCKS) blocks.delete(blocks.keys().next().value);
     return b;

@@ -23,14 +23,14 @@ export const MARK = Object.freeze({
   lineHalf: 0.075,          // m: half the width of a line (15 cm of paint)
   edgeInset: 0.5,           // m: an edge line lies this far inside the edge of the carriageway (a street without a hard shoulder) ...
   edgeInsetMin: 0.35,       // ... and never closer to it than this
-  edgeMinHw: 3.6,           // m: a street narrower than this (half width) has no edge lines (a motorway, a trunk road and their slip roads always have them)
+  edgeMinHw: 3.5,           // m: a street narrower than this (half width) has no edge lines (a motorway, a trunk road and their slip roads always have them)
   shoulderLeft: 0.15,       // the share of the shoulder of a motorway / trunk carriageway on its LEFT (the median side): the rest is the hard shoulder on the right
   shoulderLeftMin: 0.25,    // m
   shoulderLeftMax: 0.6,     // m
   dashPeriod: 9,            // m: a dashed line is DASH_LENGTH of paint every DASH_PERIOD
   dashLength: 3,
-  taperRatio: 25,           // m of length per m of lateral shift: a line that moves (a lane is added / dropped) moves at 1 : 25 ...
-  taperMin: 12,             // ... over at least this length
+  taperRatio: 12,           // m of length per m of lateral shift: a line that moves (a lane is added / dropped) moves at 1 : 12 ...
+  taperMin: 8,             // ... over at least this length
   cutStep: 0.5,             // m: the resolution of the cut along a line
   cutInside: 0.05,          // m: a line point this deep inside ANOTHER carriageway is cut
   levelApart: 1.2,          // m: two carriageways whose beds differ by more than this are at two levels (a bridge over the road): no cut
