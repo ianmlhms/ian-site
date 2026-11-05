@@ -819,7 +819,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   const candI = new Int32Array(MAX_CAND), candD = new Float32Array(MAX_CAND), candT = new Float32Array(MAX_CAND), candLat = new Float32Array(MAX_CAND), candOver = new Float32Array(MAX_CAND);
   const pinPri = new Float32Array(MAX_PINS), pinVal = new Float32Array(MAX_PINS), pinWt = new Float32Array(MAX_PINS);
   const pinEdge = new Float32Array(MAX_PINS), pinBed = new Float32Array(MAX_PINS), slotPinRoad = new Int32Array(MAX_PINS), pinAlong = new Float32Array(MAX_PINS);
-  const wayEdge = new Float32Array(MAX_CAND), wayBed = new Float32Array(MAX_CAND);
+  const wayEdge = new Float32Array(MAX_CAND), wayBed = new Float32Array(MAX_CAND), wayDirX = new Float32Array(MAX_CAND), wayDirZ = new Float32Array(MAX_CAND), wayGap = new Float32Array(MAX_CAND);
   const paintECar = new Float32Array(MAX_CAND), paintEPave = new Float32Array(MAX_CAND), paintBed = new Float32Array(MAX_CAND), paintRoad = new Int32Array(MAX_CAND);
   const paintOffX = new Float32Array(MAX_CAND), paintOffZ = new Float32Array(MAX_CAND);   // per way near the point: the distance past the edge of its bench (its end cap included) and its bed there   // per pin: the distance to the edge of its bench (negative inside) and the level of its carriageway
   const armOf = new Int32Array(MAX_CAND), armFirst = new Uint8Array(MAX_CAND), slotRoad = new Int32Array(MAX_CAND), slotArm1 = new Int32Array(MAX_CAND), slotArm2 = new Int32Array(MAX_CAND);
@@ -1019,6 +1019,9 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
       const dMin = candD[slotArm1[sl]];
       if (NOBATTER[candI[slotArm1[sl]]]) { wayEdge[sl] = Infinity; continue; }             // a way that rides over the others keeps the DTM (its fill): no batter, no pin
       segmentState(slotArm1[sl]); wayBed[sl] = sBed; wayEdge[sl] = dMin - BENCH[candI[slotArm1[sl]]];
+      { const c1 = slotArm1[sl], i1 = candI[c1], t1 = candT[c1];          // the direction from the way to the point (which side of it the point lies on)
+        const fx = X0[i1] + (X1[i1] - X0[i1]) * t1, fz = Z0[i1] + (Z1[i1] - Z0[i1]) * t1, dl = Math.hypot(x - fx, z - fz) || 1;
+        wayDirX[sl] = (x - fx) / dl; wayDirZ[sl] = (z - fz) / dl; }
       let wAll = 0, claimSum = 0, devAcc = 0, pinSum = 0, pinValSum = 0, pinBedSum = 0, pinMagSum = 0, pinMagW = 0;   // (pinMag: the strength of the pin of the way here)   // (a segment that does not reach the point counts with zero claim and zero pin: the weights of a way fade out where its batter ends)
       for (let k = 0; k < nCand; k++) {
         const i = candI[k];
@@ -1118,18 +1121,28 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     // A way at another level (a ramp beside the junction) keeps its own surface: the sheet lets go of its bench.
     junctionSheet.sample(x, z, sheet);
     if (sheet.weight > 1e-3) {
-      let near = 0, apart = 0, meet1 = 0, meet2 = 0;
+      let inBench = 0, between = 0, apart = 0, meet1 = 0, meet2 = 0;
       for (let sl = 0; sl < nSlots; sl++) {
         if (wayEdge[sl] === Infinity) continue;
         const same = 1 - smoothstep(SEP_LOW, SEP_HIGH, Math.abs(wayBed[sl] - sheet.level));
-        const core = 1 - smoothstep(SHEET_GAP_HOLD, SHEET_GAP_HOLD + SHEET_GAP_FADE, wayEdge[sl]);
-        if (core * same > near) near = core * same;
+        // on the bench of a way at the sheet's level: the sheet; past the benches only BETWEEN two such ways (a gap of up to 2 x SHEET_GAP_HOLD), not on the outer side of a lone
+        // carriageway, where the face of its batter joins the land (held there at the sheet level, the side of a steep street became a wall: Rue Vauban, Montée du Grund)
+        const bench = same * (1 - smoothstep(0, OWN_FADE, wayEdge[sl]));
+        if (bench > inBench) inBench = bench;
+        wayGap[sl] = same * (1 - smoothstep(SHEET_GAP_HOLD, SHEET_GAP_HOLD + SHEET_GAP_FADE, wayEdge[sl]));
+        // between two ways: their benches lie on OPPOSITE sides of the point (two ways that run side by side on one side of it are no gap)
+        for (let o = 0; o < sl; o++) {
+          if (wayEdge[o] === Infinity || wayDirX[o] * wayDirX[sl] + wayDirZ[o] * wayDirZ[sl] > -0.3) continue;
+          const b = Math.min(wayGap[o], wayGap[sl]);
+          if (b > between) between = b;
+        }
         const inside = (1 - same) * (1 - smoothstep(0, OWN_FADE, wayEdge[sl]));
         if (inside > apart) apart = inside;
         // how much two ways meet here: the second strongest of the ways near (a wide fade): a single way passing beside the plane of a junction keeps its own bed (flat across)
         const m = same * (1 - smoothstep(SHEET_GAP_HOLD, SHEET_GAP_HOLD + SHEET_MEET_FADE, wayEdge[sl]));
         if (m > meet1) { meet2 = meet1; meet1 = m; } else if (m > meet2) meet2 = m;
       }
+      const near = Math.max(inBench, between);
       bandY += (sheet.level - bandY) * sheet.weight * near * meet2 * (1 - apart) * (1 - pinCover);   // (the approach of a bridge keeps its own bed: the deck starts there)
     }
     // The protection keeps the ground under a bridge from being CUT (a pit under the deck) and from being buried under the batter of a road beside it; the CARRIAGEWAY of a way that

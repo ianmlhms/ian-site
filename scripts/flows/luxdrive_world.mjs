@@ -310,8 +310,14 @@ export const flow = {
           if (!best || len > best.len) best = { r, len };
         }
         if (!best) { out.push({ name, found: false }); continue; }
+        // the middle of the bridge by its length (the middle POINT of a bridge of two points is its end: the abutment, where the deck now starts flush with the road)
         const pts = best.r.pts;
-        const mid = pts[Math.floor(pts.length / 2)];
+        let mid = pts[0];
+        for (let i = 1, run = 0; i < pts.length; i++) {
+          const seg = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+          if (run + seg >= best.len / 2) { const t = (best.len / 2 - run) / seg; mid = [pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * t, pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * t]; break; }
+          run += seg;
+        }
         // the hint tells the ground function how high the car is: with the car high up the deck is the ground
         m.ground.hint(1e9);
         const deck = m.ground.onDeck(mid[0], mid[1]);
