@@ -190,7 +190,10 @@ export function createCar({ ground, roadInfoAt, collide = null, start = null }) 
       const h = at(state.x + cy * u - sy * v, state.z + sy * u + cy * v);
       sum += clamp(h, centre - CAR.wheelReach, centre + CAR.wheelReach);
     }
-    return sum / 4;
+    // a body never sinks deeper than CAR.crestSink below the ground under its middle: on a sharp crest (the top of a kerb with the wheels on both sides of it, the
+    // brow of a bank) the chord of the four wheels runs under the ground there
+    // (the ground under the middle as it is DRAWN, the lattice: the body never dips into the drawn kerb or bank either)
+    return Math.max(sum / 4, ground.height(state.x, state.z) - CAR.crestSink);
   }
 
   /** The vertical: the suspension follows the ground, but the car flies over a crest and lands again. */

@@ -173,6 +173,7 @@ export const CAR = Object.freeze({
   bumpiness: 0.55,           // how much of the ground roughness reaches the car
   rideHeight: 0.42,          // m: the bottom of the body above the ground
   track: 1.55,               // m between the left and the right wheels (the body rests on the mean of the four contact points: car.js)
+  crestSink: 0.05,           // m: the body rests at most this far below the ground under its middle (a crest between the wheels)
   wheelReach: 0.3,           // m: a wheel reads the ground at most this far above or below the ground under the centre (a wheel over the edge of a deck or a wall does not drop the body)
   restitution: 0.12,         // the vertical bounce of the suspension
   respawnTime: 1.2,          // s from a crash to the car standing again
