@@ -144,7 +144,8 @@ function drawRecessedFloor(ctx, run, g, ground, gf) {
   ledge(ctx, g.s0, g.s1, g.yt - 0.5, g.yt, 0.25, gf.pier, shade(gf.pier, 1.06));
 }
 
-const STONE_COURSE_H = 0.55;       // m: the height of one course of ashlar in the sandstone wall
+const STONE_BLOCK = 3.4;           // m: the mean length of a block of the sandstone wall
+const STONE_COURSE_H = 0.62;       // m: the height of one course of ashlar in the sandstone wall
 
 /** A blank wall of rough sandstone (photos Athénée_de_Luxembourg_01, Athénée Dez_07): long courses of slightly different ochre ashlar from the ground to the roof edge, a darker foot. */
 function drawStoneWall(ctx, run, part, ground) {
@@ -155,6 +156,16 @@ function drawStoneWall(ctx, run, part, ground) {
   const n = Math.max(1, Math.round((top - base) / STONE_COURSE_H));
   for (let c = 0; c < n; c++) quad(ctx, run.s0, run.s1, base + ((top - base) * c) / n, base + ((top - base) * (c + 1)) / n, OUT_1 * 0.5, paintLit(ft.color, c * 7 + run.i, 0.09));
   for (let c = 1; c < n; c++) quad(ctx, run.s0, run.s1, base + ((top - base) * c) / n - 0.025, base + ((top - base) * c) / n + 0.025, OUT_1 * 0.8, shade(ft.color, 0.55));   // the dark joints of the courses
+  // the vertical joints: blocks of about 3.4 m of uneven length, each course shifted against the one below (staggered), so the wall reads as stone blocks and not as stripes
+  const joint = shade(ft.color, 0.55);
+  for (let c = 0; c < n; c++) {
+    const y0 = base + ((top - base) * c) / n, y1 = base + ((top - base) * (c + 1)) / n;
+    let s = run.s0 + STONE_BLOCK * (0.15 + 0.7 * ((c * 0.618) % 1));
+    for (let k = 0; s < run.s1 - 0.4; k++) {
+      if (s > run.s0 + 0.4) quad(ctx, s - 0.025, s + 0.025, y0, y1, OUT_1 * 0.8, joint);
+      s += STONE_BLOCK * (0.7 + 0.6 * hashUnit(c * 41 + k * 7 + run.i));
+    }
+  }
   quad(ctx, run.s0, run.s1, base, base + 0.5, OUT_1, shade(ft.color, 0.7));                           // the foot
 }
 

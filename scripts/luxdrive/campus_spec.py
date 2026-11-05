@@ -451,6 +451,12 @@ def bake_grounds(osm, ortho_color):
     free.append({"k": "tlight", "x": 3741.5, "z": 9568.5, "yaw": math.radians(145)})
     for bx_, bz_, bh in ((3695.0, 9523.6, 7.5), (3698.8, 9531.0, 5.0), (3703.5, 9541.6, 6.8)):      # the three birches between the wall and the glass block (photo Luxembourg_Athénée_101)
         free.append({"k": "birch", "x": bx_, "z": bz_, "height": bh})
+    # the pavement between that wall and the boulevard (photo Luxembourg_Athénée_101: paved right up to the wall; the game had grass): a strip from the outer edge of the
+    # sidewalk of the 13.2 m carriageway (6.6 + 1.8 m from its axis) to the wall's street face (12.55 m)
+    ax, az, bx3, bz3 = 3694.7, 9486.7, 3730.7, 9552.2
+    ln = math.hypot(bx3 - ax, bz3 - az); dxx, dzz = (bx3 - ax) / ln, (bz3 - az) / ln; nxx, nzz = -dzz, dxx
+    at = lambda t_, o_: (ax + dxx * t_ + nxx * o_, az + dzz * t_ + nzz * o_)
+    area("athenee-boulevard-pavement", Pg([at(22, 8.5), at(72, 8.5), at(72, 12.55), at(22, 12.55)]), [0.56, 0.55, 0.53])
     # the same wall along the pavement of the boulevard in front of the glass block (photo Luxembourg_Athénée_101): the road's west pavement edge + 0.7 m
     walls.append({"pts": [(3695.0, 9514.0), (3706.6, 9535.0), (3718.1, 9556.0)], "h": 1.15, "w": 0.7, "c": [0.60, 0.50, 0.34], "hedge": [0.17, 0.30, 0.12]})
     # -- the bus stops of the campus: a shelter where OSM says shelter=yes, otherwise a pole with the sign ---------------------------

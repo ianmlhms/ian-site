@@ -119,7 +119,7 @@ function wallWithHedge(soup, ground, wall) {
 const PHI = (1 + Math.sqrt(5)) / 2;
 const ICO = [[-1, PHI, 0], [1, PHI, 0], [-1, -PHI, 0], [1, -PHI, 0], [0, -1, PHI], [0, 1, PHI], [0, -1, -PHI], [0, 1, -PHI], [PHI, 0, -1], [PHI, 0, 1], [-PHI, 0, -1], [-PHI, 0, 1]];
 const ICO_FACES = [[0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8], [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9], [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]];
-const BIRCH_BARK = [0.90, 0.88, 0.82], BIRCH_LEAF = [0.42, 0.58, 0.25], ORANGE_LEAF = [0.90, 0.46, 0.12], ORANGE_BARK = [0.38, 0.30, 0.24];
+const BIRCH_BARK = [0.97, 0.96, 0.92], BIRCH_LEAF = [0.62, 0.78, 0.38], ORANGE_LEAF = [0.90, 0.46, 0.12], ORANGE_BARK = [0.38, 0.30, 0.24];
 
 /** A lumpy leaf blob (a jittered icosahedron, 20 triangles), lighter on top. */
 function blob(soup, cx, cy, cz, rx, ry, color, seed) {
@@ -133,27 +133,36 @@ function blob(soup, cx, cy, cz, rx, ry, color, seed) {
   }
 }
 
-/** A leaf cluster: a jittered octahedron (8 triangles), lighter on top.  Several small ones read as foliage with gaps; one big blob reads as a lollipop. */
-function lump(soup, cx, cy, cz, r, color, seed) {
+/** A leaf cluster: a flat jittered hexagon with a slightly raised middle (6 triangles), tilted at random, lighter on top.  Scattered, several of them read as foliage with sky
+ * between them; the solid octahedra of the first try read as stacked diamonds. */
+function leafCluster(soup, cx, cy, cz, r, color, seed) {
   const jit = (i) => 0.75 + 0.5 * (((Math.imul(seed + i * 977, 0x9e3779b1) >>> 9) & 255) / 255);
-  const P = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -0.8, 0], [0, 0, 1], [0, 0, -1]].map(([x, y, z], i) => [cx + x * r * jit(i), cy + y * r * 0.85 * jit(i + 6), cz + z * r * jit(i + 12)]);
-  const [px, nx, py, ny, pz, nz] = P;
-  const faces = [[px, py, pz], [pz, py, nx], [nx, py, nz], [nz, py, px], [pz, ny, px], [nx, ny, pz], [nz, ny, nx], [px, ny, nz]];
-  faces.forEach(([a, b, c], i) => soup.tri(a, b, c, paint(color, seed + i, 0.08).map((v) => v * (i < 4 ? 1.12 : 0.8))));
+  const tx = (jit(20) - 1) * 0.9, tz = (jit(21) - 1) * 0.9;                           // tilt (slope of the cluster in x and z)
+  const ring = Array.from({ length: 6 }, (_, i) => { const a = (i / 6) * Math.PI * 2, rr = r * jit(i), x = Math.cos(a) * rr, z = Math.sin(a) * rr; return [cx + x, cy + x * tx + z * tz - 0.1 * r, cz + z]; });
+  const top = [cx, cy + r * 0.3, cz];
+  for (let i = 0; i < 6; i++) soup.tri(ring[i], ring[(i + 1) % 6], top, paint(color, seed + i, 0.09).map((v) => v * (1.05 + 0.1 * Math.sin(i * 1.3 + seed))));
 }
 
-/** A birch (the young birches in front of the Athénée, photo Luxembourg_Athénée_101): a white trunk that leans a little, and seven small leaf clusters spread over a
- * conical crown, wide at the bottom and thin at the top, so the trunk shows through and it reads as an airy tree.  About 76 triangles. */
+const BIRCH_MARK = [0.12, 0.11, 0.10];
+
+/** A birch (the young birches in front of the Athénée, photos Luxembourg_Athénée_101 / Athénée_de_Luxembourg_01): a slender white trunk that leans a little, with dark
+ * bark marks (small triangles), and a narrow light-green crown taller than it is wide: seven small leaf clusters loosely spread up the top half, with sky between them.
+ * About 80 triangles. */
 function birch(soup, ground, t) {
   const y = ground(t.x, t.z) - 0.2, h = t.height;
   const seed = Math.round(t.x * 7 + t.z);
-  const lean = (((Math.imul(seed, 0x9e3779b1) >>> 9) & 255) / 255 - 0.5) * 0.14 * h;       // the top of the trunk stands off the foot by up to 7 % of the height
-  soup.frustum(t.x, t.z, 0.14, 0.09, y, y + h * 0.5, 5, BIRCH_BARK, { cap: false });
-  soup.frustum(t.x + lean * 0.5, t.z, 0.09, 0.04, y + h * 0.5, y + h * 0.9, 5, BIRCH_BARK, { cap: false });
-  for (let i = 0; i < 7; i++) {
-    const k = i / 6, a = seed * 0.9 + i * 2.4;                                       // up the crown: height and (shrinking) distance from the trunk
-    const r = h * 0.1 * (1 - k * 0.6);
-    lump(soup, t.x + lean * 0.5 * k + Math.cos(a) * r, y + h * (0.5 + 0.4 * k), t.z + Math.sin(a) * r, h * (0.19 - 0.06 * k), BIRCH_LEAF, seed + i * 13);
+  const lean = (((Math.imul(seed, 0x9e3779b1) >>> 9) & 255) / 255 - 0.5) * 0.12 * h;       // the top of the trunk stands off the foot by up to 6 % of the height
+  const R0 = 0.1, R1 = 0.07, R2 = 0.03;
+  soup.frustum(t.x, t.z, R0, R1, y, y + h * 0.5, 5, BIRCH_BARK, { cap: false });
+  soup.frustum(t.x + lean * 0.5, t.z, R1, R2, y + h * 0.5, y + h * 0.93, 5, BIRCH_BARK, { cap: false });
+  for (let m = 0; m < 5; m++) {                                                     // the dark marks of the bark, on the lower trunk, facing different ways
+    const f = 0.06 + 0.1 * m, a = seed * 0.7 + m * 2.1, r = (R0 + (R1 - R0) * (f / 0.5)) * 1.03;
+    const px = t.x + Math.cos(a) * r, pz = t.z + Math.sin(a) * r, py = y + h * f, tx = -Math.sin(a) * 0.05, tz = Math.cos(a) * 0.05;
+    soup.tri([px - tx, py, pz - tz], [px + tx, py, pz + tz], [px, py + 0.14, pz], BIRCH_MARK);
+  }
+  for (let i = 0; i < 9; i++) {                                                       // nine loose leaf clusters scattered over a narrow crown (widest low, thin at the top)
+    const k = i / 8, a = seed * 0.9 + i * 2.4, r = h * (0.04 + 0.17 * Math.pow(1 - k, 0.7));
+    leafCluster(soup, t.x + lean * 0.5 * k + Math.cos(a) * r, y + h * (0.42 + 0.56 * k), t.z + Math.sin(a) * r, h * (0.15 - 0.05 * k), BIRCH_LEAF, seed + i * 13);
   }
 }
 
