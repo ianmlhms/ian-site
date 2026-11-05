@@ -80,3 +80,13 @@ export function piersOf(deck, ground, sdCarAt) {
   return piers;
 }
 
+
+/** What "a deck lies on a carriageway" means: the audit of scripts/luxdrive/bake_deck_fixes.mjs and gate D of the harness use the same numbers. */
+export const DECK_ON_ROAD = Object.freeze({
+  STEP: 1.5,               // m between the samples along a deck
+  END_MARGIN: 8,           // m: the first and the last metres of a deck belong to its own approach road
+  ON_ROAD_CLEAR: 1.5,      // m: a deck less than this over the surface of the ground lies on it
+  REMOVE_CLEAR: 3.0,       // m: a deck that never rises more than this over the ground (and lies on a road) is no bridge
+  MIN_PIECE: 12,           // m: a piece of a split deck shorter than this is dropped
+  ROAD_SD: -0.5,           // m: the ground has a carriageway under the point (signed distance to the union of the carriageways)
+});

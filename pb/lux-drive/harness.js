@@ -22,6 +22,7 @@ import { loadWorldData } from './world-data.js';
 import { createHeightField } from './heightfield.js';
 import { createSurface } from './surface.js';
 import { createDeckNetwork, createGround, DECK } from './decks.js';
+import { DECK_ON_ROAD, piersOf } from './deck-shape.js';
 import { createBuildingIndex } from './buildings.js';
 import { createLandmarks, fixLandmarkDecks } from './landmarks.js';
 import { createTreeIndex, treesOfBlock } from './trees.js';
@@ -635,6 +636,46 @@ if (wants('D')) {
   stats.deckFlags = wrongFlag;
   check('every deck knows whether it spans the land or stands on it', wrongFlag === 0,
     `${wrongFlag} of ${decks.length} decks${flagList.length ? ' ' + JSON.stringify(flagList) : ''}`);
+
+  // A deck is a bridge OVER whatever lies under it: no slab lies on a carriageway at road level (the grey slabs across Escher Strooss).  Samples every 1.5 m, the approach (first and
+  // last 8 m) left out; the decks a landmark replaces are not drawn.  scripts/luxdrive/bake_deck_fixes.mjs removes / splits the decks that fail this.
+  {
+    const { STEP, END_MARGIN, ON_ROAD_CLEAR, ROAD_SD } = DECK_ON_ROAD;
+    const probe = { sdCar: 9, sdPave: 9 };
+    let onRoad = 0;
+    const roadList = [];
+    for (const d of decks) {
+      if (landmarks.hiddenDecks.has(d.id)) continue;
+      const n = d.pts.length, cum = [0];
+      for (let i = 1; i < n; i++) cum.push(cum[i - 1] + Math.hypot(d.pts[i][0] - d.pts[i - 1][0], d.pts[i][1] - d.pts[i - 1][1]));
+      let hits = 0, at = null;
+      for (let i = 0; i < n - 1; i++) {
+        const L = cum[i + 1] - cum[i], m = Math.max(1, Math.ceil(L / STEP));
+        for (let k = 0; k < m; k++) {
+          const f = k / m, s = cum[i] + L * f;
+          if (s < END_MARGIN || s > cum[n - 1] - END_MARGIN) continue;
+          const x = d.pts[i][0] + (d.pts[i + 1][0] - d.pts[i][0]) * f, z = d.pts[i][1] + (d.pts[i + 1][1] - d.pts[i][1]) * f;
+          net.carve(x, z, probe);
+          if (probe.sdCar < ROAD_SD && d.tops[i] + (d.tops[i + 1] - d.tops[i]) * f - surface.height(x, z) < ON_ROAD_CLEAR) { hits++; at = at || [Math.round(x), Math.round(z)]; }
+        }
+      }
+      if (hits) { onRoad++; if (roadList.length < 6) roadList.push({ id: d.id, at, hits }); }
+    }
+    stats.decksOnCarriageway = onRoad;
+    check('no deck lies on a carriageway at road level', onRoad === 0, `${onRoad} decks${roadList.length ? ' ' + JSON.stringify(roadList) : ''}`);
+  }
+
+  // A high deck stands on piers, never on a wall of roadbed: where the deck is 3+ m over the ground and a carriageway lies under it, no pier stands in the carriageway.
+  {
+    const probe = { sdCar: 9, sdPave: 9 };
+    let inRoad = 0, piers = 0;
+    for (const d of decks) {
+      if (landmarks.hiddenDecks.has(d.id)) continue;
+      for (const p of piersOf(d, surface, (x, z) => { net.carve(x, z, probe); return probe.sdCar; })) { piers++; net.carve(p.x, p.z, probe); if (probe.sdCar < 0) inRoad++; }
+    }
+    stats.deckPiers = piers;
+    check('no bridge pier stands in a carriageway', inRoad === 0, `${inRoad} of ${piers} piers`);
+  }
 }
 
 /* ---------------------------------------------------------------- D1: the landmarks */

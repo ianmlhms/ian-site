@@ -27,7 +27,9 @@ function readVarint(bytes, state) {
 }
 const unzigzag = (n) => (n % 2 === 0 ? n / 2 : -(n + 1) / 2);
 
-/** decks.bin -> [{ id, parapet, spans, width, pts: [[x, z]], tops: [y] }] */
+const FLAG_PARAPET = 1, FLAG_SPANS = 2, FLAG_REMOVED = 4;   // bit 2: the deck is not a bridge (it lies on a carriageway at road level): scripts/luxdrive/bake_deck_fixes.mjs
+
+/** decks.bin -> [{ id, parapet, spans, width, pts: [[x, z]], tops: [y] }].  `id` is the index in the file; a removed deck keeps its index but is not returned. */
 export function decodeDecks(bytes) {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const count = view.getUint32(0, true);
@@ -48,9 +50,39 @@ export function decodeDecks(bytes) {
     }
     const tops = new Float32Array(n);
     for (let i = 0; i < n; i++) { tops[i] = view.getFloat32(state.pos, true); state.pos += 4; }
-    decks.push({ id: d, parapet: (flags & 1) !== 0, spans: (flags & 2) !== 0, width, pts, tops });
+    if ((flags & FLAG_REMOVED) !== 0) continue;
+    decks.push({ id: d, parapet: (flags & FLAG_PARAPET) !== 0, spans: (flags & FLAG_SPANS) !== 0, width, pts, tops });
   }
   return decks;
+}
+
+const zigzag = (n) => (n < 0 ? -2 * n - 1 : 2 * n);
+
+/**
+ * [{ id?, parapet, spans, width, pts, tops, removed? }] -> decks.bin bytes (the exact inverse of decodeDecks: positions in decimetres).  The file order is the id: a deck that is
+ * dropped keeps its slot with the removed flag, so every id that a landmark refers to stays valid.
+ */
+export function encodeDecks(decks) {
+  const bytes = [];
+  const push32 = (v) => { const b = new Uint8Array(4); new DataView(b.buffer).setUint32(0, v >>> 0, true); bytes.push(...b); };
+  const push16 = (v) => { bytes.push(v & 255, (v >> 8) & 255); };
+  const pushVar = (v) => { let r = v; while (r >= 0x80) { bytes.push((r % 0x80) | 0x80); r = Math.floor(r / 0x80); } bytes.push(r); };
+  push32(decks.length);
+  for (const d of decks) {
+    const n = d.pts.length;
+    push16((d.parapet ? FLAG_PARAPET : 0) | (d.spans ? FLAG_SPANS : 0) | (d.removed ? FLAG_REMOVED : 0));
+    push16(Math.round(d.width / DECIMETRE));
+    push16(n);
+    let x = Math.round(d.pts[0][0] / DECIMETRE), z = Math.round(d.pts[0][1] / DECIMETRE);
+    push32(x); push32(z);
+    for (let i = 1; i < n; i++) {
+      const nx = Math.round(d.pts[i][0] / DECIMETRE), nz = Math.round(d.pts[i][1] / DECIMETRE);
+      pushVar(zigzag(nx - x)); pushVar(zigzag(nz - z));
+      x = nx; z = nz;
+    }
+    for (let i = 0; i < n; i++) { const b = new Uint8Array(4); new DataView(b.buffer).setFloat32(0, d.tops[i], true); bytes.push(...b); }
+  }
+  return Uint8Array.from(bytes);
 }
 
 /**
