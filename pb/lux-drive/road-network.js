@@ -61,6 +61,10 @@ const MAX_CAND = 192;                  // segments that reach one point, at most
 const FOOT_FADE = 1.0, FOOT_FLOOR = 0.01;   // m: a segment counts fully when the foot of the perpendicular is this far from its ends; the floor of its weight (so the weights never all vanish)
 const SHEPARD_OFFSET = 0.5, SHEPARD_MIN = 1e-4;   // the weight of a segment of a way is ((d_nearest + 0.5) / (d + 0.5))^4: equal at equal distance, a few per cent at twice the distance               // m: the segments of a way that are this much farther than its nearest one still count for the ground (weighted by how much nearer the nearest is)
 const ARM_GAP = 3;                     // segments: two stretches of one way this far apart are different arms (a hairpin)
+const ARM_DETOUR_LO = 6.0, ARM_DETOUR_HI = 12.0;   // m: the ground of a way at a point is the pin of the ARM it passes on; a segment whose foot lies this much farther along the way than straight across from the
+                                       // nearest foot (the detour: along minus chord) belongs to another arm of the way (a hairpin, a loop), fading in between.  The two arms of a hairpin at two levels were
+                                       // one Shepard blend by distance: the carriageway of the lower arm leaned toward the upper one (Eecherfeld 5070,6192: 16.7 % across)
+const ARM_SOFT = 10.0;                 // m: the distance of the other arm is the soft minimum of candD + (1 - share) x this (continuous where a segment's share of the other arm grows)
 const CAP_SOFT = 2.0;                  // m: the carriageway pin ends this softly past the END of a way (no flat disc at the end of a street)
 const PIN_FADE = 3.0;                  // m: the carriageway level fades into the batter over this distance beyond the pavement
 const FILL_TAPER = 3.0;                // m: the last stretch of a fill face where it sinks to the land (the scan that finds the end of the face is coarse)
@@ -95,6 +99,10 @@ const SHEET_GAP_HOLD = 1.5;            // m: in a junction the sheet (junction-s
                                        // (a median, the nose of a slip road, the wedge where a dual carriageway splits) is at road level, not a dip to the land
 const SHEET_MEET_FADE = 16.0;           // m: a point is in a junction while a second way at its level is within its bench + SHEET_GAP_HOLD + this (fading out)
 const SHEET_GAP_FADE = 2.0;            // m: ... and lets go of it over this distance
+const SHEET_CROSS_MAX = 0.02;          // m/m: on the carriageway of a way away from the other ways of its junction the sheet tilts it across by at most this (a plane fitted to a junction carries the
+                                       // gradient of the main road, or the level difference of two ways side by side, across the side street: 8 - 22 % across tracks, Rue de la Vallée, a motorway link)
+const SHEET_FOOT_WEIGHT = 0.05;         // the weight of the sheet at the foot from which its level there is the reference of the limit (below it the way's own bed)
+const SHEET_ISO_NEAR = 1.0, SHEET_ISO_FAR = 3.0;   // m past the bench of another way at the sheet's level: inside NEAR the junction's plane holds as it is (the apron), past FAR the cross tilt is limited
 
 /**
  * The level at the two ends of every bridge deck a car drives onto, from the DSM of the deck itself: the first two points inside the deck, continued to its end (the DSM AT the end is
@@ -602,6 +610,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   // the junction sheets: one smooth surface where ways meet at one level (junction-surface.js)
   const junctionSheet = createJunctionSurface(chains, (c) => overRoads.has(c.road), (c) => Math.max(0.8, roads[c.road].width / 2));
   const sheet = { level: 0, weight: 0 };
+  const sheetFoot = { level: 0, weight: 0 };
 
   for (const { ri, road, rs, n, hw, kerbH, kerbW, pw, bench, a0, paintA0, kind, chain } of prep) {
     const bed = chain.bed;
@@ -914,6 +923,8 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   const pinCap = new Float32Array(MAX_PINS), pinDirX = new Float32Array(MAX_PINS), pinDirZ = new Float32Array(MAX_PINS);
   const wayEdge = new Float32Array(MAX_CAND), wayBed = new Float32Array(MAX_CAND), wayDirX = new Float32Array(MAX_CAND), wayDirZ = new Float32Array(MAX_CAND), wayGap = new Float32Array(MAX_CAND);
   const paintMajor = new Uint8Array(MAX_CAND);
+  const wayDist = new Float32Array(MAX_CAND);                  // per slot: the distance to the nearest segment of the way
+  const armShare = new Float32Array(MAX_CAND);                 // per candidate segment: its share in the other arm of its way (see ARM_DETOUR_LO)
   const chGroup = new Int32Array(MAX_CAND), chCar = new Float32Array(MAX_CAND), chPave = new Float32Array(MAX_CAND), chMajor = new Uint8Array(MAX_CAND);   // (the paint channels, per carriageway)
   const paintECar = new Float32Array(MAX_CAND), paintEPave = new Float32Array(MAX_CAND), paintBed = new Float32Array(MAX_CAND), paintRoad = new Int32Array(MAX_CAND);
   const paintOffX = new Float32Array(MAX_CAND), paintOffZ = new Float32Array(MAX_CAND);   // per way near the point: the distance past the edge of its bench (its end cap included) and its bed there   // per pin: the distance to the edge of its bench (negative inside) and the level of its carriageway
@@ -1151,10 +1162,26 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
       const road = slotRoad[sl];
       const dMin = candD[slotArm1[sl]];
       if (NOBATTER[candI[slotArm1[sl]]]) { wayEdge[sl] = Infinity; continue; }             // a way that rides over the others keeps the DTM (its fill): no batter, no pin
-      segmentState(slotArm1[sl]); wayBed[sl] = sBed; wayEdge[sl] = dMin - BENCH[candI[slotArm1[sl]]];
+      segmentState(slotArm1[sl]); wayBed[sl] = sBed; wayEdge[sl] = dMin - BENCH[candI[slotArm1[sl]]]; wayDist[sl] = dMin;
       { const c1 = slotArm1[sl], i1 = candI[c1], t1 = candT[c1];          // the direction from the way to the point (which side of it the point lies on)
         const fx = X0[i1] + (X1[i1] - X0[i1]) * t1, fz = Z0[i1] + (Z1[i1] - Z0[i1]) * t1, dl = Math.hypot(x - fx, z - fz) || 1;
         wayDirX[sl] = (x - fx) / dl; wayDirZ[sl] = (z - fz) / dl; }
+      // the other arm of this way here (a hairpin, a loop): the share of every candidate segment in it (0 = the arm of the nearest segment), its soft nearest distance
+      let dMin2 = Infinity, k2 = -1;
+      { const c1 = slotArm1[sl], i1 = candI[c1];
+        const f1x = X0[i1] + (X1[i1] - X0[i1]) * candT[c1], f1z = Z0[i1] + (Z1[i1] - Z0[i1]) * candT[c1], s1 = S0[i1] + (S1[i1] - S0[i1]) * candT[c1];
+        const ring = closedRoad[road] ? S1[firstSeg[road] + segCount[road] - 1] : 0;
+        for (let k = 0; k < nCand; k++) {
+          const i = candI[k];
+          if (ROADOF[i] !== road) continue;
+          const fx = X0[i] + (X1[i] - X0[i]) * candT[k], fz = Z0[i] + (Z1[i] - Z0[i]) * candT[k];
+          let ds = Math.abs(S0[i] + (S1[i] - S0[i]) * candT[k] - s1);
+          if (ring > 0) ds = Math.min(ds, ring - ds);
+          armShare[k] = smoothstep(ARM_DETOUR_LO, ARM_DETOUR_HI, ds - Math.hypot(fx - f1x, fz - f1z));
+          const dd = candD[k] + (1 - armShare[k]) * ARM_SOFT;
+          if (armShare[k] > 0 && dd < dMin2) { dMin2 = dd; k2 = k; }
+        } }
+      let pinSum2 = 0, pinValSum2 = 0, pinBedSum2 = 0, pinMagSum2 = 0, pinMagW2 = 0, pinCapSum2 = 0, presence2 = 0;   // (the pin of the other arm: the same sums, weighted by the share)
       let wAll = 0, claimSum = 0, devAcc = 0, pinSum = 0, pinValSum = 0, pinBedSum = 0, pinMagSum = 0, pinMagW = 0, pinCapSum = 0;   // (pinCap: how much of the way is here at all - its end cap)   // (pinMag: the strength of the pin of the way here)   // (a segment that does not reach the point counts with zero claim and zero pin: the weights of a way fade out where its batter ends)
       for (let k = 0; k < nCand; k++) {
         const i = candI[k];
@@ -1206,11 +1233,22 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
         // The pin itself fades over PIN_FADE, or over the join where that is longer: a pin that let go while the join was still half way from the bed to the face multiplied the two fades,
         // and the side of a way that stands 5 m over a valley (Boulevard Roosevelt over the Pétrusse) dropped 3 m in a metre.
         const pin = (1 - smoothstep(bench, bench + Math.max(PIN_FADE, join), d)) * (1 - smoothstep(0, CAP_SOFT, over));
+        const share = armShare[k], w1 = w * (1 - share);
+        const tuck = DECK_TUCK * smoothstep(0, DECK_TUCK_RUN - DECK_TUCK_FROM, candPast[k]);   // (candPast counts from the deck end + DECK_TUCK_FROM)
         if (pin > 0) {
-          const tuck = DECK_TUCK * smoothstep(0, DECK_TUCK_RUN - DECK_TUCK_FROM, candPast[k]);   // (candPast counts from the deck end + DECK_TUCK_FROM)
-          pinSum += w * pin; pinValSum += w * pin * (face + (bed - tuck - face) * (1 - smoothstep(bench, bench + join, dMin))); pinBedSum += w * pin * bed;
+          pinSum += w1 * pin; pinValSum += w1 * pin * (face + (bed - tuck - face) * (1 - smoothstep(bench, bench + join, dMin))); pinBedSum += w1 * pin * bed;
         }
-        { const wm = w * (1 - smoothstep(MAG_WINDOW[0], MAG_WINDOW[1], d - dMin)); pinMagSum += wm * pin; pinMagW += wm; pinCapSum += wm * (1 - smoothstep(0, CAP_SOFT, over)); }
+        { const wm = w1 * (1 - smoothstep(MAG_WINDOW[0], MAG_WINDOW[1], d - dMin)); pinMagSum += wm * pin; pinMagW += wm; pinCapSum += wm * (1 - smoothstep(0, CAP_SOFT, over)); }
+        if (share > 0) {                   // the other arm: its own Shepard weights about its own nearest segment
+          const q2 = (dMin2 + SHEPARD_OFFSET) / (d + SHEPARD_OFFSET);
+          const w2 = q2 * q2 * q2 * q2 * (FOOT_FLOOR + smoothstep(0, FOOT_FADE, along)) * share;
+          if (pin > 0) {
+            pinSum2 += w2 * pin; pinValSum2 += w2 * pin * (face + (bed - tuck - face) * (1 - smoothstep(bench, bench + join, dMin2))); pinBedSum2 += w2 * pin * bed;
+          }
+          const win = 1 - smoothstep(MAG_WINDOW[0], MAG_WINDOW[1], d - dMin2), wm = w2 * win;
+          pinMagSum2 += wm * pin; pinMagW2 += wm; pinCapSum2 += wm * (1 - smoothstep(0, CAP_SOFT, over));
+          if (share * win > presence2) presence2 = share * win;
+        }
       }
       if (claimSum > 0 || pinSum > 0) {
         devSum += devAcc / wAll; devW += claimSum / wAll;
@@ -1219,6 +1257,16 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
           pinBed[nPins] = pinBedSum / pinSum; pinEdge[nPins] = dMin - BENCH[candI[slotArm1[sl]]]; slotPinRoad[nPins] = road;
           pinCap[nPins] = pinCapSum / pinMagW; pinDirX[nPins] = wayDirX[sl]; pinDirZ[nPins] = wayDirZ[sl];
           { const i1 = candI[slotArm1[sl]]; pinAlong[nPins] = S0[i1] + (S1[i1] - S0[i1]) * candT[slotArm1[sl]]; }
+          nPins++;
+        }
+        // the other arm of the way (a hairpin, a loop) is a carriageway of its own: the hold below keeps each arm on its own bed (and hands over between them at two levels)
+        if (pinSum2 > 0 && pinMagW2 > 0 && presence2 > 0 && nPins < MAX_PINS) {
+          const c2 = k2, i2 = candI[c2];
+          const fx = X0[i2] + (X1[i2] - X0[i2]) * candT[c2], fz = Z0[i2] + (Z1[i2] - Z0[i2]) * candT[c2], dl = Math.hypot(x - fx, z - fz) || 1;
+          pinPri[nPins] = priority[road]; pinVal[nPins] = pinValSum2 / pinSum2; pinWt[nPins] = (pinMagSum2 / pinMagW2) * presence2;
+          pinBed[nPins] = pinBedSum2 / pinSum2; pinEdge[nPins] = dMin2 - BENCH[i2]; slotPinRoad[nPins] = road;
+          pinCap[nPins] = pinCapSum2 / pinMagW2; pinDirX[nPins] = (x - fx) / dl; pinDirZ[nPins] = (z - fz) / dl;
+          pinAlong[nPins] = S0[i2] + (S1[i2] - S0[i2]) * candT[c2];
           nPins++;
         }
       }
@@ -1245,7 +1293,10 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
         const sep = smoothstep(SEP_LOW, SEP_HIGH, apart);
         // one level: the fade of the bigger way (a) is held off the bench of the smaller one (b), where a's own bench does not hold the point; two levels: the hand-over is centred between the two
         const own = (1 - smoothstep(0, OWN_FADE, pinEdge[b])) * smoothstep(0, OWN_FADE, pinEdge[a]);
-        const half = Math.min(RAMP_MAX, Math.max(RAMP_MIN, (1.5 * apart) / RAMP_SLOPE));
+        let half = Math.min(RAMP_MAX, Math.max(RAMP_MIN, (1.5 * apart) / RAMP_SLOPE));
+        // (two arms of ONE way - a hairpin at two levels - hand over within the gap between their benches: a ramp laid into both carriageways tilted the outer metre of each lane;
+        // the step between them is the retaining wall of the hairpin)
+        if (slotPinRoad[a] === slotPinRoad[b]) half = Math.min(half, Math.max(RAMP_MIN, pinEdge[a] + pinEdge[b]));
         // (a rival that has no pin here - the end of a way, the far side of its fade - takes nothing from this way: scaled by the pin of the rival)
         hold *= 1 - pinWt[b] * (1 - ((1 - sep) * (1 - own) + sep * (1 - smoothstep(-half, half, pinEdge[a] - pinEdge[b]))));
       }
@@ -1294,7 +1345,32 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
         if (m > meet1) { meet2 = meet1; meet1 = m; } else if (m > meet2) meet2 = m;
       }
       const near = Math.max(inBench, between);
-      bandY += (sheet.level - bandY) * sheet.weight * near * meet2 * (1 - apart) * (1 - pinCover);   // (the approach of a bridge keeps its own bed: the deck starts there)
+      // the tilt across the way the point lies on (the nearest way at the sheet's level) is limited where no other way of the junction is near: the sheet at the foot on its centre line
+      // plus at most SHEET_CROSS_MAX per m of the offset (continuous: the limit fades in with the distance from the other ways, and the owner changes only where two benches meet)
+      let level = sheet.level, own = -1, ownBench = 0;
+      for (let sl = 0; sl < nSlots; sl++) {
+        if (wayEdge[sl] === Infinity) continue;
+        const b = (1 - smoothstep(SEP_LOW, SEP_HIGH, Math.abs(wayBed[sl] - sheet.level))) * (1 - smoothstep(0, OWN_FADE, wayEdge[sl]));
+        if (b > ownBench) { ownBench = b; own = sl; }
+      }
+      if (own >= 0) {
+        let iso = 1;
+        for (let sl = 0; sl < nSlots; sl++) {
+          if (sl === own || wayEdge[sl] === Infinity) continue;
+          const same = 1 - smoothstep(SEP_LOW, SEP_HIGH, Math.abs(wayBed[sl] - sheet.level));
+          iso *= 1 - same * (1 - smoothstep(SHEET_ISO_NEAR, SHEET_ISO_FAR, wayEdge[sl]));
+        }
+        const off = wayDist[own];
+        if (iso > 0 && off > 1e-3) {
+          junctionSheet.sample(x - wayDirX[own] * off, z - wayDirZ[own] * off, sheetFoot);
+          // (no plane reaches the foot: its own bed is the reference; the planes' level takes over as their weight grows)
+          const ref = wayBed[own] + (sheetFoot.level - wayBed[own]) * smoothstep(0, SHEET_FOOT_WEIGHT, sheetFoot.weight);
+          const lim = SHEET_CROSS_MAX * off, dv = sheet.level - ref;
+          const capped = ref + (dv > lim ? lim : dv < -lim ? -lim : dv);
+          level += (capped - level) * iso;
+        }
+      }
+      bandY += (level - bandY) * sheet.weight * near * meet2 * (1 - apart) * (1 - pinCover);   // (the approach of a bridge keeps its own bed: the deck starts there)
     }
     // The protection keeps the ground under a bridge from being CUT (a pit under the deck) and from being buried under the batter of a road beside it; the CARRIAGEWAY of a way that
     // rises onto a bridge (its approach on a fill, lifted to the deck) is neither, and the corridor of the other carriageway's deck beside it - whose end lies 10 .. 20 m along on a skewed

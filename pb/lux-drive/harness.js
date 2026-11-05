@@ -1352,6 +1352,47 @@ if (wants('I')) {
   check(`the car does not bob: the vertical acceleration at the design speed along the centre line is <= ${MAX_BOB} m/s2 (at most ${MAX_SHARE * 100} % of the points, none above ${HARD_BOB})`, bobBad <= MAX_SHARE * points && worstAcc <= HARD_BOB, `${bobBad} of ${points} points over, worst ${worstAcc.toFixed(2)} m/s2 at ${worstAccAt}`);
   check(`the crossfall is gentle and constant (<= ${MAX_CROSSFALL * 100} %)`, fallBad === 0 && fallMeasured > 1500, `${fallMeasured} cross sections, ${fallBad} over, worst ${(worstFall * 100).toFixed(2)} % at ${worstFallAt}`);
   check(`the kerb stands at a constant height (+-${MAX_KERB_DEV * 100} cm of ${(ROAD.kerbHeight * 100).toFixed(0)} cm)`, kerbBad === 0 && kerbMeasured > 200, `${kerbMeasured} kerbs measured, ${kerbBad} off, worst ${(kerbWorst * 100).toFixed(2)} cm`);
+
+  // (roads9) The crossfall of EVERY carved way, not a sample: the sample above never drew Eecherfeld (5070,6192: 16.7 % across, the two arms of a hairpin at two levels blended by
+  // distance), and the planes of the junction sheets tilted tracks and side streets 8 - 22 % across past their junctions (2654 cross sections over 2.5 %, 341 over 6 % in 228 places).
+  // Every 6 m of every carved way at ground level, junction aprons and tight bends aside, measured as above.  Left over 6 %: Neie Wee beside the 30 m cliff of the Corniche (the 1 m
+  // lattice blurs the cliff into the lane), a service loop whose two arms overlap 0.7 m apart in level, and a narrow lane (6.1 %).
+  {
+    const ALL_STEP = 6, STEEP_ALL = 0.06, MAX_STEEP_ALL = 4, MAX_OVER_ALL = 0.0012;
+    let allMeasured = 0, allOver = 0, allSteep = 0, allWorst = 0, allWorstAt = '';
+    const steepAt = [];
+    for (const ch of net.chains) {
+      if (ch.tagged || net.overRoads.has(ch.road)) continue;
+      const L = ch.arc[ch.arc.length - 1], hw = net.info[ch.road].hw;
+      const tight = [];
+      for (let i = 1; i < ch.x.length - 1; i++) {
+        const ax = ch.x[i - 1], az = ch.z[i - 1], bx = ch.x[i], bz = ch.z[i], cx = ch.x[i + 1], cz = ch.z[i + 1];
+        const area2 = Math.abs((bx - ax) * (cz - az) - (bz - az) * (cx - ax));
+        const R = area2 < 1e-9 ? Infinity : (Math.hypot(bx - ax, bz - az) * Math.hypot(cx - bx, cz - bz) * Math.hypot(cx - ax, cz - az)) / (2 * area2);
+        if (R < TIGHT_BEND_R) tight.push(ch.arc[i]);
+      }
+      for (let q = ALL_STEP / 2; q < L - 3; q += ALL_STEP) {
+        if (tight.some((a) => Math.abs(a - q) <= hw + 4)) continue;
+        lineAt(ch, q, pt);
+        if (inJunction(ch.road, pt.x, pt.z)) continue;
+        const w = hw * 0.8;
+        const lx = pt.x - pt.nx * w, lz = pt.z - pt.nz * w, rx = pt.x + pt.nx * w, rz = pt.z + pt.nz * w;
+        if (inJunction(ch.road, lx, lz) || inJunction(ch.road, rx, rz)) continue;
+        field.height(lx, lz, li); const sL = li.s, roadL = li.road;
+        field.height(rx, rz, li); const sR = li.s, roadR = li.road;
+        const heightOf = hw >= LATTICE_RESOLVES_HW ? surface.height : field.height;
+        const hL = heightOf(lx, lz), hR = heightOf(rx, rz);
+        allMeasured++;
+        const fall = roadL === ch.road && roadR === ch.road ? Math.abs((hL - bedAt(ch, sL)) - (hR - bedAt(ch, sR))) / (2 * w) : Math.abs(hL - hR) / (2 * w);
+        if (fall > MAX_CROSSFALL) allOver++;
+        if (fall > STEEP_ALL) { allSteep++; if (steepAt.length < 6) steepAt.push(`${data.roads[ch.road].name || data.roads[ch.road].kind} ${Math.round(pt.x)},${Math.round(pt.z)} ${(fall * 100).toFixed(1)} %`); }
+        if (fall > allWorst) { allWorst = fall; allWorstAt = `${data.roads[ch.road].name || data.roads[ch.road].kind} at ${Math.round(pt.x)},${Math.round(pt.z)}`; }
+      }
+    }
+    stats.crossfallAll = { measured: allMeasured, over: allOver, overShare: +(allOver / Math.max(1, allMeasured)).toFixed(5), steep: allSteep, worstPct: +(allWorst * 100).toFixed(2), worstAt: allWorstAt };
+    check(`every carved way (every ${ALL_STEP} m): at most ${MAX_STEEP_ALL} cross sections lean more than ${STEEP_ALL * 100} % and at most ${MAX_OVER_ALL * 100} % more than ${MAX_CROSSFALL * 100} % (junction aprons and tight bends aside)`,
+      allMeasured > 100000 && allSteep <= MAX_STEEP_ALL && allOver <= MAX_OVER_ALL * allMeasured, `${allMeasured} cross sections, ${allOver} over ${MAX_CROSSFALL * 100} %, ${allSteep} over ${STEEP_ALL * 100} %: ${steepAt.join('; ')}; worst ${(allWorst * 100).toFixed(2)} % at ${allWorstAt}`);
+  }
 }
 
 /* ---------------------------------------------------------------- J: what is drawn near the car is the surface, at every quality */
