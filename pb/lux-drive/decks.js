@@ -16,6 +16,9 @@ export const DECK = Object.freeze({
   joinTolerance: 1.5,      // m: the ends of two decks this close are one bridge in two pieces (a joint): they meet at the level of the bridge, not at the valley floor under the joint
   approachJoin: 3.0,       // m: a carved way whose end lies this close to the end of a deck runs onto it there ...
   approachAlign: 0.7,      // ... when it leaves through that end toward the deck (the cosine of the two directions at least this)
+  endStub: 1.0,            // m: an inner point of a deck this close to one of its ends is dropped (see withoutEndStubs)
+  endHold: 3.0,            // m: from an end that a way runs onto the deck does not fall below the level of that end for this long (road-network.js holds the approach's carriageway at the
+                           // level of its end ABUT_HOLD = 2 m under the deck: a deck that fell away from its end at once lay 5 - 15 cm under that held road - a step onto the road and off it)
   endGrade: 0.12,          // m/m: the steepest a deck climbs or falls away from the level of its end (the DSM next to an abutment is the bank, a parapet or the canopy of a wood: used as it is, the
                            // deck began with a vertical face at the end of its approach road)
   treeAbove: 1.5,          // m: a tree whose foot is less than this above a deck surface stands on it (the ground under it is a metre or two off the LiDAR deck)
@@ -136,7 +139,7 @@ function deckEndTops(decks, surface) {
     ends.push({ k, side: 0, p: d.pts[0], into: into(0, 1), inner: n >= 3 ? innerLevel(d, 0, 1, 2) : d.tops[0] });
     ends.push({ k, side: 1, p: d.pts[n - 1], into: into(n - 1, n - 2), inner: n >= 3 ? innerLevel(d, n - 1, n - 2, n - 3) : d.tops[n - 1] });
   });
-  const out = decks.map(() => [0, 0, false, false]);
+  const out = decks.map(() => [0, 0, false, false, false, false]);   // [startTop, endTop, envelope at start, at end, an approach way at start, at end]
   for (const e of ends) {
     const [x, z] = e.p;
     // a way runs onto the deck here: its end is near and it leaves through it toward the deck (a way that only ends beside the deck, at an angle, does not)
@@ -148,7 +151,7 @@ function deckEndTops(decks, surface) {
     let level, envelope;
     if (joint.length) { level = (e.inner + joint.reduce((sum, o) => sum + o.inner, 0)) / (joint.length + 1); envelope = true; }
     else { level = isApproach || !surface.field ? surface.height(x, z) : Math.max(surface.height(x, z), surface.field.height(x, z)); envelope = isApproach; }   // (a bank: on the 1 m lattice and on the ground itself, whichever is higher - an end on the edge of a drop dived into the continuous ground)
-    out[e.k][e.side] = level; out[e.k][2 + e.side] = envelope;
+    out[e.k][e.side] = level; out[e.k][2 + e.side] = envelope; out[e.k][4 + e.side] = isApproach;
   }
   return out;
 }
@@ -157,7 +160,7 @@ function deckEndTops(decks, surface) {
  * The tops of a deck with its ends at `lo` / `hi`.  Where an end has an envelope the deck climbs or falls away from that end at no more than DECK.endGrade (the DSM inside the envelope is kept).
  * The deck never runs under the ground (it then lies on it).  Pure: returns a new array.
  */
-function endEnvelope(pts, tops, lo, hi, envLo, envHi, surface) {
+function endEnvelope(pts, tops, lo, hi, envLo, envHi, surface, holdLo = false, holdHi = false) {
   const n = pts.length;
   const out = Float32Array.from(tops);
   out[0] = lo; out[n - 1] = hi;
@@ -168,13 +171,30 @@ function endEnvelope(pts, tops, lo, hi, envLo, envHi, surface) {
   const total = arc[n - 1];
   for (let i = 1; i < n - 1; i++) {
     let below = -Infinity, above = Infinity;               // the envelope of the two ends here
-    if (envLo) { below = Math.max(below, lo - DECK.endGrade * arc[i]); above = Math.min(above, lo + DECK.endGrade * arc[i]); }
-    if (envHi) { below = Math.max(below, hi - DECK.endGrade * (total - arc[i])); above = Math.min(above, hi + DECK.endGrade * (total - arc[i])); }
+    if (envLo) { below = Math.max(below, lo - DECK.endGrade * Math.max(0, arc[i] - (holdLo ? DECK.endHold : 0))); above = Math.min(above, lo + DECK.endGrade * arc[i]); }
+    if (envHi) { below = Math.max(below, hi - DECK.endGrade * Math.max(0, total - arc[i] - (holdHi ? DECK.endHold : 0))); above = Math.min(above, hi + DECK.endGrade * (total - arc[i])); }
     // two ends too far apart in level for the grade between them (a short deck between a low and a high bank): the straight line from one to the other
     const top = below <= above ? Math.min(above, Math.max(below, tops[i])) : lo + (hi - lo) * (arc[i] / (total || 1));
     out[i] = Math.max(top, surface.height(pts[i][0], pts[i][1]));
   }
   return out;
+}
+
+/**
+ * A deck without the points that lie within DECK.endStub of one of its ends (the bake resamples every 4 m and adds the last point: a last segment of a few centimetres, whose
+ * inner point kept the DSM while the end was pinned to the ground - a vertical step of 0.3 - 0.4 m at the end of the deck, decks 255 / 160).  Pure: a new deck, or the same one.
+ */
+function withoutEndStubs(d) {
+  const n = d.pts.length;
+  if (n < 3) return d;
+  const keep = [];
+  for (let i = 0; i < n; i++) {
+    const nearStart = i > 0 && i < n - 1 && Math.hypot(d.pts[i][0] - d.pts[0][0], d.pts[i][1] - d.pts[0][1]) < DECK.endStub;
+    const nearEnd = i > 0 && i < n - 1 && Math.hypot(d.pts[i][0] - d.pts[n - 1][0], d.pts[i][1] - d.pts[n - 1][1]) < DECK.endStub;
+    if (!nearStart && !nearEnd) keep.push(i);
+  }
+  if (keep.length === n) return d;
+  return { ...d, pts: keep.map((i) => d.pts[i]), tops: Float32Array.from(keep, (i) => d.tops[i]) };
 }
 
 /**
@@ -188,7 +208,7 @@ function endEnvelope(pts, tops, lo, hi, envLo, envHi, surface) {
 export function createDeckNetwork(decks, surface = null) {
   // the decks of the ways the road network carves instead (a narrow deck that spans nothing: road-network.js groundedDeckOf) are not decks
   const grounded = surface && surface.field && surface.field.network ? surface.field.network.groundedDecks : null;
-  const kept = grounded && grounded.size ? decks.filter((d) => !grounded.has(d.id)) : decks;
+  const kept = (grounded && grounded.size ? decks.filter((d) => !grounded.has(d.id)) : decks).map(withoutEndStubs);
   const levels = surface ? deckEndTops(kept, surface) : null;
   const list = kept.map((d, k) => {
     if (!surface || d.pts.length < 2) return d;
@@ -199,8 +219,8 @@ export function createDeckNetwork(decks, surface = null) {
       tops[last] = surface.height(d.pts[last][0], d.pts[last][1]);
       return { ...d, tops };
     }
-    const [lo, hi, envLo, envHi] = levels[k];
-    return { ...d, tops: endEnvelope(d.pts, d.tops, lo, hi, envLo, envHi, surface) };
+    const [lo, hi, envLo, envHi, holdLo, holdHi] = levels[k];
+    return { ...d, tops: endEnvelope(d.pts, d.tops, lo, hi, envLo, envHi, surface, holdLo, holdHi) };
   });
   const ax = [], az = [], bx = [], bz = [], t0 = [], t1 = [], half = [], deckOf = [], ends = [];
   list.forEach((d, k) => {
@@ -301,9 +321,12 @@ export function createDeckNetwork(decks, surface = null) {
     if (count === 0) return null;
     gather(x, z);
     let best = null;
-    for (let pass = 0; pass < 2 && !best; pass++) for (let c = 0; c < candCount; c++) {
-      if (candOut[c] !== pass) continue;                    // a deck under the point first; the cap of a joint only where none is
+    // pass 0: a deck whose own width covers the point; 1: one whose margin (DECK.margin past its edge) reaches it; 2: the round cap of a joint.  Two decks side by side at two
+    // levels (the carriageways of a skewed interchange, 0.5 m apart) overlap by their margins: "the highest" put the outer wheels of a car near the edge of the lower deck on the
+    // margin of the higher one, a 0.4 - 0.6 m step in the lane (decks 84 / 74, 157 / 154, 105 / 99)
+    for (let pass = 0; pass < 3 && !best; pass++) for (let c = 0; c < candCount; c++) {
       if (candOut[c] === 2) continue;
+      if ((candOut[c] === 1 ? 2 : candSide[c] <= HALF[candSeg[c]] ? 0 : 1) !== pass) continue;
       const i = candSeg[c], t = candT[c];
       const top = T0[i] + (T1[i] - T0[i]) * t;
       if (y < top - DECK.stickBelow) continue;              // the car is under the deck: the ground stays the ground
