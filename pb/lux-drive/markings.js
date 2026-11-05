@@ -23,6 +23,7 @@ export const MARK = Object.freeze({
   lineHalf: 0.075,          // m: half the width of a line (15 cm of paint)
   edgeInset: 0.5,           // m: an edge line lies this far inside the edge of the carriageway (a street without a hard shoulder) ...
   edgeInsetMin: 0.35,       // ... and never closer to it than this
+  singleLaneMinHw: 1.6,     // m: ... but a one-way road of a single lane at least this wide (half width) has its edge lines (roads9)
   edgeMinHw: 3.5,           // m: a street narrower than this (half width) has no edge lines (a motorway, a trunk road and their slip roads always have them)
   shoulderLeft: 0.15,       // the share of the shoulder of a motorway / trunk carriageway on its LEFT (the median side): the rest is the hard shoulder on the right
   shoulderLeftMin: 0.25,    // m
@@ -71,7 +72,8 @@ export function laneLayout(road) {
       left = -hw + Math.min(MARK.shoulderLeftMax, Math.max(MARK.shoulderLeftMin, margin * MARK.shoulderLeft));
     } else left = -(lanes * w) / 2;
     const right = left + lanes * w;
-    if (shoulder || hw >= MARK.edgeMinHw) {
+    // (roads9: a one-way main road of a single lane - Route d'Esch, the one-way arms of the boulevards - has its two edge lines: with no centre line and no divider it was bare tarmac)
+    if (shoulder || hw >= MARK.edgeMinHw || (lanes === 1 && hw >= MARK.singleLaneMinHw)) {
       lines.push({ role: 'edge', o: shoulder ? left : Math.max(left, -hw + MARK.edgeInset), dashed: false, side: -1 });
       lines.push({ role: 'edge', o: shoulder ? right : Math.min(right, hw - MARK.edgeInset), dashed: false, side: 1 });
     }

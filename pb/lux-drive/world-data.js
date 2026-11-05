@@ -8,6 +8,7 @@ import { restyleBuildings } from './quarters.js';
 import { withCampusTrees } from './campus-trees.js';       // CAMPUS: the trees of Campus Geesseknäppchen
 import { createBaseField } from './base-field.js';
 import { openShallowTunnels } from './tunnel-cover.js';     // BRIDGES8: a tunnel with no land over it is an open road
+import { fillLaneFlicker } from './lane-flicker.js';          // ROADS9: a narrower run of < 60 m between two wider stretches is flicker of the lane count
 
 const DECIMETRE = 0.1;
 
@@ -157,7 +158,9 @@ export async function loadWorldData(read, onProgress = () => {}) {
   // the style of a building depends on where it stands (the stone city, the sandstone valley, the villages): quarters.js
   const buildings = restyleBuildings(decoded, places);
   // the tunnels with no land over them are open roads (tunnel-cover.js): every consumer of the roads reads the same network
-  const { roads, opened: openedTunnels } = openShallowTunnels(decodedRoads, createBaseField(near, far).baseHeight, buildings, decks);
+  const { roads: openRoads, opened: openedTunnels } = openShallowTunnels(decodedRoads, createBaseField(near, far).baseHeight, buildings, decks);
+  // ... and a lane count that flickers for a few metres keeps the wider road (lane-flicker.js)
+  const { roads, filled: flickerFilled } = fillLaneFlicker(openRoads);
   onProgress(1, 'done');
-  return { info, near, far, roads, openedTunnels, decks, walls, canopy, classes, classInfo, buildings, lines, stops, trees: withCampusTrees(trees), places, names };
+  return { info, near, far, roads, openedTunnels, flickerFilled, decks, walls, canopy, classes, classInfo, buildings, lines, stops, trees: withCampusTrees(trees), places, names };
 }
