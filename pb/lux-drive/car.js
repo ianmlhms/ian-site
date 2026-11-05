@@ -173,9 +173,29 @@ export function createCar({ ground, roadInfoAt, collide = null, start = null }) 
     state.rpm = rpmOf(state.speed, state.gear, throttle);
   }
 
+  /**
+   * The ground the body rests on: the mean of the ground under the four wheels (ground.contact: the continuous height, not the lattice), each within CAR.wheelReach
+   * of the ground under the centre.  One point under the
+   * centre read every facet of the 1 m lattice, and beside a kerb the kerb's saw-tooth on the lattice (a kerb ridge crosses the lattice rows every 7 m on a road at
+   * 8 degrees to them): a 2-8 cm step every 7 m, 20-47 m/s2 of vertical acceleration on ordinary streets (QA D01).
+   */
+  function groundUnderWheels() {
+    const at = ground.contact || ground.height;
+    const centre = at(state.x, state.z);
+    const cy = Math.cos(state.heading), sy = Math.sin(state.heading);
+    const a = CAR.wheelbase / 2, b = CAR.track / 2;
+    let sum = 0;
+    for (let k = 0; k < 4; k++) {
+      const u = k < 2 ? a : -a, v = k % 2 === 0 ? b : -b;
+      const h = at(state.x + cy * u - sy * v, state.z + sy * u + cy * v);
+      sum += clamp(h, centre - CAR.wheelReach, centre + CAR.wheelReach);
+    }
+    return sum / 4;
+  }
+
   /** The vertical: the suspension follows the ground, but the car flies over a crest and lands again. */
   function updateVertical(dt) {
-    const groundY = ground.height(state.x, state.z);
+    const groundY = groundUnderWheels();
     const target = groundY + CAR.rideHeight;
     if (state.grounded) {
       if (target < state.y - 0.28) {                 // the ground fell away: the car leaves it

@@ -371,6 +371,15 @@ export function createGround(surface, deckNetwork) {
       }
       return surface.normal(x, z, o);
     },
+    /** The ground under a WHEEL: the continuous height function (the carve itself, not its 1 m lattice) with the decks on top.  The lattice is what the renderer
+     *  draws; a wheel on it read every facet, and beside a kerb the kerb's saw-tooth on the lattice (QA D01).  Where the carriageway is flat the two agree to the
+     *  interpolation error of the lattice (gate J); at the kerb the wheel meets the real kerb, 13 cm over 0.35 m, not a 1 m ramp that zigzags into the lane. */
+    contact(x, z) {
+      const g = surface.field ? surface.field.height(x, z) : surface.height(x, z);
+      if (!deckNetwork || deckNetwork.count === 0) return g;
+      const hit = deckNetwork.deckAt(x, z, hintY, scratch);
+      return hit && hit.top > g ? hit.top : g;
+    },
     hint(y) { hintY = y; },
     /** The underside of the lowest deck above height y over (x, z), Infinity when the sky is free. */
     overheadAt(x, z, y) { return deckNetwork ? deckNetwork.overheadAt(x, z, y) : Infinity; },

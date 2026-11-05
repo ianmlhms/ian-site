@@ -172,6 +172,8 @@ export const CAR = Object.freeze({
   handbrakeDrag: 5.5,        // m/s2 of extra braking with the handbrake
   bumpiness: 0.55,           // how much of the ground roughness reaches the car
   rideHeight: 0.42,          // m: the bottom of the body above the ground
+  track: 1.55,               // m between the left and the right wheels (the body rests on the mean of the four contact points: car.js)
+  wheelReach: 0.3,           // m: a wheel reads the ground at most this far above or below the ground under the centre (a wheel over the edge of a deck or a wall does not drop the body)
   restitution: 0.12,         // the vertical bounce of the suspension
   respawnTime: 1.2,          // s from a crash to the car standing again
   pushAssist: 2.2,           // m/s2: below walking pace the car creeps forward instead of stalling
