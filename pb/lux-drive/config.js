@@ -197,6 +197,13 @@ export const PORTAL = Object.freeze({
   lintel: 1.0,              // m, the concrete above the mouth
   cornice: 0.22,            // m, the slab on top of the wall
   base: 2.0,                // m, the wall goes this far under the ground (it never floats)
+  parapet: 1.0,             // m: a headwall reaches at most this over the land behind it (the road over an underpass: the wall of the Rue de Luxembourg mouth stood 2.4 m over Route de Longwy, roads9) ...
+  behindReach: 6.0,         // m: ... the land behind is the highest ground within this behind the wall
+  lintelMin: 0.4,           // m: the thinnest concrete over a mouth that was lowered so
+  topMin: 2.7,              // m: and the lowest mouth (the garage height of the default: 2.5 + 0.2 x width)
+  flush: 0.03,              // m: a wall that a road crosses over ends this far under that road's surface (no cornice: the road runs over it, Hossegässel over the René Konen mouth) ...
+  topFloor: 2.0,            // m: ... and its mouth may get as low as this to fit under the road
+  borderProbe: 10.0,        // m: a mouth whose outside lies beyond the play area this far along its axis led to a road that was clipped at the border of the world (the Grouft south mouth)
 });
 
 /* The shallow tunnels (tunnel-cover.js): an OSM tunnel with hardly any land over it is drawn and driven as an open road in a

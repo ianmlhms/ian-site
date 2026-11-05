@@ -160,7 +160,7 @@ export async function loadWorldData(read, onProgress = () => {}) {
   // the tunnels with no land over them are open roads (tunnel-cover.js): every consumer of the roads reads the same network
   const { roads: openRoads, opened: openedTunnels } = openShallowTunnels(decodedRoads, createBaseField(near, far).baseHeight, buildings, decks);
   // ... and a lane count that flickers for a few metres keeps the wider road (lane-flicker.js)
-  const { roads, filled: flickerFilled } = fillLaneFlicker(openRoads);
+  const { roads, filled: flickerFilled } = fillLaneFlicker(openRoads, trees);
   onProgress(1, 'done');
   return { info, near, far, roads, openedTunnels, flickerFilled, decks, walls, canopy, classes, classInfo, buildings, lines, stops, trees: withCampusTrees(trees), places, names };
 }

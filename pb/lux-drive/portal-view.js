@@ -31,7 +31,7 @@ export function createPortalView({ scene, portals, ground, material }) {
     const P = (u, v, y) => [p.x + p.sx * u + ix * v, y, p.z + p.sz * u + iz * v];
     const half = p.half, bore = p.bore;
     const depth = p.depth;
-    const wallTop = y0 + p.top + PORTAL.lintel;
+    const wallTop = y0 + p.top + (p.lintel ?? PORTAL.lintel);     // (a wall lowered to the land behind it has a thinner lintel, portals.js)
     // the ground under the two ends of the wall: the wall is buried under the lowest of them, so it never floats
     const base = Math.min(y0,
       land.height(p.x + p.sx * half, p.z + p.sz * half),
@@ -59,7 +59,8 @@ export function createPortalView({ scene, portals, ground, material }) {
     b.quad(P(-bore + g, depth - g, floor), P(bore - g, depth - g, floor),
       P(bore - g, depth - g, y0 + p.top - g), P(-bore + g, depth - g, y0 + p.top - g), COLOUR_BACK);
     // the cornice on top of the wall
-    box(-half - 0.25, half + 0.25, -0.15, depth, wallTop, wallTop + PORTAL.cornice, COLOUR_CORNICE);
+    const cornice = p.cornice ?? PORTAL.cornice;                  // (none on a wall a road runs over, portals.js)
+    if (cornice > 0) box(-half - 0.25, half + 0.25, -0.15, depth, wallTop, wallTop + cornice, COLOUR_CORNICE);
   }
   chunks.finish();
   return { meshes: chunks.meshes, count: portals.list.length, update: chunks.update };

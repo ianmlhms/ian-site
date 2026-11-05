@@ -16,6 +16,12 @@ import { PORTAL } from './config.js';
 const PUSH_MAX = 0.8;          // m: the most a wall pushes the car back in one pass
 const LEVEL_BELOW = 1.5;       // m: a car this far under the mouth is on another road (a portal on a bridge end, a road under it)
 
+/** roadAt for createPortals from a road network (road-network.js): the way whose carriageway holds (x, z), or -1. */
+export function portalRoadAt(network) {
+  const out = { ...network.scratch };
+  return (x, z) => { network.carve(x, z, out); return out.sdCar < 0 ? out.road : -1; };
+}
+
 const dist2 = (ax, az, bx, bz) => (ax - bx) * (ax - bx) + (az - bz) * (az - bz);
 const endsOf = (road) => [road.pts[0], road.pts[road.pts.length - 1]];
 
@@ -33,6 +39,10 @@ const CARRIAGEWAY = new Set([
  * gives every portal its level `y` (the road at the mouth); without it the walls are as high as the sky (the old behaviour, for tools).
  * isDrawn(road) (optional): does the game draw this way for a car (road-network isDrawn: carved, or a deck)?  A portal needs a drawn road at its mouth; a
  * garage ramp that is not carved leads to none.  Without it every drivable surface way counts.
+ * inPlay(x, z) (optional): is the point inside the play area?  A mouth whose outside lies beyond the play area (its motorway clipped at the border of the world) keeps its portal when a
+ * drawn road ends at it from any side (the Grouft south mouth: Rue du Grünewald runs back up along the tunnel from the mouth).
+ * roadAt(x, z) (optional): the index of the drawn way whose carriageway holds the point (-1: none).  A road that runs behind / over the wall (an underpass under a street) caps the
+ * headwall to a parapet over that road.
  * Returns { list, at(x, z), collide(x, z, radius, y) }.
  *
  * A portal is { x, z, nx, nz, sx, sz, half, bore, top, depth, width, name, road }:
@@ -44,7 +54,7 @@ const CARRIAGEWAY = new Set([
  *   top    the height of the mouth above the ground
  *   depth  how deep the wall goes into the tunnel
  */
-export function createPortals(roads, heightAt = null, isDrawn = () => true) {
+export function createPortals(roads, heightAt = null, isDrawn = () => true, inPlay = null, roadAt = null) {
   const tunnels = roads.filter((r) => r.tunnel && r.info.drivable);
   const surface = roads.filter((r) => !r.tunnel && r.info.drivable);
 
@@ -96,7 +106,7 @@ export function createPortals(roads, heightAt = null, isDrawn = () => true) {
         // the road that leads to the mouth: a way the game draws (carved) whose end is at the mouth and that leaves it outward, along the axis.  The first
         // way with an end within 7 m used to be taken: a side street ending near the mouth, a garage ramp that is not drawn, so the wall stood in the grass
         // beside the road or across nothing (QA B09).  Without such a road the car cannot get there, and a wall would stand in the open: no portal.
-        let approach = null, bestGap2 = PORTAL.mouthGap * PORTAL.mouthGap;
+        let approach = null, bestGap2 = PORTAL.mouthGap * PORTAL.mouthGap, atBorder = false;
         for (const r of surface) {
           if (!isDrawn(r)) continue;
           const m = r.pts.length;
@@ -109,6 +119,15 @@ export function createPortals(roads, heightAt = null, isDrawn = () => true) {
             approach = r; bestGap2 = g2;
           }
         }
+        // (the road out of the mouth was clipped at the border of the world: any drawn road that ends at the mouth leads there)
+        if (!approach && inPlay && !inPlay(mouth[0] + dx * PORTAL.borderProbe, mouth[1] + dz * PORTAL.borderProbe)) {
+          let g2best = PORTAL.mouthGap * PORTAL.mouthGap;
+          for (const r of surface) {
+            if (!isDrawn(r)) continue;
+            for (const b of endsOf(r)) { const g2 = dist2(mouth[0], mouth[1], b[0], b[1]); if (g2 <= g2best) { g2best = g2; approach = r; } }
+          }
+          atBorder = !!approach;
+        }
         if (!approach) continue;
         const bore = Math.max(PORTAL.boreMin, road.width / 2 - PORTAL.boreInset);
         if (bore > road.width / 2 + 0.01) continue;
@@ -116,17 +135,41 @@ export function createPortals(roads, heightAt = null, isDrawn = () => true) {
           x: mouth[0], z: mouth[1], nx: dx, nz: dz, sx: -dz, sz: dx,
           half: road.width / 2 + PORTAL.shoulder,
           bore, top: 0, depth: PORTAL.recess, width: road.width,
-          name: road.name || '', road: road.id, approach: approach.id, approachName: approach.name || '',
+          name: road.name || '', road: road.id, approach: approach.id, approachName: approach.name || '', border: atBorder,
         });
       }
     }
   }
 
   // ---- the height of the mouth: it grows with the width of the road (a garage is lower than a motorway)
+  // A headwall reaches at most PORTAL.parapet over a ROAD that runs behind it: the mouth of an underpass under a street is a parapet at the edge of that street, not a wall standing over
+  // its carriageway (Rue de Luxembourg under Route de Longwy, QA B09).  The lintel thins first, then the mouth gets lower (never under PORTAL.topMin).  (The land behind the wall of a
+  // tunnel under a hill is often lower than the wall - the DTM rounds the hill off at the mouth - and a real headwall stands out of its slope: only a road caps it.)
   for (const p of list) {
     p.top = Math.min(5.2, Math.max(2.7, 2.5 + p.width * 0.2));
     p.y = heightAt ? heightAt(p.x, p.z) : NaN;
-    p.wallTop = p.top + PORTAL.lintel + PORTAL.cornice;      // m above y: the top of the headwall
+    p.lintel = PORTAL.lintel;
+    p.cornice = PORTAL.cornice;
+    if (heightAt && roadAt) {
+      // the roads behind the wall (a parapet over them is the most the wall may stand) and the roads over the wall itself (it ends flush under them, no cornice)
+      let behind = -Infinity, over = Infinity;
+      for (let v = 0.1; v <= PORTAL.recess + PORTAL.behindReach + 1e-6; v += v < PORTAL.recess ? 0.35 : 1.5) {
+        for (let k = -2; k <= 2; k++) {
+          const u = (k / 2) * p.half, x = p.x + p.sx * u - p.nx * v, z = p.z + p.sz * u - p.nz * v, r = roadAt(x, z);
+          if (r < 0 || r === p.approach) continue;
+          const h = heightAt(x, z);
+          if (v < PORTAL.recess) over = Math.min(over, h); else behind = Math.max(behind, h);
+        }
+      }
+      const cap = Math.min(behind > -Infinity ? behind - p.y + PORTAL.parapet : Infinity, over - p.y - PORTAL.flush);   // m above y: the highest the wall may reach (Infinity: no road behind or over it)
+      if (over < Infinity) { p.cornice = 0; }
+      if (cap < Infinity && p.top + p.lintel + p.cornice > cap) {
+        const floor = over < Infinity ? PORTAL.topFloor : PORTAL.topMin;
+        p.lintel = Math.max(PORTAL.lintelMin, cap - p.cornice - p.top);
+        if (p.top + p.lintel + p.cornice > cap) p.top = Math.max(floor, cap - p.cornice - p.lintel);
+      }
+    }
+    p.wallTop = p.top + p.lintel + p.cornice;      // m above y: the top of the headwall
   }
 
   // ---- a mouth under a street has no portal: there is no open mouth there, and a wall would block the street
@@ -155,7 +198,10 @@ export function createPortals(roads, heightAt = null, isDrawn = () => true) {
             const da = (ax - p.x) * p.nx + (az - p.z) * p.nz;        // the sides of the wall
             const db = (bx - p.x) * p.nx + (bz - p.z) * p.nz;
             if (da * db >= 0) continue;                              // the road does not cross the wall
-            const lat = Math.abs((ax - p.x) * p.sx + (az - p.z) * p.sz);
+            // (the side offset of the CROSSING, not of the segment's first point: a service lane that passes in front of the north mouth of the Rue de Luxembourg underpass and
+            // crosses the line of the wall 22 m to the side took that portal away, QA B09)
+            const tc = da / (da - db), cxp = ax + (bx - ax) * tc, czp = az + (bz - az) * tc;
+            const lat = Math.abs((cxp - p.x) * p.sx + (czp - p.z) * p.sz);
             if (lat > p.half + 3) continue;                          // it crosses far away from the wall
             underRoad.add(p);
           }

@@ -27,7 +27,7 @@ import { createWallCollider } from './wall-collider.js';
 import { createBuildingIndex } from './buildings.js';
 import { createLandmarks, fixLandmarkDecks } from './landmarks.js';
 import { createTreeIndex, treesOfBlock, keepWaysClear, bakedCrownRadius, wayMargin, crownShare } from './trees.js';
-import { createPortals } from './portals.js';
+import { createPortals, portalRoadAt } from './portals.js';
 import { createPlayArea } from './play-area.js';
 import { buildWorldMap } from './world-map.js';
 import { createCar } from './car.js';
@@ -86,8 +86,8 @@ const deckNetwork = createDeckNetwork(fixLandmarkDecks(data.decks, (x, z) => sur
 const ground = createGround(surface, deckNetwork);
 const landmarks = createLandmarks({ buildings: data.buildings, decks: deckNetwork.decks, ground: (x, z) => surface.height(x, z), roads: data.roads });
 const buildings = createBuildingIndex(data.buildings, { hidden: landmarks.hiddenBuildings });
-const portals = createPortals(data.roads, (x, z) => surface.height(x, z), (r) => field.network.isDrawn(r.id));
 const playArea = createPlayArea(area);
+const portals = createPortals(data.roads, (x, z) => surface.height(x, z), (r) => field.network.isDrawn(r.id), (x, z) => playArea.inside(x, z), portalRoadAt(field.network));
 const maps = buildWorldMap({ classes: data.classes, classInfo: data.classInfo, canopy: data.canopy, buildings: data.buildings });
 const treeDecks = createDeckNetwork([...ground.decks, ...landmarks.footprints]);      // the same trees as the game plants (main.js)
 const bakedTrees = keepWaysClear(data.trees, { network: field.network, field, treeDecks, treeFree: landmarks.treeFree });
@@ -389,7 +389,9 @@ if (wants('B')) {
     const bands = [];
     for (let i = first; i < first + count; i += 2) {         // every other sample: 8 m apart
       const b = paintBand(ri, i);
-      if (b > 0) bands.push(b);
+      // (roads9: where the carriageway tapers to the next way of its chain - a lane added or dropped, 1 : 12 - the design width there is the tapered one; measured against it)
+      const taper = net.taperDhw && net.taperDhw[ri] ? 2 * net.taperDhw[ri][i - first] : 0;
+      if (b > 0) bands.push(b - taper);
     }
     if (!bands.length) { notMeasured++; continue; }
     bands.sort((a, b) => a - b);

@@ -99,7 +99,10 @@ export function runTunnelChecks({ check, section, stats, data, field, surface, g
     const along = ((nb[0] - e[0]) * p.nx + (nb[1] - e[1]) * p.nz) / ol;
     field.height(p.x + p.nx * FRONT, p.z + p.nz * FRONT, info);
     const inFront = info.coverage > 0.5 && (info.road === p.approach || info.road === p.road) && Math.abs(info.lat) <= info.hw + 0.5;
-    if (!net.isDrawn(a.id) || gap > PORTAL.mouthGap || along < PORTAL.approachAlign || !inFront) {
+    // (roads9: a mouth whose outside lies beyond the play area - its motorway clipped at the border of the world, the Grouft south mouth - is reached by a drawn road ending at it from
+    // any side; in front of its wall is the world beyond the border)
+    const border = p.border && playArea && !playArea.inside(p.x + p.nx * PORTAL.borderProbe, p.z + p.nz * PORTAL.borderProbe);
+    if (!net.isDrawn(a.id) || gap > PORTAL.mouthGap || (!border && (along < PORTAL.approachAlign || !inFront))) {
       noRoad++;
       if (offList.length < 6) offList.push(`${p.name || p.road} at ${Math.round(p.x)},${Math.round(p.z)}: approach ${a.id} gap ${gap.toFixed(1)} cos ${along.toFixed(2)} front ${info.road}`);
     }
