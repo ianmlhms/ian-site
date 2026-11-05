@@ -28,8 +28,8 @@ export const WALL = Object.freeze({
 /** The walls are drawn out to this many times the far building radius of the quality level (a wall is a small thing: a bridge deck is drawn out to 1.5 times). */
 export const WALL_DRAW_FACTOR = 0.6;
 
-const STONE = [0.60, 0.56, 0.48];
-const COPING = [0.66, 0.63, 0.57];
+const STONE = [0.56, 0.52, 0.45];
+const COPING = [0.55, 0.53, 0.49];
 const MAGIC = 0x4c4c4157;              // 'WALL'
 const FLOATS_PER_POINT = 7;            // x, z, top, bottom, depth, nx, nz
 

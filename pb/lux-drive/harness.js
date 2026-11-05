@@ -48,6 +48,7 @@ import { placeStreetLights } from './street-lights.js';
 import { placeParkBenches } from './park-benches.js';
 import { createPropCollider } from './props.js';
 import { WALL, WALL_DRAW_FACTOR, findRamp, wallQuads } from './retaining-walls.js';
+import { JUNCTION, junctionClusters, driveLine } from './junction-probe.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DATA = path.join(HERE, 'data');
@@ -1397,6 +1398,56 @@ if (wants('K')) {
     check('retaining walls are solid for the car from the low side and from the high side', openLow === 0 && openHigh === 0, `${openLow} stretches open from the low side, ${openHigh} from the high side, of ${stretches}`);
   }
   check('retaining walls: every ramp steeper than 2 m/m beside a way has a wall (the data is not stale: re-run scripts/luxdrive/bake_walls.mjs)', bare <= Math.max(3, Math.round(ramps * 0.04)), `${bare} of ${ramps} ramps bare (${scanned} profiles), e.g. ${bareList.join('; ')}`);
+}
+
+/* ---------------------------------------------------------------- L: junctions (markings and the drive across) */
+if (wants('L')) {
+  section('L junctions');
+  const clusters = junctionClusters(net).slice(0, QUICK ? 8 : 20);
+  // (1) No fragments: a cell of the lattice whose nodes lie on two DIFFERENT roads (or arms of one) draws no markings.  The markings are interpolated from the lat / s of the nearest road
+  // at each node: where the nearest road changes inside a cell the interpolation draws stray dashes and diagonal bits (what the junction beside the start looked like).
+  const SIDE_N = QUADTREE.cells + 3;
+  let cellsChecked = 0, fragmentCells = 0;
+  const fragList = [];
+  for (const c of clusters) {
+    const ex = Math.floor(c.x / QUADTREE.minSize) * QUADTREE.minSize, ez = Math.floor(c.z / QUADTREE.minSize) * QUADTREE.minSize;
+    for (const [ox, oz] of [[0, 0], [-QUADTREE.minSize, 0], [QUADTREE.minSize, 0], [0, -QUADTREE.minSize], [0, QUADTREE.minSize]]) {
+      const leaf = { x0: ex + ox, z0: ez + oz, step: 1, size: QUADTREE.minSize };
+      const nodes = computeTileNodes(leaf, surface, field);
+      const b = surface.block(leaf.x0 / QUADTREE.minSize, leaf.z0 / QUADTREE.minSize);
+      for (let j = 0; j < QUADTREE.cells; j++) {
+        for (let i = 0; i < QUADTREE.cells; i++) {
+          const idx = [(j + 1) * SIDE_N + i + 1, (j + 1) * SIDE_N + i + 2, (j + 2) * SIDE_N + i + 1, (j + 2) * SIDE_N + i + 2];
+          const painted = idx.some((o) => nodes.road2[o * 4 + 3] > 0.5 && nodes.road2[o * 4 + 1] > 0.5 && b.sdCar[o] <= 1.0);
+          if (!painted) continue;
+          cellsChecked++;
+          const roads = new Set(idx.filter((o) => b.sdCar[o] < 0.3).map((o) => b.road[o]));
+          if (roads.size >= 2) { fragmentCells++; if (fragList.length < 4) fragList.push(`${Math.round(leaf.x0 + i)},${Math.round(leaf.z0 + j)}`); }
+        }
+      }
+    }
+  }
+  stats.junctionMarks = { junctions: clusters.length, cellsChecked, fragmentCells };
+  check('junctions: no marking fragments (no painted lattice cell holds two roads) around the biggest junctions', fragmentCells === 0, `${fragmentCells} of ${cellsChecked} cells, e.g. ${fragList.join('; ')}`);
+  // (2) The drive straight across: along every way of the biggest junctions, at 50 km/h, over the tarmac of the junction box.  Reported as stats (the vertical acceleration of a car that follows
+  // the surface); the check is a guard against the ridge: the median over the junctions and the worst single box.
+  const boxBobs = [], pitches = [];
+  let worstBox = 0, worstAt = '';
+  for (const c of clusters) {
+    let cBob = 0;
+    for (const way of c.ways) {
+      const r = driveLine(surface, c, way);
+      if (r.boxBob > cBob) cBob = r.boxBob;
+      pitches.push(r.boxPitch);
+    }
+    boxBobs.push(cBob);
+    if (cBob > worstBox) { worstBox = cBob; worstAt = `${Math.round(c.x)},${Math.round(c.z)}`; }
+  }
+  const sorted = boxBobs.slice().sort((a, b) => a - b);
+  const median = sorted[sorted.length >> 1] || 0;
+  stats.junctionDrive = { junctions: clusters.length, medianBoxBob: +median.toFixed(2), worstBoxBob: +worstBox.toFixed(2), worstAt };
+  const MAX_MEDIAN_BOX_BOB = 8, MAX_WORST_BOX_BOB = 60;                       // m/s2 at 50 km/h: a guard at today's level (a road is 0.04; the target for a junction box is JUNCTION.maxBob = 1.5)
+  check(`junctions: driving straight across the ${clusters.length} biggest junctions (median over the junctions <= ${MAX_MEDIAN_BOX_BOB}, worst <= ${MAX_WORST_BOX_BOB} m/s2; target ${JUNCTION.maxBob})`, median <= MAX_MEDIAN_BOX_BOB && worstBox <= MAX_WORST_BOX_BOB, `median ${median.toFixed(2)}, worst ${worstBox.toFixed(2)} at ${worstAt}`);
 }
 
 /* ---------------------------------------------------------------- the summary */

@@ -24,6 +24,55 @@ const CELLS = QUADTREE.cells;
 const SIDE = CELLS + 1;
 const APRON_SIDE = CELLS + 3;
 
+/**
+ * The signed distances of the paint (sdCar, sdPave) are the minimum over many ways: the minimum of two cones or planes has a crease, and the zero contour of a piecewise-linear field on a
+ * 1 m lattice turns a crease into a sawtooth of 1 m triangles (the ragged pavement where a slip road meets the avenue).  A [1 2 1] x [1 2 1] / 16 blur of the node values rounds the creases
+ * (a straight edge is a linear field and does not move).  The apron of one node around the tile is what the blur reads: the nodes of the apron itself keep their value.
+ */
+export function blurField(src) {
+  const out = Float32Array.from(src);
+  const W = [1, 2, 1];
+  for (let j = 1; j < APRON_SIDE - 1; j++) {
+    for (let i = 1; i < APRON_SIDE - 1; i++) {
+      let sum = 0;
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) sum += W[dj + 1] * W[di + 1] * src[(j + dj) * APRON_SIDE + (i + di)];
+      out[j * APRON_SIDE + i] = sum / 16;
+    }
+  }
+  return out;
+}
+
+const MARK_ON_ROAD = 0.3;               // m: a node counts as being on a carriageway (for the markings) when its signed distance to the union of the carriageways is below this
+const MARK_NEAR_ROAD = 1.0;             // m: ... and a node this close to one takes its markings from the road beside it, so it is switched off with its neighbours               // m: a node counts as being on a carriageway (for the markings) when its signed distance to the union of the carriageways is below this
+const MARK_SPLIT_ALONG = 3;             // the distance along the centre line may change at most this many nodes' spacing between two neighbouring nodes of one road: more = another arm of it
+
+/**
+ * The lane markings are drawn per pixel from the offset (lat) and the distance along (s) of the ONE nearest road, interpolated over the lattice.  Where the nearest road changes
+ * between two neighbouring nodes (a slip road that merges with the main road, a junction of several ways, the two arms of a hairpin) the interpolation draws garbage: stray dashes and short
+ * diagonal bits across the junction.  So a node that has a neighbour on a DIFFERENT road (or on the other arm of the same road) draws no markings: every cell that holds such a border has
+ * all four of its nodes switched off, and every cell that is still painted interpolates the values of one road only.  The edge lines are the contour of the union of the carriageways
+ * (aRoad3) and are not affected.  Pure: returns a new array of the same layout as `road2` (the markings factor is the 4th value of a node).
+ */
+export function maskMarkBorders(road2, road, along, sdCar, step) {
+  const out = Float32Array.from(road2);
+  for (let j = 0; j < APRON_SIDE; j++) {
+    for (let i = 0; i < APRON_SIDE; i++) {
+      const o = j * APRON_SIDE + i;
+      if (road2[o * 4 + 3] === 0 || sdCar[o] > MARK_NEAR_ROAD) continue;
+      for (let dj = -1; dj <= 1 && out[o * 4 + 3] !== 0; dj++) {
+        for (let di = -1; di <= 1; di++) {
+          const jj = j + dj, ii = i + di;
+          if ((di === 0 && dj === 0) || jj < 0 || jj >= APRON_SIDE || ii < 0 || ii >= APRON_SIDE) continue;
+          const n = jj * APRON_SIDE + ii;
+          if (sdCar[n] > MARK_ON_ROAD) continue;
+          if (road[n] !== road[o] || Math.abs(along[n] - along[o]) > MARK_SPLIT_ALONG * step) { out[o * 4 + 3] = 0; break; }
+        }
+      }
+    }
+  }
+  return out;
+}
+
 /** Node data of a tile (cached by the caller): the heights, the road coverage and the road geometry. */
 export function computeTileNodes(leaf, surface, field) {
   const { x0, z0, step } = leaf;
@@ -38,7 +87,7 @@ export function computeTileNodes(leaf, surface, field) {
       road2[o * 4 + 2] = b.surface[o];                         // the material of the road the node is on
       road2[o * 4 + 3] = b.junction[o] ? 0 : 1;                // the 1 m lattice draws the markings exactly (not at a junction)
     }
-    return { h: b.h, lat: b.lat, hw: b.hw, a0: b.a0, kind: b.kind, surface: b.surface, along: b.along, sdCar: b.sdCar, sdPave: b.sdPave, road2, shared: true };
+    return { h: b.h, lat: b.lat, hw: b.hw, a0: b.a0, kind: b.kind, surface: b.surface, along: b.along, sdCar: blurField(b.sdCar), sdPave: blurField(b.sdPave), road2: maskMarkBorders(road2, b.road, b.along, b.sdCar, step), shared: true };
   }
   const h = new Float32Array(APRON_SIDE * APRON_SIDE);
   const lat = new Float32Array(APRON_SIDE * APRON_SIDE);
@@ -49,6 +98,7 @@ export function computeTileNodes(leaf, surface, field) {
   const along = new Float32Array(APRON_SIDE * APRON_SIDE);
   const sdCar = new Float32Array(APRON_SIDE * APRON_SIDE), sdPave = new Float32Array(APRON_SIDE * APRON_SIDE);
   const road2 = new Float32Array(APRON_SIDE * APRON_SIDE * 4);
+  const roadId = new Int32Array(APRON_SIDE * APRON_SIDE);
   const info = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, lines: 0, lanes: 0, s: 0, surface: 0 };
   const mark = fadeOf(step, ROAD.markFullStep, ROAD.markFadeStep);
   for (let j = 0; j < APRON_SIDE; j++) {
@@ -56,11 +106,11 @@ export function computeTileNodes(leaf, surface, field) {
       const o = j * APRON_SIDE + i;
       h[o] = field.heightForStep(x0 + (i - 1) * step, z0 + (j - 1) * step, step, info);
       lat[o] = info.lat; hw[o] = info.hw; a0[o] = info.a0; kind[o] = info.kind; along[o] = info.s;
-      surf[o] = info.surface; sdCar[o] = info.sdCar; sdPave[o] = info.sdPave;
+      surf[o] = info.surface; sdCar[o] = info.sdCar; sdPave[o] = info.sdPave; roadId[o] = info.road;
       road2[o * 4] = info.coverage; road2[o * 4 + 1] = info.lines; road2[o * 4 + 3] = info.junction ? 0 : mark;
     }
   }
-  return { h, lat, hw, a0, kind, surface: surf, along, sdCar, sdPave, road2, shared: false };
+  return { h, lat, hw, a0, kind, surface: surf, along, sdCar: blurField(sdCar), sdPave: blurField(sdPave), road2: maskMarkBorders(road2, roadId, along, sdCar, step), shared: false };
 }
 
 /** Value of the coarser tile T's edge polyline at the boundary point (x, z) (T's spacing grid is aligned to multiples of its step). */
