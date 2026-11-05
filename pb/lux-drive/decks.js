@@ -16,7 +16,8 @@ export const DECK = Object.freeze({
   joinTolerance: 1.5,      // m: the ends of two decks this close are one bridge in two pieces (a joint): they meet at the level of the bridge, not at the valley floor under the joint
   approachJoin: 3.0,       // m: a carved way whose end lies this close to the end of a deck runs onto it there ...
   approachAlign: 0.7,      // ... when it leaves through that end toward the deck (the cosine of the two directions at least this)
-  endStub: 1.0,            // m: an inner point of a deck this close to one of its ends is dropped (see withoutEndStubs)
+  endStub: 0.5,            // m: an inner point of a deck (a car's, at least stubWidth wide) this close to one of its ends takes the level of that end (see endStubs)
+  stubWidth: 4.0,
   endHold: 3.0,            // m: from an end that a way runs onto the deck does not fall below the level of that end for this long (road-network.js holds the approach's carriageway at the
                            // level of its end ABUT_HOLD = 2 m under the deck: a deck that fell away from its end at once lay 5 - 15 cm under that held road - a step onto the road and off it)
   endGrade: 0.12,          // m/m: the steepest a deck climbs or falls away from the level of its end (the DSM next to an abutment is the bank, a parapet or the canopy of a wood: used as it is, the
@@ -150,7 +151,12 @@ function deckEndTops(decks, surface) {
     const joint = isApproach ? [] : ends.filter((o) => (o.k !== e.k || o.side !== e.side) && Math.hypot(o.p[0] - x, o.p[1] - z) <= DECK.joinTolerance);
     let level, envelope;
     if (joint.length) { level = (e.inner + joint.reduce((sum, o) => sum + o.inner, 0)) / (joint.length + 1); envelope = true; }
-    else { level = isApproach || !surface.field ? surface.height(x, z) : Math.max(surface.height(x, z), surface.field.height(x, z)); envelope = isApproach; }   // (a bank: on the 1 m lattice and on the ground itself, whichever is higher - an end on the edge of a drop dived into the continuous ground)
+    else {
+      level = isApproach || !surface.field ? surface.height(x, z) : Math.max(surface.height(x, z), surface.field.height(x, z));
+      // a free end of a car's deck (no way is carved onto it: the next way is a bridge the bake has no deck for, or a ramp of a car park) runs off its end at no more than
+      // DECK.endGrade too: pinned to the ground under a DSM 3 - 5 m higher, it began with a ramp of 80 % (decks 160, 169)
+      envelope = isApproach || decks[e.k].width >= DECK.stubWidth;
+    }   // (a bank: on the 1 m lattice and on the ground itself, whichever is higher - an end on the edge of a drop dived into the continuous ground)
     out[e.k][e.side] = level; out[e.k][2 + e.side] = envelope; out[e.k][4 + e.side] = isApproach;
   }
   return out;
@@ -181,20 +187,15 @@ function endEnvelope(pts, tops, lo, hi, envLo, envHi, surface, holdLo = false, h
 }
 
 /**
- * A deck without the points that lie within DECK.endStub of one of its ends (the bake resamples every 4 m and adds the last point: a last segment of a few centimetres, whose
- * inner point kept the DSM while the end was pinned to the ground - a vertical step of 0.3 - 0.4 m at the end of the deck, decks 255 / 160).  Pure: a new deck, or the same one.
+ * The ends of a deck carry their stub points: an inner point that lies within DECK.endStub of an end takes the level the end gets (the bake resamples every 4 m and adds the
+ * last point: a last segment of a few centimetres whose inner point kept the DSM while the end was pinned to the ground - a vertical step of 0.3 - 0.4 m at the end of the
+ * deck, decks 255 / 160).  Returns, per deck, [index of the stub at the start or -1, at the end or -1].
  */
-function withoutEndStubs(d) {
+function endStubs(d) {
   const n = d.pts.length;
-  if (n < 3) return d;
-  const keep = [];
-  for (let i = 0; i < n; i++) {
-    const nearStart = i > 0 && i < n - 1 && Math.hypot(d.pts[i][0] - d.pts[0][0], d.pts[i][1] - d.pts[0][1]) < DECK.endStub;
-    const nearEnd = i > 0 && i < n - 1 && Math.hypot(d.pts[i][0] - d.pts[n - 1][0], d.pts[i][1] - d.pts[n - 1][1]) < DECK.endStub;
-    if (!nearStart && !nearEnd) keep.push(i);
-  }
-  if (keep.length === n) return d;
-  return { ...d, pts: keep.map((i) => d.pts[i]), tops: Float32Array.from(keep, (i) => d.tops[i]) };
+  if (n < 3 || d.width < DECK.stubWidth) return [-1, -1];             // (a footbridge's last span can be that short and carry it clear of the ground)
+  const near = (i, e) => Math.hypot(d.pts[i][0] - d.pts[e][0], d.pts[i][1] - d.pts[e][1]) < DECK.endStub;
+  return [near(1, 0) ? 1 : -1, n > 3 && near(n - 2, n - 1) ? n - 2 : n === 3 && near(1, 2) && !near(1, 0) ? 1 : -1];
 }
 
 /**
@@ -208,7 +209,7 @@ function withoutEndStubs(d) {
 export function createDeckNetwork(decks, surface = null) {
   // the decks of the ways the road network carves instead (a narrow deck that spans nothing: road-network.js groundedDeckOf) are not decks
   const grounded = surface && surface.field && surface.field.network ? surface.field.network.groundedDecks : null;
-  const kept = (grounded && grounded.size ? decks.filter((d) => !grounded.has(d.id)) : decks).map(withoutEndStubs);
+  const kept = grounded && grounded.size ? decks.filter((d) => !grounded.has(d.id)) : decks;
   const levels = surface ? deckEndTops(kept, surface) : null;
   const list = kept.map((d, k) => {
     if (!surface || d.pts.length < 2) return d;
@@ -220,7 +221,11 @@ export function createDeckNetwork(decks, surface = null) {
       return { ...d, tops };
     }
     const [lo, hi, envLo, envHi, holdLo, holdHi] = levels[k];
-    return { ...d, tops: endEnvelope(d.pts, d.tops, lo, hi, envLo, envHi, surface, holdLo, holdHi) };
+    const tops = endEnvelope(d.pts, d.tops, lo, hi, envLo, envHi, surface, holdLo, holdHi);
+    const [stubA, stubB] = endStubs(d);
+    if (stubA >= 0) tops[stubA] = lo;
+    if (stubB >= 0) tops[stubB] = hi;
+    return { ...d, tops };
   });
   const ax = [], az = [], bx = [], bz = [], t0 = [], t1 = [], half = [], deckOf = [], ends = [];
   list.forEach((d, k) => {
