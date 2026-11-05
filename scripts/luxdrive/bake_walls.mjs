@@ -28,6 +28,8 @@ const MIN_LENGTH = 6;          // m: a LOW wall (rise < MIN_RISE_SHORT) shorter 
 const MIN_RISE_SHORT = WALL.shortRise;    // m: a higher ramp keeps its wall however short: with its tapered ends it is a wedge on the bank, and the bare ramp would be a crack
 const TAPER_LENGTH = 2.5;      // m: the ends of a wall run out into the ground over this length (a sloped end, not a box)
 const TAPER_HEIGHT = 0.12;     // m: the height of the tip of a tapered end above the ground
+const FOOT_PROBE = 1.0, FOOT_DROP = 1.5;   // m: the ground a metre in front of the foot of the face lies at most this under the bottom of the ramp.  Lower, the ramp goes on down below the foot (the scan
+                               // split a face of 7 m between two carriageways at a flat spot): a wall there would stand in the air on the slope, open to the car from below (wall-collider levelReach)
 const GAP_SAMPLES = 1;         // a wall goes on across a sample where the scan found nothing (the ramp flickers around its thresholds), if the ground under the middle of the bridge fits
 
 const { field, surface } = await loadWorld();
@@ -47,7 +49,7 @@ function isCovered(p) {
 }
 function cover(p) { const k = cellKey(p.x, p.z); const l = covered.get(k); if (l) l.push(p); else covered.set(k, [p]); }
 
-const rejected = { foot: 0, back: 0 };       // ramps left without a wall: the foot of the face / the back of the block would lie on a carriageway
+const rejected = { foot: 0, back: 0, air: 0 };   // ramps left without a wall: the foot of the face / the back of the block would lie on a carriageway; the foot would stand in the air (FOOT_DROP)
 const roadProbe = { sdCar: 9, sdPave: 9 };
 /** True when (x, z) lies outside every carriageway of the carved ground. */
 function clearOfRoads(x, z) { net.carve(x, z, roadProbe); return roadProbe.sdCar >= CAR_CLEAR; }
@@ -83,6 +85,7 @@ function wallPointAt(chain, i, side) {
   while (depth > WALL.minDepth && full - depth < MAX_PULL_IN && !clearOfRoads(fx + nx * toHigh * depth, fz + nz * toHigh * depth)) depth = Math.max(WALL.minDepth, depth - 0.15);
   if (!clearOfRoads(fx + nx * toHigh * depth, fz + nz * toHigh * depth)) { rejected.back++; return null; }       // the head of the ramp lies in a carriageway: the ramp is part of the road
   const top = Math.max(heights[ramp.first], heights[ramp.last]), bottom = Math.min(heights[ramp.first], heights[ramp.last]);
+  if (field.height(fx - nx * toHigh * FOOT_PROBE, fz - nz * toHigh * FOOT_PROBE) < bottom - FOOT_DROP) { rejected.air++; return null; }
   return {
     x: chain.x[i] + nx * tFoot, z: chain.z[i] + nz * tFoot, top, bottom, depth,
     nx: nx * toHigh, nz: nz * toHigh, tx: dx, tz: dz, rise: Math.abs(ramp.rise), slope: ramp.maxSlope,
@@ -172,7 +175,7 @@ fs.writeFileSync(OUT, encodeWalls(walls));
 const points = walls.reduce((s, w) => s + w.pts.length, 0);
 let length = 0;
 for (const w of walls) for (let i = 1; i < w.pts.length; i++) length += Math.hypot(w.pts[i].x - w.pts[i - 1].x, w.pts[i].z - w.pts[i - 1].z);
-console.log(`walls: ${walls.length} walls, ${points} points, ${length.toFixed(0)} m long -> ${OUT} (${fs.statSync(OUT).size} bytes); ${probed} samples probed, ${found} ramps, ${duplicate} seen twice, ${short} too short, ramps on tarmac: ${rejected.foot} at the foot / ${rejected.back} at the back`);
+console.log(`walls: ${walls.length} walls, ${points} points, ${length.toFixed(0)} m long -> ${OUT} (${fs.statSync(OUT).size} bytes); ${probed} samples probed, ${found} ramps, ${duplicate} seen twice, ${short} too short, ramps on tarmac: ${rejected.foot} at the foot / ${rejected.back} at the back, ${rejected.air} in the air`);
 if (process.argv.includes('--stats')) {
   const bins = [0.8, 1.5, 2.5, 4, 6, 8.01];
   console.log('   by rise: ' + bins.slice(0, -1).map((b, i) => `${b}-${bins[i + 1]} m: ${walls.filter((w) => w.rise >= b && w.rise < bins[i + 1]).length}`).join(', '));

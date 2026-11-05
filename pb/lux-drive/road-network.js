@@ -48,6 +48,9 @@ const GROUNDED_MAX_DIP = 1.0;          // m: ... over land that dips less than t
 const APPROACH_FREE = 20.0;            // m: the last metres of a way that runs onto a bridge are its approach: its carriageway there is not protected (see carve(), protHere)
 const ABUT_HOLD = 2.0;                 // m: ... and its carriageway is held at its own level this far under the bridge (the cap of the way starts fading only there, the protection only ramps up
                                        // from there): the 1 m lattice under the first metres of the deck is the road, so the deck starts flush on a level surface, not on the edge of the drop
+const ABUT_FADE_MAX = 6.0;             // m: past the hold the ground under the deck falls from the deck to the land below over 1.5 x drop / RAMP_SLOPE (an earth abutment under the deck end, never
+                                       // steeper than the ramp between two levels), at least CAP_SOFT / PROTECT_RAMP and at most this.  With the fixed 2 m of CAP_SOFT a deck 6 m over the road below
+                                       // stood on a vertical face of ground (the world flow's "walls the carve made": 153 of them at the motorway interchanges after the approaches were lifted)
 const smoothstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const MAX_PINS = 16;                   // carriageways that lie over one point, at most
 const MAX_CAND = 192;                  // segments that reach one point, at most
@@ -247,6 +250,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
 
   const roadLength = new Float32Array(roads.length);   // m, the length of every carved way (the distance along it from its far end)
   const capHoldA = new Float32Array(roads.length), capHoldB = new Float32Array(roads.length);   // m: how far past its first / last point the carriageway of a way is held before its cap fades (a way that runs onto a bridge)
+  const capSoftA = new Float32Array(roads.length).fill(CAP_SOFT), capSoftB = new Float32Array(roads.length).fill(CAP_SOFT);   // m: ... and over how much it then fades (the abutment, see ABUT_FADE_MAX)
   const closedRoad = new Uint8Array(roads.length);     // the rings (a pedestrian square, a loop): they have no ends, so no end cap
   const priority = new Float32Array(roads.length);     // the order of the design: the bigger way has the higher number (it wins at a junction)
   const prep = [];                   // the ways that are carved, with everything the second pass needs
@@ -652,26 +656,47 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   const protX0 = [], protZ0 = [], protX1 = [], protZ1 = [], protHalf = [];
   // per segment: the distance along its way at its start and the distances along the way at which the protection starts / ends ramping (-Infinity / Infinity: an end that no road runs onto
   // keeps the full protection up to it and the disc round it)
-  const protArc = [], protRampA = [], protRampB = [], protFade = [];
-  const approachEnds = [];                             // the ends of the carved ways (not over): an end of a bridge near one of them is an abutment
+  const protArc = [], protRampA = [], protRampB = [], protFade = [], protLenA = [], protLenB = [];   // (protLen: the length of the ramp-up at each end, see ABUT_FADE_MAX)
+  const corridorEnds = overCorridors.filter((c) => !isLandmarkDeck({ pts: c.x.map((x, i) => [x, c.z[i]]) })).flatMap((c) => [[c.x[0], c.z[0]], [c.x[c.x.length - 1], c.z[c.z.length - 1]]]);
+  const nearCorridorEnd = pointGrid(corridorEnds, APPROACH_JOIN);
+  const atBridgeEnd = (x, z) => nearCorridorEnd(x, z, APPROACH_JOIN);
+  /** How long the ground under a bridge takes to fall from the deck to the land below past the hold (m, 0 = no more than the defaults): the end of a way at level `bed` that leaves
+   *  through (x, z) in the direction (ux, uz) onto the bridge. */
+  function abutmentFade(x, z, ux, uz, bed) {
+    let land = Infinity;
+    for (let s = ABUT_HOLD; s <= ABUT_HOLD + ABUT_FADE_MAX + 1e-6; s += 1) land = Math.min(land, baseHeight(x + ux * s, z + uz * s));
+    return Math.min(ABUT_FADE_MAX, Math.max(0, (1.5 * (bed - land)) / RAMP_SLOPE));
+  }
+  const approachEnds = [];                             // the ends of the carved ways (not over): an end of a bridge near one of them is an abutment; [x, z, ux, uz, fade]
   for (const chain of chains) {
     if (overRoads.has(chain.road) || chain.x.length < 2) continue;
     const m = chain.x.length;
     for (const [e, f] of [[0, 1], [m - 1, m - 2]]) {               // the end, and the direction the way leaves through it (toward the bridge)
       const dx = chain.x[e] - chain.x[f], dz = chain.z[e] - chain.z[f], l = Math.hypot(dx, dz) || 1;
-      approachEnds.push([chain.x[e], chain.z[e], dx / l, dz / l]);
+      const fade = !chain.closed && atBridgeEnd(chain.x[e], chain.z[e]) ? abutmentFade(chain.x[e], chain.z[e], dx / l, dz / l, chain.bed[e]) : 0;
+      approachEnds.push([chain.x[e], chain.z[e], dx / l, dz / l, fade]);
+      if (fade > 0) {
+        if (e === 0) capSoftA[chain.road] = Math.max(capSoftA[chain.road], fade);
+        else capSoftB[chain.road] = Math.max(capSoftB[chain.road], fade);
+      }
     }
   }
   // An end of a bridge is an abutment when a carved way ends there (APPROACH_JOIN) and runs on in the direction of the bridge.  (The ends of the pavement decks beside a road bridge also
   // protected the end of the road between them; the protection now only keeps the ground from being CUT - see carve() - and a road lifted onto its bridge is a fill.)
   const nearApproachEnd = pointGrid(approachEnds, APPROACH_JOIN);
   const isAbutment = (x, z, ux, uz) => nearApproachEnd(x, z, APPROACH_JOIN, (p) => p[2] * ux + p[3] * uz >= APPROACH_ALIGN);
+  /** The length of the ramp-up of the protection at an abutment: the fade of the approach ways that run onto it there (the ground falls from the deck to the land over it). */
+  const protectRampAt = (x, z, ux, uz) => {
+    let fade = 0;
+    nearApproachEnd(x, z, APPROACH_JOIN, (p) => { if (p[2] * ux + p[3] * uz >= APPROACH_ALIGN) fade = Math.max(fade, p[4]); return false; });
+    return Math.max(PROTECT_RAMP, fade);
+  };
   for (const corridor of overCorridors) {              // the ways that OSM tags as over
     const m = corridor.x.length;
     if (isLandmarkDeck({ pts: corridor.x.map((x, i) => [x, corridor.z[i]]) })) {     // (the Pont Rouge / Pont Adolphe models meet their roads themselves: full protection, as before)
       for (let i = 1; i < m; i++) {
         protX0.push(corridor.x[i - 1]); protZ0.push(corridor.z[i - 1]); protX1.push(corridor.x[i]); protZ1.push(corridor.z[i]);
-        protHalf.push(corridor.half); protFade.push(PROTECT_FADE); protArc.push(0); protRampA.push(-Infinity); protRampB.push(Infinity);
+        protHalf.push(corridor.half); protFade.push(PROTECT_FADE); protArc.push(0); protRampA.push(-Infinity); protRampB.push(Infinity); protLenA.push(PROTECT_RAMP); protLenB.push(PROTECT_RAMP);
       }
       continue;
     }
@@ -681,19 +706,17 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     const lA = Math.hypot(inA[0], inA[1]) || 1, lB = Math.hypot(inB[0], inB[1]) || 1;
     const rampA = isAbutment(corridor.x[0], corridor.z[0], inA[0] / lA, inA[1] / lA) ? 0 : -Infinity;
     const rampB = isAbutment(corridor.x[m - 1], corridor.z[m - 1], inB[0] / lB, inB[1] / lB) ? total : Infinity;
+    const lenA = protectRampAt(corridor.x[0], corridor.z[0], inA[0] / lA, inA[1] / lA), lenB = protectRampAt(corridor.x[m - 1], corridor.z[m - 1], inB[0] / lB, inB[1] / lB);
     let arc = 0;
     for (let i = 1; i < m; i++) {
       protX0.push(corridor.x[i - 1]); protZ0.push(corridor.z[i - 1]);
       protX1.push(corridor.x[i]); protZ1.push(corridor.z[i]);
       protHalf.push(corridor.half); protFade.push(PROTECT_FADE);
-      protArc.push(arc); protRampA.push(rampA); protRampB.push(rampB);
+      protArc.push(arc); protRampA.push(rampA); protRampB.push(rampB); protLenA.push(lenA); protLenB.push(lenB);
       arc += Math.hypot(corridor.x[i] - corridor.x[i - 1], corridor.z[i] - corridor.z[i - 1]);
     }
   }
   // the ways that run onto a bridge: their carriageway is held at its level ABUT_HOLD under the deck (see the cap in carve())
-  const corridorEnds = overCorridors.filter((c) => !isLandmarkDeck({ pts: c.x.map((x, i) => [x, c.z[i]]) })).flatMap((c) => [[c.x[0], c.z[0]], [c.x[c.x.length - 1], c.z[c.z.length - 1]]]);
-  const nearCorridorEnd = pointGrid(corridorEnds, APPROACH_JOIN);
-  const atBridgeEnd = (x, z) => nearCorridorEnd(x, z, APPROACH_JOIN);
   for (const chain of chains) {
     if (overRoads.has(chain.road) || chain.closed) continue;
     const m = chain.x.length;
@@ -719,7 +742,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     // (near a crossing: its carriageway and a metre, fading over CROSSING_FADE: the corridor of a tagged bridge (4 m, fading over 10 m) lay over the carriageway of the trunk road beside the
     // overpass and kept its right lane on the slope of the embankment)
     protHalf.push(near ? BENCH[i] + CROSSING_MARGIN : BENCH[i]); protFade.push(near ? CROSSING_FADE : OWN_PROTECT_FADE);
-    protArc.push(0); protRampA.push(-Infinity); protRampB.push(Infinity);
+    protArc.push(0); protRampA.push(-Infinity); protRampB.push(Infinity); protLenA.push(PROTECT_RAMP); protLenB.push(PROTECT_RAMP);
   }
   const pKey = (cx, cz) => cx * 4096 + cz;
   const pBuckets = new Map();
@@ -738,9 +761,13 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   for (const [key, list] of pBuckets) pCells.set(key, Int32Array.from(list));
 
   /** How much of the ground at (x, z) is protected: 1 inside a corridor of an over way, 0 outside it. */
+  // (protFill: the protection against a FILL, set by every call of protection(): at an abutment it ramps up over the fade of the abutment, so the ground under the deck may fall from the deck
+  // to the land over that length; the protection against a CUT keeps the short PROTECT_RAMP, so the road under the bridge never digs a pit under the deck end - harness gate D)
+  let protFill = 0;
   function protection(x, z) {
     const cx = Math.floor(x / PROTECT_CELL), cz = Math.floor(z / PROTECT_CELL);
     let p = 0;
+    protFill = 0;
     for (let dz = -1; dz <= 1; dz++) {
       for (let dx = -1; dx <= 1; dx++) {
         const list = pCells.get(pKey(cx + dx, cz + dz)) || EMPTY;
@@ -753,10 +780,12 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
           // at an abutment the protection ramps up along the bridge from its end (and is nothing before it, where the approach road is)
           const along = protArc[s] + t * Math.sqrt(ll);
           const ramp = smoothstep(ABUT_HOLD, ABUT_HOLD + PROTECT_RAMP, Math.min(along - protRampA[s], protRampB[s] - along));
+          const rampFill = smoothstep(ABUT_HOLD, ABUT_HOLD + protLenA[s], along - protRampA[s]) * smoothstep(ABUT_HOLD, ABUT_HOLD + protLenB[s], protRampB[s] - along);
           t = t < 0 ? 0 : t > 1 ? 1 : t;
           const d = Math.hypot(x - (ax + ex * t), z - (az + ez * t)) - protHalf[s];
-          const v = (d <= 0 ? 1 : d < protFade[s] ? 1 - d / protFade[s] : 0) * ramp;
-          if (v >= 1) return 1;
+          const across = d <= 0 ? 1 : d < protFade[s] ? 1 - d / protFade[s] : 0;
+          if (across * rampFill > protFill) protFill = across * rampFill;
+          const v = across * ramp;
           if (v > p) p = v;
         }
       }
@@ -917,8 +946,9 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
           // how far the point lies beyond the END of the way (0 along the way): the carriageway ends at the end of the way
           let over = 0;
           if (closedRoad[ROADOF[i]]) over = 0;
-          else if (t0 < 0 && i === firstSeg[ROADOF[i]]) over = Math.max(0, -t0 * len - capHoldA[ROADOF[i]]);
-          else if (t0 > 1 && i === firstSeg[ROADOF[i]] + segCount[ROADOF[i]] - 1) over = Math.max(0, (t0 - 1) * len - capHoldB[ROADOF[i]]);
+          // (scaled so that the cap fades over CAP_SOFT of `over`: an abutment fades over its own length, capSoft)
+          else if (t0 < 0 && i === firstSeg[ROADOF[i]]) over = Math.max(0, -t0 * len - capHoldA[ROADOF[i]]) * (CAP_SOFT / capSoftA[ROADOF[i]]);
+          else if (t0 > 1 && i === firstSeg[ROADOF[i]] + segCount[ROADOF[i]] - 1) over = Math.max(0, (t0 - 1) * len - capHoldB[ROADOF[i]]) * (CAP_SOFT / capSoftB[ROADOF[i]]);
           candI[nCand] = i; candD[nCand] = d; candT[nCand] = t; candLat[nCand] = lat; candOver[nCand] = over; nCand++;
         }
       }
@@ -1066,12 +1096,15 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
         // What the pin pulls the ground toward is the surface of THIS way: the bed within the bench, and beside it the face of its own batter.  Pulling toward the flat
         // bed (the first version) multiplied the slope of the ground by 1 + e * |pin'| = 1.75 over the whole fade whenever the hillside was not flat.
         const over = candOver[k];
-        const pin = (1 - smoothstep(bench, bench + PIN_FADE, d)) * (1 - smoothstep(0, CAP_SOFT, over));
+        // The level the pin pulls toward is the bed within the bench of the NEAREST segment of the way (dMin) and its face beyond: it is a property of the point and of the way, not of the
+        // segment.  (Per segment, a segment on the far side of a tight bend had its own distance beyond the bench and pulled the carriageway toward the face of its batter.)
+        const face = ground + (applies ? dev : 0);
+        const join = Math.max(FACE_JOIN, FACE_JOIN_PER_M * Math.abs(bed - face));
+        // The pin itself fades over PIN_FADE, or over the join where that is longer: a pin that let go while the join was still half way from the bed to the face multiplied the two fades,
+        // and the side of a way that stands 5 m over a valley (Boulevard Roosevelt over the Pétrusse) dropped 3 m in a metre.
+        const pin = (1 - smoothstep(bench, bench + Math.max(PIN_FADE, join), d)) * (1 - smoothstep(0, CAP_SOFT, over));
         if (pin > 0) {
-          // The level the pin pulls toward is the bed within the bench of the NEAREST segment of the way (dMin) and its face beyond: it is a property of the point and of the way, not of the
-          // segment.  (Per segment, a segment on the far side of a tight bend had its own distance beyond the bench and pulled the carriageway toward the face of its batter.)
-          const face = ground + (applies ? dev : 0);
-          pinSum += w * pin; pinValSum += w * pin * (face + (bed - face) * (1 - smoothstep(bench, bench + Math.max(FACE_JOIN, FACE_JOIN_PER_M * Math.abs(bed - face)), dMin))); pinBedSum += w * pin * bed;
+          pinSum += w * pin; pinValSum += w * pin * (face + (bed - face) * (1 - smoothstep(bench, bench + join, dMin))); pinBedSum += w * pin * bed;
         }
         { const wm = w * (1 - smoothstep(MAG_WINDOW[0], MAG_WINDOW[1], d - dMin)); pinMagSum += wm * pin; pinMagW += wm; }
       }
@@ -1148,7 +1181,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     // The protection keeps the ground under a bridge from being CUT (a pit under the deck) and from being buried under the batter of a road beside it; the CARRIAGEWAY of a way that
     // rises onto a bridge (its approach on a fill, lifted to the deck) is neither, and the corridor of the other carriageway's deck beside it - whose end lies 10 .. 20 m along on a skewed
     // bridge - flattened the end of the approach road into the valley.
-    const protHere = prot * (1 - pinCover);
+    const protHere = (bandY > ground ? protFill : prot) * (1 - pinCover);    // (a fill under a bridge end may fall to the land over the abutment; a cut may not dig a pit)
     out.band = ground + (1 - protHere) * (bandY - ground);
     // The paint: the union of the carriageways and of the pavements, each way painted only where the ground lies at its own level.  Where two ways at different levels overlap in plan
     // (a slip road beside the trunk road, an overpass on its embankment) the ground between them is a ramp or the side of the embankment, and painted with the carriageway of the way
