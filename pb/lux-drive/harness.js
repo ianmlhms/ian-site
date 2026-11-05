@@ -1642,6 +1642,36 @@ if (wants('L')) {
   clusters.forEach((c, i) => { const at = `${Math.round(c.x)},${Math.round(c.z)}`; if (isSteep(at)) worstSteep = Math.max(worstSteep, boxBobs[i]); else if (boxBobs[i] > worstPlain) { worstPlain = boxBobs[i]; worstPlainAt = at; } });
   check(`junctions: driving straight across the ${clusters.length} biggest junctions (median over the junctions <= ${MAX_MEDIAN_BOX_BOB}, worst <= ${MAX_WORST_BOX_BOB} m/s2, the two steep old-town boxes <= ${MAX_STEEP_BOX_BOB}; target ${JUNCTION.maxBob})`,
     median <= MAX_MEDIAN_BOX_BOB && worstPlain <= MAX_WORST_BOX_BOB && worstSteep <= MAX_STEEP_BOX_BOB, `median ${median.toFixed(2)}, worst ${worstPlain.toFixed(2)} at ${worstPlainAt}, steep old town ${worstSteep.toFixed(2)}`);
+
+  // (3) Asphalt only on the carriageway, never on a slope beside it (Nei Escher Strooss: the side of an overpass embankment was painted as tarmac).  Points of the painted carriageway (0.7 m
+  // inside its edge, off the kerb) across every way (every 60th centre line sample, +-14 m), where the offset of the road the point is on is clean (its gradient within 15 % of 1): the
+  // ground across that road steeper than 15 % is asphalt on a slope.  Guard at today's level (0.8 % of the points before this round; what remains are lanes that the land and a
+  // neighbour at another level squeeze, see PROGRESS).
+  {
+    const S = net.samples, ri = { sdCar: 9 }, ra = {}, rb = {}, rc = {}, rd = {};
+    const MAX_SLOPE = 0.15, MAX_SHARE = 0.006;
+    let pts = 0, steep = 0;
+    const steepList = [];
+    for (let i = 0; i + 1 < S.x.length; i += 60) {
+      if (S.road[i + 1] !== S.road[i]) continue;
+      let dx = S.x[i + 1] - S.x[i], dz = S.z[i + 1] - S.z[i];
+      const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
+      for (let o = -14; o <= 14; o++) {
+        const x = S.x[i] - dz * o, z = S.z[i] + dx * o;
+        if (!(surface.roadInfoAt(x, z, ri).sdCar < -0.7)) continue;
+        field.height(x + 0.5, z, ra); field.height(x - 0.5, z, rb); field.height(x, z + 0.5, rc); field.height(x, z - 0.5, rd);
+        if (ra.road !== rb.road || rc.road !== rd.road || ra.road !== rc.road) continue;
+        const gx = ra.lat - rb.lat, gz = rc.lat - rd.lat, g = Math.hypot(gx, gz);
+        if (g < 0.85 || g > 1.15) continue;
+        pts++;
+        const across = Math.abs(surface.height(x + gx / g * 0.5, z + gz / g * 0.5) - surface.height(x - gx / g * 0.5, z - gz / g * 0.5));
+        if (across > MAX_SLOPE) { steep++; if (steepList.length < 5) steepList.push(`${Math.round(x)},${Math.round(z)} ${(across * 100).toFixed(0)} %`); }
+      }
+    }
+    stats.asphaltOnSlope = { points: pts, steep, share: +(steep / Math.max(1, pts)).toFixed(4) };
+    check(`asphalt only on level carriageway: painted carriageway on ground steeper than ${MAX_SLOPE * 100} % across the road <= ${MAX_SHARE * 100} % of the points`, pts > 1000 && steep <= MAX_SHARE * pts,
+      `${steep} of ${pts} points (${(100 * steep / Math.max(1, pts)).toFixed(2)} %), e.g. ${steepList.join('; ')}`);
+  }
 }
 
 /* ---------------------------------------------------------------- the summary */
