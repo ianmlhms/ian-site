@@ -83,10 +83,11 @@ const CHANNEL_FAR = 30;                 // m: "no second carriageway" (a distanc
  * group, so that the four nodes of a cell interpolate the distance to the SAME two carriageways: each is a plane, and the shader takes their minimum per pixel - the median is two
  * straight kerbs.  Where the pair changes from node to node (three carriageways meet: a junction) the node's weight is 0 and the shader keeps the blurred union (aRoad3.x).
  * The pavements of the two carriageways come along the same way (pvA / pvB: the distance to the outer edge of each one's pavement).
- * Returns a Float32Array (APRON_SIDE^2 x CHANNEL_STRIDE): carriageway 0, carriageway 1, the weight, 0, pavement 0, pavement 1, 0, 0.
+ * And which of the two is a street (maj: bit 0 the nearest, bit 1 the other): the pale tar of a service way is outside every STREET carriageway (sdMajor), per pixel as well.
+ * Returns a Float32Array (APRON_SIDE^2 x CHANNEL_STRIDE): carriageway 0, carriageway 1, the weight, which of the two are streets (bit 0 / 1), pavement 0, pavement 1, 0, 0.
  */
 export const CHANNEL_STRIDE = 8;
-export function carriagewayChannels(sdA, grpA, sdB, grpB, pvA, pvB) {
+export function carriagewayChannels(sdA, grpA, sdB, grpB, pvA, pvB, maj) {
   const out = new Float32Array(APRON_SIDE * APRON_SIDE * CHANNEL_STRIDE);
   const key0 = new Float64Array(APRON_SIDE * APRON_SIDE);
   for (let o = 0; o < APRON_SIDE * APRON_SIDE; o++) {
@@ -96,7 +97,9 @@ export function carriagewayChannels(sdA, grpA, sdB, grpB, pvA, pvB) {
     const pa = Math.min(CHANNEL_FAR, pvA[o]), pb = b < 0 ? CHANNEL_FAR : Math.min(CHANNEL_FAR, pvB[o]);
     out[o * 8] = swap ? db : da; out[o * 8 + 1] = swap ? da : db;
     out[o * 8 + 4] = swap ? pb : pa; out[o * 8 + 5] = swap ? pa : pb;
-    key0[o] = swap ? b * 1e7 + a : a * 1e7 + b;
+    const mA = maj[o] & 1, mB = b < 0 ? 0 : (maj[o] >> 1) & 1;
+    out[o * 8 + 3] = swap ? mB + 2 * mA : mA + 2 * mB;
+    key0[o] = (swap ? b * 1e7 + a : a * 1e7 + b) * 4 + out[o * 8 + 3];
   }
   for (let j = 0; j < APRON_SIDE; j++) {
     for (let i = 0; i < APRON_SIDE; i++) {
@@ -144,7 +147,7 @@ export function computeTileNodes(leaf, surface, field) {
       road2[o * 4 + 2] = b.surface[o];                         // the material of the road the node is on
       road2[o * 4 + 3] = b.junction[o] ? 0 : 1;                // the 1 m lattice draws the markings exactly (not at a junction)
     }
-    return { h: b.h, lat: b.lat, hw: b.hw, a0: b.a0, kind: b.kind, surface: b.surface, along: b.along, sdCar: blurField(b.sdCar), sdPave: blurField(b.sdPave), sdMajor: blurField(b.sdMajor), road2: maskMarkBorders(road2, b.road, b.along, b.sdCar, step), channels: carriagewayChannels(b.sdA, b.grpA, b.sdB, b.grpB, b.pvA, b.pvB), shared: true };
+    return { h: b.h, lat: b.lat, hw: b.hw, a0: b.a0, kind: b.kind, surface: b.surface, along: b.along, sdCar: blurField(b.sdCar), sdPave: blurField(b.sdPave), sdMajor: blurField(b.sdMajor), road2: maskMarkBorders(road2, b.road, b.along, b.sdCar, step), channels: carriagewayChannels(b.sdA, b.grpA, b.sdB, b.grpB, b.pvA, b.pvB, b.maj), shared: true };
   }
   const h = new Float32Array(APRON_SIDE * APRON_SIDE);
   const lat = new Float32Array(APRON_SIDE * APRON_SIDE);
@@ -159,7 +162,8 @@ export function computeTileNodes(leaf, surface, field) {
   const sdA = new Float32Array(APRON_SIDE * APRON_SIDE), sdB = new Float32Array(APRON_SIDE * APRON_SIDE);
   const grpA = new Int32Array(APRON_SIDE * APRON_SIDE), grpB = new Int32Array(APRON_SIDE * APRON_SIDE);
   const pvA = new Float32Array(APRON_SIDE * APRON_SIDE), pvB = new Float32Array(APRON_SIDE * APRON_SIDE);
-  const info = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, lines: 0, lanes: 0, s: 0, surface: 0, sdA: 0, sdB: 0, grpA: -1, grpB: -1, pvA: 0, pvB: 0 };
+  const maj = new Uint8Array(APRON_SIDE * APRON_SIDE);
+  const info = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, lines: 0, lanes: 0, s: 0, surface: 0, sdA: 0, sdB: 0, grpA: -1, grpB: -1, pvA: 0, pvB: 0, majA: 0, majB: 0 };
   const mark = fadeOf(step, ROAD.markFullStep, ROAD.markFadeStep);
   for (let j = 0; j < APRON_SIDE; j++) {
     for (let i = 0; i < APRON_SIDE; i++) {
@@ -168,10 +172,10 @@ export function computeTileNodes(leaf, surface, field) {
       lat[o] = info.lat; hw[o] = info.hw; a0[o] = info.a0; kind[o] = info.kind; along[o] = info.s;
       surf[o] = info.surface; sdCar[o] = info.sdCar; sdPave[o] = info.sdPave; sdMajor[o] = info.sdMajor; roadId[o] = info.road;
       road2[o * 4] = info.coverage; road2[o * 4 + 1] = info.lines; road2[o * 4 + 3] = info.junction ? 0 : mark;
-      sdA[o] = info.sdA; sdB[o] = info.sdB; grpA[o] = info.grpA; grpB[o] = info.grpB; pvA[o] = info.pvA; pvB[o] = info.pvB;
+      sdA[o] = info.sdA; sdB[o] = info.sdB; grpA[o] = info.grpA; grpB[o] = info.grpB; pvA[o] = info.pvA; pvB[o] = info.pvB; maj[o] = info.majA + 2 * info.majB;
     }
   }
-  return { h, lat, hw, a0, kind, surface: surf, along, sdCar: blurField(sdCar), sdPave: blurField(sdPave), sdMajor: blurField(sdMajor), road2: maskMarkBorders(road2, roadId, along, sdCar, step), channels: carriagewayChannels(sdA, grpA, sdB, grpB, pvA, pvB), shared: false };
+  return { h, lat, hw, a0, kind, surface: surf, along, sdCar: blurField(sdCar), sdPave: blurField(sdPave), sdMajor: blurField(sdMajor), road2: maskMarkBorders(road2, roadId, along, sdCar, step), channels: carriagewayChannels(sdA, grpA, sdB, grpB, pvA, pvB, maj), shared: false };
 }
 
 /** Value of the coarser tile T's edge polyline at the boundary point (x, z) (T's spacing grid is aligned to multiples of its step). */
@@ -263,7 +267,7 @@ export function buildTileMesh(leaf, nodes, split, field, marks = null) {
       road2[v * 4 + 2] = surface[a];                        // the material of the road the node is on
       road2[v * 4 + 3] = nodes.road2[a * 4 + 3];
       road3[v * 4] = nodes.sdCar[a]; road3[v * 4 + 1] = nodes.sdPave[a]; road3[v * 4 + 2] = paintK; road3[v * 4 + 3] = nodes.sdMajor[a];
-      road4[v * 4] = nodes.channels[a * 8]; road4[v * 4 + 1] = nodes.channels[a * 8 + 1]; road4[v * 4 + 2] = nodes.channels[a * 8 + 2];
+      for (let c = 0; c < 4; c++) road4[v * 4 + c] = nodes.channels[a * 8 + c];
       road5[v * 4] = nodes.channels[a * 8 + 4]; road5[v * 4 + 1] = nodes.channels[a * 8 + 5];
     }
   }
@@ -376,6 +380,7 @@ export function appendMarkings(mesh, nodes, plan) {
     road2[v * 4] = nodeLerp4(nodes.road2, x0, z0, step, x, z, 0); road2[v * 4 + 1] = nodes.road2[o * 4 + 1]; road2[v * 4 + 2] = nodes.surface[o]; road2[v * 4 + 3] = nodes.road2[o * 4 + 3];
     road3[v * 4] = nodeLerp(nodes.sdCar, x0, z0, step, x, z); road3[v * 4 + 1] = nodeLerp(nodes.sdPave, x0, z0, step, x, z); road3[v * 4 + 2] = paintK; road3[v * 4 + 3] = nodeLerp(nodes.sdMajor, x0, z0, step, x, z);
     for (let c = 0; c < 3; c++) road4[v * 4 + c] = nodeLerpK(nodes.channels, CHANNEL_STRIDE, c, x0, z0, step, x, z);
+    road4[v * 4 + 3] = nodes.channels[o * CHANNEL_STRIDE + 3];
     for (let c = 0; c < 2; c++) road5[v * 4 + c] = nodeLerpK(nodes.channels, CHANNEL_STRIDE, 4 + c, x0, z0, step, x, z);
     const l = Math.hypot(nx, nz) || 1;
     mark[v * 4] = nx / l; mark[v * 4 + 1] = nz / l; mark[v * 4 + 2] = MARK.lineHalf; mark[v * 4 + 3] = side * strength;

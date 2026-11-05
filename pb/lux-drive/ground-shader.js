@@ -24,7 +24,7 @@ export const GROUND_VERTEX = `
   attribute vec4 aRoad5;       // the distances to the outer edges of the pavements of those two carriageways
   attribute vec4 aMark;        // a lane marking ribbon (tile-mesh.js appendMarkings): the unit normal of the line (x, z), its half width, the side (-1 / +1) times the strength; 0 on the ground
   varying vec3 vWorld; varying vec3 vNormal; varying float vDist;
-  varying vec4 vRoad; varying vec4 vRoad2; varying vec4 vRoad3; varying vec3 vRoad4; varying vec2 vRoad5;
+  varying vec4 vRoad; varying vec4 vRoad2; varying vec4 vRoad3; varying vec4 vRoad4; varying vec2 vRoad5;
   varying vec3 vMark;          // across the line (-1 .. 1), the share of the ribbon that is paint, 1 on a ribbon
   void main(){
     vec4 wp = modelMatrix * vec4(position, 1.0);
@@ -34,7 +34,7 @@ export const GROUND_VERTEX = `
     float halfW = max(aMark.z, length(cameraPosition - wp.xyz) * ${MARK_PIXEL.toFixed(5)});
     wp.xz += aMark.xy * sign(aMark.w) * halfW * isMark;
     vMark = vec3(sign(aMark.w), isMark * abs(aMark.w) * aMark.z / max(halfW, 1e-4), isMark);
-    vWorld = wp.xyz; vNormal = normal; vRoad = aRoad; vRoad2 = aRoad2; vRoad3 = aRoad3; vRoad4 = aRoad4.xyz; vRoad5 = aRoad5.xy;
+    vWorld = wp.xyz; vNormal = normal; vRoad = aRoad; vRoad2 = aRoad2; vRoad3 = aRoad3; vRoad4 = aRoad4; vRoad5 = aRoad5.xy;
     vec4 mv = viewMatrix * wp;
     vDist = length(mv.xyz);
     // the ribbon lies ON the triangles it was sampled from; it wins the depth test by being pulled a few centimetres toward the camera (more with the distance, where the depth is coarse).
@@ -52,7 +52,7 @@ export const GROUND_FRAGMENT = `
   uniform float uKerbWidth;
   uniform float uTreeRadius;
   varying vec3 vWorld; varying vec3 vNormal; varying float vDist;
-  varying vec4 vRoad; varying vec4 vRoad2; varying vec4 vRoad3; varying vec3 vRoad4; varying vec2 vRoad5;
+  varying vec4 vRoad; varying vec4 vRoad2; varying vec4 vRoad3; varying vec4 vRoad4; varying vec2 vRoad5;
   varying vec3 vMark;
   ${PAINT_LIGHT_GLSL}
   float hash21(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
@@ -158,11 +158,16 @@ export const GROUND_FRAGMENT = `
     // read as a blotch.  They get a soft border (a wider blend, so the angles round off) and a calmer, lighter grey.  Streets of 6 m and more are not touched.
     // (minor = on a carriageway but outside every street carriageway: the signed distance to those is continuous, so the pale tar of a service way that runs into the avenue ends in a
     // straight line along the avenue's edge, not in the sawtooth of the half width of the nearest way switching per node)
-    float minorW = smoothstep(0.0, 0.8, vRoad3.w) * step(surface, 0.5) * step(0.5, roadW);
+    // (where the two channels hold, the distance to the street carriageways is theirs too: the streets among the two, bit 0 / bit 1 of aRoad4.w)
+    float majBits = floor(vRoad4.w + 0.5);
+    float majA = mod(majBits, 2.0), majB = floor(majBits / 2.0);
+    float sdMaj = min(majA > 0.5 ? vRoad4.x : 99.0, majB > 0.5 ? vRoad4.y : 99.0);
+    float minorW = smoothstep(0.0, 0.8, mix(vRoad3.w, min(sdMaj, 8.0), wC)) * step(surface, 0.5) * step(0.5, roadW);
     // (the soft border is a few decimetres: a wider one let the lawn under it show through as a light green halo along every narrow road, QA T09)
     onCarriage = mix(onCarriage, 1.0 - smoothstep(-0.2, 0.2, sdC), minorW);
     surf = mix(surf, mix(surf, vec3(0.40, 0.40, 0.40) * (0.96 + 0.08 * nMid.g), 0.55), minorW);
-    float onKerb = smoothstep(-aaC, aaC, sdC) * (1.0 - smoothstep(kerbW - aaC, kerbW + aaC, sdC));
+    // (the kerb takes what the carriageway leaves: under the soft border of a service way it is the kerb, not the lawn, that shows - the green halo, QA T09)
+    float onKerb = (1.0 - onCarriage) * (1.0 - smoothstep(kerbW - aaC, kerbW + aaC, sdC));
     float onPave = smoothstep(kerbW - aaC, kerbW + aaC, sdC) * (1.0 - smoothstep(-aaP, aaP, sdP));
     // A kerb and a pavement lie on level ground: on a ramp steeper than 1.3 m/m (the foot of a retaining wall, a cutting beside a junction) the slab texture is a stretched
     // stripe with ragged teeth along the lattice, so the ramp keeps the paint of the land and only the carriageway stays painted.
