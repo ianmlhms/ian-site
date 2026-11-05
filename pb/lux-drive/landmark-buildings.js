@@ -102,7 +102,7 @@ export function buildPhilharmonie({ buildings, ground }) {
   const yRoof = y0 + K.columnHeight;
   soup.prism(roofOuter, yRoof, yRoof + K.roofThickness, K.white, { topColor: paint(K.white, 9, 0.02) });
   const roofInner = ellipse(cx, cz, K.rx - 10, K.rz - 14, 32, K.yaw);
-  soup.prism(roofInner, yRoof + K.roofThickness, yRoof + K.roofThickness + 2.2, C.concrete, { topColor: C.paving });
+  soup.prism(roofInner, yRoof + K.roofThickness, yRoof + K.roofThickness + 2.2, paint(K.white, 11, 0.02), { topColor: paint(K.white, 12, 0.02) });   // the roof is white all over in the photographs (a grey pad read as a lid)
   // the white shell: one smooth skin, from the podium (outer rim, flat) up to the colonnade; its height follows a bell along the arc (the wave of the photographs)
   const S = K.shell;
   const rim = (a, k) => ellipse1(cx, cz, K.rx * k, K.rz * k, a, K.yaw);

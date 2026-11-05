@@ -301,33 +301,33 @@
   "free": true
  },
  {
-  "name": "philharmonie_hi60",
-  "tx": 5975,
-  "tz": 8000,
+  "name": "philharmonie_air_n",
+  "tx": 5960,
+  "tz": 7990,
   "ty": 8,
   "dist": 110,
-  "bearing": 60,
-  "height": 70,
+  "bearing": 272.6,
+  "height": 90,
   "fov": 55,
   "hide": [
    "trees"
   ],
   "free": true,
-  "sightStop": 200
+  "sightStop": 400
  },
  {
-  "name": "philharmonie_hi20",
-  "tx": 5975,
-  "tz": 8000,
+  "name": "philharmonie_air_w",
+  "tx": 5960,
+  "tz": 7990,
   "ty": 8,
-  "dist": 110,
-  "bearing": 20,
-  "height": 70,
+  "dist": 94,
+  "bearing": 148,
+  "height": 90,
   "fov": 55,
   "hide": [
    "trees"
   ],
   "free": true,
-  "sightStop": 200
+  "sightStop": 400
  }
 ]
