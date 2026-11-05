@@ -142,9 +142,9 @@ export const GROUND_FRAGMENT = `
     float markOn = smoothstep(0.5, 0.9, mark);
     float dash = (lines > 0.5 && lines < 1.5) ? step(fract(s / 9.0), 0.34) : 1.0;
     float centre = (1.0 - smoothstep(0.05, 0.11, al)) * dash * step(0.5, lines) * step(lines, 2.5);
-    // Where two ways meet at a shallow angle the offset `lat` of the nearest way is interpolated between vertices that belong to DIFFERENT ways: its gradient is no longer 1 per metre
-    // (a true offset from a centre line has a gradient of exactly 1) and the zero of `lat` wobbles.  The centre line fades out there: it ends cleanly instead of wobbling.
-    vec2 Jx = dFdx(P), Jy = dFdy(P), sl = vec2(dFdx(lat), dFdy(lat));           // the world gradient of `lat` from its screen derivatives: M g = sl with the rows Jx, Jy of M
+    // Where two ways meet at a shallow angle the offset lat of the nearest way is interpolated between vertices that belong to DIFFERENT ways: its gradient is no longer 1 per metre
+    // (a true offset from a centre line has a gradient of exactly 1) and the zero of lat wobbles.  The centre line fades out there: it ends cleanly instead of wobbling.
+    vec2 Jx = dFdx(P), Jy = dFdy(P), sl = vec2(dFdx(lat), dFdy(lat));           // the world gradient of lat from its screen derivatives: M g = sl with the rows Jx, Jy of M
     float detJ = Jx.x * Jy.y - Jx.y * Jy.x;
     float latSlope = abs(detJ) > 1e-9 ? length(vec2(Jy.y * sl.x - Jx.y * sl.y, -Jy.x * sl.x + Jx.x * sl.y)) / abs(detJ) : 1.0;
     centre *= 1.0 - smoothstep(1.3, 1.9, latSlope);
