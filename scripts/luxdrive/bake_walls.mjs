@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadWorld } from './world_node.mjs';
-import { WALL, findRamp, encodeWalls } from '../../pb/lux-drive/retaining-walls.js';
+import { WALL, findRamp, encodeWalls, rampTolerance } from '../../pb/lux-drive/retaining-walls.js';
 
 const OUT_DEFAULT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../pb/lux-drive/data/walls.bin');
 const outArg = process.argv.find((a) => a.startsWith('--out='));
@@ -25,7 +25,7 @@ const MIN_SAMPLES = 2;         // a ramp seen at a single sample is noise of the
 const CAR_CLEAR = -0.15;        // the foot of the face and the back of the block lie outside every carriageway (signed distance to the union of the carriageways): a wall never stands on tarmac
 const MAX_PULL_IN = 0.6;       // m: the back of the block is pulled in at most this far to get off a carriageway (a sliver of the lane edge); a ramp whose head lies deeper in the road has no wall
 const MIN_LENGTH = 6;          // m: a LOW wall (rise < MIN_RISE_SHORT) shorter than this (2 samples on a short bend) reads as a crate lying on the bank: not baked, the ground carries the step
-const MIN_RISE_SHORT = 2.0;    // m: a higher ramp keeps its wall however short: with its tapered ends it is a wedge on the bank, and the bare ramp would be a crack
+const MIN_RISE_SHORT = WALL.shortRise;    // m: a higher ramp keeps its wall however short: with its tapered ends it is a wedge on the bank, and the bare ramp would be a crack
 const TAPER_LENGTH = 2.5;      // m: the ends of a wall run out into the ground over this length (a sloped end, not a box)
 const TAPER_HEIGHT = 0.12;     // m: the height of the tip of a tapered end above the ground
 const GAP_SAMPLES = 1;         // a wall goes on across a sample where the scan found nothing (the ramp flickers around its thresholds), if the ground under the middle of the bridge fits
@@ -95,7 +95,8 @@ const ON_RAMP = 0.9;           // m: the foot of the face stands within this of 
 
 /** The wall point stands on the ramp it was found on: the ground under the foot of the face is the bottom, the ground under the back of the block is the top. */
 function fits(p) {
-  return Math.abs(surface.height(p.x, p.z) - p.bottom) <= ON_RAMP && Math.abs(surface.height(p.x + p.nx * p.depth, p.z + p.nz * p.depth) - p.top) <= ON_RAMP;
+  const tol = Math.max(ON_RAMP, rampTolerance(p.top - p.bottom, p.depth));
+  return Math.abs(surface.height(p.x, p.z) - p.bottom) <= tol && Math.abs(surface.height(p.x + p.nx * p.depth, p.z + p.nz * p.depth) - p.top) <= tol;
 }
 
 /** A wall found at one sample covers WALL.endExtend m of the way on both sides of it: the ends of a wall are extended, as far as the ramp goes on (the ground may change there). */
@@ -150,7 +151,7 @@ for (const chain of chains) {
     for (let i = 0; i < chain.x.length; i++) {
       probed++;
       const p = wallPointAt(chain, i, side);
-      if (debugOn && Math.hypot(chain.x[i] - DEBUG_AT[0], chain.z[i] - DEBUG_AT[1]) < 12) console.log('debug', chain.road, i, side, p ? `point rise ${p.rise.toFixed(1)} depth ${p.depth.toFixed(2)} fits ${fits(p)} covered ${isCovered(p)}` : 'none');
+      if (debugOn && Math.hypot(chain.x[i] - DEBUG_AT[0], chain.z[i] - DEBUG_AT[1]) < 12) console.log('debug', chain.road, i, side, p ? `point rise ${p.rise.toFixed(1)} depth ${p.depth.toFixed(2)} fits ${fits(p)} foot ${surface.height(p.x, p.z).toFixed(2)}/${p.bottom.toFixed(2)} head ${surface.height(p.x + p.nx * p.depth, p.z + p.nz * p.depth).toFixed(2)}/${p.top.toFixed(2)} covered ${isCovered(p)}` : 'none');
       if (!p || !fits(p)) { misses++; if (misses > GAP_SAMPLES) { flush(); misses = 0; } continue; }
       if (isCovered(p)) { duplicate++; flush(); misses = 0; continue; }
       found++;

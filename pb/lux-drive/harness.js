@@ -47,7 +47,7 @@ import { createTramSim } from './tram-sim.js';
 import { placeStreetLights } from './street-lights.js';
 import { placeParkBenches } from './park-benches.js';
 import { createPropCollider } from './props.js';
-import { WALL, WALL_DRAW_FACTOR, findRamp, wallQuads } from './retaining-walls.js';
+import { WALL, WALL_DRAW_FACTOR, findRamp, wallQuads, rampTolerance } from './retaining-walls.js';
 import { JUNCTION, junctionClusters, driveLine } from './junction-probe.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -1297,7 +1297,8 @@ if (wants('K')) {
       if (!ok) { insane++; continue; }
       if (tip) { const k = wkey(p.x, p.z), l = gridW.get(k); if (l) l.push(p); else gridW.set(k, [p]); continue; }
       const foot = surface.height(p.x, p.z), head = surface.height(p.x + p.nx * p.depth, p.z + p.nz * p.depth);
-      if (Math.abs(foot - p.bottom) > ON_RAMP || Math.abs(head - p.top) > ON_RAMP) { if (foot - p.bottom < -ON_RAMP || p.top - head < -ON_RAMP) buried++; else floating++; }
+      const tol = Math.max(ON_RAMP, rampTolerance(p.top - p.bottom, p.depth));       // (a ramp steeper than 3 m/m is off by more on the 1 m lattice)
+      if (Math.abs(foot - p.bottom) > tol || Math.abs(head - p.top) > tol) { if (foot - p.bottom < -tol || p.top - head < -tol) buried++; else floating++; }
       const k = wkey(p.x, p.z), l = gridW.get(k); if (l) l.push(p); else gridW.set(k, [p]);
     }
   }
@@ -1321,7 +1322,7 @@ if (wants('K')) {
     }
     return false;
   };
-  let scanned = 0, ramps = 0, bare = 0, inRoad = 0;
+  let scanned = 0, ramps = 0, bare = 0, inRoad = 0, latticeLimited = 0;
   const wprobe = { sdCar: 9, sdPave: 9 };
   const bareList = [];
   const STRIDE = QUICK ? 25 : 5;
@@ -1340,7 +1341,7 @@ if (wants('K')) {
     if (!ramp) return null;
     const rising = ramp.rise > 0, tFoot = t0 + (rising ? ramp.first : ramp.last) * WALL.scanStep, toHigh = rising ? 1 : -1;
     const tHead = t0 + (rising ? ramp.last : ramp.first) * WALL.scanStep;
-    return { rise: Math.abs(ramp.rise), slope: ramp.maxSlope, depth: Math.max(WALL.minDepth, Math.abs(tHead - tFoot)), x: chain.x[i] + nx * tFoot, z: chain.z[i] + nz * tFoot, nx: nx * toHigh, nz: nz * toHigh, top: Math.max(heights[ramp.first], heights[ramp.last]) };
+    return { rise: Math.abs(ramp.rise), slope: ramp.maxSlope, depth: Math.max(WALL.minDepth, Math.abs(tHead - tFoot)), x: chain.x[i] + nx * tFoot, z: chain.z[i] + nz * tFoot, nx: nx * toHigh, nz: nz * toHigh, top: Math.max(heights[ramp.first], heights[ramp.last]), bottom: Math.min(heights[ramp.first], heights[ramp.last]) };
   };
   const ways = net.chains.filter((c) => !c.tagged && !net.overRoads.has(c.road));
   for (const chain of ways) {
@@ -1358,15 +1359,19 @@ if (wants('K')) {
         const r = rampAt(chain, i, side);
         if (!r) continue;
         if (!usable(r)) { inRoad++; continue; }
+        // a ramp the 1 m lattice cannot show (the drawn ground at its foot / head is more than the wall tolerance from the carve's own heights: a face of 5 m in 2 m at a hairpin) has no wall to stand on
+        const tolR = Math.max(ON_RAMP, rampTolerance(r.rise, r.depth));
+        if (Math.abs(surface.height(r.x, r.z) - r.bottom) > tolR || Math.abs(surface.height(r.x + r.nx * r.depth, r.z + r.nz * r.depth) - r.top) > tolR) { latticeLimited++; continue; }
         // a ramp that persists: the neighbouring sample has one too (or it is a big one)
-        const persists = [i + 1, i - 1].some((k) => { if (k < 0 || k >= chain.x.length) return false; const q = rampAt(chain, k, side); return q && usable(q); });
+        const neighbour = (k) => { if (k < 0 || k >= chain.x.length) return false; const q = rampAt(chain, k, side); return !!q && usable(q); };
+        const persists = r.rise >= WALL.shortRise ? neighbour(i + 1) || neighbour(i - 1) : neighbour(i + 1) && neighbour(i - 1);   // (a low ramp that is only two samples long is carried by the ground, see bake_walls.mjs)
         if (!persists) continue;
         ramps++;
         if (!coveredBy(r.x, r.z, r.nx, r.nz, r.top)) { bare++; if (bareList.length < 5) bareList.push(`${Math.round(r.x)},${Math.round(r.z)} rise ${r.rise.toFixed(1)} slope ${r.slope.toFixed(1)}`); }
       }
     }
   }
-  stats.wallCoverage = { scanned, ramps, bare, rampsInRoads: inRoad };
+  stats.wallCoverage = { scanned, ramps, bare, rampsInRoads: inRoad, latticeLimited };
   // a ramp seen at a single sample is noise that the baker drops (a wall needs two samples in a row): a few bare ramps are allowed, a stretch of them is not
   // A wall is never built on tarmac: the foot of its face and the back of its block (the two lines that carry the coping) lie outside every carriageway.
   {

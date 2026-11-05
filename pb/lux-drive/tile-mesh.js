@@ -43,7 +43,7 @@ export function blurField(src) {
 }
 
 const MARK_ON_ROAD = 0.3;               // m: a node counts as being on a carriageway (for the markings) when its signed distance to the union of the carriageways is below this
-const MARK_NEAR_ROAD = 1.0;             // m: ... and a node this close to one takes its markings from the road beside it, so it is switched off with its neighbours               // m: a node counts as being on a carriageway (for the markings) when its signed distance to the union of the carriageways is below this
+const MARK_NEAR_ROAD = 1.0;             // m: ... and a node this close to one takes its markings from the road beside it, so it is switched off with its neighbours
 const MARK_SPLIT_ALONG = 3;             // the distance along the centre line may change at most this many nodes' spacing between two neighbouring nodes of one road: more = another arm of it
 
 /**
