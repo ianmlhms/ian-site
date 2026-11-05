@@ -13,7 +13,7 @@ export { PAINT_LIGHT_GLSL };
 export const GROUND_VERTEX = `
   attribute vec4 aRoad;        // the offset from the centre line, the half width of the carriageway, the outer edge of the pavement, the distance along the centre line
   attribute vec4 aRoad2;       // the coverage of the road, the style of the markings, its material, how exactly the fine markings are drawn
-  attribute vec4 aRoad3;       // the signed distance to the union of the carriageways, to the union of the pavements, the fade of the paint
+  attribute vec4 aRoad3;       // the signed distance to the union of the carriageways, to the union of the pavements, the fade of the paint, to the union of the STREET carriageways
   varying vec3 vWorld; varying vec3 vNormal; varying float vDist;
   varying vec4 vRoad; varying vec4 vRoad2; varying vec4 vRoad3;
   void main(){
@@ -131,7 +131,9 @@ export const GROUND_FRAGMENT = `
     float onCarriage = 1.0 - smoothstep(-aaC, aaC, sdC);
     // The narrow service ways between the houses are tarmac of 3-5 m: their border is the zero of a distance interpolated on a 2-4 m lattice (angular), and the dark tar beside a pale wall
     // read as a blotch.  They get a soft border (a wider blend, so the angles round off) and a calmer, lighter grey.  Streets of 6 m and more are not touched.
-    float minorW = (1.0 - smoothstep(2.4, 3.4, hw)) * step(surface, 0.5) * step(0.5, roadW);
+    // (minor = on a carriageway but outside every street carriageway: the signed distance to those is continuous, so the pale tar of a service way that runs into the avenue ends in a
+    // straight line along the avenue's edge, not in the sawtooth of the half width of the nearest way switching per node)
+    float minorW = smoothstep(0.0, 0.8, vRoad3.w) * step(surface, 0.5) * step(0.5, roadW);
     onCarriage = mix(onCarriage, 1.0 - smoothstep(-0.5, 0.5, sdC), minorW);
     surf = mix(surf, mix(surf, vec3(0.40, 0.40, 0.40) * (0.96 + 0.08 * nMid.g), 0.55), minorW);
     float onKerb = smoothstep(-aaC, aaC, sdC) * (1.0 - smoothstep(kerbW - aaC, kerbW + aaC, sdC));

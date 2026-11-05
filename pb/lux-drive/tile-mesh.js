@@ -9,7 +9,7 @@
  * Every node also carries the road it lies on, so the shader can paint the tarmac, the kerb, the pavement and the lane markings:
  *   aRoad  (lat, hw, a0, s)   the offset from the centre line, the half width of the carriageway, the outer edge of the
  *                             pavement, the distance along the centre line (the dashes of the lane markings)
- *   aRoad3 (sdCar, sdPave, paint, -)  the signed distance to the UNION of the carriageways and of the pavements (negative =
+ *   aRoad3 (sdCar, sdPave, paint, sdMajor)  the signed distance to the UNION of the carriageways and of the pavements (negative =
  *                             inside) and the fade of the paint: the edges of the paint are the zero of these
  *   aRoad2 (coverage, lines, surface, mark)  how much road there is, the style of the markings, the material, and how
  *                             exactly the fine markings are drawn (a 4 m lattice cannot resolve a 15 cm line) */
@@ -87,7 +87,7 @@ export function computeTileNodes(leaf, surface, field) {
       road2[o * 4 + 2] = b.surface[o];                         // the material of the road the node is on
       road2[o * 4 + 3] = b.junction[o] ? 0 : 1;                // the 1 m lattice draws the markings exactly (not at a junction)
     }
-    return { h: b.h, lat: b.lat, hw: b.hw, a0: b.a0, kind: b.kind, surface: b.surface, along: b.along, sdCar: blurField(b.sdCar), sdPave: blurField(b.sdPave), road2: maskMarkBorders(road2, b.road, b.along, b.sdCar, step), shared: true };
+    return { h: b.h, lat: b.lat, hw: b.hw, a0: b.a0, kind: b.kind, surface: b.surface, along: b.along, sdCar: blurField(b.sdCar), sdPave: blurField(b.sdPave), sdMajor: blurField(b.sdMajor), road2: maskMarkBorders(road2, b.road, b.along, b.sdCar, step), shared: true };
   }
   const h = new Float32Array(APRON_SIDE * APRON_SIDE);
   const lat = new Float32Array(APRON_SIDE * APRON_SIDE);
@@ -96,7 +96,7 @@ export function computeTileNodes(leaf, surface, field) {
   const kind = new Uint8Array(APRON_SIDE * APRON_SIDE);
   const surf = new Uint8Array(APRON_SIDE * APRON_SIDE);      // the material of the road the node is on
   const along = new Float32Array(APRON_SIDE * APRON_SIDE);
-  const sdCar = new Float32Array(APRON_SIDE * APRON_SIDE), sdPave = new Float32Array(APRON_SIDE * APRON_SIDE);
+  const sdCar = new Float32Array(APRON_SIDE * APRON_SIDE), sdPave = new Float32Array(APRON_SIDE * APRON_SIDE), sdMajor = new Float32Array(APRON_SIDE * APRON_SIDE);
   const road2 = new Float32Array(APRON_SIDE * APRON_SIDE * 4);
   const roadId = new Int32Array(APRON_SIDE * APRON_SIDE);
   const info = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, lines: 0, lanes: 0, s: 0, surface: 0 };
@@ -106,11 +106,11 @@ export function computeTileNodes(leaf, surface, field) {
       const o = j * APRON_SIDE + i;
       h[o] = field.heightForStep(x0 + (i - 1) * step, z0 + (j - 1) * step, step, info);
       lat[o] = info.lat; hw[o] = info.hw; a0[o] = info.a0; kind[o] = info.kind; along[o] = info.s;
-      surf[o] = info.surface; sdCar[o] = info.sdCar; sdPave[o] = info.sdPave; roadId[o] = info.road;
+      surf[o] = info.surface; sdCar[o] = info.sdCar; sdPave[o] = info.sdPave; sdMajor[o] = info.sdMajor; roadId[o] = info.road;
       road2[o * 4] = info.coverage; road2[o * 4 + 1] = info.lines; road2[o * 4 + 3] = info.junction ? 0 : mark;
     }
   }
-  return { h, lat, hw, a0, kind, surface: surf, along, sdCar: blurField(sdCar), sdPave: blurField(sdPave), road2: maskMarkBorders(road2, roadId, along, sdCar, step), shared: false };
+  return { h, lat, hw, a0, kind, surface: surf, along, sdCar: blurField(sdCar), sdPave: blurField(sdPave), sdMajor: blurField(sdMajor), road2: maskMarkBorders(road2, roadId, along, sdCar, step), shared: false };
 }
 
 /** Value of the coarser tile T's edge polyline at the boundary point (x, z) (T's spacing grid is aligned to multiples of its step). */
@@ -198,7 +198,7 @@ export function buildTileMesh(leaf, nodes, split, field) {
       road2[v * 4] = nodes.road2[a * 4]; road2[v * 4 + 1] = nodes.road2[a * 4 + 1];
       road2[v * 4 + 2] = surface[a];                        // the material of the road the node is on
       road2[v * 4 + 3] = nodes.road2[a * 4 + 3];
-      road3[v * 4] = nodes.sdCar[a]; road3[v * 4 + 1] = nodes.sdPave[a]; road3[v * 4 + 2] = paintK;
+      road3[v * 4] = nodes.sdCar[a]; road3[v * 4 + 1] = nodes.sdPave[a]; road3[v * 4 + 2] = paintK; road3[v * 4 + 3] = nodes.sdMajor[a];
     }
   }
   // skirts: duplicate every boundary vertex lower down (order: north row, south row, west column, east column)

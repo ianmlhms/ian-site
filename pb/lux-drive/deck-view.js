@@ -13,7 +13,7 @@ const PARAPET_HEIGHT = 0.95;        // m, the height of the parapet of a road br
 const PARAPET_WIDTH = 0.30;         // m, its thickness
 const RAILING_HEIGHT = 1.05;        // m, the railing of a footbridge
 const RAILING_WIDTH = 0.10;
-const COLOUR_ASPHALT = [0.215, 0.218, 0.232];
+const COLOUR_ASPHALT = [0.245, 0.249, 0.261];  // (the far tar of the ground shader: the road runs onto the deck without a change of tone)
 const COLOUR_PATH = [0.60, 0.59, 0.56];
 const COLOUR_PAINT = [0.84, 0.83, 0.76];
 const COLOUR_SIDE = [0.56, 0.55, 0.52];
@@ -21,6 +21,11 @@ const COLOUR_UNDER = [0.40, 0.39, 0.37];
 const COLOUR_PARAPET = [0.68, 0.67, 0.64];
 const COLOUR_RAILING = [0.36, 0.38, 0.41];
 const COLOUR_PIER = [0.58, 0.57, 0.54];
+const COLOUR_MEDIAN = [0.50, 0.49, 0.47];
+const MEDIAN_GAP_MAX = 1.6;         // m: two road decks side by side (the two carriageways of a motorway on two bridges) this close are joined by a concrete median over the gap: the ground
+                                    // 15 m below showed through the gap as a green line down the middle of the bridge (Rue de Neudorf)
+const MEDIAN_PROBE = 0.1;           // m, the step of the search for the neighbour deck
+const CAP_FLUSH = 0.1;              // m: an end of a deck that lies on the road (the abutment, the road runs flush onto it) has no end face: a face of a centimetre drew a dark seam across the road
 
 /**
  * decks: the decoded decks [{ id, parapet, width, pts: [[x, z]], tops: [y] }]
@@ -32,6 +37,41 @@ export function createDeckView({ scene, decks, material, ground }) {
   const info = { sdCar: 9 };
   const sdCarAt = (x, z) => (ground && ground.roadInfoAt ? ground.roadInfoAt(x, z, info).sdCar : 9);
   let count = 0, pierCount = 0;
+  // the road decks, for the median between two of them: their segments in a coarse grid
+  const MEDIAN_CELL = 32;
+  const medianGrid = new Map();
+  for (const deck of decks) {
+    if (deck.width < ROAD_MIN_WIDTH) continue;
+    for (let i = 0; i + 1 < deck.pts.length; i++) {
+      const [ax, az] = deck.pts[i], [bx, bz] = deck.pts[i + 1];
+      const r = deck.width / 2 + MEDIAN_GAP_MAX;
+      for (let cx = Math.floor((Math.min(ax, bx) - r) / MEDIAN_CELL); cx <= Math.floor((Math.max(ax, bx) + r) / MEDIAN_CELL); cx++) {
+        for (let cz = Math.floor((Math.min(az, bz) - r) / MEDIAN_CELL); cz <= Math.floor((Math.max(az, bz) + r) / MEDIAN_CELL); cz++) {
+          const k = cx * 65536 + cz;
+          const l = medianGrid.get(k);
+          const seg = { deck, ax, az, bx, bz };
+          if (l) l.push(seg); else medianGrid.set(k, [seg]);
+        }
+      }
+    }
+  }
+  /** True when (x, z) lies on another road deck than `self`. */
+  const onOtherDeck = (x, z, self) => {
+    for (const g of medianGrid.get(Math.floor(x / MEDIAN_CELL) * 65536 + Math.floor(z / MEDIAN_CELL)) || []) {
+      if (g.deck === self) continue;
+      const ex = g.bx - g.ax, ez = g.bz - g.az, ll = ex * ex + ez * ez;
+      const t = ll > 1e-9 ? Math.min(1, Math.max(0, ((x - g.ax) * ex + (z - g.az) * ez) / ll)) : 0;
+      if (Math.hypot(x - g.ax - ex * t, z - g.az - ez * t) <= g.deck.width / 2) return true;
+    }
+    return false;
+  };
+  /** The gap from the edge of `deck` at (x, z) (side direction sx, sz) to a neighbour road deck, or -1 when there is none within MEDIAN_GAP_MAX. */
+  const gapBeside = (deck, x, z, sx, sz) => {
+    for (let g = MEDIAN_PROBE; g <= MEDIAN_GAP_MAX + 1e-6; g += MEDIAN_PROBE) {
+      if (onOtherDeck(x + sx * (deck.width / 2 + g), z + sz * (deck.width / 2 + g), deck)) return g;
+    }
+    return -1;
+  };
   for (const deck of decks) {
     const n = deck.pts.length;
     if (n < 2) continue;
@@ -77,14 +117,27 @@ export function createDeckView({ scene, decks, material, ground }) {
       // the underside (the girder's soffit)
       b.quad([ax - sx * half, ay - DECK.thickness, az - sz * half], [bx - sx * half, by - DECK.thickness, bz - sz * half],
         [bx + sx * half, by - DECK.thickness, bz + sz * half], [ax + sx * half, ay - DECK.thickness, az + sz * half], COLOUR_UNDER);
-      // the sides of the deck: the girder, and the abutment where the deck is low
+      // the median over the gap to a road deck beside this one: this deck covers its half of the gap (the neighbour the other half), at its own level
+      const medianSide = { 1: false, '-1': false };
+      if (isRoad) {
+        for (const side of [1, -1]) {
+          const ga = gapBeside(deck, ax, az, sx * side, sz * side), gb = gapBeside(deck, bx, bz, sx * side, sz * side);
+          if (ga < 0 || gb < 0) continue;
+          medianSide[side] = true;
+          const oa = side * (half + ga / 2 + 0.03), ob = side * (half + gb / 2 + 0.03), o0 = side * half;
+          const quad = [[ax + sx * o0, ay, az + sz * o0], [bx + sx * o0, by, bz + sz * o0], [bx + sx * ob, by, bz + sz * ob], [ax + sx * oa, ay, az + sz * oa]];
+          b.quad(...(side < 0 ? quad : [quad[3], quad[2], quad[1], quad[0]]), COLOUR_MEDIAN);   // (wound like the road surface: from + to - offset)
+        }
+      }
+      // the sides of the deck: the girder, and the abutment where the deck is low (not under a median: there the two decks are one structure, and the side faces reaching down to the
+      // ground between them were a row of teeth in front of the deck start)
       const al = bottomAt(ax + sx * half, az + sz * half, ay);
       const bl = bottomAt(bx + sx * half, bz + sz * half, by);
       const ar = bottomAt(ax - sx * half, az - sz * half, ay);
       const br = bottomAt(bx - sx * half, bz - sz * half, by);
-      b.quad([ax + sx * half, ay, az + sz * half], [bx + sx * half, by, bz + sz * half],
+      if (!medianSide[1]) b.quad([ax + sx * half, ay, az + sz * half], [bx + sx * half, by, bz + sz * half],
         [bx + sx * half, bl, bz + sz * half], [ax + sx * half, al, az + sz * half], COLOUR_SIDE);
-      b.quad([bx - sx * half, by, bz - sz * half], [ax - sx * half, ay, az - sz * half],
+      if (!medianSide[-1]) b.quad([bx - sx * half, by, bz - sz * half], [ax - sx * half, ay, az - sz * half],
         [ax - sx * half, ar, az - sz * half], [bx - sx * half, br, bz - sz * half], COLOUR_SIDE);
       // the parapets (a road bridge) / the railings (a footbridge): on both sides of EVERY deck
       const ph = isRoad ? PARAPET_HEIGHT : RAILING_HEIGHT, pw = isRoad ? PARAPET_WIDTH : RAILING_WIDTH;
@@ -110,6 +163,7 @@ export function createDeckView({ scene, decks, material, ground }) {
       const a = [x + sx * half, y, z + sz * half];
       const c = [x - sx * half, y, z - sz * half];
       const al = bottomAt(a[0], a[2], y), cl = bottomAt(c[0], c[2], y);
+      if (ground && [a, c, [x, y, z]].every((q) => Math.abs(y - ground.height(q[0], q[2])) <= CAP_FLUSH)) continue;   // (flush on the road: no face, see CAP_FLUSH)
       if (end === 0) b.quad(a, [a[0], al, a[2]], [c[0], cl, c[2]], c, COLOUR_SIDE);
       else b.quad(c, [c[0], cl, c[2]], [a[0], al, a[2]], a, COLOUR_SIDE);
     }
