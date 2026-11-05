@@ -1293,3 +1293,60 @@ Ian: the LAML and the Athénée must be instantly recognisable to pupils.  Only 
 * Other buildings: the LMRL has no logo banner and no deep concrete bay frames; the ISL has no swoosh logo and the tower's open stair; Blumm panels are one colour per bay.
 
 **Final gates on commit 79829519 (code unchanged since; this note is the only later change)**: `harness.js` 90 passed / 0 failed (campus 59 219 triangles); `luxdrive_world` PASS (112 / 150 / 213 draw calls low / medium / high); `luxdrive_holes` PASS medium and `HOLES_Q=low`; `luxdrive_ui` PASS; `luxdrive_webkit.mjs` PASS.
+
+
+## Look fix 3 (branch `lux-drive-look3`, Mac mini): Pont Rouge, trees off bridges and lanes, Palais, Cathédrale, Philharmonie, Bock, Coque / Mudam, ground
+
+Started from `lux-drive` 7529b959.  Montages (photo | before | after): `~/Library/Caches/luxdrive-work/look3/montages/` (all at noon, clear sky; before = the base commit, same poses).  Single frames in `look3/nb` (before) / `look3/na` (after);
+the Red Bridge in `look3/rb_before`, `rb_after*`; trees in `look3/tr_*.jpg`, `look3/f_*`.  Views: `scripts/luxdrive/look_views.json` (new `philharmonie_air_n` / `_w`: an aerial camera that really sees the hall).
+
+### Top priority (Ian): the Red Bridge and the trees
+* **Pont Rouge hole** (`rb_before_all.jpg` vs `rb_after1_all.jpg`): root cause in `landmark-bridges.js extendEnd`.  The baked deck ends are pinned to the cliff 12 m under the deck, so `fixLandmarkDecks` carries the deck on to the approach road with extra points; they were
+  added in the WRONG ORDER (`added.reverse()` for the start, no reverse for the end).  The deck zigzagged over its own extension, `createDeckNetwork` pinned the wrong point (the "end" 9 m under the slab: the inverted red trapezoid) and the model, built from the first
+  and last point, stopped 12 m short of the physical deck: the car drove over 12 m of bridge nobody drew.  Now the points run one way; the model covers the whole deck (380.9 m instead of 364.9 m) from approach road to approach road.
+  New harness checks: no carriageway deck folds back on itself; every deck a landmark model replaces lies inside that model (that check also caught the north end of the Passerelle: its footways run 17 m on over the slope at deck level, undrawn; the model now covers them).
+  The "deck orphan" check looks at the middle of a deck now (the extended ends are on ordinary roads by design).
+* **Trees** (`trees.js`, `decks.js touchesVolume`, `landmark-util.js deckFootprint`): (1) no tree (the generated woods AND the trees OSM maps one by one) stands on a bridge, grows through its slab or has its crown over it: the bake's decks plus the full-width footprint of the
+  three landmark bridges (Pont Rouge 26 m, Adolphe, Passerelle: their baked decks are narrower than the stone / steel bridge) are one deck network (`touchesVolume`: foot less than 1.5 m above the surface and the top above the underside, crown radius counted; trees in the valley UNDER a bridge stay).
+  (2) crowns keep off every lane: a tree of the woods needs `dist >= hw + 1.5 + 0.4 * height` to the way (it was `a0 + 2.5`: a 25 m beech overhung the motorway by 8 m), a tree of OSM `hw + 1.5 + crown radius`; avenue trees (mapped as street trees or on the pavement) may keep half of their crown over the kerb.
+  Footpaths, cycle ways and stairs (`lines >= 3`) are exempt (park paths would otherwise lose their trees).  Baked trees 25 938 -> 18 750 (-7 188: forest / park / garden trees along drivable roads), the woods lose the roadside rows.
+  Harness E (+4 checks, brute force over every deck segment, independent of the spatial hash): 0 trees of OSM on a deck / over a lane, 0 of the woods in the 11 209 trees round every bridge.  Before / after: `tr_f_a1_gw2.jpg` (A1 in the Grünewald: the crowns inside the camera are gone), `tr_f_a1_gw.jpg`, `tr_f_a1_nied.jpg`, `tr_f_nord.jpg`, `tr_f_dud.jpg`, `tr_neudorf.jpg`, `tr_a1_gruenewald3.jpg`.
+  The other big bridges (Adolphe, Passerelle, the A1 / Grünewald decks, Pulvermühle) are covered by the same decks gates + the tree checks: no fold, no uncovered deck, no tree.
+* The grey slabs in Ian's A1 screenshot (terrain builder) are NOT fixed here.
+
+### Landmarks (photo | before | after in `montages/`)
+| landmark | change |
+|---|---|
+| Palais grand-ducal | the 65 m front is ONE straight facade (the three runs of the outline lie within 0.3 / 0.6 m of the line through the two farthest corners; `lineFrame` + a block of stone behind it closes the gaps); real relief: window surrounds (jambs, lintel, sill) and the iron bars, mullions and transoms are boxes in front of recessed panes, pilasters between the windows, quoins, string courses 0.3 m deep, rusticated ground floor of proud courses, carved panels with a stone frame and a raised diamond boss, pediments with sloping faces; 14 columns, slender finials on every oriel roof, a pencil spire every 13 m on the ridge, taller turret spires. Sentry boxes and bollards stand on a 1.7 m raised pavement strip against the wall (the street of the data runs within 1 m of the wall: no pavement exists there, so the strip is laid over the edge of the carriageway; no collision) |
+| Cathédrale | slate: courses of single slates (0.95 x 1.5 m, every second course shifted, own shade, dark gaps) on the nave, transept, aisle and crossing roofs (`slateFace`); the west towers' spires are slender (foot 0.38 of the tower half width instead of 0.62, taller corner pinnacles); apse: a half-octagon chevet behind the transept with lancets, a slate hip roof and three chapels with hip roofs (collision walls added) |
+| Philharmonie | roof white all over (grey pad -> white); columns were already 3x white; views: `ph1` aerial from north / west show the hall (the street-level cameras always end in the office slabs) |
+| Bock | the rim is moved out to where the ground has fallen 16 m: a vertical face (7 rows, bulging a little, strata colour) stands there on top of the DTM down to its foot, a cap of rock at plateau height joins it to the old rim (no hole: `holes` 0); the fortress wall, merlons, bastions and the ruined tower stand on that new edge; 15 arched casemate mouths (stone surround + dark opening) in two storeys in the face; the parapet collision stays on the old rim |
+| Coque | plinth of proud ashlar courses (0.55 m) with a coping, real mullions every 2 m (0.22 x 0.26 m) and 0.2 m transoms |
+| Mudam | stone grooves 0.17 m wide on bigger panels (2.3 x 4.6 m), glazing bars 0.16 m wide, 0.12 m proud on the pyramid, the lantern, the wing (taller, 10 m) and the curved shell (new `glazeQuad`) |
+| trees round Coque / Mudam | `landmarks.treeFree` (9 m round the walls): measured: NO tree of OSM stands within 9 m of either façade, so nothing was removed (the park trees are 10-30 m away); the woods keep their 40 m clearings |
+
+Budget: landmarks 57 387 triangles of 60 000 (Cathédrale 11.7 k with the slates, Coque 8.3 k, Palais 6.5 k), campus unchanged (its own budget), no new mesh.
+
+### Ground (`ground-shader.js`, three added blocks, nothing else touched)
+* narrow service ways (hw < 3.4 m, tarmac): a soft 1 m border (the angular lattice zero rounds off) and a calmer, lighter grey (0.40): the dark angular patches between houses read as light service ways.  The jagged SHAPE comes from the 2-4 m terrain lattice (terrain / road files): only softened here.
+* centre line: the offset `lat` of the nearest way is interpolated between vertices of DIFFERENT ways where two ways meet; its world gradient (from the screen derivatives) is then not 1, the zero wobbles.  The centre line fades out where the gradient leaves 1.3-1.9: it ends cleanly (`ground_g_mark.jpg`).  It does not become continuous through the merge: that needs one centre line per merged way (road bake).
+
+### Still wrong (honest)
+* Palais: still no deep bay windows / ironwork like the photograph (oriels are 2 of 14 columns; the balcony is short); the facade is painted-box relief, not carved stone.  The sentry boxes / bollards stand on a strip that lies over the street's edge.
+* Cathédrale: the slates are 1 x 1.5 m (a real slate is 30 cm); the apse position is estimated from the outline and two photographs, the chapels are generic; the west front is as before.
+* Philharmonie: the shell curve is still estimated; from street level no camera sees the hall (an office slab stands in front on every bearing).
+* Bock: the face is a curtain at a fixed 16 m drop (not the real overhangs); the cap makes the plateau 6-16 m wider than the data; casemates are dark mouths, nothing behind.
+* Coque / Mudam: the Mudam wing and the curved shell are still rough shapes; no tree needed removing, the park trees stay.
+* Ground: the service ways keep the lattice's angular shape (terrain / road bake); the centre line gap at merges.
+* Trees: the crown rule removed 28 % of the OSM trees (every drivable road): the villages look barer at the road edge.  Nothing measured on a real iPad.
+
+### Gates (Mac mini, look3)
+| gate | result |
+|---|---|
+| `node pb/lux-drive/harness.js` | PASS, 96 checks, 0 failed (new: no deck folds back, landmark models cover their decks, 4 tree checks) |
+| `luxdrive_world.mjs` | PASS (draw calls low 112 / medium 150 / high 213, zero console errors) |
+| `luxdrive_holes.mjs` / `HOLES_Q=low` | PASS, 0 hole pixels (self-test 31 659 / 42 741) |
+| `luxdrive_ui.mjs` | PASS |
+| `FLOW_BROWSER=webkit luxdrive_webkit.mjs` | PASS (`luxdrive_ui.mjs` is CDP / Chromium only) |
+
+`pb/lux-drive.html`: main.js `?v=40`.  Red Bridge before / after of the exact approach: `look3/montages/redbridge_*.jpg`; `look3/rb_before_all.jpg` (before, dusk) and `look3/montages/redbridge_all.jpg` (after).

@@ -19,6 +19,19 @@ export function edgeFrame(poly, i) {
   return { a, b, len, dx, dz, nx, nz, yaw: Math.atan2(-dz, dx), at: (s, y, out = 0) => [a[0] + dx * s + nx * out, y, a[1] + dz * s + nz * out] };
 }
 
+/**
+ * The frame of a straight line from a to b whose front faces AWAY from `inside` (a point of the building): like edgeFrame, for a front that is not one edge of the footprint.
+ * `shift` moves the plane `shift` m out of the line (the facade of the Palais stands in front of the three runs of its outline).
+ */
+export function lineFrame(a, b, inside, shift = 0) {
+  const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  if (len < 1e-6) throw new Error('lineFrame: the line has no length');
+  const dx = (b[0] - a[0]) / len, dz = (b[1] - a[1]) / len;
+  let nx = -dz, nz = dx;
+  if ((inside[0] - a[0]) * nx + (inside[1] - a[1]) * nz > 0) { nx = -nx; nz = -nz; }
+  return { a, b, len, dx, dz, nx, nz, yaw: Math.atan2(-dz, dx), at: (s, y, out = 0) => [a[0] + dx * s + nx * (out + shift), y, a[1] + dz * s + nz * (out + shift)] };
+}
+
 /** A flat panel on the wall plane (s0..s1 along, y0..y1 up) at `out` m in front of it. */
 export function panel(soup, f, s0, s1, y0, y1, out, color) {
   soup.quad(f.at(s0, y0, out), f.at(s1, y0, out), f.at(s1, y1, out), f.at(s0, y1, out), color);
@@ -115,4 +128,38 @@ export function roundArch(soup, f, sc, y0, w, h, frame, glass, steps = 8) {
   };
   one(0.3, EPS_OUT, frame, 11);
   one(0, EPS_OUT * 2, glass, 13);
+}
+
+/**
+ * Slates on a roof face: courses of rectangular slates (rowH x colW, every second course shifted by half a slate, each slate its own shade, a dark gap between them) lying
+ * `lift` m above the plane bl-br-tl-tr (bl, br at the eave, tl, tr at the ridge; tl = tr for a triangle).  The face under them stays the dark slate colour of the roof,
+ * so the gaps read as the joints.  Real geometry (two triangles a slate), so use it on the big roofs only.
+ */
+export function slateFace(soup, bl, br, tl, tr, { rowH = 0.8, colW = 1.3, color, key = 0, gap = 0.07, lift = 0.03 } = {}) {
+  const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+  const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+  const u = sub(br, bl), v = sub(tl, bl);
+  let n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+  const nl = Math.hypot(...n);
+  if (nl < 1e-9) return;
+  n = n.map((c) => c / nl);
+  const up = n[1] < 0 ? -1 : 1;                                       // the side of the face that looks up
+  n = n.map((c) => c * up * lift);
+  const slope = Math.hypot(...v);
+  const rows = Math.max(1, Math.round(slope / rowH));
+  const lift3 = (p) => [p[0] + n[0], p[1] + n[1], p[2] + n[2]];
+  for (let j = 0; j < rows; j++) {
+    const t0 = j / rows, t1 = (j + 1) / rows, tg = Math.min(0.45 / rows, gap / slope);
+    const L0 = lerp(bl, tl, t0 + tg), R0 = lerp(br, tr, t0 + tg), L1 = lerp(bl, tl, t1 - tg), R1 = lerp(br, tr, t1 - tg);
+    const width = Math.hypot(...sub(lerp(br, tr, (t0 + t1) / 2), lerp(bl, tl, (t0 + t1) / 2)));
+    const cols = Math.max(1, Math.round(width / colW)), stag = (j % 2) * 0.5;
+    for (let k = -1; k < cols; k++) {
+      const a = Math.max(0, (k + stag) / cols), b = Math.min(1, (k + 1 + stag) / cols);
+      const ug = Math.min(0.45 / cols, gap / Math.max(width, 1e-6));
+      if (b - a <= 2 * ug + 1e-6) continue;
+      const p00 = lerp(L0, R0, a + ug), p10 = lerp(L0, R0, b - ug), p11 = lerp(L1, R1, b - ug), p01 = lerp(L1, R1, a + ug);
+      const q = up > 0 ? [p00, p10, p11, p01] : [p00, p01, p11, p10];
+      soup.quad(lift3(q[0]), lift3(q[1]), lift3(q[2]), lift3(q[3]), paint(color, key + j * 131 + k * 17, 0.07));
+    }
+  }
 }

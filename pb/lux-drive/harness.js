@@ -24,7 +24,7 @@ import { createSurface } from './surface.js';
 import { createDeckNetwork, createGround, DECK } from './decks.js';
 import { createBuildingIndex } from './buildings.js';
 import { createLandmarks, fixLandmarkDecks } from './landmarks.js';
-import { createTreeIndex, treesOfBlock } from './trees.js';
+import { createTreeIndex, treesOfBlock, keepWaysClear, bakedCrownRadius, wayMargin, crownShare } from './trees.js';
 import { createPortals } from './portals.js';
 import { createPlayArea } from './play-area.js';
 import { buildWorldMap } from './world-map.js';
@@ -82,7 +82,9 @@ const buildings = createBuildingIndex(data.buildings, { hidden: landmarks.hidden
 const portals = createPortals(data.roads);
 const playArea = createPlayArea(area);
 const maps = buildWorldMap({ classes: data.classes, classInfo: data.classInfo, canopy: data.canopy, buildings: data.buildings });
-const forest = createTreeIndex({ map: maps, field, network: field.network, buildings, trees: data.trees, clearings: landmarks.clearings });
+const treeDecks = createDeckNetwork([...ground.decks, ...landmarks.footprints]);      // the same trees as the game plants (main.js)
+const bakedTrees = keepWaysClear(data.trees, { network: field.network, field, treeDecks, treeFree: landmarks.treeFree });
+const forest = createTreeIndex({ map: maps, field, network: field.network, buildings, trees: bakedTrees, clearings: landmarks.clearings, treeDecks });
 const net = field.network;
 
 /* ---------------------------------------------------------------- shared: where the carved ways meet (gates I and J) */
@@ -535,18 +537,19 @@ if (wants('D')) {
   const orphanList = [];
   for (const d of decks) {
     let best = Infinity;
+    const mid = d.pts[d.pts.length >> 1];            // the middle: the ends of a landmark bridge are carried on to the approach road (fixLandmarkDecks), which does not ride over anything
     for (const r of overRoads) {
       for (let k = 0; k + 1 < r.pts.length; k++) {
         const ax = r.pts[k][0], az = r.pts[k][1], bx = r.pts[k + 1][0], bz = r.pts[k + 1][1];
         const ex = bx - ax, ez = bz - az;
         const ll = ex * ex + ez * ez;
         if (ll < 1e-9) continue;
-        let t = ((d.pts[0][0] - ax) * ex + (d.pts[0][1] - az) * ez) / ll;
+        let t = ((mid[0] - ax) * ex + (mid[1] - az) * ez) / ll;
         t = t < 0 ? 0 : t > 1 ? 1 : t;
-        best = Math.min(best, Math.hypot(d.pts[0][0] - (ax + ex * t), d.pts[0][1] - (az + ez * t)));
+        best = Math.min(best, Math.hypot(mid[0] - (ax + ex * t), mid[1] - (az + ez * t)));
       }
     }
-    if (best > 6) { orphan++; if (orphanList.length < 6) orphanList.push({ x: Math.round(d.pts[0][0]), z: Math.round(d.pts[0][1]), near: +best.toFixed(1) }); }
+    if (best > 6) { orphan++; if (orphanList.length < 6) orphanList.push({ x: Math.round(mid[0]), z: Math.round(mid[1]), near: +best.toFixed(1) }); }
   }
   stats.deckOrphans = orphan;
   check('every deck stands on a way that rides over the others', orphan === 0,
@@ -635,6 +638,38 @@ if (wants('D')) {
   stats.deckFlags = wrongFlag;
   check('every deck knows whether it spans the land or stands on it', wrongFlag === 0,
     `${wrongFlag} of ${decks.length} decks${flagList.length ? ' ' + JSON.stringify(flagList) : ''}`);
+
+  // A deck runs one way: no segment turns back on the one before (the Pont Rouge was carried on to its approach roads with the extension points in the wrong
+  // order: the deck zigzagged over its own end, the model stopped short of it and the car drove over 12 m of invisible bridge).
+  let folded = 0;
+  const foldList = [];
+  for (const d of decks) {
+    if (d.width < 5) continue;                       // a footway deck may be a hairpin of a ramp (3.2 m wide); a carriageway is never
+    for (let i = 1; i + 1 < d.pts.length; i++) {
+      const ax = d.pts[i][0] - d.pts[i - 1][0], az = d.pts[i][1] - d.pts[i - 1][1];
+      const bx = d.pts[i + 1][0] - d.pts[i][0], bz = d.pts[i + 1][1] - d.pts[i][1];
+      if (ax * bx + az * bz < -0.5 * Math.hypot(ax, az) * Math.hypot(bx, bz)) {          // a turn of more than 120 degrees
+        folded++;
+        if (foldList.length < 6) foldList.push({ id: d.id, x: Math.round(d.pts[i][0]), z: Math.round(d.pts[i][1]) });
+        break;
+      }
+    }
+  }
+  stats.decksFolded = folded;
+  check('no deck folds back on itself', folded === 0, `${folded} of ${decks.length} decks ${JSON.stringify(foldList)}`);
+
+  // A bridge the landmarks draw replaces its baked decks: every point of such a deck lies inside the model (no stretch of road the car drives and nobody sees).
+  let uncovered = 0;
+  const uncoveredList = [];
+  for (const d of decks) {
+    if (!landmarks.hiddenDecks.has(d.id)) continue;
+    const sorted = Array.from(d.tops).sort((p, q) => p - q), median = sorted[sorted.length >> 1];
+    // the pinned ends of a footway dip to the ground under them (a bake artefact the models ignore: passerelle.js): points more than 3 m under the median are not the bridge, and a deck that lies on the land (within 0.6 m of it) hides nothing
+    const bad = d.pts.filter(([x, z], i) => d.tops[i] > median - 3 && d.tops[i] - surface.height(x, z) > 0.6 && !landmarks.list.some((m) => x >= m.bounds[0] - 0.5 && x <= m.bounds[2] + 0.5 && z >= m.bounds[1] - 0.5 && z <= m.bounds[3] + 0.5));
+    if (bad.length) { uncovered++; uncoveredList.push({ id: d.id, points: bad.length, first: bad[0].map(Math.round) }); }
+  }
+  stats.hiddenDecksUncovered = uncovered;
+  check('every deck a landmark model replaces lies inside that model (no invisible bridge)', uncovered === 0, JSON.stringify(uncoveredList));
 }
 
 /* ---------------------------------------------------------------- D1: the landmarks */
@@ -737,12 +772,67 @@ if (wants('E')) {
   check('no tree stands inside a house', inHouse === 0, `${inHouse} of ${data.trees.length}`);
   check('no tree stands in the carriageway of a road', onRoad === 0, `${onRoad} of ${data.trees.length}`);
 
+  // No tree on a bridge, through its slab or with its crown over it: brute force over EVERY deck segment and every landmark bridge footprint (not the spatial hash
+  // the game uses), for the trees of OSM and for the woods around every bridge.
+  const allDecks = [...ground.decks, ...landmarks.footprints];
+  const treeOnDeck = (x, z, y0, y1, radius) => {
+    for (const d of allDecks) {
+      for (let i = 0; i + 1 < d.pts.length; i++) {
+        const [ax, az] = d.pts[i], [bx, bz] = d.pts[i + 1];
+        const ex = bx - ax, ez = bz - az, ll = ex * ex + ez * ez;
+        if (ll < 1e-9) continue;
+        const u = Math.min(1, Math.max(0, ((x - ax) * ex + (z - az) * ez) / ll));
+        if (Math.hypot(x - ax - ex * u, z - az - ez * u) > d.width / 2 + radius) continue;
+        const top = d.tops[i] + (d.tops[i + 1] - d.tops[i]) * u;
+        if (y0 < top + 1.5 && y1 > top - 0.6 - 0.3) return true;
+      }
+    }
+    return false;
+  };
+  let onDeck = 0, overLane = 0;
+  for (const t of forest.trees) {
+    const g = field.height(t.x, t.z), crown = bakedCrownRadius(t);
+    if (treeOnDeck(t.x, t.z, g, g + t.height, Math.max(crown, 1.5))) onDeck++;
+    if (t.kind === 2) continue;
+    net.carve(t.x, t.z, net.scratch);
+    const s = net.scratch;
+    if (s.road >= 0 && s.lines < 3 && s.dist < s.hw + wayMargin(t, s) + crown * crownShare(t, s) - 1e-6) overLane++;
+  }
+  stats.treesOnDecks = onDeck; stats.treesOverLanes = overLane;
+  check('no tree of OSM stands on a bridge, through its slab or with its crown over it', onDeck === 0, `${onDeck} of ${forest.trees.length}`);
+  check('no crown of a tree of OSM hangs over a lane (street trees: half a crown over the kerb)', overLane === 0, `${overLane} of ${forest.trees.length}`);
+  {
+    let woodOnDeck = 0, woodOverLane = 0, n = 0;
+    const seen = new Set();
+    for (const d of allDecks) {
+      if (d.pts.length < 8 && d.width < 5) continue;        // the little decks of footpaths are covered by the sample below
+      for (const [x, z] of d.pts.filter((_, i) => i % 6 === 0)) {
+        for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+          const bx = Math.floor(x / 32) + dx, bz = Math.floor(z / 32) + dz, k = bx * 100003 + bz;
+          if (seen.has(k)) continue;
+          seen.add(k);
+          const list = treesOfBlock(bx, bz, { map: maps, field, network: field.network, buildings, clearings: landmarks.clearings, treeDecks });
+          for (let i = 0; i < list.length; i += 6) {
+            n++;
+            const h = list[i + 3], crown = h * 0.4;
+            if (treeOnDeck(list[i], list[i + 2], list[i + 1], list[i + 1] + h, Math.max(crown, 2))) woodOnDeck++;
+            net.carve(list[i], list[i + 2], net.scratch);
+            if (net.scratch.road >= 0 && net.scratch.lines < 3 && net.scratch.dist < net.scratch.hw + 1.5 + crown - 1e-6) woodOverLane++;
+          }
+        }
+      }
+    }
+    stats.woodTreesNearBridges = n;
+    check('no tree of the woods grows on a bridge or with its crown over it (blocks around every bridge)', woodOnDeck === 0, `${woodOnDeck} of ${n}`);
+    check('no crown of a tree of the woods hangs over a lane (blocks around every bridge)', woodOverLane === 0, `${woodOverLane} of ${n}`);
+  }
+
   // the woods: the trees of the blocks near the start stand on the ground too
   const rng = createRng(23);
   let woodFloating = 0, woodWorst = 0, woodCount = 0, woodInHouse = 0;
   for (let i = 0; i < (QUICK ? 20 : 120); i++) {
     const bx = Math.floor(rng() * 400), bz = Math.floor(rng() * 400);
-    const list = treesOfBlock(bx, bz, { map: maps, field, network: field.network, buildings, clearings: landmarks.clearings });
+    const list = treesOfBlock(bx, bz, { map: maps, field, network: field.network, buildings, clearings: landmarks.clearings, treeDecks });
     for (let k = 0; k < list.length; k += 6) {
       woodCount++;
       const x = list[k], y = list[k + 1], z = list[k + 2];

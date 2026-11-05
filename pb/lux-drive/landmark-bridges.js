@@ -7,7 +7,7 @@
  * off the deck: the baked deck is narrower than the real one) and the ids of the baked decks the model replaces. */
 import { Soup, axisFrame, paint } from './landmark-soup.js';
 import { PALETTE as C } from './landmark-palette.js';
-import { profileOf, pickDeck, decksAlong, wallFace, deckStrip } from './landmark-util.js';
+import { profileOf, pickDeck, decksAlong, wallFace, deckStrip, deckFootprint } from './landmark-util.js';
 
 /* ------------------------------------------------------------------------------------------------ Pont Adolphe */
 const ADOLPHE = Object.freeze({
@@ -242,7 +242,7 @@ export function buildPontAdolphe({ decks, ground }) {
     const [bx, bz] = F.xz(L, sign * K.guardOffset);
     return { ax, az, bx, bz, r: K.guardRadius, id: 'pont-adolphe' };
   });
-  return { soup, walls, hideDecks, frame: F, info: { sc, sa, sb, springY, crownRise, openings: openings.length, sideArches: sideArches.length } };
+  return { soup, walls, hideDecks, frame: F, footprints: [deckFootprint(F, top, -K.half, K.half)], info: { sc, sa, sb, springY, crownRise, openings: openings.length, sideArches: sideArches.length } };
 }
 
 
@@ -296,7 +296,9 @@ function extendEnd(deck, atStart, surfaceHeight) {
     }
     const pts = deck.pts.map((p) => [p[0], p[1]]), tops = Array.from(deck.tops);
     tops[e] = ref;                                                // the old end is a point of the deck now, at the deck level
-    if (atStart) { pts.unshift(...added.reverse()); tops.unshift(...addedTops.reverse()); } else { pts.push(...added); tops.push(...addedTops); }
+    // `added` runs from the far end (u = t) to the old end: in front of the deck that is the right order, behind it the reverse.
+    // (Both were swapped before: the deck zigzagged over its own extension and the pinned end sat 9 m under the slab.)
+    if (atStart) { pts.unshift(...added); tops.unshift(...addedTops); } else { pts.push(...added.reverse()); tops.push(...addedTops.reverse()); }
     return { ...deck, pts, tops: Float32Array.from(tops) };
   }
   return deck;
@@ -437,5 +439,5 @@ export function buildPontRouge({ decks, ground }) {
     const [ax, az] = F.xz(0, u), [bx, bz] = F.xz(L, u);
     return { ax, az, bx, bz, r: K.guardRadius, id: 'pont-rouge' };
   });
-  return { soup, walls, hideDecks: new Set(group.map((d) => d.id)), frame: F, info: { length: L, uMin, uMax, pylons: pylons.map((p) => Math.round(p)) } };
+  return { soup, walls, hideDecks: new Set(group.map((d) => d.id)), frame: F, footprints: [deckFootprint(F, top, uMin, uMax)], info: { length: L, uMin, uMax, pylons: pylons.map((p) => Math.round(p)) } };
 }
