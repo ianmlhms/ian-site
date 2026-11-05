@@ -11,6 +11,8 @@ export const DECK = Object.freeze({
   stickBelow: 0.6,         // the car counts as "on" the deck when it is at most this far below the surface
   spanDip: 3.0,            // m: the land dips this far under the way, so the deck spans it (the bake writes the same number)
   cell: 32,                // m, the spatial hash cell
+  treeAbove: 1.5,          // m: a tree whose foot is less than this above a deck surface stands on it (the ground under it is a metre or two off the LiDAR deck)
+  treeBelow: 0.3,          // m: a crown that comes within this of the underside of a deck touches it
 });
 
 const DECIMETRE = 0.1;
@@ -166,7 +168,36 @@ export function createDeckNetwork(decks, surface = null) {
     return lowest;
   }
 
-  return { deckAt, overheadAt, count, decks: list };
+  /**
+   * Does a tree (or anything that stands on the ground at (x, z), `radius` wide, from y0 to y1) touch a deck?  A tree on the deck, a crown that
+   * hangs over it or a trunk that grows through its slab: yes.  A tree in the valley UNDER a bridge, or on the land over a tunnel: no.
+   */
+  function touchesVolume(x, z, y0, y1, radius) {
+    if (count === 0) return false;
+    const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
+    const reach = Math.ceil(radius / CELL);
+    for (let dz = -1 - reach; dz <= 1 + reach; dz++) {
+      for (let dx = -1 - reach; dx <= 1 + reach; dx++) {
+        const bucket = cells.get(cellKey(cx + dx, cz + dz)) || EMPTY;
+        for (let q = 0; q < bucket.length; q++) {
+          const i = bucket[q];
+          const ax0 = AX[i], az0 = AZ[i];
+          const ex = BX[i] - ax0, ez = BZ[i] - az0;
+          const ll = ex * ex + ez * ez;
+          if (ll < 1e-9) continue;
+          let t = ((x - ax0) * ex + (z - az0) * ez) / ll;
+          t = t < 0 ? 0 : t > 1 ? 1 : t;
+          const side = Math.hypot(x - (ax0 + ex * t), z - (az0 + ez * t));
+          if (side > HALF[i] + radius) continue;
+          const top = T0[i] + (T1[i] - T0[i]) * t;
+          if (y0 < top + DECK.treeAbove && y1 > top - DECK.thickness - DECK.treeBelow) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  return { deckAt, overheadAt, touchesVolume, count, decks: list };
 }
 
 /** The ground the car, the camera and the renderer see: the terrain surface, with the bridge decks on top.

@@ -4,7 +4,7 @@
  * { soup, walls, hideBuildings, hideDecks, info } and stands on the ground at every corner (nothing floats). */
 import { Soup, axisFrame, paint, linspace } from './landmark-soup.js';
 import { PALETTE as C } from './landmark-palette.js';
-import { requireBlocks, edgeWalls, scalePoly, groundRange, decksAlong, pickDeck, wallFace, deckStrip, stationsOf } from './landmark-util.js';
+import { requireBlocks, edgeWalls, scalePoly, groundRange, decksAlong, pickDeck, wallFace, deckStrip, stationsOf, deckFootprint } from './landmark-util.js';
 import { edgeFrame, windowGrid, course, slab, turret, panel, joints, roundArch } from './landmark-facade.js';
 import { SITE_FOOTPRINTS as FOOT, FORT_TOWERS } from './landmark-site-data.js';
 
@@ -303,7 +303,7 @@ export function buildPasserelle({ decks, ground }) {
   }
   // the ends: closed so that nothing hollow shows
   for (const s of [0, L]) soup.quad(F.at(s, lowestGround(s), -half), F.at(s, lowestGround(s), half), F.at(s, under(s), half), F.at(s, under(s), -half), paint(C.bridgeStoneDark, 99));
-  return { soup, walls, hideBuildings: [], hideDecks: along.map((d) => d.id), info: { bays, open, half: +half.toFixed(1), length: +L.toFixed(0) } };
+  return { soup, walls, hideBuildings: [], hideDecks: along.map((d) => d.id), footprints: [deckFootprint(F, top, -half, half)], info: { bays, open, half: +half.toFixed(1), length: +L.toFixed(0) } };
 }
 
 /* ------------------------------------------------------------------------------------------------ Coque (Kirchberg) */

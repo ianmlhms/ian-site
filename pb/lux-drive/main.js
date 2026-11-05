@@ -12,7 +12,7 @@ import { createHeightField } from './heightfield.js';
 import { createSurface } from './surface.js';
 import { createDeckNetwork, createGround } from './decks.js';
 import { createBuildingIndex } from './buildings.js';
-import { createTreeIndex } from './trees.js';
+import { createTreeIndex, keepWaysClear } from './trees.js';
 import { createTreeView } from './tree-view.js';
 import { createPortals } from './portals.js';
 import { createPlayArea } from './play-area.js';
@@ -142,7 +142,10 @@ async function boot() {
   const playArea = createPlayArea(area);
   const maps = buildWorldMap({ classes: data.classes, classInfo: data.classInfo, canopy: data.canopy, buildings: data.buildings });
   // the trees: the woods (placed from the canopy) and the trees of OSM (the street trees, the trees of the parks)
-  const forest = createTreeIndex({ map: maps, field, network: field.network, buildings, trees: data.trees, clearings: landmarks.clearings });
+  // no tree grows on a bridge or hangs its crown over a lane (the bridges as decks, with the full width of the landmark models)
+  const treeDecks = createDeckNetwork([...ground.decks, ...landmarks.footprints]);
+  const bakedTrees = keepWaysClear(data.trees, { network: field.network, field, treeDecks });
+  const forest = createTreeIndex({ map: maps, field, network: field.network, buildings, trees: bakedTrees, clearings: landmarks.clearings, treeDecks });
 
   // ---- the painted textures, the world maps, the sky
   setLoad(0.72, 'load.build');
@@ -173,7 +176,7 @@ async function boot() {
   const solid = createSolidMaterial(env);
   const terrain = createTerrainView({ scene, surface, field, material: quality.cheapGround ? groundCheap : groundFull, quality });
   const city = createBuildingView({ scene, buildings, field, env, noiseTexture: textures.noise, quality, hidden: landmarks.hiddenBuildings });
-  const trees = createTreeView({ scene, forest, baked: data.trees, field, env, quality });
+  const trees = createTreeView({ scene, forest, baked: bakedTrees, field, env, quality });
   const decks = createDeckView({ scene, decks: ground.decks.filter((d) => !landmarks.hiddenDecks.has(d.id)), material: solid, ground: ground.surface });
   const walls = createWallView({ scene, walls: data.walls, material: solid });
   const landmarkView = createLandmarkView({ scene, landmarks, material: solid });

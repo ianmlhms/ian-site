@@ -146,3 +146,19 @@ export function groundRange(ground, pts) {
   }
   return { low, high };
 }
+
+
+/**
+ * The footprint of a bridge as a deck for the trees (decks.js `createDeckNetwork`): the whole width of the model, the surface `top(s)`, every `step` m.
+ * The baked decks are narrower than the real bridge (the Pont Rouge model is 26 m wide, its baked decks are four strips); no tree may grow in the rest either.
+ */
+export function deckFootprint(frame, top, u0, u1, step = 8) {
+  const n = Math.max(2, Math.ceil(frame.length / step));
+  const pts = [], tops = [];
+  for (let i = 0; i <= n; i++) {
+    const s = (frame.length * i) / n;
+    pts.push(frame.xz(s, (u0 + u1) / 2));
+    tops.push(top(s));
+  }
+  return { id: -1, parapet: false, spans: true, width: u1 - u0, pts, tops: Float32Array.from(tops) };
+}
