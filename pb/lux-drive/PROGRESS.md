@@ -1467,7 +1467,7 @@ r4/r5 A1, r6/r7/r7b Neudorf).  NOTE: m1 was shot before the last three commits (
   between the land and a neighbour at another level).
 
 ### Gates at HANDOFF
-* `harness.js`: **106 checks PASS** (run before the last commit: D, I, L re-run after it, PASS; K walls re-baked after it — re-run the full harness).
+* `harness.js`: **105 checks PASS** (run before the last commit: D, I, L re-run after it, PASS; K walls re-baked after it — re-run the full harness).
 * `luxdrive_world.mjs`: **FAIL** before the last commit: (1) p99 ground beside roads 1.61 (limit 1.6) -> now 1.51 (fixed by the "between" rule); (2) **9 carve walls (limit 8)**, still
   9 after the last commit (`sidewalls.mjs`): v43 had 6; new ones: Rue Cents 8576,7851; Autoroute de Dudelange 4678,12640 (road 17084 on the deck-level approach 5 m above road 7412
   1-2 m beside it); Hellege-Geescht Plateau 5452,9212; Bisserwée 5480,9070; Montée du Grund 5338,8973 (old town, check whether the sheet or the crossing protection did it);
