@@ -25,7 +25,7 @@ const COLOUR_MEDIAN = [0.50, 0.49, 0.47];
 const MEDIAN_GAP_MAX = 1.6;         // m: two road decks side by side (the two carriageways of a motorway on two bridges) this close are joined by a concrete median over the gap: the ground
                                     // 15 m below showed through the gap as a green line down the middle of the bridge (Rue de Neudorf)
 const MEDIAN_PROBE = 0.1;           // m, the step of the search for the neighbour deck
-const CAP_FLUSH = 0.1;              // m: an end of a deck that lies on the road (the abutment, the road runs flush onto it) has no end face: a face of a centimetre drew a dark seam across the road
+const CAP_FLUSH = 0.1;              // m: an end of a deck that lies on the road (the abutment, the road runs flush onto it) has an end face of tarmac, not of the girder's grey
 
 /**
  * decks: the decoded decks [{ id, parapet, width, pts: [[x, z]], tops: [y] }]
@@ -163,9 +163,11 @@ export function createDeckView({ scene, decks, material, ground }) {
       const a = [x + sx * half, y, z + sz * half];
       const c = [x - sx * half, y, z - sz * half];
       const al = bottomAt(a[0], a[2], y), cl = bottomAt(c[0], c[2], y);
-      if (ground && [a, c, [x, y, z]].every((q) => Math.abs(y - ground.height(q[0], q[2])) <= CAP_FLUSH)) continue;   // (flush on the road: no face, see CAP_FLUSH)
-      if (end === 0) b.quad(a, [a[0], al, a[2]], [c[0], cl, c[2]], c, COLOUR_SIDE);
-      else b.quad(c, [c[0], cl, c[2]], [a[0], al, a[2]], a, COLOUR_SIDE);
+      // (flush on the road: the face is a sliver of a few centimetres at most, and in the grey of the girder it was a seam across the road: there it is tarmac, see CAP_FLUSH)
+      const flush = ground && [a, c, [x, y, z]].every((q) => Math.abs(y - ground.height(q[0], q[2])) <= CAP_FLUSH);
+      const capColour = flush ? COLOUR_ASPHALT : COLOUR_SIDE;
+      if (end === 0) b.quad(a, [a[0], al, a[2]], [c[0], cl, c[2]], c, capColour);
+      else b.quad(c, [c[0], cl, c[2]], [a[0], al, a[2]], a, capColour);
     }
     // the piers
     if (ground) {

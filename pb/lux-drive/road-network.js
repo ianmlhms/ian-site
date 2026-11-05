@@ -48,6 +48,8 @@ const GROUNDED_MAX_DIP = 1.0;          // m: ... over land that dips less than t
 const APPROACH_FREE = 20.0;            // m: the last metres of a way that runs onto a bridge are its approach: its carriageway there is not protected (see carve(), protHere)
 const ABUT_HOLD = 2.0;                 // m: ... and its carriageway is held at its own level this far under the bridge (the cap of the way starts fading only there, the protection only ramps up
                                        // from there): the 1 m lattice under the first metres of the deck is the road, so the deck starts flush on a level surface, not on the edge of the drop
+const DECK_TUCK = 0.08, DECK_TUCK_FROM = 0.4, DECK_TUCK_RUN = 1.0;   // m: under its deck the carriageway of an approach way lies this much lower, reached between these distances past the end of
+                                       // the way: flush with the deck at the abutment, and no longer in the same plane as the deck beyond it (the two surfaces fought for the pixels: a ragged seam across the road)
 const ABUT_FADE_MAX = 6.0;             // m: past the hold the ground under the deck falls from the deck to the land below over 1.5 x drop / RAMP_SLOPE (an earth abutment under the deck end, never
                                        // steeper than the ramp between two levels), at least CAP_SOFT / PROTECT_RAMP and at most this.  With the fixed 2 m of CAP_SOFT a deck 6 m over the road below
                                        // stood on a vertical face of ground (the world flow's "walls the carve made": 153 of them at the motorway interchanges after the approaches were lifted)
@@ -260,7 +262,8 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
 
   const roadLength = new Float32Array(roads.length);   // m, the length of every carved way (the distance along it from its far end)
   const capHoldA = new Float32Array(roads.length), capHoldB = new Float32Array(roads.length);   // m: how far past its first / last point the carriageway of a way is held before its cap fades (a way that runs onto a bridge)
-  const capSoftA = new Float32Array(roads.length).fill(CAP_SOFT), capSoftB = new Float32Array(roads.length).fill(CAP_SOFT);   // m: ... and over how much it then fades (the abutment, see ABUT_FADE_MAX)
+  const capSoftA = new Float32Array(roads.length).fill(CAP_SOFT), capSoftB = new Float32Array(roads.length).fill(CAP_SOFT);
+  const tuckFromA = new Float32Array(roads.length), tuckFromB = new Float32Array(roads.length);   // m past the end of an approach way where its tuck under the deck starts (the deck end + DECK_TUCK_FROM)   // m: ... and over how much it then fades (the abutment, see ABUT_FADE_MAX)
   const closedRoad = new Uint8Array(roads.length);     // the rings (a pedestrian square, a loop): they have no ends, so no end cap
   const priority = new Float32Array(roads.length);     // the order of the design: the bigger way has the higher number (it wins at a junction)
   const prep = [];                   // the ways that are carved, with everything the second pass needs
@@ -696,6 +699,12 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
       const dx = chain.x[e] - chain.x[f], dz = chain.z[e] - chain.z[f], l = Math.hypot(dx, dz) || 1;
       const fade = !chain.closed && atBridgeEnd(chain.x[e], chain.z[e]) ? abutmentFade(chain.x[e], chain.z[e], dx / l, dz / l, chain.bed[e]) : 0;
       approachEnds.push([chain.x[e], chain.z[e], dx / l, dz / l, fade]);
+      if (fade > 0 || atBridgeEnd(chain.x[e], chain.z[e])) {
+        // the end of the bridge lies up to APPROACH_JOIN before or after the end of the way: the tuck is counted from the end of the bridge
+        let ahead = 0, best = Infinity;
+        for (const [bx, bz] of corridorEnds) { const dd = Math.hypot(bx - chain.x[e], bz - chain.z[e]); if (dd < best && dd <= APPROACH_JOIN) { best = dd; ahead = (bx - chain.x[e]) * dx / l + (bz - chain.z[e]) * dz / l; } }
+        if (e === 0) tuckFromA[chain.road] = Math.max(0, ahead) + DECK_TUCK_FROM; else tuckFromB[chain.road] = Math.max(0, ahead) + DECK_TUCK_FROM;
+      }
       if (fade > 0) {
         if (e === 0) capSoftA[chain.road] = Math.max(capSoftA[chain.road], fade);
         else capSoftB[chain.road] = Math.max(capSoftB[chain.road], fade);
@@ -866,6 +875,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
    *  roads count as crossing when their directions differ by more than this (sine): two ways that continue one street
    *  meet end to end at a small angle and are not a junction. */
   const MARK_CLEAR = 3.5, CROSS_SIN = 0.35, MAX_PARTNERS = 6;
+  const candPast = new Float32Array(MAX_CAND);
   const candI = new Int32Array(MAX_CAND), candD = new Float32Array(MAX_CAND), candT = new Float32Array(MAX_CAND), candLat = new Float32Array(MAX_CAND), candOver = new Float32Array(MAX_CAND);
   const pinPri = new Float32Array(MAX_PINS), pinVal = new Float32Array(MAX_PINS), pinWt = new Float32Array(MAX_PINS);
   const pinEdge = new Float32Array(MAX_PINS), pinBed = new Float32Array(MAX_PINS), slotPinRoad = new Int32Array(MAX_PINS), pinAlong = new Float32Array(MAX_PINS);
@@ -1005,7 +1015,10 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
           // (scaled so that the cap fades over CAP_SOFT of `over`: an abutment fades over its own length, capSoft)
           else if (t0 < 0 && i === firstSeg[ROADOF[i]]) over = Math.max(0, -t0 * len - capHoldA[ROADOF[i]]) * (CAP_SOFT / capSoftA[ROADOF[i]]);
           else if (t0 > 1 && i === firstSeg[ROADOF[i]] + segCount[ROADOF[i]] - 1) over = Math.max(0, (t0 - 1) * len - capHoldB[ROADOF[i]]) * (CAP_SOFT / capSoftB[ROADOF[i]]);
-          candI[nCand] = i; candD[nCand] = d; candT[nCand] = t; candLat[nCand] = lat; candOver[nCand] = over; nCand++;
+          // how far an approach way runs on under its deck (0 elsewhere): its carriageway is tucked DECK_TUCK under the deck there (see below)
+          const r0 = ROADOF[i];
+          const past = t0 < 0 && i === firstSeg[r0] && capHoldA[r0] > 0 ? -t0 * len - tuckFromA[r0] : t0 > 1 && i === firstSeg[r0] + segCount[r0] - 1 && capHoldB[r0] > 0 ? (t0 - 1) * len - tuckFromB[r0] : 0;
+          candI[nCand] = i; candD[nCand] = d; candT[nCand] = t; candLat[nCand] = lat; candOver[nCand] = over; candPast[nCand] = past; nCand++;
         }
       }
     }
@@ -1160,7 +1173,8 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
         // and the side of a way that stands 5 m over a valley (Boulevard Roosevelt over the Pétrusse) dropped 3 m in a metre.
         const pin = (1 - smoothstep(bench, bench + Math.max(PIN_FADE, join), d)) * (1 - smoothstep(0, CAP_SOFT, over));
         if (pin > 0) {
-          pinSum += w * pin; pinValSum += w * pin * (face + (bed - face) * (1 - smoothstep(bench, bench + join, dMin))); pinBedSum += w * pin * bed;
+          const tuck = DECK_TUCK * smoothstep(0, DECK_TUCK_RUN - DECK_TUCK_FROM, candPast[k]);   // (candPast counts from the deck end + DECK_TUCK_FROM)
+          pinSum += w * pin; pinValSum += w * pin * (face + (bed - tuck - face) * (1 - smoothstep(bench, bench + join, dMin))); pinBedSum += w * pin * bed;
         }
         { const wm = w * (1 - smoothstep(MAG_WINDOW[0], MAG_WINDOW[1], d - dMin)); pinMagSum += wm * pin; pinMagW += wm; pinCapSum += wm * (1 - smoothstep(0, CAP_SOFT, over)); }
       }
