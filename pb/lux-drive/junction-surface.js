@@ -28,6 +28,7 @@ export const JUNCTION_SURFACE = Object.freeze({
   ridge: 1e-3,         // a tiny pull of the gradient to zero (a fit from one sample)
   levelTol: 0.6,       // m: only the ways at the level of the contact (within this) shape its plane (a flyover beside it does not)
   dedupe: 3.0,         // m: contact points closer than this are one
+  saturate: 2.0,       // the summed weight of the planes at which a point is fully junction (see sample)
   overlapSlack: 0.3,   // m: two centre line samples closer than the two half widths plus this: the carriageways overlap (a contact even without a junction pin)
   cell: 24,            // m: the spatial hash of the planes
   goodFit: 0.10,       // m: a plane whose weighted rms distance from the beds it was fitted to is below this counts fully ...
@@ -196,7 +197,9 @@ export function createJunctionSurface(chains, skip, hwOf, opts = JUNCTION_SURFAC
         }
       }
     }
-    out.weight = wSum > 1 ? 1 : wSum;
+    // a soft saturation (1 - (1 - s / SAT)^2, flat at SAT): a hard min(1, sum) kinked where the sum of many planes crossed 1, within a metre or two at the edge of a big junction
+    const u = wSum >= opts.saturate ? 0 : 1 - wSum / opts.saturate;
+    out.weight = 1 - u * u;
     out.level = wSum > 0 ? hSum / wSum : 0;
     return out;
   }

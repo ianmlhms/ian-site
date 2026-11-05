@@ -15,9 +15,8 @@
 import { ROAD } from './config.js';
 import { ROAD_KINDS, kindInfo } from './roads.js';
 import { designBed, bedSlopes, hermite } from './road-bed.js';
-import { createJunctionSurface, JUNCTION_SURFACE } from './junction-surface.js';
+import { createJunctionSurface } from './junction-surface.js';
 import { isLandmarkDeck } from './decks.js';
-const JS_OPTS = globalThis.process?.env?.JS_OPTS ? { ...JUNCTION_SURFACE, ...JSON.parse(globalThis.process.env.JS_OPTS) } : JUNCTION_SURFACE;   // TEMP experiment hook
 
 const CELL = ROAD.cell;                 // m, the spatial hash cell (the biggest kernel radius fits inside it)
 const BATTER_STEP = 2.0;               // m, the step of the walk that finds where the batter gives up
@@ -30,6 +29,7 @@ const MEDIAN_WIDTH = 3.0;             // m: a gap of at most this between the ca
                                     // narrow was a wobbling green sliver between two ragged kerbs (the paint edge of each side is a contour on a 1 m lattice)
 const PROTECT_CELL = 64;               // m, the cell of the spatial hash of the protected corridors
 const OWN_PROTECT_FADE = 2.0;          // m: ... and away from them only its own carriageway, fading out over this
+const CROSSING_MARGIN = 1.0, CROSSING_FADE = 4.0;   // m: ... there the ground is protected this far past its pavement, fading out over this
 const CROSSING_PROTECT = 30.0;         // m: a way that the crossings found to ride over another protects the ground within this of its crossings (see the protected corridors)
 const PROTECT_RAMP = 1.5;              // m: where a carved way runs onto a bridge, the protection of the ground under the bridge grows from nothing at the abutment to its full strength over this
                                        // distance along the bridge, and is nothing BEFORE the abutment.  The approach road keeps its own bed right up to the deck (the ground under the deck drops
@@ -539,7 +539,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   findCrossings();
   reconcileJunctions();
   // the junction sheets: one smooth surface where ways meet at one level (junction-surface.js)
-  const tJS = performance.now(); const junctionSheet = createJunctionSurface(chains, (c) => overRoads.has(c.road), (c) => Math.max(0.8, roads[c.road].width / 2), JS_OPTS); if (globalThis.process?.env?.JS_TIME) console.log("junction sheet", (performance.now() - tJS).toFixed(0), "ms", junctionSheet.count);
+  const junctionSheet = createJunctionSurface(chains, (c) => overRoads.has(c.road), (c) => Math.max(0.8, roads[c.road].width / 2));
   const sheet = { level: 0, weight: 0 };
 
   for (const { ri, road, rs, n, hw, kerbH, kerbW, pw, bench, a0, kind, chain } of prep) {
@@ -715,7 +715,9 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     const near = !crossingsOf.has(ROADOF[i]) || nearCrossing(i);
     protX0.push(X0[i]); protZ0.push(Z0[i]); protX1.push(X1[i]); protZ1.push(Z1[i]);
     // (away from its crossings only its own carriageway and pavement is protected: it is not carved, its surface is the embankment of the DTM, and the batter of the road beside it may not cut it)
-    protHalf.push(near ? A0[i] + PROTECT_MARGIN : A0[i]); protFade.push(near ? PROTECT_FADE : OWN_PROTECT_FADE);
+    // (near a crossing: its carriageway and a metre, fading over CROSSING_FADE: the corridor of a tagged bridge (4 m, fading over 10 m) lay over the carriageway of the trunk road beside the
+    // overpass and kept its right lane on the slope of the embankment)
+    protHalf.push(near ? BENCH[i] + CROSSING_MARGIN : BENCH[i]); protFade.push(near ? CROSSING_FADE : OWN_PROTECT_FADE);
     protArc.push(0); protRampA.push(-Infinity); protRampB.push(Infinity);
   }
   const pKey = (cx, cz) => cx * 4096 + cz;
@@ -1113,7 +1115,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     }
     // The junction sheet: where ways meet at one level the carriageways (and the gaps of up to 2 x SHEET_GAP_HOLD between them) lie on one smooth surface, not on the layered beds.
     // A way at another level (a ramp beside the junction) keeps its own surface: the sheet lets go of its bench.
-    if (JS_OPTS.off) sheet.weight = 0; else junctionSheet.sample(x, z, sheet);
+    junctionSheet.sample(x, z, sheet);
     if (sheet.weight > 1e-3) {
       let near = 0, apart = 0;
       for (let sl = 0; sl < nSlots; sl++) {
@@ -1129,7 +1131,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     // The protection keeps the ground under a bridge from being CUT (a pit under the deck) and from being buried under the batter of a road beside it; the CARRIAGEWAY of a way that
     // rises onto a bridge (its approach on a fill, lifted to the deck) is neither, and the corridor of the other carriageway's deck beside it - whose end lies 10 .. 20 m along on a skewed
     // bridge - flattened the end of the approach road into the valley.
-    const protHere = bandY >= ground ? prot * (1 - pinCover) : prot * (1 - pinCover);
+    const protHere = prot * (1 - pinCover);
     out.band = ground + (1 - protHere) * (bandY - ground);
     // The paint: the union of the carriageways and of the pavements, each way painted only where the ground lies at its own level.  Where two ways at different levels overlap in plan
     // (a slip road beside the trunk road, an overpass on its embankment) the ground between them is a ramp or the side of the embankment, and painted with the carriageway of the way
