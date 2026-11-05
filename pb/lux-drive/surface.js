@@ -7,6 +7,7 @@
  * of the carriageway, the outer edge of the pavement and the class of the road.  The car reads them to know whether it
  * is on the tarmac, on the kerb or off the road, and the shader reads them to paint the road. */
 import { QUADTREE } from './config.js';
+import { CHANNELS } from './road-network.js';
 
 export const BLOCK = QUADTREE.minSize;            // 32 m: one LOD 0 tile
 const APRON = 1;
@@ -40,12 +41,10 @@ export function createSurface(field) {
     const sdPave = new Float32Array(SIDE * SIDE);        // ... and to the union of the pavements
     const junction = new Uint8Array(SIDE * SIDE);        // 1 where marked roads cross: the lane markings are cut there
     const sdMajor = new Float32Array(SIDE * SIDE);       // the signed distance to the union of the street carriageways (road-network.js MINOR_HW)
-    const sdA = new Float32Array(SIDE * SIDE), sdB = new Float32Array(SIDE * SIDE);    // the signed distances to the nearest carriageway and to the nearest OTHER carriageway ...
-    const grpA = new Int32Array(SIDE * SIDE), grpB = new Int32Array(SIDE * SIDE);      // ... and which carriageways they are (carriageways.js groups; -1 none)
-    const pvA = new Float32Array(SIDE * SIDE), pvB = new Float32Array(SIDE * SIDE);    // ... and the distances to their pavements
-    const maj = new Uint8Array(SIDE * SIDE);             // ... and which of the two are streets (bit 0: the nearest, bit 1: the other)
+    // the paint channels (CHANNELS per node): the nearest carriageways (carriageways.js groups, -1 none), the distances to them and to their pavements, and whether each is a street
+    const chGroup = new Int32Array(SIDE * SIDE * CHANNELS), chCar = new Float32Array(SIDE * SIDE * CHANNELS), chPave = new Float32Array(SIDE * SIDE * CHANNELS), chMajor = new Uint8Array(SIDE * SIDE * CHANNELS);
     const x0 = bx * BLOCK, z0 = bz * BLOCK;
-    const info = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, lines: 0, lanes: 0, s: 0, surface: 0, sdCar: 0, sdPave: 0, sdMajor: 0, junction: 0, sdA: 0, sdB: 0, grpA: -1, grpB: -1, pvA: 0, pvB: 0, majA: 0, majB: 0 };
+    const info = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, lines: 0, lanes: 0, s: 0, surface: 0, sdCar: 0, sdPave: 0, sdMajor: 0, junction: 0, chGroup: new Int32Array(CHANNELS), chCar: new Float32Array(CHANNELS), chPave: new Float32Array(CHANNELS), chMajor: new Uint8Array(CHANNELS) };
     for (let j = 0; j < SIDE; j++) {
       for (let i = 0; i < SIDE; i++) {
         const o = j * SIDE + i;
@@ -53,10 +52,10 @@ export function createSurface(field) {
         cover[o] = info.coverage; lat[o] = info.lat; hw[o] = info.hw; a0[o] = info.a0;
         kind[o] = info.kind; road[o] = info.road; lines[o] = info.lines; surface[o] = info.surface;
         lanes[o] = info.lanes; along[o] = info.s; sdCar[o] = info.sdCar; sdPave[o] = info.sdPave; junction[o] = info.junction; sdMajor[o] = info.sdMajor;
-        sdA[o] = info.sdA; sdB[o] = info.sdB; grpA[o] = info.grpA; grpB[o] = info.grpB; pvA[o] = info.pvA; pvB[o] = info.pvB; maj[o] = info.majA + 2 * info.majB;
+        chGroup.set(info.chGroup, o * CHANNELS); chCar.set(info.chCar, o * CHANNELS); chPave.set(info.chPave, o * CHANNELS); chMajor.set(info.chMajor, o * CHANNELS);
       }
     }
-    b = { bx, bz, x0, z0, h, cover, lat, hw, a0, kind, surface, road, lines, lanes, along, sdCar, sdPave, sdMajor, junction, sdA, sdB, grpA, grpB, pvA, pvB, maj, side: SIDE, apron: APRON };
+    b = { bx, bz, x0, z0, h, cover, lat, hw, a0, kind, surface, road, lines, lanes, along, sdCar, sdPave, sdMajor, junction, chGroup, chCar, chPave, chMajor, side: SIDE, apron: APRON };
     blocks.set(k, b);
     if (blocks.size > MAX_BLOCKS) blocks.delete(blocks.keys().next().value);
     return b;

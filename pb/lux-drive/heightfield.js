@@ -41,7 +41,7 @@ export function createHeightField({ near, far, roads, decks = [] }) {
       info.kind = scratch.kind; info.road = scratch.road; info.lines = scratch.lines;
       info.lanes = scratch.lanes; info.s = scratch.s; info.surface = scratch.surface;
       info.sdCar = scratch.sdCar; info.sdPave = scratch.sdPave; info.sdMajor = scratch.sdMajor; info.junction = scratch.junction;
-      info.sdA = scratch.sdA; info.grpA = scratch.grpA; info.sdB = scratch.sdB; info.grpB = scratch.grpB; info.pvA = scratch.pvA; info.pvB = scratch.pvB; info.majA = scratch.majA; info.majB = scratch.majB;
+      if (info.chCar) { info.chGroup.set(scratch.chGroup); info.chCar.set(scratch.chCar); info.chPave.set(scratch.chPave); info.chMajor.set(scratch.chMajor); }
     }
     // The ground beside the road is the BATTER (the ramp from the level of the road to the land, never steeper than
     // the slope limit), not a fade of the bed: the ground beside a road may never be a wall, and the real terrain
@@ -69,7 +69,7 @@ export function createHeightField({ near, far, roads, decks = [] }) {
       info.kind = scratch.kind; info.road = scratch.road; info.lines = scratch.lines;
       info.lanes = scratch.lanes; info.s = scratch.s; info.surface = scratch.surface;
       info.sdCar = scratch.sdCar; info.sdPave = scratch.sdPave; info.sdMajor = scratch.sdMajor; info.junction = scratch.junction;
-      info.sdA = scratch.sdA; info.grpA = scratch.grpA; info.sdB = scratch.sdB; info.grpB = scratch.grpB; info.pvA = scratch.pvA; info.pvB = scratch.pvB; info.majA = scratch.majA; info.majB = scratch.majB;
+      if (info.chCar) { info.chGroup.set(scratch.chGroup); info.chCar.set(scratch.chCar); info.chPave.set(scratch.chPave); info.chMajor.set(scratch.chMajor); }
     }
     return scratch.band + scratch.kerb * kerbK;
   }

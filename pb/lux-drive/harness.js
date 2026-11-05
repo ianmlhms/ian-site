@@ -49,6 +49,7 @@ import { placeParkBenches } from './park-benches.js';
 import { createPropCollider } from './props.js';
 import { WALL, WALL_DRAW_FACTOR, findRamp, wallQuads, rampTolerance } from './retaining-walls.js';
 import { JUNCTION, junctionClusters, driveLine } from './junction-probe.js';
+import { runMarkingChecks } from './marking-checks.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DATA = path.join(HERE, 'data');
@@ -1672,6 +1673,12 @@ if (wants('L')) {
     check(`asphalt only on level carriageway: painted carriageway on ground steeper than ${MAX_SLOPE * 100} % across the road <= ${MAX_SHARE * 100} % of the points`, pts > 1000 && steep <= MAX_SHARE * pts,
       `${steep} of ${pts} points (${(100 * steep / Math.max(1, pts)).toFixed(2)} %), e.g. ${steepList.join('; ')}`);
   }
+}
+
+/* ---------------------------------------------------------------- M: the lane markings (marking-checks.js) */
+if (wants('M')) {
+  section('M markings');
+  runMarkingChecks({ data, net, surface, field, decks: deckNetwork.decks.filter((d) => !landmarks.hiddenDecks.has(d.id)), check, stats, quick: QUICK });
 }
 
 /* ---------------------------------------------------------------- the summary */

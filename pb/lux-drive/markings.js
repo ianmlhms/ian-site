@@ -34,7 +34,7 @@ export const MARK = Object.freeze({
   cutStep: 0.5,             // m: the resolution of the cut along a line
   cutInside: 0.05,          // m: a line point this deep inside ANOTHER carriageway is cut
   levelApart: 1.2,          // m: two carriageways whose beds differ by more than this are at two levels (a bridge over the road): no cut
-  minPiece: 1.5,            // m: a piece of a solid line shorter than this after the cuts is a fragment: not painted
+  minPiece: 3.0,            // m: a piece of a solid line shorter than this after the cuts is a fragment: not painted (a sliver between two junction mouths)
   minDash: 0.6,             // m: nor a dash cut shorter than this (tile-mesh.js)
   onRoad: 0.15,             // m: a line is painted only where the terrain's carriageway paint lies at least this far around it (tile-mesh.js): never up a wall or a ramp
   cell: 32,                 // m: the grid of the pieces (one LOD 0 tile)
@@ -229,7 +229,12 @@ export function buildMarkingPlan(roads, network, decks = []) {
       let ownSet = ownOf.get(p.way);
       if (!ownSet) { ownSet = new Set(own); for (const r of plainNeighbours.get(road.id) || []) ownSet.add(r); ownOf.set(p.way, ownSet); }
       vis[q] = insideOther(p.x, p.z, p.bed, ownSet) ? 0 : 1;
-      if (!vis[q]) cutLength += (tr.s1 - tr.s0) / steps;
+      if (!vis[q]) {
+        cutLength += (tr.s1 - tr.s0) / steps;
+        // (the stretches cut by another carriageway, for gate M: a gap at a hand-over that another road explains is a junction, not a broken line)
+        const ds = (tr.s1 - tr.s0) / steps, last = tr.cuts[tr.cuts.length - 1];
+        if (last && last[1] >= s - ds * 1.01) last[1] = s + ds / 2; else tr.cuts.push([s - ds / 2, s + ds / 2]);
+      }
     }
     // runs of equal (visible, deck, dashed) -> pieces; a solid piece shorter than minPiece is a fragment
     let q0 = 0;
@@ -460,7 +465,7 @@ function buildTracks(chain, roads, tracks) {
 }
 
 function newTrack(chain, line, s0) {
-  return { chain: chain.id, role: line.role, side: line.side, o: line.o, dashed: line.dashed, knS: [s0], knO: [line.o], s0, s1: s0, style: [{ s0, s1: Infinity, dashed: line.dashed }] };
+  return { chain: chain.id, role: line.role, side: line.side, o: line.o, dashed: line.dashed, knS: [s0], knO: [line.o], s0, s1: s0, style: [{ s0, s1: Infinity, dashed: line.dashed }], cuts: [] };
 }
 function pushKnot(t, s, o) {
   const n = t.knS.length;

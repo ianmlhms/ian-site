@@ -56,6 +56,7 @@ const ABUT_FADE_MAX = 6.0;             // m: past the hold the ground under the 
                                        // stood on a vertical face of ground (the world flow's "walls the carve made": 153 of them at the motorway interchanges after the approaches were lifted)
 const smoothstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const MAX_PINS = 16;                   // carriageways that lie over one point, at most
+export const CHANNELS = 3;              // the paint channels: the nearest carriageways whose edges the shader takes exactly (tile-mesh.js carriagewayChannels)
 const MAX_CAND = 192;                  // segments that reach one point, at most
 const FOOT_FADE = 1.0, FOOT_FLOOR = 0.01;   // m: a segment counts fully when the foot of the perpendicular is this far from its ends; the floor of its weight (so the weights never all vanish)
 const SHEPARD_OFFSET = 0.5, SHEPARD_MIN = 1e-4;   // the weight of a segment of a way is ((d_nearest + 0.5) / (d + 0.5))^4: equal at equal distance, a few per cent at twice the distance               // m: the segments of a way that are this much farther than its nearest one still count for the ground (weighted by how much nearer the nearest is)
@@ -892,6 +893,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   const pinCap = new Float32Array(MAX_PINS), pinDirX = new Float32Array(MAX_PINS), pinDirZ = new Float32Array(MAX_PINS);
   const wayEdge = new Float32Array(MAX_CAND), wayBed = new Float32Array(MAX_CAND), wayDirX = new Float32Array(MAX_CAND), wayDirZ = new Float32Array(MAX_CAND), wayGap = new Float32Array(MAX_CAND);
   const paintMajor = new Uint8Array(MAX_CAND);
+  const chGroup = new Int32Array(MAX_CAND), chCar = new Float32Array(MAX_CAND), chPave = new Float32Array(MAX_CAND), chMajor = new Uint8Array(MAX_CAND);   // (the paint channels, per carriageway)
   const paintECar = new Float32Array(MAX_CAND), paintEPave = new Float32Array(MAX_CAND), paintBed = new Float32Array(MAX_CAND), paintRoad = new Int32Array(MAX_CAND);
   const paintOffX = new Float32Array(MAX_CAND), paintOffZ = new Float32Array(MAX_CAND);   // per way near the point: the distance past the edge of its bench (its end cap included) and its bed there   // per pin: the distance to the edge of its bench (negative inside) and the level of its carriageway
   const armOf = new Int32Array(MAX_CAND), armFirst = new Uint8Array(MAX_CAND), slotRoad = new Int32Array(MAX_CAND), slotArm1 = new Int32Array(MAX_CAND), slotArm2 = new Int32Array(MAX_CAND);
@@ -909,7 +911,8 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     sNotch = right * (NOTCHR[s0] + (NOTCHR[s0 + 1] - NOTCHR[s0]) * t) + (1 - right) * (NOTCHL[s0] + (NOTCHL[s0 + 1] - NOTCHL[s0]) * t);
     sFade = right * (FADER[s0] + (FADER[s0 + 1] - FADER[s0]) * t) + (1 - right) * (FADEL[s0] + (FADEL[s0 + 1] - FADEL[s0]) * t);
   }
-  const scratch = { coverage: 0, bed: 0, band: 0, kerb: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, dist: 0, lines: 0, lanes: 0, s: 0, surface: 0, sdCar: SD_FAR, sdPave: SD_FAR, sdMajor: SD_FAR, junction: 0, sdA: SD_FAR, grpA: -1, sdB: SD_FAR, grpB: -1, pvA: SD_FAR, pvB: SD_FAR, majA: 0, majB: 0 };
+  const scratch = { coverage: 0, bed: 0, band: 0, kerb: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, dist: 0, lines: 0, lanes: 0, s: 0, surface: 0, sdCar: SD_FAR, sdPave: SD_FAR, sdMajor: SD_FAR, junction: 0,
+    chGroup: new Int32Array(CHANNELS).fill(-1), chCar: new Float32Array(CHANNELS).fill(SD_FAR), chPave: new Float32Array(CHANNELS).fill(SD_FAR), chMajor: new Uint8Array(CHANNELS) };
 
   const LEVEL_FULL = 4.0;           // m: a road shapes the ground that lies at its own level (within this).  A road
                                     // that stands far above the ground is a viaduct and must not fill the valley
@@ -1292,12 +1295,25 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
       if (ePave < sdPave) sdPave = ePave;
       if (paintMajor[q] && eCar < sdMajor) sdMajor = eCar;
     }
-    // the pavements of the two channels (the carriageways sdCar / sdCar2 belong to)
-    let pvA = SD_FAR, pvB = SD_FAR, majA = 0, majB = 0;      // (and whether each is a street: the pale tar of the service ways is outside every street, see sdMajor)
-    for (let q = 0; q < nPaint; q++) {
-      const g = GROUP[paintRoad[q]], ePave = paintEPave[q] + PAINT_LEVEL_PUSH * Math.max(0, Math.abs(out.band - paintBed[q]) - PAINT_LEVEL_TOL);
-      if (g === sdCarRoad) { if (ePave < pvA) pvA = ePave; if (paintMajor[q]) majA = 1; }
-      else if (g === sdCar2Road) { if (ePave < pvB) pvB = ePave; if (paintMajor[q]) majB = 1; }
+    // The paint CHANNELS (tile-mesh.js carriagewayChannels): the three nearest carriageways (groups), each with its distance, the distance to its pavement and whether it is a street
+    // (the pale tar of the service ways is outside every street, see sdMajor).
+    let nGrp = 0;
+    for (let q = 0; q < nPaint && out.chCar; q++) {
+      const push = PAINT_LEVEL_PUSH * Math.max(0, Math.abs(out.band - paintBed[q]) - PAINT_LEVEL_TOL);
+      const g = GROUP[paintRoad[q]], eCar = paintECar[q] + push, ePave = paintEPave[q] + push;
+      let k = 0;
+      while (k < nGrp && chGroup[k] !== g) k++;
+      if (k === nGrp) { chGroup[k] = g; chCar[k] = eCar; chPave[k] = ePave; chMajor[k] = paintMajor[q]; nGrp++; continue; }
+      if (eCar < chCar[k]) chCar[k] = eCar;
+      if (ePave < chPave[k]) chPave[k] = ePave;
+      if (paintMajor[q]) chMajor[k] = 1;
+    }
+    for (let c = 0; c < CHANNELS && out.chCar; c++) {
+      let bestK = -1;
+      for (let k = 0; k < nGrp; k++) if (chGroup[k] !== -2 && (bestK < 0 || chCar[k] < chCar[bestK])) bestK = k;
+      out.chGroup[c] = bestK < 0 ? -1 : chGroup[bestK]; out.chCar[c] = bestK < 0 ? SD_FAR : chCar[bestK];
+      out.chPave[c] = bestK < 0 ? SD_FAR : chPave[bestK]; out.chMajor[c] = bestK < 0 ? 0 : chMajor[bestK];
+      if (bestK >= 0) chGroup[bestK] = -2;          // (taken)
     }
     out.sdMajor = sdMajor;
     if (out.debug) out.debug.push({ ground, batter: devW > 0 ? ground + devSum / devW : ground, prot, pinCover, protHere, sheetLevel: sheet.level, sheetW: sheet.weight, ways: Array.from({ length: nSlots }, (_, q) => [slotRoad[q], wayEdge[q], wayBed[q]]) });
@@ -1311,8 +1327,6 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     }
     out.junction = junction;
     if (sdCar2 < SD_FAR && sdCar >= 0 && dispX * disp2X + dispZ * disp2Z < 0) sdPave = Math.min(sdPave, sdCar + sdCar2 - MEDIAN_WIDTH);   // the median between two carriageways: paved as a whole, the edges are the kerbs
-    out.sdA = sdCar; out.grpA = sdCarRoad; out.sdB = sdCar2; out.grpB = sdCar2Road;      // the two channels of the paint (tile-mesh.js carriagewayChannels)
-    out.pvA = pvA; out.pvB = pvB; out.majA = majA; out.majB = majB;
     if (best < 0) {
       out.coverage = 0; out.bed = 0; out.kerb = 0; out.lat = 0; out.hw = 0; out.a0 = 0; out.kind = 0; out.road = -1;
       out.dist = Infinity; out.lines = 0; out.lanes = 0; out.s = 0; out.surface = 0;
