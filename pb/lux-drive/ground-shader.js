@@ -21,7 +21,7 @@ export const GROUND_VERTEX = `
   attribute vec4 aRoad2;       // the coverage of the road, the style of the markings, its material, how exactly the fine markings are drawn
   attribute vec4 aRoad3;       // the signed distance to the union of the carriageways, to the union of the pavements, the fade of the paint, to the union of the STREET carriageways
   attribute vec4 aRoad4;       // the distances to the three nearest carriageways (exact planes per cell) and their weight (tile-mesh.js carriagewayChannels)
-  attribute vec4 aRoad5;       // the distances to the outer edges of their pavements, and which of them are streets (bits)
+  attribute vec4 aRoad5;       // the distances to the outer edges of their pavements, and to the nearest of them that is a street
   attribute vec4 aMark;        // a lane marking ribbon (tile-mesh.js appendMarkings): the unit normal of the line (x, z), its half width, the side (-1 / +1) times the strength; 0 on the ground
   varying vec3 vWorld; varying vec3 vNormal; varying float vDist;
   varying vec4 vRoad; varying vec4 vRoad2; varying vec4 vRoad3; varying vec4 vRoad4; varying vec4 vRoad5;
@@ -159,9 +159,8 @@ export const GROUND_FRAGMENT = `
     // read as a blotch.  They get a soft border (a wider blend, so the angles round off) and a calmer, lighter grey.  Streets of 6 m and more are not touched.
     // (minor = on a carriageway but outside every street carriageway: the signed distance to those is continuous, so the pale tar of a service way that runs into the avenue ends in a
     // straight line along the avenue's edge, not in the sawtooth of the half width of the nearest way switching per node)
-    // (where the channels hold, the distance to the street carriageways is theirs too: the streets among them are the bits of aRoad5.w)
-    float majBits = floor(vRoad5.w + 0.5);
-    float sdMaj = min(min(mod(majBits, 2.0) > 0.5 ? vRoad4.x : 99.0, mod(floor(majBits / 2.0), 2.0) > 0.5 ? vRoad4.y : 99.0), floor(majBits / 4.0) > 0.5 ? vRoad4.z : 99.0);
+    // (where the channels hold, the distance to the street carriageways is theirs too: aRoad5.w, the nearest street among them)
+    float sdMaj = vRoad5.w;
     float minorW = smoothstep(0.0, 0.8, mix(vRoad3.w, min(sdMaj, 8.0), wC)) * step(surface, 0.5) * step(0.5, roadW);
     // (the soft border is a few decimetres: a wider one let the lawn under it show through as a light green halo along every narrow road, QA T09)
     onCarriage = mix(onCarriage, 1.0 - smoothstep(-0.2, 0.2, sdC), minorW);

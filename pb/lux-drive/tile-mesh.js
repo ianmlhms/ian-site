@@ -81,41 +81,42 @@ export function maskMarkBorders(road2, road, along, sdCar, step) {
  * M01).  Each node carries the distances to its CHANNELS nearest carriageways (carriageways.js groups: two ways of one carriageway are one), ordered by the group, so that the four
  * nodes of a cell interpolate the distances to the SAME carriageways: each is a plane, and the shader takes their minimum per pixel - the median is two straight kerbs.  Where the
  * set changes from node to node (more carriageways meet: a big junction) the node's weight is 0 and the shader keeps the blurred union (aRoad3.x).
- * The pavements of the carriageways come along the same way, and which of them is a street (the pale tar of a service way is outside every STREET carriageway, per pixel as well).
+ * The pavements of the carriageways come along the same way, and the distance to the nearest of them that is a street (the pale tar of a service way is outside every STREET).
  * Where the set holds over the 3 x 3 nodes the channels get the [1 2 1]^2 blur of blurField: a plane does not move, but a carriageway that lies off its level is pushed out of the
  * paint by an amount that follows the ground (road-network.js PAINT_LEVEL_PUSH), and that field, not a plane, came out of the interpolation as a sawtooth.
- * Returns a Float32Array (APRON_SIDE^2 x CHANNEL_STRIDE): carriageways 0 .. 2, the weight, pavements 0 .. 2, the street bits (bit c: channel c is a street).
+ * Returns a Float32Array (APRON_SIDE^2 x CHANNEL_STRIDE): carriageways 0 .. 2, the weight, pavements 0 .. 2, the distance to the street carriageways among them.
  */
 export const CHANNEL_STRIDE = 8;
 const CHANNEL_FAR = 30;                 // m: "no such carriageway" (a distance that never wins the minimum)
 const CHANNEL_NEAR = 3.0;               // m (see carriagewayChannels): more than two diagonals of a 1 m cell
+const CHANNEL_CRITICAL = 2.0;           // m (see carriagewayChannels agree): more than a cell's diagonal
 export function carriagewayChannels(chGroup, chCar, chPave, chMajor) {
   const n = APRON_SIDE * APRON_SIDE;
   const out = new Float32Array(n * CHANNEL_STRIDE);
-  const slotGroups = new Int32Array(n * CHANNELS).fill(-1), nearMask = new Uint8Array(n);      // the group in each slot, and which slots hold a NEAR carriageway
+  const slotGroups = new Int32Array(n * CHANNELS).fill(-1);      // the group in each slot
   const order = [0, 1, 2];
   for (let o = 0; o < n; o++) {
-    // The slots: the NEAR carriageways (within CHANNEL_NEAR of the node) by their group, then the others by their distance.  The weight holds where every carriageway that is near
-    // at a node or at one of its 8 neighbours sits in the same slot at both: an edge in a cell lies within the cell's diagonal of its four nodes, so its carriageway is near there,
-    // and a road passing a few metres away (not near) does not break the agreement.
+    // The slots: the NEAR carriageways (within CHANNEL_NEAR of the node) by their group, then the others by their distance (a carriageway that leaves the near set keeps its slot as
+    // long as it is the nearest of the far ones).  The weight holds where the node agrees with its 8 neighbours (agree, below).
     const g = (c) => chGroup[o * CHANNELS + c], d = (c) => chCar[o * CHANNELS + c];
     const isNear = (c) => g(c) >= 0 && d(c) <= CHANNEL_NEAR;
     order.sort((a, b) => (isNear(b) - isNear(a)) || (isNear(a) ? g(a) - g(b) : (g(a) < 0) - (g(b) < 0) || d(a) - d(b)));
-    let maj = 0;
+    let street = CHANNEL_FAR;
     order.forEach((c, k) => {
       const none = g(c) < 0;
       out[o * CHANNEL_STRIDE + k] = none ? CHANNEL_FAR : Math.min(CHANNEL_FAR, d(c));
       out[o * CHANNEL_STRIDE + 4 + k] = none ? CHANNEL_FAR : Math.min(CHANNEL_FAR, chPave[o * CHANNELS + c]);
-      if (!none && chMajor[o * CHANNELS + c]) maj |= 1 << k;
+      if (!none && chMajor[o * CHANNELS + c]) street = Math.min(street, d(c));
     });
-    out[o * CHANNEL_STRIDE + 7] = maj;
-    order.forEach((c, k) => { slotGroups[o * CHANNELS + k] = g(c); if (isNear(c)) nearMask[o] |= 1 << k; });
+    out[o * CHANNEL_STRIDE + 7] = street;          // (one distance, not per slot: a flag of a far slot that differs between two nodes cannot be interpolated)
+    order.forEach((c, k) => { slotGroups[o * CHANNELS + k] = g(c); });
   }
-  /** Do the nodes o and q hold every carriageway that is near at either of them in the same slot? */
+  /** May the nodes o and q be interpolated slot by slot?  Every slot must hold the same carriageway at both, unless it is far at both (CHANNEL_CRITICAL: a slot that is far at both
+   *  ends can neither make an edge in the cell nor win the minimum near one; a slot that is near at one end and holds another carriageway at the other would draw a false kerb). */
   const agree = (o, q) => {
     for (let k = 0; k < CHANNELS; k++) {
-      if ((nearMask[o] >> k) & 1 && slotGroups[q * CHANNELS + k] !== slotGroups[o * CHANNELS + k]) return false;
-      if ((nearMask[q] >> k) & 1 && slotGroups[o * CHANNELS + k] !== slotGroups[q * CHANNELS + k]) return false;
+      if (slotGroups[q * CHANNELS + k] === slotGroups[o * CHANNELS + k]) continue;
+      if (out[o * CHANNEL_STRIDE + k] < CHANNEL_CRITICAL || out[q * CHANNEL_STRIDE + k] < CHANNEL_CRITICAL) return false;
     }
     return true;
   };
@@ -139,7 +140,7 @@ export function carriagewayChannels(chGroup, chCar, chPave, chMajor) {
     for (let i = 1; i < APRON_SIDE - 1; i++) {
       const o = j * APRON_SIDE + i;
       if (!raw[o * CHANNEL_STRIDE + 3]) continue;
-      for (const c of [0, 1, 2, 4, 5, 6]) {
+      for (const c of [0, 1, 2, 4, 5, 6, 7]) {
         let sum = 0;
         for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) sum += W[dj + 1] * W[di + 1] * raw[((j + dj) * APRON_SIDE + i + di) * CHANNEL_STRIDE + c];
         out[o * CHANNEL_STRIDE + c] = sum / 16;
@@ -258,7 +259,7 @@ export function buildTileMesh(leaf, nodes, split, field, marks = null) {
   const road2 = new Float32Array((vertexCount + skirtVerts) * 4);
   const road3 = new Float32Array((vertexCount + skirtVerts) * 4);      // aRoad3: the signed distances of the paint (see the vertex shader)
   const road4 = new Float32Array((vertexCount + skirtVerts) * 4);      // aRoad4: the carriageway channels of the paint and their weight (carriagewayChannels)
-  const road5 = new Float32Array((vertexCount + skirtVerts) * 4);      // aRoad5: the pavements of the channels and the street bits
+  const road5 = new Float32Array((vertexCount + skirtVerts) * 4);      // aRoad5: the pavements of the channels and the distance to the street carriageways
   const paintK = fadeOf(step, ROAD.paintFullStep, ROAD.paintFadeStep);
   const skirtDepth = QUADTREE.skirtDepth + QUADTREE.skirtPerStep * step;
   const stitchAt = new Map();
@@ -394,7 +395,7 @@ export function appendMarkings(mesh, nodes, plan) {
     road3[v * 4] = nodeLerp(nodes.sdCar, x0, z0, step, x, z); road3[v * 4 + 1] = nodeLerp(nodes.sdPave, x0, z0, step, x, z); road3[v * 4 + 2] = paintK; road3[v * 4 + 3] = nodeLerp(nodes.sdMajor, x0, z0, step, x, z);
     for (let c = 0; c < 4; c++) road4[v * 4 + c] = nodeLerpK(nodes.channels, CHANNEL_STRIDE, c, x0, z0, step, x, z);
     for (let c = 0; c < 3; c++) road5[v * 4 + c] = nodeLerpK(nodes.channels, CHANNEL_STRIDE, 4 + c, x0, z0, step, x, z);
-    road5[v * 4 + 3] = nodes.channels[o * CHANNEL_STRIDE + 7];
+    road5[v * 4 + 3] = nodeLerpK(nodes.channels, CHANNEL_STRIDE, 7, x0, z0, step, x, z);
     const l = Math.hypot(nx, nz) || 1;
     mark[v * 4] = nx / l; mark[v * 4 + 1] = nz / l; mark[v * 4 + 2] = MARK.lineHalf; mark[v * 4 + 3] = side * strength;
   };

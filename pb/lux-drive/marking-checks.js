@@ -19,6 +19,7 @@ const WOBBLE_MAX_CM = 1.0;        // the painted lines of the study roads may de
 const PLACE_MAX_CM = 1.0;         // the GPU ribbons may lie this far from the planned line
 const MEDIAN_SAMPLE = 0.5;        // m along the dual carriageway between the samples of the median edge
 const MEDIAN_SCAN = 0.02;         // m across
+const FALSE_KERB_UNION = 0.6;    // m: a point counts as tarmac when the union paints it this far inside an edge; the channels must paint it as tarmac too
 const JOINT_CLEAR = 12;          // m: the median edge is not measured this close to a hand-over (the width of the carriageway may change there)
 const MEDIAN_MAX_CM = 6;          // the edge of the tarmac along a median may deviate this much from its 10 m running mean (v45: a sawtooth of 30 - 50 cm)
 
@@ -160,6 +161,8 @@ export function runMarkingChecks({ data, net, surface, field, decks, check, stat
   let ribbons = 0, worstPlace = 0, wobbleN = 0, worstWobble = 0, worstWobbleAt = '';
   const wobbles = [];
   let medianN = 0, worstMedian = 0, worstMedianOld = 0, medianAt = '';
+  let insideN = 0, insideBad = 0, insideSkip = 0;
+  const insideList = [];
   for (const r of STUDY_ROADS.slice(0, quick ? 3 : STUDY_ROADS.length)) {
     const meshes = new Map();
     const meshAt = (x, z) => {
@@ -260,6 +263,26 @@ export function runMarkingChecks({ data, net, surface, field, decks, check, stat
           }
           return { worst, n, at };
         };
+        // (and no false kerb INSIDE the carriageway: every point 1 m and more inside its edges is painted as tarmac)
+        if (side === 1) {
+          for (let s = 0; s <= ch.length; s += 1) {
+            chainPoint(ch, s, p);
+            if (Math.hypot(p.x - r.x, p.z - r.z) > STUDY_RADIUS - 4 || ch.joints.some((J) => Math.abs(J - s) < JOINT_CLEAR)) continue;
+            const road = roads[ch.roadIds[p.way]];
+            if (!net.info[road.id]) continue;
+            const hw = Math.max(0.8, road.width / 2);
+            for (let u = -hw + 1; u <= hw - 1; u += 0.25) {
+              const x = p.x + p.nx * u, z = p.z + p.nz * u;
+              insideN++;
+              const m = meshAt(x, z), unionOnly = paintedSd(m, x, z, false);
+              if (unionOnly > -FALSE_KERB_UNION) { insideSkip++; continue; }          // (the union does not call it tarmac either: the way lies off its level there, see road-network.js PAINT_LEVEL_PUSH)
+              // (the pale tar of a service way must not show inside a street either: the distance to the street carriageways, as the shader takes it)
+              const wq = Math.min(1, Math.max(0, meshAttrAt(m, m.road4, 4, 3, x, z)));
+              const sdMaj = meshAttrAt(m, m.road3, 4, 3, x, z) * (1 - wq) + meshAttrAt(m, m.road5, 4, 3, x, z) * wq;
+              if (paintedSd(m, x, z) > 0 || (meshAttrAt(m, m.road3, 4, 3, x, z) < -FALSE_KERB_UNION && sdMaj > 0)) { insideBad++; if (insideList.length < 4) insideList.push(`${x.toFixed(1)},${z.toFixed(1)}`); }
+            }
+          }
+        }
         const a = dev(edge), b = dev(edgeOld);
         medianN += a.n;
         if (a.worst > worstMedian) { worstMedian = a.worst; chainPoint(ch, a.at * MEDIAN_SAMPLE, p); medianAt = `${r.name} ${p.x.toFixed(0)},${p.z.toFixed(0)} (chain ${cid} s ${(a.at * MEDIAN_SAMPLE).toFixed(1)} side ${side})`; }
@@ -270,10 +293,12 @@ export function runMarkingChecks({ data, net, surface, field, decks, check, stat
   wobbles.sort((a, b) => a - b);
   out.ribbons = { quads: ribbons, worstPlaceCm: +Math.max(0, worstPlace).toFixed(2) };
   out.wobble = { samples: wobbleN, p99Cm: wobbleN ? +wobbles[Math.floor(wobbleN * 0.99)].toFixed(2) : 0, worstCm: +worstWobble.toFixed(2), at: worstWobbleAt };
+  out.inside = { samples: insideN, falseEdges: insideBad, offLevel: insideSkip };
   out.median = { samples: medianN, worstCm: +worstMedian.toFixed(1), worstCmUnionOnly: +worstMedianOld.toFixed(1), at: medianAt };
   stats.markings = out;
   check('markings: the GPU ribbons lie on the planned lines (study roads)', ribbons > 0 && worstPlace <= PLACE_MAX_CM, `${ribbons} quads, worst ${Math.max(0, worstPlace).toFixed(2)} cm`);
   check(`markings: the painted lines of the ten study roads do not wobble (deviation from their own ${WOBBLE_WINDOW} m mean <= ${WOBBLE_MAX_CM} cm, tapers aside)`, wobbleN > 100 && worstWobble <= WOBBLE_MAX_CM, `${wobbleN} samples, p99 ${out.wobble.p99Cm} cm, worst ${worstWobble.toFixed(2)} cm at ${worstWobbleAt}`);
+  check('paint: no false kerb inside a carriageway (every point 1 m inside its edges that the union paints as tarmac stays tarmac, study roads)', insideN > 1000 && insideBad === 0, `${insideBad} of ${insideN} points (${insideSkip} not tarmac in the union either: off its level), e.g. ${insideList.join('; ')}`);
   check(`markings: the edge of the tarmac along a median is straight (deviation from its 10 m mean <= ${MEDIAN_MAX_CM} cm)`, medianN > 50 && worstMedian <= MEDIAN_MAX_CM, `${medianN} samples, worst ${worstMedian.toFixed(1)} cm at ${medianAt} (the union field alone, v45: ${worstMedianOld.toFixed(1)} cm)`);
   return out;
 }
