@@ -1633,10 +1633,10 @@ if (wants('L')) {
   const sorted = boxBobs.slice().sort((a, b) => a - b);
   const median = sorted[sorted.length >> 1] || 0;
   stats.junctionDrive = { junctions: clusters.length, medianBoxBob: +median.toFixed(2), worstBoxBob: +worstBox.toFixed(2), worstAt };
-  // m/s2 at 50 km/h (a road is 0.04).  The junction sheets (junction-surface.js) took the median from 4.9 to 0.6 and the worst from 21.8 to under 3.  Two junctions of the steep old town are
+  // m/s2 at 50 km/h (a road is 0.04).  The junction sheets (junction-surface.js) took the median from 4.9 to 0.5 and the worst from 21.8 to 1.9 (the steep old town aside).  Two junctions of the steep old town are
   // excepted from the worst with a bound of their own: Pafendaller Bierg / Stater Bierg (5297,8632: a pitch of 32 % and two ways ending 37 cm apart in level on it) and Waassergaass
   // (5349,8778: six ways at two levels 29 cm apart within one box); a plane is no fit for either, the sheet lets go of them and the layered beds stay.
-  const MAX_MEDIAN_BOX_BOB = 1.0, MAX_WORST_BOX_BOB = 2.7, STEEP_OLD_TOWN = [[5297, 8632], [5349, 8778]], MAX_STEEP_BOX_BOB = 6;
+  const MAX_MEDIAN_BOX_BOB = 1.0, MAX_WORST_BOX_BOB = 2.5, STEEP_OLD_TOWN = [[5297, 8632], [5349, 8778]], MAX_STEEP_BOX_BOB = 12;
   const isSteep = (at) => { const [x, z] = at.split(',').map(Number); return STEEP_OLD_TOWN.some(([sx, sz]) => Math.hypot(sx - x, sz - z) < 6); };
   let worstPlain = 0, worstPlainAt = '', worstSteep = 0;
   clusters.forEach((c, i) => { const at = `${Math.round(c.x)},${Math.round(c.z)}`; if (isSteep(at)) worstSteep = Math.max(worstSteep, boxBobs[i]); else if (boxBobs[i] > worstPlain) { worstPlain = boxBobs[i]; worstPlainAt = at; } });

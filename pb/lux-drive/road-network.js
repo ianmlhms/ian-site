@@ -76,6 +76,7 @@ const PAINT_LEVEL_TOL = 0.20;          // m: a way paints its carriageway where 
 const PAINT_LEVEL_PUSH = 8.0;          // ... and beyond that its edge moves in by this many m per m of the difference (see carve(), the paint)
 const SHEET_GAP_HOLD = 1.5;            // m: in a junction the sheet (junction-surface.js) holds the ground this far past the bench of a way at its level: a gap of up to 2 x this between two carriageways
                                        // (a median, the nose of a slip road, the wedge where a dual carriageway splits) is at road level, not a dip to the land
+const SHEET_MEET_FADE = 16.0;           // m: a point is in a junction while a second way at its level is within its bench + SHEET_GAP_HOLD + this (fading out)
 const SHEET_GAP_FADE = 2.0;            // m: ... and lets go of it over this distance
 
 /**
@@ -1117,7 +1118,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     // A way at another level (a ramp beside the junction) keeps its own surface: the sheet lets go of its bench.
     junctionSheet.sample(x, z, sheet);
     if (sheet.weight > 1e-3) {
-      let near = 0, apart = 0;
+      let near = 0, apart = 0, meet1 = 0, meet2 = 0;
       for (let sl = 0; sl < nSlots; sl++) {
         if (wayEdge[sl] === Infinity) continue;
         const same = 1 - smoothstep(SEP_LOW, SEP_HIGH, Math.abs(wayBed[sl] - sheet.level));
@@ -1125,8 +1126,11 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
         if (core * same > near) near = core * same;
         const inside = (1 - same) * (1 - smoothstep(0, OWN_FADE, wayEdge[sl]));
         if (inside > apart) apart = inside;
+        // how much two ways meet here: the second strongest of the ways near (a wide fade): a single way passing beside the plane of a junction keeps its own bed (flat across)
+        const m = same * (1 - smoothstep(SHEET_GAP_HOLD, SHEET_GAP_HOLD + SHEET_MEET_FADE, wayEdge[sl]));
+        if (m > meet1) { meet2 = meet1; meet1 = m; } else if (m > meet2) meet2 = m;
       }
-      bandY += (sheet.level - bandY) * sheet.weight * near * (1 - apart) * (1 - pinCover);   // (the approach of a bridge keeps its own bed: the deck starts there)
+      bandY += (sheet.level - bandY) * sheet.weight * near * meet2 * (1 - apart) * (1 - pinCover);   // (the approach of a bridge keeps its own bed: the deck starts there)
     }
     // The protection keeps the ground under a bridge from being CUT (a pit under the deck) and from being buried under the batter of a road beside it; the CARRIAGEWAY of a way that
     // rises onto a bridge (its approach on a fill, lifted to the deck) is neither, and the corridor of the other carriageway's deck beside it - whose end lies 10 .. 20 m along on a skewed
