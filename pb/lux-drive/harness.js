@@ -1350,11 +1350,11 @@ if (wants('K')) {
         // a ramp whose foot or head lies on tarmac (two carriageways of different levels that overlap in plan, an interchange) cannot have a wall: a wall is never built on a carriageway; counted apart
         const usable = (q) => {
           wprobe.sdCar = 9; net.carve(q.x, q.z, wprobe);
-          if (wprobe.sdCar < -0.15) return false;
+          if (wprobe.sdCar < -0.6) return false;
           net.carve(q.x + q.nx * q.depth, q.z + q.nz * q.depth, wprobe);                    // the head of the ramp, or (the baker pulls the back of the block in by at most 0.6 m) just short of it
-          if (wprobe.sdCar >= -0.15) return true;
+          if (wprobe.sdCar >= -0.6) return true;
           net.carve(q.x + q.nx * Math.max(WALL.minDepth, q.depth - 0.6), q.z + q.nz * Math.max(WALL.minDepth, q.depth - 0.6), wprobe);
-          return wprobe.sdCar >= -0.15;
+          return wprobe.sdCar >= -0.6;
         };
         const r = rampAt(chain, i, side);
         if (!r) continue;
@@ -1378,11 +1378,11 @@ if (wants('K')) {
     let onTarmac = 0, wallsOnTarmac = 0;
     for (const w of walls) {
       let hit = 0;
-      for (const p of w.pts) for (const t of [0, p.depth]) { net.carve(p.x + p.nx * t, p.z + p.nz * t, wprobe); if (wprobe.sdCar < -0.2) hit++; }
+      for (const p of w.pts) for (const t of [0, p.depth]) { net.carve(p.x + p.nx * t, p.z + p.nz * t, wprobe); if (wprobe.sdCar < -0.7) hit++; }
       if (hit) { wallsOnTarmac++; onTarmac += hit; }
     }
     stats.wallsOnTarmac = wallsOnTarmac;
-    check('retaining walls: no wall stands on a carriageway (face and back lines outside every carriageway)', wallsOnTarmac === 0, `${wallsOnTarmac} of ${walls.length} walls, ${onTarmac} points`);
+    check('retaining walls: no wall stands on a carriageway (face and back lines outside every carriageway, the edge line aside)', wallsOnTarmac === 0, `${wallsOnTarmac} of ${walls.length} walls, ${onTarmac} points`);
   }
   // A wall is solid for the car from both sides (wall-collider.js): 0.5 m in front of the face and 0.5 m behind the back of the block a body circle of the car collides, at every stretch
   // that is higher than half a metre (the tapered tips are not obstacles).

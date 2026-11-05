@@ -22,7 +22,7 @@ const COVER_CELL = 2;          // m: a ramp that is already in a wall of an earl
 const COVER_DIST = 1.4;
 const COVER_TOP = 1.2;
 const MIN_SAMPLES = 2;         // a ramp seen at a single sample is noise of the scan (a bend, a driveway) and a lone block of stone looks like a crate: a wall is at least two samples long
-const CAR_CLEAR = -0.15;        // the foot of the face and the back of the block lie outside every carriageway (signed distance to the union of the carriageways): a wall never stands on tarmac
+const CAR_CLEAR = -0.6;        // the foot of the face and the back of the block lie outside every carriageway (signed distance to the union of the carriageways; -0.6 = the face may stand on the edge line, which lies 0.5 m inside the carriageway): a wall never stands on tarmac
 const MAX_PULL_IN = 0.6;       // m: the back of the block is pulled in at most this far to get off a carriageway (a sliver of the lane edge); a ramp whose head lies deeper in the road has no wall
 const MIN_LENGTH = 6;          // m: a LOW wall (rise < MIN_RISE_SHORT) shorter than this (2 samples on a short bend) reads as a crate lying on the bank: not baked, the ground carries the step
 const MIN_RISE_SHORT = WALL.shortRise;    // m: a higher ramp keeps its wall however short: with its tapered ends it is a wedge on the bank, and the bare ramp would be a crack
