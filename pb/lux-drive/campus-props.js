@@ -152,8 +152,8 @@ function birch(soup, ground, t) {
   soup.frustum(t.x + lean * 0.5, t.z, 0.09, 0.04, y + h * 0.5, y + h * 0.9, 5, BIRCH_BARK, { cap: false });
   for (let i = 0; i < 7; i++) {
     const k = i / 6, a = seed * 0.9 + i * 2.4;                                       // up the crown: height and (shrinking) distance from the trunk
-    const r = h * 0.16 * (1 - k * 0.7);
-    lump(soup, t.x + lean * 0.5 * k + Math.cos(a) * r, y + h * (0.46 + 0.5 * k), t.z + Math.sin(a) * r, h * (0.12 - 0.04 * k), BIRCH_LEAF, seed + i * 13);
+    const r = h * 0.1 * (1 - k * 0.6);
+    lump(soup, t.x + lean * 0.5 * k + Math.cos(a) * r, y + h * (0.5 + 0.4 * k), t.z + Math.sin(a) * r, h * (0.19 - 0.06 * k), BIRCH_LEAF, seed + i * 13);
   }
 }
 
