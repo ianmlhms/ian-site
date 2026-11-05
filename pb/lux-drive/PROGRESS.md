@@ -1398,3 +1398,28 @@ Started from `lux-drive` 7529b959.  Ian's five screenshots (spawn pavement, junc
 * Hairpins / rings with arms at different levels (Eecherfeld, Hellege-Geescht) and the 5 m cuts / 9 m fills beside cliffs are untouched.
 * Walls are left off where the ramp lies in a road (75 ramps): the ground shows a steep ramp there (the Nei Escher Strooss slip road).  Footbridge decks 8 m over flat land are now thin decks on piers; whether such a deck is real is for the bake (`bake_decks.py`) to say.
 * The start still has the stone-slab texture patch on the trench; not measured on a real GPU or an iPad.
+
+## Terrain fix 4 (branch `lux-drive-terrain4`, Mac mini): the start, medians, Escher markings, wall ends; decks and junction bumps measured, NOT fixed
+
+Started from `lux-drive` 867a7db9 (v42).  Montages (before | after, noon, medium): `~/Library/Caches/luxdrive-work/terrain4/montages/` (`r1_spawn`, `r2_junction`, `r3_esch`, `r4_a1_viaduct`, `r5_a1_deck2`, `r6_neudorf`, `r7_neudorf_deck`).
+
+### Done
+* **Start (Avenue J.F. Kennedy)**: the grey checkered blotch was the class default pavement (`URBAN_PAVEMENT` 2.5 m each side, bake_roads) of way 2089, a service way that ends in a tunnel (a garage ramp).  `road-network.js`: a service way with a tunnel end has no pavement (`isGarageRamp`; ~60 such ways).
+  The pale strip was the coping of retaining wall 44 (1 m wide, 12 cm over the road edge, light grey): `retaining-walls.js` coping 6 cm, dark concrete `[0.27 ..]`.  Pavement slabs: texture scale 0.46 -> 0.72 and a calmer shade range (`ground-shader.js`, `paint-textures.js`).
+  The trench itself is real (the DTM has it: avenue edge 321.0, ramp 319.7) and is kept as an asphalt ramp with a low wall; no railing.
+* **Medians**: a gap of up to 3 m between the carriageways of two different roads that face each other is paved as a whole (`MEDIAN_WIDTH`, facing test on the offsets, `sdPave`): the green/grey sawtooth at Rue de Neudorf is now a grey strip.  Edges still wobble by a few cm (the roads' own centre lines).
+* **Escher Strooss**: the diagonal dashes were the contour sdC = -0.5 on the flat ridge between two overlapping carriageways; the edge line now needs a distance gradient of ~1 (`sdSlope`, ground-shader.js).  Fewer and fainter, not gone (a faint streak and a green sliver remain on the left lane: a gap of < 1 m between the two overlapping ways is neither tarmac nor median).
+  Wall ends: where a road is in the way at every taper reach the end point itself now runs out to ground + 12 cm (`bake_walls.mjs taper`); walls.bin re-baked (121 walls).
+* **Gate L / probe**: the drive probe now only counts samples 1.5 m inside the carriageway (`JUNCTION.laneInset`: the kerb edge zone is 0.3 m kerb + a metre of lattice and no wheel is there); limits tightened from median <= 8 / worst <= 60 to **<= 5.5 / <= 25** (measured 4.89 / 21.8).  This is a tightening to today's level, NOT the 1.0 / 2.5 target.
+
+### Measured, not fixed (honest)
+* **Decks standing as a step (Rue de Neudorf)**: root cause found.  The ground under an over way is protected from the carve over a disc of half-width + 10 m round the FIRST point of the way; the road that runs onto the bridge (chain 11838, bed 332.6) lost its bed there and follows the valley edge (330.6), and `createDeckNetwork` pins the deck end to that surface, while the DSM tops are at 332.8: a 2 m raised box.
+  It is not a single case: **110 carriageway ends at bridges sag more than 0.6 m, worst 7.2 m** (new check was written, see the patch).  Also decks that meet end to end (22 / 37 at 8676,7434) are both pinned to the valley floor under the joint (a 16 m cliff).
+  Tried (patch + variants in `~/Library/Caches/luxdrive-work/terrain4/attic/`: `deck_flush_experiment.patch`, `road-network.ramp.js`, `decks.flush.js`): protection that ramps up from nothing over 1.5 m at each end of the way, deck ends of one joint at the mean DSM level (transitive), the ends of carriageway decks made flush with a 9 % grade envelope.
+  Result on the picture: flush deck, no vertical face.  Result on the gates: gate D fails (8 deck end points "dive" 0.6 .. 1.1 m because the end now stands on the edge of a cliff in the 1 m lattice, 1 pit of 1.3 m, 2 decks on the ground, the Pont Adolphe deck 1 uncovered).  Never loosened, so **reverted**.  Next builder: apply the ramp, pin the ends with `max(surface at the end, surface 1 m inward)`, and re-run `bake_deck_fixes.mjs` + `bake_walls.mjs`.
+  Flat decks that span nothing (50 with < 1.5 m clearance, 14 on drivable ways) are still decks; removing them needs their ways un-tagged so that they are carved.
+* **Junction bumps**: a plane / co-levelling of the BEDS of touching ways (`junction-bed.js`, in the attic) changed the median only from 4.89 to 4.5-4.8.  The remaining bumps are 4-8 cm dips at the hand-over between two roads' surface on the lattice (OWN_FADE 0.5 m), not differences of the beds; 3 of the 20 are real steep old-town streets (Waassergaass, Pafendaller Bierg: 20-40 % pitch).  Reverted.  Median 4.9 / worst 21.8 m/s2 (target 1.0 / 2.5).
+* Not done: hairpins with arms at different levels (Eecherfeld), the 8 humps, gate J at 500 samples, a railing on the garage-ramp wall.
+
+### Gates (Mac mini)
+`harness.js` 103 checks PASS; `luxdrive_world` PASS (112 / 150 / 213 draw calls); holes 0 at medium and low; `luxdrive_ui` PASS; `luxdrive_webkit` PASS.  `pb/lux-drive.html`: main.js `?v=43`.
