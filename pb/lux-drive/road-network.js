@@ -211,7 +211,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     return dip < GROUNDED_MAX_DIP ? deck : null;
   }
   const segAx = [], segAz = [], segBx = [], segBz = [], segB0 = [], segB1 = [];
-  const segHw = [], segKerbH = [], segKerbW = [], segPw = [], segA0 = [], segBench = [], segR = [], segReach = [];
+  const segHw = [], segKerbH = [], segKerbW = [], segPw = [], segA0 = [], segPaintA0 = [], segBench = [], segR = [], segReach = [];
   const segKind = [], segRoad = [], segKerbOn = [], segLines = [], segS0 = [], segS1 = [], segSurf = [];
   const segTan0 = [], segTan1 = [];   // the tangents of the bed at the two ends of every segment (slope times length: the cubic Hermite curve, road-bed.js)
   const segSamp = [];            // the index of the centre line sample every segment starts at
@@ -532,9 +532,10 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     // A service way that dives into a tunnel is a garage ramp: the class default of 2.5 m of pavement (bake_roads URBAN_PAVEMENT) is for streets, and on a ramp it is a grey slab
     // field lying over the verge and the trench (the start of the game).  A ramp has no pavement.
     const isGarageRamp = road.kind === 'service' && (endOf(rs.x[0], rs.z[0]) === 'tunnel' || endOf(rs.x[n - 1], rs.z[n - 1]) === 'tunnel');
-    // A service way (a lane to a car park, a farm, a petrol station) has no pavement of its own either: the bake's urban default of 2.5 m on both sides joined the pavement of
-    // the street it leaves into an apron of 6 - 8 m of slabs beside every junction mouth (QA T11).
-    const pw = isGarageRamp || road.kind === 'service' ? 0 : Math.max(0, road.sidewalk);
+    const pw = isGarageRamp ? 0 : Math.max(0, road.sidewalk);
+    // A service way (a lane to a car park, a farm, a petrol station) has no pavement PAINTED: the bake's urban default of 2.5 m on both sides joined the pavement of the street it
+    // leaves into an apron of 6 - 8 m of slabs beside every junction mouth (QA T11).  (The shape of the ground keeps the pavement's level shelf: only the paint goes.)
+    const paintA0 = road.kind === 'service' ? hw + (KERB_SURFACES.has(road.surface || kind.surface) ? ROAD.kerbWidth : 0) : null;
     // The bench of the road is the carriageway and its kerb; the pavement beside it is PAINT, not a bench.
     // A wide pavement would dig the ground deeper into the hillside and build a wall beside the street (the
     // reviewer saw one), so the carve keeps its narrow bench and the pavement is painted on the ground beside it.
@@ -565,7 +566,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     const chain = { road: ri, kind: road.kind, x: rs.x, z: rs.z, arc, ground, bed: null, tagged, hw, rank: roadRank(road, hw), closed, ends };
     chains.push(chain);
     if (closed) closedRoad[ri] = 1;
-    prep.push({ ri, road, rs, n, hw, kerbH, kerbW, pw, bench, a0, kind, chain });
+    prep.push({ ri, road, rs, n, hw, kerbH, kerbW, pw, bench, a0, paintA0, kind, chain });
   }
 
   // ---- the carriageways: consecutive ways of one road joined (carriageways.js).  The paint tells a MEDIAN (the gap between two carriageways) from the hand-over of two ways of one
@@ -582,7 +583,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   const junctionSheet = createJunctionSurface(chains, (c) => overRoads.has(c.road), (c) => Math.max(0.8, roads[c.road].width / 2));
   const sheet = { level: 0, weight: 0 };
 
-  for (const { ri, road, rs, n, hw, kerbH, kerbW, pw, bench, a0, kind, chain } of prep) {
+  for (const { ri, road, rs, n, hw, kerbH, kerbW, pw, bench, a0, paintA0, kind, chain } of prep) {
     const bed = chain.bed;
     const slope = bedSlopes(bed, chain.arc);
     const radius = Math.min(ROAD.maxRadius, a0 + ROAD.falloff);
@@ -625,7 +626,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
       segB0.push(bed[i]); segB1.push(bed[i + 1]);
       segTan0.push(slope[i] * (chain.arc[i + 1] - chain.arc[i])); segTan1.push(slope[i + 1] * (chain.arc[i + 1] - chain.arc[i]));
       segHw.push(hw); segKerbH.push(kerbH); segKerbW.push(kerbW); segPw.push(pw);
-      segA0.push(a0); segBench.push(bench); segR.push(radius); segReach.push(reach);
+      segA0.push(a0); segPaintA0.push(paintA0 === null ? a0 : paintA0); segBench.push(bench); segR.push(radius); segReach.push(reach);
       segKind.push(kindCode); segRoad.push(ri); segKerbOn.push(1);
       segLines.push(kind.lines); segS0.push(along[i]); segS1.push(along[i + 1]);
       segSurf.push(road.surfaceCode ?? 0);
@@ -641,7 +642,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   const BED0 = Float32Array.from(segB0), BED1 = Float32Array.from(segB1);
   const TAN0 = Float32Array.from(segTan0), TAN1 = Float32Array.from(segTan1);
   const HW = Float32Array.from(segHw), KERBH = Float32Array.from(segKerbH), KERBW = Float32Array.from(segKerbW);
-  const PW = Float32Array.from(segPw), A0 = Float32Array.from(segA0), RAD = Float32Array.from(segR);
+  const PW = Float32Array.from(segPw), A0 = Float32Array.from(segA0), PAINT_A0 = Float32Array.from(segPaintA0), RAD = Float32Array.from(segR);
   const BENCH = Float32Array.from(segBench);
   const REACH = Float32Array.from(segReach);
   // the box of every segment: the cheap reject of the segments that are far away (the batter reaches 10 m past the
@@ -1074,7 +1075,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
             const eCar = d - HW[i];
             // (the union of the carriageways and pavements is taken below, once the level of the ground here is known)
             if (nPaint < MAX_CAND) {
-              paintECar[nPaint] = eCar; paintEPave[nPaint] = d - a0; paintBed[nPaint] = bed; paintRoad[nPaint] = ROADOF[i]; paintMajor[nPaint] = HW[i] >= MINOR_HW || LINES[i] === 1 || LINES[i] === 2 ? 1 : 0;   // (a marked road - a slip road of 6 m - is never the pale tar of a service way)
+              paintECar[nPaint] = eCar; paintEPave[nPaint] = d - PAINT_A0[i]; paintBed[nPaint] = bed; paintRoad[nPaint] = ROADOF[i]; paintMajor[nPaint] = HW[i] >= MINOR_HW || LINES[i] === 1 || LINES[i] === 2 ? 1 : 0;   // (a marked road - a slip road of 6 m - is never the pale tar of a service way)
               paintOffX[nPaint] = -lat * ez / len; paintOffZ[nPaint] = lat * ex / len; nPaint++;
             }
             if (LINES[i] > 0 && eCar < MARK_CLEAR && partners < MAX_PARTNERS) {
