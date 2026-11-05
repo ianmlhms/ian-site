@@ -24,34 +24,54 @@ export function frontColumns(len) {
   return Array.from({ length: n }, (_, i) => ({ sc: END_MARGIN + (i + 0.5) * step, kind: oriels.has(i) ? 'oriel' : 'window', index: i, count: n }));
 }
 
-/** A rectangular window with a stone surround, mullion and transom (a cross), dark panes. */
+/** The stone surround of a window as four real boxes (jambs, lintel, sill) standing out of the wall: the pane sits `reveal` m behind their face, so the window is a recess. */
+function surround(soup, f, sc, y0, w, h, key, { post = 0.3, depth = 0.26, sill = 0.34 } = {}) {
+  const stone = (k) => paint(C.sandstoneLight, key + k, 0.03);
+  slab(soup, f, sc - w / 2 - post, sc - w / 2, y0 - 0.05, y0 + h + post, depth, stone(0), { topColor: C.sandstoneLight });                      // the jambs
+  slab(soup, f, sc + w / 2, sc + w / 2 + post, y0 - 0.05, y0 + h + post, depth, stone(1), { topColor: C.sandstoneLight });
+  slab(soup, f, sc - w / 2 - post, sc + w / 2 + post, y0 + h, y0 + h + post + 0.12, depth + 0.06, stone(2), { topColor: C.sandstoneLight });   // the lintel
+  slab(soup, f, sc - w / 2 - post * 0.6, sc + w / 2 + post * 0.6, y0 - 0.22, y0, sill, stone(3), { topColor: C.sandstoneLight });              // the sill
+}
+
+/** A rectangular window: a recessed dark pane in a stone surround of real boxes, a mullion and a transom (a cross). */
 function mullionWindow(soup, f, sc, y0, w, h, key) {
-  panel(soup, f, sc - w / 2 - 0.3, sc + w / 2 + 0.3, y0 - 0.25, y0 + h + 0.3, 0.04, paint(C.sandstoneLight, key, 0.03));
-  panel(soup, f, sc - w / 2, sc + w / 2, y0, y0 + h, 0.08, paint(C.glassDark, key + 1, 0.06));
-  panel(soup, f, sc - 0.05, sc + 0.05, y0, y0 + h, 0.1, C.sandstoneLight);                         // the mullion
-  panel(soup, f, sc - w / 2, sc + w / 2, y0 + h * 0.62, y0 + h * 0.62 + 0.1, 0.1, C.sandstoneLight);   // the transom
+  panel(soup, f, sc - w / 2, sc + w / 2, y0, y0 + h, 0.04, paint(C.glassDark, key + 1, 0.06));
+  surround(soup, f, sc, y0, w, h, key);
+  slab(soup, f, sc - 0.05, sc + 0.05, y0, y0 + h, 0.13, C.sandstoneLight);                                                // the mullion
+  slab(soup, f, sc - w / 2, sc + w / 2, y0 + h * 0.62, y0 + h * 0.62 + 0.1, 0.13, C.sandstoneLight);                      // the transom
 }
 
 /** A window with the little triangular pediment of the first storey. */
 function pedimentWindow(soup, f, sc, y0, w, h, key) {
   mullionWindow(soup, f, sc, y0, w, h, key);
-  soup.tri(f.at(sc - w / 2 - 0.45, y0 + h + 0.3, 0.07), f.at(sc + w / 2 + 0.45, y0 + h + 0.3, 0.07), f.at(sc, y0 + h + 1.1, 0.07), paint(C.sandstoneLight, key + 2, 0.03));
+  const ya = y0 + h + 0.42, ridge = 0.34;                                                                                  // the pediment: two sloping faces over a base, standing out of the wall
+  soup.tri(f.at(sc - w / 2 - 0.45, ya, 0.2), f.at(sc, ya, ridge), f.at(sc, ya + 0.85, 0.3), paint(C.sandstoneLight, key + 2, 0.03));
+  soup.tri(f.at(sc, ya, ridge), f.at(sc + w / 2 + 0.45, ya, 0.2), f.at(sc, ya + 0.85, 0.3), paint(C.sandstoneDark, key + 3, 0.03));
+  soup.tri(f.at(sc - w / 2 - 0.45, ya, 0.2), f.at(sc, ya + 0.85, 0.3), f.at(sc, ya, 0.2), paint(C.sandstoneLight, key + 4, 0.03));
+  soup.tri(f.at(sc + w / 2 + 0.45, ya, 0.2), f.at(sc, ya, 0.2), f.at(sc, ya + 0.85, 0.3), paint(C.sandstoneLight, key + 5, 0.03));
 }
 
-/** A window of the ground floor: a stone surround and dark iron bars over the panes. */
+/** A window of the ground floor: a heavy stone surround (boxes) and dark iron bars standing out in front of the recessed pane. */
 function barredWindow(soup, f, sc, y0, w, h, key) {
-  panel(soup, f, sc - w / 2 - 0.25, sc + w / 2 + 0.25, y0 - 0.2, y0 + h + 0.25, 0.04, paint(C.sandstoneLight, key, 0.03));
-  panel(soup, f, sc - w / 2, sc + w / 2, y0, y0 + h, 0.08, C.blackGlass);
-  for (let k = 1; k <= 4; k++) { const s = sc - w / 2 + (w * k) / 5; panel(soup, f, s - 0.04, s + 0.04, y0, y0 + h, 0.1, BARS_COLOUR); }
-  panel(soup, f, sc - w / 2, sc + w / 2, y0 + h * 0.5, y0 + h * 0.5 + 0.07, 0.1, BARS_COLOUR);
+  panel(soup, f, sc - w / 2, sc + w / 2, y0, y0 + h, 0.04, C.blackGlass);
+  surround(soup, f, sc, y0, w, h, key, { post: 0.25, depth: 0.22, sill: 0.3 });
+  for (let k = 1; k <= 4; k++) { const s = sc - w / 2 + (w * k) / 5; slab(soup, f, s - 0.04, s + 0.04, y0, y0 + h, 0.2, BARS_COLOUR); }
+  slab(soup, f, sc - w / 2, sc + w / 2, y0 + h * 0.5, y0 + h * 0.5 + 0.07, 0.2, BARS_COLOUR);
 }
 
-/** A carved panel as painted relief: a recessed darker rectangle with a lighter diamond and a dark centre. */
+/** A carved panel in relief: a stone frame standing out of the wall round a recessed field, and in the field a raised diamond boss (four faces of a flat pyramid) with a dark centre. */
 function carvedPanel(soup, f, sc, y0, w, h, key) {
-  panel(soup, f, sc - w / 2, sc + w / 2, y0, y0 + h, 0.05, paint(C.stoneBand, key, 0.05));
-  const cy = y0 + h / 2, dw = w * 0.36, dh = h * 0.42;
-  soup.quad(f.at(sc - dw, cy, 0.08), f.at(sc, cy - dh, 0.08), f.at(sc + dw, cy, 0.08), f.at(sc, cy + dh, 0.08), paint(C.sandstoneLight, key + 3, 0.04));
-  soup.quad(f.at(sc - dw * 0.4, cy, 0.1), f.at(sc, cy - dh * 0.4, 0.1), f.at(sc + dw * 0.4, cy, 0.1), f.at(sc, cy + dh * 0.4, 0.1), paint(C.stoneBand, key + 4, 0.05));
+  const t = 0.16, stone = (k) => paint(C.sandstoneLight, key + k, 0.03);
+  panel(soup, f, sc - w / 2, sc + w / 2, y0, y0 + h, 0.03, paint(C.stoneBand, key, 0.05));                       // the recessed field
+  slab(soup, f, sc - w / 2, sc + w / 2, y0, y0 + t, 0.14, stone(1), { topColor: C.sandstoneLight });              // the frame
+  slab(soup, f, sc - w / 2, sc + w / 2, y0 + h - t, y0 + h, 0.14, stone(2), { topColor: C.sandstoneLight });
+  slab(soup, f, sc - w / 2, sc - w / 2 + t, y0 + t, y0 + h - t, 0.14, stone(3), { topColor: C.sandstoneLight });
+  slab(soup, f, sc + w / 2 - t, sc + w / 2, y0 + t, y0 + h - t, 0.14, stone(4), { topColor: C.sandstoneLight });
+  const cy = y0 + h / 2, dw = w * 0.34, dh = h * 0.36, boss = 0.2;
+  const c = f.at(sc, cy, boss), L = f.at(sc - dw, cy, 0.04), R = f.at(sc + dw, cy, 0.04), B = f.at(sc, cy - dh, 0.04), T = f.at(sc, cy + dh, 0.04);
+  soup.tri(L, B, c, paint(C.sandstoneLight, key + 5, 0.04)); soup.tri(B, R, c, paint(C.sandstoneDark, key + 6, 0.04));
+  soup.tri(R, T, c, paint(C.sandstoneLight, key + 7, 0.04)); soup.tri(T, L, c, paint(C.sandstoneDark, key + 8, 0.04));
+  slab(soup, f, sc - 0.12, sc + 0.12, cy - 0.12, cy + 0.12, 0.26, paint(C.stoneBand, key + 9, 0.05));              // the centre of the boss
 }
 
 /** An oriel: a two-storey bay on stepped corbels, windows on the front and the two cheeks, a slate hip roof on top. */
@@ -74,6 +94,7 @@ function oriel(soup, f, sc, high, yEave, key) {
   const roofBase = yTop, apex = f.at(sc, roofBase + 4.2, d / 2);
   const xz = (s, o) => { const q = f.at(s, 0, o); return [q[0], q[2]]; };
   soup.pyramid([xz(sc - w / 2 - 0.2, -0.1), xz(sc + w / 2 + 0.2, -0.1), xz(sc + w / 2 + 0.2, d + 0.2), xz(sc - w / 2 - 0.2, d + 0.2)], roofBase, apex, paint(C.slateBlack, key + 4, 0.05));
+  soup.frustum(apex[0], apex[2], 0.16, 0.0, apex[1], apex[1] + 3.0, 4, C.slateBlack, { cap: false });                       // the slim finial on the roof of the bay
 }
 
 /** The iron balcony: a slab and a railing (posts and a rail) in front of the windows of the first storey, from s0 to s1. */
@@ -106,15 +127,22 @@ export function bollard(soup, f, s, y, out, key) {
  */
 export function renaissanceFront(soup, f, { high, yEave, floor, ground, key = 0, sentries = false }) {
   const cols = frontColumns(f.len);
-  // ground floor: rusticated ashlar, barred windows, an arched door in the middle column
-  joints(soup, f, { y0: high, y1: high + floor, rowH: 0.85, colW: 1.7, color: C.stoneBand, key: key + 1, width: 0.07 });
+  // ground floor: rusticated ashlar (proud courses, the joints are the gaps between them), barred windows, an arched door in the middle column
+  for (let r = 0; (r + 1) * 0.85 <= floor; r++) slab(soup, f, 0, f.len, high + r * 0.85 + 0.08, high + r * 0.85 + 0.78, 0.1, paint(C.palaisStone, key + 30 + r, 0.05), { topColor: C.sandstoneLight });
   const doorAt = cols.length ? cols[Math.floor(cols.length / 2)].index : -1;
   for (const c of cols) {
     if (c.index === doorAt) roundArch(soup, f, c.sc, high, 2.2, 2.2, C.sandstoneLight, C.glassDark);
     else barredWindow(soup, f, c.sc, high + 1.0, 1.3, 1.9, key + c.index * 7);
   }
-  // the string courses between the storeys and under the eaves
-  for (let r = 1; r <= 2; r++) panel(soup, f, 0, f.len, high + r * floor - 0.18, high + r * floor + 0.18, 0.12, paint(C.sandstoneLight, key + r, 0.03));
+  // the string courses between the storeys: real mouldings
+  for (let r = 1; r <= 2; r++) slab(soup, f, 0, f.len, high + r * floor - 0.2, high + r * floor + 0.2, 0.32, paint(C.sandstoneLight, key + r, 0.03), { topColor: C.sandstoneLight });
+  // pilasters between the columns of the two upper storeys
+  for (let i = 0; i + 1 < cols.length; i++) {
+    const sm = (cols[i].sc + cols[i + 1].sc) / 2;
+    slab(soup, f, sm - 0.3, sm + 0.3, high + floor + 0.2, yEave - 0.8, 0.2, paint(C.sandstoneLight, key + 60 + i, 0.03), { topColor: C.sandstoneLight });
+  }
+  slab(soup, f, 0, 0.6, high + floor + 0.2, yEave - 0.8, 0.26, C.sandstoneLight);                                                      // the corner quoins
+  slab(soup, f, f.len - 0.6, f.len, high + floor + 0.2, yEave - 0.8, 0.26, C.sandstoneLight);
   // the two upper storeys
   for (const c of cols) {
     if (c.kind === 'oriel') { oriel(soup, f, c.sc, high, yEave, key + c.index * 13); continue; }
