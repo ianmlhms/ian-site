@@ -187,7 +187,8 @@ export const CAR = Object.freeze({
  * mouth of the tunnel in it. The car stops at the wall. */
 export const PORTAL = Object.freeze({
   joinTolerance: 4.0,       // m: two tunnel ways whose ends are this close belong to the same tunnel
-  approachTolerance: 7.0,   // m: the surface road that leads to the mouth of the tunnel
+  mouthGap: 2.0,            // m: the end of the drawn road that leads to a mouth is this close to it (else the wall would stand in the open, QA B09)
+  approachAlign: 0.7,       // cos: that road leaves the mouth along the axis of the tunnel (within 45 deg), not beside it
   cell: 32,                 // m, the spatial hash cell of the walls
   shoulder: 1.3,            // m, the wall reaches this far past the carriageway on each side
   boreInset: 0.25,          // m, the mouth of the tunnel is this much narrower than the carriageway
@@ -196,6 +197,18 @@ export const PORTAL = Object.freeze({
   lintel: 1.0,              // m, the concrete above the mouth
   cornice: 0.22,            // m, the slab on top of the wall
   base: 2.0,                // m, the wall goes this far under the ground (it never floats)
+});
+
+/* The shallow tunnels (tunnel-cover.js): an OSM tunnel with hardly any land over it is drawn and driven as an open road in a
+ * cut, without portals (the A1 under the Senningerberg interchange: 2-4 m of DTM over 88 m, QA B10).  The cover is the DTM
+ * over the line between the ground at the mouths. */
+export const TUNNEL_OPEN = Object.freeze({
+  cover: 4.0,               // m: a run with less land than this over most of it is opened (a bore needs ~5 m of clearance alone)
+  coverShare: 0.8,          // the share of the run that has to be that shallow
+  cutMax: 6.0,              // m: never opened where the land over it reaches this (no canyon is dug)
+  sample: 2.0,              // m: the step of the measure along the ways
+  deckEndNear: 8.0,         // m: an end of a run this close to the end of a deck: the deck lands there (road-network BRIDGE_JOIN)
+  stackedShare: 0.5,        // a run that much under a deck that lands at its mouth is stacked under it and stays a tunnel
 });
 
 /* The Luxtram (CAF Urbos 100, 45 m, 2.65 m wide): the rails are the OSM tram ways of the bake (lines.bin, kind 2), the vehicles

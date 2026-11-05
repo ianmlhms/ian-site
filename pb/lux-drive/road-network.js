@@ -490,6 +490,25 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   const nearBridgeEnd = pointGrid(bridgeEndPoints, BRIDGE_JOIN), nearTunnelEnd = pointGrid(tunnelEndPoints, BRIDGE_JOIN);
   const endOf = (x, z) => (nearBridgeEnd(x, z, BRIDGE_JOIN) ? 'bridge' : nearTunnelEnd(x, z, BRIDGE_JOIN) ? 'tunnel' : null);
 
+  /** The ground under an opened shallow tunnel (tunnel-cover.js) at the samples rs: the floor of its cut (`cutLevels` at its pts, read by the
+   *  distance along the way), or the land where that is lower (the cut never stands on a ridge of its own). */
+  function cutGround(road, rs) {
+    const pts = road.pts, lv = road.cutLevels;
+    const arcPts = [0];
+    for (let i = 1; i < pts.length; i++) arcPts.push(arcPts[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+    const n = rs.x.length, arcRs = [0];
+    for (let i = 1; i < n; i++) arcRs.push(arcRs[i - 1] + Math.hypot(rs.x[i] - rs.x[i - 1], rs.z[i] - rs.z[i - 1]));
+    const scale = arcRs[n - 1] > 0 ? arcPts[arcPts.length - 1] / arcRs[n - 1] : 0;
+    let k = 1;
+    return rs.x.map((x, i) => {
+      const s = arcRs[i] * scale;
+      while (k < arcPts.length - 1 && arcPts[k] < s) k++;
+      const span = arcPts[k] - arcPts[k - 1];
+      const f = span > 0 ? Math.min(1, Math.max(0, (s - arcPts[k - 1]) / span)) : 0;
+      return Math.min(baseHeight(x, rs.z[i]), lv[k - 1] + (lv[k] - lv[k - 1]) * f);
+    });
+  }
+
   const garagePads = [];                 // the filled trenches of the garage ramps: [{ x0, z0, x1, z1, half, level }] per segment (see GARAGE_RAMP_MAX)
   for (let ri = 0; ri < roads.length; ri++) {
     const road = roads[ri];
@@ -548,7 +567,8 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     }
     // the terrain under the centre line; the bed (the profile of the surface) is designed below, once every way is known,
     // because the ways that meet must agree on the level of their junction
-    const ground = rs.x.map((x, i) => baseHeight(x, rs.z[i]));
+    // (an opened shallow tunnel, tunnel-cover.js: the floor of its cut runs between its mouths; the land over it is cut away, never followed over)
+    const ground = road.openCut ? cutGround(road, rs) : rs.x.map((x, i) => baseHeight(x, rs.z[i]));
     // Every drivable way keeps its centre line and its bed: the crossings of the ways decide which one rides over
     // which.  That is how an overpass that OSM does not tag as a bridge (a slip road on a viaduct) is found.
     const arc = new Float64Array(n);
@@ -1328,8 +1348,10 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     return { road: roads[out.road], index: out.road, lat: out.lat, dist: out.dist, coverage: out.coverage, kind: out.kind };
   }
 
+  /** Does the game draw this way for a car: carved into the ground, or a drivable way that rides over it (a deck)?  A garage ramp is neither. */
+  const isDrawn = (ri) => !!info[ri] || (!!roads[ri].info.drivable && !roads[ri].tunnel && !!(roads[ri].over || (roads[ri].layer || 0) >= 1));
   return {
-    carve, nearestRoad, roads, info, count, scratch, overRoads, crossings, chains, protection, groundedDecks,
+    carve, nearestRoad, roads, info, count, scratch, overRoads, crossings, chains, protection, groundedDecks, isDrawn,
     segments: { X0, Z0, X1, Z1, BED0, BED1, TAN0, TAN1, HW, KERBH, KERBW, PW, A0, RAD, REACH, KIND, ROADOF, KERBON, LINES, S0, S1, SURF },
     // the centre lines as they are carved (resampled and rounded): the game, the minimap and the probes follow these
     samples: { x: SAMPLES_X, z: SAMPLES_Z, road: SAMPLES_ROAD, first: firstSample, segs: segCount },

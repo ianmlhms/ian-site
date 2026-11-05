@@ -139,7 +139,7 @@ async function boot() {
   // the landmarks (the famous places) replace some blocks and some bridge decks of the bake and have collision of their own
   const landmarks = createLandmarks({ buildings: data.buildings, decks: ground.decks, ground: (x, z) => surface.height(x, z), roads: data.roads });
   const buildings = createBuildingIndex(data.buildings, { hidden: landmarks.hiddenBuildings });
-  const portals = createPortals(data.roads, (x, z) => surface.height(x, z));
+  const portals = createPortals(data.roads, (x, z) => surface.height(x, z), (r) => field.network.isDrawn(r.id));
   const playArea = createPlayArea(area);
   const maps = buildWorldMap({ classes: data.classes, classInfo: data.classInfo, canopy: data.canopy, buildings: data.buildings });
   // the trees: the woods (placed from the canopy) and the trees of OSM (the street trees, the trees of the parks)

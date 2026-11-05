@@ -31,6 +31,8 @@ const CARRIAGEWAY = new Set([
  * The portals of the tunnels of a road network.
  * heightAt(x, z) (optional): the ground of the carve (surface.height, never the decks: a mouth under a bridge opens at the road under it).  It
  * gives every portal its level `y` (the road at the mouth); without it the walls are as high as the sky (the old behaviour, for tools).
+ * isDrawn(road) (optional): does the game draw this way for a car (road-network isDrawn: carved, or a deck)?  A portal needs a drawn road at its mouth; a
+ * garage ramp that is not carved leads to none.  Without it every drivable surface way counts.
  * Returns { list, at(x, z), collide(x, z, radius, y) }.
  *
  * A portal is { x, z, nx, nz, sx, sz, half, bore, top, depth, width, name, road }:
@@ -42,7 +44,7 @@ const CARRIAGEWAY = new Set([
  *   top    the height of the mouth above the ground
  *   depth  how deep the wall goes into the tunnel
  */
-export function createPortals(roads, heightAt = null) {
+export function createPortals(roads, heightAt = null, isDrawn = () => true) {
   const tunnels = roads.filter((r) => r.tunnel && r.info.drivable);
   const surface = roads.filter((r) => !r.tunnel && r.info.drivable);
 
@@ -69,7 +71,6 @@ export function createPortals(roads, heightAt = null) {
 
   // ---- the ends of the runs: the mouths
   const list = [];
-  const approachTol2 = PORTAL.approachTolerance * PORTAL.approachTolerance;
   for (const run of runs.values()) {
     for (const i of run) {
       const road = tunnels[i];
@@ -92,13 +93,21 @@ export function createPortals(roads, heightAt = null) {
         const len = Math.hypot(dx, dz);
         if (!(len > 0.01)) continue;
         dx /= len; dz /= len;
-        // does a surface road lead to the mouth?  Without one the car cannot get there.
-        let approach = null;
+        // the road that leads to the mouth: a way the game draws (carved) whose end is at the mouth and that leaves it outward, along the axis.  The first
+        // way with an end within 7 m used to be taken: a side street ending near the mouth, a garage ramp that is not drawn, so the wall stood in the grass
+        // beside the road or across nothing (QA B09).  Without such a road the car cannot get there, and a wall would stand in the open: no portal.
+        let approach = null, bestGap2 = PORTAL.mouthGap * PORTAL.mouthGap;
         for (const r of surface) {
-          for (const b of endsOf(r)) {
-            if (dist2(mouth[0], mouth[1], b[0], b[1]) <= approachTol2) { approach = r; break; }
+          if (!isDrawn(r)) continue;
+          const m = r.pts.length;
+          for (let f = 0; f < 2; f++) {
+            const b = f === 0 ? r.pts[0] : r.pts[m - 1], nb = f === 0 ? r.pts[1] : r.pts[m - 2];
+            const g2 = dist2(mouth[0], mouth[1], b[0], b[1]);
+            if (g2 > bestGap2) continue;
+            const ox = nb[0] - b[0], oz = nb[1] - b[1], ol = Math.hypot(ox, oz);
+            if (!(ol > 0.01) || (ox * dx + oz * dz) / ol < PORTAL.approachAlign) continue;
+            approach = r; bestGap2 = g2;
           }
-          if (approach) break;
         }
         if (!approach) continue;
         const bore = Math.max(PORTAL.boreMin, road.width / 2 - PORTAL.boreInset);

@@ -83,7 +83,7 @@ const deckNetwork = createDeckNetwork(fixLandmarkDecks(data.decks, (x, z) => sur
 const ground = createGround(surface, deckNetwork);
 const landmarks = createLandmarks({ buildings: data.buildings, decks: deckNetwork.decks, ground: (x, z) => surface.height(x, z), roads: data.roads });
 const buildings = createBuildingIndex(data.buildings, { hidden: landmarks.hiddenBuildings });
-const portals = createPortals(data.roads, (x, z) => surface.height(x, z));
+const portals = createPortals(data.roads, (x, z) => surface.height(x, z), (r) => field.network.isDrawn(r.id));
 const playArea = createPlayArea(area);
 const maps = buildWorldMap({ classes: data.classes, classInfo: data.classInfo, canopy: data.canopy, buildings: data.buildings });
 const treeDecks = createDeckNetwork([...ground.decks, ...landmarks.footprints]);      // the same trees as the game plants (main.js)
