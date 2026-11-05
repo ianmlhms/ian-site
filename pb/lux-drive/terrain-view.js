@@ -8,7 +8,7 @@ const RESELECT_DISTANCE = 4;          // m the car moves before the tile set is 
 const CACHE_LIMIT = 700;
 const TILE_BUDGET_MS = 2;             // wall-clock ms per frame spent building terrain tiles (at least one tile per frame, even if it takes longer)
 
-export function createTerrainView({ scene, surface, field, material: initialMaterial, quality }) {
+export function createTerrainView({ scene, surface, field, material: initialMaterial, quality, marks = null }) {
   let material = initialMaterial;
   const group = new THREE.Group();
   group.name = 'luxdrive-terrain';
@@ -30,6 +30,7 @@ export function createTerrainView({ scene, surface, field, material: initialMate
     g.setAttribute('aRoad', new THREE.BufferAttribute(mesh.road, 4));
     g.setAttribute('aRoad2', new THREE.BufferAttribute(mesh.road2, 4));
     g.setAttribute('aRoad3', new THREE.BufferAttribute(mesh.road3, 4));
+    g.setAttribute('aMark', new THREE.BufferAttribute(mesh.mark, 4));          // the lane marking ribbons (0 on the ground)
     g.setIndex(new THREE.BufferAttribute(mesh.indices, 1));
     let lo = Infinity, hi = -Infinity;
     for (let i = 1; i < mesh.positions.length; i += 3) { const y = mesh.positions[i]; if (y < lo) lo = y; if (y > hi) hi = y; }
@@ -59,7 +60,7 @@ export function createTerrainView({ scene, surface, field, material: initialMate
 
   /** Builds (or rebuilds) one queued leaf into its mesh. */
   function buildLeaf(leaf, have) {
-    const data = buildTileMesh(leaf, nodesFor(leaf), split, field);
+    const data = buildTileMesh(leaf, nodesFor(leaf), split, field, marks);
     const geometry = makeGeometry(data);
     if (have) { have.mesh.geometry.dispose(); have.mesh.geometry = geometry; have.signature = data.signature; stats.rebuilt++; return; }
     const mesh = new THREE.Mesh(geometry, material);

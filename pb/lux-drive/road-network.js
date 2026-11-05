@@ -160,7 +160,7 @@ export function resample(points, spacing) {
 }
 
 /** A Gaussian smoothing of a series of values (the ends are renormalised, so a value keeps its end). */
-function gaussianSmooth(values, sigmaSamples) {
+export function gaussianSmooth(values, sigmaSamples) {
   const n = values.length;
   const radius = Math.max(1, Math.ceil(sigmaSamples * 2.5));
   const kernel = [];

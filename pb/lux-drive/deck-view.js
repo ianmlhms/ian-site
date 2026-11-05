@@ -30,9 +30,10 @@ const CAP_FLUSH = 0.1;              // m: an end of a deck that lies on the road
 /**
  * decks: the decoded decks [{ id, parapet, width, pts: [[x, z]], tops: [y] }]
  * ground: the surface under the decks ({ height(x, z), roadInfoAt(x, z, out) }): the abutments reach down to it, the piers stand on it and keep out of its carriageways.
+ * laneLinesOn: false when the lane lines of the roads are laid onto the decks by the marking plan (deck-marking-view.js)
  * Returns { meshes, count, piers, update(x, z, radius) }: one mesh per chunk (chunked-flat.js), culled by the frustum and by distance.
  */
-export function createDeckView({ scene, decks, material, ground }) {
+export function createDeckView({ scene, decks, material, ground, laneLinesOn = true }) {
   const chunks = createChunkedFlat({ scene, material, name: 'luxdrive-decks' });
   const info = { sdCar: 9 };
   const sdCarAt = (x, z) => (ground && ground.roadInfoAt ? ground.roadInfoAt(x, z, info).sdCar : 9);
@@ -84,7 +85,7 @@ export function createDeckView({ scene, decks, material, ground }) {
       if (!ground) return y - DECK.thickness;
       return y - sideDepth(y - ground.height(x, z));
     };
-    const lines = isRoad ? laneLines(deck.width) : [];
+    const lines = isRoad && laneLinesOn ? laneLines(deck.width) : [];      // (laneLinesOn false: the lines of the roads are laid on the decks by deck-marking-view.js)
     let s0 = 0;                                       // the arc length at the start of the segment (the dashes of the lane lines are laid on it)
     for (let i = 0; i + 1 < n; i++) {
       const [ax, az] = deck.pts[i];

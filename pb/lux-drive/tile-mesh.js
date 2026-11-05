@@ -17,6 +17,7 @@ import { QUADTREE, ROAD } from './config.js';
 import { diagonalIsMain } from './surface.js';
 import { tilesTouching, leafAt } from './quadtree.js';
 import { fadeOf } from './heightfield.js';
+import { MARK, trackPoint, pieceSpans } from './markings.js';
 
 const EDGE_EPS = 1e-6;
 const EPS_PROBE = 1e-3;                 // same offset as quadtree.js tilesTouching
@@ -165,9 +166,10 @@ export function stitchSignature(leaf, split) {
 }
 
 /**
- * Returns { positions, normals, road, road2, indices, vertexCount, signature, ... } (tile-local positions).
+ * Returns { positions, normals, road, road2, road3, mark, indices, vertexCount, signature, ... } (tile-local positions).
+ * `marks` (optional): the marking plan (markings.js); its pieces are draped over this tile as ribbons (appended after the grid and the skirts, see appendMarkings).
  */
-export function buildTileMesh(leaf, nodes, split, field) {
+export function buildTileMesh(leaf, nodes, split, field, marks = null) {
   const { x0, z0, step, size } = leaf;
   const h = nodes.h, lat = nodes.lat, hw = nodes.hw, a0 = nodes.a0, surface = nodes.surface, along = nodes.along;
   const vertexCount = SIDE * SIDE;
@@ -237,7 +239,129 @@ export function buildTileMesh(leaf, nodes, split, field) {
   for (let i = 0; i < CELLS; i++) wall(CELLS * SIDE + i + 1, CELLS * SIDE + i);             // south edge
   for (let j = 0; j < CELLS; j++) wall((j + 1) * SIDE, j * SIDE);                           // west edge
   for (let j = 0; j < CELLS; j++) wall(j * SIDE + CELLS, (j + 1) * SIDE + CELLS);           // east edge
-  return { positions, normals, road, road2, road3, indices: indices.subarray(0, n), vertexCount: vertexCount + skirtVerts, gridVertexCount: vertexCount, signature: [...stitchAt.values()].map((st) => `${st.v}@${st.tile.key}`).join('|'), size, x0, z0, step };
+  const base = { positions, normals, road, road2, road3, mark: new Float32Array((vertexCount + skirtVerts) * 4), indices: indices.subarray(0, n), vertexCount: vertexCount + skirtVerts, gridVertexCount: vertexCount, signature: [...stitchAt.values()].map((st) => `${st.v}@${st.tile.key}`).join('|'), size, x0, z0, step };
+  return marks ? appendMarkings(base, nodes, marks) : base;
+}
+
+const MARK_ROUND = 1e-4;
+
+/**
+ * The lane markings of the tile as RIBBONS draped over its own triangles: every visible piece of the marking plan (markings.js) that crosses the tile is cut to the tile's box and laid
+ * along the track in steps of the lattice spacing; the height of every ribbon vertex is the height of this very mesh at its point (exact, at every LOD), its normal and its paint
+ * attributes are the tile's own there, so the shader paints the ground under the line exactly as beside it.  The ribbon is a line of zero width on the CPU: the vertex shader widens
+ * it along aMark.xy to the half width aMark.z (at least about a pixel at a distance) and pulls it a little toward the camera (ground-shader.js).
+ * aMark = (the unit normal of the line x, z, its half width, the side (-1 / +1) times the strength of the paint).  0 on the ground.
+ * A piece of line is laid only where the terrain's carriageway lies around it (MARK.onRoad) and the ground is level enough for a road: never up a wall, a ramp or a kerb.
+ * Pure: returns a new mesh object (the arrays of `mesh` are copied, not changed).
+ */
+export function appendMarkings(mesh, nodes, plan) {
+  const { x0, z0, step, size } = mesh;
+  const strength = fadeOf(step, ROAD.markFullStep, ROAD.markFadeStep);
+  if (strength <= 0) return mesh;
+  const x1 = x0 + size, z1 = z0 + size;
+  const quads = [];                    // [ax, az, bx, bz, anx, anz, bnx, bnz]
+  const p = { x: 0, z: 0, nx: 0, nz: 0, bed: 0, way: 0, o: 0 }, q = { x: 0, z: 0, nx: 0, nz: 0, bed: 0, way: 0, o: 0 };
+  const along = Math.max(1, step);
+  const sdAt = (x, z) => nodeLerp(nodes.sdCar, x0, z0, step, x, z);
+  const levelAt = (x, z) => nodeLerp3(mesh.normals, x0, z0, step, x, z, 1);
+  // (the carriageway test needs the 1 m lattice: on a 2 m lattice the distance of a narrow median or a kerb is blurred over 4 m, so a coarse tile only asks for level ground near a road)
+  const sdLimit = step <= 1 ? -MARK.onRoad : COARSE_ON_ROAD;
+  const okAt = (x, z) => sdAt(x, z) < sdLimit && levelAt(x, z) >= LEVEL_NORMAL_Y;
+  for (const idx of plan.piecesIn(x0, z0, x1, z1)) {
+    const pc = plan.pieces[idx];
+    if (pc.deck) continue;
+    const tr = plan.tracks[pc.track], ch = plan.chains[tr.chain];
+    for (const [a, b] of pieceSpans(pc)) {
+      const nSub = Math.max(1, Math.ceil((b - a) / along - 1e-6));
+      trackPoint(ch, tr, a, p);
+      for (let k = 1; k <= nSub; k++) {
+        trackPoint(ch, tr, a + (b - a) * (k / nSub), q);
+        const c = clipToBox(p.x, p.z, q.x, q.z, x0, z0, x1, z1);
+        if (c) {
+          const ax = p.x + (q.x - p.x) * c[0], az = p.z + (q.z - p.z) * c[0];
+          const bx = p.x + (q.x - p.x) * c[1], bz = p.z + (q.z - p.z) * c[1];
+          if (Math.hypot(bx - ax, bz - az) > MARK_ROUND && okAt(ax, az) && okAt(bx, bz) && okAt((ax + bx) / 2, (az + bz) / 2)) {
+            const anx = p.nx + (q.nx - p.nx) * c[0], anz = p.nz + (q.nz - p.nz) * c[0];
+            const bnx = p.nx + (q.nx - p.nx) * c[1], bnz = p.nz + (q.nz - p.nz) * c[1];
+            quads.push(ax, az, bx, bz, anx, anz, bnx, bnz);
+          }
+        }
+        p.x = q.x; p.z = q.z; p.nx = q.nx; p.nz = q.nz;
+      }
+    }
+  }
+  if (!quads.length) return mesh;
+  const nq = quads.length / 8;
+  const v0 = mesh.vertexCount, vc = v0 + nq * 4;
+  const grow = (src, k) => { const out = new Float32Array(vc * k); out.set(src.subarray(0, v0 * k)); return out; };
+  const positions = grow(mesh.positions, 3), normals = grow(mesh.normals, 3);
+  const road = grow(mesh.road, 4), road2 = grow(mesh.road2, 4), road3 = grow(mesh.road3, 4), mark = grow(mesh.mark, 4);
+  const indices = new Uint16Array(mesh.indices.length + nq * 6);
+  indices.set(mesh.indices);
+  let ni = mesh.indices.length;
+  const paintK = mesh.road3[2];
+  const put = (v, x, z, nx, nz, side) => {
+    positions[v * 3] = x - x0; positions[v * 3 + 1] = meshHeightAt(mesh, x, z); positions[v * 3 + 2] = z - z0;
+    normals[v * 3] = nodeLerp3(mesh.normals, x0, z0, step, x, z, 0); normals[v * 3 + 1] = nodeLerp3(mesh.normals, x0, z0, step, x, z, 1); normals[v * 3 + 2] = nodeLerp3(mesh.normals, x0, z0, step, x, z, 2);
+    const o = nearestNode(x0, z0, step, x, z);
+    road[v * 4] = nodeLerp(nodes.lat, x0, z0, step, x, z); road[v * 4 + 1] = nodes.hw[o]; road[v * 4 + 2] = nodes.a0[o]; road[v * 4 + 3] = nodes.along[o];
+    road2[v * 4] = nodeLerp4(nodes.road2, x0, z0, step, x, z, 0); road2[v * 4 + 1] = nodes.road2[o * 4 + 1]; road2[v * 4 + 2] = nodes.surface[o]; road2[v * 4 + 3] = nodes.road2[o * 4 + 3];
+    road3[v * 4] = nodeLerp(nodes.sdCar, x0, z0, step, x, z); road3[v * 4 + 1] = nodeLerp(nodes.sdPave, x0, z0, step, x, z); road3[v * 4 + 2] = paintK; road3[v * 4 + 3] = nodeLerp(nodes.sdMajor, x0, z0, step, x, z);
+    const l = Math.hypot(nx, nz) || 1;
+    mark[v * 4] = nx / l; mark[v * 4 + 1] = nz / l; mark[v * 4 + 2] = MARK.lineHalf; mark[v * 4 + 3] = side * strength;
+  };
+  for (let k = 0; k < nq; k++) {
+    const [ax, az, bx, bz, anx, anz, bnx, bnz] = quads.slice(k * 8, k * 8 + 8);
+    const v = v0 + k * 4;
+    put(v, ax, az, anx, anz, -1); put(v + 1, ax, az, anx, anz, 1); put(v + 2, bx, bz, bnx, bnz, 1); put(v + 3, bx, bz, bnx, bnz, -1);
+    // wound like the ground (counter-clockwise seen from above): the side of the normal decides which way round
+    const dx = bx - ax, dz = bz - az;
+    const ccw = (dz * anx - dx * anz) > 0;           // (the corner -n at A, then B: is the turn to +n counter-clockwise in x / z?)
+    if (ccw) { indices[ni++] = v; indices[ni++] = v + 3; indices[ni++] = v + 2; indices[ni++] = v; indices[ni++] = v + 2; indices[ni++] = v + 1; }
+    else { indices[ni++] = v; indices[ni++] = v + 2; indices[ni++] = v + 3; indices[ni++] = v; indices[ni++] = v + 1; indices[ni++] = v + 2; }
+  }
+  return { ...mesh, positions, normals, road, road2, road3, mark, indices, vertexCount: vc, markQuads: nq };
+}
+
+const COARSE_ON_ROAD = 0.5;           // m (see appendMarkings)
+const LEVEL_NORMAL_Y = 0.94;          // a line is laid only where the ground is level enough for a carriageway (about 20 degrees): never up the face of a wall or a ramp
+
+/** The part [t0, t1] of the segment a -> b inside the box (Liang-Barsky), or null. */
+function clipToBox(ax, az, bx, bz, x0, z0, x1, z1) {
+  let t0 = 0, t1 = 1;
+  const dx = bx - ax, dz = bz - az;
+  for (const [pp, qq] of [[-dx, ax - x0], [dx, x1 - ax], [-dz, az - z0], [dz, z1 - az]]) {
+    if (Math.abs(pp) < 1e-12) { if (qq < 0) return null; continue; }
+    const r = qq / pp;
+    if (pp < 0) { if (r > t1) return null; if (r > t0) t0 = r; } else { if (r < t0) return null; if (r < t1) t1 = r; }
+  }
+  return t1 - t0 > 1e-9 ? [t0, t1] : null;
+}
+
+/** Bilinear value of a node array of the tile (the apron layout of computeTileNodes) at a world point inside the tile. */
+function nodeLerp(arr, x0, z0, step, x, z) { return nodeLerpK(arr, 1, 0, x0, z0, step, x, z); }
+function nodeLerp4(arr, x0, z0, step, x, z, c) { return nodeLerpK(arr, 4, c, x0, z0, step, x, z); }
+function nodeLerpK(arr, k, c, x0, z0, step, x, z) {
+  const fx = Math.min(CELLS, Math.max(0, (x - x0) / step)), fz = Math.min(CELLS, Math.max(0, (z - z0) / step));
+  const i = Math.min(CELLS - 1, Math.floor(fx)), j = Math.min(CELLS - 1, Math.floor(fz));
+  const tx = fx - i, tz = fz - j;
+  const a = (j + 1) * APRON_SIDE + i + 1;
+  const v00 = arr[a * k + c], v10 = arr[(a + 1) * k + c], v01 = arr[(a + APRON_SIDE) * k + c], v11 = arr[(a + APRON_SIDE + 1) * k + c];
+  return (v00 * (1 - tx) + v10 * tx) * (1 - tz) + (v01 * (1 - tx) + v11 * tx) * tz;
+}
+/** Bilinear value of a per-vertex array of the grid (3 values per vertex: normals) at a world point inside the tile. */
+function nodeLerp3(arr, x0, z0, step, x, z, c) {
+  const fx = Math.min(CELLS, Math.max(0, (x - x0) / step)), fz = Math.min(CELLS, Math.max(0, (z - z0) / step));
+  const i = Math.min(CELLS - 1, Math.floor(fx)), j = Math.min(CELLS - 1, Math.floor(fz));
+  const tx = fx - i, tz = fz - j;
+  const a = j * SIDE + i;
+  const v00 = arr[a * 3 + c], v10 = arr[(a + 1) * 3 + c], v01 = arr[(a + SIDE) * 3 + c], v11 = arr[(a + SIDE + 1) * 3 + c];
+  return (v00 * (1 - tx) + v10 * tx) * (1 - tz) + (v01 * (1 - tx) + v11 * tx) * tz;
+}
+/** The apron index of the node nearest to a world point inside the tile. */
+function nearestNode(x0, z0, step, x, z) {
+  const i = Math.min(CELLS, Math.max(0, Math.round((x - x0) / step))), j = Math.min(CELLS, Math.max(0, Math.round((z - z0) / step)));
+  return (j + 1) * APRON_SIDE + i + 1;
 }
 
 /** Exact height of the built mesh (grid triangles only, no skirts) at a world point inside the tile, by vertical ray vs triangle. */
