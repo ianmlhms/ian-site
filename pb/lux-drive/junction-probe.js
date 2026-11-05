@@ -8,6 +8,7 @@ export const JUNCTION = Object.freeze({
   box: 22,            // m: within this of the centre is the junction box (the roads of the junction, their aprons)
   step: 0.5,          // m: the sampling step along the line
   speed: 14,          // m/s: 50 km/h
+  laneInset: 1.5,     // m: the car drives where the carriageway extends at least this far around it (half the track of the car, 0.9 m, plus a margin: the wheels are never on the kerb, whose edge zone is 0.3 m of kerb and a metre of lattice)
   maxBob: 1.5,        // m/s2: the limit of the comfort of a driver on a straight line through a junction (the same as the roads)
 });
 
@@ -62,7 +63,7 @@ export function driveLine(surface, c, way) {
   const n = Math.round((2 * JUNCTION.reach) / JUNCTION.step);
   const h = new Float64Array(n + 1), onRoad = new Uint8Array(n + 1);
   const info = { sdCar: 9 };
-  for (let i = 0; i <= n; i++) { const s = -JUNCTION.reach + i * JUNCTION.step; h[i] = surface.height(c.x + dx * s, c.z + dz * s); onRoad[i] = surface.roadInfoAt(c.x + dx * s, c.z + dz * s, info).sdCar < 0 ? 1 : 0; }
+  for (let i = 0; i <= n; i++) { const s = -JUNCTION.reach + i * JUNCTION.step; h[i] = surface.height(c.x + dx * s, c.z + dz * s); onRoad[i] = surface.roadInfoAt(c.x + dx * s, c.z + dz * s, info).sdCar < -JUNCTION.laneInset ? 1 : 0; }
   const span = Math.round(2 / JUNCTION.step);                                  // h'' over a base of 4 m (+-2 m): the base of the road smoothness gate
   let boxBob = 0, apBob = 0, boxPitch = 0, boxStep = 0, stepAt = [c.x, c.z], at = [c.x, c.z];
   for (let i = span * 2; i <= n - span * 2; i++) {

@@ -12,6 +12,8 @@ export const DECK = Object.freeze({
   spanDip: 3.0,            // m: the land dips this far under the way, so the deck spans it (the bake writes the same number)
   cell: 32,                // m, the spatial hash cell
   joinTolerance: 6.0,      // m: two decks whose ends are this close are one bridge in two pieces: they meet at one level (the mean of their own tops), not at the ground below
+  ownSites: [[4829, 9101], [5179, 8061]],   // m: Pont Rouge and Pont Adolphe (landmark-bridges.js ROUGE.at / ADOLPHE.at): their decks are shaped by the landmark models, which meet their approach roads themselves ...
+  ownRadius: 220,          // ... within this distance of a site a deck keeps its ends pinned to the ground (flushTops does not touch it)
   maxGrade: 0.09,          // m/m: the top of a deck never climbs away from an end faster than this (a viaduct ramp of the real world is 6 %): the DSM beside a bridge end is the abutment,
                            // the parapet or a tree, and used as it is it made a raised box with a vertical face at the end of the approach road
   treeAbove: 1.5,          // m: a tree whose foot is less than this above a deck surface stands on it (the ground under it is a metre or two off the LiDAR deck)
@@ -111,6 +113,12 @@ export function flushTops(pts, tops, lo, hi) {
   return out;
 }
 
+/** A deck the landmark models (Pont Rouge, Pont Adolphe) shape themselves. */
+function isLandmarkDeck(d) {
+  const m = d.pts[d.pts.length >> 1];
+  return DECK.ownSites.some(([x, z]) => Math.hypot(m[0] - x, m[1] - z) <= DECK.ownRadius);
+}
+
 /** The level each end of every deck has to take: the ground the deck runs onto, or, where another deck ends at the same place, the mean of the two pieces (null: the deck keeps its own). */
 function endLevels(decks, surface) {
   const ends = [];
@@ -138,6 +146,13 @@ export function createDeckNetwork(decks, surface = null) {
   const levels = surface ? endLevels(decks, surface) : [];
   const list = decks.map((d, k) => {
     if (!surface || d.pts.length < 2) return d;
+    if (isLandmarkDeck(d)) {                       // the landmark models shape their own decks: only the old pin of the two ends
+      const tops = Float32Array.from(d.tops);
+      const last = d.pts.length - 1;
+      tops[0] = surface.height(d.pts[0][0], d.pts[0][1]);
+      tops[last] = surface.height(d.pts[last][0], d.pts[last][1]);
+      return { ...d, tops };
+    }
     const lo = levels.find((e) => e.k === k && e.end === 0).level, hi = levels.find((e) => e.k === k && e.end === 1).level;
     return { ...d, tops: flushTops(d.pts, d.tops, lo, hi) };
   });

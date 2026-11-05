@@ -27,6 +27,8 @@ const PROTECT_END_TRIM = 24.0;         // m: the protected corridor of an over w
                                     // bridge keeps its own bed up to the abutment.  The corridor is a disc of half + PROTECT_FADE round its first point, and the approach road lost its bed there
                                     // and followed the valley edge: the deck then started 2 m above it (a raised box, Rue de Neudorf).
 const PROTECT_END_SHARE = 0.5;        // (a way shorter than twice the trim has no protected corridor at all: it is all abutment)
+const MEDIAN_WIDTH = 3.0;             // m: a gap of at most this between the carriageways of two ROADS (the median of a dual carriageway, the nose of a slip road) is paved as a whole: the grass left in a gap that
+                                    // narrow was a wobbling green sliver between two ragged kerbs (the paint edge of each side is a contour on a 1 m lattice)
 const PROTECT_CELL = 64;               // m, the cell of the spatial hash of the protected corridors
 const smoothstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const MAX_PINS = 16;                   // carriageways that lie over one point, at most
@@ -719,7 +721,8 @@ export function createRoadNetwork(roads, baseHeight) {
     // is the zero of these, and a min over all the roads is continuous in the place: the lattice interpolates it into
     // a straight line.  The offset of ONE nearest road (lat, hw, a0) jumps where the nearest road changes, and the jump
     // was the ragged kerb and pavement the reviewer saw.
-    let sdCar = SD_FAR, sdPave = SD_FAR;
+    let sdCar = SD_FAR, sdPave = SD_FAR, sdCarRoad = -1, sdCar2 = SD_FAR;   // (sdCar2: the nearest carriageway edge of a DIFFERENT road than the nearest one)
+    let dispX = 0, dispZ = 0, disp2X = 0, disp2Z = 0;                        // (the offsets of the point from those two roads: opposite ones = the point lies BETWEEN them)
     let partners = 0;               // the marked roads whose carriageway (plus the clearance) holds this point
     // ---- pass 1: the segments that reach this point.  Only the NEAREST segment of every way takes part (and, where the same way
     // comes back past this point - a hairpin, a loop - the nearest segment of the other arm): the ground at a point is the
@@ -791,7 +794,12 @@ export function createRoadNetwork(roads, baseHeight) {
           const level = 1 - smoothstep(LEVEL_FULL, LEVEL_FADE, -sNotch);
           if (level >= 0.5) {
             const eCar = d - HW[i], ePave = d - a0;
-            if (eCar < sdCar) sdCar = eCar;
+            const roadHere = ROADOF[i];
+            const offX = -lat * ez / len, offZ = lat * ex / len;
+            if (eCar < sdCar) {
+              if (sdCarRoad !== roadHere) { sdCar2 = sdCar; disp2X = dispX; disp2Z = dispZ; }
+              sdCar = eCar; sdCarRoad = roadHere; dispX = offX; dispZ = offZ;
+            } else if (roadHere !== sdCarRoad && eCar < sdCar2) { sdCar2 = eCar; disp2X = offX; disp2Z = offZ; }
             if (ePave < sdPave) sdPave = ePave;
             if (LINES[i] > 0 && eCar < MARK_CLEAR && partners < MAX_PARTNERS) {
               partnerId[partners] = ROADOF[i]; partnerDx[partners] = ex / len; partnerDz[partners] = ez / len; partners++;
@@ -945,6 +953,7 @@ export function createRoadNetwork(roads, baseHeight) {
       }
     }
     out.junction = junction;
+    if (sdCar2 < SD_FAR && sdCar >= 0 && dispX * disp2X + dispZ * disp2Z < 0) sdPave = Math.min(sdPave, sdCar + sdCar2 - MEDIAN_WIDTH);   // the median between two carriageways: paved as a whole, the edges are the kerbs
     if (best < 0) {
       out.coverage = 0; out.bed = 0; out.kerb = 0; out.lat = 0; out.hw = 0; out.a0 = 0; out.kind = 0; out.road = -1;
       out.dist = Infinity; out.lines = 0; out.lanes = 0; out.s = 0; out.surface = 0;
