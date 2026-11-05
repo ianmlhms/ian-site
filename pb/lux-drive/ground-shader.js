@@ -51,7 +51,7 @@ export const GROUND_FRAGMENT = `
     // ---- the land: the painted ground, tinted by the class of the place
     vec3 gTex = texture2D(uGround, P * 0.085).rgb;
     vec3 lTex = texture2D(uLitter, P * 0.13).rgb;
-    vec3 pave = texture2D(uPavement, P * 0.46).rgb;
+    vec3 pave = texture2D(uPavement, P * 0.72).rgb;
     vec3 grav = texture2D(uGravel, P * 0.55).rgb;
     // the meadow: a calm olive green (the colour of the MTB meadow), not a bright lawn
     vec3 meadow = gTex * vec3(0.70, 0.86, 0.52) * (0.90 + 0.20 * nMid.g);

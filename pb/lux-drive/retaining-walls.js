@@ -18,7 +18,7 @@ export const WALL = Object.freeze({
   naturalMargin: 0.5,
   maxLandSlope: 1.4,       // m/m: where the land itself is steeper than this the ground is a hillside, and a block of stone on it reads as a crate (a wall stands where the carve made the ramp)
   skirt: 0.5,              // m: the face of the wall goes this far below the foot of the ramp (buried), so nothing shows under it
-  coping: 0.12,            // m: the coping stands this far above the high ground, and overhangs the face by copingLip
+  coping: 0.06,            // m: the coping stands this far above the high ground, and overhangs the face by copingLip
   copingLip: 0.07,
   courseHeight: 0.42,      // m: the height of a course of stone
   minDepth: 0.45,          // m: the block is at least this thick (the ramp inside it is narrower, but the coping needs a seat)
@@ -39,7 +39,7 @@ export function rampTolerance(rise, depth) {
 export const WALL_DRAW_FACTOR = 0.6;
 
 const STONE = [0.56, 0.52, 0.45];
-const COPING = [0.55, 0.53, 0.49];
+const COPING = [0.27, 0.27, 0.27];      // a dark concrete cap: the light grey it had was a white strip lying on the edge of the road when seen from the driver's seat
 const MAGIC = 0x4c4c4157;              // 'WALL'
 const FLOATS_PER_POINT = 7;            // x, z, top, bottom, depth, nx, nz
 

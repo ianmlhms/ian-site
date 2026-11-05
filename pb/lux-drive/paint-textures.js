@@ -81,7 +81,7 @@ function pavement(size, seed) {
     const w = size / cols;
     for (let k = 0; k < cols; k++) {
       const x = k * w + (r % 2) * w * 0.5, y = r * h;
-      const shade = 140 + rng() * 26;
+      const shade = 144 + rng() * 12;                              // slabs a shade apart, not a chequerboard: the light and dark squares read as big blocks from the driver's seat
       ctx.fillStyle = `rgb(${shade|0},${(shade - 2)|0},${(shade - 8)|0})`;
       ctx.fillRect(x + 0.8, y + 0.8, w - 1.6, h - 1.6);
       ctx.globalAlpha = 0.25 + rng() * 0.25;                     // the speckle of the concrete

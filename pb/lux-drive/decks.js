@@ -11,6 +11,9 @@ export const DECK = Object.freeze({
   stickBelow: 0.6,         // the car counts as "on" the deck when it is at most this far below the surface
   spanDip: 3.0,            // m: the land dips this far under the way, so the deck spans it (the bake writes the same number)
   cell: 32,                // m, the spatial hash cell
+  joinTolerance: 6.0,      // m: two decks whose ends are this close are one bridge in two pieces: they meet at one level (the mean of their own tops), not at the ground below
+  maxGrade: 0.09,          // m/m: the top of a deck never climbs away from an end faster than this (a viaduct ramp of the real world is 6 %): the DSM beside a bridge end is the abutment,
+                           // the parapet or a tree, and used as it is it made a raised box with a vertical face at the end of the approach road
   treeAbove: 1.5,          // m: a tree whose foot is less than this above a deck surface stands on it (the ground under it is a metre or two off the LiDAR deck)
   treeBelow: 0.3,          // m: a crown that comes within this of the underside of a deck touches it
 });
@@ -87,6 +90,42 @@ export function encodeDecks(decks) {
   return Uint8Array.from(bytes);
 }
 
+
+/**
+ * The tops of a deck with its two ends made flush.  `tops` are the DSM heights of the bake; `lo`, `hi` the levels the two ends must have (the road surface the deck runs onto, or the
+ * common level of two pieces of one bridge).  The ends take those levels, and the interior is the DSM kept inside the envelope that climbs / falls at most DECK.maxGrade from
+ * either end.  A deck too short for its two levels (a footbridge on a steep bank) is the straight line between them.  Pure: returns a new array.
+ */
+export function flushTops(pts, tops, lo, hi) {
+  const n = pts.length;
+  const out = Float32Array.from(tops);
+  out[0] = lo; out[n - 1] = hi;
+  const arc = new Float64Array(n);
+  for (let i = 1; i < n; i++) arc[i] = arc[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+  const total = arc[n - 1] || 1;
+  for (let i = 1; i < n - 1; i++) {
+    const hiEnv = Math.min(lo + DECK.maxGrade * arc[i], hi + DECK.maxGrade * (total - arc[i]));
+    const loEnv = Math.max(lo - DECK.maxGrade * arc[i], hi - DECK.maxGrade * (total - arc[i]));
+    out[i] = hiEnv >= loEnv ? Math.min(hiEnv, Math.max(loEnv, tops[i])) : lo + (hi - lo) * (arc[i] / total);
+  }
+  return out;
+}
+
+/** The level each end of every deck has to take: the ground the deck runs onto, or, where another deck ends at the same place, the mean of the two pieces (null: the deck keeps its own). */
+function endLevels(decks, surface) {
+  const ends = [];
+  decks.forEach((d, k) => {
+    if (d.pts.length < 2) return;
+    ends.push({ k, end: 0, x: d.pts[0][0], z: d.pts[0][1], own: d.tops[1] });
+    ends.push({ k, end: 1, x: d.pts[d.pts.length - 1][0], z: d.pts[d.pts.length - 1][1], own: d.tops[d.pts.length - 2] });
+  });
+  return ends.map((e) => {
+    let sum = e.own, count = 1;
+    for (const o of ends) if (o.k !== e.k && Math.hypot(o.x - e.x, o.z - e.z) <= DECK.joinTolerance) { sum += o.own; count++; }
+    return { ...e, level: count > 1 ? sum / count : surface.height(e.x, e.z) };
+  });
+}
+
 /**
  * The deck network: the segments of every deck in a spatial hash, so the ground function can ask
  * "is there a deck over this point, and how high is it?".
@@ -96,13 +135,11 @@ export function encodeDecks(decks) {
  * and not at the level of the land above it, or the bridge hangs in the air over its own approach.
  */
 export function createDeckNetwork(decks, surface = null) {
-  const list = decks.map((d) => {
+  const levels = surface ? endLevels(decks, surface) : [];
+  const list = decks.map((d, k) => {
     if (!surface || d.pts.length < 2) return d;
-    const tops = Float32Array.from(d.tops);
-    const last = d.pts.length - 1;
-    tops[0] = surface.height(d.pts[0][0], d.pts[0][1]);
-    tops[last] = surface.height(d.pts[last][0], d.pts[last][1]);
-    return { ...d, tops };
+    const lo = levels.find((e) => e.k === k && e.end === 0).level, hi = levels.find((e) => e.k === k && e.end === 1).level;
+    return { ...d, tops: flushTops(d.pts, d.tops, lo, hi) };
   });
   const ax = [], az = [], bx = [], bz = [], t0 = [], t1 = [], half = [];
   for (const d of list) {
