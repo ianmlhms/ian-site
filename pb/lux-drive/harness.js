@@ -51,6 +51,7 @@ import { WALL, WALL_DRAW_FACTOR, findRamp, wallQuads, rampTolerance, createWallF
 import { JUNCTION, junctionClusters, driveLine } from './junction-probe.js';
 import { runBridgeChecks } from './harness-bridges.js';          // section N (bridges7)
 import { runTunnelChecks } from './harness-tunnels.js';          // section O (bridges8)
+import { runDeckChecks } from './harness-decks.js';              // section Q (decks10)
 import { runMarkingChecks } from './marking-checks.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -1694,6 +1695,8 @@ if (wants('M')) {
 if (wants('N')) runBridgeChecks({ check, section, stats, data, surface, ground, net, portals, buildings, forest, playArea });
 /* ---------------------------------------------------------------- O: the shallow tunnels that are open roads, the portals on their roads (harness-tunnels.js) */
 if (wants('O')) runTunnelChecks({ check, section, stats, data, field, surface, ground, net, portals, buildings, forest, playArea });
+/* ---------------------------------------------------------------- Q: decks driven end to end, banks under deck ends, medians, camera (harness-decks.js) */
+if (wants('Q')) runDeckChecks({ check, section, stats, data, field, surface, ground, net, buildings, portals, playArea });
 
 /* ---------------------------------------------------------------- the summary */
 console.log(`\n${results.fail === 0 ? 'PASS' : 'FAIL'}  ${results.pass} checks passed, ${results.fail} failed  (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
