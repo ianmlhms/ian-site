@@ -29,6 +29,8 @@ const PROTECT_FADE = 10.0;             // m: the protection fades out over this 
 const MEDIAN_WIDTH = 3.0;             // m: a gap of at most this between the carriageways of two ROADS (the median of a dual carriageway, the nose of a slip road) is paved as a whole: the grass left in a gap that
                                     // narrow was a wobbling green sliver between two ragged kerbs (the paint edge of each side is a contour on a 1 m lattice)
 const PROTECT_CELL = 64;               // m, the cell of the spatial hash of the protected corridors
+const OWN_PROTECT_FADE = 2.0;          // m: ... and away from them only its own carriageway, fading out over this
+const CROSSING_PROTECT = 30.0;         // m: a way that the crossings found to ride over another protects the ground within this of its crossings (see the protected corridors)
 const PROTECT_RAMP = 1.5;              // m: where a carved way runs onto a bridge, the protection of the ground under the bridge grows from nothing at the abutment to its full strength over this
                                        // distance along the bridge, and is nothing BEFORE the abutment.  The approach road keeps its own bed right up to the deck (the ground under the deck drops
                                        // away from there, hidden by the deck).  With full protection in a disc round the first point of the bridge the approach road followed the valley edge for the last
@@ -70,6 +72,8 @@ const BRIDGE_JOIN = 8.0;               // m: a street whose end lies this close 
 const END_JOIN = 3.0;                  // m: the ends of ways this close to one another meet at one node
 const JUNCTION_TOUCH = 0.6;           // m: a way whose centre line lies within the pavement (+ this) of another way runs into it: the apron of the junction is the level of that way
 const KERB_SURFACES = new Set(['asphalt', 'cobble', 'concrete']);
+const PAINT_LEVEL_TOL = 0.20;          // m: a way paints its carriageway where the ground lies within this of its bed ...
+const PAINT_LEVEL_PUSH = 8.0;          // ... and beyond that its edge moves in by this many m per m of the difference (see carve(), the paint)
 const SHEET_GAP_HOLD = 1.5;            // m: in a junction the sheet (junction-surface.js) holds the ground this far past the bench of a way at its level: a gap of up to 2 x this between two carriageways
                                        // (a median, the nose of a slip road, the wedge where a dual carriageway splits) is at road level, not a dip to the land
 const SHEET_GAP_FADE = 2.0;            // m: ... and lets go of it over this distance
@@ -94,6 +98,27 @@ export function deckEndLevels(decks) {
     }
   }
   return out;
+}
+
+/** A grid of points ([x, z, ...]) for the question "is any of them within r of (x, z)?" (r at most `cell`); `test(p)` may reject a point.  The lists of ends of the ways are tens of
+ *  thousands long, and a linear search per way was most of the time of building the network. */
+function pointGrid(points, cell) {
+  const grid = new Map();
+  const key = (cx, cz) => cx * 65536 + cz;
+  for (const p of points) {
+    const k = key(Math.floor(p[0] / cell), Math.floor(p[1] / cell));
+    const l = grid.get(k);
+    if (l) l.push(p); else grid.set(k, [p]);
+  }
+  return (x, z, r, test = null) => {
+    const cx = Math.floor(x / cell), cz = Math.floor(z / cell);
+    for (let dz = -1; dz <= 1; dz++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        for (const p of grid.get(key(cx + dx, cz + dz)) || []) if (Math.hypot(p[0] - x, p[1] - z) <= r && (!test || test(p))) return true;
+      }
+    }
+    return false;
+  };
 }
 
 /** Resamples a polyline (array of [x, z]) every `spacing` m, keeping its shape. Returns { x: number[], z: number[] }. */
@@ -444,8 +469,8 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     const list = road.tunnel ? tunnelEndPoints : road.over || (road.layer || 0) >= 1 ? bridgeEndPoints : null;
     if (list) list.push(road.pts[0], road.pts[road.pts.length - 1]);
   }
-  const near = (list, x, z) => list.some((p) => Math.hypot(p[0] - x, p[1] - z) <= BRIDGE_JOIN);
-  const endOf = (x, z) => (near(bridgeEndPoints, x, z) ? 'bridge' : near(tunnelEndPoints, x, z) ? 'tunnel' : null);
+  const nearBridgeEnd = pointGrid(bridgeEndPoints, BRIDGE_JOIN), nearTunnelEnd = pointGrid(tunnelEndPoints, BRIDGE_JOIN);
+  const endOf = (x, z) => (nearBridgeEnd(x, z, BRIDGE_JOIN) ? 'bridge' : nearTunnelEnd(x, z, BRIDGE_JOIN) ? 'tunnel' : null);
 
   for (let ri = 0; ri < roads.length; ri++) {
     const road = roads[ri];
@@ -514,7 +539,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   findCrossings();
   reconcileJunctions();
   // the junction sheets: one smooth surface where ways meet at one level (junction-surface.js)
-  const junctionSheet = createJunctionSurface(chains, (c) => overRoads.has(c.road), (c) => Math.max(0.8, roads[c.road].width / 2), JS_OPTS);
+  const tJS = performance.now(); const junctionSheet = createJunctionSurface(chains, (c) => overRoads.has(c.road), (c) => Math.max(0.8, roads[c.road].width / 2), JS_OPTS); if (globalThis.process?.env?.JS_TIME) console.log("junction sheet", (performance.now() - tJS).toFixed(0), "ms", junctionSheet.count);
   const sheet = { level: 0, weight: 0 };
 
   for (const { ri, road, rs, n, hw, kerbH, kerbW, pw, bench, a0, kind, chain } of prep) {
@@ -626,7 +651,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   const protX0 = [], protZ0 = [], protX1 = [], protZ1 = [], protHalf = [];
   // per segment: the distance along its way at its start and the distances along the way at which the protection starts / ends ramping (-Infinity / Infinity: an end that no road runs onto
   // keeps the full protection up to it and the disc round it)
-  const protArc = [], protRampA = [], protRampB = [];
+  const protArc = [], protRampA = [], protRampB = [], protFade = [];
   const approachEnds = [];                             // the ends of the carved ways (not over): an end of a bridge near one of them is an abutment
   for (const chain of chains) {
     if (overRoads.has(chain.road) || chain.x.length < 2) continue;
@@ -638,13 +663,14 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   }
   // An end of a bridge is an abutment when a carved way ends there (APPROACH_JOIN) and runs on in the direction of the bridge.  (The ends of the pavement decks beside a road bridge also
   // protected the end of the road between them; the protection now only keeps the ground from being CUT - see carve() - and a road lifted onto its bridge is a fill.)
-  const isAbutment = (x, z, ux, uz) => approachEnds.some((p) => Math.abs(p[0] - x) <= APPROACH_JOIN && Math.abs(p[1] - z) <= APPROACH_JOIN && Math.hypot(p[0] - x, p[1] - z) <= APPROACH_JOIN && p[2] * ux + p[3] * uz >= APPROACH_ALIGN);
+  const nearApproachEnd = pointGrid(approachEnds, APPROACH_JOIN);
+  const isAbutment = (x, z, ux, uz) => nearApproachEnd(x, z, APPROACH_JOIN, (p) => p[2] * ux + p[3] * uz >= APPROACH_ALIGN);
   for (const corridor of overCorridors) {              // the ways that OSM tags as over
     const m = corridor.x.length;
     if (isLandmarkDeck({ pts: corridor.x.map((x, i) => [x, corridor.z[i]]) })) {     // (the Pont Rouge / Pont Adolphe models meet their roads themselves: full protection, as before)
       for (let i = 1; i < m; i++) {
         protX0.push(corridor.x[i - 1]); protZ0.push(corridor.z[i - 1]); protX1.push(corridor.x[i]); protZ1.push(corridor.z[i]);
-        protHalf.push(corridor.half); protArc.push(0); protRampA.push(-Infinity); protRampB.push(Infinity);
+        protHalf.push(corridor.half); protFade.push(PROTECT_FADE); protArc.push(0); protRampA.push(-Infinity); protRampB.push(Infinity);
       }
       continue;
     }
@@ -658,14 +684,15 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     for (let i = 1; i < m; i++) {
       protX0.push(corridor.x[i - 1]); protZ0.push(corridor.z[i - 1]);
       protX1.push(corridor.x[i]); protZ1.push(corridor.z[i]);
-      protHalf.push(corridor.half);
+      protHalf.push(corridor.half); protFade.push(PROTECT_FADE);
       protArc.push(arc); protRampA.push(rampA); protRampB.push(rampB);
       arc += Math.hypot(corridor.x[i] - corridor.x[i - 1], corridor.z[i] - corridor.z[i - 1]);
     }
   }
   // the ways that run onto a bridge: their carriageway is held at its level ABUT_HOLD under the deck (see the cap in carve())
   const corridorEnds = overCorridors.filter((c) => !isLandmarkDeck({ pts: c.x.map((x, i) => [x, c.z[i]]) })).flatMap((c) => [[c.x[0], c.z[0]], [c.x[c.x.length - 1], c.z[c.z.length - 1]]]);
-  const atBridgeEnd = (x, z) => corridorEnds.some((p) => Math.hypot(p[0] - x, p[1] - z) <= APPROACH_JOIN);
+  const nearCorridorEnd = pointGrid(corridorEnds, APPROACH_JOIN);
+  const atBridgeEnd = (x, z) => nearCorridorEnd(x, z, APPROACH_JOIN);
   for (const chain of chains) {
     if (overRoads.has(chain.road) || chain.closed) continue;
     const m = chain.x.length;
@@ -673,10 +700,22 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     if (atBridgeEnd(chain.x[m - 1], chain.z[m - 1])) capHoldB[chain.road] = ABUT_HOLD;
     roadLength[chain.road] = chain.arc[m - 1];
   }
+  // The ways the crossings found to be over: their ground is protected near the crossings only.  Along the rest of such a way (an overpass that runs on beside the trunk road on its
+  // embankment) the corridor of 4 m past its pavement lay over the carriageway of the road beside it, kept it on the slope of the embankment, and that slope was painted as tarmac
+  // (Nei Escher Strooss).
+  const crossingsOf = new Map();
+  for (const c of crossings) { const l = crossingsOf.get(c.over); if (l) l.push(c); else crossingsOf.set(c.over, [c]); }
+  const nearCrossing = (i) => (crossingsOf.get(ROADOF[i]) || []).some((c) => {
+    const ex = X1[i] - X0[i], ez = Z1[i] - Z0[i], ll = ex * ex + ez * ez;
+    const t = ll > 1e-9 ? Math.min(1, Math.max(0, ((c.x - X0[i]) * ex + (c.z - Z0[i]) * ez) / ll)) : 0;
+    return Math.hypot(c.x - X0[i] - ex * t, c.z - Z0[i] - ez * t) <= CROSSING_PROTECT;
+  });
   for (let i = 0; i < count; i++) {                     // the ways the crossings found to be over
     if (!overRoads.has(ROADOF[i])) continue;
+    const near = !crossingsOf.has(ROADOF[i]) || nearCrossing(i);
     protX0.push(X0[i]); protZ0.push(Z0[i]); protX1.push(X1[i]); protZ1.push(Z1[i]);
-    protHalf.push(A0[i] + PROTECT_MARGIN);
+    // (away from its crossings only its own carriageway and pavement is protected: it is not carved, its surface is the embankment of the DTM, and the batter of the road beside it may not cut it)
+    protHalf.push(near ? A0[i] + PROTECT_MARGIN : A0[i]); protFade.push(near ? PROTECT_FADE : OWN_PROTECT_FADE);
     protArc.push(0); protRampA.push(-Infinity); protRampB.push(Infinity);
   }
   const pKey = (cx, cz) => cx * 4096 + cz;
@@ -713,7 +752,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
           const ramp = smoothstep(ABUT_HOLD, ABUT_HOLD + PROTECT_RAMP, Math.min(along - protRampA[s], protRampB[s] - along));
           t = t < 0 ? 0 : t > 1 ? 1 : t;
           const d = Math.hypot(x - (ax + ex * t), z - (az + ez * t)) - protHalf[s];
-          const v = (d <= 0 ? 1 : d < PROTECT_FADE ? 1 - d / PROTECT_FADE : 0) * ramp;
+          const v = (d <= 0 ? 1 : d < protFade[s] ? 1 - d / protFade[s] : 0) * ramp;
           if (v >= 1) return 1;
           if (v > p) p = v;
         }
@@ -777,7 +816,9 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   const candI = new Int32Array(MAX_CAND), candD = new Float32Array(MAX_CAND), candT = new Float32Array(MAX_CAND), candLat = new Float32Array(MAX_CAND), candOver = new Float32Array(MAX_CAND);
   const pinPri = new Float32Array(MAX_PINS), pinVal = new Float32Array(MAX_PINS), pinWt = new Float32Array(MAX_PINS);
   const pinEdge = new Float32Array(MAX_PINS), pinBed = new Float32Array(MAX_PINS), slotPinRoad = new Int32Array(MAX_PINS), pinAlong = new Float32Array(MAX_PINS);
-  const wayEdge = new Float32Array(MAX_CAND), wayBed = new Float32Array(MAX_CAND);   // per way near the point: the distance past the edge of its bench (its end cap included) and its bed there   // per pin: the distance to the edge of its bench (negative inside) and the level of its carriageway
+  const wayEdge = new Float32Array(MAX_CAND), wayBed = new Float32Array(MAX_CAND);
+  const paintECar = new Float32Array(MAX_CAND), paintEPave = new Float32Array(MAX_CAND), paintBed = new Float32Array(MAX_CAND), paintRoad = new Int32Array(MAX_CAND);
+  const paintOffX = new Float32Array(MAX_CAND), paintOffZ = new Float32Array(MAX_CAND);   // per way near the point: the distance past the edge of its bench (its end cap included) and its bed there   // per pin: the distance to the edge of its bench (negative inside) and the level of its carriageway
   const armOf = new Int32Array(MAX_CAND), armFirst = new Uint8Array(MAX_CAND), slotRoad = new Int32Array(MAX_CAND), slotArm1 = new Int32Array(MAX_CAND), slotArm2 = new Int32Array(MAX_CAND);
   const partnerId = new Int32Array(MAX_PARTNERS), partnerDx = new Float32Array(MAX_PARTNERS), partnerDz = new Float32Array(MAX_PARTNERS);
   // What one segment of a way gives a point: the bed under the foot of the perpendicular, the NOTCH of the way on this side (how deep the bench of the way is cut
@@ -845,6 +886,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     let sdCar = SD_FAR, sdPave = SD_FAR, sdCarRoad = -1, sdCar2 = SD_FAR;   // (sdCar2: the nearest carriageway edge of a DIFFERENT road than the nearest one)
     let dispX = 0, dispZ = 0, disp2X = 0, disp2Z = 0;                        // (the offsets of the point from those two roads: opposite ones = the point lies BETWEEN them)
     let partners = 0;               // the marked roads whose carriageway (plus the clearance) holds this point
+    let nPaint = 0;                 // the arms that paint here (their distances to the edges, their bed, their road, the offset of the point from them)
     // ---- pass 1: the segments that reach this point.  Only the NEAREST segment of every way takes part (and, where the same way
     // comes back past this point - a hairpin, a loop - the nearest segment of the other arm): the ground at a point is the
     // ground of the way as it passes THIS point.  Summing every segment in reach (the first version) mixed in the bed of
@@ -914,14 +956,12 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
           // the notch changes sign, a step of up to 0.7 m in the ground beside a way on an embankment)
           const level = 1 - smoothstep(LEVEL_FULL, LEVEL_FADE, -sNotch);
           if (level >= 0.5) {
-            const eCar = d - HW[i], ePave = d - a0;
-            const roadHere = ROADOF[i];
-            const offX = -lat * ez / len, offZ = lat * ex / len;
-            if (eCar < sdCar) {
-              if (sdCarRoad !== roadHere) { sdCar2 = sdCar; disp2X = dispX; disp2Z = dispZ; }
-              sdCar = eCar; sdCarRoad = roadHere; dispX = offX; dispZ = offZ;
-            } else if (roadHere !== sdCarRoad && eCar < sdCar2) { sdCar2 = eCar; disp2X = offX; disp2Z = offZ; }
-            if (ePave < sdPave) sdPave = ePave;
+            const eCar = d - HW[i];
+            // (the union of the carriageways and pavements is taken below, once the level of the ground here is known)
+            if (nPaint < MAX_CAND) {
+              paintECar[nPaint] = eCar; paintEPave[nPaint] = d - a0; paintBed[nPaint] = bed; paintRoad[nPaint] = ROADOF[i];
+              paintOffX[nPaint] = -lat * ez / len; paintOffZ[nPaint] = lat * ex / len; nPaint++;
+            }
             if (LINES[i] > 0 && eCar < MARK_CLEAR && partners < MAX_PARTNERS) {
               partnerId[partners] = ROADOF[i]; partnerDx[partners] = ex / len; partnerDz[partners] = ez / len; partners++;
             }
@@ -1091,6 +1131,19 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     // bridge - flattened the end of the approach road into the valley.
     const protHere = bandY >= ground ? prot * (1 - pinCover) : prot * (1 - pinCover);
     out.band = ground + (1 - protHere) * (bandY - ground);
+    // The paint: the union of the carriageways and of the pavements, each way painted only where the ground lies at its own level.  Where two ways at different levels overlap in plan
+    // (a slip road beside the trunk road, an overpass on its embankment) the ground between them is a ramp or the side of the embankment, and painted with the carriageway of the way
+    // above it was a hillside of asphalt (Nei Escher Strooss).  A way off its level is pushed out of the union smoothly (PAINT_LEVEL_PUSH per m past PAINT_LEVEL_TOL), so the edge of the
+    // tarmac runs along the top or the foot of the ramp and the distance field stays continuous.
+    for (let q = 0; q < nPaint; q++) {
+      const push = PAINT_LEVEL_PUSH * Math.max(0, Math.abs(out.band - paintBed[q]) - PAINT_LEVEL_TOL);
+      const eCar = paintECar[q] + push, ePave = paintEPave[q] + push, roadHere = paintRoad[q];
+      if (eCar < sdCar) {
+        if (sdCarRoad !== roadHere) { sdCar2 = sdCar; disp2X = dispX; disp2Z = dispZ; }
+        sdCar = eCar; sdCarRoad = roadHere; dispX = paintOffX[q]; dispZ = paintOffZ[q];
+      } else if (roadHere !== sdCarRoad && eCar < sdCar2) { sdCar2 = eCar; disp2X = paintOffX[q]; disp2Z = paintOffZ[q]; }
+      if (ePave < sdPave) sdPave = ePave;
+    }
     if (out.debug) out.debug.push({ ground, batter: devW > 0 ? ground + devSum / devW : ground, prot, pinCover, protHere, sheetLevel: sheet.level, sheetW: sheet.weight, ways: Array.from({ length: nSlots }, (_, q) => [slotRoad[q], wayEdge[q], wayBed[q]]) });
     // A junction: two marked roads of different ways that cross at an angle meet here.  The lane markings are cut
     // before it (a dash that ends in the middle of the crossing street is the fragment the reviewer saw).

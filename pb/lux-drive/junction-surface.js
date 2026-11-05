@@ -27,7 +27,8 @@ export const JUNCTION_SURFACE = Object.freeze({
   crossWeight: 0.3,    // the wish that a way is flat across, against 1 for its level (a lone way gives no tilt across; two crossing ways tilt it)
   ridge: 1e-3,         // a tiny pull of the gradient to zero (a fit from one sample)
   levelTol: 0.6,       // m: only the ways at the level of the contact (within this) shape its plane (a flyover beside it does not)
-  dedupe: 2.0,         // m: contact points closer than this are one
+  dedupe: 3.0,         // m: contact points closer than this are one
+  overlapSlack: 0.3,   // m: two centre line samples closer than the two half widths plus this: the carriageways overlap (a contact even without a junction pin)
   cell: 24,            // m: the spatial hash of the planes
   goodFit: 0.10,       // m: a plane whose weighted rms distance from the beds it was fitted to is below this counts fully ...
   poorFit: 0.30,       // m: ... and one above this not at all
@@ -77,6 +78,32 @@ export function createJunctionSurface(chains, skip, hwOf, opts = JUNCTION_SURFAC
       if (seen.has(key)) continue;
       seen.add(key);
       px.push(x); pz.push(z); ph.push(level);
+    }
+  }
+  // ... and where the carriageways of two ways at one level overlap without a junction pin (a slip road that merges alongside, two ways of one street laid side by side): their beds
+  // differ by up to a few decimetres there, and the hand-over between them was a step within half a metre (23 cm on the link at Kirchberg).  The sheet makes it a gentle crossfall.
+  for (const c of live) {
+    const hwC = hwOf(c);
+    for (let k = 0; k < c.x.length; k++) {
+      const cx = Math.floor(c.x[k] / SG), cz = Math.floor(c.z[k] / SG);
+      for (let dz = -1; dz <= 1; dz++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const l = sgrid.get(skey(cx + dx, cz + dz));
+          if (!l) continue;
+          for (let q = 0; q < l.length; q += 2) {
+            const o = l[q], j = l[q + 1];
+            if (o === c || o.road <= c.road) continue;                   // (every pair once)
+            const d = Math.hypot(o.x[j] - c.x[k], o.z[j] - c.z[k]);
+            if (d > hwC + hwOf(o) + opts.overlapSlack || Math.abs(o.bed[j] - c.bed[k]) > opts.levelTol) continue;
+            if ((c.deckPins && c.deckPins.has(k)) || (o.deckPins && o.deckPins.has(j))) continue;
+            const x = (c.x[k] + o.x[j]) / 2, z = (c.z[k] + o.z[j]) / 2, level = (c.bed[k] + o.bed[j]) / 2;
+            const key = `${Math.round(x / opts.dedupe)},${Math.round(z / opts.dedupe)},${Math.round(level / opts.levelTol)}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            px.push(x); pz.push(z); ph.push(level);
+          }
+        }
+      }
     }
   }
   // ---- one plane per contact point: least squares of the beds around it
