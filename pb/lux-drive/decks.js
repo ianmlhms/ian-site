@@ -18,6 +18,12 @@ export const DECK = Object.freeze({
   approachAlign: 0.7,      // ... when it leaves through that end toward the deck (the cosine of the two directions at least this)
   endStub: 0.5,            // m: an inner point of a deck (a car's, at least stubWidth wide) this close to one of its ends takes the level of that end (see endStubs)
   stubWidth: 4.0,
+  apronWidth: 5.0,         // m: a deck at least this wide (a carriageway) gets an approach slab where its approach does not reach the corners of its end (withAprons) ...
+  apronInset: 1.2,         // ... probed this far inside its edges ...
+  apronDrop: 0.25,         // ... where the ground lies this far under the approach on the axis (or the deck end) ...
+  apronCut: 1.0,           // ... somewhere at least this deep (the cut of the road below) ...
+  apronMax: 6.0,           // ... up to this far back; the slab ends this far under the road on the axis
+  apronTuck: 0.02,
   endHold: 3.0,            // m: from an end that a way runs onto the deck does not fall below the level of that end for this long (road-network.js holds the approach's carriageway at the
                            // level of its end ABUT_HOLD = 2 m under the deck: a deck that fell away from its end at once lay 5 - 15 cm under that held road - a step onto the road and off it)
   endGrade: 0.12,          // m/m: the steepest a deck climbs or falls away from the level of its end (the DSM next to an abutment is the bank, a parapet or the canopy of a wood: used as it is, the
@@ -199,6 +205,40 @@ function endStubs(d) {
 }
 
 /**
+ * Approach slabs where the approach does not reach the corners of the deck end.  A road bridge over a road at a skew: the OSM bridge ends square to its own axis, but the gap
+ * under it runs along the road below, so at the acute corner the cut of the road below reaches past the deck end and the approach carriageway there falls away 1 - 5 m (the
+ * Autoroute d'Arlon over the Autoroute d'Esch, decks 104 / 114 / 119 / 137: a car in the outer lane fell off the corner before the deck).  There the deck is continued back
+ * over its approach (an approach slab) far enough to cover the corner, its far end just under the road on the axis.  Pure: a new deck, or the same one.
+ */
+function withAprons(d, holdA, holdB, surface) {
+  if (d.width < DECK.apronWidth || d.pts.length < 2 || (!holdA && !holdB)) return d;
+  let pts = d.pts, tops = Array.from(d.tops);
+  for (const atStart of [true, false]) {
+    if (!(atStart ? holdA : holdB)) continue;
+    const n = pts.length, e = atStart ? 0 : n - 1, f = atStart ? 1 : n - 2;
+    const l = Math.hypot(pts[f][0] - pts[e][0], pts[f][1] - pts[e][1]) || 1;
+    const ux = (pts[e][0] - pts[f][0]) / l, uz = (pts[e][1] - pts[f][1]) / l;          // out of the deck, along the approach
+    const top = tops[e], side = d.width / 2 - DECK.apronInset;
+    let eaten = 0, deepest = 0;
+    for (let s = 0.5; s <= DECK.apronMax + 1e-6; s += 0.5) {
+      const axis = Math.min(top, surface.height(pts[e][0] + ux * s, pts[e][1] + uz * s));   // (the approach climbing or falling to the deck is not a corner that falls away)
+      for (const k of [-1, 1]) {
+        const x = pts[e][0] + ux * s - uz * side * k, z = pts[e][1] + uz * s + ux * side * k;
+        const drop = axis - surface.height(x, z);
+        if (drop > DECK.apronDrop) eaten = s;
+        deepest = Math.max(deepest, drop);
+      }
+    }
+    if (eaten === 0 || deepest < DECK.apronCut) continue;            // (a verge that falls away gently is the bank of an approach on a curve, not the cut of a road below)
+    const len = Math.min(DECK.apronMax, eaten + 1.5);
+    const fx = pts[e][0] + ux * len, fz = pts[e][1] + uz * len;
+    const farTop = Math.min(top, surface.height(fx, fz)) - DECK.apronTuck;
+    if (atStart) { pts = [[fx, fz], ...pts]; tops = [farTop, ...tops]; } else { pts = [...pts, [fx, fz]]; tops = [...tops, farTop]; }
+  }
+  return pts === d.pts ? d : { ...d, pts, tops: Float32Array.from(tops), apron: true };
+}
+
+/**
  * The deck network: the segments of every deck in a spatial hash, so the ground function can ask
  * "is there a deck over this point, and how high is it?".
  *
@@ -225,7 +265,7 @@ export function createDeckNetwork(decks, surface = null) {
     const [stubA, stubB] = endStubs(d);
     if (stubA >= 0) tops[stubA] = lo;
     if (stubB >= 0) tops[stubB] = hi;
-    return { ...d, tops };
+    return withAprons({ ...d, tops }, holdLo, holdHi, surface);
   });
   const ax = [], az = [], bx = [], bz = [], t0 = [], t1 = [], half = [], deckOf = [], ends = [];
   list.forEach((d, k) => {
