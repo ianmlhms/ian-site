@@ -12,6 +12,8 @@ import { buildPhilharmonie, buildEcj, buildCathedral, buildPalais, buildGelleFra
 
 import { buildBock, buildPasserelle, buildCoque, buildThuengen, buildMudam, buildBcee } from './landmark-sites.js';
 
+import { buildGare } from './landmark-gare.js';
+
 import { CAMPUS_BUILDERS } from './campus.js';   // CAMPUS: Campus Geesseknäppchen (campus.js)
 
 export { fixLandmarkDecks };
@@ -33,6 +35,7 @@ const BUILDERS = [
   { id: 'fort-thuengen', build: buildThuengen, clearTrees: true },
   { id: 'mudam', build: buildMudam, clearTrees: true },
   { id: 'bcee', build: buildBcee, clearTrees: true },
+  { id: 'gare-centrale', build: buildGare, clearTrees: true },     // city12: the station building, missing from the bake
   ...CAMPUS_BUILDERS,                                  // CAMPUS: the schools of Geesseknäppchen (one model per zone)
 ];
 

@@ -268,7 +268,15 @@ const ROUGE = Object.freeze({
   legTopHalf: 7.2,                // m, ... and the head of the leg this far (the legs spread: a V)
   abutmentEast: 24,               // m of abutment along the bridge from the baked start ...
   abutmentWest: 24,               // ... and from the baked end
-  railing: 1.25,                  // m, the height of the steel railing
+  railing: 1.15,                  // m, the handrail of the safety screen (the photographs on the bridge: a lit rail at hip height ...)
+  screenFoot: 0.35,               // m, ... over a red steel upstand at the edge of the footway,
+  screenTop: 3.6,                 // m, ... and above it the tall screen of white vertical slats, leaning out
+  screenLean: 0.4,                // m, ... by this at its top,
+  slatPitch: 0.6,                 // m between the slats (the real ones are a hand apart: from the car they read as one bright see-through screen)
+  slatWidth: 0.12,
+  postPitch: 7.2,                 // m between the red posts that carry the screen (12 slat pitches)
+  midRail: 2.45,                  // m, a rail half way up the slats
+  surfaceStep: 8,                 // m between the cross sections of the deck (the profile is within 3.4 cm of the LiDAR decks: city12 freed the triangles for the screens)
   mastEvery: 36,                  // m between the masts of the tram
   mastHeight: 7.0,
   guardNorth: 5.4, guardSouth: -15.4, guardFar: 12.4, guardRadius: 0.4,   // the collision walls (u from the road deck)
@@ -349,7 +357,7 @@ export function buildPontRouge({ decks, ground }) {
   uMin = Math.max(uMin, -15.2); uMax = Math.min(uMax, 12.2);
   const uc = (uMin + uMax) / 2;
   const soup = new Soup();
-  const steps = Math.ceil(L / 3);
+  const steps = Math.ceil(L / K.surfaceStep);
 
   // ---- the surface: two carriageways (asphalt), the tram bed between them and the footway, paving on the outer edges
   const strip = (u0, u1, color, key, lift = 0) => deckStrip(soup, F, u0, u1, 0, L, top, color, steps, key, lift);
@@ -359,12 +367,26 @@ export function buildPontRouge({ decks, ground }) {
   strip(uMin, K.roadSouth, C.paving, 4, 0.04);
   for (const u of [0, -8.1]) for (let s = 4; s + 3 < L - 4; s += 9) deckStrip(soup, F, u - 0.09, u + 0.09, s, s + 3, top, C.line, 1, 8, 0.02);
   for (const u of [5.2, 7.4]) strip(u - 0.07, u + 0.07, C.steelDark, 9, 0.02);       // the tram tracks
-  // the slab edge and the railing
+  // the slab edge and the safety screens (city12, QA3 section 3: from the car the bridge was a flat deck with low grey rails; the photographs taken ON
+  // the bridge show a red steel upstand, a lit handrail and a tall screen of white slats leaning out over the valley on both sides, on red posts)
   for (const [u, sign] of [[uMax, 1], [uMin, -1]]) {
-    wallFace(soup, F, u, 0, L, under, top, C.steelRed, steps, 10);
-    wallFace(soup, F, u - sign * 0.05, 0, L, top, (s) => top(s) + K.railing, C.white, steps, 11);
-    wallFace(soup, F, u - sign * 0.2, 0, L, top, (s) => top(s) + K.railing, C.steelGrey, steps, 12);
-    deckStrip(soup, F, u - sign * 0.2, u - sign * 0.05, 0, L, (s) => top(s) + K.railing, C.steelGrey, steps, 13);
+    wallFace(soup, F, u, 0, L, under, (s) => top(s) + K.screenFoot, C.steelRed, steps, 10);                       // the red edge girder, up through the deck to the upstand
+    deckStrip(soup, F, u - sign * 0.25, u, 0, L, (s) => top(s) + K.screenFoot, C.steelRedDark, steps, 11);       // the top of the upstand
+    wallFace(soup, F, u - sign * 0.25, 0, L, top, (s) => top(s) + K.screenFoot, C.steelRed, steps, 12);
+    wallFace(soup, F, u - sign * 0.12, 0, L, (s) => top(s) + K.screenFoot, (s) => top(s) + K.railing, C.screenWhite, steps, 13);   // the lower panel
+    deckStrip(soup, F, u - sign * 0.22, u - sign * 0.02, 0, L, (s) => top(s) + K.railing, C.steelGrey, steps, 14);                   // the handrail
+    const lean = (y) => sign * K.screenLean * Math.max(0, (y - K.railing) / (K.screenTop - K.railing));
+    const at = (s, h, du = 0) => F.at(s, top(s) + h, u - sign * 0.12 + lean(h) + du);
+    for (let s = K.slatPitch / 2; s < L; s += K.slatPitch) {                                                    // the slats: flat, see-through between them
+      const w = K.slatWidth / 2;
+      soup.quad(at(s - w, K.railing), at(s + w, K.railing), at(s + w, K.screenTop), at(s - w, K.screenTop), paint(C.screenWhite, Math.round(s), 0.03));
+    }
+    for (let s = K.postPitch / 2; s < L; s += K.postPitch) {                                                    // the red posts: a flat bar across the screen
+      const w = 0.09;
+      soup.quad(at(s - w, K.screenFoot, -sign * 0.02), at(s + w, K.screenFoot, -sign * 0.02), at(s + w, K.screenTop + 0.1, -sign * 0.02), at(s - w, K.screenTop + 0.1, -sign * 0.02), paint(C.steelRed, Math.round(s) + 5, 0.03));
+    }
+    wallFace(soup, F, u - sign * 0.12 + sign * K.screenLean, 0, L, (s) => top(s) + K.screenTop - 0.12, (s) => top(s) + K.screenTop + 0.1, C.steelGrey, steps, 15);   // the top rail
+    wallFace(soup, F, u - sign * 0.12 + lean(K.midRail), 0, L, (s) => top(s) + K.midRail - 0.06, (s) => top(s) + K.midRail + 0.06, C.screenWhite, steps, 16);
   }
   deckStrip(soup, F, uMin, uMax, 0, L, under, C.steelRedDark, steps, 14);              // the underside of the slab
 

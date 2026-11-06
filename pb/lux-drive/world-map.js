@@ -2,6 +2,7 @@
  * trees read.
  *
  *   cover  R the open land (grass, parks, scrub)  G the forest  B the built-up city  A the water
+ *   (the GPU copy `coverGpu`: R the paved squares of paved-squares.js instead of the open land, which no shader reads; B weighted by the houses)
  *   canopy R the canopy cover 0..1  G the canopy height / 45 m  B the parks and the heath  A the farmland
  *
  * The weights are stored as weights (not as a class id) because the GPU filters them bilinearly: the border between a
@@ -9,6 +10,7 @@
  * textures, the tree placement samples them on the CPU. */
 import { WORLD } from './config.js';
 import { sampleBilinear } from './base-field.js';
+import { PAVED_SQUARES } from './paved-squares.js';
 
 export const CLASS_CELL = 8;
 export const CLASS = Object.freeze({ grass: 0, forest: 1, water: 2, park: 3, urban: 4, farmland: 5, sand: 6, scrub: 7 });
@@ -107,6 +109,26 @@ const URBAN_FROM = 0.03, URBAN_FULL = 0.10;      // the built share of the 72 m 
  *  keeps its kerbs and slabs. */
 const NEAR_RADIUS = 1;
 const NEAR_FROM = 0.05, NEAR_FULL = 0.17;      // the built share of the 24 m window under which `urban` is open ground, and over which it is the city
+// (city12, QA3 section 3 item 7: the near rule also took the strip between the pavement and the shop fronts of a wide street in the dense centre for a
+// verge - Bd Royal was a lawn corridor.  Where the 72 m window is densely built (the old town and the boulevards 0.33 - 0.73; the lawns of Kirchberg
+// and the JFK verges are 0.0 - 0.21) the urban class is the city whatever the 24 m window says.)
+const DENSE_FROM = 0.26, DENSE_FULL = 0.34;
+
+/** The cells (8 m) whose middle lies in a paved square, as a 0 / 1 mask. */
+function pavedSquareMask(nx, nz) {
+  const mask = new Uint8Array(nx * nz);
+  for (const sq of PAVED_SQUARES) {
+    const flat = sq.pts.flat();
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (const [x, z] of sq.pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+    for (let j = Math.max(0, Math.floor(z0 / CLASS_CELL)); j <= Math.min(nz - 1, Math.ceil(z1 / CLASS_CELL)); j++) {
+      for (let i = Math.max(0, Math.floor(x0 / CLASS_CELL)); i <= Math.min(nx - 1, Math.ceil(x1 / CLASS_CELL)); i++) {
+        if (insidePolygon(flat, i * CLASS_CELL, j * CLASS_CELL)) mask[j * nx + i] = 1;
+      }
+    }
+  }
+  return mask;
+}
 
 export function buildWorldMap({ classes, classInfo, canopy, buildings = null }) {
   const nx = classInfo.nx, nz = classInfo.nz;
@@ -118,6 +140,21 @@ export function buildWorldMap({ classes, classInfo, canopy, buildings = null }) 
   const coverGpu = new Uint8Array(nx * nz * 4);          // the same, with the urban weight scaled by how built-up the place is (the ground shader reads this)
   const density = buildings ? builtDensity(buildings, nx, nz) : null;
   const near = buildings ? builtCover(buildings, nx, nz, NEAR_RADIUS) : null;
+  const squares = pavedSquareMask(nx, nz);
+  // the dense rule, grown by one cell: a wide street through the dense centre has a lower density on its own cells (the window is centred on the
+  // carriageway), and the GPU's bilinear filter would carry that dip as a lawn up to the kerb.  The road is painted over the cells anyway.
+  const dense = new Float32Array(nx * nz);
+  if (density) {
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) if (classes.data[j * nx + i] === CLASS.urban) dense[j * nx + i] = smooth01(DENSE_FROM, DENSE_FULL, density[j * nx + i]);
+  }
+  const denseNear = (i, j) => {
+    let m = 0;
+    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+      const ii = i + di, jj = j + dj;
+      if (ii >= 0 && jj >= 0 && ii < nx && jj < nz && dense[jj * nx + ii] > m) m = dense[jj * nx + ii];
+    }
+    return m;
+  };
   const cx = canopy.cover.nx, cz = canopy.cover.nz;
   const can = new Uint8Array(cx * cz * 4);
   const ch = canopy.height, cc = canopy.cover;
@@ -130,9 +167,11 @@ export function buildWorldMap({ classes, classInfo, canopy, buildings = null }) 
       cover[o + 1] = cls === CLASS.forest ? 255 : 0;
       cover[o + 2] = cls === CLASS.urban ? 255 : 0;
       cover[o + 3] = cls === CLASS.water ? 255 : 0;
-      coverGpu[o] = cover[o]; coverGpu[o + 1] = cover[o + 1]; coverGpu[o + 3] = cover[o + 3];
-      coverGpu[o + 2] = density && cls === CLASS.urban
-        ? Math.round(255 * Math.min(smooth01(URBAN_FROM, URBAN_FULL, density[j * nx + i]), smooth01(NEAR_FROM, NEAR_FULL, near[j * nx + i])))
+      const square = squares[j * nx + i] === 1;
+      coverGpu[o] = square ? 255 : 0; coverGpu[o + 1] = cover[o + 1]; coverGpu[o + 3] = cover[o + 3];
+      const d = density ? density[j * nx + i] : 0;
+      coverGpu[o + 2] = square ? 255 : density && cls === CLASS.urban
+        ? Math.round(255 * Math.max(Math.min(smooth01(URBAN_FROM, URBAN_FULL, d), smooth01(NEAR_FROM, NEAR_FULL, near[j * nx + i])), denseNear(i, j)))
         : cover[o + 2];
     }
   }

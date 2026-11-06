@@ -110,7 +110,7 @@ export const GROUND_FRAGMENT = `
     vec3 water = vec3(0.20, 0.30, 0.36) * (0.9 + 0.2 * nMid.b);
     water += vec3(0.10, 0.13, 0.14) * (sin(P.x * 0.9 + uTime * 0.6) * sin(P.y * 0.7 - uTime * 0.4) * 0.5 + 0.5) * near;
 
-    float open = cls.r, forest = cls.g, urban = cls.b, wetWater = cls.a;
+    float square = cls.r, forest = cls.g, urban = cls.b, wetWater = cls.a;     // (R: the paved squares, world-map.js coverGpu)
     float farm = can.a, park = can.b;
     vec3 albedo = meadow;
     albedo = mix(albedo, meadow * vec3(1.06, 1.16, 0.84), park * 0.8);        // the parks are mown and brighter
@@ -126,6 +126,10 @@ export const GROUND_FRAGMENT = `
     // both carriageways - the slabs at Grund.  The hard ground of the town is level: a bank keeps the land's paint)
     urbanW *= smoothstep(0.80, 0.93, N.y);
     albedo = mix(albedo, city, urbanW);
+    // the paved squares (paved-squares.js, city12: the Place de la Gare was tarmac with lawn blobs): the stone of the squares, a clean border
+    float squareW = smoothstep(0.40, 0.60, square) * smoothstep(0.80, 0.93, N.y);
+    vec3 squareStone = texture2D(uStone, P * 0.30).rgb * (0.93 + 0.14 * nLo.g);
+    albedo = mix(albedo, squareStone, squareW);
     // the water class is a blurred 8 m cover as well: mixed straight in, the river was a teal smear far over the lawns of its banks (QA T10).  The shore is the 0.5 line of the
     // cover, one pixel wide (fwidth: a crisp edge at every distance, not a 3 m teal fade into the lawn), with a narrow band of wet earth on the land side (look11).
     float aaW = max(fwidth(wetWater), 0.01);
@@ -158,7 +162,7 @@ export const GROUND_FRAGMENT = `
     vec3 tar = mix(texture2D(uAsphalt, P * 0.33).rgb, vec3(0.248, 0.252, 0.263), smoothstep(30.0, 110.0, vDist)) * (0.965 + 0.07 * nMid.g);
     vec3 cob = texture2D(uCobble, P * 0.40).rgb;
     // the paved stone of the squares: the slow noise breaks the tiling up, a square is a calm surface
-    vec3 stn = texture2D(uStone, P * 0.30).rgb * (0.93 + 0.14 * nLo.g);
+    vec3 stn = squareStone;                  // (fetched once, above)
     // the material of the way the node is on: 0 tarmac, 1 cobbles, 2 concrete, 3 gravel, 4 earth, 5 paved stone
     vec3 surf = surface < 0.5 ? tar : surface < 1.5 ? cob : surface < 2.5 ? pave : surface < 4.5 ? grav : stn;
     // the kerb belongs to the materials that have one (the tarmac, the cobbles, the concrete)

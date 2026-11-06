@@ -40,7 +40,8 @@ export function panel(soup, f, s0, s1, y0, y1, out, color) {
 /** A box that stands on the wall: s0..s1 along, y0..y1 up, `depth` m in front of the wall (out0 = where it starts). */
 export function slab(soup, f, s0, s1, y0, y1, depth, color, { out0 = 0, topColor = null } = {}) {
   const [cx, , cz] = f.at((s0 + s1) / 2, y0, out0 + depth / 2);
-  soup.box(cx, y0, cz, s1 - s0, y1 - y0, depth, f.yaw, color, { topColor });
+  const [wx, , wz] = f.at((s0 + s1) / 2, y0, out0 - 1);                    // a point behind the slab: its back face is left out
+  soup.box(cx, y0, cz, s1 - s0, y1 - y0, depth, f.yaw, color, { topColor, against: out0 <= 0.05 ? [wx, wz] : null });
 }
 
 /**

@@ -151,17 +151,21 @@ export class Soup {
 
   /**
    * A box. (cx, cz) is the middle of the base, y0 the bottom, sx x sz the plan, h the height, yaw the turn about y.
-   * `bottom: false` leaves the underside open (a box that stands on the ground has no use for it).
+   * `bottom: false` leaves the underside open (a box that stands on the ground has no use for it).  `against: [x, z]` leaves out the one of the two
+   * faces across local z that is nearer that point: the back of a box that stands against a wall (a mullion, a course) is never seen (city12: 2 of 10
+   * triangles of every facade slab, which paid for the Gare in the landmark budget).
    */
-  box(cx, y0, cz, sx, h, sz, yaw, color, { bottom = false, topColor = null } = {}) {
+  box(cx, y0, cz, sx, h, sz, yaw, color, { bottom = false, topColor = null, against = null } = {}) {
     const c = Math.cos(yaw), s = Math.sin(yaw);
     const hx = sx / 2, hz = sz / 2;
     const P = (lx, y, lz) => [cx + lx * c + lz * s, y, cz - lx * s + lz * c];
     const a0 = P(-hx, y0, -hz), b0 = P(hx, y0, -hz), c0 = P(hx, y0, hz), d0 = P(-hx, y0, hz);
     const a1 = P(-hx, y0 + h, -hz), b1 = P(hx, y0 + h, -hz), c1 = P(hx, y0 + h, hz), d1 = P(-hx, y0 + h, hz);
-    this.quad(a0, a1, b1, b0, color);
+    // the back face: the z face whose middle is nearer `against` (none without it)
+    const backMinus = against ? Math.hypot(cx - hz * s - against[0], cz - hz * c - against[1]) < Math.hypot(cx + hz * s - against[0], cz + hz * c - against[1]) : null;
+    if (backMinus !== true) this.quad(a0, a1, b1, b0, color);
     this.quad(b0, b1, c1, c0, color);
-    this.quad(c0, c1, d1, d0, color);
+    if (backMinus !== false) this.quad(c0, c1, d1, d0, color);
     this.quad(d0, d1, a1, a0, color);
     this.quad(a1, d1, c1, b1, topColor || color);
     if (bottom) this.quad(a0, b0, c0, d0, color);
