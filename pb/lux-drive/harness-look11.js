@@ -8,6 +8,8 @@
  *   S5  the storeys of a façade are level: the façade height v is world height minus one level per house (QA BL02: the bands followed the slope and waved)
  *   S6  the chase camera never puts its lens inside the block of a retaining wall (QA2 N-C02 at 4620,11599: the picture was the inside of the face), at the QA pose and
  *       with the car turned away from the middle of every wall
+ *   S8  the drawn wheels stand on the ground (QA2 N-C03: at rest beside a kerb / on a crest a wheel stood up to 24 cm in the drawn ground): at the QA2 places, the car settled,
+ *       every wheel within 3 cm of the ground under it unless its spring is at the end of its travel
  *   S7  the slim columns of the footbridges / cycle bridges (deck-view SLIM, QA2 N-B02 deck 218) stand clear of every carriageway under them
  * Called by harness.js; everything it needs is passed in.  Pure Node. */
 
@@ -16,6 +18,8 @@ import { buildBroadleaf } from './tree-models.js';
 import { addBuilding, createBuildingMesh, KIND } from './building-mesh.js';
 import { createChaseCamera } from './camera.js';
 import { ROAD_MIN_WIDTH, SLIM_PIERS, piersOf } from './deck-shape.js';
+import { createCar } from './car.js';
+import { WHEEL_TRAVEL, wheelContact, wheelOffsets } from './car-wheels.js';
 
 const NORMAL_TOL = 1e-4;          // S1: the normals of two stretches at their shared point
 const FOOT_TOL = 0.05;            // S3: m the drawn ground may stand over the footing (the lattice between the probes)
@@ -177,4 +181,27 @@ export function runLookChecks({ check, section, stats, data, field, surface, gro
   }
   stats.slimPiers = slimPiers;
   check('S7 no slim column of a footbridge / cycle bridge stands on a carriageway', slimInRoad, `${slimInRoad} of ${slimPiers}`);
+
+  // ---- S8: the drawn wheels on the ground
+  const SPOTS = [[1.31, 0.78], [1.31, -0.78], [-1.31, 0.78], [-1.31, -0.78]];       // (car-model.js WHEEL_X, WHEEL_Z)
+  const NC03 = [[5237.3, 6293.6, -0.659], [5938.2, 6337.6, -0.872], [5724, 8853, 0], [5273.6, 9214.7, 1.154], [7615, 8342, 0], [3264, 9986, 0], [3608.3, 7993.4, -1.793], [8311.4, 6184.8, 2.388]];
+  const car = createCar({ ground, roadInfoAt: (x, z, o) => surface.roadInfoAt(x, z, o) });
+  const groundAtW = (x, z) => ground.height(x, z);
+  let wheelsOff = 0, wheelsAt = 0, worstOff = 0, beforeWorst = 0;
+  for (const [x, z, h] of NC03) {
+    car.reset(x, z, h);
+    for (let f = 0; f < 120; f++) car.update(1 / 60, {});
+    const st = car.state, y0 = st.y - 0.42, roll = Math.max(-0.3, Math.min(0.3, st.roll));
+    const offs = wheelOffsets(st.x, y0, st.z, st.heading, st.pitch, roll, SPOTS, groundAtW);
+    SPOTS.forEach(([lx, lz], i) => {
+      const [wx, wy, wz] = wheelContact(st.x, y0, st.z, st.heading, st.pitch, roll, lx, lz);
+      const d = groundAtW(wx, wz) - wy;
+      beforeWorst = Math.max(beforeWorst, Math.abs(d));
+      const atStop = offs[i] >= WHEEL_TRAVEL.bump - 1e-6 || offs[i] <= -WHEEL_TRAVEL.droop + 1e-6;
+      wheelsAt++;
+      const left = Math.abs(d - offs[i]);
+      if (left > 0.03 && !atStop) { wheelsOff++; worstOff = Math.max(worstOff, left); }
+    });
+  }
+  check('S8 every drawn wheel stands on the ground at the QA2 N-C03 places (its spring takes the kerb / the crest)', wheelsOff, `${wheelsOff} of ${wheelsAt} wheels, worst ${worstOff.toFixed(3)} m (without the springs ${beforeWorst.toFixed(2)} m)`);
 }

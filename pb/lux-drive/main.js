@@ -201,7 +201,7 @@ async function boot() {
   for (let i = 0; i < parkBenches.count; i++) props.add(parkBenches.x[i], parkBenches.z[i], BENCH_RADIUS);
   const benchView = createBenchView({ scene, benches: parkBenches, ground, env });
   const colourId = CAR_COLOURS[readKey(COLOUR_KEY)] ? readKey(COLOUR_KEY) : 'red';
-  const model = createCarModel({ colourId, material: solid });
+  const model = createCarModel({ colourId, material: solid, groundAt: (x, z) => ground.height(x, z) });     // look11: the drawn wheels on their springs
   scene.add(model.group);
 
   // ---- the car, the camera, the interface

@@ -9,6 +9,7 @@
  * lamps (brake lights) and the reversing lamps.  That is 10 meshes, 8 of them with geometry shared by the wheels. */
 import { CAR_COLOURS } from './config.js';
 
+import { WHEEL_TRAVEL, wheelOffsets } from './car-wheels.js';
 const THREE = window.THREE;
 
 const WHEEL_RADIUS = 0.36;         // bigger wheels than the old model (the Golf VII on 17-18 inch)
@@ -20,6 +21,7 @@ const BODY_CENTRE_Y = 0.6;        // m: the middle of the body seen from the sid
 const BODY_LIFT = 0;              // m: the model's ground level is the group origin
 const LIFT_FROM_PHYSICS = 0.42;   // m: car.state.y is the ride height above the ground; the model stands on the ground itself
 const ROLL_LIMIT = 0.3;           // rad
+const WHEEL_SPOTS = [[WHEEL_X, WHEEL_Z], [WHEEL_X, -WHEEL_Z], [-WHEEL_X, WHEEL_Z], [-WHEEL_X, -WHEEL_Z]];   // (the order of the wheels below)
 
 /** A mesh under construction: flat-shaded triangles with a colour each. */
 class FaceBuilder {
@@ -274,7 +276,7 @@ const setColor = (material, c) => material.color.setRGB(c[0], c[1], c[2]);
  * The car model. `colourId` is a key of CAR_COLOURS.
  * Returns { group, body, wheels, setColour, apply, headlight }.
  */
-export function createCarModel({ colourId = 'red', material }) {
+export function createCarModel({ colourId = 'red', material, groundAt = null }) {
   const group = new THREE.Group();
   group.name = 'car';
   const body = new THREE.Mesh(buildBody(CAR_COLOURS[colourId] || CAR_COLOURS.red), material);
@@ -293,14 +295,14 @@ export function createCarModel({ colourId = 'red', material }) {
 
   const wheelGeometry = buildWheel();
   const wheels = [];                                    // { pivot, tyre, front }
-  for (const [x, z] of [[WHEEL_X, WHEEL_Z], [WHEEL_X, -WHEEL_Z], [-WHEEL_X, WHEEL_Z], [-WHEEL_X, -WHEEL_Z]]) {
+  for (const [x, z] of WHEEL_SPOTS) {
     const pivot = new THREE.Group();
     pivot.position.set(x, WHEEL_RADIUS, z);
     const tyre = new THREE.Mesh(wheelGeometry, material);
     tyre.name = 'car-wheel';
     pivot.add(tyre);
     group.add(pivot);
-    wheels.push({ pivot, tyre, front: x > 0 });
+    wheels.push({ pivot, tyre, front: x > 0, travel: 0 });
   }
   let spin = 0;
   let smoothHead = 0;
@@ -330,10 +332,16 @@ export function createCarModel({ colourId = 'red', material }) {
       // a wheel rolling forward (+x) turns by -v/R about its axle (+z)
       spin -= (state.speed * dt) / WHEEL_RADIUS;
       if (spin < -1e4 || spin > 1e4) spin %= 2 * Math.PI;
-      for (const w of wheels) {
+      // each drawn wheel on its own spring down to the ground under it (car-wheels.js; the body keeps the attitude of the physics)
+      const roll = Math.max(-ROLL_LIMIT, Math.min(ROLL_LIMIT, state.roll));
+      const offs = groundAt ? wheelOffsets(state.x, state.y - LIFT_FROM_PHYSICS + BODY_LIFT, state.z, state.heading, state.pitch, roll, WHEEL_SPOTS, groundAt) : null;
+      const k = Math.min(1, dt * WHEEL_TRAVEL.rate);
+      wheels.forEach((w, i) => {
         w.pivot.rotation.set(0, w.front ? -state.steer : 0, 0);
         w.tyre.rotation.set(0, 0, spin);
-      }
+        w.travel += ((offs ? offs[i] : 0) - w.travel) * (dt > 0 ? k : 1);
+        w.pivot.position.y = WHEEL_RADIUS + w.travel;
+      });
       // the lamps: the headlamps follow the headlights, the tail lamps glow at night and flare when braking
       smoothHead += (lights.head - smoothHead) * Math.min(1, dt * 8);
       setColor(headMat, mix3(HEAD_OFF, HEAD_ON, smoothHead));
