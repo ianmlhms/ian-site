@@ -23,7 +23,8 @@ import { createHeightField } from './heightfield.js';
 import { createSurface } from './surface.js';
 import { createDeckNetwork, createGround, DECK } from './decks.js';
 import { DECK_ON_ROAD, piersOf } from './deck-shape.js';
-import { createWallCollider } from './wall-collider.js';
+import { createWallCollider, WALL_COLLIDER } from './wall-collider.js';
+import { createLaneSegments, wallBlocksLane, WALL_LANE } from './lane-clearance.js';
 import { createBuildingIndex } from './buildings.js';
 import { createLandmarks, fixLandmarkDecks } from './landmarks.js';
 import { createTreeIndex, treesOfBlock, keepWaysClear, bakedCrownRadius, wayMargin, crownShare } from './trees.js';
@@ -1551,6 +1552,20 @@ if (wants('K')) {
     return { rise: Math.abs(ramp.rise), slope: ramp.maxSlope, depth: Math.max(WALL.minDepth, Math.abs(tHead - tFoot)), x: chain.x[i] + nx * tFoot, z: chain.z[i] + nz * tFoot, nx: nx * toHigh, nz: nz * toHigh, top: Math.max(heights[ramp.first], heights[ramp.last]), bottom: Math.min(heights[ramp.first], heights[ramp.last]) };
   };
   const ways = net.chains.filter((c) => !c.tagged && !net.overRoads.has(c.road));
+  // drive12 (QA3 N3-W01): a ramp whose wall would reach a lane at its level - the face moved up the ramp as far as the baker moves it (WALL_LANE.shiftMax) - cannot have one:
+  // the wall's collision block would stop the car in that lane (34 road / wall pairs did).  Counted with the ramps on tarmac.
+  const kLanes = createLaneSegments({ roads: data.roads, ground, surface, isOpen: (r) => !!(net.roads[r.id] && net.roads[r.id].openCut) });
+  const laneFree = (q) => {
+    const tx = -q.nz, tz = q.nx, h = 2;
+    for (let sh = 0; sh <= WALL_LANE.shiftMax + 1e-6; sh += WALL_LANE.shiftStep) {
+      const fx = q.x + q.nx * sh, fz = q.z + q.nz * sh, d = Math.max(WALL.minDepth, q.depth - sh), bx = q.x + q.nx * q.depth, bz = q.z + q.nz * q.depth;
+      const face = wallBlocksLane(kLanes, fx - tx * h, fz - tz * h, fx + tx * h, fz + tz * h, q.bottom, q.top, WALL_LANE.clear, WALL_COLLIDER.levelReach);
+      const back = wallBlocksLane(kLanes, bx - tx * h, bz - tz * h, bx + tx * h, bz + tz * h, q.bottom, q.top, WALL_LANE.clear, WALL_COLLIDER.levelReach);
+      if (!face && !back) return true;
+      if (!face && d <= WALL.minDepth) return false;
+    }
+    return false;
+  };
   for (const chain of ways) {
     for (let i = 0; i < chain.x.length; i += STRIDE) {
       for (const side of [1, -1]) {
@@ -1565,7 +1580,7 @@ if (wants('K')) {
         };
         const r = rampAt(chain, i, side);
         if (!r) continue;
-        if (!usable(r)) { inRoad++; continue; }
+        if (!usable(r) || !laneFree(r)) { inRoad++; continue; }
         // a ramp the 1 m lattice cannot show (the drawn ground at its foot / head is more than the wall tolerance from the carve's own heights: a face of 5 m in 2 m at a hairpin) has no wall to stand on
         const tolR = Math.max(ON_RAMP, rampTolerance(r.rise, r.depth));
         if (Math.abs(surface.height(r.x, r.z) - r.bottom) > tolR || Math.abs(surface.height(r.x + r.nx * r.depth, r.z + r.nz * r.depth) - r.top) > tolR) { latticeLimited++; continue; }
@@ -1636,7 +1651,7 @@ if (wants('K')) {
         const st = c.state;
         // the position across the wall: along n from the face (low side: must stay < 0) / from the back (high side: must stay > 0)
         const across = side === 'low' ? (st.x - mx) * nx + (st.z - mz) * nz : (st.x - (mx + nx * dep)) * nx + (st.z - (mz + nz * dep)) * nz;
-        if (side === 'low' ? across > 0.2 : across < -0.2) crossed++;
+        if (side === 'low' ? across > 0.2 : across < -0.2) { crossed++; if (VERBOSE) console.log('    wall crossed', side, mx.toFixed(1), mz.toFixed(1), across.toFixed(2)); }
       }
     }
     stats.wallDrive = { runs, crossed };

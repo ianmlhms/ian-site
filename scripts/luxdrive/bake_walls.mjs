@@ -11,6 +11,8 @@ import { fileURLToPath } from 'node:url';
 import { loadWorld } from './world_node.mjs';
 import { WALL, CUT_RAMP, findRamp, encodeWalls, rampTolerance } from '../../pb/lux-drive/retaining-walls.js';
 import { PORTAL } from '../../pb/lux-drive/config.js';
+import { WALL_COLLIDER } from '../../pb/lux-drive/wall-collider.js';
+import { createLaneSegments, wallBlocksLane, WALL_LANE } from '../../pb/lux-drive/lane-clearance.js';
 
 const OUT_DEFAULT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../pb/lux-drive/data/walls.bin');
 const outArg = process.argv.find((a) => a.startsWith('--out='));
@@ -39,7 +41,11 @@ const CUT_JOIN_GAP = 2;       // the walls of a cut and of the ways into its mou
 const DECK_CLEAR = 0.05;       // m: the top of a wall (with its coping) stays this far under the carriageway of a deck over it, or the ramp there has no wall
 const GAP_SAMPLES = 1;         // a wall goes on across a sample where the scan found nothing (the ramp flickers around its thresholds), if the ground under the middle of the bridge fits
 
-const { field, surface, ground } = await loadWorld();
+// drive12 (QA3 N3-W01): a wall's collision block keeps WALL_LANE.clear from the centre line of every lane at its level; a point that reaches a lane moves WALL_LANE.shiftStep
+// per pass (its face up the ramp, or its back toward the face), at most WALL_LANE.shiftMax (= MAX_PULL_IN), else it is dropped (lane-clearance.js)
+const { clear: LANE_WALL_CLEAR, shiftStep: LANE_SHIFT_STEP, shiftMax: LANE_SHIFT_MAX } = WALL_LANE;
+
+const { field, surface, ground, data } = await loadWorld();
 const net = field.network;
 const chains = net.chains.filter((c) => !c.tagged && !net.overRoads.has(c.road));
 /** The ways that lead into the mouth of an opened cut: an end of theirs within PORTAL.mouthGap of an end of a cut way. */
@@ -302,6 +308,76 @@ for (let again = true; again;) {
   }
 }
 console.log(`walls of one face joined where their ends met: ${faceJoins}`);
+
+// drive12 (QA3 N3-W01 / N3-W02): a wall's COLLISION block never reaches into a lane.  The rules above keep the foot and the back off the carriageways the carve knows
+// (sdCar), at the samples; but the solid lines between the samples, the tapered ends, the ends of the block, and the carriageways the carve does not know (the ways on
+// a deck: wall 52 stood across both lanes of the A1 at the start of viaduct deck 23) were not tested - 34 road / wall pairs had the lane centre inside a block, and
+// invisible walls stopped the car on open motorway lanes.  Now every solid line of every wall (wall-collider.js: face, back, ends) is tested against the centre line of
+// every lane of every car road at the wall's level (lane-clearance.js, the same lanes as harness T); a wall point whose line comes within LANE_WALL_CLEAR of a lane is
+// dropped, the wall splits there and is tapered again, until no line reaches a lane.  The ramp there is left to the ground (the harness K coverage counts it with the
+// ramps on tarmac).
+{
+  const cellOf = (x, z) => `${Math.floor(x / 24)},${Math.floor(z / 24)}`;
+  const nearWall = new Set();
+  for (const w of walls) for (const p of w.pts) for (const d of [0, p.depth]) for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) nearWall.add(cellOf(p.x + p.nx * d + a * 24, p.z + p.nz * d + b * 24));
+  const lanes = createLaneSegments({ roads: data.roads, ground, surface, isOpen: (r) => !!(net.roads[r.id] && net.roads[r.id].openCut), within: (x, z) => nearWall.has(cellOf(x, z)) });
+  const solid = (p, q) => ((p.top - p.bottom) + (q.top - q.bottom)) / 2 >= WALL_COLLIDER.minHeight;
+  const blocks = (a, b, p, q) => solid(p, q) && !!wallBlocksLane(lanes, a[0], a[1], b[0], b[1], Math.min(p.bottom, q.bottom), Math.max(p.top, q.top), LANE_WALL_CLEAR, WALL_COLLIDER.levelReach);
+  const back = (p) => [p.x + p.nx * p.depth, p.z + p.nz * p.depth];
+  /** The body points of a wall whose collision lines (with the taper of its ends) reach a lane: { face: Set, back: Set } of body indices (the face line or the
+   *  back line / an end reaches it). */
+  const offending = (body) => {
+    const pts = taper(body), face = new Set(), backs = new Set();
+    const bodyIndex = pts.map((p) => body.indexOf(p));                             // (taper keeps the body points as they are; a tip is -1)
+    const lastBody = body.length - 1;
+    const mark = (set, k) => { const b = bodyIndex[k]; set.add(b >= 0 ? b : k === 0 ? 0 : lastBody); };   // a tip that reaches a lane: its end point answers
+    for (let k = 0; k + 1 < pts.length; k++) {
+      const p = pts[k], q = pts[k + 1];
+      if (blocks([p.x, p.z], [q.x, q.z], p, q)) { mark(face, k); mark(face, k + 1); }
+      if (blocks(back(p), back(q), p, q)) { mark(backs, k); mark(backs, k + 1); }
+    }
+    for (const k of [0, pts.length - 1]) { const p = pts[k]; if (blocks([p.x, p.z], back(p), p, p)) mark(face, k); }
+    return { face, back: backs, size: face.size + backs.size };
+  };
+  /** A wall point moved off a lane by `step` (a NEW point): the face toward the high ground (the back stays, the foot is the ground there), or the back toward the face
+   *  (the top is the ground there).  null when it would no longer stand on its ramp (fits), would leave LANE_SHIFT_MAX behind, or the block gets too thin. */
+  const shifted = (p, side) => {
+    const moved = (p.shift || 0) + LANE_SHIFT_STEP;
+    if (moved > LANE_SHIFT_MAX + 1e-6 || p.depth - LANE_SHIFT_STEP < WALL.minDepth) return null;
+    const q = side === 'face'
+      ? { ...p, x: p.x + p.nx * LANE_SHIFT_STEP, z: p.z + p.nz * LANE_SHIFT_STEP, depth: p.depth - LANE_SHIFT_STEP, shift: moved }
+      : { ...p, depth: p.depth - LANE_SHIFT_STEP, shift: moved };
+    if (side === 'face') q.bottom = Math.min(q.top - WALL.minRise, surface.height(q.x, q.z)); else q.top = Math.max(q.bottom + WALL.minRise, surface.height(...back(q)));
+    return fits(q) && clearOfRoads(q.x, q.z) && clearOfDecks(q) ? q : null;
+  };
+  let trimmedLane = 0, droppedLane = 0, pointsLane = 0, shiftedLane = 0;
+  const out = [];
+  for (const w of walls) {
+    let runs = [w.body];
+    let touched = false;
+    for (let pass = 0; pass < 24; pass++) {
+      let changed = false;
+      const next = [];
+      for (const body of runs) {
+        const bad = offending(body);
+        if (!bad.size) { next.push(body); continue; }
+        changed = true; touched = true;
+        // first move the point off the lane (a few decimetres up its ramp); a point that cannot move far enough is dropped and the wall splits there
+        const moved = body.map((p, i) => (bad.face.has(i) ? shifted(p, 'face') : bad.back.has(i) ? shifted(p, 'back') : p));
+        let run = [];
+        moved.forEach((p, i) => { if (!p) { pointsLane++; if (run.length) next.push(run); run = []; } else { if (p !== body[i]) shiftedLane++; run.push(p); } });
+        if (run.length) next.push(run);
+      }
+      runs = next.filter((r) => r.length >= MIN_SAMPLES && !(wallLength(r) < MIN_LENGTH && Math.max(...r.map((p) => p.top - p.bottom)) < MIN_RISE_SHORT));
+      if (!changed) break;
+    }
+    if (runs.some((r) => offending(r).size)) throw new Error(`bake_walls: wall of way ${w.way} still reaches a lane after 24 passes`);
+    if (touched) { trimmedLane++; if (!runs.length) droppedLane++; }
+    for (const body of runs) { const clean = body.map(({ shift, ...rest }) => rest); out.push({ ...w, body: clean, pts: taper(clean) }); }
+  }
+  walls.splice(0, walls.length, ...out);
+  console.log(`walls whose collision block reached a lane (lane-clearance.js, ${lanes.count} lane pieces near walls): ${trimmedLane} touched, ${shiftedLane} point moves off a lane, ${pointsLane} points dropped, ${droppedLane} walls dropped whole`);
+}
 
 fs.writeFileSync(OUT, encodeWalls(walls));
 const points = walls.reduce((s, w) => s + w.pts.length, 0);

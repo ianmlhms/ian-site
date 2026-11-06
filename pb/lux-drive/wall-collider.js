@@ -32,9 +32,8 @@ export function wallSegments(walls) {
 }
 
 /**
- * walls: the decoded walls; groundAt(x, z): the height the car stands on there (used when the caller gives no level).
- * Returns { count, collide(x, z, radius, y) -> { nx, nz, pen, id } | null }; y: the level of the car's wheels (drive12: the car's own level, not the ground under
- * the global height hint - a probe of the lanes asks for a car at a level of its own).
+ * walls: the decoded walls; groundAt(x, z): the height the car stands on there (null: the caller's level y is used - a probe of the lanes at a level of its own).
+ * Returns { count, collide(x, z, radius, y) -> { nx, nz, pen, id } | null }.
  */
 export function createWallCollider(walls, groundAt) {
   const segs = wallSegments(walls);
@@ -60,7 +59,7 @@ export function createWallCollider(walls, groundAt) {
       if (d >= reach) continue;
       const pen = reach - d;
       if (best && pen <= best.pen) continue;
-      if (ground === null) ground = Number.isFinite(y) ? y : groundAt(x, z);
+      if (ground === null) ground = groundAt ? groundAt(x, z) : y;                // (the ground under the car, not its wheels: a car that flies off the high side over the back is still at the wall's level)
       if (ground > s.top + WALL_COLLIDER.levelReach || ground < s.bottom - WALL_COLLIDER.levelReach) continue;     // on a bridge above the wall / in a tunnel below it
       let nx, nz;
       if (d > 1e-4) { nx = (x - qx) / d; nz = (z - qz) / d; } else { const l = Math.sqrt(ll) || 1; nx = -ez / l; nz = ex / l; }
