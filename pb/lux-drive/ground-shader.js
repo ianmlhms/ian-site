@@ -145,7 +145,8 @@ export const GROUND_FRAGMENT = `
     // A near-vertical face of the ground (the step of the carve beside the end of a retaining wall, a cutting) took the land's texture stretched down the face: a dark
     // brown slab with wood-grain streaks beside the wall (QA3 N3-W04 / W05, "tombstones", the 6 m brown monolith at Neie Wee).  It is a rough grey-beige rock face with
     // level bands, like the walls beside it.
-    float cliff = 1.0 - smoothstep(0.30, 0.55, N.y);
+    // (city13: 0.30 - 0.55 also greyed the steep grass banks of 55 - 65 deg (QA3 w014, a grey smear on the hill); the carve's steps are 70 deg and steeper)
+    float cliff = 1.0 - smoothstep(0.24, 0.42, N.y);
     float rockN = texture2D(uNoise, vec2((P.x + P.y) * 0.05, vWorld.y * 0.11)).g;
     vec3 rock = vec3(0.57, 0.54, 0.48) * (0.82 + 0.30 * rockN) * (0.95 + 0.05 * sin(vWorld.y * 4.2 + rockN * 3.0));
     albedo = mix(albedo, rock, cliff);
