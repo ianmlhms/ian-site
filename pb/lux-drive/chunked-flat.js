@@ -10,10 +10,10 @@ const THREE = window.THREE;
 const CELL = 1024;                         // m: the size of a chunk (a bridge or a portal is small: fewer, bigger chunks keep the draw calls down)
 
 /**
- * @param {{ scene, material, name: string }} options
+ * @param {{ scene, material, name: string, makeBuilder?: () => FlatBuilder }} options (makeBuilder: a builder with more attributes, e.g. the walls')
  * @returns {{ builderAt(x, z): FlatBuilder, finish(): void, update(x, z, radius): number, meshes: THREE.Mesh[] }}
  */
-export function createChunkedFlat({ scene, material, name }) {
+export function createChunkedFlat({ scene, material, name, makeBuilder = () => new FlatBuilder() }) {
   const builders = new Map();
   const meshes = [];
   const key = (x, z) => `${Math.floor(x / CELL)}:${Math.floor(z / CELL)}`;
@@ -25,7 +25,7 @@ export function createChunkedFlat({ scene, material, name }) {
       if (finished) throw new Error(`${name}: the chunks are already built`);
       const k = key(x, z);
       let b = builders.get(k);
-      if (!b) { b = new FlatBuilder(); builders.set(k, b); }
+      if (!b) { b = makeBuilder(); builders.set(k, b); }
       return b;
     },
     /** Turns every builder into a mesh. */

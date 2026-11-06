@@ -39,7 +39,15 @@ export function laneLines(width) {
 }
 
 /** The piers of a deck: [{ x, z, top, bottom, dx, dz }] (the position and the direction of the deck, the top under the girder, the bottom under the ground).  Pure: used by the view and the harness. */
-export function piersOf(deck, ground, sdCarAt) {
+/** A slim deck (look11, QA2 N-B02 deck 218): a footbridge / cycle bridge is a thin slab with an edge beam on slim columns, filled down to the ground only where it
+ *  lies within `fill` of it (a deck of the full DECK.thickness, solid to the ground up to FILL_FULL, was a grey slab 3 m high beside the Route de Bettembourg). */
+export const SLIM = Object.freeze({ thickness: 0.42, fill: 0.7, blend: 0.5 });
+
+/** The piers of a slim deck (a footbridge / cycle bridge, narrower than ROAD_MIN_WIDTH, look11): thin columns, closer together, already under a low deck. */
+export const SLIM_PIERS = Object.freeze({ spacing: 11, minClear: 1.1, endMargin: 3, size: 0.45 });
+
+export function piersOf(deck, ground, sdCarAt, opts = null) {
+  const SPACING = opts ? opts.spacing : PIER_SPACING, MIN_CLEAR = opts ? opts.minClear : PIER_MIN_CLEAR, END = opts ? opts.endMargin : PIER_END_MARGIN, SIZE = opts ? opts.size : PIER_SIZE;
   const piers = [];
   const n = deck.pts.length;
   const cum = [0];
@@ -53,23 +61,23 @@ export function piersOf(deck, ground, sdCarAt) {
     return { x: deck.pts[i - 1][0] + dx * f, z: deck.pts[i - 1][1] + dz * f, top: deck.tops[i - 1] + (deck.tops[i] - deck.tops[i - 1]) * f, dx: dx / l, dz: dz / l };
   };
   const offsets = deck.width >= 9 ? [-deck.width * 0.25, deck.width * 0.25] : [0];
-  for (let s = PIER_SPACING / 2; s < length - PIER_END_MARGIN; s += PIER_SPACING) {
+  for (let s = SPACING / 2; s < length - END; s += SPACING) {
     for (let shift = 0; shift <= PIER_SHIFT_MAX; shift += PIER_SHIFT_STEP) {
       let placed = false;
       for (const sign of shift === 0 ? [1] : [1, -1]) {
         const ss = s + sign * shift;
-        if (ss < PIER_END_MARGIN || ss > length - PIER_END_MARGIN) continue;
+        if (ss < END || ss > length - END) continue;
         const p = at(ss);
         const cols = offsets.map((o) => ({ x: p.x - p.dz * o, z: p.z + p.dx * o }));
         const g = Math.min(...cols.map((c) => ground.height(c.x, c.z)));
-        if (p.top - g < PIER_MIN_CLEAR) continue;
+        if (p.top - g < MIN_CLEAR) continue;
         if (cols.some((c) => sdCarAt(c.x, c.z) < PIER_ROAD_CLEAR)) continue;
         for (const c of cols) {
           // the foot goes under the lowest corner of the column (a pier on a slope must not hover on its downhill side)
-          const h = PIER_SIZE / 2;
+          const h = SIZE / 2;
           let low = Infinity;
           for (const [ox, oz] of [[-h, -h], [h, -h], [h, h], [-h, h]]) low = Math.min(low, ground.height(c.x + ox, c.z + oz));
-          piers.push({ x: c.x, z: c.z, top: p.top - DECK.thickness, bottom: low - PIER_FOOT, dx: p.dx, dz: p.dz });
+          piers.push({ x: c.x, z: c.z, top: p.top - (opts ? SLIM.thickness : DECK.thickness), bottom: low - PIER_FOOT, dx: p.dx, dz: p.dz, size: SIZE });
         }
         placed = true;
         break;

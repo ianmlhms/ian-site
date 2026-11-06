@@ -54,6 +54,7 @@ import { runTunnelChecks } from './harness-tunnels.js';          // section O (b
 import { runRoads9Checks } from './harness-roads9.js';           // section P (roads9)
 import { runDeckChecks } from './harness-decks.js';              // section Q (decks10)
 import { runSurfaceChecks } from './harness-surface.js';         // section R (surface11)
+import { runLookChecks } from './harness-look11.js';             // section S (look11)
 import { runMarkingChecks } from './marking-checks.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -447,8 +448,8 @@ if (wants('C')) {
     addBuilding(mesh, b, heightAt, landAt);
     for (let v = 0; v < mesh.pos.length / 3; v++) {
       if (mesh.info[v * 4 + 2] !== KIND.wall) continue;
-      if (mesh.info[v * 4 + 1] > 0.001) continue;             // only the bottom of a wall
       const x = mesh.pos[v * 3], y = mesh.pos[v * 3 + 1], z = mesh.pos[v * 3 + 2];
+      if (Math.abs(y - eaveY) < 1e-3) continue;               // only the bottom of a wall (the top of every wall is the eave; v is measured from one level per house since look11)
       const g = heightAt(x, z);
       if (y - g > 0.3) { floating++; worstFloating = Math.max(worstFloating, y - g); }
       if (g - y > 1.0) { buried++; worstBuried = Math.max(worstBuried, g - y); }
@@ -1745,6 +1746,8 @@ if (wants('P')) runRoads9Checks({ check, section, stats, data, field, surface, g
 if (wants('Q')) runDeckChecks({ check, section, stats, data, field, surface, ground, net, buildings, portals, playArea });
 /* ---------------------------------------------------------------- R: the carriageway smooth over its whole width, every lane driven (harness-surface.js) */
 if (wants('R')) runSurfaceChecks({ check, section, stats, data, field, surface, ground, net, buildings, portals, playArea });
+/* ---------------------------------------------------------------- S: how the walls, trees, façades and the camera look (harness-look11.js) */
+if (wants('S')) runLookChecks({ check, section, stats, data, field, surface, ground, net, buildings, forest, portals });
 
 /* ---------------------------------------------------------------- the summary */
 console.log(`\n${results.fail === 0 ? 'PASS' : 'FAIL'}  ${results.pass} checks passed, ${results.fail} failed  (${((Date.now() - t0) / 1000).toFixed(1)} s)`);

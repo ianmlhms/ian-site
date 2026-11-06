@@ -38,16 +38,8 @@ export function rampTolerance(rise, depth) {
 /** The walls are drawn out to this many times the far building radius of the quality level (a wall is a small thing: a bridge deck is drawn out to 1.5 times). */
 export const WALL_DRAW_FACTOR = 0.6;
 
-const STONE = [0.56, 0.52, 0.45];
-const COPING = [0.27, 0.27, 0.27];      // a dark concrete cap: the light grey it had was a white strip lying on the edge of the road when seen from the driver's seat
 const MAGIC = 0x4c4c4157;              // 'WALL'
 const FLOATS_PER_POINT = 7;            // x, z, top, bottom, depth, nx, nz
-
-/** Course tint: a deterministic hash of the course and the place, so a wall is not one flat colour. */
-function tint(course, x, z) {
-  const h = Math.sin(course * 12.9898 + Math.floor(x / 3.1) * 78.233 + Math.floor(z / 3.1) * 37.719) * 43758.5453;
-  return 0.88 + 0.16 * (h - Math.floor(h));
-}
 
 /** The face of the cut of an opened shallow tunnel (tunnel-cover.js) is a retaining wall wherever it is steep, however steep the hillside it is cut into (findRamp with these limits
  *  for the ways of a cut, bake_walls.mjs).  A face that rises higher than maxRise is not dropped as a rock face: the wall holds its lowest maxRise metres (capRise) and the hillside
@@ -136,42 +128,117 @@ export function decodeWalls(bytes) {
   return walls;
 }
 
+/** The look of the walls (look11, wall-view.js / wall-material.js): the geometry of the face, the coping and the block. */
+export const WALL_LOOK = Object.freeze({
+  batter: 0.04,            // m/m: the face leans back this much toward the high ground (a laid wall has a batter; the foot line stays where the bake put it)
+  copingDepth: 0.2,        // m: the coping slab is this thick (it covers the top of the face) ...
+  copingLip: 0.05,         // ... overhangs the face by this much, and stands WALL.coping over the top
+  backDrop: 1.2,           // m: the back of the block is closed this far down (seen only where the ground behind it falls away: no see-through block)
+  footOut: 0.32,           // m: the footing stands out of the face this far at the foot ...
+  footMin: 0.22,           // ... and is at least this high, or as high as the drawn ground in front of the face (+ footOver): the 1 m lattice cannot follow a
+  footMax: 0.75,           // vertical face, its triangles climb up to 0.8 m in front of it, and that was the sawtooth grass fringe along the foot of every wall
+  footOver: 0.08,
+  footReach: 0.9,          // m: how far in front of the face the ground is looked at
+  oldTown: [4300, 8200, 5700, 9900],   // x0, z0, x1, z1: the old town, the Grund, Pfaffenthal and Clausen are walled in Luxembourg sandstone
+});
+
+// the colours of the kinds (wall-material.js draws the joints and the grain on top): Luxembourg sandstone, grey limestone, poured concrete, a pale concrete coping
+const STONE_OF = Object.freeze({ 0: [0.66, 0.58, 0.45], 1: [0.57, 0.56, 0.52], 2: [0.62, 0.61, 0.58] });
+const COPING_COLOR = [0.55, 0.54, 0.52];
+const FOOTING_SHADE = 0.86;             // the footing's front is the stone of the wall, this much darker (a stepped base, not a pale bench)
+const scaleColor = (c, k) => [c[0] * k, c[1] * k, c[2] * k];
+const KIND = Object.freeze({ coping: 3, back: 4 });      // (= WALL_KIND of wall-material.js; 0..2 are the stone of the face)
+
+/** The stone of a wall: sandstone in the old town, elsewhere concrete or limestone or sandstone by a stable hash of its place. */
+export function wallStone(wall) {
+  const m = wall.pts[wall.pts.length >> 1];
+  const [x0, z0, x1, z1] = WALL_LOOK.oldTown;
+  if (m.x > x0 && m.x < x1 && m.z > z0 && m.z < z1) return 0;
+  const h = Math.sin(Math.floor(m.x) * 12.9898 + Math.floor(m.z) * 78.233) * 43758.5453, f = h - Math.floor(h);
+  return f < 0.45 ? 2 : f < 0.75 ? 1 : 0;
+}
+
 /**
- * The quads of one wall: [{ q: [a, b, c, d], color }] with a, b, c, d = [x, y, z].  A block with a vertical face in courses of stone at the foot of the ramp, a flat top
- * and a coping that overhangs the face a little; the two ends are closed.  The back of the block is buried in the ground and is not drawn.
+ * The quads of one wall: [{ part, q: [a, b, c, d], n: [na, nb, nc, nd], color, a: [ua, ub, uc, ud] }] (part: face, footing, footTop, lipUnder, lipFront, top, back, end) with a.. = [x, y, z], n.. = the vertex normals and
+ * u.. = [metres along the wall, kind, the height of the foot] (wall-material.js).  A block with a face in one piece from the buried foot to the coping (the
+ * courses are the shader's, level in world height), a coping slab that overhangs the face a little, a flat top and a closed back; the two ends are closed.
+ * The normals of the face are SMOOTH along the wall (the mean of the two segments at a point), so a curved wall has no facets.
+ * groundAt(x, z): the drawn ground (optional): the footing at the foot is as high as the ground in front of the face (it hides the lattice's teeth).
  */
-export function wallQuads(wall) {
+export function wallQuads(wall, groundAt = null) {
   const quads = [];
   const pts = wall.pts;
-  const add = (a, b, c, d, color) => quads.push({ q: [a, b, c, d], color });
-  const scale = (c, k) => [Math.min(1, c[0] * k), Math.min(1, c[1] * k), Math.min(1, c[2] * k)];
-  for (let i = 0; i + 1 < pts.length; i++) {
-    const p = pts[i], r = pts[i + 1];
-    // the face: courses of stone from the buried foot to the top
-    const yLow0 = p.bottom - WALL.skirt, yLow1 = r.bottom - WALL.skirt;
-    const courses = Math.max(1, Math.round((Math.max(p.top, r.top) - Math.min(yLow0, yLow1)) / WALL.courseHeight));
-    for (let c = 0; c < courses; c++) {
-      const f0 = c / courses, f1 = (c + 1) / courses;
-      const ya0 = yLow0 + (p.top - yLow0) * f0, ya1 = yLow0 + (p.top - yLow0) * f1;
-      const yb0 = yLow1 + (r.top - yLow1) * f0, yb1 = yLow1 + (r.top - yLow1) * f1;
-      add(front(p, ya0), front(r, yb0), front(r, yb1), front(p, ya1), scale(STONE, tint(c, p.x, p.z)));
+  const stone = wallStone(wall), stoneColor = STONE_OF[stone];
+  const add = (part, q, n, color, kind, us, foot) => quads.push({ part, q, n, color, a: us.map((u, k) => [u, kind, foot[k]]) });
+  // the distance along the wall and the outward normal of the face at every point (away from the high ground), smoothed over the two segments
+  const along = [0];
+  for (let i = 1; i < pts.length; i++) along.push(along[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z));
+  const out = pts.map((p, i) => {
+    let sx = 0, sz = 0;
+    for (const [a, b] of [[pts[i - 1], p], [p, pts[i + 1]]]) {
+      if (!a || !b) continue;
+      const dx = b.x - a.x, dz = b.z - a.z, l = Math.hypot(dx, dz);
+      if (l < 1e-3) continue;
+      let ox = dz / l, oz = -dx / l;
+      if (ox * p.nx + oz * p.nz > 0) { ox = -ox; oz = -oz; }      // away from the high ground
+      sx += ox; sz += oz;
     }
-    // the coping: the face of the slab, then the top of the block
-    add(front(p, p.top, WALL.copingLip), front(r, r.top, WALL.copingLip), front(r, r.top + WALL.coping, WALL.copingLip), front(p, p.top + WALL.coping, WALL.copingLip), scale(COPING, 0.92));
-    add(front(p, p.top + WALL.coping, WALL.copingLip), front(r, r.top + WALL.coping, WALL.copingLip), back(r, r.top + WALL.coping), back(p, p.top + WALL.coping), COPING);
+    const l = Math.hypot(sx, sz);
+    return l > 1e-6 ? [sx / l, sz / l] : [-p.nx, -p.nz];
+  });
+  const lean = Math.hypot(1, WALL_LOOK.batter);
+  const faceN = (i) => [out[i][0] / lean, WALL_LOOK.batter / lean, out[i][1] / lean];
+  const backN = (i) => [-out[i][0], 0, -out[i][1]];
+  const UP = [0, 1, 0], DOWN = [0, -1, 0];
+  // the geometry of a point: the face leans back by the batter from the foot; the coping is at most half the height of a tapered tip thick
+  const geo = pts.map((p, i) => {
+    const rise = p.top - p.bottom;
+    const cap = Math.min(WALL_LOOK.copingDepth, Math.max(0.02, rise * 0.5));
+    const at = (y, over) => {                                          // the face at height y, `over` m in front of it
+      const back = WALL_LOOK.batter * Math.max(0, y - p.bottom) - over;
+      return [p.x + p.nx * back, y, p.z + p.nz * back];
+    };
+    const yUnder = p.top - cap, yTop = p.top + WALL.coping;
+    return {
+      foot: at(p.bottom - WALL.skirt, 0), under: at(yUnder, 0), lipLow: at(yUnder, WALL_LOOK.copingLip), lipTop: at(yTop, WALL_LOOK.copingLip),
+      backTop: [p.x + p.nx * p.depth, yTop, p.z + p.nz * p.depth], backLow: [p.x + p.nx * p.depth, yTop - WALL_LOOK.backDrop, p.z + p.nz * p.depth],
+      footY: p.bottom, i,
+    };
+  });
+  // the footing: a concrete step at the foot, as high as the drawn ground in front of the face (the highest of the point and its neighbours: a calm top)
+  const rawFoot = pts.map((p) => {
+    let up = WALL_LOOK.footMin - WALL_LOOK.footOver;
+    if (groundAt) for (let d = 0.1; d <= WALL_LOOK.footReach + 1e-6; d += 0.2) up = Math.max(up, groundAt(p.x - p.nx * d, p.z - p.nz * d) - p.bottom);
+    return Math.min(WALL_LOOK.footMax, up + WALL_LOOK.footOver, Math.max(0.02, (p.top - p.bottom) * 0.5));
+  });
+  const footH = rawFoot.map((f, i) => Math.min(Math.max(f, rawFoot[i - 1] ?? 0, rawFoot[i + 1] ?? 0), Math.max(0.02, (pts[i].top - pts[i].bottom) * 0.5)));
+  const footing = pts.map((p, i) => {
+    const y0 = p.bottom - WALL.skirt, y1 = p.bottom + footH[i];
+    return { low: [p.x - p.nx * WALL_LOOK.footOut, y0, p.z - p.nz * WALL_LOOK.footOut], high: [p.x - p.nx * WALL_LOOK.footOut, y1, p.z - p.nz * WALL_LOOK.footOut],
+      seat: [p.x + p.nx * WALL_LOOK.batter * footH[i], y1 + 0.03, p.z + p.nz * WALL_LOOK.batter * footH[i]] };
+  });
+  for (let i = 0; i + 1 < pts.length; i++) {
+    const g = geo[i], h = geo[i + 1], us = [along[i], along[i + 1], along[i + 1], along[i]], foot = [g.footY, h.footY, h.footY, g.footY];
+    const f = footing[i], e = footing[i + 1];
+    add('footing', [f.low, e.low, e.high, f.high], [faceN(i), faceN(i + 1), faceN(i + 1), faceN(i)], scaleColor(stoneColor, FOOTING_SHADE), stone, us, foot);   // the footing's front: the wall's stone, a shade darker
+    add('footTop', [f.high, e.high, e.seat, f.seat], [UP, UP, UP, UP], scaleColor(stoneColor, FOOTING_SHADE * 0.92), stone, us, foot);                                           // its top
+    add('face', [g.foot, h.foot, h.under, g.under], [faceN(i), faceN(i + 1), faceN(i + 1), faceN(i)], stoneColor, stone, us, foot);            // the face
+    add('lipUnder', [g.under, h.under, h.lipLow, g.lipLow], [DOWN, DOWN, DOWN, DOWN], COPING_COLOR, KIND.coping, us, foot);                         // the underside of the lip
+    add('lipFront', [g.lipLow, h.lipLow, h.lipTop, g.lipTop], [faceN(i), faceN(i + 1), faceN(i + 1), faceN(i)], COPING_COLOR, KIND.coping, us, foot); // the front of the coping
+    add('top', [g.lipTop, h.lipTop, h.backTop, g.backTop], [UP, UP, UP, UP], COPING_COLOR, KIND.coping, us, foot);                             // the top
+    add('back', [g.backTop, h.backTop, h.backLow, g.backLow], [backN(i), backN(i + 1), backN(i + 1), backN(i)], stoneColor, stone, us, foot); // the back: the stone (seen over the sloping end of a wall)
   }
-  // the ends
-  for (const [s, flip] of [[pts[0], false], [pts[pts.length - 1], true]]) {
-    const a = front(s, s.bottom - WALL.skirt), b = front(s, s.top + WALL.coping), c = back(s, s.top + WALL.coping), d = back(s, s.bottom - WALL.skirt);
-    if (flip) add(a, d, c, b, scale(STONE, 0.9)); else add(a, b, c, d, scale(STONE, 0.9));
+  // the ends: the side of the block from the buried foot to the top of the coping
+  for (const [k, sign] of [[0, -1], [pts.length - 1, 1]]) {
+    const g = geo[k], p = pts[k];
+    const tx = p.nz * sign, tz = -p.nx * sign;                         // along the wall, outward (the sign of the end)
+    const n = Math.sign(out[k][0] * -tz + out[k][1] * tx) || 1;        // (any orientation: the material is two-sided and flips N)
+    const endN = [tx * n, 0, tz * n];
+    const backFoot = [p.x + p.nx * p.depth, p.bottom - WALL.skirt, p.z + p.nz * p.depth];
+    add('end', [g.foot, g.lipTop, g.backTop, backFoot], [endN, endN, endN, endN], stoneColor, stone, [along[k], along[k], along[k], along[k]], [p.bottom, p.bottom, p.bottom, p.bottom]);
   }
   return quads;
 }
-
-/** A point of the face of the wall at height y, `over` m in front of it (the coping overhangs). */
-function front(s, y, over = 0) { return [s.x - s.nx * over, y, s.z - s.nz * over]; }
-/** A point of the back of the block (buried in the high ground) at height y. */
-function back(s, y) { return [s.x + s.nx * s.depth, y, s.z + s.nz * s.depth]; }
 
 /**
  * A test "does a thing of radius r at (x, z) stand in a retaining wall": the block of every stretch (face line to back line, in plan) of every wall, in a spatial hash.
@@ -211,5 +278,92 @@ export function createWallFootprint(walls, cell = 16) {
     for (const k of grid.get(key(Math.floor(x / cell), Math.floor(z / cell))) || []) if (distTo(quads[k], x, z) <= r) return true;
     return false;
   };
+}
+
+
+/**
+ * The lens test of the chase camera (QA2 N-C02): is a sphere of radius r at (x, y, z) inside the block of a retaining wall (between the face and the back, under the
+ * coping)?  At the end of a service way under a 3.6 m wall (4620,11599) the boom reached over the face into the block and the picture was the inside of the face.
+ * Returns (x, z, r, y) => { nx, nz, pen } | null: the shorter way out, through the face (toward the low side) or over the back.
+ */
+export function createWallBlockTest(walls, cell = 16) {
+  const segs = [], grid = new Map();
+  const key = (cx, cz) => cx * 65536 + cz;
+  for (const wall of walls) {
+    for (let i = 0; i + 1 < wall.pts.length; i++) {
+      const p = wall.pts[i], q = wall.pts[i + 1];
+      const top = Math.max(p.top, q.top) + WALL.coping + 0.05, bottom = Math.min(p.bottom, q.bottom) - WALL.skirt;
+      if (Math.max(p.top - p.bottom, q.top - q.bottom) < WALL.minRise * 0.5) continue;      // (the tapered tips)
+      const k = segs.push({ p, q, top, bottom }) - 1;
+      const r = Math.max(p.depth, q.depth) + 2;
+      for (let cx = Math.floor((Math.min(p.x, q.x) - r) / cell); cx <= Math.floor((Math.max(p.x, q.x) + r) / cell); cx++) {
+        for (let cz = Math.floor((Math.min(p.z, q.z) - r) / cell); cz <= Math.floor((Math.max(p.z, q.z) + r) / cell); cz++) {
+          const l = grid.get(key(cx, cz)); if (l) l.push(k); else grid.set(key(cx, cz), [k]);
+        }
+      }
+    }
+  }
+  return (x, z, r, y) => {
+    let best = null;
+    for (const k of grid.get(key(Math.floor(x / cell), Math.floor(z / cell))) || []) {
+      const { p, q, top, bottom } = segs[k];
+      if (y > top + r || y < bottom) continue;
+      const ex = q.x - p.x, ez = q.z - p.z, ll = ex * ex + ez * ez;
+      if (ll < 1e-9) continue;
+      const t = ((x - p.x) * ex + (z - p.z) * ez) / ll;
+      if (t < 0 || t > 1) continue;
+      const nx = p.nx + (q.nx - p.nx) * t, nz = p.nz + (q.nz - p.nz) * t, nl = Math.hypot(nx, nz) || 1;
+      const depth = p.depth + (q.depth - p.depth) * t;
+      const s = ((x - p.x - ex * t) * nx + (z - p.z - ez * t) * nz) / nl;      // how far into the block (from the face toward the high ground)
+      if (s <= -r || s >= depth + r) continue;
+      const out = s + r <= depth + r - s ? { nx: -nx / nl, nz: -nz / nl, pen: s + r } : { nx: nx / nl, nz: nz / nl, pen: depth + r - s };
+      if (!best || out.pen > best.pen) best = out;
+    }
+    return best;
+  };
+}
+
+/** Two walls closer than this (m, face to face) with the same high side are one wall baked twice (the two arms of a hairpin scan the same ramp: Eecherfeld 68 / 69). */
+const TWIN_GAP = 0.8;
+/** ... when this share of the points of the shorter one lies on the other. */
+const TWIN_SHARE = 0.7;
+/** ... and the other one reaches as high and as low there (m). */
+const TWIN_COVER = 0.4;
+
+/** The distance in plan from (x, z) to the face polyline of a wall. */
+function distToFace(wall, x, z) {
+  let best = Infinity;
+  const pts = wall.pts;
+  for (let i = 0; i + 1 < pts.length; i++) {
+    const a = pts[i], b = pts[i + 1], ex = b.x - a.x, ez = b.z - a.z, ll = ex * ex + ez * ez;
+    const t = ll > 1e-9 ? Math.max(0, Math.min(1, ((x - a.x) * ex + (z - a.z) * ez) / ll)) : 0;
+    best = Math.min(best, Math.hypot(x - a.x - ex * t, z - a.z - ez * t));
+  }
+  return best;
+}
+
+/**
+ * The walls to draw: every wall but the twins (a wall whose points lie on the face of a longer one with the same high side): two faces 0.2 m apart flicker,
+ * and the end of the one shows as a dark stripe on the other.  The physics keeps both (they stand in the same place).  Pure: returns a new list.
+ */
+export function drawnWalls(walls) {
+  const len = (w) => w.pts.reduce((s, p, i) => (i ? s + Math.hypot(p.x - w.pts[i - 1].x, p.z - w.pts[i - 1].z) : 0), 0);
+  const lengths = new Map(walls.map((w) => [w, len(w)]));
+  const twin = (w, o) => {
+    if (o === w) return false;
+    const lw = lengths.get(w), lo = lengths.get(o);
+    if (lo < lw || (lo === lw && o.id > w.id)) return false;            // only the shorter one (or the later of two equal ones) gives way
+    const m = w.pts[w.pts.length >> 1], c = o.pts[o.pts.length >> 1];
+    if (Math.hypot(m.x - c.x, m.z - c.z) > lw + lo) return false;
+    let on = 0;
+    for (const p of w.pts) {
+      if (distToFace(o, p.x, p.z) > TWIN_GAP) continue;
+      const near = o.pts.reduce((b, q) => (Math.hypot(q.x - p.x, q.z - p.z) < Math.hypot(b.x - p.x, b.z - p.z) ? q : b));
+      // (the same high side, and the other one covers this one's height: a short high wall in front of a long low one is not its twin)
+      if (near.nx * p.nx + near.nz * p.nz > 0.7 && near.top >= p.top - TWIN_COVER && near.bottom <= p.bottom + TWIN_COVER) on++;
+    }
+    return on >= TWIN_SHARE * w.pts.length;
+  };
+  return walls.filter((w) => !walls.some((o) => twin(w, o)));
 }
 

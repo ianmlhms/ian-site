@@ -11,6 +11,7 @@ import { ROAD } from './config.js';
 export { PAINT_LIGHT_GLSL };
 
 const MEDIAN_WIDTH = 3.0;       // m: road-network.js MEDIAN_WIDTH (a gap between two carriageways up to this wide is paved as a whole)
+const PAVE_MAX = 5.0;           // m: a pavement reaches at most this far beyond its kerb (look11: the wide pale aprons, QA2 N-T05)
 const MARK_PIXEL = 0.0006;      // rad: a line ribbon is at least this wide per metre of distance (about a pixel at the medium quality) ...
 const MARK_BIAS = 0.03;         // m: ... and pulled this far toward the camera,
 const MARK_BIAS_PER_M = 0.0012; // plus this per metre of distance,
@@ -121,9 +122,17 @@ export const GROUND_FRAGMENT = `
     // The hard ground is a calm light grey-beige and it has a CLEAN border: the class weight is a blurred 24 m / 72 m cover, and mixed straight into the
     // lawn it made a wide smoky brown-grey penumbra beside every wall (the dark blotches).  The weight is sharpened to a band of a few metres.
     float urbanW = smoothstep(0.42, 0.62, urban);
+    // (look11, QA2 N-T02: the bank between two carriageways at two levels in the city (0.5 - 0.7 m/m) was this pale hard ground, a pale wedge with the lattice's teeth along
+    // both carriageways - the slabs at Grund.  The hard ground of the town is level: a bank keeps the land's paint)
+    urbanW *= smoothstep(0.80, 0.93, N.y);
     albedo = mix(albedo, city, urbanW);
-    // the water class is a blurred 8 m cover as well: mixed straight in, the river was a teal smear far over the lawns of its banks (QA T10).  Sharpened like the city.
-    albedo = mix(albedo, water, smoothstep(0.35, 0.65, wetWater));
+    // the water class is a blurred 8 m cover as well: mixed straight in, the river was a teal smear far over the lawns of its banks (QA T10).  The shore is the 0.5 line of the
+    // cover, one pixel wide (fwidth: a crisp edge at every distance, not a 3 m teal fade into the lawn), with a narrow band of wet earth on the land side (look11).
+    float aaW = max(fwidth(wetWater), 0.01);
+    float waterW = smoothstep(0.5 - aaW, 0.5 + aaW, wetWater);
+    float shore = smoothstep(0.30, 0.42, wetWater) * (1.0 - waterW);
+    albedo = mix(albedo, albedo * vec3(0.62, 0.60, 0.50), shore * 0.7);
+    albedo = mix(albedo, water, waterW);
     // The trees of the view only reach so far: beyond them the wood is its canopy.  Without this the forest is a
     // brown litter floor under green blobs, and the land reads as a blotch of brown patches.
     float farK = smoothstep(uTreeRadius * 0.62, uTreeRadius * 1.05, vDist) * forest * (1.0 - urban);
@@ -170,13 +179,21 @@ export const GROUND_FRAGMENT = `
     float onPave = smoothstep(kerbW - aaC, kerbW + aaC, sdC) * (1.0 - smoothstep(-aaP, aaP, sdP));
     // A kerb and a pavement lie on level ground: on a ramp steeper than 1.3 m/m (the foot of a retaining wall, a cutting beside a junction) the slab texture is a stretched
     // stripe with ragged teeth along the lattice, so the ramp keeps the paint of the land and only the carriageway stays painted.
-    float levelK = smoothstep(0.30, 0.62, N.y);
+    // (look11, QA2 N-T02: the banks between two carriageways at two levels, 30 - 50 deg, were still paved, a pale wedge with the lattice's teeth along both edges: a pavement
+    // and its median are level, so a slope steeper than 0.35 m/m (N.y 0.95) begins to be the land's and one of 0.6 m/m (N.y 0.86) is; the steepest streets of the old town
+    // are 0.2 m/m)
+    float levelK = smoothstep(0.86, 0.95, N.y);
     onKerb *= levelK; onPave *= levelK;
+    // (look11, QA2 N-T05 / T11: at junction mouths and along the rural roads the pavement channel widened into 6 - 10 m pale aprons that read as slabs; a pavement is a strip
+    // of a few metres beside its kerb)
+    onPave *= 1.0 - smoothstep(${PAVE_MAX.toFixed(1)}, ${(PAVE_MAX + 0.6).toFixed(1)}, sdC - kerbW);
     // The lane markings are not painted from the lattice any more: they are RIBBONS (markings.js plans them per carriageway, tile-mesh.js drapes them over the triangles of the
     // tile) drawn with this very shader, so the ground under a line is computed exactly as beside it and the paint is laid over it.  Across the ribbon vMark.x runs from -1 to 1:
     // the edge of the paint is one pixel wide (fwidth), the line is a clean stroke from the driver's seat and from above.
     float fwM = max(fwidth(vMark.x), 1e-3);
     float paint = vMark.z > 0.5 ? clamp(vMark.y, 0.0, 1.0) * (1.0 - smoothstep(1.0 - 1.5 * fwM, 1.0, abs(vMark.x))) : 0.0;
+    // (look11, QA M08: a ribbon draped over the lattice where it climbs a wall foot or a bank stood up as a white line up the wall; a line is paint on a level road)
+    paint *= smoothstep(0.80, 0.92, N.y);
 
     albedo = mix(albedo, surf, roadW * onCarriage);
     albedo = mix(albedo, pave * 0.80, roadW * onKerb);                        // the kerb stone is darker than the slabs

@@ -32,6 +32,7 @@ export const CELL = 256;            // m, the cell of the building mesh (one dra
 const EDGE_STEP = 1.0;      // m, the spacing of the points along one edge of the footprint
 const EDGE_TOL = 0.15;      // m, how far the ground may leave the line between two corners before a point is kept
 const MIN_WALL = 0.3;       // m, the shortest wall a house may keep where the ground climbs over its eaves
+const LEVEL_OVER_LOW = 1.4; // m: the storeys of a house on a slope start at most this far above the lowest point of its foot (look11, the level façade bands)
 
 /** A stable number out of the id of a building: the same building always looks the same. */
 function hash01(n) {
@@ -146,7 +147,7 @@ function wallBottom(ax, az, bx, bz, ay, by, eaveY, heightAt) {
  * landAt(x, z): the height of the land itself (the DTM): the top of the walls is the height of the eaves above it.
  * drop: how far the walls go down below the ground (m).  The cells far from the car stand on COARSE terrain tiles (up to 16 m
  *   spacing) that differ from the exact ground by a metre or two on a slope: a wall that ends at the exact ground would show a gap
- *   under it or a ledge.  The part below the ground is never seen; the window rows keep their origin at the true ground (v < 0 below it).
+ *   under it or a ledge.  The part below the ground is never seen; the window rows keep their origin at the lowest point of the foot (v < 0 below it).
  */
 export function addBuilding(m, b, heightAt, landAt, drop = 0) {
   const pts = b.pts;
@@ -169,18 +170,32 @@ export function addBuilding(m, b, heightAt, landAt, drop = 0) {
   const roof = roofColour(style, b.roof, seed, b.palette);
 
   // the walls: every edge of the footprint, from the land under it up to the flat eave
-  let along = 0;
+  const edges = [];
   for (let i = 0; i < n; i++) {
     const j = (i + 1) % n;
     const ax = pts[i * 2], az = pts[i * 2 + 1], bx = pts[j * 2], bz = pts[j * 2 + 1];
     const len = Math.hypot(bx - ax, bz - az);
-    if (len < 0.25) continue;
-    const ay = heightAt(ax, az), by = heightAt(bx, bz);
+    if (len < 0.25) { edges.push({ len, skip: true }); continue; }
+    edges.push({ ax, az, bx, bz, len, bottom: wallBottom(ax, az, bx, bz, heightAt(ax, az), heightAt(bx, bz), eaveY, heightAt) });
+  }
+  // The storeys are LEVEL: v (the height on the façade the material lays the floors, windows and the plinth on) is measured from one level for the whole
+  // house, the lowest point of its foot, not from the ground under every vertex.  Measured from the ground, every band of the façade followed the slope and
+  // bent at every point of the foot (and at the diagonal of every quad), and every stretch of wall had its own floor height: the bands waved (QA BL02).
+  // The level is the highest point of the foot, but at most LEVEL_OVER_LOW over its lowest: on a slope the downhill wall stands on a stone base (a basement) up to
+  // that much higher, and only on a steeper slope than that does the uphill wall stand in the hill below its first windows.  (From the lowest point the shop fronts
+  // of a long house on a sloping street were buried at its upper end.)
+  let low = Infinity, high = -Infinity;
+  for (const e of edges) if (!e.skip) for (const p of e.bottom) { low = Math.min(low, p[1]); high = Math.max(high, p[1]); }
+  const ref = Math.min(high, low + LEVEL_OVER_LOW);
+  const facadeH = eaveY - ref;
+  let along = 0;
+  for (const e of edges) {
+    if (e.skip) continue;
+    const { ax, az, bx, bz, len, bottom } = e;
     // the wall is seen from outside: the normal of the edge (ex, ez) is (-ez, ex) when the edge turns to the left
     const ex = (bx - ax) / len, ez = (bz - az) / len;
     const mx = (ax + bx) / 2 - cx, mz = (az + bz) / 2 - cz;
     const outward = (ex * mz - ez * mx) > 0;
-    const bottom = wallBottom(ax, az, bx, bz, ay, by, eaveY, heightAt);
     let u = along;
     for (let k = 0; k + 1 < bottom.length; k++) {
       const p0 = bottom[k], p1 = bottom[k + 1];
@@ -188,12 +203,11 @@ export function addBuilding(m, b, heightAt, landAt, drop = 0) {
       if (segLen < 0.05) continue;
       const a = [p0[0], p0[1] - drop, p0[2]], b2 = [p1[0], p1[1] - drop, p1[2]];
       const c = [p1[0], eaveY, p1[2]], d = [p0[0], eaveY, p0[2]];
-      const wallH = eaveY - (p0[1] + p1[1]) / 2;
       const uvs = outward
-        ? [[u, -drop], [u + segLen, -drop], [u + segLen, eaveY - p1[1]], [u, eaveY - p0[1]]]
-        : [[u + segLen, eaveY - p0[1]], [u, eaveY - p1[1]], [u, -drop], [u + segLen, -drop]];
+        ? [[u, a[1] - ref], [u + segLen, b2[1] - ref], [u + segLen, facadeH], [u, facadeH]]
+        : [[u + segLen, facadeH], [u, facadeH], [u, b2[1] - ref], [u + segLen, a[1] - ref]];
       const pts4 = outward ? [a, b2, c, d] : [d, c, b2, a];
-      face(m, pts4, wall, KIND.wall, seed, uvs, segLen, wallH, sty);
+      face(m, pts4, wall, KIND.wall, seed, uvs, segLen, facadeH, sty);
       u += segLen;
     }
     along += len;
