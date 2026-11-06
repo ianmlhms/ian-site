@@ -19,6 +19,7 @@ export const DECK = Object.freeze({
   approachAlign: 0.7,      // ... when it leaves through that end toward the deck (the cosine of the two directions at least this)
   endStub: 0.5,            // m: an inner point of a deck (a car's, at least stubWidth wide) this close to one of its ends takes the level of that end (see endStubs)
   stubWidth: 4.0,
+  overRoadClear: 2.5,      // m: a deck this far over a carriageway under it is a bridge over that road (its free ends keep their plain pin)
   apronWidth: 5.0,         // m: a deck at least this wide (a carriageway) gets an approach slab where its approach does not reach the corners of its end (withAprons) ...
   apronInset: 1.2,         // ... probed this far inside its edges ...
   apronDrop: 0.25,         // ... where the ground lies this far under the approach on the axis (or the deck end) ...
@@ -41,6 +42,14 @@ export const DECK = Object.freeze({
 });
 
 const DECIMETRE = 0.1;
+/** The classes of the ways a car drives on (a deck of one of them runs off a free end at DECK.endGrade even where it stands over a street: the ramp of a car park). */
+const CAR_DECK_KINDS = new Set(['motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary', 'primary_link', 'secondary', 'secondary_link', 'tertiary', 'tertiary_link',
+  'unclassified', 'residential', 'living_street', 'service', 'track', 'road']);
+const segDistance = (p, a, b) => {
+  const ex = b[0] - a[0], ez = b[1] - a[1], ll = ex * ex + ez * ez || 1;
+  const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * ex + (p[1] - a[1]) * ez) / ll));
+  return Math.hypot(p[0] - a[0] - ex * t, p[1] - a[1] - ez * t);
+};
 
 function readVarint(bytes, state) {
   let result = 0, shift = 0;
@@ -154,6 +163,15 @@ function deckEndTops(decks, surface) {
     ends.push({ k, side: 0, p: d.pts[0], into: into(0, 1), inner: n >= 3 ? innerLevel(d, 0, 1, 2) : d.tops[0] });
     ends.push({ k, side: 1, p: d.pts[n - 1], into: into(n - 1, n - 2), inner: n >= 3 ? innerLevel(d, n - 1, n - 2, n - 3) : d.tops[n - 1] });
   });
+  // (a deck that stands over a carriageway - a footbridge over a street, pinned to the ground at its free ends - keeps its DSM: an envelope from its ends laid it onto the street, 152)
+  const o = { sdCar: 9 };
+  const overCarriageway = (d) => !!surface.roadInfoAt && d.pts.some((p, i) => i > 0 && i < d.pts.length - 1 && (surface.roadInfoAt(p[0], p[1], o), o.sdCar < 0) && d.tops[i] - surface.height(p[0], p[1]) > DECK.overRoadClear);
+  // (a deck that carries cars: the way under its middle point is a road for cars, not a footway / cycleway / pedestrian street)
+  const carriesCars = (d) => {
+    if (!net) return false;
+    const m = d.pts[d.pts.length >> 1];
+    return net.roads.some((r) => CAR_DECK_KINDS.has(r.kind) && r.pts.some((q, i) => i > 0 && segDistance(m, r.pts[i - 1], q) <= 1.5));
+  };
   const out = decks.map(() => [0, 0, false, false, false, false]);   // [startTop, endTop, envelope at start, at end, an approach way at start, at end]
   for (const e of ends) {
     const [x, z] = e.p;
@@ -169,7 +187,7 @@ function deckEndTops(decks, surface) {
       level = isApproach || !surface.field ? surface.height(x, z) : Math.max(surface.height(x, z), surface.field.height(x, z));
       // a free end of a car's deck (no way is carved onto it: the next way is a bridge the bake has no deck for, or a ramp of a car park) runs off its end at no more than
       // DECK.endGrade too: pinned to the ground under a DSM 3 - 5 m higher, it began with a ramp of 80 % (decks 160, 169)
-      envelope = isApproach || decks[e.k].width >= DECK.stubWidth;
+      envelope = isApproach || (decks[e.k].width >= DECK.stubWidth && (carriesCars(decks[e.k]) || !overCarriageway(decks[e.k])));
     }   // (a bank: on the 1 m lattice and on the ground itself, whichever is higher - an end on the edge of a drop dived into the continuous ground)
     out[e.k][e.side] = level; out[e.k][2 + e.side] = envelope; out[e.k][4 + e.side] = isApproach;
   }
@@ -243,7 +261,7 @@ function endStubs(d) {
  */
 function withAprons(d, holdA, holdB, surface) {
   if (d.width < DECK.apronWidth || d.pts.length < 2 || (!holdA && !holdB)) return d;
-  let pts = d.pts, tops = Array.from(d.tops);
+  let pts = d.pts, tops = Array.from(d.tops), apronA = 0, apronB = 0;
   for (const atStart of [true, false]) {
     if (!(atStart ? holdA : holdB)) continue;
     const n = pts.length, e = atStart ? 0 : n - 1, f = atStart ? 1 : n - 2;
@@ -264,9 +282,9 @@ function withAprons(d, holdA, holdB, surface) {
     const len = Math.min(DECK.apronMax, eaten + 1.5);
     const fx = pts[e][0] + ux * len, fz = pts[e][1] + uz * len;
     const farTop = Math.min(top, surface.height(fx, fz)) - DECK.apronTuck;
-    if (atStart) { pts = [[fx, fz], ...pts]; tops = [farTop, ...tops]; } else { pts = [...pts, [fx, fz]]; tops = [...tops, farTop]; }
+    if (atStart) { pts = [[fx, fz], ...pts]; tops = [farTop, ...tops]; apronA = len; } else { pts = [...pts, [fx, fz]]; tops = [...tops, farTop]; apronB = len; }
   }
-  return pts === d.pts ? d : { ...d, pts, tops: Float32Array.from(tops), apron: true };
+  return pts === d.pts ? d : { ...d, pts, tops: Float32Array.from(tops), apronA, apronB };   // (apronA / apronB: the metres of approach slab at each end - the bridge ends there)
 }
 
 /**

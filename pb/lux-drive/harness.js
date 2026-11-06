@@ -754,7 +754,7 @@ if (wants('D')) {
         const L = cum[i + 1] - cum[i], m = Math.max(1, Math.ceil(L / STEP));
         for (let k = 0; k < m; k++) {
           const f = k / m, s = cum[i] + L * f;
-          if (s < END_MARGIN || s > cum[n - 1] - END_MARGIN) continue;
+          if (s < END_MARGIN + (d.apronA || 0) || s > cum[n - 1] - END_MARGIN - (d.apronB || 0)) continue;   // (the approach margin counts from the bridge end, past its approach slab: decks.js withAprons)
           const x = d.pts[i][0] + (d.pts[i + 1][0] - d.pts[i][0]) * f, z = d.pts[i][1] + (d.pts[i + 1][1] - d.pts[i][1]) * f;
           net.carve(x, z, probe);
           if (probe.sdCar < ROAD_SD && d.tops[i] + (d.tops[i + 1] - d.tops[i]) * f - surface.height(x, z) < ON_ROAD_CLEAR) { hits++; at = at || [Math.round(x), Math.round(z)]; }
