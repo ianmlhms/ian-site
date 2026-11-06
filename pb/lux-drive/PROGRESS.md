@@ -2015,3 +2015,84 @@ Montages (photo | before v55 | after city12): `~/Library/Caches/luxdrive-work/ci
 * Étoile (item 4) and the ragged JFK side-street aprons (item 5) are not fixed (junction lattice / road bake); the game still has no Étoile landmark.
 * Gare: the tower is placed from the outline and one photograph (not surveyed); the glass hall has no lettering; the platform roof block 15153 behind is still the bake's flat
   glass shed.  Pont Rouge: the posts are red per the brief, the photographs show white posts.
+
+## Drive 12 (branch `lux-drive-drive12`, Mac mini): what stops, launches or rolls the car - collisions at their height, walls out of the lanes, the Pont Adolphe end (QA round 3)
+
+Started from live v55 (5b802d6f); merged `lux-drive` (city12, e94df7fd) before the final gates; main.js `?v=58`.  Input `~/Library/Caches/luxdrive-work/qa3/BUGS.md` sections 2 and 3.
+Round folder `~/Library/Caches/luxdrive-work/drive12/`: tools `tools/` (`gameworld.mjs` the game's world in Node as main.js builds it, `drive.mjs` the QA's drive jobs in Node with the
+collider that stopped the car named, `lanes.mjs` the lane clearance scan, `underdeck.mjs`, `deckend.mjs` levels across a deck end, `q3.mjs` every deck in every lane, `table.py`), the
+live snapshot `v55/` for before numbers, logs `out/`, gate logs `gate_*.txt`, drive table `drive_table.md`.  The Node drive reproduces the QA's browser numbers to the decimetre (b03_d0
+stopped at 5209.0,8052.8, b10_d23 at 8726.1,7303.1, r05_0 at 4770.1,8589.4).
+
+### 1. Every collider answers for the car's level (QA3 N3-B01) - `car-collide.js` (new), `level-span.js` (new), `buildings.js`, `trees.js`, `props.js`, `landmarks.js`, `tram-sim.js`, `rail-ground.js` (moved out of tram-view.js), `placement.js`, `decks.js levelAt`, `main.js`
+* Root cause: `buildings.collide(x, z, r)` was a wall from the centre of the earth to the sky, the trees and lamps were switched off by "is the car on a deck" (the global hint) and the
+  landmark guard rails, the trams and the catenary poles had no height at all.  Four Pfaffenthal houses 60 m under the Pont Rouge stopped the car on the deck.
+* Now one composition (`createCarCollider`, used by main.js, harness T and the tools): a house is solid from the lowest ground under its corners to its ridge (building-mesh.js'
+  levels), a tree from its foot to its top, a lamp / bench / catenary pole from its ground (the rails' level for a pole) up its height, a tram at its rails' level, a landmark guard
+  rail at its deck's level along it (`deckLevels`), any other landmark wall from the ground to its landmark's top (the Gare's new walls included), the retaining walls and the portals
+  as before; the car's body is `LEVEL.bodyHeight` 1.6 m over its wheels.  The chase camera's lens and the teleport placement ask at their own level (`blockedAt(x, z, yaw, hint)`).
+* Pont Rouge (b03_d0): stopped at 149 of 455 m -> driven across (452/455, step 0.10 m).  Under-deck scan: 10 buildings under decks, 5 of them reach up through the deck (the
+  23-storey 4808 at Place de l'Europe, 93 / 365 Bd Royal, 3902, 10100): at deck level the lanes of every bridge way touch none of them (T2 = 0).
+
+### 2. No retaining wall's collision block reaches a lane (QA3 N3-W01 / N3-W02) - `lane-clearance.js` (new), `scripts/luxdrive/bake_walls.mjs`, `wall-collider.js`, harness K
+* Root cause: the bake kept the foot and the back of a wall off the carriageways the carve knows (sdCar >= -0.6) at its 4 m samples only; the solid lines between the samples, the
+  tapered ends, the ends of the block, and every carriageway the carve does not know (the ways on decks: wall 52 across both A1 lanes at viaduct deck 23) were never tested against a
+  lane, and the car's body circle (1.0 m + the 0.15 m thin wall) reaches 0.25 m past a lane at the edge clamp.
+* Now `lane-clearance.js` lays the centre line of every lane of every car road (one-way: max(1, lanes), two-way: max(2, lanes); 0.9 m inside the edge), at its own level (on its
+  deck where it is a bridge), every segment run on by the car's nose circle at both ends (a road never ends in a wall); the bake tests every solid line of every wall against them
+  (`WALL_LANE.clear` 1.35 m) and moves a point that reaches a lane up its ramp (or its back toward its face) by 0.15 m steps, at most 0.6 m, standing on its ramp (fits), else
+  drops it and splits the wall.  Walls 125 -> **95** (3308 -> 2349 m; 31 walls dropped whole, 1175 point moves).  Harness K: a ramp whose wall would block a lane (face moved
+  as far as the bake moves it) is counted with the ramps on tarmac (rampsInRoads 11 -> 178): it cannot have a solid wall.
+* Static lane scan (every lane of every car road, 1 754 039 samples, walls only): v55 **89 road / wall pairs (1267 samples)** -> **0**.  QA wall-pair drives (34): stopped 25 -> 5
+  (none by a wall: 2 leave the play area, 1 a closed tunnel portal, 1 a house, 1 Kirchberg link onto the next way - the QA's lane offset carried onto a narrower way).
+
+### 3. Decks
+* N3-B05 Pont Adolphe (deck 5): the ground AT its east end is a pit (the carve of the approach stops short of the deck, the bank shows, 0.96 m under the road a metre out); the plain
+  pin of the landmark decks dropped the deck 0.9 m into its last 3 m.  `decks.js`: where an end of a landmark deck is such a pit (`landmarkPit` 0.3 m under both the deck and the
+  road), the deck runs on `landmarkPinOut` 2.5 m over its approach at the road's level.  Every-lane drive deck 5: 69 cm / air 5 -> 22 cm (west end, lane -1.8: the flat deck against
+  the cambered road); axis (Q1) 10 cm -> passes.
+* Q1 stays as it was (axis + outer lanes, ratchet); the every-lane drive WITH the game's collider is harness T3 (690 runs over 134 decks).
+
+### Drive table (Node, the QA's own job files, v55 -> drive12 before the merge; `drive_table.md`)
+| job | runs | stopped (< 3 m/s) | by a wall | by a house | runs with flight |
+|---|---|---|---|---|---|
+| qa3 alldrive | 237 | 47 -> 42 | 12 -> 9 | 21 -> 20 | 14 -> 14 |
+| qa3 wallpairs (lane inside a wall block) | 34 | 25 -> 5 | 24 -> 1 | 2 -> 1 | 2 -> 3 |
+Fixed stops: Pont Rouge b03_d0, A1 deck 23 b10_d23, walls 2 / 25, the Pont Adolphe rail run x065; 20 of the 25 wall pairs.  The remaining alldrive stops are the classes
+in "Still wrong" (houses on narrow streets, closed tunnel portals, the car leaving the road - qa3 "Not bugs").
+
+### 4. N3-D01 / N3-D02 - what stopped the car
+* r05_0 Bd Royal lane 1: the QA's lane polyline keeps the -5.25 m offset through a 60 deg kink at 13 m/s; the car runs wide into house 9262 at the outside of the corner.
+  The house is not in any lane (lane scan) - a driver artefact (also at 8 m/s it touches a lamp on the pavement of the corner).
+* r07_1 Rue de Neudorf lane 2: the 11 m, 3-lane way ends at one node in a 7.6 m 2-lane way; the outer lane ends without a taper and the car runs onto the pavement and a lamp.
+  Not changed (the width hand-over is roads9's taper rule) - in "Still wrong".
+* r21_0 Rue de la Barrière: the route ends at the end of way 3050; the car overshoots the last point into house 20835.  Artefact.
+* r13_0 Rue de Luxembourg: the pure pursuit loses the polyline after two kinks (speed 12.8, no contact).  Artefact.
+
+### Harness section T (`harness-drive12.js`, 5 checks)
+T1 no wall block reaches a lane (every lane, at its level) = 0; T2 the lanes of every bridge way at deck level touch no house, landmark wall, lamp, bench or tree = 0 (a dead end
+at a house excepted); T3 every car deck, every lane, both ways, the game's collider probing the body: ratchet 13 runs (deck 59 Buchler car park spiral bank, deck 169 wall 41 at its
+free end, deck 197 into house 6763); T4 the QA's 13 verified invisible-wall routes (walls 52, 98, 72, 44, 5, 18, 57, 13, 80) drive through with the game's car: no wall touched, no
+stop (a closed tunnel's portal at the end of the way aside); T5 the level rule (the Pont Rouge over house 7233).
+
+### Gates (merged tree, `drive12/gate_*.txt`)
+* `harness.js` **159 / 161** (156 of city12 + T 5): **FAIL R3** - Merl link outer lane roll 0.749 rad at 3116,9975 (was 0.089 with wall 32 in the lane); **FAIL T4** - p09 (A6 deck 241,
+  1971,11619) and p12 (way 301, 4877,12243) stopped by the ground.  Both are the same thing: where the invisible wall stood in the lane, the steep two-level face it hid is in the
+  lane too (OSM carriageways overlapping in plan; surface11 "the faces eat up to ~1 m of each carriageway").  The wall acted as a guard rail along the face; without it the car's
+  outer wheels climb the face.  Not resolved - see HANDOFF-drive12.md.  K PASS (walls 95, bare 5 of 148), Q1 PASS, T1 / T2 / T3 / T5 PASS, U PASS.
+* Browser gates on the merged tree: `luxdrive_world` PASS (deepest carve wall 7.90, draw calls 113 / 150 / 209), `luxdrive_holes` 0 at medium and at low, `luxdrive_ui` PASS,
+  `luxdrive_webkit` PASS.
+
+### Still wrong (honest)
+* **Houses in lanes on narrow streets**: the lane scan finds 1097 road / house pairs (880 not at a dead end) where a lane centre's body circle touches a footprint - nearly all
+  service ways, residential and living streets of the old town (Plättisgaass, Rue Émile Metz, Millegässel ...) whose OSM width puts the lane 1.6 m off the axis against the
+  façades; JFK service lane 3730 (qa2 N-BL02) too.  Not fixed (a road width / footprint question, not a collision one); no gate.
+* **Ramps in lanes**: 178 ramp samples beside the ways lie within a lane's reach at their level (K rampsInRoads 11 -> 178): where two carriageways overlap in plan (Croix de
+  Gasperich A6 5.8 m, Bd Robert Schuman 3.7 m, Kirchberg links, Merl) the wall that stood in the lane is gone, but the ground there is still the steep face - the lane is narrower
+  than OSM says.  The car meets a bank there instead of an invisible wall.  The fix is the carriageways' widths at two-level overlaps (road-network), not done.
+* 31 walls were dropped whole: their ramp stands in reach of a lane; the bare face shows there (look not re-checked in the browser this round).
+* T3 ratchet 13: deck 59 (the Buchler car park spiral: no car park deck in the data), deck 169 (Hondhausbréck, free end on a bank, wall 41 at it), deck 197 (service deck into house
+  6763 near the Gare).  N3-B02 deck 73, N3-B03 deck 28, N3-B04 decks 169 / 204 / 157 / Pont Margot reverse: NOT fixed (deck 73 / 28 do not fail the every-lane carry: the QA's
+  steps there come from its route leaving the lane, see qa3 section "Not bugs"; 204 12 cm, 169 16 cm remain in the every-lane list).
+* Pont Adolphe west end: 22 cm in lane -1.8 (flat deck, cambered road).  Rue de Neudorf 3 -> 2 lanes without a taper.
+* Q1-style every-lane steps: 20 decks over 5 cm (T3 reports them, not gated).
