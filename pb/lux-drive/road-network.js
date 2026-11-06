@@ -62,7 +62,9 @@ export const CHANNELS = 3;              // the paint channels: the nearest carri
 const MAX_CAND = 192;                  // segments that reach one point, at most
 const FOOT_FADE = 1.0, FOOT_FLOOR = 0.01;   // m: a segment counts fully when the foot of the perpendicular is this far from its ends; the floor of its weight (so the weights never all vanish)
 const STATION_FADE = 0.5;              // m: two segments of a way hand over across the mitre line of their joint (see the station in carve()) within this either side of it
-const STATION_EXTRAPOLATE = 1.0;        // segment lengths: the bed of a segment is read at most this far past its ends (continued along its end tangent) at an inner joint of its way
+const STATION_EXTRAPOLATE = 0.05;       // segment lengths: the bed of a segment is read at most this far past its ends (continued along its end tangent) at an inner joint of its way: enough for the
+                                       // hand-over across the mitre line (0.2 m of a 4 m segment); further, a segment with only its floor weight left read a bed metres along the way (a ridge of 12.9 m/s2 in the steep
+                                       // old-town junction box at 5298,8644, gate L)
 const SHEPARD_OFFSET = 0.5, SHEPARD_MIN = 1e-4;   // the weight of a segment of a way is ((d_nearest + 0.5) / (d + 0.5))^4: equal at equal distance, a few per cent at twice the distance               // m: the segments of a way that are this much farther than its nearest one still count for the ground (weighted by how much nearer the nearest is)
 const ARM_GAP = 3;                     // segments: two stretches of one way this far apart are different arms (a hairpin)
 const ARM_DETOUR_LO = 6.0, ARM_DETOUR_HI = 12.0;   // m: the ground of a way at a point is the pin of the ARM it passes on; a segment whose foot lies this much farther along the way than straight across from the
@@ -132,6 +134,47 @@ export function deckEndLevels(decks) {
       const grade = Math.max(-DECK_END_GRADE, Math.min(DECK_END_GRADE, (d.tops[j] - d.tops[j2]) / l2));
       out.push({ deck: d.id, x: d.pts[k][0], z: d.pts[k][1], level: d.tops[j] + grade * l1 });
     }
+  }
+  return out;
+}
+
+const ORPHAN_STEP = 2.0;                // m: a bridge way is sampled this often ...
+const ORPHAN_SHARE = 0.1, ORPHAN_MIN = 4.0;   // ... and it has no deck when more than this share of it (and at least this many metres) lies off every deck
+const DECKLESS_SHARE = 0.8;             // ... and that no deck carries over at least this share of its length (bake_orphan_decks.mjs MIN_UNCOVERED)
+const DECKLESS_MAX_DIP = 2.0;           // m: a drivable bridge way without a deck over land that sags less than this under the chord of its ends is carved like any way (bake_orphan_decks.mjs
+                                       // found it on the ground: the DTM there is the deck - most of the Pont Jean-Pierre Buchler, the Clausener Bierg)
+
+/**
+ * The drivable ways tagged as bridges (or a layer over the ground) that no deck carries: [road].  `decks` are the decoded decks (decks.js decodeDecks).  The deck bake left 43 of them
+ * (1.5 km, most of the Pont Jean-Pierre Buchler): neither carved nor decked, the car drove on the valley floor under them.  scripts/luxdrive/bake_orphan_decks.mjs bakes a deck for
+ * the ones that stand clear of the land; the network carves the others (deckless, see createRoadNetwork).
+ */
+export function orphanBridgeWays(roads, decks) {
+  const CELL_O = 32, key = (a, b) => a * 65536 + b, grid = new Map();
+  for (const d of decks) {
+    for (let i = 1; i < d.pts.length; i++) {
+      const [ax, az] = d.pts[i - 1], [bx, bz] = d.pts[i], r = d.width / 2;
+      for (let a = Math.floor((Math.min(ax, bx) - r) / CELL_O); a <= Math.floor((Math.max(ax, bx) + r) / CELL_O); a++) {
+        for (let b = Math.floor((Math.min(az, bz) - r) / CELL_O); b <= Math.floor((Math.max(az, bz) + r) / CELL_O); b++) {
+          const k = key(a, b), l = grid.get(k), seg = [ax, az, bx, bz, r];
+          if (l) l.push(seg); else grid.set(k, [seg]);
+        }
+      }
+    }
+  }
+  const covered = (x, z) => (grid.get(key(Math.floor(x / CELL_O), Math.floor(z / CELL_O))) || []).some(([ax, az, bx, bz, r]) => {
+    const ex = bx - ax, ez = bz - az, ll = ex * ex + ez * ez || 1, t = Math.max(0, Math.min(1, ((x - ax) * ex + (z - az) * ez) / ll));
+    return Math.hypot(x - ax - ex * t, z - az - ez * t) <= r;
+  });
+  const out = [];
+  for (const r of roads) {
+    if (!r.info || !r.info.drivable || r.tunnel || !(r.over || (r.layer || 0) >= 1) || !r.pts || r.pts.length < 2) continue;
+    let tot = 0, bad = 0;
+    for (let i = 0; i + 1 < r.pts.length; i++) {
+      const [ax, az] = r.pts[i], [bx, bz] = r.pts[i + 1], l = Math.hypot(bx - ax, bz - az);
+      for (let s = 0; s < l; s += ORPHAN_STEP) { tot++; if (!covered(ax + (bx - ax) * s / l, az + (bz - az) * s / l)) bad++; }
+    }
+    if (bad * ORPHAN_STEP >= ORPHAN_MIN && bad > ORPHAN_SHARE * tot) out.push(Object.assign(Object.create(r), { uncovered: bad * ORPHAN_STEP }));   // (a view of the road with the metres no deck covers)
   }
   return out;
 }
@@ -211,6 +254,20 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   // It is carved like any way and its deck is not drawn (decks.js): a deck lifted off such a way was a box 2 .. 25 m high in the wood, and a deck laid onto it lay on the ground
   // with the cut of the track under its ends.  Returns the deck or null.
   const groundedDecks = new Set();
+  // the drivable bridge ways that no deck carries and whose land does not dip under them (the deck bake found them on the ground): carved like any way
+  const deckless = new Set(orphanBridgeWays(roads, decks).filter((r) => {
+    if (r.uncovered < DECKLESS_SHARE * (r.length || 0)) return false;     // (a way that its decks carry for the most part keeps them)
+    const g = [];
+    for (let i = 0; i + 1 < r.pts.length; i++) {
+      const [ax, az] = r.pts[i], [bx, bz] = r.pts[i + 1], l = Math.hypot(bx - ax, bz - az);
+      for (let s = 0; s < l; s += ORPHAN_STEP) g.push(baseHeight(ax + (bx - ax) * s / l, az + (bz - az) * s / l));
+    }
+    // the sag of the land under the chord between the ends (a way on a grade is no dip; the land under a viaduct is)
+    const n = g.length, a = baseHeight(r.pts[0][0], r.pts[0][1]), b = baseHeight(r.pts[r.pts.length - 1][0], r.pts[r.pts.length - 1][1]);
+    let sag = 0;
+    for (let k = 0; k < n; k++) sag = Math.max(sag, a + (b - a) * (k / Math.max(1, n - 1)) - g[k]);
+    return sag < DECKLESS_MAX_DIP;
+  }).map((r) => r.id));
   function groundedDeckOf(road) {
     if (!road.info || !road.info.drivable || road.tunnel || !(road.over || (road.layer || 0) >= 1) || !road.pts || road.pts.length < 2) return null;
     const a = road.pts[0], b = road.pts[road.pts.length - 1];
@@ -564,7 +621,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     // into the height function and the ground under it is protected (see the crossings below).
     const grounded = groundedDeckOf(road);
     if (grounded) groundedDecks.add(grounded.id);
-    const tagged = !grounded && !!(road.over || (road.layer || 0) >= 1);
+    const tagged = !grounded && !deckless.has(ri) && !!(road.over || (road.layer || 0) >= 1);
     // The centre line of the way, as the game draws it: the polyline resampled and its corners rounded.
     // Every way needs it: the drivable ones are carved along it, and the ones that ride over the ground
     // protect the ground under them along it.

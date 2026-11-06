@@ -74,6 +74,7 @@ const report = { removed: [], split: [], landmark: 0, clean: 0 };
 const appended = [];
 for (const d of raw) {
   if (landmarks.hiddenDecks.has(d.id)) { report.landmark++; continue; }
+  if (!piped.has(d.id)) { report.clean++; continue; }          // (a deck the road network carves instead - road-network.js groundedDeckOf - is not drawn)
   const a = audit(piped.get(d.id));
   if (a.hits === 0) { report.clean++; continue; }
   if (a.maxClear < REMOVE_CLEAR) { outDecks[d.id].removed = true; report.removed.push({ id: d.id, at: d.pts[d.pts.length >> 1].map(Math.round), width: d.width, maxClear: +a.maxClear.toFixed(1), hits: a.hits }); continue; }
