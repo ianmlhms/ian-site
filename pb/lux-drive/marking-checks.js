@@ -8,6 +8,7 @@
 import { buildMarkingPlan, trackPoint, chainPoint, pieceSpans, MARK } from './markings.js';
 import { computeTileNodes, buildTileMesh } from './tile-mesh.js';
 import { meshAttrAt, paintedSd, paintAt } from './paint-model.js';
+import { CHANNELS } from './road-network.js';
 import { QUADTREE } from './config.js';
 import { junctionClusters } from './junction-probe.js';
 import { leafAt, selectTiles } from './quadtree.js';
@@ -22,6 +23,7 @@ const MEDIAN_SCAN = 0.02;         // m across
 const FALSE_KERB_UNION = 0.6;    // m: a point counts as tarmac when the union paints it this far inside an edge; the channels must paint it as tarmac too
 const JOINT_CLEAR = 12;          // m: the median edge is not measured this close to a hand-over (the width of the carriageway may change there)
 const MEDIAN_P95_CM = 8;          // the edge of the tarmac along a median may deviate this much from its 10 m running mean (95 % of the samples; v45: a sawtooth of 30 - 50 cm) ...
+const OWN_EDGE = 1.0;             // m: M5 measures the zero of the painted distance within this of the carriageway's half width (its own edge)
 const MEDIAN_MAX_CM = 20;         // ... and at worst this much (where four carriageways meet the paint falls back to the blurred union over a few metres)
 
 /** The ten roads of the QA markings study (qa1/marks_roads.json): a point on the road and its direction (deg, 0 = +x). */
@@ -57,6 +59,8 @@ export function runMarkingChecks({ data, net, surface, field, decks, check, stat
   const roads = data.roads;
   const out = { ...plan.stats, buildMs: Date.now() - t0 };
   const p = { x: 0, z: 0, nx: 0, nz: 0, bed: 0, way: 0, o: 0 };
+  const exactInfo = { chGroup: new Int32Array(CHANNELS), chCar: new Float32Array(CHANNELS), chPave: new Float32Array(CHANNELS), chMajor: new Uint8Array(CHANNELS), chCode: new Uint8Array(CHANNELS) };
+  const exactSd = (x, z) => { field.height(x, z, exactInfo); return exactInfo.sdCar; };
   const piecesOf = new Map();
   plan.pieces.forEach((pc) => { const l = piecesOf.get(pc.track); if (l) l.push(pc); else piecesOf.set(pc.track, [pc]); });
 
@@ -242,7 +246,9 @@ export function runMarkingChecks({ data, net, surface, field, decks, check, stat
               if (zero !== null && sd < 0) { again = true; break; }
               prev = sd;
             }
-            found[kk] = zero !== null && again ? zero : null;
+            // (paint15: the zero must be the edge of THIS carriageway - within OWN_EDGE of its half width: where another carriageway merges over its edge (a slip road's nose,
+            // JFK 6685,7613) the first zero is the far edge of the merging one, a diagonal line that is no median edge; the per-pixel channels show it exactly)
+            found[kk] = zero !== null && again && Math.abs(zero - hw) <= OWN_EDGE ? zero : null;
           }
           edge.push(found[0]); edgeOld.push(found[1]);
         }
@@ -270,7 +276,9 @@ export function runMarkingChecks({ data, net, surface, field, decks, check, stat
             for (let u = -hw + 1; u <= hw - 1; u += 0.25) {
               const x = p.x + p.nx * u, z = p.z + p.nz * u;
               insideN++;
-              const m = meshAt(x, z), unionOnly = meshAttrAt(m, m.union, 2, 0, x, z);
+              // (paint15: the reference is the carve's own signed distance at the point - the blurred union of the lattice is no longer what the shader paints, and in a field pushed
+              // off its level (8 m per m) its blur called a point 1 m inside the edge that the carve puts on the edge itself, Rocade de Bonnevoie 5289,10500)
+              const m = meshAt(x, z), unionOnly = Math.max(meshAttrAt(m, m.union, 2, 0, x, z), exactSd(x, z));
               if (unionOnly > -FALSE_KERB_UNION) { insideSkip++; continue; }          // (the union does not call it tarmac either: the way lies off its level there, see road-network.js PAINT_LEVEL_PUSH)
               // (the pale tar of a service way must not show inside a street either: the distance to the street carriageways, as the shader takes it)
               const pa = paintAt(m, x, z);

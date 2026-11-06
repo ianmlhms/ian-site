@@ -166,7 +166,8 @@ export function carriagewayChannels(chGroup, chCar, chPave, chCode, step = 1) {
         const own = raw[o * CHANNEL_STRIDE + c], lo = own - BLUR_REACH * step, hi = own + BLUR_REACH * step;
         let sum = 0;
         for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { const v = raw[((j + dj) * APRON_SIDE + i + di) * CHANNEL_STRIDE + c]; sum += W[dj + 1] * W[di + 1] * (v < lo ? lo : v > hi ? hi : v); }
-        out[o * CHANNEL_STRIDE + c] = sum / 16;
+        // (... and the blur never takes a node out of its carriageway: inside, the blurred value is at most the node's own)
+        out[o * CHANNEL_STRIDE + c] = (c < CH_PAVE || c === CH_REST) && own < 0 ? Math.min(own, sum / 16) : sum / 16;
       }
     }
   }
