@@ -20,12 +20,12 @@ export const POLE_HEIGHT = TRAM.catenary.height + 1;   // m: a catenary pole of 
  *   buildings: buildings.js index (with groundAt: the houses know their height), landmarks: landmarks.js, walls: wall-collider.js, portals: portals.js,
  *   ground: decks.js createGround (the bank under a deck end), forest: trees.js, props: props.js (lamps, benches, poles with their level), trams: tram-sim.js,
  *   playArea: play-area.js, surface + deckNetwork: the level of the tram's rails and the parapets of the decks (deck-barriers.js, collide14: the car stays on a bridge;
- *   the decks a landmark draws carry the landmark's own walls).
+ *   the decks a landmark draws carry the landmark's own walls), roads: the decoded ways (a parapet never stands in a lane).
  * Returns { collide(x, z, radius, y), parts, barriers }.
  */
-export function createCarCollider({ buildings, landmarks, walls, portals, ground, forest, props, trams, playArea, surface = null, deckNetwork = null }) {
+export function createCarCollider({ buildings, landmarks, walls, portals, ground, forest, props, trams, playArea, surface = null, deckNetwork = null, roads = null }) {
   const railGround = surface ? createRailGround(surface, deckNetwork) : null;
-  const barriers = surface && deckNetwork ? createDeckBarriers(deckNetwork, surface, { skip: landmarks.hiddenDecks }) : null;
+  const barriers = surface && deckNetwork ? createDeckBarriers(deckNetwork, surface, { skip: landmarks.hiddenDecks, roads }) : null;
   /** A tram: at the level of its rails, as high as the vehicle. */
   const tramHit = (x, z, radius, y) => {
     const hit = trams.collide(x, z, radius);

@@ -10,7 +10,7 @@ import { QUALITY, WORLD, TRAM, CAR_COLOURS, CAR } from './config.js';
 import { loadWorldData } from './world-data.js';
 import { createHeightField } from './heightfield.js';
 import { createSurface } from './surface.js';
-import { createDeckNetwork, createGround } from './decks.js';
+import { createDeckNetwork, widenToWays, createGround } from './decks.js';
 import { createBuildingIndex } from './buildings.js';
 import { createTreeIndex, keepWaysClear } from './trees.js';
 import { createTreeView } from './tree-view.js';
@@ -137,7 +137,7 @@ async function boot() {
   await new Promise((r) => setTimeout(r, 0));
   const field = createHeightField({ near: data.near, far: data.far, roads: data.roads, decks: data.decks });
   const surface = createSurface(field);
-  const deckNetwork = createDeckNetwork(fixLandmarkDecks(data.decks, (x, z) => surface.height(x, z)), surface);
+  const deckNetwork = createDeckNetwork(widenToWays(fixLandmarkDecks(data.decks, (x, z) => surface.height(x, z)), data.roads), surface);
   const ground = createGround(surface, deckNetwork);
   // the landmarks (the famous places) replace some blocks and some bridge decks of the bake and have collision of their own
   const landmarks = createLandmarks({ buildings: data.buildings, decks: ground.decks, ground: (x, z) => surface.height(x, z), roads: data.roads });
@@ -210,7 +210,7 @@ async function boot() {
   // Everything that stops the car answers for the car's own level (`y`: the level of its wheels, car-collide.js): a house, a tree, a lamp stops a car only
   // where the car's body overlaps it in height.  (Before drive12 the trees and lamps were switched off on any deck and the houses were solid to the sky: the
   // houses of Pfaffenthal stopped the car on the Pont Rouge 60 m above them, QA3 N3-B01.)  The bank under the end of a bridge stops a car under the deck.
-  const { collide } = createCarCollider({ buildings, landmarks, walls: wallCollider, portals, ground, forest, props, trams: tramSim, playArea, surface, deckNetwork });
+  const { collide } = createCarCollider({ buildings, landmarks, walls: wallCollider, portals, ground, forest, props, trams: tramSim, playArea, surface, deckNetwork, roads: data.roads });
   const car = createCar({ ground, roadInfoAt: (x, z, out) => surface.roadInfoAt(x, z, out), collide, start });
   const wallLens = createWallBlockTest(data.walls);          // look11 (QA2 N-C02): the lens never inside the block of a retaining wall
   // (the wall first: a house that only touches the lens - pen 0 - answered before the wall, and the lens stayed in the block of a wall that ends at the house: Bd Konrad Adenauer 7706,6728)

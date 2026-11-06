@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { loadWorldData } from './world-data.js';
 import { createHeightField } from './heightfield.js';
 import { createSurface } from './surface.js';
-import { createDeckNetwork, createGround, DECK } from './decks.js';
+import { createDeckNetwork, widenToWays, createGround, DECK } from './decks.js';
 import { DECK_ON_ROAD, piersOf } from './deck-shape.js';
 import { createWallCollider, WALL_COLLIDER } from './wall-collider.js';
 import { createLaneSegments, wallBlocksLane, WALL_LANE } from './lane-clearance.js';
@@ -89,7 +89,7 @@ const area = JSON.parse(fs.readFileSync(path.join(DATA, 'area.json'), 'utf8'));
 
 const field = createHeightField({ near: data.near, far: data.far, roads: data.roads, decks: data.decks });
 const surface = createSurface(field);
-const deckNetwork = createDeckNetwork(fixLandmarkDecks(data.decks, (x, z) => surface.height(x, z)), surface);
+const deckNetwork = createDeckNetwork(widenToWays(fixLandmarkDecks(data.decks, (x, z) => surface.height(x, z)), data.roads), surface);
 const ground = createGround(surface, deckNetwork);
 const landmarks = createLandmarks({ buildings: data.buildings, decks: deckNetwork.decks, ground: (x, z) => surface.height(x, z), roads: data.roads });
 const buildings = createBuildingIndex(data.buildings, { hidden: landmarks.hiddenBuildings, groundAt: (x, z) => field.height(x, z), landAt: (x, z) => field.baseHeight(x, z) });   // (as main.js: the houses know their height, drive12)

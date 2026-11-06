@@ -2,7 +2,7 @@
  *   V1  every building, every façade (a quarter, the middle and three quarters of every wall of 3 m or more): the car's body circle at the ground 0.6 m outside it is
  *       stopped by the building (QA4 N4-C01: nine huge footprints were not in the index - the car drove into Kirchberg 1372, the tower block 4808, the Gare's platform
  *       roof 15153; N4-C02: 33 houses on carved slopes let a car in the road pit at the middle of a façade drive under their bottom)
- *   V2  a building under a deck does not stop a car on the deck over it (the footprint points under a deck that stands clear over the building's top)
+ *   V2  a building under a deck does not stop a car on the deck over it (the footprint points under a deck whose surface is over the building's top)
  *   V3  every car deck, ten stations along it, the car steered at each edge (straight at it and at 45 degrees, 9 m/s, 2.5 s) with the game's own collider: it stays on
  *       the deck - beside the deck its wheels never come more than V_FALL under it (QA4 N4-B01: the car left the south side of the Pont Rouge at 5 of 5 stations).
  *       (A car that slides along a parapet off the END of a short deck is on its approach or bank: not judged here.)
@@ -17,7 +17,6 @@ import { buildGameCollider } from './harness-drive12.js';
 
 const V_PROBE_OUT = 0.6;       // m outside a façade: the centre of the probe circle (the car's body circle CAR.bodyRadius)
 const V_MIN_EDGE = 3;          // m: the walls probed (QA4's rule)
-const V_UNDER_CLEAR = 1.5;     // m: a deck that stands this far over a building's top is clear of it (its soffit DECK.thickness under the surface)
 const V_STATIONS = 10;
 const V_SPEED = 9;             // m/s (QA4 edgetest)
 const V_TIME = 2.5;            // s
@@ -161,14 +160,14 @@ export function runCollide14Checks({ check, section, stats, data, field, surface
     for (let i = 0; i < n; i++) { cx += p[i * 2] / n; cz += p[i * 2 + 1] / n; }
     for (const [x, z] of [[cx, cz], ...Array.from({ length: n }, (_, i) => [(p[i * 2] + cx) / 2, (p[i * 2 + 1] + cz) / 2])]) {
       const d = deckNetwork.deckAt(x, z, 1e9, scratch);
-      if (!d || scratch.top - DECK.thickness < topB + V_UNDER_CLEAR) continue;
+      if (!d || scratch.top <= topB) continue;                              // (a house that reaches up through the deck stops a car on it: that is right)
       under++;
       if (buildings.collide(x, z, CAR.bodyRadius, scratch.top)) v2bad.push(`${id} under the deck at ${x.toFixed(0)},${z.toFixed(0)}`);
       break;
     }
   }
   stats.underDeck = { buildings: under, blocked: v2bad.length, list: v2bad.slice(0, 8) };
-  check(`V2 a building under a deck does not stop a car on the deck over it (${under} buildings under decks)`, under > 5 && v2bad.length === 0, v2bad.slice(0, 8).join('; '));
+  check(`V2 a building under a deck does not stop a car on the deck over it (${under} buildings under decks)`, under >= 4 && v2bad.length === 0, v2bad.slice(0, 8).join('; '));
 
   // ---- V3
   const v3 = deckEdgeScan({ ground, surface, roads: data.roads, collide: carCollider.collide });

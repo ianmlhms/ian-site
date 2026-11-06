@@ -45,7 +45,7 @@ export const DECK = Object.freeze({
 
 const DECIMETRE = 0.1;
 /** The classes of the ways a car drives on (a deck of one of them runs off a free end at DECK.endGrade even where it stands over a street: the ramp of a car park). */
-const CAR_DECK_KINDS = new Set(['motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary', 'primary_link', 'secondary', 'secondary_link', 'tertiary', 'tertiary_link',
+export const CAR_DECK_KINDS = new Set(['motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary', 'primary_link', 'secondary', 'secondary_link', 'tertiary', 'tertiary_link',
   'unclassified', 'residential', 'living_street', 'service', 'track', 'road']);
 const segDistance = (p, a, b) => {
   const ex = b[0] - a[0], ez = b[1] - a[1], ll = ex * ex + ez * ez || 1;
@@ -121,6 +121,31 @@ export function encodeDecks(decks) {
     for (let i = 0; i < n; i++) { const b = new Uint8Array(4); new DataView(b.buffer).setFloat32(0, d.tops[i], true); bytes.push(...b); }
   }
   return Uint8Array.from(bytes);
+}
+
+/**
+ * collide14 (harness V3): a deck is at least as wide as the car road it carries.  The bake gave deck 142 (Rue de la Cimenterie, 5.9 m over the ground) 5.1 m for a 7.2 m
+ * secondary road: the outer wheels of both lanes ran off the deck and a parapet there would stand in the lanes.  The deck takes its way's width (centred on its axis:
+ * the way runs along it).  decks: the decoded decks, roads: the decoded ways.  Returns new decks (the others unchanged).
+ */
+export function widenToWays(decks, roads) {
+  const segDist = (p, a, b) => { const ex = b[0] - a[0], ez = b[1] - a[1], ll = ex * ex + ez * ez || 1, t = Math.max(0, Math.min(1, ((p[0] - a[0]) * ex + (p[1] - a[1]) * ez) / ll)); return Math.hypot(p[0] - a[0] - ex * t, p[1] - a[1] - ez * t); };
+  const G = 64, grid = new Map(), key = (x, z) => Math.floor(x / G) * 65536 + Math.floor(z / G);
+  for (const r of roads) {
+    if (!CAR_DECK_KINDS.has(r.kind) || !(r.bridge || r.over)) continue;
+    for (const q of r.pts) { const k = key(q[0], q[1]), l = grid.get(k); if (!l) grid.set(k, [r]); else if (!l.includes(r)) l.push(r); }
+  }
+  return decks.map((d) => {
+    const cand = new Set();
+    for (const p of d.pts) for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (const r of grid.get(key(p[0] + a * G, p[1] + b * G)) || []) cand.add(r);
+    let way = null, most = 0;
+    for (const r of cand) {
+      let c = 0;
+      for (const p of d.pts) for (let i = 0; i + 1 < r.pts.length; i++) if (segDist(p, r.pts[i], r.pts[i + 1]) <= 1.5) { c++; break; }
+      if (c > most) { most = c; way = r; }
+    }
+    return way && most >= d.pts.length * 0.6 && way.width > d.width ? { ...d, width: way.width } : d;
+  });
 }
 
 /** A deck that a landmark model shapes (DECK.landmarkSites). */

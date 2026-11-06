@@ -2211,3 +2211,13 @@ job (its offset carried onto 9356) still drops off 9356 onto trunk 875 (see T4 a
   steps there come from its route leaving the lane, see qa3 section "Not bugs"; 204 12 cm, 169 16 cm remain in the every-lane list).
 * Pont Adolphe west end: 22 cm in lane -1.8 (flat deck, cambered road).  Rue de Neudorf r07_1: a QA-route artefact (section 5).
 * Q1-style every-lane steps: 20 decks over 5 cm (T3 reports them, not gated).
+
+## Collide 14 (branch `lux-drive-collide14`, Mac mini): houses that could be entered, bridges that could be left (QA round 4) - WIP, PAUSED (usage limit)
+
+Round folder `~/Library/Caches/luxdrive-work/collide14/` (tools `tools/`: vcheck.mjs = section V alone + T3 in Node, probe.mjs, edgedbg.mjs, t3dbg.mjs, lanes.mjs; live v60 snapshot `v60/`).
+Done so far: N4-C01 huge footprints hashed along their edges (buildings.js); N4-C02 a house reaches down to the lowest ground within the car's reach (V1 façade probes 541 free -> 0);
+N4-B01 Pont Rouge / Passerelle footways on their road's level (the LiDAR footway sagged 2 - 9.9 m: the root cause) + deck parapets solid where the edge falls away
+(deck-barriers.js, yielding to the lanes: V4 0, T3 back to 13); deck 142 widened to its way (widenToWays); deck-lanes.js shared lane model; harness section V.
+V3 (car steered at both edges of every car deck, 10 stations): v60 1545 of 5356 runs fall -> 19 before the deck 142 fix (re-run pending).
+Next: re-run vcheck V3,V4,T3 (deck 142 widened; deck 59 car park 1 fall left), full harness + all gates, item 4 (decks 73 / 28 / Adolphe east / 169 / 204 / 59 / 157 / 197
+via tools/drive.mjs on qa4/jobs/bridges.json, v60 vs now), main.js ?v=62, before/after montages, browser boot time of the barriers (~1.2 s in Node).

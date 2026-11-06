@@ -64,7 +64,7 @@ export function buildGameCollider({ data, surface, ground, net, buildings, landm
   const benches = placeParkBenches({ roads: data.roads, network: net, buildings, map: maps });
   for (let i = 0; i < benches.count; i++) props.add(benches.x[i], benches.z[i], BENCH_RADIUS, surface.height(benches.x[i], benches.z[i]), BENCH_HEIGHT);
   const gameWalls = createWallCollider(data.walls, (x, z) => ground.height(x, z));
-  const game = createCarCollider({ buildings, landmarks, walls: gameWalls, portals, ground, forest, props, trams: null, playArea, surface, deckNetwork });
+  const game = createCarCollider({ buildings, landmarks, walls: gameWalls, portals, ground, forest, props, trams: null, playArea, surface, deckNetwork, roads: data.roads });
   return { game, gameWalls };
 }
 
