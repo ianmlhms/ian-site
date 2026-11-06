@@ -73,7 +73,8 @@ const FRAGMENT = `
     } else if (kind < 3.5) {
       albedo *= 0.94 + 0.10 * grain;                            // the coping: plain pale concrete
     } else {
-      albedo *= 0.85 + 0.15 * grain;                            // the back of the block (only seen where the ground behind it falls away)
+      // the bank behind the coping and the back of the block (city12): earth and grass, mottled like the meadow, so where the ground behind falls away it reads as a bank
+      albedo *= 0.80 + 0.30 * grain * (0.7 + 0.6 * grain2);
     }
     vec3 c = paintLightW(albedo * (1.0 - 0.2 * uWet), N, mix(1.0, 0.8, uCloud * 0.6), 1.15, vWorld);
     gl_FragColor = vec4(applyFogW(pow(c, vec3(0.97)), vDist, vWorld.y), 1.0);

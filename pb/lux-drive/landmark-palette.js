@@ -30,6 +30,7 @@ export const PALETTE = Object.freeze({
   steelGrey: [0.52, 0.56, 0.60],
   steelDark: [0.24, 0.26, 0.29],
   white: [0.93, 0.93, 0.91],
+  screenWhite: [0.88, 0.89, 0.88],      // the slats of the Pont Rouge's safety screens
   glassBlue: [0.40, 0.55, 0.64],
   glassDark: [0.22, 0.30, 0.36],
   bronze: [0.62, 0.45, 0.22],           // the gold-bronze of the Cour de justice

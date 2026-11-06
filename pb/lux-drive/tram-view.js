@@ -25,9 +25,16 @@ const GROOVE = 0.16;                // m: the dark groove around a rail
 const BED_EDGE_TOLERANCE = 0.6;     // m: on a deck, an edge of the bed that differs from the middle by more than this is off the deck
 const BED_LIFT = 0.03;              // m: the bed over the ground (the ground is a 1 m lattice, the bed a 2 m ribbon)
 const COL = {
-  slab: [0.60, 0.61, 0.60], slabDark: [0.50, 0.51, 0.51], grass: [0.35, 0.50, 0.24], groove: [0.24, 0.25, 0.26], rail: [0.40, 0.41, 0.43],
+  slab: [0.60, 0.61, 0.60], slabDark: [0.50, 0.51, 0.51], sett: [0.60, 0.575, 0.535], grass: [0.35, 0.50, 0.24], groove: [0.24, 0.25, 0.26], rail: [0.40, 0.41, 0.43],
   railTop: [0.66, 0.67, 0.69], wire: [0.17, 0.17, 0.19], platform: [0.74, 0.73, 0.70], platformEdge: [0.88, 0.80, 0.30], platformSide: [0.58, 0.57, 0.55],
 };
+
+/** The setts of a section: the sett colour with a faint shade of its own (+-2.5 %, a stable hash of the section). */
+function settShade(key) {
+  const h = Math.sin(key * 12.9898) * 43758.5453;
+  const f = 0.975 + 0.05 * (h - Math.floor(h));
+  return [COL.sett[0] * f, COL.sett[1] * f, COL.sett[2] * f];
+}
 
 const lerp3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 
@@ -101,7 +108,7 @@ export function createTramView({ scene, network, sim, surface, deckNetwork, env,
       sampleWorldMap(maps, x, z, land);
       // the tram shares the street (a slab, the rails are embedded) or runs on paving in the city; only in the open it has a grass bed
       const onRoad = onDeck || road.sdCar < 0.6 || road.sdPave < 0.3 || land.urban > 0.5;
-      sections.push({ x, z, tx, tz, rx, rz, yc, yl, yr, onRoad, along: last });
+      sections.push({ x, z, tx, tz, rx, rz, yc, yl, yr, onRoad, onDeck, along: last });
       if (k > 0) last += Math.hypot(x - sections[k - 1].x, z - sections[k - 1].z);
       if (k % 8 === 7) yield;
     }
@@ -114,8 +121,14 @@ export function createTramView({ scene, network, sim, surface, deckNetwork, env,
     };
     for (let k = 0; k + 1 < sections.length; k++) {
       const s0 = sections[k], s1 = sections[k + 1];
-      const slab = s0.onRoad || s1.onRoad ? (k % 4 < 2 ? COL.slab : COL.slabDark) : COL.grass;
-      const g = s0.onRoad || s1.onRoad ? COL.slab : COL.grass;
+      // On a bridge the bed is a concrete slab; in the streets of the city the rails lie in granite setts like the paving round them (city12, QA3 section 3
+      // item 8: the photographs of the Avenue de la Liberté and the Bd Royal show warm grey setts the whole width, no grey concrete blocks): a calm colour
+      // with a faint shade per section, not the alternating 4 m slabs.
+      const paved = s0.onRoad || s1.onRoad;
+      const deck = s0.onDeck || s1.onDeck;
+      const sett = settShade(chunk.cx + k * 7.31);
+      const slab = !paved ? COL.grass : deck ? (k % 4 < 2 ? COL.slab : COL.slabDark) : sett;
+      const g = !paved ? COL.grass : deck ? COL.slab : sett;
       strip(s0, s1, -HALF_BED, -half - GROOVE, BED_LIFT, g, g);
       strip(s0, s1, -half - GROOVE, -half + GROOVE, BED_LIFT, COL.groove, COL.groove);
       strip(s0, s1, -half + GROOVE, half - GROOVE, BED_LIFT, slab, slab);

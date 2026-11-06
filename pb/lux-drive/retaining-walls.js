@@ -139,15 +139,21 @@ export const WALL_LOOK = Object.freeze({
   footMax: 0.75,           // vertical face, its triangles climb up to 0.8 m in front of it, and that was the sawtooth grass fringe along the foot of every wall
   footOver: 0.08,
   footReach: 0.9,          // m: how far in front of the face the ground is looked at
+  copingBack: 0.5,         // m: the pale coping is this deep; behind it the block is a bank of earth (city12, QA3 N3-W04 / W05: the full block top was a pale slab and its back
+                           // and ends stood above a falling ground as a beige box or a dark tombstone; JFK's first wall read as a concrete kerb slab lying on the tarmac)
+  endTaper: 2.5,           // m: the end of a wall runs down into the ground beyond it over at most this
+  bankBelow: 0.25,         // m: the bank behind the coping goes down to this far under the drawn ground behind the block (buried where the ground is as high as the top)
   oldTown: [4300, 8200, 5700, 9900],   // x0, z0, x1, z1: the old town, the Grund, Pfaffenthal and Clausen are walled in Luxembourg sandstone
 });
 
 // the colours of the kinds (wall-material.js draws the joints and the grain on top): Luxembourg sandstone, grey limestone, poured concrete, a pale concrete coping
 const STONE_OF = Object.freeze({ 0: [0.66, 0.58, 0.45], 1: [0.57, 0.56, 0.52], 2: [0.62, 0.61, 0.58] });
 const COPING_COLOR = [0.55, 0.54, 0.52];
+const BANK_COLOR = [0.40, 0.45, 0.27];  // the earth and grass of the bank behind the coping (wall-material.js KIND back: a mottled ground colour, never a box of stone)
 const FOOTING_SHADE = 0.86;             // the footing's front is the stone of the wall, this much darker (a stepped base, not a pale bench)
 const scaleColor = (c, k) => [c[0] * k, c[1] * k, c[2] * k];
 const KIND = Object.freeze({ coping: 3, back: 4 });      // (= WALL_KIND of wall-material.js; 0..2 are the stone of the face)
+export const WALL_PART_KIND = KIND;                       // (harness U5: wall-material.js needs THREE)
 
 /** The stone of a wall: sandstone in the old town, elsewhere concrete or limestone or sandstone by a stable hash of its place. */
 export function wallStone(wall) {
@@ -159,7 +165,7 @@ export function wallStone(wall) {
 }
 
 /**
- * The quads of one wall: [{ part, q: [a, b, c, d], n: [na, nb, nc, nd], color, a: [ua, ub, uc, ud] }] (part: face, footing, footTop, lipUnder, lipFront, top, back, end) with a.. = [x, y, z], n.. = the vertex normals and
+ * The quads of one wall: [{ part, q: [a, b, c, d], n: [na, nb, nc, nd], color, a: [ua, ub, uc, ud] }] (part: face, footing, footTop, lipUnder, lipFront, top, bank, back, end, endBank) with a.. = [x, y, z], n.. = the vertex normals and
  * u.. = [metres along the wall, kind, the height of the foot] (wall-material.js).  A block with a face in one piece from the buried foot to the coping (the
  * courses are the shader's, level in world height), a coping slab that overhangs the face a little, a flat top and a closed back; the two ends are closed.
  * The normals of the face are SMOOTH along the wall (the mean of the two segments at a point), so a curved wall has no facets.
@@ -199,9 +205,14 @@ export function wallQuads(wall, groundAt = null) {
       return [p.x + p.nx * back, y, p.z + p.nz * back];
     };
     const yUnder = p.top - cap, yTop = p.top + WALL.coping;
+    const cb = Math.min(p.depth, WALL_LOOK.copingBack);
+    // the back edge of the bank: under the drawn ground behind the block (buried where the ground there is as high as the top: a retaining wall), down the slope where it falls away
+    const behind = groundAt ? groundAt(p.x + p.nx * p.depth, p.z + p.nz * p.depth) - WALL_LOOK.bankBelow : yTop - WALL_LOOK.backDrop;
+    const backY = Math.max(p.bottom, Math.min(yTop - 0.02, behind));
     return {
       foot: at(p.bottom - WALL.skirt, 0), under: at(yUnder, 0), lipLow: at(yUnder, WALL_LOOK.copingLip), lipTop: at(yTop, WALL_LOOK.copingLip),
-      backTop: [p.x + p.nx * p.depth, yTop, p.z + p.nz * p.depth], backLow: [p.x + p.nx * p.depth, yTop - WALL_LOOK.backDrop, p.z + p.nz * p.depth],
+      cope: [p.x + p.nx * cb, yTop, p.z + p.nz * cb], copeFoot: [p.x + p.nx * cb, p.bottom - WALL.skirt, p.z + p.nz * cb],
+      backTop: [p.x + p.nx * p.depth, backY, p.z + p.nz * p.depth], backLow: [p.x + p.nx * p.depth, backY - WALL_LOOK.backDrop, p.z + p.nz * p.depth],
       footY: p.bottom, i,
     };
   });
@@ -225,8 +236,9 @@ export function wallQuads(wall, groundAt = null) {
     add('face', [g.foot, h.foot, h.under, g.under], [faceN(i), faceN(i + 1), faceN(i + 1), faceN(i)], stoneColor, stone, us, foot);            // the face
     add('lipUnder', [g.under, h.under, h.lipLow, g.lipLow], [DOWN, DOWN, DOWN, DOWN], COPING_COLOR, KIND.coping, us, foot);                         // the underside of the lip
     add('lipFront', [g.lipLow, h.lipLow, h.lipTop, g.lipTop], [faceN(i), faceN(i + 1), faceN(i + 1), faceN(i)], COPING_COLOR, KIND.coping, us, foot); // the front of the coping
-    add('top', [g.lipTop, h.lipTop, h.backTop, g.backTop], [UP, UP, UP, UP], COPING_COLOR, KIND.coping, us, foot);                             // the top
-    add('back', [g.backTop, h.backTop, h.backLow, g.backLow], [backN(i), backN(i + 1), backN(i + 1), backN(i)], stoneColor, stone, us, foot); // the back: the stone (seen over the sloping end of a wall)
+    add('top', [g.lipTop, h.lipTop, h.cope, g.cope], [UP, UP, UP, UP], COPING_COLOR, KIND.coping, us, foot);                                     // the coping
+    add('bank', [g.cope, h.cope, h.backTop, g.backTop], [UP, UP, UP, UP], BANK_COLOR, KIND.back, us, foot);                                     // the bank behind it, down to the ground at the back
+    add('back', [g.backTop, h.backTop, h.backLow, g.backLow], [backN(i), backN(i + 1), backN(i + 1), backN(i)], BANK_COLOR, KIND.back, us, foot); // the back (buried; earth where the ground falls away)
   }
   // the ends: the side of the block from the buried foot to the top of the coping
   for (const [k, sign] of [[0, -1], [pts.length - 1, 1]]) {
@@ -235,7 +247,20 @@ export function wallQuads(wall, groundAt = null) {
     const n = Math.sign(out[k][0] * -tz + out[k][1] * tx) || 1;        // (any orientation: the material is two-sided and flips N)
     const endN = [tx * n, 0, tz * n];
     const backFoot = [p.x + p.nx * p.depth, p.bottom - WALL.skirt, p.z + p.nz * p.depth];
-    add('end', [g.foot, g.lipTop, g.backTop, backFoot], [endN, endN, endN, endN], stoneColor, stone, [along[k], along[k], along[k], along[k]], [p.bottom, p.bottom, p.bottom, p.bottom]);
+    const at = [along[k], along[k], along[k], along[k]], ft = [p.bottom, p.bottom, p.bottom, p.bottom];
+    add('end', [g.foot, g.lipTop, g.cope, g.copeFoot], [endN, endN, endN, endN], stoneColor, stone, at, ft);                         // the stone: as deep as the coping
+    add('endBank', [g.copeFoot, g.cope, g.backTop, backFoot], [endN, endN, endN, endN], BANK_COLOR, KIND.back, at, ft);              // the earth behind it, sloping to the back
+    // the end tapers into the ground beyond it: a wedge of earth from the top of the end down to the drawn ground ENDTAPER m on (the end stood up out of a falling slope as
+    // a dark slab, QA3 N3-W04); its face side is the wall's stone
+    if (groundAt) {
+      const run = Math.min(WALL_LOOK.endTaper, Math.max(0.5, p.top - p.bottom));
+      const on = (q) => { const x = q[0] + tx * run, z = q[2] + tz * run; return [x, Math.min(q[1], groundAt(x, z) - 0.1), z]; };
+      const c1 = on(g.cope), b1 = on(g.backTop), l1 = on(g.lipTop);
+      const slopeN = [tx * n * 0.7, 0.7, tz * n * 0.7];
+      add('endTaper', [g.cope, c1, b1, g.backTop], [slopeN, slopeN, slopeN, slopeN], BANK_COLOR, KIND.back, at, ft);
+      add('endTaperTop', [g.lipTop, l1, c1, g.cope], [slopeN, slopeN, slopeN, slopeN], COPING_COLOR, KIND.coping, at, ft);
+      quads.push({ part: 'endTaperFace', q: [g.foot, [l1[0], g.foot[1], l1[2]], l1, g.lipTop], n: [faceN(k), faceN(k), faceN(k), faceN(k)], color: stoneColor, a: at.map((u) => [u, stone, p.bottom]) });
+    }
   }
   return quads;
 }
