@@ -2273,3 +2273,66 @@ the before shots; `out/` reports and logs; gate logs `gate_*.txt`).
 * rampsInRoads 186 (task 2) unchanged; tarmac-down-the-face fixed only in the shader.
 * Kirchberg 9423's outer lane at the merge node (task 3): not fixed (above).  Houses in narrow-street lanes (task 4): not started (1097 pairs as drive12).
 * The concrete paint also takes any natural bank steeper than ~0.75 m/m within 3 m of a road (checked on the look poses; none seen, not proven everywhere).
+
+## Paint 15 (branch `lux-drive-paint15`, Mac mini): every edge of the ground paint a straight per-pixel edge - Ian's Avenue Victor Hugo, the junction blobs, the pale aprons
+
+Started from live v60 (c630a40c).  Input: Ian's Safari screenshot (Av. Victor Hugo, `paint15/ian_victor_hugo.webp`), QA4 N4-T03 (17 sweep poses), N-T03 / N-M02 (junction top views),
+N3-T01 (JFK first 150 m), Rond-Point Schuman.  Montages (left live v60, right this branch, GPU shots, noon): `~/Library/Caches/luxdrive-work/paint15/montage/sheet_00..10.jpg`
+(00 Ian's view x3 + top, 01-04 the 17 N4-T03 poses, 05-07 junction tops q01-q14, 08 JFK, 09-10 Schuman); singles `paint15/before/`, `paint15/after/` (poses `paint15/poses.json`).
+Node top-down tools (paint as the shader decides it, from the GPU arrays): `paint15/tools/paintmap2.mjs`, `edgeimg.mjs` (edges coloured by wobble), `edges.mjs` (the W1 metric, v60 too).
+
+### Root causes (measured in Node, `paint15/vh_z.png` / `vh_z_new.png`)
+1. **The material of the paint was a per-node label**: `aRoad2.z` = the material of the ONE nearest way, interpolated and thresholded (`surface < 0.5 ? tar : < 1.5 ? cobbles :
+   ...`).  Where the 10 m pedestrian way "Place Auguste Laurent" (paved stone) overlaps Av. Victor Hugo (tarmac) the switch ran along the lattice: a 1 m sawtooth with a band
+   of cobbles + "kerb" (the 1 / 2 thresholds between 0 and 5) zigzagging along it - Ian's picture exactly.  Same for the TONE (the pale tar of minor ways, a blurred union field with
+   a 0.8 m soft band): the dark soft blob in every junction box (N-T03).
+2. **Three channels, one group per OSM way**: unmarked streets were one carriageway per way, so a plain residential crossing was 4 carriageways > 3 channels; and the per-node
+   slot order (near ones by group) reshuffled whenever a carriageway crossed the "near" radius.  Either way the node lost its weight and the paint fell back to the blurred union
+   (ragged corners, stray kerb scratches in q03).
+3. **The level push** (8 m per m of level difference) acted OUTSIDE the edge too: a cut rising beside the road made a kink half a metre past the edge, which the lattice turned into
+   a sawtooth (Rue du Fort Dumoulin 10 - 17 cm); the pavement was pushed by the land's level under it, so its outer edge waved with the terrain (the village aprons).
+4. The kerb (pave x 0.80) and the slabs (x 0.82) were one tone, the town's hard ground nearly the same: pavement + hard ground read as one wide kerbless apron (N4-T03).
+
+### What changed
+* `road-network.js` (paint fields only, no height logic): `PAINT_CODE` per way (material + 8 street + 16 car road); `PAINT_GROUP` (carriageways.js `paintGroups`: unmarked ways
+  joined where they continue each other straight, same name, same code); `CHANNELS` 3 -> 6 reported per point with a code each; the median (gap <= 3 m, opposite sides) folded
+  into the pavement channels, only between carriageways at one level (bed difference > SEP_LOW pushes it out; the bank between two levels stays land); the push fades out over
+  0.5 m outside an edge (`PUSH_OUT_FADE`); the pavement is pushed only where the land falls away faster than 1 m/m (`PAVE_LEVEL_SLOPE`).
+* `tile-mesh.js carriagewayChannels`: 4 GPU slots (`PAINT_SLOTS`) given per TILE by colouring (two carriageways near in one 3 x 3 neighbourhood never share a slot); the
+  carriageways that get no slot form the REST (a blurred union, aRoad3) - no weight, no all-or-nothing fallback.  Blur clamped (a neighbour counts at most 1.5 m/m from the
+  node) and never lifts an inside node out of its carriageway.  Layout: aRoad4 distances, aRoad5 pavements, aRoad codes, aRoad3 the rest, aRoad2.z the rest's material.
+* `ground-shader.js`: per pixel - edge = min(channels, rest); material = the nearest street's inside it, else the nearest car road's, else the nearest carriageway's (a car
+  road lies over a pedestrian square); tone = pale only outside every street; a kerb along a car road's edge where a square of another material meets it; kerb light granite
+  with a dark gutter line, pavement with a darker edging (near only), town hard ground warmer/darker than slabs.  Pavement/kerb fade only on ramps > ~1 m/m (was 0.35 - 0.6:
+  the irregular pale/green smears of the JFK banks).
+* `paint-model.js`: the shader's paint rules in Node (keep in step with GROUND_FRAGMENT); `paint-edges.js`: edge tracing + wobble; `marking-checks.js` reads the new layout.
+
+### Gate W (new, `harness-paint15.js`, 5 checks)
+74 places (Ian's VH, 17 N4-T03 poses, 14 junctions, JFK first 150 m, Rond-Point Schuman, 40 random places on the carved ways), every visible paint edge traced from the GPU
+arrays: **W1** edges wobbling > 2 cm: 2.96 % of 33.3 km (v60 on the 30 named places: 16.9 %; this tree on the same: 3.6 %), places' p99 14.1 cm, Ian's place 2.6 %.
+**W2** tone changes on a street's exact edge: 404 / 421 (96 %), half tones 0.26 % of tarmac.  **W3** Av. Victor Hugo / Place Auguste Laurent: 251 stations, wobble 1.5 cm, 1.0 cm
+off the carve's edge, kerb at 288 / 291.  **W4** painted tarmac edge vs carve: p95 3.9 cm.
+Gate M changes (honest): M3 reference = max(blurred union, the carve's own distance) (the blurred union called a point on the carve's edge "1 m inside" in a pushed field at the
+Rocade loop end); M5 measures only a zero within 1 m of the carriageway's half width (the far edge of a merging slip road at JFK 6685,7613 was measured as the median edge).
+M5 now p95 4.4 / worst 7.8 cm (v60 4.7 / 17.4).
+
+### Gates
+`harness.js` **166 / 166** (1436 s).  `luxdrive_world` PASS, `luxdrive_holes` PASS (medium and low), `luxdrive_ui` PASS (logs `paint15/gate_*.txt`); `luxdrive_webkit` NOT RUN
+(killed at the 90 % usage stop - the 'browser closed' in gate_webkit.txt is that kill).  `pb/lux-drive.html` main.js `?v=63`.
+
+### Still wrong (honest)
+* **Edges of carriageways pushed off their level beside a step to another level** (the narrow gaps between JFK and its service roads, N3-T01 / jf03; q01 Rummplateau; random
+  service ways): the push inside the edge is 8 m per m and the lattice still makes a 5 - 27 cm wobble there - 463 m of the 984 m that wobble are in the JFK window.  A cleaner
+  edge needs the true distance to the step (or the walls13 step placement); not done.
+* Where more than 4 carriageways meet (q03 Circuit de la Foire) the rest is the blurred union: its tone boundary is up to 38 cm off the exact edge (W2 17 points).
+* The tone switches on a street's ROUND end cap where a street way ends inside a pale service way (q03 lollipop); data-driven, not smoothed.
+* Pavement lenses where two nearly coincident service ways overlap (VH 4519,7767); pavements on 0.5 - 1 m/m slopes are now painted (strips), may look stretched.
+* The wide pale areas of N4-T03 are mostly the town's hard-ground CLASS (8 m blurred cover), not paint: the edge between pavement and hard ground is now a line, the hard
+  ground itself still has its soft blob edge to lawns (not a lattice staircase).  Rond-Point Schuman: still no roundabout / Étoile (data).
+* Tile building does more work (6 reported carriageways per node, per-tile colouring): not measured on an iPad.
+
+### Status at the usage stop (6 Nov, WIP, committed)
+* Done: the paint rework above, gate W, harness 166/166, world / holes x2 / ui pass on commit 4320f686 + this PROGRESS.
+* Next: (1) run `bash ~/Library/Caches/luxdrive-work/paint15/gates.sh` again for WebKit (or just `luxdrive_webkit.mjs` through browser-slot); (2) re-take the after
+  shots (`REPO=<worktree> node tools/run.mjs poses.json after` via browser-slot) - the montages in `paint15/montage/` predate the last blur / M-gate commit; rebuild them with
+  `tools/montage.py before after montage <names>`; (3) final report.

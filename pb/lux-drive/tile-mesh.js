@@ -6,19 +6,17 @@
  * Stitching: a boundary vertex that touches a COARSER tile takes the value of that tile's edge polyline (exactly what the coarser tile
  * renders there), corners included. A skirt hangs under every boundary vertex.
  *
- * Every node also carries the road it lies on, so the shader can paint the tarmac, the kerb, the pavement and the lane markings:
- *   aRoad  (lat, hw, a0, s)   the offset from the centre line, the half width of the carriageway, the outer edge of the
- *                             pavement, the distance along the centre line (the dashes of the lane markings)
- *   aRoad3 (sdCar, sdPave, paint, sdMajor)  the signed distance to the UNION of the carriageways and of the pavements (negative =
- *                             inside) and the fade of the paint: the edges of the paint are the zero of these
- *   aRoad2 (coverage, lines, surface, mark)  how much road there is, the style of the markings, the material, and how
- *                             exactly the fine markings are drawn (a 4 m lattice cannot resolve a 15 cm line) */
+ * Every node also carries the road it lies on, so the shader can paint the tarmac, the kerb and the pavement (the lane markings are ribbons, appendMarkings):
+ *   aRoad3 (rest, restPave, paint, restStreet)  the signed distance to the union of the REST of the carriageways (the ones without a slot), of their pavements and of
+ *                             their streets (negative = inside), and the fade of the paint
+ *   aRoad4, aRoad5, aRoad     the PAINT_SLOTS channels (carriagewayChannels): the distances to the nearest carriageways, to their pavements, and their paint codes
+ *   aRoad2 (-, lines, restMaterial, -)  the style of the markings, the material of the nearest carriageway of the rest */
 import { QUADTREE, ROAD } from './config.js';
 import { diagonalIsMain } from './surface.js';
 import { tilesTouching, leafAt } from './quadtree.js';
 import { fadeOf } from './heightfield.js';
 import { MARK, trackPoint, pieceSpans } from './markings.js';
-import { CHANNELS } from './road-network.js';
+import { CHANNELS, PAINT_CODE } from './road-network.js';
 
 const EDGE_EPS = 1e-6;
 const EPS_PROBE = 1e-3;                 // same offset as quadtree.js tilesTouching
@@ -78,72 +76,98 @@ export function maskMarkBorders(road2, road, along, sdCar, step) {
 /**
  * The edge of the tarmac as exact CHANNELS.  The union of the carriageways is the minimum of the distances to each of them; interpolated over the 1 m lattice, the minimum of two
  * roads has a crease, and a gap narrower than the lattice (the median of a dual carriageway: 0.5 .. 2 m) falls between the nodes: the median was a sawtooth of 1 m teeth (QA T01, T07,
- * M01).  Each node carries the distances to its CHANNELS nearest carriageways (carriageways.js groups: two ways of one carriageway are one), ordered by the group, so that the four
- * nodes of a cell interpolate the distances to the SAME carriageways: each is a plane, and the shader takes their minimum per pixel - the median is two straight kerbs.  Where the
- * set changes from node to node (more carriageways meet: a big junction) the node's weight is 0 and the shader keeps the blurred union (aRoad3.x).
- * The pavements of the carriageways come along the same way, and the distance to the nearest of them that is a street (the pale tar of a service way is outside every STREET).
- * Where the set holds over the 3 x 3 nodes the channels get the [1 2 1]^2 blur of blurField: a plane does not move, but a carriageway that lies off its level is pushed out of the
- * paint by an amount that follows the ground (road-network.js PAINT_LEVEL_PUSH), and that field, not a plane, came out of the interpolation as a sawtooth.
- * Returns a Float32Array (APRON_SIDE^2 x CHANNEL_STRIDE): carriageways 0 .. 2, the weight, pavements 0 .. 2, the distance to the street carriageways among them.
+ * M01).  So the shader gets PAINT_SLOTS channels per node, each the distance to ONE carriageway (road-network.js PAINT_GROUP: the ways of one street are one), the distance to its
+ * pavement and its paint code (road-network.js PAINT_CODE: the material, street or not, car road or not); the four nodes of a cell interpolate the distances to the SAME
+ * carriageways, each a plane, and the shader takes their minimum per pixel - the median is two straight kerbs - and the material and the tone of the tarmac from the codes of the
+ * nearest ones (paint15: per lattice node they were a sawtooth along every boundary between two materials or tones).
+ * The slots are given per TILE (paint15): the carriageways that come near the tile are coloured like a map - two that are NEAR (within the reach of their paint) at two nodes of one
+ * 3 x 3 neighbourhood never share a slot - so a carriageway keeps its slot over the whole tile.  (Per node, ordered by the group, a fourth carriageway coming into reach shifted
+ * the others into new slots, the paint fell back to the blurred union over the whole neighbourhood: the ragged junction boxes and their dark soft blobs, QA4 N-T03.)  The carve
+ * reports the CHANNELS nearest carriageways of every node, more than the slots, so a slot is filled wherever its carriageway is near.
+ * Where more carriageways meet than the slots hold, the ones that cover the fewest nodes of the tile get no slot: they are the REST, a union (its carriageways, its pavements, its
+ * streets) that the shader takes as one more channel, the blurred field of the lattice (the old union) - only there, and only for them.
+ * All the distances get the [1 2 1]^2 blur of blurField: a plane does not move, but a carriageway that lies off its level is pushed out of the paint by an amount that follows the
+ * ground (road-network.js PAINT_LEVEL_PUSH), and that field, not a plane, came out of the interpolation as a sawtooth.  (Never the codes: a code is a label, constant over a cell
+ * where its carriageway is near.)
+ * Returns a Float32Array (APRON_SIDE^2 x CHANNEL_STRIDE): the slots' carriageways, their pavements, their paint codes, the rest's carriageways, pavements, streets and material.
  */
-export const CHANNEL_STRIDE = 8;
-const CHANNEL_FAR = 30;                 // m: "no such carriageway" (a distance that never wins the minimum)
-const CHANNEL_NEAR = 3.0;               // m (see carriagewayChannels): more than two diagonals of a 1 m cell
-const CHANNEL_CRITICAL = 2.0;           // m (see carriagewayChannels agree): more than a cell's diagonal
-export function carriagewayChannels(chGroup, chCar, chPave, chMajor) {
+export const PAINT_SLOTS = 4;           // the channels of the GPU (aRoad4 / aRoad5 / aRoad: one vec4 each)
+export const CH_PAVE = PAINT_SLOTS, CH_CODE = 2 * PAINT_SLOTS, CH_REST = 3 * PAINT_SLOTS;    // (the offsets of the parts of a node's channel record; the rest: carriageways, pavements, streets, the material of its nearest)
+export const CHANNEL_STRIDE = CH_REST + 4;
+export const CHANNEL_FAR = 30;          // m: "no such carriageway" (a distance that never wins the minimum)
+const BLUR_REACH = 1.5;                 // m per m of the node spacing (see the blur in carriagewayChannels)
+const PAINT_REACH = 6.0;                // m: a carriageway's paint shows at most this far past its edge (its kerb and pavement, ground-shader.js PAVE_MAX + 0.95; a median: 3)
+export function carriagewayChannels(chGroup, chCar, chPave, chCode, step = 1) {
   const n = APRON_SIDE * APRON_SIDE;
+  // NEAR: the carriageway's paint can show in a cell of this node (its reach and a cell's diagonal)
+  const near = PAINT_REACH + 1.5 * step;
   const out = new Float32Array(n * CHANNEL_STRIDE);
-  const slotGroups = new Int32Array(n * CHANNELS).fill(-1);      // the group in each slot
-  const order = [0, 1, 2];
+  // ---- the carriageways near the tile, how many nodes each covers, and which of them are near together (in one 3 x 3 neighbourhood of nodes)
+  const groups = new Map();              // group -> { nodes, best, slot, conflicts: Set }
+  const nearOf = Array.from({ length: n }, () => []);
   for (let o = 0; o < n; o++) {
-    // The slots: the NEAR carriageways (within CHANNEL_NEAR of the node) by their group, then the others by their distance (a carriageway that leaves the near set keeps its slot as
-    // long as it is the nearest of the far ones).  The weight holds where the node agrees with its 8 neighbours (agree, below).
-    const g = (c) => chGroup[o * CHANNELS + c], d = (c) => chCar[o * CHANNELS + c];
-    const isNear = (c) => g(c) >= 0 && d(c) <= CHANNEL_NEAR;
-    order.sort((a, b) => (isNear(b) - isNear(a)) || (isNear(a) ? g(a) - g(b) : (g(a) < 0) - (g(b) < 0) || d(a) - d(b)));
-    let street = CHANNEL_FAR;
-    order.forEach((c, k) => {
-      const none = g(c) < 0;
-      out[o * CHANNEL_STRIDE + k] = none ? CHANNEL_FAR : Math.min(CHANNEL_FAR, d(c));
-      out[o * CHANNEL_STRIDE + 4 + k] = none ? CHANNEL_FAR : Math.min(CHANNEL_FAR, chPave[o * CHANNELS + c]);
-      if (!none && chMajor[o * CHANNELS + c]) street = Math.min(street, d(c));
-    });
-    out[o * CHANNEL_STRIDE + 7] = street;          // (one distance, not per slot: a flag of a far slot that differs between two nodes cannot be interpolated)
-    order.forEach((c, k) => { slotGroups[o * CHANNELS + k] = g(c); });
-  }
-  /** May the nodes o and q be interpolated slot by slot?  Every slot must hold the same carriageway at both, unless it is far at both (CHANNEL_CRITICAL: a slot that is far at both
-   *  ends can neither make an edge in the cell nor win the minimum near one; a slot that is near at one end and holds another carriageway at the other would draw a false kerb). */
-  const agree = (o, q) => {
-    for (let k = 0; k < CHANNELS; k++) {
-      if (slotGroups[q * CHANNELS + k] === slotGroups[o * CHANNELS + k]) continue;
-      if (out[o * CHANNEL_STRIDE + k] < CHANNEL_CRITICAL || out[q * CHANNEL_STRIDE + k] < CHANNEL_CRITICAL) return false;
+    for (let c = 0; c < CHANNELS; c++) {
+      const g = chGroup[o * CHANNELS + c], d = chCar[o * CHANNELS + c];
+      if (g < 0 || d > near) continue;
+      nearOf[o].push(g);
+      const e = groups.get(g);
+      if (!e) groups.set(g, { nodes: 1, best: d, slot: -1, conflicts: new Set() });
+      else { e.nodes++; if (d < e.best) e.best = d; }
     }
-    return true;
-  };
+  }
   for (let j = 0; j < APRON_SIDE; j++) {
     for (let i = 0; i < APRON_SIDE; i++) {
-      const o = j * APRON_SIDE + i;
-      let same = 1;
-      for (let dj = -1; dj <= 1 && same; dj++) {
-        for (let di = -1; di <= 1; di++) {
-          const jj = j + dj, ii = i + di;
-          if (jj < 0 || jj >= APRON_SIDE || ii < 0 || ii >= APRON_SIDE) continue;
-          if (!agree(o, jj * APRON_SIDE + ii)) { same = 0; break; }
-        }
+      const hood = new Set();
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+        const jj = j + dj, ii = i + di;
+        if (jj >= 0 && jj < APRON_SIDE && ii >= 0 && ii < APRON_SIDE) for (const g of nearOf[jj * APRON_SIDE + ii]) hood.add(g);
       }
-      out[o * CHANNEL_STRIDE + 3] = same;
+      if (hood.size < 2) continue;
+      for (const a of hood) for (const b of hood) if (a !== b) groups.get(a).conflicts.add(b);
+    }
+  }
+  // ---- the colouring: the carriageway that covers the most nodes first, the lowest free slot
+  const order = [...groups.entries()].sort((p, q) => q[1].nodes - p[1].nodes || p[1].best - q[1].best || p[0] - q[0]);
+  for (const [, e] of order) {
+    let used = 0;
+    for (const b of e.conflicts) { const sl = groups.get(b).slot; if (sl >= 0) used |= 1 << sl; }
+    for (let sl = 0; sl < PAINT_SLOTS; sl++) if (!(used & (1 << sl))) { e.slot = sl; break; }
+  }
+  // ---- every node: in each slot the nearest of its carriageways that the carve reported there; the others make the rest
+  for (let o = 0; o < n; o++) {
+    const base = o * CHANNEL_STRIDE;
+    for (let k = 0; k < PAINT_SLOTS; k++) { out[base + k] = CHANNEL_FAR; out[base + CH_PAVE + k] = CHANNEL_FAR; }
+    out[base + CH_REST] = CHANNEL_FAR; out[base + CH_REST + 1] = CHANNEL_FAR; out[base + CH_REST + 2] = CHANNEL_FAR;
+    for (let c = 0; c < CHANNELS; c++) {
+      const g = chGroup[o * CHANNELS + c];
+      if (g < 0) continue;
+      const e = groups.get(g);
+      const d = Math.min(CHANNEL_FAR, chCar[o * CHANNELS + c]), p = Math.min(CHANNEL_FAR, chPave[o * CHANNELS + c]), code = chCode[o * CHANNELS + c];
+      if (!e) continue;                                             // (never near the tile)
+      if (e.slot < 0) {
+        if (d < out[base + CH_REST]) { out[base + CH_REST] = d; out[base + CH_REST + 3] = code % PAINT_CODE.street; }
+        out[base + CH_REST + 1] = Math.min(out[base + CH_REST + 1], p);
+        if ((code & PAINT_CODE.car) && (code & PAINT_CODE.street)) out[base + CH_REST + 2] = Math.min(out[base + CH_REST + 2], d);
+        continue;
+      }
+      if (d >= out[base + e.slot]) continue;
+      out[base + e.slot] = d; out[base + CH_PAVE + e.slot] = p; out[base + CH_CODE + e.slot] = code;
     }
   }
   const raw = Float32Array.from(out);
   const W = [1, 2, 1];
+  const blurred = [...Array(CH_CODE).keys(), CH_REST, CH_REST + 1, CH_REST + 2];
   for (let j = 1; j < APRON_SIDE - 1; j++) {
     for (let i = 1; i < APRON_SIDE - 1; i++) {
       const o = j * APRON_SIDE + i;
-      if (!raw[o * CHANNEL_STRIDE + 3]) continue;
-      for (const c of [0, 1, 2, 4, 5, 6, 7]) {
+      for (const c of blurred) {
+        // (a neighbour counts at most BLUR_REACH away from the node's own value: a distance changes by at most a diagonal of the lattice, and a channel pushed off its level
+        // - 8 m per m of the level, road-network.js PAINT_LEVEL_PUSH - would drag the node across its edge: a point well inside the tarmac lost its paint, gate M3)
+        const own = raw[o * CHANNEL_STRIDE + c], lo = own - BLUR_REACH * step, hi = own + BLUR_REACH * step;
         let sum = 0;
-        for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) sum += W[dj + 1] * W[di + 1] * raw[((j + dj) * APRON_SIDE + i + di) * CHANNEL_STRIDE + c];
-        out[o * CHANNEL_STRIDE + c] = sum / 16;
+        for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { const v = raw[((j + dj) * APRON_SIDE + i + di) * CHANNEL_STRIDE + c]; sum += W[dj + 1] * W[di + 1] * (v < lo ? lo : v > hi ? hi : v); }
+        // (... and the blur never takes a node out of its carriageway: inside, the blurred value is at most the node's own)
+        out[o * CHANNEL_STRIDE + c] = (c < CH_PAVE || c === CH_REST) && own < 0 ? Math.min(own, sum / 16) : sum / 16;
       }
     }
   }
@@ -164,7 +188,7 @@ export function computeTileNodes(leaf, surface, field) {
       road2[o * 4 + 2] = b.surface[o];                         // the material of the road the node is on
       road2[o * 4 + 3] = b.junction[o] ? 0 : 1;                // the 1 m lattice draws the markings exactly (not at a junction)
     }
-    return { h: b.h, lat: b.lat, hw: b.hw, a0: b.a0, kind: b.kind, surface: b.surface, along: b.along, sdCar: blurField(b.sdCar), sdPave: blurField(b.sdPave), sdMajor: blurField(b.sdMajor), road2: maskMarkBorders(road2, b.road, b.along, b.sdCar, step), channels: carriagewayChannels(b.chGroup, b.chCar, b.chPave, b.chMajor), shared: true };
+    return { h: b.h, lat: b.lat, hw: b.hw, a0: b.a0, kind: b.kind, surface: b.surface, along: b.along, sdCar: blurField(b.sdCar), sdPave: blurField(b.sdPave), sdMajor: blurField(b.sdMajor), road2: maskMarkBorders(road2, b.road, b.along, b.sdCar, step), channels: carriagewayChannels(b.chGroup, b.chCar, b.chPave, b.chCode, step), shared: true };
   }
   const h = new Float32Array(APRON_SIDE * APRON_SIDE);
   const lat = new Float32Array(APRON_SIDE * APRON_SIDE);
@@ -177,8 +201,8 @@ export function computeTileNodes(leaf, surface, field) {
   const road2 = new Float32Array(APRON_SIDE * APRON_SIDE * 4);
   const roadId = new Int32Array(APRON_SIDE * APRON_SIDE);
   const N = APRON_SIDE * APRON_SIDE;
-  const chGroup = new Int32Array(N * CHANNELS), chCar = new Float32Array(N * CHANNELS), chPave = new Float32Array(N * CHANNELS), chMajor = new Uint8Array(N * CHANNELS);
-  const info = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, lines: 0, lanes: 0, s: 0, surface: 0, chGroup: new Int32Array(CHANNELS), chCar: new Float32Array(CHANNELS), chPave: new Float32Array(CHANNELS), chMajor: new Uint8Array(CHANNELS) };
+  const chGroup = new Int32Array(N * CHANNELS), chCar = new Float32Array(N * CHANNELS), chPave = new Float32Array(N * CHANNELS), chMajor = new Uint8Array(N * CHANNELS), chCode = new Uint8Array(N * CHANNELS);
+  const info = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, road: -1, lines: 0, lanes: 0, s: 0, surface: 0, chGroup: new Int32Array(CHANNELS), chCar: new Float32Array(CHANNELS), chPave: new Float32Array(CHANNELS), chMajor: new Uint8Array(CHANNELS), chCode: new Uint8Array(CHANNELS) };
   const mark = fadeOf(step, ROAD.markFullStep, ROAD.markFadeStep);
   for (let j = 0; j < APRON_SIDE; j++) {
     for (let i = 0; i < APRON_SIDE; i++) {
@@ -187,10 +211,10 @@ export function computeTileNodes(leaf, surface, field) {
       lat[o] = info.lat; hw[o] = info.hw; a0[o] = info.a0; kind[o] = info.kind; along[o] = info.s;
       surf[o] = info.surface; sdCar[o] = info.sdCar; sdPave[o] = info.sdPave; sdMajor[o] = info.sdMajor; roadId[o] = info.road;
       road2[o * 4] = info.coverage; road2[o * 4 + 1] = info.lines; road2[o * 4 + 3] = info.junction ? 0 : mark;
-      chGroup.set(info.chGroup, o * CHANNELS); chCar.set(info.chCar, o * CHANNELS); chPave.set(info.chPave, o * CHANNELS); chMajor.set(info.chMajor, o * CHANNELS);
+      chGroup.set(info.chGroup, o * CHANNELS); chCar.set(info.chCar, o * CHANNELS); chPave.set(info.chPave, o * CHANNELS); chMajor.set(info.chMajor, o * CHANNELS); chCode.set(info.chCode, o * CHANNELS);
     }
   }
-  return { h, lat, hw, a0, kind, surface: surf, along, sdCar: blurField(sdCar), sdPave: blurField(sdPave), sdMajor: blurField(sdMajor), road2: maskMarkBorders(road2, roadId, along, sdCar, step), channels: carriagewayChannels(chGroup, chCar, chPave, chMajor), shared: false };
+  return { h, lat, hw, a0, kind, surface: surf, along, sdCar: blurField(sdCar), sdPave: blurField(sdPave), sdMajor: blurField(sdMajor), road2: maskMarkBorders(road2, roadId, along, sdCar, step), channels: carriagewayChannels(chGroup, chCar, chPave, chCode, step), shared: false };
 }
 
 /** Value of the coarser tile T's edge polyline at the boundary point (x, z) (T's spacing grid is aligned to multiples of its step). */
@@ -250,7 +274,7 @@ export function stitchSignature(leaf, split) {
  */
 export function buildTileMesh(leaf, nodes, split, field, marks = null) {
   const { x0, z0, step, size } = leaf;
-  const h = nodes.h, lat = nodes.lat, hw = nodes.hw, a0 = nodes.a0, surface = nodes.surface, along = nodes.along;
+  const h = nodes.h;
   const vertexCount = SIDE * SIDE;
   const skirtVerts = 4 * SIDE;
   const positions = new Float32Array((vertexCount + skirtVerts) * 3);
@@ -277,12 +301,15 @@ export function buildTileMesh(leaf, nodes, split, field, marks = null) {
       const dhdz = (h[a + APRON_SIDE] - h[a - APRON_SIDE]) / (2 * step);
       const inv = 1 / Math.hypot(dhdx, 1, dhdz);
       normals[v * 3] = -dhdx * inv; normals[v * 3 + 1] = inv; normals[v * 3 + 2] = -dhdz * inv;
-      road[v * 4] = lat[a]; road[v * 4 + 1] = hw[a]; road[v * 4 + 2] = a0[a]; road[v * 4 + 3] = along[a];
-      road2[v * 4] = nodes.road2[a * 4]; road2[v * 4 + 1] = nodes.road2[a * 4 + 1];
-      road2[v * 4 + 2] = surface[a];                        // the material of the road the node is on
+      // (paint15: aRoad carries the paint codes of the channels and aRoad2.x their weight - the offset, the widths, the distance along and the coverage were no longer read by any shader
+      // since the markings became ribbons)
+      for (let c = 0; c < PAINT_SLOTS; c++) road[v * 4 + c] = nodes.channels[a * CHANNEL_STRIDE + CH_CODE + c];
+      road2[v * 4] = 0; road2[v * 4 + 1] = nodes.road2[a * 4 + 1];
+      road2[v * 4 + 2] = nodes.channels[a * CHANNEL_STRIDE + CH_REST + 3];     // the material of the REST (carriagewayChannels)
       road2[v * 4 + 3] = nodes.road2[a * 4 + 3];
-      road3[v * 4] = nodes.sdCar[a]; road3[v * 4 + 1] = nodes.sdPave[a]; road3[v * 4 + 2] = paintK; road3[v * 4 + 3] = nodes.sdMajor[a];
-      for (let c = 0; c < 4; c++) { road4[v * 4 + c] = nodes.channels[a * CHANNEL_STRIDE + c]; road5[v * 4 + c] = nodes.channels[a * CHANNEL_STRIDE + 4 + c]; }
+      // (paint15: the rest of the carriageways, the ones without a slot - the whole union before)
+      road3[v * 4] = nodes.channels[a * CHANNEL_STRIDE + CH_REST]; road3[v * 4 + 1] = nodes.channels[a * CHANNEL_STRIDE + CH_REST + 1]; road3[v * 4 + 2] = paintK; road3[v * 4 + 3] = nodes.channels[a * CHANNEL_STRIDE + CH_REST + 2];
+      for (let c = 0; c < PAINT_SLOTS; c++) { road4[v * 4 + c] = nodes.channels[a * CHANNEL_STRIDE + c]; road5[v * 4 + c] = nodes.channels[a * CHANNEL_STRIDE + CH_PAVE + c]; }
     }
   }
   // skirts: duplicate every boundary vertex lower down (order: north row, south row, west column, east column)
@@ -346,8 +373,9 @@ export function appendMarkings(mesh, nodes, plan) {
   const along = Math.max(1, step);
   const sdAt = (x, z) => {             // (the edge of the carriageway as the shader paints it: the channels where they hold, else the blurred union)
     const ch = (c) => nodeLerpK(nodes.channels, CHANNEL_STRIDE, c, x0, z0, step, x, z);
-    const w = Math.min(1, Math.max(0, ch(3)));
-    return nodeLerp(nodes.sdCar, x0, z0, step, x, z) * (1 - w) + Math.min(ch(0), ch(1), ch(2)) * w;
+    let m = ch(CH_REST);
+    for (let c = 0; c < PAINT_SLOTS; c++) m = Math.min(m, ch(c));
+    return m;
   };
   const levelAt = (x, z) => nodeLerp3(mesh.normals, x0, z0, step, x, z, 1);
   // (the carriageway test needs the 1 m lattice: on a 2 m lattice the distance of a narrow median or a kerb is blurred over 4 m, so a coarse tile only asks for level ground near a road)
@@ -390,12 +418,11 @@ export function appendMarkings(mesh, nodes, plan) {
     positions[v * 3] = x - x0; positions[v * 3 + 1] = meshHeightAt(mesh, x, z); positions[v * 3 + 2] = z - z0;
     normals[v * 3] = nodeLerp3(mesh.normals, x0, z0, step, x, z, 0); normals[v * 3 + 1] = nodeLerp3(mesh.normals, x0, z0, step, x, z, 1); normals[v * 3 + 2] = nodeLerp3(mesh.normals, x0, z0, step, x, z, 2);
     const o = nearestNode(x0, z0, step, x, z);
-    road[v * 4] = nodeLerp(nodes.lat, x0, z0, step, x, z); road[v * 4 + 1] = nodes.hw[o]; road[v * 4 + 2] = nodes.a0[o]; road[v * 4 + 3] = nodes.along[o];
-    road2[v * 4] = nodeLerp4(nodes.road2, x0, z0, step, x, z, 0); road2[v * 4 + 1] = nodes.road2[o * 4 + 1]; road2[v * 4 + 2] = nodes.surface[o]; road2[v * 4 + 3] = nodes.road2[o * 4 + 3];
-    road3[v * 4] = nodeLerp(nodes.sdCar, x0, z0, step, x, z); road3[v * 4 + 1] = nodeLerp(nodes.sdPave, x0, z0, step, x, z); road3[v * 4 + 2] = paintK; road3[v * 4 + 3] = nodeLerp(nodes.sdMajor, x0, z0, step, x, z);
-    for (let c = 0; c < 4; c++) road4[v * 4 + c] = nodeLerpK(nodes.channels, CHANNEL_STRIDE, c, x0, z0, step, x, z);
-    for (let c = 0; c < 3; c++) road5[v * 4 + c] = nodeLerpK(nodes.channels, CHANNEL_STRIDE, 4 + c, x0, z0, step, x, z);
-    road5[v * 4 + 3] = nodeLerpK(nodes.channels, CHANNEL_STRIDE, 7, x0, z0, step, x, z);
+    for (let c = 0; c < PAINT_SLOTS; c++) road[v * 4 + c] = nodes.channels[o * CHANNEL_STRIDE + CH_CODE + c];      // (a label: the nearest node's)
+    road2[v * 4] = 0; road2[v * 4 + 1] = nodes.road2[o * 4 + 1]; road2[v * 4 + 2] = nodes.channels[o * CHANNEL_STRIDE + CH_REST + 3]; road2[v * 4 + 3] = nodes.road2[o * 4 + 3];
+    road3[v * 4] = nodeLerpK(nodes.channels, CHANNEL_STRIDE, CH_REST, x0, z0, step, x, z); road3[v * 4 + 1] = nodeLerpK(nodes.channels, CHANNEL_STRIDE, CH_REST + 1, x0, z0, step, x, z);
+    road3[v * 4 + 2] = paintK; road3[v * 4 + 3] = nodeLerpK(nodes.channels, CHANNEL_STRIDE, CH_REST + 2, x0, z0, step, x, z);
+    for (let c = 0; c < PAINT_SLOTS; c++) { road4[v * 4 + c] = nodeLerpK(nodes.channels, CHANNEL_STRIDE, c, x0, z0, step, x, z); road5[v * 4 + c] = nodeLerpK(nodes.channels, CHANNEL_STRIDE, CH_PAVE + c, x0, z0, step, x, z); }
     const l = Math.hypot(nx, nz) || 1;
     mark[v * 4] = nx / l; mark[v * 4 + 1] = nz / l; mark[v * 4 + 2] = MARK.lineHalf; mark[v * 4 + 3] = side * strength;
   };
@@ -429,7 +456,6 @@ function clipToBox(ax, az, bx, bz, x0, z0, x1, z1) {
 
 /** Bilinear value of a node array of the tile (the apron layout of computeTileNodes) at a world point inside the tile. */
 function nodeLerp(arr, x0, z0, step, x, z) { return nodeLerpK(arr, 1, 0, x0, z0, step, x, z); }
-function nodeLerp4(arr, x0, z0, step, x, z, c) { return nodeLerpK(arr, 4, c, x0, z0, step, x, z); }
 function nodeLerpK(arr, k, c, x0, z0, step, x, z) {
   const fx = Math.min(CELLS, Math.max(0, (x - x0) / step)), fz = Math.min(CELLS, Math.max(0, (z - z0) / step));
   const i = Math.min(CELLS - 1, Math.floor(fx)), j = Math.min(CELLS - 1, Math.floor(fz));
