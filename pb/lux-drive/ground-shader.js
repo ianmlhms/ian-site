@@ -7,9 +7,11 @@
  * (soft banded gouache shading, drifting cloud shadows, the fog of the valleys). */
 import { PAINT_LIGHT_GLSL } from './light-glsl.js';
 import { ROAD } from './config.js';
+import { WALL } from './retaining-walls.js';
 
 export { PAINT_LIGHT_GLSL };
 
+const STEP_FACE_NEAR = 3.0, STEP_FACE_FAR = 6.0;   // m from a carriageway edge: a steep face this near is a man-made step (concrete), fading out by FAR (walls13)
 const MEDIAN_WIDTH = 3.0;       // m: road-network.js MEDIAN_WIDTH (a gap between two carriageways up to this wide is paved as a whole)
 const PAVE_MAX = 5.0;           // m: a pavement reaches at most this far beyond its kerb (look11: the wide pale aprons, QA2 N-T05)
 const MARK_PIXEL = 0.0006;      // rad: a line ribbon is at least this wide per metre of distance (about a pixel at the medium quality) ...
@@ -166,6 +168,18 @@ export const GROUND_FRAGMENT = `
     float sdP = mix(vRoad3.y, min(min(vRoad5.x, min(vRoad5.y, vRoad5.z)), medianP), wC);
     float roadW = smoothstep(0.0, 0.5, vRoad3.z);
     float aaC = max(fwidth(sdC), 0.04), aaP = max(fwidth(sdP), 0.04);
+    // walls13: the STEP beside a carriageway (the carve's face between two carriageways at two levels, the bank a road was cut into) where no retaining wall could stand -
+    // its block would reach a lane (drive12, lane-clearance.js) - was a bare grass cliff with the lattice's teeth along it (Merl link / A4, Kirchberg 875 / 10415, Eecherfeld).
+    // A face that steep (vertex N.y 0.82 - 0.62: the shoulder of the carve's step too, or a green lip stays on top) within a few metres of a carriageway is a man-made one: it is the concrete revetment of the walls (their
+    // concrete, retaining-walls.js STONE_OF, with the walls' level courses), not lawn.  The land's own slopes (and the hills beyond a road's batter) keep their paint.
+    // (the slope of the FACET decides - a face one or two lattice cells wide has its vertex normals averaged with the level ground on both sides, half as steep, and the face
+    // came out half grass - and the vertex normal fades it out toward the level ground: the facets of a face that runs across the lattice are its teeth, and painted by the
+    // facet alone they stood out as grey spikes on the lawn along its top)
+    float facetY = abs(normalize(cross(dFdx(vWorld), dFdy(vWorld))).y);
+    float stepFace = (1.0 - smoothstep(0.66, 0.80, facetY)) * (1.0 - smoothstep(0.84, 0.97, N.y)) * (1.0 - smoothstep(${STEP_FACE_NEAR.toFixed(1)}, ${STEP_FACE_FAR.toFixed(1)}, sdC));
+    float courseY = fract(vWorld.y / ${WALL.courseHeight.toFixed(2)});
+    vec3 concrete = vec3(0.60, 0.59, 0.56) * (0.90 + 0.14 * nMid.g) * (1.0 - 0.07 * smoothstep(0.90, 0.97, courseY));
+    albedo = mix(albedo, concrete, stepFace);
     // the grain of the tarmac is a stone chip: from a distance it averages to the plain colour (from above the 3 m tile would show as a pattern), and a
     // very slow noise keeps a long road from being one flat grey
     vec3 tar = mix(texture2D(uAsphalt, P * 0.33).rgb, vec3(0.248, 0.252, 0.263), smoothstep(30.0, 110.0, vDist)) * (0.965 + 0.07 * nMid.g);
@@ -177,6 +191,9 @@ export const GROUND_FRAGMENT = `
     // the kerb belongs to the materials that have one (the tarmac, the cobbles, the concrete)
     float kerbW = (surface < 2.5) ? uKerbWidth : 0.0;
     float onCarriage = 1.0 - smoothstep(-aaC, aaC, sdC);
+    // walls13: the tarmac is paint on a LEVEL carriageway: the lattice interpolates sdCar over 1 m cells, so the upper way's tarmac ran up to a metre down the face of a step
+    // (Merl 3072 - 3090,9976).  A carriageway is never steeper than ~0.3 m/m (N.y 0.96); a vertex whose normal leans past N.y 0.88 is on the face (its normal averages the face in).
+    onCarriage *= smoothstep(0.78, 0.88, N.y);
     // The narrow service ways between the houses are tarmac of 3-5 m: their border is the zero of a distance interpolated on a 2-4 m lattice (angular), and the dark tar beside a pale wall
     // read as a blotch.  They get a soft border (a wider blend, so the angles round off) and a calmer, lighter grey.  Streets of 6 m and more are not touched.
     // (minor = on a carriageway but outside every street carriageway: the signed distance to those is continuous, so the pale tar of a service way that runs into the avenue ends in a

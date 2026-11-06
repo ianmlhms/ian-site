@@ -49,7 +49,7 @@ function wayEnds(roads, lineOf) {
  * roads: the decoded roads (road.id = the index); lineOf(road): its centre line { x, z } as the network draws it (null: the way is not a carriageway).
  * Only MARKED ways (the classes with lane markings) are chained (the others are a chain of their own).
  * Returns { chainWays: [[{ road, rev }]] (the marked chains, `rev`: walked from its end to its start), groupOf: Int32Array (road -> its chain; an unchained road: roads.length + its id),
- *           plainNeighbours: Map(road -> Set of roads it meets end to end at a node of two ends only) }.
+ *           plainNeighbours: Map(road -> Set of roads it meets end to end at a node of two ends only), forkEnds: Set of `${road}:${atStart ? 1 : 0}` (a merge / split end) }.
  */
 export function chainCarriageways(roads, lineOf) {
   const marked = roads.filter((r) => isMarkedWay(r) && lineOf(r));
@@ -60,6 +60,7 @@ export function chainCarriageways(roads, lineOf) {
   // ---- the joins: at every node the pairs of marked ways that continue each other (one partner per end)
   const partner = new Map();             // `${road}:${atStart}` -> { road, atStart }
   const endKey = (e) => `${e.road}:${e.atStart ? 1 : 0}`;
+  const forkEnds = new Set();            // `${road}:${atStart}` of the ends where two marked ways or more go on from a way (a merge / a split)
   const plainNeighbours = new Map();     // road -> Set of the roads it meets end to end at a node of two ends only (one carriageway in two ways, chained or not)
   const addPlain = (a, b) => { for (const [p, q] of [[a, b], [b, a]]) { let s = plainNeighbours.get(p); if (!s) { s = new Set(); plainNeighbours.set(p, s); } s.add(q); } };
   for (const nd of nodes) {
@@ -83,6 +84,12 @@ export function chainCarriageways(roads, lineOf) {
         const score = (1 - cos) + (sameName ? 0 : 0.3) + (sameKind ? 0 : 0.2) + Math.abs(ra.width - rb.width) * 0.02;
         pairs.push({ ea, eb, score });
       }
+    }
+    // the ends where a way meets TWO or more marked ways that both go on from it (a merge: Kirchberg 6060 + 12330 -> 9423; a split): the way is the whole of both there, not the
+    // continuation of the one partner it is chained to (road-network.js: its width does not taper to that partner's across the node - walls13)
+    for (const e of ms) {
+      const goOn = ms.filter((o) => o.road !== e.road && -(e.dx * o.dx + e.dz * o.dz) >= JOIN.cos && !(roads[e.road].oneway && roads[o.road].oneway && e.atStart === o.atStart));
+      if (goOn.length >= 2) forkEnds.add(endKey(e));
     }
     pairs.sort((p, q) => p.score - q.score);
     for (const { ea, eb } of pairs) {
@@ -118,5 +125,5 @@ export function chainCarriageways(roads, lineOf) {
   const groupOf = new Int32Array(roads.length);
   for (let r = 0; r < roads.length; r++) groupOf[r] = roads.length + r;
   chainWays.forEach((ws, c) => { for (const w of ws) groupOf[w.road] = c; });
-  return { chainWays, groupOf, plainNeighbours };
+  return { chainWays, groupOf, plainNeighbours, forkEnds };
 }

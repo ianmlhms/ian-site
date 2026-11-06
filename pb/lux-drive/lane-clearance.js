@@ -7,7 +7,7 @@
  * LANE.edgeClear inside the edge of the carriageway (the car's half width: a car never drives with its wheels off the tarmac). */
 import { CAR } from './config.js';
 import { isCarRoad } from './road-index.js';
-import { WALL_COLLIDER } from './wall-collider.js';
+import { WALL_COLLIDER, aboveOnDeck } from './wall-collider.js';
 
 export const LANE = Object.freeze({
   step: 1,                 // m between the samples along a lane
@@ -130,7 +130,8 @@ export function createLaneSegments({ roads, ground, surface, isOpen, within = nu
     for (let k = 0; k < n; k++) {
       const x0 = ax + ((bx - ax) * k) / n, z0 = az + ((bz - az) * k) / n, x1 = ax + ((bx - ax) * (k + 1)) / n, z1 = az + ((bz - az) * (k + 1)) / n;
       if (within && !within(x0, z0) && !within(x1, z1)) continue;
-      const p = { ax: x0, az: z0, ay: levelOf(r, x0, z0), bx: x1, bz: z1, by: levelOf(r, x1, z1), road: r.id };
+      // (at, bt: the terrain under the ends - a lane on a deck over a wall rides over it, wall-collider.js aboveOnDeck)
+      const p = { ax: x0, az: z0, ay: levelOf(r, x0, z0), at: surface.height(x0, z0), bx: x1, bz: z1, by: levelOf(r, x1, z1), bt: surface.height(x1, z1), road: r.id };
       const i = pieces.length;
       pieces.push(p);
       for (let cx = Math.floor(Math.min(x0, x1) / LANE_CELL); cx <= Math.floor(Math.max(x0, x1) / LANE_CELL); cx++) {
@@ -198,6 +199,7 @@ export function wallBlocksLane(lanes, ax, az, bx, bz, bottom, top, clear, levelR
     // the lane's level where it passes the wall: the closer end of the piece decides (pieces are <= 4 m)
     const ya = p.ay, yb = p.by;
     if (Math.min(ya, yb) > top + levelReach || Math.max(ya, yb) < bottom - levelReach) continue;
+    if (aboveOnDeck(ya, p.at, top) && aboveOnDeck(yb, p.bt, top)) continue;                 // a deck over the wall (the game's collider: createWallCollider with terrainAt)
     return p;
   }
   return null;
