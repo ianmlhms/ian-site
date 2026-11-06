@@ -7,12 +7,10 @@
  * The car drives on the top of it (the physics reads the same heights from decks.js). */
 import { DECK } from './decks.js';
 import { createChunkedFlat } from './chunked-flat.js';
-import { ROAD_MIN_WIDTH, LINE_WIDTH, DASH_PERIOD, DASH_LENGTH, PAINT_LIFT, PIER_SIZE, FILL_NONE, ABUT, SLIM, SLIM_PIERS, sideDepth, laneLines, piersOf, abutmentsOf } from './deck-shape.js';
+import { ROAD_MIN_WIDTH, LINE_WIDTH, DASH_PERIOD, DASH_LENGTH, PAINT_LIFT, PIER_SIZE, FILL_NONE, ABUT, SLIM, SLIM_PIERS, PARAPET_WIDTH, RAILING_WIDTH, sideDepth, laneLines, piersOf, abutmentsOf, mitres } from './deck-shape.js';
 
 const PARAPET_HEIGHT = 0.95;        // m, the height of the parapet of a road bridge
-const PARAPET_WIDTH = 0.30;         // m, its thickness
 const RAILING_HEIGHT = 1.05;        // m, the railing of a footbridge
-const RAILING_WIDTH = 0.10;
 const COLOUR_ASPHALT = [0.245, 0.249, 0.261];  // (the far tar of the ground shader: the road runs onto the deck without a change of tone)
 const COLOUR_PATH = [0.60, 0.59, 0.56];
 const COLOUR_PATH_SLIM = [0.36, 0.36, 0.37];   // look11: the asphalt of a cycle bridge / footbridge (the pale concrete read as a grey slab beside the road)
@@ -36,27 +34,8 @@ const PARAPET_TAPER = 6;            // m: at an end of a deck that lies on the r
 const PARAPET_FOOT = 0.15;
 const BEAM_WIDTH = 0.7;             // m: a girder under the soffit of a road deck
 const BEAM_DEPTH = 0.9;             // m below the soffit
-const MITRE_MAX = 2.0;              // the longest a mitre may grow (a sharp bend): longer, it would reach far past the outside of the bend
 const COLOUR_BEAM = [0.52, 0.51, 0.48];
 const COLOUR_BEAM_UNDER = [0.44, 0.43, 0.41];
-
-/** The side vector (left of the direction of travel) at every point of a polyline, mitred: [sx, sz] with |s| = 1 / cos(half the bend) (at most MITRE_MAX). */
-function mitres(pts) {
-  const n = pts.length, out = [];
-  const normal = (i) => { const dx = pts[i + 1][0] - pts[i][0], dz = pts[i + 1][1] - pts[i][1], l = Math.hypot(dx, dz) || 1; return [-dz / l, dx / l]; };
-  for (let i = 0; i < n; i++) {
-    if (i === 0) { out.push(normal(0)); continue; }
-    if (i === n - 1) { out.push(normal(n - 2)); continue; }
-    const p = normal(i - 1), q = normal(i);
-    let mx = p[0] + q[0], mz = p[1] + q[1];
-    const ml = Math.hypot(mx, mz);
-    if (ml < 1e-6) { out.push(q); continue; }              // (a fold back: the plain normal)
-    mx /= ml; mz /= ml;
-    const k = Math.min(MITRE_MAX, 1 / Math.max(1e-3, mx * q[0] + mz * q[1]));
-    out.push([mx * k, mz * k]);
-  }
-  return out;
-}
 
 const COLOUR_ABUT = [0.62, 0.61, 0.58];   // the concrete of an abutment
 const ABUT_WING = 0.05;                    // m: the front wall reaches this far past the side of the deck (it closes onto the wing walls)

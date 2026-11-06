@@ -18,6 +18,9 @@ export const PIER_ROAD_CLEAR = 1.2;        // m: a pier stands this far from any
 export const PIER_SHIFT_STEP = 2.5;        // m: a pier that would stand in a road is moved along the deck in steps of this ...
 export const PIER_SHIFT_MAX = 12;          // ... up to this far
 export const PIER_FOOT = 0.5;              // m: the column reaches this far below the ground
+export const PARAPET_WIDTH = 0.30;         // m: the thickness of the parapet of a road bridge (deck-view.js; the car's barrier stands at its inner face: deck-barriers.js)
+export const RAILING_WIDTH = 0.10;         // m: the railing of a footbridge
+const MITRE_MAX = 2.0;                     // the longest a mitre may grow (a sharp bend): longer, it would reach far past the outside of the bend
 
 /** The clearance -> how deep the side of the deck reaches below the surface (a function of the clearance that is continuous: no step where the fill ends). */
 export function sideDepth(clearance) {
@@ -155,3 +158,21 @@ export const DECK_ON_ROAD = Object.freeze({
   MIN_PIECE: 12,           // m: a piece of a split deck shorter than this is dropped
   ROAD_SD: -0.5,           // m: the ground has a carriageway under the point (signed distance to the union of the carriageways)
 });
+
+/** The side vector (left of the direction of travel) at every point of a polyline, mitred: [sx, sz] with |s| = 1 / cos(half the bend) (at most MITRE_MAX). */
+export function mitres(pts) {
+  const n = pts.length, out = [];
+  const normal = (i) => { const dx = pts[i + 1][0] - pts[i][0], dz = pts[i + 1][1] - pts[i][1], l = Math.hypot(dx, dz) || 1; return [-dz / l, dx / l]; };
+  for (let i = 0; i < n; i++) {
+    if (i === 0) { out.push(normal(0)); continue; }
+    if (i === n - 1) { out.push(normal(n - 2)); continue; }
+    const p = normal(i - 1), q = normal(i);
+    let mx = p[0] + q[0], mz = p[1] + q[1];
+    const ml = Math.hypot(mx, mz);
+    if (ml < 1e-6) { out.push(q); continue; }              // (a fold back: the plain normal)
+    mx /= ml; mz /= ml;
+    const k = Math.min(MITRE_MAX, 1 / Math.max(1e-3, mx * q[0] + mz * q[1]));
+    out.push([mx * k, mz * k]);
+  }
+  return out;
+}

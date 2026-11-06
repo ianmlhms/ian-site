@@ -6,9 +6,15 @@
  * drive12 (QA3 N3-B01): a house stops the car only at its own height - from the ground under its walls to its ridge.  The footprints of Pfaffenthal under the
  * Pont Rouge stopped the car on the deck 60 m above them. */
 import { spansLevel } from './level-span.js';
+import { CAR } from './config.js';
 
 const CELL = 32;                 // m, the cell of the spatial hash
-const MAX_CELLS_PER_BUILDING = 64;
+const MAX_CELLS_PER_BUILDING = 64;   // a footprint whose box covers more cells is hashed along its edges only (collide and near measure the edges)
+const EDGE_STEP = 1;             // m: the step along an edge (the cells a huge footprint's edges pass through; the ground under a house's walls)
+// collide14 (QA4 N4-C02): the car stands on the ground up to this far from a wall it touches (its body circle's radius + the circle's offset from its centre): a house
+// reaches down to the lowest ground there.  From the lowest corner only, a house on a carved slope (a road pit at the middle of its façade, 2.4 - 5.9 m under every corner)
+// let a car in the pit drive under its bottom into the footprint (33 houses).
+const GROUND_REACH = CAR.bodyRadius + Math.max(...CAR.bodyCircles.map(Math.abs));
 
 /** The bounding box of a footprint. */
 function boundsOf(pts) {
@@ -56,26 +62,55 @@ export function createBuildingIndex(buildings, { cell = CELL, hidden = null, gro
     boxes.set(b.id, box);
     const cx0 = Math.floor(box.minX / cell), cx1 = Math.floor(box.maxX / cell);
     const cz0 = Math.floor(box.minZ / cell), cz1 = Math.floor(box.maxZ / cell);
-    if ((cx1 - cx0 + 1) * (cz1 - cz0 + 1) > MAX_CELLS_PER_BUILDING) continue;    // a huge building: it is not worth indexing (there is none)
-    for (let cx = cx0; cx <= cx1; cx++) {
-      for (let cz = cz0; cz <= cz1; cz++) {
-        const k = key(cx, cz);
-        const list = cells.get(k);
-        if (list) list.push(b.id); else cells.set(k, [b.id]);
+    const add = (k) => { const list = cells.get(k); if (!list) cells.set(k, [b.id]); else if (list[list.length - 1] !== b.id) list.push(b.id); };
+    if ((cx1 - cx0 + 1) * (cz1 - cz0 + 1) <= MAX_CELLS_PER_BUILDING) {
+      for (let cx = cx0; cx <= cx1; cx++) for (let cz = cz0; cz <= cz1; cz++) add(key(cx, cz));
+      continue;
+    }
+    // collide14 (QA4 N4-C01): a huge footprint (Kirchberg 1372, the tower block 4808 at Place de l'Europe, the Gare's platform roof 15153: nine of 160 - 480 m) was left
+    // out of the index - drawn, but the car drove into it and stood under its black ceiling.  Its edges are hashed instead of its box (the collision is the distance
+    // to the edges): every cell an edge passes through, and its neighbours where the edge runs within EDGE_STEP of a cell border.
+    const set = new Set();
+    for (let i = 0, n = b.pts.length / 2; i < n; i++) {
+      const j = (i + 1) % n, ax = b.pts[i * 2], az = b.pts[i * 2 + 1], ex = b.pts[j * 2] - ax, ez = b.pts[j * 2 + 1] - az;
+      const steps = Math.max(1, Math.ceil(Math.hypot(ex, ez) / EDGE_STEP));
+      for (let s = 0; s <= steps; s++) {
+        const x = ax + (ex * s) / steps, z = az + (ez * s) / steps;
+        for (const [ox, oz] of [[0, 0], [EDGE_STEP, 0], [-EDGE_STEP, 0], [0, EDGE_STEP], [0, -EDGE_STEP]]) set.add(key(Math.floor((x + ox) / cell), Math.floor((z + oz) / cell)));
       }
     }
+    for (const k of set) add(k);
   }
   const scratch = { qx: 0, qz: 0 };
   const levels = new Map();                      // id -> [bottom, top], measured the first time a car comes near
 
-  /** The height range of a house: from the lowest ground under its corners to its ridge over the ground at its middle (building-mesh.js addBuilding). */
+  /** The lowest ground along the walls of a footprint and on both sides of them within GROUND_REACH (where a car that touches a wall can stand). */
+  function lowestAround(pts) {
+    let low = Infinity;
+    for (let i = 0, n = pts.length / 2; i < n; i++) {
+      const j = (i + 1) % n, ax = pts[i * 2], az = pts[i * 2 + 1], ex = pts[j * 2] - ax, ez = pts[j * 2 + 1] - az, l = Math.hypot(ex, ez);
+      if (l < 1e-6) continue;
+      const nx = -ez / l, nz = ex / l, steps = Math.max(1, Math.ceil(l / EDGE_STEP));
+      for (let s = 0; s <= steps; s++) {
+        const x = ax + (ex * s) / steps, z = az + (ez * s) / steps;
+        for (const o of [0, GROUND_REACH / 2, GROUND_REACH]) {
+          low = Math.min(low, groundAt(x + nx * o, z + nz * o));
+          if (o > 0) low = Math.min(low, groundAt(x - nx * o, z - nz * o));
+        }
+      }
+    }
+    return low;
+  }
+
+  /** The height range of a house: from the lowest ground at its walls (within the car's reach of them) to its ridge over the ground at its middle (building-mesh.js addBuilding). */
   function levelOf(id) {
     let lv = levels.get(id);
     if (lv) return lv;
     const b = buildings[id], pts = b.pts, n = pts.length / 2;
     if (!groundAt) { lv = [-Infinity, Infinity]; levels.set(id, lv); return lv; }
-    let cx = 0, cz = 0, bottom = Infinity;
-    for (let i = 0; i < n; i++) { cx += pts[i * 2] / n; cz += pts[i * 2 + 1] / n; bottom = Math.min(bottom, groundAt(pts[i * 2], pts[i * 2 + 1])); }
+    let cx = 0, cz = 0;
+    for (let i = 0; i < n; i++) { cx += pts[i * 2] / n; cz += pts[i * 2 + 1] / n; }
+    const bottom = lowestAround(pts);
     const foot = Math.max(groundAt(cx, cz), landAt ? landAt(cx, cz) : -Infinity);
     lv = [Math.min(bottom, foot), foot + Math.max(b.ridge, b.eave)];
     levels.set(id, lv);

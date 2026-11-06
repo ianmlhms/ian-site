@@ -312,16 +312,28 @@ function extendEnd(deck, atStart, surfaceHeight) {
   return deck;
 }
 
-/** The decks of the baked world with the Pont Rouge carried on to its approach roads (call it before createDeckNetwork). */
+/** A deck of the Pont Rouge's group (the four baked decks of the bridge). */
+const isRougeDeck = (d) => {
+  const K = ROUGE, a = d.pts[0], b = d.pts[d.pts.length - 1], m = d.pts[d.pts.length >> 1];
+  return Math.hypot(b[0] - a[0], b[1] - a[1]) >= K.minLength && Math.hypot(m[0] - K.at[0], m[1] - K.at[1]) <= 60;
+};
+
+/**
+ * The decks of the baked world with the Pont Rouge carried on to its approach roads (call it before createDeckNetwork).
+ * collide14 (QA4 N4-B01): the footways of the bridge lie on the model's one surface too.  The LiDAR under the south footway (deck 3) reads through the slat screen and
+ * the cantilever into the valley: its tops sag 2 - 9.9 m under the road (302 m against 310.7 m at mid-span).  The model draws the footway at the road's level, the guard
+ * rail answers for the road's level - and a car steered onto the footway fell through the drawn slab onto the sagging physics, under the rail, and off the bridge
+ * (5 of 5 stations).  Every narrow deck of the group takes the level of the road decks at its station (the model's `top`, buildPontRouge).
+ */
 export function fixLandmarkDecks(decks, surfaceHeight) {
-  const K = ROUGE;
-  return decks.map((d) => {
-    const a = d.pts[0], b = d.pts[d.pts.length - 1];
-    const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
-    const m = d.pts[d.pts.length >> 1];
-    if (len < K.minLength || Math.hypot(m[0] - K.at[0], m[1] - K.at[1]) > 60) return d;
-    return extendEnd(extendEnd(d, true, surfaceHeight), false, surfaceHeight);
-  });
+  const extended = decks.map((d) => (isRougeDeck(d) ? extendEnd(extendEnd(d, true, surfaceHeight), false, surfaceHeight) : d));
+  const roads = extended.filter((d) => isRougeDeck(d) && d.width > 8);
+  if (roads.length < 2) return extended;
+  const a = roads[0].pts[0], b = roads[0].pts[roads[0].pts.length - 1];
+  const F = axisFrame(a[0], a[1], b[0], b[1]);
+  const prof0 = profileOf(F, roads[0]), prof1 = profileOf(F, roads[1]);
+  const top = (s) => (prof0(s) + prof1(s)) / 2;
+  return extended.map((d) => (isRougeDeck(d) && d.width <= 8 ? { ...d, tops: Float32Array.from(d.pts, (p) => top(F.local(p[0], p[1])[0])) } : d));
 }
 
 /** A frustum between two rectangles (a leg of the pylon): corners at (s, u) +- half sizes, from the foot to the head. */
@@ -333,11 +345,7 @@ function loft(soup, F, foot, head, color, key) {
 
 export function buildPontRouge({ decks, ground }) {
   const K = ROUGE;
-  const group = decks.filter((d) => {
-    const a = d.pts[0], b = d.pts[d.pts.length - 1];
-    const m = d.pts[d.pts.length >> 1];
-    return Math.hypot(b[0] - a[0], b[1] - a[1]) >= K.minLength && Math.hypot(m[0] - K.at[0], m[1] - K.at[1]) < 60;
-  });
+  const group = decks.filter(isRougeDeck);
   if (group.length < 4) throw new Error(`Pont Rouge: expected 4 decks, found ${group.length}`);
   // the road decks are the 8.4 m wide ones; the frame follows the first of them (u = 0 on it, positive to the left of the way)
   const roads = group.filter((d) => d.width > 8);

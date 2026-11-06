@@ -249,12 +249,15 @@ const PASSERELLE = Object.freeze({
   roadHalf: 5.9, maxHalf: 10.5,
 });
 
-export function buildPasserelle({ decks, ground }) {
+/**
+ * The Passerelle's bridge in the decks: { road, along, F, L, top(s) } - the road deck (11.8 m), the decks of the bridge itself (the road and its footways; the lower footways
+ * of the bake that run along the slope stay as they are), the frame from the first to the last station of the bridge at deck level and the road's profile by station.
+ */
+export function passerelleBridge(decks) {
   const K = PASSERELLE;
   const road = pickDeck(decks, K.at[0], K.at[1], { width: 11.8, tolerance: 0.6, minLength: 120 });
   const p0 = road.pts[0], p1 = road.pts[road.pts.length - 1];
   const F0 = axisFrame(p0[0], p0[1], p1[0], p1[1]);
-  // the decks of the bridge itself (the road and its footway); the lower footways of the bake that run along the slope stay as they are
   // (the footway decks beside the road ride on the bridge, but their pinned ends dip to the ground 10 m below: the MEDIAN of the tops tells a bridge deck from a path
   // down the slope.  They used to be left to the generic deck view and hung as grey slabs inside the arcade, seen through the openings.)
   const median = (a) => { const v = Array.from(a).sort((p, q) => p - q); return v[v.length >> 1]; };
@@ -265,7 +268,6 @@ export function buildPasserelle({ decks, ground }) {
   let sLo = 0, sHi = F0.length;
   for (const d of along) d.pts.forEach((p, i) => { if (d.tops[i] < road.tops[0] - 3) return; const [s] = F0.local(p[0], p[1]); sLo = Math.min(sLo, s); sHi = Math.max(sHi, s); });
   const F = axisFrame(...F0.xz(sLo, 0), ...F0.xz(sHi, 0));
-  const L = F.length;
   // the profile of the road deck by station
   const ss = stationsOf(F, road.pts);
   const flip = ss[0] > ss[ss.length - 1];
@@ -277,6 +279,28 @@ export function buildPasserelle({ decks, ground }) {
     while (hi - lo > 1) { const m = (lo + hi) >> 1; if (sArr[m] <= s) lo = m; else hi = m; }
     return tArr[lo] + ((tArr[hi] - tArr[lo]) * (s - sArr[lo])) / (sArr[hi] - sArr[lo] || 1);
   };
+  return { road, along, F, L: F.length, top };
+}
+
+/**
+ * collide14 (QA4 N4-B01 / harness V3): the footways of the Passerelle lie on the model's surface.  The model draws one deck at the road's level from balustrade to
+ * balustrade, but the LiDAR footways under it sag 1 - 4.4 m (the DSM reads between the balustrade and the arcade): a car steered at the east balustrade dropped onto
+ * them, under the rail.  Every point of a footway of the bridge that lies on the bridge (its station within the model's) takes the road's level there; the dipping ends
+ * beyond the bridge stay as they are.  Returns new decks.
+ */
+export function fixPasserelleDecks(decks) {
+  const { road, along, F, L, top } = passerelleBridge(decks);
+  const ids = new Set(along.filter((d) => d !== road).map((d) => d.id));
+  return decks.map((d) => {
+    if (!ids.has(d.id)) return d;
+    const tops = Float32Array.from(d.pts, (p, i) => { const [s] = F.local(p[0], p[1]); return s >= 0 && s <= L ? top(s) : d.tops[i]; });
+    return { ...d, tops };
+  });
+}
+
+export function buildPasserelle({ decks, ground }) {
+  const K = PASSERELLE;
+  const { road, along, F, L, top } = passerelleBridge(decks);
   const under = (s) => top(s) - K.fascia;
     // the full width: the roadway and the footways of the baked decks beside it
   let half = K.roadHalf + 2.9;

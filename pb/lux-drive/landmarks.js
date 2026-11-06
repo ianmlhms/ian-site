@@ -7,17 +7,19 @@
  *
  * ctx: { buildings: the decoded LOD2 footprints, decks: the decks the physics reads, ground: (x, z) -> y of the land }. */
 import { spansLevel } from './level-span.js';
-import { buildPontAdolphe, buildPontRouge, fixLandmarkDecks } from './landmark-bridges.js';
+import { buildPontAdolphe, buildPontRouge, fixLandmarkDecks as fixBridgeDecks } from './landmark-bridges.js';
 
 import { buildPhilharmonie, buildEcj, buildCathedral, buildPalais, buildGelleFra, buildOberanven } from './landmark-buildings.js';
 
-import { buildBock, buildPasserelle, buildCoque, buildThuengen, buildMudam, buildBcee } from './landmark-sites.js';
+import { buildBock, buildPasserelle, buildCoque, buildThuengen, buildMudam, buildBcee, fixPasserelleDecks } from './landmark-sites.js';
 
 import { buildGare } from './landmark-gare.js';
 
 import { CAMPUS_BUILDERS } from './campus.js';   // CAMPUS: Campus Geesseknäppchen (campus.js)
 
-export { fixLandmarkDecks };
+/** The baked decks as the landmark models need them (call it before createDeckNetwork): the Pont Rouge carried on to its approaches and its footways on its road's
+ *  level (landmark-bridges.js), the Passerelle's footways on its road's level (landmark-sites.js, collide14). */
+export const fixLandmarkDecks = (decks, surfaceHeight) => fixPasserelleDecks(fixBridgeDecks(decks, surfaceHeight));
 
 /** The builders in the order of the brief (the bridges first). A landmark that cannot be built is an error, never a silent gap. */
 const TREE_CLEARING = 40;          // m: the generated woods keep this far from the walls of the buildings people come to see (`clearTrees`)

@@ -56,11 +56,8 @@ function drawnHalfWidth(net, r, x, z) {
 /** T5: a Pfaffenthal house under the Pont Rouge (QA3 N3-B01: the car stopped on the deck at 5209,8052.8). */
 const ROUGE_POSE = [5209.0, 8052.8, 3.0], ROUGE_HOUSE = 7233;
 
-export function runDrive12Checks({ check, section, stats, data, field, surface, ground, net, buildings, landmarks, portals, forest, playArea, maps, deckNetwork }) {
-  section('T nothing stops the car where it may drive (drive12, QA round 3)');
-  const isOpen = (r) => !!(net.roads[r.id] && net.roads[r.id].openCut);
-
-  // ---- the game's collider (main.js), the props placed as the game places them
+/** The game's collider as main.js builds it (car-collide.js), the props placed as the game places them (no trams: they move).  Returns { game, gameWalls }. */
+export function buildGameCollider({ data, surface, ground, net, buildings, landmarks, portals, forest, playArea, maps, deckNetwork }) {
   const props = createPropCollider();
   const lamps = placeStreetLights({ roads: data.roads, network: net, buildings, map: maps, walls: data.walls });
   for (let i = 0; i < lamps.count; i++) props.add(lamps.x[i], lamps.z[i], LAMP_POST_RADIUS, surface.height(lamps.x[i], lamps.z[i]), LAMP_POST_HEIGHT);
@@ -68,6 +65,14 @@ export function runDrive12Checks({ check, section, stats, data, field, surface, 
   for (let i = 0; i < benches.count; i++) props.add(benches.x[i], benches.z[i], BENCH_RADIUS, surface.height(benches.x[i], benches.z[i]), BENCH_HEIGHT);
   const gameWalls = createWallCollider(data.walls, (x, z) => ground.height(x, z));
   const game = createCarCollider({ buildings, landmarks, walls: gameWalls, portals, ground, forest, props, trams: null, playArea, surface, deckNetwork });
+  return { game, gameWalls };
+}
+
+export function runDrive12Checks({ check, section, stats, data, field, surface, ground, net, buildings, landmarks, portals, forest, playArea, maps, deckNetwork }) {
+  section('T nothing stops the car where it may drive (drive12, QA round 3)');
+  const isOpen = (r) => !!(net.roads[r.id] && net.roads[r.id].openCut);
+
+  const { game, gameWalls } = buildGameCollider({ data, surface, ground, net, buildings, landmarks, portals, forest, playArea, maps, deckNetwork });
 
   // ---- T1: the walls and every lane (the probe's own level: a wall collider without a ground function reads the level it is given)
   const probeWalls = createWallCollider(data.walls, null);

@@ -7,6 +7,7 @@
 import { TRAM } from './config.js';
 import { spansLevel } from './level-span.js';
 import { createRailGround } from './rail-ground.js';
+import { createDeckBarriers } from './deck-barriers.js';
 
 export const LAMP_POST_RADIUS = 0.22;     // m: a street lamp (the car stops at it like at a tree)
 export const LAMP_POST_HEIGHT = 8;        // m: its pole
@@ -18,11 +19,13 @@ export const POLE_HEIGHT = TRAM.catenary.height + 1;   // m: a catenary pole of 
  * The parts (each a collider of its own, [name, (x, z, radius, y) => hit | null]) and the car's collider: the first part that is hit answers.
  *   buildings: buildings.js index (with groundAt: the houses know their height), landmarks: landmarks.js, walls: wall-collider.js, portals: portals.js,
  *   ground: decks.js createGround (the bank under a deck end), forest: trees.js, props: props.js (lamps, benches, poles with their level), trams: tram-sim.js,
- *   playArea: play-area.js, surface + deckNetwork: the level of the tram's rails.
- * Returns { collide(x, z, radius, y), parts }.
+ *   playArea: play-area.js, surface + deckNetwork: the level of the tram's rails and the parapets of the decks (deck-barriers.js, collide14: the car stays on a bridge;
+ *   the decks a landmark draws carry the landmark's own walls).
+ * Returns { collide(x, z, radius, y), parts, barriers }.
  */
 export function createCarCollider({ buildings, landmarks, walls, portals, ground, forest, props, trams, playArea, surface = null, deckNetwork = null }) {
   const railGround = surface ? createRailGround(surface, deckNetwork) : null;
+  const barriers = surface && deckNetwork ? createDeckBarriers(deckNetwork, surface, { skip: landmarks.hiddenDecks }) : null;
   /** A tram: at the level of its rails, as high as the vehicle. */
   const tramHit = (x, z, radius, y) => {
     const hit = trams.collide(x, z, radius);
@@ -34,13 +37,14 @@ export function createCarCollider({ buildings, landmarks, walls, portals, ground
     ['building', (x, z, r, y) => buildings.collide(x, z, r, y)],
     ['landmark', (x, z, r, y) => landmarks.collide(x, z, r, y)],
     ['wall', (x, z, r, y) => walls.collide(x, z, r, y)],
+    ['parapet', (x, z, r, y) => barriers.collide(x, z, r, y)],
     ['portal', (x, z, r, y) => portals.collide(x, z, r, y)],
     ['bank', (x, z, r, y) => ground.bankCollide(x, z, r, y)],          // the bank under a deck end, for a car under the deck (decks.js)
     ['tree', (x, z, r, y) => forest.collide(x, z, r, y)],
     ['prop', (x, z, r, y) => props.collide(x, z, r, y)],
     ['tram', tramHit],
     ['area', (x, z, r) => playArea.collide(x, z, r)],
-  ].filter(([name]) => name !== 'tram' || trams);
+  ].filter(([name]) => (name !== 'tram' || trams) && (name !== 'parapet' || barriers));
   function collide(x, z, radius, y = NaN) {
     for (let i = 0; i < parts.length; i++) {
       const hit = parts[i][1](x, z, radius, y);
@@ -48,5 +52,5 @@ export function createCarCollider({ buildings, landmarks, walls, portals, ground
     }
     return null;
   }
-  return { collide, parts };
+  return { collide, parts, barriers };
 }
