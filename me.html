@@ -9,8 +9,8 @@
 <meta name="theme-color" content="#0d0d1a">
 <script src="season.js?v=5"></script>
 <script src="theme.js?v=31"></script>
-<script src="i18n-dict.js?v=52"></script>
-<script src="i18n.js?v=4"></script>
+<script src="i18n-dict.js?v=53"></script>
+<script src="i18n.js?v=5"></script>
 <link rel="stylesheet" href="site-ui.css?v=2">
 <style>
   *{box-sizing:border-box}
@@ -139,10 +139,12 @@ async function loadGoat(){
     const count=(j.count||"").replace(/\s/g,"")||"–";
     $("pGc").innerHTML=`${H("📈","Site traffic")}
       <div class="big">${esc(count)}</div><div class="sub">total pageviews (GoatCounter)</div>
-      <div class="stat" style="margin-top:8px"><span>Dashboard</span><b><a href="${GC}" target="_blank" rel="noopener">open →</a></b></div>`;
+      <div class="stat" style="margin-top:8px"><span>Dashboard</span><b><a href="${GC}" target="_blank" rel="noopener">open →</a></b></div>
+      <div class="stat"><span>Statistiken (per day)</span><b><a href="traffic.html">open →</a></b></div>`;
   }catch(e){
     $("pGc").innerHTML=`${H("📈","Site traffic")}
-      <div class="muted">Public totals off — <a href="${GC}" target="_blank" rel="noopener">open dashboard →</a></div>`;
+      <div class="muted">Public totals off — <a href="${GC}" target="_blank" rel="noopener">open dashboard →</a></div>
+      <div class="stat" style="margin-top:8px"><span>Statistiken (per day)</span><b><a href="traffic.html">open →</a></b></div>`;
   }
 }
 

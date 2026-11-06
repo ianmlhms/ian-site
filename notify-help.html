@@ -70,7 +70,7 @@
 </header>
 
 <main class="ui-page">
-  <div class="langs" role="group" aria-label="Sprooch / Sprache / Language">
+  <div class="langs" role="group" aria-label="Sprooch / Sprache / Language" style="display:none">
     <button class="lang active" data-l="lb" lang="lb" aria-pressed="true"><span aria-hidden="true">🇱🇺</span> Lëtzebuergesch</button>
     <button class="lang" data-l="de" lang="de" aria-pressed="false"><span aria-hidden="true">🇩🇪</span> Deutsch</button>
     <button class="lang" data-l="en" lang="en" aria-pressed="false"><span aria-hidden="true">🇬🇧</span> English</button>
@@ -201,9 +201,8 @@
     try { localStorage.setItem("helpLang", l); } catch {}
   }
   langs.forEach((b) => (b.onclick = () => setLang(b.dataset.l)));
-  let saved = "lb";
-  try { saved = localStorage.getItem("helpLang") || "lb"; } catch {}
-  setLang(saved);
+  // Luxembourgish only (6 Nov 2026); the de/en sections stay in the page.
+  setLang("lb");
 </script>
   <script src="pixelbreak-config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>

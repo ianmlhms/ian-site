@@ -21,13 +21,10 @@
   "use strict";
 
   var LANGS = ["lb", "de", "en"];
-  // Luxembourgish is the default again (it was forced to English in Jul 2026
-  // only because AdSense rejects the language; AdSense was dropped in Sep 2026).
-  // Both states stay honest about <html lang>: applyAll() below sets
-  // documentElement.lang to the active language, so a JS visitor gets lb text
-  // under lang="lb", while a no-JS crawler still sees the static English
-  // fallback markup under the static lang="en". An explicit choice wins over
-  // both, and de/en are still auto-selected from the browser.
+  // Luxembourgish only since 6 Nov 2026 (Ian's decision): read() below always
+  // answers "lb". apply() sets documentElement.lang at runtime; pages whose
+  // static fallback markup is still English keep a static lang="en" for no-JS
+  // crawlers until their markup is translated.
   var DEFAULT_LANG = "lb";
   var STORE_KEY = "site_lang";
   var DICT = window.I18N_DICT || {};
@@ -40,18 +37,14 @@
     return LANGS.indexOf(l) >= 0 ? l : null;
   })();
 
+  // Luxembourgish only (Ian, 6 Nov 2026): no switcher, and a stored de/en
+  // choice or the browser language no longer count. The de/en strings stay in
+  // i18n-dict.js. The stored preference is overwritten with "lb" because many
+  // modules and games read localStorage.site_lang directly instead of asking
+  // I18N. A data-lang-lock page (the Garmin QR pages) keeps its pinned language.
   function read() {
     if (LOCKED) return LOCKED;
-    try {
-      var v = localStorage.getItem(STORE_KEY);
-      if (LANGS.indexOf(v) >= 0) return v;   // an explicit choice always wins
-    } catch (e) {
-      return DEFAULT_LANG;                   // private mode: no stored choice
-    }
-    // No stored choice yet: Luxembourgish, the site's own language. Browser
-    // sniffing was only added in Jul 2026 to keep an AdSense reviewer off the
-    // Luxembourgish homepage; with AdSense gone the site speaks lb by default
-    // again, and the switcher remembers anything else you pick.
+    try { localStorage.setItem(STORE_KEY, DEFAULT_LANG); } catch (e) { /* private mode */ }
     return DEFAULT_LANG;
   }
 
@@ -88,17 +81,8 @@
     syncSwitchers();
   }
 
-  function set(next) {
-    if (LOCKED) return;
-    if (LANGS.indexOf(next) < 0 || next === lang) {
-      if (next === lang) return;
-      return;
-    }
-    lang = next;
-    try { localStorage.setItem(STORE_KEY, lang); } catch (e) {}
-    apply(document);
-    document.dispatchEvent(new CustomEvent("i18n:change", { detail: { lang: lang } }));
-  }
+  // Kept for callers; the site no longer changes language.
+  function set() {}
 
   // ---- language switcher (auto-mounts into every #langSw host) -------------
   function injectCss() {
@@ -135,8 +119,11 @@
     });
   }
 
+  // The LB/DE/EN switcher is gone (Luxembourgish only). The #langSw hosts stay
+  // in the pages as empty spans: theme.js still anchors its picker there.
+  var SWITCHER_ENABLED = false;
   function mountSwitchers() {
-    if (LOCKED) return;
+    if (LOCKED || !SWITCHER_ENABLED) return;
     document.querySelectorAll("#langSw, [data-langsw]").forEach(function (host) {
       if (!host.dataset.i18nMounted) {
         host.dataset.i18nMounted = "1";

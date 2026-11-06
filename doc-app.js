@@ -9,8 +9,8 @@ import { createDocumentEditor, esc } from "./doc-editor.js?v=2";
 import { createStudioShell, installStudioChrome } from "./studio-shell.js?v=2"; installStudioChrome();
 import { deleteDocument, listDocuments, loadDocument, saveDocument,
   scheduleAutosave, startNewDocument } from "./doc-store.js?v=31";
+import { STUDIO_ALLOW } from "./studio-allow.js?v=1";
 
-const STUDIO_ALLOW = ["konto@ian.lu", "matthieugerouville@gmail.com"];
 const DEFAULT_WORDS = 500;
 const PROGRESS_HIDE_MS = 700;
 const PPT_SCRIPT_SEED_KEY = "ian-doc-script-seed-v1";

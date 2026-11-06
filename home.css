@@ -1,0 +1,261 @@
+/* ian.lu homepage, "Gitter" look (Nov 2026): one hairline grid, sharp corners,
+ * off-white paper, off-black ink, ONE green accent. Light only — the site-wide
+ * theme tokens are pinned to light values on body.gt, so shared UI that lands on
+ * this page (sign-in modal, ⌘K panel, toasts, phone tab bar) matches it even when
+ * the visitor picked dark mode elsewhere. Everything is scoped to body.gt. */
+@font-face {
+  font-family: "Geist";
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("assets/fonts/geist-latin.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Geist Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("assets/fonts/geist-mono-500-latin.woff2") format("woff2");
+}
+
+html:has(body.gt) { background: #f6f6f3; color-scheme: light; }
+
+body.gt {
+  --paper: #f6f6f3;
+  --white: #fcfcfa;
+  --ink: #16171a;
+  --muted: #62656a;
+  --line: #16171a;
+  --soft: rgba(22, 23, 26, 0.14);
+  --tint: rgba(22, 23, 26, 0.04);
+  --green: #1f7a4d;
+  --gutter: 36px;
+  /* site-wide tokens (theme.js / glass-contrast.js), pinned to this look */
+  --bg: var(--paper); --text: var(--ink); --text2: var(--muted); --border: var(--soft);
+  --card: var(--white); --card-opaque: var(--white); --card2: #efefeb; --card2-opaque: #efefeb;
+  --card-hover: #efefeb; --panel: var(--white); --panel2: #efefeb;
+  --glass-solid: var(--white); --glass-tint: var(--white); --control-fill: var(--white);
+  --accent: var(--green); --accent-text: var(--green); --accent-foreground: #fff;
+  --accent-border: var(--green); --accent2: var(--green); --focus-ring: var(--green);
+  margin: 0;
+  min-height: 100svh;
+  background: var(--paper);
+  color: var(--ink);
+  color-scheme: light;
+  font: 400 16px/1.45 "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+body.gt * { box-sizing: border-box; }
+body.gt [hidden] { display: none !important; }
+body.gt :is(h1, h2, h3, p) { margin: 0; }
+:where(body.gt) a { color: inherit; }
+.gt .ic { width: 1em; height: 1em; flex: none; fill: currentColor; vertical-align: -0.125em; }
+
+/* Light only: no appearance picker on this page. */
+body.gt #themeFab, body.gt #themePop { display: none !important; }
+
+/* Signed-in state comes from html.auth-in (theme.js guesses it before paint,
+ * auth.js corrects it) so the right variant shows on the first frame. */
+html.auth-in .gt .only-out, html:not(.auth-in) .gt .only-in { display: none !important; }
+
+.gt-page { max-width: 1240px; margin: 0 auto; padding: 24px var(--gutter) 56px; }
+.gt-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  border-top: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+}
+.gt .c {
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 18px 20px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+}
+.gt .full { grid-column: 1 / -1; }
+
+/* ---- header row ---- */
+.gt-nav { flex-direction: row !important; align-items: center; padding: 2px 20px !important; font-size: 14px; }
+.gt-mark { font-weight: 800; font-size: 16px; text-decoration: none; letter-spacing: -0.01em; }
+.gt-navr { display: flex; align-items: center; gap: 4px; }
+.gt-acct {
+  border: 0; background: none; cursor: pointer; padding: 0 0 0 10px; min-height: 44px;
+  font: 600 14px/1 "Geist", system-ui, sans-serif; color: var(--green);
+  max-width: 16ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+html.auth-in .gt-acct { color: var(--ink); }
+.gt-acct:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* ---- hero row ---- */
+.gt-hero { grid-column: span 4; justify-content: flex-end !important; min-height: 250px; }
+.gt-hello { color: var(--muted); font-size: 15px; min-height: 1.45em; }
+.gt-word {
+  font-size: 120px; font-weight: 800; letter-spacing: -0.065em; line-height: 0.85;
+  margin: 8px 0 4px -4px !important; color: var(--ink);
+}
+.gt-word span { color: var(--green); }
+.gt-tag { color: var(--muted); font-size: 18px; max-width: 36ch; }
+.gt-time { grid-column: span 2; }
+.gt-date { color: var(--muted); }
+.gt-clock {
+  font-family: "Geist Mono", ui-monospace, monospace; font-weight: 500; font-size: 44px;
+  letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums;
+}
+.gt-cta { color: var(--muted); font-size: 14px; }
+.gt-go {
+  color: var(--green); font-weight: 600; text-decoration: none; display: inline-flex; align-items: center;
+  gap: 6px; background: none; border: 0; padding: 0; font: inherit; font-weight: 600; cursor: pointer;
+}
+.gt-go:hover { text-decoration: underline; text-underline-offset: 3px; }
+.gt-time .gt-go.big { font-size: 17px; }
+
+/* ---- search row ---- */
+.gt-search { grid-column: span 4; padding: 0 !important; }
+.gt-search button {
+  all: unset; box-sizing: border-box; cursor: text; width: 100%; height: 100%; min-height: 76px;
+  display: flex; align-items: center; gap: 14px; padding: 16px 20px; font-size: 18px; color: var(--muted);
+}
+.gt-search button:hover { background: var(--white); }
+.gt-search button:focus-visible { outline: 2px solid var(--green); outline-offset: -3px; }
+.gt-search .ic { font-size: 22px; color: var(--ink); }
+.gt-search .ph { flex: 1; min-width: 0; line-height: 1.3; }
+.gt-keys { font-family: "Geist Mono", ui-monospace, monospace; font-size: 13px; border: 1px solid var(--soft); padding: 2px 8px; white-space: nowrap; }
+.gt-chips { grid-column: span 2; flex-direction: row !important; flex-wrap: wrap; align-content: center; align-items: center; justify-content: flex-start !important; gap: 6px 14px !important; padding: 14px 20px !important; }
+.gt-chips a { font-weight: 600; font-size: 14px; text-decoration: none; border-bottom: 1px solid var(--soft); line-height: 1.6; }
+.gt-chips a:hover { color: var(--green); border-color: var(--green); }
+
+/* ---- category index: hidden columns drop out, the rest share the width ---- */
+.gt-index { grid-column: 1 / -1; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+.gt-index .c { justify-content: flex-start; gap: 2px; padding: 18px 20px 20px; }
+.gt-index h3, .gt-admin h3 {
+  font-size: 15px; font-weight: 600; color: var(--muted); margin-bottom: 8px !important;
+  display: flex; gap: 8px; align-items: center;
+}
+.gt-index h3 .ic, .gt-admin h3 .ic { font-size: 18px; }
+.gt-index a {
+  text-decoration: none; font-weight: 600; font-size: 17px; padding: 4px 0;
+  display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+}
+.gt-index a:hover, .gt-admin a:hover { color: var(--green); }
+.gt .kont { color: var(--muted); font-weight: 400; font-size: 12px; }
+html.auth-in .gt .kont { display: none; }
+
+.gt-admin { flex-direction: row !important; align-items: center; justify-content: flex-start !important; gap: 8px 28px !important; flex-wrap: wrap; padding: 12px 20px !important; background: var(--tint); }
+.gt-admin h3 { margin: 0 !important; font-size: 14px; }
+.gt-admin a { text-decoration: none; font-weight: 600; font-size: 15px; }
+
+/* ---- arcade ---- */
+.gt-lbl { flex-direction: row !important; align-items: center; padding: 10px 20px !important; font-weight: 600; font-size: 14px; background: var(--tint); }
+.gt-lbl a { text-decoration: none; }
+.gt-lbl a:hover { color: var(--green); }
+.gt-week { grid-column: span 3; padding: 0 !important; gap: 0 !important; justify-content: flex-start !important; }
+.gt-week .shot { display: block; aspect-ratio: 16 / 9; overflow: hidden; background: var(--tint); }
+.gt-week img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.gt-week .body { padding: 16px 20px 18px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.gt-kick { color: var(--green); font-weight: 600; font-size: 13px; }
+.gt-week h3 { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; }
+.gt-week .meta { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
+.gt-week .foot { margin-top: auto; display: flex; gap: 20px; align-items: center; padding-top: 8px; flex-wrap: wrap; }
+.gt-play { background: var(--ink); color: var(--paper) !important; padding: 0 18px; min-height: 44px; display: inline-flex; align-items: center; font-weight: 600; text-decoration: none; }
+.gt-play:hover { background: var(--green); }
+.gt-week.loading .shot img, .gt-week.loading .body > * { opacity: 0; }
+.gt-week .shot img, .gt-week .body > * { transition: opacity .25s ease; }
+
+.gt-tiles { grid-column: span 3; display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; }
+.gt-tiles a {
+  border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); min-width: 0;
+  text-decoration: none; font-weight: 600; font-size: 15px; display: flex; flex-direction: column;
+}
+.gt-tiles .shot { flex: 1; min-height: 0; overflow: hidden; background: var(--tint); }
+.gt-tiles img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.gt-tiles .cap { display: block; padding: 8px 14px 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gt-tiles a:hover .cap { color: var(--green); }
+
+.gt-word-cell { grid-column: span 3; flex-direction: row !important; align-items: center; justify-content: flex-start !important; gap: 14px !important; text-decoration: none; }
+.gt-word-cell .ic { font-size: 28px; }
+.gt-word-cell b { display: block; font-size: 17px; font-weight: 600; }
+.gt-word-cell small { display: block; color: var(--muted); font-size: 14px; }
+.gt-word-cell:hover { background: var(--white); }
+.gt-word-cell:hover b { color: var(--green); }
+.gt-all {
+  grid-column: span 3; background: var(--ink); color: var(--paper) !important; text-decoration: none;
+  flex-direction: row !important; align-items: center; min-height: 96px;
+}
+.gt-all b { font-size: 30px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; }
+.gt-all .ic { font-size: 34px; transition: transform .2s ease; }
+.gt-all:hover { background: var(--green); }
+.gt-all:hover .ic { transform: translateX(4px); }
+.gt-all:focus-visible { outline: 3px solid var(--green); outline-offset: -6px; }
+
+/* ---- about (visitors) ---- */
+.gt-about { grid-column: span 4; justify-content: flex-start !important; }
+.gt-about h2 { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
+.gt-about p { color: var(--muted); max-width: 62ch; }
+.gt-about p strong { color: var(--ink); font-weight: 600; }
+.gt-about details summary { cursor: pointer; color: var(--green); font-weight: 600; font-size: 15px; display: inline-flex; align-items: center; min-height: 44px; list-style: none; }
+.gt-about details summary::-webkit-details-marker { display: none; }
+.gt-about details[open] summary { margin-bottom: 4px; }
+.gt-about details h3 { font-size: 16px; font-weight: 600; margin: 18px 0 6px !important; }
+.gt-about details p { font-size: 15px; line-height: 1.65; margin-bottom: 4px; }
+.gt-about details a { color: var(--green); }
+.gt-about-go { grid-column: span 2; justify-content: flex-end !important; text-decoration: none; }
+.gt-about-go b { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; display: inline-flex; gap: 8px; align-items: center; }
+.gt-about-go:hover { background: var(--white); }
+.gt-about-go:hover b { color: var(--green); }
+
+/* ---- footer ---- */
+.gt-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 0 18px; color: var(--muted); font-size: 14px; padding-top: 6px; }
+.gt-foot a { color: var(--muted); display: inline-flex; align-items: center; min-height: 44px; text-underline-offset: 3px; }
+.gt-foot a:hover { color: var(--ink); }
+.gt-foot .gt-install { margin-left: auto; }
+.gt-foot .gt-install:empty { display: none; }
+.gt #pwaInstall { border-radius: 0 !important; background: var(--ink) !important; color: var(--paper) !important; font: 600 13px "Geist", system-ui, sans-serif !important; }
+
+@media (hover: none) { .gt-keys { display: none; } }
+
+/* ---- iPad portrait and narrower tablets ---- */
+@media (max-width: 1000px) {
+  body.gt { --gutter: 24px; }
+  .gt-word { font-size: 104px; }
+  .gt-clock { font-size: 38px; }
+  .gt-all b { font-size: 26px; }
+  .gt-search button { font-size: 16px; gap: 12px; }
+}
+
+/* ---- phones: one column ---- */
+@media (max-width: 700px) {
+  body.gt { --gutter: 16px; }
+  .gt-page { padding-top: 12px; padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
+  .gt-grid { grid-template-columns: minmax(0, 1fr); }
+  .gt-grid > * { grid-column: 1 / -1 !important; }
+  .gt-hero { min-height: 0; padding-top: 26px !important; }
+  .gt-word { font-size: clamp(64px, 22vw, 96px); }
+  .gt-tag { font-size: 16px; }
+  .gt-time { gap: 6px !important; }
+  .gt-clock { font-size: 34px; }
+  .gt-search button { min-height: 60px; font-size: 16px; }
+  .gt-index { grid-auto-flow: row; grid-template-columns: minmax(0, 1fr); }
+  .gt-week h3 { font-size: 22px; }
+  .gt-tiles .shot { aspect-ratio: 16 / 10; flex: none; }
+  .gt-all { min-height: 76px; }
+  .gt-all b { font-size: 24px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gt-all .ic, .gt-week .shot img, .gt-week .body > * { transition: none; }
+}
+
+/* 44px touch targets without changing the drawn layout: the extra height is
+ * padding, taken back with a negative margin. */
+.gt-mark { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; }
+.gt-chips a { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; min-width: 44px; border-bottom: 0; text-decoration: underline; text-decoration-color: var(--soft); text-decoration-thickness: 1px; text-underline-offset: 5px; }
+.gt-chips a:hover { text-decoration-color: var(--green); }
+.gt-index a { padding: 10.5px 0; align-items: center; }
+.gt-index h3 { margin-bottom: 2px !important; }
+.gt-chips { row-gap: 0 !important; padding-block: 6px !important; }
+.gt-admin a, .gt-lbl a, .gt-week .foot .gt-go, .gt-cta .gt-go { padding: 10.5px 0; margin: -10.5px 0; }
+.gt-time .gt-go.big { padding: 10px 0; margin: -10px 0; }
+.gt-lbl a { display: inline-flex; align-items: center; min-height: 44px; padding: 0; margin: -12px 0; }

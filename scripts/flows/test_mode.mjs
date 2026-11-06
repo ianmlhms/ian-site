@@ -245,8 +245,8 @@ export const flow = {
     h.eq(await page.locator("#pbEventChip").count(), 1, "control: normal mode shows the event counter chip");
 
     /* ---------------- languages ---------------- */
-    h.step("prompt follows the site language");
-    for (const [lang, expected] of [["en", "Play normally"], ["de", "Normal spielen"]]) {
+    h.step("prompt stays Luxembourgish whatever language was stored (site is lb only since 6 Nov 2026)");
+    for (const [lang, expected] of [["en", "Normal spillen"], ["de", "Normal spillen"]]) {
       await page.evaluate((value) => localStorage.setItem("site_lang", value), lang);
       await h.goto("/pixelbreak.html");
       await page.waitForFunction(() => window.PB && window.PB.isOwner() && document.getElementById("pbAcct")?.textContent.includes("tester"));
