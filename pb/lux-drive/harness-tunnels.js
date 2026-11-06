@@ -61,7 +61,7 @@ function runFrom(pts, x, z, len) {
   return out;
 }
 
-export function runTunnelChecks({ check, section, stats, data, field, surface, ground, net, portals, buildings, forest, playArea }) {
+export function runTunnelChecks({ check, section, stats, data, field, surface, ground, net, portals, buildings, forest, playArea, tubeIds = new Set() }) {
   section('O shallow tunnels are open roads, the portals sit on their roads (bridges8)');
   const opened = data.openedTunnels || [];
   const openWays = opened.flatMap((o) => o.ids).map((id) => data.roads[id]);
@@ -193,7 +193,8 @@ export function runTunnelChecks({ check, section, stats, data, field, surface, g
     `${badRides.length} of ${rides.length} ways ${badRides.slice(0, 6).map((r) => `${r.way.name || r.way.kind} ${r.way.id} at ${r.way.pts[0].map(Math.round)}: ${r.why}`).join('; ')}`);
 
   // ---- O4: the real tunnels stay tunnels with their mouths
-  const lost = REAL_TUNNELS.filter(([, ids]) => ids.some((id) => !data.roads[id] || !data.roads[id].tunnel) || !portals.list.some((p) => ids.includes(p.road)));
+  // (tunnels16: a real tunnel the car drives through - a tube, tunnel-tubes.js - has open mouths of its own instead of a closed portal; it is still never opened as a cut)
+  const lost = REAL_TUNNELS.filter(([, ids]) => ids.some((id) => !data.roads[id] || !data.roads[id].tunnel) || !(portals.list.some((p) => ids.includes(p.road)) || ids.some((id) => tubeIds.has(id))));
   stats.openedTunnels = opened.map((o) => `${o.name} ${Math.round(o.length)} m cover ${o.cover.toFixed(1)}`);
-  check('O4 the real tunnels under hills keep their mouths (René Konen, Cents, Grouft, Albert Bousser, Rangwee, Desserte Schuman)', lost.length === 0, lost.map(([n]) => n).join(', '));
+  check('O4 the real tunnels under hills keep their mouths, closed or open as a drivable tube (René Konen, Cents, Grouft, Albert Bousser, Rangwee, Desserte Schuman)', lost.length === 0, lost.map(([n]) => n).join(', '));
 }

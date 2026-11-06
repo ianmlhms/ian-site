@@ -1762,7 +1762,7 @@ if (wants('M')) {
 /* ---------------------------------------------------------------- N: the bridges, the portals, the ride (harness-bridges.js) */
 if (wants('N')) runBridgeChecks({ check, section, stats, data, surface, ground, net, portals, buildings, forest, playArea });
 /* ---------------------------------------------------------------- O: the shallow tunnels that are open roads, the portals on their roads (harness-tunnels.js) */
-if (wants('O')) runTunnelChecks({ check, section, stats, data, field, surface, ground, net, portals, buildings, forest, playArea });
+if (wants('O')) runTunnelChecks({ check, section, stats, data, field, surface, ground, net, portals, buildings, forest, playArea, tubeIds: tubes.ids });
 if (wants('P')) runRoads9Checks({ check, section, stats, data, field, surface, ground, net, portals, buildings, forest, playArea, markDecks: deckNetwork.decks.filter((d) => !landmarks.hiddenDecks.has(d.id)) });
 /* ---------------------------------------------------------------- Q: decks driven end to end, banks under deck ends, medians, camera (harness-decks.js) */
 if (wants('Q')) runDeckChecks({ check, section, stats, data, field, surface, ground, net, buildings, portals, playArea });
