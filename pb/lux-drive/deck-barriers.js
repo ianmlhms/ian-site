@@ -33,7 +33,8 @@ export const BARRIER = Object.freeze({
   laneChunk: 40,           // ways made into lane segments per step of the build
   touchSamples: 400,       // lane samples of a deck route per step of the build
   shiftStep: 0.15,         // m: a piece that a lane touches moves out this far at a time (the walls' rule, lane-clearance.js WALL_LANE) ...
-  shiftMax: 0.6,           // ... up to this: the line stays within DECK.margin past the deck edge (the parapet 0.3 + 0.05 + 0.6 < 0.8 + the car's half width)
+  shiftMax: 0.6,
+  movedSlack: 1.0,         // m: a moved piece keeps clear of the lanes down to drop + this under it           // ... up to this: the line stays within DECK.margin past the deck edge (the parapet 0.3 + 0.05 + 0.6 < 0.8 + the car's half width)
 });
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 
@@ -288,11 +289,13 @@ function* barrierSteps(deckNetwork, surface, { skip, roads }) {
       phase('lanes');
     }
     yield 'lanes'; tp = now();
-    const inLane = (c) => laneSets.some((lanes) => lanes.near(c.ax, c.az, c.bx, c.bz, BARRIER.laneClear).some((p) => {
+    // (below: how far under the piece a lane still counts as at its level - a moved piece keeps clear of lanes BARRIER.movedSlack lower still: the level of a lane
+    // here is the DTM's estimate, and a piece moved out over a road beside the deck end 0.4 m lower stood in its lane - V4, deck 223 on Rue de Munsbach)
+    const inLane = (c, below = BARRIER.drop) => laneSets.some((lanes) => lanes.near(c.ax, c.az, c.bx, c.bz, BARRIER.laneClear).some((p) => {
       const g = segmentGap(p.ax, p.az, p.bx, p.bz, c.ax, c.az, c.bx, c.bz);
       if (g.d >= BARRIER.laneClear) return false;
       const top = c.ay + (c.by - c.ay) * g.t;
-      return Math.max(p.ay, p.by) >= top - BARRIER.drop && Math.min(p.ay, p.by) < top + BARRIER.height;
+      return Math.max(p.ay, p.by) >= top - below && Math.min(p.ay, p.by) < top + BARRIER.height;
     }));
     // a candidate that a lane touches moves out, BARRIER.shiftStep at a time up to BARRIER.shiftMax, onto the margin the deck still carries a car on (DECK.margin):
     // the lane and the deck disagree by a little where a way cuts the corner of its deck (the top of the Buchler car park spiral, deck 59: the way 14882 bends 1 m
@@ -308,7 +311,7 @@ function* barrierSteps(deckNetwork, surface, { skip, roads }) {
       phase('deckLanes');
       const still = [];
       for (let i = 0; i < moved.length; i++) {
-        if (!onDeckLane.has(i) && !inLane(moved[i])) kept.push(moved[i]); else still.push(pending[i]);
+        if (!onDeckLane.has(i) && !inLane(moved[i], shift === 0 ? BARRIER.drop : BARRIER.drop + BARRIER.movedSlack)) kept.push(moved[i]); else still.push(pending[i]);
         if ((i + 1) % BARRIER.filterChunk === 0) { phase('filter'); yield 'filter'; tp = now(); }
       }
       phase('filter');

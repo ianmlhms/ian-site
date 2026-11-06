@@ -24,6 +24,9 @@ const V_DT = 1 / 60;
 const V_FALL = 1.0;            // m of flight down = the car fell off the deck
 const V_MIN_WIDTH = 4;         // m: the decks of cars (harness-decks.js Q_MIN_WIDTH)
 const V_ANGLES = [Math.PI / 2, Math.PI / 4];    // between the heading and the deck's axis
+// the buildings the data has wholly under a deck (deck surface over the ridge): Pfaffenthal 6350 and 7233 under the Pont Rouge, 60 m below it (the other five a deck
+// passes over reach up through it: they stop a car on the deck, rightly).  A floor that keeps V2 from passing on nothing.
+const V2_MIN_UNDER = 2;
 
 const pip = (p, x, z) => {
   let c = false;
@@ -167,7 +170,7 @@ export function runCollide14Checks({ check, section, stats, data, field, surface
     }
   }
   stats.underDeck = { buildings: under, blocked: v2bad.length, list: v2bad.slice(0, 8) };
-  check(`V2 a building under a deck does not stop a car on the deck over it (${under} buildings under decks)`, under >= 4 && v2bad.length === 0, v2bad.slice(0, 8).join('; '));
+  check(`V2 a building under a deck does not stop a car on the deck over it (${under} buildings under decks)`, under >= V2_MIN_UNDER && v2bad.length === 0, v2bad.slice(0, 8).join('; '));
 
   // ---- V3
   const v3 = deckEdgeScan({ ground, surface, roads: data.roads, collide: carCollider.collide });

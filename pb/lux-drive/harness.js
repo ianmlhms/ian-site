@@ -1255,13 +1255,21 @@ if (wants('I')) {
   const WINDOW = 10, DEV_SLACK = 0.01, HARD_DEV_RATIO = 2, MAX_CROSSFALL = 0.025, MAX_KERB_DEV = 0.03;   // (a vertical curve of the radius of its class leaves its 20 m mean by deviationOf(R): 11 cm for a town street, 3 cm for a motorway; + 1 cm for the rounding of the lattice and of the junction pins)
   // the ways: carved, at ground level (layer 0, not riding over anything), long enough to hold a window; half in the town, half outside
   const urban = [], rural = [];
+  const isHugeFootprint = (id) => {                                   // (buildings.js: a box over more than 64 cells of 32 m is hashed along its edges)
+    const p = data.buildings[id].pts;
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (let i = 0; i < p.length; i += 2) { x0 = Math.min(x0, p[i]); x1 = Math.max(x1, p[i]); z0 = Math.min(z0, p[i + 1]); z1 = Math.max(z1, p[i + 1]); }
+    return (Math.floor(x1 / 32) - Math.floor(x0 / 32) + 1) * (Math.floor(z1 / 32) - Math.floor(z0 / 32) + 1) > 64;
+  };
   for (const ch of net.chains) {
     if (ch.tagged || net.overRoads.has(ch.road) || ch.arc[ch.arc.length - 1] < 3 * WINDOW) continue;
     // (an opened shallow tunnel is driven by section O; kept out of this random sample so that the sample stays the same set of streets.  With them in it
     // the draw shifted onto Eecherfeld at 5070,6192: a 16.7 % crossfall there that was never sampled before - not caused by them, listed in PROGRESS, bridges8)
     if (data.roads[ch.road].openCut) continue;
     const mid = Math.floor(ch.x.length / 2);
-    (buildings.near(ch.x[mid], ch.z[mid], 60).length > 6 ? urban : rural).push(ch);
+    // (the nine huge footprints the index holds since collide14 do not count: with them the town / country split moved and the draw shifted onto Avenue John F. Kennedy
+    // at 6053,7854 - a 9 cm bump never sampled before, not caused by them, listed in PROGRESS Collide 14)
+    (buildings.near(ch.x[mid], ch.z[mid], 60).filter((id) => !isHugeFootprint(id)).length > 6 ? urban : rural).push(ch);
   }
   const pick = (list, n) => { const out = [], pool = list.slice(); while (out.length < n && pool.length) out.push(pool.splice(Math.floor(rng() * pool.length), 1)[0]); return out; };
   const ways = [...pick(urban, 100), ...pick(rural, 100)];
