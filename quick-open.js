@@ -54,14 +54,11 @@ let results = [];
 let selectedIndex = 0;
 let previouslyFocused = null;
 
+// Luxembourgish only (6 Nov 2026): I18N answers "lb" (or a page's locked
+// language); without I18N there is no stored or browser language to follow.
 function currentLanguage() {
   if (["lb", "de", "en"].includes(window.I18N?.lang)) return window.I18N.lang;
-  try {
-    const saved = localStorage.getItem("site_lang");
-    if (["lb", "de", "en"].includes(saved)) return saved;
-  } catch {}
-  const browserLanguage = (navigator.language || "").slice(0, 2).toLowerCase();
-  return browserLanguage === "lb" || browserLanguage === "de" ? browserLanguage : "en";
+  return "lb";
 }
 
 function translate(key) {

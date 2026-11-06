@@ -118,7 +118,7 @@ window.I18N_DICT = {
   "home.quick":        { lb: "Séier Linken", de: "Schnellzugriff", en: "Quick links" },
   "home.cat.friends":  { lb: "Frënn", de: "Freunde", en: "Friends" },
   "home.cat.travel":   { lb: "Ënnerwee", de: "Unterwegs", en: "Getting around" },
-  "home.cat.mine":     { lb: "Mäin", de: "Persönlich", en: "Personal" },
+  "home.cat.mine":     { lb: "Perséinlech", de: "Persönlich", en: "Personal" },
   "home.kont":         { lb: "Kont", de: "Konto", en: "Account" },
   "home.dashboard":    { lb: "Mäin Dashboard", de: "Mein Dashboard", en: "My dashboard" },
   "home.weekKick":     { lb: "Spill vun der Woch", de: "Spiel der Woche", en: "Game of the week" },

@@ -1,14 +1,14 @@
-import * as auth from "./auth.js?v=39";
+import * as auth from "./auth.js?v=40";
 import { ingestFiles, INGEST_LIMITS } from "./ppt-ingest.js?v=3"; // Shared studio ingest; historical prefix kept intentionally.
-import { createDocumentGeneration, reviseDocument, rewriteDocument } from "./doc-ai.js?v=31";
+import { createDocumentGeneration, reviseDocument, rewriteDocument } from "./doc-ai.js?v=32";
 import { documentText, validateDocument } from "./doc-schema.js?v=1";
 import { replaceBlock } from "./doc-ops.js?v=2";
-import { exportDocumentDocx } from "./doc-export.js?v=31";
+import { exportDocumentDocx } from "./doc-export.js?v=32";
 import { createHistory } from "./ppt-history.js?v=3";
 import { createDocumentEditor, esc } from "./doc-editor.js?v=2";
 import { createStudioShell, installStudioChrome } from "./studio-shell.js?v=2"; installStudioChrome();
 import { deleteDocument, listDocuments, loadDocument, saveDocument,
-  scheduleAutosave, startNewDocument } from "./doc-store.js?v=31";
+  scheduleAutosave, startNewDocument } from "./doc-store.js?v=32";
 import { STUDIO_ALLOW } from "./studio-allow.js?v=1";
 
 const DEFAULT_WORDS = 500;

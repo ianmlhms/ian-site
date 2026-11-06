@@ -167,7 +167,7 @@ const hideLoading = (frame) => frame.evaluate(() => { document.getElementById('l
 export async function runOverlapMatrix(h, opts = {}) {
   const only = csv('OVERLAP_ONLY');
   const wantStates = csv('OVERLAP_STATES');
-  const langs = csv('OVERLAP_LANGS') || (FULL ? ['lb', 'de', 'en'] : ['de']);
+  const langs = csv('OVERLAP_LANGS') || ['lb']   /* Luxembourgish only since 6 Nov 2026: the game ignores other languages */;
   const sizes = sizeList();
   const reportDir = process.env.OVERLAP_REPORT_DIR || (FULL ? LOCAL_OUT : null);
   const shotAll = process.env.OVERLAP_SHOTS === 'all';

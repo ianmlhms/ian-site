@@ -31,13 +31,9 @@ export const flow = {
     await h.page.waitForSelector('#menu:not([hidden])');
     await h.shot('menu');
 
-    h.step('language switch lb -> de -> en');
-    const titles = {};
-    for (const lang of ['de', 'en', 'lb']) {
-      await h.page.locator(`.langs [data-lang="${lang}"], .langs button:has-text("${lang.toUpperCase()}")`).first().tap();
-      titles[lang] = await h.page.locator('#btnStart').innerText();
-    }
-    h.expect(new Set(Object.values(titles)).size === 3, 'start button text differs per language: ' + JSON.stringify(titles));
+    h.step('Luxembourgish only (6 Nov 2026): no language buttons, the menu is lb');
+    h.eq(await h.page.locator('[data-lang]').count(), 0, 'no language buttons');
+    h.eq(await h.page.evaluate(() => document.documentElement.lang), 'lb', 'html lang is lb');
 
     h.step('start a race from the menu (track 2, night)');
     await h.page.locator('#trackCards > *').nth(1).tap();

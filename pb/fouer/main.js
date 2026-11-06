@@ -37,14 +37,8 @@ function param(name) {
   return null;
 }
 
+// Luxembourgish only (Ian, 6 Nov 2026): no language chips, stored choices are ignored; i18n.js keeps de/en.
 function pickLang() {
-  try {
-    const own = localStorage.getItem(LANG_KEY);
-    if (LANGS.includes(own)) return own;
-    const site = localStorage.getItem('site_lang');
-    if (LANGS.includes(site)) return site;
-    if (site === 'fr') return 'en';
-  } catch (error) { /* storage blocked */ }
   return 'lb';
 }
 

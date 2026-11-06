@@ -251,7 +251,7 @@ export const flow = {
       await h.goto('/pixelbreak.html?g=paket-express&test=1'); frame = await gameFrame(h);
       h.eq(await frame.evaluate(() => document.body.classList.contains('dark')), theme === 'dark', theme + ' chrome');
       await h.page.setViewportSize({ width: 390, height: 844 });
-      for (const language of ['de', 'en', 'lb']) { await frame.locator('[data-lang="' + language + '"]').tap(); h.eq(await frame.evaluate(() => document.documentElement.lang), language, language + ' UI'); }
+      h.eq(await frame.evaluate(() => document.documentElement.lang), 'lb', 'lb UI (Luxembourgish only)'); h.expect(!(await frame.locator('[data-lang="de"]').isVisible()), 'no language buttons');
       h.expect(await frame.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), theme + ' phone menu fits');
       await h.shot(theme + '-phone-menu'); await frame.locator('#startShift').tap();
       h.expect(await frame.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), theme + ' phone HUD fits');
@@ -293,7 +293,7 @@ export const flow = {
     await h.page.evaluate(()=>window.__pbAuth.sb.auth.signOut());await h.pause(400);
     await frame.locator('#toGarage').tap();
     await frame.waitForFunction(()=>document.getElementById('dailyStatus').textContent.includes('Mell dech un'));
-    for(const [language,label] of [['de','Melde dich'],['en','Sign in'],['lb','Mell dech']]){await frame.locator('[data-lang="'+language+'"]').tap();h.expect((await frame.locator('#dailyStatus').innerText()).includes(label),'signed-out daily status translated to '+language);}
+    h.expect((await frame.locator('#dailyStatus').innerText()).includes('Mell dech'),'signed-out daily status in lb');
     await h.shot('signed-out-daily-ipad');await frame.locator('#startDaily').tap();
     h.eq(await frame.evaluate(()=>__pxTest.state().phase),'running','signed-out players can drive the daily route');
     await h.goto('/pixelbreak.html?g=paket-express');

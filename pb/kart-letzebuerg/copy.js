@@ -158,13 +158,13 @@
   TXT.de.tagline = 'Drifte durch die Stadt, schnapp dir die Boxen und gewinne das Rennen.';
   let lang = 'lb';
   KL.lang = () => lang;
-  KL.setLang = (l) => { if (TXT[l]) { lang = l; document.documentElement.lang = l; try { localStorage.setItem('site_lang', l); } catch (e) { /* storage may be blocked */ } } };
+  // Luxembourgish only (Ian, 6 Nov 2026): every request ends in lb; the de/en copy stays above.
+  KL.setLang = () => { lang = 'lb'; document.documentElement.lang = 'lb'; };
   KL.t = (key, vars) => {
     let s = (TXT[lang] && TXT[lang][key]) || TXT.en[key] || key;
     if (vars) for (const k in vars) s = s.replace('{' + k + '}', vars[k]);
     return s;
   };
   KL.copy = TXT;
-  try { const l = localStorage.getItem('site_lang'); if (TXT[l]) lang = l; } catch (e) { /* ignore */ }
   document.documentElement.lang = lang;
 })();

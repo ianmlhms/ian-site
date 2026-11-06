@@ -329,7 +329,6 @@ export function createUi({ root, lang, trails, handlers, touch = false }) {
       ${select('weather', T('set.weather'), WEATHER_IDS, s.weather, (v) => (v === 'random' ? T('set.random') : T(`weather.${v}`)))}
       ${select('season', T('set.season'), SEASON_IDS, s.season, (v) => (v === 'random' ? T('set.random') : T(`season.${v}`)))}
       ${select('quality', T('set.quality'), QUALITY_IDS, s.quality, (v) => (v === 'auto' ? `${T('set.auto')} (${T(`quality.${d.autoQuality}`)})` : T(`quality.${v}`)))}
-      ${select('lang', T('set.language'), LANGS, s.lang, (v) => LANG_NAMES[v])}
       ${select('sound', T('set.sound'), ['on', 'off'], s.muted ? 'off' : 'on', (v) => T(`set.${v}`))}
       <p class="note">${esc(T('set.note'))}</p>
       <p class="note">${esc(d.cloud ? T('save.cloud') : T('save.local'))}</p></div>`;

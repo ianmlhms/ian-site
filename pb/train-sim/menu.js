@@ -739,7 +739,7 @@
 
     const root = h('div', { class: 'ts-menu', lang: TS.lang, role: 'main', 'aria-labelledby': 'ts-menu-title' });
     const inner = h('div', { class: 'ts-menu__inner' },
-      h('div', { class: 'ts-menu__top' }, h('span', { class: 'ts-menu__stamp', text: C.careers[ctx.career].icon + (ctx.career === 'tram' ? ' LUXTRAM · SIM' : ' LUX RAIL · SIM') }), h('div', { class: 'ts-menu__topR' }, hintsToggle(), langBar())),
+      h('div', { class: 'ts-menu__top' }, h('span', { class: 'ts-menu__stamp', text: C.careers[ctx.career].icon + (ctx.career === 'tram' ? ' LUXTRAM · SIM' : ' LUX RAIL · SIM') }), h('div', { class: 'ts-menu__topR' }, hintsToggle())),
       resumeCard(),
       careerSwitch(),
       hero(),
