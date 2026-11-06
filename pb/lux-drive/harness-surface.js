@@ -6,6 +6,8 @@
  * Called by harness.js; everything it needs is passed in.  Pure Node. */
 import { createCar } from './car.js';
 import { JUNCTION } from './junction-probe.js';
+import { createWallCollider } from './wall-collider.js';
+import { CAR } from './config.js';
 
 export const R1_SPEED = 13;            // m/s (the QA drive test)
 const R1_DT = 1 / 60;
@@ -195,7 +197,7 @@ function nearDeck(ground, x, z) {
   return false;
 }
 
-export function runSurfaceChecks({ check, section, stats, data, net, surface, ground }) {
+export function runSurfaceChecks({ check, section, stats, data, net, field, surface, ground }) {
   section('R surface11: the carriageway smooth over its whole width');
   const res = laneDriveScan({ net, roads: data.roads, surface, ground });
   const runs = res.flatMap((r) => r.runs.map((u) => ({ ...u, label: r.label })));
@@ -205,4 +207,119 @@ export function runSurfaceChecks({ check, section, stats, data, net, surface, gr
   check(`R1 ten multi-lane roads driven in every lane (${runs.length} lanes) at ${R1_SPEED} m/s: vertical acceleration <= ${R1_MAX_ACC} m/s2 outside the junction boxes`,
     missing.length === 0 && runs.length >= 20 && worst.maxAcc <= R1_MAX_ACC,
     `worst ${worst.maxAcc.toFixed(2)} m/s2 (${worst.label}, lane ${worst.off} m at ${worst.at}); ${missing.length ? `missing / short: ${missing.map((r) => r.label).join(', ')}` : 'all roads found'}`);
+
+  // ---- R2
+  const lp = levelPairScan({ net, field });
+  stats.levelPairs = { pairs: lp.pairs, samples: lp.samples, bad: lp.bad, worst: +lp.worst.toFixed(2), worstAt: lp.worstAt };
+  check(`R2 carriageways at two levels side by side (${lp.pairs} pairs >= ${R2_MIN_APART} m apart, benches <= ${R2_MAX_GAP} m apart): the painted carriageway is level across (<= ${R2_SLOPE * 100} % + ${R2_SLACK * 100} cm) up to the step between them (ratchet <= ${R2_MAX_BAD} of ${lp.samples} samples; v51 467)`,
+    lp.samples > 800 && lp.bad <= R2_MAX_BAD, `${lp.bad} samples: ${lp.list.join('; ')}`);
+
+  // ---- R3
+  const md = mergeDriveScan({ net, data, surface, ground });
+  stats.mergeDrive = md.map((r) => `${r.label}: roll ${r.roll !== undefined ? r.roll.toFixed(3) : '-'} at ${r.rollAt}, air ${r.air}, ${r.through ? 'through' : 'blocked'}`);
+  check(`R3 the outer lanes past the Merl link (QA2 N-T01) driven with the walls: roll of the ground under the wheels <= ${R3_MAX_ROLL} rad, no flight, through`,
+    md.every((r) => !r.missing && r.roll <= R3_MAX_ROLL && r.air === 0 && r.through), stats.mergeDrive.join('; '));
+}
+
+/* ---- R2: two carriageways at two levels side by side ---------------------------------------------------------------------------------------------------------- */
+export const R2_MIN_APART = 1.2;       // m: two carved ways whose beds differ by at least this ...
+export const R2_MAX_GAP = 0.5;         // m: ... and whose benches lie at most this far apart (or overlap): the hand-over between them does not fit beside both carriageways
+const R2_STEP = 0.25;                  // m: the cross section is probed this often from each axis toward the other way
+const R2_IN = 0.3;                     // m: a probe counts while it lies this far inside the painted carriageway of its way
+const R2_MAX_BAD = 80;                 // samples off level (v51: 467; the ones left are junctions of merging links and the ends of ways - PROGRESS Surface 11).  A ratchet: lower it, never raise it
+const R2_SLOPE = 0.04, R2_SLACK = 0.03;   // the painted carriageway lies within this crossfall (+ slack) of its axis: no ramp into the lanes (QA2 N-T01: a 150 % grass bank across the outer lanes, the car rolled 31 deg)
+
+/** Every sample of a carved way where another carved way at another level lies within R2_MAX_GAP of its bench: the painted carriageway of each, probed across from its axis toward
+ *  the other, stays level.  Returns { pairs, samples, bad, worst, worstAt, list }. */
+export function levelPairScan({ net, field, maxList = 8 }) {
+  const GC = 32, key = (a, b) => a * 4096 + b, grid = new Map();
+  const chains = net.chains.filter((c) => !c.tagged && !net.overRoads.has(c.road));
+  for (const ch of chains) for (let i = 1; i < ch.x.length; i++) {
+    const a0 = Math.floor(Math.min(ch.x[i - 1], ch.x[i]) / GC), a1 = Math.floor(Math.max(ch.x[i - 1], ch.x[i]) / GC), b0 = Math.floor(Math.min(ch.z[i - 1], ch.z[i]) / GC), b1 = Math.floor(Math.max(ch.z[i - 1], ch.z[i]) / GC);
+    for (let a = a0; a <= a1; a++) for (let b = b0; b <= b1; b++) { const k = key(a, b); const l = grid.get(k); if (l) l.push(ch, i); else grid.set(k, [ch, i]); }
+  }
+  const bench = (r) => net.info[r].hw + net.info[r].kerbW;
+  const group = net.carriageways.groupOf;
+  const info = { chGroup: new Int32Array(3), chCar: new Float32Array(3), chPave: new Float32Array(3), chMajor: new Uint8Array(3) };
+  const sdOf = (x, z, g) => { field.height(x, z, info); for (let c = 0; c < 3; c++) if (info.chGroup[c] === g) return info.chCar[c]; return Infinity; };
+  const pairs = new Set();
+  let samples = 0, bad = 0, worst = 0, worstAt = '';
+  const list = [];
+  for (const ch of chains) {
+    for (let k = 1; k + 1 < ch.x.length; k++) {
+      const x = ch.x[k], z = ch.z[k], cx = Math.floor(x / GC), cz = Math.floor(z / GC);
+      for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
+        const l = grid.get(key(cx + a, cz + b)); if (!l) continue;
+        for (let q = 0; q < l.length; q += 2) {
+          const o = l[q], j = l[q + 1];
+          if (o.road === ch.road) continue;
+          const ax = o.x[j - 1], az = o.z[j - 1], ex = o.x[j] - ax, ez = o.z[j] - az, ll = ex * ex + ez * ez;
+          const t = ll > 1e-9 ? ((x - ax) * ex + (z - az) * ez) / ll : 0;
+          if (t <= 0 || t >= 1) continue;
+          const fx = ax + ex * t, fz = az + ez * t, d = Math.hypot(x - fx, z - fz);
+          if (d < 1 || d - bench(ch.road) - bench(o.road) > R2_MAX_GAP) continue;
+          const bedO = o.bed[j - 1] + (o.bed[j] - o.bed[j - 1]) * t;
+          if (Math.abs(ch.bed[k] - bedO) < R2_MIN_APART) continue;
+          pairs.add(`${Math.min(ch.road, o.road)}-${Math.max(ch.road, o.road)}`);
+          samples++;
+          // from this way's axis toward the other way: every probe that lies inside this way's painted carriageway
+          const ux = (fx - x) / d, uz = (fz - z) / d, g = group[ch.road], h0 = field.height(x, z);
+          let dev = 0;
+          for (let s = R2_STEP; s < d; s += R2_STEP) {
+            const px = x + ux * s, pz = z + uz * s;
+            if (sdOf(px, pz, g) > -R2_IN) break;
+            dev = Math.max(dev, Math.abs(field.height(px, pz) - h0) - (R2_SLOPE * s + R2_SLACK));
+          }
+          if (dev > 0) { bad++; if (list.length < maxList) list.push(`${ch.road}/${o.road} ${Math.round(x)},${Math.round(z)} ${(dev * 100).toFixed(0)} cm`); }
+          if (dev > worst) { worst = dev; worstAt = `${Math.round(x)},${Math.round(z)}`; }
+        }
+      }
+    }
+  }
+  return { pairs: pairs.size, samples, bad, worst, worstAt, list };
+}
+
+/* ---- R3: the QA2 N-T01 drive: the outer lanes past the Merl link, the car driven (pure pursuit, the game's collisions with the retaining walls) ------------------------ */
+const R3_ROUTES = [
+  // [label, way, the lane offset (m, + = right of the way), from x to x]: the outer lane of each as the step between them leaves it (the two carriageways overlap 2 - 3 m in OSM;
+  // each ends at the wall half way between their benches, its outer lane centre 1.9 m from its axis: the car's side 0.9 m from the face)
+  ['A4 outer lane beside the Merl link (QA2 N-T01)', 1848, 1.9, 3150, 3010],
+  ['Merl link outer lane beside the A4', 12832, -1.9, 3116, 3030],
+];
+const R3_MAX_ROLL = 0.10;              // rad of the ground under the four wheels (QA2: 0.54)
+
+function wheelRoll(ground, st) {
+  const cy = Math.cos(st.heading), sy = Math.sin(st.heading), a = CAR.wheelbase / 2, b = CAR.track / 2, at = ground.contact || ground.height;
+  const h = (u, v) => at(st.x + cy * u - sy * v, st.z + sy * u + cy * v);
+  return Math.atan2(Math.abs((h(a, b) + h(-a, b)) - (h(a, -b) + h(-a, -b))) / 2, 2 * b);
+}
+
+export function mergeDriveScan({ net, data, surface, ground }) {
+  const walls = createWallCollider(data.walls, (x, z) => ground.height(x, z));
+  const car = createCar({ ground, roadInfoAt: (x, z, o) => surface.roadInfoAt(x, z, o), collide: (x, z, r, y) => walls.collide(x, z, r, y) });
+  const out = [];
+  for (const [label, road, off, xa, xb] of R3_ROUTES) {
+    const ch = net.chains.find((c) => c.road === road);
+    if (!ch) { out.push({ label, missing: true }); continue; }
+    const line = laneLine(ch, off).filter((p) => (p[0] - xa) * (p[0] - xb) <= 0);
+    if (xa > xb !== line[0][0] > line[line.length - 1][0]) line.reverse();
+    const st = car.state;
+    ground.hint(-1e4);
+    car.reset(line[0][0], line[0][1], Math.atan2(line[4][1] - line[0][1], line[4][0] - line[0][0]));
+    let idx = 0, roll = 0, rollAt = null, air = 0;
+    for (let t = 0; t < 30 && idx < line.length - 8; t += R1_DT) {
+      const d2 = (k) => (line[k][0] - st.x) ** 2 + (line[k][1] - st.z) ** 2;
+      while (idx < line.length - 8 && d2(idx) >= d2(idx + 1)) idx++;
+      const la = Math.min(line.length - 1, idx + Math.round(Math.max(12, Math.abs(st.speed) * 1.4)));
+      let e = Math.atan2(line[la][1] - st.z, line[la][0] - st.x) - st.heading;
+      while (e > Math.PI) e -= 2 * Math.PI; while (e < -Math.PI) e += 2 * Math.PI;
+      ground.hint(st.y);
+      car.update(R1_DT, { throttle: Math.max(0, Math.min(1, (R1_SPEED - st.speed) * 0.5)), brake: 0, steer: Math.max(-1, Math.min(1, e * 1.6)), handbrake: false });
+      const r = wheelRoll(ground, st);
+      if (r > roll) { roll = r; rollAt = [Math.round(st.x), Math.round(st.z)]; }
+      if (!st.grounded) air++;
+    }
+    out.push({ label, roll, rollAt, air, through: idx >= line.length - 8 });
+  }
+  return out;
 }

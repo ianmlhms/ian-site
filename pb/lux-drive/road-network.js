@@ -104,6 +104,7 @@ const MINOR_HW = 3.4;                   // m: a carriageway at least this wide (
 const KERB_SURFACES = new Set(['asphalt', 'cobble', 'concrete']);
 const PAINT_LEVEL_TOL = 0.20;          // m: a way paints its carriageway where the ground lies within this of its bed ...
 const PAINT_LEVEL_PUSH = 8.0;          // ... and beyond that its edge moves in by this many m per m of the difference (see carve(), the paint)
+const PAINT_CLIP_CLEAR = 0.5;          // m: where two carriageways at two levels overlap, each one's paint ends this far before the line half way between their benches (the face of the wall between them)
 const SHEET_GAP_HOLD = 1.5;            // m: in a junction the sheet (junction-surface.js) holds the ground this far past the bench of a way at its level: a gap of up to 2 x this between two carriageways
                                        // (a median, the nose of a slip road, the wedge where a dual carriageway splits) is at road level, not a dip to the land
 const SHEET_MEET_FADE = 16.0;           // m: a point is in a junction while a second way at its level is within its bench + SHEET_GAP_HOLD + this (fading out)
@@ -1024,6 +1025,8 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   const pinCap = new Float32Array(MAX_PINS), pinDirX = new Float32Array(MAX_PINS), pinDirZ = new Float32Array(MAX_PINS);
   const wayEdge = new Float32Array(MAX_CAND), wayBed = new Float32Array(MAX_CAND), wayDirX = new Float32Array(MAX_CAND), wayDirZ = new Float32Array(MAX_CAND), wayGap = new Float32Array(MAX_CAND);
   const paintMajor = new Uint8Array(MAX_CAND);
+  const paintClip = new Float32Array(MAX_CAND);
+  let nPinsNow = 0;                                            // (the pins of the point carve() is at, for levelClip)
   const wayDist = new Float32Array(MAX_CAND);                  // per slot: the distance to the nearest segment of the way
   const armShare = new Float32Array(MAX_CAND);                 // per candidate segment: its share in the other arm of its way (see ARM_DETOUR_LO)
   const chGroup = new Int32Array(MAX_CAND), chCar = new Float32Array(MAX_CAND), chPave = new Float32Array(MAX_CAND), chMajor = new Uint8Array(MAX_CAND);   // (the paint channels, per carriageway)
@@ -1109,6 +1112,23 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     return y;
   }
 
+  /** How far the paint of way `road` (its arm at level `bed`, `eCar` its signed distance to its carriageway edge) is pushed out where another carriageway at another level owns
+   *  the point: its distance becomes at least the signed distance past the line PAINT_CLIP_CLEAR before the line half way between the two benches (blended by how much the two
+   *  are two levels and how present the other is).  0 where the carriageways do not reach that line. */
+  function levelClip(road, bed, eCar) {
+    let a = -1;
+    for (let k = 0; k < nPinsNow; k++) if (slotPinRoad[k] === road && (a < 0 || Math.abs(pinBed[k] - bed) < Math.abs(pinBed[a] - bed))) a = k;
+    if (a < 0) return 0;
+    let clip = 0;
+    for (let b = 0; b < nPinsNow; b++) {
+      if (b === a) continue;
+      const sep = smoothstep(SEP_LOW, SEP_HIGH, Math.abs(pinBed[a] - pinBed[b]));
+      if (sep <= 0) continue;
+      const line = (pinEdge[a] - pinEdge[b]) / 2 + PAINT_CLIP_CLEAR;       // the signed distance past the line (> 0 on the other way's side of it)
+      if (line > eCar) clip = Math.max(clip, sep * pinWt[b] * (line - eCar));
+    }
+    return clip;
+  }
   function carve(x, z, out, groundY) {
     const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
     const ground = garageFill(x, z, groundY === undefined ? baseHeight(x, z) : groundY);
@@ -1267,6 +1287,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     // distance, and where a ring or a hairpin comes back past the point the nearest arm changes - and the bed, the face and the pin of the way are means, so nothing
     // jumps where the nearest segment changes.
     let nPins = 0;                         // the carriageway: the bed of the ways whose carriageway (plus the pavement) holds this point
+    nPinsNow = 0;
     let devSum = 0, devW = 0;              // the batter: how far the roads pull the ground here, and how much they claim it
     for (let sl = 0; sl < nSlots; sl++) {
       const road = slotRoad[sl];
@@ -1385,6 +1406,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
         }
       }
     }
+    nPinsNow = nPins;
     let bandY = devW > 0 ? ground + devSum / devW : ground;
     // The ways lay their carriageway over the ground in the order of their rank: the smallest way first, the biggest last, so
     // that at a junction the surface IS the bed of the bigger way (flat across, smooth along) and the side street joins it.
@@ -1409,9 +1431,10 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
         // one level: the fade of the bigger way (a) is held off the bench of the smaller one (b), where a's own bench does not hold the point; two levels: the hand-over is centred between the two
         const own = (1 - smoothstep(0, OWN_FADE, pinEdge[b])) * smoothstep(0, OWN_FADE, pinEdge[a]);
         let half = Math.min(RAMP_MAX, Math.max(RAMP_MIN, (1.5 * apart) / RAMP_SLOPE));
-        // (two arms of ONE way - a hairpin at two levels - hand over within the gap between their benches: a ramp laid into both carriageways tilted the outer metre of each lane;
-        // the step between them is the retaining wall of the hairpin)
-        if (slotPinRoad[a] === slotPinRoad[b]) half = Math.min(half, Math.max(RAMP_MIN, pinEdge[a] + pinEdge[b]));
+        // (two carriageways at two levels hand over within the gap between their benches: a ramp laid into both carriageways tilted the outer metre of each lane - the two arms
+        // of a hairpin, and two ways side by side whose benches are closer than the ramp: the Échangeur de Merl link level beside the A4 that falls 5 m, QA2 N-T01, where the 4 m
+        // ramp lay across the outer lanes of both and the car rolled 31 deg.  The step between them is a retaining wall (bake_walls.mjs), solid for the car)
+        half = Math.min(half, Math.max(RAMP_MIN, pinEdge[a] + pinEdge[b]));
         // (a rival that has no pin here - the end of a way, the far side of its fade - takes nothing from this way: scaled by the pin of the rival)
         hold *= 1 - pinWt[b] * (1 - ((1 - sep) * (1 - own) + sep * (1 - smoothstep(-half, half, pinEdge[a] - pinEdge[b]))));
       }
@@ -1499,8 +1522,12 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     // (a slip road beside the trunk road, an overpass on its embankment) the ground between them is a ramp or the side of the embankment, and painted with the carriageway of the way
     // above it was a hillside of asphalt (Nei Escher Strooss).  A way off its level is pushed out of the union smoothly (PAINT_LEVEL_PUSH per m past PAINT_LEVEL_TOL), so the edge of the
     // tarmac runs along the top or the foot of the ramp and the distance field stays continuous.
+    // Two carriageways at two levels that overlap in plan (the hand-over is a narrow step - a retaining wall - on the line half way between their benches, see the hold): the
+    // carriageway of each ends at that line.  (The lower one was painted on under the upper one up to the foot of the step, and the wall that belongs there stood "on its tarmac":
+    // the bake dropped it - the Merl link over the A4, QA2 N-T01.)
+    for (let q = 0; q < nPaint; q++) paintClip[q] = levelClip(paintRoad[q], paintBed[q], paintECar[q]);
     for (let q = 0; q < nPaint; q++) {
-      const push = PAINT_LEVEL_PUSH * Math.max(0, Math.abs(out.band - paintBed[q]) - PAINT_LEVEL_TOL);
+      const push = PAINT_LEVEL_PUSH * Math.max(0, Math.abs(out.band - paintBed[q]) - PAINT_LEVEL_TOL) + paintClip[q];
       // (the second distance is that of another CARRIAGEWAY: two ways of one carriageway that hand over are no median, and the paint reads the two as two exact channels, tile-mesh.js)
       const eCar = paintECar[q] + push, ePave = paintEPave[q] + push, roadHere = GROUP[paintRoad[q]];
       if (eCar < sdCar) {
@@ -1514,7 +1541,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     // (the pale tar of the service ways is outside every street, see sdMajor).
     let nGrp = 0;
     for (let q = 0; q < nPaint && out.chCar; q++) {
-      const push = PAINT_LEVEL_PUSH * Math.max(0, Math.abs(out.band - paintBed[q]) - PAINT_LEVEL_TOL);
+      const push = PAINT_LEVEL_PUSH * Math.max(0, Math.abs(out.band - paintBed[q]) - PAINT_LEVEL_TOL) + paintClip[q];
       const g = GROUP[paintRoad[q]], eCar = paintECar[q] + push, ePave = paintEPave[q] + push;
       let k = 0;
       while (k < nGrp && chGroup[k] !== g) k++;
