@@ -2274,21 +2274,46 @@ the before shots; `out/` reports and logs; gate logs `gate_*.txt`).
 * Kirchberg 9423's outer lane at the merge node (task 3): not fixed (above).  Houses in narrow-street lanes (task 4): not started (1097 pairs as drive12).
 * The concrete paint also takes any natural bank steeper than ~0.75 m/m within 3 m of a road (checked on the look poses; none seen, not proven everywhere).
 
-## Houses 17 (branch `lux-drive-houses17`, Mac mini): real façades from the ACT LOD2.2 photos, prototype on the old town core - WIP (paused at the usage limit)
+## Houses 17 (branch `lux-drive-houses17`, Mac mini): real façades + roofs from the ACT LOD2.2 photos, prototype on the old town core - all gates pass
 
-What exists (all new modules, small hooks):
-- Bake: `scripts/luxdrive/facade_area.py` (box x 4700-5230, z 8600-8960: Grand-Rue, Bd Royal/Hamilius, Place d'Armes, Place Guillaume; 366 game buildings),
-  `facade_parse.py` (streams the 1.1 GB GML, 458 ACT buildings), `facade_fetch.py` (460 photo atlases via HTTP range from the 5.4 GB zip, 260 MB),
-  `bake_facades.py` (per game wall: z-buffered orthographic render of the matching ACT wall + steep-roof polygons with homographies; party walls skipped;
-  occlusion line from a 0.5 m roof DSM + 45-55 deg oblique cameras -> the hidden lower storeys repeat the lowest clean storey; band below 3.4 m never baked;
-  checks cover / trees / smudge / edge-on -> fallback = painted wall in the measured colour; white balance, light levelling, chroma transfer, sharpen;
-  one WebP atlas per 256 m cell). Output `pb/lux-drive/data/facades/` (index.json 36 kB + 6 WebP, 0.67 MB at 4 px/m, 602 of 1137 visible walls baked).
-- Game: `facade-data.js` (pure: index parse, quads on the exact painted walls via the new `facadeFrame` export of building-mesh.js, stop at the painted
-  ground floor), `facade-view.js` (streams packs < 420 m, drops > 560 m, low quality off, stats in `__lux.stats().facades`, waits in cityPending),
-  `facade-material.js` (photo lit/fogged like the painted walls, night panes). building-mesh/view take `paintOf` (measured wall/roof colours of the area).
-  `?facades=0` = v61 exactly. Draw calls medium +~0-6 (132-148 measured).
-- Shots/montages: `~/Library/Caches/luxdrive-work/houses17/` (poses.json = 8 views, shots/v61, shots/r2, montages/*.jpg, scripts/montage.py).
+**Area**: box x 4700-5230, z 8600-8960 (Grand-Rue, Bd Royal / Hamilius, Place d'Armes, Place Guillaume): 366 game buildings, 458 ACT buildings.
 
-Where I am: r1 looked poor (few walls textured, blurry up close, a purple north wall, pale roofs); r2 adds chroma transfer + darker roofs (not yet viewed).
-Next: look at montages/all.jpg (r2); decide roofs (measured colour vs top-down ACT roof photo on the game roofs); tune smudge threshold; test 2/6 px/m sizes;
-measure GPU memory in game; bump main.js ?v=; run gates (harness, world, holes x2, ui, webkit); write the honest assessment + city-wide cost.
+**Bake** (`scripts/luxdrive/facade_area.py`, `facade_parse.py`, `facade_fetch.py`, `bake_facades.py`; work files in `~/Library/Caches/luxdrive-work/houses17/`):
+- parse: streams the 1.1 GB GML (20 s); fetch: 460 photo atlases by HTTP range out of the 5.4 GB zip (260 MB, ~3 min).
+- per game wall: the ACT walls (+ the steep mansard roofs) of the same building rendered orthographically onto the game wall with a z-buffer,
+  each polygon by a homography from its uv; top row = top of the game wall. Party walls (a neighbour 0.8 m outside) skipped: 1507 of 2650.
+- clean-up: the lowest 3.4 m never baked (the painted shop fronts / doors stay, in the measured wall colour); an occlusion line from a 0.5 m roof
+  raster (oblique cameras ~50 deg) - the lower storeys the cameras could not see (narrow Grand-Rue) are the lowest clean storey repeated;
+  walls with poor cover / trees / smudge / edge-on / mostly roof keep the painted wall + painted windows; de-haze, area white balance,
+  per-wall light levelling, chroma transfer (photo luminance in the building's colour: no purple shade walls), unsharp mask.
+- roofs: the ACT roofs seen from straight above (3 px/m), laid on the game's own roof faces by x/z (`roofFaces` now shared by building-mesh.js).
+- result: 602 of 1137 visible walls baked, 362 roofs; one WebP atlas per 256 m cell. Bake 30-70 s (machine load).
+
+**Sizes** (walls only / + roofs 3 px/m): 2 px/m 0.25 MB, GPU 9 MB; **4 px/m 0.67 MB, 19 MB (chosen)**; 6 px/m 1.13 MB, 36 MB; final with roofs
+**1.09 MB WebP + 51 kB index**, GPU 37.7 MB if all 6 packs live (RGBA8 + mips; the shots had 6 live). 6 px/m was only marginally crisper (the
+source is ~8 px/m, blurred): not worth 2x. Roofs at 4 px/m: 47 MB GPU, a little crisper.
+
+**Game**: `facade-data.js` (pure: quads on the exact painted walls via `facadeFrame`, stop at the painted ground floor; roof photo on `roofFaces`),
+`facade-view.js` (streams packs < 420 m, drops > 560 m, low quality: off; `__lux.stats().facades`; pending counts in cityPending),
+`facade-material.js` (lit/fogged like the painted walls, night panes on walls). building-mesh/view take `paintOf` (measured colours).
+`?facades=0` = v61 exactly. main.js ?v=62. Draw calls medium in the area 132-153 (v61 same poses ~130-150).
+
+**Gates** (on this branch): harness **161/161** (1492 s, dataBytes 12.8 MB); luxdrive_world PASS (medium 150 calls, low 113); holes 0 (medium + low);
+luxdrive_ui PASS; luxdrive_webkit PASS.
+
+**Montages**: `~/Library/Caches/luxdrive-work/houses17/montages/` (1-6 street, 7-8 aerial; real | v61 | houses17), shots/final, shots/v61, ppm_compare.jpg.
+
+**Honest assessment**
+- From above (7, 8) it reads as the real old town: real flat white roofs, slate, roof gardens instead of one navy colour - but blurry and the photo
+  roofs do not match the game's simpler hip-roof shapes (ridges painted where the game has a slope).
+- At car height it is NOT clearly better than v61: photo walls are blurry close up (8 px/m source, foreshortened from the air), sit as a patchwork
+  next to painted fallback walls, and the narrow Grand-Rue is mostly fallback / repeated storeys (the cameras never saw its lower floors).
+  Some wider-street façades are recognisable (the 19th-c. façade with dormers on Bd Royal, view 5; Place d'Armes north side, view 6).
+- Still wrong: view 5's pose shows a different building than the BGL in the photo; views 2/3 do not reach the photos' corner buildings either
+  (Commons coordinates are rough); near walls (view 1 left, view 3) are mush; roof zone above the real eave is a flat slate band; night untested.
+
+**Extending to the city centre** (Ville Haute + Gare + Grund/Clausen/Pfaffenthal + south Limpertsberg: ~4600 buildings, ~12.6x):
+~14 MB WebP (data total ~25 MB of the 30 MB budget, tight; walls only ~8.5 MB); GPU with ~8 packs live 50-120 MB RGBA8 - too much for
+school iPads without KTX2/ASTC (needs the KTX2Loader + transcoder: the game loads three as a global script, so an import map / vendored module);
+fetch ~1.7 GB of atlases (~30 min), bake ~10-15 min; effort 1-2 rounds (KTX2, per-quarter thresholds - trees on the boulevards, Kirchberg glass,
+pose QA). My view: worth it for the aerial / mid-distance look and the roofs; at street level it does not beat the painted look.
