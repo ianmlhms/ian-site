@@ -77,11 +77,8 @@
   var scores = {}, used = {}, doubleCell = null, openCell = null, board = [];
   var editing = null;
 
-  function detect() {
-    try { var s = localStorage.getItem('jq_lang'); if (s && UI.start[s]) return s; } catch (e) {}
-    var n = (navigator.language || 'lb').slice(0, 2).toLowerCase();
-    return UI.start[n] ? n : 'lb';
-  }
+  // Luxembourgish only (6 Nov 2026); the de/en strings stay in UI.
+  function detect() { return 'lb'; }
   function loadTheme() {
     try { var t = localStorage.getItem('jq_theme'); if (THEMES.indexOf(t) >= 0) return t; } catch (e) {}
     return 'classic';

@@ -536,13 +536,13 @@ export const flow = {
     await setTheme(h, "light");
     await h.goto("/admin.html#kart");
     await page.waitForSelector(".kt-race");
-    h.eq(await text(page, "#tabKart"), "🏎️ Kart", "English tab label");
-    h.expect(/Upper Town/.test(await text(page, ".kt-race")) && /3 humans/.test(await text(page, ".kt-race")), "English race row");
+    h.eq(await text(page, "#tabKart"), "🏎️ Kart", "tab label");
+    h.expect(/Uewerstad/.test(await text(page, ".kt-race")) && /3 Mënschen/.test(await text(page, ".kt-race")), "stored «en» ignored: Luxembourgish race row (site is lb only since 6 Nov 2026)");
     await h.shot("kart-light-ipad");
     await page.evaluate(() => localStorage.setItem("site_lang", "de"));
     await h.goto("/admin.html?de=1#saves");
     await page.waitForSelector("#svSearch");
-    h.expect(/Spielstände eines Benutzers/.test(await text(page, ".wide-bar h2")), "German texts");
+    h.expect(/Späicherstänn vun engem Benotzer/.test(await text(page, ".wide-bar h2")), "stored «de» ignored: Luxembourgish texts");
     await h.shot("saves-search-de-light-ipad");
     await setTheme(h, "dark");
     await page.evaluate(() => localStorage.setItem("site_lang", "lb"));

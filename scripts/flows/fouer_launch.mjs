@@ -123,10 +123,10 @@ export const flow = {
     h.expect((await tile.innerText()).includes("Féier d'Schueberfouer um Glacis"), "description in lb");
     h.expect((await tile.locator(".game-thumb .em").innerText()).includes("🎡"), "emoji 🎡");
     await h.shot("a-tile-lb");
-    for (const [lang, snippet] of [["de", "Betreibe die Schueberfouer auf dem Glacis"], ["en", "Run the Schueberfouer on the Glacis"], ["lb", "Féier d'Schueberfouer um Glacis"]]) {
+    for (const lang of ["de", "en"]) {   // Luxembourgish only (6 Nov 2026): switching is a no-op
       await page.evaluate(code => window.I18N.set(code), lang);
       await h.pause(500);
-      h.expect((await page.locator(".game-card", { hasText: "Schueberfouer Tycoon" }).innerText()).includes(snippet), `description in ${lang}`);
+      h.expect((await page.locator(".game-card", { hasText: "Schueberfouer Tycoon" }).innerText()).includes("Féier d'Schueberfouer um Glacis"), `asking for ${lang} keeps the lb description`);
     }
     h.eq(await page.evaluate(() => GAMES.find(g => g.id === "park").src), "pb/fouer.html", "the park tile's src is pb/fouer.html (id park, pinned, no rewrite)");
     h.expect(await page.evaluate(() => PINNED_GAME_IDS.has("park") && BIG_GAME_IDS.has("park")), "still pinned and a big game");

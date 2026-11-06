@@ -120,3 +120,53 @@ export function chainCarriageways(roads, lineOf) {
   chainWays.forEach((ws, c) => { for (const w of ws) groupOf[w.road] = c; });
   return { chainWays, groupOf, plainNeighbours };
 }
+
+/**
+ * The carriageways of the PAINT (road-network.js PAINT_GROUP, tile-mesh.js carriagewayChannels): the marked chains above, and besides them every drivable way joined to the way that
+ * continues it straight at a node (same name, or both nameless of one class; < 35 deg) when both are painted alike (`paintKey`: the material and the tone of the tarmac).
+ * The paint takes the edge of the tarmac exactly from a few nearest carriageways per lattice node (the channels); OSM cuts a residential street at every junction, so a plain crossing of two
+ * streets was four carriageways - more than the channels hold - and its junction box fell back to the blurred union (the dark soft blobs, the ragged corners, QA4 N-T03).  As one
+ * carriageway per street it is two.  Only the paint reads these groups (the markings and the medians keep `groupOf`).
+ * Returns an Int32Array road -> group (a group of `groupOf` keeps its number; a joined set of unmarked ways takes the number of the smallest group in it).
+ */
+export function paintGroups(roads, lineOf, groupOf, paintKey) {
+  const parent = Int32Array.from(groupOf.length ? groupOf.keys() : []);
+  const find = (r) => { while (parent[r] !== r) { parent[r] = parent[parent[r]]; r = parent[r]; } return r; };
+  const union = (a, b) => { const ra = find(a), rb = find(b); if (ra !== rb) parent[Math.max(ra, rb)] = Math.min(ra, rb); };
+  // the ways of one marked chain are one set already
+  const firstOf = new Map();
+  for (let r = 0; r < roads.length; r++) {
+    const g = groupOf[r];
+    if (g >= roads.length) continue;
+    if (firstOf.has(g)) union(firstOf.get(g), r); else firstOf.set(g, r);
+  }
+  for (const nd of wayEnds(roads, lineOf)) {
+    if (nd.ends.length < 2) continue;
+    const pairs = [];
+    for (let a = 0; a < nd.ends.length; a++) {
+      for (let b = a + 1; b < nd.ends.length; b++) {
+        const ea = nd.ends[a], eb = nd.ends[b];
+        if (ea.road === eb.road) continue;
+        const cos = -(ea.dx * eb.dx + ea.dz * eb.dz);
+        if (cos < JOIN.cos) continue;
+        const ra = roads[ea.road], rb = roads[eb.road];
+        if (paintKey(ra) !== paintKey(rb)) continue;
+        const sameName = !!ra.name && ra.name === rb.name;
+        if (nd.ends.length > 2 && !sameName && !(!ra.name && !rb.name && ra.kind === rb.kind)) continue;
+        pairs.push({ ea, eb, score: (1 - cos) + (sameName ? 0 : 0.3) });
+      }
+    }
+    pairs.sort((p, q) => p.score - q.score);
+    const used = new Set();
+    for (const { ea, eb } of pairs) {
+      const ka = `${ea.road}:${ea.atStart}`, kb = `${eb.road}:${eb.atStart}`;
+      if (used.has(ka) || used.has(kb)) continue;
+      used.add(ka); used.add(kb);
+      union(ea.road, eb.road);
+    }
+  }
+  const out = new Int32Array(roads.length);
+  for (let r = 0; r < roads.length; r++) { const root = find(r); out[r] = groupOf[root]; }
+  return out;
+}
+

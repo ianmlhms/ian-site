@@ -53,14 +53,15 @@
   const fmtInt = (n) => Math.round(n).toLocaleString(lang === 'en' ? 'en' : lang === 'de' ? 'de' : 'fr-LU').replace(/ | /g, ' ');
 
   /* ------------------------------------------------------------ i18n */
-  let lang = (['lb', 'de', 'en'].includes(readStore('site_lang')) ? readStore('site_lang') : 'lb');
+  // Luxembourgish only (Ian, 6 Nov 2026): no language buttons, a stored de/en is ignored; the de/en copy stays in copy.js.
+  let lang = 'lb';
   /* on a touch screen a hint that names a key (W, D, ...) has a 'T' twin in the copy that names the on-screen control instead */
   function t(key, vars) {
     return safe('TS.t', () => (TS.t ? TS.t(touchUi && TS.copy && TS.copy.lb && TS.copy.lb[key + 'T'] !== undefined ? key + 'T' : key, vars) : key), key);
   }
   const nameOf = (obj) => (obj && typeof obj === 'object' ? obj[lang] || obj.lb || obj.en || '' : String(obj || ''));
   function setLanguage(next) {
-    if (!['lb', 'de', 'en'].includes(next)) return;
+    if (next !== 'lb') return;
     lang = next;
     writeStore('site_lang', lang);
     safe('TS.setLang', () => TS.setLang && TS.setLang(lang));
