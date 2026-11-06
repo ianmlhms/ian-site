@@ -1544,7 +1544,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
       const near = Math.max(inBench, between);
       // the tilt across the way the point lies on (the nearest way at the sheet's level) is limited where no other way of the junction is near: the sheet at the foot on its centre line
       // plus at most SHEET_CROSS_MAX per m of the offset (continuous: the limit fades in with the distance from the other ways, and the owner changes only where two benches meet)
-      let level = sheet.level, own = -1, ownBench = 0;
+      let level = sheet.level, own = -1, ownBench = 0, sheetW = sheet.weight;
       for (let sl = 0; sl < nSlots; sl++) {
         if (wayEdge[sl] === Infinity) continue;
         const b = (1 - smoothstep(SEP_LOW, SEP_HIGH, Math.abs(wayBed[sl] - sheet.level))) * (1 - smoothstep(0, OWN_FADE, wayEdge[sl]));
@@ -1565,9 +1565,12 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
           const lim = SHEET_CROSS_MAX * off, dv = sheet.level - ref;
           const capped = ref + (dv > lim ? lim : dv < -lim ? -lim : dv);
           level += (capped - level) * iso;
+          // ... and the plane's WEIGHT there is the one at the foot too: it falls off across the lane (0.91 -> 0.53 over the 3.2 m of service way 3526 at Route de Remich
+          // 10111,8482), and a capped level lifted by a weight that varies across the lane tilted it 2.52 %
+          sheetW += (sheetFoot.weight - sheetW) * iso;
         }
       }
-      bandY += (level - bandY) * sheet.weight * near * meet2 * (1 - apart) * (1 - pinCover);   // (the approach of a bridge keeps its own bed: the deck starts there)
+      bandY += (level - bandY) * sheetW * near * meet2 * (1 - apart) * (1 - pinCover);   // (the approach of a bridge keeps its own bed: the deck starts there)
     }
     // The protection keeps the ground under a bridge from being CUT (a pit under the deck) and from being buried under the batter of a road beside it; the CARRIAGEWAY of a way that
     // rises onto a bridge (its approach on a fill, lifted to the deck) is neither, and the corridor of the other carriageway's deck beside it - whose end lies 10 .. 20 m along on a skewed

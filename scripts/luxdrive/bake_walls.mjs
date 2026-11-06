@@ -48,18 +48,33 @@ const approachWays = new Set(chains.filter((c) => !net.roads[c.road].openCut
   && chainEnds(c).some(([x, z]) => cutMouths.some(([mx, mz]) => Math.hypot(x - mx, z - mz) <= PORTAL.mouthGap))).map((c) => c.road));
 let approachRamps = 0;
 
-const covered = new Map();      // grid of the points already written
-const cellKey = (x, z) => Math.floor(x / COVER_CELL) * 100003 + Math.floor(z / COVER_CELL);
+// The faces already written, as the SEGMENTS of their walls: two ways that both see one face (the step between two carriageways at two levels, surface11) sample it 4 m apart
+// at offsets of their own, so a point of the second way lies up to 2 m from the nearest POINT of the first one's wall and was written again - a second wall in the first
+// (Merl link beside the A4: two 85 m walls in one another).  A point within COVER_DIST of a segment, facing the same way, at the same top, is covered.
+const covered = new Map();      // grid cell -> the segments [p, q] of the walls already written that pass near it
+const cellKey = (cx, cz) => cx * 100003 + cz;
+function segmentGap(p, a, b) {
+  const dx = b.x - a.x, dz = b.z - a.z, l2 = dx * dx + dz * dz;
+  const t = l2 > 0 ? Math.min(1, Math.max(0, ((p.x - a.x) * dx + (p.z - a.z) * dz) / l2)) : 0;
+  return { d: Math.hypot(a.x + dx * t - p.x, a.z + dz * t - p.z), top: a.top + (b.top - a.top) * t, nx: a.nx + (b.nx - a.nx) * t, nz: a.nz + (b.nz - a.nz) * t };
+}
 function isCovered(p) {
   const cx = Math.floor(p.x / COVER_CELL), cz = Math.floor(p.z / COVER_CELL);
-  for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
-    for (const q of covered.get((cx + dx) * 100003 + (cz + dz)) || []) {
-      if (Math.hypot(q.x - p.x, q.z - p.z) <= COVER_DIST && q.nx * p.nx + q.nz * p.nz > LINK_FACING && Math.abs(q.top - p.top) <= COVER_TOP) return true;
-    }
+  for (const [a, b] of covered.get(cellKey(cx, cz)) || []) {
+    const g = segmentGap(p, a, b);
+    if (g.d <= COVER_DIST && g.nx * p.nx + g.nz * p.nz > LINK_FACING && Math.abs(g.top - p.top) <= COVER_TOP) return true;
   }
   return false;
 }
-function cover(p) { const k = cellKey(p.x, p.z); const l = covered.get(k); if (l) l.push(p); else covered.set(k, [p]); }
+/** Lists the segment a-b in every cell within COVER_DIST of its box (isCovered then reads one cell). */
+function cover(a, b) {
+  const x0 = Math.floor((Math.min(a.x, b.x) - COVER_DIST) / COVER_CELL), x1 = Math.floor((Math.max(a.x, b.x) + COVER_DIST) / COVER_CELL);
+  const z0 = Math.floor((Math.min(a.z, b.z) - COVER_DIST) / COVER_CELL), z1 = Math.floor((Math.max(a.z, b.z) + COVER_DIST) / COVER_CELL);
+  for (let cz = z0; cz <= z1; cz++) for (let cx = x0; cx <= x1; cx++) {
+    const k = cellKey(cx, cz), l = covered.get(k);
+    if (l) l.push([a, b]); else covered.set(k, [[a, b]]);
+  }
+}
 
 const rejected = { foot: 0, back: 0, air: 0 };   // ramps left without a wall: the foot of the face / the back of the block would lie on a carriageway; the foot would stand in the air (FOOT_DROP)
 const roadProbe = { sdCar: 9, sdPave: 9 };
@@ -191,7 +206,7 @@ for (const chain of chains) {
     flush();
   }
   // the points of this way are written now: the ways after it do not write them again
-  for (let w = firstOfChain; w < walls.length; w++) for (const p of walls[w].pts) cover(p);
+  for (let w = firstOfChain; w < walls.length; w++) { const b = walls[w].body; for (let i = 0; i < b.length; i++) cover(b[i], b[Math.min(i + 1, b.length - 1)]); }
 }
 
 // The face of a cut goes on from one way to the next (the cut and the ways into its mouths are ways of their own): their walls are joined into one where the end of the one
