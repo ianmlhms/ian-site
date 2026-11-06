@@ -8,7 +8,7 @@
 <title>MTB Mëllerdall · Arcade</title>
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="/pb/mtb/ui.css?v=3">
-<script src="/pb/arcade-kit.js?v=40" data-arcade-id="mtb" data-arcade-title="MTB Mëllerdall"></script>
+<script src="/pb/arcade-kit.js?v=41" data-arcade-id="mtb" data-arcade-title="MTB Mëllerdall"></script>
 <script src="/pb/game-data.js?v=1" defer></script>
 </head>
 <body>
@@ -27,7 +27,7 @@
     fr: { code: "Chargement du code …", slow: "Plus long que d'habitude …", retry: "Réessayer" }
   };
   var lang = "lb";
-  try { var own = localStorage.getItem("pb_mtb_lang"), site = localStorage.getItem("site_lang"); lang = STR[own] ? own : STR[site] ? site : "lb"; } catch (e) { /* storage blocked */ }
+  // Luxembourgish only (6 Nov 2026)
   var T = STR[lang], STALL_MS = 12000, last = Date.now(), value = 0, done = false;
   function setBar(p) { bar.style.transform = "scaleX(" + Math.max(0, Math.min(1, p)) + ")"; }
   var api = window.__mtbLoad = {
@@ -53,7 +53,7 @@ if(!window.THREE){
 <script type="module">
   // Imports are absolute: inside the arcade this page runs as a srcdoc iframe (relative URLs inside main.js come from import.meta.url).
   // bootProbe = import() that shows on the loading screen which file failed when the code does not load (pb/boot-probe.js).
-  if (window.bootProbe) window.bootProbe("/pb/mtb/main.js?v=4", window.__mtbLoad); else import("/pb/mtb/main.js?v=4");
+  if (window.bootProbe) window.bootProbe("/pb/mtb/main.js?v=5", window.__mtbLoad); else import("/pb/mtb/main.js?v=5");
 </script>
 </body>
 </html>

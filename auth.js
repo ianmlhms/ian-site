@@ -1,12 +1,12 @@
 /* Shared Supabase auth for ian.lu. ES module. */
 import "./i18n-dict.js?v=52";
-import { openAuthDialog } from "./auth-ui.js?v=9";
-import { esc } from "./pin-pad.js?v=4";
+import { openAuthDialog } from "./auth-ui.js?v=10";
+import { esc } from "./pin-pad.js?v=5";
 import {
   openProfilePinDialog,
   resetPinBriefing,
   startPinBriefing,
-} from "./pin-brief.js?v=8";
+} from "./pin-brief.js?v=9";
 
 const cfg = window.PB_CONFIG || {};
 const PASSWORD_ALPHABET =
@@ -153,7 +153,7 @@ function startInvitePop() {
 function startAccountCheck() {
   if (window.top !== window || isKartAccount()) return;
   if (!_g.accountCheckModule) {
-    _g.accountCheckModule = import("./account-check.js?v=15");
+    _g.accountCheckModule = import("./account-check.js?v=16");
   }
   void _g.accountCheckModule
     .then(({ startAccountCheck: start }) => start(_g.sb, () => _g.session))

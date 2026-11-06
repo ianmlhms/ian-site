@@ -35,7 +35,7 @@ button { font: inherit; color: inherit; }
 <link rel="stylesheet" href="/pb/idle-extras.css?v=5">
 <link rel="stylesheet" href="/pb/fouer/ui.css?v=5">
 <script src="/pb/idle-extras.js?v=8"></script>
-<script src="/pb/arcade-kit.js?v=40" data-arcade-id="park" data-arcade-title="Schueberfouer Tycoon"></script>
+<script src="/pb/arcade-kit.js?v=41" data-arcade-id="park" data-arcade-title="Schueberfouer Tycoon"></script>
 <script src="/pb/game-data.js?v=1" defer></script>
 </head>
 <body>
@@ -69,7 +69,7 @@ button { font: inherit; color: inherit; }
     en: { code: "Loading the code …", slow: "Taking longer than usual …", retry: "Try again" }
   };
   var lang = "lb";
-  try { var own = localStorage.getItem("pb_fouer_lang"), site = localStorage.getItem("site_lang"); lang = STR[own] ? own : STR[site] ? site : site === "fr" ? "en" : "lb"; } catch (e) { /* storage blocked */ }
+  // Luxembourgish only (6 Nov 2026)
   var T = STR[lang], STALL_MS = 12000, EXPECT_MODULES = 60, QUICK_MS = 380;
   var state = { value: 0, ceiling: 0.1, last: Date.now(), anim: null, done: false, taken: false, log: [], seen: 0 };
   function now() { return Date.now(); }
@@ -140,7 +140,7 @@ if(!window.THREE){
   // ?models=1 -> the W3 model preview (turntable grid / single model / full fair); ?stage=1 -> W2's empty Glacis stage; otherwise the game.
   // Imports are absolute: inside the arcade this page runs as a srcdoc iframe.
   const q = new URLSearchParams(location.search);
-  const entry = q.get("models") === "1" ? "/pb/fouer/models/preview.js?v=1" : q.get("stage") === "1" ? "/pb/fouer/world/stage.js?v=1" : "/pb/fouer/main.js?v=8";
+  const entry = q.get("models") === "1" ? "/pb/fouer/models/preview.js?v=1" : q.get("stage") === "1" ? "/pb/fouer/world/stage.js?v=1" : "/pb/fouer/main.js?v=9";
   if (entry.indexOf("main.js") < 0 && window.__fouerLoad) window.__fouerLoad.done();         // the preview pages run their own screens
   if (window.bootProbe) window.bootProbe(entry, window.__fouerLoad); else import(entry);   // bootProbe: shows which file failed when the code does not load
 </script>

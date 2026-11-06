@@ -85,12 +85,12 @@ export const flow = {
     const c1 = await page.evaluate(() => window.__mtb.env.getChoice());
     h.eq([c1.timeMode, c1.weatherMode, c1.timeId, c1.weatherId], ["night", "fog", "night", "fog"], "choices persist across a reload");
 
-    h.step("language: the start card follows the stored language");
+    h.step("language: Luxembourgish only (6 Nov 2026), a stored language is ignored");
     for (const lang of ["de", "en", "fr", "lb"]) {
       await page.evaluate((l) => localStorage.setItem("pb_mtb_lang", l), lang);
       await boot(h, "/pb/mtb.html?debug=1&q=low&time=noon&weather=clear");
       const word = await page.evaluate(() => (document.querySelector(".mcard .bigstart") || {}).textContent);
-      h.eq(word, START_WORD[lang], `${lang}: the start button says "${START_WORD[lang]}"`);
+      h.eq(word, START_WORD.lb, `stored ${lang}: the start button still says "${START_WORD.lb}"`);
     }
     await page.evaluate(() => localStorage.removeItem("pb_mtb_lang"));
 

@@ -25,11 +25,11 @@ export const flow = {
     watchConsole(page, consoleErrors);
 
     // ---- 1. in season: the attribute is set on the home page and the arcade ----
-    h.step("home page, 31 Oct — season is on");
-    await h.goto(`/index.html?season-date=${IN_SEASON}`);
+    h.step("about page, 31 Oct — season is on (the Gitter homepage is light only and has no seasonal look)");
+    await h.goto(`/about.html?season-date=${IN_SEASON}`);
     await h.pause(300);
-    h.eq(await seasonAttr(page), "halloween", "index.html gets data-season on 31 Oct");
-    h.expect(await page.$("link[href*='halloween.css']") !== null, "halloween.css is loaded on index.html");
+    h.eq(await seasonAttr(page), "halloween", "about.html gets data-season on 31 Oct");
+    h.expect(await page.$("link[href*='halloween.css']") !== null, "halloween.css is loaded on about.html");
     h.expect(await page.$(".hw-deco") !== null, "at least one decoration is present in the DOM");
     await h.shot("index-in-season");
 
@@ -41,10 +41,10 @@ export const flow = {
     await h.shot("arcade-in-season");
 
     // ---- 2. out of season: the attribute is gone on both ----
-    h.step("home page, 5 Nov — season is off");
-    await h.goto(`/index.html?season-date=${OUT_OF_SEASON}`);
+    h.step("about page, 5 Nov — season is off");
+    await h.goto(`/about.html?season-date=${OUT_OF_SEASON}`);
     await h.pause(300);
-    h.eq(await seasonAttr(page), null, "index.html has no data-season on 5 Nov");
+    h.eq(await seasonAttr(page), null, "about.html has no data-season on 5 Nov");
 
     h.step("arcade lobby, 5 Nov — season is off");
     await h.goto(`/pixelbreak.html?season-date=${OUT_OF_SEASON}`);
@@ -85,7 +85,7 @@ export const flow = {
 
     // ---- 4. the toggle works, and is remembered across a reload ----
     h.step("the picker toggle turns the look off, live, with no reload");
-    await h.goto(`/index.html?season-date=${IN_SEASON}`);
+    await h.goto(`/about.html?season-date=${IN_SEASON}`);
     await h.pause(300);
     h.eq(await seasonAttr(page), "halloween", "starts on (in season, no stored preference yet)");
     await page.evaluate(() => window.SEASON.setToggle(false));
@@ -93,7 +93,7 @@ export const flow = {
     h.eq(await seasonAttr(page), null, "turning the toggle off removes data-season without a reload");
 
     h.step("the choice survives a reload (localStorage)");
-    await h.goto(`/index.html?season-date=${IN_SEASON}`);
+    await h.goto(`/about.html?season-date=${IN_SEASON}`);
     await h.pause(300);
     h.eq(await seasonAttr(page), null, "still off after reload, even though the date is in season");
     h.eq(await page.evaluate(() => localStorage.getItem("site_halloween")), "off", "the off choice is the one stored");
@@ -101,14 +101,14 @@ export const flow = {
     await page.evaluate(() => window.SEASON.setToggle(true));
     await h.pause(100);
     h.eq(await seasonAttr(page), "halloween", "turning the toggle back on restores data-season live");
-    await h.goto(`/index.html?season-date=${IN_SEASON}`);
+    await h.goto(`/about.html?season-date=${IN_SEASON}`);
     await h.pause(300);
     h.eq(await seasonAttr(page), "halloween", "still on after reload");
     h.eq(await page.evaluate(() => localStorage.getItem("site_halloween")), "on", "the on choice is the one stored");
 
     h.step("the picker UI itself reflects the toggle and can drive it");
     await page.evaluate(() => localStorage.removeItem("site_halloween"));
-    await h.goto(`/index.html?season-date=${IN_SEASON}`);
+    await h.goto(`/about.html?season-date=${IN_SEASON}`);
     await h.pause(300);
     await page.click("#themeFab");
     await page.waitForSelector("#themePop.open [data-season-toggle]");
@@ -122,7 +122,7 @@ export const flow = {
     // ---- 5. decorations never intercept clicks ----
     h.step("every ambient decoration is pointer-events:none");
     await page.evaluate(() => localStorage.removeItem("site_halloween")); // clean slate: the previous step left an explicit "off"
-    await h.goto(`/index.html?season-date=${IN_SEASON}`);
+    await h.goto(`/about.html?season-date=${IN_SEASON}`);
     await h.pause(300);
     h.eq(await seasonAttr(page), "halloween", "season is back on (in window, no stored preference) before checking decorations");
     const badPointerEvents = await page.$$eval(
@@ -131,14 +131,10 @@ export const flow = {
     );
     h.eq(badPointerEvents, [], "no ambient decoration intercepts pointer events");
     const decoCount = await page.$$eval(".hw-deco", (nodes) => nodes.length);
-    h.expect(decoCount >= 2, `index.html shows more than one decoration (got ${decoCount})`);
+    h.expect(decoCount >= 2, `about.html shows more than one decoration (got ${decoCount})`);
 
-    h.step("the home-page pumpkin Easter egg is the one deliberate exception");
-    const interactiveCount = await page.$$eval(".hw-deco--interactive", (nodes) => nodes.length);
-    h.eq(interactiveCount, 1, "exactly one interactive decoration (the home footer pumpkin)");
-    await page.click(".hw-deco--interactive");
-    await page.waitForSelector(".hw-pumpkin-laugh", { timeout: 2000 });
-    h.expect(await page.$(".hw-pumpkin-laugh") !== null, "clicking the pumpkin shows the laugh bubble");
+    h.step("the pumpkin Easter egg lived on the old homepage only (gone with the Gitter redesign, Nov 2026)");
+    h.eq(await page.$$eval(".hw-deco--interactive", (nodes) => nodes.length), 0, "no interactive decoration outside the homepage");
 
     // ---- 6. no console errors anywhere in this flow ----
     h.step("no console errors across the whole flow");

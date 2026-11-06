@@ -53,16 +53,15 @@ export const flow = {
     h.expect(await page.evaluate(() => window.__mtb.ui.isMenuOpen()), "Escape opens the menu");
     await h.shot("menu");
 
-    h.step("the menu in all four languages: tabs, trail list, settings");
-    for (const lang of ["de", "en", "fr", "lb"]) {
+    h.step("the menu is Luxembourgish only (6 Nov 2026): no language setting, tabs and settings in lb");
+    {
       await page.evaluate(() => window.__mtb.openMenu("settings"));
-      await page.selectOption('select[data-set="lang"]', lang);
       await h.pause(200);
+      h.eq(await page.locator('select[data-set="lang"]').count(), 0, "no language setting");
       const names = await page.evaluate(() => [...document.querySelectorAll(".menu-tabs .tab")].map((b) => b.textContent));
-      h.eq(names, TABS[lang], `${lang}: the four tabs`);
+      h.eq(names, TABS.lb, "lb: the four tabs");
       const raw = await page.evaluate(() => /\b(menu|set|bike|card|hud|finish|help|free|time|weather)\.[a-z]+/i.test(document.querySelector(".mmenu").textContent));
-      h.expect(!raw, `${lang}: no untranslated key shows`);
-      h.eq(await page.evaluate(() => localStorage.getItem("pb_mtb_lang")), lang, `${lang}: the language is stored`);
+      h.expect(!raw, "lb: no untranslated key shows");
     }
 
     h.step("weather and time: the choice is applied and stored, Random stays available");

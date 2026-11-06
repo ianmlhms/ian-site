@@ -61,6 +61,7 @@ import { runSurfaceChecks } from './harness-surface.js';         // section R (s
 import { runLookChecks } from './harness-look11.js';             // section S (look11)
 import { runDrive12Checks } from './harness-drive12.js';           // section T (drive12)
 import { runCity12Checks } from './harness-city12.js';           // section U (city12)
+import { runPaint15Checks } from './harness-paint15.js';         // section W (paint15)
 import { runMarkingChecks } from './marking-checks.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -1790,6 +1791,8 @@ if (wants('X')) {
 }
 /* ---------------------------------------------------------------- U: the city centre of the first drive, the walls' look (harness-city12.js) */
 if (wants('U')) runCity12Checks({ check, section, stats, data, surface, landmarks, maps, buildingsRaw: data.buildings });
+/* ---------------------------------------------------------------- W: the edges of the ground paint (harness-paint15.js) */
+if (wants('W')) runPaint15Checks({ check, section, stats, data, surface, field });
 
 /* ---------------------------------------------------------------- the summary */
 console.log(`\n${results.fail === 0 ? 'PASS' : 'FAIL'}  ${results.pass} checks passed, ${results.fail} failed  (${((Date.now() - t0) / 1000).toFixed(1)} s)`);

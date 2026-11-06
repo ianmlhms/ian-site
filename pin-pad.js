@@ -13,14 +13,10 @@ export function esc(value) {
   }[character]));
 }
 
+// Luxembourgish only (6 Nov 2026): I18N answers "lb" (or a page's locked
+// language); without I18N the site's language is still Luxembourgish.
 function preferredLanguage() {
-  if (window.I18N?.lang) return window.I18N.lang;
-  try {
-    const stored = localStorage.getItem("site_lang");
-    if (["lb", "de", "en"].includes(stored)) return stored;
-  } catch { /* private mode */ }
-  const browser = (navigator.language || "en").slice(0, 2);
-  return ["lb", "de"].includes(browser) ? browser : "en";
+  return window.I18N?.lang || "lb";
 }
 
 export function translate(key, fallback) {

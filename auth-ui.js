@@ -3,7 +3,7 @@ import {
   DEFAULT_PIN_LENGTH,
   esc,
   translate,
-} from "./pin-pad.js?v=4";
+} from "./pin-pad.js?v=5";
 const USERNAME_SHAPE = /^[A-Za-z0-9_]{3,20}$/;
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 let modal = null;

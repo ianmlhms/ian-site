@@ -107,8 +107,8 @@ export const flow = {
       await emma.page.keyboard.press("Escape");
       await sleep(300);
 
-      h.step("(e) German + English texts, Luxembourgish default; Tab stays inside the dialog");
-      for (const [lang, re] of [["de", /hat dich zu .* eingeladen/], ["en", /invited you to/]]) {
+      h.step("(e) Luxembourgish only (6 Nov 2026): a stored de/en choice is ignored; Tab stays inside the dialog");
+      for (const [lang, re] of [["de", /huet dech op .* invitéiert/], ["en", /huet dech op .* invitéiert/]]) {
         await emma.page.evaluate((l) => (window.I18N ? window.I18N.set(l) : localStorage.setItem("site_lang", l)), lang);
         sendInvite(world, { game: "slf", room: "sl" + lang, from: USERS.max });
         await popup(emma.page).waitFor({ timeout: 20000 });
