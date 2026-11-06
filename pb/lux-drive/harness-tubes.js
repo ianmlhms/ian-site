@@ -9,12 +9,14 @@
 import { createCar } from './car.js';
 import { createChaseCamera } from './camera.js';
 import { CAR, CAMERA } from './config.js';
-import { TUBE, exposedStretches, indexAt } from './tunnel-tubes.js';
+import { TUBE, exposedStretches, indexAt, groundStart, groundEnd } from './tunnel-tubes.js';
 
 const RIDE_DT = 1 / 60;
 const RIDE_SPEED = 13;              // m/s (the drive tests of sections O and N)
 export const X_RIDE_MAX_A = 3;       // m/s2: the worst vertical acceleration in a tube and at its faces (Ian: smooth like the deck ends)
-const RUN_OUT = 30;                  // m driven before the first face and after the last
+const RUN_OUT = 30;                  // m driven before the first face and after the last ...
+const SETTLE = 1;                    // s: the first second of a ride (the car settles on its springs) is not measured
+const RUN_PAST = 12;                 // ... and at least this far past the outer end of a trough
 const MEASURE_IN = 3;                // m inside the faces from which the acceleration is measured (the tube; the joint with the approach is measured apart, the approach
                                      // roads are the world's: the gully of the René Konen south approach rocks a car in its outer lane before the face)
 const FLUSH_MAX = 0.03;              // m: the floor at a face against the approach's ground just outside it, in every lane
@@ -38,8 +40,10 @@ export function laneCentres(tube, approach) {
  */
 export function driveTube(tube, dir, lat, ctx) {
   const { ground, surface, collide } = ctx;
-  const iFrom = dir > 0 ? Math.max(0, Math.floor(tube.sA - RUN_OUT)) : Math.min(tube.s.length - 1, Math.ceil(tube.sB + RUN_OUT));
-  const iTo = dir > 0 ? Math.min(tube.s.length - 1, Math.ceil(tube.sB + RUN_OUT)) : Math.max(0, Math.floor(tube.sA - RUN_OUT));
+  const sFrom = Math.min(tube.sA - RUN_OUT, groundStart(tube) - RUN_PAST), sTo = Math.max(tube.sB + RUN_OUT, groundEnd(tube) + RUN_PAST);
+  const last = tube.s.length - 1;
+  const iFrom = dir > 0 ? Math.max(0, indexAt(tube, sFrom)) : Math.min(last, indexAt(tube, sTo) + 1);
+  const iTo = dir > 0 ? Math.min(last, indexAt(tube, sTo) + 1) : Math.max(0, indexAt(tube, sFrom));
   const poly = [];
   for (let i = iFrom; dir > 0 ? i <= iTo : i >= iTo; i += dir) {
     const l = lat * dir;            // (the lane to the right of the direction of travel)
@@ -90,11 +94,16 @@ export function driveTube(tube, dir, lat, ctx) {
   }
   const W = 3;
   let maxA = 0, maxAt = '', jointA = 0;
-  for (let i = W; i < ys.length - W; i++) {
+  // (gated: the tube from MEASURE_IN inside its faces, and a trough from MEASURE_IN inside its outer end - its floor and its blend into the approach are ours; the
+  // joint where the car leaves the world's road - at a face without a trough, at the outer end of a trough - is measured apart: until the rear wheels are past it the
+  // bumps of the carved approach are in the car's height)
+  const gFrom = tube.troughA ? tube.tA + MEASURE_IN : tube.sA + MEASURE_IN, gTo = tube.troughB ? tube.tB - MEASURE_IN : tube.sB - MEASURE_IN;
+  const settle = Math.round(SETTLE / RIDE_DT);      // (the car is put down at the start of the ride: an approach shorter than the run-out starts it in a joint)
+  for (let i = Math.max(W, settle); i < ys.length - W; i++) {
     const s = ss[i];
-    if (!(s >= tube.sA - MEASURE_IN && s <= tube.sB + MEASURE_IN)) continue;
+    if (!(s >= gFrom - 2 * MEASURE_IN && s <= gTo + 2 * MEASURE_IN)) continue;      // (the joints: MEASURE_IN m to each side of where the world's road ends)
     const a = Math.abs(ys[i + W] - 2 * ys[i] + ys[i - W]) / ((W * RIDE_DT) ** 2);
-    if (s >= tube.sA + MEASURE_IN && s <= tube.sB - MEASURE_IN) { if (a > maxA) { maxA = a; maxAt = `s ${(s - tube.sMouthA).toFixed(0)}`; } } else if (a > jointA) jointA = a;
+    if (s >= gFrom && s <= gTo) { if (a > maxA) { maxA = a; maxAt = `s ${(s - tube.sMouthA).toFixed(0)}`; } } else if (a > jointA) jointA = a;
   }
   const done = idx >= poly.length - 5;
   return { ok: done && !touched && maxA <= X_RIDE_MAX_A && camBad === 0, maxA, maxAt, jointA, touched, done, camBad, camWhy, time: t };
@@ -125,7 +134,7 @@ export function runTubeChecks({ check, section, stats, data, surface, ground, tu
   stats.tubeRides = { rides: rides.length, bad: bad.length, worst: +worst.toFixed(2), worstJoint: joints.length ? `${joints[0][0].toFixed(1)} m/s2 ${joints[0][1].tube.name} ${joints[0][1].tube.ids[0]}` : '',
     jointsOver3: joints.filter((j) => j[0] > X_RIDE_MAX_A).map((j) => `${j[1].tube.name} ${j[1].tube.ids[0]} ${j[1].dir > 0 ? 'A>B' : 'B>A'} ${j[1].lat.toFixed(1)}: ${j[0].toFixed(1)}`) };
   const tell = (q) => `${q.tube.name} ${q.tube.ids[0]} ${q.dir > 0 ? 'A>B' : 'B>A'} lane ${q.lat.toFixed(1)}: ${q.r.done ? '' : 'stopped '}${q.r.touched ? `touched a ${q.r.touched} ` : ''}${q.r.maxA.toFixed(2)} m/s2 at ${q.r.maxAt}`;
-  check(`X2 a car drives through every tube, every lane, both ways, without touching anything and <= ${X_RIDE_MAX_A} m/s2 in the tube (${rides.length} rides, worst ${worst.toFixed(2)})`,
+  check(`X2 a car drives through every tube, every lane, both ways, without touching anything and <= ${X_RIDE_MAX_A} m/s2 in the tube and its troughs (${rides.length} rides, worst ${worst.toFixed(2)})`,
     rides.length > 0 && bad.length === 0, bad.slice(0, 40).map(tell).join('; '));
   // flush: at each face, in every lane of its approach, the floor against the ground 0.3 m outside it (the car's ground there: the blend has reached the floor)
   const loc = {};
@@ -159,7 +168,10 @@ export function runTubeChecks({ check, section, stats, data, surface, ground, tu
   const closed = portals.all.filter((p) => ids.has(p.road)).length;
   const intruders = [];
   for (const tube of list) {
-    for (const st of exposedStretches(tube, (x, z) => surface.height(x, z))) {
+    const troughs = [];
+    if (tube.troughA) troughs.push({ i0: indexAt(tube, tube.tA), i1: indexAt(tube, tube.sA) });
+    if (tube.troughB) troughs.push({ i0: indexAt(tube, tube.sB), i1: indexAt(tube, tube.tB) });
+    for (const st of [...exposedStretches(tube, (x, z) => surface.height(x, z)), ...troughs]) {
       for (let i = st.i0; i <= st.i1; i += 2) {
         for (const l of [-tube.innerHalf, 0, tube.innerHalf]) {
           const x = tube.x[i] - tube.tz[i] * l, z = tube.z[i] + tube.tx[i] * l, y = tube.floor[i] + 0.5;
@@ -170,6 +182,6 @@ export function runTubeChecks({ check, section, stats, data, surface, ground, tu
       }
     }
   }
-  check('X4 no closed portal in a tube, and no tree, lamp or house stands where a tube\'s shell shows', closed === 0 && intruders.length === 0,
+  check('X4 no closed portal in a tube, and no tree, lamp or house stands where a tube\'s shell shows or in its troughs', closed === 0 && intruders.length === 0,
     `${closed} closed portals; ${[...new Set(intruders)].slice(0, 8).join('; ')}`);
 }

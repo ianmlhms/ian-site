@@ -38,7 +38,7 @@ export const TUBE = Object.freeze({
   underpassLength: 120,
   slab: 0.45,              // m: the roof slab over the ceiling (the roof top is floor + clearance + slab)
   coverMargin: 0.05,       // m: a road over the tube keeps this much over the roof
-  approachRun: 40,         // m of each approach road that is part of the floor problem (its surface is the boundary)
+  approachRun: 130,        // m of each approach road that is part of the floor problem (its surface is the boundary; longer than the longest trough)
   fixedInside: 4,          // m: the surface outside the mouth is the boundary up to this far before the OSM mouth (the cap of a carved road end rises there)
   blend: 8,                // m in front of each mouth over which the car's ground blends from the surface into the floor of the tube
   flushIn: 16,             // m: the cross-section of the approach at a face fades into the plane floor over this ...
@@ -75,6 +75,33 @@ export const TUBE = Object.freeze({
   wFree: 1e-4,             // ... of the target inside (the straight line, or the smooth curve under the bounds) ...
   wPush: 1e-2,             // ... of a sample over its bound (doubled every pass it is still over) ...
   wHard: 1e7,              // ... at most
+});
+
+/**
+ * The cut of an approach (tunnels16, round 2): where the land beside the road in front of a face lies over its floor, the road runs in a TROUGH, as at the real
+ * portals - concrete retaining walls on both sides (the tube's walls continued out of the face), the floor of the tube's own profile between them (a plane across:
+ * no gully, clean tarmac edges, the same lanes in every lane), and the terrain inside hidden (tunnel-mask.js).  Before, the hill reached the lane in one lattice cell:
+ * a grass gully with ragged paint, and the outer lanes of the René Konen south approach rocked a car at 33.7 m/s2.
+ */
+export const TROUGH = Object.freeze({
+  rise: 0.5,               // m: a station is in the cut where the land beside the road (at the foot or the back of a wall) lies this much over the floor ...
+  quiet: 4,                // ... and the cut ends after this many metres of level land
+  reach: 120,              // m: at most this far out of the face (the Rocade de Bonnevoie runs in a cut 3 - 6 m deep for more than 80 m)
+  minLength: 6,            // m: a shorter cut gets no trough (the wings of the headwall hold it)
+  laneRoom: 0.3,           // m: the approach's carriageway keeps this much to each wall (a wider approach - René Konen north, 3 lanes - gets no trough)
+  levelRoad: 1.5,          // m: another road beside the trough within this of the floor is a junction at its level: the trough ends before it
+  parapet: 0.8,            // m: a wall stands this much over the land behind it (a parapet: nobody drives over the edge) ...
+  parapetEnd: 0.3,         // ... and this much at the outer end of the trough ...
+  taper: 8,                // ... rising over this many metres
+  back: 1.5,               // m behind a wall over which the land it holds is read
+  speed: 20,               // m/s: the blend from the approach's ground into the floor at the outer end is long enough for this speed ...
+  accel: 2,                // ... at this vertical acceleration (m/s2) ...
+  blendMin: 6,             // ... and at least this long (m)
+  slopeRun: 3,             // samples (m) out of the outer end over which the approach's grade in each lane is read ...
+  slopeFade: 6,            // ... and the m over which the floor's own grade takes over from it
+  wheelIn: 0.8,            // m: the wheels of a car in an outer lane run this far inside the edge of the carriageway
+  wFloor: 1e-3,            // the weight of the carved approach under the smoothed floor of a trough (against TUBE.lambda: a smoothing over ~6 m) ...
+  fixInside: 3,            // ... which is free from this far inside the face
 });
 
 /* The ways over a tube that need their ground (the roof stays under them): the roads of cars.  The land and the footways over a tube may lie lower than its roof: there the shell
@@ -291,7 +318,9 @@ function buildTube(chain, appA, appB, surface, net, roads, housesNear) {
   const s = new Float64Array(n);
   for (let i = 1; i < n; i++) s[i] = s[i - 1] + dist(pts[i], pts[i - 1]);
   const nearestS = (p, from, to) => { let bi = from; for (let i = from; i <= to; i++) if (dist(pts[i], p) < dist(pts[bi], p)) bi = i; return s[bi]; };
-  const sMouthA = nearestS(chain.pts[0], 0, n >> 1), sMouthB = nearestS(chain.pts[chain.pts.length - 1], n >> 1, n - 1);
+  // (each mouth on its own side of the middle of the TUNNEL part: the two approaches can differ in length by 100 m)
+  const mid = clamp(aPts.length - 1 + (rounded.length >> 1), 1, n - 2);
+  const sMouthA = nearestS(chain.pts[0], 0, mid), sMouthB = nearestS(chain.pts[chain.pts.length - 1], mid, n - 1);
   const tx = new Float64Array(n), tz = new Float64Array(n);       // the unit tangent at each sample
   for (let i = 0; i < n; i++) {
     const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)], l = dist(a, b) || 1;
@@ -498,8 +527,180 @@ export function findTubes(roads, surface, net, buildings = null) {
     if (built.reject) { rejected.push({ name, ids, length, why: built.reject, tube: built.tube }); continue; }
     tubes.push(built.tube);
   }
-  return pairTubes(tubes, rejected);
+  const paired = pairTubes(tubes, rejected);
+  return { tubes: paired.tubes.map((t) => withTroughs(t, surface, roads)), rejected: paired.rejected };
 }
+
+/** The point of a tube at sample i, lat to the right. */
+const sidePoint = (tube, i, lat) => [tube.x[i] - tube.tz[i] * lat, tube.z[i] + tube.tx[i] * lat];
+
+/**
+ * The length of the trough of one approach (end -1: the approach of face A, outward = decreasing s; +1: face B), measured from the face outward: a station is in
+ * the cut while the land beside the road lies TROUGH.rise over the floor on either side; the trough ends at TROUGH.quiet m of level land, at a road beside it at its
+ * level (a junction), at another road across it or into it, or where the samples of the approach end.  0: no trough.
+ */
+function troughLength(tube, end, surface, roads) {
+  const appId = end < 0 ? tube.approachA : tube.approachB;
+  const app = roads[appId];
+  if (!app || app.width / 2 > Math.min(tube.innerL, tube.innerR) - TROUGH.laneRoom) return 0;
+  const sFace = end < 0 ? tube.sA : tube.sB, n = tube.s.length;
+  const own = new Set([appId, ...tube.ids]);
+  const info = {};
+  const plane = (i, lat) => tube.floor[i] + tube.cross[i] * lat;
+  let len = 0, quiet = 0;
+  for (let k = 0.5; k <= TROUGH.reach; k += 1) {
+    const sq = sFace + end * k;
+    if (sq < tube.s[0] + 1 || sq > tube.s[n - 1] - 1) break;
+    const i = indexAt(tube, sq);
+    let rise = -Infinity, junction = false;
+    for (const side of [-1, 1]) {
+      const inner = innerOf(tube, side), outer = outerOf(tube, side);
+      for (const l of [inner + 0.3, outer + 0.8]) { const [x, z] = sidePoint(tube, i, side * l); rise = Math.max(rise, surface.height(x, z) - plane(i, side * l)); }
+      for (const l of [0, inner - 0.5, outer + 0.3, outer + 1.2]) {
+        const [x, z] = sidePoint(tube, i, side * l);
+        surface.roadInfoAt(x, z, info);
+        const other = info.sdCar < 0 && info.road >= 0 && !own.has(info.road) ? roads[info.road] : null;
+        // (a road at its level beside it or across it is a junction; a road at any level whose carriageway reaches into the trough would lose its edge to it.  A higher
+        // road just behind a wall is held by it: Bd Roosevelt over the René Konen south approach)
+        if (other && !other.tunnel && (l < inner || Math.abs(surface.height(x, z) - plane(i, side * l)) < TROUGH.levelRoad)) junction = true;
+      }
+    }
+    if (junction) break;
+    if (rise > TROUGH.rise) { len = k + 0.5; quiet = 0; } else if (++quiet > TROUGH.quiet) break;
+  }
+  return len < TROUGH.minLength ? 0 : len;
+}
+
+/**
+ * The floor of a tube with its troughs smoothed (a new array): in a trough the floor is ours (the walls hide the land), so it need not follow every cell of the carved
+ * approach - the profile of the René Konen south approach, read on its centre line, changed its grade from 4 to 11 % and back every 8 m (29 m/s2 at 13 m/s).  The
+ * samples outside the troughs (and TROUGH_FIX m into the tube) are held, the trough is the smoothest curve between them.
+ */
+function smoothTroughFloor(tube, lenA, lenB) {
+  const n = tube.s.length, w = new Float64Array(n), t = Float64Array.from(tube.floor);
+  for (let i = 0; i < n; i++) {
+    const s = tube.s[i];
+    const free = (lenA && s > tube.sA - lenA && s < tube.sA + TROUGH.fixInside) || (lenB && s < tube.sB + lenB && s > tube.sB - TROUGH.fixInside);
+    w[i] = free ? TROUGH.wFloor : TUBE.wHard;
+  }
+  return solveBanded(t, w, TUBE.lambda);
+}
+
+/** The blend and the wall tops of a trough of length len (the floor already smoothed): { len, blend, top: [L, R] per sample index (NaN outside), width }. */
+function troughShape(tube, end, len, surface, roads) {
+  const app = roads[end < 0 ? tube.approachA : tube.approachB];
+  const sFace = end < 0 ? tube.sA : tube.sB, n = tube.s.length;
+  const plane = (i, lat) => tube.floor[i] + tube.cross[i] * lat;
+  // the blend at the outer end: as long as the step between the approach's ground and the plane across its lanes needs (a smoothstep of height h over L m has a peak
+  // curvature of 6 h / L2)
+  // (read where the wheels run: the outer edge of an outer lane of a narrow carved approach lies on the slope of its gully, which the floor hides)
+  const sEnd = sFace + end * len, hw = Math.max(0.5, app.width / 2 - TROUGH.wheelIn);
+  let dh = 0;
+  for (let d = 0; d <= 12; d += 1) {
+    const i = indexAt(tube, sEnd - end * d);
+    for (const lat of [-hw, -hw / 2, 0, hw / 2, hw]) { const [x, z] = sidePoint(tube, i, lat); dh = Math.max(dh, Math.abs(surface.height(x, z) - plane(i, lat))); }
+  }
+  const blend = clamp(Math.sqrt((6 * dh * TROUGH.speed ** 2) / TROUGH.accel), TROUGH.blendMin, len);
+  // the cross-section of the approach at the outer end (the drawn ground against the plane, across the whole floor): the floor starts there exactly on the ground and
+  // fades into the plane over the blend.  (Blended into the ground itself, the floor carried every step of the carved approach into the trough: 0.27 m in 1 m on the
+  // centre line of the René Konen south approach, 20 m/s2.)
+  const iE = clamp(Math.round(indexAt(tube, sEnd) + (sEnd - tube.s[indexAt(tube, sEnd)]) / Math.max(1e-6, tube.s[Math.min(n - 1, indexAt(tube, sEnd) + 1)] - tube.s[indexAt(tube, sEnd)])), 0, n - 1);
+  // (read every EDGE_STEP m across: interpolated from the 17 lats of a face, the floor met the lattice 2 cm off and a car felt the step at 5 m/s2.  And its grade too, 3 m out:
+  // the floor leaves the end with the approach's own grade in every lane, see troughFloor)
+  const iOut = clamp(iE + end * TROUGH.slopeRun, 0, n - 1), run = Math.abs(tube.s[iE] - tube.s[iOut]) || 1;
+  const lats = Array.from({ length: EDGE_N }, (_, k) => (k / (EDGE_N - 1) * 2 - 1) * tube.innerHalf);
+  const residual = (i, lat) => { const [x, z] = sidePoint(tube, i, lat); return surface.height(x, z) - plane(i, lat); };
+  const edge = Float32Array.from(lats, (lat) => residual(iE, lat));
+  const edgeSlope = Float32Array.from(lats, (lat, k) => (edge[k] - residual(iOut, lat)) / run);
+  // the wall tops: the land the wall holds (from the middle of the lane to TROUGH.back behind it) plus the parapet, never lower than a parapet over the floor
+  const top = [new Float32Array(n).fill(NaN), new Float32Array(n).fill(NaN)];
+  const iFace = indexAt(tube, sFace), iEnd = indexAt(tube, sEnd);
+  const i0 = Math.min(iFace, iEnd), i1 = Math.min(n - 1, Math.max(iFace, iEnd) + 1);
+  for (let i = i0; i <= i1; i++) {
+    const dEnd = Math.abs(tube.s[i] - sEnd);
+    const parapet = TROUGH.parapetEnd + (TROUGH.parapet - TROUGH.parapetEnd) * smooth01(dEnd / TROUGH.taper);
+    [-1, 1].forEach((side, k) => {
+      const inner = innerOf(tube, side), outer = outerOf(tube, side);
+      let land = plane(i, side * inner);
+      for (let l = inner / 2; l <= outer + TROUGH.back + 1e-6; l += 0.5) { const [x, z] = sidePoint(tube, i, side * l); land = Math.max(land, surface.height(x, z)); }
+      top[k][i] = land + parapet;
+    });
+  }
+  // (a moving maximum, then a moving mean, each over TOP_SMOOTH m to each side: the coping runs in long even lines, not along every cell of the lattice, and still over
+  // the land at every station - every maximum in the mean covers the station)
+  const pass = (arr, fn) => Float32Array.from(arr, (v, i) => {
+    if (Number.isNaN(v)) return v;
+    const win = [];
+    for (let j = Math.max(i0, i - TOP_SMOOTH); j <= Math.min(i1, i + TOP_SMOOTH); j++) if (!Number.isNaN(arr[j])) win.push(arr[j]);
+    return fn(win);
+  });
+  const out = top.map((arr) => pass(pass(arr, (w) => Math.max(...w)), (w) => w.reduce((p, q) => p + q, 0) / w.length));
+  return { len, blend, top: out, width: app.width, edge, edgeSlope };
+}
+
+/** A tube with the troughs of its approaches (a new object): tA / tB the outer ends (sA / sB without one), the flush residual of a trough's face dropped (its floor is a plane). */
+function withTroughs(tube, surface, roads) {
+  // (each outer end on a sample: there the floor starts exactly on the cross-section read at that sample)
+  const n = tube.s.length;
+  const rawA = troughLength(tube, -1, surface, roads), rawB = troughLength(tube, 1, surface, roads);
+  const lenA = rawA ? tube.sA - tube.s[indexAt(tube, tube.sA - rawA)] : 0;
+  const lenB = rawB ? tube.s[Math.min(n - 1, indexAt(tube, tube.sB + rawB) + 1)] - tube.sB : 0;
+  if (!lenA && !lenB) return { ...tube, troughA: 0, troughB: 0, blendA: 0, blendB: 0, roadA: 0, roadB: 0, edgeA: null, edgeB: null, edgeSlopeA: null, edgeSlopeB: null, tA: tube.sA, tB: tube.sB, wallTopL: new Float32Array(tube.s.length).fill(NaN), wallTopR: new Float32Array(tube.s.length).fill(NaN) };
+  const smoothed = { ...tube, floor: smoothTroughFloor(tube, lenA, lenB) };
+  const a = lenA ? troughShape(smoothed, -1, lenA, surface, roads) : null, b = lenB ? troughShape(smoothed, 1, lenB, surface, roads) : null;
+  const topL = new Float32Array(n).fill(NaN), topR = new Float32Array(n).fill(NaN);
+  for (const t of [a, b]) if (t) for (let i = 0; i < n; i++) if (!Number.isNaN(t.top[0][i])) { topL[i] = t.top[0][i]; topR[i] = t.top[1][i]; }
+  return {
+    ...smoothed,
+    troughA: lenA, troughB: lenB, blendA: a ? a.blend : 0, blendB: b ? b.blend : 0, roadA: a ? a.width : 0, roadB: b ? b.width : 0,
+    tA: tube.sA - lenA, tB: tube.sB + lenB, wallTopL: topL, wallTopR: topR,
+    flushA: a ? null : tube.flushA, flushB: b ? null : tube.flushB, edgeA: a ? a.edge : null, edgeB: b ? b.edge : null, edgeSlopeA: a ? a.edgeSlope : null, edgeSlopeB: b ? b.edgeSlope : null,
+  };
+}
+
+/**
+ * The floor of a trough at sample i (+ f), side offset lat, arc length s (between its outer end and its face): the plane of the tube plus the cross-section of the
+ * approach at the outer end, fading out over the blend, plus the difference of the approach's grade in that lane, fading out over TROUGH.slopeFade (C1 at the end:
+ * no kink where the car leaves the carved road).  The car's ground and the drawn floor are this one function.
+ */
+export function troughFloor(tube, i, f, lat, s) {
+  const h = floorOf(tube, i, f, lat);
+  const atA = s < tube.sA, edge = atA ? tube.edgeA : s > tube.sB ? tube.edgeB : null;
+  if (!edge) return h;
+  const slope = atA ? tube.edgeSlopeA : tube.edgeSlopeB;
+  const u = (clamp(lat / tube.innerHalf, -1, 1) + 1) / 2 * (EDGE_N - 1), k = Math.min(EDGE_N - 2, Math.floor(u)), r = u - k;
+  const d = Math.max(0, atA ? s - tube.tA : tube.tB - s);
+  return h + (edge[k] + (edge[k + 1] - edge[k]) * r) * (1 - approachWeight(tube, s)) + (slope[k] + (slope[k + 1] - slope[k]) * r) * d * Math.exp(-d / TROUGH.slopeFade);
+}
+
+/** Samples (m) to each side over which the tops of a trough's walls are evened out. */
+const TOP_SMOOTH = 3;
+
+/** The lats across a trough's floor at which the cross-section of its outer end is read (every ~0.25 m on a 9 m floor). */
+const EDGE_N = 37;
+
+/** The top of a trough wall at sample i (+ f) on the side of lat (NaN: no trough there). */
+export function wallTopAt(tube, i, f, lat) {
+  const arr = lat >= 0 ? tube.wallTopR : tube.wallTopL;
+  const a = arr[i], b = arr[Math.min(arr.length - 1, i + 1)];
+  if (Number.isNaN(a)) return b;
+  if (Number.isNaN(b)) return a;
+  return a + (b - a) * f;
+}
+
+/**
+ * How far the car's ground has blended from the surface into the floor at arc length s in front of a face (1 between the faces): in a trough over its blend from the
+ * outer end, else over TUBE.blend m in front of the face.
+ */
+export function approachWeight(tube, s) {
+  if (s >= tube.sA && s <= tube.sB) return 1;
+  if (s < tube.sA) return tube.troughA ? smooth01((s - tube.tA) / tube.blendA) : smooth01((s - (tube.sA - TUBE.blend)) / TUBE.blend);
+  return tube.troughB ? smooth01((tube.tB - s) / tube.blendB) : smooth01(((tube.sB + TUBE.blend) - s) / TUBE.blend);
+}
+
+/** The first and last arc length at which a tube touches the car's ground (the outer ends of its troughs, or the blends in front of its faces). */
+export const groundStart = (tube) => (tube.troughA ? tube.tA : tube.sA - TUBE.blend);
+export const groundEnd = (tube) => (tube.troughB ? tube.tB : tube.sB + TUBE.blend);
 
 /**
  * Two tubes side by side (the two carriageways under the Rond-Point Schuman, 5 m apart at their west mouths; the bores under the Rond-Point Merl) share a wall: on
@@ -548,7 +749,7 @@ export function createTubeNetwork(tubes) {
   const key = (cx, cz) => (cx + 8192) * 32768 + (cz + 8192);
   const cells = new Map();
   tubes.forEach((tube, k) => {
-    const lo = Math.max(0, Math.floor(tube.sA - TUBE.blend - 2)), hi = Math.min(tube.s.length - 1, Math.ceil(tube.sB + TUBE.blend + 2));
+    const lo = Math.max(0, indexAt(tube, groundStart(tube) - 2)), hi = Math.min(tube.s.length - 1, indexAt(tube, groundEnd(tube) + 2) + 1);
     tube.iLo = lo; tube.iHi = hi;
     const r = tube.outerHalf + TUBE.wing + 1;
     for (let i = lo; i < hi; i++) {
@@ -601,15 +802,16 @@ export function createTubeNetwork(tubes) {
   function groundAt(x, z, y, g) {
     if (!locate(x, z, L)) return g;
     const tube = L.tube, s = L.s, a = Math.abs(L.lat);
-    if (s < tube.sA - TUBE.blend || s > tube.sB + TUBE.blend) return g;
+    if (s < groundStart(tube) || s > groundEnd(tube)) return g;
     const inner = a <= innerOf(tube, L.lat);
     if (atLevel(y, L.floor)) {
       if (!inner) return g;
       if (s >= tube.sA && s <= tube.sB) return L.floor;
+      // in a trough: its floor (across its whole width: its walls hold the edges)
+      if (s < tube.sA ? tube.troughA > 0 : tube.troughB > 0) return troughFloor(tube, L.i, L.f, L.lat, s);
       // in front of a face: the surface blends into the floor
-      const k = s < tube.sA ? smooth01((s - (tube.sA - TUBE.blend)) / TUBE.blend) : smooth01(((tube.sB + TUBE.blend) - s) / TUBE.blend);
       const side = 1 - smooth01((a - (innerOf(tube, L.lat) - 1.0)) / 1.0);
-      return g + (L.floor - g) * k * side;
+      return g + (L.floor - g) * approachWeight(tube, s) * side;
     }
     // over the tube: where its roof lies above the land (the hood of a portal), the roof carries the car
     if (s >= tube.sA && s <= tube.sB && a <= outerOf(tube, L.lat)) {
@@ -635,6 +837,14 @@ export function createTubeNetwork(tubes) {
     return L.s >= tube.sA - 0.3 && L.s <= tube.sB + 0.3 && Math.abs(L.lat) <= innerOf(tube, L.lat) + 0.05 && y >= L.floor - 1.0 && y <= L.floor + tube.clearance;
   }
 
+  /** The roof top of the tube under (x, z) (its outer width, face to face), -Infinity elsewhere: the foot of a house over a tunnel stays on it (building-mesh.js). */
+  function roofAt(x, z) {
+    if (!locate(x, z, L)) return -Infinity;
+    const tube = L.tube;
+    if (L.s < tube.sA - 0.5 || L.s > tube.sB + 0.5 || Math.abs(L.lat) > outerOf(tube, L.lat) + 0.5) return -Infinity;
+    return L.floor - tube.cross[L.i] * L.lat + Math.abs(tube.cross[L.i]) * tube.outerHalf + tube.roofDepth + 0.02;
+  }
+
   /** The name of the tube the car is in ('' unnamed), or null outside: the road name the dashboard shows. */
   function nameAt(x, z, y) { return inside(x, z, y) ? L.tube.label : null; }
 
@@ -646,12 +856,20 @@ export function createTubeNetwork(tubes) {
   function collide(x, z, radius, y = NaN) {
     if (!Number.isFinite(y) || !locate(x, z, L, radius)) return null;      // (a tube is solid only at its own level: a pose without a level is above it)
     const tube = L.tube, s = L.s, lat = L.lat, a = Math.abs(lat), sign = lat >= 0 ? 1 : -1;
-    if (s < tube.sA - radius - 0.1 || s > tube.sB + radius + 0.1) return null;
+    if (s < tube.tA - radius - 0.1 || s > tube.tB + radius + 0.1) return null;
+    if (y < L.floor - TUBE.levelBelow) return null;                           // far under it
     const roofTop = L.floor + tube.roofDepth + Math.abs(tube.cross[L.i]) * tube.outerHalf;
-    if (y > roofTop - 0.3 || y < L.floor - TUBE.levelBelow) return null;      // over the roof (the land, a street over it) or far under it
-    const inner = innerOf(tube, lat), head = headOf(tube, lat);
-    const boxes = [[tube.sA, tube.sB, inner, outerOf(tube, lat)]];
-    boxes.push([tube.sA, tube.sA + TUBE.headDepth, inner, head], [tube.sB - TUBE.headDepth, tube.sB, inner, head]);
+    const inner = innerOf(tube, lat), head = headOf(tube, lat), outer = outerOf(tube, lat);
+    const boxes = [];
+    // the tube and its headwalls up to its roof (over it: the land, a street over it) ...
+    if (y <= roofTop - 0.3) boxes.push([tube.sA, tube.sB, inner, outer], [tube.sA, tube.sA + TUBE.headDepth, inner, head], [tube.sB - TUBE.headDepth, tube.sB, inner, head]);
+    // ... and the walls of its troughs up to their tops (a car on the land behind one meets its parapet)
+    const top = wallTopAt(tube, L.i, L.f, lat);
+    if (!Number.isNaN(top) && y <= top - 0.3) {
+      if (tube.troughA) boxes.push([tube.tA, tube.sA, inner, outer]);
+      if (tube.troughB) boxes.push([tube.sB, tube.tB, inner, outer]);
+    }
+    if (!boxes.length) return null;
     let best = null;
     for (const [s0, s1, l0, l1] of boxes) {
       // the circle against the box [s0, s1] x [l0, l1] on the side of the point
@@ -676,7 +894,7 @@ export function createTubeNetwork(tubes) {
     return { nx: nx / l, nz: nz / l, pen: Math.min(best.pen, TUBE.pushMax) };
   }
 
-  return { tubes, locate, groundAt, ceilingAt, inside, nameAt, collide, count: tubes.length };
+  return { tubes, locate, groundAt, ceilingAt, inside, nameAt, collide, roofAt, count: tubes.length };
 }
 
 /**
@@ -719,7 +937,11 @@ export function createTubes(roads, surface, net, buildings = null) {
 export function tubeShells(tubes, heightAt) {
   const boxes = [];
   for (const tube of tubes) {
-    for (const st of exposedStretches(tube, heightAt)) {
+    // (the troughs too: a lamp of the approach would stand in its wall)
+    const troughs = [];
+    if (tube.troughA) troughs.push({ i0: indexAt(tube, tube.tA), i1: indexAt(tube, tube.sA) + 1 });
+    if (tube.troughB) troughs.push({ i0: indexAt(tube, tube.sB), i1: Math.min(tube.s.length - 1, indexAt(tube, tube.tB) + 1) });
+    for (const st of [...exposedStretches(tube, heightAt), ...troughs]) {
       const r = tube.outerHalf + TUBE.wing;
       let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
       for (let i = st.i0; i <= st.i1; i++) { x0 = Math.min(x0, tube.x[i] - r); x1 = Math.max(x1, tube.x[i] + r); z0 = Math.min(z0, tube.z[i] - r); z1 = Math.max(z1, tube.z[i] + r); }
@@ -743,4 +965,21 @@ export function lampsOutsideShells(lamps, inShell) {
   const keep = [];
   for (let i = 0; i < lamps.count; i++) if (!inShell(lamps.x[i], lamps.z[i], 0.5)) keep.push(i);
   return { count: keep.length, x: Float32Array.from(keep, (i) => lamps.x[i]), z: Float32Array.from(keep, (i) => lamps.z[i]), yaw: Float32Array.from(keep, (i) => lamps.yaw[i]), size: Uint8Array.from(keep, (i) => lamps.size[i]) };
+}
+
+/**
+ * The retaining walls of the bake without the stretches inside a tube's shell or trough (new wall objects: a wall is cut where it enters one).  The trough's own
+ * walls hold the cut there; a baked stone wall stood in front of the concrete at the Schuman underpass.
+ */
+export function wallsOutsideShells(walls, inShell) {
+  const out = [];
+  for (const wall of walls) {
+    let run = [];
+    const flush = () => { if (run.length >= 2) out.push({ ...wall, pts: run }); run = []; };
+    for (const p of wall.pts) {
+      if (inShell(p.x, p.z, 0.3)) flush(); else run.push(p);
+    }
+    flush();
+  }
+  return out;
 }

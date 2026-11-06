@@ -53,6 +53,37 @@ export function maskSegments(tubes, heightAt) {
         out.push({ ax, az, bx, bz, ta, tb, halfL: tube.outerL - TUBE.maskInset, halfR: tube.outerR - TUBE.maskInset });
       }
     }
+    out.push(...troughSegments(tube));
+  }
+  return out;
+}
+
+/**
+ * The mask segments of the troughs of a tube (tunnel-tubes.js TROUGH): between its walls everything of the terrain under the wall tops is hidden (the gully, the ragged
+ * paint, the slopes): the trough's own floor, kerbs and walls are drawn there.  Square segments from the face out to the outer end, never past either.
+ */
+function troughSegments(tube) {
+  const out = [];
+  const topAt = (i) => {
+    let m = -Infinity;
+    for (const j of [i, i + 1]) for (const arr of [tube.wallTopL, tube.wallTopR]) if (j < arr.length && !Number.isNaN(arr[j])) m = Math.max(m, arr[j]);
+    return m + 0.05;
+  };
+  for (const [s0, s1] of [[tube.tA, tube.sA], [tube.sB, tube.tB]]) {
+    if (s1 - s0 < 0.5) continue;
+    for (let s = s0; s < s1 - 0.01; s += SEGMENT) {
+      const e = Math.min(s1, s + SEGMENT);
+      const sa = s === s0 ? s : Math.max(s0, s - OVERLAP), se = e === s1 ? e : Math.min(s1, e + OVERLAP);
+      const at = (q) => {
+        const i = indexAt(tube, q), f = Math.max(0, Math.min(1, (q - tube.s[i]) / Math.max(1e-6, tube.s[i + 1] - tube.s[i])));
+        return [tube.x[i] + (tube.x[i + 1] - tube.x[i]) * f, tube.z[i] + (tube.z[i + 1] - tube.z[i]) * f, i];
+      };
+      const [ax, az, ia] = at(sa), [bx, bz, ib] = at(se);
+      let top = -Infinity;
+      for (let i = Math.min(ia, ib); i <= Math.max(ia, ib); i++) top = Math.max(top, topAt(i));
+      if (!Number.isFinite(top)) continue;
+      out.push({ ax, az, bx, bz, ta: top, tb: top, halfL: tube.outerL - TUBE.maskInset, halfR: tube.outerR - TUBE.maskInset });
+    }
   }
   return out;
 }

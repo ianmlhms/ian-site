@@ -6,7 +6,8 @@
  * (tunnel-tubes.js floorOf), so what the car drives on is what is drawn. */
 import { FlatBuilder } from './flat-builder.js';
 import { PAINT_LIGHT_GLSL } from './light-glsl.js';
-import { TUBE, floorOf } from './tunnel-tubes.js';
+import { TUBE, floorOf, wallTopAt, troughFloor } from './tunnel-tubes.js';
+import { laneLines, LINE_WIDTH as PAINT_WIDTH, DASH_PERIOD, DASH_LENGTH, PAINT_LIFT } from './deck-shape.js';
 // (a tube's two sides may differ: one it shares with a parallel tube is narrower - tunnel-tubes.js pairTubes)
 
 const THREE = window.THREE;
@@ -21,6 +22,7 @@ const DASH = 3, GAP = 9;                         // m: the dashes between two la
 const LINE_LIFT = 0.015;                         // m over the floor
 const WALKWAY = 0.45;                            // m: the pale strip along the foot of each wall
 const DADO = 1.3;                                // m: the tiled lower part of the walls
+const FACE_SKIRT = 1.0;                          // m: the floor's edge at a face hangs this far down
 const INSIDE_RADIUS = 320;                       // m: the inside of a tube is drawn this close to the camera
 
 const C_ASPHALT = [0.16, 0.16, 0.17];
@@ -33,6 +35,16 @@ const C_LINE = [0.85, 0.85, 0.82];
 const C_HEAD = [0.68, 0.66, 0.61];               // the concrete of the headwalls
 const C_COPING = [0.78, 0.76, 0.71];
 const C_SHELL = [0.60, 0.59, 0.56];
+// the troughs of the approaches (tunnel-tubes.js TROUGH): sunlit, so drawn with the solid material, in the tones of the decks (the road runs on without a change of tone)
+const TROUGH_STEP = 1;                           // m between the cross sections of a trough (its wall tops follow the land)
+const KERB_WIDTH = 0.35, KERB_HEIGHT = 0.12;     // m: the kerb along the foot of each trough wall
+const WALL_FOOT = 1.5;                           // m: the back of a trough wall reaches this far under the land it holds
+const APRON = 0.6, APRON_SINK = 0.03;            // m: the floor reaches this far on past the outer end of a trough, this far under the terrain
+const FLOOR_SKIRT = 1.0;                         // m: the floor's outer edge hangs this far down (the terrain is cut there by the mask)
+const C_TAR = [0.245, 0.249, 0.261];             // (deck-view.js COLOUR_ASPHALT: the far tar of the ground shader)
+const C_PAINT = [0.84, 0.83, 0.76];
+const C_TROUGH_WALL = [0.66, 0.65, 0.61];
+const C_TROUGH_KERB = [0.58, 0.58, 0.56];
 
 const INSIDE_VERTEX = `
   attribute vec3 color; varying vec3 vC; varying vec3 vWorld; varying float vDist;
@@ -111,6 +123,17 @@ export function buildInside(tube, b) {
     const ta = tube.floor[a.i] + (tube.floor[a.i + 1] - tube.floor[a.i]) * a.f + clr, tc = tube.floor[c.i] + (tube.floor[c.i + 1] - tube.floor[c.i]) * c.f + clr;
     b.quad(P(a, -(iL - CHAMFER), ta), P(c, -(iL - CHAMFER), tc), P(c, iR - CHAMFER, tc), P(a, iR - CHAMFER, ta), C_CEILING);
   }
+  // the skirts of the floor at the faces (facing out of the tube): in front of a face the terrain is cut by the mask, and where the floor's edge lies over the
+  // approach's ground a sliver under it stood open (the holes flow saw it under the mouths of the Schuman underpass)
+  for (const [sFace, out] of [[tube.sA, -1], [tube.sB, 1]]) {
+    const e = frameAt(tube, sFace);
+    for (let j = 0; j < FLOOR_STRIPS; j++) {
+      const l0 = -iL + ((iL + iR) * j) / FLOOR_STRIPS, l1 = -iL + ((iL + iR) * (j + 1)) / FLOOR_STRIPS;
+      const y0 = floorY(e, l0), y1 = floorY(e, l1);       // (on the floor's own vertices: watertight)
+      if (out < 0) b.quad(P(e, l0, y0 - FACE_SKIRT), P(e, l1, y1 - FACE_SKIRT), P(e, l1, y1), P(e, l0, y0), C_ASPHALT);
+      else b.quad(P(e, l0, y0), P(e, l1, y1), P(e, l1, y1 - FACE_SKIRT), P(e, l0, y0 - FACE_SKIRT), C_ASPHALT);
+    }
+  }
   // the light band: lamps along the ceiling, over the edge lines (a little under the ceiling, facing down)
   for (let s = tube.sA + LAMP_EVERY / 2; s + LAMP_LENGTH < tube.sB; s += LAMP_EVERY) {
     const a = frameAt(tube, s), c = frameAt(tube, s + LAMP_LENGTH);
@@ -179,6 +202,104 @@ export function buildOutside(tube, b, heightAt) {
   }
 }
 
+/** The stations of the trough of one end (end -1: face A, +1: face B), from the face outward, every TROUGH_STEP m; [] without one. */
+function troughStations(tube, end) {
+  const len = end < 0 ? tube.troughA : tube.troughB;
+  if (!len) return [];
+  const sFace = end < 0 ? tube.sA : tube.sB, out = [];
+  for (let d = 0; d < len - 1e-6; d += TROUGH_STEP) out.push(sFace + end * d);
+  out.push(sFace + end * len);
+  return out;
+}
+
+/**
+ * The troughs of a tube into builder b (tunnel-tubes.js TROUGH): the floor between the walls (troughFloor: the car's ground), its lane lines (the approach's, as the decks paint them), a kerb at the foot of each wall, the walls (face, coping, back) and their ends.
+ * heightAt: the drawn ground.
+ */
+export function buildTroughs(tube, b, heightAt) {
+  const P = (fr, lat, y) => [fr.x + fr.rx * lat, y, fr.z + fr.rz * lat];
+  const floorY = (fr, s, lat) => troughFloor(tube, fr.i, fr.f, lat, s);
+  const iL = tube.innerL, iR = tube.innerR;
+  for (const end of [-1, 1]) {
+    const st = troughStations(tube, end);
+    if (!st.length) continue;
+    const road = end < 0 ? tube.roadA : tube.roadB;
+    // (built from the outer end toward the face: a then c run along +s on both ends)
+    const ordered = end < 0 ? [...st].reverse() : st;
+    for (let k = 0; k + 1 < ordered.length; k++) {
+      const sa = ordered[k], sc = ordered[k + 1];
+      const a = frameAt(tube, sa), c = frameAt(tube, sc);
+      for (let j = 0; j < FLOOR_STRIPS; j++) {
+        const l0 = -iL + ((iL + iR) * j) / FLOOR_STRIPS, l1 = -iL + ((iL + iR) * (j + 1)) / FLOOR_STRIPS;
+        b.quad(P(a, l1, floorY(a, sa, l1)), P(c, l1, floorY(c, sc, l1)), P(c, l0, floorY(c, sc, l0)), P(a, l0, floorY(a, sa, l0)), C_TAR);
+      }
+      for (const side of [-1, 1]) {
+        const ih = side > 0 ? iR : iL, oh = side > 0 ? tube.outerR : tube.outerL;
+        const lw = side * ih, lk = side * (ih - KERB_WIDTH), lo = side * oh;
+        const ya = floorY(a, sa, lw), yc = floorY(c, sc, lw);
+        const ka = floorY(a, sa, lk) + KERB_HEIGHT, kc = floorY(c, sc, lk) + KERB_HEIGHT;
+        const ta = wallTopAt(tube, a.i, a.f, lw), tc = wallTopAt(tube, c.i, c.f, lw);
+        if (!Number.isFinite(ta) || !Number.isFinite(tc)) continue;
+        // a quad between two lats (l0 < l1) facing up, and a wall at lat facing toward the middle (in) or away from it
+        const up = (l0, l1, y0a, y0c, y1a, y1c, col) => b.quad(P(a, l1, y1a), P(c, l1, y1c), P(c, l0, y0c), P(a, l0, y0a), col);
+        const wall = (lat, y0a, y0c, y1a, y1c, inward, col) => ((side > 0) === inward
+          ? b.quad(P(a, lat, y0a), P(a, lat, y1a), P(c, lat, y1c), P(c, lat, y0c), col)
+          : b.quad(P(c, lat, y0c), P(c, lat, y1c), P(a, lat, y1a), P(a, lat, y0a), col));
+        // the kerb (its top and its face)
+        if (side > 0) up(lk, lw, ka, kc, ka, kc, C_TROUGH_KERB); else up(lw, lk, ka, kc, ka, kc, C_TROUGH_KERB);
+        wall(lk, floorY(a, sa, lk) - 0.02, floorY(c, sc, lk) - 0.02, ka, kc, true, C_TROUGH_KERB);
+        // the wall: its face from under the kerb to the top, the coping, the back down into the land it holds
+        wall(lw, ya - 0.3, yc - 0.3, ta, tc, true, C_TROUGH_WALL);
+        if (side > 0) up(lw, lo, ta, tc, ta, tc, C_COPING); else up(lo, lw, ta, tc, ta, tc, C_COPING);
+        const [xa, , za] = P(a, side * (oh + 0.3), 0), [xc, , zc] = P(c, side * (oh + 0.3), 0);
+        wall(lo, Math.min(heightAt(xa, za), ya) - WALL_FOOT, Math.min(heightAt(xc, zc), yc) - WALL_FOOT, ta, tc, false, C_TROUGH_WALL);
+      }
+    }
+    // the outer end: the end faces of the walls and the skirt of the floor (facing out of the trough)
+    const sEnd = st[st.length - 1], e = frameAt(tube, sEnd);
+    const face = (l0, l1, y0, y1, col) => (end < 0
+      ? b.quad(P(e, l0, y0), P(e, l1, y0), P(e, l1, y1), P(e, l0, y1), col)
+      : b.quad(P(e, l0, y1), P(e, l1, y1), P(e, l1, y0), P(e, l0, y0), col));
+    for (const side of [-1, 1]) {
+      const ih = side > 0 ? iR : iL, oh = side > 0 ? tube.outerR : tube.outerL, top = wallTopAt(tube, e.i, e.f, side * ih);
+      if (!Number.isFinite(top)) continue;
+      const foot = Math.min(floorY(e, sEnd, side * ih), floorY(e, sEnd, side * oh)) - WALL_FOOT;
+      if (side > 0) face(ih, oh, foot, top, C_TROUGH_WALL); else face(-oh, -ih, foot, top, C_TROUGH_WALL);
+    }
+    // the apron: the floor reaches APRON m on under the terrain past the outer end (APRON_SINK under it) and hangs a skirt there, its top following the floor's
+    // edge.  The mask's square end is square to the chord of its segment, the floor's to the tangent: on a bend the two differ by centimetres at the walls, and
+    // the holes flow saw that sliver
+    const o = frameAt(tube, sEnd + end * APRON);
+    for (let j = 0; j < FLOOR_STRIPS; j++) {
+      const l0 = -iL + ((iL + iR) * j) / FLOOR_STRIPS, l1 = -iL + ((iL + iR) * (j + 1)) / FLOOR_STRIPS;
+      const y0 = floorY(e, sEnd, l0) - APRON_SINK, y1 = floorY(e, sEnd, l1) - APRON_SINK;
+      const t0 = y0 + APRON_SINK, t1 = y1 + APRON_SINK;        // (and the skirt at the end itself, from the floor's edge down: on its very vertices - a gap of 5 mm let rays under the floor)
+      if (end < 0) b.quad(P(e, l0, t0 - FLOOR_SKIRT), P(e, l1, t1 - FLOOR_SKIRT), P(e, l1, t1), P(e, l0, t0), C_TAR);
+      else b.quad(P(e, l0, t0), P(e, l1, t1), P(e, l1, t1 - FLOOR_SKIRT), P(e, l0, t0 - FLOOR_SKIRT), C_TAR);
+      if (end < 0) {
+        b.quad(P(e, l1, y1), P(e, l0, y0), P(o, l0, y0), P(o, l1, y1), C_TAR);
+        b.quad(P(o, l0, y0 - FLOOR_SKIRT), P(o, l1, y1 - FLOOR_SKIRT), P(o, l1, y1), P(o, l0, y0), C_TAR);
+      } else {
+        b.quad(P(o, l1, y1), P(o, l0, y0), P(e, l0, y0), P(e, l1, y1), C_TAR);
+        b.quad(P(o, l0, y0), P(o, l1, y1), P(o, l1, y1 - FLOOR_SKIRT), P(o, l0, y0 - FLOOR_SKIRT), C_TAR);
+      }
+    }
+    // the lane lines of the approach (solid edges, dashed lanes), from the face out to the end of the trough
+    const len = end < 0 ? tube.troughA : tube.troughB, sFace = end < 0 ? tube.sA : tube.sB;
+    for (const line of laneLines(road)) {
+      const lat = line.offset * -end;          // (laneLines is to the right of the road's way; the trough's lat is to the right of s, outward is -s on end A)
+      for (let d = 0; d < len - 0.05; d += line.dashed ? DASH_PERIOD : TROUGH_STEP) {
+        const d1 = Math.min(len, d + (line.dashed ? DASH_LENGTH : TROUGH_STEP));
+        const s0 = sFace + end * d, s1 = sFace + end * d1;
+        const [sa, sc] = s0 < s1 ? [s0, s1] : [s1, s0];
+        const a = frameAt(tube, sa), c = frameAt(tube, sc);
+        const l0 = lat - PAINT_WIDTH / 2, l1 = lat + PAINT_WIDTH / 2;
+        b.quad(P(a, l1, floorY(a, sa, l1) + PAINT_LIFT), P(c, l1, floorY(c, sc, l1) + PAINT_LIFT), P(c, l0, floorY(c, sc, l0) + PAINT_LIFT), P(a, l0, floorY(a, sa, l0) + PAINT_LIFT), C_PAINT);
+      }
+    }
+  }
+}
+
 /**
  * tubes: tunnel-tubes.js tubes; heightAt: the drawn ground (surface.height).  inside / outside: the two materials.
  * Returns { update(x, z, radius), meshes, count }.
@@ -189,6 +310,7 @@ export function createTunnelView({ scene, tubes, heightAt, insideMaterial, outsi
     const bi = new FlatBuilder(), bo = new FlatBuilder();
     buildInside(tube, bi);
     buildOutside(tube, bo, heightAt);
+    buildTroughs(tube, bo, heightAt);
     const inside = new THREE.Mesh(bi.build(), insideMaterial), outside = new THREE.Mesh(bo.build(), outsideMaterial);
     inside.name = `luxdrive-tube-inside ${tube.name}`; outside.name = `luxdrive-tube-outside ${tube.name}`;
     for (const m of [inside, outside]) { m.matrixAutoUpdate = false; scene.add(m); }
