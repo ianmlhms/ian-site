@@ -57,6 +57,8 @@ const ABUT_FADE_MAX = 6.0;             // m: past the hold the ground under the 
                                        // steeper than the ramp between two levels), at least CAP_SOFT / PROTECT_RAMP and at most this.  With the fixed 2 m of CAP_SOFT a deck 6 m over the road below
                                        // stood on a vertical face of ground (the world flow's "walls the carve made": 153 of them at the motorway interchanges after the approaches were lifted)
 const smoothstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+/** The step of a two-level hand-over over [-half, half]: the smoothstep, turned toward a straight ramp by `straight` (0 .. 1; the straight one is 1.5 x less steep at its middle). */
+const stepProfile = (half, straight, x) => { const t = Math.min(1, Math.max(0, (x + half) / (2 * half))); return t + (t * t * (3 - 2 * t) - t) * (1 - straight); };
 const MAX_PINS = 16;                   // carriageways that lie over one point, at most
 export const CHANNELS = 3;              // the paint channels: the nearest carriageways whose edges the shader takes exactly (tile-mesh.js carriagewayChannels)
 const MAX_CAND = 192;                  // segments that reach one point, at most
@@ -83,6 +85,10 @@ const MEDIAN_FLAT_FADE = 1.0;          // m: the gap of up to MEDIAN_WIDTH betwe
                                        // letting go over this much more gap.  Beside a bridge (the approach keeps its own bed, not the junction sheet) the median was a ditch 0.5 m deep under both
                                        // carriageways: its paint frayed and showed grass (Rue de Neudorf, the deck start)
 const RAMP_MIN = 0.8, RAMP_MAX = 4.0;  // m: half width of the hand-over from one carriageway to the other, bounds
+const STEP_SLOPE = 2.7;                 // m per m: the steepest a step between two carriageways at two levels may be where their benches leave no room for the RAMP_SLOPE ramp (the
+                                       // face of a retaining wall, bake_walls.mjs).  The narrow step (RAMP_MIN: up to 9 m/m, a 5 m rise in 0.8 m) was a cliff of the carve on every
+                                       // such pair, 22 sides of the world gate's sample (limit 8, look11 7); the face takes this much room off both carriageways instead, its
+                                       // profile turning from the smoothstep (peak 1.5 x the mean slope) to a straight one as the gap closes (see stepShape)
 const FACE_JOIN_PER_M = 0.79;         // the join of the bed and the face is at least as wide as this per m of their difference: a smoothstep is at most 1.5 times as steep as its mean, so the
                                        // ground between a terrace and the face under it never rises faster than RAMP_SLOPE (a terrace on a cliff dropped 5 m in 0.4 m: a crack)
 const FACE_JOIN = 0.4;                 // m: the pinned surface runs from the bed to the face of the batter over this distance past the bench (they meet to within the noise of the land)
@@ -106,6 +112,11 @@ const MINOR_HW = 3.4;                   // m: a carriageway at least this wide (
 const KERB_SURFACES = new Set(['asphalt', 'cobble', 'concrete']);
 const PAINT_LEVEL_TOL = 0.20;          // m: a way paints its carriageway where the ground lies within this of its bed ...
 const PAINT_LEVEL_PUSH = 8.0;          // ... and beyond that its edge moves in by this many m per m of the difference (see carve(), the paint)
+const STEP_SIDE_DOT = [0.92, 0.97];   // the face lies between two ways SIDE BY SIDE (parallel within ~15 - 25 deg) whose benches overlap by at most STEP_OVERLAP m (the Merl link over
+const STEP_OVERLAP = [-4.0, -3.0];     // the A4: 3 m); a way that crosses over another (a ramp on its fill over the A6 at Croix de Gasperich: 30 deg, the benches 5 - 6 m into each other) is no face
+const STEP_MAX_HALF = 2.4;             // m: the widest such face (a step of up to 6.5 m at STEP_SLOPE)
+const STEP_FADE = 0.5;                 // (in the difference of the two edge distances: 0.25 m of ground) the face lets go of the ground this far past its ends
+const PAINT_STEP_MARGIN = 0.1;         // m: ... and at least this far before the edge of a wider face (STEP_SLOPE)
 const PAINT_CLIP_CLEAR = 0.5;          // m: where two carriageways at two levels overlap, each one's paint ends this far before the line half way between their benches (the face of the wall between them)
 const SHEET_GAP_HOLD = 1.5;            // m: in a junction the sheet (junction-surface.js) holds the ground this far past the bench of a way at its level: a gap of up to 2 x this between two carriageways
                                        // (a median, the nose of a slip road, the wedge where a dual carriageway splits) is at road level, not a dip to the land
@@ -1169,6 +1180,26 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     return y;
   }
 
+  /** How much pins a and b are two carriageways SIDE BY SIDE (the step between two levels is laid as a face there, see the step in carve()): the two run parallel (the
+   *  directions from them to the point along one line, either way: continuous across the axis of either) and their benches overlap by at most STEP_OVERLAP. */
+  function sideBySide(a, b) {
+    return smoothstep(STEP_SIDE_DOT[0], STEP_SIDE_DOT[1], Math.abs(pinDirX[a] * pinDirX[b] + pinDirZ[a] * pinDirZ[b])) * smoothstep(STEP_OVERLAP[0], STEP_OVERLAP[1], pinEdge[a] + pinEdge[b]);
+  }
+
+  /** The hand-over of two carriageways at two levels `apart` m apart whose benches are `gap` m apart (< 0: they overlap), `side` how much they lie side by side (sideBySide):
+   *  its half width (the profile in the difference of the two edge distances runs from -half to +half, i.e. over `half` m of ground centred on the line half way between the
+   *  benches) and how straight the profile is (0 = smoothstep, 1 = linear: side by side, where the gap closes).  As wide as RAMP_SLOPE wants where the gap allows, else the
+   *  gap, but never steeper than STEP_SLOPE (up to STEP_MAX_HALF: a higher step is a wall in any case, and the face would take the street beside it). */
+  function stepShape(apart, gap, side, res) {
+    const wide = Math.min(RAMP_MAX, Math.max(RAMP_MIN, (1.5 * apart) / RAMP_SLOPE));
+    const straight = (1 - smoothstep(0.6 * wide, wide, gap)) * side;
+    const full = Math.min(wide, STEP_MAX_HALF, Math.max(RAMP_MIN, ((1.5 - 0.5 * straight) * apart) / STEP_SLOPE));
+    res.half = Math.min(wide, Math.max(full, gap));
+    res.straight = straight;
+    return res;
+  }
+  const stepTmp = { half: 0, straight: 0 };
+
   /** How far the paint of way `road` (its arm at level `bed`, `eCar` its signed distance to its carriageway edge) is pushed out where another carriageway at another level owns
    *  the point: its distance becomes at least the signed distance past the line PAINT_CLIP_CLEAR before the line half way between the two benches (blended by how much the two
    *  are two levels and how present the other is).  0 where the carriageways do not reach that line. */
@@ -1181,8 +1212,10 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
       if (b === a) continue;
       const sep = smoothstep(SEP_LOW, SEP_HIGH, Math.abs(pinBed[a] - pinBed[b]));
       if (sep <= 0) continue;
-      const line = (pinEdge[a] - pinEdge[b]) / 2 + PAINT_CLIP_CLEAR;       // the signed distance past the line (> 0 on the other way's side of it)
-      if (line > eCar) clip = Math.max(clip, sep * pinWt[b] * (line - eCar));
+      // (the face is half wide either side of the line: the paint ends PAINT_CLIP_CLEAR before the line, or before the face where it is wider)
+      const face = stepShape(Math.abs(pinBed[a] - pinBed[b]), pinEdge[a] + pinEdge[b], sideBySide(a, b), stepTmp).half;
+      const line = (pinEdge[a] - pinEdge[b]) / 2 + Math.max(PAINT_CLIP_CLEAR, face / 2 + PAINT_STEP_MARGIN);       // the signed distance past the line (> 0 on the other way's side of it)
+      if (line > eCar) clip = Math.max(clip, sep * pinCap[b] * (line - eCar));
     }
     return clip;
   }
@@ -1481,20 +1514,23 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     let cutCover = 0;                                          // how much of the point is the carriageway of an opened shallow tunnel (its cut passes under a bridge: deck 32 over the A1)
     let pinCover = 0;                                          // how much of the point is the carriageway of a way that runs onto a bridge (its pins), not a batter
     for (let a = 0; a < nPins; a++) {
-      let hold = 1;
+      let holdOne = 1, holdTwo = 1;
       for (let b = 0; b < a; b++) {
         const apart = Math.abs(pinBed[a] - pinBed[b]);
         const sep = smoothstep(SEP_LOW, SEP_HIGH, apart);
         // one level: the fade of the bigger way (a) is held off the bench of the smaller one (b), where a's own bench does not hold the point; two levels: the hand-over is centred between the two
         const own = (1 - smoothstep(0, OWN_FADE, pinEdge[b])) * smoothstep(0, OWN_FADE, pinEdge[a]);
-        let half = Math.min(RAMP_MAX, Math.max(RAMP_MIN, (1.5 * apart) / RAMP_SLOPE));
+        const { half, straight } = stepShape(apart, pinEdge[a] + pinEdge[b], sideBySide(a, b), stepTmp);
         // (two carriageways at two levels hand over within the gap between their benches: a ramp laid into both carriageways tilted the outer metre of each lane - the two arms
         // of a hairpin, and two ways side by side whose benches are closer than the ramp: the Échangeur de Merl link level beside the A4 that falls 5 m, QA2 N-T01, where the 4 m
         // ramp lay across the outer lanes of both and the car rolled 31 deg.  The step between them is a retaining wall (bake_walls.mjs), solid for the car)
-        half = Math.min(half, Math.max(RAMP_MIN, pinEdge[a] + pinEdge[b]));
         // (a rival that has no pin here - the end of a way, the far side of its fade - takes nothing from this way: scaled by the pin of the rival)
-        hold *= 1 - pinWt[b] * (1 - ((1 - sep) * (1 - own) + sep * (1 - smoothstep(-half, half, pinEdge[a] - pinEdge[b]))));
+        // (one level: every rival holds the way back, a product; two levels: the STRONGEST rival does - two carriageways side by side at the upper level, 0.7 m apart, multiplied
+        // their two steps into one twice as steep: the Merl link pair 17104 / 12833 over the A4, 4.4 m/m where the face is laid at STEP_SLOPE)
+        holdOne *= 1 - pinWt[b] * (1 - sep) * own;
+        holdTwo = Math.min(holdTwo, 1 - pinWt[b] * sep * stepProfile(half, straight, pinEdge[a] - pinEdge[b]));
       }
+      const hold = holdOne * holdTwo;
       if (out.debug) out.debug.push({ road: slotPinRoad[a], pri: pinPri[a], val: pinVal[a], wt: pinWt[a], hold, edge: pinEdge[a], bed: pinBed[a], before: bandY });
       bandY += (pinVal[a] - bandY) * pinWt[a] * hold;
       const r = slotPinRoad[a];
@@ -1514,6 +1550,30 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
         if (w <= 0) continue;
         const t = Math.min(1, Math.max(0, pinEdge[a] / Math.max(gap, 1e-3)));        // 0 at the bench of a, 1 at the bench of b
         bandY += (pinBed[a] + (pinBed[b] - pinBed[a]) * t - bandY) * w;
+      }
+    }
+    let stepCover = 0;                                         // how much of the point is the face between two levels (the junction sheet does not lay its plane over it)
+    // The face: where two carriageways at two levels leave no room for the RAMP_SLOPE ramp (stepShape), the ground between them IS the step, laid as it is meant (from the bed of
+    // one to the bed of the other, STEP_SLOPE at most), not left to the fades of the two pins and the land: both pins fade out past their benches, and the product of the
+    // two fades with the hold made a face of 5 - 7 m/m (Kirchberg 8500,6038, Croix de Gasperich 2023,11672: 22 sides of the world gate's sample a wall the carve made).
+    for (let a = 0; a < nPins; a++) {
+      for (let b = 0; b < a; b++) {
+        const apart = Math.abs(pinBed[a] - pinBed[b]), gap = pinEdge[a] + pinEdge[b];
+        const sep = smoothstep(SEP_LOW, SEP_HIGH, apart);
+        if (sep <= 0) continue;
+        const { half, straight } = stepShape(apart, gap, sideBySide(a, b), stepTmp);      // (straight carries the side-by-side weight)
+        const across = pinEdge[a] - pinEdge[b];
+        let w = sep * straight * pinCap[a] * pinCap[b] * (1 - smoothstep(half, half + STEP_FADE, Math.abs(across)));
+        // (not on the carriageway of a third way at the level of either: two links side by side over the A4 at Merl, 12830 and 12831 - the face of the inner one with the A4
+        // lay on the outer one's lanes; there the face of the outer one holds)
+        for (let c = 0; c < nPins && w > 0; c++) {
+          if (c === a || c === b) continue;
+          const same = 1 - smoothstep(SEP_LOW, SEP_HIGH, Math.min(Math.abs(pinBed[c] - pinBed[a]), Math.abs(pinBed[c] - pinBed[b])));
+          w *= 1 - same * pinCap[c] * (1 - smoothstep(-OWN_FADE, 0, pinEdge[c]));
+        }
+        if (w <= 0) continue;
+        bandY += (pinBed[a] + (pinBed[b] - pinBed[a]) * stepProfile(half, straight, across) - bandY) * w;
+        stepCover = Math.max(stepCover, w * (1 - smoothstep(half - STEP_FADE, half, Math.abs(across))));
       }
     }
     // The junction sheet: where ways meet at one level the carriageways (and the gaps of up to 2 x SHEET_GAP_HOLD between them) lie on one smooth surface, not on the layered beds.
@@ -1570,7 +1630,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
           sheetW += (sheetFoot.weight - sheetW) * iso;
         }
       }
-      bandY += (level - bandY) * sheetW * near * meet2 * (1 - apart) * (1 - pinCover);   // (the approach of a bridge keeps its own bed: the deck starts there)
+      bandY += (level - bandY) * sheetW * near * meet2 * (1 - apart) * (1 - pinCover) * (1 - stepCover);   // (the approach of a bridge keeps its own bed: the deck starts there)
     }
     // The protection keeps the ground under a bridge from being CUT (a pit under the deck) and from being buried under the batter of a road beside it; the CARRIAGEWAY of a way that
     // rises onto a bridge (its approach on a fill, lifted to the deck) is neither, and the corridor of the other carriageway's deck beside it - whose end lies 10 .. 20 m along on a skewed

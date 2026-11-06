@@ -216,7 +216,8 @@ async function boot() {
     (ground.onDeck(x, z) ? null : forest.collide(x, z, radius) || props.collide(x, z, radius)) || tramSim.collide(x, z, radius) || playArea.collide(x, z, radius);
   const car = createCar({ ground, roadInfoAt: (x, z, out) => surface.roadInfoAt(x, z, out), collide, start });
   const wallLens = createWallBlockTest(data.walls);          // look11 (QA2 N-C02): the lens never inside the block of a retaining wall
-  const chase = createChaseCamera(ground, (x, z, radius, y) => buildings.collide(x, z, radius) || (ground.onDeck(x, z) ? null : forest.collide(x, z, radius)) || portals.collide(x, z, radius, y) || wallLens(x, z, radius, y));
+  // (the wall first: a house that only touches the lens - pen 0 - answered before the wall, and the lens stayed in the block of a wall that ends at the house: Bd Konrad Adenauer 7706,6728)
+  const chase = createChaseCamera(ground, (x, z, radius, y) => wallLens(x, z, radius, y) || buildings.collide(x, z, radius) || (ground.onDeck(x, z) ? null : forest.collide(x, z, radius)) || portals.collide(x, z, radius, y));
 
   // the Kaart: one road index and one painted base for the minimap, the full map and the teleport
   const roadIndex = createRoadIndex(data.roads);

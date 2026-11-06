@@ -144,7 +144,7 @@ export function runLookChecks({ check, section, stats, data, field, surface, gro
 
   // ---- S6: the lens never inside a wall
   const lensIn = createWallBlockTest(walls);
-  const collide = (x, z, r, y) => buildings.collide(x, z, r) || (ground.onDeck(x, z) ? null : forest.collide(x, z, r)) || portals.collide(x, z, r, y) || lensIn(x, z, r, y);   // (as main.js)
+  const collide = (x, z, r, y) => lensIn(x, z, r, y) || buildings.collide(x, z, r) || (ground.onDeck(x, z) ? null : forest.collide(x, z, r)) || portals.collide(x, z, r, y);   // (as main.js: the wall first)
   const lensInside = (x, z, heading) => {
     const chase = createChaseCamera(ground, collide);
     const state = { x, z, y: ground.height(x, z) + 0.42, heading, vx: 0, vz: 0, vy: 0, speed: 0, roll: 0, grounded: true };

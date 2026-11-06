@@ -16,6 +16,8 @@ const smoothstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); retu
  * @param surface the ground (height, and overheadAt for the bridge decks above the car)
  * @param collide (x, z, radius, y) => { nx, nz, pen } | null: anything the lens at height y must not sit in (houses, trees, tunnel portals)
  */
+const CAMERA_PUSH_PASSES = 3;
+
 export function createChaseCamera(surface, collide = null) {
   let yaw = null;                       // the smoothed heading the camera sits behind
   let fovNow = CAMERA.fov;
@@ -72,8 +74,8 @@ export function createChaseCamera(surface, collide = null) {
     const floor = surface.height(cx, cz) + CAMERA.minClearance;
     let py = Math.max(lerp(eyeY, wantY, t), floor);
     let px = cx, pz = cz;
-    if (collide) {                      // never inside a building: two passes push the camera out of up to two neighbours
-      for (let pass = 0; pass < 2; pass++) {
+    if (collide) {                      // never inside a building: the passes push the camera out of up to three neighbours (a wall that ends at a house: out of the one, then the other)
+      for (let pass = 0; pass < CAMERA_PUSH_PASSES; pass++) {
         const hit = collide(px, pz, CAMERA.bodyRadius, py);
         if (!hit) break;
         px += hit.nx * hit.pen; pz += hit.nz * hit.pen;
