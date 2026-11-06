@@ -75,6 +75,9 @@ const FRAGMENT = `
     } else {
       // the bank behind the coping and the back of the block (city12): earth and grass, mottled like the meadow, so where the ground behind falls away it reads as a bank
       albedo *= 0.80 + 0.30 * grain * (0.7 + 0.6 * grain2);
+      // (city13, QA3 N3-W04: the earth at the END of a block is a vertical quad from the coping to the buried foot; lit as a wall that looks along the road it was a
+      // dark brown tombstone beside the next wall.  Earth is a rough bank: it takes the light as a slope does, the light of the hill above it)
+      N = normalize(N + vec3(0.0, 1.2, 0.0));
     }
     vec3 c = paintLightW(albedo * (1.0 - 0.2 * uWet), N, mix(1.0, 0.8, uCloud * 0.6), 1.15, vWorld);
     gl_FragColor = vec4(applyFogW(pow(c, vec3(0.97)), vDist, vWorld.y), 1.0);

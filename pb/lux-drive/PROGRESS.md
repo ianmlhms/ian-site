@@ -2015,3 +2015,73 @@ Montages (photo | before v55 | after city12): `~/Library/Caches/luxdrive-work/ci
 * Étoile (item 4) and the ragged JFK side-street aprons (item 5) are not fixed (junction lattice / road bake); the game still has no Étoile landmark.
 * Gare: the tower is placed from the outline and one photograph (not surveyed); the glass hall has no lettering; the platform roof block 15153 behind is still the bake's flat
   glass shed.  Pont Rouge: the posts are red per the brief, the photographs show white posts.
+
+## City 13 (branch `lux-drive-city13`, Mac mini): the train simulator's landmarks (Gare on the LOD2 survey), the wall look
+
+Started from live v57 (e94df7fd, city12).  Ian: reuse the train simulator's photo-checked models (`pb/train-sim/luxtram-landmarks.js`, never edited: copied / adapted).
+Round folder `~/Library/Caches/luxdrive-work/city13/`: `v57/` a `git archive` of the base (the "before" pictures), `before/`, `a1..a4/` the steps, `final/` the first-five-minutes
+stills (city12's free-camera poses, `poses_first5cam.json`), `refs/` Commons photographs of the Étoile (credits in `refs/credits.txt`, never shipped), `montages/`, `tools/`
+(`lod_world.py` the train simulator's LOD2 -> Lux Drive world frame, `gen_lod2_data.py` the shipped data module, `lod_*.mjs` survey probes, `pairs.py` the montages).
+
+### Mapping the train simulator's data
+* The LOD2 polygons of `luxtram-landmarks.json` are decimetres relative to the landmark anchor in the train simulator's equirectangular projection (x east, z south around
+  49.6055 N / 6.164 E), y over the building's LOD2 ground (`gmin`).  `lod_world.py` inverts that projection exactly (anchor + offset -> lat / lon) and projects with pyproj to
+  EPSG:2169 -> the bake's frame (E 72192 / N 83968 top).  Check: the Gare's tower top, the main hall's gable and the OSM outline of landmark-gare.js agree within 0.5 m; the survey's
+  wall feet lie 283.5 .. 284.1 m on the game's ground (one median offset per building, `lod2Base`).
+
+### 1. Gare Centrale: the LOD2 survey + city12's details (`landmark-gare.js`, new `landmark-lod2.js`, `landmark-lod2-data.js` 58 KB)
+* Side by side (`montages/1_gare.jpg`, photo | v57 | city13; the LOD2-only try in `cmp_gare1.jpg`): city12's hand-built station had the right parts but guessed proportions -
+  a 6.2 m tower square (the survey: 4.5 m, its shaft to 29.8 m: the slim tall tower of the photographs), hip roofs as boxes, no north wing.  The pure survey had the right masses and
+  roofs but a plain stone obelisk for a tower and no windows.  Kept: the survey for every wall and roof (slate on the steep roofs, zinc on the flat ones, copper on the gable
+  ornaments, faces < 0.6 m2 left out: 395 of 1 324), city12's clock tower rebuilt on the survey's square and height (clocks, string courses, balustrade, copper bell roof, belfry,
+  lantern, needle: 44 m), the great arched window / mullions / columns / entablature / cartouche on the survey's gable wall (u 4.05), the glass hall of 2012 (its survey faces left
+  out), the porch of the survey as the dark steel marquise over glazed doors.  Windows: the survey cuts a facade into many narrow faces (piers, steps), so `lod2StreetWalls` groups
+  the foot edges of the vertical faces into straight facades (direction 6 deg, line 0.6 m, jog 1.6 m), finds the street side by the roofs (the side not under a roof), and
+  `lod2Windows` puts a window on the face it falls on (never across a jog), as many storeys as that face is high: 63 windows.  Collision: the OSM outlines + the feet of the survey's
+  street walls outside them (the north wing).  2 091 -> 2 683 triangles, still one mesh (one draw call).
+* Triangle budget (landmarks, not campus, limit 60 000, not raised): the cathedral's slates (`slateFace`, two triangles a slate) were 8 390 of its 11 583 triangles; the slate is now
+  1.1 x 1.8 m (was 0.95 x 1.5 and 0.8 x 1.3 on the aisles): 11 583 -> 8 925, the same roof from the street and from the air (`montages/1_cathedral_slates.jpg`).  Total 58 198 -> 56 132.
+* Harness U1 now checks the survey: every foot of a survey wall the model draws reaches under the ground (was: a vertex at every OSM corner).
+
+### 2. Place de l'Étoile and 3. Royal-Hamilius: tried, NOT swapped
+* QA3's "Étoile" (4831, 8139, f19 - f22) is the Rond-Point Robert Schuman at the end of the Pont Rouge (road names there: Bd R. Schuman, Rond-Point R. Schuman); the real Place de
+  l'Étoile is 600 m west (4345, 8495), off the first-five-minutes route, and the game HAS it: its corner blocks (17826, 7354) are in the bake with their textured facades.
+* The train simulator's Étoile and Hamilius models are its LOD2 shapes dressed with its texture ATLAS (punched windows, the Lafayette facets).  Lux Drive's landmarks are vertex
+  coloured: built from the same surveys with geometric windows (`landmark-lod2-sites.js`, tried and removed) they read WORSE than the bake's blocks with the building shader's windows
+  (`montages/3_etoile_lod2_tried.jpg`, `3_hamilius_lod2_tried.jpg`: plain cream / white boxes, the curved office of the Étoile lost its ribbon windows; Hamilius cost 3 143 triangles).
+  Per the brief (swap only where clearly better) the bake keeps them.  The way to use them would be the survey's shapes through the BUILDING shader (aInfo / aGeo per face), not
+  the landmark soup - not done.
+* The other train-simulator models (Pont Adolphe, Pont Rouge, Coque, Philharmonie, Mudam / Thüngen, Cour de Justice) exist in Lux Drive as hand-built landmarks checked against
+  photographs in look3 / city12; the train simulator's are atlas-textured LOD2 / procedural equivalents of the same shapes - not compared one by one this round.  Missing in Lux
+  Drive and present there: the Pfaffenthal lift, Luxexpo, the Stade, Cloche d'Or (off the first drive) - not ported.
+
+### 4. Look items of QA3
+* **N3-W04 the dark end slabs - identified**: the `endBank` quad of a wall's end (earth kind, from the coping to the buried foot across the block's depth), vertical and lit as a wall
+  that looks along the road: where the next wall starts lower / further out it stood as a dark brown tombstone above it (w002, w014, w022).  The earth of a wall now takes the
+  light as a bank (wall-material.js: its normal bent up): the slab reads as the grassy hill above it (`montages/4_walls.jpg`).  Geometry unchanged (U5 stays: earth behind the
+  coping).  A thin dark edge (the end taper seen edge-on) remains.
+* **N3-W07 the white line on wall 76**: it was the lit top of the footing, whose height (max of a point and its neighbours) stepped up and down every few metres: a white zigzag.
+  The footing's top is now the envelope of 2 points either side, climbing / falling at most 0.12 m/m: a calm ledge (w029).  Still a pale line (a lit ledge), no zigzag.
+* **Rock paint**: `cliff` 1 - smoothstep(0.30, 0.55, N.y) -> (0.24, 0.42): ground of 55 - 65 deg keeps the land's paint; the carve's steps (70 deg and steeper) stay rock.
+  The grey smear on the hill in w014 is NOT gone (so it is not the rock paint; not identified).
+* **N3-W03 the sawtooth at wall feet: NOT fixed** - the green teeth stand in front of the footing (the 1 m lattice nodes beside the face, carve geometry: drive12's area).
+* **JFK side-street aprons (f02 - f13) and the ragged edges at the Rond-Point Schuman (f21): NOT fixed** - measured: the urban class weight is 0 there (`classmap.mjs`), the grey
+  blobs are the junction paint of the service way / JFK service road / cycleway mouths (blurred union where the channels fail, ground-shader sdC / sdP), the green fringe the
+  lattice's union contour beside the median.  A real fix is the junction paint (exact edges for 3+ ways), not attempted.
+
+### Shots
+The reviewer's GPU shot tools (82905fad, cherry-picked as f0bba4ba: `shot.mjs` renders on Metal, no pending tiles) were used for every montage: `gpu_before/` (v57 tree) and
+`gpu_after/` (= `final/`) over the same 68 poses (`poses_all.json`: Gare, cathedral, walls, junctions, the first-five-minutes poses f02 - f51).
+
+### Gates (final tree) - ALL PASS
+`harness.js` **156 / 156** (`city13/gate_harness.txt`; landmarks 56 132 of 60 000 triangles, campus unchanged); `luxdrive_world` PASS, draw calls low 113 / medium 150 /
+high 210; `luxdrive_holes` medium 0 / low 0 hole pixels (72 poses each); `luxdrive_ui` PASS; `luxdrive_webkit.mjs` PASS.  `pb/lux-drive.html` main.js `?v=59`.
+Montages (`~/Library/Caches/luxdrive-work/city13/montages/`): `1_gare.jpg` (photo | v57 | city13), `1_cathedral_slates.jpg`, `3_etoile_lod2_tried.jpg`,
+`3_hamilius_lod2_tried.jpg` (why they were not swapped), `4_walls.jpg`, `4_junctions.jpg` (unchanged), `first5_f02 / f12 / f22 / f32 / f42.jpg` (QA3 frame | v57 | city13).
+
+### Still wrong (honest)
+* Étoile / Royal-Hamilius / the other train-simulator models: not swapped (see 2-3); the real way (survey shapes through the building shader) is not built.
+* Gare: no lettering on the glass hall; the porch is a dark box (no door arches: they would be inside the survey's porch); the platform roof block 15153 behind is still the bake's;
+  the north wing's windows are the generic grid; the tower's details are city12's (not surveyed).
+* Walls: W03 sawtooth teeth (geometry), the w014 grey smear, a thin dark edge at the wall ends, the footing's top still reads as a pale ledge on wall 76.
+* Junction paint: the JFK side-street aprons and the ragged edge at the Rond-Point Schuman are unchanged.
