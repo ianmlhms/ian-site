@@ -2211,3 +2211,65 @@ job (its offset carried onto 9356) still drops off 9356 onto trunk 875 (see T4 a
   steps there come from its route leaving the lane, see qa3 section "Not bugs"; 204 12 cm, 169 16 cm remain in the every-lane list).
 * Pont Adolphe west end: 22 cm in lane -1.8 (flat deck, cambered road).  Rue de Neudorf r07_1: a QA-route artefact (section 5).
 * Q1-style every-lane steps: 20 decks over 5 cm (T3 reports them, not gated).
+
+## Walls 13 (branch `lux-drive-walls13`, Mac mini): the walls the lane rule removed, the bare steps, Kirchberg 9423 - all gates pass, task 1 only partly done
+
+Started from live v60 (c630a40c); main.js `?v=61`.  Round folder `~/Library/Caches/luxdrive-work/walls13/` (tools `tools/`: `survive.mjs` which walls of the bake's lane
+report survive, `plan.mjs` + `plan.py` plan views of a place (slope colours, carriageways, every lane centre line with its level, the walls before / after the lane rule),
+`kramps.mjs` harness K's 186 "ramps in roads" one by one with the reason and the lane, `mkposes.mjs`, `sheet.py`, `montage.py`, `laneroll.mjs`; `v60/` the live snapshot for
+the before shots; `out/` reports and logs; gate logs `gate_*.txt`).
+
+### What stops a wall (measured, `bake_walls.mjs --lane-report=<file>`, new)
+* The report lists, for every wall BEFORE the lane rule, every lane (way, face / back / end line, distance, the lane's level against the wall's top and bottom) that comes within
+  WALL_LANE.clear 1.35 m.  78 walls reach a lane; on the v60 tree 31 of them were dropped whole and 23 cut (`out/survive0.txt`).
+* Harness K's 186 ramps in roads (`out/kramps0.json`): 175 are "a lane at the wall's level within 1.35 m", 10 a foot on tarmac, 1 a head on tarmac.  Of the 175, ~140 have a lane of
+  ANOTHER way at the top or the foot of the step: two carriageways at two levels whose OSM widths overlap or nearly touch (Merl A4 1848 / link 12832: lane centres 2.6 m apart
+  across a 4.7 m step; Kirchberg trunk 875 between the links 10415 / 10713 / 9423; Rampart / Montée du Grund: two 7 m streets on axes 5 m apart; Bd Robert Schuman; Eecherfeld's
+  hairpin; the Kirchberg service loops 12923 / 12926).  A wall block (face line at the foot, back line at the head, both solid) needs 1.35 m from the lane on both sides plus the
+  width of the step (1.7 m at STEP_SLOPE for 4.7 m): ~4.4 m between the lanes.  Where OSM leaves 2.6 m there is no place for any solid wall that keeps T1 at 0 - not at the
+  foot, not at the top, not a slim one (a 0.3 m barrier half way needs 2.7 m).  The rest are deck ends (below).
+
+### 1. Walls back where they fit - `wall-collider.js`, `lane-clearance.js`, `scripts/luxdrive/bake_walls.mjs`, `main.js`, harness T / R / O as the game
+* **A car on a deck over a wall rides over it** (`aboveOnDeck`, WALL_COLLIDER.deckOver 0.05 / deckClear 0.06): levelReach (2.5 m) is the guard of the HIGH GROUND (a car beside the
+  back of a block must not drive onto it); it also made every abutment wall under a deck end a wall for the deck's lanes 0.1 - 0.6 m above its top (the A6 over the A4 at
+  Autoroute de Dudelange, the A1 over the Trèves track, Rue In Bouler's bridge, Rue Nennig, ...: 9 walls).  The car's ground is a deck (more than 5 cm over the terrain) and
+  above the wall's coping: the block is under the slab, it cannot touch the car.  The game (`createWallCollider(walls, groundAt, terrainAt)`), the bake (`wallBlocksLane`, the
+  lane pieces carry the terrain under them) and harness T1 / T4 / R3 / O (the same third argument) use one rule; T1's lanes, levels and clearance are unchanged.
+  Most of those walls still stay out: their BACK line lies at the bank top where the deck meets its approach flush (not "on a deck" there), and the approach lanes cross it.
+* The bake moved a point off a lane by a shared count (0.6 m for the face AND the back together); a point between a lane at its foot and one at its top now has 0.6 m for each.
+* Walls **97 -> 99, 2376 -> 2449 m** (`out/bake4.log`).  Of the 54 walls the lane rule dropped or cut: 31 / 23 -> **29 / 25** (Merl A4 wall w33 and the A1 / Trèves track
+  wall w54 partly back, more of the cut walls kept).  T1 **0**, K passes (bare 5, as before), rampsInRoads **186** (unchanged: the lanes did not move).
+
+### 2. The steps where no wall can stand: concrete, not grass - `ground-shader.js`
+* A face steeper than ~0.75 m/m (facet normal) within STEP_FACE_NEAR 3 m of a carriageway edge (fading out by 6 m) is painted as the concrete of the walls with their level
+  courses (WALL.courseHeight), faded toward the level ground by the vertex normal (the facets of a face across the lattice are its teeth: painted by the facet alone they
+  were grey spikes on the lawn).  Merl (A4 / link), Kirchberg (875 / 10415 / 10713, wall 89's 4.5 m cliff), Eecherfeld, Rampart read as a battered concrete wall now
+  (montages).  The lattice teeth along the top of a diagonal face are geometry and stay.
+* The tarmac is paint on LEVEL ground: `onCarriage *= smoothstep(0.78, 0.88, N.y)` - the upper way's tarmac no longer runs down the face (Merl 3072 - 3090,9976).  This is in the
+  shader; the CPU count of drive12 (`paintslope.mjs`, sdCar on the lattice) does not see it and is unchanged.
+
+### 3. Kirchberg 9423 (task 3) - tried, reverted
+* Root cause confirmed: 9423 (5 lanes, 18.7 m) starts at ONE node where 6060 (2 lanes) and 12330 (3 lanes) end; the chain takes 12330 as its partner and the width taper
+  narrows 9423 to 11.7 m there, so laneOffsets' outer lane (-7.48) begins 1.6 m off the tarmac, on the bank.  At that node both incoming ways are centred on the node
+  (their union IS 11.7 m wide): a car coming from 6060 enters at +-2.05 and is on tarmac; only a car put on lane -7.48 at the node is not.
+* Tried: no taper across an end where two marked ways go on (carriageways.js fork ends, 265 in the network).  Harness P1 failed (134 width steps at joints, worst 2.5 m at the
+  Merl links) and T4 p06 ran into wall 18 on the widened tarmac.  Reverted (commit 776a40b0).  A real fix needs the OSM merge moved apart (6060 / 12330 offset to 9423's own
+  lanes before the node) - not done.
+
+### 4. Houses in narrow streets (task 4) - not started.
+
+### Gates (final tree, walls re-baked; `walls13/gate_*.txt`) - ALL PASS
+* `harness.js` **161 / 161** (1336 s): K walls 99 / bare 5 / rampsInRoads 186, P1 (1 step, as v60), R2 72, R3 0.096 / 0.088, T1 0, T2 0, T3 13, T4 0 stopped.
+* `luxdrive_world` PASS (6 carve walls, deepest 7.90; draw calls 113 / 150 / 211).  `luxdrive_holes` 0 / 0 (medium, low).  `luxdrive_ui` PASS.  `luxdrive_webkit` PASS.
+* Montages (left live v60, right walls13; noon / clear, GPU): `walls13/montages/1_steps.jpg` (Merl, Kirchberg, Eecherfeld, Rampart), `2_walls_touched.jpg` (every wall the lane
+  rule touched, oblique + top), `3_general.jpg` (the look poses: no grey on the natural banks); pairs `pair_*.jpg`.
+
+### Still wrong (honest)
+* **Task 1 is mostly not done as asked**: 29 of the walls the lane rule removed are still gone and 25 cut.  Where two carriageways at two levels lie closer than ~4.4 m lane to lane
+  (Merl, Kirchberg, Rampart, Eecherfeld, Bd Schuman, ...) no solid wall can stand without reaching an OSM lane (T1); those steps are concrete-painted ground, not wall blocks -
+  the car still climbs / falls the 2.7 m/m face where it leaves its lane, as in v60.  A real fix moves the carriageways (narrower OSM widths where two levels overlap, the lanes
+  with them) - a data / lane-model change this round did not make.
+* The abutment walls under deck ends stay out where their back line meets the approach road flush with the deck.
+* rampsInRoads 186 (task 2) unchanged; tarmac-down-the-face fixed only in the shader.
+* Kirchberg 9423's outer lane at the merge node (task 3): not fixed (above).  Houses in narrow-street lanes (task 4): not started (1097 pairs as drive12).
+* The concrete paint also takes any natural bank steeper than ~0.75 m/m within 3 m of a road (checked on the look poses; none seen, not proven everywhere).
