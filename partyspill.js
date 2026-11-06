@@ -72,11 +72,8 @@
 
   /* ---------------- helpers ---------------- */
 
-  function detectLang() {
-    try { var s = localStorage.getItem('ps_lang'); if (s && UI.lede[s]) return s; } catch (e) {}
-    var n = (navigator.language || 'lb').slice(0, 2).toLowerCase();
-    return UI.lede[n] ? n : 'lb';
-  }
+  // Luxembourgish only (6 Nov 2026); the de/en strings stay in UI.
+  function detectLang() { return 'lb'; }
   function t(key, vars) {
     var s = (UI[key] && (UI[key][lang] || UI[key].en)) || key;
     if (vars) Object.keys(vars).forEach(function (k) { s = s.replace('{' + k + '}', vars[k]); });

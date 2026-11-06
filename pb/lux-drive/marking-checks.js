@@ -6,8 +6,9 @@
  *   M5  the edge of the tarmac along a median is straight: the zero of the painted distance (as the shader interpolates it per triangle) along the dual carriageways of the study
  * Pure (Node): `runMarkingChecks({ ... })` records its checks with `check` and its numbers in `stats.markings`. */
 import { buildMarkingPlan, trackPoint, chainPoint, pieceSpans, MARK } from './markings.js';
-import { computeTileNodes, buildTileMesh, CHANNEL_STRIDE } from './tile-mesh.js';
-import { diagonalIsMain } from './surface.js';
+import { computeTileNodes, buildTileMesh } from './tile-mesh.js';
+import { meshAttrAt, paintedSd, paintAt } from './paint-model.js';
+import { CHANNELS } from './road-network.js';
 import { QUADTREE } from './config.js';
 import { junctionClusters } from './junction-probe.js';
 import { leafAt, selectTiles } from './quadtree.js';
@@ -22,6 +23,7 @@ const MEDIAN_SCAN = 0.02;         // m across
 const FALSE_KERB_UNION = 0.6;    // m: a point counts as tarmac when the union paints it this far inside an edge; the channels must paint it as tarmac too
 const JOINT_CLEAR = 12;          // m: the median edge is not measured this close to a hand-over (the width of the carriageway may change there)
 const MEDIAN_P95_CM = 8;          // the edge of the tarmac along a median may deviate this much from its 10 m running mean (95 % of the samples; v45: a sawtooth of 30 - 50 cm) ...
+const OWN_EDGE = 1.0;             // m: M5 measures the zero of the painted distance within this of the carriageway's half width (its own edge)
 const MEDIAN_MAX_CM = 20;         // ... and at worst this much (where four carriageways meet the paint falls back to the blurred union over a few metres)
 
 /** The ten roads of the QA markings study (qa1/marks_roads.json): a point on the road and its direction (deg, 0 = +x). */
@@ -39,25 +41,16 @@ export const STUDY_ROADS = Object.freeze([
 ]);
 const STUDY_RADIUS = 40;          // m round each study point
 
-/** A value of a per-vertex attribute of a built tile mesh at a world point, interpolated over the triangle exactly as the GPU does (the diagonal rule of the lattice). */
-export function meshAttrAt(mesh, arr, stride, c, x, z) {
-  const cells = QUADTREE.cells, side = cells + 1;
-  const lx = (x - mesh.x0) / mesh.step, lz = (z - mesh.z0) / mesh.step;
-  const i = Math.min(cells - 1, Math.max(0, Math.floor(lx))), j = Math.min(cells - 1, Math.max(0, Math.floor(lz)));
-  const fx = lx - i, fz = lz - j;
-  const a = j * side + i, b = a + 1, cc = a + side, d = cc + 1;
-  const va = arr[a * stride + c], vb = arr[b * stride + c], vc = arr[cc * stride + c], vd = arr[d * stride + c];
-  const gi = Math.round(mesh.x0 / mesh.step) + i, gj = Math.round(mesh.z0 / mesh.step) + j;
-  if (diagonalIsMain(gi, gj)) return fx >= fz ? va + (vb - va) * fx + (vd - vb) * fz : va + (vd - vc) * fx + (vc - va) * fz;
-  return fx + fz <= 1 ? va + (vb - va) * fx + (vc - va) * fz : vd + (vc - vd) * (1 - fx) + (vb - vd) * (1 - fz);
-}
+// (the GPU interpolation and the shader's paint rules live in paint-model.js since paint15; re-exported for the callers of this module)
+export { meshAttrAt, paintedSd };
 
-/** The signed distance to the carriageways as the shader paints it (ground-shader.js: the two channels where they hold, else the blurred union); `channels` false: v45 (the union only). */
-export function paintedSd(mesh, x, z, channels = true) {
-  const union = meshAttrAt(mesh, mesh.road3, 4, 0, x, z);
-  if (!channels) return union;
-  const w = Math.min(1, Math.max(0, meshAttrAt(mesh, mesh.road4, 4, 3, x, z)));
-  return union * (1 - w) + Math.min(meshAttrAt(mesh, mesh.road4, 4, 0, x, z), meshAttrAt(mesh, mesh.road4, 4, 1, x, z), meshAttrAt(mesh, mesh.road4, 4, 2, x, z)) * w;
+/** The blurred UNION fields of the lattice per grid vertex (the paint of v45: the distance to the union of the carriageways and to that of the streets), laid out like a mesh
+ *  attribute of stride 2 - the reference the channels are measured against (the mesh itself carries the channels and the rest since paint15). */
+function unionAttr(nodes) {
+  const cells = QUADTREE.cells, side = cells + 1, apron = cells + 3;
+  const out = new Float32Array(side * side * 2);
+  for (let j = 0; j <= cells; j++) for (let i = 0; i <= cells; i++) { const a = (j + 1) * apron + i + 1, v = j * side + i; out[v * 2] = nodes.sdCar[a]; out[v * 2 + 1] = nodes.sdMajor[a]; }
+  return out;
 }
 
 export function runMarkingChecks({ data, net, surface, field, decks, check, stats, quick = false }) {
@@ -66,6 +59,8 @@ export function runMarkingChecks({ data, net, surface, field, decks, check, stat
   const roads = data.roads;
   const out = { ...plan.stats, buildMs: Date.now() - t0 };
   const p = { x: 0, z: 0, nx: 0, nz: 0, bed: 0, way: 0, o: 0 };
+  const exactInfo = { chGroup: new Int32Array(CHANNELS), chCar: new Float32Array(CHANNELS), chPave: new Float32Array(CHANNELS), chMajor: new Uint8Array(CHANNELS), chCode: new Uint8Array(CHANNELS) };
+  const exactSd = (x, z) => { field.height(x, z, exactInfo); return exactInfo.sdCar; };
   const piecesOf = new Map();
   plan.pieces.forEach((pc) => { const l = piecesOf.get(pc.track); if (l) l.push(pc); else piecesOf.set(pc.track, [pc]); });
 
@@ -174,7 +169,8 @@ export function runMarkingChecks({ data, net, surface, field, decks, check, stat
       if (!m) {
         const sel = selectTiles(x0 + QUADTREE.minSize / 2, z0 + QUADTREE.minSize / 2, {});
         const leaf = leafAt(sel.split, x0 + QUADTREE.minSize / 2, z0 + QUADTREE.minSize / 2);
-        m = buildTileMesh(leaf, computeTileNodes(leaf, surface, field), sel.split, field, plan);
+        const nodes = computeTileNodes(leaf, surface, field);
+        m = { ...buildTileMesh(leaf, nodes, sel.split, field, plan), union: unionAttr(nodes) };
         meshes.set(k, m);
       }
       return m;
@@ -244,12 +240,15 @@ export function runMarkingChecks({ data, net, surface, field, decks, check, stat
             let prev = null, zero = null, again = false;
             for (let u = hw - 0.6; u <= hw + 3.2; u += MEDIAN_SCAN) {
               const x = p.x + p.nx * u * side, z = p.z + p.nz * u * side;
-              const sd = paintedSd(meshAt(x, z), x, z, chOn);
+              const mm = meshAt(x, z);
+              const sd = chOn ? paintedSd(mm, x, z) : meshAttrAt(mm, mm.union, 2, 0, x, z);
               if (prev !== null && zero === null && prev < 0 && sd >= 0) zero = u - MEDIAN_SCAN * sd / Math.max(1e-6, sd - prev);
               if (zero !== null && sd < 0) { again = true; break; }
               prev = sd;
             }
-            found[kk] = zero !== null && again ? zero : null;
+            // (paint15: the zero must be the edge of THIS carriageway - within OWN_EDGE of its half width: where another carriageway merges over its edge (a slip road's nose,
+            // JFK 6685,7613) the first zero is the far edge of the merging one, a diagonal line that is no median edge; the per-pixel channels show it exactly)
+            found[kk] = zero !== null && again && Math.abs(zero - hw) <= OWN_EDGE ? zero : null;
           }
           edge.push(found[0]); edgeOld.push(found[1]);
         }
@@ -277,12 +276,14 @@ export function runMarkingChecks({ data, net, surface, field, decks, check, stat
             for (let u = -hw + 1; u <= hw - 1; u += 0.25) {
               const x = p.x + p.nx * u, z = p.z + p.nz * u;
               insideN++;
-              const m = meshAt(x, z), unionOnly = paintedSd(m, x, z, false);
+              // (paint15: the reference is the carve's own signed distance at the point - the blurred union of the lattice is no longer what the shader paints, and in a field pushed
+              // off its level (8 m per m) its blur called a point 1 m inside the edge that the carve puts on the edge itself, Rocade de Bonnevoie 5289,10500)
+              const m = meshAt(x, z), unionOnly = Math.max(meshAttrAt(m, m.union, 2, 0, x, z), exactSd(x, z));
               if (unionOnly > -FALSE_KERB_UNION) { insideSkip++; continue; }          // (the union does not call it tarmac either: the way lies off its level there, see road-network.js PAINT_LEVEL_PUSH)
               // (the pale tar of a service way must not show inside a street either: the distance to the street carriageways, as the shader takes it)
-              const wq = Math.min(1, Math.max(0, meshAttrAt(m, m.road4, 4, 3, x, z)));
-              const sdMaj = meshAttrAt(m, m.road3, 4, 3, x, z) * (1 - wq) + meshAttrAt(m, m.road5, 4, 3, x, z) * wq;
-              if (paintedSd(m, x, z) > 0 || (meshAttrAt(m, m.road3, 4, 3, x, z) < -FALSE_KERB_UNION && sdMaj > 0)) { insideBad++; if (insideList.length < 4) insideList.push(`${x.toFixed(1)},${z.toFixed(1)}`); }
+              const pa = paintAt(m, x, z);
+              const sdMaj = Math.min(pa.chS, meshAttrAt(m, m.road3, 4, 3, x, z));        // (the channels' streets and the rest's)
+              if (paintedSd(m, x, z) > 0 || (meshAttrAt(m, m.union, 2, 1, x, z) < -FALSE_KERB_UNION && sdMaj > 0)) { insideBad++; if (insideList.length < 4) insideList.push(`${x.toFixed(1)},${z.toFixed(1)}`); }
             }
           }
         }

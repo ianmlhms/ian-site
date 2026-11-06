@@ -492,7 +492,7 @@
   });
   new ResizeObserver(resize).observe($('game'));
   Arcade.onMute(value => { muted = value; updateMute(); }); Arcade.onRestart(() => start(mode));
-  const storedLang = readStore('site_lang'); if (TEXT[storedLang]) lang = storedLang;
+  // Luxembourgish only (Ian, 6 Nov 2026): the language buttons are hidden and a stored de/en is ignored; TEXT keeps de/en.
   try { mergeSave(window.__pbSave || JSON.parse(readStore(SAVE_KEY) || 'null')); }
   catch (error) { warn('Progress restore failed', error); notify(text('saveError')); }
   if (TEST_MODE) { progress = testUnlockAll(progress); refreshGarage(); updateHUD(); }

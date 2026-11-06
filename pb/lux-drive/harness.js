@@ -59,6 +59,7 @@ import { runLookChecks } from './harness-look11.js';             // section S (l
 import { runDrive12Checks } from './harness-drive12.js';           // section T (drive12)
 import { runCity12Checks } from './harness-city12.js';           // section U (city12)
 import { runCollide14Checks } from './harness-collide14.js';     // section V (collide14)
+import { runPaint15Checks } from './harness-paint15.js';         // section W (paint15)
 import { runMarkingChecks } from './marking-checks.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -1771,6 +1772,8 @@ if (wants('T')) runDrive12Checks({ check, section, stats, data, field, surface, 
 if (wants('U')) runCity12Checks({ check, section, stats, data, surface, landmarks, maps, buildingsRaw: data.buildings });
 /* ---------------------------------------------------------------- V: no house can be entered, no bridge left over its edge (harness-collide14.js) */
 if (wants('V')) runCollide14Checks({ check, section, stats, data, field, surface, ground, net, buildings, landmarks, portals, forest, playArea, maps, deckNetwork });
+/* ---------------------------------------------------------------- W: the edges of the ground paint (harness-paint15.js) */
+if (wants('W')) runPaint15Checks({ check, section, stats, data, surface, field });
 
 /* ---------------------------------------------------------------- the summary */
 console.log(`\n${results.fail === 0 ? 'PASS' : 'FAIL'}  ${results.pass} checks passed, ${results.fail} failed  (${((Date.now() - t0) / 1000).toFixed(1)} s)`);

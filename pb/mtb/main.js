@@ -71,13 +71,9 @@ function param(name) {
 const readKey = (key) => { try { return localStorage.getItem(key); } catch (error) { console.warn('[mtb] storage blocked', error); return null; } };
 const writeKey = (key, value) => { try { localStorage.setItem(key, value); } catch (error) { console.warn('[mtb] storage blocked', error); } };
 
-function pickLang(progress) {
-  const own = readKey(LANG_KEY);
-  if (LANGS.includes(own)) return own;
-  const saved = progress && settingsOf(progress).lang;
-  const site = readKey('site_lang');
-  if (LANGS.includes(site)) return site;
-  return LANGS.includes(saved) && readKey('pb_mtb_save') ? saved : 'lb';
+// Luxembourgish only (Ian, 6 Nov 2026): no language setting, stored choices are ignored; i18n.js keeps de/en/fr.
+function pickLang() {
+  return 'lb';
 }
 
 function autoQuality() {
@@ -305,7 +301,7 @@ async function boot() {
     else if (key === 'weather') { env.setWeather(value); save(withSettings(progress, { weather: value })); }
     else if (key === 'season') { env.setSeason(value); save(withSettings(progress, { season: value })); }
     else if (key === 'quality') { if (value === 'auto') { try { localStorage.removeItem(QUALITY_KEY); } catch (error) { /* ignore */ } applyQuality(autoQuality()); } else { writeKey(QUALITY_KEY, value); applyQuality(value); } save(withSettings(progress, { q: value })); }
-    else if (key === 'lang') { lang = value; writeKey(LANG_KEY, value); ui.setLang(value); input.setLabels({ pedal: tr('touch.pedal'), brake: tr('touch.brake'), jump: tr('touch.jump') }); save(withSettings(progress, { lang: value })); if (current.trail && game.mode === 'card') showCard(); setHudMode(); }
+    else if (key === 'lang') { if (value !== 'lb') return; lang = value; writeKey(LANG_KEY, value); ui.setLang(value); input.setLabels({ pedal: tr('touch.pedal'), brake: tr('touch.brake'), jump: tr('touch.jump') }); save(withSettings(progress, { lang: value })); if (current.trail && game.mode === 'card') showCard(); setHudMode(); }
     else if (key === 'sound') { audio.setMuted(value === 'off'); writeKey('pb_muted', value === 'off' ? '1' : '0'); save(withSettings(progress, { snd: value === 'off' ? 0 : 1 })); }
     refreshMenu();
     hudButtons();

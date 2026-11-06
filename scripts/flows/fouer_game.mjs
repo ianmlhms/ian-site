@@ -288,17 +288,12 @@ export const flow = {
     await page.evaluate(() => { window.__fouerGame.env.setWeather("clear"); window.__fouerGame.env.setTime("evening"); });
 
     /* ------------------------------------------------------------ A5: language + reload */
-    h.step("language switch lb -> en -> de, and the choice survives a reload");
+    h.step("Luxembourgish only (6 Nov 2026): no language chips in the settings, a stored language is ignored, the game survives a reload");
     await page.click("#menuBtn");
     h.expect(await page.isVisible("#menu"), "the menu button opens settings");
-    await page.click('#menu [data-lang="en"]');
-    h.eq(await page.evaluate(() => document.documentElement.lang), "en", "document language en");
-    const goalEn = await page.locator("#goal .gtext b").innerText();
-    h.expect(/Goal|points/.test(goalEn), `goal card in English: ${goalEn}`);
-    await page.click('#menu [data-lang="de"]');
-    h.expect(/Ziel/.test(await page.locator("#goal .gtext b").innerText()), "goal card in German");
-    h.eq(await page.evaluate(() => localStorage.getItem("pb_fouer_lang")), "de", "stored as pb_fouer_lang");
-    await page.click('#menu [data-lang="lb"]');
+    h.eq(await page.locator('#menu [data-lang]').count(), 0, "no language chips");
+    h.eq(await page.evaluate(() => document.documentElement.lang), "lb", "document language lb");
+    await page.evaluate(() => localStorage.setItem("pb_fouer_lang", "de"));
     const before = await state(page);
     await page.evaluate(() => window.__fouerGame.game.flushSave());
     await page.reload({ waitUntil: "domcontentloaded" });

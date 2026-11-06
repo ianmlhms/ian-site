@@ -458,7 +458,7 @@
   });
   TS.copy = copy;
   TS.langs = LANGS;
-  if (!LANGS.includes(TS.lang)) TS.lang = 'lb';
+  TS.lang = 'lb'; // Luxembourgish only (6 Nov 2026)
 
   function t(key, vars, langOverride) {
     const lang = LANGS.includes(langOverride) ? langOverride : TS.lang;
@@ -472,11 +472,9 @@
     if (!obj || typeof obj !== 'object') return obj === undefined ? '' : String(obj);
     return obj[langOverride || TS.lang] || obj.lb || obj.en || '';
   }
-  function setLang(lang) {
-    if (!LANGS.includes(lang)) {
-      console.warn('[Lokféierer] unknown language', lang);
-      return TS.lang;
-    }
+  // Luxembourgish only (Ian, 6 Nov 2026): every request ends in lb; the de/en copy stays above.
+  function setLang() {
+    const lang = 'lb';
     TS.lang = lang;
     try {
       document.documentElement.lang = lang === 'lb' ? 'lb' : lang;

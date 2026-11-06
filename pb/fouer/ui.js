@@ -738,15 +738,8 @@ export function createUi({ root, game, scene, r, env, hooks, sfx, lang: initialL
     const mounted = mountEnvUi({ env, r, pitches: null, lang });
     const menu = document.getElementById("menu");
     const head = el("div", "", "");
-    head.innerHTML = `<h3>${esc(T("set.language"))}</h3>`;
-    const langRow = el("div", "row"); langRow.setAttribute("role", "group");
-    LANGS.forEach(code => {
-      const chip = el("button", "chip", esc(LANG_NAMES[code])); chip.type = "button"; chip.dataset.lang = code; chip.setAttribute("aria-pressed", String(code === lang));
-      chip.addEventListener("click", () => { if (code !== lang) changeLang(code); });
-      langRow.append(chip);
-    });
-    head.append(langRow);
-    head.insertAdjacentHTML("beforeend", `<h3>${esc(T("set.sound"))}</h3>`);
+    // Luxembourgish only (Ian, 6 Nov 2026): the language chips are gone.
+    head.innerHTML = `<h3>${esc(T("set.sound"))}</h3>`;
     const soundRow = el("div", "row");
     for (const on of [true, false]) {
       const chip = el("button", "chip", `${on ? "🔊" : "🔇"} ${esc(T(on ? "set.on" : "set.off"))}`); chip.type = "button"; chip.dataset.sound = on ? "1" : "0";
