@@ -23,6 +23,8 @@ import { createTerrainView } from './terrain-view.js';
 import { buildMarkingPlan } from './markings.js';                 // the lane markings, planned per carriageway (paint7)
 import { createDeckMarkingView } from './deck-marking-view.js';
 import { createBuildingView } from './building-view.js';
+import { createFacadeView, loadFacadeIndex } from './facade-view.js';           // houses17: the real façades of the old town core
+import { facadePaintOf } from './facade-data.js';
 import { createDeckView } from './deck-view.js';
 import { createWallCollider } from './wall-collider.js';
 import { createWallView } from './wall-view.js';
@@ -131,6 +133,10 @@ async function boot() {
   const areaRes = await fetch(new URL('./data/area.json', import.meta.url));
   if (!areaRes.ok) throw new Error(`area.json: HTTP ${areaRes.status}`);
   const area = await areaRes.json();
+  // houses17: the façade index (the measured colours of the old town core and its streamed photo atlases); optional.
+  // ?facades=0 leaves it out (the painted city exactly as before: the before / after shots)
+  const facadeBase = new URL('./data/facades/', import.meta.url);
+  const facadeIndex = param('facades') === '0' ? null : await loadFacadeIndex(new URL('index.json', facadeBase));
 
   // ---- the pure world
   setLoad(0.62, 'load.build');
@@ -181,7 +187,8 @@ async function boot() {
   const shownDecks = ground.decks.filter((d) => !landmarks.hiddenDecks.has(d.id));
   const markPlan = buildMarkingPlan(data.roads, field.network, shownDecks);
   const terrain = createTerrainView({ scene, surface, field, material: quality.cheapGround ? groundCheap : groundFull, quality, marks: markPlan });
-  const city = createBuildingView({ scene, buildings, field, env, noiseTexture: textures.noise, quality, hidden: landmarks.hiddenBuildings });
+  const city = createBuildingView({ scene, buildings, field, env, noiseTexture: textures.noise, quality, hidden: landmarks.hiddenBuildings, paintOf: facadePaintOf(facadeIndex) });
+  const facades = facadeIndex ? createFacadeView({ scene, index: facadeIndex, baseUrl: facadeBase, buildings: data.buildings, field, env, renderer, quality, hidden: landmarks.hiddenBuildings }) : null;
   const trees = createTreeView({ scene, forest, baked: bakedTrees, field, env, quality });
   const decks = createDeckView({ scene, decks: shownDecks, material: solid, ground: ground.surface, laneLinesOn: false });
   const deckMarks = createDeckMarkingView({ scene, plan: markPlan, material: solid });
@@ -489,6 +496,7 @@ async function boot() {
     const focusX = frozenCamera ? camera.position.x : car.state.x, focusZ = frozenCamera ? camera.position.z : car.state.z;
     terrain.update(focusX, focusZ);
     city.update(focusX, focusZ);
+    if (facades) facades.update(focusX, focusZ);
     decks.update(camera.position.x, camera.position.z, quality.buildingFarRadius * BUILT_DRAW_FACTOR);
     deckMarks.update(camera.position.x, camera.position.z, DECK_MARK_RADIUS);
     walls.update(camera.position.x, camera.position.z, quality.buildingFarRadius * WALL_DRAW_FACTOR);
@@ -536,7 +544,7 @@ async function boot() {
   // the API for the harness (the checks read the state of the game from here)
   window.__lux = {
     landmarks, landmarkView, trams, tramSim, tramNetwork, streetLights, benchView, scene, camera, renderer, car, env, terrain, city, trees, surface, ground, field, portals, playArea, buildings, markPlan, quality: () => quality,
-    ui, fullMap, roadIndex, sound, stepper, model, input, forest, collide, placeAt, blockedAt,
+    ui, fullMap, roadIndex, sound, stepper, model, input, forest, collide, placeAt, blockedAt, facades, facadeIndex,
     /** The Kaart and the teleport for the flows: open the map, put the car on the road nearest to (x, z). */
     toggleMap: () => toggleMap(), startDriving: () => startDriving(), isStarted: () => started,
     teleportNear: (x, z, reach = 200) => { const hit = roadIndex.nearest(x, z, reach); if (hit) teleportTo(hit); return !!hit; },
@@ -565,7 +573,8 @@ async function boot() {
     stats: () => ({
       calls: renderer.info.render.calls, triangles: renderer.info.render.triangles,
       tiles: terrain.tiles.size, pending: terrain.stats.pending,
-      cells: city.stats.visible, cityPending: city.stats.pending,
+      cells: city.stats.visible, cityPending: city.stats.pending + (facades ? facades.stats.pending : 0),
+      facades: facades ? { ...facades.stats } : null,
       trees: trees.stats.trees,
     }),
   };

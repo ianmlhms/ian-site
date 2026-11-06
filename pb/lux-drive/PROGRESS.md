@@ -2273,3 +2273,22 @@ the before shots; `out/` reports and logs; gate logs `gate_*.txt`).
 * rampsInRoads 186 (task 2) unchanged; tarmac-down-the-face fixed only in the shader.
 * Kirchberg 9423's outer lane at the merge node (task 3): not fixed (above).  Houses in narrow-street lanes (task 4): not started (1097 pairs as drive12).
 * The concrete paint also takes any natural bank steeper than ~0.75 m/m within 3 m of a road (checked on the look poses; none seen, not proven everywhere).
+
+## Houses 17 (branch `lux-drive-houses17`, Mac mini): real façades from the ACT LOD2.2 photos, prototype on the old town core - WIP (paused at the usage limit)
+
+What exists (all new modules, small hooks):
+- Bake: `scripts/luxdrive/facade_area.py` (box x 4700-5230, z 8600-8960: Grand-Rue, Bd Royal/Hamilius, Place d'Armes, Place Guillaume; 366 game buildings),
+  `facade_parse.py` (streams the 1.1 GB GML, 458 ACT buildings), `facade_fetch.py` (460 photo atlases via HTTP range from the 5.4 GB zip, 260 MB),
+  `bake_facades.py` (per game wall: z-buffered orthographic render of the matching ACT wall + steep-roof polygons with homographies; party walls skipped;
+  occlusion line from a 0.5 m roof DSM + 45-55 deg oblique cameras -> the hidden lower storeys repeat the lowest clean storey; band below 3.4 m never baked;
+  checks cover / trees / smudge / edge-on -> fallback = painted wall in the measured colour; white balance, light levelling, chroma transfer, sharpen;
+  one WebP atlas per 256 m cell). Output `pb/lux-drive/data/facades/` (index.json 36 kB + 6 WebP, 0.67 MB at 4 px/m, 602 of 1137 visible walls baked).
+- Game: `facade-data.js` (pure: index parse, quads on the exact painted walls via the new `facadeFrame` export of building-mesh.js, stop at the painted
+  ground floor), `facade-view.js` (streams packs < 420 m, drops > 560 m, low quality off, stats in `__lux.stats().facades`, waits in cityPending),
+  `facade-material.js` (photo lit/fogged like the painted walls, night panes). building-mesh/view take `paintOf` (measured wall/roof colours of the area).
+  `?facades=0` = v61 exactly. Draw calls medium +~0-6 (132-148 measured).
+- Shots/montages: `~/Library/Caches/luxdrive-work/houses17/` (poses.json = 8 views, shots/v61, shots/r2, montages/*.jpg, scripts/montage.py).
+
+Where I am: r1 looked poor (few walls textured, blurry up close, a purple north wall, pale roofs); r2 adds chroma transfer + darker roofs (not yet viewed).
+Next: look at montages/all.jpg (r2); decide roofs (measured colour vs top-down ACT roof photo on the game roofs); tune smudge threshold; test 2/6 px/m sizes;
+measure GPU memory in game; bump main.js ?v=; run gates (harness, world, holes x2, ui, webkit); write the honest assessment + city-wide cost.
