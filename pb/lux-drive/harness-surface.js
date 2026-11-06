@@ -295,7 +295,7 @@ function wheelRoll(ground, st) {
 }
 
 export function mergeDriveScan({ net, data, surface, ground }) {
-  const walls = createWallCollider(data.walls, (x, z) => ground.height(x, z));
+  const walls = createWallCollider(data.walls, (x, z) => ground.height(x, z), (x, z) => surface.height(x, z));
   const car = createCar({ ground, roadInfoAt: (x, z, o) => surface.roadInfoAt(x, z, o), collide: (x, z, r, y) => walls.collide(x, z, r, y) });
   const out = [];
   for (const [label, road, off, xa, xb] of R3_ROUTES) {

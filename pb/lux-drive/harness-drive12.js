@@ -63,7 +63,7 @@ export function buildGameCollider({ data, surface, ground, net, buildings, landm
   for (let i = 0; i < lamps.count; i++) props.add(lamps.x[i], lamps.z[i], LAMP_POST_RADIUS, surface.height(lamps.x[i], lamps.z[i]), LAMP_POST_HEIGHT);
   const benches = placeParkBenches({ roads: data.roads, network: net, buildings, map: maps });
   for (let i = 0; i < benches.count; i++) props.add(benches.x[i], benches.z[i], BENCH_RADIUS, surface.height(benches.x[i], benches.z[i]), BENCH_HEIGHT);
-  const gameWalls = createWallCollider(data.walls, (x, z) => ground.height(x, z));
+  const gameWalls = createWallCollider(data.walls, (x, z) => ground.height(x, z), (x, z) => surface.height(x, z));
   const game = createCarCollider({ buildings, landmarks, walls: gameWalls, portals, ground, forest, props, trams: null, playArea, surface, deckNetwork, roads: data.roads });
   return { game, gameWalls };
 }
@@ -75,7 +75,7 @@ export function runDrive12Checks({ check, section, stats, data, field, surface, 
   const { game, gameWalls } = buildGameCollider({ data, surface, ground, net, buildings, landmarks, portals, forest, playArea, maps, deckNetwork });
 
   // ---- T1: the walls and every lane (the probe's own level: a wall collider without a ground function reads the level it is given)
-  const probeWalls = createWallCollider(data.walls, null);
+  const probeWalls = createWallCollider(data.walls, null, (x, z) => surface.height(x, z));          // (as the game's: a lane on a deck over a wall rides over it)
   const t1 = laneClearanceScan({ roads: data.roads, parts: [['wall', (x, z, r, y) => probeWalls.collide(x, z, r, y)]], ground, surface, isOpen });
   const g1 = groupHits(t1.hits);
   stats.laneWalls = { samples: t1.samples, hits: t1.hits.length, pairs: g1.length, list: g1.slice(0, 8).map((e) => `wall ${e.id} on ${e.name} (way ${e.road}) ${e.n} x at ${e.first}`) };

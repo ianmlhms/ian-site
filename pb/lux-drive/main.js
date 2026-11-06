@@ -206,7 +206,7 @@ async function boot() {
   // ---- the car, the camera, the interface
   const start = data.places.start || { x: WORLD.width / 2, z: WORLD.depth / 2, yaw: 0 };
   const roadInfo = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, surface: 0, road: -1, lines: 0, lanes: 0, s: 0 };
-  const wallCollider = createWallCollider(data.walls, (x, z) => ground.height(x, z));        // the retaining walls are solid from both sides (wall-collider.js)
+  const wallCollider = createWallCollider(data.walls, (x, z) => ground.height(x, z), (x, z) => surface.height(x, z));        // the retaining walls are solid from both sides (wall-collider.js)
   // Everything that stops the car answers for the car's own level (`y`: the level of its wheels, car-collide.js): a house, a tree, a lamp stops a car only
   // where the car's body overlaps it in height.  (Before drive12 the trees and lamps were switched off on any deck and the houses were solid to the sky: the
   // houses of Pfaffenthal stopped the car on the Pont Rouge 60 m above them, QA3 N3-B01.)  The bank under the end of a bridge stops a car under the deck.

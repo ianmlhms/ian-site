@@ -114,7 +114,7 @@ export function runTunnelChecks({ check, section, stats, data, field, surface, g
 
   // ---- O3: drive every opened way with its approaches
   /** What the car touches at (x, z): a house, a retaining wall, a portal, a tree or the edge of the area (null: nothing). */
-  const retaining = createWallCollider(data.walls || [], (x, z) => ground.height(x, z));
+  const retaining = createWallCollider(data.walls || [], (x, z) => ground.height(x, z), (x, z) => surface.height(x, z));
   const touch = (x, z, r, y) => {
     const house = buildings.collide(x, z, r);
     if (house) return { hit: house, what: 'house' };

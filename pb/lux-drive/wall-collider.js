@@ -9,7 +9,18 @@ export const WALL_COLLIDER = Object.freeze({
   minHeight: 0.5,         // m: a stretch of wall lower than this (the tapered tip) is no obstacle
   cell: 16,               // m: the spatial hash
   levelReach: 2.5,        // m: the car counts as being at the level of the wall when the ground under it is within this of the wall (a car on a bridge above the wall is not blocked by it)
+  // walls13: a car ON A DECK (its ground is a deck at least deckOver above the terrain there) whose deck lies at least deckClear over the top of a wall rides over it: the wall is the
+  // abutment under the deck's end (bake_walls.mjs keeps its coping under the slab).  levelReach is the guard of the HIGH GROUND (a car beside the back of the block must not drive
+  // onto it or drop off it); a deck has no such edge there - its slab covers the block.  The wall under the A6 decks over the A4 (Autoroute de Dudelange), under the A1 at the
+  // Trèves track, under Rue In Bouler's bridge ... reached the deck lanes by levelReach and the bake dropped them (drive12): bare abutment banks under every such bridge.
+  deckOver: 0.05,
+  deckClear: 0.06,        // (WALL.coping: the coping stands this far over the top)
 });
+
+/** True when a car whose ground is `y` at a point whose terrain is `terrain` rides on a deck over a wall of top `top` (see WALL_COLLIDER.deckOver / deckClear). */
+export function aboveOnDeck(y, terrain, top) {
+  return y > terrain + WALL_COLLIDER.deckOver && y >= top + WALL_COLLIDER.deckClear;
+}
 
 /** The thin walls of a decoded wall list: [{ ax, az, bx, bz, top, bottom, id }]. */
 export function wallSegments(walls) {
@@ -32,10 +43,11 @@ export function wallSegments(walls) {
 }
 
 /**
- * walls: the decoded walls; groundAt(x, z): the height the car stands on there (null: the caller's level y is used - a probe of the lanes at a level of its own).
+ * walls: the decoded walls; groundAt(x, z): the height the car stands on there (null: the caller's level y is used - a probe of the lanes at a level of its own);
+ * terrainAt(x, z): the terrain without the decks (the game's surface.height) - with it a car on a deck over a wall is not blocked by it (aboveOnDeck; null: the old rule).
  * Returns { count, collide(x, z, radius, y) -> { nx, nz, pen, id } | null }.
  */
-export function createWallCollider(walls, groundAt) {
+export function createWallCollider(walls, groundAt, terrainAt = null) {
   const segs = wallSegments(walls);
   const cells = new Map();
   const key = (cx, cz) => cx * 65536 + cz;
@@ -47,7 +59,7 @@ export function createWallCollider(walls, groundAt) {
   function collide(x, z, radius, y = NaN) {
     const list = cells.get(key(Math.floor(x / WALL_COLLIDER.cell), Math.floor(z / WALL_COLLIDER.cell)));
     if (!list) return null;
-    let best = null, ground = null;
+    let best = null, ground = null, terrain = null;
     for (const i of list) {
       const s = segs[i];
       const ex = s.bx - s.ax, ez = s.bz - s.az, ll = ex * ex + ez * ez;
@@ -61,6 +73,7 @@ export function createWallCollider(walls, groundAt) {
       if (best && pen <= best.pen) continue;
       if (ground === null) ground = groundAt ? groundAt(x, z) : y;                // (the ground under the car, not its wheels: a car that flies off the high side over the back is still at the wall's level)
       if (ground > s.top + WALL_COLLIDER.levelReach || ground < s.bottom - WALL_COLLIDER.levelReach) continue;     // on a bridge above the wall / in a tunnel below it
+      if (terrainAt) { if (terrain === null) terrain = terrainAt(x, z); if (aboveOnDeck(ground, terrain, s.top)) continue; }   // on a deck over the wall (its abutment)
       let nx, nz;
       if (d > 1e-4) { nx = (x - qx) / d; nz = (z - qz) / d; } else { const l = Math.sqrt(ll) || 1; nx = -ez / l; nz = ex / l; }
       best = { nx, nz, pen, id: s.id };

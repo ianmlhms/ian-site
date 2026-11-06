@@ -11,8 +11,8 @@ import { fileURLToPath } from 'node:url';
 import { loadWorld } from './world_node.mjs';
 import { WALL, CUT_RAMP, findRamp, encodeWalls, rampTolerance } from '../../pb/lux-drive/retaining-walls.js';
 import { PORTAL } from '../../pb/lux-drive/config.js';
-import { WALL_COLLIDER } from '../../pb/lux-drive/wall-collider.js';
-import { createLaneSegments, wallBlocksLane, WALL_LANE } from '../../pb/lux-drive/lane-clearance.js';
+import { WALL_COLLIDER, aboveOnDeck } from '../../pb/lux-drive/wall-collider.js';
+import { createLaneSegments, wallBlocksLane, WALL_LANE, segmentGap as segmentGapLL } from '../../pb/lux-drive/lane-clearance.js';
 
 const OUT_DEFAULT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../pb/lux-drive/data/walls.bin');
 const outArg = process.argv.find((a) => a.startsWith('--out='));
@@ -341,15 +341,52 @@ console.log(`walls of one face joined where their ends met: ${faceJoins}`);
   };
   /** A wall point moved off a lane by `step` (a NEW point): the face toward the high ground (the back stays, the foot is the ground there), or the back toward the face
    *  (the top is the ground there).  null when it would no longer stand on its ramp (fits), would leave LANE_SHIFT_MAX behind, or the block gets too thin. */
+  // (walls13: the face and the back keep a count of their own - a point between a lane at its foot and one at its top moves both lines, each up to LANE_SHIFT_MAX: with one
+  // shared count a point whose face had to move 0.45 m could pull its back in by 0.15 m only, and walls between two roads were dropped whole)
   const shifted = (p, side) => {
-    const moved = (p.shift || 0) + LANE_SHIFT_STEP;
+    const key = side === 'face' ? 'shiftFace' : 'shiftBack';
+    const moved = (p[key] || 0) + LANE_SHIFT_STEP;
     if (moved > LANE_SHIFT_MAX + 1e-6 || p.depth - LANE_SHIFT_STEP < WALL.minDepth) return null;
     const q = side === 'face'
-      ? { ...p, x: p.x + p.nx * LANE_SHIFT_STEP, z: p.z + p.nz * LANE_SHIFT_STEP, depth: p.depth - LANE_SHIFT_STEP, shift: moved }
-      : { ...p, depth: p.depth - LANE_SHIFT_STEP, shift: moved };
+      ? { ...p, x: p.x + p.nx * LANE_SHIFT_STEP, z: p.z + p.nz * LANE_SHIFT_STEP, depth: p.depth - LANE_SHIFT_STEP, [key]: moved }
+      : { ...p, depth: p.depth - LANE_SHIFT_STEP, [key]: moved };
     if (side === 'face') q.bottom = Math.min(q.top - WALL.minRise, surface.height(q.x, q.z)); else q.top = Math.max(q.bottom + WALL.minRise, surface.height(...back(q)));
     return fits(q) && clearOfRoads(q.x, q.z) && clearOfDecks(q) ? q : null;
   };
+  // --lane-report=<file>: for every wall whose block reaches a lane (before the lane rule acts), which lanes and how close (a tool: why a wall was cut or dropped)
+  const reportArg = process.argv.find((a) => a.startsWith('--lane-report='));
+  if (reportArg) {
+    const report = walls.map((w, wi) => {
+      const pts = taper(w.body), hits = new Map();
+      const lines = [];
+      for (let k = 0; k + 1 < pts.length; k++) {
+        lines.push(['face', [pts[k].x, pts[k].z], [pts[k + 1].x, pts[k + 1].z], pts[k], pts[k + 1]]);
+        lines.push(['back', back(pts[k]), back(pts[k + 1]), pts[k], pts[k + 1]]);
+      }
+      for (const k of [0, pts.length - 1]) lines.push(['end', [pts[k].x, pts[k].z], back(pts[k]), pts[k], pts[k]]);
+      for (const [kind, a, b, p, q] of lines) {
+        if (!solid(p, q)) continue;
+        const bottom = Math.min(p.bottom, q.bottom), top = Math.max(p.top, q.top);
+        for (const lp of lanes.near(a[0], a[1], b[0], b[1], LANE_WALL_CLEAR)) {
+          const g = segmentGapLL(lp.ax, lp.az, lp.bx, lp.bz, a[0], a[1], b[0], b[1]);
+          if (g.d >= LANE_WALL_CLEAR) continue;
+          if (Math.min(lp.ay, lp.by) > top + WALL_COLLIDER.levelReach || Math.max(lp.ay, lp.by) < bottom - WALL_COLLIDER.levelReach) continue;
+          if (aboveOnDeck(lp.ay, lp.at, top) && aboveOnDeck(lp.by, lp.bt, top)) continue;
+          const key = `${lp.road}:${kind}`, h = hits.get(key) || { road: lp.road, kind, n: 0, minD: 9, lane: 0, at: null };
+          h.n++; if (g.d < h.minD) { h.minD = +g.d.toFixed(2); h.lane = +((lp.ay + lp.by) / 2).toFixed(2); h.at = [+a[0].toFixed(1), +a[1].toFixed(1)]; }
+          hits.set(key, h);
+        }
+      }
+      if (!hits.size) return null;
+      const m = w.body[w.body.length >> 1];
+      return { wall: wi, way: w.way, wayName: net.roads[w.way]?.name || net.roads[w.way]?.kind, mid: [+m.x.toFixed(1), +m.z.toFixed(1)], top: +m.top.toFixed(2), bottom: +m.bottom.toFixed(2),
+        depth: +m.depth.toFixed(2), rise: +w.rise.toFixed(2), n: w.body.length, len: +wallLength(w.body).toFixed(1),
+        hits: [...hits.values()].map((h) => ({ ...h, own: h.road === w.way, name: net.roads[h.road]?.name || net.roads[h.road]?.kind })) };
+    }).filter(Boolean);
+    fs.writeFileSync(reportArg.slice(14), JSON.stringify(report, null, 1));
+    fs.writeFileSync(reportArg.slice(14) + '.walls.bin', encodeWalls(walls));
+    console.log(`lane report: ${report.length} walls reach a lane -> ${reportArg.slice(14)}`);
+  }
   let trimmedLane = 0, droppedLane = 0, pointsLane = 0, shiftedLane = 0;
   const out = [];
   for (const w of walls) {
@@ -373,7 +410,7 @@ console.log(`walls of one face joined where their ends met: ${faceJoins}`);
     }
     if (runs.some((r) => offending(r).size)) throw new Error(`bake_walls: wall of way ${w.way} still reaches a lane after 24 passes`);
     if (touched) { trimmedLane++; if (!runs.length) droppedLane++; }
-    for (const body of runs) { const clean = body.map(({ shift, ...rest }) => rest); out.push({ ...w, body: clean, pts: taper(clean) }); }
+    for (const body of runs) { const clean = body.map(({ shiftFace, shiftBack, ...rest }) => rest); out.push({ ...w, body: clean, pts: taper(clean) }); }
   }
   walls.splice(0, walls.length, ...out);
   console.log(`walls whose collision block reached a lane (lane-clearance.js, ${lanes.count} lane pieces near walls): ${trimmedLane} touched, ${shiftedLane} point moves off a lane, ${pointsLane} points dropped, ${droppedLane} walls dropped whole`);
