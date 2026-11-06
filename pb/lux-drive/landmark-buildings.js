@@ -218,7 +218,7 @@ const CATHEDRAL = Object.freeze({
 
 const SLATE_SPIRE = [0.20, 0.22, 0.27];
 const SPIRE_BASE = 0.38;       // the radius of the spire's foot per half width of the tower (the photographs: the needles are a third of the belfry wide; the old model's were two thirds)
-const CATHEDRAL_SLATE = Object.freeze({ rowH: 0.95, colW: 1.5, color: [0.40, 0.43, 0.50] });   // the slates of the great roofs: blue-grey, lighter than the dark roof under them (the gaps)
+const CATHEDRAL_SLATE = Object.freeze({ rowH: 1.1, colW: 1.8, color: [0.40, 0.43, 0.50] });   // the slates of the great roofs: blue-grey, lighter than the dark roof under them (the gaps); city13: 1.1 x 1.8 m (was 0.95 x 1.5) pays for the LOD2 landmarks
 
 /** A slim octagonal needle from the radius r at y0 to the tip. */
 function needle(soup, x, z, r, y0, yTip, color, yaw = Math.PI / 8) {
@@ -319,7 +319,7 @@ export function buildCathedral({ buildings, ground }) {
       const A = [xo, yA + 0.2, nz0 + 2.0], B = [xo, yA + 0.2, nz1], Cc = [xi, yA + K.aisleRise, nz1], D = [xi, yA + K.aisleRise, nz0 + 2.0];
       soup.quad(A, B, Cc, D, paint(C.slateGrey, 80 + side, 0.05));
       soup.quad(D, Cc, B, A, paint(C.slateGrey, 82 + side, 0.05));
-      slateFace(soup, A, B, D, Cc, { ...CATHEDRAL_SLATE, rowH: 0.8, colW: 1.3, key: 90 + side });
+      slateFace(soup, A, B, D, Cc, { ...CATHEDRAL_SLATE, key: 90 + side });   // city13: the default slate (was 0.8 x 1.3 m)
       for (let z = nz0 + 6; z < nz1 - 3; z += 8) soup.box((xo + xi) / 2, yA + K.aisleRise * 0.5 + 0.2, z, 1.1, 0.9, 1.1, 0, paint(C.sandstoneLight, z, 0.03));   // a roof dormer on every aisle roof
     }
     // ---- the transept: a stone box with a roof of its own, a rose window at each end
@@ -343,7 +343,7 @@ export function buildCathedral({ buildings, ground }) {
       walls.push(...edgeWalls(arc, 0.3, 'cathedral-apse'));
       const apex = [ax, yE + A.roofRise, az - 0.5];
       const rim = poly.map((p) => [p[0], yE, p[1]]);
-      rim.forEach((p, i) => { const q = rim[(i + 1) % rim.length]; if (i >= A.faces) { soup.tri(p, q, apex, paint(C.slateRoof, 120 + i, 0.05)); return; } soup.tri(p, q, apex, paint(C.slateRoof, 120 + i, 0.05)); slateFace(soup, p, q, apex, apex, { ...CATHEDRAL_SLATE, rowH: 0.85, colW: 1.3, key: 140 + i }); });
+      rim.forEach((p, i) => { const q = rim[(i + 1) % rim.length]; if (i >= A.faces) { soup.tri(p, q, apex, paint(C.slateRoof, 120 + i, 0.05)); return; } soup.tri(p, q, apex, paint(C.slateRoof, 120 + i, 0.05)); slateFace(soup, p, q, apex, apex, { ...CATHEDRAL_SLATE, key: 140 + i }); });
       for (let i = 0; i < A.faces; i++) {
         const f = edgeFrame([arc[i], arc[i + 1], [arc[i + 1][0], arc[i + 1][1] - 4], [arc[i][0], arc[i][1] - 4]], 0);
         course(soup, f, high - 0.4, high + 1.2, 0.35, C.sandstoneDark, 150 + i);                       // the plinth

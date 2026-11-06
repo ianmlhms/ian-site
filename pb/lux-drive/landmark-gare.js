@@ -12,7 +12,8 @@
  * Same contract as the other landmark builders: { soup, walls, hideBuildings, hideDecks, info }; it stands on the ground at every corner. */
 import { Soup, axisFrame, paint } from './landmark-soup.js';
 import { PALETTE as C } from './landmark-palette.js';
-import { edgeWalls, groundRange, blocksNear } from './landmark-util.js';
+import { edgeWalls, blocksNear, insidePoly, scalePoly, distanceToPolygon } from './landmark-util.js';
+import { lod2Buildings, addLod2, lod2Base, lod2StreetWalls, lod2FootWalls, lod2Windows } from './landmark-lod2.js';
 import { edgeFrame, windowGrid, slab, panel, roundArch } from './landmark-facade.js';
 
 const SINK = 1.0;                       // m, the walls go this far under the ground (the ground is a carved lattice: no cracks)
@@ -56,51 +57,24 @@ const STONE_DARK = [0.70, 0.65, 0.52];  // the plinth and the courses
 const COPPER = [0.50, 0.62, 0.56];      // the weathered copper of the tower roofs (light green-grey)
 const CLOCK = [0.94, 0.94, 0.90];
 const SLATE = [0.27, 0.29, 0.33];       // the slate of the roofs: darker and greyer than the cathedral's blue-grey in the photographs
+const ZINC = [0.46, 0.47, 0.48];        // the flat roofs between the hip roofs (grey zinc / bitumen in the aerial photographs)
 
 const GARE = Object.freeze({
-  base: 10.5,                 // m: the stone mass of the whole outline (two storeys), the roofs and the taller parts stand on it
   floor: 4.6,
-  tower: { s0: 23.0, s1: 29.2, u0: -5.6, u1: 0.6, shaft: 25.5, clock: 21.5, clockR: 1.6 },
-  hall: { s0: 29.2, s1: 44.3, u0: -30, u1: 3.2, eave: 14.5, rise: 8, arch: { w: 7.0, y0: 7.2, h: 5.6 }, marquise: { y: 5.0, out: 3.8 } },
-  // the wings (s0, s1, u0, u1, eave, rise of the hip roof, dormers on the front)
-  wings: [
-    { s0: -2.4, s1: 23.0, u0: -18.0, u1: -2.4, eave: 11.5, rise: 6.5, dormers: 6 },     // (the back half under it is the flat roof of the stone mass)
-    { s0: 44.3, s1: 56.0, u0: -6.4, u1: 0.0, eave: 11.0, rise: 4.5, dormers: 2 },
-    { s0: 44.3, s1: 94.0, u0: -33.6, u1: -16.5, eave: 10.8, rise: 5.5, dormers: 0 },
-  ],
-  pavilion: { eave: 9.0, rise: 9.5 },
+  // city13: the tower on the LOD2 survey's square (s 26.5 - 31.0, u -3.6 - 1.3: 4.5 m, slimmer than city12's guess), shaft to the survey's 29.8 m
+  tower: { s0: 26.5, s1: 31.0, u0: -3.6, u1: 1.3, shaft: 29.8, clock: 24.5, clockR: 1.35 },
+  // the main hall's front: the survey's gable wall stands at u 3.7 - 4.0; the porch (glazed marquise) in front of it, u 4 - 8.2, up to 7.1 m
+  hall: { s0: 31.6, s1: 46.0, u1: 4.05, eave: 18.6, arch: { w: 7.0, y0: 7.6, h: 5.6 }, porch: { s0: 30.5, s1: 47.0, u0: 4.3, top: 7.6 } },
   glassHall: 9.8,             // m: the height of the glass hall (under the cornice of the old building)
   mullionPitch: 2.8,
+  minFace: 0.6,               // m^2: smaller faces of the survey (chimney pots, slivers) are left out
   clearing: 60,               // m: no baked block may stand inside the model (an error, the model would be inside a house)
 });
-
-/** A hipped roof over the rectangle s0..s1 x u0..u1 from yEave, the ridge along the longer side. */
-function hipRoof(soup, F, s0, s1, u0, u1, yEave, rise, color) {
-  const ls = s1 - s0, lu = u1 - u0;
-  const inset = Math.min(ls, lu) / 2;
-  const P = (s, u, y) => F.at(s, y, u);
-  const A = P(s0, u0, yEave), B = P(s1, u0, yEave), Cc = P(s1, u1, yEave), D = P(s0, u1, yEave);
-  if (ls >= lu) {
-    const r0 = P(s0 + inset, (u0 + u1) / 2, yEave + rise), r1 = P(s1 - inset, (u0 + u1) / 2, yEave + rise);
-    soup.quad(A, B, r1, r0, paint(color, 1, 0.03)); soup.quad(Cc, D, r0, r1, paint(color, 2, 0.03));
-    soup.tri(D, A, r0, paint(color, 3, 0.03)); soup.tri(B, Cc, r1, paint(color, 4, 0.03));
-  } else {
-    const r0 = P((s0 + s1) / 2, u0 + inset, yEave + rise), r1 = P((s0 + s1) / 2, u1 - inset, yEave + rise);
-    soup.quad(B, Cc, r1, r0, paint(color, 1, 0.03)); soup.quad(D, A, r0, r1, paint(color, 2, 0.03));
-    soup.tri(A, B, r0, paint(color, 3, 0.03)); soup.tri(Cc, D, r1, paint(color, 4, 0.03));
-  }
-}
 
 /** A box in the frame: s0..s1 x u0..u1, from y0 up by h. */
 function frameBox(soup, F, s0, s1, u0, u1, y0, h, color, opts = {}) {
   const [cx, , cz] = F.at((s0 + s1) / 2, 0, (u0 + u1) / 2);
   soup.box(cx, y0, cz, s1 - s0, h, u1 - u0, Math.atan2(-F.dz, F.dx), color, opts);
-}
-
-/** The walls of the rectangle s0..s1 x u0..u1 from y0 to y1 (no top: a roof goes there). */
-function frameWalls(soup, F, s0, s1, u0, u1, y0, y1, color) {
-  const pts = [[s0, u0], [s1, u0], [s1, u1], [s0, u1]].map(([s, u]) => F.xz(s, u));
-  soup.prism(pts, y0, y1, color, { top: false });
 }
 
 /** The clock tower: the shaft, the clocks, cornice and balustrade, the copper bell roof, the open belfry, a small dome, the lantern, the needle. */
@@ -113,7 +87,7 @@ function buildTower(soup, F, ground, yBase, K) {
   const yTop = yBase + T.shaft;
   soup.prism(corners, corners.map(([x, z]) => ground(x, z) - SINK), yTop, paint(STONE, 41, 0.02), { top: false });
   frameBox(soup, F, T.s0 - 0.25, T.s1 + 0.25, T.u0 - 0.25, T.u1 + 0.25, yBase - 0.5, 2.2, STONE_DARK);                // the plinth
-  for (const y of [yBase + 10.5, yBase + 17.0]) frameBox(soup, F, T.s0 - 0.15, T.s1 + 0.15, T.u0 - 0.15, T.u1 + 0.15, y, 0.45, STONE_DARK);   // string courses
+  for (const y of [yBase + 11.0, yBase + 19.5]) frameBox(soup, F, T.s0 - 0.15, T.s1 + 0.15, T.u0 - 0.15, T.u1 + 0.15, y, 0.45, STONE_DARK);   // string courses
   // corner pilasters (the shaft reads as a framed tower, not a box)
   for (const [s, u] of [[T.s0, T.u0], [T.s1, T.u0], [T.s1, T.u1], [T.s0, T.u1]]) {
     const ds = s === T.s0 ? 0.35 : -0.35, du = u === T.u0 ? 0.35 : -0.35;
@@ -159,36 +133,23 @@ function buildTower(soup, F, ground, yBase, K) {
   return yb + 9.6 - yBase;
 }
 
-/** The main hall: walls up to its eave, the front gable with the great window between paired columns, the transverse roof, the marquise. */
-function buildHall(soup, F, yBase, K) {
+/** The main hall's front (the survey has its gable wall, roof and porch): the great round-arched window with its mullions between paired
+ *  columns on pedestals, the entablature and a cartouche - in front of the survey's wall. */
+function buildHallFront(soup, F, yBase, K) {
   const H = K.hall;
-  const yEave = yBase + H.eave, yApex = yEave + H.rise;
-  frameWalls(soup, F, H.s0, H.s1, H.u0, H.u1, yBase + K.base, yEave, paint(STONE, 51, 0.02));
-  // the transverse gable roof (ridge along u) and the stone gable on the front
   const sm = (H.s0 + H.s1) / 2;
-  const P = (s, u, y) => F.at(s, y, u);
-  soup.quad(P(H.s0, H.u0, yEave), P(H.s0, H.u1, yEave), P(sm, H.u1, yApex), P(sm, H.u0, yApex), paint(SLATE, 53, 0.03));
-  soup.quad(P(H.s1, H.u1, yEave), P(H.s1, H.u0, yEave), P(sm, H.u0, yApex), P(sm, H.u1, yApex), paint(SLATE, 54, 0.03));
-  soup.tri(P(H.s0 - 0.3, H.u1 + 0.3, yEave - 0.4), P(H.s1 + 0.3, H.u1 + 0.3, yEave - 0.4), P(sm, H.u1 + 0.3, yApex + 0.6), paint(STONE, 55, 0.02));
-  soup.tri(P(H.s0, H.u0, yEave), P(sm, H.u0, yApex), P(H.s1, H.u0, yEave), paint(STONE, 56, 0.02));
-  // the front plane (a frame: s along the front, out = towards the square)
   const f = { yaw: Math.atan2(-F.dz, F.dx), at: (s, y, out = 0) => F.at(s, y, H.u1 + out), len: H.s1 - H.s0 };
   const A = H.arch;
   roundArch(soup, f, sm, yBase + A.y0, A.w, A.h, STONE_DARK, C.glassDark, 10);
   for (const ds of [-A.w / 4, 0, A.w / 4]) panel(soup, f, sm + ds - 0.09, sm + ds + 0.09, yBase + A.y0, yBase + A.y0 + A.h + (ds === 0 ? A.w / 2 : A.w * 0.43), 0.13, STONE_DARK);   // the mullions
   panel(soup, f, sm - A.w / 2, sm + A.w / 2, yBase + A.y0 + A.h * 0.55 - 0.09, yBase + A.y0 + A.h * 0.55 + 0.09, 0.13, STONE_DARK);
-  // paired columns on pedestals either side of the window, an entablature over them; a cartouche at the top of the gable
+  const yEave = yBase + H.eave;
   for (const sc of [H.s0 + 1.3, H.s0 + 2.5, H.s1 - 2.5, H.s1 - 1.3]) {
-    slab(soup, f, sc - 0.36, sc + 0.36, yBase + 5.6, yBase + 7.0, 0.85, STONE_DARK);
-    slab(soup, f, sc - 0.3, sc + 0.3, yBase + 7.0, yEave - 0.9, 0.7, paint(STONE, Math.round(sc * 7), 0.03));
+    slab(soup, f, sc - 0.36, sc + 0.36, yBase + H.porch.top, yBase + H.porch.top + 1.2, 0.85, STONE_DARK);
+    slab(soup, f, sc - 0.3, sc + 0.3, yBase + H.porch.top + 1.2, yEave - 0.9, 0.7, paint(STONE, Math.round(sc * 7), 0.03));
   }
   slab(soup, f, H.s0 + 0.6, H.s1 - 0.6, yEave - 0.9, yEave - 0.3, 0.95, STONE_DARK, { topColor: STONE });
-  slab(soup, f, sm - 1.4, sm + 1.4, yEave + 2.0, yEave + 4.6, 0.4, STONE_DARK);
-  // the doors under the marquise, the marquise itself (dark steel and glass hanging from the front)
-  for (const ds of [-4.5, 0, 4.5]) roundArch(soup, f, sm + ds, yBase + 0.05, 2.6, 2.8, STONE_DARK, C.glassDark, 6);
-  const M = H.marquise;
-  const [mx, mz] = F.xz(sm, H.u1 + M.out / 2);
-  soup.box(mx, yBase + M.y, mz, H.s1 - H.s0 - 0.6, 0.45, M.out, f.yaw, C.steelDark, { bottom: true, topColor: C.glassBlue });
+  slab(soup, f, sm - 1.4, sm + 1.4, yEave + 1.0, yEave + 3.4, 0.4, STONE_DARK);
 }
 
 /** The glass hall of 2012: glass walls with steel mullions on the edges that are not shared with the stone building, a flat roof. */
@@ -211,53 +172,61 @@ function buildGlassHall(soup, ground, yBase, K) {
   soup.prism(HALL, yTop, yTop + 0.6, C.white, { topColor: paint(C.glassBlue, 3, 0.02) });   // the roof: a white steel edge, glass on top
 }
 
+/** The tower's square in the world (no window of the station on it). */
+const TOWER_BOX = (F) => { const T = GARE.tower; return [[T.s0 - 0.4, T.u0 - 0.4], [T.s1 + 0.4, T.u0 - 0.4], [T.s1 + 0.4, T.u1 + 0.4], [T.s0 - 0.4, T.u1 + 0.4]].map(([s, u]) => F.xz(s, u)); };
+
+/** A face of the survey: where it is in the frame of the building (s along the front, u out to the square). */
+const inBox = (F, info, s0, s1, u0, u1) => { const [s, u] = F.local(info.cx, info.cz); return s > s0 && s < s1 && u > u0 && u < u1; };
+
 export function buildGare({ buildings, ground }) {
   const K = GARE;
   const F = axisFrame(ORIGIN[0], ORIGIN[1], ORIGIN[0] + ALONG[0] * 100, ORIGIN[1] + ALONG[1] * 100);
   // the frame's u must point to the square (the front): it is the side of the tram platforms (5300, 10060)
   if (F.local(5300, 10060)[1] <= 0) throw new Error('Gare: the frame does not face the Place de la Gare');
+  const survey = lod2Buildings('gare', ['main']);
+  // no baked block may stand inside the survey (the bake missed the station; a block there would be a house inside the model)
   for (const b of blocksNear(buildings, ...ORIGIN, K.clearing, 200)) {
-    if (b.pts.some((p) => F.local(p[0], p[1])[0] > -2 && F.local(p[0], p[1])[0] < 56 && F.local(p[0], p[1])[1] > -30 && F.local(p[0], p[1])[1] < 0)) {
-      throw new Error(`Gare: block ${b.id} of the bake stands inside the station`);
-    }
+    const [cx, cz] = b.pts.reduce((a, p) => [a[0] + p[0] / b.pts.length, a[1] + p[1] / b.pts.length], [0, 0]);
+    if (survey[0].roofs.some((r) => insidePoly(r.map((p) => [p[0], p[1]]), cx, cz))) throw new Error(`Gare: block ${b.id} of the bake stands inside the station`);
   }
   const soup = new Soup();
-  const { high } = groundRange(ground, STATION_FRONT);
-  const yBase = high;
-  // the stone mass of the whole outline (two storeys), the plinth, the cornice; the windows of both storeys on every long edge
-  soup.prism(STATION_FRONT, STATION_FRONT.map(([x, z]) => ground(x, z) - SINK), yBase + K.base, paint(STONE, 1, 0.02), { topColor: SLATE });
-  soup.prism(PAVILION, PAVILION.map(([x, z]) => ground(x, z) - SINK), yBase + K.pavilion.eave, paint(STONE, 2, 0.02), { top: false });
-  const apex = F.at(...[-6.3, yBase + K.pavilion.eave + K.pavilion.rise, -27.6]);
-  soup.pyramid(PAVILION, yBase + K.pavilion.eave, apex, paint(SLATE, 3, 0.04));
-  for (let e = 0; e < STATION_FRONT.length; e++) {
-    const f = edgeFrame(STATION_FRONT, e);
-    if (f.len < 4.5) continue;
-    const [ms, mu] = F.local((f.a[0] + f.b[0]) / 2, (f.a[1] + f.b[1]) / 2);
-    if (ms > K.hall.s0 - 0.5 && ms < K.hall.s1 + 0.5 && mu > -1) continue;           // the main hall's front has its own window
-    slab(soup, f, 0, f.len, yBase - 0.6, yBase + 1.1, 0.25, STONE_DARK, { topColor: STONE_DARK });
-    slab(soup, f, 0, f.len, yBase + K.base - 0.6, yBase + K.base, 0.45, STONE_DARK, { topColor: STONE });
-    windowGrid(soup, f, { s0: 0.8, s1: f.len - 0.8, y0: yBase + 1.6, rows: 2, floorH: K.floor, w: 1.5, h: 2.7, pitch: 3.4, frame: STONE_DARK, glass: C.glassDark, key: e * 13 });
+  const yBase = lod2Base(survey, ground);
+  const T = K.tower, P = K.hall.porch;
+  // the glass hall's own faces (on or inside its outline, not on the station's): built below as glass and steel
+  const glassOnly = (info) => distanceToPolygon(HALL, info.cx, info.cz) < 1.0 && distanceToPolygon(STATION_FRONT, info.cx, info.cz) > 0.5;
+  const isTower = (info) => inBox(F, info, T.s0 - 0.3, T.s1 + 0.3, T.u0 - 0.3, T.u1 + 0.3);
+  const isPorch = (info) => info.top < P.top && inBox(F, info, P.s0, P.s1, P.u0, 12);
+  let key = 0;
+  // the survey: sandstone walls, slate on the steep roofs, copper on the ornaments high on the gables, grey zinc on the flat roofs;
+  // the tower and the glass hall are built below (their survey faces are left out), the porch is the glazed marquise
+  const lod = addLod2(soup, survey, {
+    base: yBase, ground, minArea: K.minFace,
+    colorOf: (ring, info, kind) => {
+      key += 1;
+      if (isTower(info) || glassOnly(info)) return null;
+      if (isPorch(info)) return kind === 'wall' && info.slope > 60 ? paint(C.glassDark, key, 0.05) : paint(C.steelDark, key, 0.04);   // the marquise: dark steel over glazed doors
+      if (kind === 'wall' || info.slope > 75) return paint(STONE, key, 0.025);
+      if (info.slope > 20) return paint(info.top > 24 ? COPPER : SLATE, key, 0.03);
+      return paint(ZINC, key, 0.03);
+    },
+  });
+  // the windows of both storeys on every street wall of the survey (not on the tower, the porch or the glass hall), the plinth under them
+  const streetWalls = lod2StreetWalls(survey, { base: yBase, ground, minLen: 3.4, minHeight: 4.6 });
+  let windows = 0;
+  for (const [i, w] of streetWalls.entries()) {
+    if (isTower(w.info) || isPorch(w.info) || glassOnly(w.info)) continue;
+    windows += lod2Windows(soup, w, { base: yBase, y0: yBase + 1.6, floorH: K.floor, w: 1.5, h: 2.7, pitch: 3.4, frame: STONE_DARK, glass: C.glassDark, key: i * 13,
+      skip: ([x, , z]) => insidePoly(TOWER_BOX(F), x, z) || (F.local(x, z)[0] > K.hall.s0 - 1 && F.local(x, z)[0] < K.hall.s1 + 1 && F.local(x, z)[1] > 2) });
   }
-  // the wings: upper walls from the stone mass to their eaves, hip roofs, dormers on the front slope
-  for (const [i, w] of K.wings.entries()) {
-    const yEave = yBase + w.eave;
-    if (w.eave > K.base) frameWalls(soup, F, w.s0, w.s1, w.u0, w.u1, yBase + K.base, yEave, paint(STONE, 10 + i, 0.02));
-    hipRoof(soup, F, w.s0 - 0.4, w.s1 + 0.4, w.u0 - 0.4, w.u1 + 0.4, yEave, w.rise, SLATE);
-    const slope = w.rise / (Math.min(w.s1 - w.s0, w.u1 - w.u0) / 2 + 0.4);                // every face of a hip roof runs in by half the shorter side
-    for (let k = 0; k < w.dormers; k++) {
-      const s = w.s0 + ((k + 0.5) * (w.s1 - w.s0)) / w.dormers;
-      const u = w.u1 + 0.4 - 1.6, y = yEave + 1.6 * slope;                                  // the dormer's front stands 1.6 m in from the eave
-      frameBox(soup, F, s - 0.8, s + 0.8, u - 1.4, u, yEave, y + 1.3 - yEave, paint(STONE, 20 + k, 0.03), { topColor: SLATE });
-      const fr = { yaw: Math.atan2(-F.dz, F.dx), at: (ss, yy, out = 0) => F.at(ss, yy, u + out) };
-      panel(soup, fr, s - 0.45, s + 0.45, y - 0.2, y + 1.0, 0.04, C.glassDark);
-    }
-  }
-  buildHall(soup, F, yBase, K);
+  buildHallFront(soup, F, yBase, K);
   const towerHeight = buildTower(soup, F, ground, yBase, K);
   buildGlassHall(soup, ground, yBase, K);
+  // collision: the OSM outlines (station, glass hall), and the feet of the survey's walls outside them (the north wing, the pavilion)
   const hallOnly = HALL.filter((p) => !STATION.some((q) => Math.hypot(p[0] - q[0], p[1] - q[1]) < 0.05));
-  const walls = [...edgeWalls(STATION_FRONT, 0.3, 'gare'), ...edgeWalls(PAVILION, 0.3, 'gare'), ...edgeWalls(HALL, 0.3, 'gare-hall').filter((w) => hallOnly.some((p) => Math.hypot(p[0] - w.ax, p[1] - w.az) < 0.05 || Math.hypot(p[0] - w.bx, p[1] - w.bz) < 0.05))];
-  return { soup, walls, hideBuildings: [], hideDecks: [], info: { tower: Math.round(towerHeight), base: Math.round(yBase) } };
+  const outside = streetWalls.filter((w) => !insidePoly(scalePoly(STATION_FRONT, 1.02), w.info.cx, w.info.cz) && !insidePoly(HALL, w.info.cx, w.info.cz));
+  const walls = [...edgeWalls(STATION_FRONT, 0.3, 'gare'), ...lod2FootWalls(outside, 0.3, 'gare-wing'),
+    ...edgeWalls(HALL, 0.3, 'gare-hall').filter((w) => hallOnly.some((p) => Math.hypot(p[0] - w.ax, p[1] - w.az) < 0.05 || Math.hypot(p[0] - w.bx, p[1] - w.bz) < 0.05))];
+  return { soup, walls, hideBuildings: [], hideDecks: [], info: { tower: Math.round(towerHeight), base: Math.round(yBase), surveyFaces: lod.faces, surveyDropped: lod.dropped, surveyTris: lod.triangles, windows } };
 }
 
 export const GARE_OUTLINES = Object.freeze({ station: STATION_FRONT, pavilion: PAVILION, hall: HALL });

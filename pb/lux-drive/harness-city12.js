@@ -1,6 +1,6 @@
 /* Lux Drive harness, section U (city12): the city centre a player who knows Luxembourg drives through first (QA3 section 3 and the walls of section 4).
- *   U1  the Gare Centrale stands (the bake has no block for the station): a stone building on the OSM outline with a clock tower of at least 35 m, standing on the
- *       ground at every corner (nothing floats), no baked block inside it, collision walls on its whole outline, and no road for cars (other than the
+ *   U1  the Gare Centrale stands (the bake has no block for the station): the LOD2 survey (city13) with a clock tower of at least 35 m, standing on the
+ *       ground at every foot of its walls (nothing floats), no baked block inside it, collision walls on its whole outline, and no road for cars (other than the
  *       pedestrian forecourt) inside it
  *   U2  the Pont Rouge reads as the Red Bridge from the deck: safety screens of slats on both sides, at least 3 m over the deck
  *   U3  the Place de la Gare is paved (no lawn blobs): the cells of the paved squares are paved stone and city in the GPU cover
@@ -11,6 +11,7 @@
  * Called by harness.js; everything it needs is passed in.  Pure Node. */
 import { WALL_LOOK, WALL_PART_KIND as WALL_KIND, wallQuads, drawnWalls } from './retaining-walls.js';
 import { GARE_OUTLINES } from './landmark-gare.js';
+import { lod2Buildings } from './landmark-lod2.js';
 import { PAVED_SQUARES } from './paved-squares.js';
 import { CLASS_CELL, DENSE_CENTRE, builtCover, urbanLook2 } from './world-map.js';
 import { insidePoly, footprintOf } from './landmark-util.js';
@@ -32,15 +33,21 @@ export function runCity12Checks({ check, section, stats, data, surface, landmark
   if (gare) {
     const st = GARE_OUTLINES.station;
     const lowest = Math.min(...st.map(([x, z]) => groundAt(x, z)));
+    // city13: the station is the LOD2 survey (landmark-lod2.js): every foot of a survey wall the model draws reaches under the ground there
     const pos = gare.soup.pos;
-    let floating = 0;
-    for (const [x, z] of st) {                                   // a wall vertex at every corner reaches under the ground there
-      let low = Infinity;
-      for (let i = 0; i < pos.length; i += 3) if (Math.abs(pos[i] - x) < 0.05 && Math.abs(pos[i + 2] - z) < 0.05) low = Math.min(low, pos[i + 1]);
+    const columns = new Map();                                   // the lowest vertex of the model per 5 cm column
+    for (let i = 0; i < pos.length; i += 3) { const k = `${Math.round(pos[i] * 20)},${Math.round(pos[i + 2] * 20)}`; columns.set(k, Math.min(columns.get(k) ?? Infinity, pos[i + 1])); }
+    let feet = 0, drawn = 0, floating = 0;
+    for (const b of lod2Buildings('gare', ['main'])) for (const r of b.walls) for (const [x, z, y] of r) {
+      if (y > 0.3) continue;
+      feet++;
+      const low = columns.get(`${Math.round(x * 20)},${Math.round(z * 20)}`);
+      if (low === undefined || low > groundAt(x, z) + 3) continue;   // a face the model leaves out (the tower, the glass hall, a sliver): only a roof corner above
+      drawn++;
       if (!(low <= groundAt(x, z) + 1e-3)) floating++;
     }
     const tower = gare.top - lowest;
-    check(`U1 the station stands on the ground at all ${st.length} corners and its tower is >= ${TOWER_MIN} m`, floating === 0 && tower >= TOWER_MIN, `${floating} corners floating, top ${tower.toFixed(1)} m over the lowest corner`);
+    check(`U1 the station stands on the ground at every foot of its survey walls (>= 80 % of ${feet} drawn) and its tower is >= ${TOWER_MIN} m`, floating === 0 && drawn >= feet * 0.8 && tower >= TOWER_MIN, `${floating} of ${drawn} drawn feet floating, top ${tower.toFixed(1)} m over the lowest corner`);
     const inside = buildingsRaw.filter((b) => { const pts = footprintOf(b); const c = pts.reduce((a, p) => [a[0] + p[0] / pts.length, a[1] + p[1] / pts.length], [0, 0]); return insidePoly(st, c[0], c[1]); });
     check('U1 no baked block stands inside the station', inside.length === 0, inside.map((b) => b.id).join(',') || 'none');
     const walls = landmarks.walls.filter((w) => w.id === 'gare');

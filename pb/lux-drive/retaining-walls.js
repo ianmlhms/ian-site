@@ -149,6 +149,8 @@ export const WALL_LOOK = Object.freeze({
 // the colours of the kinds (wall-material.js draws the joints and the grain on top): Luxembourg sandstone, grey limestone, poured concrete, a pale concrete coping
 const STONE_OF = Object.freeze({ 0: [0.66, 0.58, 0.45], 1: [0.57, 0.56, 0.52], 2: [0.62, 0.61, 0.58] });
 const COPING_COLOR = [0.55, 0.54, 0.52];
+const FOOT_WINDOW = 2;                  // points: the footing's top is the highest need this many points either side ...
+const FOOT_SLOPE = 0.12;                // ... and changes by at most this many m per m along the wall
 const BANK_COLOR = [0.40, 0.45, 0.27];  // the earth and grass of the bank behind the coping (wall-material.js KIND back: a mottled ground colour, never a box of stone)
 const FOOTING_SHADE = 0.86;             // the footing's front is the stone of the wall, this much darker (a stepped base, not a pale bench)
 const scaleColor = (c, k) => [c[0] * k, c[1] * k, c[2] * k];
@@ -222,7 +224,12 @@ export function wallQuads(wall, groundAt = null) {
     if (groundAt) for (let d = 0.1; d <= WALL_LOOK.footReach + 1e-6; d += 0.2) up = Math.max(up, groundAt(p.x - p.nx * d, p.z - p.nz * d) - p.bottom);
     return Math.min(WALL_LOOK.footMax, up + WALL_LOOK.footOver, Math.max(0.02, (p.top - p.bottom) * 0.5));
   });
-  const footH = rawFoot.map((f, i) => Math.min(Math.max(f, rawFoot[i - 1] ?? 0, rawFoot[i + 1] ?? 0), Math.max(0.02, (pts[i].top - pts[i].bottom) * 0.5)));
+  // (city13, QA3 N3-W07: the max of a point and its two neighbours still stepped up and down every few metres, and the lit top of the footing read as a white zigzag
+  // line along the wall.  The top is the envelope of FOOT_WINDOW points either side, and it climbs and falls at most FOOT_SLOPE m/m: a calm line, never lower than needed)
+  const env = rawFoot.map((_, i) => Math.max(...rawFoot.slice(Math.max(0, i - FOOT_WINDOW), i + FOOT_WINDOW + 1)));
+  for (let i = 1; i < env.length; i++) env[i] = Math.max(env[i], env[i - 1] - FOOT_SLOPE * (along[i] - along[i - 1]));
+  for (let i = env.length - 2; i >= 0; i--) env[i] = Math.max(env[i], env[i + 1] - FOOT_SLOPE * (along[i + 1] - along[i]));
+  const footH = env.map((f, i) => Math.min(f, Math.max(0.02, (pts[i].top - pts[i].bottom) * 0.5)));
   const footing = pts.map((p, i) => {
     const y0 = p.bottom - WALL.skirt, y1 = p.bottom + footH[i];
     return { low: [p.x - p.nx * WALL_LOOK.footOut, y0, p.z - p.nz * WALL_LOOK.footOut], high: [p.x - p.nx * WALL_LOOK.footOut, y1, p.z - p.nz * WALL_LOOK.footOut],
