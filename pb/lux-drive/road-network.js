@@ -624,6 +624,8 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   const GROUP = carriageways.groupOf;
   // ---- the width tapers: along every carriageway chain the half width of the tarmac is the lower envelope of slope 1 / WIDTH_TAPER of the half widths of its ways (the narrowing is laid in
   // the wider way, the narrow way keeps its own width; a short wider way - a turning lane - ramps up from both ends as far as it can).  Per sample of a carved way: the change of its half width.
+  // Only the carved ways narrow each other: tapering a road to the OSM width of the bridge way at a deck end narrowed it beside the other carriageway of a split (Échangeur de Kirchberg
+  // 11833 at deck 104 / 105: the link fell off its level across the outer lane of deck 105, an 8 cm jolt, harness Q1).
   const taperDhw = new Array(roads.length).fill(null);
   {
     const prepOf = new Map(prep.map((p) => [p.ri, p]));
@@ -646,7 +648,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
           const sc = q.w.rev ? q.b - c.arc[i] : q.a + c.arc[i];          // the place of the sample along the chain
           let hw = q.hw;
           for (const o of span) {
-            if (o === q || o.hw >= hw) continue;
+            if (o === q || o.hw >= hw || !o.pr) continue;              // (a deck way is not carved: the deck is drawn at its own width and meets the road with its own apron, decks.js)
             const dist = sc < o.a ? o.a - sc : sc > o.b ? sc - o.b : 0;
             const v = o.hw + dist / WIDTH_TAPER;
             if (v < hw) hw = v;
