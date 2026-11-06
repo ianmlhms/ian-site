@@ -18,7 +18,7 @@ const RUN_DEV = 0.6;          // m: the most a face of a straight facade may sta
 const EPS_OUT = 0.04;         // m: a window stands this far in front of its face (no z-fighting)
 const RUN_GAP = 1.6;          // m: the longest jog between two faces of one facade
 
-/** The buildings of a landmark key ('gare', 'etoile', 'hamilius'), optionally only some roles: [{ role, osm, roofs, walls }] with
+/** The buildings of a landmark key of landmark-lod2-data.js ('gare'), optionally only some roles: [{ role, osm, roofs, walls }] with
  *  polygons as [[x, z, y], ...] in the world frame (y over the survey's ground of that building). */
 export function lod2Buildings(key, roles = null) {
   const entry = LOD2[key];
