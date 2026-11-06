@@ -10,6 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadWorld } from './world_node.mjs';
 import { WALL, CUT_RAMP, findRamp, encodeWalls, rampTolerance } from '../../pb/lux-drive/retaining-walls.js';
+import { PORTAL } from '../../pb/lux-drive/config.js';
 
 const OUT_DEFAULT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../pb/lux-drive/data/walls.bin');
 const outArg = process.argv.find((a) => a.startsWith('--out='));
@@ -31,11 +32,21 @@ const TAPER_LENGTH = 2.5;      // m: the ends of a wall run out into the ground 
 const TAPER_HEIGHT = 0.12;     // m: the height of the tip of a tapered end above the ground
 const FOOT_PROBE = 1.0, FOOT_DROP = 1.5;   // m: the ground a metre in front of the foot of the face lies at most this under the bottom of the ramp.  Lower, the ramp goes on down below the foot (the scan
                                // split a face of 7 m between two carriageways at a flat spot): a wall there would stand in the air on the slope, open to the car from below (wall-collider levelReach)
+const APPROACH_DUG = 2.0;      // m: on the way that leads into the mouth of an opened cut, a steep face that the carve dug at least this far below the land (somewhere on it) is the cut's face going on
+                               // (CUT_RAMP): the road was cut into the hillside there too (QA2 N-U03: Rue Godchaux runs 100 m along the foot of a hill of 2 m/m before its cut, the car
+                               // climbed that bank 15 m before the mouth and rolled 65 deg).  A face the land has anyway (dug less) stays the land's own slope.
+const CUT_JOIN_GAP = 2;       // the walls of a cut and of the ways into its mouths are joined across a gap of up to this many LINK_FRONT (the samples of two ways do not meet at the mouth)
 const GAP_SAMPLES = 1;         // a wall goes on across a sample where the scan found nothing (the ramp flickers around its thresholds), if the ground under the middle of the bridge fits
 
 const { field, surface } = await loadWorld();
 const net = field.network;
 const chains = net.chains.filter((c) => !c.tagged && !net.overRoads.has(c.road));
+/** The ways that lead into the mouth of an opened cut: an end of theirs within PORTAL.mouthGap of an end of a cut way. */
+const chainEnds = (c) => [[c.x[0], c.z[0]], [c.x[c.x.length - 1], c.z[c.z.length - 1]]];
+const cutMouths = chains.filter((c) => net.roads[c.road].openCut).flatMap(chainEnds);
+const approachWays = new Set(chains.filter((c) => !net.roads[c.road].openCut
+  && chainEnds(c).some(([x, z]) => cutMouths.some(([mx, mz]) => Math.hypot(x - mx, z - mz) <= PORTAL.mouthGap))).map((c) => c.road));
+let approachRamps = 0;
 
 const covered = new Map();      // grid of the points already written
 const cellKey = (x, z) => Math.floor(x / COVER_CELL) * 100003 + Math.floor(z / COVER_CELL);
@@ -71,12 +82,18 @@ function wallPointAt(chain, i, side) {
     const t = t0 + k * WALL.scanStep, x = chain.x[i] + nx * t, z = chain.z[i] + nz * t;
     heights[k] = field.height(x, z); lands[k] = field.groundHeight(x, z);
   }
-  // (the cut of an opened tunnel: a wall wherever its face is steep, retaining-walls.js CUT_RAMP; the face ends where the ground meets the land again - the hillside above it
-  // is the land's own, Rue Godchaux: 15 m of hill over a 3 m cut)
+  // (the cut of an opened tunnel: a wall wherever its face is steep, retaining-walls.js CUT_RAMP, its lowest WALL.maxRise metres; the face ends where the ground meets the land
+  // again - the hillside above it is the land's own)
   const cut = !!net.roads[chain.road].openCut;
   let end = count;
   if (cut) { let k = 1; while (k < count && heights[k] < lands[k] - CUT_MEETS_LAND) k++; end = Math.min(count, k + 1); }
-  const ramp = findRamp(end < count ? heights.subarray(0, end) : heights, end < count ? lands.subarray(0, end) : lands, WALL.scanStep, cut ? CUT_RAMP : WALL);
+  let ramp = findRamp(end < count ? heights.subarray(0, end) : heights, end < count ? lands.subarray(0, end) : lands, WALL.scanStep, cut ? CUT_RAMP : WALL);
+  if (!ramp && approachWays.has(chain.road)) {
+    const face = findRamp(heights, lands, WALL.scanStep, CUT_RAMP);
+    let dug = -Infinity;
+    for (let k = face ? face.first : 0; face && k <= face.last; k++) dug = Math.max(dug, lands[k] - heights[k]);
+    if (dug >= APPROACH_DUG) { ramp = face; approachRamps++; }
+  }
   if (!ramp) return null;
   // the foot of the face is the low end of the ramp; the block reaches back to its high end
   const rising = ramp.rise > 0;
@@ -155,7 +172,7 @@ for (const chain of chains) {
         const body = extend(run).map((p) => ({ x: p.x, z: p.z, top: p.top, bottom: p.bottom, depth: p.depth, nx: p.nx, nz: p.nz }));
         if (wallLength(body) < MIN_LENGTH && Math.max(...run.map((p) => p.rise)) < MIN_RISE_SHORT) { short++; run = []; return; }
         const pts = taper(body);
-        walls.push({ pts, slope: Math.max(...run.map((p) => p.slope)), rise: Math.max(...run.map((p) => p.rise)), way: chain.road });
+        walls.push({ pts, body, slope: Math.max(...run.map((p) => p.slope)), rise: Math.max(...run.map((p) => p.rise)), way: chain.road });
       }
       run = [];
     };
@@ -177,10 +194,38 @@ for (const chain of chains) {
   for (let w = firstOfChain; w < walls.length; w++) for (const p of walls[w].pts) cover(p);
 }
 
+// The face of a cut goes on from one way to the next (the cut and the ways into its mouths are ways of their own): their walls are joined into one where the end of the one
+// and the start of the next agree, instead of two tapered ends that meet in a notch down to the ground at the mouth (Rue Godchaux).
+const isCutWall = (w) => net.roads[w.way].openCut || approachWays.has(w.way);
+let joined = 0;
+for (let again = true; again;) {
+  again = false;
+  for (const a of walls) {
+    if (!isCutWall(a) || a.body.length < 2) continue;
+    const end = a.body[a.body.length - 1];
+    const prev = a.body[a.body.length - 2];
+    const onward = (w) => {                                       // the next wall goes on in the same direction (two walls of one face that run back over each other are not joined)
+      const s = w.body[0], s1 = w.body[1], tx = end.x - prev.x, tz = end.z - prev.z;
+      return (s.x - end.x) * tx + (s.z - end.z) * tz > 0 && (s1.x - s.x) * tx + (s1.z - s.z) * tz > 0;
+    };
+    const b = walls.find((w) => w !== a && isCutWall(w) && w.body.length > 1 && link(end, w.body[0], CUT_JOIN_GAP) && onward(w));
+    if (!b) continue;
+    const s = b.body[0];
+    const mid = { ...end, x: (end.x + s.x) / 2, z: (end.z + s.z) / 2, top: (end.top + s.top) / 2, bottom: (end.bottom + s.bottom) / 2, depth: (end.depth + s.depth) / 2 };
+    if (!fits(mid) || !clearOfRoads(mid.x, mid.z) || !clearOfRoads(mid.x + mid.nx * mid.depth, mid.z + mid.nz * mid.depth)) continue;
+    const body = [...a.body, mid, ...b.body];
+    walls.splice(walls.indexOf(b), 1);
+    walls.splice(walls.indexOf(a), 1, { ...a, body, pts: taper(body), slope: Math.max(a.slope, b.slope), rise: Math.max(a.rise, b.rise) });
+    joined++; again = true;
+    break;
+  }
+}
+
 fs.writeFileSync(OUT, encodeWalls(walls));
 const points = walls.reduce((s, w) => s + w.pts.length, 0);
 let length = 0;
 for (const w of walls) for (let i = 1; i < w.pts.length; i++) length += Math.hypot(w.pts[i].x - w.pts[i - 1].x, w.pts[i].z - w.pts[i - 1].z);
+console.log(`the ways into an opened cut: ${approachWays.size}, ${approachRamps} dug faces on them; ${joined} cut walls joined at a mouth`);
 console.log(`walls: ${walls.length} walls, ${points} points, ${length.toFixed(0)} m long -> ${OUT} (${fs.statSync(OUT).size} bytes); ${probed} samples probed, ${found} ramps, ${duplicate} seen twice, ${short} too short, ramps on tarmac: ${rejected.foot} at the foot / ${rejected.back} at the back, ${rejected.air} in the air`);
 if (process.argv.includes('--stats')) {
   const bins = [0.8, 1.5, 2.5, 4, 6, 8.01];

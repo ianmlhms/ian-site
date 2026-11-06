@@ -3,11 +3,12 @@
  *   O2  every portal sits on its tunnel's end at the mouth, and a drawn road leaves the mouth along its axis with its carriageway in front of the wall
  *       (QA B09: portal blocks standing in the grass beside the road)
  *   O3  a car driven along every opened tunnel way (with its approaches: 13 m/s on a road, 6 m/s in a car park lane) gets through without touching anything
- *       and without a jolt
+ *       (the retaining walls of the cuts too, as in the game: main.js collide) and without a jolt
  *   O4  the real tunnels under hills keep their mouths (René Konen, Cents, the Grouft, Albert Bousser, Rangwee, Desserte Schuman)
  * Called by harness.js; everything it needs is passed in.  Pure Node. */
 import { createCar } from './car.js';
 import { PORTAL } from './config.js';
+import { createWallCollider } from './wall-collider.js';
 
 const RIDE_DT = 1 / 60;
 const RIDE_SPEED = 13;            // m/s: a road (the QA drive test)
@@ -112,10 +113,13 @@ export function runTunnelChecks({ check, section, stats, data, field, surface, g
     `${offEnd} off the end, ${noRoad} without their road ${offList.join('; ')}`);
 
   // ---- O3: drive every opened way with its approaches
-  /** What the car touches at (x, z): a house, a portal, a tree or the edge of the area (null: nothing). */
+  /** What the car touches at (x, z): a house, a retaining wall, a portal, a tree or the edge of the area (null: nothing). */
+  const retaining = createWallCollider(data.walls || [], (x, z) => ground.height(x, z));
   const touch = (x, z, r, y) => {
     const house = buildings.collide(x, z, r);
     if (house) return { hit: house, what: 'house' };
+    const stone = retaining.collide(x, z, r);
+    if (stone) return { hit: stone, what: 'retaining wall' };
     const wall = portals.collide(x, z, r, y);
     if (wall) return { hit: wall, what: 'portal' };
     const tree = ground.onDeck(x, z) ? null : forest.collide(x, z, r);

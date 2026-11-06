@@ -49,16 +49,17 @@ function tint(course, x, z) {
   return 0.88 + 0.16 * (h - Math.floor(h));
 }
 
+/** The face of the cut of an opened shallow tunnel (tunnel-cover.js) is a retaining wall wherever it is steep, however steep the hillside it is cut into (findRamp with these limits
+ *  for the ways of a cut, bake_walls.mjs).  A face that rises higher than maxRise is not dropped as a rock face: the wall holds its lowest maxRise metres (capRise) and the hillside
+ *  goes on above the coping (QA2 N-U03: the Rue Godchaux cut lies at the foot of a hill of 2 m/m that rises 20 m within the scan; the car climbed its bare bank and rolled 65 deg). */
+export const CUT_RAMP = Object.freeze({ maxRise: WALL.maxRise, capRise: true, maxLandSlope: Infinity, naturalFactor: 0, naturalMargin: 0 });
+
 /**
  * The ramp in a profile of the ground across a way.  `heights[k]` and `lands[k]` (the terrain without the roads) at distance k * step.
  * Returns { first, last, rise, maxSlope } (the sample range of the ramp; rise > 0 when the ground rises away from the way) or null.
  * A ramp is a run of ground steeper than toeSlope that has a place steeper than steepSlope and rises (or falls) by at least minRise, and is steeper than the land under it:
  * a cliff that the land has anyway is the shader's business, not a wall.
  */
-/** The face of the cut of an opened shallow tunnel (tunnel-cover.js) is a retaining wall wherever it is steep, however steep the hillside it is cut into and up to the height of the
- *  cut (QA2 N-U03: the car climbed the 60 deg grass bank of the Rue Godchaux cut, 12 m into a hillside of 1.6 m/m): findRamp with these limits for the ways of a cut (bake_walls.mjs). */
-export const CUT_RAMP = Object.freeze({ maxRise: 12, maxLandSlope: Infinity, naturalFactor: 0, naturalMargin: 0 });
-
 export function findRamp(heights, lands, step = WALL.scanStep, limits = WALL) {
   const lim = limits === WALL ? WALL : { ...WALL, ...limits };
   const n = heights.length;
@@ -76,10 +77,20 @@ export function findRamp(heights, lands, step = WALL.scanStep, limits = WALL) {
       landSlope = Math.max(landSlope, Math.abs((lands[m + 1] - lands[m]) / step));
       m++;
     }
-    const rise = heights[m] - heights[k];
+    let lo = k, hi = m;                                                // (the samples of the ramp that are kept: all of it, or its lowest maxRise metres)
+    if (lim.capRise && Math.abs(heights[m] - heights[k]) > lim.maxRise) {
+      const foot = sign > 0 ? k : m;                                   // the low end of the ramp is its foot
+      if (sign > 0) { while (hi > lo + 1 && heights[hi] - heights[foot] > lim.maxRise) hi--; } else { while (lo < hi - 1 && heights[lo] - heights[foot] > lim.maxRise) lo++; }
+      maxSlope = 0; landSlope = 0;
+      for (let q = lo; q < hi; q++) {
+        maxSlope = Math.max(maxSlope, Math.abs(heights[q + 1] - heights[q]) / step);
+        landSlope = Math.max(landSlope, Math.abs(lands[q + 1] - lands[q]) / step);
+      }
+    }
+    const rise = heights[hi] - heights[lo];
     const isRamp = maxSlope >= lim.steepSlope && Math.abs(rise) >= lim.minRise && Math.abs(rise) <= lim.maxRise
       && landSlope <= lim.maxLandSlope && maxSlope > lim.naturalFactor * landSlope + lim.naturalMargin;
-    if (isRamp && (!best || Math.abs(rise) > Math.abs(best.rise))) best = { first: k, last: m, rise, maxSlope };
+    if (isRamp && (!best || Math.abs(rise) > Math.abs(best.rise))) best = { first: lo, last: hi, rise, maxSlope };
     k = m + 1;
   }
   return best;
