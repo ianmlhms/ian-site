@@ -7,6 +7,7 @@
 import { FlatBuilder } from './flat-builder.js';
 import { PAINT_LIGHT_GLSL } from './light-glsl.js';
 import { TUBE, floorOf } from './tunnel-tubes.js';
+// (a tube's two sides may differ: one it shares with a parallel tube is narrower - tunnel-tubes.js pairTubes)
 
 const THREE = window.THREE;
 const STEP = 2;                                  // m between the cross sections of a tube
@@ -78,18 +79,18 @@ function linesOf(tube) {
 /** The inside of one tube into builder b. */
 export function buildInside(tube, b) {
   const st = stationsOf(tube);
-  const ih = tube.innerHalf, clr = tube.clearance;
+  const iL = tube.innerL, iR = tube.innerR, clr = tube.clearance;
   const P = (fr, lat, y) => [fr.x + fr.rx * lat, y, fr.z + fr.rz * lat];
   const floorY = (fr, lat) => floorOf(tube, fr.i, fr.f, lat);
   for (let k = 0; k + 1 < st.length; k++) {
     const a = frameAt(tube, st[k]), c = frameAt(tube, st[k + 1]);
     // the floor: asphalt between the walkways, the walkways pale (the floor faces up: the winding a, c, c', a' seen from above)
     for (let j = 0; j < FLOOR_STRIPS; j++) {
-      const l0 = -ih + (2 * ih * j) / FLOOR_STRIPS, l1 = -ih + (2 * ih * (j + 1)) / FLOOR_STRIPS;
+      const l0 = -iL + ((iL + iR) * j) / FLOOR_STRIPS, l1 = -iL + ((iL + iR) * (j + 1)) / FLOOR_STRIPS;
       b.quad(P(a, l1, floorY(a, l1)), P(c, l1, floorY(c, l1)), P(c, l0, floorY(c, l0)), P(a, l0, floorY(a, l0)), C_ASPHALT);
     }
     for (const side of [-1, 1]) {
-      const lw = side * ih, lk = side * (ih - WALKWAY);
+      const ih = side > 0 ? iR : iL, lw = side * ih, lk = side * (ih - WALKWAY);
       const q = (l0, l1, lift, col) => (side > 0
         ? b.quad(P(a, l1, floorY(a, l1) + lift), P(c, l1, floorY(c, l1) + lift), P(c, l0, floorY(c, l0) + lift), P(a, l0, floorY(a, l0) + lift), col)
         : b.quad(P(a, l0, floorY(a, l0) + lift), P(c, l0, floorY(c, l0) + lift), P(c, l1, floorY(c, l1) + lift), P(a, l1, floorY(a, l1) + lift), col));
@@ -108,14 +109,13 @@ export function buildInside(tube, b) {
     }
     // the ceiling (facing down)
     const ta = tube.floor[a.i] + (tube.floor[a.i + 1] - tube.floor[a.i]) * a.f + clr, tc = tube.floor[c.i] + (tube.floor[c.i + 1] - tube.floor[c.i]) * c.f + clr;
-    const ci = ih - CHAMFER;
-    b.quad(P(a, -ci, ta), P(c, -ci, tc), P(c, ci, tc), P(a, ci, ta), C_CEILING);
+    b.quad(P(a, -(iL - CHAMFER), ta), P(c, -(iL - CHAMFER), tc), P(c, iR - CHAMFER, tc), P(a, iR - CHAMFER, ta), C_CEILING);
   }
   // the light band: lamps along the ceiling, over the edge lines (a little under the ceiling, facing down)
   for (let s = tube.sA + LAMP_EVERY / 2; s + LAMP_LENGTH < tube.sB; s += LAMP_EVERY) {
     const a = frameAt(tube, s), c = frameAt(tube, s + LAMP_LENGTH);
     const ya = tube.floor[a.i] + (tube.floor[a.i + 1] - tube.floor[a.i]) * a.f + clr - 0.04, yc = tube.floor[c.i] + (tube.floor[c.i + 1] - tube.floor[c.i]) * c.f + clr - 0.04;
-    for (const lat of [-(ih - CHAMFER - 0.3), ih - CHAMFER - 0.3]) {
+    for (const lat of [-(iL - CHAMFER - 0.3), iR - CHAMFER - 0.3]) {
       b.quad(P(a, lat - LAMP_WIDTH, ya), P(c, lat - LAMP_WIDTH, yc), P(c, lat + LAMP_WIDTH, yc), P(a, lat + LAMP_WIDTH, ya), C_LAMP);
     }
   }
@@ -141,22 +141,21 @@ function box(b, P, u0, u1, v0, v1, ya, yc, col) {
 }
 
 /** The roof top of a tube at a frame (flat across, over the highest corner of its floor). */
-const roofAt = (tube, fr) => tube.floor[fr.i] + (tube.floor[fr.i + 1] - tube.floor[fr.i]) * fr.f + Math.abs(tube.cross[fr.i]) * tube.outerHalf + tube.roofDepth;
+const roofAt = (tube, fr) => tube.floor[fr.i] + (tube.floor[fr.i + 1] - tube.floor[fr.i]) * fr.f + Math.abs(tube.cross[fr.i]) * tube.outerHalf + tube.roofDepth;   // (as tunnel-tubes.js)
 
 /** The outside of one tube into builder b: the shell (outer walls and roof top) and the headwalls of its two portals.  heightAt: the drawn ground. */
 export function buildOutside(tube, b, heightAt) {
-  const st = stationsOf(tube), oh = tube.outerHalf;
+  const st = stationsOf(tube), oL = tube.outerL, oR = tube.outerR;
   const P = (fr, lat, y) => [fr.x + fr.rx * lat, y, fr.z + fr.rz * lat];
   for (let k = 0; k + 1 < st.length; k++) {
     const a = frameAt(tube, st[k]), c = frameAt(tube, st[k + 1]);
     const ra = roofAt(tube, a) + TUBE.maskLift, rc = roofAt(tube, c) + TUBE.maskLift;
-    const fa = Math.min(floorOf(tube, a.i, a.f, -oh), floorOf(tube, a.i, a.f, oh)) - 1, fc = Math.min(floorOf(tube, c.i, c.f, -oh), floorOf(tube, c.i, c.f, oh)) - 1;
-    b.quad(P(a, oh, ra), P(c, oh, rc), P(c, -oh, rc), P(a, -oh, ra), C_SHELL);                               // the roof top (facing up)
-    b.quad(P(a, oh, fa), P(c, oh, fc), P(c, oh, rc), P(a, oh, ra), C_SHELL);                                 // the right outer wall (facing out)
-    b.quad(P(c, -oh, fc), P(a, -oh, fa), P(a, -oh, ra), P(c, -oh, rc), C_SHELL);                             // the left one
+    const fa = Math.min(floorOf(tube, a.i, a.f, -oL), floorOf(tube, a.i, a.f, oR)) - 1, fc = Math.min(floorOf(tube, c.i, c.f, -oL), floorOf(tube, c.i, c.f, oR)) - 1;
+    b.quad(P(a, oR, ra), P(c, oR, rc), P(c, -oL, rc), P(a, -oL, ra), C_SHELL);                               // the roof top (facing up)
+    b.quad(P(a, oR, fa), P(c, oR, fc), P(c, oR, rc), P(a, oR, ra), C_SHELL);                                 // the right outer wall (facing out)
+    b.quad(P(c, -oL, fc), P(a, -oL, fa), P(a, -oL, ra), P(c, -oL, rc), C_SHELL);                             // the left one
   }
   // the headwalls: a frame of concrete round the open mouth, set into the cut, at each face (v into the tube)
-  const head = oh + TUBE.wing;
   for (const [sFace, into] of [[tube.sA, 1], [tube.sB, -1]]) {
     const fr = frameAt(tube, sFace);
     // u to the right looking INTO the tube, e into it (the tangent of s is (rz, -rx))
@@ -164,18 +163,19 @@ export function buildOutside(tube, b, heightAt) {
     const PP = (u, v, y) => [fr.x + ux * u + ex * v, y, fr.z + uz * u + ez * v];
     const floor0 = floorOf(tube, fr.i, fr.f, 0), top = floor0 + tube.clearance;
     const roof = roofAt(tube, fr);
+    // (u > 0 is the side lat = into: the pillar there ends at that side's head)
+    const headP = into > 0 ? tube.headR : tube.headL, headN = into > 0 ? tube.headL : tube.headR, inP = into > 0 ? tube.innerR : tube.innerL, inN = into > 0 ? tube.innerL : tube.innerR;
     let base = Infinity, behind = -Infinity;
-    for (let u = -head; u <= head + 1e-6; u += head / 4) {
+    for (let u = -headN; u <= headP + 1e-6; u += (headN + headP) / 8) {
       base = Math.min(base, heightAt(fr.x + ux * u - ex * 0.5, fr.z + uz * u - ez * 0.5), heightAt(fr.x + ux * u + ex * (TUBE.headDepth + 0.5), fr.z + uz * u + ez * (TUBE.headDepth + 0.5)));
       behind = Math.max(behind, heightAt(fr.x + ux * u + ex * (TUBE.headDepth + 1.5), fr.z + uz * u + ez * (TUBE.headDepth + 1.5)));
     }
     base = Math.min(base, floor0) - 1.2;
     const wallTop = Math.max(roof + TUBE.parapet, Math.min(behind + 0.2, roof + TUBE.headMax));
-    const ih = tube.innerHalf;
-    box(b, PP, -head, -ih, 0, TUBE.headDepth, base, wallTop, C_HEAD);               // the pillars beside the mouth
-    box(b, PP, ih, head, 0, TUBE.headDepth, base, wallTop, C_HEAD);
-    box(b, PP, -ih, ih, 0, TUBE.headDepth, top, wallTop, C_HEAD);                   // the lintel over it
-    box(b, PP, -head - 0.2, head + 0.2, -0.15, TUBE.headDepth, wallTop, wallTop + 0.25, C_COPING);
+    box(b, PP, -headN, -inN, 0, TUBE.headDepth, base, wallTop, C_HEAD);             // the pillars beside the mouth
+    box(b, PP, inP, headP, 0, TUBE.headDepth, base, wallTop, C_HEAD);
+    box(b, PP, -inN, inP, 0, TUBE.headDepth, top, wallTop, C_HEAD);                 // the lintel over it
+    box(b, PP, -headN - (headN > tube.outerHalf ? 0.2 : 0), headP + (headP > tube.outerHalf ? 0.2 : 0), -0.15, TUBE.headDepth, wallTop, wallTop + 0.25, C_COPING);
   }
 }
 

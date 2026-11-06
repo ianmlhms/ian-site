@@ -9,7 +9,7 @@
  * MASK_MAX segments, the nearest to the camera, inside one bounding box. */
 import { TUBE, exposedStretches, indexAt } from './tunnel-tubes.js';
 
-export const MASK_MAX = 24;               // segments in the shader
+export const MASK_MAX = 40;               // segments in the shader
 const SEGMENT = 4;                        // m: the length of one mask segment
 const OVERLAP = 1.0;                      // m: a segment reaches this far on into its neighbour (the bends), never past a face
 
@@ -24,15 +24,15 @@ const MASK_GLSL = `
       float t = dot(p.xz - A.xy, d) / max(dot(d, d), 1e-6);
       if (t < 0.0 || t > 1.0) continue;
       float tc = t;
-      vec2 q = p.xz - (A.xy + d * tc);
-      if (dot(q, q) > B.z * B.z) continue;
+      float lat = (d.x * (p.z - A.y) - d.y * (p.x - A.x)) / max(length(d), 1e-6);     // (to the right of the segment: x east, z south)
+      if (lat > B.w || -lat > B.z) continue;
       if (p.y < mix(B.x, B.y, tc)) return true;
     }
     return false;
   }
 `;
 
-/** The mask segments of the tubes: [{ ax, az, bx, bz, ta, tb, half, caps }] (ta / tb: the top of the shell at each end). */
+/** The mask segments of the tubes: [{ ax, az, bx, bz, ta, tb, halfL, halfR }] (ta / tb: the top of the shell at each end; halfL / halfR: how far to each side). */
 export function maskSegments(tubes, heightAt) {
   const out = [];
   for (const tube of tubes) {
@@ -50,7 +50,7 @@ export function maskSegments(tubes, heightAt) {
         // 7.8 m past the face of the Rocade de Bonnevoie and hid the road in front of its portal)
         const sa = Math.abs(s - tube.sA) < 0.01 ? s : Math.max(tube.sA, s - OVERLAP), se = Math.abs(e - tube.sB) < 0.01 ? e : Math.min(tube.sB, e + OVERLAP);
         const [ax, az, ta] = at(sa), [bx, bz, tb] = at(se);
-        out.push({ ax, az, bx, bz, ta, tb, half: tube.outerHalf - TUBE.maskInset, caps: 0 });
+        out.push({ ax, az, bx, bz, ta, tb, halfL: tube.outerL - TUBE.maskInset, halfR: tube.outerR - TUBE.maskInset });
       }
     }
   }
@@ -86,7 +86,7 @@ export function createTubeMask(THREE, tubes, heightAt) {
   /** Does the tile (leaf: x0, z0, size) touch a mask segment? */
   function needsMask(leaf) {
     return segments.some((g) => {
-      const r = g.half + 1;
+      const r = Math.max(g.halfL, g.halfR) + 1;
       return Math.max(g.ax, g.bx) + r >= leaf.x0 && Math.min(g.ax, g.bx) - r <= leaf.x0 + leaf.size && Math.max(g.az, g.bz) + r >= leaf.z0 && Math.min(g.az, g.bz) - r <= leaf.z0 + leaf.size;
     });
   }
@@ -97,9 +97,10 @@ export function createTubeMask(THREE, tubes, heightAt) {
     let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
     near.forEach(([, g], k) => {
       uniforms.uTubeA.value[k].set(g.ax, g.az, g.bx, g.bz);
-      uniforms.uTubeB.value[k].set(g.ta, g.tb, g.half, g.caps);
-      x0 = Math.min(x0, g.ax - g.half, g.bx - g.half); x1 = Math.max(x1, g.ax + g.half, g.bx + g.half);
-      z0 = Math.min(z0, g.az - g.half, g.bz - g.half); z1 = Math.max(z1, g.az + g.half, g.bz + g.half);
+      uniforms.uTubeB.value[k].set(g.ta, g.tb, g.halfL, g.halfR);
+      const r = Math.max(g.halfL, g.halfR);
+      x0 = Math.min(x0, g.ax - r, g.bx - r); x1 = Math.max(x1, g.ax + r, g.bx + r);
+      z0 = Math.min(z0, g.az - r, g.bz - r); z1 = Math.max(z1, g.az + r, g.bz + r);
     });
     uniforms.uTubeN.value = near.length;
     uniforms.uTubeBox.value.set(x0, z0, x1, z1);

@@ -28,7 +28,8 @@ export const TUBE = Object.freeze({
   kinds: new Set(['motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary', 'primary_link', 'secondary', 'secondary_link',
     'tertiary', 'tertiary_link', 'unclassified', 'residential']),
   minLength: 25,           // m: a shorter tunnel run is a culvert or a passage under a building, not a tunnel to drive through
-  shoulder: 1.0,           // m beside the carriageway to the wall of the tube (the inner half width is road.width / 2 + shoulder)
+  shoulder: 1.0,           // m beside the carriageway to the wall of the tube (the inner half width is road.width / 2 + shoulder) ...
+  shoulderMin: 0.2,        // ... at least this much on a side it shares with a parallel tube
   wall: 0.6,               // m: the thickness of the walls and the roof slab's edge
   clearance: { motorway: 5.0, motorway_link: 4.9, trunk: 4.8, trunk_link: 4.7, primary: 4.5 },
   clearanceDefault: 4.3,
@@ -40,9 +41,9 @@ export const TUBE = Object.freeze({
   approachRun: 40,         // m of each approach road that is part of the floor problem (its surface is the boundary)
   fixedInside: 4,          // m: the surface outside the mouth is the boundary up to this far before the OSM mouth (the cap of a carved road end rises there)
   blend: 8,                // m in front of each mouth over which the car's ground blends from the surface into the floor of the tube
-  flushIn: 10,             // m: the cross-section of the approach at a face fades into the plane floor over this ...
+  flushIn: 16,             // m: the cross-section of the approach at a face fades into the plane floor over this ...
   flushOut: 0.4,           // ... read this far out of the face ...
-  flushMax: 0.3,           // ... and never more than this off the plane (the cut slope beside a narrow approach is not its road)
+  flushMax: 0.2,           // ... and never more than this off the plane (the cut slope beside a narrow approach is not its road)
   frontBack: 1.2,          // m: the face of a portal stands this far before the place where the drawn terrain rises over the road ...
   frontOut: 12,            // ... but at most this far out of the OSM mouth ...
   frontIn: 3,              // ... or this far into it
@@ -61,7 +62,8 @@ export const TUBE = Object.freeze({
   headMax: 4.0,            // m: ... and covers the land behind it up to this much over the roof top
   maskInset: 0.25,         // m: the terrain is hidden this far inside the outer face of the shell (the wall hides the rest)
   maskLift: 0.03,          // m: ... and up to this much over the roof top
-  exposeMargin: 0.3,       // m: a stretch of the shell whose land lies less than this over the roof is "exposed" (masked and drawn)
+  exposeMargin: 3.2,       // m: a stretch of the shell whose land lies less than this over the roof is "exposed" (masked: the skirts of the terrain tiles hang 2.5 m and more
+                           // under their edges, and from land 1 m over the roof a skirt stood in the tunnel)
   cell: 32,                // m: the spatial hash
   pushMax: 0.8,            // m: the most a wall pushes in one pass
   houseClear: 0.5,         // m: a house over a tube whose land lies less than this over the roof stands in the tube
@@ -79,6 +81,13 @@ export const TUBE = Object.freeze({
  * shows (the hood of a portal) and the terrain inside it is hidden (exposedStretches, tunnel-mask.js).  Held under the land too, the floor of the Cents tunnel dived 1 m
  * just inside its mouth (13 % up and down) for a hill 5.6 m over the road. */
 const OVER_KINDS = new Set([...TUBE.kinds, 'service', 'living_street', 'busway']);
+
+/** The inner half width of a tube on the side of lat (a side next to a parallel tube is narrower: the two share a wall, see pairTubes). */
+export const innerOf = (tube, lat) => (lat >= 0 ? tube.innerR : tube.innerL);
+/** ... and the outer face of its wall on that side. */
+export const outerOf = (tube, lat) => (lat >= 0 ? tube.outerR : tube.outerL);
+/** ... and how far its headwall reaches beside the mouth on that side (no wing on a shared wall). */
+export const headOf = (tube, lat) => (lat >= 0 ? tube.headR : tube.headL);
 
 /** The sample index of a tube at arc length s (the samples are about 1 m apart, not exactly: the index is searched, not s rounded). */
 export function indexAt(tube, s) {
@@ -425,7 +434,8 @@ function buildTube(chain, appA, appB, surface, net, roads, housesNear) {
   }
   const tube = {
     name: way.name || way.kind, label: way.name || '', kind: way.kind, ids: chain.ways.map((r) => r.id), oneway: chain.ways.every((r) => r.oneway), lanes: way.lanes || 1, width,
-    length, innerHalf, outerHalf, clearance, roofDepth,
+    length, innerHalf, outerHalf, innerL: innerHalf, innerR: innerHalf, outerL: outerHalf, outerR: outerHalf, headL: outerHalf + TUBE.wing, headR: outerHalf + TUBE.wing,
+    clearance, roofDepth,
     x: Float64Array.from(pts, (p) => p[0]), z: Float64Array.from(pts, (p) => p[1]), s, tx, tz, floor: f, cross,
     sMouthA, sMouthB, sA: sFa, sB: sFb, flushA: null, flushB: null, upper: Float32Array.from(upper), line: Float32Array.from(t), approachA: appA.road.id, approachB: appB.road.id, grade, curve, curveAt, over, overRoad,
   };
@@ -488,7 +498,40 @@ export function findTubes(roads, surface, net, buildings = null) {
     if (built.reject) { rejected.push({ name, ids, length, why: built.reject, tube: built.tube }); continue; }
     tubes.push(built.tube);
   }
-  return { tubes, rejected };
+  return pairTubes(tubes, rejected);
+}
+
+/**
+ * Two tubes side by side (the two carriageways under the Rond-Point Schuman, 5 m apart at their west mouths; the bores under the Rond-Point Merl) share a wall: on
+ * the side facing the other, a tube's interior ends TUBE.wall / 2 before the line half way between them and its shell at that line (no wing on its headwall).  Their
+ * full width overlapped: the outer wall of one stood in the other.  A tube whose lanes do not fit beside its neighbour stays closed.  Pure: new tube objects.
+ */
+function pairTubes(tubes, rejected) {
+  const out = tubes.map((t) => ({ ...t }));
+  for (let a = 0; a < out.length; a++) {
+    for (let b = 0; b < out.length; b++) {
+      if (a === b) continue;
+      const ta = out[a], tb = out[b];
+      const reach = ta.outerHalf + tb.outerHalf;
+      let gapL = Infinity, gapR = Infinity;
+      for (let i = indexAt(ta, ta.sA); i <= indexAt(ta, ta.sB); i += 2) {
+        for (let j = indexAt(tb, tb.sA); j <= indexAt(tb, tb.sB); j++) {
+          const dx = tb.x[j] - ta.x[i], dz = tb.z[j] - ta.z[i], d = Math.hypot(dx, dz);
+          if (d >= reach) continue;
+          const lat = -ta.tz[i] * dx + ta.tx[i] * dz;          // (the side of ta that tb lies on)
+          if (lat >= 0) gapR = Math.min(gapR, d); else gapL = Math.min(gapL, d);
+        }
+      }
+      if (gapR < Infinity) { ta.innerR = Math.min(ta.innerR, gapR / 2 - TUBE.wall / 2); ta.outerR = Math.min(ta.outerR, gapR / 2); ta.headR = ta.outerR; }
+      if (gapL < Infinity) { ta.innerL = Math.min(ta.innerL, gapL / 2 - TUBE.wall / 2); ta.outerL = Math.min(ta.outerL, gapL / 2); ta.headL = ta.outerL; }
+    }
+  }
+  const kept = [];
+  for (const t of out) {
+    if (Math.min(t.innerL, t.innerR) < t.width / 2 + TUBE.shoulderMin) rejected.push({ name: t.name, ids: t.ids, length: t.length, why: `its lanes do not fit beside the tube next to it (${Math.min(t.innerL, t.innerR).toFixed(2)} m)`, tube: t });
+    else kept.push(t);
+  }
+  return { tubes: kept, rejected };
 }
 
 /**
@@ -559,17 +602,17 @@ export function createTubeNetwork(tubes) {
     if (!locate(x, z, L)) return g;
     const tube = L.tube, s = L.s, a = Math.abs(L.lat);
     if (s < tube.sA - TUBE.blend || s > tube.sB + TUBE.blend) return g;
-    const inner = a <= tube.innerHalf;
+    const inner = a <= innerOf(tube, L.lat);
     if (atLevel(y, L.floor)) {
       if (!inner) return g;
       if (s >= tube.sA && s <= tube.sB) return L.floor;
       // in front of a face: the surface blends into the floor
       const k = s < tube.sA ? smooth01((s - (tube.sA - TUBE.blend)) / TUBE.blend) : smooth01(((tube.sB + TUBE.blend) - s) / TUBE.blend);
-      const side = 1 - smooth01((a - (tube.innerHalf - 1.0)) / 1.0);
+      const side = 1 - smooth01((a - (innerOf(tube, L.lat) - 1.0)) / 1.0);
       return g + (L.floor - g) * k * side;
     }
     // over the tube: where its roof lies above the land (the hood of a portal), the roof carries the car
-    if (s >= tube.sA && s <= tube.sB && a <= tube.outerHalf) {
+    if (s >= tube.sA && s <= tube.sB && a <= outerOf(tube, L.lat)) {
       const roof = L.floor - tube.cross[L.i] * L.lat + Math.abs(tube.cross[L.i]) * tube.outerHalf + tube.roofDepth;
       if (y >= roof - TUBE.roofLift && roof > g) return roof;
     }
@@ -580,7 +623,7 @@ export function createTubeNetwork(tubes) {
   function ceilingAt(x, z, y) {
     if (!locate(x, z, L)) return Infinity;
     const tube = L.tube;
-    if (L.s < tube.sA || L.s > tube.sB || Math.abs(L.lat) > tube.outerHalf) return Infinity;
+    if (L.s < tube.sA || L.s > tube.sB || Math.abs(L.lat) > outerOf(tube, L.lat)) return Infinity;
     if (y > L.floor + tube.clearance + 0.3 || y < L.floor - TUBE.levelBelow) return Infinity;
     return L.floor - tube.cross[L.i] * L.lat + tube.clearance;
   }
@@ -589,7 +632,7 @@ export function createTubeNetwork(tubes) {
   function inside(x, z, y) {
     if (!locate(x, z, L)) return false;
     const tube = L.tube;
-    return L.s >= tube.sA - 0.3 && L.s <= tube.sB + 0.3 && Math.abs(L.lat) <= tube.innerHalf + 0.05 && y >= L.floor - 1.0 && y <= L.floor + tube.clearance;
+    return L.s >= tube.sA - 0.3 && L.s <= tube.sB + 0.3 && Math.abs(L.lat) <= innerOf(tube, L.lat) + 0.05 && y >= L.floor - 1.0 && y <= L.floor + tube.clearance;
   }
 
   /** The name of the tube the car is in ('' unnamed), or null outside: the road name the dashboard shows. */
@@ -606,9 +649,9 @@ export function createTubeNetwork(tubes) {
     if (s < tube.sA - radius - 0.1 || s > tube.sB + radius + 0.1) return null;
     const roofTop = L.floor + tube.roofDepth + Math.abs(tube.cross[L.i]) * tube.outerHalf;
     if (y > roofTop - 0.3 || y < L.floor - TUBE.levelBelow) return null;      // over the roof (the land, a street over it) or far under it
-    const boxes = [[tube.sA, tube.sB, tube.innerHalf, tube.outerHalf]];
-    const head = tube.outerHalf + TUBE.wing;
-    boxes.push([tube.sA, tube.sA + TUBE.headDepth, tube.innerHalf, head], [tube.sB - TUBE.headDepth, tube.sB, tube.innerHalf, head]);
+    const inner = innerOf(tube, lat), head = headOf(tube, lat);
+    const boxes = [[tube.sA, tube.sB, inner, outerOf(tube, lat)]];
+    boxes.push([tube.sA, tube.sA + TUBE.headDepth, inner, head], [tube.sB - TUBE.headDepth, tube.sB, inner, head]);
     let best = null;
     for (const [s0, s1, l0, l1] of boxes) {
       // the circle against the box [s0, s1] x [l0, l1] on the side of the point
