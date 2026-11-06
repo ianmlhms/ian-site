@@ -274,6 +274,35 @@ for (const w of byRise) {
 walls.splice(0, walls.length, ...walls.filter((w) => keptWalls.includes(w)), ...keptWalls.filter((w) => !walls.includes(w)));
 console.log(`walls inside a higher one: ${trimmedInside} trimmed`);
 
+// Two walls of one face whose ends meet (one way's wall goes on as the next one's, or what a trim left of a lower wall meets the higher one) are one wall: two tapered
+// ends that met left a V down to the ground in the face (the A4 under the Merl link, 3112,9993).  Either may run either way along the face.
+let faceJoins = 0;
+const ends = (w) => [{ end: w.body[w.body.length - 1], prev: w.body[w.body.length - 2], body: w.body }, { end: w.body[0], prev: w.body[1], body: w.body.slice().reverse() }];
+for (let again = true; again;) {
+  again = false;
+  search: for (const a of walls) {
+    if (a.body.length < 2) continue;
+    for (const ea of ends(a)) {
+      for (const b of walls) {
+        if (b === a || b.body.length < 2) continue;
+        for (const eb of ends(b)) {
+          const s = eb.end, s1 = eb.prev;                               // b's end that meets a, and the point before it (b's body runs on away from a)
+          const tx = ea.end.x - ea.prev.x, tz = ea.end.z - ea.prev.z;
+          if (!link(ea.end, s, CUT_JOIN_GAP) || (s.x - ea.end.x) * tx + (s.z - ea.end.z) * tz <= 0 || (s1.x - s.x) * tx + (s1.z - s.z) * tz <= 0) continue;
+          const mid = { ...ea.end, x: (ea.end.x + s.x) / 2, z: (ea.end.z + s.z) / 2, top: (ea.end.top + s.top) / 2, bottom: (ea.end.bottom + s.bottom) / 2, depth: (ea.end.depth + s.depth) / 2 };
+          if (!fits(mid) || !clearOfRoads(mid.x, mid.z) || !clearOfRoads(mid.x + mid.nx * mid.depth, mid.z + mid.nz * mid.depth) || !clearOfDecks(mid)) continue;
+          const body = [...ea.body, mid, ...eb.body.slice().reverse()];
+          walls.splice(walls.indexOf(b), 1);
+          walls.splice(walls.indexOf(a), 1, { ...a, body, pts: taper(body), slope: Math.max(a.slope, b.slope), rise: Math.max(a.rise, b.rise) });
+          faceJoins++; again = true;
+          break search;
+        }
+      }
+    }
+  }
+}
+console.log(`walls of one face joined where their ends met: ${faceJoins}`);
+
 fs.writeFileSync(OUT, encodeWalls(walls));
 const points = walls.reduce((s, w) => s + w.pts.length, 0);
 let length = 0;
