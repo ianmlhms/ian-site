@@ -8,6 +8,7 @@ import { createCar } from './car.js';
 import { JUNCTION } from './junction-probe.js';
 import { createWallCollider } from './wall-collider.js';
 import { CAR } from './config.js';
+import { CHANNELS } from './road-network.js';
 
 export const R1_SPEED = 13;            // m/s (the QA drive test)
 const R1_DT = 1 / 60;
@@ -240,7 +241,7 @@ export function levelPairScan({ net, field, maxList = 8 }) {
   }
   const bench = (r) => net.info[r].hw + net.info[r].kerbW;
   const group = net.carriageways.groupOf;
-  const info = { chGroup: new Int32Array(3), chCar: new Float32Array(3), chPave: new Float32Array(3), chMajor: new Uint8Array(3) };
+  const info = { chGroup: new Int32Array(CHANNELS), chCar: new Float32Array(CHANNELS), chPave: new Float32Array(CHANNELS), chMajor: new Uint8Array(CHANNELS) };
   const sdOf = (x, z, g) => { field.height(x, z, info); for (let c = 0; c < 3; c++) if (info.chGroup[c] === g) return info.chCar[c]; return Infinity; };
   const pairs = new Set();
   let samples = 0, bad = 0, worst = 0, worstAt = '';

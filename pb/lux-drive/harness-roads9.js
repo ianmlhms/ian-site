@@ -12,6 +12,7 @@ import { buildMarkingPlan, chainPoint, MARK } from './markings.js';
 import { isMarkedWay } from './carriageways.js';
 import { PORTAL } from './config.js';
 import { portalRoadAt } from './portals.js';
+import { CHANNELS } from './road-network.js';
 
 const PROBE = 0.3;                // m before and after a joint, along the chain
 const MAX_STEP = 0.12;            // m of half width between the two probes (a 1 : 12 taper changes 0.05 over 0.6 m)
@@ -33,7 +34,7 @@ function paintedHalf(net, x, z, group, out) {
 
 export function runRoads9Checks({ check, section, stats, data, net, surface, portals, markDecks }) {
   section('P roads9: widths, lines, portals');
-  const out = { ...net.scratch, chGroup: new Int32Array(3), chCar: new Float32Array(3), chPave: new Float32Array(3), chMajor: new Uint8Array(3) };
+  const out = { ...net.scratch, chGroup: new Int32Array(CHANNELS), chCar: new Float32Array(CHANNELS), chPave: new Float32Array(CHANNELS), chMajor: new Uint8Array(CHANNELS), chCode: new Uint8Array(CHANNELS) };
   const chainOf = new Map(net.chains.map((c) => [c.road, c]));
   const groupOf = net.carriageways.groupOf;
   // ---- P1: the width at the joints of the carriageway chains
