@@ -141,18 +141,14 @@ function wallBottom(ax, az, bx, bz, ay, by, eaveY, heightAt) {
 }
 
 /**
- * Adds one building to the mesh.
- * b: the decoded LOD2 building { id, roof, style, levels, eave, ridge, ridgeDir, pts }.
- * heightAt(x, z): the height of the ground as the game draws it (the land with the roads carved into it).
- * landAt(x, z): the height of the land itself (the DTM): the top of the walls is the height of the eaves above it.
- * drop: how far the walls go down below the ground (m).  The cells far from the car stand on COARSE terrain tiles (up to 16 m
- *   spacing) that differ from the exact ground by a metre or two on a slope: a wall that ends at the exact ground would show a gap
- *   under it or a ledge.  The part below the ground is never seen; the window rows keep their origin at the lowest point of the foot (v < 0 below it).
+ * The frame of a building's walls, exactly as addBuilding stands them (the façades of facade-data.js lie on the very same
+ * walls): the middle of the foot, the eave and ridge levels, the level the storeys count from (`ref`), the height of the
+ * façade over it and every edge of the footprint with its bottom along the ground.  null for a footprint of < 3 points.
  */
-export function addBuilding(m, b, heightAt, landAt, drop = 0) {
+export function facadeFrame(b, heightAt, landAt) {
   const pts = b.pts;
   const n = pts.length / 2;
-  if (n < 3) return;
+  if (n < 3) return null;
   let cx = 0, cz = 0;
   for (let i = 0; i < n; i++) { cx += pts[i * 2]; cz += pts[i * 2 + 1]; }
   cx /= n; cz /= n;
@@ -162,13 +158,6 @@ export function addBuilding(m, b, heightAt, landAt, drop = 0) {
   const groundY = Math.max(landAt(cx, cz), heightAt(cx, cz));
   const eaveY = groundY + b.eave;
   const ridgeY = groundY + b.ridge;
-  const seed = hash01(b.id);
-  // the style byte carries the kind of façade and the bit "there is a shop on the ground floor"
-  const style = (b.style | 0) & 7;
-  const sty = [b.style | 0, Math.max(1, b.levels | 0)];
-  const wall = wallColour(style, seed, b.palette);
-  const roof = roofColour(style, b.roof, seed, b.palette);
-
   // the walls: every edge of the footprint, from the land under it up to the flat eave
   const edges = [];
   for (let i = 0; i < n; i++) {
@@ -187,7 +176,31 @@ export function addBuilding(m, b, heightAt, landAt, drop = 0) {
   let low = Infinity, high = -Infinity;
   for (const e of edges) if (!e.skip) for (const p of e.bottom) { low = Math.min(low, p[1]); high = Math.max(high, p[1]); }
   const ref = Math.min(high, low + LEVEL_OVER_LOW);
-  const facadeH = eaveY - ref;
+  return { cx, cz, groundY, eaveY, ridgeY, ref, facadeH: eaveY - ref, edges };
+}
+
+/**
+ * Adds one building to the mesh.
+ * b: the decoded LOD2 building { id, roof, style, levels, eave, ridge, ridgeDir, pts }.
+ * heightAt(x, z): the height of the ground as the game draws it (the land with the roads carved into it).
+ * landAt(x, z): the height of the land itself (the DTM): the top of the walls is the height of the eaves above it.
+ * drop: how far the walls go down below the ground (m).  The cells far from the car stand on COARSE terrain tiles (up to 16 m
+ *   spacing) that differ from the exact ground by a metre or two on a slope: a wall that ends at the exact ground would show a gap
+ *   under it or a ledge.  The part below the ground is never seen; the window rows keep their origin at the lowest point of the foot (v < 0 below it).
+ * paint: { wall, roof } colours that replace the palette (roof-data.js: the roof colour measured from the ACT photos; wall null = the palette's wall), or null.
+ */
+export function addBuilding(m, b, heightAt, landAt, drop = 0, paint = null) {
+  const frame = facadeFrame(b, heightAt, landAt);
+  if (!frame) return;
+  const { cx, cz, eaveY, ref, facadeH, edges } = frame;
+  const seed = hash01(b.id);
+  // the style byte carries the kind of façade and the bit "there is a shop on the ground floor"
+  const style = (b.style | 0) & 7;
+  const sty = [b.style | 0, Math.max(1, b.levels | 0)];
+  // houses17: a house of the roof area gets the roof colour measured from its ACT photo (roof-data.js); the wall stays the palette's
+  const wall = paint && paint.wall ? paint.wall : wallColour(style, seed, b.palette);
+  const roof = paint && paint.roof ? paint.roof : roofColour(style, b.roof, seed, b.palette);
+
   let along = 0;
   for (const e of edges) {
     if (e.skip) continue;
@@ -213,6 +226,18 @@ export function addBuilding(m, b, heightAt, landAt, drop = 0) {
     along += len;
   }
 
+  for (const f of roofFaces(b, frame)) faceUp(m, f.points, roof, f.kind, seed, f.uvs, f.len, f.up, sty);
+}
+
+/**
+ * The faces of a building's roof (building-mesh.js draws them painted, facade-data.js lays the roof photo on the same ones):
+ * [{ points: [[x, y, z] x 3 or 4], uvs, kind, len, up }].  `frame` is facadeFrame(b, ...).
+ */
+export function roofFaces(b, frame) {
+  const pts = b.pts;
+  const n = pts.length / 2;
+  const { cx, cz, eaveY, ridgeY } = frame;
+  const out = [];
   if (b.roof === 1 && ridgeY > eaveY + 0.2) {
     // A hip roof along the direction of the bake.  The ridge is a line through the middle of the footprint, as long as
     // the footprint reaches along that direction.  Every corner of the eave is joined to the point of the ridge above
@@ -254,9 +279,9 @@ export function addBuilding(m, b, heightAt, landAt, drop = 0) {
       const ra = [ta.x, ridgeY, ta.z], rb = [tb.x, ridgeY, tb.z];
       const uvs = [[eaveAlong, 0], [eaveAlong + len, 0], [eaveAlong + len, tb.up], [eaveAlong, ta.up]];
       if (Math.hypot(rb[0] - ra[0], rb[2] - ra[2]) < 0.05) {
-        faceUp(m, [a, b2, rb], roof, KIND.roof, seed, [[eaveAlong, 0], [eaveAlong + len, 0], [eaveAlong + len, tb.up]], len, tb.up, sty);
+        out.push({ points: [a, b2, rb], uvs: [[eaveAlong, 0], [eaveAlong + len, 0], [eaveAlong + len, tb.up]], kind: KIND.roof, len, up: tb.up });
       } else {
-        faceUp(m, [a, b2, rb, ra], roof, KIND.roof, seed, uvs, len, (ta.up + tb.up) / 2, sty);
+        out.push({ points: [a, b2, rb, ra], uvs, kind: KIND.roof, len, up: (ta.up + tb.up) / 2 });
       }
       eaveAlong += len;
     }
@@ -268,11 +293,11 @@ export function addBuilding(m, b, heightAt, landAt, drop = 0) {
       const ax = pts[i * 2], az = pts[i * 2 + 1], bx = pts[j * 2], bz = pts[j * 2 + 1];
       const len = Math.hypot(bx - ax, bz - az);
       if (len < 0.25) continue;
-      faceUp(m, [[cx, eaveY, cz], [ax, eaveY, az], [bx, eaveY, bz]], roof, KIND.flat, seed,
-        [[0, 0], [eaveAlong, 0], [eaveAlong + len, 0]], len, 0, sty);
+      out.push({ points: [[cx, eaveY, cz], [ax, eaveY, az], [bx, eaveY, bz]], uvs: [[0, 0], [eaveAlong, 0], [eaveAlong + len, 0]], kind: KIND.flat, len, up: 0 });
       eaveAlong += len;
     }
   }
+  return out;
 }
 
 /**
@@ -306,12 +331,13 @@ export function groupByCell(buildings) {
  * buildings: the decoded LOD2 buildings.
  * heightAt(x, z): the height of the ground as the game draws it.
  * landAt(x, z): the height of the land itself.
+ * paintOf(id): the measured { wall, roof } colours of a building, or null (facade-data.js).
  */
-export function buildCellMesh(ids, buildings, heightAt, landAt, drop = 0) {
+export function buildCellMesh(ids, buildings, heightAt, landAt, drop = 0, paintOf = null) {
   const m = createBuildingMesh();
   for (const id of ids) {
     const b = buildings[id];
-    if (b) addBuilding(m, b, heightAt, landAt, drop);
+    if (b) addBuilding(m, b, heightAt, landAt, drop, paintOf ? paintOf(id) : null);
   }
   return { pos: m.pos, nor: m.nor, col: m.col, info: m.info, geo: m.geo, sty: m.sty, idx: m.idx };
 }
