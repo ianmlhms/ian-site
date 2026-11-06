@@ -112,7 +112,12 @@ const NEAR_FROM = 0.05, NEAR_FULL = 0.17;      // the built share of the 24 m wi
 // (city12, QA3 section 3 item 7: the near rule also took the strip between the pavement and the shop fronts of a wide street in the dense centre for a
 // verge - Bd Royal was a lawn corridor.  Where the 72 m window is densely built (the old town and the boulevards 0.33 - 0.73; the lawns of Kirchberg
 // and the JFK verges are 0.0 - 0.21) the urban class is the city whatever the 24 m window says.)
+// Only in the centre (the Ville-Haute, the boulevards, the Gare quarter): the perimeter blocks there have paved fronts and courtyards; a terraced street of the
+// suburbs is as dense in the 72 m window and has lawns behind its houses (Weimershof, Neudorf, Dommeldange kept their gardens: harness U4).
 const DENSE_FROM = 0.26, DENSE_FULL = 0.34;
+export const DENSE_CENTRE = Object.freeze([4300, 8000, 5800, 10400]);     // x0, z0, x1, z1
+/** The urban weight of look2 (the 72 m density x the 24 m near cover), before the dense rule: harness U4 measures what the dense rule changed. */
+export const urbanLook2 = (density, near) => Math.round(255 * Math.min(smooth01(URBAN_FROM, URBAN_FULL, density), smooth01(NEAR_FROM, NEAR_FULL, near)));
 
 /** The cells (8 m) whose middle lies in a paved square, as a 0 / 1 mask. */
 function pavedSquareMask(nx, nz) {
@@ -145,7 +150,10 @@ export function buildWorldMap({ classes, classInfo, canopy, buildings = null }) 
   // carriageway), and the GPU's bilinear filter would carry that dip as a lawn up to the kerb.  The road is painted over the cells anyway.
   const dense = new Float32Array(nx * nz);
   if (density) {
-    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) if (classes.data[j * nx + i] === CLASS.urban) dense[j * nx + i] = smooth01(DENSE_FROM, DENSE_FULL, density[j * nx + i]);
+    const [cx0, cz0, cx1, cz1] = DENSE_CENTRE.map((v) => Math.round(v / CLASS_CELL));
+    for (let j = Math.max(0, cz0); j <= Math.min(nz - 1, cz1); j++) {
+      for (let i = Math.max(0, cx0); i <= Math.min(nx - 1, cx1); i++) if (classes.data[j * nx + i] === CLASS.urban) dense[j * nx + i] = smooth01(DENSE_FROM, DENSE_FULL, density[j * nx + i]);
+    }
   }
   const denseNear = (i, j) => {
     let m = 0;
@@ -171,7 +179,7 @@ export function buildWorldMap({ classes, classInfo, canopy, buildings = null }) 
       coverGpu[o] = square ? 255 : 0; coverGpu[o + 1] = cover[o + 1]; coverGpu[o + 3] = cover[o + 3];
       const d = density ? density[j * nx + i] : 0;
       coverGpu[o + 2] = square ? 255 : density && cls === CLASS.urban
-        ? Math.round(255 * Math.max(Math.min(smooth01(URBAN_FROM, URBAN_FULL, d), smooth01(NEAR_FROM, NEAR_FULL, near[j * nx + i])), denseNear(i, j)))
+        ? Math.max(urbanLook2(d, near[j * nx + i]), Math.round(255 * denseNear(i, j)))
         : cover[o + 2];
     }
   }

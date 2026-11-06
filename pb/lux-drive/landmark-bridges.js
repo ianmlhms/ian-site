@@ -369,6 +369,7 @@ export function buildPontRouge({ decks, ground }) {
   for (const u of [5.2, 7.4]) strip(u - 0.07, u + 0.07, C.steelDark, 9, 0.02);       // the tram tracks
   // the slab edge and the safety screens (city12, QA3 section 3: from the car the bridge was a flat deck with low grey rails; the photographs taken ON
   // the bridge show a red steel upstand, a lit handrail and a tall screen of white slats leaning out over the valley on both sides, on red posts)
+  const slats = [0, 0];                                                                                           // per side (harness U2)
   for (const [u, sign] of [[uMax, 1], [uMin, -1]]) {
     wallFace(soup, F, u, 0, L, under, (s) => top(s) + K.screenFoot, C.steelRed, steps, 10);                       // the red edge girder, up through the deck to the upstand
     deckStrip(soup, F, u - sign * 0.25, u, 0, L, (s) => top(s) + K.screenFoot, C.steelRedDark, steps, 11);       // the top of the upstand
@@ -379,6 +380,7 @@ export function buildPontRouge({ decks, ground }) {
     const at = (s, h, du = 0) => F.at(s, top(s) + h, u - sign * 0.12 + lean(h) + du);
     for (let s = K.slatPitch / 2; s < L; s += K.slatPitch) {                                                    // the slats: flat, see-through between them
       const w = K.slatWidth / 2;
+      slats[sign > 0 ? 0 : 1] += 1;
       soup.quad(at(s - w, K.railing), at(s + w, K.railing), at(s + w, K.screenTop), at(s - w, K.screenTop), paint(C.screenWhite, Math.round(s), 0.03));
     }
     for (let s = K.postPitch / 2; s < L; s += K.postPitch) {                                                    // the red posts: a flat bar across the screen
@@ -461,5 +463,5 @@ export function buildPontRouge({ decks, ground }) {
     const [ax, az] = F.xz(0, u), [bx, bz] = F.xz(L, u);
     return { ax, az, bx, bz, r: K.guardRadius, id: 'pont-rouge' };
   });
-  return { soup, walls, hideDecks: new Set(group.map((d) => d.id)), frame: F, footprints: [deckFootprint(F, top, uMin, uMax)], info: { length: L, uMin, uMax, pylons: pylons.map((p) => Math.round(p)) } };
+  return { soup, walls, hideDecks: new Set(group.map((d) => d.id)), frame: F, footprints: [deckFootprint(F, top, uMin, uMax)], info: { length: L, uMin, uMax, pylons: pylons.map((p) => Math.round(p)), screens: { slats, height: K.screenTop, pitch: K.slatPitch } } };
 }

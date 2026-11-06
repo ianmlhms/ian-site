@@ -55,6 +55,7 @@ import { runRoads9Checks } from './harness-roads9.js';           // section P (r
 import { runDeckChecks } from './harness-decks.js';              // section Q (decks10)
 import { runSurfaceChecks } from './harness-surface.js';         // section R (surface11)
 import { runLookChecks } from './harness-look11.js';             // section S (look11)
+import { runCity12Checks } from './harness-city12.js';           // section U (city12)
 import { runMarkingChecks } from './marking-checks.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -1748,6 +1749,8 @@ if (wants('Q')) runDeckChecks({ check, section, stats, data, field, surface, gro
 if (wants('R')) runSurfaceChecks({ check, section, stats, data, field, surface, ground, net, buildings, portals, playArea });
 /* ---------------------------------------------------------------- S: how the walls, trees, façades and the camera look (harness-look11.js) */
 if (wants('S')) runLookChecks({ check, section, stats, data, field, surface, ground, net, buildings, forest, portals });
+/* ---------------------------------------------------------------- U: the city centre of the first drive, the walls' look (harness-city12.js) */
+if (wants('U')) runCity12Checks({ check, section, stats, data, surface, landmarks, maps, buildingsRaw: data.buildings });
 
 /* ---------------------------------------------------------------- the summary */
 console.log(`\n${results.fail === 0 ? 'PASS' : 'FAIL'}  ${results.pass} checks passed, ${results.fail} failed  (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
