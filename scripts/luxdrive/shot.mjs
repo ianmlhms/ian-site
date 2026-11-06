@@ -30,7 +30,11 @@ const server = http.createServer((req, res) => {
 });
 await new Promise((r) => server.listen(0, "127.0.0.1", r));
 const origin = `http://127.0.0.1:${server.address().port}`;
-const browser = await chromium.launch({ args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist", "--mute-audio"] });
+// macOS renders on the Mac's own GPU (Metal: ~6x faster per shot and every tile loaded before the shot); Linux / the cloud keep software GL.
+// SHOT_GL=swiftshader forces software rendering anywhere.
+const USE_METAL = process.platform === "darwin" && process.env.SHOT_GL !== "swiftshader";
+const GL_ARGS = USE_METAL ? ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist"] : ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"];
+const browser = await chromium.launch({ args: [...GL_ARGS, "--mute-audio"] });
 try {
   const page = await browser.newPage({ viewport: { width: 1180, height: 820 } });
   const errors = [];
