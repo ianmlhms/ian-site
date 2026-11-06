@@ -11,7 +11,8 @@ import { PAINT_CODE } from './road-network.js';
 
 export { PAINT_LIGHT_GLSL };
 
-const MEDIAN_WIDTH = 3.0;       // m: road-network.js MEDIAN_WIDTH (a gap between two carriageways up to this wide is paved as a whole)
+const GUTTER = 0.07;            // m: the dark line of the gutter along the foot of the kerb
+const EDGING = 0.12;            // m: the edging stones along the outer edge of a pavement
 const PAVE_MAX = 5.0;           // m: a pavement reaches at most this far beyond its kerb (look11: the wide pale aprons, QA2 N-T05)
 const MARK_PIXEL = 0.0006;      // rad: a line ribbon is at least this wide per metre of distance (about a pixel at the medium quality) ...
 const MARK_BIAS = 0.03;         // m: ... and pulled this far toward the camera,
@@ -60,8 +61,6 @@ export const GROUND_FRAGMENT = `
   float hash21(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
   // the value of m at the channel nearest by d (the minimum of d)
   float pickMin(vec4 d, vec4 m){ float b = min(min(d.x, d.y), min(d.z, d.w)); return d.x <= b ? m.x : d.y <= b ? m.y : d.z <= b ? m.z : m.w; }
-  // the gap between two carriageways (both outside: a median), or none
-  float gapOf(float a, float b){ return a > 0.0 && b > 0.0 ? a + b : 99.0; }
 
   void main(){
     vec3 N = normalize(vNormal);
@@ -85,7 +84,8 @@ export const GROUND_FRAGMENT = `
     // the wood seen from afar is its canopy, not its floor (the MTB paints it the same way)
     vec3 canopy = mix(vec3(0.19, 0.31, 0.14), vec3(0.32, 0.44, 0.19), smoothstep(0.3, 0.8, nLo.g * 0.6 + nMid.b * 0.5));
     // the ground between the houses: HARD ground (gravel and slabs), never a lawn
-    vec3 city = mix(grav * 0.86, pave * 0.78, 0.45) * (0.94 + 0.08 * nMid.r);
+    // (paint15: a warmer, darker beige than the slabs of a pavement - the two were one tone, QA4 N4-T03)
+    vec3 city = mix(grav * 0.80, pave * 0.70, 0.35) * vec3(1.02, 0.99, 0.93) * (0.94 + 0.08 * nMid.r);
     // the farmland: painted parcels of crops (young wheat, ripe grain, ploughed earth, rape, stubble).  The parcel is a slow
     // noise cut into bands, so it reads as a patchwork of fields from above and never as one grey-brown wash.
     float lum = dot(gTex, vec3(0.30, 0.59, 0.11));
@@ -161,7 +161,7 @@ export const GROUND_FRAGMENT = `
     // of constant width, per pixel, one pixel wide (fwidth), never a staircase.
     // Each of the four CHANNELS (tile-mesh.js carriagewayChannels) is the distance to ONE carriageway, a plane over the cell; the edge is their minimum per pixel (the median
     // between two carriageways is two straight kerbs, not a sawtooth of the lattice), with the REST (aRoad3: the union of the carriageways that got no channel where more meet,
-    // the blurred field of the lattice).  The pavement the same way: the nearest pavement, and the median between two carriageways (a gap of up to MEDIAN_WIDTH) paved as a whole.
+    // the blurred field of the lattice).  The pavement the same way: the nearest pavement (the median between two carriageways at one level is folded into their pavements, road-network.js).
     vec4 dC = vRoad4;
     vec4 isCar = step(${(PAINT_CODE.car - 0.5).toFixed(1)}, vRoad);
     vec4 isStreet = step(${(PAINT_CODE.street - 0.5).toFixed(1)}, vRoad - ${PAINT_CODE.car.toFixed(1)} * isCar);
@@ -169,8 +169,7 @@ export const GROUND_FRAGMENT = `
     float chC = min(min(dC.x, dC.y), min(dC.z, dC.w));
     float restC = vRoad3.x, restMat = vRoad2.z;
     float sdC = min(chC, restC);
-    float medianP = min(min(min(gapOf(dC.x, dC.y), gapOf(dC.x, dC.z)), min(gapOf(dC.x, dC.w), gapOf(dC.y, dC.z))), min(gapOf(dC.y, dC.w), gapOf(dC.z, dC.w))) - ${MEDIAN_WIDTH.toFixed(1)};
-    float sdP = min(min(min(min(vRoad5.x, vRoad5.y), min(vRoad5.z, vRoad5.w)), medianP), vRoad3.y);
+    float sdP = min(min(min(vRoad5.x, vRoad5.y), min(vRoad5.z, vRoad5.w)), vRoad3.y);
     float roadW = smoothstep(0.0, 0.5, vRoad3.z);
     float aaC = max(fwidth(sdC), 0.04), aaP = max(fwidth(sdP), 0.04);
     // The MATERIAL and the TONE per pixel (paint15): a car road lies over the paving of a pedestrian street or square it meets, and a street over the pale tar of a service way at
@@ -211,10 +210,10 @@ export const GROUND_FRAGMENT = `
     float onPave = smoothstep(kerbW - aaC, kerbW + aaC, sdC) * (1.0 - smoothstep(-aaP, aaP, sdP));
     // A kerb and a pavement lie on level ground: on a ramp steeper than 1.3 m/m (the foot of a retaining wall, a cutting beside a junction) the slab texture is a stretched
     // stripe with ragged teeth along the lattice, so the ramp keeps the paint of the land and only the carriageway stays painted.
-    // (look11, QA2 N-T02: the banks between two carriageways at two levels, 30 - 50 deg, were still paved, a pale wedge with the lattice's teeth along both edges: a pavement
-    // and its median are level, so a slope steeper than 0.35 m/m (N.y 0.95) begins to be the land's and one of 0.6 m/m (N.y 0.86) is; the steepest streets of the old town
-    // are 0.2 m/m)
-    float levelK = smoothstep(0.86, 0.95, N.y);
+    // (paint15: from 0.35 - 0.6 m/m back to the steep ramps only.  The slope of the lattice normals made the edge of every pavement and median on a bank an irregular smear of
+    // pale and green - the aprons of the first 150 m of JFK, QA4 N3-T01.  A pavement on falling land is now narrowed by the level of the land under it (road-network.js
+    // PAVE_LEVEL_SLOPE) - a distance field, a clean edge - and the bank between two carriageways at two levels is no median, road-network.js MEDIAN_LEVEL.)
+    float levelK = smoothstep(0.62, 0.72, N.y);
     onKerb *= levelK; onPave *= levelK;
     // (look11, QA2 N-T05 / T11: at junction mouths and along the rural roads the pavement channel widened into 6 - 10 m pale aprons that read as slabs; a pavement is a strip
     // of a few metres beside its kerb)
@@ -228,8 +227,15 @@ export const GROUND_FRAGMENT = `
     paint *= smoothstep(0.80, 0.92, N.y);
 
     albedo = mix(albedo, surf, roadW * onCarriage);
-    albedo = mix(albedo, pave * 0.80, roadW * onKerb);                        // the kerb stone is darker than the slabs
-    albedo = mix(albedo, pave * 0.82, roadW * onPave);
+    // (paint15, QA4 N4-T03: the kerb (0.80) and the slabs (0.82) were one pale tone, and the pavement ran into the pale hard ground of the town without a line - a wide kerbless
+    // apron.  The kerb is a light granite with the dark line of the gutter on the tarmac side, and the pavement ends in a darker edging; both from the distance fields, so
+    // they are straight and of constant width.  Near only: a few centimetres are no line at a distance.)
+    float nearLine = 1.0 - smoothstep(25.0, 60.0, vDist);
+    float kerbD = sdC < 0.0 ? chR : sdC;                                      // (the kerb of a car road along a square lies inside the union: its own distance)
+    float gutter = (1.0 - smoothstep(${GUTTER.toFixed(2)} - aaC, ${GUTTER.toFixed(2)} + aaC, kerbD)) * nearLine;
+    float edging = smoothstep(-${EDGING.toFixed(2)} - aaP, -${EDGING.toFixed(2)} + aaP, sdP) * nearLine;
+    albedo = mix(albedo, pave * mix(0.96, 0.52, gutter), roadW * onKerb);
+    albedo = mix(albedo, pave * mix(0.80, 0.64, edging), roadW * onPave);
     albedo = mix(albedo, vec3(0.84, 0.83, 0.76), paint);
 
     // ---- the weather: the rain darkens the tarmac and the ground

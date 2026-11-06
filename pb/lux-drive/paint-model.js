@@ -5,7 +5,6 @@ import { QUADTREE, ROAD } from './config.js';
 import { diagonalIsMain } from './surface.js';
 import { PAINT_CODE } from './road-network.js';
 
-const MEDIAN_WIDTH = 3.0;        // m: ground-shader.js MEDIAN_WIDTH
 const PAVE_MAX = 5.0;            // m: ground-shader.js PAVE_MAX
 const AA = 0.04;                 // m: the narrowest edge blend of the shader (max(fwidth, 0.04)): the edges seen from close by
 const FAR = 30;                  // m: "no street near" (ground-shader.js dS)
@@ -32,7 +31,6 @@ export function varyingsAt(mesh, x, z) {
 }
 
 const pickMin = (d, m) => { let k = 0; for (let c = 1; c < 4; c++) if (d[c] < d[k]) k = c; return m[k]; };
-const gapOf = (a, b) => (a > 0 && b > 0 ? a + b : 99);
 
 /**
  * The road paint of the shader from its varyings (ground-shader.js, "the road"): the signed distances of the edges (sdC carriageway, sdP pavement, chS the nearest street), the
@@ -47,8 +45,7 @@ export function paintOf(v, aa = AA) {
   const chC = Math.min(...dC);
   const restC = v.road3[0], restMat = v.road2[2];
   const sdC = Math.min(chC, restC);
-  const medianP = Math.min(gapOf(dC[0], dC[1]), gapOf(dC[0], dC[2]), gapOf(dC[0], dC[3]), gapOf(dC[1], dC[2]), gapOf(dC[1], dC[3]), gapOf(dC[2], dC[3])) - MEDIAN_WIDTH;
-  const sdP = Math.min(...v.road5, medianP, v.road3[1]);
+  const sdP = Math.min(...v.road5, v.road3[1]);
   const roadW = smoothstep(0, 0.5, v.road3[2]);
   const dS = dC.map((d, k) => (isStreet[k] ? d : FAR)), dR = dC.map((d, k) => (isCar[k] ? d : FAR));
   const chS = Math.min(...dS), chR = Math.min(...dR);
@@ -65,7 +62,7 @@ export function paintOf(v, aa = AA) {
   const kerbR = matRoad < 2.5 && matOwn > 0.5 ? ROAD.kerbWidth : 0;
   onKerb = Math.max(onKerb, onCarriage * (1 - inRoad) * (1 - smoothstep(kerbR - aa, kerbR + aa, chR)));
   let onPave = smoothstep(kerbW - aa, kerbW + aa, sdC) * (1 - smoothstep(-aa, aa, sdP));
-  const levelK = smoothstep(0.86, 0.95, v.ny);
+  const levelK = smoothstep(0.62, 0.72, v.ny);
   onKerb *= levelK; onPave *= levelK;
   onPave *= 1 - smoothstep(PAVE_MAX, PAVE_MAX + 0.6, sdC - kerbW);
   // the material painted (the larger share; the shader blends the colours over the edge pixel)

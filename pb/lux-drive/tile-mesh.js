@@ -95,6 +95,7 @@ export const PAINT_SLOTS = 4;           // the channels of the GPU (aRoad4 / aRo
 export const CH_PAVE = PAINT_SLOTS, CH_CODE = 2 * PAINT_SLOTS, CH_REST = 3 * PAINT_SLOTS;    // (the offsets of the parts of a node's channel record; the rest: carriageways, pavements, streets, the material of its nearest)
 export const CHANNEL_STRIDE = CH_REST + 4;
 export const CHANNEL_FAR = 30;          // m: "no such carriageway" (a distance that never wins the minimum)
+const BLUR_REACH = 1.5;                 // m per m of the node spacing (see the blur in carriagewayChannels)
 const PAINT_REACH = 6.0;                // m: a carriageway's paint shows at most this far past its edge (its kerb and pavement, ground-shader.js PAVE_MAX + 0.95; a median: 3)
 export function carriagewayChannels(chGroup, chCar, chPave, chCode, step = 1) {
   const n = APRON_SIDE * APRON_SIDE;
@@ -160,8 +161,11 @@ export function carriagewayChannels(chGroup, chCar, chPave, chCode, step = 1) {
     for (let i = 1; i < APRON_SIDE - 1; i++) {
       const o = j * APRON_SIDE + i;
       for (const c of blurred) {
+        // (a neighbour counts at most BLUR_REACH away from the node's own value: a distance changes by at most a diagonal of the lattice, and a channel pushed off its level
+        // - 8 m per m of the level, road-network.js PAINT_LEVEL_PUSH - would drag the node across its edge: a point well inside the tarmac lost its paint, gate M3)
+        const own = raw[o * CHANNEL_STRIDE + c], lo = own - BLUR_REACH * step, hi = own + BLUR_REACH * step;
         let sum = 0;
-        for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) sum += W[dj + 1] * W[di + 1] * raw[((j + dj) * APRON_SIDE + i + di) * CHANNEL_STRIDE + c];
+        for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { const v = raw[((j + dj) * APRON_SIDE + i + di) * CHANNEL_STRIDE + c]; sum += W[dj + 1] * W[di + 1] * (v < lo ? lo : v > hi ? hi : v); }
         out[o * CHANNEL_STRIDE + c] = sum / 16;
       }
     }
