@@ -2068,3 +2068,20 @@ stills (city12's free-camera poses, `poses_first5cam.json`), `refs/` Commons pho
 * **JFK side-street aprons (f02 - f13) and the ragged edges at the Rond-Point Schuman (f21): NOT fixed** - measured: the urban class weight is 0 there (`classmap.mjs`), the grey
   blobs are the junction paint of the service way / JFK service road / cycleway mouths (blurred union where the channels fail, ground-shader sdC / sdP), the green fringe the
   lattice's union contour beside the median.  A real fix is the junction paint (exact edges for 3+ ways), not attempted.
+
+### Shots
+The reviewer's GPU shot tools (82905fad, cherry-picked as f0bba4ba: `shot.mjs` renders on Metal, no pending tiles) were used for every montage: `gpu_before/` (v57 tree) and
+`gpu_after/` (= `final/`) over the same 68 poses (`poses_all.json`: Gare, cathedral, walls, junctions, the first-five-minutes poses f02 - f51).
+
+### Gates (final tree) - ALL PASS
+`harness.js` **156 / 156** (`city13/gate_harness.txt`; landmarks 56 132 of 60 000 triangles, campus unchanged); `luxdrive_world` PASS, draw calls low 113 / medium 150 /
+high 210; `luxdrive_holes` medium 0 / low 0 hole pixels (72 poses each); `luxdrive_ui` PASS; `luxdrive_webkit.mjs` PASS.  `pb/lux-drive.html` main.js `?v=59`.
+Montages (`~/Library/Caches/luxdrive-work/city13/montages/`): `1_gare.jpg` (photo | v57 | city13), `1_cathedral_slates.jpg`, `3_etoile_lod2_tried.jpg`,
+`3_hamilius_lod2_tried.jpg` (why they were not swapped), `4_walls.jpg`, `4_junctions.jpg` (unchanged), `first5_f02 / f12 / f22 / f32 / f42.jpg` (QA3 frame | v57 | city13).
+
+### Still wrong (honest)
+* Étoile / Royal-Hamilius / the other train-simulator models: not swapped (see 2-3); the real way (survey shapes through the building shader) is not built.
+* Gare: no lettering on the glass hall; the porch is a dark box (no door arches: they would be inside the survey's porch); the platform roof block 15153 behind is still the bake's;
+  the north wing's windows are the generic grid; the tower's details are city12's (not surveyed).
+* Walls: W03 sawtooth teeth (geometry), the w014 grey smear, a thin dark edge at the wall ends, the footing's top still reads as a pale ledge on wall 76.
+* Junction paint: the JFK side-street aprons and the ragged edge at the Rond-Point Schuman are unchanged.
