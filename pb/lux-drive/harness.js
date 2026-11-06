@@ -53,6 +53,7 @@ import { runBridgeChecks } from './harness-bridges.js';          // section N (b
 import { runTunnelChecks } from './harness-tunnels.js';          // section O (bridges8)
 import { runRoads9Checks } from './harness-roads9.js';           // section P (roads9)
 import { runDeckChecks } from './harness-decks.js';              // section Q (decks10)
+import { runSurfaceChecks } from './harness-surface.js';         // section R (surface11)
 import { runMarkingChecks } from './marking-checks.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -1742,6 +1743,8 @@ if (wants('O')) runTunnelChecks({ check, section, stats, data, field, surface, g
 if (wants('P')) runRoads9Checks({ check, section, stats, data, field, surface, ground, net, portals, buildings, forest, playArea, markDecks: deckNetwork.decks.filter((d) => !landmarks.hiddenDecks.has(d.id)) });
 /* ---------------------------------------------------------------- Q: decks driven end to end, banks under deck ends, medians, camera (harness-decks.js) */
 if (wants('Q')) runDeckChecks({ check, section, stats, data, field, surface, ground, net, buildings, portals, playArea });
+/* ---------------------------------------------------------------- R: the carriageway smooth over its whole width, every lane driven (harness-surface.js) */
+if (wants('R')) runSurfaceChecks({ check, section, stats, data, field, surface, ground, net, buildings, portals, playArea });
 
 /* ---------------------------------------------------------------- the summary */
 console.log(`\n${results.fail === 0 ? 'PASS' : 'FAIL'}  ${results.pass} checks passed, ${results.fail} failed  (${((Date.now() - t0) / 1000).toFixed(1)} s)`);

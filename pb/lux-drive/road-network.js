@@ -47,6 +47,8 @@ const GROUNDED_MATCH = 2.0;            // m: a deck belongs to a way when both i
 const GROUNDED_MAX_LENGTH = 16.0;      // m: a narrow deck at most this long ...
 const GROUNDED_MAX_DIP = 1.0;          // m: ... over land that dips less than this under it spans nothing (see groundedDeckOf)
 const APPROACH_FREE = 20.0;            // m: the last metres of a way that runs onto a bridge are its approach: its carriageway there is not protected (see carve(), protHere)
+const APPROACH_FREE_FADE = 10.0;       // m: ... fading in over this before them (a switch at APPROACH_FREE let go of a junction sheet 20 cm under the bed in one lattice step: Clausener Bierg 6031,8528, a car in
+                                       // either lane took 30 - 40 m/s2 there)
 const ABUT_HOLD = 2.0;                 // m: ... and its carriageway is held at its own level this far under the bridge (the cap of the way starts fading only there, the protection only ramps up
                                        // from there): the 1 m lattice under the first metres of the deck is the road, so the deck starts flush on a level surface, not on the edge of the drop
 const DECK_TUCK = 0.08, DECK_TUCK_FROM = 0.4, DECK_TUCK_RUN = 1.0;   // m: under its deck the carriageway of an approach way lies this much lower, reached between these distances past the end of
@@ -59,6 +61,8 @@ const MAX_PINS = 16;                   // carriageways that lie over one point, 
 export const CHANNELS = 3;              // the paint channels: the nearest carriageways whose edges the shader takes exactly (tile-mesh.js carriagewayChannels)
 const MAX_CAND = 192;                  // segments that reach one point, at most
 const FOOT_FADE = 1.0, FOOT_FLOOR = 0.01;   // m: a segment counts fully when the foot of the perpendicular is this far from its ends; the floor of its weight (so the weights never all vanish)
+const STATION_FADE = 0.5;              // m: two segments of a way hand over across the mitre line of their joint (see the station in carve()) within this either side of it
+const STATION_EXTRAPOLATE = 1.0;        // segment lengths: the bed of a segment is read at most this far past its ends (continued along its end tangent) at an inner joint of its way
 const SHEPARD_OFFSET = 0.5, SHEPARD_MIN = 1e-4;   // the weight of a segment of a way is ((d_nearest + 0.5) / (d + 0.5))^4: equal at equal distance, a few per cent at twice the distance               // m: the segments of a way that are this much farther than its nearest one still count for the ground (weighted by how much nearer the nearest is)
 const ARM_GAP = 3;                     // segments: two stretches of one way this far apart are different arms (a hairpin)
 const ARM_DETOUR_LO = 6.0, ARM_DETOUR_HI = 12.0;   // m: the ground of a way at a point is the pin of the ARM it passes on; a segment whose foot lies this much farther along the way than straight across from the
@@ -777,6 +781,41 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   const cells = new Map();
   for (const [key, list] of buckets) cells.set(key, Int32Array.from(list));
   const EMPTY = new Int32Array(0);
+  // the first hash cell of every segment's box: a segment that spans two cells of the 3 x 3 cells around a point is listed in both, and it is taken only from the first of them that the
+  // neighbourhood holds.  (It was taken twice: its bed counted double in the Shepard mean of its way, and at a vertex of a graded road, 6 m off the centre line, the doubled bed of
+  // the next segment but one lifted the carriageway by up to 6.7 cm in a spike half a metre long - the washboard of QA2 N-D01, the A1 east)
+  const HCX = new Int32Array(count), HCZ = new Int32Array(count);
+  for (let i = 0; i < count; i++) { HCX[i] = Math.floor(MINX[i] / CELL); HCZ[i] = Math.floor(MINZ[i] / CELL); }
+  // ---- the STATION of a point off the centre line: the mitre normals.  At every inner joint of a way the normal is the bisector of its two segments (the normal at an end of the way, and
+  // at the seam of a ring, is its segment's own); across a segment the normal turns linearly from the one at its start to the one at its end.  The station of a point is where the normal
+  // through it meets the centre line: continuous across every joint, and moving at a smooth speed along any line parallel to the way.  The foot of the perpendicular (the old station) stood
+  // still across the wedge outside every bend and jumped across the overlap inside it: on a graded road the carriageway off the centre line stepped by grade x offset x bend angle.
+  const MNX0 = new Float32Array(count), MNZ0 = new Float32Array(count), MNX1 = new Float32Array(count), MNZ1 = new Float32Array(count);
+  const INNER0 = new Uint8Array(count), INNER1 = new Uint8Array(count);   // the start / end of the segment is an inner joint of its way (its bed may be read past it)
+  for (let i = 0; i < count; i++) {
+    const r = ROADOF[i], first = firstSeg[r], last = first + segCount[r] - 1;
+    const dir = (k) => { const ex = X1[k] - X0[k], ez = Z1[k] - Z0[k], l = Math.hypot(ex, ez) || 1; return [ex / l, ez / l]; };
+    const [ux, uz] = dir(i);
+    let [ax, az] = [ux, uz], [bx, bz] = [ux, uz];
+    if (i > first) { const [px, pz] = dir(i - 1); if (px * ux + pz * uz > 0) { ax = px + ux; az = pz + uz; INNER0[i] = 1; } }
+    if (i < last) { const [qx, qz] = dir(i + 1); if (qx * ux + qz * uz > 0) { bx = qx + ux; bz = qz + uz; INNER1[i] = 1; } }
+    const la = Math.hypot(ax, az) || 1, lb = Math.hypot(bx, bz) || 1;
+    MNX0[i] = -az / la; MNZ0[i] = ax / la; MNX1[i] = -bz / lb; MNZ1[i] = bx / lb;
+  }
+  /** The station of (x, z) on segment i as a parameter (0 at its start, 1 at its end, beyond outside it): where the mitre normal through the point meets the segment.  `t0` is the
+   *  foot of the perpendicular (unclamped): of the two roots the nearer one; past the focus of a tight bend's inner side (no root) the place where the two roots met. */
+  function stationOf(i, x, z, t0) {
+    const ax = X0[i], az = Z0[i], ex = X1[i] - ax, ez = Z1[i] - az, qx = x - ax, qz = z - az;
+    const n0x = MNX0[i], n0z = MNZ0[i], mx = MNX1[i] - n0x, mz = MNZ1[i] - n0z;
+    // (q - t e) x (n0 + t m) = 0:  a t^2 + b t + c = 0
+    const a = -(ex * mz - ez * mx), b = (qx * mz - qz * mx) - (ex * n0z - ez * n0x), c = qx * n0z - qz * n0x;
+    if (Math.abs(a) <= 1e-9 * Math.abs(b)) return Math.abs(b) > 1e-12 ? -c / b : t0;
+    const disc = b * b - 4 * a * c;
+    if (disc <= 0) return -b / (2 * a);
+    const sq = Math.sqrt(disc), qq = -0.5 * (b + (b >= 0 ? sq : -sq));
+    const r1 = qq / a, r2 = Math.abs(qq) > 1e-12 ? c / qq : r1;
+    return Math.abs(r1 - t0) <= Math.abs(r2 - t0) ? r1 : r2;
+  }
 
   // ---- the protected corridors: the ground under a way that rides over the others stays the ground -----
   const protX0 = [], protZ0 = [], protX1 = [], protZ1 = [], protHalf = [];
@@ -978,6 +1017,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
    *  meet end to end at a small angle and are not a junction. */
   const MARK_CLEAR = 3.5, CROSS_SIN = 0.35, MAX_PARTNERS = 6;
   const candPast = new Float32Array(MAX_CAND), candDh = new Float32Array(MAX_CAND);   // (candDh: the taper of the half width at the foot, WIDTH_TAPER)
+  const candTm = new Float32Array(MAX_CAND);                   // (the station of the point on the segment, see stationOf: clamped to the segment at the ends of its way)
   const candI = new Int32Array(MAX_CAND), candD = new Float32Array(MAX_CAND), candT = new Float32Array(MAX_CAND), candLat = new Float32Array(MAX_CAND), candOver = new Float32Array(MAX_CAND);
   const pinPri = new Float32Array(MAX_PINS), pinVal = new Float32Array(MAX_PINS), pinWt = new Float32Array(MAX_PINS);
   const pinEdge = new Float32Array(MAX_PINS), pinBed = new Float32Array(MAX_PINS), slotPinRoad = new Int32Array(MAX_PINS), pinAlong = new Float32Array(MAX_PINS);
@@ -996,11 +1036,14 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   // The side of the way is a smooth function of the direction (+1 straight to the right, -1 straight to the left): the sign of the offset from the LINE of a
   // segment flips on its extension, in the wedge around a corner of the way where the nearest point is the corner itself, and the notches of the two sides
   // differ by the hillside (metres).
+  // The bed is read at the STATION of the point (stationOf), and past an inner joint of the way along the end tangent (the next segment's curve starts with that tangent: the two agree
+  // there to the second order), so that the two segments of a joint give the same level wherever their weights hand over.
   let sBed = 0, sNotch = 0, sFade = 0;
   function segmentState(k) {
-    const i = candI[k], t = candT[k], s0 = SAMP0[i];
+    const i = candI[k], tm = candTm[k], s0 = SAMP0[i];
+    const t = tm < 0 ? 0 : tm > 1 ? 1 : tm;
     const right = smoothstep(-0.5, 0.5, candD[k] > 1e-6 ? candLat[k] / candD[k] : 0);
-    sBed = hermite(BED0[i], BED1[i], TAN0[i], TAN1[i], t);
+    sBed = tm < 0 ? BED0[i] + TAN0[i] * tm : tm > 1 ? BED1[i] + TAN1[i] * (tm - 1) : hermite(BED0[i], BED1[i], TAN0[i], TAN1[i], tm);
     sNotch = right * (NOTCHR[s0] + (NOTCHR[s0 + 1] - NOTCHR[s0]) * t) + (1 - right) * (NOTCHL[s0] + (NOTCHL[s0 + 1] - NOTCHL[s0]) * t);
     sFade = right * (FADER[s0] + (FADER[s0 + 1] - FADER[s0]) * t) + (1 - right) * (FADEL[s0] + (FADEL[s0 + 1] - FADEL[s0]) * t);
   }
@@ -1094,6 +1137,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
         const list = cells.get(cellKey(cx + dx, cz + dz)) || EMPTY;
         for (let q = 0; q < list.length; q++) {
           const i = list[q];
+          if ((HCX[i] > cx - 1 ? HCX[i] : cx - 1) !== cx + dx || (HCZ[i] > cz - 1 ? HCZ[i] : cz - 1) !== cz + dz) continue;   // (listed in an earlier cell of the neighbourhood)
           const reach = REACH[i];
           // the cheap reject: the segment is too far away to shape the ground here
           if (x < MINX[i] - reach || x > MAXX[i] + reach || z < MINZ[i] - reach || z > MAXZ[i] + reach) continue;
@@ -1124,6 +1168,11 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
           // how far an approach way runs on under its deck (0 elsewhere): its carriageway is tucked DECK_TUCK under the deck there (see below)
           const r0 = ROADOF[i];
           const past = t0 < 0 && i === firstSeg[r0] && capHoldA[r0] > 0 ? -t0 * len - tuckFromA[r0] : t0 > 1 && i === firstSeg[r0] + segCount[r0] - 1 && capHoldB[r0] > 0 ? (t0 - 1) * len - tuckFromB[r0] : 0;
+          { // the station (clamped at the ends of the way: past the end of a street, or under the deck it runs onto, its bed stays the end's level)
+            let tm = stationOf(i, x, z, t0);
+            const lo = INNER0[i] ? -STATION_EXTRAPOLATE : 0, hi = INNER1[i] ? 1 + STATION_EXTRAPOLATE : 1;
+            candTm[nCand] = tm < lo ? lo : tm > hi ? hi : tm;
+          }
           candI[nCand] = i; candD[nCand] = d; candT[nCand] = t; candLat[nCand] = lat; candOver[nCand] = over; candPast[nCand] = past; candDh[nCand] = DHW0[i] + (DHW1[i] - DHW0[i]) * t; nCand++;
         }
       }
@@ -1252,8 +1301,11 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
         const q = (dMin + SHEPARD_OFFSET) / (candD[k] + SHEPARD_OFFSET);
         const nearness = q * q * q * q;
         if (nearness < SHEPARD_MIN) continue;
-        const along = Math.min(candT[k], 1 - candT[k]) * Math.hypot(X1[i] - X0[i], Z1[i] - Z0[i]);
-        const w = nearness * (FOOT_FLOOR + smoothstep(0, FOOT_FADE, along));
+        // (how far the station lies inside the segment: two segments of a joint hand over across its mitre line - the station - not across the feet of their perpendiculars, which
+        // left a wedge outside the bend where both feet were the corner and the segments beyond it took over with a floor weight each)
+        const segLen = Math.hypot(X1[i] - X0[i], Z1[i] - Z0[i]), tmk = candTm[k];
+        const along = Math.min(INNER0[i] ? tmk : candT[k], INNER1[i] ? 1 - tmk : 1 - candT[k]) * segLen;
+        const w = nearness * (FOOT_FLOOR + (INNER0[i] || INNER1[i] ? smoothstep(-STATION_FADE, STATION_FADE, along) : smoothstep(0, FOOT_FADE, along)));
         wAll += w;
         const d = candD[k], bench = BENCH[i] + candDh[k], edge = d > bench ? d - bench : 0;
         segmentState(k);
@@ -1303,7 +1355,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
         { const wm = w1 * (1 - smoothstep(MAG_WINDOW[0], MAG_WINDOW[1], d - dMin)); pinMagSum += wm * pin; pinMagW += wm; pinCapSum += wm * (1 - smoothstep(0, CAP_SOFT, over)); }
         if (share > 0) {                   // the other arm: its own Shepard weights about its own nearest segment
           const q2 = (dMin2 + SHEPARD_OFFSET) / (d + SHEPARD_OFFSET);
-          const w2 = q2 * q2 * q2 * q2 * (FOOT_FLOOR + smoothstep(0, FOOT_FADE, along)) * share;
+          const w2 = q2 * q2 * q2 * q2 * (FOOT_FLOOR + (INNER0[i] || INNER1[i] ? smoothstep(-STATION_FADE, STATION_FADE, along) : smoothstep(0, FOOT_FADE, along))) * share;
           if (pin > 0) {
             pinSum2 += w2 * pin; pinValSum2 += w2 * pin * (face + (bed - tuck - face) * (1 - smoothstep(bench, bench + join, dMin2))); pinBedSum2 += w2 * pin * bed;
           }
@@ -1366,8 +1418,9 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
       if (out.debug) out.debug.push({ road: slotPinRoad[a], pri: pinPri[a], val: pinVal[a], wt: pinWt[a], hold, edge: pinEdge[a], bed: pinBed[a], before: bandY });
       bandY += (pinVal[a] - bandY) * pinWt[a] * hold;
       const r = slotPinRoad[a];
-      const nearAbutment = (capHoldA[r] > 0 && pinAlong[a] <= APPROACH_FREE) || (capHoldB[r] > 0 && roadLength[r] - pinAlong[a] <= APPROACH_FREE);
-      if (nearAbutment) pinCover += (1 - pinCover) * pinWt[a] * hold;
+      const nearAbutment = Math.max(capHoldA[r] > 0 ? 1 - smoothstep(APPROACH_FREE, APPROACH_FREE + APPROACH_FREE_FADE, pinAlong[a]) : 0,
+        capHoldB[r] > 0 ? 1 - smoothstep(APPROACH_FREE, APPROACH_FREE + APPROACH_FREE_FADE, roadLength[r] - pinAlong[a]) : 0);
+      if (nearAbutment > 0) pinCover += (1 - pinCover) * pinWt[a] * hold * nearAbutment;
       if (roads[r].openCut) cutCover += (1 - cutCover) * pinWt[a] * hold;          // (see protHere)
     }
     // The median: the gap between two carriageways at ONE level that lie on opposite sides of the point is the straight line from the bench of one to the bench of the other (both ways
