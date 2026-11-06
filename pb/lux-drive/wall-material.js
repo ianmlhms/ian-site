@@ -39,7 +39,9 @@ const FRAGMENT = `
     return line * (1.0 - smoothstep(0.18, 0.45, aa));
   }
   void main(){
-    vec3 N = normalize(vN); if (!gl_FrontFacing) N = -N;
+    // the normals are the wall's own (smooth along it); they turn toward the viewer by the view direction, not by the winding of the quad (the face quads are wound
+    // toward the high ground: flipped by gl_FrontFacing the face seen from the road was lit as if it looked into the hill, a dark slate grey)
+    vec3 N = normalize(vN); if (dot(N, cameraPosition - vWorld) < 0.0) N = -N;
     float kind = vWall.y, u = vWall.x, y = vWorld.y;
     float above = max(0.0, y - vWall.z);                        // metres above the foot of the face
     float grain = texture2D(uNoise, vec2(u * 0.37, y * 0.37)).g;

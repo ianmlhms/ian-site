@@ -122,6 +122,9 @@ export const GROUND_FRAGMENT = `
     // The hard ground is a calm light grey-beige and it has a CLEAN border: the class weight is a blurred 24 m / 72 m cover, and mixed straight into the
     // lawn it made a wide smoky brown-grey penumbra beside every wall (the dark blotches).  The weight is sharpened to a band of a few metres.
     float urbanW = smoothstep(0.42, 0.62, urban);
+    // (look11, QA2 N-T02: the bank between two carriageways at two levels in the city (0.5 - 0.7 m/m) was this pale hard ground, a pale wedge with the lattice's teeth along
+    // both carriageways - the slabs at Grund.  The hard ground of the town is level: a bank keeps the land's paint)
+    urbanW *= smoothstep(0.80, 0.93, N.y);
     albedo = mix(albedo, city, urbanW);
     // the water class is a blurred 8 m cover as well: mixed straight in, the river was a teal smear far over the lawns of its banks (QA T10).  The shore is the 0.5 line of the
     // cover, one pixel wide (fwidth: a crisp edge at every distance, not a 3 m teal fade into the lawn), with a narrow band of wet earth on the land side (look11).
@@ -188,6 +191,8 @@ export const GROUND_FRAGMENT = `
     // the edge of the paint is one pixel wide (fwidth), the line is a clean stroke from the driver's seat and from above.
     float fwM = max(fwidth(vMark.x), 1e-3);
     float paint = vMark.z > 0.5 ? clamp(vMark.y, 0.0, 1.0) * (1.0 - smoothstep(1.0 - 1.5 * fwM, 1.0, abs(vMark.x))) : 0.0;
+    // (look11, QA M08: a ribbon draped over the lattice where it climbs a wall foot or a bank stood up as a white line up the wall; a line is paint on a level road)
+    paint *= smoothstep(0.80, 0.92, N.y);
 
     albedo = mix(albedo, surf, roadW * onCarriage);
     albedo = mix(albedo, pave * 0.80, roadW * onKerb);                        // the kerb stone is darker than the slabs

@@ -146,7 +146,9 @@ export const WALL_LOOK = Object.freeze({
 const STONE_OF = Object.freeze({ 0: [0.66, 0.58, 0.45], 1: [0.57, 0.56, 0.52], 2: [0.62, 0.61, 0.58] });
 const COPING_COLOR = [0.55, 0.54, 0.52];
 const BACK_COLOR = [0.44, 0.41, 0.36];
-const FOOTING_COLOR = [0.47, 0.47, 0.46];
+const FOOTING_COLOR = [0.50, 0.50, 0.48];
+const FOOTING_SHADE = 0.86;             // the footing's front is the stone of the wall, this much darker (a stepped base, not a pale bench)
+const scaleColor = (c, k) => [c[0] * k, c[1] * k, c[2] * k];
 const KIND = Object.freeze({ coping: 3, back: 4 });      // (= WALL_KIND of wall-material.js; 0..2 are the stone of the face)
 
 /** The stone of a wall: sandstone in the old town, elsewhere concrete or limestone or sandstone by a stable hash of its place. */
@@ -220,7 +222,7 @@ export function wallQuads(wall, groundAt = null) {
   for (let i = 0; i + 1 < pts.length; i++) {
     const g = geo[i], h = geo[i + 1], us = [along[i], along[i + 1], along[i + 1], along[i]], foot = [g.footY, h.footY, h.footY, g.footY];
     const f = footing[i], e = footing[i + 1];
-    add('footing', [f.low, e.low, e.high, f.high], [faceN(i), faceN(i + 1), faceN(i + 1), faceN(i)], FOOTING_COLOR, KIND.coping, us, foot);           // the footing's front
+    add('footing', [f.low, e.low, e.high, f.high], [faceN(i), faceN(i + 1), faceN(i + 1), faceN(i)], scaleColor(stoneColor, FOOTING_SHADE), stone, us, foot);   // the footing's front: the wall's stone, a shade darker
     add('footTop', [f.high, e.high, e.seat, f.seat], [UP, UP, UP, UP], FOOTING_COLOR, KIND.coping, us, foot);                                           // its top
     add('face', [g.foot, h.foot, h.under, g.under], [faceN(i), faceN(i + 1), faceN(i + 1), faceN(i)], stoneColor, stone, us, foot);            // the face
     add('lipUnder', [g.under, h.under, h.lipLow, g.lipLow], [DOWN, DOWN, DOWN, DOWN], COPING_COLOR, KIND.coping, us, foot);                         // the underside of the lip
