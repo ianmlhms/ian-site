@@ -212,7 +212,10 @@ Old full data was scrubbed from git history.
   `site_lang` with `lb` (many modules/games read it directly) and no longer mounts the LB/DE/EN
   switcher (the empty `#langSw` hosts stay: theme.js anchors its picker there). de/en strings stay in
   the dictionaries. `data-lang-lock` pages (kart.html, kart-link.html, Garmin QR) keep their pinned
-  language. Jeopardy, Partyspill and notify-help had their own pickers: hidden, forced to lb.
+  language. Jeopardy, Partyspill and notify-help had their own pickers: hidden, forced to lb. The arcade games
+  Zuchsimulator/Tram (`pb/train-sim*`), Kart Lëtzebuerg, Paket Express, MTB and Schueberfouer are lb-only too
+  (buttons/settings removed, stored `site_lang` / `pb_*_lang` ignored, copy tables kept). Lux Drive was left out on
+  purpose. `quick-open.js` and `pin-pad.js` fall back to lb instead of the browser language.
 
 - **One Supabase client only.** `auth.js` caches its client on `window.__pbAuth`, so every
   import (even mismatched `auth.js` vs `auth.js?v=3`) shares ONE GoTrue. Two session-managing
