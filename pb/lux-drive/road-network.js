@@ -306,7 +306,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   const segCut = [];                 // per segment: 1 on an opened shallow tunnel (its cut has walls, CUT_WALL_SLOPE)
   const segDhw0 = [], segDhw1 = [];  // per segment: the taper of the half width at its two ends (<= 0; see WIDTH_TAPER)
   const segHw = [], segKerbH = [], segKerbW = [], segPw = [], segA0 = [], segPaintA0 = [], segBench = [], segR = [], segReach = [];
-  const segKeep = [];                 // the lane keep of each segment (LANE_KEEP)
+  const segKeep0 = [], segKeep1 = [];  // the lane keep at the two ends of every segment (LANE_KEEP, keepUp)
   const segKind = [], segRoad = [], segKerbOn = [], segLines = [], segS0 = [], segS1 = [], segSurf = [];
   const segTan0 = [], segTan1 = [];   // the tangents of the bed at the two ends of every segment (slope times length: the cubic Hermite curve, road-bed.js)
   const segSamp = [];            // the index of the centre line sample every segment starts at
@@ -707,6 +707,11 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   // Only the carved ways narrow each other: tapering a road to the OSM width of the bridge way at a deck end narrowed it beside the other carriageway of a split (Échangeur de Kirchberg
   // 11833 at deck 104 / 105: the link fell off its level across the outer lane of deck 105, an 8 cm jolt, harness Q1).
   const taperDhw = new Array(roads.length).fill(null);
+  // the lane keep of a way (LANE_KEEP: its outer lane's centre + the car's clearance, at most its bench), and along a carriageway chain the UPPER envelope of slope 1 / WIDTH_TAPER of
+  // the keeps of its ways: where a 1-lane way runs on into a 2-lane one (the Merl links 12833 / 17104 into 12832) the keep changes over the taper, not at the joint - a face
+  // that moved by a keep jumping at the joint stepped the paint of both by 0.8 - 1.2 m there (harness P1)
+  const laneKeepOf = (r, bench) => Math.min(bench, Math.max(...laneOffsets(r).map(Math.abs)) + LANE_KEEP);
+  const keepUp = new Array(roads.length).fill(null);
   {
     const prepOf = new Map(prep.map((p) => [p.ri, p]));
     for (const ws of carriageways.chainWays) {
@@ -716,8 +721,24 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
       for (const w of ws) {
         const pr = prepOf.get(w.road);
         const L = pr ? pr.chain.arc[pr.n - 1] : (roads[w.road].length || 0);
-        span.push({ a: at, b: at + L, hw: Math.max(0.8, roads[w.road].width / 2), w, pr, L });
+        span.push({ a: at, b: at + L, hw: Math.max(0.8, roads[w.road].width / 2), keep: pr ? laneKeepOf(roads[w.road], pr.bench) : 0, w, pr, L });
         at += L;
+      }
+      for (const q of span) {
+        if (!q.pr) continue;
+        const { n, chain: c } = q.pr;
+        let out = null;
+        for (let i = 0; i < n; i++) {
+          const sc = q.w.rev ? q.b - c.arc[i] : q.a + c.arc[i];
+          let k = q.keep;
+          for (const o of span) {
+            if (o === q || o.keep <= k || !o.pr) continue;
+            const dist = sc < o.a ? o.a - sc : sc > o.b ? sc - o.b : 0;
+            k = Math.max(k, o.keep - dist / WIDTH_TAPER);
+          }
+          if (k > q.keep + 1e-3) { if (!out) out = new Float32Array(n); out[i] = k - q.keep; }
+        }
+        keepUp[q.w.road] = out;
       }
       if (span.every((q) => Math.abs(q.hw - span[0].hw) < 1e-3)) continue;
       for (const q of span) {
@@ -788,8 +809,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     const along = new Float64Array(n);
     for (let i = 1; i < n; i++) along[i] = along[i - 1] + Math.hypot(rs.x[i] - rs.x[i - 1], rs.z[i] - rs.z[i - 1]);
     const kindCode = ROAD_KINDS.indexOf(road.kind);
-    // (the part of the carriageway its lanes need: the outer lane centre + LANE_KEEP, never more than the bench)
-    const laneKeep = Math.min(bench, Math.max(...laneOffsets(road).map(Math.abs)) + LANE_KEEP);
+    const laneKeep = laneKeepOf(road, bench), ku = keepUp[ri];          // (the part of the carriageway its lanes need, see keepUp)
     for (let i = 0; i < n - 1; i++) {
       segAx.push(rs.x[i]); segAz.push(rs.z[i]); segBx.push(rs.x[i + 1]); segBz.push(rs.z[i + 1]);
       segB0.push(bed[i]); segB1.push(bed[i + 1]);
@@ -797,7 +817,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
       { const tp = taperDhw[ri]; segDhw0.push(tp ? tp[i] : 0); segDhw1.push(tp ? tp[i + 1] : 0); }
       segCut.push(road.openCut ? 1 : 0);
       segHw.push(hw); segKerbH.push(kerbH); segKerbW.push(kerbW); segPw.push(pw);
-      segA0.push(a0); segPaintA0.push(paintA0 === null ? a0 : paintA0); segBench.push(bench); segKeep.push(laneKeep); segR.push(radius); segReach.push(reach);
+      segA0.push(a0); segPaintA0.push(paintA0 === null ? a0 : paintA0); segBench.push(bench); segKeep0.push(laneKeep + (ku ? ku[i] : 0)); segKeep1.push(laneKeep + (ku ? ku[i + 1] : 0)); segR.push(radius); segReach.push(reach);
       segKind.push(kindCode); segRoad.push(ri); segKerbOn.push(1);
       segLines.push(kind.lines); segS0.push(along[i]); segS1.push(along[i + 1]);
       segSurf.push(road.surfaceCode ?? 0);
@@ -816,7 +836,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   const HW = Float32Array.from(segHw), KERBH = Float32Array.from(segKerbH), KERBW = Float32Array.from(segKerbW);
   const PW = Float32Array.from(segPw), A0 = Float32Array.from(segA0), PAINT_A0 = Float32Array.from(segPaintA0), RAD = Float32Array.from(segR);
   const BENCH = Float32Array.from(segBench);
-  const KEEP = Float32Array.from(segKeep);
+  const KEEP0 = Float32Array.from(segKeep0), KEEP1 = Float32Array.from(segKeep1);
   const REACH = Float32Array.from(segReach);
   // the box of every segment: the cheap reject of the segments that are far away (the batter reaches 10 m past the
   // pavement, so the loop cannot stop at the paint's radius)
@@ -1095,7 +1115,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
    *  roads count as crossing when their directions differ by more than this (sine): two ways that continue one street
    *  meet end to end at a small angle and are not a junction. */
   const MARK_CLEAR = 3.5, CROSS_SIN = 0.35, MAX_PARTNERS = 6;
-  const candPast = new Float32Array(MAX_CAND), candDh = new Float32Array(MAX_CAND);   // (candDh: the taper of the half width at the foot, WIDTH_TAPER)
+  const candPast = new Float32Array(MAX_CAND), candDh = new Float32Array(MAX_CAND), candKeep = new Float32Array(MAX_CAND);   // (candDh: the taper of the half width at the foot, WIDTH_TAPER)
   const candTm = new Float32Array(MAX_CAND);                   // (the station of the point on the segment, see stationOf: clamped to the segment at the ends of its way)
   const candI = new Int32Array(MAX_CAND), candD = new Float32Array(MAX_CAND), candT = new Float32Array(MAX_CAND), candLat = new Float32Array(MAX_CAND), candOver = new Float32Array(MAX_CAND);
   const pinPri = new Float32Array(MAX_PINS), pinVal = new Float32Array(MAX_PINS), pinWt = new Float32Array(MAX_PINS);
@@ -1243,8 +1263,11 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
       const sep = smoothstep(SEP_LOW, SEP_HIGH, Math.abs(pinBed[a] - pinBed[b]));
       if (sep <= 0) continue;
       // (the face is half wide either side of the line: the paint ends PAINT_CLIP_CLEAR before the line, or before the face where it is wider)
+      // (the signed distance past the line, > 0 on the other way's side of it.  Where the face moves out of the lanes - stepPlace - the paint of the way it moves into ends before it,
+      // and the paint of the other way does not grow over the ground it leaves: that ground was the junction of merging links, not level - harness R2 at the Merl links 12833 / 17104)
       const st = stepPlace(a, b, Math.abs(pinBed[a] - pinBed[b]), placeTmp);
-      const line = (pinEdge[a] - pinEdge[b] - st.shift) / 2 + Math.max(PAINT_CLIP_CLEAR, st.half / 2 + PAINT_STEP_MARGIN);       // the signed distance past the line (> 0 on the other way's side of it; moved with the face)
+      const margin = Math.max(PAINT_CLIP_CLEAR, st.half / 2 + PAINT_STEP_MARGIN);
+      const line = (pinEdge[a] - pinEdge[b]) / 2 + margin - Math.min(0, st.shift / 2);
       if (line > eCar) clip = Math.max(clip, sep * pinCap[b] * (line - eCar));
     }
     return clip;
@@ -1313,7 +1336,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
             const lo = INNER0[i] ? -STATION_EXTRAPOLATE : 0, hi = INNER1[i] ? 1 + STATION_EXTRAPOLATE : 1;
             candTm[nCand] = tm < lo ? lo : tm > hi ? hi : tm;
           }
-          candI[nCand] = i; candD[nCand] = d; candT[nCand] = t; candLat[nCand] = lat; candOver[nCand] = over; candPast[nCand] = past; candDh[nCand] = DHW0[i] + (DHW1[i] - DHW0[i]) * t; nCand++;
+          candI[nCand] = i; candD[nCand] = d; candT[nCand] = t; candLat[nCand] = lat; candOver[nCand] = over; candPast[nCand] = past; candDh[nCand] = DHW0[i] + (DHW1[i] - DHW0[i]) * t; candKeep[nCand] = KEEP0[i] + (KEEP1[i] - KEEP0[i]) * t; nCand++;
         }
       }
     }
@@ -1510,7 +1533,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
         if (pinSum > 0 && nPins < MAX_PINS) {
           pinPri[nPins] = priority[road]; pinVal[nPins] = pinValSum / pinSum; pinWt[nPins] = pinMagSum / pinMagW;
           pinBed[nPins] = pinBedSum / pinSum; pinEdge[nPins] = dMin - (BENCH[candI[slotArm1[sl]]] + candDh[slotArm1[sl]]); slotPinRoad[nPins] = road;
-          pinRoom[nPins] = Math.max(0, BENCH[candI[slotArm1[sl]]] + candDh[slotArm1[sl]] - KEEP[candI[slotArm1[sl]]]);
+          pinRoom[nPins] = Math.max(0, BENCH[candI[slotArm1[sl]]] + candDh[slotArm1[sl]] - candKeep[slotArm1[sl]]);
           pinCap[nPins] = pinCapSum / pinMagW; pinDirX[nPins] = wayDirX[sl]; pinDirZ[nPins] = wayDirZ[sl];
           { const i1 = candI[slotArm1[sl]]; pinAlong[nPins] = S0[i1] + (S1[i1] - S0[i1]) * candT[slotArm1[sl]]; }
           nPins++;
@@ -1521,7 +1544,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
           const fx = X0[i2] + (X1[i2] - X0[i2]) * candT[c2], fz = Z0[i2] + (Z1[i2] - Z0[i2]) * candT[c2], dl = Math.hypot(x - fx, z - fz) || 1;
           pinPri[nPins] = priority[road]; pinVal[nPins] = pinValSum2 / pinSum2; pinWt[nPins] = (pinMagSum2 / pinMagW2) * presence2;
           pinBed[nPins] = pinBedSum2 / pinSum2; pinEdge[nPins] = dMin2 - (BENCH[i2] + candDh[c2]); slotPinRoad[nPins] = road;
-          pinRoom[nPins] = Math.max(0, BENCH[i2] + candDh[c2] - KEEP[i2]);
+          pinRoom[nPins] = Math.max(0, BENCH[i2] + candDh[c2] - candKeep[c2]);
           pinCap[nPins] = pinCapSum2 / pinMagW2; pinDirX[nPins] = (x - fx) / dl; pinDirZ[nPins] = (z - fz) / dl;
           pinAlong[nPins] = S0[i2] + (S1[i2] - S0[i2]) * candT[c2];
           nPins++;
