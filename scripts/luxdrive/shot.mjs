@@ -1,6 +1,6 @@
 /* Lux Drive: take screenshots of the game from named poses (cloud / Linux friendly, no video, no browser-slot).
  *   node scripts/luxdrive/shot.mjs <outdir> <pose.json|inline json array> [query]
- * A pose: { name, x, z, h (camera height above ground), yaw? (deg, 0 = +x), pitch? (deg, negative = down), dist?, fov?, car? [x,z,yawRad] }
+ * A pose: { name, x, z, h (camera height above ground), yaw? (deg, 0 = +x), pitch? (deg, negative = down), dist?, fov?, car? [x,z,yawRad], hint? (the car's level: 1e9 = on a deck) }
  * The camera is placed at (x, ground+h, z) looking along yaw/pitch, or at (x, ground+h, z) looking at `at` = [x, z, height above ground].
  * Orbit form (the landmark montages): { name, at: [tx, tz, ty], az (deg, the camera stands at target + (cos az, sin az) * dist: 0 = east, 90 = south),
  * dist, h, fov }.  `hide`: names of scene meshes to leave out of this shot (prefix match, e.g. ["trees"]).  Prints the stats of each shot. */
@@ -50,7 +50,7 @@ try {
     await page.evaluate((p) => {
       const m = window.__lux;
       m.scene.traverse((o) => { if (o.userData.shotHidden) { delete o.visible; o.visible = true; o.userData.shotHidden = false; } });   // the previous shot's hides are undone
-      if (p.car) { m.car.reset(p.car[0], p.car[1], p.car[2] || 0); }
+      if (p.car) { if (p.hint !== undefined && m.ground.hint) m.ground.hint(p.hint); m.car.reset(p.car[0], p.car[1], p.car[2] || 0); }   // (hint: the level to put the car at - 1e9 = on the deck over the point)
       if (p.mode === "chase") { m.setCamera(null); return; }
       let { x, z } = p;
       if (p.az !== undefined && p.at) {

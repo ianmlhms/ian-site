@@ -18,6 +18,7 @@ import { designBed, bedSlopes, hermite } from './road-bed.js';
 import { createJunctionSurface } from './junction-surface.js';
 import { chainCarriageways } from './carriageways.js';
 import { isLandmarkDeck } from './decks.js';
+import { laneOffsets } from './lane-clearance.js';
 
 const CELL = ROAD.cell;                 // m, the spatial hash cell (the biggest kernel radius fits inside it)
 const BATTER_STEP = 2.0;               // m, the step of the walk that finds where the batter gives up
@@ -117,6 +118,11 @@ const STEP_OVERLAP = [-4.0, -3.0];     // the A4: 3 m); a way that crosses over 
 const STEP_MAX_HALF = 2.4;             // m: the widest such face (a step of up to 6.5 m at STEP_SLOPE)
 const STEP_FADE = 0.5;                 // (in the difference of the two edge distances: 0.25 m of ground) the face lets go of the ground this far past its ends
 const PAINT_STEP_MARGIN = 0.1;         // m: ... and at least this far before the edge of a wider face (STEP_SLOPE)
+const LANE_KEEP = 1.2;                 // m: where two carriageways at two levels side by side leave no room for their face between their benches (OSM overlaps them: the Merl link and the
+                                       // A4, 2 - 3 m; the Kirchberg trunk link 9423 over trunk 875, 1.2 m), the face moves into the part of each carriageway that no lane needs: the bench of a
+                                       // way gives way down to its outer lane's centre (lane-clearance.js laneOffsets) + this (the car's half width 0.9 + 0.3).  Centred on the line half
+                                       // way between the two benches, the face lay in the outer lane of the way whose bench is the wider (drive12: with the walls out of the lanes the
+                                       // car's outer wheels climbed it - Merl roll 0.75 rad, Kirchberg lane -7.5 stopped)
 const PAINT_CLIP_CLEAR = 0.5;          // m: where two carriageways at two levels overlap, each one's paint ends this far before the line half way between their benches (the face of the wall between them)
 const SHEET_GAP_HOLD = 1.5;            // m: in a junction the sheet (junction-surface.js) holds the ground this far past the bench of a way at its level: a gap of up to 2 x this between two carriageways
                                        // (a median, the nose of a slip road, the wedge where a dual carriageway splits) is at road level, not a dip to the land
@@ -300,6 +306,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   const segCut = [];                 // per segment: 1 on an opened shallow tunnel (its cut has walls, CUT_WALL_SLOPE)
   const segDhw0 = [], segDhw1 = [];  // per segment: the taper of the half width at its two ends (<= 0; see WIDTH_TAPER)
   const segHw = [], segKerbH = [], segKerbW = [], segPw = [], segA0 = [], segPaintA0 = [], segBench = [], segR = [], segReach = [];
+  const segKeep = [];                 // the lane keep of each segment (LANE_KEEP)
   const segKind = [], segRoad = [], segKerbOn = [], segLines = [], segS0 = [], segS1 = [], segSurf = [];
   const segTan0 = [], segTan1 = [];   // the tangents of the bed at the two ends of every segment (slope times length: the cubic Hermite curve, road-bed.js)
   const segSamp = [];            // the index of the centre line sample every segment starts at
@@ -781,6 +788,8 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     const along = new Float64Array(n);
     for (let i = 1; i < n; i++) along[i] = along[i - 1] + Math.hypot(rs.x[i] - rs.x[i - 1], rs.z[i] - rs.z[i - 1]);
     const kindCode = ROAD_KINDS.indexOf(road.kind);
+    // (the part of the carriageway its lanes need: the outer lane centre + LANE_KEEP, never more than the bench)
+    const laneKeep = Math.min(bench, Math.max(...laneOffsets(road).map(Math.abs)) + LANE_KEEP);
     for (let i = 0; i < n - 1; i++) {
       segAx.push(rs.x[i]); segAz.push(rs.z[i]); segBx.push(rs.x[i + 1]); segBz.push(rs.z[i + 1]);
       segB0.push(bed[i]); segB1.push(bed[i + 1]);
@@ -788,7 +797,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
       { const tp = taperDhw[ri]; segDhw0.push(tp ? tp[i] : 0); segDhw1.push(tp ? tp[i + 1] : 0); }
       segCut.push(road.openCut ? 1 : 0);
       segHw.push(hw); segKerbH.push(kerbH); segKerbW.push(kerbW); segPw.push(pw);
-      segA0.push(a0); segPaintA0.push(paintA0 === null ? a0 : paintA0); segBench.push(bench); segR.push(radius); segReach.push(reach);
+      segA0.push(a0); segPaintA0.push(paintA0 === null ? a0 : paintA0); segBench.push(bench); segKeep.push(laneKeep); segR.push(radius); segReach.push(reach);
       segKind.push(kindCode); segRoad.push(ri); segKerbOn.push(1);
       segLines.push(kind.lines); segS0.push(along[i]); segS1.push(along[i + 1]);
       segSurf.push(road.surfaceCode ?? 0);
@@ -807,6 +816,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   const HW = Float32Array.from(segHw), KERBH = Float32Array.from(segKerbH), KERBW = Float32Array.from(segKerbW);
   const PW = Float32Array.from(segPw), A0 = Float32Array.from(segA0), PAINT_A0 = Float32Array.from(segPaintA0), RAD = Float32Array.from(segR);
   const BENCH = Float32Array.from(segBench);
+  const KEEP = Float32Array.from(segKeep);
   const REACH = Float32Array.from(segReach);
   // the box of every segment: the cheap reject of the segments that are far away (the batter reaches 10 m past the
   // pavement, so the loop cannot stop at the paint's radius)
@@ -1091,6 +1101,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   const pinPri = new Float32Array(MAX_PINS), pinVal = new Float32Array(MAX_PINS), pinWt = new Float32Array(MAX_PINS);
   const pinEdge = new Float32Array(MAX_PINS), pinBed = new Float32Array(MAX_PINS), slotPinRoad = new Int32Array(MAX_PINS), pinAlong = new Float32Array(MAX_PINS);
   const pinCap = new Float32Array(MAX_PINS), pinDirX = new Float32Array(MAX_PINS), pinDirZ = new Float32Array(MAX_PINS);
+  const pinRoom = new Float32Array(MAX_PINS);         // how far the bench of a pin may give way to a face between two levels: bench - lane keep (LANE_KEEP), at least 0
   const wayEdge = new Float32Array(MAX_CAND), wayBed = new Float32Array(MAX_CAND), wayDirX = new Float32Array(MAX_CAND), wayDirZ = new Float32Array(MAX_CAND), wayGap = new Float32Array(MAX_CAND);
   const paintMajor = new Uint8Array(MAX_CAND);
   const paintClip = new Float32Array(MAX_CAND);
@@ -1200,6 +1211,25 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   }
   const stepTmp = { half: 0, straight: 0 };
 
+  /** Where the step between pins a and b (two levels `apart` m apart) lies: stepShape's face (res.half, res.straight), and res.shift, how far its centre moves (in the difference of
+   *  the two edge distances, `across`) off the line half way between the two benches.  Two carriageways side by side whose benches overlap (OSM: the Merl link and the A4) had the
+   *  face centred in the overlap, in the outer lane of the way with the wider bench: the face moves to the free ground between the two lane keeps (LANE_KEEP: the outer lane's centre
+   *  + the car's half width + 0.3 m), or, where even that is narrower than the face, half way between them (into both keeps alike).  The shift fades with sideBySide; where the
+   *  benches leave the face room nothing moves. */
+  function stepPlace(a, b, apart, res) {
+    const gap = pinEdge[a] + pinEdge[b], side = sideBySide(a, b);
+    stepShape(apart, gap, side, stepTmp);
+    res.half = stepTmp.half; res.straight = stepTmp.straight; res.shift = 0;
+    if (side <= 0) return res;
+    // (along a cross section ea + eb = gap: the face is [c - half / 2, c + half / 2] in ea, c = gap / 2 between the benches; a's lanes need ea <= -roomA, b's ea >= gap + roomB)
+    const ra = pinRoom[a], rb = pinRoom[b], w2 = res.half / 2, c0 = gap / 2;
+    const lo = -ra + w2, hi = gap + rb - w2;
+    const c = lo <= hi ? Math.min(hi, Math.max(lo, c0)) : (lo + hi) / 2;
+    res.shift = 2 * (c - c0) * side;
+    return res;
+  }
+  const placeTmp = { half: 0, straight: 0, shift: 0 };
+
   /** How far the paint of way `road` (its arm at level `bed`, `eCar` its signed distance to its carriageway edge) is pushed out where another carriageway at another level owns
    *  the point: its distance becomes at least the signed distance past the line PAINT_CLIP_CLEAR before the line half way between the two benches (blended by how much the two
    *  are two levels and how present the other is).  0 where the carriageways do not reach that line. */
@@ -1213,8 +1243,8 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
       const sep = smoothstep(SEP_LOW, SEP_HIGH, Math.abs(pinBed[a] - pinBed[b]));
       if (sep <= 0) continue;
       // (the face is half wide either side of the line: the paint ends PAINT_CLIP_CLEAR before the line, or before the face where it is wider)
-      const face = stepShape(Math.abs(pinBed[a] - pinBed[b]), pinEdge[a] + pinEdge[b], sideBySide(a, b), stepTmp).half;
-      const line = (pinEdge[a] - pinEdge[b]) / 2 + Math.max(PAINT_CLIP_CLEAR, face / 2 + PAINT_STEP_MARGIN);       // the signed distance past the line (> 0 on the other way's side of it)
+      const st = stepPlace(a, b, Math.abs(pinBed[a] - pinBed[b]), placeTmp);
+      const line = (pinEdge[a] - pinEdge[b] - st.shift) / 2 + Math.max(PAINT_CLIP_CLEAR, st.half / 2 + PAINT_STEP_MARGIN);       // the signed distance past the line (> 0 on the other way's side of it; moved with the face)
       if (line > eCar) clip = Math.max(clip, sep * pinCap[b] * (line - eCar));
     }
     return clip;
@@ -1480,6 +1510,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
         if (pinSum > 0 && nPins < MAX_PINS) {
           pinPri[nPins] = priority[road]; pinVal[nPins] = pinValSum / pinSum; pinWt[nPins] = pinMagSum / pinMagW;
           pinBed[nPins] = pinBedSum / pinSum; pinEdge[nPins] = dMin - (BENCH[candI[slotArm1[sl]]] + candDh[slotArm1[sl]]); slotPinRoad[nPins] = road;
+          pinRoom[nPins] = Math.max(0, BENCH[candI[slotArm1[sl]]] + candDh[slotArm1[sl]] - KEEP[candI[slotArm1[sl]]]);
           pinCap[nPins] = pinCapSum / pinMagW; pinDirX[nPins] = wayDirX[sl]; pinDirZ[nPins] = wayDirZ[sl];
           { const i1 = candI[slotArm1[sl]]; pinAlong[nPins] = S0[i1] + (S1[i1] - S0[i1]) * candT[slotArm1[sl]]; }
           nPins++;
@@ -1490,6 +1521,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
           const fx = X0[i2] + (X1[i2] - X0[i2]) * candT[c2], fz = Z0[i2] + (Z1[i2] - Z0[i2]) * candT[c2], dl = Math.hypot(x - fx, z - fz) || 1;
           pinPri[nPins] = priority[road]; pinVal[nPins] = pinValSum2 / pinSum2; pinWt[nPins] = (pinMagSum2 / pinMagW2) * presence2;
           pinBed[nPins] = pinBedSum2 / pinSum2; pinEdge[nPins] = dMin2 - (BENCH[i2] + candDh[c2]); slotPinRoad[nPins] = road;
+          pinRoom[nPins] = Math.max(0, BENCH[i2] + candDh[c2] - KEEP[i2]);
           pinCap[nPins] = pinCapSum2 / pinMagW2; pinDirX[nPins] = (x - fx) / dl; pinDirZ[nPins] = (z - fz) / dl;
           pinAlong[nPins] = S0[i2] + (S1[i2] - S0[i2]) * candT[c2];
           nPins++;
@@ -1502,10 +1534,10 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     // that at a junction the surface IS the bed of the bigger way (flat across, smooth along) and the side street joins it.
     // Averaging the beds of the ways that meet (the first version) made a hump of a hand's breadth on the main road.
     for (let a = 1; a < nPins; a++) {                          // insertion sort by priority, ascending (a handful of entries)
-      const pr = pinPri[a], v = pinVal[a], wt = pinWt[a], ed = pinEdge[a], bd = pinBed[a], rr = slotPinRoad[a], al = pinAlong[a], cp = pinCap[a], dx = pinDirX[a], dz = pinDirZ[a];
+      const pr = pinPri[a], v = pinVal[a], wt = pinWt[a], ed = pinEdge[a], bd = pinBed[a], rr = slotPinRoad[a], al = pinAlong[a], cp = pinCap[a], dx = pinDirX[a], dz = pinDirZ[a], rm = pinRoom[a];
       let b = a - 1;
-      while (b >= 0 && pinPri[b] > pr) { pinPri[b + 1] = pinPri[b]; pinVal[b + 1] = pinVal[b]; pinWt[b + 1] = pinWt[b]; pinEdge[b + 1] = pinEdge[b]; pinBed[b + 1] = pinBed[b]; slotPinRoad[b + 1] = slotPinRoad[b]; pinAlong[b + 1] = pinAlong[b]; pinCap[b + 1] = pinCap[b]; pinDirX[b + 1] = pinDirX[b]; pinDirZ[b + 1] = pinDirZ[b]; b--; }
-      pinPri[b + 1] = pr; pinVal[b + 1] = v; pinWt[b + 1] = wt; pinEdge[b + 1] = ed; pinBed[b + 1] = bd; slotPinRoad[b + 1] = rr; pinAlong[b + 1] = al; pinCap[b + 1] = cp; pinDirX[b + 1] = dx; pinDirZ[b + 1] = dz;
+      while (b >= 0 && pinPri[b] > pr) { pinPri[b + 1] = pinPri[b]; pinVal[b + 1] = pinVal[b]; pinWt[b + 1] = pinWt[b]; pinEdge[b + 1] = pinEdge[b]; pinBed[b + 1] = pinBed[b]; slotPinRoad[b + 1] = slotPinRoad[b]; pinAlong[b + 1] = pinAlong[b]; pinCap[b + 1] = pinCap[b]; pinDirX[b + 1] = pinDirX[b]; pinDirZ[b + 1] = pinDirZ[b]; pinRoom[b + 1] = pinRoom[b]; b--; }
+      pinPri[b + 1] = pr; pinVal[b + 1] = v; pinWt[b + 1] = wt; pinEdge[b + 1] = ed; pinBed[b + 1] = bd; slotPinRoad[b + 1] = rr; pinAlong[b + 1] = al; pinCap[b + 1] = cp; pinDirX[b + 1] = dx; pinDirZ[b + 1] = dz; pinRoom[b + 1] = rm;
     }
     // A carriageway belongs to its own way.  Where two ways lie side by side (or one inside the other) at different levels, the bigger way used to lay its pin - and its 3 m fade -
     // over the carriageway of the smaller one, and a bed that is smooth was cut up by 1 .. 8 cm (Boulevard de la Foire: 15 m/s2).  Now a way is held back by every way laid BELOW it
@@ -1520,7 +1552,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
         const sep = smoothstep(SEP_LOW, SEP_HIGH, apart);
         // one level: the fade of the bigger way (a) is held off the bench of the smaller one (b), where a's own bench does not hold the point; two levels: the hand-over is centred between the two
         const own = (1 - smoothstep(0, OWN_FADE, pinEdge[b])) * smoothstep(0, OWN_FADE, pinEdge[a]);
-        const { half, straight } = stepShape(apart, pinEdge[a] + pinEdge[b], sideBySide(a, b), stepTmp);
+        const { half, straight, shift } = stepPlace(a, b, apart, placeTmp);
         // (two carriageways at two levels hand over within the gap between their benches: a ramp laid into both carriageways tilted the outer metre of each lane - the two arms
         // of a hairpin, and two ways side by side whose benches are closer than the ramp: the Échangeur de Merl link level beside the A4 that falls 5 m, QA2 N-T01, where the 4 m
         // ramp lay across the outer lanes of both and the car rolled 31 deg.  The step between them is a retaining wall (bake_walls.mjs), solid for the car)
@@ -1528,7 +1560,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
         // (one level: every rival holds the way back, a product; two levels: the STRONGEST rival does - two carriageways side by side at the upper level, 0.7 m apart, multiplied
         // their two steps into one twice as steep: the Merl link pair 17104 / 12833 over the A4, 4.4 m/m where the face is laid at STEP_SLOPE)
         holdOne *= 1 - pinWt[b] * (1 - sep) * own;
-        holdTwo = Math.min(holdTwo, 1 - pinWt[b] * sep * stepProfile(half, straight, pinEdge[a] - pinEdge[b]));
+        holdTwo = Math.min(holdTwo, 1 - pinWt[b] * sep * stepProfile(half, straight, pinEdge[a] - pinEdge[b] - shift));
       }
       const hold = holdOne * holdTwo;
       if (out.debug) out.debug.push({ road: slotPinRoad[a], pri: pinPri[a], val: pinVal[a], wt: pinWt[a], hold, edge: pinEdge[a], bed: pinBed[a], before: bandY });
@@ -1558,11 +1590,11 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     // two fades with the hold made a face of 5 - 7 m/m (Kirchberg 8500,6038, Croix de Gasperich 2023,11672: 22 sides of the world gate's sample a wall the carve made).
     for (let a = 0; a < nPins; a++) {
       for (let b = 0; b < a; b++) {
-        const apart = Math.abs(pinBed[a] - pinBed[b]), gap = pinEdge[a] + pinEdge[b];
+        const apart = Math.abs(pinBed[a] - pinBed[b]);
         const sep = smoothstep(SEP_LOW, SEP_HIGH, apart);
         if (sep <= 0) continue;
-        const { half, straight } = stepShape(apart, gap, sideBySide(a, b), stepTmp);      // (straight carries the side-by-side weight)
-        const across = pinEdge[a] - pinEdge[b];
+        const { half, straight, shift } = stepPlace(a, b, apart, placeTmp);   // (straight carries the side-by-side weight; the face moves out of the lanes: LANE_KEEP)
+        const across = pinEdge[a] - pinEdge[b] - shift;
         let w = sep * straight * pinCap[a] * pinCap[b] * (1 - smoothstep(half, half + STEP_FADE, Math.abs(across)));
         // (not on the carriageway of a third way at the level of either: two links side by side over the A4 at Merl, 12830 and 12831 - the face of the inner one with the A4
         // lay on the outer one's lanes; there the face of the outer one holds)

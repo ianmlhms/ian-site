@@ -16,7 +16,7 @@ import { createPropCollider } from './props.js';
 import { placeStreetLights } from './street-lights.js';
 import { placeParkBenches } from './park-benches.js';
 import { createCarCollider, LAMP_POST_RADIUS, LAMP_POST_HEIGHT, BENCH_RADIUS, BENCH_HEIGHT } from './car-collide.js';
-import { laneClearanceScan, groupHits } from './lane-clearance.js';
+import { laneClearanceScan, groupHits, LANE } from './lane-clearance.js';
 import { createRoadIndex } from './road-index.js';
 import { placeClear } from './placement.js';
 import { deckDriveScan } from './harness-decks.js';
@@ -27,22 +27,32 @@ const T3_MAX_PUSHED = 13;      // runs of T3 in which something touches the car 
                                // deck 169 Hondhausbréck: wall 41 at its free end on a bank; deck 197 service deck at 5693,9852 into building 6763).  A ratchet: lower it, never raise it
 const T_STUCK = 4;             // s without progress along the route = stopped (the QA's rule)
 const segDist = (x, z, a, b) => { const ex = b[0] - a[0], ez = b[1] - a[1], ll = ex * ex + ez * ez || 1, t = Math.max(0, Math.min(1, ((x - a[0]) * ex + (z - a[1]) * ez) / ll)); return Math.hypot(x - a[0] - ex * t, z - a[1] - ez * t); };
-/** The QA's verified invisible-wall routes (qa3/jobs/wallpairs.json): [name, [[x, z, lane offset to the left], ...]]. */
+/** The QA's verified invisible-wall routes (qa3/jobs/wallpairs.json: the wall's way from 45 m before the first hit, on into the next ways): [name, [[x, z, lane offset to the
+ *  left], ...]], the offsets snapped to the lanes of the wall's way (lane-clearance.js laneOffsets).  (drive12b: the first table's polylines did not follow their ways - 5 to 90 m
+ *  off them; p09 and p12 ran over the bank beside the A4 and across the field beside Rue In Bouler, the Kirchberg route p06 never touched 9423's lanes.) */
 const WALL_ROUTES = [
-  ["p06_w18_r9423", [[8608.2, 5949.2, -7.48], [8604.3, 5951.3, -7.48], [8595.9, 5955.8, -7.48], [8582.7, 5962.5, -7.48], [8568.7, 5969.7, -7.48], [8556.4, 5975.9, -7.48], [8544.4, 5982.0, -7.48], [8533.0, 5988.0, -7.48], [8522.2, 5993.9, -7.48], [8512.5, 5999.4, -7.48], [8502.2, 6005.5, -7.48], [8494.5, 6010.4, -7.48], [8487.4, 6015.3, -7.48], [8480.2, 6020.7, -7.48]]],
-  ["p09_w98_r241", [[1966.3, 11566.1, -2.45], [1971.3, 11597.7, -2.45], [1970.2, 11660.6, -2.45], [1965.5, 11707.4, -2.45]]],
-  ["p11_w13_r11619", [[4835.0, 8104.9, 7.12], [4825.6, 8136.9, 7.12], [4818.5, 8163.8, 7.12], [4813.6, 8186.7, 7.12]]],
-  ["p12_w44_r301", [[4904.1, 12224.7, -1.73], [4886.8, 12236.0, -1.73], [4872.9, 12245.9, -1.73], [4858.0, 12256.9, -1.73], [4844.9, 12267.6, -1.73], [4830.0, 12280.0, -1.73]]],
-  ["p14_w72_r1104", [[4659.9, 12584.3, -2.45], [4652.6, 12633.8, -2.45], [4646.6, 12676.2, -2.45], [4640.3, 12720.4, -2.45]]],
-  ["p16_w44_r11417", [[4897.3, 12222.5, -1.73], [4882.4, 12232.2, -1.73], [4866.9, 12243.6, -1.73], [4851.9, 12255.2, -1.73], [4838.6, 12266.3, -1.73]]],
-  ["p18_w52_r11837", [[8701.5, 7343.3, -2.45], [8708.8, 7328.0, -2.45], [8715.5, 7314.3, -2.45], [8722.3, 7300.8, -2.45], [8727.6, 7290.9, -2.45], [8733.0, 7281.2, -2.45], [8743.1, 7263.8, -2.45], [8754.4, 7245.8, -2.45], [8765.1, 7229.6, -2.45]]],
-  ["p19_w52_r11837", [[8701.5, 7343.3, 2.45], [8708.8, 7328.0, 2.45], [8715.5, 7314.3, 2.45], [8722.3, 7300.8, 2.45], [8727.6, 7290.9, 2.45], [8733.0, 7281.2, 2.45], [8743.1, 7263.8, 2.45], [8754.4, 7245.8, 2.45], [8765.1, 7229.6, 2.45]]],
-  ["p24_w98_r11984", [[1975.8, 11577.6, -2.45], [1975.4, 11589.2, -2.45], [1974.4, 11598.4, -2.45], [1972.7, 11607.3, -2.45], [1971.3, 11617.2, -2.45], [1970.1, 11628.6, -2.45], [1969.6, 11640.1, -2.45], [1969.8, 11650.1, -2.45], [1970.5, 11659.0, -2.45], [1971.8, 11668.2, -2.45], [1972.7, 11676.6, -2.45]]],
-  ["p26_w72_r434", [[4664.3, 12579.4, -2.45], [4659.5, 12603.6, -2.45], [4653.4, 12633.0, -2.45], [4647.5, 12669.6, -2.45], [4642.8, 12695.5, -2.45]]],
-  ["p27_w80_r1057", [[5300.0, 9187.8, -3.53], [5296.4, 9197.2, -3.53], [5292.7, 9207.6, -3.53], [5288.4, 9219.4, -3.53], [5284.2, 9231.6, -3.53], [5279.4, 9245.2, -3.53], [5274.3, 9259.8, -3.53]]],
-  ["p30_w5_r1045", [[1910.1, 11736.2, -1.6], [1914.6, 11741.6, -1.6], [1920.0, 11747.6, -1.6], [1924.8, 11752.6, -1.6], [1929.6, 11757.9, -1.6], [1934.4, 11763.3, -1.6], [1939.2, 11769.5, -1.6], [1943.8, 11776.0, -1.6], [1947.6, 11782.4, -1.6], [1951.5, 11789.8, -1.6], [1954.5, 11796.4, -1.6], [1957.6, 11804.0, -1.6]]],
-  ["p31_w57_r1806", [[1384.5, 9585.6, 1.6], [1394.0, 9601.6, 1.6], [1404.6, 9617.1, 1.6], [1416.9, 9632.6, 1.6]]],
+  ["p06_w18_r9423", [[8586.9, 5961.3, -7.48], [8574.4, 5965.5, -7.48], [8549.9, 5978.3, -7.48], [8526.5, 5994.3, -7.48], [8504.6, 6004.9, -7.48], [8473.5, 6030.5, -7.48], [8462.2, 6037.1, -7.48], [8446.3, 6042.6, -7.48], [8438.2, 6043.8, -7.48], [8429.4, 6043.9, -7.48], [8421.6, 6042.6, -7.48], [8413.9, 6040.6, -7.48], [8402.9, 6035.3, -7.48], [8378.5, 6017, -7.48]]],
+  ["p09_w98_r241", [[1946.5, 11590.3, -2.45], [1974.6, 11624.9, -2.45], [2009.4, 11665.3, -2.45], [2021, 11678.2, -2.45]]],
+  ["p11_w13_r11619", [[4817.4, 8144.2, 7.12], [4862, 8134.3, 7.12], [4912.1, 8127.1, 7.12], [4968.7, 8115.9, 7.12]]],
+  ["p12_w44_r301", [[4873.8, 12248.8, -1.73], [4829.7, 12207.2, -1.73], [4798.4, 12178.3, -1.73], [4765.3, 12146.2, -1.73], [4756.5, 12133.3, -1.73], [4746.4, 12110.9, -1.73]]],
+  ["p14_w72_r1104", [[4652, 12628.3, -2.45], [4682.3, 12638.2, -2.45], [4725, 12652.2, -2.45], [4793.4, 12675.8, -2.45]]],
+  ["p16_w44_r11417", [[4826.1, 12211.4, -1.73], [4870.1, 12253.2, -1.73], [4898, 12276.8, -1.73], [4931.9, 12303.5, -1.73], [4973.1, 12329.7, -1.73]]],
+  ["p18_w52_r11837", [[8723.5, 7303, -2.45], [8727.6, 7292.2, -2.45], [8776.7, 7146.9, -2.45], [8786.9, 7111.8, -2.45], [8794.8, 7080.2, -2.45], [8799.3, 7058.8, -2.45], [8810.1, 7007.2, -2.45], [8816.9, 6963.3, -2.45], [8822.5, 6916.4, -2.45]]],
+  ["p19_w52_r11837", [[8723.5, 7303, 2.45], [8727.6, 7292.2, 2.45], [8776.7, 7146.9, 2.45], [8786.9, 7111.8, 2.45], [8794.8, 7080.2, 2.45], [8799.3, 7058.8, 2.45], [8810.1, 7007.2, 2.45], [8816.9, 6963.3, 2.45], [8822.5, 6916.4, 2.45]]],
+  ["p24_w98_r11984", [[1968.2, 11714.5, 2.45], [1967.2, 11650.3, 2.45], [1967.3, 11534.8, 2.45], [1971.9, 11401.5, 2.45], [1977.8, 11320.4, 2.45], [1983.9, 11266, 2.45], [1990.6, 11212.9, 2.45], [1998.9, 11159.5, 2.45], [2005.2, 11111.6, 2.45], [2018.6, 11053.6, 2.45], [2045.3, 10942.5, 2.45]]],
+  ["p26_w72_r434", [[4654.6, 12617.4, 2.45], [4668.2, 12621.8, 2.45], [4684.7, 12627.2, 2.45], [4727.5, 12641.3, 2.45], [4798.8, 12665.7, 2.45]]],
+  ["p27_w80_r1057", [[5280.4, 9225.3, 0], [5282.3, 9227.7, 0], [5284.8, 9229.3, 0], [5287.8, 9230.1, 0], [5290.8, 9229.8, 0], [5302.1, 9226.3, 0], [5334.9, 9214.5, 0]]],
+  ["p30_w5_r1045", [[1940, 11770, 0], [1968.8, 11794.6, 0], [1992.4, 11809.3, 0], [2014.7, 11820.2, 0], [2048.7, 11833.4, 0], [2150, 11862.6, 0], [2183.1, 11874.9, 0], [2200.9, 11882.5, 0], [2225.2, 11893.9, 0], [2261.3, 11919.2, 0], [2334.2, 11972.8, 0], [2367, 11993.6, 0]]],
+  ["p31_w57_r1806", [[1399.6, 9610.9, 1.6], [1393.3, 9588.1, 1.6], [1392.4, 9572.4, 1.6], [1392.1, 9535.6, 1.6]]],
 ];
+/** The half width of way r as the network draws it at the centre-line sample nearest (x, z): its OSM half width with the width taper (road-network.js taperDhw). */
+function drawnHalfWidth(net, r, x, z) {
+  const hw = Math.max(0.8, r.width / 2), taper = net.taperDhw[r.id], ch = taper ? net.chains.find((c) => c.road === r.id) : null;
+  if (!ch) return hw;
+  let j = 0, best = Infinity;
+  for (let i = 0; i < ch.x.length; i++) { const d = (ch.x[i] - x) ** 2 + (ch.z[i] - z) ** 2; if (d < best) { best = d; j = i; } }
+  return hw + taper[j];
+}
 /** T5: a Pfaffenthal house under the Pont Rouge (QA3 N3-B01: the car stopped on the deck at 5209,8052.8). */
 const ROUGE_POSE = [5209.0, 8052.8, 3.0], ROUGE_HOUSE = 7233;
 
@@ -88,17 +98,22 @@ export function runDrive12Checks({ check, section, stats, data, field, surface, 
   const stopped = [];
   const nearWay = (r, x, z) => r.pts.some((q, i) => i + 1 < r.pts.length && segDist(x, z, q, r.pts[i + 1]) <= 1);
   for (const [name, all] of WALL_ROUTES) {
-    // the QA's route carries its lane offset on into the next ways, where that lane may lie off the carriageway (a narrower way): judged on the wall's own way only
+    // the QA's route carries its lane offset on into the next ways, where that lane may lie off the carriageway (a narrower way): judged on the wall's own way only (its points
+    // on that way), and the lane kept LANE.edgeClear inside the carriageway as it is DRAWN - where a width taper narrows the way (a lane drop: Kirchberg 9423, 5 lanes -> 3) the
+    // outer lane ends with the tarmac, as laneOffsets keeps it inside the OSM width
     const way = data.roads[Number(name.split('_r')[1])];
     let keep = 0;
     while (keep < all.length && nearWay(way, all[keep][0], all[keep][1])) keep++;
-    const pts = all.slice(0, Math.max(4, keep + 1));
+    const pts = all.slice(0, Math.max(2, keep));
     const poly = [];
     for (let i = 0; i + 1 < pts.length; i++) {
       const [ax, az, off] = pts[i], [bx, bz] = pts[i + 1], l = Math.hypot(bx - ax, bz - az);
       if (l < 1e-3) continue;
       const dx = (bx - ax) / l, dz = (bz - az) / l;
-      for (let s = 0; s < l; s += 1) poly.push([ax + dx * s - dz * off, az + dz * s + dx * off]);
+      for (let s = 0; s < l; s += 1) {
+        const lim = Math.max(0, drawnHalfWidth(net, way, ax + dx * s, az + dz * s) - LANE.edgeClear), o = Math.max(-lim, Math.min(lim, off));
+        poly.push([ax + dx * s - dz * o, az + dz * s + dx * o]);
+      }
     }
     const st = car.state;
     // the QA's start: the game's teleport to the road nearest the first point (main.js teleportNear: placeClear, landCar), then the car put on the first point at that level
