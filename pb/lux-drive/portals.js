@@ -63,6 +63,7 @@ const CARRIAGEWAY = new Set([
  * drawn road ends at it from any side (the Grouft south mouth: Rue du Grünewald runs back up along the tunnel from the mouth).
  * roadAt(x, z) (optional): the index of the drawn way whose carriageway holds the point (-1: none).  A road that runs behind / over the wall (an underpass under a street) caps the
  * headwall to a parapet over that road.
+ * tubeIds (optional): the ids of the tunnel ways that are drivable tubes (tunnel-tubes.js): they get no closed portal.
  * blocked(p) (optional): does the wall of portal p stand in something solid (a house, a deck)?  Then there is no portal: a mouth cut into a house front or a box under a
  * deck slab (QA2 N-U01) is worse than the road ending at the facade.
  * Returns { list, at(x, z), collide(x, z, radius, y) }.
@@ -76,8 +77,9 @@ const CARRIAGEWAY = new Set([
  *   top    the height of the mouth above the ground
  *   depth  how deep the wall goes into the tunnel
  */
-export function createPortals(roads, heightAt = null, isDrawn = () => true, inPlay = null, roadAt = null, blocked = null) {
-  const tunnels = roads.filter((r) => r.tunnel && r.info.drivable);
+export function createPortals(roads, heightAt = null, isDrawn = () => true, inPlay = null, roadAt = null, blocked = null, tubeIds = null) {
+  // (a tunnel the car drives through - tunnel-tubes.js - has open mouths of its own, tunnel-view.js: no closed portal)
+  const tunnels = roads.filter((r) => r.tunnel && r.info.drivable && !(tubeIds && tubeIds.has(r.id)));
   const surface = roads.filter((r) => !r.tunnel && r.info.drivable);
 
   // ---- chain the tunnel ways into runs (two ways that share an end belong to the same tunnel)

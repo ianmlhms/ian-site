@@ -524,18 +524,32 @@ export function createDeckNetwork(decks, surface = null) {
 }
 
 /** The ground the car, the camera and the renderer see: the terrain surface, with the bridge decks on top.
- *  `hint(y)` tells it how high the car is (a car UNDER a bridge stays under it). */
-export function createGround(surface, deckNetwork) {
+ *  `hint(y)` tells it how high the car is (a car UNDER a bridge stays under it).
+ *  tubes (optional, tunnel-tubes.js createTubeNetwork): the drivable tunnels.  A car whose hint lies at a tube's level, over the tube's footprint, stands on the
+ *  tube's floor (under the terrain, which stays as it is); a car over a tube's exposed roof stands on the roof.  With a hint of 1e9 (the renderer, the bakers)
+ *  nothing changes. */
+export function createGround(surface, deckNetwork, tubes = null) {
   let hintY = 1e9;
   const scratch = { top: 0, slope: 0, ux: 1, uz: 0, along: 0 };
+  const withTubes = !!(tubes && tubes.count > 0);
+  /** The lattice / continuous ground under a car at y, with the tubes (and then the decks) on it. */
+  const levelOf = (x, z, y, g0) => {
+    const g = withTubes ? tubes.groundAt(x, z, y, g0) : g0;
+    if (!deckNetwork || deckNetwork.count === 0) return g;
+    const hit = deckNetwork.deckAt(x, z, y, scratch);
+    return hit && hit.top > g ? hit.top : g;
+  };
+  const NORMAL_STEP = 0.5;          // m: the normal on a tube floor is the slope of the floor over this
   const out = {
-    height(x, z) {
-      const g = surface.height(x, z);
-      if (!deckNetwork || deckNetwork.count === 0) return g;
-      const hit = deckNetwork.deckAt(x, z, hintY, scratch);
-      return hit && hit.top > g ? hit.top : g;
-    },
+    height(x, z) { return levelOf(x, z, hintY, surface.height(x, z)); },
     normal(x, z, o) {
+      if (withTubes && tubes.groundAt(x, z, hintY, -1e9) > -1e9) {      // (in a tube, or on its roof: the slope of that floor)
+        const e = NORMAL_STEP, at = (px, pz) => tubes.groundAt(px, pz, hintY, surface.height(px, pz));
+        const gx = (at(x + e, z) - at(x - e, z)) / (2 * e), gz = (at(x, z + e) - at(x, z - e)) / (2 * e);
+        const l = Math.hypot(gx, 1, gz);
+        o.x = -gx / l; o.y = 1 / l; o.z = -gz / l;
+        return o;
+      }
       if (deckNetwork && deckNetwork.count > 0) {
         const g = surface.height(x, z);
         const hit = deckNetwork.deckAt(x, z, hintY, scratch);
@@ -551,27 +565,22 @@ export function createGround(surface, deckNetwork) {
     /** The ground under a WHEEL: the continuous height function (the carve itself, not its 1 m lattice) with the decks on top.  The lattice is what the renderer
      *  draws; a wheel on it read every facet, and beside a kerb the kerb's saw-tooth on the lattice (QA D01).  Where the carriageway is flat the two agree to the
      *  interpolation error of the lattice (gate J); at the kerb the wheel meets the real kerb, 13 cm over 0.35 m, not a 1 m ramp that zigzags into the lane. */
-    contact(x, z) {
-      const g = surface.field ? surface.field.height(x, z) : surface.height(x, z);
-      if (!deckNetwork || deckNetwork.count === 0) return g;
-      const hit = deckNetwork.deckAt(x, z, hintY, scratch);
-      return hit && hit.top > g ? hit.top : g;
-    },
+    contact(x, z) { return levelOf(x, z, hintY, surface.field ? surface.field.height(x, z) : surface.height(x, z)); },
     hint(y) { hintY = y; },
     /** The height the car stands on at (x, z) for a car at the height `y` (the hint as an argument, the global one stays as it is): the level of a pose that is not
      *  the car's own (a teleport candidate, a lane probe - drive12). */
-    levelAt(x, z, y) {
-      const g = surface.height(x, z);
-      if (!deckNetwork || deckNetwork.count === 0) return g;
-      const hit = deckNetwork.deckAt(x, z, y, scratch);
-      return hit && hit.top > g ? hit.top : g;
+    levelAt(x, z, y) { return levelOf(x, z, y, surface.height(x, z)); },
+    /** The underside of the lowest deck above height y over (x, z), Infinity when the sky is free; in a tube, its ceiling. */
+    overheadAt(x, z, y) {
+      const deck = deckNetwork ? deckNetwork.overheadAt(x, z, y) : Infinity;
+      return withTubes ? Math.min(deck, tubes.ceilingAt(x, z, y)) : deck;
     },
-    /** The underside of the lowest deck above height y over (x, z), Infinity when the sky is free. */
-    overheadAt(x, z, y) { return deckNetwork ? deckNetwork.overheadAt(x, z, y) : Infinity; },
     onDeck(x, z) { return !!deckNetwork && deckNetwork.count > 0 && deckNetwork.deckAt(x, z, hintY, scratch) !== null; },
+    /** Is the car (its body at the hint) inside a tube? */
+    inTube(x, z) { return withTubes && tubes.inside(x, z, hintY - DECK.hintLift); },
     /** The bank under a deck end for a car under the deck (y: the level of its wheels): see bankCollide. */
     bankCollide(x, z, radius, y) { return deckNetwork && deckNetwork.bankCollide ? deckNetwork.bankCollide(x, z, radius, y) : null; },
-    surface, decks: deckNetwork ? deckNetwork.decks : [],
+    surface, decks: deckNetwork ? deckNetwork.decks : [], tubes: withTubes ? tubes : null,
   };
   return out;
 }

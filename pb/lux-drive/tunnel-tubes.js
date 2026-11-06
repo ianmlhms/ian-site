@@ -21,6 +21,7 @@
  *
  * Pure (no THREE): the game, the harness and the tools read the same tubes. */
 import { PORTAL } from './config.js';
+import { insidePolygon, houseGrid } from './tunnel-cover.js';
 
 export const TUBE = Object.freeze({
   // the classes of the roads that get a tube (a car park lane, a service way, a track or a footway stays closed)
@@ -39,6 +40,9 @@ export const TUBE = Object.freeze({
   approachRun: 40,         // m of each approach road that is part of the floor problem (its surface is the boundary)
   fixedInside: 4,          // m: the surface outside the mouth is the boundary up to this far before the OSM mouth (the cap of a carved road end rises there)
   blend: 8,                // m in front of each mouth over which the car's ground blends from the surface into the floor of the tube
+  flushIn: 10,             // m: the cross-section of the approach at a face fades into the plane floor over this ...
+  flushOut: 0.4,           // ... read this far out of the face ...
+  flushMax: 0.3,           // ... and never more than this off the plane (the cut slope beside a narrow approach is not its road)
   frontBack: 1.2,          // m: the face of a portal stands this far before the place where the drawn terrain rises over the road ...
   frontOut: 12,            // ... but at most this far out of the OSM mouth ...
   frontIn: 3,              // ... or this far into it
@@ -60,6 +64,7 @@ export const TUBE = Object.freeze({
   exposeMargin: 0.3,       // m: a stretch of the shell whose land lies less than this over the roof is "exposed" (masked and drawn)
   cell: 32,                // m: the spatial hash
   pushMax: 0.8,            // m: the most a wall pushes in one pass
+  houseClear: 0.5,         // m: a house over a tube whose land lies less than this over the roof stands in the tube
   boundReach: 8,           // m: the bounds over the tube are eroded over this ...
   boundSigma: 12,          // ... and smoothed over this (m, a Gaussian) into the target of the floor ...
   approachGrade: 0.075,    // ... after reaching out from every bound at this grade (the highest floor of this grade under the bounds)
@@ -74,6 +79,22 @@ export const TUBE = Object.freeze({
  * shows (the hood of a portal) and the terrain inside it is hidden (exposedStretches, tunnel-mask.js).  Held under the land too, the floor of the Cents tunnel dived 1 m
  * just inside its mouth (13 % up and down) for a hill 5.6 m over the road. */
 const OVER_KINDS = new Set([...TUBE.kinds, 'service', 'living_street', 'busway']);
+
+/** The side offsets (in inner half widths) at which the cross-section of an approach is read at a face. */
+const FLUSH_LATS = [-1, -0.875, -0.75, -0.625, -0.5, -0.375, -0.25, -0.125, 0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1];
+
+/**
+ * The floor of a tube at sample i (+ fraction f toward i + 1) and side offset lat: the profile, the crossfall and the approach's cross-section near each face.  The game
+ * (createTubeNetwork) and the view (tunnel-view.js) read the floor through this one function.
+ */
+export function floorOf(tube, i, f, lat) {
+  const s = tube.s[i] + (tube.s[i + 1] - tube.s[i]) * f;
+  let h = tube.floor[i] + (tube.floor[i + 1] - tube.floor[i]) * f + (tube.cross[i] + (tube.cross[i + 1] - tube.cross[i]) * f) * lat;
+  const u = clamp(lat / tube.innerHalf, -1, 1) * 8 + 8, k = Math.min(15, Math.floor(u)), r = u - k;
+  if (tube.flushA && s < tube.sA + TUBE.flushIn) h += (tube.flushA[k] + (tube.flushA[k + 1] - tube.flushA[k]) * r) * (1 - smooth01((s - tube.sA) / TUBE.flushIn));
+  if (tube.flushB && s > tube.sB - TUBE.flushIn) h += (tube.flushB[k] + (tube.flushB[k + 1] - tube.flushB[k]) * r) * (1 - smooth01((tube.sB - s) / TUBE.flushIn));
+  return h;
+}
 
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const endsOf = (road) => [road.pts[0], road.pts[road.pts.length - 1]];
@@ -234,7 +255,7 @@ function clearanceOf(kind, length) {
  * Builds one tube (or returns { reject: why }).
  * surface: surface.js (height = the drawn lattice, field.height = the continuous ground, roadInfoAt), net: the road network.
  */
-function buildTube(chain, appA, appB, surface, net, roads) {
+function buildTube(chain, appA, appB, surface, net, roads, housesNear) {
   const way = chain.ways.find((w) => w.name) || chain.ways[0];
   const width = Math.max(...chain.ways.map((w) => w.width));
   const length = chain.ways.reduce((s, w) => s + w.length, 0);
@@ -355,8 +376,9 @@ function buildTube(chain, appA, appB, surface, net, roads) {
   /** The face of a portal: before the place where the drawn terrain rises over the road (the straight line t between the approaches). */
   const faceOf = (sMouth, dirOut) => {
     let sRise = null;
-    const hw = clamp(width / 2 - 0.5, 0.6, 1.0);      // (the middle of the approach: the cut of a narrow approach rises beside its lane, René Konen south)
-    for (let k = -TUBE.frontOut - 2; k <= TUBE.frontIn + 8; k += 0.5) {
+    const hw = 0.5;      // (the middle of the approach: the hill rises across the whole road, the cut of a narrow approach beside its lane - René Konen south)
+    // (from the end of the approach's boundary inward: farther out the line IS the drawn road, and only the lattice of a narrow approach lay over its continuous ground)
+    for (let k = -TUBE.fixedInside; k <= TUBE.frontIn + 8; k += 0.5) {
       const sq = sMouth - dirOut * k;           // k: metres INTO the tunnel from the mouth
       const i = clamp(Math.round(sq), 0, n - 1);
       let rises = false;
@@ -364,31 +386,66 @@ function buildTube(chain, appA, appB, surface, net, roads) {
         const [x, z] = at(i, lat);
         if (surface.height(x, z) - (t[i] + cross[i] * lat) > TUBE.riseLimit) { rises = true; break; }     // (over the straight road, not the floor: a sag would move the face out)
       }
-      if (rises && k > -TUBE.frontOut) { sRise = k; break; }
+      if (rises) { sRise = k; break; }
     }
     const kFace = sRise === null ? 0 : clamp(sRise - TUBE.frontBack, -TUBE.frontOut, TUBE.frontIn);
     return sMouth - dirOut * kFace;
   };
   const sFa = faceOf(sMouthA, -1), sFb = faceOf(sMouthB, 1);
+  // the floor meets the approach AT the face: the surface is the boundary up to the face (the terrain rises only behind it), the floor free from there on.  (With the
+  // boundary at the mouth +- TUBE.fixedInside, a face outside it met a floor that followed the chord between the mouths: 12 cm under the road at the face of Rue du Grünewald.)
+  for (let i = 0; i < n; i++) {
+    if (s[i] <= sFa || s[i] >= sFb) { t[i] = contact(pts[i][0], pts[i][1]); w[i] = TUBE.wFixed; } else w[i] = TUBE.wFree;
+  }
+  iA = 0; iB = n - 1;
+  while (iA < n - 1 && s[iA + 1] <= sFa) iA++;
+  while (iB > 0 && s[iB - 1] >= sFb) iB--;
+  for (let i = iA + 1; i < iB; i++) t[i] = t[iA] + ((t[iB] - t[iA]) * (s[i] - s[iA])) / Math.max(1e-6, s[iB] - s[iA]);
   boundsBetween(sFa, sFb);
   const f = solve();
   // ---- the measures: grade, curvature, how much of the bound is still broken
   let grade = 0, gradeAt = 0, curve = 0, curveAt = 0, over = 0, overRoad = 0;
   for (let i = 1; i < n - 1; i++) {
-    if (s[i] < Math.max(sFa, fixA) || s[i] > Math.min(sFb, fixB)) continue;          // (the approaches are the roads of the world as they are: a steep approach is not the tube's)
+    if (s[i] < Math.max(sFa, fixA) || s[i] > Math.min(sFb, fixB)) continue;     // (the approaches are the roads of the world as they are: a face out on a steep approach is not the tube's grade)
     const gi = Math.abs(f[i + 1] - f[i - 1]) / Math.max(1e-6, s[i + 1] - s[i - 1]);
     if (gi > grade) { grade = gi; gradeAt = s[i]; }
     const ci = Math.abs(f[i + 1] - 2 * f[i] + f[i - 1]);
-    if (s[i] > fixA && s[i] < fixB && ci > curve) { curve = ci; curveAt = s[i]; }
+    if (ci > curve) { curve = ci; curveAt = s[i]; }
     const o = f[i] - upper[i];
     if (o > 0.02) { over = Math.max(over, o); if (hardKind[i] === 1) overRoad = Math.max(overRoad, o); }
   }
   const tube = {
-    name: way.name || way.kind, kind: way.kind, ids: chain.ways.map((r) => r.id), oneway: chain.ways.every((r) => r.oneway), lanes: way.lanes || 1, width,
+    name: way.name || way.kind, label: way.name || '', kind: way.kind, ids: chain.ways.map((r) => r.id), oneway: chain.ways.every((r) => r.oneway), lanes: way.lanes || 1, width,
     length, innerHalf, outerHalf, clearance, roofDepth,
     x: Float64Array.from(pts, (p) => p[0]), z: Float64Array.from(pts, (p) => p[1]), s, tx, tz, floor: f, cross,
-    sMouthA, sMouthB, sA: sFa, sB: sFb, upper: Float32Array.from(upper), line: Float32Array.from(t), approachA: appA.road.id, approachB: appB.road.id, grade, curve, curveAt, over, overRoad,
+    sMouthA, sMouthB, sA: sFa, sB: sFb, flushA: null, flushB: null, upper: Float32Array.from(upper), line: Float32Array.from(t), approachA: appA.road.id, approachB: appB.road.id, grade, curve, curveAt, over, overRoad,
   };
+  // the cross-section of each approach at its face (what the plane f + cross * lat does not hold: the crown of a street, the gully of a narrow approach), fading out
+  // TUBE.flushIn m into the tube: the floor meets every lane of the approach without a step (flush, like the deck ends)
+  const residualAt = (sFace, dirOut) => {
+    const i = clamp(Math.round(sFace + dirOut * TUBE.flushOut), 0, n - 1);
+    const out = new Float32Array(FLUSH_LATS.length);
+    const [xc, zc] = at(i, 0), base = contact(xc, zc);
+    FLUSH_LATS.forEach((u, k) => {
+      const lat = u * innerHalf, [x, z] = at(i, lat);
+      out[k] = clamp(contact(x, z) - base - cross[i] * lat, -TUBE.flushMax, TUBE.flushMax);
+    });
+    return out;
+  };
+  const flushA = residualAt(sFa, -1), flushB = residualAt(sFb, 1);
+  // a house standing in the tube (its footprint over the tube where the land under it lies lower than the roof: the house's walls would stand in the tunnel) keeps it closed
+  if (housesNear) {
+    for (let i = 0; i < n; i++) {
+      if (s[i] < sFa || s[i] > sFb) continue;
+      for (const lat of [-outerHalf, 0, outerHalf]) {
+        const [x, z] = at(i, lat);
+        if (surface.height(x, z) < f[i] + roofDepth + TUBE.houseClear && housesNear(x, z).some((b) => insidePolygon(b.pts, x, z))) {
+          return { reject: `a house stands in it at ${Math.round(x)},${Math.round(z)}`, tube };
+        }
+      }
+    }
+  }
+  tube.flushA = flushA; tube.flushB = flushB;
   if (grade > TUBE.gradeMax) return { reject: `grade ${(grade * 100).toFixed(1)} % at ${(gradeAt - sMouthA).toFixed(0)} m from the first mouth (faces ${(sFa - sMouthA).toFixed(1)} / ${(sFb - sMouthA).toFixed(1)})`, tube };
   if (overRoad > 0.05) return { reject: `a road over it ${overRoad.toFixed(2)} m into the roof`, tube };
   return { tube };
@@ -396,11 +453,13 @@ function buildTube(chain, appA, appB, surface, net, roads) {
 
 /**
  * The tubes of a road network.
- * roads: the decoded ways (after tunnel-cover.js); surface: surface.js; net: road-network.js (surface.field.network).
+ * roads: the decoded ways (after tunnel-cover.js); surface: surface.js; net: road-network.js (surface.field.network); buildings (optional): the footprints
+ * [{ pts }] (a tube a house stands in stays closed).
  * Returns { tubes, rejected: [{ name, ids, why }] }.
  */
-export function findTubes(roads, surface, net) {
+export function findTubes(roads, surface, net, buildings = null) {
   const tunnels = roads.filter((r) => r.tunnel && r.info.drivable && r.pts.length >= 2);
+  const housesNear = buildings ? houseGrid(buildings, tunnels) : null;
   const tubes = [], rejected = [];
   for (const run of tunnelRuns(tunnels)) {
     const name = (run.find((r) => r.name) || run[0]).name || run[0].kind;
@@ -416,7 +475,7 @@ export function findTubes(roads, surface, net) {
     const appA = approachAt(roads, net, p[0], [outA[0] / la, outA[1] / la], tunnelIds);
     const appB = approachAt(roads, net, p[m - 1], [outB[0] / lb, outB[1] / lb], tunnelIds);
     if (!appA || !appB) { rejected.push({ name, ids, length, why: `no drawn road at ${appA ? 'the end' : 'the start'}` }); continue; }
-    const built = buildTube(chain, appA, appB, surface, net, roads);
+    const built = buildTube(chain, appA, appB, surface, net, roads, housesNear);
     if (built.reject) { rejected.push({ name, ids, length, why: built.reject, tube: built.tube }); continue; }
     tubes.push(built.tube);
   }
@@ -453,7 +512,6 @@ export function createTubeNetwork(tubes) {
       }
     }
   });
-  const floorAt = (tube, i, f, lat) => tube.floor[i] + (tube.floor[i + 1] - tube.floor[i]) * f + (tube.cross[i] + (tube.cross[i + 1] - tube.cross[i]) * f) * lat;
 
   /** The nearest tube segment within `reach` of its centre line (past the outer half by `reach`). */
   function locate(x, z, out, reach = 0) {
@@ -479,7 +537,7 @@ export function createTubeNetwork(tubes) {
     if (!found) return null;
     out.tube = found.tube; out.i = found.i; out.f = found.f; out.s = found.s; out.lat = found.lat;
     out.ux = found.ux; out.uz = found.uz; out.rx = found.rx; out.rz = found.rz;
-    out.floor = floorAt(found.tube, found.i, found.f, found.lat);
+    out.floor = floorOf(found.tube, found.i, found.f, found.lat);
     return out;
   }
 
@@ -525,8 +583,8 @@ export function createTubeNetwork(tubes) {
     return L.s >= tube.sA - 0.3 && L.s <= tube.sB + 0.3 && Math.abs(L.lat) <= tube.innerHalf + 0.05 && y >= L.floor - 1.0 && y <= L.floor + tube.clearance;
   }
 
-  /** The name of the tube the car is in (or null): the road name the dashboard shows. */
-  function nameAt(x, z, y) { return inside(x, z, y) ? L.tube.name : null; }
+  /** The name of the tube the car is in ('' unnamed), or null outside: the road name the dashboard shows. */
+  function nameAt(x, z, y) { return inside(x, z, y) ? L.tube.label : null; }
 
   /**
    * The solids of a tube in its own frame (s along, lat across): the two walls (lat innerHalf .. outerHalf, s from face to face) and the two
@@ -588,4 +646,49 @@ export function exposedStretches(tube, heightAt) {
     if ((!exposed || i === i1) && start >= 0) { out.push({ tube, i0: Math.max(i0, start - 3), i1: Math.min(i1, (exposed ? i : i - 1) + 3) }); start = -1; }
   }
   return out;
+}
+
+/** The road under a car in a tube (surface.roadInfoAt's fields): asphalt, fully on the road (the car's grip and top speed). */
+export function tubeRoadInfo(out) {
+  out.coverage = 1; out.lat = 0; out.hw = 3; out.a0 = 3; out.kind = 0; out.surface = 0; out.road = -1; out.lines = 0; out.lanes = 1; out.s = 0;
+  return out;
+}
+
+/** The tubes of the world as the game builds them (main.js, the harness and the tools call this): { network, tubes, rejected, ids } (ids: every tube way). */
+export function createTubes(roads, surface, net, buildings = null) {
+  const { tubes, rejected } = findTubes(roads, surface, net, buildings);
+  return { network: createTubeNetwork(tubes), tubes, rejected, ids: new Set(tubes.flatMap((t) => t.ids)) };
+}
+
+/**
+ * Where the shells of the tubes show (exposedStretches): nothing may stand there (a lamp of the approach, a tree, the crown of a wood would grow through the hood of a portal).
+ * Returns { inShell(x, z, r), clearings } (clearings: rectangles [x0, z0, x1, z1] for the generated woods, trees.js).
+ */
+export function tubeShells(tubes, heightAt) {
+  const boxes = [];
+  for (const tube of tubes) {
+    for (const st of exposedStretches(tube, heightAt)) {
+      const r = tube.outerHalf + TUBE.wing;
+      let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+      for (let i = st.i0; i <= st.i1; i++) { x0 = Math.min(x0, tube.x[i] - r); x1 = Math.max(x1, tube.x[i] + r); z0 = Math.min(z0, tube.z[i] - r); z1 = Math.max(z1, tube.z[i] + r); }
+      boxes.push({ tube, i0: st.i0, i1: st.i1, r, box: [x0, z0, x1, z1] });
+    }
+  }
+  const inShell = (x, z, rad = 0) => boxes.some((b) => {
+    if (x < b.box[0] - rad || x > b.box[2] + rad || z < b.box[1] - rad || z > b.box[3] + rad) return false;
+    for (let i = b.i0; i < b.i1; i++) {
+      const ax = b.tube.x[i], az = b.tube.z[i], ex = b.tube.x[i + 1] - ax, ez = b.tube.z[i + 1] - az, ll = ex * ex + ez * ez || 1;
+      const f = clamp(((x - ax) * ex + (z - az) * ez) / ll, 0, 1);
+      if (Math.hypot(x - ax - ex * f, z - az - ez * f) <= b.r + rad) return true;
+    }
+    return false;
+  });
+  return { inShell, clearings: boxes.map((b) => b.box) };
+}
+
+/** The lamps of placeStreetLights without those in a tube's shell (a new object). */
+export function lampsOutsideShells(lamps, inShell) {
+  const keep = [];
+  for (let i = 0; i < lamps.count; i++) if (!inShell(lamps.x[i], lamps.z[i], 0.5)) keep.push(i);
+  return { count: keep.length, x: Float32Array.from(keep, (i) => lamps.x[i]), z: Float32Array.from(keep, (i) => lamps.z[i]), yaw: Float32Array.from(keep, (i) => lamps.yaw[i]), size: Uint8Array.from(keep, (i) => lamps.size[i]) };
 }

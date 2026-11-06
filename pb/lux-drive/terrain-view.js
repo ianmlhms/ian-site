@@ -8,8 +8,10 @@ const RESELECT_DISTANCE = 4;          // m the car moves before the tile set is 
 const CACHE_LIMIT = 700;
 const TILE_BUDGET_MS = 2;             // wall-clock ms per frame spent building terrain tiles (at least one tile per frame, even if it takes longer)
 
-export function createTerrainView({ scene, surface, field, material: initialMaterial, quality, marks = null }) {
+export function createTerrainView({ scene, surface, field, material: initialMaterial, quality, marks = null, variant = null }) {
   let material = initialMaterial;
+  // tunnels16: a tile may need a twin of the material (tunnel-mask.js: the tiles over the shell of a tunnel); variant(leaf, material) picks it
+  const pick = (leaf) => (variant ? variant(leaf, material) : material);
   const group = new THREE.Group();
   group.name = 'luxdrive-terrain';
   scene.add(group);
@@ -65,7 +67,7 @@ export function createTerrainView({ scene, surface, field, material: initialMate
     const data = buildTileMesh(leaf, nodesFor(leaf), split, field, marks);
     const geometry = makeGeometry(data);
     if (have) { have.mesh.geometry.dispose(); have.mesh.geometry = geometry; have.signature = data.signature; stats.rebuilt++; return; }
-    const mesh = new THREE.Mesh(geometry, material);
+    const mesh = new THREE.Mesh(geometry, pick(leaf));
     mesh.position.set(leaf.x0, 0, leaf.z0);
     mesh.matrixAutoUpdate = false; mesh.updateMatrix();
     mesh.name = `tile ${leaf.key}`;
@@ -121,7 +123,7 @@ export function createTerrainView({ scene, surface, field, material: initialMate
   }
 
   /** Swaps the ground shader of every tile (the cheaper one for the `low` quality level). */
-  function setMaterial(next) { material = next; for (const t of tiles.values()) t.mesh.material = next; }
+  function setMaterial(next) { material = next; for (const t of tiles.values()) t.mesh.material = pick(t.leaf); }
 
   return { group, update, buildAll, setMaterial, tiles, stats, dispose() { for (const t of tiles.values()) t.mesh.geometry.dispose(); } };
 }
