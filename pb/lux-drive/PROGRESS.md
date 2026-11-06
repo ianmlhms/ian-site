@@ -1775,3 +1775,75 @@ Scratch tools `tools/` (`deckdrive.mjs` / `qscan.mjs` every car deck driven, `dr
 * N-T02, T10, M08, TR01, BL01, BL02, the S3 markings: not touched (out of time); the montage `t.jpg` shows them unchanged.
 * The approach slabs are drawn as deck (asphalt, parapet): on the side where the road is at deck level the slab lies 2 cm under the road (possible z-fight at a distance on a real GPU, not seen in
   SwiftShader).  Not checked on an iPad.
+
+## Look 11 (branch `lux-drive-look11`, Mac mini): retaining walls, slabs at Grund, water, camera in walls, wheels, trees, façades, deck 218
+
+Started from live v51 (12440570).  Round folder `~/Library/Caches/luxdrive-work/look11/`: before = a `git archive` of v51 (`v51/`) shot at the same poses (`poses.json`, 41 poses: the QA2
+repro poses of every item + a free camera at 10 walls around the map), noon, clear, medium; after = this branch.  Montages (left = live v51, right = look11) `montages/1_walls_E2_C1.jpg`,
+`1_walls_10.jpg`, `2_roads_NT02_T02_T04_T11.jpg`, `3_water_M08.jpg`, `4_camera_car.jpg`, `5_trees_buildings.jpg`, `6_deck218.jpg`, `7_markings_S3.jpg`; references (Commons, not shipped) `ref/`.
+Tools `tools/` (`walls_list.mjs`, `wall_pts.mjs`, `wall_twins.mjs`, `wall_foot.mjs` the ground in front of every face, `s6_before.mjs` the camera at N-C02 on v51, `nc01.mjs`, `pairs.py`).
+Nothing of the placement was changed: walls.bin, decks, road heights are surface11's (not re-baked, gate K unchanged).
+
+### 1. Retaining walls (Ian's E2 Eecherfeld / C1 Rue Godchaux) - `retaining-walls.js` (wallQuads), `wall-view.js`, `wall-material.js` (new)
+* What was wrong: (a) every stretch was a flat-shaded quad with its own normal and the courses were slices parallel to the sloping top and foot, tinted per 3.1 m cell: on a curved
+  wall (Godchaux) the facets and the slanted course bands were the big diamonds; (b) Eecherfeld walls 68 / 69 are the same wall baked twice by the two arms of the hairpin, 0.2 m
+  apart: two faces flickering and the end of one as the dark vertical stripe; 24 such twins on the map; (c) the coping was near-black (0.27): the dark top edge; (d) the
+  1 m lattice climbs up to 0.8 m in front of a vertical face (measured over every wall: 1520 of 8516 samples > 0.25 m): the sawtooth grass fringe at every foot.
+* Now: one face quad per stretch from the buried foot to the coping, SMOOTH normals (the mean of the two stretches at a point), a 4 % batter (the face leans back, the foot line
+  stays where the bake put it), the masonry in the shader from world height and the distance along the wall: LEVEL courses, staggered joints, per-block tint, damp foot;
+  three kinds - Luxembourg sandstone (the old town / Grund / Pfaffenthal / Clausen box), grey limestone rubble, poured concrete with 2.4 x 0.6 m formwork panels (by a stable hash
+  elsewhere); a thin pale coping slab (0.2 m, 5 cm lip, shadow line under it); the back of the block closed (no see-through over the sloping end); a footing of the wall's
+  stone, as high as the drawn ground within 0.9 m in front of the face (0.22 .. 0.75 m, 0.32 m out: inside the car's collision clearance of 0.25 m + 0.07); twins drawn once
+  (`drawnWalls`: 134 of 158 drawn; physics keeps both).  The normals turn to the viewer by the view direction (by gl_FrontFacing the face was lit as looking into the hill).
+  Triangles 17040 (budget 40000).
+* Compared with Commons photos of the Corniche / Pfaffenthal walls (`ref/`): grey-ochre stone, level courses, a coping - matched in tone and course scale; the concrete walls
+  of the Kirchberg / motorway roads read as panels.
+
+### 2. Slabs and paint - `ground-shader.js`
+* N-T02 Grund (5274,9215): probed in Node: the pale wedges are the median rule ("a gap <= 3 m between carriageways is paved") and the town's hard ground lying on the 0.5 -
+  0.7 m/m bank between the two carriageways.  A pavement / median is now only paint on level ground (full below 0.35 m/m, none above 0.6 m/m; the old town's steepest streets
+  are 0.2), the hard ground of the town likewise (0.43 .. 0.8 m/m): the bank takes the land's paint.  Better, NOT gone: the strips at Grund are now a pale/grass mix.
+* N-T05 / T11 aprons: a pavement reaches at most 5 m past its kerb.  At the QA poses the visible change is small (the aprons are mostly tarmac of a service way, not pavement).
+* T10: the water's shore is the 0.5 line of the 8 m cover, one pixel wide, with a band of wet earth: no teal fade over the lawn.  The water itself is OSM's (Kirchberg pond).
+* M08: road paint fades out on ground steeper than 0.4 m/m (a ribbon draped over the lattice at a wall foot stood up as a white line up the wall): the line is gone at the repro.
+
+### 3. Camera and car - `retaining-walls.js` createWallBlockTest, `main.js`, `car-wheels.js` (new), `car-model.js`
+* N-C02 (4620,11599): not a building - the car stands at the end of a service stub against wall 140 (3.6 m); the boom reached over the face into the block (v51 lens inside the
+  block, Node).  The lens test now includes the wall blocks (way out through the face or over the back): the picture is the road, but the boom is 2.1 m there (dead end against
+  a wall).  The pedestrian (4689,11620) and Centre Bourse poses are open views (not walls).
+* N-C01 (7115,9681): the 3.1 m boom is a building 4 m behind the car on the boom line (Node): correct, not changed.
+* N-C03: each DRAWN wheel has its own spring (bump 0.14 / droop 0.16 m) to the ground under it; the physics body is untouched.  At the 8 QA places, settled: wheel-to-ground
+  0.58 m worst without springs -> 0 wheels off within the travel.
+
+### 4. Trees, buildings - `tree-models.js`, `building-mesh.js`
+* TR01: the trunk stopped at the fork, the underside of the crown blob lay up to 0.07 x the height above it (1.4 m on a 20 m tree): the trunk now runs into the crown.
+* BL02: the façade's v (floors, windows, plinth) was measured from the ground under every vertex: bands followed the slope, bent at every quad diagonal, and every stretch had
+  its own floor height.  v is now world height over ONE level per house (the highest point of its foot, at most 1.4 m over its lowest).  Harness C bottom check adapted
+  (bottom = not at the eave), not loosened.
+* BL01 (wall + plinth over the pavement, Knappchen roof at the lane): footprint placement (OSM / bake), not touched.
+
+### 5. Deck 218 (Route de Bettembourg) - `deck-view.js`, `deck-shape.js` (SLIM, SLIM_PIERS, piersOf opts)
+* A footbridge / cycle bridge on its own (narrower than 6.5 m, no road deck within 3 m beside it: 179 narrow decks minus the footways of road bridges) is slim: 0.42 m
+  slab, filled to the ground only within 0.7 m of it (blend 0.5 m), dark asphalt, a pale edge beam, slim 0.45 m columns every 11 m (clear of carriageways), an open railing
+  (handrail, knee rail, posts every 3 m) instead of two solid 1 m walls, no abutment front wall.  Deck 218 reads as a cycle bridge beside the road; its ramp end near the
+  ground stays filled.
+
+### Harness section S (`harness-look11.js`, 11 checks; harness 144)
+S1 wall faces smooth (0 seams of 984), upright and leaning back by <= the batter; S2 no wall drawn twice; S3 footing covers the drawn ground in front (0 of 850; 7 points where
+the footing is at its cap, ratchet 40); S4 trunk into crown (120 models); S5 level storeys (4178 houses sampled); S6 lens never inside a wall block (N-C02 poses + the car
+backed up to 88 walls; v51 fails the QA pose); S7 slim columns off carriageways (766); S8 drawn wheels on the ground at the N-C03 places.
+
+### Gates
+* `harness.js`: **144 of 144 PASS** (133 + section S 11; walls 158 / 17040 triangles / 8 chunks in view, K unchanged; Q1 13 decks = ratchet).
+* `luxdrive_world`: PASS, draw calls medium 150, high 212 (as v51).  `luxdrive_holes`: 0 hole pixels at medium and at HOLES_Q=low (72 poses each).  `luxdrive_ui`: PASS.
+  `luxdrive_webkit`: PASS (low 113 / medium 150 draw calls).  Logs `look11/gate_*.txt`.  `pb/lux-drive.html` main.js `?v=53` (surface11 has 52).
+
+### Still wrong (honest)
+* Walls: lattice teeth further than 0.9 m in front of a face still show as small green/earth triangles (W26, C1 foot); the steep end of a wall (5 m down in 1.6 m, the bake)
+  shows its sloped coping as a bright diagonal (E2 near end); the short wall stub in the median at Grund (bake) reads as a block; the stone kind outside the old town is a hash,
+  not surveyed (Rue Godchaux is concrete here).
+* N-T02 Grund: the pale strips are reduced, not gone; T02 JFK / T04 Rocade / T11 / N-T05 aprons: no visible change at the QA poses (tarmac of service ways and the junction
+  sheet, road-network's).
+* S3 markings (N-M01 deck-start slivers, N-M02 junction scratches, N-M03 bare roundabouts): NOT done.  BL01: not done (placement).  N-C02: camera boom 2.1 m at the dead end.
+* The slim rule changes ~150 footbridges, not only deck 218: checked on 218 only.  The approach slabs / ramps of slim decks within 0.7 m of the ground are still solid.
+* Not checked on an iPad (WebKit gate only); the wall shader adds per-fragment work on walls (noise lookups x2, joints).
