@@ -26,7 +26,8 @@ import { createBuildingView } from './building-view.js';
 import { createDeckView } from './deck-view.js';
 import { createWallCollider } from './wall-collider.js';
 import { createWallView } from './wall-view.js';
-import { WALL_DRAW_FACTOR } from './retaining-walls.js';              // TERRAIN2: the retaining walls
+import { createWallMaterial } from './wall-material.js';               // look11: masonry drawn in the shader
+import { WALL_DRAW_FACTOR, createWallBlockTest } from './retaining-walls.js';              // TERRAIN2: the retaining walls
 import { createLandmarks, fixLandmarkDecks } from './landmarks.js';
 import { createLandmarkView } from './landmark-view.js';
 import { createPortalView } from './portal-view.js';
@@ -185,7 +186,7 @@ async function boot() {
   const trees = createTreeView({ scene, forest, baked: bakedTrees, field, env, quality });
   const decks = createDeckView({ scene, decks: shownDecks, material: solid, ground: ground.surface, laneLinesOn: false });
   const deckMarks = createDeckMarkingView({ scene, plan: markPlan, material: solid });
-  const walls = createWallView({ scene, walls: data.walls, material: solid });
+  const walls = createWallView({ scene, walls: data.walls, material: createWallMaterial(env), groundAt: (x, z) => surface.height(x, z) });
   const landmarkView = createLandmarkView({ scene, landmarks, material: solid });
   const portalView = createPortalView({ scene, portals, ground, material: solid });
   // the Luxtram: the rails and the vehicles of the line (tram-network.js builds the two tracks from lines.bin, tram-sim.js runs the vehicles on them)
@@ -214,7 +215,8 @@ async function boot() {
   const collide = (x, z, radius, y) => buildings.collide(x, z, radius) || landmarks.collide(x, z, radius) || wallCollider.collide(x, z, radius) || portals.collide(x, z, radius, y) || ground.bankCollide(x, z, radius, y) ||
     (ground.onDeck(x, z) ? null : forest.collide(x, z, radius) || props.collide(x, z, radius)) || tramSim.collide(x, z, radius) || playArea.collide(x, z, radius);
   const car = createCar({ ground, roadInfoAt: (x, z, out) => surface.roadInfoAt(x, z, out), collide, start });
-  const chase = createChaseCamera(ground, (x, z, radius, y) => buildings.collide(x, z, radius) || (ground.onDeck(x, z) ? null : forest.collide(x, z, radius)) || portals.collide(x, z, radius, y));
+  const wallLens = createWallBlockTest(data.walls);          // look11 (QA2 N-C02): the lens never inside the block of a retaining wall
+  const chase = createChaseCamera(ground, (x, z, radius, y) => buildings.collide(x, z, radius) || (ground.onDeck(x, z) ? null : forest.collide(x, z, radius)) || portals.collide(x, z, radius, y) || wallLens(x, z, radius, y));
 
   // the Kaart: one road index and one painted base for the minimap, the full map and the teleport
   const roadIndex = createRoadIndex(data.roads);

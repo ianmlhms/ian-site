@@ -112,9 +112,11 @@ export function buildBroadleaf(detail, seed = 1) {
   const m = createTreeMesh();
   const fork = 0.42 + rng() * 0.12;
   const leanX = (rng() - 0.5) * 0.05, leanZ = (rng() - 0.5) * 0.05;
-  addTrunk(m, fork, 0.028, 0.018, 0.011, leanX, leanZ, rng);
   const crownR = detail === 0 ? 0.30 : detail === 1 ? 0.32 : 0.34;
   const cy = fork + (1 - fork) * 0.46;
+  // The trunk runs up INTO the crown (to its middle).  It stopped at the fork, and the underside of a crown blob (its centre minus 0.85 x the flattened,
+  // jittered radius) lies up to 0.07 of the height above the fork: on a 20 m tree a 1.4 m gap of sky between the trunk and the crown, the floating hats (QA TR01).
+  addTrunk(m, cy, 0.028, 0.018, 0.011, leanX, leanZ, rng);
   const blobs = detail === 0
     ? [[0, cy, 0, crownR], [crownR * 0.62, cy - 0.1, crownR * 0.2, crownR * 0.66], [-crownR * 0.5, cy - 0.06, -crownR * 0.3, crownR * 0.62]]
     : detail === 1
