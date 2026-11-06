@@ -36,9 +36,10 @@ const APPROACH_DUG = 2.0;      // m: on the way that leads into the mouth of an 
                                // (CUT_RAMP): the road was cut into the hillside there too (QA2 N-U03: Rue Godchaux runs 100 m along the foot of a hill of 2 m/m before its cut, the car
                                // climbed that bank 15 m before the mouth and rolled 65 deg).  A face the land has anyway (dug less) stays the land's own slope.
 const CUT_JOIN_GAP = 2;       // the walls of a cut and of the ways into its mouths are joined across a gap of up to this many LINK_FRONT (the samples of two ways do not meet at the mouth)
+const DECK_CLEAR = 0.05;       // m: the top of a wall (with its coping) stays this far under the carriageway of a deck over it, or the ramp there has no wall
 const GAP_SAMPLES = 1;         // a wall goes on across a sample where the scan found nothing (the ramp flickers around its thresholds), if the ground under the middle of the bridge fits
 
-const { field, surface } = await loadWorld();
+const { field, surface, ground } = await loadWorld();
 const net = field.network;
 const chains = net.chains.filter((c) => !c.tagged && !net.overRoads.has(c.road));
 /** The ways that lead into the mouth of an opened cut: an end of theirs within PORTAL.mouthGap of an end of a cut way. */
@@ -76,10 +77,19 @@ function cover(a, b) {
   }
 }
 
-const rejected = { foot: 0, back: 0, air: 0 };   // ramps left without a wall: the foot of the face / the back of the block would lie on a carriageway; the foot would stand in the air (FOOT_DROP)
+const rejected = { foot: 0, back: 0, air: 0, deck: 0 };   // ramps left without a wall: the foot of the face / the back of the block would lie on a carriageway; the foot would stand in the air (FOOT_DROP)
 const roadProbe = { sdCar: 9, sdPave: 9 };
 /** True when (x, z) lies outside every carriageway of the carved ground. */
 function clearOfRoads(x, z) { net.carve(x, z, roadProbe); return roadProbe.sdCar >= CAR_CLEAR; }
+
+/** True when the top of wall point p (with its coping) stays DECK_CLEAR under the carriageway of any deck over its block (foot, middle, back).  Inside the slab it is hidden. */
+function clearOfDecks(p) {
+  for (const d of [0, p.depth / 2, p.depth]) {
+    const x = p.x + p.nx * d, z = p.z + p.nz * d;
+    if (ground.overheadAt(x, z, p.bottom + 0.1) < p.top + WALL.coping && ground.onDeck(x, z) && ground.height(x, z) < p.top + WALL.coping + DECK_CLEAR) return false;
+  }
+  return true;
+}
 
 /** The wall point at sample i of a way on one side (side = +1 right, -1 left), or null. */
 function wallPointAt(chain, i, side) {
@@ -124,6 +134,9 @@ function wallPointAt(chain, i, side) {
   if (!clearOfRoads(fx + nx * toHigh * depth, fz + nz * toHigh * depth)) { rejected.back++; return null; }       // the head of the ramp lies in a carriageway: the ramp is part of the road
   const top = Math.max(heights[ramp.first], heights[ramp.last]), bottom = Math.min(heights[ramp.first], heights[ramp.last]);
   if (field.height(fx - nx * toHigh * FOOT_PROBE, fz - nz * toHigh * FOOT_PROBE) < bottom - FOOT_DROP) { rejected.air++; return null; }
+  // under a bridge: the block reaches up to the deck (the ground under the A6 bridge at Croix de Gasperich rises to the deck's level; a wall there poked its coping through
+  // the carriageway above)
+  if (!clearOfDecks({ x: fx, z: fz, nx: nx * toHigh, nz: nz * toHigh, depth, top, bottom })) { rejected.deck++; return null; }
   return {
     x: chain.x[i] + nx * tFoot, z: chain.z[i] + nz * tFoot, top, bottom, depth,
     nx: nx * toHigh, nz: nz * toHigh, tx: dx, tz: dz, rise: Math.abs(ramp.rise), slope: ramp.maxSlope,
@@ -146,7 +159,7 @@ function extend(pts) {
   const reach = (p, sign) => {
     for (const e of [WALL.endExtend, WALL.endExtend / 2, WALL.endExtend / 4]) {
       const q = { ...p, x: p.x + sign * p.tx * e, z: p.z + sign * p.tz * e };
-      if (fits(q) && clearOfRoads(q.x, q.z) && clearOfRoads(q.x + q.nx * q.depth, q.z + q.nz * q.depth)) return q;
+      if (fits(q) && clearOfRoads(q.x, q.z) && clearOfRoads(q.x + q.nx * q.depth, q.z + q.nz * q.depth) && clearOfDecks(q)) return q;
     }
     return null;
   };
@@ -236,12 +249,37 @@ for (let again = true; again;) {
   }
 }
 
+// A lower wall on the foot line of a higher one is inside its block: two ways see one face, the farther one's scan ends below its top (the A4 under the Merl link: a 3 m wall
+// in the 6 m one, its sandstone showing through the concrete face).  The walls are kept from the highest down; the points of a lower one that a kept wall covers (COVER_DIST
+// from its face, the same facing, no higher than its top + COVER_TOP) are dropped, and what is left of it stays a wall where it is still MIN_SAMPLES long.
+const insideOf = (p, kept) => kept.some((w) => w.body.some((a, i) => {
+  const b = w.body[Math.min(i + 1, w.body.length - 1)], g = segmentGap(p, a, b);
+  return g.d <= COVER_DIST && g.nx * p.nx + g.nz * p.nz > LINK_FACING && p.top <= g.top + COVER_TOP;
+}));
+const nearWalls = (w, all) => all.filter((o) => o.body.some((a) => w.body.some((p) => Math.hypot(a.x - p.x, a.z - p.z) < 12)));
+const byRise = walls.slice().sort((a, b) => b.rise - a.rise);
+const keptWalls = [];
+let trimmedInside = 0;
+for (const w of byRise) {
+  const near = nearWalls(w, keptWalls);
+  if (!near.length) { keptWalls.push(w); continue; }
+  const runs = [];
+  let run = [];
+  for (const p of w.body) { if (insideOf(p, near)) { if (run.length) runs.push(run); run = []; } else run.push(p); }
+  if (run.length) runs.push(run);
+  if (runs.length === 1 && runs[0].length === w.body.length) { keptWalls.push(w); continue; }
+  trimmedInside++;
+  for (const r of runs) if (r.length >= MIN_SAMPLES) keptWalls.push({ ...w, body: r, pts: taper(r) });
+}
+walls.splice(0, walls.length, ...walls.filter((w) => keptWalls.includes(w)), ...keptWalls.filter((w) => !walls.includes(w)));
+console.log(`walls inside a higher one: ${trimmedInside} trimmed`);
+
 fs.writeFileSync(OUT, encodeWalls(walls));
 const points = walls.reduce((s, w) => s + w.pts.length, 0);
 let length = 0;
 for (const w of walls) for (let i = 1; i < w.pts.length; i++) length += Math.hypot(w.pts[i].x - w.pts[i - 1].x, w.pts[i].z - w.pts[i - 1].z);
 console.log(`the ways into an opened cut: ${approachWays.size}, ${approachRamps} dug faces on them; ${joined} cut walls joined at a mouth`);
-console.log(`walls: ${walls.length} walls, ${points} points, ${length.toFixed(0)} m long -> ${OUT} (${fs.statSync(OUT).size} bytes); ${probed} samples probed, ${found} ramps, ${duplicate} seen twice, ${short} too short, ramps on tarmac: ${rejected.foot} at the foot / ${rejected.back} at the back, ${rejected.air} in the air`);
+console.log(`walls: ${walls.length} walls, ${points} points, ${length.toFixed(0)} m long -> ${OUT} (${fs.statSync(OUT).size} bytes); ${probed} samples probed, ${found} ramps, ${duplicate} seen twice, ${short} too short, ramps on tarmac: ${rejected.foot} at the foot / ${rejected.back} at the back, ${rejected.air} in the air, ${rejected.deck} under a deck`);
 if (process.argv.includes('--stats')) {
   const bins = [0.8, 1.5, 2.5, 4, 6, 8.01];
   console.log('   by rise: ' + bins.slice(0, -1).map((b, i) => `${b}-${bins[i + 1]} m: ${walls.filter((w) => w.rise >= b && w.rise < bins[i + 1]).length}`).join(', '));
