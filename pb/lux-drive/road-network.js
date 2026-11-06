@@ -741,10 +741,6 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
         keepUp[q.w.road] = out;
       }
       if (span.every((q) => Math.abs(q.hw - span[0].hw) < 1e-3)) continue;
-      // walls13: a way does not narrow toward a partner across an end where TWO ways go on from it (carriageways.js forkEnds: Kirchberg 9423, 5 lanes, starts where the 2-lane
-      // 6060 and the 3-lane 12330 merge; tapered to its chain partner 12330's 11.7 m, the lanes of 6060's side began on the 1 m bank beside the narrowed tarmac - the car rolled
-      // 0.3 rad over its first 10 m).  There it is the whole of both, at its own width; a lane drop at a plain joint still tapers.
-      const forkSide = (q, o) => carriageways.forkEnds.has(`${q.w.road}:${(o.b <= q.a + 1e-6) !== q.w.rev ? 1 : 0}`);
       for (const q of span) {
         if (!q.pr) continue;
         const { n, chain: c } = q.pr;
@@ -753,7 +749,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
           const sc = q.w.rev ? q.b - c.arc[i] : q.a + c.arc[i];          // the place of the sample along the chain
           let hw = q.hw;
           for (const o of span) {
-            if (o === q || o.hw >= hw || !o.pr || forkSide(q, o)) continue;   // (a deck way is not carved: the deck is drawn at its own width and meets the road with its own apron, decks.js)
+            if (o === q || o.hw >= hw || !o.pr) continue;              // (a deck way is not carved: the deck is drawn at its own width and meets the road with its own apron, decks.js)
             const dist = sc < o.a ? o.a - sc : sc > o.b ? sc - o.b : 0;
             const v = o.hw + dist / WIDTH_TAPER;
             if (v < hw) hw = v;
