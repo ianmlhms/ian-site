@@ -6,6 +6,7 @@
  * and the collision shapes of the car, so the Node harness checks the very same landmarks the browser draws.
  *
  * ctx: { buildings: the decoded LOD2 footprints, decks: the decks the physics reads, ground: (x, z) -> y of the land }. */
+import { spansLevel } from './level-span.js';
 import { buildPontAdolphe, buildPontRouge, fixLandmarkDecks } from './landmark-bridges.js';
 
 import { buildPhilharmonie, buildEcj, buildCathedral, buildPalais, buildGelleFra, buildOberanven } from './landmark-buildings.js';
@@ -42,14 +43,20 @@ function closestOnSegment(w, x, z, out) {
   const ll = ex * ex + ez * ez;
   let t = ll > 1e-9 ? ((x - w.ax) * ex + (z - w.az) * ez) / ll : 0;
   t = t < 0 ? 0 : t > 1 ? 1 : t;
-  out.qx = w.ax + ex * t; out.qz = w.az + ez * t;
+  out.qx = w.ax + ex * t; out.qz = w.az + ez * t; out.t = t;
   return Math.hypot(x - out.qx, z - out.qz);
 }
 
 /** Do two bounding boxes [minX, minZ, maxX, maxZ] overlap? */
 const overlaps = (a, b) => a[0] <= b[2] && a[2] >= b[0] && a[1] <= b[3] && a[3] >= b[1];
 
+const GUARD_LEVEL_REACH = 2.5;     // m: a car counts as on a landmark deck (at its guard rails) when its wheels are within this of the deck's level there
+
 export function createLandmarks({ buildings, decks, ground, roads = [], only = null }) {
+  /** A wall with its height (a NEW object): a guard rail of a bridge carries its deck's level along it (`levels`, set by the builder: landmark-util.js deckLevels); any
+   *  other wall stands from the ground under its ends to the top of its landmark. */
+  const levelled = (w, top) => (Array.isArray(w.levels) && w.levels.length ? { ...w, level: 'deck' }
+    : { ...w, level: 'ground', y0: Math.min(ground(w.ax, w.az), ground(w.bx, w.bz)), y1: top });
   const ctx = { buildings, decks, ground, roads };
   const list = [];
   const hiddenBuildings = new Set();
@@ -67,14 +74,26 @@ export function createLandmarks({ buildings, decks, ground, roads = [], only = n
     list.push({ id: spec.id, soup: model.soup, info: model.info || {}, bounds: [b[0], b[2], b[3], b[5]], top: b[4], bottom: b[1] });
     for (const id of model.hideBuildings || []) hiddenBuildings.add(id);
     for (const id of model.hideDecks || []) hiddenDecks.add(id);
-    for (const w of model.walls || []) walls.push(w);
+    for (const w of model.walls || []) walls.push(levelled(w, model.soup.bounds()[4]));
     for (const f of model.footprints || []) footprints.push(f);
     for (const t of model.treeFree || []) treeFree.push(t);
   }
-  const scratch = { qx: 0, qz: 0 };
+  const scratch = { qx: 0, qz: 0, t: 0 };
 
-  /** The push out of a landmark wall: { nx, nz, pen, id } when the circle touches one, otherwise null. */
-  function collide(x, z, radius) {
+  /** True when the car (wheels at y; NaN = every height) is at the level of wall w at the point t (0..1) along it (drive12, QA3 N3-B01: the guard rails of the
+   *  Pont Rouge stopped nothing under it only because no road was driven there; a house wall of a landmark is as high as the landmark). */
+  const atLevel = (w, y, t) => {
+    if (!Number.isFinite(y) || !w.level) return true;
+    if (w.level === 'deck') {
+      const f = t * (w.levels.length - 1), i = Math.min(w.levels.length - 2, Math.floor(f));
+      const at = w.levels.length === 1 ? w.levels[0] : w.levels[i] + (w.levels[i + 1] - w.levels[i]) * (f - i);
+      return Math.abs(y - at) <= GUARD_LEVEL_REACH;
+    }
+    return spansLevel(y, w.y0, w.y1);
+  };
+
+  /** The push out of a landmark wall: { nx, nz, pen, id } when the circle touches one at the car's height (y: the level of its wheels), otherwise null. */
+  function collide(x, z, radius, y = NaN) {
     let best = null;
     for (const w of walls) {
       const d = closestOnSegment(w, x, z, scratch);
@@ -82,6 +101,7 @@ export function createLandmarks({ buildings, decks, ground, roads = [], only = n
       if (d >= reach) continue;
       const pen = reach - d;
       if (best && pen <= best.pen) continue;
+      if (!atLevel(w, y, scratch.t)) continue;
       let nx, nz;
       if (d > 1e-4) { nx = (x - scratch.qx) / d; nz = (z - scratch.qz) / d; } else { nx = -(w.bz - w.az); nz = w.bx - w.ax; const l = Math.hypot(nx, nz) || 1; nx /= l; nz /= l; }
       best = { nx, nz, pen, id: w.id };

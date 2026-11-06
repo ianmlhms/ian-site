@@ -2,7 +2,10 @@
  *
  * The index serves two things: the collision of the car (a circle against the footprints: the car never drives through a
  * house) and, in the city milestone, the renderer (the buildings around the car).
- * Pure maths (no THREE), so the harness checks the very same shapes as the game. */
+ * Pure maths (no THREE), so the harness checks the very same shapes as the game.
+ * drive12 (QA3 N3-B01): a house stops the car only at its own height - from the ground under its walls to its ridge.  The footprints of Pfaffenthal under the
+ * Pont Rouge stopped the car on the deck 60 m above them. */
+import { spansLevel } from './level-span.js';
 
 const CELL = 32;                 // m, the cell of the spatial hash
 const MAX_CELLS_PER_BUILDING = 64;
@@ -39,9 +42,11 @@ function closestOnPolygon(pts, x, z, out) {
 /**
  * buildings: the decoded LOD2 footprints [{ id, roof, style, ridgeDir, levels, eave, ridge, pts }]
  * `hidden`: ids of the blocks a landmark replaces (they are not indexed: no invisible wall where a landmark stands).
- * Returns { count, collide(x, z, radius), near(x, z, radius), boxes }.
+ * `groundAt(x, z)` / `landAt(x, z)`: the ground as the game draws it and the land (building-mesh.js stands the walls on the one and measures the eave from the
+ * higher of the two).  Without them a house is solid at every height.
+ * Returns { count, collide(x, z, radius, y), near(x, z, radius), levelOf(id), boxes }.
  */
-export function createBuildingIndex(buildings, { cell = CELL, hidden = null } = {}) {
+export function createBuildingIndex(buildings, { cell = CELL, hidden = null, groundAt = null, landAt = null } = {}) {
   const boxes = new Map();                       // id -> the bounding box
   const cells = new Map();                       // cell key -> the ids inside
   const key = (cx, cz) => cx * 100003 + cz;
@@ -61,6 +66,21 @@ export function createBuildingIndex(buildings, { cell = CELL, hidden = null } = 
     }
   }
   const scratch = { qx: 0, qz: 0 };
+  const levels = new Map();                      // id -> [bottom, top], measured the first time a car comes near
+
+  /** The height range of a house: from the lowest ground under its corners to its ridge over the ground at its middle (building-mesh.js addBuilding). */
+  function levelOf(id) {
+    let lv = levels.get(id);
+    if (lv) return lv;
+    const b = buildings[id], pts = b.pts, n = pts.length / 2;
+    if (!groundAt) { lv = [-Infinity, Infinity]; levels.set(id, lv); return lv; }
+    let cx = 0, cz = 0, bottom = Infinity;
+    for (let i = 0; i < n; i++) { cx += pts[i * 2] / n; cz += pts[i * 2 + 1] / n; bottom = Math.min(bottom, groundAt(pts[i * 2], pts[i * 2 + 1])); }
+    const foot = Math.max(groundAt(cx, cz), landAt ? landAt(cx, cz) : -Infinity);
+    lv = [Math.min(bottom, foot), foot + Math.max(b.ridge, b.eave)];
+    levels.set(id, lv);
+    return lv;
+  }
 
   /** The buildings whose cell is within the radius of (x, z): [id, ...]. */
   function near(x, z, radius) {
@@ -78,8 +98,8 @@ export function createBuildingIndex(buildings, { cell = CELL, hidden = null } = 
     return out;
   }
 
-  /** The push out of a building: { nx, nz, pen } when the circle touches a footprint, otherwise null. */
-  function collide(x, z, radius) {
+  /** The push out of a building: { nx, nz, pen, id } when the circle touches a footprint at the car's height (y: the level of its wheels; NaN = every height), otherwise null. */
+  function collide(x, z, radius, y = NaN) {
     let best = null;
     for (const id of near(x, z, radius)) {
       const b = buildings[id];
@@ -87,6 +107,7 @@ export function createBuildingIndex(buildings, { cell = CELL, hidden = null } = 
       if (d >= radius) continue;
       const pen = radius - d;
       if (best && pen <= best.pen) continue;
+      if (Number.isFinite(y)) { const [bottom, top] = levelOf(id); if (!spansLevel(y, bottom, top)) continue; }      // on a bridge over it, in a tunnel under it
       let nx, nz;
       if (d > 1e-4) { nx = (x - scratch.qx) / d; nz = (z - scratch.qz) / d; }
       else {
@@ -103,5 +124,5 @@ export function createBuildingIndex(buildings, { cell = CELL, hidden = null } = 
     return best;
   }
 
-  return { count: buildings.length, collide, near, boxes, buildings };
+  return { count: buildings.length, collide, near, levelOf, boxes, buildings };
 }

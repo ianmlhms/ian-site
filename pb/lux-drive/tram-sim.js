@@ -137,7 +137,8 @@ export function createTramSim(network, cfg, { vehicles = cfg.vehicles, seed = 11
   }
   for (const tram of trams) updateSections(tram);
 
-  /** The push out of a vehicle: { nx, nz, pen, tram, speed } when the circle touches a section, otherwise null. */
+  /** The push out of a vehicle: { nx, nz, pen, tram, speed, qx, qz, tx, tz } when the circle touches a section, otherwise null ((qx, qz) the nearest point of the
+   *  section and (tx, tz) its direction: the car's collider reads the level of the rails there, car-collide.js). */
   function collide(x, z, radius) {
     let best = null;
     const reach = cfg.bodyHalfWidth + radius;
@@ -155,7 +156,8 @@ export function createTramSim(network, cfg, { vehicles = cfg.vehicles, seed = 11
         if (best && pen <= best.pen) continue;
         let nx = 1, nz = 0;
         if (d > 1e-4) { nx = (x - qx) / d; nz = (z - qz) / d; }
-        best = { nx, nz, pen, tram: tram.id, speed: tram.v };
+        const l = Math.sqrt(ll);
+        best = { nx, nz, pen, tram: tram.id, speed: tram.v, qx, qz, tx: ex / l, tz: ez / l };
       }
     }
     return best;

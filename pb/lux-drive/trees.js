@@ -7,6 +7,7 @@
  * The placement of the woods is deterministic, per 32 m block, so a block always gives the same trees: nothing pops
  * when a block is built again and the harness sees the very same forest as the game.  Pure (no THREE).
  */
+import { spansLevel } from './level-span.js';
 import { createRng } from './noise.js';
 import { sampleWorldMap } from './world-map.js';
 import { distanceToPolygon } from './landmark-util.js';
@@ -111,7 +112,7 @@ export function trunkRadius(height) {
 /**
  * The index of the trees: the cached blocks of the woods and the baked trees of OSM.
  * trees: the baked trees [{ x, z, height, kind, girth, inStreet }].
- * Returns { block(bx, bz), collide(x, z, radius), near(x, z, radius), blocks }.
+ * Returns { block(bx, bz), collide(x, z, radius, y), near(x, z, radius), blocks }.
  */
 export function createTreeIndex({ map, field, network, buildings, trees = [], clearings = [], treeDecks = null }) {
   const blocks = new Map();
@@ -158,8 +159,11 @@ export function createTreeIndex({ map, field, network, buildings, trees = [], cl
   }
 
   const scratch = { nx: 0, nz: 0, pen: 0 };
-  /** The push out of a trunk: { nx, nz, pen } when the circle touches a trunk, otherwise null. */
-  function collide(x, z, radius) {
+  const bakedFoot = new Map();          // baked tree -> the ground under its trunk (the tree view stands it on field.height)
+  const footOf = (i) => { let y = bakedFoot.get(i); if (y === undefined) { y = field.height(trees[i].x, trees[i].z); bakedFoot.set(i, y); } return y; };
+  /** The push out of a trunk: { nx, nz, pen } when the circle touches a trunk at the car's height (y: the level of its wheels, NaN = every height), otherwise null.
+   *  drive12: a tree is solid from its foot to its top - a car on a bridge over a wood is not stopped by it (QA3 N3-B01), a car under a deck still is. */
+  function collide(x, z, radius, y = NaN) {
     let best = null;
     // the trees of the woods: only the blocks around the point
     const bx0 = Math.floor((x - radius - 1) / BLOCK), bx1 = Math.floor((x + radius + 1) / BLOCK);
@@ -172,6 +176,7 @@ export function createTreeIndex({ map, field, network, buildings, trees = [], cl
           const reach = radius + trunkRadius(t[i + 3]);
           const d2 = dx * dx + dz * dz;
           if (d2 >= reach * reach) continue;
+          if (!spansLevel(y, t[i + 1], t[i + 1] + t[i + 3])) continue;
           const d = Math.sqrt(d2) || 1e-6;
           const pen = reach - d;
           if (!best || pen > best.pen) { best = { nx: dx / d, nz: dz / d, pen }; }
@@ -185,6 +190,7 @@ export function createTreeIndex({ map, field, network, buildings, trees = [], cl
       const reach = radius + trunkRadius(t.height);
       const d2 = dx * dx + dz * dz;
       if (d2 >= reach * reach) continue;
+      if (Number.isFinite(y) && !spansLevel(y, footOf(i), footOf(i) + t.height)) continue;
       const d = Math.sqrt(d2) || 1e-6;
       const pen = reach - d;
       if (!best || pen > best.pen) { best = { nx: dx / d, nz: dz / d, pen }; }

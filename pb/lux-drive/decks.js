@@ -544,6 +544,14 @@ export function createGround(surface, deckNetwork) {
       return hit && hit.top > g ? hit.top : g;
     },
     hint(y) { hintY = y; },
+    /** The height the car stands on at (x, z) for a car at the height `y` (the hint as an argument, the global one stays as it is): the level of a pose that is not
+     *  the car's own (a teleport candidate, a lane probe - drive12). */
+    levelAt(x, z, y) {
+      const g = surface.height(x, z);
+      if (!deckNetwork || deckNetwork.count === 0) return g;
+      const hit = deckNetwork.deckAt(x, z, y, scratch);
+      return hit && hit.top > g ? hit.top : g;
+    },
     /** The underside of the lowest deck above height y over (x, z), Infinity when the sky is free. */
     overheadAt(x, z, y) { return deckNetwork ? deckNetwork.overheadAt(x, z, y) : Infinity; },
     onDeck(x, z) { return !!deckNetwork && deckNetwork.count > 0 && deckNetwork.deckAt(x, z, hintY, scratch) !== null; },

@@ -42,17 +42,17 @@ const SNAP_M = 6;                   // m: a candidate is snapped back to the nea
  * and the first one where the whole body is clear wins.  When nothing is clear within 60 m the tapped point is used.
  *
  * @param {object} index the road index (nearest)
- * @param {(x:number, z:number, yaw:number) => boolean} blocked true when the car at that pose would touch something
+ * @param {(x:number, z:number, yaw:number, hint:number) => boolean} blocked true when the car at that pose (put down with that height hint) would touch something
  */
 export function placeClear(index, hit, heading, groundHeight, blocked) {
   const first = placeOnRoad(hit, heading, groundHeight);
   const poses = (h) => [placeOnRoad(h, heading, groundHeight), placeOnRoad(h, heading, groundHeight, 0)];   // the lane, then the centre line
-  for (const p of poses(hit)) if (!blocked(p.x, p.z, p.yaw)) return p;
+  for (const p of poses(hit)) if (!blocked(p.x, p.z, p.yaw, p.hint)) return p;
   for (let s = CLEAR_STEP_M; s <= CLEAR_REACH_M; s += CLEAR_STEP_M) {
     for (const sign of [1, -1]) {
       const near = index.nearest(hit.x + hit.dx * s * sign, hit.z + hit.dz * s * sign, SNAP_M);
       if (!near) continue;
-      for (const p of poses(near)) if (!blocked(p.x, p.z, p.yaw)) return p;
+      for (const p of poses(near)) if (!blocked(p.x, p.z, p.yaw, p.hint)) return p;
     }
   }
   return first;

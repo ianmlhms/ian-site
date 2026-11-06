@@ -7,7 +7,7 @@
  * off the deck: the baked deck is narrower than the real one) and the ids of the baked decks the model replaces. */
 import { Soup, axisFrame, paint } from './landmark-soup.js';
 import { PALETTE as C } from './landmark-palette.js';
-import { profileOf, pickDeck, decksAlong, wallFace, deckStrip, deckFootprint } from './landmark-util.js';
+import { profileOf, pickDeck, decksAlong, wallFace, deckStrip, deckFootprint, deckLevels } from './landmark-util.js';
 
 /* ------------------------------------------------------------------------------------------------ Pont Adolphe */
 const ADOLPHE = Object.freeze({
@@ -240,7 +240,7 @@ export function buildPontAdolphe({ decks, ground }) {
   const walls = SIGNS.map((sign) => {
     const [ax, az] = F.xz(0, sign * K.guardOffset);
     const [bx, bz] = F.xz(L, sign * K.guardOffset);
-    return { ax, az, bx, bz, r: K.guardRadius, id: 'pont-adolphe' };
+    return { ax, az, bx, bz, r: K.guardRadius, id: 'pont-adolphe', levels: deckLevels(top, L) };        // (the deck's level along the rail, landmarks.js: a car under the bridge is not stopped by it)
   });
   return { soup, walls, hideDecks, frame: F, footprints: [deckFootprint(F, top, -K.half, K.half)], info: { sc, sa, sb, springY, crownRise, openings: openings.length, sideArches: sideArches.length } };
 }
@@ -437,7 +437,7 @@ export function buildPontRouge({ decks, ground }) {
   // ---- the collision walls: the baked decks are narrower than the bridge, the car stays on them
   const walls = [K.guardNorth, K.guardSouth, K.guardFar].map((u) => {
     const [ax, az] = F.xz(0, u), [bx, bz] = F.xz(L, u);
-    return { ax, az, bx, bz, r: K.guardRadius, id: 'pont-rouge' };
+    return { ax, az, bx, bz, r: K.guardRadius, id: 'pont-rouge', levels: deckLevels(top, L) };
   });
   return { soup, walls, hideDecks: new Set(group.map((d) => d.id)), frame: F, footprints: [deckFootprint(F, top, uMin, uMax)], info: { length: L, uMin, uMax, pylons: pylons.map((p) => Math.round(p)) } };
 }

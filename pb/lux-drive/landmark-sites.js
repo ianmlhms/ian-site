@@ -4,7 +4,7 @@
  * { soup, walls, hideBuildings, hideDecks, info } and stands on the ground at every corner (nothing floats). */
 import { Soup, axisFrame, paint, linspace } from './landmark-soup.js';
 import { PALETTE as C } from './landmark-palette.js';
-import { requireBlocks, edgeWalls, scalePoly, groundRange, decksAlong, pickDeck, wallFace, deckStrip, stationsOf, deckFootprint } from './landmark-util.js';
+import { requireBlocks, edgeWalls, scalePoly, groundRange, decksAlong, pickDeck, wallFace, deckStrip, stationsOf, deckFootprint, deckLevels } from './landmark-util.js';
 import { edgeFrame, windowGrid, course, slab, turret, panel, joints, roundArch } from './landmark-facade.js';
 import { SITE_FOOTPRINTS as FOOT, FORT_TOWERS } from './landmark-site-data.js';
 
@@ -283,7 +283,7 @@ export function buildPasserelle({ decks, ground }) {
     wallFace(soup, F, sign * half, 0, L, (s) => top(s) - 0.3, (s) => top(s) + K.balustrade, C.bridgeStoneLight, Math.ceil(L / 3), 3 + (sign > 0 ? 0 : 1));
     wallFace(soup, F, sign * (half - 0.5), 0, L, (s) => top(s) + K.kerb, (s) => top(s) + K.balustrade, C.bridgeStone, Math.ceil(L / 3), 6);
     deckStrip(soup, F, sign * (half - 0.5), sign * half, 0, L, (s) => top(s) + K.balustrade, C.bridgeStoneLight, Math.ceil(L / 3), 7);
-    walls.push({ ax: F.xz(0, sign * (half - 0.4))[0], az: F.xz(0, sign * (half - 0.4))[1], bx: F.xz(L, sign * (half - 0.4))[0], bz: F.xz(L, sign * (half - 0.4))[1], r: 0.4, id: 'passerelle-rail' });
+    walls.push({ ax: F.xz(0, sign * (half - 0.4))[0], az: F.xz(0, sign * (half - 0.4))[1], bx: F.xz(L, sign * (half - 0.4))[0], bz: F.xz(L, sign * (half - 0.4))[1], r: 0.4, id: 'passerelle-rail', levels: deckLevels(top, L) });
   }
   for (let s = 1; s < L; s += K.pitch) for (const sign of [1, -1]) {
     const [x, z] = F.xz(s, sign * (half - 0.25));

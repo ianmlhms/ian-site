@@ -7,7 +7,8 @@
  * The vehicles are three instanced meshes (the end sections, the sections with a pantograph, the plain ones): all the
  * trams of the line are three draw calls. */
 import { TRAM } from './config.js';
-import { DECK } from './decks.js';
+import { createRailGround } from './rail-ground.js';
+import { POLE_HEIGHT } from './car-collide.js';      // (drive12: pure, the car's collision with a tram reads the same level)
 import { sampleWorldMap } from './world-map.js';
 import { PartBuilder } from './part-builder.js';
 import { createPartMaterial } from './part-material.js';
@@ -29,27 +30,6 @@ const COL = {
 };
 
 const lerp3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
-
-/** The ground the tram runs on: the terrain, or the deck of a bridge that CARRIES the track.  A deck carries the track when it runs
- *  along it (the Pont Rouge, the viaducts); a deck that crosses over the track at an angle is a bridge the tram runs UNDER, and the
- *  ground stays the ground there.  (Telling them apart by the direction needs no memory of the height before: a chunk of track
- *  can be built on its own.)  (tx, tz) is the direction of the track at the point. */
-const ALIGNED = 0.42;                   // sine of the largest angle (25 degrees) between a deck and the track it carries
-function createRailGround(surface, deckNetwork) {
-  const scratch = { top: 0, slope: 0, ux: 1, uz: 0, along: 0 };
-  return (x, z, tx, tz) => {
-    const g = surface.height(x, z);
-    if (!deckNetwork || deckNetwork.count === 0) return g;
-    let y = 1e9;
-    for (let k = 0; k < 3; k++) {                  // the highest deck first, then the ones below it
-      const hit = deckNetwork.deckAt(x, z, y, scratch);
-      if (!hit) break;
-      if (Math.abs(hit.ux * tz - hit.uz * tx) < ALIGNED) return hit.top > g ? hit.top : g;
-      y = hit.top - DECK.stickBelow - 0.01;
-    }
-    return g;
-  };
-}
 
 export function createTramView({ scene, network, sim, surface, deckNetwork, env, camera, maps, props, quality = {} }) {
   const material = createPartMaterial(env);
@@ -173,7 +153,7 @@ export function createTramView({ scene, network, sim, surface, deckNetwork, env,
           if (!(surface.roadInfoAt(px, pz, road), road.sdCar < 0.3)) {            // never in a carriageway
             const py = s0.yc;                                                         // the level of the track (a pole on a bridge stands on the deck)
             wire.append(poleGeom, { x: px, y: py + TRAM.lift + TRAM.railHeight, z: pz, yaw: Math.atan2(-s0.rx, -s0.rz) });
-            if (props) props.add(px, pz, TRAM.poleRadius);
+            if (props) props.add(px, pz, TRAM.poleRadius, py, POLE_HEIGHT);          // (at the level of its rails: a car under the tram bridge is not stopped by it)
           }
         }
       }

@@ -37,6 +37,7 @@ import { createTramView } from './tram-view.js';
 import { placeStreetLights } from './street-lights.js';        // the street lights (city finish)
 import { createStreetLightView } from './street-light-view.js';
 import { createPropCollider } from './props.js';              // lamps, poles and benches stop the car
+import { createCarCollider, LAMP_POST_RADIUS, LAMP_POST_HEIGHT, BENCH_RADIUS, BENCH_HEIGHT } from './car-collide.js';   // drive12: everything that stops the car, at its height
 import { placeParkBenches } from './park-benches.js';          // the benches of the parks (city finish)
 import { createBenchView } from './bench-view.js';
 import { createSolidMaterial } from './solid-material.js';
@@ -56,8 +57,6 @@ import { createQualityStepper } from './quality-step.js';
 import { roadDirectionAt } from './roads.js';
 import { t, LANGS } from './i18n.js';
 
-const LAMP_POST_RADIUS = 0.22;        // m: a street lamp, a catenary pole (the car stops at it like at a tree)
-const BENCH_RADIUS = 0.8;             // m: a park bench
 const BUILT_DRAW_FACTOR = 1.5;        // bridge decks and tunnel portals are drawn out to this many times the far building radius
 const DECK_MARK_RADIUS = 700;         // m: the lane lines on the bridge decks are drawn out to this distance (a 15 cm line is far below a pixel beyond)
 const MAX_FRAME_S = 0.1;              // s: a long frame (a tab in the background) never jumps the car
@@ -142,7 +141,7 @@ async function boot() {
   const ground = createGround(surface, deckNetwork);
   // the landmarks (the famous places) replace some blocks and some bridge decks of the bake and have collision of their own
   const landmarks = createLandmarks({ buildings: data.buildings, decks: ground.decks, ground: (x, z) => surface.height(x, z), roads: data.roads });
-  const buildings = createBuildingIndex(data.buildings, { hidden: landmarks.hiddenBuildings });
+  const buildings = createBuildingIndex(data.buildings, { hidden: landmarks.hiddenBuildings, groundAt: (x, z) => field.height(x, z), landAt: (x, z) => field.baseHeight(x, z) });   // (the houses know their height: drive12)
   const playArea = createPlayArea(area);
   const portals = createPortals(data.roads, (x, z) => surface.height(x, z), (r) => field.network.isDrawn(r.id), (x, z) => playArea.inside(x, z), portalRoadAt(field.network), portalBlocked(buildings, deckNetwork));
   const maps = buildWorldMap({ classes: data.classes, classInfo: data.classInfo, canopy: data.canopy, buildings: data.buildings });
@@ -195,10 +194,10 @@ async function boot() {
   const props = createPropCollider();                       // lamps, catenary poles and benches: small solid circles the car stops at
   const trams = createTramView({ scene, network: tramNetwork, sim: tramSim, surface, deckNetwork, env, camera, maps, props, quality });
   const lamps = placeStreetLights({ roads: data.roads, network: field.network, buildings, map: maps, walls: data.walls });
-  for (let i = 0; i < lamps.count; i++) props.add(lamps.x[i], lamps.z[i], LAMP_POST_RADIUS);
+  for (let i = 0; i < lamps.count; i++) props.add(lamps.x[i], lamps.z[i], LAMP_POST_RADIUS, surface.height(lamps.x[i], lamps.z[i]), LAMP_POST_HEIGHT);   // (no lamp stands on a deck: harness H)
   const streetLights = createStreetLightView({ scene, lights: lamps, ground, env });
   const parkBenches = placeParkBenches({ roads: data.roads, network: field.network, buildings, map: maps });
-  for (let i = 0; i < parkBenches.count; i++) props.add(parkBenches.x[i], parkBenches.z[i], BENCH_RADIUS);
+  for (let i = 0; i < parkBenches.count; i++) props.add(parkBenches.x[i], parkBenches.z[i], BENCH_RADIUS, surface.height(parkBenches.x[i], parkBenches.z[i]), BENCH_HEIGHT);
   const benchView = createBenchView({ scene, benches: parkBenches, ground, env });
   const colourId = CAR_COLOURS[readKey(COLOUR_KEY)] ? readKey(COLOUR_KEY) : 'red';
   const model = createCarModel({ colourId, material: solid, groundAt: (x, z) => ground.height(x, z) });     // look11: the drawn wheels on their springs
@@ -208,16 +207,15 @@ async function boot() {
   const start = data.places.start || { x: WORLD.width / 2, z: WORLD.depth / 2, yaw: 0 };
   const roadInfo = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, surface: 0, road: -1, lines: 0, lanes: 0, s: 0 };
   const wallCollider = createWallCollider(data.walls, (x, z) => ground.height(x, z));        // the retaining walls are solid from both sides (wall-collider.js)
-  // On a bridge deck the trees and the street lamps of the land below are not in the way (no tree and no lamp stands on a deck: harness E, H): they
-  // have no height, and a car on the A1 viaduct was stopped by the trees of the valley 13 m under it and pushed off the edge (QA drive test, deck 35).
-  // The portals know their level (portals.js): `y` is the level of the car's wheels.
-  // The bank under the end of a bridge stops a car that drives under the deck (decks.js bankCollide).
-  const collide = (x, z, radius, y) => buildings.collide(x, z, radius) || landmarks.collide(x, z, radius) || wallCollider.collide(x, z, radius) || portals.collide(x, z, radius, y) || ground.bankCollide(x, z, radius, y) ||
-    (ground.onDeck(x, z) ? null : forest.collide(x, z, radius) || props.collide(x, z, radius)) || tramSim.collide(x, z, radius) || playArea.collide(x, z, radius);
+  // Everything that stops the car answers for the car's own level (`y`: the level of its wheels, car-collide.js): a house, a tree, a lamp stops a car only
+  // where the car's body overlaps it in height.  (Before drive12 the trees and lamps were switched off on any deck and the houses were solid to the sky: the
+  // houses of Pfaffenthal stopped the car on the Pont Rouge 60 m above them, QA3 N3-B01.)  The bank under the end of a bridge stops a car under the deck.
+  const { collide } = createCarCollider({ buildings, landmarks, walls: wallCollider, portals, ground, forest, props, trams: tramSim, playArea, surface, deckNetwork });
   const car = createCar({ ground, roadInfoAt: (x, z, out) => surface.roadInfoAt(x, z, out), collide, start });
   const wallLens = createWallBlockTest(data.walls);          // look11 (QA2 N-C02): the lens never inside the block of a retaining wall
   // (the wall first: a house that only touches the lens - pen 0 - answered before the wall, and the lens stayed in the block of a wall that ends at the house: Bd Konrad Adenauer 7706,6728)
-  const chase = createChaseCamera(ground, (x, z, radius, y) => wallLens(x, z, radius, y) || buildings.collide(x, z, radius) || (ground.onDeck(x, z) ? null : forest.collide(x, z, radius)) || portals.collide(x, z, radius, y));
+  // (the lens is a ball: a house or a tree is in its way where the ball overlaps it in height - the lens over the Pont Rouge is not pushed by the houses under it)
+  const chase = createChaseCamera(ground, (x, z, radius, y) => wallLens(x, z, radius, y) || buildings.collide(x, z, radius, y - radius) || forest.collide(x, z, radius, y - radius) || portals.collide(x, z, radius, y));
 
   // the Kaart: one road index and one painted base for the minimap, the full map and the teleport
   const roadIndex = createRoadIndex(data.roads);
@@ -392,10 +390,12 @@ async function boot() {
     landCar(startPose.x, startPose.z, startPose.yaw, startPose.hint);
     ui.setToast(tr('toast.reset'));
   }
-  /** True when the car at this pose would touch a house, a tunnel portal, a tree or the edge of the area. */
-  function blockedAt(x, z, yaw) {
+  /** True when the car at this pose would touch a house, a tunnel portal, a tree or the edge of the area (at the level it is put down on with `hint`; without one at
+   *  every height). */
+  function blockedAt(x, z, yaw, hint = NaN) {
     const cy = Math.cos(yaw), sy = Math.sin(yaw);
-    return CAR.bodyCircles.concat(0).some((o) => !!collide(x + cy * o, z + sy * o, CAR.bodyRadius + PLACE_MARGIN_M));
+    const level = Number.isFinite(hint) ? ground.levelAt(x, z, hint) : NaN;
+    return CAR.bodyCircles.concat(0).some((o) => !!collide(x + cy * o, z + sy * o, CAR.bodyRadius + PLACE_MARGIN_M, level));
   }
   const placeAt = (hit) => placeClear(roadIndex, hit, car.state.heading, (x, z) => surface.height(x, z), blockedAt);
   // the start and the reset follow the same rule as a tap on the Kaart: a CAR road (never the plaza beside it), clear of everything

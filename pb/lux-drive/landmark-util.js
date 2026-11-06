@@ -111,6 +111,15 @@ export function requireBlocks(buildings, name, x, z, r, minArea, atLeast = 1) {
 }
 
 /** The collision walls along the edges of a polygon. */
+const DECK_LEVEL_STEP = 8;          // m between the levels of a guard rail (deckLevels)
+
+/** The level of a bridge deck along a guard rail of length L (top(s): the deck's surface at station s), every DECK_LEVEL_STEP m: the `levels` of a landmark wall
+ *  (landmarks.js: a guard rail stops a car on its deck, not one on the road under the bridge - drive12, QA3 N3-B01). */
+export function deckLevels(top, L) {
+  const n = Math.max(1, Math.ceil(L / DECK_LEVEL_STEP));
+  return Array.from({ length: n + 1 }, (_, i) => top((L * i) / n));
+}
+
 export function edgeWalls(pts, r, id) {
   return pts.map((p, i) => {
     const q = pts[(i + 1) % pts.length];
