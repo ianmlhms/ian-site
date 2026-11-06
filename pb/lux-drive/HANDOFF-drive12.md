@@ -1,6 +1,7 @@
 # HANDOFF drive12 (branch `lux-drive-drive12`, merged with lux-drive e94df7fd, main.js ?v=58)
 
-State: committed, NOT finished - harness 159 / 161 (R3 and T4 fail), browser gates see PROGRESS "Drive 12".
+State: DONE (finish 6 Nov 2026, merged with city13, main.js ?v=60) - harness 161 / 161, world / holes (medium, low) / ui / webkit PASS; see PROGRESS "Drive 12" section 5.
+Item 1 below is fixed (road-network `stepPlace` / `LANE_KEEP`; T4's route table was wrong and is now the QA's own routes); items 2 - 4 stay open (item 4 is a QA-route artefact).
 
 ## What is done
 * Every collider of the car answers for the car's level (`car-collide.js`, `level-span.js`): the Pont Rouge drives across; no house / tree / lamp / rail under a deck touches a car on it (T2 = 0, T5).

@@ -2086,9 +2086,9 @@ Montages (`~/Library/Caches/luxdrive-work/city13/montages/`): `1_gare.jpg` (phot
 * Walls: W03 sawtooth teeth (geometry), the w014 grey smear, a thin dark edge at the wall ends, the footing's top still reads as a pale ledge on wall 76.
 * Junction paint: the JFK side-street aprons and the ragged edge at the Rond-Point Schuman are unchanged.
 
-## Drive 12 (branch `lux-drive-drive12`, Mac mini): what stops, launches or rolls the car - collisions at their height, walls out of the lanes, the Pont Adolphe end (QA round 3)
+## Drive 12 (branch `lux-drive-drive12`, Mac mini): what stops, launches or rolls the car - collisions at their height, walls out of the lanes, the Pont Adolphe end (QA round 3) - DONE (all gates pass)
 
-Started from live v55 (5b802d6f); merged `lux-drive` (city12, e94df7fd) before the final gates; main.js `?v=58`.  Input `~/Library/Caches/luxdrive-work/qa3/BUGS.md` sections 2 and 3.
+Started from live v55 (5b802d6f); merged `lux-drive` (city12, e94df7fd), then (finish, section 5) `lux-drive` (city13, 4b979037) before the final gates; main.js `?v=60`.  Input `~/Library/Caches/luxdrive-work/qa3/BUGS.md` sections 2 and 3.
 Round folder `~/Library/Caches/luxdrive-work/drive12/`: tools `tools/` (`gameworld.mjs` the game's world in Node as main.js builds it, `drive.mjs` the QA's drive jobs in Node with the
 collider that stopped the car named, `lanes.mjs` the lane clearance scan, `underdeck.mjs`, `deckend.mjs` levels across a deck end, `q3.mjs` every deck in every lane, `table.py`), the
 live snapshot `v55/` for before numbers, logs `out/`, gate logs `gate_*.txt`, drive table `drive_table.md`.  The Node drive reproduces the QA's browser numbers to the decimetre (b03_d0
@@ -2142,27 +2142,72 @@ in "Still wrong" (houses on narrow streets, closed tunnel portals, the car leavi
 ### Harness section T (`harness-drive12.js`, 5 checks)
 T1 no wall block reaches a lane (every lane, at its level) = 0; T2 the lanes of every bridge way at deck level touch no house, landmark wall, lamp, bench or tree = 0 (a dead end
 at a house excepted); T3 every car deck, every lane, both ways, the game's collider probing the body: ratchet 13 runs (deck 59 Buchler car park spiral bank, deck 169 wall 41 at its
-free end, deck 197 into house 6763); T4 the QA's 13 verified invisible-wall routes (walls 52, 98, 72, 44, 5, 18, 57, 13, 80) drive through with the game's car: no wall touched, no
-stop (a closed tunnel's portal at the end of the way aside); T5 the level rule (the Pont Rouge over house 7233).
+free end, deck 197 into house 6763); T4 the QA's 13 verified invisible-wall routes (walls 52, 98, 72, 44, 5, 18, 57, 13, 80) drive through with the game's car on the wall's way, the lane inside the
+drawn carriageway (section 5: the first table's polylines were not the QA's): no wall touched, no stop (a closed tunnel's portal at the end of the way aside); T5 the level rule (the Pont Rouge over house 7233).
 
-### Gates (merged tree, `drive12/gate_*.txt`)
-* `harness.js` **159 / 161** (156 of city12 + T 5): **FAIL R3** - Merl link outer lane roll 0.749 rad at 3116,9975 (was 0.089 with wall 32 in the lane); **FAIL T4** - p09 (A6 deck 241,
-  1971,11619) and p12 (way 301, 4877,12243) stopped by the ground.  Both are the same thing: where the invisible wall stood in the lane, the steep two-level face it hid is in the
-  lane too (OSM carriageways overlapping in plan; surface11 "the faces eat up to ~1 m of each carriageway").  The wall acted as a guard rail along the face; without it the car's
-  outer wheels climb the face.  Not resolved - see HANDOFF-drive12.md.  K PASS (walls 95, bare 5 of 148), Q1 PASS, T1 / T2 / T3 / T5 PASS, U PASS.
-* Browser gates on the merged tree: `luxdrive_world` PASS (deepest carve wall 7.90, draw calls 113 / 150 / 209), `luxdrive_holes` 0 at medium and at low, `luxdrive_ui` PASS,
+### 5. Finish (6 Nov 2026, second builder): the step between two levels out of the lanes; harness T4 fixed - `road-network.js`, `harness-drive12.js`, `scripts/luxdrive/shot.mjs`
+Tools / logs in `~/Library/Caches/luxdrive-work/drive12b/` and `drive12/tools/` (`rt.mjs` R3 + T4 alone in 90 s, `xsec.mjs` / `dbg.mjs` / `dbg2.mjs` cross sections of the carve and
+its pins, `routecheck.mjs`, `mkroutes.mjs`, `r2list.mjs`, `wallgone.mjs`, `paintslope.mjs`, `table3.py`); the live v57 snapshot for the before shots `drive12b/v57/`.
+* **Root cause (R3)**: where two carriageways at two levels lie side by side and their benches overlap in OSM (Merl: the A4 1848 bench 5.25 m, the link 12832 3.77 m - tapered from
+  the 1-lane links 12833 / 17104 -, axes 7.5 m apart), the face was centred on the line half way between the two BENCHES: link coordinates [-3.75, -2.25], the outer wheel of the
+  link's lane (-1.9 + 0.78 = -2.68) on it.  The car's wheels read the continuous carve (`ground.contact`), so the face has to clear the wheel in the carve itself.
+* **Fix** (`stepPlace`, `LANE_KEEP` 1.2 m, `keepUp`): every way has a lane keep - its outer lane's centre (lane-clearance.js `laneOffsets`) + 1.2 m (the car's half width + 0.3),
+  at most its bench.  Where a side-by-side face does not fit between the benches it moves into the ground the lanes do not need (bench - keep of each, the "room"): clamped to the
+  free ground between the two keeps, or half way between them where even that is too narrow; the shift fades with `sideBySide`, nothing moves where the benches leave the face
+  room.  The hold (`holdTwo`), the face pass and the paint clip (`levelClip`) all use the moved centre; the paint never GROWS where the face moves away (the ground it leaves is the
+  junction of the merging links, R2).  The keep tapers along a carriageway chain like the width (upper envelope, 1 : WIDTH_TAPER): a keep that jumped at the 1-lane / 2-lane joint
+  moved the face at the joint and stepped the paint 0.8 - 1.2 m there (harness P1, first try).  Merl: face [-4.5, -3.0] in link coordinates, both outer wheels on flat ground.
+  **R3**: link lane roll **0.749 -> 0.088 rad**, A4 lane 0.096 (limit 0.10, unchanged).  R2 stays at 72 (ratchet), P1 passes, world gate unchanged (6 carve walls, deepest 7.90).
+* **T4 was not testing the QA's routes.**  The polylines in `WALL_ROUTES` did not follow their ways (5 - 90 m off them: `routecheck.mjs`): p09 ran at ground level over the bank
+  beside the A4 under the A6 decks, p12 across the field between Rue In Bouler and the 13888 embankment, p06 never touched 9423 - so "p09 / p12 stopped by the ground" were not
+  the two-level face at all.  The table is now the QA's own routes (`qa3/jobs/wallpairs.json`, the 13 verified ones, offsets snapped to `laneOffsets`, as the first table meant).
+  With them p09 (way 241 deck lane -2.45) and p12 (way 301 lane -1.73) drive through on the committed drive12 tree already; p06 (Kirchberg trunk link 9423, wall 18) was the one
+  real failure: 9423 is 5 lanes on 18.7 m for 41 m between 3-lane ways and its tarmac is tapered to 11.7 m at both ends (WIDTH_TAPER), so the QA's lane -7.48 runs up to 1.5 m
+  outside the drawn carriageway and off the 2 m step onto trunk 875.  T4 now (a) judges a route on the points that lie on the wall's own way (the comment always said so; the old
+  slice took one point of the next way, where the QA's offset lies off a narrower way - p06 onto 9356, 1.6 m past its edge) and (b) keeps the lane `LANE.edgeClear` inside the
+  carriageway as it is drawn (OSM half width + taper), as `laneOffsets` keeps it inside the OSM width.  T4: 13 routes, **0 stopped, no wall touched**.  This is a change of the
+  check's input and of its lane rule, not of a limit; T1 (walls vs every OSM lane) is unchanged and still 0.
+* Walls re-baked: **97** (95 + 2 short ones at 4574,11611 / 4589,11624), 2376 m.  At Merl there is still no wall between the link and the A4: the lanes of both (laneOffsets at
+  2.45 m from axes 7.5 m apart) leave no 1.35 m clearance for a wall block, so the bake drops it - the face there is bare grass (shots C2 / C3).
+* `shot.mjs`: a pose may carry `hint` (the car's level: 1e9 = on the deck over the point) - the chase shots on the Pont Rouge / A1 deck 23 / A6.
+* **Rue de Neudorf r07_1** (QA3 N3-D02, "3 -> 2 lanes at one node without a taper"): the taper is there - way 4975 (11 m) narrows to 3396's 7.6 m over its last 20 m (taperDhw
+  -0.18 ... -1.70).  The stop is the QA route's: it keeps 4975's offset 4.6 m for 45 m onto 3396 (half width 3.8) and only switches to 1.9 at the next point, so the car drives 0.8 m
+  past the edge onto the pavement into the lamp.  A driver artefact (not changed).
+
+### Drive table, final tree (`drive12b/drive_table.md`; v55 -> drive12 first pass -> final)
+| job | runs | stopped (< 3 m/s) | by a wall | by a house | runs with flight | max roll > 0.3 rad |
+|---|---|---|---|---|---|---|
+| qa3 alldrive | 237 | 47 -> 42 -> 42 | 12 -> 9 -> 8 | 21 -> 20 -> 20 | 14 -> 14 -> 13 | 32 -> 34 -> 34 |
+| qa3 wallpairs | 34 | 25 -> 5 -> 5 | 24 -> 1 -> 1 | 2 -> 1 -> 1 | 2 -> 3 -> 3 | 8 -> 14 -> 13 |
+Changed by the finish: x046_w65r (service by wall 65) stopped -> through; p02 Merl roll 1.216 -> 0.933 (the QA's offset 2.5 lies past the face: laneOffsets' lane of a 9.8 m
+link on a carriageway 7.5 m from the A4's), b02_d5 Pont Adolphe air 6 -> 0; x034_w54 Eecherfeld now counts as stopped (5.9 -> 1.0 m/s at the same tree after the hairpin, the
+lane at 1.6 m on a 2.7 m way); x017 / p08 rolls 0.47 -> 0.63 / 0.94 -> 1.11 where the QA's car already left the road (crash at full speed / Schiggrisgaass).  p06 in the QA's own
+job (its offset carried onto 9356) still drops off 9356 onto trunk 875 (see T4 above).
+
+### Gates (final tree, merged with city13, walls re-baked; `drive12b/gate_*.txt`, copies in `drive12/`) - ALL PASS
+* `harness.js` **161 / 161** (1282 s): K (walls 97, rampsInRoads 186), P1, Q1, R1, R2 72, R3 0.096 / 0.088, T1 0, T2 0, T3 13, T4 0 stopped, T5, U.
+* `luxdrive_world` PASS: 6 carve walls (<= 8), deepest 7.90 (<= 8), draw calls 113 / 150 / 211.  `luxdrive_holes` 0 hole pixels at medium and at low (72 poses).  `luxdrive_ui` PASS.
   `luxdrive_webkit` PASS.
+* Montages (left live v57 = origin/main before city13, right this tree; noon / clear, GPU shots): `drive12/montages/1_decks_merl.jpg` (Pont Rouge chase from the deck A1 / A2, A1 deck
+  23 start B1 / B2, Merl link C1 - C3, A6 way 241 D1 / D2, Pont Adolphe east end E1 / E2, Kirchberg 9423 F1 / F2) and `2_walls_removed.jpg` (6 of the 31 walls the lane rule
+  removed: 23, 72, 92, 110, 43, 89; oblique + top), pairs `pair_*.jpg`.
 
 ### Still wrong (honest)
 * **Houses in lanes on narrow streets**: the lane scan finds 1097 road / house pairs (880 not at a dead end) where a lane centre's body circle touches a footprint - nearly all
   service ways, residential and living streets of the old town (Plättisgaass, Rue Émile Metz, Millegässel ...) whose OSM width puts the lane 1.6 m off the axis against the
   façades; JFK service lane 3730 (qa2 N-BL02) too.  Not fixed (a road width / footprint question, not a collision one); no gate.
-* **Ramps in lanes**: 178 ramp samples beside the ways lie within a lane's reach at their level (K rampsInRoads 11 -> 178): where two carriageways overlap in plan (Croix de
-  Gasperich A6 5.8 m, Bd Robert Schuman 3.7 m, Kirchberg links, Merl) the wall that stood in the lane is gone, but the ground there is still the steep face - the lane is narrower
-  than OSM says.  The car meets a bank there instead of an invisible wall.  The fix is the carriageways' widths at two-level overlaps (road-network), not done.
-* 31 walls were dropped whole: their ramp stands in reach of a lane; the bare face shows there (look not re-checked in the browser this round).
+* **Ramps in lanes**: 186 ramp samples beside the ways lie within an OSM lane's reach at their level (K rampsInRoads; v55 11).  The face now clears the lanes where there is room
+  (section 5), but where OSM overlaps two carriageways by more than the face needs (Merl: lanes 2.6 m apart centre to centre at 4.7 m of rise) the face still lies in the
+  laneOffsets lanes - it clears the lanes the car is driven in (R3 1.9 m) only.  No wall can stand there, the face is bare grass.
+* **Bare steep faces where walls were dropped** (31 walls of v57, 2376 m left of 3308): G6 (wall 89, Kirchberg 8487,6040) is the worst - a 4.5 m grass cliff cut off at the wall
+  end, beside a building; Merl (C3) a long bare grass bank between the link and the A4 where v57 had a concrete wall; wall 40 (the A4 / A4 median at Merl) gone too.  Look work for
+  city13's successors (rock-face paint, or a wall that stands outside the lanes on a narrower bench).
+* Paint on the face: the lattice interpolates `sdCar` over 1 m, so the upper way's tarmac reaches up to ~1 m down a face (Merl 3072 - 3090,9976: 19 lattice samples on ground
+  steeper than 1 m/m, v57 23) - visible now that the wall in front is gone.
+* Kirchberg 9423 at its merge node (8587,5961): the outer lane starts on the 1 m bank of the merge (the car tilts 0.3 rad in the first 10 m, shot F1).  The taper of a way that
+  starts where two ways MERGE (6060 + 12330 -> 9423) narrows it as if one 3-lane way went on (taperDhw rule, carriageways.js chains one partner) - not changed.
 * T3 ratchet 13: deck 59 (the Buchler car park spiral: no car park deck in the data), deck 169 (Hondhausbréck, free end on a bank, wall 41 at it), deck 197 (service deck into house
   6763 near the Gare).  N3-B02 deck 73, N3-B03 deck 28, N3-B04 decks 169 / 204 / 157 / Pont Margot reverse: NOT fixed (deck 73 / 28 do not fail the every-lane carry: the QA's
   steps there come from its route leaving the lane, see qa3 section "Not bugs"; 204 12 cm, 169 16 cm remain in the every-lane list).
-* Pont Adolphe west end: 22 cm in lane -1.8 (flat deck, cambered road).  Rue de Neudorf 3 -> 2 lanes without a taper.
+* Pont Adolphe west end: 22 cm in lane -1.8 (flat deck, cambered road).  Rue de Neudorf r07_1: a QA-route artefact (section 5).
 * Q1-style every-lane steps: 20 decks over 5 cm (T3 reports them, not gated).
