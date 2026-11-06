@@ -1848,7 +1848,7 @@ backed up to 88 walls; v51 fails the QA pose); S7 slim columns off carriageways 
 * The slim rule changes ~150 footbridges, not only deck 218: checked on 218 only.  The approach slabs / ramps of slim decks within 0.7 m of the ground are still solid.
 * Not checked on an iPad (WebKit gate only); the wall shader adds per-fragment work on walls (noise lookups x2, joints).
 
-## Surface 11 (branch `lux-drive-surface11`, Mac mini): the washboard off the centre line, orphan bridge ways, carriageways at two levels side by side — HANDOFF (gates not all run)
+## Surface 11 (branch `lux-drive-surface11`, Mac mini): the washboard off the centre line, orphan bridge ways, carriageways at two levels side by side — DONE (all gates pass)
 
 Started from live v51 (12440570), merged look11 (`lux-drive` 934af75b) before the final harness; main.js `?v=54`.  Round folder `~/Library/Caches/luxdrive-work/surface11/` (tools in `tools/`:
 `ripple.mjs` / `ripfine.mjs` / `cands.mjs` the washboard, `lanes.mjs` R1, `r2.mjs` / `r3.mjs`, `overlap.mjs` the level pairs, `orphans2.mjs`, `q1.mjs` Q1 for some decks, `jline.mjs` a gate-L drive line,
@@ -1894,13 +1894,40 @@ Started from live v51 (12440570), merged look11 (`lux-drive` 934af75b) before th
   way 10241 (4930,9669): the roll is off the road - the pure-pursuit line leaves the carriageway after the 79 deg corner at 4940,9670 and meets the DTM's 2.4 m pit beside the opened cut
   (a round end cap at joints was tried and reverted: no effect).
 
-### Gates (merged tree, walls re-baked after the last carve change)
-* `harness.js`: **146 of 147** (log `surface11/harness2.txt`).  FAILS: gate I "crossfall <= 2.5 %" on the 200-way sample: 1 of 7073 cross sections, **2.52 %** at service way 3526
-  (10111,8482) - v51 had 2.50 there (the junction sheet of Route de Remich is applied with a weight that varies across the service way; the 2 % cross cap is on the sheet level, not on the
-  blended result).  Q1 / R2 ratchets were lowered AFTER this run (11 / 76 = the measured counts).
-* NOT RUN: luxdrive_world, luxdrive_holes (medium / low), luxdrive_ui, luxdrive_webkit; no before/after montages (poses ready: `surface11/poses.json`).  Out of budget.
+### First pass's gates (merged tree, before the finish below)
+* `harness.js` 146 / 147 (gate I 2.52 % at service way 3526, log `surface11/harness2.txt`); the browser gates were not run.  Run on that tree they FAILED: the world flow counted
+  **22** sides of roads that are a wall the carve made (limit 8, look11 7) and the deepest one **11.63** m/m (limit 8) - the narrow two-level step (RAMP_MIN, a 5 m rise in 0.8 m) was a
+  cliff at every pair (log `surface11/gate_world.txt` of that run is overwritten; numbers from the node replica `slopewalls_cur.txt` agree with the browser to the hundredth).
 
-### Next builder
-1. Gate I at 3526 (above): apply SHEET_CROSS_MAX to the sheet's effect on the way (or evaluate the sheet weight at the foot), then the full harness.
-2. Run world (draw calls: +30 walls), holes, ui, webkit; shoot `poses.json` with v51 (`surface11/v51`, its own shot.mjs) and this tree; montage.
-3. The 30 new walls are where two carriageways at two levels overlap: look at a few (interchanges at Kirchberg 8500,6040, Bonnevoie 5285,10590, Merl 3091,9976) for walls in odd places.
+### 5. Finish (6 Nov 2026, second builder) - `road-network.js`, `bake_walls.mjs`, `camera.js`, `main.js`
+* **Gate I at 3526** (10111,8482): on a way isolated from the rest of its junction the sheet's WEIGHT is taken at the foot too (it fell 0.91 -> 0.53 across the 3.2 m lane, so a capped
+  level was lifted unevenly).  2.52 -> **1.58 %** there; 200-way sample worst **2.18 %**; all ways: 102 -> 35 sections over 2.5 %.
+* **The step between two levels is a face, not a cliff of the carve** (`stepShape`, `stepProfile`, the face pass in carve()): where the benches leave no room for the RAMP_SLOPE ramp the
+  hand-over is at least as wide as STEP_SLOPE 2.7 m/m needs (up to STEP_MAX_HALF 2.4 m), its profile turns straight where two ways run side by side (`sideBySide`: parallel within
+  ~20 deg, benches overlapping <= 3 - 4 m), and the ground there IS that face (both pins fade past their benches; with the hold their product made 5 - 9 m/m).  The hold of two-level
+  rivals is the strongest one, not the product (two links side by side over the A4 doubled the step); the junction sheet stays off the face (`stepCover`); a face is not laid on a
+  third carriageway at either level; the paint clip ends PAINT_STEP_MARGIN before the face and is weighted by the other way's end cap, not its lateral fade (a steep sd ramp
+  painted a false kerb 1.5 m inside Rocade de Bonnevoie).  World flow: **22 -> 6** carve walls, deepest **11.63 -> 7.90** (Croix de Gasperich 2023,11672: a ramp on its fill over
+  the A6 crossing at 30 deg - not side by side, so no face; still the steepest sample).  R2 76 -> **72** (ratchet 72), R3 0.096 / 0.088 rad (unchanged), Q1 11 -> **10** (ratchet 10).
+* **Walls** (`bake_walls.mjs`): the dedup of a face two ways see is against the SEGMENTS of the walls written (points 4 m apart at offsets of their own were up to 2 m from the nearest
+  point: two 85 m walls in one another at Merl, 30 such); a lower wall on the foot line of a higher one is trimmed (12: its sandstone showed through the concrete at Merl); a wall
+  point whose coping would poke through the carriageway of a deck over it is dropped (Croix de Gasperich: a grey quad on the bridge); two walls of one face whose ends meet are joined
+  (6: a V notch down to the ground under the Merl link).  Walls 188 -> **125** (v51 158), 3308 m; drawn 125.
+* **Camera** (`camera.js`, `main.js`, harness S6 as main.js): the lens collider asks the walls first and pushes out in 3 passes (a house corner at the end of a wall - Bd Konrad
+  Adenauer 7706,6728 - answered first with pen 0 and the lens stayed in the block).
+* Looked at (shots `surface11/after/`, montages below): Kirchberg 8348,6165 / 8487,6040, Bonnevoie 5291,10615, Merl 3102,9977 / 3102,9993, Neie Wee, and 7 others: walls stand
+  between the two levels on their foot line, lanes clear, none on a carriageway or floating; where v51 had a grass bank laid across the outer lanes there is now a wall.
+
+### Gates (final tree, walls re-baked after the last carve change) - ALL PASS
+* `harness.js` **147 / 147** (`surface11/harness8.txt`).  World flow PASS: 6 carve walls (<= 8), deepest 7.90 (<= 8), draw calls low 113 / medium 150 / high 212 (unchanged).
+  Holes medium 0, low 0.  UI PASS.  WebKit (`luxdrive_webkit.mjs`) PASS.  Logs `surface11/gate_*.txt`.  main.js `?v=55`.
+* Montages (left live v51, right surface11, noon / clear): `surface11/montages/1_roads_bridges.jpg`, `2_walls_kirchberg_bonnevoie_merl.jpg`, `3_walls_neiewee_and_random.jpg`
+  (+ `pair_*.jpg`).
+
+### Still wrong
+* The faces eat up to ~1 m of each carriageway where OSM overlaps two levels (Merl: the A4 and the link overlap 1 - 3 m in OSM; the DTM shows the real cutting slope lies on the A4
+  side, the A4's OSM width is too much there).  The outer lanes stay drivable (R3), but they are narrower than real.
+* The world gate's deepest carve wall is 7.90 of 8 (Croix de Gasperich, a crossing pair) - no margin; and Rue Cents 8591,7846 (6.75, a vertical step of the opened A1 cut, the
+  same in v51, only newly sampled since the stride shifted).
+* Service loop 9630,9356 (7.2 % across), Rue de la Vallée, service 10241 as before; R2 72 samples left (merging-link junctions, ends of ways, the Hellege-Geescht plateau pedestrians).
+* Q1: decks 59 / 64 / 157 / 169 / 5 / 204 / 167 / 146 / 111 / 103 as before.
