@@ -1676,19 +1676,42 @@ snapshot for the before shots and the before numbers).
 ### 6. Kerbs / abutments
 * Kerbs inside a lane: gate M's "false kerbs inside a carriageway" stays 0 of 25958.  Interchange abutments: not touched (see below).
 
-### Gates at HANDOFF (token budget reached)
-* `harness.js`: **130 of 131 PASS** (run 5, walls rebaked after the last carve change).  FAIL: **P5** - the Rue Godchaux cut (7243, 15 m, 7301,9135) has no wall: it runs along the foot of a
-  1.6 m/m hillside; its own face is short and the bake (CUT_RAMP, face cut off where the ground meets the land) finds no place >= 2 m/m there.  The car can still climb that bank (QA2 N-U03).
-* NOT RUN yet: `luxdrive_world.mjs`, `luxdrive_holes.mjs` (medium + low), `luxdrive_ui.mjs`, `luxdrive_webkit.mjs`; no before / after shots taken (poses ready: `roads9/poses.json`, v48 snapshot `roads9/v48/`).
-* `pb/lux-drive.html` main.js `?v=49` (bumped).
+### 7. Finish (second builder): the Rue Godchaux cut (P5, QA2 N-U03), the merge with decks10
+* **Rue Godchaux**: the cut (way 7243, 15 m) lies at the foot of a hill of 2 m/m that rises ~20 m within the wall scan, so CUT_RAMP (max rise 12 m) found no ramp.  `findRamp` takes
+  `capRise`: a face higher than maxRise keeps its lowest WALL.maxRise (6 m) as the wall and the hillside goes on above the coping (CUT_RAMP = { maxRise 6, capRise }).
+* QA2's roll (65 deg at 7315,9113) and the -0.82 m "entry step" were on the APPROACH, 15 m before the mouth: Rue Godchaux (way 256) runs 100 m along the same dug bank.  The ways that lead
+  into a cut's mouth (18 ways) now wall a steep face too when the carve dug it >= 2 m below the land somewhere on it (APPROACH_DUG; a face the land has anyway stays the land's slope), and
+  the walls of a cut and its approaches are JOINED across the mouth (no tapered notch down to the ground at each way joint; an onward-direction check keeps two walls of one face that
+  run back over each other apart).  Result: one 148 m wall 256 -> 7243 -> 7244 (rise 5.6 - 6 m), and the A1 cut wall under deck 32 joined (two pieces -> one).  Walls 158 -> 158
+  (+4 new, -4 joined), 3455 -> 3602 m.
+* Driven in Node with the game's own car and collisions (`roads9/tools/drive_cuts.mjs`, reproduces QA2's numbers exactly): QA2's route is the cut's first segment run 30 m straight on, which at
+  Godchaux starts 7 m up the bank - now the car meets the wall (blocked, no roll off the road); along the real road (approach lines, lane and kerb): roll 0.03, step 0.02 m, through.
+  **A1 bore 12539 (N-U04, 13044,5906)**: along the road (lane 4.9 m and kerb offset) the car gets through both bores; QA2's straight-on route drifts 1.2 m inside the carriageway edge and
+  touches the east end of the cut wall, whose face stands on the edge line (bake rule CAR_CLEAR -0.6) - honest note, not changed.
+* Harness O3 now drives into the retaining walls too (as main.js collide does): 9 of 9 opened ways through.
+* **Merge with decks10** (`lux-drive` 8ad4c140): harness sections P and Q both run, main.js keeps the deck-bank collider, main.js `?v=51`.  On the merged tree Q1 failed with 14 decks
+  (ratchet 13): deck 105 (Échangeur de Kirchberg) had an 8 cm jolt because the width taper narrowed link 11833 to the OSM width of the BRIDGE way at the deck end, so it no longer
+  covered its level beside link 6061.  Only carved ways narrow each other now (a deck is drawn at its own width with its own apron): Q1 back to decks10's 13 decks, P1 unchanged (437
+  joints, 1 step).
 
-### Still wrong / next builder (see `roads9/HANDOFF.md`)
-1. P5 / N-U03 Rue Godchaux: either give an opened cut a wall wherever the ground beside it rises more than ~1.5 m within 3 m (bake rule for cut chains independent of findRamp), or keep runs along a
-   hillside closed (a side-cover rule was tried: it also closed one A1 bore because the twin bore's hill is "beside" it - reverted).  The QA2 A1 stop at 13044,5906 and the 0.8 m entry step were not re-checked.
-2. Run the four browser gates and the shots (left v48 = `roads9/v48` with `node scripts/luxdrive/shot.mjs`, right = this branch), montage with `terrain5/tools/montage.py`.
-3. Neie Wee 5437,8831 (9.8 % across: the 1 m lattice blurs the Corniche cliff into the lane), a service loop 9630,9356 whose arms overlap at two levels (6.5 %), Rue de la Vallée 4296,10041 (6.1 %).
-4. 4 portals capped at the lowest mouth still stand under / over a road (P4 lists them as floored); 47 garage mouths lost their portals (houses / decks) - the road ends at the facade.
-5. Interchange abutments (~100 steep grass banks at skewed motorway deck ends): not touched.  Gate L's steep old-town box 10.25 -> 11.43 (bound 12).
+### Gates (final, merged tree, walls re-baked and unchanged by the last carve change)
+* `harness.js`: **133 of 133 PASS** (P5: 3 deep cuts, 3 walled; O3 9 / 9 rides; Q1 13 decks = ratchet; crossfall 105 over 2.5 %, 4 over 6 %; walls 158, 8 chunks in view).
+* `luxdrive_world`: PASS, draw calls 113 / 150 / 212 (low / medium / high).  `luxdrive_holes`: 0 hole pixels (medium and HOLES_Q=low, 72 poses each).  `luxdrive_ui`: PASS.
+  `luxdrive_webkit`: PASS.  Logs `roads9/harness8.txt`, `roads9/final_*.txt`.
+* Shots: 25 poses (`roads9/poses.json`: the 20 of this round + 4 Rue Godchaux + N-C02), before = v48 (`roads9/v48`), after = this branch merged; montages `roads9/montages/*.jpg`.
+
+### Still wrong / next builder
+1. **N-C02** (4620,11599): the chase camera is still inside flat grey planes - the same picture as v48.  There is no portal within 15 m any more (the roads9 portal rule dropped it), so the
+   camera sits in something else (a building over the garage way, or the camera boom - camera.js).  Not fixed.
+2. **N-D01** washboard (A1 east 13764,5849; Arelerstrooss 3698,8421): not done (decks10 diagnosed it: the bed is taken at the foot of the perpendicular per segment, so off the axis the height
+   wobbles with the polyline's bends - needs a continuous station in road-network's carve).
+3. Service way 10241 (4930,9669): an opened 12 m cut on an EMBANKMENT at a sharp corner - a car that cuts the corner rolls 38 deg down the fill (both QA's route and along the road).
+   Rue Charles Darwin (QA's 18 deg) is only on QA's straight-on route.
+4. The A1 cut wall's east end (13045,5912) stands on the edge line: a car hugging the edge of the outer lane touches it.
+5. Neie Wee 5437,8831 (9.8 % across), a service loop 9630,9356 (6.5 %), Rue de la Vallée 4296,10041 (6.1 %); 4 portals floored under / over a road; 47 garage mouths without portals;
+   interchange abutments (~100 steep grass banks); gate L's steep old-town box 11.43 (bound 12) - unchanged from above.
+6. Rue Godchaux: the wall's foot shows the sawtooth grass fringe of every wall (wall-view), and the hill above the coping is still climbable on foot of the land's own slope where no road
+   dug it (7244 beyond 7280,9160).
 
 ## Decks 10 (branch `lux-drive-decks10`, Mac mini): every deck driven end to end, the banks under deck ends (QA round 2)
 
