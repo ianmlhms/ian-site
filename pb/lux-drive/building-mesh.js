@@ -32,6 +32,7 @@ export const CELL = 256;            // m, the cell of the building mesh (one dra
 const EDGE_STEP = 1.0;      // m, the spacing of the points along one edge of the footprint
 const EDGE_TOL = 0.15;      // m, how far the ground may leave the line between two corners before a point is kept
 const MIN_WALL = 0.3;       // m, the shortest wall a house may keep where the ground climbs over its eaves
+const LEVEL_OVER_LOW = 1.4; // m: the storeys of a house on a slope start at most this far above the lowest point of its foot (look11, the level façade bands)
 
 /** A stable number out of the id of a building: the same building always looks the same. */
 function hash01(n) {
@@ -180,9 +181,12 @@ export function addBuilding(m, b, heightAt, landAt, drop = 0) {
   // The storeys are LEVEL: v (the height on the façade the material lays the floors, windows and the plinth on) is measured from one level for the whole
   // house, the lowest point of its foot, not from the ground under every vertex.  Measured from the ground, every band of the façade followed the slope and
   // bent at every point of the foot (and at the diagonal of every quad), and every stretch of wall had its own floor height: the bands waved (QA BL02).
-  // On a slope the uphill wall stands in the hill up to its first windows, the downhill one shows its plinth higher - as a house on a slope does.
-  let ref = Infinity;
-  for (const e of edges) if (!e.skip) for (const p of e.bottom) ref = Math.min(ref, p[1]);
+  // The level is the highest point of the foot, but at most LEVEL_OVER_LOW over its lowest: on a slope the downhill wall stands on a stone base (a basement) up to
+  // that much higher, and only on a steeper slope than that does the uphill wall stand in the hill below its first windows.  (From the lowest point the shop fronts
+  // of a long house on a sloping street were buried at its upper end.)
+  let low = Infinity, high = -Infinity;
+  for (const e of edges) if (!e.skip) for (const p of e.bottom) { low = Math.min(low, p[1]); high = Math.max(high, p[1]); }
+  const ref = Math.min(high, low + LEVEL_OVER_LOW);
   const facadeH = eaveY - ref;
   let along = 0;
   for (const e of edges) {
