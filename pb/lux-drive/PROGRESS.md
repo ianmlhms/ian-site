@@ -1931,3 +1931,87 @@ Started from live v51 (12440570), merged look11 (`lux-drive` 934af75b) before th
   same in v51, only newly sampled since the stride shifted).
 * Service loop 9630,9356 (7.2 % across), Rue de la Vallée, service 10241 as before; R2 72 samples left (merging-link junctions, ends of ways, the Hellege-Geescht plateau pedestrians).
 * Q1: decks 59 / 64 / 157 / 169 / 5 / 204 / 167 / 146 / 111 / 103 as before.
+
+## City 12 (branch `lux-drive-city12`, Mac mini): the city centre of the first drive - Gare, Pont Rouge, Bd Royal, Place de la Gare, tram setts, wall look
+
+Started from live v55 (5b802d6f).  Input: QA3 `BUGS.md` section 3 (the drive Av. JFK -> Pont Rouge -> Bd R. Schuman -> Bd Royal -> Pont Adolphe -> Av. de la Liberté -> Gare) and
+section 4 (walls).  Round folder `~/Library/Caches/luxdrive-work/city12/`: `v55/` = a `git archive` of the base (the "before" pictures, same poses), `before/` / `final/` the frames,
+`refs/` Commons photographs (credits in `refs/credits.txt`, never shipped), `montages/` photo | before v55 | after, `first5/` the first-five-minutes drive re-run on this
+branch (tool `tools/first5.mjs` = QA3's with the repo as a parameter) and `montages/first5_*.jpg` QA3's frame | this branch's frame.  Tools in `tools/` (`near_bld.mjs`,
+`dump_bld.mjs` + `plan.py` the plan of blocks / OSM / roads, `classmap.mjs` / `density.mjs` the class raster, `tri_by_line.mjs` the triangles of a landmark per source line,
+`what_near.mjs`, `wall_roads.mjs`, `montage3.py`).
+
+### 1. Gare Centrale (`landmark-gare.js`, new) - QA3 section 3 item 5
+* Root cause: the bake has NO block for the station building (OSM way 209293282 is there, the LOD2 bake missed it: only the indoor footways were painted); what read as the
+  station from the Av. de la Liberté was block 15153, the long flat platform roof behind it (e 11 m).
+* Now a landmark on the OSM outlines (station 209293282, pavilion 209293283, glass hall 198144651), checked against Commons photos (`refs/The_Gateway_to_Luxembourg.jpg`,
+  `Luxembourg_Railway_Station_in_2019.12.jpg`): pale sandstone two-storey mass with plinth, cornice and both storeys of windows; slate hip roofs with dormers on the NE wing,
+  the corner block and the SW back; the pavilion's pyramid roof; the clock tower NE of the main hall (6.2 m square shaft, corner pilasters, string courses, a clock on all four
+  faces, cornice + balustrade, copper bell roof, open octagonal belfry, small dome, lantern, needle: 40 m); the main hall (projecting gable 22.5 m, the great round-arched window
+  with mullions between paired columns on pedestals, entablature, cartouche, three arched doors, the glass marquise on the rounded porch of the outline); the glass hall of 2012
+  (glass walls only on its own edges, steel mullions every 2.8 m, a transom, flat roof).  Collision walls on the whole outline.  2 091 triangles, one mesh.
+* Place de la Gare: `paved-squares.js` (new) - the square from the station front to the houses across it (incl. the bus island and the north end at the Av. de la Liberté)
+  and the OSM area Parvis de la Gare are paved stone (world-map.js writes them into the R channel of the GPU cover, which no shader read; ground-shader paints `uStone` there):
+  the lawn blobs are gone, the roads are painted over as everywhere.
+
+### 2. Pont Rouge from the driver's seat (`landmark-bridges.js`) - item 2
+* Photos taken ON the bridge (`refs/Luxembourg_Pont_G-D_Charlotte_3_.jpg`, `_4_`): a red steel upstand at the foot, a lit handrail at hip height and a tall screen of white
+  vertical slats leaning out over the valley, on both sides.  Before: a 1.25 m white/grey rail.  Now: red edge girder up through the deck to a 0.35 m red upstand, a white lower
+  panel, a grey handrail at 1.15 m, white slats every 0.6 m up to 3.6 m leaning out 0.4 m, a mid rail, a top rail, red posts every 7.2 m (the posts are the brief's; in the photos
+  they are white/grey - the red is the upstand and the girder).  The deck surface is now built every 8 m (was 3 m; the profile is within 3.4 cm of the LiDAR decks) to pay for it.
+  Pont Rouge 5 355 -> 6 313 triangles.
+* Triangle budget: the facade `slab()` boxes no longer draw their back face (against the wall, never seen): Coque 8 342 -> 7 330, Palais 6 470 -> 5 516, Cathedral 11 721 -> 11 583 ...
+  landmarks (not campus) 57 417 -> 55 149 before the Gare and the screens; ~58 200 after (limit 60 000).
+
+### 3. Bd Royal (`world-map.js`) - item 3 / section 3 item 7
+* Cause: the near-cover rule of look2 (hard ground only where a 24 m window is >= 5-17 % built) took the strip between the pavement and the shop fronts of a 25 m street for a
+  verge; the road's own cells (density lower: the window is centred on the carriageway) were 0 and the bilinear filter carried that dip as a lawn up to the kerb.
+* Now: in the centre box (DENSE_CENTRE 4300..5800 x 8000..10400) an urban cell whose 72 m window is densely built (0.26 -> 0.34; Bd Royal 0.33 - 0.73, Kirchberg / JFK <= 0.21)
+  is city whatever the 24 m window says, grown by one cell.  Only in the centre: across the map the rule had raised 7 830 suburban cells (gardens of Weimershof, Neudorf ...).
+  Top view `dbg2/royal_top.png`: pavement to the facades.  The wavy pavement/lawn edge is gone where there is no lawn any more.
+* Gëlle Fra: built since look1 at Place de la Constitution (4970, 8985), 25 m; visible from the Pont Adolphe / Bréisseler Plaz (`final/gelle_from_adolphe`); from Bd Royal itself
+  the houses hide it (true in reality too: the square is at the end of Bd F. D. Roosevelt).  Not changed.
+
+### 4. Tram tracks (`tram-view.js`) - item 6
+* Photos of the Av. de la Liberté and the Bd Royal (`refs/Avenue_Libert_*`, `Luxembourg_bd_Royal_11-2020_*`): the rails lie in warm grey granite setts the whole width.  The bed
+  in the city streets is now that sett colour with a faint shade per 2 m section (was pale concrete alternating with darker slabs every 4 m); on a bridge it stays concrete; in
+  the open the grass bed is unchanged.
+
+### 5. Walls look (`retaining-walls.js`, `wall-material.js`, `ground-shader.js`) - section 4 and item 5
+* N3-W05 / the JFK start (item 5, f02 / f04: the "pale concrete kerb slabs" are a retaining wall at the car-park ramp beside JFK, its wide pale coping): the pale coping is 0.5 m
+  deep; behind it the block is a BANK (earth/grass colour, kind `back`) sloping down to 0.25 m under the drawn ground behind the block (buried where the ground is as high as the
+  top: a normal retaining wall; a slope where it falls away: no beige box with a lid, w005 before/after).
+* N3-W04: the ends are stone only as deep as the coping, earth behind; the end tapers into the ground beyond it over <= 2.5 m (a wedge of earth with a coping and a stone face).
+  The "dark brown tombstone" beside the end and the "6 m brown monolith" (w002, w014, w016, w022) are NOT the wall: they are the carve's vertical step of the ground beyond the
+  wall's end, painted with the land's texture stretched down the face.  Near-vertical ground (N.y < 0.30 .. 0.55) is now a rough grey-beige rock face with level bands.
+* N3-W06 (walls 112, 110 "in an empty meadow"): measured - the road IS drawn there (112: gravel track 13584, 110: asphalt service way 12926, both within 2 m of the face): the
+  pale path in front is that road.  Not changed.
+* N3-W07 (white line along wall 76) and N3-W03 (sawtooth grass at the foot further than 0.9 m out): NOT changed.
+* N3-B06 deck 221: measured - no building footprint lies within 8 m of the deck's line; the block in w066 stands behind it.  Not changed.
+
+### 6. Place de l'Étoile / Rond-Point Schuman (item 4) and the JFK side-street aprons (item 5): NOT fixed
+* f21: the pale "concrete wall strips" are retaining walls (now with the narrow coping and the earth bank); the ragged tarmac edge with the green fringe is the junction's lattice
+  union (no channels at a big junction, road-network / tile-mesh), and the game has no Étoile landmark.  The train simulator has one (`pb/train-sim/luxtram-landmarks.js`
+  def 'etoile', LOD2 of the corner blocks): see HANDOFF.
+
+### Harness section U (`harness-city12.js`, 9 checks; harness 156)
+U1 the Gare is built, stands on the ground at all corners, tower >= 35 m, no baked block inside, collision walls on every edge, no road for cars inside; U2 the Pont Rouge screens
+(>= 400 slats a side, >= 3 m); U3 every cell of the paved squares is paved and city; U4 the dense rule stays in the centre box (0 cells raised outside it, the Kirchberg / JFK lawn
+samples stay lawn, the Bd Royal strip is city); U5 walls: coping <= 0.5 m deep, earth behind it, no stone deeper than the coping.
+
+### Gates (final tree) - ALL PASS
+`harness.js` **156 / 156** (`city12/gate_harness.txt`); world PASS, draw calls low 113 / medium 150 / high 212; holes medium 0 / low 0 (72 poses each); `luxdrive_ui` PASS;
+`luxdrive_webkit.mjs` PASS.  `pb/lux-drive.html` main.js `?v=57`.
+Montages (photo | before v55 | after city12): `~/Library/Caches/luxdrive-work/city12/montages/1_gare.jpg`, `2_pont_rouge.jpg`, `3_bd_royal.jpg`, `4_etoile.jpg`, `5_jfk_start.jpg`,
+`6_liberte_tracks.jpg`, `7_walls_a.jpg`, `7_walls_b.jpg`; the first-five-minutes frames f02..f51 as free-camera poses on the route (`before/fNN.png` v55, `final/fNN.png`).
+
+### Still wrong (honest)
+* NOT DONE: the train simulator's photo-checked models (`pb/train-sim/luxtram-landmarks.js`: Gare with the real LOD2 roofs and tower, Étoile, Hamilius, Pont Rouge
+  superstructure) were pointed out late in the round and are NOT compared / merged - see `HANDOFF-city12.md`.
+* NOT DONE: the first-five-minutes DRIVE re-run on this branch (tool ready: `city12/tools/first5.mjs`); the free-camera frames along the route are the comparison for now.
+* W04: the dark slab at the END of walls (w002, w014, w022) is still there - it is not the end quad I changed (the end and its taper changed colour, the slab did not); probably
+  the back/end of a second, joined wall or a carve face; not identified.  W03 sawtooth, W07 the white line on wall 76: not touched.
+* The rock paint of near-vertical ground also greys a few very steep grass banks (w014 after: a grey smear on the hill): threshold N.y 0.30..0.55 may be too wide.
+* Étoile (item 4) and the ragged JFK side-street aprons (item 5) are not fixed (junction lattice / road bake); the game still has no Étoile landmark.
+* Gare: the tower is placed from the outline and one photograph (not surveyed); the glass hall has no lettering; the platform roof block 15153 behind is still the bake's flat
+  glass shed.  Pont Rouge: the posts are red per the brief, the photographs show white posts.
