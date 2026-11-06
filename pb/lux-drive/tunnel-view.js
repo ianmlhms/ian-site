@@ -76,7 +76,7 @@ function linesOf(tube) {
 }
 
 /** The inside of one tube into builder b. */
-function buildInside(tube, b) {
+export function buildInside(tube, b) {
   const st = stationsOf(tube);
   const ih = tube.innerHalf, clr = tube.clearance;
   const P = (fr, lat, y) => [fr.x + fr.rx * lat, y, fr.z + fr.rz * lat];
@@ -144,7 +144,7 @@ function box(b, P, u0, u1, v0, v1, ya, yc, col) {
 const roofAt = (tube, fr) => tube.floor[fr.i] + (tube.floor[fr.i + 1] - tube.floor[fr.i]) * fr.f + Math.abs(tube.cross[fr.i]) * tube.outerHalf + tube.roofDepth;
 
 /** The outside of one tube into builder b: the shell (outer walls and roof top) and the headwalls of its two portals.  heightAt: the drawn ground. */
-function buildOutside(tube, b, heightAt) {
+export function buildOutside(tube, b, heightAt) {
   const st = stationsOf(tube), oh = tube.outerHalf;
   const P = (fr, lat, y) => [fr.x + fr.rx * lat, y, fr.z + fr.rz * lat];
   for (let k = 0; k + 1 < st.length; k++) {

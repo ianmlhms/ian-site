@@ -35,7 +35,7 @@ export const flow = {
         const inv = new THREE.Matrix4();
         const out = { poses: poses.length, holes: 0, worst: [], rendered: 0, minTiles: 1e9 };
         for (const p of poses) {
-          const y = m.surface.height(p.x, p.z) + p.up;
+          const y = p.y !== undefined ? p.y : m.surface.height(p.x, p.z) + p.up;      // (a pose in a tunnel has its own level: tunnels16)
           const yr = p.yaw * Math.PI / 180, pr = p.pitch * Math.PI / 180;
           m.setCamera({ x: p.x, y, z: p.z, tx: p.x + Math.cos(yr) * Math.cos(pr) * 50, ty: y + Math.sin(pr) * 50, tz: p.z + Math.sin(yr) * Math.cos(pr) * 50, fov: 70 });
           // the terrain catches up with the new pose: the pending tiles are built in a plain loop (the game builds 3 per frame, which takes
@@ -99,10 +99,21 @@ export const flow = {
         const p = [{ x: 60, z: 60 + t * (d - 120), yaw: 180 }, { x: w - 60, z: 60 + t * (d - 120), yaw: 0 }, { x: 60 + t * (w - 120), z: 60, yaw: 270 }, { x: 60 + t * (w - 120), z: d - 60, yaw: 90 }][side];
         poses.push({ ...p, up: 1.7 + (i % 3) * 25, pitch: -6 + rng() * 6, kind: "edge" });
       }
+      // tunnels16: the tunnels the car drives through - in front of each portal, at its face, inside (both ways), over the portal looking down
+      for (const t of (m.tubes ? m.tubes.tubes : [])) {
+        const at = (s, lat = 0) => { const i = Math.max(0, Math.min(t.s.length - 2, Math.round(s))); return { x: t.x[i] - t.tz[i] * lat, z: t.z[i] + t.tx[i] * lat, f: t.floor[i], yaw: Math.atan2(t.tz[i], t.tx[i]) * 180 / Math.PI }; };
+        const a = at(t.sA - 14), mid = at((t.sA + t.sB) / 2), b = at(t.sB + 14), fa = at(t.sA + 1), fb = at(t.sB - 1);
+        poses.push({ x: a.x, z: a.z, y: a.f + 2.4, yaw: a.yaw, pitch: -4, kind: "tube approach" });
+        poses.push({ x: b.x, z: b.z, y: b.f + 2.4, yaw: b.yaw + 180, pitch: -4, kind: "tube approach" });
+        poses.push({ x: fa.x, z: fa.z, y: fa.f + 2.2, yaw: fa.yaw, pitch: -6, kind: "tube face" });
+        poses.push({ x: fb.x, z: fb.z, y: fb.f + 2.2, yaw: fb.yaw, pitch: -3, kind: "tube looking out" });
+        poses.push({ x: mid.x, z: mid.z, y: mid.f + 2.5, yaw: mid.yaw + 180, pitch: -5, kind: "tube inside" });
+        poses.push({ x: a.x, z: a.z, y: a.f + 14, yaw: a.yaw, pitch: -30, kind: "tube over the portal" });
+      }
       return window.__probe(poses);
     }, { N: POSES, w: WORLD_W, d: WORLD_D });
-    h.eq(result.rendered, POSES, `${POSES} poses rendered`);
-    h.eq(result.holes, 0, `0 hole pixels below the horizon over ${result.rendered} poses${result.holes ? " " + JSON.stringify(result.worst.slice(0, 4)) : ""}`);
+    h.eq(result.rendered >= POSES, true, `${result.rendered} poses rendered (${result.rendered - POSES} in and at the tunnels)`);
+    h.eq(result.holes, 0, `0 hole pixels below the horizon over ${result.rendered} poses${result.holes ? " " + JSON.stringify(result.worst.slice(0, 40).map((q) => [Math.round(q.x), Math.round(q.z), +q.y.toFixed?.(1) || q.up, Math.round(q.yaw), q.kind, q.flagged])) : ""}`);
     h.expect(result.minTiles > (QUALITY === "low" ? 30 : 60), `at least ${result.minTiles} terrain tiles at every pose`);
 
     h.step("self-test: with one tile removed the detector DOES report holes");

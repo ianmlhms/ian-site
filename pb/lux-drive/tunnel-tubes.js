@@ -80,6 +80,15 @@ export const TUBE = Object.freeze({
  * just inside its mouth (13 % up and down) for a hill 5.6 m over the road. */
 const OVER_KINDS = new Set([...TUBE.kinds, 'service', 'living_street', 'busway']);
 
+/** The sample index of a tube at arc length s (the samples are about 1 m apart, not exactly: the index is searched, not s rounded). */
+export function indexAt(tube, s) {
+  const n = tube.s.length;
+  let i = Math.max(0, Math.min(n - 2, Math.round(s)));
+  while (i > 0 && tube.s[i] > s) i--;
+  while (i < n - 2 && tube.s[i + 1] <= s) i++;
+  return i;
+}
+
 /** The side offsets (in inner half widths) at which the cross-section of an approach is read at a face. */
 const FLUSH_LATS = [-1, -0.875, -0.75, -0.625, -0.5, -0.375, -0.25, -0.125, 0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1];
 
@@ -633,7 +642,7 @@ export function createTubeNetwork(tubes) {
  */
 export function exposedStretches(tube, heightAt) {
   const out = [];
-  const i0 = Math.max(0, Math.floor(tube.sA)), i1 = Math.min(tube.s.length - 1, Math.ceil(tube.sB));
+  const i0 = indexAt(tube, tube.sA), i1 = Math.min(tube.s.length - 1, indexAt(tube, tube.sB) + 1);
   let start = -1;
   for (let i = i0; i <= i1; i++) {
     const roof = tube.floor[i] + tube.roofDepth + Math.abs(tube.cross[i]) * tube.outerHalf;

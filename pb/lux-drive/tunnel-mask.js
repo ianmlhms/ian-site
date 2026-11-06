@@ -7,11 +7,11 @@
  *
  * Only the tiles that touch an exposed stretch get the masked twin of the ground material (a discard costs the early depth test), and the shader tests at most
  * MASK_MAX segments, the nearest to the camera, inside one bounding box. */
-import { TUBE, exposedStretches } from './tunnel-tubes.js';
+import { TUBE, exposedStretches, indexAt } from './tunnel-tubes.js';
 
 export const MASK_MAX = 24;               // segments in the shader
 const SEGMENT = 4;                        // m: the length of one mask segment
-const CAP_START = 1, CAP_END = 2;         // the segment ends flat at the face of a portal (the mouth is open there, the road outside is drawn)
+const OVERLAP = 1.0;                      // m: a segment reaches this far on into its neighbour (the bends), never past a face
 
 const MASK_GLSL = `
   uniform vec4 uTubeA[${MASK_MAX}]; uniform vec4 uTubeB[${MASK_MAX}]; uniform float uTubeN; uniform vec4 uTubeBox;
@@ -22,9 +22,8 @@ const MASK_GLSL = `
       vec4 A = uTubeA[i]; vec4 B = uTubeB[i];
       vec2 d = A.zw - A.xy;
       float t = dot(p.xz - A.xy, d) / max(dot(d, d), 1e-6);
-      if (t < 0.0 && mod(B.w, 2.0) > 0.5) continue;
-      if (t > 1.0 && B.w > 1.5) continue;
-      float tc = clamp(t, 0.0, 1.0);
+      if (t < 0.0 || t > 1.0) continue;
+      float tc = t;
       vec2 q = p.xz - (A.xy + d * tc);
       if (dot(q, q) > B.z * B.z) continue;
       if (p.y < mix(B.x, B.y, tc)) return true;
@@ -44,12 +43,14 @@ export function maskSegments(tubes, heightAt) {
       for (let s = s0; s < s1 - 0.01; s += SEGMENT) {
         const e = Math.min(s1, s + SEGMENT);
         const at = (q) => {
-          const i = Math.max(0, Math.min(tube.s.length - 2, Math.floor(q))), f = Math.max(0, Math.min(1, q - tube.s[i]));
+          const i = indexAt(tube, q), f = Math.max(0, Math.min(1, (q - tube.s[i]) / Math.max(1e-6, tube.s[i + 1] - tube.s[i])));
           return [tube.x[i] + (tube.x[i + 1] - tube.x[i]) * f, tube.z[i] + (tube.z[i + 1] - tube.z[i]) * f, Math.max(top(i), top(i + 1)), i, f];
         };
-        const [ax, az, ta] = at(s), [bx, bz, tb] = at(e);
-        const caps = (Math.abs(s - tube.sA) < 0.01 ? CAP_START : 0) | (Math.abs(e - tube.sB) < 0.01 ? CAP_END : 0);
-        out.push({ ax, az, bx, bz, ta, tb, half: tube.outerHalf - TUBE.maskInset, caps });
+        // (every segment ends square; one that does not end at a face reaches OVERLAP m on into the next, so the bends are covered.  A round end reached
+        // 7.8 m past the face of the Rocade de Bonnevoie and hid the road in front of its portal)
+        const sa = Math.abs(s - tube.sA) < 0.01 ? s : Math.max(tube.sA, s - OVERLAP), se = Math.abs(e - tube.sB) < 0.01 ? e : Math.min(tube.sB, e + OVERLAP);
+        const [ax, az, ta] = at(sa), [bx, bz, tb] = at(se);
+        out.push({ ax, az, bx, bz, ta, tb, half: tube.outerHalf - TUBE.maskInset, caps: 0 });
       }
     }
   }
@@ -104,5 +105,5 @@ export function createTubeMask(THREE, tubes, heightAt) {
     uniforms.uTubeBox.value.set(x0, z0, x1, z1);
     return near.length;
   }
-  return { twin, needsMask, update, segments };
+  return { twin, needsMask, update, segments, uniforms };
 }
