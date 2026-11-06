@@ -13,7 +13,11 @@ const REPO = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../.
 const { chromium } = createRequire("/opt/node-tools/")("playwright");
 const MIME = { html: "text/html", js: "text/javascript", json: "application/json", css: "text/css", webp: "image/webp", png: "image/png" };
 const port = Number(process.argv[2] || 8791);
-const browser = await chromium.launch({ args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist", "--mute-audio"] });
+// macOS renders on the Mac's own GPU (Metal: ~6x faster per shot and every tile loaded before the shot); Linux / the cloud keep software GL.
+// SHOT_GL=swiftshader forces software rendering anywhere.
+const USE_METAL = process.platform === "darwin" && process.env.SHOT_GL !== "swiftshader";
+const GL_ARGS = USE_METAL ? ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist"] : ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"];
+const browser = await chromium.launch({ args: [...GL_ARGS, "--mute-audio"] });
 const page = await browser.newPage({ viewport: { width: Number(process.env.W || 1180), height: Number(process.env.H || 820) } });
 const errors = [];
 page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
