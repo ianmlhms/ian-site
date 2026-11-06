@@ -142,6 +142,14 @@ export const GROUND_FRAGMENT = `
     float farK = smoothstep(uTreeRadius * 0.62, uTreeRadius * 1.05, vDist) * forest * (1.0 - urban);
     albedo = mix(albedo, canopy * (0.85 + 0.30 * nLo.g), farK);
 
+    // A near-vertical face of the ground (the step of the carve beside the end of a retaining wall, a cutting) took the land's texture stretched down the face: a dark
+    // brown slab with wood-grain streaks beside the wall (QA3 N3-W04 / W05, "tombstones", the 6 m brown monolith at Neie Wee).  It is a rough grey-beige rock face with
+    // level bands, like the walls beside it.
+    float cliff = 1.0 - smoothstep(0.30, 0.55, N.y);
+    float rockN = texture2D(uNoise, vec2((P.x + P.y) * 0.05, vWorld.y * 0.11)).g;
+    vec3 rock = vec3(0.57, 0.54, 0.48) * (0.82 + 0.30 * rockN) * (0.95 + 0.05 * sin(vWorld.y * 4.2 + rockN * 3.0));
+    albedo = mix(albedo, rock, cliff);
+
     // ---- the road: the tarmac, the kerb, the pavement and the markings
     float surface = vRoad2.z;
     // The edges of the paint are the zero of the signed distance to the UNION of the carriageways / pavements (aRoad3):

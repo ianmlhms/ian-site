@@ -141,6 +141,7 @@ export const WALL_LOOK = Object.freeze({
   footReach: 0.9,          // m: how far in front of the face the ground is looked at
   copingBack: 0.5,         // m: the pale coping is this deep; behind it the block is a bank of earth (city12, QA3 N3-W04 / W05: the full block top was a pale slab and its back
                            // and ends stood above a falling ground as a beige box or a dark tombstone; JFK's first wall read as a concrete kerb slab lying on the tarmac)
+  endTaper: 2.5,           // m: the end of a wall runs down into the ground beyond it over at most this
   bankBelow: 0.25,         // m: the bank behind the coping goes down to this far under the drawn ground behind the block (buried where the ground is as high as the top)
   oldTown: [4300, 8200, 5700, 9900],   // x0, z0, x1, z1: the old town, the Grund, Pfaffenthal and Clausen are walled in Luxembourg sandstone
 });
@@ -249,6 +250,17 @@ export function wallQuads(wall, groundAt = null) {
     const at = [along[k], along[k], along[k], along[k]], ft = [p.bottom, p.bottom, p.bottom, p.bottom];
     add('end', [g.foot, g.lipTop, g.cope, g.copeFoot], [endN, endN, endN, endN], stoneColor, stone, at, ft);                         // the stone: as deep as the coping
     add('endBank', [g.copeFoot, g.cope, g.backTop, backFoot], [endN, endN, endN, endN], BANK_COLOR, KIND.back, at, ft);              // the earth behind it, sloping to the back
+    // the end tapers into the ground beyond it: a wedge of earth from the top of the end down to the drawn ground ENDTAPER m on (the end stood up out of a falling slope as
+    // a dark slab, QA3 N3-W04); its face side is the wall's stone
+    if (groundAt) {
+      const run = Math.min(WALL_LOOK.endTaper, Math.max(0.5, p.top - p.bottom));
+      const on = (q) => { const x = q[0] + tx * run, z = q[2] + tz * run; return [x, Math.min(q[1], groundAt(x, z) - 0.1), z]; };
+      const c1 = on(g.cope), b1 = on(g.backTop), l1 = on(g.lipTop);
+      const slopeN = [tx * n * 0.7, 0.7, tz * n * 0.7];
+      add('endTaper', [g.cope, c1, b1, g.backTop], [slopeN, slopeN, slopeN, slopeN], BANK_COLOR, KIND.back, at, ft);
+      add('endTaperTop', [g.lipTop, l1, c1, g.cope], [slopeN, slopeN, slopeN, slopeN], COPING_COLOR, KIND.coping, at, ft);
+      quads.push({ part: 'endTaperFace', q: [g.foot, [l1[0], g.foot[1], l1[2]], l1, g.lipTop], n: [faceN(k), faceN(k), faceN(k), faceN(k)], color: stoneColor, a: at.map((u) => [u, stone, p.bottom]) });
+    }
   }
   return quads;
 }
