@@ -226,7 +226,7 @@ export const R2_MIN_APART = 1.2;       // m: two carved ways whose beds differ b
 export const R2_MAX_GAP = 0.5;         // m: ... and whose benches lie at most this far apart (or overlap): the hand-over between them does not fit beside both carriageways
 const R2_STEP = 0.25;                  // m: the cross section is probed this often from each axis toward the other way
 const R2_IN = 0.3;                     // m: a probe counts while it lies this far inside the painted carriageway of its way
-const R2_MAX_BAD = 80;                 // samples off level (v51: 467; the ones left are junctions of merging links and the ends of ways - PROGRESS Surface 11).  A ratchet: lower it, never raise it
+const R2_MAX_BAD = 76;                 // samples off level (v51: 467; the ones left are junctions of merging links and the ends of ways - PROGRESS Surface 11).  A ratchet: lower it, never raise it
 const R2_SLOPE = 0.04, R2_SLACK = 0.03;   // the painted carriageway lies within this crossfall (+ slack) of its axis: no ramp into the lanes (QA2 N-T01: a 150 % grass bank across the outer lanes, the car rolled 31 deg)
 
 /** Every sample of a carved way where another carved way at another level lies within R2_MAX_GAP of its bench: the painted carriageway of each, probed across from its axis toward

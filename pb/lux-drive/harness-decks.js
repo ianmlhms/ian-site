@@ -15,7 +15,7 @@ const Q_LANE_INSET = 2.2;         // m: the outer lanes of a deck at least Q_LAN
 const Q_LANE_DECK = 9;
 const Q_LANE_MARGIN = 0.9;        // m: a lane must lie this far inside the carriageway of the way it continues on (else that lane does not exist there and is not driven)
 const Q_MIN_WIDTH = 4;            // m: the decks of cars (a narrower one is a footbridge)
-const Q_MAX_FAILING = 13;         // decks with a step or a flight (v48: 24 of 132).  A ratchet: lower it when a deck is fixed, never raise it.  The ones left are listed in PROGRESS (Decks 10)
+const Q_MAX_FAILING = 11;         // decks with a step or a flight (v48: 24 of 132, decks10: 13, surface11: 11 of 134).  A ratchet: lower it when a deck is fixed, never raise it.  The ones left are listed in PROGRESS (Surface 11)
 export const CAR_KINDS = new Set(['motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary', 'primary_link', 'secondary', 'secondary_link', 'tertiary', 'tertiary_link',
   'unclassified', 'residential', 'living_street', 'service', 'track', 'road']);
 /** The QA drive routes that started UNDER a viaduct (the car at the valley floor): [label, [[x, z, lane offset], ...]] (qa1 v122 / v128, qa2 n126). */

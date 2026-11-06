@@ -1847,3 +1847,60 @@ backed up to 88 walls; v51 fails the QA pose); S7 slim columns off carriageways 
 * S3 markings (N-M01 deck-start slivers, N-M02 junction scratches, N-M03 bare roundabouts): NOT done.  BL01: not done (placement).  N-C02: camera boom 2.1 m at the dead end.
 * The slim rule changes ~150 footbridges, not only deck 218: checked on 218 only.  The approach slabs / ramps of slim decks within 0.7 m of the ground are still solid.
 * Not checked on an iPad (WebKit gate only); the wall shader adds per-fragment work on walls (noise lookups x2, joints).
+
+## Surface 11 (branch `lux-drive-surface11`, Mac mini): the washboard off the centre line, orphan bridge ways, carriageways at two levels side by side — HANDOFF (gates not all run)
+
+Started from live v51 (12440570), merged look11 (`lux-drive` 934af75b) before the final harness; main.js `?v=54`.  Round folder `~/Library/Caches/luxdrive-work/surface11/` (tools in `tools/`:
+`ripple.mjs` / `ripfine.mjs` / `cands.mjs` the washboard, `lanes.mjs` R1, `r2.mjs` / `r3.mjs`, `overlap.mjs` the level pairs, `orphans2.mjs`, `q1.mjs` Q1 for some decks, `jline.mjs` a gate-L drive line,
+`xf1.mjs` the crossfall gate along one way; `v51/` = the live snapshot for before numbers; logs `harness1.txt` (before the merge), `harness2.txt` (merged tree)).
+
+### 1. N-D01 washboard - `road-network.js`
+* Root cause: the spatial hash lists a segment in every 22 m cell its box touches and carve() read the 3 x 3 cells around a point WITHOUT de-duplicating: a segment that spans two cells
+  was a candidate twice and its bed counted double in the Shepard mean of its way.  On the centre line the nearest segment dominates; 6 m off it, at every vertex, the two adjacent segments
+  only have their floor weight (the feet of the perpendiculars are the vertex) and the next-but-one segments (beds +- grade x 4 m) weigh as much - a doubled one lifted the carriageway by
+  up to 6.7 cm in a spike 0.5 m long (A1 east 13764,5849).  Fix: a segment is taken only from the first cell of the neighbourhood it is listed in.
+* Second, structural: the bed is read at a continuous STATION (mitred normals: the bisector at every inner joint, turning linearly across a segment; `stationOf`), the two segments of a
+  joint hand over across its mitre line (STATION_FADE 0.5 m), the bed is continued along the end tangent by at most 0.05 segment past an inner joint (more read beds metres along the way:
+  a 12.9 m/s2 ridge in gate L's steep old-town box).
+* The approach cover of a way that runs onto a bridge (APPROACH_FREE) was a switch: it let go of a junction sheet 20 cm under the bed in one lattice step (Clausener Bierg 6031,8528: 30 - 40
+  m/s2 in both lanes).  It fades in over 10 m.
+* Ripple at 6.4 m off the A1 east axis: 6.7 -> 0.4 cm.  **Harness R1** (new): ten multi-lane roads (A1 east, Arelerstrooss, Bd de Kockelscheuer, Route de Longwy, A4, JFK, Route
+  d'Echternach, Rue de Neudorf, Rue de Beggen, A6) driven over +-500 m of their carriageway chain in EVERY lane at 13 m/s with the game's car, outside gate L's junction boxes:
+  worst **0.96 m/s2** (limit 2; v51: 20.4 on the A1 outer lanes, 14.6 Route d'Echternach, 6.5 A4, 5.0 Arelerstrooss).
+
+### 2. Decks - `road-network.js` (deckless), `scripts/luxdrive/bake_orphan_decks.mjs` + `dsm_points.py` (new), `bake_deck_fixes.mjs`
+* `orphanBridgeWays`: 43 drivable bridge / layer ways (1.5 km) no deck carries.  `bake_orphan_decks.mjs` reads the 2 m DSM on them with bake_decks.py's rules (+ stricter: a deck must stand
+  alone or span a dip; a smooth deck alone over a real dip is a bridge however short; ends steeper than 25 % are no road): 2 new decks (Schlassbréck 523, Rue d'Anvers 3102; ids 305, 306).
+  36 ways have a DSM within 1.2 m of the DTM all along (the DTM there IS the deck: most of the Pont Jean-Pierre Buchler, the Clausener Bierg, Bréisseler Plaz, A1 over Rue de Munsbach):
+  they are now carved like any way (`deckless`: no deck over >= 80 % of it, the land sags < 2 m under the chord of its ends).
+* bake_deck_fixes.mjs crashed on decks the network carves (groundedDecks, also on v51): skipped.  Its `--check` now proposes splitting decks 41 / 80 (not applied: gate D, which counts
+  the approach margin past the slab, has 0 decks on a carriageway).
+* Q1: 13 -> **11** of 134 decks (ratchet lowered to 11).  Left: 59 / 64 (the spiral ramps of the Buchler car park: a free end 9 m up, no car park deck in the data), 157 (two merging links,
+  approaches 0.5 m apart), 169 (free end on a bank), 5 (Pont Adolphe landmark end, 10 cm), 204 (a crest at the deck end: the approach climbs 15 % to the end, the DSM deck falls 15 %),
+  137 / 167 / 146 / 111 / 103 (5 - 7 cm).
+
+### 3. N-T01 Merl link and every carriageway pair at two levels - `road-network.js`
+* Two carriageways at two levels hand over inside the gap between their benches (the hairpin rule of roads9, now for every pair): where their benches overlap (the link 7.5 m beside the
+  A4, 3 - 5 m apart in level, carriageways overlapping 2 m in OSM) the step is a narrow face on the line half way between them, baked as a retaining wall (wall 45, rise 4 - 4.6 m), solid
+  for the car.  The paint of each ends 0.5 m before that line (`levelClip`: the lower one was painted up to the foot of the step and the bake dropped the wall as "on tarmac").
+  Walls 158 -> **188** (3602 -> 5217 m; ramps rejected as on tarmac 311 -> 35); draw calls not measured on the merged tree.
+* **Harness R2**: every sample where two carved ways >= 1.2 m apart in level have benches <= 0.5 m apart (126 pairs, 1196 samples): the painted carriageway is level across up to the step:
+  v51 467 off level -> **76** (ratchet 76; left: junctions of merging links, ends of ways, the Hellege-Geescht plateau).  **R3**: the outer lanes past the Merl link driven with the walls:
+  roll 0.84 rad (v51, link) -> 0.089; the QA pose itself now stands against the wall.
+* Neie Wee 9.8 % across (the 4 m hand-over ramp of the Rampart 29 m above lay over its lane) fixed by the same rule: 0.3 %.
+
+### 4. Crossfall leftovers
+* Neie Wee fixed (above).  Not fixed: the service loop 9630,9356 (6.9 %: a ring of ~3 m radius whose two arms overlap 0.65 m apart in level), Rue de la Vallée 4296,10041 (6.1 %), service
+  way 10241 (4930,9669): the roll is off the road - the pure-pursuit line leaves the carriageway after the 79 deg corner at 4940,9670 and meets the DTM's 2.4 m pit beside the opened cut
+  (a round end cap at joints was tried and reverted: no effect).
+
+### Gates (merged tree, walls re-baked after the last carve change)
+* `harness.js`: **146 of 147** (log `surface11/harness2.txt`).  FAILS: gate I "crossfall <= 2.5 %" on the 200-way sample: 1 of 7073 cross sections, **2.52 %** at service way 3526
+  (10111,8482) - v51 had 2.50 there (the junction sheet of Route de Remich is applied with a weight that varies across the service way; the 2 % cross cap is on the sheet level, not on the
+  blended result).  Q1 / R2 ratchets were lowered AFTER this run (11 / 76 = the measured counts).
+* NOT RUN: luxdrive_world, luxdrive_holes (medium / low), luxdrive_ui, luxdrive_webkit; no before/after montages (poses ready: `surface11/poses.json`).  Out of budget.
+
+### Next builder
+1. Gate I at 3526 (above): apply SHEET_CROSS_MAX to the sheet's effect on the way (or evaluate the sheet weight at the foot), then the full harness.
+2. Run world (draw calls: +30 walls), holes, ui, webkit; shoot `poses.json` with v51 (`surface11/v51`, its own shot.mjs) and this tree; montage.
+3. The 30 new walls are where two carriageways at two levels overlap: look at a few (interchanges at Kirchberg 8500,6040, Bonnevoie 5285,10590, Merl 3091,9976) for walls in odd places.
