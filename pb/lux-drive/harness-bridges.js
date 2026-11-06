@@ -17,7 +17,7 @@ const END_RUN = 6;                // m sampled past each end of a deck (the appr
 const MAX_STEP = 0.05;            // m: a step in the ground along a drivable line (minus what the grade explains)
 const LOOKUP_TOL = 0.10;          // m: the ground on a deck may differ this much from the deck's own profile (the bend of a polyline, the margin) - the QA steps were 0.1 .. 1.6 m
 const STEEP_GRADE = 0.25;         // a deck's own profile steeper than this between two points is reported (the data, not the lookup)
-const MAX_LOOKUP = 222;           // points where the ground on a deck answers with a level no deck there has: v45 101 321 (a later span's line, a cap 5 m over the
+const MAX_LOOKUP = 205;           // points where the ground on a deck answers with a level no deck there has: v45 101 321 (a later span's line, a cap 5 m over the
                                   // next span); left (bridges7): sidewalk decks beside a road deck near their ends, the bogus decks 29 / 303 - a ratchet, never raise it
 const RIDE_DT = 1 / 60;
 const RIDE_SPEED = 13;            // m/s, the QA drive test

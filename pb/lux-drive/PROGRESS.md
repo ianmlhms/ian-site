@@ -1689,3 +1689,66 @@ snapshot for the before shots and the before numbers).
 3. Neie Wee 5437,8831 (9.8 % across: the 1 m lattice blurs the Corniche cliff into the lane), a service loop 9630,9356 whose arms overlap at two levels (6.5 %), Rue de la Vallée 4296,10041 (6.1 %).
 4. 4 portals capped at the lowest mouth still stand under / over a road (P4 lists them as floored); 47 garage mouths lost their portals (houses / decks) - the road ends at the facade.
 5. Interchange abutments (~100 steep grass banks at skewed motorway deck ends): not touched.  Gate L's steep old-town box 10.25 -> 11.43 (bound 12).
+
+## Decks 10 (branch `lux-drive-decks10`, Mac mini): every deck driven end to end, the banks under deck ends (QA round 2)
+
+Started from live v48 (498084fe).  Input `~/Library/Caches/luxdrive-work/qa2/BUGS.md`.  Round folder `~/Library/Caches/luxdrive-work/decks10/`: montages (left = live v48, right = this branch, noon, medium)
+`montages/d.jpg` (decks: N-B01..N-B06, the Arlon interchange top view, Pont Buchler, qa1 B02 / B06 / B08), `montages/c.jpg` (camera N-C01..N-C03), `montages/t.jpg` (N-T01, N-T02, T10, M08 - unchanged, for the
+record); pairs `montages/pair_*.jpg`, singles `before/`, `after/`, poses `poses.json`.  Drive tables `drive_table.md` (Node, the QA routes, v48 -> this branch) and `q1_v48.txt` (the new deck drive on v48).
+Scratch tools `tools/` (`deckdrive.mjs` / `qscan.mjs` every car deck driven, `drive.mjs` the QA drive test with `HINT=-1e4` = the car starting under a deck, `endprof.mjs`, `probe.mjs`, `corners.mjs`,
+`trench.mjs` medians, `ripple.mjs` the washboard, `cam.mjs` the chase camera in Node).
+
+### What the QA's deck steps were
+* **B02 (deck 23), N-B01 (deck 87), deck 10**: the QA driver called `car.reset` without `ground.hint` - the car started on the valley floor UNDER the viaduct, drove along under it and climbed the
+  bank under the deck end (the earth abutment, 100 - 200 %) until it came within 0.6 m of the deck, which then took it: a 0.76 - 0.92 m pop, a_z 450 - 640.  On the deck itself both are smooth (v48 too).
+  Fix: `decks.js bankCollide` - for a car UNDER a deck (no deck at its level, one over it) a bank steeper than 80 % that rises 0.3 m over its wheels, or a deck underside closer than 1.5 m over the
+  car on ground steeper than 15 %, is a wall (pushed downhill, 0.15 m per step); `main.js` collide uses it.  Under deck 23 / 10 / 87: pop 0.76 / 0.50 / 0.92 m -> blocked, rocking <= 9 cm, 0 airborne.
+* A new drive test of EVERY car deck (the decks of motorway .. track ways, 132): carried along the deck on its axis and in its outer lanes (2.2 m inside the edges, decks >= 9 m), both ways, with
+  30 m of the ways that run onto it (a lane is driven only where it exists on that way too), the car's own vertical (four wheels, flight).  v48: **24 of 132 decks** with a step > 5 cm or a flight; now **13**.
+  Root causes found and fixed (all `decks.js`):
+  - two decks side by side whose margins overlap (skewed interchanges, 0.4 - 0.6 m apart): "the highest wins" put a car near the edge of the lower one onto the higher one (84 / 74, 157 / 154,
+    105 / 99).  The deck that covers the point with its own width now wins over another's margin, and of two that both cover it the one at the car's level carries it (`DECK.hintLift`).
+  - the approach is held at its end level 2 m under the deck (road-network ABUT_HOLD), but the deck fell away from its end at once: 5 - 15 cm under the held road.  Decks now hold the end level
+    for `DECK.endHold` 3 m at an approach end.
+  - the bake's last segment of a few cm (resample + last point): the inner point kept the DSM while the end was pinned to the ground - a 0.3 - 0.4 m step AT the end (255, 160).  Stub points take
+    the end's level.
+  - free ends of car decks (no way carved onto them: the next way is a bridge the bake has no deck for, a car-park ramp) were pinned to the ground under a DSM 3 - 5 m higher: an 80 % ramp,
+    the car flew (Pont Buchler 62: 0.65 m, 83 airborne frames; 160, 169).  They now run off at <= 12 % like an approach end (not for a footbridge over a street: 152 stays as it was).
+  - skewed bridges (Autoroute d'Arlon over the Autoroute d'Esch, decks 104 / 114 / 119 / 137): the OSM deck ends square to its axis, the cut of the road below reaches past it at the acute corner,
+    and a car in the outer lane fell 1 - 5 m off the corner of the approach (0.65 - 0.9 m steps, 50 - 75 airborne frames).  `withAprons`: where the ground at the deck end corners lies >= 1 m
+    under the approach on the axis, the deck continues back over its approach (an approach slab, <= 6 m, its far end 2 cm under the road).  8 decks have one.
+  - the DSM of narrow decks (< 5 m: tracks, lanes) is smoothed along the deck (deck 28's 50 % kinks over the gully).
+* QA N-B02 (deck 218, Route de Bettembourg): a cycleway bridge 9 m beside the road (not over it); the car flew off its free end (a 3.3 m drop over its last metre, the end pinned to the ground).
+  Now a 12 % ramp: airborne 56 / 58 -> 22 / 0 frames on the QA route, a_z 148 -> 57; the slab is lower but still there (see montage).
+* QA N-B04 (deck 145): on the deck and its axis it is smooth (v48 too); the QA kerb route drives beside the carriageway and hits a tree at 10517,8847 (off the road, sdCar 8 m).  Not changed.
+* QA N-B03 (deck 28): on its axis it now passes; the QA route drives 3.08 m off the axis of a 4.4 m deck, i.e. off its side (a 0.87 m fall).  The track 1394 beyond the deck is a tagged over way
+  that is neither carved nor decked (see Still wrong).
+
+### Harness section Q (`harness-decks.js`, 2 checks; harness now 127 checks)
+* Q1 every car deck driven end to end both ways (axis + outer lanes, 400 runs over 132 decks): step <= 5 cm and no flight within 5 m of the deck; ratchet **<= 13 decks** (v48 24) - lower it as
+  decks get fixed, never raise it.
+* Q2 a car that starts on the valley floor under deck 23, deck 10 and deck 87 (the QA routes) is stopped by the bank: step <= 12 cm, no flight.
+* Refinements (not loosenings): gate D's "no deck lies on a carriageway at road level" counts its 8 m approach margin from the bridge end, past an approach slab; harness-bridges M1's lookup
+  ratchet LOWERED 222 -> 205 (this branch: 205).
+
+### Gates (Mac mini)
+`harness.js` **127 checks PASS** (125 + Q1, Q2); `luxdrive_world` PASS (draw calls 112 / 150 / 212); `luxdrive_holes` 0 hole pixels at medium and at low; `luxdrive_ui` PASS;
+`luxdrive_webkit` PASS.  `pb/lux-drive.html` main.js `?v=50` (roads9 has 49).  Logs `decks10/gate_*.txt`.
+
+### Still wrong (honest)
+* **13 car decks still fail Q1** (listed by the harness, `stats.deckDrive`): 59 / 64 (Pont Buchler side decks: the Buchler bridge ways 8067 / 15753 / 15754 / 16046 / 17921 have NO deck in
+  decks.bin - the car falls off the end of deck 62's neighbours; 43 drivable tagged ways, 1.5 km, have no deck at all: `tools/orphans.mjs`), 157 (two links merging side by side whose APPROACHES
+  are 0.5 m apart - the road network's levels), 169 (free end on a bank), 5 (Pont Adolphe landmark deck end, 10 cm), 22 / 204 / 137 (8 - 9 cm at the deck / road hand-over), 167 / 146 / 114 /
+  111 / 103 (5 cm, borderline).  Orphan bridge ways should get a deck from their approaches (or be carved where the land does not dip): not done.
+* **N-T01** (Autoroute d'Esch 3091,9977) is not a median trench: the Échangeur de Merl link (12832, 9.8 m wide) runs flat at 268.7 m while the A4 descends beside it to 263.8 m, axes 7.5 m apart -
+  their carriageways OVERLAP by 2 m and the gap is a 150 % grass bank (no retaining wall).  A median-fill rule in road-network (fill gaps <= 8 m between carriageways at one level) was tried and
+  reverted (it made JFK / Av. Monterey bumpier).  Trench scan (`tools/trench.mjs`): 5 same-name pairs with a dip > 0.3 m (A1 8566,8471 at a deck end; JFK 8059,6447 a 1.1 m DTM ditch between JFK
+  and its service road; JFK 8047,6458; 5999,7868).  No gate added for it.
+* **N-D01** washboard (A1 east 13764,5849; Arelerstrooss) NOT fixed - diagnosed: the continuous field is smooth on the way's axis (0.2 cm) but ripples by up to 6.7 cm at 6 m off it, growing
+  linearly with the offset (`tools/ripple.mjs 7816 13790 5843`): the bed is taken at the foot of the perpendicular on each segment (Shepard-blended), so off the axis the height of a graded road
+  wobbles with the polyline's bends.  A fix belongs in road-network's carve (a mitred, continuous station for points off the axis) - the roads9 builder owns the crossfall there.
+* **N-C02** camera: not fixed.  At 4620,11599 the car stands at the mouth of a portal box at the end of a 7 m service stub (way 14079); with buildings or terrain hidden the view is the same grey
+  planes, so the lens is inside the portal box (portals are roads9's).  N-C01 (3.2 m boom at 7115,9681) and N-C03 (wheels in the drawn kerb) not touched.
+* N-T02, T10, M08, TR01, BL01, BL02, the S3 markings: not touched (out of time); the montage `t.jpg` shows them unchanged.
+* The approach slabs are drawn as deck (asphalt, parapet): on the side where the road is at deck level the slab lies 2 cm under the road (possible z-fight at a distance on a real GPU, not seen in
+  SwiftShader).  Not checked on an iPad.

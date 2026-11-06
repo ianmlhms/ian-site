@@ -1,0 +1,214 @@
+/* Lux Drive harness, section Q (decks10): every carriageway deck driven end to end, the banks under deck ends, the medians, the camera (QA round 2).
+ *   Q1  every car deck (the deck of a motorway .. track) is driven end to end in both directions, on its axis and in its outer lanes, with 30 m of the ways that lead onto it:
+ *       no height step over Q_MAX_STEP and no airborne frame within Q_ZONE of the deck (QA2: decks 23, 87, 218, 28, 145 - steps of 0.25 .. 3 m)
+ *   Q2  a car that drives along the valley UNDER a viaduct is stopped by the bank under its end, it is not popped onto the deck (QA B02 deck 23, N-B01 deck 87, deck 10)
+ * Called by harness.js; everything it needs is passed in.  Pure Node. */
+import { createCar } from './car.js';
+
+const Q_MAX_STEP = 0.05;          // m: a step in the height of the car from one frame to the next, minus what the grade explains (the QA's steps were 0.25 .. 3 m)
+const Q_ZONE = 5;                 // m: the drive is judged on the deck and this far past its ends and sides (beyond that the road network's own gates judge the road)
+const Q_RUN = 30;                 // m of the way that leads onto each end
+const Q_FREE_RUN = 12;            // m driven straight on past an end that no way continues
+const Q_SPEED = 13;               // m/s (the QA drive test)
+const Q_DT = 1 / 60;
+const Q_LANE_INSET = 2.2;         // m: the outer lanes of a deck at least Q_LANE_DECK wide run this far inside its edges
+const Q_LANE_DECK = 9;
+const Q_LANE_MARGIN = 0.9;        // m: a lane must lie this far inside the carriageway of the way it continues on (else that lane does not exist there and is not driven)
+const Q_MIN_WIDTH = 4;            // m: the decks of cars (a narrower one is a footbridge)
+const Q_MAX_FAILING = 13;         // decks with a step or a flight (v48: 24 of 132).  A ratchet: lower it when a deck is fixed, never raise it.  The ones left are listed in PROGRESS (Decks 10)
+export const CAR_KINDS = new Set(['motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary', 'primary_link', 'secondary', 'secondary_link', 'tertiary', 'tertiary_link',
+  'unclassified', 'residential', 'living_street', 'service', 'track', 'road']);
+/** The QA drive routes that started UNDER a viaduct (the car at the valley floor): [label, [[x, z, lane offset], ...]] (qa1 v122 / v128, qa2 n126). */
+const UNDER_ROUTES = [
+  ['under deck 23 (A1)', [[8764.9, 7181.9, 3.08], [8776.7, 7146.9, 3.08], [8786.9, 7111.8, 3.08], [8794.8, 7080.2, 3.08], [8799.3, 7058.8, 3.08], [8810.1, 7007.2, 3.08], [8816.9, 6963.3, 3.08], [8822.5, 6916.4, 3.08]]],
+  ['under deck 10 (A1)', [[8207.6, 9233.1, 3.08], [8212, 9207.9, 3.08], [8220.2, 9170.2, 3.08], [8233.8, 9119.2, 3.08], [8243.6, 9084.6, 3.08], [8259, 9044, 3.08], [8278.9, 8997.4, 3.08], [8312.2, 8927.9, 3.08]]],
+  ['under deck 87 (Jonction Grunewald)', [[9460.4, 5510.6, 3.08], [9444.9, 5499.1, 3.08], [9422.4, 5487, 3.08], [9395.4, 5472.8, 3.08], [9371.3, 5456.4, 3.08], [9357.6, 5444.1, 3.08]]],
+];
+const Q2_MAX_STEP = 0.12;         // m: pressing against the bank the car may rock a little; the pops were 0.76 .. 0.92 m
+
+const segDist = (p, a, b) => {
+  const ex = b[0] - a[0], ez = b[1] - a[1], ll = ex * ex + ez * ez || 1;
+  const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * ex + (p[1] - a[1]) * ez) / ll));
+  return Math.hypot(p[0] - a[0] - ex * t, p[1] - a[1] - ez * t);
+};
+const polyDist = (P, p) => { let m = Infinity; for (let i = 0; i + 1 < P.length; i++) m = Math.min(m, segDist(p, P[i], P[i + 1])); return m; };
+const normalAt = (P, i) => { const a = P[Math.max(0, i - 1)], b = P[Math.min(P.length - 1, i + 1)], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [-(b[1] - a[1]) / l, (b[0] - a[0]) / l]; };
+
+/** The way a deck carries: the road whose line covers most of its points (within 1.5 m), or null. */
+function wayOf(d, roads) {
+  const m = d.pts[d.pts.length >> 1];
+  let best = null, most = 0;
+  for (const r of roads) {
+    if (!r.pts.some((q) => Math.abs(q[0] - m[0]) < 400 && Math.abs(q[1] - m[1]) < 400)) continue;
+    let c = 0;
+    for (const p of d.pts) if (polyDist(r.pts, p) <= 1.5) c++;
+    if (c > most) { most = c; best = r; }
+  }
+  return best && most >= d.pts.length * 0.6 ? best : null;
+}
+
+/** The ends of the drivable ways: [x, z, ux, uz (leaving through the end), road, index of the end]. */
+function wayEnds(roads) {
+  const out = [];
+  for (const r of roads) {
+    if (!r.info.drivable || r.tunnel || r.pts.length < 2) continue;
+    const m = r.pts.length;
+    for (const [a, b] of [[0, 1], [m - 1, m - 2]]) {
+      const ux = r.pts[a][0] - r.pts[b][0], uz = r.pts[a][1] - r.pts[b][1], l = Math.hypot(ux, uz) || 1;
+      out.push([r.pts[a][0], r.pts[a][1], ux / l, uz / l, r, a]);
+    }
+  }
+  return out;
+}
+
+/** The way that leads into the deck end p (into: the direction into the deck), Q_RUN m of it ordered toward the end; null when none.  (An approach slab moves the deck end up to
+ *  7.5 m back over its approach: the way's end then lies on the deck axis inside it.) */
+function approachOf(ends, p, into, self) {
+  let best = null, bd = 7.5;
+  for (const q of ends) {
+    if (q[4] === self) continue;
+    const d = Math.hypot(q[0] - p[0], q[1] - p[1]), along = (q[0] - p[0]) * into[0] + (q[1] - p[1]) * into[1];
+    const onAxis = d <= 3 || (along > 0 && Math.sqrt(Math.max(0, d * d - along * along)) <= 3);
+    if (d <= bd && onAxis && q[2] * into[0] + q[3] * into[1] >= 0.7) { bd = d; best = q; }
+  }
+  if (!best) return null;
+  const r = best[4], P = best[5] === 0 ? r.pts : r.pts.slice().reverse(), out = [];
+  let s = 0;
+  for (let k = 0; k < P.length && s <= Q_RUN; k++) { if (k) s += Math.hypot(P[k][0] - P[k - 1][0], P[k][1] - P[k - 1][1]); out.push(P[k]); }
+  return { pts: out.reverse(), hw: Math.max(0.8, r.width / 2) };
+}
+
+/** The route over a deck in the lane `off` (to the left of its axis), with the ways at its ends; { none } when a way at an end has no lane there. */
+function laneRoute(d, off, self, ends) {
+  const n = d.pts.length, P = d.pts;
+  const dir = (a, b) => { const dx = P[b][0] - P[a][0], dz = P[b][1] - P[a][1], l = Math.hypot(dx, dz) || 1; return [dx / l, dz / l]; };
+  const lane = P.map((q, i) => { const nn = normalAt(P, i); return [q[0] + nn[0] * off, q[1] + nn[1] * off]; });
+  const parts = [];
+  for (const [e, into] of [[0, dir(0, 1)], [n - 1, dir(n - 1, n - 2)]]) {
+    const ap = approachOf(ends, P[e], into, self);
+    if (!ap) { parts.push([[lane[e][0] - into[0] * Q_FREE_RUN, lane[e][1] - into[1] * Q_FREE_RUN]]); continue; }
+    const A = ap.pts, m = A.length, nA = normalAt(A, m - 1);
+    const offA = (lane[e][0] - A[m - 1][0]) * nA[0] + (lane[e][1] - A[m - 1][1]) * nA[1];      // the lane keeps its lateral position onto the way
+    if (Math.abs(offA) > ap.hw - Q_LANE_MARGIN) return { none: true };
+    const before = (q) => (q[0] - P[e][0]) * into[0] + (q[1] - P[e][1]) * into[1] < -0.5;    // (a way may run on under the deck)
+    parts.push(A.map((q, i) => { const nn = normalAt(A, i); return [q[0] + nn[0] * offA, q[1] + nn[1] * offA]; }).filter(before));
+  }
+  return { pts: [...parts[0], ...lane, ...parts[1].slice().reverse()] };
+}
+
+/**
+ * The car carried along `pts` at Q_SPEED (its x, z and heading set every frame: the test is the ground, not the steering), its vertical its own (car.js: the four wheels, the
+ * suspension, the flight over a crest).  Returns { step, stepAt, air } judged within Q_ZONE of the deck line P.
+ */
+function carry(car, ground, pts, P) {
+  const poly = [];
+  for (let i = 0; i + 1 < pts.length; i++) {
+    const [ax, az] = pts[i], [bx, bz] = pts[i + 1], l = Math.hypot(bx - ax, bz - az);
+    if (l < 1e-3) continue;
+    for (let s = 0; s < l; s += 0.5) { const q = [ax + (bx - ax) * s / l, az + (bz - az) * s / l], last = poly[poly.length - 1]; if (!last || Math.hypot(q[0] - last[0], q[1] - last[1]) > 0.1) poly.push(q); }
+  }
+  if (poly.length < 8) return null;
+  const seg = [];
+  let total = 0;
+  for (let i = 0; i + 1 < poly.length; i++) { const l = Math.hypot(poly[i + 1][0] - poly[i][0], poly[i + 1][1] - poly[i][1]); seg.push(l); total += l; }
+  const st = car.state;
+  let i = 0, acc = 0;
+  const poseAt = (s) => {
+    while (i < seg.length - 1 && acc + seg[i] < s) { acc += seg[i]; i++; }
+    const f = Math.min(1, (s - acc) / (seg[i] || 1)), [ax, az] = poly[i], [bx, bz] = poly[i + 1];
+    return [ax + (bx - ax) * f, az + (bz - az) * f, Math.atan2(bz - az, bx - ax)];
+  };
+  ground.hint(1e4);                                   // the car starts ON a deck where there is one (main.js landCar)
+  const [x0, z0, h0] = poseAt(0);
+  car.reset(x0, z0, h0);
+  const ys = [], zone = [], grounded = [], at = [];
+  for (let s = 0; s < total - 0.5; s += Q_SPEED * Q_DT) {
+    const [x, z, h] = poseAt(s);
+    st.x = x; st.z = z; st.heading = h; st.vx = Math.cos(h) * Q_SPEED; st.vz = Math.sin(h) * Q_SPEED; st.speed = Q_SPEED;
+    ground.hint(st.y);
+    car.update(Q_DT, { throttle: 0, brake: 0, steer: 0, handbrake: false });
+    ys.push(st.y); grounded.push(st.grounded); at.push([st.x, st.z]); zone.push(polyDist(P, [st.x, st.z]) <= Q_ZONE);
+  }
+  let step = 0, stepAt = null, air = 0;
+  for (let k = 2; k + 1 < ys.length; k++) {
+    if (!zone[k]) continue;
+    const d = Math.abs((ys[k] - ys[k - 1]) - ((ys[k - 1] - ys[k - 2]) + (ys[k + 1] - ys[k])) / 2);
+    if (d > step) { step = d; stepAt = at[k]; }
+    if (!grounded[k]) air++;
+  }
+  return { step, stepAt, air };
+}
+
+/** Q1: every car deck, both directions, axis and outer lanes.  Returns { decks, runs, failing: [{ deck, kind, step, air, at }] }. */
+export function deckDriveScan({ ground, surface, roads, carCollide = null }) {
+  const car = createCar({ ground, roadInfoAt: (x, z, o) => surface.roadInfoAt(x, z, o), collide: carCollide });
+  const ends = wayEnds(roads);
+  const worst = new Map();
+  let decks = 0, runs = 0;
+  for (const d of ground.decks) {
+    if (d.width < Q_MIN_WIDTH || d.pts.length < 2) continue;
+    const way = wayOf(d, roads);
+    if (!way || !CAR_KINDS.has(way.kind)) continue;
+    decks++;
+    const half = d.width / 2;
+    for (const off of d.width >= Q_LANE_DECK ? [0, half - Q_LANE_INSET, -(half - Q_LANE_INSET)] : [0]) {
+      const r = laneRoute(d, off, way, ends);
+      if (r.none) continue;
+      for (const pts of [r.pts, r.pts.slice().reverse()]) {
+        const res = carry(car, ground, pts, d.pts);
+        if (!res) continue;
+        runs++;
+        const w = worst.get(d.id);
+        if (!w || res.step > w.step || res.air > w.air) worst.set(d.id, { deck: d.id, kind: way.kind, step: Math.max(res.step, w ? w.step : 0), air: Math.max(res.air, w ? w.air : 0), at: res.stepAt });
+      }
+    }
+  }
+  const failing = [...worst.values()].filter((w) => w.step > Q_MAX_STEP || w.air > 0).sort((a, b) => b.step - a.step);
+  return { decks, runs, failing };
+}
+
+export function runDeckChecks({ check, section, stats, data, surface, ground, buildings, portals, playArea }) {
+  section('Q decks driven end to end, the banks under deck ends (decks10)');
+
+  // ---- Q1
+  const scan = deckDriveScan({ ground, surface, roads: data.roads });
+  stats.deckDrive = { decks: scan.decks, runs: scan.runs, failing: scan.failing.length, list: scan.failing.map((f) => `deck ${f.deck} ${f.kind} ${(f.step * 100).toFixed(0)} cm${f.air ? ` air ${f.air}` : ''} at ${f.at ? f.at.map(Math.round).join(',') : '-'}`) };
+  check(`Q1 every car deck driven end to end both ways (axis and outer lanes, ${scan.runs} runs over ${scan.decks} decks): step <= ${Q_MAX_STEP * 100} cm and no flight within ${Q_ZONE} m (ratchet <= ${Q_MAX_FAILING} decks)`,
+    scan.decks > 100 && scan.failing.length <= Q_MAX_FAILING, `${scan.failing.length} decks: ${stats.deckDrive.list.slice(0, 8).join('; ')}`);
+
+  // ---- Q2: under the viaducts
+  const collide = (x, z, r, y) => buildings.collide(x, z, r) || portals.collide(x, z, r, y) || ground.bankCollide(x, z, r, y) || playArea.collide(x, z, r);
+  const car = createCar({ ground, roadInfoAt: (x, z, o) => surface.roadInfoAt(x, z, o), collide });
+  const results = [];
+  for (const [label, pts] of UNDER_ROUTES) {
+    const poly = [];
+    for (let i = 0; i + 1 < pts.length; i++) {
+      const [ax, az, off] = pts[i], [bx, bz] = pts[i + 1], l = Math.hypot(bx - ax, bz - az);
+      if (l < 1e-3) continue;
+      const dx = (bx - ax) / l, dz = (bz - az) / l;
+      for (let s = 0; s < l; s += 1) poly.push([ax + dx * s - dz * off, az + dz * s + dx * off]);
+    }
+    const st = car.state;
+    ground.hint(-1e4);                                 // the car starts on the valley floor UNDER the deck
+    car.reset(poly[0][0], poly[0][1], Math.atan2(poly[3][1] - poly[0][1], poly[3][0] - poly[0][0]));
+    const ys = [];
+    let idx = 0, maxStep = 0, air = 0;
+    for (let t = 0; t < 40 && idx < poly.length - 3; t += Q_DT) {
+      const d2 = (k) => (poly[k][0] - st.x) ** 2 + (poly[k][1] - st.z) ** 2;
+      while (idx < poly.length - 3 && d2(idx) >= d2(idx + 1)) idx++;
+      const la = Math.min(poly.length - 1, idx + Math.round(Math.max(6, Math.abs(st.speed) * 0.7)));
+      let e = Math.atan2(poly[la][1] - st.z, poly[la][0] - st.x) - st.heading;
+      while (e > Math.PI) e -= 2 * Math.PI; while (e < -Math.PI) e += 2 * Math.PI;
+      ground.hint(st.y);
+      car.update(Q_DT, { throttle: Math.max(0, Math.min(1, (Q_SPEED - st.speed) * 0.5)), brake: 0, steer: Math.max(-1, Math.min(1, e * 1.6)), handbrake: false });
+      ys.push(st.y);
+      if (!st.grounded) air++;
+    }
+    for (let k = 2; k + 1 < ys.length; k++) maxStep = Math.max(maxStep, Math.abs((ys[k] - ys[k - 1]) - ((ys[k - 1] - ys[k - 2]) + (ys[k + 1] - ys[k])) / 2));
+    results.push({ label, maxStep, air });
+  }
+  stats.underDecks = results.map((r) => `${r.label}: step ${(r.maxStep * 100).toFixed(0)} cm, air ${r.air}`);
+  const bad = results.filter((r) => r.maxStep > Q2_MAX_STEP || r.air > 0);
+  check(`Q2 a car under a viaduct is stopped by the bank under its end (no pop onto the deck, step <= ${Q2_MAX_STEP * 100} cm, no flight)`, results.length === 3 && bad.length === 0,
+    stats.underDecks.join('; '));
+}

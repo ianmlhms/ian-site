@@ -11,18 +11,45 @@ export const DECK = Object.freeze({
   stickBelow: 0.6,         // the car counts as "on" the deck when it is at most this far below the surface
   spanDip: 3.0,            // m: the land dips this far under the way, so the deck spans it (the bake writes the same number)
   cell: 32,                // m, the spatial hash cell
+  hintLift: 0.42,          // m: the car's body lies this far over its wheels (CAR.rideHeight): the hint is the body, the deck is under the wheels
   landmarkSites: [[4829, 9101], [5179, 8061]],   // m: the Pont Adolphe and the Pont Rouge (landmark-bridges.js ADOLPHE.at / ROUGE.at): their models shape their decks and meet their roads themselves ...
   landmarkRadius: 30,      // m: ... whose middle lies within this of the site (the ends of those decks keep their plain pin to the ground; road-network.js does not lift their approaches)
   joinTolerance: 1.5,      // m: the ends of two decks this close are one bridge in two pieces (a joint): they meet at the level of the bridge, not at the valley floor under the joint
   approachJoin: 3.0,       // m: a carved way whose end lies this close to the end of a deck runs onto it there ...
   approachAlign: 0.7,      // ... when it leaves through that end toward the deck (the cosine of the two directions at least this)
+  endStub: 0.5,            // m: an inner point of a deck (a car's, at least stubWidth wide) this close to one of its ends takes the level of that end (see endStubs)
+  stubWidth: 4.0,
+  overRoadClear: 2.5,      // m: a deck this far over a carriageway under it is a bridge over that road (its free ends keep their plain pin)
+  apronWidth: 5.0,         // m: a deck at least this wide (a carriageway) gets an approach slab where its approach does not reach the corners of its end (withAprons) ...
+  apronInset: 1.2,         // ... probed this far inside its edges ...
+  apronDrop: 0.25,         // ... where the ground lies this far under the approach on the axis (or the deck end) ...
+  apronCut: 1.0,           // ... somewhere at least this deep (the cut of the road below) ...
+  apronMax: 6.0,           // ... up to this far back; the slab ends this far under the road on the axis
+  apronTuck: 0.02,
+  trustWidth: 5.0,         // m: the DSM of a narrower deck is smoothed (smoothTops; road-network.js DECK_TRUST_WIDTH is the same number) ...
+  smoothSigma: 4.0,        // ... over this (m)
+  endHold: 3.0,            // m: from an end that a way runs onto the deck does not fall below the level of that end for this long (road-network.js holds the approach's carriageway at the
+                           // level of its end ABUT_HOLD = 2 m under the deck: a deck that fell away from its end at once lay 5 - 15 cm under that held road - a step onto the road and off it)
   endGrade: 0.12,          // m/m: the steepest a deck climbs or falls away from the level of its end (the DSM next to an abutment is the bank, a parapet or the canopy of a wood: used as it is, the
                            // deck began with a vertical face at the end of its approach road)
+  bankSlope: 0.8,          // m/m: the bank under a deck end steeper than this is a wall for a car under the deck (bankCollide) ...
+  bankRise: 0.3,           // ... where it rises this far over the car's wheels ...
+  bankPush: 0.15,          // ... pushed back at most this far per step; and where the underside of the deck is less than roofClear over the car (on ground steeper than lowSlope)
+  roofClear: 1.5,
+  lowSlope: 0.15,
   treeAbove: 1.5,          // m: a tree whose foot is less than this above a deck surface stands on it (the ground under it is a metre or two off the LiDAR deck)
   treeBelow: 0.3,          // m: a crown that comes within this of the underside of a deck touches it
 });
 
 const DECIMETRE = 0.1;
+/** The classes of the ways a car drives on (a deck of one of them runs off a free end at DECK.endGrade even where it stands over a street: the ramp of a car park). */
+const CAR_DECK_KINDS = new Set(['motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary', 'primary_link', 'secondary', 'secondary_link', 'tertiary', 'tertiary_link',
+  'unclassified', 'residential', 'living_street', 'service', 'track', 'road']);
+const segDistance = (p, a, b) => {
+  const ex = b[0] - a[0], ez = b[1] - a[1], ll = ex * ex + ez * ez || 1;
+  const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * ex + (p[1] - a[1]) * ez) / ll));
+  return Math.hypot(p[0] - a[0] - ex * t, p[1] - a[1] - ez * t);
+};
 
 function readVarint(bytes, state) {
   let result = 0, shift = 0;
@@ -136,7 +163,16 @@ function deckEndTops(decks, surface) {
     ends.push({ k, side: 0, p: d.pts[0], into: into(0, 1), inner: n >= 3 ? innerLevel(d, 0, 1, 2) : d.tops[0] });
     ends.push({ k, side: 1, p: d.pts[n - 1], into: into(n - 1, n - 2), inner: n >= 3 ? innerLevel(d, n - 1, n - 2, n - 3) : d.tops[n - 1] });
   });
-  const out = decks.map(() => [0, 0, false, false]);
+  // (a deck that stands over a carriageway - a footbridge over a street, pinned to the ground at its free ends - keeps its DSM: an envelope from its ends laid it onto the street, 152)
+  const o = { sdCar: 9 };
+  const overCarriageway = (d) => !!surface.roadInfoAt && d.pts.some((p, i) => i > 0 && i < d.pts.length - 1 && (surface.roadInfoAt(p[0], p[1], o), o.sdCar < 0) && d.tops[i] - surface.height(p[0], p[1]) > DECK.overRoadClear);
+  // (a deck that carries cars: the way under its middle point is a road for cars, not a footway / cycleway / pedestrian street)
+  const carriesCars = (d) => {
+    if (!net) return false;
+    const m = d.pts[d.pts.length >> 1];
+    return net.roads.some((r) => CAR_DECK_KINDS.has(r.kind) && r.pts.some((q, i) => i > 0 && segDistance(m, r.pts[i - 1], q) <= 1.5));
+  };
+  const out = decks.map(() => [0, 0, false, false, false, false]);   // [startTop, endTop, envelope at start, at end, an approach way at start, at end]
   for (const e of ends) {
     const [x, z] = e.p;
     // a way runs onto the deck here: its end is near and it leaves through it toward the deck (a way that only ends beside the deck, at an angle, does not)
@@ -147,8 +183,13 @@ function deckEndTops(decks, surface) {
     const joint = isApproach ? [] : ends.filter((o) => (o.k !== e.k || o.side !== e.side) && Math.hypot(o.p[0] - x, o.p[1] - z) <= DECK.joinTolerance);
     let level, envelope;
     if (joint.length) { level = (e.inner + joint.reduce((sum, o) => sum + o.inner, 0)) / (joint.length + 1); envelope = true; }
-    else { level = isApproach || !surface.field ? surface.height(x, z) : Math.max(surface.height(x, z), surface.field.height(x, z)); envelope = isApproach; }   // (a bank: on the 1 m lattice and on the ground itself, whichever is higher - an end on the edge of a drop dived into the continuous ground)
-    out[e.k][e.side] = level; out[e.k][2 + e.side] = envelope;
+    else {
+      level = isApproach || !surface.field ? surface.height(x, z) : Math.max(surface.height(x, z), surface.field.height(x, z));
+      // a free end of a car's deck (no way is carved onto it: the next way is a bridge the bake has no deck for, or a ramp of a car park) runs off its end at no more than
+      // DECK.endGrade too: pinned to the ground under a DSM 3 - 5 m higher, it began with a ramp of 80 % (decks 160, 169)
+      envelope = isApproach || (decks[e.k].width >= DECK.stubWidth && (carriesCars(decks[e.k]) || !overCarriageway(decks[e.k])));
+    }   // (a bank: on the 1 m lattice and on the ground itself, whichever is higher - an end on the edge of a drop dived into the continuous ground)
+    out[e.k][e.side] = level; out[e.k][2 + e.side] = envelope; out[e.k][4 + e.side] = isApproach;
   }
   return out;
 }
@@ -157,7 +198,7 @@ function deckEndTops(decks, surface) {
  * The tops of a deck with its ends at `lo` / `hi`.  Where an end has an envelope the deck climbs or falls away from that end at no more than DECK.endGrade (the DSM inside the envelope is kept).
  * The deck never runs under the ground (it then lies on it).  Pure: returns a new array.
  */
-function endEnvelope(pts, tops, lo, hi, envLo, envHi, surface) {
+function endEnvelope(pts, tops, lo, hi, envLo, envHi, surface, holdLo = false, holdHi = false) {
   const n = pts.length;
   const out = Float32Array.from(tops);
   out[0] = lo; out[n - 1] = hi;
@@ -168,13 +209,82 @@ function endEnvelope(pts, tops, lo, hi, envLo, envHi, surface) {
   const total = arc[n - 1];
   for (let i = 1; i < n - 1; i++) {
     let below = -Infinity, above = Infinity;               // the envelope of the two ends here
-    if (envLo) { below = Math.max(below, lo - DECK.endGrade * arc[i]); above = Math.min(above, lo + DECK.endGrade * arc[i]); }
-    if (envHi) { below = Math.max(below, hi - DECK.endGrade * (total - arc[i])); above = Math.min(above, hi + DECK.endGrade * (total - arc[i])); }
+    if (envLo) { below = Math.max(below, lo - DECK.endGrade * Math.max(0, arc[i] - (holdLo ? DECK.endHold : 0))); above = Math.min(above, lo + DECK.endGrade * arc[i]); }
+    if (envHi) { below = Math.max(below, hi - DECK.endGrade * Math.max(0, total - arc[i] - (holdHi ? DECK.endHold : 0))); above = Math.min(above, hi + DECK.endGrade * (total - arc[i])); }
     // two ends too far apart in level for the grade between them (a short deck between a low and a high bank): the straight line from one to the other
     const top = below <= above ? Math.min(above, Math.max(below, tops[i])) : lo + (hi - lo) * (arc[i] / (total || 1));
     out[i] = Math.max(top, surface.height(pts[i][0], pts[i][1]));
   }
   return out;
+}
+
+/**
+ * The DSM of a narrow deck (a track, a lane, a footbridge: under DECK.trustWidth) is often the canopy over it or a parapet: smoothed along the deck (a Gaussian of DECK.smoothSigma
+ * in arc length) - the track over the gully on deck 28 had kinks of 50 % between two points 4 m apart.  Pure: a new array (the ends are set by the caller).
+ */
+function smoothTops(d) {
+  const n = d.pts.length;
+  const arc = new Float64Array(n);
+  for (let i = 1; i < n; i++) arc[i] = arc[i - 1] + Math.hypot(d.pts[i][0] - d.pts[i - 1][0], d.pts[i][1] - d.pts[i - 1][1]);
+  const out = Float32Array.from(d.tops);
+  const sg = DECK.smoothSigma;
+  for (let i = 1; i < n - 1; i++) {
+    let sum = 0, wsum = 0;
+    for (let j = 1; j < n - 1; j++) {
+      const u = (arc[j] - arc[i]) / sg;
+      if (u * u > 9) continue;
+      const w = Math.exp(-0.5 * u * u);
+      sum += w * d.tops[j]; wsum += w;
+    }
+    out[i] = wsum > 0 ? sum / wsum : d.tops[i];
+  }
+  return out;
+}
+
+/**
+ * The ends of a deck carry their stub points: an inner point that lies within DECK.endStub of an end takes the level the end gets (the bake resamples every 4 m and adds the
+ * last point: a last segment of a few centimetres whose inner point kept the DSM while the end was pinned to the ground - a vertical step of 0.3 - 0.4 m at the end of the
+ * deck, decks 255 / 160).  Returns, per deck, [index of the stub at the start or -1, at the end or -1].
+ */
+function endStubs(d) {
+  const n = d.pts.length;
+  if (n < 3 || d.width < DECK.stubWidth) return [-1, -1];             // (a footbridge's last span can be that short and carry it clear of the ground)
+  const near = (i, e) => Math.hypot(d.pts[i][0] - d.pts[e][0], d.pts[i][1] - d.pts[e][1]) < DECK.endStub;
+  return [near(1, 0) ? 1 : -1, n > 3 && near(n - 2, n - 1) ? n - 2 : n === 3 && near(1, 2) && !near(1, 0) ? 1 : -1];
+}
+
+/**
+ * Approach slabs where the approach does not reach the corners of the deck end.  A road bridge over a road at a skew: the OSM bridge ends square to its own axis, but the gap
+ * under it runs along the road below, so at the acute corner the cut of the road below reaches past the deck end and the approach carriageway there falls away 1 - 5 m (the
+ * Autoroute d'Arlon over the Autoroute d'Esch, decks 104 / 114 / 119 / 137: a car in the outer lane fell off the corner before the deck).  There the deck is continued back
+ * over its approach (an approach slab) far enough to cover the corner, its far end just under the road on the axis.  Pure: a new deck, or the same one.
+ */
+function withAprons(d, holdA, holdB, surface) {
+  if (d.width < DECK.apronWidth || d.pts.length < 2 || (!holdA && !holdB)) return d;
+  let pts = d.pts, tops = Array.from(d.tops), apronA = 0, apronB = 0;
+  for (const atStart of [true, false]) {
+    if (!(atStart ? holdA : holdB)) continue;
+    const n = pts.length, e = atStart ? 0 : n - 1, f = atStart ? 1 : n - 2;
+    const l = Math.hypot(pts[f][0] - pts[e][0], pts[f][1] - pts[e][1]) || 1;
+    const ux = (pts[e][0] - pts[f][0]) / l, uz = (pts[e][1] - pts[f][1]) / l;          // out of the deck, along the approach
+    const top = tops[e], side = d.width / 2 - DECK.apronInset;
+    let eaten = 0, deepest = 0;
+    for (let s = 0.5; s <= DECK.apronMax + 1e-6; s += 0.5) {
+      const axis = Math.min(top, surface.height(pts[e][0] + ux * s, pts[e][1] + uz * s));   // (the approach climbing or falling to the deck is not a corner that falls away)
+      for (const k of [-1, 1]) {
+        const x = pts[e][0] + ux * s - uz * side * k, z = pts[e][1] + uz * s + ux * side * k;
+        const drop = axis - surface.height(x, z);
+        if (drop > DECK.apronDrop) eaten = s;
+        deepest = Math.max(deepest, drop);
+      }
+    }
+    if (eaten === 0 || deepest < DECK.apronCut) continue;            // (a verge that falls away gently is the bank of an approach on a curve, not the cut of a road below)
+    const len = Math.min(DECK.apronMax, eaten + 1.5);
+    const fx = pts[e][0] + ux * len, fz = pts[e][1] + uz * len;
+    const farTop = Math.min(top, surface.height(fx, fz)) - DECK.apronTuck;
+    if (atStart) { pts = [[fx, fz], ...pts]; tops = [farTop, ...tops]; apronA = len; } else { pts = [...pts, [fx, fz]]; tops = [...tops, farTop]; apronB = len; }
+  }
+  return pts === d.pts ? d : { ...d, pts, tops: Float32Array.from(tops), apronA, apronB };   // (apronA / apronB: the metres of approach slab at each end - the bridge ends there)
 }
 
 /**
@@ -199,8 +309,12 @@ export function createDeckNetwork(decks, surface = null) {
       tops[last] = surface.height(d.pts[last][0], d.pts[last][1]);
       return { ...d, tops };
     }
-    const [lo, hi, envLo, envHi] = levels[k];
-    return { ...d, tops: endEnvelope(d.pts, d.tops, lo, hi, envLo, envHi, surface) };
+    const [lo, hi, envLo, envHi, holdLo, holdHi] = levels[k];
+    const tops = endEnvelope(d.pts, d.width < DECK.trustWidth ? smoothTops(d) : d.tops, lo, hi, envLo, envHi, surface, holdLo, holdHi);
+    const [stubA, stubB] = endStubs(d);
+    if (stubA >= 0) tops[stubA] = lo;
+    if (stubB >= 0) tops[stubB] = hi;
+    return withAprons({ ...d, tops }, holdLo, holdHi, surface);
   });
   const ax = [], az = [], bx = [], bz = [], t0 = [], t1 = [], half = [], deckOf = [], ends = [];
   list.forEach((d, k) => {
@@ -301,13 +415,18 @@ export function createDeckNetwork(decks, surface = null) {
     if (count === 0) return null;
     gather(x, z);
     let best = null;
-    for (let pass = 0; pass < 2 && !best; pass++) for (let c = 0; c < candCount; c++) {
-      if (candOut[c] !== pass) continue;                    // a deck under the point first; the cap of a joint only where none is
+    // pass 0: a deck whose own width covers the point; 1: one whose margin (DECK.margin past its edge) reaches it; 2: the round cap of a joint.  Two decks side by side at two
+    // levels (the carriageways of a skewed interchange, 0.5 m apart) overlap by their margins: "the highest" put the outer wheels of a car near the edge of the lower deck on the
+    // margin of the higher one, a 0.4 - 0.6 m step in the lane (decks 84 / 74, 157 / 154, 105 / 99)
+    for (let pass = 0; pass < 3 && !best; pass++) for (let c = 0; c < candCount; c++) {
       if (candOut[c] === 2) continue;
+      if ((candOut[c] === 1 ? 2 : candSide[c] <= HALF[candSeg[c]] ? 0 : 1) !== pass) continue;
       const i = candSeg[c], t = candT[c];
       const top = T0[i] + (T1[i] - T0[i]) * t;
       if (y < top - DECK.stickBelow) continue;              // the car is under the deck: the ground stays the ground
-      if (!best || top > best.top) {
+      // of two decks that overlap the one at the car's own level carries it (y is the car's body, DECK.hintLift over its wheels): two links that merge side by side at
+      // 0.5 m apart (decks 157 / 154) put a car near the edge of the lower one onto the higher one with "the highest wins".  (A hint of 1e9 still asks for the highest.)
+      if (!best || Math.abs(top - (y - DECK.hintLift)) < Math.abs(best.top - (y - DECK.hintLift))) {
         const ax0 = AX[i], az0 = AZ[i], ex = BX[i] - ax0, ez = BZ[i] - az0, len = Math.hypot(ex, ez);
         out.top = top;
         out.slope = (T1[i] - T0[i]) / len;
@@ -365,7 +484,29 @@ export function createDeckNetwork(decks, surface = null) {
     return false;
   }
 
-  return { deckAt, overheadAt, touchesVolume, count, decks: list };
+  /**
+   * The bank under the end of a bridge is a wall for a car UNDER the deck.  The ground under a deck end rises from the valley to the deck (the abutment: 1.5 x drop / RAMP_SLOPE
+   * in road-network.js, 100 - 200 %); a car that drove along the valley under the A1 viaduct climbed it and was popped onto the deck with a 0.9 m step (QA B02 deck 23, N-B01
+   * deck 87, deck 10).  (x, z): a body circle, y: the level of its wheels.  Returns { nx, nz, pen } (downhill) or null.  Only under a deck, only on a bank steeper than
+   * DECK.bankSlope that rises DECK.bankRise over the wheels: a road under a bridge is never that steep.
+   */
+  const bankScratch = { top: 0, slope: 0, ux: 1, uz: 0, along: 0 };
+  function bankCollide(x, z, radius, y) {
+    if (count === 0 || !surface) return null;
+    const h = surface.height(x, z);
+    const bottom = overheadAt(x, z, y);
+    if (bottom === Infinity) return null;                                    // no deck over the car
+    const low = bottom - Math.max(h, y) < DECK.roofClear;                   // the underside of the deck comes down onto the roof (a natural bank under a low deck end: deck 87)
+    if (h < y + DECK.bankRise && !low) return null;
+    if (deckAt(x, z, y, bankScratch)) return null;                          // the car is on a deck here (or is lifted onto one): no bank
+    const e = 0.5;
+    const gx = (surface.height(x + e, z) - surface.height(x - e, z)) / (2 * e), gz = (surface.height(x, z + e) - surface.height(x, z - e)) / (2 * e);
+    const g = Math.hypot(gx, gz);
+    if (g < (low ? DECK.lowSlope : DECK.bankSlope)) return null;
+    return { nx: -gx / g, nz: -gz / g, pen: Math.min(DECK.bankPush, Math.max(0, h - y - DECK.bankRise) / g + 0.05) };
+  }
+
+  return { deckAt, overheadAt, touchesVolume, bankCollide, count, decks: list };
 }
 
 /** The ground the car, the camera and the renderer see: the terrain surface, with the bridge decks on top.
@@ -406,6 +547,8 @@ export function createGround(surface, deckNetwork) {
     /** The underside of the lowest deck above height y over (x, z), Infinity when the sky is free. */
     overheadAt(x, z, y) { return deckNetwork ? deckNetwork.overheadAt(x, z, y) : Infinity; },
     onDeck(x, z) { return !!deckNetwork && deckNetwork.count > 0 && deckNetwork.deckAt(x, z, hintY, scratch) !== null; },
+    /** The bank under a deck end for a car under the deck (y: the level of its wheels): see bankCollide. */
+    bankCollide(x, z, radius, y) { return deckNetwork && deckNetwork.bankCollide ? deckNetwork.bankCollide(x, z, radius, y) : null; },
     surface, decks: deckNetwork ? deckNetwork.decks : [],
   };
   return out;

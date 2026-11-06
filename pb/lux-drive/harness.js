@@ -52,6 +52,7 @@ import { JUNCTION, junctionClusters, driveLine } from './junction-probe.js';
 import { runBridgeChecks } from './harness-bridges.js';          // section N (bridges7)
 import { runTunnelChecks } from './harness-tunnels.js';          // section O (bridges8)
 import { runRoads9Checks } from './harness-roads9.js';           // section P (roads9)
+import { runDeckChecks } from './harness-decks.js';              // section Q (decks10)
 import { runMarkingChecks } from './marking-checks.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -756,7 +757,7 @@ if (wants('D')) {
         const L = cum[i + 1] - cum[i], m = Math.max(1, Math.ceil(L / STEP));
         for (let k = 0; k < m; k++) {
           const f = k / m, s = cum[i] + L * f;
-          if (s < END_MARGIN || s > cum[n - 1] - END_MARGIN) continue;
+          if (s < END_MARGIN + (d.apronA || 0) || s > cum[n - 1] - END_MARGIN - (d.apronB || 0)) continue;   // (the approach margin counts from the bridge end, past its approach slab: decks.js withAprons)
           const x = d.pts[i][0] + (d.pts[i + 1][0] - d.pts[i][0]) * f, z = d.pts[i][1] + (d.pts[i + 1][1] - d.pts[i][1]) * f;
           net.carve(x, z, probe);
           if (probe.sdCar < ROAD_SD && d.tops[i] + (d.tops[i + 1] - d.tops[i]) * f - surface.height(x, z) < ON_ROAD_CLEAR) { hits++; at = at || [Math.round(x), Math.round(z)]; }
@@ -1739,6 +1740,8 @@ if (wants('N')) runBridgeChecks({ check, section, stats, data, surface, ground, 
 /* ---------------------------------------------------------------- O: the shallow tunnels that are open roads, the portals on their roads (harness-tunnels.js) */
 if (wants('O')) runTunnelChecks({ check, section, stats, data, field, surface, ground, net, portals, buildings, forest, playArea });
 if (wants('P')) runRoads9Checks({ check, section, stats, data, field, surface, ground, net, portals, buildings, forest, playArea, markDecks: deckNetwork.decks.filter((d) => !landmarks.hiddenDecks.has(d.id)) });
+/* ---------------------------------------------------------------- Q: decks driven end to end, banks under deck ends, medians, camera (harness-decks.js) */
+if (wants('Q')) runDeckChecks({ check, section, stats, data, field, surface, ground, net, buildings, portals, playArea });
 
 /* ---------------------------------------------------------------- the summary */
 console.log(`\n${results.fail === 0 ? 'PASS' : 'FAIL'}  ${results.pass} checks passed, ${results.fail} failed  (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
