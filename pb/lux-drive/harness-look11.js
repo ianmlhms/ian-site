@@ -8,12 +8,14 @@
  *   S5  the storeys of a façade are level: the façade height v is world height minus one level per house (QA BL02: the bands followed the slope and waved)
  *   S6  the chase camera never puts its lens inside the block of a retaining wall (QA2 N-C02 at 4620,11599: the picture was the inside of the face), at the QA pose and
  *       with the car turned away from the middle of every wall
+ *   S7  the slim columns of the footbridges / cycle bridges (deck-view SLIM, QA2 N-B02 deck 218) stand clear of every carriageway under them
  * Called by harness.js; everything it needs is passed in.  Pure Node. */
 
 import { WALL, WALL_LOOK, wallQuads, createWallBlockTest, drawnWalls } from './retaining-walls.js';
 import { buildBroadleaf } from './tree-models.js';
 import { addBuilding, createBuildingMesh, KIND } from './building-mesh.js';
 import { createChaseCamera } from './camera.js';
+import { ROAD_MIN_WIDTH, SLIM_PIERS, piersOf } from './deck-shape.js';
 
 const NORMAL_TOL = 1e-4;          // S1: the normals of two stretches at their shared point
 const FOOT_TOL = 0.05;            // S3: m the drawn ground may stand over the footing (the lattice between the probes)
@@ -24,7 +26,7 @@ const S5_SAMPLE = 4000;           // S5: the houses measured (every n-th)
 const QA_POSES = [[4620.0, 11599.2, -2.634], [4688.9, 11620.1, 0.749]];
 const CAMERA_FRAMES = 90, DT = 1 / 60;
 
-export function runLookChecks({ check, section, stats, data, field, surface, ground, buildings, forest, portals }) {
+export function runLookChecks({ check, section, stats, data, field, surface, ground, net, buildings, forest, portals }) {
   section('S look11: walls, trees, façades, camera');
   const walls = data.walls;
   const shown = drawnWalls(walls);
@@ -161,4 +163,18 @@ export function runLookChecks({ check, section, stats, data, field, surface, gro
     if (lensInside(x, z, Math.atan2(-p.nz, -p.nx))) { inside++; if (where.length < 4) where.push(`${x.toFixed(0)},${z.toFixed(0)}`); }
   }
   check('S6 the chase camera is not inside a retaining wall with the car backed up to the middle of any wall', inside, `${inside} of ${probes} ${where.join(' ')}`);
+
+  // ---- S7: the slim piers keep out of the roads
+  const probe = { ...net.scratch };
+  let slimPiers = 0, slimInRoad = 0;
+  for (const d of data.decks) {
+    if (d.width >= ROAD_MIN_WIDTH) continue;
+    for (const p of piersOf(d, surface, (x, z) => { net.carve(x, z, probe); return probe.sdCar; }, SLIM_PIERS)) {
+      slimPiers++;
+      net.carve(p.x, p.z, probe);
+      if (probe.sdCar < 0) slimInRoad++;
+    }
+  }
+  stats.slimPiers = slimPiers;
+  check('S7 no slim column of a footbridge / cycle bridge stands on a carriageway', slimInRoad, `${slimInRoad} of ${slimPiers}`);
 }

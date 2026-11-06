@@ -7,7 +7,7 @@
  * The car drives on the top of it (the physics reads the same heights from decks.js). */
 import { DECK } from './decks.js';
 import { createChunkedFlat } from './chunked-flat.js';
-import { ROAD_MIN_WIDTH, LINE_WIDTH, DASH_PERIOD, DASH_LENGTH, PAINT_LIFT, PIER_SIZE, FILL_NONE, ABUT, sideDepth, laneLines, piersOf, abutmentsOf } from './deck-shape.js';
+import { ROAD_MIN_WIDTH, LINE_WIDTH, DASH_PERIOD, DASH_LENGTH, PAINT_LIFT, PIER_SIZE, FILL_NONE, ABUT, SLIM, SLIM_PIERS, sideDepth, laneLines, piersOf, abutmentsOf } from './deck-shape.js';
 
 const PARAPET_HEIGHT = 0.95;        // m, the height of the parapet of a road bridge
 const PARAPET_WIDTH = 0.30;         // m, its thickness
@@ -15,6 +15,8 @@ const RAILING_HEIGHT = 1.05;        // m, the railing of a footbridge
 const RAILING_WIDTH = 0.10;
 const COLOUR_ASPHALT = [0.245, 0.249, 0.261];  // (the far tar of the ground shader: the road runs onto the deck without a change of tone)
 const COLOUR_PATH = [0.60, 0.59, 0.56];
+const COLOUR_PATH_SLIM = [0.36, 0.36, 0.37];   // look11: the asphalt of a cycle bridge / footbridge (the pale concrete read as a grey slab beside the road)
+const COLOUR_SLIM_EDGE = [0.62, 0.62, 0.60];   // the edge beam of a slim deck: a thin pale concrete band under the railing
 const COLOUR_PAINT = [0.84, 0.83, 0.76];
 const COLOUR_SIDE = [0.56, 0.55, 0.52];
 const COLOUR_UNDER = [0.40, 0.39, 0.37];
@@ -24,7 +26,8 @@ const COLOUR_PIER = [0.58, 0.57, 0.54];
 const COLOUR_MEDIAN = [0.50, 0.49, 0.47];
 const MEDIAN_GAP_MAX = 1.6;         // m: two road decks side by side (the two carriageways of a motorway on two bridges) this close are joined by a concrete median over the gap: the ground
                                     // 15 m below showed through the gap as a green line down the middle of the bridge (Rue de Neudorf)
-const MEDIAN_PROBE = 0.1;           // m, the step of the search for the neighbour deck
+const MEDIAN_PROBE = 0.1;
+const SLIM_BESIDE = 3;              // m: a narrow deck with a road deck this close beside it is the footway of a road bridge (not slim)           // m, the step of the search for the neighbour deck
 const CAP_FLUSH = 0.1;
 const PARAPET_TAPER = 6;            // m: at an end of a deck that lies on the road the parapet rises from PARAPET_FOOT of its height to the full height over this length
 const PARAPET_FOOT = 0.15;
@@ -143,6 +146,19 @@ export function createDeckView({ scene, decks, material, ground, laneLinesOn = t
     }
     return -1;
   };
+  /** True when a road deck lies beside `deck` (within SLIM_BESIDE m of its edge) at a quarter, the middle or three quarters of it. */
+  const besideRoadDeck = (deck) => {
+    const n = deck.pts.length;
+    for (const f of [0.25, 0.5, 0.75]) {
+      const i = Math.min(n - 2, Math.floor(f * (n - 1)));
+      const [ax, az] = deck.pts[i], [bx, bz] = deck.pts[i + 1];
+      const l = Math.hypot(bx - ax, bz - az) || 1, sx = -(bz - az) / l, sz = (bx - ax) / l;
+      for (const sd of [1, -1]) {
+        for (let g = 0; g <= SLIM_BESIDE; g += 0.5) if (onOtherDeck(ax + sx * sd * (deck.width / 2 + g), az + sz * sd * (deck.width / 2 + g), deck)) return true;
+      }
+    }
+    return false;
+  };
   for (const source of decks) {
     if (source.pts.length < 2) continue;
     const deck = withAbutments(source, ground, sdCarAt);
@@ -150,10 +166,20 @@ export function createDeckView({ scene, decks, material, ground, laneLinesOn = t
     const b = chunks.builderAt(deck.pts[n >> 1][0], deck.pts[n >> 1][1]);          // the whole deck goes to the chunk of its middle
     const half = deck.width / 2;
     const isRoad = deck.width >= ROAD_MIN_WIDTH;
+    // look11: a footbridge / cycle bridge on its own is a thin slab on slim columns (SLIM).  The footway of a road bridge (a narrow deck beside a road deck) keeps the
+    // depth of its road deck: the two are one structure.
+    const slim = !isRoad && !besideRoadDeck(deck);
+    const thick = slim ? SLIM.thickness : DECK.thickness;
     count += 1;
     // the bottom of the side of the deck: the ground where the deck is low (abutment, ramp), the girder where it is high (see sideDepth)
     const bottomAt = (x, z, y, i) => {
-      if (!ground) return y - DECK.thickness;
+      if (!ground) return y - thick;
+      if (slim) {                                  // solid to the ground only within SLIM.fill of it, then the edge beam (blended over SLIM.blend: no step)
+        const g = ground.height(x, z), c = y - g;
+        if (c <= SLIM.fill) return Math.min(y - thick, g - ABUT.skirt);
+        const k = Math.min(1, (c - SLIM.fill) / SLIM.blend);
+        return Math.min(y - thick, (g - ABUT.skirt) + (y - thick - g + ABUT.skirt) * k);
+      }
       if (deck.abut[i]) return Math.min(y - DECK.thickness, ground.height(x, z) - ABUT.skirt);       // the wing wall of an abutment
       return y - sideDepth(y - ground.height(x, z));
     };
@@ -189,7 +215,7 @@ export function createDeckView({ scene, decks, material, ground, laneLinesOn = t
       dx /= len; dz /= len;
       const sx = -dz, sz = dx;                      // the side of the segment (left): the dashes inside it
       // the road surface
-      b.quad(at(i, half, ay), at(i + 1, half, by), at(i + 1, -half, by), at(i, -half, ay), isRoad ? COLOUR_ASPHALT : COLOUR_PATH);
+      b.quad(at(i, half, ay), at(i + 1, half, by), at(i + 1, -half, by), at(i, -half, ay), isRoad ? COLOUR_ASPHALT : slim ? COLOUR_PATH_SLIM : COLOUR_PATH);
       // the lane lines: strips of paint laid on the asphalt (a solid line is mitred like the deck, a dash lies inside its segment)
       for (const line of lines) {
         const o = line.offset, hwl = LINE_WIDTH / 2;
@@ -211,7 +237,7 @@ export function createDeckView({ scene, decks, material, ground, laneLinesOn = t
       }
       s0 += len;
       // the underside (the girder's soffit)
-      b.quad(at(i, -half, ay - DECK.thickness), at(i + 1, -half, by - DECK.thickness), at(i + 1, half, by - DECK.thickness), at(i, half, ay - DECK.thickness), COLOUR_UNDER);
+      b.quad(at(i, -half, ay - thick), at(i + 1, -half, by - thick), at(i + 1, half, by - thick), at(i, half, ay - thick), COLOUR_UNDER);
       // the girders under the soffit where the deck stands high (both ends of the segment clear of the ground by the beam and the fill zone): two or three beams, closed at
       // the ends of a run
       const beamHere = beams.length > 0 && Math.min(clear[i], clear[i + 1]) >= FILL_NONE + BEAM_DEPTH;
@@ -251,7 +277,7 @@ export function createDeckView({ scene, decks, material, ground, laneLinesOn = t
       const L0 = at(i, half, ay), L1 = at(i + 1, half, by), R0 = at(i, -half, ay), R1 = at(i + 1, -half, by);
       const al = bottomAt(L0[0], L0[2], ay, i), bl = bottomAt(L1[0], L1[2], by, i + 1);
       const ar = bottomAt(R0[0], R0[2], ay, i), br = bottomAt(R1[0], R1[2], by, i + 1);
-      const wing = deck.abut[i] && deck.abut[i + 1] ? COLOUR_ABUT : COLOUR_SIDE;
+      const wing = slim ? COLOUR_SLIM_EDGE : deck.abut[i] && deck.abut[i + 1] ? COLOUR_ABUT : COLOUR_SIDE;
       if (!medianSide[1]) b.quad(L0, L1, [L1[0], bl, L1[2]], [L0[0], al, L0[2]], wing);
       if (!medianSide[-1]) b.quad(R1, R0, [R0[0], ar, R0[2]], [R1[0], br, R1[2]], wing);
       // the parapets (a road bridge) / the railings (a footbridge): on both sides of EVERY deck
@@ -283,12 +309,12 @@ export function createDeckView({ scene, decks, material, ground, laneLinesOn = t
       const al = bottomAt(a[0], a[2], y, end), cl = bottomAt(c[0], c[2], y, end);
       // (flush on the road: the face is a sliver of a few centimetres at most, and in the grey of the girder it was a seam across the road: there it is tarmac, see CAP_FLUSH)
       const flush = ground && [a, c, at(end, 0, y)].every((q) => Math.abs(y - ground.height(q[0], q[2])) <= CAP_FLUSH);
-      const capColour = flush ? COLOUR_ASPHALT : COLOUR_SIDE;
+      const capColour = flush ? COLOUR_ASPHALT : slim ? COLOUR_SLIM_EDGE : COLOUR_SIDE;
       if (end === 0) b.quad(a, [a[0], al, a[2]], [c[0], cl, c[2]], c, capColour);
       else b.quad(c, [c[0], cl, c[2]], [a[0], al, a[2]], a, capColour);
     }
     // the front walls of the abutments: across the deck at the foot of the bank, from under the ground to the soffit
-    for (const f of deck.fronts) {
+    for (const f of slim ? [] : deck.fronts) {      // (a slim deck has no front wall: it is filled to the ground only where it lies on it)
       const y = deck.tops[f] - DECK.thickness, o = half + ABUT_WING;
       const lo = Math.min(ground.height(...xz(at(f, o, 0))), ground.height(...xz(at(f, -o, 0))), ground.height(deck.pts[f][0], deck.pts[f][1])) - ABUT.skirt;
       b.quad(at(f, o, y), at(f, -o, y), at(f, -o, lo), at(f, o, lo), COLOUR_ABUT);
@@ -296,8 +322,8 @@ export function createDeckView({ scene, decks, material, ground, laneLinesOn = t
     }
     // the piers
     if (ground) {
-      for (const p of piersOf(deck, ground, sdCarAt)) {
-        const h = PIER_SIZE / 2, ux = p.dx * h, uz = p.dz * h, vx = -p.dz * h, vz = p.dx * h;
+      for (const p of piersOf(deck, ground, sdCarAt, slim ? SLIM_PIERS : null)) {
+        const h = (slim ? SLIM_PIERS.size : PIER_SIZE) / 2, ux = p.dx * h, uz = p.dz * h, vx = -p.dz * h, vz = p.dx * h;
         const c = [[p.x - ux - vx, p.z - uz - vz], [p.x + ux - vx, p.z + uz - vz], [p.x + ux + vx, p.z + uz + vz], [p.x - ux + vx, p.z - uz + vz]];
         for (let k = 0; k < 4; k++) {
           const q = c[k], r = c[(k + 1) % 4];

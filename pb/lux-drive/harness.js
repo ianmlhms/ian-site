@@ -1744,7 +1744,7 @@ if (wants('P')) runRoads9Checks({ check, section, stats, data, field, surface, g
 /* ---------------------------------------------------------------- Q: decks driven end to end, banks under deck ends, medians, camera (harness-decks.js) */
 if (wants('Q')) runDeckChecks({ check, section, stats, data, field, surface, ground, net, buildings, portals, playArea });
 /* ---------------------------------------------------------------- S: how the walls, trees, façades and the camera look (harness-look11.js) */
-if (wants('S')) runLookChecks({ check, section, stats, data, field, surface, ground, buildings, forest, portals });
+if (wants('S')) runLookChecks({ check, section, stats, data, field, surface, ground, net, buildings, forest, portals });
 
 /* ---------------------------------------------------------------- the summary */
 console.log(`\n${results.fail === 0 ? 'PASS' : 'FAIL'}  ${results.pass} checks passed, ${results.fail} failed  (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
