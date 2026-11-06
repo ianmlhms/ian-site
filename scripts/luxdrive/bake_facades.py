@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
-"""Façades step 3 (houses17): bake real, cleaned-up façade textures for the game's own LOD2 walls of the façade area.
+"""Roofs (and optionally façades) step 3 (houses17): bake the real roof photos of the game's LOD2 buildings of the area.
 
-    ~/Library/Caches/luxtram-work/.venv/bin/python scripts/luxdrive/bake_facades.py [--ppm 4] [--quality 80] [--dry]
+    ~/Library/Caches/luxtram-work/.venv/bin/python scripts/luxdrive/bake_facades.py [--roof-ppm 3] [--quality 80] [--dry]
+        [--walls --ppm 4]    ALSO bake the cleaned-up façade textures of the walls (off: Ian shipped roofs only, the painted walls stay)
         [--sheet <png>]      a contact sheet of walls (kept / fallback, with their numbers) for tuning the checks
+
+What ships (roofs only, the default): pb/lux-drive/data/roofs/index.json + r_<cx>_<cz>_<page>.webp, streamed by roof-view.js.
+The wall pipeline below still runs (its numbers decide which houses were seen well, and the white balance of the area comes
+from the lit walls, so the roofs come out exactly as with --walls) but its pictures are only written with --walls; the game
+has no runtime for them any more (facade-view.js / facade-data.js of commit 6965b107 draw them: restore those to use them).
 
 Source: the ACT "Bâtiments 3D 2023" CityGML LOD2.2 (CC0), whose every wall and roof carries a texture cut from oblique
 aerial photos (facade_parse.py, facade_fetch.py).  The game's buildings are the same survey, simplified (bake_buildings.py):
@@ -23,7 +29,8 @@ Per game wall (an edge of a game footprint):
   3. Pack.  The walls of each 256 m cell of the building view go into one atlas (WebP), so a cell's façades are one draw
      call and can be streamed in and out with the car.
 
-Output: pb/lux-drive/data/facades/index.json + f_<cx>_<cz>_<page>.webp (the game streams them: facade-view.js).
+Output: pb/lux-drive/data/roofs/index.json + r_<cx>_<cz>_<page>.webp (the game streams them: roof-view.js).
+With --walls the walls go into the same packs (index "walls" rows, "wallPaint" colours) and the default output dir is data/facades.
 """
 import argparse
 import json
@@ -583,12 +590,15 @@ def main():
     ap.add_argument("--ppm", type=float, default=4.0)
     ap.add_argument("--quality", type=int, default=80)
     ap.add_argument("--roof-ppm", type=float, default=3.0, help="px / m of the roof photos seen from above (0 = measured colour only); 3: 4 was crisper but 2x the GPU memory, the source is ~5-8")
+    ap.add_argument("--walls", action="store_true", help="also bake the façade textures (needs the façade runtime of commit 6965b107; default output dir data/facades)")
     ap.add_argument("--dry", action="store_true", help="measure only, write nothing to the game")
     ap.add_argument("--sheet", default=None)
     ap.add_argument("--dump", default="", help="id/edge,...: write these walls' images (kept or not) to WORK/bake/dump")
     ap.add_argument("--sheet-box", default=None, help="x0,x1,z0,z1: only walls of buildings there go on the sheet")
-    ap.add_argument("--out", default=os.path.join(OUT_DIR, "facades"))
+    ap.add_argument("--out", default=None)
     args = ap.parse_args()
+    if args.out is None:
+        args.out = os.path.join(OUT_DIR, "facades" if args.walls else "roofs")
     t0 = time.time()
     area = json.load(open(os.path.join(WORK, "act", "area.json")))
     acts = act_buildings(area)
@@ -602,7 +612,7 @@ def main():
     game_tree = STRtree(near_feet)
     report = []                                    # every wall's numbers and verdict (WORK/bake/walls.json, for tuning)
     stats = {"buildings": 0, "matched": 0, "walls": 0, "seen": 0, "kept": 0, "fallback": {}}
-    walls, paint, sheet, houses, roofs = [], {}, [], [], []
+    walls, paint, wall_paints, sheet, houses, roofs = [], {}, {}, [], [], []
     def cell_order(gid):
         p = games[gid]["pts"]
         return (math.floor(p[0][0] / 64), math.floor(p[0][1] / 64))
@@ -710,7 +720,10 @@ def main():
         gain = float(np.clip(TARGET_L / max(lum(col), 1e-3), *GAIN_RANGE))
         wall_paint = np.clip(grade(col[None, None, :], 1.0, gain)[0, 0], 0, 1)
         roof_paint = np.clip(roof_raw * wb * ROOF_GAIN, 0, 1) if roof_raw is not None else None
-        paint[gid] = [round(float(v), 3) for v in wall_paint] + ([round(float(v), 3) for v in roof_paint] if roof_paint is not None else [])
+        if roof_paint is not None:
+            paint[gid] = [round(float(v), 3) for v in roof_paint]
+        if args.walls:
+            wall_paints[gid] = [round(float(v), 3) for v in wall_paint]
         if args.roof_ppm > 0 and roof_paint is not None:
             r = roof_photo(h["pts"], h["roof_polys"], args.roof_ppm)
             if r is not None:
@@ -729,7 +742,7 @@ def main():
                 stats["kept"] += 1
             level = float(np.clip(lum(col) / max(lum(w["c"]["col"] * wb), 1e-3), *LEVEL_RANGE))
             dump = f"{gid}/{w['edge']}" in args.dump.split(",")
-            if not why or on_sheet or dump:
+            if (not why and args.walls) or on_sheet or dump:
                 keep = CHROMA_KEEP_SHADE if level > SHADE_LEVEL else CHROMA_KEEP
                 rgb = grade(fill_holes(w["rgb"], w["covered"]) * wb, level, gain, wall_paint, keep)
                 if roof_paint is not None and w["above"].any():
@@ -743,7 +756,7 @@ def main():
                     os.makedirs(os.path.join(WORK, "bake", "dump"), exist_ok=True)
                     img.resize((img.size[0] * 2, img.size[1] * 2), Image.NEAREST).save(
                         os.path.join(WORK, "bake", "dump", f"{gid}_{w['edge']}_{why or 'keep'}.png"))
-                if not why:
+                if not why and args.walls:
                     walls.append({"id": gid, "edge": w["edge"], "sign": w["sign"], "depth": round(w["depth"], 2), "img": img,
                                   "cell": f"{math.floor(h['cx'] / CELL)},{math.floor(h['cz'] / CELL)}"})
     print(f"bake_facades: {stats}  ({time.time() - t0:.0f} s)")
@@ -755,7 +768,7 @@ def main():
     px_total = sum(w["img"].size[0] * w["img"].size[1] for w in walls)
     print(f"bake_facades: {len(walls)} walls baked at {args.ppm} px/m, {px_total / 1e6:.2f} Mpx")
     print(f"bake_facades: {len(roofs)} roofs at {args.roof_ppm} px/m, {sum(r['img'].size[0] * r['img'].size[1] for r in roofs) / 1e6:.2f} Mpx")
-    write_packs(walls, roofs, paint, args)
+    write_packs(walls, roofs, paint, wall_paints, args)
 
 
 def in_box(x, z, box):
@@ -763,11 +776,11 @@ def in_box(x, z, box):
     return x0 <= x <= x1 and z0 <= z <= z1
 
 
-def write_packs(walls, roofs, paint, args):
+def write_packs(walls, roofs, paint, wall_paints, args):
     out_dir = args.out if not args.dry else os.path.join(WORK, "bake", f"dry_{args.ppm:g}")
     os.makedirs(out_dir, exist_ok=True)
     for f in os.listdir(out_dir):
-        if f.startswith("f_") and f.endswith(".webp"):
+        if f.startswith(("f_", "r_")) and f.endswith(".webp"):
             os.remove(os.path.join(out_dir, f))
     cells = {}
     for w in walls:
@@ -790,15 +803,21 @@ def write_packs(walls, roofs, paint, args):
         cx, cz = (int(v) for v in key.split(","))
         files = []
         for k, page in enumerate(pages):
-            name = f"f_{cx}_{cz}_{k}.webp"
+            name = f"{'f' if args.walls else 'r'}_{cx}_{cz}_{k}.webp"
             page.save(os.path.join(out_dir, name), "WEBP", quality=args.quality, method=6)
             size = os.path.getsize(os.path.join(out_dir, name))
             total_bytes += size
             gpu_bytes += page.size[0] * page.size[1] * 4 * 4 // 3
             files.append({"file": name, "w": page.size[0], "h": page.size[1], "bytes": size})
-        packs.append({"key": key, "centre": [(cx + 0.5) * CELL, (cz + 0.5) * CELL], "pages": files, "walls": rows, "roofs": roof_rows})
-    index = {"version": 1, "ppm": args.ppm, "band": BAND, "box": BOX, "packs": packs,
+        pack_row = {"key": key, "centre": [(cx + 0.5) * CELL, (cz + 0.5) * CELL], "pages": files, "roofs": roof_rows}
+        if args.walls:
+            pack_row["walls"] = rows
+        packs.append(pack_row)
+    # version 2: roofs only; "paint" = the measured colour of each roof (the painted roof under / far from the photo)
+    index = {"version": 2, "roofPpm": args.roof_ppm, "box": BOX, "packs": packs,
              "paint": {str(k): v for k, v in sorted(paint.items())}}
+    if args.walls:
+        index.update({"ppm": args.ppm, "band": BAND, "wallPaint": {str(k): v for k, v in sorted(wall_paints.items())}})
     with open(os.path.join(out_dir, "index.json"), "w") as f:
         json.dump(index, f, separators=(",", ":"))
     print(f"bake_facades: {len(packs)} packs, {sum(len(p['pages']) for p in packs)} pages, "

@@ -187,7 +187,7 @@ export function facadeFrame(b, heightAt, landAt) {
  * drop: how far the walls go down below the ground (m).  The cells far from the car stand on COARSE terrain tiles (up to 16 m
  *   spacing) that differ from the exact ground by a metre or two on a slope: a wall that ends at the exact ground would show a gap
  *   under it or a ledge.  The part below the ground is never seen; the window rows keep their origin at the lowest point of the foot (v < 0 below it).
- * paint: { wall, roof } colours that replace the palette (the façade area: measured from the ACT photos), or null.
+ * paint: { wall, roof } colours that replace the palette (roof-data.js: the roof colour measured from the ACT photos; wall null = the palette's wall), or null.
  */
 export function addBuilding(m, b, heightAt, landAt, drop = 0, paint = null) {
   const frame = facadeFrame(b, heightAt, landAt);
@@ -197,7 +197,7 @@ export function addBuilding(m, b, heightAt, landAt, drop = 0, paint = null) {
   // the style byte carries the kind of façade and the bit "there is a shop on the ground floor"
   const style = (b.style | 0) & 7;
   const sty = [b.style | 0, Math.max(1, b.levels | 0)];
-  // houses17: the façade area paints a house in the colours measured from its ACT photos (facade-data.js), else the palette
+  // houses17: a house of the roof area gets the roof colour measured from its ACT photo (roof-data.js); the wall stays the palette's
   const wall = paint && paint.wall ? paint.wall : wallColour(style, seed, b.palette);
   const roof = paint && paint.roof ? paint.roof : roofColour(style, b.roof, seed, b.palette);
 

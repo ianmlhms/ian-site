@@ -43,7 +43,7 @@ export function createBuildingView({ scene, buildings, field, env, noiseTexture,
     const cell = cells.get(key);
     // a landmark replaces some blocks: they are not drawn
     const ids = hidden && hidden.size ? cell.ids.filter((id) => !hidden.has(id)) : cell.ids;
-    const data = buildCellMesh(ids, buildings.buildings, heightAt, landAt, WALL_DROP, paintOf);   // paintOf: the measured colours of the façade area (houses17)
+    const data = buildCellMesh(ids, buildings.buildings, heightAt, landAt, WALL_DROP, paintOf);   // paintOf: the measured roof colours of the roof area (houses17)
     if (!data.idx.length) { live.set(key, null); return; }
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(data.pos, 3));
