@@ -18,7 +18,7 @@ export const LANE = Object.freeze({
 /** A retaining wall and the lanes (scripts/luxdrive/bake_walls.mjs, harness K and T): its collision lines keep `clear` from the centre line of every lane at its level; a
  *  wall point that comes closer moves `shiftStep` at a time, up to `shiftMax`, up its ramp (or its back toward its face), else it is dropped. */
 export const WALL_LANE = Object.freeze({
-  clear: CAR.bodyRadius + WALL_COLLIDER.radius + 0.05,
+  clear: CAR.bodyRadius + WALL_COLLIDER.radius + 0.2,      // (+0.2: on a bend the nose and tail circles of the car leave the lane centre line by up to ~0.15 m)
   shiftStep: 0.15,
   shiftMax: 0.6,
 });
@@ -116,12 +116,11 @@ const LANE_CELL = 16;            // m: the spatial hash of the pieces
 
 /**
  * The lane centre lines of the car roads: { near(ax, az, bx, bz, reach) -> pieces [{ ax, az, ay, bx, bz, by, road }], count }.  Each way's lanes are its offset
- * segments, the corners joined (the offset of one segment to the next), and run on CAR.bodyCircles[0] past an end no other car road continues (the nose of a car that
- * stands at the end: a road may never end in a wall).  `within(x, z)`: only the pieces near something (the bake: near the walls).
+ * segments, the corners joined (the offset of one segment to the next), every segment run on CAR.bodyCircles[0] past both its ends (the nose of a car at a corner or
+ * at the end of a dead end: a road may never end in a wall).  `within(x, z)`: only the pieces near something (the bake: near the walls).
  */
 export function createLaneSegments({ roads, ground, surface, isOpen, within = null }) {
   const list = laneRoads(roads, isOpen);
-  const ends = endIndex(list);
   const pieces = [];
   const cells = new Map();
   const key = (cx, cz) => cx * 100003 + cz;
@@ -152,10 +151,9 @@ export function createLaneSegments({ roads, ground, surface, isOpen, within = nu
         const dx = (bx - ax) / l, dz = (bz - az) / l;
         const a = [ax - dz * off, az + dx * off], b = [bx - dz * off, bz + dx * off];
         if (prev) add(r, prev[0], prev[1], a[0], a[1]);                              // the corner: from the end of the last offset segment to the start of this one
-        else if (!ends.continued(r, 0)) add(r, a[0] - dx * CAR.bodyCircles[0], a[1] - dz * CAR.bodyCircles[0], a[0], a[1]);
-        add(r, a[0], a[1], b[0], b[1]);
+        // the segment, run on by the nose / tail circle of the car at both ends (a car at the corner, or at the end of a dead end, still points along it)
+        add(r, a[0] - dx * CAR.bodyCircles[0], a[1] - dz * CAR.bodyCircles[0], b[0] + dx * CAR.bodyCircles[0], b[1] + dz * CAR.bodyCircles[0]);
         prev = b;
-        if (i + 2 === P.length && !ends.continued(r, P.length - 1)) add(r, b[0], b[1], b[0] + dx * CAR.bodyCircles[0], b[1] + dz * CAR.bodyCircles[0]);
       }
     }
   }

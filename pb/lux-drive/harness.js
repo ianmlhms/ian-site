@@ -56,6 +56,7 @@ import { runRoads9Checks } from './harness-roads9.js';           // section P (r
 import { runDeckChecks } from './harness-decks.js';              // section Q (decks10)
 import { runSurfaceChecks } from './harness-surface.js';         // section R (surface11)
 import { runLookChecks } from './harness-look11.js';             // section S (look11)
+import { runDrive12Checks } from './harness-drive12.js';           // section T (drive12)
 import { runMarkingChecks } from './marking-checks.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -89,7 +90,7 @@ const surface = createSurface(field);
 const deckNetwork = createDeckNetwork(fixLandmarkDecks(data.decks, (x, z) => surface.height(x, z)), surface);
 const ground = createGround(surface, deckNetwork);
 const landmarks = createLandmarks({ buildings: data.buildings, decks: deckNetwork.decks, ground: (x, z) => surface.height(x, z), roads: data.roads });
-const buildings = createBuildingIndex(data.buildings, { hidden: landmarks.hiddenBuildings });
+const buildings = createBuildingIndex(data.buildings, { hidden: landmarks.hiddenBuildings, groundAt: (x, z) => field.height(x, z), landAt: (x, z) => field.baseHeight(x, z) });   // (as main.js: the houses know their height, drive12)
 const playArea = createPlayArea(area);
 const portals = createPortals(data.roads, (x, z) => surface.height(x, z), (r) => field.network.isDrawn(r.id), (x, z) => playArea.inside(x, z), portalRoadAt(field.network), portalBlocked(buildings, deckNetwork));
 const maps = buildWorldMap({ classes: data.classes, classInfo: data.classInfo, canopy: data.canopy, buildings: data.buildings });
@@ -1763,6 +1764,7 @@ if (wants('Q')) runDeckChecks({ check, section, stats, data, field, surface, gro
 if (wants('R')) runSurfaceChecks({ check, section, stats, data, field, surface, ground, net, buildings, portals, playArea });
 /* ---------------------------------------------------------------- S: how the walls, trees, façades and the camera look (harness-look11.js) */
 if (wants('S')) runLookChecks({ check, section, stats, data, field, surface, ground, net, buildings, forest, portals });
+if (wants('T')) runDrive12Checks({ check, section, stats, data, field, surface, ground, net, buildings, landmarks, portals, forest, playArea, maps, deckNetwork });
 
 /* ---------------------------------------------------------------- the summary */
 console.log(`\n${results.fail === 0 ? 'PASS' : 'FAIL'}  ${results.pass} checks passed, ${results.fail} failed  (${((Date.now() - t0) / 1000).toFixed(1)} s)`);

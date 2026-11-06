@@ -14,6 +14,8 @@ export const DECK = Object.freeze({
   hintLift: 0.42,          // m: the car's body lies this far over its wheels (CAR.rideHeight): the hint is the body, the deck is under the wheels
   landmarkSites: [[4829, 9101], [5179, 8061]],   // m: the Pont Adolphe and the Pont Rouge (landmark-bridges.js ADOLPHE.at / ROUGE.at): their models shape their decks and meet their roads themselves ...
   landmarkRadius: 30,      // m: ... whose middle lies within this of the site (the ends of those decks keep their plain pin to the ground; road-network.js does not lift their approaches)
+  landmarkPinOut: 2.5,     // m: ... or, where the ground at an end is a pit (landmarkPit under both the deck and the road), the deck runs on this far over its approach
+  landmarkPit: 0.3,
   joinTolerance: 1.5,      // m: the ends of two decks this close are one bridge in two pieces (a joint): they meet at the level of the bridge, not at the valley floor under the joint
   approachJoin: 3.0,       // m: a carved way whose end lies this close to the end of a deck runs onto it there ...
   approachAlign: 0.7,      // ... when it leaves through that end toward the deck (the cosine of the two directions at least this)
@@ -303,11 +305,23 @@ export function createDeckNetwork(decks, surface = null) {
   const list = kept.map((d, k) => {
     if (!surface || d.pts.length < 2) return d;
     if (isLandmarkDeck(d)) {                                    // (the landmark models: the plain pin of the two ends, see DECK.landmarkSites)
-      const tops = Float32Array.from(d.tops);
-      const last = d.pts.length - 1;
-      tops[0] = surface.height(d.pts[0][0], d.pts[0][1]);
-      tops[last] = surface.height(d.pts[last][0], d.pts[last][1]);
-      return { ...d, tops };
+      // drive12 (QA3 N3-B05): where the ground AT an end is a pit - lower than both the deck's next point and the road DECK.landmarkPinOut beyond the end by DECK.landmarkPit
+      // (the Pont Adolphe's east end: the carve of its approach stops short of the deck and the bank under it shows, 0.96 m under the road a metre out) - the plain pin
+      // dropped the deck 0.9 m into its last 3 m and the lanes met a 0.5 - 0.7 m step, the car rolled 36 - 40 deg.  There the deck runs on over the pit to that point
+      // of the road, at the road's level.  The other ends met their roads and keep the plain pin.
+      const tops = Array.from(d.tops), pts = d.pts.slice();
+      const endOf = (e, i) => {
+        const [x, z] = d.pts[e], [ix, iz] = d.pts[i], l = Math.hypot(x - ix, z - iz) || 1;
+        const ox = x + ((x - ix) / l) * DECK.landmarkPinOut, oz = z + ((z - iz) / l) * DECK.landmarkPinOut;
+        const plain = surface.height(x, z), out = surface.height(ox, oz);
+        return Math.min(out, d.tops[i]) - plain > DECK.landmarkPit ? { level: out, extra: [ox, oz] } : { level: plain, extra: null };
+      };
+      const head = endOf(0, 1), tail = endOf(d.pts.length - 1, d.pts.length - 2);
+      tops[0] = head.level;
+      tops[tops.length - 1] = tail.level;
+      if (head.extra) { pts.unshift(head.extra); tops.unshift(head.level); }
+      if (tail.extra) { pts.push(tail.extra); tops.push(tail.level); }
+      return { ...d, pts, tops: Float32Array.from(tops) };
     }
     const [lo, hi, envLo, envHi, holdLo, holdHi] = levels[k];
     const tops = endEnvelope(d.pts, d.width < DECK.trustWidth ? smoothTops(d) : d.tops, lo, hi, envLo, envHi, surface, holdLo, holdHi);

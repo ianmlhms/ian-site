@@ -7,6 +7,11 @@ import { PALETTE as C } from './landmark-palette.js';
 import { requireBlocks, edgeWalls, scalePoly, groundRange, decksAlong, pickDeck, wallFace, deckStrip, stationsOf, deckFootprint, deckLevels } from './landmark-util.js';
 import { edgeFrame, windowGrid, course, slab, turret, panel, joints, roundArch } from './landmark-facade.js';
 import { SITE_FOOTPRINTS as FOOT, FORT_TOWERS } from './landmark-site-data.js';
+import { isCarRoad } from './road-index.js';
+import { segmentGap } from './lane-clearance.js';
+
+const BOCK_GATE_REACH = 200;     // m: the car roads with a point this close to the middle of the Bock may cross its rim (BOCK.reach 70 m + the length of a way)
+const BOCK_GATE_CLEAR = 1.4;     // m: a stretch of the fortress wall keeps this past the edge of a carriageway it would cross (CAR.bodyRadius + the wall's 0.9 m - its own half thickness)
 
 const TAU = Math.PI * 2;
 const SINK = 1.0;
@@ -145,7 +150,7 @@ function faceOf(ground, e, K) {
   return { ...e, y, rim: e, curtain: false };
 }
 
-export function buildBock({ ground }) {
+export function buildBock({ ground, roads = [] }) {
   const K = BOCK;
   const soup = new Soup();
   const walls = [];
@@ -186,9 +191,14 @@ export function buildBock({ ground }) {
   const placed = arcs.length;
   // the fortress wall along the edge: blue-grey masonry with a coping and merlons, standing on the rim of the rock
   const edgeIdx = edge.map((e, i) => (e ? i : -1)).filter((i) => i >= 0);
+  // drive12 (harness T2): where a car road crosses the rim (the Schlassbréck, the Clausener Bierg onto the Bock) the fortress wall has a gate - it stood across both lanes
+  // of those bridges, an invisible-looking stop 1.9 m into the lane
+  const carWays = roads.filter((r) => isCarRoad(r) && r.pts.some((q) => Math.hypot(q[0] - K.centre[0], q[1] - K.centre[1]) < BOCK_GATE_REACH));
+  const crossesRoad = (e, f) => carWays.some((r) => r.pts.some((q, k) => k + 1 < r.pts.length && segmentGap(e.rim.x, e.rim.z, f.rim.x, f.rim.z, q[0], q[1], r.pts[k + 1][0], r.pts[k + 1][1]).d < r.width / 2 + BOCK_GATE_CLEAR));
   edgeIdx.forEach((i, n) => {
     const e = edge[i], f = edge[(i + 1) % edge.length];
     if (!f) return;
+    if (crossesRoad(e, f)) return;
     const y = Math.min(e.y, f.y);
     const len = Math.hypot(f.x - e.x, f.z - e.z), yaw = Math.atan2(-(f.z - e.z), f.x - e.x);
     const mx = (e.x + f.x) / 2 + e.dx * 0.6, mz = (e.z + f.z) / 2 + e.dz * 0.6;

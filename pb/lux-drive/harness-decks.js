@@ -4,6 +4,8 @@
  *   Q2  a car that drives along the valley UNDER a viaduct is stopped by the bank under its end, it is not popped onto the deck (QA B02 deck 23, N-B01 deck 87, deck 10)
  * Called by harness.js; everything it needs is passed in.  Pure Node. */
 import { createCar } from './car.js';
+import { CAR } from './config.js';
+import { laneOffsets } from './lane-clearance.js';
 
 const Q_MAX_STEP = 0.05;          // m: a step in the height of the car from one frame to the next, minus what the grade explains (the QA's steps were 0.25 .. 3 m)
 const Q_ZONE = 5;                 // m: the drive is judged on the deck and this far past its ends and sides (beyond that the road network's own gates judge the road)
@@ -15,6 +17,7 @@ const Q_LANE_INSET = 2.2;         // m: the outer lanes of a deck at least Q_LAN
 const Q_LANE_DECK = 9;
 const Q_LANE_MARGIN = 0.9;        // m: a lane must lie this far inside the carriageway of the way it continues on (else that lane does not exist there and is not driven)
 const Q_MIN_WIDTH = 4;            // m: the decks of cars (a narrower one is a footbridge)
+const Q_PUSH = 0.02;              // m: the body circles are probed this much smaller (a graze of a guard rail at the deck edge is no stop: drive12, every lane with every collider)
 const Q_MAX_FAILING = 10;         // decks with a step or a flight (v48: 24 of 132, decks10: 13, surface11: 10 of 134).  A ratchet: lower it when a deck is fixed, never raise it.  The ones left are listed in PROGRESS (Surface 11)
 export const CAR_KINDS = new Set(['motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary', 'primary_link', 'secondary', 'secondary_link', 'tertiary', 'tertiary_link',
   'unclassified', 'residential', 'living_street', 'service', 'track', 'road']);
@@ -100,7 +103,7 @@ function laneRoute(d, off, self, ends) {
  * The car carried along `pts` at Q_SPEED (its x, z and heading set every frame: the test is the ground, not the steering), its vertical its own (car.js: the four wheels, the
  * suspension, the flight over a crest).  Returns { step, stepAt, air } judged within Q_ZONE of the deck line P.
  */
-function carry(car, ground, pts, P) {
+function carry(car, ground, pts, P, push = null) {
   const poly = [];
   for (let i = 0; i + 1 < pts.length; i++) {
     const [ax, az] = pts[i], [bx, bz] = pts[i + 1], l = Math.hypot(bx - ax, bz - az);
@@ -128,6 +131,11 @@ function carry(car, ground, pts, P) {
     ground.hint(st.y);
     car.update(Q_DT, { throttle: 0, brake: 0, steer: 0, handbrake: false });
     ys.push(st.y); grounded.push(st.grounded); at.push([st.x, st.z]); zone.push(polyDist(P, [st.x, st.z]) <= Q_ZONE);
+    // drive12: something solid touches the car's body at its level here (a house under the deck, a wall across the lane, a guard rail): the car would be stopped
+    if (push && !push.at && zone[zone.length - 1]) {
+      const lv = st.y - CAR.rideHeight;
+      for (const o of CAR.bodyCircles) { const c = push.collide(x + Math.cos(h) * o, z + Math.sin(h) * o, CAR.bodyRadius - Q_PUSH, lv); if (c) { push.at = [x, z]; push.id = c.id; break; } }
+    }
   }
   let step = 0, stepAt = null, air = 0;
   for (let k = 2; k + 1 < ys.length; k++) {
@@ -139,11 +147,14 @@ function carry(car, ground, pts, P) {
   return { step, stepAt, air };
 }
 
-/** Q1: every car deck, both directions, axis and outer lanes.  Returns { decks, runs, failing: [{ deck, kind, step, air, at }] }. */
-export function deckDriveScan({ ground, surface, roads, carCollide = null }) {
-  const car = createCar({ ground, roadInfoAt: (x, z, o) => surface.roadInfoAt(x, z, o), collide: carCollide });
+/** Q1: every car deck, both directions, axis and outer lanes.  Returns { decks, runs, failing: [{ deck, kind, step, air, at }], pushed: [{ deck, off, at }] }.
+ *  allLanes (drive12, QA3: the lane drives saw steps the axis run did not - Pont Adolphe 0.52 m, deck 204 0.45 m): the axis and the centre of every lane of the way the
+ *  deck carries (lane-clearance.js laneOffsets).  carCollide: the car's collider (car-collide.js); a run in which it moves the car is listed in `pushed`. */
+export function deckDriveScan({ ground, surface, roads, carCollide = null, allLanes = false }) {
+  const car = createCar({ ground, roadInfoAt: (x, z, o) => surface.roadInfoAt(x, z, o), collide: null });          // (the carried car is not pushed: carCollide is a probe of its body at every pose)
   const ends = wayEnds(roads);
   const worst = new Map();
+  const pushed = [];
   let decks = 0, runs = 0;
   for (const d of ground.decks) {
     if (d.width < Q_MIN_WIDTH || d.pts.length < 2) continue;
@@ -151,20 +162,23 @@ export function deckDriveScan({ ground, surface, roads, carCollide = null }) {
     if (!way || !CAR_KINDS.has(way.kind)) continue;
     decks++;
     const half = d.width / 2;
-    for (const off of d.width >= Q_LANE_DECK ? [0, half - Q_LANE_INSET, -(half - Q_LANE_INSET)] : [0]) {
+    const offs = allLanes ? [...new Set([0, ...laneOffsets({ ...way, width: Math.min(way.width, d.width) })])] : d.width >= Q_LANE_DECK ? [0, half - Q_LANE_INSET, -(half - Q_LANE_INSET)] : [0];
+    for (const off of offs) {
       const r = laneRoute(d, off, way, ends);
       if (r.none) continue;
       for (const pts of [r.pts, r.pts.slice().reverse()]) {
-        const res = carry(car, ground, pts, d.pts);
+        const push = carCollide ? { at: null, collide: carCollide } : null;
+        const res = carry(car, ground, pts, d.pts, push);
         if (!res) continue;
         runs++;
+        if (push && push.at) pushed.push({ deck: d.id, kind: way.kind, off, at: push.at, id: push.id });
         const w = worst.get(d.id);
         if (!w || res.step > w.step || res.air > w.air) worst.set(d.id, { deck: d.id, kind: way.kind, step: Math.max(res.step, w ? w.step : 0), air: Math.max(res.air, w ? w.air : 0), at: res.stepAt });
       }
     }
   }
   const failing = [...worst.values()].filter((w) => w.step > Q_MAX_STEP || w.air > 0).sort((a, b) => b.step - a.step);
-  return { decks, runs, failing };
+  return { decks, runs, failing, pushed };
 }
 
 export function runDeckChecks({ check, section, stats, data, surface, ground, buildings, portals, playArea }) {
