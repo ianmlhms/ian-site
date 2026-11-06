@@ -145,8 +145,6 @@ export const WALL_LOOK = Object.freeze({
 // the colours of the kinds (wall-material.js draws the joints and the grain on top): Luxembourg sandstone, grey limestone, poured concrete, a pale concrete coping
 const STONE_OF = Object.freeze({ 0: [0.66, 0.58, 0.45], 1: [0.57, 0.56, 0.52], 2: [0.62, 0.61, 0.58] });
 const COPING_COLOR = [0.55, 0.54, 0.52];
-const BACK_COLOR = [0.44, 0.41, 0.36];
-const FOOTING_COLOR = [0.50, 0.50, 0.48];
 const FOOTING_SHADE = 0.86;             // the footing's front is the stone of the wall, this much darker (a stepped base, not a pale bench)
 const scaleColor = (c, k) => [c[0] * k, c[1] * k, c[2] * k];
 const KIND = Object.freeze({ coping: 3, back: 4 });      // (= WALL_KIND of wall-material.js; 0..2 are the stone of the face)
@@ -223,12 +221,12 @@ export function wallQuads(wall, groundAt = null) {
     const g = geo[i], h = geo[i + 1], us = [along[i], along[i + 1], along[i + 1], along[i]], foot = [g.footY, h.footY, h.footY, g.footY];
     const f = footing[i], e = footing[i + 1];
     add('footing', [f.low, e.low, e.high, f.high], [faceN(i), faceN(i + 1), faceN(i + 1), faceN(i)], scaleColor(stoneColor, FOOTING_SHADE), stone, us, foot);   // the footing's front: the wall's stone, a shade darker
-    add('footTop', [f.high, e.high, e.seat, f.seat], [UP, UP, UP, UP], FOOTING_COLOR, KIND.coping, us, foot);                                           // its top
+    add('footTop', [f.high, e.high, e.seat, f.seat], [UP, UP, UP, UP], scaleColor(stoneColor, FOOTING_SHADE * 0.92), stone, us, foot);                                           // its top
     add('face', [g.foot, h.foot, h.under, g.under], [faceN(i), faceN(i + 1), faceN(i + 1), faceN(i)], stoneColor, stone, us, foot);            // the face
     add('lipUnder', [g.under, h.under, h.lipLow, g.lipLow], [DOWN, DOWN, DOWN, DOWN], COPING_COLOR, KIND.coping, us, foot);                         // the underside of the lip
     add('lipFront', [g.lipLow, h.lipLow, h.lipTop, g.lipTop], [faceN(i), faceN(i + 1), faceN(i + 1), faceN(i)], COPING_COLOR, KIND.coping, us, foot); // the front of the coping
     add('top', [g.lipTop, h.lipTop, h.backTop, g.backTop], [UP, UP, UP, UP], COPING_COLOR, KIND.coping, us, foot);                             // the top
-    add('back', [g.backTop, h.backTop, h.backLow, g.backLow], [backN(i), backN(i + 1), backN(i + 1), backN(i)], BACK_COLOR, KIND.back, us, foot); // the back
+    add('back', [g.backTop, h.backTop, h.backLow, g.backLow], [backN(i), backN(i + 1), backN(i + 1), backN(i)], stoneColor, stone, us, foot); // the back: the stone (seen over the sloping end of a wall)
   }
   // the ends: the side of the block from the buried foot to the top of the coping
   for (const [k, sign] of [[0, -1], [pts.length - 1, 1]]) {

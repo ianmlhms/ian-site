@@ -27,6 +27,9 @@ const COLOUR_MEDIAN = [0.50, 0.49, 0.47];
 const MEDIAN_GAP_MAX = 1.6;         // m: two road decks side by side (the two carriageways of a motorway on two bridges) this close are joined by a concrete median over the gap: the ground
                                     // 15 m below showed through the gap as a green line down the middle of the bridge (Rue de Neudorf)
 const MEDIAN_PROBE = 0.1;
+const SLIM_RAILS = [[0.93, 1.0], [0.45, 0.5]];   // the handrail and the knee rail of a slim deck: shares of the railing height
+const SLIM_POST = 3;                // m between the posts of its railing
+const SLIM_POST_SIZE = 0.07;        // m
 const SLIM_BESIDE = 3;              // m: a narrow deck with a road deck this close beside it is the footway of a road bridge (not slim)           // m, the step of the search for the neighbour deck
 const CAP_FLUSH = 0.1;
 const PARAPET_TAPER = 6;            // m: at an end of a deck that lies on the road the parapet rises from PARAPET_FOOT of its height to the full height over this length
@@ -284,7 +287,25 @@ export function createDeckView({ scene, decks, material, ground, laneLinesOn = t
       const ph = isRoad ? PARAPET_HEIGHT : RAILING_HEIGHT, pw = isRoad ? PARAPET_WIDTH : RAILING_WIDTH;
       const pc = isRoad ? COLOUR_PARAPET : COLOUR_RAILING;
       const pha = parapetAt(i, ph), phb = parapetAt(i + 1, ph);
-      for (const sd of [1, -1]) {
+      if (slim) {
+        // an open railing (look11): a handrail and a knee rail on posts - a solid 1 m wall on both sides made a footbridge a closed grey box
+        for (const sd of [1, -1]) {
+          const o = sd * (half - RAILING_WIDTH / 2);
+          for (const [lo, hi] of SLIM_RAILS) {
+            const face = (a0, b0, a1, b1) => (sd > 0 ? b.quad(a0, b0, b1, a1, COLOUR_RAILING) : b.quad(b0, a0, a1, b1, COLOUR_RAILING));
+            face(at(i, o, ay + lo * pha / ph), at(i + 1, o, by + lo * phb / ph), at(i, o, ay + hi * pha / ph), at(i + 1, o, by + hi * phb / ph));
+          }
+          // the posts in this segment, every SLIM_POST m of arc (two crossed thin quads each)
+          for (let k = Math.ceil(cum[i] / SLIM_POST); k * SLIM_POST < cum[i + 1]; k++) {
+            const t = (k * SLIM_POST - cum[i]) / Math.max(cum[i + 1] - cum[i], 1e-6);
+            const px = ax + (bx - ax) * t + sx * o, pz = az + (bz - az) * t + sz * o, py = ay + (by - ay) * t, ph2 = pha + (phb - pha) * t;
+            const r = SLIM_POST_SIZE / 2;
+            b.quad([px - dx * r, py, pz - dz * r], [px + dx * r, py, pz + dz * r], [px + dx * r, py + ph2, pz + dz * r], [px - dx * r, py + ph2, pz - dz * r], COLOUR_RAILING);
+            b.quad([px - sx * r, py, pz - sz * r], [px + sx * r, py, pz + sz * r], [px + sx * r, py + ph2, pz + sz * r], [px - sx * r, py + ph2, pz - sz * r], COLOUR_RAILING);
+          }
+        }
+      }
+      for (const sd of slim ? [] : [1, -1]) {
         // the parapet is a wall of thickness pw along the edge: its outer face, its inner face and the strip of its top (the top must NOT span the deck: that was a lid over the whole bridge)
         const o0 = sd * half, o1 = sd * (half - pw);
         const face = (a0, b0, a1, b1) => (sd > 0 ? b.quad(a0, b0, b1, a1, pc) : b.quad(b0, a0, a1, b1, pc));
@@ -293,7 +314,7 @@ export function createDeckView({ scene, decks, material, ground, laneLinesOn = t
         face(at(i, o1, ay + pha), at(i + 1, o1, by + phb), at(i, o0, ay + pha), at(i + 1, o0, by + phb));   // the top of the wall
       }
       // the two ends of the parapets
-      for (const e of [i === 0 ? 0 : -1, i + 2 === n ? n - 1 : -1].filter((k) => k >= 0)) {
+      for (const e of slim ? [] : [i === 0 ? 0 : -1, i + 2 === n ? n - 1 : -1].filter((k) => k >= 0)) {
         const y = deck.tops[e], h = parapetAt(e, ph);
         for (const sd of [1, -1]) {
           const o0 = sd * half, o1 = sd * (half - pw);

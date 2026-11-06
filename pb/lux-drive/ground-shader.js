@@ -179,9 +179,10 @@ export const GROUND_FRAGMENT = `
     float onPave = smoothstep(kerbW - aaC, kerbW + aaC, sdC) * (1.0 - smoothstep(-aaP, aaP, sdP));
     // A kerb and a pavement lie on level ground: on a ramp steeper than 1.3 m/m (the foot of a retaining wall, a cutting beside a junction) the slab texture is a stretched
     // stripe with ragged teeth along the lattice, so the ramp keeps the paint of the land and only the carriageway stays painted.
-    // (look11, QA2 N-T02: the banks between two carriageways at two levels, 35 - 50 deg, were still paved, a pale wedge with the lattice's teeth along both edges: a pavement
-    // is level, so a slope steeper than 0.6 m/m (N.y 0.85) is the land's)
-    float levelK = smoothstep(0.62, 0.86, N.y);
+    // (look11, QA2 N-T02: the banks between two carriageways at two levels, 30 - 50 deg, were still paved, a pale wedge with the lattice's teeth along both edges: a pavement
+    // and its median are level, so a slope steeper than 0.35 m/m (N.y 0.95) begins to be the land's and one of 0.6 m/m (N.y 0.86) is; the steepest streets of the old town
+    // are 0.2 m/m)
+    float levelK = smoothstep(0.86, 0.95, N.y);
     onKerb *= levelK; onPave *= levelK;
     // (look11, QA2 N-T05 / T11: at junction mouths and along the rural roads the pavement channel widened into 6 - 10 m pale aprons that read as slabs; a pavement is a strip
     // of a few metres beside its kerb)
