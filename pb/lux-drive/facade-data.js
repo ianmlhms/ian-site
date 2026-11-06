@@ -11,7 +11,7 @@
  * shadows and smears there).  A wall the cameras did not see well is not in the atlas: it keeps its painted windows.
  *
  * Pure (no THREE), so the harness checks the very same quads as the game. */
-import { facadeFrame, STYLE } from './building-mesh.js';
+import { facadeFrame, roofFaces, STYLE } from './building-mesh.js';
 
 export const FACADE_OFFSET = 0.06;     // m in front of the painted wall (with a polygon offset: no z-fight with it at a distance)
 const SHOP_BAND = 3.4;                 // m: the painted ground floor of a house (building-material.js: the shopfront up to 3.4 m)
@@ -19,6 +19,8 @@ const OFFICE_BAND = 3.6;               // m: the stone base of an office / the g
 const TOWN_STOREY = 3.4;               // m: the storey of a town façade (building-material.js: floors = eave / 3.4, rounded)
 const MIN_FACADE = 0.5;                // m: less picture than this over the painted ground floor is not drawn
 const WALL_FIELDS = 9;                 // [building id, edge, side, page, x, y, w, h, depth] per wall
+const ROOF_FIELDS = 9;                 // [building id, page, x, y, w, h, x0, z0, ppm] per roof photo (seen from above; pixel (0, 0) = world x0, z0)
+export const ROOF_LIFT = 0.05;         // m over the painted roof (with the polygon offset)
 
 /** Checks the shape of the index (it comes over the network): throws with the reason when something is off. */
 export function parseFacadeIndex(json) {
@@ -30,8 +32,10 @@ export function parseFacadeIndex(json) {
       throw new Error(`facades: malformed pack ${p && p.key}`);
     }
     for (const w of p.walls) if (!Array.isArray(w) || w.length !== WALL_FIELDS) throw new Error(`facades: malformed wall in pack ${p.key}`);
+    const roofs = p.roofs || [];
+    for (const r of roofs) if (!Array.isArray(r) || r.length !== ROOF_FIELDS) throw new Error(`facades: malformed roof in pack ${p.key}`);
     for (const pg of p.pages) if (!(pg.w > 0 && pg.h > 0) || typeof pg.file !== 'string') throw new Error(`facades: malformed page in pack ${p.key}`);
-    return { key: p.key, centre: [p.centre[0], p.centre[1]], pages: p.pages.map((pg) => ({ ...pg })), walls: p.walls };
+    return { key: p.key, centre: [p.centre[0], p.centre[1]], pages: p.pages.map((pg) => ({ ...pg })), walls: p.walls, roofs };
   });
   const paint = new Map();
   for (const [id, c] of Object.entries(json.paint || {})) {
@@ -86,6 +90,35 @@ export function buildFacadePack(pack, buildings, heightAt, landAt, hidden = null
     // the front face looks along the outward normal: (b - a) x up points along (-ez, ex), i.e. side +1 keeps a-b-c
     if (side > 0) out.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
     else out.idx.push(base, base + 2, base + 1, base, base + 3, base + 2);
+    drawn += 1;
+  }
+  // the roof photos: laid on the game's own roof faces by x / z (a photo from straight above), a little over them
+  for (const [id, page, x, y, w, h, x0, z0, ppm] of pack.roofs || []) {
+    const b = buildings[id];
+    if (!b || (hidden && hidden.has(id)) || !pages[page]) { skipped += 1; continue; }
+    if (!frames.has(id)) frames.set(id, facadeFrame(b, heightAt, landAt));
+    const frame = frames.get(id);
+    if (!frame) { skipped += 1; continue; }
+    const pg = pack.pages[page], out = pages[page];
+    const uvOf = (px, pz) => [(x + Math.min(w, Math.max(0, (px - x0) * ppm))) / pg.w, 1 - (y + Math.min(h, Math.max(0, (pz - z0) * ppm))) / pg.h];
+    for (const f of roofFaces(b, frame)) {
+      const [a, b2, c] = f.points;
+      let nx = (b2[1] - a[1]) * (c[2] - a[2]) - (b2[2] - a[2]) * (c[1] - a[1]);
+      let ny = (b2[2] - a[2]) * (c[0] - a[0]) - (b2[0] - a[0]) * (c[2] - a[2]);
+      let nz = (b2[0] - a[0]) * (c[1] - a[1]) - (b2[1] - a[1]) * (c[0] - a[0]);
+      const l = Math.hypot(nx, ny, nz) || 1;
+      const up = ny >= 0 ? 1 : -1;                       // the face looks up (faceUp of building-mesh.js)
+      nx *= up / l; ny *= up / l; nz *= up / l;
+      const base = out.pos.length / 3;
+      for (const p of f.points) {
+        out.pos.push(p[0] + nx * ROOF_LIFT, p[1] + ny * ROOF_LIFT, p[2] + nz * ROOF_LIFT);
+        out.nor.push(nx, ny, nz);
+        out.uv.push(...uvOf(p[0], p[2]));
+      }
+      const tri = up > 0 ? [0, 1, 2] : [0, 2, 1];
+      out.idx.push(base + tri[0], base + tri[1], base + tri[2]);
+      if (f.points.length === 4) out.idx.push(...(up > 0 ? [base, base + 2, base + 3] : [base, base + 3, base + 2]));
+    }
     drawn += 1;
   }
   return { pages, drawn, skipped };

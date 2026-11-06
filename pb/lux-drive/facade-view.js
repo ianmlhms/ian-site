@@ -1,4 +1,4 @@
-/* The real façades in the scene (houses17): the atlases of the façade area are streamed with the car.  A pack (the walls
+/* The real façades in the scene (houses17): the atlases of the façade area are streamed with the car.  A pack (the walls and roofs
  * of one 256 m cell, one WebP page) is fetched when the car comes within LOAD_RADIUS of its cell and thrown away - mesh,
  * texture and GPU memory - beyond UNLOAD_RADIUS, so the iPad only ever holds the few pages around the car.  One draw call
  * per page.  Low quality draws no photos (the painted walls in the measured colours stay).  Everywhere outside the area

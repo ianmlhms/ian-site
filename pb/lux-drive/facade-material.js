@@ -1,4 +1,4 @@
-/* The material of the real façades (houses17): the cleaned-up ACT photo, lit and fogged exactly like the painted
+/* The material of the real façades and roofs (houses17): the cleaned-up ACT photo, lit and fogged exactly like the painted
  * buildings (light-glsl.js), so a photo wall sits in the painted world.  At night the dark panes (the windows of the photo)
  * light up here and there, like the painted windows next door. */
 import { PAINT_LIGHT_GLSL } from './light-glsl.js';
@@ -29,7 +29,7 @@ const FRAGMENT = `
     float pane = 1.0 - smoothstep(0.16, 0.3, dot(albedo, vec3(0.299, 0.587, 0.114)));
     vec2 cell = floor(vec2(dot(vWorld.xz, vec2(-N.z, N.x)) / 1.4, vWorld.y / 3.0));
     float lit = step(0.66, h2(cell + floor(vWorld.xz / 97.0)));
-    col += vec3(1.0, 0.76, 0.4) * pane * lit * uNight * 0.8;
+    col += vec3(1.0, 0.76, 0.4) * pane * lit * uNight * 0.8 * (1.0 - step(0.5, abs(N.y)));      // (walls only: the roof photos have no windows)
     col = pow(col, vec3(0.97));
     gl_FragColor = vec4(applyFogW(col, vDist, vWorld.y), 1.0);
   }

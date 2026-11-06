@@ -192,9 +192,7 @@ export function facadeFrame(b, heightAt, landAt) {
 export function addBuilding(m, b, heightAt, landAt, drop = 0, paint = null) {
   const frame = facadeFrame(b, heightAt, landAt);
   if (!frame) return;
-  const pts = b.pts;
-  const n = pts.length / 2;
-  const { cx, cz, eaveY, ridgeY, ref, facadeH, edges } = frame;
+  const { cx, cz, eaveY, ref, facadeH, edges } = frame;
   const seed = hash01(b.id);
   // the style byte carries the kind of façade and the bit "there is a shop on the ground floor"
   const style = (b.style | 0) & 7;
@@ -228,6 +226,18 @@ export function addBuilding(m, b, heightAt, landAt, drop = 0, paint = null) {
     along += len;
   }
 
+  for (const f of roofFaces(b, frame)) faceUp(m, f.points, roof, f.kind, seed, f.uvs, f.len, f.up, sty);
+}
+
+/**
+ * The faces of a building's roof (building-mesh.js draws them painted, facade-data.js lays the roof photo on the same ones):
+ * [{ points: [[x, y, z] x 3 or 4], uvs, kind, len, up }].  `frame` is facadeFrame(b, ...).
+ */
+export function roofFaces(b, frame) {
+  const pts = b.pts;
+  const n = pts.length / 2;
+  const { cx, cz, eaveY, ridgeY } = frame;
+  const out = [];
   if (b.roof === 1 && ridgeY > eaveY + 0.2) {
     // A hip roof along the direction of the bake.  The ridge is a line through the middle of the footprint, as long as
     // the footprint reaches along that direction.  Every corner of the eave is joined to the point of the ridge above
@@ -269,9 +279,9 @@ export function addBuilding(m, b, heightAt, landAt, drop = 0, paint = null) {
       const ra = [ta.x, ridgeY, ta.z], rb = [tb.x, ridgeY, tb.z];
       const uvs = [[eaveAlong, 0], [eaveAlong + len, 0], [eaveAlong + len, tb.up], [eaveAlong, ta.up]];
       if (Math.hypot(rb[0] - ra[0], rb[2] - ra[2]) < 0.05) {
-        faceUp(m, [a, b2, rb], roof, KIND.roof, seed, [[eaveAlong, 0], [eaveAlong + len, 0], [eaveAlong + len, tb.up]], len, tb.up, sty);
+        out.push({ points: [a, b2, rb], uvs: [[eaveAlong, 0], [eaveAlong + len, 0], [eaveAlong + len, tb.up]], kind: KIND.roof, len, up: tb.up });
       } else {
-        faceUp(m, [a, b2, rb, ra], roof, KIND.roof, seed, uvs, len, (ta.up + tb.up) / 2, sty);
+        out.push({ points: [a, b2, rb, ra], uvs, kind: KIND.roof, len, up: (ta.up + tb.up) / 2 });
       }
       eaveAlong += len;
     }
@@ -283,11 +293,11 @@ export function addBuilding(m, b, heightAt, landAt, drop = 0, paint = null) {
       const ax = pts[i * 2], az = pts[i * 2 + 1], bx = pts[j * 2], bz = pts[j * 2 + 1];
       const len = Math.hypot(bx - ax, bz - az);
       if (len < 0.25) continue;
-      faceUp(m, [[cx, eaveY, cz], [ax, eaveY, az], [bx, eaveY, bz]], roof, KIND.flat, seed,
-        [[0, 0], [eaveAlong, 0], [eaveAlong + len, 0]], len, 0, sty);
+      out.push({ points: [[cx, eaveY, cz], [ax, eaveY, az], [bx, eaveY, bz]], uvs: [[0, 0], [eaveAlong, 0], [eaveAlong + len, 0]], kind: KIND.flat, len, up: 0 });
       eaveAlong += len;
     }
   }
+  return out;
 }
 
 /**

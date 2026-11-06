@@ -85,6 +85,8 @@ SHADE_LEVEL = 1.25
 PALETTE_REF = (0.89, 0.83, 0.70)   # the mean of CITY_WALLS (building-style.js): the hue the median house is balanced to
 WB_RANGE = (0.8, 1.3)
 ROOF_GAIN = 0.9            # the roofs from above came out pale (light flat roofs and the haze in the median): a little darker
+ROOF_MARGIN = 1.0          # m around the game footprint in a roof photo (the eave of the game roof is the footprint)
+MIN_ROOF_COVER = 0.8       # share of the roof photo box the ACT roofs (or the outside of the footprint) cover, else the measured colour
 PAD = 4                    # px of edge-extended border around every wall in the atlas (no bleeding into mipmaps)
 ATLAS_W = 2048
 ATLAS_MAX_H = 2048
@@ -481,6 +483,50 @@ def roof_colour(polys):
     return np.median(np.concatenate(px_all), axis=0)
 
 
+def roof_photo(pts, polys, ppm):
+    """The ACT roofs of a house seen from straight above over the game footprint's box (the highest roof wins):
+    (rgb, covered, cover share, x0, z0) - the game lays it on its own (hip) roof faces by x / z, so dormers, chimneys, the slate and the
+    flat gravel roofs are the real ones even where the game's roof shape is simpler."""
+    if not polys:
+        return None
+    xs, zs = [p[0] for p in pts], [p[1] for p in pts]
+    x0, z0 = min(xs) - ROOF_MARGIN, min(zs) - ROOF_MARGIN
+    wid = int(math.ceil((max(xs) + ROOF_MARGIN - x0) * ppm))
+    hgt = int(math.ceil((max(zs) + ROOF_MARGIN - z0) * ppm))
+    if wid < 2 or hgt < 2 or wid > ATLAS_W - 2 * PAD:
+        return None
+    rgb = np.zeros((hgt, wid, 3), np.float32)
+    zbuf = np.full((hgt, wid), -np.inf, np.float32)
+    for p in polys:
+        cols, rows = (p.pts[:, 0] - x0) * ppm, (p.pts[:, 2] - z0) * ppm
+        c0, c1 = max(0, int(cols.min())), min(wid, int(math.ceil(cols.max())) + 1)
+        r0, r1 = max(0, int(rows.min())), min(hgt, int(math.ceil(rows.max())) + 1)
+        if c1 <= c0 or r1 <= r0:
+            continue
+        m = Image.new("L", (c1 - c0, r1 - r0), 0)
+        ImageDraw.Draw(m).polygon([(c - c0, r - r0) for c, r in zip(cols, rows)], fill=255)
+        rr, cc = np.nonzero(np.asarray(m) > 0)
+        if not len(rr):
+            continue
+        rr, cc = rr + r0, cc + c0
+        x, z = x0 + (cc + 0.5) / ppm, z0 + (rr + 0.5) / ppm
+        y = p.pts[0, 1] - (p.n[0] * (x - p.pts[0, 0]) + p.n[2] * (z - p.pts[0, 2])) / p.n[1]
+        keep = y > zbuf[rr, cc]
+        if not keep.any():
+            continue
+        rr, cc, x, y, z = rr[keep], cc[keep], x[keep], y[keep], z[keep]
+        rgb[rr, cc] = sample(image(p.img), p.to_pixel(np.c_[x, y, z]))
+        zbuf[rr, cc] = y
+    covered = np.isfinite(zbuf)
+    foot = Image.new("L", (wid, hgt), 0)
+    ImageDraw.Draw(foot).polygon([((px - x0) * ppm, (pz - z0) * ppm) for px, pz in pts], fill=255)
+    inside = np.asarray(foot) > 0
+    if inside.sum() < 4 or not covered.any():
+        return None
+    share = float((covered | ~inside).mean())     # outside the footprint nothing is drawn: it never counts as a hole
+    return rgb, covered, share, x0, z0
+
+
 def white_balance(cols):
     """Per-channel gains that bring the median house colour to the hue of the painted city palette (same luminance)."""
     med = np.median(np.asarray(cols), axis=0)
@@ -536,6 +582,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ppm", type=float, default=4.0)
     ap.add_argument("--quality", type=int, default=80)
+    ap.add_argument("--roof-ppm", type=float, default=3.0, help="px / m of the roof photos seen from above (0 = measured colour only); 3: 4 was crisper but 2x the GPU memory, the source is ~5-8")
     ap.add_argument("--dry", action="store_true", help="measure only, write nothing to the game")
     ap.add_argument("--sheet", default=None)
     ap.add_argument("--dump", default="", help="id/edge,...: write these walls' images (kept or not) to WORK/bake/dump")
@@ -555,7 +602,7 @@ def main():
     game_tree = STRtree(near_feet)
     report = []                                    # every wall's numbers and verdict (WORK/bake/walls.json, for tuning)
     stats = {"buildings": 0, "matched": 0, "walls": 0, "seen": 0, "kept": 0, "fallback": {}}
-    walls, paint, sheet, houses = [], {}, [], []
+    walls, paint, sheet, houses, roofs = [], {}, [], [], []
     def cell_order(gid):
         p = games[gid]["pts"]
         return (math.floor(p[0][0] / 64), math.floor(p[0][1] / 64))
@@ -651,7 +698,8 @@ def main():
         lit = sorted([w for w in bwalls if w["c"]["cover"] > 0.4], key=lambda w: -w["c"]["lum"])
         lit = lit[:max(1, (len(lit) + 1) // 2)] or bwalls[:1]
         wsum = sum(w["area"] for w in lit)
-        houses.append({"gid": gid, "cx": cx, "cz": cz, "walls": bwalls, "roof": roof_colour(polys),
+        houses.append({"gid": gid, "cx": cx, "cz": cz, "walls": bwalls, "roof": roof_colour(polys), "pts": pts,
+                       "roof_polys": [p for p in polys if p.kind == "roof" and p.n[1] > 0.05],
                        "col": sum(w["c"]["col"] * w["area"] for w in lit) / wsum})
     # the white balance of the area: the haze of the aerial photos is blue; the median house is brought to the palette's
     wb = white_balance([h["col"] for h in houses])
@@ -663,6 +711,16 @@ def main():
         wall_paint = np.clip(grade(col[None, None, :], 1.0, gain)[0, 0], 0, 1)
         roof_paint = np.clip(roof_raw * wb * ROOF_GAIN, 0, 1) if roof_raw is not None else None
         paint[gid] = [round(float(v), 3) for v in wall_paint] + ([round(float(v), 3) for v in roof_paint] if roof_paint is not None else [])
+        if args.roof_ppm > 0 and roof_paint is not None:
+            r = roof_photo(h["pts"], h["roof_polys"], args.roof_ppm)
+            if r is not None:
+                rgb, covered, share, x0, z0 = r
+                if share >= MIN_ROOF_COVER:
+                    rgb = np.clip(fill_holes(rgb, covered) * wb * ROOF_GAIN, 0, 1)
+                    img = Image.fromarray((rgb * 255 + 0.5).astype(np.uint8)).filter(ImageFilter.UnsharpMask(radius=1.0, percent=60, threshold=2))
+                    roofs.append({"id": gid, "img": img, "x0": round(x0, 2), "z0": round(z0, 2),
+                                  "cell": f"{math.floor(h['cx'] / CELL)},{math.floor(h['cz'] / CELL)}"})
+                    stats["roofs"] = stats.get("roofs", 0) + 1
         for w in h["walls"]:
             why = w["why"]
             if why:
@@ -696,7 +754,8 @@ def main():
         contact_sheet(sheet, args.sheet)
     px_total = sum(w["img"].size[0] * w["img"].size[1] for w in walls)
     print(f"bake_facades: {len(walls)} walls baked at {args.ppm} px/m, {px_total / 1e6:.2f} Mpx")
-    write_packs(walls, paint, args)
+    print(f"bake_facades: {len(roofs)} roofs at {args.roof_ppm} px/m, {sum(r['img'].size[0] * r['img'].size[1] for r in roofs) / 1e6:.2f} Mpx")
+    write_packs(walls, roofs, paint, args)
 
 
 def in_box(x, z, box):
@@ -704,7 +763,7 @@ def in_box(x, z, box):
     return x0 <= x <= x1 and z0 <= z <= z1
 
 
-def write_packs(walls, paint, args):
+def write_packs(walls, roofs, paint, args):
     out_dir = args.out if not args.dry else os.path.join(WORK, "bake", f"dry_{args.ppm:g}")
     os.makedirs(out_dir, exist_ok=True)
     for f in os.listdir(out_dir):
@@ -713,16 +772,21 @@ def write_packs(walls, paint, args):
     cells = {}
     for w in walls:
         cells.setdefault(w["cell"], []).append(w)
+    for r in roofs:
+        cells.setdefault(r["cell"], []).append(r)
     packs, total_bytes, gpu_bytes = [], 0, 0
     for key, ws in sorted(cells.items()):
         place, heights = pack([w["img"].size for w in ws])
         pages = [Image.new("RGB", (ATLAS_W, h), (128, 128, 128)) for h in heights]
-        rows = []
+        rows, roof_rows = [], []
         for w, (pg, x, y) in zip(ws, place):
             img = w["img"]
             a = np.pad(np.asarray(img), ((PAD, PAD), (PAD, PAD), (0, 0)), mode="edge")
             pages[pg].paste(Image.fromarray(a), (x - PAD, y - PAD))
-            rows.append([w["id"], w["edge"], w["sign"], pg, x, y, img.size[0], img.size[1], w["depth"]])
+            if "edge" in w:
+                rows.append([w["id"], w["edge"], w["sign"], pg, x, y, img.size[0], img.size[1], w["depth"]])
+            else:                                  # a roof photo: its pixel (0, 0) is the world point (x0, z0), rows run south
+                roof_rows.append([w["id"], pg, x, y, img.size[0], img.size[1], w["x0"], w["z0"], args.roof_ppm])
         cx, cz = (int(v) for v in key.split(","))
         files = []
         for k, page in enumerate(pages):
@@ -732,7 +796,7 @@ def write_packs(walls, paint, args):
             total_bytes += size
             gpu_bytes += page.size[0] * page.size[1] * 4 * 4 // 3
             files.append({"file": name, "w": page.size[0], "h": page.size[1], "bytes": size})
-        packs.append({"key": key, "centre": [(cx + 0.5) * CELL, (cz + 0.5) * CELL], "pages": files, "walls": rows})
+        packs.append({"key": key, "centre": [(cx + 0.5) * CELL, (cz + 0.5) * CELL], "pages": files, "walls": rows, "roofs": roof_rows})
     index = {"version": 1, "ppm": args.ppm, "band": BAND, "box": BOX, "packs": packs,
              "paint": {str(k): v for k, v in sorted(paint.items())}}
     with open(os.path.join(out_dir, "index.json"), "w") as f:
