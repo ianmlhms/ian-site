@@ -210,7 +210,10 @@ async function boot() {
   // Everything that stops the car answers for the car's own level (`y`: the level of its wheels, car-collide.js): a house, a tree, a lamp stops a car only
   // where the car's body overlaps it in height.  (Before drive12 the trees and lamps were switched off on any deck and the houses were solid to the sky: the
   // houses of Pfaffenthal stopped the car on the Pont Rouge 60 m above them, QA3 N3-B01.)  The bank under the end of a bridge stops a car under the deck.
-  const { collide } = createCarCollider({ buildings, landmarks, walls: wallCollider, portals, ground, forest, props, trams: tramSim, playArea, surface, deckNetwork, roads: data.roads });
+  // (collide14: the parapets of the decks are built after the boot, in slices between the frames - 1 - 1.6 s of build kept off the start screen)
+  const { collide, barriers: deckBarriers } = createCarCollider({ buildings, landmarks, walls: wallCollider, portals, ground, forest, props, trams: tramSim, playArea, surface, deckNetwork, roads: data.roads, lateBarriers: true });
+  let barriersSettled = false;                               // (built, or failed: the quality auto-step waits for it)
+  deckBarriers.ready.then(() => { barriersSettled = true; }, (err) => { barriersSettled = true; console.error('[lux-drive] the bridge parapets are not solid:', err); });
   const car = createCar({ ground, roadInfoAt: (x, z, out) => surface.roadInfoAt(x, z, out), collide, start });
   const wallLens = createWallBlockTest(data.walls);          // look11 (QA2 N-C02): the lens never inside the block of a retaining wall
   // (the wall first: a house that only touches the lens - pen 0 - answered before the wall, and the lens stayed in the block of a wall that ends at the house: Bd Konrad Adenauer 7706,6728)
@@ -510,7 +513,8 @@ async function boot() {
     if (fullMap.isOpen()) fullMap.setCar(car.state);
 
     // the quality auto-step: a slow game steps down (never above the choice of the player), a long fast stretch may step back up
-    const stepped = stepper.frame(dt);
+    // (not while the parapets are built in slices between the frames: those frames are slow for the build, not for the device)
+    const stepped = barriersSettled ? stepper.frame(dt) : null;
     if (stepped) {
       applyQuality(stepped);
       ui.setToast(tr('toast.quality', { q: tr(`quality.${stepped}`) }));
@@ -536,7 +540,7 @@ async function boot() {
   // the API for the harness (the checks read the state of the game from here)
   window.__lux = {
     landmarks, landmarkView, trams, tramSim, tramNetwork, streetLights, benchView, scene, camera, renderer, car, env, terrain, city, trees, surface, ground, field, portals, playArea, buildings, markPlan, quality: () => quality,
-    ui, fullMap, roadIndex, sound, stepper, model, input, forest, collide, placeAt, blockedAt,
+    ui, fullMap, roadIndex, sound, stepper, model, input, forest, collide, placeAt, blockedAt, deckBarriers,
     /** The Kaart and the teleport for the flows: open the map, put the car on the road nearest to (x, z). */
     toggleMap: () => toggleMap(), startDriving: () => startDriving(), isStarted: () => started,
     teleportNear: (x, z, reach = 200) => { const hit = roadIndex.nearest(x, z, reach); if (hit) teleportTo(hit); return !!hit; },

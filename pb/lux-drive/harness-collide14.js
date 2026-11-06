@@ -176,7 +176,8 @@ export function runCollide14Checks({ check, section, stats, data, field, surface
 
   // ---- V4
   const isOpen = (r) => !!(field.network.roads[r.id] && field.network.roads[r.id].openCut);
-  const v4 = laneClearanceScan({ roads: data.roads, parts: carCollider.parts.filter(([nm]) => nm === 'parapet'), ground, surface, isOpen });
+  // (each lane at the level carried along it - lane-clearance.js follow: the lower turn of a spiral ramp is not on the deck over it)
+  const v4 = laneClearanceScan({ roads: data.roads, parts: carCollider.parts.filter(([nm]) => nm === 'parapet'), ground, surface, isOpen, follow: true });
   const g4 = groupHits(v4.hits);
   stats.laneParapets = { samples: v4.samples, pairs: g4.length, list: g4.slice(0, 8).map((e) => `deck ${e.id} on ${e.name} (way ${e.road}) ${e.n} x at ${e.first}`) };
   check(`V4 no parapet of a deck touches a lane (${v4.samples} lane samples, every lane of every car road at its level; ${carCollider.barriers ? carCollider.barriers.count : 0} barrier pieces)`, g4.length === 0, stats.laneParapets.list.join('; '));

@@ -15,7 +15,7 @@ import { ROAD_MIN_WIDTH, PARAPET_WIDTH, RAILING_WIDTH, mitres } from './deck-sha
 import { spansLevel } from './level-span.js';
 import { CAR } from './config.js';
 import { createLaneSegments, segmentGap, laneOffsets } from './lane-clearance.js';
-import { wayOf, wayEnds, laneRoute } from './deck-lanes.js';
+import { wayOf, wayEnds, laneRoute, DECK_LANE } from './deck-lanes.js';
 
 export const BARRIER = Object.freeze({
   drop: 0.5,               // m: the edge falls away where the landing beside it lies this far under the deck (a kerb-high step is no fall)
@@ -28,7 +28,14 @@ export const BARRIER = Object.freeze({
   laneClear: CAR.bodyRadius + 0.05 + 0.1,   // m: a piece keeps this from the centre line of every lane at its level (the body circle, the barrier's half thickness, 0.1 for the bends)
   cover: 1.0,              // m: an edge that lies on another deck within this of its level is no edge (two decks side by side, overlapping)
   cell: 16,                // m: the spatial hash cell
+  sliceMs: 8,              // ms of build per task when built after the boot (createDeckBarriersLater: the build took 1.1 - 1.6 s in Node, a frozen start screen)
+  filterChunk: 400,        // candidates judged against the lanes between two yields of the build
+  laneChunk: 40,           // ways made into lane segments per step of the build
+  touchSamples: 400,       // lane samples of a deck route per step of the build
+  shiftStep: 0.15,         // m: a piece that a lane touches moves out this far at a time (the walls' rule, lane-clearance.js WALL_LANE) ...
+  shiftMax: 0.6,           // ... up to this: the line stays within DECK.margin past the deck edge (the parapet 0.3 + 0.05 + 0.6 < 0.8 + the car's half width)
 });
+const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 
 /**
  * The candidates that the car's body touches on the lanes of a deck as a car drives them (deck-lanes.js: the lanes of the way the deck carries along the deck's axis,
@@ -37,10 +44,17 @@ export const BARRIER = Object.freeze({
  * rides on.  Returns the set of candidate indices.
  */
 export function deckLaneTouches(candidates, decks, roads, levelAt) {
+  return runToEnd(deckLaneTouchSteps(candidates, decks, roads, levelAt)).touched;
+}
+/** deckLaneTouches as steps: yields between the decks and every BARRIER.touchSamples lane samples.  Returns { touched (the set), decks (the decks whose lanes touched one) }. */
+function* deckLaneTouchSteps(candidates, decks, roads, levelAt) {
   const CELL = BARRIER.cell, cells = new Map(), key = (x, z) => Math.floor(x / CELL) * 65536 + Math.floor(z / CELL);
   candidates.forEach((c, i) => { for (const k of new Set([key(c.ax, c.az), key(c.bx, c.bz)])) { const l = cells.get(k); if (l) l.push(i); else cells.set(k, [i]); } });
-  const out = new Set();
+  const out = new Set(), byDeck = new Set();
   const reach = CAR.bodyRadius + BARRIER.radius + LANE_SLACK;
+  // (the cells within two of a candidate's: a sample of a lane outside them touches nothing - its body circles reach one cell, `touching` one more)
+  const hot = new Set();
+  for (const k of cells.keys()) { const cx = Math.floor(k / 65536), cz = k - cx * 65536; for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) hot.add((cx + a) * 65536 + cz + b); }
   /** The candidates within the body circle at (x, z): [[index, top there]]. */
   const touching = (x, z) => {
     const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
@@ -59,11 +73,18 @@ export function deckLaneTouches(candidates, decks, roads, levelAt) {
     if (!b) { b = [Infinity, Infinity, -Infinity, -Infinity]; for (const [x, z] of r.pts) { b[0] = Math.min(b[0], x); b[1] = Math.min(b[1], z); b[2] = Math.max(b[2], x); b[3] = Math.max(b[3], z); } boxes.set(r, b); }
     return b;
   };
+  const run = DECK_LANE.run + DECK_LANE.freeRun + reach;              // m: how far a deck route reaches past the deck's box
+  let work = 0;
   for (const d of decks) {
     if (d.pts.length < 2 || !candidates.length) continue;
+    yield;
     // (the ways whose box meets the deck's box)
     let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
     for (const [x, z] of d.pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+    // (a deck whose routes pass no candidate's cell: nothing to touch)
+    let any = false;
+    for (let cx = Math.floor((x0 - run) / CELL); cx <= Math.floor((x1 + run) / CELL) && !any; cx++) for (let cz = Math.floor((z0 - run) / CELL); cz <= Math.floor((z1 + run) / CELL) && !any; cz++) any = cells.has(cx * 65536 + cz);
+    if (!any) continue;
     const g = 2;                                                                       // (the way of a deck passes within 1.5 m of most of its points)
     const near = roads.filter((r) => { const b = boxOf(r); return b[0] <= x1 + g && b[2] >= x0 - g && b[1] <= z1 + g && b[3] >= z0 - g; });
     const way = wayOf(d, near);
@@ -73,24 +94,35 @@ export function deckLaneTouches(candidates, decks, roads, levelAt) {
       if (route.none) continue;
       for (const pts of [route.pts, route.pts.slice().reverse()]) {
         let y = levelAt(pts[0][0], pts[0][1], 1e4);                                       // (the car starts ON a deck where there is one, then keeps to its level)
+        let since = 0;
         for (let i = 0; i + 1 < pts.length; i++) {
           const [ax, az] = pts[i], [bx, bz] = pts[i + 1], l = Math.hypot(bx - ax, bz - az);
           if (l < 1e-3) continue;
           const ux = (bx - ax) / l, uz = (bz - az) / l;
           for (let s = 0; s <= l; s += LANE_STEP) {
+            if (++work % BARRIER.touchSamples === 0) yield;
             const x = ax + ux * s, z = az + uz * s;
-            const hits = CAR.bodyCircles.flatMap((o) => touching(x + ux * o, z + uz * o) || []);
-            if (!hits.length) continue;                                                   // (the level is asked only where a candidate is touched: the hint carries on)
+            const hits = hot.has(key(x, z)) ? CAR.bodyCircles.flatMap((o) => touching(x + ux * o, z + uz * o) || []) : [];
+            // the level follows the lane as the wheels do: asked where a candidate is touched and every LANE_LEVEL_EVERY samples between (a level asked only at the
+            // touches kept the level of the route's start: the approach of service deck 103 climbs 3 m onto it, the spiral of deck 59 9 m - the hint stayed under the
+            // deck, the lane read the ground under it and the parapets at its end were kept in the lane: harness T3)
+            if (!hits.length) { if (++since >= LANE_LEVEL_EVERY) { since = 0; y = levelAt(x, z, y + DECK.hintLift); } continue; }
+            since = 0;
             y = levelAt(x, z, y + DECK.hintLift);
-            for (const [i, top] of hits) if (y >= top - BARRIER.drop && y < top + BARRIER.height) out.add(i);
+            for (const [i, top] of hits) if (y >= top - BARRIER.drop && y < top + BARRIER.height) { out.add(i); byDeck.add(d); }
           }
         }
       }
     }
   }
-  return out;
+  return { touched: out, decks: byDeck };
+}
+/** Runs the steps of a generator to its end: its return value. */
+function runToEnd(gen) {
+  for (;;) { const r = gen.next(); if (r.done) return r.value; }
 }
 const LANE_STEP = 0.5;           // m along a deck lane
+const LANE_LEVEL_EVERY = 4;      // samples (2 m: at a grade of 15 % the level moves 0.3 m, well within DECK.hintLift)
 const LANE_SLACK = 0.03;         // m
 
 /**
@@ -101,7 +133,59 @@ const LANE_SLACK = 0.03;         // m
  * Returns { collide(x, z, radius, y), count (pieces), length (m), pieces: [{ deck, ax, az, ay, bx, bz, by, nx, nz }] }.
  */
 export function createDeckBarriers(deckNetwork, surface, { skip = null, roads = null } = {}) {
+  const t0 = now();
+  const built = runToEnd(barrierSteps(deckNetwork, surface, { skip, roads }));
+  return barrierCollider(built, now() - t0);
+}
+
+/**
+ * createDeckBarriers built after the boot, in slices of BARRIER.sliceMs between the frames (collide14: 1.1 - 1.6 s of build in Node was on the start path of the
+ * game).  Until it is ready the car meets no parapet (the start of the game is on a street, not on a bridge edge).  Returns { collide, ready (a promise of the
+ * built barriers), barriers () (the built ones or null), buildMs () (the time spent in the slices), slices (), longestSlice () (ms), longestStep () ({ ms, after: the phase it ended in }) }.  A failed build rejects `ready` with its context.
+ */
+export function createDeckBarriersLater(deckNetwork, surface, { skip = null, roads = null } = {}, { sliceMs = BARRIER.sliceMs, defer = (f) => setTimeout(f, 0) } = {}) {
+  const gen = barrierSteps(deckNetwork, surface, { skip, roads });
+  let built = null, spent = 0, slices = 0, longest = 0;
+  const longestStep = { ms: 0, after: '' };
+  const ready = new Promise((resolve, reject) => {
+    const slice = () => {
+      const t0 = now(), end = t0 + sliceMs;
+      try {
+        let r;
+        do {
+          const ts = now();
+          r = gen.next();
+          const took = now() - ts;
+          if (took > longestStep.ms) { longestStep.ms = took; longestStep.after = r.done ? 'end' : r.value; }
+        } while (!r.done && now() < end);
+        const took = now() - t0;
+        spent += took; slices++; longest = Math.max(longest, took);
+        if (!r.done) { defer(slice); return; }
+        built = barrierCollider(r.value, spent);
+        resolve(built);
+      } catch (err) {
+        reject(new Error(`deck barriers: the build failed after ${slices} slices (${spent.toFixed(0)} ms): ${err && err.message}`, { cause: err }));
+      }
+    };
+    defer(slice);
+  });
+  return {
+    collide: (x, z, radius, y = NaN) => (built ? built.collide(x, z, radius, y) : null),
+    ready,
+    barriers: () => built,
+    buildMs: () => spent,
+    slices: () => slices,
+    longestSlice: () => longest,
+    longestStep: () => ({ ...longestStep }),
+  };
+}
+
+/** The build of the barrier pieces as steps (yields between decks and chunks of candidates).  Returns { pieces, yielded, ms: the time of each phase }. */
+function* barrierSteps(deckNetwork, surface, { skip, roads }) {
   const CELL = BARRIER.cell;
+  const ms = { candidates: 0, lanes: 0, deckLanes: 0, filter: 0 };
+  let tp = now();
+  const phase = (name) => { const t = now(); ms[name] += t - tp; tp = t; };
   const cellOf = (x, z) => Math.floor(x / CELL) * 65536 + Math.floor(z / CELL);
   const scratch = { top: 0, slope: 0, ux: 1, uz: 0, along: 0 };
   // the ground as the wheels read it: the continuous carve (decks.js createGround contact; the 1 m lattice of surface.height costs ~1000 x as much and is what the
@@ -142,6 +226,7 @@ export function createDeckBarriers(deckNetwork, surface, { skip = null, roads = 
   let candidates = [];
   for (const d of deckNetwork.decks) {
     if (d.pts.length < 2 || (skip && skip.has(d.id))) continue;
+    phase('candidates'); yield 'candidates'; tp = now();
     const half = d.width / 2;
     const face = half - (d.width >= ROAD_MIN_WIDTH ? PARAPET_WIDTH : RAILING_WIDTH);       // the inner face of the drawn parapet / railing
     const line = Math.max(0.5, face + BARRIER.radius);
@@ -172,6 +257,7 @@ export function createDeckBarriers(deckNetwork, surface, { skip = null, roads = 
     }
   }
 
+  phase('candidates');
   // ---- the lanes win: a candidate within BARRIER.laneClear of a lane at its level is left out
   let yielded = 0;
   if (roads) {
@@ -194,19 +280,49 @@ export function createDeckBarriers(deckNetwork, surface, { skip = null, roads = 
     // (the level along the lanes: the deck where one is clearly over the land - judged against the DTM, 8 x cheaper than the carve - else the wheel ground)
     const base = surface.field && surface.field.baseHeight ? (x, z) => surface.field.baseHeight(x, z) : groundAt;
     const laneLevel = (x, z, y) => { const hit = deckNetwork.deckAt(x, z, y, levelScratch); return hit && hit.top > base(x, z) + 1 ? hit.top : wheelGround.levelAt(x, z, y); };
-    const lanes = createLaneSegments({ roads: roads.filter(passes), ground: { levelAt: laneLevel }, surface: { height: base }, isOpen, within: nearPiece });
-    const inLane = (c) => lanes.near(c.ax, c.az, c.bx, c.bz, BARRIER.laneClear).some((p) => {
+    // (the lanes in chunks of ways: a step of the build each)
+    const passing = roads.filter(passes), laneSets = [];
+    for (let k = 0; k < passing.length; k += BARRIER.laneChunk) {
+      yield 'lanes'; tp = now();
+      laneSets.push(createLaneSegments({ roads: passing.slice(k, k + BARRIER.laneChunk), ground: { levelAt: laneLevel }, surface: { height: base }, isOpen, within: nearPiece, follow: true }));
+      phase('lanes');
+    }
+    yield 'lanes'; tp = now();
+    const inLane = (c) => laneSets.some((lanes) => lanes.near(c.ax, c.az, c.bx, c.bz, BARRIER.laneClear).some((p) => {
       const g = segmentGap(p.ax, p.az, p.bx, p.bz, c.ax, c.az, c.bx, c.bz);
       if (g.d >= BARRIER.laneClear) return false;
       const top = c.ay + (c.by - c.ay) * g.t;
       return Math.max(p.ay, p.by) >= top - BARRIER.drop && Math.min(p.ay, p.by) < top + BARRIER.height;
-    });
-    const onDeckLane = deckLaneTouches(candidates, deckNetwork.decks, roads.filter(passes), laneLevel);
-    const kept = candidates.filter((c, i) => !onDeckLane.has(i) && !inLane(c));
+    }));
+    // a candidate that a lane touches moves out, BARRIER.shiftStep at a time up to BARRIER.shiftMax, onto the margin the deck still carries a car on (DECK.margin):
+    // the lane and the deck disagree by a little where a way cuts the corner of its deck (the top of the Buchler car park spiral, deck 59: the way 14882 bends 1 m
+    // inside the deck's left edge where it leaves deck 71 - the piece yielded and a car steered at the edge there fell 7 m, harness V3).  Else it is left out.
+    // (the moved pieces are driven again on the lanes of the decks whose lanes touched them where they stood)
+    const kept = [];
+    let pending = candidates, touchDecks = deckNetwork.decks;
+    for (let shift = 0; shift <= BARRIER.shiftMax + 1e-6 && pending.length; shift += BARRIER.shiftStep) {
+      const moved = shift === 0 ? pending : pending.map((c) => ({ ...c, ax: c.ax - c.nx * shift, az: c.az - c.nz * shift, bx: c.bx - c.nx * shift, bz: c.bz - c.nz * shift }));
+      const touchSteps = deckLaneTouchSteps(moved, touchDecks, passing, laneLevel);
+      let onDeckLane;
+      for (;;) { const r = touchSteps.next(); if (r.done) { onDeckLane = r.value.touched; if (shift === 0) touchDecks = [...r.value.decks]; break; } phase('deckLanes'); yield 'deckLanes'; tp = now(); }
+      phase('deckLanes');
+      const still = [];
+      for (let i = 0; i < moved.length; i++) {
+        if (!onDeckLane.has(i) && !inLane(moved[i])) kept.push(moved[i]); else still.push(pending[i]);
+        if ((i + 1) % BARRIER.filterChunk === 0) { phase('filter'); yield 'filter'; tp = now(); }
+      }
+      phase('filter');
+      pending = still;
+    }
     yielded = candidates.length - kept.length;
     candidates = kept;
   }
-  const pieces = candidates;
+  return { pieces: candidates, yielded, ms };
+}
+
+/** The collider of the built pieces (a spatial hash).  buildMs: the time the build took. */
+function barrierCollider({ pieces, yielded, ms }, buildMs) {
+  const CELL = BARRIER.cell;
 
   const key = (cx, cz) => (cx + 8192) * 32768 + (cz + 8192);
   const cells = new Map();
@@ -251,5 +367,5 @@ export function createDeckBarriers(deckNetwork, surface, { skip = null, roads = 
     return best;
   }
 
-  return { collide, count: pieces.length, length, pieces, yielded };
+  return { collide, count: pieces.length, length, pieces, yielded, buildMs, phaseMs: ms };
 }

@@ -7,7 +7,7 @@
 import { TRAM } from './config.js';
 import { spansLevel } from './level-span.js';
 import { createRailGround } from './rail-ground.js';
-import { createDeckBarriers } from './deck-barriers.js';
+import { createDeckBarriers, createDeckBarriersLater } from './deck-barriers.js';
 
 export const LAMP_POST_RADIUS = 0.22;     // m: a street lamp (the car stops at it like at a tree)
 export const LAMP_POST_HEIGHT = 8;        // m: its pole
@@ -21,11 +21,13 @@ export const POLE_HEIGHT = TRAM.catenary.height + 1;   // m: a catenary pole of 
  *   ground: decks.js createGround (the bank under a deck end), forest: trees.js, props: props.js (lamps, benches, poles with their level), trams: tram-sim.js,
  *   playArea: play-area.js, surface + deckNetwork: the level of the tram's rails and the parapets of the decks (deck-barriers.js, collide14: the car stays on a bridge;
  *   the decks a landmark draws carry the landmark's own walls), roads: the decoded ways (a parapet never stands in a lane).
- * Returns { collide(x, z, radius, y), parts, barriers }.
+ *   lateBarriers: the parapets are built after the boot in slices (deck-barriers.js createDeckBarriersLater: the game; their build is 1 - 1.6 s), else at once (the harness).
+ * Returns { collide(x, z, radius, y), parts, barriers } (barriers: the built parapets, or with lateBarriers the handle of the build - its `ready` promise).
  */
-export function createCarCollider({ buildings, landmarks, walls, portals, ground, forest, props, trams, playArea, surface = null, deckNetwork = null, roads = null }) {
+export function createCarCollider({ buildings, landmarks, walls, portals, ground, forest, props, trams, playArea, surface = null, deckNetwork = null, roads = null, lateBarriers = false }) {
   const railGround = surface ? createRailGround(surface, deckNetwork) : null;
-  const barriers = surface && deckNetwork ? createDeckBarriers(deckNetwork, surface, { skip: landmarks.hiddenDecks, roads }) : null;
+  const barrierOpts = { skip: landmarks.hiddenDecks, roads };
+  const barriers = !(surface && deckNetwork) ? null : lateBarriers ? createDeckBarriersLater(deckNetwork, surface, barrierOpts) : createDeckBarriers(deckNetwork, surface, barrierOpts);
   /** A tram: at the level of its rails, as high as the vehicle. */
   const tramHit = (x, z, radius, y) => {
     const hit = trams.collide(x, z, radius);

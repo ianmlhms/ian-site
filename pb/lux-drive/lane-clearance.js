@@ -43,7 +43,7 @@ export function laneRoads(roads, isOpen = () => false) {
  * Returns { samples, hits: [{ road, name, kind, off, x, z, y, part, id, pen, end }] } - one per sample (the deepest part), `end` = the sample lies within the car's
  * length of an end of the way that no other car road continues.
  */
-export function laneClearanceScan({ roads, parts, ground, surface, skip = new Set(['tram', 'area']), isOpen, only = null }) {
+export function laneClearanceScan({ roads, parts, ground, surface, skip = new Set(['tram', 'area']), isOpen, only = null, follow = false }) {
   const use = parts.filter(([name]) => !skip.has(name));
   const ends = endIndex(laneRoads(roads, isOpen));
   const hits = [];
@@ -54,6 +54,7 @@ export function laneClearanceScan({ roads, parts, ground, surface, skip = new Se
     const bridge = !!(r.over || r.bridge);
     const P = r.pts;
     const free = [0, P.length - 1].filter((i) => !ends.continued(r, i)).map((i) => P[i]);
+    const hints = new Map();                 // follow: the level carried along each lane of a bridge way
     for (let i = 0; i + 1 < P.length; i++) {
       const [ax, az] = P[i], [bx, bz] = P[i + 1], l = Math.hypot(bx - ax, bz - az);
       if (l < 0.05) continue;
@@ -61,7 +62,8 @@ export function laneClearanceScan({ roads, parts, ground, surface, skip = new Se
       for (let s = 0; s < l; s += LANE.step) {
         for (const off of offs) {
           const x = ax + dx * s - dz * off, z = az + dz * s + dx * off;
-          const y = ground.levelAt(x, z, bridge ? 1e9 : surface.height(x, z) + LANE.hintLift);
+          const y = !bridge ? ground.levelAt(x, z, surface.height(x, z) + LANE.hintLift) : !follow ? ground.levelAt(x, z, 1e9) : ground.levelAt(x, z, hints.has(off) ? hints.get(off) + LANE.hintLift : 1e9);
+          if (bridge && follow) hints.set(off, y);
           samples++;
           let best = null;
           for (const o of CAR.bodyCircles.concat(0)) {
@@ -113,39 +115,63 @@ export function groupHits(hits) {
  * body circles (CAR.bodyRadius) ride on that line, the thin wall has WALL_COLLIDER.radius. */
 const LANE_PIECE = 4;            // m: the longest piece of a lane (its level is linear between its ends)
 const LANE_CELL = 16;            // m: the spatial hash of the pieces
+const LANE_FOLLOW_STEP = 1;      // m: createLaneSegments `follow` carries the level of a bridge lane this often (a spiral ramp climbs 1 m in 4 m)
 
 /**
  * The lane centre lines of the car roads: { near(ax, az, bx, bz, reach) -> pieces [{ ax, az, ay, bx, bz, by, road }], count }.  Each way's lanes are its offset
  * segments, the corners joined (the offset of one segment to the next), every segment run on CAR.bodyCircles[0] past both its ends (the nose of a car at a corner or
  * at the end of a dead end: a road may never end in a wall).  `within(x, z)`: only the pieces near something (the bake: near the walls).
  */
-export function createLaneSegments({ roads, ground, surface, isOpen, within = null }) {
+export function createLaneSegments({ roads, ground, surface, isOpen, within = null, follow = false }) {
   const list = laneRoads(roads, isOpen);
   const pieces = [];
   const cells = new Map();
   const key = (cx, cz) => cx * 100003 + cz;
-  const levelOf = (r, x, z) => ground.levelAt(x, z, r.over || r.bridge ? 1e9 : surface.height(x, z) + LANE.hintLift);
+  // the level of a lane: on its ground (a way that is no bridge), else the highest deck - or with `follow` (collide14) the deck at the level carried along the lane
+  // from its start, every LANE_FOLLOW_STEP, as the wheels follow it: "the highest" put the lane of the lower turn of the Buchler car park spiral (way 14883, on the
+  // ground at 283 m) onto the top of deck 59 at 292 m over it, and the parapet there yielded to a lane 9 m under it (harness V3: the car fell 7 m)
+  let hint = null;
+  const levelOf = (r, x, z) => {
+    if (!(r.over || r.bridge)) return ground.levelAt(x, z, surface.height(x, z) + LANE.hintLift);
+    if (!follow) return ground.levelAt(x, z, 1e9);
+    hint = ground.levelAt(x, z, hint === null ? 1e9 : hint + LANE.hintLift);
+    return hint;
+  };
   const add = (r, ax, az, bx, bz) => {
     const l = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(l / LANE_PIECE));
+    const carried = follow && !!(r.over || r.bridge);
     for (let k = 0; k < n; k++) {
       const x0 = ax + ((bx - ax) * k) / n, z0 = az + ((bz - az) * k) / n, x1 = ax + ((bx - ax) * (k + 1)) / n, z1 = az + ((bz - az) * (k + 1)) / n;
+      if (carried) {
+        // (the level is carried over every piece, also the ones left out: the next one starts at the level this one ends at)
+        const ay = levelOf(r, x0, z0), m = Math.max(1, Math.ceil(l / n / LANE_FOLLOW_STEP));
+        for (let j = 1; j < m; j++) levelOf(r, x0 + ((x1 - x0) * j) / m, z0 + ((z1 - z0) * j) / m);
+        const by = levelOf(r, x1, z1);
+        if (within && !within(x0, z0) && !within(x1, z1)) continue;
+        push({ ax: x0, az: z0, ay, at: surface.height(x0, z0), bx: x1, bz: z1, by, bt: surface.height(x1, z1), road: r.id });
+        continue;
+      }
       if (within && !within(x0, z0) && !within(x1, z1)) continue;
       // (at, bt: the terrain under the ends - a lane on a deck over a wall rides over it, wall-collider.js aboveOnDeck)
-      const p = { ax: x0, az: z0, ay: levelOf(r, x0, z0), at: surface.height(x0, z0), bx: x1, bz: z1, by: levelOf(r, x1, z1), bt: surface.height(x1, z1), road: r.id };
-      const i = pieces.length;
-      pieces.push(p);
-      for (let cx = Math.floor(Math.min(x0, x1) / LANE_CELL); cx <= Math.floor(Math.max(x0, x1) / LANE_CELL); cx++) {
-        for (let cz = Math.floor(Math.min(z0, z1) / LANE_CELL); cz <= Math.floor(Math.max(z0, z1) / LANE_CELL); cz++) {
-          const k2 = key(cx, cz), c = cells.get(k2);
-          if (c) c.push(i); else cells.set(k2, [i]);
-        }
-      }
+      push({ ax: x0, az: z0, ay: levelOf(r, x0, z0), at: surface.height(x0, z0), bx: x1, bz: z1, by: levelOf(r, x1, z1), bt: surface.height(x1, z1), road: r.id });
     }
   };
+  /** A piece into the list and the hash. */
+  function push(p) {
+    const i = pieces.length;
+    pieces.push(p);
+    for (let cx = Math.floor(Math.min(p.ax, p.bx) / LANE_CELL); cx <= Math.floor(Math.max(p.ax, p.bx) / LANE_CELL); cx++) {
+      for (let cz = Math.floor(Math.min(p.az, p.bz) / LANE_CELL); cz <= Math.floor(Math.max(p.az, p.bz) / LANE_CELL); cz++) {
+        const k2 = key(cx, cz), c = cells.get(k2);
+        if (c) c.push(i); else cells.set(k2, [i]);
+      }
+    }
+  }
   for (const r of list) {
     const P = r.pts;
     for (const off of laneOffsets(r)) {
       let prev = null;
+      hint = null;
       for (let i = 0; i + 1 < P.length; i++) {
         const [ax, az] = P[i], [bx, bz] = P[i + 1], l = Math.hypot(bx - ax, bz - az);
         if (l < 0.05) continue;
