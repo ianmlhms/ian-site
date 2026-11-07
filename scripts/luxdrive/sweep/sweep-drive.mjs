@@ -72,6 +72,7 @@ async function main() {
   if (only) {   // rebuilds the markdown from a finished sweep-drive.json (the events are in it)
     const j = JSON.parse(fs.readFileSync(only, 'utf8'));
     const r = buildReport({ events: j.events, totals: j.totals, wall: j.wallSeconds, workers: j.workers, meta: null, speeds: j.speeds });
+    fs.writeFileSync(only, JSON.stringify({ ...r.json, wallSeconds: j.wallSeconds, workers: j.workers }));
     fs.writeFileSync(only.replace(/\.json$/, '.md'), r.md);
     console.log(`[sweep-drive] report rebuilt: ${only.replace(/\.json$/, '.md')}`);
     return;
@@ -141,7 +142,8 @@ async function main() {
 
 /** Groups the events into places (greedy by score, CLUSTER_M) and writes the worst-list. */
 export function buildReport({ events, totals, wall, workers, meta, speeds }) {
-  const scored = events.filter((e) => e.type !== 'error').map((e) => ({ ...e, score: score(e) })).sort((a, b) => b.score - a.score);
+  // (offroad is judged on the ground road network under the car: on a deck or in a tube that network is not under the wheels, so those are no findings)
+  const scored = events.filter((e) => e.type !== 'error' && !(e.type === 'offroad' && (e.bridge || e.tunnel))).map((e) => ({ ...e, score: score(e) })).sort((a, b) => b.score - a.score);
   const grid = new Map(), places = [];
   const key = (x, z) => `${Math.floor(x / CLUSTER_M)},${Math.floor(z / CLUSTER_M)}`;
   for (const e of scored) {
