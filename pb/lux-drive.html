@@ -13,20 +13,19 @@
 </head>
 <body>
 <main id="shell">
-  <canvas id="luxCanvas" tabindex="0" role="img" aria-label="Driving through Luxembourg City: a chase view of a car on the roads."></canvas>
+  <canvas id="luxCanvas" tabindex="0" role="img" aria-label="Fuere mam Auto duerch Lëtzebuerg-Stad: Usiicht vun hannert dem Auto."></canvas>
 </main>
 <script>
 /* The loading screen: honest progress (main.js calls set(p, label) between its real steps). */
 (function () {
   var STR = {
-    lb: { code: 'Luxemburg gëtt gelueden …', slow: 'Dauert méi laang wéi gewinnt …', retry: 'Nei probéieren' },
+    lb: { code: 'Lëtzebuerg gëtt gelueden …', slow: 'Dauert méi laang wéi gewinnt …', retry: 'Nei probéieren', error: 'D\'Spill konnt net gelueden ginn. Kontrolléier d\'Verbindung.' },
     de: { code: 'Luxemburg wird geladen …', slow: 'Dauert länger als sonst …', retry: 'Nochmal versuchen' },
     en: { code: 'Loading Luxembourg …', slow: 'Taking longer than usual …', retry: 'Try again' },
     fr: { code: 'Chargement du Luxembourg …', slow: 'Cela prend plus de temps que d’habitude …', retry: 'Réessayer' }
   };
-  var lang = "lb";
-  try { var own = localStorage.getItem("pb_luxdrive_lang"), site = localStorage.getItem("site_lang"); lang = STR[own] ? own : STR[site] ? site : "lb"; } catch (e) { /* the storage is blocked */ }
-  var T = STR[lang];
+  // Luxembourgish only (Ian, 6 Nov 2026): a stored or browser language is ignored; the other tables stay.
+  var T = STR.lb;
   var loadBox = document.createElement("div");
   loadBox.id = "loading";
   loadBox.innerHTML = '<div class="loadBox"><h1>Lux Drive</h1><p id="loadLabel"></p><div class="bar"><div id="loadBar"></div></div></div>';
@@ -46,14 +45,14 @@
 window.addEventListener("error", function (event) { document.documentElement.dataset.bootError = event.message || "script-error"; });
 if (!window.THREE) {
   document.documentElement.dataset.bootError = "three-missing";
-  if (window.__luxLoad) window.__luxLoad.fail("three.js r160 failed to load");
+  if (window.__luxLoad) window.__luxLoad.fail("D'Spill konnt net gelueden ginn. Kontrolléier d'Verbindung.");
   throw new Error("three.js r160 failed to load");
 }
 </script>
 <script src="/pb/boot-probe.js?v=1"></script>
 <script type="module">
   // The imports are absolute: inside the arcade this page runs as a srcdoc iframe (the relative URLs of main.js would come from import.meta.url).
-  if (window.bootProbe) window.bootProbe("/pb/lux-drive/main.js?v=69", window.__luxLoad); else import("/pb/lux-drive/main.js?v=69");
+  if (window.bootProbe) window.bootProbe("/pb/lux-drive/main.js?v=70", window.__luxLoad); else import("/pb/lux-drive/main.js?v=70");
 </script>
 </body>
 </html>

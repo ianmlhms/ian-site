@@ -60,12 +60,11 @@ import { createBasemap } from './basemap.js';
 import { placeClear } from './placement.js';
 import { createQualityStepper } from './quality-step.js';
 import { roadDirectionAt } from './roads.js';
-import { t, LANGS } from './i18n.js';
+import { t } from './i18n.js';
 
 const BUILT_DRAW_FACTOR = 1.5;        // bridge decks and tunnel portals are drawn out to this many times the far building radius
 const DECK_MARK_RADIUS = 700;         // m: the lane lines on the bridge decks are drawn out to this distance (a 15 cm line is far below a pixel beyond)
 const MAX_FRAME_S = 0.1;              // s: a long frame (a tab in the background) never jumps the car
-const LANG_KEY = 'pb_luxdrive_lang';
 const QUALITY_KEY = 'pb_luxdrive_quality';
 const COLOUR_KEY = 'pb_luxdrive_colour';
 const SOUND_KEY = 'pb_luxdrive_sound';       // 'off' = muted
@@ -90,11 +89,8 @@ function autoQuality() {
   return weak ? 'medium' : 'high';
 }
 
+// Luxembourgish only (Ian, 6 Nov 2026): no language chips, a stored or browser language is ignored; i18n.js keeps de / en / fr.
 function pickLang() {
-  const own = readKey(LANG_KEY);
-  if (LANGS.includes(own)) return own;
-  const site = readKey('site_lang');
-  if (LANGS.includes(site)) return site;
   return 'lb';
 }
 
@@ -305,7 +301,6 @@ async function boot() {
       case 'time': chooseTime(id); break;
       case 'sound': { const off = id === 'off'; writeKey(SOUND_KEY, off ? 'off' : 'on'); sound.setMuted(off); ui.setValue('sound', off ? 'off' : 'on'); break; }
       case 'colour': if (CAR_COLOURS[id]) { writeKey(COLOUR_KEY, id); model.setColour(id); } break;
-      case 'language': changeLanguage(id); break;
       case 'quality': chooseQuality(id); break;
       case 'fullscreen': toggleFullscreen(); break;
       default: break;
@@ -360,14 +355,6 @@ async function boot() {
     ui.setValue('time', next);
     const now = env.getChoice().timeId;
     ui.setToast(`${tr('hud.timeOfDay')}: ${label('time', next)}${next === 'random' ? ` (${tr(`time.${now}`)})` : ''}`);
-  }
-  function changeLanguage(next) {
-    if (!next || !LANGS.includes(next)) return;
-    lang = next;
-    writeKey(LANG_KEY, next);
-    ui.setLanguage(next);
-    input.setLabels(touchLabels());
-    showRoad = '\u0000';                      // the road name is written again in the frame
   }
   /** The player's choice becomes the ceiling of the auto-step. 'auto' = the quality picked for this device. */
   function chooseQuality(id) {
@@ -606,5 +593,5 @@ boot().catch((error) => {
   console.error('[luxdrive]', error);
   document.documentElement.dataset.bootError = error.message || 'boot failed';
   const loader = window.__luxLoad;
-  if (loader) loader.fail(error.message || String(error));
+  if (loader) loader.fail(t('lb', 'load.error'));        // the technical message stays in data-boot-error and the console
 });

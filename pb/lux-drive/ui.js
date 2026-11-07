@@ -5,7 +5,7 @@
  * `onAction(action, value)` so that the game loop stays in charge of the state.  Weather and time of day are chosen with
  * chips; "Random" comes first and is the default (Ian's rule: always customisable, random by default).
  * The language changes live (no reload). */
-import { t, LANG_NAMES, LANGS } from './i18n.js';
+import { t } from './i18n.js';
 import { TIME_PRESETS, WEATHER_IDS } from './env.js';
 import { CAR_COLOURS, CAR_COLOUR_IDS } from './config.js';
 
@@ -24,7 +24,6 @@ const chip = (group, value, icon, key) =>
 const chipRow = (group, ids, iconOf, keyOf) => ids.map((id) => chip(group, id, iconOf(id), keyOf(id))).join('');
 const weatherChips = (g) => chipRow(g, ['random', ...WEATHER_IDS], (id) => WEATHER_ICON[id], (id) => `weather.${id}`);
 const timeChips = (g) => chipRow(g, ['random', ...TIME_IDS], (id) => TIME_ICON[id], (id) => `time.${id}`);
-const langChips = (g) => LANGS.map((l) => `<button type="button" class="chip" data-group="${g}" data-value="${l}" aria-pressed="false"><span class="lbl">${LANG_NAMES[l]}</span></button>`).join('');
 const qualityChips = (g) => chipRow(g, QUALITY_IDS, () => '', (id) => (id === 'auto' ? 'set.auto' : `quality.${id}`));
 const soundChips = (g) => chip(g, 'on', '🔊', 'set.on') + chip(g, 'off', '🔇', 'set.off');
 const cameraChips = (g) => chipRow(g, CAMERA_IDS, (id) => CAMERA_ICON[id], (id) => `cam.${id}`);
@@ -61,7 +60,6 @@ export function createUI({ root, lang = 'lb', onAction = () => {} }) {
       <div class="box wide">
         <div class="head"><h1>Lux Drive</h1><p class="tagline" data-i18n="start.tagline"></p></div>
         <div class="grid">
-          <section><h3 data-i18n="set.language"></h3><div class="chips">${langChips('lang')}</div></section>
           <section><h3 data-i18n="set.weather"></h3><div class="chips">${weatherChips('weather')}</div></section>
           <section><h3 data-i18n="set.time"></h3><div class="chips">${timeChips('time')}</div></section>
           <section><h3 data-i18n="set.quality"></h3><div class="chips">${qualityChips('quality')}</div></section>
@@ -89,7 +87,6 @@ export function createUI({ root, lang = 'lb', onAction = () => {} }) {
       <div class="box wide">
         <h2 data-i18n="menu.settings"></h2>
         <div class="grid">
-          <section><h3 data-i18n="set.language"></h3><div class="chips">${langChips('lang')}</div></section>
           <section><h3 data-i18n="set.quality"></h3><div class="chips">${qualityChips('quality')}</div></section>
           <section><h3 data-i18n="set.weather"></h3><div class="chips">${weatherChips('weather')}</div></section>
           <section><h3 data-i18n="set.time"></h3><div class="chips">${timeChips('time')}</div></section>
@@ -113,7 +110,7 @@ export function createUI({ root, lang = 'lb', onAction = () => {} }) {
 
     <div id="mapOverlay" hidden>
       <canvas id="mapCanvas" aria-label="Kaart"></canvas>
-      <div class="mapBar"><b data-i18n="map.title"></b><span data-i18n="map.hint"></span><button type="button" class="hbtn" data-act="closeMap" aria-label="Close">✕</button></div>
+      <div class="mapBar"><b data-i18n="map.title"></b><span data-i18n="map.hint"></span><button type="button" class="hbtn" data-act="closeMap" aria-label="Zoumaachen">✕</button></div>
       <div class="mapZoom"><button type="button" class="hbtn" data-zoom="in" aria-label="+">＋</button><button type="button" class="hbtn" data-zoom="out" aria-label="−">－</button></div>
     </div>
 
