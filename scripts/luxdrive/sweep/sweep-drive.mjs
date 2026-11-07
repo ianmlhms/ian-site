@@ -35,8 +35,8 @@ async function work() {
   const world = await loadWorld();
   const car = newCar(world);
   const byId = new Map(world.roads.map((r) => [r.id, r]));
-  // worker 0 also tells the main thread which roads there are (the main thread never loads the world: 0.6 GB less)
-  parentPort.postMessage({ ready: true, roads: workerData.index === 0 ? world.roads.map((r) => ({ id: r.id, length: r.length, kind: r.kind, bbox: r.pts.reduce((b, p) => [Math.min(b[0], p[0]), Math.min(b[1], p[1]), Math.max(b[2], p[0]), Math.max(b[3], p[1])], [1e9, 1e9, -1e9, -1e9]) })) : null });
+  // worker 0 also tells the main thread which roads there are (only the ones that touch the play area: the rest of the baked world is backdrop) (the main thread never loads the world: 0.6 GB less)
+  parentPort.postMessage({ ready: true, roads: workerData.index === 0 ? world.roads.filter((r) => r.pts.some((p) => world.playArea.inside(p[0], p[1]))).map((r) => ({ id: r.id, length: r.length, kind: r.kind, bbox: r.pts.reduce((b, p) => [Math.min(b[0], p[0]), Math.min(b[1], p[1]), Math.max(b[2], p[0]), Math.max(b[3], p[1])], [1e9, 1e9, -1e9, -1e9]) })) : null });
   parentPort.on('message', (msg) => {
     if (msg.stop) { process.exit(0); }
     const out = { batch: msg.batch, ids: msg.ids, events: [], km: 0, runs: 0, lanes: 0, roads: 0, ms: 0 };
