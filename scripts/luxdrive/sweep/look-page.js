@@ -169,7 +169,7 @@ window.__sweep = (() => {
         if (hit && (!best || hit.pen > best.pen)) best = { pen: hit.pen, id: hit.id, off, x: x + cy * o, z: z + sy * o, y: lvl };
       }
     }
-    return best && best.pen >= T_.objectPen ? best : null;
+    return best && best.pen >= T_.objectPen && best.pen <= 2 ? best : null;     // (a penetration over a body diameter is the edge of the play area, not a thing in the lane)
   }
 
   /** A labelled JPEG of the current view (normal sky), the flag circled.  Returns a data URL. */
@@ -202,11 +202,15 @@ window.__sweep = (() => {
       land(p, v.head);
       m.setCamera(v.cam);
       await new Promise((r) => requestAnimationFrame(r));
+      // the terrain follows the camera (its LOD tiles are picked around it): build what the new pose asks for before the picture is judged (as luxdrive_holes.mjs)
+      for (let k = 0; k < 800; k++) { m.terrain.update(v.cam.x, v.cam.z); if (m.terrain.stats.pending === 0 && k >= 3) break; }
+      for (let k = 0; k < 20 && m.stats().cityPending > 0; k++) await new Promise((r) => requestAnimationFrame(r));
+      await new Promise((r) => requestAnimationFrame(r));
       const flags = detect(p, v);
       frames++;
       if (obj && v.name === 'chase-fwd') {
         const pix = project(obj.x, obj.y + 0.5, obj.z);
-        flags.push({ type: 'object', score: 2 + obj.pen / 0.2, at: pix, detail: `solid #${obj.id} in lane ${obj.off} (pen ${obj.pen.toFixed(2)} m)` });
+        flags.push({ type: 'object', score: 2 + obj.pen / 0.2, at: pix, detail: `something solid in lane ${obj.off} (pen ${obj.pen.toFixed(2)} m at ${Math.round(obj.x)}, ${Math.round(obj.z)})` });
       }
       for (const f of flags) {
         const rec = { type: f.type, view: v.name, score: +f.score.toFixed(2), detail: f.detail, at: f.at };
