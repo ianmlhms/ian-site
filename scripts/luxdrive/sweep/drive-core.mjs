@@ -15,23 +15,33 @@ export const LIMITS = Object.freeze({
 });
 const JOLT_W = 3;               // frames: half window
 const PROBE_EVERY = 0.5;        // m of travel between two collider probes
+const HEADING_SPAN = 2.5;       // m
 const END_CLEAR = 4;            // m: events this near an end of the way are junction / dead-end noise, not judged
 const MERGE = 6;                // m: events of one kind closer than this along one run are one event
 
-/** Offsets one polyline sideways by `off` (m, to the left as laneOffsets: x - dz * off, z + dx * off), miter-joined (limited). */
+/** Offsets one polyline sideways by `off` (m, to the left as laneOffsets: x - dz * off, z + dx * off).  Inside a bend the two offset segments are joined at their
+ *  crossing (miter, limited); outside a bend the lane sweeps round the vertex on an arc of radius |off| (a sharp miter point would leave the carriageway there). */
 export function offsetLine(pts, off) {
   const out = [];
+  const normal = (a, b) => { const l = Math.hypot(b[0] - a[0], b[1] - a[1]); return l > 1e-6 ? [-(b[1] - a[1]) / l, (b[0] - a[0]) / l, (b[0] - a[0]) / l, (b[1] - a[1]) / l] : null; };
   for (let i = 0; i < pts.length; i++) {
-    const a = pts[Math.max(0, i - 1)], b = pts[i], c = pts[Math.min(pts.length - 1, i + 1)];
-    let n1x = 0, n1z = 0, n2x = 0, n2z = 0;
-    const l1 = Math.hypot(b[0] - a[0], b[1] - a[1]), l2 = Math.hypot(c[0] - b[0], c[1] - b[1]);
-    if (l1 > 1e-6) { n1x = -(b[1] - a[1]) / l1; n1z = (b[0] - a[0]) / l1; }
-    if (l2 > 1e-6) { n2x = -(c[1] - b[1]) / l2; n2z = (c[0] - b[0]) / l2; }
-    let nx = n1x + n2x, nz = n1z + n2z;
-    const nl = Math.hypot(nx, nz);
-    if (nl < 1e-6) { nx = n1x || n2x; nz = n1z || n2z; } else { nx /= nl; nz /= nl; }
-    const cos = Math.max(0.6, nx * (n1x || n2x) + nz * (n1z || n2z));
-    out.push([b[0] + nx * off / cos, b[1] + nz * off / cos]);
+    const n1 = i > 0 ? normal(pts[i - 1], pts[i]) : null, n2 = i + 1 < pts.length ? normal(pts[i], pts[i + 1]) : null;
+    const v = pts[i];
+    if (!n1 || !n2) { const n = n1 || n2; if (n) out.push([v[0] + n[0] * off, v[1] + n[1] * off]); continue; }
+    const cross = n1[2] * n2[3] - n1[3] * n2[2];                 // > 0: the path turns toward +normal
+    const dot = n1[0] * n2[0] + n1[1] * n2[1];
+    if (cross * off > 0) {                                        // inside the bend: the crossing of the two offset segments
+      let nx = n1[0] + n2[0], nz = n1[1] + n2[1];
+      const nl = Math.hypot(nx, nz) || 1; nx /= nl; nz /= nl;
+      const cos = Math.max(0.5, nx * n1[0] + nz * n1[1]);
+      out.push([v[0] + nx * off / cos, v[1] + nz * off / cos]);
+    } else {                                                      // outside: an arc from the first normal to the second
+      const ang = Math.acos(Math.max(-1, Math.min(1, dot))), steps = Math.max(1, Math.ceil(ang / (Math.PI / 12)));
+      const a1 = Math.atan2(n1[1], n1[0]);
+      let da = Math.atan2(n2[1], n2[0]) - a1;
+      while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
+      for (let k = 0; k <= steps; k++) { const a = a1 + da * k / steps; out.push([v[0] + Math.cos(a) * off, v[1] + Math.sin(a) * off]); }
+    }
   }
   return out;
 }
@@ -69,11 +79,16 @@ export function driveLane({ world, car, road, line, speed }) {
   for (let i = 0; i + 1 < pts.length; i++) { const l = Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]); seg.push(l); cum.push(cum[i] + l); }
   const total = cum[cum.length - 1];
   const st = car.state;
-  let i = 0;
+  const xzAt = (s) => {
+    let lo = 0, hi = seg.length - 1;
+    while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (cum[mid] <= s) lo = mid; else hi = mid - 1; }
+    const f = Math.max(0, Math.min(1, (s - cum[lo]) / (seg[lo] || 1))), a = pts[lo], b = pts[lo + 1];
+    return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
+  };
+  // the heading is the chord over +-HEADING_SPAN m: a real car does not turn on the spot at the vertex of a polyline (the lane of a bend would jolt on the heading alone)
   const poseAt = (s) => {
-    while (i < seg.length - 1 && cum[i] + seg[i] < s) i++;
-    const f = Math.min(1, (s - cum[i]) / (seg[i] || 1)), a = pts[i], b = pts[i + 1];
-    return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, Math.atan2(b[1] - a[1], b[0] - a[0])];
+    const [x, z] = xzAt(s), a = xzAt(Math.max(0, s - HEADING_SPAN)), b = xzAt(Math.min(total, s + HEADING_SPAN));
+    return [x, z, Math.atan2(b[1] - a[1], b[0] - a[0])];
   };
   const [x0, z0, h0] = poseAt(0);
   ground.hint(startHint({ road, x: x0, z: z0, world }));
