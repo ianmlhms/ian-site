@@ -33,6 +33,9 @@ export const JUNCTION_SURFACE = Object.freeze({
   cell: 24,            // m: the spatial hash of the planes
   goodFit: 0.10,       // m: a plane whose weighted rms distance from the beds it was fitted to is below this counts fully ...
   poorFit: 0.30,       // m: ... and one above this not at all
+  refNear: 1.0,        // m: sampled for a way at a level (sample's ref), a plane whose level at the point lies within this of it counts fully ...
+  refFar: 2.0,         // ... and one this far off not at all (tunnels18: the planes of a junction 7 m over a tunnel mouth were blended into the sheet of the
+                       // approach road under it - a 15 cm hump 7 m out of the Rue du Grünewald tube, where the blended level crossed the carve's SEP window)
 });
 
 /** Solves the symmetric 3 x 3 system A x = b (row-major array of 9).  Returns [x0, x1, x2] or null when singular. */
@@ -179,8 +182,10 @@ export function createJunctionSurface(chains, skip, hwOf, opts = JUNCTION_SURFAC
   const reach = opts.sigma * opts.cutoff, reach2 = reach * reach, s2 = 2 * opts.sigma * opts.sigma;
   const span = Math.ceil(reach / C);
 
-  /** The junction sheet at (x, z): out.level and out.weight (0: no junction near). */
-  function sample(x, z, out) {
+  /** The junction sheet at (x, z): out.level and out.weight (0: no junction near).  ref (optional): the level of the way asking - the planes of a junction at
+   *  another level (a street over a tunnel, a flyover) are left out (opts.refNear .. refFar). */
+  function sample(x, z, out, ref = NaN) {
+    const gated = Number.isFinite(ref);
     let wSum = 0, hSum = 0;
     const cx = Math.floor(x / C), cz = Math.floor(z / C);
     for (let dz = -span; dz <= span; dz++) {
@@ -192,8 +197,9 @@ export function createJunctionSurface(chains, skip, hwOf, opts = JUNCTION_SURFAC
           const ex = x - PX[p], ez = z - PZ[p];
           const d2 = ex * ex + ez * ez;
           if (d2 > reach2) continue;
-          const w = Q[p] * Math.exp(-d2 / s2);
-          wSum += w; hSum += w * (H0[p] + GX[p] * ex + GZ[p] * ez);
+          const h = H0[p] + GX[p] * ex + GZ[p] * ez;
+          const w = Q[p] * Math.exp(-d2 / s2) * (gated ? 1 - smoothstep(opts.refNear, opts.refFar, Math.abs(h - ref)) : 1);
+          wSum += w; hSum += w * h;
         }
       }
     }

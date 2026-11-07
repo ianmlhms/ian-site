@@ -101,6 +101,7 @@ const FACE_JOIN = 0.4;                 // m: the pinned surface runs from the be
 const JUNCTION_LEVEL = 0.6;            // m: two ways meet at a junction when their beds differ by less than this where they meet (more: one is over the other)
 const CLOSED_MIN_SAMPLES = 6;          // a ring has at least this many samples (a way shorter than 20 m that ends where it starts is a stub)
 const BRIDGE_JOIN = 8.0;               // m: a street whose end lies this close to the end of a bridge (or a tunnel) runs onto it
+const NODE_EPS = 1e-6;                 // (the parameter of a crossing at the very end of a segment: the shared node of two ways)
 const END_JOIN = 3.0;                  // m: the ends of ways this close to one another meet at one node
 const JUNCTION_TOUCH = 0.6;           // m: a way whose centre line lies within the pavement (+ this) of another way runs into it: the apron of the junction is the level of that way
 export const GARAGE_RAMP_MAX = 40.0;          // m: a service way at most this long that dives into a tunnel (a garage ramp, ~60 in the city) is not a road of the game: it is neither carved nor painted, and
@@ -389,6 +390,12 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   const overRoads = new Set();
   const crossings = [];            // the crossings of two ways where one of them rides over the other
   const crossingKeys = new Set();
+  /**
+   * Does the end k of a chain lead to a tunnel (its OTHER end is a tunnel mouth)?  (tunnels18) Such a way is designed on its own with its tunnel end held to the
+   * hillside over the portal (road-bed.js TIGHT_END_WEIGHT); a short one (Rangwee 16842, 26 m from Bd de Kyiv to the tube) was tilted by it 2.2 m under the junction
+   * at its other end, so the junction took it for a way passing under, left it unpinned and the carve dropped 1.1 m in 5 m between the junction and the bed.
+   */
+  const leadsToTunnel = (chain, k) => !!chain.ends && (k === 0 ? chain.ends.end : k === chain.x.length - 1 ? chain.ends.start : null) === 'tunnel';
 
   /** Where the segment AB crosses the segment CD: the parameters t (on AB) and u (on CD), or null. */
   function crossing(ax, az, bx, bz, cx, cz, dx, dz) {
@@ -440,6 +447,10 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
               if (!hit) continue;
               const bedA = chain.bed[i - 1] + (chain.bed[i] - chain.bed[i - 1]) * hit[0];
               const bedB = other.bed[j - 1] + (other.bed[j] - other.bed[j - 1]) * hit[1];
+              // (the node where two ways END together is a junction, not a crossing, when the lower one leads to a tunnel: its own design sank it there, see leadsToTunnel)
+              const endA = hit[0] <= NODE_EPS && i === 1 ? 0 : hit[0] >= 1 - NODE_EPS && i === chain.x.length - 1 ? i : -1;
+              const endB = hit[1] <= NODE_EPS && j === 1 ? 0 : hit[1] >= 1 - NODE_EPS && j === other.x.length - 1 ? j : -1;
+              if (endA >= 0 && endB >= 0 && (bedA < bedB ? leadsToTunnel(chain, endA) : leadsToTunnel(other, endB))) continue;
               if (bedA > bedB + OVER_LEVEL) overRoads.add(chain.road);
               else if (bedB > bedA + OVER_LEVEL) overRoads.add(other.road);
               else continue;
@@ -538,9 +549,14 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
       const hs = members.map((m) => m.h).sort((a, b) => a - b);
       const mid = hs[hs.length >> 1];
       const same = members.filter((m) => Math.abs(m.h - mid) <= JUNCTION_LEVEL);       // the way at another level rides over or under
-      if (same.length < 2) continue;
-      const mean = same.reduce((sum, m) => sum + m.h, 0) / same.length;
-      for (const m of same) pinOf(m.chain).set(m.k, mean);
+      // (tunnels18: a way that leads to a tunnel is at the level of the node it starts from, whatever its own design gave it - see leadsToTunnel.  The level is
+      // the others' then: at Rangwee 15992 / 16815 the two ends of one street met 1.54 m apart and neither was pinned)
+      const led = members.filter((m) => !same.includes(m) && leadsToTunnel(m.chain, m.k));
+      const rest = members.filter((m) => !leadsToTunnel(m.chain, m.k));
+      const level = same.length >= 2 ? same : led.length && rest.length ? rest.filter((m) => Math.abs(m.h - rest[rest.length >> 1].h) <= JUNCTION_LEVEL) : null;
+      if (!level || !level.length) continue;
+      const mean = level.reduce((sum, m) => sum + m.h, 0) / level.length;
+      for (const m of new Set([...level, ...same.length >= 2 ? same : [], ...led])) pinOf(m.chain).set(m.k, mean);
     }
     // ---- 2. the ways that run into the carriageway of a way designed before them
     const order = chains.slice().sort((a, b) => b.rank - a.rank || b.x.length - a.x.length || a.road - b.road);
@@ -1655,7 +1671,11 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     }
     // The junction sheet: where ways meet at one level the carriageways (and the gaps of up to 2 x SHEET_GAP_HOLD between them) lie on one smooth surface, not on the layered beds.
     // A way at another level (a ramp beside the junction) keeps its own surface: the sheet lets go of its bench.
-    junctionSheet.sample(x, z, sheet);
+    // (asked for the level of the carriageway the point is on or nearest to: the planes of a junction at another level - the streets over a tunnel mouth - are not
+    // this junction's sheet, see junction-surface.js refNear)
+    let sheetRef = NaN, refEdge = Infinity;
+    for (let sl = 0; sl < nSlots; sl++) if (wayEdge[sl] < refEdge) { refEdge = wayEdge[sl]; sheetRef = wayBed[sl]; }
+    junctionSheet.sample(x, z, sheet, sheetRef);
     if (sheet.weight > 1e-3) {
       let inBench = 0, between = 0, apart = 0, meet1 = 0, meet2 = 0;
       for (let sl = 0; sl < nSlots; sl++) {
@@ -1696,7 +1716,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
         }
         const off = wayDist[own];
         if (iso > 0 && off > 1e-3) {
-          junctionSheet.sample(x - wayDirX[own] * off, z - wayDirZ[own] * off, sheetFoot);
+          junctionSheet.sample(x - wayDirX[own] * off, z - wayDirZ[own] * off, sheetFoot, wayBed[own]);
           // (no plane reaches the foot: its own bed is the reference; the planes' level takes over as their weight grows)
           const ref = wayBed[own] + (sheetFoot.level - wayBed[own]) * smoothstep(0, SHEET_FOOT_WEIGHT, sheetFoot.weight);
           const lim = SHEET_CROSS_MAX * off, dv = sheet.level - ref;

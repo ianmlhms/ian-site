@@ -26,7 +26,11 @@ export function createChaseCamera(surface, collide = null) {
   const out = { x: 0, y: 0, z: 0, tx: 0, ty: 0, tz: 0, fov: CAMERA.fov, shake: 0, boom: CAMERA.followDistance };
 
   /** Reset (respawn / start): snap behind the car. */
-  function snap(state) { yaw = state.heading; height = null; boomShare = 1; }
+  function snap(state) {
+    const axis = surface.tubeHeading ? surface.tubeHeading(state.x, state.z) : NaN;
+    yaw = Number.isFinite(axis) ? (Math.cos(state.heading - axis) >= 0 ? axis : axis + Math.PI) : state.heading;
+    height = null; boomShare = 1;
+  }
 
   /**
    * state: { x, y, z, heading, vx, vz, vy, speed, roll, grounded }
@@ -34,8 +38,12 @@ export function createChaseCamera(surface, collide = null) {
    */
   function update(state, dt, mode = 0, time = 0) {
     if (yaw === null) yaw = state.heading;
-    // the camera follows the heading with a lag: the quicker the car turns, the quicker the camera swings round
-    let d = state.heading - yaw;
+    // the camera follows the heading with a lag: the quicker the car turns, the quicker the camera swings round.  In a tube it follows the tube's axis (the way
+    // the car faces along it): a car standing across the tube put the boom into the wall, the lens 3.6 m behind the car on its roof (QA5 TU05, tunnels18)
+    let heading = state.heading;
+    const axis = surface.tubeHeading ? surface.tubeHeading(state.x, state.z) : NaN;
+    if (Number.isFinite(axis)) heading = Math.cos(state.heading - axis) >= 0 ? axis : axis + Math.PI;
+    let d = heading - yaw;
     while (d > Math.PI) d -= 2 * Math.PI;
     while (d < -Math.PI) d += 2 * Math.PI;
     yaw += d * Math.min(1, dt * CAMERA.turnLag);

@@ -11,7 +11,9 @@ import { TUBE, exposedStretches, indexAt } from './tunnel-tubes.js';
 
 export const MASK_MAX = 40;               // segments in the shader
 const SEGMENT = 4;                        // m: the length of one mask segment
-const OVERLAP = 1.0;                      // m: a segment reaches this far on into its neighbour (the bends), never past a face
+const OVERLAP = 1.0;                      // m: a segment reaches this far on into its neighbour (the bends), never past a face ...
+const FACE_OVERLAP = 0.5;                 // ... except a trough's segment at the face, which reaches this far into the tube (under the headwall, TUBE.headDepth deep): ending
+                                          // square at the face on both sides, the two masks left a hair of terrain between them - a thin strip across the mouth (QA5 TU01)
 
 const MASK_GLSL = `
   uniform vec4 uTubeA[${MASK_MAX}]; uniform vec4 uTubeB[${MASK_MAX}]; uniform float uTubeN; uniform vec4 uTubeBox;
@@ -73,7 +75,9 @@ function troughSegments(tube) {
     if (s1 - s0 < 0.5) continue;
     for (let s = s0; s < s1 - 0.01; s += SEGMENT) {
       const e = Math.min(s1, s + SEGMENT);
-      const sa = s === s0 ? s : Math.max(s0, s - OVERLAP), se = e === s1 ? e : Math.min(s1, e + OVERLAP);
+      // (the face is s1 of trough A and s0 of trough B)
+      const atFace = s0 === tube.sB;
+      const sa = s === s0 ? (atFace ? s - FACE_OVERLAP : s) : Math.max(s0, s - OVERLAP), se = e === s1 ? (atFace ? e : e + FACE_OVERLAP) : Math.min(s1, e + OVERLAP);
       const at = (q) => {
         const i = indexAt(tube, q), f = Math.max(0, Math.min(1, (q - tube.s[i]) / Math.max(1e-6, tube.s[i + 1] - tube.s[i])));
         return [tube.x[i] + (tube.x[i + 1] - tube.x[i]) * f, tube.z[i] + (tube.z[i + 1] - tube.z[i]) * f, i];

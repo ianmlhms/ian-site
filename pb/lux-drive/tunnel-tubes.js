@@ -88,7 +88,10 @@ export const TROUGH = Object.freeze({
   quiet: 4,                // ... and the cut ends after this many metres of level land
   reach: 120,              // m: at most this far out of the face (the Rocade de Bonnevoie runs in a cut 3 - 6 m deep for more than 80 m)
   minLength: 6,            // m: a shorter cut gets no trough (the wings of the headwall hold it)
-  laneRoom: 0.3,           // m: the approach's carriageway keeps this much to each wall (a wider approach - René Konen north, 3 lanes - gets no trough)
+  laneRoom: 0.3,           // m: the approach's carriageway keeps this much to each wall ...
+  wideReach: 12,           // ... and an approach wider than that (René Konen north, 3 lanes into a 2-lane tube) gets a trough of at most this many metres: its outer lane ends
+                           // at the wall there, as it would in front of the face (tunnels18: without one, the face of the cut between it and the road beside it - 3.8 m higher -
+                           // stood across the outer lane in front of the face, and the chase camera saw a slab of terrain where the tube's wall should be)
   levelRoad: 1.5,          // m: another road beside the trough within this of the floor is a junction at its level: the trough ends before it
   parapet: 0.8,            // m: a wall stands this much over the land behind it (a parapet: nobody drives over the edge) ...
   parapetEnd: 0.3,         // ... and this much at the outer end of the trough ...
@@ -542,13 +545,14 @@ const sidePoint = (tube, i, lat) => [tube.x[i] - tube.tz[i] * lat, tube.z[i] + t
 function troughLength(tube, end, surface, roads) {
   const appId = end < 0 ? tube.approachA : tube.approachB;
   const app = roads[appId];
-  if (!app || app.width / 2 > Math.min(tube.innerL, tube.innerR) - TROUGH.laneRoom) return 0;
+  if (!app) return 0;
+  const reach = app.width / 2 > Math.min(tube.innerL, tube.innerR) - TROUGH.laneRoom ? TROUGH.wideReach : TROUGH.reach;
   const sFace = end < 0 ? tube.sA : tube.sB, n = tube.s.length;
   const own = new Set([appId, ...tube.ids]);
   const info = {};
   const plane = (i, lat) => tube.floor[i] + tube.cross[i] * lat;
   let len = 0, quiet = 0;
-  for (let k = 0.5; k <= TROUGH.reach; k += 1) {
+  for (let k = 0.5; k <= reach; k += 1) {
     const sq = sFace + end * k;
     if (sq < tube.s[0] + 1 || sq > tube.s[n - 1] - 1) break;
     const i = indexAt(tube, sq);
@@ -809,9 +813,10 @@ export function createTubeNetwork(tubes) {
       if (s >= tube.sA && s <= tube.sB) return L.floor;
       // in a trough: its floor (across its whole width: its walls hold the edges)
       if (s < tube.sA ? tube.troughA > 0 : tube.troughB > 0) return troughFloor(tube, L.i, L.f, L.lat, s);
-      // in front of a face: the surface blends into the floor
-      const side = 1 - smooth01((a - (innerOf(tube, L.lat) - 1.0)) / 1.0);
-      return g + (L.floor - g) * approachWeight(tube, s) * side;
+      // in front of a face: the surface blends into the floor (in the outer metre less: the edge of the approach - but fully at the face, where the floor takes
+      // over across its whole width: the wheels of a car 0.8 m from the wall stepped 3 cm there, 27 m/s2 at 20 m/s into Rangwee 16860, tunnels18)
+      const w = approachWeight(tube, s), side = 1 - smooth01((a - (innerOf(tube, L.lat) - 1.0)) / 1.0);
+      return g + (L.floor - g) * w * (1 - (1 - side) * (1 - w));
     }
     // over the tube: where its roof lies above the land (the hood of a portal), the roof carries the car
     if (s >= tube.sA && s <= tube.sB && a <= outerOf(tube, L.lat)) {
@@ -971,13 +976,16 @@ export function lampsOutsideShells(lamps, inShell) {
  * The retaining walls of the bake without the stretches inside a tube's shell or trough (new wall objects: a wall is cut where it enters one).  The trough's own
  * walls hold the cut there; a baked stone wall stood in front of the concrete at the Schuman underpass.
  */
-export function wallsOutsideShells(walls, inShell) {
+export function wallsOutsideShells(walls, inShell, roofAt = null) {
   const out = [];
   for (const wall of walls) {
     let run = [];
     const flush = () => { if (run.length >= 2) out.push({ ...wall, pts: run }); run = []; };
     for (const p of wall.pts) {
-      if (inShell(p.x, p.z, 0.3)) flush(); else run.push(p);
+      // (and the stretches whose foot lies under the roof of a tube - roofAt: tunnel network - wherever its land is: the bake saw the step between the Schuman
+      // approach and its twin as a ramp and stood a wall 1.6 m beside the axis INSIDE the mouth of tube 482, where the land over it is high; tunnels18, QA5 TU07)
+      const underRoof = roofAt && Number.isFinite(p.bottom) && p.bottom < roofAt(p.x, p.z);
+      if (inShell(p.x, p.z, 0.3) || underRoof) flush(); else run.push(p);
     }
     flush();
   }

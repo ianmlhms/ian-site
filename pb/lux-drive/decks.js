@@ -557,6 +557,7 @@ export function createGround(surface, deckNetwork, tubes = null) {
   let hintY = 1e9;
   const scratch = { top: 0, slope: 0, ux: 1, uz: 0, along: 0 };
   const withTubes = !!(tubes && tubes.count > 0);
+  const tubeLoc = {};
   /** The lattice / continuous ground under a car at y, with the tubes (and then the decks) on it. */
   const levelOf = (x, z, y, g0) => {
     const g = withTubes ? tubes.groundAt(x, z, y, g0) : g0;
@@ -603,6 +604,8 @@ export function createGround(surface, deckNetwork, tubes = null) {
     onDeck(x, z) { return !!deckNetwork && deckNetwork.count > 0 && deckNetwork.deckAt(x, z, hintY, scratch) !== null; },
     /** Is the car (its body at the hint) inside a tube? */
     inTube(x, z) { return withTubes && tubes.inside(x, z, hintY - DECK.hintLift); },
+    /** The heading of the axis of the tube the car is in (along s), NaN outside: the chase camera looks down the tube (tunnels18). */
+    tubeHeading(x, z) { return withTubes && tubes.inside(x, z, hintY - DECK.hintLift) && tubes.locate(x, z, tubeLoc) ? Math.atan2(tubeLoc.uz, tubeLoc.ux) : NaN; },
     /** The bank under a deck end for a car under the deck (y: the level of its wheels): see bankCollide. */
     bankCollide(x, z, radius, y) { return deckNetwork && deckNetwork.bankCollide ? deckNetwork.bankCollide(x, z, radius, y) : null; },
     surface, decks: deckNetwork ? deckNetwork.decks : [], tubes: withTubes ? tubes : null,

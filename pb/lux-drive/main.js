@@ -159,7 +159,7 @@ async function boot() {
   // no tree grows on a bridge or hangs its crown over a lane (the bridges as decks, with the full width of the landmark models)
   const treeDecks = createDeckNetwork([...ground.decks, ...landmarks.footprints]);
   const shells = tubeShells(tubes.tubes, (x, z) => surface.height(x, z));       // (nothing grows in the hood of a tunnel portal: tunnels16)
-  const bakedWalls = wallsOutsideShells(data.walls, shells.inShell);              // (the troughs of the tunnel approaches have walls of their own)
+  const bakedWalls = wallsOutsideShells(data.walls, shells.inShell, tubes.network.roofAt);              // (the troughs of the tunnel approaches have walls of their own)
   const bakedTrees = keepWaysClear(data.trees, { network: field.network, field, treeDecks, treeFree: landmarks.treeFree }).filter((t) => !shells.inShell(t.x, t.z, 1.5));
   const forest = createTreeIndex({ map: maps, field, network: field.network, buildings, trees: bakedTrees, clearings: [...landmarks.clearings, ...shells.clearings], treeDecks });
 
