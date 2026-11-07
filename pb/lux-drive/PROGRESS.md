@@ -2551,7 +2551,7 @@ measured; X4 also checks the troughs.
 
 ## Collide 14 (branch `lux-drive-collide14`, Mac mini): houses that could be entered, bridges that could be left (QA round 4) - DONE (all gates pass)
 
-Started from live v60 (c630a40c); merged lux-drive three times (walls13 v61, paint15 v63, houses17 roofs v66); main.js `?v=68`.  Round folder
+Started from live v60 (c630a40c); merged lux-drive four times (walls13 v61, paint15 v63, houses17 roofs v66, tunnels16 v67); main.js `?v=68`.  Round folder
 `~/Library/Caches/luxdrive-work/collide14/` (tools `tools/`: `vcheck.mjs` section V alone + T3, `edgedbg.mjs` one V3 run traced, `edge59.mjs` the edge samples of a deck as the
 barriers judge them, `whoyield.mjs` which way makes a piece yield, `t3bar.mjs` / `dlt.mjs` the T3 parapet pushes and deckLaneTouches traced, `v4one.mjs`, `v2list.mjs`,
 `barlater.mjs` / `barprof.mjs` the barrier build in Node, `barboot.mjs` the build in the browser, `drive.mjs` the QA bridge drives (TRACE=1), `scen.mjs` + `driveshot.mjs`
@@ -2589,8 +2589,15 @@ barriers judge them, `whoyield.mjs` which way makes a piece yield, `t3bar.mjs` /
 * Unchanged, not this round: deck 73 (b24 +2.47 m step, roll 1.2), deck 28 (+1.1 m), Pont Adolphe east (b02 roll 0.46 rad, -0.18 m), deck 204 (+-0.45 m), deck 157 (blocked by
   the area at the start), deck 109 (-0.86 m), deck 160 (+1.1 m), Pont Margot reverse (house 9249).
 
-### Gates (merged tree, v68)
-* harness GATE_HARNESS; world GATE_WORLD; holes GATE_HOLES; ui GATE_UI; webkit GATE_WEBKIT.
+* **Merge with tunnels16**: the car collider takes both the tubes and the late parapets (`car-collide.js`), main.js / harness / world_node build the widened decks and
+  the tubes.  The huge footprints in the index blocked 7 tunnel mouths (portalBlocked: "the house the mouth would be cut into") - Impasse Drosbach x5 under 11862, Rue du Fort
+  Thüngen x2 under the tower block 4808 - and harness P4's floor (> 50 portals) failed at 49: a huge footprint (`buildings.isHuge`) no longer blocks a mouth, portals 56 as on
+  lux-drive.
+
+### Gates (merged tree with tunnels16 + houses17, main.js ?v=68; logs `out/harness_5.txt`, `out/gate_*.txt`)
+* `node pb/lux-drive/harness.js`: **175 / 175 PASS** in one run (1719 s).  V1 0 free of 406646, V2 2 under / 0 blocked, V3 0 fell of 5356, V4 0 pairs, T3 13 (ratchet 13).
+* `luxdrive_world`: PASS, 89 ok (draw calls low 113 / medium 150 / high 210).  `luxdrive_holes`: **0** hole pixels over 132 poses (medium), **0** with HOLES_Q=low.
+* `luxdrive_ui`: PASS, 98 ok.  `luxdrive_webkit`: PASS, 22 ok.
 
 ### Montages (`~/Library/Caches/luxdrive-work/collide14/shots/montages/`, before above, after below, the car circled; the same start, 9 m/s straight at the edge)
 * `montage_pont_rouge_south.png` (v60 fell 5.5 m through the south side), `montage_a1_viaduct.png` (deck 42, fell 9.5 m), `montage_buchler_spiral.png` (deck 59, 5.1 m),
@@ -2600,5 +2607,6 @@ barriers judge them, `whoyield.mjs` which way makes a piece yield, `t3bar.mjs` /
 * The barriers are collision only: on generic decks the drawn parapet (deck-view.js) is where they stand, but where a piece MOVED out (up to 0.6 m) it stands past the drawn
   parapet's inner face, and where a piece yielded to a lane there is no solid parapet although one is drawn (the deck and its way disagree there).
 * For the first ~2 s after the boot (longer on an iPad) the parapets are not solid yet.
+* portalBlocked asks the first building hit: where a huge footprint and a house overlap at a mouth, the house is not seen (none found; the 7 mouths above have no house).
 * The Avenue John F. Kennedy bump at 6053,7854 (9 cm, 14.7 m/s2) exists on lux-drive too; only the sample saw it.
 * The decks' own bumps listed above (73, 28, Adolphe east, 204, 109, 160) are untouched.
