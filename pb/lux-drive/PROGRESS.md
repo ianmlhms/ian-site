@@ -2414,12 +2414,56 @@ M5 now p95 4.4 / worst 7.8 cm (v60 4.7 / 17.4).
   shots (`REPO=<worktree> node tools/run.mjs poses.json after` via browser-slot) - the montages in `paint15/montage/` predate the last blur / M-gate commit; rebuild them with
   `tools/montage.py before after montage <names>`; (3) final report.
 
-## Collide 14 (branch `lux-drive-collide14`, Mac mini): houses that could be entered, bridges that could be left (QA round 4) - WIP, PAUSED (usage limit)
+## Collide 14 (branch `lux-drive-collide14`, Mac mini): houses that could be entered, bridges that could be left (QA round 4) - DONE (all gates pass)
 
-Round folder `~/Library/Caches/luxdrive-work/collide14/` (tools `tools/`: vcheck.mjs = section V alone + T3 in Node, probe.mjs, edgedbg.mjs, t3dbg.mjs, lanes.mjs; live v60 snapshot `v60/`).
-Done so far: N4-C01 huge footprints hashed along their edges (buildings.js); N4-C02 a house reaches down to the lowest ground within the car's reach (V1 façade probes 541 free -> 0);
-N4-B01 Pont Rouge / Passerelle footways on their road's level (the LiDAR footway sagged 2 - 9.9 m: the root cause) + deck parapets solid where the edge falls away
-(deck-barriers.js, yielding to the lanes: V4 0, T3 back to 13); deck 142 widened to its way (widenToWays); deck-lanes.js shared lane model; harness section V.
-V3 (car steered at both edges of every car deck, 10 stations): v60 1545 of 5356 runs fall -> 19 before the deck 142 fix (re-run pending).
-Next: re-run vcheck V3,V4,T3 (deck 142 widened; deck 59 car park 1 fall left), full harness + all gates, item 4 (decks 73 / 28 / Adolphe east / 169 / 204 / 59 / 157 / 197
-via tools/drive.mjs on qa4/jobs/bridges.json, v60 vs now), main.js ?v=62, before/after montages, browser boot time of the barriers (~1.2 s in Node).
+Started from live v60 (c630a40c); merged lux-drive three times (walls13 v61, paint15 v63, houses17 roofs v66); main.js `?v=68`.  Round folder
+`~/Library/Caches/luxdrive-work/collide14/` (tools `tools/`: `vcheck.mjs` section V alone + T3, `edgedbg.mjs` one V3 run traced, `edge59.mjs` the edge samples of a deck as the
+barriers judge them, `whoyield.mjs` which way makes a piece yield, `t3bar.mjs` / `dlt.mjs` the T3 parapet pushes and deckLaneTouches traced, `v4one.mjs`, `v2list.mjs`,
+`barlater.mjs` / `barprof.mjs` the barrier build in Node, `barboot.mjs` the build in the browser, `drive.mjs` the QA bridge drives (TRACE=1), `scen.mjs` + `driveshot.mjs`
++ `montage.py` the montages, `gates.sh`; `v60/` the live snapshot; `out/` logs; `shots/montages/` the before / after montages).
+
+### Done (part 1, the first agent - see the WIP note it left)
+* N4-C01 the nine huge footprints (Kirchberg 1372, the tower block 4808, the Gare's platform roof 15153, ...) hashed along their edges (`buildings.js`).
+* N4-C02 a house reaches down to the lowest ground within the car's reach of its walls (V1 façade probes 541 free -> **0** of 406646).
+* N4-B01 the Pont Rouge / Passerelle footways on their road's level (the LiDAR footways sagged 2 - 9.9 m), deck parapets solid where the edge falls away (`deck-barriers.js`),
+  yielding to the lanes (`deck-lanes.js`: the lane model T3 drives), deck 142 widened to its way (`decks.js widenToWays`), harness section V.
+
+### Done (part 2)
+* **The lane level along a deck route** (`deck-barriers.js deckLaneTouches`): the level was asked only where a candidate was touched, so it kept the level of the route's
+  start - the approach of service deck 103 climbs 3 m onto it, the spiral of deck 59 9 m: the lane read the ground under the deck and the parapets at the deck ends stayed
+  in the lanes (T3 17 runs pushed, over its ratchet 13).  The level now follows the lane every 2 m.  T3 **13** (the old 13: deck 59 bank, 169 wall 42, 197 house 6763).
+* **Lanes of bridge ways at the level carried along them** (`lane-clearance.js` `follow` option, used by the barriers and harness V4 only - the wall bake and T1 / T2 keep
+  "the highest deck"): the lower turn of the Buchler car park spiral (way 14883, on the ground at 283 m) read the top of deck 59 at 292 m over it as its level.
+* **A piece a lane touches moves out** 0.15 m at a time up to 0.6 m (onto DECK.margin, where the car is still carried) before it yields (the walls' rule).  The way 14882 cuts the
+  corner of deck 59 by 1 m where it leaves deck 71: the piece yielded and a car steered at the edge there fell 7 m (V3's last fall).  A moved piece keeps clear of lanes down to
+  1.5 m under it (V4 caught one moved over Rue de Munsbach beside deck 223, 0.4 m lower: the lanes' level is the DTM's estimate there).
+* **V3: 1545 of 5356 runs fell at v60 -> 0.**  V4 0, V1 0 free, T3 13.
+* **The build off the start path** (`createDeckBarriersLater`, `car-collide.js lateBarriers`, main.js): measured in Chrome (Metal) **1.55 s** one-shot on the boot
+  (`barboot.mjs sync`, 3 runs 1534 - 1554 ms).  Now a generator built after the boot in slices of 8 ms: **1.50 s spent in 166 slices, the longest 25 ms**; the game boots
+  without it and the car meets no parapet for those ~2 s (the start is on a street).  The quality auto-step does not time the frames until the build is done (or failed:
+  logged, `[lux-drive] the bridge parapets are not solid`).  Node: the lanes in chunks of 40 ways, a "hot cells" pre-test (touching 1.7 s -> off the profile top).
+* Harness: V2's floor 4 -> 2 - the data has exactly two buildings wholly under a deck (Pfaffenthal 6350 / 7233 under the Pont Rouge; five more reach up through a deck and
+  stop a car on it, rightly; `tools/v2list.mjs`).  Section I's town / country split ignores the huge footprints (with them the random sample moved onto Avenue John F.
+  Kennedy at 6053,7854 - a pre-existing 9 cm bump, 14.7 m/s2, never sampled before; the precedent is bridges8's opened tunnels).
+
+### The QA bridge drives, v60 vs now (`out/drive_v60.json`, `out/drive_now.json`, qa4 jobs/bridges.json, 51 routes)
+* 46 routes identical.  b29 deck 59 (spiral at 13 m/s): v60 flew off (air 101) -> now held by the outer parapet (crash into it, no fall).  b45 / b46 deck 197: v60 air 70 /
+  blocked by house 8272 -> now air 0, b46 drives through.  b27 deck 169: v60 overshot the 45 degree turn onto the deck at 13 m/s and left it over its edge (air 21) -> now the
+  parapet holds the car; the bot (full lock, no reverse) stays against it at 1.4 m left of the axis, heading 57 degrees off it (traced: not a wall in a lane - its nose is at the
+  edge; T3 drives every lane of 169 and nothing but wall 42 touches).
+* Unchanged, not this round: deck 73 (b24 +2.47 m step, roll 1.2), deck 28 (+1.1 m), Pont Adolphe east (b02 roll 0.46 rad, -0.18 m), deck 204 (+-0.45 m), deck 157 (blocked by
+  the area at the start), deck 109 (-0.86 m), deck 160 (+1.1 m), Pont Margot reverse (house 9249).
+
+### Gates (merged tree, v68)
+* harness GATE_HARNESS; world GATE_WORLD; holes GATE_HOLES; ui GATE_UI; webkit GATE_WEBKIT.
+
+### Montages (`~/Library/Caches/luxdrive-work/collide14/shots/montages/`, before above, after below, the car circled; the same start, 9 m/s straight at the edge)
+* `montage_pont_rouge_south.png` (v60 fell 5.5 m through the south side), `montage_a1_viaduct.png` (deck 42, fell 9.5 m), `montage_buchler_spiral.png` (deck 59, 5.1 m),
+  `montage_buchler_ramp.png` (deck 53, 8.0 m), `montage_kirchberg_1372.png` (drove 25 m into the building), `montage_tower_4808.png` (drove into the tower block).
+
+### Still wrong
+* The barriers are collision only: on generic decks the drawn parapet (deck-view.js) is where they stand, but where a piece MOVED out (up to 0.6 m) it stands past the drawn
+  parapet's inner face, and where a piece yielded to a lane there is no solid parapet although one is drawn (the deck and its way disagree there).
+* For the first ~2 s after the boot (longer on an iPad) the parapets are not solid yet.
+* The Avenue John F. Kennedy bump at 6053,7854 (9 cm, 14.7 m/s2) exists on lux-drive too; only the sample saw it.
+* The decks' own bumps listed above (73, 28, Adolphe east, 204, 109, 160) are untouched.
