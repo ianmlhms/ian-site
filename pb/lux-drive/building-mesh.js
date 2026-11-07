@@ -141,6 +141,28 @@ function wallBottom(ax, az, bx, bz, ay, by, eaveY, heightAt) {
 }
 
 /**
+ * The foot of one wall: its bottom points dropped by `drop`, never under floorAt (a new list of [x, y, z]).  Over a tunnel the bottom is sampled every
+ * EDGE_STEP m, so an edge that crosses the tube between two corners is lifted where it crosses.
+ */
+function footOf(bottom, drop, floorAt) {
+  if (!floorAt) return bottom.map((p) => [p[0], p[1] - drop, p[2]]);
+  const out = [];
+  for (let k = 0; k < bottom.length; k++) {
+    const p0 = bottom[k];
+    out.push([p0[0], Math.max(p0[1] - drop, floorAt(p0[0], p0[2])), p0[2]]);
+    if (k + 1 === bottom.length) break;
+    const p1 = bottom[k + 1], len = Math.hypot(p1[0] - p0[0], p1[2] - p0[2]), steps = Math.floor(len / EDGE_STEP);
+    for (let j = 1; j < steps; j++) {
+      const t = j / steps, x = p0[0] + (p1[0] - p0[0]) * t, z = p0[2] + (p1[2] - p0[2]) * t;
+      const lim = floorAt(x, z);
+      if (lim === -Infinity) continue;
+      out.push([x, Math.max(p0[1] + (p1[1] - p0[1]) * t - drop, lim), z]);
+    }
+  }
+  return out;
+}
+
+/**
  * The frame of a building's walls, exactly as addBuilding stands them (the façades of facade-data.js lie on the very same
  * walls): the middle of the foot, the eave and ridge levels, the level the storeys count from (`ref`), the height of the
  * façade over it and every edge of the footprint with its bottom along the ground.  null for a footprint of < 3 points.
@@ -188,8 +210,10 @@ export function facadeFrame(b, heightAt, landAt) {
  *   spacing) that differ from the exact ground by a metre or two on a slope: a wall that ends at the exact ground would show a gap
  *   under it or a ledge.  The part below the ground is never seen; the window rows keep their origin at the lowest point of the foot (v < 0 below it).
  * paint: { wall, roof } colours that replace the palette (roof-data.js: the roof colour measured from the ACT photos; wall null = the palette's wall), or null.
+ * floorAt(x, z) (optional): the lowest a wall may reach there (-Infinity: no limit) - the roof of a tunnel under the house (tunnels16: the walls dropped into the
+ *   René Konen tunnel and showed as a beige slab under its ceiling).
  */
-export function addBuilding(m, b, heightAt, landAt, drop = 0, paint = null) {
+export function addBuilding(m, b, heightAt, landAt, drop = 0, paint = null, floorAt = null) {
   const frame = facadeFrame(b, heightAt, landAt);
   if (!frame) return;
   const { cx, cz, eaveY, ref, facadeH, edges } = frame;
@@ -210,12 +234,12 @@ export function addBuilding(m, b, heightAt, landAt, drop = 0, paint = null) {
     const mx = (ax + bx) / 2 - cx, mz = (az + bz) / 2 - cz;
     const outward = (ex * mz - ez * mx) > 0;
     let u = along;
-    for (let k = 0; k + 1 < bottom.length; k++) {
-      const p0 = bottom[k], p1 = bottom[k + 1];
-      const segLen = Math.hypot(p1[0] - p0[0], p1[2] - p0[2]);
+    const foot = footOf(bottom, drop, floorAt);
+    for (let k = 0; k + 1 < foot.length; k++) {
+      const a = foot[k], b2 = foot[k + 1];
+      const segLen = Math.hypot(b2[0] - a[0], b2[2] - a[2]);
       if (segLen < 0.05) continue;
-      const a = [p0[0], p0[1] - drop, p0[2]], b2 = [p1[0], p1[1] - drop, p1[2]];
-      const c = [p1[0], eaveY, p1[2]], d = [p0[0], eaveY, p0[2]];
+      const c = [b2[0], eaveY, b2[2]], d = [a[0], eaveY, a[2]];
       const uvs = outward
         ? [[u, a[1] - ref], [u + segLen, b2[1] - ref], [u + segLen, facadeH], [u, facadeH]]
         : [[u + segLen, facadeH], [u, facadeH], [u, b2[1] - ref], [u + segLen, a[1] - ref]];
@@ -333,11 +357,11 @@ export function groupByCell(buildings) {
  * landAt(x, z): the height of the land itself.
  * paintOf(id): the measured { wall, roof } colours of a building, or null (facade-data.js).
  */
-export function buildCellMesh(ids, buildings, heightAt, landAt, drop = 0, paintOf = null) {
+export function buildCellMesh(ids, buildings, heightAt, landAt, drop = 0, paintOf = null, floorAt = null) {
   const m = createBuildingMesh();
   for (const id of ids) {
     const b = buildings[id];
-    if (b) addBuilding(m, b, heightAt, landAt, drop, paintOf ? paintOf(id) : null);
+    if (b) addBuilding(m, b, heightAt, landAt, drop, paintOf ? paintOf(id) : null, floorAt);
   }
   return { pos: m.pos, nor: m.nor, col: m.col, info: m.info, geo: m.geo, sty: m.sty, idx: m.idx };
 }

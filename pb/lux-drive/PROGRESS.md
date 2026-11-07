@@ -2414,6 +2414,141 @@ M5 now p95 4.4 / worst 7.8 cm (v60 4.7 / 17.4).
   shots (`REPO=<worktree> node tools/run.mjs poses.json after` via browser-slot) - the montages in `paint15/montage/` predate the last blur / M-gate commit; rebuild them with
   `tools/montage.py before after montage <names>`; (3) final report.
 
+## Tunnels 16 (branch `lux-drive-tunnels16`, Mac mini): the real road tunnels are drivable - Rond-Point Schuman underpass, René Konen, 8 more
+
+Started from v61 (45b768e9).  Round folder `~/Library/Caches/luxdrive-work/tunnels16/` (tools in `tools/`: `runs.mjs` every tunnel run with length and mouths, `tubes.mjs` what becomes a
+tube and why the others stay closed, `tubedbg.mjs` / `xsec.mjs` / `ride.mjs` / `ridelog.mjs` / `fine.mjs` the floor problem, cross sections and rides of one tube, `poses.mjs`
+the shot poses; `v61/` = the live snapshot for the before shots).
+
+### The design: a tunnel is an underground deck (`tunnel-tubes.js`, new)
+* The terrain and the streets over a tunnel stay exactly as they are.  `createGround(surface, decks, tubes)` (decks.js, a small hook) asks the tubes first, at the car's own
+  level (the height hint, as for the decks): a car whose body lies within 2.6 m over a tube's floor and over its footprint stands on the TUBE FLOOR; a car over the exposed roof of a
+  portal hood stands on the roof; with the renderer's hint (1e9) nothing changes.  `overheadAt` returns the tube's ceiling (the chase camera stays under it),
+  `ground.inTube` tells main.js (the dashboard shows the tunnel's name, the tyres are on asphalt).
+* Which runs become tubes is measured, like tunnel-cover.js: a car road (motorway .. residential; garages and car-park lanes stay closed), one chain with two mouths (no fork:
+  Albert Bousser stays closed), a drawn road arriving at each mouth along the axis, a floor that exists (below), no house standing in it (a footprint over the tube whose land
+  lies less than 0.5 m over the roof), and room beside a parallel tube.
+* The floor (1 m samples along the tube's line = approach A + tunnel + approach B): a banded least-squares problem - the continuous ground of the approaches outside the faces,
+  minimal curvature inside, a target that is the straight line or a smooth curve under every CAR ROAD over the tube (eroded 8 m, coned at 7.5 %, Gaussian 12 m) - with an active
+  set that pushes any sample still over its bound down.  Roof = floor + clearance (3.9 m for an underpass shorter than 120 m, 4.5 primary, 4.8 trunk, 5.0 motorway) + slab.
+  The land is NOT a bound (pinned under it, the Cents floor dived 13 % just inside its mouth): where the land lies under the roof the shell shows (the hood of a portal).
+* Flush at the faces: the face of a portal stands 1.2 m before the place where the drawn terrain rises 0.35 m over the road (so the lattice ramp of the hill is never in front
+  of the mouth); the approach's own cross-section at the face (crown, gully) is added to the floor and fades out over 16 m (`floorOf`); in front of the face the car's ground
+  blends from the surface into the floor over 8 m.
+* Parallel tubes share a wall (`pairTubes`): the Schuman pair is 5 m apart at its west mouths; each tube's interior ends 0.3 m before the middle line on that side.  The A4 /
+  Nei Escher bores under the Rond-Point Merl and the two motorway links at 1900,11500 do not fit: closed.
+* Collisions (`car-collide.js` hook): inside a tube the car meets only the tube's walls, the faces of its portals and the edge of the world (houses, streets, walls, trees, lamps
+  over it are not at its level); outside, the shell and the headwalls are solid.  The lens (main.js) the same; the camera's "never below the ground" stays: in a tube its ground is
+  the floor and its ceiling the roof of the tube.
+* Closed portals: `createPortals(..., tubeIds)` skips the tube ways.
+
+### Drawn (`tunnel-view.js`, `tunnel-mask.js`, new; `terrain-view.js` a `variant` hook)
+* The inside (its own unlit material: the tunnel lights it, the fog of the world over it): asphalt floor following `floorOf`, pale walkway strips, a tiled dado, walls,
+  chamfered ceiling, two rows of lamps every 6 m, the lane lines (edges, dashed lanes of one way, a solid centre line on a two-way tube).  Drawn within 320 m of the camera.
+* The outside (the solid material): the shell (outer walls and roof) and at each face a headwall (pillars beside the mouth, a lintel, a coping) set into the cut, from under
+  the land to the land behind it (at most 4 m over the roof).  Drawn as far as the closed portals.
+* The terrain inside a shell is not drawn: the tiles that touch a stretch of a tube whose land lies less than 3.2 m over its roof (the tile skirts hang 2.5 m and more) use a
+  twin of the ground material that discards every fragment inside the shell (square segments of 4 m with 1 m overlap, never past a face, asymmetric beside a shared wall;
+  the 40 segments nearest to the camera).  Trees, lamps and benches are kept out of those stretches (`tubeShells`).
+
+### Tunnels (all drivable road tunnel runs of the area; length; result)
+| tunnel | ways | length | result |
+|---|---|---|---|
+| Rond-Point Robert Schuman underpass, eastbound (Bd Robert Schuman under the roundabout) | 482 | 75 m | OPEN (tube, primary, 1 lane, clearance 3.9 m, shares a wall with 481) |
+| Rond-Point Robert Schuman underpass, westbound | 481 | 71 m | OPEN (tube) |
+| René Konen tunnel (OSM name Hellege-Geescht-Tunnel) | 2461 | 629 m | OPEN (tube, primary, 2 lanes one way, clearance 4.5 m, floor dips 8 % under Bd Jean Ulveling) |
+| Rocade de Bonnevoie underpass (Gare / Bonnevoie) | 411 | 57 m | OPEN (tube, trunk, 3 lanes) |
+| Rue de Cessange | 813 | 51 m | OPEN (tube) |
+| Rangwee (both ways, shared wall) | 1055 / 16860 | 62 / 61 m | OPEN (2 tubes) |
+| Échangeur de Kirchberg link | 1280 | 58 m | OPEN (tube) |
+| Rue du Grünewald (two short tunnels) | 915 / 1992 | 35 / 38 m | OPEN (2 tubes) |
+| Grouft (A7, both bores) | 5767+5768 / 4105+11815 | 1073 / 1087 m | closed: the south mouth lies outside the play area (no drawn road arrives along the axis) |
+| Cents (A1, both bores) | 158 / 159 | 308 / 312 m | closed: the approach at the viaduct end is carved up a 30 % ramp (DTM over the Pulvermühle valley) - no floor <= 10 % meets it |
+| Albert Bousser (with its ramps) | 219 + 4 ramps | 463 m | closed: a fork inside (the ramps join in the tunnel) |
+| Desserte Schuman | 2325 | 186 m | closed: a house stands in it at 5915,8117 |
+| Rue du Fort Thüngen | 8333 | 140 m | closed: a house stands in it at 6075,8059 |
+| A4 Autoroute d'Esch / Nei Escher Strooss under the Rond-Point Merl | 12867+12868 / 586+1849 | 80 / 80 m | closed: the two bores are 10 m apart, their lanes do not fit beside a shared wall |
+| A6 motorway links at 1900,11500 | 1041 / 1042 | 65 / 67 m | closed: the two links are 4 m apart |
+| Kirchberg trunk / trunk_link tunnels | 559, 2418, 7460 | 151 / 151 / 357 m | closed: houses stand in them (Kirchberg plaza buildings) |
+| Bd Konrad Adenauer | 1775 | 69 m | closed: grade 20 % at its mouth (the approach) |
+| Sichegronn | 2592 | 28 m | closed: grade 26 % |
+| Rue du Chemin de Fer / Traufelsbierg | 4261 / 5097 | 38 / 30 m | closed: a house stands in them |
+| garages, car-park lanes, service tunnels | - | - | closed (not car roads) |
+
+### Harness section X (`harness-tubes.js`, 5 checks)
+X1 Schuman (both ways) and René Konen are tubes, every floor <= 10 %, under the roads over it; X2 a car through every tube, every lane of its approach, both ways, with the game's
+own collider (houses, walls, trees, lamps): nothing touched, <= 3 m/s2 in the tube (39 rides, worst 2.51); the joints with the approaches are measured apart (stats); X2b flush at
+every face in every lane (worst 0.02 m over 0.2 m); X3 the chase camera inside a tube stays under its ceiling, outside never below the ground; X4 no closed portal in a tube, no
+tree / lamp / house in a shell.  The holes flow got 60 more poses at and in the tubes (approach both ends, face, looking out, inside, over the portal).
+
+### Gates (so far)
+`### Round 2 (6-7 Nov, second agent): troughs at the approaches, the René Konen jolt, house foundations, the gates
+
+**Troughs (`tunnel-tubes.js` TROUGH, `tunnel-view.js` buildTroughs, `tunnel-mask.js` troughSegments).**  Where the land beside the road in front of a face lies 0.5 m or more over
+the floor, the approach now runs in a trough as at the real portals: concrete retaining walls on both sides (the tube's walls continued out of the face, a coping, the
+back reaching 1.5 m into the land they hold), a kerb at the foot of each wall, a tarmac floor across the whole width between them with the approach's own lane lines
+(deck-shape.js laneLines, the decks' tar and paint), and the terrain inside hidden by the mask (no grass gully, no ragged paint).  Measured outward from the face, 1 m
+steps: the trough ends after 4 m of level land, at a road at its level beside it or across it (a junction), at a road whose carriageway reaches into it, or at 120 m.
+Wall tops = the highest land from the middle of the lane to 1.5 m behind the wall + a 0.8 m parapet (0.3 m at the outer end, rising over 8 m), evened out (moving max,
+then moving mean over +-3 m).  A higher road just behind a wall is held by it (Bd Roosevelt over the René Konen south approach).  An approach wider than the tube
+(René Konen north: 3 lanes) gets none.
+| trough | length |
+|---|---|
+| Rocade de Bonnevoie 411 | A 67 m (cut 3-6 m deep), B 35 m |
+| Rond-Point Schuman 481 (westbound) | B (east) 63 m; A (at the roundabout): none - the two carriageways merge 19 m out |
+| Rond-Point Schuman 482 (eastbound) | A (east) 83 m; B (roundabout): none |
+| Rue de Cessange 813 | A 18 m |
+| Rue du Grünewald 915 | A 10 m, B 16 m |
+| Rangwee 1055 / 16860 | A 30 m, B 8 m / B 17 m |
+| Échangeur de Kirchberg 1280 | A 9 m, B 68 m |
+| Rue du Grünewald 1992 | A 9 m |
+| René Konen 2461 | A (south) 42 m, Bd Roosevelt held behind the left wall; B (north, 3-lane approach wider than the tube): none |
+
+**Floor in a trough.**  `smoothTroughFloor`: the floor is ours there, so it is the smoothest curve between the held samples (outside the trough and > 3 m inside the face);
+read on its centre line the carved René Konen approach changed grade 4 % -> 11 % -> 4 % every 8 m (29 m/s2).  `troughFloor` = the plane of the tube + the cross-section
+of the approach read at the outer end (37 lats, every ~0.25 m), fading out over the blend (as long as 6 h v2 / a needs for v 20 m/s, a 2 m/s2, from the step at the wheel
+lanes), + the approach's own grade in each lane fading over 6 m (C1 where the car leaves the carved road).  The car's ground (`groundAt`) and the drawn floor are this one
+function.  The outer ends lie on samples.  (Blended into the lattice instead, every step of the carved road came along: 0.27 m in 1 m, 20 m/s2.)
+
+**Joints and collisions.**  The trough walls are solid up to their tops (a car on the land behind meets the parapet); `tubeShells` covers the troughs (no lamp / tree in a
+trough wall, X4 checks them), and the baked retaining walls are cut where they enter a shell or a trough (`wallsOutsideShells`: a stone wall stood in front of the concrete
+at the Schuman east portal).
+
+**House foundations (René Konen).**  `building-mesh.js` footOf: a wall's bottom (2.5 m under the ground) stops on the roof of a tube under it (`tubes.network.roofAt`,
+sampled every 1 m along an edge that crosses a tube) - the beige slab under the René Konen ceiling is gone.
+
+**Holes.**  Floor skirts on the floor's own vertices at every face and at the outer end of every trough, plus an apron 0.6 m under the terrain past the outer end (the
+mask's square end is square to the chord of its segment, the floor's to the tangent).  Before: 469 hole pixels (medium) in the tunnel poses.
+
+**Also fixed:** the mouth search of `buildTube` split the samples at n/2, so a long approach on one side put a mouth on the wrong side (with the approach run 130 m,
+Schuman 481 was rejected; Rue du Grünewald 1992's face A was 14 m out of its mouth).  It splits at the middle of the tunnel part now.
+
+**Harness X (round 2).**  X2 now drives from 12 m past the outer end of each trough and gates the tube AND its troughs (from 3 m inside each outer end; the joint where
+the car leaves the world's carved road, 3 m each side of it, is measured apart as at a face without a trough); the first second of a ride (the car settling) is not
+measured; X4 also checks the troughs.
+
+### Gates (final, after merging lux-drive with paint15; main.js ?v=67)
+* `node pb/lux-drive/harness.js`: **171 / 171 PASS** in one run (1556 s; before the merge 166 / 166).  X2: 39 rides, worst 2.57 m/s2 in tubes + troughs (René Konen
+  south was 33.7 at its face); X2b flush 0.02 m; joints (stats, the world's carved road just outside): worst 9.3 m/s2 René Konen B>A at the trough's outer end - the
+  approach road itself 42+ m south of the portal rocks a car 5-10 m/s2 on its own.
+* `luxdrive_world`: PASS, 89 ok (draw calls low 113 / medium 150 / high 208).
+* `luxdrive_holes`: medium **0** hole pixels over 132 poses (60 at / in the tunnels), low **0** (before this round: 469 medium).
+* `luxdrive_ui`: PASS, 98 ok.  `luxdrive_webkit`: PASS, 22 ok.
+
+### Shots / montages
+`~/Library/Caches/luxdrive-work/tunnels16/montages/` (stacked, labelled, circles on the fix): 01 René Konen south approach (v61 / WIP / now), 02 its portal, 03 inside
+(the house slab gone), 04 / 05 Schuman east approach and portal (gully + stone wall -> trough), 06 Bonnevoie, 07 Kirchberg, 08 René Konen south trough overview,
+09 Rangwee + Cessange.  Raw shots: `before/` (v61 snapshot) and `after/` with `poses_all.json` (poses.json + `poses_troughs.json`).
+
+### Still wrong (honest)
+* The two Schuman mouths AT the Rond-Point (west) have no trough: the two carriageways merge 19 m out of the faces, so two troughs would stand in each other; the
+  grass gully and the ragged paint stay there (seen from over the portal).  René Konen north (3-lane approach wider than the 2-lane tube) has none either.
+* The René Konen south approach beyond the trough (42 m+ from the face) is the world's carved road: a narrow gully, 5-10 m/s2 for a car in its outer lanes.
+* The trough floor is the decks' flat tar: at its outer end the textured near asphalt of the ground shader meets it in a straight line (a change of tone up close).
+* The walls are plain concrete (one colour, no texture, no railing on the parapet); the Bonnevoie walls are 6 m high and dark in shade.  Interior of the tubes is still
+  plain (flat colours).
+* Cents, Grouft, Desserte Schuman, Fort Thüngen, A4 / Nei Escher, Albert Bousser stay closed (table above).  findTubes + troughs cost ~3 s in Node at startup (not optimised).
+
 ## Collide 14 (branch `lux-drive-collide14`, Mac mini): houses that could be entered, bridges that could be left (QA round 4) - DONE (all gates pass)
 
 Started from live v60 (c630a40c); merged lux-drive three times (walls13 v61, paint15 v63, houses17 roofs v66); main.js `?v=68`.  Round folder

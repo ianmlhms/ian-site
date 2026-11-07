@@ -15,6 +15,7 @@ import { createBuildingIndex } from './buildings.js';
 import { createTreeIndex, keepWaysClear } from './trees.js';
 import { createTreeView } from './tree-view.js';
 import { createPortals, portalRoadAt, portalBlocked } from './portals.js';
+import { createTubes, tubeRoadInfo, tubeShells, lampsOutsideShells, wallsOutsideShells } from './tunnel-tubes.js';                // tunnels16: the tunnels the car drives through
 import { createPlayArea } from './play-area.js';
 import { buildWorldMap } from './world-map.js';
 import { createPaintTextures } from './paint-textures.js';
@@ -33,6 +34,8 @@ import { WALL_DRAW_FACTOR, createWallBlockTest } from './retaining-walls.js';   
 import { createLandmarks, fixLandmarkDecks } from './landmarks.js';
 import { createLandmarkView } from './landmark-view.js';
 import { createPortalView } from './portal-view.js';
+import { createTunnelView, createTubeInsideMaterial } from './tunnel-view.js';     // tunnels16: the tubes and their open portals
+import { createTubeMask } from './tunnel-mask.js';
 import { createTramNetwork } from './tram-network.js';          // the Luxtram (city finish)
 import { createTramSim } from './tram-sim.js';
 import { createTramView } from './tram-view.js';
@@ -144,18 +147,21 @@ async function boot() {
   const field = createHeightField({ near: data.near, far: data.far, roads: data.roads, decks: data.decks });
   const surface = createSurface(field);
   const deckNetwork = createDeckNetwork(widenToWays(fixLandmarkDecks(data.decks, (x, z) => surface.height(x, z)), data.roads), surface);
-  const ground = createGround(surface, deckNetwork);
+  const tubes = createTubes(data.roads, surface, field.network, data.buildings);
+  const ground = createGround(surface, deckNetwork, tubes.network);
   // the landmarks (the famous places) replace some blocks and some bridge decks of the bake and have collision of their own
   const landmarks = createLandmarks({ buildings: data.buildings, decks: ground.decks, ground: (x, z) => surface.height(x, z), roads: data.roads });
   const buildings = createBuildingIndex(data.buildings, { hidden: landmarks.hiddenBuildings, groundAt: (x, z) => field.height(x, z), landAt: (x, z) => field.baseHeight(x, z) });   // (the houses know their height: drive12)
   const playArea = createPlayArea(area);
-  const portals = createPortals(data.roads, (x, z) => surface.height(x, z), (r) => field.network.isDrawn(r.id), (x, z) => playArea.inside(x, z), portalRoadAt(field.network), portalBlocked(buildings, deckNetwork));
+  const portals = createPortals(data.roads, (x, z) => surface.height(x, z), (r) => field.network.isDrawn(r.id), (x, z) => playArea.inside(x, z), portalRoadAt(field.network), portalBlocked(buildings, deckNetwork), tubes.ids);
   const maps = buildWorldMap({ classes: data.classes, classInfo: data.classInfo, canopy: data.canopy, buildings: data.buildings });
   // the trees: the woods (placed from the canopy) and the trees of OSM (the street trees, the trees of the parks)
   // no tree grows on a bridge or hangs its crown over a lane (the bridges as decks, with the full width of the landmark models)
   const treeDecks = createDeckNetwork([...ground.decks, ...landmarks.footprints]);
-  const bakedTrees = keepWaysClear(data.trees, { network: field.network, field, treeDecks, treeFree: landmarks.treeFree });
-  const forest = createTreeIndex({ map: maps, field, network: field.network, buildings, trees: bakedTrees, clearings: landmarks.clearings, treeDecks });
+  const shells = tubeShells(tubes.tubes, (x, z) => surface.height(x, z));       // (nothing grows in the hood of a tunnel portal: tunnels16)
+  const bakedWalls = wallsOutsideShells(data.walls, shells.inShell);              // (the troughs of the tunnel approaches have walls of their own)
+  const bakedTrees = keepWaysClear(data.trees, { network: field.network, field, treeDecks, treeFree: landmarks.treeFree }).filter((t) => !shells.inShell(t.x, t.z, 1.5));
+  const forest = createTreeIndex({ map: maps, field, network: field.network, buildings, trees: bakedTrees, clearings: [...landmarks.clearings, ...shells.clearings], treeDecks });
 
   // ---- the painted textures, the world maps, the sky
   setLoad(0.72, 'load.build');
@@ -186,21 +192,25 @@ async function boot() {
   const solid = createSolidMaterial(env);
   const shownDecks = ground.decks.filter((d) => !landmarks.hiddenDecks.has(d.id));
   const markPlan = buildMarkingPlan(data.roads, field.network, shownDecks);
-  const terrain = createTerrainView({ scene, surface, field, material: quality.cheapGround ? groundCheap : groundFull, quality, marks: markPlan });
-  const city = createBuildingView({ scene, buildings, field, env, noiseTexture: textures.noise, quality, hidden: landmarks.hiddenBuildings, paintOf: roofPaintOf(roofIndex) });
+  // (the tiles over the shell of a tunnel draw no terrain inside it: tunnel-mask.js)
+  const tubeMask = createTubeMask(THREE, tubes.tubes, (x, z) => surface.height(x, z));
+  const terrain = createTerrainView({ scene, surface, field, material: quality.cheapGround ? groundCheap : groundFull, quality, marks: markPlan,
+    variant: (leaf, m) => (tubeMask.needsMask(leaf) ? tubeMask.twin(m) : m) });
+  const city = createBuildingView({ scene, buildings, field, env, noiseTexture: textures.noise, quality, hidden: landmarks.hiddenBuildings, paintOf: roofPaintOf(roofIndex), floorAt: tubes.network.roofAt });
   const roofs = roofIndex ? createRoofView({ scene, index: roofIndex, baseUrl: roofBase, buildings: data.buildings, field, env, renderer, quality, hidden: landmarks.hiddenBuildings }) : null;
   const trees = createTreeView({ scene, forest, baked: bakedTrees, field, env, quality });
   const decks = createDeckView({ scene, decks: shownDecks, material: solid, ground: ground.surface, laneLinesOn: false });
   const deckMarks = createDeckMarkingView({ scene, plan: markPlan, material: solid });
-  const walls = createWallView({ scene, walls: data.walls, material: createWallMaterial(env), groundAt: (x, z) => surface.height(x, z) });
+  const walls = createWallView({ scene, walls: bakedWalls, material: createWallMaterial(env), groundAt: (x, z) => surface.height(x, z) });
   const landmarkView = createLandmarkView({ scene, landmarks, material: solid });
   const portalView = createPortalView({ scene, portals, ground, material: solid });
+  const tunnelView = createTunnelView({ scene, tubes: tubes.tubes, heightAt: (x, z) => surface.height(x, z), insideMaterial: createTubeInsideMaterial(env), outsideMaterial: solid });
   // the Luxtram: the rails and the vehicles of the line (tram-network.js builds the two tracks from lines.bin, tram-sim.js runs the vehicles on them)
   const tramNetwork = createTramNetwork(data.lines, data.stops, TRAM);
   const tramSim = createTramSim(tramNetwork, TRAM);
   const props = createPropCollider();                       // lamps, catenary poles and benches: small solid circles the car stops at
   const trams = createTramView({ scene, network: tramNetwork, sim: tramSim, surface, deckNetwork, env, camera, maps, props, quality });
-  const lamps = placeStreetLights({ roads: data.roads, network: field.network, buildings, map: maps, walls: data.walls });
+  const lamps = lampsOutsideShells(placeStreetLights({ roads: data.roads, network: field.network, buildings, map: maps, walls: bakedWalls }), shells.inShell);
   for (let i = 0; i < lamps.count; i++) props.add(lamps.x[i], lamps.z[i], LAMP_POST_RADIUS, surface.height(lamps.x[i], lamps.z[i]), LAMP_POST_HEIGHT);   // (no lamp stands on a deck: harness H)
   const streetLights = createStreetLightView({ scene, lights: lamps, ground, env });
   const parkBenches = placeParkBenches({ roads: data.roads, network: field.network, buildings, map: maps });
@@ -213,19 +223,24 @@ async function boot() {
   // ---- the car, the camera, the interface
   const start = data.places.start || { x: WORLD.width / 2, z: WORLD.depth / 2, yaw: 0 };
   const roadInfo = { coverage: 0, lat: 0, hw: 0, a0: 0, kind: 0, surface: 0, road: -1, lines: 0, lanes: 0, s: 0 };
-  const wallCollider = createWallCollider(data.walls, (x, z) => ground.height(x, z), (x, z) => surface.height(x, z));        // the retaining walls are solid from both sides (wall-collider.js)
+  const wallCollider = createWallCollider(bakedWalls, (x, z) => ground.height(x, z), (x, z) => surface.height(x, z));        // the retaining walls are solid from both sides (wall-collider.js)
   // Everything that stops the car answers for the car's own level (`y`: the level of its wheels, car-collide.js): a house, a tree, a lamp stops a car only
   // where the car's body overlaps it in height.  (Before drive12 the trees and lamps were switched off on any deck and the houses were solid to the sky: the
   // houses of Pfaffenthal stopped the car on the Pont Rouge 60 m above them, QA3 N3-B01.)  The bank under the end of a bridge stops a car under the deck.
   // (collide14: the parapets of the decks are built after the boot, in slices between the frames - 1 - 1.6 s of build kept off the start screen)
-  const { collide, barriers: deckBarriers } = createCarCollider({ buildings, landmarks, walls: wallCollider, portals, ground, forest, props, trams: tramSim, playArea, surface, deckNetwork, roads: data.roads, lateBarriers: true });
+  const { collide, barriers: deckBarriers } = createCarCollider({ buildings, landmarks, walls: wallCollider, portals, ground, forest, props, trams: tramSim, playArea, surface, deckNetwork, roads: data.roads, lateBarriers: true, tubes: tubes.network });
   let barriersSettled = false;                               // (built, or failed: the quality auto-step waits for it)
   deckBarriers.ready.then(() => { barriersSettled = true; }, (err) => { barriersSettled = true; console.error('[lux-drive] the bridge parapets are not solid:', err); });
-  const car = createCar({ ground, roadInfoAt: (x, z, out) => surface.roadInfoAt(x, z, out), collide, start });
-  const wallLens = createWallBlockTest(data.walls);          // look11 (QA2 N-C02): the lens never inside the block of a retaining wall
+  // (in a tube the road under the car is the tube's: the land over it would be grass)
+  const roadInfoAt = (x, z, out) => (ground.inTube(x, z) ? tubeRoadInfo(out) : surface.roadInfoAt(x, z, out));
+  const car = createCar({ ground, roadInfoAt, collide, start });
+  const wallLens = createWallBlockTest(bakedWalls);          // look11 (QA2 N-C02): the lens never inside the block of a retaining wall
   // (the wall first: a house that only touches the lens - pen 0 - answered before the wall, and the lens stayed in the block of a wall that ends at the house: Bd Konrad Adenauer 7706,6728)
   // (the lens is a ball: a house or a tree is in its way where the ball overlaps it in height - the lens over the Pont Rouge is not pushed by the houses under it)
-  const chase = createChaseCamera(ground, (x, z, radius, y) => wallLens(x, z, radius, y) || buildings.collide(x, z, radius, y - radius) || forest.collide(x, z, radius, y - radius) || portals.collide(x, z, radius, y));
+  // (in a tube the lens meets the tube alone: its walls keep it inside, the houses over it are not at its level - tunnels16)
+  const lensHit = (x, z, radius, y) => tubes.network.collide(x, z, radius, y - radius);
+  const chase = createChaseCamera(ground, (x, z, radius, y) => (tubes.network.inside(x, z, y - radius) ? lensHit(x, z, radius, y)
+    : wallLens(x, z, radius, y) || buildings.collide(x, z, radius, y - radius) || forest.collide(x, z, radius, y - radius) || portals.collide(x, z, radius, y) || lensHit(x, z, radius, y)));
 
   // the Kaart: one road index and one painted base for the minimap, the full map and the teleport
   const roadIndex = createRoadIndex(data.roads);
@@ -504,6 +519,8 @@ async function boot() {
     deckMarks.update(camera.position.x, camera.position.z, DECK_MARK_RADIUS);
     walls.update(camera.position.x, camera.position.z, quality.buildingFarRadius * WALL_DRAW_FACTOR);
     portalView.update(camera.position.x, camera.position.z, quality.buildingFarRadius * BUILT_DRAW_FACTOR);
+    tunnelView.update(camera.position.x, camera.position.z, quality.buildingFarRadius * BUILT_DRAW_FACTOR);
+    tubeMask.update(camera.position.x, camera.position.z);
     trees.update(camera.position.x, camera.position.z, elapsed);
     tramSim.setObstacle(car.state.x, car.state.z);
     trams.update(dt, camera.position.x, camera.position.z);
@@ -515,7 +532,8 @@ async function boot() {
     const road = roadInfo.coverage > 0.35 && roadInfo.road >= 0 ? data.roads[roadInfo.road] : null;
     ui.setSpeed(Math.abs(car.state.speed) * 3.6);
     if (frames % 10 === 0) ui.setRain(env.state.rain);
-    const roadName = road && road.name ? road.name : '';
+    const tubeName = tubes.network.nameAt(car.state.x, car.state.z, car.state.y - CAR.rideHeight);      // (in a tunnel: its name, not the street over it)
+    const roadName = tubeName !== null ? tubeName : road && road.name ? road.name : '';
     if (roadName !== showRoad) { showRoad = roadName; ui.setRoad(roadName); }
     if (frames % 6 === 0) minimap.draw(car.state.x, car.state.z, car.state.heading);
     if (fullMap.isOpen()) fullMap.setCar(car.state);
@@ -547,7 +565,7 @@ async function boot() {
 
   // the API for the harness (the checks read the state of the game from here)
   window.__lux = {
-    landmarks, landmarkView, trams, tramSim, tramNetwork, streetLights, benchView, scene, camera, renderer, car, env, terrain, city, trees, surface, ground, field, portals, playArea, buildings, markPlan, quality: () => quality,
+    tubes, tunnelView, tubeMask, landmarks, landmarkView, trams, tramSim, tramNetwork, streetLights, benchView, scene, camera, renderer, car, env, terrain, city, trees, surface, ground, field, portals, playArea, buildings, markPlan, quality: () => quality,
     ui, fullMap, roadIndex, sound, stepper, model, input, forest, collide, placeAt, blockedAt, deckBarriers, roofs, roofIndex,
     /** The Kaart and the teleport for the flows: open the map, put the car on the road nearest to (x, z). */
     toggleMap: () => toggleMap(), startDriving: () => startDriving(), isStarted: () => started,
