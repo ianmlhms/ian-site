@@ -27,7 +27,8 @@ export function speedsOf(kind, requested) {
   return [...new Set(requested.map((v) => Math.min(v, cap)))];
 }
 
-if (isMainThread) await main(); else await work();
+if (!isMainThread) await work();
+else if (process.argv[1] && path.resolve(process.argv[1]) === SELF) await main();
 
 async function work() {
   const { loadWorld } = await import('./world.mjs');
@@ -67,6 +68,14 @@ async function work() {
 }
 
 async function main() {
+  const only = arg('--report-only', '');
+  if (only) {   // rebuilds the markdown from a finished sweep-drive.json (the events are in it)
+    const j = JSON.parse(fs.readFileSync(only, 'utf8'));
+    const r = buildReport({ events: j.events, totals: j.totals, wall: j.wallSeconds, workers: j.workers, meta: null, speeds: j.speeds });
+    fs.writeFileSync(only.replace(/\.json$/, '.md'), r.md);
+    console.log(`[sweep-drive] report rebuilt: ${only.replace(/\.json$/, '.md')}`);
+    return;
+  }
   const outDir = path.resolve(arg('--out', path.join(HERE, '../../../..', 'luxdrive-sweep-out', 'drive')));
   fs.mkdirSync(outDir, { recursive: true });
   const limit = Number(arg('--limit', 0)) || 0;
@@ -157,7 +166,7 @@ export function buildReport({ events, totals, wall, workers, meta, speeds }) {
     `${totals.roads} roads, ${totals.lanes} lanes, ${totals.runs} runs at ${speeds.join('/')} m/s (class-capped), ${totals.km.toFixed(0)} km driven, ${(wall / 60).toFixed(1)} min on ${workers} workers.`,
     `Events: ${Object.entries(typeCount).map(([k, v]) => `${k} ${v}`).join(', ')}; ${places.length} places (within ${CLUSTER_M} m); ${errors.length} run errors.`, '',
     '| # | score | street | x, z | worst events (lane offset m, speed m/s, value) |', '|---|---|---|---|---|',
-    ...places.slice(0, TOP).map((p, i) => `| ${i + 1} | ${p.score.toFixed(1)} | ${p.name} (${p.kind}, way ${p.road}) | ${Math.round(p.x)}, ${Math.round(p.z)} | ${Object.entries(p.types).sort((a, b) => b[1].score - a[1].score).map(([k, t]) => `${k} ${fmt(t, k)} (lane ${t.lane}, ${t.speed})`).join('; ')} |`), '',
+    ...places.slice(0, TOP).map((p, i) => `| ${i + 1} | ${p.score.toFixed(1)} | ${p.name === p.kind ? `(unnamed ${p.kind})` : `${p.name} (${p.kind})`}, way ${p.road} | ${Math.round(p.x)}, ${Math.round(p.z)} | ${Object.entries(p.types).sort((a, b) => b[1].score - a[1].score).map(([k, t]) => `${k} ${fmt(t, k)} (lane ${t.lane}, ${t.speed})`).join('; ')} |`), '',
   ].join('\n');
   return { json, md };
 }

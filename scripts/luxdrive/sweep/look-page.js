@@ -99,18 +99,18 @@ window.__sweep = (() => {
     }
     if (mag >= T_.holeMin) {
       inv.copy(m.camera.projectionMatrixInverse);
-      let real = 0;
+      let real = 0, ex = null;
       for (const [px, py] of holes) {
         dir.set((px + 0.5) / w * 2 - 1, (py + 0.5) / h * 2 - 1, 0.5).applyMatrix4(inv).applyMatrix4(m.camera.matrixWorld).sub(m.camera.position).normalize();
         if (dir.y >= -0.0175) continue;
         let t = 4;
         while (t < m.camera.far) {
           const x = m.camera.position.x + dir.x * t, z = m.camera.position.z + dir.z * t, yy = m.camera.position.y + dir.y * t;
-          if (yy < m.field.baseHeight(x, z) - (1 + 0.004 * t)) { real++; break; }
+          if (yy < m.field.baseHeight(x, z) - (1 + 0.004 * t)) { real++; if (!ex) ex = [px, py, +dir.y.toFixed(4), Math.round(t), +yy.toFixed(1), +m.field.baseHeight(x, z).toFixed(1)]; break; }
           t += Math.max(3, t * 0.04);
         }
       }
-      if (real >= 2) flags.push({ type: 'hole', score: mag / 40, at: [Math.round(sx / mag), Math.round(sy / mag)], detail: `${mag} px` });
+      if (real >= 2) flags.push({ type: 'hole', score: mag / 40, at: [Math.round(sx / mag), Math.round(sy / mag)], detail: `${mag} px, e.g. ${JSON.stringify(ex)}` });
     }
     if (flicker >= T_.flickerMin) flags.push({ type: 'flicker', score: flicker / 250, at: [Math.round(fx / flicker), Math.round(fy / flicker)], detail: `${flicker} px` });
     // --- the lane in the picture: samples along the road's own centre line ahead / around, read from the pixels
