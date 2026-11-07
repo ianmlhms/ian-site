@@ -2610,3 +2610,63 @@ barriers judge them, `whoyield.mjs` which way makes a piece yield, `t3bar.mjs` /
 * portalBlocked asks the first building hit: where a huge footprint and a house overlap at a mouth, the house is not seen (none found; the 7 mouths above have no house).
 * The Avenue John F. Kennedy bump at 6053,7854 (9 cm, 14.7 m/s2) exists on lux-drive too; only the sample saw it.
 * The decks' own bumps listed above (73, 28, Adolphe east, 204, 109, 160) are untouched.
+
+## Tunnels 18 (branch `lux-drive-tunnels18`, Mac mini): the tunnel bugs of QA round 5 (TU01 - TU09)
+
+Started from live v68 (7fd84cdf); main.js `?v=69`.  Round folder `~/Library/Caches/luxdrive-work/tunnels18/` (tools in `tools/`: `tprof.mjs` the car's ground along a tube,
+`near.mjs` / `lateral.mjs` / `carve.mjs` / `carvedbg.mjs` the carve along / across a line and its pins, `chain.mjs` / `chains_near.mjs` / `unpinned.mjs` the beds and
+junction pins, `hgrid.mjs` + `hdiff.py` + `roughness.mjs` what a change does to the whole world (6.36 M road points), `camride.mjs` / `campose.mjs` the chase camera in
+every tube / at a QA pose, `drive.mjs` + `gameworld.mjs` drives with the game's collider, `prof2.mjs` + `chart.py` + `montage.py` the montages; `v68/` the live snapshot).
+
+### Fixed
+* **TU03 Rangwee east approach (5484,11684): the 1.1 m dip and the neck.**  Not the tube: the carved approach way 16842 (26 m, Bd de Kyiv -> the mouth) was designed on
+  its own with its tunnel end held to the hillside over the portal (road-bed.js TIGHT_END), a straight line 2.2 m UNDER the junction at its other end.  So
+  `findCrossings` took Bd de Kyiv / Bd des Scillas (17026 / 17018, which END at that node) for roads passing over it (over roads: no batter, no junction sheet), the
+  junction did not pin it (off by > JUNCTION_LEVEL) and the carve fell from the junction onto the sunk bed: -1.1 m in 5 m, the paint necked in.  `road-network.js`:
+  `leadsToTunnel(chain, k)` (the other end of the way is a tunnel mouth); a crossing at a node where both ways END is no crossing when the LOWER one leads to a tunnel;
+  in the end clusters a way that leads to a tunnel takes the junction's level (also when the cluster has only one other way: Rangwee 15992 / 16815 at the far end met
+  1.54 m apart, unpinned - the +0.15 m step QA saw 23 m after the exit).  Affects 7 ways (Rangwee 16842 / 16815, Rue Wiltheim 3260, Desserte Schuman 5822,
+  Traufelsbierg 6786, Bd Konrad Adenauer 11662, service 8709); the tubes and the closed tunnels are the same set (Rangwee 16860's grade 9.1 % -> 2.8 %, its face A
+  5 m further in).  Bot at 13 / 20 m/s, both lanes: a_z 29 / 39 -> 1.6 - 3.5 (20 m/s left lane 12: the slope change at the face).
+* **TU02 Rue du Grünewald 1992, east mouth: the 15 cm hump 5 - 7 m out of the face** (a_z 51 - 84 -> 0.6 - 2.1 in all four bot runs).  The junction sheet
+  (junction-surface.js) blended the planes of the junction of Rue du Grünewald 15 / 1347, 7 m OVER the tunnel, into the sheet of the approach 1993 under it; where the
+  blended level crossed the carve's SEP window the approach was lifted 15 cm in 1 m.  `sample(x, z, out, ref)`: a plane whose level at the point lies more than
+  refNear (1 m) .. refFar (2 m) off the level of the way asking is left out; the carve asks with the bed of the nearest carriageway (and the foot sample with its own).
+  World diff (6.36 M road samples, `hdiff.py`): 5745 > 2 cm, 175 cells of 20 m, roughness (2nd difference on carriageways) 22 cells better / 21 worse by > 2 cm - the
+  worse ones are faces between two stacked carriageways (Place 9515 / Rue 5912 at 5935,8152, the Merl links at 3158,9993) that no longer lean into the lower lanes and
+  stand in the gap instead.  Walls re-baked (100 walls; gate K passes).
+* **TU04 René Konen north mouth: the terrain slab over the right wall.**  The 3-lane approach 214 (10.6 m) is wider than the 2-lane tube, so it got no trough, and
+  the face of the cut between it and road 9499 beside it (3.8 m higher) stood across its outer lane right in front of the face.  `TROUGH.wideReach`: an approach wider
+  than the tube now gets a trough of at most 12 m (its outer lane ends at the wall there, as it does in front of the face): René Konen B 10.3 m.  No other tube changed.
+* **TU01 the strip inside Rocade de Bonnevoie / Rue de Cessange (and every face with a trough).**  Not a wire: a hair of terrain at the face plane - the trough's mask
+  segment and the tube's ended square at the face on both sides (hidden terrain: the strip vanishes with the tiles hidden).  `tunnel-mask.js FACE_OVERLAP`: a trough's
+  face segment reaches 0.5 m into the tube (under the 0.9 m headwall).  The tram wire over the Rocade runs on the land 6 m over the roof (not inside).
+* **TU05 René Konen middle, the camera on the roof.**  A pose artefact: QA used one yaw for every pose of a tube, 47 deg across the tube at (5272,8820); with the axis
+  yaw the boom is 7.2 m, the lens 3.1 m over the car.  Driven by the camera of the game through every tube, both ways, every lane (`camride.mjs`): boom >= 5.9 m, lens
+  >= 2.7 m over the car, never out of the walls, never over the ceiling.  Still made robust: in a tube the chase camera follows the tube's axis (the way the car faces
+  along it; `ground.tubeHeading`, camera.js) - at the QA pose boom 3.6 -> 7.2 m, lens 2.1 -> 3.1 m over the car.
+* **TU07 Schuman 482 exit, verified.**  Lane centre and +-0.6 m at 8 / 13 / 20 m/s: through, no touch (the QA stop is the bot's route).  Real: a baked retaining wall
+  stood INSIDE the mouth (1.6 m beside the axis, 2.9 and 0.4 m inside face B) - the bake saw the step to the twin's approach as a ramp.  `wallsOutsideShells(walls,
+  inShell, roofAt)`: a wall point whose foot lies under a tube's roof is cut (main.js).  Hugging the right edge (lat 1.2 in the 3.8 m one-lane road) still meets the wall
+  on the carriageway edge 1.5 m out of the face; at 20 m/s that throws the car (as on v68).
+* **The face blend**: in front of a face without a trough the outer metre of the floor was blended less (the approach's edge) but taken fully at the face - a car 0.8 m
+  from the wall stepped 3 cm there (27 m/s2 at 20 m/s into Rangwee 16860).  The edge fade now runs out with the blend (continuous).
+
+### Not fixed
+* **TU09 René Konen south, roll 0.25 - 0.32 rad** (verified real, both directions, the west lane, at the outer end of trough A, 5282,9178): the approach 13628 is an
+  "over" road (its own bed sits > 1.5 m over a way at its start node: the tunnel end drags it), so it is not carved: its outer lane rides the raw DTM gully, 26 %
+  crossfall 1 - 5 m outside the trough.  Treating it as a junction (the crossing rule above, for the upper way too) carved it but lowered the land 2.2 m at the house
+  5266,9107 over the mouth and René Konen was rejected ("a house stands in it"); left as it is.
+* TU06 grey smudges round the hoods: the ground shader's steep-slope colour on the cut faces beside the headwalls; not touched.
+* Schuman 482 exit: 3 - 8 cm dips 6 - 10 m after face B where approach 9252 meets carriageway 9145 (beds 7 - 9 cm apart, no junction sheet): a_z 10 - 19 at 13 - 20 m/s.
+* TU08 Cessange approach washboard: not looked at.
+
+### Gates (tree at the commit, main.js ?v=69; logs in the round folder)
+* `node pb/lux-drive/harness.js`: **175 / 175 PASS** in one run (1686 s).
+* `luxdrive_world`: PASS, 89 ok (draw calls low 113 / medium 150 / high 210).  `luxdrive_holes`: **0** hole pixels over 132 poses (medium), **0** with HOLES_Q=low.
+* `luxdrive_ui`: PASS, 98 ok.  `luxdrive_webkit`: PASS, 22 ok.
+
+### Montages (`~/Library/Caches/luxdrive-work/tunnels18/montages/`, v68 above, now below)
+`01_TU03_rangwee_profile.png`, `02_TU03_rangwee_top.png`, `02b_TU03_rangwee_chase.png`, `03_TU02_gruenewald_profile.png`, `04_TU04_konen_north_mouth.png`,
+`04b_TU04_konen_north_outside.png`, `05_TU05_konen_mid_camera.png`, `06_TU01_cessange_strip.png`, `06b_TU01_rocade_strip.png`.  Raw shots `shots/v68`, `shots/now`
+(`poses1.json`).
