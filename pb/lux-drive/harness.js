@@ -29,6 +29,8 @@ import { createBuildingIndex } from './buildings.js';
 import { createLandmarks, fixLandmarkDecks } from './landmarks.js';
 import { createTreeIndex, treesOfBlock, keepWaysClear, bakedCrownRadius, wayMargin, crownShare } from './trees.js';
 import { createPortals, portalRoadAt, portalBlocked } from './portals.js';
+import { createTubes, tubeShells, lampsOutsideShells } from './tunnel-tubes.js';                   // tunnels16
+import { runTubeChecks } from './harness-tubes.js';                // section X (tunnels16)
 import { createPlayArea } from './play-area.js';
 import { buildWorldMap } from './world-map.js';
 import { createCar } from './car.js';
@@ -48,7 +50,8 @@ import { createTramSim } from './tram-sim.js';
 import { placeStreetLights } from './street-lights.js';
 import { placeParkBenches } from './park-benches.js';
 import { createPropCollider } from './props.js';
-import { WALL, WALL_DRAW_FACTOR, findRamp, wallQuads, rampTolerance, createWallFootprint } from './retaining-walls.js';
+import { WALL, WALL_DRAW_FACTOR, findRamp, wallQuads, rampTolerance, createWallFootprint, createWallBlockTest } from './retaining-walls.js';
+import { createCarCollider, LAMP_POST_RADIUS, LAMP_POST_HEIGHT, BENCH_RADIUS, BENCH_HEIGHT } from './car-collide.js';
 import { JUNCTION, junctionClusters, driveLine } from './junction-probe.js';
 import { runBridgeChecks } from './harness-bridges.js';          // section N (bridges7)
 import { runTunnelChecks } from './harness-tunnels.js';          // section O (bridges8)
@@ -90,15 +93,17 @@ const area = JSON.parse(fs.readFileSync(path.join(DATA, 'area.json'), 'utf8'));
 const field = createHeightField({ near: data.near, far: data.far, roads: data.roads, decks: data.decks });
 const surface = createSurface(field);
 const deckNetwork = createDeckNetwork(fixLandmarkDecks(data.decks, (x, z) => surface.height(x, z)), surface);
-const ground = createGround(surface, deckNetwork);
+const tubes = createTubes(data.roads, surface, field.network, data.buildings);          // tunnels16: the tunnels the car drives through (as main.js)
+const ground = createGround(surface, deckNetwork, tubes.network);
 const landmarks = createLandmarks({ buildings: data.buildings, decks: deckNetwork.decks, ground: (x, z) => surface.height(x, z), roads: data.roads });
 const buildings = createBuildingIndex(data.buildings, { hidden: landmarks.hiddenBuildings, groundAt: (x, z) => field.height(x, z), landAt: (x, z) => field.baseHeight(x, z) });   // (as main.js: the houses know their height, drive12)
 const playArea = createPlayArea(area);
-const portals = createPortals(data.roads, (x, z) => surface.height(x, z), (r) => field.network.isDrawn(r.id), (x, z) => playArea.inside(x, z), portalRoadAt(field.network), portalBlocked(buildings, deckNetwork));
+const portals = createPortals(data.roads, (x, z) => surface.height(x, z), (r) => field.network.isDrawn(r.id), (x, z) => playArea.inside(x, z), portalRoadAt(field.network), portalBlocked(buildings, deckNetwork), tubes.ids);
 const maps = buildWorldMap({ classes: data.classes, classInfo: data.classInfo, canopy: data.canopy, buildings: data.buildings });
 const treeDecks = createDeckNetwork([...ground.decks, ...landmarks.footprints]);      // the same trees as the game plants (main.js)
-const bakedTrees = keepWaysClear(data.trees, { network: field.network, field, treeDecks, treeFree: landmarks.treeFree });
-const forest = createTreeIndex({ map: maps, field, network: field.network, buildings, trees: bakedTrees, clearings: landmarks.clearings, treeDecks });
+const shells = tubeShells(tubes.tubes, (x, z) => surface.height(x, z));
+const bakedTrees = keepWaysClear(data.trees, { network: field.network, field, treeDecks, treeFree: landmarks.treeFree }).filter((t) => !shells.inShell(t.x, t.z, 1.5));
+const forest = createTreeIndex({ map: maps, field, network: field.network, buildings, trees: bakedTrees, clearings: [...landmarks.clearings, ...shells.clearings], treeDecks });
 const net = field.network;
 
 /* ---------------------------------------------------------------- shared: where the carved ways meet (gates I and J) */
@@ -1758,7 +1763,7 @@ if (wants('M')) {
 /* ---------------------------------------------------------------- N: the bridges, the portals, the ride (harness-bridges.js) */
 if (wants('N')) runBridgeChecks({ check, section, stats, data, surface, ground, net, portals, buildings, forest, playArea });
 /* ---------------------------------------------------------------- O: the shallow tunnels that are open roads, the portals on their roads (harness-tunnels.js) */
-if (wants('O')) runTunnelChecks({ check, section, stats, data, field, surface, ground, net, portals, buildings, forest, playArea });
+if (wants('O')) runTunnelChecks({ check, section, stats, data, field, surface, ground, net, portals, buildings, forest, playArea, tubeIds: tubes.ids });
 if (wants('P')) runRoads9Checks({ check, section, stats, data, field, surface, ground, net, portals, buildings, forest, playArea, markDecks: deckNetwork.decks.filter((d) => !landmarks.hiddenDecks.has(d.id)) });
 /* ---------------------------------------------------------------- Q: decks driven end to end, banks under deck ends, medians, camera (harness-decks.js) */
 if (wants('Q')) runDeckChecks({ check, section, stats, data, field, surface, ground, net, buildings, portals, playArea });
@@ -1767,6 +1772,23 @@ if (wants('R')) runSurfaceChecks({ check, section, stats, data, field, surface, 
 /* ---------------------------------------------------------------- S: how the walls, trees, façades and the camera look (harness-look11.js) */
 if (wants('S')) runLookChecks({ check, section, stats, data, field, surface, ground, net, buildings, forest, portals });
 if (wants('T')) runDrive12Checks({ check, section, stats, data, field, surface, ground, net, buildings, landmarks, portals, forest, playArea, maps, deckNetwork });
+/* ---------------------------------------------------------------- X: the tunnels the car drives through (harness-tubes.js, tunnels16) */
+if (wants('X')) {
+  // the game's own collider and lens (main.js): the houses, walls, trees, lamps and benches over a tube must not stop a car in it
+  const props = createPropCollider();
+  const xLamps = lampsOutsideShells(placeStreetLights({ roads: data.roads, network: net, buildings, map: maps, walls: data.walls }), shells.inShell);
+  for (let i = 0; i < xLamps.count; i++) props.add(xLamps.x[i], xLamps.z[i], LAMP_POST_RADIUS, surface.height(xLamps.x[i], xLamps.z[i]), LAMP_POST_HEIGHT);
+  const benches = placeParkBenches({ roads: data.roads, network: net, buildings, map: maps });
+  for (let i = 0; i < benches.count; i++) props.add(benches.x[i], benches.z[i], BENCH_RADIUS, surface.height(benches.x[i], benches.z[i]), BENCH_HEIGHT);
+  const gameWalls = createWallCollider(data.walls, (x, z) => ground.height(x, z), (x, z) => surface.height(x, z));
+  const game = createCarCollider({ buildings, landmarks, walls: gameWalls, portals, ground, forest, props, trams: null, playArea, surface, deckNetwork, tubes: tubes.network });
+  const wallLens = createWallBlockTest(data.walls);
+  const tubeLens = (x, z, radius, y) => tubes.network.collide(x, z, radius, y - radius);
+  const lens = (x, z, radius, y) => (tubes.network.inside(x, z, y - radius) ? tubeLens(x, z, radius, y)
+    : wallLens(x, z, radius, y) || buildings.collide(x, z, radius, y - radius) || forest.collide(x, z, radius, y - radius) || portals.collide(x, z, radius, y) || tubeLens(x, z, radius, y));
+  const lampsAt = (x, z, r) => { for (let i = 0; i < xLamps.count; i++) if (Math.hypot(xLamps.x[i] - x, xLamps.z[i] - z) < r) return true; return false; };
+  runTubeChecks({ check, section, stats, data, surface, ground, tubes, portals, collide: game.collide, parts: game.parts, lens, forest, buildings, lampsAt });
+}
 /* ---------------------------------------------------------------- U: the city centre of the first drive, the walls' look (harness-city12.js) */
 if (wants('U')) runCity12Checks({ check, section, stats, data, surface, landmarks, maps, buildingsRaw: data.buildings });
 /* ---------------------------------------------------------------- W: the edges of the ground paint (harness-paint15.js) */

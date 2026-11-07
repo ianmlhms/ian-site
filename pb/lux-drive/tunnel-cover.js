@@ -37,7 +37,7 @@ const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const endsOf = (road) => [road.pts[0], road.pts[road.pts.length - 1]];
 
 /** Is (x, z) inside the footprint pts (flat [x0, z0, x1, z1, ...], as decodeBuildings gives it)? */
-function insidePolygon(pts, x, z) {
+export function insidePolygon(pts, x, z) {
   let inside = false;
   const n = pts.length / 2;
   for (let i = 0, j = n - 1; i < n; j = i++) {
@@ -216,7 +216,7 @@ function nearPolyline(pts, x, z, r) {
 }
 
 /** A small grid of the house footprints near the tunnels only (the whole city is not indexed for 160 short runs). */
-function houseGrid(buildings, tunnels) {
+export function houseGrid(buildings, tunnels) {
   const CELL = 64, key = (cx, cz) => cx * 65536 + cz;
   const wanted = new Set();
   for (const t of tunnels) for (const [x, z] of t.pts) for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) wanted.add(key(Math.floor(x / CELL) + a, Math.floor(z / CELL) + b));

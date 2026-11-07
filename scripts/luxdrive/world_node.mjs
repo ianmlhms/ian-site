@@ -8,6 +8,7 @@ import { createHeightField } from '../../pb/lux-drive/heightfield.js';
 import { createSurface } from '../../pb/lux-drive/surface.js';
 import { createDeckNetwork, createGround } from '../../pb/lux-drive/decks.js';
 import { fixLandmarkDecks } from '../../pb/lux-drive/landmarks.js';
+import { createTubes } from '../../pb/lux-drive/tunnel-tubes.js';
 
 const DATA = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../pb/lux-drive/data');
 export async function loadWorld() {
@@ -15,6 +16,7 @@ export async function loadWorld() {
   const field = createHeightField({ near: data.near, far: data.far, roads: data.roads, decks: data.decks });
   const surface = createSurface(field);
   const deckNetwork = createDeckNetwork(fixLandmarkDecks(data.decks, (x, z) => surface.height(x, z)), surface);
-  const ground = createGround(surface, deckNetwork);
-  return { data, field, surface, ground, deckNetwork };
+  const tubes = createTubes(data.roads, surface, field.network, data.buildings);       // (the tunnels the car drives through, as main.js)
+  const ground = createGround(surface, deckNetwork, tubes.network);
+  return { data, field, surface, ground, deckNetwork, tubes };
 }
