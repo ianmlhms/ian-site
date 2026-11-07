@@ -38,6 +38,14 @@ async function work() {
   const byId = new Map(world.roads.map((r) => [r.id, r]));
   // worker 0 also tells the main thread which roads there are (only the ones that touch the play area: the rest of the baked world is backdrop) (the main thread never loads the world: 0.6 GB less)
   parentPort.postMessage({ ready: true, roads: workerData.index === 0 ? world.roads.filter((r) => r.pts.some((p) => world.playArea.inside(p[0], p[1]))).map((r) => ({ id: r.id, length: r.length, kind: r.kind, bbox: r.pts.reduce((b, p) => [Math.min(b[0], p[0]), Math.min(b[1], p[1]), Math.max(b[2], p[0]), Math.max(b[3], p[1])], [1e9, 1e9, -1e9, -1e9]) })) : null });
+  const DRAWN = !!workerData.drawn;
+  const drawnLine = (road) => {
+    const ri = world.net.roads.findIndex((q) => q.id === road.id), S = world.net.samples;
+    if (ri < 0 || !(S.segs[ri] >= 1)) return road.pts;
+    const pts = [];
+    for (let k = S.first[ri]; k <= S.first[ri] + S.segs[ri]; k++) pts.push([S.x[k], S.z[k]]);
+    return pts;
+  };
   parentPort.on('message', (msg) => {
     if (msg.stop) { process.exit(0); }
     const out = { batch: msg.batch, ids: msg.ids, events: [], km: 0, runs: 0, lanes: 0, roads: 0, ms: 0 };
@@ -50,7 +58,9 @@ async function work() {
       const dirs = road.oneway ? [1] : [1, -1];
       for (const off of offs) {
         out.lanes++;
-        const base = offsetLine(road.pts, off);
+        // --drawn: the lanes run beside the centre line the game DRAWS and carves (road-network.js rounds the corners of the OSM polyline with a 3 m Gaussian); the lanes of the
+        // raw polyline leave the carriageway by up to 0.6 m at the corner of a tight service loop and every such corner read as a kerb jolt of 40 - 120 m/s2 (fix19)
+        const base = offsetLine(DRAWN ? drawnLine(road) : road.pts, off);
         for (const dir of dirs) {
           const line = dir > 0 ? base : base.slice().reverse();
           for (const speed of speedsOf(road.kind, msg.speeds)) {
@@ -118,7 +128,7 @@ async function main() {
       while (idle.length) pump(idle.shift());
     };
     for (let k = 0; k < workers; k++) {
-      const w = new Worker(SELF, { workerData: { index: k }, resourceLimits: { maxOldGenerationSizeMb: 1800 } });
+      const w = new Worker(SELF, { workerData: { index: k, drawn: process.argv.includes("--drawn") }, resourceLimits: { maxOldGenerationSizeMb: 1800 } });
       w.on('message', (m) => {
         if (m.ready) { if (m.roads) begin(m.roads); if (started) pump(w); else idle.push(w); return; }
         events.push(...m.events);
