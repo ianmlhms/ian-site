@@ -23,12 +23,15 @@ const LEVEL_BELOW = 1.5;       // m: a car this far under the mouth is on anothe
 
 /** blocked for createPortals: the wall box of a portal (its width, its recess, from its road to its top) touches a house (buildings.js collide) or a deck (decks.js overheadAt: the underside of a deck over it). */
 export function portalBlocked(buildings, decks) {
+  // (a huge footprint - a block of offices over its own car park, collide14 put them in the index - does not block a mouth: the ramps of Impasse Drosbach under 11862 and
+  // Rue du Fort Thüngen under the tower block 4808 lead into them; their portals stand at the façade as before)
+  const houseAt = (x, z) => { const h = buildings.collide(x, z, BLOCK_HOUSE); return !!h && !(buildings.isHuge && buildings.isHuge(h.id)); };
   return (p) => {
     if (!Number.isFinite(p.y)) return false;
     for (let u = -p.half - 0.3; u <= p.half + 0.3 + 1e-6; u += (2 * p.half + 0.6) / 8) {
       for (const v of [-BLOCK_FRONT, 0.1, p.depth / 2, p.depth, p.depth + BLOCK_BEHIND / 2, p.depth + BLOCK_BEHIND, p.depth + BLOCK_DECK_BEHIND]) {
         const x = p.x + p.sx * u - p.nx * v, z = p.z + p.sz * u - p.nz * v;
-        if (v <= p.depth + BLOCK_BEHIND && buildings && buildings.collide(x, z, BLOCK_HOUSE)) return true;                                  // (behind the wall too: the house the mouth would be cut into)
+        if (v <= p.depth + BLOCK_BEHIND && buildings && houseAt(x, z)) return true;                                  // (behind the wall too: the house the mouth would be cut into)
         if (v >= 0 && decks && decks.overheadAt(x, z, p.y) <= p.y + p.wallTop + BLOCK_DECK_OVER) return true;   // (a slab just over the box sits on it)
       }
     }

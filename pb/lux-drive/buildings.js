@@ -50,10 +50,11 @@ function closestOnPolygon(pts, x, z, out) {
  * `hidden`: ids of the blocks a landmark replaces (they are not indexed: no invisible wall where a landmark stands).
  * `groundAt(x, z)` / `landAt(x, z)`: the ground as the game draws it and the land (building-mesh.js stands the walls on the one and measures the eave from the
  * higher of the two).  Without them a house is solid at every height.
- * Returns { count, collide(x, z, radius, y), near(x, z, radius), levelOf(id), boxes }.
+ * Returns { count, collide(x, z, radius, y), near(x, z, radius), levelOf(id), isHuge(id) (hashed along its edges), boxes }.
  */
 export function createBuildingIndex(buildings, { cell = CELL, hidden = null, groundAt = null, landAt = null } = {}) {
   const boxes = new Map();                       // id -> the bounding box
+  const huge = new Set();                        // ids of the footprints hashed along their edges (collide14)
   const cells = new Map();                       // cell key -> the ids inside
   const key = (cx, cz) => cx * 100003 + cz;
   for (const b of buildings) {
@@ -70,6 +71,7 @@ export function createBuildingIndex(buildings, { cell = CELL, hidden = null, gro
     // collide14 (QA4 N4-C01): a huge footprint (Kirchberg 1372, the tower block 4808 at Place de l'Europe, the Gare's platform roof 15153: nine of 160 - 480 m) was left
     // out of the index - drawn, but the car drove into it and stood under its black ceiling.  Its edges are hashed instead of its box (the collision is the distance
     // to the edges): every cell an edge passes through, and its neighbours where the edge runs within EDGE_STEP of a cell border.
+    huge.add(b.id);
     const set = new Set();
     for (let i = 0, n = b.pts.length / 2; i < n; i++) {
       const j = (i + 1) % n, ax = b.pts[i * 2], az = b.pts[i * 2 + 1], ex = b.pts[j * 2] - ax, ez = b.pts[j * 2 + 1] - az;
@@ -159,5 +161,5 @@ export function createBuildingIndex(buildings, { cell = CELL, hidden = null, gro
     return best;
   }
 
-  return { count: buildings.length, collide, near, levelOf, boxes, buildings };
+  return { count: buildings.length, collide, near, levelOf, isHuge: (id) => huge.has(id), boxes, buildings };
 }
