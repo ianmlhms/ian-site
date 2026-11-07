@@ -2670,3 +2670,46 @@ every tube / at a QA pose, `drive.mjs` + `gameworld.mjs` drives with the game's 
 `01_TU03_rangwee_profile.png`, `02_TU03_rangwee_top.png`, `02b_TU03_rangwee_chase.png`, `03_TU02_gruenewald_profile.png`, `04_TU04_konen_north_mouth.png`,
 `04b_TU04_konen_north_outside.png`, `05_TU05_konen_mid_camera.png`, `06_TU01_cessange_strip.png`, `06b_TU01_rocade_strip.png`.  Raw shots `shots/v68`, `shots/now`
 (`poses1.json`).
+
+## Fix 19 (branch `lux-drive-fix19`, Mac mini): sweep-1 worst places - Rue de Munsbach under the A1, the service-loop "kerb" jolts
+
+Started from main 75ec45c5 (v69).  Tools + logs: `~/Library/Caches/luxdrive-work/fix19/` (`tools/probe.mjs`, `xsec.mjs`, `prof.mjs`, `near.mjs`, `joined.mjs`, `multi.mjs`, `multi-drawn.mjs`).
+
+### 1. Rue de Munsbach under the A1 (ways 9232 / 9086 at 14882,5517): FIXED
+Cause: the four A1 bridges over the street (2844 / 2845 / 2847 / 2849, 18 m each) survived the DTM filter: the land under the street rises 4.5 m onto the motorway
+(266.6 m) and falls 5 m back.  2845 / 2849 have no deck (deckless, carved on the ground), so the street was carved over the crest (the protection of the over ways
+kept the land) and deck 254 (2844, spans: false) caught the car at 266.3 m and dropped it 5 m: jolt 175 m/s2, fall 5.4 m, air 1.27 s, roll 0.6 rad.
+Fix: `embankment-underpass.js` (new, applied in `world-data.js` after openShallowTunnels): a carved car way that crosses drivable bridge ways (layer >= 1) where the
+land at a crossing stands >= 3 m over the line between the land 22 m before / after the crossings is split; the stretch under the embankment (from foot to foot, land
+<= 0.8 m over that line, <= 16 m beyond the outer crossings) becomes a tunnel way, so tunnel-tubes.js gives it a tube (the A1 keeps its embankment).  Measured over the
+whole network it fires only on 9232 and 9086 (2 tubes, 30 m, grade 2.2 / 2.4 %).  Ids = indices: the way keeps its id before the underpass, the tunnel and the rest
+are appended (20268 .. 20271).  Joined drive of 9232 + 20270 + 20271: worst jolt 175 -> 10 (13 m/s) / 17 (25 m/s), no air, no fall; 9086: none / 9.4.
+
+### 2. Service-loop jolts at lane +-1.6 m (11479, 7841, 10291, 11562, 11575, 17194, 2633, 11329, 18440, 4570, 9396, 9158, 19466): SWEEP ARTEFACT, no game change
+Cause: sweep 1 offsets the lanes from the RAW OSM polyline, the game draws and carves a centre line whose corners are rounded (ROAD.lineSmoothing, 3 m Gaussian), up to
+~2 m inside the raw corner of a tight loop.  The raw lane then leaves the carriageway by up to 0.6 m (lat - hw = 0.05 .. 0.61) and the car rides the carriageway edge /
+kerb at 13 m/s on a 3 - 5 m radius.  7841 (13 m, 15 % grade) is a start artefact: the car is reset with vy = 0 on the slope and flies 0.8 m.  Driven along lanes
+offset from the DRAWN centre line, all 13 ways have no jolt event at all.  Whole sweep with drawn lanes (`--drawn`, patch for branch lux-drive-sweep:
+`~/Library/Caches/luxdrive-work/fix19/sweep-drawn-lanes.patch`): jolt 385 -> 107, roll 11 -> 4, places 131 -> 24.  Place de l'Indépendance 379 is the same artefact.
+
+### 3. Not done (budget)
+Bd des Scillas 7721 (11 m stub, lane 3.67 lies 1.6 m outside its carriageway: likely a tapered junction stub), Route de Luxembourg 2864 (lane -3.67 on the kerb,
+0.4 - 0.8 m outside), Autoroute de Dudelange 17100 (merge with 9104): still in the drawn-lane sweep top 3; not looked at.
+
+### Sweep 1 (raw lanes, same tool as v69), v69 -> now
+Events: jolt 385 -> 385, fall 2 -> 0, air 2 -> 0, hit 4 -> 4, roll 13 -> 11 (406 -> 400); 131 places either way.  New top 10: 11479, 7841, 10291, 7721, 2864, 11562,
+11575, 17194, 17100, 2633 (all item 2 artefacts or item 3).  Munsbach left: 20271 jolt 17.2 at the north mouth (25 m/s), 9086 jolt 9.4.
+
+### Gates (main.js ?v=71)
+* harness: **175 / 175 PASS** in one run (1751 s; tubes list now has the two Rue de Munsbach tubes, tubeRides bad 0, joints 5.0 - 7.6 m/s2).
+* luxdrive_world PASS.  luxdrive_ui PASS.  luxdrive_webkit PASS.
+* **luxdrive_holes FAIL (medium and low): 52 hole pixels**, one auto pose "tube inside" of the new Munsbach tube (14872,5491, looking NE at mouth B): a thin
+  sliver under the mouth opening where nothing is drawn (`fix19/shots/now/t_inside_hole.png`).  Not fixed (budget).  Likely the terrain mask / trough at mouth B,
+  where deck 254 (A1 link 2844) lies right over the mouth and the land falls 5 m.  Either fix the mouth (tunnel-mask / tube face) or, if it cannot be fixed fast,
+  revert `embankment-underpass.js` + the world-data.js hook and ship v71 without item 1.
+
+### Montages (`~/Library/Caches/luxdrive-work/fix19/montages/`, v69 above, now below)
+`m1_mouth_north.png` (the north approach: the climb onto the A1 vs the two portals), `m1_overview.png`, `m2_loop_11479.png` (unchanged: item 2 is no game change).
+
+### Still wrong
+Holes gate above; item 3 not looked at; the trough exit of the Munsbach tube still gives 17 m/s2 at 25 m/s; the A1 link deck 254 sits on top of the portal hood.
