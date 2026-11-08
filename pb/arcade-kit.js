@@ -174,45 +174,51 @@
     const style = document.createElement("style");
     style.id = "arcade-kit-css";
     style.textContent = `
-      .arcade-bar{box-sizing:border-box;min-height:56px;flex:none;display:flex;align-items:center;gap:8px;
+      .arcade-bar{--k-paper:#f6f6f3;--k-white:#fcfcfa;--k-ink:#16171a;--k-muted:#62656a;--k-green:#1f7a4d;
+        box-sizing:border-box;min-height:56px;flex:none;display:flex;align-items:center;gap:8px;
         padding:max(6px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) 6px max(10px,env(safe-area-inset-left));
-        border-bottom:1px solid color-mix(in srgb,var(--border,#2a2a4a) 82%,transparent);
-        background:color-mix(in srgb,var(--bg,#0d0d1a) 86%,transparent);color:var(--text,#e8e8f0);
-        backdrop-filter:blur(18px) saturate(150%);-webkit-backdrop-filter:blur(18px) saturate(150%);
-        font-family:-apple-system,"SF Pro Text","SF Pro Display",BlinkMacSystemFont,"Segoe UI",sans-serif;
-        position:relative;z-index:1000}
+        border-bottom:1px solid var(--k-ink);background:var(--k-paper);color:var(--k-ink);
+        font-family:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;position:relative;z-index:1000}
       .arcade-bar__back,.arcade-bar__button{box-sizing:border-box;min-width:44px;min-height:44px;display:inline-flex;
-        align-items:center;justify-content:center;border:1px solid transparent;border-radius:11px;background:transparent;
-        color:inherit;text-decoration:none;font:650 14px/1 -apple-system,"SF Pro Text",BlinkMacSystemFont,"Segoe UI",sans-serif;
-        letter-spacing:.01em;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .18s cubic-bezier(.2,.8,.2,1),background .18s ease,border-color .18s ease}
-      .arcade-bar__back{padding:0 10px;color:var(--muted,var(--text2,#9b9bb8));white-space:nowrap}
-      .arcade-bar__button{padding:0 11px;font-size:18px;border-color:var(--border,#2a2a4a);background:var(--card,#161625)}
-      .arcade-bar__back:hover,.arcade-bar__button:hover{background:var(--card2,#1e1e35);color:var(--text,#fff)}
-      .arcade-bar__back:active,.arcade-bar__button:active{transform:scale(.94)}
-      .arcade-bar__back:focus-visible,.arcade-bar__button:focus-visible{outline:3px solid var(--accent,#6ea8fe);outline-offset:2px}
-      .arcade-bar__title{margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:17px;line-height:1.15;font-weight:700;letter-spacing:-.012em}
-      .arcade-bar__badge{flex:none;padding:4px 9px;border-radius:999px;background:#ffcc00;color:#2a1d00;font:800 11px/1 -apple-system,"SF Pro Text",BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:.06em;white-space:nowrap}
-      .arcade-bar__spacer{flex:1;min-width:4px}.arcade-bar__best{color:var(--muted,var(--text2,#9b9bb8));font-size:12px;font-weight:650;white-space:nowrap}
+        align-items:center;justify-content:center;border:1px solid transparent;border-radius:0;background:transparent;
+        color:inherit;text-decoration:none;font:600 14px/1 "Geist",system-ui,-apple-system,"Segoe UI",sans-serif;
+        cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background-color .15s,border-color .15s,color .15s}
+      .arcade-bar__back{padding:0 10px;color:var(--k-muted);white-space:nowrap}
+      .arcade-bar__button{padding:0 11px;font-size:18px;border-color:var(--k-ink);background:var(--k-white)}
+      .arcade-bar__back:hover{color:var(--k-green)}
+      .arcade-bar__button:hover{background:var(--k-white);border-color:var(--k-green);color:var(--k-green)}
+      .arcade-bar__button:active{background:var(--k-ink);color:var(--k-paper)}
+      .arcade-bar__back:focus-visible,.arcade-bar__button:focus-visible{outline:2px solid var(--k-green);outline-offset:2px}
+      .arcade-bar__title{margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:16px;line-height:1.15;font-weight:800;letter-spacing:-.01em}
+      .arcade-bar__badge{flex:none;padding:3px 8px;border:1px solid var(--k-green);color:var(--k-green);font:500 11px/1.4 "Geist Mono",ui-monospace,monospace;letter-spacing:.06em;white-space:nowrap}
+      .arcade-bar__spacer{flex:1;min-width:4px}.arcade-bar__best{color:var(--k-muted);font:500 11px/1 "Geist Mono",ui-monospace,monospace;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
       .arcade-context{box-sizing:border-box;min-height:44px;display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:4px 14px;
-        border-bottom:1px solid var(--border,#2a2a4a);background:var(--bg,#0d0d1a);color:var(--muted,var(--text2,#9b9bb8));
-        font:650 13px/1.2 -apple-system,"SF Pro Text",BlinkMacSystemFont,"Segoe UI",sans-serif}
-      .arcade-context code{color:var(--text,#e8e8f0)}.arcade-context [data-arcade-hidden-control]{display:none!important}
+        border-bottom:1px solid #16171a;background:#fcfcfa;color:#62656a;
+        font:500 13px/1.2 "Geist",system-ui,-apple-system,"Segoe UI",sans-serif}
+      .arcade-context code{color:#16171a;font-family:"Geist Mono",ui-monospace,monospace}.arcade-context [data-arcade-hidden-control]{display:none!important}
       .arcade-hardware-keyboard [data-arcade-touch-controls]{display:none!important}
       @media(max-width:520px){.arcade-bar{gap:4px}.arcade-bar__back{font-size:13px;padding-inline:7px}.arcade-bar .arcade-bar__title{font-size:15px}.arcade-bar__best{display:none}.arcade-bar__button{padding:0 8px}.arcade-context{justify-content:center;flex-wrap:wrap}}
-      @media(prefers-reduced-motion:reduce){.arcade-bar__back,.arcade-bar__button{transition:background .12s ease,border-color .12s ease}.arcade-bar__back:active,.arcade-bar__button:active{transform:none}}
-      @media(prefers-reduced-transparency:reduce){.arcade-bar{background:var(--bg,#0d0d1a);backdrop-filter:none;-webkit-backdrop-filter:none}}
-      @media(prefers-contrast:more){.arcade-bar{background:var(--bg,#0d0d1a);border-bottom-color:currentColor}}
+      @media(prefers-reduced-motion:reduce){.arcade-bar__back,.arcade-bar__button{transition:none}}
     `;
     document.head.appendChild(style);
   }
 
-  function button(className, label, text, onClick) {
+  // Phosphor-style line icons (the bar used emoji before the Gitter look)
+  const ICONS = Object.freeze({
+    trophy: '<path d="M8 4h8v6a4 4 0 0 1-8 0V4Zm0 2H4v1a4 4 0 0 0 4 4M16 6h4v1a4 4 0 0 1-4 4M12 14v4m-4 2h8"/>',
+    restart: '<path d="M19 12a7 7 0 1 1-2.05-4.95L19 9m0-4v4h-4"/>',
+    soundOn: '<path d="M4 9.5h3l5-4v13l-5-4H4v-5Zm12.5 0a4 4 0 0 1 0 5m2.5-8a8 8 0 0 1 0 11"/>',
+    soundOff: '<path d="M4 9.5h3l5-4v13l-5-4H4v-5Zm12 .5 5 5m0-5-5 5"/>',
+  });
+  const iconSvg = (name) => `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
+
+  function button(className, label, icon, onClick) {
     const element = document.createElement("button");
     element.type = "button";
     element.className = className;
     element.setAttribute("aria-label", label);
     element.title = label;
-    element.textContent = text;
+    element.innerHTML = iconSvg(icon);
     element.addEventListener("click", onClick);
     return element;
   }
@@ -261,23 +267,23 @@
       badge.className = "arcade-bar__badge";
       badge.setAttribute("role", "status");
       badge.setAttribute("aria-label", "Test mode");
-      badge.textContent = "🧪 TEST";
+      badge.textContent = "TEST";
       bar.append(badge);
     }
     bar.append(spacer, best);
 
     if (!config.noScore) {
-      const board = button("arcade-bar__button arcade-bar__leaderboard", "Leaderboard", "🏆", config.onLeaderboard || (() => window.PB?.openBoard?.()));
+      const board = button("arcade-bar__button arcade-bar__leaderboard", "Leaderboard", "trophy", config.onLeaderboard || (() => window.PB?.openBoard?.()));
       bar.appendChild(board);
     }
     if (config.restart !== false) {
-      const restart = button("arcade-bar__button arcade-bar__restart", "Restart", "↻", config.onRestart || runRestart);
+      const restart = button("arcade-bar__button arcade-bar__restart", "Restart", "restart", config.onRestart || runRestart);
       bar.appendChild(restart);
     }
-    const mute = button("arcade-bar__button arcade-bar__mute", muted() ? "Unmute" : "Mute", muted() ? "🔇" : "🔊", () => {
+    const mute = button("arcade-bar__button arcade-bar__mute", muted() ? "Unmute" : "Mute", muted() ? "soundOff" : "soundOn", () => {
       const next = !muted();
       applyMute(next);
-      mute.textContent = next ? "🔇" : "🔊";
+      mute.innerHTML = iconSvg(next ? "soundOff" : "soundOn");
       mute.setAttribute("aria-label", next ? "Unmute" : "Mute");
       if (config.onMute) config.onMute(next);
     });
