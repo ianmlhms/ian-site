@@ -6,12 +6,15 @@ Pilot only: the shared kit is restyled and proven on 5 games. The rest follows a
 ## What the shared kit now does
 - `pb/arcade-ui.css?v=2` has two palettes on purpose.
   - `--g-*` = page chrome in Gitter (paper #f6f6f3, ink #16171a, one green #1f7a4d, hairlines, radius 0, Geist + Geist Mono from `/assets/fonts/`, absolute paths for srcdoc).
-  - `--bg --card --text --accent --cyan ...` = the board palette, unchanged, because the games read these with `getComputedStyle` to paint their canvas. Boards stay dark and sit in a 1 px ink hairline on the paper stage. `--radius*` are now 0, `--glow` is none, `--font*` is Geist.
+  - `--bg --card --text --accent --cyan ...` = the board palette. Games read these with `getComputedStyle` to paint their canvas, so since round 2 (Ian: dark boards stand out) they hold LIGHT values (#fbfbf8 board, ink text, deeper saturated accents) and every canvas game turns light at once. Boards sit in a 1 px ink hairline on the paper stage. `--radius*` are now 0, `--glow` is none, `--font*` is Geist.
 - Restyled, class names and ids untouched: `.arcade-stage` (paper, no gradient), `.arcade-hud` + `.arcade-pill` (mono hairline cells, no blur), `.arcade-overlay` (paper veil .95, no blur) + `.arcade-panel` (white card, ink hairline, no glow), `.arcade-big`, `.arcade-btn` (green; ink on hover/press; `.secondary` = outline; `.danger`), `.arcade-seg` (hairline segmented control, ink = selected), `.arcade-hint`, new `.arcade-toast`.
 - `.arcade-stage canvas` gets `box-shadow:0 0 0 1px ink` and radius 0 (beats the old per-game `canvas{...}` shadows); canvases inside a pill get none.
 - `pb/arcade-kit.js?v=42`: the game bar (`.arcade-bar*`, `.arcade-context`) is now paper with an ink hairline, square 44 px buttons, Geist; emoji icons (trophy, restart, speaker) replaced by inline line icons; TEST badge is text only (still contains "TEST").
 - `pixelbreak.html`: game overlay, iframe and on-screen D-pad strip are paper (were black); D-pad buttons are white hairline squares, action button green.
-- Opt-out so nothing unreadable ships: `bus-tycoon`, `cookie-clicker`, `idle-empire` (not restyled yet, files untouched, not even the `?v=` bump) keep the old dark page via an `html:has(script[data-arcade-id=...])` block at the end of `arcade-ui.css`. Remove that block when each is restyled.
+- Opt-out: `bus-tycoon` (another agent owns it) keeps the old dark palette via an `html:has(script[data-arcade-id="bus-tycoon"])` block at the end of `arcade-ui.css`. Remove it when bus-tycoon is restyled.
+- Round 2: English game words (Game over, Play again, hints) are kept on purpose. `arcade-ui.css?v=3`.
+- Idle games: `pb/idle-gitter.css` (new, loaded only by `idle-empire` and `cookie-clicker`; `idle-extras.css` is shared with bus-tycoon/fouer and untouched) restyles panels, shop/upgrade lists, buttons, notices, modals and the shared idle dialogs/toasts; numbers in Geist Mono; cookie art untouched.
+- Tetris: 7 piece colours deepened, square blocks. Flappy: eye/cloud colours fixed for light. Asteroids/space games: light works (thin ink outlines on paper, faint stars); no game needed to stay dark. Space-invaders and run-3 read the same vars but were not screenshotted: check them.
 - `?v=` bumped (css 1 to 2, kit 41 to 42) in every other file that loads them, including the root games (dots, connect4, wordle, ...) that load the kit. Skipped: the protected big games listed above, `lux-drive*`.
 
 ## Pilot games
