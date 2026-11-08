@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="lb" data-no-season>
+<html lang="lb">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -13,46 +13,39 @@
 <meta property="og:url" content="https://ian.lu/slf.html">
 <meta property="og:image" content="https://ian.lu/apple-touch-icon.png">
 <meta name="twitter:card" content="summary">
-<meta name="theme-color" content="#0d0d1a">
+<meta name="theme-color" content="#f6f6f3">
+<link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="gitter.css?v=3">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <script src="mp-gate.js?v=7" data-game="slf"></script>
-<script src="season.js?v=5"></script>
 <script src="theme.js?v=32"></script>
 <style>
-  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--good:#3fb950}
-  *{box-sizing:border-box}
-  body{margin:0;min-height:100vh;min-height:100svh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-  a{color:var(--accent2-text);text-decoration:none}
-  .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
-  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
-  .bar .code{color:var(--muted);font-size:13px}.bar code{background:var(--card2);padding:2px 8px;border-radius:6px;color:var(--accent2-text)}
-  .wrap{max-width:680px;margin:0 auto;padding:22px 18px 60px}
+  .wrap{max-width:760px;margin:0 auto;padding:22px 20px 60px}
   .players{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
-  .pchip{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:6px 12px;font-size:13px}
-  .letter{font-size:64px;font-weight:900;text-align:center;color:var(--accent-text);margin:10px 0}
-  .big{width:100%;background:var(--accent);color:var(--accent-foreground);border:none;border-radius:12px;padding:14px;font-weight:800;font-size:16px;cursor:pointer}
-  .big.stop{background:#ff5d6c}
+  .pchip{background:var(--white);border:1px solid var(--ink);font-family:"Geist Mono",ui-monospace,monospace;border-radius:0;padding:6px 12px;font-size:13px}
+  .letter{font:500 72px/1 "Geist Mono",ui-monospace,monospace;text-align:center;color:var(--green);margin:14px 0}
+  .big{font-family:inherit;width:100%;min-height:48px;background:var(--ink);color:var(--paper);border:1px solid var(--ink);padding:14px;font-weight:600;font-size:16px;cursor:pointer}.big:hover{background:var(--green);border-color:var(--green)}
+  .big.stop{background:var(--danger);border-color:var(--danger)}
   .cat{display:flex;align-items:center;gap:10px;margin-bottom:10px}
   .cat label{width:120px;color:var(--muted);font-size:14px;flex:none}
-  .cat input{flex:1;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:11px 13px;font-size:15px}
+  .cat input{flex:1;min-height:44px;background:var(--white);border:1px solid var(--ink);color:var(--ink);border-radius:0;padding:11px 13px;font-size:16px}.cat input:focus{outline:2px solid var(--green);outline-offset:-2px;border-color:var(--green)}
   table{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}
-  th,td{padding:7px 8px;border-bottom:1px solid var(--border);text-align:left}
-  th{color:var(--muted);font-size:12px}
+  th,td{padding:9px 8px;border-bottom:1px solid var(--soft);text-align:left}
+  th{color:var(--muted);font-size:13px;font-weight:600}th[scope=col]{border-bottom-color:var(--ink)}
   td.pts{text-align:right;font-weight:800}
   .tot{margin-top:16px}
-  .ovr{background:var(--card2);border:1px solid var(--border);color:var(--good);border-radius:8px;padding:2px 7px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap}
+  .ovr{font-family:inherit;min-height:32px;background:transparent;border:1px solid var(--green);color:var(--green);border-radius:0;padding:2px 7px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap}
   .ovr:hover{border-color:var(--good)}
   .muted{color:var(--muted)}.center{text-align:center}
-  h3{font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:22px 0 10px}
+  h3{font-size:15px;font-weight:600;color:var(--muted);margin:22px 0 10px}
   .catpick .chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px}
-  .chip{background:var(--card);border:1px solid var(--border);color:var(--muted);border-radius:20px;padding:7px 13px;font-size:13px;cursor:pointer}
-  .chip.on{background:var(--accent);border-color:var(--accent-border);color:var(--accent-foreground);font-weight:700}
+  .chip{background:transparent;border:1px solid var(--ink);color:var(--ink);padding:7px 13px;font-size:14px;cursor:pointer;font-family:inherit}.chip:hover{border-color:var(--green);color:var(--green)}
+  .chip.on{background:var(--ink);border-color:var(--ink);color:var(--paper);font-weight:600}
   /* design-pass: a11y + touch */
   .sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   button,.chip,.ovr{touch-action:manipulation}
-  .big.stop{color:#000}                      /* fixed red background: the accent-foreground (white on a dark accent) failed contrast */
+  .big.stop{color:#fff}                      /* fixed red background: the accent-foreground (white on a dark accent) failed contrast */
   td.pts,.letter,.tot td{font-variant-numeric:tabular-nums}
-  html[data-theme="light"]{--good:#1a7f37}   /* #3fb950 on white is 2.5:1 */
   .cat input:focus-visible,.big:focus-visible,.chip:focus-visible,.ovr:focus-visible{outline:2px solid var(--focus-ring,var(--accent2-text));outline-offset:2px}
   .chip{min-height:var(--hit-target,2.75rem)}
   .cat label{overflow-wrap:anywhere}
@@ -60,23 +53,22 @@
   @media(max-width:420px){.cat{flex-wrap:wrap;gap:4px}.cat label{width:100%}}
   @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
 </style>
-  <link rel="stylesheet" href="game-common.css?v=5">
-<script data-goatcounter="https://ianm.goatcounter.com/count"
+  <script data-goatcounter="https://ianm.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
 </head>
-<body>
+<body class="gt">
 <header class="bar">
   <a class="home" href="pixelbreak.html">‹ Arcade</a>
-  <h1>🔤 Stadt-Land-Fluss</h1>
+  <h1>Stadt-Land-Fluss</h1>
   <div class="spacer"></div>
-  <span class="code">room <code id="roomc"></code></span>
+  <span class="code">Raum <code id="roomc"></code></span>
 </header>
 <div class="sr-only" id="srLive" role="status" aria-live="polite" aria-atomic="true"></div>
-<main class="wrap" id="app"><p class="muted">Connecting…</p></main>
+<main class="wrap" id="app"><p class="muted">Lued …</p></main>
 
 <script src="pixelbreak-config.js"></script>
 <script src="pb/arcade-kit.js?v=42" data-arcade-id="o-slf" data-arcade-title="Stadt-Land-Fluss" data-arcade-no-score data-arcade-replace=".bar"></script>
@@ -213,7 +205,7 @@ async function validateAll(ps){
 async function getName(){
   let n=localStorage.getItem("playerName");
   if(!n){ try{ n=window.__pbAuth?.session?.user?.user_metadata?.username; }catch{} }
-  if(!n){ n=(prompt("Your name for the game:")||"Player").slice(0,20); }
+  if(!n){ n=(prompt("Däin Numm fir d'Spill:")||"Player").slice(0,20); }
   localStorage.setItem("playerName", n); return n;
 }
 function players(){ const st=ch.presenceState(); return Object.keys(st).filter(k=>isId(k)&&Array.isArray(st[k])&&isObject(st[k][0])&&isText(st[k][0].name,MAX_NAME)).slice(0,MAX_PLAYERS).map(k=>({cid:k, name:(st[k][0]||{}).name||"?"})); }
@@ -242,15 +234,15 @@ function render(){
   const ps = players();
   if(window.MPGate) MPGate.setOver(phase==="lobby"||phase==="results");
   if (phase==="lobby"){
-    announce(ps.length<2?"Lobby: waiting for players":"Lobby: ready");
+    announce(ps.length<2?"Lobby: waart op Spiller":"Lobby: prett");
     $("app").innerHTML = `
-      <div class="players">${ps.map(p=>`<span class="pchip"><span aria-hidden="true">👤</span> ${esc(p.name)}${p.cid===cid?" (you)":""}</span>`).join("")||'<span class="muted">…</span>'}</div>
-      <p class="muted">${ps.length<2?"Waiting for players — share the room code above.":"Ready!"}</p>
-      <p class="muted" style="font-size:12.5px"><span aria-hidden="true">🔎</span> At the reveal, answers are checked against Wikidata — made-up words score 0.</p>
+      <div class="players">${ps.map(p=>`<span class="pchip">${esc(p.name)}${p.cid===cid?" (du)":""}</span>`).join("")||'<span class="muted">…</span>'}</div>
+      <p class="muted">${ps.length<2?"Waart op Spiller — deel de Raumcode uewen.":"Prett!"}</p>
+      <p class="muted" style="font-size:12.5px">Beim Opléise ginn d'Äntwerte mat Wikidata iwwerpréift — erfonne Wierder ginn 0 Punkten.</p>
       ${role==="host" ? renderCatPicker() : ""}
-      ${role==="host" ? `<button class="big" id="startBtn" ${(ps.length<2||selIdx.length<2)?"disabled":""}>Start round ${round+1}</button>`
-                      : (hostHere ? `<p class="center muted">Waiting for the host to start…</p>`
-                                  : `<p class="center muted">⚠️ The host left the room — ask them to rejoin, or <a href="pixelbreak.html">start a new game</a>.</p>`)}
+      ${role==="host" ? `<button class="big" id="startBtn" ${(ps.length<2||selIdx.length<2)?"disabled":""}>Ronn ${round+1} starten</button>`
+                      : (hostHere ? `<p class="center muted">Waart bis den Host ufänkt …</p>`
+                                  : `<p class="center muted">Den Host ass fort — frot en, nees bäizetrieden, oder <a href="pixelbreak.html">fänk e neit Spill un</a>.</p>`)}
       ${renderTotals(ps)}`;
     if(role==="host"){
       $("startBtn") && ($("startBtn").onclick=startRound);
@@ -258,44 +250,44 @@ function render(){
     }
   } else if (phase==="play"){
     $("app").innerHTML = `
-      <div class="players">${ps.map(p=>`<span class="pchip"><span aria-hidden="true">👤</span> ${esc(p.name)}</span>`).join("")}</div>
+      <div class="players">${ps.map(p=>`<span class="pchip">${esc(p.name)}</span>`).join("")}</div>
       <div class="letter"></div>
       ${cats.map((c,i)=>`<div class="cat"><label for="c${i}">${esc(c.name)}</label><input id="c${i}" name="answer-${i}" type="text" enterkeyhint="next" autocomplete="off" autocapitalize="words" spellcheck="false" maxlength="200"></div>`).join("")}
-      <button class="big stop" id="stopBtn" type="button"><span aria-hidden="true">✋</span> Stop! (reveal)</button>`;
+      <button class="big stop" id="stopBtn" type="button">Stop! (opléisen)</button>`;
     $("app").querySelector(".letter").textContent=letter;
     cats.forEach((_,i)=>$("c"+i).placeholder=letter+"…");
     $("c0").focus();
-    announce("Round "+round+": letter "+letter);
+    announce("Ronn "+round+": Buschtaf "+letter);
     $("stopBtn").onclick=()=>{ ch.send({type:"broadcast",event:"stop",payload:{}}); doStop(); };
   } else if (phase==="checking"){
-    announce("Checking the answers on Wikidata");
+    announce("D'Äntwerte ginn op Wikidata gepréift");
     $("app").innerHTML = `
       <div class="letter" style="font-size:34px"></div>
-      <p class="center muted"><span aria-hidden="true">🔎</span> Checking the answers on Wikidata…</p>`;
+      <p class="center muted">D'Äntwerte ginn op Wikidata gepréift …</p>`;
   } else if (phase==="results"){
-    announce("Round "+round+" results are in");
+    announce("D'Resultater vun der Ronn "+round+" sinn do");
     $("app").innerHTML = `
       <div class="letter" style="font-size:34px"></div>
       ${renderRound(ps)}
       ${renderTotals(ps)}
-      ${role==="host" ? `<button class="big" id="nextBtn" style="margin-top:18px">Next round</button>`
-                      : (hostHere ? `<p class="center muted">Waiting for host…</p>`
-                                  : `<p class="center muted">⚠️ The host left — <a href="pixelbreak.html">start a new game</a>.</p>`)}`;
+      ${role==="host" ? `<button class="big" id="nextBtn" style="margin-top:18px">Nächst Ronn</button>`
+                      : (hostHere ? `<p class="center muted">Waart op den Host …</p>`
+                                  : `<p class="center muted">Den Host ass fort — <a href="pixelbreak.html">fänk e neit Spill un</a>.</p>`)}`;
     if(role==="host"){
       $("nextBtn").onclick=()=>{ phase="lobby"; render(); };
       $("app").querySelectorAll("[data-ov]").forEach(b=> b.onclick=()=>overrideVerdict(b.dataset.ov,true));
     }
   }
-  if(phase==="checking"||phase==="results") $("app").querySelector(".letter").textContent="Letter: "+letter;
+  if(phase==="checking"||phase==="results") $("app").querySelector(".letter").textContent="Buschtaf: "+letter;
 }
 function renderRound(ps){
-  let rows = `<h3>Round ${round}</h3><table><tr><th scope="col">Category</th>${ps.map(p=>`<th scope="col">${esc(p.name)}</th>`).join("")}</tr>`;
+  let rows = `<h3>Ronn ${round}</h3><table><tr><th scope="col">Kategorie</th>${ps.map(p=>`<th scope="col">${esc(p.name)}</th>`).join("")}</tr>`;
   cats.forEach((cat,i)=>{
     rows += `<tr><th scope="row" class="muted" style="font-weight:400;font-size:14px">${esc(cat.name)}</th>` + ps.map(p=>{
       const a=(answers[p.cid]?.ans?.[i])||""; const pts=scoreCell(i,p.cid,ps);
       const isBad = verdicts[p.cid+"|"+i]===false;
-      const ovr = role==="host" ? ` <button class="ovr" type="button" data-ov="${p.cid}|${i}" title="Wikidata got it wrong? Count this answer anyway." aria-label="Count ${esc(a)} anyway (Wikidata got it wrong)">✓ count it</button>` : "";
-      const shown = !a ? "—" : isBad ? `<s style="color:var(--text)">${esc(a)}</s> <span aria-hidden="true">❌</span><span class="sr-only">(rejected by Wikidata)</span>${ovr}` : esc(a);
+      const ovr = role==="host" ? ` <button class="ovr" type="button" data-ov="${p.cid}|${i}" title="Wikidata läit falsch? Déi Äntwert trotzdeem zielen." aria-label="${esc(a)} trotzdeem zielen (Wikidata läit falsch)">zielen</button>` : "";
+      const shown = !a ? "—" : isBad ? `<s style="color:var(--text)">${esc(a)}</s> <span class="sr-only">(vu Wikidata refuséiert)</span>${ovr}` : esc(a);
       return `<td>${shown} <span class="pts" style="color:var(--good)">${pts?("+"+pts):""}</span></td>`;
     }).join("") + `</tr>`;
   });
@@ -304,7 +296,7 @@ function renderRound(ps){
 function renderTotals(ps){
   if(!Object.keys(totals).length) return "";
   const sorted=[...ps].sort((a,b)=>(totals[b.cid]||0)-(totals[a.cid]||0));
-  return `<div class="tot"><h3>Scores</h3><table>${sorted.map(p=>`<tr><td><span aria-hidden="true">👤</span> ${esc(p.name)}</td><td class="pts">${totals[p.cid]||0}</td></tr>`).join("")}</table></div>`;
+  return `<div class="tot"><h3>Punkten</h3><table>${sorted.map(p=>`<tr><td>${esc(p.name)}</td><td class="pts">${totals[p.cid]||0}</td></tr>`).join("")}</table></div>`;
 }
 const MIN_ANSWER_LEN = 2;                // a lone letter ("B") is never an answer
 function valid(a){ const t=(a||"").trim(); return t.length>=MIN_ANSWER_LEN && t[0].toUpperCase()===letter; }
@@ -335,7 +327,7 @@ function toggleCat(i){
 function renderCatPicker(){
   return `<div class="catpick"><h3>Kategorien (${selIdx.length})</h3>
     <div class="chips">${CATALOG.map((c,i)=>`<button class="chip${selIdx.includes(i)?" on":""}" type="button" aria-pressed="${selIdx.includes(i)}" data-ci="${i}">${esc(c.name)}</button>`).join("")}</div>
-    ${selIdx.length<2?'<p class="muted" style="font-size:12px">Wähle mindestens 2 Kategorien.</p>':''}</div>`;
+    ${selIdx.length<2?'<p class="muted" style="font-size:12px">Wiel mindestens 2 Kategorien.</p>':''}</div>`;
 }
 function enterPlay(){ phase="play"; stopped=false; answers={}; verdicts={}; roundScores={}; clearTimeout(verdictTimer); render(); }
 function doStop(){
