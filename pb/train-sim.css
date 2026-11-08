@@ -271,3 +271,207 @@ body.touch[data-cam="cab"] .hud-util>#btnQuality{display:none}
   .tl-rail{height:clamp(110px,20vh,300px)}
 }
 @media(max-aspect-ratio:5/4) and (max-width:900px){.statsbox{grid-column:2/4}}
+
+/* ======================================================================================================
+   GITTER (Nov 2026): paper #f6f6f3 / ink #16171a / one green #1f7a4d, hairline borders, radius 0, Geist.
+   Only the look changes: HUD panels are solid paper (readable over bright and dark scenery), no blur, glow, gradient or shadow.
+   ====================================================================================================== */
+@font-face{font-family:"Geist";font-style:normal;font-weight:400 800;font-display:swap;src:url("/assets/fonts/geist-latin.woff2") format("woff2")}
+@font-face{font-family:"Geist Mono";font-style:normal;font-weight:500;font-display:swap;src:url("/assets/fonts/geist-mono-500-latin.woff2") format("woff2")}
+:root{color-scheme:light;--paper:#f6f6f3;--white:#fcfcfa;--ink:#16171a;--soft:#62656a;--hair:rgba(22,23,26,.14);--line:#16171a;--gt-green:#1f7a4d;--gt-danger:#a32121;--tint:rgba(22,23,26,.05);
+  --glass:#fcfcfa;--glass-strong:#fcfcfa;--amber:#16171a;--teal:#1f7a4d;--red:#a32121;--green:#1f7a4d;--yellow:#16171a;
+  --font:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Geist Mono",ui-monospace,Menlo,monospace}
+html,body{background:var(--paper);color:var(--ink)}
+#game{background:var(--paper)}
+:focus-visible{outline:2px solid var(--gt-green);outline-offset:2px}
+.glass{background:var(--white);border:1px solid var(--ink);border-radius:0;backdrop-filter:none;-webkit-backdrop-filter:none;box-shadow:none}
+.muted{color:var(--soft)}
+/* next stop */
+.nextbox .lbl{font:500 11px/1.4 var(--mono);letter-spacing:.06em;color:var(--soft)}
+.nextbox b{font-weight:800;letter-spacing:-.025em}
+.nextbox .row{color:var(--soft)}
+.chip{border-radius:0;background:transparent;color:var(--ink);border:1px solid var(--ink);font:500 11px/1.5 var(--mono);padding:0 7px}
+.pill{border-radius:0;background:transparent;border:1px solid var(--hair)}
+.pill small{font:500 9.5px/1.4 var(--mono);letter-spacing:.04em;color:var(--soft)}
+.pill b{font-variant-numeric:tabular-nums}
+.pill.now{background:var(--ink);border-color:var(--ink)}.pill.now b,.pill.now small{color:var(--paper)}
+.pill.past b,.pill.pass b{color:var(--soft)}
+.depbadge{border-radius:0;background:transparent;color:var(--ink);border:1px solid var(--ink)}
+.depbadge.go{background:transparent;color:var(--gt-green);border-color:var(--gt-green)}
+.depbadge.late{background:transparent;color:var(--gt-danger);border-color:var(--gt-danger)}
+.delayword{color:var(--gt-green);font-family:var(--mono)}.delayword.late{color:var(--gt-danger)}
+#stripNextLbl{border-radius:0;background:var(--white);color:var(--ink);border:1px solid var(--ink);top:31px}
+/* route strip */
+.strip{background:var(--white);border:1px solid var(--ink)}
+.strip .line{background:var(--ink);height:1px;border-radius:0}
+#stripDots i{border-radius:0;background:var(--white);border:1px solid var(--ink);width:9px;height:9px;margin-left:-4.5px;top:19px}
+#stripDots i.done{background:var(--ink);border-color:var(--ink)}
+#stripDots i.next{background:var(--gt-green);border-color:var(--gt-green);box-shadow:none;transform:rotate(45deg)}
+#stripDots span{color:var(--soft)}
+#stripTrain{border-top-color:var(--gt-green);filter:none}
+#stripDots b.tsr{background:var(--gt-danger);border-radius:0;opacity:1}
+.strip{padding:0 18px}
+/* clock + stats */
+.statsbox{text-align:right}
+.clockrow b{font:500 24px/1.2 var(--mono);letter-spacing:-.02em}
+#clockSec{color:var(--soft);font-family:var(--mono)}
+.delay{color:var(--gt-green);font-family:var(--mono)}.delay.late{color:var(--gt-danger)}.delay.warn{color:var(--ink);text-decoration:underline}
+.statline{color:var(--soft)}.statline b{color:var(--ink);font-family:var(--mono);font-weight:500}
+/* speed */
+.speed b{font:500 56px/.95 var(--mono);letter-spacing:-.05em}
+.speed small{color:var(--soft);font-family:var(--mono)}
+.limit-sign{border-color:#c4251f;background:#fff;color:#16171a}
+.nextlimit{color:var(--soft);font-family:var(--mono)}
+/* lever + centre */
+#leverLabel{color:var(--ink);font-family:var(--mono);font-weight:500}
+#leverLabel.brake{color:var(--ink)}#leverLabel.eb{color:var(--gt-danger)}#leverLabel.neutral{color:var(--soft)}
+#leverBar i{border-radius:0;background:var(--hair)}
+#leverBar i.on.p{background:var(--gt-green)}#leverBar i.on.b{background:var(--ink)}#leverBar i.on.e{background:var(--gt-danger)}#leverBar i.zero{background:var(--ink)}
+.doorstate{color:var(--soft)}.doorstate.open{color:var(--ink);font-weight:700}
+.hint kbd,#helpBody kbd{border-radius:0;background:var(--paper);border:1px solid var(--ink);font:500 12px/1.3 var(--mono);color:var(--ink)}
+.hint.coach{color:var(--gt-green)}
+.xchg{border-bottom-color:var(--hair)}
+.xchg .out{color:var(--gt-danger)}.xchg .in{color:var(--gt-green)}.xchg .on{color:var(--soft)}
+/* signal: a real signal head stays dark, but flat (no glow) */
+.sig{background:var(--ink);border-radius:0;border:0}
+.sig i{background:#3a3d44}
+.sig.r .r{background:#e0453b;box-shadow:none}.sig.y .y{background:#f0c93a;box-shadow:none}.sig.g .g{background:#3ec97b;box-shadow:none}
+.sigtext{color:var(--soft)}.sigtext b{color:var(--ink)}
+/* util chips */
+.chipbtn{border-radius:0;color:var(--ink);font-weight:600}
+button.chipbtn:hover{color:var(--gt-green);border-color:var(--gt-green)}
+button.chipbtn.on{color:var(--paper);background:var(--ink);box-shadow:none}
+.revlamp,.revlamp[hidden]{box-shadow:none}
+.revlamp{background:var(--ink);color:var(--paper);font-family:var(--mono);font-weight:500;border-radius:0}
+.parklamp{border-radius:0;background:transparent;color:var(--gt-danger);border:1px solid var(--gt-danger);font-family:var(--mono);font-weight:500}
+.guide{border-radius:0}
+.guide.brake{background:var(--ink);color:var(--paper);border:1px solid var(--ink)}
+.guide.late,.guide.eb{background:var(--white);color:var(--gt-danger);border:1px solid var(--gt-danger)}
+.guide.ok{background:transparent;color:var(--gt-green);border:1px solid var(--gt-green)}
+.guide.subtle{background:transparent;border-color:transparent}.guide.subtle.late{background:transparent}
+.aheadload{border-radius:0}
+/* messages */
+.toast{border-radius:0;background:var(--ink);color:var(--paper);border:1px solid var(--ink);border-left:3px solid var(--paper);font-weight:600}
+.toast.bad{border-color:var(--gt-danger);border-left-color:#e06a6a;color:var(--paper)}
+.toast.good{border-color:var(--ink);border-left-color:#5fd49a;color:var(--paper)}
+.toast.info{color:var(--paper)}
+#banner{border-radius:0;background:var(--white);color:var(--ink);border:1px solid var(--ink);font-weight:800;letter-spacing:-.02em}
+#banner small{color:var(--soft)}
+.msgstack.tighter .toast,.msgstack.tighter #banner{border-radius:0}
+.camhint{border-radius:0;color:var(--soft)}
+/* weather popover */
+.wxpop{border-radius:0;box-shadow:none}
+.wxpop__lbl{font:500 11px/1.4 var(--mono);letter-spacing:.06em;color:var(--soft)}
+.wxopt{border-radius:0;background:transparent;border:1px solid var(--hair);color:var(--ink);font-weight:600}
+.wxopt:hover{border-color:var(--ink);background:transparent}
+.wxopt[aria-checked="true"]{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.wxopt:focus-visible,#btnWx:focus-visible{outline:2px solid var(--gt-green)}
+#btnMenu{color:var(--ink)}
+.walkpad{border-radius:0;background:var(--white);border:1px solid var(--ink)}
+.walkpad i{border-radius:0;background:var(--ink);border:0}
+/* overlays + cards */
+.overlay.center{background:rgba(246,246,243,.9);backdrop-filter:none;-webkit-backdrop-filter:none}
+#menu{background:var(--paper)}
+.card{background:var(--white);border:1px solid var(--ink);border-radius:0;box-shadow:none;padding:26px 28px}
+.card h2{font-weight:800;letter-spacing:-.03em}
+.btns button,.card>button,button.primary{border-radius:0;background:transparent;border:1px solid var(--ink);color:var(--ink);font-weight:600}
+.btns button:hover,.card>button:hover{background:transparent;border-color:var(--gt-green);color:var(--gt-green)}
+button.primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+button.primary:hover{background:var(--gt-green);border-color:var(--gt-green);color:#fff}
+.stamp{font:500 12px/1.4 var(--mono);letter-spacing:.06em;color:var(--gt-green)}
+.loadcard{border-radius:0;background:var(--white);border:1px solid var(--ink)}
+.loadbar{border-radius:0;background:var(--hair);border:0;height:6px}
+.loadbar i{background:var(--gt-green);box-shadow:none;border-radius:0}
+.loadbar i::after{display:none}
+#loading{background:var(--paper)}
+.spinner{border-color:var(--hair);border-top-color:var(--gt-green)}
+#ttBody th{font-family:var(--mono);font-weight:500;color:var(--soft)}
+#ttBody th,#ttBody td,#sumRows td{border-bottom-color:var(--hair)}
+#ttBody tr.cur td{color:var(--gt-green)}
+#sumRows td:last-child{font-family:var(--mono);font-weight:500}
+#sumRows td.neg:last-child{color:var(--gt-danger)}#sumRows td.pos:last-child{color:var(--gt-green)}
+.grade{font-weight:800;color:var(--ink)}
+.sumtotal b{color:var(--ink);font-family:var(--mono);font-weight:500}
+#phoneBlock,#errorScreen{background:var(--paper)}
+/* touch pad */
+.tl-rail{border-radius:0}
+.tl-ticks i{border-radius:0;background:var(--hair)}
+.tl-ticks i.p{background:rgba(31,122,77,.4)}.tl-ticks i.b{background:rgba(22,23,26,.4)}.tl-ticks i.zero{background:var(--ink)}
+.tl-thumb{border-radius:0;background:var(--gt-green);border:1px solid var(--ink);box-shadow:none}
+.tl-thumb b{color:#fff;font-family:var(--mono);font-weight:500}
+.tl-thumb.brake{background:var(--ink)}.tl-thumb.brake b{color:var(--paper)}
+.tl-thumb.neutral{background:var(--white)}.tl-thumb.neutral b{color:var(--ink)}
+.tl-thumb.eb{background:var(--gt-danger)}
+.tbtn{border-radius:0;color:var(--ink)}
+.tbtn .lb{color:var(--soft)}
+.tbtn.tb-eb{border-color:var(--gt-danger);background:var(--white)}.tbtn.tb-eb .ic{color:var(--gt-danger)}
+.tbtn.on{background:var(--ink);color:var(--paper);box-shadow:none}.tbtn.on .lb{color:var(--paper)}
+.tbtn.tb-eb.on{background:var(--gt-danger)}.tbtn.tb-eb.on .ic{color:#fff}
+.tbtn.down{background:var(--tint)}
+body[data-cam="cab"] .centerbox{background:var(--white)}
+
+/* ======================================================================================================
+   SKINS (Ian picks one later): <html data-skin="a|b|c">. A = Paper (the rules above, default), B = Cab ink, C = Signal.
+   B and C only override on top of A, so choosing one later = change the default in train-sim.html.
+   ====================================================================================================== */
+/* ---- B: Cab ink. Dark ink panels + menus, paper text, the same green (a touch lighter so it reads on ink) ---- */
+html[data-skin="b"]{color-scheme:dark;--paper:#16171a;--white:#1c1e22;--ink:#f6f6f3;--soft:#9ea1a7;--hair:rgba(246,246,243,.16);--line:rgba(246,246,243,.3);--gt-green:#3aa570;--gt-danger:#e5675f;--tint:rgba(246,246,243,.06);--teal:#3aa570;--red:#e5675f;--green:#3aa570}
+html[data-skin="b"] .glass,html[data-skin="b"] .card,html[data-skin="b"] .strip,html[data-skin="b"] #banner,html[data-skin="b"] .loadcard,html[data-skin="b"] .walkpad{border-color:rgba(246,246,243,.34)}
+html[data-skin="b"] .toast{background:#25282d;color:#f6f6f3;border-color:rgba(246,246,243,.34);border-left-color:var(--gt-green)}
+html[data-skin="b"] .toast.bad{border-left-color:var(--gt-danger)}
+html[data-skin="b"] .overlay.center{background:rgba(22,23,26,.9)}
+html[data-skin="b"] .sig{background:#0b0c0e;border:1px solid var(--hair)}
+html[data-skin="b"] .pill.now{background:var(--gt-green);border-color:var(--gt-green)}html[data-skin="b"] .pill.now b,html[data-skin="b"] .pill.now small{color:#fff}
+html[data-skin="b"] button.chipbtn.on,html[data-skin="b"] .revlamp,html[data-skin="b"] .tbtn.on{background:var(--gt-green);color:#fff}
+html[data-skin="b"] .tbtn.on .lb{color:#fff}
+html[data-skin="b"] button.primary,html[data-skin="b"] .wxopt[aria-checked="true"]{background:var(--gt-green);border-color:var(--gt-green);color:#fff}
+html[data-skin="b"] button.primary:hover{background:#2f8a5e}
+html[data-skin="b"] .guide.brake{background:#f6f6f3;color:#16171a}
+html[data-skin="b"] .tl-thumb b{color:#fff}html[data-skin="b"] .tl-thumb.brake{background:#f6f6f3}html[data-skin="b"] .tl-thumb.brake b{color:#16171a}
+html[data-skin="b"] .tl-thumb.neutral{background:#25282d}
+html[data-skin="b"] .tl-ticks i.zero{background:#f6f6f3}
+html[data-skin="b"] .ts-menu{--bg:#16171a;--bg2:#16171a;--card:#1c1e22;--card2:#25282d;--line:rgba(246,246,243,.34);--hair:rgba(246,246,243,.16);--ink:#f6f6f3;--soft:#9ea1a7;--gold:#3aa570;--gold2:#3aa570;--green:#3aa570;--red:#e5675f;color:#f6f6f3}
+html[data-skin="b"] .ts-menu__mode--career{background:var(--green);color:#fff;border-color:var(--green)}
+html[data-skin="b"] .ts-menu__mode--career small{color:rgba(255,255,255,.82)}html[data-skin="b"] .ts-menu__mode--career .sub{color:#fff}html[data-skin="b"] .ts-menu__mode--career .go{border-color:#fff}
+html[data-skin="b"] .ts-menu__mode--career:not(:disabled):hover{background:#2f8a5e}
+html[data-skin="b"] .ts-menu__career[aria-selected="true"],html[data-skin="b"] .ts-menu__career[data-career="tram"][aria-selected="true"]{background:var(--green);color:#fff}
+html[data-skin="b"] .ts-menu__career[aria-selected="true"] small,html[data-skin="b"] .ts-menu__career[aria-selected="true"] .cash b{color:#fff}
+html[data-skin="b"] .ts-menu__btn--buy{background:var(--green);border-color:var(--green);color:#fff}
+html[data-skin="b"] .ts-menu__btn--buy:not(:disabled):hover{background:#2f8a5e}
+html[data-skin="b"] .ts-menu__hints[aria-pressed="true"]{color:#fff}
+html[data-skin="b"] .ts-menu__envOpt[aria-checked="true"],html[data-skin="b"] .ts-menu__langs button[aria-pressed="true"],html[data-skin="b"] .ts-menu__dir[aria-pressed="true"]{background:var(--green);border-color:var(--green);color:#fff}
+html[data-skin="b"] .ts-menu__resumeBtns .go{background:var(--green);border-color:var(--green);color:#fff}
+html[data-skin="b"] .ts-menu__stage{background:#f1f1ee}
+html[data-skin="b"] .ts-menu__toast{background:#f6f6f3;color:#16171a}
+html[data-skin="b"] .ts-menu__heroTrain svg{filter:none}
+
+/* ---- C: Signal. Paper menus, but a loud HUD like station signage: big mono numerals on ink plates, hard 2 px frames ---- */
+html[data-skin="c"] .glass,html[data-skin="c"] .strip{border-width:2px}
+html[data-skin="c"] .nextbox{padding-top:0;overflow:hidden}
+html[data-skin="c"] .nextbox .lbl{background:var(--ink);color:var(--paper);margin:0 -14px 8px;padding:4px 14px;letter-spacing:.1em}
+html[data-skin="c"] .nextbox b{font-size:24px;letter-spacing:-.03em}
+html[data-skin="c"] .speedbox{background:var(--ink);color:var(--paper)}
+html[data-skin="c"] .speed b{font-size:76px;color:var(--paper);letter-spacing:-.06em}
+html[data-skin="c"] .speed small,html[data-skin="c"] .nextlimit{color:#b9bcc1}
+html[data-skin="c"] .statsbox{background:var(--ink);color:var(--paper)}
+html[data-skin="c"] .clockrow b{font-size:36px;color:var(--paper)}
+html[data-skin="c"] #clockSec,html[data-skin="c"] .statline,html[data-skin="c"] .statsbox small{color:#b9bcc1}
+html[data-skin="c"] .statline b{color:var(--paper)}
+html[data-skin="c"] .delay{color:#5fd49a}html[data-skin="c"] .delay.late{color:#ff8f86}
+html[data-skin="c"] .centerbox{border-top-width:6px}
+html[data-skin="c"] #leverBar{height:20px;gap:2px}
+html[data-skin="c"] #leverLabel{font-size:30px}
+html[data-skin="c"] .signalbox{border-top:6px solid var(--gt-green)}
+html[data-skin="c"] .strip .line{height:3px;top:22px}
+html[data-skin="c"] #stripDots i{width:12px;height:12px;margin-left:-6px;top:18px;border-width:2px}
+html[data-skin="c"] .chipbtn{border-width:2px}
+html[data-skin="c"] .ts-menu__title{text-transform:uppercase;letter-spacing:-.03em;font-weight:800}
+html[data-skin="c"] .ts-menu__title2{text-transform:none}
+html[data-skin="c"] .ts-menu__sec>h2{background:var(--ink);color:var(--bg);padding:6px 12px}
+html[data-skin="c"] .ts-menu__sec>h2::after{display:none}
+html[data-skin="c"] .ts-menu__hero,html[data-skin="c"] .ts-menu__modes,html[data-skin="c"] .ts-menu__careers,html[data-skin="c"] .ts-menu__grid,html[data-skin="c"] .ts-menu__up{border-top-width:2px;border-left-width:2px}
+html[data-skin="c"] .ts-menu__titlebox,html[data-skin="c"] .ts-menu__player,html[data-skin="c"] .ts-menu__mode,html[data-skin="c"] .ts-menu__career,html[data-skin="c"] .ts-menu__card,html[data-skin="c"] .ts-menu__upRow{border-right-width:2px;border-bottom-width:2px}
+html[data-skin="c"] .ts-menu__wallet{font-size:48px}
+html[data-skin="c"] .ts-menu__mode--career{background:var(--green)}
+html[data-skin="c"] .ts-menu__mode--career .sub{color:#fff}html[data-skin="c"] .ts-menu__mode--career small{color:rgba(255,255,255,.85)}
+@media(max-width:700px){html[data-skin="c"] .ts-menu__title{text-transform:none;font-size:34px}html[data-skin="c"] .clockrow b{font-size:26px}html[data-skin="c"] .speed b{font-size:52px}}
