@@ -67,7 +67,7 @@ import * as auth from "./auth.js?v=40";
 const $ = (id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const gate=(msg,extra="")=>`<div class="c full gt-gate"><p class="gt-big">${msg}</p>${extra}</div>`;
-const BUCKET="devoirs", SIGNED_URL_SECONDS=600, OVERDUE_DAYS_SHOWN=14;
+const BUCKET="devoirs", SIGNED_URL_SECONDS=600, SCHOOL_TZ="Europe/Luxembourg";
 const STATUS={
   solved:{label:"Geléist",cls:"green"},
   needs_scan:{label:"Foto néideg",cls:"ink"},
@@ -104,7 +104,7 @@ function showApp(){
 const loc=()=>{ try{ return Intl.DateTimeFormat.supportedLocalesOf(["lb"]).length?"lb":"de"; }catch{ return "de"; } };
 const DAY_MS=86400000;
 const dayNumber=(iso)=>Math.round(new Date(iso+"T00:00:00Z").getTime()/DAY_MS);
-const todayIso=()=>new Date().toLocaleDateString("sv-SE");
+const todayIso=()=>new Date().toLocaleDateString("sv-SE",{timeZone:SCHOOL_TZ});
 function dueLabel(d,days){
   if(!d) return "";
   if(days===0) return "Haut";
@@ -117,7 +117,8 @@ function sortItems(list){
   return [...list].sort((a,b)=>(a.sol?.done?1:0)-(b.sol?.done?1:0) || key(a).localeCompare(key(b)));
 }
 async function loadList(){
-  const from=new Date(Date.now()-OVERDUE_DAYS_SHOWN*DAY_MS).toLocaleDateString("sv-SE");
+  // a devoir stays listed through its due day (Luxembourg time), then drops off
+  const from=todayIso();
   const [hw,sol]=await Promise.all([
     sb.from("homework").select("*").or(`due_date.gte.${from},due_date.is.null`),
     sb.from("homework_solutions").select("*"),
