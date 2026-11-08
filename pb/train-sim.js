@@ -81,6 +81,7 @@
     $('phoneTitle').textContent = t('devicePhoneTitle');
     $('phoneText').textContent = t('devicePhoneBlock');
     $('phoneHint').textContent = t('devicePhoneHint');
+    $('phoneBack').addEventListener('click', () => { const a = document.querySelector('.arcade-bar__back'); if (a) a.click(); else location.href = '/pixelbreak.html'; });
     $('pauseQuality').textContent = t('quality') + ': ' + t(qualityKey(quality));
     $('btnQuality').textContent = 'Q · ' + qualityName();
     $('btnFast').title = t('fastTitle'); $('btnRev').title = t('reverseTitle');
@@ -133,9 +134,9 @@
 
   /* ------------------------------------------------------------ device */
   function isPhone() {
-    if (!isTouch) return false;
+    /* Ian (Nov 2026): no Zuch / Tram on phones at all. The shorter side of the SCREEN decides (iPads and laptops are >= 744), touch or not. */
     const screenSide = Math.min(screen.width || 9999, screen.height || 9999);
-    return screenSide < PHONE_MIN_SIDE || Math.min(innerWidth, innerHeight) < PHONE_MIN_VIEW;
+    return screenSide < PHONE_MIN_SIDE || (isTouch && Math.min(innerWidth, innerHeight) < PHONE_MIN_VIEW);
   }
   function checkDevice() {
     const phone = isPhone();

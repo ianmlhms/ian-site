@@ -475,3 +475,101 @@ html[data-skin="c"] .ts-menu__wallet{font-size:48px}
 html[data-skin="c"] .ts-menu__mode--career{background:var(--green)}
 html[data-skin="c"] .ts-menu__mode--career .sub{color:#fff}html[data-skin="c"] .ts-menu__mode--career small{color:rgba(255,255,255,.85)}
 @media(max-width:700px){html[data-skin="c"] .ts-menu__title{text-transform:none;font-size:34px}html[data-skin="c"] .clockrow b{font-size:26px}html[data-skin="c"] .speed b{font-size:52px}}
+
+/* ---- C refined (Ian picked C): the in-cab HUD has NO boxes. White text, numerals and hairline rules sit straight on the 3D scene,
+   with a soft dark text-shadow for legibility over bright sky and platforms. Menus, shop and dialogs (.card, .ts-menu) stay paper. ---- */
+html[data-skin="c"] #hud,html[data-skin="c"] .msgstack{--ink:#fff;--soft:rgba(255,255,255,.82);--hair:rgba(255,255,255,.5);--line:rgba(255,255,255,.5);--white:transparent;--paper:#16171a;--gt-green:#7ee0ad;--gt-danger:#ff9a90;--tint:rgba(255,255,255,.08);
+  color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6),0 0 8px rgba(0,0,0,.4)}
+html[data-skin="c"] #hud .glass,html[data-skin="c"] .msgstack .glass{background:none;border:0;box-shadow:none;border-radius:0}
+html[data-skin="c"] #hud .wxpop{--ink:#16171a;--soft:#62656a;--hair:rgba(22,23,26,.14);--paper:#f6f6f3;--gt-green:#1f7a4d;--white:#fcfcfa;background:#fcfcfa;border:1px solid #16171a;color:#16171a;text-shadow:none}
+html[data-skin="c"] #hud .wxpop *{text-shadow:none}
+/* next stop */
+html[data-skin="c"] .nextbox{padding:0;min-width:0;max-width:300px;overflow:visible}
+html[data-skin="c"] .nextbox .lbl{background:none;color:#fff;margin:0;padding:0;font:500 11px/1.4 var(--mono);letter-spacing:.14em;text-transform:uppercase}
+html[data-skin="c"] .nextbox b{font-size:28px;margin:2px 0 4px;letter-spacing:-.03em}
+html[data-skin="c"] .nextbox .row{color:rgba(255,255,255,.85)}
+html[data-skin="c"] .chip{border-color:rgba(255,255,255,.85);color:#fff;background:none;text-shadow:inherit}
+html[data-skin="c"] .sched{margin-top:8px;gap:14px;border-top:1px solid rgba(255,255,255,.5);padding-top:6px}
+html[data-skin="c"] .pill{border:0;padding:0;background:none}
+html[data-skin="c"] .pill small{color:rgba(255,255,255,.8)}
+html[data-skin="c"] .pill.now{background:none}html[data-skin="c"] .pill.now b{color:#7ee0ad}html[data-skin="c"] .pill.now small{color:#7ee0ad}
+html[data-skin="c"] .nextbox .pill b{font:500 22px/1.15 var(--mono);letter-spacing:-.03em}
+html[data-skin="c"] .depbadge{background:none;border:0;border-top:1px solid rgba(255,255,255,.5);padding:6px 0 0;border-radius:0;color:#fff}
+html[data-skin="c"] .depbadge small{color:rgba(255,255,255,.8);text-transform:uppercase;letter-spacing:.08em;font-family:var(--mono)}
+html[data-skin="c"] .nextbox .depbadge b{font:500 30px/1.1 var(--mono);letter-spacing:-.04em}
+html[data-skin="c"] .depbadge.go{color:#7ee0ad;border-top-color:#7ee0ad;background:none}
+html[data-skin="c"] .depbadge.late{color:#ff9a90;border-top-color:#ff9a90;background:none}
+/* strip */
+html[data-skin="c"] .strip{padding:0 18px}
+html[data-skin="c"] .strip .line{background:#fff;height:1px;top:23px;filter:drop-shadow(0 1px 1px rgba(0,0,0,.6))}
+html[data-skin="c"] #stripDots i{background:transparent;border:1px solid #fff;width:9px;height:9px;margin-left:-4.5px;top:19px;filter:drop-shadow(0 1px 1px rgba(0,0,0,.6))}
+html[data-skin="c"] #stripDots i.done{background:#fff}
+html[data-skin="c"] #stripDots i.next{background:#7ee0ad;border-color:#7ee0ad}
+html[data-skin="c"] #stripDots span{color:#fff}
+html[data-skin="c"] #stripNextLbl{background:none;border:0;color:#7ee0ad;font-family:var(--mono)}
+html[data-skin="c"] #stripTrain{border-top-color:#7ee0ad;filter:drop-shadow(0 1px 1px rgba(0,0,0,.6))}
+/* clock + stats */
+html[data-skin="c"] .statsbox{background:none;color:#fff;padding:0}
+html[data-skin="c"] .clockrow b{font-size:44px;color:#fff;letter-spacing:-.05em;margin-right:-4px}
+html[data-skin="c"] #clockSec{color:rgba(255,255,255,.8)}
+html[data-skin="c"] .delay{color:#7ee0ad;font-size:15px}html[data-skin="c"] .delay.late{color:#ff9a90}html[data-skin="c"] .delay.warn{color:#fff}
+html[data-skin="c"] .statline{color:rgba(255,255,255,.85)}html[data-skin="c"] .statline b{color:#fff}
+html[data-skin="c"] .statsbox small{color:rgba(255,255,255,.75);text-transform:uppercase;letter-spacing:.08em;font-family:var(--mono)}
+/* speed */
+html[data-skin="c"] .speedbox{background:none;color:#fff;padding:0 6px}
+html[data-skin="c"] .speed b{font-size:88px;color:#fff;letter-spacing:-.07em}
+html[data-skin="c"] .speed small,html[data-skin="c"] .nextlimit{color:rgba(255,255,255,.85)}
+html[data-skin="c"] .limit-sign{filter:drop-shadow(0 1px 3px rgba(0,0,0,.5))}
+/* centre: lever + hints */
+html[data-skin="c"] .centerbox{background:none;border:0;border-top:1px solid rgba(255,255,255,.5);padding:8px 0 0}
+html[data-skin="c"] .xchg{border-bottom-color:rgba(255,255,255,.5)}
+html[data-skin="c"] #leverLabel{color:#fff}
+html[data-skin="c"] #leverBar{height:14px;gap:2px}
+html[data-skin="c"] #leverBar i{background:rgba(255,255,255,.3)}
+html[data-skin="c"] #leverBar i.on.p{background:#7ee0ad}html[data-skin="c"] #leverBar i.on.b{background:#fff}html[data-skin="c"] #leverBar i.on.e{background:#ff9a90}html[data-skin="c"] #leverBar i.zero{background:#fff}
+html[data-skin="c"] .hint kbd{background:none;border-color:rgba(255,255,255,.85);color:#fff}
+html[data-skin="c"] .signalbox{border-top:0;background:none}
+html[data-skin="c"] .sigtext{color:rgba(255,255,255,.85)}html[data-skin="c"] .sigtext b{color:#fff}
+html[data-skin="c"] .guide{background:none;border:0;border-top:1px solid rgba(255,255,255,.5);color:#fff;text-align:center}
+html[data-skin="c"] .guide.brake{background:none;color:#fff;border-top-color:#fff}
+html[data-skin="c"] .guide.late,html[data-skin="c"] .guide.eb{background:none;color:#ff9a90;border-top-color:#ff9a90}
+html[data-skin="c"] .guide.ok{background:none;color:#7ee0ad;border-top-color:#7ee0ad}
+/* buttons: white outlines, no fill */
+html[data-skin="c"] #hud .chipbtn,html[data-skin="c"] #hud button.glass{background:none;border:1px solid rgba(255,255,255,.9);color:#fff;border-width:1px;box-shadow:0 0 0 1px rgba(0,0,0,.18)}
+html[data-skin="c"] #hud button.chipbtn:hover{color:#7ee0ad;border-color:#7ee0ad;background:none}
+html[data-skin="c"] #hud button.chipbtn.on{background:none;color:#7ee0ad;border-color:#7ee0ad}
+html[data-skin="c"] .revlamp{background:none;color:#7ee0ad;border:1px solid #7ee0ad;box-shadow:none}
+html[data-skin="c"] .parklamp{background:none;color:#ff9a90;border-color:#ff9a90}
+html[data-skin="c"] #camName{border-color:transparent;box-shadow:none}
+html[data-skin="c"] .aheadload{background:none}
+/* messages: plain white lines, centred, no box */
+html[data-skin="c"] .msgstack .toast,html[data-skin="c"] .msgstack #banner,html[data-skin="c"] .camhint{background:none;border:0;color:#fff}
+html[data-skin="c"] .toast{font-weight:600;padding:3px 10px}
+html[data-skin="c"] .toast.bad{color:#ffb3ab}html[data-skin="c"] .toast.good{color:#fff}
+html[data-skin="c"] #banner{font-size:26px;font-weight:800;letter-spacing:-.03em}
+html[data-skin="c"] #banner small{color:rgba(255,255,255,.85)}
+html[data-skin="c"] .camhint{color:rgba(255,255,255,.8)}
+/* touch pad + walk pad: outlines too */
+html[data-skin="c"] .tl-rail,html[data-skin="c"] .walkpad{border:1px solid rgba(255,255,255,.7)!important}
+html[data-skin="c"] .walkpad i{background:#fff}
+html[data-skin="c"] .tl-ticks i{background:rgba(255,255,255,.3)}html[data-skin="c"] .tl-ticks i.p{background:rgba(126,224,173,.6)}html[data-skin="c"] .tl-ticks i.b{background:rgba(255,255,255,.6)}html[data-skin="c"] .tl-ticks i.zero{background:#fff}
+html[data-skin="c"] .tl-thumb{background:#7ee0ad;border-color:#fff}html[data-skin="c"] .tl-thumb b{color:#16171a}
+html[data-skin="c"] .tl-thumb.brake{background:#fff}html[data-skin="c"] .tl-thumb.neutral{background:#16171a;border-color:#fff}html[data-skin="c"] .tl-thumb.neutral b{color:#fff}
+html[data-skin="c"] .tl-thumb.eb{background:#ff9a90}
+html[data-skin="c"] #hud .tbtn{background:none;color:#fff}html[data-skin="c"] #hud .tbtn .lb{color:rgba(255,255,255,.85)}
+html[data-skin="c"] #hud .tbtn.on{background:none;border-color:#7ee0ad;color:#7ee0ad}html[data-skin="c"] #hud .tbtn.on .lb{color:#7ee0ad}
+html[data-skin="c"] #hud .tbtn.tb-eb{border-color:#ff9a90}
+/* phone: only what matters (next stop, departure countdown, clock, speed); secondary lines go */
+@media(max-width:700px){
+  html[data-skin="c"] .nextbox .row,html[data-skin="c"] .depbadge small,html[data-skin="c"] .statsbox small,html[data-skin="c"] .statline,html[data-skin="c"] .sched,html[data-skin="c"] #camName,html[data-skin="c"] #btnQuality,html[data-skin="c"] #btnRev,html[data-skin="c"] #btnFast,html[data-skin="c"] #btnHelp,html[data-skin="c"] #btnInside,html[data-skin="c"] .camhint{display:none!important}
+  html[data-skin="c"] .nextbox b{font-size:22px}
+  html[data-skin="c"] .nextbox .depbadge b{font-size:24px}
+  html[data-skin="c"] .clockrow b{font-size:34px}
+  html[data-skin="c"] .speed b{font-size:60px}
+  html[data-skin="c"] #banner{font-size:19px}
+}
+/* phones: the game does not start (train-sim.js isPhone); a calm paper screen with a way back */
+#phoneBlock .card{width:min(360px,100%);align-items:flex-start;text-align:left;padding:28px 24px}
+#phoneBlock h2{font-size:34px}
+#phoneBlock .bigemoji{font-size:40px;margin-bottom:8px}
+#phoneBlock .card>button{margin-top:18px;align-self:stretch;min-height:52px}
