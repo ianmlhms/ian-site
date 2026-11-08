@@ -168,7 +168,7 @@ function renderChatList(chats) {
     const isCur = current && current.id === g.id;
     return `<li class="grp ${isCur ? "active" : ""} ${g.unread ? "unread" : ""}" data-id="${g.id}">
        <button type="button" class="grp-open"${isCur ? ' aria-current="true"' : ""}>
-         <span class="gtop"><span class="gname"><span aria-hidden="true">${g.is_dm ? "💬 " : ""}</span>${esc(g.display)}${online}${muted}</span>${g.unread ? '<span class="dot" aria-hidden="true"></span>' : ""}</span>
+         <span class="gtop"><span class="gname">${esc(g.display)}${online}${muted}</span>${g.unread ? '<span class="dot" aria-hidden="true"></span>' : ""}</span>
          ${prev}
        </button>
      </li>`;
@@ -219,19 +219,19 @@ async function selectChat(g) {
   const onlineHead = g.is_dm && onlineUsers.has(g.display) ? `<span class="on-dot"></span><span class="presence">online</span>` : "";
   $("chatHead").innerHTML =
     `<button class="back-btn" id="backBtn" type="button" title="${esc(TA("back"))}" aria-label="${esc(TA("back"))}"><span aria-hidden="true">‹</span></button>
-     <b>${g.is_dm ? "💬 " : ""}${esc(g.display)}</b><span id="headPresence">${onlineHead}</span>
+     <b>${esc(g.display)}</b><span id="headPresence">${onlineHead}</span>
      ${g.is_dm ? "" : `<span class="invite" title="${esc(T("msg.tip.join"))}">code: <code>${esc(g.invite_code)}</code></span>`}
      <span class="head-actions">
-       <button id="muteBtn" type="button" title="${esc(muteLabel(g.id))}" aria-label="${esc(muteLabel(g.id))}" aria-pressed="${mutedSet().has(g.id)}">${mutedSet().has(g.id) ? "🔕" : "🔔"}</button>
+       <button id="muteBtn" type="button" title="${esc(muteLabel(g.id))}" aria-label="${esc(muteLabel(g.id))}" aria-pressed="${mutedSet().has(g.id)}">${mutedSet().has(g.id) ? '<svg class="ic" aria-hidden="true"><use href="gitter-icons.svg#g-bell-off"/></svg>' : '<svg class="ic" aria-hidden="true"><use href="gitter-icons.svg#g-bell"/></svg>'}</button>
        ${g.is_dm ? "" : `<button id="addPeopleBtn" type="button" class="add-people" title="${esc(TI("grp.add"))}" aria-label="${esc(TI("grp.add"))}">${esc(TI("grp.addBtn"))}</button>`}
-       <button id="membersBtn" type="button" title="${esc(T("msg.members"))}" aria-label="${esc(T("msg.members"))}">👥</button>
-       <button id="leaveBtn" type="button" title="${esc(TA("leave"))}" aria-label="${esc(TA("leave"))}">🚪</button>
+       <button id="membersBtn" type="button" title="${esc(T("msg.members"))}" aria-label="${esc(T("msg.members"))}"><svg class="ic" aria-hidden="true"><use href="gitter-icons.svg#g-users"/></svg></button>
+       <button id="leaveBtn" type="button" title="${esc(TA("leave"))}" aria-label="${esc(TA("leave"))}"><svg class="ic" aria-hidden="true"><use href="gitter-icons.svg#g-enter"/></svg></button>
      </span>`;
   $("backBtn").onclick = goBackToList;
   $("muteBtn").onclick = () => {
     toggleMute(g.id);
     const b = $("muteBtn"), on = mutedSet().has(g.id);
-    b.textContent = on ? "🔕" : "🔔";
+    b.innerHTML = on ? '<svg class="ic" aria-hidden="true"><use href="gitter-icons.svg#g-bell-off"/></svg>' : '<svg class="ic" aria-hidden="true"><use href="gitter-icons.svg#g-bell"/></svg>';
     b.setAttribute("aria-pressed", String(on)); b.title = muteLabel(g.id); b.setAttribute("aria-label", muteLabel(g.id));
     renderChatList(applySearch(allChats));
   };
@@ -532,12 +532,12 @@ async function toggleRecording() {
     mediaRecorder.ondataavailable = (e) => { if (e.data.size) recChunks.push(e.data); };
     mediaRecorder.onstop = async () => { stream.getTracks().forEach((t) => t.stop()); await sendVoice(new Blob(recChunks, { type: mediaRecorder.mimeType || "audio/webm" })); };
     mediaRecorder.start();
-    recording = true; $("micBtn").classList.add("rec"); $("micBtn").textContent = "⏹";
+    recording = true; $("micBtn").classList.add("rec"); $("micBtn").innerHTML = '<svg class="ic" aria-hidden="true"><use href="gitter-icons.svg#g-stop"/></svg>';
     $("micBtn").setAttribute("aria-pressed", "true"); $("micBtn").setAttribute("aria-label", TA("stopRec"));
   } catch { alert(T("msg.micErr")); }
 }
 function stopRecording() {
-  if (mediaRecorder && recording) { recording = false; $("micBtn").classList.remove("rec"); $("micBtn").textContent = "🎤";
+  if (mediaRecorder && recording) { recording = false; $("micBtn").classList.remove("rec"); $("micBtn").innerHTML = '<svg class="ic" aria-hidden="true"><use href="gitter-icons.svg#g-mic"/></svg>';
     $("micBtn").setAttribute("aria-pressed", "false"); $("micBtn").setAttribute("aria-label", T("msg.tip.voice")); try { mediaRecorder.stop(); } catch {} }
 }
 async function sendVoice(blob) {
@@ -829,8 +829,8 @@ async function uploadAndSend(file) {
   if (!file || !current) return;
   const type = file.type.startsWith("video/") ? "video" : file.type.startsWith("image/") ? "image" : "file";
   if (file.size > MAX_MEDIA) return alert(T("msg.tooLarge"));
-  const att = $("attachBtn"); att.disabled = true; att.textContent = "⏳";
-  const done = () => { att.disabled = false; att.textContent = "📎"; };
+  const att = $("attachBtn"); att.disabled = true; att.textContent = "…";
+  const done = () => { att.disabled = false; att.innerHTML = '<svg class="ic" aria-hidden="true"><use href="gitter-icons.svg#g-clip"/></svg>'; };
   // photos: shrink to <= 1600 px + a 480 px thumbnail; videos: a poster frame. Any failure falls back to the plain upload.
   let body = file, ext = extOf(file), thumb = null;
   if (type === "image") {
@@ -884,10 +884,9 @@ async function loadClasses() {
 
 async function boot() {
   if (!auth.authConfigured) {
-    $("gate").innerHTML = `<div class="gate-box"><h3>${T("msg.h1")}</h3></div>`;
+    $("gate").innerHTML = `<div class="gate-box"><h3>Messenger</h3></div>`;
     $("gate").style.display = "flex"; return;
   }
-  auth.mountAccountButton($("acctHost"));
   sb = await auth.client();
   try { const { data } = await sb.rpc("admin_user_ids"); adminIds = new Set((data || []).map((r) => r.user_id)); } catch (e) { console.warn("[msgr] admin ids", e); }
   await loadRestriction();
@@ -909,7 +908,7 @@ function showGate() {
   $("app").style.display = "none";
   $("gate").style.display = "flex";
   $("gate").innerHTML = `<div class="gate-box">
-    <h3>${T("msg.h1")}</h3><p>${T("msg.gateTitle")}<br>${T("msg.gateSub")}</p>
+    <h3>Messenger</h3><p>${T("msg.gateTitle")}<br>${T("msg.gateSub")}</p>
     <button class="auth-go" id="gateBtn">${T("auth.signin")}</button></div>`;
   $("gateBtn").onclick = auth.openAuthModal;
 }
@@ -954,6 +953,7 @@ async function showApp() {
     } catch (e) { console.warn(e); }
   }
 }
+const noEmoji = (t) => String(t).replace(/^[^\p{L}\p{N}]+/u, "");
 async function setupNotifyButton() {
   const btn = $("notifyBtn");
   await registerSW();
@@ -961,9 +961,9 @@ async function setupNotifyButton() {
     const st = await pushState();
     if (st === "unsupported") { btn.style.display = "none"; return; }
     btn.style.display = "";
-    if (st === "subscribed") { btn.textContent = T("msg.notify.on"); btn.classList.add("on"); btn.title = T("msg.notify.onTip"); }
-    else if (st === "denied") { btn.textContent = T("msg.notify.blocked"); btn.classList.remove("on"); btn.title = T("msg.notify.blockedTip"); }
-    else { btn.textContent = T("msg.notify.notify"); btn.classList.remove("on"); btn.title = T("msg.notify.offTip"); }
+    if (st === "subscribed") { btn.textContent = noEmoji(T("msg.notify.on")); btn.classList.add("on"); btn.title = T("msg.notify.onTip"); }
+    else if (st === "denied") { btn.textContent = noEmoji(T("msg.notify.blocked")); btn.classList.remove("on"); btn.title = T("msg.notify.blockedTip"); }
+    else { btn.textContent = noEmoji(T("msg.notify.notify")); btn.classList.remove("on"); btn.title = T("msg.notify.offTip"); }
   };
   btn.onclick = async () => {
     const st = await pushState();
@@ -978,8 +978,8 @@ async function setupNotifyButton() {
 function showAdminLink() {
   if ($("adminLink")) return;
   const a = document.createElement("a");
-  a.id = "adminLink"; a.href = "admin.html"; a.textContent = "🛡 Admin"; a.className = "admin-link";
-  $("acctHost").parentNode.insertBefore(a, $("acctHost"));
+  a.id = "adminLink"; a.href = "admin.html"; a.innerHTML = '<svg class="ic" aria-hidden="true"><use href="gitter-icons.svg#g-shield"/></svg>&nbsp;Admin'; a.className = "admin-link";
+  $("gtAcct").parentNode.insertBefore(a, $("gtAcct"));
 }
 
 boot();
