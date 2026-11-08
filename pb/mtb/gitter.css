@@ -1,0 +1,73 @@
+/* MTB Mëllerdall: Gitter look (Nov 2026). Loaded AFTER ui.css. Paper / ink / ONE green, hairlines, radius 0, Geist.
+   Dialogs, cards and the menu are light paper; the HUD straight on the 3D trail is white text with a dark outline, no boxes.
+   Presentation only: ids, classes and logic are untouched. */
+@font-face{font-family:"Geist";font-style:normal;font-weight:400 800;font-display:swap;src:url("/assets/fonts/geist-latin.woff2") format("woff2")}
+@font-face{font-family:"Geist Mono";font-style:normal;font-weight:500;font-display:swap;src:url("/assets/fonts/geist-mono-500-latin.woff2") format("woff2")}
+:root{--g-paper:#f6f6f3;--g-white:#fcfcfa;--g-ink:#16171a;--g-muted:#62656a;--g-soft:rgba(22,23,26,.14);--g-tint:rgba(22,23,26,.05);--g-green:#1f7a4d;--g-danger:#a32121;
+  --g-mono:"Geist Mono",ui-monospace,"SF Mono",Menlo,monospace;--halo:0 0 2px #000,0 0 3px #000a,0 1px 5px #0009;color-scheme:light;
+  --ink:var(--g-ink);--muted:var(--g-muted);--panel:var(--g-white);--panel2:var(--g-white);--line:var(--g-soft);--gold:var(--g-green);--accent:var(--g-green);--accent2:var(--g-green);--warn:var(--g-danger)}
+html,body{background:var(--g-paper);font-family:"Geist",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button,select{font-family:inherit}
+.mhud *,.mcard,.mcard *,.mfinish *,.mmenu *,.mhint,.mhint *,.morient,#touchControls *,#loading *{font-family:"Geist",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.mcard,.mcard *,.mfinish *,.mmenu *,.mhint,.mhint *,.morient,.hbtn,#touchControls .pad,#touchControls .tbtn,.mhud .toast,.mcount .lights,.mcount .lights i{border-radius:0!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;text-shadow:none}
+button:focus-visible{outline:2px solid var(--g-green);outline-offset:2px}
+
+/* loading */
+#loading{background:var(--g-paper)}#loading .box{color:var(--g-ink)}#loading b{font-weight:800;letter-spacing:-.03em}
+#bar{border-radius:0;background:var(--g-soft);height:6px}#bar i{border-radius:0;background:var(--g-green)}
+#loading small,#loading .slow{color:var(--g-muted)}
+#loading .slow button{border-radius:0;border:1px solid var(--g-ink);background:var(--g-white);color:var(--g-ink)}
+
+/* HUD on the scene */
+.mhud .trail-line,.mhud .clock,.mhud .split,.mhud .speed b,.mhud .banner{color:#fff;text-shadow:var(--halo)}
+.mhud .sub,.mhud .speed small{color:#fff;opacity:.92;text-shadow:var(--halo);font-family:var(--g-mono);font-weight:500}
+.mhud .clock,.mhud .speed b{font-family:var(--g-mono);font-weight:500;letter-spacing:-.02em}
+.mhud .bar,.mhud .speed .gauge{background:rgba(22,23,26,.45);border:1px solid #fff;border-radius:0}.mhud .bar i,.mhud .speed .gauge i,.mhud .speed[data-tier] .gauge i{background:#fff!important}
+.mhud .speed[data-tier] b{color:#fff;text-shadow:var(--halo)}
+.mhud .split.good{color:#fff}.mhud .split.bad{color:#fff}
+.mhud .banner.bad{color:#fff}
+.hbtn{background:var(--g-white);color:var(--g-ink);border:1px solid var(--g-ink)}
+.mhud .toast{background:var(--g-white);color:var(--g-ink);border:1px solid var(--g-ink);border-left:4px solid var(--g-green)}
+.mhud .toast.warn{border-left-color:var(--g-danger)}
+.grade{border-radius:0!important;border:1px solid var(--g-ink)}.grade.green{background:var(--g-green)}.grade.blue{background:#2d5fb3}.grade.red{background:var(--g-danger)}.grade.black{background:var(--g-ink)}
+.mhint .hi.on{background:var(--g-tint);transform:none;outline:1px solid var(--g-green)}
+
+/* cards and finish */
+.mcard,.fin-box,.menu-box,.morient{background:var(--g-white);border:1px solid var(--g-ink);color:var(--g-ink)}
+.card-head .ct{font-weight:800;letter-spacing:-.03em}
+.card-head .cs,.card-stats,.fin-trail,.fin-best,.fin-next,.fin-ghost.lost,.fin-splits,.note,.map-cap,.trail-row small,.bike p{color:var(--g-muted)}
+.card-stats b{color:var(--g-ink)}
+.tag,.newbest{background:var(--g-green);color:#fff}
+.card-medals .mt{background:var(--g-tint);border:1px solid var(--g-soft)}
+.ghost,.fin-ghost{color:var(--g-green)}
+.locked,.fin-invalid{background:var(--g-white);border:1px solid var(--g-danger);color:var(--g-danger)}
+.bigstart{background:var(--g-green);color:#fff;border:1px solid var(--g-green);font-size:22px;font-weight:700;letter-spacing:0;animation:none}
+.bigstart:hover:not(:disabled){background:var(--g-ink);border-color:var(--g-ink);color:var(--g-paper)}
+.bigstart:disabled{filter:none;background:var(--g-tint);color:var(--g-muted);border-color:var(--g-soft)}
+.sbtn,.fin-fold,.x{background:var(--g-white);color:var(--g-ink);border:1px solid var(--g-ink)}
+.sbtn:hover,.fin-fold:hover,.x:hover{border-color:var(--g-green);color:var(--g-green)}
+.sbtn small{color:var(--g-muted)}
+.fin-title .mn{color:var(--g-green)}.fin-time b,.card-best b,.mcount .num{font-family:var(--g-mono);font-weight:500}
+.fin-unlock{background:var(--g-white);border:1px solid var(--g-green);color:var(--g-green)}
+.fin-unlock .okmark{background:var(--g-green);color:#fff;border-radius:0}
+.sp.good{color:var(--g-green)}.sp.bad{color:var(--g-danger)}
+.mcount .lights{background:rgba(22,23,26,.45);border:2px solid #fff}.mcount .num{color:#fff;text-shadow:var(--halo)}.mcount.go .num{color:#fff}
+
+/* menu */
+.mmenu{background:rgba(246,246,243,.96)}
+.menu-head{border-bottom:1px solid var(--g-ink)}.menu-head b{font-weight:800;letter-spacing:-.03em}
+.tab{border-radius:0!important;color:var(--g-ink)}.tab.on{background:var(--g-ink);color:var(--g-paper)}
+.map-wrap canvas{border:1px solid var(--g-ink)!important;border-radius:0!important}
+.trail-row,.bike,.srow{background:var(--g-white);border:1px solid var(--g-soft);color:var(--g-ink)}.srow{font-weight:600}
+.trail-row.cur,.bike.cur{border-color:var(--g-green);background:var(--g-tint);box-shadow:inset 0 0 0 1px var(--g-green)!important}
+.bike .sw{border-radius:0;border:1px solid var(--g-ink)}
+.bars .b{background:var(--g-soft);border-radius:0}.bars .b i{background:var(--g-green)}
+.bike-points{color:var(--g-green);font-family:var(--g-mono)}
+.srow select{background:var(--g-white);border:1px solid var(--g-ink);border-radius:0;color:var(--g-ink)}
+
+/* touch controls over the scene */
+#touchControls .pad,#touchControls .tbtn{background:rgba(22,23,26,.35);border:2px solid #fff;color:#fff;text-shadow:var(--halo)}
+#touchControls .pad .knob{background:var(--g-white);border:1px solid var(--g-ink);border-radius:0!important}
+#touchControls .pad .lbl{color:#fff}
+#touchControls .tbtn.big{background:rgba(31,122,77,.55);border-color:#fff}
+#touchControls .on{background:var(--g-green)!important}
