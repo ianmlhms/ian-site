@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="lb">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Arcade - Play Games</title>
+<title>Arcade — ian.lu</title>
 <meta name="description" content="Arcade — 54 free browser games, from quick arcade breaks to bigger games with saved progress and multiplayer for two iPads.">
 <meta property="og:title" content="Arcade — ian.lu">
 <meta property="og:description" content="54 free browser games — big adventures, quick breaks and multiplayer.">
@@ -13,119 +13,113 @@
 <link rel="manifest" href="pixelbreak.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<meta name="theme-color" content="#0d0d1a">
-<script src="season.js?v=5"></script>
+<meta name="theme-color" content="#f6f6f3">
+<link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="gitter.css?v=1">
 <script src="theme.js?v=32"></script>
 <script src="i18n-dict.js?v=54"></script>
 <script src="i18n.js?v=5"></script>
-<link rel="stylesheet" href="site-ui.css?v=2">
 <style>
-:root{--accent2:#4de8ff;--accent3:#ffcc00;--accent4:#44ff88;--radius:14px}
-*{margin:0;padding:0;box-sizing:border-box}
-body{min-height:100vh;min-height:100svh;display:flex;flex-direction:column;color:var(--text);font-family:-apple-system,"SF Pro Text","SF Pro Display",BlinkMacSystemFont,"Segoe UI",sans-serif}
-::selection{background:var(--accent);color:var(--accent-foreground)}
-.skip{position:absolute;left:12px;top:-60px;z-index:3000;padding:12px 18px;border-radius:var(--r-chip);background:var(--accent);color:var(--accent-foreground);font-weight:700;text-decoration:none}
+.skip{position:absolute;left:12px;top:-60px;z-index:3000;padding:12px 18px;background:var(--ink);color:var(--paper);font-weight:600;text-decoration:none}
 .skip:focus{top:12px}
+::selection{background:var(--green);color:#fff}
 
-/* ---- header ---- */
-html body.ui .ui-header{flex-wrap:wrap;gap:10px 14px;padding-top:max(16px,env(safe-area-inset-top))}
-.header-left{display:flex;align-items:center;gap:12px;min-width:0}
-.home-btn{display:inline-flex;align-items:center;min-height:44px;padding:8px 16px;border-radius:var(--r-chip);border:1px solid var(--border);background:transparent;color:var(--text);text-decoration:none;font:700 14px var(--font-display);white-space:nowrap;transition:background-color .2s,border-color .2s,transform .3s var(--ease)}
-.home-btn:hover{background:color-mix(in srgb,var(--accent) 10%,transparent);border-color:var(--accent-border)}
-.home-btn:active{transform:scale(.97)}
-.logo{display:inline-flex;align-items:center;gap:10px;min-height:44px;cursor:pointer}
-.logo-icon{display:grid;place-items:center;width:36px;height:36px;border-radius:11px;font-size:19px;background:color-mix(in srgb,var(--accent) 22%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 32%,transparent),inset 0 1px 0 color-mix(in srgb,#fff 22%,transparent)}
-.header-right{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:10px}
-#installBtn{min-height:44px;padding:8px 16px;border-radius:var(--r-chip);border:1px solid var(--accent-border);background:transparent;color:var(--accent-text);font:700 14px var(--font-display);cursor:pointer;transition:background-color .2s,transform .3s var(--ease)}
-.hdr-link{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:8px 16px;border-radius:var(--r-chip);border:1px solid var(--border);background:transparent;color:var(--text);font:700 14px var(--font-display);text-decoration:none;white-space:nowrap;transition:background-color .2s,border-color .2s,transform .3s var(--ease)}
-.hdr-link:hover{background:color-mix(in srgb,var(--accent) 10%,transparent);border-color:var(--accent-border)}
-.hdr-link:active{transform:scale(.97)}
-#installBtn:hover{background:color-mix(in srgb,var(--accent) 10%,transparent)}
-#installBtn:active{transform:scale(.97)}
-body.ui .pb-acct{min-height:44px;padding:8px 16px;border:1px solid var(--border);border-radius:var(--r-chip);background:transparent;color:var(--text);font:700 14px var(--font-display);transition:background-color .2s,border-color .2s}
-body.ui .pb-acct:hover{background:color-mix(in srgb,var(--accent) 10%,transparent);border-color:var(--accent-border);color:var(--text)}
-body.ui .pb-box{border-radius:var(--r-panel);border:0;background:var(--card-opaque);box-shadow:inset 0 0 0 1px var(--tile-edge),0 30px 60px -24px rgb(var(--ink)/.55)}
-body.ui .pb-box input{min-height:46px;border-radius:var(--r-chip);font-size:16px}
-body.ui .pb-go{min-height:46px;border-radius:var(--r-chip);font-family:var(--font-display)}
-body.ui .pb-tab{min-height:44px;border-radius:var(--r-chip)}
-body.ui .pb-x{min-width:44px;min-height:44px;margin:-8px -8px 0 0}
+/* ---- header row ---- */
+.header-right{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:0 14px}
+#installBtn{min-height:44px;padding:0 14px;border:1px solid var(--ink);border-radius:0;background:var(--ink);color:var(--paper);font:600 13px "Geist",system-ui,sans-serif;cursor:pointer}
+#installBtn:hover{background:var(--green);border-color:var(--green)}
+body.gt .pb-acct{min-height:44px;padding:0 0 0 10px;border:0;border-radius:0;background:none;color:var(--ink);font:600 14px/1 "Geist",system-ui,sans-serif}
+body.gt .pb-acct:hover{background:none;color:var(--green);text-decoration:underline;text-underline-offset:3px}
+body.gt .pb-box{border-radius:0;border:1px solid var(--ink);background:var(--white);box-shadow:none;color:var(--ink);font-family:"Geist",system-ui,sans-serif}
+body.gt .pb-box h3{font-family:"Geist",system-ui,sans-serif;font-weight:800;letter-spacing:-.02em}
+body.gt .pb-box input{min-height:46px;border-radius:0;font-size:16px;background:var(--white);border:1px solid var(--ink);color:var(--ink);font-family:inherit}
+body.gt .pb-go{min-height:46px;border-radius:0;background:var(--ink);color:var(--paper);font-family:inherit}
+body.gt .pb-go:hover{background:var(--green);filter:none}
+body.gt .pb-tab{min-height:44px;border-radius:0;border-color:var(--ink);color:var(--ink);font-family:inherit}
+body.gt .pb-tab.active{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+body.gt .pb-x{min-width:44px;min-height:44px;margin:-8px -8px 0 0;color:var(--muted)}
+body.gt .pb-link{color:var(--green)}
+body.gt .pb-save-hint{border-radius:0;box-shadow:none;border:1px solid var(--ink);background:var(--white);color:var(--ink);font-family:"Geist",system-ui,sans-serif}
+body.gt .pb-save-hint__go{border-radius:0;background:var(--ink);color:var(--paper)}
 
 /* ---- hero + tools ---- */
-.arc-hero{padding:clamp(22px,6vw,56px) 0 clamp(18px,3vw,28px)}
-.arc-kicker{margin:0 0 8px;font-size:17px;font-weight:650;color:var(--muted)}
-.arc-title{margin:0;font-family:var(--font-display);font-size:clamp(56px,13vw,120px);font-weight:800;letter-spacing:-.05em;line-height:.9;color:var(--text)}
-.arc-title span{color:var(--accent-text)}
-.arc-sub{max-width:30rem;margin:18px 0 0;font-size:clamp(16px,2.2vw,19px);line-height:1.5;color:var(--muted);text-wrap:pretty}
-.arc-tools{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
-.arc-search{position:relative;max-width:560px}
-.arc-search .si{position:absolute;left:16px;top:50%;transform:translateY(-50%);font-size:16px;opacity:.55;pointer-events:none}
-.arc-search input{padding-left:46px;-webkit-appearance:none;appearance:none}
-.genre-filters{display:flex;flex-wrap:wrap;gap:8px}
-.genre-filter{min-height:44px;padding:9px 18px;border-radius:999px;border:1px solid var(--border);background:transparent;color:var(--text);font:700 14px var(--font-display);cursor:pointer;transition:border-color .2s,background-color .2s,color .2s,transform .3s var(--ease)}
-.genre-filter:hover{border-color:var(--accent-border);background:color-mix(in srgb,var(--accent) 10%,transparent)}
-.genre-filter:active{transform:scale(.97)}
-.genre-filter.active{background:var(--accent);border-color:var(--accent);color:var(--accent-foreground)}
-.browse-status{min-height:20px;margin-top:2px;font-size:13px;font-weight:600;color:var(--muted)}
-.genre-filter:focus-visible,.game-card:focus-visible,.home-btn:focus-visible,.hdr-link:focus-visible,.logo:focus-visible,#installBtn:focus-visible,#om button:focus-visible,#om input:focus-visible,.more-games summary:focus-visible,.pb-acct:focus-visible,.arc-empty button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.arc-hero{justify-content:flex-end!important;min-height:200px}
+.arc-kicker{color:var(--muted);font-size:15px}
+.arc-title{font-size:clamp(64px,13vw,120px);font-weight:800;letter-spacing:-.065em;line-height:.85;margin:8px 0 4px -4px!important;color:var(--ink)}
+.arc-title span{color:var(--green)}
+.arc-sub{color:var(--muted);font-size:18px;max-width:36ch}
+.arc-search{position:relative;padding:0!important}
+.arc-search .si{position:absolute;left:20px;top:50%;transform:translateY(-50%);font-size:22px;color:var(--ink);pointer-events:none;display:flex}
+.arc-search input{width:100%;min-height:76px;padding:16px 20px 16px 58px;border:0;border-radius:0;background:transparent;color:var(--ink);font:400 18px/1.3 "Geist",system-ui,sans-serif;-webkit-appearance:none;appearance:none}
+.arc-search input::placeholder{color:var(--muted);opacity:1}
+.arc-search input:hover{background:var(--white)}
+.arc-search input:focus{outline:2px solid var(--green);outline-offset:-3px;background:var(--white)}
+.genre-filters{display:flex;flex-wrap:wrap;gap:0 18px}
+.genre-filter{min-height:44px;padding:0;border:0;border-bottom:1px solid transparent;border-radius:0;background:none;color:var(--ink);font:600 14px "Geist",system-ui,sans-serif;cursor:pointer;text-decoration:underline;text-decoration-color:var(--soft);text-underline-offset:5px;text-decoration-thickness:1px}
+.genre-filter:hover{color:var(--green);text-decoration-color:var(--green)}
+.genre-filter.active{color:var(--green);text-decoration-color:var(--green);text-decoration-thickness:2px}
+.browse-status{min-height:20px;font-size:13px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums}
+.browse-status:empty{display:none}
+
+/* ---- weekly card (arcade-weekly.js / pixelbreak-records.js emit .weekly-card) ---- */
+.weekly-card{padding:18px 20px!important;margin:0!important;background:var(--white)!important}
+.weekly-card h2{font-size:22px!important;font-weight:800;letter-spacing:-.02em}
+.weekly-row{border-bottom-color:var(--soft)!important}
+.weekly-own{background:var(--tint)!important}
+.weekly-card .weekly-play{margin-top:14px;align-self:flex-start}
 
 /* ---- sections ---- */
-.arc-sec{margin-top:clamp(26px,5vw,42px)}
-.sec-title{display:flex;align-items:center;gap:12px}
-.sec-ico{display:grid;place-items:center;flex:none;width:40px;height:40px;border-radius:12px;font-size:21px;line-height:1;background:color-mix(in srgb,var(--accent) 18%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 28%,transparent)}
-.sec-sub{margin:2px 0 16px;font-size:14px;color:var(--muted);text-wrap:pretty}
-.game-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,10.5rem),1fr));gap:14px}
-.big-grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,15rem),1fr));gap:16px}
+.gt-sec{grid-column:1/-1;display:block}
+.sec-title{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600}
+.sec-title .ic{font-size:18px}
+.game-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,11rem),1fr))}
+.big-grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,17rem),1fr))}
 
-/* ---- game cards ---- */
-.game-card{--h:var(--accent);appearance:none;display:flex;flex-direction:column;width:100%;padding:8px;font:inherit;color:var(--text);text-align:left;background:var(--card);border:0;border-radius:var(--r-tile);cursor:pointer;position:relative;box-shadow:inset 0 0 0 1px var(--tile-edge),0 1px 2px rgb(var(--ink)/.05),0 14px 30px -18px rgb(var(--ink)/.35);transition:transform .35s var(--ease),background-color .2s,box-shadow .35s var(--ease)}
-.game-card:hover{transform:translateY(-4px);background:var(--card-opaque);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--h) 55%,transparent),0 18px 34px -18px rgb(var(--ink)/.5)}
-.game-card:active{transform:scale(.985);transition-duration:.08s}
-.game-thumb{position:relative;display:flex;align-items:center;justify-content:center;flex:none;aspect-ratio:16/10;overflow:hidden;border-radius:14px;font-size:48px;background:radial-gradient(circle at 50% 38%,color-mix(in srgb,var(--h) 38%,transparent),transparent 72%),color-mix(in srgb,var(--h) 16%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--h) 22%,transparent)}
-.game-card.big .game-thumb{font-size:62px}
+/* ---- game tiles: sharp, hairline, thumbnail on top ---- */
+.game-card{appearance:none;display:flex;flex-direction:column;width:100%;padding:0;font:inherit;color:var(--ink);text-align:left;background:transparent;border:0;border:0;border-radius:0;cursor:pointer;position:relative;box-shadow:1px 0 0 var(--line),0 1px 0 var(--line)}
+.game-card:hover{background:var(--white)}
+.game-card:hover .game-name{color:var(--green)}
+.game-thumb{position:relative;display:flex;align-items:center;justify-content:center;flex:none;aspect-ratio:16/10;overflow:hidden;font-size:44px;background:var(--tint);border-bottom:1px solid var(--soft)}
+.game-card.big .game-thumb{font-size:56px}
 .game-thumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1}
 .game-thumb img.failed{display:none}
-.game-thumb .em{filter:drop-shadow(0 8px 16px rgb(var(--ink)/.4));transition:transform .45s var(--ease)}
-.game-card:hover .game-thumb .em{transform:scale(1.1) rotate(-4deg)}
-.game-thumb::after{content:'\25B6';position:absolute;right:10px;bottom:10px;z-index:2;display:grid;place-items:center;width:34px;height:34px;padding-left:2px;border-radius:50%;background:var(--accent);color:var(--accent-foreground);font-size:13px;opacity:0;transform:scale(.7);transition:opacity .25s,transform .35s var(--ease)}
-.game-card:hover .game-thumb::after,.game-card:focus-visible .game-thumb::after{opacity:1;transform:none}
-.game-info{display:flex;flex:1;flex-direction:column;gap:3px;padding:10px 6px 6px;overflow-wrap:anywhere}
-.game-name{display:block;font-family:var(--font-display);font-size:15px;font-weight:750;letter-spacing:-.015em;line-height:1.2;text-wrap:balance}
-.game-card.big .game-info{padding:12px 8px 8px}
-.game-card.big .game-name{font-size:18px}
+.game-info{display:flex;flex:1;flex-direction:column;gap:3px;padding:12px 14px 14px;overflow-wrap:anywhere}
+.game-name{display:block;font-size:15px;font-weight:600;letter-spacing:-.01em;line-height:1.25;text-wrap:balance}
+.game-card.big .game-name{font-size:18px;font-weight:800;letter-spacing:-.02em}
 .game-desc{display:block;margin:0 0 6px;font-size:13px;line-height:1.4;color:var(--muted)}
 .game-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:auto;padding-top:4px}
 .game-tags:empty{display:none}
-.tag{padding:3px 9px;border-radius:8px;font-size:11px;font-weight:700;background:color-mix(in srgb,var(--text) 8%,transparent);color:var(--muted)}
-.tag.mp{background:color-mix(in srgb,var(--accent2) 20%,transparent);color:var(--text)}
-.tag.save{background:color-mix(in srgb,#f4a62a 26%,transparent);color:var(--text)}
-.ext{position:absolute;top:16px;right:16px;z-index:3;padding:3px 9px;border-radius:8px;background:color-mix(in srgb,var(--card-opaque) 88%,transparent);color:var(--text);font-size:11px;font-weight:700;box-shadow:inset 0 0 0 1px var(--tile-edge)}
+.tag{padding:1px 7px;border:1px solid var(--soft);font:500 11px/1.6 "Geist Mono",ui-monospace,monospace;color:var(--muted)}
+.tag.mp{border-color:var(--ink);color:var(--ink)}
+.tag.save{border-color:var(--ink);color:var(--ink)}
+.tag.weekly-badge{border-color:var(--green);color:var(--green)}
+.ext{position:absolute;top:8px;right:8px;z-index:3;padding:1px 7px;background:var(--paper);color:var(--ink);font:500 11px/1.6 "Geist Mono",ui-monospace,monospace;border:1px solid var(--ink)}
 
-.arc-empty{display:grid;justify-items:center;gap:6px;margin-top:30px;padding:44px 20px;text-align:center}
-.arc-empty[hidden]{display:none}
-.arc-empty .ico{font-size:40px;line-height:1;margin-bottom:6px}
-.arc-empty h2{font-family:var(--font-display);font-size:20px;font-weight:750;letter-spacing:-.02em}
-.arc-empty p{margin-bottom:12px;color:var(--muted)}
+.arc-empty{align-items:flex-start;gap:6px!important;padding:32px 20px!important}
+.arc-empty h2{font-size:20px;font-weight:800;letter-spacing:-.02em}
+.arc-empty p{margin-bottom:10px;color:var(--muted)}
 
-.more-games{margin-top:clamp(26px,5vw,42px);overflow:hidden;padding:0}
-.more-games summary{min-height:60px;display:flex;align-items:center;gap:10px;padding:0 20px;cursor:pointer;font-family:var(--font-display);font-size:19px;font-weight:750;letter-spacing:-.02em;list-style:none;user-select:none;-webkit-user-select:none}
+details.more-games{padding:0!important;display:block}
+.more-games summary{min-height:60px;display:flex;align-items:center;gap:10px;padding:0 20px;cursor:pointer;font-size:14px;font-weight:600;list-style:none;user-select:none;-webkit-user-select:none}
 .more-games summary::-webkit-details-marker{display:none}
-.more-games summary #moreCount{font-size:14px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
-.more-games summary::after{content:"";flex:none;width:9px;height:9px;margin:0 6px 0 auto;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg) translate(-2px,-2px);transition:transform .3s var(--ease)}
-.more-games[open] summary::after{transform:rotate(-135deg) translate(-2px,-2px)}
-.more-games summary:hover{background:color-mix(in srgb,var(--text) 5%,transparent)}
-.more-content{padding:0 18px 22px}
-.big-group h3{margin:22px 0 12px;font-family:var(--font-display);font-size:16px;font-weight:700;letter-spacing:-.01em;color:var(--muted);display:flex;align-items:center;gap:8px}
-.big-group:first-child h3{margin-top:6px}
-.more-group h3{margin:20px 0 12px;font-family:var(--font-display);font-size:15px;font-weight:700;letter-spacing:-.01em;color:var(--muted)}
+.more-games summary #moreCount{margin-left:auto;font-size:14px;font-weight:400;color:var(--muted);font-variant-numeric:tabular-nums}
+.more-games summary::after{content:"+";flex:none;width:18px;text-align:center;font:500 20px/1 "Geist Mono",ui-monospace,monospace}
+.more-games[open] summary::after{content:"\2212"}
+.more-games summary:hover{background:var(--white)}
+.more-games[open] summary{border-bottom:1px solid var(--line)}
+.more-content{padding:0}
+.big-group h3,.more-group h3{margin:0;padding:10px 20px;background:var(--tint);border-bottom:1px solid var(--line);font-size:14px;font-weight:600;color:var(--muted);display:flex;align-items:center;gap:8px}
+.big-group+.big-group h3,.more-group+.more-group h3{border-top:0}
+.big-group h3 span{display:none}
 
-.pb-about{max-width:760px;margin:clamp(34px,6vw,56px) 0 0}
-.pb-about h2{margin-bottom:12px}
-.pb-about h3{margin:22px 0 6px;font-family:var(--font-display);font-size:16px;font-weight:750;letter-spacing:-.015em}
-.pb-about p{margin:0;font-size:15px;line-height:1.7;color:var(--muted);text-wrap:pretty}
-.pb-about strong{color:var(--text)}
-.arc-foot{width:100%;max-width:1040px;margin:34px auto 0;padding:22px 28px calc(36px + env(safe-area-inset-bottom));border-top:1px solid var(--border);font-size:13px;line-height:1.6;color:var(--muted)}
-.arc-foot a{display:inline-flex;align-items:center;min-height:44px;color:var(--muted)}
-.arc-foot a:hover{color:var(--text)}
+.pb-about{max-width:none}
+.pb-about h2{font-size:22px;font-weight:800;letter-spacing:-.02em;margin-bottom:12px}
+.pb-about h3{margin:22px 0 6px;font-size:16px;font-weight:600}
+.pb-about p{font-size:15px;line-height:1.65;color:var(--muted);max-width:68ch}
+.pb-about strong{color:var(--ink);font-weight:600}
+.arc-foot{max-width:1240px;width:100%;margin:0 auto;padding:6px var(--gutter) calc(36px + env(safe-area-inset-bottom));font-size:14px;color:var(--muted)}
+.arc-foot a{display:inline-flex;align-items:center;min-height:44px;color:var(--muted);text-underline-offset:3px}
+.arc-foot a:hover{color:var(--ink)}
 
 /* ---- game overlay (the games bring their own top bar) ---- */
 #overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:1000;display:none;flex-direction:column}
@@ -139,7 +133,7 @@ body.ui .pb-x{min-width:44px;min-height:44px;margin:-8px -8px 0 0}
 #tc .tb{position:absolute;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);color:#fff;font-size:20px;border-radius:12px;display:flex;align-items:center;justify-content:center;touch-action:none;cursor:pointer}
 #tc .dpad .tb{width:50px;height:50px}
 #tc .up{left:53px;top:0}#tc .left{left:0;top:53px}#tc .down{left:53px;top:106px}#tc .right{left:106px;top:53px}
-#tc .act{position:static;width:78px;height:78px;border-radius:50%;background:var(--accent);border:none;font-weight:800;font-size:24px;flex:none}
+#tc .act{position:static;width:78px;height:78px;border-radius:50%;background:var(--green);border:none;font-weight:800;font-size:24px;flex:none;border-radius:0}
 #tc .tb.on{background:var(--accent2);color:var(--accent2-foreground)}
 @media (pointer:coarse){#tc{display:flex}}
 #tc.keyboard-hidden{display:none!important}
@@ -163,34 +157,26 @@ body.game-no-pad #tc{display:none!important}
 #om .x{float:right;display:grid;place-items:center;width:44px;height:44px;margin:-10px -10px 0 0;background:none;border:none;border-radius:50%;color:var(--muted);font-size:20px;cursor:pointer;line-height:1}
 #om .x:hover{background:color-mix(in srgb,var(--text) 8%,transparent);color:var(--text)}
 
-button,.game-card,.genre-filter,.home-btn,.logo{touch-action:manipulation}
+button,.game-card,.genre-filter{touch-action:manipulation}
 @media(max-width:700px){
-.arc-search{max-width:none}
-.hdr-link [data-i18n],#installBtn [data-i18n]{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-#installBtn,.hdr-link{padding-inline:12px}
-.header-right{gap:6px}
-.header-right .pb-acct{padding-inline:12px}
-.genre-filters{flex-wrap:nowrap;overflow-x:auto;margin-inline:-16px;padding:2px 16px;scrollbar-width:none}
+#installBtn{padding-inline:10px}
+.gt-nav .logo{display:none}
+.genre-filters{flex-wrap:nowrap;overflow-x:auto;margin-inline:-16px;padding:0 16px;scrollbar-width:none}
 .genre-filters::-webkit-scrollbar{display:none}
 .genre-filter{flex:none}
-.game-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.big-grid{grid-template-columns:minmax(0,1fr);gap:12px}
-.game-thumb{font-size:38px}
-.game-card.big{flex-direction:row;gap:10px}
-.game-card.big .game-thumb{width:118px;aspect-ratio:1;font-size:46px}
-.game-card.big .game-info{padding:6px 4px 4px 0}
-.game-card.big .game-name{font-size:17px}
-.ext{top:12px;right:12px}
-.more-content{padding:0 12px 18px}
+.arc-hero{min-height:0;padding-top:26px!important}
+.arc-title{font-size:clamp(64px,22vw,96px)}
+.arc-sub{font-size:16px}
+.arc-search input{min-height:60px;font-size:16px}
+.game-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.big-grid{grid-template-columns:minmax(0,1fr)}
+.game-card.big{flex-direction:row}
+.game-card.big .game-thumb{width:118px;flex:none;aspect-ratio:1;font-size:44px;border-bottom:0;border-right:1px solid var(--soft)}
+.game-card.big .game-info{padding:12px}
+.gt-lbl .sub{display:none}
 .arc-foot{padding-inline:16px;padding-bottom:calc(96px + env(safe-area-inset-bottom))}
 }
-@media(prefers-reduced-motion:no-preference){
-.arc-hero>*{animation:arc-rise .75s var(--ease) both}
-.arc-title{animation-delay:.05s}.arc-sub{animation-delay:.13s}
-}
-@keyframes arc-rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
-@media(prefers-reduced-motion:reduce){.game-card,.game-thumb .em,.game-thumb::after,.more-games summary::after,.genre-filter,.home-btn,#installBtn,#om .go{transition:none}.game-card:hover,.game-card:active{transform:none}}
-@media(prefers-contrast:more){.game-card,.arc-empty{box-shadow:0 0 0 2px var(--text)}}
+@media(prefers-reduced-motion:reduce){#om .go{transition:none}}
 body.game-open #themeFab,body.game-open #themePop,body.game-open #pwaRefresh,body.game-open #pwaInstall,body.game-open #appNav{display:none!important}
 </style>
 <script data-goatcounter="https://ianm.goatcounter.com/count"
@@ -198,74 +184,78 @@ body.game-open #themeFab,body.game-open #themePop,body.game-open #pwaRefresh,bod
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
 </head>
-<body class="ui">
-<a class="skip" href="#main" data-i18n="arc.skip">Skip to content</a>
-<header class="ui-header">
-<div class="header-left">
-<a class="home-btn" href="index.html" data-i18n="nav.home">&#x2039; Home</a>
-<a class="logo ui-brand" href="pixelbreak.html" onclick="goHome();return false;"><span class="logo-icon" aria-hidden="true">&#x1F3AE;</span>Arcade</a>
+<body class="gt">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <symbol id="i-magnifying-glass" viewBox="0 0 256 256"><path d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"/></symbol>
+    <symbol id="i-trophy" viewBox="0 0 256 256"><path d="M232,64H208V48a8,8,0,0,0-8-8H56a8,8,0,0,0-8,8V64H24A16,16,0,0,0,8,80V96a40,40,0,0,0,40,40h3.65A80.13,80.13,0,0,0,120,191.61V216H96a8,8,0,0,0,0,16h64a8,8,0,0,0,0-16H136V191.58c31.94-3.23,58.44-25.64,68.08-55.58H208a40,40,0,0,0,40-40V80A16,16,0,0,0,232,64ZM48,120A24,24,0,0,1,24,96V80H48v32q0,4,.39,8Zm144-8.9c0,35.52-29,64.64-64,64.9a64,64,0,0,1-64-64V56H192ZM232,96a24,24,0,0,1-24,24h-.5a81.81,81.81,0,0,0,.5-8.9V80h24Z"/></symbol>
+    <symbol id="i-users-three" viewBox="0 0 256 256"><path d="M244.8,150.4a8,8,0,0,1-11.2-1.6A51.6,51.6,0,0,0,192,128a8,8,0,0,1-7.37-4.89,8,8,0,0,1,0-6.22A8,8,0,0,1,192,112a24,24,0,1,0-23.24-30,8,8,0,1,1-15.5-4A40,40,0,1,1,219,117.51a67.94,67.94,0,0,1,27.43,21.68A8,8,0,0,1,244.8,150.4ZM190.92,212a8,8,0,1,1-13.84,8,57,57,0,0,0-98.16,0,8,8,0,1,1-13.84-8,72.06,72.06,0,0,1,33.74-29.92,48,48,0,1,1,58.36,0A72.06,72.06,0,0,1,190.92,212ZM128,176a32,32,0,1,0-32-32A32,32,0,0,0,128,176ZM72,120a8,8,0,0,0-8-8A24,24,0,1,1,87.24,82a8,8,0,1,0,15.5-4A40,40,0,1,0,37,117.51,67.94,67.94,0,0,0,9.6,139.19a8,8,0,1,0,12.8,9.61A51.6,51.6,0,0,1,64,128,8,8,0,0,0,72,120Z"/></symbol>
+    <symbol id="i-squares-four" viewBox="0 0 256 256"><path d="M104,40H56A16,16,0,0,0,40,56v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V56A16,16,0,0,0,104,40Zm0,64H56V56h48v48Zm96-64H152a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V56A16,16,0,0,0,200,40Zm0,64H152V56h48v48Zm-96,32H56a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V152A16,16,0,0,0,104,136Zm0,64H56V152h48v48Zm96-64H152a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V152A16,16,0,0,0,200,136Zm0,64H152V152h48v48Z"/></symbol>
+    <symbol id="i-game-controller" viewBox="0 0 256 256"><path d="M176,112H152a8,8,0,0,1,0-16h24a8,8,0,0,1,0,16ZM104,96H96V88a8,8,0,0,0-16,0v8H72a8,8,0,0,0,0,16h8v8a8,8,0,0,0,16,0v-8h8a8,8,0,0,0,0-16ZM241.48,200.65a36,36,0,0,1-54.94,4.81c-.12-.12-.24-.24-.35-.37L146.48,160h-37L69.81,205.09l-.35.37A36.08,36.08,0,0,1,44,216,36,36,0,0,1,8.56,173.75a.68.68,0,0,1,0-.14L24.93,89.52A59.88,59.88,0,0,1,83.89,40H172a60.08,60.08,0,0,1,59,49.25c0,.06,0,.12,0,.18l16.37,84.17a.68.68,0,0,1,0,.14A35.74,35.74,0,0,1,241.48,200.65ZM172,144a44,44,0,0,0,0-88H83.89A43.9,43.9,0,0,0,40.68,92.37l0,.13L24.3,176.59A20,20,0,0,0,58,194.3l41.92-47.59a8,8,0,0,1,6-2.71Zm59.7,32.59-8.74-45A60,60,0,0,1,172,160h-4.2L198,194.31a20.09,20.09,0,0,0,17.46,5.39,20,20,0,0,0,16.23-23.11Z"/></symbol>
+  </svg>
+<a class="skip" href="#main" data-i18n="arc.skip">Sprang zum Inhalt</a>
+<main class="gt-page" id="main">
+<div class="gt-grid">
+<header class="c full gt-nav">
+<div class="gt-nav-l">
+<a class="gt-back" href="index.html" data-i18n="nav.home">&#x2039; Heem</a>
+<a class="gt-mark logo" href="pixelbreak.html" onclick="goHome();return false;">Arcade</a>
 </div>
-<div class="header-right">
-<a id="lbLink" class="hdr-link" href="leaderboard.html"><span aria-hidden="true">&#x1F3C6;</span> <span data-i18n="nav.leaderboard">Ranglëscht</span></a>
-<button id="installBtn" type="button" style="display:none"><span aria-hidden="true">📲</span> <span data-i18n="arc.install">Install</span></button>
+<div class="gt-navr header-right">
+<a id="lbLink" class="gt-link" href="leaderboard.html"><svg class="ic" aria-hidden="true"><use href="#i-trophy"/></svg><span data-i18n="nav.leaderboard">Ranglëscht</span></a>
+<button id="installBtn" type="button" style="display:none"><span data-i18n="arc.install">Installéieren</span></button>
 <span id="langSw"></span>
 </div>
 </header>
-<main class="ui-page" id="main">
-<div id="halloweenBanner" hidden data-i18n="arc.halloweenBanner" style="margin-bottom:12px;padding:10px 14px;border:1px solid var(--border);border-radius:12px;background:var(--card);color:var(--text);font-size:13px;line-height:1.5"></div>
-<section class="arc-hero">
-<p class="arc-kicker" data-i18n="arc.kicker">Games for breaks</p>
+<div id="halloweenBanner" class="c full" hidden data-i18n="arc.halloweenBanner" style="background:var(--tint);font-size:14px"></div>
+<section class="c full arc-hero">
+<p class="arc-kicker" data-i18n="arc.kicker">Spiller fir Pausen</p>
 <h1 class="arc-title">Arcade<span>.</span></h1>
-<p class="arc-sub" data-i18n="arc.sub">Right in your browser, no download. On iPad, phone and laptop.</p>
+<p class="arc-sub" data-i18n="arc.sub">Direkt am Browser, ouni Download. Op iPad, Handy a Laptop.</p>
 </section>
-<div class="arc-tools">
-<div class="arc-search">
-<span class="si" aria-hidden="true">&#x1F50D;</span>
-<input class="ui-input" type="search" id="search" name="q" aria-label="Search games" data-i18n-attr="aria-label:arc.searchLabel|placeholder:arc.search" placeholder="Search games…" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" oninput="applyFilters()">
+<div class="c full arc-search">
+<span class="si" aria-hidden="true"><svg class="ic"><use href="#i-magnifying-glass"/></svg></span>
+<input type="search" id="search" name="q" aria-label="Spiller sichen" data-i18n-attr="aria-label:arc.searchLabel|placeholder:arc.search" placeholder="Spiller sichen …" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" oninput="applyFilters()">
 </div>
-<nav class="browse" aria-label="Browse games by genre" data-i18n-attr="aria-label:arc.browse">
+<div class="c full top arc-tools">
+<nav class="browse" aria-label="Spiller no Genre" data-i18n-attr="aria-label:arc.browse">
 <div class="genre-filters">
-<button class="genre-filter active" type="button" aria-pressed="true" data-genre="all" data-i18n="arc.g.all" onclick="setGenre('all')">All games</button>
+<button class="genre-filter active" type="button" aria-pressed="true" data-genre="all" data-i18n="arc.g.all" onclick="setGenre('all')">All Spiller</button>
 <button class="genre-filter" type="button" aria-pressed="false" data-genre="puzzle" data-i18n="arc.g.puzzle" onclick="setGenre('puzzle')">Puzzle</button>
 <button class="genre-filter" type="button" aria-pressed="false" data-genre="action" data-i18n="arc.g.action" onclick="setGenre('action')">Action</button>
-<button class="genre-filter" type="button" aria-pressed="false" data-genre="sim" data-i18n="arc.g.sim" onclick="setGenre('sim')">Simulation</button> <button class="genre-filter" type="button" aria-pressed="false" data-genre="driving" data-i18n="arc.g.driving" onclick="setGenre('driving')">Driving &amp; stunts</button>
-<button class="genre-filter" type="button" aria-pressed="false" data-genre="creative" data-i18n="arc.g.creative" onclick="setGenre('creative')">Creative</button>
-<button class="genre-filter" type="button" aria-pressed="false" data-genre="idle" data-i18n="arc.g.idle" onclick="setGenre('idle')">Idle &amp; strategy</button>
+<button class="genre-filter" type="button" aria-pressed="false" data-genre="sim" data-i18n="arc.g.sim" onclick="setGenre('sim')">Simulatioun</button> <button class="genre-filter" type="button" aria-pressed="false" data-genre="driving" data-i18n="arc.g.driving" onclick="setGenre('driving')">Fueren &amp; Stunts</button>
+<button class="genre-filter" type="button" aria-pressed="false" data-genre="creative" data-i18n="arc.g.creative" onclick="setGenre('creative')">Kreativ</button>
+<button class="genre-filter" type="button" aria-pressed="false" data-genre="idle" data-i18n="arc.g.idle" onclick="setGenre('idle')">Idle &amp; Strategie</button>
 </div>
 </nav>
 <p class="browse-status" id="count" aria-live="polite"></p>
 </div>
-<section id="weeklyCard" class="ui-card weekly-card" hidden aria-live="polite"></section>
-<section class="arc-sec" id="bigSec">
-<h2 class="sec-title ui-title"><span class="sec-ico" aria-hidden="true">🏆</span><span data-i18n="arc.big">Big games</span></h2>
-<p class="sec-sub" data-i18n="arc.bigSub">Progress saves, so you can come back and keep going.</p>
+<section id="weeklyCard" class="c full ui-card weekly-card" hidden aria-live="polite"></section>
+<section class="gt-sec" id="bigSec">
+<h2 class="c gt-lbl sec-title"><svg class="ic" aria-hidden="true"><use href="#i-trophy"/></svg><span data-i18n="arc.big">Grouss Spiller</span><span class="sub" data-i18n="arc.bigSub">De Fortschrëtt gëtt gespäichert.</span></h2>
 <div class="big-groups" id="gridBig"></div>
 </section>
-<section class="arc-sec" id="togetherSec">
-<h2 class="sec-title ui-title"><span class="sec-ico" aria-hidden="true">👥</span><span data-i18n="arc.together">Play together</span></h2>
-<p class="sec-sub" data-i18n="arc.togetherSub">Play on two iPads, against AI, or side by side.</p>
+<section class="gt-sec" id="togetherSec">
+<h2 class="c gt-lbl sec-title"><svg class="ic" aria-hidden="true"><use href="#i-users-three"/></svg><span data-i18n="arc.together">Zesumme spillen</span><span class="sub" data-i18n="arc.togetherSub">Op zwee iPads, géint d'KI oder niewentenee.</span></h2>
 <div class="game-grid" id="gridTogether"></div>
 </section>
-<section class="arc-sec" id="quickSec">
-<h2 class="sec-title ui-title"><span class="sec-ico" aria-hidden="true">⚡</span><span data-i18n="arc.quick">Quick games</span></h2>
-<p class="sec-sub" data-i18n="arc.quickSub">One sitting, no progress to lose.</p>
+<section class="gt-sec" id="quickSec">
+<h2 class="c gt-lbl sec-title"><svg class="ic" aria-hidden="true"><use href="#i-squares-four"/></svg><span data-i18n="arc.quick">Séier Spiller</span><span class="sub" data-i18n="arc.quickSub">Eng Sëtzung, näischt ze verléieren.</span></h2>
 <div class="game-grid" id="gridQuick"></div>
 </section>
 
-<details class="more-games ui-card" id="moreGames">
-<summary><span data-i18n="arc.more">More games</span> <span id="moreCount"></span></summary>
+<details class="c full more-games" id="moreGames">
+<summary><span data-i18n="arc.more">Méi Spiller</span> <span id="moreCount"></span></summary>
 <div class="more-content" id="moreContent"></div>
 </details>
 
-<div class="arc-empty ui-card" id="emptyMsg" hidden>
-<span class="ico" aria-hidden="true">🕹️</span>
-<h2 data-i18n="arc.emptyT">Nothing found</h2>
-<p data-i18n="arc.emptyS">Try another word or another genre.</p>
-<button class="ui-btn ui-btn--primary" type="button" data-i18n="arc.emptyB" onclick="goHome()">Show all games</button>
+<div class="c full arc-empty" id="emptyMsg" hidden>
+<h2 data-i18n="arc.emptyT">Näischt fonnt</h2>
+<p data-i18n="arc.emptyS">Probéier en anert Wuert oder en anert Genre.</p>
+<button class="gt-btn" type="button" data-i18n="arc.emptyB" onclick="goHome()">All Spiller weisen</button>
 </div>
 
-<section class="pb-about ui-card">
-<h2 class="ui-title" data-i18n="arc.aboutH">About Arcade</h2>
+<section class="c full top pb-about">
+<h2 data-i18n="arc.aboutH">About Arcade</h2>
 <p data-i18n="arc.about1">Arcade is a small browser arcade I built myself. Its games run in the browser — there is nothing
 to download and no launcher to install. Open it on a phone, an iPad, a school laptop or a desktop, pick a
 game, and it starts immediately. High scores and supported game progress are saved for you.</p>
@@ -292,6 +282,7 @@ action button appear underneath the game, so everything is playable without a ke
 well-known arcade concepts — the kind of games most people have played some version of — but the code, the
 artwork and the level design are my own, and none of it is copied from another game.</p>
 </section>
+</div>
 </main>
 <div id="overlay" role="dialog" aria-modal="true" aria-label="Game" data-i18n-attr="aria-label:arc.game">
 <div id="gh"></div>
@@ -307,7 +298,7 @@ artwork and the level design are my own, and none of it is copied from another g
 </div>
 </div>
 <div id="om" role="dialog" aria-modal="true" aria-labelledby="omTitle"><div class="box"></div></div>
-<footer class="arc-foot"><span data-i18n="arc.foot">Arcade — made for fun. Built-in games are original creations inspired by popular concepts.</span> · <a href="privacy.html">Datenschutz · Privacy</a></footer>
+<footer class="arc-foot"><span data-i18n="arc.foot">Arcade — fir de Spaass gemaach. D'Spiller hei sinn Originaler, inspiréiert vu bekannte Konzepter.</span> · <a href="privacy.html" data-i18n="footer.privacy">Dateschutz</a></footer>
 <script>
 const GAMES=[
 {id:"park",name:"Schueberfouer Tycoon",emoji:"🎡",thumb:"pb/thumbs/park.webp",featured:true,desc:"Run the Schueberfouer on the Glacis — rent pitches, build rides and stalls, walk through your fair and join the real fair days with the Hämmelsmarsch and fireworks",cats:["sim","creative"],tags:[],src:"pb/fouer.html"},
@@ -764,7 +755,7 @@ loadPlayCounts();
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script src="pb/arcade-kit.js?v=41"></script>
-<script type="module" src="pixelbreak-records.js?v=59"></script>
+<script type="module" src="pixelbreak-records.js?v=60"></script>
 <script>
 /* ---------- install as app (PWA) ---------- */
 (function(){

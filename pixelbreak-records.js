@@ -1009,15 +1009,15 @@ function renderAccount() {
     btn.onclick = openAuth;
     host.appendChild(btn);
   }
-  btn.innerHTML = session ? `👤 ${esc(username)}` : "👤 Sign in";
+  btn.innerHTML = session ? esc(username) : "Umellen";
 }
 
 function openAuth() {
   if (session) {
     authModal.querySelector(".pb-box").innerHTML =
-      `<button class="pb-x">&times;</button><h3>Signed in</h3>
-       <p style="color:var(--text2);font-size:13px">as <b>${esc(username)}</b></p>
-       <button class="pb-go" id="pbOut">Sign out</button>`;
+      `<button class="pb-x">&times;</button><h3>Ugemellt</h3>
+       <p style="color:var(--text2);font-size:13px">als <b>${esc(username)}</b></p>
+       <button class="pb-go" id="pbOut">Ofmellen</button>`;
     authModal.querySelector(".pb-x").onclick = () => authModal.classList.remove("open");
     authModal.querySelector("#pbOut").onclick = async () => { await sb.auth.signOut(); authModal.classList.remove("open"); };
     authModal.classList.add("open");
@@ -1029,13 +1029,13 @@ function openAuth() {
       <button class="pb-x">&times;</button>
       <h3>Arcade</h3>
       <div class="pb-tabs">
-        <button class="pb-tab ${mode==='in'?'active':''}" data-m="in">Sign in</button>
-        <button class="pb-tab ${mode==='up'?'active':''}" data-m="up">Create account</button>
+        <button class="pb-tab ${mode==='in'?'active':''}" data-m="in">Umellen</button>
+        <button class="pb-tab ${mode==='up'?'active':''}" data-m="up">Kont erstellen</button>
       </div>
-      ${mode==='up'?'<input id="pbUser" placeholder="Username" maxlength="24" autocomplete="username">':''}
-      <input id="pbEmail" type="email" placeholder="Email" autocomplete="email">
-      <input id="pbPass" type="password" placeholder="Password (min 6)" autocomplete="current-password">
-      <button class="pb-go">${mode==='up'?'Create account':'Sign in'}</button>
+      ${mode==='up'?'<input id="pbUser" placeholder="Benotzernumm" maxlength="24" autocomplete="username">':''}
+      <input id="pbEmail" type="email" placeholder="E-Mail" autocomplete="email">
+      <input id="pbPass" type="password" placeholder="Passwuert (mindestens 6)" autocomplete="current-password">
+      <button class="pb-go">${mode==='up'?'Kont erstellen':'Umellen'}</button>
       <div class="pb-msg" id="pbMsg"></div>`;
     const box = authModal.querySelector(".pb-box");
     box.querySelector(".pb-x").onclick = () => authModal.classList.remove("open");
@@ -1046,20 +1046,20 @@ function openAuth() {
     const msg = document.getElementById("pbMsg");
     const email = val("pbEmail"), pass = val("pbPass");
     msg.className = "pb-msg";
-    if (!email || pass.length < 6) { msg.className = "pb-msg err"; msg.textContent = "Enter an email and a 6+ char password."; return; }
+    if (!email || pass.length < 6) { msg.className = "pb-msg err"; msg.textContent = "Gëff eng E-Mail an e Passwuert mat mindestens 6 Zeechen an."; return; }
     msg.textContent = "…";
     try {
       if (mode === "up") {
         const uname = val("pbUser") || email.split("@")[0];
         const { data, error } = await sb.auth.signUp({ email, password: pass, options: { data: { username: uname } } });
         if (error) throw error;
-        if (!data.session) { msg.className = "pb-msg ok"; msg.textContent = "Account created — check your email to confirm, then sign in."; return; }
+        if (!data.session) { msg.className = "pb-msg ok"; msg.textContent = "Kont erstallt. Bestätegt deng E-Mail, dann mell dech un."; return; }
       } else {
         const { error } = await sb.auth.signInWithPassword({ email, password: pass });
         if (error) throw error;
       }
       authModal.classList.remove("open");
-    } catch (e) { msg.className = "pb-msg err"; msg.textContent = e.message || "Something went wrong."; }
+    } catch (e) { msg.className = "pb-msg err"; msg.textContent = e.message || "Et ass eppes schifgaangen."; }
   };
   draw();
   authModal.classList.add("open");

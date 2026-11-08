@@ -1,112 +1,66 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="lb">
 <head>
 <meta charset="utf-8">
 <meta name="robots" content="noindex,follow">
-<!-- Private profile page. -->
+<!-- Private profile page. "Gitter" look (Nov 2026): see gitter.css. -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Profile — ian.lu</title>
-  <link rel="canonical" href="https://ian.lu/profile.html" />
-<meta name="description" content="Your ian.lu player profile — avatar and game stats.">
+<title>Profil — ian.lu</title>
+<link rel="canonical" href="https://ian.lu/profile.html" />
+<meta name="description" content="Däi ian.lu Spillerprofil: Avatar a Statistiken.">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<meta name="theme-color" content="#0d0d1a">
-<script src="season.js?v=5"></script>
+<meta name="theme-color" content="#f6f6f3">
+<link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="stylesheet" href="gitter.css?v=1">
 <script src="theme.js?v=32"></script>
 <script src="i18n-dict.js?v=54"></script>
 <script src="i18n.js?v=5"></script>
-<link rel="stylesheet" href="site-ui.css?v=2">
 <style>
-  *{box-sizing:border-box}
-  body{margin:0;min-height:100vh;min-height:100svh;display:flex;flex-direction:column;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-  a{color:var(--accent-text);text-decoration:none}
-  button{touch-action:manipulation}
+  .gt-page { padding-bottom: max(56px, calc(40px + env(safe-area-inset-bottom))); }
+  .gt-gate { text-align: left; align-items: flex-start; padding: 28px 20px !important; gap: 14px !important; justify-content: flex-start !important; }
+  .gt-gate .gt-big { font-size: 22px; }
 
-  /* ---- header + column (site-ui look) ---- */
-  html body.ui .ui-header{max-width:720px;flex-wrap:wrap;gap:8px 14px;padding:max(16px,env(safe-area-inset-top)) max(28px,env(safe-area-inset-right)) 0 max(28px,env(safe-area-inset-left))}
-  .header-left,.header-right{display:flex;align-items:center;gap:10px;min-width:0}
-  .header-left{flex:1 1 auto}
-  .header-right{flex-wrap:wrap;justify-content:flex-end}
-  body.ui .ui-header .home{display:inline-flex;align-items:center;min-height:44px;padding:8px 16px;border-radius:var(--r-chip);border:1px solid var(--border);background:transparent;color:var(--text);font:700 14px var(--font-display);white-space:nowrap;touch-action:manipulation;transition:background-color .2s,border-color .2s,transform .3s var(--ease)}
-  body.ui .ui-header .home:hover{background:color-mix(in srgb,var(--accent) 10%,transparent);border-color:var(--accent-border)}
-  body.ui .ui-header .home:active{transform:scale(.97)}
-  body.ui .ui-header h1.ui-brand{margin:0;display:flex;align-items:center;gap:10px;font-size:19px;white-space:nowrap}
-  .ui .ui-page{display:flex;flex-direction:column;gap:12px;max-width:720px;padding-top:22px;padding-left:max(28px,env(safe-area-inset-left));padding-right:max(28px,env(safe-area-inset-right));padding-bottom:max(72px,calc(40px + env(safe-area-inset-bottom)))}
-  .ui-btn:focus-visible,.ui-input:focus-visible,.avb:focus-visible,a:focus-visible{outline:2px solid var(--focus-ring,var(--accent));outline-offset:2px}
+  /* hero */
+  .gt-me { flex-direction: row !important; align-items: center; justify-content: flex-start !important; gap: 20px !important; padding: 20px !important; }
+  .gt-me .big { flex: none; display: grid; place-items: center; width: 96px; height: 96px; border: 1px solid var(--ink); background: var(--white); font-size: 48px; line-height: 1; overflow: hidden; }
+  .gt-me .big img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .gt-me .who { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .gt-me .name { font-size: clamp(26px, 5vw, 40px); font-weight: 800; letter-spacing: -0.04em; line-height: 1; overflow-wrap: anywhere; }
 
-  /* ---- loading / sign-in / not-found gate ---- */
-  .gate{text-align:center;color:var(--muted);padding:clamp(30px,6vw,52px) 22px;margin-top:10px}
-  .gate-ico{display:grid;place-items:center;width:72px;height:72px;margin:0 auto 16px;border-radius:22px;font-size:36px;background:color-mix(in srgb,var(--accent) 20%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 30%,transparent)}
-  .gate .ui-btn{margin-top:14px}
-  #stats>.gate,#ach>.gate{flex:1 1 100%;padding:14px;margin:0}
+  /* forms */
+  .gt-form { justify-content: flex-start !important; gap: 12px !important; }
+  .gt-field .gt-btn { padding-inline: 20px; }
+  .upl { display: flex; gap: 8px; flex-wrap: wrap; }
 
-  /* ---- section titles ---- */
-  h2{margin:18px 4px 0;font:800 17px var(--font-display);letter-spacing:-.02em;text-transform:none;color:var(--text)}
+  /* emoji picker: flat hairline cells */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); border-top: 1px solid var(--soft); border-left: 1px solid var(--soft); }
+  .avb { aspect-ratio: 1; min-height: 52px; font-size: 26px; line-height: 1; border: 0; border-right: 1px solid var(--soft); border-bottom: 1px solid var(--soft); border-radius: 0; color: var(--ink); background: var(--white); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+  .avb:hover { background: var(--tint); }
+  .avb.on { background: var(--ink); outline: 0; }
+  .avb:focus-visible { outline: 2px solid var(--green); outline-offset: -3px; }
 
-  /* ---- hero ---- */
-  .me{display:flex;align-items:center;gap:clamp(14px,3vw,22px)}
-  .me .big{flex:none;display:grid;place-items:center;width:88px;height:88px;border-radius:26px;font-size:46px;line-height:1;overflow:hidden;background:color-mix(in srgb,var(--accent) 20%,var(--card-opaque));box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--accent) 55%,transparent),0 14px 28px -14px color-mix(in srgb,var(--accent) 70%,transparent)}
-  .me .big img{width:100%;height:100%;object-fit:cover;display:block}
-  .me .who{min-width:0}
-  .me .name{font:800 clamp(22px,4vw,28px)/1.15 var(--font-display);letter-spacing:-.025em;overflow-wrap:anywhere}
-  .me .sub{color:var(--muted);font-size:13.5px;margin-top:2px}
-  .tags{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
-  .tags:empty{display:none}
-  .tags span{border-radius:8px;padding:2px 8px;font:800 11.5px var(--font-display);letter-spacing:.2px}
-  .class-tag{background:rgba(92,200,255,.15);color:#5cc8ff;box-shadow:inset 0 0 0 1px rgba(92,200,255,.4)}
-  .admin-tag{background:rgba(255,207,77,.15);color:#ffcf4d;box-shadow:inset 0 0 0 1px rgba(255,207,77,.4)}
-  html[data-theme="light"] .class-tag{color:#075985;background:rgba(14,116,144,.12);box-shadow:inset 0 0 0 1px rgba(14,116,144,.4)}
-  html[data-theme="light"] .admin-tag{color:#854d0e;background:rgba(202,138,4,.14);box-shadow:inset 0 0 0 1px rgba(161,98,7,.45)}
+  /* stats: a nested hairline grid, like the category index on the homepage */
+  .gt-stats { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .gt-stats.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .gt-stats .c { justify-content: flex-start; gap: 4px; padding: 16px 20px 18px; }
+  .gt-stats b { font: 500 clamp(26px, 3.4vw, 36px)/1 "Geist Mono", ui-monospace, monospace; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .gt-stats b :is(span,button) { font: inherit; color: inherit; letter-spacing: inherit; }
+  .gt-stats span { color: var(--muted); font-size: 14px; }
+  .gt-stats .gt-loading { grid-column: 1 / -1; }
+  .ach-card { flex-direction: row !important; flex-wrap: wrap; justify-content: flex-start !important; gap: 8px !important; }
+  .ach { display: inline-flex; align-items: center; padding: 3px 10px; border: 1px solid var(--green); color: var(--green); font: 500 13px/1.5 "Geist Mono", ui-monospace, monospace; }
+  .ach-none { color: var(--muted); }
+  .share a { color: var(--green); overflow-wrap: anywhere; }
 
-  /* ---- forms ---- */
-  .pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-  .pair>section{min-width:0}
-  .pair .ui-card{margin-top:12px}
-  .field{display:flex;gap:8px;flex-wrap:wrap;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}
-  .field .ui-input{flex:1;min-width:150px;width:auto}
-  .field .ui-btn{padding-inline:20px;white-space:nowrap}
-  .ui-btn[disabled]{opacity:.6;cursor:default;transform:none}
-  .hint{color:var(--muted);font-size:12.5px;line-height:1.45;margin-top:10px;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}
-  .msg{min-height:18px;margin-top:4px;color:var(--accent-text);font-weight:700;font-size:13px}
-  .msg:empty{min-height:0;margin:0}
-  .msg.err{color:#ff6b6b}
-  html[data-theme="light"] .msg.err{color:#b91c1c}
-  .upl{display:flex;gap:10px;flex-wrap:wrap}
-  .upl .ui-btn[hidden]{display:none}
-
-  /* ---- emoji picker ---- */
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(56px,1fr));gap:10px}
-  .avb{aspect-ratio:1;min-height:48px;font-size:26px;line-height:1;border:0;border-radius:var(--r-chip);color:var(--text);background:var(--card2-opaque);cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 1px var(--border);transition:transform .3s var(--ease),box-shadow .2s,background-color .2s;touch-action:manipulation}
-  .avb:hover{transform:translateY(-3px) rotate(-4deg);box-shadow:inset 0 0 0 1px var(--accent-border,var(--accent))}
-  .avb:active{transform:scale(.94)}
-  .avb.on{background:color-mix(in srgb,var(--accent) 22%,var(--card-opaque));box-shadow:inset 0 0 0 2px var(--accent),0 10px 20px -12px color-mix(in srgb,var(--accent) 80%,transparent)}
-
-  /* ---- stats + achievements ---- */
-  .stats{display:flex;flex-wrap:wrap;gap:10px}
-  .stat{--h:var(--accent);flex:1 1 104px;padding:16px 10px 14px;text-align:center;border-radius:var(--r-tile);background:var(--card);box-shadow:inset 0 0 0 1px var(--tile-edge),0 1px 2px rgb(var(--ink)/.05),0 14px 30px -20px rgb(var(--ink)/.35)}
-  .stat:nth-child(5n+2){--h:#ff6b9d}
-  .stat:nth-child(5n+3){--h:#4fc37a}
-  .stat:nth-child(5n+4){--h:#ffb347}
-  .stat:nth-child(5n+5){--h:#a371f7}
-  .stat::before{content:"";display:block;width:26px;height:4px;margin:0 auto 10px;border-radius:99px;background:var(--h)}
-  .stat b{display:block;text-align:right;overflow-wrap:anywhere;font:800 clamp(24px,4vw,30px)/1.1 var(--font-display);letter-spacing:-.03em;font-variant-numeric:tabular-nums}
-  .stat > span{display:block;margin-top:4px;font-size:12.5px;color:var(--muted)}
-  .ach-card{display:flex;flex-wrap:wrap;gap:8px}
-  .ach{display:inline-flex;align-items:center;padding:7px 14px;border-radius:var(--r-chip);font:700 13.5px var(--font-display);background:color-mix(in srgb,var(--accent) 14%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 28%,transparent)}
-  .ach-none{color:var(--muted)}
-  .share{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:18px}
-  .share .hint{margin:0}
-  .share a{overflow-wrap:anywhere}
-
-  @media(max-width:640px){
-    html body.ui .ui-header{padding:max(12px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 0 max(16px,env(safe-area-inset-left))}
-    body.ui .ui-header h1.ui-brand{font-size:18px}
-    .ui .ui-page{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));padding-top:16px}
-    .pair{grid-template-columns:minmax(0,1fr);gap:0}
-    .me .big{width:76px;height:76px;border-radius:22px;font-size:40px}
-    .field .ui-btn{flex:1 1 100%}
-    .grid{grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:8px}
+  @media (max-width: 700px) {
+    .gt-me { gap: 14px !important; }
+    .gt-me .big { width: 76px; height: 76px; font-size: 40px; }
+    .gt-field .gt-btn, .upl .gt-btn { flex: 1 1 100%; }
+    .grid { grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); }
+    .gt-stats, .gt-stats.three { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .gt-stats .c:last-child:nth-child(odd) { grid-column: 1 / -1; }
+    .gt-nav { padding-inline: 14px !important; }
   }
-  @media(prefers-reduced-motion:reduce){.avb{transition:none}.avb:hover,.avb:active{transform:none}}
 </style>
 <script data-goatcounter="https://ianm.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
@@ -115,18 +69,16 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
 </head>
-<body class="ui">
-<header class="ui-header">
-  <div class="header-left">
-    <a class="home" href="index.html" data-i18n="nav.home">‹ Home</a>
-    <h1 class="ui-brand"><span aria-hidden="true">👤</span> <span data-i18n="tile.profile">Profile</span></h1>
+<body class="gt">
+<main class="gt-page">
+  <div class="gt-grid">
+    <div class="c full gt-nav">
+      <div class="gt-nav-l"><a class="gt-back" href="index.html">‹ Heem</a><h1 class="gt-page-title">Profil</h1></div>
+      <div class="gt-navr"><button type="button" class="gt-acct" id="gtAcct">Umellen</button></div>
+    </div>
+    <div id="wrap" class="gt-contents"><div class="c full gt-gate" role="status"><p class="gt-sub">Lued …</p></div></div>
   </div>
-  <div class="header-right">
-    <span id="acctHost"></span>
-  </div>
-</header>
-
-<main class="ui-page" id="wrap"><div class="gate ui-card" role="status">Loading…</div></main>
+</main>
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
@@ -140,7 +92,7 @@ const AVATARS=["😀","😎","🤖","👾","🐱","🐶","🦊","🐸","🐼","�
                "🦄","🐙","🐢","🦖","🐬","🦅","⚡","🔥","🌟","🍕","🎮","🏎️"];
 const BUCKET="avatars", AV_PX=256;
 const isUrl=(v)=>/^https?:\/\//.test(v||"");
-const avInner=(v)=>v?(isUrl(v)?`<img src="${esc(v)}" alt="" width="64" height="64">`:`<span aria-hidden="true">${esc(v)}</span>`):'<span aria-hidden="true">👤</span>';
+const avInner=(v)=>v?(isUrl(v)?`<img src="${esc(v)}" alt="" width="64" height="64">`:`<span aria-hidden="true">${esc(v)}</span>`):'<span aria-hidden="true">–</span>';
 let sb=null,myAvatar=null,myClass=null;
 // same specific-class rule as class-gate.js
 const normClass=(r)=>(""+(r??"")).trim().toUpperCase().replace(/[^A-Z0-9]/g,"");
@@ -150,46 +102,54 @@ const validClass=(r)=>{const v=normClass(r);return CLASS_SHAPE.test(v)&&!YEAR_ON
 const validName=(n)=>/^[A-Za-z0-9_]{3,20}$/.test((n||"").trim());
 const qs=new URLSearchParams(location.search);
 
+// Header button: "Umellen" for visitors, the username once signed in (opens the same account dialog as the homepage).
+function mountAcct(){
+  const b=$("gtAcct");if(!b)return;
+  b.textContent=auth.session()?(auth.username()||"Kont"):"Umellen";
+  b.onclick=auth.openAuthModal;
+}
+
 // Cosmetic badges derived from stats (server wins/losses + local wordle best).
 function achievements(s){
   const A=[];
   const add=(cond,html)=>{if(cond)A.push(`<span class="ach">${html}</span>`);};
-  add(s.wins>=1,"🏆 First win");
-  add(s.wins>=10,"🔥 10 wins");
-  add(s.wins>=50,"🌟 50 wins");
-  add((s.total||0)>=100,"💯 100 games");
-  add(s.pct!=null&&s.pct>=60&&(s.total||0)>=10,"🎯 60%+ win rate");
-  add((s.wordleMax||0)>=5,`📚 Wordle streak ${s.wordleMax}`);
-  return A.length?A.join(""):'<span class="ach-none">No badges yet — play some games!</span>';
+  add(s.wins>=1,"Éischte Gewënn");
+  add(s.wins>=10,"10 Gewënn");
+  add(s.wins>=50,"50 Gewënn");
+  add((s.total||0)>=100,"100 Spiller");
+  add(s.pct!=null&&s.pct>=60&&(s.total||0)>=10,"60%+ Gewënnrate");
+  add((s.wordleMax||0)>=5,`Wordle-Serie ${s.wordleMax}`);
+  return A.length?A.join(""):'<span class="ach-none">Nach keng Badgen. Spill e puer Spiller!</span>';
 }
+
+const gateHtml=(msg,extra="")=>`<div class="c full gt-gate"><p class="gt-big">${msg}</p>${extra}</div>`;
 
 // Read-only view of another player: profile.html?u=<username>.
 async function renderPublic(username){
   // Signed-out visitors may only read id/username/avatar (school class is for signed-in accounts).
   const cols=auth.session()?"id,avatar,class,username":"id,avatar,username";
   const {data:p}=await sb.from("profiles").select(cols).ilike("username",username).maybeSingle();
-  if(!p){$("wrap").innerHTML=`<div class="gate ui-card"><div class="gate-ico" aria-hidden="true">🔍</div>No player called “${esc(username)}”.<br><a class="ui-btn ui-btn--ghost" href="profile.html">‹ Your profile</a></div>`;return;}
+  if(!p){$("wrap").innerHTML=gateHtml(`Kee Spiller mam Numm „${esc(username)}“.`,`<a class="gt-btn ghost" href="profile.html">‹ Däi Profil</a>`);return;}
   let isAdmin=false;
   try{const {data}=await sb.rpc("admin_user_ids");isAdmin=(data||[]).some(r=>r.user_id===p.id);}catch{}
-  const tags=(p.class?`<span class="class-tag">${esc(p.class)}</span>`:"")+(isAdmin?`<span class="admin-tag">👑 Admin</span>`:"");
+  const tags=(p.class?`<span class="gt-tag">${esc(p.class)}</span>`:"")+(isAdmin?`<span class="gt-tag ink">Admin</span>`:"");
   let stats={wins:0,losses:0,total:0,pct:null};
   try{const {data}=await sb.rpc("game_leaderboard",{p_game:null});const m=(data||[]).find(r=>r.username===p.username);if(m)stats={wins:m.wins,losses:m.losses,total:m.total,pct:m.winpct};}catch{}
   $("wrap").innerHTML=`
-    <div class="ui-card ui-card--accent me">
+    <div class="c full gt-me">
       <div class="big">${avInner(p.avatar)}</div>
-      <div class="who"><div class="name">${esc(p.username)}</div><div class="sub">ian.lu player</div><div class="tags">${tags}</div></div>
+      <div class="who"><div class="name">${esc(p.username)}</div><div class="gt-sub">ian.lu Spiller</div><div class="gt-tags">${tags}</div></div>
     </div>
-    <h2>Stats</h2>
-    <div class="stats">
-      <div class="stat"><b>${scoreHtml(stats.wins)}</b><span>Match wins</span></div>
-      <div class="stat"><b>${scoreHtml(stats.losses)}</b><span>Losses</span></div>
-      <div class="stat"><b>${stats.pct==null?"—":stats.pct+"%"}</b><span>Win rate</span></div>
+    <div class="c full gt-lbl">Statistiken</div>
+    <div class="gt-stats three">
+      <div class="c"><b>${scoreHtml(stats.wins)}</b><span>Gewonne Matcher</span></div>
+      <div class="c"><b>${scoreHtml(stats.losses)}</b><span>Néierlagen</span></div>
+      <div class="c"><b>${stats.pct==null?"—":stats.pct+"%"}</b><span>Gewënnrate</span></div>
     </div>
-    ${scoreKeyHtml([stats.wins,stats.losses])}
-    <p class="hint" id="arcadeStreak" role="status"></p>
-    <h2>Achievements</h2>
-    <div class="ui-card ach-card">${achievements(stats)}<span id="eventBadges"></span></div>
-    <div class="share"><a class="ui-btn ui-btn--ghost" href="profile.html">‹ Your profile</a></div>`;
+    <div class="c full top">${scoreKeyHtml([stats.wins,stats.losses])}<p class="gt-hint" id="arcadeStreak" role="status"></p></div>
+    <div class="c full gt-lbl">Badgen</div>
+    <div class="c full ach-card">${achievements(stats)}<span id="eventBadges"></span></div>
+    <div class="c full top"><a class="gt-btn ghost" href="profile.html" style="align-self:flex-start">‹ Däi Profil</a></div>`;
   await loadProfileStreak(p.id);
 }
 
@@ -212,20 +172,20 @@ function squareResize(file,size){
       const con=Math.min(size/img.width,size/img.height);
       const iw=img.width*con,ih=img.height*con;
       ctx.drawImage(img,(size-iw)/2,(size-ih)/2,iw,ih);
-      c.toBlob(b=>b?res(b):rej(new Error("Could not process image")),"image/jpeg",0.85);
+      c.toBlob(b=>b?res(b):rej(new Error("D'Bild konnt net veraarbecht ginn")),"image/jpeg",0.85);
     };
-    img.onerror=()=>rej(new Error("That file isn't a readable image"));
+    img.onerror=()=>rej(new Error("Dat ass keng liesbar Bilddatei"));
     img.src=URL.createObjectURL(file);
   });
 }
 
 async function boot(){
   sb=await auth.client();
-  auth.mountAccountButton($("acctHost"));
+  mountAcct();
   const viewU=qs.get("u");
   if(viewU && viewU.toLowerCase()!==(auth.username()||"").toLowerCase()){ return renderPublic(viewU); }
   if(!auth.session()){
-    $("wrap").innerHTML=`<div class="gate ui-card"><div class="gate-ico" aria-hidden="true">👤</div>Sign in to see your profile.<br><button type="button" class="ui-btn ui-btn--primary" id="signin">Sign in</button></div>`;
+    $("wrap").innerHTML=gateHtml("Mell dech un, fir däi Profil ze gesinn.",`<button type="button" class="gt-btn" id="signin">Umellen</button>`);
     $("signin").onclick=auth.openAuthModal;
     return;
   }
@@ -235,72 +195,67 @@ async function boot(){
   let isAdmin=false;
   try{const {data}=await sb.rpc("admin_user_ids");isAdmin=(data||[]).some(r=>r.user_id===uid);}catch{}
   const tagsHtml=
-    (myClass?`<span class="class-tag">${esc(myClass)}</span>`:"")+
-    (isAdmin?`<span class="admin-tag">👑 Admin</span>`:"");
+    (myClass?`<span class="gt-tag cls">${esc(myClass)}</span>`:"")+
+    (isAdmin?`<span class="gt-tag ink">Admin</span>`:"");
   $("wrap").innerHTML=`
-    <div class="ui-card ui-card--accent me">
+    <div class="c full gt-me">
       <div class="big" id="bigAv">${avInner(myAvatar)}</div>
-      <div class="who"><div class="name" id="dispName">${esc(uname)}</div><div class="sub">ian.lu player</div>
-        <div class="tags" id="tags">${tagsHtml}</div></div>
+      <div class="who"><div class="name" id="dispName">${esc(uname)}</div><div class="gt-sub">ian.lu Spiller</div>
+        <div class="gt-tags" id="tags">${tagsHtml}</div></div>
     </div>
-    <div class="pair">
-      <section>
-        <h2>Username</h2>
-        <div class="ui-card">
-          <div class="field">
-            <input class="ui-input" id="nameInp" maxlength="20" value="${esc(uname)}" placeholder="your name" aria-label="Username" aria-describedby="nameHint" autocomplete="off" autocapitalize="none" spellcheck="false">
-            <button type="button" class="ui-btn ui-btn--primary" id="nameSave">Save</button>
-          </div>
-          <div class="hint" id="nameHint">3–20 characters — letters, numbers and underscore. Must be unique.</div>
-          <div class="msg" id="nameMsg" role="status" aria-live="polite"></div>
-        </div>
-      </section>
-      <section>
-        <h2>Class</h2>
-        <div class="ui-card">
-          <div class="field">
-            <input class="ui-input" id="classInp" maxlength="12" value="${esc(myClass||"")}" placeholder="e.g. 5C6" aria-label="Class" aria-describedby="classHint" autocomplete="off" autocapitalize="characters" spellcheck="false">
-            <button type="button" class="ui-btn ui-btn--primary" id="classSave">Save</button>
-          </div>
-          <div class="hint" id="classHint">A specific class in a year (5C6, 7C1, 2CG) — not just the year. Helps friends find you.</div>
-          <div class="msg" id="classMsg" role="status" aria-live="polite"></div>
-        </div>
-      </section>
-    </div>
-    <h2>Profile picture</h2>
-    <div class="ui-card">
-      <div class="upl">
-        <button type="button" class="ui-btn ui-btn--primary" id="uplBtn"><span aria-hidden="true">📷</span>&nbsp;Upload a photo</button>
-        <button type="button" class="ui-btn ui-btn--ghost" id="rmBtn"${isUrl(myAvatar)?"":" hidden"}>Remove photo</button>
-        <input type="file" id="uplFile" accept="image/*" hidden aria-label="Choose a photo">
+    <div class="c half gt-form">
+      <h2 class="gt-h">Benotzernumm</h2>
+      <div class="gt-field">
+        <input class="gt-input" id="nameInp" maxlength="20" value="${esc(uname)}" placeholder="däin Numm" aria-label="Benotzernumm" aria-describedby="nameHint" autocomplete="off" autocapitalize="none" spellcheck="false">
+        <button type="button" class="gt-btn" id="nameSave">Späicheren</button>
       </div>
-      <div class="hint">Any image works — the whole photo is kept and stored small (256px). Or pick an emoji below.</div>
-      <div class="msg" id="uplMsg" role="status" aria-live="polite"></div>
+      <div class="gt-hint" id="nameHint">3–20 Zeechen: Buchstaben, Zuelen an Underscore. Muss eenzegaarteg sinn.</div>
+      <div class="gt-msg" id="nameMsg" role="status" aria-live="polite"></div>
     </div>
-    <h2>Or pick an emoji</h2>
-    <div class="ui-card"><div class="grid" id="avGrid" role="group" aria-label="Emoji avatars"></div><div class="msg" id="avMsg" role="status" aria-live="polite"></div></div>
-    <h2 data-i18n="pin.profileTitle">PIN</h2>
-    <div class="ui-card">
-      <button type="button" class="ui-btn ui-btn--ghost" id="pinChange" data-i18n="pin.change">Change PIN</button>
-      <div class="hint" data-i18n="pin.changeHint">Use 4 or 6 digits. Six is recommended.</div>
+    <div class="c half gt-form">
+      <h2 class="gt-h">Klass</h2>
+      <div class="gt-field">
+        <input class="gt-input" id="classInp" maxlength="12" value="${esc(myClass||"")}" placeholder="z.B. 5C6" aria-label="Klass" aria-describedby="classHint" autocomplete="off" autocapitalize="characters" spellcheck="false">
+        <button type="button" class="gt-btn" id="classSave">Späicheren</button>
+      </div>
+      <div class="gt-hint" id="classHint">Eng genau Klass mat Joer (5C6, 7C1, 2CG), net just d'Joer. Esou fanne Frënn dech méi einfach.</div>
+      <div class="gt-msg" id="classMsg" role="status" aria-live="polite"></div>
     </div>
-    <h2 data-i18n="acct.mergeTitle">Merge accounts</h2>
-    <div class="ui-card">
-      <button type="button" class="ui-btn ui-btn--ghost" id="acctMerge" data-i18n="acct.profileMerge">🔗 Konten zesummeleeën</button>
-      <div class="msg" id="acctMergeMsg" role="status" aria-live="polite"></div>
+    <div class="c half gt-form">
+      <h2 class="gt-h">Profilbild</h2>
+      <div class="upl">
+        <button type="button" class="gt-btn" id="uplBtn">Foto eroplueden</button>
+        <button type="button" class="gt-btn ghost" id="rmBtn"${isUrl(myAvatar)?"":" hidden"}>Foto ewechhuelen</button>
+        <input type="file" id="uplFile" accept="image/*" hidden aria-label="Wiel e Foto">
+      </div>
+      <div class="gt-hint">All Bild geet. Dat ganzt Foto gëtt behalen a kleng gespäichert (256 px). Oder wiel en Emoji.</div>
+      <div class="gt-msg" id="uplMsg" role="status" aria-live="polite"></div>
     </div>
-    <p class="hint" id="arcadeStreak" role="status"></p>
-    <h2>Your stats</h2>
-    <div class="stats" id="stats"><div class="gate ui-card" role="status">Loading…</div></div>
-    <h2>Achievements</h2>
-    <div class="ui-card ach-card" id="ach"><div class="gate" role="status">Loading…</div></div>
-    <div class="ui-card share"><div class="hint">Your public profile: <a id="shareLink" href="profile.html?u=${encodeURIComponent(uname)}">ian.lu/profile.html?u=${esc(uname)}</a></div></div>`;
+    <div class="c half gt-form">
+      <h2 class="gt-h">Kont</h2>
+      <div class="upl">
+        <button type="button" class="gt-btn ghost" id="pinChange">PIN änneren</button>
+        <button type="button" class="gt-btn ghost" id="acctMerge">Konten zesummeleeën</button>
+      </div>
+      <div class="gt-hint">Benotz 4 oder 6 Zifferen fir de PIN. Sechs si recommandéiert.</div>
+      <div class="gt-msg" id="acctMergeMsg" role="status" aria-live="polite"></div>
+    </div>
+    <div class="c full gt-form">
+      <h2 class="gt-h">Oder wiel en Emoji</h2>
+      <div class="grid" id="avGrid" role="group" aria-label="Emoji-Avatarer"></div>
+      <div class="gt-msg" id="avMsg" role="status" aria-live="polite"></div>
+    </div>
+    <div class="c full gt-lbl">Deng Statistiken</div>
+    <div class="gt-stats" id="stats"><div class="c gt-loading" role="status"><span>Lued …</span></div></div>
+    <div class="c full top"><p class="gt-hint" id="arcadeStreak" role="status"></p></div>
+    <div class="c full gt-lbl">Badgen</div>
+    <div class="c full ach-card" id="ach"><span class="gt-sub" role="status">Lued …</span></div>
+    <div class="c full share"><div class="gt-hint">Däi ëffentleche Profil: <a id="shareLink" href="profile.html?u=${encodeURIComponent(uname)}">ian.lu/profile.html?u=${esc(uname)}</a></div></div>`;
   wireUpload();
   wireName();
   wireClass();
   $("pinChange").onclick=auth.openPinSetup;
   $("acctMerge").onclick=openMerge;
-  window.I18N?.apply($("wrap"));
   const grid=$("avGrid");
   for(const a of AVATARS){
     const b=document.createElement("button");
@@ -311,8 +266,8 @@ async function boot(){
         if(error)throw error;
         myAvatar=a;$("bigAv").innerHTML=avInner(a);$("rmBtn").hidden=true;
         grid.querySelectorAll(".avb").forEach(x=>{const on=x.textContent===a;x.classList.toggle("on",on);x.setAttribute("aria-pressed",String(on));});
-        $("avMsg").classList.remove("err");$("avMsg").textContent="Saved ✓";setTimeout(()=>$("avMsg").textContent="",1200);
-      }catch(e){console.warn(e);$("avMsg").textContent="Couldn't save (run the migration?)";$("avMsg").classList.add("err");}
+        $("avMsg").classList.remove("err");$("avMsg").textContent="Gespäichert ✓";setTimeout(()=>$("avMsg").textContent="",1200);
+      }catch(e){console.warn(e);$("avMsg").textContent="Konnt net späicheren.";$("avMsg").classList.add("err");}
     };
     grid.appendChild(b);
   }
@@ -327,7 +282,7 @@ async function openMerge(){
     await m.openAccountCheck({startWithMerge:true});
   }catch(e){
     console.error("account merge dialog failed to open",e);
-    setMsg("acctMergeMsg","Couldn't open this — try again.",true);
+    setMsg("acctMergeMsg","Konnt dat net opmaachen. Probéier nach eng Kéier.",true);
   }
 }
 
@@ -341,19 +296,19 @@ function wireName(){
   const inp=$("nameInp"),btn=$("nameSave");
   const run=async()=>{
     const v=inp.value.trim();
-    if(!validName(v)){setMsg("nameMsg","3–20 letters, numbers or underscore.",true);return;}
-    if(v===auth.username()){setMsg("nameMsg","That's already your name.");return;}
-    btn.disabled=true;setMsg("nameMsg","Saving…");
+    if(!validName(v)){setMsg("nameMsg","3–20 Buchstaben, Zuelen oder Underscore.",true);return;}
+    if(v===auth.username()){setMsg("nameMsg","Dat ass schonn däin Numm.");return;}
+    btn.disabled=true;setMsg("nameMsg","Gëtt gespäichert …");
     try{
       const {data,error}=await sb.rpc("set_username",{p_name:v});
       if(error)throw error;
-      if(!data){setMsg("nameMsg","That name is taken — try another.",true);btn.disabled=false;return;}
+      if(!data){setMsg("nameMsg","Dësen Numm ass besat. Probéier en aneren.",true);btn.disabled=false;return;}
       // keep the JWT metadata in sync so auth.username() (account button, etc.) matches
       try{await sb.auth.updateUser({data:{username:data}});}catch(e){console.warn("meta sync",e);}
       $("dispName").textContent=data;inp.value=data;
-      auth.mountAccountButton($("acctHost"));
-      setMsg("nameMsg","Saved ✓");
-    }catch(e){console.warn(e);setMsg("nameMsg","Couldn't save (run the migration?).",true);}
+      mountAcct();
+      setMsg("nameMsg","Gespäichert ✓");
+    }catch(e){console.warn(e);setMsg("nameMsg","Konnt net späicheren.",true);}
     btn.disabled=false;
   };
   btn.onclick=run;
@@ -364,20 +319,20 @@ function wireClass(){
   const inp=$("classInp"),btn=$("classSave");
   const run=async()=>{
     const raw=inp.value.trim();
-    if(!raw){setMsg("classMsg","Enter a class, e.g. 5C6.",true);return;}
-    if(!validClass(raw)){setMsg("classMsg","A specific class, e.g. 5C6 — not just the year.",true);return;}
+    if(!raw){setMsg("classMsg","Gëff eng Klass an, z.B. 5C6.",true);return;}
+    if(!validClass(raw)){setMsg("classMsg","Eng genau Klass, z.B. 5C6, net just d'Joer.",true);return;}
     const v=normClass(raw);
-    btn.disabled=true;setMsg("classMsg","Saving…");
+    btn.disabled=true;setMsg("classMsg","Gëtt gespäichert …");
     try{
       const {error}=await sb.rpc("set_class",{p_class:v});
       if(error)throw error;
       myClass=v;inp.value=v;
       // reflect the class tag next to the name without a reload
-      const tags=$("tags"),ex=tags.querySelector(".class-tag");
+      const tags=$("tags"),ex=tags.querySelector(".cls");
       if(ex)ex.textContent=v;
-      else tags.insertAdjacentHTML("afterbegin",`<span class="class-tag">${esc(v)}</span>`);
-      setMsg("classMsg","Saved ✓");
-    }catch(e){console.warn(e);setMsg("classMsg","Couldn't save your class.",true);}
+      else tags.insertAdjacentHTML("afterbegin",`<span class="gt-tag cls">${esc(v)}</span>`);
+      setMsg("classMsg","Gespäichert ✓");
+    }catch(e){console.warn(e);setMsg("classMsg","Konnt deng Klass net späicheren.",true);}
     btn.disabled=false;
   };
   btn.onclick=run;
@@ -396,8 +351,8 @@ function wireUpload(){
     const file=e.target.files&&e.target.files[0];
     e.target.value="";                 // allow re-picking the same file later
     if(!file)return;
-    if(!/^image\//.test(file.type)){setUpl("Please choose an image file.",true);return;}
-    setUpl("Processing…");
+    if(!/^image\//.test(file.type)){setUpl("Wiel w.e.g. eng Bilddatei.",true);return;}
+    setUpl("Gëtt veraarbecht …");
     try{
       const blob=await squareResize(file,AV_PX);
       const uid=auth.session().user.id;
@@ -410,13 +365,13 @@ function wireUpload(){
       if(error)throw error;
       myAvatar=url;
       $("bigAv").innerHTML=avInner(url);
-      $("avGrid").querySelectorAll(".avb").forEach(x=>x.classList.remove("on"));
+      $("avGrid").querySelectorAll(".avb").forEach(x=>{x.classList.remove("on");x.setAttribute("aria-pressed","false");});
       $("rmBtn").hidden=false;
-      setUpl("Saved ✓");
-    }catch(err){console.warn(err);setUpl(err.message||"Upload failed — is the migration run?",true);}
+      setUpl("Gespäichert ✓");
+    }catch(err){console.warn(err);setUpl(err.message||"Eroplueden huet net geklappt.",true);}
   };
   $("rmBtn").onclick=async()=>{
-    setUpl("Removing…");
+    setUpl("Gëtt ewechgeholl …");
     try{
       const {error}=await sb.rpc("set_avatar",{p_avatar:""});
       if(error)throw error;
@@ -424,8 +379,8 @@ function wireUpload(){
       myAvatar=null;
       $("bigAv").innerHTML=avInner(null);
       $("rmBtn").hidden=true;
-      setUpl("Removed ✓");
-    }catch(err){console.warn(err);setUpl("Couldn't remove the photo.",true);}
+      setUpl("Ewechgeholl ✓");
+    }catch(err){console.warn(err);setUpl("Konnt d'Foto net ewechhuelen.",true);}
   };
 }
 
@@ -440,11 +395,11 @@ async function loadStats(uname){
   const lb=w("lb"),de=w("de");
   const wordleMax=Math.max(lb.max,de.max);
   $("stats").innerHTML=`
-    <div class="stat"><b>${scoreHtml(wins)}</b><span>Match wins</span></div>
-    <div class="stat"><b>${scoreHtml(losses)}</b><span>Losses</span></div>
-    <div class="stat"><b>${pct==null?"—":pct+"%"}</b><span>Win rate</span></div>
-    <div class="stat"><b>${scoreHtml(lb.wins+de.wins)}/${scoreHtml(lb.played+de.played)}</b><span>Wordle wins</span></div>
-    <div class="stat"><b>${scoreHtml(wordleMax)}</b><span>Best streak</span></div>`;
+    <div class="c"><b>${scoreHtml(wins)}</b><span>Gewonne Matcher</span></div>
+    <div class="c"><b>${scoreHtml(losses)}</b><span>Néierlagen</span></div>
+    <div class="c"><b>${pct==null?"—":pct+"%"}</b><span>Gewënnrate</span></div>
+    <div class="c"><b>${scoreHtml(lb.wins+de.wins)}/${scoreHtml(lb.played+de.played)}</b><span>Wordle gewonnen</span></div>
+    <div class="c"><b>${scoreHtml(wordleMax)}</b><span>Längste Serie</span></div>`;
   $("stats").insertAdjacentHTML("afterend", scoreKeyHtml([wins,losses,lb.wins+de.wins,lb.played+de.played,wordleMax]));
   if($("ach"))$("ach").innerHTML=achievements({wins,losses,pct,total,wordleMax})+'<span id="eventBadges"></span>';
   paintProfileBadges();
