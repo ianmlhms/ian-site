@@ -39,3 +39,6 @@ on conflict (id) do update set public = false;
 drop policy if exists devoirs_admin_read on storage.objects;
 create policy devoirs_admin_read on storage.objects
   for select to authenticated using (bucket_id = 'devoirs' and public.is_admin());
+
+-- 8 Nov 2026: "Page remplie" PDF (book/dossier page with the answers written on it)
+alter table public.homework_solutions add column if not exists filled_path text;

@@ -147,13 +147,14 @@ function cardHtml(h,today){
   const body=s?.status==="needs_scan"&&s.ask?`<div class="hw-ask">${esc(s.ask)}</div>`:s?.summary?`<div class="hw-sum">${esc(s.summary)}</div>`:"";
   const solBtn=s?.solution_path?`<button type="button" class="gt-btn" data-open="${esc(s.solution_path)}">Léisung</button>`:"";
   const handBtn=s?.handin_path?`<button type="button" class="gt-btn ghost" data-open="${esc(s.handin_path)}">Ofzeginn</button>`:"";
+  const filledBtn=s?.filled_path?`<button type="button" class="gt-btn ghost" data-open="${esc(s.filled_path)}">Säit ausgefëllt</button>`:"";
   const tick=`<button type="button" class="gt-btn ghost tick" data-tick="${esc(h.id)}" aria-pressed="${done}"><span class="box" aria-hidden="true">${done?"✓":""}</span> Gemaach</button>`;
   return `<article class="c half hw ${cls}">
     <div class="hw-top"><span class="hw-subj">${esc(h.subject||"—")}</span><span class="hw-due">${esc(dueLabel(h.due_date,days))}</span></div>
     <div class="gt-tags">${tag}</div>
     <div class="hw-task">${esc(h.text||h.remark||"(kee Text)")}</div>
     ${body}
-    <div class="hw-acts">${solBtn}${handBtn}${tick}</div>
+    <div class="hw-acts">${solBtn}${handBtn}${filledBtn}${tick}</div>
   </article>`;
 }
 // iOS Safari blocks window.open after an await, so the tab is opened first and pointed at the signed URL afterwards.

@@ -7,7 +7,7 @@
 // Deploy: supabase functions deploy devoir-ingest --no-verify-jwt --project-ref lvksqmgfwkfbblfsozfk
 //
 // POST JSON: { homework_id: int, subject?, due_date? (YYYY-MM-DD), task_text?, status, summary?, ask?,
-//              solution_pdf_b64?, handin_pdf_b64? }
+//              solution_pdf_b64?, handin_pdf_b64?, filled_pdf_b64? }
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const SB_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -83,7 +83,8 @@ Deno.serve(async (req) => {
   }
   const solution = decodePdf(body.solution_pdf_b64);
   const handin = decodePdf(body.handin_pdf_b64);
-  if (solution === "bad" || handin === "bad") return json({ error: "pdf" }, 400);
+  const filled = decodePdf(body.filled_pdf_b64);
+  if (solution === "bad" || handin === "bad" || filled === "bad") return json({ error: "pdf" }, 400);
 
   const sb = createClient(SB_URL, SB_SERVICE, { auth: { persistSession: false } });
   const row: Record<string, unknown> = {
@@ -96,7 +97,7 @@ Deno.serve(async (req) => {
     ask: text.ask,
     updated_at: new Date().toISOString(),
   };
-  for (const [field, bytes, name] of [["solution_path", solution, "solution.pdf"], ["handin_path", handin, "handin.pdf"]] as const) {
+  for (const [field, bytes, name] of [["solution_path", solution, "solution.pdf"], ["handin_path", handin, "handin.pdf"], ["filled_path", filled, "filled.pdf"]] as const) {
     if (!bytes) continue;
     const path = `${id}/${name}`;
     const { error } = await sb.storage.from(BUCKET).upload(path, bytes, { contentType: "application/pdf", upsert: true });
