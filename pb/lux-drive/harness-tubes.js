@@ -214,7 +214,9 @@ export function runTubeChecks({ check, section, stats, data, surface, ground, tu
         for (const l of [-tube.innerHalf, 0, tube.innerHalf]) {
           const x = tube.x[i] - tube.tz[i] * l, z = tube.z[i] + tube.tx[i] * l, y = tube.floor[i] + 0.5;
           if (forest.collide(x, z, 0.6, y)) intruders.push(`tree in ${tube.name} at ${Math.round(x)},${Math.round(z)}`);
-          if (!between && buildings.collide(x, z, 0.3, y)) intruders.push(`house in ${tube.name} at ${Math.round(x)},${Math.round(z)}`);
+          // (a house over the shell between the faces is a building passage only where the game lifts its walls onto the roof - building-view floorAt = roofAt)
+          const passage = between && tubes.network.roofAt(x, z) > tube.floor[i] + tube.clearance;
+          if (!passage && buildings.collide(x, z, 0.3, y)) intruders.push(`house in ${tube.name} at ${Math.round(x)},${Math.round(z)}`);
           if (lampsAt && lampsAt(x, z, 0.8)) intruders.push(`lamp in ${tube.name} at ${Math.round(x)},${Math.round(z)}`);
         }
       }
