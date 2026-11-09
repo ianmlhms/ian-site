@@ -162,7 +162,7 @@
 
   function cardinal(heading) {
     if (heading === null || heading === undefined) return "—";
-    const names = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+    const names = ["N", "NO", "O", "SO", "S", "SW", "W", "NW"];
     return names[Math.round(normalizeAngle(heading) / 45) % 8];
   }
 
@@ -172,12 +172,12 @@
   }
 
   function formatNumber(value) {
-    return Number(value).toLocaleString("en-US", { maximumFractionDigits: 0 });
+    return Number(value).toLocaleString("de-LU", { maximumFractionDigits: 0 });
   }
 
   function formatAltitude(value) {
     if (value === null) return "—";
-    if (value <= 0) return "Ground";
+    if (value <= 0) return "Buedem";
     return formatNumber(Math.round(value / 25) * 25) + " ft";
   }
 
@@ -185,7 +185,7 @@
 
   function formatVertical(value) {
     if (value === null) return "—";
-    if (Math.abs(value) < 64) return "Level";
+    if (Math.abs(value) < 64) return "Gläich";
     return (value > 0 ? "+" : "−") + formatNumber(Math.abs(Math.round(value / 50) * 50)) + " fpm";
   }
 
@@ -196,23 +196,23 @@
 
   function typeLabel(aircraft) {
     if (aircraft.description) return aircraft.description;
-    return TYPE_NAMES[aircraft.type] || aircraft.type || "Unknown aircraft";
+    return TYPE_NAMES[aircraft.type] || aircraft.type || "Onbekannte Fliger";
   }
 
   function routeLabel(route) {
-    if (!route) return "Route unavailable";
+    if (!route) return "Route net disponibel";
     if (typeof route === "string") {
       const cleaned = route.trim();
-      if (!cleaned || cleaned.toLowerCase() === "unknown") return "Route unavailable";
+      if (!cleaned || cleaned.toLowerCase() === "unknown") return "Route net disponibel";
       return cleaned.replace(/\s*[-–>]\s*/g, " → ");
     }
-    if (Array.isArray(route)) return route.filter(Boolean).join(" → ") || "Route unavailable";
+    if (Array.isArray(route)) return route.filter(Boolean).join(" → ") || "Route net disponibel";
     if (typeof route === "object") {
       const origin = route.origin || route.from || route.departure;
       const destination = route.destination || route.to || route.arrival;
       if (origin || destination) return [origin || "?", destination || "?"].join(" → ");
     }
-    return "Route unavailable";
+    return "Route net disponibel";
   }
 
   function normalizeAircraft(raw, center) {
@@ -285,7 +285,7 @@
 
   function initMap() {
     if (!window.L) {
-      showToast("The map library could not load. The flight list is still available.");
+      showToast("D'Kaart konnt net gelueden ginn. D'Fluchlëscht ass awer nach disponibel.");
       setMode("list");
       return;
     }
@@ -402,7 +402,7 @@
     state.requestController = controller;
     els.refresh.classList.add("is-spinning");
     els.livePulse.className = "live-pulse is-loading";
-    if (!state.hasLoaded) els.feedStatus.textContent = "Loading live traffic…";
+    if (!state.hasLoaded) els.feedStatus.textContent = "Live-Trafic gëtt gelueden …";
     const query = visibleQuery();
 
     try {
@@ -418,8 +418,8 @@
       if (controller.signal.aborted || (error && error.name === "AbortError")) return;
       state.lastError = error && error.message ? error.message : "Feed unavailable";
       els.livePulse.className = "live-pulse is-error";
-      els.feedStatus.textContent = state.hasLoaded ? "Live feed interrupted" : "Aircraft feed unavailable";
-      if (!state.hasLoaded) showToast("Live aircraft could not be loaded. SkyLens will keep retrying.");
+      els.feedStatus.textContent = state.hasLoaded ? "Live-Feed ënnerbrach" : "Fliger-Feed net disponibel";
+      if (!state.hasLoaded) showToast("D'Fliger konnten net gelueden ginn. SkyLens probéiert et weider.");
     } finally {
       if (state.requestController === controller) {
         state.loading = false;
@@ -471,7 +471,7 @@
       selectFlight(id, { follow: true, center: true });
     } else if (state.pendingIcao && !state.hasLoaded) {
       setTimeout(() => {
-        if (state.pendingIcao) showToast("That aircraft is not currently visible in this area. SkyLens will keep watching.");
+        if (state.pendingIcao) showToast("Dëse Fliger ass elo net an dëser Géigend ze gesinn. SkyLens bleift drun.");
       }, 500);
     }
 
@@ -486,7 +486,7 @@
           state.map.panTo([selected.lat, selected.lon], { animate: true, duration: .7 });
         }
       } else {
-        els.detailState.textContent = "SIGNAL LOST";
+        els.detailState.textContent = "SIGNAL VERLUER";
         els.detailState.style.color = "var(--sky-red)";
       }
     }
@@ -532,9 +532,9 @@
     const all = [...state.aircraft.values()].filter((aircraft) => !aircraft.stale);
     els.countAll.textContent = all.length;
     els.countInteresting.textContent = all.filter((aircraft) => aircraft.interesting).length;
-    const label = visible.length + (visible.length === 1 ? " aircraft" : " aircraft");
+    const label = visible.length + (visible.length === 1 ? " Fliger" : " Fligeren");
     els.visibleCount.textContent = label;
-    els.listSummary.textContent = label + " in view";
+    els.listSummary.textContent = label + " an der Usiicht";
   }
 
   function markerClass(aircraft) {
@@ -599,14 +599,14 @@
     els.flightList.innerHTML = aircraft.map((item) => {
       const identity = item.flight || item.registration || item.hex.toUpperCase();
       const sub = item.route ? routeLabel(item.route) : (item.registration || item.hex.toUpperCase());
-      const type = item.type || "Unknown";
+      const type = item.type || "Onbekannt";
       const selected = item.id === state.selectedId ? " is-selected" : "";
       return '<button class="flight-card ' + markerClass(item) + selected + '" type="button" data-id="' + esc(item.id) + '">' +
         '<span class="flight-identity"><span class="list-plane">' + planeSvg(item.trackDeg) + '</span><span class="flight-main"><strong>' + esc(identity) + '</strong><span>' + esc(sub) + '</span></span></span>' +
         '<span class="flight-type"><strong>' + esc(type) + '</strong><span>' + esc(typeLabel(item)) + '</span></span>' +
         '<span class="flight-metric">' + esc(formatAltitude(item.altitudeFt)) + '<small>' + esc(formatVertical(item.verticalRateFpm)) + '</small></span>' +
         '<span class="flight-metric">' + esc(formatSpeed(item.groundSpeedKt)) + '<small>' + esc(cardinal(item.trackDeg)) + ' ' + (item.trackDeg === null ? "" : Math.round(item.trackDeg) + "°") + '</small></span>' +
-        '<span class="flight-metric distance">' + esc(formatDistance(item.distanceNm)) + '<small>' + esc(cardinal(item.bearingDeg)) + ' from center</small></span>' +
+        '<span class="flight-metric distance">' + esc(formatDistance(item.distanceNm)) + '<small>' + esc(cardinal(item.bearingDeg)) + ' vum Zentrum</small></span>' +
       '</button>';
     }).join("");
     els.emptyState.hidden = aircraft.length > 0;
@@ -651,24 +651,24 @@
   }
 
   function renderDetails(aircraft) {
-    els.detailState.textContent = aircraft.stale ? "POSITION DELAYED" : aircraft.emergency ? "EMERGENCY" : "LIVE FLIGHT";
+    els.detailState.textContent = aircraft.stale ? "POSITIOUN VERSPÉIT" : aircraft.emergency ? "NOUTFALL" : "LIVE-FLUCH";
     els.detailState.style.color = aircraft.emergency ? "var(--sky-red)" : aircraft.stale ? "var(--sky-amber)" : "var(--sky-green)";
     els.detailFlight.textContent = aircraft.flight || aircraft.registration || aircraft.hex.toUpperCase();
     els.detailRoute.textContent = routeLabel(aircraft.route);
     const badges = [];
-    if (aircraft.emergency) badges.push('<span class="detail-badge emergency">Emergency</span>');
-    if (aircraft.military) badges.push('<span class="detail-badge military">Military</span>');
-    else if (aircraft.interesting) badges.push('<span class="detail-badge interesting">★ Interesting</span>');
-    if (aircraft.cargo) badges.push('<span class="detail-badge">Cargo</span>');
+    if (aircraft.emergency) badges.push('<span class="detail-badge emergency">Noutfall</span>');
+    if (aircraft.military) badges.push('<span class="detail-badge military">Militär</span>');
+    else if (aircraft.interesting) badges.push('<span class="detail-badge interesting">Interessant</span>');
+    if (aircraft.cargo) badges.push('<span class="detail-badge">Fracht</span>');
     if (aircraft.category) badges.push('<span class="detail-badge">' + esc(aircraft.category) + '</span>');
     els.detailBadges.innerHTML = badges.join("");
     els.detailAltitude.textContent = formatAltitude(aircraft.altitudeFt);
     els.detailSpeed.textContent = formatSpeed(aircraft.groundSpeedKt);
     els.detailVertical.textContent = formatVertical(aircraft.verticalRateFpm);
-    els.detailRegistration.textContent = aircraft.registration || "Unknown";
-    els.detailType.textContent = aircraft.type ? aircraft.type + " · " + typeLabel(aircraft) : "Unknown";
+    els.detailRegistration.textContent = aircraft.registration || "Onbekannt";
+    els.detailType.textContent = aircraft.type ? aircraft.type + " · " + typeLabel(aircraft) : "Onbekannt";
     els.detailType.title = typeLabel(aircraft);
-    els.detailCallsign.textContent = aircraft.flight || "Unknown";
+    els.detailCallsign.textContent = aircraft.flight || "Onbekannt";
     els.detailHex.textContent = aircraft.hex.toUpperCase();
     els.detailSquawk.textContent = aircraft.squawk || "—";
     els.detailDistance.textContent = formatDistance(aircraft.distanceNm) + (aircraft.bearingDeg === null ? "" : " · " + cardinal(aircraft.bearingDeg));
@@ -676,7 +676,7 @@
     els.headingDial.style.setProperty("--heading", (aircraft.trackDeg ?? 0) + "deg");
     renderAircraftPhoto(aircraft);
     const trail = state.trails.get(aircraft.id) || [];
-    els.trailText.textContent = trail.length > 1 ? trail.length + " positions captured this session" : "Trail starts while SkyLens is open";
+    els.trailText.textContent = trail.length > 1 ? trail.length + " Positioune dës Sessioun opgeholl" : "D'Spur fänkt un, soulaang SkyLens op ass";
   }
 
   function renderAircraftPhoto(aircraft) {
@@ -691,11 +691,11 @@
     };
 
     if (!hasResult || pending) {
-      showPlaceholder("Finding aircraft photo…");
+      showPlaceholder("Fliger-Foto gëtt gesicht …");
       return;
     }
     if (!photo) {
-      showPlaceholder("No photo available for this aircraft");
+      showPlaceholder("Kee Foto fir dëse Fliger disponibel");
       return;
     }
 
@@ -707,17 +707,17 @@
     };
     const fail = () => {
       state.photoCache.set(aircraft.id, null);
-      if (state.selectedId === aircraft.id) showPlaceholder("Aircraft photo unavailable");
+      if (state.selectedId === aircraft.id) showPlaceholder("Fliger-Foto net disponibel");
     };
 
     els.detailPhotoLink.href = photo.link;
     els.detailPhotoCredit.href = photo.link;
     els.detailPhotoCredit.textContent = "© " + photo.photographer + " · " + photo.provider;
-    els.detailPhotoImage.alt = (aircraft.registration || aircraft.flight || aircraft.hex.toUpperCase()) + " aircraft photo";
+    els.detailPhotoImage.alt = (aircraft.registration || aircraft.flight || aircraft.hex.toUpperCase()) + " Fliger-Foto";
     els.detailPhotoImage.onload = reveal;
     els.detailPhotoImage.onerror = fail;
     if (els.detailPhotoImage.src !== photo.thumbnailUrl) {
-      showPlaceholder("Loading aircraft photo…");
+      showPlaceholder("Fliger-Foto gëtt gelueden …");
       els.detailPhotoImage.src = photo.thumbnailUrl;
     } else if (els.detailPhotoImage.complete && els.detailPhotoImage.naturalWidth > 0) {
       reveal();
@@ -763,7 +763,7 @@
     }
     if (points.length < 2) return;
     state.trailLayer = L.polyline(points, {
-      color: "#32D6FF", weight: 3, opacity: .82, lineJoin: "round", smoothFactor: 1.2,
+      color: "#1f7a4d", weight: 3, opacity: .82, lineJoin: "round", smoothFactor: 1.2,
     }).addTo(state.map);
   }
 
@@ -781,7 +781,7 @@
       state.tracePath.set(aircraft.id, { path, at: Date.now() });
       if (state.selectedId === aircraft.id) {
         drawSelectedTrail();
-        if (path.length > 1) els.trailText.textContent = path.length + " point flight path from ADS-B history";
+        if (path.length > 1) els.trailText.textContent = path.length + " Punkte Flugwee aus der ADS-B-Geschicht";
       }
     } catch (_) {
       state.tracePath.set(aircraft.id, { path: [], at: Date.now() });
@@ -804,7 +804,7 @@
       const payload = await requestJson(PROXY + "?" + qs, null, 7000);
       let route = payload.route || null;
       if (!route && (payload.origin || payload.destination)) route = { origin: payload.origin, destination: payload.destination };
-      if (route && routeLabel(route) !== "Route unavailable") {
+      if (route && routeLabel(route) !== "Route net disponibel") {
         state.routeCache.set(callsign, route);
         saveRouteCache();
         const current = state.aircraft.get(aircraft.id);
@@ -820,7 +820,7 @@
   function updateFollowButton() {
     els.follow.classList.toggle("is-active", state.follow);
     els.follow.setAttribute("aria-pressed", String(state.follow));
-    els.follow.lastChild.textContent = state.follow ? " Following" : " Follow";
+    els.follow.lastChild.textContent = state.follow ? " Gëtt verfollegt" : " Verfollegen";
   }
 
   function setMode(mode) {
@@ -837,7 +837,7 @@
   }
 
   function locateUser() {
-    if (!navigator.geolocation) return showToast("Location is not supported by this browser.");
+    if (!navigator.geolocation) return showToast("Dëse Browser ënnerstëtzt keng Plazbestëmmung.");
     els.locate.classList.add("is-active");
     navigator.geolocation.getCurrentPosition((position) => {
       const lat = position.coords.latitude;
@@ -848,17 +848,17 @@
         if (state.userAccuracy) state.userAccuracy.remove();
         state.userMarker = L.marker([lat, lon], {
           icon: L.divIcon({ className: "", html: '<div class="user-marker"></div>', iconSize: [20, 20], iconAnchor: [10, 10] }),
-          title: "Your location", zIndexOffset: 1000,
+          title: "Deng Plaz", zIndexOffset: 1000,
         }).addTo(state.map);
-        state.userAccuracy = L.circle([lat, lon], { radius: position.coords.accuracy, color: "#3887ff", weight: 1, fillColor: "#3887ff", fillOpacity: .07 }).addTo(state.map);
+        state.userAccuracy = L.circle([lat, lon], { radius: position.coords.accuracy, color: "#1f7a4d", weight: 1, fillColor: "#1f7a4d", fillOpacity: .07 }).addTo(state.map);
         state.map.setView([lat, lon], Math.max(state.map.getZoom(), 10), { animate: true });
       }
       els.locate.classList.remove("is-active");
-      showToast("Centered on your location");
+      showToast("Op deng Plaz zentréiert");
     }, (error) => {
       els.locate.classList.remove("is-active");
       const denied = error && error.code === 1;
-      showToast(denied ? "Location permission was not granted." : "Your location could not be found.");
+      showToast(denied ? "D'Erlabnis fir d'Plaz gouf net ginn." : "Deng Plaz konnt net fonnt ginn.");
     }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 });
   }
 
@@ -881,17 +881,17 @@
     els.arOverlay.hidden = false;
     document.body.style.overflow = "hidden";
     if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      els.arPermission.querySelector("h2").textContent = "Camera view is unavailable";
-      els.arPermission.querySelector("p").textContent = "Sky view needs a secure browser with camera access. The live radar and list remain available.";
+      els.arPermission.querySelector("h2").textContent = "Kamera-Usiicht net disponibel";
+      els.arPermission.querySelector("p").textContent = "D'Himmelsusiicht brauch e séchere Browser mat Kamerazougrëff. De Live-Radar an d'Lëscht bleiwen disponibel.";
       els.startAr.disabled = true;
-      els.startAr.textContent = "Not supported here";
+      els.startAr.textContent = "Hei net ënnerstëtzt";
     }
   }
 
   async function startAr() {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
     els.startAr.disabled = true;
-    els.startAr.textContent = "Opening camera…";
+    els.startAr.textContent = "Kamera gëtt opgemaach …";
 
     let orientationRequest = Promise.resolve("unavailable");
     if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === "function") {
@@ -913,7 +913,7 @@
       state.ar.active = true;
       state.ar.orientationAvailable = orientationGranted;
       els.arPermission.hidden = true;
-      els.arSensorStatus.textContent = orientationGranted ? "Camera + live sensor alignment" : "Camera live · compass unavailable";
+      els.arSensorStatus.textContent = orientationGranted ? "Kamera + Live-Sensor-Ausriichtung" : "Kamera live · Kompass net disponibel";
 
       if (orientationGranted) {
         state.ar.orientationHandler = handleOrientation;
@@ -923,9 +923,9 @@
       scheduleArRender();
     } catch (error) {
       els.startAr.disabled = false;
-      els.startAr.textContent = "Try again";
-      els.arPermission.querySelector("h2").textContent = "Camera permission needed";
-      els.arPermission.querySelector("p").textContent = "Allow camera access in your browser settings, then try again. SkyLens never uploads camera frames.";
+      els.startAr.textContent = "Nach eng Kéier probéieren";
+      els.arPermission.querySelector("h2").textContent = "Kamera-Erlabnis néideg";
+      els.arPermission.querySelector("p").textContent = "Erlaabt de Kamerazougrëff an den Browser-Astellungen a probéiert et nach eng Kéier. SkyLens luet ni Kamerabiller erop.";
     }
   }
 
@@ -950,7 +950,7 @@
       const center = visibleQuery();
       state.ar.location = { lat: center.lat, lon: center.lon };
       state.ar.altitudeFt = 1000;
-      els.arSensorStatus.textContent += " · map-center location";
+      els.arSensorStatus.textContent += " · Plaz vum Kaartezentrum";
     }
     scheduleArRender();
   }
@@ -979,7 +979,7 @@
     if (!state.ar.active) return;
     const location = state.ar.location;
     if (!location) {
-      els.arHeading.textContent = "Finding your location…";
+      els.arHeading.textContent = "Deng Plaz gëtt gesicht …";
       return;
     }
     const nearby = [...state.aircraft.values()].map((aircraft) => ({
@@ -987,9 +987,9 @@
       distance: haversineNm(location.lat, location.lon, aircraft.lat, aircraft.lon),
       bearing: bearingDeg(location.lat, location.lon, aircraft.lat, aircraft.lon),
     })).filter((item) => item.distance <= 80).sort((a, b) => a.distance - b.distance);
-    els.arCount.textContent = nearby.length + " nearby";
+    els.arCount.textContent = nearby.length + " an der Nopeschaft";
     const heading = state.ar.heading;
-    els.arHeading.textContent = heading === null ? "Compass unavailable · use the bearing cards" : Math.round(heading) + "° " + cardinal(heading) + " · " + Math.round(state.ar.elevation) + "° elevation";
+    els.arHeading.textContent = heading === null ? "Kompass net disponibel · benotz d'Richtungskaarten" : Math.round(heading) + "° " + cardinal(heading) + " · " + Math.round(state.ar.elevation) + "° Héichtewinkel";
 
     if (heading === null || !state.ar.orientationAvailable) {
       els.arTargets.innerHTML = "";
@@ -1035,9 +1035,9 @@
     els.arNearest.innerHTML = "";
     els.arPermission.hidden = false;
     els.startAr.disabled = false;
-    els.startAr.textContent = "Start sky view";
-    els.arPermission.querySelector("h2").textContent = "Identify aircraft in the sky";
-    els.arPermission.querySelector("p").textContent = "SkyLens uses your rear camera, location and motion sensors to place live flight labels in the right direction.";
+    els.startAr.textContent = "Himmelsusiicht starten";
+    els.arPermission.querySelector("h2").textContent = "Fliger um Himmel erkennen";
+    els.arPermission.querySelector("p").textContent = "SkyLens benotzt d'Réckkamera, deng Plaz an d'Beweegungssensoren, fir d'Fluchetiketten an der richteger Richtung ze setzen.";
     els.arOverlay.hidden = true;
   }
 
