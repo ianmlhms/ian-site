@@ -149,4 +149,4 @@ html.auth-in .gt-acct { color: var(--ink); }
 /* tokens some older pages still read */
 body.gt { --accent2-text: var(--green); --ok: var(--green); --good: var(--green); --good-text: var(--green); --bad: var(--danger); }
 /* site-glass.css (loaded by theme.js) decorates these class names; flatten them in the Gitter look */
-body.gt :is(.empty, .card, .tile, .hint, .gate-box, .bar, .wrap) { box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; border-radius: 0; }
+body.gt :is(.empty, .card, .tile, .hint, .gate-box, .bar, .wrap, .proj-card, .note-card, .tbl-wrap) { box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; border-radius: 0; }

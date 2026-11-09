@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="lb">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
@@ -10,145 +10,113 @@
   <meta property="og:image" content="https://ian.lu/apple-touch-icon.png" />
   <link rel="canonical" href="https://ian.lu/about.html" />
   <title>About — Ian Mulheims</title>
-  <link rel="stylesheet" href="site-ui.css?v=2" />
   <style>
-    *{box-sizing:border-box}
-    body{margin:0;min-height:100vh;min-height:100svh;display:flex;flex-direction:column;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-    a{color:var(--accent-text);text-decoration:none}
-    a,button{touch-action:manipulation}
-    a:focus-visible,button:focus-visible{outline:2px solid var(--focus-ring,var(--accent));outline-offset:3px;border-radius:8px}
+          a,button{touch-action:manipulation}
+    a:focus-visible,button:focus-visible{outline:2px solid var(--focus-ring,var(--accent));outline-offset:3px;border-radius:0}
 
     /* ---- header + column ---- */
-    html body.ui .ui-header{flex-wrap:wrap;gap:8px 14px;padding:max(16px,env(safe-area-inset-top)) max(28px,env(safe-area-inset-right)) 0 max(28px,env(safe-area-inset-left))}
-    .header-left,.header-right{display:flex;align-items:center;gap:10px;min-width:0}
-    .header-left{flex:1 1 auto}
-    .header-right{flex-wrap:wrap;justify-content:flex-end;gap:12px}
-    body.ui .ui-header .home{display:inline-flex;align-items:center;min-height:44px;padding:8px 16px;border-radius:var(--r-chip);border:1px solid var(--border);background:transparent;color:var(--text);font:700 14px var(--font-display);white-space:nowrap;transition:background-color .2s,border-color .2s,transform .3s var(--ease)}
-    body.ui .ui-header .home:hover{background:color-mix(in srgb,var(--accent) 10%,transparent);border-color:var(--accent-border)}
-    body.ui .ui-header .home:active{transform:scale(.97)}
-    .ui .ui-page{display:flex;flex-direction:column;gap:34px;padding-top:22px;padding-left:max(28px,env(safe-area-inset-left));padding-right:max(28px,env(safe-area-inset-right));padding-bottom:max(56px,calc(36px + env(safe-area-inset-bottom)))}
-    @media (max-width:620px){.ui .ui-page{gap:28px;padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}html body.ui .ui-header{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}}
 
-    /* ---- hero ---- */
-    .about-hero{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:clamp(16px,3vw,28px);align-items:start;padding:clamp(22px,4vw,38px);overflow:hidden}
-    .about-hero .ava{display:grid;place-items:center;width:clamp(72px,11vw,104px);height:clamp(72px,11vw,104px);border-radius:clamp(22px,3.4vw,32px);font-size:clamp(38px,6vw,56px);line-height:1;background:color-mix(in srgb,var(--accent) 24%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 34%,transparent),inset 0 1px 0 color-mix(in srgb,#fff 24%,transparent),0 16px 30px -18px rgb(var(--ink)/.5);transform:rotate(-4deg)}
-    .about-hero h1.ui-title{margin:2px 0 10px;font-size:clamp(34px,6vw,52px);line-height:1.04;letter-spacing:-.04em}
-    .about-hero .bio{margin:0;max-width:62ch;font-size:clamp(16px,2vw,18px);line-height:1.6;color:var(--text);text-wrap:pretty}
+    .about-hero{flex-direction:row !important;justify-content:flex-start !important;align-items:flex-start;gap:clamp(16px,3vw,28px) !important;padding:clamp(22px,4vw,36px) !important}
+    .about-hero .ava{display:grid;place-items:center;flex:none;width:clamp(72px,11vw,104px);height:clamp(72px,11vw,104px);border:1px solid var(--ink);background:var(--white);font-size:clamp(38px,6vw,56px);line-height:1}
+    .about-hero h1.ui-title{margin:2px 0 10px;font:800 clamp(34px,6vw,52px)/1.04 "Geist",system-ui,sans-serif;letter-spacing:-.04em}
+    .about-hero .bio{margin:0;max-width:62ch;font-size:clamp(16px,2vw,18px);line-height:1.6;color:var(--ink);text-wrap:pretty}
     .about-hero .acts{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
-    .about-hero .ui-btn{padding:12px 22px}
-    @media (max-width:560px){.about-hero{grid-template-columns:minmax(0,1fr);row-gap:16px}.about-hero .acts{margin-top:18px}}
-
-    /* ---- projects ---- */
-    .ui-title.sec{margin-bottom:14px}
-    .proj-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,17rem),1fr));gap:14px}
-    .proj-grid .ui-tile{grid-template-columns:minmax(0,1fr);grid-template-areas:"ico" "name" "sub" "tags";align-content:start;row-gap:4px;min-height:0;padding:20px}
-    .proj-grid .ui-tile .ui-tile__ico{width:60px;height:60px;margin-bottom:14px;border-radius:18px;font-size:32px}
-    .proj-grid .ui-tile .ui-tile__name{align-self:start;font-size:18px}
-    .proj-grid .ui-tile .ui-tile__sub{display:block;-webkit-line-clamp:unset;overflow:visible;font-size:14px;line-height:1.5}
-    .proj-grid .ptags{grid-area:tags;display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}
-    .proj-grid .ptag{display:inline-flex;align-items:center;min-height:26px;padding:3px 11px;border-radius:13px;background:color-mix(in srgb,var(--h) 16%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--h) 28%,transparent);color:var(--text);font:700 12px var(--font-display);letter-spacing:.01em}
-    .proj-grid .ui-tile__go{position:absolute;top:22px;right:20px;color:var(--muted);font-size:24px;line-height:1;transition:transform .3s var(--ease),color .2s}
-    .proj-grid a.ui-tile:hover .ui-tile__go{color:var(--h);transform:translateX(3px)}
-    .proj-grid div.ui-tile{cursor:default}
-    .proj-grid div.ui-tile:hover{transform:none;background:var(--card);box-shadow:inset 0 0 0 1px var(--tile-edge),0 1px 2px rgb(var(--ink)/.05),0 14px 30px -18px rgb(var(--ink)/.35)}
-    .proj-grid div.ui-tile:hover .ui-tile__ico{transform:none}
-
-    /* ---- footer ---- */
-    .about-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 28px;width:calc(100% - 56px);max-width:984px;margin:0 auto;padding:20px 0 calc(36px + env(safe-area-inset-bottom));border-top:1px solid var(--border);color:var(--muted);font-size:13px}
+    @media (max-width:560px){.about-hero{flex-direction:column !important}.about-hero .acts{margin-top:18px}}
+    #projects{display:contents}
+    .proj-grid{display:contents}
+    .proj-card{justify-content:flex-start !important;gap:6px !important;padding:20px !important;text-decoration:none;position:relative}
+    a.proj-card:hover{background:var(--white)}
+    a.proj-card:hover .ptitle{color:var(--green)}
+    .proj-card .ptitle{font:800 18px/1.2 "Geist",system-ui,sans-serif;letter-spacing:-.02em}
+    .proj-card .pdesc{color:var(--muted);font-size:14px;line-height:1.5;display:block}
+    .proj-card .ptags{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+    .proj-card .ptag{display:inline-flex;align-items:center;padding:2px 8px;border:1px solid var(--ink);font:500 12px/1.5 "Geist Mono",ui-monospace,monospace}
+    .proj-card .ui-tile__go{position:absolute;top:18px;right:18px;color:var(--muted);font-size:22px;line-height:1}
+    .about-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 28px;max-width:1240px;margin:0 auto;padding:0 var(--gutter) calc(36px + env(safe-area-inset-bottom));color:var(--muted);font-size:14px}
     .about-foot .foot-links{display:flex;flex-wrap:wrap;gap:0 2px;margin-inline:-10px}
-    .about-foot .foot-link{display:inline-flex;align-items:center;min-height:44px;padding:0 10px;border-radius:10px;color:var(--muted)}
-    .about-foot .foot-link:hover{color:var(--text)}
-    @media (max-width:760px){.about-foot{width:calc(100% - 32px);padding-bottom:calc(88px + env(safe-area-inset-bottom))}}
-
-    @media (prefers-reduced-motion:reduce){body.ui .ui-header .home,.proj-grid .ui-tile__go{transition:none}.about-hero .ava{transform:none}}
-    @media (prefers-contrast:more){.about-hero .ava,.proj-grid .ptag{box-shadow:0 0 0 2px var(--text)}}
-  </style>
+    .about-foot .foot-link{display:inline-flex;align-items:center;min-height:44px;padding:0 10px;color:var(--muted)}
+    .about-foot .foot-link:hover{color:var(--green)}
+    @media (max-width:760px){.about-foot{padding-bottom:calc(88px + env(safe-area-inset-bottom));padding-inline:16px}}
+  .gt-page{padding-bottom:max(56px,calc(40px + env(safe-area-inset-bottom)))}
+  @media(max-width:640px){.gt-nav{padding-inline:14px !important}}
+</style>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <script src="season.js?v=5"></script>
-  <script src="theme.js?v=32"></script>
+    <link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="gitter.css?v=6">
+<script src="theme.js?v=32"></script>
   <script src="i18n-dict.js?v=54"></script>
   <script src="i18n.js?v=5"></script>
 <script data-goatcounter="https://ianm.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
-  <meta name="theme-color" content="#0d0d1a">
+  <meta name="theme-color" content="#f6f6f3">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="manifest" href="site.webmanifest">
 </head>
-<body class="ui">
-  <header class="bar ui-header">
-    <div class="header-left">
-      <a class="brand ui-brand" href="/">ian.lu</a>
-      <a class="home" href="index.html" data-i18n="nav.home">‹ Home</a>
-    </div>
-    <div class="header-right">
-      <span id="langSw"></span>
-      <span id="acctHost"></span>
-    </div>
+<body class="gt">
+<main class="gt-page">
+<div class="gt-grid">
+  <header class="c full gt-nav">
+    <div class="gt-nav-l"><a class="gt-back" href="index.html">‹ Heem</a><h1 class="gt-page-title">Iwwer mech</h1></div>
+    <div class="gt-navr"><button type="button" class="gt-acct" id="gtAcct">Umellen</button></div>
   </header>
 
-  <main class="page ui-page">
     <!-- about me -->
-    <section class="about-hero ui-card ui-card--accent">
+    <section class="about-hero c full">
       <div class="ava" aria-hidden="true">🧑‍💻</div>
       <div>
         <h1 class="hero-name ui-title" data-i18n="about.title">About me</h1>
         <p class="hero-tag bio" data-i18n="about.bio">I'm Ian, a student from Luxembourg who loves building games, real-time apps and small tools — on the web with plain JavaScript and Supabase, and on iPhone and Apple Watch with SwiftUI. Most of the projects below started as a quick "can I build this?" and ended up being used by my friends and family.</p>
         <div class="acts">
-          <a class="ui-btn ui-btn--primary" href="#projects"><span data-i18n="index.projects">Projects</span></a>
-          <a class="ui-btn ui-btn--ghost" href="https://github.com/ianmlhms" rel="noopener">GitHub</a>
+          <a class="gt-btn" href="#projects"><span data-i18n="index.projects">Projects</span></a>
+          <a class="gt-btn ghost" href="https://github.com/ianmlhms" rel="noopener">GitHub</a>
         </div>
       </div>
     </section>
 
     <!-- projects showcase -->
-    <section id="projects" aria-labelledby="projTitle">
-      <h2 class="sec-title ui-title sec" id="projTitle" data-i18n="index.projects">Projects</h2>
+    <section id="projects" >
+      <div class="c full gt-lbl" id="projTitle"><span data-i18n="index.projects">Projects</span></div>
       <div class="proj-grid">
-        <a class="proj-card ui-tile" style="--h:#f0a04b" href="pixelbreak.html">
-          <span class="pico ui-tile__ico" aria-hidden="true">🎮</span>
+        <a class="proj-card c third" href="pixelbreak.html">
           <span class="ptitle ui-tile__name">Arcade</span>
           <span class="pdesc ui-tile__sub" data-i18n="proj.pixelbreak.desc">53 arcade games, all playable in the browser — no install, no ads.</span>
           <span class="ptags"><span class="ptag">Web</span><span class="ptag">JavaScript</span></span>
           <span class="ui-tile__go" aria-hidden="true">›</span>
         </a>
-        <a class="proj-card ui-tile" style="--h:#a78bfa" href="pixelbreak.html">
-          <span class="pico ui-tile__ico" aria-hidden="true">🎲</span>
+        <a class="proj-card c third" href="pixelbreak.html">
           <span class="ptitle ui-tile__name">Multiplayer Games</span>
           <span class="pdesc ui-tile__sub" data-i18n="proj.games.desc">Connect 4, Reversi, Battleship and more — 1v1 across two devices, or against an AI with three difficulty levels.</span>
           <span class="ptags"><span class="ptag" data-i18n="tag.realtime">Realtime</span><span class="ptag">Supabase</span></span>
           <span class="ui-tile__go" aria-hidden="true">›</span>
         </a>
-        <a class="proj-card ui-tile" style="--h:#6ea8fe" href="messenger.html">
-          <span class="pico ui-tile__ico" aria-hidden="true">💬</span>
+        <a class="proj-card c third" href="messenger.html">
           <span class="ptitle ui-tile__name">Messenger</span>
           <span class="pdesc ui-tile__sub" data-i18n="proj.messenger.desc">Real-time chat with groups, voice notes, file sharing, replies and reactions.</span>
           <span class="ptags"><span class="ptag" data-i18n="tag.realtime">Realtime</span><span class="ptag">PWA</span></span>
           <span class="ui-tile__go" aria-hidden="true">›</span>
         </a>
-        <a class="proj-card ui-tile" style="--h:#4fc37a" href="wordle.html">
-          <span class="pico ui-tile__ico" aria-hidden="true">🟩</span>
+        <a class="proj-card c third" href="wordle.html">
           <span class="ptitle ui-tile__name">Wuertspill</span>
           <span class="pdesc ui-tile__sub" data-i18n="proj.wordle.desc">Wordle, but in Luxembourgish and German — the way I actually speak.</span>
           <span class="ptags"><span class="ptag">Web</span><span class="ptag">Lëtzebuergesch</span></span>
           <span class="ui-tile__go" aria-hidden="true">›</span>
         </a>
-        <div class="proj-card static ui-tile" style="--h:#ef6a6a">
-          <span class="pico ui-tile__ico" aria-hidden="true">🏎️</span>
+        <div class="proj-card static c third">
           <span class="ptitle ui-tile__name">KartTracker</span>
           <span class="pdesc ui-tile__sub" data-i18n="proj.kart.desc">A go-kart lap timer for iPhone + Apple Watch — live lap times, best-lap tracking and session history.</span>
           <span class="ptags"><span class="ptag">SwiftUI</span><span class="ptag">watchOS</span></span>
         </div>
-        <div class="proj-card static ui-tile" style="--h:#e879a9">
-          <span class="pico ui-tile__ico" aria-hidden="true">🎬</span>
+        <div class="proj-card static c third">
           <span class="ptitle ui-tile__name">ShortsFactory</span>
           <span class="pdesc ui-tile__sub" data-i18n="proj.shorts.desc">An automated pipeline that generates faceless short videos and uploads them — with a Telegram approval step.</span>
           <span class="ptags"><span class="ptag">Python</span><span class="ptag" data-i18n="tag.automation">Automation</span></span>
         </div>
       </div>
     </section>
-  </main>
+  </div>
+</main>
 
   <footer class="about-foot">
     <span class="foot-id"><span id="year"></span> Ian Mulheims</span>
@@ -162,10 +130,7 @@
   <script src="main.js"></script>
   <script src="pixelbreak-config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-  <script type="module">
-    import { mountAccountButton } from "./auth.js?v=40";
-    mountAccountButton(document.getElementById("acctHost"));
-  </script>
+  <script type="module" src="gitter-acct.js?v=1"></script>
   <script type="module" src="rtc-ring.js?v=36"></script>
   <script type="module" src="class-gate.js?v=37"></script>
 </body>
