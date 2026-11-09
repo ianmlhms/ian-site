@@ -9,6 +9,19 @@ const LD = path.join(REPO, 'pb', 'lux-drive');
 const DATA = path.join(LD, 'data');
 const imp = (f) => import(new URL(`file:///${path.join(LD, f).replace(/\\/g, '/').replace(/^\//, '')}`).href);
 
+/** Is (x, z) inside area.ring and outside every area.holes ring (even-odd ray cast)? */
+export function insideRings(area, x, z) {
+  const inRing = (ring) => {
+    let c = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [xi, zi] = ring[i], [xj, zj] = ring[j];
+      if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) c = !c;
+    }
+    return c;
+  };
+  return inRing(area.ring) && !(area.holes || []).some(inRing);
+}
+
 /** Loads the world.  Returns everything the sweeps need: { data, field, surface, ground, tubes, net, collider (car-collide.js), roads (drivable car ways) }. */
 export async function loadWorld() {
   const [wd, hf, sf, dk, ps, tt, lm, bd, tr, pt, pa, wm, wc, pr, sl, pb, cc, ri, lc] = await Promise.all([
@@ -42,5 +55,9 @@ export async function loadWorld() {
   const collider = cc.createCarCollider({ buildings, landmarks, walls, portals, ground, forest, props, trams: null, playArea, surface, deckNetwork, tubes: tubes.network });
   const isOpen = (r) => tubes.ids.has(r.id);
   const roads = lc.laneRoads(data.roads, isOpen);
-  return { playArea, data, field, surface, ground, tubes, net, collider, roads, deckNetwork, isOpen, laneOffsets: lc.laneOffsets };
+  // (the sweeps ask "is this point in the play area" anywhere in the communes: play-area.js inside() only answers near the border - it reads the nearest ring
+  // segment in the 3x3 cells of 64 m around the point and says "outside" when there is none, so the sweeps drove only a ~100 m band along the border, not the city,
+  // tunnels19.  The game's own uses - the portals' border probe, the car's push back - keep play-area.js as it is.)
+  const sweepArea = { ...playArea, inside: (x, z) => insideRings(area, x, z) };
+  return { playArea: sweepArea, data, field, surface, ground, tubes, net, collider, roads, deckNetwork, isOpen, laneOffsets: lc.laneOffsets };
 }

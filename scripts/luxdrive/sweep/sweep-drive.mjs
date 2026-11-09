@@ -1,5 +1,5 @@
 /* Lux Drive sweep 1: every lane of every car road driven in both directions at two speeds, headless, with the game's own car physics and collider.
- *   node scripts/luxdrive/sweep/sweep-drive.mjs [--out DIR] [--workers N] [--limit N] [--area x0,z0,x1,z1] [--speeds 13,25] [--resume]
+ *   node scripts/luxdrive/sweep/sweep-drive.mjs [--out DIR] [--workers N] [--limit N] [--area x0,z0,x1,z1[;...]] [--speeds 13,25] [--resume]
  * Output (DIR, default <repo>/../luxdrive-sweep-out/drive): sweep-drive.json (events, totals), sweep-drive.md (worst-list, top 100 places within 25 m), progress.json (resume).
  * One worker per thread (each loads the world: ~0.6 GB, ~1 min); the main thread hands out batches of roads and writes the progress file. */
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
@@ -92,7 +92,8 @@ async function main() {
   const outDir = path.resolve(arg('--out', path.join(HERE, '../../../..', 'luxdrive-sweep-out', 'drive')));
   fs.mkdirSync(outDir, { recursive: true });
   const limit = Number(arg('--limit', 0)) || 0;
-  const area = (arg('--area', '') || '').toString().split(',').map(Number);
+  // (--area x0,z0,x1,z1[;x0,z0,x1,z1...]: one or more boxes, a road touching any of them is driven)
+  const boxes = (arg('--area', '') || '').toString().split(';').filter(Boolean).map((b) => b.split(',').map(Number)).filter((b) => b.length === 4 && b.every(Number.isFinite));
   const speeds = (arg('--speeds', '13,25')).toString().split(',').map(Number);
   const resume = process.argv.includes('--resume');
   const freeGb = os.freemem() / 1e9;
@@ -121,7 +122,7 @@ async function main() {
     const begin = (list) => {
       let roads = list;
       for (const r of roads) meta.set(r.id, r);
-      if (area.length === 4 && area.every(Number.isFinite)) roads = roads.filter((r) => r.bbox[2] >= area[0] && r.bbox[3] >= area[1] && r.bbox[0] <= area[2] && r.bbox[1] <= area[3]);
+      if (boxes.length) roads = roads.filter((r) => boxes.some((a) => r.bbox[2] >= a[0] && r.bbox[3] >= a[1] && r.bbox[0] <= a[2] && r.bbox[1] <= a[3]));
       if (limit) roads = roads.filter((_, i) => i % Math.max(1, Math.floor(roads.length / limit)) === 0).slice(0, limit);
       const todo = roads.filter((r) => !done.has(r.id)).sort((a, b) => b.length - a.length);   // the long ways first: the short ones even out the end
       for (let i = 0; i < todo.length; i += BATCH) queue.push(todo.slice(i, i + BATCH).map((r) => r.id));
