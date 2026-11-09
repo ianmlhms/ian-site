@@ -6,80 +6,57 @@
 <title>Sichen — ian.lu</title>
 <meta name="robots" content="noindex">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<meta name="theme-color" content="#0d0d1a">
-<script src="season.js?v=5"></script>
+<meta name="theme-color" content="#f6f6f3">
+<link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="gitter.css?v=8">
 <script src="theme.js?v=32"></script>
-<link rel="stylesheet" href="site-ui.css?v=2">
 <style>
-  *{box-sizing:border-box}
-  body{margin:0;min-height:100vh;min-height:100svh;display:flex;flex-direction:column;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-  a{color:var(--accent-text);text-decoration:none}
   button,a{touch-action:manipulation}
   a:focus-visible,button:focus-visible{outline:2px solid var(--focus-ring,var(--accent));outline-offset:2px}
 
   /* ---- header + column ---- */
-  html body.ui .ui-header{max-width:720px;flex-wrap:wrap;gap:8px 14px;padding:max(16px,env(safe-area-inset-top)) max(28px,env(safe-area-inset-right)) 0 max(28px,env(safe-area-inset-left))}
-  .header-left,.header-right{display:flex;align-items:center;gap:10px;min-width:0}
-  .header-left{flex:1 1 auto}
-  body.ui .ui-header .home{display:inline-flex;align-items:center;min-height:44px;padding:8px 16px;border-radius:var(--r-chip);border:1px solid var(--border);background:transparent;color:var(--text);font:700 14px var(--font-display);white-space:nowrap;transition:background-color .2s,border-color .2s,transform .3s var(--ease)}
-  body.ui .ui-header .home:hover{background:color-mix(in srgb,var(--accent) 10%,transparent);border-color:var(--accent-border)}
-  body.ui .ui-header .home:active{transform:scale(.97)}
-  body.ui .ui-header h1.ui-brand{margin:0;display:flex;align-items:center;gap:10px;font-size:19px;white-space:nowrap}
-  .ui .ui-page{display:flex;flex-direction:column;gap:14px;max-width:720px;padding-top:22px;padding-left:max(28px,env(safe-area-inset-left));padding-right:max(28px,env(safe-area-inset-right));padding-bottom:max(72px,calc(40px + env(safe-area-inset-bottom)))}
-  @media (max-width:620px){.ui .ui-page{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}html body.ui .ui-header{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}}
 
   /* ---- search field ---- */
-  .sfield{position:relative}
-  .sfield .mag{position:absolute;left:18px;top:50%;transform:translateY(-50%);font-size:20px;line-height:1;pointer-events:none}
-  #q.ui-input{min-height:56px;padding:14px 18px 14px 52px;border-radius:var(--r-tile);font:600 17px var(--font-display);letter-spacing:-.01em;-webkit-appearance:none;appearance:none}
-  #q.ui-input:focus-visible{outline:none}
-  #q.ui-input::placeholder{font-weight:500}
-  #q::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none;width:22px;height:22px;border-radius:50%;cursor:pointer;background:color-mix(in srgb,var(--muted) 35%,transparent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'%3E%3Cpath d='M7 7l8 8M15 7l-8 8' stroke='%23fff' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") center/100% no-repeat}
-
-  /* ---- results ---- */
-  #out{display:flex;flex-direction:column;gap:6px}
-  .grp{display:flex;align-items:center;gap:8px;margin:14px 2px 2px;color:var(--muted);font:800 12px var(--font-display);letter-spacing:.08em;text-transform:uppercase}
-  .grp:first-child{margin-top:4px}
-  .grp .n{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 7px;border-radius:11px;background:color-mix(in srgb,var(--h) 18%,var(--card-opaque));color:var(--text);font-size:11px;letter-spacing:0}
-  .res{display:flex;flex-direction:column;gap:10px}
-  .res .ui-tile{min-height:76px;padding:12px 16px}
-  .res .ui-tile .ui-tile__ico{width:48px;height:48px;font-size:24px}
-  .res .ui-tile .ui-tile__name{overflow-wrap:anywhere}
-  .res .ui-tile .ui-tile__go{position:absolute;top:50%;right:16px;transform:translateY(-50%);color:var(--muted);font-size:22px;line-height:1;transition:transform .3s var(--ease),color .2s}
-  .res .ui-tile:hover .ui-tile__go{color:var(--h);transform:translate(3px,-50%)}
-  .res .ui-tile{padding-right:40px}
-
-  /* ---- empty / loading / sign-in ---- */
-  .gate{display:flex;margin:0;flex-direction:column;align-items:center;gap:10px;text-align:center;color:var(--muted);padding:clamp(34px,8vw,64px) 22px}
-  .gate .big{display:grid;place-items:center;width:72px;height:72px;margin-bottom:4px;border-radius:22px;font-size:36px;background:color-mix(in srgb,var(--accent) 18%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 28%,transparent)}
-  .gate p{margin:0;max-width:30ch;line-height:1.4;overflow-wrap:anywhere}
-  .gate .gt{color:var(--text);font:800 clamp(20px,3vw,24px) var(--font-display);letter-spacing:-.02em}
-  .gate .ui-btn{margin-top:8px}
-
-  @media (prefers-reduced-motion:reduce){body.ui .ui-header .home,.res .ui-tile .ui-tile__go{transition:none}}
+  #q.ui-input,#q{min-height:56px;padding:14px 18px;font:600 18px "Geist",system-ui,sans-serif;letter-spacing:-.01em;border:1px solid var(--ink);border-radius:0;background:var(--white);width:100%;-webkit-appearance:none;appearance:none}
+  #q:focus{outline:2px solid var(--green);outline-offset:-2px;border-color:var(--green)}
+  .sfield{padding:0 !important}
+  .sfield #q{border:0}
+  #out{display:contents}
+  .grp{flex-direction:row !important;justify-content:flex-start !important;align-items:center;gap:8px;background:var(--tint);padding:10px 20px !important;font:600 14px "Geist",system-ui,sans-serif;color:var(--muted)}
+  .grp .n{margin-left:auto;font:500 13px "Geist Mono",ui-monospace,monospace}
+  .res{padding:0 !important;gap:0 !important}
+  .res a{display:flex;flex-direction:row;align-items:center;gap:12px;min-height:56px;padding:10px 20px;border-bottom:1px solid var(--soft);text-decoration:none}
+  .res a:last-child{border-bottom:0}
+  .res a:hover{background:var(--tint)}
+  .res .nm{flex:1;min-width:0;font-weight:600;overflow-wrap:anywhere}
+  .res .sb{color:var(--muted);font-size:13.5px}
+  .res .go{color:var(--muted);font-size:20px}
+  .gate{align-items:flex-start;gap:6px !important;justify-content:flex-start !important;padding:24px 20px !important;color:var(--muted)}
+  .gate .big{display:none}
+  .gate p{margin:0;max-width:40ch;line-height:1.4;overflow-wrap:anywhere}
+  .gate .gt{color:var(--ink);font:800 22px/1.2 "Geist",system-ui,sans-serif;letter-spacing:-.03em}
+  .gate .gt-btn{margin-top:8px}
+  .gt-page{padding-bottom:max(56px,calc(40px + env(safe-area-inset-bottom)))}
+  @media(max-width:640px){.gt-nav{padding-inline:14px !important}}
 </style>
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
 </head>
-<body class="ui">
-<header class="ui-header">
-  <div class="header-left">
-    <a class="home" href="index.html">‹ Heem</a>
-    <h1 class="ui-brand"><span aria-hidden="true">🔎</span> Sichen</h1>
-  </div>
-  <div class="header-right">
-    <span id="acctHost"></span>
-  </div>
-</header>
+<body class="gt">
+<main class="gt-page">
+<div class="gt-grid">
+  <header class="c full gt-nav">
+    <div class="gt-nav-l"><a class="gt-back" href="index.html">‹ Heem</a><h1 class="gt-page-title">Siche</h1></div>
+    <div class="gt-navr"><button type="button" class="gt-acct" id="gtAcct">Umellen</button></div>
+  </header>
 
-<main class="ui-page">
-  <div class="sfield">
-    <span class="mag" aria-hidden="true">🔎</span>
-    <input id="q" class="ui-input" type="search" enterkeyhint="search" spellcheck="false" aria-label="Sichen" aria-controls="out" placeholder="Sich no Leit, Hausaufgaben, Tester, Kaarten…" autocomplete="off">
+  <div class="c full sfield">
+    <input id="q" class="ui-input" type="search" enterkeyhint="search" spellcheck="false" aria-label="Sichen" aria-controls="out" placeholder="Sich no Leit, Hausaufgaben, Tester, Kaarten …" autocomplete="off">
   </div>
-  <div id="out" role="status" aria-live="polite"><div class="gate ui-card"><div class="big" aria-hidden="true">🔎</div><p class="gt">Sichen</p><p>Fänk un ze tippen…</p></div></div>
+  <div id="out" role="status" aria-live="polite"><div class="c full gate"><div class="big" aria-hidden="true"></div><p class="gt">Sichen</p><p>Fänk un ze tippen…</p></div></div>
+</div>
 </main>
 
 <script src="pixelbreak-config.js"></script>
@@ -92,23 +69,22 @@ let sb=null,timer=null;
 
 async function boot(){
   sb=await auth.client();
-  auth.mountAccountButton($("acctHost"));
   if(!auth.session()){
-    $("out").innerHTML=gate("🔒","Sichen","Mell dech un fir ze sichen.",`<button type="button" class="ui-btn ui-btn--primary" id="si">Umellen</button>`);
+    $("out").innerHTML=gate("","Sichen","Mell dech un fir ze sichen.",`<button type="button" class="gt-btn" id="si">Umellen</button>`);
     $("si").onclick=auth.openAuthModal;return;
   }
   $("q").addEventListener("input",()=>{clearTimeout(timer);timer=setTimeout(run,220);});
   $("q").focus();
 }
 
-function gate(big,title,text,extra=""){ return `<div class="gate ui-card"><div class="big" aria-hidden="true">${big}</div>${title?`<p class="gt">${title}</p>`:""}<p>${text}</p>${extra}</div>`; }
-function grp(title,tint,rows){ return rows.length?`<div class="grp" style="--h:${tint}">${title}<span class="n">${rows.length}</span></div><div class="res">${rows.join("")}</div>`:""; }
-function row(ic,tint,t,s,href){ return `<a class="ui-tile" style="--h:${tint}" href="${href}"><span class="ui-tile__ico" aria-hidden="true">${ic}</span><span class="ui-tile__name">${esc(t)}</span><span class="ui-tile__sub">${esc(s)}</span><span class="ui-tile__go" aria-hidden="true">›</span></a>`; }
+function gate(big,title,text,extra=""){ return `<div class="c full gate"><div class="big" aria-hidden="true">${big}</div>${title?`<p class="gt">${title}</p>`:""}<p>${text}</p>${extra}</div>`; }
+function grp(title,tint,rows){ return rows.length?`<div class="c full grp">${title}<span class="n">${rows.length}</span></div><div class="c full res">${rows.join("")}</div>`:""; }
+function row(ic,tint,t,s,href){ return `<a href="${href}"><span class="nm">${esc(t)}</span><span class="sb">${esc(s)}</span><span class="go" aria-hidden="true">›</span></a>`; }
 
 async function run(){
   const q=$("q").value.trim();
-  if(q.length<2){$("out").innerHTML=gate("🔎","Sichen","Fänk un ze tippen…");return;}
-  $("out").innerHTML=gate("⏳","","Sichen…");
+  if(q.length<2){$("out").innerHTML=gate("","Sichen","Fänk un ze tippen…");return;}
+  $("out").innerHTML=gate("","","Sichen…");
   const like="%"+q.replace(/[%_]/g,"")+"%";
   const [ppl,hw,ex,dk]=await Promise.all([
     sb.from("profiles").select("username,class").ilike("username",like).limit(8),
@@ -121,7 +97,7 @@ async function run(){
   const rEx=(ex.data||[]).map(e=>row("⏳","#f0a04b",e.subject,e.note||"Test","exams.html"));
   const rDk=(dk.data||[]).map(d=>row("🃏","#a78bfa",d.title,"Kaartekëscht","flashcards.html?deck="+d.id));
   const html=grp("Leit","#6ea8fe",rPpl)+grp("Hausaufgaben","#4fc37a",rHw)+grp("Tester","#f0a04b",rEx)+grp("Kaarten","#a78bfa",rDk);
-  $("out").innerHTML=html||gate("🤷","Näischt fonnt",`Keng Resultater fir „${esc(q)}“.`);
+  $("out").innerHTML=html||gate("","Näischt fonnt",`Keng Resultater fir „${esc(q)}“.`);
 }
 
 auth.onAuth(boot);
@@ -129,5 +105,6 @@ boot();
 </script>
   <script type="module" src="rtc-ring.js?v=36"></script>
   <script type="module" src="class-gate.js?v=37"></script>
+<script type="module" src="gitter-acct.js?v=1"></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-no-season>
+<html lang="lb">
 <head>
 <meta charset="utf-8">
 <meta name="robots" content="noindex,follow">
@@ -10,38 +10,38 @@
   <link rel="canonical" href="https://ian.lu/checkers.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <script src="mp-gate.js?v=7" data-game="checkers" data-over="#rematch"></script>
-<script src="season.js?v=5"></script>
+<link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="gitter.css?v=8">
 <script src="theme.js?v=32"></script>
-<link rel="stylesheet" href="game-common.css?v=5">
 <style>
-  :root{--red:#ff5d6c;--cyan:#4de8ff;--dark:#1b2150;--light:#12122a}
+  :root{--red:#1f7a4d;--cyan:#fcfcfa;--dark:#16171a;--light:#efefeb}
   body{display:flex;flex-direction:column}
   .wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:16px}
-  .board{display:grid;grid-template-columns:repeat(8,1fr);border:3px solid var(--border);border-radius:12px;overflow:hidden;touch-action:manipulation}
+  .board{display:grid;grid-template-columns:repeat(8,1fr);border:3px solid var(--border);border-radius:0;overflow:hidden;touch-action:manipulation}
   .sq{width:min(11vw,52px);height:min(11vw,52px);display:flex;align-items:center;justify-content:center;background:var(--light)}
   .sq.d{background:var(--dark)}
   .sq.sel{box-shadow:inset 0 0 0 3px var(--accent)}
   .sq.tgt{cursor:pointer}
-  .sq.tgt::after{content:"";width:30%;height:30%;border-radius:50%;background:var(--accent);opacity:.75}
-  .pc{width:78%;height:78%;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:min(5vw,24px);box-shadow:0 2px 6px rgba(0,0,0,.5)}
-  .pc.p1{background:radial-gradient(circle at 35% 30%,#ff8b96,var(--red))}
-  .pc.p2{background:radial-gradient(circle at 35% 30%,#9df2ff,var(--cyan));color:#0d0d1a}
+  .sq.tgt::after{content:"";width:30%;height:30%;border-radius:0;background:var(--accent);opacity:.75}
+  .pc{width:78%;height:78%;border-radius:0;display:flex;align-items:center;justify-content:center;font-size:min(5vw,24px);box-shadow:none}
+  .pc.p1{background:var(--red)}
+  .pc.p2{background:var(--cyan);border:2px solid #16171a;color:#16171a}
   .pc.mine{cursor:pointer}
   .sq[role=button],.pc[role=button]{min-height:0;min-width:0}
-  .me{display:inline-block;width:14px;height:14px;border-radius:50%;vertical-align:-2px;margin:0 4px}
+  .me{display:inline-block;width:14px;height:14px;border-radius:0;vertical-align:-2px;margin:0 4px}
 </style>
 <script data-goatcounter="https://ianm.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
-  <meta name="theme-color" content="#0d0d1a">
+  <meta name="theme-color" content="#f6f6f3">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
 </head>
-<body>
+<body class="gt">
 <header class="bar">
   <a class="home" href="pixelbreak.html">‹ Arcade</a>
-  <h1><span aria-hidden="true">🟠</span> Checkers</h1>
+  <h1>Checkers</h1>
   <div class="spacer"></div>
 </header>
 
@@ -55,7 +55,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="pb/arcade-kit.js?v=42" data-arcade-id="o-checkers" data-arcade-title="Checkers" data-arcade-no-score data-arcade-replace=".bar"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-<script src="game-common.js?v=4"></script>
+<script src="game-common.js?v=5"></script>
 <script type="module" src="notify-ambient.js?v=40"></script>
 <script>
 /* English draughts: men move diagonally forward, captures are mandatory (and

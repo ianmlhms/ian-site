@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-no-season>
+<html lang="lb">
 <head>
 <meta charset="utf-8">
 <meta name="robots" content="noindex,follow">
@@ -9,54 +9,52 @@
   <meta name="description" content="Meme generator on ian.lu — pick a template, add your own caption and share the result." />
   <link rel="canonical" href="https://ian.lu/meme.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<meta name="theme-color" content="#0d0d1a">
+<meta name="theme-color" content="#f6f6f3">
 <script src="mp-gate.js?v=7" data-game="meme"></script>
-<script src="season.js?v=5"></script>
+<link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="gitter.css?v=8">
 <script src="theme.js?v=32"></script>
 <style>
-  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--good:#3fb950}
-  *{box-sizing:border-box}
   body{margin:0;min-height:100vh;min-height:100svh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-  a{color:var(--accent2-text);text-decoration:none}
   .bar{display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--border)}
   .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:17px;margin:0}.bar .spacer{flex:1}
-  .bar code{background:var(--card2);padding:2px 8px;border-radius:6px;color:var(--accent2-text)}
+  .bar code{background:var(--card2);padding:2px 8px;border-radius:0;color:var(--accent2-text)}
   .wrap{max-width:560px;margin:0 auto;padding:14px 12px 40px}
   .scores{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
-  .pchip{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:5px 11px;font-size:13px}
+  .pchip{background:var(--card);border:1px solid var(--border);border-radius:0;padding:5px 11px;font-size:13px}
   .pchip.lead{border-color:var(--accent-border);color:var(--accent-text)}
   .topbar{display:flex;align-items:center;gap:10px;margin-bottom:10px;min-height:26px}
   .topbar .rnd{color:var(--muted);font-size:13px}
   .topbar .prog{flex:1;text-align:center;color:var(--muted);font-size:13px}
   .topbar .timer{font-weight:800;color:var(--accent2-text)}
-  .big{width:100%;background:var(--accent);color:var(--accent-foreground);border:none;border-radius:12px;padding:13px;font-weight:800;font-size:15px;cursor:pointer;margin-top:8px}
+  .big{width:100%;background:var(--accent);color:var(--accent-foreground);border:none;border-radius:0;padding:13px;font-weight:800;font-size:15px;cursor:pointer;margin-top:8px}
   .big:disabled{opacity:.45;cursor:default}
   .muted{color:var(--muted)}.center{text-align:center}
   .sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
-  .win{background:linear-gradient(90deg,rgba(110,168,254,.2),transparent);border:1px solid var(--border);border-radius:12px;padding:14px;font-size:18px;font-weight:800;text-align:center;margin-bottom:10px}
+  .win{background:var(--tint);border:1px solid var(--border);border-radius:0;padding:14px;font-size:18px;font-weight:800;text-align:center;margin-bottom:10px}
   /* meme */
-  .meme{position:relative;width:100%;border-radius:10px;overflow:hidden;background:#111;line-height:0}
+  .meme{position:relative;width:100%;border-radius:0;overflow:hidden;background:#111;line-height:0}
   .meme img{width:100%;display:block}
   .mtext{position:absolute;left:0;right:0;text-align:center;padding:2px 6px;font-family:Impact,"Haettenschweiler","Arial Narrow Bold",sans-serif;text-transform:uppercase;color:#fff;font-weight:900;line-height:1.05;letter-spacing:.5px;word-break:break-word;-webkit-text-stroke:1.5px #000;paint-order:stroke fill}
   .mtext.top{top:2%}.mtext.bottom{bottom:2%}
   .meme.big .mtext{font-size:clamp(20px,7vw,32px);-webkit-text-stroke-width:2px}
   .grid .mtext{font-size:16px}
-  .reroll{width:100%;margin-top:8px;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:10px;font-weight:700;cursor:pointer}
+  .reroll{width:100%;margin-top:8px;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:0;padding:10px;font-weight:700;cursor:pointer}
   .reroll:hover{border-color:var(--accent2-text)}
   .reroll:disabled{opacity:.5;cursor:default}
-  .cin{width:100%;margin-top:8px;padding:11px 13px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:15px;outline:none}
+  .cin{width:100%;margin-top:8px;padding:11px 13px;border-radius:0;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:15px;outline:none}
   .cin:focus{border-color:var(--accent2-text)}
   .cin:focus-visible{outline:.2rem solid var(--focus-ring);outline-offset:.18rem}
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
-  .ventry{position:relative;border:2px solid var(--border);border-radius:12px;overflow:hidden;cursor:pointer;transition:border-color .12s}
+  .ventry{position:relative;border:2px solid var(--border);border-radius:0;overflow:hidden;cursor:pointer;transition:border-color .12s}
   .ventry:not(.mine):hover{border-color:var(--accent2-text)}
   .ventry.mine{cursor:default}
   .ventry.voted{border-color:var(--accent-border)}
   .ventry.won{border-color:var(--good)}
   .mlabel{padding:6px 8px;font-size:12.5px;font-weight:700;text-align:center;background:var(--card)}
-  .invite{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px;font-size:13px;margin:12px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  .invite code{background:var(--card2);padding:3px 7px;border-radius:6px;color:var(--accent2-text);font-size:12px;word-break:break-all;flex:1;min-width:0}
-  .invite button{background:var(--accent);color:var(--accent-foreground);border:none;border-radius:8px;padding:7px 12px;font-weight:700;cursor:pointer}
+  .invite{background:var(--card);border:1px solid var(--border);border-radius:0;padding:10px;font-size:13px;margin:12px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .invite code{background:var(--card2);padding:3px 7px;border-radius:0;color:var(--accent2-text);font-size:12px;word-break:break-all;flex:1;min-width:0}
+  .invite button{background:var(--accent);color:var(--accent-foreground);border:none;border-radius:0;padding:7px 12px;font-weight:700;cursor:pointer}
 </style>
 <script data-goatcounter="https://ianm.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
   <meta name="mobile-web-app-capable" content="yes">
@@ -64,10 +62,10 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
 </head>
-<body>
+<body class="gt">
 <header class="bar">
   <a class="home" href="pixelbreak.html">‹ Arcade</a>
-  <h1>😂 Meme Party</h1>
+  <h1>Meme Party</h1>
   <div class="spacer"></div>
   <span class="muted">room <code id="roomc"></code></span>
 </header>
@@ -185,11 +183,11 @@ function render(){
   if(phase==="lobby"){
     let html = `<p class="muted center">Everyone gets a meme — keep it or <b>change it up to ${MAX_REROLLS}×</b> — caption it, then vote for the funniest. Most votes over ${ROUNDS} rounds wins. 3+ players is best!</p>`;
     html += scoreChips();
-    html += `<div class="invite"><span aria-hidden="true">🔗</span> <code>${esc(inviteURL)}</code><button id="cpy" aria-label="Copy invite link">Copy</button></div>`;
+    html += `<div class="invite"><code>${esc(inviteURL)}</code><button id="cpy" aria-label="Copy invite link">Copy</button></div>`;
     const ps=players();
     html += role==="host" ? `<button class="big" id="startBtn" ${ps.length<2?"disabled":""}>${ps.length<2?"Waiting for players…":"Start game"}</button>`
                           : (hostHere ? `<p class="center muted">Waiting for the host to start…</p>`
-                                      : `<p class="center muted" role="alert"><span aria-hidden="true">⚠️</span> The host left — ask them to rejoin.</p>`);
+                                      : `<p class="center muted" role="alert">The host left — ask them to rejoin.</p>`);
     $("app").innerHTML=html;
     if($("cpy")) $("cpy").onclick=()=>{ navigator.clipboard?.writeText(inviteURL); $("cpy").textContent="Copied ✓"; say("Invite link copied"); };
     if(role==="host"&&$("startBtn")) $("startBtn").onclick=start;
@@ -198,9 +196,9 @@ function render(){
   if(phase==="final"){
     const ps=[...players()].sort((a,b)=>(scores[b.cid]||0)-(scores[a.cid]||0));
     const top=ps[0];
-    let html = `<div class="win"><span aria-hidden="true">🏆</span> ${top?esc(top.name)+(top.cid===cid?" (you)":""):"-"} wins!</div>`+scoreChips();
+    let html = `<div class="win">${top?esc(top.name)+(top.cid===cid?" (you)":""):"-"} wins!</div>`+scoreChips();
     html += role==="host" ? `<button class="big" id="againBtn">Play again</button>`
-                          : (hostHere ? `<p class="center muted">Waiting for host…</p>` : `<p class="center muted" role="alert"><span aria-hidden="true">⚠️</span> The host left.</p>`);
+                          : (hostHere ? `<p class="center muted">Waiting for host…</p>` : `<p class="center muted" role="alert">The host left.</p>`);
     $("app").innerHTML=html;
     if(role==="host"&&$("againBtn")) $("againBtn").onclick=()=>{ ch.send({type:"broadcast",event:"reset",payload:{}}); resetAll(); render(); };
     return;
@@ -208,7 +206,7 @@ function render(){
   let html = scoreChips()+topbar();
   if(phase==="caption"){
     html += `<div class="meme big" id="prev"><img alt="Meme template"><div class="mtext top" id="pt"></div><div class="mtext bottom" id="pb"></div></div>`;
-    if(myCap){ html += `<p class="center muted"><span aria-hidden="true">✅</span> Meme sent! Waiting for the others…</p>`; }
+    if(myCap){ html += `<p class="center muted">Meme sent! Waiting for the others…</p>`; }
     else html += `<button class="reroll" id="rrBtn">🔄 Change meme (${rerollsLeft})</button>
                   <input id="capT" class="cin" placeholder="Top text" aria-label="Top text" maxlength="60" autocomplete="off">
                   <input id="capB" class="cin" placeholder="Bottom text" aria-label="Bottom text" maxlength="60" autocomplete="off">
@@ -222,7 +220,7 @@ function render(){
     startTick(); return;
   }
   if(phase==="vote"){
-    html += `<p class="center muted">Vote for the funniest <span aria-hidden="true">👇</span></p><div class="grid"></div>`;
+    html += `<p class="center muted">Vote for the funniest </p><div class="grid"></div>`;
     $("app").innerHTML=html;
     $("app").querySelector(".grid").replaceChildren(...entries.map(e=>{
       const isMine=e.cid===cid, isVoted=myVote===e.cid;
