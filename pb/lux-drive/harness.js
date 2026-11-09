@@ -672,19 +672,37 @@ if (wants('D')) {
   // The ends of the deck are where the approach road is, and a road on an embankment has the land beside it:
   // that is the bench of the road, not a pit, so the ends are not measured.
   // (the street that runs onto a bridge continues the gradient of the street and does not follow the valley edge, designBed; the original limit of 1.0 m)
-  const MAX_PIT = 1.0;
-  let pits = 0, worstPit = 0;
+  // (city21, the reviewer's decision) ... unless the cut is CLOSED BY A WALL: a road that passes under a bridge has its whole carriageway, and the abutment beside it is a
+  // vertical concrete face - a baked retaining wall (data/walls.bin, drawn by wall-view.js, solid for the car, gate K proves it stands on its ramp).  A point deeper than
+  // MAX_PIT passes only where (a) the lowered ground belongs to a road (on its carriageway or within PIT_ROAD of it: the road under the bridge and the foot of its wall, not
+  // a hole in a field) and (b) a wall stands within PIT_WALL_REACH whose foot is at that level (its bottom at most PIT_BED over the ground) and whose top holds the land
+  // back to within MAX_PIT.  An open pit -
+  // land you can see down into, no wall - still fails.  (The A13 9520 under the A6 at Croix de Cessange: city20 capped the cut at 0.9 m, the outer lane rode the toe.)
+  const MAX_PIT = 1.0, PIT_BED = 0.6, PIT_WALL_REACH = 10, PIT_ROAD = 1.5;
+  const wallPts = data.walls.flatMap((w) => w.pts);
+  const pitProbe = {};
+  const closedByWall = (x, z, g, land) => {
+    net.carve(x, z, pitProbe);
+    if (!(pitProbe.sdCar <= PIT_ROAD)) return false;
+    return wallPts.some((p) => Math.hypot(p.x - x, p.z - z) <= PIT_WALL_REACH && p.bottom <= g + PIT_BED && p.top >= land - MAX_PIT);
+  };
+  let pits = 0, worstPit = 0, walled = 0, worstWalled = 0;
+  const pitList = [];
   for (const d of decks) {
     for (let i = 1; i < d.pts.length - 1; i++) {
       const x = d.pts[i][0], z = d.pts[i][1];
       const land = field.baseHeight(x, z);
       const g = field.height(x, z);
-      if (land - g > MAX_PIT) { pits++; worstPit = Math.max(worstPit, land - g); }
+      if (land - g <= MAX_PIT) continue;
+      if (closedByWall(x, z, g, land)) { walled++; worstWalled = Math.max(worstWalled, land - g); continue; }
+      pits++; worstPit = Math.max(worstPit, land - g);
+      if (pitList.length < 12) pitList.push({ deck: d.id, x: Math.round(x), z: Math.round(z), depth: +(land - g).toFixed(2) });
     }
   }
   stats.deckPits = pits;
-  check('the ground under a bridge is the ground (no pit under a deck)', pits === 0,
-    `${pits} points, worst ${worstPit.toFixed(2)} m`);
+  stats.deckPitsWalled = { points: walled, worst: +worstWalled.toFixed(2) };
+  check('the ground under a bridge is the ground (no open pit under a deck: a cut deeper than 1 m is closed by a wall)', pits === 0,
+    `${pits} open points, worst ${worstPit.toFixed(2)} m ${JSON.stringify(pitList)}; ${walled} points in a cut closed by a wall (worst ${worstWalled.toFixed(2)} m)`);
 
   // A deck is a bridge: it stands clear of the ground under it, it is not a slab on the ground.
   let flat = 0;

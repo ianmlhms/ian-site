@@ -3101,3 +3101,106 @@ stacked_1_a13_under_a6, stacked_2_hondhausbreck_junction, stacked_3_roudebesch_t
 ### Gates (tree merged with origin/main 87a0226a = tunnels19 v74, main.js ?v=75; logs `luxdrive-work/city20/gates/g4_*`)
 walls re-baked (104 walls, unchanged by the merge); luxdrive_world PASS (carve walls 6 / 8 sampled, deepest 3.7); luxdrive_holes PASS (0) and HOLES_Q=low PASS (0);
 luxdrive_ui PASS; luxdrive_webkit PASS; harness **175 / 175 PASS** (1871 s).
+
+## City 21 (9 Nov 2026, branch `lux-drive-city21`, Mac mini): Croix de Cessange, abutment walls under road bridges (harness D re-thought), sweep start / lane artefacts - main.js ?v=76
+
+Started from main 33912da9 (v75).  Tools + logs: `~/Library/Caches/luxdrive-work/city21/` (city20's tools plus `tools/wprof.mjs` the DTM + deck tops along raw ways,
+`dprof.mjs` the deck-aware ground along a way, `dends.mjs` the deck end levels / rejected decks / chain beds at the ends, `gaps.mjs` every short ground way between two decks,
+`walls.mjs` the baked wall points near a place (and a diff against another walls.bin), `pit.mjs` a pit point (land, ground, carriageway, nearest walls), `cdbg.mjs` the carve's
+pins at a point, `overlap.mjs` footway decks over carriageways, `moved.mjs` the moved / trimmed bridge ends; `base-wt/` a detached worktree of 33912da9 for the before runs).
+
+### 1. A13 links 238 / 239 at Croix de Cessange (the city's top 2: falls 6 / 2 m): FIXED - not a viaduct, a bridge end in the dip it spans (bridge-ends.js)
+The reviewer's "bridge chain" rule was measured first (`tools/gaps.mjs`: every carved way <= 150 m whose both ends run onto trusted decks, the land along it against the line
+between the two deck levels).  11 such gaps in the whole world; on every one the land comes within 1.7 m of the deck line somewhere (A6 240 / 1050: within 0.1 m - the A6 lies on
+an EMBANKMENT at 283 m, the DTM has it; A1 Trèves 438 / 551 / 1164 / 1165 / 11835 / 11838, A7 724 / 729 likewise).  No motorway gap in the city is a viaduct the DTM lost, so
+the rule would touch no way: NOT added (it would be dead code).  The real cause: the A6 bridge 1051 (deck 104, 14 m) ends on both sides IN the dip it spans (land 275.7 / 276.8,
+deck 283); city20's deck-end mover (`moveBridgeEnds`) judged "can the approaches be pinned to this deck" from the land AT the end (7.3 m under the deck > APPROACH_LIFT_MAX 7),
+so it kept the OSM ends and the abutment earth of the A6 fell onto the two links that pass 3 m from the end.  road-network.js itself DID pin the approaches (it judges their
+smoothed bed, 283).  Now `deckUsable` takes the highest land of the approach within BRIDGE_END.maxMove (12 m) of the end - where the moved end may land.  Touches 4 ends
+(listed by `tools/moved.mjs`, old vs new): deck 104 both ends (moved 10.5 / 8.2 m: the links pass under), deck 73 (way 11245 over 15712, 3.2 m), deck 258 (8124 over the
+service 8121, 1.3 m).  238 / 239 at 13 / 25 / 57 m/s: falls 2.0 / 6.0 m, air, rolls 0.77 / 0.86, jolts 670 / 1726 -> no fall, no air, worst jolt 36.
+
+### 2. Harness D re-thought (the reviewer's decision 2) + abutment walls: A13 9520 under the A6 FIXED
+* road-network.js: the lanes of a street under a ROAD deck (>= DECK_TRUST_WIDTH 5 m) are cut to their bed with no cap (city20 capped the cut at 0.9 m under the land); the face
+  starts at the BENCH (the carriageway's edge), not at the lane keep - the whole carriageway passes under the bridge and the face stands where a wall may (a wall never stands on
+  tarmac).  Under a FOOTBRIDGE the 0.9 m cap stays (no abutment: Val du Scheid under footway deck 81 got a 1.35 m cut of 1.5 m/m - too gentle for a wall, an open pit).  A
+  service lane under the same bridge keeps its land against a freed face (Val du Scheid's face dug 0.8 m into the lane of service 11952 beside it).
+* bake_walls.mjs: a face under a deck that the carve dug >= 1 m under the land is an abutment wall (CUT_RAMP limits: its lowest 6 m, however steep the land behind it).
+  36 abutment faces, 116 walls (were 104; 53 / 118 before the landmark-deck exclusion:
+  under a LANDMARK deck (isLandmarkDeck - the Pont Rouge draws its own piers) the 0.9 m cap stays as under a footbridge: the uncapped face at Eecher Bierg was a 3.2 m/m side).
+* harness D: a deck point more than 1 m over the drawn ground passes only where (a) the lowered ground belongs to a road (on or within 1.5 m of a carriageway) and (b) a baked
+  wall within 10 m has its foot at that level (bottom <= ground + 0.6) and its top holds the land back to within 1 m.  Anything else - land you see down into - is still a pit.
+  `stats.deckPitsWalled`: 11 points (worst 3.05 m, Val du Scheid under the A1 deck 42), open pits 0.
+* luxdrive_world, "the ground beside the roads is never a wall" (the reviewer's decision, same rule as harness D): a face whose FOOT is closed by a baked wall is concrete, not a
+  wall the carve made.  At the steepest step of a sampled side (its lower end): the point is a road (on a carriageway or within 1.5 m of one), a baked wall (`window.__lux.bakedWalls`,
+  the walls the game draws) lies within 10 m with its bottom <= the ground + 0.6 and its top >= the land - 1.  Open earth faces still count; the limit (8) and the deepest (8) are
+  unchanged.  On the sample none of the 9 walls is such a face (all 9 are old earth faces), so the rule alone does not pass the flow - see item 4.  Over the WHOLE network
+  (`tools/carvewalls3.mjs`, STRIDE=1, every segment): v75 233 carve walls (222 open + 11 closed by an old retaining wall), this branch before item 4: 243 (216 open + 27 closed:
+  the 16 new abutment faces are all closed), after item 4: 230 (204 open + 26 closed).  Open walls v75 -> v76: 222 -> 204 (21 gone or closed, 3 new: the slip 2405 at 4841,12208 3.46 and the A3 4701
+  at 4852,12219 3.18 / 3.10 near decks 125 / 126 at the Rue de Cessange slip - from items 1 - 2, not sampled, no wall closes them).
+* A13 9520 under the A6 (1953,11573 / 11597): roll 0.58 / 0.41, jolt 577 -> no roll >= 0.15, jolts 27 - 79 (the abutment wall now stands beside the hard shoulder).
+
+### 3. Sweep tool (lux-drive-sweep d52d424e, pushed) - start and lane artefacts, not the game
+* `--drawn` lanes are clamped point by point to the drawn carriageway (the carve's half width at the centre line, less 0.95 m): trunk link 9423 lane -7.48 (OSM 18.7 m, drawn
+  12.4 m) ran 1.3 m off the asphalt onto the next road: roll 1.08 / air -> gone.
+* A lane that starts at a bridge end under a deck starts ON the deck (startHint) - a player arrives off the bridge.
+* A lane out of a CLOSED tunnel's face (Stafelter, kept closed) starts 10 m out: Autoroute du Nord 17563 was put on the hill over the portal and "fell" 15 m (jolt 361 -> 13).
+* Tried and dropped: reporting hits / rolls where the lane centre lies off every drawn carriageway as "offroad" - it also hid the REAL A13 link falls (the carve's level clip
+  narrows the drawn carriageway exactly where the ground is wrong).  So Rocade link 5876 lane 0 and Kennedy 2965's widening lanes stay in the report.
+The "before" sweep is base v75 driven with this new tool (the same tool before and after).
+
+### 4. The pin of a tall fill lets go a little later (road-network.js FILL_PIN_*): Bd Roosevelt 3.07 -> 2.49, Fort Olisy 3.03 -> 2.43 (the world flow's sample 9 -> 7)
+Both sampled walls just over 3 m/m are the side of a road on a FILL 4 - 5 m over a falling hillside: Boulevard Roosevelt 12245 over the Pétrusse (beside 687), Clausener Bierg 5501
+over Rue du Fort Olisy 3275.  The pin of the carriageway and the join from the bed to the face of the batter fade over the same length (FACE_JOIN_PER_M x the drop): the product of
+the two smoothsteps is 1.98 x the drop / the join = 2.5 m/m on its own, plus the hillside.  Now on a fill the pin fades over the join + 40 % of it, at most + 1 m and never past the
+batter's last FILL_TAPER, and only where every OTHER way's carriageway is >= 6 m away (fading from 3 m): measured on the whole network, a plain longer pin (x 1.3 for cuts and fills)
+made 16 new walls (the Rampart over Neie Wee: the upper street's face pushed onto the lower one), fills only 8, with the let-go near other carriageways 4, + the 1 m cap 1, + inside
+the batter 0.  Whole network 216 -> 204 open walls: 12 gone (Bd Roosevelt x 4, Hellege-Geescht tube approach 13628 x 3, Fort Olisy x 3, 243, Hellege-Geescht 13628), none new;
+one old one steeper: Neie Wee 4473 at 5446,8819 4.37 -> 4.91 (a 17 m step between Rampart and Neie Wee 7 m apart, the land's own cliff 2.4; not sampled).
+
+### Full-city drive sweep
+Before = base v75 (33912da9, `base-wt`), after = this branch (?v=76), both driven with the new sweep tool (lux-drive-sweep d52d424e, `--drawn`, 13/25 + SWEEP_FAST, Mini,
+`luxdrive-work/city21/sweep/before-v75` -> `after-v76`).  `tools/summary.py` (REPORT.md's classes):
+| | v75 (before) | v76 (after) |
+|---|---|---|
+| serious places (fall / air / parapet / non-building hit) | 45 (14 main) | **44 (13 main)** |
+| falls | 4 (3) | **2 (1)** |
+| airborne | 7 (4) | **5 (2)** |
+| parapet hits | 11 (7) | 11 (7) |
+| bank / wall / tube / prop / landmark hits | 32 (5) | **31 (4)** |
+| main-road rolls >= 0.3 rad | 28 | **23** |
+| main-road jolts >= 100 m/s2 | 43 | **38** |
+Gone: A13 links 238 / 239 falls 6.0 / 2.0 m, air 1.38 / 0.87 s, rolls 0.86 / 0.77, jolts 1726 / 670 (-> 11 / 26), A13 9520 under the A6 rolls 0.58 / 0.41 + jolt 577 (-> 75),
+A13 11984 jolt 190 -> 29 / roll 0.32 -> 0, service 11952 jolt 140 -> 38, Val du Scheid 11065 rolls 0.52 -> 0, 0.81 -> 0.51, 0.61 -> 0.39.  22 road cells better, 8 worse
+(`after-v76/diff-v75.txt`):
+* Bd Roosevelt 12245 at 5304,9275 (primary): a passerelle-rail hit 0.46 m - at the city's worst roll (1.08 rad, the Hellege-Geescht tube 2461 mouth, unchanged, city20's list):
+  the car is already on its side when it grazes the Passerelle's balustrade.  Caused by item 4 (an area sweep with FILL_PIN_STRETCH = 0 has every event identical but the hit):
+  the ground beside the lane is a little higher.  Not a new broken place; the roll at the tube mouth is the thing to fix.
+* Rue d'Alsace 15428 (tertiary) under the Buchler path deck: roll 0 -> 0.48, jolt 44 -> 164 (item 2: the uncapped cut under the deck; see Still wrong).
+* Val du Scheid 11065 (unclassified): three rolls 0.34 - 0.54 (two roads 1 m apart in level beside it; the 0.81 / 0.61 / 0.52 ones went down).
+* Neie Wee 5379 (residential) jolt 302 -> 371 at 5479,8737 (beside the sampled 4.13 wall, unchanged).
+
+### Shots
+`luxdrive-work/city21/shots/stacked/` (before = base v75 worktree, after = this branch, same poses `poses.json`, `stack.py`): stacked_1_a13_links_croix_de_cessange,
+stacked_2_a13_links_under_a6_low, stacked_3_a13_9520_abutment_wall (the abutment walls beside the A13 under the A6), stacked_4_a13_9520_lane_view,
+stacked_5_bd_paul_eyschen_under_pont_rouge, stacked_6_slip_2405_rue_de_cessange (singles in before/ and after/).
+
+### Gates (main.js ?v=76)
+Tree = origin/main 33912da9 (unmoved) + this branch, main.js ?v=76; logs `luxdrive-work/city21/gates/g2_*`.  walls re-baked (116 walls, 36 abutment faces; unchanged by the
+gate run's re-bake); luxdrive_world PASS (carve walls **7 / 8** sampled, 0 of them closed by a baked wall, deepest 6.90; p90 0.62, p99 1.51); luxdrive_holes PASS (0) and
+HOLES_Q=low PASS (0); luxdrive_ui PASS; luxdrive_webkit PASS; harness **175 / 175 PASS** (2455 s; D: open pits 0, 11 points in a cut closed by a wall, worst 3.05 m).
+
+### Still wrong (for the next round)
+* Pont Buchler 15754 / 16046 lane 3.67: the road is a DECKLESS (carved) bridge, the path deck 229 (way 14427) overlaps its outer lane 0.5 - 0.8 m higher -> roll 0.6 + the path's railing.
+  Footway decks over carriageways are common (`tools/overlap.mjs`: ~30, mostly beside road DECKS where it is harmless); a rule only for decks over CARVED carriageways is next.
+* 4504 at 9630,9374: service 10335 (bed 312.6) and 4504 (bed 311.1) overlap 1.5 m apart in level; the service pin lifts 4504's lane 0.85 m (fall at 57 m/s only).
+* Stafelter 17563 / 8709: 17563 has a garbage bed (267) and counts as an over way (protected land): roll 0.4 / 0.73 at the closed tunnel's mouth (world data border).
+* Kennedy 2965 lanes +-3.53 start beside the Pont Rouge landmark deck (bridge 7.2 m, avenue 10.6 m wide): the outer lanes start in the valley under the deck end - the lane model at a widening.
+* Rocade link 5876 lane 0: off the drawn carriageway (an off-centre carriageway beside the 411 trough).
+* Val du Scheid (8390 / 8409): two roads side by side 1 m apart in level (11065 / service 11952) - still rough.
+* Carve walls (whole network, not sampled): 204 open.  New since v75: the slip 2405 (4841,12208, 3.46) and the A3 4701 (4852,12219, 3.18 / 3.10) near decks 125 / 126; steeper:
+  Neie Wee 4473 under the Rampart (5446,8819) 4.37 -> 4.91.  The sample sits at 7 of 8: Autoroute de Dudelange 17100 3.20, Montée du Grund 18069 3.37 and 12680 3.59 are the next cheap ones.
+* Bd Roosevelt 12245 at the Hellege-Geescht tube 2461 mouth: roll 1.08 rad (the city's worst main-road roll, since v73) + now a Passerelle balustrade graze 0.46 m (above).
+* Remaining falls / air: 4504 at 9630,9374 (above), service at 5148,10482 (fall 7.1 m, parapet 0.93), Kéibierg / Tréiererstrooss 5597,8885 (air 0.40, parapet 1.02), Route de Trèves
+  11374,5355 (air 0.05), service 10035,8431 (air 0.23).
+* Rue d'Alsace 15428 under the Buchler path deck: roll 0.48 / jolt 164 (new with item 2).

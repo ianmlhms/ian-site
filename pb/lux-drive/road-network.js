@@ -70,7 +70,8 @@ const ABUT_UNDER = 3.0;                // m: a road under a bridge lies 5.9 - 21
 const UNDER_DECK_CLEAR = 4.5;          // m: a deck at least this far over the bed of the way (the way passes under it: a car and the deck's 1 m; a link that climbs onto the deck beside
                                        // it lies 3 - 4 m under the deck near its end - A1 link 7463 at deck 42 - and is no way under the bridge)
 const UNDER_DECK_FACE = 1.9;           // m per m: the mean slope of the face from the lane keep up to the protected ground (a smoothstep is 1.5 x steeper at its middle: 2.85, under the wall of 3)
-const UNDER_DECK_MAX_CUT = 0.9;        // m: the deepest those lanes are cut under the land (harness D: no pit of more than 1 m under a deck)
+const UNDER_DECK_MAX_CUT = 0.9;        // m: the deepest the lanes are cut under the land under a FOOTBRIDGE (harness D: no open pit of more than 1 m under a deck; a road bridge's
+                                       // abutment wall closes a deeper cut, city21)
 const UNDER_DECK_CELL = 32;            // m: the cell of the grid of the deck segments
 const UNDER_DECK_REACH = 8.0;          // m past the edge of the deck: the protected corridor reaches past the deck (PROTECT_MARGIN + its fade), and so does the exemption: in full up to
                                        // PROTECT_MARGIN past the edge (the gap between the two decks of a dual carriageway), fading out over the rest
@@ -104,6 +105,12 @@ const ARM_SOFT = 10.0;                 // m: the distance of the other arm is th
 const CAP_SOFT = 2.0;                  // m: the carriageway pin ends this softly past the END of a way (no flat disc at the end of a street)
 const PIN_FADE = 3.0;                  // m: the carriageway level fades into the batter over this distance beyond the pavement
 const FILL_TAPER = 3.0;                // m: the last stretch of a fill face where it sinks to the land (the scan that finds the end of the face is coarse)
+const FILL_PIN_STRETCH = 0.4;          // (city21) the pin of a way on a FILL fades over its join + this much of it more ...
+const FILL_PIN_EXTRA_MAX = 1.0;        // m ... at most this much more, and never past the batter's last FILL_TAPER: the pin and the join of a tall fill let go together, and the product of
+                                       // their two smoothsteps is 2.5 m/m on its own (peak 1.98 x the drop / the join) - over a falling hillside a 3.0 - 3.1 m/m wall beside the road (Boulevard
+                                       // Roosevelt 12245 over the Petrusse, Clausener Bierg 5501 over Rue du Fort Olisy: the world flow's sampled carve walls)
+const FILL_PIN_FREE = [3.0, 6.0];      // m: ... and only where the carriageway of every OTHER way is this far away (fading in between): over a cliff between two streets (Rampart / Neie Wee)
+                                       // the longer pin pushed the face of the upper one onto the lower one
 const MAG_WINDOW = [0.3, 1.2];         // m: the strength of the pin of a way is the mean of the pins of the segments that are about as near as the nearest one (a ring comes back past its own seam:
                                        // the pin of one arbitrary segment of the two jumped where the nearest one changed)
 const SEP_LOW = 0.4, SEP_HIGH = 0.8;   // m: two carriageways whose beds differ by less than SEP_LOW are one level (a junction), by more than SEP_HIGH two levels
@@ -306,7 +313,7 @@ export function gaussianSmooth(values, sigmaSamples) {
  */
 export function createRoadNetwork(roads, baseHeight, decks = []) {
   const deckEnds = deckEndLevels(decks);
-  let usableDeckEnds = [];               // (decided in reconcileJunctions, once the ways have their own beds)
+  let usableDeckEnds = [], rejectedDecks = new Set();               // (decided in reconcileJunctions, once the ways have their own beds)
   // A drivable way tagged as a bridge whose deck spans nothing: a narrow deck (its DSM is the canopy of a wood, not a deck), no dip of the land under it, and short (a track over a ditch).
   // It is carved like any way and its deck is not drawn (decks.js): a deck lifted off such a way was a box 2 .. 25 m high in the wood, and a deck laid onto it lay on the ground
   // with the cut of the track under its ends.  Returns the deck or null.
@@ -545,6 +552,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
       }
     }
     usableDeckEnds = deckEnds.filter((de) => !rejected.has(de.deck));
+    rejectedDecks = rejected;
     const endPins = new Map();                  // chain -> Map(sample index -> level)
     const pinOf = (chain) => { let m = endPins.get(chain); if (!m) { m = new Map(); endPins.set(chain, m); } return m; };
     for (const e of ends) {
@@ -1393,7 +1401,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
       const [ax, az] = d.pts[i], [bx, bz] = d.pts[i + 1], r = d.width / 2 + UNDER_DECK_REACH;
       for (let cx = Math.floor((Math.min(ax, bx) - r) / UNDER_DECK_CELL); cx <= Math.floor((Math.max(ax, bx) + r) / UNDER_DECK_CELL); cx++) {
         for (let cz = Math.floor((Math.min(az, bz) - r) / UNDER_DECK_CELL); cz <= Math.floor((Math.max(az, bz) + r) / UNDER_DECK_CELL); cz++) {
-          const k = cx * 65536 + cz, seg = [ax, az, bx, bz, r, d.tops[i], d.tops[i + 1]], list = deckCells.get(k);
+          const k = cx * 65536 + cz, seg = [ax, az, bx, bz, r, d.tops[i], d.tops[i + 1], d.width >= DECK_TRUST_WIDTH && !isLandmarkDeck(d)], list = deckCells.get(k);
           if (list) list.push(seg); else deckCells.set(k, [seg]);
         }
       }
@@ -1401,15 +1409,18 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   }
   /** How much a deck stands over (x, z) at least UNDER_DECK_CLEAR over `level`: 1 over the deck (fading to 0 at UNDER_DECK_REACH past its edge) and at least UNDER_DECK_CLEAR + 2 m over
    *  the level, 0 at UNDER_DECK_CLEAR (the DSM tops: a deck end stands on its land, so the ends never count).  Smooth along a road that passes under it. */
+  let deckOverWide = 0;                  // (deckOver: the same for the carriageway decks alone - a road bridge, with abutments; a footbridge has none)
   function deckOver(x, z, level) {
     let w = 0;
-    for (const [ax, az, bx, bz, r, t0, t1] of deckCells.get(Math.floor(x / UNDER_DECK_CELL) * 65536 + Math.floor(z / UNDER_DECK_CELL)) || EMPTY) {
+    deckOverWide = 0;
+    for (const [ax, az, bx, bz, r, t0, t1, wide] of deckCells.get(Math.floor(x / UNDER_DECK_CELL) * 65536 + Math.floor(z / UNDER_DECK_CELL)) || EMPTY) {
       const ex = bx - ax, ez = bz - az, ll = ex * ex + ez * ez;
       const t = ll > 1e-9 ? Math.max(0, Math.min(1, ((x - ax) * ex + (z - az) * ez) / ll)) : 0;
       const d = Math.hypot(x - ax - ex * t, z - az - ez * t), half = r - UNDER_DECK_REACH + PROTECT_MARGIN;
       if (d >= r) continue;
       const v = (1 - smoothstep(half, r, d)) * smoothstep(UNDER_DECK_CLEAR, UNDER_DECK_CLEAR + 2, t0 + (t1 - t0) * t - level);
       if (v > w) w = v;
+      if (wide && v > deckOverWide) deckOverWide = v;
     }
     return w;
   }
@@ -1580,6 +1591,12 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
       const dMin = candD[slotArm1[sl]];
       if (NOBATTER[candI[slotArm1[sl]]]) { wayEdge[sl] = Infinity; continue; }             // a way that rides over the others keeps the DTM (its fill): no batter, no pin
       segmentState(slotArm1[sl]); wayBed[sl] = sBed; wayEdge[sl] = dMin - (BENCH[candI[slotArm1[sl]]] + candDh[slotArm1[sl]]); wayDist[sl] = dMin;
+      let otherEdge = Infinity;                                  // (the nearest carriageway of another way: the longer pin of a fill lets go near it, FILL_PIN_FREE)
+      for (let s2 = 0; s2 < nSlots; s2++) {
+        if (s2 === sl || slotRoad[s2] === road || NOBATTER[candI[slotArm1[s2]]]) continue;
+        otherEdge = Math.min(otherEdge, candD[slotArm1[s2]] - (BENCH[candI[slotArm1[s2]]] + candDh[slotArm1[s2]]));
+      }
+      const fillLetGo = smoothstep(FILL_PIN_FREE[0], FILL_PIN_FREE[1], otherEdge);
       { const c1 = slotArm1[sl], i1 = candI[c1], t1 = candT[c1];          // the direction from the way to the point (which side of it the point lies on)
         const fx = X0[i1] + (X1[i1] - X0[i1]) * t1, fz = Z0[i1] + (Z1[i1] - Z0[i1]) * t1, dl = Math.hypot(x - fx, z - fz) || 1;
         wayDirX[sl] = (x - fx) / dl; wayDirZ[sl] = (z - fz) / dl; }
@@ -1653,7 +1670,9 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
         const join = Math.max(FACE_JOIN, FACE_JOIN_PER_M * Math.abs(bed - face));
         // The pin itself fades over PIN_FADE, or over the join where that is longer: a pin that let go while the join was still half way from the bed to the face multiplied the two fades,
         // and the side of a way that stands 5 m over a valley (Boulevard Roosevelt over the Pétrusse) dropped 3 m in a metre.
-        const pin = (1 - smoothstep(bench, bench + Math.max(PIN_FADE, join), d)) * (1 - smoothstep(0, CAP_SOFT, over));
+        // (city21) On a fill it fades a little longer than the join (FILL_PIN_*): the two smoothsteps together were a 3 m/m wall beside a tall fill over a falling hillside.
+        const fillExtra = bed > face ? Math.max(0, Math.min(join * FILL_PIN_STRETCH, FILL_PIN_EXTRA_MAX, fadeLen - FILL_TAPER - join)) * fillLetGo : 0;
+        const pin = (1 - smoothstep(bench, bench + Math.max(PIN_FADE, join + fillExtra), d)) * (1 - smoothstep(0, CAP_SOFT, over));
         const share = armShare[k], w1 = w * (1 - share);
         const tuck = DECK_TUCK * smoothstep(0, DECK_TUCK_RUN - DECK_TUCK_FROM, candPast[k]);   // (candPast counts from the deck end + DECK_TUCK_FROM)
         if (pin > 0) {
@@ -1839,23 +1858,38 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     // bridge - flattened the end of the approach road into the valley.
     // (the cut of an opened tunnel under a bridge is the road the bridge spans: the protection kept the land there, a 1.2 m hump on the A1 under deck 32 with no tarmac painted)
     // (city20, UNDER_DECK_CLEAR) the lanes of a way under a deck: free of the protection against a cut up to its lane keep, then a face of UNDER_DECK_FACE
-    let laneCover = 0;
+    let laneCover = 0, laneCoverWide = 0;
     if (prot > 0 && bandY < ground) {
       for (let a = 0; a < nPins; a++) {
-        const past = pinEdge[a] + pinRoom[a];                    // m past the lane keep (negative: inside it)
+        // (city21: the face starts at the BENCH, not at the lane keep - the whole carriageway passes under the bridge and the abutment's face stands beside it, where
+        // bake_walls.mjs can draw its wall: a wall never stands on tarmac, and a face from the lane keep put its foot on the hard shoulder - no wall, an open pit)
+        const past = pinEdge[a];                                 // m past the bench (negative: inside it)
         const w = Math.max(OWN_FADE, (ground - pinBed[a]) / UNDER_DECK_FACE);
         if (past >= w || pinWt[a] <= 0 || !UNDER_DECK_KINDS.has(roads[slotPinRoad[a]].kind)) continue;
         const under = deckOver(x, z, pinBed[a]);
-        if (under > 0) laneCover += (1 - laneCover) * pinWt[a] * under * (1 - smoothstep(0, w, past));
+        if (under > 0) {
+          const f = pinWt[a] * (1 - smoothstep(0, w, past));
+          laneCover += (1 - laneCover) * f * under;
+          laneCoverWide += (1 - laneCoverWide) * f * deckOverWide;
+        }
+      }
+      // (city21: ... but not into the carriageway of a way that keeps its land - a service lane under the same bridge: the face of Val du Scheid 11065, freed from its bench
+      // since city21, dug 0.3 - 0.8 m under the bed of the service way 11952 beside it under the Val de Hamm deck 55, an open pit in its lane)
+      for (let b = 0; b < nPins && laneCover > 0; b++) {
+        if (pinWt[b] > 0 && !UNDER_DECK_KINDS.has(roads[slotPinRoad[b]].kind)) laneCover *= smoothstep(-OWN_FADE, 0, pinEdge[b]);
       }
     }
     const protHere = (bandY > ground ? protFill : prot * (1 - laneCover)) * (1 - pinCover) * (1 - cutCover);    // (a fill under a bridge end may fall to the land over the abutment; a cut may not dig a pit)
     out.band = ground + (1 - protHere) * (bandY - ground);
-    // (... but the lanes freed under a deck are cut no deeper than UNDER_DECK_MAX_CUT under the land: the ground under a bridge stays the ground - harness D, a pit of 1 m.
-    // The ground the protection alone gives is kept where it lies lower)
-    if (laneCover > 0) {
-      const kept = ground + (1 - (bandY > ground ? protFill : prot) * (1 - pinCover) * (1 - cutCover)) * (bandY - ground);
-      out.band = Math.max(out.band, Math.min(kept, ground - UNDER_DECK_MAX_CUT));
+    // (city21: no cap on that cut under a ROAD bridge.  city20 cut the freed lanes no deeper than UNDER_DECK_MAX_CUT under the land - harness D's "no pit of 1 m under a deck" -
+    // and the A13 9520 lane under the A6 kept 0.7 m of the abutment toe across its wheels: roll 0.58.  A deeper cut is allowed where a baked retaining wall closes it - the
+    // abutment's concrete face beside the lane (bake_walls.mjs, harness D "closed by a wall").  Under a FOOTBRIDGE (narrower than DECK_TRUST_WIDTH: no abutment) the cap stays -
+    // Val du Scheid under deck 81 got a 1.35 m cut of 1.5 m/m there, too gentle for a wall: an open pit) - and under a landmark deck (the Pont Rouge: its model draws its
+    // own piers; the abutment face under it at Eecher Bierg was a 3.2 m/m side, a wall of the world flow)
+    if (laneCover > laneCoverWide) {
+      const kept = ground + (1 - prot * (1 - pinCover) * (1 - cutCover)) * (bandY - ground);
+      const capped = Math.max(out.band, Math.min(kept, ground - UNDER_DECK_MAX_CUT));
+      out.band = capped + (out.band - capped) * (laneCoverWide / laneCover);
     }
     // The paint: the union of the carriageways and of the pavements, each way painted only where the ground lies at its own level.  Where two ways at different levels overlap in plan
     // (a slip road beside the trunk road, an overpass on its embankment) the ground between them is a ramp or the side of the embankment, and painted with the carriageway of the way
@@ -1967,6 +2001,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   const isDrawn = (ri) => !!info[ri] || (!!roads[ri].info.drivable && !roads[ri].tunnel && !!(roads[ri].over || (roads[ri].layer || 0) >= 1));
   return {
     carve, nearestRoad, roads, info, count, scratch, overRoads, crossings, chains, protection, groundedDecks, isDrawn, carriageways,
+    get rejectedDecks() { return rejectedDecks; },          // (the decks whose DSM level the approaches are not pinned to: probes, harness)
     taperDhw, segments: { X0, Z0, X1, Z1, BED0, BED1, TAN0, TAN1, HW, DHW0, DHW1, KERBH, KERBW, PW, A0, RAD, REACH, KIND, ROADOF, KERBON, LINES, S0, S1, SURF },
     // the centre lines as they are carved (resampled and rounded): the game, the minimap and the probes follow these
     samples: { x: SAMPLES_X, z: SAMPLES_Z, road: SAMPLES_ROAD, first: firstSample, segs: segCount },

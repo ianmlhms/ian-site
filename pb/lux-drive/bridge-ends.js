@@ -78,13 +78,29 @@ function innerLevel(d, k) {
 }
 
 /** Does road-network.js pin the approaches to this deck's own level?  Both ends must agree: no end more than APPROACH_LIFT_MAX over its land or DECK_BELOW_BANK under it
- *  (reconcileJunctions; the land stands in for the bed the approach has on its own). */
-function deckUsable(d, groundAt) {
+ *  (reconcileJunctions; the land stands in for the bed the approach has on its own).
+ *  (city21) The land of an end is the highest land of its approach within BRIDGE_END.maxMove of the end (and the land at the end itself): road-network.js judges the
+ *  approach's BED, which the smoother carries on from its own land, and an OSM end that lies inside the gap the bridge spans stands on the bottom of that gap.  The A6
+ *  bridge 1051 over the A13 links at Croix de Cessange (deck 104, 14 m) ends on both sides 7.3 / 6.1 m under its deck, in the dip it spans; its approaches lie on the
+ *  embankment at the deck's level 8 - 12 m back.  With the land AT the end the deck counted as "not usable", its ends stayed where OSM put them and the earth under
+ *  them fell onto the links that pass 3 m from the end (falls 2 / 6 m, the city's top 2 places, full-city sweep v75). */
+function deckUsable(d, groundAt, carved) {
   const n = d.pts.length;
   return [0, n - 1].every((k) => {
-    const inner = innerLevel(d, k), land = groundAt(d.pts[k][0], d.pts[k][1]);
+    const inner = innerLevel(d, k), land = approachLand(d, k, carved, groundAt);
     return inner !== null && inner - land <= BRIDGE_END.liftMax && inner >= land - BRIDGE_END.belowBank;
   });
+}
+
+/** The land of the approach at end k of a deck: the highest of the land at the end and along the carved way that runs onto it there, up to BRIDGE_END.maxMove back. */
+function approachLand(d, k, carved, groundAt) {
+  const E = d.pts[k], f = d.pts[k === 0 ? 1 : d.pts.length - 2], ul = dist(f, E) || 1, u = [(f[0] - E[0]) / ul, (f[1] - E[1]) / ul];
+  let land = groundAt(E[0], E[1]);
+  const approach = carved ? wayEndingAt(carved, E, u, BRIDGE_END.join, BRIDGE_END.align) : null;
+  if (!approach) return land;
+  const pts = approach.atEnd ? approach.way.pts.slice().reverse() : approach.way.pts, cum = arcsOf(pts);
+  for (let s = 0; s <= Math.min(BRIDGE_END.maxMove, cum[cum.length - 1]); s += BRIDGE_END.step * 2) { const P = pointAt(pts, cum, s); land = Math.max(land, groundAt(P[0], P[1])); }
+  return land;
 }
 
 /** The way among `ways` with an end within `join` of p whose direction through that end (out of the way) is aligned with u: { way, atEnd } or null. */
@@ -292,7 +308,7 @@ export function moveBridgeEnds(roads, decks, groundAt) {
       // the level of the end: the deck's own (its DSM continued to the end, as road-network.js deckEndLevels), unless the approach would have to climb more than
       // APPROACH_LIFT_MAX onto it - road-network.js then does not use that deck (a canopy, a structure over the way) and the end stays on the approach's land
       const land = groundAt(E[0], E[1]);
-      const level = deckUsable(d, groundAt) ? innerLevel(d, e) : land;
+      const level = deckUsable(d, groundAt, carved) ? innerLevel(d, e) : land;
       const { need: by, by: under } = moveNeeded(E, u, d.width / 2, level, carved.filter((r) => r !== approach.way), groundAt);
       if (by <= B.step) continue;
       const a = outRoads[approach.way.id], cum = arcsOf(a.pts), len = cum[cum.length - 1];
