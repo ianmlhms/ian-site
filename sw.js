@@ -16,7 +16,7 @@ const CACHE = "ianlu-v13";
 const GAMEDATA_CACHE = "ianlu-gamedata-v1";
 const CORE = [
   "index.html", "favicon.svg", "apple-touch-icon.png", "site.webmanifest",
-  "skylens.html", "skylens.css?v=5", "skylens.js?v=7", "skylens.webmanifest",
+  "skylens.html", "skylens.css?v=6", "skylens.js?v=8", "skylens.webmanifest",
 ];
 
 /* ---- Game data -------------------------------------------------------------------------------------------------------------------------------

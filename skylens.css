@@ -578,3 +578,163 @@ html[data-theme="dark"] .leaflet-tile-pane {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* ===== Gitter look (Nov 2026): paper / ink / one green, hairlines, radius 0, no shadows or blur. =====
+   Map tiles stay as they are (natural, no dark filter); everything around them is restyled. */
+body.gt {
+  --sky-bg: var(--paper); --sky-panel: var(--white); --sky-panel-strong: #efefeb;
+  --sky-border: var(--ink); --sky-text: var(--ink); --sky-muted: var(--muted);
+  --sky-accent: var(--green); --sky-cyan: var(--green); --sky-green: var(--green); --sky-amber: var(--muted); --sky-red: var(--danger);
+  --sky-cyan-text: var(--green); --sky-green-text: var(--green); --sky-amber-text: var(--muted); --sky-red-text: var(--danger);
+  font-family: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif; color-scheme: light;
+}
+body.gt .sky-header { background: var(--paper); box-shadow: none; padding-inline: 20px; }
+body.gt .brand-mark { display: none; }
+body.gt .sky-brand strong { font-size: 16px; font-weight: 800; letter-spacing: -.01em; }
+body.gt .sky-brand small { font-size: 11px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--muted); margin-top: 2px; }
+body.gt .view-switch { padding: 0; gap: 0; border: 1px solid var(--ink); border-radius: 0; background: transparent; }
+body.gt .view-button { min-height: 44px; min-width: 76px; border-radius: 0; padding: 0 16px; font: 600 14px "Geist", system-ui, sans-serif; color: var(--ink); }
+body.gt .view-button + .view-button { border-left: 1px solid var(--ink); }
+body.gt .view-button:hover { color: var(--green); }
+body.gt .view-button.is-active { background: var(--ink); color: var(--paper); box-shadow: none; }
+body.gt .icon-button { border: 1px solid var(--ink); border-radius: 0; background: transparent; font: 600 14px "Geist", system-ui, sans-serif; }
+body.gt .icon-button svg { fill: currentColor; }
+body.gt .icon-button:hover { border-color: var(--green); background: var(--white); color: var(--green); }
+body.gt .command-bar { background: var(--paper); }
+body.gt .search-box { border: 1px solid var(--ink); border-radius: 0; background: var(--white); height: 44px; box-shadow: none; }
+body.gt .search-box:focus-within { border-color: var(--green); outline: 2px solid var(--green); outline-offset: -2px; box-shadow: none; }
+body.gt .search-box input { font-size: 16px; }
+body.gt .search-box kbd { border-radius: 0; font-family: "Geist Mono", ui-monospace, monospace; background: transparent; }
+body.gt .filter-chip { height: 44px; border: 1px solid var(--ink); border-radius: 0; color: var(--ink); font: 600 13px "Geist", system-ui, sans-serif; padding: 0 14px; }
+body.gt .filter-chip:hover { border-color: var(--green); color: var(--green); }
+body.gt .filter-chip.is-active { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+body.gt .filter-chip.emergency-filter.is-active { background: var(--danger); border-color: var(--danger); color: #fff; }
+body.gt #map { background: #e9e9e4; }
+html body.gt .leaflet-tile-pane, html[data-theme] body.gt .leaflet-tile-pane { filter: none !important; }
+body.gt .leaflet-control-zoom { border: 1px solid var(--ink) !important; border-radius: 0 !important; box-shadow: none !important; }
+body.gt .leaflet-control-zoom a { border-radius: 0 !important; background: var(--white) !important; color: var(--ink) !important; border-color: var(--ink) !important; }
+body.gt .leaflet-control-attribution { background: var(--paper) !important; color: var(--muted) !important; }
+body.gt .glass-panel { background: var(--white); border: 1px solid var(--ink); box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; border-radius: 0; }
+body.gt .map-summary { border-radius: 0; min-height: 44px; font-size: 13px; color: var(--muted); }
+body.gt .live-pulse { box-shadow: none; border-radius: 0; background: var(--green); width: 8px; height: 8px; }
+body.gt .live-pulse.is-error { background: var(--danger); box-shadow: none; }
+body.gt .live-pulse.is-loading { background: var(--muted); }
+body.gt .status-refresh { border-radius: 0; min-width: 44px; height: 44px; }
+body.gt .status-refresh:hover { background: var(--tint); }
+body.gt .map-tool { border: 1px solid var(--ink); border-radius: 0; background: var(--white); box-shadow: none; backdrop-filter: none; min-width: 44px; }
+body.gt .map-tool:hover { border-color: var(--green); color: var(--green); }
+body.gt .map-tool.is-active { background: var(--ink); color: var(--paper); }
+body.gt .legend { border-radius: 0; font-size: 12px; font-weight: 600; color: var(--ink); }
+body.gt .legend-plane { border-radius: 0; background: var(--ink); }
+body.gt .legend-plane.special { background: var(--green); }
+body.gt .legend-plane.alert { background: var(--danger); }
+body.gt .plane-marker-wrap { --plane-color: var(--ink); }
+body.gt .plane-marker-wrap.is-interesting { --plane-color: var(--green); }
+body.gt .plane-marker-wrap.is-military { --plane-color: var(--muted); }
+body.gt .plane-marker-wrap.is-emergency { --plane-color: var(--danger); }
+body.gt .plane-marker-glyph { filter: none; }
+body.gt .plane-marker-glyph svg { stroke: var(--paper); stroke-width: 1; }
+body.gt .plane-marker-ring { border-radius: 0; }
+body.gt .plane-marker-label { border: 1px solid var(--ink); border-radius: 0; color: var(--ink); background: var(--white); box-shadow: none; font: 500 10px "Geist Mono", ui-monospace, monospace; }
+body.gt .plane-marker-wrap.is-selected .plane-marker-label { color: #fff; background: var(--plane-color); border-color: var(--plane-color); }
+body.gt .airport-marker { border-radius: 0; border: 1px solid var(--ink); background: var(--white); color: var(--ink); box-shadow: none; font-family: "Geist Mono", ui-monospace, monospace; }
+body.gt .user-marker { background: var(--green); border: 3px solid var(--white); border-radius: 0; box-shadow: none; }
+
+body.gt .list-view { background: var(--paper); }
+body.gt .eyebrow { color: var(--green); font: 500 12px "Geist Mono", ui-monospace, monospace; letter-spacing: .04em; }
+body.gt .list-heading h2 { font-weight: 800; letter-spacing: -.03em; }
+body.gt .list-heading > span { font-size: 14px; }
+body.gt .flight-table-head { font: 600 13px "Geist", system-ui, sans-serif; letter-spacing: 0; text-transform: none; color: var(--muted); }
+body.gt .flight-list { gap: 0; border-top: 1px solid var(--ink); }
+body.gt .flight-card { border: 0; border-bottom: 1px solid var(--ink); border-radius: 0; background: var(--white); min-height: 64px; transition: none; }
+body.gt .flight-card:hover { transform: none; background: #efefeb; border-color: var(--ink); }
+body.gt .flight-card.is-selected { box-shadow: inset 3px 0 var(--green); border-color: var(--ink); }
+body.gt .list-plane { border-radius: 0; color: var(--ink); background: transparent; border: 1px solid var(--soft); }
+body.gt .flight-card.is-interesting .list-plane { color: var(--green); background: transparent; border-color: var(--green); }
+body.gt .flight-card.is-emergency .list-plane { color: var(--danger); background: transparent; border-color: var(--danger); }
+body.gt .flight-main span, body.gt .flight-type span, body.gt .flight-metric small { font-size: 12.5px; }
+body.gt .flight-main strong, body.gt .flight-metric { font-family: "Geist Mono", ui-monospace, monospace; font-weight: 500; }
+body.gt .flight-type strong { font-size: 13px; }
+body.gt .empty-state > span { color: var(--soft); }
+
+body.gt .flight-drawer { background: var(--white); border-left: 1px solid var(--ink); box-shadow: none; backdrop-filter: none; transition-duration: .18s; }
+body.gt .drawer-close { border-radius: 0; border: 1px solid var(--ink); background: transparent; color: var(--ink); min-width: 44px; padding: 0; }
+body.gt .drawer-close:hover { border-color: var(--green); color: var(--green); }
+body.gt .drawer-hero { border-bottom: 1px solid var(--ink); }
+body.gt .drawer-kicker { font: 500 12px "Geist Mono", ui-monospace, monospace; letter-spacing: .04em; }
+body.gt .drawer-title-row h2 { font-weight: 800; letter-spacing: -.03em; }
+body.gt .drawer-title-row p { font-size: 13.5px; }
+body.gt .heading-dial circle { fill: var(--white); stroke: var(--ink); }
+body.gt .heading-dial .dial-plane { fill: var(--ink); }
+body.gt .heading-dial span { font: 500 11px "Geist Mono", ui-monospace, monospace; }
+body.gt .detail-badge { border-radius: 0; border: 1px solid var(--ink); background: transparent; color: var(--ink); font: 500 11px "Geist Mono", ui-monospace, monospace; padding: 3px 8px; }
+body.gt .detail-badge.interesting { background: var(--green); border-color: var(--green); color: #fff; }
+body.gt .detail-badge.military { background: var(--ink); color: var(--paper); }
+body.gt .detail-badge.emergency { background: var(--danger); border-color: var(--danger); color: #fff; animation: none; }
+body.gt .aircraft-photo { border: 1px solid var(--ink); border-radius: 0; background: #efefeb; }
+body.gt .aircraft-photo-placeholder { font: 500 12px "Geist", system-ui, sans-serif; text-transform: none; letter-spacing: 0; }
+body.gt .aircraft-photo-placeholder svg { fill: var(--muted); filter: none; }
+body.gt .aircraft-photo-credit { border-radius: 0; border: 1px solid var(--ink); background: var(--white); color: var(--ink); backdrop-filter: none; font-size: 11px; }
+body.gt .aircraft-photo-credit:hover { background: #efefeb; }
+body.gt .detail-primary { gap: 0; border: 1px solid var(--ink); }
+body.gt .detail-primary > div { border: 0; border-radius: 0; background: transparent; }
+body.gt .detail-primary > div + div { border-left: 1px solid var(--ink); }
+body.gt .detail-primary span, body.gt .detail-grid dt { font: 600 12px "Geist", system-ui, sans-serif; letter-spacing: 0; text-transform: none; }
+body.gt .detail-primary strong { font-family: "Geist Mono", ui-monospace, monospace; font-weight: 500; font-size: 14px; }
+body.gt .detail-grid { border-top: 1px solid var(--ink); }
+body.gt .detail-grid div { border-color: var(--soft); }
+body.gt .detail-grid dd { font-size: 14px; font-weight: 600; }
+body.gt .trail-note { font-size: 13px; }
+body.gt .trail-line { border-radius: 0; background: var(--green); }
+body.gt .primary-action, body.gt .secondary-action { border-radius: 0; font: 600 14px "Geist", system-ui, sans-serif; }
+body.gt .primary-action { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+body.gt .primary-action.is-active { background: var(--green); border-color: var(--green); color: #fff; }
+body.gt .secondary-action { background: transparent; border: 1px solid var(--ink); }
+body.gt .primary-action:hover, body.gt .secondary-action:hover { filter: none; border-color: var(--green); background: var(--green); color: #fff; }
+body.gt .data-note { font-size: 12.5px; }
+
+/* camera view: the camera picture stays; its controls are flat paper chips, the start screen is plain paper */
+body.gt .ar-overlay { background: var(--ink); }
+body.gt .ar-shade { background: none; }
+body.gt .ar-close, body.gt .ar-count, body.gt .ar-compass, body.gt .ar-bearing-card { border: 1px solid var(--ink); border-radius: 0; background: var(--white); color: var(--ink); backdrop-filter: none; text-shadow: none; }
+body.gt .ar-close { font-size: 24px; }
+body.gt .ar-brand { text-shadow: none; }
+body.gt .ar-brand strong, body.gt .ar-brand span { display: inline-block; align-self: flex-start; padding: 2px 8px; background: var(--white); color: var(--ink); }
+body.gt .ar-brand span { margin-top: 0; font-size: 12px; }
+body.gt .ar-count { font-size: 13px; }
+body.gt .ar-compass { font-size: 12px; color: var(--ink); }
+body.gt .ar-reticle i { background: var(--paper); border-radius: 0; box-shadow: none; }
+body.gt .ar-target { filter: none; color: var(--ink); }
+body.gt .ar-target::before { background: var(--green); }
+body.gt .ar-target::after { border-color: var(--green); border-radius: 0; }
+body.gt .ar-target-main { border: 1px solid var(--ink); border-left: 3px solid var(--green); border-radius: 0; background: var(--white); backdrop-filter: none; }
+body.gt .ar-target span, body.gt .ar-bearing-card span { color: var(--muted); font-size: 12px; }
+body.gt .ar-target strong, body.gt .ar-bearing-card strong { font: 500 13px "Geist Mono", ui-monospace, monospace; }
+body.gt .ar-target.is-interesting .ar-target-main { border-left-color: var(--green); }
+body.gt .ar-target.is-emergency .ar-target-main { border-left-color: var(--danger); }
+body.gt .ar-target.is-emergency::before { background: var(--danger); }
+body.gt .ar-permission { background: var(--paper); color: var(--ink); }
+body.gt .permission-icon { border-radius: 0; border: 1px solid var(--ink); background: var(--white); color: var(--green); }
+body.gt .ar-permission h2 { font-weight: 800; }
+body.gt .ar-permission p { color: var(--muted); font-size: 15px; }
+body.gt .ar-permission button { border-radius: 0; background: var(--ink); color: var(--paper); font: 600 15px "Geist", system-ui, sans-serif; min-height: 48px; }
+body.gt .ar-permission button:hover { background: var(--green); }
+body.gt .ar-permission small { color: var(--muted); font-size: 12.5px; }
+body.gt .toast { border: 1px solid var(--ink); border-radius: 0; background: var(--ink); color: var(--paper); box-shadow: none; font: 600 14px "Geist", system-ui, sans-serif; }
+body.gt .noscript { background: var(--paper); color: var(--ink); }
+
+@media (max-width: 740px) {
+  body.gt { --command-height: 112px; }
+  body.gt .sky-header { padding-inline: 14px; }
+  body.gt .view-switch { background: var(--white); box-shadow: none; backdrop-filter: none; }
+  body.gt .command-bar { grid-template-rows: 44px 44px; padding: 7px 10px 8px; }
+  body.gt .filter-scroller { width: calc(100vw - 20px); }
+  body.gt .flight-drawer { border-radius: 0; border-top: 1px solid var(--ink); box-shadow: none; }
+  body.gt .flight-drawer::before { border-radius: 0; background: var(--ink); }
+}
+body.gt *, body.gt *::before, body.gt *::after { box-shadow: none !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; text-shadow: none !important; }
+body.gt .sky-header, body.gt .command-bar, body.gt .view-switch, body.gt .filter-chip, body.gt .search-box, body.gt .icon-button, body.gt .flight-list { border-radius: 0 !important; }
+body.gt .filter-chip, body.gt .view-button:not(.is-active) { background: var(--white); }
+body.gt .filter-chip.is-active { background: var(--ink); }
+body.gt .flight-card.is-selected { border-left: 3px solid var(--green); }
+body.gt .flight-card { background: var(--white); }

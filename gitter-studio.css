@@ -1,0 +1,80 @@
+/* gitter-studio.css — Gitter look for the studio-style tool pages (doc.html, ppt.html, ops.html).
+ * Loads after gitter.css + the page's own CSS. Flattens the shared "glass" chrome (site-glass.css / studio-glass.css)
+ * into paper / ink / one green: hairlines, radius 0, no shadows, no blur, no gradients.
+ * Document / slide content (.doc-paper, .preview-host, .thumb, the full-screen presenter) is left as it is. */
+body.gt {
+  --radius-pane: 0; --radius-control: 0; --radius-inner: 0; --studio-radius: 0; --shadow: none;
+  --glass-edge: var(--ink); --chrome: var(--paper); --chrome-solid: var(--white); --soft-fill: var(--tint);
+  --accent-soft: rgba(31, 122, 77, .12); --danger: #a32121; --accent-border: var(--green);
+  --hit-target: 44px; --border: rgba(22, 23, 26, .28);
+  font-family: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--paper); color: var(--ink); color-scheme: light;
+}
+body.gt .glass, body.gt .glass--chip, body.gt .glass--thick { background: var(--white); border: 1px solid var(--ink); box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+body.gt .glass::before { display: none; }
+body.gt :not(.doc-paper):not(.doc-paper *):not(.preview-host *):not(.thumb *):not(.ppt-presenter-root *):not(.ppt-presenter-root) {
+  border-radius: 0 !important; box-shadow: none !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+}
+body.gt .studio-bar { border-radius: 0; min-height: 56px; border: 0; border-bottom: 1px solid var(--ink); background: var(--paper); gap: 14px; }
+body.gt .home-link { color: var(--muted); font-weight: 600; font-size: 14px; text-decoration: none; }
+body.gt .home-link:hover { color: var(--green); }
+body.gt .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 16px; letter-spacing: -.01em; }
+body.gt .brand-mark { display: inline-grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--ink); background: var(--ink); color: var(--paper) !important; font: 600 14px "Geist Mono", ui-monospace, monospace; }
+body.gt .builder-link { border: 1px solid var(--ink); border-radius: 0; padding: 0 14px; min-height: 44px; color: var(--ink); font: 600 14px "Geist", system-ui, sans-serif; }
+body.gt .builder-link:hover, body.gt .builder-link:focus-visible { border-color: var(--green); color: var(--green); }
+body.gt .toolbar-button, body.gt .icon-button, body.gt .icon-text-button, body.gt .delete-button, body.gt .slide-controls button, body.gt .doc-controls button, body.gt .doc-controls select {
+  border: 1px solid var(--ink); background: var(--white); color: var(--ink); font-family: "Geist", system-ui, sans-serif; font-weight: 600; min-height: 44px;
+}
+body.gt .toolbar-button:hover, body.gt .icon-button:hover, body.gt .icon-text-button:hover, body.gt .slide-controls button:hover, body.gt .doc-controls button:hover { border-color: var(--green); color: var(--green); }
+body.gt .primary-button { background: var(--ink); border: 1px solid var(--ink); color: var(--paper) !important; font-family: "Geist", system-ui, sans-serif; font-weight: 600; }
+body.gt .primary-button:hover { background: var(--green); border-color: var(--green); }
+body.gt input, body.gt select, body.gt textarea { border: 1px solid var(--ink); background: var(--white); color: var(--ink); }
+body.gt input:focus, body.gt select:focus, body.gt textarea:focus { outline: 2px solid var(--green); outline-offset: -2px; border-color: var(--green); }
+body.gt .gate-panel { background: var(--white); border: 1px solid var(--ink); text-align: left; max-width: 28rem; margin: 3rem auto; }
+body.gt .gate-icon { color: var(--green); }
+body.gt .gate-panel h1 { font-weight: 800; letter-spacing: -.02em; }
+body.gt .input-panel, body.gt .inspector-panel, body.gt .preview-column, body.gt .doc-preview-column { border: 1px solid var(--ink); background: var(--white); }
+body.gt .preview-toolbar, body.gt .slide-controls, body.gt .doc-controls, body.gt .filmstrip, body.gt .revision-bar { background: var(--white); border-color: var(--ink); }
+body.gt .doc-preview-column, body.gt .preview-scroll, body.gt .doc-preview-scroll { background: #efefeb; }
+body.gt .panel-tabs { border: 1px solid var(--ink); background: var(--white); }
+body.gt .panel-tabs button { color: var(--ink); font-weight: 600; min-height: 44px; }
+body.gt .panel-tabs button[aria-selected="true"] { background: var(--ink); color: var(--paper); }
+body.gt .eyebrow, body.gt .engine-badge { color: var(--green); font-family: "Geist Mono", ui-monospace, monospace; letter-spacing: .02em; }
+body.gt .doc-type-card span, body.gt .style-card, body.gt .voice-box { border: 1px solid var(--soft); background: var(--white); }
+body.gt .doc-type-card input:checked + span, body.gt .style-card.is-selected, body.gt .thumb.is-selected { border-color: var(--green); outline: 2px solid var(--green); outline-offset: -2px; }
+body.gt .doc-paper { box-shadow: none; border: 1px solid var(--ink); }
+body.gt .doc-block:hover, body.gt .doc-block:focus-visible, body.gt .doc-block.is-selected { border-color: var(--green); }
+body.gt .export-popover { background: var(--white); border: 1px solid var(--ink); }
+body.gt .image-picker { background: var(--white); border: 1px solid var(--ink); }
+body.gt .ppt-present-notes { background: var(--paper); color: var(--ink); border: 1px solid var(--ink); }
+body.gt .ppt-present-script, body.gt .ppt-present-speaker, body.gt .ppt-present-meta small, body.gt .ppt-present-next small { color: var(--ink); }
+body.gt .ppt-present-help { background: var(--ink); color: var(--paper); }
+body.gt #themeFab, body.gt #themePop, body.gt #pwaRefresh { display: none !important; }
+
+/* ops.html */
+body.gt .ops-bar { position: sticky; background: var(--paper); border: 0; border-bottom: 1px solid var(--ink); }
+body.gt .ops-root { max-width: 46rem; margin: 0 auto; padding: 24px var(--gutter, 24px); }
+body.gt .ops-summary { background: var(--white); border: 1px solid var(--ink); border-left-width: 4px; }
+body.gt .ops-summary--ok { border-left-color: var(--green); }
+body.gt .ops-summary--warn, body.gt .ops-summary--missed { border-left-color: var(--ink); }
+body.gt .ops-summary--down { border-left-color: var(--danger); }
+body.gt .ops-refresh { border: 1px solid var(--ink); background: var(--white); color: var(--ink); }
+body.gt .ops-refresh:hover { border-color: var(--green); color: var(--green); }
+body.gt .tiles { gap: 0; border-top: 1px solid var(--ink); border-left: 1px solid var(--ink); margin-top: 14px; }
+body.gt .tile { border: 0; border-right: 1px solid var(--ink); border-bottom: 1px solid var(--ink); border-top-width: 0; background: var(--white); text-align: left; }
+body.gt .tile--ok .tile-mark { color: var(--green); }
+body.gt .tile--warn .tile-mark { color: var(--ink); }
+body.gt .tile--down .tile-mark { color: var(--danger); }
+body.gt .tile-name { font-weight: 800; }
+body.gt .tile-state { font-family: "Geist Mono", ui-monospace, monospace; font-weight: 500; font-size: 1.1rem; }
+body.gt .tile-detail--error { color: var(--danger); }
+@media (max-width: 700px) { body.gt .tiles { grid-template-columns: minmax(0, 1fr); } body.gt .ops-root { padding-inline: 16px; } }
+body.gt .gate-panel h1 { font-size: 22px; margin: 10px 0 6px; }
+body.gt .gate-panel p { margin: 0; }
+body.gt .studio-bar .gt-acct, body.gt .ops-bar .gt-acct { margin-left: auto; }
+body.gt #acctHost { display: none !important; }
+/* phone: the active-panel attribute sits on the studio root, so show the chosen panel from there too */
+@media (max-width: 70rem) {
+  body.gt [data-active-panel="source"] [data-panel="source"], body.gt [data-active-panel="inspector"] [data-panel="inspector"] { display: block; overflow-y: auto; }
+  body.gt [data-active-panel="preview"] [data-panel="preview"] { display: grid; }
+}
+body.gt .tile:last-child:nth-child(odd) { grid-column: 1 / -1; }

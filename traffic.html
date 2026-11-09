@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="lb">
 <head>
   <meta charset="utf-8">
   <meta name="robots" content="noindex">
@@ -7,16 +7,16 @@
   <title>Traffic — ian.lu</title>
   <meta name="description" content="Private visitor statistics for ian.lu.">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <meta name="theme-color" content="#0d0d1a">
-  <link rel="stylesheet" href="style.css?v=19">
-  <script src="season.js?v=5"></script>
+  <meta name="theme-color" content="#f6f6f3">
+  <link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="gitter.css?v=9">
   <script src="theme.js?v=32"></script>
   <style>
     :root {
-      --traffic-visitors: #6ea8fe;
-      --traffic-pageviews: #ff6b9d;
-      --traffic-good: #4de8ff;
-      --traffic-accounts: #4de8ff;
+      --traffic-visitors: #16171a;
+      --traffic-pageviews: #1f7a4d;
+      --traffic-good: #1f7a4d;
+      --traffic-accounts: #1f7a4d;
     }
 
     [hidden] { display: none !important; }
@@ -92,8 +92,8 @@
     .panel,
     .state-card {
       background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
+      border: 1px solid var(--ink);
+      border-radius: 0;
     }
 
     .metric-card { padding: 18px; }
@@ -200,7 +200,7 @@
       width: 9px;
       height: 9px;
       margin-right: 5px;
-      border-radius: 50%;
+      border-radius: 0;
     }
 
     .legend .visitors { background: var(--traffic-visitors); }
@@ -296,7 +296,7 @@
 
     .comparison-period {
       padding: 14px;
-      border-radius: 12px;
+      border-radius: 0;
       background: var(--card2);
     }
 
@@ -332,7 +332,7 @@
       margin-top: 10px;
       padding: 4px 10px;
       border: 1px solid color-mix(in srgb, var(--traffic-good) 40%, transparent);
-      border-radius: 999px;
+      border-radius: 0;
       background: color-mix(in srgb, var(--traffic-good) 10%, transparent);
       color: var(--traffic-good);
       font-size: 12px;
@@ -369,9 +369,9 @@
       margin-top: 20px;
       padding: 10px 20px;
       border: 0;
-      border-radius: 11px;
+      border-radius: 0;
       background: var(--accent);
-      color: var(--accent-foreground, #0d0d1a);
+      color: var(--paper);
       cursor: pointer;
       font: inherit;
       font-size: 14px;
@@ -426,53 +426,79 @@
       .comparison-grid { grid-template-columns: 1fr; gap: 8px; }
       .comparison-arrow { line-height: 1; text-align: center; transform: rotate(90deg); }
     }
+  
+    /* Gitter look */
+    .chart-wrap { position: relative; }
+    .panel, .metric-card, .state-card, .comparison-period, .summary-grid, .dashboard-grid { box-shadow: none !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+    .traffic-body { align-items: stretch; justify-content: flex-start; padding: 20px 20px 28px !important; gap: 0; }
+    .gt-nav { position: static; }
+    .traffic-intro h2, .state-card h2 { font-weight: 800; letter-spacing: -0.03em; }
+    .traffic-intro h2 { font-size: clamp(24px, 4vw, 32px); }
+    .summary-grid { gap: 0; border-top: 1px solid var(--ink); border-left: 1px solid var(--ink); }
+    .metric-card { border: 0; border-right: 1px solid var(--ink); border-bottom: 1px solid var(--ink); background: var(--white); }
+    .metric-label, .eyebrow { font-size: 13px; font-weight: 600; letter-spacing: 0; text-transform: none; }
+    .metric-primary { font-family: "Geist Mono", ui-monospace, monospace; font-weight: 500; }
+    .metric-kind { color: var(--green); }
+    .accounts-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .dashboard-grid { gap: 0; margin-top: 20px; border-top: 1px solid var(--ink); border-left: 1px solid var(--ink); }
+    .panel { border: 0; border-right: 1px solid var(--ink); border-bottom: 1px solid var(--ink); background: var(--white); }
+    .state-card { background: var(--white); border: 1px solid var(--ink); text-align: left; width: 100%; max-width: none; margin: 0; padding: 28px 20px; }
+    .state-icon { display: none; }
+    .state-action { background: var(--ink); color: var(--paper); border: 1px solid var(--ink); font-weight: 600; font-size: 15px; }
+    .state-action:hover { filter: none; background: var(--green); border-color: var(--green); }
+    .comparison-period { background: var(--tint); border: 1px solid var(--soft); }
+    .change-badge { border-color: var(--green); background: transparent; }
+    .chart-grid { stroke: var(--soft); }
+    .chart-label { font-family: "Geist Mono", ui-monospace, monospace; }
+    .accounts-intro { margin-top: 28px; }
+    @media (max-width: 720px) { .accounts-grid, .summary-grid { grid-template-columns: minmax(0, 1fr); } .traffic-body { padding: 14px 14px 24px !important; } }
   </style>
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
 </head>
-<body>
-  <header class="bar traffic-bar">
-    <a class="home" href="index.html">&lsaquo; Home</a>
-    <h1><span aria-hidden="true">📈</span> Traffic</h1>
-  </header>
-
-  <main class="traffic-shell">
+<body class="gt">
+  <main class="gt-page"><div class="gt-grid">
+    <header class="c full gt-nav">
+      <div class="gt-nav-l"><a class="gt-back" href="index.html">‹ Heem</a><h1 class="gt-page-title">Besucher</h1></div>
+      <div class="gt-navr"><button type="button" class="gt-acct" id="gtAcct">Umellen</button></div>
+    </header>
+    <div class="c full top traffic-body">
     <section id="statusView" class="state-card" aria-live="polite">
-      <div id="statusIcon" class="state-icon" aria-hidden="true">⏳</div>
-      <h2 id="statusTitle">Loading traffic</h2>
-      <p id="statusMessage">Checking your access and fetching the latest figures…</p>
+      <div id="statusIcon" class="state-icon" aria-hidden="true"></div>
+      <h2 id="statusTitle">Besucherzuelen gi gelueden</h2>
+      <p id="statusMessage">Zougrëff gëtt gepréift an déi lescht Zuele ginn higeholl …</p>
       <button id="statusAction" class="state-action" type="button" hidden></button>
     </section>
 
     <div id="dashboardView" hidden>
       <div class="traffic-intro">
         <div>
-          <h2>Visitor overview</h2>
-          <p>Unique visitors are primary; pageviews show total activity.</p>
+          <h2>Besucher-Iwwerbléck</h2>
+          <p>Eenzegaarteg Besucher stinn am Virdergrond; d'Säitenopruffer weisen d'Gesamtaktivitéit.</p>
         </div>
         <p id="freshness" class="freshness"></p>
       </div>
 
-      <section class="summary-grid" aria-label="Traffic summary">
+      <section class="summary-grid" aria-label="Zesummefassung vum Trafic">
         <article class="metric-card">
-          <span class="metric-label">Today</span>
+          <span class="metric-label">Haut</span>
           <strong id="todayVisitors" class="metric-primary">0</strong>
-          <span class="metric-kind">unique visitors</span>
-          <p class="metric-secondary"><strong id="todayPageviews">0</strong> pageviews</p>
+          <span class="metric-kind">eenzegaarteg Besucher</span>
+          <p class="metric-secondary"><strong id="todayPageviews">0</strong> Säitenopruffer</p>
         </article>
         <article class="metric-card">
-          <span class="metric-label">Last 7 days</span>
+          <span class="metric-label">Lescht 7 Deeg</span>
           <strong id="weekVisitors" class="metric-primary">0</strong>
-          <span class="metric-kind">unique visitors</span>
-          <p class="metric-secondary"><strong id="weekPageviews">0</strong> pageviews</p>
+          <span class="metric-kind">eenzegaarteg Besucher</span>
+          <p class="metric-secondary"><strong id="weekPageviews">0</strong> Säitenopruffer</p>
         </article>
         <article class="metric-card">
-          <span class="metric-label">Last 30 days</span>
+          <span class="metric-label">Lescht 30 Deeg</span>
           <strong id="monthVisitors" class="metric-primary">0</strong>
-          <span class="metric-kind">unique visitors</span>
-          <p class="metric-secondary"><strong id="monthPageviews">0</strong> pageviews</p>
+          <span class="metric-kind">eenzegaarteg Besucher</span>
+          <p class="metric-secondary"><strong id="monthPageviews">0</strong> Säitenopruffer</p>
         </article>
       </section>
 
@@ -480,12 +506,12 @@
         <section class="panel" aria-labelledby="chartTitle">
           <div class="panel-heading">
             <div>
-              <span class="eyebrow">Last 30 days</span>
-              <h3 id="chartTitle">Daily traffic</h3>
+              <span class="eyebrow">Lescht 30 Deeg</span>
+              <h3 id="chartTitle">Trafic pro Dag</h3>
             </div>
             <div class="legend" aria-hidden="true">
-              <span><i class="visitors"></i>Unique visitors</span>
-              <span><i class="pageviews"></i>Pageviews</span>
+              <span><i class="visitors"></i>Eenzegaarteg Besucher</span>
+              <span><i class="pageviews"></i>Säitenopruffer</span>
             </div>
           </div>
           <div id="chart" class="chart-wrap"></div>
@@ -494,32 +520,32 @@
         <section class="panel" aria-labelledby="topPagesTitle">
           <div class="panel-heading">
             <div>
-              <span class="eyebrow">Last 30 days</span>
-              <h3 id="topPagesTitle">Top pages</h3>
+              <span class="eyebrow">Lescht 30 Deeg</span>
+              <h3 id="topPagesTitle">Beléiftst Säiten</h3>
             </div>
           </div>
           <ol id="topPages" class="top-pages"></ol>
-          <p id="topPagesEmpty" class="empty-inline" hidden>No page data in this range.</p>
+          <p id="topPagesEmpty" class="empty-inline" hidden>Keng Säitendaten an dësem Zäitraum.</p>
         </section>
 
         <section class="panel panel-wide" aria-labelledby="comparisonTitle">
           <div class="panel-heading">
             <div>
-              <span class="eyebrow">Since school started</span>
-              <h3 id="comparisonTitle">Weekday daily average</h3>
+              <span class="eyebrow">Zënter dem Schoulufank</span>
+              <h3 id="comparisonTitle">Duerchschnëtt pro Wochendag</h3>
             </div>
           </div>
           <div class="comparison-grid">
             <div class="comparison-period">
-              <span class="metric-label">Before 17 Sep</span>
+              <span class="metric-label">Virum 17. Sep.</span>
               <strong id="beforeVisitors">—</strong>
-              <small>unique visitors · <span id="beforePageviews">—</span> pageviews</small>
+              <small>eenzegaarteg Besucher · <span id="beforePageviews">—</span> Säitenopruffer</small>
             </div>
             <div class="comparison-arrow" aria-hidden="true">→</div>
             <div class="comparison-period">
-              <span class="metric-label">Since 17 Sep</span>
+              <span class="metric-label">Zënter dem 17. Sep.</span>
               <strong id="afterVisitors">—</strong>
-              <small>unique visitors · <span id="afterPageviews">—</span> pageviews</small>
+              <small>eenzegaarteg Besucher · <span id="afterPageviews">—</span> Säitenopruffer</small>
               <span id="changeBadge" class="change-badge" hidden></span>
             </div>
           </div>
@@ -529,37 +555,37 @@
 
       <div class="traffic-intro accounts-intro">
         <div>
-          <h2>Accounts</h2>
-          <p>Registered ian.lu accounts. Counts only, no personal details.</p>
+          <h2>Konten</h2>
+          <p>Registréiert ian.lu-Konten. Nëmmen Zuelen, keng perséinlech Donnéeën.</p>
         </div>
         <p id="accountsFreshness" class="freshness"></p>
       </div>
 
-      <section class="summary-grid accounts-grid" aria-label="Account summary">
+      <section class="summary-grid accounts-grid" aria-label="Zesummefassung vun de Konten">
         <article class="metric-card">
-          <span class="metric-label">Total accounts</span>
+          <span class="metric-label">Konten am Ganzen</span>
           <strong id="accTotal" class="metric-primary">—</strong>
-          <span class="metric-kind">registered</span>
+          <span class="metric-kind">registréiert</span>
         </article>
         <article class="metric-card">
-          <span class="metric-label">New (7 days)</span>
+          <span class="metric-label">Nei (7 Deeg)</span>
           <strong id="accNew7" class="metric-primary">—</strong>
-          <span class="metric-kind">signed up</span>
+          <span class="metric-kind">ugemellt</span>
         </article>
         <article class="metric-card">
-          <span class="metric-label">New (30 days)</span>
+          <span class="metric-label">Nei (30 Deeg)</span>
           <strong id="accNew30" class="metric-primary">—</strong>
-          <span class="metric-kind">signed up</span>
+          <span class="metric-kind">ugemellt</span>
         </article>
         <article class="metric-card">
-          <span class="metric-label">Active (7 days)</span>
+          <span class="metric-label">Aktiv (7 Deeg)</span>
           <strong id="accActive7" class="metric-primary">—</strong>
-          <span class="metric-kind">signed in</span>
+          <span class="metric-kind">amgeloggt</span>
         </article>
         <article class="metric-card">
-          <span class="metric-label">Active (30 days)</span>
+          <span class="metric-label">Aktiv (30 Deeg)</span>
           <strong id="accActive30" class="metric-primary">—</strong>
-          <span class="metric-kind">signed in</span>
+          <span class="metric-kind">amgeloggt</span>
         </article>
       </section>
 
@@ -567,22 +593,23 @@
         <section class="panel panel-wide" aria-labelledby="accountsChartTitle">
           <div class="panel-heading">
             <div>
-              <span class="eyebrow">Last 30 days</span>
-              <h3 id="accountsChartTitle">New accounts per day</h3>
+              <span class="eyebrow">Lescht 30 Deeg</span>
+              <h3 id="accountsChartTitle">Nei Konten pro Dag</h3>
             </div>
             <div class="legend" aria-hidden="true">
-              <span><i class="accounts"></i>New accounts</span>
+              <span><i class="accounts"></i>Nei Konten</span>
             </div>
           </div>
           <div id="accountsChart" class="chart-wrap"></div>
           <div id="accountsError" class="account-error" role="alert" hidden>
-            <p>Couldn't load account stats.</p>
-            <button id="accountsRetry" class="state-action" type="button">Try again</button>
+            <p>D'Kontostatistike konnten net gelueden ginn.</p>
+            <button id="accountsRetry" class="state-action" type="button">Nach eng Kéier probéieren</button>
           </div>
         </section>
       </div>
     </div>
-  </main>
+    </div>
+  </div></main>
 
   <script src="pixelbreak-config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
@@ -600,8 +627,8 @@
     const CHART_WIDTH = 760;
     const CHART_HEIGHT = 300;
     const CHART_MARGIN = Object.freeze({ top: 18, right: 16, bottom: 34, left: 42 });
-    const integerFormatter = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
-    const averageFormatter = new Intl.NumberFormat(undefined, {
+    const integerFormatter = new Intl.NumberFormat("de-LU", { maximumFractionDigits: 0 });
+    const averageFormatter = new Intl.NumberFormat("de-LU", {
       minimumFractionDigits: 1,
       maximumFractionDigits: 1,
     });
@@ -625,29 +652,29 @@
 
     function showLoading() {
       showStatus({
-        icon: "⏳",
-        title: "Loading traffic",
-        message: "Checking your access and fetching the latest figures…",
+        icon: "",
+        title: "Besucherzuelen gi gelueden",
+        message: "Zougrëff gëtt gepréift an déi lescht Zuele ginn higeholl …",
       });
     }
 
     function showSignedOut() {
       showStatus({
-        icon: "🔒",
-        title: "This page is private",
-        message: "Sign in with the admin account to see visitor statistics.",
-        actionLabel: "Sign in",
+        icon: "",
+        title: "Dës Säit ass privat",
+        message: "Mell dech mam Admin-Kont un, fir d'Besucherstatistike ze gesinn.",
+        actionLabel: "Umellen",
         onAction: auth.openAuthModal,
       });
     }
 
     function showNoAccess(email) {
-      const account = email ? ` The signed-in account (${email}) is not an admin.` : " This account is not an admin.";
+      const account = email ? ` De ugemellte Kont (${email}) ass keen Admin.` : " Dëse Kont ass keen Admin.";
       showStatus({
         icon: "🛡️",
-        title: "No admin access",
-        message: `Traffic figures are restricted.${account}`,
-        actionLabel: "Change account",
+        title: "Keen Admin-Zougrëff",
+        message: `D'Besucherzuele si geschützt.${account}`,
+        actionLabel: "Kont wiesselen",
         onAction: auth.openAuthModal,
       });
     }
@@ -655,9 +682,9 @@
     function showNoData() {
       showStatus({
         icon: "🕒",
-        title: "No traffic data yet",
-        message: "You have access, but the hourly traffic job has not added any rows yet. Check again after its next run.",
-        actionLabel: "Check again",
+        title: "Nach keng Besucherdaten",
+        message: "Du hues Zougrëff, mä de stënnleche Trafic-Job huet nach keng Zeilen derbäigesat. Kuck no sengem nächste Lafzäit nach eng Kéier.",
+        actionLabel: "Nach eng Kéier kucken",
         onAction: queueLoad,
       });
     }
@@ -665,9 +692,9 @@
     function showLoadError() {
       showStatus({
         icon: "⚠️",
-        title: "Traffic could not be loaded",
-        message: "The private statistics service did not respond correctly. Please try again.",
-        actionLabel: "Try again",
+        title: "Besucherzuele konnten net gelueden ginn",
+        message: "De private Statistik-Service huet net richteg geäntwert. Probéier et w.e.g. nach eng Kéier.",
+        actionLabel: "Nach eng Kéier probéieren",
         onAction: queueLoad,
       });
     }
@@ -823,7 +850,7 @@
     function formatShortDay(day) {
       const parsed = parseDateKey(day);
       return parsed
-        ? new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", timeZone: "UTC" }).format(parsed)
+        ? new Intl.DateTimeFormat("de-LU", { day: "numeric", month: "short", timeZone: "UTC" }).format(parsed)
         : day;
     }
 
@@ -910,7 +937,7 @@
       const dataTable = document.createElement("table");
       dataTable.className = "sr-only";
       const head = dataTable.createTHead().insertRow();
-      [{ label: "Day" }, ...table].forEach(({ label }) => {
+      [{ label: "Dag" }, ...table].forEach(({ label }) => {
         const cell = document.createElement("th");
         cell.scope = "col";
         cell.textContent = label;
@@ -935,12 +962,12 @@
           { key: "uniqueVisitors", className: "visitors" },
         ],
         table: [
-          { label: "Unique visitors", key: "uniqueVisitors" },
-          { label: "Pageviews", key: "pageviews" },
+          { label: "Eenzegaarteg Besucher", key: "uniqueVisitors" },
+          { label: "Säitenopruffer", key: "pageviews" },
         ],
-        ariaLabel: "Line chart of unique visitors and pageviews for the last 30 days",
-        titleText: "Daily traffic over the last 30 days",
-        descText: "Blue shows unique visitors and pink shows pageviews.",
+        ariaLabel: "Linnendiagramm vun den eenzegaartege Besucher a Säitenopruffer vun de leschte 30 Deeg",
+        titleText: "Trafic pro Dag iwwer déi lescht 30 Deeg",
+        descText: "Schwaarz weist d'eenzegaartege Besucher a gréng d'Säitenopruffer.",
       });
     }
 
@@ -958,7 +985,7 @@
         path.title = page.path;
         const views = document.createElement("span");
         views.className = "top-page-views";
-        views.textContent = `${formatInteger(page.views)} views`;
+        views.textContent = `${formatInteger(page.views)} Opruffer`;
         item.append(path, views);
         list.appendChild(item);
       });
@@ -980,26 +1007,26 @@
       badge.hidden = !hasFactor;
       if (hasFactor) {
         const factor = after.uniqueVisitors / before.uniqueVisitors;
-        badge.textContent = `${averageFormatter.format(factor)}× unique visitors`;
+        badge.textContent = `${averageFormatter.format(factor)}× eenzegaarteg Besucher`;
       }
 
       const beforeCount = before?.dayCount ?? 0;
       const afterCount = after?.dayCount ?? 0;
       byId("comparisonNote").textContent = beforeCount > 0 && afterCount > 0
-        ? `Based on ${beforeCount} completed weekdays before term and ${afterCount} since ${formatShortDay(SCHOOL_START_DATE)}.`
-        : "More completed weekday data is needed to compare both periods.";
+        ? `Baséiert op ${beforeCount} ofgeschlossene Wochendeeg virum Schouljoer an ${afterCount} zënter dem ${formatShortDay(SCHOOL_START_DATE)}.`
+        : "Fir déi zwou Zäitraim ze vergläichen, brauch et méi ofgeschloss Wochendeeg-Donnéeën.";
     }
 
     function renderFreshness(newestRow) {
       if (!newestRow.updatedAt) {
-        byId("freshness").textContent = "Latest update time unavailable";
+        byId("freshness").textContent = "Zäit vum leschten Update net disponibel";
         return;
       }
-      const formatted = new Intl.DateTimeFormat(undefined, {
+      const formatted = new Intl.DateTimeFormat("de-LU", {
         dateStyle: "medium",
         timeStyle: "short",
       }).format(new Date(newestRow.updatedAt));
-      byId("freshness").textContent = `Updated ${formatted}`;
+      byId("freshness").textContent = `Aktualiséiert ${formatted}`;
     }
 
     function renderDashboard(rows) {
@@ -1049,10 +1076,10 @@
       byId("accountsError").hidden = true;
       renderLineChart(byId("accountsChart"), daily, {
         lines: [{ key: "accounts", className: "accounts" }],
-        table: [{ label: "New accounts", key: "accounts" }],
-        ariaLabel: `Line chart of new accounts per day for the last ${daily.length} days`,
-        titleText: `New accounts per day over the last ${daily.length} days`,
-        descText: "Each point is the number of accounts created that day.",
+        table: [{ label: "Nei Konten", key: "accounts" }],
+        ariaLabel: `Linnendiagramm vun den neie Konten pro Dag vun de leschten ${daily.length} Deeg`,
+        titleText: `Nei Konten pro Dag iwwer déi lescht ${daily.length} Deeg`,
+        descText: "All Punkt ass d'Zuel vun de Konten, déi un deem Dag erstallt goufen.",
         evenMax: true,
       });
     }
@@ -1140,5 +1167,6 @@
     await queueLoad();
     window.setInterval(queueLoad, AUTO_REFRESH_MS);
   </script>
+  <script type="module" src="gitter-acct.js?v=1"></script>
 </body>
 </html>

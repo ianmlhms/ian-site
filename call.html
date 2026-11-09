@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="lb">
 <head>
 <meta charset="utf-8">
 <meta name="robots" content="noindex,follow">
@@ -9,73 +9,74 @@
   <meta name="description" content="Voice and video calls on ian.lu, between signed-in accounts." />
   <link rel="canonical" href="https://ian.lu/call.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<meta name="theme-color" content="#0d0d1a">
-<script src="season.js?v=5"></script>
+<meta name="theme-color" content="#f6f6f3">
+<link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="gitter.css?v=9">
 <script src="theme.js?v=32"></script>
 <script src="i18n-dict.js?v=54"></script>
 <script src="i18n.js?v=5"></script>
 <style>
-  /* The call UI is permanently dark (body #000, #stage #05050a). It used to
-     declare --text/--muted on :root, but theme.js sets those same names on the
-     root element at runtime and wins, so in light theme the text turned dark
-     and sat on a black stage at 1.16:1. Page-local names cannot be clobbered. */
-  :root{--call-card:#161625;--call-border:#2a2a4a;--call-text:#e8e8f0;--call-muted:#9a9ab8;--call-link:#9ec5ff;--danger:#ff5d6c}
-  *{box-sizing:border-box}
-  html,body{margin:0;height:100%}
-  body{background:#000;color:var(--call-text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
-  #stage{position:fixed;inset:0;background:#05050a}
-  #remote{width:100%;height:100%;object-fit:cover;background:#05050a}
+  /* Gitter look: light page; only the live remote video keeps a dark field (the picture itself). */
+  .call-page{padding-bottom:max(24px,env(safe-area-inset-bottom))}
+  .topbar{flex-wrap:wrap;gap:0 12px;justify-content:flex-end;text-align:right}
+  .topbar .who{font-weight:800;font-size:15px}
+  .topbar .st{color:var(--muted);font-size:13.5px}
+  #stage{position:relative;padding:0 !important;height:clamp(340px,calc(100svh - 230px),760px);background:var(--paper);overflow:hidden;display:block}
+  #remote{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:var(--ink)}
   #remote.waiting{opacity:0}
-  #local{position:fixed;right:14px;top:14px;width:112px;height:150px;object-fit:cover;border-radius:14px;border:1px solid rgba(255,255,255,.2);background:#111;box-shadow:0 6px 20px rgba(0,0,0,.5);transform:scaleX(-1);z-index:4}
+  #local{position:absolute;right:12px;top:12px;width:112px;height:150px;object-fit:cover;border:1px solid var(--paper);background:var(--ink);transform:scaleX(-1);z-index:4}
   #local.off{display:none}
-  .topbar{position:fixed;top:0;left:0;right:0;padding:16px 18px;display:flex;align-items:center;gap:10px;z-index:3;background:linear-gradient(#000a,transparent)}
-  .topbar .who{font-weight:800;font-size:17px}
-  .topbar .st{color:var(--call-muted);font-size:13px}
-  .center{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:2;text-align:center;padding:24px}
-  .avatar{width:96px;height:96px;border-radius:50%;background:var(--call-card);border:1px solid var(--call-border);display:flex;align-items:center;justify-content:center;font-size:44px}
-  .center .nm{font-size:22px;font-weight:800}
-  .center .sub{color:var(--call-muted);font-size:14px}
-  .controls{position:fixed;left:0;right:0;bottom:0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));display:flex;gap:18px;align-items:center;justify-content:center;z-index:3;background:linear-gradient(transparent,#000b)}
-  .cbtn{width:60px;height:60px;border-radius:50%;border:none;background:rgba(255,255,255,.14);color:#fff;font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
-  .cbtn:hover{background:rgba(255,255,255,.24)}
-  .cbtn.off{background:#fff;color:#111}
-  .cbtn.hang{background:var(--danger);width:66px;height:66px}
-  .cbtn.hang:hover{filter:brightness(1.08)}
-  .cbtn.answer{background:#3fb950;width:66px;height:66px}
-  .msg{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:30px;color:var(--call-text);z-index:6}
-  .msg a{color:var(--call-link)}
+  .center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:2;text-align:center;padding:24px}
+  .avatar{width:72px;height:72px;border:1px solid var(--ink);background:var(--white);display:flex;align-items:center;justify-content:center;font:800 28px "Geist",system-ui,sans-serif}
+  .center .nm{font-size:24px;font-weight:800;letter-spacing:-.02em}
+  .center .sub{color:var(--muted);font-size:14px}
+  .controls-cell{flex-direction:row !important;flex-wrap:wrap;gap:10px !important;align-items:center;justify-content:center !important}
+  .cbtn{min-width:120px;min-height:48px;padding:0 18px;border:1px solid var(--ink);border-radius:0;background:var(--white);color:var(--ink);font:600 15px/1 "Geist",system-ui,sans-serif;cursor:pointer}
+  .cbtn:hover{border-color:var(--green);color:var(--green)}
+  .cbtn.off{background:var(--ink);color:var(--paper)}
+  .cbtn.hang{background:var(--danger);border-color:var(--danger);color:#fff}
+  .cbtn.hang:hover{background:#7d1818;border-color:#7d1818;color:#fff}
+  .cbtn.answer{background:var(--green);border-color:var(--green);color:#fff}
+  .msg{position:absolute;inset:0;display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:center;text-align:center;padding:30px;color:var(--ink);z-index:6;background:var(--paper);font-weight:600}
+  .msg a{color:var(--green)}
   .hidden{display:none!important}
+  @media(max-width:700px){#local{width:84px;height:112px}.cbtn{flex:1 1 40%;min-width:0}}
 </style>
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
 </head>
-<body>
-<div id="stage">
-  <video id="remote" class="waiting" autoplay playsinline></video>
-  <video id="local" autoplay playsinline muted></video>
+<body class="gt">
+<main class="gt-page call-page"><div class="gt-grid">
+  <header class="c full gt-nav">
+    <div class="gt-nav-l"><a class="gt-back" href="friends.html">‹ Frënn</a><h1 class="gt-page-title">Uruff</h1></div>
+    <div class="gt-navr topbar hidden" id="topbar">
+      <span class="who" id="who"></span>
+      <span class="st" id="status" role="status" aria-live="polite"></span>
+    </div>
+  </header>
 
-  <div class="topbar hidden" id="topbar">
-    <span class="who" id="who"></span>
-    <span class="st" id="status" role="status" aria-live="polite"></span>
+  <div class="c full" id="stage">
+    <video id="remote" class="waiting" autoplay playsinline></video>
+    <video id="local" autoplay playsinline muted></video>
+
+    <div class="center" id="center">
+      <div class="avatar" aria-hidden="true" id="avatarLetter"></div>
+      <div class="nm" id="peerName">…</div>
+      <div class="sub" id="centerSub" role="status" aria-live="polite" data-i18n="call.calling">Rifft un…</div>
+    </div>
+
+    <div class="msg hidden" id="fatal" role="alert"></div>
   </div>
 
-  <div class="center" id="center">
-    <div class="avatar" aria-hidden="true">📹</div>
-    <div class="nm" id="peerName">…</div>
-    <div class="sub" id="centerSub" role="status" aria-live="polite" data-i18n="call.calling">Calling…</div>
+  <div class="c full controls-cell hidden" id="controls">
+    <button type="button" class="cbtn" id="micBtn" title="Mikro" aria-label="Mikro" aria-pressed="true">Mikro</button>
+    <button type="button" class="cbtn answer hidden" id="answerBtn" title="Ofhiewen" aria-label="Ofhiewen"><span>Ofhiewen</span></button>
+    <button type="button" class="cbtn hang" id="hangBtn" title="Opleeën" aria-label="Opleeën"><span>Opleeën</span></button>
+    <button type="button" class="cbtn" id="camBtn" title="Kamera" aria-label="Kamera" aria-pressed="true">Kamera</button>
   </div>
-
-  <div class="controls hidden" id="controls">
-    <button type="button" class="cbtn" id="micBtn" title="Mic" aria-label="Mic" aria-pressed="true">🎙️</button>
-    <button type="button" class="cbtn answer hidden" id="answerBtn" title="Answer" aria-label="Answer"><span aria-hidden="true">📞</span></button>
-    <button type="button" class="cbtn hang" id="hangBtn" title="Hang up" aria-label="Hang up"><span aria-hidden="true">📵</span></button>
-    <button type="button" class="cbtn" id="camBtn" title="Camera" aria-label="Camera" aria-pressed="true"><span aria-hidden="true">🎥</span></button>
-  </div>
-
-  <div class="msg hidden" id="fatal" role="alert"></div>
-</div>
+</div></main>
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
@@ -106,7 +107,7 @@ document.addEventListener("i18n:change",labelControls);
 const isCallee=q.get("answer")==="1";
 const peerId=q.get("peer")||"";
 const peerName=q.get("name")||"…";
-$("peerName").textContent=peerName;
+$("peerName").textContent=peerName; $("avatarLetter").textContent=(peerName.trim()[0]||"?").toUpperCase();
 
 const MAX_NAME=80, MAX_SDP=65536, MAX_CANDIDATE=4096, MAX_ICE=256, MAX_ICE_FIELD=256;
 const isObject=(v)=>v!==null&&typeof v==="object"&&!Array.isArray(v);
@@ -266,11 +267,11 @@ function wireControls(){
   $("hangBtn").onclick=()=>{ if(!isCallee && !offered) ring("cancel"); endCall(T("call.ended"),true); };
   $("micBtn").onclick=()=>{
     const t=localStream.getAudioTracks()[0]; if(!t) return; t.enabled=!t.enabled;
-    $("micBtn").classList.toggle("off",!t.enabled); $("micBtn").textContent=t.enabled?"🎙️":"🔇"; $("micBtn").setAttribute("aria-pressed",String(t.enabled));
+    $("micBtn").classList.toggle("off",!t.enabled); $("micBtn").textContent=t.enabled?"Mikro":"Mikro aus"; $("micBtn").setAttribute("aria-pressed",String(t.enabled));
   };
   $("camBtn").onclick=()=>{
     const t=localStream.getVideoTracks()[0]; if(!t) return; t.enabled=!t.enabled;
-    $("camBtn").classList.toggle("off",!t.enabled); $("local").classList.toggle("off",!t.enabled); $("camBtn").setAttribute("aria-pressed",String(t.enabled));
+    $("camBtn").textContent=t.enabled?"Kamera":"Kamera aus"; $("camBtn").classList.toggle("off",!t.enabled); $("local").classList.toggle("off",!t.enabled); $("camBtn").setAttribute("aria-pressed",String(t.enabled));
   };
 }
 

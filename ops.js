@@ -7,9 +7,7 @@
  * resolved from the `ops` edge function (supabase/functions/ops/health.ts), so
  * there is one place where "is this machine alive" is decided.
  *
- * English rather than Luxembourgish: every term here is technical and
- * translating them would mean inventing vocabulary. The two gate strings are
- * the site's existing reviewed LB ones. */
+ * UI text is Luxembourgish (Gitter look, Nov 2026); machine names and details come from the server. */
 import * as auth from "./auth.js?v=40";
 
 const OWNER = "konto@ian.lu";
@@ -21,25 +19,25 @@ const DAY = 24 * HOUR;
 /* Never colour alone: each state has its own glyph and word. `unknown` is not
  * a traffic-light colour — nothing has reported, which is neither good nor bad. */
 const STATE = {
-  ok: { mark: "●", word: "Up" },
-  warn: { mark: "▲", word: "Warning" },
-  down: { mark: "✕", word: "Down" },
-  unknown: { mark: "○", word: "No report" },
+  ok: { mark: "●", word: "Un" },
+  warn: { mark: "▲", word: "Warnung" },
+  down: { mark: "✕", word: "Aus" },
+  unknown: { mark: "○", word: "Keng Meldung" },
 };
 /* The Supabase tile reports usage, not liveness, so its words differ: warn =
  * heading for the limit, over = a free-plan limit is already crossed. */
 const USAGE_STATE = {
   ok: { mark: "●", word: "OK" },
-  warn: { mark: "▲", word: "Warn" },
-  down: { mark: "✕", word: "Over" },
+  warn: { mark: "▲", word: "Warnung" },
+  down: { mark: "✕", word: "Iwwer" },
   unknown: STATE.unknown,
 };
-const STALE_STATE = { mark: "✕", word: "No data" };
+const STALE_STATE = { mark: "✕", word: "Keng Daten" };
 const SUMMARY = {
-  ok: "Everything is up.",
-  warn: "Something reports a warning.",
-  down: "Something is down.",
-  unknown: "Something has not reported yet.",
+  ok: "Alles leeft.",
+  warn: "Eppes mellt eng Warnung.",
+  down: "Eppes ass aus.",
+  unknown: "Eppes huet sech nach net gemellt.",
 };
 
 let refreshTimer = null;
@@ -52,14 +50,14 @@ const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => (
 
 function config() {
   const cfg = window.PB_CONFIG || {};
-  if (!cfg.url || !cfg.anonKey) throw new Error("Supabase is not configured on this page.");
+  if (!cfg.url || !cfg.anonKey) throw new Error("Supabase ass op dëser Säit net agestallt.");
   return cfg;
 }
 
 async function callOps(body) {
   const cfg = config();
   const token = auth.session()?.access_token;
-  if (!token) throw new Error("Not signed in.");
+  if (!token) throw new Error("Net ugemellt.");
   const response = await fetch(`${cfg.url.replace(/\/$/, "")}/functions/v1/ops`, {
     method: "POST",
     headers: {
@@ -71,14 +69,14 @@ async function callOps(body) {
   });
   const data = await response.json().catch(() => null);
   if (!response.ok) {
-    throw new Error(data?.error || `The ops service answered ${response.status}.`);
+    throw new Error(data?.error || `De Status-Service huet mat ${response.status} geäntwert.`);
   }
   return data;
 }
 
 function gate(title, message, canSignIn = false) {
   $("root").innerHTML = `<section class="gate-panel glass glass--thick">
-    <div class="gate-icon">◍</div>
+    <div class="gate-icon" aria-hidden="true">◍</div>
     <h1>${esc(title)}</h1><p>${esc(message)}</p>
     ${canSignIn ? '<button class="primary-button" id="signIn" type="button">Umellen</button>' : ""}
   </section>`;
@@ -87,22 +85,22 @@ function gate(title, message, canSignIn = false) {
 
 /** "last seen 3 min ago", from the server's own age so a wrong phone clock can't skew it. */
 function lastSeen(seconds) {
-  if (seconds === null || seconds === undefined) return "never seen";
-  if (seconds < MINUTE) return "last seen just now";
-  if (seconds < HOUR) return `last seen ${Math.floor(seconds / MINUTE)} min ago`;
+  if (seconds === null || seconds === undefined) return "nach ni gesinn";
+  if (seconds < MINUTE) return "viru Kuerzem gesinn";
+  if (seconds < HOUR) return `viru ${Math.floor(seconds / MINUTE)} Min. gesinn`;
   if (seconds < DAY) {
     const hours = Math.floor(seconds / HOUR);
     const minutes = Math.floor((seconds % HOUR) / MINUTE);
-    return `last seen ${hours} h${minutes ? ` ${minutes} min` : ""} ago`;
+    return `viru ${hours} Std.${minutes ? ` ${minutes} Min.` : ""} gesinn`;
   }
-  return `last seen ${Math.floor(seconds / DAY)} d ago`;
+  return `viru ${Math.floor(seconds / DAY)} Deeg gesinn`;
 }
 
 function tile(machine) {
   const states = machine.key === "supabase" ? USAGE_STATE : STATE;
   const state = machine.stale && machine.key === "supabase"
     ? STALE_STATE : (states[machine.health] || STATE.unknown);
-  const seen = machine.health === "unknown" ? "nothing has reported yet" : lastSeen(machine.ageSeconds);
+  const seen = machine.health === "unknown" ? "nach näischt gemellt" : lastSeen(machine.ageSeconds);
   return `<article class="tile tile--${esc(machine.health)}">
     <div class="tile-mark" aria-hidden="true">${state.mark}</div>
     <h2 class="tile-name">${esc(machine.label)}</h2>
@@ -122,10 +120,10 @@ function render(state) {
         <h1>Status</h1>
         <p>${esc(SUMMARY[state.overall] || "")}</p>
       </div>
-      <button class="ops-refresh" id="refresh" type="button" title="Refresh now" aria-label="Refresh now">↻</button>
+      <button class="ops-refresh" id="refresh" type="button" title="Elo aktualiséieren" aria-label="Elo aktualiséieren">↻</button>
     </section>
     <div class="tiles">${state.machines.map(tile).join("")}</div>
-    <p class="ops-stamp">checked ${esc(new Date(state.checkedAt).toLocaleTimeString())}</p>`;
+    <p class="ops-stamp">gepréift ${esc(new Date(state.checkedAt).toLocaleTimeString())}</p>`;
   $("refresh").onclick = () => refresh(true);
 }
 
@@ -137,7 +135,7 @@ async function refresh(manual = false) {
   } catch (error) {
     if (manual || !document.querySelector(".tiles")) {
       $("root").innerHTML = `<section class="gate-panel glass glass--thick">
-        <div class="gate-icon">⚠</div><h1>Could not read status</h1>
+        <div class="gate-icon">⚠</div><h1>De Status konnt net gelies ginn</h1>
         <p>${esc(error.message)}</p></section>`;
     }
   } finally {
@@ -177,7 +175,7 @@ async function boot() {
     await refresh(true);
     startAutoRefresh();
   } catch (error) {
-    gate("Status unavailable", error.message || "Could not start the connection.");
+    gate("Status net disponibel", error.message || "D'Verbindung konnt net gestart ginn.");
   }
 }
 
