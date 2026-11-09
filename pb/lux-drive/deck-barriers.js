@@ -218,11 +218,12 @@ function* barrierSteps(deckNetwork, surface, { skip, roads }) {
       const [ax, az] = d.pts[i], [bx, bz] = d.pts[i + 1], ex = bx - ax, ez = bz - az, ll = ex * ex + ez * ez;
       const t = ll > 1e-9 ? Math.max(0, Math.min(1, ((x - ax) * ex + (z - az) * ez) / ll)) : 0;
       if (Math.hypot(x - ax - ex * t, z - az - ez * t) > d.width / 2) continue;
-      // (upward the cover reaches as far as the barrier holds a car: an edge that lies under another deck by up to BARRIER.height + drop has no barrier - it would block the
-      // cars on that deck, not hold any on its own.  The footway deck 200 beside Rue de Cessange 640 sags under the road deck: at a 1.0 m cover its railing stood 0.5 m into
-      // the road's outer lane wherever the sag passed 1 m, fix19)
+      // (fix19: the edge of a FOOTWAY deck under a road deck is covered as far up as a barrier holds a car - BARRIER.height + drop: its railing there would block the cars on
+      // the road deck, it holds nobody on its own.  The footway deck 200 beside Rue de Cessange 640 sags under the road deck: at a 1.0 m cover its railing stood 0.5 m into
+      // the road's outer lane wherever the sag passed 1 m.  A road deck's own edges keep the 1.0 m cover: the harness V3 / V4 drive them)
       const dt = d.tops[i] + (d.tops[i + 1] - d.tops[i]) * t - top;
-      if (dt >= -BARRIER.cover && dt <= BARRIER.height + BARRIER.drop) return true;
+      const up = self.width < ROAD_MIN_WIDTH && d.width >= ROAD_MIN_WIDTH ? BARRIER.height + BARRIER.drop : BARRIER.cover;
+      if (dt >= -BARRIER.cover && dt <= up) return true;
     }
     return false;
   };
