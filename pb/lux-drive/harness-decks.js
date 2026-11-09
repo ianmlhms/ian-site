@@ -7,6 +7,7 @@ import { createCar } from './car.js';
 import { CAR } from './config.js';
 import { laneOffsets } from './lane-clearance.js';
 import { wayOf, wayEnds, laneRoute, polyDist } from './deck-lanes.js';
+import { groundStart, groundEnd } from './tunnel-tubes.js';
 
 const Q_MAX_STEP = 0.05;          // m: a step in the height of the car from one frame to the next, minus what the grade explains (the QA's steps were 0.25 .. 3 m)
 const Q_ZONE = 5;                 // m: the drive is judged on the deck and this far past its ends and sides (beyond that the road network's own gates judge the road)
@@ -31,7 +32,7 @@ const Q2_MAX_STEP = 0.12;         // m: pressing against the bank the car may ro
  * The car carried along `pts` at Q_SPEED (its x, z and heading set every frame: the test is the ground, not the steering), its vertical its own (car.js: the four wheels, the
  * suspension, the flight over a crest).  Returns { step, stepAt, air } judged within Q_ZONE of the deck line P.
  */
-function carry(car, ground, pts, P, push = null) {
+function carry(car, ground, pts, P, push = null, startLevel = null) {
   const poly = [];
   for (let i = 0; i + 1 < pts.length; i++) {
     const [ax, az] = pts[i], [bx, bz] = pts[i + 1], l = Math.hypot(bx - ax, bz - az);
@@ -49,8 +50,10 @@ function carry(car, ground, pts, P, push = null) {
     const f = Math.min(1, (s - acc) / (seg[i] || 1)), [ax, az] = poly[i], [bx, bz] = poly[i + 1];
     return [ax + (bx - ax) * f, az + (bz - az) * f, Math.atan2(bz - az, bx - ax)];
   };
-  ground.hint(1e4);                                   // the car starts ON a deck where there is one (main.js landCar)
   const [x0, z0, h0] = poseAt(0);
+  // the car starts ON a deck where there is one (main.js landCar) - or on the floor of a tube's trough, where a route that leaves a deck into a tunnel starts on the way
+  // back (not on the hill over its portal: tunnels19, Cents south, deck 21)
+  ground.hint(startLevel ? startLevel(x0, z0) : 1e4);
   car.reset(x0, z0, h0);
   const ys = [], zone = [], grounded = [], at = [];
   for (let s = 0; s < total - 0.5; s += Q_SPEED * Q_DT) {
@@ -78,7 +81,13 @@ function carry(car, ground, pts, P, push = null) {
 /** Q1: every car deck, both directions, axis and outer lanes.  Returns { decks, runs, failing: [{ deck, kind, step, air, at }], pushed: [{ deck, off, at }] }.
  *  allLanes (drive12, QA3: the lane drives saw steps the axis run did not - Pont Adolphe 0.52 m, deck 204 0.45 m): the axis and the centre of every lane of the way the
  *  deck carries (lane-clearance.js laneOffsets).  carCollide: the car's collider (car-collide.js); a run in which it moves the car is listed in `pushed`. */
-export function deckDriveScan({ ground, surface, roads, carCollide = null, allLanes = false }) {
+export function deckDriveScan({ ground, surface, roads, carCollide = null, allLanes = false, tubes = null }) {
+  // (tubes: the tunnel network - a route that starts in the trough or the blend of a tube starts on its floor)
+  const L = {};
+  const startLevel = (x, z) => {
+    if (tubes && tubes.locate(x, z, L) && L.s >= groundStart(L.tube) && L.s <= groundEnd(L.tube)) return L.floor + CAR.rideHeight + 0.3;
+    return 1e4;
+  };
   const car = createCar({ ground, roadInfoAt: (x, z, o) => surface.roadInfoAt(x, z, o), collide: null });          // (the carried car is not pushed: carCollide is a probe of its body at every pose)
   const ends = wayEnds(roads);
   const worst = new Map();
@@ -96,7 +105,7 @@ export function deckDriveScan({ ground, surface, roads, carCollide = null, allLa
       if (r.none) continue;
       for (const pts of [r.pts, r.pts.slice().reverse()]) {
         const push = carCollide ? { at: null, collide: carCollide } : null;
-        const res = carry(car, ground, pts, d.pts, push);
+        const res = carry(car, ground, pts, d.pts, push, startLevel);
         if (!res) continue;
         runs++;
         if (push && push.at) pushed.push({ deck: d.id, kind: way.kind, off, at: push.at, id: push.id });
@@ -109,11 +118,11 @@ export function deckDriveScan({ ground, surface, roads, carCollide = null, allLa
   return { decks, runs, failing, pushed };
 }
 
-export function runDeckChecks({ check, section, stats, data, surface, ground, buildings, portals, playArea }) {
+export function runDeckChecks({ check, section, stats, data, surface, ground, buildings, portals, playArea, tubes = null }) {
   section('Q decks driven end to end, the banks under deck ends (decks10)');
 
   // ---- Q1
-  const scan = deckDriveScan({ ground, surface, roads: data.roads });
+  const scan = deckDriveScan({ ground, surface, roads: data.roads, tubes });
   stats.deckDrive = { decks: scan.decks, runs: scan.runs, failing: scan.failing.length, list: scan.failing.map((f) => `deck ${f.deck} ${f.kind} ${(f.step * 100).toFixed(0)} cm${f.air ? ` air ${f.air}` : ''} at ${f.at ? f.at.map(Math.round).join(',') : '-'}`) };
   check(`Q1 every car deck driven end to end both ways (axis and outer lanes, ${scan.runs} runs over ${scan.decks} decks): step <= ${Q_MAX_STEP * 100} cm and no flight within ${Q_ZONE} m (ratchet <= ${Q_MAX_FAILING} decks)`,
     scan.decks > 100 && scan.failing.length <= Q_MAX_FAILING, `${scan.failing.length} decks: ${stats.deckDrive.list.slice(0, 8).join('; ')}`);

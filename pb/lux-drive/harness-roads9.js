@@ -117,6 +117,9 @@ export function runRoads9Checks({ check, section, stats, data, net, surface, por
   check(`P3 the marked ways on bridges carry their lines over the deck (>= ${MIN_COVER * 100} % of the way)`, bridges > 20 && bridgesBare <= MAX_BRIDGES_BARE, `${bridges} ways on decks, ${bridgesBare} bare: ${bridgeList.join('; ')}`);
 
   // ---- P4: the headwalls against the roads behind and over them
+  // (how many portals there must at least be - the check is not run on an empty list: tunnels19 opened seven more tunnels as drivable tubes, their 11 closed
+  // portals are gone, 56 -> 45; the limit itself, no headwall over a road, is unchanged)
+  const PORTALS_MIN = 40;
   const roadAt = portalRoadAt(net);
   let walls = 0, overRoad = 0, floored = 0;
   const wallList = [];
@@ -141,7 +144,7 @@ export function runRoads9Checks({ check, section, stats, data, net, surface, por
     }
   }
   stats.portalWalls = { walls, overRoad, floored };
-  check('P4 no portal headwall stands more than a parapet over a road behind it, nor over a road that runs over it (the mouths at the lowest height the rule allows aside)', walls > 50 && overRoad === 0, `${walls} portals, ${overRoad} over a road: ${wallList.join('; ')}; ${floored} at the lowest mouth under a road`);
+  check('P4 no portal headwall stands more than a parapet over a road behind it, nor over a road that runs over it (the mouths at the lowest height the rule allows aside)', walls > PORTALS_MIN && overRoad === 0, `${walls} portals, ${overRoad} over a road: ${wallList.join('; ')}; ${floored} at the lowest mouth under a road`);
 
   // ---- P5: the walls of the opened cuts
   const cutWays = data.roads.filter((r) => r.openCut && net.info[r.id]);

@@ -68,7 +68,7 @@ export function buildGameCollider({ data, surface, ground, net, buildings, landm
   return { game, gameWalls };
 }
 
-export function runDrive12Checks({ check, section, stats, data, field, surface, ground, net, buildings, landmarks, portals, forest, playArea, maps, deckNetwork }) {
+export function runDrive12Checks({ check, section, stats, data, field, surface, ground, net, buildings, landmarks, portals, forest, playArea, maps, deckNetwork, tubes = null }) {
   section('T nothing stops the car where it may drive (drive12, QA round 3)');
   const isOpen = (r) => !!(net.roads[r.id] && net.roads[r.id].openCut);
 
@@ -91,7 +91,7 @@ export function runDrive12Checks({ check, section, stats, data, field, surface, 
   // ---- T3: every car deck in every lane, the game's collider probing the body
   // (the edge of the play area is no deck bug: decks 154 / 157 run out of the area at Croix de Gasperich)
   const named = (x, z, r, y) => { for (const [n, f] of game.parts) { if (n === 'area') continue; const h = f(x, z, r, y); if (h) return { ...h, id: `${n}${h.id !== undefined ? ' ' + h.id : ''}` }; } return null; };
-  const scan = deckDriveScan({ ground, surface, roads: data.roads, carCollide: named, allLanes: true });
+  const scan = deckDriveScan({ ground, surface, roads: data.roads, carCollide: named, allLanes: true, tubes });
   stats.deckLaneDrive = { decks: scan.decks, runs: scan.runs, pushed: scan.pushed.length, list: scan.pushed.slice(0, 10).map((p) => `deck ${p.deck} lane ${p.off.toFixed(1)} ${p.id ?? ''} at ${p.at.map(Math.round).join(',')}`), stepFailing: scan.failing.length,
     steps: scan.failing.slice(0, 12).map((f) => `deck ${f.deck} ${(f.step * 100).toFixed(0)} cm${f.air ? ` air ${f.air}` : ''} at ${f.at ? f.at.map(Math.round).join(',') : '-'}`) };
   check(`T3 every car deck driven end to end in every lane both ways (${scan.runs} runs over ${scan.decks} decks): nothing solid touches the car (ratchet <= ${T3_MAX_PUSHED} runs)`, scan.decks > 100 && scan.pushed.length <= T3_MAX_PUSHED, `${scan.pushed.length} runs: ${stats.deckLaneDrive.list.join('; ')}`);
