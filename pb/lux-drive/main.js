@@ -50,6 +50,7 @@ import { createEnv, TIME_PRESETS, WEATHER_IDS } from './env.js';
 import { createChaseCamera } from './camera.js';
 import { createCar } from './car.js';
 import { createCarModel } from './car-model.js';
+import { CAR_DESIGNS, DEFAULT_CAR_DESIGN } from './car-designs.js';    // car20: the three cars (?car=hatch|coupe|taxi)
 import { createSound } from './sound.js';
 import { createInput } from './input.js';
 import { createUI } from './ui.js';
@@ -216,8 +217,9 @@ async function boot() {
   const parkBenches = placeParkBenches({ roads: data.roads, network: field.network, buildings, map: maps });
   for (let i = 0; i < parkBenches.count; i++) props.add(parkBenches.x[i], parkBenches.z[i], BENCH_RADIUS, surface.height(parkBenches.x[i], parkBenches.z[i]), BENCH_HEIGHT);
   const benchView = createBenchView({ scene, benches: parkBenches, ground, env });
-  const colourId = CAR_COLOURS[readKey(COLOUR_KEY)] ? readKey(COLOUR_KEY) : 'red';
-  const model = createCarModel({ colourId, material: solid, groundAt: (x, z) => ground.height(x, z) });     // look11: the drawn wheels on their springs
+  const designId = CAR_DESIGNS[param('car')] ? param('car') : DEFAULT_CAR_DESIGN;
+  const colourId = CAR_COLOURS[readKey(COLOUR_KEY)] ? readKey(COLOUR_KEY) : null;       // (null: the design's own paint)
+  const model = createCarModel({ designId, colourId, material: solid, groundAt: (x, z) => ground.height(x, z) });     // look11: the drawn wheels on their springs
   scene.add(model.group);
 
   // ---- the car, the camera, the interface
@@ -459,7 +461,7 @@ async function boot() {
   ui.setValue('weather', choice.weatherMode);
   ui.setValue('time', choice.timeMode);
   ui.setValue('quality', readKey(QUALITY_KEY) || 'auto');
-  ui.setValue('colour', colourId);
+  ui.setValue('colour', model.colourId);
   ui.setValue('sound', sound.muted ? 'off' : 'on');
   ui.setValue('camera', CAMERA_IDS[0]);
   ui.setChooserIcon(WEATHER_ICON[choice.weatherId] || '⛅');
