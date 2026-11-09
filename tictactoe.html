@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-no-season>
+<html lang="lb">
 <head>
 <meta charset="utf-8">
 <meta name="robots" content="noindex,follow">
@@ -10,15 +10,15 @@
   <link rel="canonical" href="https://ian.lu/tictactoe.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <script src="mp-gate.js?v=7" data-game="tictactoe" data-over="#rematch"></script>
-<script src="season.js?v=5"></script>
+<link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="gitter.css?v=8">
 <script src="theme.js?v=32"></script>
-<link rel="stylesheet" href="game-common.css?v=5">
 <style>
-  :root{--x:#6ea8fe;--o:#ff5d6c;--board:#1b2150}
+  :root{--x:#1f7a4d;--o:#16171a;--board:#fcfcfa}
   body{display:flex;flex-direction:column}
   .wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:16px}
-  .board{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;background:var(--board);padding:12px;border-radius:16px;touch-action:manipulation}
-  .cell{width:min(22vw,92px);height:min(22vw,92px);border-radius:12px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:min(13vw,56px);font-weight:800;line-height:1}
+  .board{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;background:var(--board);padding:12px;border-radius:0;touch-action:manipulation}
+  .cell{width:min(22vw,92px);height:min(22vw,92px);border-radius:0;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:min(13vw,56px);font-weight:800;line-height:1}
   .cell[data-p="1"]{color:var(--x)} .cell[data-p="2"]{color:var(--o)}
   .board.mine .cell:not([data-p="1"]):not([data-p="2"]){cursor:pointer}
   .board.mine .cell:not([data-p="1"]):not([data-p="2"]):hover{background:var(--card2)}
@@ -27,20 +27,21 @@
   .board:focus{outline:none}
   .board:focus-visible,.cell:focus-visible{outline:.2rem solid var(--focus-ring,currentColor);outline-offset:.18rem}
   @media (hover:none){.board.mine .cell:not([data-p="1"]):not([data-p="2"]):hover{background:var(--bg)}}
-  .me{display:inline-block;width:14px;height:14px;border-radius:50%;vertical-align:-2px;margin:0 4px}
+  .me{display:inline-block;width:14px;height:14px;border-radius:0;vertical-align:-2px;margin:0 4px}
+  .board{border:1px solid var(--ink)}
 </style>
 <script data-goatcounter="https://ianm.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
-  <meta name="theme-color" content="#0d0d1a">
+  <meta name="theme-color" content="#f6f6f3">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
 </head>
-<body>
+<body class="gt">
 <header class="bar">
   <a class="home" href="pixelbreak.html">‹ Arcade</a>
-  <h1><span aria-hidden="true">✕</span> Tic-Tac-Toe</h1>
+  <h1>Tic-Tac-Toe</h1>
   <div class="spacer"></div>
 </header>
 
@@ -54,7 +55,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="pb/arcade-kit.js?v=42" data-arcade-id="o-tictactoe" data-arcade-title="Tic-Tac-Toe Online" data-arcade-no-score data-arcade-replace=".bar"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-<script src="game-common.js?v=4"></script>
+<script src="game-common.js?v=5"></script>
 <script type="module" src="notify-ambient.js?v=40"></script>
 <script>
 const GC = window.GameCommon;

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-no-season>
+<html lang="lb">
 <head>
 <meta charset="utf-8">
 <meta name="robots" content="noindex,follow">
@@ -10,32 +10,30 @@
   <link rel="canonical" href="https://ian.lu/color.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <script src="mp-gate.js?v=7" data-game="color"></script>
-<script src="season.js?v=5"></script>
+<link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="gitter.css?v=8">
 <script src="theme.js?v=32"></script>
 <style>
-  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#ff6b9d;--accent2:#4de8ff;--good:#3fb950}
-  *{box-sizing:border-box}
   body{margin:0;min-height:100vh;min-height:100svh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-  a{color:var(--accent2-text);text-decoration:none}
   .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
   .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
-  .bar .code{color:var(--muted);font-size:13px}.bar code{background:var(--card2);padding:2px 8px;border-radius:6px;color:var(--accent2-text)}
+  .bar .code{color:var(--muted);font-size:13px}.bar code{background:var(--card2);padding:2px 8px;border-radius:0;color:var(--accent2-text)}
   .wrap{max-width:560px;margin:0 auto;padding:22px 18px 60px}
   .players{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
-  .pchip{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:6px 12px;font-size:13px}
+  .pchip{background:var(--card);border:1px solid var(--border);border-radius:0;padding:6px 12px;font-size:13px}
   .pchip.locked{border-color:var(--good);color:var(--good)}
-  .big{width:100%;background:var(--accent);color:var(--accent-foreground);border:none;border-radius:12px;padding:14px;font-weight:800;font-size:16px;cursor:pointer}
+  .big{width:100%;background:var(--accent);color:var(--accent-foreground);border:none;border-radius:0;padding:14px;font-weight:800;font-size:16px;cursor:pointer}
   .big:disabled{opacity:.45;cursor:default}
   .ghost{background:var(--card2);color:var(--text);border:1px solid var(--border)}
-  .swatch{width:100%;height:130px;border-radius:16px;border:1px solid var(--border)}
-  .swatch.sm{width:34px;height:24px;height:24px;border-radius:6px;display:inline-block;vertical-align:middle}
+  .swatch{width:100%;height:130px;border-radius:0;border:1px solid var(--border)}
+  .swatch.sm{width:34px;height:24px;height:24px;border-radius:0;display:inline-block;vertical-align:middle}
   .swatch.covered{display:flex;align-items:center;justify-content:center;color:var(--muted);font-weight:700;font-size:14px;
-    background:repeating-linear-gradient(45deg,#1e1e35,#1e1e35 12px,#161625 12px,#161625 24px)}
-  .peekbar{height:6px;background:var(--card2);border-radius:4px;overflow:hidden;margin-top:8px}
+    background:var(--tint)}
+  .peekbar{height:6px;background:var(--card2);border-radius:0;overflow:hidden;margin-top:8px}
   .peekbar i{display:block;height:100%;width:100%;background:var(--accent);animation:peekshrink 3s linear forwards}
   @keyframes peekshrink{from{width:100%}to{width:0}}
   .modes{display:flex;gap:8px;justify-content:center;margin:0 0 14px}
-  .modebtn{flex:1;padding:10px 8px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--muted);font-weight:700;cursor:pointer;font-size:13px}
+  .modebtn{flex:1;padding:10px 8px;border-radius:0;border:1px solid var(--border);background:var(--card2);color:var(--muted);font-weight:700;cursor:pointer;font-size:13px}
   .modebtn.on{border-color:var(--accent-border);color:var(--text)}
   .lbl{color:var(--muted);font-size:13px;text-transform:uppercase;letter-spacing:.6px;margin:18px 0 8px;text-align:center}
   .two{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:center;margin:8px 0 6px}
@@ -50,27 +48,26 @@
   th,td{padding:8px;border-bottom:1px solid var(--border);text-align:left}
   th{color:var(--muted);font-size:12px}
   td.pts{text-align:right;font-weight:800;font-variant-numeric:tabular-nums}
-  .win{background:linear-gradient(90deg,rgba(255,107,157,.18),transparent);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin:6px 0 14px;font-size:18px;font-weight:800;text-align:center}
+  .win{background:var(--tint);border:1px solid var(--border);border-radius:0;padding:14px 16px;margin:6px 0 14px;font-size:18px;font-weight:800;text-align:center}
   h3{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:22px 0 10px}
   .muted{color:var(--muted)}.center{text-align:center}
   .rounds{display:flex;align-items:center;gap:10px;justify-content:center;margin:14px 0}
   .srt{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
   @media (prefers-reduced-motion:reduce){.peekbar i{animation:none;width:100%}}
-  .rounds input{width:70px;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:9px;font-size:15px;text-align:center}
+  .rounds input{width:70px;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:0;padding:9px;font-size:15px;text-align:center}
 </style>
-<link rel="stylesheet" href="game-common.css?v=5">
 <script data-goatcounter="https://ianm.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
-  <meta name="theme-color" content="#0d0d1a">
+  <meta name="theme-color" content="#f6f6f3">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
 </head>
-<body>
+<body class="gt">
 <header class="bar">
   <a class="home" href="pixelbreak.html">‹ Arcade</a>
-  <h1><span aria-hidden="true">🎨</span> Colour Guess</h1>
+  <h1>Colour Guess</h1>
   <div class="spacer"></div>
   <span class="code">room <code id="roomc"></code></span>
 </header>
@@ -202,7 +199,7 @@ function render(){
 function drawApp(ps){
   if(phase==="lobby"){
     $("app").innerHTML = `
-      <div class="players">${ps.map(p=>`<span class="pchip"><span aria-hidden="true">👤</span> ${esc(p.name)}${p.cid===cid?" (you)":""}</span>`).join("")||'<span class="muted">…</span>'}</div>
+      <div class="players">${ps.map(p=>`<span class="pchip">${esc(p.name)}${p.cid===cid?" (you)":""}</span>`).join("")||'<span class="muted">…</span>'}</div>
       <p class="muted center">Everyone sees the same colour, then dials in their best match with the R/G/B sliders. Closest match wins the round.</p>
       ${role==="host"
         ? `<div class="rounds"><span class="muted">Best of</span><input id="rounds" type="number" min="1" max="15" aria-label="Number of rounds"><span class="muted">rounds</span></div>
@@ -221,7 +218,7 @@ function drawApp(ps){
     }
   } else if(phase==="play"){
     $("app").innerHTML = `
-      <div class="players">${ps.map(p=>`<span class="pchip ${guesses[p.cid]?"locked":""}"><span aria-hidden="true">👤</span> ${esc(p.name)}${guesses[p.cid]?'<span aria-hidden="true"> ✓</span><span class="srt"> (locked in)</span>':""}</span>`).join("")}</div>
+      <div class="players">${ps.map(p=>`<span class="pchip ${guesses[p.cid]?"locked":""}">${esc(p.name)}${guesses[p.cid]?'<span aria-hidden="true"> ✓</span><span class="srt"> (locked in)</span>':""}</span>`).join("")}</div>
       <p class="muted center">Round ${round} / ${rounds}</p>
       <div class="two">
         <div><div class="cap">${(mode==="flash"&&peeking)?"👀 Memorise!":"Match this"}</div>${targetSwatch()}</div>
@@ -277,7 +274,7 @@ function sendCfg(){ if(AI) return; ch.send({type:"broadcast",event:"cfg",payload
 function targetSwatch(){
   if(mode!=="flash" || peeking)
     return `<div class="swatch" role="img" aria-label="Target colour" style="background:${rgbCss(target)}"></div>${(mode==="flash"&&peeking)?'<div class="peekbar"><i></i></div>':""}`;
-  return `<div class="swatch covered"><span aria-hidden="true">🙈</span>&nbsp;from memory</div>`;
+  return `<div class="swatch covered">&nbsp;from memory</div>`;
 }
 function announce(msg){ const el=$("sr"); if(el) el.textContent=msg; }
 function beginPlay(){

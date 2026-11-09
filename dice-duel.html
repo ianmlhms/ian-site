@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-no-season>
+<html lang="lb">
 <head>
 <meta charset="utf-8">
 <meta name="robots" content="noindex,follow">
@@ -10,16 +10,16 @@
   <link rel="canonical" href="https://ian.lu/dice-duel.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <script src="mp-gate.js?v=7" data-game="dice-duel" data-over="#rematch"></script>
-<script src="season.js?v=5"></script>
+<link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="gitter.css?v=8">
 <script src="theme.js?v=32"></script>
-<link rel="stylesheet" href="game-common.css?v=5">
 <style>
   body{display:flex;flex-direction:column}
   .wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:16px;gap:12px;max-width:520px;margin:0 auto;width:100%}
   .dice{display:flex;gap:10px}
-  .die{width:56px;height:56px;border-radius:12px;background:#f5f2ea;color:#1a1a2e;font-size:40px;line-height:1;
+  .die{width:56px;height:56px;border-radius:0;background:#f5f2ea;color:#1a1a2e;font-size:40px;line-height:1;
     display:flex;align-items:center;justify-content:center;border:2px solid transparent;cursor:default;user-select:none}
-  .die.held{border-color:var(--accent-border);transform:translateY(6px);background:#dfe9ff}
+  .die.held{border-color:var(--accent-border);transform:translateY(6px);background:var(--soft)}
   .die.can{cursor:pointer}
   button.die{padding:0;font-family:inherit;-webkit-appearance:none;appearance:none}
   .pickbtn{display:block;width:calc(100% + 16px);min-height:0;margin:-6px -8px;padding:6px 8px;border:0;background:none;color:inherit;font:inherit;cursor:pointer}
@@ -31,23 +31,23 @@
   td:first-child,th:first-child{text-align:left}
   th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.6px}
   td.open{color:var(--muted)}
-  td.pick{color:var(--accent2-text);font-weight:800;cursor:pointer;background:rgba(110,168,254,.08);border-radius:6px}
-  td.pick:hover{background:rgba(110,168,254,.2)}
+  td.pick{color:var(--accent2-text);font-weight:800;cursor:pointer;background:var(--tint);border-radius:0}
+  td.pick:hover{background:var(--soft)}
   tr.tot td{font-weight:800;border-top:2px solid var(--border)}
   .colme{color:var(--accent2-text)}
 </style>
 <script data-goatcounter="https://ianm.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
-  <meta name="theme-color" content="#0d0d1a">
+  <meta name="theme-color" content="#f6f6f3">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
 </head>
-<body>
+<body class="gt">
 <header class="bar">
   <a class="home" href="pixelbreak.html">‹ Arcade</a>
-  <h1>🎲 Kniffel</h1>
+  <h1>Kniffel</h1>
   <div class="spacer"></div>
 </header>
 
@@ -63,7 +63,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="pb/arcade-kit.js?v=42" data-arcade-id="o-dice-duel" data-arcade-title="Kniffel" data-arcade-no-score data-arcade-replace=".bar"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-<script src="game-common.js?v=4"></script>
+<script src="game-common.js?v=5"></script>
 <script type="module" src="notify-ambient.js?v=40"></script>
 <script>
 /* Yahtzee-style dice duel: 3 rolls per turn, hold dice between rolls, score one
