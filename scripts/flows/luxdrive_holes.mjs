@@ -109,6 +109,11 @@ export const flow = {
         poses.push({ x: fb.x, z: fb.z, y: fb.f + 2.2, yaw: fb.yaw, pitch: -3, kind: "tube looking out" });
         poses.push({ x: mid.x, z: mid.z, y: mid.f + 2.5, yaw: mid.yaw + 180, pitch: -5, kind: "tube inside" });
         poses.push({ x: a.x, z: a.z, y: a.f + 14, yaw: a.yaw, pitch: -30, kind: "tube over the portal" });
+        // tunnels19 (seven more tunnels open, troughs at most mouths): the other portal from above, looking out of face A, and the middle of each trough towards its face
+        poses.push({ x: b.x, z: b.z, y: b.f + 14, yaw: b.yaw + 180, pitch: -30, kind: "tube over the portal" });
+        poses.push({ x: fa.x, z: fa.z, y: fa.f + 2.2, yaw: fa.yaw + 180, pitch: -3, kind: "tube looking out" });
+        if (t.troughA) { const q = at(t.sA - t.troughA / 2); poses.push({ x: q.x, z: q.z, y: q.f + 2.4, yaw: q.yaw, pitch: -4, kind: "tube trough" }); }
+        if (t.troughB) { const q = at(t.sB + t.troughB / 2); poses.push({ x: q.x, z: q.z, y: q.f + 2.4, yaw: q.yaw + 180, pitch: -4, kind: "tube trough" }); }
       }
       return window.__probe(poses);
     }, { N: POSES, w: WORLD_W, d: WORLD_D });

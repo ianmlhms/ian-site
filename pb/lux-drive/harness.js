@@ -94,7 +94,7 @@ const area = JSON.parse(fs.readFileSync(path.join(DATA, 'area.json'), 'utf8'));
 const field = createHeightField({ near: data.near, far: data.far, roads: data.roads, decks: data.decks });
 const surface = createSurface(field);
 const deckNetwork = createDeckNetwork(widenToWays(fixLandmarkDecks(data.decks, (x, z) => surface.height(x, z)), data.roads), surface);
-const tubes = createTubes(data.roads, surface, field.network, data.buildings);          // tunnels16: the tunnels the car drives through (as main.js)
+const tubes = createTubes(data.roads, surface, field.network, data.buildings, deckNetwork);          // tunnels16: the tunnels the car drives through (as main.js)
 const ground = createGround(surface, deckNetwork, tubes.network);
 const landmarks = createLandmarks({ buildings: data.buildings, decks: deckNetwork.decks, ground: (x, z) => surface.height(x, z), roads: data.roads });
 const buildings = createBuildingIndex(data.buildings, { hidden: landmarks.hiddenBuildings, groundAt: (x, z) => field.height(x, z), landAt: (x, z) => field.baseHeight(x, z) });   // (as main.js: the houses know their height, drive12)
@@ -1770,12 +1770,12 @@ if (wants('N')) runBridgeChecks({ check, section, stats, data, surface, ground, 
 if (wants('O')) runTunnelChecks({ check, section, stats, data, field, surface, ground, net, portals, buildings, forest, playArea, tubeIds: tubes.ids });
 if (wants('P')) runRoads9Checks({ check, section, stats, data, field, surface, ground, net, portals, buildings, forest, playArea, markDecks: deckNetwork.decks.filter((d) => !landmarks.hiddenDecks.has(d.id)) });
 /* ---------------------------------------------------------------- Q: decks driven end to end, banks under deck ends, medians, camera (harness-decks.js) */
-if (wants('Q')) runDeckChecks({ check, section, stats, data, field, surface, ground, net, buildings, portals, playArea });
+if (wants('Q')) runDeckChecks({ check, section, stats, data, field, surface, ground, net, buildings, portals, playArea, tubes: tubes.network });
 /* ---------------------------------------------------------------- R: the carriageway smooth over its whole width, every lane driven (harness-surface.js) */
 if (wants('R')) runSurfaceChecks({ check, section, stats, data, field, surface, ground, net, buildings, portals, playArea });
 /* ---------------------------------------------------------------- S: how the walls, trees, façades and the camera look (harness-look11.js) */
 if (wants('S')) runLookChecks({ check, section, stats, data, field, surface, ground, net, buildings, forest, portals });
-if (wants('T')) runDrive12Checks({ check, section, stats, data, field, surface, ground, net, buildings, landmarks, portals, forest, playArea, maps, deckNetwork });
+if (wants('T')) runDrive12Checks({ check, section, stats, data, field, surface, ground, net, buildings, landmarks, portals, forest, playArea, maps, deckNetwork, tubes: tubes.network });
 /* ---------------------------------------------------------------- X: the tunnels the car drives through (harness-tubes.js, tunnels16) */
 if (wants('X')) {
   // the game's own collider and lens (main.js): the houses, walls, trees, lamps and benches over a tube must not stop a car in it

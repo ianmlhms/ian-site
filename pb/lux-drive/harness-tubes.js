@@ -4,7 +4,9 @@
  *   X2  a car driven through every tube in every lane, both ways (13 m/s, the game's own collider with the houses, walls, trees and lamps over it), gets through without
  *       touching anything and without a jolt: vertical acceleration <= X_RIDE_MAX_A from 10 m before the first face to 10 m after the last, and flush at the faces
  *   X3  the chase camera on those drives: inside a tube it stays inside (under the ceiling, between the walls); outside it never goes below the ground
- *   X4  the closed portals are gone from every tube, and nothing stands in a tube where its shell shows (a tree, a lamp, a house in the hood of a portal)
+ *   X4  the closed portals are gone from every tube, and nothing stands in a tube where its shell shows (a tree, a lamp in the hood of a portal), and no house
+ *       stands in a trough or on the open road in front of a face (tunnels19: a house OVER a tube between its faces is a building passage - Rue du Fort Thüngen under
+ *       the KAD - its walls stand on the roof, building-mesh.js footOf; the car inside meets only the tube)
  * Called by harness.js.  Pure Node. */
 import { createCar } from './car.js';
 import { createChaseCamera } from './camera.js';
@@ -24,12 +26,19 @@ const FLUSH_MAX = 0.03;              // m: the floor at a face against the appro
 const MUST_OPEN = [
   ['the Rond-Point Robert Schuman underpass (Bd Robert Schuman, both ways)', [481, 482]],
   ['the René Konen tunnel (Hellege-Geescht)', [2461]],
+  // tunnels19 (Ian: "ALL tunnels working")
+  ['the Cents tunnel (A1, both bores)', [158, 159]],
+  ['the Desserte Schuman', [2325]],
+  ['Rue du Fort Thüngen under the KAD', [8333]],
+  ['the A4 / N56 boxes under the Rond-Point Merl', [1849, 12867]],
+  ['the Albert Bousser tunnel', [219]],
 ];
 
 /** The lane centres (lat to the right of the direction of travel) of the road a car arrives on at a face: every lane of that approach (its carriageway is centred on the
- *  tube's line - the tube's line is the approach's drawn line); a car keeps its lane into the tube. */
-export function laneCentres(tube, approach) {
-  const n = Math.max(1, approach ? approach.lanes || 1 : tube.lanes), w = Math.min(tube.width, approach ? approach.width : tube.width), out = [];
+ *  tube's line - the tube's line is the approach's drawn line); a car keeps its lane into the tube.  drawn: the width of the carriageway the game draws there (tunnels19:
+ *  the OSM width of a motorway counts its shoulders - 9.8 m on the A4 / N56, drawn 7.8 m: the "outer lane" of 9.8 m ran along the retaining wall at its edge). */
+export function laneCentres(tube, approach, drawn = Infinity) {
+  const n = Math.max(1, approach ? approach.lanes || 1 : tube.lanes), w = Math.min(tube.width, approach ? approach.width : tube.width, drawn), out = [];
   for (let k = 0; k < n; k++) out.push(-w / 2 + ((k + 0.5) * w) / n);
   return out;
 }
@@ -38,15 +47,19 @@ export function laneCentres(tube, approach) {
  * Drives one tube along the lane at side offset `lat` in direction dir (+1: from face A to face B).  ctx: { ground, surface, collide, tubes }.
  * Returns { ok, maxA, maxAt, touched, done, camBad, camWhy }.
  */
-export function driveTube(tube, dir, lat, ctx) {
+export function driveTube(tube, dir, lat, ctx, latEnd = lat) {
   const { ground, surface, collide } = ctx;
   const sFrom = Math.min(tube.sA - RUN_OUT, groundStart(tube) - RUN_PAST), sTo = Math.max(tube.sB + RUN_OUT, groundEnd(tube) + RUN_PAST);
   const last = tube.s.length - 1;
   const iFrom = dir > 0 ? Math.max(0, indexAt(tube, sFrom)) : Math.min(last, indexAt(tube, sTo) + 1);
   const iTo = dir > 0 ? Math.min(last, indexAt(tube, sTo) + 1) : Math.max(0, indexAt(tube, sFrom));
   const poly = [];
+  // (the lane to the right of the direction of travel; from face to face it moves from its place on the entry approach to its place on the exit approach - the
+  // A4 / N56 boxes: drawn 9.8 m wide at the Merl end, 7.8 m at the other, tunnels19)
+  const sIn = dir > 0 ? tube.sA : tube.sB, sOut = dir > 0 ? tube.sB : tube.sA;
   for (let i = iFrom; dir > 0 ? i <= iTo : i >= iTo; i += dir) {
-    const l = lat * dir;            // (the lane to the right of the direction of travel)
+    const t = Math.max(0, Math.min(1, (tube.s[i] - sIn) / (sOut - sIn)));
+    const l = (lat + (latEnd - lat) * t) * dir;
     poly.push([tube.x[i] - tube.tz[i] * l, tube.z[i] + tube.tx[i] * l, tube.s[i]]);
   }
   let touching = null;
@@ -118,14 +131,33 @@ export function runTubeChecks({ check, section, stats, data, surface, ground, tu
   const steep = list.filter((t) => t.grade > TUBE.gradeMax || t.overRoad > 0.05);
   stats.tubes = list.map((t) => `${t.name} ${Math.round(t.length)} m grade ${(t.grade * 100).toFixed(1)} %`);
   stats.tubesRejected = tubes.rejected.map((r) => `${r.name} [${r.ids}] ${Math.round(r.length)} m: ${r.why}`);
-  check(`X1 the Schuman underpass and the René Konen tunnel are drivable (${list.length} tubes); every floor <= ${TUBE.gradeMax * 100} % and under the roads over it`,
+  check(`X1 the Schuman underpass, René Konen, Cents, the Desserte Schuman, Fort Thüngen, the A4 / N56 and Albert Bousser are drivable (${list.length} tubes); every floor <= ${TUBE.gradeMax * 100} % and under the roads over it`,
     missing.length === 0 && steep.length === 0, `${missing.map(([n]) => n).join(', ')} ${steep.map((t) => t.name).join(', ')}`);
 
   // ---- X2 / X3
+  /** The width of the carriageway the game draws on an approach (where surface.roadInfoAt's sdCar < 0 across the tube's line), the narrowest 6 - 24 m out of its face. */
+  const drawnAt = (tube, end) => {
+    const info = {};
+    let w = Infinity;
+    for (const k of [6, 12, 18, 24]) {
+      const i = indexAt(tube, end < 0 ? tube.sA - k : tube.sB + k);
+      const edge = (side) => {
+        let l = 0;
+        for (; l <= 8; l += 0.25) { surface.roadInfoAt(tube.x[i] - tube.tz[i] * side * l, tube.z[i] + tube.tx[i] * side * l, info); if (!(info.sdCar < 0)) break; }
+        return l;
+      };
+      const across = edge(-1) + edge(1);
+      if (across > 1) w = Math.min(w, across);
+    }
+    return w;
+  };
   const rides = [];
   for (const tube of list) {
     for (const dir of [1, -1]) {
-      for (const lat of laneCentres(tube, data.roads[dir > 0 ? tube.approachA : tube.approachB])) rides.push({ tube, dir, lat, r: driveTube(tube, dir, lat, { ground, surface, collide, parts, tubes: tubes.network, lens }) });
+      const wIn = drawnAt(tube, dir > 0 ? -1 : 1), wOut = drawnAt(tube, dir > 0 ? 1 : -1);
+      const appIn = data.roads[dir > 0 ? tube.approachA : tube.approachB], wLanes = Math.min(tube.width, appIn ? appIn.width : tube.width, wIn);
+      const scale = Number.isFinite(wOut) ? Math.min(1, Math.min(tube.width, wOut) / wLanes) : 1;      // (the same lane on a narrower exit)
+      for (const lat of laneCentres(tube, appIn, wIn)) rides.push({ tube, dir, lat, r: driveTube(tube, dir, lat, { ground, surface, collide, parts, tubes: tubes.network, lens }, lat * scale) });
     }
   }
   const bad = rides.filter((q) => !q.r.done || q.r.touched || q.r.maxA > X_RIDE_MAX_A);
@@ -141,7 +173,7 @@ export function runTubeChecks({ check, section, stats, data, surface, ground, tu
   let flushWorst = 0, flushAt = '';
   for (const tube of list) {
     for (const [sFace, out, app] of [[tube.sA, -1, tube.approachA], [tube.sB, 1, tube.approachB]]) {
-      for (const lat0 of laneCentres(tube, data.roads[app])) {
+      for (const lat0 of laneCentres(tube, data.roads[app], drawnAt(tube, out))) {
         const lat = out > 0 ? lat0 : -lat0;
         const probe = (sq) => {
           const i = indexAt(tube, sq), f = Math.max(0, Math.min(1, (sq - tube.s[i]) / Math.max(1e-6, tube.s[i + 1] - tube.s[i])));
@@ -171,17 +203,25 @@ export function runTubeChecks({ check, section, stats, data, surface, ground, tu
     const troughs = [];
     if (tube.troughA) troughs.push({ i0: indexAt(tube, tube.tA), i1: indexAt(tube, tube.sA) });
     if (tube.troughB) troughs.push({ i0: indexAt(tube, tube.sB), i1: indexAt(tube, tube.tB) });
-    for (const st of [...exposedStretches(tube, (x, z) => surface.height(x, z)), ...troughs]) {
+    // (the open road in front of a face without a trough: its blend)
+    const open = [];
+    if (!tube.troughA) open.push({ i0: indexAt(tube, tube.sA - TUBE.blend), i1: indexAt(tube, tube.sA) });
+    if (!tube.troughB) open.push({ i0: indexAt(tube, tube.sB), i1: indexAt(tube, tube.sB + TUBE.blend) });
+    const shell = exposedStretches(tube, (x, z) => surface.height(x, z));
+    for (const st of [...shell, ...troughs, ...open]) {
+      const between = shell.includes(st);
       for (let i = st.i0; i <= st.i1; i += 2) {
         for (const l of [-tube.innerHalf, 0, tube.innerHalf]) {
           const x = tube.x[i] - tube.tz[i] * l, z = tube.z[i] + tube.tx[i] * l, y = tube.floor[i] + 0.5;
           if (forest.collide(x, z, 0.6, y)) intruders.push(`tree in ${tube.name} at ${Math.round(x)},${Math.round(z)}`);
-          if (buildings.collide(x, z, 0.3, y)) intruders.push(`house in ${tube.name} at ${Math.round(x)},${Math.round(z)}`);
+          // (a house over the shell between the faces is a building passage only where the game lifts its walls onto the roof - building-view floorAt = roofAt)
+          const passage = between && tubes.network.roofAt(x, z) > tube.floor[i] + tube.clearance;
+          if (!passage && buildings.collide(x, z, 0.3, y)) intruders.push(`house in ${tube.name} at ${Math.round(x)},${Math.round(z)}`);
           if (lampsAt && lampsAt(x, z, 0.8)) intruders.push(`lamp in ${tube.name} at ${Math.round(x)},${Math.round(z)}`);
         }
       }
     }
   }
-  check('X4 no closed portal in a tube, and no tree, lamp or house stands where a tube\'s shell shows or in its troughs', closed === 0 && intruders.length === 0,
+  check('X4 no closed portal in a tube, no tree or lamp where a tube\'s shell shows or in its troughs, no house in a trough or in front of a face', closed === 0 && intruders.length === 0,
     `${closed} closed portals; ${[...new Set(intruders)].slice(0, 8).join('; ')}`);
 }

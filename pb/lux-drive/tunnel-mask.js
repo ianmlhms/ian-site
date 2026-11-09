@@ -12,6 +12,9 @@ import { TUBE, exposedStretches, indexAt } from './tunnel-tubes.js';
 export const MASK_MAX = 40;               // segments in the shader
 const SEGMENT = 4;                        // m: the length of one mask segment
 const OVERLAP = 1.0;                      // m: a segment reaches this far on into its neighbour (the bends), never past a face ...
+const WALL_BAND = 0.1;                    // m: a trough's mask reaches this far into its walls, no farther: the land over the wall band is the coping's to hide (a mask out to the
+                                          // walls' outer faces hid the land over a wall lower than the top of its 4 m segment - a sliver of sky over the coping where the wall
+                                          // top steps down under a road it holds, tunnels19)
 const FACE_OVERLAP = 0.5;                 // ... except a trough's segment at the face, which reaches this far into the tube (under the headwall, TUBE.headDepth deep): ending
                                           // square at the face on both sides, the two masks left a hair of terrain between them - a thin strip across the mouth (QA5 TU01)
 
@@ -28,13 +31,18 @@ const MASK_GLSL = `
       float tc = t;
       float lat = (d.x * (p.z - A.y) - d.y * (p.x - A.x)) / max(length(d), 1e-6);     // (to the right of the segment: x east, z south)
       if (lat > B.w || -lat > B.z) continue;
-      if (p.y < mix(B.x, B.y, tc)) return true;
+      // (B.y < 0: a trough segment, one top per side - B.x on the left, -B.y on the right; else the top runs from B.x to B.y along the segment)
+      float top = B.y < 0.0 ? (lat < 0.0 ? B.x : -B.y) : mix(B.x, B.y, tc);
+      if (p.y < top) return true;
     }
     return false;
   }
 `;
 
-/** The mask segments of the tubes: [{ ax, az, bx, bz, ta, tb, halfL, halfR }] (ta / tb: the top of the shell at each end; halfL / halfR: how far to each side). */
+/**
+ * The mask segments of the tubes: [{ ax, az, bx, bz, ta, tb, halfL, halfR, topL?, topR? }] (ta / tb: the top of the shell at each end; halfL / halfR: how far to each
+ * side; a trough's segment has one top per side instead, topL / topR).
+ */
 export function maskSegments(tubes, heightAt) {
   const out = [];
   for (const tube of tubes) {
@@ -66,9 +74,11 @@ export function maskSegments(tubes, heightAt) {
  */
 function troughSegments(tube) {
   const out = [];
-  const topAt = (i) => {
+  // (each side up to its own wall top: with the higher top of the two on both sides, the land over a lower wall - a road held by it, whose edge lies over the coping -
+  // was hidden over the coping and the sky showed through behind it: Rocade de Bonnevoie mouth B, the René Konen south trough, tunnels19)
+  const topAt = (i, arr) => {
     let m = -Infinity;
-    for (const j of [i, i + 1]) for (const arr of [tube.wallTopL, tube.wallTopR]) if (j < arr.length && !Number.isNaN(arr[j])) m = Math.max(m, arr[j]);
+    for (const j of [i, i + 1]) if (j < arr.length && !Number.isNaN(arr[j])) m = Math.max(m, arr[j]);
     return m + 0.05;
   };
   for (const [s0, s1] of [[tube.tA, tube.sA], [tube.sB, tube.tB]]) {
@@ -83,10 +93,14 @@ function troughSegments(tube) {
         return [tube.x[i] + (tube.x[i + 1] - tube.x[i]) * f, tube.z[i] + (tube.z[i + 1] - tube.z[i]) * f, i];
       };
       const [ax, az, ia] = at(sa), [bx, bz, ib] = at(se);
-      let top = -Infinity;
-      for (let i = Math.min(ia, ib); i <= Math.max(ia, ib); i++) top = Math.max(top, topAt(i));
-      if (!Number.isFinite(top)) continue;
-      out.push({ ax, az, bx, bz, ta: top, tb: top, halfL: tube.outerL - TUBE.maskInset, halfR: tube.outerR - TUBE.maskInset });
+      let topL = -Infinity, topR = -Infinity;
+      for (let i = Math.min(ia, ib); i <= Math.max(ia, ib); i++) { topL = Math.max(topL, topAt(i, tube.wallTopL)); topR = Math.max(topR, topAt(i, tube.wallTopR)); }
+      if (!Number.isFinite(topL) && !Number.isFinite(topR)) continue;
+      // (a side without a wall top takes the other's)
+      if (!Number.isFinite(topL)) topL = topR;
+      if (!Number.isFinite(topR)) topR = topL;
+      const top = Math.max(topL, topR);
+      out.push({ ax, az, bx, bz, ta: top, tb: top, topL, topR, halfL: tube.innerL + WALL_BAND, halfR: tube.innerR + WALL_BAND });
     }
   }
   return out;
@@ -132,7 +146,9 @@ export function createTubeMask(THREE, tubes, heightAt) {
     let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
     near.forEach(([, g], k) => {
       uniforms.uTubeA.value[k].set(g.ax, g.az, g.bx, g.bz);
-      uniforms.uTubeB.value[k].set(g.ta, g.tb, g.halfL, g.halfR);
+      // (a trough's segment: its right top negated - heights are positive, the shader reads the sign; see MASK_GLSL)
+      if (g.topL !== undefined) uniforms.uTubeB.value[k].set(g.topL, -g.topR, g.halfL, g.halfR);
+      else uniforms.uTubeB.value[k].set(g.ta, g.tb, g.halfL, g.halfR);
       const r = Math.max(g.halfL, g.halfR);
       x0 = Math.min(x0, g.ax - r, g.bx - r); x1 = Math.max(x1, g.ax + r, g.bx + r);
       z0 = Math.min(z0, g.az - r, g.bz - r); z1 = Math.max(z1, g.az + r, g.bz + r);

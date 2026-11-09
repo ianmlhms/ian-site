@@ -16,7 +16,7 @@ export async function loadWorld() {
   const field = createHeightField({ near: data.near, far: data.far, roads: data.roads, decks: data.decks });
   const surface = createSurface(field);
   const deckNetwork = createDeckNetwork(widenToWays(fixLandmarkDecks(data.decks, (x, z) => surface.height(x, z)), data.roads), surface);
-  const tubes = createTubes(data.roads, surface, field.network, data.buildings);       // (the tunnels the car drives through, as main.js)
+  const tubes = createTubes(data.roads, surface, field.network, data.buildings, deckNetwork);       // (the tunnels the car drives through, as main.js)
   const ground = createGround(surface, deckNetwork, tubes.network);
   return { data, field, surface, ground, deckNetwork, tubes };
 }

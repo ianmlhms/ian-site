@@ -9,8 +9,9 @@ import { withCampusTrees } from './campus-trees.js';       // CAMPUS: the trees 
 import { createBaseField } from './base-field.js';
 import { openShallowTunnels } from './tunnel-cover.js';     // BRIDGES8: a tunnel with no land over it is an open road
 import { splitEmbankmentUnderpasses } from './embankment-underpass.js';   // fix19: a street under an embankment the DTM kept is a tunnel
-import { fillLaneFlicker } from './lane-flicker.js';
-import { moveBridgeEnds, trimFreeEnds } from './bridge-ends.js';            // city20: a bridge end that stands on the road below moves back along its approach          // ROADS9: a narrower run of < 60 m between two wider stretches is flicker of the lane count
+import { fillLaneFlicker } from './lane-flicker.js';          // ROADS9: a narrower run of < 60 m between two wider stretches is flicker of the lane count
+import { dropMergeLanes } from './lane-drop.js';              // tunnels19: an on-ramp's merge lane ends before a tunnel with fewer lanes (Cents north)
+import { moveBridgeEnds, trimFreeEnds } from './bridge-ends.js';            // city20: a bridge end that stands on the road below moves back along its approach
 
 const DECIMETRE = 0.1;
 
@@ -165,11 +166,13 @@ export async function loadWorldData(read, onProgress = () => {}) {
   // ... and a street under a motorway embankment that the DTM kept over its bridges dives under it (embankment-underpass.js)
   const { roads: underRoads, split: underpasses } = splitEmbankmentUnderpasses(openRoads, baseHeight);
   // ... and a lane count that flickers for a few metres keeps the wider road (lane-flicker.js)
-  const { roads: laneRoads, filled: flickerFilled } = fillLaneFlicker(underRoads, trees);
+  const { roads: steadyRoads, filled: flickerFilled } = fillLaneFlicker(underRoads, trees);
+  // ... and the merge lane of an on-ramp ends before a tunnel that has fewer lanes (lane-drop.js)
+  const { roads: droppedRoads, dropped: laneDropped } = dropMergeLanes(steadyRoads);
   // ... and a bridge whose abutment would stand on the lanes of a road below it starts where it leaves them free (bridge-ends.js)
-  const { roads, decks: movedDecks, moved: movedBridgeEnds } = moveBridgeEnds(laneRoads, bakedDecks, baseHeight);
+  const { roads, decks: movedDecks, moved: movedBridgeEnds } = moveBridgeEnds(droppedRoads, bakedDecks, baseHeight);
   // ... and a deck end that no way runs onto but that lies on a street's carriageway at its level begins at the edge of that carriageway
   const { decks, trimmed: trimmedDeckEnds } = trimFreeEnds(roads, movedDecks, baseHeight);
   onProgress(1, 'done');
-  return { info, near, far, roads, openedTunnels, underpasses, flickerFilled, movedBridgeEnds, trimmedDeckEnds, decks, walls, canopy, classes, classInfo, buildings, lines, stops, trees: withCampusTrees(trees), places, names };
+  return { info, near, far, roads, openedTunnels, underpasses, flickerFilled, laneDropped, movedBridgeEnds, trimmedDeckEnds, decks, walls, canopy, classes, classInfo, buildings, lines, stops, trees: withCampusTrees(trees), places, names };
 }

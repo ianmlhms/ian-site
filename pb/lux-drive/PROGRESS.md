@@ -2826,6 +2826,199 @@ fall / air / hit place.  Jolt count unchanged (the sweep carries the car: the ve
 * The sweep's jolt metric carries the car (vertical only), so it does not see the steering; a driven sweep (steer + throttle at the new top speed) would be
   the next check.
 
+## Tunnels 19 (branch `lux-drive-tunnels19`, Mac mini, from main 0df61250 = v72): open the closed tunnels - WIP, HANDOFF (context rotation)
+
+Round folder `~/Library/Caches/luxdrive-work/tunnels19/` (tools in `tools/`: `tubes2.mjs` every tube with faces / troughs / approaches and the rejected runs, `cmpbase.mjs`
+the tubes of HEAD 0df61250 (copy `pb/lux-drive/_tt_base.js`, untracked, git-excluded) against now, `drive.mjs ids lats speeds` (FLY=1 starts at speed, PAD=m before/after)
+drives with the game collider, `tprof.mjs` / `xs.mjs` the car's ground along / across a tube, `trough.mjs`, `crest.mjs` (troughs / ramps / leads per side),
+`poses19.mjs` + `sheet.py` shots per tube (A/B top, portal, chase, inside), `probe.mjs` / `wayprof.mjs` / `osmtun.py` / `osmbox.py` the roads at a mouth, a way's
+profile with decks, the OSM tunnels; `base-wt/` a detached worktree of 0df61250 for base drives: `REPO=.../base-wt node drive.mjs ...`).
+
+### Opened (17 tubes now, were 10; harness X alone: X1-X5 PASS, 70 rides, worst 2.58 m/s2 - `tunnels19/hx5.txt`)
+| tunnel | ways | what it needed |
+|---|---|---|
+| Cents (A1), both bores | 158 / 159 | the north approaches (26 m between the Pulvermühle viaduct and the mouths) were carved at 29 % from the deck up to the DTM over the portal (road-bed TIGHT_END). New: the approach line follows on onto a bridge (`approachAt`, `approachShort` / `approachFollow`), the road level along it is deck-aware (`ground`, `onDeck`, findTubes/createTubes take the deck network as a 5th argument - main.js, harness.js, world_node.mjs pass it), a **ramp** (`rampEnd`: steep from the mouth, ending on a deck or a level road) makes the face the OSM mouth and the floor ours to the ramp's end, in a trough. At 55 m/s: <= 8.4 m/s2 (158), deck joint 3.7. |
+| Desserte Schuman | 2325 | "a house stands in it": houses OVER a tube between its faces are now building passages (building-mesh footOf already lifts their walls onto the roof); a house over a mouth moves the face out past it + `houseGap` 2.6 m (`clearOfHouses`); a house on the open approach rejects. |
+| Rue du Fort Thüngen (under the KAD) | 8333 + 9464 + 5913 + 11613 | the same house rule + `withGaps`: a short open way (<= 15 m) joining two tunnel ways end to end is part of the tunnel (the 12 m light well between the KAD passage and the 24 m tunnel before the Desserte junction; was a 27 % ramp between two closed mouths). Garage-ramp service tunnels are no longer part of runs (only `TUBE.kinds`). |
+| A4 / N56 under the Rond-Point Merl | 1849+586 / 12867+12868 | `pairTubes` fit by lanes (`laneMin` 3.5 + `laneRoomPair` 0.3) instead of the OSM width with shoulders; edge lines clamp to the narrower wall (tunnel-view `linesOf`); twins' troughs share their middle wall (`twinIds`: the twin's road beside a trough is no junction, unless it reaches into it); `troughLength` judges "wider than the tube" by lanes (586 A trough 81 m). |
+| Albert Bousser | 219 + 17926 + 11938 (+ links 11937 / 11939) | `forkChain`: two one-lane links split off in the last 22 m and leave through the same wide mouth (mouths 3.8 - 5.4 m apart): the main chain is the tube, the links are absorbed (ids). |
+| (fast tubes) | motorway / trunk | `leadFast` 40 m: a fast tube owns 40 m of each approach (a trough, junction-limited) - the tight-end crests at Cents south (22 m/s2 at 200 km/h); trough blend at `speedFast` 55. Changes Rocade 411 (B trough 35 -> 40) and Kirchberg 1280 (A 9 -> 41; base 7.7-8.4 -> 1.8-2.0 m/s2 at 25 m/s, 36 -> 7 at 55). The other 8 old tubes are identical to base (cmpbase). |
+| `troughFloor` | | its grade term now fades out at the face with the cross-section (a 6 cm step at the face of a short trough, Cents 159 south). |
+Kept closed (`TUBE.keepClosed`, explicit): Kirchberg plaza trunk pair 559 / 2418 (opened by the house rule, 3.2 m/s2 + 26 m/s2 joint, not finished), Rue du Chemin de Fer 4261
+(3.2 m passage, a car touches its walls in the curve).  Stafelter (the plan's "Grouft", A7 4105/5767): the baked world ends inside it (data clip at the commune
+border, 750 m before the real north portal) - closed; Ian told via Slack (default: stays closed, world extension = separate job).
+
+### Harness X changes (stricter + accurate, see harness-tubes.js)
+MUST_OPEN + Cents, Desserte, Fort Thüngen, A4/N56, Albert Bousser.  X2 lanes = the approach's lanes within the carriageway the game DRAWS (sdCar), and a lane moves
+from its place on the entry approach to its place on the exit (A4: 9.8 m OSM width, drawn 7.8 m at the east end: the "outer lane" ran along the retaining wall
+holding slip road 3012).  X4: no house in a trough or in front of a face (houses over a tube between its faces are building passages now).
+
+### HANDOFF - what is left (in this order)
+1. **Schuman west mouth trough**: the twin rule gave 482 a 9 m trough B at the Rond-Point (481 A still 0). Look at it (shots), X2 is fine, joint 6.8 / 5.2 m/s2
+   (stats) at 4730,8175 - smooth it or accept; make 481 A match if possible.
+2. **TU09** (René Konen south roll): NOT fixed. Trough A ends 42 m out at the junction with Bd Roosevelt 8608 (levelRoad); the roll (0.2 - 0.3 rad, left lane) is
+   the raw DTM gully of the uncarved approach 13628 6 - 40 m out (`xs.mjs 2461 60 100 2`: lat -3 +0.4..0.8 m).  Options: carve 13628 (road-network crossing rule
+   for the upper way, tunnels18 tried: lowered a house over the mouth - the new house rule may now accept it), or let the trough pass the 8608 junction.
+3. A4/N56 west mouths (Merl slip roads 12830 at the face, no trough): joint 23 m/s2 at 586 B>A lane 2.5 (stats, will show as a sweep jolt).
+4. All gates (COMMON-BRIEF order; holes poses for the new tubes: add them to the holes flow like tunnels16 did, `poses_new.json` has 63), drive sweep `--drawn`
+   (tools on lux-drive-sweep; its world.mjs must pass the deck network to createTubes as main.js now does), camera sweep (MSI), stacked before/after shots
+   per tunnel into `luxdrive-work/tunnels19/shots/final/` (WIP shots: `shots/wip1_sheets/`), merge origin/main, main.js ?v= >= 74 (fix19 = 73), push, vault line.
+
+### Tunnels 19, part 2 (second builder, Opus, 9 Nov afternoon)
+
+**Gate review (harness X, the previous builder's change) - verdict: KEPT, with one tightening.**
+* X2 lanes inside the carriageway the game draws (`drawnAt`, sdCar < 0) and a lane that moves from its place on the entry approach to its place on the
+  exit: this measures what the player drives (same principle as the sweep's `--drawn`).  Proof run with the old model on today's geometry
+  (`HX_OLD=1`, temporary switch, `tunnels19/hx_old.txt`): X2 1 bad ride of 70 - only the NEW A4 tube 12867 A>B, OSM lane -2.45, touching a wall at
+  3255,9985.  Every previously required tunnel (Schuman 481 / 482, René Konen 2461) and the other old tubes pass the old model too.  Explained: the drawn
+  carriageway at the A4 east end is 7.25 - 8.25 m wide and sits 0.8 m off the tube line (drawn lat -2.75 .. +4.5); the OSM lane -2.45 puts the car's left
+  side 0.65 m off the asphalt, onto the retaining wall at the drawn edge (`tools2/sdx.mjs`).  A player in a drawn lane does not touch it.
+* X4 "no house" exemption for a house over a tube between its faces: the game really treats it as a building passage (car-collide: inside a tube the car
+  meets only the tube; building-view floorAt = tubes.network.roofAt lifts the walls onto the roof face to face).  Old model: X4 flagged only Desserte
+  Schuman / Fort Thüngen houses that stand on the shell between the faces.  TIGHTENED (5bd29a75): the exemption now holds only where roofAt is really over
+  the tube's ceiling at that point (where the walls are lifted), not for the whole exposed stretch.  The new X4 also checks the open road in front of a face
+  without a trough (stricter than before).  X still 5/5.
+
+**TU09 (René Konen south roll) - FIXED.**  The trough's outer end lay at the 8608 "junction" 42 m out, on a crooked section (Bd Franklin D. Roosevelt
+runs 1.6 m beside the ramp, at its level at first, then 0.5 - 1 m higher: the carve between them is a 2 m slope under the left lane).  troughLength:
+a road beside the trough behind its outer wall that does not join the approach (no end of it within `joinGap` 2 m of a node of the approach) is held by
+the wall, not a junction; and the outer end of a trough is carried on out to a level section (`endFlat` 0.08 m across the wheel tracks).  2461 trough A
+42 -> 78 m.  Drives (13 / 25 m/s, lane -1.8): roll 0.29 -> 0.07 rad, a_z 21.6 -> 8.8 m/s2 (the rest is the world road's own 7 cm crest 40 m out).
+Sweep: the TU09 roll/jolt places are gone.
+
+**A4 / N56 west mouth joint - SMOOTHED.**  586's west mouth had no trough because the Merl slip road 12830 (6.7 m higher, over the portal) reached into
+it at the face; the cut slope came down to the lane edge (shot `shots/w3/sheets/sheet_n56w.jpg`).  A road over the roof within `overFace` 2 m of a face
+crosses over the portal - no junction: 586 trough B 0 -> 31 m.  X2 joints: 586 B>A 23.3 -> 7.1 m/s2 (worst joint of all tubes now 12.9: 586 A>B at the
+outer end of that trough, where the world's twin carriageways 2222 / 1848 meet 0.4 m apart in level 30 - 45 m out - also in base).  12867's west mouth
+stays without a trough: slip road 12833 overhangs its carriageway (a trough would cut 12833's edge).  New: walls under a road held by them get no parapet
+over it (`heldAbove` 0.8, `heldRoom` 1.0, `heldBelow` 0.35): link 3013 runs on the top edge of the N56 east cut, its lane centre over the wall - the
+parapet was a hit (sweep: 0.8 m) - gone.
+
+**Schuman west mouths - ACCEPTED as is (explained).**  481 A cannot get a trough: the twin 482's carriageway (9252) reaches into it 3.5 m out (the two
+carriageways merge right there); 482 B has its 9 m one, and its middle wall is the shared wall between both (shots `shots/w2/sheets/sheet_s481.jpg`,
+`sheet_s482.jpg`: both look the same).  The jolt at 4730,8175 (482 A>B 6.8 m/s2 at 13 m/s, 15 - 19 at 25) is the world road's own sag: the merge plateau
+of 9252 / 9145 is flat for 11 m and then climbs at 5 % within 3 m - a road-network carve issue, not the tube (base: 20.8 / 31.7 at 25 m/s, so better now).
+
+**Sweep tools (lux-drive-sweep, pushed)**: world.mjs passes the deck network to createTubes (6dcd1d98); SWEEP_FAST=1 from car20 committed; `--area`
+takes several boxes; a lane that starts in a tube's trough / blend starts on its floor (f44999be: the Cents south approach 521 starts AT the face, the car
+was put on the hill over the portal and "flew" 0.6 s).
+**BIG FINDING (2c1835cc)**: `play-area.js inside()` only answers within ~100 m of the commune border (it reads the nearest ring segment in the 3x3 cells of 64 m
+around the point and says "outside" when there is none).  The sweeps used it to pick their roads and points: every sweep so far drove 596 roads along
+the BORDER, not the city (8610 roads; no tunnel, no old town).  The sweep now uses a real point-in-polygon.  A full-city drive sweep takes ~100 min per
+speed set on the Mini (stopped after 6 min: 1472 events in the first 480 roads) - needs its own run (MSI or overnight).  The game uses inside() for the
+portal border probe only (main.js createPortals): interior mouths without an approach count as "border" there - harmless, left alone.
+
+**Harness gates on this tree (8b09811b, ?v=74)**: full run 173 / 175 (`tunnels19/gates/harness.txt`, 2051 s); the 2 failures were caused by opening the tunnels and
+are fixed in the harness's measuring, not its limits: P4's floor on the NUMBER of portals (> 50; 11 closed portals became open tubes, 56 -> 45 -> floor 40, the
+"no headwall over a road" limit unchanged); Q1 (and T's deck drive) started a route that leaves a deck into a tube's trough at hint 1e4 = on the hill over the
+Cents south portal (deck 21: air 33 frames) - a route that starts in a trough / blend now starts on the tube's floor (as the sweep).  Re-run P, Q, T, X: 17 / 17
+PASS (`gates/harness_PQTX.txt`; Q1 9 decks failing, ratchet 10, base 9-10).
+
+**Tunnel-area drive sweep (`--drawn`, 11 boxes round all tubes, `sweep/run-area.sh`, compare `tools2/cmpsweep.py base-x new-x`)**: base (main v72) slow 461 jolts /
+251 hits / 1 fall / 1 air, the tunnel areas are rough in base already (city interior: see BIG FINDING).  New-vs-base at 13/25 m/s (new1, before the last fixes):
+gone - TU09 roll + jolt, Schuman 9252 jolt 22.7, Fort Thüngen building hit, Cents 157 jolt 60; new - Cents 521 air (sweep start artifact, fixed f44999be), link 3013
+tube hit (fixed: held roads), Desserte 9510 jolt 36.9 (see Still wrong), Cents 2929 hit lane -4.48 (see Still wrong).
+
+### Still wrong (honest)
+* **Cents north (2929 -> 158)**: the approach is drawn 13 - 14 m wide (3 lanes) into the 41 m trough of a 2-lane tube; the OSM outer lane (-4.48) meets the
+  trough's wall end (sweep hit 0.41 m).  Needs a funnel trough (walls flaring from the tube width to the approach width) - trough width is per tube today
+  (tunnel-view, tunnel-mask, collide, troughFloor all use innerOf): a separate job.
+* **Desserte Schuman exit (9510 at 5929,8148)**: jolt 23 - 35 m/s2 for a car leaving the Desserte tube: its lane crosses the blend in front of Rue du Fort
+  Thüngen's face B almost square (the two mouths meet at the Desserte junction); that blend pulls the ground 2 - 5 cm towards FT's floor plane over 1 m.
+  Fix idea: blend in front of a face only along the approach's own carriageway / fade it with the angle of the crossing road.
+* Schuman west sag (world carve of the 9252 / 9145 merge), N56 west world road 30 - 45 m out (twins 0.4 m apart in level), 12867 west without a trough
+  (12833 overhangs it) - all in base too.
+* The world sweeps so far covered only the border band (BIG FINDING): a full-city drive + camera sweep is needed before launch.
+
+### HANDOFF (if this builder runs out): what is left, in order
+1. Browser gates on 8b09811b (`tunnels19/gates/run.sh` -> `gates/*.txt`): **world PASS** (114 / 151 / 213 draw calls).  **holes FAIL 283 px, holes_low
+   FAIL 259 px** - the holes flow now has 232 poses (160 at tunnels: + the other portal from above, looking out of A, each trough's middle), three poses see holes:
+   (a) 5284,10592 y 296.9 yaw 267 "tube over the portal" 196 px = Rocade de Bonnevoie 411 mouth B from above (an OLD tube: a new pose, so likely in base too -
+   check with base-wt; fix the mask / skirt there), (b) 5282,9171 y 293 yaw -111 "tube trough" 10 px = the René Konen trough A that this round lengthened to
+   78 m (TU09), (c) 3199,9983 y 264.3 yaw 183 "tube inside" 77 px = inside the A4 / N56 pair.  Shoot each pose (holes flow `__probe` style: x, z, y, yaw,
+   pitch) to see them, fix, re-run.  ui PASS, webkit PASS (`gates/ui.txt`, `gates/webkit.txt`).
+2. Final tunnel-area sweep: `sweep/run-area.sh <repo> new2` then `python3 tools2/cmpsweep.py base-slow new2-slow` (and fast).
+3. Camera sweep (MSI if reachable, else Mini; sweep-look.mjs with the fixed world.mjs, `--area`-like restriction to the tunnel boxes is not built in).
+4. Shots: `shots/final/poses_final.json` (50 poses, 10 tubes) through shot.mjs on base-wt (before) and this tree (after), then `python3 tools2/stack.py before after
+   shots/final/stacked`.
+5. Deploy: fetch + merge origin/main (fix19 = ?v=73 may have landed; keep both sides), ?v=74 stays (or next free), gates again if shared files changed, push,
+   vault line, Progress line in ORCHESTRATOR-HANDOFF.md.
+
+### Tunnels 19, part 3 (third builder, Opus, 9 Nov late afternoon)
+
+Round folder additions: `tunnels19/p3/` (hole probes `holeeval.js` / `rayeval.js` / `cnt.js` as `SHOT_EVAL` scripts for shot.mjs in `?holes=1` mode, `segat.mjs` the mask
+segments over a point, `xsface.mjs` the land across a face, `lanecheck.mjs` a road's lane against the tubes, `earthcount.mjs` the earth stops per mouth, `fan.mjs` the blend at a point).
+
+**Holes gate: FAIL 283 / 259 px -> PASS 0 / 0** (232 poses, medium and low).
+* Rocade de Bonnevoie mouth B from above (196 px) and the René Konen trough (10 px) - one cause, NEW in tunnels19 (v72 shows nothing there: shot
+  `p3/look_base_h/rocB_close.png`): part 2's held-road rule lowers a trough wall under a road it holds (0.35 m under it), but the trough's mask hid the land
+  up to the HIGHER wall top of the two sides and out to the walls' outer faces - so the land over the lower coping was hidden and the sky showed behind it.
+  tunnel-mask.js: a trough segment now has one top per side (packed in the uniform: B.y < 0 = trough segment, B.x left top, -B.y right top) and reaches only
+  WALL_BAND 0.1 m into the walls (the coping hides the wall band; a 4 m segment's top is its highest station, so a mask out to the outer face still hid land
+  over a wall that steps down within the segment).
+* Inside the A4 / N56 pair (77 px): looking out of the A4 (12867) west mouth, which has no trough because the Merl slip road 12833 overhangs it: the land of the
+  slip road stands 6.8 m over the floor in the left 1.5 m of the opening, and a 0.3 m lip of the slope beside the lanes; from inside the tube the terrain is
+  seen from below (not drawn).  tunnel-view.js buildOutside, mouths without a trough: **earth stops** (blocks of the headwall's concrete, 0.5 m strips, 0.3 m deep)
+  where the land at the face stands EARTH_RISE 0.4 m over the floor on a drawn carriageway / EARTH_RISE_OFF 0.12 m beside it (main.js passes onRoad), and an
+  **apron** (the floor runs on 0.6 m out of the face, 3 cm under the land, its outer edge rising to just under higher land).  fix19's sill (merged from main) does
+  the same for the hairline across a mouth from inside; both kept.  Earth stops appear at 10 mouths (earthcount.mjs: Bousser B, Schuman 481 A, Cessange B,
+  Grünewald 1992 B, Desserte A / B, Fort Thüngen A / B, A4 A, Rangwee 16860 A) - always where the land already stood in the opening.
+
+**Cents north (2929 into 158): FIXED.**  2929 is the 71 m merge stretch where the on-ramp 125 runs beside the A1 (549, 2 lanes, 9.8 m) up to the mouth of the
+2-lane tube: OSM 3 lanes, 13.45 m, its outer lane (-4.48: the car's side 5.4 m out, the tube's wall 5.14) ran into the trough wall end and the face.  New
+`lane-drop.js` (applied in loadWorldData after the lane flicker, so game / harness / bakers / sweep read the same): a one-way approach into a tunnel way with fewer
+lanes that starts where an on-ramp joins the carriageway it continues takes that carriageway's width and lanes - the ramp merges at the joint (only 2929 in the
+whole world matches).  Sweep: the 0.41 m hit is gone; Cents box otherwise unchanged.
+
+**Desserte Schuman exit (9510 at 5929,8148): FIXED.**  Not the angle of the crossing: floorOf carried the cross-section of a face (the flush residual) on
+unchanged out of the face, so 4 m in front of Rue du Fort Thüngen's face B the blend target still had FT's kerb 0.21 m high at lat +3.5, and the Desserte exit
+lane crossing it was pulled up 5 - 10 cm (23 - 37 m/s2).  The flush now fades out over TUBE.flushOff 4 m out of the face (8 m, flushOffFast, in a fast tube: at 57 m/s the 4 m fade
+rocked the A4 west mouth 11.6 -> 19.3 m/s2; with 8 m 15.1, the other A4 / Bousser lanes within +-2 of no fade); at the face it is unchanged.
+Sweep: the 9510 jolt is gone.  FT's own lanes (drive.mjs 8333, 13 / 25 m/s): mixed small changes (worst 18.9 -> 18.1; 14.4 -> 17.6 in one lane at 25 m/s,
+13.9 -> 11.1 in another) - FT face B was rough before (a building passage at a junction).
+
+**The full-city sweep's "tube mouth" group (15 places, v73 REPORT.md): 13 were the SWEEP, not the game.**  drive-core.mjs (f44999be) started every lane whose
+start lay within a tube's s range on the tube's FLOOR - also roads OVER a tube (Rond-Point Schuman 1684 / 1683, Jonction Grunewald 1140, Pont Buchler 15774,
+Krautmaart 1443, service 8549): the car was put inside the tube under the street, met its walls (0.8 m = pushMax) and was thrown (2,700 m/s2).  Fixed on
+lux-drive-sweep (09d040b8, pushed): only a tube's own approaches (and the way on from a short one: Cents 157 -> 9174) start on its floor.  Re-driven: all gone.
+Left (identical in v72): Bd Robert Schuman 11619 lane -7.12 (OSM 17.8 m / 5 lanes; the drawn carriageway beside the underpass trough is narrower - that lane runs
+0.4 - 2.6 m OFF the asphalt, on the verge, into the trough parapet) and the Rocade link 5876 (its sweep lane runs 1.5 - 2.9 m off the drawn carriageway, along
+the trough wall of 411 A).  Both are lanes off the asphalt (sweep lane model), not a tube floor or blend; no player drives there.
+
+**Camera sweep** (MSI offline -> Mini GPU; `p3/lookpts.mjs` = look-points of the whole play area kept in the 11 tunnel boxes, 856 points x 4 views, 4.2 min):
+v72 (`look3base/`) hole 1 / flicker 204 / object 42 / grass 88 / nolines 34; this tree before the flashing (`look3/`) hole 2 (both at the René Konen south
+trough: the land at the inner foot of the left wall lies 0.1 m over the wall top lowered under Bd Roosevelt, the mask hid it and the ray over the coping met the
+land behind from below) -> **flashing** (tunnel-view.js buildTroughs: where the land behind a wall lies over its top, a strip rises from the coping's back edge
+to 3 cm under that land) -> final run `look3b/`: **hole 0** / flicker 190 / object 36 / grass 28 / nolines 31 (all at or under v72).
+
+**Merged origin/main (fix19 = v73) into the branch** (ef3aac17): conflicts lux-drive.html (?v=74 kept), world-data.js (fix19's embankment underpasses run
+first, then the lane flicker, then the lane drop), tunnel-view.js (fix19's sills in buildInside kept beside this round's earth stops / apron; both run).
+
+**Gates on the merged tree**: harness **175 / 175** (1999 s; after the fast-tube fade P,Q,T,X again 17 / 17, tube rides 73, bad 0, worst 2.58, worst joint 12.9
+N56 586 as before), world PASS (114 / 151 / 212 draw calls), holes **0** / holes-low **0** (232 poses), ui PASS (98), webkit PASS (22).
+
+**Tunnel-area drive sweep** (`--drawn`, 11 boxes, both trees with the fixed sweep tool; base3 = v72 base-wt, new3 = this tree; `tools2/cmpsweep.py`):
+13/25 m/s: base jolt 458 / roll 106 / hit 251 / fall 1 / air 1 / offroad 7 -> new 426 / 94 / 246 / 1 / 1 / 5; NEW or WORSE: none.  Gone: Bd Schuman 11619
+jolts 116 / 61 + rolls 0.89, Cents 157 jolt 60, the Fort Thüngen building hit, Rue de Merl 36, Schuman 9252 23, TU09 (13628) 17 + roll, 1684 / 5876 tube hits,
+2929 9.  SWEEP_FAST 13/25/57: base 1057 / 133 / 299 / 1 / 1 / 8 -> new 1018 / 115 / 290 / 1 / 1 / 5; NEW or WORSE (all jolts at 57 m/s, no hit / fall / air):
+Bd Schuman 1684 lane -7.12 49 (the off-asphalt OSM lane over the Schuman underpass), A4 12867 west mouth 35 (tube opened this round; 57 m/s drives 15 - 28, the
+world road's own roughness there), Bousser link 11939 21, Bousser 219 10, Cents 11836 / 2929 ~9.
+
+**Shots** (stacked before = live v72 / after = this tree, labelled for the phone): `luxdrive-work/tunnels19/shots/final/stacked/*.jpg`, 58 views of 11 tubes
+(the 10 of part 2 + Rocade de Bonnevoie A / B from above, mouths, chase, inside, + `a4_A_frominside`); poses `shots/final/poses_final.json`.
+
+**Sweep tools (lux-drive-sweep, pushed 09d040b8)**: drive-core.mjs startHint - see the "tube mouth" paragraph.  Also run on base-wt with the same tool.
+
+### Still wrong (honest)
+* A4 12867 west mouth at 57 m/s: 15 - 28 m/s2 (the world's road 1848 and the slip-road junction in front of a mouth without a trough); fine at 13 / 25.
+* Bd Schuman 11619 / 1684 and the Rocade link 5876: sweep lanes OFF the drawn asphalt (OSM width wider than what the game draws next to the underpass troughs) -
+  they rock on the verge and touch the trough parapet; not a lane anybody drives, identical in v72.  A sweep that clamps lanes to the drawn carriageway would
+  stop reporting them.
+* Cents 9174 jolt 24 m/s2 at 7 m into the way at 13 m/s is a run-start transient (through-drives from the tube: 2.0 - 2.9 m/s2).
+* FT face B (building passage at the Desserte junction): its own lanes 11 - 18 m/s2 at 25 m/s, as before.
+* Earth stops show as concrete blocks where the land stood in a mouth's opening (Bousser B, Desserte, Fort Thüngen, Rangwee, A4 west): honest, but the real
+  portals there are cleaner (a trough would be the real fix where a road over the edge allows one).
+* Stafelter ("Grouft") still closed (world data ends inside it).  The full-city sweep is the orchestrator's (city20 works the non-tunnel groups).
 ## City 20 (9 Nov 2026, branch `lux-drive-city20`, Mac mini): the full-city sweep's ramps, carve banks, deck parapets, interchange rolls (groups 2 - 6 of citysweep/v73)
 
 Started from main 93b33426 (v73).  Tools + logs: `~/Library/Caches/luxdrive-work/city20/` (`tools/pp.mjs` drawn-lane probe, `pj.mjs` the lane JOINED with the ways that
