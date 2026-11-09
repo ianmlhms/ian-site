@@ -571,6 +571,7 @@ async function boot() {
   window.__lux = {
     tubes, tunnelView, tubeMask, landmarks, landmarkView, trams, tramSim, tramNetwork, streetLights, benchView, scene, camera, renderer, car, env, terrain, city, trees, surface, ground, field, portals, playArea, buildings, markPlan, quality: () => quality,
     ui, fullMap, roadIndex, sound, stepper, model, input, forest, collide, placeAt, blockedAt, deckBarriers, roofs, roofIndex,
+    bakedWalls,                                            // (the retaining walls the game draws: the world flow's carve-wall check, city21)
     /** The Kaart and the teleport for the flows: open the map, put the car on the road nearest to (x, z). */
     toggleMap: () => toggleMap(), startDriving: () => startDriving(), isStarted: () => started,
     teleportNear: (x, z, reach = 200) => { const hit = roadIndex.nearest(x, z, reach); if (hit) teleportTo(hit); return !!hit; },

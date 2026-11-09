@@ -249,6 +249,17 @@ export const flow = {
       // (bridges8: the opened shallow tunnels are left out of the stride, so the stride samples the same sides as before they were opened; every side of them is
       // measured on its own below and may have no wall at all)
       const STRIDE = 41;
+      // (city21, the reviewer's decision - the same rule as harness D's pits under a deck) a face that a baked retaining wall closes is concrete, not a wall the carve made: its
+      // foot is a road (on its carriageway or within PIT_ROAD of it) and a baked wall within PIT_WALL_REACH has its foot at that level (bottom at most PIT_BED over the ground) and
+      // its top holds the land back to within MAX_PIT.  The abutment faces under the road decks (bake_walls.mjs CUT_RAMP) are such walls; an open earth face still counts.
+      const MAX_PIT = 1.0, PIT_BED = 0.6, PIT_WALL_REACH = 10, PIT_ROAD = 1.5;
+      const wallPts = m.bakedWalls.flatMap((w) => w.pts);
+      const probe = {};
+      const closedByWall = (x, z) => {
+        const g = m.field.height(x, z, probe), land = m.field.baseHeight(x, z);
+        if (!(probe.sdCar <= PIT_ROAD)) return false;
+        return wallPts.some((p) => Math.hypot(p.x - x, p.z - z) <= PIT_WALL_REACH && p.bottom <= g + PIT_BED && p.top >= land - MAX_PIT);
+      };
       const opened = [];
       let k = -1;
       for (let i = 0; i < net.count; i++) {
@@ -261,16 +272,18 @@ export const flow = {
         const nx = -(bz - az) / len, nz = (bx - ax) / len;    // across the road
         const a0 = S.A0[i], reach = S.REACH[i];
         for (const s of [1, -1]) {
-          let carved = 0, natural = 0;
+          let carved = 0, natural = 0, footX = 0, footZ = 0;
           for (let d = a0 + 0.5; d <= reach; d += 0.5) {
             const x = px + nx * s * d, z = pz + nz * s * d;
             if (!isFinite(x) || !isFinite(z)) continue;
-            const h0 = m.field.height(x, z), h1 = m.field.height(x + nx * s * 0.5, z + nz * s * 0.5);
-            const g0 = m.field.groundHeight(x, z), g1 = m.field.groundHeight(x + nx * s * 0.5, z + nz * s * 0.5);
-            carved = Math.max(carved, Math.abs(h1 - h0) / 0.5);
+            const x1 = x + nx * s * 0.5, z1 = z + nz * s * 0.5;
+            const h0 = m.field.height(x, z), h1 = m.field.height(x1, z1);
+            const g0 = m.field.groundHeight(x, z), g1 = m.field.groundHeight(x1, z1);
+            const c = Math.abs(h1 - h0) / 0.5;
+            if (c > carved) { carved = c; if (h0 <= h1) { footX = x; footZ = z; } else { footX = x1; footZ = z1; } }   // (the foot of the steepest step: its lower end)
             natural = Math.max(natural, Math.abs(g1 - g0) / 0.5);
           }
-          rows.push({ carved, natural });
+          rows.push({ carved, natural, closed: carved > 3 && natural <= 3 && closedByWall(footX, footZ) });
         }
       }
       // every side of the opened tunnels (a cut, 2-4 m deep under deck 32 on the A1): never a wall
@@ -299,7 +312,7 @@ export const flow = {
       // A WALL is a slope of more than 3 (72 degrees) over half a metre.  The land of Luxembourg has cliffs of its
       // own (the valley of the Alzette): they stay cliffs, they are not the fault of the carve.  A wall is counted
       // only where the carve made one: the ground there is steeper than 3 while the land at the same point is not.
-      const walls = rows.filter((r) => r.carved > 3 && r.natural <= 3);
+      const walls = rows.filter((r) => r.carved > 3 && r.natural <= 3 && !r.closed);
       return {
         total: rows.length,
         p50: q(0.5), p90: q(0.9), p99: q(0.99),
@@ -307,6 +320,7 @@ export const flow = {
         walls: walls.length,
         deepest: walls.reduce((m, r) => Math.max(m, r.carved), 0),
         cliffs: rows.filter((r) => r.natural > 3).length,
+        closed: rows.filter((r) => r.closed).length,
         openedSides, openedWalls,
       };
     });
@@ -316,7 +330,7 @@ export const flow = {
     // the pin of the carriageway pulls toward the face of its own batter, not toward a flat bed), so the ground beside a road is at most a little steeper than the land.
     h.expect(slope.p99 <= 1.6, `the ground beside the roads is at most ${slope.p99.toFixed(2)} (99th percentile)`);
     h.expect(slope.share <= 0.02, `${(slope.share * 100).toFixed(2)}% of the sides are steeper than the land (the limit is 2%)`);
-    h.expect(slope.walls <= 8, `${slope.walls} sides of roads are a wall the carve made (the limit is 8 of ${slope.total}, the ${slope.cliffs} cliffs are the land's own)`);
+    h.expect(slope.walls <= 8, `${slope.walls} sides of roads are a wall the carve made (the limit is 8 of ${slope.total}, the ${slope.cliffs} cliffs are the land's own, ${slope.closed} faces are closed by a baked wall)`);
     h.expect(slope.openedSides > 50 && slope.openedWalls === 0, `${slope.openedWalls} of ${slope.openedSides} sides of the opened shallow tunnels are a wall the carve made (none may be)`);
     h.expect(slope.deepest <= 8, `the deepest wall the carve makes is ${slope.deepest.toFixed(2)} (the limit is 8)`);
 

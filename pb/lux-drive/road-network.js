@@ -105,6 +105,12 @@ const ARM_SOFT = 10.0;                 // m: the distance of the other arm is th
 const CAP_SOFT = 2.0;                  // m: the carriageway pin ends this softly past the END of a way (no flat disc at the end of a street)
 const PIN_FADE = 3.0;                  // m: the carriageway level fades into the batter over this distance beyond the pavement
 const FILL_TAPER = 3.0;                // m: the last stretch of a fill face where it sinks to the land (the scan that finds the end of the face is coarse)
+const FILL_PIN_STRETCH = 0.4;          // (city21) the pin of a way on a FILL fades over its join + this much of it more ...
+const FILL_PIN_EXTRA_MAX = 1.0;        // m ... at most this much more, and never past the batter's last FILL_TAPER: the pin and the join of a tall fill let go together, and the product of
+                                       // their two smoothsteps is 2.5 m/m on its own (peak 1.98 x the drop / the join) - over a falling hillside a 3.0 - 3.1 m/m wall beside the road (Boulevard
+                                       // Roosevelt 12245 over the Petrusse, Clausener Bierg 5501 over Rue du Fort Olisy: the world flow's sampled carve walls)
+const FILL_PIN_FREE = [3.0, 6.0];      // m: ... and only where the carriageway of every OTHER way is this far away (fading in between): over a cliff between two streets (Rampart / Neie Wee)
+                                       // the longer pin pushed the face of the upper one onto the lower one
 const MAG_WINDOW = [0.3, 1.2];         // m: the strength of the pin of a way is the mean of the pins of the segments that are about as near as the nearest one (a ring comes back past its own seam:
                                        // the pin of one arbitrary segment of the two jumped where the nearest one changed)
 const SEP_LOW = 0.4, SEP_HIGH = 0.8;   // m: two carriageways whose beds differ by less than SEP_LOW are one level (a junction), by more than SEP_HIGH two levels
@@ -1585,6 +1591,12 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
       const dMin = candD[slotArm1[sl]];
       if (NOBATTER[candI[slotArm1[sl]]]) { wayEdge[sl] = Infinity; continue; }             // a way that rides over the others keeps the DTM (its fill): no batter, no pin
       segmentState(slotArm1[sl]); wayBed[sl] = sBed; wayEdge[sl] = dMin - (BENCH[candI[slotArm1[sl]]] + candDh[slotArm1[sl]]); wayDist[sl] = dMin;
+      let otherEdge = Infinity;                                  // (the nearest carriageway of another way: the longer pin of a fill lets go near it, FILL_PIN_FREE)
+      for (let s2 = 0; s2 < nSlots; s2++) {
+        if (s2 === sl || slotRoad[s2] === road || NOBATTER[candI[slotArm1[s2]]]) continue;
+        otherEdge = Math.min(otherEdge, candD[slotArm1[s2]] - (BENCH[candI[slotArm1[s2]]] + candDh[slotArm1[s2]]));
+      }
+      const fillLetGo = smoothstep(FILL_PIN_FREE[0], FILL_PIN_FREE[1], otherEdge);
       { const c1 = slotArm1[sl], i1 = candI[c1], t1 = candT[c1];          // the direction from the way to the point (which side of it the point lies on)
         const fx = X0[i1] + (X1[i1] - X0[i1]) * t1, fz = Z0[i1] + (Z1[i1] - Z0[i1]) * t1, dl = Math.hypot(x - fx, z - fz) || 1;
         wayDirX[sl] = (x - fx) / dl; wayDirZ[sl] = (z - fz) / dl; }
@@ -1658,7 +1670,9 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
         const join = Math.max(FACE_JOIN, FACE_JOIN_PER_M * Math.abs(bed - face));
         // The pin itself fades over PIN_FADE, or over the join where that is longer: a pin that let go while the join was still half way from the bed to the face multiplied the two fades,
         // and the side of a way that stands 5 m over a valley (Boulevard Roosevelt over the Pétrusse) dropped 3 m in a metre.
-        const pin = (1 - smoothstep(bench, bench + Math.max(PIN_FADE, join), d)) * (1 - smoothstep(0, CAP_SOFT, over));
+        // (city21) On a fill it fades a little longer than the join (FILL_PIN_*): the two smoothsteps together were a 3 m/m wall beside a tall fill over a falling hillside.
+        const fillExtra = bed > face ? Math.max(0, Math.min(join * FILL_PIN_STRETCH, FILL_PIN_EXTRA_MAX, fadeLen - FILL_TAPER - join)) * fillLetGo : 0;
+        const pin = (1 - smoothstep(bench, bench + Math.max(PIN_FADE, join + fillExtra), d)) * (1 - smoothstep(0, CAP_SOFT, over));
         const share = armShare[k], w1 = w * (1 - share);
         const tuck = DECK_TUCK * smoothstep(0, DECK_TUCK_RUN - DECK_TUCK_FROM, candPast[k]);   // (candPast counts from the deck end + DECK_TUCK_FROM)
         if (pin > 0) {
