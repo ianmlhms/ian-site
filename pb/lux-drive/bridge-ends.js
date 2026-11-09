@@ -255,8 +255,14 @@ export function moveBridgeEnds(roads, decks, groundAt) {
       const piece = approach.atEnd ? slice(a.pts, cum, len - by, len) : slice(a.pts, cum, 0, by).reverse();
       const rest = approach.atEnd ? slice(a.pts, cum, 0, len - by) : slice(a.pts, cum, by, len);
       const newEnd = piece[0];
-      // (a third way that meets the approach on the moved stretch or at the end - a slip road merging at the abutment: the A1 link 7463 at deck 42 - would end on the deck)
-      if (carved.some((r) => r.id !== a.id && [r.pts[0], r.pts[r.pts.length - 1]].some((p) => piece.some((q, k) => k > 0 && dist(p, q) <= B.join) || dist(p, E) <= B.join))) continue;
+      // a slip road that merges with the approach AT the abutment runs onto the bridge with it (the A1 link 7463 at deck 42 over the Val du Scheid): it gives up the same stretch,
+      // its new end lies beside the approach's (road-network.js pins the ends there to the deck); any other way that meets the approach on the moved stretch or at the end
+      // (a side street at the abutment) would end on the deck: no move
+      const merging = wayEndingAt(carved.filter((r) => r.id !== a.id), E, u, B.join, B.align);
+      const mergeOk = merging && !touched.has(`${merging.way.id}:${merging.atEnd ? 1 : 0}`) && arcsOf(outRoads[merging.way.id].pts).at(-1) - by >= B.minLeft;
+      const others = carved.filter((r) => r.id !== a.id && !(mergeOk && r.id === merging.way.id));
+      if (merging && !mergeOk) continue;
+      if (others.some((r) => [r.pts[0], r.pts[r.pts.length - 1]].some((p) => piece.some((q, k) => k > 0 && dist(p, q) <= B.join) || dist(p, E) <= B.join))) continue;
       // the bridge way: the stretch is put before its end at E (its point at E is replaced by the stretch, which ends there)
       const bw = outRoads[bridge.way.id];
       const bpts = bridge.atEnd ? [...bw.pts.slice(0, -1), ...piece.slice().reverse()] : [...piece, ...bw.pts.slice(1)];
@@ -271,9 +277,15 @@ export function moveBridgeEnds(roads, decks, groundAt) {
       tops[ei] = top;
       outDecks[di] = { ...d, pts, tops: Float32Array.from(tops), spans: spansOf(pts, groundAt) };
       outRoads[a.id] = { ...a, pts: rest, length: len - by };
+      if (mergeOk) {
+        const m = outRoads[merging.way.id], mc = arcsOf(m.pts), ml = mc[mc.length - 1];
+        const mrest = merging.atEnd ? slice(m.pts, mc, 0, ml - by) : slice(m.pts, mc, by, ml);
+        outRoads[m.id] = { ...m, pts: mrest, length: ml - by };
+        touched.add(`${m.id}:${merging.atEnd ? 1 : 0}`);
+      }
       outRoads[bw.id] = { ...bw, pts: bpts, length: arcsOf(bpts).at(-1) };
       touched.add(endKey);
-      moved.push({ deck: d.id, way: bw.id, approach: a.id, under, by: +by.toFixed(2), x: +E[0].toFixed(1), z: +E[1].toFixed(1) });
+      moved.push({ deck: d.id, way: bw.id, approach: a.id, merging: mergeOk ? merging.way.id : null, under, by: +by.toFixed(2), x: +E[0].toFixed(1), z: +E[1].toFixed(1) });
     }
   });
   return { roads: outRoads, decks: outDecks, moved };

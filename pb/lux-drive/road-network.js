@@ -67,13 +67,14 @@ const ABUT_UNDER = 3.0;                // m: a road under a bridge lies 5.9 - 21
 // city20: the LANES of a way under a bridge deck are cut to their bed even where the protection keeps the ground under the bridge: the DTM there holds the toe of the abutment
 // (the A13 under the A6 at Croix de Cessange: the right lane rode 1.4 m up the abutment's slope, roll 0.72).  Past the lane keep the protection comes back over a face no
 // steeper than UNDER_DECK_FACE (the world flow's "wall" is > 3 m/m), so the ground beside the lanes is the abutment, the pit under the deck end stays filled (harness D).
-const UNDER_DECK_CLEAR = 3.0;          // m: a deck at least this far over the bed of the way (the way passes under it)
+const UNDER_DECK_CLEAR = 4.5;          // m: a deck at least this far over the bed of the way (the way passes under it: a car and the deck's 1 m; a link that climbs onto the deck beside
+                                       // it lies 3 - 4 m under the deck near its end - A1 link 7463 at deck 42 - and is no way under the bridge)
 const UNDER_DECK_FACE = 1.9;           // m per m: the mean slope of the face from the lane keep up to the protected ground (a smoothstep is 1.5 x steeper at its middle: 2.85, under the wall of 3)
 const UNDER_DECK_CELL = 32;            // m: the cell of the grid of the deck segments
 const UNDER_DECK_REACH = 8.0;          // m past the edge of the deck: the protected corridor reaches past the deck (PROTECT_MARGIN + its fade), and so does the exemption: in full up to
                                        // PROTECT_MARGIN past the edge (the gap between the two decks of a dual carriageway), fading out over the rest
-const UNDER_DECK_KINDS = new Set(['motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary', 'primary_link', 'secondary', 'secondary_link']);   // (the roads a bridge is built over
-                                       // with a clean cut; a street or a lane under a bridge in a valley keeps the land the bridge stands over: Val du Scheid, Bd Paul Eyschen measured worse)
+const UNDER_DECK_KINDS = new Set(['motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary', 'primary_link', 'secondary', 'secondary_link', 'tertiary', 'tertiary_link', 'unclassified', 'residential']);
+                                       // (the streets; a service lane or a track under a bridge keeps the land the bridge stands on)
 const ABUT_FADE_MAX = 6.0;             // m: past the hold the ground under the deck falls from the deck to the land below over 1.5 x drop / RAMP_SLOPE (an earth abutment under the deck end, never
                                        // steeper than the ramp between two levels), at least CAP_SOFT / PROTECT_RAMP and at most this.  With the fixed 2 m of CAP_SOFT a deck 6 m over the road below
                                        // stood on a vertical face of ground (the world flow's "walls the carve made": 153 of them at the motorway interchanges after the approaches were lifted)
