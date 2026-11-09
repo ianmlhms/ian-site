@@ -6,31 +6,26 @@
 <title>Sue — ian.lu</title>
 <meta name="robots" content="noindex">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<meta name="theme-color" content="#0d0d1a">
-<script src="season.js?v=5"></script>
+<meta name="theme-color" content="#f6f6f3">
+<link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="gitter.css?v=7">
 <script src="theme.js?v=32"></script>
 <style>
-  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--ok:#3fb950;--warn:#f87171;--gold:#f0b429}
-  *{box-sizing:border-box}
-  body{margin:0;min-height:100vh;min-height:100svh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
-  a{color:var(--accent2-text);text-decoration:none}
-  .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
-  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
-  .wrap{flex:1;width:100%;max-width:720px;margin:0 auto;padding:16px 14px 48px;display:flex;flex-direction:column;gap:14px}
+  :root{--warn:#f87171;--gold:#f0b429}
   .gate{text-align:center;color:var(--muted);padding:50px 16px}
-  .btn{background:var(--accent);color:var(--accent-foreground);border:none;border-radius:10px;padding:10px 16px;font-weight:800;cursor:pointer;font-size:14px}
-  .ghost{background:var(--card2);color:var(--muted);border:1px solid var(--border);border-radius:10px;padding:9px 13px;font-weight:700;cursor:pointer;font-size:13px}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px}
-  h2{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:6px 0 0;display:flex;align-items:center;gap:10px}
-  input,select{padding:10px 12px;border-radius:9px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:16px;font-family:inherit}
+  .btn{background:var(--ink);color:var(--paper);border:1px solid var(--ink);min-height:44px;padding:10px 18px;font:600 15px "Geist",system-ui,sans-serif;cursor:pointer}.btn:hover{background:var(--green);border-color:var(--green)}
+  .ghost{background:transparent;color:var(--ink);border:1px solid var(--ink);min-height:44px;padding:9px 14px;font:600 14px "Geist",system-ui,sans-serif;cursor:pointer}.ghost:hover{border-color:var(--green);color:var(--green)}
+  .card{background:var(--white);border:1px solid var(--ink);padding:16px}
+  h2{font:600 15px "Geist",system-ui,sans-serif;color:var(--muted);margin:10px 0 0;display:flex;align-items:center;gap:10px}
+  input,select{min-height:44px;padding:10px 12px;border-radius:0;border:1px solid var(--ink);background:var(--white);color:var(--ink);font-size:16px;font-family:inherit}input:focus,select:focus{outline:2px solid var(--green);outline-offset:-2px}
   .bal{display:flex;gap:10px;flex-wrap:wrap}
-  .bal .metric{flex:1;min-width:90px;background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center}
-  .bal .metric b{display:block;font-size:19px;font-variant-numeric:tabular-nums}
-  .bal .metric.in b{color:var(--ok)}.bal .metric.out b{color:var(--warn)}.bal .metric.inv b{color:var(--gold)}
+  .bal .metric{flex:1;min-width:90px;background:var(--white);border:1px solid var(--soft);padding:12px;text-align:center}
+  .bal .metric b{display:block;font:500 19px "Geist Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+  .bal .metric.in b{color:var(--ok)}.bal .metric.out b{color:var(--warn)}.bal .metric.inv b{color:var(--ink)}
   .bal .metric span{font-size:11px;color:var(--muted)}
-  .seg{display:inline-flex;border:1px solid var(--border);border-radius:9px;overflow:hidden;flex-wrap:wrap}
-  .seg button{background:var(--card2);color:var(--muted);border:none;padding:8px 12px;font-weight:800;cursor:pointer;font-size:13px}
-  .seg button.on{background:var(--accent);color:var(--accent-foreground)}
+  .seg{display:inline-flex;border:1px solid var(--ink);border-radius:0;overflow:hidden;flex-wrap:wrap}
+  .seg button{background:transparent;color:var(--ink);border:none;min-height:44px;padding:8px 14px;font:600 14px "Geist",system-ui,sans-serif;cursor:pointer}
+  .seg button.on{background:var(--ink);color:var(--paper)}
   .field{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
   .field input,.field select{flex:1;min-width:90px}
   .row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)}
@@ -41,39 +36,45 @@
   .ic{font-size:18px;width:22px;text-align:center;flex:0 0 auto}
   .catbar{display:flex;align-items:center;gap:10px;margin:8px 0}
   .catbar .lab{width:120px;font-size:13px;font-weight:700;flex:0 0 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .catbar .track{flex:1;height:9px;background:var(--card2);border-radius:6px;overflow:hidden}
-  .catbar .fill{height:100%;border-radius:6px;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+  .catbar .track{flex:1;height:6px;background:var(--soft);border-radius:0;overflow:hidden}
+  .catbar .fill{height:100%;border-radius:0;background:var(--green)}
   .catbar .val{font-size:12px;color:var(--muted);width:96px;text-align:right;flex:0 0 auto;font-variant-numeric:tabular-nums}
   .catbar.pick{cursor:pointer}.catbar.pick:hover .lab{color:var(--accent2-text)}
-  .chip{display:inline-flex;align-items:center;gap:6px;background:var(--card2);border:1px solid var(--border);border-radius:20px;padding:6px 12px;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer}
+    .chip{display:inline-flex;align-items:center;gap:6px;background:transparent;border:1px solid var(--ink);padding:6px 14px;min-height:44px;font:600 13px "Geist",system-ui,sans-serif;cursor:pointer;color:var(--ink)}
   .chip.on{border-color:var(--accent-border);color:var(--text)}
   .chips{display:flex;gap:8px;flex-wrap:wrap}
-  .tag{display:inline-block;font-size:10px;font-weight:800;padding:1px 6px;border-radius:6px;background:rgba(136,136,170,.18);color:var(--muted);margin-left:6px}
+  .tag{display:inline-block;font-size:10px;font-weight:800;padding:1px 6px;border-radius:0;background:rgba(136,136,170,.18);color:var(--muted);margin-left:6px}
   .due{margin-left:auto;text-align:right;font-size:12px}.due.soon{color:var(--warn);font-weight:800}
   .del{background:none;border:none;color:var(--muted);font-size:15px;cursor:pointer;padding:2px 4px}.del:hover{color:var(--warn)}
   .flip{background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;padding:2px 4px}.flip:hover{color:var(--accent2-text)}
   .msg{min-height:15px;color:var(--accent2-text);font-weight:700;font-size:12.5px}
   .hint{color:var(--muted);font-size:12px;line-height:1.5;background:none;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;border-radius:0}
-  .ai{background:linear-gradient(135deg,rgba(110,168,254,.12),rgba(77,232,255,.08));border:1px solid var(--border);border-radius:12px;padding:12px 14px;font-size:13.5px;line-height:1.55}
+    .ai{background:var(--tint);border:1px solid var(--soft);padding:12px 14px;font-size:14px;line-height:1.5}
   details.acc>summary{cursor:pointer;list-style:none;font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:700;padding:2px 0}
   details.acc>summary::-webkit-details-marker{display:none}
   details.acc>summary::before{content:"▸ ";content:"▸ " / "";color:var(--accent-text)}
   details.acc[open]>summary::before{content:"▾ ";content:"▾ " / ""}
+  .wrap{width:100%;padding:18px 20px 24px;display:flex;flex-direction:column;gap:14px}
+  .gate{text-align:left;color:var(--muted);padding:20px 0}
+  .gt-nav{padding-inline:20px}
+  @media(max-width:640px){.gt-nav{padding-inline:14px !important}.wrap{padding:14px}}
 </style>
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
 </head>
-<body>
-<header class="bar">
-  <a class="home" href="index.html">‹ Heem</a>
-  <h1><span aria-hidden="true">💶</span> Sue</h1>
-  <div class="spacer"></div>
-  <span id="acctHost"></span>
-</header>
-
-<main class="wrap" id="wrap"><div class="gate" role="status">Lueden…</div></main>
+<body class="gt">
+<main class="gt-page">
+<div class="gt-grid">
+  <header class="c full gt-nav">
+    <div class="gt-nav-l"><a class="gt-back" href="index.html">‹ Heem</a><h1 class="gt-page-title">Suen</h1></div>
+    <div class="gt-navr"><button type="button" class="gt-acct" id="gtAcct">Umellen</button></div>
+  </header>
+  <div class="c full" style="padding:0">
+<div class="wrap" id="wrap"><div class="gate" role="status">Lueden…</div></div></div>
+</div>
+</main>
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
@@ -130,7 +131,6 @@ const effCat=(t)=>t.is_transfer?"transfer":(t._cat||"other");
 
 async function boot(){
   sb=await auth.client();
-  auth.mountAccountButton($("acctHost"));
   if(!auth.session()){
     $("wrap").innerHTML=`<div class="gate">Mell dech un fir deng Suen ze verfollegen.<br><br><button class="btn" id="si">Umellen</button></div>`;
     $("si").onclick=auth.openAuthModal;return;
@@ -159,7 +159,7 @@ function shell(){
       </div>
       <div class="ai" id="aiBox" role="status" style="margin-top:12px;display:none"></div>
       <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
-        <button class="ghost" id="aiInsight">✨ AI-Iwwerbléck</button>
+        <button class="ghost" id="aiInsight">AI-Iwwerbléck</button>
         <span class="msg" id="aiMsg" role="status" style="margin:0"></span>
       </div>
     </div>
@@ -170,22 +170,22 @@ function shell(){
     <details class="acc"><summary>Kontoen</summary>
       <div class="card" id="acctCard" style="margin-top:8px"><div class="hint">—</div></div></details>
 
-    <details class="acc"><summary>📈 Investitiounen</summary>
+    <details class="acc"><summary>Investitiounen</summary>
       <div class="card" id="invCard" style="margin-top:8px"><div class="hint">—</div></div></details>
 
-    <details class="acc" id="trDetails"><summary>🔁 Transferten (tëscht dénge Kontoen)</summary>
+    <details class="acc" id="trDetails"><summary>Transferten (tëscht dénge Kontoen)</summary>
       <div class="card" id="trCard" style="margin-top:8px"><div class="hint">—</div></div></details>
 
     <h2>Buchungen
-      <button class="ghost" id="importBtn" style="margin-left:auto">📥 Importéieren</button>
+      <button class="ghost" id="importBtn" style="margin-left:auto">Importéieren</button>
       <input type="file" id="impFile" accept=".csv,.pdf,text/csv,application/pdf" hidden>
     </h2>
     <div class="hint" id="impMsg" role="status" style="margin-top:-4px"></div>
-    <div style="margin-top:2px"><button class="ghost" id="delImp" style="font-size:12px;padding:6px 10px">🗑️ Importéiert Buchungen läschen</button></div>
+    <div style="margin-top:2px"><button class="ghost" id="delImp" style="font-size:12px;padding:6px 10px">Importéiert Buchungen läschen</button></div>
     <div class="chips" id="filterChips"></div>
     <div class="card" id="txList"><div class="gate">Lueden…</div></div>
 
-    <details class="acc"><summary>➕ Buchung vun Hand bäisetzen</summary>
+    <details class="acc"><summary>Buchung vun Hand bäisetzen</summary>
       <div class="card" style="margin-top:8px">
         <div class="seg" id="kindSeg" role="group" aria-label="Typ">
           <button type="button" data-k="out" class="on" aria-pressed="true">− Ausginn</button><button type="button" data-k="in" aria-pressed="false">＋ Rakomm</button>
@@ -697,10 +697,10 @@ function isImported(t){
 async function delImported(){
   const b=$("delImp");
   const imp=tx.filter(isImported);
-  if(!imp.length){$("impMsg").textContent="Keng importéiert Buchungen fonnt.";$("impMsg").style.color="var(--muted)";b.dataset.armed="";b.textContent="🗑️ Importéiert Buchungen läschen";return;}
+  if(!imp.length){$("impMsg").textContent="Keng importéiert Buchungen fonnt.";$("impMsg").style.color="var(--muted)";b.dataset.armed="";b.textContent="Importéiert Buchungen läschen";return;}
   if(b.dataset.armed!=="1"){
-    b.dataset.armed="1";b.textContent=`⚠️ Sécher? ${imp.length} läschen`;b.style.color="var(--warn)";b.style.borderColor="var(--warn)";
-    setTimeout(()=>{if(b.dataset.armed==="1"){b.dataset.armed="";b.textContent="🗑️ Importéiert Buchungen läschen";b.style.color="";b.style.borderColor="";}},4500);
+    b.dataset.armed="1";b.textContent=`Sécher? ${imp.length} läschen`;b.style.color="var(--warn)";b.style.borderColor="var(--warn)";
+    setTimeout(()=>{if(b.dataset.armed==="1"){b.dataset.armed="";b.textContent="Importéiert Buchungen läschen";b.style.color="";b.style.borderColor="";}},4500);
     return;
   }
   b.dataset.armed="";b.style.color="";b.style.borderColor="";b.disabled=true;b.textContent="Läschen…";
@@ -712,7 +712,7 @@ async function delImported(){
     $("impMsg").textContent=`✓ ${ids.length} importéiert Buchungen geläscht`;$("impMsg").style.color="var(--ok)";
     tx=tx.filter(t=>!isImported(t));render();await loadAll();
   }catch(e){console.warn(e);$("impMsg").textContent="Läsche feelgeschloen.";$("impMsg").style.color="var(--warn)";}
-  b.disabled=false;b.textContent="🗑️ Importéiert Buchungen läschen";
+  b.disabled=false;b.textContent="Importéiert Buchungen läschen";
 }
 async function onImportFile(file){
   $("impMsg").textContent="Liesen…";$("impMsg").style.color="var(--muted)";
@@ -810,5 +810,6 @@ boot();
   }).observe(c("impModal"),{attributes:true,attributeFilter:["class"]});
   document.addEventListener("keydown",e=>{if(e.key==="Escape"&&c("impModal").classList.contains("open"))close();});
 </script>
+<script type="module" src="gitter-acct.js?v=1"></script>
 </body>
 </html>
