@@ -2731,3 +2731,41 @@ fall / air / hit place.  Jolt count unchanged (the sweep carries the car: the ve
 * No car choice in the menu yet (only `?car=`).
 * The sweep's jolt metric carries the car (vertical only), so it does not see the steering; a driven sweep (steer + throttle at the new top speed) would be
   the next check.
+
+## Tunnels 19 (branch `lux-drive-tunnels19`, Mac mini, from main 0df61250 = v72): open the closed tunnels - WIP, HANDOFF (context rotation)
+
+Round folder `~/Library/Caches/luxdrive-work/tunnels19/` (tools in `tools/`: `tubes2.mjs` every tube with faces / troughs / approaches and the rejected runs, `cmpbase.mjs`
+the tubes of HEAD 0df61250 (copy `pb/lux-drive/_tt_base.js`, untracked, git-excluded) against now, `drive.mjs ids lats speeds` (FLY=1 starts at speed, PAD=m before/after)
+drives with the game collider, `tprof.mjs` / `xs.mjs` the car's ground along / across a tube, `trough.mjs`, `crest.mjs` (troughs / ramps / leads per side),
+`poses19.mjs` + `sheet.py` shots per tube (A/B top, portal, chase, inside), `probe.mjs` / `wayprof.mjs` / `osmtun.py` / `osmbox.py` the roads at a mouth, a way's
+profile with decks, the OSM tunnels; `base-wt/` a detached worktree of 0df61250 for base drives: `REPO=.../base-wt node drive.mjs ...`).
+
+### Opened (harness X: 20 -> 17 tubes listed... see `hx5.txt`: X1-X5 PASS, 70 rides, worst 2.58 m/s2)
+| tunnel | ways | what it needed |
+|---|---|---|
+| Cents (A1), both bores | 158 / 159 | the north approaches (26 m between the Pulvermühle viaduct and the mouths) were carved at 29 % from the deck up to the DTM over the portal (road-bed TIGHT_END). New: the approach line follows on onto a bridge (`approachAt`, `approachShort` / `approachFollow`), the road level along it is deck-aware (`ground`, `onDeck`, findTubes/createTubes take the deck network as a 5th argument - main.js, harness.js, world_node.mjs pass it), a **ramp** (`rampEnd`: steep from the mouth, ending on a deck or a level road) makes the face the OSM mouth and the floor ours to the ramp's end, in a trough. At 55 m/s: <= 8.4 m/s2 (158), deck joint 3.7. |
+| Desserte Schuman | 2325 | "a house stands in it": houses OVER a tube between its faces are now building passages (building-mesh footOf already lifts their walls onto the roof); a house over a mouth moves the face out past it + `houseGap` 2.6 m (`clearOfHouses`); a house on the open approach rejects. |
+| Rue du Fort Thüngen (under the KAD) | 8333 + 9464 + 5913 + 11613 | the same house rule + `withGaps`: a short open way (<= 15 m) joining two tunnel ways end to end is part of the tunnel (the 12 m light well between the KAD passage and the 24 m tunnel before the Desserte junction; was a 27 % ramp between two closed mouths). Garage-ramp service tunnels are no longer part of runs (only `TUBE.kinds`). |
+| A4 / N56 under the Rond-Point Merl | 1849+586 / 12867+12868 | `pairTubes` fit by lanes (`laneMin` 3.5 + `laneRoomPair` 0.3) instead of the OSM width with shoulders; edge lines clamp to the narrower wall (tunnel-view `linesOf`); twins' troughs share their middle wall (`twinIds`: the twin's road beside a trough is no junction, unless it reaches into it); `troughLength` judges "wider than the tube" by lanes (586 A trough 81 m). |
+| Albert Bousser | 219 + 17926 + 11938 (+ links 11937 / 11939) | `forkChain`: two one-lane links split off in the last 22 m and leave through the same wide mouth (mouths 3.8 - 5.4 m apart): the main chain is the tube, the links are absorbed (ids). |
+| (fast tubes) | motorway / trunk | `leadFast` 40 m: a fast tube owns 40 m of each approach (a trough, junction-limited) - the tight-end crests at Cents south (22 m/s2 at 200 km/h); trough blend at `speedFast` 55. Changes Rocade 411 (B trough 35 -> 40) and Kirchberg 1280 (A 9 -> 41; base 7.7-8.4 -> 1.8-2.0 m/s2 at 25 m/s, 36 -> 7 at 55). The other 8 old tubes are identical to base (cmpbase). |
+| `troughFloor` | | its grade term now fades out at the face with the cross-section (a 6 cm step at the face of a short trough, Cents 159 south). |
+Kept closed (`TUBE.keepClosed`, explicit): Kirchberg plaza trunk pair 559 / 2418 (opened by the house rule, 3.2 m/s2 + 26 m/s2 joint, not finished), Rue du Chemin de Fer 4261
+(3.2 m passage, a car touches its walls in the curve).  Stafelter (the plan's "Grouft", A7 4105/5767): the baked world ends inside it (data clip at the commune
+border, 750 m before the real north portal) - closed; Ian told via Slack (default: stays closed, world extension = separate job).
+
+### Harness X changes (stricter + accurate, see harness-tubes.js)
+MUST_OPEN + Cents, Desserte, Fort Thüngen, A4/N56, Albert Bousser.  X2 lanes = the approach's lanes within the carriageway the game DRAWS (sdCar), and a lane moves
+from its place on the entry approach to its place on the exit (A4: 9.8 m OSM width, drawn 7.8 m at the east end: the "outer lane" ran along the retaining wall
+holding slip road 3012).  X4: no house in a trough or in front of a face (houses over a tube between its faces are building passages now).
+
+### HANDOFF - what is left (in this order)
+1. **Schuman west mouth trough**: the twin rule gave 482 a 9 m trough B at the Rond-Point (481 A still 0). Look at it (shots), X2 is fine, joint 6.8 / 5.2 m/s2
+   (stats) at 4730,8175 - smooth it or accept; make 481 A match if possible.
+2. **TU09** (René Konen south roll): NOT fixed. Trough A ends 42 m out at the junction with Bd Roosevelt 8608 (levelRoad); the roll (0.2 - 0.3 rad, left lane) is
+   the raw DTM gully of the uncarved approach 13628 6 - 40 m out (`xs.mjs 2461 60 100 2`: lat -3 +0.4..0.8 m).  Options: carve 13628 (road-network crossing rule
+   for the upper way, tunnels18 tried: lowered a house over the mouth - the new house rule may now accept it), or let the trough pass the 8608 junction.
+3. A4/N56 west mouths (Merl slip roads 12830 at the face, no trough): joint 23 m/s2 at 586 B>A lane 2.5 (stats, will show as a sweep jolt).
+4. All gates (COMMON-BRIEF order; holes poses for the new tubes: add them to the holes flow like tunnels16 did, `poses_new.json` has 63), drive sweep `--drawn`
+   (tools on lux-drive-sweep; its world.mjs must pass the deck network to createTubes as main.js now does), camera sweep (MSI), stacked before/after shots
+   per tunnel into `luxdrive-work/tunnels19/shots/final/` (WIP shots: `shots/wip1_sheets/`), merge origin/main, main.js ?v= >= 74 (fix19 = 73), push, vault line.
