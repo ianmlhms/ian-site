@@ -126,7 +126,7 @@
 import * as auth from "./auth.js?v=41";
 import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=13";
 import { scoreHtml, scoreKeyHtml, arcadeText } from "./score-format.js?v=11";
-import { loadWeekly, installWeeklyUi, weeklyHeadingHtml, weeklyRowsHtml } from "./arcade-weekly.js?v=11";
+import { loadWeekly, installWeeklyUi, weeklyHeadingHtml, weeklyRowsHtml } from "./arcade-weekly.js?v=12";
 installWeeklyUi();
 const $ = (id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));

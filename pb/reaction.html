@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Reaction Time - Arcade</title>
+<title>Reaktiounszäit - Arcade</title>
 <link rel="stylesheet" href="/pb/arcade-ui.css?v=10">
 <style>
 body{display:flex;flex-direction:column}
@@ -21,12 +21,12 @@ body{display:flex;flex-direction:column}
 .arcade-hud{inset:5px 14px auto;align-items:center;justify-content:center;gap:10px}
 .arcade-btn.play{min-width:min(220px,100%);min-height:52px;font-size:17px}
 </style>
-<script src="/pb/arcade-kit.js?v=50" data-arcade-id="reaction" data-arcade-title="Reaction Time" data-arcade-lower-is-better></script>
+<script src="/pb/arcade-kit.js?v=50" data-arcade-id="reaction" data-arcade-title="Reaktiounszäit" data-arcade-lower-is-better></script>
 </head>
 <body>
 <main class="arcade-stage" id="stage">
   <div class="pad" id="pad" role="button" tabindex="0" aria-live="polite" aria-label="Reaction pad">
-    <div><h2 id="padTitle">Reaction Time</h2><p id="padSub"></p></div>
+    <div><h2 id="padTitle">Reaktiounszäit</h2><p id="padSub"></p></div>
   </div>
   <div class="arcade-hud">
     <span class="arcade-pill">Average <b id="avg">–</b></span>
@@ -34,7 +34,7 @@ body{display:flex;flex-direction:column}
   </div>
 
   <div class="arcade-overlay show" id="startOv" role="dialog" aria-modal="true" aria-labelledby="startTitle"><div class="arcade-panel">
-    <h2 id="startTitle">Reaction Time</h2>
+    <h2 id="startTitle">Reaktiounszäit</h2>
     <p>The screen starts red. The moment it turns green, tap it, click it or press Space as fast as you can. Tapping too early costs the round.</p>
     <div class="arcade-actions"><button class="arcade-btn play" id="playBtn" type="button">Play</button></div>
   </div></div>
@@ -99,7 +99,7 @@ function tap(){
 function cancelRound(){ // tab hidden mid-round: drop it instead of timing a background tab
   if(state!=='waiting'&&state!=='ready')return;
   clearTimeout(timeout);state='idle';
-  setPad('','Reaction Time','');
+  setPad('','Reaktiounszäit','');
   $('startOv').classList.add('show');
   focusDialog('startOv');
 }
@@ -113,7 +113,7 @@ document.addEventListener('keydown',e=>{
 });
 document.addEventListener('visibilitychange',()=>{if(document.hidden)cancelRound()});
 $('playBtn').onclick=beginRound;$('againBtn').onclick=beginRound;
-setPad('','Reaction Time','');
+setPad('','Reaktiounszäit','');
 </script>
 </body>
 </html>

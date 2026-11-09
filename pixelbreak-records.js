@@ -13,7 +13,7 @@ import * as auth from "./auth.js?v=41";
 import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=13";
 
 import { compactScore, scoreHtml, scoreKeyHtml, arcadeText } from "./score-format.js?v=11";
-import { loadWeekly, installWeeklyUi, weeklyHeadingHtml, weeklyRowsHtml } from "./arcade-weekly.js?v=11";
+import { loadWeekly, installWeeklyUi, weeklyHeadingHtml, weeklyRowsHtml } from "./arcade-weekly.js?v=12";
 
 const cfg = window.PB_CONFIG || {};
 const cloudEnabled = /^https:\/\/.+\.supabase\.co\/?$/.test((cfg.url || "").trim()) &&

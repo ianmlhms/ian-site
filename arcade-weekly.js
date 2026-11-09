@@ -3,10 +3,10 @@ import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=13";
 import { arcadeText, escapeHtml as esc, scoreHtml, scoreKeyHtml } from "./score-format.js?v=11";
 
 const GAMES = Object.freeze({
-  tetris: ["Tetris", "🧱"], flappy: ["Flappy Bird", "🐦"], "crossy-road": ["Crossy Road", "🐔"],
+  tetris: ["Tetris", "🧱"], flappy: ["Flappy Bird", "🐦"], "crossy-road": ["Stross iwwerquéieren", "🐔"],
   "doodle-jump": ["Doodle Jump", "🚀"], dino: ["Dino Run", "🦖"], snake: ["Snake", "🐍"],
-  "tower-stack": ["Tower Stack", "🏗️"], pacman: ["Pac-Man", "🟡"], "2048": ["2048", "🔢"],
-  asteroids: ["Asteroids", "☄️"], "fruit-slash": ["Fruit Slash", "🍉"], reaction: ["Reaction Time", "⚡"],
+  "tower-stack": ["Tuerm stapelen", "🏗️"], pacman: ["Pac-Man", "🟡"], "2048": ["2048", "🔢"],
+  asteroids: ["Asteroids", "☄️"], "fruit-slash": ["Fruit Slicer", "🍉"], reaction: ["Reaktiounszäit", "⚡"],
   "bubble-shooter": ["Bubble Shooter", "🫧"], "space-invaders": ["Space Invaders", "👾"],
 });
 const weeklyLoads = new Map();
