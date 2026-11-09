@@ -42,6 +42,7 @@ const DECK_TRUST_WIDTH = 5.0;          // m: the DSM of a deck at least this wid
 const DECK_END_GRADE = 0.12;           // m/m: the deck is continued from its first two points to its end at no steeper grade than this
 const APPROACH_LIFT_MAX = 7.0;         // m: a way is lifted onto the deck at its end by at most this; more is a DSM that is not the deck (a canopy)
 const APPROACH_LOWER_MAX = 4.0;        // m: ... and lowered to it by at most this (a steep street whose bed ran on past the bank in the air)
+const DECK_NODE_TRUST = 2.0;           // m: a junction node of two or more ways at one level keeps that level when a deck end there stands this much off it (see reconcileJunctions)
 const DECK_BELOW_BANK = 1.0;           // m: a deck level more than this under the land at the end of the deck is not the deck (the DSM is the top of everything: a deck under its bank is one under a structure)
 const APPROACH_ALIGN = 0.7;            // the cosine between the direction a way leaves through its end and the direction into a bridge: at least this, and the way runs onto the bridge
 const GROUNDED_MATCH = 2.0;            // m: a deck belongs to a way when both its ends lie this close to the ends of the way
@@ -63,6 +64,16 @@ const ABUT_FADE_STEP = 0.25;           // m
 const ABUT_STEEPEST = 2.2;             // m per m: the steepest mean-based fall (smoothstep peaks at 1.5 x the mean; on the lattice the faces measured up to ~1.5 x more): at 2.35 the A6 abutments beside the other carriageway (7412) became two walls of the world flow (9 > 8), at 2.2 eight
 const ABUT_UNDER = 3.0;                // m: a road under a bridge lies 5.9 - 21 m under its approaches in the network; the ways that meet at the end of the Hondhausbréck lie
                                        // 1.4 - 2.1 m apart (a junction at the abutment: their own lanes need its earth, harness V4)
+// city20: the LANES of a way under a bridge deck are cut to their bed even where the protection keeps the ground under the bridge: the DTM there holds the toe of the abutment
+// (the A13 under the A6 at Croix de Cessange: the right lane rode 1.4 m up the abutment's slope, roll 0.72).  Past the lane keep the protection comes back over a face no
+// steeper than UNDER_DECK_FACE (the world flow's "wall" is > 3 m/m), so the ground beside the lanes is the abutment, the pit under the deck end stays filled (harness D).
+const UNDER_DECK_CLEAR = 3.0;          // m: a deck at least this far over the bed of the way (the way passes under it)
+const UNDER_DECK_FACE = 1.9;           // m per m: the mean slope of the face from the lane keep up to the protected ground (a smoothstep is 1.5 x steeper at its middle: 2.85, under the wall of 3)
+const UNDER_DECK_CELL = 32;            // m: the cell of the grid of the deck segments
+const UNDER_DECK_REACH = 8.0;          // m past the edge of the deck: the protected corridor reaches past the deck (PROTECT_MARGIN + its fade), and so does the exemption: in full up to
+                                       // PROTECT_MARGIN past the edge (the gap between the two decks of a dual carriageway), fading out over the rest
+const UNDER_DECK_KINDS = new Set(['motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary', 'primary_link', 'secondary', 'secondary_link']);   // (the roads a bridge is built over
+                                       // with a clean cut; a street or a lane under a bridge in a valley keeps the land the bridge stands over: Val du Scheid, Bd Paul Eyschen measured worse)
 const ABUT_FADE_MAX = 6.0;             // m: past the hold the ground under the deck falls from the deck to the land below over 1.5 x drop / RAMP_SLOPE (an earth abutment under the deck end, never
                                        // steeper than the ramp between two levels), at least CAP_SOFT / PROTECT_RAMP and at most this.  With the fixed 2 m of CAP_SOFT a deck 6 m over the road below
                                        // stood on a vertical face of ground (the world flow's "walls the carve made": 153 of them at the motorway interchanges after the approaches were lifted)
@@ -549,7 +560,16 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
         }
       }
       // an end that runs onto a bridge: the deck (the DSM of the bridge) sets the level of the node, and every way at that node meets it
-      const deckLevel = deckLevelAt(e.x, e.z);
+      // (city20, DECK_NODE_TRUST) ... unless the node is a junction of a street that runs on past it: two or more ways at one level of their own, far from the deck's DSM.  The deck
+      // end then meets the street (decks.js pins it to the surface there): the Hondhausbréck's DSM stands 4 m over the node of Rue Vauban and Allée Pierre de Mansfeld, and the street
+      // was lifted onto a 5 m peak at the node - the car fell 5 m off it (full-city sweep v73)
+      let deckLevel = deckLevelAt(e.x, e.z);
+      if (deckLevel !== null) {
+        const street = members.filter((m) => !overRoads.has(m.chain.road)).map((m) => m.h).sort((a, b) => a - b);
+        const mid = street.length ? street[street.length >> 1] : 0;
+        const agree = street.filter((h) => Math.abs(h - mid) <= JUNCTION_LEVEL);
+        if (agree.length >= 2 && Math.abs(agree.reduce((sum, h) => sum + h, 0) / agree.length - deckLevel) > DECK_NODE_TRUST) deckLevel = null;
+      }
       if (deckLevel !== null) {
         for (const m of members) { pinOf(m.chain).set(m.k, deckLevel); (m.chain.deckPins || (m.chain.deckPins = new Set())).add(m.k); }
         continue;
@@ -1363,6 +1383,35 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     }
     return clip;
   }
+  // the deck segments in a grid (the decks that are drawn: not the grounded ones), for deckOver()
+  const deckCells = new Map();
+  for (const d of decks) {
+    if (groundedDecks.has(d.id) || d.removed || d.pts.length < 2) continue;
+    for (let i = 0; i + 1 < d.pts.length; i++) {
+      const [ax, az] = d.pts[i], [bx, bz] = d.pts[i + 1], r = d.width / 2 + UNDER_DECK_REACH;
+      for (let cx = Math.floor((Math.min(ax, bx) - r) / UNDER_DECK_CELL); cx <= Math.floor((Math.max(ax, bx) + r) / UNDER_DECK_CELL); cx++) {
+        for (let cz = Math.floor((Math.min(az, bz) - r) / UNDER_DECK_CELL); cz <= Math.floor((Math.max(az, bz) + r) / UNDER_DECK_CELL); cz++) {
+          const k = cx * 65536 + cz, seg = [ax, az, bx, bz, r, d.tops[i], d.tops[i + 1]], list = deckCells.get(k);
+          if (list) list.push(seg); else deckCells.set(k, [seg]);
+        }
+      }
+    }
+  }
+  /** How much a deck stands over (x, z) at least UNDER_DECK_CLEAR over `level`: 1 over the deck (fading to 0 at UNDER_DECK_REACH past its edge) and at least UNDER_DECK_CLEAR + 2 m over
+   *  the level, 0 at UNDER_DECK_CLEAR (the DSM tops: a deck end stands on its land, so the ends never count).  Smooth along a road that passes under it. */
+  function deckOver(x, z, level) {
+    let w = 0;
+    for (const [ax, az, bx, bz, r, t0, t1] of deckCells.get(Math.floor(x / UNDER_DECK_CELL) * 65536 + Math.floor(z / UNDER_DECK_CELL)) || EMPTY) {
+      const ex = bx - ax, ez = bz - az, ll = ex * ex + ez * ez;
+      const t = ll > 1e-9 ? Math.max(0, Math.min(1, ((x - ax) * ex + (z - az) * ez) / ll)) : 0;
+      const d = Math.hypot(x - ax - ex * t, z - az - ez * t), half = r - UNDER_DECK_REACH + PROTECT_MARGIN;
+      if (d >= r) continue;
+      const v = (1 - smoothstep(half, r, d)) * smoothstep(UNDER_DECK_CLEAR, UNDER_DECK_CLEAR + 2, t0 + (t1 - t0) * t - level);
+      if (v > w) w = v;
+    }
+    return w;
+  }
+
   function carve(x, z, out, groundY) {
     const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
     const ground = garageFill(x, z, groundY === undefined ? baseHeight(x, z) : groundY);
@@ -1787,7 +1836,18 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     // rises onto a bridge (its approach on a fill, lifted to the deck) is neither, and the corridor of the other carriageway's deck beside it - whose end lies 10 .. 20 m along on a skewed
     // bridge - flattened the end of the approach road into the valley.
     // (the cut of an opened tunnel under a bridge is the road the bridge spans: the protection kept the land there, a 1.2 m hump on the A1 under deck 32 with no tarmac painted)
-    const protHere = (bandY > ground ? protFill : prot) * (1 - pinCover) * (1 - cutCover);    // (a fill under a bridge end may fall to the land over the abutment; a cut may not dig a pit)
+    // (city20, UNDER_DECK_CLEAR) the lanes of a way under a deck: free of the protection against a cut up to its lane keep, then a face of UNDER_DECK_FACE
+    let laneCover = 0;
+    if (prot > 0 && bandY < ground) {
+      for (let a = 0; a < nPins; a++) {
+        const past = pinEdge[a] + pinRoom[a];                    // m past the lane keep (negative: inside it)
+        const w = Math.max(OWN_FADE, (ground - pinBed[a]) / UNDER_DECK_FACE);
+        if (past >= w || pinWt[a] <= 0 || !UNDER_DECK_KINDS.has(roads[slotPinRoad[a]].kind)) continue;
+        const under = deckOver(x, z, pinBed[a]);
+        if (under > 0) laneCover += (1 - laneCover) * pinWt[a] * under * (1 - smoothstep(0, w, past));
+      }
+    }
+    const protHere = (bandY > ground ? protFill : prot * (1 - laneCover)) * (1 - pinCover) * (1 - cutCover);    // (a fill under a bridge end may fall to the land over the abutment; a cut may not dig a pit)
     out.band = ground + (1 - protHere) * (bandY - ground);
     // The paint: the union of the carriageways and of the pavements, each way painted only where the ground lies at its own level.  Where two ways at different levels overlap in plan
     // (a slip road beside the trunk road, an overpass on its embankment) the ground between them is a ramp or the side of the embankment, and painted with the carriageway of the way

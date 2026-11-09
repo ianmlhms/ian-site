@@ -10,7 +10,7 @@ import { createBaseField } from './base-field.js';
 import { openShallowTunnels } from './tunnel-cover.js';     // BRIDGES8: a tunnel with no land over it is an open road
 import { splitEmbankmentUnderpasses } from './embankment-underpass.js';   // fix19: a street under an embankment the DTM kept is a tunnel
 import { fillLaneFlicker } from './lane-flicker.js';
-import { moveBridgeEnds } from './bridge-ends.js';            // city20: a bridge end that stands on the road below moves back along its approach          // ROADS9: a narrower run of < 60 m between two wider stretches is flicker of the lane count
+import { moveBridgeEnds, trimFreeEnds } from './bridge-ends.js';            // city20: a bridge end that stands on the road below moves back along its approach          // ROADS9: a narrower run of < 60 m between two wider stretches is flicker of the lane count
 
 const DECIMETRE = 0.1;
 
@@ -167,7 +167,9 @@ export async function loadWorldData(read, onProgress = () => {}) {
   // ... and a lane count that flickers for a few metres keeps the wider road (lane-flicker.js)
   const { roads: laneRoads, filled: flickerFilled } = fillLaneFlicker(underRoads, trees);
   // ... and a bridge whose abutment would stand on the lanes of a road below it starts where it leaves them free (bridge-ends.js)
-  const { roads, decks, moved: movedBridgeEnds } = moveBridgeEnds(laneRoads, bakedDecks, baseHeight);
+  const { roads, decks: movedDecks, moved: movedBridgeEnds } = moveBridgeEnds(laneRoads, bakedDecks, baseHeight);
+  // ... and a deck end that no way runs onto but that lies on a street's carriageway at its level begins at the edge of that carriageway
+  const { decks, trimmed: trimmedDeckEnds } = trimFreeEnds(roads, movedDecks, baseHeight);
   onProgress(1, 'done');
-  return { info, near, far, roads, openedTunnels, underpasses, flickerFilled, movedBridgeEnds, decks, walls, canopy, classes, classInfo, buildings, lines, stops, trees: withCampusTrees(trees), places, names };
+  return { info, near, far, roads, openedTunnels, underpasses, flickerFilled, movedBridgeEnds, trimmedDeckEnds, decks, walls, canopy, classes, classInfo, buildings, lines, stops, trees: withCampusTrees(trees), places, names };
 }
