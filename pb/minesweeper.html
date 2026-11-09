@@ -4,6 +4,30 @@
 .tool{min-height:40px;min-width:44px}select{min-height:44px}.tools span{color:#fff!important;font-size:12px!important}
 select:focus-visible,.tool:focus-visible,.card button:focus-visible,.cell:focus-visible{outline:3px solid #fff;outline-offset:-3px;box-shadow:0 0 0 2px #244514}
 @media(max-height:560px){.tool{min-height:34px}select{min-height:36px}}
+/* Gitter look (Nov 2026): paper / ink / ONE green, hairlines, radius 0, Geist. */
+@font-face{font-family:"Geist";font-style:normal;font-weight:400 800;font-display:swap;src:url("/assets/fonts/geist-latin.woff2") format("woff2")}
+@font-face{font-family:"Geist Mono";font-style:normal;font-weight:500;font-display:swap;src:url("/assets/fonts/geist-mono-500-latin.woff2") format("woff2")}
+html,body{font-family:"Geist",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#f6f6f3;color:#16171a}
+.game{background:#fbfbf8;box-shadow:0 0 0 1px #16171a}
+.head{background:#fcfcfa;border-bottom:1px solid #16171a;color:#16171a}
+.stats{font-family:"Geist Mono",ui-monospace,Menlo,monospace;font-weight:500}
+.flagIcon{color:#a32121}
+select{background:#fcfcfa;color:#16171a;border:1px solid #16171a;border-radius:0;font-family:inherit}
+.tools{background:#f6f6f3;border-bottom:1px solid rgba(22,23,26,.14)}.tools span{color:#62656a!important}
+.tool{border-radius:0;background:#fcfcfa;color:#16171a;border:1px solid rgba(22,23,26,.14);font-family:inherit}
+.tool.active{background:#16171a;color:#f6f6f3;border-color:#16171a}
+.board{box-shadow:0 0 0 1px #16171a}
+.covered.a{background:#e9e9e3}.covered.b{background:#dfdfd8}.covered:active{filter:brightness(.95)}
+.open.a{background:#fbfbf8}.open.b{background:#f4f4ef}
+.n1{color:#1f5fa8}.n2{color:#1f7a4d}.n3{color:#a32121}.n4{color:#6a3fb5}.n5{color:#b36b00}.n6{color:#0b7a8a}.n7{color:#16171a}.n8{color:#62656a}
+.cell{font-family:"Geist Mono",ui-monospace,Menlo,monospace}
+.overlay{background:rgba(246,246,243,.95)}
+.card{border-radius:0;background:#fcfcfa;color:#16171a;border:1px solid #16171a;box-shadow:none}
+.card h1{color:#16171a;font-weight:800;letter-spacing:-.03em}.big{color:#1f7a4d;font-family:"Geist Mono",ui-monospace,Menlo,monospace;font-weight:500}
+.card button{border-radius:0;background:#1f7a4d;border:1px solid #1f7a4d;font-family:inherit}.card button:hover{background:#16171a;border-color:#16171a}
+.best{color:#62656a}
+.cell.cursor{box-shadow:inset 0 0 0 3px #1f7a4d}
+select:focus-visible,.tool:focus-visible,.card button:focus-visible,.cell:focus-visible{outline:2px solid #1f7a4d;box-shadow:none}
 </style></head><body><main class="game" id="game"><header class="head"><label class="select"><select id="difficulty" aria-label="Difficulty"><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option></select></label><div class="stats"><span><b class="flagIcon" aria-hidden="true">⚑</b><i id="left" aria-label="Flags left">10</i></span><span><b class="clock" aria-hidden="true">◷</b><i id="time" aria-label="Seconds">0</i></span></div></header><div class="tools"><button class="tool active" data-tool="dig" aria-pressed="true">☝ Dig</button><button class="tool" data-tool="flag" aria-pressed="false">⚑ Flag</button><span style="font-size:11px;color:#dceccc">Hold a cell to flag</span></div><section class="boardWrap" id="wrap"><div class="board" id="board"></div></section></main><div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="title"><div class="card"><h1 id="title">Cleared!</h1><div class="big" id="finalTime">0:00</div><p id="summary">Perfect sweep.</p><div class="best" id="best">Best: —</div><button id="again">Play again</button></div></div><script src="/pb/arcade-kit.js?v=42" data-arcade-id="minesweeper" data-arcade-title="Minesweeper"></script><script>
 var score=0;
 (()=>{'use strict';const TEST_MODE=window.__pbTestMode===true;const configs={easy:[10,8,10,1000],medium:[18,14,40,4000],hard:[24,20,99,10000]},boardEl=document.querySelector('#board'),wrap=document.querySelector('#wrap'),diff=document.querySelector('#difficulty');let W,H,M,base,cells=[],first=true,ended=false,flags=0,opened=0,seconds=0,timer=null,tool='dig',cursor=0,hold=null,holdFired=false,muted=false,audio=null,lossQueue=[];
