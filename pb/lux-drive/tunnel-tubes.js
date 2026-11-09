@@ -30,6 +30,9 @@ export const TUBE = Object.freeze({
   minLength: 25,           // m: a shorter tunnel run is a culvert or a passage under a building, not a tunnel to drive through
   shoulder: 1.0,           // m beside the carriageway to the wall of the tube (the inner half width is road.width / 2 + shoulder) ...
   shoulderMin: 0.2,        // ... at least this much on a side it shares with a parallel tube
+  laneMin: 3.5,            // m: beside a parallel tube the carriageway may lose its hard shoulders as long as its lanes (this wide) fit (the twin boxes of the A4 / N56
+                           // under the Rond-Point Merl are 9 m apart, centre to centre, for two lanes each; the OSM width of 9.8 m counts the shoulders, tunnels19) ...
+  laneRoomPair: 0.3,       // ... with this much between the lanes and the shared wall
   wall: 0.6,               // m: the thickness of the walls and the roof slab's edge
   clearance: { motorway: 5.0, motorway_link: 4.9, trunk: 4.8, trunk_link: 4.7, primary: 4.5 },
   clearanceDefault: 4.3,
@@ -38,7 +41,19 @@ export const TUBE = Object.freeze({
   underpassLength: 120,
   slab: 0.45,              // m: the roof slab over the ceiling (the roof top is floor + clearance + slab)
   coverMargin: 0.05,       // m: a road over the tube keeps this much over the roof
-  approachRun: 130,        // m of each approach road that is part of the floor problem (its surface is the boundary; longer than the longest trough)
+  approachRun: 130,        // m of each approach road that is part of the floor problem (its surface is the boundary; longer than the longest trough) ...
+  approachShort: 10,       // m: an approach way shorter than this, or one that ends on a bridge, is followed on past its far end into the one way that carries on along it
+  approachFollow: 0.9,     // (cos; tunnels19: the 26 m approach of Cents ends on the Pulvermühle viaduct, the 3 m one of Rue du Fort Thüngen at a junction) ...
+  deckLevel: 1.5,          // ... and on a bridge deck at the level of the road (within this) the deck is its ground, not the valley under it
+  rampGrade: 0.15,         // a carved approach steeper than this from the mouth on climbs to the DTM over the portal, not to the road: the floor is ours there (a trough from
+  rampRise: 2.0,           // the face out to the end of the ramp; Cents north: the viaduct meets the mouths 7.6 m under the hill, carved at 29 %) - when it climbs this much ...
+  rampReach: 40,           // ... within this many metres, and the road past it runs on a bridge or ...
+  rampLevelRun: 10,        // ... this many metres no steeper than gradeMax
+  fastKinds: new Set(['motorway', 'motorway_link', 'trunk', 'trunk_link']),
+  leadFast: 40,            // m: a fast tube (a motorway, a trunk) owns this much of each approach (a trough): the carve held the last 12 m of an approach to the hill over the
+                           // portal (road-bed.js TIGHT_END) - a crest of R 140 m at the south face of Cents, 22 m/s2 at 200 km/h; in the trough the floor is the smoothest
+                           // curve from the road outside it (tunnels19) ...
+  leadGap: 3,              // ... ending this far before a junction on the approach
   fixedInside: 4,          // m: the surface outside the mouth is the boundary up to this far before the OSM mouth (the cap of a carved road end rises there)
   blend: 8,                // m in front of each mouth over which the car's ground blends from the surface into the floor of the tube
   flushIn: 16,             // m: the cross-section of the approach at a face fades into the plane floor over this ...
@@ -66,7 +81,10 @@ export const TUBE = Object.freeze({
                            // under their edges, and from land 1 m over the roof a skirt stood in the tunnel)
   cell: 32,                // m: the spatial hash
   pushMax: 0.8,            // m: the most a wall pushes in one pass
-  houseClear: 0.5,         // m: a house over a tube whose land lies less than this over the roof stands in the tube
+  houseReach: 12,          // m: no house may stand over the open approach this far out of a face (its walls would stand on the road): a house over a mouth moves the face
+                           // out to its wall (the tube runs through its ground floor, as the real building passages do: Rue du Fort Thüngen under the KAD, tunnels19) ...
+  houseGap: 2.6,           // ... to this far past it (the car is a body, not a point: its tail would still hit the wall it leaves; drive tests at the Desserte Schuman)
+  houseStep: 0.25,         // m: the band over the mouth is read this finely
   boundReach: 8,           // m: the bounds over the tube are eroded over this ...
   boundSigma: 12,          // ... and smoothed over this (m, a Gaussian) into the target of the floor ...
   approachGrade: 0.075,    // ... after reaching out from every bound at this grade (the highest floor of this grade under the bounds)
@@ -97,7 +115,8 @@ export const TROUGH = Object.freeze({
   parapetEnd: 0.3,         // ... and this much at the outer end of the trough ...
   taper: 8,                // ... rising over this many metres
   back: 1.5,               // m behind a wall over which the land it holds is read
-  speed: 20,               // m/s: the blend from the approach's ground into the floor at the outer end is long enough for this speed ...
+  speed: 20,               // m/s: the blend from the approach's ground into the floor at the outer end is long enough for this speed (speedFast in a fast tube) ...
+  speedFast: 55,
   accel: 2,                // ... at this vertical acceleration (m/s2) ...
   blendMin: 6,             // ... and at least this long (m)
   slopeRun: 3,             // samples (m) out of the outer end over which the approach's grade in each lane is read ...
@@ -187,6 +206,98 @@ function chainOf(run) {
   return { pts, ways };
 }
 
+/** The forks a tube absorbs (forkChain). */
+const FORK = Object.freeze({
+  linkMax: 30,             // m: a link longer than this is a tunnel of its own
+  reach: 0.5,              // m: its carriageway at its mouth lies within the tube's inner half width (the main carriageway's + the shoulder) + this of the main mouth
+  join: 0.5,               // m: two ends this close are one node of the fork
+});
+
+/**
+ * A run with a fork at a mouth (tunnels19, Albert Bousser: two one-lane links split off the three-lane carriageway in the last 22 m and leave through the same
+ * portal, 4 - 5 m beside it): the main chain between two mouths (the path of the widest, longest ways), when every other way of the run is a short link whose own
+ * mouth lies inside the main mouth's width (the links are lanes of one wide mouth).  Returns { pts, ways, side } or null.
+ */
+export function forkChain(run) {
+  const tol = FORK.join;           // (the ways of a fork share their nodes; the three mouths of Albert Bousser lie 3.8 - 5.4 m apart, inside PORTAL.joinTolerance)
+  const nodes = [];
+  const nodeOf = (p) => { let k = nodes.findIndex((q) => dist(q, p) <= tol); if (k < 0) { nodes.push(p); k = nodes.length - 1; } return k; };
+  const edges = run.map((r) => ({ r, a: nodeOf(r.pts[0]), b: nodeOf(r.pts[r.pts.length - 1]) }));
+  const degree = nodes.map((_, k) => edges.filter((e) => e.a === k || e.b === k).length);
+  const mouths = nodes.map((_, k) => k).filter((k) => degree[k] === 1);
+  if (mouths.length < 3) return null;
+  // (every simple path between two mouths; the one with the most carriageway, length x width, is the main chain)
+  let best = null;
+  const walk = (k, goal, used, path) => {
+    if (k === goal) {
+      const score = path.reduce((sum, e) => sum + e.r.length * e.r.width, 0);
+      if (!best || score > best.score) best = { score, path: [...path] };
+      return;
+    }
+    for (const e of edges) {
+      if (used.has(e) || (e.a !== k && e.b !== k)) continue;
+      used.add(e); path.push(e);
+      walk(e.a === k ? e.b : e.a, goal, used, path);
+      used.delete(e); path.pop();
+    }
+  };
+  for (let x = 0; x < mouths.length; x++) for (let y = x + 1; y < mouths.length; y++) walk(mouths[x], mouths[y], new Set(), []);
+  if (!best) return null;
+  const main = best.path, side = edges.filter((e) => !main.includes(e));
+  // the path's points from its first mouth
+  let at = main[0].a, pts = null;
+  if (main.length > 1 && (main[1].a === at || main[1].b === at)) at = main[0].b;
+  const ways = [];
+  for (const e of main) {
+    const fwd = e.a === at ? e.r.pts : [...e.r.pts].reverse();
+    pts = pts ? [...pts, ...fwd.slice(1)] : [...fwd];
+    at = e.a === at ? e.b : e.a;
+    ways.push(e.r);
+  }
+  const mainMouths = [pts[0], pts[pts.length - 1]];
+  const halfWidth = Math.max(...ways.map((r) => r.width)) / 2;
+  for (const e of side) {
+    const own = [e.a, e.b].find((k) => degree[k] === 1);
+    if (own === undefined || e.r.length > FORK.linkMax) return null;
+    if (Math.min(...mainMouths.map((m) => dist(m, nodes[own]))) > halfWidth + TUBE.shoulder + FORK.reach - e.r.width / 2) return null;
+  }
+  return { pts, ways, side: side.map((e) => e.r) };
+}
+
+
+/**
+ * The tunnel ways plus the short open ways that join two of them end to end with nothing else at either joint (a new list): one tunnel with a light well in it.
+ * Rue du Fort Thüngen leaves the KAD building's passage, runs 12 m in the open and dives under the next building for 24 m before its junction with the Desserte
+ * Schuman: two tunnels of 140 m and 24 m with a 12 m ramp between them in the game (carved at 27 % from mouth to mouth), so neither was a road to drive (tunnels19).
+ */
+function withGaps(tunnels, roads) {
+  const ends = (r) => [r.pts[0], r.pts[r.pts.length - 1]];
+  const near = (p, q) => dist(p, q) <= GAP.join;
+  const endsAt = (p) => roads.filter((r) => r.info.drivable && ends(r).some((e) => near(e, p)));
+  const gaps = roads.filter((r) => {
+    if (r.tunnel || !r.info.drivable || r.length > GAP.max || r.pts.length < 2) return false;
+    return ends(r).every((e) => {
+      const at = endsAt(e);
+      if (at.length !== 2) return false;                         // (a junction: the gap is a street of its own)
+      const t = at.find((q) => q !== r);
+      if (!t || !t.tunnel || !t.info.drivable) return false;
+      // (along the tunnel: the joint is no corner)
+      const tf = near(t.pts[0], e) ? [t.pts[1], t.pts[0]] : [t.pts[t.pts.length - 2], t.pts[t.pts.length - 1]];
+      const rf = near(r.pts[0], e) ? [r.pts[0], r.pts[1]] : [r.pts[r.pts.length - 1], r.pts[r.pts.length - 2]];
+      const ax = tf[1][0] - tf[0][0], az = tf[1][1] - tf[0][1], bx = rf[1][0] - rf[0][0], bz = rf[1][1] - rf[0][1];
+      return (ax * bx + az * bz) / ((Math.hypot(ax, az) * Math.hypot(bx, bz)) || 1) >= GAP.align;
+    });
+  });
+  return gaps.length ? [...tunnels, ...gaps] : tunnels;
+}
+
+/** The open gaps a tunnel bridges (withGaps). */
+const GAP = Object.freeze({
+  max: 15,                 // m: the longest open way between two tunnel ways that is still one tunnel
+  join: 0.5,               // m: its ends meet theirs
+  align: 0.8,              // cos: and it carries on along them
+});
+
 /** The drawn centre line of way ri ([[x, z], ...]), as the network carves it (road-network samples). */
 function drawnLine(net, ri) {
   const s = net.samples, first = s.first[ri], n = s.segs[ri] + 1;
@@ -217,11 +328,38 @@ function approachAt(roads, net, mouth, axisOut, tunnelIds) {
   if (!best) return null;
   const line = drawnLine(net, best.road.id);
   if (!line) return null;
-  const fwd = best.atStart ? line : [...line].reverse();
-  const out = [fwd[0]];
-  let s = 0;
-  for (let i = 1; i < fwd.length && s < TUBE.approachRun; i++) { s += dist(fwd[i], fwd[i - 1]); out.push(fwd[i]); }
-  return { road: best.road, pts: out, gap: bestGap };
+  const out = [];
+  let s = 0, road = best.road, atStart = best.atStart, fwd = atStart ? line : [...line].reverse();
+  const seen = new Set([road.id]);
+  for (;;) {
+    if (!out.length) out.push(fwd[0]);
+    for (let i = 1; i < fwd.length && s < TUBE.approachRun; i++) { s += dist(fwd[i], fwd[i - 1]); out.push(fwd[i]); }
+    if (s >= TUBE.approachRun) break;
+    // (on into the one way that carries on along it from the far end of this one: a bridge after a short approach, a short link before a junction)
+    const end = atStart ? road.pts[road.pts.length - 1] : road.pts[0];
+    const dx = out[out.length - 1][0] - out[out.length - 2][0], dz = out[out.length - 1][1] - out[out.length - 2][1], dl = Math.hypot(dx, dz) || 1;
+    const next = [];
+    for (const r of roads) {
+      if (seen.has(r.id) || r.tunnel || tunnelIds.has(r.id) || !r.info.drivable || !net.isDrawn(r.id)) continue;
+      const m = r.pts.length;
+      for (let f = 0; f < 2; f++) {
+        const b = f === 0 ? r.pts[0] : r.pts[m - 1], nb = f === 0 ? r.pts[1] : r.pts[m - 2];
+        if (dist(b, end) > 1.0) continue;
+        const ox = nb[0] - b[0], oz = nb[1] - b[1], ol = Math.hypot(ox, oz);
+        if (ol > 0.01 && (ox * dx + oz * dz) / (ol * dl) >= TUBE.approachFollow) next.push({ road: r, atStart: f === 0 });
+      }
+    }
+    if (next.length !== 1 || (road === best.road && road.length >= TUBE.approachShort && !next[0].road.bridge)) break;
+    const nl = drawnLine(net, next[0].road.id) || next[0].road.pts.map((p) => [p[0], p[1]]);
+    road = next[0].road; atStart = next[0].atStart; seen.add(road.id);
+    fwd = atStart ? nl : [...nl].reverse();
+    // (the drawn line of the next way starts where this one ends, give or take the network's trimming: join it at its point nearest to our end)
+    let k0 = 0;
+    for (let k = 1; k < Math.min(fwd.length, 8); k++) if (dist(fwd[k], out[out.length - 1]) < dist(fwd[k0], out[out.length - 1])) k0 = k;
+    fwd = [out[out.length - 1], ...fwd.slice(k0 + 1)];
+    if (fwd.length < 2) break;
+  }
+  return { road: best.road, pts: out, gap: bestGap, ids: [...seen] };
 }
 
 /** Resamples a polyline every `step` m (the ends kept).  Returns [[x, z], ...]. */
@@ -303,12 +441,13 @@ function clearanceOf(kind, length) {
  * Builds one tube (or returns { reject: why }).
  * surface: surface.js (height = the drawn lattice, field.height = the continuous ground, roadInfoAt), net: the road network.
  */
-function buildTube(chain, appA, appB, surface, net, roads, housesNear) {
+function buildTube(chain, appA, appB, surface, net, roads, housesNear, decks) {
   const way = chain.ways.find((w) => w.name) || chain.ways[0];
   const width = Math.max(...chain.ways.map((w) => w.width));
   const length = chain.ways.reduce((s, w) => s + w.length, 0);
   const innerHalf = width / 2 + TUBE.shoulder, outerHalf = innerHalf + TUBE.wall;
   const clearance = clearanceOf(way.kind, length);
+  const chainIds = new Set(chain.ways.map((r) => r.id));
   const roofDepth = clearance + (length < TUBE.underpassLength ? TUBE.slabUnderpass : TUBE.slab);
   // the centre line: approach A (toward the mouth), the tunnel, approach B (away from it), every 1 m; the tunnel part rounded like a drawn road
   const tunnelPts = resample(chain.pts, 1);
@@ -332,6 +471,22 @@ function buildTube(chain, appA, appB, surface, net, roads, housesNear) {
   // the side offset: lat > 0 to the right of the direction of s (x east, z south: right = (-tz, tx))
   const at = (i, lat) => [pts[i][0] - tz[i] * lat, pts[i][1] + tx[i] * lat];
   const contact = (x, z) => (surface.field ? surface.field.height(x, z) : surface.height(x, z));
+  // the level of the road under every sample: the continuous ground, or a bridge deck at the level of the road (followed outward from each mouth: a deck crossing over
+  // an approach is not its road).  The valley under the viaduct is no boundary of the floor of Cents.
+  const ground = Float64Array.from(pts, (p) => contact(p[0], p[1])), onDeck = new Uint8Array(n);
+  if (decks && decks.count > 0) {
+    const hit = {};
+    const follow = (from, to, step) => {
+      let ref = ground[from];
+      for (let i = from; i !== to; i += step) {
+        const d = decks.deckAt(pts[i][0], pts[i][1], ref + 0.5, hit);
+        if (d && Math.abs(d.top - ref) <= TUBE.deckLevel && d.top >= ground[i] - 0.05) { ground[i] = d.top; onDeck[i] = 1; }       // (the car stands on the higher of the two)
+        ref = ground[i];
+      }
+    };
+    const iOf = (sq) => { let bi = 0; for (let i = 1; i < n; i++) if (Math.abs(s[i] - sq) < Math.abs(s[bi] - sq)) bi = i; return bi; };
+    follow(iOf(sMouthA), -1, -1); follow(iOf(sMouthB), n, 1);
+  }
 
   // ---- the crossfall of each approach (m per m across, to the right), read on the continuous ground 6 m out of the mouth
   const crossAt = (sq) => {
@@ -347,7 +502,7 @@ function buildTube(chain, appA, appB, surface, net, roads, housesNear) {
   const t = new Float64Array(n), w = new Float64Array(n), upper = new Float64Array(n).fill(Infinity), hardKind = new Uint8Array(n);
   const fixA = sMouthA - TUBE.fixedInside, fixB = sMouthB + TUBE.fixedInside;
   for (let i = 0; i < n; i++) {
-    if (s[i] <= fixA || s[i] >= fixB) { t[i] = contact(pts[i][0], pts[i][1]); w[i] = TUBE.wFixed; } else w[i] = TUBE.wFree;
+    if (s[i] <= fixA || s[i] >= fixB) { t[i] = ground[i]; w[i] = TUBE.wFixed; } else w[i] = TUBE.wFree;
   }
   // the straight line inside (a weak target): between the boundary values at the two ends of the free part
   let iA = 0, iB = n - 1;
@@ -371,7 +526,8 @@ function buildTube(chain, appA, appB, surface, net, roads, housesNear) {
         const h = surface.height(x, z);
         surface.roadInfoAt(x, z, info);
         const other = info.road >= 0 ? roads[info.road] : null;
-        const onRoad = info.sdCar < 0 && other && other.id !== appA.road.id && other.id !== appB.road.id && !other.tunnel && OVER_KINDS.has(other.kind) && (!inZone || h > t[i] + TUBE.overAbove);
+        // (the open gap of the tube's own chain is no road over it: withGaps)
+        const onRoad = info.sdCar < 0 && other && other.id !== appA.road.id && other.id !== appB.road.id && !other.tunnel && !chainIds.has(other.id) && OVER_KINDS.has(other.kind) && (!inZone || h > t[i] + TUBE.overAbove);
         if (onRoad) {
           const u = h - (inZone ? clearance : roofDepth) - TUBE.coverMargin - Math.abs(cross[i]) * outerHalf;
           if (u < upper[i]) { upper[i] = u; hardKind[i] = onRoad ? 1 : 2; }
@@ -441,22 +597,100 @@ function buildTube(chain, appA, appB, surface, net, roads, housesNear) {
     const kFace = sRise === null ? 0 : clamp(sRise - TUBE.frontBack, -TUBE.frontOut, TUBE.frontIn);
     return sMouth - dirOut * kFace;
   };
-  const sFa = faceOf(sMouthA, -1), sFb = faceOf(sMouthB, 1);
+  /**
+   * A face that stands under a house (its footprint over the mouth) moves out past the house's wall: the house stands on the tube (building-mesh.js lifts its walls
+   * onto the roof), never on the open road in front of the face.  Returns the face, or NaN when that is more than TUBE.frontOut out of the OSM mouth.
+   */
+  const pointAt = (sq, lat) => {
+    let i = 0;
+    while (i < n - 2 && s[i + 1] < sq) i++;
+    const f = clamp((sq - s[i]) / Math.max(1e-6, s[i + 1] - s[i]), 0, 1);
+    const [xa, za] = at(i, lat), [xb, zb] = at(i + 1, lat);
+    return [xa + (xb - xa) * f, za + (zb - za) * f];
+  };
+  const housedAt = (sq) => !!housesNear && [-outerHalf, -innerHalf / 2, 0, innerHalf / 2, outerHalf].some((lat) => {
+    const [x, z] = pointAt(sq, lat);
+    return housesNear(x, z).some((b) => insidePolygon(b.pts, x, z));
+  });
+  const clearOfHouses = (sFace, sMouth, dirOut) => {
+    let face = sFace;
+    for (let moved = true; moved;) {
+      moved = false;
+      // (a house from TUBE.houseGap m inside the face to TUBE.houseReach m out of it: the face goes TUBE.houseGap m past its outermost point)
+      for (let k = TUBE.houseReach; k > -TUBE.houseGap; k -= TUBE.houseStep) {
+        if (!housedAt(face + dirOut * k)) continue;
+        face += dirOut * (k + TUBE.houseGap); moved = true;
+        break;
+      }
+      if ((face - sMouth) * dirOut > TUBE.frontOut) return NaN;
+    }
+    return face;
+  };
+  /**
+   * The far end of a ramp on the approach out of a mouth (null: none): the carved approach climbs or dives at more than TUBE.rampGrade (over 6 m) within
+   * TUBE.rampReach m - to the DTM over the portal, not along the road (Cents north: the viaduct meets the mouths 7.6 m under the hill, the 26 m between carved at
+   * 29 %).  The floor is ours from there to the face, in a trough; the face stands at the OSM mouth (the "rising land" of faceOf is the ramp itself).
+   */
+  const rampEnd = (sMouth, dirOut) => {
+    let i0 = 0;
+    for (let i = 1; i < n; i++) if (Math.abs(s[i] - sMouth) < Math.abs(s[i0] - sMouth)) i0 = i;
+    const steep = (i) => i - 3 >= 0 && i + 3 < n && Math.abs(ground[i + 3] - ground[i - 3]) / Math.max(1e-6, s[i + 3] - s[i - 3]) > TUBE.rampGrade;
+    // (steep from the mouth on: the first 3 m out may be the cap of the carve)
+    let i = i0 + dirOut * 3;
+    if (!steep(i)) return null;
+    while (steep(i + dirOut) && Math.abs(s[i + dirOut] - sMouth) <= TUBE.rampReach) i += dirOut;
+    const end = clamp(i + dirOut * 3, 0, n - 1);
+    // (only a ramp that ends on a bridge deck or on a road that runs on level - the carve held the mouth to the hill over it and dropped the road from there to its
+    // real level, at both ends of Cents.  The gully of the René Konen south approach is steep and rough on, TU09: its trough)
+    let level = true;
+    for (let k = 1; k <= TUBE.rampLevelRun && level; k++) {
+      const j = end + dirOut * k, jn = j + dirOut;
+      if (jn < 0 || jn >= n) break;
+      if (Math.abs(ground[jn] - ground[j]) / Math.max(1e-6, Math.abs(s[jn] - s[j])) > TUBE.gradeMax) level = false;
+    }
+    return Math.abs(ground[end] - ground[i0]) >= TUBE.rampRise && (onDeck[clamp(end + dirOut, 0, n - 1)] || level) ? s[end] : null;
+  };
+  const rampA = rampEnd(sMouthA, -1), rampB = rampEnd(sMouthB, 1);
+  const sFa = clearOfHouses(rampA === null ? faceOf(sMouthA, -1) : sMouthA, sMouthA, -1), sFb = clearOfHouses(rampB === null ? faceOf(sMouthB, 1) : sMouthB, sMouthB, 1);
+  if (Number.isNaN(sFa) || Number.isNaN(sFb)) return { reject: `a house stands over its approach at the ${Number.isNaN(sFa) ? 'first' : 'second'} mouth` };
+  /** The far end of the lead of a fast tube out of a face (TUBE.leadFast m, or TUBE.leadGap m before a junction: another carriageway at the level of the approach). */
+  const own = new Set([...appA.ids, ...appB.ids, ...chain.ways.map((r) => r.id)]);
+  const leadEnd = (sFace, dirOut) => {
+    const info = {};
+    let k = 1;
+    for (; k <= TUBE.leadFast; k++) {
+      const i = clamp(Math.round(sFace + dirOut * k), 0, n - 1);
+      if (i === 0 || i === n - 1) break;
+      let junction = false;
+      // (a carriageway that reaches into ours: a junction, a merge.  The twin carriageway beside it does not - the A4 / N56 bores are 9 m apart)
+      for (const lat of [-innerHalf + 0.5, -innerHalf / 2, 0, innerHalf / 2, innerHalf - 0.5]) {
+        const [x, z] = at(i, lat);
+        surface.roadInfoAt(x, z, info);
+        if (info.sdCar < 0 && info.road >= 0 && !own.has(info.road) && !roads[info.road].tunnel && Math.abs(surface.height(x, z) - ground[i]) < TROUGH.levelRoad) { junction = true; break; }
+      }
+      if (junction) { k = Math.max(0, k - TUBE.leadGap); break; }
+    }
+    return k >= TROUGH.minLength ? sFace + dirOut * Math.min(k, TUBE.leadFast) : null;
+  };
+  const fast = TUBE.fastKinds.has(way.kind);
+  const leadA = fast && rampA === null ? leadEnd(sFa, -1) : null, leadB = fast && rampB === null ? leadEnd(sFb, 1) : null;
+  // (over a ramp or a lead the boundary is the road beyond its far end)
+  const fixLo = Math.min(sFa, rampA ?? Infinity, leadA ?? Infinity), fixHi = Math.max(sFb, rampB ?? -Infinity, leadB ?? -Infinity);
   // the floor meets the approach AT the face: the surface is the boundary up to the face (the terrain rises only behind it), the floor free from there on.  (With the
   // boundary at the mouth +- TUBE.fixedInside, a face outside it met a floor that followed the chord between the mouths: 12 cm under the road at the face of Rue du Grünewald.)
   for (let i = 0; i < n; i++) {
-    if (s[i] <= sFa || s[i] >= sFb) { t[i] = contact(pts[i][0], pts[i][1]); w[i] = TUBE.wFixed; } else w[i] = TUBE.wFree;
+    if (s[i] <= fixLo || s[i] >= fixHi) { t[i] = ground[i]; w[i] = TUBE.wFixed; } else w[i] = TUBE.wFree;
   }
   iA = 0; iB = n - 1;
-  while (iA < n - 1 && s[iA + 1] <= sFa) iA++;
-  while (iB > 0 && s[iB - 1] >= sFb) iB--;
+  while (iA < n - 1 && s[iA + 1] <= fixLo) iA++;
+  while (iB > 0 && s[iB - 1] >= fixHi) iB--;
   for (let i = iA + 1; i < iB; i++) t[i] = t[iA] + ((t[iB] - t[iA]) * (s[i] - s[iA])) / Math.max(1e-6, s[iB] - s[iA]);
   boundsBetween(sFa, sFb);
   const f = solve();
   // ---- the measures: grade, curvature, how much of the bound is still broken
   let grade = 0, gradeAt = 0, curve = 0, curveAt = 0, over = 0, overRoad = 0;
   for (let i = 1; i < n - 1; i++) {
-    if (s[i] < Math.max(sFa, fixA) || s[i] > Math.min(sFb, fixB)) continue;     // (the approaches are the roads of the world as they are: a face out on a steep approach is not the tube's grade)
+    if (s[i] < (fixLo < sFa ? fixLo : Math.max(sFa, fixA)) || s[i] > (fixHi > sFb ? fixHi : Math.min(sFb, fixB))) continue;     // (the approaches are the roads of the world as they are: a face out on a steep approach is not the tube's grade)
     const gi = Math.abs(f[i + 1] - f[i - 1]) / Math.max(1e-6, s[i + 1] - s[i - 1]);
     if (gi > grade) { grade = gi; gradeAt = s[i]; }
     const ci = Math.abs(f[i + 1] - 2 * f[i] + f[i - 1]);
@@ -465,11 +699,13 @@ function buildTube(chain, appA, appB, surface, net, roads, housesNear) {
     if (o > 0.02) { over = Math.max(over, o); if (hardKind[i] === 1) overRoad = Math.max(overRoad, o); }
   }
   const tube = {
-    name: way.name || way.kind, label: way.name || '', kind: way.kind, ids: chain.ways.map((r) => r.id), oneway: chain.ways.every((r) => r.oneway), lanes: way.lanes || 1, width,
+    name: way.name || way.kind, label: way.name || '', kind: way.kind, ids: [...chain.ways, ...(chain.side || [])].map((r) => r.id), oneway: chain.ways.every((r) => r.oneway), lanes: way.lanes || 1, width,
     length, innerHalf, outerHalf, innerL: innerHalf, innerR: innerHalf, outerL: outerHalf, outerR: outerHalf, headL: outerHalf + TUBE.wing, headR: outerHalf + TUBE.wing,
     clearance, roofDepth,
     x: Float64Array.from(pts, (p) => p[0]), z: Float64Array.from(pts, (p) => p[1]), s, tx, tz, floor: f, cross,
-    sMouthA, sMouthB, sA: sFa, sB: sFb, flushA: null, flushB: null, upper: Float32Array.from(upper), line: Float32Array.from(t), approachA: appA.road.id, approachB: appB.road.id, grade, curve, curveAt, over, overRoad,
+    sMouthA, sMouthB, sA: sFa, sB: sFb, rampA: rampA === null ? 0 : sFa - rampA, rampB: rampB === null ? 0 : rampB - sFb,
+    leadA: leadA === null ? 0 : sFa - leadA, leadB: leadB === null ? 0 : leadB - sFb,
+    ground: Float32Array.from(ground), onDeck, flushA: null, flushB: null, upper: Float32Array.from(upper), line: Float32Array.from(t), approachA: appA.road.id, approachB: appB.road.id, grade, curve, curveAt, over, overRoad,
   };
   // the cross-section of each approach at its face (what the plane f + cross * lat does not hold: the crown of a street, the gully of a narrow approach), fading out
   // TUBE.flushIn m into the tube: the floor meets every lane of the approach without a step (flush, like the deck ends)
@@ -484,18 +720,6 @@ function buildTube(chain, appA, appB, surface, net, roads, housesNear) {
     return out;
   };
   const flushA = residualAt(sFa, -1), flushB = residualAt(sFb, 1);
-  // a house standing in the tube (its footprint over the tube where the land under it lies lower than the roof: the house's walls would stand in the tunnel) keeps it closed
-  if (housesNear) {
-    for (let i = 0; i < n; i++) {
-      if (s[i] < sFa || s[i] > sFb) continue;
-      for (const lat of [-outerHalf, 0, outerHalf]) {
-        const [x, z] = at(i, lat);
-        if (surface.height(x, z) < f[i] + roofDepth + TUBE.houseClear && housesNear(x, z).some((b) => insidePolygon(b.pts, x, z))) {
-          return { reject: `a house stands in it at ${Math.round(x)},${Math.round(z)}`, tube };
-        }
-      }
-    }
-  }
   tube.flushA = flushA; tube.flushB = flushB;
   if (grade > TUBE.gradeMax) return { reject: `grade ${(grade * 100).toFixed(1)} % at ${(gradeAt - sMouthA).toFixed(0)} m from the first mouth (faces ${(sFa - sMouthA).toFixed(1)} / ${(sFb - sMouthA).toFixed(1)})`, tube };
   if (overRoad > 0.05) return { reject: `a road over it ${overRoad.toFixed(2)} m into the roof`, tube };
@@ -508,8 +732,9 @@ function buildTube(chain, appA, appB, surface, net, roads, housesNear) {
  * [{ pts }] (a tube a house stands in stays closed).
  * Returns { tubes, rejected: [{ name, ids, why }] }.
  */
-export function findTubes(roads, surface, net, buildings = null) {
-  const tunnels = roads.filter((r) => r.tunnel && r.info.drivable && r.pts.length >= 2);
+export function findTubes(roads, surface, net, buildings = null, decks = null) {
+  // (only the tunnels of car roads: a garage ramp of 9 m that leaves Rue du Fort Thüngen at the joint of its two tunnels is no part of the tube, and its kind came first)
+  const tunnels = withGaps(roads.filter((r) => r.tunnel && r.info.drivable && r.pts.length >= 2 && TUBE.kinds.has(r.kind)), roads);
   const housesNear = buildings ? houseGrid(buildings, tunnels) : null;
   const tubes = [], rejected = [];
   for (const run of tunnelRuns(tunnels)) {
@@ -517,7 +742,7 @@ export function findTubes(roads, surface, net, buildings = null) {
     const ids = run.map((r) => r.id);
     const length = run.reduce((sum, r) => sum + r.length, 0);
     if (!TUBE.kinds.has(run[0].kind) || length < TUBE.minLength) continue;          // (the garages and the lanes are not listed: they never were tunnels to drive)
-    const chain = chainOf(run);
+    const chain = chainOf(run) || forkChain(run);
     if (!chain) { rejected.push({ name, ids, length, why: 'a fork or a ring inside' }); continue; }
     const p = chain.pts, m = p.length;
     const outA = [p[0][0] - p[1][0], p[0][1] - p[1][1]], la = Math.hypot(...outA);
@@ -526,7 +751,7 @@ export function findTubes(roads, surface, net, buildings = null) {
     const appA = approachAt(roads, net, p[0], [outA[0] / la, outA[1] / la], tunnelIds);
     const appB = approachAt(roads, net, p[m - 1], [outB[0] / lb, outB[1] / lb], tunnelIds);
     if (!appA || !appB) { rejected.push({ name, ids, length, why: `no drawn road at ${appA ? 'the end' : 'the start'}` }); continue; }
-    const built = buildTube(chain, appA, appB, surface, net, roads, housesNear);
+    const built = buildTube(chain, appA, appB, surface, net, roads, housesNear, decks);
     if (built.reject) { rejected.push({ name, ids, length, why: built.reject, tube: built.tube }); continue; }
     tubes.push(built.tube);
   }
@@ -604,7 +829,8 @@ function troughShape(tube, end, len, surface, roads) {
     const i = indexAt(tube, sEnd - end * d);
     for (const lat of [-hw, -hw / 2, 0, hw / 2, hw]) { const [x, z] = sidePoint(tube, i, lat); dh = Math.max(dh, Math.abs(surface.height(x, z) - plane(i, lat))); }
   }
-  const blend = clamp(Math.sqrt((6 * dh * TROUGH.speed ** 2) / TROUGH.accel), TROUGH.blendMin, len);
+  const speed = TUBE.fastKinds.has(tube.kind) ? TROUGH.speedFast : TROUGH.speed;
+  const blend = clamp(Math.sqrt((6 * dh * speed ** 2) / TROUGH.accel), TROUGH.blendMin, len);
   // the cross-section of the approach at the outer end (the drawn ground against the plane, across the whole floor): the floor starts there exactly on the ground and
   // fades into the plane over the blend.  (Blended into the ground itself, the floor carried every step of the carved approach into the trough: 0.27 m in 1 m on the
   // centre line of the René Konen south approach, 20 m/s2.)
@@ -613,7 +839,8 @@ function troughShape(tube, end, len, surface, roads) {
   // the floor leaves the end with the approach's own grade in every lane, see troughFloor)
   const iOut = clamp(iE + end * TROUGH.slopeRun, 0, n - 1), run = Math.abs(tube.s[iE] - tube.s[iOut]) || 1;
   const lats = Array.from({ length: EDGE_N }, (_, k) => (k / (EDGE_N - 1) * 2 - 1) * tube.innerHalf);
-  const residual = (i, lat) => { const [x, z] = sidePoint(tube, i, lat); return surface.height(x, z) - plane(i, lat); };
+  // (on a bridge deck past the end of a ramp the road is the deck, not the valley under it)
+  const residual = (i, lat) => { const [x, z] = sidePoint(tube, i, lat); return (tube.onDeck && tube.onDeck[i] ? tube.ground[i] + tube.cross[i] * lat : surface.height(x, z)) - plane(i, lat); };
   const edge = Float32Array.from(lats, (lat) => residual(iE, lat));
   const edgeSlope = Float32Array.from(lats, (lat, k) => (edge[k] - residual(iOut, lat)) / run);
   // the wall tops: the land the wall holds (from the middle of the lane to TROUGH.back behind it) plus the parapet, never lower than a parapet over the floor
@@ -646,9 +873,11 @@ function troughShape(tube, end, len, surface, roads) {
 function withTroughs(tube, surface, roads) {
   // (each outer end on a sample: there the floor starts exactly on the cross-section read at that sample)
   const n = tube.s.length;
-  const rawA = troughLength(tube, -1, surface, roads), rawB = troughLength(tube, 1, surface, roads);
-  const lenA = rawA ? tube.sA - tube.s[indexAt(tube, tube.sA - rawA)] : 0;
-  const lenB = rawB ? tube.s[Math.min(n - 1, indexAt(tube, tube.sB + rawB) + 1)] - tube.sB : 0;
+  // (a ramp's trough reaches exactly to its far end: past it lies the road the floor starts from - the viaduct of Cents)
+  // (a fast tube's lead is its shortest trough)
+  const rawA = tube.rampA || Math.max(tube.leadA || 0, troughLength(tube, -1, surface, roads)), rawB = tube.rampB || Math.max(tube.leadB || 0, troughLength(tube, 1, surface, roads));
+  const lenA = rawA ? tube.sA - tube.s[indexAt(tube, tube.sA - rawA) + (tube.rampA ? 1 : 0)] : 0;
+  const lenB = rawB ? tube.s[Math.min(n - 1, indexAt(tube, tube.sB + rawB) + (tube.rampB ? 0 : 1))] - tube.sB : 0;
   if (!lenA && !lenB) return { ...tube, troughA: 0, troughB: 0, blendA: 0, blendB: 0, roadA: 0, roadB: 0, edgeA: null, edgeB: null, edgeSlopeA: null, edgeSlopeB: null, tA: tube.sA, tB: tube.sB, wallTopL: new Float32Array(tube.s.length).fill(NaN), wallTopR: new Float32Array(tube.s.length).fill(NaN) };
   const smoothed = { ...tube, floor: smoothTroughFloor(tube, lenA, lenB) };
   const a = lenA ? troughShape(smoothed, -1, lenA, surface, roads) : null, b = lenB ? troughShape(smoothed, 1, lenB, surface, roads) : null;
@@ -733,7 +962,8 @@ function pairTubes(tubes, rejected) {
   }
   const kept = [];
   for (const t of out) {
-    if (Math.min(t.innerL, t.innerR) < t.width / 2 + TUBE.shoulderMin) rejected.push({ name: t.name, ids: t.ids, length: t.length, why: `its lanes do not fit beside the tube next to it (${Math.min(t.innerL, t.innerR).toFixed(2)} m)`, tube: t });
+    const lanesHalf = Math.min(t.width / 2, (t.lanes * TUBE.laneMin) / 2) + TUBE.laneRoomPair;
+    if (Math.min(t.innerL, t.innerR) < Math.min(t.width / 2 + TUBE.shoulderMin, lanesHalf)) rejected.push({ name: t.name, ids: t.ids, length: t.length, why: `its lanes do not fit beside the tube next to it (${Math.min(t.innerL, t.innerR).toFixed(2)} m)`, tube: t });
     else kept.push(t);
   }
   return { tubes: kept, rejected };
@@ -930,8 +1160,8 @@ export function tubeRoadInfo(out) {
 }
 
 /** The tubes of the world as the game builds them (main.js, the harness and the tools call this): { network, tubes, rejected, ids } (ids: every tube way). */
-export function createTubes(roads, surface, net, buildings = null) {
-  const { tubes, rejected } = findTubes(roads, surface, net, buildings);
+export function createTubes(roads, surface, net, buildings = null, decks = null) {
+  const { tubes, rejected } = findTubes(roads, surface, net, buildings, decks);
   return { network: createTubeNetwork(tubes), tubes, rejected, ids: new Set(tubes.flatMap((t) => t.ids)) };
 }
 

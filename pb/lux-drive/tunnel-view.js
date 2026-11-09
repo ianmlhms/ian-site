@@ -80,9 +80,14 @@ function stationsOf(tube) {
   return out;
 }
 
+/** m: an edge line keeps this far off the walkway. */
+const EDGE_ROOM = 0.15;
+
 /** The lane lines of a tube: [lat, dashed] (lat to the right of s). */
 function linesOf(tube) {
-  const w = tube.width, n = Math.max(1, tube.lanes), out = [[-w / 2 + 0.3, false], [w / 2 - 0.3, false]];
+  // (the edge lines keep off the walkways: beside a parallel tube the carriageway loses its hard shoulder - the A4 / N56 boxes under the Rond-Point Merl, tunnels19)
+  const w = tube.width, n = Math.max(1, tube.lanes);
+  const out = [[Math.max(-w / 2 + 0.3, -(tube.innerL - WALKWAY - EDGE_ROOM)), false], [Math.min(w / 2 - 0.3, tube.innerR - WALKWAY - EDGE_ROOM), false]];
   if (!tube.oneway && n >= 2) out.push([0, false]);                                   // (two ways: a solid centre line)
   if (tube.oneway) for (let k = 1; k < n; k++) out.push([-w / 2 + (k * w) / n, true]);
   return out;

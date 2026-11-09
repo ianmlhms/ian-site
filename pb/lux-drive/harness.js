@@ -94,7 +94,7 @@ const area = JSON.parse(fs.readFileSync(path.join(DATA, 'area.json'), 'utf8'));
 const field = createHeightField({ near: data.near, far: data.far, roads: data.roads, decks: data.decks });
 const surface = createSurface(field);
 const deckNetwork = createDeckNetwork(widenToWays(fixLandmarkDecks(data.decks, (x, z) => surface.height(x, z)), data.roads), surface);
-const tubes = createTubes(data.roads, surface, field.network, data.buildings);          // tunnels16: the tunnels the car drives through (as main.js)
+const tubes = createTubes(data.roads, surface, field.network, data.buildings, deckNetwork);          // tunnels16: the tunnels the car drives through (as main.js)
 const ground = createGround(surface, deckNetwork, tubes.network);
 const landmarks = createLandmarks({ buildings: data.buildings, decks: deckNetwork.decks, ground: (x, z) => surface.height(x, z), roads: data.roads });
 const buildings = createBuildingIndex(data.buildings, { hidden: landmarks.hiddenBuildings, groundAt: (x, z) => field.height(x, z), landAt: (x, z) => field.baseHeight(x, z) });   // (as main.js: the houses know their height, drive12)
