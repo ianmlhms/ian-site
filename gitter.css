@@ -176,3 +176,12 @@ body.gt :is(.empty, .card, .tile, .hint, .gate-box, .bar, .wrap, .proj-card, .no
 .gt header.bar:not(.arcade-bar) h1 { margin: 0; font: 800 16px/1.2 "Geist", system-ui, sans-serif; letter-spacing: -0.01em; }
 .gt header.bar .spacer { flex: 1; }
 @media (max-width: 700px) { .gt header.bar:not(.arcade-bar) { margin-top: 12px; padding-inline: 14px; } }
+
+/* legacy site-ui header (.ui-header) on pages restyled without restructuring */
+.gt .ui-header { display: flex; align-items: center; justify-content: space-between; gap: 4px 14px; flex-wrap: wrap; min-height: 52px; padding: 2px 20px; max-width: calc(1240px - 2 * var(--gutter)); width: calc(100% - 2 * var(--gutter)); margin: 24px auto 0; border: 1px solid var(--ink); background: transparent; position: static; box-shadow: none; backdrop-filter: none; border-radius: 0; }
+.gt .ui-header .header-left, .gt .ui-header .header-right { display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap; }
+.gt .ui-header .home, .gt .ui-header .ui-brand a { display: inline-flex; align-items: center; min-height: 44px; padding: 0; border: 0; background: none; color: var(--muted); font: 600 14px "Geist", system-ui, sans-serif; text-decoration: none; cursor: pointer; }
+.gt .ui-header .home:hover { color: var(--green); }
+.gt .ui-header h1.ui-brand { margin: 0; display: flex; align-items: center; gap: 10px; font: 800 16px/1.2 "Geist", system-ui, sans-serif; letter-spacing: -0.01em; white-space: nowrap; }
+.gt .ui-header .auth-btn { border: 0; background: none; border-radius: 0; box-shadow: none; color: var(--green); font: 600 14px "Geist", system-ui, sans-serif; min-height: 44px; padding: 0 0 0 10px; cursor: pointer; }
+@media (max-width: 700px) { .gt .ui-header { margin-top: 12px; padding-inline: 14px; } }
