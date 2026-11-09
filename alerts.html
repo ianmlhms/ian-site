@@ -6,33 +6,23 @@
 <title>Neiegkeeten — ian.lu</title>
 <meta name="robots" content="noindex">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<meta name="theme-color" content="#0d0d1a">
-<script src="season.js?v=5"></script>
+<meta name="theme-color" content="#f6f6f3">
+<link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="gitter.css?v=3">
 <script src="theme.js?v=32"></script>
-<link rel="stylesheet" href="site-ui.css?v=2">
 <style>
-  *{box-sizing:border-box}
-  body{margin:0;min-height:100vh;min-height:100svh;display:flex;flex-direction:column;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  body{display:flex;flex-direction:column}
   a{color:var(--accent-text);text-decoration:none}
   button,a{touch-action:manipulation}
   a:focus-visible,button:focus-visible{outline:2px solid var(--focus-ring,var(--accent));outline-offset:2px}
   .sr{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
   /* ---- header + column ---- */
-  html body.ui .ui-header{max-width:720px;flex-wrap:wrap;gap:8px 14px;padding:max(16px,env(safe-area-inset-top)) max(28px,env(safe-area-inset-right)) 0 max(28px,env(safe-area-inset-left))}
-  .header-left,.header-right{display:flex;align-items:center;gap:10px;min-width:0}
-  .header-left{flex:1 1 auto}
-  body.ui .ui-header .home{display:inline-flex;align-items:center;min-height:44px;padding:8px 16px;border-radius:var(--r-chip);border:1px solid var(--border);background:transparent;color:var(--text);font:700 14px var(--font-display);white-space:nowrap;transition:background-color .2s,border-color .2s,transform .3s var(--ease)}
-  body.ui .ui-header .home:hover{background:color-mix(in srgb,var(--accent) 10%,transparent);border-color:var(--accent-border)}
-  body.ui .ui-header .home:active{transform:scale(.97)}
-  body.ui .ui-header h1.ui-brand{margin:0;display:flex;align-items:center;gap:10px;font-size:19px;white-space:nowrap}
-  .ui .ui-page{display:flex;flex-direction:column;gap:12px;max-width:720px;padding-top:22px;padding-left:max(28px,env(safe-area-inset-left));padding-right:max(28px,env(safe-area-inset-right));padding-bottom:max(72px,calc(40px + env(safe-area-inset-bottom)))}
-  @media (max-width:620px){.ui .ui-page{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}html body.ui .ui-header{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}}
 
   /* ---- toolbar: summary + clear ---- */
   .bar2{display:flex;align-items:center;justify-content:space-between;gap:10px 14px;flex-wrap:wrap;padding:0 2px}
-  .sum{display:flex;align-items:center;gap:8px;margin:0;color:var(--muted);font:700 13px var(--font-display)}
-  .sum .dot{width:7px;height:7px;border-radius:50%;background:var(--muted);opacity:.5}
+  .sum{display:flex;align-items:center;gap:8px;margin:0;color:var(--muted);font:700 13px "Geist",system-ui,sans-serif}
+  .sum .dot{width:7px;height:7px;border-radius:0;background:var(--muted);opacity:.5}
   .sum.has-new{color:var(--text)}
   .sum.has-new .dot{background:var(--accent);opacity:1;box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 22%,transparent)}
   .clear{min-height:44px;padding:8px 16px;font-size:14px}
@@ -40,43 +30,42 @@
 
   /* ---- notification cards ---- */
   .list{display:flex;flex-direction:column;gap:10px}
-  .a{--h:var(--accent);position:relative;display:flex;gap:14px;align-items:flex-start;padding:14px 8px 14px 16px;border-radius:var(--r-tile);background:var(--card);box-shadow:inset 0 0 0 1px var(--tile-edge),0 1px 2px rgb(var(--ink)/.05),0 14px 30px -20px rgb(var(--ink)/.35)}
+  .a{--h:var(--accent);position:relative;display:flex;gap:14px;align-items:flex-start;padding:14px 8px 14px 16px;border-radius:var(--r-tile);background:var(--card);border:1px solid var(--soft),0 1px 2px rgb(var(--ink)/.05),0 14px 30px -20px rgb(var(--ink)/.35)}
   .a .ic{flex:none;display:grid;place-items:center;width:48px;height:48px;border-radius:var(--r-chip);font-size:24px;line-height:1;background:color-mix(in srgb,var(--h) 18%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--h) 28%,transparent),inset 0 1px 0 color-mix(in srgb,#fff 20%,transparent)}
   .a .main{flex:1;min-width:0;padding-top:1px}
-  .a .t{font:750 16px/1.25 var(--font-display);letter-spacing:-.015em;overflow-wrap:anywhere}
+  .a .t{font:750 16px/1.25 "Geist",system-ui,sans-serif;letter-spacing:-.015em;overflow-wrap:anywhere}
   .a .b{margin-top:3px;color:var(--muted);font-size:14px;line-height:1.4;overflow-wrap:anywhere}
   .a .meta{display:flex;align-items:center;flex-wrap:wrap;gap:4px 14px;margin-top:6px;color:var(--muted);font-size:12.5px}
-  .a .meta a,.a .meta .nolink{display:inline-flex;align-items:center;min-height:44px;margin:-10px 0;padding:0 2px;font:750 14px var(--font-display);letter-spacing:-.01em}
+  .a .meta a,.a .meta .nolink{display:inline-flex;align-items:center;min-height:44px;margin:-10px 0;padding:0 2px;font:750 14px "Geist",system-ui,sans-serif;letter-spacing:-.01em}
   .a .meta .nolink{color:var(--muted)}
   .a .meta a:hover{text-decoration:underline;text-underline-offset:3px}
-  .a.unseen{background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 16%,var(--card-opaque)),color-mix(in srgb,var(--accent) 5%,var(--card-opaque)));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 34%,transparent),0 14px 30px -20px rgb(var(--ink)/.4)}
-  .a.unseen::after{content:"";position:absolute;top:14px;right:56px;width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 22%,transparent)}
+  .a.unseen{background:var(--tint);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 34%,transparent),0 14px 30px -20px rgb(var(--ink)/.4)}
+  .a.unseen::after{content:"";position:absolute;top:14px;right:56px;width:9px;height:9px;border-radius:0;background:var(--accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 22%,transparent)}
   .del{flex:none;display:grid;place-items:center;min-width:44px;min-height:44px;border:0;border-radius:var(--r-chip);background:none;color:var(--muted);font-size:16px;cursor:pointer;transition:color .2s,background-color .2s,transform .3s var(--ease)}
   .del:hover{color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,transparent)}
   .del:active{transform:scale(.92)}
 
   /* ---- empty / loading / sign-in ---- */
   .gate{display:flex;margin:0;flex-direction:column;align-items:center;gap:10px;text-align:center;color:var(--muted);padding:clamp(34px,8vw,64px) 22px}
-  .gate .big{display:grid;place-items:center;width:72px;height:72px;margin-bottom:4px;border-radius:22px;font-size:36px;background:color-mix(in srgb,var(--accent) 18%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 28%,transparent)}
+  .gate .big{display:grid;place-items:center;width:72px;height:72px;margin-bottom:4px;border-radius:0;font-size:36px;background:color-mix(in srgb,var(--accent) 18%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 28%,transparent)}
   .gate p{margin:0;max-width:30ch;line-height:1.4}
-  .gate .gt{color:var(--text);font:800 clamp(20px,3vw,24px) var(--font-display);letter-spacing:-.02em}
+  .gate .gt{color:var(--text);font:800 clamp(20px,3vw,24px) "Geist",system-ui,sans-serif;letter-spacing:-.02em}
   .gate .ui-btn{margin-top:8px}
 
-  @media (prefers-reduced-motion:reduce){.del,body.ui .ui-header .home{transition:none}}
 </style>
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
 </head>
-<body class="ui">
+<body class="gt">
 <header class="ui-header">
   <div class="header-left">
     <a class="home" href="index.html">‹ Heem</a>
-    <h1 class="ui-brand"><span aria-hidden="true">🔔</span> Neiegkeeten</h1>
+    <h1 class="ui-brand">Neiegkeeten</h1>
   </div>
   <div class="header-right">
-    <span id="acctHost"></span>
+    <button type="button" class="gt-acct" id="gtAcct">Umellen</button>
   </div>
 </header>
 
@@ -107,9 +96,8 @@ function ago(ts){
 
 async function boot(){
   sb=await auth.client();
-  auth.mountAccountButton($("acctHost"));
   if(!auth.session()){
-    $("wrap").innerHTML=`<div class="gate ui-card"><div class="big" aria-hidden="true">🔔</div><p class="gt">Neiegkeeten</p><p>Mell dech un fir deng Neiegkeeten.</p><button class="ui-btn ui-btn--primary" id="si" type="button">Umellen</button></div>`;
+    $("wrap").innerHTML=`<div class="gate ui-card"><div class="big" aria-hidden="true">🔔</div><p class="gt">Neiegkeeten</p><p>Mell dech un fir deng Neiegkeeten.</p><button class="gt-btn" id="si" type="button">Umellen</button></div>`;
     $("si").onclick=auth.openAuthModal;return;
   }
   await render();
@@ -122,7 +110,7 @@ async function render(){
   if(!(data||[]).length){$("wrap").innerHTML='<div class="gate ui-card"><div class="big" aria-hidden="true">🎉</div><p class="gt">Näischt Neies</p><p>Du bass um neiste Stand.</p></div>';return;}
   const fresh=data.filter(n=>!n.seen).length;
   $("wrap").innerHTML=
-    `<div class="bar2"><p class="sum${fresh?" has-new":""}"><span class="dot" aria-hidden="true"></span>${fresh?fresh+" nei":"Alles gesinn"}</p><button class="ui-btn ui-btn--ghost clear" id="clr" type="button">Alles läschen</button></div><div class="list">`+
+    `<div class="bar2"><p class="sum${fresh?" has-new":""}"><span class="dot" aria-hidden="true"></span>${fresh?fresh+" nei":"Alles gesinn"}</p><button class="gt-btn ghost clear" id="clr" type="button">Alles läschen</button></div><div class="list">`+
     data.map(n=>`<article class="a${n.seen?"":" unseen"}" style="--h:${TINT[n.kind]||"#6ea8fe"}">
       <div class="ic" aria-hidden="true">${ICON[n.kind]||"🔔"}</div>
       <div class="main">
@@ -130,7 +118,7 @@ async function render(){
         ${n.body?`<div class="b">${esc(n.body)}</div>`:""}
         <div class="meta"><span>${ago(n.created_at)}</span>${n.url?(isSitePath(n.url)?`<a href="${esc(n.url)}">Opmaachen ›</a>`:`<span class="nolink">Opmaachen ›</span>`):""}</div>
       </div>
-      <button class="del" data-del="${n.id}" type="button" title="Läschen" aria-label="Läschen"><span aria-hidden="true">✕</span></button>
+      <button class="del" data-del="${n.id}" type="button" title="Läschen" aria-label="Läschen"></button>
       </article>`).join("")+`</div>`;
   $("clr").onclick=async()=>{await sb.from("notifications").delete().neq("id","00000000-0000-0000-0000-000000000000");render();};
   $("wrap").querySelectorAll("[data-del]").forEach(b=>b.onclick=async()=>{await sb.from("notifications").delete().eq("id",b.dataset.del);render();});
@@ -141,5 +129,6 @@ boot();
 </script>
   <script type="module" src="rtc-ring.js?v=36"></script>
   <script type="module" src="class-gate.js?v=37"></script>
+<script type="module" src="gitter-acct.js?v=1"></script>
 </body>
 </html>
