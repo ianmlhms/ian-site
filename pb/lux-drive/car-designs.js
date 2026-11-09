@@ -16,7 +16,7 @@
 export const TRIM = Object.freeze({
   black: [0.07, 0.07, 0.08], plastic: [0.13, 0.13, 0.14], liner: [0.05, 0.05, 0.055], chrome: [0.74, 0.76, 0.8], silver: [0.62, 0.64, 0.68],
   plate: [0.96, 0.8, 0.12],            // Luxembourg number plates are yellow
-  eu: [0.12, 0.22, 0.62], red: [0.84, 0.13, 0.15], skyblue: [0.36, 0.67, 0.88], white: [0.95, 0.95, 0.93],
+  eu: [0.12, 0.22, 0.62], pipe: [0.34, 0.35, 0.38], red: [0.84, 0.13, 0.15], skyblue: [0.36, 0.67, 0.88], white: [0.95, 0.95, 0.93],
   bezel: [0.09, 0.1, 0.12], glassLow: [0.09, 0.12, 0.16], glassHigh: [0.38, 0.46, 0.55], signText: [0.08, 0.08, 0.1],
 });
 
@@ -97,23 +97,23 @@ const COUPE = {
   lamps: {
     head: [{ end: 'front', pts: [[0.50, 0.40], [0.54, 0.74], [0.62, 0.86], [0.66, 0.80], [0.60, 0.44]] }],
     drl: [{ end: 'front', pts: [[0.475, 0.38], [0.51, 0.76], [0.525, 0.76], [0.49, 0.38]] }],
-    tail: [{ end: 'back', pts: [[0.76, -0.70], [0.76, 0.70], [0.80, 0.70], [0.80, -0.70]], mirror: false },              // the light bar
-      { end: 'back', pts: [[0.72, 0.52], [0.72, 0.74], [0.82, 0.76], [0.82, 0.52]] }],
-    reverse: [{ end: 'back', pts: [[0.40, 0.40], [0.40, 0.50], [0.44, 0.50], [0.44, 0.40]] }],
+    tail: [{ end: 'back', pts: [[0.755, -0.72], [0.755, 0.72], [0.79, 0.72], [0.79, -0.72]], mirror: false },            // the light bar across the tail
+      { end: 'back', pts: [[0.69, 0.44], [0.69, 0.72], [0.74, 0.79], [0.83, 0.79], [0.83, 0.44]] }],                       // the lamp clusters at the corners
+    reverse: [{ end: 'back', pts: [[0.635, 0.50], [0.635, 0.64], [0.665, 0.64], [0.665, 0.50]] }],
   },
   decals: [
     { end: 'front', colour: 'black', pts: [[0.24, 0], [0.24, 0.50], [0.40, 0.54], [0.44, 0.30], [0.42, 0]] },              // the big intake
     { end: 'front', colour: 'black', pts: [[0.26, 0.56], [0.24, 0.70], [0.38, 0.68], [0.40, 0.58]] },                      // the brake duct
     ...plate('front', 0.36, 0.24, 0.05),
-    { end: 'back', colour: 'black', pts: [[0.30, 0], [0.30, 0.70], [0.50, 0.66], [0.50, 0]] },                           // the diffuser
+    { end: 'back', colour: 'black', pts: [[0.30, 0], [0.30, 0.66], [0.46, 0.62], [0.46, 0]] },                           // the diffuser
     ...plate('back', 0.62, 0.24, 0.055),
   ],
   boxes: [
     { c: [2.10, 0.15, 0], h: [0.12, 0.012, 0.74], colour: 'black' },                                                      // the splitter
     { c: [0.12, 0.17, 0.89], h: [0.98, 0.03, 0.03], colour: 'black', mirror: true },                                      // the side skirts
     { c: [-2.02, 0.955, 0], h: [0.12, 0.014, 0.62], colour: 'black' },                                                    // the ducktail lip
-    { c: [-2.15, 0.30, 0.30], h: [0.03, 0.032, 0.04], colour: 'silver', mirror: true },                                   // the tail pipes
-    { c: [-2.15, 0.30, 0.41], h: [0.03, 0.032, 0.04], colour: 'silver', mirror: true },
+    { c: [-2.15, 0.30, 0.30], h: [0.03, 0.03, 0.04], colour: 'pipe', mirror: true },                                      // the tail pipes
+    { c: [-2.15, 0.30, 0.41], h: [0.03, 0.03, 0.04], colour: 'pipe', mirror: true },
   ],
   stripes: [],
   roofRails: false, sign: null,
@@ -170,5 +170,5 @@ const TAXI = {
 
 export const CAR_DESIGNS = Object.freeze({ hatch: HATCH, coupe: COUPE, taxi: TAXI });
 export const CAR_DESIGN_IDS = Object.freeze(Object.keys(CAR_DESIGNS));
-/** The car of the game until Ian picks one (car20): change this one line, or ?car=<id>. */
-export const DEFAULT_CAR_DESIGN = 'hatch';
+/** The car of the game: Ian picked the coupé (9 Nov 2026); the others stay selectable with ?car=<id>. */
+export const DEFAULT_CAR_DESIGN = 'coupe';

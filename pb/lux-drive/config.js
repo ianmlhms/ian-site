@@ -153,7 +153,7 @@ export const CAR = Object.freeze({
   steerMax: 0.56,            // rad of the road wheel angle at standstill
   steerSpeedRef: 13,         // m/s: the steering authority falls off with the speed
   slideScrub: 0.7,           // 1/s: how fast a sliding car loses speed (at full slip): a handbrake drift, a car on ice - not a corner within the grip
-  launchCap: 7.2,            // m/s2: the most the drive pushes at low speed (no rocket launch)
+  launchCap: 6.5,            // m/s2: the most the drive pushes at low speed (no rocket launch)
   steerRate: 7,              // 1/s: how fast the wheel follows the input
   cornerGrip: 1.12,          // the sideways grip of the (sports) tyres over the surface's friction: a corner at the limit pulls ~1.0 g on dry asphalt (car20)
   steerGripShare: 0.92,      // the share of the tyre grip that full lock may ask for in a corner (the rest is the margin before a slide)

@@ -317,11 +317,11 @@ function buildBody(design, paint) {
     }
     // the door handles
     for (const x of design.handles) { const y = shape.ringAt(x)[4][0] - 0.08; b.box(x, y, side * (shape.sideZ(x, y) + 0.012), 0.1, 0.014, 0.012, pal.dark); }
-    // the mirror: a black foot at the base of the A pillar and a housing in the paint
-    const m = design.mirror, mz = shape.sideZ(m.x, m.y);
-    b.box(m.x, m.y - 0.01, side * (mz + 0.04), 0.06, 0.025, 0.05, TRIM.black);
-    b.box(m.x - 0.02, m.y + 0.04, side * (mz + 0.13), 0.075, 0.055, 0.06, pal.roof === TRIM.black ? TRIM.black : pal.body);
-    b.box(m.x - 0.085, m.y + 0.04, side * (mz + 0.13), 0.012, 0.045, 0.05, TRIM.black);
+    // the mirror: a black foot on the belt line at the base of the A pillar, a housing in the paint, the dark glass facing back
+    const mr = shape.ringAt(design.mirror.x), my = mr[4][0] + 0.05, mz = mr[4][1];
+    b.box(design.mirror.x, my - 0.015, side * (mz + 0.03), 0.05, 0.02, 0.04, TRIM.black);
+    b.box(design.mirror.x - 0.02, my + 0.03, side * (mz + 0.12), 0.07, 0.045, 0.075, pal.body);
+    b.box(design.mirror.x - 0.092, my + 0.03, side * (mz + 0.12), 0.004, 0.036, 0.064, TRIM.black);
     // the stripes along the flank (the flag of the taxi), stopped by the wheel arches
     for (const s of design.stripes) {
       const steps = Math.max(2, Math.ceil((s.x0 - s.x1) / 0.08));
@@ -406,7 +406,7 @@ function buildWheel(design) {
 function buildLamps(design, lists, withSign = false) {
   const shape = shapeOf(design);
   const b = new FaceBuilder();
-  for (const list of lists) for (const l of list || []) for (const side of l.mirror === false ? [1] : [1, -1]) layOnBody(b, shape, l.end, l.pts, [1, 1, 1], SURFACE_LIFT * 1.6, side);
+  for (const list of lists) for (const l of list || []) for (const side of l.mirror === false ? [1] : [1, -1]) layOnBody(b, shape, l.end, l.pts, [1, 1, 1], SURFACE_LIFT * 2.2, side);
   if (withSign && design.sign) {
     const s = design.sign, top = shape.ringAt(s.x)[8][0];
     b.box(s.x, top + 0.035 + s.h / 2, 0, s.d / 2, s.h / 2, s.w / 2, [1, 1, 1]);
@@ -435,8 +435,8 @@ function shadowTexture() {
   return t;
 }
 
-const HEAD_OFF = [0.82, 0.83, 0.8], HEAD_ON = [1, 0.97, 0.8];
-const TAIL_OFF = [0.45, 0.06, 0.06], TAIL_NIGHT = [0.8, 0.08, 0.07], TAIL_BRAKE = [1, 0.14, 0.1];
+const HEAD_OFF = [0.76, 0.79, 0.82], HEAD_ON = [1, 0.97, 0.8];
+const TAIL_OFF = [0.6, 0.07, 0.07], TAIL_NIGHT = [0.8, 0.08, 0.07], TAIL_BRAKE = [1, 0.14, 0.1];
 const REVERSE_OFF = [0.6, 0.6, 0.6], REVERSE_ON = [1, 1, 0.94];
 
 const lampMaterial = () => new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false, toneMapped: false, side: THREE.DoubleSide });
