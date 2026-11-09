@@ -13,6 +13,7 @@ const A11Y = {
 };
 const TA = (k) => { const e = A11Y[k]; return e[window.I18N?.lang] || e.en; };
 let sb = null, inviteSubbed = false;
+const ini = (n) => String(n || "?").trim().charAt(0).toUpperCase();
 let adminIds = new Set();   // user_ids of app admins → pinned on top + 👑 tagged
 // Per-account visibility restriction (server-driven): a restricted viewer only
 // sees an allowlist of people. UX-only — RLS still protects the real data.
@@ -99,7 +100,7 @@ function renderActivity(list) {
     const who = a.is_me ? T("friends.you") : esc(a.username);
     const game = esc(GAMES[a.game] || a.game);
     const verb = VERB[a.result] ? T(VERB[a.result]) : a.result;
-    return `<div class="act-row"><span class="act-emoji" aria-hidden="true">${a.result === "win" ? "🏆" : a.result === "loss" ? "❌" : "🤝"}</span>` +
+    return `<div class="act-row"><span class="act-emoji" aria-hidden="true">${a.result === "win" ? "G" : a.result === "loss" ? "V" : "="}</span>` +
       `<span class="act-text"><b>${who}</b>${a.is_me ? "" : classTag(a.username)} ${verb} <b>${game}</b></span>` +
       `<span class="act-time">${ago(a.created_at)}</span></div>`;
   }).join("");
@@ -109,7 +110,7 @@ function renderSent(list) {
   $("sentWrap").style.display = list.length ? "" : "none";
   $("sent").innerHTML = list.map(s => `
     <div class="row">
-      <span class="name"><span class="av" aria-hidden="true">👤</span>${esc(s.username)}${classTag(s.username)} <span style="color:var(--muted);font-weight:400">${T("friends.pending")}</span></span>
+      <span class="name"><span class="av" aria-hidden="true">${esc(ini(s.username))}</span>${esc(s.username)}${classTag(s.username)} <span style="color:var(--muted);font-weight:400">${T("friends.pending")}</span></span>
       <button type="button" class="mini x" data-cancel="${s.user_id}" aria-label="${esc(TA("cancel") + ": " + s.username)}">${T("btn.cancel")}</button>
     </div>`).join("");
   $("sent").querySelectorAll("[data-cancel]").forEach(b => b.onclick = async () => { await sb.rpc("remove_friend", { p_other: b.dataset.cancel }); refresh(); });
@@ -122,11 +123,11 @@ function renderFriends(list) {
   const ordered = [...list.filter(f => adminIds.has(f.user_id)), ...list.filter(f => !adminIds.has(f.user_id))];
   el.innerHTML = ordered.map(f => `
     <div class="row">
-      <span class="name"><span class="av" aria-hidden="true">👤</span>${esc(f.username)}${classTag(f.username)}${adminIds.has(f.user_id) ? ` <span class="admin-tag">👑 Admin</span>` : ""}</span>
+      <span class="name"><span class="av" aria-hidden="true">${esc(ini(f.username))}</span>${esc(f.username)}${classTag(f.username)}${adminIds.has(f.user_id) ? ` <span class="admin-tag">Admin</span>` : ""}</span>
       <a class="mini" href="call.html?peer=${encodeURIComponent(f.user_id)}&amp;name=${encodeURIComponent(f.username)}" title="${esc(T("friends.call"))}" aria-label="${esc(T("friends.call") + ": " + f.username)}"><span aria-hidden="true">📹</span></a>
       <a class="mini" href="messenger.html?dm=${encodeURIComponent(f.username)}" aria-label="${esc(T("friends.message") + ": " + f.username)}">${T("friends.message")}</a>
       <button type="button" class="mini go" data-play="${f.user_id}" data-name="${esc(f.username)}" aria-label="${esc(T("friends.play") + ": " + f.username)}">${T("friends.play")}</button>
-      <button type="button" class="mini x" data-remove="${f.user_id}" title="${esc(T("grades.remove"))}" aria-label="${esc(TA("remove") + ": " + f.username)}"><span aria-hidden="true">✕</span></button>
+      <button type="button" class="mini x" data-remove="${f.user_id}" title="${esc(T("grades.remove"))}" aria-label="${esc(TA("remove") + ": " + f.username)}"><span aria-hidden="true">×</span></button>
     </div>`).join("");
   el.querySelectorAll("[data-play]").forEach(b => b.onclick = () => chooseGame(b.dataset.play, b.dataset.name));
   el.querySelectorAll("[data-remove]").forEach(b => b.onclick = async () => {
@@ -139,7 +140,7 @@ function renderRequests(list) {
   $("reqWrap").style.display = list.length ? "" : "none";
   $("requests").innerHTML = list.map(r => `
     <div class="row">
-      <span class="name"><span class="av" aria-hidden="true">👤</span>${esc(r.username)}${classTag(r.username)} <span style="color:var(--muted);font-weight:400">${T("friends.wantsFriend")}</span></span>
+      <span class="name"><span class="av" aria-hidden="true">${esc(ini(r.username))}</span>${esc(r.username)}${classTag(r.username)} <span style="color:var(--muted);font-weight:400">${T("friends.wantsFriend")}</span></span>
       <button type="button" class="mini go" data-accept="${r.id}" aria-label="${esc(T("friends.accept") + ": " + r.username)}">${T("friends.accept")}</button>
     </div>`).join("");
   $("requests").querySelectorAll("[data-accept]").forEach(b => b.onclick = async () => {
@@ -151,7 +152,7 @@ function renderInvites(list) {
   $("invitesWrap").style.display = list.length ? "" : "none";
   $("invites").innerHTML = list.map(i => `
     <div class="row">
-      <span class="name"><span aria-hidden="true">🎮</span> <b>${esc(i.from_name)}</b>${classTag(i.from_name)} ${T("friends.invitedYou")} <b>${esc(gameName(i.game))}</b></span>
+      <span class="name"><b>${esc(i.from_name)}</b>${classTag(i.from_name)} ${T("friends.invitedYou")} <b>${esc(gameName(i.game))}</b></span>
       <button type="button" class="mini go" data-join="${esc(i.game)}|${esc(i.room)}|${i.id}" aria-label="${esc(T("btn.join") + ": " + gameName(i.game))}">${T("btn.join")}</button>
     </div>`).join("");
   $("invites").querySelectorAll("[data-join]").forEach(b => b.onclick = async () => {
@@ -234,7 +235,7 @@ function showGate() {
 
 (async function boot() {
   if (!auth.authConfigured) { $("gate").style.display = ""; $("gate").innerHTML = T("friends.notConfigured"); return; }
-  auth.mountAccountButton($("acctHost"));
+  
   sb = await auth.client();
   try { const { data } = await sb.rpc("admin_user_ids"); adminIds = new Set((data || []).map((r) => r.user_id)); } catch (e) { console.warn(e); }
   await loadRestriction();

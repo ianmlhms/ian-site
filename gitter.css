@@ -148,3 +148,5 @@ html.auth-in .gt-acct { color: var(--ink); }
 .gt #appNav a.on::before { content: ""; position: absolute; left: 0; right: 0; top: -1px; height: 3px; background: var(--green); }
 /* tokens some older pages still read */
 body.gt { --accent2-text: var(--green); --ok: var(--green); --good: var(--green); --good-text: var(--green); --bad: var(--danger); }
+/* site-glass.css (loaded by theme.js) decorates these class names; flatten them in the Gitter look */
+body.gt :is(.empty, .card, .tile, .hint, .gate-box, .bar, .wrap) { box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; border-radius: 0; }
