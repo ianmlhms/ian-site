@@ -54,9 +54,16 @@ const ABUT_HOLD = 2.0;                 // m: ... and its carriageway is held at 
                                        // from there): the 1 m lattice under the first metres of the deck is the road, so the deck starts flush on a level surface, not on the edge of the drop
 const DECK_TUCK = 0.08, DECK_TUCK_FROM = 0.4, DECK_TUCK_RUN = 1.0;   // m: under its deck the carriageway of an approach way lies this much lower, reached between these distances past the end of
                                        // the way: flush with the deck at the abutment, and no longer in the same plane as the deck beyond it (the two surfaces fought for the pixels: a ragged seam across the road)
-const ABUT_LANE_GAP = 1.0;             // m: the fall of an abutment ends this far before the lane keep of a way under the bridge (abutmentFade, fix19) ...
-const ABUT_UNDER = 3.0;                // ... a way at least this far under the approach (a road under a bridge: 5.9 - 21 m in the network; the ways that meet at the end of the
-                                       // Hondhausbréck lie 1.4 - 2.1 m apart, a junction at the abutment, and their own lanes need its earth)
+// fix19, abutmentFade: the fall of an abutment ends before the lanes of a way UNDER the bridge.  It is cut where the earth would stand more than ABUT_TOUCH over the bed of a
+// way at least ABUT_UNDER under the approach, at the centre line of that way's outer lane (its lane keep less ABUT_KEEP_SLACK), and then ends ABUT_LANE_GAP before that
+// point (the car's half width + 1.3 m), but never falls steeper than ABUT_STEEPEST.  The A1 abutment over the Autoroute de Dudelange (0.30 m over the outer lane's centre)
+// is cut; the gentler feet of the A6 abutments beside the other carriageway (0.20 - 0.23 m) keep their fall (cut, their faces became walls of the world flow).
+const ABUT_LANE_GAP = 2.2;             // m
+const ABUT_KEEP_SLACK = 1.2;           // m (= LANE_KEEP: the lane keep less it is the outer lane's centre)
+const ABUT_TOUCH = 0.25;               // m
+const ABUT_STEEPEST = 2.9;             // m per m: the steepest fall (smoothstep: 1.5 x the mean); the world flow counts a face over 3 as a wall the carve made
+const ABUT_UNDER = 3.0;                // m: a road under a bridge lies 5.9 - 21 m under its approaches in the network; the ways that meet at the end of the Hondhausbréck lie
+                                       // 1.4 - 2.1 m apart (a junction at the abutment: their own lanes need its earth, harness V4)
 const ABUT_FADE_MAX = 6.0;             // m: past the hold the ground under the deck falls from the deck to the land below over 1.5 x drop / RAMP_SLOPE (an earth abutment under the deck end, never
                                        // steeper than the ramp between two levels), at least CAP_SOFT / PROTECT_RAMP and at most this.  With the fixed 2 m of CAP_SOFT a deck 6 m over the road below
                                        // stood on a vertical face of ground (the world flow's "walls the carve made": 153 of them at the motorway interchanges after the approaches were lifted)
@@ -984,27 +991,31 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
       }
     }
   }
-  /** Is (x, z) within the lane keep of a carved way (not `road`) whose bed lies ABUT_UNDER under `bed` (a way under the bridge)? */
+  /** The bed of a carved way (not `road`) whose lane keep reaches (x, z) and whose bed lies ABUT_UNDER under `bed` (a way under the bridge), or null. */
   function lowerLaneAt(x, z, bed, road) {
     for (const [c, i, keep, ri] of keepCells.get(Math.floor(x / KEEP_CELL) * 65536 + Math.floor(z / KEEP_CELL)) || []) {
       if (ri === road) continue;
       const ex = c.x[i + 1] - c.x[i], ez = c.z[i + 1] - c.z[i], ll = ex * ex + ez * ez;
       const t = ll > 1e-9 ? Math.max(0, Math.min(1, ((x - c.x[i]) * ex + (z - c.z[i]) * ez) / ll)) : 0;
-      if (Math.hypot(x - c.x[i] - ex * t, z - c.z[i] - ez * t) > keep) continue;
-      if (c.bed[i] + (c.bed[i + 1] - c.bed[i]) * t < bed - ABUT_UNDER) return true;
+      if (Math.hypot(x - c.x[i] - ex * t, z - c.z[i] - ez * t) > keep - ABUT_KEEP_SLACK) continue;
+      const b = c.bed[i] + (c.bed[i + 1] - c.bed[i]) * t;
+      if (b < bed - ABUT_UNDER) return b;
     }
-    return false;
+    return null;
   }
   /** How long the ground under a bridge takes to fall from the deck to the land below past the hold (m, 0 = no more than the defaults): the end of a way at level `bed` that leaves
    *  through (x, z) in the direction (ux, uz) onto the bridge. */
   function abutmentFade(x, z, ux, uz, bed, road) {
     let land = Infinity;
     for (let s = ABUT_HOLD; s <= ABUT_HOLD + ABUT_FADE_MAX + 1e-6; s += 1) land = Math.min(land, baseHeight(x + ux * s, z + uz * s));
-    const fade = Math.min(ABUT_FADE_MAX, Math.max(0, (1.5 * (bed - land)) / RAMP_SLOPE));
-    // (fix19) the abutment ends before the lanes of a carriageway that runs under the bridge: the earth under the deck of the A1 over the Autoroute de Dudelange fell over 7 m and
-    // took the outer lane of the motorway below (its face rose under the lane's centre: a car there rolled 0.39 rad).  (capSoft never drops under the default CAP_SOFT.)
+    const fade = Math.min(ABUT_FADE_MAX, Math.max(0, (1.5 * (bed - land)) / RAMP_SLOPE)), steepest = Math.min(fade, Math.max(0, (1.5 * (bed - land)) / ABUT_STEEPEST));
+    // (fix19, see ABUT_LANE_GAP) the earth under the deck of the A1 over the Autoroute de Dudelange fell over 7 m and took the outer lane of the motorway below (its face
+    // rose under the lane's centre: a car there rolled 0.39 rad).  (capSoft never drops under the default CAP_SOFT.)
     for (let s = ABUT_HOLD; s <= ABUT_HOLD + fade + 1e-6; s += 0.5) {
-      if (lowerLaneAt(x + ux * s, z + uz * s, bed, road)) return Math.max(0, Math.min(fade, s - ABUT_HOLD - ABUT_LANE_GAP));
+      const under = lowerLaneAt(x + ux * s, z + uz * s, bed, road);
+      if (under === null) continue;
+      const earth = bed - (bed - land) * smoothstep(ABUT_HOLD, ABUT_HOLD + fade, s);
+      if (earth - under > ABUT_TOUCH) return Math.max(steepest, Math.min(fade, s - ABUT_HOLD - ABUT_LANE_GAP));
     }
     return fade;
   }
