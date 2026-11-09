@@ -88,7 +88,7 @@ function appendMedia(container, m) {
     const vp = thumbPathFor(m.media_url); if (vp) media.loadInto(tag, vp, { attr: "poster" });
   } else if (m.media_type === "file") {
     tag = document.createElement("a"); tag.className = "filechip"; tag.target = "_blank"; tag.rel = "noopener";
-    tag.innerHTML = `<span>${fileIcon(m.content)}</span><span>${esc(m.content || "File")}</span><span>⬇</span>`;
+    tag.innerHTML = `<span>${fileIcon(m.content)}</span><span>${esc(m.content || "Fichier")}</span><span>⬇</span>`;
   } else {
     tag = document.createElement("img"); tag.className = "media"; tag.loading = "lazy"; tag.decoding = "async";   // image (default)
   }
@@ -110,17 +110,17 @@ const media = createMediaUrls(() => sb, () => auth.session()?.user?.id);
 /* ============================ GROUPS ============================ */
 async function loadGroups() {
   const { data, error } = await sb.rpc("admin_groups");
-  if (error) { $("msg").textContent = "Error: " + error.message; return; }
+  if (error) { $("msg").textContent = "Feeler: " + error.message; return; }
   groups = data || [];
   renderGroupList(groups);
 }
 function renderGroupList(list) {
   const ul = $("glist");
-  if (!list.length) { ul.innerHTML = `<li class="empty">No groups yet.</li>`; return; }
+  if (!list.length) { ul.innerHTML = `<li class="empty">Nach keng Gruppen.</li>`; return; }
   ul.innerHTML = list.map((g) =>
     `<li class="grow ${current && current.id === g.id ? "active" : ""}" data-id="${g.id}" tabindex="0" role="button">
        <div class="n">${esc(g.name)}${g.is_dm ? '<span class="tag">DM</span>' : ""}</div>
-       <div class="meta">#${esc(g.invite_code)} · ${g.member_count} member(s) · ${g.message_count} msg · ${fmt(g.created_at)}</div>
+       <div class="meta">#${esc(g.invite_code)} · ${g.member_count} Member · ${g.message_count} Noriichten · ${fmt(g.created_at)}</div>
      </li>`).join("");
   ul.querySelectorAll(".grow").forEach((li) => (li.onclick = () => openGroup(+li.dataset.id)));
 }
@@ -134,18 +134,18 @@ async function openGroup(id) {
     sb.rpc("admin_messages", { p_group_id: id }),
   ]);
   const chips = (members || []).map((m) =>
-    `<span class="chip">${esc(m.username)}<button class="chip-x" data-uid="${m.user_id}" title="Remove from group" aria-label="Remove ${esc(m.username)} from group">&times;</button></span>`).join("") || "<span class='muted'>no members</span>";
+    `<span class="chip">${esc(m.username)}<button class="chip-x" data-uid="${m.user_id}" title="Aus der Grupp ewechhuelen" aria-label="${esc(m.username)} aus der Grupp ewechhuelen">&times;</button></span>`).join("") || "<span class='muted'>keng Membere</span>";
   $("detailH").innerHTML =
     `<div class="dh-top"><b>${esc(current.name)}</b>${current.is_dm ? '<span class="tag dm">DM</span>' : ""}
-       <button class="danger" id="delGroup">Delete group</button></div>
+       <button class="danger" id="delGroup">Grupp läschen</button></div>
      <div class="members" id="memberBar">${chips}</div>
-     <div class="addmem"><input id="addUser" placeholder="add member by username" autocomplete="off"><button id="addBtn">Add</button></div>`;
+     <div class="addmem"><input id="addUser" placeholder="Member mam Benotzernumm derbäisetzen" autocomplete="off"><button id="addBtn">Derbäi</button></div>`;
   $("delGroup").onclick = () => deleteGroup(id);
   $("addBtn").onclick = () => addMember(id);
   $("addUser").addEventListener("keydown", (e) => { if (e.key === "Enter") addMember(id); });
   $("memberBar").querySelectorAll(".chip-x").forEach((b) => (b.onclick = () => removeMember(id, b.dataset.uid)));
   const box = $("mlist");
-  if (!msgs || !msgs.length) { box.innerHTML = `<div class="empty">No messages.</div>`; return; }
+  if (!msgs || !msgs.length) { box.innerHTML = `<div class="empty">Keng Noriichten.</div>`; return; }
   box.innerHTML = "";
   msgs.forEach((m) => {
     const el = document.createElement("div");
@@ -154,7 +154,7 @@ async function openGroup(id) {
     // don't repeat it as text. Other media (image/video/audio) carry empty content.
     const txt = m.media_type === "file" ? "" : (m.content || "");
     el.innerHTML = `<span class="who">${esc(m.username)}</span><span class="txt">${esc(txt)}</span>
-      <button class="msg-del" title="Delete message" aria-label="Delete message">🗑</button><span class="when">${fmt(m.created_at)}</span>`;
+      <button class="msg-del" title="Noriicht läschen" aria-label="Noriicht läschen">🗑</button><span class="when">${fmt(m.created_at)}</span>`;
     if (m.media_url) appendMedia(el.querySelector(".txt"), m);
     el.querySelector(".msg-del").onclick = () => deleteMessage(m.id, id);
     box.appendChild(el);
@@ -162,11 +162,11 @@ async function openGroup(id) {
   box.scrollTop = 0;
 }
 async function deleteGroup(id) {
-  if (!confirm("Delete this entire group/DM and ALL its messages? This cannot be undone.")) return;
+  if (!confirm("Dës ganz Grupp/DM an ALL hir Noriichten läschen? Dat kann net réckgängeg gemaach ginn.")) return;
   const { error } = await sb.rpc("admin_delete_group", { p_group_id: id });
   if (error) return alert(error.message);
   showList();
-  current = null; $("detailH").innerHTML = "Select a group to inspect"; $("mlist").innerHTML = ""; loadGroups();
+  current = null; $("detailH").innerHTML = "Wiel eng Grupp aus"; $("mlist").innerHTML = ""; loadGroups();
 }
 async function deleteMessage(mid, gid) {
   const { error } = await sb.rpc("admin_delete_message", { p_message_id: mid });
@@ -174,7 +174,7 @@ async function deleteMessage(mid, gid) {
   openGroup(gid);
 }
 async function removeMember(gid, uid) {
-  if (!confirm("Remove this member from the group?")) return;
+  if (!confirm("Dëse Member aus der Grupp ewechhuelen?")) return;
   const { error } = await sb.rpc("admin_remove_member", { p_group_id: gid, p_user_id: uid });
   if (error) return alert(error.message);
   await openGroup(gid); loadGroups();
@@ -190,17 +190,17 @@ async function addMember(gid) {
 /* ============================ USERS ============================ */
 async function loadUsers() {
   const { data, error } = await sb.rpc("admin_list_users");
-  if (error) { $("glist").innerHTML = `<li class="empty">Error: ${esc(error.message)}</li>`; return; }
+  if (error) { $("glist").innerHTML = `<li class="empty">Feeler: ${esc(error.message)}</li>`; return; }
   users = data || [];
   renderUserList(users);
 }
 function renderUserList(list) {
   const ul = $("glist");
-  if (!list.length) { ul.innerHTML = `<li class="empty">No users.</li>`; return; }
+  if (!list.length) { ul.innerHTML = `<li class="empty">Keng Benotzer.</li>`; return; }
   ul.innerHTML = list.map((u) =>
     `<li class="grow ${current && current.id === u.id ? "active" : ""}" data-uid="${u.id}" tabindex="0" role="button">
        <div class="n">${esc(u.username || "(no username)")}</div>
-       <div class="meta">${esc(u.email)} · joined ${fmt(u.created_at)}${u.confirmed ? "" : " · ⚠ unconfirmed"}</div>
+       <div class="meta">${esc(u.email)} · derbäi ${fmt(u.created_at)}${u.confirmed ? "" : " · ⚠ net bestätegt"}</div>
      </li>`).join("");
   ul.querySelectorAll(".grow").forEach((li) => (li.onclick = () => openUser(li.dataset.uid)));
 }
@@ -216,23 +216,23 @@ function openUser(uid) {
   const u = current;
   $("detailH").innerHTML =
     `<div class="dh-top"><b>${esc(u.username || "(no username)")}</b>
-       <button type="button" class="danger" id="delUser">Delete user</button></div>`;
+       <button type="button" class="danger" id="delUser">Benotzer läschen</button></div>`;
   $("mlist").innerHTML =
     `<div class="uinfo">
-       <div><span class="k">Email</span><br>${esc(u.email)}</div>
-       <div><span class="k">User ID</span><br><span class="muted" style="font-family:ui-monospace,monospace">${esc(u.id)}</span></div>
-       <div><span class="k">Joined</span> ${fmt(u.created_at)}</div>
-       <div><span class="k">Last sign-in</span> ${u.last_sign_in_at ? fmt(u.last_sign_in_at) : "never"}</div>
-       <div><span class="k">Email confirmed</span> ${u.confirmed ? "yes" : "no"}</div>
+       <div><span class="k">E-Mail</span><br>${esc(u.email)}</div>
+       <div><span class="k">Benotzer-ID</span><br><span class="muted" style="font-family:ui-monospace,monospace">${esc(u.id)}</span></div>
+       <div><span class="k">Derbäi</span> ${fmt(u.created_at)}</div>
+       <div><span class="k">Lescht Umeldung</span> ${u.last_sign_in_at ? fmt(u.last_sign_in_at) : "ni"}</div>
+       <div><span class="k">E-Mail bestätegt</span> ${u.confirmed ? "jo" : "nee"}</div>
      </div>
      <div class="uact">
-       <h4>Reset password</h4>
+       <h4>Passwuert zrécksetzen</h4>
        <div class="pwrow">
-         <input id="newPw" name="new-password" aria-label="New password" autocomplete="off" spellcheck="false" value="${genPassword()}">
-         <button type="button" class="pwgen" id="genPw" title="Generate new" aria-label="Generate new password">🎲</button>
-         <button type="button" id="setPw">Set</button>
+         <input id="newPw" name="new-password" aria-label="Neit Passwuert" autocomplete="off" spellcheck="false" value="${genPassword()}">
+         <button type="button" class="pwgen" id="genPw" title="Neit generéieren" aria-label="Neit Passwuert generéieren">🎲</button>
+         <button type="button" id="setPw">Setzen</button>
        </div>
-       <div class="hint">Passwords can't be viewed (they're encrypted). Set a new one here and share it — the user can change it later after signing in.</div>
+       <div class="hint">Passwierter kënnen net ugekuckt ginn (si sinn verschlësselt). Setz hei en neit an deel et — de Benotzer kann et méi spéit nom Umellen änneren.</div>
        <div class="pwresult" id="pwResult" role="status" aria-live="polite"></div>
      </div>`;
   $("delUser").onclick = () => deleteUser(uid);
@@ -240,18 +240,18 @@ function openUser(uid) {
   $("setPw").onclick = () => setUserPassword(uid);
 }
 async function deleteUser(uid) {
-  if (!confirm("Permanently delete this user and ALL their data (messages, scores, memberships)? This cannot be undone.")) return;
+  if (!confirm("Dëse Benotzer an ALL seng Donnéeën (Noriichten, Scores, Memberschaften) endgülteg läschen? Dat kann net réckgängeg gemaach ginn.")) return;
   const { error } = await sb.rpc("admin_delete_user", { p_user_id: uid });
   if (error) return alert(error.message);
   showList();
-  current = null; $("detailH").innerHTML = "Select a user"; $("mlist").innerHTML = ""; loadUsers();
+  current = null; $("detailH").innerHTML = "Wiel e Benotzer aus"; $("mlist").innerHTML = ""; loadUsers();
 }
 async function setUserPassword(uid) {
   const pw = ($("newPw").value || "").trim();
-  if (pw.length < 6) return alert("Password must be at least 6 characters.");
+  if (pw.length < 6) return alert("D'Passwuert muss mindestens 6 Zeechen hunn.");
   const { error } = await sb.rpc("admin_set_password", { p_user_id: uid, p_password: pw });
   if (error) return alert(error.message);
-  $("pwResult").innerHTML = `✓ Password set to <code>${esc(pw)}</code> — give this to the user.`;
+  $("pwResult").innerHTML = `✓ Passwuert gesat op <code>${esc(pw)}</code> — gëff et dem Benotzer.`;
 }
 
 /* ============================ FEEDBACK ============================ */
@@ -259,29 +259,29 @@ let feedback = [];
 const KIND = { idea: "💡", bug: "🐛", other: "💬" };
 async function loadFeedback() {
   const { data, error } = await sb.from("feedback").select("*").order("created_at", { ascending: false });
-  if (error) { $("mlist").innerHTML = `<div class="empty">Error: ${esc(error.message)}</div>`; return; }
+  if (error) { $("mlist").innerHTML = `<div class="empty">Feeler: ${esc(error.message)}</div>`; return; }
   feedback = data || [];
   renderFeedback(feedback);
 }
 function renderFeedback(list) {
-  $("glist").innerHTML = `<li class="empty"><button type="button" id="viewFeedback" class="tab">${list.length} submission(s)</button></li>`;
+  $("glist").innerHTML = `<li class="empty"><button type="button" id="viewFeedback" class="tab">${list.length} Aschécker</button></li>`;
   $("viewFeedback").onclick = () => $("panel").classList.add("detail-open");
   const box = $("mlist");
-  if (!list.length) { box.innerHTML = `<div class="empty">No feedback yet.</div>`; return; }
+  if (!list.length) { box.innerHTML = `<div class="empty">Nach kee Feedback.</div>`; return; }
   box.innerHTML = "";
   list.forEach((f) => {
     const el = document.createElement("div");
     el.className = "am";
     el.innerHTML = `<span class="who">${KIND[f.kind] || "💬"}</span>
       <span class="txt">${esc(f.message)}<br><span class="muted">${esc(f.page || "?")}${f.username ? " · " + esc(f.username) : ""}</span></span>
-      <button class="msg-del" title="Delete" aria-label="Delete">🗑</button><span class="when">${fmt(f.created_at)}</span>`;
+      <button class="msg-del" title="Läschen" aria-label="Läschen">🗑</button><span class="when">${fmt(f.created_at)}</span>`;
     el.querySelector(".msg-del").onclick = () => deleteFeedback(f.id);
     box.appendChild(el);
   });
   box.scrollTop = 0;
 }
 async function deleteFeedback(id) {
-  if (!confirm("Delete this feedback?")) return;
+  if (!confirm("Dëse Feedback läschen?")) return;
   const { error } = await sb.from("feedback").delete().eq("id", id);
   if (error) return alert(error.message);
   loadFeedback();
@@ -300,11 +300,11 @@ function pageLabel(page) {
   const raw = String(page || "/");
   try {
     const url = new URL(raw, location.origin);
-    if (url.pathname === "/" || url.pathname === "/index.html") return "Home";
+    if (url.pathname === "/" || url.pathname === "/index.html") return "Heem";
     if (url.pathname === "/pixelbreak.html" && url.searchParams.get("g")) {
       return `Arcade · ${url.searchParams.get("g")}`;
     }
-    const file = url.pathname.split("/").filter(Boolean).pop() || "Home";
+    const file = url.pathname.split("/").filter(Boolean).pop() || "Heem";
     try {
       return decodeURIComponent(file).replace(/\.html$/i, "");
     } catch (error) {
@@ -313,7 +313,7 @@ function pageLabel(page) {
     }
   } catch (error) {
     console.warn("[admin] invalid presence page", raw, error);
-    return raw.split("?")[0].split("/").filter(Boolean).pop()?.replace(/\.html$/i, "") || "Home";
+    return raw.split("?")[0].split("/").filter(Boolean).pop()?.replace(/\.html$/i, "") || "Heem";
   }
 }
 
@@ -369,23 +369,23 @@ function filteredOnlineRows() {
 function renderOnline(list) {
   const searching = Boolean($("search").value.trim());
   if (searching && !list.length) {
-    $("glist").innerHTML = `<li class="online-section"><div class="online-list"><div class="online-empty">No matching people.</div></div></li>`;
+    $("glist").innerHTML = `<li class="online-section"><div class="online-list"><div class="online-empty">Keng Leit fonnt.</div></div></li>`;
     return;
   }
   const online = list.filter((row) => row.online === true);
   const recent = list.filter((row) => row.online !== true);
   const onlineEmpty = onlineRows.length
-    ? "Nobody online right now."
+    ? "Keen ass grad online."
     : "Keen ass grad online.";
   $("glist").innerHTML =
-    onlineSectionHtml("Online now", online, onlineEmpty, true) +
-    onlineSectionHtml("Recently", recent, "Nobody seen recently.");
+    onlineSectionHtml("Elo online", online, onlineEmpty, true) +
+    onlineSectionHtml("Viru Kuerzem", recent, "Viru Kuerzem war keen do.");
   setCommandBusy(issuingCommand);
 }
 
 async function loadOnline(generation) {
   if (!onlineLoaded && generation === onlineGeneration && mode === "online") {
-    $("glist").innerHTML = `<li class="empty">Loading online activity…</li>`;
+    $("glist").innerHTML = `<li class="empty">Aktivitéit gëtt gelueden …</li>`;
   }
   try {
     const [onlineResult, tagData] = await Promise.all([
@@ -403,7 +403,7 @@ async function loadOnline(generation) {
   } catch (error) {
     console.error("[admin] online activity failed to load", error);
     if (generation !== onlineGeneration || mode !== "online") return;
-    $("glist").innerHTML = `<li class="empty">Couldn’t load online activity. Try again shortly.</li>`;
+    $("glist").innerHTML = `<li class="empty">D'Online-Aktivitéit konnt net gelueden ginn. Probéier et geschwënn nach eng Kéier.</li>`;
   }
 }
 
@@ -460,7 +460,7 @@ function setMode(m) {
   $("tabOnline").classList.toggle("active", m === "online");
   $("search").value = "";
   $("search").placeholder = m === "groups" ? "Search groups / DMs…" : m === "users" ? "Search users…" : m === "feedback" ? "Search feedback…" : "Search online…";
-  $("detailH").innerHTML = m === "groups" ? "Select a group to inspect" : m === "users" ? "Select a user" : m === "feedback" ? "💬 Feedback" : "🟢 Online";
+  $("detailH").innerHTML = m === "groups" ? "Wiel eng Grupp aus" : m === "users" ? "Wiel e Benotzer aus" : m === "feedback" ? "💬 Feedback" : "🟢 Online";
   $("mlist").innerHTML = "";
   $("glist").innerHTML = "";
   if (m === "groups") loadGroups();
@@ -479,8 +479,8 @@ function showDenied() {
   $("panel").style.display = "none";
   $("msg").style.display = "flex";
   $("msg").innerHTML = auth.session()
-    ? `<div>Not authorized.<br><span style="font-size:13px">This account isn't an admin.</span></div>`
-    : `<div>Admin sign-in required.<br><button class="auth-go" id="go">Sign in</button></div>`;
+    ? `<div>Net autoriséiert.<br><span style="font-size:13px">Dëse Kont ass keen Admin.</span></div>`
+    : `<div>Admin-Umeldung néideg.<br><button class="auth-go" id="go">Umellen</button></div>`;
   const go = $("go"); if (go) go.onclick = auth.openAuthModal;
 }
 
@@ -516,7 +516,7 @@ async function gate() {
 }
 
 async function boot() {
-  if (!auth.authConfigured) { $("msg").textContent = "Not configured."; return; }
+  if (!auth.authConfigured) { $("msg").textContent = "Net konfiguréiert."; return; }
   sb = await auth.client();
   auth.onAuth(() => gate());
   gate();

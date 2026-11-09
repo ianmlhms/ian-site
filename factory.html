@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>ShortsFactory — Dashboard</title>
 <link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="gitter.css?v=3">
+<link rel="stylesheet" href="gitter.css?v=11">
 <script src="theme.js?v=32"></script>
 <style>
   :root{ --panel:#161b22; --panel2:#1c232c;
@@ -121,17 +121,17 @@
 <div id="gate" class="gate" style="display:none">
   <div class="gate-box">
     <div class="gate-icon" aria-hidden="true">🔒</div>
-    <h2>ShortsFactory — Full Dashboard</h2>
-    <p id="gateMsg" role="status">Admin access only.</p>
-    <button id="signInBtn">Sign in</button>
-    <a class="home" href="index.html">‹ back to ian.lu</a>
+    <h2>ShortsFactory — Dashboard</h2>
+    <p id="gateMsg" role="status">Just fir Admins.</p>
+    <button id="signInBtn">Umellen</button>
+    <a class="home" href="index.html">‹ zréck op ian.lu</a>
   </div>
 </div>
 <main class="wrap" id="dash" style="display:none">
-  <div style="margin-bottom:6px"><a class="backlink" href="index.html">‹ Home</a></div>
+  <div style="margin-bottom:6px"><a class="backlink" href="index.html">‹ Heem</a></div>
   <header>
     <div>
-      <h1><span class="dot">▸</span> ShortsFactory <span class="muted" style="font-weight:400">Production Dashboard</span></h1>
+      <h1><span class="dot">▸</span> ShortsFactory <span class="muted" style="font-weight:400">Produktiouns-Dashboard</span></h1>
       <div class="sub" id="subhead"></div>
     </div>
     <div class="sub" id="genat"></div>
@@ -139,32 +139,32 @@
 
   <div class="kpis" id="kpis"></div>
 
-  <h2>Social reach <span class="note muted" id="socAt"></span></h2>
+  <h2>Reechwäit op de Netzwierker <span class="note muted" id="socAt"></span></h2>
   <div class="chcards" id="social"></div>
 
-  <h2>Recent posts <span class="note muted">Instagram items show live engagement · TikTok per-video needs the official API</span></h2>
+  <h2>Rezent Posts <span class="note muted">Instagram weist d'Interaktioun live · TikTok pro Video brauch déi offiziell API</span></h2>
   <div class="posts" id="posts"></div>
 
-  <h2>Production breakdown</h2>
+  <h2>Produktioun am Detail</h2>
   <div class="grid">
     <div class="card"><h3>Status</h3><div class="donut-wrap"><div id="donut"></div><ul class="legend" id="statusLegend"></ul></div></div>
-    <div class="card"><h3>Videos per channel</h3><div id="byChannel"></div></div>
+    <div class="card"><h3>Videoen pro Kanal</h3><div id="byChannel"></div></div>
     <div class="card"><h3>Format</h3><div id="byFormat"></div></div>
-    <div class="card"><h3>Platform reach</h3><div id="byPlatform"></div></div>
-    <div class="card"><h3>Language</h3><div id="byLang"></div></div>
-    <div class="card"><h3>Output over last 30 days</h3><div class="spark" id="spark"></div><div class="spark-x" id="sparkX"></div></div>
+    <div class="card"><h3>Reechwäit pro Plattform</h3><div id="byPlatform"></div></div>
+    <div class="card"><h3>Sprooch</h3><div id="byLang"></div></div>
+    <div class="card"><h3>Produktioun an de leschten 30 Deeg</h3><div class="spark" id="spark"></div><div class="spark-x" id="sparkX"></div></div>
   </div>
 
-  <h2>Channels</h2>
+  <h2>Kanäl</h2>
   <div class="chcards" id="channels"></div>
 
-  <h2>Videos</h2>
+  <h2>Videoen</h2>
   <div class="toolbar">
-    <input id="q" type="search" placeholder="Search title, topic, id…" aria-label="Search videos by title, topic or id">
-    <span id="filters" role="group" aria-label="Filter by status"></span>
+    <input id="q" type="search" placeholder="Titel, Thema, ID sichen …" aria-label="Videoen no Titel, Thema oder ID sichen">
+    <span id="filters" role="group" aria-label="No Status filteren"></span>
   </div>
   <div class="card" style="padding:6px 8px"><table id="tbl"><thead></thead><tbody></tbody></table>
-    <div class="empty" id="tblEmpty" style="display:none">No videos match.</div>
+    <div class="empty" id="tblEmpty" style="display:none">Keng Videoen fonnt.</div>
   </div>
 
   <footer id="foot"></footer>
@@ -177,9 +177,9 @@ const CH = DATA.channels || [];
 const SOC = (DATA.social && DATA.social.accounts) || [];
 
 const STATUS = {
-  pending:{c:'var(--pending)',l:'Pending'}, approved:{c:'var(--approved)',l:'Approved'},
-  posted:{c:'var(--posted)',l:'Posted'}, rejected:{c:'var(--rejected)',l:'Rejected'},
-  failed:{c:'var(--failed)',l:'Failed'},
+  pending:{c:'var(--pending)',l:'Waart'}, approved:{c:'var(--approved)',l:'Guttgeheescht'},
+  posted:{c:'var(--posted)',l:'Gepost'}, rejected:{c:'var(--rejected)',l:'Ofgeleent'},
+  failed:{c:'var(--failed)',l:'Feelgeschloen'},
 };
 const PLAT = {youtube:'var(--yt)', tiktok:'var(--tt)', instagram:'var(--ig)'};
 const PLATMETA = {tiktok:{l:'TikTok',c:'var(--tt)'}, instagram:{l:'Instagram',c:'var(--ig)'}, youtube:{l:'YouTube',c:'var(--yt)'}};
@@ -205,31 +205,31 @@ const totLikes = sum(SOC.filter(a=>a.platform==='tiktok'), a=>a.likes||0);
 const totYtViews = sum(V, v=>v.views||0);
 const kpis = [
   {v:fmtN(totFollowers), l:'<b>Followers</b> (TT+IG+YT)', c:'var(--accent)'},
-  {v:fmtN(totYtViews), l:'<b>YouTube views</b> (posted)', c:'var(--yt)'},
-  {v:fmtN(totLikes), l:'TikTok likes', c:'var(--tt)'},
-  {v:posted, l:'<b>Posted</b> (live)', c:'var(--posted)'},
-  {v:V.length, l:'Total videos'},
-  {v:byStatus.pending||0, l:'Pending approval', c:'var(--pending)'},
-  {v:byStatus.failed||0, l:'Failed', c:(byStatus.failed?'var(--failed)':null)},
-  {v:totalMin.toFixed(1)+'m', l:'Content produced'},
-  {v:fmtDur(avg), l:'Avg length'},
+  {v:fmtN(totYtViews), l:'<b>YouTube-Opruff</b> (gepost)', c:'var(--yt)'},
+  {v:fmtN(totLikes), l:'TikTok-Likes', c:'var(--tt)'},
+  {v:posted, l:'<b>Gepost</b> (live)', c:'var(--posted)'},
+  {v:V.length, l:'Videoen insgesamt'},
+  {v:byStatus.pending||0, l:'Waart op Guttheeschung', c:'var(--pending)'},
+  {v:byStatus.failed||0, l:'Feelgeschloen', c:(byStatus.failed?'var(--failed)':null)},
+  {v:totalMin.toFixed(1)+'m', l:'Produzéierten Inhalt'},
+  {v:fmtDur(avg), l:'Duerchschnëttslängt'},
 ];
 document.getElementById('kpis').innerHTML = kpis.map(k=>
   `<div class="kpi"><div class="v" style="color:${k.c||'var(--text)'}">${k.v}</div><div class="l">${k.l}</div></div>`).join('');
 document.getElementById('subhead').innerHTML =
-  `${V.length} videos · ${enabledCh} active channel${enabledCh!==1?'s':''} · model ${esc(DATA.defaults.llm_model)} · ${esc(DATA.defaults.resolution)} @ ${DATA.defaults.fps}fps`;
+  `${V.length} Videoen · ${enabledCh} aktiv${enabledCh!==1?'':'e'} Kanal${enabledCh!==1?'äl':''} · Modell ${esc(DATA.defaults.llm_model)} · ${esc(DATA.defaults.resolution)} @ ${DATA.defaults.fps}fps`;
 document.getElementById('genat').textContent = 'Generated ' + fmtDate(DATA.generated_at);
 
 // ---- Social reach ----
 function socCard(a){
   const m = PLATMETA[a.platform] || {l:a.platform,c:'#888'};
-  const stale = a.stale ? `<span class="stale" title="live fetch failed — showing last good value from ${fmtDate(a.as_of)}">⚠ cached</span>` : '';
+  const stale = a.stale ? `<span class="stale" title="Live-Ofruff feelgeschloen — lescht gudde Wäert vum ${fmtDate(a.as_of)}">⚠ am Cache</span>` : '';
   const sec = a.platform==='tiktok'
     ? `<div><b>${fmtN(a.likes)}</b>likes</div><div><b>${fmtN(a.videos)}</b>videos</div>`
     : a.platform==='youtube'
     ? `<div><b>${fmtN(a.videos)}</b>videos</div>${a.views!=null?`<div><b>${fmtN(a.views)}</b>views</div>`:''}`
     : `<div><b>${fmtN(a.posts)}</b>posts</div>`;
-  const flabel = a.platform==='youtube' ? 'subscribers' : 'followers';
+  const flabel = a.platform==='youtube' ? 'Abonnenten' : 'Follower';
   return `<div class="ch">
     <div class="top"><span class="plat" style="width:11px;height:11px;background:${m.c}"></span>
       <span class="name">${m.l}</span>
@@ -240,7 +240,7 @@ function socCard(a){
   </div>`;
 }
 document.getElementById('social').innerHTML = SOC.length
-  ? SOC.map(socCard).join('') : '<div class="muted">No social handles configured in channels.yaml.</div>';
+  ? SOC.map(socCard).join('') : '<div class="muted">Keng Social-Handles an der channels.yaml agestallt.</div>';
 if (DATA.social && DATA.social.fetched_at)
   document.getElementById('socAt').textContent = '· fetched ' + fmtDate(DATA.social.fetched_at);
 
@@ -258,7 +258,7 @@ function postCard(p){
     <span class="thumb"${thumb}></span>
     <span class="pbody">
       <span class="ptop"><span class="plat" style="width:9px;height:9px;background:${m.c}"></span>${m.l} · ${esc(chName(p.channel_id))}${date?` · ${date}`:''}</span>
-      <span class="pcap">${esc(p.caption)||'<span class="muted">(no caption)</span>'}</span>
+      <span class="pcap">${esc(p.caption)||'<span class="muted">(keng Ënnerschrëft)</span>'}</span>
       <span class="pmeta">${stats.map(s=>`<span>${s}</span>`).join('')||'<span class="muted">—</span>'}</span>
     </span></a>`;
 }
@@ -268,12 +268,12 @@ function ttCard(a){
     <span class="pbody">
       <span class="ptop"><span class="plat" style="width:9px;height:9px;background:var(--tt)"></span>TikTok · ${esc(chName(a.channel_id))}</span>
       <span class="pcap">@${esc(a.handle)}</span>
-      <span class="pmeta"><span>${fmtN(a.videos)} videos</span><span>♥ ${fmtN(a.likes)} likes</span></span>
+      <span class="pmeta"><span>${fmtN(a.videos)} Videoen</span><span>♥ ${fmtN(a.likes)} Likes</span></span>
     </span></a>`;
 }
 const ttAccts = SOC.filter(a=>a.platform==='tiktok' && (a.videos||0)>0);
 document.getElementById('posts').innerHTML =
-  (POSTS.map(postCard).join('') + ttAccts.map(ttCard).join('')) || '<div class="muted">No posts found yet.</div>';
+  (POSTS.map(postCard).join('') + ttAccts.map(ttCard).join('')) || '<div class="muted">Nach keng Posts fonnt.</div>';
 
 // ---- Donut (status) ----
 function donut(items,size){
@@ -282,7 +282,7 @@ function donut(items,size){
   for(const it of items){ if(!it.value)continue; const len=it.value/tot*c;
     arcs+=`<circle cx="${k}" cy="${k}" r="${r}" fill="none" stroke="${it.color}" stroke-width="20" stroke-dasharray="${len} ${c-len}" stroke-dashoffset="${-off}" transform="rotate(-90 ${k} ${k})"/>`; off+=len; }
   if(!arcs) arcs=`<circle cx="${k}" cy="${k}" r="${r}" fill="none" stroke="var(--panel2)" stroke-width="20"/>`;
-  return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" role="img" aria-label="Videos by status: ${items.filter(i=>i.value).map(i=>i.label+" "+i.value).join(", ")||"none"}">${arcs}<text x="${k}" y="${k-2}" text-anchor="middle" class="donut-num">${items.reduce((a,b)=>a+b.value,0)}</text><text x="${k}" y="${k+16}" text-anchor="middle" class="donut-lbl">videos</text></svg>`;
+  return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" role="img" aria-label="Videoen no Status: ${items.filter(i=>i.value).map(i=>i.label+" "+i.value).join(", ")||"keng"}">${arcs}<text x="${k}" y="${k-2}" text-anchor="middle" class="donut-num">${items.reduce((a,b)=>a+b.value,0)}</text><text x="${k}" y="${k+16}" text-anchor="middle" class="donut-lbl">videos</text></svg>`;
 }
 const statusItems = ORDER.filter(s=>byStatus[s]).map(s=>({label:STATUS[s].l,value:byStatus[s],color:STATUS[s].c}));
 document.getElementById('donut').innerHTML = donut(statusItems.length?statusItems:[{label:'',value:0,color:''}],150);
@@ -294,7 +294,7 @@ function bars(el, rows, color){
   const max=Math.max(1,...rows.map(r=>r.v));
   el.innerHTML = rows.length ? rows.map(r=>
     `<div class="bar"><div class="bar-l" title="${esc(r.l)}">${esc(r.l)}</div><div class="bar-track"><div class="bar-fill" style="width:${r.v/max*100}%;background:${r.color||color}"></div></div><div class="bar-v">${r.v}</div></div>`
-  ).join('') : '<div class="muted" style="padding:8px 0">No data yet.</div>';
+  ).join('') : '<div class="muted" style="padding:8px 0">Nach keng Donnéeën.</div>';
 }
 bars(document.getElementById('byChannel'),
   Object.entries(countBy(V,v=>v.channel_id)).sort((a,b)=>b[1]-a[1]).map(([id,v])=>({l:chName(id),v})), 'var(--accent)');
@@ -315,7 +315,7 @@ bars(document.getElementById('byLang'),
     const idx=Math.round((d-labels[0])/86400000); if(idx>=0&&idx<days)buckets[idx]++;});
   const max=Math.max(1,...buckets);
   document.getElementById('spark').setAttribute('role','img');
-  document.getElementById('spark').setAttribute('aria-label','Videos produced per day over the last 30 days: '+buckets.reduce((a,b)=>a+b,0)+' in total');
+  document.getElementById('spark').setAttribute('aria-label','Videoen pro Dag an de leschten 30 Deeg: '+buckets.reduce((a,b)=>a+b,0)+' insgesamt');
   document.getElementById('spark').innerHTML = buckets.map((n,i)=>
     `<div class="b" aria-hidden="true" style="height:${n/max*100}%" title="${labels[i].toLocaleDateString()}: ${n}"></div>`).join('');
   document.getElementById('sparkX').innerHTML =
@@ -326,13 +326,13 @@ bars(document.getElementById('byLang'),
 function socLine(id,p){
   const a=socFor(id,p); const m=PLATMETA[p];
   if(!a) return '';
-  const extra = p==='tiktok' ? ` · ${fmtN(a.likes)} likes`
+  const extra = p==='tiktok' ? ` · ${fmtN(a.likes)} Likes`
     : p==='youtube' ? ` · ${fmtN(a.videos)} videos`
     : ` · ${fmtN(a.posts)} posts`;
-  const flabel = p==='youtube' ? 'subscribers' : 'followers';
+  const flabel = p==='youtube' ? 'Abonnenten' : 'Follower';
   return `<div class="soc-row"><span class="lbl"><span class="plat" style="width:9px;height:9px;background:${m.c}"></span>${m.l}</span>
     <a href="${a.url}" target="_blank" rel="noopener">@${esc(a.handle)}</a>
-    <span style="margin-left:auto" class="mono"><b>${fmtN(a.followers)}</b> ${flabel}${extra}${a.stale?' <span class="stale" title="cached">⚠</span>':''}</span></div>`;
+    <span style="margin-left:auto" class="mono"><b>${fmtN(a.followers)}</b> ${flabel}${extra}${a.stale?' <span class="stale" title="am Cache">⚠</span>':''}</span></div>`;
 }
 document.getElementById('channels').innerHTML = CH.map(c=>{
   const vids=V.filter(v=>v.channel_id===c.id);
@@ -340,24 +340,24 @@ document.getElementById('channels').innerHTML = CH.map(c=>{
   const plats=c.platforms.map(p=>`<span class="plat" style="background:${PLAT[p]||'#888'}" title="${p}"></span>`).join('')+' '+c.platforms.join(', ');
   return `<div class="ch">
     <div class="top"><span class="name">${esc(c.display_name)}</span>
-      <span class="pill ${c.enabled?'on':'off'}">${c.enabled?'enabled':'disabled'}</span></div>
+      <span class="pill ${c.enabled?'on':'off'}">${c.enabled?'aktiv':'inaktiv'}</span></div>
     <div class="muted mono" style="font-size:12px">${esc(c.id)}</div>
     <div class="niche">${esc(c.niche)}</div>
     <div class="meta">
       <span class="k">Format</span><span>${esc(c.format)} · ${c.language.toUpperCase()}</span>
-      <span class="k">Schedule</span><span>daily ${esc(c.schedule)}</span>
-      <span class="k">Length</span><span>${c.target_min_s}–${c.target_max_s}s</span>
-      <span class="k">Platforms</span><span>${plats}</span>
+      <span class="k">Zäitplang</span><span>deeglech ${esc(c.schedule)}</span>
+      <span class="k">Längt</span><span>${c.target_min_s}–${c.target_max_s}s</span>
+      <span class="k">Plattformen</span><span>${plats}</span>
     </div>
     ${socLine(c.id,'tiktok')}${socLine(c.id,'instagram')}${socLine(c.id,'youtube')}
-    <div class="nums"><div><b>${vids.length}</b>made</div><div><b style="color:var(--posted)">${post}</b>posted</div>
+    <div class="nums"><div><b>${vids.length}</b>gemaach</div><div><b style="color:var(--posted)">${post}</b>gepost</div>
       <div><b>${fmtDur(vids.length?sum(vids,v=>v.duration_s)/vids.length:0)}</b>avg</div></div>
   </div>`;
-}).join('') || '<div class="muted">No channels configured.</div>';
+}).join('') || '<div class="muted">Keng Kanäl agestallt.</div>';
 
 // ---- Videos table (sortable + searchable + status filter) ----
-const COLS=[['created_at','When'],['channel_id','Channel'],['status','Status'],['fmt','Format'],
-  ['duration_s','Len'],['title','Title / topic'],['platforms','Targets'],['views','Views'],['youtube_id','Link']];
+const COLS=[['created_at','Wéini'],['channel_id','Kanal'],['status','Status'],['fmt','Format'],
+  ['duration_s','Längt'],['title','Titel / Thema'],['platforms','Ziler'],['views','Opruff'],['youtube_id','Link']];
 let sortKey='created_at', sortDir=-1, statusFilter='all', query='';
 document.querySelector('#tbl thead').innerHTML='<tr>'+COLS.map(([k,l])=>
   `<th data-k="${k}" tabindex="0" role="columnheader" aria-sort="none">${l}</th>`).join('')+'</tr>';
@@ -366,7 +366,7 @@ document.getElementById('filters').innerHTML='<button type="button" class="chip 
 
 function badge(s){const m=STATUS[s]||{c:'var(--muted)',l:s};
   return `<span class="badge" style="color:${m.c};background:${m.c}22">${m.l}</span>`;}
-function ytLink(id){return id?`<a href="https://youtube.com/watch?v=${encodeURIComponent(id)}" target="_blank" rel="noopener">▶ open</a>`:'<span class="muted">—</span>';}
+function ytLink(id){return id?`<a href="https://youtube.com/watch?v=${encodeURIComponent(id)}" target="_blank" rel="noopener">▶ opmaachen</a>`:'<span class="muted">—</span>';}
 function platDots(ps){return ps.map(p=>`<span class="plat" style="background:${PLAT[p]||'#888'}" title="${p}" role="img" aria-label="${p}"></span>`).join('')||'<span class="muted">—</span>';}
 
 function render(){
@@ -387,7 +387,7 @@ function render(){
     <td class="mono">${fmtDur(v.duration_s)}</td>
     <td class="title">${esc(v.title)||'<span class=muted>—</span>'}</td>
     <td>${platDots(v.platforms)}</td>
-    <td class="mono" title="${v.views!=null?v.views+' views'+(v.likes!=null?` · ${v.likes} likes`:'')+(v.comments!=null?` · ${v.comments} comments`:''):'no data'}">${v.views!=null?fmtN(v.views):'<span class=muted>—</span>'}</td>
+    <td class="mono" title="${v.views!=null?v.views+' Opruff'+(v.likes!=null?` · ${v.likes} Likes`:'')+(v.comments!=null?` · ${v.comments} Kommentaren`:''):'keng Donnéeën'}">${v.views!=null?fmtN(v.views):'<span class=muted>—</span>'}</td>
     <td>${ytLink(v.youtube_id)}</td></tr>`).join('');
   document.getElementById('tblEmpty').style.display=rows.length?'none':'block';
 }
@@ -406,8 +406,8 @@ document.getElementById('q').oninput=e=>{query=e.target.value; render();};
 render();
 
 document.getElementById('foot').innerHTML =
-  `Snapshot of <span class="mono">${esc(DATA.db_path)}</span> · re-run <span class="mono">~/.shortsfactory/dashboard.sh</span> to refresh · ` +
-  `social via public TikTok/Instagram/YouTube endpoints (unofficial) · YouTube uploads are <b>${esc(DATA.defaults.youtube_privacy)}</b>`;
+  `Momentopnam vun <span class="mono">${esc(DATA.db_path)}</span> · <span class="mono">~/.shortsfactory/dashboard.sh</span> nei lafe loossen fir ze aktualiséieren · ` +
+  `Social iwwer ëffentlech TikTok-/Instagram-/YouTube-Endpoints (inoffiziell) · YouTube-Uploads sinn <b>${esc(DATA.defaults.youtube_privacy)}</b>`;
 
 } /* end renderDashboard */
 

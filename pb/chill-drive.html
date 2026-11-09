@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="lb">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -71,35 +71,35 @@ body{background:var(--g-paper)}
 #lvls button.done{background:var(--g-tint);border-color:var(--g-green);color:var(--g-green)}
 #ov button:focus-visible,#mm:focus-visible,#mute:focus-visible{outline:2px solid var(--g-green)}
 </style>
-<script src="/pb/arcade-kit.js?v=41" data-arcade-id="chill-drive" data-arcade-title="3D Cruiser"></script>
+<script src="/pb/arcade-kit.js?v=43" data-arcade-id="chill-drive" data-arcade-title="3D Cruiser"></script>
 </head>
 <body>
-<canvas id="c" role="img" aria-label="3D Cruiser game view"></canvas>
+<canvas id="c" role="img" aria-label="3D-Cruiser-Spillansiicht"></canvas>
 <div id="hud">
 <div><div class="v" id="spd">0</div><div class="l">km/h</div></div>
-<div><div class="v" id="dist">0</div><div class="l">meters</div></div>
-<div><div class="v st" id="style">0</div><div class="l">style</div></div>
-<div><div class="v lv" id="lives">♥♥♥♥♥</div><div class="l">crashes</div></div>
-<div><div class="v" id="prog">—</div><div class="l" id="progl">mode</div></div>
+<div><div class="v" id="dist">0</div><div class="l">Meter</div></div>
+<div><div class="v st" id="style">0</div><div class="l">Stil</div></div>
+<div><div class="v lv" id="lives">♥♥♥♥♥</div><div class="l">Onfäll</div></div>
+<div><div class="v" id="prog">—</div><div class="l" id="progl">Modus</div></div>
 </div>
 <div id="pop"></div><div id="flash"></div>
-<button id="mute" class="hidden" type="button" aria-label="Mute">🔊</button>
-<button id="mm" class="hidden" type="button" title="Menu" aria-label="Menu">☰</button>
+<button id="mute" class="hidden" type="button" aria-label="Toun aus">🔊</button>
+<button id="mm" class="hidden" type="button" title="Menü" aria-label="Menü">☰</button>
 <div id="ov" role="dialog" aria-modal="true" aria-labelledby="ovh">
 <h1 id="ovh">🛣️ 3D Cruiser</h1>
-<div class="sub" id="ovp">Cruise, overtake, survive — 5 crashes end your run.<br>Close overtakes earn style points. ↑↓ speed · ←→ steer</div>
+<div class="sub" id="ovp">Cruis, iwwerhuel, iwwerlief — 5 Onfäll beennen deng Fuert.<br>Knapp Iwwerhuele ginn Stilpunkten. ↑↓ Tempo · ←→ lenken</div>
 <div id="modes">
-<button id="mTraffic" class="mode on" type="button" aria-pressed="true"><span aria-hidden="true">🚗</span> TRAFFIC</button>
-<button id="mZen" class="mode" type="button" aria-pressed="false"><span aria-hidden="true">🧘</span> ZEN — no traffic</button>
+<button id="mTraffic" class="mode on" type="button" aria-pressed="true"><span aria-hidden="true">🚗</span> VERKÉIER</button>
+<button id="mZen" class="mode" type="button" aria-pressed="false"><span aria-hidden="true">🧘</span> ZEN — ouni Verkéier</button>
 </div>
 <div id="envs">
-<button id="e0" type="button"><span aria-hidden="true">🌄</span> MEADOWS</button>
-<button id="e1" type="button"><span aria-hidden="true">🏜️</span> DESERT SUNSET</button>
-<button id="e2" type="button"><span aria-hidden="true">🌃</span> NEON NIGHT</button>
+<button id="e0" type="button"><span aria-hidden="true">🌄</span> WIESEN</button>
+<button id="e1" type="button"><span aria-hidden="true">🏜️</span> WÜÜSTEWEND</button>
+<button id="e2" type="button"><span aria-hidden="true">🌃</span> NEON-NUECHT</button>
 </div>
-<button class="big" id="go" type="button" style="display:none">DRIVE AGAIN</button>
-<button class="big" id="goMenu" type="button" style="margin-top:10px;background:rgba(255,255,255,.18);color:#fff"><span aria-hidden="true">🏠</span> MAIN MENU</button>
-<div id="lvlt">— or race 20 levels (reach the finish, max 5 crashes) —</div>
+<button class="big" id="go" type="button" style="display:none">Play again</button>
+<button class="big" id="goMenu" type="button" style="margin-top:10px;background:rgba(255,255,255,.18);color:#fff"><span aria-hidden="true">🏠</span> HAAPTMENÜ</button>
+<div id="lvlt">— oder probéier 20 Level (komm ant Zil, max. 5 Onfäll) —</div>
 <div id="lvls"></div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
@@ -107,7 +107,7 @@ body{background:var(--g-paper)}
 "use strict";
 const $=(id)=>document.getElementById(id);
 if(!window.THREE){
-  $('ovp').innerHTML='Could not load the 3D engine — check your connection and reload.';
+  $('ovp').innerHTML='Den 3D-Moteur konnt net gelued ginn — kuck deng Verbindung a lued d\'Säit nei.';
   $('envs').style.display='none';$('modes').style.display='none';$('lvlt').style.display='none';
   throw new Error('three.js failed to load');
 }
@@ -124,13 +124,13 @@ const SEG_WLD=4, RH=7.6, CURVE_K=0.0075, Y_K=0.009, CHUNK=128, TS=0.22;
 
 /* ---------- environments (the 3 endless worlds) ---------- */
 const ENVS=[
- {name:'Meadows',sky:0x9fd8f0,fog:0xc4e6f2,ground:0x77c065,road:0x585d66,line:0xf2f2f2,rumble:0xc4485a,
+ {name:'Wiesen',sky:0x9fd8f0,fog:0xc4e6f2,ground:0x77c065,road:0x585d66,line:0xf2f2f2,rumble:0xc4485a,
   mount:0x4d7d59,trunk:0x6b4a26,leaf:0x3f9a45,leaf2:0x2f7d38,sunCol:0xfff2b0,hemi:[0xcfe8ff,0x7a9a6a,1.0],dir:1.0,
   night:false,clouds:true,deco:'pine',traffic:10,vmin:55,vspan:55},
- {name:'Desert Sunset',sky:0xffab72,fog:0xffc9a0,ground:0xdfae6e,road:0x6b5f57,line:0xffe9d0,rumble:0xa84a3a,
+ {name:'Wüüstewend',sky:0xffab72,fog:0xffc9a0,ground:0xdfae6e,road:0x6b5f57,line:0xffe9d0,rumble:0xa84a3a,
   mount:0xb0704e,trunk:0x7a5a34,leaf:0x5a9a50,leaf2:0x4a8442,sunCol:0xff6a3d,hemi:[0xffd2a8,0xa87a52,0.9],dir:0.85,
   night:false,clouds:true,deco:'cactus',traffic:12,vmin:60,vspan:60},
- {name:'Neon Night',sky:0x0a1030,fog:0x121a3e,ground:0x14301e,road:0x2b2e38,line:0x4de8ff,rumble:0x8858c8,
+ {name:'Neon-Nuecht',sky:0x0a1030,fog:0x121a3e,ground:0x14301e,road:0x2b2e38,line:0x4de8ff,rumble:0x8858c8,
   mount:0x1a2848,trunk:0x1c2a20,leaf:0x1f4a2e,leaf2:0x173c24,sunCol:0xdfe8ff,hemi:[0x3a4a8a,0x101820,0.55],dir:0.25,
   night:true,clouds:false,deco:'pine',traffic:14,vmin:65,vspan:60},
 ];
@@ -289,7 +289,7 @@ const sfx={
   win:()=>{[523,659,784,1047].forEach((f,i)=>setTimeout(()=>blip(f,0.22,0.14,'triangle'),i*110));},
   lose:()=>{[392,330,262,196].forEach((f,i)=>setTimeout(()=>blip(f,0.3,0.14,'triangle'),i*140));},
 };
-$('mute').onclick=()=>{muted=!muted;$('mute').textContent=muted?'🔇':'🔊';$('mute').setAttribute('aria-label',muted?'Unmute':'Mute');if(engG)engG.gain.value=0;if(padG)padG.gain.value=muted?0:0.05;};
+$('mute').onclick=()=>{muted=!muted;$('mute').textContent=muted?'🔇':'🔊';$('mute').setAttribute('aria-label',muted?'Toun un':'Toun aus');if(engG)engG.gain.value=0;if(padG)padG.gain.value=muted?0:0.05;};
 
 /* ---------- three.js scene ---------- */
 const C=$('c');
@@ -546,14 +546,14 @@ function startEndless(e,z){
   if(zen)cfgNow.traffic=0;
   genRoad(cfgNow);resetRun();buildWorld();
   state='play';$('ov').classList.add('hidden');$('mm').classList.remove('hidden');
-  $('progl').textContent=(zen?'zen · ':'')+ENV.name.toLowerCase();$('prog').textContent='∞';
+  $('progl').textContent=(zen?'Zen · ':'')+ENV.name.toLowerCase();$('prog').textContent='∞';
   audio();
 }
 function startLevel(n){
   mode='level';lvl=n;envIdx=(n-1)%3;ENV=ENVS[envIdx];cfgNow=levelCfg(n);
   genRoad(cfgNow);resetRun();buildWorld();
   state='play';$('ov').classList.add('hidden');$('mm').classList.remove('hidden');
-  $('progl').textContent='level '+n;
+  $('progl').textContent='Level '+n;
   audio();
 }
 function overlay(h,p,btn,menuMode){
@@ -570,7 +570,7 @@ function menu(){
   state='menu';
   paintZen();
   overlay('🛣️ 3D Cruiser',
-    'Cruise, overtake, survive — 5 crashes end your run.<br>Pick your endless world · close overtakes earn style · ↑↓ speed · ←→ steer',
+    'Cruis, iwwerhuel, iwwerlief — 5 Onfäll beennen deng Fuert.<br>Wiel deng Endlos-Welt · knapp Iwwerhuele ginn Stil · ↑↓ Tempo · ←→ lenken',
     null,true);
   $('lvlt').style.display='';$('lvls').style.display='';
   const u=unlocked(), box=$('lvls');
@@ -585,21 +585,21 @@ function endRun(won){
   $('lvlt').style.display='none';$('lvls').style.display='none';
   if(mode==='endless'){
     sfx.lose();
-    overlay('🔚 Run over!',
-      `Five crashes — the cruise is done.<br>Distance <b>${Math.floor(pos/METER)} m</b> · Style <b>${stylePts}</b> · Score <b>${Math.floor(pos/METER)+stylePts}</b>`,
-      'DRIVE AGAIN');
+    overlay('🔚 Fuert eriwwer!',
+      `Fënnef Onfäll — d\'Fuert ass eriwwer.<br>Distanz <b>${Math.floor(pos/METER)} m</b> · Stil <b>${stylePts}</b> · Score <b>${Math.floor(pos/METER)+stylePts}</b>`,
+      'Play again');
   }else if(won){
     sfx.win();
     if(!TEST_MODE&&lvl+1>unlocked()&&lvl<N_LEVELS){localStorage.setItem('pb_cd_lvl',lvl+1);cdPush();}
-    overlay('🏁 Level '+lvl+' done!',
-      `Crashes used: <b>${crashes}/${MAX_CRASH}</b> · Style <b>${stylePts}</b>`,
-      lvl<N_LEVELS?'NEXT LEVEL ▶':'BACK TO MENU');
+    overlay('🏁 Level '+lvl+' gepackt!',
+      `Onfäll: <b>${crashes}/${MAX_CRASH}</b> · Stil <b>${stylePts}</b>`,
+      lvl<N_LEVELS?'NÄCHST LEVEL ▶':'ZRÉCK AT MENÜ');
     state='won';
   }else{
     sfx.lose();
-    overlay('💥 Wrecked!',
-      `Five crashes before the finish of level ${lvl}.`,
-      'RETRY LEVEL');
+    overlay('💥 Totalschued!',
+      `Fënnef Onfäll virum Zil vum Level ${lvl}.`,
+      'LEVEL NEI PROBÉIEREN');
     state='failed';
   }
 }
@@ -691,7 +691,7 @@ function update(){
       $('flash').style.opacity=0.35;
       sfx.crash();
       crashes++;
-      pop(crashes>=MAX_CRASH?'WRECKED!':'CRASH!','#ff6b6b');
+      pop(crashes>=MAX_CRASH?'TOTALSCHUED!':'ONFALL!','#ff6b6b');
       if(crashes>=MAX_CRASH){endRun(false);break;}
     }
   }

@@ -6,7 +6,7 @@
 <title>Admin — Messenger</title>
 <meta name="robots" content="noindex">
 <link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="gitter.css?v=3">
+<link rel="stylesheet" href="gitter.css?v=11">
 <script src="theme.js?v=32"></script>
 <script src="i18n-dict.js?v=54"></script>
 <script src="i18n.js?v=5"></script>
@@ -209,20 +209,20 @@
 </head>
 <body class="gt">
 <header>
-  <a class="home" href="index.html">‹ Home</a>
+  <a class="home" href="index.html">‹ Heem</a>
   <h1><span class="b">Admin</span> · Messenger</h1>
   <div class="spacer"></div>
   <a class="home-link" href="messenger.html" style="margin-right:14px;color:var(--muted)">Messenger</a>
   <button type="button" class="gt-acct" id="gtAcct">Umellen</button>
 </header>
 
-<div id="msg" role="status" aria-live="polite">Loading…</div>
+<div id="msg" role="status" aria-live="polite">Lued …</div>
 
 <div id="panel">
   <aside class="side" aria-label="Lëscht">
     <div class="side-h">
-      <div class="tabs"><button type="button" id="tabGroups" class="tab active">Groups</button><button type="button" id="tabUsers" class="tab">Users</button><button type="button" id="tabFeedback" class="tab">Feedback</button><button type="button" id="tabOnline" class="tab">🟢 Online</button><button type="button" id="tabKart" class="tab">🏎️ Kart</button><button type="button" id="tabSaves" class="tab">💾 Saves</button></div>
-      <input id="search" name="search" type="search" aria-label="Search" placeholder="Search…" autocomplete="off">
+      <div class="tabs"><button type="button" id="tabGroups" class="tab active">Gruppen</button><button type="button" id="tabUsers" class="tab">Benotzer</button><button type="button" id="tabFeedback" class="tab">Feedback</button><button type="button" id="tabOnline" class="tab">🟢 Online</button><button type="button" id="tabKart" class="tab">🏎️ Kart</button><button type="button" id="tabSaves" class="tab">💾 Saves</button></div>
+      <input id="search" name="search" type="search" aria-label="Sichen" placeholder="Sichen …" autocomplete="off">
       <div class="command-toolbar"><button type="button" id="reloadAll" data-i18n="commands.reloadAll">🔄 Alles nei lueden</button><span id="commandStatus" role="status" aria-live="polite"></span></div>
       <div class="uact">
         <h4>PIN zerécksetzen</h4>
@@ -240,8 +240,8 @@
     <div class="wide-host"><div id="wideKart" hidden></div><div id="wideSaves" hidden></div></div>
   </aside>
   <section class="detail">
-    <button type="button" id="detailBack">‹ Back</button>
-    <div class="detail-h" id="detailH">Select a group to inspect</div>
+    <button type="button" id="detailBack">‹ Zréck</button>
+    <div class="detail-h" id="detailH">Wiel eng Grupp aus</div>
     <div class="mlist" id="mlist"></div>
   </section>
 </div>
