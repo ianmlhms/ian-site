@@ -2740,7 +2740,7 @@ drives with the game collider, `tprof.mjs` / `xs.mjs` the car's ground along / a
 `poses19.mjs` + `sheet.py` shots per tube (A/B top, portal, chase, inside), `probe.mjs` / `wayprof.mjs` / `osmtun.py` / `osmbox.py` the roads at a mouth, a way's
 profile with decks, the OSM tunnels; `base-wt/` a detached worktree of 0df61250 for base drives: `REPO=.../base-wt node drive.mjs ...`).
 
-### Opened (harness X: 20 -> 17 tubes listed... see `hx5.txt`: X1-X5 PASS, 70 rides, worst 2.58 m/s2)
+### Opened (? tubes now, were 10; harness X alone: X1-X5 PASS, 70 rides, worst 2.58 m/s2 - `tunnels19/hx5.txt`)
 | tunnel | ways | what it needed |
 |---|---|---|
 | Cents (A1), both bores | 158 / 159 | the north approaches (26 m between the Pulvermühle viaduct and the mouths) were carved at 29 % from the deck up to the DTM over the portal (road-bed TIGHT_END). New: the approach line follows on onto a bridge (`approachAt`, `approachShort` / `approachFollow`), the road level along it is deck-aware (`ground`, `onDeck`, findTubes/createTubes take the deck network as a 5th argument - main.js, harness.js, world_node.mjs pass it), a **ramp** (`rampEnd`: steep from the mouth, ending on a deck or a level road) makes the face the OSM mouth and the floor ours to the ramp's end, in a trough. At 55 m/s: <= 8.4 m/s2 (158), deck joint 3.7. |
