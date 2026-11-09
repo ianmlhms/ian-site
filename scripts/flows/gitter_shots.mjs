@@ -22,11 +22,15 @@ export const flow = {
   async run(h) {
     const { page } = h;
     fs.mkdirSync(OUT, { recursive: true });
+    let cur = "";
+    page.on("pageerror", (e) => console.log("    PAGEERROR " + cur + ": " + String(e.message).slice(0, 160)));
     const errors = [];
     page.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) errors.push(m.text()); });
     for (const mode of (process.env.GITTER_SIGNED === "1" ? ["out", "signed"] : ["out"])) {
       if (mode === "signed") await h.signIn();
       for (const p of PAGES) {
+       try {
+        cur = p;
         await h.goto("/" + p);
         await h.pause(900);
         for (const w of [1280, 375]) {
@@ -36,6 +40,7 @@ export const flow = {
           h.expect(!over, `${p} ${mode} @${w}: no horizontal scroll`);
           await page.screenshot({ path: path.join(OUT, `${PREFIX}-${p.replace(".html", "").replace(/[^a-z0-9-]/gi, "_")}-${mode}-${w}.png`), fullPage: true });
         }
+       } catch (e) { console.log("    PAGEFAIL " + p + ": " + String(e).slice(0, 160)); }
       }
     }
     h.expect(errors.length === 0, "no console errors: " + errors.join(" | ").slice(0, 300));

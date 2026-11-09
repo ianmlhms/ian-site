@@ -517,7 +517,6 @@ async function gate() {
 
 async function boot() {
   if (!auth.authConfigured) { $("msg").textContent = "Not configured."; return; }
-  auth.mountAccountButton($("acctHost"));
   sb = await auth.client();
   auth.onAuth(() => gate());
   gate();

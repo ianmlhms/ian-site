@@ -857,7 +857,6 @@ function openChatFromUrl() {
 }
 
 function bindUi() {
-  mountAccountButton(document.getElementById("acctHost"));
   document.getElementById("composer").addEventListener("submit", sendMessage);
   document.getElementById("attachButton").addEventListener("click", () => {
     document.getElementById("attachmentInput").click();

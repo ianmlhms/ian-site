@@ -1,22 +1,19 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="lb">
 <head>
 <meta charset="utf-8">
   <meta name="robots" content="noindex,nofollow" />
   <!-- Admin-only ShortsFactory dashboard. Kept out of the index, like admin.html and me.html. -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>ShortsFactory — Dashboard</title>
-<script src="season.js?v=5"></script>
+<link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="gitter.css?v=3">
 <script src="theme.js?v=32"></script>
 <style>
-  :root{
-    --bg:#0e1116; --panel:#161b22; --panel2:#1c232c; --border:#283039;
-    --text:#e6edf3; --muted:#8b949e; --accent:#58a6ff;
+  :root{ --panel:#161b22; --panel2:#1c232c;
     --pending:#d29922; --approved:#58a6ff; --posted:#3fb950;
     --rejected:#6e7681; --failed:#f85149;
-    --yt:#ff4444; --tt:#25f4ee; --ig:#e1306c;
-  }
-  *{box-sizing:border-box}
+    --yt:#ff4444; --tt:#25f4ee; --ig:#e1306c}
   body{margin:0;background:var(--bg);color:var(--text);
     font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
   a{color:var(--accent-text);text-decoration:none} a:hover{text-decoration:underline}
@@ -29,31 +26,31 @@
      margin:34px 0 12px;font-weight:600}
   h2 .note{text-transform:none;letter-spacing:0;font-weight:400;margin-left:8px}
   .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-top:18px}
-  .kpi{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px}
+  .kpi{background:var(--panel);border:1px solid var(--border);border-radius:0;padding:16px 18px}
   .kpi .v{font-size:26px;font-weight:700;line-height:1.1}
   .kpi .l{color:var(--muted);font-size:12px;margin-top:4px}
   .kpi .l b{color:var(--text);font-weight:600}
   .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:16px}
-  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:0;padding:18px}
   .card h3{margin:0 0 14px;font-size:14px;font-weight:600}
   .donut-wrap{display:flex;align-items:center;gap:18px}
   .donut-num{fill:var(--text);font-size:26px;font-weight:700}
   .donut-lbl{fill:var(--muted);font-size:11px}
   .legend{list-style:none;margin:0;padding:0;font-size:13px;flex:1}
   .legend li{display:flex;align-items:center;gap:8px;padding:3px 0}
-  .legend .sw{width:11px;height:11px;border-radius:3px;flex:none}
+  .legend .sw{width:11px;height:11px;border-radius:0;flex:none}
   .legend .lv{margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums}
   .bar{display:flex;align-items:center;gap:10px;margin:9px 0;font-size:13px}
   .bar-l{width:96px;color:var(--muted);flex:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .bar-track{flex:1;background:var(--panel2);border-radius:6px;height:18px;overflow:hidden}
-  .bar-fill{height:100%;border-radius:6px;min-width:2px;transition:width .4s}
+  .bar-track{flex:1;background:var(--panel2);border-radius:0;height:18px;overflow:hidden}
+  .bar-fill{height:100%;border-radius:0;min-width:2px;transition:width .4s}
   .bar-v{width:34px;text-align:right;color:var(--muted);flex:none;font-variant-numeric:tabular-nums}
   .spark{display:flex;align-items:flex-end;gap:3px;height:90px;margin-top:6px}
-  .spark .b{flex:1;background:var(--accent);border-radius:3px 3px 0 0;min-height:2px;opacity:.85}
+  .spark .b{flex:1;background:var(--accent);border-radius:0 3px 0 0;min-height:2px;opacity:.85}
   .spark .b:hover{opacity:1}
   .spark-x{display:flex;justify-content:space-between;color:var(--muted);font-size:11px;margin-top:6px}
   .chcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:16px}
-  .ch{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px}
+  .ch{background:var(--panel);border:1px solid var(--border);border-radius:0;padding:18px}
   .ch .top{display:flex;align-items:center;gap:10px;margin-bottom:8px}
   .ch .name{font-size:15px;font-weight:600}
   .ch .niche{color:var(--muted);font-size:12.5px;margin:8px 0 12px}
@@ -63,13 +60,13 @@
   .ch .nums div{font-size:12px;color:var(--muted)} .ch .nums b{display:block;font-size:18px;color:var(--text)}
   .soc-row{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12.5px}
   .soc-row .lbl{display:flex;align-items:center;gap:6px;min-width:92px}
-  .pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:600;
+  .pill{display:inline-block;padding:1px 8px;border-radius:0;font-size:11px;font-weight:600;
     border:1px solid var(--border)}
   .pill.on{color:var(--posted);border-color:rgba(63,185,80,.4)}
   .pill.off{color:var(--muted)}
   .stale{color:var(--pending);font-size:11px;cursor:help}
   .posts{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px}
-  .post{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;color:var(--text)}
+  .post{background:var(--panel);border:1px solid var(--border);border-radius:0;overflow:hidden;display:flex;flex-direction:column;color:var(--text)}
   .post:hover{border-color:var(--accent-border);text-decoration:none}
   .post .thumb{aspect-ratio:1/1;background:var(--panel2) center/cover no-repeat}
   .post.tt .thumb{display:flex;align-items:center;justify-content:center;color:var(--tt);font-weight:700;letter-spacing:.5px}
@@ -79,8 +76,8 @@
   .post .pmeta{display:flex;gap:12px;color:var(--muted);font-size:12px;margin-top:auto}
   .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
   .toolbar input{background:var(--panel);border:1px solid var(--border);color:var(--text);
-    border-radius:8px;padding:7px 11px;font-size:13px;min-width:200px}
-  .chip{background:var(--panel);border:1px solid var(--border);color:var(--muted);border-radius:999px;
+    border-radius:0;padding:7px 11px;font-size:13px;min-width:200px}
+  .chip{background:var(--panel);border:1px solid var(--border);color:var(--muted);border-radius:0;
     padding:5px 12px;font-size:12.5px;cursor:pointer;user-select:none}
   .chip.active{color:var(--text);border-color:var(--accent-border)}
   table{width:100%;border-collapse:collapse;font-size:13px}
@@ -88,21 +85,21 @@
   th{color:var(--muted);font-weight:600;font-size:12px;cursor:pointer;white-space:nowrap}
   tbody tr:hover{background:var(--panel)}
   td.title{max-width:380px}
-  .badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:600;white-space:nowrap}
+  .badge{display:inline-block;padding:2px 9px;border-radius:0;font-size:11.5px;font-weight:600;white-space:nowrap}
   .mono{font-variant-numeric:tabular-nums}
   .muted{color:var(--muted)}
   .empty{color:var(--muted);text-align:center;padding:40px}
   footer{margin-top:40px;color:var(--muted);font-size:12px;text-align:center}
-  .plat{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:3px}
+  .plat{display:inline-block;width:9px;height:9px;border-radius:0;margin-right:3px}
 
   /* PIN gate */
   .gate{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px}
-  .gate-box{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:32px 28px;width:320px;max-width:100%;text-align:center}
+  .gate-box{background:var(--panel);border:1px solid var(--border);border-radius:0;padding:32px 28px;width:320px;max-width:100%;text-align:center}
   .gate-icon{font-size:34px;margin-bottom:8px}
   .gate-box h2{margin:0 0 6px;font-size:18px}
   .gate-box p{color:var(--muted);font-size:13px;margin:0 0 16px}
-  .gate-box input{width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:11px 12px;font-size:20px;text-align:center;letter-spacing:8px;margin-bottom:12px}
-  .gate-box button{width:100%;background:var(--accent);color:var(--accent-foreground);border:none;border-radius:8px;padding:11px;font-size:15px;font-weight:700;cursor:pointer}
+  .gate-box input{width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:0;padding:11px 12px;font-size:20px;text-align:center;letter-spacing:8px;margin-bottom:12px}
+  .gate-box button{width:100%;background:var(--accent);color:var(--accent-foreground);border:none;border-radius:0;padding:11px;font-size:15px;font-weight:700;cursor:pointer}
   .gate-box button:hover{filter:brightness(1.08)}
   .gate-err{color:var(--failed);font-size:12.5px;margin-top:10px}
   .gate-box .home{display:inline-block;margin-top:14px;font-size:12.5px;color:var(--muted)}
@@ -114,13 +111,13 @@
   @media (prefers-reduced-motion:reduce){.bar-fill{transition:none}}
 </style>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <meta name="theme-color" content="#0d0d1a">
+  <meta name="theme-color" content="#f6f6f3">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
 </head>
-<body>
+<body class="gt">
 <div id="gate" class="gate" style="display:none">
   <div class="gate-box">
     <div class="gate-icon" aria-hidden="true">🔒</div>
