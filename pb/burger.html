@@ -9,7 +9,7 @@
 :root{--ink:var(--text);--panel:var(--card);--panel-2:var(--card2);--line:var(--border);--red:var(--danger);--gold:var(--amber);--green:var(--good);--blue:var(--cyan);--tap:44px;--counter-top:64%}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{display:flex;flex-direction:column;touch-action:manipulation}
-button{min-width:var(--tap);min-height:var(--tap);border:1px solid var(--border);border-radius:12px;background:var(--card2);color:var(--ink);font:750 14px/1.1 var(--font);letter-spacing:.01em;cursor:pointer;transition:transform .18s var(--spring),filter .18s ease,background .18s ease}
+button{min-width:var(--tap);min-height:var(--tap);border:1px solid var(--border);border-radius:0;background:var(--card2);color:var(--ink);font:750 14px/1.1 var(--font);letter-spacing:.01em;cursor:pointer;transition:transform .18s var(--spring),filter .18s ease,background .18s ease}
 button:hover:not(:disabled){filter:brightness(1.12)}
 button:active:not(:disabled){transform:scale(.95)}
 button:focus-visible{outline:3px solid var(--cyan);outline-offset:2px}
@@ -67,13 +67,13 @@ button:disabled{cursor:not-allowed;filter:grayscale(.75);opacity:.48}
    the wood front. Anchoring the tray to the band's top keeps it on the cream. */
 .tray-zone{position:absolute;left:8%;right:8%;top:1%;z-index:3;pointer-events:auto}
 .tray{min-height:50px;display:grid;grid-template-columns:repeat(var(--tray-slots,2),minmax(46px,1fr));gap:5px}
-.tray-slot,.station-slot{position:relative;display:grid;place-items:center;min-width:var(--tap);min-height:44px;border:2px dashed rgba(136,136,170,.45);border-radius:12px;background:#ffffff1f}
+.tray-slot,.station-slot{position:relative;display:grid;place-items:center;min-width:var(--tap);min-height:44px;border:2px dashed rgba(136,136,170,.45);border-radius:0;background:#ffffff1f}
 .tray-slot.filled{border-style:solid;border-color:var(--amber);background:rgba(245,185,66,.18);animation:pop .18s ease-out}
 .tray-slot.shake{animation:shake .32s linear}
 .scene-status{position:absolute;z-index:5;top:5px;left:8px;right:8px;display:flex;align-items:center;justify-content:space-between;color:#fff3d8;font-size:10px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;text-shadow:0 2px 3px #000b}
 
 /* ---- the kitchen the player works in ---- */
-.kitchen{position:relative;min-height:0;padding:7px 6px 6px;background:linear-gradient(var(--card2),var(--card) 60%);border-top:1px solid var(--border);overflow:auto}
+.kitchen{position:relative;min-height:0;padding:7px 6px 6px;background:var(--card);border-top:1px solid var(--border);overflow:auto}
 .kitchen::before{content:"";position:absolute;inset:0;background:url("/pb/burger/art/floor.webp?v=3") repeat;background-size:84px;opacity:.16;pointer-events:none}
 .stations{position:relative;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
 .station{min-height:124px;padding:6px;display:flex;flex-direction:column;gap:5px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg2)}
@@ -83,15 +83,15 @@ button:disabled{cursor:not-allowed;filter:grayscale(.75);opacity:.48}
    fryer or drink tap filling half its station, which read as a broken empty panel. */
 .station-slots{display:grid;grid-template-columns:repeat(var(--slot-count,2),minmax(44px,1fr));gap:5px;flex:1}
 .station-slot{border-style:solid;border-color:var(--border);overflow:hidden}
-.station-slot .state-label{position:absolute;right:3px;bottom:2px;padding:1px 4px;border-radius:6px;background:rgba(10,8,14,.78);font-size:9px;text-transform:uppercase}
-.station-slot.ready{border-color:var(--green);box-shadow:inset 0 0 12px rgba(118,214,107,.3)}
+.station-slot .state-label{position:absolute;right:3px;bottom:2px;padding:1px 4px;border-radius:0;background:rgba(10,8,14,.78);font-size:9px;text-transform:uppercase}
+.station-slot.ready{border-color:var(--green);box-shadow:none}
 .station-slot.burnt{border-color:var(--red);background:rgba(255,102,133,.14)}
 .station-slot.locked{opacity:.42}
 .drink-options,.toppings{display:flex;flex-wrap:wrap;gap:5px}
 .drink-choice,.topping{flex:1;padding:3px;min-width:44px;font-size:11px}
 .drink-choice.active,.topping.active{border-color:var(--gold);background:rgba(245,185,66,.22)}
 .assembly{display:grid;grid-template-columns:minmax(62px,1fr) minmax(62px,1fr);gap:5px;flex:1}
-.assembly-preview{min-height:60px;display:grid;place-items:center;border:2px dashed rgba(136,136,170,.45);border-radius:12px;background:#00000026}
+.assembly-preview{min-height:60px;display:grid;place-items:center;border:2px dashed rgba(136,136,170,.45);border-radius:0;background:#00000026}
 .assembly-actions{display:flex;flex-direction:column;gap:5px}
 .plate-button{flex:1;background:var(--accent);border-color:transparent;color:#08101f}
 .sprite{position:relative;width:46px;height:46px;display:block;background-position:center;background-repeat:no-repeat;background-size:contain;pointer-events:none}
@@ -103,8 +103,8 @@ button:disabled{cursor:not-allowed;filter:grayscale(.75);opacity:.48}
 .hud-label{display:block;color:var(--muted);font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
 .hud-value{display:block;overflow:hidden;text-overflow:ellipsis;font-size:14px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
 .boost-button{grid-column:1/-1;min-height:44px;border-color:transparent;background:var(--violet);color:#14092a}
-.modal-layer,.shop-layer{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:14px;background:rgba(8,8,18,.5);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
-.modal{width:min(94vw,430px);padding:20px;border:1px solid rgba(77,232,255,.42);border-radius:var(--radius-l);background:rgba(22,22,37,.94);box-shadow:var(--glow);text-align:center;animation:arcade-rise .32s var(--spring)}
+.modal-layer,.shop-layer{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:14px;background:rgba(246,246,243,.9)}
+.modal{width:min(94vw,430px);padding:20px;border:1px solid var(--g-ink);border-radius:0;background:var(--g-white);color:var(--g-ink);box-shadow:none;text-align:center;animation:arcade-rise .32s var(--spring)}
 .modal h2{margin:0 0 8px;font:750 clamp(24px,5vw,30px)/1.08 var(--font-display);letter-spacing:-.02em}
 .modal p{margin:6px 0;color:var(--muted)}
 .modal-stars{min-height:42px;color:var(--gold);font-size:34px;letter-spacing:4px}
@@ -124,7 +124,7 @@ button:disabled{cursor:not-allowed;filter:grayscale(.75);opacity:.48}
 .upgrade-description{margin:0;color:var(--muted);font-size:12px}
 .upgrade-level{display:block;margin-top:4px;color:var(--blue);font-size:11px;font-weight:800}
 .upgrade-buy{min-width:72px}
-.toast{position:fixed;z-index:40;left:50%;bottom:calc(82px + env(safe-area-inset-bottom));max-width:90vw;transform:translate(-50%,12px);padding:9px 14px;border-radius:12px;background:var(--card2);border:1px solid var(--border);color:var(--text);box-shadow:0 5px 20px #0009;opacity:0;transition:.18s;pointer-events:none;text-align:center;font-weight:800}
+.toast{position:fixed;z-index:40;left:50%;bottom:calc(82px + env(safe-area-inset-bottom));max-width:90vw;transform:translate(-50%,12px);padding:9px 14px;border-radius:0;background:var(--card2);border:1px solid var(--border);color:var(--text);box-shadow:none;opacity:0;transition:.18s;pointer-events:none;text-align:center;font-weight:800}
 .toast.show{opacity:1;transform:translate(-50%,0)}
 .boot-error{margin:auto;padding:18px;color:var(--danger);text-align:center}
 @keyframes pop{0%{transform:scale(.75)}100%{transform:scale(1)}}

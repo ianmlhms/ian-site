@@ -58,6 +58,7 @@
   <a class="home" href="index.html">‹ Heem</a>
   <h1>Hausaufgaben<span id="classTag"></span></h1>
   <div class="spacer"></div>
+  <button type="button" class="gt-acct" id="gtAcct">Umellen</button>
 </header>
 
 <div class="wrap">
@@ -168,7 +169,7 @@ $("hwAdd").onclick=async()=>{
 };
 $("hwTitle").addEventListener("keydown",e=>{if(e.key==="Enter")$("hwAdd").click();});
 
-(async()=>{);
+(async()=>{
   $("gateBtn").onclick=(e)=>{e.preventDefault();auth.openAuthModal();};
   auth.onAuth(async()=>{
     isAdmin=false;
@@ -179,6 +180,7 @@ $("hwTitle").addEventListener("keydown",e=>{if(e.key==="Enter")$("hwAdd").click(
   refresh();
 })();
 </script>
+  <script type="module" src="gitter-acct.js?v=1"></script>
   <script type="module" src="rtc-ring.js?v=36"></script>
   <script type="module" src="class-gate.js?v=37"></script>
 </body>

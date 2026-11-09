@@ -127,7 +127,7 @@
     $('lede').textContent = t('lede');
     $('barTitle').textContent = 'Partyspill';
     $('grid').innerHTML = GAMES.map(function (g) {
-      return '<button class="tile" data-id="' + g.id + '" style="border-color:' + g.accent + '33">' +
+      return '<button class="tile" data-id="' + g.id + '">' +
         '<span class="em" aria-hidden="true">' + g.emoji + '</span>' +
         '<span class="nm">' + esc(tx(g.name)) + '</span>' +
         '<span class="tg">' + esc(tx(g.tag)) + '</span></button>';

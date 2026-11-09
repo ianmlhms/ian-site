@@ -71,13 +71,9 @@
 
   /* ---- play ---- */
   .stage{text-align:center;padding:clamp(22px,4vw,34px) 18px}
-  .disc{position:relative;display:grid;place-items:center;width:clamp(120px,22vw,150px);height:clamp(120px,22vw,150px);margin:0 auto 18px;border-radius:0;
-    background:repeating-radial-gradient(circle at 50% 50%,#1b1426 0 2px,#0f0a18 2px 4px);
-    box-shadow:0 0 0 1px rgb(255 255 255/.08),0 22px 36px -18px rgb(var(--ink)/.7),inset 0 0 0 6px #0d0814}
-  .disc::before{content:"";position:absolute;inset:0;border-radius:0;
-    background:conic-gradient(from 20deg,transparent 0 18%,rgb(255 255 255/.12) 25%,transparent 32% 68%,rgb(255 255 255/.1) 75%,transparent 82%)}
-  .disc span{position:relative;display:grid;place-items:center;width:46%;height:46%;border-radius:0;font-size:clamp(22px,4.4vw,30px);line-height:1;
-    background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 0 0 3px #0d0814}
+  .disc{position:relative;display:grid;place-items:center;width:clamp(120px,22vw,150px);height:clamp(120px,22vw,150px);margin:0 auto 18px;border-radius:50%;background:var(--ink);border:1px solid var(--ink)}
+  .disc::before{content:"";position:absolute;inset:14%;border-radius:50%;border:1px solid rgb(255 255 255/.22);border-top-color:transparent}
+  .disc span{position:relative;display:grid;place-items:center;width:46%;height:46%;border-radius:50%;font-size:clamp(22px,4.4vw,30px);line-height:1;background:var(--green)}
   .disc.spin{animation:sp 3s linear infinite}
   @keyframes sp{to{transform:rotate(360deg)}}
   .secs{font:900 clamp(40px,8vw,56px)/1 "Geist",system-ui,sans-serif;letter-spacing:-.04em;color:var(--accent-text);font-variant-numeric:tabular-nums}

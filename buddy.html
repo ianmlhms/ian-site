@@ -35,7 +35,7 @@
   .modes{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:6px}
   .mode{position:relative;overflow:hidden;text-align:left;background:var(--tint);border:1px solid var(--border);border-radius:0;padding:16px;cursor:pointer;color:var(--text);transition:transform .15s ease,border-color .15s,box-shadow .15s}
   .mode:hover,.mode:active{transform:translateY(-3px);border-color:var(--m,var(--accent2));box-shadow:0 12px 26px rgba(0,0,0,.28)}
-  .mode::after{content:"";position:absolute;right:-28px;top:-28px;width:92px;height:92px;border-radius:0;background:radial-gradient(circle,color-mix(in srgb,var(--m,var(--accent)) 34%,transparent),transparent 70%);opacity:.55;pointer-events:none}
+  .mode::after{display:none;content:"";position:absolute;right:-28px;top:-28px;width:92px;height:92px;border-radius:0;background:radial-gradient(circle,color-mix(in srgb,var(--m,var(--accent)) 34%,transparent),transparent 70%);opacity:.55;pointer-events:none}
   .mode .ic{position:relative;z-index:1;display:inline-flex;align-items:center;justify-content:center;width:46px;height:46px;border-radius:0;font-size:23px;background:rgba(255,255,255,.06);background:color-mix(in srgb,var(--m,var(--accent)) 20%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--m,var(--accent)) 42%,transparent)}
   .mode b{position:relative;z-index:1;display:block;margin:12px 0 3px;font-size:15.5px}
   .mode span{position:relative;z-index:1;color:var(--muted);font-size:12.5px;line-height:1.4;display:block}

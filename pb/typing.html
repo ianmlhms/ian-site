@@ -15,12 +15,12 @@ body{display:flex;flex-direction:column}
   font:600 clamp(18px,4.2vw,24px)/1.7 var(--font);text-align:center;letter-spacing:.005em}
 .correct{color:var(--good)}.pending{color:var(--muted)}
 .wrong{color:var(--danger);text-decoration:underline}
-.current{background:rgba(255,255,255,.12);border-radius:4px;padding:0 1px;color:var(--text)}
-#inp{width:100%;min-height:52px;padding:0 18px;border:1px solid var(--border);border-radius:14px;background:var(--card2);color:var(--text);
+.current{background:var(--g-tint,rgba(22,23,26,.08));border-radius:0;padding:0 1px;color:var(--text)}
+#inp{width:100%;min-height:52px;padding:0 18px;border:1px solid var(--border);border-radius:0;background:var(--card2);color:var(--text);
   font:650 20px/1 var(--font);text-align:center;outline:none}
 #inp:focus-visible{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(77,232,255,.25)}
-#progress{height:6px;border-radius:99px;background:var(--border);overflow:hidden}
-#prog-fill{height:100%;width:0;border-radius:inherit;background:linear-gradient(90deg,var(--accent),var(--cyan));transition:width .3s var(--spring)}
+#progress{height:6px;border-radius:0;background:var(--border);overflow:hidden}
+#prog-fill{height:100%;width:0;border-radius:inherit;background:var(--accent);transition:width .3s var(--spring)}
 .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;align-items:center}
 .arcade-btn:focus-visible{outline-offset:3px}
 .arcade-seg button{min-height:44px}

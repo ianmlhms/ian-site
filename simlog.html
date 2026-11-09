@@ -140,7 +140,7 @@ async function boot(){
     await refresh();
   }catch(error){
     console.warn("[simlog] boot",error);
-    if(run===bootNumber)$("wrap").innerHTML='<div class="gate">D'Logbuch konnt net gestart ginn. Probéier et w.e.g. nach eng Kéier.</div>';
+    if(run===bootNumber)$("wrap").innerHTML='<div class="gate">D\'Logbuch konnt net gestart ginn. Probéier et w.e.g. nach eng Kéier.</div>';
   }
 }
 
@@ -154,7 +154,7 @@ async function refresh(){
   }catch(error){
     console.warn("[simlog] load",error);
     setMessage("loadMsg","D'Flüchte konnten net gelueden ginn. Probéier et w.e.g. nach eng Kéier.",true);
-    $("list").innerHTML='<div class="gate">D'Logbuch konnt net gelueden ginn.</div>';
+    $("list").innerHTML='<div class="gate">D\'Logbuch konnt net gelueden ginn.</div>';
   }
 }
 
@@ -290,7 +290,7 @@ function renderMap(){
   if(map){map.remove();map=null;}
   const mapped=mappedFlights(),host=$("mapHost");
   if(!mapped.length){host.innerHTML='<div class="map-empty">Nach keng Flüchte op der Kaart</div>';return;}
-  if(!window.L){host.innerHTML='<div class="map-empty">D'Kaartebibliothéik konnt net gelueden ginn.</div>';return;}
+  if(!window.L){host.innerHTML='<div class="map-empty">D\'Kaartebibliothéik konnt net gelueden ginn.</div>';return;}
   host.innerHTML='<div id="map"></div>';
   map=L.map("map").setView(MAP_CENTER,MAP_ZOOM);
   const tiles=L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:TILE_MAX_ZOOM,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'});
