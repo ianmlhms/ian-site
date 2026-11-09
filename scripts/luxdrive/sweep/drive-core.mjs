@@ -53,6 +53,16 @@ function clean(pts) {
   return out;
 }
 
+/** Is the road an approach of the tube, or the way that carries on from the far end of one (within 1.5 m)? */
+function approachOf(tube, road, world) {
+  if (road.id === tube.approachA || road.id === tube.approachB) return true;
+  const ends = [road.pts[0], road.pts[road.pts.length - 1]];
+  return [tube.approachA, tube.approachB].some((id) => {
+    const a = world.roadById ? world.roadById.get(id) : world.roads.find((r) => r.id === id);
+    return !!a && [a.pts[0], a.pts[a.pts.length - 1]].some((p) => ends.some((e) => Math.hypot(p[0] - e[0], p[1] - e[1]) <= 1.5));
+  });
+}
+
 /** The level (the car's body, the hint) a lane starts at. */
 function startHint({ road, x, z, world }) {
   const { ground, surface, tubes } = world;
@@ -65,10 +75,13 @@ function startHint({ road, x, z, world }) {
     }
   }
   if (road.over || road.bridge) return 1e9;
-  // (a road that starts in the trough or the blend of a tube - the 26 m approach of Cents south ends at the face - starts on the tube's floor, not on the land of
-  // the hill over the portal: the car fell off it and "flew" 0.6 s, tunnels19)
+  // (an approach of a tube that starts in its trough or blend - the 26 m approach of Cents south ends at the face - starts on the tube's floor, not on the land of
+  // the hill over the portal: the car fell off it and "flew" 0.6 s, tunnels19.  Only the tube's own approaches: a road OVER the tube - the Rond-Point Schuman,
+  // Krautmaart over the René Konen tunnel, the Buchler bridge over the Rocade mouth - was put on the floor under it, inside the walls: the full-city sweep's
+  // "tube mouth" places, 0.8 m tube hits and 2,700 m/s2 jolts at every lane)
+  // (the next way on from a short approach counts too: Cents north 157 is 13 m long, 9174 starts in the trough of tube 159)
   const L = {};
-  if (tubes && tubes.network && tubes.network.locate(x, z, L) && L.tube) {
+  if (tubes && tubes.network && tubes.network.locate(x, z, L) && L.tube && approachOf(L.tube, road, world)) {
     const t = L.tube, g0 = t.troughA ? t.tA : t.sA - 8, g1 = t.troughB ? t.tB : t.sB + 8;
     if (L.s >= g0 && L.s <= g1) return L.floor + CAR.rideHeight + 0.3;
   }
