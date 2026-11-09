@@ -2736,26 +2736,32 @@ carriageway) skips split joints (a split is no joint of one carriageway; `stats.
 ### 3. Rue de Cessange 640, parapet #200 hit: FIXED (deck-barriers.js)
 #200 is the footway deck beside the road deck 156: OSM puts it 3.8 m from the road's axis (its edge 2 m inside the road deck) and its DSM tops sag up to 2.5 m under the
 road.  Where the sag passed BARRIER.cover (1 m) its edge "fell away", and the railing piece next to a covered sample still held a car at the road's level: 0.53 m into
-lane 1.8.  The cover now reaches upward as far as a barrier holds a car (BARRIER.height + drop): an edge under another deck by up to 1.5 m has no barrier.
+lane 1.8.  For a FOOTWAY deck (< ROAD_MIN_WIDTH) whose edge lies under a road deck, the cover now reaches upward as far as a barrier holds a car (BARRIER.height
++ drop = 1.5 m): no railing there.  (Road decks keep the 1.0 m cover: applied to every deck it let a car off deck 209 - harness V3.)
 
-### 4. Autoroute de Dudelange 17100 under the A1 (4681,12616): FIXED (road-network.js abutmentFade)
-The abutment of the A1 (9104 -> bridge 432) holds the road level 2 m under the deck, then its earth falls over up to 6 m: 7 m past the way's end, which reached 2.4 m
-into the motorway below (its face rose under the outer lane's centre: roll 0.39, jolt 34).  The fall now ends ABUT_LANE_GAP (1 m) before the lane keep of any carved way
-two levels (SEP_HIGH) under the approach (never shorter than the default soft cap).  Cross-section: the motorway is flat to its edge (6.25 m), the abutment stands beside it.
-Walls re-baked (100 walls).
+### 4. Autoroute de Dudelange 17100 under the A1 (4681,12616): MOSTLY FIXED (road-network.js abutmentFade)
+The abutment of the A1 (9104 -> bridge 432, and 435 on the other bridge) holds the road level 2 m under the deck, then its earth falls over up to 6 m: it reached 2.4 m
+into the motorway below (its face rose under the outer lane's centre: roll 0.39, jolt 34).  Now the fall is shortened, 0.25 m at a time, until its earth stands at most
+5 cm over the wheels of the outer lane of a way at least 3 m under the approach (ABUT_UNDER: the ways that meet at the Hondhausbréck end lie 1.4 - 2.1 m apart and need
+the earth, harness V4), but never steeper than ABUT_STEEPEST = 2.2 m/m (mean).  Steeper (2.35+) fixed the A13 completely (no roll, jolt 16) but the A6 abutments beside
+the other carriageway (7412) then became two more "walls the carve made" in the world flow (9 > 8); at 2.2 the flow has 8 (limit 8, it had 7) and the A13 keeps roll 0.20 /
+jolt 18 in its outer lane.  Fires on 16 abutments (A1/A6/A13 interchanges, Val du Scheid, Rue des Alouettes, Clausener Bierg ...).
 
-### Sweep (`--drawn`, Mini, `luxdrive-work/fix19/sweep-before` -> `sweep-abut`)
-Events: jolt 107 -> 88, roll 4 -> 0, hit 4 -> 0; places 24 -> 23.  Gone: Bd des Scillas (80.4), Route de Luxembourg (64.9), A13 roll 0.39 / jolt 34.2, Rue de Cessange
-parapet hit.  The A13 place splits into two small ones on the same lane: 16.9 m/s2 at 4677,12633 (was 23.2 there) and 10.0 at 4684,12603 (a 5 cm sag).  New top: service
-4497 (10623,8421) 33.9 m/s2, residential 3135 (2337,7552) 26.4, service loops.
+### Sweep (`--drawn`, Mini, `luxdrive-work/fix19/sweep-before` -> `sweep-final2`, the last on the tree merged with car20)
+Events: jolt 107 -> 89, roll 4 -> 1, hit 4 -> 0; places 24 -> 22.  Gone: Bd des Scillas (80.4), Route de Luxembourg (64.9), Rue de Cessange parapet hit.  A13 17100:
+roll 0.39 -> 0.20, jolt 34.2 -> 18.2 (outer lane, 4680,12620).  New top: service 4497 (10623,8421) 33.9 m/s2, residential 3135 (2337,7552) 26.4, service loops.
+
+### Gates (tree merged with car20, main.js ?v=73)
+harness 175 / 175 (1786 s); luxdrive_world PASS (medium 151 draw calls, carve walls 8 / 8); holes 0 (medium) / 0 (low); luxdrive_ui PASS; luxdrive_webkit PASS.
 
 ### Shots (`luxdrive-work/fix19/shots/final/`, before = live v69 or the holes run, after = this branch; stacked + labelled)
 1_munsbach_tunnel_mouth, 2_bd_des_scillas, 3_route_de_luxembourg, 4_a13_under_a1_bridge, 5_a13_abutment_side.
 
 ### Still wrong
+* A13 17100 under the A1: roll 0.20 / jolt 18 left in the outer lane (the abutment cannot fall steeper without two more carve walls on the other carriageway).
 * Bd des Scillas: west of the split the DTM has a pit 4.5 m deep (no OSM feature: no tunnel, no ramp).  The full-width road now ends on its rim: a steep grey fill face
   with the lattice's sawtooth (before: a grass slope, with the road pinched).  A wall or a filled pit would look better.
-* The A1 abutment over the A13 is now a 6.6 m earth face at ~5 m/m under the deck (no retaining wall: walls are not baked under decks), grey sawtooth shading.
+* The shortened abutments are steep grey earth faces under their decks (no retaining wall: walls are not baked under decks).
 * Rue de Munsbach: the tube's exit jolt 17 m/s2 at 25 m/s (unchanged); deck 254 still sits on the portal hood.
 * Footway deck 200 (Rue de Cessange) sags under the road deck in the picture too (its railing may show through the road deck): not looked at.
 
