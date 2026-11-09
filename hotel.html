@@ -1,79 +1,81 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="lb">
 <head>
 <meta charset="UTF-8">
   <meta name="robots" content="noindex,nofollow" />
   <!-- Private, account-restricted builder. Kept out of the index, like admin.html and me.html. -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Hotel-Bausimulator</title>
+<title>Hotel-Bausimulator — ian.lu</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="gitter.css?v=9">
 <style>
   :root{
-    --bg:#0f172a; --panel:#1e293b; --panel2:#273449; --text:#e2e8f0;
-    --muted:#94a3b8; --accent:#38bdf8; --accent2:#0ea5e9; --line:#334155;
-    --grid:#334155; --gridbg:#1a2434; --font:'Segoe UI',system-ui,sans-serif;
+    --bg:#f6f6f3; --panel:#fcfcfa; --panel2:#efefeb; --text:#16171a;
+    --muted:#62656a; --accent:#1f7a4d; --accent2:#1f7a4d; --line:#16171a; --soft:rgba(22,23,26,.14);
+    --grid:rgba(22,23,26,.14); --gridbg:#fcfcfa; --font:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif; --danger:#a32121;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;height:100%;}
   body{font-family:var(--font);background:var(--bg);color:var(--text);overflow:hidden;}
   button{font-family:inherit;cursor:pointer;}
   ::-webkit-scrollbar{width:10px;height:10px;}
-  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:6px;}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:0;}
 
   /* ---------- STARTBILDSCHIRM ---------- */
   #start{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
-    background:radial-gradient(circle at 50% 25%, var(--panel2), var(--bg));z-index:50;padding:20px;overflow:auto;}
-  .start-card{max-width:780px;width:100%;background:var(--panel);border-radius:18px;padding:32px 38px;
-    box-shadow:0 30px 80px rgba(0,0,0,.5);border:1px solid var(--line);margin:auto;}
+    background:var(--bg);z-index:50;padding:20px;overflow:auto;}
+  .start-card{max-width:780px;width:100%;background:var(--panel);border-radius:0;padding:32px 38px;
+    border:1px solid var(--line);margin:auto;}
   .start-card h1{margin:0 0 6px;font-size:30px;}
   .start-card .sub{color:var(--muted);margin:0 0 22px;font-size:14px;}
   .section-title{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:20px 0 11px;font-weight:700;}
   .styles{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
-  .style-opt{border:2px solid var(--line);border-radius:14px;padding:14px;cursor:pointer;text-align:center;transition:.15s;background:var(--panel2);}
+  .style-opt{border:1px solid var(--line);border-radius:0;padding:14px;cursor:pointer;text-align:center;transition:.15s;background:var(--panel2);}
   .style-opt:hover{transform:translateY(-3px);}
-  .style-opt.selected{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 35%,transparent);}
-  .style-opt .swatch{height:46px;border-radius:8px;margin-bottom:9px;}
+  .style-opt.selected{border-color:var(--accent);}
+  .style-opt .swatch{height:46px;border-radius:0;margin-bottom:9px;}
   .style-opt strong{display:block;font-size:14px;}
   .style-opt span{font-size:11px;color:color-mix(in srgb,var(--muted) 85%,var(--text));}
   .field label{display:block;font-size:13px;margin-bottom:7px;color:var(--muted);}
-  .txt{width:100%;padding:11px 13px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:15px;}
-  .stepper{display:flex;align-items:center;border:1px solid var(--line);border-radius:10px;overflow:hidden;width:fit-content;}
+  .txt{width:100%;padding:11px 13px;border-radius:0;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:15px;}
+  .stepper{display:flex;align-items:center;border:1px solid var(--line);border-radius:0;overflow:hidden;width:fit-content;}
   .stepper button{width:auto;min-height:44px;padding-inline:18px;background:var(--panel2);border:none;color:var(--text);font-size:20px;}
   .stepper button:hover{background:var(--accent);color:#fff;}
   .stepper input{width:56px;min-height:44px;text-align:center;border:none;background:transparent;color:var(--text);font-size:17px;font-weight:600;-moz-appearance:textfield;}
   .stepper input::-webkit-outer-spin-button,.stepper input::-webkit-inner-spin-button{-webkit-appearance:none;}
   #bldList{display:flex;flex-direction:column;gap:10px;}
-  .bld-row{display:flex;flex-wrap:wrap;align-items:center;gap:12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;}
-  .bld-row .idx{width:26px;height:26px;border-radius:7px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex:0 0 auto;}
-  .bld-row input.name{min-width:0;min-height:44px;flex:1;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:14px;}
+  .bld-row{display:flex;flex-wrap:wrap;align-items:center;gap:12px;background:var(--panel2);border:1px solid var(--line);border-radius:0;padding:10px 12px;}
+  .bld-row .idx{width:26px;height:26px;border-radius:0;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex:0 0 auto;}
+  .bld-row input.name{min-width:0;min-height:44px;flex:1;padding:8px 10px;border-radius:0;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:14px;}
   .bld-row .flbl{font-size:12px;color:color-mix(in srgb,var(--muted) 85%,var(--text));}
   .bld-row .stepper{margin-left:auto;}
-  .start-btn{margin-top:26px;width:100%;min-height:44px;padding:15px;font-size:17px;font-weight:700;border:none;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;}
+  .start-btn{margin-top:26px;width:100%;min-height:44px;padding:15px;font-size:17px;font-weight:700;border:none;border-radius:0;background:var(--ink,#16171a);color:#fff;}
   #hotelSignin,#hotelName{min-height:44px;}
-  .start-btn:hover{filter:brightness(1.08);}
-  .resume{margin-top:12px;width:100%;padding:12px;font-size:14px;font-weight:600;border:1px solid var(--accent);border-radius:10px;background:transparent;color:var(--accent);}
+  .start-btn:hover{background:var(--accent);}
+  .resume{margin-top:12px;width:100%;padding:12px;font-size:14px;font-weight:600;border:1px solid var(--accent);border-radius:0;background:transparent;color:var(--accent);}
   .resume:hover{background:color-mix(in srgb,var(--accent) 15%,transparent);}
   #resumeList{margin-top:12px;display:flex;flex-direction:column;gap:8px;}
-  .hotel-row{display:flex;align-items:center;gap:10px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;}
+  .hotel-row{display:flex;align-items:center;gap:10px;background:var(--panel2);border:1px solid var(--line);border-radius:0;padding:10px 12px;}
   .hotel-row .h-info{flex:1;min-width:0;}
   .hotel-row .h-info b{display:block;font-size:14px;}
   .hotel-row .h-info small{color:var(--muted);font-size:11px;}
-  .hotel-row button{padding:7px 11px;border-radius:8px;font-size:13px;border:1px solid var(--line);background:var(--bg);color:var(--text);}
+  .hotel-row button{padding:7px 11px;border-radius:0;font-size:13px;border:1px solid var(--line);background:var(--bg);color:var(--text);}
   .hotel-row .h-open{border-color:var(--accent);color:var(--accent);font-weight:600;}
   .hotel-row .h-del{border-color:transparent;color:var(--muted);}
-  .hotel-row .h-del:hover{color:#ef4444;}
+  .hotel-row .h-del:hover{color:var(--danger);}
 
   /* ---------- APP ---------- */
   #app{display:none;height:100%;flex-direction:column;}
   header.topbar{display:flex;align-items:center;gap:10px;padding:9px 16px;background:var(--panel);border-bottom:1px solid var(--line);flex:0 0 auto;flex-wrap:wrap;}
   header.topbar h2{margin:0;font-size:17px;white-space:nowrap;}
   .views{display:flex;gap:6px;margin-left:8px;}
-  .view-tab{padding:8px 14px;border-radius:9px;background:var(--panel2);border:1px solid var(--line);color:var(--text);font-size:13px;}
+  .view-tab{padding:8px 14px;border-radius:0;background:var(--panel2);border:1px solid var(--line);color:var(--text);font-size:13px;}
   .view-tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
   .stats{display:flex;gap:14px;margin-left:auto;font-size:12px;color:var(--muted);}
   .stats b{color:var(--text);}
-  .tbtn{background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:8px 12px;border-radius:8px;font-size:13px;}
+  .tbtn{background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:8px 12px;border-radius:0;font-size:13px;}
   .tbtn:hover{border-color:var(--accent);}
   .main{flex:1 1 auto;min-height:0;position:relative;}
   .view{position:absolute;inset:0;display:none;}
@@ -88,96 +90,96 @@
       linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px),
       repeating-linear-gradient(45deg,transparent,transparent 18px,color-mix(in srgb,#22c55e 8%,transparent) 18px,color-mix(in srgb,#22c55e 8%,transparent) 20px);
     background-size:40px 40px,40px 40px,auto,auto;background-color:var(--gridbg);
-    border:3px solid var(--line);border-radius:8px;flex:0 0 auto;}
+    border:1px solid var(--line);border-radius:0;flex:0 0 auto;}
   .plot-label{position:absolute;top:8px;left:12px;font-size:12px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;pointer-events:none;}
-  .bld-block{position:absolute;background:color-mix(in srgb,var(--accent) 22%,var(--panel));border:2px solid var(--accent);border-radius:8px;
-    cursor:grab;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:6px;overflow:hidden;box-shadow:0 6px 16px rgba(0,0,0,.35);}
+  .bld-block{position:absolute;background:color-mix(in srgb,var(--accent) 22%,var(--panel));border:2px solid var(--accent);border-radius:0;
+    cursor:grab;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:6px;overflow:hidden;}
   .bld-block:active{cursor:grabbing;}
   .bld-block.sel{outline:3px solid var(--accent2);outline-offset:2px;}
   .bld-block .bb-ico{font-size:24px;}
   .bld-block .bb-name{font-weight:700;font-size:14px;margin-top:2px;}
   .bld-block .bb-info{font-size:11px;color:var(--muted);margin-top:2px;}
   .bld-block .bb-resize{position:absolute;right:2px;bottom:2px;width:16px;height:16px;cursor:nwse-resize;
-    background:linear-gradient(135deg,transparent 50%,var(--accent2) 50%);border-radius:0 0 6px 0;}
-  .bld-block .bb-edit{position:absolute;top:4px;right:6px;font-size:11px;background:var(--accent);color:#fff;border:none;border-radius:6px;padding:3px 7px;opacity:0;transition:.12s;}
+    background:linear-gradient(135deg,transparent 50%,var(--accent2) 50%);border-radius:0;}
+  .bld-block .bb-edit{position:absolute;top:4px;right:6px;font-size:11px;background:var(--accent);color:#fff;border:none;border-radius:0;padding:3px 7px;opacity:0;transition:.12s;}
   .bld-block:hover .bb-edit{opacity:1;}
-  .out-block{position:absolute;border:2px solid;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;cursor:grab;overflow:hidden;box-shadow:0 4px 10px rgba(0,0,0,.22);}
+  .out-block{position:absolute;border:2px solid;border-radius:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;cursor:grab;overflow:hidden;}
   .out-block:active{cursor:grabbing;}
   .out-block .ob-ico{font-size:22px;}
   .out-block .ob-name{font-size:12px;font-weight:600;margin-top:2px;}
-  .out-block .ob-del{position:absolute;top:3px;right:4px;font-size:11px;background:rgba(0,0,0,.45);color:#fff;border:none;border-radius:50%;width:18px;height:18px;opacity:0;transition:.12s;}
+  .out-block .ob-del{position:absolute;top:3px;right:4px;font-size:11px;background:rgba(0,0,0,.45);color:#fff;border:none;border-radius:0;width:18px;height:18px;opacity:0;transition:.12s;}
   .out-block:hover .ob-del{opacity:1;}
-  .out-block .ob-resize{position:absolute;right:2px;bottom:2px;width:15px;height:15px;cursor:nwse-resize;background:linear-gradient(135deg,transparent 50%,rgba(0,0,0,.45) 50%);border-radius:0 0 9px 0;}
+  .out-block .ob-resize{position:absolute;right:2px;bottom:2px;width:15px;height:15px;cursor:nwse-resize;background:linear-gradient(135deg,transparent 50%,rgba(0,0,0,.45) 50%);border-radius:0;}
 
   /* ---- GRUNDRISS ---- */
   #viewFloor{flex-direction:row;}
   .palette{width:260px;flex:0 0 260px;background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;padding:12px;}
   .palette h3{margin:4px 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);}
-  .search{width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);margin-bottom:10px;font-size:13px;}
+  .search{width:100%;padding:9px 12px;border-radius:0;border:1px solid var(--line);background:var(--panel2);color:var(--text);margin-bottom:10px;font-size:13px;}
   .cat-head{font-size:12px;font-weight:700;color:var(--accent);margin:13px 0 7px;letter-spacing:.5px;}
-  .part{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:9px;background:var(--panel2);border:1px solid var(--line);margin-bottom:6px;cursor:grab;transition:.12s;user-select:none;}
+  .part{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:0;background:var(--panel2);border:1px solid var(--line);margin-bottom:6px;cursor:grab;transition:.12s;user-select:none;}
   .part:hover{border-color:var(--accent);transform:translateX(2px);}
   .part .ico{font-size:19px;width:24px;text-align:center;}
   .part .meta{flex:1;min-width:0;}
   .part .meta b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .part .meta small{color:var(--muted);font-size:11px;}
-  .part .dot{width:11px;height:11px;border-radius:3px;flex:0 0 auto;}
+  .part .dot{width:11px;height:11px;border-radius:0;flex:0 0 auto;}
 
   .editor{flex:1 1 auto;display:flex;flex-direction:column;min-width:0;background:var(--bg);}
   .editor-bar{display:flex;align-items:center;gap:10px;padding:9px 16px;border-bottom:1px solid var(--line);background:var(--panel);flex:0 0 auto;flex-wrap:wrap;}
   .editor-bar .floor-name{font-size:15px;font-weight:600;}
   .editor-bar .hint{margin-left:auto;font-size:12px;color:var(--muted);}
   .canvas-wrap{flex:1 1 auto;overflow:auto;padding:24px;display:flex;align-items:flex-start;justify-content:center;}
-  #grid{position:relative;background:var(--gridbg);border:2px solid var(--line);border-radius:6px;flex:0 0 auto;
+  #grid{position:relative;background:var(--gridbg);border:1px solid var(--line);border-radius:0;flex:0 0 auto;
     background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);}
-  #grid.drag-over{box-shadow:0 0 0 3px var(--accent) inset;}
-  @keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 60%,transparent) inset;}100%{box-shadow:0 0 0 14px transparent inset;}}
+  #grid.drag-over{}
+  @keyframes pulse{0%{}100%{}}
   #grid.flash{animation:pulse .7s ease-out 1;}
-  .room{position:absolute;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-size:12px;text-align:center;overflow:hidden;cursor:grab;box-shadow:0 4px 10px rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.25);padding:2px;}
+  .room{position:absolute;border-radius:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-size:12px;text-align:center;overflow:hidden;cursor:grab;border:1px solid rgba(255,255,255,.25);padding:2px;}
   .room:hover{filter:brightness(1.12);}
   .room.dragging{opacity:.6;cursor:grabbing;z-index:20;}
   .room .r-ico{font-size:19px;line-height:1;}
   .room .r-name{font-weight:600;margin-top:2px;line-height:1.05;}
   .room .r-size{font-size:10px;opacity:.85;}
-  .room .r-del{min-height:0;border:0;padding:0;color:inherit;font-family:inherit;position:absolute;top:2px;right:3px;font-size:12px;opacity:0;background:rgba(0,0,0,.5);border-radius:50%;width:17px;height:17px;display:flex;align-items:center;justify-content:center;}
+  .room .r-del{min-height:0;border:0;padding:0;color:inherit;font-family:inherit;position:absolute;top:2px;right:3px;font-size:12px;opacity:0;background:rgba(0,0,0,.5);border-radius:0;width:17px;height:17px;display:flex;align-items:center;justify-content:center;}
   .room:hover .r-del{opacity:1;}
-  .room .r-resize{position:absolute;right:1px;bottom:1px;width:14px;height:14px;cursor:nwse-resize;background:linear-gradient(135deg,transparent 50%,rgba(255,255,255,.85) 50%);border-radius:0 0 5px 0;}
-  .room.shaft{border:2px dashed rgba(255,255,255,.92);box-shadow:0 0 0 2px rgba(0,0,0,.3),0 4px 12px rgba(0,0,0,.45);}
-  .room .r-badge{font-size:9px;background:rgba(0,0,0,.5);border-radius:6px;padding:1px 5px;margin-top:2px;white-space:nowrap;}
+  .room .r-resize{position:absolute;right:1px;bottom:1px;width:14px;height:14px;cursor:nwse-resize;background:linear-gradient(135deg,transparent 50%,rgba(255,255,255,.85) 50%);border-radius:0;}
+  .room.shaft{border:2px dashed rgba(255,255,255,.92);}
+  .room .r-badge{font-size:9px;background:rgba(0,0,0,.5);border-radius:0;padding:1px 5px;margin-top:2px;white-space:nowrap;}
   .room.sel{outline:3px solid var(--accent2);outline-offset:1px;z-index:18;}
   /* Zusammengefügter Raum: Container fängt KEINE Klicks ab, nur seine Kacheln –
-     so bleiben Räume in den leeren Ecken (z. B. L-Form) bedien-/verschiebbar. */
-  .room.merged{overflow:visible;pointer-events:none;background:transparent!important;box-shadow:none!important;border:none!important;}
+     so bleiben Raim in den leeren Ecken (z. B. L-Form) bedien-/verschiebbar. */
+  .room.merged{overflow:visible;pointer-events:none;background:transparent!important;border:none!important;}
   .room.merged .r-tile{pointer-events:auto;}
   .room.merged .r-del{pointer-events:auto;}
-  .r-tile{position:absolute;border-radius:4px;border:1px solid rgba(255,255,255,.3);box-shadow:0 2px 6px rgba(0,0,0,.3);}
+  .r-tile{position:absolute;border-radius:0;border:1px solid rgba(255,255,255,.3);}
   .r-label{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;text-align:center;pointer-events:none;text-shadow:0 1px 3px rgba(0,0,0,.7);}
-  .ghost{position:absolute;border:2px dashed var(--accent);border-radius:6px;background:color-mix(in srgb,var(--accent) 18%,transparent);pointer-events:none;display:none;z-index:15;}
+  .ghost{position:absolute;border:2px dashed var(--accent);border-radius:0;background:color-mix(in srgb,var(--accent) 18%,transparent);pointer-events:none;display:none;z-index:15;}
 
   .floornav{width:170px;flex:0 0 170px;background:var(--panel);border-left:1px solid var(--line);overflow-y:auto;padding:12px;}
   .floornav h3{margin:2px 0 9px;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);}
-  .fl-item{display:flex;align-items:center;gap:7px;padding:8px 9px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;cursor:pointer;background:var(--panel2);transition:.12s;}
+  .fl-item{display:flex;align-items:center;gap:7px;padding:8px 9px;border:1px solid var(--line);border-radius:0;margin-bottom:6px;cursor:pointer;background:var(--panel2);transition:.12s;}
   .fl-item.active{background:color-mix(in srgb,var(--accent) 25%,var(--panel2));border-left:3px solid var(--accent);}
   .fl-item:hover{filter:brightness(1.1);}
   .fl-item .fl-name{font-size:13px;font-weight:600;flex:1;background:none;border:0;padding:0;color:inherit;font-family:inherit;text-align:left;cursor:pointer;}
   .fl-item .fl-count{font-size:11px;color:var(--muted);}
-  .fl-item .fl-del{background:transparent;border:none;color:var(--muted);font-size:13px;border-radius:5px;padding:1px 5px;line-height:1;}
-  .fl-item .fl-del:hover{color:#ef4444;background:color-mix(in srgb,#ef4444 15%,transparent);}
+  .fl-item .fl-del{background:transparent;border:none;color:var(--muted);font-size:13px;border-radius:0;padding:1px 5px;line-height:1;}
+  .fl-item .fl-del:hover{color:var(--danger);background:color-mix(in srgb,var(--danger) 15%,transparent);}
 
   /* ---- FRONTANSICHT ---- */
   #viewFront{flex-direction:column;}
   .front-bar{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel);flex:0 0 auto;}
-  .front-wrap{flex:1;overflow:auto;padding:30px;display:flex;align-items:flex-end;justify-content:center;gap:34px;background:linear-gradient(180deg,var(--gridbg),var(--bg));}
+  .front-wrap{flex:1;overflow:auto;padding:30px;display:flex;align-items:flex-end;justify-content:center;gap:34px;background:var(--gridbg);}
   .front-bld{display:flex;flex-direction:column;align-items:center;}
-  .front-stack{display:flex;flex-direction:column;border:2px solid var(--line);border-bottom:none;border-radius:6px 6px 0 0;overflow:hidden;background:var(--panel);}
+  .front-stack{display:flex;flex-direction:column;border:1px solid var(--line);border-bottom:none;border-radius:0;overflow:hidden;background:var(--panel);}
   .front-floor{display:flex;border-bottom:1px solid var(--line);}
   .front-cell{flex:0 0 auto;}
-  .front-base{height:16px;width:100%;background:var(--panel2);border:2px solid var(--line);border-top:none;border-radius:0 0 6px 6px;}
+  .front-base{height:16px;width:100%;background:var(--panel2);border:1px solid var(--line);border-top:none;border-radius:0;}
   .front-name{margin-top:8px;font-size:13px;font-weight:600;}
   .front-sub{font-size:11px;color:var(--muted);}
   .ground-line{position:relative;}
 
-  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid var(--accent);color:var(--text);padding:11px 20px;border-radius:10px;font-size:14px;box-shadow:0 10px 30px rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:.25s;z-index:100;}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid var(--accent);color:var(--text);padding:11px 20px;border-radius:0;font-size:14px;opacity:0;pointer-events:none;transition:.25s;z-index:100;}
   .toast.show{opacity:1;}
   .hidden{display:none!important;}
 a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,.style-opt:focus-visible,.part:focus-visible{outline:3px solid var(--accent2);outline-offset:2px;}
@@ -185,33 +187,63 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,.s
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;}.style-opt:hover,.part:hover{transform:none;}}
 @media (pointer:coarse){.tbtn,.view-tab,.hotel-row button,.resume,.search,.fl-item .fl-del{min-height:44px;}.fl-item .fl-del,.fl-item .fl-name{min-width:44px;min-height:44px;}.ob-del{min-width:44px;min-height:44px;}}
 @media (hover:none) and (pointer:coarse){.bld-block .bb-edit{opacity:1;min-width:44px;min-height:44px}.room .r-del{opacity:1;width:44px;height:44px}}
+
+  /* Gitter flat chrome */
+  .start-card{border:1px solid var(--line);background:var(--panel);}
+  .start-card .sub,.gt .start-card .sub{text-align:left;}
+  .section-title{font-size:13px;text-transform:none;letter-spacing:0;font-weight:600;}
+  #start .styles,#start .section-title:nth-of-type(1){display:none;}
+  .start-btn{background:var(--ink,#16171a);color:#f6f6f3;border-radius:0;font-family:var(--font);}
+  .tbtn,.view-tab,.part,.fl-item,.hotel-row button,.search,.txt,.resume{border-color:var(--line);}
+  .view-tab.active{background:var(--ink,#16171a);color:#f6f6f3;border-color:var(--ink,#16171a);}
+  .tbtn:hover,.part:hover,.view-tab:hover{border-color:var(--accent);color:var(--accent);}
+  .view-tab.active:hover{color:#f6f6f3;}
+  .stepper button:hover{background:var(--accent);color:#fff;}
+  .part:hover{transform:none;}
+  header.topbar,.site-bar,.editor-bar,.front-bar,.palette,.floornav{background:var(--panel);}
+  .toast{background:var(--ink,#16171a);color:#f6f6f3;border:1px solid var(--ink,#16171a);}
+  .bld-block{background:color-mix(in srgb,var(--accent) 12%,var(--panel));}
+  .bld-block .bb-edit{background:var(--ink,#16171a);}
+  .bld-block .bb-resize{background:linear-gradient(135deg,transparent 50%,var(--accent) 50%);}
+  .out-block .ob-del,.room .r-del{border-radius:0;}
+  .stats{font-family:"Geist Mono",ui-monospace,monospace;}
+  select.tbtn{appearance:none;-webkit-appearance:none;}
+  :root{--ink:#16171a;}
+  @media (max-width:760px){
+    #viewFloor{flex-direction:column;overflow-y:auto;}
+    .palette{width:100%;flex:0 0 auto;max-height:200px;border-right:0;border-bottom:1px solid var(--line);}
+    .editor{flex:0 0 auto;min-height:420px;}
+    .floornav{width:100%;flex:0 0 auto;border-left:0;border-top:1px solid var(--line);max-height:220px;}
+    header.topbar{padding:8px 12px;}
+    .stats{margin-left:0;width:100%;}
+    .site-bar .hint,.editor-bar .hint{margin-left:0;width:100%;}
+  }
 </style>
-  <meta name="theme-color" content="#0d0d1a">
+  <meta name="theme-color" content="#f6f6f3">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="manifest" href="site.webmanifest">
 </head>
-<body>
+<body class="gt">
 
 <!-- ===================== ZUGANGS-SPERRE (privat) ===================== -->
-<div id="hotelGate" style="position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 25%,#273449,#0f172a);padding:20px;">
-  <div style="max-width:420px;width:100%;background:#1e293b;border:1px solid #334155;border-radius:18px;padding:34px 32px;text-align:center;color:#e2e8f0;font-family:'Segoe UI',system-ui,sans-serif;box-shadow:0 30px 80px rgba(0,0,0,.5);">
-    <div style="font-size:44px;line-height:1;margin-bottom:10px" aria-hidden="true">🏨</div>
-    <h1 style="margin:0 0 6px;font-size:24px">Hotel-Simulator</h1>
-    <p id="hotelGateMsg" role="status" style="color:#94a3b8;font-size:14px;margin:0 0 20px">Wird geladen…</p>
-    <button id="hotelSignin" style="display:none;background:#38bdf8;color:#06283a;border:none;border-radius:10px;padding:11px 22px;font-weight:800;font-size:15px;cursor:pointer;font-family:inherit">Anmelden</button>
-    <p style="margin-top:18px;margin-bottom:0"><a href="/" style="color:#94a3b8;font-size:13px;text-decoration:none">&lsaquo; Zurück zu ian.lu</a></p>
+<div id="hotelGate" style="position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:#f6f6f3;padding:20px;">
+  <div style="max-width:420px;width:100%;background:#fcfcfa;border:1px solid #16171a;padding:30px 28px;text-align:left;color:#16171a;font-family:'Geist',system-ui,sans-serif;">
+    <h1 style="margin:0 0 6px;font-size:22px;font-weight:800;letter-spacing:-.02em">Hotel-Simulator</h1>
+    <p id="hotelGateMsg" role="status" style="color:#62656a;font-size:14px;margin:0 0 20px">Gëtt gelueden …</p>
+    <button id="hotelSignin" style="display:none;background:#16171a;color:#f6f6f3;border:1px solid #16171a;border-radius:0;padding:0 22px;min-height:44px;font-weight:600;font-size:15px;cursor:pointer;font-family:inherit">Umellen</button>
+    <p style="margin-top:18px;margin-bottom:0"><a href="/" style="color:#62656a;font-size:14px;text-decoration:none;font-weight:600;display:inline-flex;min-height:44px;align-items:center">&lsaquo; Heem</a></p>
   </div>
 </div>
 
 <!-- ===================== STARTBILDSCHIRM ===================== -->
 <div id="start">
   <div class="start-card">
-    <h1><span aria-hidden="true">🏨</span> Hotel-Bausimulator</h1>
-    <p class="sub">Plane dein eigenes Luxushotel: Stil wählen, Grundstück mit Gebäuden anlegen, Stockwerke einrichten und Räume per Drag-and-Drop einbauen.</p>
+    <h1>Hotel-Bausimulator</h1>
+    <p class="sub">Plang däin eegent Luxushotel: Grondstéck mat Gebaier unleeën, Stäck areeden a Raim mat Drag-and-Drop androen.</p>
 
-    <div class="section-title">1 · Stil wählen</div>
-    <div class="styles" id="styleOpts" role="radiogroup" aria-label="Stil wählen">
+    <div class="section-title">Stil wielen</div>
+    <div class="styles" id="styleOpts" role="radiogroup" aria-label="Stil wielen">
       <div class="style-opt" data-style="playful" role="radio" aria-checked="false" tabindex="0">
         <div class="swatch" aria-hidden="true" style="background:linear-gradient(135deg,#ff7eb3,#ffd166,#06d6a0)"></div>
         <strong>Bunt &amp; verspielt</strong><span>Farbig &amp; freundlich</span>
@@ -226,21 +258,21 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,.s
       </div>
     </div>
 
-    <div class="section-title">2 · Hotelname</div>
-    <div class="field"><input class="txt" id="hotelName" aria-label="Hotelname" placeholder="z. B. Grand Palace Resort" value="Mein Luxushotel"></div>
+    <div class="section-title">1 · Hotelnumm</div>
+    <div class="field"><input class="txt" id="hotelName" aria-label="Hotelnumm" placeholder="z. B. Grand Palace Resort" value="Mäi Luxushotel"></div>
 
-    <div class="section-title">3 · Wie viele Gebäude?</div>
+    <div class="section-title">2 · Wéi vill Gebaier?</div>
     <div class="stepper">
-      <button type="button" id="bldMinus" aria-label="Ein Gebäude weniger">−</button>
-      <input id="numBld" type="number" value="2" min="1" max="8" aria-label="Anzahl Gebäude">
-      <button type="button" id="bldPlus" aria-label="Ein Gebäude mehr">+</button>
+      <button type="button" id="bldMinus" aria-label="Ee Gebai manner">−</button>
+      <input id="numBld" type="number" value="2" min="1" max="8" aria-label="Zuel vu Gebaier">
+      <button type="button" id="bldPlus" aria-label="Ee Gebai méi">+</button>
     </div>
 
-    <div class="section-title">4 · Stockwerke pro Gebäude</div>
+    <div class="section-title">3 · Stäck pro Gebai</div>
     <div id="bldList"></div>
 
     <button class="start-btn" id="startBtn">Hotel erstellen →</button>
-    <button class="resume hidden" id="resumeBtn">⟳ Gespeichertes Hotel fortsetzen</button>
+    <button class="resume hidden" id="resumeBtn">Gespäichert Hotel weiderféieren</button>
     <div id="resumeList" class="hidden"></div>
   </div>
 </div>
@@ -248,21 +280,21 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,.s
 <!-- ===================== APP ===================== -->
 <div id="app">
   <header class="topbar">
-    <h2 id="hotelTitle">🏨 Hotel</h2>
+    <h2 id="hotelTitle">Hotel</h2>
     <div class="views">
-      <button class="view-tab" data-view="site" type="button" aria-pressed="false">🗺️ Lageplan</button>
-      <button class="view-tab" data-view="floor" type="button" aria-pressed="false">📐 Grundriss</button>
-      <button class="view-tab" data-view="front" type="button" aria-pressed="false">🏢 Frontansicht</button>
+      <button class="view-tab" data-view="site" type="button" aria-pressed="false">Lagplang</button>
+      <button class="view-tab" data-view="floor" type="button" aria-pressed="false">Grondrëss</button>
+      <button class="view-tab" data-view="front" type="button" aria-pressed="false">Frontusiicht</button>
     </div>
     <div class="stats">
-      <span>Gebäude <b id="stBld">0</b></span>
-      <span>Stockwerke <b id="stFlr">0</b></span>
-      <span>Räume <b id="stRooms">0</b></span>
+      <span>Gebaier <b id="stBld">0</b></span>
+      <span>Stäck <b id="stFlr">0</b></span>
+      <span>Raim <b id="stRooms">0</b></span>
     </div>
-    <button class="tbtn" id="saveBtn">💾 Speichern</button>
-    <button class="tbtn" id="exportBtn">⬇︎ Export</button>
-    <button class="tbtn" id="importBtn">⬆︎ Import</button>
-    <button class="tbtn" id="restartBtn">Neu</button>
+    <button class="tbtn" id="saveBtn">Späicheren</button>
+    <button class="tbtn" id="exportBtn">Exportéieren</button>
+    <button class="tbtn" id="importBtn">Importéieren</button>
+    <button class="tbtn" id="restartBtn">Nei</button>
     <input type="file" id="importFile" accept="application/json" class="hidden">
   </header>
 
@@ -270,41 +302,41 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,.s
     <!-- LAGEPLAN -->
     <section class="view" id="viewSite">
       <div class="site-bar">
-        <button class="tbtn" id="addBldBtn2">+ Gebäude</button>
-        <button class="tbtn" id="delBldBtn">🗑 Gebäude löschen</button>
-        <select class="tbtn" id="outdoorSel"><option value="">🌳 Außenanlage hinzufügen…</option></select>
-        <span class="hint">Gebäude/Außenanlagen ziehen = verschieben · Ecke = Größe · Doppelklick aufs Gebäude öffnet die Stockwerke</span>
+        <button class="tbtn" id="addBldBtn2">+ Gebai</button>
+        <button class="tbtn" id="delBldBtn">Gebai läschen</button>
+        <select class="tbtn" id="outdoorSel"><option value="">Baussenanlag derbäisetzen …</option></select>
+        <span class="hint">Gebai/Baussenanlag zéien = réckelen · Eck = Gréisst · Duebelklick op d'Gebai mécht d'Stäck op</span>
       </div>
-      <div class="site-wrap"><div id="plot"><div class="plot-label">🌳 Grundstück / Lageplan</div></div></div>
+      <div class="site-wrap"><div id="plot"><div class="plot-label">Grondstéck / Lagplang</div></div></div>
     </section>
 
     <!-- GRUNDRISS -->
     <section class="view" id="viewFloor">
       <aside class="palette">
-        <h3>Bauteile</h3>
-        <input class="search" id="search" type="search" aria-label="Bauteil suchen" placeholder="🔍 Bauteil suchen...">
+        <h3>Bauelementer</h3>
+        <input class="search" id="search" type="search" aria-label="Bauelement sichen" placeholder="Bauelement sichen …">
         <div id="palette"></div>
       </aside>
       <div class="editor">
         <div class="editor-bar">
-          <button class="tbtn" id="backToSite">← Lageplan</button>
-          <span class="floor-name" id="floorName">Erdgeschoss</span>
-          <button class="tbtn" id="mergeBtn">🔗 Zusammenfügen</button>
-          <button class="tbtn" id="clearFloorBtn">Etage leeren</button>
-          <span class="hint">Ziehen = verschieben · Ecke = Größe · Raum anklicken = auswählen · 2+ auswählen, dann „Zusammenfügen"</span>
+          <button class="tbtn" id="backToSite">‹ Lagplang</button>
+          <span class="floor-name" id="floorName">Parterre</span>
+          <button class="tbtn" id="mergeBtn">Zesummefügen</button>
+          <button class="tbtn" id="clearFloorBtn">Stack eidel maachen</button>
+          <span class="hint">Zéien = réckelen · Eck = Gréisst · Raum uklicken = auswielen · 2+ auswielen, dann „Zesummefügen"</span>
         </div>
         <div class="canvas-wrap"><div id="grid"><div class="ghost" id="ghost"></div></div></div>
       </div>
       <aside class="floornav">
-        <h3 id="floornavTitle">Stockwerke</h3>
-        <button class="tbtn" id="addFloorBtn" style="width:100%;margin-bottom:10px;">+ Stockwerk</button>
+        <h3 id="floornavTitle">Stäck</h3>
+        <button class="tbtn" id="addFloorBtn" style="width:100%;margin-bottom:10px;">+ Stack</button>
         <div id="floorList"></div>
       </aside>
     </section>
 
     <!-- FRONTANSICHT -->
     <section class="view" id="viewFront">
-      <div class="front-bar"><b>Frontansicht des Hotels</b><span class="hint" style="margin-left:auto;color:var(--muted);font-size:12px;">Gebäude in Reihenfolge des Lageplans · jedes Stockwerk zeigt seinen Grundriss</span></div>
+      <div class="front-bar"><b>Frontusiicht vum Hotel</b><span class="hint" style="margin-left:auto;color:var(--muted);font-size:12px;">Gebaier an der Reiefolleg vum Lagplang · all Stack weist säi Grondrëss</span></div>
       <div class="front-wrap" id="frontWrap"></div>
     </section>
   </div>
@@ -314,20 +346,18 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,.s
 
 <script>
 /* ============ THEMES ============ */
-const THEMES={
-  playful:{'--bg':'#fdf2f8','--panel':'#ffffff','--panel2':'#fff0f6','--text':'#3b1f2b','--muted':'#9d6b80','--accent':'#ec4899','--accent2':'#f97316','--line':'#fbcfe8','--grid':'#f5d0e0','--gridbg':'#fff7fb','--font':"'Comic Sans MS','Segoe UI',sans-serif"},
-  luxury:{'--bg':'#14110b','--panel':'#1d1810','--panel2':'#2a2114','--text':'#f3e9d2','--muted':'#b9a878','--accent':'#caa84b','--accent2':'#9a7b2e','--line':'#3a2f1c','--grid':'#3a2f1c','--gridbg':'#1a150d','--font':"'Georgia','Times New Roman',serif"},
-  minimal:{'--bg':'#f8fafc','--panel':'#ffffff','--panel2':'#f1f5f9','--text':'#1e293b','--muted':'#64748b','--accent':'#0ea5e9','--accent2':'#0284c7','--line':'#e2e8f0','--grid':'#e2e8f0','--gridbg':'#fbfdff','--font':"'Segoe UI',system-ui,sans-serif"},
-};
+/* Gitter: one look. The old three styles all map to the same paper/ink/green tokens. */
+const GITTER_THEME={'--bg':'#f6f6f3','--panel':'#fcfcfa','--panel2':'#efefeb','--text':'#16171a','--muted':'#62656a','--accent':'#1f7a4d','--accent2':'#1f7a4d','--line':'#16171a','--grid':'rgba(22,23,26,.14)','--gridbg':'#fcfcfa','--font':"'Geist',system-ui,sans-serif"};
+const THEMES={playful:GITTER_THEME,luxury:GITTER_THEME,minimal:GITTER_THEME};
 function applyTheme(n){const t=THEMES[n]||THEMES.minimal;for(const k in t)document.documentElement.style.setProperty(k,t[k]);}
 
 /* ============ KATALOG ============ */
 const CATALOG=[
- {cat:'Gästezimmer',items:[
-   {id:'single',name:'Einzelzimmer',ico:'🛏️',w:1,h:1,color:'#60a5fa'},
-   {id:'double',name:'Doppelzimmer',ico:'🛏️',w:2,h:1,color:'#3b82f6'},
-   {id:'twin',name:'Zweibettzimmer',ico:'🛏️',w:2,h:1,color:'#2563eb'},
-   {id:'family',name:'Familienzimmer',ico:'👨‍👩‍👧',w:2,h:2,color:'#6366f1'},
+ {cat:'Gaschtzëmmeren',items:[
+   {id:'single',name:'Eenzelzëmmer',ico:'🛏️',w:1,h:1,color:'#60a5fa'},
+   {id:'double',name:'Duebelzëmmer',ico:'🛏️',w:2,h:1,color:'#3b82f6'},
+   {id:'twin',name:'Zweebettzëmmer',ico:'🛏️',w:2,h:1,color:'#2563eb'},
+   {id:'family',name:'Familljenzëmmer',ico:'👨‍👩‍👧',w:2,h:2,color:'#6366f1'},
    {id:'junior',name:'Junior-Suite',ico:'🛋️',w:2,h:2,color:'#8b5cf6'},
    {id:'suite',name:'Luxus-Suite',ico:'✨',w:3,h:2,color:'#a855f7'},
    {id:'president',name:'Präsidenten-Suite',ico:'👑',w:3,h:3,color:'#c026d3'},
@@ -338,56 +368,56 @@ const CATALOG=[
    {id:'finedining',name:'Gourmet-Restaurant',ico:'🍷',w:3,h:3,color:'#b91c1c'},
    {id:'bar',name:'Bar',ico:'🍸',w:2,h:1,color:'#f97316'},
    {id:'cafe',name:'Café',ico:'☕',w:2,h:1,color:'#d97706'},
-   {id:'kitchen',name:'Küche',ico:'🍳',w:2,h:2,color:'#facc15'},
-   {id:'banquet',name:'Bankettsaal',ico:'🥂',w:4,h:3,color:'#eab308'},
-   {id:'wine',name:'Weinkeller',ico:'🍾',w:2,h:1,color:'#7c2d12'},
+   {id:'kitchen',name:'Kuch',ico:'🍳',w:2,h:2,color:'#facc15'},
+   {id:'banquet',name:'Bankettsall',ico:'🥂',w:4,h:3,color:'#eab308'},
+   {id:'wine',name:'Wäikeller',ico:'🍾',w:2,h:1,color:'#7c2d12'},
  ]},
- {cat:'Wellness & Freizeit',items:[
+ {cat:'Wellness & Fräizäit',items:[
    {id:'spa',name:'Spa',ico:'💆',w:3,h:2,color:'#14b8a6'},
    {id:'sauna',name:'Sauna',ico:'🧖',w:2,h:1,color:'#0d9488'},
-   {id:'pool',name:'Innenpool',ico:'🏊',w:4,h:3,color:'#06b6d4'},
+   {id:'pool',name:'Bannepool',ico:'🏊',w:4,h:3,color:'#06b6d4'},
    {id:'gym',name:'Fitnessstudio',ico:'🏋️',w:2,h:2,color:'#0891b2'},
    {id:'massage',name:'Massageraum',ico:'💅',w:1,h:1,color:'#2dd4bf'},
    {id:'casino',name:'Casino',ico:'🎰',w:3,h:2,color:'#e11d48'},
    {id:'cinema',name:'Kino',ico:'🎬',w:3,h:2,color:'#9333ea'},
-   {id:'kids',name:'Kinderclub',ico:'🧸',w:2,h:2,color:'#f472b6'},
-   {id:'library',name:'Bibliothek',ico:'📚',w:2,h:2,color:'#a16207'},
+   {id:'kids',name:'Kannerclub',ico:'🧸',w:2,h:2,color:'#f472b6'},
+   {id:'library',name:'Bibliothéik',ico:'📚',w:2,h:2,color:'#a16207'},
  ]},
  {cat:'Empfang & Service',items:[
-   {id:'reception',name:'Rezeption',ico:'🛎️',w:2,h:2,color:'#22c55e'},
+   {id:'reception',name:'Rezeptioun',ico:'🛎️',w:2,h:2,color:'#22c55e'},
    {id:'lobby',name:'Lobby',ico:'🛋️',w:3,h:2,color:'#16a34a'},
    {id:'concierge',name:'Concierge',ico:'🎩',w:1,h:1,color:'#15803d'},
    {id:'office',name:'Büro',ico:'💼',w:1,h:1,color:'#65a30d'},
    {id:'conference',name:'Konferenzraum',ico:'📊',w:3,h:2,color:'#4d7c0f'},
    {id:'shop',name:'Boutique',ico:'🛍️',w:2,h:1,color:'#84cc16'},
-   {id:'laundry',name:'Wäscherei',ico:'🧺',w:2,h:1,color:'#a3a3a3'},
+   {id:'laundry',name:'Wäschräin',ico:'🧺',w:2,h:1,color:'#a3a3a3'},
    {id:'storage',name:'Lager',ico:'📦',w:1,h:1,color:'#737373'},
  ]},
- {cat:'Infrastruktur & Außen',items:[
-   {id:'elevator',name:'Aufzug',ico:'🛗',w:1,h:1,color:'#94a3b8'},
-   {id:'stairs',name:'Treppenhaus',ico:'🪜',w:1,h:1,color:'#64748b'},
-   {id:'hallway',name:'Flur',ico:'🚪',w:1,h:1,color:'#cbd5e1'},
+ {cat:'Infrastruktur & Baussen',items:[
+   {id:'elevator',name:'Lift',ico:'🛗',w:1,h:1,color:'#94a3b8'},
+   {id:'stairs',name:'Trapp',ico:'🪜',w:1,h:1,color:'#64748b'},
+   {id:'hallway',name:'Gang',ico:'🚪',w:1,h:1,color:'#cbd5e1'},
    {id:'wc',name:'Toiletten',ico:'🚻',w:1,h:1,color:'#7dd3fc'},
    {id:'parking',name:'Parkhaus',ico:'🅿️',w:4,h:2,color:'#475569'},
-   {id:'terrace',name:'Dachterrasse',ico:'🌅',w:3,h:2,color:'#fb923c'},
-   {id:'garden',name:'Garten',ico:'🌳',w:3,h:2,color:'#22c55e'},
-   {id:'rooftoppool',name:'Dachpool',ico:'🌊',w:3,h:2,color:'#38bdf8'},
+   {id:'terrace',name:'Daachterrass',ico:'🌅',w:3,h:2,color:'#fb923c'},
+   {id:'garden',name:'Gaart',ico:'🌳',w:3,h:2,color:'#22c55e'},
+   {id:'rooftoppool',name:'Daachpool',ico:'🌊',w:3,h:2,color:'#38bdf8'},
  ]},
 ];
 const PARTS={};CATALOG.forEach(c=>c.items.forEach(i=>PARTS[i.id]=i));
 
 /* Außenanlagen für den Lageplan (Pixel-Größen auf dem Grundstück) */
 const OUTDOOR=[
-  {id:'o_garden',name:'Garten',ico:'🌳',color:'#22c55e',w:160,h:120},
-  {id:'o_pool',name:'Außenpool',ico:'🏊',color:'#06b6d4',w:160,h:100},
-  {id:'o_parking',name:'Parkplatz',ico:'🅿️',color:'#475569',w:180,h:120},
-  {id:'o_terrace',name:'Terrasse',ico:'⛱️',color:'#fb923c',w:140,h:100},
-  {id:'o_playground',name:'Spielplatz',ico:'🛝',color:'#f472b6',w:140,h:120},
-  {id:'o_tennis',name:'Tennisplatz',ico:'🎾',color:'#84cc16',w:120,h:170},
-  {id:'o_garage',name:'Tiefgarage-Einfahrt',ico:'🚗',color:'#64748b',w:140,h:80},
-  {id:'o_fountain',name:'Brunnen',ico:'⛲',color:'#38bdf8',w:90,h:90},
-  {id:'o_path',name:'Weg / Einfahrt',ico:'🛣️',color:'#a3a3a3',w:200,h:60},
-  {id:'o_helipad',name:'Hubschrauberlandeplatz',ico:'🚁',color:'#7c3aed',w:130,h:130},
+  {id:'o_garden',name:'Gaart',ico:'🌳',color:'#22c55e',w:160,h:120},
+  {id:'o_pool',name:'Baussepool',ico:'🏊',color:'#06b6d4',w:160,h:100},
+  {id:'o_parking',name:'Parkplaz',ico:'🅿️',color:'#475569',w:180,h:120},
+  {id:'o_terrace',name:'Terrass',ico:'⛱️',color:'#fb923c',w:140,h:100},
+  {id:'o_playground',name:'Spillplaz',ico:'🛝',color:'#f472b6',w:140,h:120},
+  {id:'o_tennis',name:'Tennisplaz',ico:'🎾',color:'#84cc16',w:120,h:170},
+  {id:'o_garage',name:'Tiefgarage-Areet',ico:'🚗',color:'#64748b',w:140,h:80},
+  {id:'o_fountain',name:'Sprangbur',ico:'⛲',color:'#38bdf8',w:90,h:90},
+  {id:'o_path',name:'Wee / Areet',ico:'🛣️',color:'#a3a3a3',w:200,h:60},
+  {id:'o_helipad',name:'Helikopterplaz',ico:'🚁',color:'#7c3aed',w:130,h:130},
 ];
 const OUT={};OUTDOOR.forEach(o=>OUT[o.id]=o);
 
@@ -404,15 +434,15 @@ function rectCells(r){const a=[];for(let y=r.y;y<r.y+r.h;y++)for(let x=r.x;x<r.x
 function cellsOf(r){return r.cells?r.cells:rectCells(r);}
 function bbox(cells){const xs=cells.map(c=>c.x),ys=cells.map(c=>c.y);const minx=Math.min(...xs),miny=Math.min(...ys);return{minx,miny,w:Math.max(...xs)-minx+1,h:Math.max(...ys)-miny+1};}
 function clearSel(){selectedRooms.clear();updateMergeBtn();}
-function updateMergeBtn(){const n=selectedRooms.size,b=document.getElementById('mergeBtn');if(b)b.textContent=n>=2?`🔗 Zusammenfügen (${n})`:'🔗 Zusammenfügen';}
+function updateMergeBtn(){const n=selectedRooms.size,b=document.getElementById('mergeBtn');if(b)b.textContent=n>=2?`Zesummefügen (${n})`:'Zesummefügen';}
 
-function floorLabel(i){return i===0?'Erdgeschoss':i+'. OG';}
+function floorLabel(i){return i===0?'Parterre':i+'. Stack';}
 function uid(){return Math.random().toString(36).slice(2,9);}
 function newFloor(i){return{name:floorLabel(i),rooms:[]};}
 function newBuilding(idx,name,nFlr){
   const floors=[];for(let f=0;f<nFlr;f++)floors.push(newFloor(f));
   const col=idx%4;
-  return{id:uid(),name:name||('Gebäude '+(idx+1)),floors,shafts:[],
+  return{id:uid(),name:name||('Gebai '+(idx+1)),floors,shafts:[],
     site:{x:40+col*210,y:80+Math.floor(idx/4)*180,w:180,h:130}};
 }
 const THROUGH=new Set(['elevator','stairs']); // verlaufen durch alle Etagen
@@ -435,12 +465,12 @@ function renderBldList(){
   for(let i=0;i<n;i++){
     const row=document.createElement('div');row.className='bld-row';
     row.innerHTML=`<div class="idx">${i+1}</div>
-      <input class="name" aria-label="Name Gebäude ${i+1}" value="${old[i]?old[i].name:'Gebäude '+(i+1)}">
-      <span class="flbl">Stockwerke:</span>
+      <input class="name" aria-label="Numm Gebai ${i+1}" value="${old[i]?old[i].name:'Gebai '+(i+1)}">
+      <span class="flbl">Stäck:</span>
       <div class="stepper">
-        <button type="button" class="fm" aria-label="Ein Stockwerk weniger, Gebäude ${i+1}">−</button>
-        <input class="flr" type="number" min="1" max="40" aria-label="Stockwerke Gebäude ${i+1}" value="${old[i]?old[i].fl:5}" style="width:48px;">
-        <button type="button" class="fp" aria-label="Ein Stockwerk mehr, Gebäude ${i+1}">+</button>
+        <button type="button" class="fm" aria-label="Ee Stack manner, Gebai ${i+1}">−</button>
+        <input class="flr" type="number" min="1" max="40" aria-label="Stäck Gebai ${i+1}" value="${old[i]?old[i].fl:5}" style="width:48px;">
+        <button type="button" class="fp" aria-label="Ee Stack méi, Gebai ${i+1}">+</button>
       </div>`;
     const inp=row.querySelector('.flr');
     row.querySelector('.fm').onclick=()=>{inp.value=Math.max(1,(parseInt(inp.value)||1)-1);};
@@ -455,7 +485,7 @@ renderBldList();
 
 document.getElementById('startBtn').onclick=()=>{
   const rows=[...document.querySelectorAll('#bldList .bld-row')];
-  state={id:uid(),style:chosenStyle,name:document.getElementById('hotelName').value||'Mein Hotel',buildings:[],outdoor:[],curB:0,curF:0};
+  state={id:uid(),style:chosenStyle,name:document.getElementById('hotelName').value||'Mäin Hotel',buildings:[],outdoor:[],curB:0,curF:0};
   rows.forEach((r,i)=>state.buildings.push(newBuilding(i,r.querySelector('.name').value,parseInt(r.querySelector('.flr').value)||1)));
   enterApp();
 };
@@ -469,7 +499,7 @@ function enterApp(){
   applyTheme(state.style);
   document.getElementById('start').style.display='none';
   document.getElementById('app').style.display='flex';
-  document.getElementById('hotelTitle').textContent='🏨 '+state.name;
+  document.getElementById('hotelTitle').textContent=state.name;
   buildPalette();fillOutdoorSelect();setupGrid();
   setView('site');renderAll();save();
 }
@@ -492,7 +522,7 @@ function buildPalette(){
     cat.items.forEach(it=>{
       const el=document.createElement('div');el.className='part';el.draggable=true;el.dataset.id=it.id;
       el.dataset.search=(it.name+' '+cat.cat).toLowerCase();
-      el.innerHTML=`<span class="ico">${it.ico}</span><div class="meta"><b>${it.name}</b><small>${it.w}×${it.h} · skalierbar</small></div><span class="dot" style="background:${it.color}"></span>`;
+      el.innerHTML=`<span class="ico">${it.ico}</span><div class="meta"><b>${it.name}</b><small>${it.w}×${it.h} · skaléierbar</small></div><span class="dot" style="background:${it.color}"></span>`;
       el.addEventListener('dragstart',e=>{dragNew=it.id;e.dataTransfer.setData('text/plain',it.id);e.dataTransfer.effectAllowed='copy';});
       wrap.appendChild(el);
     });
@@ -510,13 +540,13 @@ const plot=document.getElementById('plot');
 plot.style.width=PLOTW+'px';plot.style.height=PLOTH+'px';
 function fillOutdoorSelect(){
   const sel=document.getElementById('outdoorSel');
-  sel.innerHTML='<option value="">🌳 Außenanlage hinzufügen…</option>'+OUTDOOR.map(o=>`<option value="${o.id}">${o.ico} ${o.name}</option>`).join('');
+  sel.innerHTML='<option value="">Baussenanlag derbäisetzen …</option>'+OUTDOOR.map(o=>`<option value="${o.id}">${o.ico} ${o.name}</option>`).join('');
 }
 document.getElementById('outdoorSel').onchange=function(){
   const id=this.value;this.value='';if(!id)return;const o=OUT[id];
   const n=(state.outdoor=state.outdoor||[]).length;
   state.outdoor.push({id:uid(),typeId:id,x:Math.min(PLOTW-o.w,40+(n%5)*30),y:Math.min(PLOTH-o.h,40+(n%5)*24),w:o.w,h:o.h});
-  renderSite();save();toast(o.name+' hinzugefügt – auf dem Grundstück platzieren.');
+  renderSite();save();toast(o.name+' derbäigesat – um Grondstéck placéieren.');
 };
 function renderSite(){
   plot.querySelectorAll('.bld-block,.out-block').forEach(b=>b.remove());
@@ -524,7 +554,7 @@ function renderSite(){
     const od=OUT[o.typeId];if(!od)return;const el=document.createElement('div');el.className='out-block';
     el.style.left=o.x+'px';el.style.top=o.y+'px';el.style.width=o.w+'px';el.style.height=o.h+'px';
     el.style.background='color-mix(in srgb,'+od.color+' 32%,var(--panel))';el.style.borderColor=od.color;
-    el.innerHTML=`<div class="ob-ico">${od.ico}</div><div class="ob-name">${od.name}</div><button class="ob-del" type="button" title="Entfernen" aria-label="Entfernen">✕</button><div class="ob-resize"></div>`;
+    el.innerHTML=`<div class="ob-ico">${od.ico}</div><div class="ob-name">${od.name}</div><button class="ob-del" type="button" title="Ewechhuelen" aria-label="Ewechhuelen">×</button><div class="ob-resize"></div>`;
     el.querySelector('.ob-del').onclick=ev=>{ev.stopPropagation();const i=state.outdoor.indexOf(o);if(i>-1)state.outdoor.splice(i,1);renderSite();save();};
     el.addEventListener('mousedown',ev=>startOutDrag(ev,el,o));
     plot.appendChild(el);
@@ -532,7 +562,7 @@ function renderSite(){
   state.buildings.forEach((b,i)=>{
     const el=document.createElement('div');el.className='bld-block'+(b.id===selBld?' sel':'');
     const rooms=b.floors.reduce((a,f)=>a+f.rooms.length,0);
-    el.innerHTML=`<button class="bb-edit" type="button" aria-label="Gebäude bearbeiten: ${b.name}">Bearbeiten ✎</button><div class="bb-ico" aria-hidden="true">🏢</div><div class="bb-name">${b.name}</div><div class="bb-info">${b.floors.length} Stockw. · ${rooms} Räume</div><div class="bb-resize"></div>`;
+    el.innerHTML=`<button class="bb-edit" type="button" aria-label="Gebai beaarbechten: ${b.name}">Beaarbechten</button><div class="bb-ico" aria-hidden="true">🏢</div><div class="bb-name">${b.name}</div><div class="bb-info">${b.floors.length} Stäck · ${rooms} Raim</div><div class="bb-resize"></div>`;
     posBld(el,b);
     el.querySelector('.bb-edit').onclick=ev=>{ev.stopPropagation();openBuilding(i);};
     el.addEventListener('dblclick',()=>openBuilding(i));
@@ -570,12 +600,12 @@ function startBldDrag(ev,el,b){
 }
 document.getElementById('addBldBtn2').onclick=()=>{
   const nFlr=state.buildings[0]?state.buildings[0].floors.length:5;
-  const b=newBuilding(state.buildings.length,null,nFlr);state.buildings.push(b);selBld=b.id;renderAll();save();toast('Gebäude hinzugefügt.');
+  const b=newBuilding(state.buildings.length,null,nFlr);state.buildings.push(b);selBld=b.id;renderAll();save();toast('Gebai derbäigesat.');
 };
 document.getElementById('delBldBtn').onclick=()=>{
-  if(!selBld){toast('Erst ein Gebäude anklicken.');return;}
-  if(state.buildings.length<=1){toast('Mindestens ein Gebäude muss bleiben.');return;}
-  if(confirm('Ausgewähltes Gebäude wirklich löschen?')){
+  if(!selBld){toast('Klick fir d\'éischt op e Gebai.');return;}
+  if(state.buildings.length<=1){toast('Mindestens ee Gebai muss bleiwen.');return;}
+  if(confirm('Dat gewielt Gebai wierklech läschen?')){
     const i=state.buildings.findIndex(b=>b.id===selBld);state.buildings.splice(i,1);selBld=null;
     if(state.curB>=state.buildings.length)state.curB=0;renderAll();save();
   }
@@ -605,7 +635,7 @@ grid.addEventListener('drop',e=>{
   const id=e.dataTransfer.getData('text/plain')||dragNew;const p=PARTS[id];dragNew=null;if(!p)return;
   let{cx,cy}=cellFromEvent(e);
   cx=Math.max(0,Math.min(COLS-p.w,cx));cy=Math.max(0,Math.min(ROWS-p.h,cy));
-  if(THROUGH.has(id)){const b=curB();(b.shafts=b.shafts||[]).push({id:uid(),typeId:id,x:cx,y:cy,w:p.w,h:p.h});toast(p.name+' verläuft jetzt durch alle Etagen.');}
+  if(THROUGH.has(id)){const b=curB();(b.shafts=b.shafts||[]).push({id:uid(),typeId:id,x:cx,y:cy,w:p.w,h:p.h});toast(p.name+' geet elo duerch all Stäck.');}
   else curFloor().rooms.push({typeId:id,x:cx,y:cy,w:p.w,h:p.h});
   afterEdit();
 });
@@ -628,14 +658,14 @@ function addEl(obj,isShaft){
     el.style.background='transparent';el.style.boxShadow='none';el.style.border='none';
     let html='';
     cells.forEach(c=>{html+=`<span class="r-tile" style="left:${(c.x-bb.minx)*CELL}px;top:${(c.y-bb.miny)*CELL}px;width:${CELL-2}px;height:${CELL-2}px;background:${p.color}"></span>`;});
-    html+=`<span class="r-label"><span class="r-ico">${p.ico}</span><span class="r-name">${p.name}</span></span><button type="button" class="r-del" title="Entfernen" aria-label="Entfernen">✕</button>`;
+    html+=`<span class="r-label"><span class="r-ico">${p.ico}</span><span class="r-name">${p.name}</span></span><button type="button" class="r-del" title="Ewechhuelen" aria-label="Ewechhuelen">✕</button>`;
     el.innerHTML=html;
   }else{ // Rechteck
     el.style.background=p.color;const big=obj.w*obj.h>=2;
     el.innerHTML=`<span class="r-ico">${p.ico}</span>`
       +(big?`<span class="r-name">${p.name}</span>`:'')
-      +(isShaft?`<span class="r-badge">↕ alle Etagen</span>`:(big?`<span class="r-size">${obj.w}×${obj.h}</span>`:''))
-      +`<button type="button" class="r-del" title="Entfernen" aria-label="Entfernen">✕</button><span class="r-resize" title="Größe ändern"></span>`;
+      +(isShaft?`<span class="r-badge">↕ all Stäck</span>`:(big?`<span class="r-size">${obj.w}×${obj.h}</span>`:''))
+      +`<button type="button" class="r-del" title="Ewechhuelen" aria-label="Ewechhuelen">✕</button><span class="r-resize" title="Gréisst änneren"></span>`;
     el.querySelector('.r-resize').addEventListener('mousedown',ev=>startResize(ev,obj,el));
   }
   el.querySelector('.r-del').onclick=ev=>{ev.stopPropagation();const arr=isShaft?curB().shafts:curFloor().rooms;const i=arr.indexOf(obj);if(i>-1)arr.splice(i,1);selectedRooms.delete(obj);updateMergeBtn();afterEdit();};
@@ -680,39 +710,39 @@ function startResize(ev,obj,el){
 }
 
 function renderFloorList(){
-  const b=curB();document.getElementById('floornavTitle').textContent='Stockwerke · '+b.name;
+  const b=curB();document.getElementById('floornavTitle').textContent='Stäck · '+b.name;
   const list=document.getElementById('floorList');list.innerHTML='';
   for(let f=b.floors.length-1;f>=0;f--){
     const fl=b.floors[f];const it=document.createElement('div');it.className='fl-item'+(f===state.curF?' active':'');
-    it.innerHTML=`<button type="button" class="fl-name"${f===state.curF?' aria-current="true"':''}>${fl.name}</button><span class="fl-count">${fl.rooms.length} 🚪</span><button class="fl-del" type="button" title="Stockwerk löschen" aria-label="Stockwerk löschen: ${fl.name}">✕</button>`;
+    it.innerHTML=`<button type="button" class="fl-name"${f===state.curF?' aria-current="true"':''}>${fl.name}</button><span class="fl-count">${fl.rooms.length}</span><button class="fl-del" type="button" title="Stack läschen" aria-label="Stack läschen: ${fl.name}">×</button>`;
     it.onclick=ev=>{state.curF=f;clearSel();renderGrid();renderFloorList();document.getElementById('floorName').textContent=b.name+' · '+fl.name;flashGrid();if(ev.detail===0)document.querySelector('.fl-item.active .fl-name')?.focus();};
     it.querySelector('.fl-del').onclick=ev=>{ev.stopPropagation();delFloor(f);};
     list.appendChild(it);
   }
   document.getElementById('floorName').textContent=b.name+' · '+curFloor().name;
 }
-document.getElementById('addFloorBtn').onclick=()=>{const b=curB();b.floors.push(newFloor(b.floors.length));state.curF=b.floors.length-1;renderGrid();renderFloorList();renderStats();save();toast('Stockwerk hinzugefügt.');};
+document.getElementById('addFloorBtn').onclick=()=>{const b=curB();b.floors.push(newFloor(b.floors.length));state.curF=b.floors.length-1;renderGrid();renderFloorList();renderStats();save();toast('Stack derbäigesat.');};
 function delFloor(f){
   const b=curB();
-  if(b.floors.length<=1){toast('Mindestens ein Stockwerk muss bleiben.');return;}
-  if(!confirm('Dieses Stockwerk wirklich löschen?'))return;
+  if(b.floors.length<=1){toast('Mindestens ee Stack muss bleiwen.');return;}
+  if(!confirm('Dëse Stack wierklech läschen?'))return;
   b.floors.splice(f,1);b.floors.forEach((fl,i)=>fl.name=floorLabel(i));
   if(state.curF>=b.floors.length)state.curF=b.floors.length-1;
   renderGrid();renderFloorList();renderStats();save();
 }
 document.getElementById('clearFloorBtn').onclick=()=>{curFloor().rooms=[];renderGrid();renderFloorList();renderStats();save();};
 
-/* Ausgewählte Räume zu einem Raum (beliebige Form) zusammenfügen */
+/* Ausgewählte Raim zu einem Raum (beliebige Form) zusammenfügen */
 function mergeSelected(){
   const fl=curFloor();
   const valid=[...selectedRooms].filter(r=>fl.rooms.includes(r));
-  if(valid.length<2){toast('Klicke zuerst zwei (oder mehr) Räume auf dieser Etage an.');return;}
+  if(valid.length<2){toast('Klick fir d\'éischt zwee (oder méi) Raim op dësem Stack un.');return;}
   const set=new Set();const type=valid[0].typeId;
   valid.forEach(r=>cellsOf(r).forEach(c=>set.add(c.x+','+c.y)));
   const cells=[...set].map(s=>{const[a,b]=s.split(',').map(Number);return{x:a,y:b};});
   valid.forEach(r=>{const i=fl.rooms.indexOf(r);if(i>-1)fl.rooms.splice(i,1);});
   fl.rooms.push({typeId:type,cells});
-  clearSel();afterEdit();toast(valid.length+' Räume zusammengefügt ✓');
+  clearSel();afterEdit();toast(valid.length+' Raim zesummegefüügt ✓');
 }
 document.getElementById('mergeBtn').onclick=mergeSelected;
 document.getElementById('backToSite').onclick=()=>setView('site');
@@ -736,7 +766,7 @@ function renderFront(){
     col.appendChild(stack);
     const base=document.createElement('div');base.className='front-base';base.style.width=(COLS*fc+4)+'px';col.appendChild(base);
     const nm=document.createElement('div');nm.className='front-name';nm.textContent=b.name;col.appendChild(nm);
-    const sub=document.createElement('div');sub.className='front-sub';sub.textContent=b.floors.length+' Stockwerke';col.appendChild(sub);
+    const sub=document.createElement('div');sub.className='front-sub';sub.textContent=b.floors.length+' Stäck';col.appendChild(sub);
     wrap.appendChild(col);
   });
 }
@@ -770,7 +800,7 @@ function save(){
     SB.from('hotel_saves').upsert(
       {hotel_id:meta.id,name:meta.name,style:meta.style,buildings:meta.buildings,ts:meta.ts,data},
       {onConflict:'user_id,hotel_id'}
-    ).then(({error})=>{if(error){console.warn('hotel save',error);toast('Cloud-Speichern fehlgeschlagen – erneut versuchen.');}});
+    ).then(({error})=>{if(error){console.warn('hotel save',error);toast('Cloud-Späicheren huet net geklappt – probéier et nach eng Kéier.');}});
   }
 }
 function loadHotel(id){
@@ -791,16 +821,16 @@ function __hotelBoot(client,rows){
 }
 function renderResumeList(){
   const lib=libGet().sort((a,b)=>b.ts-a.ts);const box=document.getElementById('resumeList');box.innerHTML='';
-  if(!lib.length){box.innerHTML='<div style="color:var(--muted);font-size:13px;padding:8px;">Noch keine gespeicherten Hotels.</div>';return;}
+  if(!lib.length){box.innerHTML='<div style="color:var(--muted);font-size:13px;padding:8px;">Nach keng gespäichert Hotelen.</div>';return;}
   lib.forEach(h=>{
     const row=document.createElement('div');row.className='hotel-row';const d=new Date(h.ts);
-    row.innerHTML=`<div class="h-info"><b>${h.name||'Hotel'}</b><small>${h.buildings} Gebäude · Stil: ${h.style} · ${d.toLocaleDateString('de-DE')} ${d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}</small></div><button class="h-open" type="button">Öffnen</button><button class="h-del" type="button" title="Löschen" aria-label="Hotel löschen: ${h.name||'Hotel'}"><span aria-hidden="true">🗑</span></button>`;
+    row.innerHTML=`<div class="h-info"><b>${h.name||'Hotel'}</b><small>${h.buildings} Gebaier · ${d.toLocaleDateString('lb-LU')} ${d.toLocaleTimeString('lb-LU',{hour:'2-digit',minute:'2-digit'})}</small></div><button class="h-open" type="button">Opmaachen</button><button class="h-del" type="button" title="Läschen" aria-label="Hotel läschen: ${h.name||'Hotel'}"><span aria-hidden="true">×</span></button>`;
     row.querySelector('.h-open').onclick=()=>{if(loadHotel(h.id))enterApp();};
-    row.querySelector('.h-del').onclick=()=>{if(confirm('Dieses Hotel löschen?')){deleteHotel(h.id);renderResumeList();checkResume();}};
+    row.querySelector('.h-del').onclick=()=>{if(confirm('Dëst Hotel läschen?')){deleteHotel(h.id);renderResumeList();checkResume();}};
     box.appendChild(row);
   });
 }
-document.getElementById('saveBtn').onclick=()=>{save();toast('Gespeichert ✓ – beim Start über „Fortsetzen" wählbar.');};
+document.getElementById('saveBtn').onclick=()=>{save();toast('Gespäichert ✓ – beim Start iwwer „Weiderféieren" wielbar.');};
 document.getElementById('exportBtn').onclick=()=>{
   const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(state.name||'hotel').replace(/\s+/g,'_')+'.json';a.click();
@@ -810,11 +840,11 @@ document.getElementById('importFile').onchange=e=>{
   const f=e.target.files[0];if(!f)return;const r=new FileReader();
   r.onload=()=>{try{const s=JSON.parse(r.result);if(!s.buildings)throw 0;
     migrateRooms(s);
-    state=s;state.id=uid();chosenStyle=s.style||'minimal';state.curB=0;state.curF=0;enterApp();toast('Hotel importiert ✓');
-  }catch(err){toast('Datei konnte nicht gelesen werden.');}};
+    state=s;state.id=uid();chosenStyle=s.style||'minimal';state.curB=0;state.curF=0;enterApp();toast('Hotel importéiert ✓');
+  }catch(err){toast('D\'Datei konnt net gelies ginn.');}};
   r.readAsText(f);
 };
-document.getElementById('restartBtn').onclick=()=>{if(confirm('Zurück zum Startbildschirm? Dieses Hotel bleibt gespeichert – du kannst auch ein zweites anlegen.')){save();document.getElementById('app').style.display='none';document.getElementById('start').style.display='flex';document.getElementById('resumeList').classList.add('hidden');checkResume();}};
+document.getElementById('restartBtn').onclick=()=>{if(confirm('Zréck op den Startbildschierm? Dëst Hotel bleift gespäichert – du kanns och en zweet uleeën.')){save();document.getElementById('app').style.display='none';document.getElementById('start').style.display='flex';document.getElementById('resumeList').classList.add('hidden');checkResume();}};
 
 /* ============ TOAST ============ */
 let tt;function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),1900);}
@@ -845,8 +875,8 @@ checkResume(); // Cloud-Hotels werden vom Gate via __hotelBoot() nachgeladen
   async function check() {
     const sb = await client();
     const email = (session()?.user?.email || "").toLowerCase();
-    if (!email) { bootedEmail = null; return showGate("Dieser Bereich ist privat. Bitte melde dich an.", true); }
-    if (!ALLOW.includes(email)) { bootedEmail = null; return showGate("Dieses Konto hat keinen Zugriff auf den Hotel-Simulator.", true); }
+    if (!email) { bootedEmail = null; return showGate("Dëse Beräich ass privat. Mell dech w.e.g. un.", true); }
+    if (!ALLOW.includes(email)) { bootedEmail = null; return showGate("Dëse Kont huet keen Zougrëff op den Hotel-Simulator.", true); }
     if (email !== bootedEmail) {                               // berechtigt → Cloud-Hotels laden
       bootedEmail = email;
       const { data, error } = await sb
