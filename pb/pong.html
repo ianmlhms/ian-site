@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="lb">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -29,38 +29,38 @@ body{display:flex;flex-direction:column}
 </head>
 <body>
 <main class="arcade-stage" id="stage">
-  <canvas id="c" role="img" aria-label="Pong court"></canvas>
+  <canvas id="c" role="img" aria-label="Pong-Terrain"></canvas>
   <div class="arcade-hud">
     <span class="arcade-pill p1"><i class="dot"></i><span id="n1">P1</span> <b id="s1">0</b></span>
-    <button class="arcade-btn secondary hud-btn" id="hudMenu" type="button">Menu</button>
+    <button class="arcade-btn secondary hud-btn" id="hudMenu" type="button">Menü</button>
     <span class="arcade-pill p2"><span id="n2">P2</span> <b id="s2">0</b><i class="dot"></i></span>
   </div>
   <div class="arcade-hint" id="hint" role="status"></div>
 
   <div class="arcade-overlay show" id="menu" role="dialog" aria-modal="true" aria-labelledby="menuTitle"><div class="arcade-panel">
     <h2 id="menuTitle">Pong</h2>
-    <p>First to 10 wins. Move with W / S or the arrow keys; on touch use the on-screen D-pad.</p>
+    <p>Wien als éischt 10 Punkte huet, gewënnt. Beweeg mat W / S oder de Pfeiltaste; um Touchscreen mam D-Pad um Écran.</p>
     <div class="arcade-actions menu-actions">
-      <button class="arcade-btn" id="mAI" type="button">Play vs Computer</button>
-      <button class="arcade-btn secondary" id="mLocal" type="button">2 players, one device</button>
-      <button class="arcade-btn secondary" id="mHost" type="button">Host online game</button>
-      <div class="join"><input id="mCode" name="room-code" maxlength="5" placeholder="room code" aria-label="Room code" enterkeyhint="go" autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false"><button class="arcade-btn secondary" id="mJoin" type="button">Join</button></div>
+      <button class="arcade-btn" id="mAI" type="button">Géint de Computer spillen</button>
+      <button class="arcade-btn secondary" id="mLocal" type="button">Zu zweet, een Apparat</button>
+      <button class="arcade-btn secondary" id="mHost" type="button">Online-Spill opmaachen</button>
+      <div class="join"><input id="mCode" name="room-code" maxlength="5" placeholder="Raumcode" aria-label="Raumcode" enterkeyhint="go" autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false"><button class="arcade-btn secondary" id="mJoin" type="button">Bäitrieden</button></div>
     </div>
     <p class="status" id="mStatus" role="status"></p>
   </div></div>
 
   <div class="arcade-overlay" id="pauseOv" role="dialog" aria-modal="true" aria-labelledby="pauseTitle"><div class="arcade-panel">
-    <h2 id="pauseTitle">Paused</h2><p>The game waits for you.</p>
-    <div class="arcade-actions"><button class="arcade-btn" id="resumeBtn" type="button">Resume</button></div>
+    <h2 id="pauseTitle">Pause</h2><p>D'Spill waart op dech.</p>
+    <div class="arcade-actions"><button class="arcade-btn" id="resumeBtn" type="button">Weider</button></div>
   </div></div>
 
   <div class="arcade-overlay" id="overOv" role="dialog" aria-modal="true" aria-labelledby="overTitle"><div class="arcade-panel">
-    <h2 id="overTitle">You win</h2>
+    <h2 id="overTitle">Du hues gewonnen</h2>
     <span class="arcade-big" id="overBig">10 - 0</span>
     <p id="overNote"></p>
     <div class="arcade-actions">
-      <button class="arcade-btn" id="rematchBtn" type="button">Rematch</button>
-      <button class="arcade-btn secondary" id="menuBtn" type="button">Menu</button>
+      <button class="arcade-btn" id="rematchBtn" type="button">Revanche</button>
+      <button class="arcade-btn secondary" id="menuBtn" type="button">Menü</button>
     </div>
   </div></div>
 </main>
@@ -103,17 +103,17 @@ function focusDialog(id){const p=$(id).firstElementChild;p.tabIndex=-1;p.style.o
 const pauseOv=$('pauseOv'),overOv=$('overOv');
 let paused=false,overShown=false;
 function names(){ // [left label, right label] for the current mode
-  if(mode==='ai')return['You','CPU'];
-  if(mode==='host')return['You','Them'];
-  if(mode==='guest')return['Them','You'];
+  if(mode==='ai')return['Du','CPU'];
+  if(mode==='host')return['Du','Géigner'];
+  if(mode==='guest')return['Géigner','Du'];
   return['P1','P2'];
 }
 function begin(){p1.score=0;p2.score=0;p1.y=250;p2.y=250;resetBall(1);running=true;paused=false;menu.classList.remove('show');
   const[n1,n2]=names();$('n1').textContent=n1;$('n2').textContent=n2;
   $('hint').textContent=
-    mode==='local'?'First to 10  ·  P1: W / S  ·  P2: ↑ / ↓':
-    mode==='ai'?'First to 10  ·  W / S or ↑ / ↓ to move':
-    'You are '+(mode==='host'?'left (cyan)':'right (amber)')+'  ·  first to 10';}
+    mode==='local'?'Als éischt 10  ·  P1: W / S  ·  P2: ↑ / ↓':
+    mode==='ai'?'Als éischt 10  ·  W / S oder ↑ / ↓ zum Beweegen':
+    'Du bass '+(mode==='host'?'lénks (cyan)':'riets (amber)')+'  ·  als éischt 10';}
 function backToMenu(msg){running=false;paused=false;mode=null;parent.postMessage({__pbNet:{op:'close'}},'*');
   pauseOv.classList.remove('show');menu.classList.add('show');status(msg||'');$('mAI').focus({preventScroll:true})}
 function setPaused(v){ // pause offline games when the tab is hidden; online rooms keep running
@@ -128,14 +128,14 @@ $('hudMenu').onclick=()=>backToMenu();
 document.getElementById('mLocal').onclick=()=>{mode='local';begin()};
 document.getElementById('mAI').onclick=()=>{mode='ai';begin()};
 document.getElementById('mHost').onclick=()=>{if(window.MPGate){MPGate.openLobby('new');return}mode='host';const c=randCode();NET.open(c,'host');
-  status('Room code: '+c.toUpperCase()+' — waiting for the other player…')};
+  status('Raumcode: '+c.toUpperCase()+' — waart op deen anere Spiller…')};
 document.getElementById('mJoin').onclick=()=>{const c=(document.getElementById('mCode').value||'').trim().toLowerCase();if(window.MPGate&&/^[a-z]{4}$/.test(c)){MPGate.openLobby(c);return}
-  if(!/^[a-z0-9]{4,6}$/.test(c)){status('Enter the 4-6 letter code from the host');return}
-  mode='guest';NET.open(c,'guest');status('Joining '+c.toUpperCase()+'…')};
+  if(!/^[a-z0-9]{4,6}$/.test(c)){status('Gëff de Code mat 4–6 Buschtawen vum Host an');return}
+  mode='guest';NET.open(c,'guest');status('Trëtt bäi: '+c.toUpperCase()+'…')};
 NET.onPeers=(p)=>{peerN=p.n;
   if(!running&&(mode==='host'||mode==='guest')&&p.n>=2)begin();
-  if(running&&(mode==='host'||mode==='guest')&&p.n<2)backToMenu('Opponent left the game.')};
-NET.onErr=(e)=>{if(mode==='host'||mode==='guest')backToMenu(e==='offline'?'Online play needs the internet.':'Connection problem — try again.')};
+  if(running&&(mode==='host'||mode==='guest')&&p.n<2)backToMenu('De Géigner huet d\'Spill verlooss.')};
+NET.onErr=(e)=>{if(mode==='host'||mode==='guest')backToMenu(e==='offline'?'Online spillen brauch Internet.':'Problem mat der Verbindung — probéier nach eng Kéier.')};
 NET.onMsg=(r,d)=>{
   if(mode==='host'&&d&&d.t==='k'){remoteKeys.up=!!d.up;remoteKeys.down=!!d.down;remoteKeys.sp=!!d.sp}
   if(mode==='guest'&&d&&d.t==='s')guestTarget=d;
@@ -260,10 +260,10 @@ function syncHud(over){ // DOM HUD + result overlay, touched only when something
   let name=p1w?'P1':'P2';
   if(mode==='ai')name=p1w?'You':'Computer';
   if(mode==='host'||mode==='guest')name=(p1w===(mode==='host'))?'You':'They';
-  $('overTitle').textContent=name==='You'?'You win':name+' win'+(name==='They'?'':'s');
+  $('overTitle').textContent=name==='You'?'Du hues gewonnen':(name==='They'?'Géigner':name==='Computer'?'De Computer':name)+' huet gewonnen';
   $('overBig').textContent=p1.score+' - '+p2.score;
-  $('overNote').textContent=mode==='guest'?'Waiting for the host to start a rematch.':
-    mode==='ai'?'Wins this session: '+(window.score||0):'Space or Rematch to play again.';
+  $('overNote').textContent=mode==='guest'?'Waart drop, dass den Host eng Revanche start.':
+    mode==='ai'?'Siege an dëser Sessioun: '+(window.score||0):'Space oder Revanche, fir nach eng Kéier ze spillen.';
   $('rematchBtn').hidden=mode==='guest';
   focusDialog('overOv');
 }
@@ -278,7 +278,7 @@ document.addEventListener('keyup',e=>{keys[e.key]=false;
   if((mode==='guest')&&['w','s','W','S','ArrowUp','ArrowDown',' '].includes(e.key))sendKeys()});
 requestAnimationFrame(loop);
 /* Started from the shared lobby (lobby.html): open the room with the lobby's code and role right away (as «Host online game» / «Join» would). */
-if(window.MPGate&&MPGate.ctx&&(MPGate.ctx.role==='host'||MPGate.ctx.role==='guest')){mode=MPGate.ctx.role;NET.open(MPGate.ctx.room,mode);status('Connecting to '+MPGate.ctx.room.toUpperCase()+'…')}
+if(window.MPGate&&MPGate.ctx&&(MPGate.ctx.role==='host'||MPGate.ctx.role==='guest')){mode=MPGate.ctx.role;NET.open(MPGate.ctx.room,mode);status('Verbënnt mat '+MPGate.ctx.room.toUpperCase()+'…')}
 </script>
 </body>
 </html>
