@@ -168,3 +168,11 @@ body.gt :is(.empty, .card, .tile, .hint, .gate-box, .bar, .wrap, .proj-card, .no
 .gt .btn:hover { background: var(--green); border-color: var(--green); transform: none; }
 .gt code { background: var(--tint); border: 1px solid var(--soft); border-radius: 0; padding: 1px 7px; color: var(--ink); font: 500 0.9em "Geist Mono", ui-monospace, monospace; }
 .gt .wrap { box-shadow: none; }
+
+/* ---- legacy top bar (header.bar) on pages that are not converted to the nav cell yet ---- */
+.gt header.bar:not(.arcade-bar) { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; min-height: 52px; padding: 2px 20px; max-width: calc(1240px - 2 * var(--gutter)); margin: 24px auto 0; border: 1px solid var(--ink); background: transparent; position: static; box-shadow: none; width: calc(100% - 2 * var(--gutter)); }
+.gt header.bar:not(.arcade-bar) .home, .gt header.bar:not(.arcade-bar) .home-link { display: inline-flex; align-items: center; min-height: 44px; padding: 0; border: 0; background: none; color: var(--muted); font: 600 14px "Geist", system-ui, sans-serif; text-decoration: none; }
+.gt header.bar:not(.arcade-bar) .home:hover { color: var(--green); }
+.gt header.bar:not(.arcade-bar) h1 { margin: 0; font: 800 16px/1.2 "Geist", system-ui, sans-serif; letter-spacing: -0.01em; }
+.gt header.bar .spacer { flex: 1; }
+@media (max-width: 700px) { .gt header.bar:not(.arcade-bar) { margin-top: 12px; padding-inline: 14px; } }
