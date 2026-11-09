@@ -15,6 +15,8 @@ const CLUSTER_M = 25;                   // m: events within this are one place
 const TOP = 100;
 const KM_PER_SPEED_CAP = { motorway: 25, motorway_link: 25, trunk: 25, trunk_link: 25, primary: 25, primary_link: 25, secondary: 25, secondary_link: 25, tertiary: 20, tertiary_link: 20, unclassified: 20, residential: 18 };
 const DEFAULT_CAP = 13;                 // service, living_street, road
+// car20: SWEEP_FAST=1 drives at the new top speed (57 m/s) where a road lets a player reach it: the big roads at 57, tertiary 40, streets 30, service as before
+const FAST_CAP = { motorway: 57, motorway_link: 57, trunk: 57, trunk_link: 57, primary: 57, primary_link: 57, secondary: 57, secondary_link: 57, tertiary: 40, tertiary_link: 40, unclassified: 30, residential: 30 };
 const SCORE_UNIT = { jolt: 8, roll: 0.15, air: 0.1, fall: 1, hit: 0.2, offroad: 3 };
 const SCORE_BASE = { jolt: 0, roll: 0, air: 0, fall: 2, hit: 2, offroad: 0 };
 const score = (e) => SCORE_BASE[e.type] + (e.type === 'hit' ? (e.value + 0.05) / SCORE_UNIT.hit : e.type === 'air' ? Math.min(6, e.value / SCORE_UNIT.air) : e.value / SCORE_UNIT[e.type]);
@@ -23,7 +25,7 @@ function arg(name, def) { const i = process.argv.indexOf(name); return i < 0 ? d
 
 /** The speeds a road is driven at: the requested ones, each capped by the road class (and not twice). */
 export function speedsOf(kind, requested) {
-  const cap = KM_PER_SPEED_CAP[kind] ?? DEFAULT_CAP;
+  const cap = (process.env.SWEEP_FAST ? FAST_CAP : KM_PER_SPEED_CAP)[kind] ?? DEFAULT_CAP;
   return [...new Set(requested.map((v) => Math.min(v, cap)))];
 }
 
