@@ -2713,3 +2713,48 @@ Events: jolt 385 -> 385, fall 2 -> 0, air 2 -> 0, hit 4 -> 4, roll 13 -> 11 (406
 
 ### Still wrong
 Holes gate above; item 3 not looked at; the trough exit of the Munsbach tube still gives 17 m/s2 at 25 m/s; the A1 link deck 254 sits on top of the portal hood.
+
+## Fix 19, part 2 (9 Nov 2026, branch `lux-drive-fix19`, Mac mini): the Munsbach mouth hole, the sweep's last real places - main.js ?v=73
+
+Merged origin/main (the Gitter redesign) first.  Tools: `~/Library/Caches/luxdrive-work/fix19/tools/` (+ `grid.mjs` carve map, `across.mjs` cross-section, `lanepro.mjs`, `deckp.mjs`)
+and `fix19/diag/` (holes-mode probes for shot.mjs SHOT_EVAL).
+
+### 1. Holes gate: 52 px under the north mouth of the Rue de Munsbach tube: FIXED (tunnel-view.js)
+Not deck 254: the land in front of face A of tube 20268 (the foot of the A1 embankment) rises 0.03 - 0.15 m over the floor's edge across the lanes.  A ray from inside
+passed over the floor edge and under the terrain beyond it (seen from below, terrain is not drawn): a hairline of nothing across the mouth.  New: a SILL at every face
+without a trough, from the floor's edge up to the drawn ground just in front of the face (read 0 / 0.12 / 0.25 m out, + 3 cm for the coarse tiles of the low level).
+Only fills pixels that were holes; drawn in the tube's dark asphalt.  The pose: 448 hole px (1180x820) -> 0 at medium and low.
+
+### 2. Bd des Scillas 7721 / Route de Luxembourg 2864: FIXED (carriageways.js splitsAt, road-network.js width taper)
+Both are a two-way 11 m way between the SPLITS of a dual carriageway.  The carriageway chain runs on from the two-way way into one of the one-way branches (3.8 m), and
+the width taper (1 : 12) narrowed the two-way way toward that branch: 7721 (10.6 m long) was 4.5 m wide, 2864 (30 m, splits at both ends) ~7 m.  The outer lanes ran off
+the tarmac (0.4 - 1.6 m) onto a slope: jolts 65 - 80 m/s2, roll 0.38.  Now chainCarriageways reports `splits` (a two-way way + a one-way way of the same street at a node
+where another one-way way of that street leaves the other way) and the taper never crosses a split; the two-way way keeps its width up to the split node.  61 ways
+network-wide lose a wrong taper (mostly 7.2 m secondaries that were narrowed to one lane at their split), 4 change slightly.  Harness P1 (width steps at the joints of a
+carriageway) skips split joints (a split is no joint of one carriageway; `stats.widthJoints.splits` counts them).  Walls re-baked.
+
+### 3. Rue de Cessange 640, parapet #200 hit: FIXED (deck-barriers.js)
+#200 is the footway deck beside the road deck 156: OSM puts it 3.8 m from the road's axis (its edge 2 m inside the road deck) and its DSM tops sag up to 2.5 m under the
+road.  Where the sag passed BARRIER.cover (1 m) its edge "fell away", and the railing piece next to a covered sample still held a car at the road's level: 0.53 m into
+lane 1.8.  The cover now reaches upward as far as a barrier holds a car (BARRIER.height + drop): an edge under another deck by up to 1.5 m has no barrier.
+
+### 4. Autoroute de Dudelange 17100 under the A1 (4681,12616): FIXED (road-network.js abutmentFade)
+The abutment of the A1 (9104 -> bridge 432) holds the road level 2 m under the deck, then its earth falls over up to 6 m: 7 m past the way's end, which reached 2.4 m
+into the motorway below (its face rose under the outer lane's centre: roll 0.39, jolt 34).  The fall now ends ABUT_LANE_GAP (1 m) before the lane keep of any carved way
+two levels (SEP_HIGH) under the approach (never shorter than the default soft cap).  Cross-section: the motorway is flat to its edge (6.25 m), the abutment stands beside it.
+Walls re-baked (100 walls).
+
+### Sweep (`--drawn`, Mini, `luxdrive-work/fix19/sweep-before` -> `sweep-abut`)
+Events: jolt 107 -> 88, roll 4 -> 0, hit 4 -> 0; places 24 -> 23.  Gone: Bd des Scillas (80.4), Route de Luxembourg (64.9), A13 roll 0.39 / jolt 34.2, Rue de Cessange
+parapet hit.  The A13 place splits into two small ones on the same lane: 16.9 m/s2 at 4677,12633 (was 23.2 there) and 10.0 at 4684,12603 (a 5 cm sag).  New top: service
+4497 (10623,8421) 33.9 m/s2, residential 3135 (2337,7552) 26.4, service loops.
+
+### Shots (`luxdrive-work/fix19/shots/final/`, before = live v69 or the holes run, after = this branch; stacked + labelled)
+1_munsbach_tunnel_mouth, 2_bd_des_scillas, 3_route_de_luxembourg, 4_a13_under_a1_bridge, 5_a13_abutment_side.
+
+### Still wrong
+* Bd des Scillas: west of the split the DTM has a pit 4.5 m deep (no OSM feature: no tunnel, no ramp).  The full-width road now ends on its rim: a steep grey fill face
+  with the lattice's sawtooth (before: a grass slope, with the road pinched).  A wall or a filled pit would look better.
+* The A1 abutment over the A13 is now a 6.6 m earth face at ~5 m/m under the deck (no retaining wall: walls are not baked under decks), grey sawtooth shading.
+* Rue de Munsbach: the tube's exit jolt 17 m/s2 at 25 m/s (unchanged); deck 254 still sits on the portal hood.
+* Footway deck 200 (Rue de Cessange) sags under the road deck in the picture too (its railing may show through the road deck): not looked at.
