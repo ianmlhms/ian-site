@@ -44,6 +44,7 @@ export const BRIDGE_END = Object.freeze({
   trimMax: 12.0,      // m: the most a deck end is trimmed ...
   trimKeep: 2.5,      // ... and the least of the deck that is left
   joint: 1.5,         // m: decks.js DECK.joinTolerance (the ends of two decks this close are one bridge: no free end)
+  leftClear: 1.0,     // m: an inner point of the trimmed deck stands at least this over the land
   besideCar: 6.0,     // m past the edge of a car's deck: a footway deck that ends this close to one is its pavement, not trimmed
 });
 
@@ -226,7 +227,11 @@ export function trimFreeEnds(roads, decks, groundAt) {
       // (the pavement deck beside a road bridge: the road's outer lane may lie on it where the road's deck is narrower than its way - Autoroute de Dudelange 6593 beside
       // footway deck 118 lost its outer lane's ground and flew 0.35 s when it was trimmed)
       if (!ownCar && decks.some((o, oi) => carDeck[oi] && oi !== di && o.pts.length > 1 && polyDist(E, o.pts) <= o.width / 2 + B.besideCar)) continue;
-      if (ownCar && carved.filter((r) => dist(r.pts[0], E) <= B.join || dist(r.pts[r.pts.length - 1], E) <= B.join).length < 2) continue;
+      const endingHere = carved.filter((r) => dist(r.pts[0], E) <= B.join || dist(r.pts[r.pts.length - 1], E) <= B.join).length;
+      if (ownCar && (endingHere < 2 || d.width < B.trustWidth)) continue;     // (a narrow car's deck - a service lane's, 160 - has the canopy for its DSM: left as it is)
+      // a footway's or a track's deck: only where it crosses a street at its level (Rue Roudebësch).  (A footbridge that goes on from the end of a street keeps its end: deck 160
+      // at 5838,11028, trimmed, ran its envelope from the new end onto the carriageway under it - harness D; the Kéibierg footbridge 185 would be a deck of two points)
+      if (!ownCar && !crossesStreet) continue;
       const cum = arcsOf(pts), len = cum[cum.length - 1];
       const near = carved.filter((r) => polyDist(E, r.pts) < r.width / 2 + d.width / 2 + B.trimEdge + B.trimMax);
       if (!near.length) continue;
@@ -252,6 +257,8 @@ export function trimFreeEnds(roads, decks, groundAt) {
       const keep = slice(pts, cum, s, len), k0 = cum.findIndex((c) => c > s);
       const t0 = tops[k0 - 1] + (tops[k0] - tops[k0 - 1]) * ((s - cum[k0 - 1]) / ((cum[k0] - cum[k0 - 1]) || 1));
       const keepTops = [t0, ...tops.slice(k0, k0 + keep.length - 1)];
+      // (what is left must still be a bridge: an inner point clear of the land - a deck of two points is pinned to the ground at both and lay on it, harness D)
+      if (keep.length < 3 || !keepTops.slice(1, -1).some((t, i) => t - groundAt(keep[i + 1][0], keep[i + 1][1]) >= B.leftClear)) continue;
       const newPts = side ? keep.slice().reverse() : keep, newTops = side ? keepTops.slice().reverse() : keepTops;
       out[di] = { ...d, pts: newPts, tops: Float32Array.from(newTops), spans: spansOf(newPts, groundAt) };
       trimmed.push({ deck: d.id, by: +s.toFixed(2), x: +E[0].toFixed(1), z: +E[1].toFixed(1) });

@@ -70,6 +70,7 @@ const ABUT_UNDER = 3.0;                // m: a road under a bridge lies 5.9 - 21
 const UNDER_DECK_CLEAR = 4.5;          // m: a deck at least this far over the bed of the way (the way passes under it: a car and the deck's 1 m; a link that climbs onto the deck beside
                                        // it lies 3 - 4 m under the deck near its end - A1 link 7463 at deck 42 - and is no way under the bridge)
 const UNDER_DECK_FACE = 1.9;           // m per m: the mean slope of the face from the lane keep up to the protected ground (a smoothstep is 1.5 x steeper at its middle: 2.85, under the wall of 3)
+const UNDER_DECK_MAX_CUT = 0.9;        // m: the deepest those lanes are cut under the land (harness D: no pit of more than 1 m under a deck)
 const UNDER_DECK_CELL = 32;            // m: the cell of the grid of the deck segments
 const UNDER_DECK_REACH = 8.0;          // m past the edge of the deck: the protected corridor reaches past the deck (PROTECT_MARGIN + its fade), and so does the exemption: in full up to
                                        // PROTECT_MARGIN past the edge (the gap between the two decks of a dual carriageway), fading out over the rest
@@ -1850,6 +1851,12 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     }
     const protHere = (bandY > ground ? protFill : prot * (1 - laneCover)) * (1 - pinCover) * (1 - cutCover);    // (a fill under a bridge end may fall to the land over the abutment; a cut may not dig a pit)
     out.band = ground + (1 - protHere) * (bandY - ground);
+    // (... but the lanes freed under a deck are cut no deeper than UNDER_DECK_MAX_CUT under the land: the ground under a bridge stays the ground - harness D, a pit of 1 m.
+    // The ground the protection alone gives is kept where it lies lower)
+    if (laneCover > 0) {
+      const kept = ground + (1 - (bandY > ground ? protFill : prot) * (1 - pinCover) * (1 - cutCover)) * (bandY - ground);
+      out.band = Math.max(out.band, Math.min(kept, ground - UNDER_DECK_MAX_CUT));
+    }
     // The paint: the union of the carriageways and of the pavements, each way painted only where the ground lies at its own level.  Where two ways at different levels overlap in plan
     // (a slip road beside the trunk road, an overpass on its embankment) the ground between them is a ramp or the side of the embankment, and painted with the carriageway of the way
     // above it was a hillside of asphalt (Nei Escher Strooss).  A way off its level is pushed out of the union smoothly (PAINT_LEVEL_PUSH per m past PAINT_LEVEL_TOL), so the edge of the

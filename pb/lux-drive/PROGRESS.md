@@ -2857,7 +2857,13 @@ Mansfeld 3262: the street was lifted onto a 5 m peak (38 % either side) and the 
 there and their mean lies > 2 m off the deck level, the node keeps their level (decks.js pins that free deck end to the surface, the envelope runs the deck from it).
 
 ### 4. Free deck ends on a street's carriageway are trimmed (bridge-ends.js `trimFreeEnds`)
-A deck end that no carved way runs onto (no approach, no bridge way going on, no real joint - except a footway's / track's joint ON a street) but whose end or corners lie on
-the carriageway (+ 0.3 m) of a street where the deck stands < 2.5 m over the land (the level no steeper than 12 % off its end's land: the Hondhausbréck's DSM) starts at the
-edge of that carriageway (<= 12 m, >= 4 m of deck left).  66 ends.  Rue Roudebësch: the Rue de Leudelange track decks 155 / 304 met ON the street 0.9 m over it (fall 6.3 m,
-air 2.4 s, parapet 1.03) -> jolt 36 only; Kéibierg footbridge 185 railing in the lane (parapet 1.02, air 0.4) -> gone; Hondhausbréck deck 169 over the junction -> gone.
+A deck end that no carved way runs onto (no approach, no car bridge going on, no other deck end there) whose end or corners lie on the carriageway (+ 0.3 m) of a street,
+where the deck stands < 2.5 m over the STREET's level (its land on its centre line; a car's deck enveloped at 12 % from its end), starts at the edge of that carriageway
+(<= 12 m, >= 3 points left with an inner point >= 1 m over the land).  Only two kinds (the rest measured worse, harness D): a footway's / track's deck that crosses a street
+AT ITS LEVEL (an at-grade joint on the street), and a car's deck (>= 5 m wide) at a street junction (>= 2 ways end there).  5 ends: Rue Roudebësch (the Rue de Leudelange
+track decks 155 / 304 met ON the street 0.9 m over it: fall 6.3 m, air 2.4 s, parapet 1.03 -> jolt 36), Hondhausbréck 169 (over the junction: parapet 1.0 -> none), 28, 67.
+Tried and dropped: trimming pavement decks beside road bridges (Autoroute de Dudelange lost its outer lane's ground: air 0.35), footbridges in the air (decks 113/141/165),
+the Kéibierg footbridge (would be 2 points, flat; still a railing in Kéibierg's lane), narrow decks (160: envelope on the carriageway).
+
+### 2b. The cut of 2. is capped at UNDER_DECK_MAX_CUT = 0.9 m under the land (harness D: no pit > 1 m under a deck).  The A13 outer lane under the A6 keeps 0.7 m of the
+abutment toe across its wheels (roll ~0.45 instead of 0.72): the rest needs the pit gate re-thought (a real abutment is a wall beside the lane) - for the reviewer.
