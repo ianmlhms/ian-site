@@ -17,33 +17,30 @@
 <meta property="og:image" content="https://ian.lu/apple-touch-icon.png">
 <meta name="twitter:card" content="summary">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<meta name="theme-color" content="#0d0d1a">
-<script src="season.js?v=5"></script>
+<meta name="theme-color" content="#f6f6f3">
+<link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="gitter.css?v=9">
 <script src="theme.js?v=32"></script>
 <style>
-  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--ok:#3fb950;--bad:#f87171}
-  *{box-sizing:border-box}
-  body{margin:0;min-height:100vh;min-height:100svh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
-  a{color:var(--accent2-text);text-decoration:none}
-  .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
-  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
-  .class-tag{display:inline-block;font-size:11px;font-weight:800;color:#5cc8ff;background:rgba(92,200,255,.14);border:1px solid rgba(92,200,255,.45);border-radius:999px;padding:1px 8px;margin-left:8px;vertical-align:middle;letter-spacing:.3px}
+  :root{--bad:#f87171}
+  body{display:flex;flex-direction:column}
+  .class-tag{display:inline-block;font-size:11px;font-weight:800;color:#5cc8ff;background:rgba(92,200,255,.14);border:1px solid rgba(92,200,255,.45);border-radius:0;padding:1px 8px;margin-left:8px;vertical-align:middle;letter-spacing:.3px}
   .wrap{flex:1;width:100%;max-width:640px;margin:0 auto;padding:18px 14px 40px;display:flex;flex-direction:column;gap:14px}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px}
-  .newhw input{width:100%;margin-bottom:8px;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:16px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:0;padding:14px}
+  .newhw input{width:100%;margin-bottom:8px;padding:10px 12px;border-radius:0;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:16px}
   .newhw .row2{display:flex;gap:8px}.newhw .row2 input{margin-bottom:0}
-  .btn{background:var(--accent);color:var(--accent-foreground);border:none;border-radius:10px;padding:10px 18px;font-weight:800;cursor:pointer;font-size:14px}
+  .btn{background:var(--accent);color:var(--accent-foreground);border:none;border-radius:0;padding:10px 18px;font-weight:800;cursor:pointer;font-size:14px}
   .adminrow{display:flex;gap:8px;align-items:center;margin-top:10px}
   .hw{display:flex;gap:12px;align-items:flex-start;padding:12px 4px;border-bottom:1px solid var(--border)}
   .hw:last-child{border-bottom:none}
-  .chk{flex:none;width:44px;height:44px;border-radius:12px;border:2px solid var(--border);background:var(--card2);cursor:pointer;font-size:20px;color:var(--ok);display:flex;align-items:center;justify-content:center;padding:0}
+  .chk{flex:none;width:44px;height:44px;border-radius:0;border:2px solid var(--border);background:var(--card2);cursor:pointer;font-size:20px;color:var(--ok);display:flex;align-items:center;justify-content:center;padding:0}
   .chk.on{border-color:var(--ok);background:rgba(63,185,80,.16)}
   .hw .body{flex:1;min-width:0}
   .hw .ttl{font-weight:700;font-size:15px;word-break:break-word}
   .hw.done .ttl{text-decoration:line-through;color:var(--muted)}
-  .subj{display:inline-block;font-size:11px;font-weight:800;color:var(--accent-text);background:rgba(110,168,254,.14);border:1px solid rgba(110,168,254,.4);border-radius:999px;padding:1px 8px;margin-right:6px;vertical-align:middle}
+  .subj{display:inline-block;font-size:11px;font-weight:800;color:var(--accent-text);background:rgba(110,168,254,.14);border:1px solid rgba(110,168,254,.4);border-radius:0;padding:1px 8px;margin-right:6px;vertical-align:middle}
   .meta{color:var(--muted);font-size:12px;margin-top:4px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-  .due{font-weight:700}.due.soon{color:#ffb347}.due.over{color:var(--bad)}
+  .due{font-weight:700}.due.soon{color:var(--green)}.due.over{color:var(--bad)}
   .del{background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;flex:none;line-height:1;padding:2px 4px;min-width:44px}
   .del:hover{color:var(--bad)}
   .gate,.empty{text-align:center;color:var(--muted);padding:10px}
@@ -56,12 +53,11 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
 </head>
-<body>
+<body class="gt">
 <header class="bar">
   <a class="home" href="index.html">‹ Heem</a>
-  <h1><span aria-hidden="true">📋</span> Hausaufgaben<span id="classTag"></span></h1>
+  <h1>Hausaufgaben<span id="classTag"></span></h1>
   <div class="spacer"></div>
-  <span id="acctHost"></span>
 </header>
 
 <div class="wrap">
@@ -143,11 +139,11 @@ function render(){
       <div class="body">
         <div class="ttl">${r.subject?`<span class="subj">${esc(r.subject)}</span>`:""}${esc(r.title)}</div>
         <div class="meta">
-          ${d?`<span class="due ${d.cls}"><span aria-hidden="true">📅</span> ${d.label}</span>`:""}
+          ${d?`<span class="due ${d.cls}">${d.label}</span>`:""}
           <span>${r.untis_id?"📡 vu WebUntis":`vun ${esc(names[r.created_by]||"?")}`}</span>
         </div>
       </div>
-      ${canDel?`<button type="button" class="del" data-del="${r.id}" title="Läschen" aria-label="Läschen: ${esc(r.title)}"><span aria-hidden="true">✕</span></button>`:""}
+      ${canDel?`<button type="button" class="del" data-del="${r.id}" title="Läschen" aria-label="Läschen: ${esc(r.title)}"></button>`:""}
     </div>`;
   }).join("");
   $("list").querySelectorAll("[data-done]").forEach(b=>b.onclick=()=>toggleDone(b.dataset.done));
@@ -172,8 +168,7 @@ $("hwAdd").onclick=async()=>{
 };
 $("hwTitle").addEventListener("keydown",e=>{if(e.key==="Enter")$("hwAdd").click();});
 
-(async()=>{
-  auth.mountAccountButton($("acctHost"));
+(async()=>{);
   $("gateBtn").onclick=(e)=>{e.preventDefault();auth.openAuthModal();};
   auth.onAuth(async()=>{
     isAdmin=false;
