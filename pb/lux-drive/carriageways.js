@@ -49,8 +49,32 @@ function wayEnds(roads, lineOf) {
  * roads: the decoded roads (road.id = the index); lineOf(road): its centre line { x, z } as the network draws it (null: the way is not a carriageway).
  * Only MARKED ways (the classes with lane markings) are chained (the others are a chain of their own).
  * Returns { chainWays: [[{ road, rev }]] (the marked chains, `rev`: walked from its end to its start), groupOf: Int32Array (road -> its chain; an unchained road: roads.length + its id),
- *           plainNeighbours: Map(road -> Set of roads it meets end to end at a node of two ends only) }.
+ *           plainNeighbours: Map(road -> Set of roads it meets end to end at a node of two ends only), splits: Set of splitKey(a, b) (see splitsAt) }.
  */
+/** The key of the joint of ways a and b in `splits`. */
+export const splitKey = (a, b) => (a < b ? `${a}:${b}` : `${b}:${a}`);
+
+/**
+ * The SPLITS of a node (fix19): a two-way way that divides into the two one-way carriageways of a dual carriageway (Bd des Scillas 7721 into 6083 / 19889, Route de Luxembourg 2864
+ * at both ends).  The chain goes on into one of the two branches, but the two-way way does not narrow into it: its width is the width of both branches side by side.  A joint of the
+ * two-way way and a one-way way is a split when another one-way way of the same street (name, or class when unnamed) leaves the node the other way.  Adds the keys to `out`.
+ */
+function splitsAt(roads, ends, out) {
+  if (ends.length < 3) return;
+  const sameStreet = (p, q) => (p.name || q.name ? p.name === q.name : p.kind === q.kind);
+  for (const ea of ends) {
+    const ra = roads[ea.road];
+    if (ra.oneway) continue;
+    for (const eb of ends) {
+      const rb = roads[eb.road];
+      if (eb.road === ea.road || !rb.oneway || !sameStreet(ra, rb)) continue;
+      // (a one-way way leaves the node at its start, enters it at its end)
+      const twin = ends.some((ec) => ec.road !== ea.road && ec.road !== eb.road && roads[ec.road].oneway && ec.atStart !== eb.atStart && sameStreet(rb, roads[ec.road]));
+      if (twin) out.add(splitKey(ea.road, eb.road));
+    }
+  }
+}
+
 export function chainCarriageways(roads, lineOf) {
   const marked = roads.filter((r) => isMarkedWay(r) && lineOf(r));
   const isMarked = new Uint8Array(roads.length);
@@ -62,8 +86,10 @@ export function chainCarriageways(roads, lineOf) {
   const endKey = (e) => `${e.road}:${e.atStart ? 1 : 0}`;
   const plainNeighbours = new Map();     // road -> Set of the roads it meets end to end at a node of two ends only (one carriageway in two ways, chained or not)
   const addPlain = (a, b) => { for (const [p, q] of [[a, b], [b, a]]) { let s = plainNeighbours.get(p); if (!s) { s = new Set(); plainNeighbours.set(p, s); } s.add(q); } };
+  const splits = new Set();
   for (const nd of nodes) {
     if (nd.ends.length === 2 && nd.ends[0].road !== nd.ends[1].road) addPlain(nd.ends[0].road, nd.ends[1].road);
+    splitsAt(roads, nd.ends, splits);
     const ms = nd.ends.filter((e) => isMarked[e.road]);
     if (ms.length < 2) continue;
     const pairs = [];
@@ -118,7 +144,7 @@ export function chainCarriageways(roads, lineOf) {
   const groupOf = new Int32Array(roads.length);
   for (let r = 0; r < roads.length; r++) groupOf[r] = roads.length + r;
   chainWays.forEach((ws, c) => { for (const w of ws) groupOf[w.road] = c; });
-  return { chainWays, groupOf, plainNeighbours };
+  return { chainWays, groupOf, plainNeighbours, splits };
 }
 
 /**

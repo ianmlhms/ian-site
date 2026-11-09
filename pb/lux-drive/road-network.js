@@ -16,7 +16,7 @@ import { ROAD } from './config.js';
 import { ROAD_KINDS, kindInfo } from './roads.js';
 import { designBed, bedSlopes, hermite } from './road-bed.js';
 import { createJunctionSurface } from './junction-surface.js';
-import { chainCarriageways, paintGroups } from './carriageways.js';
+import { chainCarriageways, paintGroups, splitKey } from './carriageways.js';
 import { isLandmarkDeck } from './decks.js';
 import { laneOffsets } from './lane-clearance.js';
 
@@ -54,6 +54,15 @@ const ABUT_HOLD = 2.0;                 // m: ... and its carriageway is held at 
                                        // from there): the 1 m lattice under the first metres of the deck is the road, so the deck starts flush on a level surface, not on the edge of the drop
 const DECK_TUCK = 0.08, DECK_TUCK_FROM = 0.4, DECK_TUCK_RUN = 1.0;   // m: under its deck the carriageway of an approach way lies this much lower, reached between these distances past the end of
                                        // the way: flush with the deck at the abutment, and no longer in the same plane as the deck beyond it (the two surfaces fought for the pixels: a ragged seam across the road)
+// fix19, abutmentFade: the fall of an abutment ends before the wheels of the cars on a way UNDER the bridge (a way at least ABUT_UNDER under the approach, its outer lane's
+// centre + the car's half width: the lane keep less ABUT_KEEP_SLACK): the fall is shortened, ABUT_FADE_STEP at a time, until its earth stands at most ABUT_TOUCH over that
+// way's bed there, but it never falls steeper than ABUT_STEEPEST.  The A1 abutments over the Autoroute de Dudelange rose 0.2 - 0.3 m over the outer lane's wheels (roll 0.39).
+const ABUT_KEEP_SLACK = 0.3;           // m (LANE_KEEP is the outer lane's centre + 0.9 m of half width + 0.3 m of air)
+const ABUT_TOUCH = 0.05;               // m
+const ABUT_FADE_STEP = 0.25;           // m
+const ABUT_STEEPEST = 2.2;             // m per m: the steepest mean-based fall (smoothstep peaks at 1.5 x the mean; on the lattice the faces measured up to ~1.5 x more): at 2.35 the A6 abutments beside the other carriageway (7412) became two walls of the world flow (9 > 8), at 2.2 eight
+const ABUT_UNDER = 3.0;                // m: a road under a bridge lies 5.9 - 21 m under its approaches in the network; the ways that meet at the end of the Hondhausbréck lie
+                                       // 1.4 - 2.1 m apart (a junction at the abutment: their own lanes need its earth, harness V4)
 const ABUT_FADE_MAX = 6.0;             // m: past the hold the ground under the deck falls from the deck to the land below over 1.5 x drop / RAMP_SLOPE (an earth abutment under the deck end, never
                                        // steeper than the ramp between two levels), at least CAP_SOFT / PROTECT_RAMP and at most this.  With the fixed 2 m of CAP_SOFT a deck 6 m over the road below
                                        // stood on a vertical face of ground (the world flow's "walls the carve made": 153 of them at the motorway interchanges after the approaches were lifted)
@@ -778,6 +787,11 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
         keepUp[q.w.road] = out;
       }
       if (span.every((q) => Math.abs(q.hw - span[0].hw) < 1e-3)) continue;
+      // (no taper across a split, carriageways.js splitsAt: the two-way way of a dual carriageway kept its width only in the middle - narrowed 1 : 12 toward one branch, its outer
+      // lane ran off its tarmac at the Bd des Scillas and the Route de Luxembourg (sweep: 0.4 - 1.6 m outside, jolts of 65 - 80 m/s2))
+      const part = [0];
+      for (let k = 1; k < span.length; k++) part.push(part[k - 1] + (carriageways.splits.has(splitKey(span[k - 1].w.road, span[k].w.road)) ? 1 : 0));
+      span.forEach((q, k) => { q.part = part[k]; });
       for (const q of span) {
         if (!q.pr) continue;
         const { n, chain: c } = q.pr;
@@ -786,7 +800,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
           const sc = q.w.rev ? q.b - c.arc[i] : q.a + c.arc[i];          // the place of the sample along the chain
           let hw = q.hw;
           for (const o of span) {
-            if (o === q || o.hw >= hw || !o.pr) continue;              // (a deck way is not carved: the deck is drawn at its own width and meets the road with its own apron, decks.js)
+            if (o === q || o.hw >= hw || !o.pr || o.part !== q.part) continue;   // (a deck way is not carved: the deck is drawn at its own width and meets the road with its own apron, decks.js)
             const dist = sc < o.a ? o.a - sc : sc > o.b ? sc - o.b : 0;
             const v = o.hw + dist / WIDTH_TAPER;
             if (v < hw) hw = v;
@@ -961,12 +975,52 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   const corridorEnds = overCorridors.filter((c) => !isLandmarkDeck({ pts: c.x.map((x, i) => [x, c.z[i]]) })).flatMap((c) => [[c.x[0], c.z[0]], [c.x[c.x.length - 1], c.z[c.z.length - 1]]]);
   const nearCorridorEnd = pointGrid(corridorEnds, APPROACH_JOIN);
   const atBridgeEnd = (x, z) => nearCorridorEnd(x, z, APPROACH_JOIN);
+  // the lane keeps of the carved ways (LANE_KEEP) in a grid of their centre-line segments: where an abutment meets the lanes of a way below it (abutmentFade)
+  const KEEP_CELL = 16;
+  const keepCells = new Map();
+  for (const p of prep) {
+    if (overRoads.has(p.ri)) continue;
+    const c = p.chain, keep = laneKeepOf(p.road, p.bench);
+    for (let i = 0; i + 1 < c.x.length; i++) {
+      for (let cx = Math.floor((Math.min(c.x[i], c.x[i + 1]) - keep) / KEEP_CELL); cx <= Math.floor((Math.max(c.x[i], c.x[i + 1]) + keep) / KEEP_CELL); cx++) {
+        for (let cz = Math.floor((Math.min(c.z[i], c.z[i + 1]) - keep) / KEEP_CELL); cz <= Math.floor((Math.max(c.z[i], c.z[i + 1]) + keep) / KEEP_CELL); cz++) {
+          const k = cx * 65536 + cz, list = keepCells.get(k);
+          if (list) list.push([c, i, keep, p.ri]); else keepCells.set(k, [[c, i, keep, p.ri]]);
+        }
+      }
+    }
+  }
+  /** The bed of a carved way (not `road`) whose lane keep reaches (x, z) and whose bed lies ABUT_UNDER under `bed` (a way under the bridge), or null. */
+  function lowerLaneAt(x, z, bed, road) {
+    for (const [c, i, keep, ri] of keepCells.get(Math.floor(x / KEEP_CELL) * 65536 + Math.floor(z / KEEP_CELL)) || []) {
+      if (ri === road) continue;
+      const ex = c.x[i + 1] - c.x[i], ez = c.z[i + 1] - c.z[i], ll = ex * ex + ez * ez;
+      const t = ll > 1e-9 ? Math.max(0, Math.min(1, ((x - c.x[i]) * ex + (z - c.z[i]) * ez) / ll)) : 0;
+      if (Math.hypot(x - c.x[i] - ex * t, z - c.z[i] - ez * t) > keep - ABUT_KEEP_SLACK) continue;
+      const b = c.bed[i] + (c.bed[i + 1] - c.bed[i]) * t;
+      if (b < bed - ABUT_UNDER) return b;
+    }
+    return null;
+  }
   /** How long the ground under a bridge takes to fall from the deck to the land below past the hold (m, 0 = no more than the defaults): the end of a way at level `bed` that leaves
    *  through (x, z) in the direction (ux, uz) onto the bridge. */
-  function abutmentFade(x, z, ux, uz, bed) {
+  function abutmentFade(x, z, ux, uz, bed, road) {
     let land = Infinity;
     for (let s = ABUT_HOLD; s <= ABUT_HOLD + ABUT_FADE_MAX + 1e-6; s += 1) land = Math.min(land, baseHeight(x + ux * s, z + uz * s));
-    return Math.min(ABUT_FADE_MAX, Math.max(0, (1.5 * (bed - land)) / RAMP_SLOPE));
+    const fade = Math.min(ABUT_FADE_MAX, Math.max(0, (1.5 * (bed - land)) / RAMP_SLOPE)), steepest = Math.min(fade, Math.max(0, (1.5 * (bed - land)) / ABUT_STEEPEST));
+    // (fix19, see ABUT_KEEP_SLACK) the earth under the deck of the A1 over the Autoroute de Dudelange fell over 7 m and took the outer lane of the motorway below (its face
+    // rose under the lane's centre: a car there rolled 0.39 rad).  (capSoft never drops under the default CAP_SOFT.)
+    const lanes = [];                                  // the stations of the ray over the wheels of a lower way, and that way's bed
+    for (let s = ABUT_HOLD; s <= ABUT_HOLD + fade + 1e-6; s += 0.25) {
+      const under = lowerLaneAt(x + ux * s, z + uz * s, bed, road);
+      if (under !== null) lanes.push([s, under]);
+    }
+    if (!lanes.length) return fade;
+    // the longest fall whose earth stands at most ABUT_TOUCH over the wheels (the shortest: ABUT_STEEPEST)
+    for (let f = fade; f > steepest; f -= ABUT_FADE_STEP) {
+      if (lanes.every(([s, under]) => bed - (bed - land) * smoothstep(ABUT_HOLD, ABUT_HOLD + f, s) - under <= ABUT_TOUCH)) return f;
+    }
+    return steepest;
   }
   const approachEnds = [];                             // the ends of the carved ways (not over): an end of a bridge near one of them is an abutment; [x, z, ux, uz, fade]
   for (const chain of chains) {
@@ -974,7 +1028,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     const m = chain.x.length;
     for (const [e, f] of [[0, 1], [m - 1, m - 2]]) {               // the end, and the direction the way leaves through it (toward the bridge)
       const dx = chain.x[e] - chain.x[f], dz = chain.z[e] - chain.z[f], l = Math.hypot(dx, dz) || 1;
-      const fade = !chain.closed && atBridgeEnd(chain.x[e], chain.z[e]) ? abutmentFade(chain.x[e], chain.z[e], dx / l, dz / l, chain.bed[e]) : 0;
+      const fade = !chain.closed && atBridgeEnd(chain.x[e], chain.z[e]) ? abutmentFade(chain.x[e], chain.z[e], dx / l, dz / l, chain.bed[e], chain.road) : 0;
       approachEnds.push([chain.x[e], chain.z[e], dx / l, dz / l, fade]);
       if (fade > 0 || atBridgeEnd(chain.x[e], chain.z[e])) {
         // the end of the bridge lies up to APPROACH_JOIN before or after the end of the way: the tuck is counted from the end of the bridge
