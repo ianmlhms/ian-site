@@ -1395,7 +1395,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
       const [ax, az] = d.pts[i], [bx, bz] = d.pts[i + 1], r = d.width / 2 + UNDER_DECK_REACH;
       for (let cx = Math.floor((Math.min(ax, bx) - r) / UNDER_DECK_CELL); cx <= Math.floor((Math.max(ax, bx) + r) / UNDER_DECK_CELL); cx++) {
         for (let cz = Math.floor((Math.min(az, bz) - r) / UNDER_DECK_CELL); cz <= Math.floor((Math.max(az, bz) + r) / UNDER_DECK_CELL); cz++) {
-          const k = cx * 65536 + cz, seg = [ax, az, bx, bz, r, d.tops[i], d.tops[i + 1], d.width >= DECK_TRUST_WIDTH], list = deckCells.get(k);
+          const k = cx * 65536 + cz, seg = [ax, az, bx, bz, r, d.tops[i], d.tops[i + 1], d.width >= DECK_TRUST_WIDTH && !isLandmarkDeck(d)], list = deckCells.get(k);
           if (list) list.push(seg); else deckCells.set(k, [seg]);
         }
       }
@@ -1870,7 +1870,8 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     // (city21: no cap on that cut under a ROAD bridge.  city20 cut the freed lanes no deeper than UNDER_DECK_MAX_CUT under the land - harness D's "no pit of 1 m under a deck" -
     // and the A13 9520 lane under the A6 kept 0.7 m of the abutment toe across its wheels: roll 0.58.  A deeper cut is allowed where a baked retaining wall closes it - the
     // abutment's concrete face beside the lane (bake_walls.mjs, harness D "closed by a wall").  Under a FOOTBRIDGE (narrower than DECK_TRUST_WIDTH: no abutment) the cap stays -
-    // Val du Scheid under deck 81 got a 1.35 m cut of 1.5 m/m there, too gentle for a wall: an open pit)
+    // Val du Scheid under deck 81 got a 1.35 m cut of 1.5 m/m there, too gentle for a wall: an open pit) - and under a landmark deck (the Pont Rouge: its model draws its
+    // own piers; the abutment face under it at Eecher Bierg was a 3.2 m/m side, a wall of the world flow)
     if (laneCover > laneCoverWide) {
       const kept = ground + (1 - prot * (1 - pinCover) * (1 - cutCover)) * (bandY - ground);
       const capped = Math.max(out.band, Math.min(kept, ground - UNDER_DECK_MAX_CUT));
