@@ -42,7 +42,7 @@ export const BRIDGE_END = Object.freeze({
   trimEdge: 0.3,      // m: the deck's end keeps this off the street's carriageway
   trimStep: 0.25,     // m
   trimMax: 12.0,      // m: the most a deck end is trimmed ...
-  trimKeep: 4.0,      // ... and the least of the deck that is left
+  trimKeep: 2.5,      // ... and the least of the deck that is left
   joint: 1.5,         // m: decks.js DECK.joinTolerance (the ends of two decks this close are one bridge: no free end)
   besideCar: 6.0,     // m past the edge of a car's deck: a footway deck that ends this close to one is its pavement, not trimmed
 });
@@ -158,6 +158,18 @@ function spansOf(pts, groundAt) {
   return Math.max(groundAt(pts[0][0], pts[0][1]), groundAt(pts[n - 1][0], pts[n - 1][1])) - lowest >= BRIDGE_END.spanDip;
 }
 
+/** The nearest point to p on a polyline. */
+function nearestOn(p, pts) {
+  let m = Infinity, best = pts[0];
+  for (let i = 0; i + 1 < pts.length; i++) {
+    const a = pts[i], b = pts[i + 1], ex = b[0] - a[0], ez = b[1] - a[1], ll = ex * ex + ez * ez;
+    const t = ll > 1e-12 ? Math.max(0, Math.min(1, ((p[0] - a[0]) * ex + (p[1] - a[1]) * ez) / ll)) : 0;
+    const q = [a[0] + ex * t, a[1] + ez * t], d = dist(p, q);
+    if (d < m) { m = d; best = q; }
+  }
+  return best;
+}
+
 /** The distance from p to a polyline. */
 function polyDist(p, pts) {
   let m = Infinity;
@@ -226,9 +238,13 @@ export function trimFreeEnds(roads, decks, groundAt) {
         // (a bridge over the street from here on; the level of the deck no steeper than DECK_END_GRADE off its land at the end: the DSM of the Hondhausbréck stood 4 m over the junction)
         // (a footbridge's own DSM is its level; a car's deck is enveloped by decks.js from its end)
         const level = ownCar ? Math.min(top, groundAt(E[0], E[1]) + B.endGrade * s) : top;
-        if (level - groundAt(P[0], P[1]) >= B.trimClear) { over = true; break; }
         const c = [P, [P[0] - u[1] * hw, P[1] + u[0] * hw], [P[0] + u[1] * hw, P[1] - u[0] * hw]];
-        if (!near.some((r) => c.some((q) => polyDist(q, r.pts) < r.width / 2 + B.trimEdge))) break;
+        const on = near.filter((r) => c.some((q) => polyDist(q, r.pts) < r.width / 2 + B.trimEdge));
+        if (!on.length) break;
+        // (measured against the street's own level - its land on its centre line next to the deck -, not the land under the deck: the Kéibierg footbridge stands over a
+        // slope that falls 5 m beside the street)
+        const street = Math.min(...on.map((r) => { const Q = nearestOn(P, r.pts); return groundAt(Q[0], Q[1]); }));
+        if (level - street >= B.trimClear) { over = true; break; }
       }
       // (nothing to trim; the deck would be all street; or it rises over the street before it leaves the carriageway - a footbridge over it: its end would be pinned
       // to the street under it, a ramp in the lanes)
