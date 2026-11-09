@@ -1,6 +1,19 @@
 (function () {
   "use strict";
 
+  /* Gitter-dark: a game in the hub's srcdoc frame gets data-theme from the hub (and later via postMessage); a standalone game page
+   * resolves it itself from localStorage "gt-theme" + prefers-color-scheme. Runs before anything paints where the kit loads early. */
+  (function theme() {
+    const root = document.documentElement;
+    const set = (value) => { if (value === "light" || value === "dark") { root.setAttribute("data-theme", value); root.style.colorScheme = value; } };
+    if (!root.hasAttribute("data-theme")) {
+      let stored = "";
+      try { stored = localStorage.getItem("gt-theme") || ""; } catch { /* private mode */ }
+      set(stored === "light" || stored === "dark" ? stored : (window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
+    }
+    window.addEventListener("message", (event) => { if (event.data && event.data.__gtTheme) set(event.data.__gtTheme); });
+  })();
+
   /* Any finite score up to 1e300 (the idle games reach 1e25 and far beyond); the database columns are double
    * precision with the same range check, and pixelbreak-records.js uses the same limit. */
   const SCORE_LIMIT = 1e300;
@@ -174,7 +187,7 @@
     const style = document.createElement("style");
     style.id = "arcade-kit-css";
     style.textContent = `
-      .arcade-bar{--k-paper:#f6f6f3;--k-white:#fcfcfa;--k-ink:#16171a;--k-muted:#62656a;--k-green:#1f7a4d;
+      .arcade-bar{--k-paper:var(--g-paper,var(--paper,#f6f6f3));--k-white:var(--g-white,var(--white,#fcfcfa));--k-ink:var(--g-ink,var(--ink,#16171a));--k-muted:var(--g-muted,var(--muted,#62656a));--k-green:var(--g-green,var(--green,#1f7a4d));
         box-sizing:border-box;min-height:56px;flex:none;display:flex;flex-wrap:nowrap;align-items:center;gap:8px;
         padding:max(6px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) 6px max(10px,env(safe-area-inset-left));
         border-bottom:1px solid var(--k-ink);background:var(--k-paper);color:var(--k-ink);
@@ -193,9 +206,9 @@
       .arcade-bar__badge{flex:none;padding:3px 8px;border:1px solid var(--k-green);color:var(--k-green);font:500 11px/1.4 "Geist Mono",ui-monospace,monospace;letter-spacing:.06em;white-space:nowrap}
       .arcade-bar__spacer{flex:1;min-width:4px}.arcade-bar__best{color:var(--k-muted);font:500 11px/1 "Geist Mono",ui-monospace,monospace;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
       .arcade-context{box-sizing:border-box;min-height:44px;display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:4px 14px;
-        border-bottom:1px solid #16171a;background:#fcfcfa;color:#62656a;
+        border-bottom:1px solid var(--g-ink,var(--ink,#16171a));background:var(--g-white,var(--white,#fcfcfa));color:var(--g-muted,var(--muted,#62656a));
         font:500 13px/1.2 "Geist",system-ui,-apple-system,"Segoe UI",sans-serif}
-      .arcade-context code{color:#16171a;font-family:"Geist Mono",ui-monospace,monospace}.arcade-context [data-arcade-hidden-control]{display:none!important}
+      .arcade-context code{color:var(--g-ink,var(--ink,#16171a));font-family:"Geist Mono",ui-monospace,monospace}.arcade-context [data-arcade-hidden-control]{display:none!important}
       .arcade-hardware-keyboard [data-arcade-touch-controls]{display:none!important}
       @media(max-width:520px){.arcade-bar{gap:4px}.arcade-bar__back{font-size:13px;padding-inline:7px}.arcade-bar .arcade-bar__title{font-size:15px}.arcade-bar__best{display:none}.arcade-bar__button{padding:0 8px}.arcade-context{justify-content:center;flex-wrap:wrap}}
       @media(prefers-reduced-motion:reduce){.arcade-bar__back,.arcade-bar__button{transition:none}}

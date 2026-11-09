@@ -21,14 +21,16 @@
   :root{
     --bg:#f6f6f3; --panel:#fcfcfa; --panel2:#efefeb; --panel3:#e4e4de;
     --border:rgba(22,23,26,.28); --text:#16171a; --muted:#62656a; --ink:#16171a;
-    --green:#1f7a4d; --green-d:#17613d; --red:#a32121; --blue:#16171a; --gold:#16171a;
+    --green:#1f7a4d; --green-d:#17613d; --red:#a32121; --blue:#16171a; --gold:#16171a; --on:#fff; --stage:#dfe9e4;
   }
+  html[data-theme="dark"]{--bg:#121314; --panel:#1a1b1d; --panel2:#222326; --panel3:#2a2b2f; --border:rgba(236,236,234,.28); --text:#ececea; --muted:#9a9b98; --ink:#ececea; --green:#3fae76; --green-d:#2f8f5e; --red:#e5645f; --blue:#ececea; --gold:#ececea; --on:#07140d; --stage:#1d2622}
+  @media (prefers-color-scheme:dark){html:not([data-theme="light"]){--bg:#121314; --panel:#1a1b1d; --panel2:#222326; --panel3:#2a2b2f; --border:rgba(236,236,234,.28); --text:#ececea; --muted:#9a9b98; --ink:#ececea; --green:#3fae76; --green-d:#2f8f5e; --red:#e5645f; --blue:#ececea; --gold:#ececea; --on:#07140d; --stage:#1d2622}}
   /* The shared sign-in dialog (auth.css) is styled with site-glass tokens, which this
      page doesn't load; without them it rendered unstyled and BEHIND the access gate. */
   .auth-modal{--space-1:.25rem;--space-2:.5rem;--space-3:.75rem;--space-4:1rem;--space-5:1.5rem;
     --radius-pane:0;--radius-inner:0;--hit-target:2.75rem;--z-scrim:10000;
     --control-fill:var(--panel2);--card-hover:var(--panel3);--glass-solid:var(--panel);
-    --accent:var(--green);--accent-foreground:#fff;--accent-border:var(--text);--focus-ring:var(--text)}
+    --accent:var(--green);--accent-foreground:var(--on);--accent-border:var(--text);--focus-ring:var(--text)}
   *{box-sizing:border-box}
   html,body{margin:0}
   body{min-height:100vh;background:var(--bg);color:var(--text);
@@ -85,7 +87,7 @@
   .betbtn:active{transform:scale(.99)}
   .betbtn:disabled{opacity:.5;cursor:not-allowed;filter:none}
   .cashbtn{background:var(--ink);color:var(--paper)}
-  .warn{background:var(--red);color:#fff}
+  .warn{background:var(--red);color:var(--on)}
 
   .kv{display:flex;justify-content:space-between;font-size:13px}
   .kv span:first-child{color:var(--muted);font-weight:600}
@@ -93,14 +95,14 @@
 
   .hist{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;margin-bottom:14px;min-height:26px}
   .hchip{font-size:12px;font-weight:800;padding:4px 9px;border-radius:0;font-variant-numeric:tabular-nums}
-  .hchip.win{background:rgba(31,122,77,.12);color:var(--green)}
-  .hchip.lose{background:rgba(163,33,33,.1);color:var(--red)}
+  .hchip.win{background:color-mix(in srgb,var(--green) 12%,transparent);color:var(--green)}
+  .hchip.lose{background:color-mix(in srgb,var(--red) 10%,transparent);color:var(--red)}
 
   .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);opacity:0;
     background:var(--ink);color:var(--paper);border:1px solid var(--ink);border-radius:0;padding:10px 16px;
     font-weight:800;font-size:14px;pointer-events:none;transition:opacity .2s,transform .2s;z-index:50}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-  .toast.win{background:var(--green);border-color:var(--green);color:#fff} .toast.lose{background:var(--red);border-color:var(--red);color:#fff}
+  .toast.win{background:var(--green);border-color:var(--green);color:var(--on)} .toast.lose{background:var(--red);border-color:var(--red);color:var(--on)}
 
   /* dice */
   .dicetrack{position:relative;height:64px;margin:26px 0 10px;border-radius:0;cursor:pointer;touch-action:none;
@@ -124,8 +126,8 @@
     font-size:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;
     transition:transform .06s,background .15s;user-select:none}
   .cell:hover:not(.done){background:var(--panel3);transform:translateY(-2px)}
-  .cell.gem{background:rgba(31,122,77,.12);border-color:var(--green)}
-  .cell.mine{background:rgba(163,33,33,.1);border-color:var(--red)}
+  .cell.gem{background:color-mix(in srgb,var(--green) 12%,transparent);border-color:var(--green)}
+  .cell.mine{background:color-mix(in srgb,var(--red) 10%,transparent);border-color:var(--red)}
   .cell.done{cursor:default}
   .cell.dim{opacity:.4}
 
@@ -157,7 +159,7 @@
   .rout button{flex:1;background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:0;
     min-height:44px;padding:9px 4px;font-size:12px;font-weight:700;cursor:pointer;position:relative}
   .rout button:hover{filter:brightness(1.2)}
-  .rout button.ored{background:var(--red);color:#fff}.rout button.oblk{background:var(--ink);color:#fff}
+  .rout button.ored{background:var(--red);color:var(--on)}.rout button.oblk{background:var(--ink);color:var(--bg)}
   .chipb{position:absolute;top:-6px;right:-6px;background:var(--gold);color:var(--paper);font-size:10px;font-weight:800;
     border-radius:0;padding:1px 5px;min-width:16px;text-align:center;}
   .rmsg{text-align:center;font-weight:800;font-size:15px;min-height:22px;margin-top:10px}
@@ -172,13 +174,13 @@
   .lane.curb{flex-basis:56px;background:var(--panel3)}
   .lane.next{cursor:pointer;border-color:var(--gold);}
   .lane.next:hover{background:var(--panel3);transform:translateY(-3px)}
-  .lane.passed{background:rgba(31,122,77,.12);border-color:var(--green)}
-  .lane.dead{background:rgba(163,33,33,.1);border-color:var(--red)}
+  .lane.passed{background:color-mix(in srgb,var(--green) 12%,transparent);border-color:var(--green)}
+  .lane.dead{background:color-mix(in srgb,var(--red) 10%,transparent);border-color:var(--red)}
   .lane .mult{font-weight:800;font-size:13px;color:var(--text)}
   .lane .chick{font-size:30px;line-height:1;min-height:34px}
   .chkstat{text-align:center;font-weight:800;font-size:15px;min-height:22px;margin-top:12px}
   .chkstat.win{color:var(--green)}.chkstat.lose{color:var(--red)}
-  .chk3d{position:relative;width:100%;flex:1;min-height:360px;border-radius:0;overflow:hidden;background:#dfe9e4;touch-action:manipulation}
+  .chk3d{position:relative;width:100%;flex:1;min-height:360px;border-radius:0;overflow:hidden;background:var(--stage);touch-action:manipulation}
   .chkcanvas{display:block;width:100%;height:100%}
   .chk2dwrap{width:100%;padding:10px}
   .chkload{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--ink);font-weight:800;font-size:15px}
@@ -235,15 +237,21 @@
   <link rel="manifest" href="site.webmanifest">
 </head>
 <body class="gt">
+<script>
+/* Gitter-dark: canvas colours come from the page tokens, re-read when the theme flips. */
+var tokens=(function(){var c=null;function read(){var s=getComputedStyle(document.body),g=function(n){return s.getPropertyValue(n).trim()};c={ink:g("--ink"),paper:g("--bg"),green:g("--green"),red:g("--red"),muted:g("--muted"),peg:g("--muted"),axis:g("--border")}}
+new MutationObserver(function(){c=null}).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+return function(){if(!c)read();return c}})();
+</script>
 <!-- Access gate. FakeStake is play-money only and private: the page was pulled
      on 11 Aug 2026 after the host's Imunify360 scanner false-flagged it, and it
      is restored for named accounts only. Membership lives in profiles.can_casino
      rather than an email list here, because this repo is public. -->
-<div id="gateBox" style="position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#f6f6f3;color:#16171a;font-family:'Geist',system-ui,sans-serif;text-align:center;padding:24px">
+<div id="gateBox" style="position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:var(--bg);color:var(--text);font-family:'Geist',system-ui,sans-serif;text-align:center;padding:24px">
   <div style="font-size:22px;font-weight:800;letter-spacing:-.02em">FakeStake</div>
-  <div id="gateMsg" role="status" style="max-width:30rem;line-height:1.5;color:#62656a">Kont gëtt gepréift &hellip;</div>
-  <button id="gateSignin" style="display:none;min-height:44px;padding:0 28px;border:1px solid #16171a;border-radius:0;background:#16171a;color:#f6f6f3;font-weight:600;font-size:15px;cursor:pointer;font-family:inherit">Umellen</button>
-  <a href="index.html" style="color:#62656a;font-size:14px;font-weight:600;display:inline-flex;align-items:center;min-height:44px;text-decoration:none">&lsaquo; Heem</a>
+  <div id="gateMsg" role="status" style="max-width:30rem;line-height:1.5;color:var(--muted)">Kont gëtt gepréift &hellip;</div>
+  <button id="gateSignin" style="display:none;min-height:44px;padding:0 28px;border:1px solid var(--ink);border-radius:0;background:var(--ink);color:var(--bg);font-weight:600;font-size:15px;cursor:pointer;font-family:inherit">Umellen</button>
+  <a href="index.html" style="color:var(--muted);font-size:14px;font-weight:600;display:inline-flex;align-items:center;min-height:44px;text-decoration:none">&lsaquo; Heem</a>
 </div>
 
 <div class="gt-page"><div class="gt-grid">
@@ -638,9 +646,10 @@ const Plinko = {
     }
     function bucketX(i){ return W/2 - rows*gap/2 + i*gap; }
     function draw(){
+      const K = tokens();
       ctx.clearRect(0,0,W,H);
       // pegs
-      ctx.fillStyle = "#8d9096";
+      ctx.fillStyle = K.peg;
       for (let r=0;r<rows;r++) for (let i=0;i<r+2;i++){ const p=pegPos(r,i); ctx.beginPath(); ctx.arc(p.x,p.y,pegR,0,7); ctx.fill(); }
       // buckets
       const mult = PLINKO[rows][risk];
@@ -651,13 +660,13 @@ const Plinko = {
         const x = bucketX(i);
         const m = mult[i];
         const hot = m>=2 ? 1 : m>=1 ? 0.5 : 0;
-        ctx.fillStyle = m>=10 ? "#16171a" : m>=2 ? "#1f7a4d" : m>=1 ? "#62656a" : "#8d9096";
+        ctx.fillStyle = m>=10 ? K.ink : m>=2 ? K.green : m>=1 ? K.muted : K.peg;
         rr(ctx, x-bw/2, by, bw, gap*0.6, 4); ctx.fill();
-        ctx.fillStyle = "#fcfcfa";
+        ctx.fillStyle = K.paper;
         ctx.fillText(m+"×", x, by+gap*0.3);
       }
       // balls
-      ctx.fillStyle = "#16171a";
+      ctx.fillStyle = K.ink;
       for (const b of balls){ ctx.beginPath(); ctx.arc(b.x,b.y,pegR*1.5,0,7); ctx.fill(); }
     }
     function rr(c,x,y,w,h,r){ c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
@@ -730,10 +739,10 @@ const Crash = {
     }
     function drawCurve(m){
       ctx.clearRect(0,0,W,H);
-      ctx.strokeStyle="rgba(22,23,26,.28)"; ctx.lineWidth=1;
+      ctx.strokeStyle=tokens().axis; ctx.lineWidth=1;
       ctx.beginPath(); ctx.moveTo(30,H-20); ctx.lineTo(W-6,H-20); ctx.moveTo(30,H-20); ctx.lineTo(30,6); ctx.stroke();
       const span = Math.max(2, m); const pts = 60;
-      ctx.strokeStyle = cashed ? "#1f7a4d" : inRound ? "#16171a" : "#a32121";
+      { const K = tokens(); ctx.strokeStyle = cashed ? K.green : inRound ? K.ink : K.red; }
       ctx.lineWidth = 3; ctx.beginPath();
       for (let i=0;i<=pts;i++){
         const f=i/pts; const cm = 1+(m-1)*f;

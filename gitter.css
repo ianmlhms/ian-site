@@ -131,7 +131,7 @@ html.auth-in .gt-acct { color: var(--ink); }
 
 /* ---- toast + dialog panel ---- */
 .gt-toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 9999; max-width: 90vw; padding: 12px 18px; background: var(--ink); color: var(--paper); font-weight: 600; font-size: 14px; text-align: center; }
-.gt-panel { background: var(--white); border: 1px solid var(--ink); padding: 22px; }
+.gt-panel { background: var(--white); border: 1px solid var(--line); padding: 22px; }
 
 /* ---- list rows (links to other pages) ---- */
 .gt-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 44px; padding: 10px 0; border-bottom: 1px solid var(--soft); text-decoration: none; font-weight: 600; }
@@ -160,7 +160,7 @@ html.auth-in .gt-acct { color: var(--ink); }
 .gt-gate .gt-big { font-size: 22px; }
 
 /* ---- site bottom tab bar (theme.js injects #appNav on phones): text tabs, hairline, green = here ---- */
-.gt #appNav { background: var(--paper); border-top: 1px solid var(--ink); }
+.gt #appNav { background: var(--paper); border-top: 1px solid var(--line); }
 .gt #appNav a { min-height: 56px; justify-content: center; padding: 0; color: var(--muted); font: 600 13px/1 "Geist", system-ui, sans-serif; position: relative; }
 .gt #appNav a .i { display: none; }
 .gt #appNav a.on { color: var(--ink); }
@@ -173,7 +173,7 @@ body.gt > header:not(.arcade-bar):not(.gt-nav):not(.gt-bar) { box-shadow: none; 
 
 /* ---- legacy page compat (pages that still use site-ui style markup: .ui-page / .ui-card / .ui-title / .pick buttons) ---- */
 .gt .ui-page { max-width: 760px; margin: 0 auto; padding: 22px var(--gutter) max(56px, calc(40px + env(safe-area-inset-bottom))); display: flex; flex-direction: column; gap: 14px; width: 100%; }
-.gt .ui-card { background: var(--white); border: 1px solid var(--ink); padding: 20px; box-shadow: none; }
+.gt .ui-card { background: var(--white); border: 1px solid var(--line); padding: 20px; box-shadow: none; }
 .gt .ui-title { font-weight: 800; letter-spacing: -0.04em; }
 .gt .ui-card--accent { background: var(--white); }
 .gt select.ui-input { appearance: none; -webkit-appearance: none; min-height: 44px; padding: 10px 12px; border: 1px solid var(--ink); border-radius: 0; background: var(--white); color: var(--ink); font: 400 16px "Geist", system-ui, sans-serif; }
@@ -190,7 +190,7 @@ body.gt > header:not(.arcade-bar):not(.gt-nav):not(.gt-bar) { box-shadow: none; 
 .gt .wrap { box-shadow: none; }
 
 /* ---- legacy top bar (header.bar) on pages that are not converted to the nav cell yet ---- */
-.gt header.bar:not(.arcade-bar) { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; min-height: 52px; padding: 2px 20px; max-width: calc(1240px - 2 * var(--gutter)); margin: 24px auto 0; border: 1px solid var(--ink); background: transparent; position: static; box-shadow: none; width: calc(100% - 2 * var(--gutter)); }
+.gt header.bar:not(.arcade-bar) { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; min-height: 52px; padding: 2px 20px; max-width: calc(1240px - 2 * var(--gutter)); margin: 24px auto 0; border: 1px solid var(--line); background: transparent; position: static; box-shadow: none; width: calc(100% - 2 * var(--gutter)); }
 .gt header.bar:not(.arcade-bar) .home, .gt header.bar:not(.arcade-bar) .home-link { display: inline-flex; align-items: center; min-height: 44px; padding: 0; border: 0; background: none; color: var(--muted); font: 600 14px "Geist", system-ui, sans-serif; text-decoration: none; }
 .gt header.bar:not(.arcade-bar) .home:hover { color: var(--green); }
 .gt header.bar:not(.arcade-bar) h1 { margin: 0; font: 800 16px/1.2 "Geist", system-ui, sans-serif; letter-spacing: -0.01em; }
@@ -198,7 +198,7 @@ body.gt > header:not(.arcade-bar):not(.gt-nav):not(.gt-bar) { box-shadow: none; 
 @media (max-width: 700px) { .gt header.bar:not(.arcade-bar) { margin-top: 12px; padding-inline: 14px; } }
 
 /* legacy site-ui header (.ui-header) on pages restyled without restructuring */
-.gt .ui-header { display: flex; align-items: center; justify-content: space-between; gap: 4px 14px; flex-wrap: wrap; min-height: 52px; padding: 2px 20px; max-width: calc(1240px - 2 * var(--gutter)); width: calc(100% - 2 * var(--gutter)); margin: 24px auto 0; border: 1px solid var(--ink); background: transparent; position: static; box-shadow: none; backdrop-filter: none; border-radius: 0; }
+.gt .ui-header { display: flex; align-items: center; justify-content: space-between; gap: 4px 14px; flex-wrap: wrap; min-height: 52px; padding: 2px 20px; max-width: calc(1240px - 2 * var(--gutter)); width: calc(100% - 2 * var(--gutter)); margin: 24px auto 0; border: 1px solid var(--line); background: transparent; position: static; box-shadow: none; backdrop-filter: none; border-radius: 0; }
 .gt .ui-header .header-left, .gt .ui-header .header-right { display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap; }
 .gt .ui-header .home, .gt .ui-header .ui-brand a { display: inline-flex; align-items: center; min-height: 44px; padding: 0; border: 0; background: none; color: var(--muted); font: 600 14px "Geist", system-ui, sans-serif; text-decoration: none; cursor: pointer; }
 .gt .ui-header .home:hover { color: var(--green); }
@@ -215,3 +215,7 @@ html body.gt .arcade-bar .langsw, html body.gt .arcade-bar #langSw { display: no
 .gt-theme:hover { color: var(--green); }
 .gt-theme svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .gt-theme-float { position: fixed; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom)); z-index: 50; background: var(--paper); border: 1px solid var(--line); }
+
+/* dark: no glow from legacy page shadows (dark paper makes them visible) */
+html[data-theme="dark"] body.gt :is(.primary-button, .gate-box, .gate-ico, .notice, .card, .tile, .panel) { box-shadow: none; }
+@media (prefers-color-scheme: dark) { html:not([data-theme="light"]) body.gt :is(.primary-button, .gate-box, .gate-ico, .notice, .card, .tile, .panel) { box-shadow: none; } }

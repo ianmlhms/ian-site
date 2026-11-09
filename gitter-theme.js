@@ -5,7 +5,7 @@
  *   <meta theme-color> pair (media light / dark) is kept in sync so iPad Safari's bars match
  *   toggle      #gtTheme (Auto -> Hell -> Däischter) is injected into the page header on body.gt pages
  *   games       window.gtTheme.onChange(fn); srcdoc game frames get data-theme + a postMessage {__gtTheme}
- * API: window.gtTheme = { pref(), resolved(), set(pref), cycle(), onChange(fn) }. Event: "gt-theme" on window. */
+ * <html data-gt-light> keeps a page light-only (no toggle). API: window.gtTheme = { pref(), resolved(), set(pref), cycle(), onChange(fn) }. Event: "gt-theme" on window. */
 (function () {
   "use strict";
   var KEY = "gt-theme";
@@ -57,7 +57,7 @@
 
   function apply(announce) {
     var pref = readPref();
-    var resolved = resolve(pref);
+    var resolved = root.hasAttribute("data-gt-light") ? "light" : resolve(pref);   // <html data-gt-light>: the page stays light (Mordsfall)
     root.setAttribute("data-theme", resolved);
     root.setAttribute("data-theme-pref", pref);
     root.style.colorScheme = resolved;
@@ -90,7 +90,7 @@
     button.setAttribute("data-pref", pref);
   }
   function mount() {
-    if (button || !document.body || !document.body.classList.contains("gt")) return;
+    if (button || !document.body || !document.body.classList.contains("gt") || root.hasAttribute("data-gt-light")) return;
     button = document.createElement("button");
     button.type = "button"; button.id = "gtTheme"; button.className = "gt-theme";
     button.addEventListener("click", cycle);
@@ -98,7 +98,10 @@
     if (host) host.insertBefore(button, host.firstChild);
     else {
       var bar = document.querySelector(".ui-header .header-right, header.bar:not(.arcade-bar), .studio-bar, .ops-bar, .topbar, .command-bar, .command-toolbar");
-      if (bar) bar.appendChild(button);
+      if (bar) {
+        var acct = bar.querySelector(".gt-acct, .auth-btn, #authBtn");
+        if (acct && acct.parentNode) acct.parentNode.insertBefore(button, acct); else bar.appendChild(button);
+      }
       else { button.className += " gt-theme-float"; document.body.appendChild(button); }
     }
     paintButton();
