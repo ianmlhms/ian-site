@@ -114,7 +114,19 @@ export const TROUGH = Object.freeze({
   wideReach: 12,           // ... and an approach wider than that (René Konen north, 3 lanes into a 2-lane tube) gets a trough of at most this many metres: its outer lane ends
                            // at the wall there, as it would in front of the face (tunnels18: without one, the face of the cut between it and the road beside it - 3.8 m higher -
                            // stood across the outer lane in front of the face, and the chase camera saw a slab of terrain where the tube's wall should be)
-  levelRoad: 1.5,          // m: another road beside the trough within this of the floor is a junction at its level: the trough ends before it
+  levelRoad: 1.5,          // m: another road beside the trough within this of the floor is a junction at its level: the trough ends before it ...
+  joinGap: 2.0,            // ... if it joins the approach (an end of it within this of a node of the approach); one that only runs beside it, behind the outer wall,
+                           // is held by the wall (Bd Roosevelt beside the René Konen south approach, 1.6 m from its edge: tunnels19, QA5 TU09)
+  heldAbove: 0.8,          // m: a road behind a wall this much over the floor is held by it ...
+  heldRoom: 1.0,           // m: ... and one whose carriageway comes this close to the wall's outer face gets no parapet
+                           // over it - the wall top is its edge (Nei Escher Strooss link 3013 on the cut of the N56 east approach: its lane ran 0.3 m from the wall and
+                           // a car in it hit the parapet, tunnels19) ...
+  heldBelow: 0.35,         // m: ... it stays this far under that road (a car on its edge, its wheels on the slope of the cut, passes over it: car-collide meets a wall only
+                           // up to 0.3 m under its top)
+  overFace: 2.0,           // m: ... and a road over the roof of the tube within this of the face crosses over the portal, it is no junction (the Merl slip road 12830
+                           // over the N56 west mouth)
+  endFlat: 0.08,           // m: the outer end of a trough lies where the approach's ground across its lanes is this flat (the floor starts exactly on that section: on a
+                           // crooked one the car rolls there - TU09, 0.29 rad); the trough carries on out (no junction, within reach) until it is
   parapet: 0.8,            // m: a wall stands this much over the land behind it (a parapet: nobody drives over the edge) ...
   parapetEnd: 0.3,         // ... and this much at the outer end of the trough ...
   taper: 8,                // ... rising over this many metres
@@ -787,15 +799,13 @@ function troughLength(tube, end, surface, roads) {
   const own = new Set([appId, ...tube.ids]);
   const info = {};
   const plane = (i, lat) => tube.floor[i] + tube.cross[i] * lat;
-  let len = 0, quiet = 0;
-  for (let k = 0.5; k <= reach; k += 1) {
-    const sq = sFace + end * k;
-    if (sq < tube.s[0] + 1 || sq > tube.s[n - 1] - 1) break;
-    const i = indexAt(tube, sq);
-    let rise = -Infinity, junction = false;
+  // (does another road join the approach: an end of it at a node of the approach way)
+  const joins = (other) => endsOf(other).some((e) => app.pts.some((p) => dist(e, p) <= TROUGH.joinGap));
+  /** Is there a junction at station i: a road beside the trough at its level, across it, or reaching into it. */
+  const junctionAt = (i, k) => {
+    let junction = false;
     for (const side of [-1, 1]) {
       const inner = innerOf(tube, side), outer = outerOf(tube, side);
-      for (const l of [inner + 0.3, outer + 0.8]) { const [x, z] = sidePoint(tube, i, side * l); rise = Math.max(rise, surface.height(x, z) - plane(i, side * l)); }
       for (const l of [0, inner - 0.5, outer + 0.3, outer + 1.2]) {
         const [x, z] = sidePoint(tube, i, side * l);
         surface.roadInfoAt(x, z, info);
@@ -805,13 +815,42 @@ function troughLength(tube, end, surface, roads) {
         // (the twin's carriageway beside it is not: the two troughs share their middle wall as the tubes do - unless it reaches into this one, where the two
         // carriageways merge: the Schuman underpass at the Rond-Point, 19 m out of its west mouths, tunnels19)
         const twin = !!other && !!tube.twinIds && tube.twinIds.has(other.id);
-        if (other && !other.tunnel && (l < inner || (!twin && Math.abs(surface.height(x, z) - plane(i, side * l)) < TROUGH.levelRoad))) junction = true;
+        const beside = !!other && l >= outer && !joins(other);
+        const overPortal = !!other && k <= TROUGH.overFace && surface.height(x, z) > plane(i, side * l) + tube.roofDepth;
+        if (other && !other.tunnel && !overPortal && (l < inner || (!twin && !beside && Math.abs(surface.height(x, z) - plane(i, side * l)) < TROUGH.levelRoad))) junction = true;
       }
     }
-    if (junction) break;
+    return junction;
+  };
+  // (how crooked the approach's ground is across its lanes at a station, against the plane of the floor: the largest step between two wheel tracks)
+  const hw = Math.max(0.5, app.width / 2 - TROUGH.wheelIn);
+  const crooked = (i) => {
+    const d = [-hw, -hw / 2, 0, hw / 2, hw].map((lat) => { const [x, z] = sidePoint(tube, i, lat); return surface.height(x, z) - plane(i, lat); });
+    return Math.max(...d) - Math.min(...d);
+  };
+  let len = 0, quiet = 0;
+  for (let k = 0.5; k <= reach; k += 1) {
+    const sq = sFace + end * k;
+    if (sq < tube.s[0] + 1 || sq > tube.s[n - 1] - 1) break;
+    const i = indexAt(tube, sq);
+    if (junctionAt(i, k)) break;
+    let rise = -Infinity;
+    for (const side of [-1, 1]) {
+      const inner = innerOf(tube, side), outer = outerOf(tube, side);
+      for (const l of [inner + 0.3, outer + 0.8]) { const [x, z] = sidePoint(tube, i, side * l); rise = Math.max(rise, surface.height(x, z) - plane(i, side * l)); }
+    }
     if (rise > TROUGH.rise) { len = k + 0.5; quiet = 0; } else if (++quiet > TROUGH.quiet) break;
   }
-  return len < TROUGH.minLength ? 0 : len;
+  if (len < TROUGH.minLength) return 0;
+  // the outer end on a level section: carried on out while the ground across the lanes is crooked (and no junction, within reach)
+  for (let k = len; k <= reach; k += 1) {
+    const sq = sFace + end * k;
+    if (sq < tube.s[0] + 1 || sq > tube.s[n - 1] - 1) break;
+    const i = indexAt(tube, sq);
+    if (crooked(i) <= TROUGH.endFlat) return k;
+    if (junctionAt(i, k)) return len;
+  }
+  return len;
 }
 
 /**
@@ -858,7 +897,21 @@ function troughShape(tube, end, len, surface, roads) {
   const edge = Float32Array.from(lats, (lat) => residual(iE, lat));
   const edgeSlope = Float32Array.from(lats, (lat, k) => (edge[k] - residual(iOut, lat)) / run);
   // the wall tops: the land the wall holds (from the middle of the lane to TROUGH.back behind it) plus the parapet, never lower than a parapet over the floor
-  const top = [new Float32Array(n).fill(NaN), new Float32Array(n).fill(NaN)];
+  const top = [new Float32Array(n).fill(NaN), new Float32Array(n).fill(NaN)], held = [new Float32Array(n).fill(NaN), new Float32Array(n).fill(NaN)];
+  // (the level of another road's carriageway right behind the wall, higher than a junction - null: none.  The carriageways are read on the lattice of the surface,
+  // which misses a sample here and there: see the spread below)
+  const own = new Set([end < 0 ? tube.approachA : tube.approachB, ...tube.ids]), info = {};
+  const heldRoadAt = (i, side, outer) => {
+    let h = null;
+    for (let l = outer + 0.2; l <= outer + TROUGH.heldRoom + 1e-6; l += 0.4) {
+      const [x, z] = sidePoint(tube, i, side * l);
+      surface.roadInfoAt(x, z, info);
+      if (!(info.sdCar < 0) || info.road < 0 || own.has(info.road) || (tube.twinIds && tube.twinIds.has(info.road))) continue;
+      const y = surface.height(x, z);
+      if (y - plane(i, side * l) > TROUGH.heldAbove) h = h === null ? y : Math.min(h, y);
+    }
+    return h;
+  };
   const iFace = indexAt(tube, sFace), iEnd = indexAt(tube, sEnd);
   const i0 = Math.min(iFace, iEnd), i1 = Math.min(n - 1, Math.max(iFace, iEnd) + 1);
   for (let i = i0; i <= i1; i++) {
@@ -869,6 +922,8 @@ function troughShape(tube, end, len, surface, roads) {
       let land = plane(i, side * inner);
       for (let l = inner / 2; l <= outer + TROUGH.back + 1e-6; l += 0.5) { const [x, z] = sidePoint(tube, i, side * l); land = Math.max(land, surface.height(x, z)); }
       top[k][i] = land + parapet;
+      const h = heldRoadAt(i, side, outer);
+      if (h !== null) held[k][i] = h;
     });
   }
   // (a moving maximum, then a moving mean, each over TOP_SMOOTH m to each side: the coping runs in long even lines, not along every cell of the lattice, and still over
@@ -880,6 +935,16 @@ function troughShape(tube, end, len, surface, roads) {
     return fn(win);
   });
   const out = top.map((arr) => pass(pass(arr, (w) => Math.max(...w)), (w) => w.reduce((p, q) => p + q, 0) / w.length));
+  // a held road: no parapet over its carriageway - the wall top is just under its edge (spread over TOP_SMOOTH samples to each side, after the evening out, which would carry
+  // the parapet of the next sample back over it), never lower than the parapet at the outer end over the floor
+  out.forEach((arr, k) => {
+    const side = k === 0 ? -1 : 1, inner = innerOf(tube, side);
+    for (let i = i0; i <= i1; i++) {
+      let h = Infinity;
+      for (let j = Math.max(i0, i - TOP_SMOOTH); j <= Math.min(i1, i + TOP_SMOOTH); j++) if (!Number.isNaN(held[k][j])) h = Math.min(h, held[k][j]);
+      if (h < Infinity && !Number.isNaN(arr[i])) arr[i] = Math.max(plane(i, side * inner) + TROUGH.parapetEnd, Math.min(arr[i], h - TROUGH.heldBelow));
+    }
+  });
   return { len, blend, top: out, width: app.width, edge, edgeSlope };
 }
 
