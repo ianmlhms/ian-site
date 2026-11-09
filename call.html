@@ -9,10 +9,12 @@
   <meta name="description" content="Sprooch- a Videoruffe op ian.lu, tëscht ugemellte Konten." />
   <link rel="canonical" href="https://ian.lu/call.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<meta name="theme-color" content="#f6f6f3">
+<meta name="theme-color" content="#f6f6f3" media="(prefers-color-scheme: light)" data-gt="light">
+<meta name="theme-color" content="#121314" media="(prefers-color-scheme: dark)" data-gt="dark">
+<script src="gitter-theme.js?v=1"></script>
 <link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="gitter.css?v=9">
-<script src="theme.js?v=32"></script>
+<link rel="stylesheet" href="gitter.css?v=12">
+<script src="theme.js?v=33"></script>
 <script src="i18n-dict.js?v=54"></script>
 <script src="i18n.js?v=5"></script>
 <style>
@@ -34,9 +36,9 @@
   .cbtn{min-width:120px;min-height:48px;padding:0 18px;border:1px solid var(--ink);border-radius:0;background:var(--white);color:var(--ink);font:600 15px/1 "Geist",system-ui,sans-serif;cursor:pointer}
   .cbtn:hover{border-color:var(--green);color:var(--green)}
   .cbtn.off{background:var(--ink);color:var(--paper)}
-  .cbtn.hang{background:var(--danger);border-color:var(--danger);color:#fff}
+  .cbtn.hang{background:var(--danger);border-color:var(--danger);color:var(--on-green)}
   .cbtn.hang:hover{background:#7d1818;border-color:#7d1818;color:#fff}
-  .cbtn.answer{background:var(--green);border-color:var(--green);color:#fff}
+  .cbtn.answer{background:var(--green);border-color:var(--green);color:var(--on-green)}
   .msg{position:absolute;inset:0;display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:center;text-align:center;padding:30px;color:var(--ink);z-index:6;background:var(--paper);font-weight:600}
   .msg a{color:var(--green)}
   .hidden{display:none!important}
@@ -81,7 +83,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module">
-import * as auth from "./auth.js?v=40";
+import * as auth from "./auth.js?v=41";
 const $=(id)=>document.getElementById(id);
 const T=(k)=>(window.I18N?window.I18N.t(k):k);
 const q=new URLSearchParams(location.search);

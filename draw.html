@@ -10,9 +10,10 @@
   <link rel="canonical" href="https://ian.lu/draw.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <script src="mp-gate.js?v=8" data-game="draw"></script>
+<script src="gitter-theme.js?v=1"></script>
 <link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="gitter.css?v=11">
-<script src="theme.js?v=32"></script>
+<link rel="stylesheet" href="gitter.css?v=12">
+<script src="theme.js?v=33"></script>
 <style>
   body{margin:0;min-height:100vh;min-height:100svh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
   .bar{display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--border)}
@@ -56,7 +57,8 @@
 </style>
 <script data-goatcounter="https://ianm.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
-  <meta name="theme-color" content="#f6f6f3">
+  <meta name="theme-color" content="#f6f6f3" media="(prefers-color-scheme: light)" data-gt="light">
+<meta name="theme-color" content="#121314" media="(prefers-color-scheme: dark)" data-gt="dark">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -73,7 +75,7 @@
 <div class="sr" id="live" role="status" aria-live="polite"></div>
 
 <script src="pixelbreak-config.js"></script>
-<script src="pb/arcade-kit.js?v=43" data-arcade-id="o-draw" data-arcade-title="Zeechnen a roden" data-arcade-no-score data-arcade-replace=".bar"></script>
+<script src="pb/arcade-kit.js?v=50" data-arcade-id="o-draw" data-arcade-title="Zeechnen a roden" data-arcade-no-score data-arcade-replace=".bar"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module" src="notify-ambient.js?v=40"></script>
 <script>

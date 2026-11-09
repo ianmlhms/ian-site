@@ -8,7 +8,7 @@
  * there is one place where "is this machine alive" is decided.
  *
  * UI text is Luxembourgish (Gitter look, Nov 2026); machine names and details come from the server. */
-import * as auth from "./auth.js?v=40";
+import * as auth from "./auth.js?v=41";
 
 const OWNER = "konto@ian.lu";
 const REFRESH_MS = 20_000;

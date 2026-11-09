@@ -2,7 +2,7 @@
  *   <script type="module" src="rtc-ring.js?v=36"></script>
  * Subscribes to the user's personal ring inbox (rtc:<uid>) and shows an
  * Answer/Decline banner when a friend calls. Answering opens call.html. */
-import * as auth from "./auth.js?v=40";
+import * as auth from "./auth.js?v=41";
 
 const T = (k) => (window.I18N ? window.I18N.t(k) : k);
 let subbed = false, sb = null, current = null, ringOsc = null, ringTimer = null, ringGain = null;

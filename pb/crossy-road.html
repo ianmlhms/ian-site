@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Road Crossing - Arcade</title>
-<link rel="stylesheet" href="/pb/arcade-ui.css?v=3">
+<link rel="stylesheet" href="/pb/arcade-ui.css?v=10">
 <style>
 body{display:flex;flex-direction:column}
 [hidden]{display:none!important}
@@ -22,11 +22,11 @@ canvas{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border),0 18px 48p
 .levels button:focus-visible{outline:3px solid var(--cyan);outline-offset:2px}
 .levels button[disabled]{opacity:.4;cursor:not-allowed}
 .levels button.cleared{border-color:var(--good)}
-.levels button.next{background:var(--g-green);border-color:var(--g-green);color:#fff}
+.levels button.next{background:var(--g-green);border-color:var(--g-green);color:var(--g-on-green)}
 .levels-title{margin:0 0 8px;color:var(--muted);font:800 12px/1 var(--font);letter-spacing:.06em;text-transform:uppercase}
 @media (prefers-reduced-motion:reduce){.levels button{transition:none}.levels button:active:not([disabled]){transform:none}}
 </style>
-<script src="/pb/arcade-kit.js?v=43" data-arcade-id="crossy-road" data-arcade-title="Road Crossing"></script>
+<script src="/pb/arcade-kit.js?v=50" data-arcade-id="crossy-road" data-arcade-title="Road Crossing"></script>
 </head>
 <body>
 <main class="arcade-stage" id="stage">

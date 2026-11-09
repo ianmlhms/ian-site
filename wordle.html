@@ -15,10 +15,12 @@
 <link rel="canonical" href="https://ian.lu/wordle.html">
 <link rel="manifest" href="site.webmanifest">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<meta name="theme-color" content="#f6f6f3">
+<meta name="theme-color" content="#f6f6f3" media="(prefers-color-scheme: light)" data-gt="light">
+<meta name="theme-color" content="#121314" media="(prefers-color-scheme: dark)" data-gt="dark">
+<script src="gitter-theme.js?v=1"></script>
 <link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="gitter.css?v=11">
-<script src="theme.js?v=32"></script>
+<link rel="stylesheet" href="gitter.css?v=12">
+<script src="theme.js?v=33"></script>
 <style>
   :root{
         --correct:#00c853;--present:#ffb300;--absent:#3a3a3c}
@@ -33,7 +35,7 @@
   .tile{width:54px;height:54px;border:1px solid var(--soft);background:var(--white);font-family:"Geist Mono",ui-monospace,monospace;border-radius:0;display:flex;align-items:center;justify-content:center;
         font-size:26px;font-weight:500;text-transform:uppercase;transition:transform .1s}
   .tile.filled{border-color:var(--ink)}
-  .tile.correct{background:var(--green);border-color:var(--green);color:#fff}
+  .tile.correct{background:var(--green);border-color:var(--green);color:var(--on-green)}
   .tile.present{background:var(--ink);border-color:var(--ink);color:var(--paper)}
   .tile.absent{background:var(--tint);border-color:var(--soft);color:var(--muted)}
   .tile.pop{transform:scale(1.1)}
@@ -42,7 +44,7 @@
   .kb .krow{display:flex;gap:5px;justify-content:center}
   .key{flex:1;max-width:42px;height:50px;border:1px solid var(--ink);border-radius:0;background:var(--white);color:var(--ink);font-weight:600;font-size:15px;cursor:pointer;text-transform:uppercase;font-family:inherit;padding:0}
   .key.wide{max-width:64px;font-size:12px}
-  .key.correct{background:var(--green);border-color:var(--green);color:#fff} .key.present{background:var(--ink);color:var(--paper)} .key.absent{background:var(--tint);border-color:var(--soft);color:var(--muted)}
+  .key.correct{background:var(--green);border-color:var(--green);color:var(--on-green)} .key.present{background:var(--ink);color:var(--paper)} .key.absent{background:var(--tint);border-color:var(--soft);color:var(--muted)}
   .stats{display:flex;gap:18px;color:var(--muted);font-size:13px;margin-top:4px}
   .stats b{color:var(--ink);font:500 20px "Geist Mono",ui-monospace,monospace;display:block;text-align:center}
   .share{background:var(--ink);color:var(--paper);border:1px solid var(--ink);border-radius:0;min-height:44px;padding:11px 20px;font:600 15px "Geist",system-ui,sans-serif;cursor:pointer;display:none}.share:hover{background:var(--green);border-color:var(--green)}
@@ -306,10 +308,10 @@ load();
 </div>
 
 <script src="pixelbreak-config.js"></script>
-<script src="pb/arcade-kit.js?v=43" data-arcade-id="o-wordle" data-arcade-title="Wuertspill" data-arcade-no-score data-arcade-leaderboard-target="#lbBtn" data-arcade-replace=".bar"></script>
+<script src="pb/arcade-kit.js?v=50" data-arcade-id="o-wordle" data-arcade-title="Wuertspill" data-arcade-no-score data-arcade-leaderboard-target="#lbBtn" data-arcade-replace=".bar"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module">
-  import * as auth from "./auth.js?v=40";
+  import * as auth from "./auth.js?v=41";
   import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=13";
   import { scoreHtml, scoreKeyHtml } from "./score-format.js?v=11";
   let sb = null;

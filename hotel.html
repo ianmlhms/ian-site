@@ -8,14 +8,17 @@
 <title>Hotel-Bausimulator — ian.lu</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<script src="gitter-theme.js?v=1"></script>
 <link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="gitter.css?v=9">
+<link rel="stylesheet" href="gitter.css?v=12">
 <style>
   :root{
     --bg:#f6f6f3; --panel:#fcfcfa; --panel2:#efefeb; --text:#16171a;
     --muted:#62656a; --accent:#1f7a4d; --accent2:#1f7a4d; --line:#16171a; --soft:rgba(22,23,26,.14);
-    --grid:rgba(22,23,26,.14); --gridbg:#fcfcfa; --font:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif; --danger:#a32121;
+    --grid:rgba(22,23,26,.14); --gridbg:#fcfcfa; --font:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif; --danger:#a32121; --on:#fff; --ink-text:#f6f6f3;
   }
+  html[data-theme="dark"]{--bg:#121314; --panel:#1a1b1d; --panel2:#222326; --text:#ececea; --muted:#9a9b98; --accent:#3fae76; --accent2:#3fae76; --line:#34363a; --soft:rgba(236,236,234,.14); --grid:rgba(236,236,234,.12); --gridbg:#1a1b1d; --danger:#e5645f; --ink:#ececea; --on:#07140d; --ink-text:#121314;}
+  @media (prefers-color-scheme:dark){html:not([data-theme="light"]){--bg:#121314; --panel:#1a1b1d; --panel2:#222326; --text:#ececea; --muted:#9a9b98; --accent:#3fae76; --accent2:#3fae76; --line:#34363a; --soft:rgba(236,236,234,.14); --grid:rgba(236,236,234,.12); --gridbg:#1a1b1d; --danger:#e5645f; --ink:#ececea; --on:#07140d; --ink-text:#121314;}}
   *{box-sizing:border-box;}
   html,body{margin:0;height:100%;}
   body{font-family:var(--font);background:var(--bg);color:var(--text);overflow:hidden;}
@@ -42,16 +45,16 @@
   .txt{width:100%;padding:11px 13px;border-radius:0;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:15px;}
   .stepper{display:flex;align-items:center;border:1px solid var(--line);border-radius:0;overflow:hidden;width:fit-content;}
   .stepper button{width:auto;min-height:44px;padding-inline:18px;background:var(--panel2);border:none;color:var(--text);font-size:20px;}
-  .stepper button:hover{background:var(--accent);color:#fff;}
+  .stepper button:hover{background:var(--accent);color:var(--on);}
   .stepper input{width:56px;min-height:44px;text-align:center;border:none;background:transparent;color:var(--text);font-size:17px;font-weight:600;-moz-appearance:textfield;}
   .stepper input::-webkit-outer-spin-button,.stepper input::-webkit-inner-spin-button{-webkit-appearance:none;}
   #bldList{display:flex;flex-direction:column;gap:10px;}
   .bld-row{display:flex;flex-wrap:wrap;align-items:center;gap:12px;background:var(--panel2);border:1px solid var(--line);border-radius:0;padding:10px 12px;}
-  .bld-row .idx{width:26px;height:26px;border-radius:0;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex:0 0 auto;}
+  .bld-row .idx{width:26px;height:26px;border-radius:0;background:var(--accent);color:var(--on);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex:0 0 auto;}
   .bld-row input.name{min-width:0;min-height:44px;flex:1;padding:8px 10px;border-radius:0;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:14px;}
   .bld-row .flbl{font-size:12px;color:color-mix(in srgb,var(--muted) 85%,var(--text));}
   .bld-row .stepper{margin-left:auto;}
-  .start-btn{margin-top:26px;width:100%;min-height:44px;padding:15px;font-size:17px;font-weight:700;border:none;border-radius:0;background:var(--ink,#16171a);color:#fff;}
+  .start-btn{margin-top:26px;width:100%;min-height:44px;padding:15px;font-size:17px;font-weight:700;border:none;border-radius:0;background:var(--ink,#16171a);color:var(--ink-text);}
   #hotelSignin,#hotelName{min-height:44px;}
   .start-btn:hover{background:var(--accent);}
   .resume{margin-top:12px;width:100%;padding:12px;font-size:14px;font-weight:600;border:1px solid var(--accent);border-radius:0;background:transparent;color:var(--accent);}
@@ -72,7 +75,7 @@
   header.topbar h2{margin:0;font-size:17px;white-space:nowrap;}
   .views{display:flex;gap:6px;margin-left:8px;}
   .view-tab{padding:8px 14px;border-radius:0;background:var(--panel2);border:1px solid var(--line);color:var(--text);font-size:13px;}
-  .view-tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .view-tab.active{background:var(--accent);color:var(--on);border-color:var(--accent);}
   .stats{display:flex;gap:14px;margin-left:auto;font-size:12px;color:var(--muted);}
   .stats b{color:var(--text);}
   .tbtn{background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:8px 12px;border-radius:0;font-size:13px;}
@@ -101,7 +104,7 @@
   .bld-block .bb-info{font-size:11px;color:var(--muted);margin-top:2px;}
   .bld-block .bb-resize{position:absolute;right:2px;bottom:2px;width:16px;height:16px;cursor:nwse-resize;
     background:linear-gradient(135deg,transparent 50%,var(--accent2) 50%);border-radius:0;}
-  .bld-block .bb-edit{position:absolute;top:4px;right:6px;font-size:11px;background:var(--accent);color:#fff;border:none;border-radius:0;padding:3px 7px;opacity:0;transition:.12s;}
+  .bld-block .bb-edit{position:absolute;top:4px;right:6px;font-size:11px;background:var(--accent);color:var(--on);border:none;border-radius:0;padding:3px 7px;opacity:0;transition:.12s;}
   .bld-block:hover .bb-edit{opacity:1;}
   .out-block{position:absolute;border:2px solid;border-radius:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;cursor:grab;overflow:hidden;}
   .out-block:active{cursor:grabbing;}
@@ -193,22 +196,21 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,.s
   .start-card .sub,.gt .start-card .sub{text-align:left;}
   .section-title{font-size:13px;text-transform:none;letter-spacing:0;font-weight:600;}
   #start .styles,#start .section-title:nth-of-type(1){display:none;}
-  .start-btn{background:var(--ink,#16171a);color:#f6f6f3;border-radius:0;font-family:var(--font);}
+  .start-btn{background:var(--ink,#16171a);color:var(--ink-text);border-radius:0;font-family:var(--font);}
   .tbtn,.view-tab,.part,.fl-item,.hotel-row button,.search,.txt,.resume{border-color:var(--line);}
-  .view-tab.active{background:var(--ink,#16171a);color:#f6f6f3;border-color:var(--ink,#16171a);}
+  .view-tab.active{background:var(--ink,#16171a);color:var(--ink-text);border-color:var(--ink,#16171a);}
   .tbtn:hover,.part:hover,.view-tab:hover{border-color:var(--accent);color:var(--accent);}
-  .view-tab.active:hover{color:#f6f6f3;}
-  .stepper button:hover{background:var(--accent);color:#fff;}
+  .view-tab.active:hover{color:var(--ink-text);}
+  .stepper button:hover{background:var(--accent);color:var(--on);}
   .part:hover{transform:none;}
   header.topbar,.site-bar,.editor-bar,.front-bar,.palette,.floornav{background:var(--panel);}
-  .toast{background:var(--ink,#16171a);color:#f6f6f3;border:1px solid var(--ink,#16171a);}
+  .toast{background:var(--ink,#16171a);color:var(--ink-text);border:1px solid var(--ink,#16171a);}
   .bld-block{background:color-mix(in srgb,var(--accent) 12%,var(--panel));}
   .bld-block .bb-edit{background:var(--ink,#16171a);}
   .bld-block .bb-resize{background:linear-gradient(135deg,transparent 50%,var(--accent) 50%);}
   .out-block .ob-del,.room .r-del{border-radius:0;}
   .stats{font-family:"Geist Mono",ui-monospace,monospace;}
   select.tbtn{appearance:none;-webkit-appearance:none;}
-  :root{--ink:#16171a;}
   @media (max-width:760px){
     #viewFloor{flex-direction:column;overflow-y:auto;}
     .palette{width:100%;flex:0 0 auto;max-height:200px;border-right:0;border-bottom:1px solid var(--line);}
@@ -219,7 +221,8 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,.s
     .site-bar .hint,.editor-bar .hint{margin-left:0;width:100%;}
   }
 </style>
-  <meta name="theme-color" content="#f6f6f3">
+  <meta name="theme-color" content="#f6f6f3" media="(prefers-color-scheme: light)" data-gt="light">
+<meta name="theme-color" content="#121314" media="(prefers-color-scheme: dark)" data-gt="dark">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="manifest" href="site.webmanifest">
@@ -227,12 +230,12 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,.s
 <body class="gt">
 
 <!-- ===================== ZUGANGS-SPERRE (privat) ===================== -->
-<div id="hotelGate" style="position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:#f6f6f3;padding:20px;">
-  <div style="max-width:420px;width:100%;background:#fcfcfa;border:1px solid #16171a;padding:30px 28px;text-align:left;color:#16171a;font-family:'Geist',system-ui,sans-serif;">
+<div id="hotelGate" style="position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:var(--bg);padding:20px;">
+  <div style="max-width:420px;width:100%;background:var(--panel);border:1px solid var(--ink);padding:30px 28px;text-align:left;color:var(--text);font-family:'Geist',system-ui,sans-serif;">
     <h1 style="margin:0 0 6px;font-size:22px;font-weight:800;letter-spacing:-.02em">Hotel-Simulator</h1>
-    <p id="hotelGateMsg" role="status" style="color:#62656a;font-size:14px;margin:0 0 20px">Gëtt gelueden …</p>
-    <button id="hotelSignin" style="display:none;background:#16171a;color:#f6f6f3;border:1px solid #16171a;border-radius:0;padding:0 22px;min-height:44px;font-weight:600;font-size:15px;cursor:pointer;font-family:inherit">Umellen</button>
-    <p style="margin-top:18px;margin-bottom:0"><a href="/" style="color:#62656a;font-size:14px;text-decoration:none;font-weight:600;display:inline-flex;min-height:44px;align-items:center">&lsaquo; Heem</a></p>
+    <p id="hotelGateMsg" role="status" style="color:var(--muted);font-size:14px;margin:0 0 20px">Gëtt gelueden …</p>
+    <button id="hotelSignin" style="display:none;background:var(--ink);color:var(--ink-text);border:1px solid var(--ink);border-radius:0;padding:0 22px;min-height:44px;font-weight:600;font-size:15px;cursor:pointer;font-family:inherit">Umellen</button>
+    <p style="margin-top:18px;margin-bottom:0"><a href="/" style="color:var(--muted);font-size:14px;text-decoration:none;font-weight:600;display:inline-flex;min-height:44px;align-items:center">&lsaquo; Heem</a></p>
   </div>
 </div>
 
@@ -347,7 +350,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,.s
 <script>
 /* ============ THEMES ============ */
 /* Gitter: one look. The old three styles all map to the same paper/ink/green tokens. */
-const GITTER_THEME={'--bg':'#f6f6f3','--panel':'#fcfcfa','--panel2':'#efefeb','--text':'#16171a','--muted':'#62656a','--accent':'#1f7a4d','--accent2':'#1f7a4d','--line':'#16171a','--grid':'rgba(22,23,26,.14)','--gridbg':'#fcfcfa','--font':"'Geist',system-ui,sans-serif"};
+const GITTER_THEME={'--font':"'Geist',system-ui,sans-serif"};   // colours live in CSS (light + dark)
 const THEMES={playful:GITTER_THEME,luxury:GITTER_THEME,minimal:GITTER_THEME};
 function applyTheme(n){const t=THEMES[n]||THEMES.minimal;for(const k in t)document.documentElement.style.setProperty(k,t[k]);}
 
@@ -858,7 +861,7 @@ checkResume(); // Cloud-Hotels werden vom Gate via __hotelBoot() nachgeladen
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module">
-  import { client, session, onAuth, openAuthModal } from "./auth.js?v=40";
+  import { client, session, onAuth, openAuthModal } from "./auth.js?v=41";
   const ALLOW = ["konto@ian.lu", "quinn@mulheims.lu"];   // nur diese Konten dürfen rein
   const gate = document.getElementById("hotelGate");
   const msg = document.getElementById("hotelGateMsg");

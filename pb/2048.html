@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>2048 - Arcade</title>
-<link rel="stylesheet" href="/pb/arcade-ui.css?v=3">
+<link rel="stylesheet" href="/pb/arcade-ui.css?v=10">
 <style>
 body{display:flex;flex-direction:column}
 [hidden]{display:none!important}
@@ -25,7 +25,7 @@ body{display:flex;flex-direction:column}
 @keyframes cell-pop{from{transform:scale(.6);opacity:.4}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion:reduce){.cell.pop{animation:none}}
 </style>
-<script src="/pb/arcade-kit.js?v=43" data-arcade-id="2048" data-arcade-title="2048"></script>
+<script src="/pb/arcade-kit.js?v=50" data-arcade-id="2048" data-arcade-title="2048"></script>
 </head>
 <body>
 <main class="arcade-stage" id="stage">
@@ -109,13 +109,22 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden&&typeof pau
 
 const SIZE=4,WIN_TILE=2048,SWIPE_MIN_PX=24,FOUR_CHANCE=0.1;
 // tile ramp: muted cards first, then the shared accent colours as the numbers grow
-const TILE_STYLE={
+const TILE_LIGHT={
   0:['rgba(22,23,26,.05)','#16171a'],
   2:['#ebebe5','#16171a'],4:['#dedfd6','#16171a'],8:['#cfe0d5','#16171a'],16:['#aacfb9','#16171a'],
   32:['#7fb698','#16171a'],64:['#3f9468','#fff'],128:['#1f7a4d','#fff'],256:['#185f3c','#fff'],
   512:['#11452b','#fff'],1024:['#2b2e33','#fff'],2048:['#16171a','#fff']
 };
-const BEYOND_STYLE=['#16171a','#fff'];
+const BEYOND_LIGHT=['#16171a','#fff'];
+// dark ramp (Gitter-dark): dim cards first, then green gets brighter, ends in light "ink"
+const TILE_DARK={
+  0:['rgba(236,236,234,.06)','#ececea'],
+  2:['#2a2c2f','#ececea'],4:['#34383b','#ececea'],8:['#1f3a2c','#ececea'],16:['#25533a','#ececea'],
+  32:['#2f7d54','#ececea'],64:['#3fae76','#07140d'],128:['#5bc48c','#07140d'],256:['#8bd8b0','#07140d'],
+  512:['#bfe9d2','#07140d'],1024:['#d9d9d6','#121314'],2048:['#ececea','#121314']
+};
+const BEYOND_DARK=['#ececea','#121314'];
+const isDark=()=>document.documentElement.getAttribute('data-theme')==='dark';
 let grid,score=0,state='ready',won=false,newTile=null,swipeStart=null;
 
 function updateHud(){
@@ -182,7 +191,7 @@ function render(){
   }
   for(let r=0;r<SIZE;r++)for(let c=0;c<SIZE;c++){
     const v=grid[r][c],el=cells[r*SIZE+c];
-    const [bg,fg]=TILE_STYLE[v]||BEYOND_STYLE;
+    const [bg,fg]=(isDark()?TILE_DARK[v]||BEYOND_DARK:TILE_LIGHT[v]||BEYOND_LIGHT);
     el.style.background=bg;el.style.color=fg;
     el.textContent=v||'';
     el.className='cell'+(v>=1024?' huge':v>=128?' big':'')+(newTile===r+','+c?' pop':'');

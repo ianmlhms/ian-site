@@ -19,6 +19,8 @@
 }
 
 html:has(body.gt) { background: #f6f6f3; color-scheme: light; }
+html[data-theme="dark"]:has(body.gt) { background: #121314; color-scheme: dark; }
+@media (prefers-color-scheme: dark) { html:not([data-theme="light"]):has(body.gt) { background: #121314; color-scheme: dark; } }
 
 body.gt {
   --paper: #f6f6f3;
@@ -29,13 +31,15 @@ body.gt {
   --soft: rgba(22, 23, 26, 0.14);
   --tint: rgba(22, 23, 26, 0.04);
   --green: #1f7a4d;
+  --on-green: #fff;
+  --sunk: #efefeb;
   --gutter: 36px;
   /* site-wide tokens (theme.js / glass-contrast.js), pinned to this look */
   --bg: var(--paper); --text: var(--ink); --text2: var(--muted); --border: var(--soft);
-  --card: var(--white); --card-opaque: var(--white); --card2: #efefeb; --card2-opaque: #efefeb;
-  --card-hover: #efefeb; --panel: var(--white); --panel2: #efefeb;
+  --card: var(--white); --card-opaque: var(--white); --card2: var(--sunk); --card2-opaque: var(--sunk);
+  --card-hover: var(--sunk); --panel: var(--white); --panel2: var(--sunk);
   --glass-solid: var(--white); --glass-tint: var(--white); --control-fill: var(--white);
-  --accent: var(--green); --accent-text: var(--green); --accent-foreground: #fff;
+  --accent: var(--green); --accent-text: var(--green); --accent-foreground: var(--on-green);
   --accent-border: var(--green); --accent2: var(--green); --focus-ring: var(--green);
   margin: 0;
   min-height: 100svh;
@@ -44,6 +48,21 @@ body.gt {
   color-scheme: light;
   font: 400 16px/1.45 "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+/* ---- Dark ("Gitter-dark", Nov 2026): same base tokens as gitter.css. html[data-theme] comes from gitter-theme.js (Auto = device); the media query is the no-JS fallback. */
+html[data-theme="dark"] body.gt {
+  --paper: #121314; --white: #1a1b1d; --ink: #ececea; --muted: #9a9b98;
+  --line: #34363a; --soft: rgba(236, 236, 234, 0.14); --tint: rgba(236, 236, 234, 0.045);
+  --green: #3fae76; --danger: #e5645f; --on-green: #07140d; --sunk: #222326; --ink-rgb: 236 236 234;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) body.gt {
+    --paper: #121314; --white: #1a1b1d; --ink: #ececea; --muted: #9a9b98;
+    --line: #34363a; --soft: rgba(236, 236, 234, 0.14); --tint: rgba(236, 236, 234, 0.045);
+    --green: #3fae76; --danger: #e5645f; --on-green: #07140d; --sunk: #222326; --ink-rgb: 236 236 234;
+    color-scheme: dark;
+  }
 }
 body.gt * { box-sizing: border-box; }
 body.gt [hidden] { display: none !important; }
@@ -259,3 +278,9 @@ html.auth-in .gt .kont { display: none; }
 .gt-admin a, .gt-lbl a, .gt-week .foot .gt-go, .gt-cta .gt-go { padding: 10.5px 0; margin: -10.5px 0; }
 .gt-time .gt-go.big { padding: 10px 0; margin: -10px 0; }
 .gt-lbl a { display: inline-flex; align-items: center; min-height: 44px; padding: 0; margin: -12px 0; }
+
+/* ---- theme toggle (gitter-theme.js injects #gtTheme into the header): Auto -> Hell -> Daischter, line icon ---- */
+.gt-theme { display: inline-grid; place-items: center; width: 44px; min-width: 44px; height: 44px; padding: 0; border: 0; border-radius: 0; background: none; color: var(--muted); cursor: pointer; touch-action: manipulation; }
+.gt-theme:hover { color: var(--green); }
+.gt-theme svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.gt-theme-float { position: fixed; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom)); z-index: 50; background: var(--paper); border: 1px solid var(--line); }
