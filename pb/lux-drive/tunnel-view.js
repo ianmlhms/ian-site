@@ -50,6 +50,7 @@ const C_SHELL = [0.60, 0.59, 0.56];
 const TROUGH_STEP = 1;                           // m between the cross sections of a trough (its wall tops follow the land)
 const KERB_WIDTH = 0.35, KERB_HEIGHT = 0.12;     // m: the kerb along the foot of each trough wall
 const WALL_FOOT = 1.5;                           // m: the back of a trough wall reaches this far under the land it holds
+const FLASH_WIDTH = 0.6, FLASH_SINK = 0.03;      // m: the flashing behind a wall lower than the land it holds reaches this far back, this far under the land
 const APRON = 0.6, APRON_SINK = 0.03;            // m: the floor reaches this far on past the outer end of a trough, this far under the terrain
 const FLOOR_SKIRT = 1.0;                         // m: the floor's outer edge hangs this far down (the terrain is cut there by the mask)
 const C_TAR = [0.245, 0.249, 0.261];             // (deck-view.js COLOUR_ASPHALT: the far tar of the ground shader)
@@ -317,6 +318,13 @@ export function buildTroughs(tube, b, heightAt) {
         if (side > 0) up(lw, lo, ta, tc, ta, tc, C_COPING); else up(lo, lw, ta, tc, ta, tc, C_COPING);
         const [xa, , za] = P(a, side * (oh + 0.3), 0), [xc, , zc] = P(c, side * (oh + 0.3), 0);
         wall(lo, Math.min(heightAt(xa, za), ya) - WALL_FOOT, Math.min(heightAt(xc, zc), yc) - WALL_FOOT, ta, tc, false, C_TROUGH_WALL);
+        // the flashing: where the land behind the wall lies over its top (a road the wall holds: its top stays under the road's edge), a strip rises from the coping's
+        // back edge to just under that land - a ray over the coping met the land from below (the René Konen south trough beside Bd Roosevelt, the camera sweep, tunnels19)
+        const lf = side * (oh + FLASH_WIDTH), [fxa, , fza] = P(a, lf, 0), [fxc, , fzc] = P(c, lf, 0);
+        const fa = heightAt(fxa, fza) - FLASH_SINK, fc = heightAt(fxc, fzc) - FLASH_SINK;
+        if (fa > ta || fc > tc) {
+          if (side > 0) up(lo, lf, ta, tc, Math.max(ta, fa), Math.max(tc, fc), C_COPING); else up(lf, lo, Math.max(ta, fa), Math.max(tc, fc), ta, tc, C_COPING);
+        }
       }
     }
     // the outer end: the end faces of the walls and the skirt of the floor (facing out of the trough)

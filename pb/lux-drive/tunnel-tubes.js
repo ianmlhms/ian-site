@@ -59,7 +59,8 @@ export const TUBE = Object.freeze({
   flushIn: 16,             // m: the cross-section of the approach at a face fades into the plane floor over this ...
   flushOut: 0.4,           // ... read this far out of the face ...
   flushMax: 0.2,           // ... and never more than this off the plane (the cut slope beside a narrow approach is not its road) ...
-  flushOff: 4,             // ... and out of the face it fades over this (m: half the blend, tunnels19)
+  flushOff: 4,             // ... and out of the face it fades over this (m: half the blend, tunnels19) ...
+  flushOffFast: 8,         // ... in a fast tube over the whole blend (at 57 m/s the 4 m fade rocked the A4 west mouth: 11.6 -> 19.3 m/s2)
   frontBack: 1.2,          // m: the face of a portal stands this far before the place where the drawn terrain rises over the road ...
   frontOut: 12,            // ... but at most this far out of the OSM mouth ...
   frontIn: 3,              // ... or this far into it
@@ -177,8 +178,9 @@ export function floorOf(tube, i, f, lat) {
   const u = clamp(lat / tube.innerHalf, -1, 1) * 8 + 8, k = Math.min(15, Math.floor(u)), r = u - k;
   // (the cross-section of the face is the approach's AT the face: out of it the term fades over TUBE.flushOff - carried on unchanged, the floor in front of Rue du Fort
   // Thüngen's face B kept its kerb 0.2 m high 4 m out, where the Desserte exit crosses the blend: a car leaving the Desserte tube was pulled up 5 - 10 cm there, 23 - 35 m/s2)
-  if (tube.flushA && s < tube.sA + TUBE.flushIn) h += (tube.flushA[k] + (tube.flushA[k + 1] - tube.flushA[k]) * r) * (1 - smooth01((s - tube.sA) / TUBE.flushIn)) * (1 - smooth01((tube.sA - s) / TUBE.flushOff));
-  if (tube.flushB && s > tube.sB - TUBE.flushIn) h += (tube.flushB[k] + (tube.flushB[k + 1] - tube.flushB[k]) * r) * (1 - smooth01((tube.sB - s) / TUBE.flushIn)) * (1 - smooth01((s - tube.sB) / TUBE.flushOff));
+  const off = TUBE.fastKinds.has(tube.kind) ? TUBE.flushOffFast : TUBE.flushOff;
+  if (tube.flushA && s < tube.sA + TUBE.flushIn) h += (tube.flushA[k] + (tube.flushA[k + 1] - tube.flushA[k]) * r) * (1 - smooth01((s - tube.sA) / TUBE.flushIn)) * (1 - smooth01((tube.sA - s) / off));
+  if (tube.flushB && s > tube.sB - TUBE.flushIn) h += (tube.flushB[k] + (tube.flushB[k + 1] - tube.flushB[k]) * r) * (1 - smooth01((tube.sB - s) / TUBE.flushIn)) * (1 - smooth01((s - tube.sB) / off));
   return h;
 }
 
