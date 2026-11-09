@@ -8,18 +8,20 @@
 @font-face { font-family: "Geist Mono"; font-style: normal; font-weight: 500; font-display: swap; src: url("assets/fonts/geist-mono-500-latin.woff2") format("woff2"); }
 
 html:has(body.gt) { background: #f6f6f3; color-scheme: light; }
+html[data-theme="dark"]:has(body.gt) { background: #121314; color-scheme: dark; }
+@media (prefers-color-scheme: dark) { html:not([data-theme="light"]):has(body.gt) { background: #121314; color-scheme: dark; } }
 
 body.gt {
   --paper: #f6f6f3; --white: #fcfcfa; --ink: #16171a; --muted: #62656a;
   --line: #16171a; --soft: rgba(22, 23, 26, 0.14); --tint: rgba(22, 23, 26, 0.04);
-  --green: #1f7a4d; --danger: #a32121; --gutter: 36px;
+  --green: #1f7a4d; --danger: #a32121; --on-green: #fff; --sunk: #efefeb; --gutter: 36px;
   /* site-wide tokens (theme.js / glass-contrast.js), pinned to this look */
   --bg: var(--paper); --text: var(--ink); --text2: var(--muted); --border: var(--soft);
-  --card: var(--white); --card-opaque: var(--white); --card2: #efefeb; --card2-opaque: #efefeb;
-  --card-hover: #efefeb; --panel: var(--white); --panel2: #efefeb;
+  --card: var(--white); --card-opaque: var(--white); --card2: var(--sunk); --card2-opaque: var(--sunk);
+  --card-hover: var(--sunk); --panel: var(--white); --panel2: var(--sunk);
   --glass-solid: var(--white); --glass-tint: var(--white); --control-fill: var(--white);
-  --accent: var(--green); --accent-text: var(--green); --accent-foreground: #fff;
-  --accent-border: var(--green); --accent2: var(--green); --accent2-foreground: #fff;
+  --accent: var(--green); --accent-text: var(--green); --accent-foreground: var(--on-green);
+  --accent-border: var(--green); --accent2: var(--green); --accent2-foreground: var(--on-green);
   --accent3: var(--green); --accent4: var(--green); --focus-ring: var(--green);
   --font-display: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
   --r-tile: 0; --r-chip: 0; --r-panel: 0; --radius: 0; --tile-edge: var(--soft);
@@ -27,6 +29,23 @@ body.gt {
   margin: 0; min-height: 100svh; background: var(--paper); color: var(--ink); color-scheme: light;
   font: 400 16px/1.45 "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+/* ---- Dark ("Gitter-dark", Nov 2026): near-black paper, lifted green. The tokens above are the light set; this overrides the BASE tokens only
+ * (everything else is derived from them). html[data-theme] is set before first paint by gitter-theme.js (Auto follows the device);
+ * the media query is the no-JS fallback. Keep both blocks identical. */
+html[data-theme="dark"] body.gt {
+  --paper: #121314; --white: #1a1b1d; --ink: #ececea; --muted: #9a9b98;
+  --line: #34363a; --soft: rgba(236, 236, 234, 0.14); --tint: rgba(236, 236, 234, 0.045);
+  --green: #3fae76; --danger: #e5645f; --on-green: #07140d; --sunk: #222326; --ink-rgb: 236 236 234;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) body.gt {
+    --paper: #121314; --white: #1a1b1d; --ink: #ececea; --muted: #9a9b98;
+    --line: #34363a; --soft: rgba(236, 236, 234, 0.14); --tint: rgba(236, 236, 234, 0.045);
+    --green: #3fae76; --danger: #e5645f; --on-green: #07140d; --sunk: #222326; --ink-rgb: 236 236 234;
+    color-scheme: dark;
+  }
 }
 body.gt::before, body.gt::after { display: none !important; }
 body.gt * { box-sizing: border-box; }
@@ -78,7 +97,7 @@ html.auth-in .gt-acct { color: var(--ink); }
 
 /* ---- buttons ---- */
 .gt-btn, .gt .ui-btn { appearance: none; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 18px; border: 1px solid var(--ink); border-radius: 0; background: var(--ink); color: var(--paper); font: 600 15px/1 "Geist", system-ui, sans-serif; text-decoration: none; cursor: pointer; white-space: nowrap; transition: background-color .15s, border-color .15s, color .15s; }
-.gt-btn:hover, .gt .ui-btn:hover { background: var(--green); border-color: var(--green); color: #fff; transform: none; filter: none; }
+.gt-btn:hover, .gt .ui-btn:hover { background: var(--green); border-color: var(--green); color: var(--on-green); transform: none; filter: none; }
 .gt-btn.ghost, .gt .ui-btn--ghost { background: transparent; color: var(--ink); }
 .gt-btn.ghost:hover, .gt .ui-btn--ghost:hover { background: var(--white); border-color: var(--green); color: var(--green); }
 .gt-btn[disabled], .gt .ui-btn[disabled] { opacity: .5; cursor: default; }
@@ -190,3 +209,9 @@ body.gt > header:not(.arcade-bar):not(.gt-nav):not(.gt-bar) { box-shadow: none; 
 /* ---- polish (Nov 2026): the Arcade game bar never wraps (site-glass wraps bars that hold the hidden language switcher) ---- */
 html body.gt .arcade-bar { flex-wrap: nowrap; }
 html body.gt .arcade-bar .langsw, html body.gt .arcade-bar #langSw { display: none !important; }
+
+/* ---- theme toggle (gitter-theme.js injects #gtTheme into the header): Auto -> Hell -> Daischter, line icon ---- */
+.gt-theme { display: inline-grid; place-items: center; width: 44px; min-width: 44px; height: 44px; padding: 0; border: 0; border-radius: 0; background: none; color: var(--muted); cursor: pointer; touch-action: manipulation; }
+.gt-theme:hover { color: var(--green); }
+.gt-theme svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.gt-theme-float { position: fixed; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom)); z-index: 50; background: var(--paper); border: 1px solid var(--line); }
