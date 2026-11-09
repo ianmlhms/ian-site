@@ -53,7 +53,8 @@ const chainEnds = (c) => [[c.x[0], c.z[0]], [c.x[c.x.length - 1], c.z[c.z.length
 const cutMouths = chains.filter((c) => net.roads[c.road].openCut).flatMap(chainEnds);
 const approachWays = new Set(chains.filter((c) => !net.roads[c.road].openCut
   && chainEnds(c).some(([x, z]) => cutMouths.some(([mx, mz]) => Math.hypot(x - mx, z - mz) <= PORTAL.mouthGap))).map((c) => c.road));
-let approachRamps = 0;
+let approachRamps = 0, abutRamps = 0;
+const ABUT_DUG = 1.0;          // m: (city21) a face under a deck that the carve dug this far under the land (somewhere on it) is the abutment's wall - harness D's "pit of 1 m"
 
 // The faces already written, as the SEGMENTS of their walls: two ways that both see one face (the step between two carriageways at two levels, surface11) sample it 4 m apart
 // at offsets of their own, so a point of the second way lies up to 2 m from the nearest POINT of the first one's wall and was written again - a second wall in the first
@@ -124,6 +125,20 @@ function wallPointAt(chain, i, side) {
     let dug = -Infinity;
     for (let k = face ? face.first : 0; face && k <= face.last; k++) dug = Math.max(dug, lands[k] - heights[k]);
     if (dug >= APPROACH_DUG) { ramp = face; approachRamps++; }
+  }
+  // (city21) the abutment of a bridge beside a road that passes under it: the carve frees the carriageway under a deck down to its bed (road-network.js UNDER_DECK_*), and the
+  // face from the edge of the carriageway up to the land under the bridge is the abutment's concrete - a wall like the face of an opened cut (CUT_RAMP, its lowest maxRise
+  // metres), where the carve dug it at least ABUT_DUG under the land and a deck stands over the middle of the face.  (Harness D: a cut of more than 1 m under a deck must be
+  // closed by such a wall; the A13 9520 under the A6 at Croix de Cessange rode the abutment's toe in its outer lane, roll 0.58)
+  if (!ramp) {
+    const face = findRamp(heights, lands, WALL.scanStep, CUT_RAMP);
+    let dug = -Infinity;
+    for (let k = face ? face.first : 0; face && k <= face.last; k++) dug = Math.max(dug, lands[k] - heights[k]);
+    if (face && dug >= ABUT_DUG) {
+      const tMid = t0 + ((face.first + face.last) / 2) * WALL.scanStep, mx = chain.x[i] + nx * tMid, mz = chain.z[i] + nz * tMid;
+      const low = Math.min(heights[face.first], heights[face.last]);
+      if (ground.overheadAt(mx, mz, low + 0.1) < Infinity) { ramp = face; abutRamps++; }
+    }
   }
   if (!ramp) return null;
   // the foot of the face is the low end of the ramp; the block reaches back to its high end
@@ -420,7 +435,7 @@ fs.writeFileSync(OUT, encodeWalls(walls));
 const points = walls.reduce((s, w) => s + w.pts.length, 0);
 let length = 0;
 for (const w of walls) for (let i = 1; i < w.pts.length; i++) length += Math.hypot(w.pts[i].x - w.pts[i - 1].x, w.pts[i].z - w.pts[i - 1].z);
-console.log(`the ways into an opened cut: ${approachWays.size}, ${approachRamps} dug faces on them; ${joined} cut walls joined at a mouth`);
+console.log(`the ways into an opened cut: ${approachWays.size}, ${approachRamps} dug faces on them; ${joined} cut walls joined at a mouth; ${abutRamps} abutment faces under decks`);
 console.log(`walls: ${walls.length} walls, ${points} points, ${length.toFixed(0)} m long -> ${OUT} (${fs.statSync(OUT).size} bytes); ${probed} samples probed, ${found} ramps, ${duplicate} seen twice, ${short} too short, ramps on tarmac: ${rejected.foot} at the foot / ${rejected.back} at the back, ${rejected.air} in the air, ${rejected.deck} under a deck`);
 if (process.argv.includes('--stats')) {
   const bins = [0.8, 1.5, 2.5, 4, 6, 8.01];
