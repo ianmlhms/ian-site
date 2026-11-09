@@ -16,7 +16,7 @@ import { ROAD } from './config.js';
 import { ROAD_KINDS, kindInfo } from './roads.js';
 import { designBed, bedSlopes, hermite } from './road-bed.js';
 import { createJunctionSurface } from './junction-surface.js';
-import { chainCarriageways, paintGroups } from './carriageways.js';
+import { chainCarriageways, paintGroups, splitKey } from './carriageways.js';
 import { isLandmarkDeck } from './decks.js';
 import { laneOffsets } from './lane-clearance.js';
 
@@ -778,6 +778,11 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
         keepUp[q.w.road] = out;
       }
       if (span.every((q) => Math.abs(q.hw - span[0].hw) < 1e-3)) continue;
+      // (no taper across a split, carriageways.js splitsAt: the two-way way of a dual carriageway kept its width only in the middle - narrowed 1 : 12 toward one branch, its outer
+      // lane ran off its tarmac at the Bd des Scillas and the Route de Luxembourg (sweep: 0.4 - 1.6 m outside, jolts of 65 - 80 m/s2))
+      const part = [0];
+      for (let k = 1; k < span.length; k++) part.push(part[k - 1] + (carriageways.splits.has(splitKey(span[k - 1].w.road, span[k].w.road)) ? 1 : 0));
+      span.forEach((q, k) => { q.part = part[k]; });
       for (const q of span) {
         if (!q.pr) continue;
         const { n, chain: c } = q.pr;
@@ -786,7 +791,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
           const sc = q.w.rev ? q.b - c.arc[i] : q.a + c.arc[i];          // the place of the sample along the chain
           let hw = q.hw;
           for (const o of span) {
-            if (o === q || o.hw >= hw || !o.pr) continue;              // (a deck way is not carved: the deck is drawn at its own width and meets the road with its own apron, decks.js)
+            if (o === q || o.hw >= hw || !o.pr || o.part !== q.part) continue;   // (a deck way is not carved: the deck is drawn at its own width and meets the road with its own apron, decks.js)
             const dist = sc < o.a ? o.a - sc : sc > o.b ? sc - o.b : 0;
             const v = o.hw + dist / WIDTH_TAPER;
             if (v < hw) hw = v;

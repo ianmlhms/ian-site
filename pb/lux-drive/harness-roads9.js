@@ -9,7 +9,7 @@
  * Called by harness.js; everything it needs is passed in.  Pure Node. */
 
 import { buildMarkingPlan, chainPoint, MARK } from './markings.js';
-import { isMarkedWay } from './carriageways.js';
+import { isMarkedWay, splitKey } from './carriageways.js';
 import { PORTAL } from './config.js';
 import { portalRoadAt } from './portals.js';
 import { CHANNELS } from './road-network.js';
@@ -38,11 +38,13 @@ export function runRoads9Checks({ check, section, stats, data, net, surface, por
   const chainOf = new Map(net.chains.map((c) => [c.road, c]));
   const groupOf = net.carriageways.groupOf;
   // ---- P1: the width at the joints of the carriageway chains
-  let joints = 0, steps = 0, worst = 0, worstAt = '', twoLevels = 0;
+  let joints = 0, steps = 0, worst = 0, worstAt = '', twoLevels = 0, splits = 0;
   const stepList = [], levelList = [];
   for (const ws of net.carriageways.chainWays) {
     for (let k = 1; k < ws.length; k++) {
       const p = ws[k - 1], q = ws[k];
+      // (a split - a two-way way into the two one-way carriageways of a dual carriageway - is no joint of one carriageway: the two-way way keeps its width over both, fix19)
+      if (net.carriageways.splits.has(splitKey(p.road, q.road))) { splits++; continue; }
       const cp = chainOf.get(p.road), cq = chainOf.get(q.road);
       if (!cp || !cq || !net.info[p.road] || !net.info[q.road]) continue;                 // (a bridge or a tunnel in the chain: the deck is drawn by the deck view)
       if (Math.abs(net.info[p.road].hw - net.info[q.road].hw) < MIN_DIFF) continue;
@@ -64,7 +66,7 @@ export function runRoads9Checks({ check, section, stats, data, net, surface, por
       if (step > MAX_STEP) { steps++; if (stepList.length < 5) stepList.push(`${data.roads[p.road].name || data.roads[p.road].kind} ${Math.round(ax)},${Math.round(az)} ${step.toFixed(2)} m`); }
     }
   }
-  stats.widthJoints = { joints, steps, twoLevels, levelList, worstM: +worst.toFixed(3), worstAt, flickerFilled: (data.flickerFilled || []).length };
+  stats.widthJoints = { joints, steps, twoLevels, splits, levelList, worstM: +worst.toFixed(3), worstAt, flickerFilled: (data.flickerFilled || []).length };
   check(`P1 the tarmac never steps in width at a joint of a carriageway (two ways of >= ${MIN_DIFF} m different half width: <= ${MAX_STEP} m over ${2 * PROBE} m)`,
     joints > 100 && steps <= MAX_STEPS_LEFT, `${joints} joints, ${steps} steps: ${stepList.join('; ')}; worst ${worst.toFixed(3)} m at ${worstAt}`);
 
