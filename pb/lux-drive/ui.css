@@ -233,3 +233,70 @@ body[class*='open-'] #touchControls { display: none; }
   .overlay .box { padding: 0.8rem 1rem; }
   .overlay h1 { font-size: 1.7rem; }
 }
+
+/* ======================================================================================================
+   car20: the Gitter look of ian.lu, as the Zuch / Tram simulator wears it (pb/train-sim.css skin C, HUD w2):
+   paper menus with square ink frames and mono labels; a boxless HUD - white text and numerals with a dark
+   outline straight on the 3D scene; touch controls as square outlines.  Only colours, frames and type change:
+   every size and place of the rules above stays (the flows measure the touch controls).
+   ====================================================================================================== */
+@font-face { font-family: "Geist"; font-style: normal; font-weight: 400 800; font-display: swap; src: url("/assets/fonts/geist-latin.woff2") format("woff2"); }
+@font-face { font-family: "Geist Mono"; font-style: normal; font-weight: 500; font-display: swap; src: url("/assets/fonts/geist-mono-500-latin.woff2") format("woff2"); }
+:root {
+  color-scheme: light;
+  --paper: #f6f6f3; --white: #fcfcfa; --ink: #16171a; --muted: #62656a; --hair: rgba(22, 23, 26, 0.14); --line: #16171a;
+  --gt-green: #1f7a4d; --gold: #16171a; --accent: #1f7a4d; --accent2: #1f7a4d; --panel: #16171a; --panel2: #fcfcfa; --hud-bg: transparent;
+  --hud-t: #fff; --hud-t2: rgba(255, 255, 255, 0.86); --hud-line: rgba(255, 255, 255, 0.78); --hud-go: #7ee0ad;
+  --hud-sh: 1px 0 0 #0c0d0f, -1px 0 0 #0c0d0f, 0 1px 0 #0c0d0f, 0 -1px 0 #0c0d0f, 1px 1px 0 #0c0d0f, -1px -1px 0 #0c0d0f, 1px -1px 0 #0c0d0f, -1px 1px 0 #0c0d0f, 0 0 9px rgba(0, 0, 0, 0.55);
+  --hud-plate: rgba(12, 13, 15, 0.32);
+  --font: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif; --mono: "Geist Mono", ui-monospace, Menlo, monospace;
+}
+html, body { background: var(--paper); font-family: var(--font); }
+
+/* the loading screen: paper, an ink title, a green bar */
+#loading { background: var(--paper); color: var(--ink); }
+#loading h1 { font-weight: 800; letter-spacing: -0.03em; }
+#loading p { color: var(--muted); font: 500 0.82rem/1.4 var(--mono); letter-spacing: 0.04em; }
+#loading .bar { border-radius: 0; background: var(--hair); }
+#loading #loadBar { background: var(--gt-green); }
+
+/* the HUD: no boxes, white with a dark outline */
+#hud { color: var(--hud-t); text-shadow: var(--hud-sh); font-weight: 600; }
+#speedo #speedValue { font: 500 3.1rem/1 var(--mono); letter-spacing: -0.05em; }
+#speedo small { color: var(--hud-t2); font: 500 0.85rem/1 var(--mono); letter-spacing: 0.04em; }
+#roadName { background: none; border: 0; border-bottom: 1px solid var(--hud-line); border-radius: 0; padding: 0.1rem 0.2rem 0.2rem; font-weight: 700; letter-spacing: -0.01em; }
+.hbtn { border-radius: 0; border: 1.5px solid var(--hud-line); background: var(--hud-plate); color: var(--hud-t); backdrop-filter: none; -webkit-backdrop-filter: none; }
+#minimap { border-radius: 0; border: 2px solid var(--hud-t); box-shadow: 0 0 0 1px #0c0d0f, 0 4px 16px rgba(0, 0, 0, 0.35); }
+#toast { background: var(--ink); color: var(--paper); border: 1px solid var(--ink); border-left: 3px solid var(--hud-go); border-radius: 0; font-weight: 600; }
+
+/* the chooser and the overlays: paper cards with an ink frame */
+#chooser, .overlay .box, #orient { background: var(--white); color: var(--ink); border: 1px solid var(--ink); border-radius: 0; box-shadow: none; text-shadow: none; }
+#chooser .chRow > b, .overlay h3 { font: 500 0.72rem/1.4 var(--mono); color: var(--muted); letter-spacing: 0.06em; }
+.overlay { background: rgba(246, 246, 243, 0.86); backdrop-filter: none; -webkit-backdrop-filter: none; }
+.overlay h1 { color: var(--ink); letter-spacing: -0.03em; font-weight: 800; }
+.overlay h2 { letter-spacing: -0.02em; font-weight: 800; }
+.overlay p { color: var(--muted); }
+.overlay .tagline { color: var(--ink); }
+.overlay button:not(.chip):not(.dot) { border-radius: 0; background: transparent; border: 1px solid var(--ink); color: var(--ink); font-weight: 600; }
+.overlay button:not(.chip):not(.dot):hover { border-color: var(--gt-green); color: var(--gt-green); }
+.overlay button.primary:not(.chip):not(.dot) { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.overlay button.primary:not(.chip):not(.dot):hover { background: var(--gt-green); border-color: var(--gt-green); color: #fff; }
+.chip { border-radius: 0; border: 1px solid var(--hair); background: transparent; color: var(--ink); font-weight: 600; }
+.chip:hover { border-color: var(--ink); }
+.chip[aria-pressed='true'] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.dot { border-radius: 0; border: 2px solid var(--white); box-shadow: 0 0 0 1px var(--hair); }
+.dot[aria-pressed='true'] { border-color: var(--white); box-shadow: 0 0 0 2px var(--ink); }
+
+/* the Kaart */
+.mapBar { background: var(--white); color: var(--ink); border: 1px solid var(--ink); border-radius: 0; }
+.mapBar span { color: var(--muted); }
+#mapOverlay .hbtn { background: var(--white); color: var(--ink); border: 1px solid var(--ink); text-shadow: none; }
+
+/* the touch controls: square outlines over the scene, ink when pressed */
+#touchControls .pad { border-radius: 0; background: var(--hud-plate); border: 2px solid var(--hud-line); color: var(--hud-t); }
+#touchControls .pad.on { background: rgba(12, 13, 15, 0.46); }
+#touchControls .knob { border-radius: 0; background: var(--hud-t); box-shadow: 0 0 0 1px #0c0d0f, 0 3px 10px rgba(0, 0, 0, 0.35); }
+#touchControls .tbtn { border-radius: 0; background: var(--hud-plate); color: var(--hud-t); border: 2px solid var(--hud-line); text-shadow: var(--hud-sh); }
+#touchControls .tbtn small { font: 500 0.68rem/1 var(--mono); letter-spacing: 0.04em; }
+#touchControls .tbtn.big { background: rgba(31, 122, 77, 0.42); border-color: var(--hud-go); }
+#touchControls .tbtn.on, #touchControls .tbtn.big.on { background: var(--hud-t); color: var(--ink); text-shadow: none; border-color: var(--hud-t); }
