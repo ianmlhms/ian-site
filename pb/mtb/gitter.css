@@ -37,11 +37,11 @@ button:focus-visible{outline:2px solid var(--g-green);outline-offset:2px}
 .card-head .ct{font-weight:800;letter-spacing:-.03em}
 .card-head .cs,.card-stats,.fin-trail,.fin-best,.fin-next,.fin-ghost.lost,.fin-splits,.note,.map-cap,.trail-row small,.bike p{color:var(--g-muted)}
 .card-stats b{color:var(--g-ink)}
-.tag,.newbest{background:var(--g-green);color:#fff}
+.tag,.newbest{background:var(--g-green);color:var(--g-on-green)}
 .card-medals .mt{background:var(--g-tint);border:1px solid var(--g-soft)}
 .ghost,.fin-ghost{color:var(--g-green)}
 .locked,.fin-invalid{background:var(--g-white);border:1px solid var(--g-danger);color:var(--g-danger)}
-.bigstart{background:var(--g-green);color:#fff;border:1px solid var(--g-green);font-size:22px;font-weight:700;letter-spacing:0;animation:none}
+.bigstart{background:var(--g-green);color:var(--g-on-green);border:1px solid var(--g-green);font-size:22px;font-weight:700;letter-spacing:0;animation:none}
 .bigstart:hover:not(:disabled){background:var(--g-ink);border-color:var(--g-ink);color:var(--g-paper)}
 .bigstart:disabled{filter:none;background:var(--g-tint);color:var(--g-muted);border-color:var(--g-soft)}
 .sbtn,.fin-fold,.x{background:var(--g-white);color:var(--g-ink);border:1px solid var(--g-ink)}
@@ -49,12 +49,12 @@ button:focus-visible{outline:2px solid var(--g-green);outline-offset:2px}
 .sbtn small{color:var(--g-muted)}
 .fin-title .mn{color:var(--g-green)}.fin-time b,.card-best b,.mcount .num{font-family:var(--g-mono);font-weight:500}
 .fin-unlock{background:var(--g-white);border:1px solid var(--g-green);color:var(--g-green)}
-.fin-unlock .okmark{background:var(--g-green);color:#fff;border-radius:0}
+.fin-unlock .okmark{background:var(--g-green);color:var(--g-on-green);border-radius:0}
 .sp.good{color:var(--g-green)}.sp.bad{color:var(--g-danger)}
 .mcount .lights{background:rgba(22,23,26,.45);border:2px solid #fff}.mcount .num{color:#fff;text-shadow:var(--halo)}.mcount.go .num{color:#fff}
 
 /* menu */
-.mmenu{background:rgba(246,246,243,.96)}
+.mmenu{background:var(--g-veil)}
 .menu-head{border-bottom:1px solid var(--g-ink)}.menu-head b{font-weight:800;letter-spacing:-.03em}
 .tab{border-radius:0!important;color:var(--g-ink)}.tab.on{background:var(--g-ink);color:var(--g-paper)}
 .map-wrap canvas{border:1px solid var(--g-ink)!important;border-radius:0!important}
@@ -69,5 +69,8 @@ button:focus-visible{outline:2px solid var(--g-green);outline-offset:2px}
 #touchControls .pad,#touchControls .tbtn{background:rgba(22,23,26,.35);border:2px solid #fff;color:#fff;text-shadow:var(--halo)}
 #touchControls .pad .knob{background:var(--g-white);border:1px solid var(--g-ink);border-radius:0!important}
 #touchControls .pad .lbl{color:#fff}
-#touchControls .tbtn.big{background:rgba(31,122,77,.55);border-color:#fff}
+#touchControls .tbtn.big{background:color-mix(in srgb,var(--g-green) 55%,transparent);border-color:#fff}
 #touchControls .on{background:var(--g-green)!important}
+
+/* Gitter-dark (Nov 2026): the tokens flip with html[data-theme] (set by the hub / gitter-theme.js); the HUD on the 3D scene stays white with an outline. */
+html[data-theme="dark"],html[data-theme="dark"] body,html[data-theme="dark"] body.dark{--g-paper:#121314;--g-white:#1a1b1d;--g-ink:#ececea;--g-muted:#9a9b98;--g-green:#3fae76;--g-danger:#e5645f;--g-soft:rgba(236,236,234,.14);--g-tint:rgba(236,236,234,.05);--g-veil:rgba(18,19,20,.95);--g-on-green:#07140d;color-scheme:dark}

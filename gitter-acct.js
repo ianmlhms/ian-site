@@ -1,6 +1,6 @@
 /* gitter-acct.js — header account button of the Gitter look: "Umellen" for visitors, the username once signed in.
  * Usage: <button class="gt-acct" id="gtAcct">Umellen</button> + <script type="module" src="gitter-acct.js?v=1"></script>. */
-import * as auth from "./auth.js?v=40";
+import * as auth from "./auth.js?v=41";
 
 const button = document.getElementById("gtAcct");
 

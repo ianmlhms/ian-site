@@ -25,7 +25,7 @@ export const flow = {
       const watch = new MutationObserver(() => {
         if (document.body && window.__themeAtBody === undefined) { window.__themeAtBody = document.documentElement.getAttribute("data-theme"); watch.disconnect(); }
       });
-      watch.observe(document.documentElement, { childList: true });
+      watch.observe(document, { childList: true, subtree: true });
     });
     const errors = [];
     page.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) errors.push(m.text()); });

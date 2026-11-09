@@ -9,7 +9,7 @@
  * The page calls: PB.chooseMode(game) (owner prompt: true = test, false = normal, null = cancelled),
  * PB.onOpenGame(game, {testMode}), PB.instrument(html), PB.onCloseGame().
  */
-import * as auth from "./auth.js?v=40";
+import * as auth from "./auth.js?v=41";
 import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=13";
 
 import { compactScore, scoreHtml, scoreKeyHtml, arcadeText } from "./score-format.js?v=11";
@@ -962,9 +962,9 @@ function css() {
   .pb-box h3{margin:0 0 4px;font-family:'Fredoka',sans-serif;font-size:20px}
   .pb-tabs{display:flex;gap:8px;margin:14px 0}
   .pb-tab{flex:1;padding:8px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;font-weight:700;font-size:13px}
-  .pb-tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+  .pb-tab.active{background:var(--accent);border-color:var(--accent);color:var(--accent-foreground,#fff)}
   .pb-box input{width:100%;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:11px 12px;font-size:14px;margin-bottom:10px;font-family:'Nunito',sans-serif}
-  .pb-go{width:100%;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px;font-size:15px;font-weight:800;cursor:pointer}
+  .pb-go{width:100%;background:var(--accent);color:var(--accent-foreground,#fff);border:none;border-radius:10px;padding:12px;font-size:15px;font-weight:800;cursor:pointer}
   .pb-go:hover{filter:brightness(1.08)}
   .pb-msg{font-size:12.5px;margin-top:10px;min-height:16px}
   .pb-msg.err{color:#ff6b6b}.pb-msg.ok{color:var(--accent4)}
@@ -973,7 +973,7 @@ function css() {
   .pb-row .r{width:26px;flex:none;color:var(--text2)}.pb-row .pb-name{min-width:0;flex:1;overflow-wrap:anywhere}.pb-row b{flex:none;margin-left:6px;color:var(--accent3);text-align:right;font-variant-numeric:tabular-nums;max-width:45%;min-width:0}
   .pb-link{color:var(--accent2);cursor:pointer;font-size:12.5px}
   .pb-save-hint{position:fixed;left:50%;bottom:max(14px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:2500;display:flex;align-items:center;gap:10px;width:max-content;max-width:calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right));padding:8px 8px 8px 14px;border-radius:14px;background:var(--card,#161625);color:var(--text,#e8e8f0);border:1px solid var(--border,rgba(255,255,255,.14));box-shadow:0 10px 30px rgba(0,0,0,.4);font:600 13.5px/1.35 'Nunito',system-ui,sans-serif}
-  .pb-save-hint__go{flex:none;min-height:44px;padding:0 16px;border:0;border-radius:10px;background:var(--accent,#6c5ce7);color:#fff;font:inherit;font-weight:800;cursor:pointer}
+  .pb-save-hint__go{flex:none;min-height:44px;padding:0 16px;border:0;border-radius:10px;background:var(--accent,#6c5ce7);color:var(--accent-foreground,#fff);font:inherit;font-weight:800;cursor:pointer}
   .pb-mode{z-index:3100}
   .pb-mode__box{text-align:center}
   .pb-mode__box h3{margin-bottom:2px}

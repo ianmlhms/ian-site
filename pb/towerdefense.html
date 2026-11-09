@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Tower Defense - Arcade</title>
-<link rel="stylesheet" href="/pb/arcade-ui.css?v=3">
+<link rel="stylesheet" href="/pb/arcade-ui.css?v=10">
 <style>
 :root{--ink:var(--text);--panel:rgba(22,22,37,.92);--line:var(--border);--gold:var(--amber);--green:var(--good);--blue:var(--cyan)}
 *{box-sizing:border-box}html,body{width:100%;height:100%;margin:0}body{height:100dvh;display:flex;flex-direction:column;overflow:hidden;background:var(--bg);color:var(--ink);touch-action:manipulation}
@@ -34,32 +34,36 @@ button:active{transform:scale(.95)}button:disabled{opacity:.38;cursor:default;tr
 @media(max-height:650px){#hud{min-height:46px}.stat b{font-size:13px;line-height:18px}#dock{padding-top:4px}.skill{height:42px}.towerCard{height:46px;min-height:46px}.panel{padding:13px}.panel h1{font-size:27px}.panel>p{margin-bottom:8px}.menuTitle{margin-top:8px}}
 @media(max-width:390px){#hud{grid-template-columns:repeat(3,1fr);min-height:78px}.stat b{line-height:17px}.stat span{font-size:9px}#towerTray{gap:3px}.towerCard strong{font-size:9px}.towerCard span{font-size:9px}#metaGrid{grid-template-columns:1fr}.panel{padding:13px}#levelGrid{gap:5px}.levelButton{height:46px}}
 @media(prefers-reduced-motion:reduce){button{transition:none}button:active{transform:none}#overlay,.panel{animation:none}}
+/* tokenized: light + dark (Gitter-dark, Nov 2026) */
+:root{--g-paper:#f6f6f3;--g-white:#fcfcfa;--g-ink:#16171a;--g-muted:#62656a;--g-green:#1f7a4d;--g-danger:#a32121;--g-board:#fbfbf8;--g-s1:#e9e9e3;--g-s2:#dfdfd8;--g-s3:#f4f4ef;--g-soft:rgba(22,23,26,.14);--g-soft2:rgba(22,23,26,.3);--g-veil:rgba(246,246,243,.95);--g-on-green:#fff;}
+html[data-theme="dark"]{--g-paper:#121314;--g-white:#1a1b1d;--g-ink:#ececea;--g-muted:#9a9b98;--g-green:#3fae76;--g-danger:#e5645f;--g-board:#17181a;--g-s1:#26272b;--g-s2:#2e2f33;--g-s3:#1d1e21;--g-soft:rgba(236,236,234,.14);--g-soft2:rgba(236,236,234,.3);--g-veil:rgba(18,19,20,.95);--g-on-green:#07140d;color-scheme:dark}
+@media(prefers-color-scheme:dark){html:not([data-theme="light"]){--g-paper:#121314;--g-white:#1a1b1d;--g-ink:#ececea;--g-muted:#9a9b98;--g-green:#3fae76;--g-danger:#e5645f;--g-board:#17181a;--g-s1:#26272b;--g-s2:#2e2f33;--g-s3:#1d1e21;--g-soft:rgba(236,236,234,.14);--g-soft2:rgba(236,236,234,.3);--g-veil:rgba(18,19,20,.95);--g-on-green:#07140d;color-scheme:dark}}
 /* Gitter look (Nov 2026): paper / ink / ONE green, hairlines, radius 0. The battlefield canvas keeps its own art. */
-:root{--panel:#fcfcfa}
-button{border-radius:0;background:#fcfcfa;color:#16171a;border:1px solid rgba(22,23,26,.14);font-weight:650}
-button:hover:not(:disabled){filter:none;border-color:#16171a}button:focus-visible{outline:2px solid #1f7a4d}
-#hud,#dock{backdrop-filter:none;-webkit-backdrop-filter:none;background:#f6f6f3}
-.stat b{color:#16171a;font-family:var(--font-mono)}.stat span{font-family:var(--font-mono);font-weight:500}
-#shell{background:#f6f6f3}
-#notice{border-radius:0;background:#fcfcfa;border:1px solid #16171a;color:#16171a;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
-#targetMode{border-radius:0;background:#a32121;color:#fff}
+:root{--panel:var(--g-white)}
+button{border-radius:0;background:var(--g-white);color:var(--g-ink);border:1px solid var(--g-soft);font-weight:650}
+button:hover:not(:disabled){filter:none;border-color:var(--g-ink)}button:focus-visible{outline:2px solid var(--g-green)}
+#hud,#dock{backdrop-filter:none;-webkit-backdrop-filter:none;background:var(--g-paper)}
+.stat b{color:var(--g-ink);font-family:var(--font-mono)}.stat span{font-family:var(--font-mono);font-weight:500}
+#shell{background:var(--g-paper)}
+#notice{border-radius:0;background:var(--g-white);border:1px solid var(--g-ink);color:var(--g-ink);box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
+#targetMode{border-radius:0;background:var(--g-danger);color:var(--g-on-green)}
 .skill::after{border-radius:0;background:conic-gradient(rgba(22,23,26,.18) var(--cool),transparent 0)}
-.skill small,.towerCard strong{color:#16171a}.towerCard span,.levelButton span,.skill span{color:#1f7a4d}
-.towerCard.selected{outline:2px solid #1f7a4d;background:#fcfcfa}
-#waveBtn,#continueBtn,#upgradeBtn{background:#1f7a4d;border-color:#1f7a4d;color:#fff}
-#waveBtn:hover:not(:disabled),#continueBtn:hover:not(:disabled),#upgradeBtn:hover:not(:disabled){background:#16171a;border-color:#16171a}
-#sellBtn{background:#fcfcfa;border-color:#a32121;color:#a32121}
-#overlay,#branchSheet{background:rgba(246,246,243,.95);backdrop-filter:none;-webkit-backdrop-filter:none}
-.panel,.sheet{border:1px solid #16171a;border-radius:0;background:#fcfcfa;box-shadow:none;color:#16171a}
+.skill small,.towerCard strong{color:var(--g-ink)}.towerCard span,.levelButton span,.skill span{color:var(--g-green)}
+.towerCard.selected{outline:2px solid var(--g-green);background:var(--g-white)}
+#waveBtn,#continueBtn,#upgradeBtn{background:var(--g-green);border-color:var(--g-green);color:var(--g-on-green)}
+#waveBtn:hover:not(:disabled),#continueBtn:hover:not(:disabled),#upgradeBtn:hover:not(:disabled){background:var(--g-ink);border-color:var(--g-ink)}
+#sellBtn{background:var(--g-white);border-color:var(--g-danger);color:var(--g-danger)}
+#overlay,#branchSheet{background:var(--g-veil);backdrop-filter:none;-webkit-backdrop-filter:none}
+.panel,.sheet{border:1px solid var(--g-ink);border-radius:0;background:var(--g-white);box-shadow:none;color:var(--g-ink)}
 .panel h1,.sheet h2{font-weight:800;letter-spacing:-.03em}
-.sheet>p{color:#1f7a4d}
-.pill{border-radius:0;background:#f6f6f3;border:1px solid rgba(22,23,26,.14);color:#1f7a4d}
+.sheet>p{color:var(--g-green)}
+.pill{border-radius:0;background:var(--g-paper);border:1px solid var(--g-soft);color:var(--g-green)}
 .menuTitle{font-family:var(--font-mono);font-weight:500}
-.levelButton.complete{background:#fcfcfa;border-color:#1f7a4d;box-shadow:inset 0 0 0 1px #1f7a4d}
-.metaButton strong,.branch strong{color:#1f7a4d}
-#helpBtn,#branchCancel{background:#fcfcfa}#helpPanel{border-radius:0;background:#f6f6f3;border:1px solid rgba(22,23,26,.14)}
+.levelButton.complete{background:var(--g-white);border-color:var(--g-green);box-shadow:inset 0 0 0 1px var(--g-green)}
+.metaButton strong,.branch strong{color:var(--g-green)}
+#helpBtn,#branchCancel{background:var(--g-white)}#helpPanel{border-radius:0;background:var(--g-paper);border:1px solid var(--g-soft)}
 </style>
-<script src="/pb/arcade-kit.js?v=43" data-arcade-id="towerdefense" data-arcade-title="Tower Defense"></script>
+<script src="/pb/arcade-kit.js?v=50" data-arcade-id="towerdefense" data-arcade-title="Tower Defense"></script>
 </head>
 <body>
 <main id="shell">
