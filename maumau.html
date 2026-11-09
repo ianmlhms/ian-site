@@ -57,7 +57,7 @@
 </header>
 
 <main class="wrap">
-  <div class="status" id="status" role="status">Connecting…</div>
+  <div class="status" id="status" role="status">Verbindung …</div>
   <div class="sub" id="sub" role="status"></div>
   <div class="opp" id="opp"></div>
   <div class="table">
@@ -67,7 +67,7 @@
   <div class="badges" id="badges" role="status"></div>
   <div class="wishbox" id="wishbox" role="group" aria-label="Wish a suit"></div>
   <div class="hand" id="hand"></div>
-  <button class="btn" id="rematch" style="display:none">↻ Rematch</button>
+  <button class="btn" id="rematch" style="display:none">Nach eng Partie</button>
   <div class="rules">Match suit or rank · 7 = opponent draws 2 (stack 7s to pass it on) · 8 = play again · J = any card + wish a suit · first empty hand wins</div>
 </main>
 
@@ -181,12 +181,12 @@ function render() {
   updateStatus(myTurn);
 }
 function updateStatus(myTurn) {
-  if (over) { setStatus(over === me ? "Mau-Mau! You win! 🎉" : "You lost — empty hand across the table."); return; }
-  if (!oppHere) return setStatus("Waiting for opponent…", `Share room <code>${room}</code> or invite from Friends.`);
-  if (!dealt) return setStatus("Dealing…");
-  if (!myTurn) return setStatus(AI ? "Computer thinking…" : "Opponent's turn");
+  if (over) { setStatus(over === me ? "Mau-Mau! Du hues gewonn!" : "Du hues verluer — de Géigner huet keng Kaarte méi."); return; }
+  if (!oppHere) return setStatus("Waart op de Géigner …", `Deel de Raumcode <code>${room}</code> oder invitéier iwwer Frënn.`);
+  if (!dealt) return setStatus("Kaarte ginn ausgedeelt …");
+  if (!myTurn) return setStatus(AI ? "De Computer denkt …" : "De Géigner ass drun");
   const has = hands[me].some(canPlay);
-  setStatus("Your turn", has ? (pending ? `Play a 7 or draw ${pending}.` : "Play a highlighted card, or tap the deck.") : (pending ? `No 7 — tap the deck to draw ${pending}.` : "No playable card — tap the deck."));
+  setStatus("Du bass drun", has ? (pending ? `Spill eng 7 oder zitt ${pending}.` : "Spill eng markéiert Kaart oder tipp op de Stapel.") : (pending ? `Keng 7 — tipp op de Stapel fir ${pending} ze zéien.` : "Keng spillbar Kaart — tipp op de Stapel."));
 }
 function setStatus(h, sub = "") { $("status").innerHTML = h; $("sub").innerHTML = sub; }
 function finish() {
@@ -253,13 +253,13 @@ function rematch() {
     if (AI && turn === opp) setTimeout(aiTurn, 800);
   } else {
     ch.send({ type: "broadcast", event: "again", payload: {} });
-    setStatus("Asked the host for a rematch…");
+    setStatus("Rematch beim Host ugefrot …");
   }
 }
 $("rematch").onclick = rematch;
 
 if (AI) {
-  document.querySelector(".bar h1").textContent = "🃏 Mau-Mau Cards — vs Computer";
+  document.querySelector(".bar h1").textContent = "🃏 Mau-Mau Cards — géint de Computer";
   GC.mountDifficulty(() => difficulty, (d) => { difficulty = d; });
   oppHere = true;
   setup(Math.floor(Math.random() * 2147483647));
@@ -292,7 +292,7 @@ if (AI) {
         }, 600);
       }
     },
-    onSeatTaken: () => { over = -1; render(); setStatus("Seat already taken", `This room already has a ${role} — join with the other role or start a new room.`); },
+    onSeatTaken: () => { over = -1; render(); setStatus("Plaz scho besat", `Dësen Raum huet schonn e(n) ${role} — trëtt mat der anerer Roll bäi oder maach en neie Raum op.`); },
   });
 }
 </script>

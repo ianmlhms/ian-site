@@ -46,10 +46,10 @@
 </header>
 
 <div class="wrap">
-  <div class="status" id="status" role="status" aria-live="polite">Connecting…</div>
+  <div class="status" id="status" role="status" aria-live="polite">Verbindung …</div>
   <div class="sub" id="sub"></div>
   <div class="board" id="board" role="group" aria-label="Checkers board"></div>
-  <button class="btn" id="rematch" type="button" style="display:none">↻ Rematch</button>
+  <button class="btn" id="rematch" type="button" style="display:none">Nach eng Partie</button>
 </div>
 
 <script src="pixelbreak-config.js"></script>
@@ -184,17 +184,17 @@ function render() {
 }
 function updateStatus(legal) {
   const dot = `<span class="me" style="background:${me === 1 ? "var(--red)" : "var(--cyan)"}"></span>`;
-  if (over) return setStatus(over === me ? "You win! 🎉" : "You lost.");
-  if (!oppHere) return setStatus("Waiting for opponent…", `Share room <code>${room}</code> or invite from Friends.`);
-  if (turn !== me) return setStatus(AI ? "Computer thinking…" : "Opponent's turn");
+  if (over) return setStatus(over === me ? "Du hues gewonn!" : "Du hues verluer.");
+  if (!oppHere) return setStatus("Waart op de Géigner …", `Deel de Raumcode <code>${room}</code> oder invitéier iwwer Frënn.`);
+  if (turn !== me) return setStatus(AI ? "De Computer denkt …" : "De Géigner ass drun");
   const forced = legal.length && legal[0].cr != null;
-  setStatus(`Your turn ${dot}`, lock ? "Keep jumping with the same piece!" : forced ? "Capture is mandatory." : "");
+  setStatus(`Du bass drun ${dot}`, lock ? "Sprong mat deemselwechte Steen weider!" : forced ? "Schloen ass Pflicht." : "");
 }
 function setStatus(h, sub = "") { $("status").innerHTML = h; $("sub").innerHTML = sub; }
 
 /* ---------- wiring ---------- */
 if (AI) {
-  document.querySelector(".bar h1").textContent = "🟠 Checkers — vs Computer";
+  document.querySelector(".bar h1").textContent = "🟠 Checkers — géint de Computer";
   GC.mountDifficulty(() => difficulty, (d) => { difficulty = d; });
   oppHere = true; fresh(); render();
 } else if (!(window.MPGate && window.MPGate.redirecting)) {   // mp-gate.js sends a bare visit to the lobby (lobby.html)
@@ -207,7 +207,7 @@ if (AI) {
     setState: (p) => { board = p.board; turn = p.turn; over = p.over; lock = p.lock; moveCount = p.moveCount || 0; sel = null; render(); if (over) $("rematch").style.display = ""; },
     isStarted: () => moveCount > 0 || over !== false,
     onPeers: (here) => { oppHere = here; render(); },
-    onSeatTaken: () => { over = true; render(); setStatus("Seat already taken", `This room already has a ${role} — join with the other role or start a new room.`); },
+    onSeatTaken: () => { over = true; render(); setStatus("Plaz scho besat", `Dësen Raum huet schonn e(n) ${role} — trëtt mat der anerer Roll bäi oder maach en neie Raum op.`); },
   });
 }
 $("rematch").onclick = () => { fresh(); $("rematch").style.display = "none"; render(); if (!AI) ch.send({ type: "broadcast", event: "reset" }); };

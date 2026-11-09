@@ -71,7 +71,7 @@
   <div class="spacer"></div>
   <span class="code">room <code id="roomc"></code></span>
 </header>
-<div class="wrap" id="app"><p class="muted">Connecting…</p></div>
+<div class="wrap" id="app"><p class="muted">Verbindung …</p></div>
 <div id="sr" role="status" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap"></div>
 
 <script src="pixelbreak-config.js"></script>
@@ -326,7 +326,7 @@ function applyReveal(p){
 function resetAll(){ clearTimeout(peekTimer); peeking=false; recorded=false; phase="lobby"; round=0; wins={}; distTot={}; guesses={}; results=null; winner=null; isFinal=false; locked=false; }
 
 if(AI){
-  document.querySelector(".bar h1").textContent="🎨 Colour Guess — vs Computer";
+  document.querySelector(".bar h1").textContent="🎨 Colour Guess — géint de Computer";
   name = localStorage.getItem("playerName") || window.__pbAuth?.session?.user?.user_metadata?.username || "Du";
   mountDiff(); phase="lobby"; render();
 } else {

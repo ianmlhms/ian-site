@@ -49,7 +49,7 @@
 </header>
 
 <main class="wrap">
-  <div class="status" id="status" role="status" aria-live="polite">Connecting…</div>
+  <div class="status" id="status" role="status" aria-live="polite">Verbindung …</div>
   <div class="sub" id="sub"></div>
   <div class="scores" id="scores"></div>
   <div class="board" id="board" role="group" aria-label="Reversi board" tabindex="-1"></div>
@@ -134,12 +134,12 @@ function render() {
 }
 function updateStatus() {
   const dot = `<span class="me" aria-hidden="true" style="background:${me === 1 ? "#1a1a1a" : "#f4f4f8"}"></span><span class="sr-only">(${me === 1 ? "black" : "white"})</span>`;
-  if (over === "draw") return setStatus("It's a draw.");
-  if (over) return setStatus(over === me ? "You win! 🎉" : "You lost.");
-  if (!oppHere) return setStatus("Waiting for opponent…", `Share room <code>${room}</code> or invite from Friends.`);
+  if (over === "draw") return setStatus("Onentschidden.");
+  if (over) return setStatus(over === me ? "Du hues gewonn!" : "Du hues verluer.");
+  if (!oppHere) return setStatus("Waart op de Géigner …", `Deel de Raumcode <code>${room}</code> oder invitéier iwwer Frënn.`);
   if (turn !== me && !hasMove(board, me) && hasMove(board, turn)) {}  // opponent moves; my pass handled in advance
-  setStatus(turn === me ? `Your turn ${dot}` : (AI ? "Computer thinking…" : "Opponent's turn"),
-    (turn === me && !legalCells(board, me).length) ? "No moves — you must pass." : "");
+  setStatus(turn === me ? `Du bass drun ${dot}` : (AI ? "De Computer denkt …" : "De Géigner ass drun"),
+    (turn === me && !legalCells(board, me).length) ? "Kee Zuch méiglech — du muss passen." : "");
 }
 function setStatus(h, sub = "") { $("status").innerHTML = h; $("sub").innerHTML = sub; }
 
@@ -165,7 +165,7 @@ function play(r, c, player, local) {
 }
 
 if (AI) {
-  document.querySelector(".bar h1").textContent = "⚫ Reversi — vs Computer";
+  document.querySelector(".bar h1").textContent = "⚫ Reversi — géint de Computer";
   GC.mountDifficulty(() => difficulty, (d) => { difficulty = d; });
   oppHere = true; fresh(); render();
 } else if (!(window.MPGate && window.MPGate.redirecting)) {   // mp-gate.js sends a bare visit to the lobby (lobby.html)
@@ -178,7 +178,7 @@ if (AI) {
     setState: (p) => { board = p.board; turn = p.turn; over = p.over; render(); if (over) $("rematch").style.display = ""; },
     isStarted: () => { const [cb, cw] = counts(board); return over !== false || cb + cw > 4; },
     onPeers: (here) => { oppHere = here; render(); },
-    onSeatTaken: () => { over = true; render(); setStatus("Seat already taken", `This room already has a ${role} — join with the other role or start a new room.`); },
+    onSeatTaken: () => { over = true; render(); setStatus("Plaz scho besat", `Dësen Raum huet schonn e(n) ${role} — trëtt mat der anerer Roll bäi oder maach en neie Raum op.`); },
   });
 }
 $("rematch").onclick = () => { fresh(); $("rematch").style.display = "none"; render(); if (!AI) ch.send({ type: "broadcast", event: "reset" }); };

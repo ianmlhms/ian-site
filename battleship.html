@@ -55,7 +55,7 @@
   <span class="sub">room <code id="roomc"></code></span>
 </header>
 <div class="wrap">
-  <div class="status" id="status" role="status" aria-live="polite">Connecting…</div>
+  <div class="status" id="status" role="status" aria-live="polite">Verbindung …</div>
   <div class="sub" id="sub" aria-live="polite"></div>
 
   <div id="setup" style="display:none;width:100%;flex-direction:column;align-items:center;gap:12px">
@@ -189,7 +189,7 @@ function renderSetup(){
   $("orientV").classList.toggle("active", orient==="v");
   $("orientH").setAttribute("aria-pressed", orient==="h");
   $("orientV").setAttribute("aria-pressed", orient==="v");
-  setStatus(myReady?"Waiting for opponent…":(allPlaced()?"Fleet ready — press Ready":"Place your ships"),
+  setStatus(myReady?"Waart op de Géigner …":(allPlaced()?"Flott prett — dréck op Prett":"Setz deng Schëffer"),
     oppHere?"":"Share room <code>"+room+"</code> so your opponent can join.");
 }
 function renderPlay(){
@@ -198,8 +198,8 @@ function renderPlay(){
   $("enemy").className="grid"+(turn===role&&!over?" fire":"");
   grid($("enemy"),enemy,false,(r,c)=>fire(r,c));
   grid($("ownSmall"),own,true,null);
-  if(over) setStatus(over===role?"You win! 🎉":"You lost.","");
-  else setStatus(turn===role?"Your turn — fire!":(AI?"Computer firing…":"Opponent's turn…"));
+  if(over) setStatus(over===role?"Du hues gewonn!":"Du hues verluer.","");
+  else setStatus(turn===role?"Du bass drun — schéiss!":(AI?"De Computer schéisst …":"De Géigner ass drun…"));
   if(over && !AI && !recorded){ recorded=true; recordResult("battleship", over===role?"win":"loss"); }
   $("rematch").style.display=over?"":"none";
 }
@@ -266,7 +266,7 @@ function onFire(r,c){
 function onResult(r,c,hit,lost){ enemy[r][c]=hit?2:3; if(lost) over=role; renderPlay(); }
 
 if(AI){
-  document.querySelector(".bar h1").textContent="🚢 Battleship — vs Computer";
+  document.querySelector(".bar h1").textContent="🚢 Battleship — géint de Computer";
   GC.mountDifficulty(()=>difficulty,(d)=>{difficulty=d;});
   clearAll(); phase="setup"; oppHere=true; renderSetup();
 } else if (!(window.MPGate && window.MPGate.redirecting)) {   // mp-gate.js sends a bare visit to the lobby (lobby.html)
@@ -293,7 +293,7 @@ if(AI){
       if(oppHere&&myReady&&phase==="setup") ch.send({type:"broadcast",event:"ready",payload:{}}); // re-announce for late joiners
       if(phase==="setup") renderSetup();
     },
-    onSeatTaken:()=>setStatus("Seat already taken",`This room already has a ${role} — join with the other role or start a new room.`),
+    onSeatTaken:()=>setStatus("Plaz scho besat",`Dësen Raum huet schonn e(n) ${role} — trëtt mat der anerer Roll bäi oder maach en neie Raum op.`),
   });
 }
 

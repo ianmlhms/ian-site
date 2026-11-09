@@ -55,11 +55,11 @@
 </header>
 
 <div class="wrap">
-  <div class="status" id="status" role="status" aria-live="polite">Connecting…</div>
+  <div class="status" id="status" role="status" aria-live="polite">Verbindung …</div>
   <div class="sub" id="sub"></div>
   <div class="scores" id="scores"></div>
   <div class="board" id="board" role="group" aria-label="Dots and Boxes board"></div>
-  <button class="btn" id="rematch" style="display:none">↻ Rematch</button>
+  <button class="btn" id="rematch" style="display:none">Nach eng Partie</button>
 </div>
 
 <script src="pixelbreak-config.js"></script>
@@ -142,10 +142,10 @@ function render() {
 }
 function updateStatus() {
   const dot = `<span class="me" style="background:${COL[me]}" aria-hidden="true"></span><span class="sr">(${me === 1 ? "blue" : "red"})</span>`;
-  if (over === "draw") return setStatus("It's a draw.");
-  if (over) return setStatus(over === me ? "You win! 🎉" : "You lost.");
-  if (!oppHere) return setStatus("Waiting for opponent…", `Share room <code>${room}</code> or invite from Friends.`);
-  setStatus(turn === me ? `Your turn ${dot}` : (AI ? "Computer thinking…" : "Opponent's turn"),
+  if (over === "draw") return setStatus("Onentschidden.");
+  if (over) return setStatus(over === me ? "Du hues gewonn!" : "Du hues verluer.");
+  if (!oppHere) return setStatus("Waart op de Géigner …", `Deel de Raumcode <code>${room}</code> oder invitéier iwwer Frënn.`);
+  setStatus(turn === me ? `Du bass drun ${dot}` : (AI ? "De Computer denkt …" : "De Géigner ass drun"),
     "Complete a box to go again.");
 }
 function setStatus(hh, sub = "") {
@@ -171,7 +171,7 @@ function play(t, i, j, player, local) {
 }
 
 if (AI) {
-  document.querySelector(".bar h1").innerHTML = "▦ Dots &amp; Boxes — vs Computer";
+  document.querySelector(".bar h1").innerHTML = "▦ Dots &amp; Boxes — géint de Computer";
   GC.mountDifficulty(() => difficulty, (d) => { difficulty = d; });
   oppHere = true; fresh(); render();
 } else if (!(window.MPGate && window.MPGate.redirecting)) {   // mp-gate.js sends a bare visit to the lobby (lobby.html)
@@ -184,7 +184,7 @@ if (AI) {
     setState: (p) => { h = p.h; v = p.v; own = p.own; turn = p.turn; over = p.over; render(); if (over) $("rematch").style.display = ""; },
     isStarted: () => over !== false || h.some((r) => r.some((x) => x)) || v.some((r) => r.some((x) => x)),
     onPeers: (here) => { oppHere = here; render(); },
-    onSeatTaken: () => { over = true; render(); setStatus("Seat already taken", `This room already has a ${role} — join with the other role or start a new room.`); },
+    onSeatTaken: () => { over = true; render(); setStatus("Plaz scho besat", `Dësen Raum huet schonn e(n) ${role} — trëtt mat der anerer Roll bäi oder maach en neie Raum op.`); },
   });
 }
 $("rematch").onclick = () => { fresh(); $("rematch").style.display = "none"; render(); if (!AI) ch.send({ type: "broadcast", event: "reset" }); };

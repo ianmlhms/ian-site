@@ -104,8 +104,8 @@ export const flow = {
       await emma.page.waitForURL(/connect4\.html\?room=/);
       h.expect(host.page.url().includes(`room=${code.toLowerCase()}&role=host&lb=${code}`), `host → ${host.page.url().replace(h.origin, "")}`);
       h.expect(emma.page.url().includes(`room=${code.toLowerCase()}&role=guest&lb=${code}`), `guest → ${emma.page.url().replace(h.origin, "")}`);
-      await host.page.waitForFunction(() => /Your turn/.test(document.getElementById("status")?.textContent || ""), null, { timeout: 15000 });
-      h.expect(true, "the game found the opponent (status: Your turn)");
+      await host.page.waitForFunction(() => /Du bass drun/.test(document.getElementById("status")?.textContent || ""), null, { timeout: 15000 });
+      h.expect(true, "the game found the opponent (status: Du bass drun)");
       const ctx = await host.page.evaluate(() => window.MPGate && window.MPGate.ctx && { code: window.MPGate.ctx.code, role: window.MPGate.ctx.role, roster: window.MPGate.ctx.roster.map((r) => r.name) });
       h.eq(ctx, { code, role: "host", roster: ["tester", "Emma"] }, "the game receives the roster + role from the lobby (MPGate.ctx)");
       await host.page.click("#colbtns button >> nth=3");
@@ -147,7 +147,7 @@ export const flow = {
       await legacy.page.waitForSelector("#board .cell");
       h.expect(legacy.page.url().includes("room=abc123") && !legacy.page.url().includes("lobby.html"), "?room=abc123&role=guest opens the game, no lobby");
       h.expect(await legacy.page.$("#mpgBack") === null, "no lobby button for an old link");
-      h.expect(/Waiting for opponent/.test(await text(legacy.page, "#status")), "…and waits for an opponent like before");
+      h.expect(/Waart op de Géigner/.test(await text(legacy.page, "#status")), "…and waits for an opponent like before");
 
       /* ---------------- budget ---------------- */
       const sum = (arr, re) => arr.filter((x) => re.test(x)).length;

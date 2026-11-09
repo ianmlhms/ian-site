@@ -17,7 +17,7 @@ const statusOf = (page) => text(page, "#status");
 const waitStatus = (page, re) => page.waitForFunction((src) => new RegExp(src).test((document.getElementById("status")?.textContent || "").replace(/\s+/g, " ")), re.source, TURN_WAIT);
 const count = (page, sel) => page.$$(sel).then((a) => a.length);
 const waitCount = (page, sel, n) => page.waitForFunction(([s, k]) => document.querySelectorAll(s).length === k, [sel, n], TURN_WAIT);
-const bothSeeEachOther = async (host, emma) => { for (const p of [host, emma]) await waitStatus(p.page, /Your turn|Opponent's turn/); };
+const bothSeeEachOther = async (host, emma) => { for (const p of [host, emma]) await waitStatus(p.page, /Du bass drun|De Géigner ass drun|Your turn|Opponent's turn/); };
 
 /* one driver per game: how to see that both players are in, how one player moves and the other sees it, what a fresh match looks like */
 const DRIVERS = {
@@ -26,13 +26,13 @@ const DRIVERS = {
     async move(h, host, emma) {
       await host.page.click("#board button.cell:not([aria-disabled]) >> nth=4");
       await waitCount(emma.page, '#board .cell[data-p="1"]', 1);
-      await waitStatus(emma.page, /Your turn/);
+      await waitStatus(emma.page, /Du bass drun|Your turn/);
       h.expect(true, "X in the middle shows up on Emma's board and it is her turn");
     },
     async fresh(page) { return (await count(page, "#board .cell[data-p]")) === 0; },
     /* a real win, so the lobby button reacts to the game's own rematch button */
     async finish(h, host, emma) {
-      const play = async (p, i) => { await waitStatus(p.page, /Your turn/); await p.page.click(`#board .cell >> nth=${i}`); };
+      const play = async (p, i) => { await waitStatus(p.page, /Du bass drun|Your turn/); await p.page.click(`#board .cell >> nth=${i}`); };
       await play(emma, 0); await play(host, 1); await play(emma, 3); await play(host, 7);   // host: 4,1,7 = the middle column
       await host.page.waitForSelector("#rematch", { state: "visible", timeout: 20000 });
       await emma.page.waitForSelector("#rematch", { state: "visible", timeout: 20000 });
@@ -43,7 +43,7 @@ const DRIVERS = {
     async move(h, host, emma) {
       await host.page.click(".cell.legal >> nth=0");
       await waitCount(emma.page, "#board .pc", 5);
-      await waitStatus(emma.page, /Your turn/);
+      await waitStatus(emma.page, /Du bass drun|Your turn/);
       h.expect(true, "black's first disc shows up on Emma's board (5 discs)");
     },
     async fresh(page) { return (await count(page, "#board .pc")) === 4; },
@@ -53,7 +53,7 @@ const DRIVERS = {
     async move(h, host, emma) {
       await host.page.click(".edge.open >> nth=3");
       await waitCount(emma.page, ".edge.set", 1);
-      await waitStatus(emma.page, /Your turn/);
+      await waitStatus(emma.page, /Du bass drun|Your turn/);
       h.expect(true, "the line the host drew appears on Emma's board");
     },
     async fresh(page) { return (await count(page, ".edge.set")) === 0; },
@@ -64,17 +64,17 @@ const DRIVERS = {
       const before = await emma.page.$eval("#board", (b) => b.innerHTML);
       await host.page.click(".pc.mine >> nth=0");
       await host.page.click(".sq.tgt >> nth=0");
-      await waitStatus(emma.page, /Your turn/);
+      await waitStatus(emma.page, /Du bass drun|Your turn/);
       h.expect((await emma.page.$eval("#board", (b) => b.innerHTML)) !== before, "the host's piece moved on Emma's board and it is her turn");
     },
     async fresh(page) { return (await count(page, "#board .pc")) === 24; },
   },
   maumau: {
-    meet: async (host, emma) => { for (const p of [host, emma]) await p.page.waitForFunction(() => /Your turn|Opponent's turn/.test(document.getElementById("status")?.textContent || ""), null, TURN_WAIT); },
+    meet: async (host, emma) => { for (const p of [host, emma]) await p.page.waitForFunction(() => /Du bass drun|De Géigner ass drun|Your turn|Opponent's turn/.test(document.getElementById("status")?.textContent || ""), null, TURN_WAIT); },
     async move(h, host, emma) {
       /* whoever's turn it is plays a playable card (or draws); the other must see the pile / the stock change */
       const sig = (p) => p.page.evaluate(() => document.getElementById("top").innerHTML + "|" + document.getElementById("stockN").textContent + "|" + document.getElementById("opp").textContent);
-      const handle = await host.page.waitForFunction(() => /Your turn/.test(document.getElementById("status").textContent) || null, null, { timeout: 3000 }).then(() => true, () => false);
+      const handle = await host.page.waitForFunction(() => /Du bass drun|Your turn/.test(document.getElementById("status").textContent) || null, null, { timeout: 3000 }).then(() => true, () => false);
       const actor = handle ? host : emma, other = handle ? emma : host;
       const before = await sig(other);
       if (await actor.page.$("#hand .card.ok")) {
@@ -101,13 +101,13 @@ const DRIVERS = {
       for (const p of [host, emma]) { await p.page.click("#shuffle"); await p.page.click("#ready"); }
       await host.page.waitForSelector("#play", { state: "visible", timeout: 20000 });
       await emma.page.waitForSelector("#play", { state: "visible", timeout: 20000 });
-      await waitStatus(host.page, /Your turn/);
+      await waitStatus(host.page, /Du bass drun|Your turn/);
       await host.page.click("#enemy button.cell >> nth=0");
       await emma.page.waitForFunction(() => document.querySelectorAll("#ownSmall .cell.hit, #ownSmall .cell.miss").length === 1, null, TURN_WAIT);
-      await waitStatus(emma.page, /Your turn/);
+      await waitStatus(emma.page, /Du bass drun|Your turn/);
       h.expect(true, "both fleets are ready, the host's shot lands on Emma's grid and it is her turn");
     },
-    async fresh(page) { return (await page.isVisible("#setup")) && (await count(page, "#own .cell.ship")) === 0 && /Place your ships/.test(await statusOf(page)); },
+    async fresh(page) { return (await page.isVisible("#setup")) && (await count(page, "#own .cell.ship")) === 0 && /Setz deng Schëffer|Place your ships/.test(await statusOf(page)); },
   },
 };
 
@@ -127,7 +127,7 @@ async function oneGame(h, id, index, players) {
     await emma.page.waitForFunction(() => (document.getElementById("status")?.textContent || "").trim().length > 0);
     h.expect(!emma.page.url().includes("lobby.html"), "?ai=1 stays on the game page");
     h.expect(await emma.page.$("#mpgBack") === null, "…without a lobby button");
-    h.expect(!/Waiting for opponent/.test(await statusOf(emma.page)), `…and it is a real vs-computer game (${await statusOf(emma.page)})`);
+    h.expect(!/Waart op de Géigner|Waiting for opponent/.test(await statusOf(emma.page)), `…and it is a real vs-computer game (${await statusOf(emma.page)})`);
     await new Promise((r) => setTimeout(r, 500));   // her ambient channels subscribe
 
     h.step(`${id}: bare URL → lobby entry → create`);

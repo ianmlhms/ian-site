@@ -52,12 +52,12 @@
 </header>
 
 <div class="wrap">
-  <div class="status" id="status" role="status" aria-live="polite">Connecting…</div>
+  <div class="status" id="status" role="status" aria-live="polite">Verbindung …</div>
   <div class="sub" id="sub"></div>
   <div class="dice" id="dice" role="group" aria-label="Dice"></div>
   <button class="btn rollbtn" id="roll">🎲 Roll</button>
   <table id="card" aria-label="Scorecard"></table>
-  <button class="btn" id="rematch" style="display:none">↻ Rematch</button>
+  <button class="btn" id="rematch" style="display:none">Nach eng Partie</button>
 </div>
 
 <script src="pixelbreak-config.js"></script>
@@ -199,12 +199,12 @@ function render() {
 function updateStatus(myTurn) {
   if (over) {
     const mine = total(me), theirs = total(opp);
-    return setStatus(mine === theirs ? "It's a draw!" : mine > theirs ? "You win! 🎉" : "You lost.", `${mine} : ${theirs}`);
+    return setStatus(mine === theirs ? "Onentschidden!" : mine > theirs ? "Du hues gewonn!" : "Du hues verluer.", `${mine} : ${theirs}`);
   }
-  if (!oppHere) return setStatus("Waiting for opponent…", `Share room <code>${room}</code> or invite from Friends.`);
-  if (!myTurn) return setStatus(AI ? "Computer thinking…" : "Opponent's turn");
-  if (rolls === 0) return setStatus("Your turn", "Roll the dice!");
-  setStatus("Your turn", rolls < 3 ? "Hold dice, roll again, or pick a category." : "Pick a category on the scorecard.");
+  if (!oppHere) return setStatus("Waart op de Géigner …", `Deel de Raumcode <code>${room}</code> oder invitéier iwwer Frënn.`);
+  if (!myTurn) return setStatus(AI ? "De Computer denkt …" : "De Géigner ass drun");
+  if (rolls === 0) return setStatus("Du bass drun", "Wärf d'Wierfelen!");
+  setStatus("Du bass drun", rolls < 3 ? "Wierfele festhalen, nees werfen oder eng Kategorie wielen." : "Wiel eng Kategorie op der Punktekaart.");
 }
 function setStatus(h, sub = "") {
   if ($("status").innerHTML !== h) $("status").innerHTML = h;
@@ -215,7 +215,7 @@ $("rematch").onclick = () => { fresh(); $("rematch").style.display = "none"; ren
 
 /* ---------- wiring ---------- */
 if (AI) {
-  document.querySelector(".bar h1").textContent = "🎲 Kniffel — vs Computer";
+  document.querySelector(".bar h1").textContent = "🎲 Kniffel — géint de Computer";
   GC.mountDifficulty(() => difficulty, (d) => { difficulty = d; });
   oppHere = true; fresh(); render();
 } else if (!(window.MPGate && window.MPGate.redirecting)) {   // mp-gate.js sends a bare visit to the lobby (lobby.html)
@@ -230,7 +230,7 @@ if (AI) {
     setState: (p) => { sc = p.sc; turn = p.turn; dice = p.dice; held = p.held; rolls = p.rolls; over = p.over; started = p.started; render(); if (over) $("rematch").style.display = ""; },
     isStarted: () => started || over,
     onPeers: (here) => { oppHere = here; render(); },
-    onSeatTaken: () => { over = true; render(); setStatus("Seat already taken", `This room already has a ${role} — join with the other role or start a new room.`); },
+    onSeatTaken: () => { over = true; render(); setStatus("Plaz scho besat", `Dësen Raum huet schonn e(n) ${role} — trëtt mat der anerer Roll bäi oder maach en neie Raum op.`); },
   });
 }
 
