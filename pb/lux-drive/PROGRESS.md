@@ -2842,7 +2842,7 @@ tube hit (fixed: held roads), Desserte 9510 jolt 36.9 (see Still wrong), Cents 2
    (a) 5284,10592 y 296.9 yaw 267 "tube over the portal" 196 px = Rocade de Bonnevoie 411 mouth B from above (an OLD tube: a new pose, so likely in base too -
    check with base-wt; fix the mask / skirt there), (b) 5282,9171 y 293 yaw -111 "tube trough" 10 px = the René Konen trough A that this round lengthened to
    78 m (TU09), (c) 3199,9983 y 264.3 yaw 183 "tube inside" 77 px = inside the A4 / N56 pair.  Shoot each pose (holes flow `__probe` style: x, z, y, yaw,
-   pitch) to see them, fix, re-run.  ui + webkit were still running in the same chain when this builder rotated (results in `gates/ui.txt`, `gates/webkit.txt`).
+   pitch) to see them, fix, re-run.  ui PASS, webkit PASS (`gates/ui.txt`, `gates/webkit.txt`).
 2. Final tunnel-area sweep: `sweep/run-area.sh <repo> new2` then `python3 tools2/cmpsweep.py base-slow new2-slow` (and fast).
 3. Camera sweep (MSI if reachable, else Mini; sweep-look.mjs with the fixed world.mjs, `--area`-like restriction to the tunnel boxes is not built in).
 4. Shots: `shots/final/poses_final.json` (50 poses, 10 tubes) through shot.mjs on base-wt (before) and this tree (after), then `python3 tools2/stack.py before after
