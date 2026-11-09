@@ -40,7 +40,7 @@ const EXAM_WINDOW_DAYS = 200;
 const HOMEWORK_LOOKBACK_DAYS = 14;
 const LUX_TZ = "Europe/Luxembourg";
 
-const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
+const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info, x-supabase-api-version", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { "content-type": "application/json", ...CORS } });
 const isoDate = (d: Date) => d.toISOString().slice(0, 10);
 // Homework dates arrive as ISO strings on the mobile API, but some tenants use yyyymmdd ints.

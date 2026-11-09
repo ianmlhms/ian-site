@@ -37,8 +37,10 @@ const DUMMY_PIN = "000000";
 
 const CORS = Object.freeze({
   "Access-Control-Allow-Origin": "*",
+  // supabase-js functions.invoke() also sends x-client-info (and may send
+  // x-supabase-api-version): without them Chrome's preflight blocks the login.
   "Access-Control-Allow-Headers":
-    "authorization, apikey, content-type",
+    "authorization, apikey, content-type, x-client-info, x-supabase-api-version",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 });
 
