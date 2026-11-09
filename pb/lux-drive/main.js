@@ -205,7 +205,9 @@ async function boot() {
   const walls = createWallView({ scene, walls: bakedWalls, material: createWallMaterial(env), groundAt: (x, z) => surface.height(x, z) });
   const landmarkView = createLandmarkView({ scene, landmarks, material: solid });
   const portalView = createPortalView({ scene, portals, ground, material: solid });
-  const tunnelView = createTunnelView({ scene, tubes: tubes.tubes, heightAt: (x, z) => surface.height(x, z), insideMaterial: createTubeInsideMaterial(env), outsideMaterial: solid });
+  const tubeRoadProbe = {};
+  const tunnelView = createTunnelView({ scene, tubes: tubes.tubes, heightAt: (x, z) => surface.height(x, z), onRoad: (x, z) => surface.roadInfoAt(x, z, tubeRoadProbe).sdCar < 0,
+    insideMaterial: createTubeInsideMaterial(env), outsideMaterial: solid });
   // the Luxtram: the rails and the vehicles of the line (tram-network.js builds the two tracks from lines.bin, tram-sim.js runs the vehicles on them)
   const tramNetwork = createTramNetwork(data.lines, data.stops, TRAM);
   const tramSim = createTramSim(tramNetwork, TRAM);

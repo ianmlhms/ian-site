@@ -23,6 +23,15 @@ const LINE_LIFT = 0.015;                         // m over the floor
 const WALKWAY = 0.45;                            // m: the pale strip along the foot of each wall
 const DADO = 1.3;                                // m: the tiled lower part of the walls
 const FACE_SKIRT = 1.0;                          // m: the floor's edge at a face hangs this far down
+// the earth stops of a mouth without a trough (tunnels19): where the land right outside the face stands in the opening (a slip road over the edge of the mouth: the
+// A4 west mouth under the Merl slip road 12833, 6.8 m over the floor 1 m inside the opening), the terrain is seen from inside the tube from below - nothing (the holes
+// flow: 77 px).  A block of the headwall's concrete fills the opening there, from under the floor up to the land at the face
+const EARTH_STEP = 0.5;                          // m: the width of one block across the opening
+const EARTH_RISE = 0.4;                          // m: a block where the land at the face (the middle of the strip) lies this far over the floor on a drawn carriageway (the road
+                                                 // meets the floor within cm: no block in a lane) ...
+const EARTH_RISE_OFF = 0.12;                     // ... and this far beside it (a 0.3 m lip of the slope beside the A4 west lanes showed its underside from inside)
+const EARTH_DEPTH = 0.3;                         // m: how far a block reaches into the tube
+const EARTH_READ = [0.1, 0.6];                   // m out of the face at which the land is read
 const INSIDE_RADIUS = 320;                       // m: the inside of a tube is drawn this close to the camera
 
 const C_ASPHALT = [0.16, 0.16, 0.17];
@@ -158,6 +167,9 @@ export function buildInside(tube, b) {
   }
 }
 
+/** The (x, z) of a point [x, y, z]. */
+const xzOf = (p) => [p[0], p[2]];
+
 /** A box in a frame (u to the side, v along +s, y up) into builder b; all six faces outward. */
 function box(b, P, u0, u1, v0, v1, ya, yc, col) {
   b.quad(P(u0, v0, ya), P(u1, v0, ya), P(u1, v0, yc), P(u0, v0, yc), col);
@@ -171,8 +183,11 @@ function box(b, P, u0, u1, v0, v1, ya, yc, col) {
 /** The roof top of a tube at a frame (flat across, over the highest corner of its floor). */
 const roofAt = (tube, fr) => tube.floor[fr.i] + (tube.floor[fr.i + 1] - tube.floor[fr.i]) * fr.f + Math.abs(tube.cross[fr.i]) * tube.outerHalf + tube.roofDepth;   // (as tunnel-tubes.js)
 
-/** The outside of one tube into builder b: the shell (outer walls and roof top) and the headwalls of its two portals.  heightAt: the drawn ground. */
-export function buildOutside(tube, b, heightAt) {
+/**
+ * The outside of one tube into builder b: the shell (outer walls and roof top) and the headwalls of its two portals.  heightAt: the drawn ground; onRoad(x, z): is the
+ * point on a drawn carriageway (optional: without it every earth stop needs EARTH_RISE).
+ */
+export function buildOutside(tube, b, heightAt, onRoad = null) {
   const st = stationsOf(tube), oL = tube.outerL, oR = tube.outerR;
   const P = (fr, lat, y) => [fr.x + fr.rx * lat, y, fr.z + fr.rz * lat];
   for (let k = 0; k + 1 < st.length; k++) {
@@ -204,6 +219,31 @@ export function buildOutside(tube, b, heightAt) {
     box(b, PP, inP, headP, 0, TUBE.headDepth, base, wallTop, C_HEAD);
     box(b, PP, -inN, inP, 0, TUBE.headDepth, top, wallTop, C_HEAD);                 // the lintel over it
     box(b, PP, -headN - (headN > tube.outerHalf ? 0.2 : 0), headP + (headP > tube.outerHalf ? 0.2 : 0), -0.15, TUBE.headDepth, wallTop, wallTop + 0.25, C_COPING);
+    // the earth stops in the opening (a mouth with a trough has its own floor and walls in front of it)
+    if (!(into > 0 ? tube.troughA : tube.troughB)) {
+      // the apron: the floor reaches APRON m on out of the face, APRON_SINK under itself (under the terrain of a flush approach).  The mask of the shell ends square at the
+      // face on the chord of its segment, the floor on the tangent: from inside, a ray over the end of the floor met the masked land past it from below (the A4 west mouth)
+      const o = frameAt(tube, sFace - into * APRON), e = frameAt(tube, sFace);
+      for (let j = 0; j < FLOOR_STRIPS; j++) {
+        const l0 = -tube.innerL + ((tube.innerL + tube.innerR) * j) / FLOOR_STRIPS, l1 = -tube.innerL + ((tube.innerL + tube.innerR) * (j + 1)) / FLOOR_STRIPS;
+        const Q = (fq, lat, y) => [fq.x + fq.rx * lat, y, fq.z + fq.rz * lat];
+        const y0 = floorOf(tube, e.i, e.f, l0) - APRON_SINK, y1 = floorOf(tube, e.i, e.f, l1) - APRON_SINK;
+        // (its outer edge rises to just under higher land: a lip of the land at the face - 0.3 m beside the A4 west lanes - is met from inside by the apron, not seen from below)
+        const out0 = Math.max(y0, heightAt(...xzOf(Q(o, l0, 0))) - APRON_SINK), out1 = Math.max(y1, heightAt(...xzOf(Q(o, l1, 0))) - APRON_SINK);
+        if (into > 0) b.quad(Q(e, l1, y1), Q(e, l0, y0), Q(o, l0, out0), Q(o, l1, out1), C_TAR);           // (facing up: face A's apron lies at smaller s)
+        else b.quad(Q(o, l1, out1), Q(o, l0, out0), Q(e, l0, y0), Q(e, l1, y1), C_TAR);
+      }
+      for (let u = -inN; u < inP - 1e-6; u += EARTH_STEP) {
+        const u1 = Math.min(inP, u + EARTH_STEP);
+        const landAt = (q) => Math.max(...EARTH_READ.map((d) => heightAt(fr.x + ux * q - ex * d, fr.z + uz * q - ez * d)));
+        const floorLo = Math.min(floorOf(tube, fr.i, fr.f, u * into), floorOf(tube, fr.i, fr.f, u1 * into));
+        // (judged in the middle of the strip: a strip that only touches the slope beside a lane stays open; the block reaches the highest land of the strip)
+        const um = (u + u1) / 2, onLane = !!onRoad && onRoad(fr.x + ux * um - ex * EARTH_READ[0], fr.z + uz * um - ez * EARTH_READ[0]);
+        if (landAt(um) < floorLo + (onLane || !onRoad ? EARTH_RISE : EARTH_RISE_OFF)) continue;
+        const land = Math.max(landAt(u), landAt((u + u1) / 2), landAt(u1));
+        box(b, PP, u, u1, 0, EARTH_DEPTH, floorLo - FACE_SKIRT, Math.min(land, top), C_HEAD);
+      }
+    }
   }
 }
 
@@ -306,15 +346,15 @@ export function buildTroughs(tube, b, heightAt) {
 }
 
 /**
- * tubes: tunnel-tubes.js tubes; heightAt: the drawn ground (surface.height).  inside / outside: the two materials.
+ * tubes: tunnel-tubes.js tubes; heightAt: the drawn ground (surface.height); onRoad(x, z): on a drawn carriageway?  inside / outside: the two materials.
  * Returns { update(x, z, radius), meshes, count }.
  */
-export function createTunnelView({ scene, tubes, heightAt, insideMaterial, outsideMaterial }) {
+export function createTunnelView({ scene, tubes, heightAt, onRoad = null, insideMaterial, outsideMaterial }) {
   const parts = [];
   for (const tube of tubes) {
     const bi = new FlatBuilder(), bo = new FlatBuilder();
     buildInside(tube, bi);
-    buildOutside(tube, bo, heightAt);
+    buildOutside(tube, bo, heightAt, onRoad);
     buildTroughs(tube, bo, heightAt);
     const inside = new THREE.Mesh(bi.build(), insideMaterial), outside = new THREE.Mesh(bo.build(), outsideMaterial);
     inside.name = `luxdrive-tube-inside ${tube.name}`; outside.name = `luxdrive-tube-outside ${tube.name}`;
