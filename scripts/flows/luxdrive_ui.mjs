@@ -45,7 +45,7 @@ export const flow = {
       return {
         lang: document.documentElement.lang, drive: document.querySelector("#start [data-act=\"drive\"]").textContent,
         langs: [...document.querySelectorAll("#start [data-group=\"lang\"]")].map((n) => n.dataset.value),
-        pLang: pressed("lang"), pWeather: pressed("weather"), pTime: pressed("time"),
+        pWeather: pressed("weather"), pTime: pressed("time"),
         weatherChips: [...document.querySelectorAll("#start [data-group=\"weather\"]")].map((n) => n.dataset.value),
         timeChips: [...document.querySelectorAll("#start [data-group=\"time\"]")].map((n) => n.dataset.value),
         choice: m.env.getChoice(), blocking: m.ui.isBlocking(), started: m.isStarted(),
@@ -53,8 +53,7 @@ export const flow = {
     });
     h.eq(start.lang, "lb", "the page language is Luxembourgish");
     h.eq(start.drive, "Fueren", "the start button says Fueren");
-    h.eq(start.langs, ["lb", "de", "en", "fr"], "the language chooser: lb, de, en, fr");
-    h.eq(start.pLang, ["lb"], "Luxembourgish is selected");
+    h.eq(start.langs, [], "no language chooser: Luxembourgish only");
     h.eq(start.pWeather, ["random"], "the weather chooser: Random is selected by default");
     h.eq(start.pTime, ["random"], "the time chooser: Random is selected by default");
     h.eq(start.weatherChips[0], "random", "Random is the first weather chip");
@@ -63,16 +62,10 @@ export const flow = {
     h.expect(start.blocking && !start.started, "the car waits behind the start menu");
     await h.shot("start-lb");
 
-    h.step("the language chooser changes the language live (no reload)");
-    await page.tap("#start [data-group=\"lang\"][data-value=\"de\"]");
-    h.eq(await page.evaluate(() => [document.documentElement.lang, document.querySelector("#start [data-act=\"drive\"]").textContent]), ["de", "Fahren"], "German: Fahren");
-    await h.shot("start-de");
-    await page.tap("#start [data-group=\"lang\"][data-value=\"fr\"]");
-    h.eq(await page.evaluate(() => document.querySelector("#start [data-act=\"drive\"]").textContent), "Rouler", "French: Rouler");
-    await page.tap("#start [data-group=\"lang\"][data-value=\"en\"]");
-    h.eq(await page.evaluate(() => document.querySelector("#start [data-act=\"drive\"]").textContent), "Drive", "English: Drive");
-    await page.tap("#start [data-group=\"lang\"][data-value=\"lb\"]");
-    h.eq(await page.evaluate(() => document.querySelector("#start [data-act=\"drive\"]").textContent), "Fueren", "and back to Luxembourgish");
+    h.step("a stored or browser language is ignored (Luxembourgish only)");
+    await page.addInitScript(() => { try { localStorage.setItem("pb_luxdrive_lang", "de"); localStorage.setItem("site_lang", "en"); } catch (e) { /* storage blocked */ } });   // runs after the clear above
+    await boot(h, "/pb/lux-drive.html?q=low");
+    h.eq(await page.evaluate(() => [document.documentElement.lang, document.querySelector("#start [data-act=\"drive\"]").textContent]), ["lb", "Fueren"], "still Luxembourgish with de / en stored");
 
     h.step("the texts: every key in all four languages, the placeholders agree, the old mistakes are gone");
     const texts = await page.evaluate(async () => {

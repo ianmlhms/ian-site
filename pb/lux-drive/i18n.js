@@ -1,4 +1,4 @@
-/* Texts of Lux Drive. Luxembourgish first, then German, English and French (the same four languages as the other arcade games).
+/* Texts of Lux Drive. Luxembourgish first, then German, English and French. The game shows Luxembourgish only (Ian, 6 Nov 2026); the other tables stay in the code.
  * `t(lang, key, params)` fills {name} placeholders. The harness checks that every key exists in all four languages and that every
  * placeholder of the Luxembourgish text is present in the others. */
 export const LANGS = ['lb', 'de', 'en', 'fr'];
@@ -7,7 +7,7 @@ export const LANG_NAMES = Object.freeze({ lb: 'Lëtzebuergesch', de: 'Deutsch', 
 const STR = {
   lb: {
     title: 'Lux Drive', loading: 'Lëtzebuerg gëtt gelueden …', 'load.terrain': 'Terrain', 'load.roads': 'Stroossen', 'load.city': 'Stad', 'load.build': 'D\'Welt gëtt gebaut …', 'load.hills': 'Hiwwelen', 'load.bridges': 'Brécken', 'load.canopy': 'Bësch', 'load.trees': 'Beem', 'load.classes': 'Land',
-    'load.done': 'Fäerdeg', 'load.slow': 'Et dauert méi laang wéi gewinnt …', 'load.retry': 'Nei probéieren', 'load.error': 'D\'Spill konnt net geluede ginn. Kuck d\'Verbindung no.',
+    'load.done': 'Fäerdeg', 'load.slow': 'Et dauert méi laang wéi gewinnt …', 'load.retry': 'Nei probéieren', 'load.error': 'D\'Spill konnt net gelueden ginn. Kontrolléier d\'Verbindung.',
     'hud.speed': 'km/h', 'hud.gear': 'Gang', 'hud.road': 'Strooss', 'hud.menu': 'Menü', 'hud.weather': 'Wieder', 'hud.timeOfDay': 'Dageszäit', 'hud.camera': 'Kamera', 'hud.sound': 'Toun', 'hud.quality': 'Qualitéit', 'hud.reset': 'Zréck op den Ufank', 'hud.area': 'Gebitt',
     'menu.title': 'Menü', 'menu.drive': 'Fueren', 'menu.settings': 'Astellungen', 'menu.help': 'Hëllef', 'menu.close': 'Zoumaachen', 'menu.resume': 'Weider', 'menu.start': 'Start', 'menu.restart': 'Nei starten', 'menu.language': 'Sprooch', 'menu.map': 'Kaart',
     'set.time': 'Dageszäit', 'set.weather': 'Wieder', 'set.quality': 'Qualitéit', 'set.language': 'Sprooch', 'set.sound': 'Toun', 'set.random': 'Zoufall', 'set.auto': 'Automatesch', 'set.on': 'un', 'set.off': 'aus',
@@ -16,12 +16,12 @@ const STR = {
     'quality.low': 'Niddereg', 'quality.medium': 'Mëttel', 'quality.high': 'Héich',
     'set.note': 'Wieder an Dageszäit änneren d\'Sicht an d\'Haftung op der Strooss.',
     'help.keys': 'Tastatur', 'help.touch': 'Touch', 'help.other': 'R zréck op den Ufank · C Kamera · T Dageszäit · G Wieder · M Kaart · H Hëllef · Esc / P Pause',
-    'help.drive': 'W / ↑ Gas ginn · S / ↓ bremsen (am Stand réckwärts) · A D / ← → lenken · Espace Handbrems',
+    'help.drive': 'W / ↑ Gas ginn · S / ↓ bremsen (am Stand no hannen) · A D / ← → lenken · Leerzeechen Handbrems',
     'touch.throttle': 'Gas', 'touch.brake': 'Brems', 'touch.handbrake': 'Handbrems', 'touch.steer': 'Lenken',
     'map.title': 'Kaart', 'map.legend': 'Stroossen', 'toast.reset': 'Zréck op d\'Place de l\'Europe', 'orient.rotate': 'Dréi den iPad op d\'Säit, da gesäis du méi.', 'fs.enter': 'Ganze Bildschierm',
     'set.colour': 'Faarf', 
     'toast.unstuck': 'Zréck op d\'Strooss gesat.', 
-    'start.tagline': 'Fuer duerch Lëtzebuerg-Stad an Nidderaanwen.', 'start.hint': 'Wieder an Dageszäit sinn all Kéier anescht, ausser du wiels se.', 'menu.pause': 'Pause', 'menu.settings2': 'Astellungen', 'menu.back': 'Zréck', 'menu.fullscreen': 'Ganze Bildschierm',
+    'start.tagline': 'Fuer duerch Lëtzebuerg-Stad an Nidderaanwen.', 'start.hint': 'Wieder an Dageszäit sinn all Kéier anescht, ausser wann s de se selwer wiels.', 'menu.pause': 'Pause', 'menu.settings2': 'Astellungen', 'menu.back': 'Zréck', 'menu.fullscreen': 'Ganze Bildschierm',
     'weather.random': 'Zoufall', 'time.random': 'Zoufall', 'set.camera': 'Kamera', 'cam.chase': 'Hannert dem Auto', 'cam.far': 'Wäit hannendrun', 'cam.bonnet': 'Motorhaub',
     'map.hint': 'Tipp op eng Strooss, fir dohinner ze kommen.', 'map.here': 'Hei bass du', 'map.zoomIn': 'Méi no', 'map.zoomOut': 'Méi wäit', 'map.teleport': 'Elo op {name}', 'map.unnamed': 'Strooss ouni Numm', 'map.noRoad': 'Do ass keng Strooss.',
     'toast.wet': 'Naass Strooss: manner Haftung', 'toast.quality': 'Qualitéit: {q}', 'touch.left': 'Lénks', 'touch.right': 'Riets', 'help.touchText': 'Lénks lenken, riets Gas, Brems an Handbrems.',
