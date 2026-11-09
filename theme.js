@@ -92,8 +92,11 @@
     const seasonAccent = window.SEASON && window.SEASON.defaultAccent(mode);
     const accent = t.accent || seasonAccent || (mode === "light" ? "#2563eb" : "#6ea8fe");
     root.style.setProperty("--accent", accent);
-    root.style.setProperty("color-scheme", mode);
-    document.documentElement.dataset.theme = mode;
+    // gitter-theme.js (loaded first on Gitter pages) owns data-theme + color-scheme there.
+    if (!window.gtTheme) {
+      root.style.setProperty("color-scheme", mode);
+      document.documentElement.dataset.theme = mode;
+    }
     refreshContrast(root, pal, accent);
   }
   function save(t) { localStorage.setItem(KEY, JSON.stringify(t)); apply(t); pushTheme(t); }

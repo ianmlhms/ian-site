@@ -62,7 +62,7 @@ function injectCss() {
     .site-notice__img img{width:100%;height:100%;object-fit:cover;display:block}
     .site-notice__actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
     .site-notice__btn{min-height:44px;min-width:96px;padding:0 18px;border-radius:12px;border:1px solid var(--border,rgba(255,255,255,.14));background:transparent;color:inherit;font:inherit;font-weight:750;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
-    .site-notice__btn--primary{background:var(--accent,#6c5ce7);border-color:transparent;color:#fff}
+    .site-notice__btn--primary{background:var(--accent,#6c5ce7);border-color:transparent;color:var(--accent-foreground,#fff)}
     .site-notice__btn:focus-visible{outline:3px solid var(--accent2,#74b9ff);outline-offset:2px}
   `;
   document.head.appendChild(style);

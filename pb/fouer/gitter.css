@@ -29,7 +29,7 @@ button{font-family:var(--font)}
 /* ---- floating buttons and popovers ---- */
 .fab{background:var(--g-white);color:var(--g-ink);border:1px solid var(--g-ink);width:48px;height:48px;font-size:20px}
 .fab:hover{background:var(--g-white);border-color:var(--g-green)}
-#walkBtn{width:58px;height:58px;font-size:28px;background:var(--g-green);border-color:var(--g-green);color:#fff}
+#walkBtn{width:58px;height:58px;font-size:28px;background:var(--g-green);border-color:var(--g-green);color:var(--g-on-green)}
 #walkBtn:hover{background:var(--g-ink);border-color:var(--g-ink)}
 .popover{background:var(--g-white);border:1px solid var(--g-ink);color:var(--g-ink)}
 .popover h3,.looks>span{font:500 11px/1.2 var(--g-mono);letter-spacing:.08em;color:var(--g-muted)}
@@ -70,12 +70,12 @@ button{font-family:var(--font)}
 .card .ico,.manage .top .ico{background:var(--g-tint)!important;border:1px solid var(--g-soft)}
 .card .price{color:var(--g-green);font-family:var(--g-mono);font-weight:500}.card .price.free{color:var(--g-green)}
 .card .stats{color:var(--g-muted);font-weight:600}.card .stats .inc{color:var(--g-green)}
-.card .tipbadge,.card .vbadge{background:var(--g-green);color:#fff;font-family:var(--g-mono);font-weight:500}
-.btn{background:var(--g-green);color:#fff;border:1px solid var(--g-green);font-weight:700;transition:background-color .15s,border-color .15s,color .15s}
+.card .tipbadge,.card .vbadge{background:var(--g-green);color:var(--g-on-green);font-family:var(--g-mono);font-weight:500}
+.btn{background:var(--g-green);color:var(--g-on-green);border:1px solid var(--g-green);font-weight:700;transition:background-color .15s,border-color .15s,color .15s}
 .btn:hover:not(:disabled){background:var(--g-ink);border-color:var(--g-ink);color:var(--g-paper)}
 .btn:active:not(:disabled){transform:none;background:var(--g-ink);border-color:var(--g-ink);color:var(--g-paper)}
 .btn:disabled{background:var(--g-tint);color:var(--g-muted);border-color:var(--g-soft)}
-.btn.green{background:var(--g-green);color:#fff}
+.btn.green{background:var(--g-green);color:var(--g-on-green)}
 .btn.ghost{background:transparent;color:var(--g-ink);border:1px solid var(--g-ink)}
 .btn.ghost:hover:not(:disabled){background:var(--g-white);border-color:var(--g-green);color:var(--g-green)}
 .pip{background:var(--g-soft)!important;border-radius:0!important}.pip.on,.pip.gold.on{background:var(--g-green)!important}
@@ -92,11 +92,11 @@ button{font-family:var(--font)}
 .bubble .msg .who{color:var(--g-green);font-family:var(--g-mono);font-weight:500}
 .bubble .skip{color:var(--g-muted)}
 .toast{background:var(--g-white);border:1px solid var(--g-ink);border-left:4px solid var(--g-green);color:var(--g-ink)}
-.qbadge{background:var(--g-green)!important;border:1px solid var(--g-white)!important;color:#fff}
+.qbadge{background:var(--g-green)!important;border:1px solid var(--g-white)!important;color:var(--g-on-green)}
 .finger{filter:drop-shadow(0 0 2px #000)}
 
 /* ---- modals: letter, dialog, gallery ---- */
-.modal{background:rgba(246,246,243,.95)}
+.modal{background:var(--g-veil)}
 .paper,.dialog{background:var(--g-white);border:1px solid var(--g-ink);color:var(--g-ink);transform:none}
 .paper::before,.paper::after{display:none}
 .paper h1{font:800 30px/1.1 var(--font);letter-spacing:-.03em;color:var(--g-ink)}
@@ -109,11 +109,11 @@ button{font-family:var(--font)}
 .dialog p,.rewardlist,.gcard .gby,.gcard .gstats{color:var(--g-muted)}
 .dialog .big{color:var(--g-green);font-family:var(--g-mono);font-weight:500;text-shadow:none}
 .stamp{background:var(--g-tint);border:1px dashed var(--g-soft);color:var(--g-muted)}
-.stamp.on{background:var(--g-green);border:1px solid var(--g-green);color:#fff}
+.stamp.on{background:var(--g-green);border:1px solid var(--g-green);color:var(--g-on-green)}
 .rewardlist li.got{color:var(--g-green)}
 .gcard{background:var(--g-tint);border:1px solid var(--g-soft)}
 .gcard.museum{background:var(--g-white);border-color:var(--g-ink)}
-.gcard .gbadge{background:var(--g-ink);color:var(--g-paper)}.gcard .gbadge.mine{background:var(--g-green);color:#fff}
+.gcard .gbadge{background:var(--g-ink);color:var(--g-paper)}.gcard .gbadge.mine{background:var(--g-green);color:var(--g-on-green)}
 .gallery .gform input,.gallery .gform label{color:var(--g-ink)}
 .gallery .gform input{background:var(--g-white);border:1px solid var(--g-ink)}
 
@@ -126,3 +126,6 @@ button{font-family:var(--font)}
 .wk-stick{border:2px solid #fff!important;background:rgba(22,23,26,.25)!important}.wk-stick i{background:var(--g-white)!important}
 .wk-keys,.wk-think,.rd-hint{text-shadow:var(--halo)}
 #pinBtn{background:var(--g-white);border:1px solid var(--g-ink)}
+
+/* Gitter-dark (Nov 2026): the tokens flip with html[data-theme] (set by the hub / gitter-theme.js); the HUD on the 3D scene stays white with an outline. */
+html[data-theme="dark"],html[data-theme="dark"] body,html[data-theme="dark"] body.dark{--g-paper:#121314;--g-white:#1a1b1d;--g-ink:#ececea;--g-muted:#9a9b98;--g-green:#3fae76;--g-danger:#e5645f;--g-soft:rgba(236,236,234,.14);--g-tint:rgba(236,236,234,.05);--g-veil:rgba(18,19,20,.95);--g-on-green:#07140d;color-scheme:dark}

@@ -9,8 +9,8 @@ export const ENGINE = Object.freeze({
   redlineRpm: 6200,
   upshiftRpm: 5100,          // the automatic changes up here ...
   downshiftRpm: 2300,        // ... and down here
-  // rpm per m/s of road speed in each gear (a small petrol hatchback: 1st tops out near 45 km/h, 5th cruises 130 at 3400 rpm)
-  rpmPerMps: Object.freeze([0, 400, 232, 160, 118, 94]),
+  // rpm per m/s of road speed in each gear (1st tops out near 45 km/h, 5th cruises 130 at 3400 rpm, car20: a 6th for the 200 km/h top: 4400 rpm there)
+  rpmPerMps: Object.freeze([0, 400, 232, 160, 118, 94, 78]),
   shiftDipS: 0.16,           // s: the revs fall and the throttle lifts during a change
   clutchRpm: 1700,           // rpm: pulling away from a standstill slips the clutch up to here
   firingsPerRev: 2,          // a four-cylinder four-stroke fires twice per revolution

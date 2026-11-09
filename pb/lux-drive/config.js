@@ -141,20 +141,24 @@ export const CAR = Object.freeze({
   mass: 1350,                // kg
   wheelbase: 2.62,
   trackWidth: 1.72,
-  power: 140000,             // W at the wheels at full throttle (about 190 hp): quick enough to reach the top speed on a straight
+  power: 215000,             // W at the wheels at full throttle (about 290 hp, car20: was 140 kW and the car hardly passed 130 km/h on a real street): 0-100 in ~4.5 s, 0-200 in ~15 s
   reversePower: 42000,       // W in reverse
-  maxSpeed: 69,              // m/s (250 km/h) - the top speed on every road (no speed limits in the game)
-  offRoadShare: 0.5,         // off the roads (grass, fields) the car tops out at this share of the top speed (125 km/h)
+  maxSpeed: 57.5,            // m/s (207 km/h; the drag holds it near 203) - the top speed on every road (no speed limits in the game); a limiter, not the drag, ends it (car20)
+  limiterBand: 3.0,          // m/s: the drive fades out over the last this much below the top speed (no hard cut, no surge)
+  offRoadShare: 0.5,         // off the roads (grass, fields) the car tops out at this share of the top speed (100 km/h)
   maxReverse: 12,            // m/s
   brakeDecel: 10.5,          // m/s2 at full braking on asphalt
-  engineBrake: 1.6,          // m/s2 when the throttle is closed
+  engineBrake: 1.6,          // m/s2 when the throttle is closed (at low speed: in a high gear it holds less, see engineBrakeHigh)
+  engineBrakeHigh: 0.65,     // the share of the engine brake left at the top speed (car20: lifting at 150 km/h no longer brakes like a low gear)
   steerMax: 0.56,            // rad of the road wheel angle at standstill
   steerSpeedRef: 13,         // m/s: the steering authority falls off with the speed
-  slideScrub: 0.7,           // 1/s: how fast a sliding car loses speed (at full slip)
+  slideScrub: 0.7,           // 1/s: how fast a sliding car loses speed (at full slip): a handbrake drift, a car on ice - not a corner within the grip
   launchCap: 6.5,            // m/s2: the most the drive pushes at low speed (no rocket launch)
   steerRate: 7,              // 1/s: how fast the wheel follows the input
-  steerGripShare: 0.95,      // the share of the tyre grip that full lock may ask for in a corner (the rest is the margin before a slide)
-  steerMin: 0.035,           // rad: the wheel always keeps this much authority, even at 200 km/h
+  cornerGrip: 1.12,          // the sideways grip of the (sports) tyres over the surface's friction: a corner at the limit pulls ~1.0 g on dry asphalt (car20)
+  steerGripShare: 0.92,      // the share of the tyre grip that full lock may ask for in a corner (the rest is the margin before a slide)
+  // (car20: there was a floor, steerMin 0.035 rad "even at 200 km/h" - above ~95 km/h it asked for more than the grip, so full lock at 150 km/h slid and
+  // scrubbed 30-50 km/h off in 3 s.  Now full lock at any speed is a corner at the grip, which keeps its speed; only the handbrake and real slides scrub.)
   squatGain: 0.006,          // rad of body pitch per m/s2 of acceleration (negative acceleration = the nose dives)
   squatMax: 0.05,            // rad
   leanMax: 0.12,             // rad: the most the body leans in a corner
@@ -176,6 +180,9 @@ export const CAR = Object.freeze({
   crestSink: 0.05,           // m: the body rests at most this far below the ground under its middle (a crest between the wheels)
   wheelReach: 0.3,           // m: a wheel reads the ground at most this far above or below the ground under the centre (a wheel over the edge of a deck or a wall does not drop the body)
   restitution: 0.12,         // the vertical bounce of the suspension
+  airDrop: 0.28,             // m: the car leaves the ground where the ground under it drops more than this in one frame ...
+  airGrade: 0.35,            // ... plus this share of the distance it moved in that frame (car20: a crest is followed at any speed and frame rate - at 200 km/h
+                             // the old 0.28 m per frame launched the car over every 30 % grade change, at 30 fps over every 15 %)
   respawnTime: 1.2,          // s from a crash to the car standing again
   pushAssist: 2.2,           // m/s2: below walking pace the car creeps forward instead of stalling
   hitSpeedLoss: 0.45,        // the share of the speed kept after a glancing hit on a building

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Burger Restaurant</title>
-<link rel="stylesheet" href="/pb/arcade-ui.css?v=3">
+<link rel="stylesheet" href="/pb/arcade-ui.css?v=10">
 <style>
 :root{--ink:var(--text);--panel:var(--card);--panel-2:var(--card2);--line:var(--border);--red:var(--danger);--gold:var(--amber);--green:var(--good);--blue:var(--cyan);--tap:44px;--counter-top:64%}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -103,7 +103,7 @@ button:disabled{cursor:not-allowed;filter:grayscale(.75);opacity:.48}
 .hud-label{display:block;color:var(--muted);font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
 .hud-value{display:block;overflow:hidden;text-overflow:ellipsis;font-size:14px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
 .boost-button{grid-column:1/-1;min-height:44px;border-color:transparent;background:var(--violet);color:#14092a}
-.modal-layer,.shop-layer{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:14px;background:rgba(246,246,243,.9)}
+.modal-layer,.shop-layer{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:14px;background:var(--g-veil)}
 .modal{width:min(94vw,430px);padding:20px;border:1px solid var(--g-ink);border-radius:0;background:var(--g-white);color:var(--g-ink);box-shadow:none;text-align:center;animation:arcade-rise .32s var(--spring)}
 .modal h2{margin:0 0 8px;font:750 clamp(24px,5vw,30px)/1.08 var(--font-display);letter-spacing:-.02em}
 .modal p{margin:6px 0;color:var(--muted)}
@@ -133,7 +133,7 @@ button:disabled{cursor:not-allowed;filter:grayscale(.75);opacity:.48}
 @media(max-height:670px){.brand{display:none}.station{min-height:116px}.game-shell{gap:5px}}
 @media(prefers-reduced-motion:reduce){.modal{animation:none}*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
-<script src="/pb/arcade-kit.js?v=43" data-arcade-id="burger" data-arcade-title="Burger Restaurant"></script>
+<script src="/pb/arcade-kit.js?v=50" data-arcade-id="burger" data-arcade-title="Burger Restaurant"></script>
 </head>
 <body>
 <main class="game-shell" id="game">

@@ -61,7 +61,7 @@ export const flow = {
       await h.goto("/pixelbreak.html");
       await page.waitForSelector("#weeklyCard .weekly-row");
       const text = await page.locator("#weeklyCard").innerText();
-      h.expect(text.includes("Reaction Time"), "weekly card names the game");
+      h.expect(/Reaction Time|Reaktiounszäit/.test(text), "weekly card names the game");
       h.eq(await page.locator("#weeklyCard .weekly-row").count(), 6, "top five plus own rank outside top five");
       h.expect(text.includes("Deng Plaz") && text.includes(ME_NAME), "own weekly rank is visible");
       h.expect(/nach \d+ D \d+ St/.test(text), "countdown is visible");

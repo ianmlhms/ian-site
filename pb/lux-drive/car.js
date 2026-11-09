@@ -67,8 +67,9 @@ export function createCar({ ground, roadInfoAt, collide = null, start = null }) 
     // (a keyboard is all or nothing: without this cap full lock at 90 km/h spins the car).
     const speedAbs = Math.abs(state.speed);
     const gripNow = surf.grip * (input.gripScale === undefined ? 1 : input.gripScale);
-    const lateralCap = Math.atan((CAR.steerGripShare * gripNow * GRAVITY * CAR.wheelbase) / Math.max(speedAbs * speedAbs, 1));
-    const steerLimit = Math.min(CAR.steerMax / (1 + speedAbs / CAR.steerSpeedRef), Math.max(lateralCap, CAR.steerMin));
+    const sideGrip = gripNow * CAR.cornerGrip;                                     // the tyres hold the car sideways a little better than they brake it
+    const lateralCap = Math.atan((CAR.steerGripShare * sideGrip * GRAVITY * CAR.wheelbase) / Math.max(speedAbs * speedAbs, 1));
+    const steerLimit = Math.min(CAR.steerMax / (1 + speedAbs / CAR.steerSpeedRef), lateralCap);
     const steerTarget = clamp(input.steer || 0, -1, 1) * steerLimit;
     steerAngle = approach(steerAngle, steerTarget, CAR.steerRate * steerLimit * dt);
     state.steer = steerAngle;
@@ -79,7 +80,7 @@ export function createCar({ ground, roadInfoAt, collide = null, start = null }) 
     const handbrake = input.handbrake ? 1 : 0;
     // the tyres hold the car sideways, up to the limit of the friction circle
     // the handbrake locks the rear wheels: the car keeps its direction of travel and the tail steps out (a drift)
-    const grip = gripNow * (handbrake ? CAR.handbrakeGrip : 1);
+    const grip = sideGrip * (handbrake ? CAR.handbrakeGrip : 1);
     const latLimit = grip * GRAVITY * dt;
     let slip = 0;
     if (Math.abs(vl) <= latLimit) {
@@ -100,7 +101,7 @@ export function createCar({ ground, roadInfoAt, collide = null, start = null }) 
       drive = (CAR.power * throttle) / Math.max(Math.abs(vf), 8) / CAR.mass;
       drive = Math.min(drive, CAR.launchCap);                                    // no rocket launch
       drive *= clamp(1 - slip * 0.8, 0.25, 1);                                   // the friction circle takes from the drive
-      if (vf >= topSpeed) drive = 0;                                            // the top speed of the car (lower on grass)
+      drive *= clamp((topSpeed - vf) / CAR.limiterBand, 0, 1);                  // the limiter: the top speed of the car (lower on grass)
     } else if (reversing) {
       drive = -(CAR.reversePower * brake) / Math.max(Math.abs(vf), 4) / CAR.mass;
       drive = Math.max(drive, -6);
@@ -110,7 +111,7 @@ export function createCar({ ground, roadInfoAt, collide = null, start = null }) 
     const dir = Math.sign(vf) || 0;
     let brakeDecel = 0;
     if (brake > 0 && !reversing) brakeDecel = CAR.brakeDecel * brake * gripNow * (handbrake ? 1.25 : 1);
-    const engineBrake = throttle < 0.05 ? CAR.engineBrake : 0;
+    const engineBrake = throttle < 0.05 ? CAR.engineBrake * lerp(1, CAR.engineBrakeHigh, clamp(Math.abs(vf) / CAR.maxSpeed, 0, 1)) : 0;
     const drag = (0.5 * CAR.airDensity * CAR.cdA * vf * Math.abs(vf)) / CAR.mass;
     const roll = surf.crr * GRAVITY * (handbrake ? 2.5 : 1);
     // the slope: the ground normal tells how steep the road is under the car
@@ -201,7 +202,7 @@ export function createCar({ ground, roadInfoAt, collide = null, start = null }) 
     const groundY = groundUnderWheels();
     const target = groundY + CAR.rideHeight;
     if (state.grounded) {
-      if (target < state.y - 0.28) {                 // the ground fell away: the car leaves it
+      if (target < state.y - (CAR.airDrop + CAR.airGrade * Math.abs(state.speed) * dt)) {      // the ground fell away: the car leaves it
         state.grounded = false; state.vy = 0;
       } else {
         state.bump = (target - state.y) / Math.max(dt, 1e-4);
@@ -258,14 +259,16 @@ function gearOf(speed) {
   if (a < 0.4) return 0;                      // 0 = neutral / standstill
   if (a < 11) return 1;
   if (a < 22) return 2;
-  if (a < 34) return 3;
-  return 4;
+  if (a < 33) return 3;
+  if (a < 43) return 4;
+  if (a < 51) return 5;
+  return 6;
 }
 
 /** The engine note of the dashboard (0..1). */
 function rpmOf(speed, gear, throttle) {
   const a = Math.abs(speed);
-  const band = gear === 0 ? 12 : [11, 22, 34, 46][Math.min(3, gear - 1)];
+  const band = gear === 0 ? 12 : [11, 22, 33, 43, 51, 60][Math.min(5, gear - 1)];
   const r = clamp((a % band) / band, 0, 1);
   return clamp(0.12 + r * 0.55 + throttle * 0.33, 0, 1);
 }

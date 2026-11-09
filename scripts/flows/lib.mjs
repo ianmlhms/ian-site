@@ -347,6 +347,7 @@ export async function runFlow(flow, { browser, origin, shotsDir = process.env.FL
   const context = await theBrowser.newContext({
     viewport, screenSize: viewport, deviceScaleFactor: 1, serviceWorkers: flow.serviceWorkers || "block",
     hasTouch: !!flow.touch, isMobile: !!flow.touch,
+    ...(process.env.FLOW_COLOR_SCHEME ? { colorScheme: process.env.FLOW_COLOR_SCHEME } : {}),   // FLOW_COLOR_SCHEME=dark emulates prefers-color-scheme
     recordVideo: { dir: tmpVideos, size: viewport },
   });
   const base = flow.backend || {};

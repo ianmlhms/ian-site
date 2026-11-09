@@ -11,11 +11,13 @@
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Messenger">
-<meta name="theme-color" content="#f6f6f3">
+<meta name="theme-color" content="#f6f6f3" media="(prefers-color-scheme: light)" data-gt="light">
+<meta name="theme-color" content="#121314" media="(prefers-color-scheme: dark)" data-gt="dark">
+<script src="gitter-theme.js?v=1"></script>
 <link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="gitter.css?v=11">
+<link rel="stylesheet" href="gitter.css?v=12">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<script src="theme.js?v=32"></script>
+<script src="theme.js?v=33"></script>
 <script src="i18n-dict.js?v=54"></script>
 <script src="i18n.js?v=5"></script>
 <style>
@@ -45,7 +47,7 @@
   .gate-box h3{font:800 22px/1.1 var(--font-display);letter-spacing:-.03em}
   .gate-box p{color:var(--muted);font-size:15px;line-height:1.5;margin:0}
   .auth-go{min-height:44px;padding:0 18px;border:1px solid var(--ink);border-radius:0;background:var(--ink);color:var(--paper);font:600 15px "Geist",system-ui,sans-serif;cursor:pointer}
-  .auth-go:hover{background:var(--green);border-color:var(--green);color:#fff}
+  .auth-go:hover{background:var(--green);border-color:var(--green);color:var(--on-green)}
 
   /* ---- app shell: two soft panels (chat list, conversation) ---- */
   #app{flex:1;display:none;min-height:0;width:100%;max-width:1240px;margin:0 auto;gap:0;padding:12px max(var(--gutter),env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(var(--gutter),env(safe-area-inset-left))}
@@ -229,11 +231,11 @@
   .av-chip{border-radius:0;background:var(--white);box-shadow:none;border:1px solid var(--soft)}
   .mp-av{border-radius:0}
   .bubble{border-radius:0;background:var(--white);border:1px solid var(--soft);padding:8px 12px 7px}
-  .msg.mine .bubble{border-radius:0;background:var(--green);border-color:var(--green);color:#fff;box-shadow:none}
+  .msg.mine .bubble{border-radius:0;background:var(--green);border-color:var(--green);color:var(--on-green);box-shadow:none}
   .bubble .who{color:var(--green);font-family:"Geist",system-ui,sans-serif}
   .admin-tag,.class-tag{border-radius:0;font-family:"Geist Mono",ui-monospace,monospace;font-weight:500;box-shadow:none;background:none;border:1px solid currentColor}
   .admin-tag{color:var(--ink)}.class-tag{color:var(--muted)}
-  .msg.mine .admin-tag,.msg.mine .class-tag{color:#fff}
+  .msg.mine .admin-tag,.msg.mine .class-tag{color:var(--on-green)}
   .ticks.read{color:var(--green)}
   .media{border-radius:0}
   .filechip{border-radius:0;background:var(--tint);border:1px solid var(--soft)}
@@ -243,7 +245,7 @@
   .del-btn:hover{box-shadow:none;border-color:var(--danger);color:var(--danger)}
   .reply-quote{border-radius:0;border-left-color:var(--green)}
   .reply-quote .rq-user{color:var(--green)}
-  .msg.mine .reply-quote{border-left-color:#fff}
+  .msg.mine .reply-quote{border-left-color:var(--on-green)}
   .react-chip{border-radius:0;background:var(--tint);box-shadow:none;border:1px solid var(--soft);color:var(--ink)}
   .react-chip.mine-r{background:var(--white);border-color:var(--green)}
   .msg.mine .react-chip{background:var(--white)}
@@ -259,7 +261,7 @@
   .composer button[type=submit]:hover{background:var(--green);filter:none}
   #attachBtn .ic,#micBtn .ic{font-size:20px}
   #attachBtn:hover,#micBtn:hover{background:var(--tint)}
-  #micBtn.rec{background:var(--danger);color:#fff}
+  #micBtn.rec{background:var(--danger);color:var(--on-green)}
   .member-panel{border-radius:0;box-shadow:none;border:1px solid var(--ink);background:var(--white)}
   .mp-invite input{border-radius:0;box-shadow:none;border:1px solid var(--ink);background:var(--white)}
   .mp-invite input:focus{box-shadow:none;outline:2px solid var(--green);outline-offset:-2px}

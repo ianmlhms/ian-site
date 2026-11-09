@@ -2758,3 +2758,64 @@ parapet hit.  The A13 place splits into two small ones on the same lane: 16.9 m/
 * The A1 abutment over the A13 is now a 6.6 m earth face at ~5 m/m under the deck (no retaining wall: walls are not baked under decks), grey sawtooth shading.
 * Rue de Munsbach: the tube's exit jolt 17 m/s2 at 25 m/s (unchanged); deck 254 still sits on the portal hood.
 * Footway deck 200 (Rue de Cessange) sags under the road deck in the picture too (its railing may show through the road deck): not looked at.
+
+## car20 (9 Nov 2026): the car - three designs, the physics for 200 km/h, the Gitter look of the menus and the HUD
+
+Branch `lux-drive-car20` (from main 27a3f532), main.js ?v=72, ui.css ?v=5.
+
+### A. Three cars (Ian picks one)
+`car-designs.js` (pure data) + `car-model.js` (one builder for all): 1 Hatchback, **2 Coupé (Ian's pick, the default since 9 Nov)**, **3 Lëtzebuerger Taxi** (white estate, the flag along
+the flanks, roof rails, lit TAXI sign).  `?car=hatch|coupe|taxi`; the default is one line (`DEFAULT_CAR_DESIGN`).  Coupé polish after the pick: tail lamp clusters + light bar, reversing lamps under them, darker pipes, mirrors on the belt in the paint.  Final shots `designs/car20-final-coupe.png`.  Every design: a 16-point loft with sill /
+skirt / shoulder / belt / roof crown; **real wheel arches** cut into the loft (the lower ring lifted onto the arch, the floor becomes the liner - the old car had
+a painted dark half disc); glass with a sky gradient (vertex colours); black pillars or a black roof; lamps and grilles laid ON the body (projected onto the
+surface, subdivided, lifted along the normal); spoked wheels (5 / 10 spokes, silver or dark); yellow Luxembourg plates with the EU strip; a painted occlusion
+(the paint darkens towards the sill); a soft contact shadow (canvas texture, one transparent quad).  Draw calls: 9 meshes (was 8; the ui flow allows 12),
+the scene at the start 188 calls vs 187.  Shots: `luxdrive-work/car20/designs/car20-design{0..3}-*.png` (0 = today's car), made by
+`luxdrive-work/car20/design-shots.mjs` + `compose.py` (Metal GPU, q=high, the start of the game).
+
+### B. Physics (car.js, config.js; numbers from `luxdrive-work/car20/sim.mjs`, flat ground, keyboard input)
+| | before | after |
+|---|---|---|
+| top speed | 244 km/h in theory, 0-200 22 s (Ian: "~130" - the street ends first, and every bend scrubbed the speed) | **203 km/h** (215 kW, soft limiter over the last 3 m/s) |
+| 0-100 / 0-150 / 0-200 | 5.2 / 10.8 / 22.1 s | **4.5 / 7.9 / 14.0 s** (launchCap kept at 6.5: 7.2 threw the harness T4 route bot off its lane at Kirchberg 9423) |
+| full lock 3 s at 150 km/h, full throttle | **101 km/h** (slip 0.87; straight: 168) | **179 km/h** (= straight 179; slip 0) |
+| half lock, full throttle | 140 km/h (slip 0.29) | 179 km/h |
+| full lock, throttle off | 85 km/h | 131 km/h (= straight: the engine brake only) |
+| handbrake + full lock 1 s from 150 | 63 km/h | 67 km/h (drifts still scrub) |
+| braking 100 -> 0 | 31.2 m | 31.6 m |
+The bleed was `steerMin` (0.035 rad "even at 200 km/h"): above ~95 km/h that floor asked for more sideways grip than the tyres have, so full lock slid
+(slideScrub 0.7/s x slip) and the friction circle cut the drive.  Now the wheel's limit is the grip limit at every speed (`steerGripShare 0.92` of
+`cornerGrip 1.12` x the surface grip): full lock is a corner at ~1 g that keeps its speed (150 km/h: R 190 m, 37 deg in 3 s).  The engine brake falls to
+65 % at the top speed.  `airDrop + airGrade x distance per frame`: the car leaves the ground only where the ground drops faster than a 35 % grade change - at
+200 km/h (and at 30 fps) the old 0.28 m per frame launched it over every 15-30 % crest.  A 6th gear for the engine note (4400 rpm at 200).
+
+### C. Gitter look (ui.css block at the end, separate commit)
+Paper menus with square ink frames and Geist / Geist Mono, ink chips when pressed, a boxless HUD (white numerals with the w2 dark outline straight on the
+scene), square minimap, square touch controls (sizes unchanged).  Shots `luxdrive-work/car20/shots/ui/`.
+
+### Drive sweep (`--drawn`, Mini, sweep tools copied from lux-drive-sweep, not committed; `luxdrive-work/car20/sweep/`)
+`SWEEP_FAST=1` (local addition) drives the big roads at 57 m/s, tertiary 40, streets 30, service 13.
+| run | main 27a3f532 | car20 |
+|---|---|---|
+| 13/25 m/s | jolt 107, fall 2, air 2, hit 4, roll 6; 24 places | **identical** |
+| 13/25/57 m/s | jolt 281, fall 3, air 4, hit 6, roll 8; 49 places | jolt 281, fall 3, **air 3**, hit 6, roll 8; 50 places |
+All falls / flights are Rue de Munsbach (fixed by fix19's underpass); the extra 0.1 s flight there at 57 m/s is gone with the new air rule.  No new
+fall / air / hit place.  Jolt count unchanged (the sweep carries the car: the vertical only); the 50th place is a jolt cluster split.
+
+### Gates (tree at 08781cd3 + this note, main.js ?v=72; logs `luxdrive-work/car20/gates/`)
+* `node pb/lux-drive/harness.js`: **175 / 175 PASS** (1940 s).  (The first run, launchCap 7.2: T4 failed - the route bot on Kirchberg 9423 got ahead of its
+  nearest-point tracking at the lane taper and steered into wall 18; with launchCap 6.5 the first metres match main and T4 passes.)
+* `luxdrive_world`: PASS (draw calls low 114 / medium 151 / high 211; was 113 / 150 / 210: +1 the car's shadow).
+* `luxdrive_holes`: **0** hole pixels (132 poses), HOLES_Q=low **0**.
+* `luxdrive_ui`: PASS, 98 ok (the car 9 draw calls; full lock 30 / 50 / 90 km/h: 85 / 61 / 39 deg in 2 s; town full throttle 157 km/h in 14 s;
+  braking from 50: 7.6 m dry / 10.0 m wet).  `luxdrive_webkit`: PASS, 22 ok.
+
+### Still wrong / open
+* The bot of harness T4 is fragile (its nearest-point tracking loses the route at a lane taper when the car arrives faster); the launch was kept as on main
+  for it.  Worth a sturdier tracker one day (not a gate change).
+* Full lock at 200 km/h is a 340 m radius (physics at ~1 g): fine on the motorway; a keyboard driver cannot take a city junction at 150 without braking.
+* The contact shadow is subtle in daylight; the coupé's side has no detail between the arches (a vent / crease would help).
+* The menus keep the emoji icons (the site's gitter-icons.svg was not brought in); the start / pause cards were not re-laid out, only re-skinned.
+* No car choice in the menu yet (only `?car=`).
+* The sweep's jolt metric carries the car (vertical only), so it does not see the steering; a driven sweep (steer + throttle at the new top speed) would be
+  the next check.

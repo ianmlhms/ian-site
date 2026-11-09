@@ -155,7 +155,7 @@ html.kl-spec #itemSlot,html.kl-spec #touch,html.kl-spec #btnReset,html.kl-spec #
    ===================================================================================================== */
 @font-face{font-family:"Geist";font-style:normal;font-weight:400 800;font-display:swap;src:url("/assets/fonts/geist-latin.woff2") format("woff2")}
 @font-face{font-family:"Geist Mono";font-style:normal;font-weight:500;font-display:swap;src:url("/assets/fonts/geist-mono-500-latin.woff2") format("woff2")}
-:root{color-scheme:light;--g-paper:#f6f6f3;--g-white:#fcfcfa;--g-ink:#16171a;--g-muted:#62656a;--g-soft:rgba(22,23,26,.14);--g-tint:rgba(22,23,26,.04);--g-green:#1f7a4d;--g-danger:#a32121;
+:root{color-scheme:light;--g-paper:#f6f6f3;--g-white:#fcfcfa;--g-ink:#16171a;--g-muted:#62656a;--g-soft:rgba(22,23,26,.14);--g-tint:rgba(22,23,26,.04);--g-green:#1f7a4d;--g-danger:#a32121;--g-on-green:#fff;--g-veil:rgba(246,246,243,.97);
   --g-font:"Geist",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--g-mono:"Geist Mono",ui-monospace,"SF Mono",Menlo,monospace;
   --halo:0 0 2px #000,0 0 3px #000a,0 1px 5px #0009}
 html,body{background:var(--g-paper)}
@@ -167,9 +167,9 @@ select,input[type=text]{border-radius:0;background:var(--g-white);color:var(--g-
 .spin{border:3px solid var(--g-soft);border-top-color:var(--g-green)}
 
 /* ---- screens: paper veil, one white card per dialog ---- */
-.screen{background:rgba(246,246,243,.97);backdrop-filter:none;-webkit-backdrop-filter:none;
+.screen{background:var(--g-veil);backdrop-filter:none;-webkit-backdrop-filter:none;
   --ink:var(--g-ink);--soft:var(--g-muted);--line:var(--g-soft);--gold:var(--g-green);--card:var(--g-white)}
-#bdScreen{background:rgba(246,246,243,.97)}
+#bdScreen{background:var(--g-veil)}
 .card,.loadcard{background:var(--g-white);border:1px solid var(--g-ink);border-radius:0;box-shadow:none;color:var(--g-ink)}
 .menu-head h1{font-style:normal;font-weight:800;letter-spacing:-.035em;background:none;-webkit-background-clip:initial;background-clip:initial;color:var(--g-ink)}
 .flag{border-radius:0;box-shadow:none;outline:1px solid var(--g-ink)}
@@ -179,7 +179,7 @@ h2{font:500 11px/1.2 var(--g-mono);letter-spacing:.08em;color:var(--g-muted)}
 h2.mini{font:500 11px/1.2 var(--g-mono)!important;letter-spacing:.08em!important;text-transform:none!important;color:var(--g-muted)!important}
 .mode,.tcard,.chips button,.drivers button{background:var(--g-white);color:var(--g-ink);border:1px solid var(--g-soft);border-radius:0}
 .mode small,.tcard small{color:var(--g-muted)}
-.mode.on{background:var(--g-green);border-color:var(--g-green);color:#fff}.mode.on small{color:rgba(255,255,255,.85)}
+.mode.on{background:var(--g-green);border-color:var(--g-green);color:var(--g-on-green)}.mode.on small{color:rgba(255,255,255,.85)}
 .mode:not(.on):hover,.tcard:not(.on):hover,.chips button:not(.on):hover,.drivers button:not(.on):hover{border-color:var(--g-ink);color:var(--g-ink)}
 .tcard canvas,.tpv,.cprev canvas{border-radius:0}.tcard canvas,.tpv{background:var(--g-tint)}
 .tcard.on{border-color:var(--g-green);background:var(--g-tint);box-shadow:0 0 0 1px var(--g-green) inset}
@@ -190,7 +190,7 @@ h2.mini{font:500 11px/1.2 var(--g-mono)!important;letter-spacing:.08em!important
 .drivers button.on{border-color:var(--g-green);background:var(--g-tint);box-shadow:0 0 0 1px var(--g-green) inset}
 .langs button[aria-pressed=true]{background:var(--g-ink);color:var(--g-paper)}
 .menu-card .foot{background:var(--g-white);border-top:1px solid var(--g-soft);border-radius:0}
-.primary{background:var(--g-green);border:1px solid var(--g-green);color:#fff;font-style:normal;font-weight:700;border-radius:0;box-shadow:none}
+.primary{background:var(--g-green);border:1px solid var(--g-green);color:var(--g-on-green);font-style:normal;font-weight:700;border-radius:0;box-shadow:none}
 .primary:hover:not(:disabled){background:var(--g-ink);border-color:var(--g-ink);color:var(--g-paper)}
 .olbtns button small{color:inherit;opacity:.8}
 .olbtns button.big{background:var(--g-white)}.olbtns button.primary small{color:#fff}
@@ -201,14 +201,14 @@ h2.mini{font:500 11px/1.2 var(--g-mono)!important;letter-spacing:.08em!important
 .plist li.me,#endList li.me{background:var(--g-white);border:1px solid var(--g-green)}
 .plist li i{border:2px solid var(--g-white);box-shadow:0 0 0 1px var(--g-ink)}
 .plist .st{border-radius:0;background:var(--g-tint);border:1px solid var(--g-soft);font-family:var(--g-mono);font-weight:500;font-size:11px}
-.plist .st.ok,.plist .st.host{background:var(--g-green);border-color:var(--g-green);color:#fff}.plist .st.wait{color:var(--g-muted)}
+.plist .st.ok,.plist .st.host{background:var(--g-green);border-color:var(--g-green);color:var(--g-on-green)}.plist .st.wait{color:var(--g-muted)}
 .plist .slow{color:var(--g-danger)}
-.invres .ic{border-radius:0;background:var(--g-green);color:#fff}.invres li.bad{background:var(--g-white);border-color:var(--g-danger)}.invres li.bad .ic{background:var(--g-danger)}
+.invres .ic{border-radius:0;background:var(--g-green);color:var(--g-on-green)}.invres li.bad{background:var(--g-white);border-color:var(--g-danger)}.invres li.bad .ic{background:var(--g-danger)}
 #endList li{font-variant-numeric:tabular-nums}#endList li b:first-child{font-style:normal;color:var(--g-green);font-family:var(--g-mono);font-weight:500}
 #endNote{color:var(--g-green)}
 .chk{color:var(--g-ink)}.chk input{accent-color:var(--g-green)}
 .ppk-modal,.ps-drop{--text:var(--g-ink);--muted:var(--g-muted);--border:var(--g-soft);--card-opaque:var(--g-white);--glass-solid:var(--g-white);--card2:var(--g-tint);--card-hover:var(--g-tint);--control-fill:var(--g-white);--accent:var(--g-green);--accent-text:var(--g-green);--accent-foreground:#fff;--focus-ring:var(--g-green);--radius-pane:0;--radius-inner:0;--r-chip:0;font-family:var(--g-font)}
-.ppk-modal .ppk-go{background:var(--g-green);border:1px solid var(--g-green);color:#fff;box-shadow:none}
+.ppk-modal .ppk-go{background:var(--g-green);border:1px solid var(--g-green);color:var(--g-on-green);box-shadow:none}
 
 /* ---- in-race HUD: straight on the 3D scene, white text with a dark outline, no boxes ---- */
 .chip{background:none;border:0;border-radius:0;backdrop-filter:none;-webkit-backdrop-filter:none;color:#fff;text-shadow:var(--halo)}
@@ -217,7 +217,7 @@ h2.mini{font:500 11px/1.2 var(--g-mono)!important;letter-spacing:.08em!important
 #itemSlot{border:0;width:auto;height:auto;min-width:64px;min-height:64px}
 #itemSlot.has{border:0;box-shadow:none}#itemSlot.has #itemIcon{filter:drop-shadow(0 0 2px #000) drop-shadow(0 1px 4px #000a)}
 #itemCount{color:#fff}
-#minimap{border-radius:0;background:rgba(246,246,243,.9);border:1px solid var(--g-ink)}
+#minimap{border-radius:0;background:var(--g-veil);border:1px solid var(--g-ink)}
 #utilities button{background:var(--g-white);color:var(--g-ink);border:1px solid var(--g-ink);border-radius:0;text-shadow:none}
 #utilities button:hover{border-color:var(--g-green);color:var(--g-green)}
 #toast{font-style:normal;font-weight:800;color:#fff;text-shadow:var(--halo)}
@@ -230,7 +230,10 @@ h2.mini{font:500 11px/1.2 var(--g-mono)!important;letter-spacing:.08em!important
 #steerKnob{border-radius:0;background:var(--g-white);box-shadow:0 0 0 1px var(--g-ink)}
 #btns button{border-radius:0;color:#fff;background:rgba(22,23,26,.35);border:2px solid #fff;text-shadow:var(--halo);box-shadow:none}
 #bDrift,#bItem{background:rgba(22,23,26,.35)}
-#btns button.held{background:var(--g-green);color:#fff;transform:none}
+#btns button.held{background:var(--g-green);color:var(--g-on-green);transform:none}
 #specBar{border-radius:0;background:var(--g-white);border:1px solid var(--g-ink);box-shadow:none;color:var(--g-ink)}
 #specBar button{border-radius:0;background:var(--g-white);color:var(--g-ink);border:1px solid var(--g-ink)}
-#specBar button.on{background:var(--g-green);color:#fff;border-color:var(--g-green)}
+#specBar button.on{background:var(--g-green);color:var(--g-on-green);border-color:var(--g-green)}
+
+/* Gitter-dark (Nov 2026) */
+html[data-theme="dark"]{--g-paper:#121314;--g-white:#1a1b1d;--g-ink:#ececea;--g-muted:#9a9b98;--g-green:#3fae76;--g-danger:#e5645f;--g-soft:rgba(236,236,234,.14);--g-tint:rgba(236,236,234,.05);--g-veil:rgba(18,19,20,.97);--g-on-green:#07140d;color-scheme:dark}
