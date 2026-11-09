@@ -1,5 +1,5 @@
 /* Arcade — shared look for every built-in game (pb/*.html, geometrydash.html).
- * Include with <link rel="stylesheet" href="/pb/arcade-ui.css?v=3"> (absolute: games load via srcdoc).
+ * Include with <link rel="stylesheet" href="/pb/arcade-ui.css?v=4"> (absolute: games load via srcdoc).
  * "Gitter" look (Nov 2026): paper #f6f6f3 / ink #16171a / ONE green #1f7a4d, hairlines, radius 0, Geist + Geist Mono.
  *
  * Two palettes live here on purpose:
@@ -92,9 +92,3 @@ canvas{display:block;touch-action:none;user-select:none;-webkit-user-select:none
   .arcade-overlay.show,.arcade-panel{animation:none}
   .arcade-btn{transition:none}
 }
-
-/* bus-tycoon is not restyled yet (another agent owns it): keep its old dark page and board palette. */
-html:has(script[data-arcade-id="bus-tycoon"]){--bg:#0d0d1a;--bg2:#11111f;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;
-  --text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--cyan:#4de8ff;--amber:#f5b942;--danger:#ff6685;--good:#4ade80;--violet:#b48cff;
-  color-scheme:dark;background:var(--bg)}
-html:has(script[data-arcade-id="bus-tycoon"]) body{background:var(--bg);color:var(--text)}
