@@ -2813,3 +2813,34 @@ around the point and says "outside" when there is none).  The sweeps used it to 
 the BORDER, not the city (8610 roads; no tunnel, no old town).  The sweep now uses a real point-in-polygon.  A full-city drive sweep takes ~100 min per
 speed set on the Mini (stopped after 6 min: 1472 events in the first 480 roads) - needs its own run (MSI or overnight).  The game uses inside() for the
 portal border probe only (main.js createPortals): interior mouths without an approach count as "border" there - harmless, left alone.
+
+**Harness gates on this tree (8b09811b, ?v=74)**: full run 173 / 175 (`tunnels19/gates/harness.txt`, 2051 s); the 2 failures were caused by opening the tunnels and
+are fixed in the harness's measuring, not its limits: P4's floor on the NUMBER of portals (> 50; 11 closed portals became open tubes, 56 -> 45 -> floor 40, the
+"no headwall over a road" limit unchanged); Q1 (and T's deck drive) started a route that leaves a deck into a tube's trough at hint 1e4 = on the hill over the
+Cents south portal (deck 21: air 33 frames) - a route that starts in a trough / blend now starts on the tube's floor (as the sweep).  Re-run P, Q, T, X: 17 / 17
+PASS (`gates/harness_PQTX.txt`; Q1 9 decks failing, ratchet 10, base 9-10).
+
+**Tunnel-area drive sweep (`--drawn`, 11 boxes round all tubes, `sweep/run-area.sh`, compare `tools2/cmpsweep.py base-x new-x`)**: base (main v72) slow 461 jolts /
+251 hits / 1 fall / 1 air, the tunnel areas are rough in base already (city interior: see BIG FINDING).  New-vs-base at 13/25 m/s (new1, before the last fixes):
+gone - TU09 roll + jolt, Schuman 9252 jolt 22.7, Fort Thüngen building hit, Cents 157 jolt 60; new - Cents 521 air (sweep start artifact, fixed f44999be), link 3013
+tube hit (fixed: held roads), Desserte 9510 jolt 36.9 (see Still wrong), Cents 2929 hit lane -4.48 (see Still wrong).
+
+### Still wrong (honest)
+* **Cents north (2929 -> 158)**: the approach is drawn 13 - 14 m wide (3 lanes) into the 41 m trough of a 2-lane tube; the OSM outer lane (-4.48) meets the
+  trough's wall end (sweep hit 0.41 m).  Needs a funnel trough (walls flaring from the tube width to the approach width) - trough width is per tube today
+  (tunnel-view, tunnel-mask, collide, troughFloor all use innerOf): a separate job.
+* **Desserte Schuman exit (9510 at 5929,8148)**: jolt 23 - 35 m/s2 for a car leaving the Desserte tube: its lane crosses the blend in front of Rue du Fort
+  Thüngen's face B almost square (the two mouths meet at the Desserte junction); that blend pulls the ground 2 - 5 cm towards FT's floor plane over 1 m.
+  Fix idea: blend in front of a face only along the approach's own carriageway / fade it with the angle of the crossing road.
+* Schuman west sag (world carve of the 9252 / 9145 merge), N56 west world road 30 - 45 m out (twins 0.4 m apart in level), 12867 west without a trough
+  (12833 overhangs it) - all in base too.
+* The world sweeps so far covered only the border band (BIG FINDING): a full-city drive + camera sweep is needed before launch.
+
+### HANDOFF (if this builder runs out): what is left, in order
+1. Browser gates were started on 8b09811b (`tunnels19/gates/run.sh`: world, holes, holes_low, ui, webkit -> `gates/*.txt`): read the results.
+2. Final tunnel-area sweep: `sweep/run-area.sh <repo> new2` then `python3 tools2/cmpsweep.py base-slow new2-slow` (and fast).
+3. Camera sweep (MSI if reachable, else Mini; sweep-look.mjs with the fixed world.mjs, `--area`-like restriction to the tunnel boxes is not built in).
+4. Shots: `shots/final/poses_final.json` (50 poses, 10 tubes) through shot.mjs on base-wt (before) and this tree (after), then `python3 tools2/stack.py before after
+   shots/final/stacked`.
+5. Deploy: fetch + merge origin/main (fix19 = ?v=73 may have landed; keep both sides), ?v=74 stays (or next free), gates again if shared files changed, push,
+   vault line, Progress line in ORCHESTRATOR-HANDOFF.md.
