@@ -306,7 +306,7 @@ export function gaussianSmooth(values, sigmaSamples) {
  */
 export function createRoadNetwork(roads, baseHeight, decks = []) {
   const deckEnds = deckEndLevels(decks);
-  let usableDeckEnds = [];               // (decided in reconcileJunctions, once the ways have their own beds)
+  let usableDeckEnds = [], rejectedDecks = new Set();               // (decided in reconcileJunctions, once the ways have their own beds)
   // A drivable way tagged as a bridge whose deck spans nothing: a narrow deck (its DSM is the canopy of a wood, not a deck), no dip of the land under it, and short (a track over a ditch).
   // It is carved like any way and its deck is not drawn (decks.js): a deck lifted off such a way was a box 2 .. 25 m high in the wood, and a deck laid onto it lay on the ground
   // with the cut of the track under its ends.  Returns the deck or null.
@@ -545,6 +545,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
       }
     }
     usableDeckEnds = deckEnds.filter((de) => !rejected.has(de.deck));
+    rejectedDecks = rejected;
     const endPins = new Map();                  // chain -> Map(sample index -> level)
     const pinOf = (chain) => { let m = endPins.get(chain); if (!m) { m = new Map(); endPins.set(chain, m); } return m; };
     for (const e of ends) {
@@ -1967,6 +1968,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   const isDrawn = (ri) => !!info[ri] || (!!roads[ri].info.drivable && !roads[ri].tunnel && !!(roads[ri].over || (roads[ri].layer || 0) >= 1));
   return {
     carve, nearestRoad, roads, info, count, scratch, overRoads, crossings, chains, protection, groundedDecks, isDrawn, carriageways,
+    get rejectedDecks() { return rejectedDecks; },          // (the decks whose DSM level the approaches are not pinned to: probes, harness)
     taperDhw, segments: { X0, Z0, X1, Z1, BED0, BED1, TAN0, TAN1, HW, DHW0, DHW1, KERBH, KERBW, PW, A0, RAD, REACH, KIND, ROADOF, KERBON, LINES, S0, S1, SURF },
     // the centre lines as they are carved (resampled and rounded): the game, the minimap and the probes follow these
     samples: { x: SAMPLES_X, z: SAMPLES_Z, road: SAMPLES_ROAD, first: firstSample, segs: segCount },
