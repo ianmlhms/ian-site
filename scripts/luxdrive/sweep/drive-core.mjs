@@ -65,6 +65,13 @@ function startHint({ road, x, z, world }) {
     }
   }
   if (road.over || road.bridge) return 1e9;
+  // (a road that starts in the trough or the blend of a tube - the 26 m approach of Cents south ends at the face - starts on the tube's floor, not on the land of
+  // the hill over the portal: the car fell off it and "flew" 0.6 s, tunnels19)
+  const L = {};
+  if (tubes && tubes.network && tubes.network.locate(x, z, L) && L.tube) {
+    const t = L.tube, g0 = t.troughA ? t.tA : t.sA - 8, g1 = t.troughB ? t.tB : t.sB + 8;
+    if (L.s >= g0 && L.s <= g1) return L.floor + CAR.rideHeight + 0.3;
+  }
   return ground.levelAt(x, z, surface.height(x, z) + 0.5) + CAR.rideHeight;
 }
 
