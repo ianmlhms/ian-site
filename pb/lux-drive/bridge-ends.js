@@ -44,6 +44,7 @@ export const BRIDGE_END = Object.freeze({
   trimMax: 12.0,      // m: the most a deck end is trimmed ...
   trimKeep: 4.0,      // ... and the least of the deck that is left
   joint: 1.5,         // m: decks.js DECK.joinTolerance (the ends of two decks this close are one bridge: no free end)
+  besideCar: 6.0,     // m past the edge of a car's deck: a footway deck that ends this close to one is its pavement, not trimmed
 });
 
 const CAR_KINDS = new Set(['motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary', 'primary_link', 'secondary', 'secondary_link', 'tertiary', 'tertiary_link',
@@ -182,6 +183,15 @@ export function trimFreeEnds(roads, decks, groundAt) {
   const allBridges = roads.filter(isBridgeWay);
   const bridgeWays = allBridges.filter((r) => CAR_KINDS.has(r.kind) && (!r.info || r.info.drivable));
   const out = decks.slice(), trimmed = [];
+  // the way a deck carries: the bridge way most of its points lie on (decks.js widenToWays' match); a deck of a car's way or of none is a car's
+  const carDeck = decks.map((d) => {
+    let best = null, most = 0;
+    for (const r of allBridges) {
+      const c = d.pts.filter((p) => polyDist(p, r.pts) <= Math.max(1.5, d.width / 2)).length;
+      if (c > most) { most = c; best = r; }
+    }
+    return !best || most < d.pts.length * 0.6 || CAR_KINDS.has(best.kind);
+  });
   decks.forEach((d0, di) => {
     for (const side of [0, 1]) {
       const d = out[di], n = d.pts.length;
@@ -190,26 +200,39 @@ export function trimFreeEnds(roads, decks, groundAt) {
       const E = pts[0], ul = dist(pts[1], E) || 1, u = [(pts[1][0] - E[0]) / ul, (pts[1][1] - E[1]) / ul];
       if (wayEndingAt(carved, E, u, B.join, B.align)) continue;                   // (an approach runs onto it: road-network.js shapes that end)
       if (wayEndingAt(bridgeWays, E, u, B.join, B.align)) continue;               // (the bridge goes on: a deckless piece or the next deck of a viaduct)
-      // (a joint of two decks: the other deck goes on from E the other way)
-      const goesOn = (o, k, k2) => dist(o.pts[k], E) <= B.joint && ((o.pts[k2][0] - o.pts[k][0]) * u[0] + (o.pts[k2][1] - o.pts[k][1]) * u[1]) / (dist(o.pts[k2], o.pts[k]) || 1) < -0.5;
-      // (... unless the joint is a footway's or a track's that crosses a street at the street's level: the two track decks of Rue de Leudelange meet on Rue Roudebësch, decks 155 / 304)
-      const crossesStreet = !wayEndingAt(bridgeWays, E, [-u[0], -u[1]], B.join, B.align) && wayEndingAt(allBridges, E, [-u[0], -u[1]], B.join, B.align) &&
+      // (a joint: another deck ends here too - one bridge in pieces, or footbridges that branch in the air over the Autoroute de Dudelange (decks 113 / 141 / 165: trimmed, the
+      // new end was pinned to the motorway under it and ramped up in its lanes) - unless it is a footway's or a track's joint that crosses a street AT ITS LEVEL: the two
+      // track decks of Rue de Leudelange meet on Rue Roudebësch, decks 155 / 304)
+      const atGrade = tops.length > 1 && tops[1] - groundAt(E[0], E[1]) < B.trimClear;
+      const crossesStreet = atGrade && !wayEndingAt(bridgeWays, E, [-u[0], -u[1]], B.join, B.align) && wayEndingAt(allBridges, E, [-u[0], -u[1]], B.join, B.align) &&
         carved.some((r) => polyDist(E, r.pts) < r.width / 2);
-      if (!crossesStreet && out.some((o, oi) => oi !== di && o.pts.length > 1 && (goesOn(o, 0, 1) || goesOn(o, o.pts.length - 1, o.pts.length - 2)))) continue;
+      const endsHere = (o) => dist(o.pts[0], E) <= B.joint || dist(o.pts[o.pts.length - 1], E) <= B.joint;
+      if (!crossesStreet && out.some((o, oi) => oi !== di && o.pts.length > 1 && endsHere(o))) continue;
+      // a car's deck only where a street junction lies at its end (two or more carved ways end there: the Hondhausbréck at Rue Vauban / Allée Pierre de Mansfeld); the decks of
+      // an interchange that meet slip roads beside their ends keep them (Autoroute de Dudelange 6593, Clausener Bréck 473 measured worse when trimmed)
+      const ownCar = carDeck[di];
+      // (the pavement deck beside a road bridge: the road's outer lane may lie on it where the road's deck is narrower than its way - Autoroute de Dudelange 6593 beside
+      // footway deck 118 lost its outer lane's ground and flew 0.35 s when it was trimmed)
+      if (!ownCar && decks.some((o, oi) => carDeck[oi] && oi !== di && o.pts.length > 1 && polyDist(E, o.pts) <= o.width / 2 + B.besideCar)) continue;
+      if (ownCar && carved.filter((r) => dist(r.pts[0], E) <= B.join || dist(r.pts[r.pts.length - 1], E) <= B.join).length < 2) continue;
       const cum = arcsOf(pts), len = cum[cum.length - 1];
       const near = carved.filter((r) => polyDist(E, r.pts) < r.width / 2 + d.width / 2 + B.trimEdge + B.trimMax);
       if (!near.length) continue;
       const hw = d.width / 2;
-      let s = 0;
+      let s = 0, over = false;
       for (; s <= Math.min(B.trimMax, len - B.trimKeep); s += B.trimStep) {
         const P = pointAt(pts, cum, s), k = Math.min(pts.length - 1, Math.max(1, cum.findIndex((c) => c >= s)));
         const top = tops[k - 1] + (tops[k] - tops[k - 1]) * Math.min(1, Math.max(0, (s - cum[k - 1]) / ((cum[k] - cum[k - 1]) || 1)));
         // (a bridge over the street from here on; the level of the deck no steeper than DECK_END_GRADE off its land at the end: the DSM of the Hondhausbréck stood 4 m over the junction)
-        if (Math.min(top, groundAt(E[0], E[1]) + B.endGrade * s) - groundAt(P[0], P[1]) >= B.trimClear) break;
+        // (a footbridge's own DSM is its level; a car's deck is enveloped by decks.js from its end)
+        const level = ownCar ? Math.min(top, groundAt(E[0], E[1]) + B.endGrade * s) : top;
+        if (level - groundAt(P[0], P[1]) >= B.trimClear) { over = true; break; }
         const c = [P, [P[0] - u[1] * hw, P[1] + u[0] * hw], [P[0] + u[1] * hw, P[1] - u[0] * hw]];
         if (!near.some((r) => c.some((q) => polyDist(q, r.pts) < r.width / 2 + B.trimEdge))) break;
       }
-      if (s <= B.trimStep || s > Math.min(B.trimMax, len - B.trimKeep)) continue;   // (nothing to trim, or the deck would be all street: left as it is)
+      // (nothing to trim; the deck would be all street; or it rises over the street before it leaves the carriageway - a footbridge over it: its end would be pinned
+      // to the street under it, a ramp in the lanes)
+      if (over || s <= B.trimStep || s > Math.min(B.trimMax, len - B.trimKeep)) continue;
       const keep = slice(pts, cum, s, len), k0 = cum.findIndex((c) => c > s);
       const t0 = tops[k0 - 1] + (tops[k0] - tops[k0 - 1]) * ((s - cum[k0 - 1]) / ((cum[k0] - cum[k0 - 1]) || 1));
       const keepTops = [t0, ...tops.slice(k0, k0 + keep.length - 1)];

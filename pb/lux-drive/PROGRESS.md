@@ -2825,3 +2825,39 @@ fall / air / hit place.  Jolt count unchanged (the sweep carries the car: the ve
 * No car choice in the menu yet (only `?car=`).
 * The sweep's jolt metric carries the car (vertical only), so it does not see the steering; a driven sweep (steer + throttle at the new top speed) would be
   the next check.
+
+## City 20 (9 Nov 2026, branch `lux-drive-city20`, Mac mini): the full-city sweep's ramps, carve banks, deck parapets, interchange rolls (groups 2 - 6 of citysweep/v73)
+
+Started from main 93b33426 (v73).  Tools + logs: `~/Library/Caches/luxdrive-work/city20/` (`tools/pp.mjs` drawn-lane probe, `pj.mjs` the lane JOINED with the ways that
+continue it at both ends - the car arrives settled, so start-of-way artefacts drop out -, `xs.mjs` cross-sections with decks / collider parts, `area-sweep.sh` the sweep of the
+30 target boxes (3 min), `cmp.py` / `diff.py` per place / per road-cell before vs after, `bridgeends.mjs` / `moved.mjs` the moved and trimmed deck ends, `carvewalls.mjs` /
+`wallat.mjs` the world flow's carve walls, `summary.py` the REPORT totals of an analysed full-city sweep).  Sweep tools copied from origin/lux-drive-sweep (not committed).
+
+### 1. Bridge ends that stand on the road below (bridge-ends.js `moveBridgeEnds`, world-data.js): A13 / A1, A6 / A13, Val du Scheid, Breedewee, slip roads
+OSM ends a bridge where the mapper drew it, often short of the real abutment; the game holds the approach ABUT_HOLD (2 m) under the deck and lets its earth fall at most
+ABUT_STEEPEST (2.2 m/m).  Where a road UNDER the bridge passes closer than hold + steepest fall (+ 0.5 m), across the deck's width + 1 m, crossing at > 26 deg and >= 3 m under
+the end's level (the deck's DSM level when road-network.js would use that deck, else the land), the bridge end moves back along its approach: the approach way gives up the
+stretch, the bridge way takes it, the deck runs on over it at its end level (`spans` recomputed with the bake's rule).  At most 12 m, >= 8 m of approach left; no move
+when a side street meets the approach on the stretch / at the end; a slip road that MERGES at the abutment (aligned with the approach) gives up the same stretch (A1 link
+7463 at deck 42: its end then lies 2.9 m from the approach's, inside END_JOIN, pinned to the deck with it).  24 ends move (A13/A1 17100 decks 123/128/133/136/147, A6 decks
+114/119/137, Val du Scheid decks 41/42, 125/126 over 2405/2408, Breedewee 80, Munsbach 223/254, 146, 258).
+Val du Scheid under the A1: fall 6.1 m / air 1.45 s / roll 1.29 -> none.  A13 17100 under the A1 (fix19 leftover): roll 0.20 -> 0.17 (7412), jolt 54 -> 30.
+
+### 2. The lanes of a street under a deck are cut flat (road-network.js UNDER_DECK_*)
+The protection of an over way keeps the ground under a bridge from being CUT (no pit under the deck end, harness D).  Where the DTM under the deck holds the toe of the
+abutment, that kept the lower road's outer lane on the abutment's slope: the A13 (Autoroute d'Esch 9520 / 11984) under the A6 rode 1.4 m up it (roll 0.72, bank hits).
+Now within the lane keep of a street (motorway .. residential, not service) whose bed lies >= 4.5 m under a deck over or within 8 m of the point (smooth: full to 4 m past
+the deck edge, the clearance faded over 2 m), the protection against a cut lets go; past the keep it comes back over a face of 1.9 m/m mean (smoothstep peak 2.85 < the
+world flow's wall of 3).  4.5 m, not 3: a link climbing onto the deck beside it (A1 link 7463, 3.5 m under deck 42) is no road under the bridge.
+A13 at 1953,11574 / 1970,11622: roll 0.72, jolt 690, bank hits -> none (jolt 102 / 145 left on 1038 / 238).
+
+### 3. A junction keeps its street level against a deck end's DSM (road-network.js DECK_NODE_TRUST, reconcileJunctions)
+An end that runs onto a bridge sets the node's level from the deck's DSM.  The Hondhausbréck's DSM stands 4 m over the node of Rue Vauban 18576 and Allée Pierre de
+Mansfeld 3262: the street was lifted onto a 5 m peak (38 % either side) and the car fell 3.6 - 5 m off it.  Now when two or more ways at one level of their own meet
+there and their mean lies > 2 m off the deck level, the node keeps their level (decks.js pins that free deck end to the surface, the envelope runs the deck from it).
+
+### 4. Free deck ends on a street's carriageway are trimmed (bridge-ends.js `trimFreeEnds`)
+A deck end that no carved way runs onto (no approach, no bridge way going on, no real joint - except a footway's / track's joint ON a street) but whose end or corners lie on
+the carriageway (+ 0.3 m) of a street where the deck stands < 2.5 m over the land (the level no steeper than 12 % off its end's land: the Hondhausbréck's DSM) starts at the
+edge of that carriageway (<= 12 m, >= 4 m of deck left).  66 ends.  Rue Roudebësch: the Rue de Leudelange track decks 155 / 304 met ON the street 0.9 m over it (fall 6.3 m,
+air 2.4 s, parapet 1.03) -> jolt 36 only; Kéibierg footbridge 185 railing in the lane (parapet 1.02, air 0.4) -> gone; Hondhausbréck deck 169 over the junction -> gone.
