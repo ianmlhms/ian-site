@@ -131,3 +131,22 @@ html.auth-in .gt-acct { color: var(--ink); }
   .gt-grid > *, .gt-contents > * { grid-column: 1 / -1 !important; }
 }
 @media (prefers-reduced-motion: reduce) { .gt-btn, .gt .ui-btn { transition: none; } }
+
+/* ---- v2 (pages batch): app-style pages + shared bits ---- */
+.gt .ic-btn { display: inline-grid; place-items: center; width: 44px; min-width: 44px; height: 44px; padding: 0; border: 1px solid var(--ink); border-radius: 0; background: transparent; color: var(--ink); font: 600 16px/1 "Geist", system-ui, sans-serif; cursor: pointer; text-decoration: none; }
+.gt .ic-btn:hover { border-color: var(--green); color: var(--green); background: var(--white); }
+.gt .ic-btn .ic { font-size: 20px; }
+.gt .ic-btn.on { background: var(--ink); color: var(--paper); }
+.gt-gate { text-align: left; align-items: flex-start; padding: 28px 20px !important; gap: 14px !important; justify-content: flex-start !important; }
+.gt-gate .gt-big { font-size: 22px; }
+
+/* ---- site bottom tab bar (theme.js injects #appNav on phones): text tabs, hairline, green = here ---- */
+.gt #appNav { background: var(--paper); border-top: 1px solid var(--ink); }
+.gt #appNav a { min-height: 56px; justify-content: center; padding: 0; color: var(--muted); font: 600 13px/1 "Geist", system-ui, sans-serif; position: relative; }
+.gt #appNav a .i { display: none; }
+.gt #appNav a.on { color: var(--ink); }
+.gt #appNav a.on::before { content: ""; position: absolute; left: 0; right: 0; top: -1px; height: 3px; background: var(--green); }
+/* tokens some older pages still read */
+body.gt { --accent2-text: var(--green); --ok: var(--green); --good: var(--green); --good-text: var(--green); --bad: var(--danger); }
+/* site-glass.css (loaded by theme.js) decorates these class names; flatten them in the Gitter look */
+body.gt :is(.empty, .card, .tile, .hint, .gate-box, .bar, .wrap) { box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; border-radius: 0; }

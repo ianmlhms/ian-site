@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="lb" data-no-season>
+<html lang="lb">
 <head>
 <meta charset="utf-8">
   <meta name="robots" content="noindex,follow" />
@@ -15,52 +15,49 @@
 <link rel="canonical" href="https://ian.lu/wordle.html">
 <link rel="manifest" href="site.webmanifest">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<meta name="theme-color" content="#0d0d1a">
-<script src="season.js?v=5"></script>
+<meta name="theme-color" content="#f6f6f3">
+<link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="gitter.css?v=5">
 <script src="theme.js?v=32"></script>
 <style>
-  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;
+  :root{
         --correct:#00c853;--present:#ffb300;--absent:#3a3a3c}
-  *{box-sizing:border-box}
-  body{margin:0;min-height:100vh;min-height:100svh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
-  a{color:var(--accent2-text);text-decoration:none}
-  .bar{display:flex;flex-wrap:wrap;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
-  .bar>*{min-width:0}
-  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
-  .langs{display:flex;border:1px solid var(--border);border-radius:10px;overflow:hidden}
-  .langs button{background:var(--card);color:var(--muted);border:none;padding:7px 12px;font-weight:800;cursor:pointer;font-size:13px}
-  .langs button.on{background:var(--accent);color:var(--accent-foreground)}
+  body{display:flex;flex-direction:column}
+  .langs{display:flex;border:1px solid var(--ink);border-radius:0;overflow:hidden}
+  .langs button{background:transparent;color:var(--ink);border:none;padding:7px 12px;font-weight:600;cursor:pointer;font-size:13px;font-family:inherit;min-height:44px}
+  .langs button.on{background:var(--ink);color:var(--paper)}
   .wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:14px;padding:18px 12px 30px}
-  .msg{min-height:22px;font-weight:700;color:var(--accent2-text);text-align:center}
+  .msg{min-height:22px;font-weight:600;color:var(--green);text-align:center}
   .board{display:grid;grid-template-rows:repeat(6,1fr);gap:6px}
   .row{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
-  .tile{width:54px;height:54px;border:2px solid var(--border);border-radius:6px;display:flex;align-items:center;justify-content:center;
-        font-size:26px;font-weight:800;text-transform:uppercase;transition:transform .1s}
-  .tile.filled{border-color:#5a5a72}
-  .tile.correct{background:var(--correct);border-color:var(--correct);color:#000}
-  .tile.present{background:var(--present);border-color:var(--present);color:#221a00}
-  .tile.absent{background:var(--absent);border-color:var(--absent);color:#fff}
+  .tile{width:54px;height:54px;border:1px solid var(--soft);background:var(--white);font-family:"Geist Mono",ui-monospace,monospace;border-radius:0;display:flex;align-items:center;justify-content:center;
+        font-size:26px;font-weight:500;text-transform:uppercase;transition:transform .1s}
+  .tile.filled{border-color:var(--ink)}
+  .tile.correct{background:var(--green);border-color:var(--green);color:#fff}
+  .tile.present{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+  .tile.absent{background:var(--tint);border-color:var(--soft);color:var(--muted)}
   .tile.pop{transform:scale(1.1)}
+  .board,.tile,.key{box-shadow:none;filter:none}
   .kb{display:flex;flex-direction:column;gap:6px;width:100%;max-width:500px;margin-top:6px}
   .kb .krow{display:flex;gap:5px;justify-content:center}
-  .key{flex:1;max-width:42px;height:50px;border:none;border-radius:7px;background:var(--card2);color:var(--text);font-weight:800;font-size:15px;cursor:pointer;text-transform:uppercase}
+  .key{flex:1;max-width:42px;height:50px;border:1px solid var(--ink);border-radius:0;background:var(--white);color:var(--ink);font-weight:600;font-size:15px;cursor:pointer;text-transform:uppercase;font-family:inherit;padding:0}
   .key.wide{max-width:64px;font-size:12px}
-  .key.correct{background:var(--correct);color:#000} .key.present{background:var(--present);color:#221a00} .key.absent{background:#23232c;color:#b8b8c8}
+  .key.correct{background:var(--green);border-color:var(--green);color:#fff} .key.present{background:var(--ink);color:var(--paper)} .key.absent{background:var(--tint);border-color:var(--soft);color:var(--muted)}
   .stats{display:flex;gap:18px;color:var(--muted);font-size:13px;margin-top:4px}
-  .stats b{color:var(--text);font-size:18px;display:block;text-align:center}
-  .share{background:var(--accent);color:var(--accent-foreground);border:none;border-radius:10px;padding:11px 20px;font-weight:800;cursor:pointer;display:none}
-  .share.again{background:var(--card2);border:1px solid var(--border)}
-  .lbbtn{background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:7px 11px;font-weight:800;cursor:pointer;font-size:13px}
-  .lbbtn:hover{border-color:var(--accent2-text);color:var(--accent2-text)}
-  .lb-modal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;z-index:5000;padding:18px}
+  .stats b{color:var(--ink);font:500 20px "Geist Mono",ui-monospace,monospace;display:block;text-align:center}
+  .share{background:var(--ink);color:var(--paper);border:1px solid var(--ink);border-radius:0;min-height:44px;padding:11px 20px;font:600 15px "Geist",system-ui,sans-serif;cursor:pointer;display:none}.share:hover{background:var(--green);border-color:var(--green)}
+  .share.again{background:transparent;color:var(--ink);border:1px solid var(--ink)}
+  .lbbtn{background:transparent;border:1px solid var(--ink);color:var(--ink);padding:7px 14px;font:600 14px "Geist",system-ui,sans-serif;cursor:pointer}
+  .lbbtn:hover{border-color:var(--green);color:var(--green)}
+  .lb-modal{position:fixed;inset:0;background:rgba(22,23,26,.55);display:none;align-items:center;justify-content:center;z-index:5000;padding:18px}
   .lb-modal.open{display:flex}
-  .lb-box{background:var(--glass-solid);border:1px solid var(--border);border-radius:16px;padding:20px;max-width:430px;width:100%;max-height:82vh;overflow:auto}
+  .lb-box{background:var(--white);border:1px solid var(--ink);border-radius:0;padding:20px;max-width:430px;width:100%;max-height:82vh;overflow:auto}
   .lb-box h2{margin:0 0 12px;font-size:18px}
   .lb-tabs{display:flex;gap:8px;margin-bottom:12px}
-  .lb-tabs button{flex:1;padding:7px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);font-weight:800;cursor:pointer}
-  .lb-tabs button.on{background:var(--accent);color:var(--accent-foreground);border-color:var(--accent-border)}
+  .lb-tabs button{flex:1;padding:7px;border-radius:0;border:1px solid var(--ink);background:transparent;color:var(--ink);font:600 14px "Geist",system-ui,sans-serif;cursor:pointer}
+  .lb-tabs button.on{background:var(--ink);color:var(--paper)}
   .lb-box table{width:100%;border-collapse:collapse;font-size:14px}
-  .lb-box th,.lb-box td{padding:7px 8px;border-bottom:1px solid var(--border);text-align:left}
+  .lb-box th,.lb-box td{padding:7px 8px;border-bottom:1px solid var(--soft);text-align:left}
   .lb-box th{color:var(--muted);font-size:12px}
   .lb-box table.tagged-board{table-layout:fixed}
   .lb-box .tagged-board th:first-child,.lb-box .tagged-board td:first-child{width:80px}
@@ -69,7 +66,7 @@
   .lb-box .tagged-board td.n{overflow-wrap:anywhere}
   .tagged-board .lb-player{overflow-wrap:anywhere;word-break:break-word}
   .tagged-board .lb-player .admin-tag,.tagged-board .lb-player .class-tag{margin-top:3px;white-space:nowrap}
-  .lb-close{float:right;background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1;min-width:44px;min-height:44px;margin:-10px -10px 0 0}
+  .lb-close{color:var(--ink);float:right;background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1;min-width:44px;min-height:44px;margin:-10px -10px 0 0}
   .bar .home:focus-visible,.langs button:focus-visible,.lbbtn:focus-visible,.share:focus-visible,.key:focus-visible,.lb-close:focus-visible,.lb-tabs button:focus-visible,.lb-box:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   @media (max-width:430px){
     .lb-box .tagged-board{font-size:12px}
@@ -89,21 +86,20 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
 </head>
-<body>
+<body class="gt">
 <header class="bar">
   <a class="home" href="pixelbreak.html">‹ Arcade</a>
-  <h1><span aria-hidden="true">🟩</span> Wuertspill</h1>
+  <h1>Wuertspill</h1>
   <div class="spacer"></div>
-  <button type="button" class="lbbtn" id="lbBtn" aria-haspopup="dialog"><span aria-hidden="true">🏆</span> Top</button>
-  <span id="acctHost"></span>
-  <div class="langs" role="group" aria-label="Sprooch"><button type="button" data-l="lb" class="on" aria-pressed="true"><span aria-hidden="true">🇱🇺</span> LB</button><button type="button" data-l="de" aria-pressed="false"><span aria-hidden="true">🇩🇪</span> DE</button></div>
+  <button type="button" class="lbbtn" id="lbBtn" aria-haspopup="dialog">Top</button>
+    <div class="langs" role="group" aria-label="Sprooch"><button type="button" data-l="lb" class="on" aria-pressed="true">LB</button><button type="button" data-l="de" aria-pressed="false">DE</button></div>
 </header>
 
 <main class="wrap">
   <div class="msg" id="msg" role="status" aria-live="polite"></div>
   <div class="board" id="board" role="group" aria-label="Spillfeld"></div>
-  <button type="button" class="share" id="share"><span aria-hidden="true">📋</span> Resultat deelen</button>
-  <button type="button" class="share again" id="again"><span aria-hidden="true">🎲</span> Nach eng Partie</button>
+  <button type="button" class="share" id="share">Resultat deelen</button>
+  <button type="button" class="share again" id="again">Nach eng Partie</button>
   <div class="kb" id="kb"></div>
   <div class="stats" id="stats" role="group" aria-label="Statistik"></div>
 </main>
@@ -170,14 +166,14 @@ function load(){
   render(); drawKeyboard(); renderStats();
   $("share").style.display = done ? "" : "none";
   $("again").style.display = done ? "" : "none";
-  if(done){ $("msg").textContent = guesses.includes(answer) ? "Gewonnen! 🎉" : "Léisung: "+answer; }
+  if(done){ $("msg").textContent = guesses.includes(answer) ? "Gewonnen!" : "Léisung: "+answer; }
 }
 function startPractice(){
   practice = true;
   answer = pickPractice();
   guesses = []; current = ""; done = false;
   $("share").style.display = "none"; $("again").style.display = "none";
-  $("msg").textContent = "🎲 Fräi Partie — zielt net fir d'Serie";
+  $("msg").textContent = "Fräi Partie — zielt net fir d'Serie";
   render(); drawKeyboard();
 }
 function save(){ if(practice) return; localStorage.setItem(stateKey(), JSON.stringify({ guesses, done })); }
@@ -249,7 +245,7 @@ function key(k){
   if(/^[A-ZÄÖÜËÉ]$/.test(k) && current.length<COLS){ current+=k; render(); }
 }
 function finish(won){
-  $("msg").textContent = won ? ["Genial!","Super!","Gutt!","Net schlecht","Knapp!","Puh! 😅"][guesses.length-1] : "Léisung: "+answer;
+  $("msg").textContent = won ? ["Genial!","Super!","Gutt!","Net schlecht","Knapp!","Puh!"][guesses.length-1] : "Léisung: "+answer;
   $("again").style.display="";
   if(practice) return;                                // free rounds: no stats, no share, no leaderboard
   $("share").style.display="";
@@ -266,7 +262,7 @@ function finish(won){
 function liveStreak(s){ return s.lastDay===undefined||s.lastDay>=dayIndex()-1 ? s.streak : 0; }
 function renderStats(){
   const s=readStored(statsKey())||{played:0,wins:0,streak:0,max:0};
-  $("stats").innerHTML=`<div><b>${s.played}</b>Gespillt</div><div><b>${s.played?Math.round(100*s.wins/s.played):0}%</b>Gewonn</div><div><b><span aria-hidden="true">🔥 </span>${liveStreak(s)}</b>Serie</div><div><b>${s.max}</b>Max</div>`;
+  $("stats").innerHTML=`<div><b>${s.played}</b>Gespillt</div><div><b>${s.played?Math.round(100*s.wins/s.played):0}%</b>Gewonn</div><div><b>${liveStreak(s)}</b>Serie</div><div><b>${s.max}</b>Max</div>`;
 }
 function shareResult(){
   const emo={correct:"🟩",present:"🟨",absent:"⬛"};
@@ -276,7 +272,7 @@ function shareResult(){
   const streak=s?liveStreak(s):0;
   const txt=`ian.lu Wuertspill (${lang.toUpperCase()}) ${won?guesses.length:"X"}/6${streak>1?` · 🔥${streak}`:""}\n${grid}\nian.lu/wordle.html`;
   if(navigator.share){ navigator.share({text:txt}).catch(()=>{}); }
-  else if(navigator.clipboard){ navigator.clipboard.writeText(txt).then(()=>flash("Kopéiert! 📋")).catch(()=>flash(txt)); }
+  else if(navigator.clipboard){ navigator.clipboard.writeText(txt).then(()=>flash("Kopéiert!")).catch(()=>flash(txt)); }
   else flash("Konnt net kopéieren");
 }
 
@@ -303,8 +299,8 @@ load();
 <div class="lb-modal" id="lbModal">
   <div class="lb-box" role="dialog" aria-modal="true" aria-labelledby="lbTitle" tabindex="-1">
     <button type="button" class="lb-close" id="lbClose" aria-label="Zoumaachen"><span aria-hidden="true">&times;</span></button>
-    <h2 id="lbTitle"><span aria-hidden="true">🏆</span> Leaderboard</h2>
-    <div class="lb-tabs" role="group" aria-label="Sprooch"><button type="button" data-lb="lb" class="on" aria-pressed="true"><span aria-hidden="true">🇱🇺</span> LB</button><button type="button" data-lb="de" aria-pressed="false"><span aria-hidden="true">🇩🇪</span> DE</button></div>
+    <h2 id="lbTitle">Leaderboard</h2>
+    <div class="lb-tabs" role="group" aria-label="Sprooch"><button type="button" data-lb="lb" class="on" aria-pressed="true">LB</button><button type="button" data-lb="de" aria-pressed="false">DE</button></div>
     <div id="lbBody" aria-live="polite">…</div>
   </div>
 </div>
@@ -318,7 +314,7 @@ load();
   import { scoreHtml, scoreKeyHtml } from "./score-format.js?v=11";
   let sb = null;
   const $ = (id) => document.getElementById(id);
-  (async () => { if (!auth.authConfigured) return; auth.mountAccountButton($("acctHost")); sb = await auth.client(); })();
+  (async () => { if (!auth.authConfigured) return; sb = await auth.client(); })();
 
   window.recordWordle = async (lang, day, guesses) => {
     try { if (!sb) sb = await auth.client(); if (!auth.session()) return; await sb.rpc("record_wordle", { p_username: auth.username(), p_lang: lang, p_day: day, p_guesses: guesses }); }

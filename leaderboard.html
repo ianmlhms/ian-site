@@ -18,89 +18,64 @@
 <meta name="twitter:card" content="summary">
 <link rel="manifest" href="site.webmanifest">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<meta name="theme-color" content="#0d0d1a">
+<meta name="theme-color" content="#f6f6f3">
+<link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="gitter.css?v=5">
 <script src="i18n-dict.js?v=54"></script>
 <script src="i18n.js?v=5"></script>
-<script src="season.js?v=5"></script>
 <script src="theme.js?v=32"></script>
-<link rel="stylesheet" href="site-ui.css?v=2">
 <style>
-  *{box-sizing:border-box}
-  [hidden]{display:none!important}
-  body{margin:0;min-height:100vh;min-height:100svh;display:flex;flex-direction:column;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-  a{color:var(--accent-text);text-decoration:none}
-  button,a{touch-action:manipulation}
-  button:focus-visible,a:focus-visible{outline:2px solid var(--focus-ring,var(--accent));outline-offset:2px}
-  .ui{--good:#3fb950;--gold:#ffd54a;--silver:#cbd5e1;--bronze:#d9a066}
-  html[data-theme="light"] .ui{--good:#1a7f37;--gold:#d99a00;--silver:#8c97ab;--bronze:#b3743a}
   .sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
-
-  /* ---- header + column ---- */
-  html body.ui .ui-header{max-width:720px;flex-wrap:wrap;gap:8px 14px;padding:max(16px,env(safe-area-inset-top)) max(28px,env(safe-area-inset-right)) 0 max(28px,env(safe-area-inset-left))}
-  .header-left,.header-right{display:flex;align-items:center;gap:10px;min-width:0}
-  .header-left{flex:1 1 auto}
-  body.ui .ui-header .home{display:inline-flex;align-items:center;min-height:44px;padding:8px 16px;border-radius:var(--r-chip);border:1px solid var(--border);background:transparent;color:var(--text);font:700 14px var(--font-display);white-space:nowrap;transition:background-color .2s,border-color .2s,transform .3s var(--ease)}
-  body.ui .ui-header .home:hover{background:color-mix(in srgb,var(--accent) 10%,transparent);border-color:var(--accent-border)}
-  body.ui .ui-header .home:active{transform:scale(.97)}
-  body.ui .ui-header h1.ui-brand{margin:0;display:flex;align-items:center;gap:10px;font-size:19px;white-space:nowrap}
-  .ui .ui-page{display:flex;flex-direction:column;gap:14px;max-width:720px;padding-top:22px;padding-left:max(28px,env(safe-area-inset-left));padding-right:max(28px,env(safe-area-inset-right));padding-bottom:max(72px,calc(40px + env(safe-area-inset-bottom)))}
+  .gt-page{padding-bottom:max(56px,calc(40px + env(safe-area-inset-bottom)))}
 
   /* ---- filters ---- */
-  .filters{display:flex;flex-direction:column;gap:10px}
-  .chips{display:flex;flex-wrap:wrap;gap:8px}
-  .lbchip{display:inline-flex;align-items:center;gap:7px;min-height:44px;padding:8px 16px;border:0;border-radius:var(--r-chip);background:var(--card-opaque);color:var(--muted);font:700 14px var(--font-display);letter-spacing:-.01em;cursor:pointer;box-shadow:inset 0 0 0 1px var(--border);transition:box-shadow .2s,background-color .2s,color .2s,transform .3s var(--ease)}
-  .lbchip:hover{color:var(--text);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 55%,var(--border))}
-  .lbchip:active{transform:scale(.97)}
-  .lbchip.on{background:var(--accent);color:var(--accent-foreground);box-shadow:0 8px 20px -12px color-mix(in srgb,var(--accent) 80%,transparent)}
-  .periods{display:inline-flex;align-self:flex-start;gap:4px;padding:4px;border-radius:calc(var(--r-chip) + 4px);background:color-mix(in srgb,var(--text) 6%,transparent)}
-  .periods .lbchip{min-height:44px;padding:6px 18px;background:transparent;box-shadow:none}
-  .periods .lbchip:hover{box-shadow:none;color:var(--text)}
-  .periods .lbchip.on{background:var(--accent);color:var(--accent-foreground)}
+  .filters{display:flex;flex-direction:column;gap:12px;justify-content:flex-start}
+  .lbchips{display:flex;flex-wrap:wrap;gap:8px}
+  .lbchip{display:inline-flex;align-items:center;gap:7px;min-height:44px;padding:8px 16px;border:1px solid var(--ink);background:transparent;color:var(--ink);font:600 14px "Geist",system-ui,sans-serif;cursor:pointer}
+  .lbchip:hover{border-color:var(--green);color:var(--green);background:var(--white)}
+  .lbchip.on{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+  .periods{display:inline-flex;align-self:flex-start;gap:8px;flex-wrap:wrap}
 
   /* ---- board ---- */
-  .board{padding:clamp(10px,2.4vw,18px) clamp(8px,2.4vw,18px) clamp(12px,2.4vw,18px)}
-  .board-sum{display:flex;align-items:center;gap:8px;margin:0;padding:4px 10px 8px;color:var(--muted);font:700 13px var(--font-display)}
-  .board-sum .dot{width:6px;height:6px;border-radius:50%;background:var(--accent)}
-  table.lb{width:100%;border-collapse:separate;border-spacing:0 6px;font-size:15px}
+  .board-c{padding:0 !important;justify-content:flex-start}
+  .board{background:none}
+  .board-sum{display:flex;align-items:center;gap:8px;margin:0;padding:14px 20px;color:var(--muted);font:600 14px "Geist",system-ui,sans-serif;border-bottom:1px solid var(--soft)}
+  .board-sum .dot{width:8px;height:8px;background:var(--green)}
+  table.lb{width:100%;border-collapse:collapse;font-size:15px}
   table.lb.tagged{table-layout:fixed}
-  .lb th{padding:2px 10px 4px;color:var(--muted);font:700 12px var(--font-display);text-align:left;letter-spacing:.02em}
-  .lb td{padding:10px;vertical-align:middle;background:color-mix(in srgb,var(--text) 4%,transparent)}
-  .lb td:first-child{border-radius:var(--r-chip) 0 0 var(--r-chip)}
-  .lb td:last-child{border-radius:0 var(--r-chip) var(--r-chip) 0}
-  .lb .n{text-align:right;font-variant-numeric:tabular-nums}
+  .lb th{padding:10px 14px;color:var(--muted);font:600 13px "Geist",system-ui,sans-serif;text-align:left;border-bottom:1px solid var(--ink)}
+  .lb td{padding:12px 14px;vertical-align:middle;border-bottom:1px solid var(--soft)}
+  .lb tr:last-child td{border-bottom:0}
+  .lb .n{text-align:right;font-family:"Geist Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+  .lb th.n{font-family:"Geist",system-ui,sans-serif}
   .lb.tagged .n{width:56px}
-  .lb td.n{font-weight:700;font-family:var(--font-display)}
-  .lb .rank{width:52px;text-align:center;font:800 15px var(--font-display);color:var(--muted)}
-  .lb .rank .medal{font-size:24px;line-height:1}
-  .lb .who{min-width:0;overflow-wrap:anywhere;font-weight:700}
+  .lb td.n{font-weight:500}
+  .lb .rank{width:56px;text-align:center;font:500 15px "Geist Mono",ui-monospace,monospace;color:var(--muted)}
+  .lb .rank .medal{font:500 15px "Geist Mono",ui-monospace,monospace;color:var(--ink)}
+  .lb .who{min-width:0;overflow-wrap:anywhere;font-weight:600}
   .lb .who .name{display:block;line-height:1.25}
-  .lb .who .meter{display:block;height:5px;margin-top:6px;border-radius:99px;background:color-mix(in srgb,var(--text) 9%,transparent);overflow:hidden}
-  .lb .who .meter i{display:block;height:100%;border-radius:99px;background:var(--good);opacity:.85}
-  .lb .pct{color:var(--good);font-weight:800;white-space:nowrap}
-  .lb tr.top1 td{padding-top:14px;padding-bottom:14px;font-size:16px;background:color-mix(in srgb,var(--gold) 20%,var(--card-opaque))}
-  .lb tr.top2 td{background:color-mix(in srgb,var(--silver) 15%,var(--card-opaque))}
-  .lb tr.top3 td{background:color-mix(in srgb,var(--bronze) 15%,var(--card-opaque))}
-  .lb tr.top1 .who .name{font-family:var(--font-display);font-size:17px;font-weight:800;letter-spacing:-.01em}
+  .lb .who .meter{display:block;height:4px;margin-top:6px;background:var(--soft);overflow:hidden}
+  .lb .who .meter i{display:block;height:100%;background:var(--green)}
+  .lb .pct{color:var(--green);font-weight:500;white-space:nowrap}
+  .lb tr.top1 td{background:var(--tint)}
+  .lb tr.top1 .rank .medal{color:var(--green)}
+  .lb tr.top1 .who .name{font-weight:800;font-size:16px}
 
   /* ---- empty / loading / error ---- */
   .lbempty{text-align:center;color:var(--muted);padding:clamp(28px,6vw,48px) 22px}
-  .lbempty .lbempty-ico{display:grid;place-items:center;width:72px;height:72px;margin:0 auto 16px;border-radius:22px;font-size:36px;background:color-mix(in srgb,var(--accent) 20%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 30%,transparent),inset 0 1px 0 color-mix(in srgb,#fff 22%,transparent)}
-  .lbempty p{margin:0;font:800 clamp(18px,2.6vw,22px)/1.25 var(--font-display);letter-spacing:-.02em;color:var(--text)}
-  .lbempty .lbempty-sub{margin-top:6px;font:500 14px/1.4 system-ui,-apple-system,sans-serif;letter-spacing:0;color:var(--muted)}
-  .lbnote{margin:4px 4px 0;color:var(--muted);font-size:12.5px;line-height:1.5;text-align:center}
+  .lbempty .lbempty-ico{display:none}
+  .lbempty p{margin:0;font:800 clamp(18px,2.6vw,22px)/1.25 "Geist",system-ui,sans-serif;letter-spacing:-.02em;color:var(--ink)}
+  .lbempty .lbempty-sub{margin-top:6px;font:400 14px/1.4 "Geist",system-ui,sans-serif;color:var(--muted)}
+  .lbnote{padding:12px 20px !important;color:var(--muted);font-size:13.5px;line-height:1.5}
 
   @media(max-width:700px){
-    html body.ui .ui-header{padding:max(12px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 0 max(16px,env(safe-area-inset-left))}
-    body.ui .ui-header h1.ui-brand{font-size:18px}
-    .ui .ui-page{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));padding-top:16px}
     .lbchip{padding:8px 13px;font-size:13.5px}
     .lb{font-size:14px}
     .lb th,.lb td{padding-left:7px;padding-right:7px}
     .lb .rank{width:40px}
     .lb.tagged .n{width:44px}
-    .lb .rank .medal{font-size:21px}
+    .gt-nav{padding-inline:14px !important}
   }
-  @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 <script data-goatcounter="https://ianm.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
@@ -108,42 +83,42 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
 </head>
-<body class="ui">
-<header class="ui-header">
-  <div class="header-left">
-    <a class="home" href="pixelbreak.html">‹ Arcade</a>
-    <h1 class="ui-brand"><span aria-hidden="true">🏆</span> <span data-t="title">Ranglëscht</span></h1>
-  </div>
-  <div class="header-right">
-    <span id="acctHost"></span>
-  </div>
-</header>
-<main class="ui-page">
+<body class="gt">
+<main class="gt-page">
+<div class="gt-grid">
+  <header class="c full gt-nav">
+    <div class="gt-nav-l"><a class="gt-back" href="pixelbreak.html">‹ Arcade</a><h1 class="gt-page-title" data-t="title">Ranglëscht</h1></div>
+    <div class="gt-navr"><button type="button" class="gt-acct" id="gtAcct">Umellen</button></div>
+  </header>
+  <div class="c full top">
   <div class="filters">
     <div class="lbchips" id="tabs" role="group" aria-label="Spill" data-t-aria="game">
       <button type="button" class="lbchip" data-g="weekly" aria-pressed="false" data-i18n="arc.weeklyTab">Woch</button>
       <button type="button" class="lbchip on" data-g="" aria-pressed="true" data-t="all">All Spiller</button>
-      <button type="button" class="lbchip" data-g="connect4" aria-pressed="false"><span aria-hidden="true">🔴</span> <span data-t="g.connect4">Connect 4</span></button>
-      <button type="button" class="lbchip" data-g="battleship" aria-pressed="false"><span aria-hidden="true">🚢</span> <span data-t="g.battleship">Battleship</span></button>
-      <button type="button" class="lbchip" data-g="color" aria-pressed="false"><span aria-hidden="true">🎨</span> <span data-t="g.color">Colour Guess</span></button>
-      <button type="button" class="lbchip" data-g="reversi" aria-pressed="false"><span aria-hidden="true">⚫</span> <span data-t="g.reversi">Reversi</span></button>
-      <button type="button" class="lbchip" data-g="dots" aria-pressed="false"><span aria-hidden="true">▦</span> <span data-t="g.dots">Dots &amp; Boxes</span></button>
-      <button type="button" class="lbchip" data-g="tictactoe" aria-pressed="false"><span aria-hidden="true">✕</span> <span data-t="g.tictactoe">Tic-Tac-Toe</span></button>
-      <button type="button" class="lbchip" data-g="checkers" aria-pressed="false"><span aria-hidden="true">🟠</span> <span data-t="g.checkers">Checkers</span></button>
-      <button type="button" class="lbchip" data-g="maumau" aria-pressed="false"><span aria-hidden="true">🃏</span> <span data-t="g.maumau">Mau-Mau</span></button>
-      <button type="button" class="lbchip" data-g="diceduel" aria-pressed="false"><span aria-hidden="true">🎲</span> <span data-t="g.diceduel">Kniffel</span></button>
+      <button type="button" class="lbchip" data-g="connect4" aria-pressed="false"><span data-t="g.connect4">Connect 4</span></button>
+      <button type="button" class="lbchip" data-g="battleship" aria-pressed="false"><span data-t="g.battleship">Battleship</span></button>
+      <button type="button" class="lbchip" data-g="color" aria-pressed="false"><span data-t="g.color">Colour Guess</span></button>
+      <button type="button" class="lbchip" data-g="reversi" aria-pressed="false"><span data-t="g.reversi">Reversi</span></button>
+      <button type="button" class="lbchip" data-g="dots" aria-pressed="false"><span data-t="g.dots">Dots &amp; Boxes</span></button>
+      <button type="button" class="lbchip" data-g="tictactoe" aria-pressed="false"><span data-t="g.tictactoe">Tic-Tac-Toe</span></button>
+      <button type="button" class="lbchip" data-g="checkers" aria-pressed="false"><span data-t="g.checkers">Checkers</span></button>
+      <button type="button" class="lbchip" data-g="maumau" aria-pressed="false"><span data-t="g.maumau">Mau-Mau</span></button>
+      <button type="button" class="lbchip" data-g="diceduel" aria-pressed="false"><span data-t="g.diceduel">Kniffel</span></button>
     </div>
     <div class="periods" id="periods" role="group" aria-label="Zäitraum" data-t-aria="period">
       <button type="button" class="lbchip on" data-p="all" aria-pressed="true" data-t="pAll">All Zäit</button>
       <button type="button" class="lbchip" data-p="7" aria-pressed="false" data-t="pWeek">Dës Woch</button>
     </div>
   </div>
-  <section class="ui-card board" id="board" aria-live="polite" aria-busy="true"><div id="body"></div></section>
-  <p class="lbnote" data-t="note">Nëmmen Partien, déi du ugemellt gespillt hues, zielen. Sieg an Néierlag mellt de Spiller selwer.</p>
+  </div>
+  <section class="c full board-c" id="board" aria-live="polite" aria-busy="true"><div id="body" class="board"></div></section>
+  <p class="c full lbnote" data-t="note">Nëmmen Partien, déi du ugemellt gespillt hues, zielen. Sieg an Néierlag mellt de Spiller selwer.</p>
+</div>
 </main>
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
+<script type="module" src="gitter-acct.js?v=1"></script>
 <script type="module" src="notify-ambient.js?v=40"></script>
 <script type="module">
 import * as auth from "./auth.js?v=40";
@@ -177,7 +152,7 @@ const T={
   sum1:{lb:"1 Spiller",de:"1 Spieler",en:"1 player"},
   sumN:{lb:"{n} Spiller",de:"{n} Spieler",en:"{n} players"},
 };
-const MEDALS=["🥇","🥈","🥉"];
+const MEDALS=["1","2","3"];
 const readLang=()=>{ try{ const v=localStorage.getItem("site_lang"); if(v==="lb"||v==="de"||v==="en") return v; }catch{} return "lb"; };
 let lang=readLang();
 const t=(k)=>{ const e=T[k]; return e?(e[lang]||e.en):k; };
@@ -200,7 +175,7 @@ const playerTags=(username)=>{
 function rowHtml(row,index){
   const pct=row.winpct==null?null:+row.winpct;
   const rank=index<3
-    ? `<span class="medal" aria-hidden="true">${MEDALS[index]}</span><span class="sr-only">${index+1}</span>`
+    ? `<span class="medal">${MEDALS[index]}</span>`
     : index+1;
   return `<tr class="top${index+1}"><td class="rank">${rank}</td><td class="who"><span class="name">${esc(row.username)}${playerTags(row.username)}</span><span class="meter" aria-hidden="true"><i style="width:${Math.max(0,Math.min(100,pct||0))}%"></i></span></td><td class="n">${scoreHtml(row.wins)}</td><td class="n">${scoreHtml(row.losses)}</td><td class="n pct">${pct==null?"—":pct+"%"}</td></tr>`;
 }
@@ -219,13 +194,13 @@ async function visibleTags(){
 
 function paint(){
   const body=$("body"), data=last;
-  if(data==="loading"){ body.innerHTML=emptyHtml("⏳",t("loading"),""); return; }
-  if(data==="error"){ body.innerHTML=emptyHtml("⚠️",t("errT"),t("errS")); return; }
+  if(data==="loading"){ body.innerHTML=emptyHtml("",t("loading"),""); return; }
+  if(data==="error"){ body.innerHTML=emptyHtml("",t("errT"),t("errS")); return; }
   if(game==="weekly" && weekly){
     body.innerHTML=weeklyHeadingHtml(weekly)+(auth.session()?weeklyRowsHtml(weekly):`<p>${esc(arcadeText("arc.weeklySignin"))}</p>`);
     return;
   }
-  if(!data||!data.length){ body.innerHTML=emptyHtml("🏆",t("emptyT"),t("emptyS")); return; }
+  if(!data||!data.length){ body.innerHTML=emptyHtml("",t("emptyT"),t("emptyS")); return; }
   const rows=data.map((row,index)=>rowHtml(row,index)).join("");
   const sum=data.length===1?t("sum1"):t("sumN").replace("{n}",data.length);
   body.innerHTML=`<p class="board-sum"><span class="dot" aria-hidden="true"></span>${esc([sum,...(game?[label()]:[]),period==="all"?t("pAll"):t("pWeek")].join(" · "))}</p>`+
@@ -261,7 +236,7 @@ window.addEventListener("storage",e=>{ if(e.key==="site_lang"){ lang=readLang();
 auth.onAuth(()=>{ tagData=null; draw(); });
 
 applyStatic();
-(async()=>{ if(auth.authConfigured){ auth.mountAccountButton($("acctHost")); sb=await auth.client(); } draw(); })();
+(async()=>{ if(auth.authConfigured){ sb=await auth.client(); } draw(); })();
 </script>
   <script type="module" src="rtc-ring.js?v=36"></script>
   <script type="module" src="class-gate.js?v=37"></script>

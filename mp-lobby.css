@@ -93,3 +93,54 @@ html[data-theme="light"] .mpl{--good:#1a7f37}
 }
 @media(prefers-reduced-motion:reduce){.mpl-btn,.mpl-toast{transition:none}.mpl-spin{animation-duration:3s}}
 @media(prefers-contrast:more){.mpl-card,.mpl-row,.mpl-btn,.mpl-chip{border-width:2px;border-color:var(--text,#fff)}}
+
+/* ---- Gitter look (lobby.html, body.gt): hairlines, sharp corners, one green. Other pages keep the rules above. ---- */
+.gt .gt-lobbycell{padding:0;justify-content:flex-start}
+.gt .mpl{max-width:none;margin:0;padding:0;font-family:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink)}
+.gt .mpl-card{background:none;border:0;border-radius:0;padding:20px;gap:18px}
+.gt .mpl h2{font:800 clamp(22px,4vw,30px)/1.1 "Geist",system-ui,sans-serif;letter-spacing:-.03em}
+.gt .mpl h3{font:600 13px/1.4 "Geist",system-ui,sans-serif;text-transform:none;letter-spacing:0;color:var(--muted)}
+.gt .mpl h4{font:600 13px/1.4 "Geist",system-ui,sans-serif;color:var(--muted)}
+.gt .mpl small,.gt .mpl-hint{color:var(--muted);font-size:13.5px}
+.gt .mpl-msg{border-radius:0;background:var(--tint);border:1px solid var(--danger);color:var(--danger);font-weight:600;font-size:14px}
+.gt .mpl-btn{border-radius:0;border:1px solid var(--ink);background:transparent;color:var(--ink);font:600 15px/1.2 "Geist",system-ui,sans-serif;transition:background-color .15s,border-color .15s,color .15s}
+.gt .mpl-btn:hover:not(:disabled){border-color:var(--green);color:var(--green);background:var(--white);transform:none}
+.gt .mpl-primary{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.gt .mpl-primary:hover:not(:disabled){background:var(--green)!important;border-color:var(--green);color:#fff!important}
+.gt .mpl-link{color:var(--ink);font-weight:600;font-size:14px}
+.gt .mpl-link:hover{color:var(--green);text-decoration:none}
+.gt .mpl :focus-visible{outline:2px solid var(--green);outline-offset:2px}
+.gt .mpl-field label,.gt .mpl-join label{font:600 13px/1.4 "Geist",system-ui,sans-serif;color:var(--muted)}
+.gt .mpl input[type=text]{border-radius:0;border:1px solid var(--ink);background:var(--white);color:var(--ink);font-family:"Geist",system-ui,sans-serif}
+.gt .mpl input[type=text]:focus{outline:2px solid var(--green);outline-offset:-2px;border-color:var(--green)}
+.gt .mpl-joinrow input{font-family:"Geist Mono",ui-monospace,monospace;font-weight:500}
+.gt .mpl-inv{border-top:1px solid var(--soft)}
+.gt .mpl-dir code,.gt .mpl code{background:var(--tint);border:1px solid var(--soft);border-radius:0;color:var(--ink);font-family:"Geist Mono",ui-monospace,monospace;font-weight:500}
+.gt .mpl-code{font:500 clamp(2.2rem,9vw,3.4rem)/1 "Geist Mono",ui-monospace,monospace;color:var(--green);letter-spacing:.2em;padding-left:.2em}
+.gt .mpl-cols{gap:0;border-top:1px solid var(--soft)}
+.gt .mpl-cols>*{padding:18px 0}
+.gt .mpl-cols>*+*{padding-left:22px;border-left:1px solid var(--soft)}
+.gt .mpl-count{font-family:"Geist Mono",ui-monospace,monospace;font-weight:500}
+.gt .mpl-roster{gap:0;border:1px solid var(--ink);background:var(--white)}
+.gt .mpl-row{border-radius:0;background:var(--white);border:0;border-bottom:1px solid var(--soft)}
+.gt .mpl-row:last-child{border-bottom:0}
+.gt .mpl-row[data-ready="1"]{box-shadow:inset 3px 0 0 var(--green)}
+.gt .mpl-row.mpl-empty,.gt .mpl-row.mpl-invited{background:var(--tint);border-style:solid;border-width:0 0 1px}
+.gt .mpl-name{font-weight:700}
+.gt .mpl-tag{font:500 12px/1.5 "Geist Mono",ui-monospace,monospace;color:var(--green);border:1px solid var(--green);padding:0 6px}
+.gt .mpl-row[data-ready="1"] .mpl-state{color:var(--green)}
+.gt .mpl-av{border-radius:0;background:var(--tint);border:1px solid var(--soft)}
+.gt .mpl-av-letter{background:var(--ink);color:var(--paper)}
+.gt .mpl-av-empty{border:1px dashed var(--muted);background:transparent}
+.gt .mpl-x{border-radius:0}.gt .mpl-x:hover{background:var(--tint);color:var(--ink)}
+.gt .mpl-chip{border-radius:0;border:1px solid var(--ink);background:transparent;color:var(--ink);font-family:"Geist",system-ui,sans-serif;font-weight:600}
+.gt .mpl-chip[aria-pressed=true]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.gt .mpl-check input{accent-color:var(--green)}
+.gt .mpl-spin{border-radius:0;border:3px solid var(--soft);border-top-color:var(--green)}
+.gt .mpl-toast{border-radius:0;background:var(--ink);color:var(--paper);border:0;box-shadow:none;font-weight:600;font-size:14px}
+.gt .mpl-toast[data-kind=ok],.gt .mpl-toast[data-kind=bad]{border:0}
+@media(max-width:620px){
+  .gt .mpl-card{padding:16px}
+  .gt .mpl-cols>*+*{padding-left:0;border-left:0;border-top:1px solid var(--soft)}
+}
+.gt .mpl-btn small{color:inherit;opacity:.75}
