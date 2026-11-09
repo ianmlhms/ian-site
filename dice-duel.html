@@ -6,12 +6,12 @@
 <!-- Game shell, no crawlable content. -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Kniffel — ian.lu</title>
-  <meta name="description" content="Kniffel (Yahtzee) on ian.lu — roll, hold and score against a friend or the computer." />
+  <meta name="description" content="Kniffel (Yahtzee) op ian.lu — wërf, haal fest a punkt géint e Frënd oder géint de Computer." />
   <link rel="canonical" href="https://ian.lu/dice-duel.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<script src="mp-gate.js?v=7" data-game="dice-duel" data-over="#rematch"></script>
+<script src="mp-gate.js?v=8" data-game="dice-duel" data-over="#rematch"></script>
 <link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="gitter.css?v=9">
+<link rel="stylesheet" href="gitter.css?v=11">
 <script src="theme.js?v=32"></script>
 <style>
   body{display:flex;flex-direction:column}
@@ -54,16 +54,16 @@
 <div class="wrap">
   <div class="status" id="status" role="status" aria-live="polite">Verbindung …</div>
   <div class="sub" id="sub"></div>
-  <div class="dice" id="dice" role="group" aria-label="Dice"></div>
-  <button class="btn rollbtn" id="roll">🎲 Roll</button>
-  <table id="card" aria-label="Scorecard"></table>
+  <div class="dice" id="dice" role="group" aria-label="Wierfelen"></div>
+  <button class="btn rollbtn" id="roll">Wërfelen</button>
+  <table id="card" aria-label="Punktekaart"></table>
   <button class="btn" id="rematch" style="display:none">Nach eng Partie</button>
 </div>
 
 <script src="pixelbreak-config.js"></script>
-<script src="pb/arcade-kit.js?v=42" data-arcade-id="o-dice-duel" data-arcade-title="Kniffel" data-arcade-no-score data-arcade-replace=".bar"></script>
+<script src="pb/arcade-kit.js?v=43" data-arcade-id="o-dice-duel" data-arcade-title="Kniffel" data-arcade-no-score data-arcade-replace=".bar"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-<script src="game-common.js?v=5"></script>
+<script src="game-common.js?v=6"></script>
 <script type="module" src="notify-ambient.js?v=40"></script>
 <script>
 /* Yahtzee-style dice duel: 3 rolls per turn, hold dice between rolls, score one
@@ -90,14 +90,14 @@ function straightLen(d) {
   for (let f = 1; f <= 6; f++) { run = c[f] ? run + 1 : 0; best = Math.max(best, run); }
   return best;
 }
-const UPPER = [1, 2, 3, 4, 5, 6].map((f) => ({ id: "u" + f, n: ["Ones","Twos","Threes","Fours","Fives","Sixes"][f - 1], f: (d) => d.filter((v) => v === f).length * f }));
+const UPPER = [1, 2, 3, 4, 5, 6].map((f) => ({ id: "u" + f, n: ["Einer","Zweier","Dräier","Véierer","Fënfer","Sechser"][f - 1], f: (d) => d.filter((v) => v === f).length * f }));
 const LOWER = [
-  { id: "k3", n: "3 of a kind", f: (d) => hasKind(d, 3) ? sum(d) : 0 },
-  { id: "k4", n: "4 of a kind", f: (d) => hasKind(d, 4) ? sum(d) : 0 },
+  { id: "k3", n: "3 vun enger Zort", f: (d) => hasKind(d, 3) ? sum(d) : 0 },
+  { id: "k4", n: "4 vun enger Zort", f: (d) => hasKind(d, 4) ? sum(d) : 0 },
   { id: "full", n: "Full House", f: (d) => isFull(d) ? 25 : 0 },
-  { id: "sm", n: "Small Straight", f: (d) => straightLen(d) >= 4 ? 30 : 0 },
-  { id: "lg", n: "Large Straight", f: (d) => straightLen(d) >= 5 ? 40 : 0 },
-  { id: "five", n: "5 of a kind ★", f: (d) => hasKind(d, 5) ? 50 : 0 },
+  { id: "sm", n: "Kleng Strooss", f: (d) => straightLen(d) >= 4 ? 30 : 0 },
+  { id: "lg", n: "Grouss Strooss", f: (d) => straightLen(d) >= 5 ? 40 : 0 },
+  { id: "five", n: "5 vun enger Zort ★", f: (d) => hasKind(d, 5) ? 50 : 0 },
   { id: "chance", n: "Chance", f: (d) => sum(d) },
 ];
 const CATS = [...UPPER, ...LOWER];
@@ -165,8 +165,8 @@ function render() {
     : faCat ? `#card [data-cat="${faCat.dataset.cat}"] button` : null;
   $("dice").innerHTML = dice.map((v, i) => {
     const can = myTurn && rolls > 0 && rolls < 3;
-    const base = `Die ${i + 1}: ${rolls === 0 ? "not rolled yet" : v}`;
-    const lbl = can ? base : base + (held[i] ? ", held" : "");
+    const base = `Wierfel ${i + 1}: ${rolls === 0 ? "nach net gewuerf" : v}`;
+    const lbl = can ? base : base + (held[i] ? ", festgehalen" : "");
     const face = `<span aria-hidden="true">${rolls === 0 ? "🎲" : FACES[v]}</span>`;
     return can
       ? `<button type="button" class="die${held[i] ? " held" : ""} can" data-i="${i}" aria-pressed="${held[i]}" aria-label="${lbl}">${face}</button>`
@@ -175,18 +175,18 @@ function render() {
   $("dice").querySelectorAll(".can").forEach((el) => { el.onclick = () => toggleHold(+el.dataset.i); });
   const rb = $("roll");
   rb.disabled = !myTurn || rolls >= 3;
-  rb.textContent = rolls === 0 ? "🎲 Roll" : `🎲 Roll again (${3 - rolls} left)`;
+  rb.textContent = rolls === 0 ? "Wërfelen" : `Nach eng Kéier wërfelen (${3 - rolls} iwwreg)`;
   rb.style.opacity = rb.disabled ? ".4" : "1";
 
   const row = (c) => {
     const meV = sc[me][c.id], opV = sc[opp][c.id];
     const canPick = myTurn && rolls > 0 && meV == null;
-    const meCell = meV != null ? meV : canPick ? `<td class="pick" data-cat="${c.id}"><button type="button" class="pickbtn" aria-label="${c.n}: score ${c.f(dice)} points">${c.f(dice)}</button></td>` : '<td class="open">–</td>';
+    const meCell = meV != null ? meV : canPick ? `<td class="pick" data-cat="${c.id}"><button type="button" class="pickbtn" aria-label="${c.n}: ${c.f(dice)} Punkten">${c.f(dice)}</button></td>` : '<td class="open">–</td>';
     const meTd = meV != null ? `<td>${meV}</td>` : meCell;
     return `<tr><td>${c.n}</td>${meTd}<td class="open">${opV != null ? opV : "–"}</td></tr>`;
   };
   $("card").innerHTML =
-    `<tr><th scope="col">Category</th><th scope="col" class="colme">You</th><th scope="col"${AI ? ' aria-label="Computer"' : ""}>${AI ? "🤖" : "Opponent"}</th></tr>` +
+    `<tr><th scope="col">Kategorie</th><th scope="col" class="colme">Du</th><th scope="col"${AI ? ' aria-label="Computer"' : ""}>${AI ? "🤖" : "Géigner"}</th></tr>` +
     UPPER.map(row).join("") +
     `<tr><td style="color:var(--muted)">Bonus (63+)</td><td>${upperSum(me)}/63 ${bonus(me) ? "→ +35" : ""}</td><td class="open">${upperSum(opp)}/63 ${bonus(opp) ? "→ +35" : ""}</td></tr>` +
     LOWER.map(row).join("") +
@@ -215,7 +215,7 @@ $("rematch").onclick = () => { fresh(); $("rematch").style.display = "none"; ren
 
 /* ---------- wiring ---------- */
 if (AI) {
-  document.querySelector(".bar h1").textContent = "🎲 Kniffel — géint de Computer";
+  document.querySelector(".bar h1").textContent = "Kniffel – géint de Computer";
   GC.mountDifficulty(() => difficulty, (d) => { difficulty = d; });
   oppHere = true; fresh(); render();
 } else if (!(window.MPGate && window.MPGate.redirecting)) {   // mp-gate.js sends a bare visit to the lobby (lobby.html)

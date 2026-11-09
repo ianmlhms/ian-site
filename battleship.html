@@ -5,13 +5,13 @@
 <meta name="robots" content="noindex,follow">
 <!-- Game shell, no crawlable content. -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Battleship — ian.lu</title>
-  <meta name="description" content="Battleship on ian.lu — place your fleet and play against a friend on two devices, or against the computer." />
+<title>Schëffer versenken — ian.lu</title>
+  <meta name="description" content="Schëffer versenken op ian.lu — setz deng Flott an a spill géint e Frënd op zwee Geräter oder géint de Computer." />
   <link rel="canonical" href="https://ian.lu/battleship.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<script src="mp-gate.js?v=7" data-game="battleship" data-over="#rematch"></script>
+<script src="mp-gate.js?v=8" data-game="battleship" data-over="#rematch"></script>
 <link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="gitter.css?v=9">
+<link rel="stylesheet" href="gitter.css?v=11">
 <script src="theme.js?v=32"></script>
 <style>
   :root{--ship:#16171a;--hit:#a32121;--miss:#c9cbcf;--water:#fcfcfa}
@@ -50,7 +50,7 @@
 <body class="gt">
 <header class="bar">
   <a class="home" href="pixelbreak.html">‹ Arcade</a>
-  <h1>Battleship</h1>
+  <h1>Schëffer versenken</h1>
   <div class="spacer"></div>
   <span class="sub">room <code id="roomc"></code></span>
 </header>
@@ -59,34 +59,34 @@
   <div class="sub" id="sub" aria-live="polite"></div>
 
   <div id="setup" style="display:none;width:100%;flex-direction:column;align-items:center;gap:12px">
-    <div class="label">Your fleet — place your ships</div>
+    <div class="label">Deng Flott — setz deng Schëffer</div>
     <div class="fleet" id="fleet" aria-hidden="true"></div>
-    <div class="grid place" id="own" role="group" aria-label="Your fleet grid"></div>
+    <div class="grid place" id="own" role="group" aria-label="Gitter vun denger Flott"></div>
     <div class="toolbar">
       <div class="seg">
         <button type="button" id="orientH" class="seg-b active" aria-pressed="true">→ Horizontal</button>
-        <button type="button" id="orientV" class="seg-b" aria-pressed="false">↓ Vertical</button>
+        <button type="button" id="orientV" class="seg-b" aria-pressed="false">↓ Vertikal</button>
       </div>
-      <button type="button" class="btn ghost" id="shuffle">Shuffle</button>
-      <button type="button" class="btn ghost" id="clear">Clear</button>
-      <button type="button" class="btn" id="ready" disabled>Ready</button>
+      <button type="button" class="btn ghost" id="shuffle">Mëschen</button>
+      <button type="button" class="btn ghost" id="clear">Läschen</button>
+      <button type="button" class="btn" id="ready" disabled>Prett</button>
     </div>
-    <div class="sub">Pick a direction, tap a square to place · tap a ship to remove it.</div>
+    <div class="sub">Wiel eng Richtung, tipp op e Feld fir ze setzen · tipp op e Schëff fir et ewechzehuelen.</div>
   </div>
 
   <div id="play" style="display:none;width:100%;flex-direction:column;align-items:center;gap:12px">
-    <div class="label">Enemy waters — tap to fire</div>
-    <div class="grid fire" id="enemy" role="group" aria-label="Enemy waters grid"></div>
-    <div class="label">Your fleet</div>
-    <div class="grid" id="ownSmall" role="group" aria-label="Your fleet grid"></div>
+    <div class="label">Géigner-Gewässer — tipp fir ze schéissen</div>
+    <div class="grid fire" id="enemy" role="group" aria-label="Gitter vun de Géigner-Gewässer"></div>
+    <div class="label">Deng Flott</div>
+    <div class="grid" id="ownSmall" role="group" aria-label="Gitter vun denger Flott"></div>
   </div>
-  <button type="button" class="btn ghost" id="rematch" style="display:none"><span aria-hidden="true">↻</span> New game</button>
+  <button type="button" class="btn ghost" id="rematch" style="display:none"><span aria-hidden="true">↻</span> Nei Partie</button>
 </div>
 
 <script src="pixelbreak-config.js"></script>
-<script src="pb/arcade-kit.js?v=42" data-arcade-id="o-battleship" data-arcade-title="Battleship" data-arcade-no-score data-arcade-replace=".bar"></script>
+<script src="pb/arcade-kit.js?v=43" data-arcade-id="o-battleship" data-arcade-title="Schëffer versenken" data-arcade-no-score data-arcade-replace=".bar"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-<script src="game-common.js?v=5"></script>
+<script src="game-common.js?v=6"></script>
 <script type="module" src="notify-ambient.js?v=40"></script>
 <script>
 const N=8, SHIPS=[4,3,3,2];
@@ -157,7 +157,7 @@ function shuffle(){
 function clearAll(){ own=empty(); placed=[]; toPlace=[...SHIPS]; renderSetup(); }
 
 // ---------- rendering ----------
-const cellName=(r,c,v,reveal)=>String.fromCharCode(65+r)+(c+1)+": "+(v===2?"hit":v===3?"miss":v===1&&reveal?"ship":"water");
+const cellName=(r,c,v,reveal)=>String.fromCharCode(65+r)+(c+1)+": "+(v===2?"Treffer":v===3?"Dernieft":v===1&&reveal?"Schëff":"Waasser");
 function grid(el,board,reveal,onclick){
   const kids=Array.from(el.children), focusIdx=kids.indexOf(document.activeElement);
   el.innerHTML="";
@@ -190,7 +190,7 @@ function renderSetup(){
   $("orientH").setAttribute("aria-pressed", orient==="h");
   $("orientV").setAttribute("aria-pressed", orient==="v");
   setStatus(myReady?"Waart op de Géigner …":(allPlaced()?"Flott prett — dréck op Prett":"Setz deng Schëffer"),
-    oppHere?"":"Share room <code>"+room+"</code> so your opponent can join.");
+    oppHere?"":"Deel de Raumcode <code>"+room+"</code>, dass däi Géigner bäitrieden kann.");
 }
 function renderPlay(){
   persistLocal();
@@ -266,7 +266,7 @@ function onFire(r,c){
 function onResult(r,c,hit,lost){ enemy[r][c]=hit?2:3; if(lost) over=role; renderPlay(); }
 
 if(AI){
-  document.querySelector(".bar h1").textContent="🚢 Battleship — géint de Computer";
+  document.querySelector(".bar h1").textContent="Schëffer versenken – géint de Computer";
   GC.mountDifficulty(()=>difficulty,(d)=>{difficulty=d;});
   clearAll(); phase="setup"; oppHere=true; renderSetup();
 } else if (!(window.MPGate && window.MPGate.redirecting)) {   // mp-gate.js sends a bare visit to the lobby (lobby.html)

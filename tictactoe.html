@@ -5,13 +5,13 @@
 <meta name="robots" content="noindex,follow">
 <!-- Game shell, no crawlable content. -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Tic-Tac-Toe — ian.lu</title>
-  <meta name="description" content="Tic Tac Toe on ian.lu — the classic game of X and O against a friend or an unbeatable AI." />
+<title>Dräi an enger Rei — ian.lu</title>
+  <meta name="description" content="Dräi an enger Rei op ian.lu — de Klassiker mat X an O, géint e Frënd oder géint de Computer." />
   <link rel="canonical" href="https://ian.lu/tictactoe.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<script src="mp-gate.js?v=7" data-game="tictactoe" data-over="#rematch"></script>
+<script src="mp-gate.js?v=8" data-game="tictactoe" data-over="#rematch"></script>
 <link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="gitter.css?v=9">
+<link rel="stylesheet" href="gitter.css?v=11">
 <script src="theme.js?v=32"></script>
 <style>
   :root{--x:#1f7a4d;--o:#16171a;--board:#fcfcfa}
@@ -41,21 +41,21 @@
 <body class="gt">
 <header class="bar">
   <a class="home" href="pixelbreak.html">‹ Arcade</a>
-  <h1>Tic-Tac-Toe</h1>
+  <h1>Dräi an enger Rei</h1>
   <div class="spacer"></div>
 </header>
 
 <main class="wrap">
   <div class="status" id="status" role="status" aria-live="polite">Verbindung …</div>
   <div class="sub" id="sub"></div>
-  <div class="board" id="board" role="group" aria-label="Tic-Tac-Toe board" tabindex="-1"></div>
-  <button type="button" class="btn" id="rematch" style="display:none"><span aria-hidden="true">↻</span> Rematch</button>
+  <div class="board" id="board" role="group" aria-label="Dräi-an-enger-Rei-Brett" tabindex="-1"></div>
+  <button type="button" class="btn" id="rematch" style="display:none"><span aria-hidden="true">↻</span> Nach eng Partie</button>
 </main>
 
 <script src="pixelbreak-config.js"></script>
-<script src="pb/arcade-kit.js?v=42" data-arcade-id="o-tictactoe" data-arcade-title="Tic-Tac-Toe Online" data-arcade-no-score data-arcade-replace=".bar"></script>
+<script src="pb/arcade-kit.js?v=43" data-arcade-id="o-tictactoe" data-arcade-title="Tic-Tac-Toe Online" data-arcade-no-score data-arcade-replace=".bar"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-<script src="game-common.js?v=5"></script>
+<script src="game-common.js?v=6"></script>
 <script type="module" src="notify-ambient.js?v=40"></script>
 <script>
 const GC = window.GameCommon;
@@ -88,10 +88,10 @@ function render() {
     const where = `Row ${Math.floor(i / 3) + 1}, column ${i % 3 + 1}`;
     if (turn === me && !over && oppHere && !board[i]) {
       d.onclick = () => play(i, me, true);
-      d.setAttribute("aria-label", `Play ${where.toLowerCase()}`);
+      d.setAttribute("aria-label", `Spill ${where.toLowerCase()}`);
     } else {
       d.tabIndex = -1; d.setAttribute("aria-disabled", "true");
-      d.setAttribute("aria-label", `${where}: ${board[i] === 1 ? "X" : board[i] === 2 ? "O" : "empty"}`);
+      d.setAttribute("aria-label", `${where}: ${board[i] === 1 ? "X" : board[i] === 2 ? "O" : "eidel"}`);
     }
     b.appendChild(d);
   }
@@ -125,7 +125,7 @@ function play(i, player, local) {
 }
 
 if (AI) {
-  document.querySelector(".bar h1").textContent = "✕ Tic-Tac-Toe — géint de Computer";
+  document.querySelector(".bar h1").textContent = "Dräi an enger Rei – géint de Computer";
   GC.mountDifficulty(() => difficulty, (d) => { difficulty = d; });
   oppHere = true; fresh(); render();
 } else if (!(window.MPGate && window.MPGate.redirecting)) {   // mp-gate.js sends a bare visit to the lobby (lobby.html)

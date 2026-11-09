@@ -20,7 +20,7 @@ const tiny = Buffer.from("UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQ
 const DRIVERS = {
   draw: {
     async started(h, all) {
-      for (const p of all) await p.page.waitForFunction(() => document.querySelectorAll(".scores .pchip").length === 3 && /Turn 1\//.test(document.body.textContent), null, T);
+      for (const p of all) await p.page.waitForFunction(() => document.querySelectorAll(".scores .pchip").length === 3 && /Zuch 1\//.test(document.body.textContent), null, T);
       h.expect(true, "round 1 opened by itself on all three devices (host auto-start)");
     },
     async round(h, all, hub) {
@@ -42,7 +42,7 @@ const DRIVERS = {
       await watcher.page.waitForFunction(() => /qqqq/.test(document.getElementById("log")?.textContent || ""), null, T);
       h.expect(true, `${guesser.label}'s guess shows up in ${watcher.label}'s chat`);
     },
-    fresh: (page) => page.waitForFunction(() => document.querySelectorAll(".scores .pchip").length === 3 && /Turn 1\//.test(document.body.textContent), null, T),
+    fresh: (page) => page.waitForFunction(() => document.querySelectorAll(".scores .pchip").length === 3 && /Zuch 1\//.test(document.body.textContent), null, T),
   },
   meme: {
     async started(h, all) {

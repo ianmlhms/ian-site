@@ -149,7 +149,8 @@ html.auth-in .gt-acct { color: var(--ink); }
 /* tokens some older pages still read */
 body.gt { --accent2-text: var(--green); --ok: var(--green); --good: var(--green); --good-text: var(--green); --bad: var(--danger); --warn: var(--danger); --gold: var(--ink); }
 /* site-glass.css (loaded by theme.js) decorates these class names; flatten them in the Gitter look */
-body.gt :is(.empty, .card, .tile, .hint, .gate-box, .bar, .wrap, .proj-card, .note-card, .tbl-wrap, .gate) { box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; border-radius: 0; }
+body.gt :is(.empty, .card, .tile, .hint, .gate-box, .bar, .wrap, .proj-card, .note-card, .tbl-wrap, .gate, .panel, .chip, .swatch, .field, .note, .auth-box, .apps-gate, .glass, .glass-panel, .flight-card),
+body.gt > header:not(.arcade-bar):not(.gt-nav):not(.gt-bar) { box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; border-radius: 0; }
 
 /* ---- legacy page compat (pages that still use site-ui style markup: .ui-page / .ui-card / .ui-title / .pick buttons) ---- */
 .gt .ui-page { max-width: 760px; margin: 0 auto; padding: 22px var(--gutter) max(56px, calc(40px + env(safe-area-inset-bottom))); display: flex; flex-direction: column; gap: 14px; width: 100%; }
@@ -185,3 +186,7 @@ body.gt :is(.empty, .card, .tile, .hint, .gate-box, .bar, .wrap, .proj-card, .no
 .gt .ui-header h1.ui-brand { margin: 0; display: flex; align-items: center; gap: 10px; font: 800 16px/1.2 "Geist", system-ui, sans-serif; letter-spacing: -0.01em; white-space: nowrap; }
 .gt .ui-header .auth-btn { border: 0; background: none; border-radius: 0; box-shadow: none; color: var(--green); font: 600 14px "Geist", system-ui, sans-serif; min-height: 44px; padding: 0 0 0 10px; cursor: pointer; }
 @media (max-width: 700px) { .gt .ui-header { margin-top: 12px; padding-inline: 14px; } }
+
+/* ---- polish (Nov 2026): the Arcade game bar never wraps (site-glass wraps bars that hold the hidden language switcher) ---- */
+html body.gt .arcade-bar { flex-wrap: nowrap; }
+html body.gt .arcade-bar .langsw, html body.gt .arcade-bar #langSw { display: none !important; }

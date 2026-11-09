@@ -90,10 +90,10 @@ const DRIVERS = {
     meet: bothSeeEachOther,
     async move(h, host, emma) {
       await host.page.click("#roll");
-      await emma.page.waitForFunction(() => ![...document.querySelectorAll("#dice .die")].some((d) => /not rolled yet/.test(d.getAttribute("aria-label"))), null, TURN_WAIT);
+      await emma.page.waitForFunction(() => ![...document.querySelectorAll("#dice .die")].some((d) => /nach net gewuerf/.test(d.getAttribute("aria-label"))), null, TURN_WAIT);
       h.expect(true, "the host's dice show up on Emma's screen");
     },
-    async fresh(page) { return (await page.$$eval("#dice .die", (els) => els.every((d) => /not rolled yet/.test(d.getAttribute("aria-label"))))); },
+    async fresh(page) { return (await page.$$eval("#dice .die", (els) => els.every((d) => /nach net gewuerf/.test(d.getAttribute("aria-label"))))); },
   },
   battleship: {
     meet: async (host, emma) => { for (const p of [host, emma]) await p.page.waitForSelector("#setup", { state: "visible" }); },

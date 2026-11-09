@@ -1,17 +1,15 @@
-/* game-common.css — shared look for the realtime game pages (v2, matches PixelBreak).
- * Pages keep their own <style> for boards and page-specific bits; this sheet is
- * linked so the shared chrome (bar, buttons, status) wins for a consistent look. */
-@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap');
-
+/* game-common.css — shared look for the realtime game pages (Gitter look, Nov 2026).
+ * Paper #f6f6f3 / ink #16171a / ONE green #1f7a4d, hairlines, radius 0, Geist. No gradients, blur or shadows.
+ * Pages keep their own <style> for boards and page-specific bits; body.gt (gitter.css) wins where it is loaded. */
 :root {
-  --bg: #0d0d1a;
-  --card: #161625;
-  --card2: #1e1e35;
-  --border: #2a2a4a;
-  --text: #e8e8f0;
-  --muted: #8888aa;
-  --accent: #6ea8fe;
-  --accent2: #4de8ff;
+  --bg: #f6f6f3;
+  --card: #fcfcfa;
+  --card2: #efefeb;
+  --border: rgba(22, 23, 26, 0.14);
+  --text: #16171a;
+  --muted: #62656a;
+  --accent: #1f7a4d;
+  --accent2: #1f7a4d;
 }
 * { box-sizing: border-box; }
 body {
@@ -19,48 +17,40 @@ body {
   /* svh, not vh: 100vh is the large mobile viewport and overshoots the screen. */
   min-height: 100vh;
   min-height: 100svh;
-  background:
-    radial-gradient(900px 480px at 75% -12%, rgba(110, 168, 254, 0.10), transparent),
-    radial-gradient(700px 420px at 10% 110%, rgba(255, 107, 157, 0.06), transparent),
-    var(--bg);
+  background: var(--bg);
   color: var(--text);
-  font-family: 'Nunito', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
-a { color: var(--accent2-text); text-decoration: none; }
+a { color: var(--accent); text-decoration: none; }
 
 .bar {
   display: flex; align-items: center; gap: 14px;
-  padding: 12px 20px;
-  border-bottom: 1px solid var(--border);
-  background: var(--card);
-  background: color-mix(in srgb, var(--card) 84%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  padding: 8px 20px;
+  border-bottom: 1px solid var(--text);
+  background: var(--bg);
   position: sticky; top: 0; z-index: 50;
 }
 .bar .home {
-  color: var(--text); font-weight: 700; font-size: 13px;
-  background: var(--card); border: 2px solid var(--border);
-  border-radius: 30px; padding: 7px 14px; white-space: nowrap;
-  transition: border-color 0.2s, color 0.2s;
+  color: var(--muted); font-weight: 600; font-size: 14px;
+  background: none; border: 0; border-radius: 0; padding: 0; white-space: nowrap;
 }
-.bar .home:hover { border-color: var(--accent-border); color: var(--accent-text); }
-.bar h1 { font-family: 'Fredoka', sans-serif; font-size: 19px; font-weight: 600; letter-spacing: 0.3px; margin: 0; }
+.bar .home:hover { color: var(--accent); }
+.bar h1 { font-size: 16px; font-weight: 800; letter-spacing: -0.01em; margin: 0; }
 .bar .spacer { flex: 1; }
 .bar .code { color: var(--muted); font-size: 13px; }
 
-code { background: var(--card2); padding: 3px 9px; border-radius: 8px; color: var(--accent2-text); font-weight: 700; }
+code { background: rgba(22, 23, 26, 0.04); border: 1px solid var(--border); padding: 1px 7px; border-radius: 0; color: var(--text); font-family: "Geist Mono", ui-monospace, monospace; font-weight: 500; }
 
 .status { font-size: 19px; font-weight: 800; min-height: 24px; text-align: center; }
 .sub { color: var(--muted); font-size: 13px; text-align: center; }
 
 .btn {
-  background: var(--card2); border: 1px solid var(--border); color: var(--text);
-  border-radius: 12px; padding: 10px 18px; font-weight: 800; cursor: pointer;
-  font-family: 'Nunito', sans-serif; font-size: 14px;
-  transition: border-color 0.2s, transform 0.15s, background 0.2s;
+  background: var(--text); border: 1px solid var(--text); color: var(--bg);
+  border-radius: 0; padding: 10px 18px; font-weight: 600; cursor: pointer;
+  font-family: inherit; font-size: 15px;
+  transition: background-color 0.15s, border-color 0.15s;
 }
-.btn:hover { border-color: var(--accent-border); transform: translateY(-1px); }
+.btn:hover { background: var(--accent); border-color: var(--accent); }
 
 .muted { color: var(--muted); }
 .center { text-align: center; }

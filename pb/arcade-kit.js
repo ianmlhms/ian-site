@@ -175,7 +175,7 @@
     style.id = "arcade-kit-css";
     style.textContent = `
       .arcade-bar{--k-paper:#f6f6f3;--k-white:#fcfcfa;--k-ink:#16171a;--k-muted:#62656a;--k-green:#1f7a4d;
-        box-sizing:border-box;min-height:56px;flex:none;display:flex;align-items:center;gap:8px;
+        box-sizing:border-box;min-height:56px;flex:none;display:flex;flex-wrap:nowrap;align-items:center;gap:8px;
         padding:max(6px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) 6px max(10px,env(safe-area-inset-left));
         border-bottom:1px solid var(--k-ink);background:var(--k-paper);color:var(--k-ink);
         font-family:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;position:relative;z-index:1000}
@@ -189,7 +189,7 @@
       .arcade-bar__button:hover{background:var(--k-white);border-color:var(--k-green);color:var(--k-green)}
       .arcade-bar__button:active{background:var(--k-ink);color:var(--k-paper)}
       .arcade-bar__back:focus-visible,.arcade-bar__button:focus-visible{outline:2px solid var(--k-green);outline-offset:2px}
-      .arcade-bar__title{margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:16px;line-height:1.15;font-weight:800;letter-spacing:-.01em}
+      .arcade-bar__title{margin:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:16px;line-height:1.15;font-weight:800;letter-spacing:-.01em}
       .arcade-bar__badge{flex:none;padding:3px 8px;border:1px solid var(--k-green);color:var(--k-green);font:500 11px/1.4 "Geist Mono",ui-monospace,monospace;letter-spacing:.06em;white-space:nowrap}
       .arcade-bar__spacer{flex:1;min-width:4px}.arcade-bar__best{color:var(--k-muted);font:500 11px/1 "Geist Mono",ui-monospace,monospace;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
       .arcade-context{box-sizing:border-box;min-height:44px;display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:4px 14px;
@@ -266,25 +266,25 @@
       const badge = document.createElement("span");
       badge.className = "arcade-bar__badge";
       badge.setAttribute("role", "status");
-      badge.setAttribute("aria-label", "Test mode");
+      badge.setAttribute("aria-label", "Testmodus");
       badge.textContent = "TEST";
       bar.append(badge);
     }
     bar.append(spacer, best);
 
     if (!config.noScore) {
-      const board = button("arcade-bar__button arcade-bar__leaderboard", "Leaderboard", "trophy", config.onLeaderboard || (() => window.PB?.openBoard?.()));
+      const board = button("arcade-bar__button arcade-bar__leaderboard", "Rangleescht", "trophy", config.onLeaderboard || (() => window.PB?.openBoard?.()));
       bar.appendChild(board);
     }
     if (config.restart !== false) {
-      const restart = button("arcade-bar__button arcade-bar__restart", "Restart", "restart", config.onRestart || runRestart);
+      const restart = button("arcade-bar__button arcade-bar__restart", "Nei starten", "restart", config.onRestart || runRestart);
       bar.appendChild(restart);
     }
-    const mute = button("arcade-bar__button arcade-bar__mute", muted() ? "Unmute" : "Mute", muted() ? "soundOff" : "soundOn", () => {
+    const mute = button("arcade-bar__button arcade-bar__mute", muted() ? "Toun un" : "Toun aus", muted() ? "soundOff" : "soundOn", () => {
       const next = !muted();
       applyMute(next);
       mute.innerHTML = iconSvg(next ? "soundOff" : "soundOn");
-      mute.setAttribute("aria-label", next ? "Unmute" : "Mute");
+      mute.setAttribute("aria-label", next ? "Toun un" : "Toun aus");
       if (config.onMute) config.onMute(next);
     });
     bar.appendChild(mute);

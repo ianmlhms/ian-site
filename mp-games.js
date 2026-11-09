@@ -25,7 +25,7 @@ const INTRO_CATEGORIES = ["🔥 Charts", "📀 2000er", "💿 2010er", "🎤 Rap
 const G = (o) => Object.freeze({ lobby: false, arcade: "", ai: false, settings: Object.freeze([]), ...o });
 
 export const MP_GAMES = Object.freeze({
-  connect4: G({ id: "connect4", name: "Connect 4", emoji: "🔴", page: "connect4.html", min: 2, max: 2, lobby: true, ai: true }),
+  connect4: G({ id: "connect4", name: "Véier gewënnt", emoji: "🔴", page: "connect4.html", min: 2, max: 2, lobby: true, ai: true }),
   slf: G({
     id: "slf", name: "Stadt-Land-Fluss", emoji: "🔤", page: "slf.html", min: 2, max: 8, lobby: true,
     settings: Object.freeze([{
@@ -35,18 +35,18 @@ export const MP_GAMES = Object.freeze({
     }]),
   }),
   // ---- migrated in the second batch (2-player GameCommon games) ----
-  tictactoe: G({ id: "tictactoe", name: "Tic-Tac-Toe", emoji: "❌", page: "tictactoe.html", min: 2, max: 2, lobby: true, ai: true }),
-  battleship: G({ id: "battleship", name: "Battleship", emoji: "🚢", page: "battleship.html", min: 2, max: 2, lobby: true, ai: true }),
+  tictactoe: G({ id: "tictactoe", name: "Dräi an enger Rei", emoji: "❌", page: "tictactoe.html", min: 2, max: 2, lobby: true, ai: true }),
+  battleship: G({ id: "battleship", name: "Schëffer versenken", emoji: "🚢", page: "battleship.html", min: 2, max: 2, lobby: true, ai: true }),
   reversi: G({ id: "reversi", name: "Reversi", emoji: "⚪", page: "reversi.html", min: 2, max: 2, lobby: true, ai: true }),
-  dots: G({ id: "dots", name: "Dots & Boxes", emoji: "🟦", page: "dots.html", min: 2, max: 2, lobby: true, ai: true }),
-  checkers: G({ id: "checkers", name: "Checkers", emoji: "🟠", page: "checkers.html", min: 2, max: 2, lobby: true, ai: true }),
-  maumau: G({ id: "maumau", name: "Mau-Mau Cards", emoji: "🃏", page: "maumau.html", min: 2, max: 2, lobby: true, ai: true }),
+  dots: G({ id: "dots", name: "Punkten a Këschten", emoji: "🟦", page: "dots.html", min: 2, max: 2, lobby: true, ai: true }),
+  checkers: G({ id: "checkers", name: "Dammspill", emoji: "🟠", page: "checkers.html", min: 2, max: 2, lobby: true, ai: true }),
+  maumau: G({ id: "maumau", name: "Mau-Mau", emoji: "🃏", page: "maumau.html", min: 2, max: 2, lobby: true, ai: true }),
   "dice-duel": G({ id: "dice-duel", name: "Kniffel", emoji: "🎲", page: "dice-duel.html", min: 2, max: 2, lobby: true, ai: true }),
   color: G({
-    id: "color", name: "Colour Guess", emoji: "🎨", page: "color.html", min: 2, max: 8, lobby: true, ai: true,
+    id: "color", name: "Faarf roden", emoji: "🎨", page: "color.html", min: 2, max: 8, lobby: true, ai: true,
     settings: Object.freeze([
       { key: "rounds", type: "choice", def: 5, label: { lb: "Ronnen", de: "Runden", en: "Rounds" }, options: Object.freeze([1, 3, 5, 7, 10].map((v) => Object.freeze({ v, label: String(v) }))) },
-      { key: "mode", type: "choice", def: "visible", label: { lb: "Modus", de: "Modus", en: "Mode" }, options: Object.freeze([{ v: "visible", label: "👁 Stays visible" }, { v: "flash", label: "⚡ Flash (memory)" }]) },
+      { key: "mode", type: "choice", def: "visible", label: { lb: "Modus", de: "Modus", en: "Mode" }, options: Object.freeze([{ v: "visible", label: "👁 Bleift ze gesinn" }, { v: "flash", label: "⚡ Blitz (aus dem Kapp)" }]) },
     ]),
   }),
   // ---- arcade games (they run inside the arcade shell; their relay code = the lobby code) ----
@@ -55,10 +55,10 @@ export const MP_GAMES = Object.freeze({
   fighters: G({ id: "fighters", name: "Platform Fighters", emoji: "🥊", page: "pb/fighters.html", arcade: "fighters", min: 2, max: 2, lobby: true, ai: true }),
   "air-hockey": G({ id: "air-hockey", name: "Air Hockey", emoji: "🥅", page: "pb/air-hockey.html", arcade: "air-hockey", min: 2, max: 2, lobby: true, ai: true }),
   // ---- not migrated: the lobby is off, links stay  page?room=CODE&role=guest ----
-  draw: G({ id: "draw", name: "Draw & Guess", emoji: "✏️", page: "draw.html", min: 2, max: 8, lobby: true }),
-  meme: G({ id: "meme", name: "Meme Caption Party", emoji: "😂", page: "meme.html", min: 2, max: 8, lobby: true }),
+  draw: G({ id: "draw", name: "Zeechnen a roden", emoji: "✏️", page: "draw.html", min: 2, max: 8, lobby: true }),
+  meme: G({ id: "meme", name: "Meme-Party", emoji: "😂", page: "meme.html", min: 2, max: 8, lobby: true }),
   intro: G({
-    id: "intro", name: "Guess the Song", emoji: "🎵", page: "intro.html", min: 2, max: 8, lobby: true,
+    id: "intro", name: "Lidd roden", emoji: "🎵", page: "intro.html", min: 2, max: 8, lobby: true,
     settings: Object.freeze([
       { key: "cat", type: "choice", def: 0, label: { lb: "Kategorie", de: "Kategorie", en: "Category" }, options: Object.freeze(INTRO_CATEGORIES.map((label, v) => Object.freeze({ v, label }))) },
       { key: "count", type: "choice", def: 5, label: { lb: "Lidder", de: "Lieder", en: "Songs" }, options: Object.freeze([3, 5, 8, 10].map((v) => Object.freeze({ v, label: String(v) }))) },

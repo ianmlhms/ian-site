@@ -34,7 +34,7 @@ export const flow = {
       await host.page.goto(h.origin + "/connect4.html", { waitUntil: "commit" });
       await host.page.waitForSelector("#mplCreate");
       h.expect(/lobby\.html\?g=connect4/.test(host.page.url()), `redirected to the lobby (${host.page.url().replace(h.origin, "")})`);
-      h.expect(/Connect 4/.test(await text(host.page, "#mplEntryTitle")), "entry screen names the game");
+      h.expect(/Véier gewënnt/.test(await text(host.page, "#mplEntryTitle")), "entry screen names the game");
       h.expect(await host.page.isVisible("#mplQuick") && await host.page.isVisible("#mplJoin"), "entry offers create / quick match / join by code");
       h.expect((await host.page.$$("a.mpl-link")).length >= 2, "entry links to vs-computer and the arcade");
       await shot(host, "entry");
@@ -74,7 +74,7 @@ export const flow = {
       h.step("Emma gets the invite popup while she plays, taps it, lands in the lobby");
       await emma.page.waitForSelector(".ip-card");
       const toast = await text(emma.page, ".ip-title");
-      h.expect(/tester/.test(toast) && /Connect 4/.test(toast), `popup names the host and the game (${toast})`);
+      h.expect(/tester/.test(toast) && /Véier gewënnt/.test(toast), `popup names the host and the game (${toast})`);
       await shot(emma, "invite-toast");
       await emma.page.click(".ip-card .ip-primary");
       await emma.page.waitForSelector("#mplRoster");

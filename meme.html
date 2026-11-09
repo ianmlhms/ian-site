@@ -5,14 +5,14 @@
 <meta name="robots" content="noindex,follow">
 <!-- Game shell, no crawlable content. -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Meme Party — ian.lu</title>
-  <meta name="description" content="Meme generator on ian.lu — pick a template, add your own caption and share the result." />
+<title>Meme-Party — ian.lu</title>
+  <meta name="description" content="Meme-Party op ian.lu — schreif eng Ënnerschrëft zum selwechte Meme a vot fir dat lëschtegst." />
   <link rel="canonical" href="https://ian.lu/meme.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#f6f6f3">
-<script src="mp-gate.js?v=7" data-game="meme"></script>
+<script src="mp-gate.js?v=8" data-game="meme"></script>
 <link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="gitter.css?v=9">
+<link rel="stylesheet" href="gitter.css?v=11">
 <script src="theme.js?v=32"></script>
 <style>
   body{margin:0;min-height:100vh;min-height:100svh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
@@ -65,15 +65,15 @@
 <body class="gt">
 <header class="bar">
   <a class="home" href="pixelbreak.html">‹ Arcade</a>
-  <h1>Meme Party</h1>
+  <h1>Meme-Party</h1>
   <div class="spacer"></div>
-  <span class="muted">room <code id="roomc"></code></span>
+  <span class="muted">Raum <code id="roomc"></code></span>
 </header>
 <main class="wrap" id="app"><p class="muted">Verbindung …</p></main>
 <div id="live" class="sr-only" role="status" aria-live="polite"></div>
 
 <script src="pixelbreak-config.js"></script>
-<script src="pb/arcade-kit.js?v=42" data-arcade-id="o-meme" data-arcade-title="Meme Caption Party" data-arcade-no-score data-arcade-replace=".bar"></script>
+<script src="pb/arcade-kit.js?v=43" data-arcade-id="o-meme" data-arcade-title="Meme-Party" data-arcade-no-score data-arcade-replace=".bar"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script>
 const FALLBACK = [
@@ -146,27 +146,27 @@ function isMessage(event,p){
   }
 }
 
-let name="Player", phase="lobby", round=0, totalRounds=0, hostHere=true;
+let name="Spiller", phase="lobby", round=0, totalRounds=0, hostHere=true;
 let scores={}, template=null, roundEnd=0, entries=[], results=[], progress=null;
 let myCap=null, myVote=null, myTemplate=null, rerollsLeft=0;
 // host-only
 let captions={}, votes={}, capTimer=null, voteTimer=null, tick=null;
 
 function players(){ const st=ch.presenceState(); return Object.keys(st).filter(k=>isId(k)&&Array.isArray(st[k])&&isObject(st[k][0])&&isText(st[k][0].name,MAX_NAME)).slice(0,MAX_PLAYERS).map(k=>({cid:k,name:(st[k][0]||{}).name||"?"})); }
-async function getName(){ let n=localStorage.getItem("playerName"); if(!n){ try{ n=window.__pbAuth?.session?.user?.user_metadata?.username; }catch{} } if(!n){ n=(prompt("Your name:")||"Player").slice(0,16);} localStorage.setItem("playerName",n); return n; }
+async function getName(){ let n=localStorage.getItem("playerName"); if(!n){ try{ n=window.__pbAuth?.session?.user?.user_metadata?.username; }catch{} } if(!n){ n=(prompt("Däin Numm:")||"Spiller").slice(0,16);} localStorage.setItem("playerName",n); return n; }
 function say(t){ const el=$("live"); if(!el) return; el.textContent=""; setTimeout(()=>{ el.textContent=t; },60); }
 let lastKey="";
 function announcePhase(){
   const key=phase+":"+round; if(key===lastKey) return; lastKey=key;
-  if(phase==="caption") say(`Round ${round} of ${totalRounds}: write your caption`);
-  else if(phase==="vote") say("Vote for the funniest meme");
-  else if(phase==="reveal") say(`Results for round ${round}`);
+  if(phase==="caption") say(`Ronn ${round} vun ${totalRounds}: schreif deng Ënnerschrëft`);
+  else if(phase==="vote") say("Vot fir dat lëschtegst Meme");
+  else if(phase==="reveal") say(`Resultater vun der Ronn ${round}`);
   else if(phase==="final") say("Game over");
 }
 function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } }
 function memeNode(url,top,bottom){
   const el=document.createElement("div"); el.className="meme";
-  const img=document.createElement("img"); img.src=url; img.loading="lazy"; img.alt=templateNames[url]||"Meme template";
+  const img=document.createElement("img"); img.src=url; img.loading="lazy"; img.alt=templateNames[url]||"Meme-Virlag";
   const t=document.createElement("div"); t.className="mtext top"; t.textContent=top||"";
   const b=document.createElement("div"); b.className="mtext bottom"; b.textContent=bottom||"";
   el.append(img,t,b); return el;
@@ -174,43 +174,43 @@ function memeNode(url,top,bottom){
 function scoreChips(){ const ps=players(); const mx=Math.max(0,...ps.map(p=>scores[p.cid]||0));
   return `<div class="scores">${ps.map(p=>`<span class="pchip ${(scores[p.cid]||0)===mx&&mx>0?"lead":""}">${esc(p.name)} · ${scores[p.cid]||0}</span>`).join("")}</div>`; }
 function topbar(){ const s=Math.max(0,Math.ceil((roundEnd-Date.now())/1000));
-  return `<div class="topbar"><span class="rnd">Round ${round}/${totalRounds}</span><span class="prog" id="prog">${progress?progress.done+"/"+progress.total+" ready":""}</span><span class="timer" id="timerEl">${s}s</span></div>`; }
+  return `<div class="topbar"><span class="rnd">Ronn ${round}/${totalRounds}</span><span class="prog" id="prog">${progress?progress.done+"/"+progress.total+" prett":""}</span><span class="timer" id="timerEl">${s}s</span></div>`; }
 
 /* ---------- render ---------- */
 function render(){
   announcePhase();
   if(window.MPGate) MPGate.setOver(phase==="lobby"||phase==="final");   // «‹ Lobby» is one tap when no game is running
   if(phase==="lobby"){
-    let html = `<p class="muted center">Everyone gets a meme — keep it or <b>change it up to ${MAX_REROLLS}×</b> — caption it, then vote for the funniest. Most votes over ${ROUNDS} rounds wins. 3+ players is best!</p>`;
+    let html = `<p class="muted center">Jiddereen kritt e Meme — behal et oder <b>wiesel et bis zu ${MAX_REROLLS}×</b> — schreif eng Ënnerschrëft dozou a vot dann fir dat lëschtegst. Wien no ${ROUNDS} Ronnen déi meescht Stëmme kritt, gewënnt. Ab 3 Spiller ass et am beschten!</p>`;
     html += scoreChips();
-    html += `<div class="invite"><code>${esc(inviteURL)}</code><button id="cpy" aria-label="Copy invite link">Copy</button></div>`;
+    html += `<div class="invite"><code>${esc(inviteURL)}</code><button id="cpy" aria-label="Invitatiounslink kopéieren">Kopéieren</button></div>`;
     const ps=players();
-    html += role==="host" ? `<button class="big" id="startBtn" ${ps.length<2?"disabled":""}>${ps.length<2?"Waiting for players…":"Start game"}</button>`
-                          : (hostHere ? `<p class="center muted">Waiting for the host to start…</p>`
-                                      : `<p class="center muted" role="alert">The host left — ask them to rejoin.</p>`);
+    html += role==="host" ? `<button class="big" id="startBtn" ${ps.length<2?"disabled":""}>${ps.length<2?"Waart op Spiller …":"Spill starten"}</button>`
+                          : (hostHere ? `<p class="center muted">Waart bis den Host ufänkt …</p>`
+                                      : `<p class="center muted" role="alert">Den Host ass fort — frot en, nees bäizetrieden.</p>`);
     $("app").innerHTML=html;
-    if($("cpy")) $("cpy").onclick=()=>{ navigator.clipboard?.writeText(inviteURL); $("cpy").textContent="Copied ✓"; say("Invite link copied"); };
+    if($("cpy")) $("cpy").onclick=()=>{ navigator.clipboard?.writeText(inviteURL); $("cpy").textContent="Kopéiert ✓"; say("Invitatiounslink kopéiert"); };
     if(role==="host"&&$("startBtn")) $("startBtn").onclick=start;
     return;
   }
   if(phase==="final"){
     const ps=[...players()].sort((a,b)=>(scores[b.cid]||0)-(scores[a.cid]||0));
     const top=ps[0];
-    let html = `<div class="win">${top?esc(top.name)+(top.cid===cid?" (you)":""):"-"} wins!</div>`+scoreChips();
+    let html = `<div class="win">${top?esc(top.name)+(top.cid===cid?" (du)":""):"-"} gewënnt!</div>`+scoreChips();
     html += role==="host" ? `<button class="big" id="againBtn">Play again</button>`
-                          : (hostHere ? `<p class="center muted">Waiting for host…</p>` : `<p class="center muted" role="alert">The host left.</p>`);
+                          : (hostHere ? `<p class="center muted">Waart op den Host …</p>` : `<p class="center muted" role="alert">Den Host ass fort.</p>`);
     $("app").innerHTML=html;
     if(role==="host"&&$("againBtn")) $("againBtn").onclick=()=>{ ch.send({type:"broadcast",event:"reset",payload:{}}); resetAll(); render(); };
     return;
   }
   let html = scoreChips()+topbar();
   if(phase==="caption"){
-    html += `<div class="meme big" id="prev"><img alt="Meme template"><div class="mtext top" id="pt"></div><div class="mtext bottom" id="pb"></div></div>`;
-    if(myCap){ html += `<p class="center muted">Meme sent! Waiting for the others…</p>`; }
-    else html += `<button class="reroll" id="rrBtn">🔄 Change meme (${rerollsLeft})</button>
-                  <input id="capT" class="cin" placeholder="Top text" aria-label="Top text" maxlength="60" autocomplete="off">
-                  <input id="capB" class="cin" placeholder="Bottom text" aria-label="Bottom text" maxlength="60" autocomplete="off">
-                  <button class="big" id="capBtn">Send meme</button>`;
+    html += `<div class="meme big" id="prev"><img alt="Meme-Virlag"><div class="mtext top" id="pt"></div><div class="mtext bottom" id="pb"></div></div>`;
+    if(myCap){ html += `<p class="center muted">Meme geschéckt! Waart op déi aner …</p>`; }
+    else html += `<button class="reroll" id="rrBtn">🔄 Anert Meme (${rerollsLeft})</button>
+                  <input id="capT" class="cin" placeholder="Text uewen" aria-label="Text uewen" maxlength="60" autocomplete="off">
+                  <input id="capB" class="cin" placeholder="Text ënnen" aria-label="Text ënnen" maxlength="60" autocomplete="off">
+                  <button class="big" id="capBtn">Meme schécken</button>`;
     $("app").innerHTML=html;
     $("prev").querySelector("img").src=myTemplate||template;
     if(myCap){ $("pt").textContent=myCap.top; $("pb").textContent=myCap.bottom; }
@@ -220,15 +220,15 @@ function render(){
     startTick(); return;
   }
   if(phase==="vote"){
-    html += `<p class="center muted">Vote for the funniest </p><div class="grid"></div>`;
+    html += `<p class="center muted">Vot fir dat lëschtegst Meme</p><div class="grid"></div>`;
     $("app").innerHTML=html;
     $("app").querySelector(".grid").replaceChildren(...entries.map(e=>{
       const isMine=e.cid===cid, isVoted=myVote===e.cid;
       const el=document.createElement("div"); el.className=`ventry ${isMine?"mine":""} ${isVoted?"voted":""}`; el.dataset.cid=e.cid;
-      const label=document.createElement("div"); label.className="mlabel"; label.textContent=isMine?"Your meme":(isVoted?"✓ Voted":"Tap to vote");
+      const label=document.createElement("div"); label.className="mlabel"; label.textContent=isMine?"Däi Meme":(isVoted?"✓ Gestëmmt":"Tipp fir ze stëmmen");
       el.append(memeNode(e.template||template,e.top,e.bottom),label);
       el.setAttribute("role","button"); el.tabIndex=isMine?-1:0;
-      el.setAttribute("aria-label",`${isMine?"Your meme":isVoted?"Voted":"Vote for this meme"}: ${[e.top,e.bottom].filter(Boolean).join(" / ")||"no caption"}`);
+      el.setAttribute("aria-label",`${isMine?"Däi Meme":isVoted?"Gestëmmt":"Stëmm fir dëst Meme"}: ${[e.top,e.bottom].filter(Boolean).join(" / ")||"keng Ënnerschrëft"}`);
       if(isMine||isVoted||myVote) el.setAttribute("aria-disabled","true");
       if(!isMine){ el.onclick=()=>castVote(e.cid); el.onkeydown=(ev)=>{ if(ev.key==="Enter"||ev.key===" "){ ev.preventDefault(); castVote(e.cid); } }; } return el;
     }));
@@ -237,17 +237,17 @@ function render(){
   if(phase==="reveal"){
     const best=results.length?results[0].votes:0;
     $("app").innerHTML=scoreChips()+`<h3 class="center"></h3><div class="grid"></div>`;
-    $("app").querySelector("h3").textContent=`Results — round ${round}/${totalRounds}`;
+    $("app").querySelector("h3").textContent=`Resultater — Ronn ${round}/${totalRounds}`;
     $("app").querySelector(".grid").replaceChildren(...results.map(r=>{
       const isWinner=r.votes===best&&best>0;
       const el=document.createElement("div"); el.className=`ventry ${isWinner?"won":""}`;
       const label=document.createElement("div"); label.className="mlabel";
-      label.textContent=`${isWinner?"👑 ":""}${r.name} · ${r.votes} ${r.votes===1?"vote":"votes"}${r.gain?` (+${r.gain})`:""}`;
+      label.textContent=`${isWinner?"👑 ":""}${r.name} · ${r.votes} ${r.votes===1?"Stëmm":"Stëmmen"}${r.gain?` (+${r.gain})`:""}`;
       el.append(memeNode(r.template||template,r.top,r.bottom),label); return el;
     })); return;
   }
 }
-function updateProg(){ const el=$("prog"); if(el&&progress) el.textContent=progress.done+"/"+progress.total+" ready"; }
+function updateProg(){ const el=$("prog"); if(el&&progress) el.textContent=progress.done+"/"+progress.total+" prett"; }
 function startTick(){ clearTimeout(tick); const step=()=>{ const el=$("timerEl"); if(!el||(phase!=="caption"&&phase!=="vote")) return;
   el.textContent=Math.max(0,Math.ceil((roundEnd-Date.now())/1000))+"s"; tick=setTimeout(step,500); }; step(); }
 
@@ -256,14 +256,14 @@ function reroll(){
   if(rerollsLeft<=0) return;
   rerollsLeft--; myTemplate=POOL[Math.floor(Math.random()*POOL.length)];
   const img=document.querySelector('#prev img'); if(img) img.src=myTemplate;
-  const b=$("rrBtn"); if(b){ b.textContent=rerollsLeft>0?`🔄 Change meme (${rerollsLeft})`:"No changes left"; if(rerollsLeft<=0) b.disabled=true; }
+  const b=$("rrBtn"); if(b){ b.textContent=rerollsLeft>0?`🔄 Anert Meme (${rerollsLeft})`:"Keng Ännerunge méi"; if(rerollsLeft<=0) b.disabled=true; }
 }
 function submitCaption(){
   const top=($("capT").value||"").slice(0,60).toUpperCase(), bottom=($("capB").value||"").slice(0,60).toUpperCase();
   if(!top && !bottom) return;
   const tpl=myTemplate||template;
   myCap={top,bottom,template:tpl};
-  say("Meme sent");
+  say("Meme geschéckt");
   if(role==="host") hostCaption({cid,name,top,bottom,template:tpl});
   else ch.send({type:"broadcast",event:"caption",payload:{cid,name,top,bottom,template:tpl}});
   render();
@@ -271,7 +271,7 @@ function submitCaption(){
 function castVote(choice){
   if(myVote||choice===cid) return;
   myVote=choice;
-  say("Vote cast");
+  say("Stëmm ofgi");
   if(role==="host") hostVote({voter:cid,choice});
   else ch.send({type:"broadcast",event:"castvote",payload:{voter:cid,choice}});
   render();

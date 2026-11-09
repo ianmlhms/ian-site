@@ -5,13 +5,13 @@
 <meta name="robots" content="noindex,follow">
 <!-- Game shell, no crawlable content. -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Mau-Mau Cards — ian.lu</title>
-  <meta name="description" content="Mau-Mau Cards on ian.lu — play against friends or the computer in your browser." />
+<title>Mau-Mau — ian.lu</title>
+  <meta name="description" content="Mau-Mau op ian.lu — Kaartespill géint Frënn oder géint de Computer, direkt am Browser." />
   <link rel="canonical" href="https://ian.lu/maumau.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<script src="mp-gate.js?v=7" data-game="maumau" data-over="#rematch"></script>
+<script src="mp-gate.js?v=8" data-game="maumau" data-over="#rematch"></script>
 <link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="gitter.css?v=9">
+<link rel="stylesheet" href="gitter.css?v=11">
 <script src="theme.js?v=32"></script>
 <style>
   :root{--redsuit:#d12b3d;--cardbg:#f5f2ea;--cardink:#1a1a2e}
@@ -52,7 +52,7 @@
 <body class="gt">
 <header class="bar">
   <a class="home" href="pixelbreak.html">‹ Arcade</a>
-  <h1>🃏 Mau-Mau Cards</h1>
+  <h1>Mau-Mau</h1>
   <div class="spacer"></div>
 </header>
 
@@ -61,20 +61,20 @@
   <div class="sub" id="sub" role="status"></div>
   <div class="opp" id="opp"></div>
   <div class="table">
-    <div class="stock" id="stock" role="button" tabindex="0" aria-label="Draw pile"><div class="card back" aria-hidden="true">🂠</div><div class="n" id="stockN"></div></div>
+    <div class="stock" id="stock" role="button" tabindex="0" aria-label="Zéihstapel"><div class="card back" aria-hidden="true">🂠</div><div class="n" id="stockN"></div></div>
     <div id="top"></div>
   </div>
   <div class="badges" id="badges" role="status"></div>
-  <div class="wishbox" id="wishbox" role="group" aria-label="Wish a suit"></div>
+  <div class="wishbox" id="wishbox" role="group" aria-label="Faarf wënschen"></div>
   <div class="hand" id="hand"></div>
   <button class="btn" id="rematch" style="display:none">Nach eng Partie</button>
-  <div class="rules">Match suit or rank · 7 = opponent draws 2 (stack 7s to pass it on) · 8 = play again · J = any card + wish a suit · first empty hand wins</div>
+  <div class="rules">Faarf oder Wäert bedingen · 7 = de Géigner zitt 2 (7en stapelen fir se weiderzeginn) · 8 = nach eng Kéier drun · Bauer = eng Kaart, a wënsch dir eng Faarf · wien als éischt keng Kaarte méi huet, gewënnt</div>
 </main>
 
 <script src="pixelbreak-config.js"></script>
-<script src="pb/arcade-kit.js?v=42" data-arcade-id="o-maumau" data-arcade-title="Mau-Mau Cards" data-arcade-no-score data-arcade-replace=".bar"></script>
+<script src="pb/arcade-kit.js?v=43" data-arcade-id="o-maumau" data-arcade-title="Mau-Mau" data-arcade-no-score data-arcade-replace=".bar"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-<script src="game-common.js?v=5"></script>
+<script src="game-common.js?v=6"></script>
 <script type="module" src="notify-ambient.js?v=40"></script>
 <script>
 /* Mau-Mau with a 32-card deck. The whole game is derived deterministically from
@@ -92,8 +92,8 @@ const RANKS = ["7", "8", "9", "10", "J", "Q", "K", "A"];
 const suitOf = (c) => Math.floor(c / 8);
 const rankOf = (c) => c % 8;               // 0=7 1=8 4=J
 const isRed = (c) => suitOf(c) === 1 || suitOf(c) === 3;
-const SUIT_NAMES = ["spades", "hearts", "clubs", "diamonds"];
-const cardName = (c) => `${RANKS[rankOf(c)]} of ${SUIT_NAMES[suitOf(c)]}`;
+const SUIT_NAMES = ["Päck", "Häerz", "Kräiz", "Karo"];
+const cardName = (c) => `${SUIT_NAMES[suitOf(c)]} ${RANKS[rankOf(c)]}`;
 
 let difficulty = GC.difficultyFromUrl();
 
@@ -155,17 +155,17 @@ function applyDraw(p) {
 
 /* ---------- render ---------- */
 function cardHTML(c, mini) {
-  return `<div class="card${isRed(c) ? " red" : ""}${mini ? " mini" : ""}" role="img" aria-label="Top card: ${cardName(c)}"><div>${RANKS[rankOf(c)]}</div><div class="s">${SUITS[suitOf(c)]}</div></div>`;
+  return `<div class="card${isRed(c) ? " red" : ""}${mini ? " mini" : ""}" role="img" aria-label="Iewescht Kaart: ${cardName(c)}"><div>${RANKS[rankOf(c)]}</div><div class="s">${SUITS[suitOf(c)]}</div></div>`;
 }
 function render() {
   $("opp").innerHTML = hands[opp].map(() => '<div class="card back mini" aria-hidden="true"></div>').join("") +
     `<span style="color:var(--muted);font-size:13px;margin-left:8px">${AI ? '<span class="sr-only">Computer</span>' : "Opponent"}: ${hands[opp].length}</span>`;
   $("top").innerHTML = dealt ? cardHTML(topCard()) : '<div class="card back"></div>';
   $("stockN").textContent = stock.length + " left";
-  $("stock").setAttribute("aria-label", `Draw pile, ${stock.length} left`);
+  $("stock").setAttribute("aria-label", `Zéihstapel, ${stock.length} iwwreg`);
   const badges = [];
-  if (pending) badges.push(`<span class="badge">+${pending} draw</span>`);
-  if (wish !== null) badges.push(`<span class="badge">Wish: ${SUITS[wish]}</span>`);
+  if (pending) badges.push(`<span class="badge">+${pending} zéien</span>`);
+  if (wish !== null) badges.push(`<span class="badge">Wonsch: ${SUITS[wish]}</span>`);
   $("badges").innerHTML = badges.join("");
   const myTurn = turn === me && !over && oppHere && dealt;
   const handHadFocus = $("hand").contains(document.activeElement);
@@ -203,7 +203,7 @@ function humanPlay(c) {
 function askWish(c) {
   const box = $("wishbox");
   box.style.display = "flex";
-  box.innerHTML = SUITS.map((s, i) => `<button data-w="${i}" aria-label="Wish ${SUIT_NAMES[i]}" style="color:${i === 1 || i === 3 ? "var(--redsuit)" : "#1a1a2e"}">${s}</button>`).join("");
+  box.innerHTML = SUITS.map((s, i) => `<button data-w="${i}" aria-label="Wonsch ${SUIT_NAMES[i]}" style="color:${i === 1 || i === 3 ? "var(--redsuit)" : "#1a1a2e"}">${s}</button>`).join("");
   box.querySelectorAll("button").forEach((b) => { b.onclick = () => { box.style.display = "none"; doPlay(me, c, +b.dataset.w); }; });
   box.querySelector("button").focus();
 }
@@ -253,13 +253,13 @@ function rematch() {
     if (AI && turn === opp) setTimeout(aiTurn, 800);
   } else {
     ch.send({ type: "broadcast", event: "again", payload: {} });
-    setStatus("Rematch beim Host ugefrot …");
+    setStatus("Nach eng Partie beim Host ugefrot …");
   }
 }
 $("rematch").onclick = rematch;
 
 if (AI) {
-  document.querySelector(".bar h1").textContent = "🃏 Mau-Mau Cards — géint de Computer";
+  document.querySelector(".bar h1").textContent = "Mau-Mau – géint de Computer";
   GC.mountDifficulty(() => difficulty, (d) => { difficulty = d; });
   oppHere = true;
   setup(Math.floor(Math.random() * 2147483647));

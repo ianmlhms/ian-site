@@ -53,7 +53,7 @@ export const flow = {
       await popup(emma.page).waitFor({ timeout: 20000 });
       h.expect(await emma.page.locator(".ip-ov").count() === 1 && await emma.page.locator(".ip-top").count() === 0, "popup only, no banner");
       const title = await emma.page.locator(".ip-title").innerText();
-      h.expect(/tester/.test(title) && /Connect 4/.test(title), `names the sender and the game (${title})`);
+      h.expect(/tester/.test(title) && /Véier gewënnt/.test(title), `names the sender and the game (${title})`);
       h.expect(/invitéiert/.test(title), "Luxembourgish by default");
       h.expect(await emma.page.evaluate(() => document.activeElement?.textContent === "Bäitrieden"), "Join has the focus");
       h.expect(await emma.page.locator('.ip-card[role="dialog"][aria-modal="true"]').count() === 1, "it is a modal dialog for screen readers");
@@ -208,7 +208,7 @@ export const flow = {
       h.eq(await popup(max.page).count(), 0, "still no popup while the game runs");
       await max.page.evaluate(() => window.closeGame());
       await popup(max.page).waitFor({ timeout: 5000 });
-      h.expect(/Tic-Tac-Toe/.test(await max.page.locator(".ip-title").innerText()), "closing the game → the missed invite is offered as a popup");
+      h.expect(/Dräi an enger Rei/.test(await max.page.locator(".ip-title").innerText()), "closing the game → the missed invite is offered as a popup");
       await max.page.keyboard.press("Escape");
 
       h.step("(b) Join from the banner sheet while the game runs → the lobby");

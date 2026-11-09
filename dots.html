@@ -5,13 +5,13 @@
 <meta name="robots" content="noindex,follow">
 <!-- Game shell, no crawlable content. -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Dots & Boxes — ian.lu</title>
-  <meta name="description" content="Dots & Boxes on ian.lu — claim the most squares, playable against a friend on two devices or an AI." />
+<title>Punkten a Këschten — ian.lu</title>
+  <meta name="description" content="Punkten a Këschten op ian.lu — hol der déi meescht Këschten, géint e Frënd op zwee Geräter oder géint de Computer." />
   <link rel="canonical" href="https://ian.lu/dots.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<script src="mp-gate.js?v=7" data-game="dots" data-over="#rematch"></script>
+<script src="mp-gate.js?v=8" data-game="dots" data-over="#rematch"></script>
 <link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="gitter.css?v=9">
+<link rel="stylesheet" href="gitter.css?v=11">
 <script src="theme.js?v=32"></script>
 <style>
   :root{--p1:#1f7a4d;--p2:#16171a;--board:#fcfcfa;--th:16px;--edge:min(11vw,52px);--lw:7px}
@@ -50,7 +50,7 @@
 <body class="gt">
 <header class="bar">
   <a class="home" href="pixelbreak.html">‹ Arcade</a>
-  <h1>▦ Dots &amp; Boxes</h1>
+  <h1>Punkten a Këschten</h1>
   <div class="spacer"></div>
 </header>
 
@@ -58,14 +58,14 @@
   <div class="status" id="status" role="status" aria-live="polite">Verbindung …</div>
   <div class="sub" id="sub"></div>
   <div class="scores" id="scores"></div>
-  <div class="board" id="board" role="group" aria-label="Dots and Boxes board"></div>
+  <div class="board" id="board" role="group" aria-label="Punkten-a-Këschten-Brett"></div>
   <button class="btn" id="rematch" style="display:none">Nach eng Partie</button>
 </div>
 
 <script src="pixelbreak-config.js"></script>
-<script src="pb/arcade-kit.js?v=42" data-arcade-id="o-dots" data-arcade-title="Dots & Boxes" data-arcade-no-score data-arcade-replace=".bar"></script>
+<script src="pb/arcade-kit.js?v=43" data-arcade-id="o-dots" data-arcade-title="Punkten a Këschten" data-arcade-no-score data-arcade-replace=".bar"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-<script src="game-common.js?v=5"></script>
+<script src="game-common.js?v=6"></script>
 <script type="module" src="notify-ambient.js?v=40"></script>
 <script>
 const N = 4;                                   // boxes per side (5x5 dots)
@@ -114,17 +114,17 @@ function render() {
       d.className = "edge hedge " + (set ? "set" : (mine ? "open" : ""));
       if (set) d.style.setProperty("--ec", COL[set]);
       d.innerHTML = "<i></i>";
-      if (mine && !set) { d.onclick = () => play("h", i, j, me, true); d.setAttribute("aria-label", `Horizontal line, row ${i + 1}, column ${j + 1}`); }
+      if (mine && !set) { d.onclick = () => play("h", i, j, me, true); d.setAttribute("aria-label", `Horizontal Linn, Rei ${i + 1}, Kolonn ${j + 1}`); }
     } else if (!er && ec) {          // vertical edge
       const i = (gr - 1) / 2, j = gc / 2, set = v[i][j];
       d.className = "edge vedge " + (set ? "set" : (mine ? "open" : ""));
       if (set) d.style.setProperty("--ec", COL[set]);
       d.innerHTML = "<i></i>";
-      if (mine && !set) { d.onclick = () => play("v", i, j, me, true); d.setAttribute("aria-label", `Vertical line, row ${i + 1}, column ${j + 1}`); }
+      if (mine && !set) { d.onclick = () => play("v", i, j, me, true); d.setAttribute("aria-label", `Vertikal Linn, Rei ${i + 1}, Kolonn ${j + 1}`); }
     } else {                         // box
       const i = (gr - 1) / 2, j = (gc - 1) / 2, o = own[i][j];
       d.className = "box";
-      if (o) { d.style.background = o === 1 ? "rgba(110,168,254,.18)" : "rgba(255,93,108,.18)"; d.style.color = COL[o]; d.textContent = o === me ? "★" : "•"; d.setAttribute("role", "img"); d.setAttribute("aria-label", `Box ${i + 1},${j + 1} claimed by ${o === me ? "you" : "your opponent"}`); }
+      if (o) { d.style.background = o === 1 ? "rgba(31,122,77,.14)" : "rgba(22,23,26,.10)"; d.style.color = COL[o]; d.textContent = o === me ? "★" : "•"; d.setAttribute("role", "img"); d.setAttribute("aria-label", `Këscht ${i + 1},${j + 1} gehéiert ${o === me ? "dir" : "dengem Géigner"}`); }
     }
     b.appendChild(d);
   }
@@ -136,17 +136,17 @@ function render() {
   const [s1, s2] = tally();
   const mine1 = me === 1;
   $("scores").innerHTML =
-    `<span class="s"><span class="swatch" style="background:var(--p1)" aria-hidden="true"></span><span class="sr">Blue: </span>${s1}${mine1 ? " (you)" : ""}</span>` +
-    `<span class="s"><span class="swatch" style="background:var(--p2)" aria-hidden="true"></span><span class="sr">Red: </span>${s2}${!mine1 ? " (you)" : ""}</span>`;
+    `<span class="s"><span class="swatch" style="background:var(--p1)" aria-hidden="true"></span><span class="sr">Gréng: </span>${s1}${mine1 ? " (du)" : ""}</span>` +
+    `<span class="s"><span class="swatch" style="background:var(--p2)" aria-hidden="true"></span><span class="sr">Schwaarz: </span>${s2}${!mine1 ? " (du)" : ""}</span>`;
   updateStatus();
 }
 function updateStatus() {
-  const dot = `<span class="me" style="background:${COL[me]}" aria-hidden="true"></span><span class="sr">(${me === 1 ? "blue" : "red"})</span>`;
+  const dot = `<span class="me" style="background:${COL[me]}" aria-hidden="true"></span><span class="sr">(${me === 1 ? "gréng" : "schwaarz"})</span>`;
   if (over === "draw") return setStatus("Onentschidden.");
   if (over) return setStatus(over === me ? "Du hues gewonn!" : "Du hues verluer.");
   if (!oppHere) return setStatus("Waart op de Géigner …", `Deel de Raumcode <code>${room}</code> oder invitéier iwwer Frënn.`);
   setStatus(turn === me ? `Du bass drun ${dot}` : (AI ? "De Computer denkt …" : "De Géigner ass drun"),
-    "Complete a box to go again.");
+    "Maach eng Këscht zou, da bass de nach eng Kéier drun.");
 }
 function setStatus(hh, sub = "") {
   if ($("status").innerHTML !== hh) $("status").innerHTML = hh;

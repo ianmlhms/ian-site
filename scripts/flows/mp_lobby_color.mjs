@@ -43,10 +43,10 @@ export const flow = {
       await host.page.click("#mplCreate");
       await host.page.waitForSelector("#mplSettings .mpl-chip");
       const code = await lobbyCode(host.page);
-      h.eq(await pressed(host.page), ["5", "👁 Stays visible"], "defaults: 5 rounds, colour stays visible");
+      h.eq(await pressed(host.page), ["5", "👁 Bleift ze gesinn"], "defaults: 5 rounds, colour stays visible");
       await host.page.click('#mplSettings .mpl-chip:text-is("3")');
-      await host.page.click('#mplSettings .mpl-chip:text-is("⚡ Flash (memory)")');
-      h.eq(await pressed(host.page), ["3", "⚡ Flash (memory)"], "host picks 3 rounds + flash mode");
+      await host.page.click('#mplSettings .mpl-chip:text-is("⚡ Blitz (aus dem Kapp)")');
+      h.eq(await pressed(host.page), ["3", "⚡ Blitz (aus dem Kapp)"], "host picks 3 rounds + flash mode");
 
       h.step("invite Emma and Max with ONE request → both toasts → both join");
       await host.page.click("#mplAdd");
@@ -57,7 +57,7 @@ export const flow = {
       h.eq(world.mpInviteCalls.map((c) => [c.p_game, c.p_to.length]), [["color", 2]], "ONE mp_invite with two people");
       for (const p of [emma, max]) {
         await p.page.waitForSelector(".ip-card");
-        h.expect(/Colour Guess/.test(await text(p.page, ".ip-title")), `${p.label}: popup names the game`);
+        h.expect(/Faarf roden/.test(await text(p.page, ".ip-title")), `${p.label}: popup names the game`);
         await p.page.click(".ip-card .ip-primary");
         await p.page.waitForSelector("#mplRoster");
       }
@@ -65,7 +65,7 @@ export const flow = {
       await guest.page.waitForSelector("#mplRoster");
       await inRoom(host.page, 4);
       h.expect(/4\/8/.test(await text(host.page, ".mpl-count")), "4/8 players");
-      h.eq(await pressed(emma.page), ["3", "⚡ Flash (memory)"], "Emma sees the host's settings");
+      h.eq(await pressed(emma.page), ["3", "⚡ Blitz (aus dem Kapp)"], "Emma sees the host's settings");
       h.expect(await emma.page.$$eval("#mplSettings .mpl-chip", (els) => els.every((e) => e.disabled)), "…read-only for her");
       await shot(host, "lobby-four");
 
@@ -84,7 +84,7 @@ export const flow = {
 
       h.step("round 1 opens by itself with 3 rounds, flash mode, four players");
       for (const p of all) await p.page.waitForSelector("#lockBtn", { timeout: 30000 });
-      for (const p of all) h.expect(/Round 1 \/ 3/.test(await text(p.page, "#app")), `${p.label}: «Round 1 / 3»`);
+      for (const p of all) h.expect(/Ronn 1 \/ 3/.test(await text(p.page, "#app")), `${p.label}: «Ronn 1 / 3»`);
       h.eq(await host.page.$$eval(".players .pchip", (els) => els.length), 4, "four players in the round");
       await host.page.waitForFunction(() => document.querySelector(".swatch.covered"), null, { timeout: 15000 });
       h.expect(true, "flash mode: the colour is covered after the peek (from memory)");
@@ -95,7 +95,7 @@ export const flow = {
       for (const p of all) await p.page.click("#lockBtn");
       for (const p of all) await p.page.waitForFunction(() => document.querySelector("table")?.rows.length === 5, null, { timeout: 20000 });
       h.eq(await guest.page.evaluate(() => document.querySelector("table").rows.length), 5, "the guest's result table: header + four players");
-      h.expect(await host.page.isVisible("#nextBtn") && await guest.page.$("#nextBtn") === null, "only the host gets «Next round»");
+      h.expect(await host.page.isVisible("#nextBtn") && await guest.page.$("#nextBtn") === null, "only the host gets «Nächst Ronn»");
       h.expect((await host.page.evaluate(() => document.getElementById("mpgBack").dataset.over)) === "0", "between rounds the lobby button still asks for a second tap");
 
       h.step("play the remaining rounds; after the final round «‹ Lobby» is one tap");
@@ -114,7 +114,7 @@ export const flow = {
       for (const p of all) { await p.page.click("#mpgBack"); await p.page.waitForSelector("#mplRoster"); }
       await inRoom(host.page, 4);
       h.eq(await lobbyCode(host.page), code, "same code");
-      h.eq(await pressed(host.page), ["3", "⚡ Flash (memory)"], "rounds + mode survived the rematch");
+      h.eq(await pressed(host.page), ["3", "⚡ Blitz (aus dem Kapp)"], "rounds + mode survived the rematch");
       REPORT.lobbyBeforeStart = lobbyFrames;
 
       h.step("old links: ?room= opens the game directly (the old in-game lobby with its Start button), no lobby chip");

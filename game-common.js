@@ -115,7 +115,7 @@ window.GameCommon = (() => {
       b.style.background = on ? "var(--ink, var(--accent))" : "transparent";
       b.style.color = on ? "var(--paper, #fff)" : "var(--ink, var(--muted))";
     });
-    [["easy", "Liicht"], ["normal", "Normal"], ["hard", "Schwéier"]].forEach(([d, label]) => {
+    [["easy", "Einfach"], ["normal", "Mëttel"], ["hard", "Schwéier"]].forEach(([d, label]) => {
       const b = document.createElement("button");
       b.textContent = label;
       b.dataset.d = d;
