@@ -48,6 +48,27 @@ async function work() {
     for (let k = S.first[ri]; k <= S.first[ri] + S.segs[ri]; k++) pts.push([S.x[k], S.z[k]]);
     return pts;
   };
+  const CAR_HALF = 0.95;                      // m: the car's half width (car.js) + a hair
+  const carveOut = {};
+  /** (city21) Moves the points of a lane that lie further from the drawn centre line than the drawn half width there (less the car's half width) in to it. */
+  const clampToDrawn = (lane, centre, road) => {
+    const ri = world.net.roads.findIndex((q) => q.id === road.id);
+    if (ri < 0) return lane;
+    let at = 0;                                   // (the lane runs along the centre line in its order: search near the last foot)
+    return lane.map((p) => {
+      let best = null, bd = Infinity, bi = at;
+      for (let i = Math.max(0, at - 8); i + 1 < centre.length && i <= at + 40; i++) {
+        const a = centre[i], b = centre[i + 1], ex = b[0] - a[0], ez = b[1] - a[1], ll = ex * ex + ez * ez || 1;
+        const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * ex + (p[1] - a[1]) * ez) / ll)), q = [a[0] + ex * t, a[1] + ez * t], d = Math.hypot(p[0] - q[0], p[1] - q[1]);
+        if (d < bd) { bd = d; best = q; bi = i; }
+      }
+      at = bi;
+      world.net.carve(best[0], best[1], carveOut);
+      if (carveOut.road !== ri || !(carveOut.hw > CAR_HALF)) return p;
+      const lim = carveOut.hw - CAR_HALF;
+      return bd <= lim ? p : [best[0] + (p[0] - best[0]) * lim / bd, best[1] + (p[1] - best[1]) * lim / bd];
+    });
+  };
   parentPort.on('message', (msg) => {
     if (msg.stop) { process.exit(0); }
     const out = { batch: msg.batch, ids: msg.ids, events: [], km: 0, runs: 0, lanes: 0, roads: 0, ms: 0 };
@@ -56,13 +77,18 @@ async function work() {
       const road = byId.get(id);
       if (!road) continue;
       out.roads++;
+      // (city21) --drawn: the lanes lie inside the carriageway the game DRAWS: where it is narrower than the OSM width (a way beside an underpass trough, a slip road whose
+      // OSM width counts its shoulders) the OSM lanes ran 0.4 - 2.9 m off the asphalt, on the verge, into trough parapets and onto the next road (Bd Schuman 1684 lane -7.12,
+      // Rocade link 5876, trunk link 9423 lane -7.48: the drawn half width is 6.2 m, the OSM one 9.35) - no player drives there.  Clamped to the drawn half width less the
+      // car's half width, point by point (the drawn width tapers along a way: road-network.js taperDhw).
       const offs = world.laneOffsets(road);
       const dirs = road.oneway ? [1] : [1, -1];
       for (const off of offs) {
         out.lanes++;
         // --drawn: the lanes run beside the centre line the game DRAWS and carves (road-network.js rounds the corners of the OSM polyline with a 3 m Gaussian); the lanes of the
         // raw polyline leave the carriageway by up to 0.6 m at the corner of a tight service loop and every such corner read as a kerb jolt of 40 - 120 m/s2 (fix19)
-        const base = offsetLine(DRAWN ? drawnLine(road) : road.pts, off);
+        const centre = DRAWN ? drawnLine(road) : road.pts;
+        const base = DRAWN ? clampToDrawn(offsetLine(centre, off), centre, road) : offsetLine(centre, off);
         for (const dir of dirs) {
           const line = dir > 0 ? base : base.slice().reverse();
           for (const speed of speedsOf(road.kind, msg.speeds)) {

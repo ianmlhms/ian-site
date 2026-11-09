@@ -16,6 +16,8 @@ export const LIMITS = Object.freeze({
 const JOLT_W = 3;               // frames: half window
 const PROBE_EVERY = 0.5;        // m of travel between two collider probes
 const HEADING_SPAN = 2.5;       // m
+const PORTAL_SKIP = 10;          // m: (city21) a lane out of a closed tunnel's face starts this far out (driveLane)
+const START_BRIDGE_JOIN = 3;    // m: (city21) a lane whose start lies this close to the end of a bridge way continues that bridge (startHint)
 const END_CLEAR = 4;            // m: events this near an end of the way are junction / dead-end noise, not judged
 const MERGE = 6;                // m: events of one kind closer than this along one run are one event
 
@@ -63,6 +65,23 @@ function approachOf(tube, road, world) {
   });
 }
 
+/** Is there an end of a bridge way ('bridge') or of a CLOSED tunnel way ('closed') within START_BRIDGE_JOIN of (x, z)?  (A grid of the ends, built once per world.) */
+function endsNear(world, kind, x, z) {
+  if (!world._ends) {
+    const grids = { bridge: new Map(), closed: new Map() }, key = (px, pz) => Math.floor(px / 16) * 65536 + Math.floor(pz / 16);
+    for (const r of world.data.roads) {
+      if (r.pts.length < 2) continue;
+      const k = r.tunnel ? (world.isOpen && world.isOpen(r) ? null : 'closed') : r.bridge || r.over ? 'bridge' : null;
+      if (!k) continue;
+      for (const p of [r.pts[0], r.pts[r.pts.length - 1]]) { const kk = key(p[0], p[1]), l = grids[k].get(kk); if (l) l.push(p); else grids[k].set(kk, [p]); }
+    }
+    world._ends = { grids, key };
+  }
+  const { grids, key } = world._ends;
+  for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (const p of grids[kind].get(key(x + a * 16, z + b * 16)) || []) if (Math.hypot(p[0] - x, p[1] - z) <= START_BRIDGE_JOIN) return true;
+  return false;
+}
+
 /** The level (the car's body, the hint) a lane starts at. */
 function startHint({ road, x, z, world }) {
   const { ground, surface, tubes } = world;
@@ -75,6 +94,9 @@ function startHint({ road, x, z, world }) {
     }
   }
   if (road.over || road.bridge) return 1e9;
+  // (city21) a way that starts where a bridge way ends and under a deck (the landmark deck of the Pont Rouge runs on 14 m past the OSM end of the bridge over the start of
+  // Av. J.F. Kennedy 2965): the car comes off the bridge onto it - it starts on the deck, not on the valley slope under it (bank hits, 700 m/s2 "jolts" at the start)
+  if (world.deckNetwork && world.deckNetwork.deckAt(x, z, 1e9, {}) && endsNear(world, 'bridge', x, z)) return 1e9;
   // (an approach of a tube that starts in its trough or blend - the 26 m approach of Cents south ends at the face - starts on the tube's floor, not on the land of
   // the hill over the portal: the car fell off it and "flew" 0.6 s, tunnels19.  Only the tube's own approaches: a road OVER the tube - the Rond-Point Schuman,
   // Krautmaart over the René Konen tunnel, the Buchler bridge over the Rocade mouth - was put on the floor under it, inside the walls: the full-city sweep's
@@ -110,16 +132,19 @@ export function driveLane({ world, car, road, line, speed }) {
     const [x, z] = xzAt(s), a = xzAt(Math.max(0, s - HEADING_SPAN)), b = xzAt(Math.min(total, s + HEADING_SPAN));
     return [x, z, Math.atan2(b[1] - a[1], b[0] - a[0])];
   };
-  const [x0, z0, h0] = poseAt(0);
+  // (city21) a lane out of the face of a CLOSED tunnel (Stafelter, kept closed: the world data ends inside it) starts PORTAL_SKIP m out: nobody comes out of that face, and the
+  // car put at the face stood on the hill over the portal - Autoroute du Nord 17563 and link 8709 "fell" 15 m off it at their start
+  const s0 = !road.tunnel && endsNear(world, 'closed', pts[0][0], pts[0][1]) && total > PORTAL_SKIP + END_CLEAR ? PORTAL_SKIP : 0;
+  const [x0, z0, h0] = poseAt(s0);
   ground.hint(startHint({ road, x: x0, z: z0, world }));
   car.reset(x0, z0, h0);
   ground.hint(st.y);
-  const n = Math.floor(total / (speed * DT)) + 1;
+  const n = Math.floor((total - s0) / (speed * DT)) + 1;
   const ys = new Float32Array(n), roll = new Float32Array(n), xs = new Float32Array(n), zs = new Float32Array(n), arc = new Float32Array(n), air = new Uint8Array(n), off = new Uint8Array(n);
   const events = [];
   let k = 0, lastProbe = -1e9, hitRun = null, airRun = null;
   const flushHit = () => { if (hitRun) { events.push({ type: 'hit', value: hitRun.pen, x: hitRun.x, z: hitRun.z, y: hitRun.y, arc: hitRun.arc, part: hitRun.part, id: hitRun.id, len: hitRun.len }); hitRun = null; } };
-  for (let s = 0; k < n && s <= total; s += speed * DT, k++) {
+  for (let s = s0; k < n && s <= total; s += speed * DT, k++) {
     const [x, z, h] = poseAt(s);
     st.x = x; st.z = z; st.heading = h; st.vx = Math.cos(h) * speed; st.vz = Math.sin(h) * speed; st.speed = speed;
     ground.hint(st.y);
