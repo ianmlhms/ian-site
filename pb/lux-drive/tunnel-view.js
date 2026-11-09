@@ -23,6 +23,8 @@ const LINE_LIFT = 0.015;                         // m over the floor
 const WALKWAY = 0.45;                            // m: the pale strip along the foot of each wall
 const DADO = 1.3;                                // m: the tiled lower part of the walls
 const FACE_SKIRT = 1.0;                          // m: the floor's edge at a face hangs this far down
+const SILL_READ = [0, 0.12, 0.25];               // m out of a face at which the drawn ground in front of it is read for the sill ...
+const SILL_LIFT = 0.03;                          // ... which rises this much over it (the coarse tiles of the low level lie a hair off the surface)
 const INSIDE_RADIUS = 320;                       // m: the inside of a tube is drawn this close to the camera
 
 const C_ASPHALT = [0.16, 0.16, 0.17];
@@ -88,8 +90,8 @@ function linesOf(tube) {
   return out;
 }
 
-/** The inside of one tube into builder b. */
-export function buildInside(tube, b) {
+/** The inside of one tube into builder b.  heightAt: the drawn ground (the sills at the faces). */
+export function buildInside(tube, b, heightAt) {
   const st = stationsOf(tube);
   const iL = tube.innerL, iR = tube.innerR, clr = tube.clearance;
   const P = (fr, lat, y) => [fr.x + fr.rx * lat, y, fr.z + fr.rz * lat];
@@ -132,6 +134,23 @@ export function buildInside(tube, b) {
       const y0 = floorY(e, l0), y1 = floorY(e, l1);       // (on the floor's own vertices: watertight)
       if (out < 0) b.quad(P(e, l0, y0 - FACE_SKIRT), P(e, l1, y1 - FACE_SKIRT), P(e, l1, y1), P(e, l0, y0), C_ASPHALT);
       else b.quad(P(e, l0, y0), P(e, l1, y1), P(e, l1, y1 - FACE_SKIRT), P(e, l0, y0 - FACE_SKIRT), C_ASPHALT);
+    }
+  }
+  // the sills at the faces without a trough (fix19): where the land in front of a face rises over the floor's edge (the foot of the embankment over the Rue de
+  // Munsbach underpass: 0.03 - 0.15 m across the lanes), a ray from inside the tube passed over the edge and under the terrain beyond (seen from below: not drawn)
+  // - a hairline of nothing across the mouth.  The sill is the step of that land, standing on the face from the floor's edge up to the ground in front of it.
+  for (const [sFace, out, trough] of [[tube.sA, -1, tube.troughA], [tube.sB, 1, tube.troughB]]) {
+    if (trough) continue;                                     // (a trough's floor runs on from the face at the floor's own level: no step)
+    const e = frameAt(tube, sFace);
+    const ex = e.rz * out, ez = -e.rx * out;                  // (out of the tube: the tangent of s is (rz, -rx))
+    const landAt = (lat) => Math.max(...SILL_READ.map((d) => heightAt(e.x + e.rx * lat + ex * d, e.z + e.rz * lat + ez * d))) + SILL_LIFT;
+    for (let j = 0; j < FLOOR_STRIPS; j++) {
+      const l0 = -iL + ((iL + iR) * j) / FLOOR_STRIPS, l1 = -iL + ((iL + iR) * (j + 1)) / FLOOR_STRIPS;
+      const y0 = floorY(e, l0), y1 = floorY(e, l1), t0 = landAt(l0), t1 = landAt(l1);
+      if (t0 <= y0 && t1 <= y1) continue;
+      const u0 = Math.max(y0, t0), u1 = Math.max(y1, t1);
+      if (out < 0) b.quad(P(e, l0, y0), P(e, l1, y1), P(e, l1, u1), P(e, l0, u0), C_ASPHALT);
+      else b.quad(P(e, l0, u0), P(e, l1, u1), P(e, l1, y1), P(e, l0, y0), C_ASPHALT);
     }
   }
   // the light band: lamps along the ceiling, over the edge lines (a little under the ceiling, facing down)
@@ -308,7 +327,7 @@ export function createTunnelView({ scene, tubes, heightAt, insideMaterial, outsi
   const parts = [];
   for (const tube of tubes) {
     const bi = new FlatBuilder(), bo = new FlatBuilder();
-    buildInside(tube, bi);
+    buildInside(tube, bi, heightAt);
     buildOutside(tube, bo, heightAt);
     buildTroughs(tube, bo, heightAt);
     const inside = new THREE.Mesh(bi.build(), insideMaterial), outside = new THREE.Mesh(bo.build(), outsideMaterial);
