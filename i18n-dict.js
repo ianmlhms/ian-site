@@ -467,7 +467,7 @@ window.I18N_DICT = {
    * the app itself renders is here, including the metric labels and units —
    * data/country-metrics.json's own de/en labels are deliberately unused, so
    * that Luxembourgish exists too and there is one place to fix wording. */
-  "countries.title":          { lb: "🌍 Länner-Verglach", de: "🌍 Ländervergleich", en: "🌍 Country Comparison" },
+  "countries.title":          { lb: "Länner-Verglach", de: "🌍 Ländervergleich", en: "🌍 Country Comparison" },
   "countries.loading":        { lb: "Daten gi gelueden…", de: "Daten werden geladen…", en: "Loading data…" },
   "countries.loadingAria":    { lb: "Lueden", de: "Lädt", en: "Loading" },
   "countries.errorTitle":     { lb: "D'Donnéeë konnten net gelueden ginn", de: "Die Daten konnten nicht geladen werden", en: "Could not load data" },
