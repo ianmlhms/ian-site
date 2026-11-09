@@ -3060,3 +3060,44 @@ the Kéibierg footbridge (would be 2 points, flat; still a railing in Kéibierg'
 
 ### 2b. The cut of 2. is capped at UNDER_DECK_MAX_CUT = 0.9 m under the land (harness D: no pit > 1 m under a deck).  The A13 outer lane under the A6 keeps 0.7 m of the
 abutment toe across its wheels (roll ~0.45 instead of 0.72): the rest needs the pit gate re-thought (a real abutment is a wall beside the lane) - for the reviewer.
+
+### Full-city drive sweep (`--drawn`, 13/25 + SWEEP_FAST, sweep tool origin/lux-drive-sweep 09d040b8, Mini, `luxdrive-work/city20/sweep/base-v74` -> `after-v75`)
+Before = origin/main 87a0226a (v74, tunnels19 landed), after = this branch merged with it (?v=75).  `tools/summary.py` (REPORT.md's classes):
+| | v73 (old tool) | v74 (before) | v75 (after) |
+|---|---|---|---|
+| serious places (fall / air / parapet / non-building hit) | 51 (21 main) | 46 (17 main) | **41 (13 main)** |
+| falls | 7 (5) | 7 (5) | **4 (3)** |
+| airborne | 12 (8) | 12 (8) | **8 (5)** |
+| parapet hits | 11 (7) | 11 (7) | **9 (5)** |
+| bank / wall / tube / prop / landmark hits | 38 (12) | 33 (8) | **29 (5)** |
+| main-road rolls >= 0.3 rad | 39 | 35 | **32** |
+| main-road jolts >= 100 m/s2 | 52 | 48 | **45** |
+Gone: Val du Scheid fall 6.1 m, Rue Roudebësch fall 6.3 m / parapet 1.03, Hondhausbréck falls 3.6 / 5 m + parapet, A13 11984 under the A6 roll 0.72 + bank hits (-> 0.32), A13 17100
+under the A1 (fix19 leftover) roll 0.20 -> 0.17.  49 road cells better, 10 worse (`after-v75/diff-v74.txt`): A13 9520 under the A6 roll 0.33 -> 0.58 (the 0.9 m pit cap leaves half the
+abutment toe in its outer lane), Val du Scheid rolls 0.6 - 0.8 / jolt 210 near the A1 abutments (instead of the 6 m fall), Bd Paul Eyschen 12583 roll 0.46, A13 links 238 / 239 jolt
+up (their falls stay), Breedewee jolt 64 -> 101, A6 1038 jolt 102, service 11952.
+
+### Shots (`luxdrive-work/city20/shots/`, stacked + labelled, before = v73 worktree, after = this branch; the sky differs: the shot time of day)
+stacked_1_a13_under_a6, stacked_2_hondhausbreck_junction, stacked_3_roudebesch_track, stacked_5_a13_under_a1 (singles in before/ and after/).
+
+### Still wrong (for the next round)
+* A13 links 238 / 239 under the A6 at Croix de Cessange (falls 2 / 6 m, top 2 of the city): NOT an abutment problem.  The A6 decks 104 / 119 have a DSM 7 m over the land
+  (283 vs 276) but their approaches lie on the land (276 - 278): road-network.js rejects the decks (lift > APPROACH_LIFT_MAX 7) and the links cross the A6 at grade, drawn as
+  a solid roadbed block they drive up and fall off.  Probably the whole A6 there is a viaduct OSM tags only in pieces (ground ways 240 / 1050 between the bridges): needs a
+  "bridge chain" rule (short ground gaps between high decks become deck) + the A6 approaches lifted, or the links cut under it.
+* Harness D (no pit > 1 m under a deck) caps the lane cut of 2.: the A13 9520 lane under the A6 still rides 0.7 m of abutment toe.  A real abutment is a wall beside the lane;
+  the gate's premise (the DTM under a deck is the ground) needs the reviewer's call - not changed (never loosen a gate).
+* Group 3 Av. J.F. Kennedy 2965 bank hit + jolt 700 (5371,8026), Breedewee 18070 bank: not done.  Kéibierg footbridge 185 railing in the lane (its deck would be 2 points).
+* Group 4 Pont Buchler parapet 229 (the PATH deck 14427 beside the road: its railing stands in lane 3.67 of 15754 / 16046 - deck-barriers.js judges the lane's level from the
+  `follow` deck level and keeps it), Autoroute de Trèves 2845 parapet 223 (link deck beside the motorway at the Munsbach underpass), Allée P. de Mansfeld 2329 parapet 255: not done.
+* Group 5 rolls > 0.7: Nei Escher 225 / 3013 and Autoroute d'Esch 1848 / Merl 12832 (two carriageways at two levels overlapping in OSM: the step face lies in the outer lane,
+  no room for a face <= 3 m/m without a wall the world flow counts), trunk_link 9423, 8709 / 17563 (17563 starts 5 m over the surface: a start artefact), Route de Trèves 18705
+  (its approach to deck 109 is 25 m: the move would need 24 m): not done.  12245 / 1057 / 122 (Bd Roosevelt / Ulveling) are at the Hellege-Geescht tube 2461 mouths (tunnels).
+* Group 6 seams: Clausener Bierg 20125 (bed jumps 2.3 m in 1 m where it meets 5501, a 13 m level difference at the joint), Bd Schuman 519 (3.4 m under its bed beside the
+  Rond-Point tube 482), Autoroute du Nord 17563 (start artefact), 4504 (service 10335's junction lifts the main road 0.6 m: fall at 57 m/s only): not done.
+* The world flow's carve-wall gate samples every 41st segment: any change of the segment count (moved bridge ends) re-draws the sample (on v73 an 8.7 m/m wall at the A1 link
+  7463 was unsampled; it is gone with the merging move).  Worth a full-network measure one day.
+
+### Gates (tree merged with origin/main 87a0226a = tunnels19 v74, main.js ?v=75; logs `luxdrive-work/city20/gates/g4_*`)
+walls re-baked (104 walls, unchanged by the merge); luxdrive_world PASS (carve walls 6 / 8 sampled, deepest 3.7); luxdrive_holes PASS (0) and HOLES_Q=low PASS (0);
+luxdrive_ui PASS; luxdrive_webkit PASS; harness **175 / 175 PASS** (1871 s).
