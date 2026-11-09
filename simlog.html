@@ -1,31 +1,30 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="lb">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Flight Logbook — ian.lu</title>
+<title>Fluchlogbuch — ian.lu</title>
 <meta name="robots" content="noindex">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<meta name="theme-color" content="#0d0d1a">
-<script src="season.js?v=5"></script>
+<meta name="theme-color" content="#f6f6f3">
+<link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="gitter.css?v=11">
 <script src="theme.js?v=32"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
-  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--warn:#f87171;--map-height:320px}
+  :root{--warn:#f87171;--map-height:320px}
   html[data-theme="light"]{--warn:#b91c1c}
-  *{box-sizing:border-box}
   body{margin:0;min-height:100vh;min-height:100svh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
-  a{color:var(--accent2-text);text-decoration:none}
   .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
   .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
   .wrap{flex:1;width:100%;max-width:1080px;margin:0 auto;padding:18px 14px 40px;display:flex;flex-direction:column;gap:14px}
   .gate{text-align:center;color:var(--muted);padding:50px 16px}
   .gate .btn{margin-top:14px}
-  .btn{background:var(--accent);color:var(--accent-foreground);border:none;border-radius:10px;padding:10px 18px;font-weight:800;cursor:pointer;font-size:14px}
+  .btn{background:var(--accent);color:var(--accent-foreground);border:none;border-radius:0;padding:10px 18px;font-weight:800;cursor:pointer;font-size:14px}
   .btn:disabled{opacity:.55;cursor:wait}
-  .ghost{background:var(--card2);color:var(--muted);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer;font-size:13px}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px}
-  input,select,textarea{padding:11px 12px;border-radius:9px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:16px;font-family:inherit;width:100%}
+  .ghost{background:var(--card2);color:var(--muted);border:1px solid var(--border);border-radius:0;padding:10px 14px;font-weight:700;cursor:pointer;font-size:13px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:0;padding:16px}
+  input,select,textarea{padding:11px 12px;border-radius:0;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:16px;font-family:inherit;width:100%}
   textarea{min-height:74px;resize:vertical}
   label{display:flex;flex-direction:column;gap:6px;color:var(--muted);font-size:12px;font-weight:700}
   .hint{min-height:14px;font-size:12px;font-weight:500;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}
@@ -36,18 +35,18 @@
   .msg.error{color:var(--warn)}
   .section-title{font-size:16px;margin:0 0 12px}
   .stats{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
-  .stat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:13px;min-width:0}
+  .stat{background:var(--card);border:1px solid var(--border);border-radius:0;padding:13px;min-width:0}
   .stat small{display:block;color:var(--muted);font-weight:700;font-size:12px;margin-bottom:5px}
   .stat b{display:block;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  #map{height:var(--map-height);border-radius:10px;background:var(--card2)}
-  .map-empty{height:var(--map-height);display:grid;place-items:center;color:var(--muted);background:var(--card2);border-radius:10px}
+  #map{height:var(--map-height);border-radius:0;background:var(--card2)}
+  .map-empty{height:var(--map-height);display:grid;place-items:center;color:var(--muted);background:var(--card2);border-radius:0}
   .leaflet-container{font-family:inherit}.leaflet-tooltip{color:#222}
   .flight-list{display:flex;flex-direction:column;gap:10px}
   .flight{display:grid;grid-template-columns:100px minmax(190px,1.5fr) minmax(150px,1fr) 82px auto;gap:14px;align-items:center}
   .date,.sub,.notes{color:var(--muted);font-size:12.5px}.route{font-size:17px;font-weight:800}
   .sub{margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.duration{font-weight:800;font-variant-numeric:tabular-nums}
   .notes{grid-column:2/5;white-space:pre-wrap;overflow-wrap:anywhere}
-  .badge{display:inline-block;border:1px solid var(--border);background:var(--card2);border-radius:999px;padding:3px 7px;color:var(--accent2-text);font-size:10px;font-weight:800;text-transform:uppercase}
+  .badge{display:inline-block;border:1px solid var(--border);background:var(--card2);border-radius:0;padding:3px 7px;color:var(--accent2-text);font-size:10px;font-weight:800;text-transform:uppercase}
   .flight-actions{display:flex;gap:6px;justify-content:flex-end;grid-column:5;grid-row:2}.flight-actions .ghost{padding:7px 9px}.danger:hover{color:var(--warn)}
   @media(max-width:850px){.stats{grid-template-columns:repeat(3,1fr)}.flight{grid-template-columns:82px 1fr auto}.plane{grid-column:2}.duration{grid-column:3;grid-row:1}.network{grid-column:1}.flight-actions{grid-column:3;grid-row:2}.notes{grid-column:2/4}}
   @media(max-width:520px){.bar{padding:12px}.bar h1{font-size:16px}.stats{grid-template-columns:repeat(2,1fr)}.flight{grid-template-columns:1fr auto}.date{grid-column:1}.route{grid-column:1}.plane{grid-column:1}.duration{grid-column:2;grid-row:2}.network{grid-column:2;grid-row:1}.flight-actions{grid-column:2;grid-row:3}.notes{grid-column:1/3}}
@@ -57,15 +56,15 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
 </head>
-<body>
+<body class="gt">
 <header class="bar">
-  <a class="home" href="index.html">‹ Home</a>
-  <h1><span aria-hidden="true">✈️</span> Flight Logbook</h1>
+  <a class="home" href="index.html">‹ Heem</a>
+  <h1>Fluchlogbuch</h1>
   <div class="spacer"></div>
-  <span id="acctHost"></span>
+  <button type="button" class="gt-acct" id="gtAcct">Umellen</button>
 </header>
 
-<main class="wrap" id="wrap"><div class="gate" role="status">Loading…</div></main>
+<main class="wrap" id="wrap"><div class="gate" role="status">Lued …</div></main>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="pixelbreak-config.js"></script>
@@ -95,40 +94,40 @@ const airports=airportResult.data;
 
 function signedOut(){
   if(map){map.remove();map=null;}
-  $("wrap").innerHTML=`<div class="gate">Sign in to keep your flight logbook<br><button type="button" class="btn" id="signIn">Sign in</button></div>`;
+  $("wrap").innerHTML=`<div class="gate">Mell dech un, fir däi Fluchlogbuch ze féieren<br><button type="button" class="btn" id="signIn">Umellen</button></div>`;
   $("signIn").onclick=()=>auth.openAuthModal();
 }
 
 function formMarkup(){
   return `<div class="card newx">
-    <h2 class="section-title" id="formTitle">Add flight</h2>
+    <h2 class="section-title" id="formTitle">Fluch derbäisetzen</h2>
     <div class="row">
-      <label>Date<input id="flownOn" type="date" required></label>
-      <label>Departure ICAO<input id="dep" list="airportList" maxlength="4" placeholder="ELLX" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="depHint" required><span class="hint" id="depHint" aria-live="polite"></span></label>
-      <label>Arrival ICAO<input id="arr" list="airportList" maxlength="4" placeholder="ENGM" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="arrHint" required><span class="hint" id="arrHint" aria-live="polite"></span></label>
+      <label>Datum<input id="flownOn" type="date" required></label>
+      <label>Départ-ICAO<input id="dep" list="airportList" maxlength="4" placeholder="ELLX" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="depHint" required><span class="hint" id="depHint" aria-live="polite"></span></label>
+      <label>Arrivée-ICAO<input id="arr" list="airportList" maxlength="4" placeholder="ENGM" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="arrHint" required><span class="hint" id="arrHint" aria-live="polite"></span></label>
     </div>
     <div class="row">
-      <label>Aircraft<input id="aircraft" maxlength="80" placeholder="A320" autocomplete="off"></label>
-      <label>Registration<input id="registration" maxlength="40" placeholder="LX-LBA" autocomplete="off" autocapitalize="characters" spellcheck="false"></label>
-      <label>Duration (H:MM)<input id="duration" placeholder="1:35" autocomplete="off" autocapitalize="none" spellcheck="false" required></label>
-      <label>Network<select id="network"><option value="offline">Offline</option><option value="vatsim">VATSIM</option><option value="ivao">IVAO</option></select></label>
+      <label>Fliger<input id="aircraft" maxlength="80" placeholder="A320" autocomplete="off"></label>
+      <label>Kennzeechen<input id="registration" maxlength="40" placeholder="LX-LBA" autocomplete="off" autocapitalize="characters" spellcheck="false"></label>
+      <label>Dauer (H:MM)<input id="duration" placeholder="1:35" autocomplete="off" autocapitalize="none" spellcheck="false" required></label>
+      <label>Netzwierk<select id="network"><option value="offline">Offline</option><option value="vatsim">VATSIM</option><option value="ivao">IVAO</option></select></label>
     </div>
-    <label>Notes<textarea id="notes" maxlength="2000" autocomplete="off" placeholder="Route, weather, approaches…"></textarea></label>
-    <div class="actions"><button type="button" class="btn" id="save">Save flight</button><button type="button" class="ghost" id="cancel" hidden>Cancel edit</button><div class="msg" id="msg" role="status" aria-live="polite"></div></div>
+    <label>Notizen<textarea id="notes" maxlength="2000" autocomplete="off" placeholder="Route, Wieder, Uflich …"></textarea></label>
+    <div class="actions"><button type="button" class="btn" id="save">Fluch späicheren</button><button type="button" class="ghost" id="cancel" hidden>Ännerung ofbriechen</button><div class="msg" id="msg" role="status" aria-live="polite"></div></div>
     <datalist id="airportList"></datalist>
   </div>`;
 }
 
 function renderShell(){
   $("wrap").innerHTML=`${formMarkup()}<div class="msg" id="loadMsg" role="status" aria-live="polite"></div><div class="stats" id="stats"></div>
-    <div class="card"><h2 class="section-title">Route map</h2><div id="mapHost" role="region" aria-label="Route map of your flights"><div class="map-empty">Loading map…</div></div></div>
-    <section><h2 class="section-title">Logbook</h2><div class="flight-list" id="list"><div class="gate" role="status">Loading…</div></div></section>`;
+    <div class="card"><h2 class="section-title">Routekaart</h2><div id="mapHost" role="region" aria-label="Routekaart vun denge Fluchten"><div class="map-empty">Kaart gëtt gelueden …</div></div></div>
+    <section><h2 class="section-title">Logbuch</h2><div class="flight-list" id="list"><div class="gate" role="status">Lued …</div></div></section>`;
   $("flownOn").value=today();
   $("airportList").innerHTML=Object.entries(airports).map(([icao,value])=>`<option value="${esc(icao)}">${esc(icao)} — ${esc(value[2])}</option>`).join("");
   [["dep","depHint"],["arr","arrHint"]].forEach(([inputId,hintId])=>$(inputId).addEventListener("input",()=>updateAirportHint(inputId,hintId)));
   $("save").onclick=saveFlight;
   $("cancel").onclick=resetForm;
-  if(airportResult.error)setMessage("loadMsg","Airport names and mapping are unavailable; ICAO codes can still be saved.",true);
+  if(airportResult.error)setMessage("loadMsg","Fluchhafennimm a Kaart sinn net verfügbar; d'ICAO-Codë kënnen trotzdeem gespäichert ginn.",true);
 }
 
 async function boot(){
@@ -136,13 +135,12 @@ async function boot(){
   try{
     sb=await auth.client();
     if(run!==bootNumber)return;
-    auth.mountAccountButton($("acctHost"));
     if(!auth.session()?.user?.id){signedOut();return;}
     renderShell();
     await refresh();
   }catch(error){
     console.warn("[simlog] boot",error);
-    if(run===bootNumber)$("wrap").innerHTML='<div class="gate">The logbook could not be started. Please try again.</div>';
+    if(run===bootNumber)$("wrap").innerHTML='<div class="gate">D\'Logbuch konnt net gestart ginn. Probéier et w.e.g. nach eng Kéier.</div>';
   }
 }
 
@@ -151,12 +149,12 @@ async function refresh(){
     const {data,error}=await sb.from("sim_flights").select("*").order("flown_on",{ascending:false}).order("created_at",{ascending:false});
     if(error)throw error;
     items=Object.freeze([...(data||[])]);
-    setMessage("loadMsg",airportResult.error?"Airport names and mapping are unavailable; ICAO codes can still be saved.":"",Boolean(airportResult.error));
+    setMessage("loadMsg",airportResult.error?"Fluchhafennimm a Kaart sinn net verfügbar; d'ICAO-Codë kënnen trotzdeem gespäichert ginn.":"",Boolean(airportResult.error));
     renderStats();renderList();renderMap();
   }catch(error){
     console.warn("[simlog] load",error);
-    setMessage("loadMsg","Flights could not be loaded. Please try again.",true);
-    $("list").innerHTML='<div class="gate">Unable to load the logbook.</div>';
+    setMessage("loadMsg","D'Flüchte konnten net gelueden ginn. Probéier et w.e.g. nach eng Kéier.",true);
+    $("list").innerHTML='<div class="gate">D\'Logbuch konnt net gelueden ginn.</div>';
   }
 }
 
@@ -174,7 +172,7 @@ function setMessage(id,text,isError=false){
 }
 function updateAirportHint(inputId,hintId){
   const input=$(inputId),code=input.value.toUpperCase();input.value=code;
-  $(hintId).textContent=code.length===4?(airports[code]?.[2]||"Not in map data — it will still be saved."):"";
+  $(hintId).textContent=code.length===4?(airports[code]?.[2]||"Net an de Kaartedonnéeën — gëtt trotzdeem gespäichert."):"";
 }
 
 function formValues(){
@@ -183,36 +181,36 @@ function formValues(){
     duration_min:parseDuration($("duration").value),network:$("network").value,notes:$("notes").value.trim()||null};
 }
 function validationError(flight){
-  if(!flight.flown_on)return "Choose a flight date.";
-  if(!/^[A-Z]{4}$/.test(flight.dep)||!/^[A-Z]{4}$/.test(flight.arr))return "Departure and arrival must each be four letters.";
-  if(flight.duration_min===null)return "Enter duration as H:MM (for example 1:35).";
+  if(!flight.flown_on)return "Wiel en Fluchdatum.";
+  if(!/^[A-Z]{4}$/.test(flight.dep)||!/^[A-Z]{4}$/.test(flight.arr))return "Départ an Arrivée musse jeeweils véier Buschtawen hunn.";
+  if(flight.duration_min===null)return "Gëff d'Dauer als H:MM an (zum Beispill 1:35).";
   return "";
 }
 
 async function saveFlight(){
   const flight=formValues(),problem=validationError(flight);
   if(problem){setMessage("msg",problem,true);return;}
-  const save=$("save");save.disabled=true;setMessage("msg","Saving…");
+  const save=$("save");save.disabled=true;setMessage("msg","Späicheren …");
   try{
     const query=editingId?sb.from("sim_flights").update(flight).eq("id",editingId):sb.from("sim_flights").insert(flight);
     const {error}=await query;if(error)throw error;
-    resetForm();setMessage("msg","Saved ✓");
+    resetForm();setMessage("msg","Gespäichert ✓");
     await refresh();
     setTimeout(()=>setMessage("msg",""),SAVE_MESSAGE_MS);
   }catch(error){
-    console.warn("[simlog] save",error);setMessage("msg","Flight could not be saved. Please try again.",true);
+    console.warn("[simlog] save",error);setMessage("msg","De Fluch konnt net gespäichert ginn. Probéier et w.e.g. nach eng Kéier.",true);
   }finally{save.disabled=false;}
 }
 
 function resetForm(){
-  editingId=null;$("formTitle").textContent="Add flight";$("save").textContent="Save flight";$("cancel").hidden=true;
+  editingId=null;$("formTitle").textContent="Fluch derbäisetzen";$("save").textContent="Fluch späicheren";$("cancel").hidden=true;
   ["dep","arr","aircraft","registration","duration","notes"].forEach(id=>$(id).value="");
   $("depHint").textContent="";$("arrHint").textContent="";
   $("flownOn").value=today();$("network").value="offline";setMessage("msg","");
 }
 function editFlight(id){
   const flight=items.find(item=>String(item.id)===id);if(!flight)return;
-  editingId=flight.id;$("formTitle").textContent="Edit flight";$("save").textContent="Update flight";$("cancel").hidden=false;
+  editingId=flight.id;$("formTitle").textContent="Fluch änneren";$("save").textContent="Fluch aktualiséieren";$("cancel").hidden=false;
   $("flownOn").value=flight.flown_on||"";$("dep").value=flight.dep||"";$("arr").value=flight.arr||"";
   $("aircraft").value=flight.aircraft||"";$("registration").value=flight.registration||"";
   $("duration").value=formatDuration(flight.duration_min);$("network").value=NETWORKS[flight.network]?flight.network:"offline";$("notes").value=flight.notes||"";
@@ -222,12 +220,12 @@ function editFlight(id){
 }
 
 async function deleteFlight(id){
-  if(!confirm("Delete this flight?"))return;
+  if(!confirm("Dëse Fluch läschen?"))return;
   try{
     const {error}=await sb.from("sim_flights").delete().eq("id",id);if(error)throw error;
     if(String(editingId)===id)resetForm();
     await refresh();
-  }catch(error){console.warn("[simlog] delete",error);setMessage("loadMsg","Flight could not be deleted. Please try again.",true);}
+  }catch(error){console.warn("[simlog] delete",error);setMessage("loadMsg","De Fluch konnt net geläscht ginn. Probéier et w.e.g. nach eng Kéier.",true);}
 }
 
 function stats(){
@@ -237,8 +235,8 @@ function stats(){
   const routes=items.reduce((all,item)=>({...all,[`${item.dep}→${item.arr}`]:(all[`${item.dep}→${item.arr}`]||0)+1}),{});
   const top=Object.entries(routes).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]))[0];
   const longest=[...items].sort((a,b)=>Number(b.duration_min||0)-Number(a.duration_min||0))[0];
-  return [["Total hours",formatDuration(minutes)],["Total flights",items.length],["Unique airports",airportSet.size],["Unique aircraft",aircraftSet.size],
-    ["Most-flown route",top?`${top[0]} ×${top[1]}`:"—"],["Longest flight",longest?`${formatDuration(longest.duration_min)} · ${longest.dep}→${longest.arr}`:"—"]];
+  return [["Stonnen insgesamt",formatDuration(minutes)],["Flüchte insgesamt",items.length],["Verschidde Fluchhäfen",airportSet.size],["Verschidde Fligeren",aircraftSet.size],
+    ["Meescht gefluenen Route",top?`${top[0]} ×${top[1]}`:"—"],["Längste Fluch",longest?`${formatDuration(longest.duration_min)} · ${longest.dep}→${longest.arr}`:"—"]];
 }
 function renderStats(){
   $("stats").innerHTML=stats().map(([label,value])=>`<div class="stat"><small>${esc(label)}</small><b title="${esc(value)}">${esc(value)}</b></div>`).join("");
@@ -246,7 +244,7 @@ function renderStats(){
 
 function airportName(code){return airports[code]?.[2]||"";}
 function renderList(){
-  if(!items.length){$("list").innerHTML='<div class="gate">No flights yet — add your first one above.</div>';return;}
+  if(!items.length){$("list").innerHTML='<div class="gate">Nach keng Flüchten — setz uewen däi éischte derbäi.</div>';return;}
   $("list").innerHTML=items.map(flight=>{
     const dep=esc(flight.dep),arr=esc(flight.arr),depName=airportName(flight.dep),arrName=airportName(flight.arr);
     const names=[depName,arrName].filter(Boolean).map(esc).join(" → ");
@@ -256,7 +254,7 @@ function renderList(){
       <div class="plane">${plane}</div><div class="duration">${formatDuration(flight.duration_min)}</div>
       <div class="network"><span class="badge">${esc(NETWORKS[flight.network]||flight.network||"offline")}</span></div>
       ${flight.notes?`<div class="notes">${esc(flight.notes)}</div>`:""}
-      <div class="flight-actions"><button type="button" class="ghost" data-edit="${esc(flight.id)}" aria-label="Edit flight ${dep} to ${arr}, ${esc(flight.flown_on)}">Edit</button><button type="button" class="ghost danger" data-delete="${esc(flight.id)}" aria-label="Delete flight ${dep} to ${arr}, ${esc(flight.flown_on)}">Delete</button></div></article>`;
+      <div class="flight-actions"><button type="button" class="ghost" data-edit="${esc(flight.id)}" aria-label="Fluch ${dep} op ${arr} änneren, ${esc(flight.flown_on)}">Änneren</button><button type="button" class="ghost danger" data-delete="${esc(flight.id)}" aria-label="Fluch ${dep} op ${arr} läschen, ${esc(flight.flown_on)}">Läschen</button></div></article>`;
   }).join("");
   $("list").querySelectorAll("[data-edit]").forEach(button=>button.onclick=()=>editFlight(button.dataset.edit));
   $("list").querySelectorAll("[data-delete]").forEach(button=>button.onclick=()=>deleteFlight(button.dataset.delete));
@@ -291,12 +289,12 @@ function mappedFlights(){
 function renderMap(){
   if(map){map.remove();map=null;}
   const mapped=mappedFlights(),host=$("mapHost");
-  if(!mapped.length){host.innerHTML='<div class="map-empty">No mapped flights yet</div>';return;}
-  if(!window.L){host.innerHTML='<div class="map-empty">The map library could not be loaded.</div>';return;}
+  if(!mapped.length){host.innerHTML='<div class="map-empty">Nach keng Flüchte op der Kaart</div>';return;}
+  if(!window.L){host.innerHTML='<div class="map-empty">D\'Kaartebibliothéik konnt net gelueden ginn.</div>';return;}
   host.innerHTML='<div id="map"></div>';
   map=L.map("map").setView(MAP_CENTER,MAP_ZOOM);
   const tiles=L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:TILE_MAX_ZOOM,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'});
-  tiles.once("tileerror",()=>setMessage("loadMsg","Map tiles could not be loaded; flight routes remain available when the connection recovers.",true));tiles.addTo(map);
+  tiles.once("tileerror",()=>setMessage("loadMsg","D'Kaartekacheln konnten net gelueden ginn; d'Fluchrouten sinn erëm do, soubal d'Verbindung funktionéiert.",true));tiles.addTo(map);
   const points=mapped.flatMap(({from,to})=>[from,to]),codes=new Set();
   mapped.forEach(({flight,from,to})=>{
     splitAntimeridian(greatCircle(from,to)).forEach(line=>L.polyline(line,{color:"#6ea8fe",weight:2,opacity:.65}).addTo(map));
@@ -311,5 +309,6 @@ function renderMap(){
 auth.onAuth(boot);
 boot();
 </script>
+<script type="module" src="gitter-acct.js?v=1"></script>
 </body>
 </html>

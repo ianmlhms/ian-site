@@ -1,25 +1,25 @@
 <!DOCTYPE html>
-<html lang="en" data-no-season>
+<html lang="lb">
 <head>
 <meta charset="utf-8">
 <meta name="robots" content="noindex,follow">
 <!-- Game shell, no crawlable content. -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Kniffel — ian.lu</title>
-  <meta name="description" content="Kniffel (Yahtzee) on ian.lu — roll, hold and score against a friend or the computer." />
+  <meta name="description" content="Kniffel (Yahtzee) op ian.lu — wërf, haal fest a punkt géint e Frënd oder géint de Computer." />
   <link rel="canonical" href="https://ian.lu/dice-duel.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<script src="mp-gate.js?v=7" data-game="dice-duel" data-over="#rematch"></script>
-<script src="season.js?v=5"></script>
+<script src="mp-gate.js?v=8" data-game="dice-duel" data-over="#rematch"></script>
+<link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="gitter.css?v=11">
 <script src="theme.js?v=32"></script>
-<link rel="stylesheet" href="game-common.css?v=5">
 <style>
   body{display:flex;flex-direction:column}
   .wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:16px;gap:12px;max-width:520px;margin:0 auto;width:100%}
   .dice{display:flex;gap:10px}
-  .die{width:56px;height:56px;border-radius:12px;background:#f5f2ea;color:#1a1a2e;font-size:40px;line-height:1;
+  .die{width:56px;height:56px;border-radius:0;background:#f5f2ea;color:#1a1a2e;font-size:40px;line-height:1;
     display:flex;align-items:center;justify-content:center;border:2px solid transparent;cursor:default;user-select:none}
-  .die.held{border-color:var(--accent-border);transform:translateY(6px);background:#dfe9ff}
+  .die.held{border-color:var(--accent-border);transform:translateY(6px);background:var(--soft)}
   .die.can{cursor:pointer}
   button.die{padding:0;font-family:inherit;-webkit-appearance:none;appearance:none}
   .pickbtn{display:block;width:calc(100% + 16px);min-height:0;margin:-6px -8px;padding:6px 8px;border:0;background:none;color:inherit;font:inherit;cursor:pointer}
@@ -31,39 +31,39 @@
   td:first-child,th:first-child{text-align:left}
   th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.6px}
   td.open{color:var(--muted)}
-  td.pick{color:var(--accent2-text);font-weight:800;cursor:pointer;background:rgba(110,168,254,.08);border-radius:6px}
-  td.pick:hover{background:rgba(110,168,254,.2)}
+  td.pick{color:var(--accent2-text);font-weight:800;cursor:pointer;background:var(--tint);border-radius:0}
+  td.pick:hover{background:var(--soft)}
   tr.tot td{font-weight:800;border-top:2px solid var(--border)}
   .colme{color:var(--accent2-text)}
 </style>
 <script data-goatcounter="https://ianm.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
-  <meta name="theme-color" content="#0d0d1a">
+  <meta name="theme-color" content="#f6f6f3">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
 </head>
-<body>
+<body class="gt">
 <header class="bar">
   <a class="home" href="pixelbreak.html">‹ Arcade</a>
-  <h1>🎲 Kniffel</h1>
+  <h1>Kniffel</h1>
   <div class="spacer"></div>
 </header>
 
 <div class="wrap">
-  <div class="status" id="status" role="status" aria-live="polite">Connecting…</div>
+  <div class="status" id="status" role="status" aria-live="polite">Verbindung …</div>
   <div class="sub" id="sub"></div>
-  <div class="dice" id="dice" role="group" aria-label="Dice"></div>
-  <button class="btn rollbtn" id="roll">🎲 Roll</button>
-  <table id="card" aria-label="Scorecard"></table>
-  <button class="btn" id="rematch" style="display:none">↻ Rematch</button>
+  <div class="dice" id="dice" role="group" aria-label="Wierfelen"></div>
+  <button class="btn rollbtn" id="roll">Wërfelen</button>
+  <table id="card" aria-label="Punktekaart"></table>
+  <button class="btn" id="rematch" style="display:none">Nach eng Partie</button>
 </div>
 
 <script src="pixelbreak-config.js"></script>
-<script src="pb/arcade-kit.js?v=41" data-arcade-id="o-dice-duel" data-arcade-title="Kniffel" data-arcade-no-score data-arcade-replace=".bar"></script>
+<script src="pb/arcade-kit.js?v=43" data-arcade-id="o-dice-duel" data-arcade-title="Kniffel" data-arcade-no-score data-arcade-replace=".bar"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-<script src="game-common.js?v=4"></script>
+<script src="game-common.js?v=6"></script>
 <script type="module" src="notify-ambient.js?v=40"></script>
 <script>
 /* Yahtzee-style dice duel: 3 rolls per turn, hold dice between rolls, score one
@@ -90,14 +90,14 @@ function straightLen(d) {
   for (let f = 1; f <= 6; f++) { run = c[f] ? run + 1 : 0; best = Math.max(best, run); }
   return best;
 }
-const UPPER = [1, 2, 3, 4, 5, 6].map((f) => ({ id: "u" + f, n: ["Ones","Twos","Threes","Fours","Fives","Sixes"][f - 1], f: (d) => d.filter((v) => v === f).length * f }));
+const UPPER = [1, 2, 3, 4, 5, 6].map((f) => ({ id: "u" + f, n: ["Einer","Zweier","Dräier","Véierer","Fënfer","Sechser"][f - 1], f: (d) => d.filter((v) => v === f).length * f }));
 const LOWER = [
-  { id: "k3", n: "3 of a kind", f: (d) => hasKind(d, 3) ? sum(d) : 0 },
-  { id: "k4", n: "4 of a kind", f: (d) => hasKind(d, 4) ? sum(d) : 0 },
+  { id: "k3", n: "3 vun enger Zort", f: (d) => hasKind(d, 3) ? sum(d) : 0 },
+  { id: "k4", n: "4 vun enger Zort", f: (d) => hasKind(d, 4) ? sum(d) : 0 },
   { id: "full", n: "Full House", f: (d) => isFull(d) ? 25 : 0 },
-  { id: "sm", n: "Small Straight", f: (d) => straightLen(d) >= 4 ? 30 : 0 },
-  { id: "lg", n: "Large Straight", f: (d) => straightLen(d) >= 5 ? 40 : 0 },
-  { id: "five", n: "5 of a kind ★", f: (d) => hasKind(d, 5) ? 50 : 0 },
+  { id: "sm", n: "Kleng Strooss", f: (d) => straightLen(d) >= 4 ? 30 : 0 },
+  { id: "lg", n: "Grouss Strooss", f: (d) => straightLen(d) >= 5 ? 40 : 0 },
+  { id: "five", n: "5 vun enger Zort ★", f: (d) => hasKind(d, 5) ? 50 : 0 },
   { id: "chance", n: "Chance", f: (d) => sum(d) },
 ];
 const CATS = [...UPPER, ...LOWER];
@@ -165,8 +165,8 @@ function render() {
     : faCat ? `#card [data-cat="${faCat.dataset.cat}"] button` : null;
   $("dice").innerHTML = dice.map((v, i) => {
     const can = myTurn && rolls > 0 && rolls < 3;
-    const base = `Die ${i + 1}: ${rolls === 0 ? "not rolled yet" : v}`;
-    const lbl = can ? base : base + (held[i] ? ", held" : "");
+    const base = `Wierfel ${i + 1}: ${rolls === 0 ? "nach net gewuerf" : v}`;
+    const lbl = can ? base : base + (held[i] ? ", festgehalen" : "");
     const face = `<span aria-hidden="true">${rolls === 0 ? "🎲" : FACES[v]}</span>`;
     return can
       ? `<button type="button" class="die${held[i] ? " held" : ""} can" data-i="${i}" aria-pressed="${held[i]}" aria-label="${lbl}">${face}</button>`
@@ -175,18 +175,18 @@ function render() {
   $("dice").querySelectorAll(".can").forEach((el) => { el.onclick = () => toggleHold(+el.dataset.i); });
   const rb = $("roll");
   rb.disabled = !myTurn || rolls >= 3;
-  rb.textContent = rolls === 0 ? "🎲 Roll" : `🎲 Roll again (${3 - rolls} left)`;
+  rb.textContent = rolls === 0 ? "Wërfelen" : `Nach eng Kéier wërfelen (${3 - rolls} iwwreg)`;
   rb.style.opacity = rb.disabled ? ".4" : "1";
 
   const row = (c) => {
     const meV = sc[me][c.id], opV = sc[opp][c.id];
     const canPick = myTurn && rolls > 0 && meV == null;
-    const meCell = meV != null ? meV : canPick ? `<td class="pick" data-cat="${c.id}"><button type="button" class="pickbtn" aria-label="${c.n}: score ${c.f(dice)} points">${c.f(dice)}</button></td>` : '<td class="open">–</td>';
+    const meCell = meV != null ? meV : canPick ? `<td class="pick" data-cat="${c.id}"><button type="button" class="pickbtn" aria-label="${c.n}: ${c.f(dice)} Punkten">${c.f(dice)}</button></td>` : '<td class="open">–</td>';
     const meTd = meV != null ? `<td>${meV}</td>` : meCell;
     return `<tr><td>${c.n}</td>${meTd}<td class="open">${opV != null ? opV : "–"}</td></tr>`;
   };
   $("card").innerHTML =
-    `<tr><th scope="col">Category</th><th scope="col" class="colme">You</th><th scope="col"${AI ? ' aria-label="Computer"' : ""}>${AI ? "🤖" : "Opponent"}</th></tr>` +
+    `<tr><th scope="col">Kategorie</th><th scope="col" class="colme">Du</th><th scope="col"${AI ? ' aria-label="Computer"' : ""}>${AI ? "🤖" : "Géigner"}</th></tr>` +
     UPPER.map(row).join("") +
     `<tr><td style="color:var(--muted)">Bonus (63+)</td><td>${upperSum(me)}/63 ${bonus(me) ? "→ +35" : ""}</td><td class="open">${upperSum(opp)}/63 ${bonus(opp) ? "→ +35" : ""}</td></tr>` +
     LOWER.map(row).join("") +
@@ -199,12 +199,12 @@ function render() {
 function updateStatus(myTurn) {
   if (over) {
     const mine = total(me), theirs = total(opp);
-    return setStatus(mine === theirs ? "It's a draw!" : mine > theirs ? "You win! 🎉" : "You lost.", `${mine} : ${theirs}`);
+    return setStatus(mine === theirs ? "Onentschidden!" : mine > theirs ? "Du hues gewonn!" : "Du hues verluer.", `${mine} : ${theirs}`);
   }
-  if (!oppHere) return setStatus("Waiting for opponent…", `Share room <code>${room}</code> or invite from Friends.`);
-  if (!myTurn) return setStatus(AI ? "Computer thinking…" : "Opponent's turn");
-  if (rolls === 0) return setStatus("Your turn", "Roll the dice!");
-  setStatus("Your turn", rolls < 3 ? "Hold dice, roll again, or pick a category." : "Pick a category on the scorecard.");
+  if (!oppHere) return setStatus("Waart op de Géigner …", `Deel de Raumcode <code>${room}</code> oder invitéier iwwer Frënn.`);
+  if (!myTurn) return setStatus(AI ? "De Computer denkt …" : "De Géigner ass drun");
+  if (rolls === 0) return setStatus("Du bass drun", "Wärf d'Wierfelen!");
+  setStatus("Du bass drun", rolls < 3 ? "Wierfele festhalen, nees werfen oder eng Kategorie wielen." : "Wiel eng Kategorie op der Punktekaart.");
 }
 function setStatus(h, sub = "") {
   if ($("status").innerHTML !== h) $("status").innerHTML = h;
@@ -215,7 +215,7 @@ $("rematch").onclick = () => { fresh(); $("rematch").style.display = "none"; ren
 
 /* ---------- wiring ---------- */
 if (AI) {
-  document.querySelector(".bar h1").textContent = "🎲 Kniffel — vs Computer";
+  document.querySelector(".bar h1").textContent = "Kniffel – géint de Computer";
   GC.mountDifficulty(() => difficulty, (d) => { difficulty = d; });
   oppHere = true; fresh(); render();
 } else if (!(window.MPGate && window.MPGate.redirecting)) {   // mp-gate.js sends a bare visit to the lobby (lobby.html)
@@ -230,7 +230,7 @@ if (AI) {
     setState: (p) => { sc = p.sc; turn = p.turn; dice = p.dice; held = p.held; rolls = p.rolls; over = p.over; started = p.started; render(); if (over) $("rematch").style.display = ""; },
     isStarted: () => started || over,
     onPeers: (here) => { oppHere = here; render(); },
-    onSeatTaken: () => { over = true; render(); setStatus("Seat already taken", `This room already has a ${role} — join with the other role or start a new room.`); },
+    onSeatTaken: () => { over = true; render(); setStatus("Plaz scho besat", `Dësen Raum huet schonn e(n) ${role} — trëtt mat der anerer Roll bäi oder maach en neie Raum op.`); },
   });
 }
 

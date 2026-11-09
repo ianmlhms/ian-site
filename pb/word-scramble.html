@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Word Unscramble - Arcade</title>
-<link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
+<link rel="stylesheet" href="/pb/arcade-ui.css?v=3">
 <style>
 body{display:flex;flex-direction:column}
 [hidden]{display:none!important}
@@ -13,11 +13,11 @@ body{display:flex;flex-direction:column}
 .game{width:min(520px,100%);margin:0 auto;min-height:100%;display:flex;flex-direction:column;gap:14px;justify-content:center;text-align:center}
 #hint{color:var(--muted);font:650 15px/1.3 var(--font)}
 #scrambled{font:800 clamp(36px,11vw,58px)/1.1 var(--font-display);letter-spacing:.16em;padding-left:.16em;color:var(--cyan);word-break:break-all}
-#guess{width:100%;min-height:52px;padding:0 18px;border:1px solid var(--border);border-radius:14px;background:var(--card2);color:var(--text);
+#guess{width:100%;min-height:52px;padding:0 18px;border:1px solid var(--border);border-radius:0;background:var(--card2);color:var(--text);
   font:750 24px/1 var(--font);text-align:center;letter-spacing:.12em;text-transform:uppercase;outline:none}
 #guess::placeholder{letter-spacing:0;text-transform:none;font-size:17px;font-weight:650;color:var(--muted)}
 #guess:focus-visible{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(77,232,255,.25)}
-#timer-bar{height:6px;border-radius:99px;background:var(--border);overflow:hidden}
+#timer-bar{height:6px;border-radius:0;background:var(--border);overflow:hidden}
 #timer-fill{height:100%;width:100%;border-radius:inherit;background:var(--good);transition:width .1s linear,background .2s ease}
 #feedback{min-height:30px;font:750 20px/1.3 var(--font)}
 .ok{color:var(--good)}.bad{color:var(--danger)}.reveal{color:var(--amber)}
@@ -27,7 +27,7 @@ body{display:flex;flex-direction:column}
 .arcade-btn.play{min-width:min(220px,100%);min-height:52px;font-size:17px}
 @media (prefers-reduced-motion:reduce){#timer-fill{transition:none}}
 </style>
-<script src="/pb/arcade-kit.js?v=41" data-arcade-id="word-scramble" data-arcade-title="Word Unscramble"></script>
+<script src="/pb/arcade-kit.js?v=43" data-arcade-id="word-scramble" data-arcade-title="Word Unscramble"></script>
 </head>
 <body>
 <main class="arcade-stage" id="stage">

@@ -4,14 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Reaction Time - Arcade</title>
-<link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
+<link rel="stylesheet" href="/pb/arcade-ui.css?v=3">
 <style>
 body{display:flex;flex-direction:column}
 [hidden]{display:none!important}
 .arcade-stage{display:block}
 .pad{position:absolute;inset:0;display:grid;place-items:center;padding:70px 20px 20px;text-align:center;cursor:pointer;
   user-select:none;-webkit-user-select:none;touch-action:manipulation;outline:none;
-  background:radial-gradient(120% 90% at 50% 0%,var(--bg2),var(--bg));transition:background .2s ease}
+  background:var(--bg2);transition:background .2s ease}
 .pad.waiting{background:color-mix(in srgb,var(--danger) 62%,var(--bg))}
 .pad.ready{background:var(--good);color:#06210f}
 .pad h2{margin:0;font:800 clamp(34px,9vw,64px)/1.05 var(--font-display);letter-spacing:-.03em}
@@ -21,7 +21,7 @@ body{display:flex;flex-direction:column}
 .arcade-hud{inset:5px 14px auto;align-items:center;justify-content:center;gap:10px}
 .arcade-btn.play{min-width:min(220px,100%);min-height:52px;font-size:17px}
 </style>
-<script src="/pb/arcade-kit.js?v=41" data-arcade-id="reaction" data-arcade-title="Reaction Time" data-arcade-lower-is-better></script>
+<script src="/pb/arcade-kit.js?v=43" data-arcade-id="reaction" data-arcade-title="Reaction Time" data-arcade-lower-is-better></script>
 </head>
 <body>
 <main class="arcade-stage" id="stage">

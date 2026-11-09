@@ -1,77 +1,94 @@
 /* Arcade — shared look for every built-in game (pb/*.html, geometrydash.html).
- * Include with <link rel="stylesheet" href="/pb/arcade-ui.css?v=1"> (absolute: games load via srcdoc).
- * Based on the Geometry Dash look; Apple-style type, materials and motion. */
+ * Include with <link rel="stylesheet" href="/pb/arcade-ui.css?v=4"> (absolute: games load via srcdoc).
+ * "Gitter" look (Nov 2026): paper #f6f6f3 / ink #16171a / ONE green #1f7a4d, hairlines, radius 0, Geist + Geist Mono.
+ *
+ * Two palettes live here on purpose:
+ *  - --g-*   the page chrome (stage, HUD, overlays, buttons): light, calm, hairline.
+ *  - --bg, --card, --text, --accent, --cyan ... the "board" palette. Games read these with getComputedStyle to
+ *    paint their canvas: light values, so the board sits in the page as a hairline cell.
+ * Fonts and anything else must be referenced by absolute path (games load through srcdoc). */
+@font-face{font-family:"Geist";font-style:normal;font-weight:400 800;font-display:swap;src:url("/assets/fonts/geist-latin.woff2") format("woff2")}
+@font-face{font-family:"Geist Mono";font-style:normal;font-weight:500;font-display:swap;src:url("/assets/fonts/geist-mono-500-latin.woff2") format("woff2")}
 :root{
-  --bg:#0d0d1a; --bg2:#11111f; --card:#161625; --card2:#1e1e35; --border:#2a2a4a;
-  --text:#e8e8f0; --muted:#8888aa; --accent:#6ea8fe; --cyan:#4de8ff; --amber:#f5b942;
-  --danger:#ff6685; --good:#4ade80; --violet:#b48cff;
-  --radius-s:9px; --radius:14px; --radius-l:20px;
-  --font:-apple-system,"SF Pro Text",BlinkMacSystemFont,system-ui,"Segoe UI",Roboto,sans-serif;
-  --font-display:-apple-system,"SF Pro Display",BlinkMacSystemFont,system-ui,"Segoe UI",Roboto,sans-serif;
-  --font-mono:ui-monospace,"SF Mono",Menlo,monospace;
-  --spring:cubic-bezier(.2,.8,.2,1); --glow:0 0 40px rgba(77,232,255,.15);
-  color-scheme:dark;
+  /* page chrome */
+  --g-paper:#f6f6f3; --g-white:#fcfcfa; --g-ink:#16171a; --g-muted:#62656a;
+  --g-soft:rgba(22,23,26,.14); --g-tint:rgba(22,23,26,.04); --g-green:#1f7a4d; --g-danger:#a32121;
+  /* board palette (canvas colours, read by the games): light, saturated but not neon */
+  --bg:#fbfbf8; --bg2:#f6f6f3; --card:#fcfcfa; --card2:#ecece6; --border:#cfcfc8;
+  --text:#16171a; --muted:#62656a; --accent:#1f7a4d; --cyan:#0b8aa6; --amber:#c8880a;
+  --danger:#cf3a3a; --good:#1f9a5b; --violet:#7a4fd0;
+  --radius-s:0px; --radius:0px; --radius-l:0px;
+  --font:"Geist",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-display:"Geist",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"Geist Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  --spring:cubic-bezier(.2,.8,.2,1); --glow:none;
+  color-scheme:light;
 }
 *{box-sizing:border-box}
-html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--g-paper);color:var(--g-ink);
   font:15px/1.45 var(--font);-webkit-font-smoothing:antialiased;overscroll-behavior:none;
   -webkit-tap-highlight-color:transparent}
 canvas{display:block;touch-action:none;user-select:none;-webkit-user-select:none}
+:focus-visible{outline:2px solid var(--g-green);outline-offset:2px}
 
-/* play area: centres the canvas/board under the shared top bar */
-.arcade-stage{position:relative;flex:1;min-height:0;display:grid;place-items:center;overflow:hidden;
-  background:radial-gradient(120% 90% at 50% 0%,var(--bg2),var(--bg))}
+/* play area: centres the canvas/board under the shared top bar; the board sits in a hairline cell on paper */
+.arcade-stage{position:relative;flex:1;min-height:0;display:grid;place-items:center;overflow:hidden;background:var(--g-paper)}
+.arcade-stage canvas{border-radius:0;box-shadow:0 0 0 1px var(--g-ink)}
+.arcade-pill canvas{box-shadow:none}
 
-/* HUD: small uppercase stats floating over the game */
+/* HUD: small mono stat cells floating over the stage */
 .arcade-hud{position:absolute;inset:12px 14px auto;display:flex;justify-content:space-between;gap:12px;
-  pointer-events:none;font:800 12px/1 var(--font);letter-spacing:.06em;text-transform:uppercase;
-  text-shadow:0 1px 5px #000;z-index:2}
-.arcade-pill{display:inline-flex;align-items:center;gap:6px;padding:7px 11px;border:1px solid var(--border);
-  border-radius:99px;background:rgba(22,22,37,.72);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
-  font:750 13px/1 var(--font);letter-spacing:.02em;font-variant-numeric:tabular-nums}
-.arcade-pill b{color:var(--cyan);font-weight:800}
+  pointer-events:none;font:500 11px/1 var(--font-mono);letter-spacing:.06em;text-transform:uppercase;
+  color:var(--g-muted);z-index:2}
+.arcade-pill{display:inline-flex;align-items:center;gap:8px;min-height:30px;padding:0 11px;border:1px solid var(--g-ink);
+  border-radius:0;background:var(--g-white);color:var(--g-muted);
+  font:500 11px/1 var(--font-mono);letter-spacing:.06em;font-variant-numeric:tabular-nums}
+.arcade-pill b{color:var(--g-ink);font:700 14px/1 var(--font);letter-spacing:-.01em}
 
-/* start / pause / game-over overlay */
+/* start / pause / game-over overlay: a paper veil over the board, one white card */
 .arcade-overlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;padding:20px;
-  background:rgba(8,8,18,.5);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);text-align:center;z-index:5}
-.arcade-overlay.show{display:flex;animation:arcade-fade .22s var(--spring)}
-.arcade-panel{width:min(380px,92vw);padding:26px 24px;border:1px solid rgba(77,232,255,.42);border-radius:var(--radius-l);
-  background:rgba(22,22,37,.94);box-shadow:var(--glow);animation:arcade-rise .32s var(--spring)}
-.arcade-panel h2{margin:0 0 6px;font:750 clamp(24px,5vw,30px)/1.08 var(--font-display);letter-spacing:-.02em}
-.arcade-panel p{margin:5px 0;color:var(--muted)}
-.arcade-panel strong,.arcade-big{color:var(--text)}
-.arcade-big{display:block;margin:10px 0 4px;font:800 clamp(40px,10vw,56px)/1 var(--font-display);
-  letter-spacing:-.03em;font-variant-numeric:tabular-nums}
-.arcade-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:18px}
+  background:rgba(246,246,243,.95);text-align:center;z-index:5}
+.arcade-overlay.show{display:flex;animation:arcade-fade .18s ease}
+.arcade-panel{width:min(380px,92vw);padding:28px 24px 24px;border:1px solid var(--g-ink);border-radius:0;
+  background:var(--g-white);color:var(--g-ink);box-shadow:none;animation:arcade-rise .22s var(--spring)}
+.arcade-panel h2{margin:0 0 8px;font:800 clamp(24px,5vw,30px)/1.08 var(--font-display);letter-spacing:-.03em;color:var(--g-ink)}
+.arcade-panel p{margin:6px 0;color:var(--g-muted);font-size:15px}
+.arcade-panel strong{color:var(--g-ink);font-weight:700}
+.arcade-big{display:block;margin:12px 0 6px;color:var(--g-ink);font:800 clamp(44px,11vw,60px)/1 var(--font-display);
+  letter-spacing:-.04em;font-variant-numeric:tabular-nums}
+.arcade-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:20px}
 
-/* buttons */
+/* buttons: ink-on-paper like .gt-btn, green is the one accent */
 .arcade-btn{min-height:44px;padding:0 20px;display:inline-flex;align-items:center;justify-content:center;gap:8px;
-  border:1px solid transparent;border-radius:12px;background:var(--accent);color:#08101f;
-  font:750 15px/1 var(--font);letter-spacing:.01em;cursor:pointer;
-  transition:transform .18s var(--spring),filter .18s ease,background .18s ease}
-.arcade-btn:hover{filter:brightness(1.08)}
-.arcade-btn:active{transform:scale(.95)}
-.arcade-btn:focus-visible{outline:3px solid var(--cyan);outline-offset:2px}
-.arcade-btn.secondary{background:var(--card2);border-color:var(--border);color:var(--text)}
-.arcade-btn.danger{background:var(--danger);color:#1a0610}
+  border:1px solid var(--g-green);border-radius:0;background:var(--g-green);color:#fff;
+  font:600 15px/1 var(--font);cursor:pointer;touch-action:manipulation;
+  transition:background-color .15s,border-color .15s,color .15s}
+.arcade-btn:hover{background:var(--g-ink);border-color:var(--g-ink);color:var(--g-paper)}
+.arcade-btn:active{background:var(--g-ink);border-color:var(--g-ink);color:var(--g-paper)}
+.arcade-btn.secondary{background:transparent;border-color:var(--g-ink);color:var(--g-ink)}
+.arcade-btn.secondary:hover,.arcade-btn.secondary:active{background:var(--g-white);border-color:var(--g-green);color:var(--g-green)}
+.arcade-btn.danger{background:var(--g-danger);border-color:var(--g-danger);color:#fff}
+.arcade-btn[disabled]{opacity:.5;cursor:default}
 
 /* segmented control (difficulty, mode) */
-.arcade-seg{display:inline-flex;padding:3px;gap:3px;border:1px solid var(--border);border-radius:12px;background:var(--card)}
-.arcade-seg button{min-height:36px;padding:0 14px;border:0;border-radius:9px;background:transparent;color:var(--muted);
-  font:700 13px/1 var(--font);cursor:pointer;transition:background .18s ease,color .18s ease}
-.arcade-seg button[aria-pressed="true"],.arcade-seg button.on{background:var(--card2);color:var(--text)}
+.arcade-seg{display:inline-flex;gap:0;border:1px solid var(--g-ink);border-radius:0;background:var(--g-white)}
+.arcade-seg button{min-height:40px;padding:0 14px;border:0;border-right:1px solid var(--g-ink);border-radius:0;
+  background:transparent;color:var(--g-ink);font:600 13px/1 var(--font);cursor:pointer;
+  transition:background-color .15s,color .15s}
+.arcade-seg button:last-child{border-right:0}
+.arcade-seg button[aria-pressed="true"],.arcade-seg button.on{background:var(--g-ink);color:var(--g-paper)}
 
-.arcade-hint{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);color:var(--muted);
-  font:700 12px/1 var(--font);white-space:nowrap;pointer-events:none;text-shadow:0 1px 4px #000;z-index:2}
+.arcade-hint{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);color:var(--g-muted);
+  font:500 11px/1 var(--font-mono);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;pointer-events:none;z-index:2}
+
+/* toast / short messages a game may pop up */
+.arcade-toast{position:absolute;left:50%;bottom:24px;transform:translateX(-50%);z-index:6;max-width:90vw;padding:10px 16px;
+  background:var(--g-ink);color:var(--g-paper);font:600 14px/1.3 var(--font);text-align:center}
 
 @keyframes arcade-fade{from{opacity:0}to{opacity:1}}
-@keyframes arcade-rise{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:none}}
-@media (max-width:520px){.arcade-hud{inset:9px 10px auto}.arcade-panel{padding:22px 18px}}
+@keyframes arcade-rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media (max-width:520px){.arcade-hud{inset:9px 10px auto}.arcade-panel{padding:24px 18px 20px}}
 @media (prefers-reduced-motion:reduce){
   .arcade-overlay.show,.arcade-panel{animation:none}
-  .arcade-btn{transition:filter .12s ease}.arcade-btn:active{transform:none}
-}
-@media (prefers-reduced-transparency:reduce){
-  .arcade-overlay,.arcade-pill{backdrop-filter:none;-webkit-backdrop-filter:none}
-  .arcade-panel{background:var(--card)}
+  .arcade-btn{transition:none}
 }

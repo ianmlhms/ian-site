@@ -644,7 +644,7 @@ export async function mountLobby(root, options = {}) {
         h("div", { class: "mpl-joinrow" }, codeInput, h("button", { class: "mpl-btn", id: "mplJoin", type: "button", onclick: joinNow }, t("join")))),
       h("div", { class: "mpl-more" },
         h("button", { class: "mpl-link", id: "mplOpenList", type: "button", "aria-expanded": "false", onclick: (e) => toggleDirectory(e.currentTarget, dirBox) }, t("openLobbies")),
-        game.ai ? h("a", { class: "mpl-link", href: offlineUrl(game.id) }, "🤖 " + t("vsAi")) : null,
+        game.ai ? h("a", { class: "mpl-link", href: offlineUrl(game.id) }, t("vsAi")) : null,
         h("a", { class: "mpl-link", href: "pixelbreak.html" }, "‹ Arcade")),
       dirBox,
     );

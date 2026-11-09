@@ -229,9 +229,10 @@
     ['hintReverseT', 'Iwwerfuer? Tipp op R an fuer lues zréck bis op de Stopp-Schëld.', 'Übers Ziel hinaus? Tippe auf R und fahre langsam zurück zur Haltetafel.', 'Overshot? Tap R and back up slowly to the stop board.'],
     ['welcomeHintT', 'Hiewel = fueren · Dieren-Knapp · ? = Hëllef', 'Hebel = fahren · Türen-Taste · ? = Hilfe', 'Lever = drive · Doors button · ? = help'],
     ['resumeBannerHintT', 'Parkbrems ass un. Tipp op „Handbrems“, dann den Hiewel erop.', 'Feststellbremse ist an. Tippe auf „Feststellbr.“, dann den Hebel hoch.', 'Parking brake is on. Tap “Park brake”, then lever up.'],
-    ['devicePhoneTitle', TITLE, TITLE, TITLE],
-    ['devicePhoneBlock', 'Dëst Spill gëtt et nëmmen op iPad a Laptop.', 'Dieses Spiel gibt es nur auf iPad und Laptop.', 'This game is only available on iPad and laptop.'],
-    ['devicePhoneHint', 'Maach et op engem gréissere Bildschierm op.', 'Öffne es auf einem größeren Bildschirm.', 'Open it on a larger screen.'],
+    ['devicePhoneTitle', TS.careerLock === 'tram' ? 'Tramsimulator' : 'Zuchsimulator', TS.careerLock === 'tram' ? 'Tramsimulator' : 'Zugsimulator', TS.careerLock === 'tram' ? 'Tram simulator' : 'Train simulator'],
+    ['devicePhoneBlock', 'Dëst Spill gëtt et nëmmen um iPad an um Computer.', 'Dieses Spiel gibt es nur auf iPad und Laptop.', 'This game is only available on iPad and laptop.'],
+    ['devicePhoneHint', '', '', ''],
+    ['devicePhoneBack', 'Zréck an d’Arcade', 'Zurück in die Arcade', 'Back to the arcade'],
     ['deviceRotate', 'Dréi däin iPad op d’Säit (Querformat) fir de beschten Androck.', 'Drehe dein iPad ins Querformat für das beste Erlebnis.', 'Rotate your iPad to landscape for the best view.'],
     ['webglMissing', 'WebGL gëtt vun dësem Browser net ënnerstëtzt.', 'WebGL wird von diesem Browser nicht unterstützt.', 'WebGL is not supported by this browser.'],
     // ---- events (toasts)

@@ -1,25 +1,25 @@
 <!DOCTYPE html>
-<html lang="en" data-no-season>
+<html lang="lb">
 <head>
 <meta charset="utf-8">
 <meta name="robots" content="noindex,follow">
 <!-- Game shell, no crawlable content. -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Battleship — ian.lu</title>
-  <meta name="description" content="Battleship on ian.lu — place your fleet and play against a friend on two devices, or against the computer." />
+<title>Schëffer versenken — ian.lu</title>
+  <meta name="description" content="Schëffer versenken op ian.lu — setz deng Flott an a spill géint e Frënd op zwee Geräter oder géint de Computer." />
   <link rel="canonical" href="https://ian.lu/battleship.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<script src="mp-gate.js?v=7" data-game="battleship" data-over="#rematch"></script>
-<script src="season.js?v=5"></script>
+<script src="mp-gate.js?v=8" data-game="battleship" data-over="#rematch"></script>
+<link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="gitter.css?v=11">
 <script src="theme.js?v=32"></script>
-<link rel="stylesheet" href="game-common.css?v=5">
 <style>
-  :root{--ship:#5b6bbf;--hit:#ff5d6c;--miss:#33384f;--water:#10142e;--ok:#3fb950}
+  :root{--ship:#16171a;--hit:#a32121;--miss:#c9cbcf;--water:#fcfcfa}
   .wrap{max-width:560px;margin:0 auto;padding:18px;display:flex;flex-direction:column;align-items:center;gap:14px}
   .status{font-size:17px;min-height:22px}
   .label{align-self:flex-start;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:-6px}
-  .grid{display:grid;grid-template-columns:repeat(8,1fr);gap:5px;width:100%;max-width:420px;background:var(--water);padding:8px;border-radius:12px;touch-action:manipulation}
-  .cell{aspect-ratio:1;border-radius:6px;background:#1a2040;display:flex;align-items:center;justify-content:center;font-size:16px}
+  .grid{display:grid;grid-template-columns:repeat(8,1fr);gap:5px;width:100%;max-width:420px;background:var(--water);padding:8px;border-radius:0;touch-action:manipulation}
+  .cell{aspect-ratio:1;border-radius:0;background:#fcfcfa;border:1px solid rgba(22,23,26,.14);display:flex;align-items:center;justify-content:center;font-size:16px}
   button.cell{border:0;padding:0;margin:0;font:inherit;font-size:16px;color:inherit;touch-action:manipulation}
   button.cell:focus-visible,.btn:focus-visible,.seg-b:focus-visible,.bar a:focus-visible{outline:3px solid var(--accent2);outline-offset:2px;position:relative;z-index:1}
   .cell.ship{background:var(--ship)} .cell.hit{background:var(--hit)} .cell.miss{background:var(--miss);color:var(--muted)}
@@ -27,66 +27,66 @@
   .grid.fire .cell:not(.hit):not(.miss){cursor:pointer}
   .grid.fire .cell:not(.hit):not(.miss):hover{outline:2px solid var(--accent2)}
   .toolbar{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;align-items:center}
-  .btn{background:var(--accent);color:var(--accent-foreground);border:none;border-radius:10px;padding:10px 16px;font-weight:800;cursor:pointer}
+  .btn{background:var(--accent);color:var(--accent-foreground);border:none;border-radius:0;padding:10px 16px;font-weight:800;cursor:pointer}
   .btn:disabled{opacity:.4;cursor:default}
   .btn.ghost{background:var(--card);border:1px solid var(--border);color:var(--text)}
-  .seg{display:flex;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+  .seg{display:flex;border:1px solid var(--border);border-radius:0;overflow:hidden}
   .seg-b{background:var(--card);color:var(--muted);border:none;padding:10px 14px;font-weight:800;cursor:pointer;font-size:13px}
   .seg-b.active{background:var(--accent);color:var(--accent-foreground)}
   .fleet{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center}
-  .ship-pip{display:flex;gap:2px;padding:5px 7px;border-radius:8px;border:1px solid var(--border);background:var(--card)}
+  .ship-pip{display:flex;gap:2px;padding:5px 7px;border-radius:0;border:1px solid var(--border);background:var(--card)}
   .ship-pip.next{border-color:var(--accent-border);box-shadow:0 0 0 1px var(--accent)}
   .ship-pip.done{opacity:.35}
-  .ship-pip i{width:11px;height:11px;border-radius:2px;background:var(--ship);display:block}
+  .ship-pip i{width:11px;height:11px;border-radius:0;background:var(--ship);display:block}
 </style>
 <script data-goatcounter="https://ianm.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
-  <meta name="theme-color" content="#0d0d1a">
+  <meta name="theme-color" content="#f6f6f3">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
 </head>
-<body>
+<body class="gt">
 <header class="bar">
   <a class="home" href="pixelbreak.html">‹ Arcade</a>
-  <h1>🚢 Battleship</h1>
+  <h1>Schëffer versenken</h1>
   <div class="spacer"></div>
   <span class="sub">room <code id="roomc"></code></span>
 </header>
 <div class="wrap">
-  <div class="status" id="status" role="status" aria-live="polite">Connecting…</div>
+  <div class="status" id="status" role="status" aria-live="polite">Verbindung …</div>
   <div class="sub" id="sub" aria-live="polite"></div>
 
   <div id="setup" style="display:none;width:100%;flex-direction:column;align-items:center;gap:12px">
-    <div class="label">Your fleet — place your ships</div>
+    <div class="label">Deng Flott — setz deng Schëffer</div>
     <div class="fleet" id="fleet" aria-hidden="true"></div>
-    <div class="grid place" id="own" role="group" aria-label="Your fleet grid"></div>
+    <div class="grid place" id="own" role="group" aria-label="Gitter vun denger Flott"></div>
     <div class="toolbar">
       <div class="seg">
         <button type="button" id="orientH" class="seg-b active" aria-pressed="true">→ Horizontal</button>
-        <button type="button" id="orientV" class="seg-b" aria-pressed="false">↓ Vertical</button>
+        <button type="button" id="orientV" class="seg-b" aria-pressed="false">↓ Vertikal</button>
       </div>
-      <button type="button" class="btn ghost" id="shuffle"><span aria-hidden="true">🔀</span> Shuffle</button>
-      <button type="button" class="btn ghost" id="clear">Clear</button>
-      <button type="button" class="btn" id="ready" disabled>Ready</button>
+      <button type="button" class="btn ghost" id="shuffle">Mëschen</button>
+      <button type="button" class="btn ghost" id="clear">Läschen</button>
+      <button type="button" class="btn" id="ready" disabled>Prett</button>
     </div>
-    <div class="sub">Pick a direction, tap a square to place · tap a ship to remove it.</div>
+    <div class="sub">Wiel eng Richtung, tipp op e Feld fir ze setzen · tipp op e Schëff fir et ewechzehuelen.</div>
   </div>
 
   <div id="play" style="display:none;width:100%;flex-direction:column;align-items:center;gap:12px">
-    <div class="label">Enemy waters — tap to fire</div>
-    <div class="grid fire" id="enemy" role="group" aria-label="Enemy waters grid"></div>
-    <div class="label">Your fleet</div>
-    <div class="grid" id="ownSmall" role="group" aria-label="Your fleet grid"></div>
+    <div class="label">Géigner-Gewässer — tipp fir ze schéissen</div>
+    <div class="grid fire" id="enemy" role="group" aria-label="Gitter vun de Géigner-Gewässer"></div>
+    <div class="label">Deng Flott</div>
+    <div class="grid" id="ownSmall" role="group" aria-label="Gitter vun denger Flott"></div>
   </div>
-  <button type="button" class="btn ghost" id="rematch" style="display:none"><span aria-hidden="true">↻</span> New game</button>
+  <button type="button" class="btn ghost" id="rematch" style="display:none"><span aria-hidden="true">↻</span> Nei Partie</button>
 </div>
 
 <script src="pixelbreak-config.js"></script>
-<script src="pb/arcade-kit.js?v=41" data-arcade-id="o-battleship" data-arcade-title="Battleship" data-arcade-no-score data-arcade-replace=".bar"></script>
+<script src="pb/arcade-kit.js?v=43" data-arcade-id="o-battleship" data-arcade-title="Schëffer versenken" data-arcade-no-score data-arcade-replace=".bar"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-<script src="game-common.js?v=4"></script>
+<script src="game-common.js?v=6"></script>
 <script type="module" src="notify-ambient.js?v=40"></script>
 <script>
 const N=8, SHIPS=[4,3,3,2];
@@ -157,7 +157,7 @@ function shuffle(){
 function clearAll(){ own=empty(); placed=[]; toPlace=[...SHIPS]; renderSetup(); }
 
 // ---------- rendering ----------
-const cellName=(r,c,v,reveal)=>String.fromCharCode(65+r)+(c+1)+": "+(v===2?"hit":v===3?"miss":v===1&&reveal?"ship":"water");
+const cellName=(r,c,v,reveal)=>String.fromCharCode(65+r)+(c+1)+": "+(v===2?"Treffer":v===3?"Dernieft":v===1&&reveal?"Schëff":"Waasser");
 function grid(el,board,reveal,onclick){
   const kids=Array.from(el.children), focusIdx=kids.indexOf(document.activeElement);
   el.innerHTML="";
@@ -189,8 +189,8 @@ function renderSetup(){
   $("orientV").classList.toggle("active", orient==="v");
   $("orientH").setAttribute("aria-pressed", orient==="h");
   $("orientV").setAttribute("aria-pressed", orient==="v");
-  setStatus(myReady?"Waiting for opponent…":(allPlaced()?"Fleet ready — press Ready":"Place your ships"),
-    oppHere?"":"Share room <code>"+room+"</code> so your opponent can join.");
+  setStatus(myReady?"Waart op de Géigner …":(allPlaced()?"Flott prett — dréck op Prett":"Setz deng Schëffer"),
+    oppHere?"":"Deel de Raumcode <code>"+room+"</code>, dass däi Géigner bäitrieden kann.");
 }
 function renderPlay(){
   persistLocal();
@@ -198,8 +198,8 @@ function renderPlay(){
   $("enemy").className="grid"+(turn===role&&!over?" fire":"");
   grid($("enemy"),enemy,false,(r,c)=>fire(r,c));
   grid($("ownSmall"),own,true,null);
-  if(over) setStatus(over===role?"You win! 🎉":"You lost.","");
-  else setStatus(turn===role?"Your turn — fire!":(AI?"Computer firing…":"Opponent's turn…"));
+  if(over) setStatus(over===role?"Du hues gewonn!":"Du hues verluer.","");
+  else setStatus(turn===role?"Du bass drun — schéiss!":(AI?"De Computer schéisst …":"De Géigner ass drun…"));
   if(over && !AI && !recorded){ recorded=true; recordResult("battleship", over===role?"win":"loss"); }
   $("rematch").style.display=over?"":"none";
 }
@@ -266,7 +266,7 @@ function onFire(r,c){
 function onResult(r,c,hit,lost){ enemy[r][c]=hit?2:3; if(lost) over=role; renderPlay(); }
 
 if(AI){
-  document.querySelector(".bar h1").textContent="🚢 Battleship — vs Computer";
+  document.querySelector(".bar h1").textContent="Schëffer versenken – géint de Computer";
   GC.mountDifficulty(()=>difficulty,(d)=>{difficulty=d;});
   clearAll(); phase="setup"; oppHere=true; renderSetup();
 } else if (!(window.MPGate && window.MPGate.redirecting)) {   // mp-gate.js sends a bare visit to the lobby (lobby.html)
@@ -293,7 +293,7 @@ if(AI){
       if(oppHere&&myReady&&phase==="setup") ch.send({type:"broadcast",event:"ready",payload:{}}); // re-announce for late joiners
       if(phase==="setup") renderSetup();
     },
-    onSeatTaken:()=>setStatus("Seat already taken",`This room already has a ${role} — join with the other role or start a new room.`),
+    onSeatTaken:()=>setStatus("Plaz scho besat",`Dësen Raum huet schonn e(n) ${role} — trëtt mat der anerer Roll bäi oder maach en neie Raum op.`),
   });
 }
 

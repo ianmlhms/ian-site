@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="lb">
 <head>
 <meta charset="utf-8">
 <meta name="robots" content="noindex,follow">
@@ -7,17 +7,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Messenger — ian.lu</title>
   <link rel="canonical" href="https://ian.lu/messenger.html" />
-<meta name="description" content="Real-time group messenger.">
+<meta name="description" content="Messenger op ian.lu: Chatten a Gruppen an Echtzäit.">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Messenger">
-<meta name="theme-color" content="#0d0d1a">
+<meta name="theme-color" content="#f6f6f3">
+<link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="gitter.css?v=11">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<script src="season.js?v=5"></script>
 <script src="theme.js?v=32"></script>
 <script src="i18n-dict.js?v=54"></script>
 <script src="i18n.js?v=5"></script>
-<link rel="stylesheet" href="site-ui.css?v=2">
 <style>
   *{box-sizing:border-box}
   html,body{height:100%}
@@ -33,47 +33,40 @@
   .sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   button,[role=button],.grp-open,.react-chip{touch-action:manipulation}
 
-  /* ---- header (site-ui look) ---- */
-  html body.ui .ui-header{flex:none;flex-wrap:wrap;gap:8px 14px;padding:max(16px,env(safe-area-inset-top)) max(28px,env(safe-area-inset-right)) 0 max(28px,env(safe-area-inset-left))}
-  .header-left,.header-right{display:flex;align-items:center;gap:10px;min-width:0}
-  .header-left{flex:1 1 auto}
-  .header-right{flex-wrap:wrap;justify-content:flex-end}
-  body.ui .ui-header .home{display:inline-flex;align-items:center;min-height:44px;padding:8px 16px;border-radius:var(--r-chip);border:1px solid var(--border);background:transparent;color:var(--text);font:700 14px var(--font-display);white-space:nowrap;transition:background-color .2s,border-color .2s,transform .3s var(--ease)}
-  body.ui .ui-header .home:hover{background:color-mix(in srgb,var(--accent) 10%,transparent);border-color:var(--accent-border)}
-  body.ui .ui-header .home:active{transform:scale(.97)}
-  body.ui .ui-header h1.ui-brand{margin:0;display:flex;align-items:center;gap:10px;font-size:19px;white-space:nowrap}
-  .ntf-btn{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;padding:8px 14px;border-radius:var(--r-chip);border:1px solid var(--border);background:transparent;color:var(--text);font:700 14px var(--font-display);white-space:nowrap;cursor:pointer;transition:background-color .2s,border-color .2s}
-  .ntf-btn:hover{background:color-mix(in srgb,var(--accent) 10%,transparent);border-color:var(--accent-border)}
-  .ntf-btn.on{border-color:var(--accent-border);color:var(--accent-text)}
-
-  /* ---- sign-in gate ---- */
-  #gate{flex:1;display:none;align-items:center;justify-content:center;padding:20px;text-align:center}
-  .gate-box{width:min(380px,100%);padding:34px 28px 28px;border-radius:var(--r-panel);background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 18%,var(--card-opaque)),color-mix(in srgb,var(--accent) 6%,var(--card-opaque)));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 28%,transparent),0 24px 48px -28px rgb(var(--ink)/.5);backdrop-filter:none;-webkit-backdrop-filter:none}
-  .gate-box h3{margin:0 0 10px;font:800 clamp(26px,5vw,32px)/1.1 var(--font-display);letter-spacing:-.03em}
-  .gate-box p{color:var(--muted);font-size:15px;line-height:1.5;margin:0 0 22px;text-wrap:balance}
-  .auth-go{width:100%;min-height:46px;background:var(--accent);color:var(--accent-foreground);border:none;border-radius:var(--r-chip);padding:12px 20px;font:750 16px var(--font-display);letter-spacing:-.01em;cursor:pointer;box-shadow:0 10px 24px -12px color-mix(in srgb,var(--accent) 75%,transparent);transition:transform .3s var(--ease),filter .2s}
-  .auth-go:hover{filter:brightness(1.06);transform:translateY(-2px)}
-  .auth-go:active{transform:scale(.98)}
+  /* ---- Gitter header + sign-in gate ---- */
+  .gt-bar{flex:none;display:flex;align-items:center;justify-content:space-between;gap:4px 14px;width:100%;max-width:1240px;margin:0 auto;padding:max(8px,env(safe-area-inset-top)) max(var(--gutter),env(safe-area-inset-right)) 0 max(var(--gutter),env(safe-area-inset-left))}
+  html body.gt .gt-bar{position:static;background:none;box-shadow:none;border:0;border-radius:0;backdrop-filter:none;-webkit-backdrop-filter:none}
+  .gt-bar .gt-nav-l{flex-wrap:nowrap}
+  .gt-bar .gt-navr{flex-wrap:nowrap;gap:8px}
+  .ntf-btn{min-height:44px;padding:0 14px;font-size:14px}
+  .ntf-btn.on{border-color:var(--green);color:var(--green)}
+  #gate{flex:1;display:none;align-items:flex-start;justify-content:center;padding:0 var(--gutter) 24px;width:100%;max-width:1240px;margin:0 auto}
+  .gate-box{width:100%;padding:28px 20px;border:1px solid var(--ink);background:var(--white);display:flex;flex-direction:column;gap:14px;align-items:flex-start}
+  .gate-box h3{font:800 22px/1.1 var(--font-display);letter-spacing:-.03em}
+  .gate-box p{color:var(--muted);font-size:15px;line-height:1.5;margin:0}
+  .auth-go{min-height:44px;padding:0 18px;border:1px solid var(--ink);border-radius:0;background:var(--ink);color:var(--paper);font:600 15px "Geist",system-ui,sans-serif;cursor:pointer}
+  .auth-go:hover{background:var(--green);border-color:var(--green);color:#fff}
 
   /* ---- app shell: two soft panels (chat list, conversation) ---- */
-  #app{flex:1;display:none;min-height:0;width:100%;max-width:1040px;margin:0 auto;gap:14px;padding:14px max(28px,env(safe-area-inset-right)) max(18px,env(safe-area-inset-bottom)) max(28px,env(safe-area-inset-left))}
-  .sidebar,.chat{background:var(--card);border-radius:var(--r-panel);box-shadow:inset 0 0 0 1px var(--tile-edge),0 1px 2px rgb(var(--ink)/.05),0 18px 40px -26px rgb(var(--ink)/.4);backdrop-filter:none;-webkit-backdrop-filter:none;overflow:hidden;min-height:0}
-  .sidebar{width:280px;display:flex;flex-direction:column;flex:none}
+  #app{flex:1;display:none;min-height:0;width:100%;max-width:1240px;margin:0 auto;gap:0;padding:12px max(var(--gutter),env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(var(--gutter),env(safe-area-inset-left))}
+  .sidebar,.chat{background:var(--white);border:1px solid var(--ink);overflow:hidden;min-height:0}
+  .chat{margin-left:-1px}
+  .sidebar{width:300px;display:flex;flex-direction:column;flex:none}
   .chat{flex:1;display:flex;flex-direction:column;min-width:0;position:relative}
-  .side-head{display:flex;align-items:center;gap:8px;padding:16px 14px 8px 20px}
-  .side-head .t{font:800 22px/1.1 var(--font-display);letter-spacing:-.03em;flex:1}
-  .side-head button{display:grid;place-items:center;width:var(--hit-target,2.75rem);min-width:var(--hit-target,2.75rem);height:var(--hit-target,2.75rem);padding:0;border-radius:var(--r-chip);border:0;background:color-mix(in srgb,var(--accent) 16%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 26%,transparent);color:var(--text);font:700 18px var(--font-display);cursor:pointer;transition:transform .3s var(--ease),background-color .2s}
-  .side-head button:hover{transform:translateY(-2px) rotate(-4deg);background:color-mix(in srgb,var(--accent) 26%,var(--card-opaque))}
-  .side-head button:active{transform:scale(.95)}
-  .search-box{padding:6px 14px 10px;border-radius:0;box-shadow:none;background:none;backdrop-filter:none;-webkit-backdrop-filter:none}
-  .search-box input{display:block;width:100%;min-height:46px;padding:10px 16px;border:0;border-radius:var(--r-chip);background:var(--card-opaque);color:var(--text);font-size:16px;outline:none;box-shadow:inset 0 0 0 1px var(--border);transition:box-shadow .2s}
+  .side-head{display:flex;align-items:center;gap:6px;padding:12px 12px 8px 16px;border-bottom:1px solid var(--soft)}
+  .side-head .t{font:800 16px/1.1 var(--font-display);letter-spacing:-.01em;flex:1}
+  .side-head button{display:grid;place-items:center;width:44px;min-width:44px;height:44px;padding:0;border:1px solid var(--ink);border-radius:0;background:transparent;color:var(--ink);cursor:pointer}
+  .side-head button:hover{border-color:var(--green);color:var(--green);background:var(--white)}
+  .side-head button .ic{font-size:20px}
+  .search-box{padding:10px 12px;border-radius:0;box-shadow:none;background:none;backdrop-filter:none;-webkit-backdrop-filter:none}
+  .search-box input{display:block;width:100%;min-height:44px;padding:10px 12px;border:1px solid var(--ink);border-radius:0;background:var(--white);color:var(--ink);font-size:16px;outline:none}
   .search-box input::placeholder{color:var(--muted);opacity:1}
-  .search-box input:hover{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 45%,var(--border))}
-  .search-box input:focus{box-shadow:inset 0 0 0 2px var(--accent)}
-  #groupList{list-style:none;margin:0;padding:4px 10px 12px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:2px;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
-  .grp{padding:0;border-radius:var(--r-chip);display:block;transition:background-color .2s}
-  .grp:hover{background:color-mix(in srgb,var(--text) 5%,transparent)}
-  .grp.active{background:color-mix(in srgb,var(--accent) 16%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 30%,transparent)}
+  
+  .search-box input:focus{outline:2px solid var(--green);outline-offset:-2px;border-color:var(--green)}
+  #groupList{list-style:none;margin:0;padding:0;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:0;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+  .grp{padding:0;display:block;border-bottom:1px solid var(--soft)}
+  .grp:hover{background:var(--tint)}
+  .grp.active{background:var(--tint);box-shadow:inset 3px 0 0 var(--green)}
   .grp-open{display:flex;flex-direction:column;gap:3px;width:100%;margin:0;padding:11px 12px;border:0;border-radius:inherit;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;min-height:var(--hit-target,2.75rem)}
   .grp-open:focus-visible{outline-offset:-2px}
   .grp .gname{font-weight:700;font-size:15px;letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -82,15 +75,15 @@
   .grp .gprev{font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .grp.unread .gname{font-weight:850}
   .grp.unread .gprev{color:var(--text)}
-  .grp .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent);flex:none;margin-left:auto}
+  .grp .dot{width:10px;height:10px;border-radius:0;background:var(--green);flex:none;margin-left:auto}
   .empty{color:var(--muted);font-size:14px;text-align:center;padding:28px 14px;line-height:1.5;text-wrap:balance}
 
   /* ---- conversation ---- */
-  .chat-head{padding:14px 16px 14px 20px;display:flex;align-items:center;gap:12px;flex:none;box-shadow:0 1px 0 var(--tile-edge);font-size:17px;position:relative;z-index:1}
-  .chat-head>b{font:800 19px/1.15 var(--font-display);letter-spacing:-.025em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+  .chat-head{padding:14px 16px 14px 20px;display:flex;align-items:center;gap:12px;flex:none;border-bottom:1px solid var(--ink);font-size:17px;position:relative;z-index:1}
+  .chat-head>b{font:800 17px/1.15 var(--font-display);letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
   /* nothing selected: turn the bare "Select a chat" line into a friendly empty state */
-  .chat:not(:has(#chatHead .back-btn)) .chat-head{flex:1;flex-direction:column;justify-content:center;gap:10px;padding:32px;box-shadow:none;color:var(--muted);font:600 16px/1.4 var(--font-display);text-align:center}
-  .chat:not(:has(#chatHead .back-btn)) .chat-head::before{content:"💬";display:grid;place-items:center;width:84px;height:84px;border-radius:26px;font-size:42px;background:color-mix(in srgb,var(--accent) 16%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 26%,transparent)}
+  .chat:not(:has(#chatHead .back-btn)) .chat-head{flex:1;flex-direction:column;justify-content:center;gap:10px;padding:32px;border-bottom:0;color:var(--muted);font:600 16px/1.4 var(--font-display);text-align:center}
+  
   .chat:not(:has(#chatHead .back-btn)) .messages{display:none}
   .back-btn{display:none;align-items:center;justify-content:center;background:transparent;border:1px solid var(--border);color:var(--text);border-radius:var(--r-chip);width:var(--hit-target,2.75rem);min-width:var(--hit-target,2.75rem);height:var(--hit-target,2.75rem);padding:0;font-size:24px;line-height:1;cursor:pointer;flex:none}
   .back-btn:hover{background:color-mix(in srgb,var(--accent) 10%,transparent);border-color:var(--accent-border)}
@@ -225,9 +218,61 @@
 
   .composer input:focus-visible,.search-box input:focus-visible{outline:none}
 
+
+  /* ---- Gitter skin: sharp corners, hairlines, one green ---- */
+  .chat-head code{border-radius:0;background:var(--tint);border:1px solid var(--soft);font-family:"Geist Mono",ui-monospace,monospace;font-weight:500}
+  .back-btn,.head-actions button{border-color:var(--ink);color:var(--ink)}
+  .back-btn:hover,.head-actions button:hover{border-color:var(--green);color:var(--green);background:var(--white)}
+  .head-actions button.add-people{background:var(--ink);color:var(--paper);border-color:var(--ink);font:600 14px "Geist",system-ui,sans-serif}
+  .head-actions button.add-people:hover{background:var(--green);border-color:var(--green);filter:none}
+  .messages{background:var(--paper)}
+  .av-chip{border-radius:0;background:var(--white);box-shadow:none;border:1px solid var(--soft)}
+  .mp-av{border-radius:0}
+  .bubble{border-radius:0;background:var(--white);border:1px solid var(--soft);padding:8px 12px 7px}
+  .msg.mine .bubble{border-radius:0;background:var(--green);border-color:var(--green);color:#fff;box-shadow:none}
+  .bubble .who{color:var(--green);font-family:"Geist",system-ui,sans-serif}
+  .admin-tag,.class-tag{border-radius:0;font-family:"Geist Mono",ui-monospace,monospace;font-weight:500;box-shadow:none;background:none;border:1px solid currentColor}
+  .admin-tag{color:var(--ink)}.class-tag{color:var(--muted)}
+  .msg.mine .admin-tag,.msg.mine .class-tag{color:#fff}
+  .ticks.read{color:var(--green)}
+  .media{border-radius:0}
+  .filechip{border-radius:0;background:var(--tint);border:1px solid var(--soft)}
+  .msg.mine .filechip{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.4)}
+  .admin-link{color:var(--green);font-weight:600;margin-right:6px;display:inline-flex;align-items:center;min-height:44px}
+  .del-btn,.reply-btn,.react-btn{border-radius:0;background:var(--white);box-shadow:none;border:1px solid var(--ink)}
+  .del-btn:hover{box-shadow:none;border-color:var(--danger);color:var(--danger)}
+  .reply-quote{border-radius:0;border-left-color:var(--green)}
+  .reply-quote .rq-user{color:var(--green)}
+  .msg.mine .reply-quote{border-left-color:#fff}
+  .react-chip{border-radius:0;background:var(--tint);box-shadow:none;border:1px solid var(--soft);color:var(--ink)}
+  .react-chip.mine-r{background:var(--white);border-color:var(--green)}
+  .msg.mine .react-chip{background:var(--white)}
+  .react-pop{border-radius:0;box-shadow:none;border:1px solid var(--ink);background:var(--white)}
+  .react-pop button{border-radius:0}
+  .reply-bar{border-radius:0;background:var(--tint);box-shadow:inset 3px 0 0 var(--green)}
+  .reply-bar .rb-user{color:var(--green)}
+  .composer{border-radius:0;background:var(--white);box-shadow:none;border:1px solid var(--ink);margin:6px 12px max(12px,env(safe-area-inset-bottom))}
+  .composer:hover{box-shadow:none}
+  .composer:focus-within{box-shadow:none;outline:2px solid var(--green);outline-offset:-2px;border-color:var(--green)}
+  .composer input{border-radius:0}
+  .composer button[type=submit]{border-radius:0;background:var(--ink);color:var(--paper);box-shadow:none;font:600 15px "Geist",system-ui,sans-serif}
+  .composer button[type=submit]:hover{background:var(--green);filter:none}
+  #attachBtn .ic,#micBtn .ic{font-size:20px}
+  #attachBtn:hover,#micBtn:hover{background:var(--tint)}
+  #micBtn.rec{background:var(--danger);color:#fff}
+  .member-panel{border-radius:0;box-shadow:none;border:1px solid var(--ink);background:var(--white)}
+  .mp-invite input{border-radius:0;box-shadow:none;border:1px solid var(--ink);background:var(--white)}
+  .mp-invite input:focus{box-shadow:none;outline:2px solid var(--green);outline-offset:-2px}
+  .inv-add{border-radius:0}.inv-add:hover,.inv-add:focus-visible{background:var(--tint)}
+  .inv-done{color:var(--green)}
+  .on-dot{border-radius:0;background:var(--green);width:8px;height:8px}
+  .chat-head .presence{color:var(--green)}
+  .lightbox img{border-radius:0}
+  .typing{font-style:normal}
+  .gt-bar .ic-btn{border-color:var(--ink)}
+
   @media(max-width:900px){
-    html body.ui .ui-header{padding-left:max(20px,env(safe-area-inset-left));padding-right:max(20px,env(safe-area-inset-right))}
-    #app{padding-left:max(20px,env(safe-area-inset-left));padding-right:max(20px,env(safe-area-inset-right))}
+    #app{padding-left:max(24px,env(safe-area-inset-left));padding-right:max(24px,env(safe-area-inset-right))}
     .sidebar{width:244px}
     .side-head{padding:14px 8px 8px 14px;gap:4px}
     .side-head .t{font-size:19px}
@@ -240,8 +285,7 @@
     .head-actions button.add-people{padding:0 11px;font-size:13px}
   }
   @media(max-width:640px){
-    html body.ui .ui-header{padding:max(12px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 0 max(16px,env(safe-area-inset-left))}
-    body.ui .ui-header h1.ui-brand{font-size:18px}
+    .gt-bar .ntf-btn{display:none!important}
     #app{padding:10px max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));gap:0}
     .bubble{max-width:85%}
     /* one pane at a time: chat list, OR the open conversation full-screen */
@@ -258,13 +302,13 @@
     .messages{padding:14px 12px 8px}
     .composer{margin:6px 8px max(8px,env(safe-area-inset-bottom))}
     /* full-screen conversation: hide the global top bar, back-btn navigates */
-    body:has(#app.chat-open) header{display:none}
+    body:has(#app.chat-open) .gt-bar{display:none}
     body:has(#app.chat-open) #app{padding-top:max(10px,env(safe-area-inset-top))}
   }
   @media(max-width:520px){
     /* the label only fits on wider screens; the button keeps its aria-label */
     .head-actions button.add-people{width:var(--hit-target,2.75rem);padding:0;font-size:0}
-    .head-actions button.add-people::before{content:"👤+";font-size:15px;letter-spacing:-1px}
+    .head-actions button.add-people::before{content:"+";font-size:20px;font-weight:600}
     .head-actions{gap:4px}
   }
   /* touch: the 44px react button was a big disc inside every bubble; keep the target, drop the disc */
@@ -272,24 +316,20 @@
     .react-btn{width:44px;height:44px;position:relative;bottom:auto;margin-top:4px;background:none;box-shadow:none;opacity:.6;display:block;margin:-8px -10px -14px auto;font-size:15px}
     .msg:not(.mine) .react-btn{right:auto}.msg.mine .react-btn{left:auto}
   }
-  @media(prefers-reduced-motion:reduce){#micBtn.rec{animation:none}.bubble,.side-head button,.auth-go,.composer button[type=submit]{transition:none}}
+  @media(prefers-reduced-motion:reduce){#micBtn.rec{animation:none}.bubble{transition:none}}
 </style>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <script data-goatcounter="https://ianm.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
   <meta name="mobile-web-app-capable" content="yes">
 </head>
-<body class="ui">
-<header class="ui-header">
-  <div class="header-left">
-    <a class="home" href="index.html" data-i18n="nav.home">‹ Home</a>
-    <h1 class="ui-brand" data-i18n="msg.h1">💬 Messenger</h1>
-  </div>
-  <div class="header-right">
-    <a href="notify-help.html" class="ntf-btn" data-i18n-attr="title:msg.notifyHelp|aria-label:msg.notifyHelp" title="How to turn on notifications" aria-label="How to turn on notifications" style="text-decoration:none"><span aria-hidden="true">❓</span></a>
-    <button id="notifyBtn" class="ntf-btn" style="display:none" title="Get notified of new messages">🔔 Notify</button>
-    <span id="langSw"></span>
-    <span id="acctHost"></span>
+<body class="gt">
+<header class="gt-bar">
+  <div class="gt-nav-l"><a class="gt-back" href="index.html">‹ Heem</a><h1 class="gt-page-title">Messenger</h1></div>
+  <div class="gt-navr">
+    <a href="notify-help.html" class="ic-btn" id="helpBtn" data-i18n-attr="title:msg.notifyHelp|aria-label:msg.notifyHelp" title="Wéi aktivéieren ech Notifikatiounen?" aria-label="Wéi aktivéieren ech Notifikatiounen?"><svg class="ic" aria-hidden="true"><use href="gitter-icons.svg#g-help"/></svg></a>
+    <button id="notifyBtn" class="gt-btn ghost ntf-btn" style="display:none" title="Notifikatioune fir nei Messagen">Notifikatiounen</button>
+    <button type="button" class="gt-acct" id="gtAcct">Umellen</button>
   </div>
 </header>
 
@@ -299,16 +339,16 @@
 <div id="app">
   <aside class="sidebar">
     <div class="side-head">
-      <span class="t" data-i18n="msg.chats">Chats</span>
-      <button id="newDM" type="button" data-i18n-attr="title:msg.tip.dm|aria-label:msg.tip.dm" title="Message someone by username" aria-label="Message someone by username"><span aria-hidden="true">@</span></button>
-      <button id="newG" type="button" data-i18n-attr="title:msg.tip.newGroup|aria-label:msg.tip.newGroup" title="New group" aria-label="New group"><span aria-hidden="true">+</span></button>
-      <button id="joinG" type="button" data-i18n-attr="title:msg.tip.join|aria-label:msg.tip.join" title="Join by code" aria-label="Join by code"><span aria-hidden="true">⇲</span></button>
+      <span class="t" data-i18n="msg.chats">Chatten</span>
+      <button id="newDM" type="button" data-i18n-attr="title:msg.tip.dm|aria-label:msg.tip.dm" title="Message someone by username" aria-label="Message someone by username"><svg class="ic" aria-hidden="true"><use href="gitter-icons.svg#g-at"/></svg></button>
+      <button id="newG" type="button" data-i18n-attr="title:msg.tip.newGroup|aria-label:msg.tip.newGroup" title="New group" aria-label="New group"><svg class="ic" aria-hidden="true"><use href="gitter-icons.svg#g-plus"/></svg></button>
+      <button id="joinG" type="button" data-i18n-attr="title:msg.tip.join|aria-label:msg.tip.join" title="Join by code" aria-label="Join by code"><svg class="ic" aria-hidden="true"><use href="gitter-icons.svg#g-enter"/></svg></button>
     </div>
-    <div class="search-box"><input id="searchInput" name="chat-search" type="text" enterkeyhint="search" data-i18n-attr="placeholder:msg.searchPlaceholder|aria-label:msg.chats" placeholder="🔍 Search chats…" aria-label="Chats" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+    <div class="search-box"><input id="searchInput" name="chat-search" type="text" enterkeyhint="search" placeholder="Chatten sichen …" aria-label="Chatten" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
     <ul id="groupList"></ul>
   </aside>
   <section class="chat">
-    <div class="chat-head" id="chatHead" data-i18n="msg.selectChat">Select a chat ←</div>
+    <div class="chat-head" id="chatHead" data-i18n="msg.selectChat">Wiel e Chat ←</div>
     <div class="messages" id="messages"></div>
     <div class="member-panel" id="memberPanel"></div>
     <div class="typing" id="typing"></div>
@@ -317,11 +357,11 @@
       <button class="rb-x" id="rbX" type="button" data-i18n-attr="title:btn.cancel|aria-label:btn.cancel" title="Cancel" aria-label="Cancel"><span aria-hidden="true">&times;</span></button>
     </div>
     <form class="composer" id="composer">
-      <button type="button" id="attachBtn" data-i18n-attr="title:msg.tip.attach|aria-label:msg.tip.attach" title="Send a photo, video or file" aria-label="Send a photo, video or file"><span aria-hidden="true">📎</span></button>
-      <button type="button" id="micBtn" aria-pressed="false" data-i18n-attr="title:msg.tip.voice|aria-label:msg.tip.voice" title="Record a voice message" aria-label="Record a voice message">🎤</button>
+      <button type="button" id="attachBtn" data-i18n-attr="title:msg.tip.attach|aria-label:msg.tip.attach" title="Send a photo, video or file" aria-label="Send a photo, video or file"><svg class="ic" aria-hidden="true"><use href="gitter-icons.svg#g-clip"/></svg></button>
+      <button type="button" id="micBtn" aria-pressed="false" data-i18n-attr="title:msg.tip.voice|aria-label:msg.tip.voice" title="Sprooch-Message opehuelen" aria-label="Sprooch-Message opehuelen"><svg class="ic" aria-hidden="true"><use href="gitter-icons.svg#g-mic"/></svg></button>
       <input type="file" id="fileInput" hidden aria-hidden="true" tabindex="-1">
-      <input id="msgInput" name="message" type="text" enterkeyhint="send" data-i18n-attr="placeholder:msg.composerPlaceholder|aria-label:msg.composerPlaceholder" placeholder="Message…" aria-label="Message" autocomplete="off" maxlength="2000">
-      <button type="submit" data-i18n="msg.send">Send</button>
+      <input id="msgInput" name="message" type="text" enterkeyhint="send" data-i18n-attr="placeholder:msg.composerPlaceholder|aria-label:msg.composerPlaceholder" placeholder="Message …" aria-label="Message" autocomplete="off" maxlength="2000">
+      <button type="submit" data-i18n="msg.send">Schécken</button>
     </form>
   </section>
 </div>
@@ -399,7 +439,8 @@
 </script>
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-<script type="module" src="messenger.js?v=69"></script>
+<script type="module" src="messenger.js?v=70"></script>
+<script type="module" src="gitter-acct.js?v=1"></script>
   <script type="module" src="rtc-ring.js?v=36"></script>
   <script type="module" src="class-gate.js?v=37"></script>
 </body>

@@ -1,82 +1,79 @@
 <!DOCTYPE html>
-<html lang="en" data-no-season>
+<html lang="lb">
 <head>
 <meta charset="utf-8">
 <meta name="robots" content="noindex,follow">
 <!-- Game shell, no crawlable content. -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Draw &amp; Guess — ian.lu</title>
-  <meta name="description" content="Draw &amp; Guess — a drawing party game on ian.lu. One player draws, everyone else guesses the word." />
+<title>Zeechnen a roden — ian.lu</title>
+  <meta name="description" content="Zeechnen a roden op ian.lu — e Zeechen-Partyspill. Ee Spiller zeechent, all déi aner roden d'Wuert." />
   <link rel="canonical" href="https://ian.lu/draw.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<script src="mp-gate.js?v=7" data-game="draw"></script>
-<script src="season.js?v=5"></script>
+<script src="mp-gate.js?v=8" data-game="draw"></script>
+<link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="gitter.css?v=11">
 <script src="theme.js?v=32"></script>
 <style>
-  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--good:#3fb950}
-  *{box-sizing:border-box}
   body{margin:0;min-height:100vh;min-height:100svh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-  a{color:var(--accent2-text);text-decoration:none}
   .bar{display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--border)}
   .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:17px;margin:0}.bar .spacer{flex:1}
-  .bar code{background:var(--card2);padding:2px 8px;border-radius:6px;color:var(--accent2-text)}
+  .bar code{background:var(--card2);padding:2px 8px;border-radius:0;color:var(--accent2-text)}
   .wrap{max-width:560px;margin:0 auto;padding:14px 12px 40px}
   .scores{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
-  .pchip{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:5px 11px;font-size:13px}
+  .pchip{background:var(--card);border:1px solid var(--border);border-radius:0;padding:5px 11px;font-size:13px}
   .pchip.draw{border-color:var(--accent-border);color:var(--accent-text)}
   .pchip.got{border-color:var(--good);color:var(--good)}
   .topbar{display:flex;align-items:center;gap:10px;margin-bottom:8px;min-height:26px}
   .topbar .word{font-weight:800;letter-spacing:3px;font-size:20px;flex:1;text-align:center}
   .topbar .timer{font-weight:800;color:var(--accent2-text)}
   .topbar .rnd{color:var(--muted);font-size:13px}
-  canvas{width:100%;aspect-ratio:1;background:#fff;border-radius:12px;border:1px solid var(--border);touch-action:none;cursor:crosshair;display:block}
+  canvas{width:100%;aspect-ratio:1;background:#fff;border-radius:0;border:1px solid var(--border);touch-action:none;cursor:crosshair;display:block}
   .tools{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0}
-  .sw{width:26px;height:26px;border-radius:50%;border:2px solid var(--border);cursor:pointer}
+  .sw{width:26px;height:26px;border-radius:0;border:2px solid var(--border);cursor:pointer}
   .sw.on{border-color:var(--accent2-text)}
-  .tools .sz{width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .tools .sz{width:30px;height:30px;border-radius:0;border:1px solid var(--border);background:var(--card);color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center}
   .tools .sz.on{border-color:var(--accent2-text)}
-  .tools .clr{margin-left:auto;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:6px 12px;cursor:pointer;font-weight:700}
-  .big{width:100%;background:var(--accent);color:var(--accent-foreground);border:none;border-radius:12px;padding:13px;font-weight:800;font-size:15px;cursor:pointer;margin-top:6px}
+  .tools .clr{margin-left:auto;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:0;padding:6px 12px;cursor:pointer;font-weight:700}
+  .big{width:100%;background:var(--accent);color:var(--accent-foreground);border:none;border-radius:0;padding:13px;font-weight:800;font-size:15px;cursor:pointer;margin-top:6px}
   .big:disabled{opacity:.45;cursor:default}
   .choices{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:6px 0}
-  .choices button{background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:11px 16px;font-weight:800;cursor:pointer;font-size:15px}
+  .choices button{background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:0;padding:11px 16px;font-weight:800;cursor:pointer;font-size:15px}
   .choices button:hover{border-color:var(--accent-border)}
-  .log{height:130px;overflow-y:auto;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13.5px;margin:8px 0;display:flex;flex-direction:column;gap:3px}
+  .log{height:130px;overflow-y:auto;background:var(--card);border:1px solid var(--border);border-radius:0;padding:8px 10px;font-size:13.5px;margin:8px 0;display:flex;flex-direction:column;gap:3px}
   .log .sys{color:var(--good);font-weight:700}
   .log .g b{color:var(--accent2-text)}
   .guessrow{display:flex;gap:8px}
-  .guessrow input{flex:1;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:22px;padding:11px 15px;font-size:14px;outline:none}
+  .guessrow input{flex:1;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:0;padding:11px 15px;font-size:14px;outline:none}
   .guessrow input:focus{border-color:var(--accent2-text)}
-  .guessrow button{background:var(--accent);color:var(--accent-foreground);border:none;border-radius:22px;padding:0 18px;font-weight:800;cursor:pointer}
+  .guessrow button{background:var(--accent);color:var(--accent-foreground);border:none;border-radius:0;padding:0 18px;font-weight:800;cursor:pointer}
   .tools{gap:8px}
   .sw{position:relative;width:28px;height:28px;min-height:0;padding:0;-webkit-appearance:none;appearance:none}
   .sw::before{content:"";position:absolute;inset:-8px}
   .tools .sz{width:34px;height:44px}
   .sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
   .muted{color:var(--muted)}.center{text-align:center}
-  .win{background:linear-gradient(90deg,rgba(110,168,254,.2),transparent);border:1px solid var(--border);border-radius:12px;padding:14px;font-size:18px;font-weight:800;text-align:center;margin-bottom:10px}
+  .win{background:var(--tint);border:1px solid var(--border);border-radius:0;padding:14px;font-size:18px;font-weight:800;text-align:center;margin-bottom:10px}
 </style>
-<link rel="stylesheet" href="game-common.css?v=5">
 <script data-goatcounter="https://ianm.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
-  <meta name="theme-color" content="#0d0d1a">
+  <meta name="theme-color" content="#f6f6f3">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
 </head>
-<body>
+<body class="gt">
 <header class="bar">
   <a class="home" href="pixelbreak.html">‹ Arcade</a>
-  <h1>🎨 Draw &amp; Guess</h1>
+  <h1>Zeechnen a roden</h1>
   <div class="spacer"></div>
-  <span class="muted">room <code id="roomc"></code></span>
+  <span class="muted">Raum <code id="roomc"></code></span>
 </header>
-<div class="wrap" id="app"><p class="muted">Connecting…</p></div>
+<div class="wrap" id="app"><p class="muted">Verbindung …</p></div>
 <div class="sr" id="live" role="status" aria-live="polite"></div>
 
 <script src="pixelbreak-config.js"></script>
-<script src="pb/arcade-kit.js?v=41" data-arcade-id="o-draw" data-arcade-title="Draw & Guess" data-arcade-no-score data-arcade-replace=".bar"></script>
+<script src="pb/arcade-kit.js?v=43" data-arcade-id="o-draw" data-arcade-title="Zeechnen a roden" data-arcade-no-score data-arcade-replace=".bar"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module" src="notify-ambient.js?v=40"></script>
 <script>
@@ -126,14 +123,14 @@ function isMessage(event,p){
   }
 }
 
-let name="Player", phase="lobby", drawerCid=null, round=0, totalTurns=0, hostHere=true;
+let name="Spiller", phase="lobby", drawerCid=null, round=0, totalTurns=0, hostHere=true;
 let scores={}, order=[], word="", mask="", roundEnd=0, guessed=new Set(), logLines=[];
 let endTimer=null, tick=null;
 const me=()=>cid, isDrawer=()=>drawerCid===cid;
 const norm=(s)=> s.toLowerCase().replace(/[^a-zäöüß]/g,"");
 
 function players(){ const st=ch.presenceState(); return Object.keys(st).filter(k=>isId(k)&&Array.isArray(st[k])&&isObject(st[k][0])&&isText(st[k][0].name,MAX_NAME)).slice(0,MAX_PLAYERS).map(k=>({cid:k,name:(st[k][0]||{}).name||"?"})); }
-async function getName(){ let n=localStorage.getItem("playerName"); if(!n){ try{ n=window.__pbAuth?.session?.user?.user_metadata?.username; }catch{} } if(!n){ n=(prompt("Your name:")||"Player").slice(0,16);} localStorage.setItem("playerName",n); return n; }
+async function getName(){ let n=localStorage.getItem("playerName"); if(!n){ try{ n=window.__pbAuth?.session?.user?.user_metadata?.username; }catch{} } if(!n){ n=(prompt("Däin Numm:")||"Spiller").slice(0,16);} localStorage.setItem("playerName",n); return n; }
 
 /* ---------- render ---------- */
 function render(){
@@ -141,37 +138,37 @@ function render(){
   if(window.MPGate) MPGate.setOver(phase==="lobby"||phase==="final");   // «‹ Lobby» is one tap when no game is running
   let html = `<div class="scores">${ps.map(p=>`<span class="pchip ${p.cid===drawerCid?"draw":""} ${guessed.has(p.cid)?"got":""}">${p.cid===drawerCid?"✏️ ":""}${esc(p.name)} · ${scores[p.cid]||0}${guessed.has(p.cid)?" ✓":""}</span>`).join("")}</div>`;
   if(phase==="lobby"){
-    html += `<p class="muted center">One player draws a secret word, everyone else races to guess it in the chat. Most points after ${LAPS} laps wins.</p>`;
-    html += role==="host" ? `<button class="big" id="startBtn" ${ps.length<2?"disabled":""}>${ps.length<2?"Waiting for players…":"Start game"}</button>`
-                          : (hostHere ? `<p class="center muted">Waiting for the host…</p>`
-                                      : `<p class="center muted">⚠️ The host left the room — ask them to rejoin, or <a href="pixelbreak.html">start a new game</a>.</p>`);
+    html += `<p class="muted center">Ee Spiller zeechent e geheimt Wuert, all déi aner roden et am Chat. Wien no ${LAPS} Ronnen déi meescht Punkten huet, gewënnt.</p>`;
+    html += role==="host" ? `<button class="big" id="startBtn" ${ps.length<2?"disabled":""}>${ps.length<2?"Waart op Spiller …":"Spill starten"}</button>`
+                          : (hostHere ? `<p class="center muted">Waart op den Host …</p>`
+                                      : `<p class="center muted">⚠️ Den Host huet de Raum verlooss — frot en, nees bäizetrieden, oder <a href="pixelbreak.html">fänk e neit Spill un</a>.</p>`);
     $("app").innerHTML=html; if(role==="host"&&$("startBtn")) $("startBtn").onclick=start; return;
   }
   if(phase==="final"){
     const sorted=[...ps].sort((a,b)=>(scores[b.cid]||0)-(scores[a.cid]||0));
     const top=sorted[0];
-    html = `<div class="win">🏆 ${top?esc(top.name)+(top.cid===cid?" (you)":""):"-"} wins!</div>`+html;
+    html = `<div class="win">🏆 ${top?esc(top.name)+(top.cid===cid?" (du)":""):"-"} gewënnt!</div>`+html;
     html += role==="host" ? `<button class="big" id="againBtn">Play again</button>`
-                          : (hostHere ? `<p class="center muted">Waiting for host…</p>`
-                                      : `<p class="center muted">⚠️ The host left — <a href="pixelbreak.html">start a new game</a>.</p>`);
+                          : (hostHere ? `<p class="center muted">Waart op den Host …</p>`
+                                      : `<p class="center muted">⚠️ Den Host ass fort — <a href="pixelbreak.html">fänk e neit Spill un</a>.</p>`);
     $("app").innerHTML=html; if(role==="host") $("againBtn").onclick=()=>{ ch.send({type:"broadcast",event:"reset",payload:{}}); resetAll(); render(); }; return;
   }
   // choosing / drawing / reveal
   const secsLeft = Math.max(0, Math.ceil((roundEnd-Date.now())/1000));
-  html += `<div class="topbar"><span class="rnd">Turn ${round}/${totalTurns}</span><span class="word" id="wordEl"></span><span class="timer" id="timerEl">${phase==="drawing"?secsLeft+"s":""}</span></div>`;
-  html += `<canvas id="cv" width="600" height="600" role="img" aria-label="${isDrawer()?"Drawing canvas — draw the word here":"Drawing canvas — the drawing appears here as the drawer draws"}"></canvas>`;
+  html += `<div class="topbar"><span class="rnd">Zuch ${round}/${totalTurns}</span><span class="word" id="wordEl"></span><span class="timer" id="timerEl">${phase==="drawing"?secsLeft+"s":""}</span></div>`;
+  html += `<canvas id="cv" width="600" height="600" role="img" aria-label="${isDrawer()?"Zeechenfläch — zeechent d'Wuert hei":"Zeechenfläch — d'Zeechnung erschéngt hei, wann den Zeechner zeechent"}"></canvas>`;
   if(phase==="choosing"){
     html += isDrawer()
-      ? `<p class="center muted">Pick a word to draw:</p><div class="choices" id="choices"></div>`
-      : `<p class="center muted">✏️ ${esc((ps.find(p=>p.cid===drawerCid)||{}).name||"Someone")} is choosing a word…</p>`;
+      ? `<p class="center muted">Wiel e Wuert fir ze zeechnen:</p><div class="choices" id="choices"></div>`
+      : `<p class="center muted">✏️ ${esc((ps.find(p=>p.cid===drawerCid)||{}).name||"Een")} wielt e Wuert …</p>`;
   } else if(phase==="drawing" && isDrawer()){
     html += `<div class="tools" id="tools"></div>`;
   }
-  html += `<div class="log" id="log" role="log" aria-live="off" aria-label="Guesses and events"></div>`;
-  if(!isDrawer()) html += `<div class="guessrow"><input id="guessIn" placeholder="Type your guess…" aria-label="Your guess" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="send" maxlength="40"><button id="guessBtn">Guess</button></div>`;
+  html += `<div class="log" id="log" role="log" aria-live="off" aria-label="Tipps an Ereegnisser"></div>`;
+  if(!isDrawer()) html += `<div class="guessrow"><input id="guessIn" placeholder="Schreif däin Tipp …" aria-label="Däin Tipp" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="send" maxlength="40"><button id="guessBtn">Roden</button></div>`;
   $("app").innerHTML=html;
   $("wordEl").textContent=phase==="drawing"?(isDrawer()?word:mask):"";
-  if(phase==="drawing"){ $("wordEl").setAttribute("role","img"); $("wordEl").setAttribute("aria-label",isDrawer()?`Your word: ${word}`:`Secret word with ${mask.split("_").length-1} letters`); }
+  if(phase==="drawing"){ $("wordEl").setAttribute("role","img"); $("wordEl").setAttribute("aria-label",isDrawer()?`Däi Wuert: ${word}`:`Geheimt Wuert mat ${mask.split("_").length-1} Buschtawen`); }
   setupCanvas();
   renderLog();
   if(phase==="choosing" && isDrawer()) renderChoices();
@@ -199,13 +196,13 @@ function setupCanvas(){
 function seg(x0,y0,x1,y1,color,size){ if(!ctx) return; ctx.strokeStyle=color; ctx.lineWidth=size; ctx.beginPath(); ctx.moveTo(x0*600,y0*600); ctx.lineTo(x1*600,y1*600); ctx.stroke(); }
 function flush(){ if(sendBuf.length){ ch.send({type:"broadcast",event:"seg",payload:{a:sendBuf,c:curColor,w:curSize}}); sendBuf=[]; } }
 setInterval(()=>{ if(isDrawer()) flush(); }, 60);
-const COLOR_NAMES={"#000000":"Black","#e53527":"Red","#1d72e8":"Blue","#2ca02c":"Green","#ffcc00":"Yellow","#8b5a2b":"Brown","#ff7ac0":"Pink","#ffffff":"White (eraser)"};
-const SIZE_NAMES={3:"Small",7:"Medium",16:"Large"};
+const COLOR_NAMES={"#000000":"Schwaarz","#e53527":"Rout","#1d72e8":"Blo","#2ca02c":"Gréng","#ffcc00":"Giel","#8b5a2b":"Brong","#ff7ac0":"Rosa","#ffffff":"Wäiss (Radéierer)"};
+const SIZE_NAMES={3:"Kleng",7:"Mëttel",16:"Grouss"};
 function renderTools(){
   const fa=document.activeElement, fSel=fa&&fa.dataset&&(fa.dataset.c?`[data-c="${fa.dataset.c}"]`:fa.dataset.s?`[data-s="${fa.dataset.s}"]`:fa.id==="clrBtn"?"#clrBtn":null);
-  const t=$("tools"); t.innerHTML = COLORS.map(c=>`<button type="button" class="sw ${c===curColor?"on":""}" data-c="${c}" style="background:${c}" aria-label="Colour: ${COLOR_NAMES[c]}" aria-pressed="${c===curColor}"></button>`).join("")
-    + [3,7,16].map(s=>`<button type="button" class="sz ${s===curSize?"on":""}" data-s="${s}" aria-label="Brush size: ${SIZE_NAMES[s]}" aria-pressed="${s===curSize}"><span aria-hidden="true" style="width:${s}px;height:${s}px;border-radius:50%;background:var(--text);display:block"></span></button>`).join("")
-    + `<button type="button" class="clr" id="clrBtn"><span aria-hidden="true">🗑</span> Clear</button>`;
+  const t=$("tools"); t.innerHTML = COLORS.map(c=>`<button type="button" class="sw ${c===curColor?"on":""}" data-c="${c}" style="background:${c}" aria-label="Faarf: ${COLOR_NAMES[c]}" aria-pressed="${c===curColor}"></button>`).join("")
+    + [3,7,16].map(s=>`<button type="button" class="sz ${s===curSize?"on":""}" data-s="${s}" aria-label="Pinselgréisst: ${SIZE_NAMES[s]}" aria-pressed="${s===curSize}"><span aria-hidden="true" style="width:${s}px;height:${s}px;border-radius:50%;background:var(--text);display:block"></span></button>`).join("")
+    + `<button type="button" class="clr" id="clrBtn">Läschen</button>`;
   t.querySelectorAll("[data-c]").forEach(b=>b.onclick=()=>{ curColor=b.dataset.c; renderTools(); });
   t.querySelectorAll("[data-s]").forEach(b=>b.onclick=()=>{ curSize=+b.dataset.s; renderTools(); });
   $("clrBtn").onclick=()=>{ clearCanvas(); ch.send({type:"broadcast",event:"clear",payload:{}}); };
@@ -255,8 +252,8 @@ function applyTurn(p){ round=p.round; totalTurns=p.totalTurns; drawerCid=p.drawe
   render();
 }
 function applyStart(p){ drawerCid=p.drawerCid; mask=p.mask; roundEnd=p.roundEnd; phase="drawing"; render(); startTick(); }
-function applyCorrect(p){ scores=p.scores; guessed=new Set(p.guessed); addLog({sys:true,t:`✅ ${p.name} guessed the word!`}); renderScores(); }
-function applyReveal(p){ word=p.word; scores=p.scores; phase="reveal"; clearTimeout(tick); addLog({sys:true,t:`The word was: ${p.word}`}); render(); }
+function applyCorrect(p){ scores=p.scores; guessed=new Set(p.guessed); addLog({sys:true,t:`✅ ${p.name} huet d'Wuert errode!`}); renderScores(); }
+function applyReveal(p){ word=p.word; scores=p.scores; phase="reveal"; clearTimeout(tick); addLog({sys:true,t:`D'Wuert war: ${p.word}`}); render(); }
 function startTick(){ clearTimeout(tick); const step=()=>{ const el=$("timerEl"); if(!el||phase!=="drawing") return; const s=Math.max(0,Math.ceil((roundEnd-Date.now())/1000)); el.textContent=s+"s"; if(s>0) tick=setTimeout(step,500); }; step(); }
 function resetAll(){ phase="lobby"; drawerCid=null; round=0; totalTurns=0; scores={}; guessed=new Set(); word=""; mask=""; logLines=[]; }
 function bcastState(){ /* final uses scores already broadcast */ }
@@ -287,7 +284,7 @@ ch.on("broadcast",{event:"turn"},onMessage("turn",payload=>applyTurn(payload)))
     const st=ch.presenceState();
     const hh = role==="host" || Object.values(st).some(m=>Array.isArray(m)&&isObject(m[0])&&m[0].role==="host");
     // mid-round we only log (a re-render would wipe the canvas)
-    if(hostHere&&!hh&&phase!=="lobby"&&phase!=="final") addLog({sys:true,t:"⚠️ The host left — the game can't continue until they rejoin."});
+    if(hostHere&&!hh&&phase!=="lobby"&&phase!=="final") addLog({sys:true,t:"⚠️ Den Host ass fort — d'Spill kann net weidergoen, bis e erëm do ass."});
     hostHere=hh;
     if(phase==="lobby"||phase==="final") render();
     maybeAutoStart();

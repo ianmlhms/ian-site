@@ -24,33 +24,27 @@
 </script>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
-<script src="season.js?v=5"></script>
+<link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="gitter.css?v=11">
+<meta name="theme-color" content="#f6f6f3">
 <script src="theme.js?v=32"></script>
 <style>
 :where(button.st,button.dep,button.lndep){appearance:none;width:100%;background:transparent;color:inherit;font:inherit;text-align:inherit;border:0;border-radius:0;margin:0}
 :where(button.st){display:block}
 button.st,button.dep,button.lndep{min-height:0}
-  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--ok:#3fb950}
-  *{box-sizing:border-box}
-  body{margin:0;min-height:100vh;min-height:100svh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
-  a{color:var(--accent2-text);text-decoration:none}
-  .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
-  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
-  .wrap{flex:1;width:100%;max-width:620px;margin:0 auto;padding:18px 14px 40px;display:flex;flex-direction:column;gap:16px}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px}
   .muted{color:var(--muted);font-size:13px}
-  .retry{margin-left:8px;min-height:34px;padding:6px 12px;border-radius:9px;border:1px solid var(--border);background:var(--card2);color:var(--text);font:inherit;font-size:13px;cursor:pointer}
+  .retry{margin-left:8px;min-height:34px;padding:6px 12px;border-radius:0;border:1px solid var(--border);background:var(--card2);color:var(--text);font:inherit;font-size:13px;cursor:pointer}
   .card h3{margin:0 0 12px;font-size:16px}
   #tprow{display:flex;gap:8px;margin-bottom:4px}
-  #stopq{flex:1;min-width:0;padding:11px 12px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:16px}
-  .tpbtn{flex:none;padding:10px 13px;border-radius:10px;border:1px solid var(--accent2);background:var(--accent2);color:var(--accent2-foreground);font-size:15px;font-weight:700;cursor:pointer}
-  .tpbtn:hover{filter:brightness(1.05)}
+  #stopq{flex:1;min-width:0;padding:11px 12px;border-radius:0;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:16px}
+  .tpbtn{flex:none;min-height:44px;padding:10px 16px;border:1px solid var(--ink);background:var(--ink);color:var(--paper);font-size:15px;font-weight:600;cursor:pointer}
+  .tpbtn:hover{background:var(--green);border-color:var(--green)}
   .tpbtn:disabled{opacity:.55;cursor:default}
   #linerow{display:flex;gap:8px}
-  #lineq{flex:1;min-width:0;padding:11px 12px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:16px}
-  .linex{flex:none;padding:10px 13px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--muted);font-size:15px;cursor:pointer}
+  #lineq{flex:1;min-width:0;padding:11px 12px;border-radius:0;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:16px}
+  .linex{flex:none;padding:10px 13px;border-radius:0;border:1px solid var(--border);background:var(--card2);color:var(--muted);font-size:15px;cursor:pointer}
   .linex:hover{border-color:var(--accent2-text);color:var(--text)}
-  #stops .st,#places .st{display:flex;justify-content:space-between;gap:8px;padding:12px 12px;border:1px solid var(--border);border-radius:9px;margin-top:6px;cursor:pointer;font-size:15px}
+  #stops .st,#places .st{display:flex;justify-content:space-between;gap:8px;padding:12px 12px;border:1px solid var(--border);border-radius:0;margin-top:6px;cursor:pointer;font-size:15px}
   #stops .st:hover,#places .st:hover{border-color:var(--accent2-text)}
   #stops .st .dist,#places .st .kind{color:var(--muted);font-size:12px;flex:none}
   #places .st .pname{min-width:0;overflow:hidden;text-overflow:ellipsis}
@@ -59,25 +53,25 @@ button.st,button.dep,button.lndep{min-height:0}
   #recents{margin-bottom:2px}
   .rectitle{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin:2px 0 7px}
   .recchips{display:flex;flex-wrap:wrap;gap:7px}
-  .recchip{display:inline-flex;align-items:center;gap:6px;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:18px;padding:8px 14px;font-size:13.5px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .recchip{display:inline-flex;align-items:center;gap:6px;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:0;padding:8px 14px;font-size:13.5px;cursor:pointer;-webkit-tap-highlight-color:transparent}
   .recchip:hover{border-color:var(--accent2-text)}
-  .recchip.fav{border-color:#f7b95566}
+  .recchip.fav{border-color:var(--green)}
   #favstops{margin-bottom:2px}#favlines{margin-top:10px}
   .favstar{font-size:16px;line-height:1}
-  .favstar.on{color:#f7b955;border-color:#f7b95588}
+  .favstar.on{color:var(--green);border-color:var(--green)}
   .dep{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--border)}
   .dep:last-child{border-bottom:none}
-  .dep .line{flex:none;min-width:44px;text-align:center;font-weight:800;font-size:13px;background:var(--card2);border:1px solid var(--border);border-radius:7px;padding:3px 6px}
+  .dep .line{flex:none;min-width:44px;text-align:center;font-weight:800;font-size:13px;background:var(--card2);border:1px solid var(--border);border-radius:0;padding:3px 6px}
   .dep .dir{flex:1;min-width:0;display:flex;flex-direction:column;font-size:13.5px}
   .dep .dir .dname{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .dep .dir .sub{color:var(--muted);font-size:11.5px;margin-top:1px}
-  .dep .dir .q{background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:0 5px;color:var(--accent2-text)}
+  .dep .dir .q{background:var(--card2);border:1px solid var(--border);border-radius:0;padding:0 5px;color:var(--accent2-text)}
   .dep .time{flex:none;font-weight:700;font-size:14px;text-align:right}
-  .dep .time em{color:#f87171;font-style:normal;font-size:12px}
+  .dep .time em{color:var(--danger);font-style:normal;font-size:12px}
   .dep .time .ok{color:var(--ok)}
   .dep.canc{opacity:.5;text-decoration:line-through}
-  .dep.train .line{background:#20304a;border-color:#3a5a8a;color:#8fc7ff}
-  .dep.school .line{background:#3a2f14;border-color:#f7b95566;color:#f7cf8a}
+  .dep.train .line{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+  .dep.school .line{background:var(--white);border-color:var(--green);color:var(--green)}
   .dep{cursor:pointer}
   .dep .dcaret{flex:none;color:var(--muted);font-size:11px;margin-left:2px;transition:transform .15s}
   .dep.open .dcaret{transform:rotate(180deg)}
@@ -86,45 +80,45 @@ button.st,button.dep,button.lndep{min-height:0}
   .journey{margin-left:6px}
   .jstop{display:flex;gap:10px;align-items:baseline;padding:5px 0 5px 14px;position:relative}
   .jstop::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--border)}
-  .jstop::after{content:"";position:absolute;left:-3px;top:10px;width:8px;height:8px;border-radius:50%;background:var(--border);border:2px solid var(--card)}
+  .jstop::after{content:"";position:absolute;left:-3px;top:10px;width:8px;height:8px;border-radius:0;background:var(--border);border:2px solid var(--card)}
   .jstop:first-child::before{top:10px}
   .jstop:last-child::before{bottom:auto;height:10px}
   .jstop.here::after{background:var(--accent2)}
   .jstop.here .jn{color:var(--text);font-weight:800}
   .jstop .jt{flex:none;min-width:66px;color:var(--muted);font-variant-numeric:tabular-nums;font-size:12.5px}
-  .jstop .jt em{color:#f87171;font-style:normal}
+  .jstop .jt em{color:var(--danger);font-style:normal}
   .jstop .jn{flex:1;min-width:0;font-size:13px;color:var(--muted)}
-  .jstop .jn .q{background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:0 5px;color:var(--accent2-text);font-size:11px;margin-left:6px}
+  .jstop .jn .q{background:var(--card2);border:1px solid var(--border);border-radius:0;padding:0 5px;color:var(--accent2-text);font-size:11px;margin-left:6px}
   /* route finder */
   .triprow{display:flex;gap:8px;align-items:center}
   .triprow .cols{flex:1;min-width:0}
   .pickrow{position:relative;margin-bottom:8px}
   .pickrow:last-child{margin-bottom:0}
-  .pickrow input{width:100%;padding:11px 12px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:16px}
-  .picklist{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:5;background:var(--card2);border:1px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+  .pickrow input{width:100%;padding:11px 12px;border-radius:0;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:16px}
+  .picklist{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:5;background:var(--card2);border:1px solid var(--border);border-radius:0;overflow:hidden;}
   .picklist .st{padding:12px 12px;cursor:pointer;font-size:15px;border-bottom:1px solid var(--border)}
   .picklist .st:last-child{border-bottom:none}
   .picklist .st:hover{background:var(--card)}
   .picklist .st .kind{color:var(--muted);font-size:12px}
-  #tpSwap{flex:none;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:10px;width:auto;height:44px;padding-inline:13px;font-size:16px;cursor:pointer}
+  #tpSwap{flex:none;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:0;width:auto;height:44px;padding-inline:13px;font-size:16px;cursor:pointer}
   .tpwhen{display:flex;gap:8px;margin-top:8px;align-items:flex-start}
-  .tpwhen select{flex:none;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:10px 11px;font-size:15px}
+  .tpwhen select{flex:none;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:0;padding:10px 11px;font-size:15px}
   /* one-tap "when" chips (Elo / +15′ / Owend / Muer / 🗓) */
   .wrow{display:flex;flex-wrap:wrap;gap:7px}
-  .wchip{background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:18px;padding:9px 14px;font-size:13.5px;cursor:pointer;line-height:1;-webkit-tap-highlight-color:transparent}
+  .wchip{background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:0;padding:9px 14px;font-size:13.5px;cursor:pointer;line-height:1;-webkit-tap-highlight-color:transparent}
   .wchip:hover{border-color:var(--accent2-text)}
   .wchip.on{background:var(--accent2);border-color:var(--accent2-text);color:var(--accent2-foreground);font-weight:700}
   .wchip.wcal{padding:7px 12px;font-size:14px}
-  #tpFind{width:100%;margin-top:10px;padding:11px;border-radius:10px;border:1px solid var(--accent2);background:var(--accent2);color:var(--accent2-foreground);font-weight:700;font-size:14px;cursor:pointer}
+  #tpFind{width:100%;margin-top:10px;min-height:44px;padding:11px;border:1px solid var(--ink);background:var(--ink);color:var(--paper);font-weight:600;font-size:15px;cursor:pointer}#tpFind:hover:not(:disabled){background:var(--green);border-color:var(--green)}
   #tpFind:disabled{opacity:.55;cursor:default}
   #rectrips{margin-top:12px}
   #rectrips .recchip .ar{color:var(--muted)}
-  .trip{border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:10px}
+  .trip{border:1px solid var(--border);border-radius:0;padding:12px;margin-top:10px}
   .trip .thead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:8px}
   .trip .ttime{font-weight:800;font-size:15px}
   .trip .tmeta{color:var(--muted);font-size:12.5px;flex:none}
   .trip .legs{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-  .leg{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;background:var(--card2);border:1px solid var(--border);border-radius:7px;padding:3px 7px}
+  .leg{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;background:var(--card2);border:1px solid var(--border);border-radius:0;padding:3px 7px}
   .leg.walk{background:transparent;border-style:dashed;color:var(--muted)}
   .leg .ln{font-weight:800}
   .trip .arrow{color:var(--muted);font-size:12px}
@@ -138,16 +132,16 @@ button.st,button.dep,button.lndep{min-height:0}
   .dleg .dlt{display:flex;gap:8px;align-items:baseline}
   .dleg .dtime{color:var(--muted);font-variant-numeric:tabular-nums;flex:none;min-width:40px;font-weight:700}
   .dleg .dlmid{color:var(--muted);padding:3px 0 3px 48px}
-  .dleg .q{background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:0 5px;font-size:11px;color:var(--accent2-text);margin-left:6px}
+  .dleg .q{background:var(--card2);border:1px solid var(--border);border-radius:0;padding:0 5px;font-size:11px;color:var(--accent2-text);margin-left:6px}
   /* line-first search: type a line → pick a direction → next departures + stops */
   #lnrow{display:flex;gap:8px}
-  #lnq{flex:1;min-width:0;padding:11px 12px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:16px}
+  #lnq{flex:1;min-width:0;padding:11px 12px;border-radius:0;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:16px}
   #lndirs{display:flex;flex-wrap:wrap;gap:8px}
   #lndirs:not(:empty){margin-top:10px}
-  .lndir{background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:9px 12px;font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;-webkit-tap-highlight-color:transparent}
+  .lndir{background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:0;padding:9px 12px;font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;-webkit-tap-highlight-color:transparent}
   .lndir:hover{border-color:var(--accent2-text)}
   .lndir.on{background:var(--accent2);border-color:var(--accent2-text);color:var(--accent2-foreground);font-weight:700}
-  .lndir .lnl{font-weight:800;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:1px 6px;font-size:12px}
+  .lndir .lnl{font-weight:800;background:var(--card);border:1px solid var(--border);border-radius:0;padding:1px 6px;font-size:12px}
   .lndir.on .lnl{background:rgba(0,0,0,.15);border-color:transparent;color:inherit}
   #lnout:not(:empty){margin-top:12px}
   #lnpick{display:flex;flex-wrap:wrap;gap:8px}
@@ -155,10 +149,40 @@ button.st,button.dep,button.lndep{min-height:0}
   #lndeps .lndep{display:flex;align-items:center;gap:10px;padding:10px 2px;border-bottom:1px solid var(--border);cursor:pointer}
   #lndeps .lndep:last-of-type{border-bottom:none}
   #lndeps .lndep .lnt{flex:1;font-weight:700;font-size:14px;font-variant-numeric:tabular-nums}
-  #lndeps .lndep .lnt em{color:#f87171;font-style:normal;font-size:12px;margin-left:6px}
+  #lndeps .lndep .lnt em{color:var(--danger);font-style:normal;font-size:12px;margin-left:6px}
   #lndeps .lndep .lnt .ok{color:var(--ok);margin-left:6px}
   #lndeps .lndep .dcaret{flex:none;color:var(--muted);font-size:11px;transition:transform .15s}
   #lndeps .lndep.open .dcaret{transform:rotate(180deg)}
+  /* Gitter look */
+  .wrap-c{gap:14px}
+  .gt .c h3,.gt-card-h{margin:0 0 12px;font-size:15px;font-weight:600;color:var(--muted)}
+  .muted{color:var(--muted);font-size:13.5px}
+  input,select{font-family:inherit}
+  #stopq,#lineq,#lnq,.pickrow input{border:1px solid var(--ink);background:var(--white);min-height:44px;color:var(--ink)}
+  #stopq:focus,#lineq:focus,#lnq:focus,.pickrow input:focus{outline:2px solid var(--green);outline-offset:-2px;border-color:var(--green)}
+  .tpwhen select{border:1px solid var(--ink);background:var(--white);color:var(--ink);min-height:44px}
+  .retry,.linex,#tpSwap{border:1px solid var(--ink);background:transparent;color:var(--ink);min-height:44px;font-weight:600}
+  .retry:hover,.linex:hover,#tpSwap:hover{border-color:var(--green);color:var(--green);background:var(--white)}
+  #stops .st,#places .st{border:1px solid var(--soft);background:var(--white);min-height:44px;align-items:center}
+  #stops .st:hover,#places .st:hover,.recchip:hover,.wchip:hover,.lndir:hover{border-color:var(--green)}
+  .recchip,.wchip,.lndir{border:1px solid var(--ink);background:transparent;min-height:44px;font-family:inherit;color:var(--ink)}
+  .wchip.on,.lndir.on{background:var(--ink);border-color:var(--ink);color:var(--paper);font-weight:600}
+  .lndir .lnl{background:var(--white);color:var(--ink)}
+  .lndir.on .lnl{background:rgba(255,255,255,.18);color:var(--paper)}
+  .recchip.fav{border-color:var(--green)}
+  .favstar.on{color:var(--green)}
+  .dep .line,.leg{background:var(--white);border-color:var(--ink);font-family:"Geist Mono",ui-monospace,monospace;font-weight:500}
+  .dep .time,.jstop .jt,.dleg .dtime,.trip .ttime{font-family:"Geist Mono",ui-monospace,monospace;font-weight:500;font-variant-numeric:tabular-nums}
+  .dep .time .ok,#lndeps .lndep .lnt .ok{color:var(--green)}
+  .trip{border:1px solid var(--soft);background:var(--white)}
+  .trip.open{border-color:var(--green)}
+  .jstop::after{border-radius:0;border:2px solid var(--white)}
+  .jstop.here::after{background:var(--green)}
+  .picklist{box-shadow:none;border:1px solid var(--ink);background:var(--white)}
+  .picklist .st:hover{background:var(--tint)}
+  .nearnote button{color:var(--green);min-height:44px;min-width:44px}
+  .dep,#lndeps .lndep{min-height:44px}
+  .gt-bus-note{margin-top:8px}
 </style>
 <script data-goatcounter="https://ianm.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
   <meta name="mobile-web-app-capable" content="yes">
@@ -166,17 +190,16 @@ button.st,button.dep,button.lndep{min-height:0}
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
 </head>
-<body>
-<header class="bar">
-  <a class="home" href="index.html">‹ Heem</a>
-  <h1>🚌 Bus &amp; Zuch</h1>
-  <div class="spacer"></div>
-  <span id="acctHost"></span>
-</header>
-
-<div class="wrap">
-  <div class="card">
-    <h3>🧭 Wee fannen</h3>
+<body class="gt">
+<main class="gt-page">
+<div class="gt-grid">
+  <header class="c full gt-nav">
+    <div class="gt-nav-l"><a class="gt-back" href="index.html">‹ Heem</a><h1 class="gt-page-title">Bus &amp; Zuch</h1></div>
+    <div class="gt-navr"><button type="button" class="gt-acct" id="gtAcct">Umellen</button></div>
+  </header>
+<div class="gt-contents">
+  <div class="c half top">
+    <h3>Wee fannen</h3>
     <div id="tproute" style="display:none">
       <div class="triprow">
         <div class="cols">
@@ -200,19 +223,19 @@ button.st,button.dep,button.lndep{min-height:0}
     </div>
     <div class="muted" id="tpRouteNote" role="status">Lueden…</div>
   </div>
-  <div class="card">
-    <h3>🚌 Nächst Departuren</h3>
+  <div class="c half top">
+    <h3>Nächst Departuren</h3>
     <div id="tprow" style="display:none">
       <input id="stopq" aria-label="Arrêt, Uertschaft oder Adress" placeholder="Arrêt, Uertschaft oder Adress sichen…" autocomplete="off">
-      <button class="tpbtn" id="tpGeo" type="button" title="Arrêten no bei mir" aria-label="Arrêten no bei mir"><span aria-hidden="true">📍</span></button>
+      <button class="tpbtn" id="tpGeo" type="button" title="Arrêten no bei mir" aria-label="Arrêten no bei mir">Bei mir</button>
       <button class="tpbtn favstar" id="favStar" type="button" title="Als Favorit späicheren" aria-label="Als Favorit späicheren" aria-pressed="false" style="display:none">☆</button>
     </div>
     <div id="linerow" style="display:none;margin-top:8px">
       <input id="lineq" aria-label="Linn filteren" placeholder="Linn filteren (z.B. 321)" autocomplete="off">
-      <button class="linex" id="lineClear" type="button" title="Läschen" aria-label="Läschen" style="display:none"><span aria-hidden="true">✕</span></button>
+      <button class="linex" id="lineClear" type="button" title="Läschen" aria-label="Läschen" style="display:none"><span aria-hidden="true">×</span></button>
     </div>
     <div id="moderow" class="wrow" style="display:none;margin-top:8px">
-      <button class="wchip" id="schoolOnly" type="button" aria-pressed="false">🎒 Nëmme Schoulbussen</button>
+      <button class="wchip" id="schoolOnly" type="button" aria-pressed="false">Nëmme Schoulbussen</button>
     </div>
     <div id="depwhen" style="display:none;margin-top:10px">
       <div class="wrow" id="depWhenChips"></div>
@@ -225,8 +248,8 @@ button.st,button.dep,button.lndep{min-height:0}
     <div id="stops"></div>
     <div id="deps" aria-live="polite"><div class="muted" id="tpNote">Lueden…</div></div>
   </div>
-  <div class="card">
-    <h3>🔎 Linn sichen</h3>
+  <div class="c full top">
+    <h3>Linn sichen</h3>
     <div id="lnrow">
       <input id="lnq" aria-label="Buslinn" placeholder="Buslinn (z.B. 321, 16, T1)" autocomplete="off" inputmode="text">
       <button class="tpbtn" id="lnGo">Sichen</button>
@@ -237,6 +260,8 @@ button.st,button.dep,button.lndep{min-height:0}
     <div id="lnout" aria-live="polite"><div class="muted">Tipp eng Buslinn fir hir Richtungen, nächst Departuren an all Arrêten ze gesinn.</div></div>
   </div>
 </div>
+</div>
+</main>
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
@@ -267,7 +292,7 @@ function pushRecent(s){
 function renderRecents(){
   const host=$("recents"); if(!host)return;
   if(!RECENTS.length){ host.innerHTML=""; return; }
-  host.innerHTML=`<div class="rectitle">🕘 Zulescht benotzt</div><div class="recchips">`+
+  host.innerHTML=`<div class="rectitle">Zulescht benotzt</div><div class="recchips">`+
     RECENTS.map(r=>`<button class="recchip" data-id="${esc(r.id)}">${esc(r.name)}</button>`).join("")+`</div>`;
   host.querySelectorAll(".recchip").forEach(el=>el.onclick=()=>{
     const r=RECENTS.find(x=>String(x.id)===el.dataset.id); if(r)selectStop(r);
@@ -297,7 +322,7 @@ function updateFavStar(){
   const b=$("favStar"); if(!b)return;
   b.style.display=curStop?"":"none";
   const on=curStop&&isFavStop(curStop.id);
-  b.textContent=on?"⭐":"☆"; b.classList.toggle("on",!!on);
+  b.textContent=on?"★":"☆"; b.classList.toggle("on",!!on);
   b.title=on?"Favorit ewechhuelen":"Als Favorit späicheren";
   b.setAttribute("aria-label",b.title); b.setAttribute("aria-pressed",String(!!on));
 }
@@ -305,14 +330,14 @@ function updateFavLineStar(){
   const b=$("favLineStar"); if(!b)return;
   b.style.display=lnLine?"":"none";
   const on=lnLine&&isFavLine(lnLine);
-  b.textContent=on?"⭐":"☆"; b.classList.toggle("on",!!on);
+  b.textContent=on?"★":"☆"; b.classList.toggle("on",!!on);
   b.title=on?"Favorit ewechhuelen":"Linn als Favorit";
   b.setAttribute("aria-label",b.title); b.setAttribute("aria-pressed",String(!!on));
 }
 function renderFavs(){
   const hs=$("favstops");
   if(hs){
-    hs.innerHTML=FAVSTOPS.length?`<div class="rectitle">⭐ Favoritten</div><div class="recchips">`+
+    hs.innerHTML=FAVSTOPS.length?`<div class="rectitle">Favoritten</div><div class="recchips">`+
       FAVSTOPS.map(f=>`<button class="recchip fav" data-id="${esc(f.id)}">${esc(f.name)}</button>`).join("")+`</div>`:"";
     hs.querySelectorAll(".recchip").forEach(el=>el.onclick=()=>{
       const f=FAVSTOPS.find(x=>String(x.id)===el.dataset.id); if(f)selectStop(f);
@@ -320,7 +345,7 @@ function renderFavs(){
   }
   const hl=$("favlines");
   if(hl){
-    hl.innerHTML=FAVLINES.length?`<div class="rectitle">⭐ Favoritt-Linnen</div><div class="recchips">`+
+    hl.innerHTML=FAVLINES.length?`<div class="rectitle">Favoritt-Linnen</div><div class="recchips">`+
       FAVLINES.map(k=>`<button class="recchip fav" data-k="${esc(k)}">${esc(k)}</button>`).join("")+`</div>`:"";
     hl.querySelectorAll(".recchip").forEach(el=>el.onclick=()=>{ $("lnq").value=el.dataset.k; lineSearch(); });
   }
@@ -346,7 +371,7 @@ async function tp(params,signal){
 }
 // rail categories the HAFAS board returns at stations (buses have cat "Bus"/"")
 const RAIL=new Set(["RB","RE","IC","IR","TER","TGV","ICE","EC","EN","CFL","TRAIN"]);
-const railIcon=(cat)=>/TGV|ICE/i.test(cat||"")?"🚄":"🚆";
+const railIcon=(cat)=>"";
 let DEPS=[], lineFilter="";
 // line filter: match the line label, train number or category (e.g. "321", "RB")
 const lineMatches=(d)=>{ if(!lineFilter)return true; const f=normLine(lineFilter);
@@ -366,13 +391,13 @@ function paintDeps(){
     const late=d.delay>0, dl=late?` <em>+${d.delay}</em>`:(d.delay===0?' <span class="ok">•</span>':"");
     const train=RAIL.has((d.cat||"").toUpperCase());
     const school=!train&&isSchoolLine(d.line);
-    const lab=train?`${railIcon(d.cat)} ${esc(d.line||d.cat)}`:(school?`🎒 ${esc(d.line)}`:esc(d.line));
+    const lab=train?`${esc(d.line||d.cat)}`:(school?`${esc(d.line)}`:esc(d.line));
     const bits=[];
     if(train && d.num) bits.push(`Zuch ${esc(d.num)}`);
     if(d.platform) bits.push(`<span class="q">Quai ${esc(d.platform)}</span>`);
     const sub=bits.length?`<span class="sub">${bits.join(" · ")}</span>`:"";
     return `<button type="button" aria-expanded="false" class="dep ${train?"train":""} ${school?"school":""} ${d.cancelled?"canc":""}" data-i="${i}"><span class="line">${lab}</span>
-      <span class="dir"><span class="dname">${esc(d.dir)}</span>${sub}</span><span class="time">${esc(d.time)}${dl}${d.cancelled?" ✖":""}</span><span class="dcaret" aria-hidden="true">▾</span></button>
+      <span class="dir"><span class="dname">${esc(d.dir)}</span>${sub}</span><span class="time">${esc(d.time)}${dl}${d.cancelled?" ×":""}</span><span class="dcaret" aria-hidden="true">▾</span></button>
       <div class="depdetail" hidden></div>`;
   }).join("");
   $("deps").querySelectorAll(".dep").forEach(el=>el.onclick=()=>toggleDep(+el.dataset.i,el));
@@ -640,7 +665,7 @@ async function loadLnDepDetail(k,box){
 function renderPlaces(places){
   const host=$("places");
   if(!places||!places.length){ host.innerHTML=""; return; }
-  host.innerHTML=`<div class="rectitle">📍 Adressen &amp; Plazen</div>`+places.map((p,i)=>
+  host.innerHTML=`<div class="rectitle">Adressen &amp; Plazen</div>`+places.map((p,i)=>
     `<button type="button" class="st" data-i="${i}"><span class="pname">${esc(p.name)}</span><span class="kind">${esc(p.kind)}</span></button>`
   ).join("");
   host.querySelectorAll(".st").forEach(el=>el.onclick=()=>{
@@ -651,7 +676,7 @@ function renderPlaces(places){
 }
 function renderStops(stops,nearPlace){
   const note=nearPlace
-    ? `<div class="nearnote"><span>Arrêten bei <b>${esc(nearPlace)}</b></span><button type="button" id="nearBack">✕</button></div>`
+    ? `<div class="nearnote"><span>Arrêten bei <b>${esc(nearPlace)}</b></span><button type="button" id="nearBack">×</button></div>`
     : "";
   if(!stops||!stops.length){$("stops").innerHTML=note+'<div class="muted">Keng Arrêten fonnt.</div>';return;}
   $("stops").innerHTML=note+stops.map(s=>
@@ -750,10 +775,10 @@ function wireStopPicker(inputId,listId,setPick){
   list.addEventListener("focusout",()=>setTimeout(closeOutsidePicker,PICKER_BLUR_DELAY_MS));
 }
 const fmtClock=(iso)=>new Date(iso).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
-const MODEICON={WALK:"🚶",BUS:"🚌",COACH:"🚌",TRAM:"🚊",RAIL:"🚆",REGIONAL_RAIL:"🚆",REGIONAL_FAST_RAIL:"🚆",LONG_DISTANCE:"🚆",HIGHSPEED_RAIL:"🚄",SUBWAY:"🚇",FERRY:"⛴️"};
+const MODEICON={WALK:"Fouss",BUS:"Bus",COACH:"Bus",TRAM:"Tram",RAIL:"Zuch",REGIONAL_RAIL:"Zuch",REGIONAL_FAST_RAIL:"Zuch",LONG_DISTANCE:"Zuch",HIGHSPEED_RAIL:"Zuch",SUBWAY:"Metro",FERRY:"Schëff"};
 function legLabel(lg){
-  if(lg.mode==="WALK"){const m=Math.max(1,Math.round((lg.duration||0)/60));return `<span class="leg walk">🚶 ${m}′</span>`;}
-  const ic=MODEICON[lg.mode]||"🚌", ln=lg.routeShortName||lg.mode;
+  if(lg.mode==="WALK"){const m=Math.max(1,Math.round((lg.duration||0)/60));return `<span class="leg walk">Fouss ${m}′</span>`;}
+  const ic=MODEICON[lg.mode]||"Bus", ln=lg.routeShortName||lg.mode;
   return `<span class="leg">${ic} <span class="ln">${esc(ln)}</span></span>`;
 }
 let TRIPS=[];
@@ -770,7 +795,7 @@ function renderTrip(data){
         <span class="ttime">${fmtClock(it.startTime)} → ${fmtClock(it.endTime)}</span>
         <span class="tmeta">${mins} min · ${chg} <span class="tcaret" aria-hidden="true">▾</span></span>
       </div>
-      <div class="legs">${chain||'<span class="leg walk">🚶 zu Fouss</span>'}</div>
+      <div class="legs">${chain||'<span class="leg walk">zu Fouss</span>'}</div>
       <div class="tripdetail" hidden></div>
     </div>`;
   }).join("");
@@ -785,9 +810,9 @@ function legDetail(lg){
   const t1=fmtClock(lg.startTime), t2=fmtClock(lg.endTime);
   if(lg.mode==="WALK"){
     const m=Math.max(1,Math.round((lg.duration||0)/60));
-    return `<div class="dleg walk">🚶 ${m} min zu Fouss (${esc(lg.from.name)} → ${esc(lg.to.name)})</div>`;
+    return `<div class="dleg walk">${m} min zu Fouss (${esc(lg.from.name)} → ${esc(lg.to.name)})</div>`;
   }
-  const ic=MODEICON[lg.mode]||"🚌", line=esc(lg.routeShortName||lg.mode);
+  const ic=MODEICON[lg.mode]||"Bus", line=esc(lg.routeShortName||lg.mode);
   const num=(lg.tripShortName&&lg.tripShortName!==lg.routeShortName)?` ${esc(lg.tripShortName)}`:"";
   const head=lg.headsign?` → ${esc(lg.headsign)}`:"";
   const ns=(lg.intermediateStops||[]).length;
@@ -836,7 +861,7 @@ function pushRecentTrip(from,to){
 function renderRecentTrips(){
   const host=$("rectrips"); if(!host)return;
   if(!RTRIPS.length){ host.innerHTML=""; return; }
-  host.innerHTML=`<div class="rectitle">🕘 Lescht Weeër</div><div class="recchips">`+
+  host.innerHTML=`<div class="rectitle">Lescht Weeër</div><div class="recchips">`+
     RTRIPS.map((r,i)=>`<button class="recchip" data-i="${i}">${esc(r.from.name)} <span class="ar">→</span> ${esc(r.to.name)}</button>`).join("")+`</div>`;
   host.querySelectorAll(".recchip").forEach(el=>el.onclick=()=>{
     const r=RTRIPS[+el.dataset.i]; if(!r)return;
@@ -897,7 +922,7 @@ function wireWhen(inputId, hostId, pickerId, onChange){
   let picker=null;
   const presets=[["now","Elo"],["m15","+15′"],["m30","+30′"],["h1","+1 St."],["eve","Owend"],["tmr","Muer"]];
   host.innerHTML=presets.map(([k,l])=>`<button type="button" class="wchip${k==="now"?" on":""}" data-k="${k}" aria-pressed="${k==="now"}">${l}</button>`).join("")
-    +`<button type="button" class="wchip wcal" data-k="cal" title="Datum &amp; Zäit wielen" aria-label="Datum &amp; Zäit wielen"><span aria-hidden="true">🗓</span></button>`;
+    +`<button type="button" class="wchip wcal" data-k="cal" title="Datum &amp; Zäit wielen" aria-label="Datum &amp; Zäit wielen">Datum</button>`;
   const apply=(k)=>{
     const now=new Date();
     if(k==="now") inp.value="";
@@ -966,13 +991,13 @@ async function initTransport(){
   };
   let saved=null; try{ saved=JSON.parse(localStorage.getItem("moienStop")||"null"); }catch(error){ console.warn("[bus] saved stop unreadable, ignoring",error); }
   if(saved&&saved.id){ selectStop(saved); }
-  else $("tpNote").innerHTML='<span class="muted">Sich en Arrêt oder tipp 📍 fir déi no bei dir.</span>';
+  else $("tpNote").innerHTML='<span class="muted">Sich en Arrêt oder tipp „Bei mir“ fir déi no bei dir.</span>';
   renderRecents(); renderFavs(); updateFavStar(); updateFavLineStar();
 }
 initTransport();
 
-auth.mountAccountButton($("acctHost"));
 </script>
+  <script type="module" src="gitter-acct.js?v=1"></script>
   <script type="module" src="rtc-ring.js?v=36"></script>
   <script type="module" src="class-gate.js?v=37"></script>
 </body>

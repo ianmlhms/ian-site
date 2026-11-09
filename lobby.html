@@ -6,41 +6,47 @@
 <!-- Game shell, no crawlable content. -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Lobby — ian.lu</title>
-<meta name="description" content="Multiplayer lobby for the online games on ian.lu: open a lobby, add people, get ready and start.">
+<meta name="description" content="Lobby fir d'Online-Spiller op ian.lu: Lobby opmaachen, Leit derbäisetzen a lasleeën.">
 <link rel="canonical" href="https://ian.lu/lobby.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<script src="season.js?v=5"></script>
+<link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="gitter.css?v=11">
 <script src="theme.js?v=32"></script>
-<link rel="stylesheet" href="game-common.css?v=5">
-<link rel="stylesheet" href="mp-lobby.css?v=1">
+<script src="i18n-dict.js?v=54"></script>
+<script src="i18n.js?v=5"></script>
+<link rel="stylesheet" href="mp-lobby.css?v=2">
 <script data-goatcounter="https://ianm.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
-<meta name="theme-color" content="#0d0d1a">
+<meta name="theme-color" content="#f6f6f3">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="manifest" href="site.webmanifest">
 </head>
-<body>
-<header class="bar">
-  <a class="home" href="pixelbreak.html">‹ Arcade</a>
-  <h1 id="lobbyH1">Lobby</h1>
-  <div class="spacer"></div>
-</header>
-<main id="mpl" aria-live="off"><noscript><p class="muted center">This page needs JavaScript.</p></noscript></main>
+<body class="gt">
+<main class="gt-page">
+  <div class="gt-grid">
+    <header class="c full gt-nav">
+      <div class="gt-nav-l"><a class="gt-back" href="pixelbreak.html">‹ Arcade</a><h1 class="gt-page-title" id="lobbyH1">Lobby</h1></div>
+      <div class="gt-navr"><button type="button" class="gt-acct" id="gtAcct">Umellen</button></div>
+    </header>
+    <div class="c full gt-lobbycell"><div id="mpl" class="mpl-host" aria-live="off"><noscript><p class="gt-hint">Dës Säit brauch JavaScript.</p></noscript></div></div>
+  </div>
+</main>
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module">
-import { mountLobby } from "./mp-lobby.js?v=11";
+import { mountLobby } from "./mp-lobby.js?v=12";
 import { gameInfo } from "./mp-games.js?v=4";
 const g = gameInfo(new URLSearchParams(location.search).get("g") || "");
-if (g) document.getElementById("lobbyH1").textContent = g.emoji + " " + g.name;
+if (g) document.getElementById("lobbyH1").textContent = g.name;
 mountLobby(document.getElementById("mpl")).catch((error) => {
   console.error("[lobby] failed to start", error);
-  document.getElementById("mpl").textContent = "Lobby konnt net starten. / Lobby could not start.";
+  document.getElementById("mpl").textContent = "D'Lobby konnt net starten.";
 });
 </script>
+<script type="module" src="gitter-acct.js?v=1"></script>
 <script type="module" src="notify-ambient.js?v=40"></script>
 <script type="module" src="rtc-ring.js?v=36"></script>
 <script type="module" src="class-gate.js?v=37"></script>

@@ -1,0 +1,192 @@
+/* gitter.css — shared base of the "Gitter" look (homepage, Profil, Arcade; Nov 2026).
+ * One hairline grid, sharp corners (radius 0), paper #f6f6f3 / ink #16171a / ONE green #1f7a4d,
+ * self-hosted Geist + Geist Mono, light only. Scoped to body.gt so nothing else on the site moves.
+ * The homepage keeps its own home.css (same tokens); sub pages load this file and add a few rules.
+ * Contents: fonts · tokens · page + grid · header row · type · buttons · inputs · tags · messages ·
+ * compat for the shared ui-* classes that scripts still emit · phone rules. */
+@font-face { font-family: "Geist"; font-style: normal; font-weight: 400 800; font-display: swap; src: url("assets/fonts/geist-latin.woff2") format("woff2"); }
+@font-face { font-family: "Geist Mono"; font-style: normal; font-weight: 500; font-display: swap; src: url("assets/fonts/geist-mono-500-latin.woff2") format("woff2"); }
+
+html:has(body.gt) { background: #f6f6f3; color-scheme: light; }
+
+body.gt {
+  --paper: #f6f6f3; --white: #fcfcfa; --ink: #16171a; --muted: #62656a;
+  --line: #16171a; --soft: rgba(22, 23, 26, 0.14); --tint: rgba(22, 23, 26, 0.04);
+  --green: #1f7a4d; --danger: #a32121; --gutter: 36px;
+  /* site-wide tokens (theme.js / glass-contrast.js), pinned to this look */
+  --bg: var(--paper); --text: var(--ink); --text2: var(--muted); --border: var(--soft);
+  --card: var(--white); --card-opaque: var(--white); --card2: #efefeb; --card2-opaque: #efefeb;
+  --card-hover: #efefeb; --panel: var(--white); --panel2: #efefeb;
+  --glass-solid: var(--white); --glass-tint: var(--white); --control-fill: var(--white);
+  --accent: var(--green); --accent-text: var(--green); --accent-foreground: #fff;
+  --accent-border: var(--green); --accent2: var(--green); --accent2-foreground: #fff;
+  --accent3: var(--green); --accent4: var(--green); --focus-ring: var(--green);
+  --font-display: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --r-tile: 0; --r-chip: 0; --r-panel: 0; --radius: 0; --tile-edge: var(--soft);
+  --ease: cubic-bezier(.2, .8, .2, 1); --ink-rgb: 22 23 26;
+  margin: 0; min-height: 100svh; background: var(--paper); color: var(--ink); color-scheme: light;
+  font: 400 16px/1.45 "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+body.gt::before, body.gt::after { display: none !important; }
+body.gt * { box-sizing: border-box; }
+body.gt [hidden] { display: none !important; }
+body.gt :is(h1, h2, h3, p) { margin: 0; }
+:where(body.gt) a { color: inherit; }
+.gt .ic { width: 1em; height: 1em; flex: none; fill: currentColor; vertical-align: -0.125em; }
+.gt :focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+.gt button { touch-action: manipulation; }
+/* Light only: no appearance picker, no season layer. */
+body.gt #themeFab, body.gt #themePop { display: none !important; }
+html.auth-in .gt .only-out, html:not(.auth-in) .gt .only-in { display: none !important; }
+
+/* ---- page + grid ---- */
+.gt-page { max-width: 1240px; margin: 0 auto; padding: 24px var(--gutter) 56px; width: 100%; }
+.gt-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+.gt-stack { border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+.gt .c { border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 18px 20px; min-width: 0; display: flex; flex-direction: column; justify-content: space-between; gap: 10px; }
+.gt .full { grid-column: 1 / -1; }
+.gt-contents { display: contents; }
+.gt .half { grid-column: span 3; }
+.gt .third { grid-column: span 2; }
+.gt .top { justify-content: flex-start; }
+
+/* ---- header row ---- */
+.gt-nav { flex-direction: row !important; align-items: center; padding: 2px 20px !important; font-size: 14px; }
+.gt-nav-l { display: flex; align-items: center; gap: 4px 18px; min-width: 0; flex-wrap: wrap; }
+.gt-back { display: inline-flex; align-items: center; min-height: 44px; font-weight: 600; text-decoration: none; color: var(--muted); }
+.gt-back:hover { color: var(--green); }
+.gt-mark { font-weight: 800; font-size: 16px; text-decoration: none; letter-spacing: -0.01em; display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; }
+.gt-page-title { font-weight: 800; font-size: 16px; letter-spacing: -0.01em; }
+.gt-navr { display: flex; align-items: center; gap: 4px 14px; flex-wrap: wrap; justify-content: flex-end; }
+.gt-acct { border: 0; background: none; cursor: pointer; padding: 0 0 0 10px; min-height: 44px; font: 600 14px/1 "Geist", system-ui, sans-serif; color: var(--green); max-width: 16ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html.auth-in .gt-acct { color: var(--ink); }
+.gt-acct:hover { text-decoration: underline; text-underline-offset: 3px; }
+.gt-link { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; font-weight: 600; font-size: 14px; text-decoration: none; color: var(--ink); background: none; border: 0; padding: 0; font-family: inherit; cursor: pointer; }
+.gt-link:hover { color: var(--green); }
+
+/* ---- type ---- */
+.gt-lbl { flex-direction: row !important; align-items: center; justify-content: flex-start !important; gap: 8px; padding: 10px 20px !important; font-weight: 600; font-size: 14px; background: var(--tint); }
+.gt-lbl .ic { font-size: 18px; }
+.gt-lbl .sub { margin-left: auto; color: var(--muted); font-weight: 400; font-variant-numeric: tabular-nums; }
+.gt-h { font-size: 15px; font-weight: 600; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+.gt-h .ic { font-size: 18px; color: var(--ink); }
+.gt-big { font-size: 28px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; overflow-wrap: anywhere; }
+.gt-sub { color: var(--muted); font-size: 14px; }
+.gt-hint { color: var(--muted); font-size: 13.5px; line-height: 1.5; }
+.gt-mono { font-family: "Geist Mono", ui-monospace, monospace; font-weight: 500; font-variant-numeric: tabular-nums; }
+
+/* ---- buttons ---- */
+.gt-btn, .gt .ui-btn { appearance: none; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 18px; border: 1px solid var(--ink); border-radius: 0; background: var(--ink); color: var(--paper); font: 600 15px/1 "Geist", system-ui, sans-serif; text-decoration: none; cursor: pointer; white-space: nowrap; transition: background-color .15s, border-color .15s, color .15s; }
+.gt-btn:hover, .gt .ui-btn:hover { background: var(--green); border-color: var(--green); color: #fff; transform: none; filter: none; }
+.gt-btn.ghost, .gt .ui-btn--ghost { background: transparent; color: var(--ink); }
+.gt-btn.ghost:hover, .gt .ui-btn--ghost:hover { background: var(--white); border-color: var(--green); color: var(--green); }
+.gt-btn[disabled], .gt .ui-btn[disabled] { opacity: .5; cursor: default; }
+.gt-btn[hidden] { display: none; }
+
+/* ---- inputs ---- */
+.gt-input, .gt input.ui-input { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--ink); border-radius: 0; background: var(--white); color: var(--ink); font: 400 16px/1.3 "Geist", system-ui, sans-serif; box-shadow: none; -webkit-appearance: none; appearance: none; }
+.gt-input::placeholder { color: var(--muted); opacity: 1; }
+.gt-input:focus { outline: 2px solid var(--green); outline-offset: -2px; border-color: var(--green); box-shadow: none; }
+.gt-field { display: flex; gap: 8px; flex-wrap: wrap; }
+.gt-field .gt-input { flex: 1; min-width: 150px; width: auto; }
+
+/* ---- tags + messages ---- */
+.gt-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.gt-tags:empty { display: none; }
+.gt-tag { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--ink); padding: 2px 8px; font: 500 12px/1.5 "Geist Mono", ui-monospace, monospace; }
+.gt-tag.green { border-color: var(--green); color: var(--green); }
+.gt-tag.ink { background: var(--ink); color: var(--paper); }
+.gt-msg { min-height: 18px; color: var(--green); font-weight: 600; font-size: 13.5px; }
+.gt-msg:empty { min-height: 0; }
+.gt-msg.err { color: var(--danger); }
+
+
+/* ---- tables (hairline rows) ---- */
+.gt-table { width: 100%; border-collapse: collapse; font-size: 15px; }
+.gt-table th { text-align: left; font-weight: 600; font-size: 13px; color: var(--muted); padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.gt-table td { padding: 10px 12px; border-bottom: 1px solid var(--soft); vertical-align: top; }
+.gt-table tr:last-child td { border-bottom: 0; }
+.gt-table .num { text-align: right; font-family: "Geist Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+.gt-scroll { overflow-x: auto; }
+
+/* ---- toast + dialog panel ---- */
+.gt-toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 9999; max-width: 90vw; padding: 12px 18px; background: var(--ink); color: var(--paper); font-weight: 600; font-size: 14px; text-align: center; }
+.gt-panel { background: var(--white); border: 1px solid var(--ink); padding: 22px; }
+
+/* ---- list rows (links to other pages) ---- */
+.gt-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 44px; padding: 10px 0; border-bottom: 1px solid var(--soft); text-decoration: none; font-weight: 600; }
+.gt-row:last-child { border-bottom: 0; }
+.gt-row:hover { color: var(--green); }
+
+/* ---- compat: shared ui-* markup emitted by scripts (weekly card, modals) ---- */
+.gt .ui-card { background: var(--white); border-radius: 0; box-shadow: none; }
+
+/* ---- phones ---- */
+@media (max-width: 1000px) { body.gt { --gutter: 24px; } }
+@media (max-width: 700px) {
+  body.gt { --gutter: 16px; }
+  .gt-page { padding-top: 12px; padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
+  .gt-grid { grid-template-columns: minmax(0, 1fr); }
+  .gt-grid > *, .gt-contents > * { grid-column: 1 / -1 !important; }
+}
+@media (prefers-reduced-motion: reduce) { .gt-btn, .gt .ui-btn { transition: none; } }
+
+/* ---- v2 (pages batch): app-style pages + shared bits ---- */
+.gt .ic-btn { display: inline-grid; place-items: center; width: 44px; min-width: 44px; height: 44px; padding: 0; border: 1px solid var(--ink); border-radius: 0; background: transparent; color: var(--ink); font: 600 16px/1 "Geist", system-ui, sans-serif; cursor: pointer; text-decoration: none; }
+.gt .ic-btn:hover { border-color: var(--green); color: var(--green); background: var(--white); }
+.gt .ic-btn .ic { font-size: 20px; }
+.gt .ic-btn.on { background: var(--ink); color: var(--paper); }
+.gt-gate { text-align: left; align-items: flex-start; padding: 28px 20px !important; gap: 14px !important; justify-content: flex-start !important; }
+.gt-gate .gt-big { font-size: 22px; }
+
+/* ---- site bottom tab bar (theme.js injects #appNav on phones): text tabs, hairline, green = here ---- */
+.gt #appNav { background: var(--paper); border-top: 1px solid var(--ink); }
+.gt #appNav a { min-height: 56px; justify-content: center; padding: 0; color: var(--muted); font: 600 13px/1 "Geist", system-ui, sans-serif; position: relative; }
+.gt #appNav a .i { display: none; }
+.gt #appNav a.on { color: var(--ink); }
+.gt #appNav a.on::before { content: ""; position: absolute; left: 0; right: 0; top: -1px; height: 3px; background: var(--green); }
+/* tokens some older pages still read */
+body.gt { --accent2-text: var(--green); --ok: var(--green); --good: var(--green); --good-text: var(--green); --bad: var(--danger); --warn: var(--danger); --gold: var(--ink); }
+/* site-glass.css (loaded by theme.js) decorates these class names; flatten them in the Gitter look */
+body.gt :is(.empty, .card, .tile, .hint, .gate-box, .bar, .wrap, .proj-card, .note-card, .tbl-wrap, .gate, .panel, .chip, .swatch, .field, .note, .auth-box, .apps-gate, .glass, .glass-panel, .flight-card),
+body.gt > header:not(.arcade-bar):not(.gt-nav):not(.gt-bar) { box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; border-radius: 0; }
+
+/* ---- legacy page compat (pages that still use site-ui style markup: .ui-page / .ui-card / .ui-title / .pick buttons) ---- */
+.gt .ui-page { max-width: 760px; margin: 0 auto; padding: 22px var(--gutter) max(56px, calc(40px + env(safe-area-inset-bottom))); display: flex; flex-direction: column; gap: 14px; width: 100%; }
+.gt .ui-card { background: var(--white); border: 1px solid var(--ink); padding: 20px; box-shadow: none; }
+.gt .ui-title { font-weight: 800; letter-spacing: -0.04em; }
+.gt .ui-card--accent { background: var(--white); }
+.gt select.ui-input { appearance: none; -webkit-appearance: none; min-height: 44px; padding: 10px 12px; border: 1px solid var(--ink); border-radius: 0; background: var(--white); color: var(--ink); font: 400 16px "Geist", system-ui, sans-serif; }
+@media (max-width: 700px) { .gt .ui-page { padding-top: 14px; } }
+
+/* ---- realtime game pages (game-common.css replacement): status line, buttons, helper text ---- */
+.gt .status { font: 800 19px/1.3 "Geist", system-ui, sans-serif; letter-spacing: -0.02em; min-height: 24px; text-align: center; }
+.gt .sub { color: var(--muted); font-size: 14px; text-align: center; }
+.gt .muted { color: var(--muted); }
+.gt .center { text-align: center; }
+.gt .btn { appearance: none; min-height: 44px; padding: 10px 18px; border: 1px solid var(--ink); border-radius: 0; background: var(--ink); color: var(--paper); font: 600 15px/1 "Geist", system-ui, sans-serif; cursor: pointer; }
+.gt .btn:hover { background: var(--green); border-color: var(--green); transform: none; }
+.gt code { background: var(--tint); border: 1px solid var(--soft); border-radius: 0; padding: 1px 7px; color: var(--ink); font: 500 0.9em "Geist Mono", ui-monospace, monospace; }
+.gt .wrap { box-shadow: none; }
+
+/* ---- legacy top bar (header.bar) on pages that are not converted to the nav cell yet ---- */
+.gt header.bar:not(.arcade-bar) { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; min-height: 52px; padding: 2px 20px; max-width: calc(1240px - 2 * var(--gutter)); margin: 24px auto 0; border: 1px solid var(--ink); background: transparent; position: static; box-shadow: none; width: calc(100% - 2 * var(--gutter)); }
+.gt header.bar:not(.arcade-bar) .home, .gt header.bar:not(.arcade-bar) .home-link { display: inline-flex; align-items: center; min-height: 44px; padding: 0; border: 0; background: none; color: var(--muted); font: 600 14px "Geist", system-ui, sans-serif; text-decoration: none; }
+.gt header.bar:not(.arcade-bar) .home:hover { color: var(--green); }
+.gt header.bar:not(.arcade-bar) h1 { margin: 0; font: 800 16px/1.2 "Geist", system-ui, sans-serif; letter-spacing: -0.01em; }
+.gt header.bar .spacer { flex: 1; }
+@media (max-width: 700px) { .gt header.bar:not(.arcade-bar) { margin-top: 12px; padding-inline: 14px; } }
+
+/* legacy site-ui header (.ui-header) on pages restyled without restructuring */
+.gt .ui-header { display: flex; align-items: center; justify-content: space-between; gap: 4px 14px; flex-wrap: wrap; min-height: 52px; padding: 2px 20px; max-width: calc(1240px - 2 * var(--gutter)); width: calc(100% - 2 * var(--gutter)); margin: 24px auto 0; border: 1px solid var(--ink); background: transparent; position: static; box-shadow: none; backdrop-filter: none; border-radius: 0; }
+.gt .ui-header .header-left, .gt .ui-header .header-right { display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap; }
+.gt .ui-header .home, .gt .ui-header .ui-brand a { display: inline-flex; align-items: center; min-height: 44px; padding: 0; border: 0; background: none; color: var(--muted); font: 600 14px "Geist", system-ui, sans-serif; text-decoration: none; cursor: pointer; }
+.gt .ui-header .home:hover { color: var(--green); }
+.gt .ui-header h1.ui-brand { margin: 0; display: flex; align-items: center; gap: 10px; font: 800 16px/1.2 "Geist", system-ui, sans-serif; letter-spacing: -0.01em; white-space: nowrap; }
+.gt .ui-header .auth-btn { border: 0; background: none; border-radius: 0; box-shadow: none; color: var(--green); font: 600 14px "Geist", system-ui, sans-serif; min-height: 44px; padding: 0 0 0 10px; cursor: pointer; }
+@media (max-width: 700px) { .gt .ui-header { margin-top: 12px; padding-inline: 14px; } }
+
+/* ---- polish (Nov 2026): the Arcade game bar never wraps (site-glass wraps bars that hold the hidden language switcher) ---- */
+html body.gt .arcade-bar { flex-wrap: nowrap; }
+html body.gt .arcade-bar .langsw, html body.gt .arcade-bar #langSw { display: none !important; }

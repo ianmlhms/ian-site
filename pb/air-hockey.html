@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="lb">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Air Hockey - Arcade</title>
-<link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
+<link rel="stylesheet" href="/pb/arcade-ui.css?v=3">
 <style>
 body{display:flex;flex-direction:column}
 [hidden]{display:none!important}
@@ -21,28 +21,28 @@ canvas{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border),0 18px 48p
 .menu-panel .arcade-actions{flex-direction:column;align-items:stretch;margin-top:16px}
 .menu-panel .arcade-btn{width:100%}
 .join{display:flex;gap:8px}
-.join input{flex:1;min-width:0;min-height:44px;padding:0 12px;border:1px solid var(--border);border-radius:12px;background:var(--card);
+.join input{flex:1;min-width:0;min-height:44px;padding:0 12px;border:1px solid var(--border);border-radius:0;background:var(--card);
   color:var(--text);font:700 16px/1 var(--font);text-align:center;text-transform:lowercase}
 .join input:focus-visible{outline:3px solid var(--cyan);outline-offset:2px}
 .join .arcade-btn{width:auto}
 #mStatus{min-height:22px;margin:12px 0 0;color:var(--cyan);font-size:14px}
 </style>
-<script src="/mp-gate.js?v=7" data-game="air-hockey" data-menu data-adopt="#hudMenu,!#mHost"></script>
-<script src="/pb/arcade-kit.js?v=41" data-arcade-id="air-hockey" data-arcade-title="Air Hockey"></script>
+<script src="/mp-gate.js?v=8" data-game="air-hockey" data-menu data-adopt="#hudMenu,!#mHost"></script>
+<script src="/pb/arcade-kit.js?v=43" data-arcade-id="air-hockey" data-arcade-title="Air Hockey"></script>
 </head>
 <body>
 <main class="arcade-stage" id="stage">
-  <canvas id="c" aria-label="Air Hockey arcade game"></canvas>
-  <div class="arcade-hud"><span class="arcade-pill" id="info"></span><button class="arcade-btn secondary hud-btn" id="hudMenu" type="button" hidden>Menu</button></div>
+  <canvas id="c" aria-label="Air-Hockey-Spill"></canvas>
+  <div class="arcade-hud"><span class="arcade-pill" id="info"></span><button class="arcade-btn secondary hud-btn" id="hudMenu" type="button" hidden>Menü</button></div>
   <div class="arcade-overlay show" id="menu" role="dialog" aria-modal="true" aria-labelledby="menuTitle">
     <div class="arcade-panel menu-panel">
       <h2 id="menuTitle">Air Hockey</h2>
-      <p>First to 7 wins. Move your mallet with WASD or the arrow keys, or the on-screen pad on touch.</p>
+      <p>Wien als éischt 7 Punkte huet, gewënnt. Beweeg däi Schläger mat WASD oder de Pfeiltaste, um Touchscreen mam Pad um Écran.</p>
       <div class="arcade-actions">
-        <button class="arcade-btn" id="mAI" type="button">Play the computer</button>
-        <button class="arcade-btn secondary" id="mLocal" type="button">2 players, one device</button>
-        <button class="arcade-btn secondary" id="mHost" type="button">Host online game</button>
-        <div class="join"><input id="mCode" name="room-code" maxlength="5" placeholder="code" aria-label="Room code" enterkeyhint="go" autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false"><button class="arcade-btn secondary" id="mJoin" type="button">Join</button></div>
+        <button class="arcade-btn" id="mAI" type="button">Géint de Computer spillen</button>
+        <button class="arcade-btn secondary" id="mLocal" type="button">Zu zweet, een Apparat</button>
+        <button class="arcade-btn secondary" id="mHost" type="button">Online-Spill opmaachen</button>
+        <div class="join"><input id="mCode" name="room-code" maxlength="5" placeholder="Code" aria-label="Raumcode" enterkeyhint="go" autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false"><button class="arcade-btn secondary" id="mJoin" type="button">Bäitrieden</button></div>
       </div>
       <p id="mStatus" role="status"></p>
     </div>
@@ -55,8 +55,8 @@ canvas{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border),0 18px 48p
       <p id="panelBody" hidden></p>
       <div id="panelExtra"></div>
       <div class="arcade-actions">
-        <button class="arcade-btn" id="primary" type="button">Play</button>
-        <button class="arcade-btn secondary" id="secondary" type="button" hidden>Menu</button>
+        <button class="arcade-btn" id="primary" type="button">Spillen</button>
+        <button class="arcade-btn secondary" id="secondary" type="button" hidden>Menü</button>
       </div>
     </div>
   </div>
@@ -170,23 +170,23 @@ const status=(t)=>mStatus.textContent=t;
 const randCode=()=>Math.random().toString(36).replace(/[^a-z0-9]/g,'').slice(0,5).padEnd(5,'x');
 function begin(){p1=null;p2=null;reset();p1.score=0;p2.score=0;running=true;paused=false;matchShown=false;menu.classList.remove('show');hidePanel();
   info.textContent=
-    mode==='local'?'Red: WASD · Blue: arrows · First to 7':
-    mode==='ai'?'You are red · WASD or arrows · First to 7':
-    'You are '+(mode==='host'?'red (bottom)':'blue (top)')+' · WASD or arrows · First to 7';}
+    mode==='local'?'Rout: WASD · Blo: Pfeiltaste · Als éischt 7':
+    mode==='ai'?'Du bass rout · WASD oder Pfeiltaste · Als éischt 7':
+    'Du bass '+(mode==='host'?'rout (ennen)':'blo (uewen)')+' · WASD oder Pfeiltaste · Als éischt 7';}
 function backToMenu(msg){running=false;paused=false;matchShown=false;mode=null;parent.postMessage({__pbNet:{op:'close'}},'*');
   hidePanel();info.textContent='';menu.classList.add('show');status(msg||'')}
 $('mCode').addEventListener('keydown',e=>{if(e.key==='Enter')$('mJoin').click()});
 $('mLocal').onclick=()=>{mode='local';begin()};
 $('mAI').onclick=()=>{mode='ai';begin()};
 $('mHost').onclick=()=>{if(window.MPGate){MPGate.openLobby('new');return}mode='host';const c=randCode();NET.open(c,'host');
-  status('Room code: '+c.toUpperCase()+' - waiting for the other iPad...')};
+  status('Raumcode: '+c.toUpperCase()+' - waart um anert iPad...')};
 $('mJoin').onclick=()=>{const c=($('mCode').value||'').trim().toLowerCase();if(window.MPGate&&/^[a-z]{4}$/.test(c)){MPGate.openLobby(c);return}
-  if(!/^[a-z0-9]{4,6}$/.test(c)){status('Enter the 4-6 letter code from the host');return}
-  mode='guest';NET.open(c,'guest');status('Joining '+c.toUpperCase()+'...')};
+  if(!/^[a-z0-9]{4,6}$/.test(c)){status('Gëff de Code mat 4–6 Buschtawen vum Host an');return}
+  mode='guest';NET.open(c,'guest');status('Trëtt bäi: '+c.toUpperCase()+'...')};
 NET.onPeers=(p)=>{
   if(!running&&(mode==='host'||mode==='guest')&&p.n>=2)begin();
-  if(running&&(mode==='host'||mode==='guest')&&p.n<2)backToMenu('Opponent left the game.')};
-NET.onErr=(e)=>{if(mode==='host'||mode==='guest')backToMenu(e==='offline'?'Online play needs the internet.':'Connection problem - try again.')};
+  if(running&&(mode==='host'||mode==='guest')&&p.n<2)backToMenu('De Géigner huet d\'Spill verlooss.')};
+NET.onErr=(e)=>{if(mode==='host'||mode==='guest')backToMenu(e==='offline'?'Online spillen brauch Internet.':'Problem mat der Verbindung - probéier nach eng Kéier.')};
 NET.onMsg=(r,d)=>{
   if(mode==='host'&&d&&d.t==='k')Object.assign(remoteKeys,d.k);
   if(mode==='guest'&&d&&d.t==='s')guestTarget=d;
@@ -201,20 +201,20 @@ function showMatchEnd(){
   matchShown=true;
   if(window.MPGate)MPGate.setOver(true);   // lobby game: «‹ Lobby» is one tap now
   const p1w=p1.score>=WIN_SCORE;
-  let name=p1w?'Red':'Blue';
+  let name=p1w?'Rout':'Blo';
   if(mode==='ai')name=p1w?'You':'Computer';
   if(mode==='host'||mode==='guest')name=(p1w===(mode==='host'))?'You':'They';
-  const title=name+(name==='You'?' win!':' wins!');
+  const title=name==='You'?'Du hues gewonnen!':(name==='They'?'Géigner':name==='Computer'?'De Computer':name)+' huet gewonnen!';
   const isGuest=mode==='guest';
   showPanel({title,big:p1.score+' : '+p2.score,
-    bestLine:'Red : Blue',
-    body:isGuest?'Waiting for the host to start a rematch.':'',
-    label:'Rematch',action:isGuest?null:rematch,label2:window.MPGate&&MPGate.ctx?'‹ Lobby':'Menu',action2:()=>window.MPGate&&MPGate.ctx?MPGate.backToLobby():backToMenu()});
+    bestLine:'Rout : Blo',
+    body:isGuest?'Waart drop, dass den Host eng Revanche start.':'',
+    label:'Revanche',action:isGuest?null:rematch,label2:window.MPGate&&MPGate.ctx?'‹ Lobby':'Menü',action2:()=>window.MPGate&&MPGate.ctx?MPGate.backToLobby():backToMenu()});
 }
 function pauseGame(){
   if(!running||paused||matchShown||(mode!=='local'&&mode!=='ai'))return;
   paused=true;keys={};
-  showPanel({title:'Paused',label:'Resume',action:()=>{paused=false},label2:'Menu',action2:()=>backToMenu()});
+  showPanel({title:'Pause',label:'Weider',action:()=>{paused=false},label2:'Menü',action2:()=>backToMenu()});
 }
 
 /* ---------- AI mallet (controls top/blue): defend the goal, strike loose pucks ---------- */
@@ -333,7 +333,7 @@ hidePanel();
 fitCanvas();
 requestAnimationFrame(loop);
 /* Started from the shared lobby (lobby.html): open the room with the lobby's code and role right away (as «Host online game» / «Join» would). */
-if(window.MPGate&&MPGate.ctx&&(MPGate.ctx.role==='host'||MPGate.ctx.role==='guest')){mode=MPGate.ctx.role;NET.open(MPGate.ctx.room,mode);status('Connecting to '+MPGate.ctx.room.toUpperCase()+'…')}
+if(window.MPGate&&MPGate.ctx&&(MPGate.ctx.role==='host'||MPGate.ctx.role==='guest')){mode=MPGate.ctx.role;NET.open(MPGate.ctx.room,mode);status('Verbënnt mat '+MPGate.ctx.room.toUpperCase()+'…')}
 </script>
 </body>
 </html>

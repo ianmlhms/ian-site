@@ -112,14 +112,14 @@ window.GameCommon = (() => {
     wrap.style.cssText = "display:flex;gap:4px;margin-left:auto";
     const paint = () => wrap.querySelectorAll("button").forEach((b) => {
       const on = b.dataset.d === get();
-      b.style.background = on ? "var(--accent)" : "var(--card2)";
-      b.style.color = on ? "#fff" : "var(--muted)";
+      b.style.background = on ? "var(--ink, var(--accent))" : "transparent";
+      b.style.color = on ? "var(--paper, #fff)" : "var(--ink, var(--muted))";
     });
-    [["easy", "Easy"], ["normal", "Normal"], ["hard", "Hard"]].forEach(([d, label]) => {
+    [["easy", "Einfach"], ["normal", "Mëttel"], ["hard", "Schwéier"]].forEach(([d, label]) => {
       const b = document.createElement("button");
       b.textContent = label;
       b.dataset.d = d;
-      b.style.cssText = "background:var(--card2);border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:5px 12px;min-height:44px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit";
+      b.style.cssText = "background:transparent;border:1px solid var(--ink, var(--border));color:var(--ink, var(--muted));border-radius:0;padding:5px 14px;min-height:44px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit";
       b.onclick = () => { set(d); paint(); };
       wrap.appendChild(b);
     });

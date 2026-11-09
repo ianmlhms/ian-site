@@ -4,21 +4,20 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>2048 - Arcade</title>
-<link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
+<link rel="stylesheet" href="/pb/arcade-ui.css?v=3">
 <style>
 body{display:flex;flex-direction:column}
 [hidden]{display:none!important}
 /* top padding keeps the board clear of the HUD pills */
 .arcade-stage{padding:52px 10px 12px}
-canvas{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border),0 18px 48px rgba(0,0,0,.35)}
 .arcade-hud b{text-transform:none}
 .arcade-panel p:empty{display:none}
 #panelExtra:not(:empty){margin:14px 0 2px}
 .arcade-stage{container-type:size}
 #board{display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(4,1fr);gap:clamp(6px,2cqmin,12px);
-  width:min(100cqw,100cqh,480px);aspect-ratio:1;padding:clamp(6px,2cqmin,12px);border:1px solid var(--border);border-radius:var(--radius-l);
-  background:var(--card);box-shadow:0 18px 48px rgba(0,0,0,.35);touch-action:none;user-select:none;-webkit-user-select:none}
-.cell{display:flex;align-items:center;justify-content:center;border-radius:var(--radius-s);background:rgba(255,255,255,.04);
+  width:min(100cqw,100cqh,480px);aspect-ratio:1;padding:clamp(6px,2cqmin,12px);border:1px solid var(--g-ink);border-radius:0;
+  background:var(--g-white);box-shadow:none;touch-action:none;user-select:none;-webkit-user-select:none}
+.cell{display:flex;align-items:center;justify-content:center;border-radius:0;background:var(--g-tint);
   font:800 clamp(18px,7cqmin,40px)/1 var(--font-display);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
 .cell.big{font-size:clamp(15px,5.6cqmin,32px)}
 .cell.huge{font-size:clamp(12px,4.4cqmin,26px)}
@@ -26,7 +25,7 @@ canvas{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border),0 18px 48p
 @keyframes cell-pop{from{transform:scale(.6);opacity:.4}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion:reduce){.cell.pop{animation:none}}
 </style>
-<script src="/pb/arcade-kit.js?v=41" data-arcade-id="2048" data-arcade-title="2048"></script>
+<script src="/pb/arcade-kit.js?v=43" data-arcade-id="2048" data-arcade-title="2048"></script>
 </head>
 <body>
 <main class="arcade-stage" id="stage">
@@ -111,12 +110,12 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden&&typeof pau
 const SIZE=4,WIN_TILE=2048,SWIPE_MIN_PX=24,FOUR_CHANCE=0.1;
 // tile ramp: muted cards first, then the shared accent colours as the numbers grow
 const TILE_STYLE={
-  0:['rgba(255,255,255,.04)',COLOR.text],
-  2:['#26264a',COLOR.text],4:['#2f2f5c',COLOR.text],8:['#3d5a9c',COLOR.text],16:['#4a70c4',COLOR.text],
-  32:['#3fa9c9','#08101f'],64:[COLOR.cyan,'#08101f'],128:[COLOR.good,'#08101f'],256:[COLOR.violet,'#140a26'],
-  512:[COLOR.amber,'#1a1204'],1024:['#ff9a5c','#1f0e04'],2048:[COLOR.danger,'#1a0610']
+  0:['rgba(22,23,26,.05)','#16171a'],
+  2:['#ebebe5','#16171a'],4:['#dedfd6','#16171a'],8:['#cfe0d5','#16171a'],16:['#aacfb9','#16171a'],
+  32:['#7fb698','#16171a'],64:['#3f9468','#fff'],128:['#1f7a4d','#fff'],256:['#185f3c','#fff'],
+  512:['#11452b','#fff'],1024:['#2b2e33','#fff'],2048:['#16171a','#fff']
 };
-const BEYOND_STYLE=[COLOR.text,'#08101f'];
+const BEYOND_STYLE=['#16171a','#fff'];
 let grid,score=0,state='ready',won=false,newTile=null,swipeStart=null;
 
 function updateHud(){

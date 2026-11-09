@@ -1,0 +1,15 @@
+{
+  "name": "Devoiren",
+  "short_name": "Devoiren",
+  "description": "Devoiren mat Léisung an Ofzeginn-PDF.",
+  "start_url": "./homework.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f6f3",
+  "theme_color": "#f6f6f3",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

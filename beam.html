@@ -7,44 +7,39 @@
 <title>Beam — Fichier iwwer QR-Codes schécken | ian.lu</title>
 <meta name="description" content="Schéck e Fichier vun engem Handy op deen aneren ouni Wifi, Bluetooth oder Internet: een Ecran weist QR-Codes, deen aneren filmt se.">
 <link rel="canonical" href="https://ian.lu/beam.html">
-<meta name="theme-color" content="#0d0d1a">
+<meta name="theme-color" content="#f6f6f3">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<script src="season.js?v=5"></script>
+<link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="gitter.css?v=11">
 <script src="theme.js?v=32"></script>
 <style>
-  :root{--bg:#0d0d1a;--panel:#161625;--line:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;
-        --accent:#4de8ff;--accent2:#ff6b9d;--good:#3fb950;--bad:#e5484d}
-  *{box-sizing:border-box}
+  :root{}
   html,body{height:100%}
-  body{margin:0;background:var(--bg);color:var(--text);
-    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overscroll-behavior:none}
+  body{display:flex;flex-direction:column}
   button{font:inherit;color:inherit;cursor:pointer;touch-action:manipulation}
   a:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
-  .bar{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
-  .bar .home{color:var(--muted);font-weight:700;text-decoration:none;font-size:14px}
-  .bar h1{font-size:15px;margin:0;font-weight:800;letter-spacing:.5px;color:var(--accent-text)}
   .wrap{max-width:620px;margin:0 auto;padding:16px 14px 40px}
   .screen{display:none}.screen.on{display:block}
   h2{font-size:18px;margin:0 0 6px}
   .sub{color:var(--muted);font-size:13.5px;line-height:1.6;margin:0 0 16px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:12px}
-  .btn{display:block;width:100%;padding:15px;border-radius:12px;border:0;background:var(--accent);
+  .card{background:var(--white);border:1px solid var(--soft);border-radius:0;padding:16px;margin-bottom:12px}
+  .btn{display:block;width:100%;padding:15px;border-radius:0;border:0;background:var(--accent);
        color:var(--accent-foreground);font-weight:800;font-size:16px;margin-top:10px}
   .btn.alt{background:var(--accent2);color:var(--accent2-foreground)}
-  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
+  .btn.ghost{background:transparent;border:1px solid var(--soft);color:var(--text)}
   .btn:disabled{opacity:.45}
   /* sender */
-  #qrwrap{background:#fff;border-radius:10px;padding:12px;display:flex;align-items:center;justify-content:center}
+  #qrwrap{background:#fff;border-radius:0;padding:12px;display:flex;align-items:center;justify-content:center}
   #qrwrap canvas,#qrwrap img{width:100%;height:auto;image-rendering:pixelated;display:block}
   .stat{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-top:10px}
   .stat b{color:var(--text);font-variant-numeric:tabular-nums}
-  input[type=range]{width:100%;accent-color:var(--accent-text)}
+  input[type=range]{width:100%;accent-color:var(--ink)}
   /* receiver */
-  #cam{width:100%;border-radius:10px;background:#000;display:block}
-  .prog{height:12px;background:var(--line);border-radius:8px;overflow:hidden;margin-top:12px}
+  #cam{width:100%;border-radius:0;background:#000;display:block}
+  .prog{height:12px;background:var(--soft);border-radius:0;overflow:hidden;margin-top:12px}
   .prog i{display:block;height:100%;width:0;background:var(--good);transition:width .2s}
-  .note{font-size:12.5px;color:var(--muted);margin-top:10px;line-height:1.55;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
+  .note{border-radius:0;font-size:12.5px;color:var(--muted);margin-top:10px;line-height:1.55;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
   .warn{color:var(--bad)}
   .ok{color:var(--good);font-weight:700}
 </style>
@@ -52,7 +47,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="manifest" href="site.webmanifest">
 </head>
-<body>
+<body class="gt">
 
 <header class="bar">
   <a class="home" href="./">‹ Heem</a>
@@ -65,8 +60,8 @@
     <h2>Fichier iwwer d'Liicht schécken</h2>
     <p class="sub">Ee Handy weist eng Serie vu QR-Codes, deen aneren filmt se a setzt de Fichier
       nees zesummen. Kee Wifi, kee Bluetooth, keen Internet — nëmmen d'Kamera.</p>
-    <button type="button" class="btn" id="beSender"><span aria-hidden="true">📤</span> Schécken (weist QR-Codes)</button>
-    <button type="button" class="btn alt" id="beReceiver"><span aria-hidden="true">📥</span> Empfänken (filmt deen aneren Ecran)</button>
+    <button type="button" class="btn" id="beSender">Schécken (weist QR-Codes)</button>
+    <button type="button" class="btn alt" id="beReceiver">Empfänken (filmt deen aneren Ecran)</button>
     <p class="note">Tipp: hal déi zwee Handyen roueg, ongeféier 15–25 cm auserneen, a stell den
       Ecran vum Sender esou hell wéi méiglech.</p>
     <p class="note"><b>Wéi séier?</b> Bis ongeféier 70 KB pro Sekonn, jee no

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-lang-lock="en">
+<html lang="lb">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -7,47 +7,54 @@
 <title>KartTracker-Auer verbannen — ian.lu</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<meta name="theme-color" content="#0d0d1a">
-<script src="season.js?v=5"></script>
+<meta name="theme-color" content="#f6f6f3">
 <script src="theme.js?v=32"></script>
 <script src="i18n-dict.js?v=54"></script>
 <script src="i18n.js?v=5"></script>
-<link rel="stylesheet" href="site-ui.css?v=2">
+<link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="gitter.css?v=11">
 <style>
-  *{box-sizing:border-box}
-  body{margin:0;min-height:100vh;min-height:100svh;display:flex;flex-direction:column;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-  a{color:var(--accent-text,var(--accent));text-decoration:none}
-  button,a,input{touch-action:manipulation}
-  button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--focus-ring,var(--accent));outline-offset:2px}
-  html body.ui .ui-header{max-width:720px;flex-wrap:wrap;gap:8px 14px;padding:max(16px,env(safe-area-inset-top)) max(28px,env(safe-area-inset-right)) 0 max(28px,env(safe-area-inset-left))}
-  .header-right{display:flex;align-items:center;gap:10px}.langsw button{min-width:44px;min-height:44px}
-  body.ui .ui-header .home{display:inline-flex;align-items:center;min-height:44px;padding:8px 16px;border:1px solid var(--border);border-radius:var(--r-chip);color:var(--text);font:700 14px var(--font-display)}
-  .ui .ui-page{display:flex;flex-direction:column;gap:14px;max-width:720px;padding-top:22px;padding-left:max(28px,env(safe-area-inset-left));padding-right:max(28px,env(safe-area-inset-right));padding-bottom:max(72px,calc(40px + env(safe-area-inset-bottom)))}
+  .gt-page{max-width:860px}
+  body.gt{--best:#1f7a4d;--hr:#a32121;--map-slow:#cfcfc8;--map-fast:#1f7a4d;--map-edge:#d8d8d2}
+  .gt .kp{padding:20px;gap:14px;justify-content:flex-start}
+  .gt-nav{padding:2px 20px!important}
+  .gt .ui-card{border:1px solid var(--ink);padding:18px 20px}
+  .gate-ico,.hero-ico,.empty-ico{display:grid;place-items:center;flex:none;width:56px;height:56px;border:1px solid var(--ink);background:var(--tint);font-size:28px}
+  .state,.loading{padding:clamp(26px,5vw,44px) 22px;text-align:center;color:var(--muted)}
+  .state .gate-ico{margin:0 auto 16px}
+  .state p{font:800 clamp(18px,2.6vw,22px)/1.25 "Geist",system-ui,sans-serif;letter-spacing:-.02em;color:var(--ink)}
+  .state .ui-btn{margin-top:18px}
+  .state.is-err .gate-ico{border-color:var(--danger)}
+  .msg{min-height:20px;color:var(--muted);font-size:13.5px;line-height:1.45}.msg.ok{color:var(--green);font-weight:600}.msg.err{color:var(--danger);font-weight:600}
+  .field{display:flex;flex-direction:column;gap:6px;min-width:0}.field label{font:500 12px/1.2 "Geist Mono",ui-monospace,monospace;color:var(--muted);letter-spacing:.04em}
+  .ui-btn:disabled{opacity:.5;cursor:default}
+  a{color:var(--green)}
+  @media(max-width:700px){.gt .kp{padding:14px}.gt-page{padding-top:12px}}
+  @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
   .hero{text-align:center;padding:clamp(26px,5vw,44px) 22px}
-  .hero-ico{display:grid;place-items:center;width:76px;height:76px;margin:0 auto 16px;border-radius:23px;font-size:38px;background:color-mix(in srgb,var(--accent) 20%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 30%,transparent)}
-  .hero h1{margin:0}.hero p{max-width:520px;margin:8px auto 0;color:var(--muted);line-height:1.5}
+  .hero-ico{margin:0 auto 16px}
+  .hero h1{font:800 clamp(22px,4vw,28px)/1.15 "Geist",system-ui,sans-serif;letter-spacing:-.03em}.hero p{max-width:520px;margin:8px auto 0;color:var(--muted);line-height:1.5}
   .actions{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:20px}
-  .form{display:flex;flex-direction:column;gap:14px;max-width:480px;margin:0 auto}
-  .field{display:flex;flex-direction:column;gap:6px;text-align:left}.field label{font:700 13px var(--font-display);color:var(--muted)}
-  .msg{min-height:20px;margin:0;color:var(--muted);font-size:13.5px;line-height:1.45}.msg.err{color:#ef5b6b}.msg.ok{color:#3fb950}
-  html[data-theme="light"] .msg.err{color:#b42335}html[data-theme="light"] .msg.ok{color:#157a42}
-  .ui-btn:disabled{opacity:.55;cursor:default;transform:none}
+  .form{display:flex;flex-direction:column;gap:14px;max-width:480px;margin:0 auto}.field{text-align:left}
   .success-link{margin-top:18px}
-  @media(max-width:640px){
-    html body.ui .ui-header{padding:max(12px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 0 max(16px,env(safe-area-inset-left))}
-    .ui .ui-page{padding:16px max(16px,env(safe-area-inset-right)) calc(80px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
-    .actions .ui-btn{width:100%}
-  }
+  @media(max-width:640px){.actions .ui-btn{width:100%}}
 </style>
 </head>
-<body class="ui">
-<header class="ui-header">
-  <a class="home" href="index.html">‹ ian.lu</a>
-  <div class="header-right"></div>
-</header>
-<main class="ui-page" id="app"><div class="ui-card hero" role="status">Lueden…</div></main>
+<body class="gt">
+<main class="gt-page">
+<div class="gt-grid">
+  <header class="c full gt-nav">
+    <div class="gt-nav-l"><a class="gt-back" href="index.html">‹ Heem</a><h1 class="gt-page-title">Auer verbannen</h1></div>
+    <div class="gt-navr"><button type="button" class="gt-acct" id="gtAcct">Umellen</button></div>
+  </header>
+  <div class="c full kp">
+    <div id="app"><div class="ui-card hero" role="status">Lued …</div></div>
+  </div>
+</div>
+</main>
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module" src="kart-link.js?v=19"></script>
+<script type="module" src="gitter-acct.js?v=1"></script>
 </body>
 </html>

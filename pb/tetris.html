@@ -4,20 +4,20 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Tetris - Arcade</title>
-<link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
+<link rel="stylesheet" href="/pb/arcade-ui.css?v=3">
 <style>
 :root{--hud-h:54px;--pad:10px;--pad-b:10px}
 body{display:flex;flex-direction:column}
 [hidden]{display:none!important}
 .arcade-stage{padding:var(--hud-h) var(--pad) var(--pad-b)}
-#c{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border)}
+#c{border-radius:0;box-shadow:0 0 0 1px var(--g-ink)}
 .arcade-hud{inset:5px 14px auto;align-items:center}
 .next{display:flex;align-items:center;gap:8px;padding:4px 10px 4px 12px;border-radius:var(--radius)}
 .arcade-btn.play{min-width:min(220px,100%);min-height:52px;font-size:17px}
 #next{display:block;width:72px;height:36px}
 @media (max-width:520px){.arcade-pill{padding:7px 9px;font-size:12px}.next{padding:4px 8px}.next .lbl{display:none}}
 </style>
-<script src="/pb/arcade-kit.js?v=41" data-arcade-id="tetris" data-arcade-title="Tetris"></script>
+<script src="/pb/arcade-kit.js?v=43" data-arcade-id="tetris" data-arcade-title="Tetris"></script>
 </head>
 <body>
 <main class="arcade-stage" id="stage">
@@ -58,13 +58,13 @@ function focusDialog(id){const p=$(id).firstElementChild;p.tabIndex=-1;p.style.o
 const ROOT=getComputedStyle(document.documentElement),tok=n=>ROOT.getPropertyValue(n).trim();
 const PAL={bg:tok('--bg2'),grid:tok('--border')};
 const SHAPES=[
-  {blocks:[[0,0],[1,0],[2,0],[3,0]],color:'#00e5ff'},
-  {blocks:[[0,0],[1,0],[0,1],[1,1]],color:'#ffcc00'},
-  {blocks:[[0,0],[1,0],[2,0],[1,1]],color:'#aa44ff'},
-  {blocks:[[0,0],[1,0],[2,0],[2,1]],color:'#ff8800'},
-  {blocks:[[0,0],[1,0],[2,0],[0,1]],color:'#4488ff'},
-  {blocks:[[0,0],[1,0],[1,1],[2,1]],color:'#44ff44'},
-  {blocks:[[1,0],[2,0],[0,1],[1,1]],color:'#ff4444'},
+  {blocks:[[0,0],[1,0],[2,0],[3,0]],color:'#0b9ec4'},
+  {blocks:[[0,0],[1,0],[0,1],[1,1]],color:'#e0a800'},
+  {blocks:[[0,0],[1,0],[2,0],[1,1]],color:'#8a3fd6'},
+  {blocks:[[0,0],[1,0],[2,0],[2,1]],color:'#e8710a'},
+  {blocks:[[0,0],[1,0],[2,0],[0,1]],color:'#2f6fe0'},
+  {blocks:[[0,0],[1,0],[1,1],[2,1]],color:'#2da44e'},
+  {blocks:[[1,0],[2,0],[0,1],[1,1]],color:'#d93a3a'},
 ];
 let grid,piece,next,score,lines,level,gameOver,dropTimer,dropInterval;
 let state='idle',paused=false,best=loadBest();
@@ -129,7 +129,7 @@ function lock(){
 }
 function drawCell(ctx,x,y,size,color){
   ctx.fillStyle=color;
-  ctx.beginPath();ctx.roundRect(x+1,y+1,size-2,size-2,size>20?4:3);ctx.fill();
+  ctx.fillRect(x+1,y+1,size-2,size-2);
 }
 function draw(){
   X.setTransform(C.width/GW,0,0,C.height/GH,0,0);

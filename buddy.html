@@ -17,14 +17,12 @@
 <meta property="og:image" content="https://ian.lu/apple-touch-icon.png">
 <meta name="twitter:card" content="summary">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<meta name="theme-color" content="#0d0d1a">
-<script src="season.js?v=5"></script>
+<meta name="theme-color" content="#f6f6f3">
+<link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="gitter.css?v=11">
 <script src="theme.js?v=32"></script>
 <style>
-  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--ok:#3fb950}
-  *{box-sizing:border-box}
   body{margin:0;min-height:100vh;min-height:100svh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
-  a{color:var(--accent2-text);text-decoration:none}
   .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
   .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
   .wrap{flex:1;width:100%;max-width:700px;margin:0 auto;padding:18px 14px 24px;display:flex;flex-direction:column;gap:14px;min-height:0}
@@ -35,61 +33,61 @@
   .hero h2{margin:10px 0 4px;font-size:22px;font-weight:800}
   .hero p{margin:0 auto;max-width:420px;color:var(--muted);font-size:13.5px;line-height:1.4}
   .modes{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:6px}
-  .mode{position:relative;overflow:hidden;text-align:left;background:linear-gradient(155deg,var(--card2),var(--card));border:1px solid var(--border);border-radius:18px;padding:16px;cursor:pointer;color:var(--text);transition:transform .15s ease,border-color .15s,box-shadow .15s}
+  .mode{position:relative;overflow:hidden;text-align:left;background:var(--tint);border:1px solid var(--border);border-radius:0;padding:16px;cursor:pointer;color:var(--text);transition:transform .15s ease,border-color .15s,box-shadow .15s}
   .mode:hover,.mode:active{transform:translateY(-3px);border-color:var(--m,var(--accent2));box-shadow:0 12px 26px rgba(0,0,0,.28)}
-  .mode::after{content:"";position:absolute;right:-28px;top:-28px;width:92px;height:92px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--m,var(--accent)) 34%,transparent),transparent 70%);opacity:.55;pointer-events:none}
-  .mode .ic{position:relative;z-index:1;display:inline-flex;align-items:center;justify-content:center;width:46px;height:46px;border-radius:14px;font-size:23px;background:rgba(255,255,255,.06);background:color-mix(in srgb,var(--m,var(--accent)) 20%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--m,var(--accent)) 42%,transparent)}
+  .mode::after{display:none;content:"";position:absolute;right:-28px;top:-28px;width:92px;height:92px;border-radius:0;background:radial-gradient(circle,color-mix(in srgb,var(--m,var(--accent)) 34%,transparent),transparent 70%);opacity:.55;pointer-events:none}
+  .mode .ic{position:relative;z-index:1;display:inline-flex;align-items:center;justify-content:center;width:46px;height:46px;border-radius:0;font-size:23px;background:rgba(255,255,255,.06);background:color-mix(in srgb,var(--m,var(--accent)) 20%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--m,var(--accent)) 42%,transparent)}
   .mode b{position:relative;z-index:1;display:block;margin:12px 0 3px;font-size:15.5px}
   .mode span{position:relative;z-index:1;color:var(--muted);font-size:12.5px;line-height:1.4;display:block}
   @media(max-width:480px){.modes{grid-template-columns:1fr}}
   /* recent conversations */
   #recent .rhead{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:800;margin:20px 4px 10px}
-  .conv{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--border);border-radius:13px;padding:11px 12px;margin-bottom:8px;cursor:pointer;transition:border-color .12s}
+  .conv{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--border);border-radius:0;padding:11px 12px;margin-bottom:8px;cursor:pointer;transition:border-color .12s}
   .conv:hover{border-color:var(--accent2-text)}
   .conv .ci{font-size:20px;flex:none}
   .conv .cmain{flex:1;min-width:0;appearance:none;background:none;border:0;padding:0;margin:0;color:inherit;font:inherit;text-align:left;cursor:pointer}
   .conv .ct{display:block;font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .conv .cs{display:block;color:var(--muted);font-size:11.5px;margin-top:2px}
-  .conv .cx{flex:none;background:none;border:none;color:var(--muted);font-size:15px;cursor:pointer;padding:6px;border-radius:8px}
+  .conv .cx{flex:none;background:none;border:none;color:var(--muted);font-size:15px;cursor:pointer;padding:6px;border-radius:0}
   .conv .cx:hover{color:#f87171}
   /* ---- chat ---- */
   .chatwrap{display:none;flex:1;flex-direction:column;gap:10px;min-height:0}
   .subbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-  .subbar .back{background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:6px 10px;font-weight:700;cursor:pointer;font-size:13px}
+  .subbar .back{background:none;border:1px solid var(--border);color:var(--muted);border-radius:0;padding:6px 10px;font-weight:700;cursor:pointer;font-size:13px}
   .subbar .tag{font-weight:800;font-size:14px}
-  .subbar select{margin-left:auto;background:var(--card2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-size:13px}
+  .subbar select{margin-left:auto;background:var(--card2);color:var(--text);border:1px solid var(--border);border-radius:0;padding:6px 8px;font-size:13px}
   .stream{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:6px 2px}
-  .b{max-width:88%;padding:10px 13px;border-radius:14px;font-size:14.5px;line-height:1.45;word-wrap:break-word}
+  .b{max-width:88%;padding:10px 13px;border-radius:0;font-size:14.5px;line-height:1.45;word-wrap:break-word}
   .b.me{align-self:flex-end;background:var(--accent);color:var(--accent-foreground);border-bottom-right-radius:4px}
   .b.ai{align-self:flex-start;background:var(--card);border:1px solid var(--border);border-bottom-left-radius:4px}
   .b .imgs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
-  .b .imgs img{max-width:150px;max-height:150px;border-radius:8px;display:block}
+  .b .imgs img{max-width:150px;max-height:150px;border-radius:0;display:block}
   .b b{font-weight:800}
-  .b.ai .badge{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--accent2-text);background:rgba(77,232,255,.1);border:1px solid var(--border);border-radius:6px;padding:1px 6px;margin-bottom:6px}
+  .b.ai .badge{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--accent2-text);background:rgba(77,232,255,.1);border:1px solid var(--border);border-radius:0;padding:1px 6px;margin-bottom:6px}
   /* Quizlet-style flashcard deck */
   .dtip{font-size:11.5px;color:var(--muted);margin-bottom:8px}
   .deck{width:100%;max-width:360px}
   .card3d{height:184px;perspective:1100px;cursor:pointer;margin:0 auto}
   .card3d .inner{position:relative;width:100%;height:100%;transition:transform .5s;transform-style:preserve-3d}
   .card3d.flip .inner{transform:rotateY(180deg)}
-  .card3d .face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;display:flex;align-items:center;justify-content:center;text-align:center;padding:18px;border-radius:16px;font-size:16px;line-height:1.45;overflow:auto}
+  .card3d .face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;display:flex;align-items:center;justify-content:center;text-align:center;padding:18px;border-radius:0;font-size:16px;line-height:1.45;overflow:auto}
   .card3d .front{background:var(--card2);border:1px solid var(--border);font-weight:800}
-  .card3d .back{background:linear-gradient(150deg,var(--accent),var(--accent2));color:var(--accent-foreground);font-weight:600;transform:rotateY(180deg)}
+  .card3d .back{background:var(--tint);color:var(--accent-foreground);font-weight:600;transform:rotateY(180deg)}
   .deckctl{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:12px}
-  .deckctl .dbtn{background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:10px;min-width:40px;height:36px;font-size:16px;cursor:pointer}
+  .deckctl .dbtn{background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:0;min-width:40px;height:36px;font-size:16px;cursor:pointer}
   .deckctl .dbtn:hover{border-color:var(--accent2-text)}
   .deckctl .count{font-size:13px;color:var(--muted);min-width:54px;text-align:center;font-weight:700}
   .hint{color:var(--muted);font-size:12px;text-align:center}
   .composer{display:flex;gap:8px;align-items:flex-end;border-top:1px solid var(--border);padding-top:10px}
-  .composer textarea{flex:1;resize:none;background:var(--card2);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:10px 12px;font-size:14.5px;font-family:inherit;max-height:120px}
-  .composer button{background:var(--accent);color:var(--accent-foreground);border:none;border-radius:12px;padding:0 16px;height:42px;font-weight:800;cursor:pointer;font-size:14px}
+  .composer textarea{flex:1;resize:none;background:var(--card2);color:var(--text);border:1px solid var(--border);border-radius:0;padding:10px 12px;font-size:14.5px;font-family:inherit;max-height:120px}
+  .composer button{background:var(--accent);color:var(--accent-foreground);border:none;border-radius:0;padding:0 16px;height:42px;font-weight:800;cursor:pointer;font-size:14px}
   .composer button:disabled{opacity:.5;cursor:default}
   .iconbtn{background:var(--card2)!important;color:var(--text)!important;border:1px solid var(--border)!important;font-size:18px!important;padding:0 12px!important}
   .thumbs{display:none;flex-wrap:wrap;gap:8px}
   .thumbs .th{position:relative}
-  .thumbs .th img{width:52px;height:52px;object-fit:cover;border-radius:8px;display:block}
+  .thumbs .th img{width:52px;height:52px;object-fit:cover;border-radius:0;display:block}
   .thumbs .th .x{position:absolute;top:-19px;right:-19px;width:44px;height:44px;padding:0;background:none;border:0;display:flex;align-items:center;justify-content:center;cursor:pointer}
-  .thumbs .th .x span{background:#f87171;color:#000;border-radius:50%;width:18px;height:18px;font-size:11px;display:flex;align-items:center;justify-content:center;font-weight:800}
+  .thumbs .th .x span{background:#f87171;color:#000;border-radius:0;width:18px;height:18px;font-size:11px;display:flex;align-items:center;justify-content:center;font-weight:800}
   .left{color:var(--muted);font-size:11.5px;text-align:right}
   @media (prefers-reduced-motion:reduce){.mode,.card3d .inner,.conv{transition:none}.mode:hover,.mode:active{transform:none}}
 </style>
@@ -99,12 +97,12 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
 </head>
-<body>
+<body class="gt">
 <header class="bar">
   <a class="home" href="index.html">‹ Heem</a>
-  <h1><span aria-hidden="true">🤖</span> Study Buddy</h1>
+  <h1>Study Buddy</h1>
   <div class="spacer"></div>
-  <span id="acctHost"></span>
+  <button type="button" class="gt-acct" id="gtAcct">Umellen</button>
 </header>
 
 <div class="wrap">
@@ -129,7 +127,7 @@
     <div class="stream" id="stream" role="log" aria-live="polite" aria-label="Chat"></div>
     <div class="thumbs" id="thumbs"></div>
     <div class="composer">
-      <button class="iconbtn" id="picBtn" type="button" title="Foto oder PDF eroplueden" aria-label="Foto oder PDF eroplueden"><span aria-hidden="true">📷</span></button>
+      <button class="iconbtn" id="picBtn" type="button" title="Foto oder PDF eroplueden" aria-label="Foto oder PDF eroplueden"></button>
       <textarea id="input" rows="1" aria-label="Deng Fro" placeholder="Schreif deng Fro…"></textarea>
       <button id="send" type="button">Schécken</button>
     </div>
@@ -312,7 +310,7 @@ function renderThumbs(){
   const el=$("thumbs");
   if(!pending.length){el.style.display="none";el.innerHTML="";return;}
   el.style.display="flex";
-  el.innerHTML=pending.map((p,i)=>`<span class="th"><img src="${p.dataUrl}" alt="${esc(p.name)}"><button type="button" class="x" data-i="${i}" aria-label="Bild ewechhuelen"><span aria-hidden="true">✕</span></button></span>`).join("");
+  el.innerHTML=pending.map((p,i)=>`<span class="th"><img src="${p.dataUrl}" alt="${esc(p.name)}"><button type="button" class="x" data-i="${i}" aria-label="Bild ewechhuelen"></button></span>`).join("");
   el.querySelectorAll(".x").forEach(x=>x.onclick=()=>{ pending.splice(+x.dataset.i,1); renderThumbs(); });
 }
 
@@ -377,7 +375,7 @@ function renderRecent(){
     return `<div class="conv" data-id="${c.id}"><span class="ci" aria-hidden="true">${m.ic}</span>
       <button type="button" class="cmain"><span class="ct">${esc(c.title||"Chat")}</span>
       <span class="cs">${esc(c.subject||"")} · ${rel(c.updated_at)}</span></button>
-      <button type="button" class="cx" data-del="${c.id}" title="Läschen" aria-label="Läschen: ${esc(c.title||"Chat")}"><span aria-hidden="true">🗑</span></button></div>`;
+      <button type="button" class="cx" data-del="${c.id}" title="Läschen" aria-label="Läschen: ${esc(c.title||"Chat")}"></button></div>`;
   }).join("");
   el.querySelectorAll(".conv").forEach(d=>d.onclick=(e)=>{ if(e.target.closest("[data-del]"))return; resumeConv(d.dataset.id); });
   el.querySelectorAll("[data-del]").forEach(b=>b.onclick=async(e)=>{ e.stopPropagation(); await deleteConv(b.dataset.del); });
@@ -425,7 +423,6 @@ function applyAuth(){
   else loadConvos();
 }
 (async()=>{
-  auth.mountAccountButton($("acctHost"));
   $("gateBtn").onclick=(e)=>{e.preventDefault();auth.openAuthModal();};
   auth.onAuth(applyAuth);
   try{ sb=await auth.client(); }catch{}
@@ -434,5 +431,6 @@ function applyAuth(){
 </script>
   <script type="module" src="rtc-ring.js?v=36"></script>
   <script type="module" src="class-gate.js?v=37"></script>
+<script type="module" src="gitter-acct.js?v=1"></script>
 </body>
 </html>

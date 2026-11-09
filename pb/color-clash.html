@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Colour Word Match - Arcade</title>
-<link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
+<link rel="stylesheet" href="/pb/arcade-ui.css?v=3">
 <style>
 body{display:flex;flex-direction:column}
 [hidden]{display:none!important}
@@ -17,8 +17,8 @@ canvas{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border),0 18px 48p
 body{user-select:none;-webkit-user-select:none}
 .arcade-stage{overflow-y:auto}
 .clash{display:flex;flex-direction:column;align-items:center;gap:14px;width:min(100%,520px);margin:auto}
-.timer{width:100%;height:8px;border:1px solid var(--border);border-radius:99px;background:var(--card);overflow:hidden}
-#timerFill{height:100%;width:100%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--cyan))}
+.timer{width:100%;height:8px;border:1px solid var(--border);border-radius:0;background:var(--card);overflow:hidden}
+#timerFill{height:100%;width:100%;border-radius:0;background:var(--accent)}
 #timerFill.low{background:var(--danger)}
 .prompt{margin:0;color:var(--muted);font-weight:700}
 #word{min-height:1.1em;margin:4px 0 6px;font:800 clamp(44px,14vw,84px)/1 var(--font-display);letter-spacing:-.03em;text-align:center}
@@ -32,7 +32,7 @@ body{user-select:none;-webkit-user-select:none}
 #feedback.good{color:var(--good)}#feedback.bad{color:var(--danger)}#feedback.slow{color:var(--amber)}
 @media (prefers-reduced-motion:reduce){.opt{transition:filter .12s ease}.opt:active{transform:none}}
 </style>
-<script src="/pb/arcade-kit.js?v=41" data-arcade-id="color-clash" data-arcade-title="Colour Word Match"></script>
+<script src="/pb/arcade-kit.js?v=43" data-arcade-id="color-clash" data-arcade-title="Colour Word Match"></script>
 </head>
 <body>
 <main class="arcade-stage" id="stage">

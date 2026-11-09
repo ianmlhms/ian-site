@@ -1,24 +1,24 @@
 <!DOCTYPE html>
-<html lang="en" data-no-season>
+<html lang="lb">
 <head>
 <meta charset="utf-8">
 <meta name="robots" content="noindex,follow">
 <!-- Game shell, no crawlable content. -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Tic-Tac-Toe — ian.lu</title>
-  <meta name="description" content="Tic Tac Toe on ian.lu — the classic game of X and O against a friend or an unbeatable AI." />
+<title>Dräi an enger Rei — ian.lu</title>
+  <meta name="description" content="Dräi an enger Rei op ian.lu — de Klassiker mat X an O, géint e Frënd oder géint de Computer." />
   <link rel="canonical" href="https://ian.lu/tictactoe.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<script src="mp-gate.js?v=7" data-game="tictactoe" data-over="#rematch"></script>
-<script src="season.js?v=5"></script>
+<script src="mp-gate.js?v=8" data-game="tictactoe" data-over="#rematch"></script>
+<link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="gitter.css?v=11">
 <script src="theme.js?v=32"></script>
-<link rel="stylesheet" href="game-common.css?v=5">
 <style>
-  :root{--x:#6ea8fe;--o:#ff5d6c;--board:#1b2150}
+  :root{--x:#1f7a4d;--o:#16171a;--board:#fcfcfa}
   body{display:flex;flex-direction:column}
   .wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:16px}
-  .board{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;background:var(--board);padding:12px;border-radius:16px;touch-action:manipulation}
-  .cell{width:min(22vw,92px);height:min(22vw,92px);border-radius:12px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:min(13vw,56px);font-weight:800;line-height:1}
+  .board{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;background:var(--board);padding:12px;border-radius:0;touch-action:manipulation}
+  .cell{width:min(22vw,92px);height:min(22vw,92px);border-radius:0;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:min(13vw,56px);font-weight:800;line-height:1}
   .cell[data-p="1"]{color:var(--x)} .cell[data-p="2"]{color:var(--o)}
   .board.mine .cell:not([data-p="1"]):not([data-p="2"]){cursor:pointer}
   .board.mine .cell:not([data-p="1"]):not([data-p="2"]):hover{background:var(--card2)}
@@ -27,34 +27,35 @@
   .board:focus{outline:none}
   .board:focus-visible,.cell:focus-visible{outline:.2rem solid var(--focus-ring,currentColor);outline-offset:.18rem}
   @media (hover:none){.board.mine .cell:not([data-p="1"]):not([data-p="2"]):hover{background:var(--bg)}}
-  .me{display:inline-block;width:14px;height:14px;border-radius:50%;vertical-align:-2px;margin:0 4px}
+  .me{display:inline-block;width:14px;height:14px;border-radius:0;vertical-align:-2px;margin:0 4px}
+  .board{border:1px solid var(--ink)}
 </style>
 <script data-goatcounter="https://ianm.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
-  <meta name="theme-color" content="#0d0d1a">
+  <meta name="theme-color" content="#f6f6f3">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
 </head>
-<body>
+<body class="gt">
 <header class="bar">
   <a class="home" href="pixelbreak.html">‹ Arcade</a>
-  <h1><span aria-hidden="true">✕</span> Tic-Tac-Toe</h1>
+  <h1>Dräi an enger Rei</h1>
   <div class="spacer"></div>
 </header>
 
 <main class="wrap">
-  <div class="status" id="status" role="status" aria-live="polite">Connecting…</div>
+  <div class="status" id="status" role="status" aria-live="polite">Verbindung …</div>
   <div class="sub" id="sub"></div>
-  <div class="board" id="board" role="group" aria-label="Tic-Tac-Toe board" tabindex="-1"></div>
-  <button type="button" class="btn" id="rematch" style="display:none"><span aria-hidden="true">↻</span> Rematch</button>
+  <div class="board" id="board" role="group" aria-label="Dräi-an-enger-Rei-Brett" tabindex="-1"></div>
+  <button type="button" class="btn" id="rematch" style="display:none"><span aria-hidden="true">↻</span> Nach eng Partie</button>
 </main>
 
 <script src="pixelbreak-config.js"></script>
-<script src="pb/arcade-kit.js?v=41" data-arcade-id="o-tictactoe" data-arcade-title="Tic-Tac-Toe Online" data-arcade-no-score data-arcade-replace=".bar"></script>
+<script src="pb/arcade-kit.js?v=43" data-arcade-id="o-tictactoe" data-arcade-title="Tic-Tac-Toe Online" data-arcade-no-score data-arcade-replace=".bar"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-<script src="game-common.js?v=4"></script>
+<script src="game-common.js?v=6"></script>
 <script type="module" src="notify-ambient.js?v=40"></script>
 <script>
 const GC = window.GameCommon;
@@ -87,10 +88,10 @@ function render() {
     const where = `Row ${Math.floor(i / 3) + 1}, column ${i % 3 + 1}`;
     if (turn === me && !over && oppHere && !board[i]) {
       d.onclick = () => play(i, me, true);
-      d.setAttribute("aria-label", `Play ${where.toLowerCase()}`);
+      d.setAttribute("aria-label", `Spill ${where.toLowerCase()}`);
     } else {
       d.tabIndex = -1; d.setAttribute("aria-disabled", "true");
-      d.setAttribute("aria-label", `${where}: ${board[i] === 1 ? "X" : board[i] === 2 ? "O" : "empty"}`);
+      d.setAttribute("aria-label", `${where}: ${board[i] === 1 ? "X" : board[i] === 2 ? "O" : "eidel"}`);
     }
     b.appendChild(d);
   }
@@ -99,10 +100,10 @@ function render() {
 }
 function updateStatus() {
   const dot = `<span class="me" aria-hidden="true" style="background:${me === 1 ? "var(--x)" : "var(--o)"}"></span><span class="sr-only">(${me === 1 ? "X" : "O"})</span>`;
-  if (over === "draw") return setStatus("It's a draw.");
-  if (over) return setStatus(over === me ? "You win! 🎉" : "You lost.");
-  if (!oppHere) return setStatus("Waiting for opponent…", `Share room <code>${room}</code> or invite from Friends.`);
-  setStatus(turn === me ? `Your turn ${dot}` : (AI ? "Computer thinking…" : "Opponent's turn"));
+  if (over === "draw") return setStatus("Onentschidden.");
+  if (over) return setStatus(over === me ? "Du hues gewonn!" : "Du hues verluer.");
+  if (!oppHere) return setStatus("Waart op de Géigner …", `Deel de Raumcode <code>${room}</code> oder invitéier iwwer Frënn.`);
+  setStatus(turn === me ? `Du bass drun ${dot}` : (AI ? "De Computer denkt …" : "De Géigner ass drun"));
 }
 function setStatus(h, sub = "") { $("status").innerHTML = h; $("sub").innerHTML = sub; }
 
@@ -124,7 +125,7 @@ function play(i, player, local) {
 }
 
 if (AI) {
-  document.querySelector(".bar h1").textContent = "✕ Tic-Tac-Toe — vs Computer";
+  document.querySelector(".bar h1").textContent = "Dräi an enger Rei – géint de Computer";
   GC.mountDifficulty(() => difficulty, (d) => { difficulty = d; });
   oppHere = true; fresh(); render();
 } else if (!(window.MPGate && window.MPGate.redirecting)) {   // mp-gate.js sends a bare visit to the lobby (lobby.html)
@@ -137,7 +138,7 @@ if (AI) {
     setState: (p) => { board = p.board; turn = p.turn; over = p.over; render(); if (over) $("rematch").style.display = ""; },
     isStarted: () => over !== false || board.some((v) => v),
     onPeers: (here) => { oppHere = here; render(); },
-    onSeatTaken: () => { over = true; render(); setStatus("Seat already taken", `This room already has a ${role} — join with the other role or start a new room.`); },
+    onSeatTaken: () => { over = true; render(); setStatus("Plaz scho besat", `Dësen Raum huet schonn e(n) ${role} — trëtt mat der anerer Roll bäi oder maach en neie Raum op.`); },
   });
 }
 $("rematch").onclick = () => { fresh(); $("rematch").style.display = "none"; render(); $("board").focus({ preventScroll: true }); if (!AI) ch.send({ type: "broadcast", event: "reset" }); };

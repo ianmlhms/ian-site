@@ -85,7 +85,7 @@
     de: { lobby: "‹ Lobby", back: "↩ Zurück zur Lobby", sure: "Sicher? Nochmal tippen", sureShort: "Sicher?", aria: "Zurück zur Lobby" },
     en: { lobby: "‹ Lobby", back: "↩ Back to lobby", sure: "Sure? Tap again", sureShort: "Sure?", aria: "Back to the lobby" },
   };
-  function lang() { try { var l = localStorage.getItem("site_lang"); return TEXT[l] ? l : "lb"; } catch (e) { return "lb"; } }
+  function lang() { return "lb"; } /* Gitter look: Luxembourgish only */
 
   /* data-over="#sel": over = the element is displayed (the game shows its rematch button exactly when the match is finished) */
   function watchOver() {
@@ -105,10 +105,10 @@
     var tx = TEXT[lang()];
     var style = document.createElement("style");
     style.textContent =
-      ".mpg-chip{position:fixed;left:max(12px,env(safe-area-inset-left));bottom:max(12px,env(safe-area-inset-bottom));z-index:900;display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border-radius:999px;" +
-      "border:2px solid var(--border,#2a2a4a);background:var(--card-opaque,#161625);color:var(--text,#e8e8f0);font:700 14px/1 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;cursor:pointer;touch-action:manipulation;box-shadow:0 6px 18px rgba(0,0,0,.35)}" +
-      ".mpg-chip:hover{border-color:var(--accent,#6ea8fe)}.mpg-chip[data-over='1']{background:var(--accent,#6ea8fe);border-color:var(--accent,#6ea8fe);color:var(--accent-foreground,#000)}" +
-      ".mpg-chip:focus-visible{outline:3px solid var(--focus-ring,var(--accent2,#4de8ff));outline-offset:2px}@media print{.mpg-chip{display:none}}";
+      ".mpg-chip{position:fixed;left:max(12px,env(safe-area-inset-left));bottom:max(12px,env(safe-area-inset-bottom));z-index:900;display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border-radius:0;" +
+      "border:1px solid var(--ink,#16171a);background:var(--white,#fcfcfa);color:var(--ink,#16171a);font:600 14px/1 'Geist',system-ui,-apple-system,'Segoe UI',sans-serif;cursor:pointer;touch-action:manipulation;}" +
+      ".mpg-chip:hover{border-color:var(--green,#1f7a4d);color:var(--green,#1f7a4d)}.mpg-chip[data-over='1']{background:var(--ink,#16171a);border-color:var(--ink,#16171a);color:var(--paper,#f6f6f3)}" +
+      ".mpg-chip:focus-visible{outline:2px solid var(--green,#1f7a4d);outline-offset:2px}@media print{.mpg-chip{display:none}}";
     document.head.appendChild(style);
     /* data-adopt: the game's own buttons that become «‹ Lobby». A leading "!" = one tap always (e.g. the start menu the game falls back to
      * when the opponent has left: there is no match to lose any more). */
