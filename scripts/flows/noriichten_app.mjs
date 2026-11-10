@@ -1,0 +1,84 @@
+/* Flow — "Noriichten", the chats-only home-screen app for the iPad
+ * (inbox.html?app=noriichten, on the mocked Cloudflare Worker): install
+ * metadata, no mail and no way off into the site, chats open side by side.
+ *   FLOW_BROWSER=webkit python3 ~/Library/Caches/browser-slot.py node scripts/flows/noriichten_app.mjs */
+import { CLOUD_ORIGIN, createCloudMock } from "./inbox_cloud_mock.mjs";
+import { runIfMain } from "./lib.mjs";
+
+const APP_URL = `/inbox.html?app=noriichten&cloud=${encodeURIComponent(CLOUD_ORIGIN)}`;
+const IPAD_LANDSCAPE = { width: 1180, height: 820 };
+const IPAD_PORTRAIT = { width: 820, height: 1180 };
+
+const mock = createCloudMock();
+
+export const flow = {
+  name: "noriichten-app",
+  viewport: IPAD_LANDSCAPE,
+  touch: true,
+  backend: { tables: { bridge_chats: () => [], bridge_accounts: () => [], bridge_mail_accounts: () => [], bridge_mail_messages: () => [] } },
+  async run(h) {
+    const { page, context } = h;
+    await h.signIn();
+    await mock.install(context);
+
+    h.step("install metadata is the app's own");
+    await h.goto(APP_URL);
+    await page.waitForSelector("#chatList li");
+    const meta = await page.evaluate(() => ({
+      manifest: document.querySelector('link[rel="manifest"]').getAttribute("href"),
+      icon: document.querySelector('link[rel="apple-touch-icon"]').getAttribute("href"),
+      title: document.querySelector('meta[name="apple-mobile-web-app-title"]').content,
+      docTitle: document.title,
+      brand: document.getElementById("brandTitle").textContent,
+    }));
+    h.eq(meta.manifest, "noriichten.webmanifest", "manifest");
+    h.eq(meta.icon, "assets/noriichten-180.png", "apple-touch-icon");
+    h.eq(meta.title, "Noriichten", "home-screen title");
+    h.eq(meta.docTitle, "Noriichten", "document title");
+    h.eq(meta.brand, "Noriichten", "header title");
+    const manifest = await (await page.request.get(h.origin + "/noriichten.webmanifest")).json();
+    h.eq(manifest.start_url, "./inbox.html?app=noriichten", "manifest start_url");
+    for (const icon of manifest.icons) {
+      const res = await page.request.get(`${h.origin}/${icon.src}`);
+      h.eq(res.status(), 200, `icon ${icon.src} is served`);
+    }
+
+    h.step("chats only: no mail switch, no mail strip, no link home");
+    h.expect(!(await page.isVisible(".mode-switch")), "mode switch hidden");
+    h.expect(!(await page.isVisible("#mailStrip")), "mail strip hidden");
+    h.expect(!(await page.isVisible(".ui-header .home")), "'‹ Heem' link hidden");
+    h.expect(await page.isVisible("#gtAcct"), "account button still there (sign out)");
+    h.expect(await page.isVisible('[data-service-filter="whatsapp"]'), "WhatsApp filter visible");
+    h.expect(await page.isVisible('[data-service-filter="imessage"]'), "iMessage filter visible");
+
+    h.step("landscape iPad: list and chat side by side, no sideways scroll");
+    await page.click('#chatList [data-chat-id="1"]');
+    await page.waitForSelector("#messages .message");
+    const layout = await page.evaluate(() => {
+      const list = document.querySelector(".sidebar").getBoundingClientRect();
+      const chat = document.querySelector(".chat-pane").getBoundingClientRect();
+      return { listVisible: list.width > 0, chatLeft: chat.left, listRight: list.right,
+        overflow: document.documentElement.scrollWidth - window.innerWidth };
+    });
+    h.expect(layout.listVisible && layout.chatLeft >= layout.listRight - 1, `side by side (${JSON.stringify(layout)})`);
+    h.expect(layout.overflow <= 0, "no horizontal overflow");
+    h.expect(await page.isVisible("#composer"), "composer shown");
+    await h.shot("landscape");
+
+    h.step("portrait iPad still fits");
+    await page.setViewportSize(IPAD_PORTRAIT);
+    await page.waitForTimeout(300);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    h.expect(overflow <= 0, "no horizontal overflow in portrait");
+    h.expect(await page.isVisible("#messages .message"), "messages still visible");
+    await h.shot("portrait");
+
+    h.step("the normal inbox is unchanged");
+    await h.goto(`/inbox.html?cloud=${encodeURIComponent(CLOUD_ORIGIN)}`);
+    await page.waitForSelector("#chatList li");
+    h.expect(await page.isVisible(".mode-switch"), "mode switch visible on inbox.html");
+    h.eq(await page.getAttribute('link[rel="manifest"]', "href"), "inbox.webmanifest", "inbox keeps its manifest");
+  },
+};
+
+runIfMain(import.meta.url, flow);

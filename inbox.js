@@ -427,15 +427,30 @@ function replacePending(localId, patch) {
   renderConversation();
 }
 
+// A fast bridge can push the outbox status over the socket before the POST
+// that queued it has answered; keep such early updates until that answer.
+const earlyOutboxUpdates = new Map();
+const EARLY_OUTBOX_MAX = 50;
+const OUTBOX_STATUS_RANK = Object.freeze({ queued: 0, sending: 1, sent: 2, failed: 2 });
+
+function pendingPatchFromOutbox(outbox) {
+  const early = earlyOutboxUpdates.get(outbox.id);
+  earlyOutboxUpdates.delete(outbox.id);
+  const isEarlyNewer = early
+    && (OUTBOX_STATUS_RANK[early.status] ?? 0) >= (OUTBOX_STATUS_RANK[outbox.status] ?? 0);
+  const latest = isEarlyNewer ? early : outbox;
+  return {
+    error: latest.error,
+    outboxId: outbox.id,
+    sentRemoteId: latest.sent_remote_id,
+    status: latest.status,
+  };
+}
+
 async function enqueuePending(pending, chat) {
   try {
     const outbox = await queueOutbox(supabase, chat, pending.body, pending.mediaPath);
-    replacePending(pending.localId, {
-      error: outbox.error,
-      outboxId: outbox.id,
-      sentRemoteId: outbox.sent_remote_id,
-      status: outbox.status,
-    });
+    replacePending(pending.localId, pendingPatchFromOutbox(outbox));
   } catch (error) {
     const message = error instanceof Error ? error.message : "D'Noriicht konnt net geschéckt ginn.";
     replacePending(pending.localId, { error: message, status: "failed" });
@@ -473,12 +488,7 @@ async function sendAttachment(chat, body, attachment) {
       showError(error);
       return;
     }
-    replacePending(pending.localId, {
-      error: outbox.error,
-      outboxId: outbox.id,
-      sentRemoteId: outbox.sent_remote_id,
-      status: outbox.status,
-    });
+    replacePending(pending.localId, pendingPatchFromOutbox(outbox));
     if (state.attachment === attachment) {
       input.value = "";
       clearAttachment();
@@ -615,6 +625,12 @@ function onMessageUpdate(message) {
 }
 
 function onOutboxUpdate(outbox) {
+  const isKnown = state.pending.some((item) => item.outboxId === outbox.id);
+  const isAwaitingAnswer = state.pending.some((item) => item.outboxId === null && item.status === "queued");
+  if (!isKnown && isAwaitingAnswer) {
+    if (earlyOutboxUpdates.size >= EARLY_OUTBOX_MAX) earlyOutboxUpdates.clear();
+    earlyOutboxUpdates.set(outbox.id, outbox);
+  }
   const pending = state.pending.map((item) => item.outboxId === outbox.id
     ? Object.freeze({
       ...item,
@@ -873,6 +889,16 @@ function bindUi() {
     button.addEventListener("click", () => setMode(button.dataset.mode));
   });
 }
+
+// The chats-only home-screen app ("Noriichten", see inbox.html): own titles.
+function applyAppMode() {
+  if (document.documentElement.dataset.app !== "noriichten") return;
+  document.getElementById("brandTitle").textContent = "Noriichten";
+  document.getElementById("gateTitle").textContent = "Noriichten";
+  document.getElementById("gateText").textContent =
+    "Mell dech un, fir deng WhatsApp- an iMessage-Noriichten ze gesinn.";
+}
+applyAppMode();
 
 let clientError = null;
 const supabase = await client().catch((error) => {

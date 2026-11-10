@@ -38,3 +38,6 @@ AddType application/manifest+json .webmanifest
 # Class chat was removed on 23 Sep 2026; send old bookmarks and the PWA
 # shortcut to the messenger instead of a 404.
 Redirect 301 /classchat.html /messenger.html
+
+# Short link for the chats-only "Noriichten" home-screen app.
+RedirectMatch 302 ^/noriichten/?$ /inbox.html?app=noriichten

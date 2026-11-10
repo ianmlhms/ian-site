@@ -1,0 +1,16 @@
+{
+  "name": "Noriichten",
+  "short_name": "Noriichten",
+  "description": "WhatsApp an iMessage op ian.lu.",
+  "id": "./inbox.html?app=noriichten",
+  "start_url": "./inbox.html?app=noriichten",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0d0d1a",
+  "theme_color": "#0d0d1a",
+  "icons": [
+    { "src": "assets/noriichten-180.png", "sizes": "180x180", "type": "image/png", "purpose": "any" },
+    { "src": "assets/noriichten-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/noriichten-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

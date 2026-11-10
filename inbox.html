@@ -231,12 +231,37 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <script data-goatcounter="https://ianm.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 <meta name="mobile-web-app-capable" content="yes">
+<script>
+/* "Noriichten": the chats-only home-screen app (inbox.html?app=noriichten, short
+   link noriichten.html). Swaps the install metadata before Safari reads it, so
+   "Add to Home Screen" gives its own name, icon and start page. */
+(function(){
+  if(!/[?&]app=noriichten(&|$)/.test(location.search))return;
+  var APP_NAME="Noriichten", ICON="assets/noriichten-180.png";
+  document.documentElement.setAttribute("data-app","noriichten");
+  document.title=APP_NAME;
+  function set(selector,attr,value){var el=document.querySelector(selector);if(el)el.setAttribute(attr,value);}
+  set('link[rel="manifest"]',"href","noriichten.webmanifest");
+  set('link[rel="apple-touch-icon"]',"href",ICON);
+  set('meta[name="apple-mobile-web-app-title"]',"content",APP_NAME);
+  set('link[rel="icon"]',"href",ICON);
+  set('link[rel="icon"]',"type","image/png");
+  set('link[rel="canonical"]',"href","https://ian.lu/inbox.html?app=noriichten");
+})();
+</script>
+<style>
+  /* Noriichten app: chats only, the whole iPad width, no way off into the site. */
+  html[data-app=noriichten] .mode-switch,
+  html[data-app=noriichten] #mailStrip,
+  html[data-app=noriichten] .ui-header .home{display:none !important}
+  html[data-app=noriichten] #app{max-width:1400px}
+</style>
 </head>
 <body class="gt">
 <header class="ui-header">
   <div class="header-left">
     <a class="home" href="index.html">‹ Heem</a>
-    <h1 class="ui-brand">Vereenegt Inbox</h1>
+    <h1 class="ui-brand" id="brandTitle">Vereenegt Inbox</h1>
   </div>
   <div class="header-right">
     <button type="button" class="gt-acct" id="gtAcct">Umellen</button>
@@ -248,8 +273,8 @@
 <div id="gate">
   <div class="gate-box">
     <div class="gate-ico" aria-hidden="true">📥</div>
-    <h2>Vereenegt Inbox</h2>
-    <p>Mell dech un, fir deng WhatsApp-, iMessage- a Mail-Noriichten ze gesinn.</p>
+    <h2 id="gateTitle">Vereenegt Inbox</h2>
+    <p id="gateText">Mell dech un, fir deng WhatsApp-, iMessage- a Mail-Noriichten ze gesinn.</p>
     <button id="gateSignIn" class="primary-button" type="button">Umellen</button>
   </div>
 </div>
@@ -313,7 +338,7 @@
 </script>
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-<script type="module" src="inbox.js?v=7"></script>
+<script type="module" src="inbox.js?v=8"></script>
 <script type="module" src="gitter-acct.js?v=1"></script>
 </body>
 </html>
