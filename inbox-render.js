@@ -4,6 +4,52 @@ const MINUTE_MS = 60 * SECOND_MS;
 const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
 
+// Dates and times are built by hand: Safari has no Luxembourgish locale data,
+// so toLocale*("lb-LU") fell back to US English ("04:24 PM", "11/04").
+const LB_WEEKDAYS = Object.freeze(["Sonndeg", "Méindeg", "Dënschdeg", "Mëttwoch", "Donneschdeg", "Freideg", "Samschdeg"]);
+const LB_MONTHS = Object.freeze(["Januar", "Februar", "Mäerz", "Abrëll", "Mee", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"]);
+const RECENT_WEEKDAY_DAYS = 6;
+const pad2 = (value) => String(value).padStart(2, "0");
+const validDate = (iso) => {
+  const date = new Date(iso);
+  return Number.isFinite(date.getTime()) ? date : null;
+};
+const dayKey = (date) => `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+const startOfDay = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+
+/** "16:05" in the viewer's time zone, always 24-hour. */
+export function clockTime(iso) {
+  const date = validDate(iso);
+  return date ? `${pad2(date.getHours())}:${pad2(date.getMinutes())}` : "";
+}
+
+/** "04.11." (day.month.) */
+export function shortDate(iso) {
+  const date = validDate(iso);
+  return date ? `${pad2(date.getDate())}.${pad2(date.getMonth() + 1)}.` : "—";
+}
+
+/** Day heading for a conversation: Haut, Gëschter, Méindeg, or "Freideg, 6. November". */
+export function dayLabel(iso, now = new Date()) {
+  const date = validDate(iso);
+  if (!date) return "";
+  const daysAgo = Math.round((startOfDay(now) - startOfDay(date)) / DAY_MS);
+  if (daysAgo === 0) return "Haut";
+  if (daysAgo === 1) return "Gëschter";
+  const weekday = LB_WEEKDAYS[date.getDay()];
+  if (daysAgo > 1 && daysAgo <= RECENT_WEEKDAY_DAYS) return weekday;
+  const year = date.getFullYear() === now.getFullYear() ? "" : ` ${date.getFullYear()}`;
+  return `${weekday}, ${date.getDate()}. ${LB_MONTHS[date.getMonth()]}${year}`;
+}
+
+function dayDivider(iso) {
+  const divider = document.createElement("div");
+  divider.className = "day-divider";
+  divider.setAttribute("role", "separator");
+  divider.append(textNode("span", "", dayLabel(iso)));
+  return divider;
+}
+
 const SERVICE_DETAILS = Object.freeze({
   whatsapp: Object.freeze({ icon: "💬", name: "WhatsApp" }),
   imessage: Object.freeze({ icon: "🍎", name: "iMessage" }),
@@ -54,7 +100,7 @@ export function relativeTime(iso, now = Date.now()) {
   if (elapsed < DAY_MS) return `virun ${Math.floor(elapsed / HOUR_MS)} St.`;
   const days = Math.floor(elapsed / DAY_MS);
   if (days < 7) return `virun ${days} D.`;
-  return new Date(iso).toLocaleDateString("lb-LU", { day: "2-digit", month: "2-digit" });
+  return shortDate(iso);
 }
 
 export function showNotice(message, tone = "error") {
@@ -352,7 +398,7 @@ function messageNode(message, options) {
   const meta = document.createElement("span");
   meta.className = "message-meta";
   const edited = message.edited_at ? " · (geännert)" : "";
-  meta.textContent = `${new Date(message.sent_at).toLocaleTimeString("lb-LU", { hour: "2-digit", minute: "2-digit" })}${edited}`;
+  meta.textContent = `${clockTime(message.sent_at)}${edited}`;
   bubble.append(meta, reactionNodes(message.reactions));
   row.append(bubble);
   return row;
@@ -404,10 +450,22 @@ export function renderMessages(messages, pending, options) {
   const host = element("messages");
   const distanceFromBottom = host.scrollHeight - host.scrollTop;
   emptyNode(host);
-  const rows = [
-    ...messages.map((message) => messageNode(message, options)),
-    ...pending.map((item) => pendingNode(item, options.onRetry)),
-  ];
+  const rows = [];
+  let lastDay = null;
+  const addDivider = (iso) => {
+    const date = validDate(iso);
+    if (!date || dayKey(date) === lastDay) return;
+    lastDay = dayKey(date);
+    rows.push(dayDivider(iso));
+  };
+  messages.forEach((message) => {
+    addDivider(message.sent_at);
+    rows.push(messageNode(message, options));
+  });
+  pending.forEach((item) => {
+    addDivider(item.createdAt);
+    rows.push(pendingNode(item, options.onRetry));
+  });
   if (!rows.length) host.append(textNode("p", "empty", "Nach keng Noriichten an dësem Chat."));
   else host.append(...rows);
   if (options.onLoadOlder) host.prepend(loadOlderButton(options.onLoadOlder));

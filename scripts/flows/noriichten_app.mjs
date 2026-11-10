@@ -63,6 +63,12 @@ export const flow = {
     h.expect(layout.listVisible && layout.chatLeft >= layout.listRight - 1, `side by side (${JSON.stringify(layout)})`);
     h.expect(layout.overflow <= 0, "no horizontal overflow");
     h.expect(await page.isVisible("#composer"), "composer shown");
+    const metas = await page.$$eval("#messages .message-meta", (nodes) => nodes.map((node) => node.textContent.trim()));
+    h.expect(metas.length > 0 && metas.every((text) => /^\d\d:\d\d/.test(text)), `24-hour times (${metas.slice(0, 3).join(", ")})`);
+    const days = await page.$$eval("#messages .day-divider", (nodes) => nodes.map((node) => node.textContent.trim()));
+    h.expect(days.length >= 1 && days.includes("Haut"), `day dividers (${days.join(" / ")})`);
+    const listTimes = await page.$$eval("#chatList .chat-time, #chatList time", (nodes) => nodes.map((node) => node.textContent.trim()));
+    h.expect(listTimes.every((text) => !/AM|PM|\//.test(text)), `chat list times (${listTimes.join(", ")})`);
     await h.shot("landscape");
 
     h.step("portrait iPad still fits");

@@ -11,7 +11,7 @@ import {
   renderMessagesLoading,
   renderSearchResults,
   showNotice,
-} from "./inbox-render.js?v=6";
+} from "./inbox-render.js?v=7";
 import { isAttachmentSizeAllowed } from "./inbox-attach.js?v=1";
 import {
   renderMailAccounts,
@@ -19,7 +19,7 @@ import {
   renderMailHeader,
   renderMailList,
   renderMailLoading,
-} from "./inbox-mail-render.js?v=4";
+} from "./inbox-mail-render.js?v=5";
 
 const {
   createMailBodyUrl,

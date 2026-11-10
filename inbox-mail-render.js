@@ -1,4 +1,4 @@
-import { relativeTime } from "./inbox-render.js?v=6";
+import { clockTime, relativeTime, shortDate } from "./inbox-render.js?v=7";
 
 const PROVIDER_ICONS = Object.freeze({
   m365: "🏢",
@@ -151,7 +151,7 @@ function mailCard(message, options) {
   head.className = "mail-card-head";
   head.append(
     textNode("strong", "", senderLabel(message)),
-    textNode("time", "chat-time", new Date(message.sent_at).toLocaleString("lb-LU")),
+    textNode("time", "chat-time", `${shortDate(message.sent_at)} ${clockTime(message.sent_at)}`),
   );
   card.append(head);
 
