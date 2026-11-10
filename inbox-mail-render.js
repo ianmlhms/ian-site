@@ -1,4 +1,4 @@
-import { clockTime, relativeTime, shortDate } from "./inbox-render.js?v=7";
+import { clockTime, relativeTime, shortDate } from "./inbox-render.js?v=8";
 
 const PROVIDER_ICONS = Object.freeze({
   m365: "🏢",

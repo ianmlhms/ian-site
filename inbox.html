@@ -164,6 +164,9 @@
 
   .day-divider{display:flex;justify-content:center;margin:12px 0 6px}
   .day-divider span{padding:3px 12px;border-radius:var(--r-chip);background:var(--card);border:1px solid var(--soft);color:var(--muted);font:650 12px "Geist",system-ui,sans-serif;letter-spacing:-.01em}
+  html.kbd-open body{position:fixed;top:var(--vvtop,0px);left:0;right:0}
+  html.kbd-open .ui-header,html.kbd-open #connectionStrip,html.kbd-open #mailStrip{display:none !important}
+  html.kbd-open #app{padding-top:8px;padding-bottom:8px;gap:6px}
   /* ---- mail cards ---- */
   .mail-card{padding:14px 16px;margin-bottom:2px;border-radius:0;background:var(--card2-opaque);border:1px solid var(--soft)}
   .mail-card.mine{background:color-mix(in srgb,var(--accent) 12%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 30%,transparent)}
@@ -330,7 +333,15 @@
   var KEYBOARD_SCROLL_DELAY_MS=250;
   var vv=window.visualViewport; if(!vv)return;
   var root=document.documentElement;
-  function fit(){ root.style.setProperty("--vvh", vv.height+"px"); }
+  /* With the on-screen keyboard up, iPad Safari leaves only ~300 px: hide the
+     header and status strips then, and pin the page to the visible area so no
+     gap opens between the composer and the keyboard. */
+  var KEYBOARD_MIN_PX=120;
+  function fit(){
+    root.style.setProperty("--vvh", vv.height+"px");
+    root.style.setProperty("--vvtop", vv.offsetTop+"px");
+    root.classList.toggle("kbd-open", window.innerHeight-vv.height>KEYBOARD_MIN_PX);
+  }
   vv.addEventListener("resize",fit); vv.addEventListener("scroll",fit); fit();
   document.addEventListener("focusin",function(e){
     if(!e.target.closest||!e.target.closest(".composer"))return;
@@ -340,7 +351,7 @@
 </script>
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-<script type="module" src="inbox.js?v=9"></script>
+<script type="module" src="inbox.js?v=10"></script>
 <script type="module" src="gitter-acct.js?v=1"></script>
 </body>
 </html>

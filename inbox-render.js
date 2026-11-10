@@ -384,7 +384,10 @@ function messageNode(message, options) {
   const bubble = document.createElement("div");
   bubble.className = "bubble";
   if (message.reply_to_remote_id || message.reply_preview) {
-    const quote = textNode("blockquote", "reply-quote", message.reply_preview || "Beäntwert Noriicht");
+    const original = options.findMessage?.(message.reply_to_remote_id);
+    const quoted = message.reply_preview || original?.body?.replace(/\uFFFC/g, "").trim()
+      || (original && original.kind !== "text" ? "📎 Fichier" : "");
+    const quote = textNode("blockquote", "reply-quote", quoted || "Beäntwert Noriicht");
     bubble.append(quote);
   }
   if (message.body) bubble.append(textNode("p", "message-body", message.body));
@@ -450,6 +453,8 @@ export function renderMessages(messages, pending, options) {
   const host = element("messages");
   const distanceFromBottom = host.scrollHeight - host.scrollTop;
   emptyNode(host);
+  const byRemoteId = new Map(messages.map((message) => [message.remote_id, message]));
+  const withLookup = { ...options, findMessage: (remoteId) => (remoteId ? byRemoteId.get(remoteId) : undefined) };
   const rows = [];
   let lastDay = null;
   const addDivider = (iso) => {
@@ -460,7 +465,7 @@ export function renderMessages(messages, pending, options) {
   };
   messages.forEach((message) => {
     addDivider(message.sent_at);
-    rows.push(messageNode(message, options));
+    rows.push(messageNode(message, withLookup));
   });
   pending.forEach((item) => {
     addDivider(item.createdAt);

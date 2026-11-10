@@ -71,6 +71,23 @@ export const flow = {
     h.expect(listTimes.every((text) => !/AM|PM|\//.test(text)), `chat list times (${listTimes.join(", ")})`);
     await h.shot("landscape");
 
+    h.step("a reply quotes the message it answers");
+    mock.push({ t: "message", op: "insert", row: {
+      id: 90, chat_id: 1, service: "imessage", remote_id: "mock-reply-90", is_from_me: true, body: "Jo, gesinn",
+      kind: "text", sent_at: new Date().toISOString(), media_path: null, thumb_path: null, thumb_url: null,
+      media_url: null, media_state: "none", reply_to_remote_id: "mock-m-14", reactions: {} } });
+    await page.waitForFunction(() => document.querySelector("#messages")?.textContent.includes("Jo, gesinn"));
+    const quotes = await page.$$eval("#messages .reply-quote", (nodes) => nodes.map((node) => node.textContent.trim()));
+    h.expect(quotes.includes("Hallo vum Mock"), `quote shows the original text (${quotes.join(" | ")})`);
+
+    h.step("keyboard open: header and status strips make room for the chat");
+    await page.evaluate(() => document.documentElement.classList.add("kbd-open"));
+    h.expect(!(await page.isVisible(".ui-header")), "header hidden");
+    h.expect(!(await page.isVisible("#connectionStrip")), "status strip hidden");
+    const messagesHeight = await page.evaluate(() => document.getElementById("messages").getBoundingClientRect().height);
+    h.expect(messagesHeight > 300, `messages keep room (${Math.round(messagesHeight)} px)`);
+    await page.evaluate(() => document.documentElement.classList.remove("kbd-open"));
+
     h.step("portrait iPad still fits");
     await page.setViewportSize(IPAD_PORTRAIT);
     await page.waitForTimeout(300);
