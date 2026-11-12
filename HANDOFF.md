@@ -404,3 +404,11 @@ App passwords go in `~/.messengerbridge/mail.env` (0600, never in the repo).
 - **No Web Push for mail yet.** The `notify` edge function has a
   `bridge_messages` branch but no `bridge_mail_messages` one — deliberate, so
   newsletters do not buzz the phone. Wire it with a bulk filter if wanted.
+
+## Leaderboard anti-cheat (12 Nov 2026, after Lou's "Hermes" AI audit)
+All in `scripts/security-hardening-v3.sql` (applied live):
+- `scores.username` is always forced from `profiles` (trigger `scores_force_username`); renames sync to scores.
+- Other users' `casino_balance` / `can_casino` / `account_checked_at` are not readable; own row via RPC `my_profile_private()`. `admin_user_ids()` is signed-in only.
+- `leaderboard_bans`: banned accounts can play, but rows into scores / weekly / daily / wordle / streaks are dropped (`drop_banned_score`). Lou = `dengens` is banned.
+- `zz_catch_suspicious_score` (BEFORE trigger on scores, runs last): a new #1 on a board with ≥3 others that is >1.5× the old #1 (or ÷1.5 for memory/maze/reaction), or from an account <1 day old, is **not saved**, the account is banned, it gets the notice "Haha, du hues also awer probéiert", and Slack #claude gets an alert (pg_net; token in Supabase vault `slack_bot_token` / `slack_claude_channel`). Admins are exempt. Caught scores are kept in `score_flags`.
+- Undo a false catch: `delete from leaderboard_bans where user_id = '<id>';`

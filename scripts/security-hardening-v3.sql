@@ -93,3 +93,101 @@ delete from public.weekly_scores  where user_id in (select user_id from public.l
 delete from public.daily_scores   where user_id in (select user_id from public.leaderboard_bans);
 delete from public.wordle_results where user_id in (select user_id from public.leaderboard_bans);
 delete from public.arcade_streaks where user_id in (select user_id from public.leaderboard_bans);
+
+-- ===== PART 4 (12 Nov 2026): catch suspicious scores =============================
+-- A score is caught when it would become the new #1 of a board with at least 3
+-- other players and either beats the old #1 by more than 1.5x (lower-is-better
+-- games: is under old/1.5), or comes from an account younger than a day. Admins
+-- are never caught. Ian's rule: a caught score is not saved (an update keeps the
+-- old score), the account is banned from all leaderboards (leaderboard_bans), it
+-- gets a one-time notice "Haha, du hues also awer probéiert", and Slack #claude
+-- gets an alert ("Ian Bots" app; token in Supabase vault as slack_bot_token /
+-- slack_claude_channel). The caught score stays in score_flags.
+-- Undo a false catch: delete from leaderboard_bans where user_id = '<id>';
+-- (the player then posts their score again with their next game).
+create table if not exists public.score_flags (
+  id bigint generated always as identity primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  game_id text not null,
+  username text,
+  score double precision not null,
+  prev_best double precision,
+  prev_user text,
+  reason text not null,
+  created_at timestamptz not null default now(),
+  reviewed_at timestamptz
+);
+drop index if exists public.score_flags_open;
+alter table public.score_flags enable row level security;
+drop policy if exists score_flags_admin on public.score_flags;
+create policy score_flags_admin on public.score_flags for select to authenticated using ((select public.is_admin()));
+
+drop trigger if exists flag_suspicious_score on public.scores;
+drop function if exists public.flag_suspicious_score();
+
+create or replace function public.catch_suspicious_score()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  c_factor constant double precision := 1.5;
+  c_min_others constant int := 3;
+  lower_better boolean := not public.merge_score_is_better(new.game_id, 2, 1);
+  prev double precision; prev_name text; others int; acct_age interval; why text;
+  fid bigint; tok text; chan text;
+begin
+  if tg_op = 'UPDATE' and new.score is not distinct from old.score then return new; end if;
+  if exists (select 1 from public.admin_user_ids() a where a.user_id = new.user_id) then return new; end if;
+  select count(*) into others from public.scores where game_id = new.game_id and user_id <> new.user_id;
+  if others < c_min_others then return new; end if;
+  select s.score, s.username into prev, prev_name from public.scores s
+   where s.game_id = new.game_id and s.user_id <> new.user_id
+   order by case when lower_better then s.score end asc, case when not lower_better then s.score end desc
+   limit 1;
+  if prev is null or not public.merge_score_is_better(new.game_id, new.score, prev) then return new; end if;   -- not the new #1
+
+  if (not lower_better and prev > 0 and new.score > prev * c_factor)
+     or (lower_better and new.score > 0 and new.score < prev / c_factor) then
+    why := format('%sx the old #1', round((case when lower_better then prev / new.score else new.score / prev end)::numeric, 1));
+  end if;
+  select now() - u.created_at into acct_age from auth.users u where u.id = new.user_id;
+  if acct_age < interval '1 day' then
+    why := concat_ws(', ', why, 'account ' || greatest(1, extract(epoch from acct_age)::int / 3600) || ' h old');
+  end if;
+  if why is null then return new; end if;
+
+  insert into public.score_flags (user_id, game_id, username, score, prev_best, prev_user, reason)
+  values (new.user_id, new.game_id, new.username, new.score, prev, prev_name, why)
+  returning id into fid;
+  insert into public.leaderboard_bans (user_id, reason)
+  values (new.user_id, format('caught score #%s: %s %s (%s)', fid, new.game_id, new.score, why))
+  on conflict do nothing;
+  insert into public.user_notices (user_id, title, body)
+  select new.user_id,
+         jsonb_build_object('lb', 'Haha, du hues also awer probéiert', 'de', 'Haha, du hues also awer probéiert', 'en', 'Haha, du hues also awer probéiert'),
+         jsonb_build_object('lb', '', 'de', '', 'en', '')
+  where not exists (select 1 from public.user_notices n where n.user_id = new.user_id and n.seen_at is null
+                      and n.title->>'lb' = 'Haha, du hues also awer probéiert');
+
+  begin
+    select decrypted_secret into tok from vault.decrypted_secrets where name = 'slack_bot_token';
+    select decrypted_secret into chan from vault.decrypted_secrets where name = 'slack_claude_channel';
+    if tok is not null and chan is not null then
+      perform net.http_post(
+        url := 'https://slack.com/api/chat.postMessage',
+        headers := jsonb_build_object('Content-Type', 'application/json', 'Authorization', 'Bearer ' || tok),
+        body := jsonb_build_object('channel', chan, 'text', format(
+          E'⚠️ Score-Fuddler op ian.lu gefaangen (#%s)\n*%s* – %s: %s\nVirdrun #1: %s mat %s\nWisou: %s\nScore net gespäichert, Kont vun de Leaderboards gebannt.',
+          fid, coalesce(new.username, '?'), new.game_id, new.score, coalesce(prev_name, '?'), prev, why)));
+    end if;
+  exception when others then
+    raise warning 'score catch alert failed: %', sqlerrm;   -- never break the game's save
+  end;
+
+  if tg_op = 'UPDATE' then return old; end if;   -- keep their previous score
+  return null;                                    -- drop the new row
+end $$;
+
+-- "zz_" so it runs after the other BEFORE triggers (keep_best, floors, username).
+drop trigger if exists zz_catch_suspicious_score on public.scores;
+create trigger zz_catch_suspicious_score
+  before insert or update on public.scores
+  for each row execute function public.catch_suspicious_score();
