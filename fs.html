@@ -326,8 +326,10 @@ function flushCloud(v){
 async function loadCloud(){
   const s = readSession(); if (!s || !s.uid) return;
   try{
-    const r = await fetch(SB_URL + "/rest/v1/profiles?select=casino_balance&id=eq." + s.uid,
-      { headers:{ apikey:SB_KEY, Authorization:"Bearer "+s.token } });
+    // Own row only, via an RPC: other accounts' balances are not readable (Nov 2026).
+    const r = await fetch(SB_URL + "/rest/v1/rpc/my_profile_private", {
+      method:"POST", headers:{ apikey:SB_KEY, Authorization:"Bearer "+s.token, "Content-Type":"application/json" }, body:"{}" });
+    if (!r.ok) throw new Error("my_profile_private " + r.status);   // never overwrite the cloud on an error
     const rows = await r.json();
     if (Array.isArray(rows) && rows[0] && rows[0].casino_balance != null) writeLocal(parseFloat(rows[0].casino_balance));
     else flushCloud(getBal());     // first time: seed the account with the current coins
@@ -1384,10 +1386,9 @@ boot();
     }
     if (!session()) return deny("FakeStake ass privat. Mell dech w.e.g. un.", true);
     try {
-      const { data, error } = await sb
-        .from("profiles").select("can_casino")
-        .eq("id", session().user.id).maybeSingle();
+      const { data: rows, error } = await sb.rpc("my_profile_private");
       if (error) throw error;
+      const data = Array.isArray(rows) ? rows[0] : rows;
       if (!data?.can_casino) return deny("Dëse Kont huet keen Zougrëff op FakeStake.", true);
       gate.style.display = "none";
       document.querySelectorAll("[data-gated]").forEach((el) => { el.inert = false; });

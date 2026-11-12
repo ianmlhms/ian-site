@@ -80,14 +80,18 @@ function writeFlag(storage, key) {
 
 /* ---------- data ---------- */
 async function loadProfile(sb, uid) {
-  const { data, error } = await sb.from("profiles")
-    .select("username, class, account_checked_at").eq("id", uid).maybeSingle();
+  const [{ data, error }, priv] = await Promise.all([
+    sb.from("profiles").select("username, class").eq("id", uid).maybeSingle(),
+    sb.rpc("my_profile_private"),   // account_checked_at is no longer readable directly
+  ]);
   if (error) throw error;
+  if (priv.error) throw priv.error;
   if (!data) return null;
+  const own = Array.isArray(priv.data) ? priv.data[0] : priv.data;
   return Object.freeze({
     username: data.username || auth.username() || "",
     class: data.class ? String(data.class).trim() : "",
-    checkedAt: data.account_checked_at || null,
+    checkedAt: own?.account_checked_at || null,
   });
 }
 

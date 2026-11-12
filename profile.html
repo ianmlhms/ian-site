@@ -280,7 +280,7 @@ async function boot(){
 // Lazy: the account-check card (and its people search) only loads when asked for.
 async function openMerge(){
   try{
-    const m=await import("./account-check.js?v=16");
+    const m=await import("./account-check.js?v=17");
     await m.openAccountCheck({startWithMerge:true});
   }catch(e){
     console.error("account merge dialog failed to open",e);

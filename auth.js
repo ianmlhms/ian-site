@@ -153,7 +153,7 @@ function startInvitePop() {
 function startAccountCheck() {
   if (window.top !== window || isKartAccount()) return;
   if (!_g.accountCheckModule) {
-    _g.accountCheckModule = import("./account-check.js?v=16");
+    _g.accountCheckModule = import("./account-check.js?v=17");
   }
   void _g.accountCheckModule
     .then(({ startAccountCheck: start }) => start(_g.sb, () => _g.session))
