@@ -57,3 +57,39 @@ grant execute on function public.admin_user_ids() to authenticated;
 revoke select on public.profiles from authenticated;  -- applied 12 Nov 2026
 grant select (id, username, created_at, avatar, class, class_confirmed, theme, account_kind)
   on public.profiles to authenticated;
+
+-- ===== PART 3 (12 Nov 2026): leaderboard bans =================================
+-- Accounts listed here can still sign in and play, but nothing they post reaches
+-- a board: inserts/updates into the score tables are silently dropped.
+create table if not exists public.leaderboard_bans (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  reason text,
+  created_at timestamptz not null default now()
+);
+alter table public.leaderboard_bans enable row level security;   -- no policies: server-only
+
+create or replace function public.drop_banned_score()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if exists (select 1 from public.leaderboard_bans b where b.user_id = new.user_id) then
+    return null;
+  end if;
+  return new;
+end $$;
+
+do $$ declare t text; begin
+  foreach t in array array['scores','weekly_scores','daily_scores','wordle_results','arcade_streaks'] loop
+    execute format('drop trigger if exists drop_banned_score on public.%I', t);
+    execute format('create trigger drop_banned_score before insert or update on public.%I for each row execute function public.drop_banned_score()', t);
+  end loop;
+end $$;
+
+-- Lou ("dengens"): faked scores with an AI agent; account kept, boards cleared.
+insert into public.leaderboard_bans (user_id, reason)
+select id, 'faked scores (Lou, Hermes audit 12 Nov 2026)' from auth.users where email = 'dengens@serlo.lu'
+on conflict do nothing;
+delete from public.scores         where user_id in (select user_id from public.leaderboard_bans);
+delete from public.weekly_scores  where user_id in (select user_id from public.leaderboard_bans);
+delete from public.daily_scores   where user_id in (select user_id from public.leaderboard_bans);
+delete from public.wordle_results where user_id in (select user_id from public.leaderboard_bans);
+delete from public.arcade_streaks where user_id in (select user_id from public.leaderboard_bans);

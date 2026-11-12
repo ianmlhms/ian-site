@@ -43,7 +43,9 @@ function imagesHtml(images) {
     if (!src) return "";
     const href = safeUrl(image?.url);
     const pic = `<img src="${esc(src)}" alt="${esc(pick(image?.alt))}" loading="eager" decoding="async">`;
-    return href ? `<a class="site-notice__img" data-act="go" data-href="${esc(href)}" href="${esc(href)}">${pic}</a>` : `<span class="site-notice__img">${pic}</span>`;
+    // full: true shows the whole picture (e.g. a portrait photo) instead of a 16:10 crop.
+    const cls = image?.full === true ? "site-notice__img site-notice__img--full" : "site-notice__img";
+    return href ? `<a class="${cls}" data-act="go" data-href="${esc(href)}" href="${esc(href)}">${pic}</a>` : `<span class="${cls}">${pic}</span>`;
   }).filter(Boolean);
   return items.length ? `<div class="site-notice__imgs">${items.join("")}</div>` : "";
 }
@@ -60,6 +62,8 @@ function injectCss() {
     .site-notice__imgs{display:flex;gap:10px;margin:0 0 14px}
     .site-notice__img{flex:1 1 0;min-width:0;display:block;border-radius:12px;overflow:hidden;aspect-ratio:16/10;background:rgba(255,255,255,.06)}
     .site-notice__img img{width:100%;height:100%;object-fit:cover;display:block}
+    .site-notice__img--full{aspect-ratio:auto;display:flex;justify-content:center}
+    .site-notice__img--full img{width:auto;max-width:100%;height:auto;max-height:min(60vh,520px);object-fit:contain}
     .site-notice__actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
     .site-notice__btn{min-height:44px;min-width:96px;padding:0 18px;border-radius:12px;border:1px solid var(--border,rgba(255,255,255,.14));background:transparent;color:inherit;font:inherit;font-weight:750;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
     .site-notice__btn--primary{background:var(--accent,#6c5ce7);border-color:transparent;color:var(--accent-foreground,#fff)}

@@ -119,7 +119,7 @@ function startPresencePing() {
       console.warn("[presence] module failed to load", error);
     });
   if (!_g.session?.user?.id) return;
-  if (!_g.noticeModule) _g.noticeModule = import("./site-notice.js?v=3");
+  if (!_g.noticeModule) _g.noticeModule = import("./site-notice.js?v=4");
   void _g.noticeModule
     .then(({ showNotices }) => showNotices(_g.sb, () => _g.session))
     .catch((error) => console.warn("[notice] module failed to load", error));
