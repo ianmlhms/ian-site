@@ -54,6 +54,6 @@ grant execute on function public.admin_user_ids() to authenticated;
 -- ===== PART 2 (after the client deploy) =========================================
 -- 4. Other accounts' casino balance, FakeStake access and account-check time
 --    were readable by every signed-in user. Column grants replace the table grant.
--- revoke select on public.profiles from authenticated;
--- grant select (id, username, created_at, avatar, class, class_confirmed, theme, account_kind)
---   on public.profiles to authenticated;
+revoke select on public.profiles from authenticated;  -- applied 12 Nov 2026
+grant select (id, username, created_at, avatar, class, class_confirmed, theme, account_kind)
+  on public.profiles to authenticated;
