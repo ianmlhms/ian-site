@@ -825,6 +825,8 @@ async function saveCloud(g, s) {
       { user_id: uid, username, game_id: g.id, game_name: g.name, score: s, updated_at: new Date().toISOString() },
       { onConflict: "user_id,game_id" });
     if (error) { cloudBests.delete(key); throw error; }
+    // A caught cheat gets its notice now, not on the next page load.
+    import("./site-notice.js?v=5").then((m) => m.showFreshNotice(sb)).catch((e) => console.warn("[PB] notice check", e));
   } catch (err) { console.warn("[PB] save score failed", err); }
 }
 async function fetchBoard(g) {

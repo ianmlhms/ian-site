@@ -130,3 +130,20 @@ export async function showNotices(sb, getSession) {
     console.warn("[notice] could not load notices", error);
   }
 }
+
+/* Right after a game saved a score: shows a notice the server created in the last
+ * 2 minutes (e.g. a caught cheat), on top of the running game. */
+const freshShown = new Set();
+export async function showFreshNotice(sb) {
+  if (!sb?.rpc || window.top !== window) return;
+  try {
+    const { data, error } = await sb.rpc("my_fresh_notices");
+    if (error) throw error;
+    const notice = Array.isArray(data) ? data[0] : null;
+    if (!notice?.id || freshShown.has(notice.id) || document.querySelector(".site-notice")) return;
+    freshShown.add(notice.id);
+    render(sb, notice);
+  } catch (error) {
+    console.warn("[notice] could not check for a fresh notice", error);
+  }
+}

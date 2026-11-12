@@ -191,3 +191,18 @@ drop trigger if exists zz_catch_suspicious_score on public.scores;
 create trigger zz_catch_suspicious_score
   before insert or update on public.scores
   for each row execute function public.catch_suspicious_score();
+
+-- ===== PART 5: show the catch notice immediately ================================
+-- The arcade calls this right after saving a score; only notices created in the
+-- last 2 minutes come back, so older announcements never pop up mid-game.
+create or replace function public.my_fresh_notices()
+returns table(id uuid, title jsonb, body jsonb, cta jsonb, url text, images jsonb)
+language sql stable security definer set search_path = public as $$
+  select n.id, n.title, n.body, n.cta, n.url, n.images
+  from public.user_notices n
+  where n.user_id = auth.uid() and n.seen_at is null and n.created_at > now() - interval '2 minutes'
+  order by n.created_at desc
+  limit 1;
+$$;
+revoke all on function public.my_fresh_notices() from public, anon;
+grant execute on function public.my_fresh_notices() to authenticated;
