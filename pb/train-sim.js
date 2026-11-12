@@ -605,7 +605,8 @@
   const stopCount = () => stationsOf().length - passIndices().length;
   function patternText() {
     const w = world, pattern = w && w.sim.plan ? w.sim.plan.pattern : 'RB';
-    return t('pattern' + pattern) + ' · ' + t('stationsN', { n: stopCount() });
+    const label = w && w.track && w.track.kind === 'hst' ? 'TGV' : t('pattern' + pattern);   // a TGV is no RB / RE
+    return label + ' · ' + t('stationsN', { n: stopCount() });
   }
 
   /* Loading bar. Real progress where it can be measured (Luxtram: the data files and the start section's tiles, with the MB fetched); the build
@@ -1690,6 +1691,9 @@
       bar.appendChild(i);
     }
   }
+  /* short routes (the abroad TGV / IC lines) name every stop on the strip; long ones (17 stops) only the ends + the next stop */
+  const STRIP_LABEL_ALL_MAX = 8;
+  const stripLabelsAll = (stations) => stations.length <= STRIP_LABEL_ALL_MAX;
   function buildStrip() {
     const stations = stationsOf(), dots = $('stripDots');
     dots.replaceChildren();
@@ -1701,10 +1705,12 @@
       const dot = document.createElement('i');
       dot.style.left = x + '%'; dot.dataset.i = String(i); dot.title = st.name + (passIndices().includes(i) ? ' · ' + t('ttPass') : '');
       dots.appendChild(dot);
-      if (i === 0 || i === stations.length - 1) {
+      const isEnd = i === 0 || i === stations.length - 1;
+      if (isEnd || stripLabelsAll(stations)) {
         const label = document.createElement('span');
-        label.style.left = x + '%'; label.textContent = st.name;
-        label.className = i === 0 ? 'first' : 'last';   // the end names stay inside the strip
+        label.style.left = x + '%'; label.textContent = st.name; label.dataset.i = String(i);
+        // the end names stay inside the strip; middle names alternate above / below the line so neighbours never collide
+        label.className = i === 0 ? 'first' : i === stations.length - 1 ? 'last' : 'mid' + (i % 2 ? ' up' : '') + (passIndices().includes(i) ? ' pass' : '');
         dots.appendChild(label);
       }
     });
@@ -1741,7 +1747,8 @@
       let lbl = $('stripNextLbl');
       if (!lbl) { lbl = document.createElement('span'); lbl.id = 'stripNextLbl'; $('stripDots').appendChild(lbl); }
       const hs = stations[heading];
-      lbl.hidden = !hs || heading <= 0 || heading >= stations.length - 1;
+      $('stripDots').querySelectorAll('span.mid').forEach((sp) => sp.classList.toggle('next', Number(sp.dataset.i) === heading));
+      lbl.hidden = !hs || heading <= 0 || heading >= stations.length - 1 || stripLabelsAll(stations);
       if (hs) { lbl.textContent = hs.name; lbl.style.left = clamp(((hs.s - s0) / span) * 100, 12, 88) + '%'; }
     }
   }

@@ -211,8 +211,9 @@
     const intermediate = [];
     for (let i = 1; i < n - 1; i++) intermediate.push(i);
     const isTram = (train && train.kind === 'tram') || track.kind === 'tram';
+    const isTgv = track.kind === 'hst';   // the TGV 803B always calls at every stop of its list: no random express
     let pass = fixedPass.slice();
-    if (!fixedPass.length && !isTram && intermediate.length >= RE_MIN_INTERMEDIATE && rng() < (opts.reChance ?? RE_CHANCE)) {
+    if (!fixedPass.length && !isTram && !isTgv && intermediate.length >= RE_MIN_INTERMEDIATE && rng() < (opts.reChance ?? RE_CHANCE)) {
       const count = intermediate.length >= 5 && rng() < 0.5 ? 2 : 1, pool = intermediate.slice();
       while (pass.length < count && pool.length) pass.push(pool.splice(Math.floor(rng() * pool.length), 1)[0]);
       pass.sort((a, b) => a - b);

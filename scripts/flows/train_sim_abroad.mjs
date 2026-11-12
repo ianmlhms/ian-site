@@ -21,7 +21,7 @@ const LINES = {
   },
   paris: {
     stations: ['Lëtzebuerg', 'Thionville', 'Metz-Ville', 'Champagne-Ardenne TGV', 'Paris-Est'],
-    lengthKm: [16, 26], minBridges: 10, minTunnels: 2, minCrossings: 0, budgetMb: 1.9, hst: true,   // LGV Est: viaducts over the Meuse / Marne valleys
+    lengthKm: [26, 36], minBridges: 10, minTunnels: 2, minCrossings: 0, budgetMb: 1.9, hst: true,   // LGV Est: viaducts over the Meuse / Marne valleys
   },
 };
 const MIN_SCENERY_ROADS = 200;
@@ -43,6 +43,11 @@ export const flow = {
       h.expect(rep.real && rep.scenery === id && rep.roads >= MIN_SCENERY_ROADS && rep.rivers >= 1, `${id}: real scenery data attached (${rep.roads} roads, ${rep.rivers} water windows)`);
       h.expect(rep.bridges >= (spec.minBridges || 0) && rep.crossings >= (spec.minCrossings || 0) && rep.tunnels >= (spec.minTunnels || 0), `${id}: ${rep.tunnels} tunnels, ${rep.bridges} bridges, ${rep.crossings} level crossings from OSM`);
       if (spec.hst) h.expect(rep.hst, `${id}: a high-speed route (hst, cruise ${rep.cruise} km/h)`);
+      if (spec.hst) {   // 12 Nov 2026: the Metz station-throat 30 (OSM) was posted 1.3 km before Metz-Ville and spread over the whole Thionville - Metz leg
+        const slow = await sim.evalGame(({ track }) => { const st = track.stations, a = st[1].s, b = st[2].s + 400; let min = Infinity;
+          track.limits.forEach((l, i) => { const e = i + 1 < track.limits.length ? track.limits[i + 1].s : track.length; if (e > a && l.s < b) min = Math.min(min, l.kmh); }); return min; });
+        h.expect(slow >= 60, `${id}: no crawl zone between ${spec.stations[1]} and ${spec.stations[2]} (lowest ${slow} km/h)`);
+      }
       h.expect(rep.railLand, `${id}: railway land is drawn as ballast ground (class rail), not as fields`);
       const back = await (async () => { await sim.start(id + '~r'); return sim.evalGame(({ track }) => ({ n: track.stations.length, first: track.stations[0].name, last: track.stations[track.stations.length - 1].name })); })();
       h.eq([back.n, back.first, back.last], [spec.stations.length, spec.stations[spec.stations.length - 1], 'Lëtzebuerg'], `${id}~r: starts at ${back.first}, ${back.n} stations`);

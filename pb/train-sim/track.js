@@ -35,6 +35,7 @@
   const GRADE_MAX = { rail: 0.025, hst: 0.035, tram: 0.06 };
   const SMOOTH = { rail: { curve: 60, grade: 100 }, hst: { curve: 220, grade: 260 }, tram: { curve: 9, grade: 22 } };
   const LATERAL_ACCEL = 1.3; // m/s2: curve speed v = sqrt(a * R)
+  const HST_THROAT_M = 400, HST_THROAT_KMH = 60;   // TGV: lowest limit over the points leaving an intermediate stop
   const BRAKE_LEAD = { rail: [0.8, 900], hst: [0.75, 1500], tram: [0.8, 120] };
   const RELIEF = {
     // amp = noise amplitude, valley = hills rising away from the track, width = how far to full height
@@ -198,9 +199,16 @@
   }
 
   // Post limit boards earlier ahead of reductions so the driver can brake in time.
-  function buildLimits(raw, kind, length) {
+  function buildLimits(raw, kind, length, stations) {
     const [decel, cap] = BRAKE_LEAD[kind];
-    const merged = raw.reduce((acc, e) => {
+    /* hst (the TGV calls at every stop, no express passes): a reduction that begins after a stop is never moved back past that stop, the
+       train stands there anyway. Without this the Metz station-throat 30 was posted 1.3 km before Metz-Ville, between Thionville and Metz. */
+    const stopsAt = kind === 'hst' ? (stations || []).slice(1, -1).map((st) => st.s) : [];   // the calls in between (not the two ends)
+    const notBefore = (from, to) => stopsAt.reduce((m, s) => (s > from && s < to ? Math.max(m, s) : m), from);
+    /* OSM tags the station tracks of Metz-Ville 30: a TGV leaves an intermediate stop over the points at 60, not 30 (the 30 then spread over
+       kilometres when short zones merged). Only the departure throat of the calls in between; the terminus approach keeps its own values. */
+    const throatFloor = (e) => (stopsAt.some((s) => e.s >= s && e.s - s < HST_THROAT_M) && e.kmh < HST_THROAT_KMH ? { s: e.s, kmh: HST_THROAT_KMH } : e);
+    const merged = raw.map(throatFloor).reduce((acc, e) => {
       const prev = acc[acc.length - 1];
       if (prev && prev.kmh === e.kmh) return acc;
       return acc.concat([{ s: e.s, kmh: e.kmh }]);
@@ -211,11 +219,11 @@
       const v1 = prev.kmh / 3.6;
       const v2 = e.kmh / 3.6;
       const lead = Math.min(cap, (v1 * v1 - v2 * v2) / (2 * decel), (e.s - prev.s) * 0.85);
-      return { s: Math.max(prev.s + 20, e.s - lead), kmh: e.kmh };
+      return { s: notBefore(Math.max(prev.s + 20, e.s - lead), e.s), kmh: e.kmh };
     });
     const sorted = shifted.slice().sort((a, b) => a.s - b.s);
     sorted[0] = { s: 0, kmh: sorted[0].kmh };
-    return tidyLimits(sorted.filter((e, i) => i === 0 || (e.s - sorted[i - 1].s > 25 && e.kmh !== sorted[i - 1].kmh)), kind, length);
+    return tidyLimits(sorted.filter((e, i) => i === 0 || (e.s - sorted[i - 1].s > 25 && e.kmh !== sorted[i - 1].kmh)), kind, length, stopsAt);
   }
 
   /* Real lines: limits in steps of 10 km/h and no zone shorter than MIN_ZONE_M (Ian: boards close together, e.g. 110 for 30 m, then 80).
@@ -223,7 +231,7 @@
      The Luxtram builds its own limits (luxtram.js buildLimits, same minimum of 300 m) and passes through here again when its return direction is mirrored. */
   const MIN_ZONE_M = { rail: 400, hst: 800, tram: 300 };
   const ROUND_KMH = { rail: 10, hst: 10, tram: 5 };   // the Luxtram keeps its 25 km/h curves
-  function tidyLimits(limits, kind, length) {
+  function tidyLimits(limits, kind, length, stopsAt = []) {
     const minZone = MIN_ZONE_M[kind];
     if (!minZone || !limits.length) return limits;
     const step = ROUND_KMH[kind] || 10;
@@ -241,13 +249,17 @@
       if (k < 0) break;
       const prev = zones[k - 1];
       const next = zones[k + 1];
-      const intoPrev = prev && (!next || Math.abs(prev.kmh - zones[k].kmh) <= Math.abs(next.kmh - zones[k].kmh));
+      // hst: a zone that begins after a stop never pulls the zone before the stop down (the train stands at the stop anyway)
+      const stopBefore = stopsAt.some((st) => prev && st > prev.s && st <= zones[k].s);
+      const intoPrev = prev && (!next || (!stopBefore && Math.abs(prev.kmh - zones[k].kmh) <= Math.abs(next.kmh - zones[k].kmh)));
       if (intoPrev) {
         prev.kmh = Math.min(prev.kmh, zones[k].kmh);
         zones.splice(k, 1);
       } else {
         next.s = zones[k].s;
-        next.kmh = Math.min(next.kmh, zones[k].kmh);
+        // a short zone just after a stop (the train is still pulling away from 0 there) hands its stretch to the next zone at that zone's speed
+        const inThroat = stopsAt.some((st) => zones[k].s >= st - 1 && zones[k].s - st < HST_THROAT_M);
+        next.kmh = inThroat ? next.kmh : Math.min(next.kmh, zones[k].kmh);
         zones.splice(k, 1);
       }
       zones = dedupe(zones);
@@ -466,7 +478,7 @@
 
     /* ---- stations / signals / limits */
     const stations = comp.stations;
-    const limits = buildLimits(comp.limitsRaw, kind, length);
+    const limits = buildLimits(comp.limitsRaw, kind, length, comp.stations);
     const signals = buildSignals(stations, comp.tunnels, comp.bridges, kind, length);
 
     const bridges = comp.bridges.map((b) => {
