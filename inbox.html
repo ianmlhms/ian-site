@@ -167,6 +167,8 @@
   html.kbd-open body{position:fixed;top:var(--vvtop,0px);left:0;right:0}
   html.kbd-open .ui-header,html.kbd-open #connectionStrip,html.kbd-open #mailStrip{display:none !important}
   html.kbd-open #app{padding-top:8px;padding-bottom:8px;gap:6px}
+  .push-toggle[hidden]{display:none}
+  .push-toggle[aria-pressed="true"]{color:var(--ok)}
   /* ---- mail cards ---- */
   .mail-card{padding:14px 16px;margin-bottom:2px;border-radius:0;background:var(--card2-opaque);border:1px solid var(--soft)}
   .mail-card.mine{background:color-mix(in srgb,var(--accent) 12%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 30%,transparent)}
@@ -269,6 +271,7 @@
     <h1 class="ui-brand" id="brandTitle">Vereenegt Inbox</h1>
   </div>
   <div class="header-right">
+    <button type="button" class="gt-acct push-toggle" id="pushToggle" aria-pressed="false" hidden>🔕 Notifikatiounen</button>
     <button type="button" class="gt-acct" id="gtAcct">Umellen</button>
   </div>
 </header>
@@ -351,7 +354,7 @@
 </script>
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-<script type="module" src="inbox.js?v=10"></script>
+<script type="module" src="inbox.js?v=11"></script>
 <script type="module" src="gitter-acct.js?v=1"></script>
 </body>
 </html>

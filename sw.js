@@ -308,7 +308,11 @@ self.addEventListener("notificationclick", (event) => {
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((wins) => {
       for (const w of wins) {
-        if (page && w.url.includes(page) && "focus" in w) return w.focus();
+        if (!page || !w.url.includes(page) || !("focus" in w)) continue;
+        // Already open (e.g. the Noriichten home-screen app): show the tapped chat.
+        const sameTarget = w.url.endsWith(url);
+        return w.focus().then((client) => (!sameTarget && client && client.navigate ? client.navigate(url) : client))
+          .catch(() => w.focus());
       }
       return self.clients.openWindow(url);
     })

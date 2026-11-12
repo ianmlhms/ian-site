@@ -43,6 +43,18 @@ export const flow = {
       h.eq(res.status(), 200, `icon ${icon.src} is served`);
     }
 
+    h.step("notification bell");
+    await page.waitForFunction(() => document.getElementById("pushToggle")?.dataset.state);
+    const bell = await page.evaluate(() => {
+      const b = document.getElementById("pushToggle");
+      return { hidden: b.hidden, text: b.textContent, state: b.dataset.state };
+    });
+    h.expect(bell.hidden || /Notifikatiounen (un|aus)/.test(bell.text), `bell (${JSON.stringify(bell)})`);
+    if (!bell.hidden && bell.state === "unsupported") {
+      await page.click("#pushToggle");
+      h.expect(/Home-Bildschirm/.test(await page.textContent("#notice")), "explains the home-screen app");
+    }
+
     h.step("chats only: no mail switch, no mail strip, no link home");
     h.expect(!(await page.isVisible(".mode-switch")), "mode switch hidden");
     h.expect(!(await page.isVisible("#mailStrip")), "mail strip hidden");

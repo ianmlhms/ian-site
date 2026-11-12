@@ -1,6 +1,7 @@
 import { client, session, onAuth } from './auth.js';
 import { mountAccountButton, openAuthModal } from "./auth.js";
 import { loadBackend } from "./inbox-backend.js?v=1";
+import { disablePush, enablePush, pushState } from "./notify.js?v=40";
 import {
   highlightMessage,
   renderAccounts,
@@ -827,6 +828,7 @@ async function startAuthenticatedApp() {
     return;
   }
   renderGate(false, openAuthModal);
+  void renderPushToggle();
   if (!accountTimer) {
     accountTimer = window.setInterval(() => {
       drawAccounts();
@@ -900,6 +902,55 @@ function applyAppMode() {
 }
 applyAppMode();
 
+// ---- Web Push for new chat messages (the bell in the header) -------------------
+const PUSH_LABELS = Object.freeze({ on: "🔔 Notifikatiounen un", off: "🔕 Notifikatiounen aus" });
+const isHomeScreenApp = () => window.matchMedia?.("(display-mode: standalone)").matches || navigator.standalone === true;
+const isAppleTouch = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+async function renderPushToggle() {
+  const button = document.getElementById("pushToggle");
+  const state = await pushState().catch(() => "unsupported");
+  // Safari on iPad/iPhone only does push inside a home-screen app: keep the
+  // button there so it can say how, hide it on browsers that can never push.
+  button.hidden = state === "unsupported" && !(isAppleTouch() && !isHomeScreenApp());
+  const isOn = state === "subscribed";
+  button.textContent = isOn ? PUSH_LABELS.on : PUSH_LABELS.off;
+  button.setAttribute("aria-pressed", String(isOn));
+  button.dataset.state = state;
+}
+
+async function togglePush() {
+  const button = document.getElementById("pushToggle");
+  const state = button.dataset.state;
+  if (state === "unsupported") {
+    showNotice("Notifikatiounen ginn um iPad nëmmen an der App: an Safari Deelen → „Zum Home-Bildschirm“, dann Noriichten vum Home-Bildschierm opmaachen.", "info");
+    return;
+  }
+  if (state === "denied") {
+    showNotice("Notifikatiounen sinn blockéiert: Astellungen → Notifikatiounen → Noriichten → erlaben.", "error");
+    return;
+  }
+  button.disabled = true;
+  try {
+    if (state === "subscribed") {
+      await disablePush();
+      showNotice("Notifikatiounen op dësem Apparat aus.", "info");
+    } else {
+      const result = await enablePush();
+      if (result.ok) showNotice("Notifikatiounen un: nei WhatsApp- an iMessage-Noriichten kommen op dësen Apparat.", "success");
+      else showNotice(result.error || "Notifikatiounen konnten net ugeschalt ginn.", "error");
+    }
+  } catch (error) {
+    console.error("push toggle failed", error);
+    showNotice("Notifikatiounen konnten net geännert ginn.", "error");
+  } finally {
+    button.disabled = false;
+    await renderPushToggle();
+  }
+}
+
+document.getElementById("pushToggle").addEventListener("click", () => void togglePush());
+
 let clientError = null;
 const supabase = await client().catch((error) => {
   clientError = error;
@@ -908,6 +959,7 @@ const supabase = await client().catch((error) => {
 if (supabase) {
   bindUi();
   onAuth((activeSession) => {
+    if (!activeSession) document.getElementById("pushToggle").hidden = true;
     if (activeSession) void startAuthenticatedApp();
     else stopAuthenticatedApp();
   });
