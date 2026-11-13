@@ -6,9 +6,9 @@ export const DEFAULT_ERROR = "Eppes ass schifgaang. Probéier nach eng Kéier.";
 
 /* "advent: name taken" -> short Luxembourgish message */
 const ERROR_TEXT = {
-  "bad name": "Dësen Numm geet net. 2 bis 20 Zeechen: Bréiwer, Zuelen, Espace, . _ ' -",
+  "bad name": "Dësen Numm geet net. 2 bis 20 Zeechen: Buschtawen, Zuelen, Espace, . _ ' -",
   "name taken": "Dësen Numm gëtt et schonn. Huel en aneren.",
-  "full": "Leider sinn all Plazen vergeben.",
+  "full": "Leider si keng Plaze méi fräi.",
   "no username": "Däi ian.lu-Kont huet nach kee Benotzernumm.",
   "locked": "Dës Dier ass nach zou.",
   "not ready": "De Kalenner ass nach net prett. Probéier méi spéit.",
