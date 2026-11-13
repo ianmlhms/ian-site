@@ -223,6 +223,7 @@
   }
   setInterval(parkMessages, 160);
   window.addEventListener('resize', parkMessages);
+  window.addEventListener('resize', () => { if (world) layoutStripLabels(); });
   function showError(text) { $('errorText').textContent = text; $('errorScreen').hidden = false; }
 
   /* ------------------------------------------------------------ module access (all guarded) */
@@ -1709,12 +1710,41 @@
       if (isEnd || stripLabelsAll(stations)) {
         const label = document.createElement('span');
         label.style.left = x + '%'; label.textContent = st.name; label.dataset.i = String(i);
-        // the end names stay inside the strip; middle names alternate above / below the line so neighbours never collide
-        label.className = i === 0 ? 'first' : i === stations.length - 1 ? 'last' : 'mid' + (i % 2 ? ' up' : '') + (passIndices().includes(i) ? ' pass' : '');
+        // the end names stay inside the strip; middle names are placed below / above the line by layoutStripLabels
+        label.className = i === 0 ? 'first' : i === stations.length - 1 ? 'last' : 'mid' + (passIndices().includes(i) ? ' pass' : '');
         dots.appendChild(label);
       }
     });
     buildStripTsr();
+    layoutStripLabels();
+  }
+  /* middle names: below the line where they fit, else above it, else hidden (the dot keeps the name as its tooltip). Measured, so long names
+     (Bertrange-Strassen) and narrow strips (iPad portrait) never overlap or get cut. Widths are taken in bold: the next stop is drawn bold. */
+  const STRIP_LABEL_GAP_PX = 4;
+  function layoutStripLabels(tries = 0) {
+    const dots = $('stripDots');
+    const spans = [...dots.querySelectorAll('span.first, span.last, span.mid')];
+    const mids = spans.filter((sp) => sp.classList.contains('mid'));
+    if (!mids.length) return;
+    const width = dots.clientWidth;
+    if (!width) { if (tries < 120) requestAnimationFrame(() => layoutStripLabels(tries + 1)); return; }   // not laid out yet (loading screen); a hidden strip (phones) gives up after ~2 s, resize retries
+    const box = (sp) => {
+      const w = sp.offsetWidth, x = (parseFloat(sp.style.left) / 100) * width;
+      if (sp.classList.contains('first')) return [x - 5, x - 5 + w];
+      if (sp.classList.contains('last')) return [x + 5 - w, x + 5];
+      return [x - w / 2, x + w / 2];
+    };
+    const rows = { down: spans.filter((sp) => !sp.classList.contains('mid')).map(box), up: [] };
+    const free = (row, b) => b[0] >= -18 && b[1] <= width + 18 && rows[row].every((o) => b[1] + STRIP_LABEL_GAP_PX <= o[0] || b[0] >= o[1] + STRIP_LABEL_GAP_PX);
+    mids.forEach((sp) => { sp.hidden = false; sp.classList.remove('up'); sp.style.fontWeight = '700'; });
+    mids.forEach((sp) => {
+      const b = box(sp);
+      const row = free('down', b) ? 'down' : free('up', b) ? 'up' : null;
+      sp.style.fontWeight = '';
+      if (!row) { sp.hidden = true; return; }
+      rows[row].push(b);
+      sp.classList.toggle('up', row === 'up');
+    });
   }
   function buildStripTsr() {
     const w = world, dots = $('stripDots'), stations = stationsOf();
@@ -1748,7 +1778,8 @@
       if (!lbl) { lbl = document.createElement('span'); lbl.id = 'stripNextLbl'; $('stripDots').appendChild(lbl); }
       const hs = stations[heading];
       $('stripDots').querySelectorAll('span.mid').forEach((sp) => sp.classList.toggle('next', Number(sp.dataset.i) === heading));
-      lbl.hidden = !hs || heading <= 0 || heading >= stations.length - 1 || stripLabelsAll(stations);
+      const shown = [...$('stripDots').querySelectorAll('span.mid')].some((sp) => Number(sp.dataset.i) === heading && !sp.hidden);   // its own name is on the strip already
+      lbl.hidden = !hs || heading <= 0 || heading >= stations.length - 1 || shown;
       if (hs) { lbl.textContent = hs.name; lbl.style.left = clamp(((hs.s - s0) / span) * 100, 12, 88) + '%'; }
     }
   }

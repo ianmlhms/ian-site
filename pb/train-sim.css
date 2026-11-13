@@ -51,7 +51,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 #stripDots i.next{background:var(--amber);border-color:var(--amber);box-shadow:0 0 10px var(--amber)}
 #stripDots span{position:absolute;top:30px;font-size:9px;color:var(--soft);transform:translateX(-50%);white-space:nowrap;max-width:70px;overflow:hidden;text-overflow:ellipsis}
 #stripDots span.first{transform:translateX(-5px)}#stripDots span.last{transform:translateX(calc(-100% + 5px))}
-#stripDots span.mid.up{top:3px}#stripDots span.mid.pass{opacity:.6;font-style:italic}#stripDots span.mid.next{color:var(--amber);font-weight:700;opacity:1}
+#stripDots span.mid{max-width:none}#stripDots span.mid.up{top:3px}#stripDots span.mid.pass{opacity:.6;font-style:italic}#stripDots span.mid.next{color:var(--amber);font-weight:700;opacity:1}
 #stripTrain{position:absolute;top:7px;width:0;height:0;margin-left:-6px;border-left:6px solid transparent;border-right:6px solid transparent;border-top:9px solid #fff;filter:drop-shadow(0 1px 2px #000)}
 .statsbox{grid-column:4/6;grid-row:1;justify-self:end;min-width:150px;max-width:100%;padding:8px 14px;text-align:right}
 .statsbox small{overflow-wrap:anywhere}
