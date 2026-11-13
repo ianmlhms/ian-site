@@ -1,0 +1,184 @@
+/* advent.css — Adventskalenner (advent.html), on top of gitter.css. Class prefix adv- (gitter.css flattens generic names like .tile/.card/.panel).
+ * One extra accent: Christmas red (--xmas), only on door numbers, the starred sudoku row, pins and conflicts. Mobile first (375px). */
+body.gt.adv { --xmas: #b3261e; }
+html[data-theme="dark"] body.gt.adv { --xmas: #ee706a; }
+@media (prefers-color-scheme: dark) { html:not([data-theme="light"]) body.gt.adv { --xmas: #ee706a; } }
+
+body.adv-lock { overflow: hidden; }
+.adv-page .gt-nav { padding-inline: 14px !important; }
+.adv-page .gt-link { min-width: 44px; justify-content: center; }
+.adv-text { font-size: 15.5px; line-height: 1.55; white-space: pre-line; overflow-wrap: anywhere; }
+.adv-small { color: var(--muted); font-size: 13.5px; line-height: 1.5; }
+.adv-error { color: var(--danger); font-weight: 600; }
+.adv-linkbtn { border: 0; background: none; cursor: pointer; padding: 0 14px 0 0; color: var(--green); font-family: inherit; }
+.adv-linkbtn:hover { text-decoration: underline; text-underline-offset: 3px; }
+.adv-badge { display: inline-block; margin-left: 8px; padding: 0 6px; border: 1px solid var(--green); color: var(--green); font: 500 11px/1.6 "Geist Mono", ui-monospace, monospace; vertical-align: 2px; }
+.adv-msg { gap: 10px; }
+
+/* ---- intro + header ---- */
+.adv-intro { align-items: flex-start; justify-content: flex-start !important; gap: 14px !important; padding: 22px 20px !important; }
+.adv-join, .adv-intro .gt-field { width: 100%; }
+.adv-join { display: flex; flex-direction: column; gap: 8px; }
+.adv-label { font-weight: 600; font-size: 15px; }
+.adv-alt { display: flex; flex-wrap: wrap; gap: 0 6px; }
+.adv-me { gap: 6px !important; padding: 14px 20px !important; justify-content: flex-start !important; }
+.adv-me-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.adv-me-name { font-size: 22px; font-weight: 800; letter-spacing: -0.03em; overflow-wrap: anywhere; }
+.adv-me-count { color: var(--muted); font-size: 14px; }
+.adv-me-count b { color: var(--ink); font-size: 18px; }
+.adv-countdown { color: var(--xmas); font-weight: 600; font-size: 14.5px; min-height: 1.4em; }
+
+/* ---- door grid: a hairline grid of 4 columns (6 from tablet) ---- */
+.adv-grid-wrap { padding: 0 !important; }
+.adv-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--soft); width: 100%; }
+.adv-grid li { display: flex; }
+.adv-door { all: unset; box-sizing: border-box; width: 100%; min-height: 88px; aspect-ratio: 1; padding: 10px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; background: var(--white); cursor: pointer; touch-action: manipulation; position: relative; }
+.adv-door:focus-visible { outline: 2px solid var(--green); outline-offset: -3px; }
+.adv-num { font: 500 clamp(26px, 8vw, 34px)/1 "Geist Mono", ui-monospace, monospace; letter-spacing: -0.04em; color: var(--xmas); }
+.adv-door-state { font: 500 12px/1.2 "Geist Mono", ui-monospace, monospace; color: var(--muted); }
+.adv-door.locked .adv-num { color: var(--muted); }
+.adv-door.locked { background: var(--sunk); }
+.adv-door.preview .adv-door-state { color: var(--xmas); }
+.adv-door.open { box-shadow: inset 0 0 0 2px var(--green); }
+.adv-door.open .adv-door-state { color: var(--green); font-weight: 600; }
+.adv-door.solved { background: var(--tint); }
+.adv-door.solved .adv-door-state { color: var(--green); }
+.adv-door.today { animation: adv-pulse 2.4s ease-in-out infinite; }
+@keyframes adv-pulse { 0%, 100% { box-shadow: inset 0 0 0 2px var(--green); } 50% { box-shadow: inset 0 0 0 5px var(--green); } }
+@media (min-width: 600px) { .adv-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); } .adv-door { min-height: 110px; } }
+
+/* ---- sheets ---- */
+.adv-sheet { position: fixed; inset: 0; z-index: 9000; background: var(--paper); color: var(--ink); overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+.adv-sheet-inner { max-width: 640px; margin: 0 auto; padding: 0 20px calc(48px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 14px; }
+.adv-sheet-top { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; padding-top: env(safe-area-inset-top); background: var(--paper); border-bottom: 1px solid var(--line); margin: 0 -20px; padding-inline: 14px; }
+.adv-back { border: 0; background: none; cursor: pointer; font-family: inherit; font-size: 15px; padding: 0 6px; }
+.adv-sheet-day { font: 500 14px/1 "Geist Mono", ui-monospace, monospace; color: var(--xmas); }
+.adv-title { font-size: 26px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.15; margin-top: 8px !important; overflow-wrap: anywhere; }
+.adv-question { font-size: 17px; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; white-space: pre-line; }
+.adv-preview { align-self: flex-start; padding: 2px 8px; border: 1px solid var(--xmas); color: var(--xmas); font: 500 12px/1.6 "Geist Mono", ui-monospace, monospace; margin-top: 12px; }
+.adv-figure { margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.adv-figure img { width: 100%; height: auto; display: block; border: 1px solid var(--line); background: var(--sunk); }
+.adv-credit { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.adv-credit a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.adv-hint-wrap { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.adv-hint { padding: 10px 12px; border-left: 3px solid var(--green); background: var(--tint); font-size: 14.5px; white-space: pre-line; overflow-wrap: anywhere; }
+.adv-form { display: flex; flex-direction: column; gap: 14px; }
+.adv-kind { display: flex; flex-direction: column; gap: 12px; }
+.adv-submit-row { display: flex; }
+.adv-submit { flex: 1; }
+.adv-feedback { min-height: 22px; font-weight: 600; font-size: 15px; color: var(--green); }
+.adv-feedback.err { color: var(--danger); }
+.adv-answer.shake { animation: adv-shake .4s; }
+@keyframes adv-shake { 20%, 60% { transform: translateX(-7px); } 40%, 80% { transform: translateX(7px); } }
+
+/* ---- solved + confetti ---- */
+.adv-solved { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 18px; border: 1px solid var(--green); background: var(--white); overflow: hidden; }
+.adv-solved-title { font-size: 24px; font-weight: 800; letter-spacing: -0.03em; }
+.adv-solved-time { font-size: 15px; color: var(--muted); }
+.adv-solved-time b { font: 500 20px "Geist Mono", ui-monospace, monospace; color: var(--ink); }
+.adv-reveal { padding-top: 4px; }
+.adv-confetti { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.adv-confetti span { position: absolute; top: -14px; left: var(--x); width: 8px; height: 12px; background: var(--c); transform: rotate(var(--r)); animation: adv-fall 1.9s var(--d) ease-in forwards; opacity: .9; }
+@keyframes adv-fall { to { transform: translateY(340px) rotate(calc(var(--r) + 540deg)); opacity: 0; } }
+
+/* ---- Klassement + menu ---- */
+.adv-tabs { display: flex; gap: 0; border: 1px solid var(--ink); margin-top: 12px; }
+.adv-tab { flex: 1; min-height: 44px; border: 0; background: transparent; color: var(--ink); font: 600 14px "Geist", system-ui, sans-serif; cursor: pointer; }
+.adv-tab.on { background: var(--ink); color: var(--paper); }
+.adv-table .me td { background: var(--tint); font-weight: 700; }
+.adv-name-cell { overflow-wrap: anywhere; }
+.adv-days { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.adv-daybtn { min-width: 44px; min-height: 44px; border: 1px solid var(--ink); background: transparent; color: var(--ink); font: 500 15px "Geist Mono", ui-monospace, monospace; cursor: pointer; }
+.adv-daybtn.on { background: var(--ink); color: var(--paper); }
+.adv-menu-block { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding-top: 6px; }
+.adv-menu-block .gt-field { width: 100%; }
+.adv-h { font-size: 17px; font-weight: 700; }
+.adv-code { font-family: "Geist Mono", ui-monospace, monospace; font-size: 14px; }
+
+/* ---- text / number / choice ---- */
+.adv-number { flex-direction: row; align-items: center; }
+.adv-number .adv-input { flex: 1; min-width: 0; }
+.adv-unit { color: var(--muted); font-weight: 600; }
+.adv-choices { gap: 8px; }
+.adv-choice { min-height: 48px; padding: 10px 14px; text-align: left; border: 1px solid var(--ink); background: var(--white); color: var(--ink); font: 600 16px "Geist", system-ui, sans-serif; cursor: pointer; overflow-wrap: anywhere; }
+.adv-choice.on { background: var(--ink); color: var(--paper); }
+
+/* ---- order ---- */
+.adv-order { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.adv-order-hint { font-weight: 600; font-size: 14px; color: var(--xmas); }
+.adv-order-row { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 4px 0 4px 2px; border-bottom: 1px solid var(--soft); }
+.adv-order-n { font: 500 13px "Geist Mono", ui-monospace, monospace; color: var(--muted); width: 18px; text-align: center; }
+.adv-order-label { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+.adv-move { width: 44px; height: 44px; border: 1px solid var(--ink); background: var(--white); color: var(--ink); cursor: pointer; font-size: 14px; }
+.adv-move[disabled] { opacity: .3; cursor: default; }
+
+/* ---- lock ---- */
+.adv-clues { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.adv-clues li { display: flex; gap: 12px; align-items: baseline; font-size: 15px; }
+.adv-clue-code { font: 500 18px "Geist Mono", ui-monospace, monospace; letter-spacing: .12em; flex: none; border: 1px solid var(--ink); padding: 2px 8px; background: var(--white); }
+.adv-wheels { display: flex; gap: 8px; justify-content: center; padding: 14px 8px; border: 1px solid var(--line); background: var(--white); }
+.adv-wheel { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.adv-wheel-btn { width: 52px; height: 44px; border: 1px solid var(--ink); background: var(--white); color: var(--ink); cursor: pointer; font-size: 14px; }
+.adv-wheel-digit { font: 500 38px/1.3 "Geist Mono", ui-monospace, monospace; width: 52px; text-align: center; border-block: 2px solid var(--xmas); }
+
+/* ---- cipher ---- */
+.adv-cipher-text { font: 500 17px/1.5 "Geist Mono", ui-monospace, monospace; letter-spacing: .06em; overflow-wrap: anywhere; padding: 10px 12px; background: var(--white); border: 1px solid var(--line); }
+.adv-wheel-svg { width: 100%; max-width: 320px; align-self: center; height: auto; }
+.adv-ring-line { fill: none; stroke: var(--ink); stroke-width: 1; }
+.adv-wheel-letter { font: 500 13px "Geist Mono", ui-monospace, monospace; fill: var(--ink); }
+.adv-ring-inner .adv-wheel-letter { fill: var(--xmas); }
+.adv-ring-mark { fill: var(--xmas); }
+.adv-shift-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.adv-range { flex: 1; min-width: 120px; min-height: 44px; accent-color: var(--green); }
+.adv-step { width: 44px; height: 44px; border: 1px solid var(--ink); background: var(--white); color: var(--ink); font-size: 20px; cursor: pointer; }
+.adv-shift-wrap { font-size: 13.5px; color: var(--muted); width: 100%; }
+.adv-shift { font: 500 15px "Geist Mono", ui-monospace, monospace; color: var(--ink); }
+.adv-decoded { font: 500 17px/1.5 "Geist Mono", ui-monospace, monospace; letter-spacing: .06em; overflow-wrap: anywhere; padding: 10px 12px; border: 1px solid var(--green); min-height: 3em; }
+
+/* ---- sudoku ---- */
+.adv-sudoku { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); width: 100%; max-width: 360px; align-self: center; border: 2px solid var(--ink); background: var(--white); }
+.adv-cell { all: unset; box-sizing: border-box; aspect-ratio: 1; min-height: 44px; display: grid; place-items: center; cursor: pointer; border-right: 1px solid var(--soft); border-bottom: 1px solid var(--soft); font: 500 24px "Geist Mono", ui-monospace, monospace; color: var(--green); touch-action: manipulation; }
+.adv-cell.given { color: var(--ink); font-weight: 500; background: var(--tint); cursor: default; }
+.adv-cell.box-r { border-right: 2px solid var(--ink); }
+.adv-cell.box-b { border-bottom: 2px solid var(--ink); }
+.adv-cell.star { background: color-mix(in srgb, var(--xmas) 12%, var(--white)); }
+.adv-cell.star.given { background: color-mix(in srgb, var(--xmas) 18%, var(--white)); }
+.adv-cell.sel { outline: 3px solid var(--green); outline-offset: -3px; }
+.adv-cell.bad { color: var(--xmas); background: color-mix(in srgb, var(--xmas) 22%, var(--white)); }
+.adv-pad { display: grid; grid-template-columns: repeat(auto-fit, minmax(44px, 1fr)); gap: 6px; max-width: 360px; width: 100%; align-self: center; }
+.adv-pad-key { min-height: 44px; border: 1px solid var(--ink); background: var(--white); color: var(--ink); font: 500 18px "Geist Mono", ui-monospace, monospace; cursor: pointer; }
+
+/* ---- map ---- */
+.adv-map { display: flex; flex-direction: column; gap: 8px; }
+.adv-map-svg { width: 100%; height: auto; max-height: 70vh; border: 1px solid var(--line); background: var(--white); touch-action: none; cursor: crosshair; }
+.adv-map-land { fill: var(--tint); stroke: var(--ink); stroke-width: 1.6; stroke-linejoin: round; }
+.adv-map-ref { fill: var(--ink); }
+.adv-map-label { font: 500 13px "Geist", system-ui, sans-serif; fill: var(--muted); pointer-events: none; }
+.adv-pin-ring { fill: none; stroke: var(--xmas); stroke-width: 2.5; }
+.adv-pin-dot { fill: var(--xmas); }
+.adv-map-pin { pointer-events: none; }
+
+/* ---- wordsearch ---- */
+.adv-ws { display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); width: 100%; max-width: 440px; align-self: center; border: 1px solid var(--ink); background: var(--white); user-select: none; -webkit-user-select: none; }
+.adv-ws-cell { all: unset; box-sizing: border-box; aspect-ratio: 1; display: grid; place-items: center; cursor: pointer; font: 500 clamp(13px, 4vw, 19px) "Geist Mono", ui-monospace, monospace; border-right: 1px solid var(--tint); border-bottom: 1px solid var(--tint); touch-action: manipulation; }
+.adv-ws-cell.start { outline: 2px solid var(--xmas); outline-offset: -2px; background: color-mix(in srgb, var(--xmas) 14%, var(--white)); }
+.adv-ws-cell.found { background: color-mix(in srgb, var(--green) 24%, var(--white)); }
+.adv-ws-cell.spare { color: var(--xmas); font-weight: 700; background: color-mix(in srgb, var(--xmas) 10%, var(--white)); }
+.adv-words { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; font: 500 13.5px "Geist Mono", ui-monospace, monospace; }
+.adv-words .done { text-decoration: line-through; color: var(--muted); }
+.adv-strip { font: 500 26px/1.4 "Geist Mono", ui-monospace, monospace; letter-spacing: .1em; color: var(--xmas); overflow-wrap: anywhere; padding: 10px 12px; border: 1px solid var(--xmas); }
+
+/* ---- slider ---- */
+.adv-slider { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 2px; width: 100%; max-width: 360px; aspect-ratio: 1; align-self: center; background: var(--soft); border: 2px solid var(--ink); }
+.adv-slider.done { display: block; gap: 0; border-color: var(--green); }
+.adv-slider-tile { all: unset; box-sizing: border-box; cursor: pointer; background-color: var(--sunk); display: flex; align-items: flex-start; justify-content: flex-start; padding: 3px 5px; font: 500 11px "Geist Mono", ui-monospace, monospace; color: #fff; text-shadow: 0 0 3px #000, 0 0 2px #000; touch-action: manipulation; }
+.adv-slider-tile:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
+.adv-slider-blank { background: var(--paper); }
+.adv-slider-wrap.noimg .adv-slider-tile { color: var(--ink); text-shadow: none; font-size: 26px; align-items: center; justify-content: center; background-image: none !important; border: 1px solid var(--ink); }
+.adv-slider-full { width: 100%; display: block; }
+p.adv-slider-full { padding: 24px; font-weight: 800; font-size: 22px; }
+.adv-slider-answer { display: flex; flex-direction: column; gap: 8px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .adv-door.today, .adv-answer.shake, .adv-confetti span { animation: none !important; }
+}

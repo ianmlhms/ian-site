@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="lb">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex,follow">
+<!-- Friends' Adventskalenner. "Gitter" look (see gitter.css). Puzzles and answers live only in the database. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Adventskalenner — ian.lu</title>
+<link rel="canonical" href="https://ian.lu/advent.html" />
+<meta name="description" content="24 Dieren, all Dag eng nei Aufgab: Rätsel, Minispiller a Froe iwwer Lëtzebuerg. Mat Klassement.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#f6f6f3" media="(prefers-color-scheme: light)" data-gt="light">
+<meta name="theme-color" content="#121314" media="(prefers-color-scheme: dark)" data-gt="dark">
+<script src="gitter-theme.js?v=1"></script>
+<link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="stylesheet" href="gitter.css?v=12">
+<link rel="stylesheet" href="advent.css?v=1">
+<script src="theme.js?v=33"></script>
+<script data-goatcounter="https://ianm.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="manifest" href="site.webmanifest">
+</head>
+<body class="gt adv">
+<main class="gt-page adv-page">
+  <div class="gt-grid">
+    <div class="c full gt-nav">
+      <div class="gt-nav-l"><a class="gt-back" href="index.html">‹ Heem</a><h1 class="gt-page-title">Adventskalenner</h1></div>
+      <div class="gt-navr">
+        <button type="button" class="gt-link" id="advBoardBtn">Klassement</button>
+        <button type="button" class="gt-link" id="advMenuBtn" aria-haspopup="dialog">Menü</button>
+      </div>
+    </div>
+
+    <div class="c full adv-msg" id="advMsg" role="status" hidden></div>
+
+    <section class="c full adv-intro" id="advIntro" aria-labelledby="advIntroTitle" hidden>
+      <h2 class="gt-big" id="advIntroTitle">Adventskalenner</h2>
+      <p class="adv-text">24 Dieren. All Dag eng nei, um 00:00 Auer. Rätsel, Minispiller a Froe iwwer Lëtzebuerg. Wiem seng Zäit ass am kierzten? Kuck am Klassement.</p>
+      <form id="joinForm" class="adv-join" novalidate>
+        <label class="adv-label" for="joinName">Moien! Gëff däin Numm an a maach mat.</label>
+        <div class="gt-field">
+          <input class="gt-input" id="joinName" name="name" type="text" maxlength="20" autocomplete="nickname" autocapitalize="words" spellcheck="false" placeholder="Däin Numm">
+          <button type="submit" class="gt-btn" id="joinBtn">Maachen mat</button>
+        </div>
+        <p class="gt-msg" id="joinErr" role="alert"></p>
+      </form>
+      <div class="adv-alt">
+        <button type="button" class="gt-link adv-linkbtn" id="restoreToggle" aria-expanded="false" aria-controls="restoreBox">Hues de schonn e Code? Aginn</button>
+        <button type="button" class="gt-link adv-linkbtn only-out" id="signInBtn">Mat ian.lu-Kont aloggen</button>
+      </div>
+      <div id="restoreBox" hidden>
+        <form id="restoreForm" class="gt-field" novalidate>
+          <input class="gt-input" id="restoreInput" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Däi Code" aria-label="Däi Code">
+          <button type="submit" class="gt-btn ghost">Weider</button>
+        </form>
+        <p class="gt-msg err" id="restoreErr" role="alert"></p>
+      </div>
+    </section>
+
+    <section class="c full adv-me" id="advMe" aria-label="Däin Stand" hidden>
+      <div class="adv-me-row">
+        <p class="adv-me-name"><span id="advName"></span><span class="adv-badge" id="advAccount" hidden>ian.lu</span></p>
+        <p class="adv-me-count"><b class="gt-mono" id="advSolved">0/24</b> geléist</p>
+      </div>
+      <p class="adv-countdown" id="advCountdown" aria-live="off"></p>
+    </section>
+
+    <div class="c full adv-grid-wrap">
+      <ol class="adv-grid" id="advGrid" aria-label="24 Dieren"></ol>
+    </div>
+  </div>
+</main>
+
+<section class="adv-sheet" id="advDoor" role="dialog" aria-modal="true" aria-label="Dier" hidden></section>
+<section class="adv-sheet" id="advBoard" role="dialog" aria-modal="true" aria-label="Klassement" hidden></section>
+<section class="adv-sheet" id="advMenu" role="dialog" aria-modal="true" aria-label="Menü" hidden></section>
+<div class="gt-toast" id="advToast" role="status" hidden></div>
+
+<script src="pixelbreak-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
+<script type="module" src="advent.js?v=1"></script>
+</body>
+</html>
