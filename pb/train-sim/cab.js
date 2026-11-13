@@ -126,8 +126,9 @@
       leverX: -0.5, joystick: false, seat: 'modern', pal: 'tgv',
       pupitre: { w: 0.44, h: 0.07, color: '#0a0b0c', top: '#15171a', lever2: 0.22 }, stk: '#9aa3ad', layout: { wiper: -0.82, light: -0.7, announce: -0.58, eb: 0.0, park: 0.14, horn: 0.28, doorL: 0.55, doorR: 0.72 },
       ceil: '#c3d3f3', blind: false, extras: [], seatCol: ['#a42a3a', '#932535'],
-      dials: [{ kind: 'gauge', x: -0.9, r: 0.048, idx: 0, v: 0.09 }, { kind: 'gauge', x: -0.79, r: 0.048, idx: 1, v: 0.09 }, { kind: 'speedo', x: -0.66, r: 0.058 }],
-      mfds: [{ x: 0.3, w: 0.26, h: 0.19, role: 'main' }, { x: 0.58, w: 0.2, h: 0.15, role: 'aux' }, { x: 0.83, w: 0.12, h: 0.1, role: 'diag' }],
+      /* the desk is only +-0.81 m wide here (capped by the nose): everything sits inside it; gauges left of the lever block, the DMI speedometer between the brake handle and the screens */
+      dials: [{ kind: 'gauge', x: -0.745, r: 0.048, idx: 0, v: 0.11 }, { kind: 'gauge', x: -0.645, r: 0.048, idx: 1, v: 0.11 }, { kind: 'speedo', x: -0.005, r: 0.058 }],
+      mfds: [{ x: 0.27, w: 0.26, h: 0.19, role: 'main' }, { x: 0.52, w: 0.19, h: 0.15, role: 'aux' }, { x: 0.715, w: 0.11, h: 0.1, role: 'diag' }],
     },
   };
 
@@ -428,15 +429,24 @@
     ctx.fillStyle = old ? '#e9e2c9' : '#0b0d11'; ctx.fill();
     const ink = old ? '#1d1a14' : '#f4f6f8';
     const at = (ang, r) => [c + r * Math.sin(ang), c - r * Math.cos(ang)];
+    /* numbers: every major tick that has room; the labels sit on a circle, so on a dense scale (0..360 in steps of 40) neighbours would run together ("160200"):
+       take every k-th major until the chord between two labels is wider than the widest label (+ margin) */
+    const labelFont = Math.round(s * (scale.scaleMax >= 300 ? 0.095 : 0.11)), labelR = R * 0.6;
+    ctx.font = '700 ' + labelFont + 'px ' + FONT;
+    const widest = ctx.measureText(String(Math.round(scale.scaleMax))).width;
+    const majorAngle = 270 * scale.major / scale.scaleMax * DEG;
+    let labelEvery = 1;
+    while (labelEvery < 6 && 2 * labelR * Math.sin(majorAngle * labelEvery / 2) < widest * 1.35) labelEvery++;
     for (let v = 0; v <= scale.scaleMax + 0.01; v += scale.minor) {
       const ang = (-135 + 270 * v / scale.scaleMax) * DEG;
-      const isMajor = Math.abs(v / scale.major - Math.round(v / scale.major)) < 0.01;
+      const majorIdx = v / scale.major;
+      const isMajor = Math.abs(majorIdx - Math.round(majorIdx)) < 0.01;
       const a = at(ang, R * 0.94), b = at(ang, R * (isMajor ? 0.78 : 0.86));
       ctx.strokeStyle = ink; ctx.lineWidth = s * (isMajor ? 0.018 : 0.01);
       ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
-      if (isMajor) {
-        const p = at(ang, R * 0.6);
-        ctx.fillStyle = ink; ctx.font = '700 ' + Math.round(s * (scale.scaleMax >= 300 ? 0.095 : 0.11)) + 'px ' + FONT;
+      if (isMajor && Math.round(majorIdx) % labelEvery === 0) {
+        const p = at(ang, labelR);
+        ctx.fillStyle = ink; ctx.font = '700 ' + labelFont + 'px ' + FONT;
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText(String(Math.round(v)), p[0], p[1]);
       }
@@ -492,7 +502,7 @@
   /* ---------------------------------------------------------------- gate plate (notch labels) */
   function notchLabel(n) { return n === NOTCH_EB ? 'EB' : n < 0 ? 'B' + (-n) : n === 0 ? '0' : 'P' + n; }
 
-  function drawGatePlate(canvas, kind, uOf, uMin, uMax) {
+  function drawGatePlate(canvas, kind, uOf, uMin, uMax, ticksRight) {
     const ctx = canvas.getContext('2d'), w = canvas.width, h = canvas.height;
     ctx.fillStyle = '#16181c'; ctx.fillRect(0, 0, w, h);
     const yOf = (n) => ((uOf(n) - uMin) / (uMax - uMin)) * h;
@@ -501,9 +511,10 @@
       const y = yOf(n);
       const power = n > 0, eb = n === NOTCH_EB, zero = n === 0;
       const col = eb ? '#ff4a3d' : power ? '#4df08f' : zero ? '#ffffff' : '#ffb347';
-      ctx.fillStyle = col; ctx.fillRect(w * 0.04, y - 2, w * (zero ? 0.2 : 0.14), 4);
+      const tickW = w * (zero ? 0.2 : 0.14);
+      ctx.fillStyle = col; ctx.fillRect(ticksRight ? w * 0.96 - tickW : w * 0.04, y - 2, tickW, 4);   // the ticks sit on the side of the slot
       ctx.font = '800 ' + Math.round(w * (eb ? 0.27 : 0.24)) + 'px ' + FONT;
-      ctx.fillText(notchLabel(n), w * 0.34, y);
+      ctx.fillText(notchLabel(n), ticksRight ? w * 0.08 : w * 0.34, y);
     }
     ctx.strokeStyle = '#3c4048'; ctx.lineWidth = 3; ctx.strokeRect(1.5, 1.5, w - 3, h - 3);
   }
@@ -617,6 +628,18 @@
       rampBase, new T.Quaternion().setFromEuler(new T.Euler(rampAlpha - Math.PI / 2, 0, 0, 'XYZ')), new T.Vector3(1, 1, 1))
       .multiply(compose(px, py, pz || 0));
 
+    /* the lever gate (see below) is computed first: its power notches lie in front of the ramp bottom and would sink into the ramp block, so a flat gap is left in the ramp there */
+    const lk = LEVER_KINDS[S.joystick ? 'joystick' : 'stick'];
+    const kindName = S.joystick ? 'joystick' : 'stick';
+    const leverU = Math.min(S.joystick ? 0.3 : 0.27, uVis - (S.joystick ? 0.19 : 0.22));
+    const leverX = Math.max(S.leverX, -(hw - 0.08));
+    const tipU = (n) => leverU + lk.len * Math.sin(leverAngleDeg(kindName, n) * DEG);
+    const uMinNotch = tipU(LEVER_MAX), uMaxNotch = tipU(LEVER_MIN);
+    const platePad = 0.028;
+    const plateU0 = uMinNotch - platePad, plateU1 = uMaxNotch + platePad;
+    const plateW = 0.096;
+    const plateSide = S.hood ? -1 : 1;   // the tram console has the controls and the fascia on the right of the lever: the plate stands on its left (free desk) instead
+    const plateX = leverX + 0.085 * plateSide;
     /* ---- desk body: extruded (z,y) profiles. Centre block carries the ramp, the wings stay flat. */
     const rearZ = zF + DESK_FRONT_U + DESK_DEPTH;
     const cowlZ = glassZ0 + 0.04, cowlY = fr.windY0 - 0.015;
@@ -679,8 +702,17 @@
       g.computeVertexNormals();
       addTo('matte', g, new T.Matrix4(), hexTop, hexBot);
     };
-    if (S.hood) loftFascia('#363b43', '#191c21'); else prismX(rampProfile, rx0, rx1, S.body);
+    /* flat gap in the ramp where the power part of the lever gate lies (u in front of the ramp foot): otherwise P2..P5 and the plate top sink into the ramp block */
+    let gapX0 = clamp(leverX - 0.07, rx0, rx1), gapX1 = clamp(Math.max(plateX + plateW / 2 + 0.025, leverX + ((S.pupitre && S.pupitre.lever2) || 0) + 0.06), rx0, rx1);
+    for (const d of dials) if (d.x + d.r * 1.12 > gapX0 && d.x - d.r * 1.12 < gapX1) { if (d.x < leverX) gapX0 = Math.max(gapX0, d.x + d.r * 1.12 + 0.01); else gapX1 = Math.min(gapX1, d.x - d.r * 1.12 - 0.01); }
+    for (const m of mfds) if (m.x + m.w / 2 + 0.02 > gapX0 && m.x - m.w / 2 - 0.02 < gapX1) { if (m.x < leverX) gapX0 = Math.max(gapX0, m.x + m.w / 2 + 0.03); else gapX1 = Math.min(gapX1, m.x - m.w / 2 - 0.03); }
+    if (S.pupitre) { const P = S.pupitre, pxm = plateX - 0.03 + (P.dx !== undefined ? P.dx : (P.lever2 || 0) / 2); gapX0 = Math.min(gapX0, pxm - (P.w || 0.3) / 2 - 0.01); gapX1 = Math.max(gapX1, pxm + (P.w || 0.3) / 2 + 0.01); }
+    const gateInRamp = !S.hood && plateU0 < rampBottomU + 0.01;
+    const gapOk = gateInRamp && gapX0 < leverX - 0.02 && gapX1 > plateX + plateW / 2;
+    const rampSpans = gapOk ? [[rx0, gapX0], [gapX1, rx1]].filter((q) => q[1] - q[0] > 0.01) : [[rx0, rx1]];
+    if (S.hood) loftFascia('#363b43', '#191c21'); else for (const [xa, xb] of rampSpans) prismX(rampProfile, xa, xb, S.body);
     const wingXs = [[-hw - 0.04, rx0], [rx1, hw + 0.04]];
+    if (gapOk) wingXs.push([gapX0, gapX1]);
     for (const [xa, xb] of wingXs) {
       if (xb - xa < 0.01) continue;
       prismX(flatProfile, xa, xb, S.body);
@@ -691,11 +723,12 @@
     }
     // centre flat top and ramp plate
     deskBox('matte', rx1 - rx0, 0.008, DESK_DEPTH - rampBottomU + 0.02, (rx0 + rx1) / 2, (rampBottomU + DESK_DEPTH) / 2 - 0.01, S.top, -0.007);
-    if (!S.hood) addTo('matte', box(rx1 - rx0, rampLen, 0.008), panelM((rx0 + rx1) / 2, rampLen / 2, 0.0), S.ramp);
-    if (!S.hood) {
+    for (const [xa, xb] of S.hood ? [] : rampSpans) {
+      const xm = (xa + xb) / 2;
+      addTo('matte', box(xb - xa, rampLen, 0.008), panelM(xm, rampLen / 2, 0.0), S.ramp);
       const z0 = cowlZ, y0 = cowlY, z1 = zF + DESK_FRONT_U + rampTopU, y1 = rampTopY;
       const len = Math.hypot(z1 - z0, y1 - y0), ang = Math.atan2(y1 - y0, z1 - z0);
-      addTo('matte', box(rx1 - rx0, 0.012, len), compose((rx0 + rx1) / 2, (y0 + y1) / 2 + 0.004, (z0 + z1) / 2, -ang, 0, 0), '#14171a');
+      addTo('matte', box(xb - xa, 0.012, len), compose(xm, (y0 + y1) / 2 + 0.004, (z0 + z1) / 2, -ang, 0, 0), '#14171a');
     }
     // front rubber/metal trim along the desk rear edge and a thin chrome nose strip
     deskBox('metal', hw * 2, 0.012, 0.016, 0, DESK_DEPTH - 0.006, S.metal, -0.004);
@@ -761,7 +794,8 @@
         face.applyMatrix4(M);
         dialGroup.add(face);
         const ang = (-135 + 270 * (GAUGE_NEEDLE[d.idx] || 0.5)) * DEG;
-        addTo('metal', box(d.r * 0.04, d.r * 0.82, 0.003), M.clone().multiply(compose(0, 0, 0.003, 0, 0, -ang)).multiply(compose(0, d.r * 0.35, 0)), '#14110c');
+        addTo('metal', box(d.r * 0.05, d.r * 0.82, 0.003), M.clone().multiply(compose(0, 0, 0.003, 0, 0, -ang)).multiply(compose(0, d.r * 0.35, 0)), S.old ? '#14110c' : '#ff7a1a');   // a dark needle on a dark face is invisible: orange like the speedometer needle
+        addTo('metal', cyl(d.r * 0.09, d.r * 0.09, 0.004, 14).rotateX(Math.PI / 2), M.clone().multiply(compose(0, 0, 0.0035)), '#c8ccd2');
       }
     }
 
@@ -865,30 +899,45 @@
     };
 
     /* ---- gate plate + lever -------------------------------------------------------------------- */
-    const lk = LEVER_KINDS[S.joystick ? 'joystick' : 'stick'];
-    const kindName = S.joystick ? 'joystick' : 'stick';
-    const leverU = Math.min(S.joystick ? 0.3 : 0.27, uVis - (S.joystick ? 0.19 : 0.22));
-    const leverX = Math.max(S.leverX, -(hw - 0.08));
-    const tipU = (n) => leverU + lk.len * Math.sin(leverAngleDeg(kindName, n) * DEG);
-    const uMinNotch = tipU(LEVER_MAX), uMaxNotch = tipU(LEVER_MIN);
-    const platePad = 0.028;
-    const plateU0 = uMinNotch - platePad, plateU1 = uMaxNotch + platePad;
-    const plateW = 0.096;
-    const plateX = leverX + 0.085;
     const PUP_H = S.pupitre ? (S.pupitre.h || 0.055) : 0;   // height of the raised console block (pupitre) the lever, its gate plate and the buttons next to it stand on
+    /* where the gate dips into the ramp block (no flat gap possible between the instruments), the plate part in front of the ramp foot is drawn on the ramp face instead:
+       slopeGate = true, plate u < splitU lies on the slope (ramp coordinate py = distance from the ramp foot along the face), the rest on the desk */
+    const slopeGate = gateInRamp && !gapOk;
+    const rampCos = Math.cos(rampAlpha);
+    const splitU = slopeGate ? rampBottomU - clamp((PUP_H + 0.003) / Math.tan(rampAlpha - deskTilt), 0, rampBottomU - plateU0) : plateU0;
+    const gateFrac = slopeGate ? (splitU - plateU0) / (plateU1 - plateU0) : 0;   // share of the plate (from its far end) that is on the slope
+    const slopeLen = (splitU - plateU0) / rampCos, slopeFromPy = (rampBottomU - splitU) / rampCos;
     const gateCanvas = makeCanvas(isLow ? 96 : 160, Math.round((isLow ? 96 : 160) * (plateU1 - plateU0) / plateW));
-    drawGatePlate(gateCanvas, kindName, tipU, plateU0, plateU1);
+    drawGatePlate(gateCanvas, kindName, tipU, plateU0, plateU1, plateSide < 0);
     const gateTex = tex(canvasTexture(gateCanvas, aniso));
     const gateMat = mat(new T.MeshStandardMaterial({ map: gateTex, emissiveMap: gateTex, emissive: '#ffffff', emissiveIntensity: 0.4, roughness: 0.7 }));
-    const gateMesh = new T.Mesh(geo(new T.PlaneGeometry(plateW, plateU1 - plateU0).rotateX(-Math.PI / 2)), gateMat);
+    const gateFlatLen = plateU1 - (slopeGate ? splitU : plateU0);
+    const gateGeo = new T.PlaneGeometry(plateW, gateFlatLen);
+    if (slopeGate) { const uv = gateGeo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setY(i, uv.getY(i) * (1 - gateFrac)); }   // canvas row 0 (v = 1) is the far end (plateU0)
+    const gateMesh = new T.Mesh(geo(gateGeo.rotateX(-Math.PI / 2)), gateMat);
     const deskGroup = new T.Group();
     deskGroup.name = 'deskFrame';
     deskGroup.matrixAutoUpdate = false;
     deskGroup.matrix.copy(deskFrame);
     deskGroup.matrixWorldNeedsUpdate = true;
     interior.add(deskGroup);
-    gateMesh.position.set(plateX, 0.003 + PUP_H, (plateU0 + plateU1) / 2);
+    gateMesh.position.set(plateX, 0.003 + PUP_H, plateU1 - gateFlatLen / 2);
     deskGroup.add(gateMesh);
+    const rampGroup = new T.Group();   // frame of the ramp face: x right, y up the slope from the foot, z out of the face
+    rampGroup.name = 'rampFrame';
+    rampGroup.matrixAutoUpdate = false;
+    rampGroup.matrixWorldNeedsUpdate = true;
+    rampGroup.matrix.copy(panelM(0, 0, 0));
+    interior.add(rampGroup);
+    if (slopeGate) {
+      const sGeo = new T.PlaneGeometry(plateW, slopeLen);
+      const suv = sGeo.attributes.uv; for (let i = 0; i < suv.count; i++) suv.setY(i, 1 - gateFrac + suv.getY(i) * gateFrac);
+      const slopeMesh = new T.Mesh(geo(sGeo), gateMat);
+      slopeMesh.position.set(plateX, slopeFromPy + slopeLen / 2, 0.007);
+      rampGroup.add(slopeMesh);
+      addTo('metal', box(plateW + 0.014, slopeLen + 0.007, 0.004), panelM(plateX, slopeFromPy + slopeLen / 2, 0.0045), S.metal);
+      addTo('matte', box(0.02, slopeLen + 0.01, 0.004), panelM(leverX, slopeFromPy + slopeLen / 2, 0.0065), '#050607');
+    }
     // the central console block of the real desk (pupitre): a raised box with a lighter top and a metal edge, the lever(s) and the gate stand on it
     if (S.pupitre) {
       const P = S.pupitre, pu = (plateU0 + plateU1) / 2, pd = plateU1 - plateU0 + (P.pad || 0.14), pw = P.w || 0.3, px = plateX - 0.03 + (P.dx !== undefined ? P.dx : (P.lever2 || 0) / 2);
@@ -903,8 +952,11 @@
     // moving amber pointer on the plate (follows the lever)
     const markerMat = mat(new T.MeshStandardMaterial({ color: '#7a5a12', emissive: '#ffbf33', emissiveIntensity: 1.4, roughness: 0.4 }));
     const marker = new T.Mesh(geo(box(0.012, 0.006, 0.012)), markerMat);
-    marker.position.set(plateX - plateW / 2 + 0.002, 0.007 + PUP_H, tipU(0));
+    marker.position.set(plateX + plateSide * (plateW / 2 - 0.002) * -1, 0.007 + PUP_H, tipU(0));
     deskGroup.add(marker);
+    const markerSlope = new T.Mesh(geo(box(0.012, 0.012, 0.006)), markerMat);
+    markerSlope.visible = false;
+    rampGroup.add(markerSlope);
 
     // lever mount (boot) static, pivot dynamic
     deskCyl('matte', S.joystick ? 0.045 : 0.034, S.joystick ? 0.05 : 0.04, S.joystick ? 0.03 : 0.022, leverX, leverU, S.trim, PUP_H, 20);
@@ -1124,7 +1176,7 @@
     // the gate (notch plate + slot) and the lever grip: one control, picks a notch
     {
       const hu0 = plateU0 - 0.025, hu1 = plateU1 + 0.025;
-      const hx0 = leverX - 0.045, hx1 = plateX + plateW / 2 + 0.02;
+      const hx0 = Math.min(leverX - 0.045, plateX - plateW / 2 - 0.02), hx1 = Math.max(leverX + 0.045, plateX + plateW / 2 + 0.02);
       addHit('lever', hx1 - hx0, 0.02, hu1 - hu0, (hx0 + hx1) / 2, 0.012 + PUP_H, (hu0 + hu1) / 2, deskGroup, { gate: true });
       addHit('lever', 0.09, 0.16, 0.09, 0, lk.len - 0.07, 0, leverPivot, { grip: true });
       addHalo('lever', plateW + 0.05, plateU1 - plateU0 + 0.05, plateX, 0.0055 + PUP_H, (plateU0 + plateU1) / 2);
@@ -1192,8 +1244,12 @@
         boxAt('matte', 0.05, h, 0.06, px, ym, capZ(ym) + 0.05, pillar, rk);
         boxAt('matte', 0.012, h, 0.012, px, ym, capZ(ym) + 0.015, '#050607', rk);
       }
-      // grab handle on the left pillar
-      boxAt('metal', 0.026, 0.4, 0.026, -(innerHW + 0.12), ym - 0.1, capZ(ym) + 0.22, '#c7ccd1', rk);
+      // grab handle on the left pillar: stood off its rear face on two brackets (it used to hang in the side window, 0.15 m beside the pillar)
+      {
+        const gx = -(innerHW + 0.045), gOff = 0.075 + (S.pillarR || 0.034) + 0.04, gy = ym - 0.1;
+        addTo('metal', cyl(0.012, 0.012, 0.4, 10), compose(gx, gy, capZ(gy) + gOff, rk), '#c7ccd1');
+        for (const by of [gy - 0.15, gy + 0.15]) boxAt('metal', 0.018, 0.018, gOff - 0.075, gx, by, capZ(by) + (0.075 + gOff) / 2, '#9aa1a8', rk);
+      }
       // the small things of each real cab
       for (const ex of S.extras || []) {
         if (ex === 'extinguisher') {   // red extinguisher with its bracket on the left wall behind the pillar
@@ -1256,8 +1312,12 @@
         boxAt('matte', 0.2, 0.2, 0.035, mx, my, mz, '#17191c', 0, -0.5);
         boxAt('metal', 0.17, 0.17, 0.008, mx - 0.004, my, mz + 0.02, '#6f7c86', 0, -0.5);
       }
-      // grab handle on the left pillar and a coat hook
-      boxAt('metal', 0.026, 0.4, 0.026, -(innerHW + 0.12), ym - 0.1, capZ(ym) + 0.22, '#c7ccd1', rk);
+      // grab handle on the left pillar: stood off its rear face on two brackets (it used to hang in the side window, 0.15 m beside the pillar)
+      {
+        const gx = -(innerHW + 0.045), gOff = 0.075 + (S.pillarR || 0.034) + 0.04, gy = ym - 0.1;
+        addTo('metal', cyl(0.012, 0.012, 0.4, 10), compose(gx, gy, capZ(gy) + gOff, rk), '#c7ccd1');
+        for (const by of [gy - 0.15, gy + 0.15]) boxAt('metal', 0.018, 0.018, gOff - 0.075, gx, by, capZ(by) + (0.075 + gOff) / 2, '#9aa1a8', rk);
+      }
     }
 
     /* ---- side windows, cab doors, details ------------------------------------------------------ */
@@ -1331,6 +1391,7 @@
     addMerged('sticker', matSticker);
     addMerged('glass', matGlass);
 
+    group.userData.gate = { plateU0, plateU1, rampBottomU, gateInRamp, gapOk, slopeGate, hw, rx0, rx1, rampLen, rampAlphaDeg: rampAlpha / DEG, tipP5: tipU(LEVER_MAX), tipEB: tipU(LEVER_MIN), deskDepth: DESK_DEPTH, uVis };   // QA
     group.userData.eye = new T.Vector3(eyeX, eyeY, eyeZ);
     group.userData.eyeLookAt = new T.Vector3(eyeX, eyeY, eyeZ - 10);
     group.userData.frame = {
@@ -1413,7 +1474,10 @@
       if (Math.abs(target - rt.leverDisp) < 0.002) rt.leverDisp = target;
       leverPivot.rotation.x = leverAngleDeg(kindName, lever2 ? Math.max(0, rt.leverDisp) : rt.leverDisp) * DEG;
       if (lever2) lever2.rotation.x = leverAngleDeg(kindName, Math.min(0, rt.leverDisp)) * DEG;
-      marker.position.z = tipU(rt.leverDisp);
+      const tipNow = tipU(rt.leverDisp), onSlope = slopeGate && tipNow < splitU;
+      marker.visible = !onSlope; markerSlope.visible = onSlope;
+      marker.position.z = tipNow;
+      if (onSlope) markerSlope.position.set(plateX - plateSide * (plateW / 2 - 0.002), (rampBottomU - tipNow) / rampCos, 0.011);
 
       // speedo
       const speed = Math.max(0, num(s.speedKmh, 0));
@@ -1512,6 +1576,14 @@
     }
 
     function notchOnPlate(raycaster) {
+      if (slopeGate) {   // the part of the plate on the ramp face: the ray meets the face before the flat desk plane
+        rampGroup.updateWorldMatrix(true, false);
+        tmpA.set(0, 0, 1).transformDirection(rampGroup.matrixWorld);
+        tmpB.set(0, 0, 0.007).applyMatrix4(rampGroup.matrixWorld);
+        tmpPlane.setFromNormalAndCoplanarPoint(tmpA, tmpB);
+        const q = raycaster.ray.intersectPlane(tmpPlane, tmpA);
+        if (q) { const lp = rampGroup.worldToLocal(tmpA); if (lp.y >= slopeFromPy - 0.01 && lp.y <= slopeFromPy + slopeLen + 0.04 && Math.abs(lp.x - plateX) < 0.08) return notchAtU(rampBottomU - lp.y * rampCos); }
+      }
       tmpA.set(0, 1, 0).transformDirection(deskGroup.matrixWorld);
       tmpB.set(0, 0.003 + PUP_H, 0).applyMatrix4(deskGroup.matrixWorld);
       tmpPlane.setFromNormalAndCoplanarPoint(tmpA, tmpB);
@@ -1538,6 +1610,7 @@
       if (!c) return null;
       group.updateWorldMatrix(true, true);
       const u = id === 'lever' && typeof notch === 'number' ? tipU(clamp(Math.round(notch), LEVER_MIN, LEVER_MAX)) : c.u;
+      if (slopeGate && id === 'lever' && u < splitU) return rampGroup.localToWorld(new T.Vector3(c.x, (rampBottomU - u) / rampCos, 0.007));
       return deskGroup.localToWorld(new T.Vector3(c.x, c.y, u));
     }
 
