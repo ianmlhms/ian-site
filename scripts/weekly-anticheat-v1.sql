@@ -117,14 +117,36 @@ create trigger zz_catch_suspicious_weekly
   for each row execute function public.catch_suspicious_weekly();
 
 -- ---------- part 2: the scripted accounts ----------
+-- Ian, 14 Nov 2026: ban AND delete them. Every table that
+-- references auth.users cascades, so deleting the users
+-- removes their scores, weekly rows, flags and bans too.
+-- A copy (accounts, scores, flags) was saved first to
+-- OneDrive/ian-stack/evidence/example-invalid-accounts-2026-11-14.jsonl
 
-insert into public.leaderboard_bans (user_id, reason)
-select u.id, 'scripted @example.invalid signup, 12-13 Nov 2026'
-  from auth.users u
- where u.email like '%@example.invalid'
-on conflict do nothing;
+delete from auth.users where email ilike '%@example.invalid';
 
-delete from public.weekly_scores s using auth.users u
- where u.id = s.user_id and u.email like '%@example.invalid';
-delete from public.scores s using auth.users u
- where u.id = s.user_id and u.email like '%@example.invalid';
+-- Banned accounts keep weekly rows saved before their ban,
+-- and weekly_board does not filter bans: clear those rows.
+delete from public.weekly_scores s
+ using public.leaderboard_bans b where b.user_id = s.user_id;
+
+-- ---------- part 3: no more @example.invalid accounts ----------
+-- Ian, 14 Nov 2026. .invalid is a reserved TLD (RFC 2606) that
+-- can never receive mail, so no real person signs up with it.
+-- Blocks both new signups and changing an email to one.
+
+create or replace function public.block_reserved_email()
+returns trigger language plpgsql
+set search_path = public as $$
+begin
+  if lower(coalesce(new.email, '')) like '%@example.invalid' then
+    raise exception 'email domain not allowed'
+      using errcode = '22023';
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists block_reserved_email on auth.users;
+create trigger block_reserved_email
+  before insert or update of email on auth.users
+  for each row execute function public.block_reserved_email();
