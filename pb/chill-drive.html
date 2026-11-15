@@ -52,11 +52,12 @@ html[data-theme="dark"]{--g-paper:#121314;--g-white:#1a1b1d;--g-ink:#ececea;--g-
 body,button{font-family:"Geist",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 body{background:var(--g-paper)}
 #hud{text-shadow:var(--halo)}
-#hud .v,#hud .v.st,#hud .v.lv{color:var(--g-on-green);font-family:"Geist Mono",ui-monospace,Menlo,monospace;font-weight:500;letter-spacing:0}
+/* on the 3D scene: always white with the dark outline (--g-on-green turns near-black in dark mode and vanished into the halo) */
+#hud .v,#hud .v.st,#hud .v.lv{color:#fff;font-family:"Geist Mono",ui-monospace,Menlo,monospace;font-weight:500;letter-spacing:0}
 #hud .l{opacity:.95;font-family:"Geist Mono",ui-monospace,Menlo,monospace;font-weight:500;letter-spacing:.06em}
 #mm,#mute{background:var(--g-white);border:1px solid var(--g-ink);color:var(--g-ink);border-radius:0}
 #mm:hover,#mute:hover{border-color:var(--g-green);color:var(--g-green)}
-#pop{text-shadow:var(--halo);color:var(--g-on-green)}
+#pop{text-shadow:var(--halo);color:#fff}
 #ov{background:var(--g-veil);color:var(--g-ink)}
 #ov h1{color:var(--g-ink);font-weight:800;letter-spacing:-.04em}
 #ov .sub{color:var(--g-muted);opacity:1}

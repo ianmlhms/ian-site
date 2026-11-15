@@ -16,9 +16,10 @@
  * the network first (see below) and the browser's own HTTP cache keeps the bundle, a second copy here would only cost storage. */
 const CACHE = "ianlu-v13";
 const GAMEDATA_CACHE = "ianlu-gamedata-v1";
+/* Only the shell every visitor needs. SkyLens (111 KB) used to be precached for everyone on every worker update,
+ * although almost nobody opens it; like every other page it is stored the first time it is visited. */
 const CORE = [
   "index.html", "favicon.svg", "apple-touch-icon.png", "site.webmanifest",
-  "skylens.html", "skylens.css?v=6", "skylens.js?v=8", "skylens.webmanifest",
 ];
 
 /* ---- Game data -------------------------------------------------------------------------------------------------------------------------------
