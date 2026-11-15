@@ -166,7 +166,7 @@
       method: "POST",
       headers: { apikey: c.anonKey, Authorization: "Bearer " + s.token, "Content-Type": "application/json" },
       body: JSON.stringify({ p_theme: t }),
-    }).catch(() => {});   // best-effort; localStorage already has it
+    }).catch((error) => console.warn("[theme] not saved to the account (kept on this device)", error));   // best-effort; localStorage already has it
   }
   async function serverSync() {
     const c = window.PB_CONFIG, s = readSession();
@@ -316,7 +316,7 @@
     if (!("serviceWorker" in navigator)) return;
     // Resolved against this script, so a page in a subfolder still registers the
     // root worker and keeps the site-wide "/" scope instead of 404ing.
-    navigator.serviceWorker.register(asset("sw.js")).catch(() => {});
+    navigator.serviceWorker.register(asset("sw.js")).catch((error) => console.warn("[theme] service worker not registered", error));
   }
 
   // Mobile bottom tab bar so the site feels like a native app. Skipped on pages
@@ -411,8 +411,40 @@
     slot.appendChild(b);
   }
 
+  // ---- offline notice ----
+  // The service worker can show a stored page without a connection, but nothing that talks to the
+  // server works then. Say so once, plainly, instead of leaving empty lists and failed buttons unexplained.
+  const OFFLINE_NOTE_ID = "siteOfflineNote";
+  const OFFLINE_NOTE_MS = 8000;     // long enough to read, never left sitting on top of a game
+  let offlineNoteTimer = 0;
+  function hideOfflineNote() {
+    clearTimeout(offlineNoteTimer);
+    const note = document.getElementById(OFFLINE_NOTE_ID);
+    if (note) note.remove();
+  }
+  function showOfflineNote() {
+    if (window.top !== window || !document.body) return;   // not inside the game frames
+    hideOfflineNote();
+    const note = document.createElement("button");
+    note.type = "button";
+    note.id = OFFLINE_NOTE_ID;
+    note.setAttribute("role", "status");
+    note.textContent = "Keng Internetverbindung. Verschiddenes geet eréischt erëm, wann s du online bass.";
+    note.style.cssText = "position:fixed;left:50%;bottom:max(14px,env(safe-area-inset-bottom));transform:translateX(-50%);" +
+      "z-index:9000;max-width:min(92vw,520px);min-height:44px;padding:10px 16px;border:1px solid #16171a;border-radius:0;" +
+      "background:#16171a;color:#f6f6f3;font:600 14px/1.35 Geist,system-ui,-apple-system,sans-serif;text-align:center;cursor:pointer";
+    note.onclick = hideOfflineNote;
+    document.body.appendChild(note);
+    offlineNoteTimer = setTimeout(hideOfflineNote, OFFLINE_NOTE_MS);
+  }
+  function watchConnection() {
+    window.addEventListener("offline", showOfflineNote);
+    window.addEventListener("online", hideOfflineNote);
+    if (navigator.onLine === false) showOfflineNote();
+  }
+
   function boot() {
-    buildPicker(); buildRefresh(); serverSync(); registerSW(); buildBottomNav();
+    buildPicker(); buildRefresh(); serverSync(); registerSW(); buildBottomNav(); watchConnection();
     if (isIosSafari()) showInstall();
   }
   if (document.body) boot();
