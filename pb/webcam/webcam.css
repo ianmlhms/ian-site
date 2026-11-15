@@ -1,0 +1,62 @@
+/* Kamera-Arcade page styles. Tokens (--g-*) come from /pb/arcade-ui.css (light + Gitter-dark). Square corners, hairlines, one green accent. */
+body{display:flex;flex-direction:column}
+[hidden]{display:none!important}
+.wc-main{flex:1;min-height:0;display:flex;flex-direction:column;position:relative}
+
+/* ---- menu ---- */
+.wc-menu{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:22px max(16px,env(safe-area-inset-right)) calc(28px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+.wc-wrap{max-width:1040px;margin:0 auto}
+.wc-menu h2{margin:0 0 6px;font:800 clamp(26px,5vw,36px)/1.08 var(--font-display);letter-spacing:-.03em}
+.wc-lead{margin:0 0 14px;max-width:62ch;color:var(--g-muted);font-size:16px}
+.wc-privacy{display:flex;gap:12px;align-items:flex-start;margin:0 0 20px;padding:12px 14px;border:1px solid var(--g-green);background:var(--g-white);max-width:62ch}
+.wc-privacy svg{flex:none;width:22px;height:22px;margin-top:1px;color:var(--g-green)}
+.wc-privacy b{display:block;color:var(--g-ink);font-size:15px}
+.wc-privacy span{color:var(--g-muted);font-size:14px}
+.wc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,290px),1fr));gap:12px}
+.wc-card{display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-height:150px;padding:16px;border:1px solid var(--g-ink);background:var(--g-white);color:var(--g-ink);text-align:left;font:inherit;cursor:pointer;touch-action:manipulation;transition:border-color .15s,background-color .15s}
+.wc-card:hover{border-color:var(--g-green);background:var(--g-tint)}
+.wc-card:active{background:var(--g-sunk)}
+.wc-card .ico{font-size:34px;line-height:1}
+.wc-card .nm{font:800 19px/1.15 var(--font-display);letter-spacing:-.02em}
+.wc-card .ds{color:var(--g-muted);font-size:14px;line-height:1.35}
+.wc-card .meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:auto;padding-top:6px}
+.wc-chip{display:inline-block;padding:3px 8px;border:1px solid var(--g-soft);color:var(--g-muted);font:500 11px/1.4 var(--font-mono);letter-spacing:.05em;text-transform:uppercase}
+.wc-chip.best{border-color:var(--g-green);color:var(--g-green)}
+.wc-foot{margin:22px 0 0;color:var(--g-muted);font-size:13px;line-height:1.5;max-width:76ch}
+.wc-foot a{color:var(--g-green)}
+
+/* ---- play ---- */
+.wc-play{flex:1;min-height:0;display:flex;flex-direction:column}
+.wc-box{flex:1;min-height:0;position:relative;display:grid;place-items:center;background:var(--g-paper);overflow:hidden}
+.wc-frame{position:relative;box-shadow:0 0 0 1px var(--g-ink);background:#0b0d0f}
+.wc-frame canvas{display:block;width:100%;height:100%;touch-action:none}
+.wc-box .arcade-overlay{position:absolute;inset:0;z-index:5;overflow:auto}
+.wc-box .arcade-panel{width:min(460px,94%);max-height:100%;overflow:auto;text-align:left}
+.wc-box .arcade-panel h2{text-align:left}
+.wc-box .arcade-panel ul{margin:8px 0 6px;padding-left:20px;color:var(--g-muted);font-size:14px}
+.wc-box .arcade-panel li{margin:4px 0}
+.wc-note{display:flex;gap:8px;align-items:flex-start;margin:12px 0 0;padding:9px 11px;border:1px solid var(--g-soft);background:var(--g-tint);color:var(--g-muted);font-size:13px;line-height:1.4}
+.wc-note svg{flex:none;width:18px;height:18px;color:var(--g-green)}
+.wc-note b{color:var(--g-ink)}
+.wc-opts{display:flex;flex-direction:column;gap:8px;margin:14px 0 0}
+.wc-opts .row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.wc-opts label{font:500 12px/1 var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--g-muted)}
+.wc-bar{height:10px;border:1px solid var(--g-ink);background:var(--g-sunk);margin:14px 0 8px}
+.wc-bar i{display:block;height:100%;width:0;background:var(--g-green);transition:width .15s}
+.wc-help{margin:10px 0 0;padding:10px 12px;border:1px solid var(--g-danger);color:var(--g-ink);font-size:14px;line-height:1.45}
+.wc-help ol{margin:6px 0 0;padding-left:20px}
+.wc-panel-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+.wc-bottom{flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px max(12px,env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));border-top:1px solid var(--g-ink);background:var(--g-paper)}
+.wc-bottom .spacer{flex:1}
+.wc-bottom .arcade-btn,.wc-tool{min-height:44px;padding:0 14px;font-size:14px}
+.wc-tool{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--g-ink);background:var(--g-white);color:var(--g-ink);font:600 14px/1 var(--font);cursor:pointer;touch-action:manipulation}
+.wc-tool:hover{border-color:var(--g-green);color:var(--g-green)}
+.wc-tool.primary{background:var(--g-green);border-color:var(--g-green);color:var(--g-on-green)}
+.wc-tool.primary:hover{background:var(--g-ink);border-color:var(--g-ink);color:var(--g-paper)}
+.wc-tool.swatch{min-width:44px;padding:0;position:relative}
+.wc-tool.swatch i{display:block;width:24px;height:24px;border-radius:50%;border:2px solid rgba(0,0,0,.5)}
+.wc-tool.swatch[aria-pressed="true"]{border-color:var(--g-green);box-shadow:inset 0 0 0 2px var(--g-green)}
+.wc-priv{display:inline-flex;align-items:center;gap:6px;color:var(--g-muted);font:500 11px/1.3 var(--font-mono);letter-spacing:.04em}
+.wc-priv svg{width:16px;height:16px;color:var(--g-green);flex:none}
+.wc-toast{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);z-index:8;max-width:90%;padding:10px 16px;background:var(--g-ink);color:var(--g-paper);font:600 14px/1.3 var(--font);pointer-events:none}
+@media (max-width:520px){.wc-priv{width:100%}}

@@ -1,0 +1,6 @@
+{"v":1,"files":{
+"models/hand_landmarker.task":"fbc2a30080",
+"models/pose_landmarker_lite.task":"59929e1d1e",
+"wasm/vision_wasm_internal.js":"e7fd9858e8",
+"wasm/vision_wasm_internal.wasm":"6a5c64584c"
+}}

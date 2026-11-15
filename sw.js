@@ -32,7 +32,7 @@ const CORE = [
  * that path is deleted. Files the manifest does not list, ranged requests and failed responses go to the network exactly as before.
  * The code (HTML, JS modules, CSS) stays network-first below: that is what un-freezes a game after a rewrite, and it must not change.
  */
-const GAMEDATA_GAMES = Object.freeze(["fouer", "mtb", "train-sim"]);   // the pb/<game> folders that have data-hashes.json (scripts/check_site.py keeps this list in step)
+const GAMEDATA_GAMES = Object.freeze(["fouer", "mtb", "train-sim", "webcam"]);   // the pb/<game> folders that have data-hashes.json (scripts/check_site.py keeps this list in step)
 const GAMEDATA_PATH = /^\/pb\/([a-z0-9-]+)\/data\/(.+)$/;
 const GAME_PAGE = /^\/pb\/([a-z0-9-]+)\.html$/;
 const MANIFEST_FILE = "data-hashes.json";
