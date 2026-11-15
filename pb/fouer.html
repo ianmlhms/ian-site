@@ -27,7 +27,7 @@ button { font: inherit; color: inherit; }
 #bar i::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 0, #ffffff80 50%, transparent 100%); transform: translateX(-100%); animation: shine 1.15s linear infinite; }
 #loading small { display: block; margin-top: 10px; color: var(--muted); font-size: 12px; min-height: 15px; }
 #loading .slow { margin-top: 14px; color: var(--muted); font-size: 13px; line-height: 1.35; }
-#loading .slow button { margin-top: 10px; padding: 9px 18px; border-radius: 18px; border: 1px solid #ffffff44; background: #ffffff18; font-weight: 700; cursor: pointer; }
+#loading .slow button { margin-top: 10px; min-height: 44px; padding: 9px 18px; border-radius: 18px; border: 1px solid #ffffff44; background: #ffffff18; font-weight: 700; cursor: pointer; }
 @keyframes shine { to { transform: translateX(100%); } }
 @media (prefers-reduced-motion: reduce) { #bar i::after, #loading .sheep { animation: none; } }
 @keyframes bob { 50% { transform: translateY(-6px); } }
@@ -36,7 +36,7 @@ button { font: inherit; color: inherit; }
 <link rel="stylesheet" href="/pb/fouer/ui.css?v=5">
 <link rel="stylesheet" href="/pb/fouer/gitter.css?v=12">
 <script src="/pb/idle-extras.js?v=8"></script>
-<script src="/pb/arcade-kit.js?v=51" data-arcade-id="park" data-arcade-title="Schueberfouer Tycoon"></script>
+<script src="/pb/arcade-kit.js?v=52" data-arcade-id="park" data-arcade-title="Schueberfouer Tycoon"></script>
 <script src="/pb/game-data.js?v=1" defer></script>
 </head>
 <body>

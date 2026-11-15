@@ -196,7 +196,8 @@
         align-items:center;justify-content:center;border:1px solid transparent;border-radius:0;background:transparent;
         color:inherit;text-decoration:none;font:600 14px/1 "Geist",system-ui,-apple-system,"Segoe UI",sans-serif;
         cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background-color .15s,border-color .15s,color .15s}
-      .arcade-bar__back{padding:0 10px;color:var(--k-muted);white-space:nowrap}
+      /* mixed from the bar's own ink + paper: a host page's --muted (old dark palettes, half-themed pages) made this unreadable */
+      .arcade-bar__back{padding:0 10px;color:var(--k-ink);color:color-mix(in srgb,var(--k-ink) 72%,var(--k-paper));white-space:nowrap}
       .arcade-bar__button{padding:0 11px;font-size:18px;border-color:var(--k-ink);background:var(--k-white)}
       .arcade-bar__back:hover{color:var(--k-green)}
       .arcade-bar__button:hover{background:var(--k-white);border-color:var(--k-green);color:var(--k-green)}
