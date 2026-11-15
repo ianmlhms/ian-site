@@ -13,7 +13,7 @@ const RESULT_PAUSE_S = 0.9;
 const SHAPES = [
   { id: "t", name: "T-Pose", armL: 90, armR: 90, level: 1 },
   { id: "y", name: "Y", armL: 155, armR: 155, level: 1 },
-  { id: "lup", name: "Lénke Aarm erop", armL: 165, armR: 15, level: 1 },
+  { id: "lup", name: "Lénken Aarm erop", armL: 165, armR: 15, level: 1 },
   { id: "rup", name: "Riets Aarm erop", armL: 15, armR: 165, level: 1 },
   { id: "diag", name: "Diagonal", armL: 150, armR: 40, level: 3 },
   { id: "squat", name: "Hock dech", armL: 30, armR: 30, crouch: 1, level: 3 },
@@ -56,7 +56,7 @@ function figure(c, cx, floorY, u, spec, scale = 1) {
 export default {
   id: "wall", name: "D'Mauer", emoji: "🧱", needs: "pose",
   desc: "Strike the pose to fit through the wall",
-  howto: ["Stell dech sou wäit hannert, dass ee ganze Kierper am Bild ass, an steh 1-2 Sekonnen roueg fir ze kalibréieren.", "Eng Mauer mat engem Lach (Silhouette) kënnt op dech zou. Maach déi selwecht Pose, sou dass däi Kierper duerch d'Lach passt.", "3 Liewen. D'Mauere ginn ëmmer méi séier."],
+  howto: ["Stell dech sou wäit zréck, dass däi ganze Kierper am Bild ass, a stéi 1–2 Sekonnen roueg fir ze kalibréieren.", "Eng Mauer mat engem Lach (Silhouette) kënnt op dech zou. Maach déi selwecht Pose, sou dass däi Kierper duerch d'Lach passt.", "3 Liewen. D'Mauere ginn ëmmer méi séier."],
   board: () => ({ id: "webcam-wall", name: "D'Mauer" }),
   create(env) {
     const { W, H } = env;

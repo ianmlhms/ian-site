@@ -268,9 +268,9 @@ async function createLandmarker(kind, onProgress, preferred, signal) {
 /* ------------------------------------------------------------------ the Input */
 export const HINT_TEXT = Object.freeze({
   hands: "Ech gesinn keng Hand. Halt se an d'Kamera a maach d'Liicht un.",
-  pose: "Ech gesinn däi Kierper net. Gëff 2 Schrëtt zréck, sou dass een ganze Kierper am Bild ass.",
-  close: "Du bass ze no. Gëff e Stéck zréck.",
-  far: "Du bass ze wäit ewech. Kënn e Stéck méi no.",
+  pose: "Ech gesinn däi Kierper net. Géi 2 Schrëtt zréck, sou dass däi ganze Kierper am Bild ass.",
+  close: "Du bass ze no. Géi e Stéck zréck.",
+  far: "Du bass ze wäit ewech. Komm e Stéck méi no.",
   dark: "Et ass ze däischter. Maach d'Liicht un.",
 });
 

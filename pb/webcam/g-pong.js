@@ -16,7 +16,7 @@ const AI_SPEED = 0.55;          // heights per second
 export default {
   id: "pong", name: "Hand-Pong", emoji: "🏓", needs: "hands", noScore: true,
   desc: "Two players, two hands, one camera",
-  howto: ["Zwee Spiller niewentenee: déi lénks Hand steiert de lénke Schléier, déi riets Hand de rietse.", "Oder een Spiller mat béide Hänn. Bewege d'Hand erop an erof.", "Wie 7 Punkte huet, gewënnt."],
+  howto: ["Zwee Spiller niewentenee: déi lénks Hand steiert déi lénks Rakett, déi riets Hand déi riets.", "Oder ee Spiller mat béiden Hänn. Beweeg d'Hand erop an erof.", "Wien als éischt 7 Punkten huet, gewënnt."],
   options: [{ key: "mode", label: "Modus", values: ["2 Spiller", "Géint Computer"], def: "2 Spiller" }],
   board: () => null,
   create(env) {
@@ -89,7 +89,7 @@ export default {
             if (left >= WIN_POINTS || right >= WIN_POINTS) {
               phase = "over";
               const leftWon = left > right;
-              env.over({ score: 0, title: ai ? (leftWon ? "Du gewënns!" : "De Computer gewënnt") : (leftWon ? "Lénkse Spiller gewënnt!" : "Rietse Spiller gewënnt!"), lines: [`${left} : ${right}`], hideScore: true });
+              env.over({ score: 0, title: ai ? (leftWon ? "Du gewënns!" : "De Computer gewënnt") : (leftWon ? "De lénke Spiller gewënnt!" : "De riets Spiller gewënnt!"), lines: [`${left} : ${right}`], hideScore: true });
             } else countdown();
           }
         }
@@ -110,7 +110,7 @@ export default {
           text(c, String(Math.max(1, Math.ceil(SERVE_S + 2 - t))), W / 2, H / 2 + 40 * k, { size: 120 * k, align: "center" });
         } else if (phase === "play" && lostFor > LOST_PAUSE_S) {
           pill(c, W / 2 - 230 * k, H - 70 * k, 460 * k, 48 * k);
-          text(c, who === "Hänn" ? "Ech gesinn keng Hand" : `D'${who} Hand fehlt`, W / 2, H - 70 * k + 33 * k, { size: 24 * k, align: "center", color: "#ffd23f" });
+          text(c, who === "Hänn" ? "Ech gesinn keng Hand" : `Déi ${who} Hand feelt`, W / 2, H - 70 * k + 33 * k, { size: 24 * k, align: "center", color: "#ffd23f" });
         }
         text(c, ai ? "Du" : "Lénks", 30 * k, H - 52 * k, { size: 22 * k, color: "#6df0b0" });
         text(c, ai ? "Computer" : "Riets", W - 30 * k, H - 52 * k, { size: 22 * k, align: "right", color: "#ffb84d" });

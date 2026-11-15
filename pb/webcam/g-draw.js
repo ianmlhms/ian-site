@@ -92,7 +92,7 @@ const strokeLength = (s) => { let l = 0; for (let i = 1; i < s.length; i += 1) l
 export default {
   id: "draw", name: "Loftmolerei", emoji: "🖌️", needs: "hands",
   desc: "Draw shapes in the air by pinching",
-  howto: ["Halt eng Hand an d'Kamera. Kniff Daum an Zeigefanger zesummen fir ze molen, loos lass fir ze stoppen.", "Formen: d'Spill freet no enger Form (Krees, Stär, Haus …). Zeechne se, dann kriss de Punkten.", "Fräi: einfach molen a nom Zeechnen als PNG späicheren."],
+  howto: ["Halt eng Hand an d'Kamera. Dréck Daum a Weisfanger zesummen fir ze molen, looss lass fir ze stoppen.", "Formen: d'Spill freet no enger Form (Krees, Stär, Haus …). Zeechne se, dann kriss de Punkten.", "Fräi: einfach molen a nom Zeechnen als PNG späicheren."],
   options: [{ key: "mode", label: "Modus", values: ["Formen", "Fräi"], def: "Formen" }],
   board: (opts) => (opts.mode === "Formen" ? { id: "webcam-draw", name: "Loftmolerei" } : null),
   create(env) {
@@ -203,7 +203,7 @@ export default {
             if (i === hoverChip) { c.strokeStyle = "#fff"; c.lineWidth = 4 * k; c.beginPath(); c.arc(p.x, p.y, p.r + 9 * k, -Math.PI / 2, -Math.PI / 2 + TAU * clamp(hoverT / 0.45, 0, 1)); c.stroke(); }
           });
           pill(c, W / 2 - 260 * k, 14, 520 * k, 46 * k);
-          text(c, pinching ? "Du moles" : "Kniff Daum + Zeigefanger fir ze molen", W / 2, 14 + 32 * k, { size: 22 * k, align: "center", weight: 600 });
+          text(c, pinching ? "Du moles" : "Dréck Daum + Weisfanger zesummen fir ze molen", W / 2, 14 + 32 * k, { size: 22 * k, align: "center", weight: 600 });
           return;
         }
         pill(c, 14, 14, 200 * k, 46 * k); text(c, "Punkten " + total, 30, 14 + 32 * k, { size: 24 * k });

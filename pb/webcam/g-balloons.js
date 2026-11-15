@@ -12,7 +12,7 @@ const BOMB_TIME_S = 3;
 export default {
   id: "balloons", name: "Ballonen", emoji: "🎈", needs: "hands",
   desc: "Pop the balloons with your fingertips",
-  howto: ["Halt eng oder zwou Hänn an d'Kamera.", "Beréier d'Ballonen mat de Fanger-Spëtzen, dat gëtt Punkten. Gëlle Ballonen zielen 5, séier Pops baue eng Kombo op.", "Pass op déi schwaarz Bomben op!"],
+  howto: ["Halt eng oder zwou Hänn an d'Kamera.", "Beréier d'Ballonen mat de Fangerspëtzen, dat gëtt Punkten. Gëlle Ballonen zielen 5, séier Pops baue eng Kombo op.", "Pass op déi schwaarz Bomben op!"],
   board: () => ({ id: "webcam-balloons", name: "Ballonen" }),
   create(env) {
     const { W, H } = env;

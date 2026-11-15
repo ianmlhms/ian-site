@@ -56,8 +56,8 @@ function renderMenu() {
     card.addEventListener("click", () => openIntro(def));
     grid.append(card);
   });
-  $("menuFoot").innerHTML = `Éischte Kéier gëtt eng eenzeg Eroflueden gemaach (Hänn ≈ ${DOWNLOAD_MB.hands} MB, Kierper ≈ ${DOWNLOAD_MB.pose} MB); duerno bleift d'Modell um Apparat. Op engem iPad: Safari, Landschaft oder Portrait. ` +
-    `Hand- a Kierpererkennung: <a href="https://ai.google.dev/edge/mediapipe/solutions/guide" rel="noopener">MediaPipe Tasks Vision</a> ${MEDIAPIPE_VERSION} (Google, Apache-2.0) mat Hand Landmarker an Pose Landmarker (lite), lokal vun ian.lu gehost. Grafiken a Sounds si Originaler, am Code gemaach.`;
+  $("menuFoot").innerHTML = `Beim éischte Mol gëtt eemol eppes erofgelueden (Hänn ≈ ${DOWNLOAD_MB.hands} MB, Kierper ≈ ${DOWNLOAD_MB.pose} MB); duerno bleift de Modell um Apparat. Op engem iPad: Safari, Landschaft oder Portrait. ` +
+    `Hand- a Kierpererkennung: <a href="https://ai.google.dev/edge/mediapipe/solutions/guide" rel="noopener">MediaPipe Tasks Vision</a> ${MEDIAPIPE_VERSION} (Google, Apache-2.0) mat Hand Landmarker a Pose Landmarker (lite), lokal vun ian.lu gehost. Grafiken a Sounds si Originaler, am Code gemaach.`;
 }
 const defaultOpts = (def) => {
   const out = {};
@@ -82,7 +82,7 @@ function setOverlay(title, nodes, visible = true) {
 const lockNote = () => {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg"); svg.setAttribute("aria-hidden", "true");
   const use = document.createElementNS("http://www.w3.org/2000/svg", "use"); use.setAttribute("href", "#wc-lock"); svg.append(use);
-  return el("p", { className: "wc-note" }, svg, el("span", {}, el("b", { textContent: "Your video never leaves this device." }), " Nothing is uploaded, recorded or saved. D'Kamera geet aus, wann s de d'Spill verléiss."));
+  return el("p", { className: "wc-note" }, svg, el("span", {}, el("b", { textContent: "Your video never leaves this device." }), " Näischt gëtt eropgelueden, opgeholl oder gespäichert. D'Kamera geet aus, wann s de d'Spill verléiss."));
 };
 const btn = (label, onClick, cls = "arcade-btn", id = "") => { const b = el("button", { type: "button", className: cls, textContent: label, id }); b.addEventListener("click", onClick); return b; };
 
@@ -111,20 +111,20 @@ function openIntro(def) {
 function showError(kind, detail) {
   const iPad = /iPad|iPhone|Macintosh/.test(navigator.userAgent) && "ontouchend" in document;
   const msg = {
-    denied: ["D'Kamera ass blockéiert", "Ouni Kamera kënne mir keng Hand an keen Kierper gesinn. D'Bild gëtt net eropgelueden."],
+    denied: ["D'Kamera ass blockéiert", "Ouni Kamera kënne mir keng Hand a keen Kierper gesinn. D'Bild gëtt net eropgelueden."],
     nocam: ["Keng Kamera fonnt", "Dësen Apparat huet keng (benotzbar) Kamera. Probéier et op engem Laptop oder iPad mat Frontkamera."],
     busy: ["D'Kamera ass besat", "Eng aner App oder e Tab benotzt d'Kamera. Maach déi zou a probéier et nach eng Kéier."],
     insecure: ["Kamera brauch eng sécher Verbindung", "Maach d'Säit iwwer https://ian.lu op."],
     unsupported: ["Dëse Browser ënnerstëtzt d'Kamera net", "Probéier eng méi nei Versioun vu Safari, Chrome oder Edge."],
-    model: ["D'Modell konnt net gelueden ginn", "Kontrolléier d'Verbindung (ee Schouln-Netz kann ofblocken) a probéier et nach eng Kéier."],
+    model: ["De Modell konnt net gelueden ginn", "Kontrolléier d'Verbindung (e Schoulnetz kann et blockéieren) a probéier et nach eng Kéier."],
     lost: ["D'Kamera ass ofgebrach", "Probéier et nach eng Kéier."],
-  }[kind] || ["Eppes ass schif gaang", detail || ""];
+  }[kind] || ["Eppes ass schifgaang", detail || ""];
   const nodes = [el("p", { textContent: msg[1] })];
   if (kind === "denied") {
     nodes.push(el("div", { className: "wc-help" }, el("b", { textContent: "Esou erlaabs de d'Kamera:" }), el("ol", {},
       el("li", { textContent: "iPad / iPhone: Astellungen › Safari › Kamera › Froen oder Erlaaben. Dann d'Säit nei lueden. (Settings › Safari › Camera › Ask/Allow.)" }),
       el("li", { textContent: "Computer: op d'Symbol lénks an der Adressleist klicken › Kamera › Erlaaben, dann d'Säit nei lueden." }))));
-    if (iPad) nodes.push(el("p", { textContent: "Op der Schoul-iPad kann et sinn, dass d'Kamera vum Schoul-Profil gespaart ass." }));
+    if (iPad) nodes.push(el("p", { textContent: "Op engem Schoul-iPad kann et sinn, dass d'Kamera vum Schoul-Profil gespaart ass." }));
   }
   nodes.push(lockNote(), el("div", { className: "wc-panel-actions" }, btn("Nach eng Kéier", () => begin(), "arcade-btn", "btnRetry"), btn("Zréck zum Menü", toMenu, "arcade-btn secondary", "btnErrMenu")));
   stopLoop();
@@ -282,7 +282,7 @@ function fail(where, error) {
   errors.push(where + ": " + (error && error.message));
   stopLoop();
   state.input && state.input.stop();
-  setOverlay("Eppes ass schif gaang", [el("p", { textContent: "D'Spill huet e Feeler gemaach. Probéier et nach eng Kéier." }), el("div", { className: "wc-panel-actions" }, btn("Nach eng Kéier", () => begin(), "arcade-btn", "btnRetry"), btn("Menü", toMenu, "arcade-btn secondary", "btnErrMenu"))]);
+  setOverlay("Eppes ass schifgaang", [el("p", { textContent: "D'Spill huet e Feeler gemaach. Probéier et nach eng Kéier." }), el("div", { className: "wc-panel-actions" }, btn("Nach eng Kéier", () => begin(), "arcade-btn", "btnRetry"), btn("Menü", toMenu, "arcade-btn secondary", "btnErrMenu"))]);
 }
 
 /** Camera light, "nothing detected" hint, test-input badge. */

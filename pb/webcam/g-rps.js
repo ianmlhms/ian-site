@@ -38,7 +38,7 @@ function drawSign(c, kind, cx, cy, size, color, alpha = 1) {
 export default {
   id: "rps", name: "Steen, Pabeier, Schéier", emoji: "✊", needs: "hands",
   desc: "Rock, paper, scissors against the computer",
-  howto: ["Halt eng Hand an d'Kamera.", "Nom Countdown (Steen … Pabeier … Schéier … LOS!) weis Steen (Fauscht), Pabeier (oppen Hand) oder Schéier (zwee Fanger).", "Wie fir d'éischt d'Mehrheet vun de Ronnen huet, gewënnt de Match."],
+  howto: ["Halt eng Hand an d'Kamera.", "Nom Countdown (Steen … Pabeier … Schéier … LOS!) weis Steen (Fauscht), Pabeier (oppen Hand) oder Schéier (zwee Fanger).", "Wien als éischt déi meeschte Ronne gewënnt, gewënnt de Match."],
   options: [{ key: "bestOf", label: "Best of", values: [3, 5], def: 3 }],
   board: (opts) => ({ id: "webcam-rps-" + opts.bestOf, name: `Steen Pabeier Schéier (best of ${opts.bestOf})` }),
   create(env) {

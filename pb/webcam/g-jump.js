@@ -16,7 +16,7 @@ const BLOCK_H_MIN = 60, BLOCK_H_MAX = 88;
 export default {
   id: "jump", name: "Sprangen", emoji: "🦘", needs: "pose",
   desc: "Jump and duck to run as far as you can",
-  howto: ["Stell dech sou wäit hannert, dass ee ganze Kierper am Bild ass, a steh roueg fir ze kalibréieren.", "Spring wierklech fir iwwer d'Këschten ze kommen. Gi gebéckt (Hock) fir ënner den Baren duerchzekommen.", "Eng Kollisioun a fäerdeg. D'Meter zielen."],
+  howto: ["Stell dech sou wäit zréck, dass däi ganze Kierper am Bild ass, a stéi roueg fir ze kalibréieren.", "Spréng wierklech, fir iwwer d'Këschten ze kommen. Hock dech, fir ënner de Balken duerchzekommen.", "Eng Kollisioun a fäerdeg. D'Meter zielen."],
   board: () => ({ id: "webcam-jump", name: "Sprangen" }),
   create(env) {
     const { W, H } = env;
