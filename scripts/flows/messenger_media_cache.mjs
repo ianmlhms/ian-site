@@ -11,7 +11,7 @@
  *     list; the full picture is fetched only when tapped, and only once
  *   - an upload sends a photo shrunk to <= 1600 px plus a <= 480 px thumbnail, thumbnail first,
  *     both with a long Cache-Control; GIFs are kept as they are; the sender's own bubble needs no download */
-import { ME, ME_NAME, profilesTable, runIfMain } from "./lib.mjs";
+import { ME, ME_NAME, orderedRows, profilesTable, runIfMain } from "./lib.mjs";
 
 const GID = 501, OTHER = 502;
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==", "base64");
@@ -67,7 +67,7 @@ export const flow = {
       profiles: profilesTable,
       group_members: () => [{ user_id: ME, username: ME_NAME, joined_at: "2026-10-01T08:00:00Z" }],
       messages: ({ url, method, body }) => {
-        if (method === "GET") return url.search.includes(`group_id=eq.${GID}`) ? messages : [];
+        if (method === "GET") return url.search.includes(`group_id=eq.${GID}`) ? orderedRows(url, messages) : [];
         if (method === "POST") { const row = { id: 100 + inserted.length, created_at: new Date().toISOString(), ...body }; inserted.push(row); return [row]; }
         return [];
       },

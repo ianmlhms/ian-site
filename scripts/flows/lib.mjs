@@ -161,6 +161,17 @@ export function ilikeRegExp(filter) {
  *   functions: { name: (body) => data },
  *   calls: [] // filled in: { kind: "rpc"|"table"|"function", name, method, body }
  * } */
+/** A table mock's rows the way PostgREST would send them: honours `order=<column>.asc|desc` and `limit`
+ *  of the request (the messenger asks for the newest messages first). Never changes `rows`. */
+export function orderedRows(url, rows) {
+  const [column, direction] = (url.searchParams.get("order") || "").split(".");
+  const sorted = column
+    ? [...rows].sort((a, b) => (a[column] < b[column] ? -1 : a[column] > b[column] ? 1 : 0) * (direction === "desc" ? -1 : 1))
+    : [...rows];
+  const limit = Number(url.searchParams.get("limit"));
+  return Number.isFinite(limit) && limit > 0 ? sorted.slice(0, limit) : sorted;
+}
+
 export function createBackend({ rpc = {}, tables = {}, functions = {}, storage = null } = {}) {
   const dailyScores = new Map();
   const luxDay = () => new Intl.DateTimeFormat('sv-SE', { timeZone:'Europe/Luxembourg', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date());

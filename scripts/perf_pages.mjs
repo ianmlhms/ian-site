@@ -12,7 +12,7 @@
  * The numbers are for comparing two versions on the same machine, not absolute iPad timings. */
 import fs from "node:fs";
 import path from "node:path";
-import { REPO, VIEWPORT, ME, ME_NAME, createBackend, fakeJwt, launchBrowser, mockRealtime, mockSupabase, profilesTable, startServer } from "./flows/lib.mjs";
+import { REPO, VIEWPORT, ME, ME_NAME, createBackend, fakeJwt, launchBrowser, mockRealtime, mockSupabase, orderedRows, profilesTable, startServer } from "./flows/lib.mjs";
 
 const SESSION_KEY = "sb-lvksqmgfwkfbblfsozfk-auth-token";
 const CPU_SLOWDOWN = 4;
@@ -67,7 +67,7 @@ async function measurePage(browser, origin, serverLog, page) {
       client_commands_since: () => ({ now: new Date().toISOString(), commands: [] }),
       my_profile_private: () => [{ account_checked_at: "2026-01-01T00:00:00Z" }],   // keeps the one-time account-check card away
     },
-    tables: { profiles: profilesTable, messages: () => HISTORY },
+    tables: { profiles: profilesTable, messages: ({ url }) => orderedRows(url, HISTORY) },
     functions: { "auth-pin": () => ({ hasPin: true, isLegacy: false }) },
   });
   await mockSupabase(context, backend);

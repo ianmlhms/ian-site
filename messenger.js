@@ -16,6 +16,7 @@ const MAX_MEDIA = 50 * 1024 * 1024; // 50 MB
 const SNIPPET = 80; // chars kept of a quoted reply
 const HISTORY_LIMIT = 300;          // newest messages loaded when a chat opens
 const PROFILE_REFRESH_MS = 60_000;  // avatars + class tags are re-read at most this often
+const CATCH_UP_MIN_MS = 3000;       // coming back to the tab re-reads missed messages at most this often
 const CHATS_RELOAD_DELAY_MS = 400;  // a burst of incoming messages reloads the chat list once
 
 let sb = null;
@@ -218,7 +219,7 @@ async function newDM() {
 
 /* ---------- a single chat ---------- */
 async function selectChat(g) {
-  current = g; seen.clear();
+  current = g; seen.clear(); newestAt = null;
   currentOthers = []; readMap = {}; readThreshold = null; reactMap = {}; hideTyping();
   closeMembers(); cancelReply();
   markRead(g.id);
@@ -403,6 +404,29 @@ function closeMembers() { const p = $("memberPanel"); if (p) { p.classList.remov
 
 // Mobile: go back from a full-screen conversation to the chat list.
 function goBackToList() { closeMembers(); $("app").classList.remove("chat-open"); }
+
+/* ---------- catching up after the tab slept ---------- */
+// Realtime does not replay what was sent while the iPad was locked or the tab was in the background, so
+// coming back used to show a chat that silently missed messages until the page was reloaded.
+let newestAt = null;        // created_at of the newest message shown in the open chat
+let lastCatchUpAt = 0;
+async function catchUp() {
+  if (!sb || !auth.session() || Date.now() - lastCatchUpAt < CATCH_UP_MIN_MS) return;
+  lastCatchUpAt = Date.now();
+  scheduleChatsReload();
+  const g = current;
+  if (!g) return;
+  let query = sb.from("messages").select("*").eq("group_id", g.id).order("created_at").limit(HISTORY_LIMIT);
+  if (newestAt) query = query.gt("created_at", newestAt);
+  const { data, error } = await query;
+  if (error) { console.warn("[msgr] catch-up failed", error); return; }
+  if (current !== g || !data || !data.length) return;
+  data.forEach((m) => appendMessage(m));
+  markRead(g.id);
+  loadReceipts(g.id);
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) catchUp(); });
+window.addEventListener("online", catchUp);
 
 async function markRead(gid) { try { await sb.rpc("mark_read", { p_group_id: gid }); } catch (e) { console.warn("[msgr] mark_read", e); } }
 
@@ -704,6 +728,7 @@ function appendHistory(messages) {
 function appendMessage(m, batch = null) {
   if (seen.has(m.id)) return;
   seen.add(m.id);
+  if (m.created_at && (!newestAt || Date.parse(m.created_at) > Date.parse(newestAt))) newestAt = m.created_at;
   const box = $("messages");
   const ph = box.querySelector(".empty"); if (ph) ph.remove();
   const mine = auth.session() && m.user_id === auth.session().user.id;
