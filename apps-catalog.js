@@ -43,6 +43,8 @@ export const APPS = Object.freeze([
     keywords: ["wordle", "wörter", "wierder", "mots", "guess"] },
   { url: "leaderboard.html", name: "Ranglëscht", icon: "🏆", group: "grp.fun", locked: false,
     keywords: ["leaderboard", "ranking", "rangliste", "classement", "highscore"] },
+  { url: "advent.html", name: "Adventskalenner", icon: "🎄", group: "grp.fun", locked: true,
+    keywords: ["advent", "kalenner", "kalender", "calendrier", "chrëschtdag", "weihnachten", "rätsel"] },
   { url: "countdowns.html", name: "Countdowns", icon: "⏳", group: "grp.fun", locked: false,
     keywords: ["timer", "zäit", "zeit", "compte à rebours", "dates"] },
 
@@ -69,7 +71,7 @@ export const APPS = Object.freeze([
     keywords: ["stats", "traffic", "github", "analytics", "statistiken"] },
   { url: "karts.html", admin: true, name: "KartTracker", icon: "🏎️", group: "grp.personal", locked: false,
     keywords: ["karting", "ronnen", "runden", "tours", "laps", "zeiten"] },
-  { url: "hotel.html", name: "Hotel-Simulator", icon: "🏨", group: "grp.personal", locked: false,
+  { url: "hotel.html", admin: true, name: "Hotel-Simulator", icon: "🏨", group: "grp.personal", locked: false,
     keywords: ["builder", "bauen", "simulateur", "building", "hotel"] },
   { url: "haus/", name: "Haus-Planer", icon: "🏠", group: "grp.personal", locked: true,
     keywords: ["haus", "house", "bauen", "builder", "grundriss", "floor plan"] },

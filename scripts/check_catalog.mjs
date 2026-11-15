@@ -1,3 +1,12 @@
+// Keeps apps-catalog.js (the ⌘K quick-open list) and the home page in step.
+//
+// Since the Gitter home page (6 Nov 2026) the home page is a short curated list,
+// no longer one tile per app — so the catalog may hold more than the home page.
+// What still has to be true:
+//   1. every catalog entry points at a page that exists, no duplicates;
+//   2. every home-page app link (data-app) is in the catalog, and its href exists;
+//   3. what the home page shows only to Ian (data-gate="ian") is `admin: true`
+//      in the catalog — otherwise ⌘K offers it to everyone.
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -5,76 +14,79 @@ import { APPS } from "../apps-catalog.js";
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const source = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");
-
-function decodeHtml(value) {
-  return value
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;|&apos;/g, "'")
-    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
-    .trim();
-}
+const IAN_GATE = "ian";
 
 function attribute(attributes, name) {
   return new RegExp(`\\b${name}=["']([^"']+)["']`).exec(attributes)?.[1];
 }
 
-function tilesFromIndex() {
-  const tiles = [];
-  const groupPattern = /<details\b([^>]*)>([\s\S]*?)<\/details>/g;
-  for (const groupMatch of source.matchAll(groupPattern)) {
-    const group = attribute(groupMatch[1], "data-group");
-    if (!group) continue;
-    const tilePattern = /<a\b([^>]*)>([\s\S]*?)<\/a>/g;
-    for (const tileMatch of groupMatch[2].matchAll(tilePattern)) {
-      const classes = attribute(tileMatch[1], "class") || "";
-      const url = attribute(tileMatch[1], "data-app");
-      if (!url || !classes.split(/\s+/).includes("tile")) continue;
-      const nameMatch = /<span\b[^>]*class=["'][^"']*\btname\b[^"']*["'][^>]*>([\s\S]*?)<\/span>/.exec(tileMatch[2]);
-      if (!nameMatch) throw new Error(`Tile ${url} has no .tname`);
-      tiles.push({
-        url,
-        name: decodeHtml(nameMatch[1].replace(/<[^>]*>/g, "")),
-        locked: /class=["'][^"']*\blockb\b[^"']*["']/.test(tileMatch[2]),
-      });
-    }
-  }
-  return tiles;
+function pageExists(url) {
+  const file = url.split(/[?#]/)[0];
+  const target = path.join(ROOT, file.endsWith("/") ? `${file}index.html` : file);
+  return fs.existsSync(target);
 }
 
-const tiles = tilesFromIndex();
-const tileByUrl = new Map(tiles.map((tile) => [tile.url, tile]));
+// Ranges of index.html that sit inside an element carrying data-gate="ian".
+function ianOnlyRanges() {
+  const ranges = [];
+  const openPattern = /<(div|section)\b[^>]*\bdata-gate=["']ian["'][^>]*>/g;
+  for (const open of source.matchAll(openPattern)) {
+    const tag = open[1];
+    const step = new RegExp(`<(/?)${tag}\\b[^>]*>`, "g");
+    step.lastIndex = open.index + open[0].length;
+    let depth = 1;
+    let end = source.length;
+    for (let hit = step.exec(source); hit; hit = step.exec(source)) {
+      depth += hit[1] ? -1 : 1;
+      if (depth === 0) { end = hit.index; break; }
+    }
+    ranges.push([open.index, end]);
+  }
+  return ranges;
+}
+
+function homeLinks() {
+  const ranges = ianOnlyRanges();
+  const links = [];
+  for (const match of source.matchAll(/<a\b([^>]*)>/g)) {
+    const app = attribute(match[1], "data-app");
+    if (!app) continue;
+    const isInIanBlock = ranges.some(([from, to]) => match.index > from && match.index < to);
+    links.push({
+      app,
+      href: attribute(match[1], "href") || "",
+      isIanOnly: attribute(match[1], "data-gate") === IAN_GATE || isInIanBlock,
+    });
+  }
+  return links;
+}
+
 const appByUrl = new Map(APPS.map((app) => [app.url, app]));
 const differences = [];
 
-for (const tile of tiles) {
-  const app = appByUrl.get(tile.url);
+for (const app of APPS) {
+  if (!pageExists(app.url)) differences.push(`APPS entry points at a missing page: ${app.url}`);
+}
+const duplicateApps = APPS.filter((app, index) => APPS.findIndex((other) => other.url === app.url) !== index);
+for (const app of duplicateApps) differences.push(`Duplicate APPS URL: ${app.url}`);
+
+const links = homeLinks();
+if (!links.length) differences.push("index.html has no data-app links — did the home page markup change?");
+for (const link of links) {
+  if (link.href && !pageExists(link.href)) differences.push(`Home link points at a missing page: ${link.href}`);
+  const app = appByUrl.get(link.app);
   if (!app) {
-    differences.push(`Missing from APPS: ${tile.url}`);
+    differences.push(`Home link is missing from APPS: ${link.app}`);
     continue;
   }
-  if (app.name !== tile.name) {
-    differences.push(`${tile.url}: name is "${tile.name}" in index.html but "${app.name}" in APPS`);
-  }
-  if (app.locked !== tile.locked) {
-    differences.push(`${tile.url}: locked is ${tile.locked} in index.html but ${app.locked} in APPS`);
+  if (link.isIanOnly && !app.admin) {
+    differences.push(`${link.app}: Ian-only on the home page but not admin: true in APPS (⌘K would offer it to everyone)`);
   }
 }
-
-for (const app of APPS) {
-  if (!tileByUrl.has(app.url)) differences.push(`Missing tile in index.html: ${app.url}`);
-}
-
-const duplicateTiles = tiles.filter((tile, index) => tiles.findIndex((other) => other.url === tile.url) !== index);
-const duplicateApps = APPS.filter((app, index) => APPS.findIndex((other) => other.url === app.url) !== index);
-for (const tile of duplicateTiles) differences.push(`Duplicate tile URL: ${tile.url}`);
-for (const app of duplicateApps) differences.push(`Duplicate APPS URL: ${app.url}`);
 
 if (differences.length) {
   console.error(`Catalog mismatch:\n${differences.map((difference) => `- ${difference}`).join("\n")}`);
   process.exitCode = 1;
 } else {
-  console.log(`Catalog OK: ${APPS.length} apps`);
+  console.log(`Catalog OK: ${APPS.length} apps, ${links.length} home links`);
 }
