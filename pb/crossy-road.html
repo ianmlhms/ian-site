@@ -146,7 +146,7 @@ function applyProg(p){
   updateHud();
 }
 function pushProg(){if(TEST_MODE)return;try{parent.postMessage({__pbSave:1,data:prog},'*')}catch(e){}}
-window.addEventListener('message',e=>{const d=e.data;if(d&&d.__pbLoadSave===1){applyProg(d.data);if(state==='menu')showMenu()}});
+window.addEventListener('message',e=>{const d=e.data;if(e.source===parent&&d&&d.__pbLoadSave===1){applyProg(d.data);if(state==='menu')showMenu()}});
 try{parent.postMessage({__pbWantSave:1},'*')}catch(e){}
 
 /* ---------- seeded rng so every level is the same course every time ---------- */

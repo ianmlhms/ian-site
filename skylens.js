@@ -710,8 +710,10 @@
       if (state.selectedId === aircraft.id) showPlaceholder("Fliger-Foto net disponibel");
     };
 
-    els.detailPhotoLink.href = photo.link;
-    els.detailPhotoCredit.href = photo.link;
+    // The link is whatever the photo API returned: only a normal https page may become a clickable link.
+    const photoLink = /^https:\/\//i.test(photo.link) ? photo.link : "#";
+    els.detailPhotoLink.href = photoLink;
+    els.detailPhotoCredit.href = photoLink;
     els.detailPhotoCredit.textContent = "© " + photo.photographer + " · " + photo.provider;
     els.detailPhotoImage.alt = (aircraft.registration || aircraft.flight || aircraft.hex.toUpperCase()) + " Fliger-Foto";
     els.detailPhotoImage.onload = reveal;

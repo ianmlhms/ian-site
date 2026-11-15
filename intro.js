@@ -375,7 +375,7 @@
     var winners = Object.keys(p.gained || {});
     $('revWho').innerHTML = winners.length
       ? winners.map(function (k) {
-          return esc(names[k] || '?') + ' <b>+' + p.gained[k] + '</b>';
+          return esc(names[k] || '?') + ' <b>+' + points(p.gained[k]) + '</b>';
         }).join(' · ')
       : 'Keen huet et erkannt.';
 
@@ -392,11 +392,18 @@
     else startRound(roundIdx + 1);
   };
 
+  /* Scores arrive in other players' broadcasts (a public channel) and are written
+   * as HTML: anything that is not a plain number counts as 0. */
+  function points(value) {
+    var n = Number(value);
+    return typeof value === 'number' && isFinite(n) ? Math.round(n) : 0;
+  }
+
   function renderScores(el, sc, names) {
     var nm = names || playerNames();
     var ps = players();
     if (!ps.length) ps = Object.keys(sc).map(function (k) { return { cid: k, name: nm[k] || '?' }; });
-    var rows = ps.map(function (p) { return { cid: p.cid, name: nm[p.cid] || p.name, pts: sc[p.cid] || 0 }; })
+    var rows = ps.map(function (p) { return { cid: p.cid, name: nm[p.cid] || p.name, pts: points(sc[p.cid]) }; })
                  .sort(function (a, b) { return b.pts - a.pts; });
     el.innerHTML = rows.map(function (r) {
       return '<div class="sc' + (r.cid === cid ? ' me' : '') + '"><span>' + esc(r.name) +
@@ -406,7 +413,7 @@
 
   function showFinal(sc, names) {
     stopAudio();
-    var rows = Object.keys(names).map(function (k) { return { cid: k, name: names[k], pts: sc[k] || 0 }; })
+    var rows = Object.keys(names || {}).map(function (k) { return { cid: k, name: names[k], pts: points((sc || {})[k]) }; })
                      .sort(function (a, b) { return b.pts - a.pts; });
     $('winner').textContent = rows.length ? (rows[0].name + ' — ' + rows[0].pts + ' Punkten') : '—';
     renderScores($('finalScores'), sc, names);

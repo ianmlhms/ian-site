@@ -119,6 +119,32 @@ const bonus = (p) => upperSum(p) >= 63 ? 35 : 0;
 const total = (p) => CATS.reduce((a, c) => a + (sc[p][c.id] ?? 0), 0) + bonus(p);
 const done = (p) => CATS.every((c) => sc[p][c.id] != null);
 
+/* ---------- what a peer may send ----------
+ * The room channel is public: anyone who knows the code can broadcast on it, and
+ * the values below end up in innerHTML. Only the shapes this game produces pass. */
+const cleanDice = (d) => Array.isArray(d) && d.length === 5 && d.every((v) => Number.isInteger(v) && v >= 1 && v <= 6) ? d.slice() : null;
+const cleanHeld = (h) => Array.isArray(h) && h.length === 5 ? h.map(Boolean) : null;
+const cleanRolls = (r) => Number.isInteger(r) && r >= 0 && r <= 3 ? r : null;
+const MAX_CATEGORY_SCORE = 50;
+function cleanCard(card) {
+  const out = {};
+  if (!card || typeof card !== "object") return out;
+  CATS.forEach((c) => {
+    const v = card[c.id];
+    if (Number.isInteger(v) && v >= 0 && v <= MAX_CATEGORY_SCORE) out[c.id] = v;
+  });
+  return out;
+}
+function cleanState(p) {
+  if (!p || typeof p !== "object") return null;
+  const d = cleanDice(p.dice), h = cleanHeld(p.held), r = cleanRolls(p.rolls);
+  if (!d || !h || r === null) return null;
+  return {
+    sc: { 1: cleanCard(p.sc?.[1]), 2: cleanCard(p.sc?.[2]) },
+    turn: p.turn === 2 ? 2 : 1, dice: d, held: h, rolls: r, over: p.over === true, started: p.started === true,
+  };
+}
+
 /* ---------- turn actions (run identically from local input and broadcasts) ---------- */
 function applyRoll(d, r) { dice = d; rolls = r; started = true; render(); }
 function applyHold(h) { held = h; render(); }
@@ -222,14 +248,22 @@ if (AI) {
   oppHere = true; fresh(); render();
 } else if (!(window.MPGate && window.MPGate.redirecting)) {   // mp-gate.js sends a bare visit to the lobby (lobby.html)
   ch = GC.createChannel("dd");
-  ch.on("broadcast", { event: "roll" }, ({ payload }) => { if (turn === opp) applyRoll(payload.d, payload.r); })
-    .on("broadcast", { event: "hold" }, ({ payload }) => { if (turn === opp) applyHold(payload.h); })
-    .on("broadcast", { event: "score" }, ({ payload }) => { if (turn === opp) applyScore(opp, payload.cat); })
+  ch.on("broadcast", { event: "roll" }, ({ payload }) => {
+      const d = cleanDice(payload?.d), r = cleanRolls(payload?.r);
+      if (turn === opp && d && r) applyRoll(d, r);
+    })
+    .on("broadcast", { event: "hold" }, ({ payload }) => { const h = cleanHeld(payload?.h); if (turn === opp && h) applyHold(h); })
+    .on("broadcast", { event: "score" }, ({ payload }) => { if (turn === opp && Object.hasOwn(catById, String(payload?.cat))) applyScore(opp, payload.cat); })
     .on("broadcast", { event: "reset" }, () => { fresh(); $("rematch").style.display = "none"; render(); });
   fresh(); render();
   GC.joinRoom(ch, {
     getState: () => ({ sc, turn, dice, held, rolls, over, started }),
-    setState: (p) => { sc = p.sc; turn = p.turn; dice = p.dice; held = p.held; rolls = p.rolls; over = p.over; started = p.started; render(); if (over) $("rematch").style.display = ""; },
+    setState: (p) => {
+      const s = cleanState(p);
+      if (!s) { console.warn("[dice-duel] ignored a malformed state from the room"); return; }
+      sc = s.sc; turn = s.turn; dice = s.dice; held = s.held; rolls = s.rolls; over = s.over; started = s.started;
+      render(); if (over) $("rematch").style.display = "";
+    },
     isStarted: () => started || over,
     onPeers: (here) => { oppHere = here; render(); },
     onSeatTaken: () => { over = true; render(); setStatus("Plaz scho besat", `Dësen Raum huet schonn e(n) ${role} — trëtt mat der anerer Roll bäi oder maach en neie Raum op.`); },

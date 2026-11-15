@@ -359,7 +359,7 @@ function renderCats(s){
   const max=entries[0][1];
   $("catCard").innerHTML=entries.map(([c,v])=>{
     const pct=Math.round(v/s.out*100);const w=Math.max(3,Math.round(v/max*100));
-    return `<div class="catbar pick" data-cat="${c}" role="button" tabindex="0" aria-pressed="${catFilter===c}" aria-label="${esc(catLbl(c))}: ${CUR}${v.toFixed(0)} (${pct}%)">
+    return `<div class="catbar pick" data-cat="${esc(c)}" role="button" tabindex="0" aria-pressed="${catFilter===c}" aria-label="${esc(catLbl(c))}: ${CUR}${v.toFixed(0)} (${pct}%)">
       <div class="lab"><span aria-hidden="true">${catIc(c)}</span> ${esc(catLbl(c))}</div>
       <div class="track"><div class="fill" style="width:${w}%"></div></div>
       <div class="val">${CUR}${v.toFixed(0)} · ${pct}%</div></div>`;

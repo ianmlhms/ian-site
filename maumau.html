@@ -155,6 +155,27 @@ function applyDraw(p) {
   turn = 3 - p;
 }
 
+/* ---------- what a peer may send ----------
+ * The room channel is public: anyone who knows the code can broadcast on it, and
+ * cards and counters end up in innerHTML. Only the shapes this game produces pass. */
+const DECK_SIZE = 32, MAX_PENDING = 64, MAX_COUNTER = 1e6, MAX_SEED = 2147483647;
+const isInt = (v, low, high) => Number.isInteger(v) && v >= low && v <= high;
+const isCard = (c) => isInt(c, 0, DECK_SIZE - 1);
+const isWish = (w) => w === null || w === undefined || isInt(w, 0, SUITS.length - 1);
+const cleanCards = (a) => Array.isArray(a) && a.length <= DECK_SIZE && a.every(isCard) ? a.slice() : null;
+function cleanState(p) {
+  if (!p || typeof p !== "object") return null;
+  const first = cleanCards(p.hands?.[1]), second = cleanCards(p.hands?.[2]);
+  const pile = cleanCards(p.stock), played = cleanCards(p.discard);
+  if (!first || !second || !pile || !played) return null;
+  if (!isInt(p.seed, 0, MAX_SEED) || !isInt(p.reshuffles, 0, MAX_COUNTER) || !isInt(p.moveCount, 0, MAX_COUNTER)) return null;
+  if (!isInt(p.pending, 0, MAX_PENDING) || !isWish(p.wish) || !isInt(p.turn, 1, 2) || !isInt(p.over, 0, 2)) return null;
+  return {
+    seed: p.seed, reshuffles: p.reshuffles, hands: { 1: first, 2: second }, stock: pile, discard: played,
+    wish: p.wish ?? null, pending: p.pending, turn: p.turn, over: p.over, moveCount: p.moveCount, dealt: p.dealt === true,
+  };
+}
+
 /* ---------- render ---------- */
 function cardHTML(c, mini) {
   return `<div class="card${isRed(c) ? " red" : ""}${mini ? " mini" : ""}" role="img" aria-label="Iewescht Kaart: ${cardName(c)}"><div>${RANKS[rankOf(c)]}</div><div class="s">${SUITS[suitOf(c)]}</div></div>`;
@@ -268,14 +289,16 @@ if (AI) {
   render();
 } else if (!(window.MPGate && window.MPGate.redirecting)) {   // mp-gate.js sends a bare visit to the lobby (lobby.html)
   ch = GC.createChannel("mau");
-  ch.on("broadcast", { event: "deal" }, ({ payload }) => { setup(payload.seed); $("rematch").style.display = "none"; render(); })
-    .on("broadcast", { event: "play" }, ({ payload }) => { if (turn === opp) doPlay(opp, payload.c, payload.wish); })
+  ch.on("broadcast", { event: "deal" }, ({ payload }) => { if (!isInt(payload?.seed, 0, MAX_SEED)) return; setup(payload.seed); $("rematch").style.display = "none"; render(); })
+    .on("broadcast", { event: "play" }, ({ payload }) => { if (turn === opp && isCard(payload?.c) && isWish(payload.wish)) doPlay(opp, payload.c, payload.wish ?? null); })
     .on("broadcast", { event: "draw" }, () => { if (turn === opp) doDraw(opp); })
     .on("broadcast", { event: "again" }, () => { if (role === "host" && over) rematch(); });
   render();
   GC.joinRoom(ch, {
     getState: () => ({ seed, reshuffles, hands, stock, discard, wish, pending, turn, over, moveCount, dealt }),
-    setState: (p) => {
+    setState: (raw) => {
+      const p = cleanState(raw);
+      if (!p) { console.warn("[maumau] ignored a malformed state from the room"); return; }
       seed = p.seed; reshuffles = p.reshuffles; hands = p.hands; stock = p.stock; discard = p.discard;
       wish = p.wish; pending = p.pending; turn = p.turn; over = p.over; moveCount = p.moveCount; dealt = p.dealt;
       render(); if (over) $("rematch").style.display = "";

@@ -99,7 +99,7 @@ function renderActivity(list) {
   $("activity").innerHTML = list.map((a) => {
     const who = a.is_me ? T("friends.you") : esc(a.username);
     const game = esc(GAMES[a.game] || a.game);
-    const verb = VERB[a.result] ? T(VERB[a.result]) : a.result;
+    const verb = VERB[a.result] ? T(VERB[a.result]) : esc(a.result);
     return `<div class="act-row"><span class="act-emoji" aria-hidden="true">${a.result === "win" ? "G" : a.result === "loss" ? "V" : "="}</span>` +
       `<span class="act-text"><b>${who}</b>${a.is_me ? "" : classTag(a.username)} ${verb} <b>${game}</b></span>` +
       `<span class="act-time">${ago(a.created_at)}</span></div>`;

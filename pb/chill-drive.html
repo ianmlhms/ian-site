@@ -106,7 +106,7 @@ body{background:var(--g-paper)}
 <div id="lvlt">— oder probéier 20 Level (komm ant Zil, max. 5 Onfäll) —</div>
 <div id="lvls"></div>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js" integrity="sha384-qOkzR5Ke/XkQxuGVJ9hpFEpDlcoLtWwVYhnJf06cLIZa2vaIptSqaubivErzmD5O" crossorigin="anonymous"></script>
 <script>
 "use strict";
 const $=(id)=>document.getElementById(id);
@@ -215,7 +215,7 @@ const unlocked=()=>TEST_MODE?N_LEVELS:+(localStorage.getItem('pb_cd_lvl')||1);
 function cdApply(sv){if(!TEST_MODE&&sv&&sv.v===1&&(sv.lvl||0)>unlocked())localStorage.setItem('pb_cd_lvl',Math.min(sv.lvl,N_LEVELS));}
 function cdPush(){try{parent.postMessage({__pbSave:1,data:{v:1,lvl:unlocked()}},'*')}catch(e){}}
 cdApply(window.__pbSave);
-window.addEventListener('message',e=>{const d=e.data;if(d&&d.__pbLoadSave===1)cdApply(d.data)});
+window.addEventListener('message',e=>{const d=e.data;if(e.source===parent&&d&&d.__pbLoadSave===1)cdApply(d.data)});
 try{parent.postMessage({__pbWantSave:1},'*')}catch(e){}
 function endlessCfg(env){
   return {rand:rngFor((Math.random()*1e9)|0),curveMul:1,hillMul:1,loop:true,roadW:2000,
