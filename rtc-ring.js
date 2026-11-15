@@ -1,5 +1,5 @@
 /* Ambient incoming-call listener (FaceTime mode). Drop on any signed-in page:
- *   <script type="module" src="rtc-ring.js?v=36"></script>
+ *   <script type="module" src="rtc-ring.js?v=37"></script>
  * Subscribes to the user's personal ring inbox (rtc:<uid>) and shows an
  * Answer/Decline banner when a friend calls. Answering opens call.html. */
 import * as auth from "./auth.js?v=42";
