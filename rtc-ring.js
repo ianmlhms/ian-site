@@ -5,16 +5,37 @@
 import * as auth from "./auth.js?v=42";
 
 const T = (k) => (window.I18N ? window.I18N.t(k) : k);
-let subbed = false, sb = null, current = null, ringOsc = null, ringTimer = null, ringGain = null;
+let subbed = false, sb = null, current = null, checking = false, ringOsc = null, ringTimer = null, ringGain = null;
 
 const MAX_NAME = 80;
+const RING_FRESH_SECONDS = 60;       // a ring older than this is not shown any more
 const isUserId = (v) => typeof v === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(v);
+const isCallId = (v) => typeof v === "string" && /^[a-z0-9.-]{1,80}$/i.test(v);
+/* Shape of the broadcast hint. callId and fromName are optional: the real ones come from the server (verifiedRing). */
 function isRing(p) {
   return p !== null && typeof p === "object" && !Array.isArray(p) &&
     Object.keys(p).every(k => ["callId", "from", "to", "fromName"].includes(k)) &&
-    typeof p.callId === "string" && /^[a-z0-9.-]{1,80}$/i.test(p.callId) && isUserId(p.from) &&
+    (p.callId === undefined || isCallId(p.callId)) && isUserId(p.from) &&
     p.to === auth.session()?.user?.id && isUserId(p.to) && p.from !== p.to &&
-    typeof p.fromName === "string" && p.fromName.length <= MAX_NAME;
+    (p.fromName === undefined || (typeof p.fromName === "string" && p.fromName.length <= MAX_NAME));
+}
+
+/* The broadcast channel is public: anybody can send a "ring" with any name in it. So the hint only
+ * says "look now"; the call that rings is the one the server recorded for me (call_ring checks the
+ * caller's login and the friendship, see scripts/security-fix-calls-v1.sql).
+ * -> { callId, from, to, fromName } with the server's values, or null when there is no such call.
+ * While that SQL is not applied (RPC missing) the hint itself is used, as before. */
+const isMissingRpc = (error) => Boolean(error) && (error.code === "PGRST202" || error.code === "42883");
+async function verifiedRing(hint) {
+  const { data, error } = await sb.rpc("call_incoming");
+  if (error) {
+    if (isMissingRpc(error)) return isCallId(hint.callId) ? hint : null;
+    console.warn("[call] ring check failed", error);
+    return null;
+  }
+  const row = (data || []).find((r) => r.from_user === hint.from && r.age_seconds <= RING_FRESH_SECONDS && isCallId(r.call_id));
+  if (!row) return null;
+  return { callId: row.call_id, from: row.from_user, to: hint.to, fromName: (row.from_name || "?").slice(0, MAX_NAME) };
 }
 
 async function start() {
@@ -25,12 +46,18 @@ async function start() {
   subbed = true;
   sb.channel("rtc:" + uid, { config: { broadcast: { self: false } } })
     .on("broadcast", { event: "ring" }, ({ payload }) => showBanner(payload))
-    .on("broadcast", { event: "cancel" }, ({ payload }) => { if (isRing(payload) && current && current.callId === payload.callId && current.from === payload.from) dismiss(); })
+    .on("broadcast", { event: "cancel" }, ({ payload }) => { if (isRing(payload) && current && (payload.callId === undefined || current.callId === payload.callId) && current.from === payload.from) dismiss(); })
     .subscribe();
 }
 
-function showBanner(p) {
-  if (!isRing(p) || current) return;              // already ringing for a call
+async function showBanner(hint) {
+  if (!isRing(hint) || current || checking) return;   // already ringing for a call
+  checking = true;
+  let p = null;
+  try { p = await verifiedRing(hint); }
+  catch (e) { console.warn("[call] ring check failed", e); }
+  finally { checking = false; }
+  if (!p || current) return;                           // no such call on the server: not shown
   current = p;
   const wrap = document.createElement("div");
   wrap.id = "rtc-ring";
@@ -58,6 +85,7 @@ function answer() {
 }
 function decline() {
   const p = current;
+  sb.rpc("call_cancel", { p_call_id: p.callId }).then(() => {}, (e) => console.warn("[call] cancel failed", e));
   try { const c = sb.channel("call:" + p.callId); c.subscribe((s) => { if (s === "SUBSCRIBED") { c.send({ type: "broadcast", event: "bye", payload: { from: auth.session()?.user?.id, to: p.from, callId: p.callId } }); setTimeout(() => sb.removeChannel(c), 300); } }); } catch (e) { console.warn("[call] decline failed", e); }
   dismiss();
 }

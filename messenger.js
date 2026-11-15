@@ -193,6 +193,11 @@ async function joinGroup() {
   if (!code) return;
   const { data, error } = await sb.rpc("join_group", { p_code: code, p_username: auth.username() });
   if (error) return alert(error.message);
+  // A wrong code comes back as "no group" (not an error), so the server can count wrong tries.
+  if (!data || !data.id) {
+    const none = T("msg.join.none");                    // an older cached i18n-dict.js has no such key yet
+    return alert(none === "msg.join.none" ? "Kee Grupp mat deem Code." : none);
+  }
   await loadChats(data.id);
 }
 async function newDM() {

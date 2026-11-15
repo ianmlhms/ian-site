@@ -397,6 +397,7 @@ window.I18N_DICT = {
   "msg.newGroup.ok": { lb: "Erstellen", de: "Erstellen", en: "Create" },
   "msg.join.title":  { lb: "Engem Grupp bäitrieden", de: "Einer Gruppe beitreten", en: "Join a group" },
   "msg.join.label":  { lb: "Invitatiounscode (z.B. a1b2c3)", de: "Einladungscode (z. B. a1b2c3)", en: "Invite code (e.g. a1b2c3)" },
+  "msg.join.none":   { lb: "Kee Grupp mat deem Code.", de: "Keine Gruppe mit diesem Code.", en: "No group with that code." },
   "msg.dm.title":    { lb: "Engem schreiwen", de: "Jemandem schreiben", en: "Message someone" },
   "msg.dm.label":    { lb: "Säi Benotzernumm", de: "Dessen Benutzername", en: "Their username" },
   "msg.dm.ok":       { lb: "Chat starten", de: "Chat starten", en: "Start chat" },
