@@ -10,7 +10,17 @@ const T = (k) => (window.I18N ? window.I18N.t(k) : k);   // i18n lookup
 const A11Y = {
   remove: { lb: "Frënd ewechhuelen", de: "Freund entfernen", en: "Remove friend" },
   cancel: { lb: "Ufro zréckzéien", de: "Anfrage zurückziehen", en: "Cancel request" },
+  loadFail: { lb: "Konnt net lueden.", de: "Konnte nicht laden.", en: "Could not load." },
+  retry: { lb: "Nach eng Kéier probéieren", de: "Nochmal versuchen", en: "Try again" },
+  actionFail: { lb: "Dat huet net geklappt. Probéier nach eng Kéier.", de: "Das hat nicht geklappt. Versuch es nochmal.", en: "That did not work. Try again." },
 };
+let bootData = Promise.resolve();   // admin ids + visibility restriction, started in boot()
+/** Runs one friend action; a failure is shown (and logged) instead of silently doing nothing. */
+async function runAction(name, args) {
+  const { error } = await sb.rpc(name, args);
+  if (error) { console.error("[friends] " + name, error); alert(TA("actionFail")); }
+  refresh();
+}
 const TA = (k) => { const e = A11Y[k]; return e[window.I18N?.lang] || e.en; };
 let sb = null, inviteSubbed = false;
 const ini = (n) => String(n || "?").trim().charAt(0).toUpperCase();
@@ -58,11 +68,20 @@ const LEGACY_INVITE_IDS = ["connect4", "slf", "battleship", "color", "draw", "re
 const GAMES = Object.freeze(Object.fromEntries(Object.values(MP_GAMES).filter((g) => g.lobby || LEGACY_INVITE_IDS.includes(g.id)).map((g) => [g.id, g.name])));
 
 async function refresh() {
-  const [{ data: fr }, { data: rq }, { data: gi }, { data: sent }, { data: act }] = await Promise.all([
+  const results = await Promise.all([
     sb.rpc("my_friends"), sb.rpc("friend_requests"), sb.rpc("my_game_invites"),
     sb.rpc("sent_requests"), sb.rpc("friends_activity", { p_limit: 30 }),
-    loadClasses(),
+    loadClasses(), bootData,   // admin tags + the visibility allowlist must be known before the lists are filtered
   ]);
+  const [{ data: fr, error: frError }, { data: rq }, { data: gi }, { data: sent }, { data: act }] = results;
+  const failed = results.slice(0, 5).map((r) => r && r.error).filter(Boolean);
+  if (failed.length) console.error("[friends] could not load", failed);
+  // An empty list must not look like "no friends yet" when the request simply failed (school Wi-Fi drops).
+  if (frError) {
+    $("friends").innerHTML = `<div class="empty">${esc(TA("loadFail"))} <button type="button" class="mini" id="friendsRetry">${esc(TA("retry"))}</button></div>`;
+    $("friendsRetry").onclick = () => { $("friends").innerHTML = `<div class="empty">…</div>`; refresh(); };
+    return;
+  }
   const frF = vis(fr, "user_id", "username"), rqF = vis(rq, null, "username"),
         giF = vis(gi, null, "from_name"), sentF = vis(sent, null, "username"),
         actF = vis(act, null, "username");
@@ -99,7 +118,7 @@ function renderActivity(list) {
   $("activity").innerHTML = list.map((a) => {
     const who = a.is_me ? T("friends.you") : esc(a.username);
     const game = esc(GAMES[a.game] || a.game);
-    const verb = VERB[a.result] ? T(VERB[a.result]) : a.result;
+    const verb = VERB[a.result] ? T(VERB[a.result]) : esc(a.result);   // self-reported text: never raw into innerHTML
     return `<div class="act-row"><span class="act-emoji" aria-hidden="true">${a.result === "win" ? "G" : a.result === "loss" ? "V" : "="}</span>` +
       `<span class="act-text"><b>${who}</b>${a.is_me ? "" : classTag(a.username)} ${verb} <b>${game}</b></span>` +
       `<span class="act-time">${ago(a.created_at)}</span></div>`;
@@ -113,7 +132,7 @@ function renderSent(list) {
       <span class="name"><span class="av" aria-hidden="true">${esc(ini(s.username))}</span>${esc(s.username)}${classTag(s.username)} <span style="color:var(--muted);font-weight:400">${T("friends.pending")}</span></span>
       <button type="button" class="mini x" data-cancel="${s.user_id}" aria-label="${esc(TA("cancel") + ": " + s.username)}">${T("btn.cancel")}</button>
     </div>`).join("");
-  $("sent").querySelectorAll("[data-cancel]").forEach(b => b.onclick = async () => { await sb.rpc("remove_friend", { p_other: b.dataset.cancel }); refresh(); });
+  $("sent").querySelectorAll("[data-cancel]").forEach(b => b.onclick = () => runAction("remove_friend", { p_other: b.dataset.cancel }));
 }
 
 function renderFriends(list) {
@@ -132,7 +151,7 @@ function renderFriends(list) {
   el.querySelectorAll("[data-play]").forEach(b => b.onclick = () => chooseGame(b.dataset.play, b.dataset.name));
   el.querySelectorAll("[data-remove]").forEach(b => b.onclick = async () => {
     if (!confirm(T("friends.removeConfirm"))) return;
-    await sb.rpc("remove_friend", { p_other: b.dataset.remove }); refresh();
+    await runAction("remove_friend", { p_other: b.dataset.remove });
   });
 }
 
@@ -143,9 +162,7 @@ function renderRequests(list) {
       <span class="name"><span class="av" aria-hidden="true">${esc(ini(r.username))}</span>${esc(r.username)}${classTag(r.username)} <span style="color:var(--muted);font-weight:400">${T("friends.wantsFriend")}</span></span>
       <button type="button" class="mini go" data-accept="${r.id}" aria-label="${esc(T("friends.accept") + ": " + r.username)}">${T("friends.accept")}</button>
     </div>`).join("");
-  $("requests").querySelectorAll("[data-accept]").forEach(b => b.onclick = async () => {
-    await sb.rpc("accept_friend", { p_id: +b.dataset.accept }); refresh();
-  });
+  $("requests").querySelectorAll("[data-accept]").forEach(b => b.onclick = () => runAction("accept_friend", { p_id: +b.dataset.accept }));
 }
 
 function renderInvites(list) {
@@ -159,7 +176,11 @@ function renderInvites(list) {
     const [game, room, id] = b.dataset.join.split("|");
     const url = joinUrl(game, room);   // lobby games → lobby.html?g=…&c=CODE, the rest → page?room=…&role=guest
     if (!url) return;
-    try { await sb.from("game_invites").update({ status: "accepted" }).eq("id", +id); } catch {}
+    // The invite is only marked as answered; joining must not depend on it.
+    try {
+      const { error } = await sb.from("game_invites").update({ status: "accepted" }).eq("id", +id);
+      if (error) console.warn("[friends] invite not marked accepted", error);
+    } catch (e) { console.warn("[friends] invite not marked accepted", e); }
     location.href = url;
   });
 }
@@ -205,20 +226,29 @@ async function addFriend() {
   } catch (e) { msg.className = "msgline err"; msg.textContent = e.message || T("friends.cantAdd"); }
 }
 
+async function loadAdminIds() {
+  try {
+    const { data, error } = await sb.rpc("admin_user_ids");
+    if (error) throw error;
+    adminIds = new Set((data || []).map((r) => r.user_id));
+  } catch (e) { console.warn("[friends] admin ids", e); }
+}
+
 async function showApp() {
   $("gate").style.display = "none"; $("app").style.display = "";
   $("addBtn").onclick = addFriend;
-  $("addInput").addEventListener("keydown", e => { if (e.key === "Enter") addFriend(); });
   // suggest usernames while typing ("emm" → every Emma); picking one sends the request
-  if (!$("addInput").dataset.people) {
+  if (!$("addInput").dataset.people) {   // showApp runs again after every sign-in: wire the input only once
     $("addInput").dataset.people = "1";
+    $("addInput").addEventListener("keydown", e => { if (e.key === "Enter") addFriend(); });
     attachPeopleSearch($("addInput"), {
       sb, onPick: () => addFriend(), emptyText: "—",
       exclude: () => new Set([auth.session()?.user?.id].filter(Boolean)),
       allow: (n) => !restricted || allowName.has(n.toLowerCase()),
     });
   }
-  try { await sb.rpc("upsert_profile", { p_username: auth.username() }); } catch (e) { console.warn(e); }
+  // (upsert_profile used to be awaited here: auth.js already does it for every page, off the critical path.)
+  $("friends").innerHTML = `<div class="empty">…</div>`;
   refresh();
   // live notify on new game invites — subscribe only once per page load
   if (!inviteSubbed) {
@@ -236,9 +266,18 @@ function showGate() {
 (async function boot() {
   if (!auth.authConfigured) { $("gate").style.display = ""; $("gate").innerHTML = T("friends.notConfigured"); return; }
   
+  // A returning user sees the page frame at once instead of nothing while supabase-js and the session load.
+  let markClientReady = () => {};
+  const clientReady = new Promise((resolve) => { markClientReady = resolve; });
+  if (auth.hasStoredSession()) {
+    $("app").style.display = ""; $("friends").innerHTML = `<div class="empty">…</div>`;
+    // The add button is already on screen: a tap before the client is up waits for it instead of doing nothing.
+    $("addBtn").onclick = () => { clientReady.then(() => { if (auth.session()) addFriend(); }); };
+  }
   sb = await auth.client();
-  try { const { data } = await sb.rpc("admin_user_ids"); adminIds = new Set((data || []).map((r) => r.user_id)); } catch (e) { console.warn(e); }
-  await loadRestriction();
+  markClientReady();
+  // Both run next to the list requests now (they used to be two extra round-trips in a row before the first list).
+  bootData = Promise.all([loadAdminIds(), loadRestriction()]);
   auth.onAuth(() => (auth.session() ? showApp() : showGate()));
   auth.session() ? showApp() : showGate();
 })();

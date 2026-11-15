@@ -14,6 +14,9 @@ const adminTag = (uid) => (adminIds.has(uid) ? ` <span class="admin-tag">👑 Ad
 const classTag = (uid) => (classByUid[uid] ? ` <span class="class-tag">${esc(classByUid[uid])}</span>` : "");
 const MAX_MEDIA = 50 * 1024 * 1024; // 50 MB
 const SNIPPET = 80; // chars kept of a quoted reply
+const HISTORY_LIMIT = 300;          // newest messages loaded when a chat opens
+const PROFILE_REFRESH_MS = 60_000;  // avatars + class tags are re-read at most this often
+const CHATS_RELOAD_DELAY_MS = 400;  // a burst of incoming messages reloads the chat list once
 
 let sb = null;
 // one signed URL per file (cached + batched) and media loaded only near the viewport — see chat-media.js
@@ -38,6 +41,7 @@ let classByUid = {};         // user_id -> school class (shown as a tag next to 
 // Per-account visibility restriction (server-driven): a restricted viewer only
 // sees/DMs an allowlist of people. UX-only — RLS still protects the real data.
 let restricted = false, allowName = new Set();
+let restrictionReady = Promise.resolve();   // settles once loadRestriction has answered (boot starts it, loadChats waits for it)
 async function loadRestriction() {
   try {
     const { data: r } = await sb.rpc("is_view_restricted");
@@ -144,7 +148,16 @@ function announce(text) {
 /* ---------- chat list ---------- */
 async function loadChats(selectId) {
   const { data, error } = await sb.rpc("my_chats");
-  if (error) { console.warn("[msgr] my_chats", error); return; }
+  if (error) {
+    console.error("[msgr] my_chats", error);
+    // Keep a list that is already on screen (a failed background refresh); only an empty list gets the message.
+    if (!allChats.length) {
+      $("groupList").innerHTML = `<li class="empty">${esc(T("msg.loadFail"))} <br><button type="button" class="gt-btn ghost" id="chatsRetry" style="margin-top:10px">${esc(TA("retry"))}</button></li>`;
+      $("chatsRetry").onclick = () => loadChats(selectId);
+    }
+    return;
+  }
+  await restrictionReady;   // the allowlist decides which DMs are listed
   allChats = visChats(data || []);
   renderChatList(applySearch(allChats));
   if (selectId) { const g = allChats.find((x) => x.id === selectId); if (g) selectChat(g); }
@@ -242,13 +255,20 @@ async function selectChat(g) {
   $("composer").style.display = "flex";
   const box = $("messages");
   box.innerHTML = `<div class="empty">${T("common.loading")}</div>`;
-  loadAvatars();   // pick up avatar changes without a reload
-  loadClasses();   // and class tags
-  const { data, error } = await sb.from("messages").select("*").eq("group_id", g.id).order("created_at").limit(300);
-  if (error) { box.innerHTML = `<div class="empty">${T("msg.loadErr")}</div>`; return; }
+  refreshProfiles();   // pick up avatar + class changes without a reload (at most once a minute)
+  // The NEWEST messages: ascending order + limit returned the oldest 300, so a chat past 300 messages opened without its latest ones.
+  const { data, error } = await sb.from("messages").select("*").eq("group_id", g.id)
+    .order("created_at", { ascending: false }).limit(HISTORY_LIMIT);
+  if (current !== g) return;                         // another chat was opened meanwhile
+  if (error) {
+    console.error("[msgr] messages", error);
+    box.innerHTML = `<div class="empty">${T("msg.loadErr")}</div>`;
+    return;
+  }
+  const history = [...(data || [])].reverse();
   box.innerHTML = "";
-  (data || []).forEach(appendMessage);
-  if (!data || !data.length) box.innerHTML = `<div class="empty">${T("msg.noMessages")}</div>`;
+  appendHistory(history);
+  if (!history.length) box.innerHTML = `<div class="empty">${T("msg.noMessages")}</div>`;
   subscribe(g.id);
   loadReceipts(g.id);
   loadReactions(g.id);
@@ -303,6 +323,7 @@ const A11Y_STRINGS = {
   "jump":    { lb: "Zur Originalnoriicht sprangen", de: "Zur ursprünglichen Nachricht springen", en: "Jump to the original message" },
   "stopRec": { lb: "Opnam stoppen a schécken", de: "Aufnahme stoppen und senden", en: "Stop and send recording" },
   "online":  { lb: "online", de: "online", en: "online" },
+  "retry":   { lb: "Nach eng Kéier probéieren", de: "Nochmal versuchen", en: "Try again" },
 };
 const TA = (k) => { const e = A11Y_STRINGS[k]; return e[window.I18N?.lang] || e.en; };
 
@@ -390,10 +411,12 @@ async function markRead(gid) { try { await sb.rpc("mark_read", { p_group_id: gid
 async function loadReceipts(gid) {
   const me = auth.session().user.id;
   readMap = {}; readThreshold = null;
-  const [{ data: mem }, { data: reads }] = await Promise.all([
+  const [{ data: mem, error: memError }, { data: reads, error: readsError }] = await Promise.all([
     sb.from("group_members").select("user_id").eq("group_id", gid),
     sb.from("chat_reads").select("user_id,last_read_at").eq("group_id", gid),
   ]);
+  if (memError || readsError) console.warn("[msgr] read receipts unavailable", memError || readsError);
+  if (!current || current.id !== gid) return;        // another chat was opened meanwhile
   currentOthers = (mem || []).map((r) => r.user_id).filter((id) => id !== me);
   (reads || []).forEach((r) => { if (r.user_id !== me) readMap[r.user_id] = r.last_read_at; });
   recomputeThreshold(); updateTicks();
@@ -424,7 +447,9 @@ function updateTicks() { $("messages").querySelectorAll(".msg.mine .ticks").forE
 /* ---------- reactions ---------- */
 async function loadReactions(gid) {
   reactMap = {};
-  const { data } = await sb.from("message_reactions").select("message_id,user_id,username,emoji").eq("group_id", gid);
+  const { data, error } = await sb.from("message_reactions").select("message_id,user_id,username,emoji").eq("group_id", gid);
+  if (error) console.warn("[msgr] reactions unavailable", error);
+  if (!current || current.id !== gid) return;        // another chat was opened meanwhile
   (data || []).forEach((r) => { (reactMap[r.message_id] = reactMap[r.message_id] || []).push(r); });
   $("messages").querySelectorAll(".msg").forEach((el) => renderReactions(+el.dataset.mid));
 }
@@ -447,14 +472,23 @@ async function toggleReaction(mid, emoji) {
   const me = auth.session().user.id;
   const list = reactMap[mid] || [];
   const had = list.some((r) => r.user_id === me && r.emoji === emoji);
+  // Optimistic: paint first, and put the old state back when the server says no (it used to stay wrong silently).
+  const undo = (error) => {
+    console.error("[msgr] reaction not saved", error);
+    reactMap[mid] = list;
+    renderReactions(mid);
+    announce(T("msg.loadFail"));
+  };
   if (had) {
     reactMap[mid] = list.filter((r) => !(r.user_id === me && r.emoji === emoji));
     renderReactions(mid);
-    await sb.from("message_reactions").delete().eq("message_id", mid).eq("user_id", me).eq("emoji", emoji);
+    const { error } = await sb.from("message_reactions").delete().eq("message_id", mid).eq("user_id", me).eq("emoji", emoji);
+    if (error) undo(error);
   } else {
     const row = { message_id: mid, group_id: current.id, user_id: me, username: auth.username(), emoji };
     reactMap[mid] = [...list, row]; renderReactions(mid);
-    await sb.from("message_reactions").insert(row);
+    const { error } = await sb.from("message_reactions").insert(row);
+    if (error) undo(error);
   }
 }
 function onReaction(type, r) {
@@ -534,11 +568,11 @@ async function toggleRecording() {
     mediaRecorder.start();
     recording = true; $("micBtn").classList.add("rec"); $("micBtn").innerHTML = '<svg class="ic" aria-hidden="true"><use href="gitter-icons.svg#g-stop"/></svg>';
     $("micBtn").setAttribute("aria-pressed", "true"); $("micBtn").setAttribute("aria-label", TA("stopRec"));
-  } catch { alert(T("msg.micErr")); }
+  } catch (e) { console.warn("[msgr] microphone", e); alert(T("msg.micErr")); }
 }
 function stopRecording() {
   if (mediaRecorder && recording) { recording = false; $("micBtn").classList.remove("rec"); $("micBtn").innerHTML = '<svg class="ic" aria-hidden="true"><use href="gitter-icons.svg#g-mic"/></svg>';
-    $("micBtn").setAttribute("aria-pressed", "false"); $("micBtn").setAttribute("aria-label", T("msg.tip.voice")); try { mediaRecorder.stop(); } catch {} }
+    $("micBtn").setAttribute("aria-pressed", "false"); $("micBtn").setAttribute("aria-label", T("msg.tip.voice")); try { mediaRecorder.stop(); } catch (e) { console.warn("[msgr] recorder stop", e); } }
 }
 async function sendVoice(blob) {
   if (!current || !blob.size) return;
@@ -657,7 +691,17 @@ function attachReplyGestures(el, m) {
 /* ---------- messages ---------- */
 const DELETE_WINDOW = 30000; // ms a user can delete their own message
 
-function appendMessage(m) {
+/* Opening a chat: build all rows off-screen, then one insert and one scroll (per-row scrolling forced a layout for each of up to 300 messages). */
+function appendHistory(messages) {
+  const batch = document.createDocumentFragment();
+  messages.forEach((m) => appendMessage(m, batch));
+  const box = $("messages");
+  box.appendChild(batch);
+  box.scrollTop = box.scrollHeight;
+}
+
+/* `batch`: a fragment collecting a chat's history (appendHistory); reactions are painted afterwards by loadReactions. */
+function appendMessage(m, batch = null) {
   if (seen.has(m.id)) return;
   seen.add(m.id);
   const box = $("messages");
@@ -745,6 +789,7 @@ function appendMessage(m) {
       setTimeout(() => del.remove(), DELETE_WINDOW - age);
     }
   }
+  if (batch) { batch.appendChild(el); return; }
   box.appendChild(el);
   renderReactions(m.id);
   box.scrollTop = box.scrollHeight;
@@ -821,7 +866,8 @@ function notifyMentions(content) {
     if (n.toLowerCase() === meName) continue;
     sb.rpc("add_notification", { p_to_username: n, p_kind: "mention",
       p_title: (auth.username() || "Een") + " huet dech ernimmt: " + (current?.display || ""),
-      p_body: content.slice(0, 120), p_url: "messenger.html" }).then(() => {}, () => {});
+      p_body: content.slice(0, 120), p_url: "messenger.html" })
+      .then(({ error }) => { if (error) console.warn("[msgr] mention not delivered", n, error); }, (e) => console.warn("[msgr] mention not delivered", n, e));
   }
 }
 
@@ -882,16 +928,54 @@ async function loadClasses() {
   } catch (e) { console.warn("[msgr] classes", e); }
 }
 
+let profilesReadAt = 0;
+/** Avatars + class tags, re-read at most once per PROFILE_REFRESH_MS (it used to be two full profile reads on every chat open). */
+function refreshProfiles() {
+  if (Date.now() - profilesReadAt < PROFILE_REFRESH_MS) return;
+  profilesReadAt = Date.now();
+  loadAvatars();
+  loadClasses();
+}
+
+async function loadAdminIds() {
+  try {
+    const { data, error } = await sb.rpc("admin_user_ids");
+    if (error) throw error;
+    adminIds = new Set((data || []).map((r) => r.user_id));
+  } catch (e) { console.warn("[msgr] admin ids", e); }
+}
+
+let chatsReloadTimer = 0;
+/** Reloads the chat list once after a burst of events (every incoming message used to start its own my_chats call). */
+function scheduleChatsReload() {
+  clearTimeout(chatsReloadTimer);
+  chatsReloadTimer = setTimeout(() => { loadChats(); }, CHATS_RELOAD_DELAY_MS);
+}
+
 async function boot() {
   if (!auth.authConfigured) {
     $("gate").innerHTML = `<div class="gate-box"><h3>Messenger</h3></div>`;
     $("gate").style.display = "flex"; return;
   }
+  // A returning user sees the app frame at once instead of an empty page while supabase-js and the session load.
+  let markClientReady = () => {};
+  const clientReady = new Promise((resolve) => { markClientReady = resolve; });
+  if (auth.hasStoredSession()) {
+    $("app").style.display = "flex";
+    $("groupList").innerHTML = `<li class="empty">${esc(T("common.loading"))}</li>`;
+    // The three buttons are already on screen: a tap before the client is up waits for it instead of doing nothing.
+    const whenReady = (action) => () => { clientReady.then(() => { if (auth.session()) action(); }); };
+    $("newG").onclick = whenReady(newGroup);
+    $("joinG").onclick = whenReady(joinGroup);
+    $("newDM").onclick = whenReady(newDM);
+  }
   sb = await auth.client();
-  try { const { data } = await sb.rpc("admin_user_ids"); adminIds = new Set((data || []).map((r) => r.user_id)); } catch (e) { console.warn("[msgr] admin ids", e); }
-  await loadRestriction();
-  loadAvatars();
-  loadClasses();
+  markClientReady();
+  // None of these block the first paint of the chat list any more (they used to run one after the other, before it):
+  // the admin tags and the profile data only decorate messages, and loadChats itself waits for the restriction.
+  loadAdminIds();
+  restrictionReady = loadRestriction();
+  refreshProfiles();
   auth.onAuth((s) => (s ? showApp() : showGate()));
   auth.session() ? showApp() : showGate();
 }
@@ -930,8 +1014,9 @@ async function showApp() {
   $("searchInput").oninput = () => renderChatList(applySearch(allChats));
   startOnlinePresence();
   setupNotifyButton();
-  try { await sb.rpc("upsert_profile", { p_username: auth.username() }); } catch (e) { console.warn(e); }
-  try { const { data } = await sb.rpc("is_admin"); if (data) showAdminLink(); } catch {}
+  // The chat list no longer waits for this (nor for upsert_profile, which auth.js already does for every page).
+  sb.rpc("is_admin")
+    .then(({ data, error }) => { if (error) console.warn("[msgr] is_admin", error); else if (data) showAdminLink(); }, (e) => console.warn("[msgr] is_admin", e));
   loadChats();
   if (!memberSubbed) {
     memberSubbed = true;
@@ -942,7 +1027,7 @@ async function showApp() {
     // Any new message in a chat I'm not currently in → refresh unread badges + ordering.
     allChannel = sb.channel("all-msgs-" + uid)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" },
-        ({ new: m }) => { if (m && m.user_id !== uid && (!current || m.group_id !== current.id)) loadChats(); })
+        ({ new: m }) => { if (m && m.user_id !== uid && (!current || m.group_id !== current.id)) scheduleChatsReload(); })
       .subscribe();
   }
   const dm = new URLSearchParams(location.search).get("dm");
