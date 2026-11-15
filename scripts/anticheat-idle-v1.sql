@@ -20,6 +20,7 @@
 create or replace function public.is_idle_game(p_game text)
 returns boolean language sql immutable as $$
   select p_game in ('idle-empire', 'cookie-clicker', 'bus-tycoon', 'park')
+      or p_game like 'webcam-%'   -- anticheat-webcam-v1.sql (Kamera-Arcade)
 $$;
 
 create or replace function public.suspicious_reason(
