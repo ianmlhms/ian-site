@@ -268,7 +268,7 @@ button.st,button.dep,button.lndep{min-height:0}
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module">
-import * as auth from "./auth.js?v=44";
+import * as auth from "./auth.js?v=45";
 import { mountPicker } from "./datetime-picker.js?v=2";
 import { searchPlaces } from "./geocode.js?v=1";
 const $=(id)=>document.getElementById(id);
@@ -697,8 +697,10 @@ function selectStop(s){
   $("deps").innerHTML='<div class="muted">Lueden…</div>';
   localStorage.setItem("moienStop",JSON.stringify(curStop));
   pushRecent(curStop); renderRecents(); updateFavStar();
-  loadBoard(); clearInterval(tpTimer); tpTimer=setInterval(loadBoard,45000);
+  loadBoard(); clearInterval(tpTimer); tpTimer=setInterval(()=>{ if(!document.hidden) loadBoard(); },45000);   // a tab in the background does not keep polling
 }
+// Coming back to the tab: fresh departures at once instead of up to 45 s old ones.
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden&&tpTimer&&curStop) loadBoard(); });
 /* local text search over the bundled stops (accent- & comma-insensitive, prefix-first).
    Uses the precomputed NORMS[] so every keystroke stays cheap. */
 function searchStops(q){
@@ -999,8 +1001,8 @@ async function initTransport(){
 initTransport();
 
 </script>
-  <script type="module" src="gitter-acct.js?v=3"></script>
-  <script type="module" src="rtc-ring.js?v=38"></script>
-  <script type="module" src="class-gate.js?v=39"></script>
+  <script type="module" src="gitter-acct.js?v=4"></script>
+  <script type="module" src="rtc-ring.js?v=39"></script>
+  <script type="module" src="class-gate.js?v=40"></script>
 </body>
 </html>

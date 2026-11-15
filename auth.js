@@ -151,10 +151,24 @@ function startInvitePop() {
 
 /* One-time "is your username and class still right?" popup. Top-level pages
  * only (never the arcade iframes), and never for kart accounts. */
+function accountCheckedToday() {
+  const uid = _g.session?.user?.id;
+  if (!uid) return false;
+  try {
+    // written by account-check.js once the server has said "already checked"
+    return localStorage.getItem("accountCheckedDay") ===
+      `${uid}|${new Date().toISOString().slice(0, 10)}`;
+  } catch {
+    return false;
+  }
+}
+
 function startAccountCheck() {
   if (window.top !== window || isKartAccount()) return;
+  // Checked accounts skip the module (27 KB) and its two requests on every page.
+  if (accountCheckedToday()) return;
   if (!_g.accountCheckModule) {
-    _g.accountCheckModule = import("./account-check.js?v=19");
+    _g.accountCheckModule = import("./account-check.js?v=20");
   }
   void _g.accountCheckModule
     .then(({ startAccountCheck: start }) => start(_g.sb, () => _g.session))

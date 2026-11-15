@@ -1,7 +1,7 @@
 import { client, session, onAuth } from './auth.js';
 import { mountAccountButton, openAuthModal } from "./auth.js";
 import { loadBackend } from "./inbox-backend.js?v=1";
-import { disablePush, enablePush, pushState } from "./notify.js?v=42";
+import { disablePush, enablePush, pushState } from "./notify.js?v=43";
 import {
   highlightMessage,
   renderAccounts,

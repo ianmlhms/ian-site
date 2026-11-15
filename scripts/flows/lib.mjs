@@ -355,6 +355,9 @@ export async function runFlow(flow, { browser, origin, shotsDir = process.env.FL
   const backend = createBackend({
     rpc: {
       has_pin: () => true, is_view_restricted: () => false,
+      // A signed-in mock account counts as "already checked": without this the one-time account-check card
+      // (account-check.js, 3 s after load) opened in the middle of unrelated flows and took the focus.
+      my_profile_private: () => [{ account_checked_at: "2026-10-01T00:00:00Z" }],
       weekly_game: () => "reaction",
       weekly_board: () => [{ week: "2026-10-05", game_id: "reaction", ends_at: "2026-10-12T00:00:00+02:00", rank: null, user_id: null, username: null, score: null }],
       submit_weekly_score: () => true,
