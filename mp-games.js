@@ -22,6 +22,10 @@ const SLF_CATEGORIES = ["Stadt", "Land", "Fluss", "Name", "Tier", "Beruf", "Pfla
 // intro-catalog.js order (index = value). A flow test compares this list with the page's catalogue.
 const INTRO_CATEGORIES = ["🔥 Charts", "📀 2000er", "💿 2010er", "🎤 Rap", "🎸 Rock", "🎬 Filmmusek", "🇩🇪 Deutschrap", "🎉 Party"];
 
+// casino games (roulette, blackjack): rounds per match and the play chips everybody starts with
+const CASINO_ROUNDS = Object.freeze([5, 10, 15, 20].map((v) => Object.freeze({ v, label: String(v) })));
+const CASINO_CHIPS = Object.freeze([500, 1000, 2500, 5000].map((v) => Object.freeze({ v, label: String(v) })));
+
 const G = (o) => Object.freeze({ lobby: false, arcade: "", ai: false, settings: Object.freeze([]), ...o });
 
 export const MP_GAMES = Object.freeze({
@@ -63,6 +67,21 @@ export const MP_GAMES = Object.freeze({
       { key: "cat", type: "choice", def: 0, label: { lb: "Kategorie", de: "Kategorie", en: "Category" }, options: Object.freeze(INTRO_CATEGORIES.map((label, v) => Object.freeze({ v, label }))) },
       { key: "count", type: "choice", def: 5, label: { lb: "Lidder", de: "Lieder", en: "Songs" }, options: Object.freeze([3, 5, 8, 10].map((v) => Object.freeze({ v, label: String(v) }))) },
       { key: "mode", type: "choice", def: "speaker", label: { lb: "Lauschteren", de: "Zuhören", en: "Listening" }, options: Object.freeze([{ v: "speaker", label: "📢 Ee Lautsprecher" }, { v: "each", label: "🎧 All Handy" }]) },
+    ]),
+  }),
+  // ---- casino (play chips only: nothing to buy, nothing carries over, no leaderboard) ----
+  roulette: G({
+    id: "roulette", name: "Roulette", emoji: "🎰", page: "roulette.html", min: 2, max: 8, lobby: true, ai: true,
+    settings: Object.freeze([
+      { key: "rounds", type: "choice", def: 10, label: { lb: "Ronnen", de: "Runden", en: "Rounds" }, options: CASINO_ROUNDS },
+      { key: "chips", type: "choice", def: 1000, label: { lb: "Jetonen", de: "Chips", en: "Chips" }, options: CASINO_CHIPS },
+    ]),
+  }),
+  blackjack: G({
+    id: "blackjack", name: "Blackjack", emoji: "♠️", page: "blackjack.html", min: 2, max: 7, lobby: true, ai: true,
+    settings: Object.freeze([
+      { key: "rounds", type: "choice", def: 10, label: { lb: "Ronnen", de: "Runden", en: "Rounds" }, options: CASINO_ROUNDS },
+      { key: "chips", type: "choice", def: 1000, label: { lb: "Jetonen", de: "Chips", en: "Chips" }, options: CASINO_CHIPS },
     ]),
   }),
   "kart-letzebuerg": G({ id: "kart-letzebuerg", name: "Kart Lëtzebuerg", emoji: "🏎️", page: "pb/kart-letzebuerg.html", min: 2, max: 8 }),

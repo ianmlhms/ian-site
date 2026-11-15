@@ -17,7 +17,7 @@
  * Everything that arrives over Realtime is untrusted: names, avatars, settings are sanitised before they are rendered. */
 import {
   gameInfo, CODE_ALPHABET, CODE_LEN, cleanCode, isCode, lobbyUrl, gameUrl, offlineUrl, sanitizeCfg, defaultCfg,
-} from "./mp-games.js?v=4";
+} from "./mp-games.js?v=5";
 
 /* ------------------------------------------------------------------ constants */
 const CTX_KEY = "mpl.ctx";               // handed to mp-gate.js in the game page
