@@ -8,9 +8,9 @@
 <title>Hotel-Bausimulator — ian.lu</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<script src="gitter-theme.js?v=1"></script>
+<script src="gitter-theme.js?v=2"></script>
 <link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="gitter.css?v=12">
+<link rel="stylesheet" href="gitter.css?v=13">
 <style>
   :root{
     --bg:#f6f6f3; --panel:#fcfcfa; --panel2:#efefeb; --text:#16171a;
@@ -861,7 +861,7 @@ checkResume(); // Cloud-Hotels werden vom Gate via __hotelBoot() nachgeladen
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module">
-  import { client, session, onAuth, openAuthModal } from "./auth.js?v=42";
+  import { client, session, onAuth, openAuthModal } from "./auth.js?v=43";
   const ALLOW = ["konto@ian.lu", "quinn@mulheims.lu"];   // nur diese Konten dürfen rein
   const gate = document.getElementById("hotelGate");
   const msg = document.getElementById("hotelGateMsg");
@@ -894,7 +894,7 @@ checkResume(); // Cloud-Hotels werden vom Gate via __hotelBoot() nachgeladen
   onAuth(() => check());
   check();
 </script>
-  <script type="module" src="rtc-ring.js?v=36"></script>
-  <script type="module" src="class-gate.js?v=37"></script>
+  <script type="module" src="rtc-ring.js?v=37"></script>
+  <script type="module" src="class-gate.js?v=38"></script>
 </body>
 </html>
