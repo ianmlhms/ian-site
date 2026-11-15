@@ -19,6 +19,7 @@ import { flow as adminOnlineNotice } from "./admin_online_notice.mjs";
 import { flow as adminKartSaves } from "./admin_kart_saves.mjs";
 import { flow as ccSigninHint } from "./cc_signin_hint.mjs";
 import { flow as accountCheck } from "./account_check.mjs";
+import { flow as quickLogin } from "./quick_login.mjs";
 import { flow as clientCommands } from "./client_commands.mjs";
 import { flow as inboxCloud } from "./inbox_cloud.mjs";
 
