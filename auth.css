@@ -226,3 +226,48 @@ body .pin-brief { max-width: 25rem; }
   body .pin-pad { gap: var(--space-1, .25rem); }
   body .pin-box { font-size: 1.3rem; }
 }
+
+/* "oder" divider above Face ID / face-scan sign-in. */
+body .auth-or {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, .5rem);
+  color: var(--muted);
+  font-size: .82rem;
+}
+body .auth-or::before,
+body .auth-or::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+
+/* Face scan: mirrored selfie view, square on phones and iPads alike. */
+body .face-cam {
+  position: relative;
+  width: min(100%, 16rem);
+  aspect-ratio: 1;
+  align-self: center;
+  overflow: hidden;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-inner, .75rem);
+  background: var(--control-fill, var(--card2, #1e1e35));
+}
+body .face-cam video {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+body .face-cam.ok { border-color: var(--accent); }
+body .face-cam.bad { border-color: color-mix(in srgb, #ff5a5a 55%, var(--text)); }
+body .face-steps {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-1, .25rem) var(--space-3, .75rem);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+  font-size: .85rem;
+}
+body .face-steps .on { color: var(--text); font-weight: 700; }
+body .face-steps .done { color: var(--accent-text, var(--accent)); }

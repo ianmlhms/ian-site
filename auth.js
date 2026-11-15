@@ -1,12 +1,13 @@
 /* Shared Supabase auth for ian.lu. ES module. */
 import "./i18n-dict.js?v=52";
-import { openAuthDialog } from "./auth-ui.js?v=10";
+import { openAuthDialog, openFaceDialog } from "./auth-ui.js?v=11";
 import { esc } from "./pin-pad.js?v=5";
 import {
   openProfilePinDialog,
   resetPinBriefing,
   startPinBriefing,
-} from "./pin-brief.js?v=9";
+} from "./pin-brief.js?v=10";
+import * as quick from "./quick-login.js?v=1";
 
 const cfg = window.PB_CONFIG || {};
 const PASSWORD_ALPHABET =
@@ -537,6 +538,62 @@ export async function signOut() {
   resetPinBriefing();
 }
 
+/* ---------- Face ID / passkey and face scan (quick-login.js) ----------
+ * Extras next to the PIN: every one of them may fail, and the dialogs then
+ * leave the normal login right where it was. */
+
+export const passkeySupported = () => quick.passkeySupported();
+export const passkeyCancelled = (error) => quick.passkeyCancelled(error);
+export const passkeyAlreadyHere = (error) => quick.passkeyAlreadyHere(error);
+
+export async function loginWithPasskey() {
+  return quick.passkeyLogin(await client());
+}
+
+export async function registerPasskey() {
+  if (!session()) throw new Error("not signed in");
+  return quick.passkeyRegister(await client());
+}
+
+export async function listPasskeys() {
+  if (!session()) return [];
+  return quick.passkeyList(await client());
+}
+
+export async function removePasskey(passkeyId) {
+  return quick.passkeyRemove(await client(), passkeyId);
+}
+
+/** Usernames whose face is saved on this device (no keys, no face data). */
+export const faceLoginAccounts = () =>
+  quick.faceEntries().map((entry) => Object.freeze({
+    userId: entry.userId,
+    username: entry.username,
+  }));
+
+export const hasFaceHere = () =>
+  Boolean(_g.session?.user?.id && quick.faceEntryFor(_g.session.user.id));
+
+export async function loginWithFace(entry) {
+  return quick.faceLogin(await client(), entry);
+}
+
+export async function enrollFace(face) {
+  const current = session();
+  if (!current || isKartAccount(current)) throw new Error("not signed in");
+  return quick.faceEnroll(await client(), {
+    userId: current.user.id,
+    username: username(),
+    face,
+  });
+}
+
+export async function forgetFace() {
+  const current = session();
+  if (!current) return;
+  await quick.faceForget(await client(), current.user.id);
+}
+
 const uiDeps = Object.freeze({
   session,
   isKartAccount,
@@ -550,6 +607,12 @@ const uiDeps = Object.freeze({
   resetPin,
   accountExists,
   pinSetupPending: () => _g.pinSetupPending === true,
+  passkeySupported,
+  loginPasskey: loginWithPasskey,
+  passkeyCancelled,
+  faceEntries: quick.faceEntries,
+  loginFace: loginWithFace,
+  enrollFace,
 });
 
 /* Appended last so it outranks the per-page <style> blocks, which would
@@ -560,7 +623,7 @@ function injectCss() {
   link.id = "auth-css";
   link.rel = "stylesheet";
   // resolved against this module, not the page: a relative "auth.css" 404s on /pb/… (and any other sub-path) pages
-  link.href = new URL("auth.css?v=3", import.meta.url).href;
+  link.href = new URL("auth.css?v=4", import.meta.url).href;
   document.head.appendChild(link);
 }
 
@@ -577,6 +640,13 @@ export function openPinSetup() {
   }
   if (isKartAccount()) return;
   void openProfilePinDialog(uiDeps);
+}
+
+/** Camera dialog that saves the signed-in player's face on this device. */
+export function openFaceSetup(onDone) {
+  injectCss();
+  if (!session() || isKartAccount()) return;
+  openFaceDialog(uiDeps, { mode: "enroll", onDone });
 }
 
 export function mountAccountButton(host) {

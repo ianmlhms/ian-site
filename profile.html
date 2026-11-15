@@ -85,7 +85,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module">
-import * as auth from "./auth.js?v=41";
+import * as auth from "./auth.js?v=42";
 import { loadTags, eventBadgesHtml } from "./leaderboard-tags.js?v=13";
 import { scoreHtml, scoreKeyHtml, arcadeText } from "./score-format.js?v=11";
 const $=(id)=>document.getElementById(id);
@@ -242,6 +242,12 @@ async function boot(){
       <div class="gt-hint">Benotz 4 oder 6 Zifferen fir de PIN. Sechs si recommandéiert.</div>
       <div class="gt-msg" id="acctMergeMsg" role="status" aria-live="polite"></div>
     </div>
+    <div class="c full gt-form" id="quickCard">
+      <h2 class="gt-h">Face ID a Gesiicht</h2>
+      <div class="upl" id="quickBtns"></div>
+      <div class="gt-hint">Face ID: däin iPad oder iPhone kontrolléiert dech selwer, ian.lu kritt just e Schlëssel. Gesiicht: d'Kamera erkennt dech direkt hei op der Websäit, däi Gesiicht bleift just op dësem Apparat. Däi PIN geet ëmmer weider.</div>
+      <div class="gt-msg" id="quickMsg" role="status" aria-live="polite"></div>
+    </div>
     <div class="c full gt-form">
       <h2 class="gt-h">Oder wiel en Emoji</h2>
       <div class="grid" id="avGrid" role="group" aria-label="Emoji-Avatarer"></div>
@@ -258,6 +264,7 @@ async function boot(){
   wireClass();
   $("pinChange").onclick=auth.openPinSetup;
   $("acctMerge").onclick=openMerge;
+  void paintQuick();
   const grid=$("avGrid");
   for(const a of AVATARS){
     const b=document.createElement("button");
@@ -286,6 +293,64 @@ async function openMerge(){
     console.error("account merge dialog failed to open",e);
     setMsg("acctMergeMsg","Konnt dat net opmaachen. Probéier nach eng Kéier.",true);
   }
+}
+
+// Face ID (native Supabase passkeys) + on-site face scan. Both optional; the PIN always keeps working.
+const cameraOk=()=>Boolean(navigator.mediaDevices?.getUserMedia)&&window.isSecureContext;
+async function paintQuick(){
+  const host=$("quickBtns");if(!host)return;
+  let keys=[],keysKnown=true;
+  if(auth.passkeySupported()){
+    try{keys=await auth.listPasskeys();}catch(e){keysKnown=false;console.warn("[passkey] list failed",e);}
+  }
+  if(!$("quickBtns"))return;
+  const btn=(id,label)=>`<button type="button" class="gt-btn ghost" id="${id}">${esc(label)}</button>`;
+  const parts=[];
+  if(auth.passkeySupported()){
+    if(keys.length){parts.push(btn("pkAdd","Face ID op dësem Apparat derbäi"),btn("pkOff","Face ID ausschalten"));}
+    else parts.push(btn("pkAdd","Face ID aschalten"));
+  }
+  if(cameraOk()){
+    if(auth.hasFaceHere())parts.push(btn("faceScan","Gesiicht nei scannen"),btn("faceOff","Gesiicht läschen"));
+    else parts.push(btn("faceScan","Gesiicht scannen"));
+  }
+  host.innerHTML=parts.join("")||'<span class="gt-sub">Dëse Browser kann dat leider net.</span>';
+  const status=[];
+  if(keys.length)status.push(`Face ID ass un (${keys.length} ${keys.length===1?"Passkey":"Passkeyen"}).`);
+  else if(!keysKnown)status.push("Konnt net kucken, ob Face ID un ass.");
+  if(auth.hasFaceHere())status.push("Däi Gesiicht ass op dësem Apparat gespäichert.");
+  if(status.length)setMsg("quickMsg",status.join(" "));
+  $("pkAdd")&&($("pkAdd").onclick=addPasskey);
+  $("pkOff")&&($("pkOff").onclick=()=>removePasskeys(keys));
+  $("faceScan")&&($("faceScan").onclick=()=>auth.openFaceSetup(()=>void paintQuick()));
+  $("faceOff")&&($("faceOff").onclick=removeFace);
+}
+async function addPasskey(){
+  setMsg("quickMsg","…");
+  try{
+    await auth.registerPasskey();
+    await paintQuick();
+    setMsg("quickMsg","Face ID ass un ✓ Elo kanns du beim Umellen op „Mat Face ID aloggen“ drécken.");
+  }catch(e){
+    console.warn("[passkey] register failed",e);
+    if(auth.passkeyAlreadyHere(e))setMsg("quickMsg","Op dësem Apparat ass Face ID schonn un.");
+    else if(auth.passkeyCancelled(e))setMsg("quickMsg","Ofgebrach. Op Schoul-iPads ass de iCloud-Schlësselbund dacks gespaart, da geet Face ID net. Probéier dann „Gesiicht scannen“.",true);
+    else setMsg("quickMsg","Face ID konnt net ageschalt ginn. Probéier et méi spéit nach eng Kéier.",true);
+  }
+}
+async function removePasskeys(keys){
+  if(!confirm("Face ID fir däi Kont op all Apparater ausschalten?"))return;
+  setMsg("quickMsg","…");
+  try{
+    for(const k of keys)await auth.removePasskey(k.id);
+    await paintQuick();
+    setMsg("quickMsg","Face ID ass aus ✓");
+  }catch(e){console.warn("[passkey] delete failed",e);setMsg("quickMsg","Konnt Face ID net ausschalten.",true);}
+}
+async function removeFace(){
+  setMsg("quickMsg","…");
+  try{await auth.forgetFace();await paintQuick();setMsg("quickMsg","Gesiicht geläscht ✓");}
+  catch(e){console.warn("[face] forget failed",e);await paintQuick();setMsg("quickMsg","Hei geläscht, mee de Server konnt net erreecht ginn.",true);}
 }
 
 function setMsg(id,t,err){

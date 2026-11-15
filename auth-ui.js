@@ -8,6 +8,13 @@ const USERNAME_SHAPE = /^[A-Za-z0-9_]{3,20}$/;
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 let modal = null;
 let modalLocked = false;
+/* Runs once when the dialog closes or is redrawn: the face scan stops its camera here. */
+let onLeave = null;
+function leave() {
+  const cleanup = onLeave;
+  onLeave = null;
+  cleanup?.();
+}
 function t(key, fallback) {
   return translate(key, fallback);
 }
@@ -30,6 +37,7 @@ function openModal(locked = false) {
   ensureModal().classList.add("open");
 }
 function closeModal() {
+  leave();
   if (!modal) return;
   modalLocked = false;
   modal.classList.remove("open");
@@ -184,7 +192,58 @@ function attachPinPad(length, onComplete) {
   box().querySelector("#authPinHost")?.appendChild(pad.element);
   return pad;
 }
-function loginMarkup(mode, length, method) {
+/* "Mat Face ID aloggen" (passkey) and, on a device where a face was saved,
+ * "Mam Gesiicht aloggen". Both sit under the normal login and only add to it. */
+function quickLoginMarkup(deps) {
+  const buttons = [];
+  if (deps.passkeySupported()) {
+    buttons.push(`<button class="auth-link" id="authPasskey" type="button">${esc(t(
+      "quick.passkey",
+      "Mat Face ID aloggen",
+    ))}</button>`);
+  }
+  if (deps.faceEntries().length) {
+    buttons.push(`<button class="auth-link" id="authFace" type="button">${esc(t(
+      "quick.face",
+      "Mam Gesiicht aloggen",
+    ))}</button>`);
+  }
+  if (!buttons.length) return "";
+  return `<div class="auth-or"><span>${esc(t("quick.or", "oder"))}</span></div>
+    <div class="auth-links">${buttons.join("")}</div>`;
+}
+
+function passkeyError(deps, error) {
+  console.warn("passkey login failed", error);
+  if (deps.passkeyCancelled(error)) {
+    return t(
+      "quick.passkeyNone",
+      "Face ID ofgebrach oder keng Passkey fir ian.lu op dësem Apparat. " +
+        "Mell dech mam PIN un. Am Profil kanns du Face ID aschalten.",
+    );
+  }
+  return t(
+    "quick.passkeyError",
+    "Face ID huet net geklappt. Mell dech w.e.g. mam PIN un.",
+  );
+}
+
+function wireQuickLogin(deps) {
+  box().querySelector("#authPasskey")?.addEventListener("click", async () => {
+    setMessage("…");
+    try {
+      await deps.loginPasskey();
+      closeModal();
+    } catch (error) {
+      setMessage(passkeyError(deps, error), "err");
+    }
+  });
+  box().querySelector("#authFace")?.addEventListener("click", () => {
+    openFaceDialog(deps, { mode: "login", values: fieldValues() });
+  });
+}
+
+function loginMarkup(deps, mode, length, method) {
   const credential = method === "pin"
     ? `${lengthTabs(length)}${pinGroup(
       "pin.enter",
@@ -201,7 +260,7 @@ function loginMarkup(mode, length, method) {
     <button class="auth-go" id="authSubmit">${esc(t(
       "pin.signIn",
       "Umellen",
-    ))}</button>${loginLinks(method)}
+    ))}</button>${quickLoginMarkup(deps)}${loginLinks(method)}
     <div class="auth-msg" id="authMsg"></div>`;
 }
 
@@ -213,11 +272,14 @@ function loginError(error) {
   );
 }
 
-function drawSignIn(deps, length, method, values) {
-  box().innerHTML = loginMarkup("in", length, method);
+function drawSignIn(deps, length, method, values, message) {
+  leave();
+  box().innerHTML = loginMarkup(deps, "in", length, method);
   restoreFields(values);
   wireClose();
   wireModeTabs(deps, "in");
+  wireQuickLogin(deps);
+  if (message) setMessage(message, "err");
   let pad = null;
   const submit = async () => {
     const identifier = value("authIdentifier");
@@ -504,4 +566,148 @@ export function openPinDialog(deps, options = {}) {
     }
   });
   openModal(Boolean(options.required));
+}
+
+/* ---------- face scan dialog ("Mam Gesiicht aloggen") ----------
+ * mode "enroll": signed in, saves the face on this device.
+ * mode "login":  signed out, matches the face against the ones saved here.
+ * Every failure ends on a message plus a way back to the PIN login. */
+
+const FACE_STEP_TEXT = Object.freeze({
+  loading: ["face.loading", "Kamera a Gesiichtserkennung lueden … Déi éischte Kéier dauert dat e bëssen."],
+  straight: ["face.straight", "Kuck riichtaus an d'Kamera."],
+  turn: ["face.turn", "Elo de Kapp lues op eng Säit dréien."],
+  back: ["face.back", "Super. An elo nach eng Kéier riichtaus kucken."],
+});
+const FACE_STEPS = ["straight", "turn", "back"];
+const FACE_STEP_LABELS = Object.freeze([
+  ["face.straightShort", "Riichtaus"],
+  ["face.turnShort", "Kapp dréien"],
+  ["face.backShort", "Erëm riichtaus"],
+]);
+const FACE_DONE_CLOSE_MS = 1200;
+
+const FACE_ERRORS = Object.freeze({
+  camera_denied: ["face.denied", "D'Kamera ass blockéiert. Erlaab se fir ian.lu (Safari: aA → Websäit-Astellungen → Kamera)."],
+  no_camera: ["face.noCamera", "Hei gëtt et keng Kamera, déi ian.lu benotze kann."],
+  load_failed: ["face.loadFailed", "D'Gesiichtserkennung konnt net lueden. Probéier et méi spéit nach eng Kéier."],
+  timeout: ["face.timeout", "Ech hunn däi Gesiicht net richteg gesinn. Probéier et mat méi Liicht nach eng Kéier."],
+  changed: ["face.changed", "Dat war net déiselwecht Persoun. Probéier nach eng Kéier."],
+  no_match: ["face.noMatch", "Ech hunn dech net erkannt. Probéier nach eng Kéier oder mell dech mam PIN un."],
+  invalid_login: ["face.expired", "Däi Gesiicht ass hei net méi aktiv. Mell dech mam PIN un a scann et am Profil nei."],
+  storage: ["face.storage", "Dëse Browser léisst ian.lu näischt späicheren (privat Modus?)."],
+});
+
+function faceErrorText(mode, error) {
+  const known = FACE_ERRORS[error?.code];
+  if (known) return t(known[0], known[1]);
+  return mode === "login"
+    ? t("face.loginError", "Dat huet net geklappt. Mell dech w.e.g. mam PIN un.")
+    : t("face.enrollError", "D'Gesiicht konnt net gespäichert ginn. Probéier et méi spéit nach eng Kéier.");
+}
+
+function faceMarkup(mode) {
+  const title = mode === "login"
+    ? t("quick.face", "Mam Gesiicht aloggen")
+    : t("face.enrollTitle", "Gesiicht scannen");
+  const intro = mode === "login"
+    ? t("face.loginIntro", "Däi Gesiicht gëtt just hei um Apparat verglach.")
+    : t("face.enrollIntro",
+      "Däi Gesiicht gëtt just op dësem Apparat gespäichert, net um Server. " +
+        "Duerno kanns du dech hei mam Gesiicht aloggen. Däi PIN bleift ëmmer.");
+  const steps = FACE_STEPS.map((step, index) => {
+    const [key, fallback] = FACE_STEP_LABELS[index];
+    return `<li data-face-step="${step}">${index + 1}. ${esc(t(key, fallback))}</li>`;
+  }).join("");
+  const back = mode === "login"
+    ? t("face.toPin", "← Mam PIN aloggen")
+    : t("face.close", "Zoumaachen");
+  return `${dialogHead(title)}
+    <p class="pin-note">${esc(intro)}</p>
+    <div class="face-cam"><video id="faceVideo" playsinline muted autoplay></video></div>
+    <ol class="face-steps">${steps}</ol>
+    <div class="auth-msg" id="authMsg" role="status" aria-live="polite"></div>
+    <div class="auth-links">
+      <button class="auth-link" id="faceRetry" type="button" hidden>${esc(t("face.retry", "Nach eng Kéier"))}</button>
+      <button class="auth-link" id="faceBack" type="button">${esc(back)}</button>
+    </div>`;
+}
+
+function showFaceStep(step) {
+  const current = FACE_STEPS.indexOf(step);
+  box().querySelectorAll("[data-face-step]").forEach((item) => {
+    const index = FACE_STEPS.indexOf(item.dataset.faceStep);
+    item.classList.toggle("on", index === current);
+    item.classList.toggle("done", current > index);
+  });
+  const text = FACE_STEP_TEXT[step];
+  if (text) setMessage(t(text[0], text[1]));
+}
+
+async function finishFace(deps, mode, face, scanner) {
+  if (mode === "enroll") {
+    await deps.enrollFace(face);
+    return t("face.saved", "Fäerdeg! Däi Gesiicht ass op dësem Apparat gespäichert.");
+  }
+  const best = scanner.matchFace(face, deps.faceEntries());
+  if (!best) throw Object.assign(new Error("no match"), { code: "no_match" });
+  await deps.loginFace(best.candidate);
+  return t("face.welcome", "Moien {name}!").replace("{name}", best.candidate.username);
+}
+
+export function openFaceDialog(deps, options = {}) {
+  const mode = options.mode === "login" ? "login" : "enroll";
+  leave();
+  ensureModal();
+  modalLocked = false;
+  box().innerHTML = faceMarkup(mode);
+  wireClose();
+  openModal();
+  const goBack = () => {
+    if (mode === "login") drawSignIn(deps, DEFAULT_PIN_LENGTH, "pin", options.values);
+    else closeModal();
+  };
+  box().querySelector("#faceBack").addEventListener("click", goBack);
+  const retry = box().querySelector("#faceRetry");
+  const run = async () => {
+    leave();
+    const controller = new AbortController();
+    onLeave = () => controller.abort();
+    retry.hidden = true;
+    box().querySelector(".face-cam")?.classList.remove("ok", "bad");
+    let scanner;
+    try {
+      scanner = await import("./face-scan.js?v=1");
+    } catch (error) {
+      console.warn("[face] module failed to load", error);
+      setMessage(faceErrorText(mode, { code: "load_failed" }), "err");
+      retry.hidden = false;
+      return;
+    }
+    try {
+      const face = await scanner.scanFace(box().querySelector("#faceVideo"), {
+        signal: controller.signal,
+        onStep: showFaceStep,
+      });
+      if (controller.signal.aborted) return;
+      setMessage("…");
+      const done = await finishFace(deps, mode, face, scanner);
+      if (controller.signal.aborted) return;
+      onLeave = null; // done: closing the dialog now must not count as a cancel
+      box().querySelector(".face-cam")?.classList.add("ok");
+      setMessage(done, "ok");
+      setTimeout(() => {
+        if (box().querySelector("#faceVideo")) closeModal();
+        options.onDone?.();
+      }, FACE_DONE_CLOSE_MS);
+    } catch (error) {
+      if (controller.signal.aborted || error?.code === "cancelled") return;
+      console.warn(`[face] ${mode} failed`, error);
+      box().querySelector(".face-cam")?.classList.add("bad");
+      setMessage(faceErrorText(mode, error), "err");
+      retry.hidden = false;
+    }
+  };
+  retry.addEventListener("click", run);
+  void run();
 }

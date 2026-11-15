@@ -1,4 +1,4 @@
-import { openPinDialog } from "./auth-ui.js?v=10";
+import { openPinDialog } from "./auth-ui.js?v=11";
 import { esc, translate } from "./pin-pad.js?v=5";
 
 const SKIP_PREFIX = "pinBriefSkip:";

@@ -1,4 +1,4 @@
-import * as auth from "./auth.js?v=41";
+import * as auth from "./auth.js?v=42";
 import { validateDeck } from "./ppt-ai.js?v=36";
 
 const TABLE = "decks";
