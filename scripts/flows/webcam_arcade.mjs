@@ -387,7 +387,8 @@ export const flowCamera = {
     const origin = hostOf(h.origin);
     const foreign = log.requests.filter((u) => /^https?:/.test(u) && hostOf(u) !== origin && !/supabase|jsdelivr|esm\.sh/.test(u));
     h.eq(foreign, [], "no request to another host (models + wasm are self-hosted)");
-    const bad = log.errs.filter((e) => !/Failed to load resource/i.test(e));
+    // MediaPipe's wasm prints its own INFO lines (the CPU delegate message) through console.error: not an error
+    const bad = log.errs.filter((e) => !/Failed to load resource/i.test(e) && !/^INFO:/.test(e));
     h.eq(bad, [], "no console errors from the real pipeline");
   },
 };
