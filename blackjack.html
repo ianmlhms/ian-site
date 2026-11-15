@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="lb">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex,follow">
+<!-- Game shell, no crawlable content. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Blackjack — ian.lu</title>
+  <meta name="description" content="Blackjack op ian.lu — spill mat Frënn géint den Dealer, nëmme mat Spillchips." />
+  <link rel="canonical" href="https://ian.lu/blackjack.html" />
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script src="mp-gate.js?v=8" data-game="blackjack"></script>
+<script src="gitter-theme.js?v=1"></script>
+<link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="gitter.css?v=12">
+<script src="theme.js?v=33"></script>
+<style>
+  body{margin:0;min-height:100vh;min-height:100svh;background:var(--paper);color:var(--ink);font-family:"Geist",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--line)}
+  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
+  .bar .code{color:var(--muted);font-size:13px}
+  .wrap{max-width:600px;margin:0 auto;padding:14px 16px 0;display:flex;flex-direction:column;min-height:calc(100svh - 60px);box-sizing:border-box}
+  .mono{font-family:"Geist Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+  .muted{color:var(--muted)}.center{text-align:center}
+  .srt{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+  /* status line */
+  .statline{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;color:var(--muted);padding-bottom:10px;border-bottom:1px solid var(--line)}
+  .statline b{color:var(--ink);font-weight:600}
+  .banner{border:1px solid var(--ink);background:var(--tint);padding:8px 12px;margin-top:10px;text-align:center;font-weight:600;font-size:14px}
+  .warn{border:1px solid var(--danger);color:var(--danger);padding:10px 12px;margin-bottom:12px;font-weight:600}
+  .warn a{color:var(--danger)}
+
+  /* cards */
+  .cards{display:flex;flex-wrap:wrap;align-items:center;min-height:calc(var(--ch) + 2px);--cw:46px;--ch:64px;--cf:15px}
+  .cards.big{--cw:62px;--ch:88px;--cf:20px}
+  .cards.small{--cw:26px;--ch:36px;--cf:11px}
+  .card{position:relative;box-sizing:border-box;width:var(--cw);height:var(--ch);background:var(--white);border:1px solid var(--ink);color:var(--ink);
+    font:600 var(--cf)/1 "Geist Mono",ui-monospace,monospace;display:flex;flex-direction:column;align-items:flex-start;padding:3px 0 0 4px;flex:none}
+  .card + .card{margin-left:calc(var(--cw) * -.28)}
+  .card.red{color:var(--danger)}
+  .card .s{font-size:calc(var(--cf) * .95)}
+  .card .mid{position:absolute;right:4px;bottom:2px;font-size:calc(var(--cf) * 1.6);opacity:.9}
+  .cards.small .mid{display:none}
+  .card.back{background:var(--green);border-color:var(--ink);color:transparent}
+  .card.back::after{content:"";position:absolute;inset:4px;border:1px solid var(--on-green);opacity:.7}
+  .card.fresh{animation:deal .32s var(--ease,ease-out) both}
+  .card.flip{animation:flip .42s ease-out both}
+  @keyframes deal{from{transform:translateY(-26px) scale(.8) rotate(-6deg);opacity:0}to{transform:none;opacity:1}}
+  @keyframes flip{0%{transform:rotateY(90deg)}100%{transform:rotateY(0)}}
+  @media (prefers-reduced-motion:reduce){.card.fresh,.card.flip{animation:none}}
+
+  /* tables of the dealer / me / the others */
+  .zone{padding:12px 0;border-bottom:1px solid var(--line)}
+  .zone h2{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 8px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .zone h2 .n{color:var(--ink);font-size:13px;letter-spacing:0;text-transform:none}
+  .row1{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .total{font:600 22px/1 "Geist Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+  .total.bust{color:var(--danger)}
+  .cards.big + .total,.hbox .total{font-size:34px}
+  .hands{display:flex;gap:12px;flex-wrap:wrap}
+  .hbox{flex:1 1 220px;border:1px solid var(--line);padding:10px;min-width:0}
+  .hbox.cur{border:2px solid var(--green);padding:9px}
+  .hstat{margin-top:6px;font-size:14px;font-weight:600;min-height:20px}
+  .hstat.win{color:var(--green)}.hstat.lose{color:var(--danger)}
+  .me.turn{outline:2px solid var(--green);outline-offset:4px}
+  .stat{display:flex;gap:16px;font-size:13px;color:var(--muted);margin-bottom:8px}
+  .stat b{color:var(--ink);font-weight:600}
+
+  .others{display:flex;flex-direction:column;gap:8px;padding:12px 0}
+  .orow{border:1px solid var(--line);padding:8px 10px;display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center}
+  .orow.turn{border:2px solid var(--green);padding:7px 9px}
+  .orow .nm{font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+  .orow .nm small{font-weight:400;color:var(--muted);font-size:12px}
+  .orow .bt{font-size:13px;text-align:right;color:var(--muted)}
+  .orow .hs{display:flex;gap:10px;flex-wrap:wrap;align-items:center;min-width:0}
+  .orow .hh{display:flex;align-items:center;gap:6px}
+  .orow .hh .total{font-size:15px}
+  .orow .ost{font-size:13px;font-weight:600;text-align:right}
+  .orow .ost.win{color:var(--green)}.orow .ost.lose{color:var(--danger)}
+
+  /* dock */
+  .dock{position:sticky;bottom:0;margin-top:auto;background:var(--paper);border-top:1px solid var(--ink);padding:12px 0 calc(12px + env(safe-area-inset-bottom));z-index:5}
+  body.has-chip .dock{padding-bottom:calc(66px + env(safe-area-inset-bottom))}
+  .dockmsg{text-align:center;font-weight:600;padding:12px 0;min-height:52px;box-sizing:border-box}
+  .acts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  body.gt .bjbtn{min-height:52px;border:1px solid var(--ink);background:var(--white);color:var(--ink);border-radius:0;font:600 16px/1.1 "Geist",system-ui,sans-serif;cursor:pointer;padding:0 14px;touch-action:manipulation}
+  body.gt .bjbtn:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+  body.gt .bjbtn.primary{background:var(--green);border-color:var(--green);color:var(--on-green)}
+  body.gt .bjbtn.sm{min-height:44px;font-size:15px;padding:0 10px}
+  body.gt .bjbtn[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+  body.gt .bjbtn:disabled{opacity:.4;cursor:default}
+  body.gt .bjbtn.wide{width:100%}
+  .betrow{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:10px}
+  .betrow .amt{min-width:90px;text-align:center;font:600 30px/1 "Geist Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+  body.gt .betrow .bjbtn{width:52px;padding:0;font-size:22px}
+  .quick{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:10px}
+  body.gt .quick .bjbtn{padding:0;font-family:"Geist Mono",ui-monospace,monospace}
+
+  /* start / final screens */
+  .panel{padding:18px 0;display:flex;flex-direction:column;gap:14px}
+  .panel p{margin:0}
+  .pchips{display:flex;flex-wrap:wrap;gap:8px}
+  .pchip{border:1px solid var(--line);background:var(--white);padding:6px 12px;font-size:14px}
+  .picker{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .picker .lb{min-width:70px;color:var(--muted);font-size:13px}
+  .win{border:1px solid var(--ink);background:var(--tint);padding:14px 16px;font-size:20px;font-weight:700;text-align:center}
+  table.rank{width:100%;border-collapse:collapse;font-size:15px}
+  table.rank th,table.rank td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left}
+  table.rank th{color:var(--muted);font-size:12px;font-weight:600}
+  table.rank td.num{text-align:right;font-family:"Geist Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;font-weight:600}
+  table.rank th.num{text-align:right}
+</style>
+<script data-goatcounter="https://ianm.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
+  <meta name="theme-color" content="#f6f6f3" media="(prefers-color-scheme: light)" data-gt="light">
+<meta name="theme-color" content="#121314" media="(prefers-color-scheme: dark)" data-gt="dark">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="manifest" href="site.webmanifest">
+</head>
+<body class="gt">
+<header class="bar">
+  <a class="home" href="pixelbreak.html">‹ Arcade</a>
+  <h1>Blackjack</h1>
+  <div class="spacer"></div>
+  <span class="code">Raum <code id="roomc"></code></span>
+</header>
+<div class="wrap" id="app"><p class="muted">Verbindung …</p></div>
+<div id="sr" role="status" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap"></div>
+
+<script src="pixelbreak-config.js"></script>
+<script src="pb/arcade-kit.js?v=50" data-arcade-id="o-blackjack" data-arcade-title="Blackjack" data-arcade-no-score data-arcade-replace=".bar"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
+<script type="module" src="notify-ambient.js?v=40"></script>
+<script>
+/* Blackjack — 2–7 players against the dealer (the host's code), or solo (?ai=1). PLAY CHIPS ONLY: chips live in memory, nowhere else.
+ *
+ * Sync: the HOST owns every state and all randomness (crypto shuffle of a 6-deck shoe). Guests only send intents ("bet", "act").
+ * After every change the host broadcasts ONE public snapshot ("state", counter v + a per-host-session epoch ep); everybody, the host
+ * included, renders only from the latest snapshot. The shoe and the dealer's hole card never leave the host before they are revealed.
+ *
+ * Test hook (play money, harmless): window.__casinoTest = { betMs, turnMs, resultMs, stepMs, deck:["AS","10H",…] } is read once at start.
+ * The timers shrink, and `deck` is dealt in that order (deal order: every bettor's 1st card in seat order, dealer up card, every
+ * bettor's 2nd card, dealer hole card, then hits / dealer draws; a split deals one card to hand 1, then one to hand 2) before the
+ * normal shuffled shoe takes over. */
+const params = new URLSearchParams(location.search);
+const AI = params.get("ai")==="1";
+const room = (params.get("room")||"demo").toLowerCase();
+const role = AI || params.get("role")!=="guest" ? "host" : "guest";
+const $ = (id)=>document.getElementById(id);
+
+/* ---------- constants ---------- */
+const MIN_BET=10, DEALER_STAND=17, MAX_SEATS=7, MAX_NAME=20, MAX_HAND_CARDS=14, MAX_CHIPS=10_000_000;
+const SHOE_DECKS=6, RESHUFFLE_FRACTION=0.25, BLACKJACK_NUM=3, BLACKJACK_DEN=2;
+const ROUND_CHOICES=[5,10,15,20], CHIP_CHOICES=[500,1000,2500,5000], DEF_ROUNDS=10, DEF_CHIPS=1000;
+const QUICK_BETS=[10,25,50,100,250], BET_STEP=10;
+const EARLY_CLOSE_MS=600, SHUFFLE_BANNER_MS=2500, AUTO_START_WAIT_MS=12000;
+const HIDDEN="XX";
+const PHASES=["bet","play","dealer","result","over"];
+const OUTCOMES=["win","blackjack","lose","bust","push"];
+const ACTS=["hit","stand","double","split"];
+const RANKS=["A","2","3","4","5","6","7","8","9","10","J","Q","K"], SUITS=["S","H","D","C"];
+const GLYPH={S:"♠",H:"♥",D:"♦",C:"♣"};
+
+/* ---------- test hook ---------- */
+function readTestHook(){
+  const t=window.__casinoTest;
+  if(t===null||typeof t!=="object") return {deck:[]};
+  const ms=(v)=>Number.isInteger(v)&&v>=0&&v<=600000?v:undefined;
+  const deck=Array.isArray(t.deck)?t.deck.filter(isCard):[];
+  return {betMs:ms(t.betMs),turnMs:ms(t.turnMs),resultMs:ms(t.resultMs),stepMs:ms(t.stepMs),deck};
+}
+function isCard(v){ return typeof v==="string"&&/^(A|[2-9]|10|J|Q|K)[SHDC]$/.test(v); }
+const TEST=readTestHook();
+const TIMING={betMs:TEST.betMs??20000,turnMs:TEST.turnMs??30000,resultMs:TEST.resultMs??5000,stepMs:TEST.stepMs??(window.__casinoTest?150:800)};
+
+/* ---------- cards and totals (pure) ---------- */
+const rankOf=(c)=>c.slice(0,-1), suitOf=(c)=>c.slice(-1);
+function cardValue(c){ const r=rankOf(c); if(r==="A") return 11; return RANKS.indexOf(r)>=9?10:Number(r); }
+function handTotals(cards){
+  let total=0, aces=0;
+  for(const c of cards){ total+=cardValue(c); if(rankOf(c)==="A") aces++; }
+  while(total>21&&aces>0){ total-=10; aces--; }
+  return {total,soft:aces>0};
+}
+function totalLabel(cards){ const {total,soft}=handTotals(cards); return soft&&total<21?`${total-10}/${total}`:String(total); }
+const isTwoCard21=(cards)=>cards.length===2&&handTotals(cards).total===21;
+const isNatural=(hand)=>!hand.split&&isTwoCard21(hand.cards);
+
+/* ---------- randomness + shoe (host only) ---------- */
+function randInt(n){   // uniform in [0,n) without modulo bias
+  const buf=new Uint32Array(1), limit=Math.floor(0x100000000/n)*n;
+  do{ crypto.getRandomValues(buf); }while(buf[0]>=limit);
+  return buf[0]%n;
+}
+function makeShoe(){
+  const cards=[];
+  for(let d=0;d<SHOE_DECKS;d++) for(const r of RANKS) for(const s of SUITS) cards.push(r+s);
+  for(let i=cards.length-1;i>0;i--){ const j=randInt(i+1); [cards[i],cards[j]]=[cards[j],cards[i]]; }   // Fisher–Yates
+  return cards;
+}
+let shoe=[], rigged=[...TEST.deck];
+function drawCard(){
+  if(rigged.length) return rigged.shift();
+  if(!shoe.length) shoe=makeShoe();
+  return shoe.pop();
+}
+function reshuffleIfLow(){
+  if(shoe.length>=SHOE_DECKS*52*RESHUFFLE_FRACTION) return false;
+  shoe=makeShoe(); return true;
+}
+
+/* ---------- game engine (pure: every function returns a NEW state) ---------- */
+const newHand=(bet)=>({cards:[],bet,doubled:false,split:false,done:false,outcome:null,delta:0});
+const newSeat=(p,chips)=>({cid:p.cid,name:p.name.slice(0,MAX_NAME),chips,present:true,bet:0,hands:[],idle:false});
+const canBet=(seat)=>seat.chips>=MIN_BET;
+const setSeat=(g,s,patch)=>({...g,seats:g.seats.map((x,i)=>i===s?{...x,...patch}:x)});
+const setHand=(g,s,h,patch)=>setSeat(g,s,{hands:g.seats[s].hands.map((x,i)=>i===h?{...x,...patch}:x)});
+const seatIndex=(g,cid)=>g.seats.findIndex((s)=>s.cid===cid);
+const canDouble=(seat,hand)=>hand.cards.length===2&&!hand.doubled&&seat.chips>=hand.bet;
+const canSplit=(seat,hand)=>seat.hands.length===1&&hand.cards.length===2&&cardValue(hand.cards[0])===cardValue(hand.cards[1])&&seat.chips>=hand.bet;
+
+function newMatch(players,rounds,chips0){
+  return {phase:"bet",round:0,rounds,chips0,seats:players.map((p)=>newSeat(p,chips0)),dealer:[],holeHidden:true,turn:null,shuffled:false};
+}
+function openBetting(g,shuffled){
+  return {...g,phase:"bet",round:g.round+1,dealer:[],holeHidden:true,turn:null,shuffled,
+    seats:g.seats.map((s)=>({...s,bet:0,hands:[],idle:false}))};
+}
+function placeBet(g,cid,amount){
+  const s=seatIndex(g,cid);
+  if(g.phase!=="bet"||s<0) return null;
+  const seat=g.seats[s];
+  if(!canBet(seat)||seat.bet>0||!Number.isInteger(amount)||amount<MIN_BET||amount>seat.chips) return null;
+  return setSeat(g,s,{bet:amount,chips:seat.chips-amount});
+}
+const bettorsWaiting=(g)=>g.seats.some((s)=>canBet(s)&&s.present&&s.bet===0);
+
+function nextTurn(g){
+  let cur=g;
+  for(let s=0;s<cur.seats.length;s++){
+    for(let h=0;h<cur.seats[s].hands.length;h++){
+      const seat=cur.seats[s];
+      if(seat.hands[h].done) continue;
+      if(seat.idle||!seat.present){ cur=setHand(cur,s,h,{done:true}); continue; }   // timed out or left: stands
+      return {...cur,phase:"play",turn:{s,h}};
+    }
+  }
+  return {...cur,phase:"dealer",turn:null,holeHidden:false};
+}
+function dealRound(g,draw){
+  const bettors=g.seats.map((s,i)=>s.bet>0?i:-1).filter((i)=>i>=0);
+  if(!bettors.length) return {...g,phase:"result",turn:null,holeHidden:false};
+  const cards=bettors.map(()=>[]), dealer=[];
+  bettors.forEach((_,k)=>cards[k].push(draw()));
+  dealer.push(draw());
+  bettors.forEach((_,k)=>cards[k].push(draw()));
+  dealer.push(draw());
+  let next={...g,dealer,holeHidden:true,turn:null};
+  bettors.forEach((s,k)=>{
+    const hand={...newHand(g.seats[s].bet),cards:cards[k]};
+    next=setSeat(next,s,{hands:[{...hand,done:isNatural(hand)}]});   // a natural blackjack stands by itself
+  });
+  const up=cardValue(dealer[0]);
+  if(up>=10&&isTwoCard21(dealer)) return settle({...next,holeHidden:false});   // peek: dealer blackjack ends the round at once
+  return nextTurn(next);
+}
+function timeoutStand(g){
+  if(g.phase!=="play"||!g.turn) return g;
+  const {s,h}=g.turn;
+  return nextTurn(setHand(setSeat(g,s,{idle:true}),s,h,{done:true}));
+}
+function playerAct(g,cid,act,hi,draw){
+  if(g.phase!=="play"||!g.turn) return null;
+  const {s,h}=g.turn, seat=g.seats[s], hand=seat.hands[h];
+  if(seat.cid!==cid||hi!==h) return null;
+  if(act==="stand") return nextTurn(setHand(g,s,h,{done:true}));
+  if(act==="hit"){
+    const cards=[...hand.cards,draw()];
+    return nextTurn(setHand(g,s,h,{cards,done:handTotals(cards).total>=21}));
+  }
+  if(act==="double"){
+    if(!canDouble(seat,hand)) return null;
+    const paid=setSeat(g,s,{chips:seat.chips-hand.bet});
+    return nextTurn(setHand(paid,s,h,{cards:[...hand.cards,draw()],bet:hand.bet*2,doubled:true,done:true}));
+  }
+  if(act==="split"){
+    if(!canSplit(seat,hand)) return null;
+    const aces=rankOf(hand.cards[0])==="A";
+    const make=(c)=>{ const cards=[c,draw()]; return {...newHand(hand.bet),cards,split:true,done:aces||handTotals(cards).total>=21}; };
+    const first=make(hand.cards[0]), second=make(hand.cards[1]);
+    return nextTurn(setSeat(g,s,{chips:seat.chips-hand.bet,hands:[first,second]}));
+  }
+  return null;
+}
+const needsDealer=(g)=>g.seats.some((s)=>s.hands.some((h)=>handTotals(h.cards).total<=21&&!isNatural(h)));
+function dealerStep(g,draw){
+  if(needsDealer(g)&&handTotals(g.dealer).total<DEALER_STAND) return {...g,dealer:[...g.dealer,draw()]};   // stands on every 17, soft too
+  return settle(g);
+}
+function judge(hand,dealerTotal,dealerBlackjack){
+  const total=handTotals(hand.cards).total, bet=hand.bet;
+  if(total>21) return {outcome:"bust",delta:-bet};
+  if(isNatural(hand)) return dealerBlackjack?{outcome:"push",delta:0}:{outcome:"blackjack",delta:Math.floor(bet*BLACKJACK_NUM/BLACKJACK_DEN)};
+  if(dealerBlackjack) return {outcome:"lose",delta:-bet};
+  if(dealerTotal>21||total>dealerTotal) return {outcome:"win",delta:bet};
+  if(total===dealerTotal) return {outcome:"push",delta:0};
+  return {outcome:"lose",delta:-bet};
+}
+function settle(g){
+  const dealerTotal=handTotals(g.dealer).total, dealerBlackjack=isTwoCard21(g.dealer);
+  const seats=g.seats.map((seat)=>{
+    const hands=seat.hands.map((hand)=>({...hand,...judge(hand,dealerTotal,dealerBlackjack)}));
+    const back=hands.reduce((sum,x)=>sum+(x.delta>=0?x.bet+x.delta:0),0);   // stake returns with a win or a push
+    return {...seat,hands,chips:seat.chips+back};
+  });
+  return {...g,seats,phase:"result",turn:null,holeHidden:false};
+}
+function isMatchOver(g){
+  if(g.round>=g.rounds) return true;
+  const alive=g.seats.filter(canBet).length;
+  return g.seats.length>1?alive<=1:alive===0;
+}
+
+/* ---------- untrusted input: validators ---------- */
+const isObject=(v)=>v!==null&&typeof v==="object"&&!Array.isArray(v);
+const isText=(v,max)=>typeof v==="string"&&v.length<=max;
+const isId=(v)=>typeof v==="string"&&/^[a-z0-9]{1,8}$/.test(v);
+const isInt=(v,min,max)=>Number.isInteger(v)&&v>=min&&v<=max;
+const isList=(v,max,check)=>Array.isArray(v)&&v.length<=max&&v.every(check);
+const isHandView=(x)=>isObject(x)&&isList(x.cards,MAX_HAND_CARDS,isCard)&&isInt(x.bet,0,MAX_CHIPS)&&typeof x.done==="boolean"
+  &&(x.outcome===null||OUTCOMES.includes(x.outcome))&&isInt(x.delta,-MAX_CHIPS,MAX_CHIPS);
+const isSeatView=(x)=>isObject(x)&&isId(x.cid)&&isText(x.name,MAX_NAME)&&isInt(x.chips,0,MAX_CHIPS)&&typeof x.present==="boolean"
+  &&isInt(x.bet,0,MAX_CHIPS)&&isList(x.hands,2,isHandView);
+const isDealerView=(d)=>isList(d,MAX_HAND_CARDS,(c,i)=>isCard(c)||(c===HIDDEN&&i===1));
+function isSnapshot(p){
+  if(!isObject(p)||!isInt(p.ep,1,1e9)||!isInt(p.v,0,1e9)||!PHASES.includes(p.phase)) return false;
+  if(!ROUND_CHOICES.includes(p.rounds)||!isInt(p.round,0,p.rounds)||!CHIP_CHOICES.includes(p.chips0)) return false;
+  if(typeof p.shuffled!=="boolean"||!isInt(p.ms,0,600000)||!isDealerView(p.dealer)) return false;
+  if(!isList(p.seats,MAX_SEATS,isSeatView)||!p.seats.length||new Set(p.seats.map((s)=>s.cid)).size!==p.seats.length) return false;
+  if(p.turn===null) return true;
+  return isObject(p.turn)&&isInt(p.turn.s,0,p.seats.length-1)&&isInt(p.turn.h,0,1)&&p.turn.h<p.seats[p.turn.s].hands.length;
+}
+function isMessage(event,p){
+  if(!isObject(p)) return false;
+  if(event==="state") return isSnapshot(p);
+  if(event==="bet") return isId(p.cid)&&isInt(p.amount,1,MAX_CHIPS);
+  if(event==="act") return isId(p.cid)&&ACTS.includes(p.act)&&isInt(p.hi,0,1);
+  return false;
+}
+const onMessage=(event,apply)=>({payload})=>{ if(isMessage(event,payload)) apply(payload); };
+
+/* ---------- identity, config, channel ---------- */
+const cfg=window.PB_CONFIG;
+const cid=(()=>{   // survives a reload of this tab, so a reloading player keeps the seat (the id is not a chip count)
+  const key="bj-cid:"+room;
+  try{ const old=sessionStorage.getItem(key); if(isId(old)) return old; }catch{ /* no storage */ }
+  const fresh=Math.random().toString(36).slice(2,10)||"x1";
+  try{ sessionStorage.setItem(key,fresh); }catch{ /* no storage */ }
+  return fresh;
+})();
+const roomEl=$("roomc"); if(roomEl) roomEl.textContent=AI?"Dealer":room;
+let sb=null, ch=null;
+if(!AI){
+  sb=supabase.createClient(cfg.url.replace(/\/$/,""),cfg.anonKey,{auth:{persistSession:false,autoRefreshToken:false}});
+  ch=sb.channel("bj:"+room,{config:{broadcast:{self:false},presence:{key:cid}}});
+}
+function pickChoice(value,allowed,fallback){ return allowed.includes(value)?value:fallback; }
+const ctxCfg=window.MPGate&&MPGate.ctx&&MPGate.ctx.cfg?MPGate.ctx.cfg:{};
+let setup={rounds:pickChoice(ctxCfg.rounds,ROUND_CHOICES,DEF_ROUNDS),chips:pickChoice(ctxCfg.chips,CHIP_CHOICES,DEF_CHIPS)};
+let name="Spiller";
+if(window.MPGate&&MPGate.code) document.body.classList.add("has-chip");
+
+async function getName(){
+  let n=null;
+  try{ n=localStorage.getItem("playerName"); }catch{ /* no storage */ }
+  if(!n){ try{ n=window.__pbAuth?.session?.user?.user_metadata?.username; }catch{ /* signed out */ } }
+  if(!n) n=window.MPGate&&MPGate.ctx?"Spiller":(prompt("Däin Numm fir d'Spill:")||"Spiller");
+  n=String(n).slice(0,MAX_NAME);
+  try{ localStorage.setItem("playerName",n); }catch{ /* no storage */ }
+  return n;
+}
+function players(){
+  if(AI) return [{cid,name}];
+  const st=ch.presenceState();
+  return Object.keys(st).filter((k)=>isId(k)&&Array.isArray(st[k])&&isObject(st[k][0])&&isText(st[k][0].name,MAX_NAME))
+    .slice(0,MAX_SEATS*2).map((k)=>({cid:k,name:st[k][0].name||"?"}));
+}
+function seatOrder(ps){   // host first, then the lobby's roster order (matched by name), strangers last in join order
+  const roster=(window.MPGate&&MPGate.ctx?MPGate.ctx.roster:[]).map((r)=>String(r.name).slice(0,16));
+  const taken=new Set();
+  const ranked=ps.map((p,i)=>{
+    if(p.cid===cid) return {p,rank:-1,i};
+    const k=roster.findIndex((n,idx)=>!taken.has(idx)&&n===p.name.slice(0,16));
+    if(k>=0) taken.add(k);
+    return {p,rank:k>=0?k:99,i};
+  });
+  return ranked.sort((a,b)=>a.rank-b.rank||a.i-b.i).map((x)=>x.p);
+}
+
+/* ---------- host driver: owns G, timers, shoe, the snapshots ---------- */
+const EPOCH=1+Math.floor(Math.random()*1e9-1);
+let G=null, version=0, timer=null, deadlineAt=0, view=null, viewAt=0;
+function schedule(ms,fn){ clearTimeout(timer); deadlineAt=Date.now()+ms; timer=setTimeout(fn,ms); }
+function hostMsLeft(){ return G&&(G.phase==="bet"||G.phase==="play"||G.phase==="result")?Math.max(0,Math.min(600000,deadlineAt-Date.now())):0; }
+function buildSnapshot(){
+  version+=1;
+  return {ep:EPOCH,v:version,phase:G.phase,round:G.round,rounds:G.rounds,chips0:G.chips0,shuffled:G.shuffled,ms:hostMsLeft(),turn:G.turn,
+    dealer:G.dealer.map((c,i)=>i===1&&G.holeHidden?HIDDEN:c),
+    seats:G.seats.map((s)=>({cid:s.cid,name:s.name,chips:s.chips,present:s.present,bet:s.bet,
+      hands:s.hands.map((h)=>({cards:[...h.cards],bet:h.bet,done:h.done,outcome:h.outcome,delta:h.delta}))}))};
+}
+function publish(){
+  const snap=buildSnapshot();
+  applyView(snap);
+  if(!AI) ch.send({type:"broadcast",event:"state",payload:snap}).catch((e)=>console.warn("[blackjack] state send failed",e));
+}
+function drive(){
+  switch(G.phase){
+    case "bet": schedule(TIMING.betMs,closeBetting); break;
+    case "play": schedule(TIMING.turnMs,onTurnTimeout); break;
+    case "dealer": schedule(TIMING.stepMs,dealerTick); break;
+    case "result": schedule(TIMING.resultMs,afterResult); break;
+    default: clearTimeout(timer);
+  }
+}
+function commit(next){ G=next; drive(); publish(); }
+function startMatch(){
+  const ps=seatOrder(players()).slice(0,MAX_SEATS);
+  if(!AI&&ps.length<2) return;
+  shoe=makeShoe();
+  G=newMatch(ps,setup.rounds,setup.chips);
+  commit(openBetting(G,false));
+}
+function closeBetting(){ if(G&&G.phase==="bet") commit(dealRound(G,drawCard)); }
+function onTurnTimeout(){ if(G&&G.phase==="play") commit(timeoutStand(G)); }
+function dealerTick(){ if(G&&G.phase==="dealer") commit(dealerStep(G,drawCard)); }
+function afterResult(){
+  if(!G||G.phase!=="result") return;
+  if(isMatchOver(G)) commit({...G,phase:"over"});
+  else commit(openBetting(G,reshuffleIfLow()));
+}
+function hostBet(from,amount){
+  if(!G) return;
+  const next=placeBet(G,from,amount);
+  if(!next){ console.warn("[blackjack] bet ignored",{from,amount}); return; }
+  G=next;
+  if(!bettorsWaiting(G)) schedule(EARLY_CLOSE_MS,closeBetting);
+  publish();
+}
+function hostAct(from,act,hi){
+  if(!G) return;
+  const next=playerAct(G,from,act,hi,drawCard);
+  if(!next){ console.warn("[blackjack] action ignored",{from,act,hi}); return; }
+  commit(next);
+}
+function rebindReturners(seats,live){   // a reload brings a new id: a returning player takes their old seat (and chips) back by name
+  const known=new Set(seats.map((s)=>s.cid));
+  return live.reduce((cur,p)=>{
+    if(known.has(p.cid)) return cur;
+    const k=cur.findIndex((s)=>!live.some((x)=>x.cid===s.cid)&&s.name.trim()===p.name.trim());
+    if(k<0) return cur;
+    known.add(p.cid);
+    return cur.map((s,i)=>i===k?{...s,cid:p.cid}:s);
+  },seats);
+}
+function syncPresence(){   // returns true when it published a snapshot. Seats keep chips when someone leaves; a missing player's turn auto-stands, nobody waits for their bet
+  if(!G||AI) return false;
+  const live=players();
+  const seats=rebindReturners(G.seats,live);
+  const here=new Set(live.map((p)=>p.cid));
+  if(seats.every((s,i)=>s.cid===G.seats[i].cid&&s.present===here.has(s.cid))) return false;
+  G={...G,seats:seats.map((s)=>({...s,present:here.has(s.cid)}))};
+  if(G.phase==="play") commit(nextTurn(G));
+  else if(G.phase==="bet"&&!bettorsWaiting(G)){ schedule(EARLY_CLOSE_MS,closeBetting); publish(); }
+  else publish();
+  return true;
+}
+
+/* ---------- client state (guests and host alike render from `view`) ---------- */
+const seen=new Map();            // card key -> last shown code: new cards deal in, the hole card flips
+const ui={stake:MIN_BET,lastBet:MIN_BET,pending:false,bannerUntil:0,bannerTimer:null};
+let hostHere=true, autoStartPending=false, autoStartTimer=null, tickTimer=null;
+const mySeatOf=(v)=>v?v.seats.findIndex((s)=>s.cid===cid):-1;
+const clampStake=(chips)=>Math.max(MIN_BET,Math.min(ui.stake,chips));
+
+function applyView(p){
+  const was=view;
+  if(!was||p.round!==was.round||(p.phase==="bet"&&was.phase!=="bet")) seen.clear();
+  if(p.phase==="bet"&&(!was||was.phase!=="bet"||was.round!==p.round)){
+    ui.stake=ui.lastBet;
+    if(p.shuffled){ ui.bannerUntil=performance.now()+SHUFFLE_BANNER_MS; clearTimeout(ui.bannerTimer); ui.bannerTimer=setTimeout(render,SHUFFLE_BANNER_MS+50); }
+  }
+  view=p; viewAt=performance.now(); ui.pending=false;
+  announceChange(was,p);
+  render();
+}
+const msLeft=()=>view?Math.max(0,view.ms-(performance.now()-viewAt)):0;
+const fmtClock=(ms)=>{ const s=Math.ceil(ms/1000); return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`; };
+const fmtDelta=(d)=>d>0?`+${d}`:d<0?`−${-d}`:"±0";
+const OUTCOME_LABEL={win:"Gewonnen",blackjack:"Blackjack!",lose:"Verluer",bust:"Iwwerkaaft",push:"Onentschidden"};
+const seatBet=(seat)=>seat.hands.length?seat.hands.reduce((n,x)=>n+x.bet,0):seat.bet;
+const roundDelta=(seat)=>seat.hands.reduce((n,x)=>n+x.delta,0);
+
+function announce(msg){ const el=$("sr"); if(el) el.textContent=msg; }
+function announceChange(was,p){
+  const me=mySeatOf(p); if(me<0) return;
+  const seat=p.seats[me];
+  if(p.phase==="bet"&&(!was||was.phase!=="bet"||was.round!==p.round)) announce(`Ronn ${p.round} vun ${p.rounds}. Setz däin Asaz.`);
+  else if(p.phase==="play"&&p.turn&&p.turn.s===me&&!(was&&was.turn&&was.turn.s===me&&was.turn.h===p.turn.h&&was.phase==="play"))
+    announce(`Du bass drun. Däin Total: ${totalLabel(seat.hands[p.turn.h].cards)}.`);
+  else if(p.phase==="result"&&(!was||was.phase!=="result")&&seat.hands.length)
+    announce(seat.hands.map((x)=>`${OUTCOME_LABEL[x.outcome]||""} ${fmtDelta(x.delta)}`).join(", ")+`. Dir hunn ${seat.chips} Jetonen.`);
+  else if(p.phase==="over"&&(!was||was.phase!=="over")) announce("D'Partie ass eriwwer.");
+}
+
+/* ---------- intents (host applies them directly, guests send them) ---------- */
+const PENDING_GUARD_MS=1500;
+function releasePendingSoon(){   // a refused intent never produces a snapshot: unlock the buttons again
+  setTimeout(()=>{ if(ui.pending){ ui.pending=false; render(); } },PENDING_GUARD_MS);
+}
+function sendBet(amount){
+  ui.pending=true; ui.lastBet=amount; releasePendingSoon();
+  if(role==="host") hostBet(cid,amount);
+  else ch.send({type:"broadcast",event:"bet",payload:{cid,amount}}).catch((e)=>console.warn("[blackjack] bet send failed",e));
+}
+function sendAct(act,hi){
+  ui.pending=true; releasePendingSoon(); render();
+  if(role==="host") hostAct(cid,act,hi);
+  else ch.send({type:"broadcast",event:"act",payload:{cid,act,hi}}).catch((e)=>console.warn("[blackjack] action send failed",e));
+}
+
+/* ---------- DOM helpers (peer strings only ever reach the DOM as text) ---------- */
+function h(tag,props,...kids){
+  const el=document.createElement(tag);
+  for(const [k,v] of Object.entries(props||{})){
+    if(v===null||v===undefined||v===false) continue;
+    if(k==="class") el.className=v;
+    else if(k==="text") el.textContent=v;
+    else if(k==="style") for(const [sk,sv] of Object.entries(v)) el.style.setProperty(sk,sv);
+    else if(k.startsWith("on")) el.addEventListener(k.slice(2),v);
+    else el.setAttribute(k,v===true?"":String(v));
+  }
+  for(const kid of kids.flat()){ if(kid!==null&&kid!==undefined&&kid!==false) el.append(kid.nodeType?kid:document.createTextNode(String(kid))); }
+  return el;
+}
+let freshCount=0;
+function cardEl(code,key){
+  const prev=seen.get(key); seen.set(key,code);
+  let extra="";
+  if(prev===undefined){ extra=" fresh"; }
+  else if(prev===HIDDEN&&code!==HIDDEN) extra=" flip";
+  const style=extra?{"animation-delay":`${Math.min(freshCount++,12)*90}ms`}:null;
+  if(code===HIDDEN) return h("div",{class:"card back"+extra,"aria-label":"Verdeckt Kaart",style});
+  const suit=suitOf(code), red=suit==="H"||suit==="D";
+  return h("div",{class:"card"+(red?" red":"")+extra,"aria-label":`${rankOf(code)} ${GLYPH[suit]}`,style},
+    h("span",{class:"r","aria-hidden":"true",text:rankOf(code)}),h("span",{class:"s","aria-hidden":"true",text:GLYPH[suit]}),
+    h("span",{class:"mid","aria-hidden":"true",text:GLYPH[suit]}));
+}
+const cardsEl=(cards,keyPrefix,size)=>h("div",{class:"cards "+size},cards.map((c,i)=>cardEl(c,`${keyPrefix}:${i}`)));
+
+/* ---------- rendering ---------- */
+function render(){
+  if(window.MPGate) MPGate.setOver(!view||view.phase==="over");   // «‹ Lobby» is one tap when no match is running
+  freshCount=0;
+  const nodes=[];
+  if(!AI&&role!=="host"&&!hostHere)
+    nodes.push(h("div",{class:"warn"},"Den Host huet de Raum verlooss — d'Spill kann net weidergoen. ",h("a",{href:"pixelbreak.html",text:"Zréck bei d'Spiller"})));
+  if(!view) nodes.push(startScreen());
+  else if(view.phase==="over") nodes.push(finalScreen());
+  else nodes.push(...tableScreen());
+  $("app").replaceChildren(...nodes);
+  clearInterval(tickTimer);
+  if(view&&view.ms>0) tickTimer=setInterval(tick,250);
+  tick();
+}
+function tick(){
+  const left=msLeft();
+  document.querySelectorAll("[data-cd]").forEach((el)=>{ el.textContent=fmtClock(left); });
+}
+const cd=()=>h("span",{class:"mono","data-cd":"1"});
+
+function phaseLabel(v){
+  return {bet:"Asazzäit",play:"Spillt",dealer:"Dealer ass drun",result:"Resultat",over:"Eriwwer"}[v.phase];
+}
+function tableScreen(){
+  const v=view, me=mySeatOf(v);
+  const bannerOn=v.shuffled&&v.phase==="bet"&&performance.now()<ui.bannerUntil;
+  const status=h("div",{class:"statline"},
+    h("span",{},"Ronn ",h("b",{class:"mono",text:`${v.round} / ${v.rounds}`})),
+    h("span",{id:"phaseLbl"},phaseLabel(v),v.ms>0&&v.phase!=="result"?" · ":"",v.ms>0&&v.phase!=="result"?cd():null));
+  const table=h("div",{class:"table","data-phase":v.phase,"data-round":v.round,style:{display:"contents"}},
+    status,
+    bannerOn?h("div",{class:"banner",id:"shuffleBanner"},"Nei gemëscht"):null,
+    dealerZone(v),
+    me>=0?myZone(v,me):null,
+    othersZone(v,me),
+    dock(v,me));
+  return [table];
+}
+function dealerZone(v){
+  const shown=v.dealer.filter((c)=>c!==HIDDEN), hidden=v.dealer.includes(HIDDEN);
+  const total=!v.dealer.length?"":hidden?"?":totalLabel(shown);
+  const bj=!hidden&&isTwoCard21(shown);
+  const bust=!hidden&&handTotals(shown).total>21;
+  return h("section",{class:"zone dealer","aria-label":"Dealer"},
+    h("h2",{},"Dealer",h("span",{class:"n",text:bj?"Blackjack!":bust?"Iwwerkaaft":""})),
+    h("div",{class:"row1"},cardsEl(v.dealer,"d","big"),v.dealer.length?h("span",{class:"total"+(bust?" bust":""),id:"dealerTotal",text:total}):h("span",{class:"muted",text:"…"})));
+}
+function handStatus(v,seat,hand,isCurrent){
+  if(hand.outcome) return {text:`${OUTCOME_LABEL[hand.outcome]} ${fmtDelta(hand.delta)}`,cls:hand.delta>0?"win":hand.delta<0?"lose":""};
+  const total=handTotals(hand.cards).total;
+  if(total>21) return {text:"Iwwerkaaft",cls:"lose"};
+  if(seat.hands.length===1&&isTwoCard21(hand.cards)) return {text:"Blackjack!",cls:"win"};
+  if(isCurrent) return {text:"Drun",cls:""};
+  return {text:hand.done?"Bleift":"Waart",cls:""};
+}
+function myZone(v,me){
+  const seat=v.seats[me], myTurn=v.phase==="play"&&v.turn&&v.turn.s===me;
+  const hands=seat.hands.map((hand,i)=>{
+    const cur=myTurn&&v.turn.h===i, st=handStatus(v,seat,hand,cur), total=handTotals(hand.cards).total;
+    return h("div",{class:"hbox"+(cur?" cur":""),"data-total":total,"data-outcome":hand.outcome||"","data-hand":i},
+      h("div",{class:"row1"},cardsEl(hand.cards,`s${me}:${i}`,"big"),h("span",{class:"total"+(total>21?" bust":""),"data-myTotal":"1",text:totalLabel(hand.cards)})),
+      h("div",{class:"hstat "+st.cls,text:st.text}));
+  });
+  return h("section",{class:"zone me"+(myTurn?" turn":""),id:"me","aria-label":"Däin Hand","data-chips":seat.chips},
+    h("h2",{},"Du",h("span",{class:"n",text:seat.name})),
+    h("div",{class:"stat"},h("span",{},"Jetonen ",h("b",{class:"mono",id:"myChips",text:seat.chips})),
+      seat.bet||seat.hands.length?h("span",{},"Asaz ",h("b",{class:"mono",id:"myBet",text:seatBet(seat)})):null),
+    hands.length?h("div",{class:"hands"},hands):h("p",{class:"muted",text:seatNote(v,seat)}));
+}
+function seatNote(v,seat){
+  if(!seat.present) return "Net méi do";
+  if(seat.chips<MIN_BET) return "Pleite — du kucks zou";
+  if(v.phase==="bet") return seat.bet?"Asaz gesat":"Iwwerleet nach …";
+  return "Setzt dës Ronn aus";
+}
+function othersZone(v,me){
+  const rows=v.seats.map((seat,i)=>({seat,i})).filter(({i})=>i!==me).map(({seat,i})=>{
+    const turn=v.phase==="play"&&v.turn&&v.turn.s===i;
+    const hands=seat.hands.map((hand,k)=>{
+      const st=handStatus(v,seat,hand,turn&&v.turn.h===k), total=handTotals(hand.cards).total;
+      return h("div",{class:"hh","data-total":total,"data-outcome":hand.outcome||""},cardsEl(hand.cards,`s${i}:${k}`,"small"),
+        h("span",{class:"total"+(total>21?" bust":""),text:totalLabel(hand.cards)}),
+        h("span",{class:"ost "+st.cls,text:st.text}));
+    });
+    return h("div",{class:"orow"+(turn?" turn":""),"data-seat":i,"data-cid":seat.cid},
+      h("div",{class:"nm"},seat.name," ",h("small",{class:"mono",text:`${seat.chips}`})),
+      h("div",{class:"bt"},seat.hands.length||seat.bet?h("span",{class:"mono",text:`Asaz ${seatBet(seat)}`}):h("span",{text:seatNote(v,seat)})),
+      hands.length?h("div",{class:"hs",style:{"grid-column":"1 / -1"}},hands):null);
+  });
+  return rows.length?h("section",{class:"others","aria-label":"Déi aner Spiller"},rows):null;
+}
+
+/* ---- dock: bet panel, action buttons, or a waiting line ---- */
+function dock(v,me){
+  const body=dockBody(v,me);
+  return h("div",{class:"dock",id:"dock"},body);
+}
+function dockBody(v,me){
+  if(me<0) return h("div",{class:"dockmsg muted",text:"Du kucks zou."});
+  const seat=v.seats[me];
+  if(v.phase==="bet") return betPanel(v,seat);
+  if(v.phase==="play"){
+    if(v.turn&&v.turn.s===me) return actionPanel(v,me);
+    const t=v.turn?v.seats[v.turn.s]:null;
+    return h("div",{class:"dockmsg",id:"waitMsg"},t?`${t.name} ass drun … `:"Dealer ass drun … ",cd());
+  }
+  if(v.phase==="dealer") return h("div",{class:"dockmsg",text:"Dealer ass drun …"});
+  return h("div",{class:"dockmsg",id:"waitMsg"},"Nächst Ronn kënnt gläich … ");
+}
+function betPanel(v,seat){
+  if(seat.chips<MIN_BET&&!seat.bet) return h("div",{class:"dockmsg",text:"Pleite — du kucks zou."});
+  if(seat.bet>0){
+    const waiting=v.seats.filter((s)=>s.present&&s.chips>=MIN_BET&&s.bet===0).length;
+    return h("div",{class:"dockmsg",id:"waitMsg"},`Asaz ${seat.bet} gesat · waart op ${waiting} aner … `,cd());
+  }
+  const stake=clampStake(seat.chips);
+  ui.stake=stake;
+  const setStake=(n)=>{ ui.stake=Math.max(MIN_BET,Math.min(n,seat.chips)); render(); };
+  const quick=[...QUICK_BETS,"Max"].map((q)=>{
+    const amt=q==="Max"?seat.chips:q;
+    return h("button",{type:"button",class:"bjbtn sm",disabled:amt>seat.chips||amt<MIN_BET,"data-amt":amt,"aria-pressed":String(stake===amt),onclick:()=>setStake(amt),text:String(q)});
+  });
+  return h("div",{id:"betPanel"},
+    h("div",{class:"betrow"},
+      h("button",{type:"button",class:"bjbtn",id:"betMinus","aria-label":"Manner setzen",disabled:stake<=MIN_BET,onclick:()=>setStake(stake-BET_STEP),text:"−"}),
+      h("span",{class:"amt",id:"betAmt","aria-live":"polite",text:String(stake)}),
+      h("button",{type:"button",class:"bjbtn",id:"betPlus","aria-label":"Méi setzen",disabled:stake>=seat.chips,onclick:()=>setStake(stake+BET_STEP),text:"+"})),
+    h("div",{class:"quick"},quick),
+    h("button",{type:"button",class:"bjbtn primary wide",id:"betGo",disabled:ui.pending,onclick:()=>sendBet(stake)},`Setz ${stake}`),
+    h("div",{class:"muted center",style:{"font-size":"13px","margin-top":"6px"}},"Zäit: ",cd()));
+}
+function actionPanel(v,me){
+  const seat=v.seats[me], hi=v.turn.h, hand=seat.hands[hi];
+  const btn=(id,label,act,primary)=>h("button",{type:"button",class:"bjbtn"+(primary?" primary":""),id,disabled:ui.pending,onclick:()=>sendAct(act,hi),text:label});
+  const asSeat={chips:seat.chips,hands:seat.hands};
+  return h("div",{id:"actions"},
+    h("div",{class:"muted center",style:{"font-size":"13px","margin-bottom":"8px"},id:"turnMsg"},"Du bass drun · ",cd()),
+    h("div",{class:"acts"},
+      btn("hitBtn","Nach eng Kaart","hit",true),btn("standBtn","Bleiwen","stand",false),
+      canDouble(asSeat,hand)?btn("doubleBtn","Verduebelen","double",false):null,
+      canSplit(asSeat,hand)?btn("splitBtn","Deelen","split",false):null));
+}
+
+/* ---- start (solo pickers / host waiting room / guest waiting) and final screens ---- */
+function chipPicker(label,key,choices,id){
+  return h("div",{class:"picker",id},h("span",{class:"lb",text:label}),
+    choices.map((c)=>h("button",{type:"button",class:"bjbtn sm",style:{"min-width":"64px"},"data-v":c,"aria-pressed":String(setup[key]===c),
+      onclick:()=>{ setup={...setup,[key]:c}; render(); },text:String(c)})));
+}
+function startScreen(){
+  const ps=AI?[]:seatOrder(players());
+  const pchips=h("div",{class:"pchips"},ps.map((p)=>h("span",{class:"pchip"},p.name,p.cid===cid?" (du)":"")));
+  if(AI)
+    return h("div",{class:"panel"},
+      h("p",{class:"muted center",text:"Du géint den Dealer. Blackjack bezilt 3:2, den Dealer bleift op all 17."}),
+      chipPicker("Ronnen","rounds",ROUND_CHOICES,"pickRounds"),chipPicker("Jetonen","chips",CHIP_CHOICES,"pickChips"),
+      h("button",{type:"button",class:"bjbtn primary wide",id:"startBtn",onclick:startMatch,text:"Spill starten"}));
+  if(role==="host")
+    return h("div",{class:"panel"},pchips,
+      h("p",{class:"muted center",text:`${setup.rounds} Ronnen · ${setup.chips} Jetonen · 2 bis ${MAX_SEATS} Spiller géint den Dealer`}),
+      h("button",{type:"button",class:"bjbtn primary wide",id:"startBtn",disabled:ps.length<2,onclick:startMatch,text:ps.length<2?"Waart op Spiller …":"Spill starten"}));
+  return h("div",{class:"panel"},pchips,h("p",{class:"muted center",text:`${setup.rounds} Ronnen · ${setup.chips} Jetonen · waart bis den Host ufänkt …`}));
+}
+function finalScreen(){
+  const v=view, ranked=v.seats.map((s,i)=>({s,i})).sort((a,b)=>b.s.chips-a.s.chips||a.i-b.i).map((x)=>x.s);
+  let banner;
+  if(v.seats.length===1){
+    const d=ranked[0].chips-v.chips0;
+    banner=d>0?`🏆 ${ranked[0].name} gewënnt!`:d===0?"🤝 Onentschidden!":"Den Dealer gewënnt.";
+  } else {
+    const tie=ranked[1].chips===ranked[0].chips;
+    banner=tie?"🤝 Onentschidden!":`🏆 ${ranked[0].name}${ranked[0].cid===cid?" (du)":""} gewënnt!`;
+  }
+  const again=role==="host"
+    ?h("button",{type:"button",class:"bjbtn primary wide",id:"againBtn",onclick:playAgain,text:"Nach eng Partie"})
+    :h("p",{class:"muted center",text:"Waart op den Host …"});
+  return h("div",{class:"panel","data-phase":"over"},
+    h("div",{class:"win",id:"banner",text:banner}),
+    h("table",{class:"rank"},h("thead",{},h("tr",{},h("th",{text:"#"}),h("th",{text:"Spiller"}),h("th",{class:"num",text:"Jetonen"}))),
+      h("tbody",{},ranked.map((s,i)=>h("tr",{"data-cid":s.cid},h("td",{class:"mono",text:String(i+1)}),
+        h("td",{},s.name,s.cid===cid?" (du)":"",s.chips<MIN_BET?h("span",{class:"muted",text:" · Pleite"}):null),h("td",{class:"num",text:String(s.chips)}))))),
+    again);
+}
+function playAgain(){
+  if(role!=="host") return;
+  if(AI){ G=null; view=null; clearTimeout(timer); seen.clear(); render(); return; }
+  startMatch();
+}
+
+/* ---------- start-up ---------- */
+function onState(p){
+  if(role==="host") return;
+  if(view&&p.ep===view.ep&&p.v<=view.v) return;   // older or duplicate snapshot
+  applyView(p);
+}
+function maybeAutoStart(){
+  if(!autoStartPending||G) return;
+  if(players().length>=MPGate.ctx.roster.length) fireAutoStart();
+}
+function fireAutoStart(){
+  if(!autoStartPending) return;
+  autoStartPending=false; clearTimeout(autoStartTimer);
+  if(!G&&players().length>=2) startMatch();
+}
+let lastCids="";
+function onPresence(){
+  const st=ch.presenceState();
+  const hh=role==="host"||Object.values(st).some((m)=>Array.isArray(m)&&isObject(m[0])&&m[0].role==="host");
+  const hostChanged=hh!==hostHere; hostHere=hh;
+  const cids=players().map((p)=>p.cid).sort().join(",");
+  const changed=cids!==lastCids; lastCids=cids;
+  if(role==="host"){
+    if(!syncPresence()&&G&&changed) publish();   // a newcomer or reloader gets the current snapshot
+  }
+  if(!view||hostChanged) render();
+  maybeAutoStart();
+}
+
+if(AI){
+  const bar=document.querySelector(".bar h1"); if(bar) bar.textContent="Blackjack – géint den Dealer";
+  try{ name=localStorage.getItem("playerName")||window.__pbAuth?.session?.user?.user_metadata?.username||"Du"; }catch{ name="Du"; }
+  render();
+} else {
+  ch.on("broadcast",{event:"state"},onMessage("state",onState))
+    .on("broadcast",{event:"bet"},onMessage("bet",(p)=>{ if(role==="host") hostBet(p.cid,p.amount); }))
+    .on("broadcast",{event:"act"},onMessage("act",(p)=>{ if(role==="host") hostAct(p.cid,p.act,p.hi); }))
+    .on("presence",{event:"sync"},onPresence);
+  autoStartPending=!!(window.MPGate&&MPGate.ctx&&role==="host");
+  render();
+  if(!(window.MPGate&&window.MPGate.redirecting)){   // mp-gate.js sends a bare visit to the lobby (lobby.html)
+    ch.subscribe(async (s)=>{
+      if(s!=="SUBSCRIBED") return;
+      name=await getName();
+      await ch.track({name,role});
+      render();
+      if(autoStartPending) autoStartTimer=setTimeout(fireAutoStart,AUTO_START_WAIT_MS);
+    });
+  }
+}
+</script>
+  <script type="module" src="rtc-ring.js?v=36"></script>
+  <script type="module" src="class-gate.js?v=37"></script>
+</body>
+</html>

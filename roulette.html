@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="lb">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex,follow">
+<!-- Game shell, no crawlable content. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Roulette — ian.lu</title>
+  <meta name="description" content="Roulette op ian.lu — mat Spill-Jetonen, 2–8 Spiller um selwechten Dësch oder eleng." />
+  <link rel="canonical" href="https://ian.lu/roulette.html" />
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script src="mp-gate.js?v=8" data-game="roulette"></script>
+<script src="gitter-theme.js?v=1"></script>
+<link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="gitter.css?v=12">
+<script src="theme.js?v=33"></script>
+<style>
+  body{margin:0;min-height:100vh;min-height:100svh;background:var(--bg);color:var(--text);font-family:var(--font-display)}
+  .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
+  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
+  .bar .code{color:var(--muted);font-size:13px}.bar code{background:var(--card2);padding:2px 8px;border-radius:0;color:var(--accent2-text)}
+  .mono{font-family:"Geist Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+  .muted{color:var(--muted)}.center{text-align:center}
+  .srt{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  [hidden]{display:none !important}
+
+  .wrap{max-width:560px;margin:0 auto;padding:12px 16px 24px}
+  body.has-chip .wrap{padding-bottom:140px}
+  body.has-chip::after{content:"";position:fixed;left:0;right:0;bottom:0;height:calc(60px + env(safe-area-inset-bottom));background:var(--paper);border-top:1px solid var(--soft);z-index:800}
+
+  .rbtn{min-height:44px;padding:0 16px;border:1px solid var(--ink);background:transparent;color:var(--ink);border-radius:0;font:600 15px/1 var(--font-display);cursor:pointer;touch-action:manipulation}
+  .rbtn:hover:not(:disabled){border-color:var(--green);color:var(--green)}
+  .rbtn:disabled{opacity:.45;cursor:default}
+  .rbtn.primary{background:var(--green);border-color:var(--green);color:var(--on-green);min-height:52px;font-weight:700}
+  .rbtn.primary:hover:not(:disabled){color:var(--on-green);filter:none;background:var(--green)}
+  .rbtn.block{display:block;width:100%}
+  .rbtn:focus-visible,.cell:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+  .seg{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:6px 0 14px}
+  .seg .rbtn{min-width:64px}
+  .seg .rbtn[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+  .lbl{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.6px;margin:14px 0 4px;text-align:center}
+  .banner{background:var(--tint);border:1px solid var(--soft);padding:14px 16px;margin:6px 0 14px;font-size:18px;font-weight:800;text-align:center}
+  .warn{border-color:var(--danger);color:var(--danger);font-size:14px;font-weight:600}
+
+  /* play layout: phone = one column, wide = table beside wheel */
+  .play{display:grid;gap:10px;grid-template-columns:minmax(0,1fr);grid-template-areas:"stat" "wheel" "hist" "tbl" "players" "bar"}
+  .stat{grid-area:stat}.wheelbox{grid-area:wheel}.hist{grid-area:hist}.tblbox{grid-area:tbl}.players{grid-area:players}.bet-bar{grid-area:bar}
+  @media (min-width:900px){
+    .wrap{max-width:1080px}
+    .play{grid-template-columns:minmax(300px,380px) minmax(0,1fr);grid-template-areas:"stat tbl" "wheel tbl" "hist tbl" "players tbl" "bar bar";align-items:start}
+  }
+
+  .stat{display:flex;align-items:center;gap:12px;flex-wrap:wrap;border:1px solid var(--soft);padding:8px 12px;background:var(--white);position:relative}
+  .stat b{font-size:15px}
+  .stat .grow{flex:1}
+  .stat .timer{font-size:20px;font-weight:700;min-width:3.2ch;text-align:right}
+  .stat .tbar{position:absolute;left:0;bottom:0;height:3px;background:var(--green);width:0}
+
+  .wheelbox{display:flex;gap:12px;align-items:center;border:1px solid var(--soft);padding:10px;background:var(--white)}
+  .wheelbox svg{width:min(44vw,180px);height:auto;flex:none;display:block}
+  @media (min-width:900px){.wheelbox svg{width:150px}}
+  .rpanel{flex:1;min-width:0;text-align:left}
+  .rpanel .cap{font-size:13px;color:var(--muted);margin-top:6px;line-height:1.35}
+  .rpanel .me{font-weight:700;margin-top:6px;font-size:15px}
+  .numtile{display:inline-flex;align-items:center;justify-content:center;min-width:64px;height:64px;font-size:34px;font-weight:700;border:1px solid var(--ink)}
+  .numtile.sm{min-width:30px;height:30px;font-size:14px;border-width:1px}
+  .c-r{background:var(--danger);color:var(--on-green)}
+  .c-b{background:var(--ink);color:var(--paper)}
+  .c-g{background:var(--green);color:var(--on-green)}
+  .c-n{background:var(--sunk);color:var(--muted)}
+  .hist{display:flex;gap:4px;align-items:center;min-height:30px;overflow:hidden}
+  .hist .lblh{font-size:12px;color:var(--muted);margin-right:4px;flex:none}
+
+  /* betting table: dozens | 3 number columns | outside bets */
+  .tbl{display:grid;grid-template-columns:54px repeat(3,minmax(0,1fr)) 82px;grid-auto-rows:minmax(44px,auto);gap:1px;background:var(--soft);border:1px solid var(--soft)}
+  .cell{position:relative;display:flex;align-items:center;justify-content:center;min-width:0;padding:0;border:0;border-radius:0;background:var(--white);color:var(--ink);font:600 12px/1.15 var(--font-display);cursor:pointer;touch-action:manipulation;text-align:center;overflow:hidden}
+  .cell.n{font:600 17px/1 "Geist Mono",ui-monospace,monospace}
+  .cell.c-r{background:var(--danger);color:var(--on-green)}
+  .cell.c-b{background:var(--ink);color:var(--paper)}
+  .cell.c-g{background:var(--green);color:var(--on-green)}
+  .cell:disabled{cursor:default}
+  .cell.mine{box-shadow:inset 0 0 0 2px var(--green),inset 0 0 0 4px var(--paper)}
+  .cell.won{box-shadow:inset 0 0 0 2px var(--paper),inset 0 0 0 5px var(--ink)}
+  .cell.mine.won{box-shadow:inset 0 0 0 2px var(--paper),inset 0 0 0 5px var(--green)}
+  .cell .l2{display:block;font-size:10px;font-weight:500;opacity:.85}
+  .mk{position:absolute;right:2px;bottom:2px;left:2px;display:flex;flex-wrap:wrap;gap:1px;justify-content:flex-end;align-items:center;pointer-events:none}
+  .mk b{font:700 10px/1 "Geist Mono",ui-monospace,monospace;background:var(--paper);color:var(--ink);border:1px solid var(--ink);padding:1px 3px}
+  .tg{display:inline-flex;align-items:center;justify-content:center;min-width:14px;height:14px;padding:0 2px;font:700 9px/1 var(--font-display);border:1px solid var(--ink);background:var(--paper);color:var(--ink)}
+  .tg.me{background:var(--green);border-color:var(--green);color:var(--on-green)}
+  .tblbox .hint{font-size:12px;color:var(--muted);margin:6px 0 0;text-align:center}
+
+  .players{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--soft);border:1px solid var(--soft)}
+  .players li{background:var(--white);padding:6px 10px;display:grid;grid-template-columns:auto 1fr auto;gap:2px 8px;align-items:center;min-width:0}
+  .players li:last-child:nth-child(odd){grid-column:1 / -1}
+  .players .nm{font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .players .ch{font-size:14px;font-weight:700}
+  .players .st{grid-column:1 / -1;font-size:12px;color:var(--muted);min-height:15px}
+  .players .st .pos{color:var(--green);font-weight:700}.players .st .neg{color:var(--danger);font-weight:700}
+  .players li.out .nm{color:var(--muted);text-decoration:line-through}
+  @media (min-width:900px){.players{grid-template-columns:minmax(0,1fr)}}
+
+  .bet-bar{position:sticky;bottom:0;z-index:700;background:var(--paper);border:1px solid var(--ink);padding:8px 10px;display:grid;gap:8px}
+  body.has-chip .bet-bar{bottom:calc(64px + env(safe-area-inset-bottom))}
+  .bet-bar .info{display:flex;gap:14px;align-items:baseline;font-size:13px;color:var(--muted);flex-wrap:wrap}
+  .bet-bar .info b{color:var(--ink);font-size:15px}
+  .chips{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+  .chips .rbtn{padding:0;font:700 16px/1 "Geist Mono",ui-monospace,monospace}
+  .chips .rbtn[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  .acts{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:6px}
+
+  .rank{width:100%;border-collapse:collapse;font-size:15px;margin:8px 0 16px}
+  .rank th,.rank td{padding:10px 8px;border-bottom:1px solid var(--soft);text-align:left}
+  .rank th{color:var(--muted);font-size:12px}.rank td.num{text-align:right;font-weight:700}
+  .waitlist{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px;justify-content:center}
+  .pchip{background:var(--card);border:1px solid var(--border);padding:6px 12px;font-size:14px}
+
+  @media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
+</style>
+<script data-goatcounter="https://ianm.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
+  <meta name="theme-color" content="#f6f6f3" media="(prefers-color-scheme: light)" data-gt="light">
+<meta name="theme-color" content="#121314" media="(prefers-color-scheme: dark)" data-gt="dark">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="manifest" href="site.webmanifest">
+</head>
+<body class="gt">
+<header class="bar">
+  <a class="home" href="pixelbreak.html">‹ Arcade</a>
+  <h1>Roulette</h1>
+  <div class="spacer"></div>
+  <span class="code">Raum <code id="roomc"></code></span>
+</header>
+<div class="wrap">
+  <div id="hostWarn" class="banner warn" hidden>Den Host huet de Raum verlooss — d'Spill kann net weidergoen. <a href="pixelbreak.html">Zréck bei d'Spiller</a></div>
+  <section id="wait" hidden></section>
+  <section id="over" hidden></section>
+  <section id="play" class="play" hidden>
+    <div class="stat" id="status">
+      <b id="stRound">Ronn 1 / 10</b>
+      <span class="muted" id="stDone"></span>
+      <span class="grow"></span>
+      <span class="timer mono" id="stTimer" aria-hidden="true"></span>
+      <i class="tbar" id="stBar"></i>
+    </div>
+    <div class="wheelbox">
+      <svg id="wheelSvg" viewBox="0 0 200 200" role="img" aria-label="Roulette-Rad"></svg>
+      <div class="rpanel">
+        <div id="rTile" class="numtile c-n mono">?</div>
+        <div id="rCap" class="cap"></div>
+        <div id="rMe" class="me mono"></div>
+      </div>
+    </div>
+    <div class="hist" id="hist" aria-label="Leschte Nummeren"></div>
+    <div class="tblbox">
+      <div class="tbl" id="tbl" role="group" aria-label="Roulette-Dësch"></div>
+      <p class="hint">Tipp op e Feld fir ze setzen, nach eng Kéier fir méi.</p>
+    </div>
+    <ul class="players" id="plist" aria-label="Spiller"></ul>
+    <div class="bet-bar" id="bar">
+      <div class="info"><span>Fräi <b class="mono" id="bFree">0</b></span><span>Asaz <b class="mono" id="bStake">0</b></span><span id="bNote"></span></div>
+      <div class="chips" id="chipPick" role="group" aria-label="Jeton wielen"></div>
+      <div class="acts">
+        <button type="button" class="rbtn" id="bClear">Ewech</button>
+        <button type="button" class="rbtn primary" id="bDone">Fäerdeg</button>
+      </div>
+    </div>
+  </section>
+</div>
+<div id="sr" role="status" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap"></div>
+
+<script src="pixelbreak-config.js"></script>
+<script src="pb/arcade-kit.js?v=50" data-arcade-id="o-roulette" data-arcade-title="Roulette" data-arcade-no-score data-arcade-replace=".bar"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
+<script type="module" src="notify-ambient.js?v=40"></script>
+<script>
+/* Roulette (European, single zero) — play chips only: nothing stored, nothing recorded.
+ *
+ * Sync: the HOST owns all state and all randomness (crypto). After every change it broadcasts ONE public snapshot
+ * (event "state", counter v; guests drop older ones) and renders from the same snapshot itself. Guests only send an
+ * intent ("act": their whole bet map + done flag), which the host validates (phase, chips, known bet keys) before using.
+ * Animations are local: the snapshot carries the phase + the remaining ms (not a clock), the spin lands on snapshot.result.
+ * Solo (?ai=1): no channel; the same host engine runs locally with just you.
+ *
+ * Test hook (play money only, normal players never set it): window.__casinoTest = { betMs, spinMs, resultMs, rig:[n1,n2,…] }
+ * — shorter timers, and rig = the winning numbers of round 1, 2, … in order.
+ */
+"use strict";
+const params = new URLSearchParams(location.search);
+const AI = params.get("ai") === "1";
+const room = (params.get("room") || "demo").toLowerCase();
+const role = params.get("role") === "guest" ? "guest" : "host";
+const cid = Math.random().toString(36).slice(2, 10);
+const $ = (id) => document.getElementById(id);
+$("roomc").textContent = AI ? "Solo" : room;
+
+/* ---------- constants ---------- */
+const WHEEL = [0,32,15,19,4,21,2,25,17,34,6,27,13,36,11,30,8,23,10,5,24,16,33,1,20,14,31,9,22,18,29,7,28,12,35,3,26];
+const POCKETS = WHEEL.length, POCKET_DEG = 360 / POCKETS;
+const RED = new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
+const CHIP_VALUES = [10, 50, 100, 500];
+const ROUND_CHOICES = [5, 10, 15, 20], CHIP_CHOICES = [500, 1000, 2500, 5000];
+const DEF_ROUNDS = 10, DEF_CHIPS = 1000;
+const HISTORY_MAX = 12, MAX_SEATS = 8, MAX_NAME = 80, MAX_CHIPS = 1000000;
+const AUTO_START_WAIT_MS = 12000;
+const REV_WHEEL = 3, REV_BALL = 5, R_BALL_OUT = 94, R_BALL_IN = 76;
+const T = window.__casinoTest || {};
+const msOr = (v, d) => (Number.isFinite(v) && v >= 50 && v <= 120000 ? v : d);
+const BET_MS = msOr(T.betMs, 20000), SPIN_MS = msOr(T.spinMs, 5000), RESULT_MS = msOr(T.resultMs, 4000);
+const RIG = Array.isArray(T.rig) ? T.rig.filter((n) => Number.isInteger(n) && n >= 0 && n <= 36) : [];
+const reduceMotion = () => window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ---------- bet definitions: key -> label, payout multiplier (stake comes back on top), winning test ---------- */
+const BET_DEFS = (() => {
+  const d = {};
+  for (let n = 0; n <= 36; n++) d["n" + n] = { label: String(n), pay: 35, wins: (x) => x === n };
+  const add = (k, label, pay, wins) => { d[k] = { label, pay, wins: (x) => x > 0 && wins(x) }; };
+  add("red", "Rout", 1, (x) => RED.has(x));
+  add("black", "Schwaarz", 1, (x) => !RED.has(x));
+  add("even", "Gerued", 1, (x) => x % 2 === 0);
+  add("odd", "Ongerued", 1, (x) => x % 2 === 1);
+  add("low", "1–18", 1, (x) => x <= 18);
+  add("high", "19–36", 1, (x) => x >= 19);
+  [1, 2, 3].forEach((i) => {
+    add("d" + i, i + ". Dosen", 2, (x) => x > (i - 1) * 12 && x <= i * 12);
+    add("c" + i, "Kolonn " + i, 2, (x) => x % 3 === i % 3);
+  });
+  return Object.freeze(d);
+})();
+const isBetKey = (k) => Object.prototype.hasOwnProperty.call(BET_DEFS, k);
+const colorClass = (n) => (n < 0 ? "c-n" : n === 0 ? "c-g" : RED.has(n) ? "c-r" : "c-b");
+const colorName = (n) => (n === 0 ? "Gréng" : RED.has(n) ? "Rout" : "Schwaarz");
+const sumBets = (bets) => Object.values(bets).reduce((a, b) => a + b, 0);
+const payout = (bets, n) => Object.entries(bets).reduce((a, [k, amt]) => a + (BET_DEFS[k].wins(n) ? amt * (BET_DEFS[k].pay + 1) : 0), 0);
+const pickFrom = (list, v, def) => (list.includes(v) ? v : def);
+const fmtK = (n) => n >= 10000 ? Math.round(n / 1000) + "k" : n >= 1000 ? (n / 1000).toFixed(1).replace(".0", "").replace(".", ",") + "k" : String(n);
+const signed = (n) => (n > 0 ? "+" + n : n < 0 ? "−" + Math.abs(n) : "±0");
+
+/* ---------- untrusted broadcast validation ---------- */
+const isObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+const isText = (v, max) => typeof v === "string" && v.length <= max;
+const isId = (v) => typeof v === "string" && /^[a-z0-9]{1,8}$/.test(v);
+const isInt = (v, min, max) => Number.isInteger(v) && v >= min && v <= max;
+const isBetMap = (m) => isObject(m) && Object.keys(m).length <= Object.keys(BET_DEFS).length &&
+  Object.entries(m).every(([k, a]) => isBetKey(k) && isInt(a, 1, MAX_CHIPS));
+const PHASES = ["wait", "bet", "spin", "result", "over"];
+const isSeat = (p) => isObject(p) && isId(p.cid) && isText(p.name, MAX_NAME) && isInt(p.chips, 0, MAX_CHIPS) && isBetMap(p.bets) &&
+  typeof p.done === "boolean" && typeof p.left === "boolean" && isInt(p.delta, -MAX_CHIPS * 40, MAX_CHIPS * 40);
+function isState(p) {
+  return isObject(p) && isInt(p.v, 0, 1e15) && PHASES.includes(p.phase) && isInt(p.round, 0, 20) && ROUND_CHOICES.includes(p.rounds) &&
+    CHIP_CHOICES.includes(p.start) && isInt(p.rem, 0, 120000) && isInt(p.result, -1, 36) &&
+    Array.isArray(p.history) && p.history.length <= HISTORY_MAX && p.history.every((n) => isInt(n, 0, 36)) &&
+    Array.isArray(p.players) && p.players.length <= MAX_SEATS && p.players.every(isSeat) &&
+    new Set(p.players.map((x) => x.cid)).size === p.players.length;
+}
+const isAct = (p) => isObject(p) && isId(p.cid) && isBetMap(p.bets) && typeof p.done === "boolean";
+const isMessage = (event, p) => (event === "state" ? isState(p) : event === "act" ? isAct(p) : false);
+
+/* ---------- identity + channel ---------- */
+const cfg = window.PB_CONFIG;
+const sb = AI ? null : supabase.createClient(cfg.url.replace(/\/$/, ""), cfg.anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
+const ch = AI ? null : sb.channel("rou:" + room, { config: { broadcast: { self: false }, presence: { key: cid } } });
+let myName = "Spiller";
+async function getName() {
+  let n = localStorage.getItem("playerName");
+  if (!n) { try { n = window.__pbAuth?.session?.user?.user_metadata?.username; } catch { /* no session */ } }
+  if (!n) n = (prompt("Däin Numm fir d'Spill:") || "Spiller").slice(0, 20);
+  localStorage.setItem("playerName", n);
+  return n;
+}
+function presencePlayers() {
+  if (AI) return [{ cid, name: myName }];
+  const st = ch.presenceState();
+  return Object.keys(st).filter((k) => isId(k) && Array.isArray(st[k]) && isObject(st[k][0]) && isText(st[k][0].name, MAX_NAME))
+    .slice(0, MAX_SEATS).map((k) => ({ cid: k, name: st[k][0].name || "?" }));
+}
+const isHost = () => role === "host";
+
+/* ---------- host engine (immutable updates: G is replaced, never mutated) ---------- */
+let G = null, hostDeadline = 0, hostTimer = null;
+const ctxCfg = (window.MPGate && MPGate.ctx && MPGate.ctx.cfg) || {};
+let setupRounds = pickFrom(ROUND_CHOICES, ctxCfg.rounds, DEF_ROUNDS), setupChips = pickFrom(CHIP_CHOICES, ctxCfg.chips, DEF_CHIPS);
+
+function secureInt(max) {   // uniform 0..max-1, rejection sampling
+  const buf = new Uint32Array(1), limit = 4294967296 - (4294967296 % max);
+  do { crypto.getRandomValues(buf); } while (buf[0] >= limit);
+  return buf[0] % max;
+}
+const newSeat = (p, chips) => ({ cid: p.cid, name: p.name.slice(0, 20) || "?", chips, bets: {}, done: false, left: false, delta: 0 });
+function initHost() {
+  G = { v: Date.now(), phase: "wait", round: 0, rounds: setupRounds, start: setupChips, result: -1, history: [], players: [] };
+}
+function snapshot() {
+  const rem = G.phase === "wait" || G.phase === "over" ? 0 : Math.max(0, Math.min(120000, Math.round(hostDeadline - performance.now())));
+  return { v: G.v, phase: G.phase, round: G.round, rounds: G.rounds, start: G.start, rem, result: G.result, history: G.history, players: G.players };
+}
+function publish() {
+  G = { ...G, v: G.v + 1 };
+  const snap = snapshot();
+  applySnapshot(snap);
+  if (!AI) ch.send({ type: "broadcast", event: "state", payload: snap });
+}
+function schedule(ms, fn) {
+  clearTimeout(hostTimer);
+  hostDeadline = performance.now() + ms;
+  hostTimer = setTimeout(fn, ms);
+}
+function syncRoster() {
+  if (!G) return;
+  const ps = presencePlayers();
+  const known = new Set(G.players.map((p) => p.cid));
+  let seats = G.players.map((p) => ({ ...p, left: !ps.some((q) => q.cid === p.cid) }));
+  ps.filter((q) => !known.has(q.cid)).forEach((q) => {
+    // a reload gets a new cid: give the player their old (left) seat back instead of fresh start chips
+    const fresh = newSeat(q, G.start), old = seats.findIndex((p) => p.left && p.name === fresh.name);
+    if (old >= 0) seats = seats.map((p, i) => (i === old ? { ...p, cid: q.cid, left: false } : p));
+    else if (seats.length < MAX_SEATS) seats = [...seats, fresh];
+  });
+  G = { ...G, players: seats };
+  publish();
+  if (G.phase === "bet") maybeEndBetting();
+}
+function startMatch() {
+  if (!isHost() || !G || G.phase !== "wait") return;
+  const ps = presencePlayers();
+  if (!AI && ps.length < 2) return;
+  const seats = ps.slice(0, MAX_SEATS).map((p) => newSeat(p, setupChips));
+  G = { ...G, rounds: setupRounds, start: setupChips, round: 0, history: [], players: seats };
+  newRound();
+}
+function newRound() {
+  G = { ...G, phase: "bet", round: G.round + 1, result: -1, players: G.players.map((p) => ({ ...p, bets: {}, done: false, delta: 0 })) };
+  schedule(BET_MS, endBetting);
+  publish();
+}
+function rematch() {
+  if (!isHost() || !G || G.phase !== "over") return;
+  G = { ...G, round: 0, history: [], players: G.players.map((p) => ({ ...p, chips: G.start, bets: {}, done: false, delta: 0 })) };
+  newRound();
+}
+function handleAct(p) {
+  if (!G || G.phase !== "bet") return;
+  const seat = G.players.find((x) => x.cid === p.cid);
+  if (!seat || seat.chips <= 0) return;
+  if (sumBets(p.bets) > seat.chips || !Object.values(p.bets).every((a) => a % 10 === 0)) { console.warn("[roulette] bet rejected", p.cid); return; }
+  G = { ...G, players: G.players.map((x) => (x.cid === p.cid ? { ...x, bets: { ...p.bets }, done: p.done } : x)) };
+  publish();
+  maybeEndBetting();
+}
+function maybeEndBetting() {
+  const active = G.players.filter((p) => p.chips > 0 && !p.left);
+  if (active.length && active.every((p) => p.done)) endBetting();
+}
+function endBetting() {
+  if (!G || G.phase !== "bet") return;
+  const n = RIG[G.round - 1] ?? secureInt(POCKETS);
+  G = { ...G, phase: "spin", result: n };
+  schedule(SPIN_MS, settle);
+  publish();
+}
+function settle() {
+  const n = G.result;
+  const players = G.players.map((p) => { const delta = payout(p.bets, n) - sumBets(p.bets); return { ...p, chips: p.chips + delta, delta }; });
+  G = { ...G, phase: "result", players, history: [n, ...G.history].slice(0, HISTORY_MAX) };
+  schedule(RESULT_MS, afterResult);
+  publish();
+}
+function matchIsOver() {
+  if (G.round >= G.rounds) return true;
+  const alive = G.players.filter((p) => p.chips > 0).length;
+  return G.players.length > 1 ? alive <= 1 : alive === 0;
+}
+function afterResult() {
+  if (matchIsOver()) { clearTimeout(hostTimer); G = { ...G, phase: "over" }; publish(); }
+  else newRound();
+}
+
+/* ---------- client state (rendered from the latest snapshot) ---------- */
+let S = null, lastV = 0, myBets = {}, myDone = false, selChip = CHIP_VALUES[0], deadlineAt = 0, hostHere = true;
+const meOf = (s) => (s ? s.players.find((p) => p.cid === cid) : null);
+function onSnapshot(s) {
+  if (s.v <= lastV) return;
+  if (isHost()) return;   // the host renders its own snapshots only
+  applySnapshot(s);
+}
+function applySnapshot(s) {
+  lastV = s.v;
+  const prev = S; S = s;
+  const me = meOf(s);
+  const phaseChanged = !prev || prev.phase !== s.phase || prev.round !== s.round;
+  if (s.phase === "bet") {
+    if (phaseChanged) { myBets = { ...(me ? me.bets : {}) }; myDone = !!(me && me.done); }
+    deadlineAt = performance.now() + s.rem;
+  }
+  if (s.phase === "spin" && phaseChanged) startSpin(s.result, s.rem);
+  else if ((s.phase === "result" || s.phase === "over" || s.phase === "spin") && !anim.running && s.result >= 0 && anim.shown !== s.result) landWheel(s.result);
+  if (window.MPGate) MPGate.setOver(s.phase === "wait" || s.phase === "over");
+  paint();
+  if (phaseChanged) announcePhase(s, me);
+}
+const announce = (msg) => { $("sr").textContent = msg; };
+function announcePhase(s, me) {
+  if (s.phase === "bet") announce(`Ronn ${s.round} vun ${s.rounds}. Setz deng Jetonen.`);
+  else if (s.phase === "result") {
+    const mine = me && me.delta !== 0 ? (me.delta > 0 ? ` Du hues ${me.delta} gewonnen.` : ` Du hues ${-me.delta} verluer.`) : (me && sumBets(me.bets) ? " Näischt gewonnen." : "");
+    announce(`Nummer ${s.result}, ${colorName(s.result)}.${mine}`);
+  } else if (s.phase === "over") announce("D'Partie ass eriwwer.");
+}
+
+/* ---------- user intents ---------- */
+function sendAct() {
+  const act = { cid, bets: { ...myBets }, done: myDone };
+  if (isHost()) handleAct(act); else ch.send({ type: "broadcast", event: "act", payload: act });
+  paint();
+}
+const meChips = () => (meOf(S) ? meOf(S).chips : 0);
+const freeChips = () => meChips() - sumBets(myBets);
+const canBet = () => S && S.phase === "bet" && !myDone && meChips() > 0;
+function pickChip() {   // keep the selected chip affordable
+  const free = freeChips();
+  if (selChip > free) selChip = [...CHIP_VALUES].reverse().find((v) => v <= free) || CHIP_VALUES[0];
+}
+function onCell(key) {
+  if (!canBet() || freeChips() < selChip) return;
+  myBets = { ...myBets, [key]: (myBets[key] || 0) + selChip };
+  pickChip(); sendAct();
+}
+function onClear() {
+  if (!S || S.phase !== "bet") return;
+  myBets = {}; myDone = false; sendAct();
+}
+function onDone() {
+  if (!S || S.phase !== "bet" || myDone || meChips() <= 0) return;
+  myDone = true; sendAct();
+}
+
+/* ---------- DOM helpers ---------- */
+function el(tag, cls, text, attrs) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined && text !== null) e.textContent = text;
+  if (attrs) Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v));
+  return e;
+}
+function playerTags(s) {   // short unique tags: first letter, plus seat number when two names start alike
+  const first = (n) => (Array.from(n.trim())[0] || "?").toUpperCase();
+  const count = {}; s.players.forEach((p) => { const f = first(p.name); count[f] = (count[f] || 0) + 1; });
+  const seen = {}, tags = {};
+  s.players.forEach((p) => { const f = first(p.name); seen[f] = (seen[f] || 0) + 1; tags[p.cid] = count[f] > 1 ? f + seen[f] : f; });
+  return tags;
+}
+const betsOfSeat = (s, p) => (p.cid === cid && s.phase === "bet" ? myBets : p.bets);
+
+/* ---------- wheel ---------- */
+const polar = (r, deg) => [100 + r * Math.sin(deg * Math.PI / 180), 100 - r * Math.cos(deg * Math.PI / 180)];
+function buildWheel() {
+  const parts = ['<circle cx="100" cy="100" r="98" style="fill:var(--ink)"/>'];
+  WHEEL.forEach((n, i) => {
+    const a1 = i * POCKET_DEG - POCKET_DEG / 2, a2 = a1 + POCKET_DEG;
+    const [x1, y1] = polar(90, a1), [x2, y2] = polar(90, a2), [x3, y3] = polar(62, a2), [x4, y4] = polar(62, a1);
+    const fill = n === 0 ? "var(--green)" : RED.has(n) ? "var(--danger)" : "var(--ink)";
+    const txt = n === 0 ? "var(--on-green)" : RED.has(n) ? "var(--on-green)" : "var(--paper)";
+    parts.push(`<path d="M${x1} ${y1}A90 90 0 0 1 ${x2} ${y2}L${x3} ${y3}A62 62 0 0 0 ${x4} ${y4}Z" style="fill:${fill};stroke:var(--paper);stroke-width:.6"/>`);
+    parts.push(`<text x="100" y="${100 - 76}" transform="rotate(${i * POCKET_DEG} 100 100)" text-anchor="middle" dominant-baseline="central" style="fill:${txt};font:700 7px 'Geist Mono',monospace">${n}</text>`);
+  });
+  const wheel = `<g id="wheelG">${parts.join("")}<circle cx="100" cy="100" r="58" style="fill:var(--sunk);stroke:var(--soft)"/><circle cx="100" cy="100" r="6" style="fill:var(--muted)"/></g>`;
+  $("wheelSvg").innerHTML = wheel + '<circle id="ballC" r="4.6" cx="100" cy="100" style="fill:var(--white);stroke:var(--ink);stroke-width:1.5" visibility="hidden"/>';
+}
+const anim = { running: false, token: 0, angle: 0, shown: -1 };
+function drawWheel(wheelDeg, ballDeg, ballR) {
+  $("wheelG").setAttribute("transform", `rotate(${wheelDeg} 100 100)`);
+  const [x, y] = polar(ballR, ballDeg), b = $("ballC");
+  b.setAttribute("cx", x); b.setAttribute("cy", y); b.setAttribute("visibility", "visible");
+}
+function landWheel(n) {   // no animation: wheel at rest with the ball in pocket n
+  drawWheel(anim.angle, anim.angle + WHEEL.indexOf(n) * POCKET_DEG, R_BALL_IN);
+  anim.shown = n;
+}
+function startSpin(n, ms) {
+  const token = ++anim.token, w0 = anim.angle % 360;
+  const w1 = w0 + 360 * REV_WHEEL + secureInt(360);
+  const pa = WHEEL.indexOf(n) * POCKET_DEG;
+  if (reduceMotion() || ms < 400) { anim.angle = w1; anim.running = false; landWheel(n); return; }
+  anim.running = true; anim.shown = -1;
+  const t0 = performance.now(), dur = Math.max(400, ms - 150), b1 = w1 + pa;
+  const smooth = (t) => t * t * (3 - 2 * t);
+  (function frame(now) {
+    if (token !== anim.token) return;
+    const t = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - t, 3);
+    const r = R_BALL_IN + (R_BALL_OUT - R_BALL_IN) * (1 - smooth(Math.min(1, Math.max(0, (t - 0.55) / 0.4))));
+    drawWheel(w0 + (w1 - w0) * e, b1 + 360 * REV_BALL * (1 - e), r);
+    if (t < 1) requestAnimationFrame(frame);
+    else { anim.running = false; anim.angle = w1; landWheel(n); if (S) paint(); }
+  })(t0);
+}
+
+/* ---------- table ---------- */
+function buildTable() {
+  const t = $("tbl"), mk = (key, cls, label, col, row, span) => {
+    const b = el("button", "cell " + cls, null, { type: "button", "data-k": key });
+    const l = el("span", null, label); b.appendChild(l);
+    b.style.gridColumn = String(col); b.style.gridRow = span ? `${row} / span ${span}` : String(row);
+    b.appendChild(el("span", "mk"));
+    b.onclick = () => onCell(key);
+    t.appendChild(b);
+  };
+  mk("n0", "n c-g", "0", "2 / span 3", 1, 0);
+  for (let n = 1; n <= 36; n++) mk("n" + n, "n " + colorClass(n), String(n), 2 + ((n - 1) % 3), 2 + Math.floor((n - 1) / 3), 0);
+  [1, 2, 3].forEach((i) => mk("d" + i, "", BET_DEFS["d" + i].label, 1, 2 + (i - 1) * 4, 4));
+  ["low", "even", "red", "black", "odd", "high"].forEach((k, i) => mk(k, k === "red" ? "c-r" : k === "black" ? "c-b" : "", BET_DEFS[k].label, 5, 2 + i * 2, 2));
+  [1, 2, 3].forEach((i) => mk("c" + i, "", BET_DEFS["c" + i].label, 1 + i, 14, 0));
+}
+function paintTable(s) {
+  const tags = playerTags(s);
+  const per = {};   // key -> [{cid, amt}]
+  s.players.forEach((p) => Object.entries(betsOfSeat(s, p)).forEach(([k, a]) => { (per[k] = per[k] || []).push({ cid: p.cid, amt: a }); }));
+  const live = canBet();
+  document.querySelectorAll("#tbl .cell").forEach((cell) => {
+    const key = cell.dataset.k, list = per[key] || [], total = list.reduce((a, b) => a + b.amt, 0);
+    const mkEl = cell.querySelector(".mk"), nodes = [];
+    if (total) {
+      nodes.push(el("b", null, fmtK(total)));
+      list.slice(0, 3).forEach((x) => nodes.push(el("span", "tg" + (x.cid === cid ? " me" : ""), tags[x.cid] || "?")));
+      if (list.length > 3) nodes.push(el("span", "tg", "+" + (list.length - 3)));
+    }
+    mkEl.replaceChildren(...nodes);
+    const mine = list.find((x) => x.cid === cid);
+    cell.classList.toggle("mine", !!mine);
+    cell.classList.toggle("won", s.phase === "result" && s.result >= 0 && BET_DEFS[key].wins(s.result));
+    cell.setAttribute("aria-label", BET_DEFS[key].label + (total ? `, insgesamt ${total} gesat${mine ? `, dovunn ${mine.amt} vun dir` : ""}` : ""));
+    cell.disabled = !live || freeChips() < CHIP_VALUES[0];
+  });
+}
+
+/* ---------- painting ---------- */
+function paint() {
+  if (!S) return;
+  const s = S, playing = s.phase !== "wait" && s.phase !== "over";
+  $("wait").hidden = s.phase !== "wait"; $("over").hidden = s.phase !== "over"; $("play").hidden = !playing;
+  $("hostWarn").hidden = AI || isHost() || hostHere;
+  if (s.phase === "wait") paintWait(s);
+  else if (s.phase === "over") paintOver(s);
+  else paintPlay(s);
+}
+function paintPlay(s) {
+  const me = meOf(s), tags = playerTags(s);
+  $("stRound").textContent = `Ronn ${s.round} / ${s.rounds}`;
+  const eligible = s.players.filter((p) => p.chips > 0 && !p.left);
+  $("stDone").textContent = s.phase === "bet" && eligible.length > 1 ? `Fäerdeg ${eligible.filter((p) => p.done).length}/${eligible.length}` : "";
+  paintResultPanel(s, me);
+  const hist = $("hist");
+  hist.replaceChildren(el("span", "lblh", "Leschte:"), ...s.history.map((n) => el("span", "numtile sm mono " + colorClass(n), String(n))));
+  if (!s.history.length) hist.appendChild(el("span", "muted", "nach näischt"));
+  paintTable(s);
+  paintPlayers(s, tags);
+  paintBar(s, me);
+  tickTimer();
+}
+function describeResult(n) {
+  if (n === 0) return "Null — all Baussewette verléieren.";
+  const parts = [colorName(n), n % 2 ? "Ongerued" : "Gerued", n <= 18 ? "1–18" : "19–36", BET_DEFS["d" + Math.ceil(n / 12)].label, BET_DEFS["c" + (n % 3 || 3)].label];
+  return parts.join(" · ");
+}
+function paintResultPanel(s, me) {
+  const tile = $("rTile"), showResult = s.phase === "result" && s.result >= 0;
+  tile.className = "numtile mono " + (showResult ? colorClass(s.result) : "c-n");
+  tile.textContent = showResult ? String(s.result) : "?";
+  $("rCap").textContent = showResult ? describeResult(s.result) : s.phase === "spin" ? "D'Kugel rullt …" : "Setz deng Jetonen!";
+  let line = "";
+  if (showResult && me) line = me.delta > 0 ? `Du: ${signed(me.delta)}` : me.delta < 0 ? `Du: ${signed(me.delta)}` : sumBets(me.bets) ? "Du: ±0" : "Du hues net gesat";
+  $("rMe").textContent = line;
+}
+function paintPlayers(s, tags) {
+  const items = s.players.map((p) => {
+    const li = el("li", p.left ? "out" : "");
+    li.appendChild(el("span", "tg" + (p.cid === cid ? " me" : ""), tags[p.cid]));
+    li.appendChild(el("span", "nm", p.name + (p.cid === cid ? " (du)" : "")));
+    li.appendChild(el("span", "ch mono", String(p.chips)));
+    const st = el("span", "st mono");
+    const stake = sumBets(betsOfSeat(s, p));
+    if (p.left) st.textContent = "fort";
+    else if (p.chips <= 0 && s.phase !== "result") st.textContent = "Pleite";
+    else if (s.phase === "result") { st.textContent = ""; st.appendChild(el("span", p.delta > 0 ? "pos" : p.delta < 0 ? "neg" : "", signed(p.delta))); if (p.chips <= 0) st.appendChild(document.createTextNode(" · Pleite")); }
+    else { st.textContent = `Asaz ${stake}`; if (s.phase === "bet" && p.done) st.textContent += " · Fäerdeg ✓"; }
+    li.appendChild(st);
+    return li;
+  });
+  $("plist").replaceChildren(...items);
+}
+function paintBar(s, me) {
+  const live = canBet(), broke = !me || me.chips <= 0;
+  $("bFree").textContent = String(me ? (s.phase === "bet" ? freeChips() : me.chips) : 0);
+  $("bStake").textContent = String(s.phase === "bet" ? sumBets(myBets) : me ? sumBets(me.bets) : 0);
+  $("bNote").textContent = !me ? "Du kucks nëmmen no" : broke ? "Pleite — du kucks nach zou" : s.phase === "bet" ? (myDone ? "Fäerdeg ✓ — waart op d'Anert" : "") : s.phase === "spin" ? "Näischt geet méi" : "";
+  if (live) pickChip();
+  const pick = $("chipPick");
+  if (!pick.children.length) CHIP_VALUES.forEach((v) => {
+    const b = el("button", "rbtn", String(v), { type: "button", "data-v": String(v) });
+    b.onclick = () => { selChip = v; paint(); };
+    pick.appendChild(b);
+  });
+  [...pick.children].forEach((b) => {
+    const v = +b.dataset.v;
+    b.setAttribute("aria-pressed", String(v === selChip));
+    b.disabled = !live || v > freeChips();
+  });
+  $("bClear").disabled = s.phase !== "bet" || broke || (!myDone && !sumBets(myBets));
+  $("bDone").disabled = !live;
+  $("bDone").textContent = myDone && s.phase === "bet" ? "Fäerdeg ✓" : "Fäerdeg";
+}
+function tickTimer() {
+  if (!S) return;
+  const bet = S.phase === "bet", left = bet ? Math.max(0, deadlineAt - performance.now()) : 0;
+  $("stTimer").textContent = bet ? Math.ceil(left / 1000) + " s" : "";
+  $("stBar").style.width = bet ? (100 * left / BET_MS) + "%" : "0";
+}
+setInterval(tickTimer, 200);
+
+/* ---------- waiting + final screens ---------- */
+function choiceRow(list, value, onPick, label) {
+  const row = el("div", "seg", null, { role: "group", "aria-label": label });
+  list.forEach((v) => {
+    const b = el("button", "rbtn", String(v), { type: "button", "aria-pressed": String(v === value) });
+    b.onclick = () => onPick(v);
+    row.appendChild(b);
+  });
+  return row;
+}
+function paintWait() {
+  const box = $("wait"), ps = presencePlayers();
+  const nodes = [el("div", "waitlist")];
+  ps.forEach((p) => nodes[0].appendChild(el("span", "pchip", p.name + (p.cid === cid ? " (du)" : ""))));
+  nodes.push(el("p", "muted center", "Roulette mat Spill-Jetonen: jiddereen setzt um selwechten Dësch, wien um Enn am meeschte Jetonen huet, gewënnt."));
+  if (isHost() && (AI || !MPGate.ctx)) {
+    nodes.push(el("div", "lbl", "Ronnen"), choiceRow(ROUND_CHOICES, setupRounds, (v) => { setupRounds = v; paintWait(); }, "Zuel vun de Ronnen"));
+    nodes.push(el("div", "lbl", "Jetonen"), choiceRow(CHIP_CHOICES, setupChips, (v) => { setupChips = v; paintWait(); }, "Start-Jetonen"));
+  } else if (!isHost()) nodes.push(el("p", "center muted", "Waart bis den Host ufänkt …"));
+  else nodes.push(el("p", "center muted", `${setupRounds} Ronnen · ${setupChips} Jetonen`));
+  if (isHost()) {
+    const b = el("button", "rbtn primary block", !AI && ps.length < 2 ? "Waart op Spiller …" : "Spill starten", { type: "button", id: "startBtn" });
+    b.disabled = !AI && ps.length < 2;
+    b.onclick = startMatch;
+    nodes.push(b);
+  }
+  box.replaceChildren(...nodes);
+}
+function paintOver(s) {
+  const sorted = [...s.players].sort((a, b) => b.chips - a.chips);
+  const top = sorted[0], tie = sorted[1] && sorted[1].chips === top.chips;
+  let text;
+  if (s.players.length === 1) text = top.chips > s.start ? "🏆 Du bass am Plus!" : top.chips <= 0 ? "Pleite — d'Bank gewënnt." : "Du bass am Minus.";
+  else text = tie ? "🤝 Onentschidden!" : `🏆 ${top.name}${top.cid === cid ? " (du)" : ""} gewënnt!`;
+  const table = el("table", "rank");
+  const head = el("tr"); ["#", "Spiller", "Jetonen"].forEach((h) => head.appendChild(el("th", null, h))); table.appendChild(head);
+  sorted.forEach((p, i) => {
+    const tr = el("tr");
+    tr.appendChild(el("td", "mono", String(i + 1)));
+    tr.appendChild(el("td", null, p.name + (p.cid === cid ? " (du)" : "") + (p.left ? " (fort)" : "")));
+    tr.appendChild(el("td", "num mono", String(p.chips)));
+    table.appendChild(tr);
+  });
+  const nodes = [el("div", "banner", text), table];
+  if (isHost()) { const b = el("button", "rbtn primary block", "Nach eng Partie", { type: "button", id: "againBtn" }); b.onclick = rematch; nodes.push(b); }
+  else nodes.push(el("p", "center muted", "Waart op den Host …"));
+  $("over").replaceChildren(...nodes);
+  announce(text);
+}
+
+/* ---------- boot ---------- */
+buildWheel(); buildTable();
+$("bClear").onclick = onClear; $("bDone").onclick = onDone;
+if (window.MPGate && MPGate.code) document.body.classList.add("has-chip");
+if (AI) { const h1 = document.querySelector(".bar h1"); if (h1) h1.textContent = "Roulette – eleng"; }
+
+function bootAi() {
+  myName = localStorage.getItem("playerName") || window.__pbAuth?.session?.user?.user_metadata?.username || "Du";
+  initHost(); G = { ...G, players: [newSeat({ cid, name: myName }, setupChips)] };
+  publish();
+}
+function bootOnline() {
+  if (window.MPGate && MPGate.redirecting) return;   // mp-gate.js sends a bare visit to the lobby; do not join "demo"
+  S = { v: 0, phase: "wait", round: 0, rounds: setupRounds, start: setupChips, rem: 0, result: -1, history: [], players: [] };
+  if (isHost()) initHost();
+  ch.on("broadcast", { event: "state" }, ({ payload }) => { if (isMessage("state", payload)) onSnapshot(payload); })
+    .on("broadcast", { event: "act" }, ({ payload }) => { if (isHost() && isMessage("act", payload)) handleAct(payload); })
+    .on("presence", { event: "sync" }, () => {
+      const st = ch.presenceState();
+      const hh = isHost() || Object.values(st).some((m) => Array.isArray(m) && isObject(m[0]) && m[0].role === "host");
+      const changed = hh !== hostHere; hostHere = hh;
+      if (isHost()) { syncRoster(); maybeAutoStart(); }
+      else if (changed || S.phase === "wait") paint();
+    });
+  paint();
+  let autoStartPending = !!(window.MPGate && MPGate.ctx && isHost()), autoTimer = null;
+  function maybeAutoStart() { if (autoStartPending && G.phase === "wait" && presencePlayers().length >= MPGate.ctx.roster.length) fireAutoStart(); }
+  function fireAutoStart() {
+    if (!autoStartPending) return;
+    autoStartPending = false; clearTimeout(autoTimer);
+    if (G.phase === "wait" && presencePlayers().length >= 2) startMatch();
+  }
+  ch.subscribe(async (st) => {
+    if (st !== "SUBSCRIBED") return;
+    myName = await getName();
+    await ch.track({ name: myName, role });
+    if (autoStartPending) autoTimer = setTimeout(fireAutoStart, AUTO_START_WAIT_MS);
+  });
+}
+if (AI) bootAi(); else bootOnline();
+</script>
+  <script type="module" src="rtc-ring.js?v=36"></script>
+  <script type="module" src="class-gate.js?v=37"></script>
+</body>
+</html>
