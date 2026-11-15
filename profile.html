@@ -130,7 +130,14 @@ const gateHtml=(msg,extra="")=>`<div class="c full gt-gate"><p class="gt-big">${
 async function renderPublic(username){
   // Signed-out visitors may only read id/username/avatar (school class is for signed-in accounts).
   const cols=auth.session()?"id,avatar,class,username":"id,avatar,username";
-  const {data:p}=await sb.from("profiles").select(cols).ilike("username",username).maybeSingle();
+  const {data:p,error:loadError}=await sb.from("profiles").select(cols).ilike("username",username).maybeSingle();
+  // A failed request is not "no such player": say what happened and offer another try.
+  if(loadError){
+    console.error("[profile] could not load",username,loadError);
+    $("wrap").innerHTML=gateHtml("De Profil konnt net geluede ginn.",`<button class="gt-btn ghost" type="button" id="profileRetry">Nach eng Kéier probéieren</button>`);
+    $("profileRetry").onclick=()=>renderPublic(username);
+    return;
+  }
   if(!p){$("wrap").innerHTML=gateHtml(`Kee Spiller mam Numm „${esc(username)}“.`,`<a class="gt-btn ghost" href="profile.html">‹ Däi Profil</a>`);return;}
   let isAdmin=false;
   try{const {data}=await sb.rpc("admin_user_ids");isAdmin=(data||[]).some(r=>r.user_id===p.id);}catch{}

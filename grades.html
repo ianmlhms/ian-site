@@ -10,6 +10,8 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#f6f6f3" media="(prefers-color-scheme: light)" data-gt="light">
 <meta name="theme-color" content="#121314" media="(prefers-color-scheme: dark)" data-gt="dark">
+<link rel="preconnect" href="https://lvksqmgfwkfbblfsozfk.supabase.co" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <script src="gitter-theme.js?v=2"></script>
 <link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="gitter.css?v=13">
@@ -215,32 +217,69 @@ function variants(y){ return Object.keys(YEARS[y].variants); }
 function template(){ return (YEARS[year]?.variants[variant] || []).map(([name,coef])=>({name,coef,marks:""})); }
 function key(){ return variant ? `${year} | ${variant}` : year; }
 function lsKey(){ return "gc_data_" + key(); }
+// "This sheet has edits of account <uid> that never reached the cloud" (a failed sync on school Wi-Fi).
+// While it is set for the signed-in account, the local copy wins on load and is sent again —
+// before, the next load fetched the older cloud copy and the marks typed in between were gone.
+function dirtyKey(sheetKey){ return "gc_dirty_" + sheetKey; }
+function readLocal(sheetKey){
+  try { const ls=localStorage.getItem("gc_data_"+sheetKey); const parsed = ls ? JSON.parse(ls) : null; return Array.isArray(parsed) ? parsed : null; }
+  catch(e){ console.warn("[grades] local copy unreadable, ignoring it", e); return null; }
+}
+const SAVE_DELAY_MS = 600;
 
 async function loadSheet(){
   localStorage.setItem("gc_year",year); localStorage.setItem("gc_variant",variant);
-  let data=null;
-  if (signedIn){
-    try { const { data:d } = await sb.from("grade_sheets").select("data").eq("sheet_key",key()).maybeSingle(); if(d) data=d.data; } catch(e){ console.warn(e); }
+  const sheetKey=key();
+  const local=readLocal(sheetKey);
+  const uid=signedIn ? auth.session()?.user?.id : null;
+  const hasUnsynced = !!uid && !!local && localStorage.getItem(dirtyKey(sheetKey))===uid;
+  let data=null, loadFailed=false;
+  if (signedIn && !hasUnsynced){
+    try {
+      const { data:d, error } = await sb.from("grade_sheets").select("data").eq("sheet_key",sheetKey).maybeSingle();
+      if (error) throw error;
+      if(d) data=d.data;
+    } catch(e){ loadFailed=true; console.warn("[grades] cloud copy not loaded, showing the local one", e); }
   }
-  if (!data){ const ls=localStorage.getItem(lsKey()); if(ls){ try{ data=JSON.parse(ls); }catch{} } }
-  rows = data || template();
+  if (sheetKey!==key()) return;   // the year / section was changed while this was loading
+  rows = data || local || template();
   render();
+  if (hasUnsynced) pushSheet(sheetKey, rows);
+  else if (loadFailed) syncMsg(T("grades.syncErr"));
 }
+let pendingSave=null;   // { sheetKey, data } waiting for the debounce
 function save(){
-  localStorage.setItem(lsKey(), JSON.stringify(rows));
+  const sheetKey=key();
+  try { localStorage.setItem(lsKey(), JSON.stringify(rows)); }
+  catch(e){ console.warn("[grades] local save failed", e); }
   if (signedIn){
+    const uid=auth.session()?.user?.id;
+    try { if(uid) localStorage.setItem(dirtyKey(sheetKey), uid); } catch(e){ console.warn("[grades] dirty mark failed", e); }
+    // The sheet and its rows are fixed NOW: the timer used to read key() and rows when it fired, so changing
+    // the year within the delay wrote the old sheet's rows under the new sheet's name.
+    pendingSave={ sheetKey, data: JSON.parse(JSON.stringify(rows)) };
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(async ()=>{
-      // Supabase returns {error} rather than throwing, so the catch alone never
-      // saw a rejected write and "synced" was reported unconditionally.
-      try {
-        const { error } = await sb.from("grade_sheets").upsert({ user_id: auth.session().user.id, sheet_key:key(), data:rows, updated_at:new Date().toISOString() }, { onConflict:"user_id,sheet_key" });
-        if (error) throw error;
-        syncMsg(T("grades.synced"));
-      }
-      catch(e){ console.warn("[grades] sync", e); syncMsg(T("grades.syncErr")+": "+(e?.message||e)); }
-    }, 600);
+    saveTimer = setTimeout(flushSave, SAVE_DELAY_MS);
   }
+}
+function flushSave(){
+  clearTimeout(saveTimer);
+  const job=pendingSave; pendingSave=null;
+  if (job) pushSheet(job.sheetKey, job.data);
+}
+async function pushSheet(sheetKey, data){
+  const uid=auth.session()?.user?.id;
+  if (!sb || !uid) return;
+  // Supabase returns {error} rather than throwing, so the catch alone never
+  // saw a rejected write and "synced" was reported unconditionally.
+  try {
+    const { error } = await sb.from("grade_sheets").upsert({ user_id: uid, sheet_key:sheetKey, data, updated_at:new Date().toISOString() }, { onConflict:"user_id,sheet_key" });
+    if (error) throw error;
+    // Only clear the mark when nothing newer is waiting for this sheet.
+    if (!pendingSave || pendingSave.sheetKey!==sheetKey) localStorage.removeItem(dirtyKey(sheetKey));
+    if (sheetKey===key()) syncMsg(T("grades.synced"));
+  }
+  catch(e){ console.warn("[grades] sync", e); if (sheetKey===key()) syncMsg(T("grades.syncErr")+": "+(e?.message||e)); }
 }
 function syncMsg(m){ $("syncLine").textContent = signedIn ? m : T("grades.notSignedIn"); }
 
@@ -311,8 +350,8 @@ function calcNeed(){
   else el.innerHTML = T("grades.need.normal").replace("{subject}",subj).replace("{g}",g.toFixed(1)).replace("{wc}",wc).replace("{target}",target);
 }
 
-$("yearSel").onchange=e=>{ year=e.target.value; variant=variants(year)[0]; loadSheet(); };
-$("variantSel").onchange=e=>{ variant=(e.target.value==="—"?"":e.target.value); loadSheet(); };
+$("yearSel").onchange=e=>{ flushSave(); year=e.target.value; variant=variants(year)[0]; loadSheet(); };
+$("variantSel").onchange=e=>{ flushSave(); variant=(e.target.value==="—"?"":e.target.value); loadSheet(); };
 $("resetBtn").onclick=()=>{ if(confirm(T("grades.resetConfirm"))){ rows=template(); save(); render(); } };
 $("addBtn").onclick=()=>{
   rows.push({name:T("grades.newSubject"),coef:1,marks:""}); save(); render();
@@ -332,7 +371,14 @@ document.addEventListener("i18n:change", render);
     loadSheet();
   }
 })();
-function loadSheetLocalFirst(){ const ls=localStorage.getItem(lsKey()); rows = ls?JSON.parse(ls):template(); render(); }
+function loadSheetLocalFirst(){ rows = readLocal(key()) || template(); render(); }
+// Leaving the page inside the debounce must not drop the last edit.
+addEventListener("pagehide", flushSave);
+// Back online: send what a failed sync left behind.
+addEventListener("online", ()=>{
+  const sheetKey=key(), uid=auth.session()?.user?.id;
+  if (signedIn && uid && !pendingSave && localStorage.getItem(dirtyKey(sheetKey))===uid) pushSheet(sheetKey, rows);
+});
 </script>
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
