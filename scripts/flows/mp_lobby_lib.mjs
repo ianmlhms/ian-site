@@ -42,6 +42,7 @@ export async function newPlayer(h, world, { label, user = null, first = false, v
       has_pin: () => true, is_view_restricted: () => false, visible_user_ids: () => [],
       client_commands_since: () => ({ now: new Date().toISOString(), commands: [] }),
       leaderboard_tags: () => [], touch_presence: () => null,
+      my_profile_private: () => [{ account_checked_at: "2026-10-01T00:00:00Z" }],   // keeps the one-time account-check card (account-check.js) away
       my_friends: () => world.friendsOf(uid).map((u) => ({ user_id: u.id, username: u.username })),
       my_game_invites: () => world.invites.filter((i) => i.to_user === uid && i.status === "pending"),
       mp_invite: ({ p_game, p_room, p_to }) => {

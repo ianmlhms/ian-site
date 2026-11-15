@@ -33,10 +33,9 @@ const pressed = (page) => page.$$eval("#mplSettings .mpl-chip", (els) => els.fil
 const inRoom = (page, n) => page.waitForFunction((k) => document.querySelectorAll("#mplRoster .mpl-row:not(.mpl-empty):not(.mpl-invited)").length === k, n, { timeout: 20000 });
 const noHScroll = (page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
 const S = (o) => Object.fromEntries(Object.entries(o).sort(([a], [b]) => (a < b ? -1 : 1)));   // key order must not depend on whose screen it is
-// timers + rigged cards for the game; the one-time «account check» card (it shows ~3 s after sign-in in the mocked world) is hidden so it cannot cover the table
+// timers + rigged cards for the game
 const hook = (context, test) => context.addInitScript((t) => {
   window.__casinoTest = t;
-  document.addEventListener("DOMContentLoaded", () => { const st = document.createElement("style"); st.textContent = "#account-check{display:none !important}"; document.head.appendChild(st); });
 }, test);
 
 const inPhase = (page, phase, timeout = 30000) => page.waitForFunction((p) => document.querySelector(`[data-phase="${p}"]`) !== null, phase, { timeout });

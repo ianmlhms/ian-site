@@ -16,10 +16,9 @@ const TEST_TIMERS = { betMs: 6000, spinMs: 1200, resultMs: 2500, rig: RIG };
 const SOLO_TIMERS = { betMs: 6000, spinMs: 800, resultMs: 1500, rig: [7] };
 const pressed = (page) => page.$$eval("#mplSettings .mpl-chip", (els) => els.filter((e) => e.getAttribute("aria-pressed") === "true").map((e) => e.textContent.trim()));
 const inRoom = (page, n) => page.waitForFunction((k) => document.querySelectorAll("#mplRoster .mpl-row:not(.mpl-empty):not(.mpl-invited)").length === k, n, { timeout: 20000 });
-// timers + rigged numbers for the game; the one-time «account check» card (it shows ~3 s after sign-in in the mocked world) is hidden so it cannot cover the table
+// timers + rigged numbers for the game
 const withTimers = (player, t) => player.context.addInitScript((cfg) => {
   window.__casinoTest = cfg;
-  document.addEventListener("DOMContentLoaded", () => { const st = document.createElement("style"); st.textContent = "#account-check{display:none !important}"; document.head.appendChild(st); });
 }, t);
 const sameChips = (a, b) => JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort());
 
