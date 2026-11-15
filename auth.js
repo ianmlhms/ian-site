@@ -154,7 +154,7 @@ function startInvitePop() {
 function startAccountCheck() {
   if (window.top !== window || isKartAccount()) return;
   if (!_g.accountCheckModule) {
-    _g.accountCheckModule = import("./account-check.js?v=18");
+    _g.accountCheckModule = import("./account-check.js?v=19");
   }
   void _g.accountCheckModule
     .then(({ startAccountCheck: start }) => start(_g.sb, () => _g.session))
@@ -199,14 +199,41 @@ function notifyAuth(event, current) {
   _g.cbs.forEach((callback) => callback(current));
 }
 
+/* upsert_profile only creates the profile row when it is missing. It used to be
+ * awaited on EVERY page load before client() resolved — one extra round-trip
+ * (and one database call) in front of every page's content. Now it runs beside
+ * the page, and a successful answer is remembered per account for the day. */
+const PROFILE_ENSURED_KEY = "profileEnsured";
+const profileStamp = (uid) => `${uid}|${new Date().toISOString().slice(0, 10)}`;
+
+function profileEnsuredToday(uid) {
+  try {
+    return localStorage.getItem(PROFILE_ENSURED_KEY) === profileStamp(uid);
+  } catch {
+    return false;   // storage unavailable: just ask the server again
+  }
+}
+
 async function ensureProfile() {
   const current = _g.session;
   const name = current?.user?.user_metadata?.username;
-  if (!_g.sb || !current || !name || isKartAccount(current)) return;
-  const { error } = await _g.sb.rpc("upsert_profile", {
-    p_username: String(name).slice(0, 24),
-  });
-  if (error) console.warn("profile setup failed", error.message);
+  const uid = current?.user?.id;
+  if (!_g.sb || !current || !name || !uid || isKartAccount(current)) return;
+  if (profileEnsuredToday(uid)) return;
+  try {
+    const { error } = await _g.sb.rpc("upsert_profile", {
+      p_username: String(name).slice(0, 24),
+    });
+    if (error) {
+      console.warn("profile setup failed", error.message);
+      return;
+    }
+    try {
+      localStorage.setItem(PROFILE_ENSURED_KEY, profileStamp(uid));
+    } catch { /* storage unavailable: asked again on the next page */ }
+  } catch (error) {
+    console.warn("profile setup failed", error);
+  }
 }
 
 function schedulePinBriefing() {
@@ -240,8 +267,8 @@ async function initializeClient() {
   _g.sb.auth.onAuthStateChange(notifyAuth);
   startPresencePing();
   if (guardKartAccount(data.session)) return _g.sb;
-  await ensureProfile();
-  schedulePinBriefing();
+  // Not awaited (see ensureProfile): pages get their client one round-trip sooner.
+  void ensureProfile().finally(schedulePinBriefing);
   return _g.sb;
 }
 

@@ -2,7 +2,7 @@
  * Backend = Supabase RPCs advent_gifts_overview / advent_gift_open (scripts/advent-gifts-v1.sql).
  * The shared auth.js client is used for every call (never a second session-managing client).
  * Gift sizes are decided on the server; server strings are rendered with textContent only. */
-import * as auth from "./auth.js?v=43";
+import * as auth from "./auth.js?v=44";
 import {
   AdventError, DOOR_COUNT, clear, el, errorText, formatAmount, formatCountdown, gameInfo, gameUrl, parseServerTime,
   prefersReducedMotion, store,

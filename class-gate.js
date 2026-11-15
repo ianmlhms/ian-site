@@ -1,10 +1,10 @@
 /* Class gate. Drop on any signed-in page:
- *   <script type="module" src="class-gate.js?v=38"></script>
+ *   <script type="module" src="class-gate.js?v=39"></script>
  * The first time a signed-in user is seen without a school class on their
  * profile, a required modal asks for it (new users at sign-up, existing users
  * the next time they open the site). Saved via the set_class RPC; the class is
  * then shown next to their name everywhere (see friends.js / messenger.js). */
-import * as auth from "./auth.js?v=43";
+import * as auth from "./auth.js?v=44";
 
 // Use i18n when the key exists; otherwise fall back to the Luxembourgish default
 // (t() returns the key unchanged when it's missing — treat that as "not found").
@@ -35,6 +35,13 @@ const YEAR_ONLY = /^\d{1,2}(E|È|EME|ÈME|IEME|IÈME)?$/;   // 5, 5E, 5EME, 5ÈM
 const CLASS_SHAPE = /^\d{1,2}[A-Z]{1,4}\d{0,2}$/;         // 5C6, 7C1, 2CG, 4GPS…
 const validClass = (raw) => { const v = normClass(raw); return CLASS_SHAPE.test(v) && !YEAR_ONLY.test(v); };
 
+// "This account has a class and confirmed it for this season" — remembered for the day, so the
+// profile is not read again on every page of the site. UI only: the server stays the truth.
+const OK_KEY = "classGateOk";
+const okStamp = (uid) => `${uid}|${SEASON}|${new Date().toISOString().slice(0, 10)}`;
+const wasOkToday = (uid) => { try { return localStorage.getItem(OK_KEY) === okStamp(uid); } catch { return false; } };
+const rememberOk = (uid) => { try { localStorage.setItem(OK_KEY, okStamp(uid)); } catch { /* private mode: asked again next page */ } };
+
 async function start() {
   if (done || shown || checking || !auth.authConfigured) return;
   const current = auth.session();
@@ -42,13 +49,17 @@ async function start() {
   const uid = current?.user?.id;
   if (!uid) return;                       // wait for sign-in (onAuth re-calls)
   if (hasSkipped(uid)) { done = true; return; }   // opted out of the class tag
+  if (wasOkToday(uid)) { done = true; return; }   // already answered today: no profile read on every page
   checking = true;
   try {
     sb = sb || await auth.client();
-    const { data } = await sb.from("profiles").select("class, class_confirmed").eq("id", uid).maybeSingle();
+    const { data, error } = await sb.from("profiles").select("class, class_confirmed").eq("id", uid).maybeSingle();
+    // A failed read (school Wi-Fi) is not "no class": it used to open the required class prompt.
+    if (error) throw error;
     const cls = data && data.class ? String(data.class).trim() : "";
     if (cls) {
       if (needsReconfirm(data.class_confirmed)) { showReconfirm(cls); return; }
+      rememberOk(uid);
       done = true; return;
     }
     showModal();

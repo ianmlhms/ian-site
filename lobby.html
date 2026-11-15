@@ -39,7 +39,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module">
-import { mountLobby } from "./mp-lobby.js?v=14";
+import { mountLobby } from "./mp-lobby.js?v=15";
 import { gameInfo } from "./mp-games.js?v=5";
 const g = gameInfo(new URLSearchParams(location.search).get("g") || "");
 if (g) document.getElementById("lobbyH1").textContent = g.name;
@@ -48,9 +48,9 @@ mountLobby(document.getElementById("mpl")).catch((error) => {
   document.getElementById("mpl").textContent = "D'Lobby konnt net starten.";
 });
 </script>
-<script type="module" src="gitter-acct.js?v=2"></script>
-<script type="module" src="notify-ambient.js?v=41"></script>
-<script type="module" src="rtc-ring.js?v=37"></script>
-<script type="module" src="class-gate.js?v=38"></script>
+<script type="module" src="gitter-acct.js?v=3"></script>
+<script type="module" src="notify-ambient.js?v=42"></script>
+<script type="module" src="rtc-ring.js?v=38"></script>
+<script type="module" src="class-gate.js?v=39"></script>
 </body>
 </html>

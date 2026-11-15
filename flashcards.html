@@ -113,7 +113,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module">
-import * as auth from "./auth.js?v=43";
+import * as auth from "./auth.js?v=44";
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const qs=new URLSearchParams(location.search);
@@ -318,8 +318,8 @@ function setEm(t,err){const m=$("em");if(!m)return;m.textContent=t;m.style.color
 auth.onAuth(boot);
 boot();
 </script>
-  <script type="module" src="rtc-ring.js?v=37"></script>
-  <script type="module" src="class-gate.js?v=38"></script>
-<script type="module" src="gitter-acct.js?v=2"></script>
+  <script type="module" src="rtc-ring.js?v=38"></script>
+  <script type="module" src="class-gate.js?v=39"></script>
+<script type="module" src="gitter-acct.js?v=3"></script>
 </body>
 </html>

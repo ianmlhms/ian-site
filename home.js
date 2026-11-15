@@ -8,13 +8,14 @@
  *   Ian (is_admin)    Hotel-Simulator, Mäin Dashboard, the Admin row
  *   Ian + kart accts  KartTracker       (auth.isKartAccount, i.e. user_metadata.account_kind === "kart")
  * The pages keep their own gates; this only decides what the homepage lists. */
-import { client, session, onAuth, openAuthModal, isKartAccount } from "./auth.js?v=43";
+import { client, session, onAuth, openAuthModal, isKartAccount } from "./auth.js?v=44";
 import { isStudioEmail } from "./studio-allow.js?v=1";
 import { loadWeekly, countdownText, weeklyGameLabel } from "./arcade-weekly.js?v=13";
 import "./quick-open.js?v=13"; // same URL theme.js loads, so this is the same module instance
 
 const TESTER_CLASS = "4C6";
 const GATES_KEY = "homeGates";
+const WEEKLY_KEY = "homeWeekly";
 const WEEKLY_TIMEOUT_MS = 5000;
 const MINUTE_MS = 60_000;
 const GAME_ID = /^[a-z0-9-]{1,40}$/;
@@ -185,6 +186,24 @@ function applyGates(gates) {
 /* ---------------- arcade: game of the week ---------------- */
 let weekly = null;
 
+/* The last answer, kept until that week ends: a returning visitor sees the game of the week on the first
+ * frame. Before, the whole cell stayed blank until supabase-js, the client and weekly_game had answered
+ * (up to WEEKLY_TIMEOUT_MS on a slow connection). The fresh answer still replaces it a moment later. */
+function cachedWeekly() {
+  try {
+    const cached = JSON.parse(localStorage.getItem(WEEKLY_KEY) || "null");
+    if (cached && GAME_ID.test(cached.gameId) && Date.parse(cached.endsAt) > Date.now()) {
+      return Object.freeze({ gameId: cached.gameId, endsAt: cached.endsAt });
+    }
+  } catch { /* ignore a broken cache */ }
+  return null;
+}
+
+function saveWeekly(result) {
+  try { localStorage.setItem(WEEKLY_KEY, JSON.stringify({ gameId: result.gameId, endsAt: result.endsAt })); }
+  catch { /* private mode */ }
+}
+
 function gameName(id) {
   // The label is "<emoji> <name>"; the homepage shows the name only.
   return weeklyGameLabel(id).replace(/^[^\p{L}\p{N}]+/u, "") || id;
@@ -217,6 +236,7 @@ async function loadWeek(sbPromise) {
     const result = await withTimeout(loadWeekly(sb, null), WEEKLY_TIMEOUT_MS);
     if (!result || !GAME_ID.test(result.gameId)) throw new Error(`unusable weekly game ${JSON.stringify(result?.gameId)}`);
     weekly = result;
+    saveWeekly(result);
     renderWeek();
   } catch (error) {
     // The cell already shows the train simulator as "My pick".
@@ -250,6 +270,8 @@ function boot() {
   applyGates(cachedGates(storedSession()?.user?.id));
   renderGreeting();
   renderAllGames();
+  weekly = cachedWeekly();
+  if (weekly) { renderWeek(); $("gtWeek").classList.remove("loading"); }
   startClock();
   wireSearch();
 
