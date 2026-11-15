@@ -324,6 +324,7 @@ export async function resetPinForAdmin(
     console.error("auth-pin admin reset", error.message);
     return null;
   }
+  await revokeFaceDevices(target.id);
   console.info("auth-pin admin reset", {
     adminId,
     targetId: target.id,
@@ -333,6 +334,20 @@ export async function resetPinForAdmin(
     username: normalized,
     recoveryUrl,
   });
+}
+
+/**
+ * Drops every face-login device key of this account (public.face_devices,
+ * see auth-face). A device key is a long-lived login that the PIN does not
+ * protect, so replacing or resetting the PIN must end them too: otherwise a
+ * key minted during a takeover keeps working after the owner is "safe" again.
+ * The player just signs in with the new PIN and scans the face again.
+ * Best effort: a failure is logged and never blocks the PIN change.
+ */
+export async function revokeFaceDevices(userId: string): Promise<void> {
+  const { error } = await admin.from("face_devices").delete()
+    .eq("user_id", userId);
+  if (error) console.error("auth-pin face revoke", error.message);
 }
 
 export async function savePin(
