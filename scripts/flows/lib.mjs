@@ -82,7 +82,7 @@ function linuxGlArgs() {
 
 /* FLOW_BROWSER=webkit runs the flow in Playwright WebKit (the engine of the school iPads) instead of Chromium (the default).
  * WebKit has no --mute-audio: the games of this repo only make sound after a tap, which a headless flow never makes unless it says so. */
-export async function launchBrowser({ fullChromium = false } = {}) {
+export async function launchBrowser({ fullChromium = false, args = [] } = {}) {
   const playwright = await importPlaywright();
   if (process.env.FLOW_BROWSER === "webkit") {
     if (!playwright.webkit) throw new Error("FLOW_BROWSER=webkit: this Playwright has no webkit");
@@ -98,7 +98,7 @@ export async function launchBrowser({ fullChromium = false } = {}) {
     : [{}, ...cachedChromiumPaths().map(executablePath => ({ executablePath })), { channel: "chrome" }];
   for (const opts of attempts) {
     // --mute-audio: the games' sound must never play on the machine running the tests
-    try { return await chromium.launch({ ...opts, args: [...(opts.args || []), "--mute-audio"] }); } catch (error) { errors.push(String(error.message).split("\n")[0]); }
+    try { return await chromium.launch({ ...opts, args: [...(opts.args || []), "--mute-audio", ...args] }); } catch (error) { errors.push(String(error.message).split("\n")[0]); }
   }
   throw new Error("Could not launch Chromium:\n" + errors.join("\n"));
 }
@@ -338,15 +338,16 @@ const failuresOf = (h) => h.failures;
 /* flow = { name, touch?: boolean, serviceWorkers?: "allow" (default "block": most flows must not see the worker), run: async (h) => void }
  * h = { page, context, origin, backend, expect, eq, step, pause, shot, signIn, goto } */
 export async function runFlow(flow, { browser, origin, shotsDir = process.env.FLOW_SHOTS_DIR } = {}) {
-  const ownBrowser = !browser;
-  const own = ownBrowser ? await Promise.all([launchBrowser({ fullChromium: !!flow.fullChromium }), startServer()]) : null;
-  const theBrowser = browser || own[0];
-  const theOrigin = origin || own[1].origin;
+  const ownBrowser = !browser || !!flow.chromiumArgs;   // a flow that needs special browser flags (fake camera) gets its own browser
+  const own = ownBrowser ? await Promise.all([launchBrowser({ fullChromium: !!flow.fullChromium, args: flow.chromiumArgs || [] }), startServer()]) : null;
+  const theBrowser = own ? own[0] : browser;
+  const theOrigin = own ? own[1].origin : origin;
   const tmpVideos = fs.mkdtempSync(path.join(os.tmpdir(), "flow-video-"));
   const viewport = flow.viewport || VIEWPORT;          // a flow may ask for another size (a game in landscape)
   const context = await theBrowser.newContext({
     viewport, screenSize: viewport, deviceScaleFactor: 1, serviceWorkers: flow.serviceWorkers || "block",
     hasTouch: !!flow.touch, isMobile: !!flow.touch,
+    ...(flow.permissions ? { permissions: flow.permissions } : {}),
     ...(process.env.FLOW_COLOR_SCHEME ? { colorScheme: process.env.FLOW_COLOR_SCHEME } : {}),   // FLOW_COLOR_SCHEME=dark emulates prefers-color-scheme
     recordVideo: { dir: tmpVideos, size: viewport },
   });

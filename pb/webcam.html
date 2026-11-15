@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="lb">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Kamera-Arcade · Arcade</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/pb/arcade-ui.css?v=10">
+<link rel="stylesheet" href="/pb/webcam/webcam.css?v=1">
+<script src="/pb/arcade-kit.js?v=50" data-arcade-id="webcam" data-arcade-title="Kamera-Arcade" data-arcade-restart></script>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="wc-lock" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" d="M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3"/></symbol>
+</svg>
+<main class="wc-main" id="main">
+  <section class="wc-menu" id="menu" aria-labelledby="menuTitle">
+    <div class="wc-wrap">
+      <h2 id="menuTitle">📷 Kamera-Arcade</h2>
+      <p class="wc-lead">Sechs Spiller, déi s de mat dengen Hänn an dengem Kierper spills. Keen Controller, keen Touch. Original mini-games you play with your hands and body through the webcam.</p>
+      <p class="wc-privacy"><svg aria-hidden="true"><use href="#wc-lock"/></svg><span><b>Your video never leaves this device.</b>Nothing is uploaded, recorded or saved: d'Biller gi just am Apparat vum Modell gelies. D'Kamera geet aus, wann s de d'Spill verléiss.</span></p>
+      <div class="wc-grid" id="grid" role="list"></div>
+      <noscript><p class="wc-foot">D'Kamera-Arcade brauch JavaScript.</p></noscript>
+      <p class="wc-foot" id="menuFoot"></p>
+    </div>
+  </section>
+
+  <section class="wc-play" id="play" hidden>
+    <div class="wc-box" id="box">
+      <div class="wc-frame" id="frame"><canvas id="cv" role="img" aria-label="Kamera-Spill: d'Kamerabild mat de erkannten Hänn oder dem Kierper"></canvas></div>
+      <div class="arcade-overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle">
+        <div class="arcade-panel" id="panel"><h2 id="ovTitle"></h2><div id="ovBody"></div></div>
+      </div>
+    </div>
+    <div class="wc-bottom" id="bottom">
+      <button class="wc-tool" id="btnMenu" type="button">‹ Menü</button>
+      <span id="toolbar" style="display:contents"></span>
+      <span class="spacer"></span>
+      <span class="wc-priv" id="priv"><svg aria-hidden="true"><use href="#wc-lock"/></svg>Your video never leaves this device</span>
+    </div>
+  </section>
+</main>
+<script type="module" src="/pb/webcam/app.js?v=1"></script>
+</body>
+</html>
