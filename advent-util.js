@@ -1,21 +1,15 @@
-/* advent-util.js — small helpers shared by the Adventskalenner (advent.js, advent-kinds.js, advent-games.js).
- * Everything that touches server strings goes through el() (textContent), never innerHTML. */
+/* advent-util.js — small pure helpers for the Adventskalenner (advent.js): DOM builder, Luxembourgish number format,
+ * countdown text, error mapping. Server strings only ever go through el() (textContent), never innerHTML. */
 
 export const DOOR_COUNT = 24;
 export const DEFAULT_ERROR = "Eppes ass schifgaang. Probéier nach eng Kéier.";
 
-/* "advent: name taken" -> short Luxembourgish message */
+/* "advent: locked" -> short Luxembourgish message */
 const ERROR_TEXT = {
-  "bad name": "Dësen Numm geet net. 2 bis 20 Zeechen: Buschtawen, Zuelen, Espace, . _ ' -",
-  "name taken": "Dësen Numm gëtt et schonn. Huel en aneren.",
-  "full": "Leider si keng Plaze méi fräi.",
-  "no username": "Däi ian.lu-Kont huet nach kee Benotzernumm.",
-  "locked": "Dës Dier ass nach zou.",
-  "not ready": "De Kalenner ass nach net prett. Probéier méi spéit.",
-  "join first": "Maach fir d'éischt mat.",
-  "open the door first": "Maach d'Dier fir d'éischt op.",
-  "bad day": "Dës Dier gëtt et net.",
-  "bad answer": "Dës Äntwert ass net valabel.",
+  signin: "Mell dech fir d'éischt un.",
+  day: "Dës Dier gëtt et net.",
+  locked: "Dës Dier ass nach zou.",
+  over: "De Kalenner ass eriwwer. Dës Dier geet net méi op.",
 };
 
 export class AdventError extends Error {
@@ -29,6 +23,16 @@ export class AdventError extends Error {
 
 export const errorText = (error) => ERROR_TEXT[error?.code] || DEFAULT_ERROR;
 
+/* The four gift games: display name, what the gift is, where to play (pixelbreak.html?g=<id>). */
+export const GAMES = Object.freeze({
+  "cookie-clicker": { name: "Cookie Clicker", unit: "Cookien", emoji: "🍪" },
+  "bus-tycoon": { name: "Bus Tycoon", unit: "Passagéier", emoji: "🚌" },
+  "idle-empire": { name: "Business Empire", unit: "Cash", emoji: "💰" },
+  "park": { name: "Schueberfouer Tycoon", unit: "Suen", emoji: "🎡" },
+});
+export const gameInfo = (id) => GAMES[id] || { name: String(id || "Spill"), unit: "", emoji: "🎁" };
+export const gameUrl = (id) => (GAMES[id] ? `pixelbreak.html?g=${id}` : "pixelbreak.html");
+
 /* ---------- DOM ---------- */
 /* el("button", { class: "x", text: "Hi", on: { click: fn }, aria: { label: "…" }, data: { day: 3 }, type: "button" }, ...children) */
 export function el(tag, props = {}, ...children) {
@@ -40,7 +44,6 @@ export function el(tag, props = {}, ...children) {
     else if (key === "on") for (const [name, handler] of Object.entries(value)) node.addEventListener(name, handler);
     else if (key === "aria") for (const [name, val] of Object.entries(value)) node.setAttribute(`aria-${name}`, String(val));
     else if (key === "data") for (const [name, val] of Object.entries(value)) node.dataset[name] = String(val);
-    else if (key === "style") node.style.cssText = value;
     else if (value === true) node.setAttribute(key, "");
     else node.setAttribute(key, String(value));
   }
@@ -52,96 +55,60 @@ export function el(tag, props = {}, ...children) {
 }
 
 export const clear = (node) => { node.replaceChildren(); return node; };
-
 export const prefersReducedMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
 
-/* Only http(s) links from server content are ever put into href/src. */
-export function safeUrl(value) {
-  try {
-    const url = new URL(String(value), location.href);
-    return url.protocol === "https:" || url.protocol === "http:" ? url.href : "";
-  } catch { return ""; }
-}
-
-/* credit line: "Foto: Name" with optional link */
-export function creditNode(image) {
-  const credit = String(image?.credit || "").trim();
-  if (!credit) return null;
-  const link = safeUrl(image?.link);
-  const label = link ? el("a", { href: link, target: "_blank", rel: "noopener noreferrer", text: credit }) : credit;
-  return el("p", { class: "adv-credit" }, "Bild: ", label);
-}
-
 /* ---------- storage (every access can throw: private windows, blocked site data) ---------- */
-function safely(read) {
-  try { return read(); } catch (error) { console.warn("[advent] storage unavailable", error); return null; }
-}
 export const store = {
-  get: (key) => safely(() => localStorage.getItem(key)),
-  set: (key, value) => safely(() => localStorage.setItem(key, value)),
-  remove: (key) => safely(() => localStorage.removeItem(key)),
-};
-export const session = {
-  get: (key) => safely(() => sessionStorage.getItem(key)),
-  set: (key, value) => safely(() => sessionStorage.setItem(key, value)),
+  remove(key) { try { localStorage.removeItem(key); } catch (error) { console.warn("[advent] storage unavailable", error); } },
 };
 
-export function readJson(raw, fallback) {
-  if (!raw) return fallback;
-  try { return JSON.parse(raw); } catch { return fallback; }
-}
+/* ---------- numbers ---------- */
+/* Luxembourgish uses the long scale: 1e6 Millioun, 1e9 Milliard, 1e12 Billioun, 1e15 Billiard, 1e18 Trillioun … */
+const SCALE_NAMES = ["Millioun", "Milliard", "Billioun", "Billiard", "Trillioun", "Trilliard", "Quadrillioun", "Quadrilliard",
+  "Quintillioun", "Quintilliard", "Sextillioun", "Sextilliard", "Septillioun", "Septilliard", "Oktillioun", "Oktilliard",
+  "Nonillioun", "Nonilliard", "Dezillioun"];   // first = 1e6, last = 1e60
+const SUPERSCRIPT = { 0: "⁰", 1: "¹", 2: "²", 3: "³", 4: "⁴", 5: "⁵", 6: "⁶", 7: "⁷", 8: "⁸", 9: "⁹" };
+const sup = (n) => String(n).replace(/\d/g, (c) => SUPERSCRIPT[c]);
+const NBSP = " ";
 
-/* ---------- content validation ---------- */
-export function asObject(value) {
-  if (value && typeof value === "object" && !Array.isArray(value)) return value;
-  if (typeof value === "string") {
-    const parsed = readJson(value, null);
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
+/* 3 significant digits, decimal comma, no trailing zeros: 6.03 -> "6,03", 12 -> "12", 100.4 -> "100" */
+const mantissa = (value) => String(Number(value.toPrecision(3))).replace(".", ",");
+const round3 = (value) => Number(value.toPrecision(3));
+
+/* 6.03e12 -> "6,03 Billiounen"; 12345 -> "12 345"; 1e220 -> "1 × 10²²⁰". Never raw exponent text. */
+export function formatAmount(raw) {
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0) return "0";
+  if (value < 1e6) return String(Math.round(value)).replace(/\B(?=(\d{3})+(?!\d))/g, NBSP);
+  let index = Math.floor(Math.log10(value) / 3) - 2;      // 0 = Millioun (1e6)
+  let scaled = value / 10 ** (3 * (index + 2));
+  if (round3(scaled) >= 1000) { index += 1; scaled = value / 10 ** (3 * (index + 2)); }
+  if (index < SCALE_NAMES.length) {
+    const name = SCALE_NAMES[index];
+    return `${mantissa(scaled)}${NBSP}${round3(scaled) === 1 ? name : `${name}en`}`;
   }
-  return {};
+  let exp = Math.floor(Math.log10(value));
+  if (round3(value / 10 ** exp) >= 10) exp += 1;
+  return `${mantissa(value / 10 ** exp)}${NBSP}×${NBSP}10${sup(exp)}`;
 }
-
-export const asArray = (value) => (Array.isArray(value) ? value : []);
 
 /* ---------- time ---------- */
-const pad2 = (n) => String(n).padStart(2, "0");
+const count = (n, one, many) => `${n}${NBSP}${n === 1 ? one : many}`;
 
-/* 83 -> "1:23", 3725 -> "1:02:05" */
-export function formatTime(totalSeconds) {
-  const seconds = Math.max(0, Math.round(Number(totalSeconds) || 0));
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
-  return h > 0 ? `${h}:${pad2(m)}:${pad2(s)}` : `${m}:${pad2(s)}`;
-}
-
-const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-
-/* ms until a door opens -> "2 Deeg 3 Stonnen" / "3 Stonnen 12 Minutten" / "12 Minutten 5 Sekonnen" / "42 Sekonnen" */
+/* ms -> "3 Deeg 5 Stonnen" / "5 Stonnen 3 Minutten" / "3 Minutten 12 Sekonnen" / "42 Sekonnen" */
 export function formatCountdown(ms) {
   const total = Math.max(0, Math.ceil(ms / 1000));
   const days = Math.floor(total / 86400);
   const hours = Math.floor((total % 86400) / 3600);
   const minutes = Math.floor((total % 3600) / 60);
   const seconds = total % 60;
-  if (days > 0) return `${plural(days, "Dag", "Deeg")} ${plural(hours, "Stonn", "Stonnen")}`;
-  if (hours > 0) return `${plural(hours, "Stonn", "Stonnen")} ${plural(minutes, "Minutt", "Minutten")}`;
-  if (minutes > 0) return `${plural(minutes, "Minutt", "Minutten")} ${plural(seconds, "Sekonn", "Sekonnen")}`;
-  return plural(seconds, "Sekonn", "Sekonnen");
+  if (days > 0) return `${count(days, "Dag", "Deeg")} ${count(hours, "Stonn", "Stonnen")}`;
+  if (hours > 0) return `${count(hours, "Stonn", "Stonnen")} ${count(minutes, "Minutt", "Minutten")}`;
+  if (minutes > 0) return `${count(minutes, "Minutt", "Minutten")} ${count(seconds, "Sekonn", "Sekonnen")}`;
+  return count(seconds, "Sekonn", "Sekonnen");
 }
-
-export const penaltyText = (seconds) => {
-  const s = Math.round(Number(seconds) || 60);
-  return s % 60 === 0 ? `+${plural(s / 60, "Minutt", "Minutten")}` : `+${plural(s, "Sekonn", "Sekonnen")}`;
-};
-
-export const waitText = (seconds) => `Waart nach ${plural(Math.max(1, Math.ceil(Number(seconds) || 1)), "Sekonn", "Sekonnen")}`;
 
 export function parseServerTime(value) {
   const ms = typeof value === "number" ? value * (value < 1e11 ? 1000 : 1) : Date.parse(String(value));
   return Number.isFinite(ms) ? ms : NaN;
 }
-
-/* ---------- name rule (mirrors the server: 2–20 chars, letters incl. accents, digits, space . _ ' -) ---------- */
-export const NAME_PATTERN = /^[\p{L}\p{N} ._'-]{2,20}$/u;
-export const isValidName = (name) => NAME_PATTERN.test(name) && name.trim() === name;
