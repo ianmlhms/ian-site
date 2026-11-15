@@ -173,7 +173,7 @@ function tick() {
   const next = nextLockedDoor();
   const now = serverNow();
   if (isOver()) {
-    header.textContent = "De Kalenner ass eriwwer. Merci fir mat ze maachen!";
+    header.textContent = "De Kalenner ass eriwwer. Merci fir d'Matmaachen!";
   } else if (!next) {
     header.textContent = "All Dieren sinn op. Hues de se all opgemaach?";
   } else {
@@ -239,7 +239,7 @@ function showGifts(day, gifts, { isNew, opener }) {
     doorStage(day),
     note ? el("p", { class: "adv-text", text: note }) : null,
     el("ul", { class: `adv-gifts${isNew ? " fresh" : ""}`, "aria-label": "Kaddoen" }, gifts.map(giftRow)),
-    el("p", { class: "adv-small", text: "Ass d'Spill oppen, kënnt de Kaddo no ongeféier enger Minutt. Soss kënnt en, wann s de d'Spill nächst Kéier opmaachs." }));
+    el("p", { class: "adv-small", text: "Ass d'Spill oppen, kënnt de Kaddo no ongeféier enger Minutt. Soss kënnt en, wann s de d'Spill déi nächst Kéier opmaachs." }));
 }
 
 function showMessageSheet(opener, day, title, text, extra = null) {
@@ -312,7 +312,7 @@ async function boot() {
     state.sb = await auth.client();
   } catch (error) {
     console.warn("[advent] client failed", error);
-    showMessage("Konnt net mat dem Server verbannen.", true);
+    showMessage("Konnt net mam Server verbannen.", true);
     return;
   }
   auth.onAuth(async () => {
