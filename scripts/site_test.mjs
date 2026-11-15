@@ -188,8 +188,13 @@ async function attempt(client, page, theme, fixtures, shotsDir, port) {
     await client.send("Fetch.enable", { patterns: [{ urlPattern: "*", requestStage: "Request" }] }, sessionId);
     client.on("Fetch.requestPaused", sessionId, (p) => { void handlePaused(client, sessionId, p, fixtures); });
     await client.send("Page.setLifecycleEventsEnabled", { enabled: true }, sessionId);
+    /* Two theme systems: theme.js reads "site_theme", the Gitter pages (gitter-theme.js, Nov 2026) read
+     * "gt-theme" and otherwise follow the device. Without the second key and the emulated media both runs
+     * showed whatever this Mac's appearance was — "light" was never really light on a dark-mode host. */
+    await client.send("Emulation.setEmulatedMedia",
+      { features: [{ name: "prefers-color-scheme", value: theme }] }, sessionId);
     await client.send("Page.addScriptToEvaluateOnNewDocument", {
-      source: `try { localStorage.setItem("site_theme", ${JSON.stringify(JSON.stringify({ mode: theme }))}); } catch (e) {}`,
+      source: `try { localStorage.setItem("site_theme", ${JSON.stringify(JSON.stringify({ mode: theme }))}); localStorage.setItem("gt-theme", ${JSON.stringify(theme)}); } catch (e) {}`,
     }, sessionId);
     const loaded = client.once("Page.loadEventFired", sessionId);
     await client.send("Page.navigate", { url: `http://127.0.0.1:${port}/${page}` }, sessionId);

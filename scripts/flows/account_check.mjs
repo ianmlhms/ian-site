@@ -42,6 +42,9 @@ export const flow = {
     tables: { profiles: profileRows },
     functions: { "auth-pin": authPin },
     rpc: {
+      // account-check.js reads the stamp through this RPC since security-hardening-v3 (the column is no longer
+      // readable from profiles); without it the mock answered "never checked" forever and the card came back.
+      my_profile_private: () => [{ account_checked_at: checkedAt }],
       mark_account_checked: () => { checkedAt = new Date().toISOString(); return null; },
       set_class: () => null,
       set_username: (args) => args.p_name,
