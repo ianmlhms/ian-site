@@ -3204,3 +3204,92 @@ HOLES_Q=low PASS (0); luxdrive_ui PASS; luxdrive_webkit PASS; harness **175 / 17
 * Remaining falls / air: 4504 at 9630,9374 (above), service at 5148,10482 (fall 7.1 m, parapet 0.93), Kéibierg / Tréiererstrooss 5597,8885 (air 0.40, parapet 1.02), Route de Trèves
   11374,5355 (air 0.05), service 10035,8431 (air 0.23).
 * Rue d'Alsace 15428 under the Buchler path deck: roll 0.48 / jolt 164 (new with item 2).
+
+## City 22 (15 - 16 Nov 2026, branch `lux-drive-city22`, Mac mini, lowest priority): Bd Roosevelt at the Passerelle, Pont Buchler's footway deck, the 4504 service ring, the Route de Trèves T junction - main.js ?v=78
+
+Started from v77 (e00cb2ce) + origin/main 4b935068 (a fast-forward: main had moved on outside Lux Drive only).  Every heavy run went through `luxdrive-work/lowprio.sh` (load < 12, nice 19)
+and one at a time; tools + logs in `~/Library/Caches/luxdrive-work/city22/` (city21's tools plus `tools/pjrun.sh` / `pjcmp.py` / `pjcmpn.py` - joined-lane drives at lowprio and their
+side-by-side comparison, `footover.mjs` footway decks overlapping a parallel carriageway, `dupseg.mjs` ways that share a segment, `waypts.mjs` raw way points, `deckinfo.mjs` a deck and the
+ways along it, `protat.mjs` the corridors that protect a point (needed a debug hook in protection(), removed again), `asweep.sh`, `to.sh` a timeout for macOS, `waitfor.sh`).
+The uncommitted 28 lines left on 9 Nov (the start of item 1) were kept and finished.
+
+### 1. Boulevard Roosevelt 12245 at the Passerelle (the city's worst main-road roll, 1.08 rad since v73): FIXED - road-network.js PROTECT_UNDER_MIN / PROTECT_HANDOVER
+The carriageway 12245 runs along the valley edge beside its twin 687 (an over way: it rides over the Hellege-Geescht approach 13628) and the Passerelle's tagged ways.  The corridors that
+protect the ground under an over way covered 12245's carriageway, so the carve kept the land of the valley edge under its outer lane - 1.8 m under its bed at the centre, 5 m at the edge
+(the car rolled 1.08 rad, jolt 698).  Now, on the carriageway of a carved way (its bench, fading over PROTECT_BESIDE 2 m past it), the protection against a FILL counts only corridors that lie
+PROTECT_UNDER_MIN (3 m) over its bed; a corridor at about its level protects only its own side of the line half way between the two benches (PROTECT_HANDOVER 0.6 m either side).
+The corridor's level: an over way's bed where it lies on its DTM within 1.5 m (else unknown = protects as before: Autoroute du Nord 17563 at the closed Stafelter tunnel), a tagged way's
+the top of the deck laid along it (within 3 m; none = unknown).  Limited after the first full sweep (`cand1`): only the FILL (the protection against a cut stays whole - service 18824 and
+Rond-Point Merl 3005 cut into the over way beside them: air 0.25, rolls 0.66 / 0.74), only along PARALLEL corridors (cosine >= 0.8 - 0.9: the footbridges 2527 / 2530 of the
+Hellege-Geescht plateau cross over service 6854 only 2 - 4.7 m up; freeing its fill dropped a car 2.2 m), and only for a fill of up to 5 - 7 m (Stafelter 8709's bed is 8 m over the land).
+12245: roll 1.08 -> 0.34 (13 m/s; 0.17 at 57), jolt 698 -> 53; 687 beside it unchanged; 1057 jolt 773 -> 762.
+
+### 2. Pont Buchler 15754 / 16046 (footway deck 229 in the outer lane): FIXED - decks.js clearCarriageways (applied by widenToWays, so the game, the harness, the bakers and the sweep agree)
+A FOOTWAY deck (narrower than DECK.trustWidth, no car way along its axis) that OSM draws overlapping the carriageway of a parallel car way moves across, out of that carriageway, until its
+inner edge meets the carriageway's edge (at most 2.5 m, spread along the deck over 12 m, fading out over the last 8 m at its ends: deck 229's end moved over the cut of service 7674 - an
+open pit, harness D).  Only beside a car way that has no deck of its own (a carved carriageway, as Pont Buchler's deckless bridge): moving footway deck 96 off Rue Jean-Baptiste
+Merkel's deck left one more point of harness M1 with no deck under it (206 > 205).  The car took the path deck - 0.5 - 0.8 m over its lane, within stickBelow + hintLift of its
+body - for its road, rolled 0.6 and met the path's railing.  `tools/footover.mjs`: 40 (deck, way) overlaps in the city, most beside road decks at their own level (harmless); 33
+footway decks move, by 0.0 - 2.5 m.  15754 roll 0.60 -> 0, the 229 parapet hits on 15754 /
+16046 (0.24 - 0.56, 13 of them) gone, 8067 roll 0.51 -> 0, 17921 jolt 147 -> 61.
+
+### 3. Secondary 4504 at 9630,9374 (the city's only main-road fall, 3.1 m at 57 m/s, air 1.17 s): FIXED - ring-share.js (new, applied in loadWorldData)
+The service ring 10335 (6.4 m, its bed 1.5 m over the street's) is closed by OSM over two nodes of 4504: one of its segments lies ON the secondary's centre line.  The carve took the two
+for carriageways at two levels overlapping in plan and handed the point to the service: a 0.9 m hump in 4504's lane.  A service ring that runs along another drivable car way for a run of
+segments loses that run (the longest) and becomes an open way whose two ends are junctions with that way (`tools/dupseg.mjs`: 9 rings in the city, 17 shared segments, all services).
+4504: fall 3.13 / air 1.17 / roll 0.48 / jolt 578 -> no event over 43; the service's own lanes jolt 225 -> 0, roll 0.49 -> 0.22.
+Harness B ("the painted tarmac is not wider than OSM") gives a CLOSED way the width of its enclosed area as allowance; an opened ring is read as the closed way it was (`data.openedRings`,
+the polygon closed by the run it gave up - the same area, the same allowance as before; without it the opened ring measured 4.35 m too wide).
+
+### 4. Route de Trèves 18705 at the motorway link 18704 (air, roll 0.58, jolt 413): FIXED - road-network.js reconcileJunctions 1b, T_END_MAX
+The link 18704 ends INSIDE the carriageway of the primary 18705 between two of its points (a T), 1.42 m under it.  Pass 2 pins only a smaller way to the bigger one designed before it,
+and the end cap of the bigger way is no crossing - so a motorway link (rank 8.5) that ends on a primary (7) was never reconciled, and the primary's lane ran onto the link's carriageway.
+Now the END of a way that stops inside the carriageway of a smaller way (across that way's own length; not at a node, not an over way, at most T_END_MAX 3 m apart) is pinned to the
+smaller way's level: the way that runs on through the junction keeps its level.  18705: air / roll 0.58 / jolt 413 -> jolt 127 (57 m/s), the link itself clean.
+
+### Full-city drive sweep
+Before = v77 + main (`base-wt` 4b935068), after = this branch, the same tool (lux-drive-sweep `--drawn`, 13/25 + SWEEP_FAST, 1 worker at nice 19).  `tools/summary.py`:
+| | v77 (before) | v78 (after) |
+|---|---|---|
+| serious places (fall / air / parapet / non-building hit) | 44 (13 main) | **38 (7 main)** |
+| falls | 2 (1) | **1 (0)** |
+| airborne | 5 (2) | **3 (0)** |
+| parapet hits | 11 (7) | **7 (3)** |
+| bank / wall / tube / prop / landmark hits | 31 (4) | 31 (4) |
+| main-road rolls >= 0.3 rad | 23 | **19** |
+| main-road max roll | 1.08 | **0.92** |
+| main-road jolts >= 100 m/s2 | 38 | **35** |
+The v77 sweep is identical to city21's after-v76 (the launch changed no road), so the tool and the before are consistent.  Main-road serious places gone: 4504 (fall 3.13 / air 1.17),
+Route de Trèves 18705 (air, roll 0.58), Pont Buchler 15754 (roll 0.60, parapet) and 16046 (parapet x 2 places), Autoroute de Trèves 2845 (the parapet of link deck 223, 0.42, no
+longer reached, roll 0.52 -> 0.30: a side effect, not traced).
+`diff.py` (after/diff-v77.txt): 31 road cells better, worse: 5 cells, none a new serious place: service 7674 at 5150,10483 parapet 0.93 -> 1.01 (an old serious place, its fall of 7.0 m unchanged: the edge of deck 229
+moved a little - the shift fades out over the last 8 m), its jolt at 5138,10470 159 -> 213; Bd Roosevelt 12245 roll 0.34 at 5295,9257 (the rest of the 1.08 place, 20 m along: a new
+grid cell of the same place); service 10335 roll 0.35 at 9631,9359 (the opened ring's last segment falls 1.5 m to 4504's node); Clausener Bierg 20125 jolt 1623 -> 1686 (see Still wrong).
+Before the final tree a first candidate (`sweep/cand1`, the corridor rule unrestricted) had 5 falls: those are what limited item 1 to fills / parallel corridors / trusted levels.
+
+### Shots
+`luxdrive-work/city22/shots/stacked/` (before = v77 `base-wt`, after = this branch, the same poses `poses22.json`, `stack.py`): stacked_1_bd_roosevelt_12245_lane,
+stacked_2_bd_roosevelt_12245_valley_side, stacked_3_pont_buchler_15754_lane, stacked_4_pont_buchler_footway_side, stacked_5_secondary_4504_service_ring,
+stacked_6_route_de_treves_18705_link (singles in before/ and after/).
+
+### Gates (main.js ?v=78)
+Tree = origin/main 4b935068 + this branch, main.js ?v=78; logs `luxdrive-work/city22/gates/g4_*`.  Walls re-baked (116 walls, 1017 points, 2791 m; the gate run's re-bake
+leaves walls.bin unchanged).  luxdrive_world PASS (carve walls **8 / 8** sampled - v76 7 / 8: the opened rings change the segment count, 15500 -> 15498 sides, so the sample is
+re-drawn; the land's own cliffs 13 -> 10; deepest 6.90; p99 1.51; medium 151 draw calls); luxdrive_holes PASS (0) and HOLES_Q=low PASS (0); luxdrive_ui PASS; luxdrive_webkit PASS;
+harness **175 / 175 PASS** (1874 s; D: open pits 0, 11 points in a cut closed by a wall, worst 3.05 m; M1 205 / 205; paint too wide 0).
+
+### Still wrong (for the next round)
+* Clausener Bierg 20125 at 5667,8685: jolt 1686 (the city's biggest; 1623 on v77).  The DTM under 20125 dips 10 m for ~45 m right after the over way 5501 (land 275.7 -> 264 ->
+  271): an untagged bridge or a hole in the DTM; 20125's bed follows the dip and climbs 12 m in 5 m to 5501's surface.  Needs a "span the dip" rule or a data fix.
+* Bd Jean Ulveling 122 at 5189,8535: roll 0.92 (now the city's worst main-road roll).  Its left lane hangs over 9499 (10 m wide, its surface 1 m UNDER its own bed) and its own
+  surface lies 1 m over its bed - a junction to untangle.
+* Bd Roosevelt 12245: roll 0.34 at 5295,9257 is what is left of the 1.08 (the cut side toward 687 keeps its protection); the step between 12245 and 687 (1.7 m higher) reads as a
+  jagged earth bank in stacked_1 (a retaining wall would be right there); the Passerelle balustrade graze 0.46 m is unchanged.
+* Clausener Bierg 522 parapet 0.95 at 57 m/s: deck 265 (3 points, 3.2 m, top 287.7 -> 282.5 over 5.7 m) - a steep stub deck across the road.
+* Val de Hamm 3735 parapet 0.65 at 57 m/s (deck 55's end, where the 11 m road meets the 8.8 m bridge - the lane model at a narrowing); Allée Pierre de Mansfeld 2329 parapet 0.33 (the
+  end of service deck 255 / way 9580 on its lane); Kennedy 2965 jolt 702 + bank and Bd Robert Schuman 519 jolt 694 (both ends of the Pont Rouge, the outer lanes at the deck's
+  narrowing); Rocade de Bonnevoie 5876 roll 0.71 + tube 0.18 (off-centre drawn carriageway) - all from city21's list, unchanged.
+* Service 7674 at 5148,10482: fall 7.0 unchanged, its parapet graze of deck 229 0.93 -> 1.01 m (the deck's edge moved a little); service 10335 roll 0.35 where the opened ring falls
+  1.5 m to 4504's node; Kéibierg 2505 (roll 1.06, air 0.40), Rampart 3211 (roll 1.02), service 4951 (roll 1.04) unchanged.
+* Stafelter 8709 / 17563 (roll 0.73, world-border beds), unchanged.
+* The corridor rule (item 1) frees only fills; a carriageway beside a parallel over way at its level that needs a CUT (12245's inner side) still keeps the over way's land.
