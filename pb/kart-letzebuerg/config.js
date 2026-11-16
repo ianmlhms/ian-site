@@ -132,7 +132,7 @@
   };
 
   KL.QUALITY = {
-    low:    { dpr: 1, shadows: false, trees: 0.4, particles: 0.4, far: 380, buildings: 0.7 },
+    low:    { dpr: 1, shadows: false, trees: 0.3, particles: 0.35, far: 340, buildings: 0.6, mapPx: 1024 },   // iPad / Niddreg: pixel ratio 1, no antialias, fewer trees and houses, a shorter view, a smaller ground map
     medium: { dpr: 1.5, shadows: false, trees: 0.75, particles: 0.7, far: 520, buildings: 1 },
     high:   { dpr: 2, shadows: true, trees: 1, particles: 1, far: 700, buildings: 1 },
   };

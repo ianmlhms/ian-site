@@ -12,8 +12,8 @@
 
   const GRID_STEP = 4;
   const GROUND_LIFT = 0.15;
-  const TEX_W = 1024;
-  const TEX_H = 2048;
+  const TEX_W_FULL = 1024;
+  const TEX_H_FULL = 2048;
   const EDGE_FADE_X = 30;
   const EDGE_FADE_Z = 50;
   const WIDTH_MARGIN = 4;          // the painted ground stays this far inside the terrain strip
@@ -301,7 +301,8 @@
   ];
   const CLASS_ALPHA = [1, 1, 1, 1, 1, 1, 1, 0, 0];
 
-  function paintGround(patch, data) {
+  function paintGround(patch, data, quality) {
+    const TEX_W = quality === 'low' ? TEX_W_FULL / 2 : TEX_W_FULL, TEX_H = quality === 'low' ? TEX_H_FULL / 2 : TEX_H_FULL;   // low (iPads): a quarter of the pixels to paint, 2 m x 2 m per texel instead of 1 m
     const cg = data.classGrid;
     const canvas = document.createElement('canvas'); canvas.width = TEX_W; canvas.height = TEX_H;
     const g = canvas.getContext('2d');
@@ -373,7 +374,7 @@
 
     /* ---- painted ground (W2c: a patch whose heavy half did not load has no class map: roads and water only) */
     if (data.classGrid) {
-      const tex = paintGround(patch, data);
+      const tex = paintGround(patch, data, quality);
       disposables.push(tex);
       const mb = new MB(true);
       const nx = Math.round((2 * capX) / GRID_STEP); const nz = Math.round((2 * EXT_Z) / GRID_STEP);

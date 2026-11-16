@@ -38,6 +38,7 @@ import { flow as paketExpress } from "./paket_express.mjs";
 import { flow as kartLetzebuerg } from "./kart_letzebuerg.mjs";
 import { flow as kartLetzebuergMp } from "./kart_letzebuerg_mp.mjs";
 import { flow as kartLetzebuergArcade } from "./kart_letzebuerg_arcade.mjs";
+import { flow as kartIpadStart } from "./kart_ipad_start.mjs";
 
 import { flow as mpLobbyConnect4 } from "./mp_lobby_connect4.mjs";
 import { flow as mpLobbySlf } from "./mp_lobby_slf.mjs";
@@ -66,6 +67,7 @@ import { flow as trainSimTramHoles } from "./train_sim_tram_holes.mjs";
 import { flow as trainSimTiming } from "./train_sim_timing.mjs";
 import { flow as trainSimStock } from "./train_sim_stock.mjs";
 import { flow as trainSimOverbridges } from "./train_sim_overbridges.mjs";
+import { flow as trainSimIpadStart } from "./train_sim_ipad_start.mjs";
 import { flow as fouerWorld } from "./fouer_world.mjs";
 import { flow as fouerModels } from "./fouer_models.mjs";
 import { flow as fouerBigModels } from "./fouer_big_models.mjs";
@@ -90,7 +92,7 @@ import { flow as homePage } from "./home_page.mjs";
 import { flow as advent } from "./advent.mjs";
 import { flow as webcamArcade, flowCamera as webcamArcadeCamera, flowPortrait as webcamArcadePortrait } from "./webcam_arcade.mjs";
 
-const ALL = [homePage, advent, webcamArcade, webcamArcadeCamera, webcamArcadePortrait, gameCache, halloween, mtbWorld, mtbHoles, mtbRide, mtbTrails, mtbMenu, mtbTouch, mtbSmooth, mtbIpadStart, fouerWorld, fouerModels, fouerBigModels, fouerGame, fouerMigration, fouerWalk, fouerRides, fouerAccess, fouerLaunch, fouerIpadStart, invitePop, invitesLight, mpLobbyConnect4, mpLobbySlf, mpLobbyQuick, mpLobbyGames, mpLobbyColor, mpLobbyParty, mpLobbyArcade, mpLobbyRoulette, mpLobbyBlackjack, trainSim, trainSimAudio, trainSimTouch, trainSimOverlap, trainSimCareerLock, trainSimResumeCloud, trainSimWorld, trainSimRoutes, trainSimAbroad, trainSimTramHoles, trainSimStock, trainSimTiming, trainSimOverbridges, paketExpress, kartLetzebuerg, kartLetzebuergMp, kartLetzebuergArcade, clientCommands, inboxCloud, busTycoon, newGroup, addMember, mediaCache, friendsAdd, slfRound, arcadePad, leaderboardTags, adminOnlineNotice, adminKartSaves, ccSigninHint, accountCheck, quickLogin, arcadeWeeklyStreak, idleRebirthHalloween, idleMoreContent, idleSoftcap, idleLiveGift, idleResetSafety, leaderboardBigScores, driveMadLevels, testMode, mordsfall];
+const ALL = [homePage, advent, webcamArcade, webcamArcadeCamera, webcamArcadePortrait, gameCache, halloween, mtbWorld, mtbHoles, mtbRide, mtbTrails, mtbMenu, mtbTouch, mtbSmooth, mtbIpadStart, fouerWorld, fouerModels, fouerBigModels, fouerGame, fouerMigration, fouerWalk, fouerRides, fouerAccess, fouerLaunch, fouerIpadStart, invitePop, invitesLight, mpLobbyConnect4, mpLobbySlf, mpLobbyQuick, mpLobbyGames, mpLobbyColor, mpLobbyParty, mpLobbyArcade, mpLobbyRoulette, mpLobbyBlackjack, trainSim, trainSimAudio, trainSimTouch, trainSimOverlap, trainSimCareerLock, trainSimResumeCloud, trainSimWorld, trainSimRoutes, trainSimAbroad, trainSimTramHoles, trainSimStock, trainSimTiming, trainSimOverbridges, trainSimIpadStart, paketExpress, kartLetzebuerg, kartLetzebuergMp, kartLetzebuergArcade, clientCommands, inboxCloud, busTycoon, newGroup, addMember, mediaCache, friendsAdd, slfRound, arcadePad, leaderboardTags, adminOnlineNotice, adminKartSaves, ccSigninHint, accountCheck, quickLogin, arcadeWeeklyStreak, idleRebirthHalloween, idleMoreContent, idleSoftcap, idleLiveGift, idleResetSafety, leaderboardBigScores, driveMadLevels, testMode, mordsfall, kartIpadStart];
 const words = process.argv.slice(2);
 const flows = words.length ? ALL.filter((f) => words.some((w) => f.name.includes(w))) : ALL;
 if (!flows.length) { console.error(`No flow matches: ${words.join(", ")}\nAvailable: ${ALL.map((f) => f.name).join(", ")}`); process.exit(2); }

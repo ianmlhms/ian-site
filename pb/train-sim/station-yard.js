@@ -218,7 +218,7 @@
         if (!masts.empty) add(new T.Mesh(masts.geometry(), mat(new T.MeshLambertMaterial({ vertexColors: true }))), true);
         stats.yardMasts = count;
       }
-      if (Y.trains && TS.stationYardTrains) TS.stationYardTrains.build(Object.assign({}, o, { rowsOf, resample, inRing, RAIL_HEAD }));
+      if (Y.trains && TS.stationYardTrains && o.quality !== 'low') TS.stationYardTrains.build(Object.assign({}, o, { rowsOf, resample, inRing, RAIL_HEAD }));
     }
 
     /* ---- platforms: raised paved slabs with a tactile band along the track edges */
