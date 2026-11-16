@@ -75,6 +75,8 @@
     KL.tracks[def.id] = Object.assign({}, cur, def, { theme, loaded: true });
   };
 
+  const fileUrl = (f) => '/pb/kart-letzebuerg/' + f[0] + '?v=' + f[1];
+
   /* load the scripts of a track once; resolves with the full definition */
   const pending = {};
   KL.ensureTrack = (id) => {
@@ -83,11 +85,21 @@
     if (d.loaded) return Promise.resolve(d);
     if (pending[id]) return pending[id];
     const load = (f) => new Promise((resolve, reject) => {
-      const s = document.createElement('script'); s.src = '/pb/kart-letzebuerg/' + f[0] + '?v=' + f[1]; s.async = false;
+      const s = document.createElement('script'); s.src = fileUrl(f); s.async = false;
       s.onload = resolve; s.onerror = () => reject(new Error('could not load ' + f[0]));
       document.head.appendChild(s);
     });
     pending[id] = d.files.reduce((p, f) => p.then(() => load(f)), Promise.resolve()).then(() => { if (!KL.tracks[id].loaded) throw new Error('track script did not register ' + id); return KL.tracks[id]; }).catch((e) => { delete pending[id]; throw e; });
     return pending[id];
+  };
+
+  /* Background loading (menu time): the other tracks' files are fetched one by one at low priority into the HTTP cache, nothing is run, so a later ensureTrack() is
+   * served from the cache. window.__klBg reports it ({ done, loaded, failed }). A failed fetch is ignored: ensureTrack() simply loads that file when it is needed. */
+  KL.prefetchTracks = (ids, gapMs) => {
+    const bg = window.__klBg = window.__klBg || { done: false, loaded: [], failed: [] };
+    const files = [];
+    for (const id of ids) { const d = KL.tracks[id]; if (d && !d.loaded) for (const f of d.files) if (!files.includes(f)) files.push(f); }
+    return files.reduce((p, f) => p.then(() => fetch(fileUrl(f), { priority: 'low' }).then((r) => r.arrayBuffer()).then(() => { bg.loaded.push(f[0]); }, () => { bg.failed.push(f[0]); })
+      .then(() => new Promise((r) => setTimeout(r, gapMs || 0)))), Promise.resolve()).then(() => { bg.done = true; });
   };
 })();
