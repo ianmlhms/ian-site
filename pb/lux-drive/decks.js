@@ -147,7 +147,7 @@ export function widenToWays(decks, roads) {
     }
     return way && most >= d.pts.length * 0.6 && way.width > d.width ? { ...d, width: way.width } : d;
   });
-  return globalThis.process?.env?.X22_NOFOOT ? widened : clearCarriageways(widened, roads);
+  return clearCarriageways(widened, roads);
 }
 
 /**

@@ -648,7 +648,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
               bestD = d; bestH = h;
             }
           }
-          if (bestD < Infinity && !globalThis.process?.env?.X22_NOTEND) pinOf(chain).set(k, bestH);
+          if (bestD < Infinity) pinOf(chain).set(k, bestH);
         }
       }
     }
@@ -1185,7 +1185,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
       protX1.push(corridor.x[i]); protZ1.push(corridor.z[i]);
       protHalf.push(corridor.half); protFade.push(PROTECT_FADE);
       protArc.push(arc); protRampA.push(rampA); protRampB.push(rampB); protLenA.push(lenA); protLenB.push(lenB);
-      protLevel0.push(globalThis.process?.env?.X22_NOLEVEL ? NaN : corridorLevel(corridor.x[i - 1], corridor.z[i - 1])); protLevel1.push(globalThis.process?.env?.X22_NOLEVEL ? NaN : corridorLevel(corridor.x[i], corridor.z[i])); protRoad.push(corridor.road); protBench.push(corridor.bench);
+      protLevel0.push(corridorLevel(corridor.x[i - 1], corridor.z[i - 1])); protLevel1.push(corridorLevel(corridor.x[i], corridor.z[i])); protRoad.push(corridor.road); protBench.push(corridor.bench);
       arc += Math.hypot(corridor.x[i] - corridor.x[i - 1], corridor.z[i] - corridor.z[i - 1]);
     }
   }
@@ -1274,7 +1274,6 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
           const across = (d <= 0 ? 1 : d < protFade[s] ? 1 - d / protFade[s] : 0) * mine;
           if (across * rampFill > protFill) protFill = across * rampFill;
           const v = across * ramp;
-          if (globalThis.__PROTDBG && v > 0) globalThis.__PROTDBG.push({ road: roads[protRoad[s]]?.id, level: protLevel0[s], v, across, ramp });
           if (v > p) p = v;
         }
       }
@@ -1961,7 +1960,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     // corridor at its level on that corridor's own side of the hand-over).  Only the fill: the protection against a CUT stays whole - a carriageway beside an over way at its level
     // that cut its embankment dug into the over way's lanes (service 18824 at the Route de Trèves interchange, Rond-Point Merl 3005 beside Nei Escher Strooss 3013) - and only a fill of up
     // to PROTECT_FREE_FILL (a bed many metres over the land beside an over way is a bed the design got wrong: Stafelter 8709 at the closed tunnel, 8 m)
-    if (prot > 0 && !globalThis.process?.env?.X22_NOPROT) {
+    if (prot > 0) {
       let own = -1;
       for (let a = 0; a < nPins; a++) if (pinWt[a] > 0 && (own < 0 || pinEdge[a] < pinEdge[own])) own = a;
       const beside = own >= 0 ? pinWt[own] * (1 - smoothstep(0, PROTECT_BESIDE, pinEdge[own])) * (1 - smoothstep(PROTECT_FREE_FILL[0], PROTECT_FREE_FILL[1], pinBed[own] - ground)) : 0;
