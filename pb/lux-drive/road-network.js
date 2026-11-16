@@ -67,6 +67,7 @@ const ABUT_STEEPEST = 2.2;             // m per m: the steepest mean-based fall 
 // land of the valley edge, 2 m under its bed: roll 1.08 rad, the city's worst; and the cut of 1057 at the land: jolt 773).  A carriageway lies under the over way when its bed is
 // at least this far under the over way's bed.
 const PROTECT_UNDER_MIN = 3.0;
+const CORRIDOR_DECK_REACH = 3.0;       // m: (city22) the deck of a tagged corridor lies within this of its line (the corridor and the deck are the same way, smoothed differently)
 const ABUT_UNDER = 3.0;                // m: a road under a bridge lies 5.9 - 21 m under its approaches in the network; the ways that meet at the end of the Hondhausbréck lie
                                        // 1.4 - 2.1 m apart (a junction at the abutment: their own lanes need its earth, harness V4)
 // city20: the LANES of a way under a bridge deck are cut to their bed even where the protection keeps the ground under the bridge: the DTM there holds the toe of the abutment
@@ -748,7 +749,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     const a0 = bench + pw;
     // A way that rides over the ground protects it, whether a car may drive on it or not: the footpath bridge
     // of a park stands over a street, and the street may not dig a pit under it.
-    if (tagged && !road.tunnel) overCorridors.push({ x: rs.x, z: rs.z, half: a0 + PROTECT_MARGIN });
+    if (tagged && !road.tunnel) overCorridors.push({ x: rs.x, z: rs.z, half: a0 + PROTECT_MARGIN, road: ri });
     // Only the roads a car may drive on are carved. A footpath or a staircase is not a road: carving it would cut a
     // trench into the hillside where the path follows a steep slope. A tunnel cannot be a trench in a single valued
     // height field (it gets a portal instead) and a way that rides over the ground is a deck (decks.js).
@@ -1008,7 +1009,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   // keeps the full protection up to it and the disc round it)
   const protArc = [], protRampA = [], protRampB = [], protFade = [], protLenA = [], protLenB = [];   // (protLen: the length of the ramp-up at each end, see ABUT_FADE_MAX)
   const protLevel0 = [], protLevel1 = [];   // (city22) the bed of a crossings-found over way at each end of its segment (NaN: a tagged way, level unknown - protects every way)
-  const protRoad = [];                      // (city22) that over way (-1: a tagged corridor)
+  const protRoad = [];                      // (city22) the way of the corridor (the network's index)
   const corridorEnds = overCorridors.filter((c) => !isLandmarkDeck({ pts: c.x.map((x, i) => [x, c.z[i]]) })).flatMap((c) => [[c.x[0], c.z[0]], [c.x[c.x.length - 1], c.z[c.z.length - 1]]]);
   const nearCorridorEnd = pointGrid(corridorEnds, APPROACH_JOIN);
   const atBridgeEnd = (x, z) => nearCorridorEnd(x, z, APPROACH_JOIN);
@@ -1089,13 +1090,36 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     nearApproachEnd(x, z, APPROACH_JOIN, (p) => { if (p[2] * ux + p[3] * uz >= APPROACH_ALIGN) fade = Math.max(fade, p[4]); return false; });
     return Math.max(PROTECT_RAMP, fade);
   };
+  // (city22) the level of a tagged corridor: the top of the deck laid along it (within CORRIDOR_DECK_REACH of the corridor's point), NaN where there is none (a deck the bake
+  // dropped: the corridor protects every carriageway, as before).  Boulevard Roosevelt 12245 runs beside the Passerelle's tagged ways at their level: their corridors kept the
+  // valley edge under its outer lane (2 m under its bed) - the city's worst main-road roll, 1.08 rad.
+  const levelCells = new Map();
+  for (const d of decks) {
+    if (d.removed || d.pts.length < 2) continue;
+    for (let i = 0; i + 1 < d.pts.length; i++) {
+      const k = Math.floor((d.pts[i][0] + d.pts[i + 1][0]) / 2 / UNDER_DECK_CELL) * 65536 + Math.floor((d.pts[i][1] + d.pts[i + 1][1]) / 2 / UNDER_DECK_CELL), list = levelCells.get(k);
+      const seg = [d.pts[i][0], d.pts[i][1], d.pts[i + 1][0], d.pts[i + 1][1], d.tops[i], d.tops[i + 1]];
+      if (list) list.push(seg); else levelCells.set(k, [seg]);
+    }
+  }
+  const corridorLevel = (x, z) => {
+    let best = CORRIDOR_DECK_REACH, level = NaN;
+    const cx = Math.floor(x / UNDER_DECK_CELL), cz = Math.floor(z / UNDER_DECK_CELL);
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (const [ax, az, bx, bz, t0, t1] of levelCells.get((cx + a) * 65536 + cz + b) || EMPTY) {
+      const ex = bx - ax, ez = bz - az, ll = ex * ex + ez * ez;
+      const t = ll > 1e-9 ? Math.max(0, Math.min(1, ((x - ax) * ex + (z - az) * ez) / ll)) : 0;
+      const d = Math.hypot(x - ax - ex * t, z - az - ez * t);
+      if (d < best) { best = d; level = t0 + (t1 - t0) * t; }
+    }
+    return level;
+  };
   for (const corridor of overCorridors) {              // the ways that OSM tags as over
     const m = corridor.x.length;
     if (isLandmarkDeck({ pts: corridor.x.map((x, i) => [x, corridor.z[i]]) })) {     // (the Pont Rouge / Pont Adolphe models meet their roads themselves: full protection, as before)
       for (let i = 1; i < m; i++) {
         protX0.push(corridor.x[i - 1]); protZ0.push(corridor.z[i - 1]); protX1.push(corridor.x[i]); protZ1.push(corridor.z[i]);
         protHalf.push(corridor.half); protFade.push(PROTECT_FADE); protArc.push(0); protRampA.push(-Infinity); protRampB.push(Infinity); protLenA.push(PROTECT_RAMP); protLenB.push(PROTECT_RAMP);
-        protLevel0.push(NaN); protLevel1.push(NaN); protRoad.push(-1);
+        protLevel0.push(NaN); protLevel1.push(NaN); protRoad.push(corridor.road);
       }
       continue;
     }
@@ -1112,7 +1136,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
       protX1.push(corridor.x[i]); protZ1.push(corridor.z[i]);
       protHalf.push(corridor.half); protFade.push(PROTECT_FADE);
       protArc.push(arc); protRampA.push(rampA); protRampB.push(rampB); protLenA.push(lenA); protLenB.push(lenB);
-      protLevel0.push(NaN); protLevel1.push(NaN); protRoad.push(-1);
+      protLevel0.push(corridorLevel(corridor.x[i - 1], corridor.z[i - 1])); protLevel1.push(corridorLevel(corridor.x[i], corridor.z[i])); protRoad.push(corridor.road);
       arc += Math.hypot(corridor.x[i] - corridor.x[i - 1], corridor.z[i] - corridor.z[i - 1]);
     }
   }
@@ -1193,6 +1217,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
           const across = d <= 0 ? 1 : d < protFade[s] ? 1 - d / protFade[s] : 0;
           if (across * rampFill > protFill) protFill = across * rampFill;
           const v = across * ramp;
+          if (globalThis.__PROTDBG && v > 0) globalThis.__PROTDBG.push({ road: roads[protRoad[s]]?.id, level: protLevel0[s], v, across, ramp });
           if (v > p) p = v;
         }
       }

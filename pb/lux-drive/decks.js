@@ -127,6 +127,7 @@ export function encodeDecks(decks) {
  * collide14 (harness V3): a deck is at least as wide as the car road it carries.  The bake gave deck 142 (Rue de la Cimenterie, 5.9 m over the ground) 5.1 m for a 7.2 m
  * secondary road: the outer wheels of both lanes ran off the deck and a parapet there would stand in the lanes.  The deck takes its way's width (centred on its axis:
  * the way runs along it).  decks: the decoded decks, roads: the decoded ways.  Returns new decks (the others unchanged).
+ * (city22: then clearCarriageways - a footway deck moves out of the carriageway beside it.)
  */
 export function widenToWays(decks, roads) {
   const segDist = (p, a, b) => { const ex = b[0] - a[0], ez = b[1] - a[1], ll = ex * ex + ez * ez || 1, t = Math.max(0, Math.min(1, ((p[0] - a[0]) * ex + (p[1] - a[1]) * ez) / ll)); return Math.hypot(p[0] - a[0] - ex * t, p[1] - a[1] - ez * t); };
@@ -135,7 +136,7 @@ export function widenToWays(decks, roads) {
     if (!CAR_DECK_KINDS.has(r.kind) || !(r.bridge || r.over)) continue;
     for (const q of r.pts) { const k = key(q[0], q[1]), l = grid.get(k); if (!l) grid.set(k, [r]); else if (!l.includes(r)) l.push(r); }
   }
-  return decks.map((d) => {
+  const widened = decks.map((d) => {
     const cand = new Set();
     for (const p of d.pts) for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (const r of grid.get(key(p[0] + a * G, p[1] + b * G)) || []) cand.add(r);
     let way = null, most = 0;
@@ -145,6 +146,71 @@ export function widenToWays(decks, roads) {
       if (c > most) { most = c; way = r; }
     }
     return way && most >= d.pts.length * 0.6 && way.width > d.width ? { ...d, width: way.width } : d;
+  });
+  return clearCarriageways(widened, roads);
+}
+
+/**
+ * city22: a FOOTWAY deck (narrower than DECK.trustWidth, no car way along its axis) that OSM draws overlapping the carriageway of a car way beside it (the pavement of a bridge
+ * mapped as its own way) moves out of that carriageway: its points move across, away from the car way, until its inner edge meets the carriageway's edge (at most
+ * FOOT_CLEAR.maxShift), the shift spread along the deck over FOOT_CLEAR.ramp so the deck does not kink.  The car took the deck - 0.5 - 0.8 m over its lane, within
+ * DECK.stickBelow + DECK.hintLift of its body - for its road: Pont Buchler 15754 / 16046 (deck 229, lane 3.67: roll 0.6, the path's railing in the lane), Route de Trèves
+ * (deck 134).  The car way: a car class, not in a tunnel, running parallel (FOOT_CLEAR.parallel) with its axis more than FOOT_CLEAR.ownAxis from the deck's (nearer: the deck's
+ * own way).  Pure: returns new decks (the others unchanged).
+ */
+export const FOOT_CLEAR = Object.freeze({ maxShift: 2.5, ramp: 12, parallel: 0.9, ownAxis: 1.5, along: 0.6, cell: 64 });
+export function clearCarriageways(decks, roads) {
+  const G = FOOT_CLEAR.cell, grid = new Map(), key = (x, z) => Math.floor(x / G) * 65536 + Math.floor(z / G);
+  for (const r of roads) {
+    if (!CAR_DECK_KINDS.has(r.kind) || r.kind === 'track' || r.tunnel || r.pts.length < 2) continue;
+    for (const q of r.pts) { const k = key(q[0], q[1]), l = grid.get(k); if (!l) grid.set(k, [r]); else if (!l.includes(r)) l.push(r); }
+  }
+  const footOf = (p, a, b) => {
+    const ex = b[0] - a[0], ez = b[1] - a[1], ll = ex * ex + ez * ez || 1, t = Math.max(0, Math.min(1, ((p[0] - a[0]) * ex + (p[1] - a[1]) * ez) / ll)), l = Math.sqrt(ll);
+    const fx = a[0] + ex * t, fz = a[1] + ez * t;
+    return { d: Math.hypot(p[0] - fx, p[1] - fz), fx, fz, ux: ex / l, uz: ez / l };
+  };
+  return decks.map((d) => {
+    const n = d.pts.length;
+    if (d.width >= DECK.trustWidth || n < 2 || isLandmarkDeck(d)) return d;
+    const cand = new Set();
+    for (const p of d.pts) for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (const r of grid.get(key(p[0] + a * G, p[1] + b * G)) || []) cand.add(r);
+    if (cand.size === 0) return d;
+    // a car way along the deck's axis: the deck is that way's (a car's deck), it stays
+    for (const r of cand) {
+      let c = 0;
+      for (const p of d.pts) for (let i = 0; i + 1 < r.pts.length; i++) if (footOf(p, r.pts[i], r.pts[i + 1]).d <= FOOT_CLEAR.ownAxis) { c++; break; }
+      if (c >= n * FOOT_CLEAR.along) return d;
+    }
+    const need = new Float64Array(n), dirX = new Float64Array(n), dirZ = new Float64Array(n);
+    let any = false;
+    for (let i = 0; i < n; i++) {
+      const p = d.pts[i], q = d.pts[Math.min(i + 1, n - 1)], o = d.pts[Math.max(i - 1, 0)];
+      const dl = Math.hypot(q[0] - o[0], q[1] - o[1]) || 1, tx = (q[0] - o[0]) / dl, tz = (q[1] - o[1]) / dl;
+      for (const r of cand) for (let k = 0; k + 1 < r.pts.length; k++) {
+        const f = footOf(p, r.pts[k], r.pts[k + 1]);
+        if (f.d <= FOOT_CLEAR.ownAxis || Math.abs(f.ux * tx + f.uz * tz) < FOOT_CLEAR.parallel) continue;
+        const over = r.width / 2 + d.width / 2 - f.d;
+        if (over > need[i]) {
+          need[i] = Math.min(over, FOOT_CLEAR.maxShift);
+          const side = (p[0] - f.fx) * -tz + (p[1] - f.fz) * tx >= 0 ? 1 : -1;     // (across the deck, away from the car way)
+          dirX[i] = -tz * side; dirZ[i] = tx * side; any = true;
+        }
+      }
+    }
+    if (!any) return d;
+    const s = new Float64Array(n);
+    for (let i = 1; i < n; i++) s[i] = s[i - 1] + Math.hypot(d.pts[i][0] - d.pts[i - 1][0], d.pts[i][1] - d.pts[i - 1][1]);
+    const pts = d.pts.map((p, i) => {
+      let shift = 0, sx = 0, sz = 0;
+      for (let j = 0; j < n; j++) {
+        if (!(need[j] > 0)) continue;
+        const v = need[j] * Math.max(0, 1 - Math.abs(s[i] - s[j]) / FOOT_CLEAR.ramp);
+        if (v > shift) { shift = v; sx = dirX[j]; sz = dirZ[j]; }
+      }
+      return shift > 0 ? [p[0] + sx * shift, p[1] + sz * shift] : p;
+    });
+    return { ...d, pts, clearedBy: Math.max(...need) };
   });
 }
 
