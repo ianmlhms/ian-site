@@ -11,7 +11,8 @@ import { openShallowTunnels } from './tunnel-cover.js';     // BRIDGES8: a tunne
 import { splitEmbankmentUnderpasses } from './embankment-underpass.js';   // fix19: a street under an embankment the DTM kept is a tunnel
 import { fillLaneFlicker } from './lane-flicker.js';          // ROADS9: a narrower run of < 60 m between two wider stretches is flicker of the lane count
 import { dropMergeLanes } from './lane-drop.js';              // tunnels19: an on-ramp's merge lane ends before a tunnel with fewer lanes (Cents north)
-import { moveBridgeEnds, trimFreeEnds } from './bridge-ends.js';            // city20: a bridge end that stands on the road below moves back along its approach
+import { moveBridgeEnds, trimFreeEnds } from './bridge-ends.js';
+import { openSharedRings } from './ring-share.js';                       // city22: a service ring that runs along a street for a segment is opened there            // city20: a bridge end that stands on the road below moves back along its approach
 
 const DECIMETRE = 0.1;
 
@@ -168,11 +169,13 @@ export async function loadWorldData(read, onProgress = () => {}) {
   // ... and a lane count that flickers for a few metres keeps the wider road (lane-flicker.js)
   const { roads: steadyRoads, filled: flickerFilled } = fillLaneFlicker(underRoads, trees);
   // ... and the merge lane of an on-ramp ends before a tunnel that has fewer lanes (lane-drop.js)
-  const { roads: droppedRoads, dropped: laneDropped } = dropMergeLanes(steadyRoads);
+  const { roads: droppedRoads0, dropped: laneDropped } = dropMergeLanes(steadyRoads);
+  // ... and a service ring laid over a street's nodes for a segment or two leaves the street to it (ring-share.js)
+  const { roads: droppedRoads, opened: openedRings } = openSharedRings(droppedRoads0);
   // ... and a bridge whose abutment would stand on the lanes of a road below it starts where it leaves them free (bridge-ends.js)
   const { roads, decks: movedDecks, moved: movedBridgeEnds } = moveBridgeEnds(droppedRoads, bakedDecks, baseHeight);
   // ... and a deck end that no way runs onto but that lies on a street's carriageway at its level begins at the edge of that carriageway
   const { decks, trimmed: trimmedDeckEnds } = trimFreeEnds(roads, movedDecks, baseHeight);
   onProgress(1, 'done');
-  return { info, near, far, roads, openedTunnels, underpasses, flickerFilled, laneDropped, movedBridgeEnds, trimmedDeckEnds, decks, walls, canopy, classes, classInfo, buildings, lines, stops, trees: withCampusTrees(trees), places, names };
+  return { info, near, far, roads, openedTunnels, underpasses, flickerFilled, laneDropped, openedRings, movedBridgeEnds, trimmedDeckEnds, decks, walls, canopy, classes, classInfo, buildings, lines, stops, trees: withCampusTrees(trees), places, names };
 }

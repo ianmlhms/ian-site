@@ -140,6 +140,7 @@ const CLOSED_MIN_SAMPLES = 6;          // a ring has at least this many samples 
 const BRIDGE_JOIN = 8.0;               // m: a street whose end lies this close to the end of a bridge (or a tunnel) runs onto it
 const NODE_EPS = 1e-6;                 // (the parameter of a crossing at the very end of a segment: the shared node of two ways)
 const END_JOIN = 3.0;                  // m: the ends of ways this close to one another meet at one node
+const T_END_MAX = 3.0;                 // m: (city22) the end of a bigger way inside a smaller way's carriageway meets its level when the two lie at most this far apart (more: one rides over the other)
 const JUNCTION_TOUCH = 0.6;           // m: a way whose centre line lies within the pavement (+ this) of another way runs into it: the apron of the junction is the level of that way
 export const GARAGE_RAMP_MAX = 40.0;          // m: a service way at most this long that dives into a tunnel (a garage ramp, ~60 in the city) is not a road of the game: it is neither carved nor painted, and
                                        // the trench the DTM has for it is filled to the level of its mouth (GARAGE_PAD_FADE).  Carved, it was a pit with a wall beside the avenue at the very start of the game
@@ -604,6 +605,49 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
       if (!level || !level.length) continue;
       const mean = level.reduce((sum, m) => sum + m.h, 0) / level.length;
       for (const m of new Set([...level, ...same.length >= 2 ? same : [], ...led])) pinOf(m.chain).set(m.k, mean);
+    }
+    // ---- 1b. (city22) the END of a way that stops inside the carriageway of a way designed AFTER it (a smaller class: a motorway link that ends on Route de Trèves
+    // 18705 between two of its points) meets that way's own level: pass 2 pins only the smaller way to the bigger one, and the end cap of the bigger way is no crossing
+    // there, so neither was pinned - the link met the primary 1.42 m under its bed, and the car on the primary's lane fell onto the link's carriageway (air, roll 0.58).
+    // The way that runs on through the junction keeps its level; the one that ends there climbs or falls to it.
+    {
+      const tGrid = new Map();
+      for (const chain of chains) {
+        if (overRoads.has(chain.road)) continue;
+        for (let i = 1; i < chain.x.length; i++) {
+          const kk = gkey(Math.floor((chain.x[i - 1] + chain.x[i]) / 2 / GC), Math.floor((chain.z[i - 1] + chain.z[i]) / 2 / GC));
+          const list = tGrid.get(kk);
+          if (list) list.push(chain, i); else tGrid.set(kk, [chain, i]);
+        }
+      }
+      for (const chain of chains) {
+        const n = chain.x.length;
+        if (n < 2 || overRoads.has(chain.road) || chain.closed) continue;
+        for (const k of [0, n - 1]) {
+          if (endPins.get(chain)?.has(k)) continue;              // (a node of its own: pass 1)
+          const x = chain.x[k], z = chain.z[k];
+          let bestD = Infinity, bestH = 0;
+          const cx = Math.floor(x / GC), cz = Math.floor(z / GC);
+          for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+            const list = tGrid.get(gkey(cx + dx, cz + dz));
+            if (!list) continue;
+            for (let q = 0; q < list.length; q += 2) {
+              const other = list[q], j = list[q + 1];
+              if (other === chain || !(other.rank < chain.rank)) continue;
+              const ax = other.x[j - 1], az = other.z[j - 1], ex = other.x[j] - ax, ez = other.z[j] - az, ll = ex * ex + ez * ez;
+              if (ll < 1e-9) continue;
+              const t = ((x - ax) * ex + (z - az) * ez) / ll;
+              if (t < 0 || t > 1) continue;                          // (only across the other way's own length: its end cap is a node, pass 1)
+              const d = Math.hypot(x - ax - ex * t, z - az - ez * t);
+              if (d >= bestD || d > other.hw + JUNCTION_TOUCH) continue;
+              const h = other.bed[j - 1] + (other.bed[j] - other.bed[j - 1]) * t;
+              if (Math.abs(h - chain.bed[k]) <= JUNCTION_LEVEL || Math.abs(h - chain.bed[k]) > T_END_MAX) continue;
+              bestD = d; bestH = h;
+            }
+          }
+          if (bestD < Infinity) pinOf(chain).set(k, bestH);
+        }
+      }
     }
     // ---- 2. the ways that run into the carriageway of a way designed before them
     const order = chains.slice().sort((a, b) => b.rank - a.rank || b.x.length - a.x.length || a.road - b.road);
