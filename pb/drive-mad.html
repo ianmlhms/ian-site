@@ -55,17 +55,22 @@ html,body,button{font-family:"Geist",system-ui,-apple-system,"Segoe UI",Roboto,s
 #levels button.done{border-color:var(--g-green);background:var(--g-white);color:var(--g-green);box-shadow:inset 0 0 0 1px var(--g-green)}#levels button:disabled{opacity:.4}
 #play{border-radius:0;background:var(--g-green);color:var(--g-on-green);box-shadow:none;font-weight:700}#play:hover{background:var(--g-ink)}
 #levels button:focus-visible,#play:focus-visible,#restart:focus-visible,.pedal:focus-visible{outline:2px solid var(--g-green)}
+#gfx{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;align-items:center;margin:0 auto 14px;font-size:13px;color:var(--g-muted)}
+#gfx button{min-height:40px;padding:6px 14px;border:1px solid var(--g-soft);border-radius:0;background:var(--g-white);color:var(--g-ink);font-size:13px;font-weight:600;cursor:pointer}
+#gfx button.on{background:var(--g-ink);color:var(--g-paper);border-color:var(--g-ink)}
+#gfx button:focus-visible{outline:2px solid var(--g-green)}
 </style>
 <script src="/pb/arcade-kit.js?v=55" data-arcade-id="drive-mad" data-arcade-title="Stunt Driver"></script>
+<script src="/pb/gfx-quality.js?v=1"></script>
 </head>
 <body>
 <div id="hud" class="hidden"><div class="pill">Stage<b id="levelText">1 / 24</b></div><div class="pill">Time<b id="timeText">0.0s</b></div><div class="pill">Best<b id="bestText">—</b></div></div>
 <div id="hint" role="status" aria-live="polite"></div>
 <button id="restart" type="button" class="hidden" aria-label="Restart level" title="Restart level">↻</button>
 <div id="touch" class="hidden" data-arcade-touch-controls><div class="grp"><button id="brake" type="button" class="pedal" aria-label="Brake and reverse"><small aria-hidden="true">▼</small>BRAKE</button><button id="tiltL" type="button" class="pedal tilt" aria-label="Tilt back (nose up) without driving" title="Tilt back"><small aria-hidden="true">↺</small></button></div><div class="grp"><button id="tiltR" type="button" class="pedal tilt" aria-label="Tilt forward (nose down) without driving" title="Tilt forward"><small aria-hidden="true">↻</small></button><button id="gas" type="button" class="pedal" aria-label="Accelerate"><small aria-hidden="true">▲</small>GAS</button></div></div>
-<div id="overlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle"><div class="card"><h1 id="ovTitle">STUNT DRIVER</h1><h2>3D STUNT TRIALS</h2><p id="message">Balance the throttle, work the suspension, and survive twenty-four short obstacle courses.<br>WASD / arrows to drive and tilt. Touch pedals work anywhere on iPad.</p><div id="levels"></div><button id="play" type="button">DRIVE</button></div></div>
+<div id="overlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle"><div class="card"><h1 id="ovTitle">STUNT DRIVER</h1><h2>3D STUNT TRIALS</h2><p id="message">Balance the throttle, work the suspension, and survive twenty-four short obstacle courses.<br>WASD / arrows to drive and tilt. Touch pedals work anywhere on iPad.</p><div id="levels"></div><div id="gfx" role="group" aria-label="Grafik"></div><button id="play" type="button">DRIVE</button></div></div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js" integrity="sha384-qOkzR5Ke/XkQxuGVJ9hpFEpDlcoLtWwVYhnJf06cLIZa2vaIptSqaubivErzmD5O" crossorigin="anonymous"></script>
 <script src="/pb/drive-mad/core.js"></script>
-<script src="/pb/drive-mad/game.js?v=6"></script>
+<script src="/pb/drive-mad/game.js?v=7"></script>
 </body>
 </html>
