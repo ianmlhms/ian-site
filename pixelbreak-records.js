@@ -9,11 +9,11 @@
  * The page calls: PB.chooseMode(game) (owner prompt: true = test, false = normal, null = cancelled),
  * PB.onOpenGame(game, {testMode}), PB.instrument(html), PB.onCloseGame().
  */
-import * as auth from "./auth.js?v=45";
-import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=14";
+import * as auth from "./auth.js?v=46";
+import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=15";
 
-import { compactScore, scoreHtml, scoreKeyHtml, arcadeText } from "./score-format.js?v=12";
-import { loadWeekly, installWeeklyUi, weeklyHeadingHtml, weeklyRowsHtml } from "./arcade-weekly.js?v=13";
+import { compactScore, scoreHtml, scoreKeyHtml, arcadeText } from "./score-format.js?v=13";
+import { loadWeekly, installWeeklyUi, weeklyHeadingHtml, weeklyRowsHtml } from "./arcade-weekly.js?v=14";
 
 const cfg = window.PB_CONFIG || {};
 const cloudEnabled = /^https:\/\/.+\.supabase\.co\/?$/.test((cfg.url || "").trim()) &&

@@ -15,7 +15,7 @@
 <link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
 <link rel="stylesheet" href="gitter.css?v=13">
 <script src="theme.js?v=35"></script>
-<script src="i18n-dict.js?v=55"></script>
+<script src="i18n-dict.js?v=56"></script>
 <script src="i18n.js?v=5"></script>
 <style>
   .gt-page { padding-bottom: max(56px, calc(40px + env(safe-area-inset-bottom))); }
@@ -85,9 +85,9 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module">
-import * as auth from "./auth.js?v=45";
-import { loadTags, eventBadgesHtml } from "./leaderboard-tags.js?v=14";
-import { scoreHtml, scoreKeyHtml, arcadeText } from "./score-format.js?v=12";
+import * as auth from "./auth.js?v=46";
+import { loadTags, eventBadgesHtml } from "./leaderboard-tags.js?v=15";
+import { scoreHtml, scoreKeyHtml, arcadeText } from "./score-format.js?v=13";
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const AVATARS=["😀","😎","🤖","👾","🐱","🐶","🦊","🐸","🐼","🦁","🐯","🐵",
@@ -294,7 +294,7 @@ async function boot(){
 // Lazy: the account-check card (and its people search) only loads when asked for.
 async function openMerge(){
   try{
-    const m=await import("./account-check.js?v=20");
+    const m=await import("./account-check.js?v=21");
     await m.openAccountCheck({startWithMerge:true});
   }catch(e){
     console.error("account merge dialog failed to open",e);
@@ -515,7 +515,7 @@ document.addEventListener("i18n:change",paintProfileStreak);
 auth.onAuth(boot);
 boot();
 </script>
-  <script type="module" src="rtc-ring.js?v=39"></script>
-  <script type="module" src="class-gate.js?v=40"></script>
+  <script type="module" src="rtc-ring.js?v=40"></script>
+  <script type="module" src="class-gate.js?v=41"></script>
 </body>
 </html>

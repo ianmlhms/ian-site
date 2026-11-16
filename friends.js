@@ -1,5 +1,5 @@
 /* Friends: add by username, list, message (DM) or invite to a game. */
-import * as auth from "./auth.js?v=45";
+import * as auth from "./auth.js?v=46";
 import { attachPeopleSearch } from "./people-search.js?v=1";
 import { MP_GAMES, gameInfo, gameName, isLobbyGame, joinUrl, lobbyUrl } from "./mp-games.js?v=5";
 
@@ -118,7 +118,7 @@ function renderActivity(list) {
   $("activity").innerHTML = list.map((a) => {
     const who = a.is_me ? T("friends.you") : esc(a.username);
     const game = esc(GAMES[a.game] || a.game);
-    const verb = VERB[a.result] ? T(VERB[a.result]) : esc(a.result);   // self-reported text: never raw into innerHTML
+    const verb = VERB[a.result] ? T(VERB[a.result]) : esc(a.result);
     return `<div class="act-row"><span class="act-emoji" aria-hidden="true">${a.result === "win" ? "G" : a.result === "loss" ? "V" : "="}</span>` +
       `<span class="act-text"><b>${who}</b>${a.is_me ? "" : classTag(a.username)} ${verb} <b>${game}</b></span>` +
       `<span class="act-time">${ago(a.created_at)}</span></div>`;

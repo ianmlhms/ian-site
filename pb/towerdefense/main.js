@@ -430,7 +430,7 @@ $("resultMenuBtn").onclick = showMenu;
 $("helpBtn").onclick = () => $("helpBtn").setAttribute("aria-expanded", String(!$("helpPanel").classList.toggle("hidden")));
 window.addEventListener("resize", () => view.resize());
 window.addEventListener("message", (event) => {
-  if (event.data?.__pbLoadSave === 1) applyIncomingSave(event.data.data);
+  if (event.source === window.parent && event.data?.__pbLoadSave === 1) applyIncomingSave(event.data.data);
 });
 window.addEventListener("pagehide", pushSave);
 

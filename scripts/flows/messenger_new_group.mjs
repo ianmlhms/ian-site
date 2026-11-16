@@ -9,6 +9,7 @@ export const flow = {
   name: "messenger-new-group",
   backend: {
     rpc: {
+      my_profile_private: () => [{ account_checked_at: "2026-10-01T00:00:00Z" }],   // keeps the one-time account-check card (account-check.js) away
       has_pin: () => true,
       is_view_restricted: () => false,
       my_chats: () => (created ? [{ id: GROUP_ID, display: GROUP_NAME, is_dm: false, invite_code: "abc123", unread: 0 }] : []),

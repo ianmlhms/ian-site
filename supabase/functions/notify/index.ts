@@ -278,6 +278,9 @@ async function sendPlan(plan: Plan) {
 // Incoming-call push (FaceTime). The browser can't hold NOTIFY_SECRET, so this
 // path authenticates with the *caller's own Supabase JWT* and only pushes when
 // the two users are accepted friends — so nobody can spam-ring a stranger.
+const USER_ID_SHAPE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 async function handleCallPush(req: Request, p: any) {
   const authz = req.headers.get("Authorization") || "";
   const token = authz.startsWith("Bearer ") ? authz.slice(7) : "";
@@ -288,6 +291,9 @@ async function handleCallPush(req: Request, p: any) {
 
   const to = String(p?.to || "");
   if (!to || to === caller) return json({ ok: true, skipped: "no target" });
+  // `to` goes into the PostgREST filter string below: anything but a plain
+  // user id could add its own conditions there (and read other friendships).
+  if (!USER_ID_SHAPE.test(to)) return json({ ok: true, skipped: "no target" });
 
   // accepted friendship in either direction
   const { data: fr } = await admin

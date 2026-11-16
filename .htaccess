@@ -30,7 +30,28 @@
   # HSTS starts SHORT (5 min) so a mistake can't lock visitors out. Once HTTPS
   # is confirmed everywhere, raise it: max-age=31536000 (one year).
   Header always set Strict-Transport-Security "max-age=300" "expr=%{HTTPS} == 'on'"
+  # Camera, microphone and location only for ian.lu's own pages and frames
+  # (face scan, Kamera-Arcade, calls, bus stops), never for a third-party frame.
+  Header always set Permissions-Policy "camera=(self), microphone=(self), geolocation=(self), payment=(), usb=(), serial=(), bluetooth=()"
 </IfModule>
+
+# STILL NOT EFFECTIVE on 15 Nov 2026 (security audit, checked from outside):
+# https://ian.lu/ and /auth.js answer with NO security header at all, so the
+# site can be framed by any other site (clickjacking) and has no HSTS.
+# Paste this into Plesk -> ian.lu -> Apache & nginx Settings -> "Additional
+# nginx directives" (it is the same set as above, in nginx syntax):
+#
+#   add_header X-Content-Type-Options "nosniff" always;
+#   add_header X-Frame-Options "SAMEORIGIN" always;
+#   add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+#   add_header Strict-Transport-Security "max-age=300" always;
+#   add_header Permissions-Policy "camera=(self), microphone=(self), geolocation=(self), payment=(), usb=(), serial=(), bluetooth=()" always;
+#   add_header Content-Security-Policy-Report-Only "frame-ancestors 'self'; object-src 'none'; base-uri 'self'" always;
+#
+# X-Frame-Options SAMEORIGIN keeps the arcade working: its game frames are
+# srcdoc / same-origin. The CSP line is report-only on purpose (nothing can
+# break); a real script-src policy needs the inline scripts moved out first.
+# Then raise HSTS to max-age=31536000 once a week has passed without trouble.
 
 AddType application/manifest+json .webmanifest
 

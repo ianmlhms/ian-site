@@ -200,7 +200,7 @@ function dmApply(sv){if(!sv||sv.v!==1)return;
   window.score=Math.max(window.score||0,doneLvls());window.Arcade?.score(window.score);}
 function dmPush(){try{parent.postMessage({__pbSave:1,data:dmSnapshot()},'*')}catch(e){}}
 dmApply(window.__pbSave);
-window.addEventListener('message',e=>{const d=e.data;if(d&&d.__pbLoadSave===1)dmApply(d.data)});
+window.addEventListener('message',e=>{const d=e.data;if(e.source===parent&&d&&d.__pbLoadSave===1)dmApply(d.data)});
 try{parent.postMessage({__pbWantSave:1},'*')}catch(e){}
 
 let audioContext=null,engineOsc=null,engineGain=null;

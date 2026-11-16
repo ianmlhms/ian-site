@@ -26,6 +26,7 @@ import {
   pinRecord,
   resetAccount,
   resetPinForAdmin,
+  revokeFaceDevices,
   resolveAccount,
   savePin,
   userFromRequest,
@@ -216,6 +217,8 @@ async function setPin(
   if (!await savePin(user.id, body.pin, length)) {
     return json({ error: "set_failed" }, 500);
   }
+  // Replacing a PIN (not setting the first one) signs every saved face out.
+  if (record) await revokeFaceDevices(user.id);
   return json({ ok: true });
 }
 

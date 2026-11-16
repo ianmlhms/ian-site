@@ -1,5 +1,5 @@
 /* Shared Supabase auth for ian.lu. ES module. */
-import "./i18n-dict.js?v=55";
+import "./i18n-dict.js?v=56";
 import { openAuthDialog, openFaceDialog } from "./auth-ui.js?v=11";
 import { esc } from "./pin-pad.js?v=5";
 import {
@@ -110,7 +110,7 @@ function parentHandlesPresence() {
 function startPresencePing() {
   if (!_g.sb || parentHandlesPresence()) return;
   if (!_g.presenceModule) {
-    _g.presenceModule = import("./presence-ping.js?v=9");
+    _g.presenceModule = import("./presence-ping.js?v=10");
   }
   void _g.presenceModule
     .then(({ startPresence }) => startPresence(_g.sb, () => _g.session))
@@ -168,7 +168,7 @@ function startAccountCheck() {
   // Checked accounts skip the module (27 KB) and its two requests on every page.
   if (accountCheckedToday()) return;
   if (!_g.accountCheckModule) {
-    _g.accountCheckModule = import("./account-check.js?v=20");
+    _g.accountCheckModule = import("./account-check.js?v=21");
   }
   void _g.accountCheckModule
     .then(({ startAccountCheck: start }) => start(_g.sb, () => _g.session))

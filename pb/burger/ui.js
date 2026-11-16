@@ -15,7 +15,7 @@ import {
   tick,
   toggleTopping,
 } from "/pb/burger/sim.js?v=1";
-import {createPersistence, snapshot} from "/pb/burger/save.js?v=2";
+import {createPersistence, snapshot} from "/pb/burger/save.js?v=3";
 import {createShop} from "/pb/burger/shop.js?v=1";
 
 const UI_REFRESH_MS = 100;

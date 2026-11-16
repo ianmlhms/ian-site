@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>KartTracker — All Sessiounen</title>
 <script src="theme.js?v=35"></script>
-<script src="i18n-dict.js?v=55"></script>
+<script src="i18n-dict.js?v=56"></script>
 <script src="i18n.js?v=5"></script>
 <script src="gitter-theme.js?v=2"></script>
 <link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
@@ -79,7 +79,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module">
-import { client, session, onAuth, mountAccountButton, openAuthModal } from "./auth.js?v=45";
+import { client, session, onAuth, mountAccountButton, openAuthModal } from "./auth.js?v=46";
 
 const T = (k) => (window.I18N ? window.I18N.t(k) : k);
 const $ = (id) => document.getElementById(id);
@@ -154,8 +154,8 @@ async function render(){
   document.addEventListener("i18n:change", () => { if (sb) render(); });
 })();
 </script>
-  <script type="module" src="rtc-ring.js?v=39"></script>
-  <script type="module" src="class-gate.js?v=40"></script>
-<script type="module" src="gitter-acct.js?v=4"></script>
+  <script type="module" src="rtc-ring.js?v=40"></script>
+  <script type="module" src="class-gate.js?v=41"></script>
+<script type="module" src="gitter-acct.js?v=5"></script>
 </body>
 </html>

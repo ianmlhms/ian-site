@@ -153,7 +153,7 @@ input[type="number"] { width: 100%; min-height: 44px; padding: 9px 12px; border:
   #notice { top: 112px; } #buildBar { width: 330px; bottom: 78px; }
 }
 </style>
-<script src="/pb/arcade-kit.js?v=54" data-arcade-id="park" data-arcade-title="Theme Park Tycoon"></script>
+<script src="/pb/arcade-kit.js?v=55" data-arcade-id="park" data-arcade-title="Theme Park Tycoon"></script>
 </head>
 <body>
 <main id="shell">
@@ -219,7 +219,7 @@ input[type="number"] { width: 100%; min-height: 44px; padding: 9px 12px; border:
   </nav>
   <div id="bootStatus" role="status"><h2>Opening the gates…</h2><p id="overlayText">Loading your 3D park.</p></div>
 </main>
-<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js" integrity="sha384-qOkzR5Ke/XkQxuGVJ9hpFEpDlcoLtWwVYhnJf06cLIZa2vaIptSqaubivErzmD5O" crossorigin="anonymous"></script>
 <script>
 window.addEventListener("error",function(event){document.documentElement.dataset.bootError=event.message||"script-error"});
 window.addEventListener("unhandledrejection",function(event){document.documentElement.dataset.bootError=String(event.reason||"promise-error")});

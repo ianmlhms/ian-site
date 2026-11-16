@@ -348,6 +348,8 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,.s
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
+/* Building, floor and hotel names come from saved or imported project files: escape them wherever they become HTML. */
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 /* ============ THEMES ============ */
 /* Gitter: one look. The old three styles all map to the same paper/ink/green tokens. */
 const GITTER_THEME={'--font':"'Geist',system-ui,sans-serif"};   // colours live in CSS (light + dark)
@@ -468,7 +470,7 @@ function renderBldList(){
   for(let i=0;i<n;i++){
     const row=document.createElement('div');row.className='bld-row';
     row.innerHTML=`<div class="idx">${i+1}</div>
-      <input class="name" aria-label="Numm Gebai ${i+1}" value="${old[i]?old[i].name:'Gebai '+(i+1)}">
+      <input class="name" aria-label="Numm Gebai ${i+1}" value="${esc(old[i]?old[i].name:'Gebai '+(i+1))}">
       <span class="flbl">Stäck:</span>
       <div class="stepper">
         <button type="button" class="fm" aria-label="Ee Stack manner, Gebai ${i+1}">−</button>
@@ -565,7 +567,7 @@ function renderSite(){
   state.buildings.forEach((b,i)=>{
     const el=document.createElement('div');el.className='bld-block'+(b.id===selBld?' sel':'');
     const rooms=b.floors.reduce((a,f)=>a+f.rooms.length,0);
-    el.innerHTML=`<button class="bb-edit" type="button" aria-label="Gebai beaarbechten: ${b.name}">Beaarbechten</button><div class="bb-ico" aria-hidden="true">🏢</div><div class="bb-name">${b.name}</div><div class="bb-info">${b.floors.length} Stäck · ${rooms} Raim</div><div class="bb-resize"></div>`;
+    el.innerHTML=`<button class="bb-edit" type="button" aria-label="Gebai beaarbechten: ${esc(b.name)}">Beaarbechten</button><div class="bb-ico" aria-hidden="true">🏢</div><div class="bb-name">${esc(b.name)}</div><div class="bb-info">${b.floors.length} Stäck · ${rooms} Raim</div><div class="bb-resize"></div>`;
     posBld(el,b);
     el.querySelector('.bb-edit').onclick=ev=>{ev.stopPropagation();openBuilding(i);};
     el.addEventListener('dblclick',()=>openBuilding(i));
@@ -717,7 +719,7 @@ function renderFloorList(){
   const list=document.getElementById('floorList');list.innerHTML='';
   for(let f=b.floors.length-1;f>=0;f--){
     const fl=b.floors[f];const it=document.createElement('div');it.className='fl-item'+(f===state.curF?' active':'');
-    it.innerHTML=`<button type="button" class="fl-name"${f===state.curF?' aria-current="true"':''}>${fl.name}</button><span class="fl-count">${fl.rooms.length}</span><button class="fl-del" type="button" title="Stack läschen" aria-label="Stack läschen: ${fl.name}">×</button>`;
+    it.innerHTML=`<button type="button" class="fl-name"${f===state.curF?' aria-current="true"':''}>${esc(fl.name)}</button><span class="fl-count">${Number(fl.rooms.length)||0}</span><button class="fl-del" type="button" title="Stack läschen" aria-label="Stack läschen: ${esc(fl.name)}">×</button>`;
     it.onclick=ev=>{state.curF=f;clearSel();renderGrid();renderFloorList();document.getElementById('floorName').textContent=b.name+' · '+fl.name;flashGrid();if(ev.detail===0)document.querySelector('.fl-item.active .fl-name')?.focus();};
     it.querySelector('.fl-del').onclick=ev=>{ev.stopPropagation();delFloor(f);};
     list.appendChild(it);
@@ -827,7 +829,7 @@ function renderResumeList(){
   if(!lib.length){box.innerHTML='<div style="color:var(--muted);font-size:13px;padding:8px;">Nach keng gespäichert Hotelen.</div>';return;}
   lib.forEach(h=>{
     const row=document.createElement('div');row.className='hotel-row';const d=new Date(h.ts);
-    row.innerHTML=`<div class="h-info"><b>${h.name||'Hotel'}</b><small>${h.buildings} Gebaier · ${d.toLocaleDateString('lb-LU')} ${d.toLocaleTimeString('lb-LU',{hour:'2-digit',minute:'2-digit'})}</small></div><button class="h-open" type="button">Opmaachen</button><button class="h-del" type="button" title="Läschen" aria-label="Hotel läschen: ${h.name||'Hotel'}"><span aria-hidden="true">×</span></button>`;
+    row.innerHTML=`<div class="h-info"><b>${esc(h.name||'Hotel')}</b><small>${esc(h.buildings)} Gebaier · ${d.toLocaleDateString('lb-LU')} ${d.toLocaleTimeString('lb-LU',{hour:'2-digit',minute:'2-digit'})}</small></div><button class="h-open" type="button">Opmaachen</button><button class="h-del" type="button" title="Läschen" aria-label="Hotel läschen: ${h.name||'Hotel'}"><span aria-hidden="true">×</span></button>`;
     row.querySelector('.h-open').onclick=()=>{if(loadHotel(h.id))enterApp();};
     row.querySelector('.h-del').onclick=()=>{if(confirm('Dëst Hotel läschen?')){deleteHotel(h.id);renderResumeList();checkResume();}};
     box.appendChild(row);
@@ -861,7 +863,7 @@ checkResume(); // Cloud-Hotels werden vom Gate via __hotelBoot() nachgeladen
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module">
-  import { client, session, onAuth, openAuthModal } from "./auth.js?v=45";
+  import { client, session, onAuth, openAuthModal } from "./auth.js?v=46";
   const ALLOW = ["konto@ian.lu", "quinn@mulheims.lu"];   // nur diese Konten dürfen rein
   const gate = document.getElementById("hotelGate");
   const msg = document.getElementById("hotelGateMsg");
@@ -894,7 +896,7 @@ checkResume(); // Cloud-Hotels werden vom Gate via __hotelBoot() nachgeladen
   onAuth(() => check());
   check();
 </script>
-  <script type="module" src="rtc-ring.js?v=39"></script>
-  <script type="module" src="class-gate.js?v=40"></script>
+  <script type="module" src="rtc-ring.js?v=40"></script>
+  <script type="module" src="class-gate.js?v=41"></script>
 </body>
 </html>

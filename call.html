@@ -15,7 +15,7 @@
 <link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="gitter.css?v=13">
 <script src="theme.js?v=35"></script>
-<script src="i18n-dict.js?v=55"></script>
+<script src="i18n-dict.js?v=56"></script>
 <script src="i18n.js?v=5"></script>
 <style>
   /* Gitter look: light page; only the live remote video keeps a dark field (the picture itself). */
@@ -83,7 +83,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module">
-import * as auth from "./auth.js?v=45";
+import * as auth from "./auth.js?v=46";
 const $=(id)=>document.getElementById(id);
 const T=(k)=>(window.I18N?window.I18N.t(k):k);
 const q=new URLSearchParams(location.search);
@@ -116,6 +116,11 @@ const isObject=(v)=>v!==null&&typeof v==="object"&&!Array.isArray(v);
 const isText=(v,max)=>typeof v==="string"&&v.length<=max;
 const isUserId=(v)=>typeof v==="string"&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(v);
 const isCallId=(v)=>typeof v==="string"&&/^[a-z0-9.-]{1,80}$/i.test(v);
+/* Phase 1 of scripts/security-fix-calls-v1.sql: the hint still carries the callId so pages with an old
+ * cached rtc-ring.js keep ringing. Set to false about a week after deploying: then the callId only
+ * reaches the callee through call_incoming() and nobody listening on the public channel can read it. */
+const RING_SENDS_CALL_ID=true;
+const isMissingRpc=(error)=>Boolean(error)&&(error.code==="PGRST202"||error.code==="42883");
 function isSignal(event,p){
   if(!isObject(p)||ended||p.from!==peerId||p.to!==me||p.callId!==callId) return false;
   const fields=["from","to","callId"];
@@ -172,11 +177,13 @@ async function boot(){
   me=auth.session().user.id; myName=auth.username()||"?";
   callId=isCallee ? (q.get("call")||"") : (crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random());
   if(!isCallId(callId)){ fatal(T("call.badLink")); return; }
+  // Answer side: only a call the server recorded for me (made by this friend) may turn the camera on.
+  if(isCallee&&!(await callIsReal())){ fatal(T("call.badLink")); return; }
 
   try{ localStream=await navigator.mediaDevices.getUserMedia({video:true,audio:true}); }
   catch(e){ fatal(T("call.noMedia")); return; }
   $("local").srcObject=localStream;
-  $("who").textContent=peerName;
+  $("who").textContent=shownName||peerName;
   $("topbar").classList.remove("hidden");
   $("controls").classList.remove("hidden");
   wireControls();
@@ -186,6 +193,7 @@ async function boot(){
 
   if(!isCallee){
     setStatus(T("call.calling"));
+    await registerCall();         // the server row is what makes the callee's page ring
     ring("ring");                 // realtime inbox (rings if the callee has the site open)
     pushRing();                   // web push (system notification even if the site is closed)
     noAnswerTimer=setTimeout(()=>{ if(!remoteReady){ ring("cancel"); endCall(T("call.ended"),true); } },40000);
@@ -245,10 +253,38 @@ async function onAnswer(sdp){ await pc.setRemoteDescription(sdp); remoteReady=tr
 function addIce(c){ if(remoteReady) return pc.addIceCandidate(c); if(pendingIce.length<MAX_ICE) pendingIce=[...pendingIce,c]; }
 function flushIce(){ pendingIce.forEach(c=>pc.addIceCandidate(c).catch(e=>console.warn("[call] ICE rejected",e))); pendingIce=[]; }
 
-// send a message to the peer's personal ring inbox (subscribe, send once)
+/* Caller: record the call on the server (checks my login and that we are friends). Best effort:
+ * it never blocks the call, an old callee page still rings from the hint alone. */
+async function registerCall(){
+  try{
+    const {data,error}=await sb.rpc("call_ring",{p_to:peerId,p_call_id:callId});
+    if(error) console.warn("[call] call_ring failed",error);
+    else if(data===false) console.warn("[call] call_ring refused (not friends): the other side will not ring");
+  }catch(e){ console.warn("[call] call_ring failed",e); }
+}
+/* Callee: is this call (callId from the link) really one that peerId made to me? One retry, then no.
+ * true while the server side is not installed yet (RPC missing), as before. */
+let shownName="";
+async function callIsReal(){
+  for(let attempt=0;attempt<2;attempt++){
+    try{
+      const {data,error}=await sb.rpc("call_incoming",{p_call_id:callId});
+      if(error){ if(isMissingRpc(error)) return true; console.warn("[call] call check failed",error); continue; }
+      const row=(data||[]).find(r=>r.call_id===callId&&r.from_user===peerId);
+      if(!row) return false;
+      shownName=isText(row.from_name,MAX_NAME)?row.from_name:"";
+      return true;
+    }catch(e){ console.warn("[call] call check failed",e); }
+  }
+  return false;
+}
+
+// send a hint to the peer's personal ring inbox (subscribe, send once)
 function ring(event){
+  if(event==="cancel") sb.rpc("call_cancel",{p_call_id:callId}).then(()=>{},(e)=>console.warn("[call] cancel failed",e));
+  const payload=RING_SENDS_CALL_ID?{callId,from:me,to:peerId,fromName:myName}:{from:me,to:peerId,fromName:myName};
   inbox=sb.channel("rtc:"+peerId,{config:{broadcast:{self:false}}});
-  inbox.subscribe((s)=>{ if(s==="SUBSCRIBED"){ inbox.send({type:"broadcast",event,payload:{callId,from:me,to:peerId,fromName:myName}}); } });
+  inbox.subscribe((s)=>{ if(s==="SUBSCRIBED"){ inbox.send({type:"broadcast",event,payload}); } });
 }
 
 // Fire a real Web Push so the callee gets a system notification even with the

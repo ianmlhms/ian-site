@@ -1,13 +1,13 @@
 /* Messenger — group chat + DMs + media, on Supabase. Shared accounts with PixelBreak. */
-import * as auth from "./auth.js?v=45";
-import { registerSW, enablePush, disablePush, pushState } from "./notify.js?v=43";
+import * as auth from "./auth.js?v=46";
+import { registerSW, enablePush, disablePush, pushState } from "./notify.js?v=44";
 import { searchPeople, highlightMatch, attachPeopleSearch } from "./people-search.js?v=1";
 import { openPeoplePicker } from "./people-picker.js?v=1";
 import { createMediaUrls, UPLOAD_CACHE_SECONDS, thumbPathFor, newMediaPaths } from "./chat-media.js?v=2";
 import { prepareImage, videoPoster, extOf } from "./chat-media-prep.js?v=1";
 
 const $ = (id) => document.getElementById(id);
-const esc = (s) => (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const esc = (s) => String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const T = (k) => (window.I18N ? window.I18N.t(k) : k);   // i18n lookup
 const fmtTime = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); };
 const adminTag = (uid) => (adminIds.has(uid) ? ` <span class="admin-tag">👑 Admin</span>` : "");
@@ -63,7 +63,8 @@ const avatarOf = (uid) => avatarMap[uid] || "👤";
 // render an avatar as an <img> when it's an uploaded photo URL, else the emoji glyph
 const avatarHtml = (uid) => {
   const a = avatarOf(uid);
-  return /^https?:\/\//.test(a) ? `<img class="av-img" src="${esc(a)}" alt="">` : a;
+  // profiles.avatar is user-chosen text (any 8 characters): always escaped, never raw HTML
+  return /^https?:\/\//.test(a) ? `<img class="av-img" src="${esc(a)}" alt="">` : esc(a);
 };
 let onlineSubbed = false;
 let allChats = [];           // last loaded chats, for search filtering
@@ -206,6 +207,11 @@ async function joinGroup() {
   if (!code) return;
   const { data, error } = await sb.rpc("join_group", { p_code: code, p_username: auth.username() });
   if (error) return alert(error.message);
+  // A wrong code comes back as "no group" (not an error), so the server can count wrong tries.
+  if (!data || !data.id) {
+    const none = T("msg.join.none");                    // an older cached i18n-dict.js has no such key yet
+    return alert(none === "msg.join.none" ? "Kee Grupp mat deem Code." : none);
+  }
   await loadChats(data.id);
 }
 async function newDM() {

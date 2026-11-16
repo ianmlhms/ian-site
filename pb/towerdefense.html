@@ -63,7 +63,7 @@ button:hover:not(:disabled){filter:none;border-color:var(--g-ink)}button:focus-v
 .metaButton strong,.branch strong{color:var(--g-green)}
 #helpBtn,#branchCancel{background:var(--g-white)}#helpPanel{border-radius:0;background:var(--g-paper);border:1px solid var(--g-soft)}
 </style>
-<script src="/pb/arcade-kit.js?v=54" data-arcade-id="towerdefense" data-arcade-title="Tower Defense"></script>
+<script src="/pb/arcade-kit.js?v=55" data-arcade-id="towerdefense" data-arcade-title="Tower Defense"></script>
 </head>
 <body>
 <main id="shell">
@@ -130,7 +130,7 @@ button:hover:not(:disabled){filter:none;border-color:var(--g-ink)}button:focus-v
     </div>
   </section>
 </main>
-<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js" integrity="sha384-qOkzR5Ke/XkQxuGVJ9hpFEpDlcoLtWwVYhnJf06cLIZa2vaIptSqaubivErzmD5O" crossorigin="anonymous"></script>
 <script>
 window.addEventListener("error",function(event){document.documentElement.dataset.bootError=event.message||"script-error"});
 window.addEventListener("unhandledrejection",function(event){document.documentElement.dataset.bootError=String(event.reason||"promise-error")});
@@ -140,6 +140,6 @@ if(!window.THREE){
   throw new Error("three.js r160 failed to load");
 }
 </script>
-<script type="module" src="/pb/towerdefense/main.js?v=3"></script>
+<script type="module" src="/pb/towerdefense/main.js?v=4"></script>
 </body>
 </html>
