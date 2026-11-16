@@ -12,6 +12,8 @@ import { createPaintTextures } from './paint-textures.js';
 import { createEnv, TIME_PRESETS, WEATHER_IDS, SEASON_IDS } from './env.js';
 import { createGroundMaterial } from './ground-shader.js';
 import { buildPlayWorld, stateAt } from './play-world.js';
+import { mapInput } from './world-build.js';
+import { buildWorldMap } from './world-map.js';
 import { createRockView } from './rock-view.js';
 import { createWaterView } from './water-view.js';
 import { createRain, createLeaves, createShafts, createBirds, createInsects } from './effects.js';
@@ -43,6 +45,7 @@ import { loadInitialProgress, createPersistence, createScoreReporter, dailyRpc }
 import { LANGS, t as translate, trailName, formatTime } from './i18n.js';
 
 const THREE = window.THREE;
+const mark = (name) => { try { performance.mark(`mtb:${name}`); } catch (error) { /* no marks */ } };
 const $ = (id) => document.getElementById(id);
 const LANG_KEY = 'pb_mtb_lang';
 const QUALITY_KEY = 'pb_mtb_quality';
@@ -76,22 +79,41 @@ function pickLang() {
   return 'lb';
 }
 
+/** The graphics level comes from the shared helper (pb/gfx-quality.js, one "Grafik" setting for the 3D games; auto = low on iPads). Without it (a page that did not load it) the old guess applies. */
+const GFX = () => window.ArcadeGfx || null;
 function autoQuality() {
+  if (GFX()) return GFX().auto();
   const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
-  const ipadDesktopUa = navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform || navigator.userAgent || '');       // an iPad that says "Macintosh" (desktop mode of Safari)
-  if (coarse || ipadDesktopUa) return 'low';                              // every touch device (iPads of the school first): the low setting, the player can raise it in the menu
-  const weak = (navigator.hardwareConcurrency || 4) <= 4;
-  return weak ? 'medium' : 'high';
+  return coarse ? 'low' : (navigator.hardwareConcurrency || 4) <= 4 ? 'medium' : 'high';
+}
+/** The old own setting (pb_mtb_quality, a player's explicit pick) moves into the shared one once, so nobody loses a choice they made. */
+function migrateOwnQuality() {
+  const gfx = GFX(), stored = readKey(QUALITY_KEY);
+  if (gfx && gfx.choice() === 'auto' && QUALITY[stored] && !readKey('pb_mtb_qauto')) gfx.set(stored);
 }
 function pickQuality() {
   const q = param('q');
-  if (q && QUALITY[q]) return q;
-  const stored = readKey(QUALITY_KEY);
-  if (QUALITY[stored]) return stored;
-  return autoQuality();
+  if (q && QUALITY[q]) return q;                                           // ?q= (tests, links) wins over everything
+  migrateOwnQuality();
+  return GFX() ? GFX().level() : (QUALITY[readKey(QUALITY_KEY)] ? readKey(QUALITY_KEY) : autoQuality());
+}
+
+const pixelRatioFor = (q) => Math.min(window.devicePixelRatio || 1, q.pixelRatio);
+
+/** Runs world-map.js in a module worker. Resolves with the rasters; rejects when workers are unavailable or the worker fails. */
+function buildMapsInWorker(data) {
+  return new Promise((resolve, reject) => {
+    let worker;
+    try { worker = new Worker(new URL('./world-map-worker.js', import.meta.url), { type: 'module' }); } catch (error) { reject(error); return; }
+    worker.onmessage = (event) => { worker.terminate(); if (event.data.ok) resolve(event.data.map); else reject(new Error(event.data.error)); };
+    worker.onerror = (event) => { worker.terminate(); reject(new Error(event.message || 'worker error')); };
+    worker.postMessage(mapInput(data));
+  });
 }
 
 const reader = (base) => async (name) => {
+  const early = window.__mtbPre && window.__mtbPre[name];               // mtb.html starts every data file at the top of the page (one download while the code loads)
+  if (early) { try { return await early; } catch (error) { console.warn('[mtb] early fetch failed, retrying', name, error); } }
   const res = await fetch(new URL(name, base));
   if (!res.ok) throw new Error(`${name}: HTTP ${res.status}`);
   return new Uint8Array(await res.arrayBuffer());
@@ -103,7 +125,7 @@ async function boot() {
   document.documentElement.lang = lang;
   const tr = (key, params) => translate(lang, key, params);
   const loader = window.__mtbLoad || { set() {}, done() {}, fail() {} };
-  const setLoad = (p, key) => loader.set(p, key ? tr(key) : '');
+  const setLoad = (p, key) => { try { performance.mark(`mtb:${p}:${key || ''}`); } catch (error) { /* no marks */ } loader.set(p, key ? tr(key) : ''); };
   const canvas = $('mtbCanvas');
   const shell = $('shell');
   const qualityId = pickQuality();
@@ -116,7 +138,7 @@ async function boot() {
   setLoad(0.04, 'load.terrain');
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: qualityId === 'high', powerPreference: 'high-performance', preserveDrawingBuffer: debug });
   renderer.outputColorSpace = THREE.LinearSRGBColorSpace;          // the whole game shades in display space (painted look)
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, quality.pixelRatio));
+  renderer.setPixelRatio(pixelRatioFor(quality));
   renderer.setClearColor(holeMode ? 0xff00ff : 0x9ab6c8, 1);
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(62, 1, 0.1, quality.far);
@@ -126,7 +148,14 @@ async function boot() {
   const data = await loadWorldData(reader(new URL('./data/', import.meta.url)), (p, what) => setLoad(0.08 + 0.52 * p, `load.${what}`));
   setLoad(0.62, 'load.build');
   await new Promise((r) => setTimeout(r, 0));
-  const world = buildPlayWorld(data);
+  mark('data');
+  // The 2 million cell world rasters are built in a worker while this thread builds the rest of the world (two cores on an iPad); without worker support, or if it fails, this thread does it.
+  const maps0 = { nx: data.classes.nx, nz: data.classes.nz, cover: null, canopy: null, field: null };
+  const mapsDone = buildMapsInWorker(data).catch((error) => { console.warn('[mtb] map worker failed, building on the main thread', error); return buildWorldMap(mapInput(data)); });
+  const world = buildPlayWorld(data, { maps: maps0 });
+  mark('world (without maps)');
+  Object.assign(maps0, await mapsDone);
+  mark('world');
   const { field, surface, ground, groundAt, maps, trees, undergrowth, rocks, decks } = world;
   const trails = world.trails;
   const trailById = world.trailById;
@@ -135,7 +164,9 @@ async function boot() {
   setLoad(0.7, 'load.build');
   await new Promise((r) => setTimeout(r, 0));
   const textures = createPaintTextures(renderer, qualityId);
-  await textures.ready;                                             // the painted set (data/tex) replaces the canvas fallbacks before the first frame
+  window.__mtbBg = { done: false, work: false };                                   // background work (painted textures) still running; the flows wait for it
+  textures.ready.then(() => { mark('painted textures'); window.__mtbBg.done = true; });               // the painted set (data/tex) replaces the canvas fallbacks as it arrives: the player never waits for it (canvas look for a moment)
+  mark('textures');
   const mapTexture = (arr, filter = THREE.LinearFilter) => { const tex = new THREE.DataTexture(arr, maps.nx, maps.nz, THREE.RGBAFormat); tex.magFilter = filter; tex.minFilter = filter; tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping; tex.colorSpace = THREE.NoColorSpace; tex.needsUpdate = true; return tex; };
   const worldMaps = { cover: mapTexture(maps.cover), canopy: mapTexture(maps.canopy), field: mapTexture(maps.field, THREE.NearestFilter) };
   const saved0 = settingsOf(progress);
@@ -149,9 +180,12 @@ async function boot() {
   const groundFor = (q) => (q.cheapGround ? groundCheap : groundFull);
   for (const m of [groundFull, groundCheap]) m.uniforms.uTreeRadius.value = quality.treeRadius;
 
+  mark('env+ground');
   // ---- world views
   const terrain = createTerrainView({ scene, surface, field, material: groundFor(quality), quality });
+  mark('terrainView');
   const forest = createForestView({ scene, trees, undergrowth, env, quality, textures, meadow: { map: maps, surface, clearance: world.clearance } });
+  mark('forestView');
   const rockView = createRockView({ scene, rocks, env, quality, textures });
   const bridge = world.bridge;
   if (bridge) {
@@ -166,8 +200,10 @@ async function boot() {
     rockView.addLandmark(parts.ledge, c.x, c.lipY, c.z, c.yaw, 0.6, 3.4, 30);
     rockView.addLandmark(parts.stones, c.x, c.lipY, c.z, c.yaw, 0.5, 3.7, 40);
   }
+  mark('rocks+bridge+cascade');
   const water = createWaterView({ scene, network: field.network, env, quality, foamTexture: textures.foam, cascade: world.cascade });
-  const town = createTownView({ scene, env, quality, houses: world.houses });
+  let town = null;                                                       // the villages and castles: built behind the start card (ensureTown), they probe the ground under every wall
+  mark('water+town');
   const junctions = findAllJunctions(field.network);
   const props = createProps({ scene, env, surface, trails, decks, junctions });
   const riderLook = () => { const s = settingsOf(progress); void s; return { bike: progress.bk || 'hardtail', frame: COLOUR_HEX[progress.col] || COLOUR_HEX.red, helmet: HELMET_HEX[progress.hm] || HELMET_HEX.plain }; };
@@ -180,6 +216,7 @@ async function boot() {
   const dust = createDust({ scene, env, quality });
   const speedLines = createSpeedLines(shell, { low: quality.id === 'low' });
   const birds = createBirds({ scene, env, quality }), insects = createInsects({ scene, env, quality, surface, map: maps, clearance: world.clearance });
+  mark('props+rider+effects');
   const hikers = createHikers({ scene, env, surface, paths: world.ways.filter((w) => w.kind === 'path') });
 
   // ---- viewpoints (free ride collectibles): the real viewpoints and landmarks inside the playable box
@@ -195,7 +232,9 @@ async function boot() {
   for (const v of viewpoints) if (Math.hypot(v.x - fall.x, v.z - fall.z) < 60) v.name = tr('vp.falls');
   viewpoints.forEach((v) => { v.name = v.name || tr('vp.unnamed'); });
   if (!viewpoints.some((v) => Math.hypot(v.x - fall.x, v.z - fall.z) < 60) && viewpoints.length < 60) viewpoints.push({ x: fall.x - 14, z: fall.z + 10, name: tr('vp.falls'), kind: 'attraction' });
-  // two more collectibles at the new landmarks: a spot with a view of the Beaufort castle ruin and one at the Berdorf church (an open, flat place near, away from every house)
+  // two more collectibles at the new landmarks: a spot with a view of the Beaufort castle ruin and one at the Berdorf church (an open, flat place near, away from every house).
+  // They are the LAST entries of the list (the saved "found" bits count by index), so they are added when the town is built: ensureTown runs before any ride or free ride starts.
+  const vpNormal = { x: 0, y: 1, z: 0 };
   const viewSpot = (name, tx, tz, ring) => {
     for (let a = 0; a < 360; a += 20) {
       const x = tx + Math.cos(a * Math.PI / 180) * ring, z = tz + Math.sin(a * Math.PI / 180) * ring;
@@ -203,15 +242,19 @@ async function boot() {
       if (!world.town.insideRect(x, z, 4) && vpNormal.y > 0.88 && viewpoints.length < MAX_VIEWPOINTS) { viewpoints.push({ x, z, name, kind: 'attraction' }); return; }
     }
   };
-  const vpNormal = { x: 0, y: 1, z: 0 };
-  if (world.town.houses.length) {
-    const ruin = world.houses.find((h) => h.flags & RUIN), church = world.houses.find((h) => h.flags & CHURCH && h.cx > 3000);
-    if (ruin) viewSpot(tr('vp.castle'), ruin.cx, ruin.cz, 30);
-    if (church) viewSpot(tr('vp.village'), church.cx, church.cz, 24);
+  function ensureTown() {
+    if (town) return;
+    town = createTownView({ scene, env, quality, houses: world.houses });
+    if (world.town.houses.length) {
+      const ruin = world.houses.find((h) => h.flags & RUIN), church = world.houses.find((h) => h.flags & CHURCH && h.cx > 3000);
+      if (ruin) viewSpot(tr('vp.castle'), ruin.cx, ruin.cz, 30);
+      if (church) viewSpot(tr('vp.village'), church.cx, church.cz, 24);
+    }
   }
   const villages = data.landmarks.filter((l) => l.kind === 'village' && l.name && l.x > 0 && l.z > 0 && l.x < WORLD.width && l.z < WORLD.depth).map((l) => ({ name: l.name, x: l.x, z: l.z }));
   const mapState = { backdrop: createMapBackdrop(data), villages, viewpoints, found: new Set(), rider: null };
 
+  mark('hikers+viewpoints');
   // ---- game, ui, sound, saves
   const game = createGame();
   const audio = createAudio({ win: window });
@@ -276,7 +319,7 @@ async function boot() {
       trails: trails.map((t) => ({ trail: t, locked: !isTrailUnlocked(progress, t.id), unlockText: unlockText(t.id), medal: medalOf(progress, t.id), bestMs: bestMs(progress, t.id) })),
       bikes: BIKE_IDS.map((id) => ({ id, locked: !isBikeUnlocked(progress, id), points: BIKE_MEDAL_POINTS[id] })), points: trailPoints(),
       current: { trailId: current.trail ? current.trail.id : FIRST_TRAIL, bike: progress.bk || 'hardtail' },
-      settings: { time: env.getChoice().timeMode, weather: env.getChoice().weatherMode, season: env.getChoice().seasonMode, quality: readKey(QUALITY_KEY) && QUALITY[readKey(QUALITY_KEY)] && !readKey('pb_mtb_qauto') ? readKey(QUALITY_KEY) : 'auto', lang, muted: audio.isMuted() },
+      settings: { time: env.getChoice().timeMode, weather: env.getChoice().weatherMode, season: env.getChoice().seasonMode, quality: GFX() ? GFX().choice() : 'auto', lang, muted: audio.isMuted() },
       autoQuality: autoQuality(), cloud: !!window.__pbSave || (window.parent !== window),
       daily: { trailName: trailName(trailById.get(d.trailId), lang), time: d.time, weather: d.weather, bestMs: d.bestMs, canBoard: window.parent !== window },
       viewpoints: { found: viewpointCount(progress.vp), total: viewpoints.length },
@@ -285,7 +328,7 @@ async function boot() {
   }
   function foundSet() { const s = new Set(); viewpoints.forEach((v, i) => { if (hasViewpoint(progress.vp, i)) s.add(i); }); return s; }
   function refreshMenu() { if (ui.isMenuOpen()) ui.refreshMenu(menuData()); }
-  function openMenu(tab) { ui.openMenu(tab || 'trails', menuData()); document.body.classList.add('menuopen'); }
+  function openMenu(tab) { ensureTown(); ui.openMenu(tab || 'trails', menuData()); document.body.classList.add('menuopen'); }
   function closeMenu() { ui.closeMenu(); document.body.classList.remove('menuopen'); }
   function cycleTime() { const ids = Object.keys(TIME_PRESETS); env.setTime(ids[(ids.indexOf(env.state.timeId) + 1) % ids.length]); save(withSettings(progress, { time: env.getChoice().timeMode })); ui.toast(`${tr('hud.timeOfDay')}: ${tr(`time.${env.state.timeId}`)}`); audio.event('ui', { kind: 'click' }); }
   function cycleWeather() { env.setWeather(WEATHER_IDS[(WEATHER_IDS.indexOf(env.state.weatherId) + 1) % WEATHER_IDS.length]); save(withSettings(progress, { weather: env.getChoice().weatherMode })); ui.toast(`${tr('hud.weather')}: ${tr(`weather.${env.state.weatherId}`)}`); audio.event('ui', { kind: 'click' }); }
@@ -294,13 +337,14 @@ async function boot() {
     const next = QUALITY[id] ? id : autoQuality();
     Object.assign(quality, QUALITY[next], { id: next });
     terrain.setMaterial(groundFor(quality));
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, quality.pixelRatio)); resize();
+    renderer.setPixelRatio(pixelRatioFor(quality)); resize();
   }
+  if (GFX()) GFX().onChange((level) => { if (level !== quality.id) applyQuality(level); });      // a change in the menu, in another game or in another tab
   function applySetting(key, value) {
     if (key === 'time') { env.setTime(value); save(withSettings(progress, { time: value })); }
     else if (key === 'weather') { env.setWeather(value); save(withSettings(progress, { weather: value })); }
     else if (key === 'season') { env.setSeason(value); save(withSettings(progress, { season: value })); }
-    else if (key === 'quality') { if (value === 'auto') { try { localStorage.removeItem(QUALITY_KEY); } catch (error) { /* ignore */ } applyQuality(autoQuality()); } else { writeKey(QUALITY_KEY, value); applyQuality(value); } save(withSettings(progress, { q: value })); }
+    else if (key === 'quality') { if (GFX()) GFX().set(value); else applyQuality(value === 'auto' ? autoQuality() : value); save(withSettings(progress, { q: value })); }       // the shared setting tells us (onChange below) to apply it
     else if (key === 'lang') { if (value !== 'lb') return; lang = value; writeKey(LANG_KEY, value); ui.setLang(value); input.setLabels({ pedal: tr('touch.pedal'), brake: tr('touch.brake'), jump: tr('touch.jump') }); save(withSettings(progress, { lang: value })); if (current.trail && game.mode === 'card') showCard(); setHudMode(); }
     else if (key === 'sound') { audio.setMuted(value === 'off'); writeKey('pb_muted', value === 'off' ? '1' : '0'); save(withSettings(progress, { snd: value === 'off' ? 0 : 1 })); }
     refreshMenu();
@@ -334,6 +378,7 @@ async function boot() {
     game.showCard(t, { kind, bestMs: bestMs(progress, t.id), bestSplits: bestSplits(progress, t.id), ghostMs: ghostData ? ghostData.duration : 0 });
     bike = stateAt(t, 0, ground);
     chase.snap(bike);
+    if (t.focus) setTimeout(() => world.finishView, 400);                 // the camera spot of the trail that ends at a sight is searched while the card is up, not at the finish
     props.setActiveTrail(t); props.setFlags(t, 0); props.setViewpoints([], null);
     writeKey(LAST_KEY, t.id);
     reporter.selectBoard(t.id, trailName(t, lang));                    // the arcade header and leaderboard follow the trail on the card: "Best" is this trail's best time
@@ -344,12 +389,14 @@ async function boot() {
     const t = current.trail;
     if (!isTrailUnlocked(progress, t.id) && current.kind !== 'daily') return;
     audio.resume();
+    scheduleDeferred(40);                                                  // the rest of the setup runs during the 3-2-1; "Go" waits for it (applyEvents)
     ui.hideCard(); document.body.classList.remove('cardopen');
     game.begin();
     hintLeft = rides < HINT_RIDES ? HINT_SECONDS : 0;
     setHudMode();
   }
   function startFree() {
+    runDeferredNow();
     closeMenu(); ui.hideCard(); ui.hideFinish(); document.body.classList.remove('cardopen'); replay = null; ghostRider.root.visible = false;
     const t = current.trail || trailById.get(FIRST_TRAIL);
     current = { trail: t, kind: 'free', dailyInfo: null };
@@ -382,7 +429,7 @@ async function boot() {
   function applyEvents(events) {
     for (const e of events) {
       if (e.type === 'countdown') { ui.showCount(e.n); audio.event('countdown', { n: e.n }); }
-      else if (e.type === 'go') { ui.showCount(0); audio.event('go'); setHudMode(); }
+      else if (e.type === 'go') { ensureTown(); ui.showCount(0); audio.event('go'); setHudMode(); }
       else if (e.type === 'checkpoint') {
         ui.split(e.delta, e.n); props.setFlags(current.trail, game.cpNext);
         audio.event('checkpoint', { better: e.delta === null ? null : e.delta <= 0 });
@@ -485,6 +532,10 @@ async function boot() {
   resize();
   window.addEventListener('resize', resize);
 
+  mark('ui');
+  /** Work the first screen does not need, done one piece at a time behind the start card (the player is let in first). A ride, a free ride or the map finishes whatever is left first (runDeferredNow),
+   *  so nothing is ever missing when it matters. All of it is the same work as before, only later. */
+  const deferred = [['town', ensureTown], ...props.worldSteps.map((step, i) => [`props ${i + 1}`, step]), ['shaders', prewarmShaders]];       // only the town is needed before "Go" (collisions); the rest is looks
   // ---- first screen
   const startTrail = param('trail') && trailById.has(param('trail')) ? param('trail') : (trailById.has(readKey(LAST_KEY)) && isTrailUnlocked(progress, readKey(LAST_KEY)) ? readKey(LAST_KEY) : FIRST_TRAIL);
   setLoad(0.86, 'load.build');
@@ -496,12 +547,20 @@ async function boot() {
   if (param('autostart') === '1' || mode === 'run') { ui.hideCard(); document.body.classList.remove('cardopen'); game.begin(); game.countdown = 0.001; }
   else if (mode === 'free') startFree();
   else if (param('daily') === '1') startDaily();
+  mark('card');
   terrain.buildAll(bike.x, bike.z);
+  mark('terrain');
   forest.update(bike.x, bike.z, 0, 0, 0, true);
+  mark('forest');
   env.update(0, camera, 0);
   hudButtons();
   if (readKey('pb_muted') === '1') audio.setMuted(true);
-  prewarmShaders();
+
+  function runDeferredNow() { while (deferred.length) { const [name, fn] = deferred.shift(); fn(); mark(`deferred ${name}`); } if (window.__mtbBg) window.__mtbBg.work = true; }
+  function scheduleDeferred(delay = 250) {
+    if (!deferred.length) { if (window.__mtbBg) window.__mtbBg.work = true; return; }
+    setTimeout(() => { if (!deferred.length) return; const [name, fn] = deferred.shift(); fn(); mark(`deferred ${name}`); scheduleDeferred(delay); }, delay);
+  }
 
   /** Compiles every shader program now, behind the loading screen: the dust, the town and the other quality level's ground shader used to compile on their first use mid-ride (a 10-40 ms hitch each). */
   function prewarmShaders() {
@@ -615,7 +674,7 @@ async function boot() {
     terrain.update(frozenCamera ? c.x : bike.x, frozenCamera ? c.z : bike.z);
     forest.update(c.x, c.z, bike.vx, bike.vz, elapsed);
     rockView.update(c.x, c.z);
-    town.update(c.x, c.z);
+    if (town) town.update(c.x, c.z);
     props.update(c.x, c.z);
     foamTimer -= dt;
     if (foamTimer <= 0) { foamTimer = 0.4; water.updateFoam(c.x, c.z, rockView.stones); }
@@ -653,10 +712,9 @@ async function boot() {
     if (perfT >= 1) {
       perf.fps = Math.round(perfFrames / perfT); perf.ms = Math.round(1000 * perfT / perfFrames);
       perf.drawCalls = renderer.info.render.calls; perf.triangles = renderer.info.render.triangles;
-      const manual = readKey(QUALITY_KEY) && !readKey('pb_mtb_qauto');
       slowT = perf.ms > FRAME_BUDGET_MS[quality.id] ? slowT + perfT : 0;
       perfT = 0; perfFrames = 0;
-      if (slowT >= ADAPT_WINDOW_S && quality.id !== 'low' && !debug && !manual) {
+      if (slowT >= ADAPT_WINDOW_S && quality.id !== 'low' && !debug) {          // watchdog: slow for a few seconds = one level down, whatever the player picked (never up: the pick is the ceiling)
         const next = quality.id === 'high' ? 'medium' : 'low';
         applyQuality(next);
         perf.adapt++; slowT = 0;
@@ -678,9 +736,11 @@ async function boot() {
   await new Promise((r) => setTimeout(r, 60));
   loader.done();
   document.documentElement.dataset.mtbReady = '1';
+  mark('ready');
+  scheduleDeferred();
 
   window.__mtb = {
-    version: 'w3-play', renderer, scene, camera, field, surface, ground, groundAt, env, cascade: world.cascade, terrain, forest, trees, undergrowth, rocks, rockView, town, water, rider, rain, leaves, shafts, birds, insects, hikers, world, maps, bridge, quality, perf, data, junctions, props,
+    version: 'w3-play', renderer, scene, camera, field, surface, ground, groundAt, env, cascade: world.cascade, terrain, forest, trees, undergrowth, rocks, rockView, get town() { ensureTown(); return town; }, water, rider, rain, leaves, shafts, birds, insects, hikers, world, maps, bridge, quality, perf, data, junctions, props,
     game, ui, input, audio, props, trails, viewpoints, persistence, dailyToday, menuData,
     get trail() { return current.trail; }, get kind() { return current.kind; }, get centre() { return current.trail.centre; },
     get bike() { return bike; }, get progress() { return progress; }, get focusBlend() { return focusBlend; }, get viewShift() { return { x: viewShift.x, y: viewShift.y }; },

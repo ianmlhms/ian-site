@@ -13,8 +13,8 @@ const FINISH_BEFORE = 8;          // m before the end: the finish arch
 const ROCK_PATH_CLEARANCE = 0.45;   // carve coverage above which a rock cannot stop the bike
 const CHECKPOINT_RADIUS = 9;      // m: riding this close to a checkpoint counts
 
-export function buildPlayWorld(data) {
-  const world = buildPureWorld(data);
+export function buildPlayWorld(data, pre = {}) {
+  const world = buildPureWorld(data, pre);
   const { field, surface, maps } = world;
   const decks = buildDecks(field.network.features, surface);
   const bridge = placeBridge(field.network, surface);                  // the Schiessentuempel stone footbridge: a deck like the plank bridges (one deck system)
@@ -39,8 +39,13 @@ export function buildPlayWorld(data) {
     return a;
   };
   const trunkHit = { nx: 0, nz: 0, pen: 0 };
-  const cascadeFinish = world.cascade ? finishView(world.cascade, surface, (x, z, r) => world.trees.collide(x, z, r, trunkHit) !== null) : null;          // where the camera stands when the Schiessentuempel trail ends (null: use the trail's own focus point)
-  return { ...world, decks, bridge, ground, groundAt, classify, collide, trails, finishView: cascadeFinish, trailById: new Map(trails.map((t) => [t.id, t])) };
+  let cascadeFinish, cascadeFinishDone = false;
+  /** Where the camera stands when the Schiessentuempel trail ends (null: use the trail's own focus point). Searched on first use: nobody needs it before a ride ends. */
+  const finishViewOnce = () => { if (!cascadeFinishDone) { cascadeFinishDone = true; cascadeFinish = world.cascade ? finishView(world.cascade, surface, (x, z, r) => world.trees.collide(x, z, r, trunkHit) !== null) : null; } return cascadeFinish; };
+  const out = Object.defineProperties({}, Object.getOwnPropertyDescriptors(world));          // (copies the lazy houses / town getters of the pure world instead of calling them)
+  Object.assign(out, { decks, bridge, ground, groundAt, classify, collide, trails, trailById: new Map(trails.map((t) => [t.id, t])) });
+  Object.defineProperty(out, 'finishView', { enumerable: true, get: finishViewOnce });
+  return out;
 }
 
 /** A trail as the game plays it. `centre` = the carved (smoothed) samples [[x, z], ...] every 1 m, `s` their arc length (m). */

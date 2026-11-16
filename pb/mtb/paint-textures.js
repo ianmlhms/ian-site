@@ -150,11 +150,18 @@ const TEX_FILES = Object.freeze({
   barkBeech: 'bark_beech', barkOak: 'bark_oak', grass: 'grass', foam: 'foam', sky: 'sky',
 });
 
-function loadImage(name) {
+/** Loads one painted file. With `size` (the low graphics level) the picture is scaled down once to size x size, so the GPU holds a quarter of the pixels. */
+function loadImage(name, size = 0) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.decoding = 'async';
-    img.onload = () => resolve(img);
+    img.onload = () => {
+      if (!size || img.width <= size) { resolve(img); return; }
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = size;
+      cv.getContext('2d').drawImage(img, 0, 0, size, size);
+      resolve(cv);
+    };
     img.onerror = () => reject(new Error(`texture ${name} failed to load`));
     img.src = new URL(`${name}.webp`, TEX_URL).href;
   });
@@ -213,7 +220,7 @@ export function createPaintTextures(renderer, quality) {
   for (const key of ['litterAutumn', 'rockMoss', 'rockWet', 'barkBeech', 'barkOak', 'grass', 'foam', 'sky']) textures[key] = make(key === 'litterAutumn' ? litter(size, 15) : key === 'grass' ? moss(size, 16) : key.startsWith('bark') ? dirt(size, 17) : key === 'foam' || key === 'sky' ? canvas(8) : sandstone(size, 18));
   const loads = Object.entries(TEX_FILES).map(async ([key, file]) => {
     try {
-      const img = await loadImage(file);
+      const img = await loadImage(file, quality === 'low' ? size : 0);
       textures[key].image = img; textures[key].needsUpdate = true;
       return true;
     } catch (error) { console.warn('[mtb] painted texture missing, using the canvas fallback:', file, error); return false; }
