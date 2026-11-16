@@ -136,6 +136,7 @@ export function widenToWays(decks, roads) {
     if (!CAR_DECK_KINDS.has(r.kind) || !(r.bridge || r.over)) continue;
     for (const q of r.pts) { const k = key(q[0], q[1]), l = grid.get(k); if (!l) grid.set(k, [r]); else if (!l.includes(r)) l.push(r); }
   }
+  const carried = new Set();                 // (the car ways a deck carries: clearCarriageways leaves the footways beside them alone)
   const widened = decks.map((d) => {
     const cand = new Set();
     for (const p of d.pts) for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (const r of grid.get(key(p[0] + a * G, p[1] + b * G)) || []) cand.add(r);
@@ -145,9 +146,10 @@ export function widenToWays(decks, roads) {
       for (const p of d.pts) for (let i = 0; i + 1 < r.pts.length; i++) if (segDist(p, r.pts[i], r.pts[i + 1]) <= 1.5) { c++; break; }
       if (c > most) { most = c; way = r; }
     }
+    if (way && most >= d.pts.length * 0.6) carried.add(way);
     return way && most >= d.pts.length * 0.6 && way.width > d.width ? { ...d, width: way.width } : d;
   });
-  return clearCarriageways(widened, roads);
+  return clearCarriageways(widened, roads, carried);
 }
 
 /**
@@ -155,18 +157,20 @@ export function widenToWays(decks, roads) {
  * mapped as its own way) moves out of that carriageway: its points move across, away from the car way, until its inner edge meets the carriageway's edge (at most
  * FOOT_CLEAR.maxShift), the shift spread along the deck over FOOT_CLEAR.ramp so the deck does not kink.  The car took the deck - 0.5 - 0.8 m over its lane, within
  * DECK.stickBelow + DECK.hintLift of its body - for its road: Pont Buchler 15754 / 16046 (deck 229, lane 3.67: roll 0.6, the path's railing in the lane), Route de Trèves
- * (deck 134).  The car way: a car class, not in a tunnel, running parallel (FOOT_CLEAR.parallel) with its axis more than FOOT_CLEAR.ownAxis from the deck's (nearer: the deck's
+ * (deck 134).  The car way: a car class, not in a tunnel, not carried by a deck of its own (a footway beside a road DECK at its level is harmless - and moving
+ * it off deck 96 beside Rue Jean-Baptiste Merkel's deck left a point of harness M1 with no deck), running parallel (FOOT_CLEAR.parallel) with its axis more than FOOT_CLEAR.ownAxis from the deck's (nearer: the deck's
  * own way); the shift fades to nothing over FOOT_CLEAR.endHold at the deck's ends.  Pure: returns new decks (the others unchanged).
  */
 // (endHold: the ends stay where they are - the end of deck 229 moved out over the cut of service 7674 beside it, an open pit under the deck, harness D)
 export const FOOT_CLEAR = Object.freeze({ maxShift: 2.5, ramp: 12, endHold: 8, parallel: 0.9, ownAxis: 1.5, along: 0.6, cell: 64 });
 const smoothstep01 = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
-export function clearCarriageways(decks, roads) {
+export function clearCarriageways(decks, roads, carried = new Set()) {
   const G = FOOT_CLEAR.cell, grid = new Map(), key = (x, z) => Math.floor(x / G) * 65536 + Math.floor(z / G);
   for (const r of roads) {
     if (!CAR_DECK_KINDS.has(r.kind) || r.kind === 'track' || r.tunnel || r.pts.length < 2) continue;
     for (const q of r.pts) { const k = key(q[0], q[1]), l = grid.get(k); if (!l) grid.set(k, [r]); else if (!l.includes(r)) l.push(r); }
   }
+  const isCarriedBy = (r) => carried.has(r);
   const footOf = (p, a, b) => {
     const ex = b[0] - a[0], ez = b[1] - a[1], ll = ex * ex + ez * ez || 1, t = Math.max(0, Math.min(1, ((p[0] - a[0]) * ex + (p[1] - a[1]) * ez) / ll)), l = Math.sqrt(ll);
     const fx = a[0] + ex * t, fz = a[1] + ez * t;
@@ -191,7 +195,7 @@ export function clearCarriageways(decks, roads) {
       const dl = Math.hypot(q[0] - o[0], q[1] - o[1]) || 1, tx = (q[0] - o[0]) / dl, tz = (q[1] - o[1]) / dl;
       for (const r of cand) for (let k = 0; k + 1 < r.pts.length; k++) {
         const f = footOf(p, r.pts[k], r.pts[k + 1]);
-        if (f.d <= FOOT_CLEAR.ownAxis || Math.abs(f.ux * tx + f.uz * tz) < FOOT_CLEAR.parallel) continue;
+        if (isCarriedBy(r) || f.d <= FOOT_CLEAR.ownAxis || Math.abs(f.ux * tx + f.uz * tz) < FOOT_CLEAR.parallel) continue;
         const over = r.width / 2 + d.width / 2 - f.d;
         if (over > need[i]) {
           need[i] = Math.min(over, FOOT_CLEAR.maxShift);
