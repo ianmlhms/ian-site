@@ -21,7 +21,10 @@ canvas{display:block;width:100vw;height:100vh}
 #ov{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;background:rgba(8,14,26,.82);z-index:20;color:#fff;text-align:center;padding:16px;overflow-y:auto}
 #ov h1{font-size:min(10vw,40px);color:#66ccff;margin-bottom:8px}
 #ov .sub{font-size:15px;opacity:.85;margin-bottom:16px;line-height:1.55}
-#modes{display:flex;gap:8px;justify-content:center;margin-bottom:12px}
+#modes,#gfxRow{display:flex;gap:8px;justify-content:center;margin-bottom:12px;flex-wrap:wrap;align-items:center}
+#gfxRow .gl{color:#fff;font-size:13px;opacity:.8}
+#gfxRow .mode{min-height:40px;padding:6px 14px;font-size:13px;font-weight:bold;border-radius:24px;cursor:pointer;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.3);color:#fff}
+#gfxRow .mode.on{background:#9be89b;color:#0e1a2a;border-color:transparent}
 #modes .mode{min-height:44px;padding:9px 20px;font-size:14px;font-weight:bold;border-radius:24px;cursor:pointer;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.3);color:#fff}
 #modes .mode.on{background:#9be89b;color:#0e1a2a;border-color:transparent}
 #envs{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:8px}
@@ -61,9 +64,10 @@ body{background:var(--g-paper)}
 #ov{background:var(--g-veil);color:var(--g-ink)}
 #ov h1{color:var(--g-ink);font-weight:800;letter-spacing:-.04em}
 #ov .sub{color:var(--g-muted);opacity:1}
-#modes .mode{border-radius:0;background:var(--g-white);border:1px solid var(--g-soft);color:var(--g-ink);font-weight:600}
-#modes .mode:hover{border-color:var(--g-ink)}
-#modes .mode.on{background:var(--g-ink);color:var(--g-paper);border-color:var(--g-ink)}
+#modes .mode,#gfxRow .mode{border-radius:0;background:var(--g-white);border:1px solid var(--g-soft);color:var(--g-ink);font-weight:600}
+#gfxRow .gl{color:var(--g-muted)}
+#modes .mode:hover,#gfxRow .mode:hover{border-color:var(--g-ink)}
+#modes .mode.on,#gfxRow .mode.on{background:var(--g-ink);color:var(--g-paper);border-color:var(--g-ink)}
 #envs button,#ov button.big{border-radius:0;font-weight:700;color:var(--g-ink);background:var(--g-white);border:1px solid var(--g-ink)}
 #e0,#e1,#e2{background:var(--g-white)}
 #envs button:hover,#ov button.big:hover{border-color:var(--g-green);color:var(--g-green)}
@@ -77,6 +81,7 @@ body{background:var(--g-paper)}
 #ov button:focus-visible,#mm:focus-visible,#mute:focus-visible{outline:2px solid var(--g-green)}
 </style>
 <script src="/pb/arcade-kit.js?v=55" data-arcade-id="chill-drive" data-arcade-title="3D Cruiser"></script>
+<script src="/pb/gfx-quality.js?v=1"></script>
 </head>
 <body>
 <canvas id="c" role="img" aria-label="3D-Cruiser-Spillansiicht"></canvas>
@@ -104,6 +109,7 @@ body{background:var(--g-paper)}
 </div>
 <button class="big" id="go" type="button" style="display:none">Play again</button>
 <button class="big" id="goMenu" type="button" style="margin-top:10px;background:rgba(255,255,255,.18);color:#fff"><span aria-hidden="true">🏠</span> HAAPTMENÜ</button>
+<div id="gfxRow" role="group" aria-label="Grafik"></div>
 <div id="lvlt">— oder probéier 20 Level (komm ant Zil, max. 5 Onfäll) —</div>
 <div id="lvls"></div>
 </div>
@@ -119,6 +125,12 @@ if(!window.THREE){
 
 /* ---------- world tuning (same simulation as the classic Chill Drive) ---------- */
 const SEGL=200, DRAW=90;
+/* Grafik: the shared level (pb/gfx-quality.js; auto = low on iPads). The frame-time watchdog may drop it one step, never above the player's choice. */
+const GFX_ORDER=['low','medium','high'];
+let wdCap=null;
+const gfx=()=>{const l=window.ArcadeGfx?ArcadeGfx.level():'high';return wdCap&&GFX_ORDER.indexOf(wdCap)<GFX_ORDER.indexOf(l)?wdCap:l;};
+const gfxLow=()=>gfx()==='low';
+const gfxPR=()=>{const r=window.ArcadeGfx?ArcadeGfx.pixelRatio():Math.min(devicePixelRatio||1,2);const l=gfx();return Math.min(r,l==='low'?1:l==='medium'?1.5:2);};
 const MAXV=320, ACCEL=0.8, BRAKE=3.5, COAST=0.985, GRASS_CAP=55, GRASS_DRAG=0.95;
 const STEER_F=0.013, CENTRI=0.19, KMH=1.25, METER=50, GRADE_F=1.4, DOWN_MAX=1.12;
 const CAR_W=0.42, NEAR_W=0.8, INVULN=150, CAR_LEN=110, MAX_CRASH=5, N_LEVELS=20;
@@ -298,8 +310,8 @@ $('mute').onclick=()=>{muted=!muted;$('mute').textContent=muted?'🔇':'🔊';$(
 
 /* ---------- three.js scene ---------- */
 const C=$('c');
-const renderer=new THREE.WebGLRenderer({canvas:C,antialias:true});
-renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
+const renderer=new THREE.WebGLRenderer({canvas:C,antialias:!gfxLow()});
+renderer.setPixelRatio(gfxPR());
 const scene=new THREE.Scene();
 const camera=new THREE.PerspectiveCamera(74,1,1,1100);
 let W=innerWidth,H=innerHeight;
@@ -326,7 +338,7 @@ function makeMats(){
 }
 function applyEnv(){
   scene.background=new THREE.Color(ENV.sky);
-  scene.fog=new THREE.Fog(ENV.fog,120,820);
+  scene.fog=gfxLow()?new THREE.Fog(ENV.fog,90,520):new THREE.Fog(ENV.fog,120,820);
   hemi.color.set(ENV.hemi[0]);hemi.groundColor.set(ENV.hemi[1]);hemi.intensity=ENV.hemi[2];
   sun.intensity=ENV.dir;sun.color.set(ENV.night?0x8898ff:0xfff4d8);
   if(sunBall){scene.remove(sunBall);sunBall=null;}
@@ -336,7 +348,8 @@ function applyEnv(){
   if(stars){scene.remove(stars);stars=null;}
   if(ENV.night){
     const g=new THREE.BufferGeometry(),v=[];
-    for(let i=0;i<420;i++){
+    const nStars=gfxLow()?150:420;
+    for(let i=0;i<nStars;i++){
       const a=Math.random()*Math.PI*2,e=Math.random()*Math.PI*0.42+0.06,r=1100;
       v.push(Math.cos(a)*Math.cos(e)*r,Math.sin(e)*r,Math.sin(a)*Math.cos(e)*r);
     }
@@ -346,7 +359,7 @@ function applyEnv(){
   }
   for(const c of clouds)scene.remove(c);
   clouds=[];
-  if(ENV.clouds)for(let i=0;i<8;i++){
+  if(ENV.clouds)for(let i=0,n=gfxLow()?3:8;i<n;i++){
     const c=new THREE.Mesh(new THREE.IcosahedronGeometry(14+Math.random()*16,0),
       new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.8}));
     c.scale.y=0.42;c.userData.ph=Math.random()*Math.PI*2;
@@ -417,11 +430,11 @@ function buildChunk(k){
   /* deco: trees / cacti from the deterministic spr field + far mountains */
   for(let i=i0;i<i1;i++){
     const s=segs[i];if(!s)continue;
-    if(s.spr){
+    if(s.spr&&!(gfxLow()&&(i&1))){
       const p=pointAt(i*SEGL,s.spr.side*(1.1+s.spr.off));
       g.add(makeDeco(s.spr.type,s.spr.size,p));
     }
-    if(i%16===8){
+    if(i%(gfxLow()?32:16)===8){
       const side=hash01(i)<0.5?-1:1;
       const p=pointAt(i*SEGL,0);
       const d=110+hash01(i*3+1)*90, hgt=22+hash01(i*7+2)*44;
@@ -460,7 +473,7 @@ function makeDeco(type,size,p){
 }
 function ensureChunks(){
   const kNow=Math.floor(pos/SEGL/CHUNK);
-  const want=new Set([kNow-1,kNow,kNow+1,kNow+2]);
+  const want=new Set(gfxLow()?[kNow-1,kNow,kNow+1]:[kNow-1,kNow,kNow+1,kNow+2]);
   for(const k of want){
     if(k<0||k*CHUNK>=segs.length)continue;
     if(!chunks.has(k))chunks.set(k,buildChunk(k));
@@ -562,6 +575,7 @@ function startLevel(n){
   audio();
 }
 function overlay(h,p,btn,menuMode){
+  $('gfxRow').style.display=menuMode?'':'none';
   $('ovh').textContent=h;$('ovp').innerHTML=p;
   $('envs').style.display=menuMode?'':'none';
   $('go').style.display=menuMode?'none':'';
@@ -755,9 +769,36 @@ function sync(){
   if(popT>0){popT--;$('pop').style.opacity=Math.min(1,popT/35);}
 }
 
+/* ---------- Grafik control + watchdog ---------- */
+function paintGfx(){
+  const box=$('gfxRow');if(!window.ArcadeGfx){box.style.display='none';return;}
+  const cur=ArcadeGfx.choice(),L=ArcadeGfx.LABELS;
+  box.innerHTML='<span class="gl">'+L.title+'</span>'+['auto','low','medium','high'].map(c=>`<button type="button" class="mode${c===cur?' on':''}" data-g="${c}" aria-pressed="${c===cur}">${L[c]}</button>`).join('');
+}
+function applyGfx(){
+  renderer.setPixelRatio(gfxPR());resize();
+  if(mats){applyEnv();clearChunks();ensureChunks();}
+}
+if(window.ArcadeGfx){
+  $('gfxRow').addEventListener('click',(e)=>{const g=e.target&&e.target.dataset?e.target.dataset.g:null;if(g)ArcadeGfx.set(g);});
+  ArcadeGfx.onChange(()=>{wdCap=null;paintGfx();applyGfx();});
+}
+paintGfx();
+let wdN=0,wdSum=0,wdLast=0;
+function watchdog(){
+  const t=performance.now(),dt=t-wdLast;wdLast=t;
+  if(state!=='play'||dt>250){wdN=0;wdSum=0;return;}
+  if(++wdN<=30)return;   /* settle first */
+  wdSum+=dt;
+  if(wdN>=150){
+    if(wdSum/120>34&&gfx()!=='low'){wdCap=GFX_ORDER[GFX_ORDER.indexOf(gfx())-1];applyGfx();}
+    wdN=0;wdSum=0;
+  }
+}
+
 /* ---------- loop ---------- */
 function loop(){
-  requestAnimationFrame(loop);
+  requestAnimationFrame(loop);watchdog();
   if(state==='play')update();
   else if(state==='menu'){pos+=3.2;time++;if(pos/SEGL>segs.length-450)extendRoad();}
   sync();
