@@ -67,6 +67,8 @@ const ABUT_STEEPEST = 2.2;             // m per m: the steepest mean-based fall 
 // land of the valley edge, 2 m under its bed: roll 1.08 rad, the city's worst; and the cut of 1057 at the land: jolt 773).  A carriageway lies under the over way when its bed is
 // at least this far under the over way's bed.
 const PROTECT_UNDER_MIN = 3.0;
+const PROTECT_HANDOVER = 0.6;          // m: (city22) half the width of the hand-over between a carriageway and a corridor at its level (1.7 m of level over 1.2 m: 2.1 m/m at the steepest)
+const PROTECT_BESIDE = 2.0;            // m: (city22) ... looked for up to this far past the carriageway's bench
 const CORRIDOR_DECK_REACH = 3.0;       // m: (city22) the deck of a tagged corridor lies within this of its line (the corridor and the deck are the same way, smoothed differently)
 const ABUT_UNDER = 3.0;                // m: a road under a bridge lies 5.9 - 21 m under its approaches in the network; the ways that meet at the end of the Hondhausbréck lie
                                        // 1.4 - 2.1 m apart (a junction at the abutment: their own lanes need its earth, harness V4)
@@ -749,7 +751,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     const a0 = bench + pw;
     // A way that rides over the ground protects it, whether a car may drive on it or not: the footpath bridge
     // of a park stands over a street, and the street may not dig a pit under it.
-    if (tagged && !road.tunnel) overCorridors.push({ x: rs.x, z: rs.z, half: a0 + PROTECT_MARGIN, road: ri });
+    if (tagged && !road.tunnel) overCorridors.push({ x: rs.x, z: rs.z, half: a0 + PROTECT_MARGIN, bench, road: ri });
     // Only the roads a car may drive on are carved. A footpath or a staircase is not a road: carving it would cut a
     // trench into the hillside where the path follows a steep slope. A tunnel cannot be a trench in a single valued
     // height field (it gets a portal instead) and a way that rides over the ground is a deck (decks.js).
@@ -1009,7 +1011,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   // keeps the full protection up to it and the disc round it)
   const protArc = [], protRampA = [], protRampB = [], protFade = [], protLenA = [], protLenB = [];   // (protLen: the length of the ramp-up at each end, see ABUT_FADE_MAX)
   const protLevel0 = [], protLevel1 = [];   // (city22) the bed of a crossings-found over way at each end of its segment (NaN: a tagged way, level unknown - protects every way)
-  const protRoad = [];                      // (city22) the way of the corridor (the network's index)
+  const protRoad = [], protBench = [];      // (city22) the way of the corridor (the network's index) and its bench (the half width of its carriageway)
   const corridorEnds = overCorridors.filter((c) => !isLandmarkDeck({ pts: c.x.map((x, i) => [x, c.z[i]]) })).flatMap((c) => [[c.x[0], c.z[0]], [c.x[c.x.length - 1], c.z[c.z.length - 1]]]);
   const nearCorridorEnd = pointGrid(corridorEnds, APPROACH_JOIN);
   const atBridgeEnd = (x, z) => nearCorridorEnd(x, z, APPROACH_JOIN);
@@ -1119,7 +1121,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
       for (let i = 1; i < m; i++) {
         protX0.push(corridor.x[i - 1]); protZ0.push(corridor.z[i - 1]); protX1.push(corridor.x[i]); protZ1.push(corridor.z[i]);
         protHalf.push(corridor.half); protFade.push(PROTECT_FADE); protArc.push(0); protRampA.push(-Infinity); protRampB.push(Infinity); protLenA.push(PROTECT_RAMP); protLenB.push(PROTECT_RAMP);
-        protLevel0.push(NaN); protLevel1.push(NaN); protRoad.push(corridor.road);
+        protLevel0.push(NaN); protLevel1.push(NaN); protRoad.push(corridor.road); protBench.push(corridor.bench);
       }
       continue;
     }
@@ -1136,7 +1138,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
       protX1.push(corridor.x[i]); protZ1.push(corridor.z[i]);
       protHalf.push(corridor.half); protFade.push(PROTECT_FADE);
       protArc.push(arc); protRampA.push(rampA); protRampB.push(rampB); protLenA.push(lenA); protLenB.push(lenB);
-      protLevel0.push(corridorLevel(corridor.x[i - 1], corridor.z[i - 1])); protLevel1.push(corridorLevel(corridor.x[i], corridor.z[i])); protRoad.push(corridor.road);
+      protLevel0.push(corridorLevel(corridor.x[i - 1], corridor.z[i - 1])); protLevel1.push(corridorLevel(corridor.x[i], corridor.z[i])); protRoad.push(corridor.road); protBench.push(corridor.bench);
       arc += Math.hypot(corridor.x[i] - corridor.x[i - 1], corridor.z[i] - corridor.z[i - 1]);
     }
   }
@@ -1167,7 +1169,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     // overpass and kept its right lane on the slope of the embankment)
     protHalf.push(near ? BENCH[i] + CROSSING_MARGIN : BENCH[i]); protFade.push(near ? CROSSING_FADE : OWN_PROTECT_FADE);
     protArc.push(0); protRampA.push(-Infinity); protRampB.push(Infinity); protLenA.push(PROTECT_RAMP); protLenB.push(PROTECT_RAMP);
-    protLevel0.push(BED0[i]); protLevel1.push(BED1[i]); protRoad.push(ROADOF[i]);
+    protLevel0.push(BED0[i]); protLevel1.push(BED1[i]); protRoad.push(ROADOF[i]); protBench.push(BENCH[i]);
   }
   const pKey = (cx, cz) => cx * 4096 + cz;
   const pBuckets = new Map();
@@ -1189,9 +1191,10 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   // (protFill: the protection against a FILL, set by every call of protection(): at an abutment it ramps up over the fade of the abutment, so the ground under the deck may fall from the deck
   // to the land over that length; the protection against a CUT keeps the short PROTECT_RAMP, so the road under the bridge never digs a pit under the deck end - harness gate D)
   let protFill = 0;
-  // (city22: with `bed`, only the corridors that lie PROTECT_UNDER_MIN over that bed - or whose level is unknown, or that belong to `road` itself - count: the protection
-  // of the carriageway of `road` at level `bed`)
-  function protection(x, z, bed = NaN, road = -1) {
+  // (city22: with `bed`, the protection of the carriageway of `road` at level `bed`, `edge` m past its bench: a corridor that lies PROTECT_UNDER_MIN over that bed - or whose
+  // level is unknown, or that belongs to `road` itself - counts in full; one at about the carriageway's level only on its own side of the line half way between the two benches,
+  // handing over within PROTECT_HANDOVER of it - two carriageways at two levels that OSM overlaps in plan, Bd Roosevelt 12245 inside the bench of 687, 1.7 m higher)
+  function protection(x, z, bed = NaN, road = -1, edge = 0) {
     const cx = Math.floor(x / PROTECT_CELL), cz = Math.floor(z / PROTECT_CELL);
     let p = 0;
     protFill = 0;
@@ -1209,12 +1212,15 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
           const ramp = smoothstep(ABUT_HOLD, ABUT_HOLD + PROTECT_RAMP, Math.min(along - protRampA[s], protRampB[s] - along));
           const rampFill = smoothstep(ABUT_HOLD, ABUT_HOLD + protLenA[s], along - protRampA[s]) * smoothstep(ABUT_HOLD, ABUT_HOLD + protLenB[s], protRampB[s] - along);
           t = t < 0 ? 0 : t > 1 ? 1 : t;
+          const dLine = Math.hypot(x - (ax + ex * t), z - (az + ez * t));
+          let mine = 1;                          // (how much of the point is the corridor's side of the hand-over)
           if (bed === bed && protRoad[s] !== road) {   // (a corridor of unknown level - NaN - protects every carriageway)
             const level = protLevel0[s] + (protLevel1[s] - protLevel0[s]) * t;
-            if (level - bed < PROTECT_UNDER_MIN) continue;
+            if (level - bed < PROTECT_UNDER_MIN) mine = smoothstep(-PROTECT_HANDOVER, PROTECT_HANDOVER, edge - (dLine - protBench[s]));
+            if (mine <= 0) continue;
           }
-          const d = Math.hypot(x - (ax + ex * t), z - (az + ez * t)) - protHalf[s];
-          const across = d <= 0 ? 1 : d < protFade[s] ? 1 - d / protFade[s] : 0;
+          const d = dLine - protHalf[s];
+          const across = (d <= 0 ? 1 : d < protFade[s] ? 1 - d / protFade[s] : 0) * mine;
           if (across * rampFill > protFill) protFill = across * rampFill;
           const v = across * ramp;
           if (globalThis.__PROTDBG && v > 0) globalThis.__PROTDBG.push({ road: roads[protRoad[s]]?.id, level: protLevel0[s], v, across, ramp });
@@ -1899,13 +1905,14 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     // bridge - flattened the end of the approach road into the valley.
     // (the cut of an opened tunnel under a bridge is the road the bridge spans: the protection kept the land there, a 1.2 m hump on the A1 under deck 32 with no tarmac painted)
     // (city20, UNDER_DECK_CLEAR) the lanes of a way under a deck: free of the protection against a cut up to its lane keep, then a face of UNDER_DECK_FACE
-    // (city22, PROTECT_UNDER_MIN) on the carriageway of a carved way (its bench, fading over OWN_FADE past it) only the corridors over its level protect the ground
+    // (city22, PROTECT_UNDER_MIN) on the carriageway of a carved way (its bench, fading over PROTECT_BESIDE past it) only the corridors over its level protect the ground (and a
+    // corridor at its level the ground on its own side of the hand-over)
     if (prot > 0) {
       let own = -1;
       for (let a = 0; a < nPins; a++) if (pinWt[a] > 0 && (own < 0 || pinEdge[a] < pinEdge[own])) own = a;
-      const beside = own >= 0 ? pinWt[own] * (1 - smoothstep(0, OWN_FADE, pinEdge[own])) : 0;
+      const beside = own >= 0 ? pinWt[own] * (1 - smoothstep(0, PROTECT_BESIDE, pinEdge[own])) : 0;
       if (beside > 0) {
-        const fill0 = protFill, p1 = protection(x, z, pinBed[own], slotPinRoad[own]);
+        const fill0 = protFill, p1 = protection(x, z, pinBed[own], slotPinRoad[own], pinEdge[own]);
         prot += (p1 - prot) * beside;
         protFill = fill0 + (protFill - fill0) * beside;
       }
