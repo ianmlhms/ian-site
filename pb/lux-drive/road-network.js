@@ -62,6 +62,11 @@ const ABUT_KEEP_SLACK = 0.3;           // m (LANE_KEEP is the outer lane's centr
 const ABUT_TOUCH = 0.05;               // m
 const ABUT_FADE_STEP = 0.25;           // m
 const ABUT_STEEPEST = 2.2;             // m per m: the steepest mean-based fall (smoothstep peaks at 1.5 x the mean; on the lattice the faces measured up to ~1.5 x more): at 2.35 the A6 abutments beside the other carriageway (7412) became two walls of the world flow (9 > 8), at 2.2 eight
+// city22: the corridor of a way the crossings found to ride OVER another protects the ground of the road UNDER it, not the carriageway of a carved way at its own level beside it
+// (Bd Roosevelt 687 rides over the Hellege-Geescht approach 13628: its corridor kept the fill of the carriageway 12245 beside it - same boulevard, 0.9 m apart in level - at the
+// land of the valley edge, 2 m under its bed: roll 1.08 rad, the city's worst; and the cut of 1057 at the land: jolt 773).  A carriageway lies under the over way when its bed is
+// at least this far under the over way's bed.
+const PROTECT_UNDER_MIN = 3.0;
 const ABUT_UNDER = 3.0;                // m: a road under a bridge lies 5.9 - 21 m under its approaches in the network; the ways that meet at the end of the Hondhausbréck lie
                                        // 1.4 - 2.1 m apart (a junction at the abutment: their own lanes need its earth, harness V4)
 // city20: the LANES of a way under a bridge deck are cut to their bed even where the protection keeps the ground under the bridge: the DTM there holds the toe of the abutment
@@ -1002,6 +1007,8 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   // per segment: the distance along its way at its start and the distances along the way at which the protection starts / ends ramping (-Infinity / Infinity: an end that no road runs onto
   // keeps the full protection up to it and the disc round it)
   const protArc = [], protRampA = [], protRampB = [], protFade = [], protLenA = [], protLenB = [];   // (protLen: the length of the ramp-up at each end, see ABUT_FADE_MAX)
+  const protLevel0 = [], protLevel1 = [];   // (city22) the bed of a crossings-found over way at each end of its segment (NaN: a tagged way, level unknown - protects every way)
+  const protRoad = [];                      // (city22) that over way (-1: a tagged corridor)
   const corridorEnds = overCorridors.filter((c) => !isLandmarkDeck({ pts: c.x.map((x, i) => [x, c.z[i]]) })).flatMap((c) => [[c.x[0], c.z[0]], [c.x[c.x.length - 1], c.z[c.z.length - 1]]]);
   const nearCorridorEnd = pointGrid(corridorEnds, APPROACH_JOIN);
   const atBridgeEnd = (x, z) => nearCorridorEnd(x, z, APPROACH_JOIN);
@@ -1088,6 +1095,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
       for (let i = 1; i < m; i++) {
         protX0.push(corridor.x[i - 1]); protZ0.push(corridor.z[i - 1]); protX1.push(corridor.x[i]); protZ1.push(corridor.z[i]);
         protHalf.push(corridor.half); protFade.push(PROTECT_FADE); protArc.push(0); protRampA.push(-Infinity); protRampB.push(Infinity); protLenA.push(PROTECT_RAMP); protLenB.push(PROTECT_RAMP);
+        protLevel0.push(NaN); protLevel1.push(NaN); protRoad.push(-1);
       }
       continue;
     }
@@ -1104,6 +1112,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
       protX1.push(corridor.x[i]); protZ1.push(corridor.z[i]);
       protHalf.push(corridor.half); protFade.push(PROTECT_FADE);
       protArc.push(arc); protRampA.push(rampA); protRampB.push(rampB); protLenA.push(lenA); protLenB.push(lenB);
+      protLevel0.push(NaN); protLevel1.push(NaN); protRoad.push(-1);
       arc += Math.hypot(corridor.x[i] - corridor.x[i - 1], corridor.z[i] - corridor.z[i - 1]);
     }
   }
@@ -1134,6 +1143,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     // overpass and kept its right lane on the slope of the embankment)
     protHalf.push(near ? BENCH[i] + CROSSING_MARGIN : BENCH[i]); protFade.push(near ? CROSSING_FADE : OWN_PROTECT_FADE);
     protArc.push(0); protRampA.push(-Infinity); protRampB.push(Infinity); protLenA.push(PROTECT_RAMP); protLenB.push(PROTECT_RAMP);
+    protLevel0.push(BED0[i]); protLevel1.push(BED1[i]); protRoad.push(ROADOF[i]);
   }
   const pKey = (cx, cz) => cx * 4096 + cz;
   const pBuckets = new Map();
@@ -1155,7 +1165,9 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   // (protFill: the protection against a FILL, set by every call of protection(): at an abutment it ramps up over the fade of the abutment, so the ground under the deck may fall from the deck
   // to the land over that length; the protection against a CUT keeps the short PROTECT_RAMP, so the road under the bridge never digs a pit under the deck end - harness gate D)
   let protFill = 0;
-  function protection(x, z) {
+  // (city22: with `bed`, only the corridors that lie PROTECT_UNDER_MIN over that bed - or whose level is unknown, or that belong to `road` itself - count: the protection
+  // of the carriageway of `road` at level `bed`)
+  function protection(x, z, bed = NaN, road = -1) {
     const cx = Math.floor(x / PROTECT_CELL), cz = Math.floor(z / PROTECT_CELL);
     let p = 0;
     protFill = 0;
@@ -1173,6 +1185,10 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
           const ramp = smoothstep(ABUT_HOLD, ABUT_HOLD + PROTECT_RAMP, Math.min(along - protRampA[s], protRampB[s] - along));
           const rampFill = smoothstep(ABUT_HOLD, ABUT_HOLD + protLenA[s], along - protRampA[s]) * smoothstep(ABUT_HOLD, ABUT_HOLD + protLenB[s], protRampB[s] - along);
           t = t < 0 ? 0 : t > 1 ? 1 : t;
+          if (bed === bed && protRoad[s] !== road) {   // (a corridor of unknown level - NaN - protects every carriageway)
+            const level = protLevel0[s] + (protLevel1[s] - protLevel0[s]) * t;
+            if (level - bed < PROTECT_UNDER_MIN) continue;
+          }
           const d = Math.hypot(x - (ax + ex * t), z - (az + ez * t)) - protHalf[s];
           const across = d <= 0 ? 1 : d < protFade[s] ? 1 - d / protFade[s] : 0;
           if (across * rampFill > protFill) protFill = across * rampFill;
@@ -1430,7 +1446,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     const ground = garageFill(x, z, groundY === undefined ? baseHeight(x, z) : groundY);
     // The ground under a way that rides over the others is protected: no road may cut into it, so the bridge road
     // does not dive into a dark pit where the road below it was cut into the hill.
-    const prot = protection(x, z);
+    let prot = protection(x, z);
     let best = -1, bestScore = -1, bestLat = 0, bestDist = 0, bestT = 0, bestDh = 0;
     let covSum = 0, bedSum = 0;     // the paint: the coverage of the road the point is on (the tight radius) and the
                                     // flat level of a junction (the roads that meet are blended)
@@ -1858,6 +1874,17 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     // bridge - flattened the end of the approach road into the valley.
     // (the cut of an opened tunnel under a bridge is the road the bridge spans: the protection kept the land there, a 1.2 m hump on the A1 under deck 32 with no tarmac painted)
     // (city20, UNDER_DECK_CLEAR) the lanes of a way under a deck: free of the protection against a cut up to its lane keep, then a face of UNDER_DECK_FACE
+    // (city22, PROTECT_UNDER_MIN) on the carriageway of a carved way (its bench, fading over OWN_FADE past it) only the corridors over its level protect the ground
+    if (prot > 0) {
+      let own = -1;
+      for (let a = 0; a < nPins; a++) if (pinWt[a] > 0 && (own < 0 || pinEdge[a] < pinEdge[own])) own = a;
+      const beside = own >= 0 ? pinWt[own] * (1 - smoothstep(0, OWN_FADE, pinEdge[own])) : 0;
+      if (beside > 0) {
+        const fill0 = protFill, p1 = protection(x, z, pinBed[own], slotPinRoad[own]);
+        prot += (p1 - prot) * beside;
+        protFill = fill0 + (protFill - fill0) * beside;
+      }
+    }
     let laneCover = 0, laneCoverWide = 0;
     if (prot > 0 && bandY < ground) {
       for (let a = 0; a < nPins; a++) {
