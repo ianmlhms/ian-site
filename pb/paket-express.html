@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="/pb/paket-express.css?v=3">
 <link rel="stylesheet" href="/pb/paket-express-gitter.css?v=13">
 <script src="/pb/arcade-kit.js?v=55" data-arcade-id="paket-express" data-arcade-title="Paket Express 📦"></script>
+<script src="/pb/gfx-quality.js?v=1"></script>
 </head>
 <body>
 <main id="game">
@@ -40,6 +41,7 @@
       <p id="intro" class="intro" data-t="intro">Kleng Stroossen, grouss Missioun. Huel d'Päck op a bréng se pünktlech un d'Dier.</p>
       <p class="career-strip"><b id="rank"></b><strong id="walletMenu">0 €</strong></p>
       <div class="traffic-settings"><label for="trafficSetting" data-t="traffic">Verkéier</label><select id="trafficSetting"><option value="off">Aus · ×0.6</option><option value="low">Wéineg · ×0.85</option><option value="normal" selected>Normal · ×1.0</option><option value="rush">Rush hour · ×1.3</option></select></div><small id="weatherPreview"></small>
+      <div class="traffic-settings"><label for="gfxSetting">Grafik</label><select id="gfxSetting"><option value="auto">Automatesch</option><option value="low">Niddreg</option><option value="medium">Mëttel</option><option value="high">Héich</option></select></div>
       <div class="modes"><button id="startShift" class="primary"><b data-t="shift">Schicht · 5 min</b><small data-t="shiftDesc">Géint d'Auer. Fir de Rekord.</small><span>↗</span></button><button id="startFree"><b data-t="free">Fräi fueren</b><small data-t="freeDesc">Ouni Drock · hallef Punkten</small><span>→</span></button></div>
       <section class="daily-card"><div><b data-t="daily">Dagestour</b><small id="dailyDate"></small></div><p data-t="dailyDesc"></p><small id="dailyWeather"></small><button id="startDaily" data-t="dailyStart"></button><ol id="dailyBoard"></ol><small id="dailyStatus" role="status"></small><button id="retryDaily" data-t="retry" hidden></button></section>
       <details class="mission-panel" open><summary data-t="dailyMissions"></summary><ul id="missions"></ul></details>
@@ -69,6 +71,6 @@
 <script src="/pb/paket-express/daily.js?v=1"></script>
 <script src="/pb/paket-express/shop.js?v=1"></script>
 <script src="/pb/paket-express/lux.js?v=2"></script>
-<script src="/pb/paket-express.js?v=7"></script>
+<script src="/pb/paket-express.js?v=8"></script>
 </body>
 </html>

@@ -59,9 +59,16 @@
   const input = new Set(), heldPointers = new Map(), obstacles = [], traffic = [];
   const player = { x: -25, z: 3, yaw: Math.PI / 2, vx: 0, vz: 0, speed: 0 };
   let city, navigation, sky, skyColors, trafficSystem, nightAmount = 0, bigMap = false, edgeNotice = 0;
-  let quality = readStore('px_quality') || ((navigator.maxTouchPoints > 0 || /iPad|iPhone/.test(navigator.userAgent)) ? 'medium' : 'high');
-  if (!['high', 'medium', 'low'].includes(quality)) quality = 'medium';
-  const QUALITY = { lb: ['Qualitéit', 'Héich', 'Mëttel', 'Niddreg'], de: ['Qualität', 'Hoch', 'Mittel', 'Niedrig'], en: ['Quality', 'High', 'Medium', 'Low'] };
+  /* Grafik: the shared level from pb/gfx-quality.js (auto = low on iPads). An old own px_quality choice moves over once. The frame-time watchdog may drop one step, never above the player's choice. */
+  const GFX_ORDER = ['low', 'medium', 'high']; let gfxCap = null;
+  const legacyQuality = readStore('px_quality');
+  if (window.ArcadeGfx && !TEST_MODE && GFX_ORDER.includes(legacyQuality)) { if (ArcadeGfx.choice() === 'auto') ArcadeGfx.set(legacyQuality); try { localStorage.removeItem('px_quality'); } catch (error) { warn('Quality migration failed', error); } }
+  function gfxLevel() {
+    const level = window.ArcadeGfx ? ArcadeGfx.level() : ((navigator.maxTouchPoints > 0 || /iPad|iPhone/.test(navigator.userAgent)) ? 'medium' : 'high');
+    return gfxCap && GFX_ORDER.indexOf(gfxCap) < GFX_ORDER.indexOf(level) ? gfxCap : level;
+  }
+  let quality = gfxLevel();
+  const QUALITY = { lb: ['Grafik', 'Héich', 'Mëttel', 'Niddreg'], de: ['Grafik', 'Hoch', 'Mittel', 'Niedrig'], en: ['Graphics', 'High', 'Medium', 'Low'] };
   const MAP_TEXT = { lb: ['Kaart', 'Zoumaachen'], de: ['Karte', 'Schließen'], en: ['Map', 'Close'] };
   /** Test mode only: a copy of the save with all vehicles and districts owned and a full wallet (upgrades and paints stay buyable). */
   function testUnlockAll(save) {
@@ -180,8 +187,9 @@
   function updateQuality() {
     const labels = QUALITY[lang], i = ['high', 'medium', 'low'].indexOf(quality);
     $('quality').textContent = labels[0] + ': ' + labels[i + 1]; $('quality').dataset.quality = quality;
+    if (window.ArcadeGfx) $('gfxSetting').value = ArcadeGfx.choice();
     if (!renderer) return;
-    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, quality === 'high' ? 1.5 : quality === 'medium' ? 1.25 : 1));
+    renderer.setPixelRatio(Math.min(window.ArcadeGfx ? ArcadeGfx.pixelRatio() : (devicePixelRatio || 1), quality === 'high' ? 1.5 : quality === 'medium' ? 1.25 : 1));
     sun.shadow.mapSize.set(quality === 'high' ? 2048 : 1024, quality === 'high' ? 2048 : 1024);
     if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }
     renderer.shadowMap.enabled = quality !== 'low'; scene.fog.near = quality === 'high' ? 130 : quality === 'medium' ? 110 : 75; scene.fog.far = quality === 'high' ? 330 : quality === 'medium' ? 270 : 210; resize();
@@ -199,7 +207,7 @@
   function init3D() {
     if (!window.THREE) { bootError(new Error('three.js r160 unavailable')); return; }
     try {
-      renderer = new THREE.WebGLRenderer({ canvas: $('world'), antialias: true, powerPreference: 'low-power' });
+      renderer = new THREE.WebGLRenderer({ canvas: $('world'), antialias: quality !== 'low', powerPreference: 'low-power' });
       $('world').addEventListener('webglcontextlost', event => {
         event.preventDefault(); if (phase === 'running' && !paused) pauseToggle();
         warn('WebGL context lost', event.statusMessage); notify(text('engineError'));
@@ -411,10 +419,22 @@
     sky.position.set(camera.position.x, 0, camera.position.z); city.update(player, quality, night, phase === 'menu'); trafficSystem.render(player, quality);
     scene.children.filter(o => o.userData.parked).forEach(o => { o.visible = Math.hypot(o.position.x - player.x, o.position.z - player.z) < 120; });
   }
+  let wdCount = 0, wdSum = 0;
+  /* about 2 s of frames slower than ~30 fps while driving: one level down */
+  function watchFrames(ms) {
+    if (phase !== 'running' || paused || ms <= 0 || ms > 250) { wdCount = 0; wdSum = 0; return; }
+    if (++wdCount <= 30) return;
+    wdSum += ms;
+    if (wdCount < 150) return;
+    if (wdSum / 120 > 34 && quality !== 'low') { gfxCap = GFX_ORDER[GFX_ORDER.indexOf(quality) - 1]; quality = gfxLevel(); updateQuality(); }
+    wdCount = 0; wdSum = 0;
+  }
   function tick(now) {
     animation = 0;
     if (document.hidden) { lastFrame = 0; return; }
+    if (phase === 'menu' && quality === 'low' && lastFrame && now - lastFrame < 45) { requestRender(); return; }   // low: the menu backdrop runs at about 20 fps, the tap stays responsive
     const wallTime = lastFrame ? (now - lastFrame) / 1000 : 0, dt = Math.min(.05, wallTime); lastFrame = now;
+    watchFrames(wallTime * 1000);
     if (phase === 'running' && !paused && !bigMap) {
       // Use unclamped wall time for deadlines, capped simulation steps for stable collisions.
       elapsed += wallTime;saveWait+=wallTime;if(saveWait>=10){save();saveWait=0;} collisionWait = Math.max(0, collisionWait - Math.min(wallTime, .3));
@@ -470,7 +490,13 @@
   $('again').addEventListener('click', () => start(mode)); $('finish').addEventListener('click', end); $('pause').addEventListener('click', pauseToggle); $('resume').addEventListener('click', pauseToggle);
   $('camera').addEventListener('click', () => actions('c')); $('reset').addEventListener('click', () => actions('r')); $('horn').addEventListener('pointerdown', event => { if (phase !== 'running' || paused) return; event.preventDefault(); $('horn').setPointerCapture(event.pointerId); horn(true); });
   ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(event => $('horn').addEventListener(event, () => { if (audio) audio.horn(false, activeVehicle()); })); $('mute').addEventListener('click', muteToggle);
-  $('quality').addEventListener('click', () => { quality = ['high', 'medium', 'low'][(['high', 'medium', 'low'].indexOf(quality) + 1) % 3]; try { if (!TEST_MODE) localStorage.setItem('px_quality', quality); } catch (error) { warn('Quality save failed', error); } updateQuality(); });
+  $('quality').addEventListener('click', () => {
+    const next = ['high', 'medium', 'low'][(['high', 'medium', 'low'].indexOf(quality) + 1) % 3];
+    if (TEST_MODE || !window.ArcadeGfx) { quality = next; updateQuality(); } else ArcadeGfx.set(next);   // set() tells onChange below
+  });
+  $('gfxSetting').addEventListener('change', () => { if (window.ArcadeGfx) ArcadeGfx.set($('gfxSetting').value); });
+  if (window.ArcadeGfx) ArcadeGfx.onChange(() => { gfxCap = null; quality = gfxLevel(); updateQuality(); });
+  $('gfxSetting').parentElement.hidden = !window.ArcadeGfx;
   $('minimap').addEventListener('click', mapToggle); $('minimap').addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); mapToggle(); } }); $('closeMap').addEventListener('click', mapToggle);
   $('toGarage').addEventListener('click', () => { phase = 'menu'; $('endScreen').hidden = true; $('menu').hidden = false; beacon.visible = false; beaconRing.visible = false; weather=forecast();refreshGarage();loadBoard(); });
   document.querySelectorAll('[data-lang]').forEach(button => button.addEventListener('click', () => {
