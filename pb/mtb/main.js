@@ -12,6 +12,8 @@ import { createPaintTextures } from './paint-textures.js';
 import { createEnv, TIME_PRESETS, WEATHER_IDS, SEASON_IDS } from './env.js';
 import { createGroundMaterial } from './ground-shader.js';
 import { buildPlayWorld, stateAt } from './play-world.js';
+import { mapInput } from './world-build.js';
+import { buildWorldMap } from './world-map.js';
 import { createRockView } from './rock-view.js';
 import { createWaterView } from './water-view.js';
 import { createRain, createLeaves, createShafts, createBirds, createInsects } from './effects.js';
@@ -98,6 +100,17 @@ function pickQuality() {
 
 const pixelRatioFor = (q) => Math.min(window.devicePixelRatio || 1, q.pixelRatio);
 
+/** Runs world-map.js in a module worker. Resolves with the rasters; rejects when workers are unavailable or the worker fails. */
+function buildMapsInWorker(data) {
+  return new Promise((resolve, reject) => {
+    let worker;
+    try { worker = new Worker(new URL('./world-map-worker.js', import.meta.url), { type: 'module' }); } catch (error) { reject(error); return; }
+    worker.onmessage = (event) => { worker.terminate(); if (event.data.ok) resolve(event.data.map); else reject(new Error(event.data.error)); };
+    worker.onerror = (event) => { worker.terminate(); reject(new Error(event.message || 'worker error')); };
+    worker.postMessage(mapInput(data));
+  });
+}
+
 const reader = (base) => async (name) => {
   const early = window.__mtbPre && window.__mtbPre[name];               // mtb.html starts every data file at the top of the page (one download while the code loads)
   if (early) { try { return await early; } catch (error) { console.warn('[mtb] early fetch failed, retrying', name, error); } }
@@ -136,7 +149,12 @@ async function boot() {
   setLoad(0.62, 'load.build');
   await new Promise((r) => setTimeout(r, 0));
   mark('data');
-  const world = buildPlayWorld(data);
+  // The 2 million cell world rasters are built in a worker while this thread builds the rest of the world (two cores on an iPad); without worker support, or if it fails, this thread does it.
+  const maps0 = { nx: data.classes.nx, nz: data.classes.nz, cover: null, canopy: null, field: null };
+  const mapsDone = buildMapsInWorker(data).catch((error) => { console.warn('[mtb] map worker failed, building on the main thread', error); return buildWorldMap(mapInput(data)); });
+  const world = buildPlayWorld(data, { maps: maps0 });
+  mark('world (without maps)');
+  Object.assign(maps0, await mapsDone);
   mark('world');
   const { field, surface, ground, groundAt, maps, trees, undergrowth, rocks, decks } = world;
   const trails = world.trails;

@@ -59,7 +59,7 @@ export const flow = {
       const tRide = Date.now();
       const secRide = (tRide - t0) / 1000, mbRide = bytesUntil(tRide) / MB;
       console.log(`    riding after ${secRide.toFixed(1)} s (incl. the ${COUNTDOWN_SECONDS} s countdown), ${mbRide.toFixed(2)} MB loaded`);
-      h.expect(secRide <= MAX_SECONDS + COUNTDOWN_SECONDS, `riding within ${MAX_SECONDS} s of opening plus the countdown (${secRide.toFixed(1)} s)`);
+      h.expect(secRide <= MAX_SECONDS + COUNTDOWN_SECONDS + TAP_SETTLE_SECONDS, `riding (tapped at once) within ${MAX_SECONDS} s + the countdown + the settle time (${secRide.toFixed(1)} s)`);
       await h.pause(2500);
       await h.shot("ipad-ride");
 

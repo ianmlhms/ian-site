@@ -13,8 +13,8 @@ const FINISH_BEFORE = 8;          // m before the end: the finish arch
 const ROCK_PATH_CLEARANCE = 0.45;   // carve coverage above which a rock cannot stop the bike
 const CHECKPOINT_RADIUS = 9;      // m: riding this close to a checkpoint counts
 
-export function buildPlayWorld(data) {
-  const world = buildPureWorld(data);
+export function buildPlayWorld(data, pre = {}) {
+  const world = buildPureWorld(data, pre);
   const { field, surface, maps } = world;
   const decks = buildDecks(field.network.features, surface);
   const bridge = placeBridge(field.network, surface);                  // the Schiessentuempel stone footbridge: a deck like the plank bridges (one deck system)

@@ -15,6 +15,8 @@ import { describeHouses, createTownIndex, CHURCH, RENAISSANCE, RUIN } from './to
 
 const CASCADE_OWN_RADIUS = 14;       // m: a fall this close to the Schiessentümpel ledge is the ledge itself (cascade.js poured its own falls)
 
+export const mapInput = (data) => ({ classes: data.classes, canopy: data.canopy, near: data.near, leaf: data.leaf, fields: data.fields, cliffs: data.cliffs });
+
 export const RIDDEN_KINDS = Object.freeze(['trail', 'path', 'track']);
 
 const WAY_MARGIN = 1.2;          // m: a house whose wall is closer than this to the centre line of a trail, path or track is left out (the way wins: OSM footpaths run through footprints, the Marathon through Beaufort)
@@ -36,7 +38,8 @@ export function clearOfWays(houses, network) {
   return rest;
 }
 
-export function buildPureWorld(data) {
+/** `pre.maps` (optional): a holder { nx, nz, cover, canopy, field } whose rasters are filled in later (the browser builds them in a worker while this thread builds the rest; nothing here reads them before the world is used). */
+export function buildPureWorld(data, pre = {}) {
   const ways = data.ways.filter((w) => !w.bridge && !w.tunnel);
   const streams = attachCascades(data.streams.filter((w) => !w.tunnel), data.falls);       // culverts are not carved; waterfalls become staircases
   const trailWays = data.trails.trails.flatMap((trail) => trail.ways);
@@ -45,7 +48,7 @@ export function buildPureWorld(data) {
   const groundAt = groundResolver(field);
   const info = { coverage: 0, way: -1, stream: 0 };
   const clearance = (x, z) => { field.height(x, z, info); return info.coverage; };
-  const maps = buildWorldMap({ classes: data.classes, canopy: data.canopy, near: data.near, leaf: data.leaf, fields: data.fields, cliffs: data.cliffs });
+  const maps = pre.maps || buildWorldMap(mapInput(data));
   const ridden = createSampleIndex(field.network, RIDDEN_KINDS);        // every way a bike or a walker uses, whichever trails the game defines: rocks, logs, shrubs keep clear of it
   const trees = createTreeIndex({ map: maps, surface, clearance, ridden });
   const undergrowth = createUndergrowthIndex({ map: maps, surface, clearance, trees, ridden });
