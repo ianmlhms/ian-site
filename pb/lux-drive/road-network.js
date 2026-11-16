@@ -68,6 +68,9 @@ const ABUT_STEEPEST = 2.2;             // m per m: the steepest mean-based fall 
 // at least this far under the over way's bed.
 const PROTECT_UNDER_MIN = 3.0;
 const PROTECT_HANDOVER = 0.6;          // m: (city22) half the width of the hand-over between a carriageway and a corridor at its level (1.7 m of level over 1.2 m: 2.1 m/m at the steepest)
+const PROTECT_LEVEL_TRUST = 1.5;       // m: (city22) see protLevel
+const PROTECT_FREE_FILL = [5.0, 7.0];  // m: (city22) ... for a fill of up to the first, none past the second
+const PROTECT_PARALLEL = [0.8, 0.9];   // (city22) ... and only a corridor that runs along the carriageway (the cosine of the two directions; fading in between)
 const PROTECT_BESIDE = 2.0;            // m: (city22) ... looked for up to this far past the carriageway's bench
 const CORRIDOR_DECK_REACH = 3.0;       // m: (city22) the deck of a tagged corridor lies within this of its line (the corridor and the deck are the same way, smoothed differently)
 const ABUT_UNDER = 3.0;                // m: a road under a bridge lies 5.9 - 21 m under its approaches in the network; the ways that meet at the end of the Hondhausbréck lie
@@ -645,7 +648,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
               bestD = d; bestH = h;
             }
           }
-          if (bestD < Infinity) pinOf(chain).set(k, bestH);
+          if (bestD < Infinity && !globalThis.process?.env?.X22_NOTEND) pinOf(chain).set(k, bestH);
         }
       }
     }
@@ -1182,7 +1185,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
       protX1.push(corridor.x[i]); protZ1.push(corridor.z[i]);
       protHalf.push(corridor.half); protFade.push(PROTECT_FADE);
       protArc.push(arc); protRampA.push(rampA); protRampB.push(rampB); protLenA.push(lenA); protLenB.push(lenB);
-      protLevel0.push(corridorLevel(corridor.x[i - 1], corridor.z[i - 1])); protLevel1.push(corridorLevel(corridor.x[i], corridor.z[i])); protRoad.push(corridor.road); protBench.push(corridor.bench);
+      protLevel0.push(globalThis.process?.env?.X22_NOLEVEL ? NaN : corridorLevel(corridor.x[i - 1], corridor.z[i - 1])); protLevel1.push(globalThis.process?.env?.X22_NOLEVEL ? NaN : corridorLevel(corridor.x[i], corridor.z[i])); protRoad.push(corridor.road); protBench.push(corridor.bench);
       arc += Math.hypot(corridor.x[i] - corridor.x[i - 1], corridor.z[i] - corridor.z[i - 1]);
     }
   }
@@ -1213,7 +1216,9 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     // overpass and kept its right lane on the slope of the embankment)
     protHalf.push(near ? BENCH[i] + CROSSING_MARGIN : BENCH[i]); protFade.push(near ? CROSSING_FADE : OWN_PROTECT_FADE);
     protArc.push(0); protRampA.push(-Infinity); protRampB.push(Infinity); protLenA.push(PROTECT_RAMP); protLenB.push(PROTECT_RAMP);
-    protLevel0.push(BED0[i]); protLevel1.push(BED1[i]); protRoad.push(ROADOF[i]); protBench.push(BENCH[i]);
+    // (city22: the level of an over way is its bed where that bed lies on its DTM - its surface - within PROTECT_LEVEL_TRUST; else unknown: Autoroute du Nord 17563 at the closed Stafelter tunnel)
+    const trust = (b, px, pz) => (Math.abs(b - baseHeight(px, pz)) <= PROTECT_LEVEL_TRUST ? b : NaN);
+    protLevel0.push(trust(BED0[i], X0[i], Z0[i])); protLevel1.push(trust(BED1[i], X1[i], Z1[i])); protRoad.push(ROADOF[i]); protBench.push(BENCH[i]);
   }
   const pKey = (cx, cz) => cx * 4096 + cz;
   const pBuckets = new Map();
@@ -1238,7 +1243,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   // (city22: with `bed`, the protection of the carriageway of `road` at level `bed`, `edge` m past its bench: a corridor that lies PROTECT_UNDER_MIN over that bed - or whose
   // level is unknown, or that belongs to `road` itself - counts in full; one at about the carriageway's level only on its own side of the line half way between the two benches,
   // handing over within PROTECT_HANDOVER of it - two carriageways at two levels that OSM overlaps in plan, Bd Roosevelt 12245 inside the bench of 687, 1.7 m higher)
-  function protection(x, z, bed = NaN, road = -1, edge = 0) {
+  function protection(x, z, bed = NaN, road = -1, edge = 0, tx = 0, tz = 0) {
     const cx = Math.floor(x / PROTECT_CELL), cz = Math.floor(z / PROTECT_CELL);
     let p = 0;
     protFill = 0;
@@ -1260,7 +1265,9 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
           let mine = 1;                          // (how much of the point is the corridor's side of the hand-over)
           if (bed === bed && protRoad[s] !== road) {   // (a corridor of unknown level - NaN - protects every carriageway)
             const level = protLevel0[s] + (protLevel1[s] - protLevel0[s]) * t;
-            if (level - bed < PROTECT_UNDER_MIN) mine = smoothstep(-PROTECT_HANDOVER, PROTECT_HANDOVER, edge - (dLine - protBench[s]));
+            // (a corridor that CROSSES the carriageway is over it, however low: the footbridges 2527 / 2530 of the Hellege-Geescht plateau 2 - 4.7 m over the service 6854)
+            const parallel = smoothstep(PROTECT_PARALLEL[0], PROTECT_PARALLEL[1], Math.abs(ex * tx + ez * tz) / (Math.sqrt(ll) || 1));
+            if (level - bed < PROTECT_UNDER_MIN) mine = 1 - parallel * (1 - smoothstep(-PROTECT_HANDOVER, PROTECT_HANDOVER, edge - (dLine - protBench[s])));
             if (mine <= 0) continue;
           }
           const d = dLine - protHalf[s];
@@ -1333,6 +1340,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
   const pinPri = new Float32Array(MAX_PINS), pinVal = new Float32Array(MAX_PINS), pinWt = new Float32Array(MAX_PINS);
   const pinEdge = new Float32Array(MAX_PINS), pinBed = new Float32Array(MAX_PINS), slotPinRoad = new Int32Array(MAX_PINS), pinAlong = new Float32Array(MAX_PINS);
   const pinCap = new Float32Array(MAX_PINS), pinDirX = new Float32Array(MAX_PINS), pinDirZ = new Float32Array(MAX_PINS);
+  const pinSeg = new Int32Array(MAX_PINS);                     // (city22) the segment of the way nearest to the point (its direction: PROTECT_PARALLEL)
   const pinRoom = new Float32Array(MAX_PINS);         // how far the bench of a pin may give way to a face between two levels: bench - lane keep (LANE_KEEP), at least 0
   const wayEdge = new Float32Array(MAX_CAND), wayBed = new Float32Array(MAX_CAND), wayDirX = new Float32Array(MAX_CAND), wayDirZ = new Float32Array(MAX_CAND), wayGap = new Float32Array(MAX_CAND);
   const paintMajor = new Uint8Array(MAX_CAND), paintCode = new Uint8Array(MAX_CAND);
@@ -1788,7 +1796,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
           pinBed[nPins] = pinBedSum / pinSum; pinEdge[nPins] = dMin - (BENCH[candI[slotArm1[sl]]] + candDh[slotArm1[sl]]); slotPinRoad[nPins] = road;
           pinRoom[nPins] = Math.max(0, BENCH[candI[slotArm1[sl]]] + candDh[slotArm1[sl]] - candKeep[slotArm1[sl]]);
           pinCap[nPins] = pinCapSum / pinMagW; pinDirX[nPins] = wayDirX[sl]; pinDirZ[nPins] = wayDirZ[sl];
-          { const i1 = candI[slotArm1[sl]]; pinAlong[nPins] = S0[i1] + (S1[i1] - S0[i1]) * candT[slotArm1[sl]]; }
+          { const i1 = candI[slotArm1[sl]]; pinAlong[nPins] = S0[i1] + (S1[i1] - S0[i1]) * candT[slotArm1[sl]]; pinSeg[nPins] = i1; }
           nPins++;
         }
         // the other arm of the way (a hairpin, a loop) is a carriageway of its own: the hold below keeps each arm on its own bed (and hands over between them at two levels)
@@ -1799,7 +1807,7 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
           pinBed[nPins] = pinBedSum2 / pinSum2; pinEdge[nPins] = dMin2 - (BENCH[i2] + candDh[c2]); slotPinRoad[nPins] = road;
           pinRoom[nPins] = Math.max(0, BENCH[i2] + candDh[c2] - candKeep[c2]);
           pinCap[nPins] = pinCapSum2 / pinMagW2; pinDirX[nPins] = (x - fx) / dl; pinDirZ[nPins] = (z - fz) / dl;
-          pinAlong[nPins] = S0[i2] + (S1[i2] - S0[i2]) * candT[c2];
+          pinAlong[nPins] = S0[i2] + (S1[i2] - S0[i2]) * candT[c2]; pinSeg[nPins] = i2;
           nPins++;
         }
       }
@@ -1810,10 +1818,10 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     // that at a junction the surface IS the bed of the bigger way (flat across, smooth along) and the side street joins it.
     // Averaging the beds of the ways that meet (the first version) made a hump of a hand's breadth on the main road.
     for (let a = 1; a < nPins; a++) {                          // insertion sort by priority, ascending (a handful of entries)
-      const pr = pinPri[a], v = pinVal[a], wt = pinWt[a], ed = pinEdge[a], bd = pinBed[a], rr = slotPinRoad[a], al = pinAlong[a], cp = pinCap[a], dx = pinDirX[a], dz = pinDirZ[a], rm = pinRoom[a];
+      const pr = pinPri[a], v = pinVal[a], wt = pinWt[a], ed = pinEdge[a], bd = pinBed[a], rr = slotPinRoad[a], al = pinAlong[a], cp = pinCap[a], dx = pinDirX[a], dz = pinDirZ[a], rm = pinRoom[a], sg = pinSeg[a];
       let b = a - 1;
-      while (b >= 0 && pinPri[b] > pr) { pinPri[b + 1] = pinPri[b]; pinVal[b + 1] = pinVal[b]; pinWt[b + 1] = pinWt[b]; pinEdge[b + 1] = pinEdge[b]; pinBed[b + 1] = pinBed[b]; slotPinRoad[b + 1] = slotPinRoad[b]; pinAlong[b + 1] = pinAlong[b]; pinCap[b + 1] = pinCap[b]; pinDirX[b + 1] = pinDirX[b]; pinDirZ[b + 1] = pinDirZ[b]; pinRoom[b + 1] = pinRoom[b]; b--; }
-      pinPri[b + 1] = pr; pinVal[b + 1] = v; pinWt[b + 1] = wt; pinEdge[b + 1] = ed; pinBed[b + 1] = bd; slotPinRoad[b + 1] = rr; pinAlong[b + 1] = al; pinCap[b + 1] = cp; pinDirX[b + 1] = dx; pinDirZ[b + 1] = dz; pinRoom[b + 1] = rm;
+      while (b >= 0 && pinPri[b] > pr) { pinPri[b + 1] = pinPri[b]; pinVal[b + 1] = pinVal[b]; pinWt[b + 1] = pinWt[b]; pinEdge[b + 1] = pinEdge[b]; pinBed[b + 1] = pinBed[b]; slotPinRoad[b + 1] = slotPinRoad[b]; pinAlong[b + 1] = pinAlong[b]; pinCap[b + 1] = pinCap[b]; pinDirX[b + 1] = pinDirX[b]; pinDirZ[b + 1] = pinDirZ[b]; pinRoom[b + 1] = pinRoom[b]; pinSeg[b + 1] = pinSeg[b]; b--; }
+      pinPri[b + 1] = pr; pinVal[b + 1] = v; pinWt[b + 1] = wt; pinEdge[b + 1] = ed; pinBed[b + 1] = bd; slotPinRoad[b + 1] = rr; pinAlong[b + 1] = al; pinCap[b + 1] = cp; pinDirX[b + 1] = dx; pinDirZ[b + 1] = dz; pinRoom[b + 1] = rm; pinSeg[b + 1] = sg;
     }
     // A carriageway belongs to its own way.  Where two ways lie side by side (or one inside the other) at different levels, the bigger way used to lay its pin - and its 3 m fade -
     // over the carriageway of the smaller one, and a bed that is smooth was cut up by 1 .. 8 cm (Boulevard de la Foire: 15 m/s2).  Now a way is held back by every way laid BELOW it
@@ -1949,15 +1957,18 @@ export function createRoadNetwork(roads, baseHeight, decks = []) {
     // bridge - flattened the end of the approach road into the valley.
     // (the cut of an opened tunnel under a bridge is the road the bridge spans: the protection kept the land there, a 1.2 m hump on the A1 under deck 32 with no tarmac painted)
     // (city20, UNDER_DECK_CLEAR) the lanes of a way under a deck: free of the protection against a cut up to its lane keep, then a face of UNDER_DECK_FACE
-    // (city22, PROTECT_UNDER_MIN) on the carriageway of a carved way (its bench, fading over PROTECT_BESIDE past it) only the corridors over its level protect the ground (and a
-    // corridor at its level the ground on its own side of the hand-over)
-    if (prot > 0) {
+    // (city22, PROTECT_UNDER_MIN) the FILL of the carriageway of a carved way (its bench, fading over PROTECT_BESIDE past it) is held back only by the corridors over its level (and by a
+    // corridor at its level on that corridor's own side of the hand-over).  Only the fill: the protection against a CUT stays whole - a carriageway beside an over way at its level
+    // that cut its embankment dug into the over way's lanes (service 18824 at the Route de Trèves interchange, Rond-Point Merl 3005 beside Nei Escher Strooss 3013) - and only a fill of up
+    // to PROTECT_FREE_FILL (a bed many metres over the land beside an over way is a bed the design got wrong: Stafelter 8709 at the closed tunnel, 8 m)
+    if (prot > 0 && !globalThis.process?.env?.X22_NOPROT) {
       let own = -1;
       for (let a = 0; a < nPins; a++) if (pinWt[a] > 0 && (own < 0 || pinEdge[a] < pinEdge[own])) own = a;
-      const beside = own >= 0 ? pinWt[own] * (1 - smoothstep(0, PROTECT_BESIDE, pinEdge[own])) : 0;
+      const beside = own >= 0 ? pinWt[own] * (1 - smoothstep(0, PROTECT_BESIDE, pinEdge[own])) * (1 - smoothstep(PROTECT_FREE_FILL[0], PROTECT_FREE_FILL[1], pinBed[own] - ground)) : 0;
       if (beside > 0) {
-        const fill0 = protFill, p1 = protection(x, z, pinBed[own], slotPinRoad[own], pinEdge[own]);
-        prot += (p1 - prot) * beside;
+        const fill0 = protFill;
+        const sg = pinSeg[own], sx = X1[sg] - X0[sg], sz = Z1[sg] - Z0[sg], sl = Math.hypot(sx, sz) || 1;
+        protection(x, z, pinBed[own], slotPinRoad[own], pinEdge[own], sx / sl, sz / sl);
         protFill = fill0 + (protFill - fill0) * beside;
       }
     }

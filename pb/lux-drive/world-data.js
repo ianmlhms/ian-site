@@ -171,7 +171,7 @@ export async function loadWorldData(read, onProgress = () => {}) {
   // ... and the merge lane of an on-ramp ends before a tunnel that has fewer lanes (lane-drop.js)
   const { roads: droppedRoads0, dropped: laneDropped } = dropMergeLanes(steadyRoads);
   // ... and a service ring laid over a street's nodes for a segment or two leaves the street to it (ring-share.js)
-  const { roads: droppedRoads, opened: openedRings } = openSharedRings(droppedRoads0);
+  const { roads: droppedRoads, opened: openedRings } = (globalThis.process?.env?.X22_NORING ? ((r) => ({ roads: r, opened: [] })) : openSharedRings)(droppedRoads0);
   // ... and a bridge whose abutment would stand on the lanes of a road below it starts where it leaves them free (bridge-ends.js)
   const { roads, decks: movedDecks, moved: movedBridgeEnds } = moveBridgeEnds(droppedRoads, bakedDecks, baseHeight);
   // ... and a deck end that no way runs onto but that lies on a street's carriageway at its level begins at the edge of that carriageway
