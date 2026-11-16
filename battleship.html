@@ -10,10 +10,10 @@
   <link rel="canonical" href="https://ian.lu/battleship.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <script src="mp-gate.js?v=8" data-game="battleship" data-over="#rematch"></script>
-<script src="gitter-theme.js?v=1"></script>
+<script src="gitter-theme.js?v=2"></script>
 <link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="gitter.css?v=12">
-<script src="theme.js?v=33"></script>
+<link rel="stylesheet" href="gitter.css?v=13">
+<script src="theme.js?v=34"></script>
 <style>
   :root{--ship:#16171a;--hit:#a32121;--miss:#c9cbcf;--water:#fcfcfa}
   .wrap{max-width:560px;margin:0 auto;padding:18px;display:flex;flex-direction:column;align-items:center;gap:14px}
@@ -310,6 +310,6 @@ function resetGame(send){ over=false; recorded=false; myReady=false; oppReady=fa
 $("rematch").onclick=()=>resetGame(true);
 </script>
   <script type="module" src="rtc-ring.js?v=37"></script>
-  <script type="module" src="class-gate.js?v=37"></script>
+  <script type="module" src="class-gate.js?v=38"></script>
 </body>
 </html>
