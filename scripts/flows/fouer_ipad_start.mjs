@@ -10,6 +10,7 @@ import path from "node:path";
 import zlib from "node:zlib";
 import { fileURLToPath } from "node:url";
 import { runIfMain, createBackend, mockSupabase } from "./lib.mjs";
+import { tapAt, tapFinger } from "./fouer_game.mjs";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const PAGE = "/pb/fouer.html";
@@ -94,6 +95,53 @@ export const flow = {
       }
       h.eq(errors.filter((e) => !/Failed to load resource/.test(e)), [], "zero page errors");
       console.log(`RESULT ready=${secReady.toFixed(2)}s readyMB=${mbReady.toFixed(2)} totalMB=${total.toFixed(2)} level=${boot.level}`);
+
+      /* ---- after the background build (the async boot with the debug hooks: ?fouerAsync=1 keeps the progressive boot): walk, leave the walk, then build a first attraction */
+      h.step("async boot + debug hooks: wait for the background build, walk forward, leave the walk");
+      const fn = await context.newPage();           // a plain page (no throttling): this part checks that things WORK after the background build
+      const errs2 = [];
+      fn.on("pageerror", (e) => errs2.push(e.message));
+      fn.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) errs2.push(m.text()); });
+      await fn.goto(origin + PAGE + "?fouerDebug=1&fouerAsync=1&fouerNoFly=1&fouerTimeMode=noon&fouerWeather=clear", { waitUntil: "commit" });
+      await fn.waitForFunction(() => document.documentElement.dataset.fouerReady === "1" || document.documentElement.dataset.bootError, null, { timeout: 120000, polling: 50 });
+      const early = await fn.evaluate(() => ({ deferred: window.__fouerBg && window.__fouerBg.deferred, full: document.documentElement.dataset.fouerFull || "" }));
+      h.expect(early.deferred === true, "the progressive boot is on (?fouerAsync=1)");
+      await fn.waitForFunction(() => window.__fouerBg && window.__fouerBg.done && window.__fouerGame, null, { timeout: 120000, polling: 100 });
+      h.eq(await fn.evaluate(() => [window.__fouerBg.error, document.documentElement.dataset.fouerFull]), ["", "1"], "the background build finished without an error");
+      const g = (fnSrc, arg) => fn.evaluate(([src, a]) => (0, eval)(src)(window.__fouerGame, a), [fnSrc.toString(), arg]);
+      h.expect(await g((x) => Boolean(x.walk && x.crowd && x.ride && x.mask)), "the walk, the guests, the rides and the mask exist");
+      await g((x) => { window.__fouerHooks.startWalk(); });
+      await fn.waitForFunction(() => window.__fouerGame.walk.active, null, { timeout: 8000 });
+      await g((x) => { x.walk.teleport(46, 56, 0); x.walk.setLook(0, 0); });
+      await fn.waitForTimeout(400);
+      const p0 = await g((x) => ({ x: x.walk.view.x, z: x.walk.view.z }));
+      await fn.keyboard.down("KeyW");
+      const ramp = [];
+      for (let i = 0; i < 4; i++) { await fn.waitForTimeout(120); ramp.push(await g((x) => x.walk.speed)); }
+      await fn.waitForTimeout(1500);
+      const pace = await g((x) => x.walk.speed);
+      const p1 = await g((x) => ({ x: x.walk.view.x, z: x.walk.view.z }));
+      await fn.keyboard.up("KeyW");
+      const moved = Math.hypot(p1.x - p0.x, p1.z - p0.z);
+      h.expect(moved > 3, `holding forward for 2 s moves the walker (${moved.toFixed(1)} m)`);
+      h.expect(ramp[0] < pace * 0.9 && ramp.every((v, i) => i === 0 || v >= ramp[i - 1] - 0.05), `the speed eases in (${ramp.map((v) => v.toFixed(1)).join(" -> ")} -> ${pace.toFixed(1)} m/s)`);
+      await g((x) => { window.__fouerHooks.endWalk(); });
+      await fn.waitForFunction(() => !window.__fouerGame.walk.active, null, { timeout: 8000 });
+      h.expect(true, "the walk ends");
+
+      h.step("after the background build: tap the glowing pitch, build the starter stall");
+      await tapFinger({ page: fn, pause: (ms) => fn.waitForTimeout(ms) }, fn);
+      await fn.locator(".sheet.build").waitFor({ timeout: 8000 });
+      const card = fn.locator('.sheet .card [data-tut="build"]');
+      await card.waitFor({ state: "visible", timeout: 8000 });
+      await fn.waitForTimeout(500);
+      const box = await card.boundingBox();
+      await tapAt({ page: fn, pause: (ms) => fn.waitForTimeout(ms) }, box.x + box.width / 2, box.y + box.height / 2);
+      await fn.waitForFunction(() => window.__fouerGame.game.builtCount() === 1, null, { timeout: 10000 });
+      h.expect(true, "one attraction is built by taps (the build UI works after the background build)");
+      await fn.waitForTimeout(1500);
+      h.eq(errs2, [], "zero page errors after the background build, the walk and the build");
+      await fn.close();
     } finally {
       await context.close();
       server.close();
