@@ -82,22 +82,31 @@
     $('phoneText').textContent = t('devicePhoneBlock');
     $('phoneHint').textContent = t('devicePhoneHint');
     $('phoneBack').addEventListener('click', () => { const a = document.querySelector('.arcade-bar__back'); if (a) a.click(); else location.href = '/pixelbreak.html'; });
-    $('pauseQuality').textContent = t('quality') + ': ' + t(qualityKey(quality));
-    $('btnQuality').textContent = 'Q · ' + qualityName();
+    $('pauseQuality').textContent = gfxTitle() + ': ' + qualityName();
+    $('btnQuality').textContent = 'Q · ' + (GFX ? GFX.LABELS[quality] : qualityName());   // the HUD chip stays as short as before (the pause screen shows "Automatesch (Niddreg)")
     $('btnFast').title = t('fastTitle'); $('btnRev').title = t('reverseTitle');
     buildHelp();
     buildWxPop();
   }
   const qualityKey = (q) => (q === 'high' ? 'qualityHigh' : q === 'medium' ? 'qualityMedium' : 'qualityLow');
-  const qualityName = () => t(qualityKey(quality));
+  const gfxTitle = () => (GFX ? GFX.LABELS.title : t('quality'));
+  /* "Automatesch (Niddreg)" while on auto, else the chosen level */
+  const qualityName = () => (GFX && GFX.choice() === 'auto' ? GFX.LABELS.auto + ' (' + GFX.LABELS[quality] + ')' : GFX ? GFX.LABELS[quality] : t(qualityKey(quality)));
 
   /* ------------------------------------------------------------ state */
   const isTouch = (navigator.maxTouchPoints || 0) > 0 || matchMedia('(pointer:coarse)').matches;
   /* touch controls (lever + buttons) and the touch wording of the hints: on while the main pointer is a finger (iPad), or after the first real touch */
   let touchUi = matchMedia('(pointer:coarse)').matches;
   let touchHintShown = false;
-  let quality = readStore('ts_quality');
+  /* Graphics level: the shared Arcade setting (pb/gfx-quality.js, "Grafik": auto = low on iPads). The old per-game choice (Q key) moves over once. */
+  const GFX = window.ArcadeGfx || null;
+  const LOW_FAR = 4000, FULL_FAR = 6000;       // draw distance (camera far plane) on low / otherwise
+  if (GFX && GFX.choice() === 'auto') { const old = readStore('ts_quality'); if (QUALITIES.includes(old)) GFX.set(old); }
+  if (GFX) removeStore('ts_quality');
+  let quality = GFX ? GFX.level() : readStore('ts_quality');
   if (!QUALITIES.includes(quality)) quality = isTouch ? 'medium' : 'high';
+  const wantsDemo = () => quality !== 'low';      // the 3D menu backdrop is a whole extra world: not built on low (iPads), the menu is a plain gradient there
+  let watchdogCap = null;                          // set when frames stayed slow: the level the watchdog dropped to (never raised above the player's choice)
   let phase = 'boot';            // boot | menu | loading | running | paused | summary | transition
   let mode = 'career';           // career | endless
   const EMPTY_CAREER = { lifetime: 0, wallet: 0, owned: [], routes: [], train: '', route: '', upgrades: {}, best: {}, services: 0, endlessBest: 0 };
@@ -152,6 +161,7 @@
     try {
       const canvas = $('world');
       renderer = new THREE.WebGLRenderer({ canvas, antialias: quality !== 'low', powerPreference: 'high-performance' });
+      renderer.debug.checkShaderErrors = false;   // the check reads every program's log right after linking and stalls the page until the driver has compiled it (about half a second at the first frames of an iPad)
     } catch (error) {
       warn('WebGL failed', error);
       showError(t('webglMissing'));
@@ -163,7 +173,7 @@
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x9ab8d4);
-    camera = new THREE.PerspectiveCamera(62, 1.6, 0.1, 6000);
+    camera = new THREE.PerspectiveCamera(62, 1.6, 0.1, quality === 'low' ? LOW_FAR : FULL_FAR);
     scene.add(camera);
     clock = new THREE.Clock();
     applyQuality();
@@ -184,8 +194,9 @@
   function applyQuality() {
     if (!renderer) return;
     const cap = quality === 'high' ? 1.5 : 1;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, cap));
+    renderer.setPixelRatio(Math.min(GFX ? GFX.pixelRatio() : window.devicePixelRatio || 1, cap, window.devicePixelRatio || 1));
     renderer.shadowMap.enabled = quality !== 'low';
+    if (camera) { camera.far = quality === 'low' ? LOW_FAR : FULL_FAR; camera.updateProjectionMatrix(); }
     resize();
   }
   function resize() {
@@ -524,10 +535,12 @@
     // the menu backdrop (demo) loads silently: the loading banner is only for a real service
     if (!demo) loaderStart(isLux ? 'tram' : 'line', nameOf(routeDef.name));
     await frameDelay();
+    if (abortIf && abortIf()) return null;   // a menu backdrop nobody wants any more costs nothing from here on
     if (isLux && TS.luxtram && TS.luxtram.preload) await safe('luxtram preload', () => TS.luxtram.preload((f) => loaderSet(f * 0.14)), Promise.resolve());   // track, world and landmark data: real byte progress
     loaderSet(isLux ? 0.16 : 0.15);
     if (!isLux && TS.realLine && TS.realLine.preload) await safe('real line preload', () => TS.realLine.preload(routeDef), Promise.resolve());   // scenery data of the Mosel line (rivers, relief, land, roads)
     if (!isLux && TS.stationSurround && TS.stationSurround.preload) await safe('station surround preload', () => TS.stationSurround.preload(routeDef.stations, routeDef.id), Promise.resolve());   // real surroundings of stations (patch data), before the track is built
+    if (abortIf && abortIf()) return null;
     const track = build('track', 'build', [routeDef]);
     if (!track) throw new Error('Track build failed');
     // the scenery half of the first station patch (about 150 kB gzip): waited for at most 6 s, the rest streams in ahead of the train (station-surround.js)
@@ -550,6 +563,7 @@
     const landscape = build('landscape', 'create', [scene, track.base || track, { quality, reverse: !!track.reverse, renderer }]);   // the return direction shares the forward track's scenery
     loaderSet(isLux ? 0.32 : 0.55);
     await frameDelay();
+    if (abortIf && abortIf()) { safe('landscape dispose', () => landscape && landscape.dispose && landscape.dispose()); return null; }
     const rootsBefore = new Set(scene.children);
     const infra = build('infra', 'create', [scene, track, { quality }]);
     const obstacleRoots = scene.children.filter((c) => !rootsBefore.has(c));
@@ -1998,7 +2012,7 @@
     paused = true; pauseByHelp = !!byHelp;
     closeWxPop();
     safe('audio pause', () => audio && audio.setMuted(true));
-    if (!byHelp && !silent) { $('pauseQuality').textContent = t('quality') + ': ' + qualityName(); $('pauseScreen').hidden = false; }
+    if (!byHelp && !silent) { $('pauseQuality').textContent = gfxTitle() + ': ' + qualityName(); $('pauseScreen').hidden = false; }
     else if (silent) { $('pauseScreen').hidden = false; }
   }
   function resumeGame() {
@@ -2068,6 +2082,7 @@
   async function startService(routeId, trainId, startMode, opts = {}) {
     if (!initRenderer()) return false;
     demoToken += 1;   // a menu backdrop that is still being built must not replace this service's world
+    showCanvas(true);
     const route = routeDefOf(routeId);
     if (!route) { toast(t('unknownRoute'), 'bad'); return false; }
     mode = startMode;
@@ -2176,6 +2191,8 @@
     const token = ++demoToken;
     disposeWorld();
     if (phase !== 'menu') return;
+    if (!wantsDemo()) { showCanvas(false); hideLoading(); return; }   // low: no backdrop world, the menu stands on its gradient
+    showCanvas(true);
     try {
       const current = save[save.career] || EMPTY_CAREER;
       const trainId = current.train, routeId = current.route || 'west';
@@ -2259,7 +2276,8 @@
   function renderMenu() {
     const host = $('menuHost');
     resumeOffer = resumeDismissed ? null : readSnapshot();
-    const opts = { resume: resumeOffer ? resumeCardData(resumeOffer) : null, save, lang, onStart: startFromMenu, onBuy: handleBuy, onSelect: handleSelect, onCareer: handleCareer, onLang: setLanguage, onHints: handleHints, onEnv: handleEnvChoice, env: { weather: wxPref, tod: todPref } };
+    const opts = { resume: resumeOffer ? resumeCardData(resumeOffer) : null, save, lang, onStart: startFromMenu, onBuy: handleBuy, onSelect: handleSelect, onCareer: handleCareer, onLang: setLanguage, onHints: handleHints, onEnv: handleEnvChoice, onGfx: (id) => { if (GFX) GFX.set(id); },
+      gfx: GFX ? { choice: GFX.choice(), level: GFX.level(), labels: GFX.LABELS } : null, env: { weather: wxPref, tod: todPref } };
     try {
       if (!TS.menu || typeof TS.menu.render !== 'function') throw new Error('TS.menu missing');
       TS.menu.render(host, opts);
@@ -2277,12 +2295,42 @@
     applyMute(muted);
     toast(t(muted ? 'evMuted' : 'evUnmuted'), 'info', 1200);
   }
+  /* Q key / pause button: Automatesch -> Niddreg -> Mëttel -> Héich -> Automatesch (the shared Arcade setting; every 3D game follows it) */
+  const GFX_CYCLE = ['auto', 'low', 'medium', 'high'];
   function cycleQuality() {
+    if (GFX) { GFX.set(GFX_CYCLE[(GFX_CYCLE.indexOf(GFX.choice()) + 1) % GFX_CYCLE.length]); return; }   // onChange below does the rest
     quality = QUALITIES[(QUALITIES.indexOf(quality) + 1) % QUALITIES.length];
     writeStore('ts_quality', quality);
+    qualityChanged();
+  }
+  /* the level changed (menu, Q, another tab, the watchdog): renderer settings now, the world is rebuilt for the new level (same spot, same service) */
+  function qualityChanged() {
     applyQuality();
     translateStatic();
-    if (world && (phase === 'running' || phase === 'menu')) rebuildWorld();
+    if (phase === 'menu') {
+      renderMenu();
+      if (wantsDemo()) { if (!world || !world.demo) buildDemo(); else rebuildWorld(); } else if (world) { disposeWorld(); showCanvas(false); }
+    } else if (world && phase === 'running') rebuildWorld();
+  }
+  function showCanvas(on) { const c = $('world'); if (c) c.style.visibility = on ? '' : 'hidden'; }
+  if (GFX) GFX.onChange((level) => {
+    watchdogCap = null;
+    if (level !== quality) { quality = level; qualityChanged(); return; }
+    translateStatic();                          // the same level under another choice: only the labels move
+    if (phase === 'menu') renderMenu();
+  });
+  /* Frame-time watchdog (auto only, not in test mode): about 4 s of slow frames in a running service drop one level, never above what the player chose. */
+  const wd = { acc: 0, n: 0, since: 0 };
+  function watchFrames(dtMs) {
+    if (!GFX || testMode || phase !== 'running' || paused || document.hidden || quality === 'low' || rebuilding || GFX.choice() !== 'auto') { wd.acc = 0; wd.n = 0; return; }
+    if (dtMs > 250) return;   // a stall (tab switch, rebuild) is not slowness
+    wd.acc += dtMs; wd.n += 1;
+    if (wd.acc < 4000) return;
+    const avg = wd.acc / wd.n; wd.acc = 0; wd.n = 0;
+    if (avg < 45) return;   // under 22 fps is slow
+    watchdogCap = quality === 'high' ? 'medium' : 'low'; quality = watchdogCap;
+    toast(gfxTitle() + ': ' + GFX.LABELS[quality], 'info', 2400, 'gfx');
+    qualityChanged();
   }
   let rebuilding = false;
   async function rebuildWorld() {
@@ -2517,6 +2565,7 @@
     frameHandle = requestAnimationFrame(frame);
     if (!renderer) return;
     const dt = lastFrame ? Math.min(MAX_FRAME_S, (now - lastFrame) / 1000) : 0.016;
+    watchFrames(lastFrame ? now - lastFrame : 0);
     lastFrame = now;
     try {
       if (world && !rebuilding) {
@@ -2720,9 +2769,9 @@
     $('menu').hidden = false;
     $('bootStatus').textContent = t('loading');
     renderMenu();
+    if (!frameHandle) frameHandle = requestAnimationFrame(frame);   // the menu answers at once; the backdrop world (not on low) is built behind it
     try { await buildDemo(); } catch (error) { warn('demo failed', error); }
     $('bootStatus').textContent = '';
-    if (!frameHandle) frameHandle = requestAnimationFrame(frame);
   }
 
   function init() {
