@@ -135,7 +135,7 @@ export function createUi({ root, game, scene, r, env, hooks, sfx, lang: initialL
     const minimal = tut.active && tut.mode === "fresh" && (tut.step <= 3 || tut.step === 4);
     document.body.classList.toggle("tut-minimal", minimal);
     const showWalk = !tut.active || (tut.mode === "fresh" ? tut.step >= 7 : tut.step >= 3);
-    walkBtn.hidden = !showWalk || walking || visiting;
+    walkBtn.hidden = !showWalk || walking || visiting || hooks.walkReady === false;      // the walk is built just after the first frame
     pinBtn.hidden = walkBtn.hidden || !hooks.pinPreview;
     pinBtn.setAttribute("aria-label", T("pin.label")); pinBtn.title = T("pin.label");
     walkBtn.classList.toggle("tut-glow", tut.active && tut.stage === "walk");

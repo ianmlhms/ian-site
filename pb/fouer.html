@@ -32,12 +32,14 @@ button { font: inherit; color: inherit; }
 @media (prefers-reduced-motion: reduce) { #bar i::after, #loading .sheep { animation: none; } }
 @keyframes bob { 50% { transform: translateY(-6px); } }
 </style>
+<link rel="modulepreload" href="/pb/fouer/main.js?v=10">
 <link rel="stylesheet" href="/pb/idle-extras.css?v=5">
 <link rel="stylesheet" href="/pb/fouer/ui.css?v=5">
 <link rel="stylesheet" href="/pb/fouer/gitter.css?v=13">
 <script src="/pb/idle-extras.js?v=8"></script>
 <script src="/pb/arcade-kit.js?v=55" data-arcade-id="park" data-arcade-title="Schueberfouer Tycoon"></script>
 <script src="/pb/game-data.js?v=1" defer></script>
+<script src="/pb/gfx-quality.js?v=1"></script>
 </head>
 <body>
 <main id="shell">
@@ -72,7 +74,7 @@ button { font: inherit; color: inherit; }
   var lang = "lb";
   // Luxembourgish only (6 Nov 2026)
   var T = STR[lang], STALL_MS = 12000, EXPECT_MODULES = 60, QUICK_MS = 380;
-  var state = { value: 0, ceiling: 0.1, last: Date.now(), anim: null, done: false, taken: false, log: [], seen: 0 };
+  var state = { value: 0, ceiling: 0.1, last: Date.now(), anim: null, done: false, taken: false, log: [], seen: 0, painted: 0 };
   function now() { return Date.now(); }
   function shown() {                                   // the value the bar shows right now (computed transform, so it includes the running animation)
     try { var t = getComputedStyle(bar).transform; if (t && t !== "none") { var m = t.match(/matrix\(([^,]+)/); if (m) return Math.max(0, Math.min(1, parseFloat(m[1]))); } } catch (e) { /* fall through */ }
@@ -93,6 +95,10 @@ button { font: inherit; color: inherit; }
     /** real progress: p in 0..1 (never goes back), an optional label, the ceiling the bar may creep to before the next real step and how long that creep takes (ms, a slow device's estimate) */
     set: function (p, label, ceiling, ms) {
       if (state.done) return;
+      // a burst of tiny steps (one per module / model) is coalesced: reading the bar's computed style forces a style recalc, 60 of them cost ~0.5 s on an iPad
+      var t = now();
+      if (p < state.value + 0.012 && (!label || label === msg.textContent) && t - state.painted < 200) { api.touch(); return; }
+      state.painted = t;
       var cur = shown(), to = Math.max(p, cur, state.value);
       var ceil = Math.min(0.995, Math.max(ceiling == null ? to + 0.04 : ceiling, to + 0.01));
       state.value = to; state.ceiling = ceil; api.touch();
@@ -141,7 +147,7 @@ if(!window.THREE){
   // ?models=1 -> the W3 model preview (turntable grid / single model / full fair); ?stage=1 -> W2's empty Glacis stage; otherwise the game.
   // Imports are absolute: inside the arcade this page runs as a srcdoc iframe.
   const q = new URLSearchParams(location.search);
-  const entry = q.get("models") === "1" ? "/pb/fouer/models/preview.js?v=1" : q.get("stage") === "1" ? "/pb/fouer/world/stage.js?v=1" : "/pb/fouer/main.js?v=9";
+  const entry = q.get("models") === "1" ? "/pb/fouer/models/preview.js?v=1" : q.get("stage") === "1" ? "/pb/fouer/world/stage.js?v=1" : "/pb/fouer/main.js?v=10";
   if (entry.indexOf("main.js") < 0 && window.__fouerLoad) window.__fouerLoad.done();         // the preview pages run their own screens
   if (window.bootProbe) window.bootProbe(entry, window.__fouerLoad); else import(entry);   // bootProbe: shows which file failed when the code does not load
 </script>

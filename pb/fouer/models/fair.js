@@ -137,7 +137,7 @@ export function sampleLane(world, step = 5) {
   return out;
 }
 
-export async function createFairLayer({ T, root, pitches, groundY, quality = 'medium', fieldPoly, buildBase = true, seed = 1, renderer = null, world = null, lane = null, glow: glowOpt = true }) {
+export async function createFairLayer({ T, root, pitches, groundY, quality = 'medium', fieldPoly, buildBase = true, seed = 1, renderer = null, world = null, lane = null, glow: glowOpt = true, deferBase = false }) {
   const M = getMaterials();
   const group = new T.Group(); group.name = 'fouer-fair'; root.add(group);
   const baseBatch = new Batch(T, M, 'base'); const pitchBatch = new Batch(T, M, 'pitches'); const frozenBatch = new Batch(T, M, 'frozen');
@@ -157,7 +157,12 @@ export async function createFairLayer({ T, root, pitches, groundY, quality = 'me
 
   /* ---- base batch: NPC background fair + props (built once) */
   const baseInfo = { npc: null, props: null };
-  if (buildBase) {
+  /* the background fair, the props and the clutter: the heaviest part of the build.  deferBase: true leaves it out of createFairLayer (the pitches, plots and the world are
+   * there at once, the player can start) and fair.buildBase() adds it afterwards; each step yields to the browser so touch and the fly-in keep running. */
+  const nextTask = () => new Promise((resolve) => setTimeout(resolve, 0));
+  async function buildBaseLayer(pause = false) {
+    if (baseInfo.built) return;
+    baseInfo.built = true;
     const npcMod = await import('./npc.js'); const propMod = await import('./props.js');
     const layoutMod = await import('../layout.js');
     const pitchDefs = [...pits.values()].map((q) => ({ id: q.rect.id, u: q.rect.u, w: q.rect.w, size: q.rect.size, face: q.rect.face }));
@@ -165,7 +170,9 @@ export async function createFairLayer({ T, root, pitches, groundY, quality = 'me
     const holders = [];
     const laneSamples = lane || sampleLane(world);
     baseInfo.npc = npcMod.buildNpcFair({ T, pitches: [...pits.values()].map((q) => q.rect), fieldPoly, groundY, seed, quality, lane: laneSamples });
+    if (pause) await nextTask();
     baseInfo.props = propMod.buildProps({ T, pitches: [...pits.values()].map((q) => q.rect), fieldPoly, groundY, seed, quality });
+    if (pause) await nextTask();
     const clutterMod = await import('./clutter.js');
     baseInfo.clutter = clutterMod.buildClutter({ T, fieldPoly, groundY, seed, quality, grid: baseInfo.npc.grid, gridDims: baseInfo.npc.gridDims, pitches: pitchDefs, stalls: baseInfo.npc.stalls });
     // polish 2: exact stall footprints + small solids for the walk collision ride on the occupancy array (walk.js createMask reads grid.g.stalls / solids / boxes)
@@ -178,6 +185,7 @@ export async function createFairLayer({ T, root, pitches, groundY, quality = 'me
     baseBatch.build(collect(M, tmp)); tmp.clear();
     if (glow) glow.setLightsFrom(group, true);
   }
+  if (buildBase && !deferBase) await buildBaseLayer();
 
   /* ---- content of one pitch: pit.near (full detail) / pit.farG (simplified static LOD, built lazily) / pit.cur = the one in pit.holder now */
   function specKey(spec) { return spec.state === 'built' ? `${spec.item}|${spec.look | 0}|${spec.level | 0 || 1}` : spec.state; }
@@ -273,6 +281,7 @@ export async function createFairLayer({ T, root, pitches, groundY, quality = 'me
 
   /* ---- public api */
   const api = {
+    buildBase: () => buildBaseLayer(true),
     group, pits, baseInfo, glow, batches: { base: baseBatch, pitches: pitchBatch, frozen: frozenBatch }, quality: () => quality,
     pitchIds: () => [...pits.keys()],
     getPitch: (id) => (pits.get(id) ? Object.assign({}, pits.get(id).spec) : null),
