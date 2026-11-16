@@ -410,7 +410,9 @@ def check_cache_versions(problems: list) -> None:
         blob = git("show", f"{rev}:{page}")
         if blob is None:
             return None
-        found = re.search(re.escape(asset) + r"\?v=(\d+)", blob)
+        # (?<![\w-]): "theme.js" must not be found inside "gitter-theme.js" — that match answered with the
+        # wrong file's version, so a changed theme.js without a bump was never reported.
+        found = re.search(r"(?<![\w-])" + re.escape(asset) + r"\?v=(\d+)", blob)
         return found.group(1) if found else None
 
     for asset, info in sorted(assets.items()):

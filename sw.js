@@ -4,7 +4,9 @@
  *    Safe with the site's ?v= versioning: bumped asset URLs are cache misses and
  *    fetch fresh; navigations are network-first so pages are never stale online. */
 
-/* v13 (fail-safe game data, 28 Oct 2026): players opening MTB / Schueberfouer for the FIRST time (nothing stored yet) stayed on the loading screen.
+/* (15 Nov 2026, same cache name, nothing is thrown away) pages fall back to their stored copy when the network hangs for more than 4 s;
+ * unversioned images / fonts / the icon sprite refresh in the background instead of being frozen; ranged requests bypass the worker.
+ * v13 (fail-safe game data, 28 Oct 2026): players opening MTB / Schueberfouer for the FIRST time (nothing stored yet) stayed on the loading screen.
  * Now the game-data path can never block or fail a file the network could deliver: every cache step has a time limit, waitUntil is guarded (WebKit throws
  * when it is called after the fetch event was dispatched), and any error falls back to a plain network fetch.
  * v12 (game worlds on the device): adds the separate cache GAMEDATA_CACHE (see "Game data" below) for the big data files of pb/<game>/data/.
@@ -14,9 +16,10 @@
  * the network first (see below) and the browser's own HTTP cache keeps the bundle, a second copy here would only cost storage. */
 const CACHE = "ianlu-v13";
 const GAMEDATA_CACHE = "ianlu-gamedata-v1";
+/* Only the shell every visitor needs. SkyLens (111 KB) used to be precached for everyone on every worker update,
+ * although almost nobody opens it; like every other page it is stored the first time it is visited. */
 const CORE = [
   "index.html", "favicon.svg", "apple-touch-icon.png", "site.webmanifest",
-  "skylens.html", "skylens.css?v=6", "skylens.js?v=8", "skylens.webmanifest",
 ];
 
 /* ---- Game data -------------------------------------------------------------------------------------------------------------------------------
@@ -44,7 +47,9 @@ const STATS_DELAY_MS = 250;
 const MANIFEST_WAIT_MS = 4000;             // a data file never waits longer than this for the manifest: after that it is fetched plainly from the network
 const CACHE_WAIT_MS = 3000;                // the same for opening / reading the device cache (a stuck storage must not stall the world)                // the page hears about hits / misses at most this often
 
-const manifests = new Map();               // game -> { files: Map<path, hash> | null, at, ttl } | { pending: Promise }
+const NAV_TIMEOUT_MS = 4000;               // a page that has a stored copy never waits longer than this for the network
+
+const manifests = new Map();               // game ->{ files: Map<path, hash> | null, at, ttl } | { pending: Promise }
 const gameStats = new Map();               // clientId -> { game, hits, misses, missBytes, timer }
 
 const manifestUrl = (game) => `/${["pb", game, MANIFEST_FILE].join("/")}`;
@@ -255,13 +260,19 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  /* Ranged requests (audio / video seeking) go straight to the network: a full 200 from the cache is not a
+   * valid answer to a Range request (Safari refuses to play it), and a 206 cannot be stored anyway. */
+  if (req.headers.has("range")) return;
+
   const isNav = req.mode === "navigate" ||
     (req.headers.get("accept") || "").includes("text/html");
 
-  const isMutable = /\.(?:m?js|css|json)$/i.test(url.pathname) && !url.searchParams.get("v");
+  const isVersioned = Boolean(url.searchParams.get("v"));
+  const isMutable = /\.(?:m?js|css|json)$/i.test(url.pathname) && !isVersioned;
   function fetchAndCache() {
     return fetch(req).then((res) => {
-      if (res.ok) {
+      // A redirected response must never be stored for a page: served later to a navigation, the browser rejects it.
+      if (res.ok && res.status === 200 && !(isNav && res.redirected)) {
         const copy = res.clone();
         keepAlive(event, caches.open(CACHE).then((c) => c.put(req, copy))
           .catch((error) => console.warn("[SW] cache write failed", error)));
@@ -280,10 +291,34 @@ self.addEventListener("fetch", (event) => {
       throw error;
     }
   }
+  /* Pages: the network first, as before — but a network that hangs (school Wi-Fi with a weak signal) no longer
+   * leaves a blank tab for as long as the browser cares to wait. After NAV_TIMEOUT_MS the stored copy of the page
+   * is shown; the request keeps running and refreshes the stored copy for the next visit. Without a stored copy
+   * nothing changes. */
+  async function navigation() {
+    const cached = await withTimeout(caches.match(req), CACHE_WAIT_MS, null);
+    if (!cached || cached.redirected) return networkFirst();
+    const network = fetchAndCache();
+    const first = await withTimeout(network, NAV_TIMEOUT_MS, null);   // null = failed or still loading
+    if (first && first.ok) return first;
+    keepAlive(event, network.catch(() => null));
+    return cached;
+  }
+  /* Files with neither ?v= nor a code extension (the icon sprite, fonts, images): the stored copy at once, and a
+   * refresh in the background. They used to be cache-first for good, so a changed file with the same name
+   * (a new icon in gitter-icons.svg) never reached a returning visitor. */
+  async function staleWhileRevalidate() {
+    const cached = await caches.match(req);
+    if (!cached) return fetchAndCache();
+    keepAlive(event, fetchAndCache().catch(() => null));
+    return cached;
+  }
 
-  // Mutable code/data and pages refresh online; versioned assets remain cache-first.
-  event.respondWith(isNav || isMutable ? networkFirst() :
-    caches.match(req).then((cached) => cached || fetchAndCache()));
+  // Pages and mutable code/data refresh online; versioned assets remain cache-first; other files refresh in the background.
+  if (isNav) event.respondWith(navigation().catch(() => fetch(req)));
+  else if (isMutable) event.respondWith(networkFirst());
+  else if (isVersioned) event.respondWith(caches.match(req).then((cached) => cached || fetchAndCache()));
+  else event.respondWith(staleWhileRevalidate().catch(() => fetch(req)));
 });
 
 self.addEventListener("push", (event) => {

@@ -1,12 +1,35 @@
 // Pure helpers for auth-face (no I/O), tested in logic_test.ts.
 
-export const MAX_DEVICES_PER_USER = 8;
 export const SECRET_BYTES = 32;
+export const DEVICE_NAME_MAX = 40;
+const DEFAULT_DEVICE_NAME = "Apparat";
+const CREDENTIAL_MAX = 1024;
 const UUID_SHAPE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SECRET_SHAPE = /^[A-Za-z0-9_-]{43}$/;
+// deno-lint-ignore no-control-regex
+const NAME_CONTROL = /[\u0000-\u001f\u007f]/g;
+const NAME_JUNK = /[<>"'`]/g;
 
-export type FaceAction = "enroll" | "login" | "forget" | "";
+export type FaceAction = "enroll" | "reauth" | "login" | "forget" | "";
+
+/** What face_device_check() answers (see scripts/security-fix-face-v2.sql). */
+export type CheckResult =
+  | "ok"
+  | "unknown"
+  | "replayed"
+  | "expired"
+  | "reenroll"
+  | "admin";
+
+/* The error code the browser gets for a refused check. */
+const CHECK_ERRORS: Readonly<Record<string, string>> = Object.freeze({
+  unknown: "invalid_login",
+  replayed: "device_revoked",
+  expired: "expired",
+  reenroll: "reenroll",
+  admin: "admin_forbidden",
+});
 
 export type DeviceProof = {
   deviceId: string;
@@ -14,10 +37,21 @@ export type DeviceProof = {
 };
 
 export function normalizeAction(value: unknown): FaceAction {
-  if (value === "enroll" || value === "login" || value === "forget") {
+  if (
+    value === "enroll" || value === "reauth" || value === "login" ||
+    value === "forget"
+  ) {
     return value;
   }
   return "";
+}
+
+/** Error code for a refused face_device_check() result; anything odd is invalid_login. */
+export function checkError(result: unknown): string {
+  if (typeof result === "string" && Object.hasOwn(CHECK_ERRORS, result)) {
+    return CHECK_ERRORS[result];
+  }
+  return CHECK_ERRORS.unknown;
 }
 
 /** deviceId + secret from a request body, or null when either is malformed. */
@@ -28,6 +62,24 @@ export function deviceProof(
   const secret = typeof body.secret === "string" ? body.secret : "";
   if (!UUID_SHAPE.test(deviceId) || !SECRET_SHAPE.test(secret)) return null;
   return Object.freeze({ deviceId: deviceId.toLowerCase(), secret });
+}
+
+/** The PIN or password typed again before enrolling; "" when missing. */
+export function credentialFrom(body: Record<string, unknown>): string {
+  const value = body.credential;
+  if (typeof value !== "string") return "";
+  return value.trim().slice(0, CREDENTIAL_MAX);
+}
+
+/** A short, harmless label for the profile's device list ("iPad · Safari"). */
+export function deviceName(value: unknown): string {
+  if (typeof value !== "string") return DEFAULT_DEVICE_NAME;
+  const clean = value.replace(NAME_CONTROL, " ").replace(NAME_JUNK, "").replace(
+    /\s+/g,
+    " ",
+  ).trim()
+    .slice(0, DEVICE_NAME_MAX).trim();
+  return clean || DEFAULT_DEVICE_NAME;
 }
 
 export function base64Url(bytes: Uint8Array): string {
@@ -61,19 +113,6 @@ export function sameDigest(left: string, right: string): boolean {
     difference |= left.charCodeAt(index) ^ right.charCodeAt(index);
   }
   return difference === 0;
-}
-
-/** Ids of the oldest devices to drop so a new one fits under the cap. */
-export function devicesToDrop(
-  rows: ReadonlyArray<{ id: string; created_at: string }>,
-  max = MAX_DEVICES_PER_USER,
-): string[] {
-  const overflow = rows.length - (max - 1);
-  if (overflow <= 0) return [];
-  return [...rows]
-    .sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at))
-    .slice(0, overflow)
-    .map((row) => row.id);
 }
 
 export function isKartUser(user: unknown): boolean {

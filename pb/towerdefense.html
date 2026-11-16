@@ -61,9 +61,11 @@ button:hover:not(:disabled){filter:none;border-color:var(--g-ink)}button:focus-v
 .menuTitle{font-family:var(--font-mono);font-weight:500}
 .levelButton.complete{background:var(--g-white);border-color:var(--g-green);box-shadow:inset 0 0 0 1px var(--g-green)}
 .metaButton strong,.branch strong{color:var(--g-green)}
+#gfx{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px;font-size:13px;color:var(--g-muted)}#gfx button{min-height:40px;padding:6px 12px;font-size:13px}#gfx button.on{background:var(--g-ink);color:var(--g-paper);border-color:var(--g-ink)}
 #helpBtn,#branchCancel{background:var(--g-white)}#helpPanel{border-radius:0;background:var(--g-paper);border:1px solid var(--g-soft)}
 </style>
-<script src="/pb/arcade-kit.js?v=50" data-arcade-id="towerdefense" data-arcade-title="Tower Defense"></script>
+<script src="/pb/arcade-kit.js?v=56" data-arcade-id="towerdefense" data-arcade-title="Tower Defense"></script>
+<script src="/pb/gfx-quality.js?v=1"></script>
 </head>
 <body>
 <main id="shell">
@@ -109,6 +111,7 @@ button:hover:not(:disabled){filter:none;border-color:var(--g-ink)}button:focus-v
         <div id="levelGrid"></div>
         <div class="menuTitle"><span>Permanent upgrades</span><span class="pill"><span aria-hidden="true">◆</span> <span id="metaShardLabel">Spend shards</span></span></div>
         <div id="metaGrid"></div>
+        <div id="gfx" role="group" aria-label="Grafik"></div>
         <button id="helpBtn" aria-expanded="false" aria-controls="helpPanel">How to command</button>
         <div id="helpPanel" class="hidden">Build on glowing pads. During battle, tap open terrain to move your commander; nearby towers gain an aura bonus. Tap Meteor, then choose a target. Freeze, Rally, and Repair activate immediately. Starting a wave before the timer expires earns bonus gold. At tower level 3, choose one of two permanent branches for that tower.</div>
       </div>
@@ -130,7 +133,7 @@ button:hover:not(:disabled){filter:none;border-color:var(--g-ink)}button:focus-v
     </div>
   </section>
 </main>
-<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js" integrity="sha384-qOkzR5Ke/XkQxuGVJ9hpFEpDlcoLtWwVYhnJf06cLIZa2vaIptSqaubivErzmD5O" crossorigin="anonymous"></script>
 <script>
 window.addEventListener("error",function(event){document.documentElement.dataset.bootError=event.message||"script-error"});
 window.addEventListener("unhandledrejection",function(event){document.documentElement.dataset.bootError=String(event.reason||"promise-error")});
@@ -140,6 +143,6 @@ if(!window.THREE){
   throw new Error("three.js r160 failed to load");
 }
 </script>
-<script type="module" src="/pb/towerdefense/main.js?v=3"></script>
+<script type="module" src="/pb/towerdefense/main.js?v=5"></script>
 </body>
 </html>

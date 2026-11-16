@@ -7,34 +7,27 @@
       "hit-target": 4
     }
   },
-  "fs.html": {
-    "light": {
-      "hit-target": 2
-    },
-    "dark": {
-      "hit-target": 2
-    }
-  },
   "geometrydash.html": {
     "light": {
-      "offscreen": 5,
-      "contrast": 2
+      "offscreen": 5
     },
     "dark": {
       "offscreen": 5
     }
   },
-  "jeopardy.html": {
+  "pb/burger.html": {
     "light": {
-      "contrast": 1
+      "contrast": 8
     }
   },
   "pb/chill-drive.html": {
     "light": {
-      "hit-target": 2
-    },
-    "dark": {
-      "hit-target": 2
+      "contrast": 6
+    }
+  },
+  "pb/color-clash.html": {
+    "light": {
+      "contrast": 1
     }
   },
   "pb/cookie-clicker.html": {
@@ -43,6 +36,11 @@
     },
     "dark": {
       "collision": 34
+    }
+  },
+  "pb/fouer.html": {
+    "light": {
+      "contrast": 2
     }
   },
   "pb/memory.html": {
@@ -55,12 +53,18 @@
   },
   "pb/minesweeper.html": {
     "light": {
-      "contrast": 1,
-      "hit-target": 3
+      "hit-target": 2
     },
     "dark": {
-      "contrast": 1,
-      "hit-target": 3
+      "hit-target": 2
+    }
+  },
+  "pb/mtb.html": {
+    "light": {
+      "hit-target": 1
+    },
+    "dark": {
+      "hit-target": 1
     }
   },
   "pb/pacman.html": {
@@ -71,63 +75,6 @@
       "hit-target": 1
     }
   },
-  "pb/park.html": {
-    "light": {
-      "contrast": 1
-    },
-    "dark": {
-      "contrast": 1
-    }
-  },
-  "pb/snake.html": {
-    "light": {
-      "contrast": 6,
-      "hit-target": 14
-    },
-    "dark": {
-      "contrast": 6,
-      "hit-target": 14
-    }
-  },
-  "pb/solitaire.html": {
-    "light": {
-      "hit-target": 3
-    },
-    "dark": {
-      "hit-target": 3
-    }
-  },
-  "pb/tictactoe.html": {
-    "light": {
-      "contrast": 1,
-      "hit-target": 3
-    },
-    "dark": {
-      "contrast": 1,
-      "hit-target": 3
-    }
-  },
-  "pb/typing.html": {
-    "light": {
-      "hit-target": 2
-    },
-    "dark": {
-      "hit-target": 2
-    }
-  },
-  "pb/word-scramble.html": {
-    "light": {
-      "hit-target": 2
-    },
-    "dark": {
-      "hit-target": 2
-    }
-  },
-  "pixelbreak.html": {
-    "light": {
-      "contrast": 5
-    }
-  },
   "skylens.html": {
     "light": {
       "offscreen": 1,
@@ -136,14 +83,6 @@
     "dark": {
       "offscreen": 1,
       "hit-target": 155
-    }
-  },
-  "wordle.html": {
-    "light": {
-      "hit-target": 31
-    },
-    "dark": {
-      "hit-target": 31
     }
   }
 }

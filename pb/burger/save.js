@@ -80,7 +80,7 @@ export function createPersistence({getState, onState, onError = console.warn}) {
 
   const receiveSave = (event) => {
     const data = event.data;
-    if (data && data.__pbLoadSave === 1) applyIncoming(data.data);
+    if (event.source === window.parent && data && data.__pbLoadSave === 1) applyIncoming(data.data);
   };
 
   window.addEventListener("message", receiveSave);

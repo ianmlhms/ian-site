@@ -26,6 +26,7 @@ import { LANGS, t as translate, formatMoney } from '/pb/fouer/i18n.js';
 import { PITCHES, ITEM_BY_ID } from '/pb/fouer/data.js';
 
 const T = window.THREE;
+const mark = name => { try { performance.mark('fouer:' + name); } catch (error) { /* no User Timing */ } };
 const $ = id => document.getElementById(id);
 const DEG = Math.PI / 180;
 const LANG_KEY = 'pb_fouer_lang';
@@ -50,7 +51,7 @@ async function boot() {
   // the loading screen (inline in pb/fouer.html): real steps call set(p, label, ceiling), the bar creeps on between them (feedback A)
   const loader = window.__fouerLoad || { set() {}, touch() {}, done() {}, fail() {}, take() {} };
   loader.take();
-  const setLoad = (p, key, ceiling, ms) => loader.set(p, key ? translate(lang, key) : '', ceiling, ms);
+  const setLoad = (p, key, ceiling, ms) => { mark('load:' + (key || p)); loader.set(p, key ? translate(lang, key) : '', ceiling, ms); };
   setLoad(0.12, 'load.glacis', 0.6, 14000);
   const testMode = window.__pbTestMode === true;
   const debug = param('fouerDebug') === '1';
@@ -60,10 +61,17 @@ async function boot() {
     if (Number.isFinite(parsed)) clockOffset = parsed - Date.now();
   }
   const now = () => Date.now() + clockOffset;
+  // the player is let in as soon as the world, the pitches and the UI stand; the background fair (NPC stalls, props, clutter), the guests and the walk are built afterwards, in slices.
+  // Tests and the debug page (?fouerDebug=1, test mode) keep the old all-at-once boot; ?fouerAsync=1 / ?fouerSync=1 force either way.
+  const deferHeavy = param('fouerAsync') === '1' || (param('fouerSync') !== '1' && !debug && !testMode);
+  const bg = window.__fouerBg = { done: false, deferred: deferHeavy, error: '' };
+  const yieldTask = () => (deferHeavy ? new Promise(resolve => setTimeout(resolve, 0)) : Promise.resolve());
 
+  mark('boot');
   const r = createRenderer({ THREE: T, canvas });
   const modelsReady = loadBigModels();      // wheel, towers, coasters, halls (index.js BIG_FILES; a missing file is skipped)
   const game = createGame({ win: window, storage: (() => { try { return localStorage; } catch (error) { return null; } })(), now, testMode, name: (() => { try { return localStorage.getItem('playerName') || ''; } catch (error) { return ''; } })() });
+  mark('renderer');
   const started = game.start();
   started.catch(() => {});      // awaited below; this only keeps an early failure from being reported twice
 
@@ -82,13 +90,16 @@ async function boot() {
     document.documentElement.dataset.bootError = 'world';
     throw error;
   }
+  mark('world');
   if (world.parts.tram) world.root.add(world.parts.tram.group);
   setLoad(0.64, 'load.rides', 0.69, 3000);
   await modelsReady;
   setLoad(0.7, 'load.stalls', 0.89, 16000);
+  mark('bigmodels');
   const markers = world.parts.pitches;
   markers.setMode('outline');
-  const fair = await createFairLayer({ T, root: r.gameRoot, pitches: markers.items, groundY: (u, w) => world.groundY(u, w), quality: r.state.quality, fieldPoly: world.fieldPoly, renderer: r, world });
+  const fair = await createFairLayer({ T, root: r.gameRoot, pitches: markers.items, groundY: (u, w) => world.groundY(u, w), quality: r.state.quality, fieldPoly: world.fieldPoly, renderer: r, world, deferBase: deferHeavy });
+  mark('fairlayer');
   let scene = null; let crowd = null; let events = null;
   world.parts.fair = { setNight: k => { fair.setNight(k); if (scene) scene.setNight(k); if (crowd) crowd.setNight(k); if (events) events.setNight(k); }, dispose: () => fair.dispose() };
   r.on('quality', q => { fair.setQuality(q); if (crowd) crowd.setQuality(q); });
@@ -108,40 +119,22 @@ async function boot() {
 
   setLoad(0.93, 'load.people', 0.975, 6000);
   await started;
-  let sfx = null; let ui = null; let walk = null; let ride = null;
+  mark('gamestarted');
+  let sfx = null; let ui = null; let walk = null; let ride = null; let mask = null;
   scene = createSceneBridge({ T, r, world, fair, markers, game, quality: r.state.quality, onGates: () => { ui.toast(translate(ui.lang, 'toast.entrance')); sfx.star(); } });
   // ---- W6: walkable mask, crowd, soundscape, rides, walk
   const rects = scene.rects;
   const faces = PITCHES.map(p => p.face);
-  // the street the tram runs in (Allée Scheffer + the Theater stop and the plaza beside the NE portal): samples of the track in game metres, every 5 m
-  const streetSamples = (() => {
-    const tr = world.parts.tram && world.parts.tram.track; if (!tr) return [];
-    const out = [];
-    for (let s = 8405; s <= 8910; s += 5) {
-      const a = tr.at(s), b = tr.at(s + 1); const A = world.toGame(a.x, a.z), B = world.toGame(b.x, b.z); const l = Math.hypot(B[0] - A[0], B[1] - A[1]) || 1;
-      out.push({ u: A[0], w: A[1], tu: (B[0] - A[0]) / l, tw: (B[1] - A[1]) / l });
-    }
-    return out;
-  })();
-  const npcInfo = fair.baseInfo && fair.baseInfo.npc;
-  // feedback A: the collision of the NPC stalls, props and clutter is read from the drawn base layer (solids.js), the footprint lists of the filler are only the fallback
-  let baseBoxes = null;
-  try { baseBoxes = deriveLayerBoxes(fair.batches.base.merged, { u0: -12, u1: 322, w0: -24, w1: 164 }); }
-  catch (error) { console.warn('[fouer] solids of the base layer failed, using the filler footprints', error); }
-  const mask = createMask({
-    fieldPoly: world.fieldPoly, corridors: CORRIDORS, rects, faces, entrances: ENTRANCES, lane: streetSamples, baseBoxes,
-    grid: npcInfo && npcInfo.grid ? { g: npcInfo.grid, nu: npcInfo.gridDims[0], nw: npcInfo.gridDims[1], cell: npcInfo.gridDims[2], u0: npcInfo.gridDims[3], w0: npcInfo.gridDims[4] } : null,
-  });
-  const getFocus = () => (walk && walk.active && !(ride.active && ride.high) ? { x: walk.view.x, z: walk.view.z, yaw: walk.view.yaw, walk: true } : { x: r.rig.cu, z: r.rig.cw, yaw: r.rig.cyaw, walk: false });
-  const laneLine = streetSamples.map(q => ({ x: q.u, z: q.w }));
-  crowd = createCrowd({ T, r, world, game, mask, corridors: CORRIDORS, polylines: laneLine.length > 5 ? [{ name: 'allee', pts: laneLine, lane: 2.3, chunk: 4 }] : [], rects, faces, quality: r.state.quality, env, getFocus, onBleat: () => ui.sheepTapped() });
   const items = { faceOf: i => faces[i], cycleOf: i => { const pit = fair.pits.get(PITCHES[i].id); return pit && pit.near && pit.near.userData.cycle ? pit.near.userData.cycle : 45; } };
   const getListener = () => {
     if (walk && walk.active) { const d = r.camera.getWorldDirection(new T.Vector3()); return { x: r.camera.position.x, y: r.camera.position.y, z: r.camera.position.z, fx: d.x, fy: d.y, fz: d.z, dist: 0 }; }
     return { x: r.rig.cu, y: r.rig.cy + 2, z: r.rig.cw, fx: Math.cos(r.rig.cyaw), fy: 0, fz: Math.sin(r.rig.cyaw), dist: r.rig.cdist };
   };
-  const audio = createAudio({ game, r, world, env, tram: world.parts.tram, rects, items, crowd, getListener });
+  // the soundscape only reads crowd.stats: until the guests exist it hears a murmur of 20
+  const crowdStats = { get stats() { return crowd ? crowd.stats : { near: 0, active: 20 }; } };
+  const audio = createAudio({ game, r, world, env, tram: world.parts.tram, rects, items, crowd: crowdStats, getListener });
   sfx = createSfx(audio);
+  let crowdShown = true;
   const hooks = {
     walking: false,
     onWalkChange() {},
@@ -153,11 +146,13 @@ async function boot() {
     rideFromBuilder: i => (walk ? walk.rideFrom(i) : false),
     endWalk() { if (walk) walk.end(); },
     /** a tap on Hämmi (builder view and walk): bleat */
-    tapSheep(x, y) { if (!crowd.tapSheep(x, y)) return false; crowd.bleat(); audio.unlock(); audio.bleat(); return true; },
+    tapSheep(x, y) { if (!crowd || !crowd.tapSheep(x, y)) return false; crowd.bleat(); audio.unlock(); audio.bleat(); return true; },
     /** W7: the pill "Hämmi has a present" flies the builder camera to the sheep */
-    findSheep() { const p = crowd.sheepPosition(); if (!p || (walk && walk.active)) return false; r.flyTo({ tu: p.x, tw: p.z, yaw: r.rig.yaw, dist: 70, tilt: 0 }, 1.1); return true; },
+    findSheep() { const p = crowd && crowd.sheepPosition(); if (!p || (walk && walk.active)) return false; r.flyTo({ tu: p.x, tw: p.z, yaw: r.rig.yaw, dist: 70, tilt: 0 }, 1.1); return true; },
     /** W7: a visited fair (gallery) hides the guests and Hämmi: they belong to the player's own fair */
-    setCrowdVisible(on) { crowd.group.visible = on; crowd.sheep.visible = on; },
+    setCrowdVisible(on) { crowdShown = on; if (crowd) { crowd.group.visible = on; crowd.sheep.visible = on; } },
+    /** false until the walk exists (it is built after the first frame): the UI keeps the walk button away until then */
+    get walkReady() { return Boolean(walk); },
     /** W7: the event controller, reachable before it exists (the UI is built first) */
     events: { watch: id => (events ? events.watch(id) : false), replay: () => { if (events) events.replay(); }, leaveCinema: () => { if (events) events.leaveCinema(); }, get cinema() { return events ? events.cinema : false; } },
   };
@@ -167,15 +162,52 @@ async function boot() {
     setLang: code => { try { localStorage.setItem(LANG_KEY, code); } catch (error) { /* storage blocked */ } if (walk) walk.refreshLabels(); if (events) events.setLang(code); },
   });
   let fairTime = 0;       // the fair layer's own clock (fair.update(dt) adds dt every frame): the coaster ride needs the model time
-  ride = createRide({ T, r, world, fair, game, scene, ui, audio, crowd, rects, faces, getWalk: () => walk, getFairTime: () => fairTime, translate });
-  walk = createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, crowd, ride, mask, env, hooks, rects, items, tram: world.parts.tram, translate });
+  /** the guests, the walkable mask, the rides and the walk: the second half of the build (it needs the background fair for its collision and its guest paths) */
+  async function buildHeavy() {
+    if (deferHeavy) { await fair.buildBase(); await yieldTask(); }
+    mark('base');
+    // the street the tram runs in (Allée Scheffer + the Theater stop and the plaza beside the NE portal): samples of the track in game metres, every 5 m
+    const streetSamples = (() => {
+      const tr = world.parts.tram && world.parts.tram.track; if (!tr) return [];
+      const out = [];
+      for (let s = 8405; s <= 8910; s += 5) {
+        const a = tr.at(s), b = tr.at(s + 1); const A = world.toGame(a.x, a.z), B = world.toGame(b.x, b.z); const l = Math.hypot(B[0] - A[0], B[1] - A[1]) || 1;
+        out.push({ u: A[0], w: A[1], tu: (B[0] - A[0]) / l, tw: (B[1] - A[1]) / l });
+      }
+      return out;
+    })();
+    const npcInfo = fair.baseInfo && fair.baseInfo.npc;
+    // feedback A: the collision of the NPC stalls, props and clutter is read from the drawn base layer (solids.js), the footprint lists of the filler are only the fallback
+    let baseBoxes = null;
+    try { baseBoxes = deriveLayerBoxes(fair.batches.base.merged, { u0: -12, u1: 322, w0: -24, w1: 164 }); }
+    catch (error) { console.warn('[fouer] solids of the base layer failed, using the filler footprints', error); }
+    mask = createMask({
+      fieldPoly: world.fieldPoly, corridors: CORRIDORS, rects, faces, entrances: ENTRANCES, lane: streetSamples, baseBoxes,
+      grid: npcInfo && npcInfo.grid ? { g: npcInfo.grid, nu: npcInfo.gridDims[0], nw: npcInfo.gridDims[1], cell: npcInfo.gridDims[2], u0: npcInfo.gridDims[3], w0: npcInfo.gridDims[4] } : null,
+    });
+    await yieldTask();
+    const getFocus = () => (walk && walk.active && !(ride.active && ride.high) ? { x: walk.view.x, z: walk.view.z, yaw: walk.view.yaw, walk: true } : { x: r.rig.cu, z: r.rig.cw, yaw: r.rig.cyaw, walk: false });
+    const laneLine = streetSamples.map(q => ({ x: q.u, z: q.w }));
+    crowd = createCrowd({ T, r, world, game, mask, corridors: CORRIDORS, polylines: laneLine.length > 5 ? [{ name: 'allee', pts: laneLine, lane: 2.3, chunk: 4 }] : [], rects, faces, quality: r.state.quality, env, getFocus, onBleat: () => ui.sheepTapped() });
+    crowd.setNight(world.nightK || 0);
+    if (!crowdShown) { crowd.group.visible = false; crowd.sheep.visible = false; }
+    mark('crowd');
+    await yieldTask();
+    ride = createRide({ T, r, world, fair, game, scene, ui, audio, crowd, rects, faces, getWalk: () => walk, getFairTime: () => fairTime, translate });
+    walk = createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, crowd, ride, mask, env, hooks, rects, items, tram: world.parts.tram, translate });
+    mark('walk');
+  }
   events = createEvents({ T, r, world, game, env, audio, ui, translate });
   events.setNight(world.nightK || 0);
   // the pitch models are built here (one tick of the loading bar per pitch)
   let modelsDone = 0;
   scene.onApplied(() => { modelsDone++; setLoad(0.95 + 0.04 * Math.min(1, modelsDone / 34), 'load.rides', 0.995, 5000); });
+  if (!deferHeavy) await buildHeavy();      // old all-at-once boot (tests, ?fouerDebug=1): the guests and the walk exist before the first frame
+  mark('pre-sync');
   scene.sync();
+  mark('synced');
   fair.flush(r.camera);
+  mark('flushed');
 
   r.on('frame', dt => {
     env.update(dt, r.camera);
@@ -184,9 +216,9 @@ async function boot() {
     fairTime += dt;
     game.update();
     scene.update(dt);
-    ride.update(dt);          // after the fair (the wheel has moved) and before the walk camera is placed
-    walk.update(dt);
-    crowd.update(dt);
+    if (ride) ride.update(dt);          // after the fair (the wheel has moved) and before the walk camera is placed
+    if (walk) walk.update(dt);
+    if (crowd) crowd.update(dt);
     audio.update(dt);
     events.update(dt);
     ui.update(dt);
@@ -217,12 +249,14 @@ async function boot() {
     setTimeout(() => document.body.classList.remove('intro'), 3200);
   }
   r.start();
+  mark('ready');
   loader.done();
   $('loading').classList.add('done');
   document.documentElement.dataset.fouerReady = '1';
   document.documentElement.dataset.fouerGame = '1';
 
-  if (debug) {
+  /** ?fouerDebug=1: the hooks the flows use (the guests, the walk and the rides are in it, so it runs once they exist) */
+  function exposeDebug() {
     const presets = {
       overview: () => r.flyTo(r.framePose(), 0),
       close: () => r.flyTo(r.poses.close, 0), top: () => r.flyTo(r.poses.top, 0), reverse: () => r.flyTo(r.poses.reverse, 0), north: () => r.flyTo(r.poses.north, 0),
@@ -281,6 +315,23 @@ async function boot() {
       },
     };
   }
+
+  /** after the first frame: the rest of the fair is built in slices, the player is already playing */
+  async function finishInBackground() {
+    try {
+      if (deferHeavy) { await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 250))); await buildHeavy(); }
+      if (debug) exposeDebug();
+      ui.refreshAll();
+      mark('full');
+    } catch (error) {
+      console.error('[fouer] background build failed', error);
+      bg.error = error && error.message ? error.message : 'error';
+    }
+    bg.done = true;
+    document.documentElement.dataset.fouerFull = bg.error ? '0' : '1';
+  }
+  if (deferHeavy) finishInBackground();
+  else await finishInBackground();
 }
 
 boot().catch(error => {

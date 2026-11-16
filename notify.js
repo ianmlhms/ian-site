@@ -9,7 +9,7 @@
  *                   every page.
  * Foreground notifications use the Notification API (no server). Closed-app push
  * is delivered by the Supabase Edge Function `notify` → the service worker. */
-import * as auth from "./auth.js?v=42";
+import * as auth from "./auth.js?v=47";
 
 const cfg = window.PB_CONFIG || {};
 const swSupported = "serviceWorker" in navigator && "PushManager" in window;
@@ -63,8 +63,12 @@ export async function disablePush() {
   const reg = await registerSW();
   const sub = reg && (await reg.pushManager.getSubscription());
   if (sub) {
-    try { const sb = await auth.client(); await sb.rpc("delete_push_subscription", { p_endpoint: sub.endpoint }); } catch {}
-    try { await sub.unsubscribe(); } catch {}
+    try {
+      const sb = await auth.client();
+      const { error } = await sb.rpc("delete_push_subscription", { p_endpoint: sub.endpoint });
+      if (error) console.warn("[notify] subscription not removed on the server", error);
+    } catch (e) { console.warn("[notify] subscription not removed on the server", e); }
+    try { await sub.unsubscribe(); } catch (e) { console.warn("[notify] unsubscribe failed", e); }
   }
   return { ok: true };
 }
@@ -115,7 +119,7 @@ function systemNotify(title, body, url) {
       const n = new Notification(title, { body, icon: "favicon.svg" });
       n.onclick = () => { window.focus(); location.href = url; };
     }
-  } catch {}
+  } catch (e) { console.warn("[notify] system notification failed", e); }
 }
 
 /* ---------- ambient (foreground) message notifications ---------- */

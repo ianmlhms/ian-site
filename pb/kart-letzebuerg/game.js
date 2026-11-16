@@ -100,7 +100,7 @@
         const cv = document.createElement('canvas'); cv.width = 128; cv.height = 108;
         const pv = document.createElement('span'); pv.className = 'tpv'; const im = new Image(); im.alt = ''; im.decoding = 'async'; im.draggable = false; im.src = '/pb/kart-letzebuerg/thumbs/' + id + '.webp?v=1'; im.addEventListener('error', () => im.remove()); pv.appendChild(im); pv.appendChild(cv); b.appendChild(pv);
         const d = document.createElement('div'); d.innerHTML = '<b></b><small></small><small class="rec"></small>'; d.firstChild.textContent = trackName(id); d.children[1].textContent = KL.t('t_' + id + '_d'); d.lastChild.textContent = recLine(id); b.appendChild(d);
-        b.addEventListener('click', () => { S.track = id; if (S.weather !== 'random' && !weathersFor(id).includes(S.weather)) S.weather = 'random'; saveSettings(); KL.Boards.select('lap', id); buildMenuChips(); G.audio.sfx('click'); });
+        b.addEventListener('click', () => { S.track = id; if (S.weather !== 'random' && !weathersFor(id).includes(S.weather)) S.weather = 'random'; saveSettings(); KL.Boards.select('lap', id); buildMenuChips(); G.audio.sfx('click'); KL.ensureTrack(id).catch(() => {}); });
         tc.appendChild(b); drawTrackPreview(cv, previewTrack(id), true);
       }
     }
@@ -110,6 +110,7 @@
     for (const d of ['easy', 'normal', 'hard']) chip(dc, KL.t('d_' + d), S.diff === d, () => { S.diff = d; saveSettings(); buildMenuChips(); });
     const vc = $('driverChips'); vc.textContent = '';
     for (const d of KL.DRIVERS) { const b = chip(vc, d.name, S.driver === d.id, () => { S.driver = d.id; saveSettings(); buildMenuChips(); }); const i = document.createElement('i'); i.style.background = d.body; b.prepend(i); }
+    buildGfxChips();
   }
   G.refreshMenu = () => buildMenuChips();
 
@@ -129,8 +130,8 @@
     for (const w of weathersFor(G.settings.track)) { const o = document.createElement('option'); o.value = w; o.textContent = WEATHER_ICON[w] + ' ' + KL.t('w_' + w); pw.appendChild(o); }
     pw.value = G.renderer ? G.renderer.weatherName : 'day';
     const pq = $('pQuality'); pq.textContent = '';
-    for (const q of ['auto', 'low', 'medium', 'high']) { const o = document.createElement('option'); o.value = q; o.textContent = KL.t('q_' + q); pq.appendChild(o); }
-    pq.value = G.settings.quality; $('pGas').value = G.settings.autoGas ? '1' : '0';
+    for (const q of ['auto', ...LEVELS]) { const o = document.createElement('option'); o.value = q; o.textContent = gfxLabel(q); pq.appendChild(o); }
+    pq.value = gfxChoice(); $('pGas').value = G.settings.autoGas ? '1' : '0';
   }
 
   /* ---------- tracks ---------- */
@@ -138,15 +139,37 @@
   function getTrack(id) { const d = KL.tracks[id]; if (!d || !d.loaded) throw new Error('track not loaded: ' + id); return G.tracks[id] || (G.tracks[id] = KL.buildTrack(d)); }
   function previewTrack(id) { return KL.tracks[id].loaded ? getTrack(id) : (G.previews[id] || (G.previews[id] = KL.buildTrack(KL.tracks[id]))); }
 
-  /* ---------- quality ---------- */
+  /* ---------- quality (Grafik) ----------
+   * The level comes from the shared pb/gfx-quality.js (window.ArcadeGfx): the player's choice (Automatesch / Niddreg / Mëttel / Héich) or the auto guess (low on iPads).
+   * The frame-time watchdog (adaptQuality) may only LOWER the effective level below that (G.wdCap), never raise it. Only the picture changes: the simulation, timing and
+   * the network traffic of an online race do not read the level at all. */
+  const LEVELS = ['low', 'medium', 'high'];
+  const lowerOf = (a, b) => (!b || LEVELS.indexOf(a) <= LEVELS.indexOf(b) ? a : b);
   function detectQuality() {
+    if (window.ArcadeGfx) return ArcadeGfx.level();
     const ua = navigator.userAgent || '', touchMac = /Mac/.test(ua) && navigator.maxTouchPoints > 1;
     const mobile = /iPad|iPhone|Android/.test(ua) || touchMac;
-    const cores = navigator.hardwareConcurrency || 4;
-    if (mobile) return cores <= 4 ? 'low' : 'medium';
-    return 'high';
+    return mobile ? ((navigator.hardwareConcurrency || 4) <= 6 ? 'low' : 'medium') : 'high';
   }
-  const effQuality = () => (G.settings.quality === 'auto' ? G.autoQ : G.settings.quality);
+  const gfxChoice = () => (window.ArcadeGfx ? ArcadeGfx.choice() : 'auto');
+  const effQuality = () => lowerOf(detectQuality(), G.wdCap);
+  function gfxLabel(c) { return (window.ArcadeGfx && ArcadeGfx.LABELS[c]) || KL.t('q_' + c); }
+  /* old saves kept the choice in the arcade settings: carry it over once, then the shared helper owns it */
+  function migrateQuality() {
+    const old = G.settings.quality;
+    if (window.ArcadeGfx && LEVELS.includes(old) && gfxChoice() === 'auto') ArcadeGfx.set(old);
+    G.settings.quality = gfxChoice();
+  }
+  function applyQuality() {
+    G.wdCap = null; G.fpsAvg = 16; G.lowStreak = 0; G.settings.quality = gfxChoice(); saveSettings();
+    if (G.renderer) { G.renderer.dprScale = 1; G.renderer.setQuality(effQuality()); }
+    buildGfxChips();
+    const pq = $('pQuality'); if (pq) pq.value = gfxChoice();
+  }
+  function buildGfxChips() {
+    const box = $('gfxChips'); if (!box) return; box.textContent = '';
+    for (const c of ['auto', ...LEVELS]) chip(box, gfxLabel(c), gfxChoice() === c, () => { if (window.ArcadeGfx) ArcadeGfx.set(c); G.audio.sfx('click'); });
+  }
 
   /* ---------- race flow ---------- */
   function showOnly(name) {
@@ -187,11 +210,13 @@
     startRace();
   }
 
+  const mark = (n) => { try { performance.mark('kl:' + n); } catch (e) { /* marks are optional */ } };
   function startRace(opts) {
     opts = Object.assign({}, sessionOpts(), opts || {});
     const S = G.settings, trackId = opts.track || S.track;
     $('loading').hidden = false; $('menu').hidden = true;
-    KL.ensureTrack(trackId).then(() => new Promise((r) => setTimeout(r, 30))).then(() => beginRace(trackId, opts))
+    mark('start-tap');
+    KL.ensureTrack(trackId).then(() => { mark('track-files'); return new Promise((r) => setTimeout(r, 30)); }).then(() => beginRace(trackId, opts))
       .catch((e) => { console.error(e); fatal(KL.t('engineError') + ' (' + (e && e.message) + ')'); });
   }
 
@@ -216,7 +241,7 @@
     }
     const R = KL.createRace({ track, karts: defs, laps: opts.laps || C.LAPS, difficulty: diffName, weather, seed, mode: opts.mode || 'race' });
     if (R.mode === 'tt') for (const b of R.boxes) { b.active = false; b.respawn = 1e9; }          // time trial: no item boxes
-    setupScene(R, track, weather, 'me', false);
+    mark('race-created'); setupScene(R, track, weather, 'me', false); mark('scene-ready');
     setupGhost(R, track, me);
     $('loading').hidden = true; showOnly(null);
     G.state = 'race'; G.paused = false; KL.input.setEnabled(true);
@@ -392,7 +417,6 @@
   function fatal(text) { $('fatalText').textContent = text; showOnly('fatal'); }
 
   function initRenderer() {
-    G.autoQ = detectQuality();
     G.renderer = new KL.Renderer($('world'), { quality: effQuality() });
     window.addEventListener('resize', onResize);
     window.addEventListener('orientationchange', () => setTimeout(onResize, 120));
@@ -659,17 +683,35 @@
     if (G.race.phase === 'countdown' && f && f.gas != null) k.input.gas = f.gas;
   }
 
-  /* adaptive resolution (auto quality only) */
+  /* frame-time watchdog. Auto: first the resolution scale, then one level down. A fixed choice: one level down when frames stay slow. Never up beyond the player's choice. */
+  const SLOW_AUTO_MS = 24, SLOW_FIXED_MS = 30;
   function adaptQuality(dt) {
-    if (G.settings.quality !== 'auto' || G.paused) return;
+    if (G.paused || !G.race || G.race.phase === 'countdown') return;
     G.fpsAvg = G.fpsAvg * 0.95 + dt * 1000 * 0.05;
     G.qT = (G.qT || 0) + dt;
     if (G.qT < 2.5) return;
     G.qT = 0;
-    const r = G.renderer;
-    if (G.fpsAvg > 21 && (r.dprScale || 1) > 0.6) { r.dprScale = Math.max(0.6, (r.dprScale || 1) - 0.15); r.resize(); }
-    else if (G.fpsAvg > 24 && G.autoQ !== 'low') { G.lowStreak++; if (G.lowStreak > 1) { G.autoQ = G.autoQ === 'high' ? 'medium' : 'low'; r.setQuality(G.autoQ); G.lowStreak = 0; } }
-    else if (G.fpsAvg < 12.5 && (r.dprScale || 1) < 1) { r.dprScale = Math.min(1, (r.dprScale || 1) + 0.1); r.resize(); }
+    const r = G.renderer, auto = gfxChoice() === 'auto', now = effQuality();
+    if (auto && G.fpsAvg > 21 && (r.dprScale || 1) > 0.6) { r.dprScale = Math.max(0.6, (r.dprScale || 1) - 0.15); r.resize(); }
+    else if (G.fpsAvg > (auto ? SLOW_AUTO_MS : SLOW_FIXED_MS) && now !== 'low') {
+      G.lowStreak++;
+      if (G.lowStreak > 1) { G.wdCap = LEVELS[LEVELS.indexOf(now) - 1]; r.dprScale = 1; r.setQuality(effQuality()); G.lowStreak = 0; G.fpsAvg = 16; }
+    }
+    else if (auto && G.fpsAvg < 12.5 && (r.dprScale || 1) < 1) { r.dprScale = Math.min(1, (r.dprScale || 1) + 0.1); r.resize(); }
+    else G.lowStreak = 0;
+  }
+
+  /* ---------- background loading ----------
+   * The menu is up as soon as the engine runs. While the player picks, the chosen track is loaded and run (so "Lass!" starts at once), then the files of all other tracks are
+   * fetched quietly into the cache, one by one. Starting a race never waits for this: ensureTrack() shares the same loading and fetches whatever is missing. */
+  function backgroundLoad() {
+    window.__klBg = { done: false, loaded: [], failed: [] };
+    const idle = window.requestIdleCallback ? (fn) => requestIdleCallback(fn, { timeout: 1500 }) : (fn) => setTimeout(fn, 300);
+    idle(() => {
+      KL.ensureTrack(G.settings.track).catch((e) => warn('track preload failed', e))
+        .then(() => KL.prefetchTracks(Object.keys(KL.tracks), 120)).catch((e) => warn('background load failed', e))
+        .then(() => { window.__klBg.done = true; mark('background-done'); });
+    });
   }
 
   /* ---------- boot ---------- */
@@ -683,7 +725,7 @@
     window.addEventListener('keydown', () => { G.gesture = true; G.audio.start(); }, { capture: true });
     KL.input.bindTouch($('touch'));
     layoutTouch();
-    G.autoQ = detectQuality();
+    migrateQuality(); if (window.ArcadeGfx) ArcadeGfx.onChange(applyQuality);
     document.querySelectorAll('[data-lang]').forEach((b) => b.addEventListener('click', () => { KL.setLang(b.dataset.lang); translate(); }));
     translate();
     $('btnStart').addEventListener('click', () => { G.audio.start(); startSelected(); });
@@ -701,7 +743,7 @@
     $('pRestart').addEventListener('click', () => { $('pauseScreen').hidden = true; startRace({ seed: null }); });
     $('pQuit').addEventListener('click', () => { $('pauseScreen').hidden = true; if (G.mp) { KL.MP.leave(); } openMenu(); });
     $('pWeather').addEventListener('change', (e) => setWeather(e.target.value));
-    $('pQuality').addEventListener('change', (e) => { G.settings.quality = e.target.value; saveSettings(); if (G.renderer) { G.renderer.dprScale = 1; G.renderer.setQuality(effQuality()); } });
+    $('pQuality').addEventListener('change', (e) => { if (window.ArcadeGfx) ArcadeGfx.set(e.target.value); });
     $('pGas').addEventListener('change', (e) => { G.settings.autoGas = e.target.value === '1'; KL.input.setAutoGas(G.settings.autoGas); saveSettings(); });
     $('eAgain').addEventListener('click', () => {
       $('endScreen').hidden = true;
@@ -736,6 +778,8 @@
     } else openMenu();
     requestAnimationFrame(frame);
     installTestHooks();
+    document.documentElement.dataset.klReady = '1'; mark('menu-ready');
+    if (!auto) backgroundLoad();
     if (!auto) KL.runPendingRoom();
   }
 

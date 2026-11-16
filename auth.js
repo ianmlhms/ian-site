@@ -1,13 +1,13 @@
 /* Shared Supabase auth for ian.lu. ES module. */
-import "./i18n-dict.js?v=52";
-import { openAuthDialog, openFaceDialog } from "./auth-ui.js?v=11";
+import "./i18n-dict.js?v=56";
+import { openAuthDialog, openFaceDialog, openPasskeyDialog } from "./auth-ui.js?v=12";
 import { esc } from "./pin-pad.js?v=5";
 import {
   openProfilePinDialog,
   resetPinBriefing,
   startPinBriefing,
-} from "./pin-brief.js?v=10";
-import * as quick from "./quick-login.js?v=1";
+} from "./pin-brief.js?v=11";
+import * as quick from "./quick-login.js?v=2";
 
 const cfg = window.PB_CONFIG || {};
 const PASSWORD_ALPHABET =
@@ -110,7 +110,7 @@ function parentHandlesPresence() {
 function startPresencePing() {
   if (!_g.sb || parentHandlesPresence()) return;
   if (!_g.presenceModule) {
-    _g.presenceModule = import("./presence-ping.js?v=8");
+    _g.presenceModule = import("./presence-ping.js?v=10");
   }
   void _g.presenceModule
     .then(({ startPresence }) => startPresence(_g.sb, () => _g.session))
@@ -151,10 +151,24 @@ function startInvitePop() {
 
 /* One-time "is your username and class still right?" popup. Top-level pages
  * only (never the arcade iframes), and never for kart accounts. */
+function accountCheckedToday() {
+  const uid = _g.session?.user?.id;
+  if (!uid) return false;
+  try {
+    // written by account-check.js once the server has said "already checked"
+    return localStorage.getItem("accountCheckedDay") ===
+      `${uid}|${new Date().toISOString().slice(0, 10)}`;
+  } catch {
+    return false;
+  }
+}
+
 function startAccountCheck() {
   if (window.top !== window || isKartAccount()) return;
+  // Checked accounts skip the module (27 KB) and its two requests on every page.
+  if (accountCheckedToday()) return;
   if (!_g.accountCheckModule) {
-    _g.accountCheckModule = import("./account-check.js?v=17");
+    _g.accountCheckModule = import("./account-check.js?v=22");
   }
   void _g.accountCheckModule
     .then(({ startAccountCheck: start }) => start(_g.sb, () => _g.session))
@@ -199,14 +213,41 @@ function notifyAuth(event, current) {
   _g.cbs.forEach((callback) => callback(current));
 }
 
+/* upsert_profile only creates the profile row when it is missing. It used to be
+ * awaited on EVERY page load before client() resolved — one extra round-trip
+ * (and one database call) in front of every page's content. Now it runs beside
+ * the page, and a successful answer is remembered per account for the day. */
+const PROFILE_ENSURED_KEY = "profileEnsured";
+const profileStamp = (uid) => `${uid}|${new Date().toISOString().slice(0, 10)}`;
+
+function profileEnsuredToday(uid) {
+  try {
+    return localStorage.getItem(PROFILE_ENSURED_KEY) === profileStamp(uid);
+  } catch {
+    return false;   // storage unavailable: just ask the server again
+  }
+}
+
 async function ensureProfile() {
   const current = _g.session;
   const name = current?.user?.user_metadata?.username;
-  if (!_g.sb || !current || !name || isKartAccount(current)) return;
-  const { error } = await _g.sb.rpc("upsert_profile", {
-    p_username: String(name).slice(0, 24),
-  });
-  if (error) console.warn("profile setup failed", error.message);
+  const uid = current?.user?.id;
+  if (!_g.sb || !current || !name || !uid || isKartAccount(current)) return;
+  if (profileEnsuredToday(uid)) return;
+  try {
+    const { error } = await _g.sb.rpc("upsert_profile", {
+      p_username: String(name).slice(0, 24),
+    });
+    if (error) {
+      console.warn("profile setup failed", error.message);
+      return;
+    }
+    try {
+      localStorage.setItem(PROFILE_ENSURED_KEY, profileStamp(uid));
+    } catch { /* storage unavailable: asked again on the next page */ }
+  } catch (error) {
+    console.warn("profile setup failed", error);
+  }
 }
 
 function schedulePinBriefing() {
@@ -240,8 +281,8 @@ async function initializeClient() {
   _g.sb.auth.onAuthStateChange(notifyAuth);
   startPresencePing();
   if (guardKartAccount(data.session)) return _g.sb;
-  await ensureProfile();
-  schedulePinBriefing();
+  // Not awaited (see ensureProfile): pages get their client one round-trip sooner.
+  void ensureProfile().finally(schedulePinBriefing);
   return _g.sb;
 }
 
@@ -571,20 +612,34 @@ export const faceLoginAccounts = () =>
     username: entry.username,
   }));
 
-export const hasFaceHere = () =>
-  Boolean(_g.session?.user?.id && quick.faceEntryFor(_g.session.user.id));
+/** This browser holds a working (v2) face key for the signed-in player. */
+export const hasFaceHere = () => {
+  const entry = _g.session?.user?.id && quick.faceEntryFor(_g.session.user.id);
+  return Boolean(entry && !entry.legacy);
+};
+
+/** A face saved by the first version (no PIN check back then) that must be scanned again. */
+export const faceNeedsRescan = () =>
+  Boolean(_g.session?.user?.id && quick.faceEntryFor(_g.session.user.id)?.legacy);
 
 export async function loginWithFace(entry) {
   return quick.faceLogin(await client(), entry);
 }
 
-export async function enrollFace(face) {
+/** Server-side check of the signed-in player's PIN (or old password). */
+export async function reauthenticate(credential) {
+  if (!session()) throw new Error("not signed in");
+  return quick.faceReauth(await client(), credential);
+}
+
+export async function enrollFace(face, credential) {
   const current = session();
   if (!current || isKartAccount(current)) throw new Error("not signed in");
   return quick.faceEnroll(await client(), {
     userId: current.user.id,
     username: username(),
     face,
+    credential,
   });
 }
 
@@ -592,6 +647,49 @@ export async function forgetFace() {
   const current = session();
   if (!current) return;
   await quick.faceForget(await client(), current.user.id);
+}
+
+export async function listFaceDevices() {
+  const current = session();
+  if (!current) return [];
+  return quick.faceDevices(await client(), current.user.id);
+}
+
+export async function removeFaceDevice(deviceId) {
+  const current = session();
+  if (!current) throw new Error("not signed in");
+  return quick.faceDeviceRemove(await client(), current.user.id, deviceId);
+}
+
+export async function forgetAllFaces() {
+  const current = session();
+  if (!current) throw new Error("not signed in");
+  return quick.faceForgetAll(await client(), current.user.id);
+}
+
+/** Admins (app_admins) cannot use the face scan; the server refuses it anyway.
+ *  Unknown (request failed) counts as admin here, so the option stays hidden. */
+export async function isAdmin() {
+  const userId = _g.session?.user?.id;
+  if (!userId) return false;
+  if (_g.adminCheck?.userId !== userId) {
+    const pending = client()
+      .then((sb) => sb.rpc("is_admin"))
+      .then(({ data, error }) => {
+        if (error) throw error;
+        return data === true;
+      });
+    _g.adminCheck = { userId, pending };
+    pending.catch(() => {
+      if (_g.adminCheck?.pending === pending) _g.adminCheck = null;
+    });
+  }
+  try {
+    return await _g.adminCheck.pending;
+  } catch (error) {
+    console.warn("[face] admin check failed", error);
+    return true;
+  }
 }
 
 const uiDeps = Object.freeze({
@@ -610,6 +708,9 @@ const uiDeps = Object.freeze({
   passkeySupported,
   loginPasskey: loginWithPasskey,
   passkeyCancelled,
+  passkeyAlreadyHere,
+  registerPasskey,
+  reauth: reauthenticate,
   faceEntries: quick.faceEntries,
   loginFace: loginWithFace,
   enrollFace,
@@ -642,11 +743,18 @@ export function openPinSetup() {
   void openProfilePinDialog(uiDeps);
 }
 
-/** Camera dialog that saves the signed-in player's face on this device. */
-export function openFaceSetup(onDone) {
+/** PIN check, then camera dialog that saves the signed-in player's face on this device. */
+export async function openFaceSetup(onDone) {
+  injectCss();
+  if (!session() || isKartAccount() || await isAdmin()) return;
+  openFaceDialog(uiDeps, { mode: "enroll", onDone });
+}
+
+/** PIN check, then "Face ID aschalten" (a Supabase passkey for this device). */
+export function openPasskeySetup(onDone) {
   injectCss();
   if (!session() || isKartAccount()) return;
-  openFaceDialog(uiDeps, { mode: "enroll", onDone });
+  openPasskeyDialog(uiDeps, { onDone });
 }
 
 export function mountAccountButton(host) {

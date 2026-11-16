@@ -78,6 +78,25 @@ flows whose name contains `foo`; `FLOW_SHOTS_DIR=/tmp/x` also saves step screens
 (`createBackend` handlers per rpc/table, `mockRealtime` presence/broadcast hooks). Add a flow = new file exporting
 `flow` + one line in `run_all.mjs`.
 
+### Improvement pass, 15 Nov 2026 (what changed in the plumbing)
+- **`site_test.mjs` themes:** it now also sets `gt-theme` and emulates `prefers-color-scheme`, so the light run is really
+  light and the dark run really dark on Gitter pages (before, both followed the host Mac's appearance).
+- **`scripts/perf_pages.mjs`:** load numbers for home / messenger / friends / grades / arcade (iPad size, CPU ×4, every
+  Supabase answer delayed, backend mocked). `--root <other checkout>` measures another version to compare with.
+- **`scripts/check_catalog.mjs`:** checks the Gitter home page: every `data-app` link is in `apps-catalog.js`, every catalog
+  page exists, and what the home page shows only to Ian (`data-gate="ian"`) is `admin: true` in the catalog.
+- **`auth.js` `client()` no longer waits for `upsert_profile`** (it was one extra round-trip before every page's content);
+  a successful call is remembered per account per day (`localStorage.profileEnsured`). Pages must not call
+  `upsert_profile` themselves. `class-gate.js` remembers a good answer for the day too (`classGateOk`).
+- **Messenger / Friends boot:** the page frame shows at once for a stored session, and admin ids, the visibility
+  restriction and the lists load side by side. Messenger loads the **newest** 300 messages (it loaded the oldest 300).
+- **Grades / Stonneplang sync:** an edit whose cloud save failed is marked (`gc_dirty_<sheet>` / `tt_dirty` = user id);
+  while the mark is set the local copy wins on load and is sent again. Never overwrite local data from the cloud
+  without checking the mark.
+- **`sw.js`:** pages with a stored copy fall back to it when the network hangs > 4 s; files without `?v=` that are not
+  code (icon sprite, fonts, images) are served from the cache and refreshed in the background; ranged requests bypass
+  the worker. Versioned JS/CSS stay cache-first, `/pb/` and `/demo` stay network-first.
+
 ### Shared look: `site-ui.css`
 The home-page design (tokens, header, title, card, tile, button, input) lives in `site-ui.css`; usage note at the top of the file. Opt in with `class="ui"` on `<body>` + `ui-*` classes. Only `index.html` uses it so far; other pages get it page by page. Bump `?v=` when it changes.
 

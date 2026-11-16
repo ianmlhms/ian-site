@@ -35,7 +35,7 @@ body.nohud #hud { display: none; }
   <div id="envPop" hidden></div><div id="menu" hidden></div>
   <div id="loading" role="status"><div><b>Big rides</b> <small id="loadMsg">…</small><div id="bar"><i></i></div></div></div>
 </main>
-<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js" integrity="sha384-qOkzR5Ke/XkQxuGVJ9hpFEpDlcoLtWwVYhnJf06cLIZa2vaIptSqaubivErzmD5O" crossorigin="anonymous"></script>
 <script>
 window.addEventListener("error", function (event) { document.documentElement.dataset.bootError = event.message || "script-error"; });
 if (!window.THREE) { document.documentElement.dataset.bootError = "three-missing"; throw new Error("three.js r160 failed to load"); }

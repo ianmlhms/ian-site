@@ -91,7 +91,7 @@
       if (!c) { c = { walls: new KL.Batch(), wallsM: new KL.Batch(), roofs: new KL.Batch(), extra: new KL.Batch(), found: new KL.Batch(), trees: new KL.Batch(), x: Math.floor(x / CHUNK) * CHUNK, z: Math.floor(z / CHUNK) * CHUNK }; chunks.set(k, c); }
       return c;
     };
-    const maxDist = theme.cityRadius || 420;        // drop buildings far from the track (fog hides them anyway)
+    const maxDist = Math.min(theme.cityRadius || 420, quality && quality.far ? quality.far : 1e9);        // drop buildings far from the track (fog hides them anyway; Niddreg's view is shorter, so its radius too)
     let count = 0, pushed = 0, dropped = 0;
 
     for (const [lv, kind, flatPts] of data.b) {

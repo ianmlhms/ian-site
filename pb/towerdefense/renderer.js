@@ -8,6 +8,19 @@ const AIR_HEIGHT = 3.2;
 const CAMERA_MIN = 27;
 const CAMERA_MAX = 72;
 
+/* Grafik: the shared level (pb/gfx-quality.js; auto = low on iPads). The frame-time watchdog may drop it one step, never above the player's choice. */
+const GFX_ORDER = ["low", "medium", "high"];
+let gfxCap = null;
+function gfxLevel() {
+  const level = window.ArcadeGfx ? window.ArcadeGfx.level() : "high";
+  return gfxCap && GFX_ORDER.indexOf(gfxCap) < GFX_ORDER.indexOf(level) ? gfxCap : level;
+}
+function gfxPixelRatio() {
+  const level = gfxLevel();
+  const ratio = window.ArcadeGfx ? window.ArcadeGfx.pixelRatio() : Math.min(window.devicePixelRatio || 1, 2);
+  return Math.min(ratio, level === "low" ? 1 : level === "medium" ? 1.5 : 2);
+}
+
 function material(colour, options = {}) {
   return new THREE.MeshStandardMaterial({ color: colour, roughness: 0.74, metalness: 0.12, ...options });
 }
@@ -154,10 +167,12 @@ export class BattlefieldView {
     this.scene.background = new THREE.Color(0x91c8df);
     this.scene.fog = new THREE.Fog(0x91c8df, 55, 105);
     this.camera = new THREE.PerspectiveCamera(45, 1, 0.1, 180);
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: gfxLevel() !== "low", alpha: false });
+    this.renderer.setPixelRatio(gfxPixelRatio());
+    this.renderer.shadowMap.enabled = gfxLevel() !== "low";
+    this.renderer.shadowMap.type = gfxLevel() === "high" ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
+    this.frameClock = { last: 0, count: 0, sum: 0 };
+    if (window.ArcadeGfx) window.ArcadeGfx.onChange(() => { gfxCap = null; this.applyGfx(); });
     this.raycaster = new THREE.Raycaster();
     this.pointer = new THREE.Vector2();
     this.cameraTarget = new THREE.Vector3(0, 0, 2);
@@ -191,14 +206,40 @@ export class BattlefieldView {
   setupLights() {
     this.scene.add(new THREE.HemisphereLight(0xdff5ff, 0x49613e, 1.35));
     const sun = new THREE.DirectionalLight(0xfff1cf, 2.2);
+    this.sun = sun;
     sun.position.set(-24, 42, 15);
-    sun.castShadow = true;
+    sun.castShadow = gfxLevel() !== "low";
     sun.shadow.mapSize.set(1024, 1024);
     sun.shadow.camera.left = -34;
     sun.shadow.camera.right = 34;
     sun.shadow.camera.top = 34;
     sun.shadow.camera.bottom = -34;
     this.scene.add(sun);
+  }
+
+  /* a live level change: pixel ratio, shadows (antialias can only be chosen when the page opens) */
+  applyGfx() {
+    const level = gfxLevel();
+    this.renderer.setPixelRatio(gfxPixelRatio());
+    this.renderer.shadowMap.enabled = level !== "low";
+    this.renderer.shadowMap.type = level === "high" ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
+    this.sun.castShadow = level !== "low";
+    if (this.sun.shadow.map) { this.sun.shadow.map.dispose(); this.sun.shadow.map = null; }
+    this.scene.traverse((part) => { [].concat(part.material || []).forEach((item) => { item.needsUpdate = true; }); });
+    this.resize();
+  }
+
+  /* about 2 s of frames slower than ~30 fps: one level down */
+  watchFrames() {
+    const clock = this.frameClock, now = performance.now(), dt = now - clock.last;
+    clock.last = now;
+    if (dt > 250 || dt <= 0) { clock.count = 0; clock.sum = 0; return; }
+    clock.count += 1;
+    if (clock.count <= 30) return;
+    clock.sum += dt;
+    if (clock.count < 150) return;
+    if (clock.sum / 120 > 34 && gfxLevel() !== "low") { gfxCap = GFX_ORDER[GFX_ORDER.indexOf(gfxLevel()) - 1]; this.applyGfx(); }
+    clock.count = 0; clock.sum = 0;
   }
 
   clearGroup(group) {
@@ -214,15 +255,24 @@ export class BattlefieldView {
   buildLevel(state) {
     this.clearGroup(this.levelGroup);
     this.currentLevel = state.level;
+    /* the checkerboard is ONE instanced mesh (was one mesh and one material per tile: 216 draw calls) */
+    const tilesX = Math.ceil(WORLD.width / TILE_SIZE), tilesZ = Math.ceil(WORLD.depth / TILE_SIZE);
+    const tiles = new THREE.InstancedMesh(new THREE.BoxGeometry(TILE_SIZE - 0.05, 0.18, TILE_SIZE - 0.05), material(0xffffff), tilesX * tilesZ);
+    tiles.castShadow = true;
+    tiles.receiveShadow = true;
+    const matrix = new THREE.Matrix4(), tint = new THREE.Color();
+    let slot = 0;
     for (let z = 0; z < WORLD.depth; z += TILE_SIZE) {
       for (let x = 0; x < WORLD.width; x += TILE_SIZE) {
-        const colour = (x / TILE_SIZE + z / TILE_SIZE) % 2 ? 0x4f8c55 : 0x568f58;
-        const tile = mesh(new THREE.BoxGeometry(TILE_SIZE - 0.05, 0.18, TILE_SIZE - 0.05), colour);
-        tile.position.set(x + TILE_SIZE / 2 - WORLD.width / 2, -0.12, z + TILE_SIZE / 2 - WORLD.depth / 2);
-        tile.userData.ground = true;
-        this.levelGroup.add(tile);
+        matrix.makeTranslation(x + TILE_SIZE / 2 - WORLD.width / 2, -0.12, z + TILE_SIZE / 2 - WORLD.depth / 2);
+        tiles.setMatrixAt(slot, matrix);
+        tiles.setColorAt(slot, tint.set((x / TILE_SIZE + z / TILE_SIZE) % 2 ? 0x4f8c55 : 0x568f58));
+        slot += 1;
       }
     }
+    tiles.count = slot;
+    tiles.userData.ground = true;
+    this.levelGroup.add(tiles);
     this.buildRoad(state.path);
     state.pads.forEach((pad, index) => this.buildPad(pad, index));
     this.buildGate(state.path[0], false);
@@ -345,7 +395,7 @@ export class BattlefieldView {
     if (!["impact", "meteor", "freeze", "rally", "heroStrike"].includes(event.type)) return;
     const radius = event.radius || event.splash || (event.type === "freeze" ? 18 : 2);
     const colour = event.type === "meteor" ? 0xff6b43 : event.type === "freeze" ? 0x72eaff : event.type === "rally" ? 0xffd966 : event.colour || 0xffffff;
-    const ring = mesh(new THREE.RingGeometry(Math.max(0.2, radius * 0.55), radius, 32), colour, { transparent: true, opacity: 0.62, side: THREE.DoubleSide });
+    const ring = mesh(new THREE.RingGeometry(Math.max(0.2, radius * 0.55), radius, gfxLevel() === "low" ? 20 : 32), colour, { transparent: true, opacity: 0.62, side: THREE.DoubleSide });
     ring.rotation.x = -Math.PI / 2;
     ring.position.set((event.x ?? 18) - WORLD.width / 2, 0.14, (event.z ?? 27) - WORLD.depth / 2);
     ring.castShadow = false;
@@ -382,6 +432,7 @@ export class BattlefieldView {
   }
 
   render(dt) {
+    this.watchFrames();
     this.updateEffects(dt);
     this.updateCamera();
     this.renderer.render(this.scene, this.camera);

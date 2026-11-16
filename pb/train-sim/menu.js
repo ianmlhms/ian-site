@@ -632,7 +632,14 @@
       h('div', { class: 'ts-menu__envOpts', role: 'radiogroup', 'aria-labelledby': 'ts-menu-env-' + kind },
         TS.envChoices[kind].map((o) => h('button', { type: 'button', class: 'ts-menu__envOpt', role: 'radio', 'aria-checked': String(ctx.env[kind] === o.id), 'data-fid': 'env-' + kind + '-' + o.id, 'data-test': (kind === 'tod' ? 'tod-' : 'wx-') + o.id, on: { click: () => doEnv(kind, o.id) } },
           h('span', { 'aria-hidden': 'true', text: o.icon }), h('span', { text: t(o.key) })))));
-    return h('section', { class: 'ts-menu__env', 'aria-label': t('weather') + ' / ' + t('timeOfDay') }, row('weather', t('weather')), row('tod', t('timeOfDay')), h('p', { class: 'ts-menu__small', text: t('envInfo') }));
+    /* Grafik: the shared Arcade level (pb/gfx-quality.js): Automatesch / Niddreg / Mëttel / Héich; the host decides what each level changes */
+    const gfx = ctx.opts.gfx;
+    const gfxRow = !gfx ? null : h('div', { class: 'ts-menu__envRow' },
+      h('span', { class: 'ts-menu__envLbl', id: 'ts-menu-env-gfx', text: gfx.labels.title }),
+      h('div', { class: 'ts-menu__envOpts', role: 'radiogroup', 'aria-labelledby': 'ts-menu-env-gfx' },
+        ['auto', 'low', 'medium', 'high'].map((id) => h('button', { type: 'button', class: 'ts-menu__envOpt', role: 'radio', 'aria-checked': String(gfx.choice === id), 'data-fid': 'gfx-' + id, 'data-test': 'gfx-' + id, on: { click: () => { callHost('onGfx', id); } } },
+          h('span', { text: gfx.labels[id] + (id === 'auto' ? ' (' + gfx.labels[gfx.level] + ')' : '') })))));
+    return h('section', { class: 'ts-menu__env', 'aria-label': t('weather') + ' / ' + t('timeOfDay') }, row('weather', t('weather')), row('tod', t('timeOfDay')), gfxRow, h('p', { class: 'ts-menu__small', text: t('envInfo') }));
   }
 
   function routeCard(id) {

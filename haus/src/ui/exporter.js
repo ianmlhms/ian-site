@@ -78,6 +78,12 @@ export function downloadFloorplanPNG(design, building, floor) {
   link.remove();
 }
 
+/* The report opens in a blank window that shares ian.lu's origin, and designs can
+ * come from an imported file: every piece of text is escaped before it is written. */
+const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+}[char]));
+
 export function openPrintableReport(design) {
   const building = mainBuildingOf(design);
   const metrics = fullMetrics(design);
@@ -92,7 +98,7 @@ export function openPrintableReport(design) {
     return { name: floor.name, dataUrl: c.toDataURL('image/png') };
   });
 
-  win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${design.name} — Bericht</title>
+  win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(design.name)} — Bericht</title>
   <style>
     body{font-family:-apple-system,Arial,sans-serif;color:#1c2128;padding:32px;max-width:900px;margin:0 auto;}
     h1{margin-bottom:4px;} .sub{color:#666;margin-bottom:24px;}
@@ -103,8 +109,8 @@ export function openPrintableReport(design) {
     @media print { button{display:none;} }
   </style></head><body>
   <button onclick="window.print()">Als PDF drucken/speichern</button>
-  <h1>${design.name}</h1>
-  <div class="sub">Stil: ${design.style} · Grundstück ${design.plot.w}×${design.plot.h} m</div>
+  <h1>${escapeHtml(design.name)}</h1>
+  <div class="sub">Stil: ${escapeHtml(design.style)} · Grundstück ${escapeHtml(design.plot.w)}×${escapeHtml(design.plot.h)} m</div>
   <table>
     <tr><td>Wohnfläche</td><td><strong>${metrics.livingAreaM2} m²</strong></td></tr>
     <tr><td>Bebaute Fläche</td><td><strong>${metrics.footprintM2} m²</strong></td></tr>
@@ -112,9 +118,9 @@ export function openPrintableReport(design) {
     <tr><td>Räume</td><td><strong>${metrics.roomCount}</strong></td></tr>
     <tr><td>Geschätzte Kosten</td><td><strong>${metrics.estimatedCostEUR.toLocaleString('de-DE')} €</strong></td></tr>
   </table>
-  ${warnings.length ? `<h3>Warnungen</h3>${warnings.map((w) => `<div class="warn">${w.message}</div>`).join('')}` : ''}
+  ${warnings.length ? `<h3>Warnungen</h3>${warnings.map((w) => `<div class="warn">${escapeHtml(w.message)}</div>`).join('')}` : ''}
   <h3>Grundrisse</h3>
-  ${canvases.map((c) => `<div><h4>${c.name}</h4><img src="${c.dataUrl}"/></div>`).join('')}
+  ${canvases.map((c) => `<div><h4>${escapeHtml(c.name)}</h4><img src="${c.dataUrl}"/></div>`).join('')}
   </body></html>`);
   win.document.close();
 }

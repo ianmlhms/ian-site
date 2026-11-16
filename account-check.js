@@ -8,7 +8,7 @@
  * Views of the one card: main -> edit (username + class), or
  * search -> prove -> pick -> done (merge a second account into this one).
  * Escape / the close button mean "later": the card closes without stamping. */
-import * as auth from "./auth.js?v=42";
+import * as auth from "./auth.js?v=47";
 import { avatarHtml, searchPeople } from "./people-search.js?v=1";
 
 const STYLE_ID = "account-check-style";
@@ -634,7 +634,10 @@ async function attemptAutoShow(sb, getSession, uid) {
     if (getSession()?.user?.id !== uid) return;
     if (document.body && !openCtx && !document.querySelector(BLOCKING_MODALS)) {
       const profile = await loadProfile(sb, uid);
-      if (profile?.checkedAt) return;
+      if (profile?.checkedAt) {
+        rememberChecked(uid);
+        return;
+      }
       if (readyToShow(profile, uid)) {
         openCard({ sb, uid, profile, startWithMerge: false, isAuto: true });
         return;
@@ -645,6 +648,14 @@ async function attemptAutoShow(sb, getSession, uid) {
 }
 
 let scheduledUid = null;
+
+/* "This account was already checked" is remembered for the day (auth.js reads the same key before it even
+ * loads this module): a checked account used to cost two requests on every page of the site. UI only. */
+const CHECKED_DAY_KEY = "accountCheckedDay";
+function rememberChecked(uid) {
+  try { localStorage.setItem(CHECKED_DAY_KEY, `${uid}|${new Date().toISOString().slice(0, 10)}`); }
+  catch { /* storage unavailable: asked again on the next page */ }
+}
 
 /** Called by auth.js whenever the session may have changed; schedules once per user per page. */
 export async function startAccountCheck(sb, getSession) {

@@ -14,19 +14,19 @@ const QUALITY = {
   medium: { pixelRatio: 1.5, farBuildings: true, label: 'medium' },
   high: { pixelRatio: 2.0, farBuildings: true, label: 'high' },
 };
-const QKEY = 'pb_fouer_quality';
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const DEG = Math.PI / 180;
 const FOV = 32;
 
+/** the start level: ?fouerQ= (tests / debugging) > the Arcade's shared "Grafik" setting (pb/gfx-quality.js: the player's choice, else auto = low on iPads) > the old guess */
 export function guessQuality() {
   try {
     const q = new URLSearchParams(location.search).get('fouerQ');
     if (QUALITY[q]) return q;
-    const saved = localStorage.getItem(QKEY);
-    if (QUALITY[saved]) return saved;
-  } catch (e) { /* storage blocked */ }
+  } catch (e) { /* no location */ }
+  const gfx = typeof window !== 'undefined' ? window.ArcadeGfx : null;
+  if (gfx && QUALITY[gfx.level()]) return gfx.level();
   const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
   const mem = navigator.deviceMemory || (coarse ? 3 : 8);
   const cores = navigator.hardwareConcurrency || 4;
@@ -35,7 +35,7 @@ export function guessQuality() {
 }
 
 export function createRenderer({ THREE: T, canvas, quality = guessQuality(), sites }) {
-  const renderer = new T.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance', stencil: false });
+  const renderer = new T.WebGLRenderer({ canvas, antialias: quality !== 'low', alpha: false, powerPreference: 'high-performance', stencil: false });
   renderer.outputColorSpace = T.SRGBColorSpace;
   renderer.toneMapping = T.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
@@ -51,6 +51,7 @@ export function createRenderer({ THREE: T, canvas, quality = guessQuality(), sit
   const state = {
     quality, running: false, lost: false, hidden: false, size: { w: 1, h: 1, dpr: 1 },
     frameMs: 16, fps: 60, frames: 0, lastInfo: { calls: 0, triangles: 0, points: 0, lines: 0 }, probe: { t: 0, n: 0, sum: 0, done: false },
+    fixedQuality: (() => { try { return QUALITY[new URLSearchParams(location.search).get('fouerQ')] !== undefined; } catch (e) { return false; } })(),
     groundY: () => 0, world: null, free: null,
   };
 
@@ -157,10 +158,10 @@ export function createRenderer({ THREE: T, canvas, quality = guessQuality(), sit
     resume() { api.start(); },
     start() { if (state.running) return; state.running = true; state.last = performance.now(); state.raf = requestAnimationFrame(loop); },
     stop() { state.running = false; if (state.raf) cancelAnimationFrame(state.raf); state.raf = 0; },
-    setQuality(q, persist = true) {
-      if (!QUALITY[q]) return;
+    /** the level is the Arcade's shared setting (ArcadeGfx.set); the frame-time watchdog below only ever steps down and never writes the player's choice */
+    setQuality(q) {
+      if (!QUALITY[q] || q === state.quality) return;
       state.quality = q; api.resize(true);
-      if (persist) { try { localStorage.setItem(QKEY, q); } catch (e) { /* ignore */ } }
       emit('quality', q);
     },
     resize(force) {
@@ -314,17 +315,15 @@ export function createRenderer({ THREE: T, canvas, quality = guessQuality(), sit
     state.frames++;
     if (!force) {
       state.frameMs = lerp(state.frameMs, dt * 1000, 0.08); state.fps = 1000 / state.frameMs;
-      // quality probe: the first 3 s after the fly-in has started (frames slower than 38 ms on average step one tier down, remembered per device)
+      // frame-time watchdog: slow frames (average > 38 ms over 3 s, after the first 12) step one level down, never above what the player chose; a new window starts after each step.
+      // The first window also runs while the fly-in plays.  ?fouerQ= (tests) switches it off.
       const pr = state.probe;
-      if (!pr.done && state.frames > 12) {
+      if (state.frames > 12 && !state.fixedQuality) {
         pr.t += dt; pr.n++; pr.sum += dt;
         if (pr.t >= 3) {
-          pr.done = true; const avg = pr.sum / pr.n * 1000;
-          pr.avgMs = avg;
-          if (!new URLSearchParams(location.search).get('fouerQ')) {
-            if (avg > 38 && state.quality !== 'low') api.setQuality(state.quality === 'high' ? 'medium' : 'low');
-            else if (avg > 70 && state.quality === 'low') { /* nothing lower exists */ }
-          }
+          pr.avgMs = pr.sum / pr.n * 1000; pr.done = true;
+          if (pr.avgMs > 38 && state.quality !== 'low') api.setQuality(state.quality === 'high' ? 'medium' : 'low');
+          pr.t = 0; pr.n = 0; pr.sum = 0;
         }
       }
     }
@@ -349,5 +348,7 @@ export function createRenderer({ THREE: T, canvas, quality = guessQuality(), sit
   if (typeof ResizeObserver === 'function') new ResizeObserver(() => api.resize()).observe(canvas);
   window.addEventListener('resize', () => api.resize());
   api.resize(true);
+  // "Grafik" in the menu (and in the other 3D games) is one shared setting: a change there applies at once
+  if (typeof window !== 'undefined' && window.ArcadeGfx) window.ArcadeGfx.onChange((level) => { state.fixedQuality = false; state.probe.t = 0; state.probe.n = 0; state.probe.sum = 0; api.setQuality(level); });
   return api;
 }

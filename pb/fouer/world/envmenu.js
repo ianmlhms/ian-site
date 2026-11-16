@@ -47,7 +47,9 @@ export function mountEnvUi({ env, r, pitches, lang = pickLang() }) {
   menu.innerHTML = '';
   const title = document.createElement('h3'); title.textContent = t.look; menu.appendChild(title);
   buildEnvControls(menu, 'M');
-  section(menu, t.quality, 'quality', ['low', 'medium', 'high'], (v) => r.setQuality(v));
+  const gfx = window.ArcadeGfx;       // pb/gfx-quality.js: one "Grafik" setting for all 3D games (Automatesch = by device, iPads start on Niddreg)
+  if (gfx) section(menu, gfx.LABELS.title, 'quality', ['auto', 'low', 'medium', 'high'], (v) => gfx.set(v), (v) => gfx.LABELS[v]);
+  else section(menu, t.quality, 'quality', ['low', 'medium', 'high'], (v) => r.setQuality(v));
   if (pitches) section(menu, t.markers, 'markers', ['off', 'outline', 'glow'], (v) => pitches.setMode(v));
   const camRow = document.createElement('div'); camRow.className = 'row';
   const fb = document.createElement('button'); fb.type = 'button'; fb.className = 'chip'; fb.textContent = '⤢ ' + t.frame; fb.addEventListener('click', () => { r.frameField(true); }); camRow.appendChild(fb);
@@ -58,7 +60,7 @@ export function mountEnvUi({ env, r, pitches, lang = pickLang() }) {
     chips.forEach(({ el, group, value }) => {
       let on = false;
       if (group.startsWith('weather')) on = s.weatherMode === value; else if (group.startsWith('time')) on = s.timeMode === value;
-      else if (group === 'quality') on = r.state.quality === value; else if (group === 'markers') on = pitches && pitches.mode === value;
+      else if (group === 'quality') on = window.ArcadeGfx ? window.ArcadeGfx.choice() === value : r.state.quality === value; else if (group === 'markers') on = pitches && pitches.mode === value;
       el.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
     // the in-game button shows what the sky is doing right now
@@ -74,6 +76,7 @@ export function mountEnvUi({ env, r, pitches, lang = pickLang() }) {
   document.getElementById('fouerCanvas').addEventListener('pointerdown', () => { envPop.hidden = true; menu.hidden = true; envBtn.setAttribute('aria-expanded', 'false'); menuBtn.setAttribute('aria-expanded', 'false'); });
   env.onChange(() => refresh());
   r.on('quality', refresh);
+  if (window.ArcadeGfx) window.ArcadeGfx.onChange(() => refresh());
   refresh();
   return { refresh, t, lang };
 }

@@ -6,8 +6,9 @@
 <meta name="color-scheme" content="light">
 <title>Paket Express 📦 – Arcade</title>
 <link rel="stylesheet" href="/pb/paket-express.css?v=3">
-<link rel="stylesheet" href="/pb/paket-express-gitter.css?v=12">
-<script src="/pb/arcade-kit.js?v=50" data-arcade-id="paket-express" data-arcade-title="Paket Express 📦"></script>
+<link rel="stylesheet" href="/pb/paket-express-gitter.css?v=13">
+<script src="/pb/arcade-kit.js?v=56" data-arcade-id="paket-express" data-arcade-title="Paket Express 📦"></script>
+<script src="/pb/gfx-quality.js?v=1"></script>
 </head>
 <body>
 <main id="game">
@@ -40,6 +41,7 @@
       <p id="intro" class="intro" data-t="intro">Kleng Stroossen, grouss Missioun. Huel d'Päck op a bréng se pünktlech un d'Dier.</p>
       <p class="career-strip"><b id="rank"></b><strong id="walletMenu">0 €</strong></p>
       <div class="traffic-settings"><label for="trafficSetting" data-t="traffic">Verkéier</label><select id="trafficSetting"><option value="off">Aus · ×0.6</option><option value="low">Wéineg · ×0.85</option><option value="normal" selected>Normal · ×1.0</option><option value="rush">Rush hour · ×1.3</option></select></div><small id="weatherPreview"></small>
+      <div class="traffic-settings"><label for="gfxSetting">Grafik</label><select id="gfxSetting"><option value="auto">Automatesch</option><option value="low">Niddreg</option><option value="medium">Mëttel</option><option value="high">Héich</option></select></div>
       <div class="modes"><button id="startShift" class="primary"><b data-t="shift">Schicht · 5 min</b><small data-t="shiftDesc">Géint d'Auer. Fir de Rekord.</small><span>↗</span></button><button id="startFree"><b data-t="free">Fräi fueren</b><small data-t="freeDesc">Ouni Drock · hallef Punkten</small><span>→</span></button></div>
       <section class="daily-card"><div><b data-t="daily">Dagestour</b><small id="dailyDate"></small></div><p data-t="dailyDesc"></p><small id="dailyWeather"></small><button id="startDaily" data-t="dailyStart"></button><ol id="dailyBoard"></ol><small id="dailyStatus" role="status"></small><button id="retryDaily" data-t="retry" hidden></button></section>
       <details class="mission-panel" open><summary data-t="dailyMissions"></summary><ul id="missions"></ul></details>
@@ -53,7 +55,7 @@
   <div id="pauseScreen" class="overlay" hidden><section class="small-card"><span class="stamp">📦 PAKET EXPRESS</span><h2 data-t="paused">Kuerz Paus.</h2><p data-t="pausedDesc">Deng Tour waart op dech.</p><button id="resume" class="primary" data-t="resume">Weiderfueren</button></section></div>
   <div id="endScreen" class="overlay" hidden><section class="small-card"><span class="stamp">📦 PAKET EXPRESS</span><h2 id="endTitle" data-t="ended">Schicht fäerdeg!</h2><b id="endPoints" class="end-points">0</b><p id="endStats"></p><p id="endBest"></p><p id="endTraffic"></p><p id="endCash"></p><button id="again" class="primary" data-t="again">Nach eng Kéier</button><button id="toGarage" data-t="garage">Deng Garage</button></section></div>
 </main>
-<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js" integrity="sha384-qOkzR5Ke/XkQxuGVJ9hpFEpDlcoLtWwVYhnJf06cLIZa2vaIptSqaubivErzmD5O" crossorigin="anonymous"></script>
 <script src="/pb/paket-express/assets.js?v=1"></script>
 <script src="/pb/paket-express/city.js?v=3"></script>
 <script src="/pb/paket-express/vehicles.js?v=3"></script>
@@ -69,6 +71,6 @@
 <script src="/pb/paket-express/daily.js?v=1"></script>
 <script src="/pb/paket-express/shop.js?v=1"></script>
 <script src="/pb/paket-express/lux.js?v=2"></script>
-<script src="/pb/paket-express.js?v=7"></script>
+<script src="/pb/paket-express.js?v=8"></script>
 </body>
 </html>

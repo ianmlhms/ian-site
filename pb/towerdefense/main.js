@@ -4,7 +4,7 @@ import {
   starsForLives, startWave, tick, towerPrice, towerStats, upgradeCost, upgradeTower, useSkill,
 } from "./simulation.js";
 import { cleanProgress, completeLevel, isStrictlyMoreProgress, metaSummary, totalStars } from "./progress.js";
-import { BattlefieldView } from "./renderer.js";
+import { BattlefieldView } from "./renderer.js?v=2";
 
 const SAVE_INTERVAL_MS = 5000;
 const NOTICE_MS = 1700;
@@ -427,10 +427,34 @@ $("branchB").onclick = () => chooseBranch("B");
 $("branchCancel").onclick = () => $("branchSheet").classList.add("hidden");
 $("continueBtn").onclick = () => startLevel(game.status === "won" && game.level < MAX_LEVEL ? game.level + 1 : game.level);
 $("resultMenuBtn").onclick = showMenu;
+function renderGfx() {
+  const box = $("gfx");
+  if (!window.ArcadeGfx) { box.classList.add("hidden"); return; }
+  const current = window.ArcadeGfx.choice(), labels = window.ArcadeGfx.LABELS;
+  box.replaceChildren();
+  const title = document.createElement("span");
+  title.textContent = labels.title;
+  box.append(title);
+  ["auto", "low", "medium", "high"].forEach((choice) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = labels[choice];
+    button.dataset.gfx = choice;
+    button.setAttribute("aria-pressed", String(choice === current));
+    if (choice === current) button.classList.add("on");
+    box.append(button);
+  });
+}
+$("gfx").addEventListener("click", (event) => {
+  const choice = event.target.dataset?.gfx;
+  if (choice && window.ArcadeGfx) window.ArcadeGfx.set(choice);
+});
+if (window.ArcadeGfx) window.ArcadeGfx.onChange(renderGfx);
+renderGfx();
 $("helpBtn").onclick = () => $("helpBtn").setAttribute("aria-expanded", String(!$("helpPanel").classList.toggle("hidden")));
 window.addEventListener("resize", () => view.resize());
 window.addEventListener("message", (event) => {
-  if (event.data?.__pbLoadSave === 1) applyIncomingSave(event.data.data);
+  if (event.source === window.parent && event.data?.__pbLoadSave === 1) applyIncomingSave(event.data.data);
 });
 window.addEventListener("pagehide", pushSave);
 

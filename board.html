@@ -19,10 +19,10 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#f6f6f3" media="(prefers-color-scheme: light)" data-gt="light">
 <meta name="theme-color" content="#121314" media="(prefers-color-scheme: dark)" data-gt="dark">
-<script src="gitter-theme.js?v=1"></script>
+<script src="gitter-theme.js?v=2"></script>
 <link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="gitter.css?v=12">
-<script src="theme.js?v=33"></script>
+<link rel="stylesheet" href="gitter.css?v=13">
+<script src="theme.js?v=35"></script>
 <style>
   :root{--bad:#f87171}
   body{display:flex;flex-direction:column}
@@ -84,7 +84,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module">
-import * as auth from "./auth.js?v=42";
+import * as auth from "./auth.js?v=47";
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const DONE_KEY="classBoardDone";
@@ -182,8 +182,8 @@ $("hwTitle").addEventListener("keydown",e=>{if(e.key==="Enter")$("hwAdd").click(
   refresh();
 })();
 </script>
-  <script type="module" src="gitter-acct.js?v=1"></script>
-  <script type="module" src="rtc-ring.js?v=36"></script>
-  <script type="module" src="class-gate.js?v=37"></script>
+  <script type="module" src="gitter-acct.js?v=6"></script>
+  <script type="module" src="rtc-ring.js?v=41"></script>
+  <script type="module" src="class-gate.js?v=42"></script>
 </body>
 </html>

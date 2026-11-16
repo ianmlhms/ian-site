@@ -1,19 +1,23 @@
 /* Messenger — group chat + DMs + media, on Supabase. Shared accounts with PixelBreak. */
-import * as auth from "./auth.js?v=42";
-import { registerSW, enablePush, disablePush, pushState } from "./notify.js?v=40";
+import * as auth from "./auth.js?v=47";
+import { registerSW, enablePush, disablePush, pushState } from "./notify.js?v=45";
 import { searchPeople, highlightMatch, attachPeopleSearch } from "./people-search.js?v=1";
 import { openPeoplePicker } from "./people-picker.js?v=1";
 import { createMediaUrls, UPLOAD_CACHE_SECONDS, thumbPathFor, newMediaPaths } from "./chat-media.js?v=2";
 import { prepareImage, videoPoster, extOf } from "./chat-media-prep.js?v=1";
 
 const $ = (id) => document.getElementById(id);
-const esc = (s) => (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const esc = (s) => String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const T = (k) => (window.I18N ? window.I18N.t(k) : k);   // i18n lookup
 const fmtTime = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); };
 const adminTag = (uid) => (adminIds.has(uid) ? ` <span class="admin-tag">👑 Admin</span>` : "");
 const classTag = (uid) => (classByUid[uid] ? ` <span class="class-tag">${esc(classByUid[uid])}</span>` : "");
 const MAX_MEDIA = 50 * 1024 * 1024; // 50 MB
 const SNIPPET = 80; // chars kept of a quoted reply
+const HISTORY_LIMIT = 300;          // newest messages loaded when a chat opens
+const PROFILE_REFRESH_MS = 60_000;  // avatars + class tags are re-read at most this often
+const CATCH_UP_MIN_MS = 3000;       // coming back to the tab re-reads missed messages at most this often
+const CHATS_RELOAD_DELAY_MS = 400;  // a burst of incoming messages reloads the chat list once
 
 let sb = null;
 // one signed URL per file (cached + batched) and media loaded only near the viewport — see chat-media.js
@@ -38,6 +42,7 @@ let classByUid = {};         // user_id -> school class (shown as a tag next to 
 // Per-account visibility restriction (server-driven): a restricted viewer only
 // sees/DMs an allowlist of people. UX-only — RLS still protects the real data.
 let restricted = false, allowName = new Set();
+let restrictionReady = Promise.resolve();   // settles once loadRestriction has answered (boot starts it, loadChats waits for it)
 async function loadRestriction() {
   try {
     const { data: r } = await sb.rpc("is_view_restricted");
@@ -58,7 +63,8 @@ const avatarOf = (uid) => avatarMap[uid] || "👤";
 // render an avatar as an <img> when it's an uploaded photo URL, else the emoji glyph
 const avatarHtml = (uid) => {
   const a = avatarOf(uid);
-  return /^https?:\/\//.test(a) ? `<img class="av-img" src="${esc(a)}" alt="">` : a;
+  // profiles.avatar is user-chosen text (any 8 characters): always escaped, never raw HTML
+  return /^https?:\/\//.test(a) ? `<img class="av-img" src="${esc(a)}" alt="">` : esc(a);
 };
 let onlineSubbed = false;
 let allChats = [];           // last loaded chats, for search filtering
@@ -144,7 +150,16 @@ function announce(text) {
 /* ---------- chat list ---------- */
 async function loadChats(selectId) {
   const { data, error } = await sb.rpc("my_chats");
-  if (error) { console.warn("[msgr] my_chats", error); return; }
+  if (error) {
+    console.error("[msgr] my_chats", error);
+    // Keep a list that is already on screen (a failed background refresh); only an empty list gets the message.
+    if (!allChats.length) {
+      $("groupList").innerHTML = `<li class="empty">${esc(T("msg.loadFail"))} <br><button type="button" class="gt-btn ghost" id="chatsRetry" style="margin-top:10px">${esc(TA("retry"))}</button></li>`;
+      $("chatsRetry").onclick = () => loadChats(selectId);
+    }
+    return;
+  }
+  await restrictionReady;   // the allowlist decides which DMs are listed
   allChats = visChats(data || []);
   renderChatList(applySearch(allChats));
   if (selectId) { const g = allChats.find((x) => x.id === selectId); if (g) selectChat(g); }
@@ -192,6 +207,11 @@ async function joinGroup() {
   if (!code) return;
   const { data, error } = await sb.rpc("join_group", { p_code: code, p_username: auth.username() });
   if (error) return alert(error.message);
+  // A wrong code comes back as "no group" (not an error), so the server can count wrong tries.
+  if (!data || !data.id) {
+    const none = T("msg.join.none");                    // an older cached i18n-dict.js has no such key yet
+    return alert(none === "msg.join.none" ? "Kee Grupp mat deem Code." : none);
+  }
   await loadChats(data.id);
 }
 async function newDM() {
@@ -205,7 +225,7 @@ async function newDM() {
 
 /* ---------- a single chat ---------- */
 async function selectChat(g) {
-  current = g; seen.clear();
+  current = g; seen.clear(); newestAt = null;
   currentOthers = []; readMap = {}; readThreshold = null; reactMap = {}; hideTyping();
   closeMembers(); cancelReply();
   markRead(g.id);
@@ -242,13 +262,20 @@ async function selectChat(g) {
   $("composer").style.display = "flex";
   const box = $("messages");
   box.innerHTML = `<div class="empty">${T("common.loading")}</div>`;
-  loadAvatars();   // pick up avatar changes without a reload
-  loadClasses();   // and class tags
-  const { data, error } = await sb.from("messages").select("*").eq("group_id", g.id).order("created_at").limit(300);
-  if (error) { box.innerHTML = `<div class="empty">${T("msg.loadErr")}</div>`; return; }
+  refreshProfiles();   // pick up avatar + class changes without a reload (at most once a minute)
+  // The NEWEST messages: ascending order + limit returned the oldest 300, so a chat past 300 messages opened without its latest ones.
+  const { data, error } = await sb.from("messages").select("*").eq("group_id", g.id)
+    .order("created_at", { ascending: false }).limit(HISTORY_LIMIT);
+  if (current !== g) return;                         // another chat was opened meanwhile
+  if (error) {
+    console.error("[msgr] messages", error);
+    box.innerHTML = `<div class="empty">${T("msg.loadErr")}</div>`;
+    return;
+  }
+  const history = [...(data || [])].reverse();
   box.innerHTML = "";
-  (data || []).forEach(appendMessage);
-  if (!data || !data.length) box.innerHTML = `<div class="empty">${T("msg.noMessages")}</div>`;
+  appendHistory(history);
+  if (!history.length) box.innerHTML = `<div class="empty">${T("msg.noMessages")}</div>`;
   subscribe(g.id);
   loadReceipts(g.id);
   loadReactions(g.id);
@@ -303,6 +330,7 @@ const A11Y_STRINGS = {
   "jump":    { lb: "Zur Originalnoriicht sprangen", de: "Zur ursprünglichen Nachricht springen", en: "Jump to the original message" },
   "stopRec": { lb: "Opnam stoppen a schécken", de: "Aufnahme stoppen und senden", en: "Stop and send recording" },
   "online":  { lb: "online", de: "online", en: "online" },
+  "retry":   { lb: "Nach eng Kéier probéieren", de: "Nochmal versuchen", en: "Try again" },
 };
 const TA = (k) => { const e = A11Y_STRINGS[k]; return e[window.I18N?.lang] || e.en; };
 
@@ -383,6 +411,29 @@ function closeMembers() { const p = $("memberPanel"); if (p) { p.classList.remov
 // Mobile: go back from a full-screen conversation to the chat list.
 function goBackToList() { closeMembers(); $("app").classList.remove("chat-open"); }
 
+/* ---------- catching up after the tab slept ---------- */
+// Realtime does not replay what was sent while the iPad was locked or the tab was in the background, so
+// coming back used to show a chat that silently missed messages until the page was reloaded.
+let newestAt = null;        // created_at of the newest message shown in the open chat
+let lastCatchUpAt = 0;
+async function catchUp() {
+  if (!sb || !auth.session() || Date.now() - lastCatchUpAt < CATCH_UP_MIN_MS) return;
+  lastCatchUpAt = Date.now();
+  scheduleChatsReload();
+  const g = current;
+  if (!g) return;
+  let query = sb.from("messages").select("*").eq("group_id", g.id).order("created_at").limit(HISTORY_LIMIT);
+  if (newestAt) query = query.gt("created_at", newestAt);
+  const { data, error } = await query;
+  if (error) { console.warn("[msgr] catch-up failed", error); return; }
+  if (current !== g || !data || !data.length) return;
+  data.forEach((m) => appendMessage(m));
+  markRead(g.id);
+  loadReceipts(g.id);
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) catchUp(); });
+window.addEventListener("online", catchUp);
+
 async function markRead(gid) { try { await sb.rpc("mark_read", { p_group_id: gid }); } catch (e) { console.warn("[msgr] mark_read", e); } }
 
 /* ---------- read receipts (✓ / ✓✓) ---------- */
@@ -390,10 +441,12 @@ async function markRead(gid) { try { await sb.rpc("mark_read", { p_group_id: gid
 async function loadReceipts(gid) {
   const me = auth.session().user.id;
   readMap = {}; readThreshold = null;
-  const [{ data: mem }, { data: reads }] = await Promise.all([
+  const [{ data: mem, error: memError }, { data: reads, error: readsError }] = await Promise.all([
     sb.from("group_members").select("user_id").eq("group_id", gid),
     sb.from("chat_reads").select("user_id,last_read_at").eq("group_id", gid),
   ]);
+  if (memError || readsError) console.warn("[msgr] read receipts unavailable", memError || readsError);
+  if (!current || current.id !== gid) return;        // another chat was opened meanwhile
   currentOthers = (mem || []).map((r) => r.user_id).filter((id) => id !== me);
   (reads || []).forEach((r) => { if (r.user_id !== me) readMap[r.user_id] = r.last_read_at; });
   recomputeThreshold(); updateTicks();
@@ -424,7 +477,9 @@ function updateTicks() { $("messages").querySelectorAll(".msg.mine .ticks").forE
 /* ---------- reactions ---------- */
 async function loadReactions(gid) {
   reactMap = {};
-  const { data } = await sb.from("message_reactions").select("message_id,user_id,username,emoji").eq("group_id", gid);
+  const { data, error } = await sb.from("message_reactions").select("message_id,user_id,username,emoji").eq("group_id", gid);
+  if (error) console.warn("[msgr] reactions unavailable", error);
+  if (!current || current.id !== gid) return;        // another chat was opened meanwhile
   (data || []).forEach((r) => { (reactMap[r.message_id] = reactMap[r.message_id] || []).push(r); });
   $("messages").querySelectorAll(".msg").forEach((el) => renderReactions(+el.dataset.mid));
 }
@@ -447,14 +502,23 @@ async function toggleReaction(mid, emoji) {
   const me = auth.session().user.id;
   const list = reactMap[mid] || [];
   const had = list.some((r) => r.user_id === me && r.emoji === emoji);
+  // Optimistic: paint first, and put the old state back when the server says no (it used to stay wrong silently).
+  const undo = (error) => {
+    console.error("[msgr] reaction not saved", error);
+    reactMap[mid] = list;
+    renderReactions(mid);
+    announce(T("msg.loadFail"));
+  };
   if (had) {
     reactMap[mid] = list.filter((r) => !(r.user_id === me && r.emoji === emoji));
     renderReactions(mid);
-    await sb.from("message_reactions").delete().eq("message_id", mid).eq("user_id", me).eq("emoji", emoji);
+    const { error } = await sb.from("message_reactions").delete().eq("message_id", mid).eq("user_id", me).eq("emoji", emoji);
+    if (error) undo(error);
   } else {
     const row = { message_id: mid, group_id: current.id, user_id: me, username: auth.username(), emoji };
     reactMap[mid] = [...list, row]; renderReactions(mid);
-    await sb.from("message_reactions").insert(row);
+    const { error } = await sb.from("message_reactions").insert(row);
+    if (error) undo(error);
   }
 }
 function onReaction(type, r) {
@@ -534,11 +598,11 @@ async function toggleRecording() {
     mediaRecorder.start();
     recording = true; $("micBtn").classList.add("rec"); $("micBtn").innerHTML = '<svg class="ic" aria-hidden="true"><use href="gitter-icons.svg#g-stop"/></svg>';
     $("micBtn").setAttribute("aria-pressed", "true"); $("micBtn").setAttribute("aria-label", TA("stopRec"));
-  } catch { alert(T("msg.micErr")); }
+  } catch (e) { console.warn("[msgr] microphone", e); alert(T("msg.micErr")); }
 }
 function stopRecording() {
   if (mediaRecorder && recording) { recording = false; $("micBtn").classList.remove("rec"); $("micBtn").innerHTML = '<svg class="ic" aria-hidden="true"><use href="gitter-icons.svg#g-mic"/></svg>';
-    $("micBtn").setAttribute("aria-pressed", "false"); $("micBtn").setAttribute("aria-label", T("msg.tip.voice")); try { mediaRecorder.stop(); } catch {} }
+    $("micBtn").setAttribute("aria-pressed", "false"); $("micBtn").setAttribute("aria-label", T("msg.tip.voice")); try { mediaRecorder.stop(); } catch (e) { console.warn("[msgr] recorder stop", e); } }
 }
 async function sendVoice(blob) {
   if (!current || !blob.size) return;
@@ -657,9 +721,20 @@ function attachReplyGestures(el, m) {
 /* ---------- messages ---------- */
 const DELETE_WINDOW = 30000; // ms a user can delete their own message
 
-function appendMessage(m) {
+/* Opening a chat: build all rows off-screen, then one insert and one scroll (per-row scrolling forced a layout for each of up to 300 messages). */
+function appendHistory(messages) {
+  const batch = document.createDocumentFragment();
+  messages.forEach((m) => appendMessage(m, batch));
+  const box = $("messages");
+  box.appendChild(batch);
+  box.scrollTop = box.scrollHeight;
+}
+
+/* `batch`: a fragment collecting a chat's history (appendHistory); reactions are painted afterwards by loadReactions. */
+function appendMessage(m, batch = null) {
   if (seen.has(m.id)) return;
   seen.add(m.id);
+  if (m.created_at && (!newestAt || Date.parse(m.created_at) > Date.parse(newestAt))) newestAt = m.created_at;
   const box = $("messages");
   const ph = box.querySelector(".empty"); if (ph) ph.remove();
   const mine = auth.session() && m.user_id === auth.session().user.id;
@@ -745,6 +820,7 @@ function appendMessage(m) {
       setTimeout(() => del.remove(), DELETE_WINDOW - age);
     }
   }
+  if (batch) { batch.appendChild(el); return; }
   box.appendChild(el);
   renderReactions(m.id);
   box.scrollTop = box.scrollHeight;
@@ -821,7 +897,8 @@ function notifyMentions(content) {
     if (n.toLowerCase() === meName) continue;
     sb.rpc("add_notification", { p_to_username: n, p_kind: "mention",
       p_title: (auth.username() || "Een") + " huet dech ernimmt: " + (current?.display || ""),
-      p_body: content.slice(0, 120), p_url: "messenger.html" }).then(() => {}, () => {});
+      p_body: content.slice(0, 120), p_url: "messenger.html" })
+      .then(({ error }) => { if (error) console.warn("[msgr] mention not delivered", n, error); }, (e) => console.warn("[msgr] mention not delivered", n, e));
   }
 }
 
@@ -882,16 +959,54 @@ async function loadClasses() {
   } catch (e) { console.warn("[msgr] classes", e); }
 }
 
+let profilesReadAt = 0;
+/** Avatars + class tags, re-read at most once per PROFILE_REFRESH_MS (it used to be two full profile reads on every chat open). */
+function refreshProfiles() {
+  if (Date.now() - profilesReadAt < PROFILE_REFRESH_MS) return;
+  profilesReadAt = Date.now();
+  loadAvatars();
+  loadClasses();
+}
+
+async function loadAdminIds() {
+  try {
+    const { data, error } = await sb.rpc("admin_user_ids");
+    if (error) throw error;
+    adminIds = new Set((data || []).map((r) => r.user_id));
+  } catch (e) { console.warn("[msgr] admin ids", e); }
+}
+
+let chatsReloadTimer = 0;
+/** Reloads the chat list once after a burst of events (every incoming message used to start its own my_chats call). */
+function scheduleChatsReload() {
+  clearTimeout(chatsReloadTimer);
+  chatsReloadTimer = setTimeout(() => { loadChats(); }, CHATS_RELOAD_DELAY_MS);
+}
+
 async function boot() {
   if (!auth.authConfigured) {
     $("gate").innerHTML = `<div class="gate-box"><h3>Messenger</h3></div>`;
     $("gate").style.display = "flex"; return;
   }
+  // A returning user sees the app frame at once instead of an empty page while supabase-js and the session load.
+  let markClientReady = () => {};
+  const clientReady = new Promise((resolve) => { markClientReady = resolve; });
+  if (auth.hasStoredSession()) {
+    $("app").style.display = "flex";
+    $("groupList").innerHTML = `<li class="empty">${esc(T("common.loading"))}</li>`;
+    // The three buttons are already on screen: a tap before the client is up waits for it instead of doing nothing.
+    const whenReady = (action) => () => { clientReady.then(() => { if (auth.session()) action(); }); };
+    $("newG").onclick = whenReady(newGroup);
+    $("joinG").onclick = whenReady(joinGroup);
+    $("newDM").onclick = whenReady(newDM);
+  }
   sb = await auth.client();
-  try { const { data } = await sb.rpc("admin_user_ids"); adminIds = new Set((data || []).map((r) => r.user_id)); } catch (e) { console.warn("[msgr] admin ids", e); }
-  await loadRestriction();
-  loadAvatars();
-  loadClasses();
+  markClientReady();
+  // None of these block the first paint of the chat list any more (they used to run one after the other, before it):
+  // the admin tags and the profile data only decorate messages, and loadChats itself waits for the restriction.
+  loadAdminIds();
+  restrictionReady = loadRestriction();
+  refreshProfiles();
   auth.onAuth((s) => (s ? showApp() : showGate()));
   auth.session() ? showApp() : showGate();
 }
@@ -930,8 +1045,9 @@ async function showApp() {
   $("searchInput").oninput = () => renderChatList(applySearch(allChats));
   startOnlinePresence();
   setupNotifyButton();
-  try { await sb.rpc("upsert_profile", { p_username: auth.username() }); } catch (e) { console.warn(e); }
-  try { const { data } = await sb.rpc("is_admin"); if (data) showAdminLink(); } catch {}
+  // The chat list no longer waits for this (nor for upsert_profile, which auth.js already does for every page).
+  sb.rpc("is_admin")
+    .then(({ data, error }) => { if (error) console.warn("[msgr] is_admin", error); else if (data) showAdminLink(); }, (e) => console.warn("[msgr] is_admin", e));
   loadChats();
   if (!memberSubbed) {
     memberSubbed = true;
@@ -942,7 +1058,7 @@ async function showApp() {
     // Any new message in a chat I'm not currently in → refresh unread badges + ordering.
     allChannel = sb.channel("all-msgs-" + uid)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" },
-        ({ new: m }) => { if (m && m.user_id !== uid && (!current || m.group_id !== current.id)) loadChats(); })
+        ({ new: m }) => { if (m && m.user_id !== uid && (!current || m.group_id !== current.id)) scheduleChatsReload(); })
       .subscribe();
   }
   const dm = new URLSearchParams(location.search).get("dm");

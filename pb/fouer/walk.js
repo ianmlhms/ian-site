@@ -407,7 +407,7 @@ export function createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, cro
   const view = { x: 0, z: 0, y: 0, yaw: 0, pitch: 0 };
   const motion = { vx: 0, vz: 0, bob: 0, speed: 0, sprintK: 0 };
   const input = { shift: false, keys: new Set(), stick: { x: 0, y: 0, id: null }, look: null, locked: false, touchSeen: false };
-  const state = { maskDirty: false, sprint: false, fromBuilder: false, busy: false, edgeT: 0, active: false, saved: null, targets: [], target: null, eating: 0, eatItem: null, clock: 0, scan: 0, lastBuilt: -1, flash: 0, hintShown: false, photoBusy: false };
+  const state = { maskDirty: true, sprint: false, fromBuilder: false, busy: false, edgeT: 0, active: false, saved: null, targets: [], target: null, eating: 0, eatItem: null, clock: 0, scan: 0, lastBuilt: -1, flash: 0, hintShown: false, photoBusy: false };
   const T_ = (key, params) => translate(ui.lang, key, params);
   const tmpF = new T.Vector3();
 

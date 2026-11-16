@@ -126,7 +126,8 @@
 
     /* ----- track ----------------------------------------------------------------------------------------------------------------- */
     loadTrack(track, race) {
-      this.clearTrack();
+      const mk = (n) => { try { performance.mark('kl:' + n); } catch (e) { /* marks are optional */ } };
+      mk('load-track'); this.clearTrack();
       const def = track.def, theme = def.theme || {};
       this.track = track; this.theme = theme;
       this.makeMaterials(theme);
@@ -140,24 +141,25 @@
       add(sides.verge, M.verge); add(sides.kerb, M.kerb); add(sides.wall, M.wall);
       const dec = KL.scenery.decals(track, def.pads ? race.pads : []);
       add(dec.pads, M.pads); add(dec.checker, M.checker);
-      this.buildBranches(track, theme);
-      this.buildGround(track, theme);
+      mk('road'); this.buildBranches(track, theme);
+      this.buildGround(track, theme); mk('ground');
       const cityData = theme.osm && KL.osm && KL.osm[theme.osm];
       if (cityData) this.buildCity(track, theme, cityData, rnd);
       else if (theme.buildings !== false) {
         const b = KL.scenery.buildings(track, theme, rnd, this.q);
         add(b.walls, M.building); add(b.roofs, M.roof); add(b.extra, M.plain);
       }
-      this.buildLamps(track, theme, rnd);
+      mk('city'); this.buildLamps(track, theme, rnd);
       this.buildSkyline(track, theme, rnd);
       const S = { THREE: T, KL, track, def, theme, rnd, mats: M, add, group: this.group, quality: this.q, renderer: this, race };
-      if (def.decorate) def.decorate(S);
+      mk('skyline'); if (def.decorate) def.decorate(S);
+      mk('decorated');
       this.buildStartLine(track);
       // item boxes
       const boxGeo = new T.BoxGeometry(1.7, 1.7, 1.7);
       this.boxMesh = new T.InstancedMesh(boxGeo, new T.MeshBasicMaterial({ map: KL.tex.itemBox(), transparent: true, opacity: 0.92 }), Math.max(1, race.boxes.length));
       this.boxMesh.frustumCulled = false; this.scene.add(this.boxMesh);
-      this.setWeather(this.weatherName, true);
+      this.setWeather(this.weatherName, true); mk('track-built');
     }
 
     /* shortcuts (track.branches): own ribbon (red cycle-path tarmac), kerbs and walls; nothing is drawn where it lies on the main road */
@@ -316,7 +318,7 @@
 
     resize() {
       const c = this.canvas, w = c.clientWidth || c.parentElement.clientWidth || 800, h = c.clientHeight || c.parentElement.clientHeight || 600;
-      const dpr = Math.min(window.devicePixelRatio || 1, this.q.dpr) * (this.dprScale || 1);
+      const dpr = Math.min(window.devicePixelRatio || 1, this.q.dpr, window.ArcadeGfx ? ArcadeGfx.pixelRatio() : 9) * (this.dprScale || 1);
       this.renderer.setPixelRatio(dpr); this.renderer.setSize(w, h, false);
       this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
       this.w = w; this.h = h;

@@ -17,16 +17,16 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#f6f6f3" media="(prefers-color-scheme: light)" data-gt="light">
 <meta name="theme-color" content="#121314" media="(prefers-color-scheme: dark)" data-gt="dark">
-<script src="gitter-theme.js?v=1"></script>
+<script src="gitter-theme.js?v=2"></script>
 <link rel="preload" href="assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="gitter.css?v=12">
-<script src="theme.js?v=33"></script>
+<link rel="stylesheet" href="gitter.css?v=13">
+<script src="theme.js?v=35"></script>
 <style>
   :root{
         --correct:#00c853;--present:#ffb300;--absent:#3a3a3c}
   body{display:flex;flex-direction:column}
   .langs{display:flex;border:1px solid var(--ink);border-radius:0;overflow:hidden}
-  .langs button{background:transparent;color:var(--ink);border:none;padding:7px 12px;font-weight:600;cursor:pointer;font-size:13px;font-family:inherit;min-height:44px}
+  .langs button{background:transparent;color:var(--ink);border:none;padding:7px 12px;font-weight:600;cursor:pointer;font-size:13px;font-family:inherit;min-height:44px;min-width:44px}
   .langs button.on{background:var(--ink);color:var(--paper)}
   .wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:14px;padding:18px 12px 30px}
   .msg{min-height:22px;font-weight:600;color:var(--green);text-align:center}
@@ -44,6 +44,8 @@
   .kb .krow{display:flex;gap:5px;justify-content:center}
   .key{flex:1;max-width:42px;height:50px;border:1px solid var(--ink);border-radius:0;background:var(--white);color:var(--ink);font-weight:600;font-size:15px;cursor:pointer;text-transform:uppercase;font-family:inherit;padding:0}
   .key.wide{max-width:64px;font-size:12px}
+  /* iPad and wider: there is room for full 44 px keys (a phone cannot fit 11 of them in a row) */
+  @media (min-width:600px){.kb{max-width:590px}.key{max-width:48px}.key.wide{max-width:72px}}
   .key.correct{background:var(--green);border-color:var(--green);color:var(--on-green)} .key.present{background:var(--ink);color:var(--paper)} .key.absent{background:var(--tint);border-color:var(--soft);color:var(--muted)}
   .stats{display:flex;gap:18px;color:var(--muted);font-size:13px;margin-top:4px}
   .stats b{color:var(--ink);font:500 20px "Geist Mono",ui-monospace,monospace;display:block;text-align:center}
@@ -308,12 +310,12 @@ load();
 </div>
 
 <script src="pixelbreak-config.js"></script>
-<script src="pb/arcade-kit.js?v=50" data-arcade-id="o-wordle" data-arcade-title="Wuertspill" data-arcade-no-score data-arcade-leaderboard-target="#lbBtn" data-arcade-replace=".bar"></script>
+<script src="pb/arcade-kit.js?v=56" data-arcade-id="o-wordle" data-arcade-title="Wuertspill" data-arcade-no-score data-arcade-leaderboard-target="#lbBtn" data-arcade-replace=".bar"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module">
-  import * as auth from "./auth.js?v=42";
-  import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=13";
-  import { scoreHtml, scoreKeyHtml } from "./score-format.js?v=11";
+  import * as auth from "./auth.js?v=47";
+  import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=15";
+  import { scoreHtml, scoreKeyHtml } from "./score-format.js?v=13";
   let sb = null;
   const $ = (id) => document.getElementById(id);
   (async () => { if (!auth.authConfigured) return; sb = await auth.client(); })();
@@ -379,7 +381,7 @@ load();
   $("lbModal").onclick = (e) => { if (e.target.id === "lbModal") window.closeWordleBoard(); };
   document.querySelectorAll("[data-lb]").forEach(b => b.onclick = () => { boardLang = b.dataset.lb; setLbTabs(); drawBoard(); });
 </script>
-  <script type="module" src="rtc-ring.js?v=36"></script>
-  <script type="module" src="class-gate.js?v=37"></script>
+  <script type="module" src="rtc-ring.js?v=41"></script>
+  <script type="module" src="class-gate.js?v=42"></script>
 </body>
 </html>
