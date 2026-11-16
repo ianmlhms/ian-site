@@ -1,5 +1,5 @@
-import { reviseDeck, rewriteSlide, translateDeck } from "./ppt-ai.js?v=40";
-import { updateSlide } from "./ppt-deck-ops.js?v=38";
+import { reviseDeck, rewriteSlide, translateDeck } from "./ppt-ai.js?v=41";
+import { updateSlide } from "./ppt-deck-ops.js?v=39";
 
 const LANGUAGE_NAMES = Object.freeze({ lb: "Lëtzebuergesch", de: "Deutsch", en: "English", fr: "Français" });
 

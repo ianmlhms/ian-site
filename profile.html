@@ -54,6 +54,17 @@
   .ach-none { color: var(--muted); }
   .share a { color: var(--green); overflow-wrap: anywhere; }
 
+  /* Face ID / face devices: one hairline row per device, delete on the right */
+  .qk-h { margin: 6px 0 0; font: 500 13px/1.4 "Geist Mono", ui-monospace, monospace; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .qk-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--soft); }
+  .qk-list li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--soft); }
+  .qk-who { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+  .qk-name { font-weight: 600; overflow-wrap: anywhere; }
+  .qk-here { color: var(--green); font-weight: 500; }
+  .qk-meta { color: var(--muted); font-size: 13px; }
+  .qk-list .gt-btn { flex: none; }
+  .qk-empty { color: var(--muted); font-size: 14px; }
+
   @media (max-width: 700px) {
     .gt-me { gap: 14px !important; }
     .gt-me .big { width: 76px; height: 76px; font-size: 40px; }
@@ -85,7 +96,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module">
-import * as auth from "./auth.js?v=46";
+import * as auth from "./auth.js?v=47";
 import { loadTags, eventBadgesHtml } from "./leaderboard-tags.js?v=15";
 import { scoreHtml, scoreKeyHtml, arcadeText } from "./score-format.js?v=13";
 const $=(id)=>document.getElementById(id);
@@ -254,6 +265,7 @@ async function boot(){
       <div class="upl" id="quickBtns"></div>
       <div class="gt-hint">Face ID: däin iPad oder iPhone kontrolléiert dech selwer, ian.lu kritt just e Schlëssel. Gesiicht: d'Kamera erkennt dech direkt hei op der Websäit, däi Gesiicht bleift just op dësem Apparat. Däi PIN geet ëmmer weider.</div>
       <div class="gt-msg" id="quickMsg" role="status" aria-live="polite"></div>
+      <div id="quickLists"></div>
     </div>
     <div class="c full gt-form">
       <h2 class="gt-h">Oder wiel en Emoji</h2>
@@ -294,7 +306,7 @@ async function boot(){
 // Lazy: the account-check card (and its people search) only loads when asked for.
 async function openMerge(){
   try{
-    const m=await import("./account-check.js?v=21");
+    const m=await import("./account-check.js?v=22");
     await m.openAccountCheck({startWithMerge:true});
   }catch(e){
     console.error("account merge dialog failed to open",e);
@@ -303,61 +315,74 @@ async function openMerge(){
 }
 
 // Face ID (native Supabase passkeys) + on-site face scan. Both optional; the PIN always keeps working.
+// Adding either needs the PIN again (dialog in auth-ui.js); every device is listed here with "Läschen".
+// The server only ever lists or deletes the signed-in player's own devices.
 const cameraOk=()=>Boolean(navigator.mediaDevices?.getUserMedia)&&window.isSecureContext;
+const day=(iso)=>{const d=iso?new Date(iso):null;return d&&!isNaN(d)?d.toLocaleDateString("de-LU",{day:"2-digit",month:"2-digit",year:"numeric"}):"–";};
+const usedText=(iso)=>iso?`lescht benotzt ${day(iso)}`:"nach net benotzt";
+function quickRow(name,meta,attr,here){
+  return `<li><span class="qk-who"><span class="qk-name">${esc(name)}${here?' <span class="qk-here">· Dësen Apparat</span>':""}</span>`+
+    `<span class="qk-meta">${esc(meta)}</span></span><button type="button" class="gt-btn ghost" ${attr}>Läschen</button></li>`;
+}
 async function paintQuick(){
   const host=$("quickBtns");if(!host)return;
-  let keys=[],keysKnown=true;
-  if(auth.passkeySupported()){
-    try{keys=await auth.listPasskeys();}catch(e){keysKnown=false;console.warn("[passkey] list failed",e);}
-  }
+  const canPasskey=auth.passkeySupported();
+  const [keysResult,admin,facesResult]=await Promise.allSettled([
+    canPasskey?auth.listPasskeys():Promise.resolve([]),
+    auth.isAdmin(),
+    auth.listFaceDevices(),
+  ]);
   if(!$("quickBtns"))return;
+  const keys=keysResult.status==="fulfilled"?keysResult.value:null;
+  const faces=facesResult.status==="fulfilled"?facesResult.value:null;
+  if(!keys)console.warn("[passkey] list failed",keysResult.reason);
+  if(!faces)console.warn("[face] device list failed",facesResult.reason);
+  const isAdmin=admin.status!=="fulfilled"||admin.value===true;
   const btn=(id,label)=>`<button type="button" class="gt-btn ghost" id="${id}">${esc(label)}</button>`;
   const parts=[];
-  if(auth.passkeySupported()){
-    if(keys.length){parts.push(btn("pkAdd","Face ID op dësem Apparat derbäi"),btn("pkOff","Face ID ausschalten"));}
-    else parts.push(btn("pkAdd","Face ID aschalten"));
-  }
-  if(cameraOk()){
-    if(auth.hasFaceHere())parts.push(btn("faceScan","Gesiicht nei scannen"),btn("faceOff","Gesiicht läschen"));
-    else parts.push(btn("faceScan","Gesiicht scannen"));
-  }
+  if(canPasskey)parts.push(btn("pkAdd",keys?.length?"Face ID op dësem Apparat derbäi":"Face ID aschalten"));
+  if(cameraOk()&&!isAdmin)parts.push(btn("faceScan",auth.hasFaceHere()||auth.faceNeedsRescan()?"Gesiicht nei scannen":"Gesiicht scannen"));
   host.innerHTML=parts.join("")||'<span class="gt-sub">Dëse Browser kann dat leider net.</span>';
   const status=[];
-  if(keys.length)status.push(`Face ID ass un (${keys.length} ${keys.length===1?"Passkey":"Passkeyen"}).`);
-  else if(!keysKnown)status.push("Konnt net kucken, ob Face ID un ass.");
-  if(auth.hasFaceHere())status.push("Däi Gesiicht ass op dësem Apparat gespäichert.");
-  if(status.length)setMsg("quickMsg",status.join(" "));
-  $("pkAdd")&&($("pkAdd").onclick=addPasskey);
-  $("pkOff")&&($("pkOff").onclick=()=>removePasskeys(keys));
-  $("faceScan")&&($("faceScan").onclick=()=>auth.openFaceSetup(()=>void paintQuick()));
-  $("faceOff")&&($("faceOff").onclick=removeFace);
-}
-async function addPasskey(){
-  setMsg("quickMsg","…");
-  try{
-    await auth.registerPasskey();
-    await paintQuick();
-    setMsg("quickMsg","Face ID ass un ✓ Elo kanns du beim Umellen op „Mat Face ID aloggen“ drécken.");
-  }catch(e){
-    console.warn("[passkey] register failed",e);
-    if(auth.passkeyAlreadyHere(e))setMsg("quickMsg","Op dësem Apparat ass Face ID schonn un.");
-    else if(auth.passkeyCancelled(e))setMsg("quickMsg","Ofgebrach. Op Schoul-iPads ass de iCloud-Schlësselbund dacks gespaart, da geet Face ID net. Probéier dann „Gesiicht scannen“.",true);
-    else setMsg("quickMsg","Face ID konnt net ageschalt ginn. Probéier et méi spéit nach eng Kéier.",true);
+  if(keys===null&&canPasskey)status.push("Konnt net kucken, ob Face ID un ass.");
+  if(faces===null)status.push("Konnt d'Gesiichter net lueden.");
+  if(auth.faceNeedsRescan()&&!isAdmin)status.push("De Gesiicht-Login ass elo méi sécher: scann däi Gesiicht w.e.g. nei.");
+  if(isAdmin)status.push("Fir Admin-Konten ass de Gesiicht-Login aus. Face ID geet.");
+  setMsg("quickMsg",status.join(" "),status.length>0&&(keys===null&&canPasskey||faces===null));
+  const lists=[];
+  if(keys?.length){
+    lists.push('<h3 class="qk-h">Face ID (Passkeyen)</h3><ul class="qk-list" id="pkList">'+
+      keys.map((k)=>quickRow(k.friendly_name||k.name||"Passkey",`derbäi ${day(k.created_at)} · ${usedText(k.last_used_at)}`,`data-pk="${esc(k.id)}"`,false)).join("")+"</ul>");
   }
+  if(faces?.length){
+    lists.push('<h3 class="qk-h">Gesiichter</h3><ul class="qk-list" id="faceList">'+
+      faces.map((f)=>quickRow(f.name||"Apparat",`derbäi ${day(f.createdAt)} · ${usedText(f.lastUsedAt)}`,`data-face="${esc(f.id)}"`,f.here)).join("")+"</ul>"+
+      `<div class="upl">${btn("faceAllOff","All Gesiichter ofmellen")}</div>`);
+  }
+  $("quickLists").innerHTML=lists.join("");
+  $("pkAdd")&&($("pkAdd").onclick=()=>auth.openPasskeySetup(()=>void paintQuick().then(()=>setMsg("quickMsg","Face ID ass un ✓ Elo kanns du beim Umellen op „Mat Face ID aloggen“ drécken."))));
+  $("faceScan")&&($("faceScan").onclick=()=>void auth.openFaceSetup(()=>void paintQuick()));
+  $("faceAllOff")&&($("faceAllOff").onclick=forgetAllFaces);
+  document.querySelectorAll("#pkList [data-pk]").forEach((b)=>{b.onclick=()=>removePasskey(b.dataset.pk);});
+  document.querySelectorAll("#faceList [data-face]").forEach((b)=>{b.onclick=()=>removeFaceDevice(b.dataset.face);});
 }
-async function removePasskeys(keys){
-  if(!confirm("Face ID fir däi Kont op all Apparater ausschalten?"))return;
+async function removePasskey(id){
+  if(!confirm("Dëse Passkey läschen? Op deem Apparat geet Face ID dann net méi."))return;
   setMsg("quickMsg","…");
-  try{
-    for(const k of keys)await auth.removePasskey(k.id);
-    await paintQuick();
-    setMsg("quickMsg","Face ID ass aus ✓");
-  }catch(e){console.warn("[passkey] delete failed",e);setMsg("quickMsg","Konnt Face ID net ausschalten.",true);}
+  try{await auth.removePasskey(id);await paintQuick();setMsg("quickMsg","Passkey geläscht ✓");}
+  catch(e){console.warn("[passkey] delete failed",e);setMsg("quickMsg","Konnt de Passkey net läschen. Probéier et méi spéit nach eng Kéier.",true);}
 }
-async function removeFace(){
+async function removeFaceDevice(id){
+  if(!confirm("Dëst Gesiicht ofmellen? Op deem Apparat geet de Gesiicht-Login dann net méi."))return;
   setMsg("quickMsg","…");
-  try{await auth.forgetFace();await paintQuick();setMsg("quickMsg","Gesiicht geläscht ✓");}
-  catch(e){console.warn("[face] forget failed",e);await paintQuick();setMsg("quickMsg","Hei geläscht, mee de Server konnt net erreecht ginn.",true);}
+  try{await auth.removeFaceDevice(id);await paintQuick();setMsg("quickMsg","Gesiicht ofgemellt ✓");}
+  catch(e){console.warn("[face] delete failed",e);setMsg("quickMsg","Konnt dat Gesiicht net ofmellen. Probéier et méi spéit nach eng Kéier.",true);}
+}
+async function forgetAllFaces(){
+  if(!confirm("All Gesiichter op all Apparater ofmellen? Däi PIN geet weider."))return;
+  setMsg("quickMsg","…");
+  try{await auth.forgetAllFaces();await paintQuick();setMsg("quickMsg","All Gesiichter ofgemellt ✓");}
+  catch(e){console.warn("[face] forget all failed",e);await paintQuick();setMsg("quickMsg","Hei ofgemellt, mee de Server konnt net erreecht ginn. Probéier et méi spéit nach eng Kéier.",true);}
 }
 
 function setMsg(id,t,err){
@@ -515,7 +540,7 @@ document.addEventListener("i18n:change",paintProfileStreak);
 auth.onAuth(boot);
 boot();
 </script>
-  <script type="module" src="rtc-ring.js?v=40"></script>
-  <script type="module" src="class-gate.js?v=41"></script>
+  <script type="module" src="rtc-ring.js?v=41"></script>
+  <script type="module" src="class-gate.js?v=42"></script>
 </body>
 </html>

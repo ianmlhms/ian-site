@@ -112,7 +112,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module">
-import * as auth from "./auth.js?v=46";
+import * as auth from "./auth.js?v=47";
 const $=(id)=>document.getElementById(id);
 const LS_KEY="timetableData";
 const DAYS=["Méindeg","Dënschdeg","Mëttwoch","Donneschdeg","Freideg"];
@@ -233,8 +233,8 @@ setInterval(highlight,60000);
 addEventListener("online",()=>{if(hasUnsynced())saveRemote();});
 addEventListener("pagehide",()=>{if(saveT&&hasUnsynced()){clearTimeout(saveT);saveT=null;saveRemote();}});
 </script>
-  <script type="module" src="rtc-ring.js?v=40"></script>
-  <script type="module" src="class-gate.js?v=41"></script>
-<script type="module" src="gitter-acct.js?v=5"></script>
+  <script type="module" src="rtc-ring.js?v=41"></script>
+  <script type="module" src="class-gate.js?v=42"></script>
+<script type="module" src="gitter-acct.js?v=6"></script>
 </body>
 </html>

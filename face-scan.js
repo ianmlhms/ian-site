@@ -1,8 +1,8 @@
 /* On-site face scan for "Mam Gesiicht aloggen". ES module, loaded on demand.
  *
  * Everything here runs in the browser: camera frames, face detection and the
- * 128-number face template (face-api.js, models from jsDelivr). Nothing of the
- * face is uploaded. A scan has three steps so a printed photo is not enough:
+ * 128-number face template (face-api.js and its models, served by ian.lu itself
+ * from assets/face/). Nothing of the face is uploaded. A scan has three steps so a printed photo is not enough:
  *   1. look straight      → a few face templates
  *   2. turn the head      → the nose moves off the line between the eyes,
  *                           which a flat photo (even tilted) cannot do
@@ -10,10 +10,15 @@
  * The caller gets the averaged template; matching against saved ones is
  * matchFace() below. */
 
-const FACE_API_URL =
-  "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/dist/face-api.esm.js";
-const MODEL_URL =
-  "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/model/";
+/* @vladmandic/face-api 1.7.15, self-hosted so no CDN can swap the code that
+ * decides who you are: dist/face-api.esm.js and the three models used here,
+ * byte for byte from the npm tarball (integrity sha512-WDMmK3CfNLo8jylWqMoQgf4n
+ * Ist3M0fzx1dnac96wv/dvMTN4DxC/Pq1DGtduDk1lktCamQ3MIDXFnvrdHTXDw==); the SHA-256
+ * of every file is in assets/face/1.7.15/SHA256SUMS. Another version goes in
+ * another folder, so a stored copy is never stale. */
+const FACE_API_DIR = new URL("assets/face/1.7.15/", import.meta.url);
+const FACE_API_URL = new URL("face-api.esm.js", FACE_API_DIR).href;
+const MODEL_URL = new URL("model/", FACE_API_DIR).href;
 const DETECT_INPUT_SIZE = 320;
 const DETECT_MIN_SCORE = 0.5;
 const STRAIGHT_SAMPLES = 3;

@@ -595,8 +595,121 @@ const FACE_ERRORS = Object.freeze({
   changed: ["face.changed", "Dat war net déiselwecht Persoun. Probéier nach eng Kéier."],
   no_match: ["face.noMatch", "Ech hunn dech net erkannt. Probéier nach eng Kéier oder mell dech mam PIN un."],
   invalid_login: ["face.expired", "Däi Gesiicht ass hei net méi aktiv. Mell dech mam PIN un a scann et am Profil nei."],
+  device_revoked: ["face.revoked", "Aus Sécherheet ass d'Gesiicht hei ofgemellt ginn. Mell dech mam PIN un a scann däi Gesiicht am Profil nei."],
+  expired: ["face.unused", "Däi Gesiicht gouf 60 Deeg net benotzt an ass ofgelaf. Mell dech mam PIN un a scann et am Profil nei."],
+  reenroll: ["face.reenroll", "De Gesiicht-Login ass elo méi sécher. Mell dech eng Kéier mam PIN un a scann däi Gesiicht am Profil nei."],
+  admin_forbidden: ["face.admin", "Fir Admin-Konten geet de Gesiicht-Login net. Mell dech w.e.g. mam PIN un."],
+  reauth_failed: ["reauth.wrong", "De PIN oder d'Passwuert stëmmt net. Probéier nach eng Kéier."],
+  reauth_locked: ["reauth.locked", "Ze vill falsch Versich. Waart e puer Minutten a probéier dann nach eng Kéier."],
+  busy: ["face.busy", "Ee Moment, et gëtt schonn ageloggt …"],
   storage: ["face.storage", "Dëse Browser léisst ian.lu näischt späicheren (privat Modus?)."],
 });
+
+/* ---------- "type your PIN again" (before a face or a passkey is added) ----------
+ * The server checks it (auth-face "reauth"), so a minute on someone's unlocked
+ * iPad is not enough to add a way back in. onProven(credential) gets the typed
+ * PIN/password; it lives only in that call, nothing stores it. */
+function reauthMarkup(title, intro) {
+  return `${dialogHead(title)}
+    <p class="pin-note">${esc(intro)}</p>
+    ${field(
+      "authCurrent",
+      "pin.currentCredential",
+      "Aktuelle PIN (oder Passwuert bei engem ale Kont)",
+      'type="password" autocomplete="current-password"',
+    )}
+    <button class="auth-go" id="reauthGo" type="button">${esc(t("reauth.go", "Weider"))}</button>
+    <div class="auth-msg" id="authMsg" role="status" aria-live="polite"></div>`;
+}
+
+function reauthErrorText(error) {
+  if (error?.code === "reauth_failed" || error?.code === "reauth_locked") {
+    const [key, fallback] = FACE_ERRORS[error.code];
+    return t(key, fallback);
+  }
+  return t("reauth.unavailable", "Dat konnt elo net nogekuckt ginn. Probéier et méi spéit nach eng Kéier.");
+}
+
+function drawReauth(deps, { title, intro, onProven }) {
+  leave();
+  ensureModal();
+  modalLocked = false;
+  box().innerHTML = reauthMarkup(title, intro);
+  wireClose();
+  openModal();
+  const input = box().querySelector("#authCurrent");
+  const go = box().querySelector("#reauthGo");
+  const submit = async () => {
+    const credential = input.value.trim();
+    if (!credential) {
+      setMessage(t("reauth.empty", "Gëff w.e.g. däi PIN oder däi Passwuert an."), "err");
+      return;
+    }
+    go.disabled = true;
+    setMessage("…");
+    try {
+      await deps.reauth(credential);
+    } catch (error) {
+      console.warn("[reauth] refused", error);
+      go.disabled = false;
+      input.value = "";
+      setMessage(reauthErrorText(error), "err");
+      return;
+    }
+    onProven(credential);
+  };
+  go.addEventListener("click", submit);
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") void submit();
+  });
+  input.focus();
+}
+
+/* ---------- "Face ID aschalten" (passkey), after the PIN check ----------
+ * The passkey itself is registered with Supabase straight from the browser;
+ * the PIN check before it is the UI's job. The second tap ("Elo aschalten")
+ * gives Safari the fresh user gesture its Face ID sheet wants. */
+function passkeySetupError(deps, error) {
+  if (deps.passkeyAlreadyHere(error)) return t("passkey.already", "Op dësem Apparat ass Face ID schonn un.");
+  if (deps.passkeyCancelled(error)) {
+    return t("passkey.cancelled",
+      "Ofgebrach. Op Schoul-iPads ass de iCloud-Schlësselbund dacks gespaart, da geet Face ID net. Probéier dann „Gesiicht scannen“.");
+  }
+  return t("passkey.failed", "Face ID konnt net ageschalt ginn. Probéier et méi spéit nach eng Kéier.");
+}
+
+export function openPasskeyDialog(deps, options = {}) {
+  const title = t("passkey.title", "Face ID aschalten");
+  drawReauth(deps, {
+    title,
+    intro: t("passkey.reauth", "Fir Face ID unzeschalten, gëff w.e.g. nach eng Kéier däi PIN an."),
+    onProven: () => {
+      box().innerHTML = `${dialogHead(title)}
+        <p class="pin-note">${esc(t("passkey.ready", "Gutt. Elo freet däin Apparat no Face ID oder dengem Code."))}</p>
+        <button class="auth-go" id="passkeyGo" type="button">${esc(t("passkey.go", "Elo Face ID aschalten"))}</button>
+        <div class="auth-msg" id="authMsg" role="status" aria-live="polite"></div>`;
+      wireClose();
+      const go = box().querySelector("#passkeyGo");
+      go.addEventListener("click", async () => {
+        go.disabled = true;
+        setMessage("…");
+        try {
+          await deps.registerPasskey();
+        } catch (error) {
+          console.warn("[passkey] register failed", error);
+          go.disabled = false;
+          setMessage(passkeySetupError(deps, error), deps.passkeyAlreadyHere(error) ? "" : "err");
+          return;
+        }
+        setMessage(t("passkey.on", "Face ID ass un ✓"), "ok");
+        setTimeout(() => {
+          if (box().querySelector("#passkeyGo")) closeModal();
+          options.onDone?.();
+        }, FACE_DONE_CLOSE_MS);
+      });
+    },
+  });
+}
 
 function faceErrorText(mode, error) {
   const known = FACE_ERRORS[error?.code];
@@ -644,9 +757,9 @@ function showFaceStep(step) {
   if (text) setMessage(t(text[0], text[1]));
 }
 
-async function finishFace(deps, mode, face, scanner) {
+async function finishFace(deps, mode, face, scanner, credential) {
   if (mode === "enroll") {
-    await deps.enrollFace(face);
+    await deps.enrollFace(face, credential);
     return t("face.saved", "Fäerdeg! Däi Gesiicht ass op dësem Apparat gespäichert.");
   }
   const best = scanner.matchFace(face, deps.faceEntries());
@@ -657,6 +770,14 @@ async function finishFace(deps, mode, face, scanner) {
 
 export function openFaceDialog(deps, options = {}) {
   const mode = options.mode === "login" ? "login" : "enroll";
+  if (mode === "enroll" && !options.credential) {
+    drawReauth(deps, {
+      title: t("face.enrollTitle", "Gesiicht scannen"),
+      intro: t("face.reauth", "Fir däi Gesiicht ze späicheren, gëff w.e.g. nach eng Kéier däi PIN an."),
+      onProven: (credential) => openFaceDialog(deps, { ...options, credential }),
+    });
+    return;
+  }
   leave();
   ensureModal();
   modalLocked = false;
@@ -677,7 +798,7 @@ export function openFaceDialog(deps, options = {}) {
     box().querySelector(".face-cam")?.classList.remove("ok", "bad");
     let scanner;
     try {
-      scanner = await import("./face-scan.js?v=1");
+      scanner = await import("./face-scan.js?v=2");
     } catch (error) {
       console.warn("[face] module failed to load", error);
       setMessage(faceErrorText(mode, { code: "load_failed" }), "err");
@@ -691,7 +812,7 @@ export function openFaceDialog(deps, options = {}) {
       });
       if (controller.signal.aborted) return;
       setMessage("…");
-      const done = await finishFace(deps, mode, face, scanner);
+      const done = await finishFace(deps, mode, face, scanner, options.credential);
       if (controller.signal.aborted) return;
       onLeave = null; // done: closing the dialog now must not count as a cancel
       box().querySelector(".face-cam")?.classList.add("ok");

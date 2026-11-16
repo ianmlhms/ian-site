@@ -8,7 +8,7 @@
  *   Ian (is_admin)    Hotel-Simulator, Mäin Dashboard, the Admin row
  *   Ian + kart accts  KartTracker       (auth.isKartAccount, i.e. user_metadata.account_kind === "kart")
  * The pages keep their own gates; this only decides what the homepage lists. */
-import { client, session, onAuth, openAuthModal, isKartAccount } from "./auth.js?v=46";
+import { client, session, onAuth, openAuthModal, isKartAccount } from "./auth.js?v=47";
 import { isStudioEmail } from "./studio-allow.js?v=1";
 import { loadWeekly, countdownText, weeklyGameLabel } from "./arcade-weekly.js?v=14";
 import "./quick-open.js?v=13"; // same URL theme.js loads, so this is the same module instance
