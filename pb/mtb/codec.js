@@ -22,12 +22,11 @@ export function decodeGrid(bytes, offset = 0) {
   let bytePos = 0;
   let acc = 0;       // bit accumulator (at most 32 bits live)
   let nacc = 0;
-  const need = (n) => { while (nacc < n) { if (bytePos >= src.length) throw new Error('terrain grid: data ends early'); acc += src[bytePos++] * 2 ** nacc; nacc += 8; } };
-  const take = (n) => {            // n <= 16
+  const need = (n) => { while (nacc < n) { if (bytePos >= src.length) throw new Error('terrain grid: data ends early'); acc |= src[bytePos++] << nacc; nacc += 8; } };
+  const take = (n) => {            // n <= 16, so the accumulator never holds more than 23 bits: plain 32-bit integer maths
     need(n);
-    const mask = 2 ** n;
-    const value = acc % mask;
-    acc = Math.floor(acc / mask);
+    const value = acc & ((1 << n) - 1);
+    acc >>>= n;
     nacc -= n;
     return value;
   };

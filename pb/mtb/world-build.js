@@ -55,7 +55,11 @@ export function buildPureWorld(data) {
   const allFalls = findFalls(field.network);
   const falls = cascade ? allFalls.map((f) => (Math.hypot(f.x - cascade.x, f.z - cascade.z) < CASCADE_OWN_RADIUS ? { ...f, bankOnly: true } : f)) : allFalls;      // (the boulders of the lip and the pool are the ledge model's; the strewn bank boulders stay)
   const rocks = createRockIndex({ map: maps, surface, clearance, ways: walkable, ridden, streams: brooks, falls });
-  const houses = clearOfWays(describeHouses((data.buildings && data.buildings.houses) || [], surface), field.network);        // the Berdorf village, the Beaufort houses and castles (town-data.js)
-  const town = createTownIndex(houses);
-  return { ridden, ways, streams, trailWays, field, surface, groundAt, clearance, maps, trees, undergrowth, rocks, walkable, brooks, falls, cascade, houses, town };
+  const world = { ridden, ways, streams, trailWays, field, surface, groundAt, clearance, maps, trees, undergrowth, rocks, walkable, brooks, falls, cascade };
+  // The houses (the Berdorf village, the Beaufort houses and castles, town-data.js) probe the ground under every wall (hundreds of surface blocks): they are built on first use, not at start-up.
+  // Same result as before, only later; the browser builds them behind the start card (main.js), the harness on its first access.
+  let houses = null, town = null;
+  Object.defineProperty(world, 'houses', { enumerable: true, get() { if (!houses) houses = clearOfWays(describeHouses((data.buildings && data.buildings.houses) || [], surface), field.network); return houses; } });
+  Object.defineProperty(world, 'town', { enumerable: true, get() { if (!town) town = createTownIndex(world.houses); return town; } });
+  return world;
 }

@@ -127,13 +127,16 @@ export function createProps({ scene, env, surface, trails, decks, junctions = []
     box(b, p.x, y0 + 1.95, p.z, 0.2, 0.06, 0.2, yaw, WOOD_LIGHT);        // a little roof cap
   }
   const SIGN_RADIUS = 260, TAPE_RADIUS = 200, BRIDGE_RADIUS = 280, ROOT_RADIUS = 200;
-  const postParts = rangedParts(new Builder(), SIGN_RADIUS);
+  let postParts = null, barrierParts = null, bridgeParts = null, rootParts = null, junctionBranches = 0;
+  /** The world-wide pieces (signposts, junction tape, bridges, roots, boardwalks, patches of every trail) cost a second on a school iPad: the game builds them behind the start card (buildWorld), not before it. */
+  function buildPosts() {
+  if (postParts) return;
+  postParts = rangedParts(new Builder(), SIGN_RADIUS);
   for (const t of trails) for (const p of t.posts) postParts.add(p.x, p.z, (b) => sign(b, p, t.grade));
 
   // ------------------------------------------------------------ junctions: an arrow sign before every fork, red-white barrier tape across every wrong branch
   const gradeOf = new Map(trails.map((t) => [t.id, t.grade]));
-  const barrierParts = rangedParts(new Builder(), TAPE_RADIUS);
-  let junctionBranches = 0;
+  barrierParts = rangedParts(new Builder(), TAPE_RADIUS);
   for (const j of junctions) {
     const grade = gradeOf.get(j.trailId) || 'green';
     const { yaw } = j.approach;
@@ -145,8 +148,12 @@ export function createProps({ scene, env, surface, trails, decks, junctions = []
   postParts.finish(mat, 'signposts', scene, meshes);
   barrierParts.finish(mat, 'junction barriers', scene, meshes);
 
+  }
+  function buildBridges() {
+  if (bridgeParts) return;
   // ------------------------------------------------------------ bridges
-  const bridgeParts = rangedParts(new Builder(), BRIDGE_RADIUS), bridges = bridgeParts.builder;
+  bridgeParts = rangedParts(new Builder(), BRIDGE_RADIUS);
+  const bridges = bridgeParts.builder;
   for (const d of decks) {
     if (d.kind === 'stone') continue;                                    // the arch footbridge is drawn by bridge-model.js
     const a0 = bridges.idx.length;
@@ -175,8 +182,12 @@ export function createProps({ scene, env, surface, trails, decks, junctions = []
   }
   bridgeParts.finish(mat, 'bridges', scene, meshes);
 
+  }
+  function buildRoots() {
+  if (rootParts) return;
   // ------------------------------------------------------------ roots, boardwalks, mud, slabs
-  const rootParts = rangedParts(new Builder(), ROOT_RADIUS), roots = rootParts.builder, walks = new Builder(), decals = new Builder();
+  rootParts = rangedParts(new Builder(), ROOT_RADIUS);
+  const roots = rootParts.builder, walks = new Builder(), decals = new Builder();
   for (const t of trails) {
     for (const f of t.features) {
       const i0 = f.i0, i1 = f.i1;
@@ -222,6 +233,7 @@ export function createProps({ scene, env, surface, trails, decks, junctions = []
     }
   }
   rootParts.finish(mat, 'roots', scene, meshes); addMesh(walks, mat, 'boardwalks'); addMesh(decals, decalMat, 'trail patches');
+  }
 
   // ------------------------------------------------------------ the active trail: gate, arch, flags
   let gateMesh = null, flagMesh = null;
@@ -300,6 +312,8 @@ export function createProps({ scene, env, surface, trails, decks, junctions = []
   }
 
   /** Called every frame with the camera position: the world-wide props draw only what is near it. */
-  function update(x, z) { postParts.refresh(x, z); barrierParts.refresh(x, z); bridgeParts.refresh(x, z); rootParts.refresh(x, z); }
-  return { setActiveTrail, setFlags, setViewpoints, update, meshes, material: mat, junctionBranches, dispose() { for (const m of [...meshes]) dispose(m); mat.dispose(); decalMat.dispose(); } };
+  const worldSteps = [buildPosts, buildBridges, buildRoots];            // three pieces, so the game can spread them over the start card
+  function buildWorld() { for (const step of worldSteps) step(); }
+  function update(x, z) { if (postParts) { postParts.refresh(x, z); barrierParts.refresh(x, z); } if (bridgeParts) bridgeParts.refresh(x, z); if (rootParts) rootParts.refresh(x, z); }
+  return { setActiveTrail, setFlags, setViewpoints, update, buildWorld, worldSteps, meshes, material: mat, get junctionBranches() { return junctionBranches; }, dispose() { for (const m of [...meshes]) dispose(m); mat.dispose(); decalMat.dispose(); } };
 }

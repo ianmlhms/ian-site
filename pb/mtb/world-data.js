@@ -52,38 +52,44 @@ export function decodeCanopy(bytes) {
   return { height, cover, step: 8 };
 }
 
+const FILES = ['terrain.json', 'terrain.bin', 'far.bin', 'ways.bin', 'ways.json', 'trails.json', 'medals.json', 'canopy.bin', 'classes.bin', 'landmarks.json', 'streams.bin', 'streams.json', 'cliffs.bin', 'cliffs.json', 'falls.json', 'buildings.json', 'leaf.bin', 'fields.bin'];
+/** The optional files: a missing one is a warning, not a failure. */
+const OPTIONAL = new Set(['medals.json', 'landmarks.json', 'buildings.json']);
+export const WORLD_FILES = Object.freeze([...FILES]);
+
 export async function loadWorldData(read, onProgress = () => {}) {
-  const json = async (name) => JSON.parse(new TextDecoder().decode(await read(name)));
+  // Every file is requested at once (one round trip instead of eighteen in a row, the big terrain file downloads while the small ones decode); decoding stays in the old order.
+  const pending = new Map(FILES.map((name) => { const p = Promise.resolve().then(() => read(name)); p.catch(() => {}); return [name, p]; }));
+  const bytes = (name) => pending.get(name);
+  const json = async (name) => JSON.parse(new TextDecoder().decode(await bytes(name)));
+  const optionalJson = async (name, fallback, why) => { try { return await json(name); } catch (error) { console.warn(`[mtb] ${name} missing (${why})`, error); return fallback; } };
   const info = await json('terrain.json');
   onProgress(0.02, 'terrain');
-  const nearGrid = decodeGrid(await read('terrain.bin'));
+  const nearGrid = decodeGrid(await bytes('terrain.bin'));
   if (gridChecksum(nearGrid.data) !== info.terrain.checksum) throw new Error('terrain.bin: checksum mismatch (decoder and baker disagree)');
   const near = { nx: nearGrid.nx, nz: nearGrid.nz, data: nearGrid.data };
   onProgress(0.5, 'hills');
-  const farGrid = decodeGrid(await read('far.bin'));
+  const farGrid = decodeGrid(await bytes('far.bin'));
   if (gridChecksum(farGrid.data) !== info.far.checksum) throw new Error('far.bin: checksum mismatch');
   const far = { nx: farGrid.nx, nz: farGrid.nz, data: farGrid.data };
   onProgress(0.6, 'ways');
-  const ways = decodeWays(await read('ways.bin'), await json('ways.json'));
+  const ways = decodeWays(await bytes('ways.bin'), await json('ways.json'));
   onProgress(0.7, 'trails');
   const trails = await json('trails.json');
   for (const t of trails.trails) t.ways = [{ id: `trail-${t.id}`, kind: 'trail', pts: t.line, features: t.features || [], yield: t.yield === true }];       // carved as kind 'trail' (berms, banking, features)
-  let medals = {};
-  try { medals = await json('medals.json'); } catch (error) { console.warn('[mtb] medals.json missing (medal times fall back to the trail length)', error); }
+  const medals = await optionalJson('medals.json', {}, 'medal times fall back to the trail length');
   onProgress(0.8, 'canopy');
-  const canopy = decodeCanopy(await read('canopy.bin'));
+  const canopy = decodeCanopy(await bytes('canopy.bin'));
   onProgress(0.9, 'classes');
-  const classes = decodeRle(await read('classes.bin'));
-  let landmarks = [];
-  try { landmarks = await json('landmarks.json'); } catch (error) { console.warn('[mtb] landmarks.json missing', error); }
+  const classes = decodeRle(await bytes('classes.bin'));
+  const landmarks = await optionalJson('landmarks.json', [], 'no landmarks');
   // W2 features: streams (flow direction = way direction), cliff lines (the drop is on the RIGHT of the way direction), forest leaf type, field ids
-  const streams = decodeWays(await read('streams.bin'), await json('streams.json'));
-  const cliffs = decodeWays(await read('cliffs.bin'), await json('cliffs.json'));
+  const streams = decodeWays(await bytes('streams.bin'), await json('streams.json'));
+  const cliffs = decodeWays(await bytes('cliffs.bin'), await json('cliffs.json'));
   const falls = await json('falls.json');
-  let buildings = { houses: [], castles: [], churches: [], centres: {} };
-  try { buildings = await json('buildings.json'); } catch (error) { console.warn('[mtb] buildings.json missing (no villages and castles)', error); }
-  const leaf = decodeRle(await read('leaf.bin'));
-  const fields = decodeRle(await read('fields.bin'));
+  const buildings = await optionalJson('buildings.json', { houses: [], castles: [], churches: [], centres: {} }, 'no villages and castles');
+  const leaf = decodeRle(await bytes('leaf.bin'));
+  const fields = decodeRle(await bytes('fields.bin'));
   onProgress(1, 'done');
   return { info, near, far, ways, trails, canopy, classes, landmarks, streams, cliffs, falls, leaf, fields, medals, buildings };
 }

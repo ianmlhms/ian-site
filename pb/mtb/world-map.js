@@ -15,24 +15,40 @@ const HEDGE_SHARE_BETWEEN = 0.62;     // share of the borders between two fields
 const HEDGE_SHARE_EDGE = 0.3;         // share of a field's border towards "no field" (forest, road, village) that carries one
 const pairHash = (a, b) => { let h = (Math.imul(a, 73856093) ^ Math.imul(b, 19349663)) >>> 0; h = Math.imul(h ^ (h >>> 13), 0x5bd1e995) >>> 0; return ((h ^ (h >>> 15)) >>> 0) / 4294967296; };
 
+const RING = Object.freeze([3, 0, -3, 0, 0, 3, 0, -3, 2, 2, -2, 2, 2, -2, -2, -2]);      // (dx, dz) pairs, hoisted: this loop runs for 2 million cells
+const RING_COL = Object.freeze(RING.filter((_, k) => k % 2 === 0).map((dx) => dx + 3)), RING_ROW = Object.freeze(RING.filter((_, k) => k % 2 === 1).map((dz) => dz + 3));    // index into RING_OFFSETS
+const RING_OFFSETS = Object.freeze([-3, -2, -1, 0, 1, 2, 3]);
+const NEIGHBOURS = Object.freeze([1, 0, -1, 0, 0, 1, 0, -1]);
+
 export function buildWorldMap({ classes, canopy, near, leaf, fields, cliffs = [] }) {
   const nx = classes.nx, nz = classes.nz;
   if (nx !== WORLD.width / MAP_CELL || nz !== WORLD.depth / MAP_CELL) throw new Error(`class raster is ${nx}x${nz}, expected ${WORLD.width / MAP_CELL}x${WORLD.depth / MAP_CELL}`);
   const cover = new Uint8Array(nx * nz * 4), can = new Uint8Array(nx * nz * 4), field = new Uint8Array(nx * nz * 4);
   const ch = canopy.height, cc = canopy.cover;
-  const hAt = (i, j) => near.data[Math.min(near.nz - 1, Math.max(0, j * 2)) * near.nx + Math.min(near.nx - 1, Math.max(0, i * 2))];
+  const nearW = near.nx, nearH = near.nz, nd = near.data;
+  // Per column / per row lookups, computed once (the loop below runs for 2 million cells): the canopy lattice cell and weight (the same clamp and floor as sampleBilinear), and the clamped
+  // near-grid indices of every offset the wetness ring reads. The arithmetic per cell is unchanged, so the rasters come out bit for bit as before.
+  const lattice = (count, size) => { const idx = new Int32Array(count), w = new Float64Array(count); for (let k = 0; k < count; k++) { const g = Math.min(size - 1.0000001, Math.max(0, (k * MAP_CELL) / canopy.step)); idx[k] = Math.floor(g); w[k] = g - idx[k]; } return { idx, w }; };
+  const latX = lattice(nx, cc.nx), latZ = lattice(nz, cc.nz);
+  const latHX = lattice(nx, ch.nx), latHZ = lattice(nz, ch.nz);
+  const colAt = (dx) => { const a = new Int32Array(nx); for (let i = 0; i < nx; i++) a[i] = Math.min(nearW - 1, Math.max(0, (i + dx) * 2)); return a; };
+  const rowAt = (dz) => { const a = new Int32Array(nz); for (let j = 0; j < nz; j++) a[j] = Math.min(nearH - 1, Math.max(0, (j + dz) * 2)) * nearW; return a; };
+  const cols = RING_OFFSETS.map(colAt), rows = RING_OFFSETS.map(rowAt), col0 = colAt(0), row0 = rowAt(0);
+  const ccd = cc.data, chd = ch.data, ccw = cc.nx, chw = ch.nx;
   for (let j = 0; j < nz; j++) {
+    const czi = latZ.idx[j], czw = latZ.w[j], chzi = latHZ.idx[j], chzw = latHZ.w[j];
     for (let i = 0; i < nx; i++) {
       const o = (j * nx + i) * 4;
       const cls = classes.data[j * nx + i];
-      const cx = (i * MAP_CELL) / canopy.step, cz = (j * MAP_CELL) / canopy.step;     // the canopy lattice is 8 m, nodes at multiples of 8 m
-      let canopyCover = sampleBilinear(cc, cx, cz);
-      const canopyHeight = sampleBilinear(ch, cx, cz);
+      const oc = czi * ccw + latX.idx[i], tx = latX.w[i];
+      let canopyCover = (ccd[oc] * (1 - tx) + ccd[oc + 1] * tx) * (1 - czw) + (ccd[oc + ccw] * (1 - tx) + ccd[oc + ccw + 1] * tx) * czw;
+      const oh = chzi * chw + latHX.idx[i], hx = latHX.w[i];
+      const canopyHeight = (chd[oh] * (1 - hx) + chd[oh + 1] * hx) * (1 - chzw) + (chd[oh + chw] * (1 - hx) + chd[oh + chw + 1] * hx) * chzw;
       if (cls === CLASS.built || cls === CLASS.water || cls === CLASS.farmland) canopyCover = 0;            // roofs and fields are not forest
       else if (cls === CLASS.meadow) canopyCover *= 0.3;
-      const h = hAt(i, j);
+      const h = nd[row0[j] + col0[i]];
       let ring = 0;
-      for (const [dx, dz] of [[3, 0], [-3, 0], [0, 3], [0, -3], [2, 2], [-2, 2], [2, -2], [-2, -2]]) ring += hAt(i + dx, j + dz);
+      for (let k = 0; k < RING.length; k += 2) ring += nd[rows[RING_ROW[k / 2]][j] + cols[RING_COL[k / 2]][i]];
       const wet = Math.min(1, Math.max(0, 0.25 + (ring / 8 - h) * 0.28));        // positive concavity: a hollow
       cover[o] = cls === CLASS.meadow ? 255 : cls === CLASS.farmland ? 190 : 0;
       cover[o + 1] = cls === CLASS.built ? 255 : 0;
@@ -41,7 +57,8 @@ export function buildWorldMap({ classes, canopy, near, leaf, fields, cliffs = []
       const fid = fields ? fields.data[j * nx + i] : 0;
       let hedge = 0;
       if (fid > 0 && cls !== CLASS.built && cls !== CLASS.forest) {
-        for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        for (let k = 0; k < NEIGHBOURS.length; k += 2) {
+          const dx = NEIGHBOURS[k], dz = NEIGHBOURS[k + 1];
           const ni = i + dx, nj = j + dz;
           const nid = ni < 0 || nj < 0 || ni >= nx || nj >= nz ? 0 : fields.data[nj * nx + ni];
           if (nid === fid) continue;
