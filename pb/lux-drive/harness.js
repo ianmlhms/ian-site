@@ -383,6 +383,7 @@ if (wants('B')) {
     }
     return Math.abs(a) / 2;
   };
+  const openedRingIds = new Set((data.openedRings || []).map((o) => o.id));
   const order = [];
   for (let i = 0; i < net.roads.length; i++) order.push(i);
   for (let k = 0; k < order.length; k++) {
@@ -395,8 +396,9 @@ if (wants('B')) {
     if (count < 4) continue;
     // the width of the area a closed way encloses: the diameter of the disc of the same area
     const raw = data.roads[ri].pts;
+    // (city22: a service ring that ring-share.js opened where it ran along a street still encloses its yard - the polygon closed by the run it gave up, the same area as before)
     const closed = raw.length > 2
-      && Math.hypot(raw[0][0] - raw[raw.length - 1][0], raw[0][1] - raw[raw.length - 1][1]) < 12;
+      && (Math.hypot(raw[0][0] - raw[raw.length - 1][0], raw[0][1] - raw[raw.length - 1][1]) < 12 || openedRingIds.has(ri));
     const areaW = closed ? 2 * Math.sqrt(enclosedArea(raw) / Math.PI) : 0;
     if (closed) closedWays++;
     const bands = [];

@@ -156,9 +156,11 @@ export function widenToWays(decks, roads) {
  * FOOT_CLEAR.maxShift), the shift spread along the deck over FOOT_CLEAR.ramp so the deck does not kink.  The car took the deck - 0.5 - 0.8 m over its lane, within
  * DECK.stickBelow + DECK.hintLift of its body - for its road: Pont Buchler 15754 / 16046 (deck 229, lane 3.67: roll 0.6, the path's railing in the lane), Route de Trèves
  * (deck 134).  The car way: a car class, not in a tunnel, running parallel (FOOT_CLEAR.parallel) with its axis more than FOOT_CLEAR.ownAxis from the deck's (nearer: the deck's
- * own way).  Pure: returns new decks (the others unchanged).
+ * own way); the shift fades to nothing over FOOT_CLEAR.endHold at the deck's ends.  Pure: returns new decks (the others unchanged).
  */
-export const FOOT_CLEAR = Object.freeze({ maxShift: 2.5, ramp: 12, parallel: 0.9, ownAxis: 1.5, along: 0.6, cell: 64 });
+// (endHold: the ends stay where they are - the end of deck 229 moved out over the cut of service 7674 beside it, an open pit under the deck, harness D)
+export const FOOT_CLEAR = Object.freeze({ maxShift: 2.5, ramp: 12, endHold: 8, parallel: 0.9, ownAxis: 1.5, along: 0.6, cell: 64 });
+const smoothstep01 = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 export function clearCarriageways(decks, roads) {
   const G = FOOT_CLEAR.cell, grid = new Map(), key = (x, z) => Math.floor(x / G) * 65536 + Math.floor(z / G);
   for (const r of roads) {
@@ -205,7 +207,7 @@ export function clearCarriageways(decks, roads) {
       let shift = 0, sx = 0, sz = 0;
       for (let j = 0; j < n; j++) {
         if (!(need[j] > 0)) continue;
-        const v = need[j] * Math.max(0, 1 - Math.abs(s[i] - s[j]) / FOOT_CLEAR.ramp);
+        const v = need[j] * Math.max(0, 1 - Math.abs(s[i] - s[j]) / FOOT_CLEAR.ramp) * smoothstep01(Math.min(s[i], s[n - 1] - s[i]) / FOOT_CLEAR.endHold);
         if (v > shift) { shift = v; sx = dirX[j]; sz = dirZ[j]; }
       }
       return shift > 0 ? [p[0] + sx * shift, p[1] + sz * shift] : p;
