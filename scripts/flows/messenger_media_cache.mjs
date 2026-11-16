@@ -56,6 +56,7 @@ export const flow = {
   name: "messenger-media-cache",
   backend: {
     rpc: {
+      my_profile_private: () => [{ account_checked_at: "2026-10-01T00:00:00Z" }],   // keeps the one-time account-check card (account-check.js) away
       has_pin: () => true,
       is_view_restricted: () => false,
       my_chats: () => [
