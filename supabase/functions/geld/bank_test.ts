@@ -267,3 +267,13 @@ Deno.test("an endless continuation_key is cut off", async () => {
   const client = { transactionsPage: () => Promise.resolve({ transactions: [], continuation_key: "again" }) };
   await assertRejects(() => fetchAllTransactions(client, "u", { dateFrom: "2026-01-01" }), EbError, "TOO_MANY_PAGES");
 });
+
+Deno.test("money from Raoul is not an own transfer (pocket money = income side)", async () => {
+  const tx = parsed({
+    credit_debit_indicator: "CRDT", creditor: undefined,
+    debtor: { name: "M. ET/OU MME RAOUL MULHEIMS - WIWINIUS" }, remittance_information: ["Taeschegeld"],
+  });
+  const [row] = await mapBankTxs([tx], await ctx());
+  assertEquals(row.is_transfer, false);
+  assertEquals(row.type, "other");
+});

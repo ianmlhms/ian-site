@@ -209,6 +209,8 @@ export async function syncAccounts(uids: string[] | null, psu?: Psu) {
       catch (e) { summaries.push(await recordFailure(acct, e)); }
     }
   }
+  const { error: pairError } = await admin.rpc("geld_pair_tr_topups");
+  if (pairError) console.error("geld bank: TR top-up pairing failed", pairError.message);
   const categorised = summaries.some((s) => s.inserted > 0) ? await categorisePending() : 0;
   return {
     ok: summaries.every((s) => !s.error), accounts: summaries, categorised,

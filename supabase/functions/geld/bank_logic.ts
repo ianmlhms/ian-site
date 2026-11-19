@@ -19,7 +19,9 @@ const KEY_LENGTH = 16;
 const NOON_UTC = "T12:00:00.000Z";
 /* Names that mean "Ian's own money" even when no IBAN matches (Trade Republic
  * has no IBAN here). Same idea as OWN_COUNTERPARTY in logic.ts. */
-const OWN_NAME = /trade republic|\bian\b|raoul/i;
+/* Raoul is NOT listed: his transfers to Ian are pocket money (income), and
+ * Ian paying him is spending unless it lands on TR (geld_pair_tr_topups). */
+const OWN_NAME = /trade republic|\bian\b/i;
 const CARD_HINT = /\b(carte|card|visa|mastercard|maestro|debit ?card|apple ?pay|google ?pay|v ?pay|paiement|pos)\b/i;
 const CARD_CODES = /^(CCRD|POS|CARD|PMNT-CCRD)/i;
 
