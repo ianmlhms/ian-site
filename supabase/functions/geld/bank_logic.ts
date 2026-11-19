@@ -2,7 +2,7 @@
  * geld_tx row, own-account detection, account labels, consent notes. */
 import { type BankId, type BankTx, isMainCandidate, type SessionAccount } from "./bank_validate.ts";
 import { clean } from "./validate.ts";
-import { merchantKey, type TxRow } from "./logic.ts";
+import { merchantKey, parentsPay, type TxRow } from "./logic.ts";
 
 export const BANK_LABEL: Record<BankId, string> = { bcee: "Spuerkeess", bdl: "BDL" };
 export const BANK_ACCOUNT_SOURCE = "bank";
@@ -88,9 +88,6 @@ export async function isOwnTransfer(tx: BankTx, ownIbanHashes: ReadonlySet<strin
 
 /* Money in with no counterparty name or reference (Spuerkeess sends some)
  * gives the model nothing to go on: call it income. */
-/* Mum/Dad paying back the school canteen card: their money, left out of spending (Ian, 20 Nov 2026). */
-const CANTEEN = /cantine|kantin|restopolis|iessengeld/i;
-const canteenRepayment = (merchant: string, kind: string) => kind === "in" && CANTEEN.test(merchant);
 
 const unnamedIncome = (merchant: string, kind: string) => merchant === "" && kind === "in";
 
@@ -103,7 +100,7 @@ export async function mapBankTx(tx: BankTx, ctx: MapContext, id: string): Promis
   return {
     id, at: atOf(tx.date), amount: tx.amount, kind: tx.kind, account: ctx.label,
     source: BANK_ACCOUNT_SOURCE, type, merchant, isin: null, shares: null,
-    cat: own ? "transfer" : ctx.rules.get(merchantKey(merchant)) ?? (canteenRepayment(merchant, tx.kind) ? "parents" : unnamedIncome(merchant, tx.kind) ? "income" : null),
+    cat: own ? "transfer" : ctx.rules.get(merchantKey(merchant)) ?? (parentsPay(merchant) ? "parents" : unnamedIncome(merchant, tx.kind) ? "income" : null),
     cat_locked: false, is_transfer: own, status: "BOOK", event_type: tx.code || null,
     updated_at: ctx.nowISO,
   };
