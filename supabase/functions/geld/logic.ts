@@ -39,10 +39,11 @@ export const merchantKey = (merchant: string) => merchant.trim().toLowerCase();
 
 /* Things Mum/Dad always pay back 100 % (Ian, 20 Nov 2026) via Digicash/Payconiq,
  * Wero or bank transfer: the school canteen and Osteria di Niederanven (NOT
- * L'Osteria on Place Guillaume II — that is Ian's own money). Their repayments
+ * L'Osteria on Place Guillaume II — that is Ian's own money), and the yearly
+ * Duolingo Super Family plan ("PLUS 12 MONTH FAMILY"). Their repayments
  * just say "osteria", so incoming money matches the looser pattern. The payment and its repayment both get "parents", which is
  * neither spending nor income. Matches bank lines with date suffixes too. */
-const PARENTS_PAY_OUT = /restopolis|restsco|osteria di niederanven/i;
+const PARENTS_PAY_OUT = /restopolis|restsco|osteria di niederanven|plus 12 month family|duolingo/i;
 const PARENTS_PAY_IN = /restopolis|cantine|kantin|iessengeld|osteria/i;
 export const parentsPay = (merchant: string | null | undefined, kind: string) =>
   (kind === "in" ? PARENTS_PAY_IN : PARENTS_PAY_OUT).test(merchant ?? "");
