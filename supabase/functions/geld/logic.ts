@@ -8,9 +8,10 @@ export const TR_ACCOUNT = "Trade Republic";
 export const TOTAL_KEY = "_total";
 export const ALERT_LEVELS = [80, 100] as const;
 /* Not spending: money that stays Ian's own or goes into the depot. */
-const NON_SPENDING_CATS = new Set(["investment", "transfer"]);
+/* "parents": paid for by Mum/Dad (school canteen) — neither Ian's spending nor income. */
+const NON_SPENDING_CATS = new Set(["investment", "transfer", "parents"]);
 /* Incoming money in these categories is income, not a refund. */
-const NOT_REFUND_CATS = new Set(["income", "dividend", "other"]);
+const NOT_REFUND_CATS = new Set(["income", "dividend", "other", "parents"]);
 /* A transfer is "own account" when the counterparty is one of the family
  * members who share this Trade Republic account. */
 // "Einzahlung" = a card/Apple Pay top-up from one of our own accounts.

@@ -103,3 +103,9 @@ Deno.test("money back for a purchase lowers that category; pocket money does not
   assertEquals(spendOf({ ...base, amount: 125, kind: "in", cat: "income" }), null);
   assertEquals(spendOf({ ...base, amount: 5, kind: "in", cat: null }), null);
 });
+
+Deno.test("canteen paid by the parents is neither spending nor a refund", () => {
+  const base = { at: "2026-10-26T12:00:00Z", type: "other", is_transfer: false, merchant: "Restopolis" };
+  assertEquals(spendOf({ ...base, amount: 100, kind: "out", cat: "parents" }), null);
+  assertEquals(spendOf({ ...base, amount: 100, kind: "in", cat: "parents" }), null);
+});

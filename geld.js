@@ -12,9 +12,10 @@ const ACCOUNT_COLUMNS = "uid,bank,label,iban_last4,name,currency,balance,balance
 const LIST_STEP = 60;
 const REFRESH_MS = 5 * 60 * 1000;
 const TOTAL_KEY = "_total";
-const NON_SPENDING = new Set(["investment", "transfer"]);
+/* "parents": paid for by Mum/Dad (school canteen) — neither Ian's spending nor income. */
+const NON_SPENDING = new Set(["investment", "transfer", "parents"]);
 /* Incoming money in these categories is income, not a refund. */
-const NOT_REFUND_CATS = new Set(["income", "dividend", "other"]);
+const NOT_REFUND_CATS = new Set(["income", "dividend", "other", "parents"]);
 const TRADE_TYPES = ["buy", "sell", "savings_plan"];
 const RULE_TYPES = "type.is.null,type.in.(card,card_refund,other,transfer_out)";
 const CHART_RANGES = [["1M", 30], ["3M", 91], ["1J", 365], ["Alles", 0]];
@@ -34,7 +35,7 @@ const TAX = {
   shopping: ["🛍️", "Shopping"], subscription: ["📱", "Abo"], leisure: ["🎮", "Fräizäit"],
   health: ["💊", "Gesondheet"], education: ["📚", "Schoul"], income: ["💼", "Rakomm"],
   investment: ["📈", "Investéieren"], dividend: ["💰", "Dividend/Zënsen"], fees: ["💳", "Gebüren"],
-  cash: ["🏧", "Boergeld"], transfer: ["🔁", "Transfer"], other: ["⭐", "Aneres"],
+  cash: ["🏧", "Boergeld"], transfer: ["🔁", "Transfer"], parents: ["👪", "Elteren bezuelen"], other: ["⭐", "Aneres"],
 };
 const SPEND_CATS = ["food", "groceries", "transport", "shopping", "subscription", "leisure", "health", "education", "fees", "cash", "other"];
 const PICK_CATS = Object.keys(TAX);

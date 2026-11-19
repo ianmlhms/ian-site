@@ -277,3 +277,9 @@ Deno.test("money from Raoul is not an own transfer (pocket money = income side)"
   assertEquals(row.is_transfer, false);
   assertEquals(row.type, "other");
 });
+
+Deno.test("parents paying back the canteen card is tagged parents", async () => {
+  const tx = parsed({ credit_debit_indicator: "CRDT", creditor: undefined, debtor: { name: "M. ET/OU MME RAOUL MULHEIMS" }, remittance_information: ["cantineskaart"] });
+  const [row] = await mapBankTxs([tx], await ctx());
+  assertEquals(row.cat, "parents");
+});
