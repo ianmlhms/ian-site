@@ -67,6 +67,8 @@ export const APPS = Object.freeze([
     keywords: ["foto", "photo", "fotobuch", "photobook", "wëschen", "duell", "vote"] },
   { url: "money.html", name: "Sue", icon: "💶", group: "grp.personal", locked: true,
     keywords: ["geld", "argent", "suen", "ausgaben", "dépenses", "subscriptions"] },
+  { url: "geld.html", admin: true, name: "Geld", icon: "🏦", group: "grp.personal", locked: false,
+    keywords: ["trade republic", "depot", "budget", "ausgaben", "dépenses", "etf", "portfolio", "suen"] },
   { url: "me.html", admin: true, name: "My Dashboard", icon: "📊", group: "grp.personal", locked: false,
     keywords: ["stats", "traffic", "github", "analytics", "statistiken"] },
   { url: "karts.html", admin: true, name: "KartTracker", icon: "🏎️", group: "grp.personal", locked: false,
