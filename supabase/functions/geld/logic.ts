@@ -15,10 +15,11 @@ const NOT_REFUND_CATS = new Set(["income", "dividend", "other", "parents"]);
 /* A transfer is "own account" when the counterparty is one of the family
  * members who share this Trade Republic account. */
 // "Einzahlung" = a card/Apple Pay top-up from one of Ian's own accounts. The TR
-// account is in Raoul's name but 100 % Ian's money (20 Nov 2026), so a transfer from
-// Raoul is only own money when it pairs with a payment from Ian's bank
-// (geld_pair_tr_topups); otherwise it is income or a repayment.
-const OWN_COUNTERPARTY = /\b(ian|einzahlung)\b/i;
+// account is in Raoul's name but 100 % Ian's money (20 Nov 2026). Ian can't pay into
+// TR directly, so he sends money to Raoul who forwards it: money from Raoul into TR
+// is always Ian's own money (the one exception, the Phantasialand repayment, is
+// set by hand and locked).
+const OWN_COUNTERPARTY = /\b(raoul|ian|einzahlung)\b/i;
 
 const DEFAULT_CAT_BY_TYPE: Partial<Record<TxType, string>> = {
   buy: "investment", sell: "investment", savings_plan: "investment",
@@ -36,9 +37,10 @@ export type ExistingTx = { id: string; cat: string | null; cat_locked: boolean; 
 
 export const merchantKey = (merchant: string) => merchant.trim().toLowerCase();
 
-/* Things Mum/Dad always pay back (Ian, 20 Nov 2026): the school canteen. The payment and its repayment both get "parents", which is
+/* Things Mum/Dad always pay back 100 % (Ian, 20 Nov 2026) via Digicash/Payconiq,
+ * Wero or bank transfer: the school canteen and the Osteria dinners. The payment and its repayment both get "parents", which is
  * neither spending nor income. Matches bank lines with date suffixes too. */
-const PARENTS_PAY = /restopolis|restsco|cantine|kantin|iessengeld/i;
+const PARENTS_PAY = /restopolis|restsco|osteria|cantine|kantin|iessengeld/i;
 export const parentsPay = (merchant: string | null | undefined) => PARENTS_PAY.test(merchant ?? "");
 
 export function isOwnTransfer(type: string, merchant: string): boolean {
