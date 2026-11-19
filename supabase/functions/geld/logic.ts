@@ -22,7 +22,7 @@ const DEFAULT_CAT_BY_TYPE: Partial<Record<TxType, string>> = {
 
 export type TxRow = {
   id: string; at: string; amount: number; kind: "in" | "out"; account: string;
-  source: "tr"; type: string; merchant: string; isin: string | null; shares: number | null;
+  source: "tr" | "bank"; type: string; merchant: string; isin: string | null; shares: number | null;
   cat: string | null; cat_locked: boolean; is_transfer: boolean; status: string;
   event_type: string | null; updated_at: string;
 };

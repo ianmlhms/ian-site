@@ -1,7 +1,10 @@
 /* Flow — Geld (geld.html): owner-only Trade Republic page, all data FAKE.
  * Other accounts see a notice and cause NO geld_* request; the owner sees the
  * cards, category bars, the chart, positions; changing a category locks the row,
- * saves a merchant rule and re-applies it to unlocked rows of that merchant. */
+ * saves a merchant rule and re-applies it to unlocked rows of that merchant.
+ * Bank sync part (Enable Banking via the geld function, FAKE accounts): the
+ * Konten card, connect buttons, ?code&state callback, ?error callback, the
+ * expiry/error banners and the "Aktualiséieren" button. */
 import { runIfMain } from "./lib.mjs";
 
 const SESSION_KEY = "sb-lvksqmgfwkfbblfsozfk-auth-token";
@@ -13,8 +16,15 @@ const tx = (id, daysAgo, amount, kind, type, merchant, cat, extra = {}) => ({
   cat, cat_locked: false, is_transfer: false, status: "EXECUTED", event_type: null, ...extra,
 });
 
+const FAKE_STATE = "a".repeat(64);
+const acct = (uid, bank, label, last4, balance, daysValid, extra = {}) => ({
+  uid, bank, label, iban_last4: last4, name: "", currency: "EUR", balance, balance_at: iso(0),
+  valid_until: new Date(NOW.getTime() + daysValid * 86400000).toISOString(), last_sync_at: iso(0, 10), last_error: null, ...extra,
+});
 let rows = [];
 let rules = [];
+let accounts = [];
+let origin = "";
 const reset = () => {
   rows = [
     tx("t1", 0, 12.5, "out", "card", "Fake Cafe", "food"),
@@ -59,7 +69,19 @@ export const flow = {
       ],
       geld_daily: () => [30, 20, 10, 0].map((d, i) => ({ day: day(d), depot_value: 340 + i * 10, invested: 350, cash: 12.34 })),
       geld_budgets: () => [{ cat: "_total", monthly_limit: 100 }, { cat: "food", monthly_limit: 50 }],
+      geld_accounts: () => accounts,
       geld_sync: () => [{ id: 1, last_ok_at: iso(0, 11), last_attempt_at: iso(0, 11), last_error: null, needs_login: true, events_total: 7 }],
+    },
+    functions: {
+      geld: (body) => {
+        if (body?.action === "bank_auth") return { url: `${origin}/geld.html?code=fakecode&state=${FAKE_STATE}` };
+        if (body?.action === "bank_session") {
+          accounts = [acct("u1", "bcee", "Spuerkeess", "0001", 1000.5, 170), accounts.find((a) => a.bank === "bdl")].filter(Boolean);
+          return { accounts: [{ label: "Spuerkeess", iban_last4: "0001" }], inserted: 42 };
+        }
+        if (body?.action === "bank_sync") return { ok: true, accounts: [{ label: "Spuerkeess", fetched: 3, inserted: 3, updated: 0 }], categorised: 0, inserted: 3 };
+        return {};
+      },
     },
   },
   async run(h) {
@@ -113,6 +135,49 @@ export const flow = {
     h.eq(rows.find((r) => r.id === "t3").cat, "food", "hand-locked row of the same merchant untouched");
     if (process.env.GELD_DEBUG) console.log(JSON.stringify(h.backend.calls.filter((c) => /geld_(rules|tx)/.test(c.name) && c.method !== "GET")));
     await h.shot("after-pick");
+
+    h.step("bank accounts: Konten card, totals, banners, filter chips");
+    accounts = [
+      acct("u1", "bcee", "Spuerkeess", "0001", 1000.5, 40),
+      acct("u2", "bdl", "BDL", "0002", 249.5, 5, { last_error: "Bank 429 ASPSP_RATE_LIMIT_EXCEEDED" }),
+    ];
+    origin = new URL(page.url()).origin;
+    await h.goto("/geld.html");
+    await page.waitForSelector("#accounts .g-row");
+    h.eq(await page.$$eval("#accounts .g-row", (e) => e.length), 2, "two accounts listed");
+    const konten = await page.textContent("#accounts");
+    h.expect(/••0001/.test(konten) && /1\.000,50\s*€/.test(konten), "Spuerkeess shows ••last4 and balance");
+    h.expect(/Zougang nach 40 Deeg/.test(konten), "consent days left shown");
+    h.expect(/1\.262,34\s*€/.test(await page.textContent("#cashAll")), "cash total = banks + Trade Republic");
+    const banners = await page.$$eval(".g-banner", (e) => e.map((b) => b.textContent));
+    h.expect(banners.some((b) => /BDL/.test(b) && /leeft of an 5 Deeg/.test(b) && /nei confirméieren/.test(b)), "expiry banner with re-confirm button");
+    h.expect(banners.some((b) => /Synchro-Feeler/.test(b) && /ASPSP_RATE_LIMIT/.test(b)), "sync error banner");
+    h.eq(await page.$$eval('[data-filter^="acct:"]', (e) => e.length), 2, "account filter chips");
+    h.expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "no horizontal overflow with the Konten card");
+    await h.shot("konten");
+
+    h.step("connect: button calls bank_auth, callback calls bank_session and cleans the URL");
+    await page.click('#accounts [data-connect="bcee"]');
+    await page.waitForFunction(() => /verbonnen ✓/.test(document.body.textContent), null, { timeout: 15000 });
+    const auth = h.backend.callsTo("geld").find((c) => c.body?.action === "bank_auth");
+    h.eq(auth?.body?.bank, "bcee", "bank_auth asked for bcee");
+    const session = h.backend.callsTo("geld").find((c) => c.body?.action === "bank_session");
+    h.eq([session?.body?.code, session?.body?.state], ["fakecode", FAKE_STATE], "bank_session got code and state");
+    h.expect(!/[?&](code|state)=/.test(page.url()), "callback params removed from the URL");
+    h.expect(/42 Buchungen/.test(await page.textContent("#wrap")), "result message shown");
+    await h.shot("connected");
+
+    h.step("bank error callback: friendly message, URL cleaned");
+    const before = h.backend.callsTo("geld").length;
+    await h.goto("/geld.html?error=access_denied&error_description=nope");
+    await page.waitForFunction(() => /ofgebrach/.test(document.body.textContent), null, { timeout: 15000 });
+    h.eq(h.backend.callsTo("geld").length, before, "no bank call for an error callback");
+    h.expect(!/error=/.test(page.url()), "error params removed from the URL");
+
+    h.step("Aktualiséieren runs bank_sync");
+    await page.click("#syncBanks");
+    await page.waitForFunction(() => /Aktualiséiert ✓/.test(document.body.textContent), null, { timeout: 15000 });
+    h.expect(h.backend.callsTo("geld").some((c) => c.body?.action === "bank_sync"), "bank_sync called");
   },
 };
 

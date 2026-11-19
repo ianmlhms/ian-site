@@ -96,3 +96,7 @@ dialog.g-pick::backdrop{background:rgba(0,0,0,.45)}
 .g-pickgrid button:hover,.g-pickgrid button.on{border-color:var(--green);color:var(--green)}
 .g-pick .g-ghost{margin-top:12px;width:100%}
 @media (prefers-reduced-motion:no-preference){.g-meter i,.g-catbar .fill{transition:width .3s}}
+
+.g-iban{font:500 12px "Geist Mono",ui-monospace,monospace;color:var(--muted);margin-left:6px}
+.g-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.g-banner .g-ghost{margin:6px 0 0 8px;font-size:13px;min-height:44px}

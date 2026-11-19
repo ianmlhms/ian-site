@@ -5,6 +5,7 @@
 //
 // Auth: every request carries header `x-sync-secret` (= GELD_SYNC_SECRET),
 // compared in constant time. With the secret unset the function fails closed.
+// Exception: the page-facing bank_* actions below accept the owner's JWT.
 //
 // Contract (POST, JSON, body.action):
 //   sync    {events:[Ev], positions:[Pos]|null, cash:number|null, daily:[{day,depot_value,invested,cash}]|null}
@@ -12,16 +13,25 @@
 //   status  {ok:bool, error?:string, needs_login?:bool}   -> {ok:true}
 //   report  {date:"YYYY-MM-DD"}                            -> numbers for the morning summary
 //   alerts  {}                                             -> {alerts:[{cat,level,spent,limit}]}
+//   bank_auth    (owner login) {bank:"bcee"|"bdl"}  -> {url}   start a bank login (Enable Banking)
+//   bank_session (owner login) {code,state}         -> {accounts,inserted}   finish it, full-history sync
+//   bank_sync    (x-sync-secret from cron, or owner login) {} -> {ok,accounts,inserted,categorised}
+//   report also returns bank_notes: [{label, problem:"expires"|"expired"|"error", days_left?, error?}]
+//
+// Auth for the bank_* actions: bank_auth/bank_session need the owner's Supabase
+// JWT (`Authorization: Bearer`, verified with auth.getUser, id must be the owner).
 //
 // Deploy:
 //   supabase functions deploy geld --no-verify-jwt --project-ref lvksqmgfwkfbblfsozfk
-// Secrets: GELD_SYNC_SECRET (new), ANTHROPIC_API_KEY (already set);
+// Secrets: GELD_SYNC_SECRET (new), ANTHROPIC_API_KEY (already set),
+// EB_APP_ID + EB_PRIVATE_KEY (Enable Banking application id + PKCS#8 PEM key);
 // SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY are injected automatically.
-import { createClient } from "npm:@supabase/supabase-js@2";
 import { secretsMatch } from "../_shared/secrets.ts";
-import { BATCH_SIZE, categoriseBatch } from "./ai.ts";
+import { handleBankAuth, handleBankSession, handleBankSync, loadBankNotes, OWNER_ID } from "./bank.ts";
+import type { Psu } from "./bank_api.ts";
+import { admin, categorisePending, loadExisting, loadRules, must, selectAll, UPSERT_CHUNK } from "./store.ts";
 import {
-  type Alert, type Budget, changeBetween, chunk, dedupeEvents, eventToRow, type ExistingTx,
+  type Alert, type Budget, changeBetween, chunk, dedupeEvents, eventToRow,
   mergeRow, planAlerts, round2, type SpendRow, spendingByCat, TOTAL_KEY, todayDailyRow,
   topMerchants, type TxRow,
 } from "./logic.ts";
@@ -30,68 +40,19 @@ import {
   MAX_BODY_BYTES, parseReportDate, parseStatus, parseSync, type SyncInput,
 } from "./validate.ts";
 
-const ANTHROPIC_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
 const SYNC_SECRET = Deno.env.get("GELD_SYNC_SECRET") ?? "";
-const UPSERT_CHUNK = 500;
-const LOOKUP_CHUNK = 200;
-const PAGE_SIZE = 1000;
-/* Rows sent to the model per sync call, so a first backfill stays well inside
- * the function's time limit; the rest is picked up by the next sync. */
-const MAX_AI_ROWS = 480;
-const AI_PARALLEL = 3;
 const TOP_MERCHANTS = 5;
 const TRADE_TYPES = ["buy", "sell", "savings_plan"];
 
-const admin = createClient(
-  Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-);
-
 const CORS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "x-sync-secret, apikey, content-type",
+  "Access-Control-Allow-Headers": "x-sync-secret, apikey, content-type, authorization",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, "content-type": "application/json" } });
 
-/** Unwrap a supabase-js result or throw with context (details go to the log). */
-// deno-lint-ignore no-explicit-any
-function must<T>(result: { data: T | null; error: any }, what: string): T {
-  if (result.error) throw new Error(`${what}: ${result.error.message}`);
-  return (result.data ?? ([] as unknown)) as T;
-}
-
-/** All rows of a query, paging past PostgREST's 1000-row cap. */
-// deno-lint-ignore no-explicit-any
-async function selectAll<T>(build: () => any, what: string): Promise<T[]> {
-  const rows: T[] = [];
-  for (let from = 0;; from += PAGE_SIZE) {
-    const page = must<T[]>(await build().range(from, from + PAGE_SIZE - 1), what);
-    rows.push(...page);
-    if (page.length < PAGE_SIZE) return rows;
-  }
-}
-
 // ---- sync -------------------------------------------------------------
-
-async function loadRules(): Promise<Map<string, string>> {
-  const rows = must<{ merchant_key: string; cat: string }[]>(
-    await admin.from("geld_rules").select("merchant_key, cat"), "rules read",
-  );
-  return new Map(rows.map((r) => [r.merchant_key, r.cat]));
-}
-
-async function loadExisting(ids: string[]): Promise<Map<string, ExistingTx>> {
-  const found = new Map<string, ExistingTx>();
-  for (const part of chunk(ids, LOOKUP_CHUNK)) {
-    const rows = must<ExistingTx[]>(
-      await admin.from("geld_tx").select("id, cat, cat_locked, is_transfer").in("id", part), "tx lookup",
-    );
-    for (const row of rows) found.set(row.id, row);
-  }
-  return found;
-}
 
 async function upsertEvents(input: SyncInput, nowISO: string) {
   const events = dedupeEvents(input.events);
@@ -122,52 +83,6 @@ async function writeDaily(input: SyncInput, nowMs: number) {
   for (const part of chunk(rows, UPSERT_CHUNK)) {
     must(await admin.from("geld_daily").upsert(part, { onConflict: "day" }), "daily upsert");
   }
-}
-
-type PendingRow = { id: string; merchant: string; amount: number; kind: string; type: string | null; account: string };
-
-/** Ask the model for rows that still have no category and store the answers.
- * A model failure is logged and leaves the rows empty for the next sync. */
-async function categorisePending(): Promise<number> {
-  if (!ANTHROPIC_KEY) { console.error("geld: ANTHROPIC_API_KEY unset, skipping categorisation"); return 0; }
-  const pending = must<PendingRow[]>(
-    await admin.from("geld_tx").select("id, merchant, amount, kind, type, account")
-      .is("cat", null).eq("cat_locked", false).eq("is_transfer", false).neq("merchant", "")
-      .order("at", { ascending: false }).limit(MAX_AI_ROWS),
-    "pending read",
-  );
-  const batches = chunk(pending, BATCH_SIZE);
-  let done = 0;
-  for (let i = 0; i < batches.length; i += AI_PARALLEL) {
-    const results = await Promise.allSettled(batches.slice(i, i + AI_PARALLEL).map(async (batch) => {
-      /* A refund is categorised by its merchant, so the model sees it as money out. */
-      const items = batch.map((r) => ({
-        id: r.id, note: r.merchant, amount: r.amount, account: r.account,
-        kind: r.type === "card_refund" ? "out" : r.kind,
-      }));
-      return await storeCats(await categoriseBatch(ANTHROPIC_KEY, items));
-    }));
-    for (const result of results) {
-      if (result.status === "fulfilled") done += result.value;
-      else console.error("geld: categorise batch failed", result.reason?.message);
-    }
-  }
-  return done;
-}
-
-async function storeCats(answers: { id: string; cat: string }[]): Promise<number> {
-  const byCat = new Map<string, string[]>();
-  for (const a of answers) byCat.set(a.cat, [...(byCat.get(a.cat) ?? []), a.id]);
-  let stored = 0;
-  for (const [cat, ids] of byCat) {
-    must(
-      await admin.from("geld_tx").update({ cat, updated_at: new Date().toISOString() })
-        .in("id", ids).is("cat", null).eq("cat_locked", false),
-      "cat update",
-    );
-    stored += ids.length;
-  }
-  return stored;
 }
 
 async function markSyncOk(nowISO: string) {
@@ -291,21 +206,54 @@ async function handleReport(body: Record<string, unknown>) {
     cash: latest?.cash ?? null,
     trades,
     alerts: await dueAlerts(),
+    bank_notes: await loadBankNotes(Date.now()),
   });
 }
 
 // ---- entry ------------------------------------------------------------
 
-const ACTIONS: Record<string, (body: Record<string, unknown>) => Promise<Response>> = {
+type Handler = (body: Record<string, unknown>) => Promise<Response>;
+const ACTIONS: Record<string, Handler> = {
   sync: handleSync, status: handleStatus, report: handleReport, alerts: () => handleAlerts(),
 };
+
+type Caller = { kind: "secret" } | { kind: "owner"; psu: Psu };
+type BankHandler = (body: Record<string, unknown>, caller: Caller) => Promise<{ status: number; body: unknown }>;
+/* Bank actions and who may call them. bank_sync is also called by cron with
+ * the sync secret; the two others need the owner's own login. */
+const BANK_ACTIONS: Record<string, { allowSecret: boolean; run: BankHandler }> = {
+  bank_auth: { allowSecret: false, run: (b, c) => handleBankAuth(b, psuOf(c)) },
+  bank_session: { allowSecret: false, run: (b, c) => handleBankSession(b, psuOf(c)) },
+  bank_sync: { allowSecret: true, run: (_b, c) => handleBankSync(c.kind === "owner" ? c.psu : undefined) },
+};
+const psuOf = (caller: Caller): Psu => (caller.kind === "owner" ? caller.psu : {});
+
+/** PSU headers of an attended request: client IP (first x-forwarded-for hop) and user agent. */
+function psuFrom(req: Request): Psu {
+  const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim();
+  const userAgent = (req.headers.get("user-agent") ?? "").slice(0, 300);
+  return { ...(ip ? { ip } : {}), ...(userAgent ? { userAgent } : {}) };
+}
+
+/** Is the bearer token the owner's Supabase session? Fails closed. */
+async function isOwner(req: Request): Promise<boolean> {
+  const match = /^Bearer\s+(\S+)$/i.exec(req.headers.get("authorization") ?? "");
+  if (!match) return false;
+  const { data, error } = await admin.auth.getUser(match[1]);
+  return !error && data.user?.id === OWNER_ID;
+}
+
+async function authenticate(req: Request, allowOwner: boolean): Promise<Caller | null> {
+  if (await secretsMatch(SYNC_SECRET, req.headers.get("x-sync-secret"))) return { kind: "secret" };
+  if (allowOwner && await isOwner(req)) return { kind: "owner", psu: psuFrom(req) };
+  return null;
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "method" }, 405);
-  if (!await secretsMatch(SYNC_SECRET, req.headers.get("x-sync-secret"))) {
-    return json({ error: "unauthorized" }, 401);
-  }
+  /* Cheap early refusal: neither the sync secret header nor a bearer token. */
+  if (!req.headers.has("x-sync-secret") && !req.headers.has("authorization")) return json({ error: "unauthorized" }, 401);
 
   const text = await req.text();
   if (text.length > MAX_BODY_BYTES) return json({ error: "body too large" }, 413);
@@ -316,14 +264,23 @@ Deno.serve(async (req) => {
   }
   const payload = body as Record<string, unknown>;
   const action = typeof payload.action === "string" ? payload.action : "";
-  if (!Object.hasOwn(ACTIONS, action)) return json({ error: "unknown action" }, 400);
-  const handler = ACTIONS[action];
+  const bank = Object.hasOwn(BANK_ACTIONS, action) ? BANK_ACTIONS[action] : null;
+  if (!bank && !Object.hasOwn(ACTIONS, action)) {
+    /* Unknown actions look the same as before to unauthenticated callers. */
+    return await authenticate(req, false) ? json({ error: "unknown action" }, 400) : json({ error: "unauthorized" }, 401);
+  }
+
+  const caller = await authenticate(req, bank !== null);
+  if (!caller || (caller.kind === "secret" && bank && !bank.allowSecret)) return json({ error: "unauthorized" }, 401);
 
   try {
-    return await handler(payload);
+    if (bank) {
+      const reply = await bank.run(payload, caller);
+      return json(reply.body, reply.status);
+    }
+    return await ACTIONS[action](payload);
   } catch (e) {
     console.error("geld:", action, (e as Error)?.message);
     return json({ error: "server error" }, 500);
   }
 });
-
