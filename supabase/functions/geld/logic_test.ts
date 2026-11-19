@@ -1,6 +1,6 @@
 import { assertEquals } from "jsr:@std/assert@1";
 import {
-  changeBetween, dedupeEvents, defaultCat, eventToRow, mergeRow, planAlerts, spendingByCat,
+  changeBetween, dedupeEvents, defaultCat, eventToRow, mergeRow, planAlerts, spendingByCat, spendOf,
   todayDailyRow, topMerchants, type SpendRow,
 } from "./logic.ts";
 import type { Ev } from "./validate.ts";
@@ -94,4 +94,12 @@ Deno.test("change between two values", () => {
   assertEquals(changeBetween(110, 100), { eur: 10, pct: 10 });
   assertEquals(changeBetween(5, 0), { eur: 5, pct: null });
   assertEquals(changeBetween(null, 1), null);
+});
+
+Deno.test("money back for a purchase lowers that category; pocket money does not", () => {
+  const base = { at: "2026-04-20T12:00:00Z", type: "other", is_transfer: false, merchant: "x" };
+  assertEquals(spendOf({ ...base, amount: 322, kind: "out", cat: "health" }), { cat: "health", value: 322 });
+  assertEquals(spendOf({ ...base, amount: 322, kind: "in", cat: "health" }), { cat: "health", value: -322 });
+  assertEquals(spendOf({ ...base, amount: 125, kind: "in", cat: "income" }), null);
+  assertEquals(spendOf({ ...base, amount: 5, kind: "in", cat: null }), null);
 });

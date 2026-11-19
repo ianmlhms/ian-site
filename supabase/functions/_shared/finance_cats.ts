@@ -23,7 +23,7 @@ export const SYS =
   "leisure (cinema, games, hobbies, sports, entertainment), " +
   "health (pharmacy, doctor, dentist), " +
   "education (school, books, courses), " +
-  "income (salary, allowance, gifts of money received, refunds), " +
+  "income (salary, pocket money/allowance, gifts of money received), " +
   "investment (buying/selling stocks or ETFs), " +
   "dividend (dividends, interest, investment rewards), " +
   "fees (bank/card fees, charges), " +
@@ -33,6 +33,12 @@ export const SYS =
   "Bank labels often look like 'PAIEMENT VISA <merchant> <city>', " +
   "'DOMICILIATION <company>' or 'Achat <merchant>' — judge by the merchant or " +
   "company name inside the label, not the payment-method words around it. " +
+  "Money RECEIVED (in) that pays back a specific purchase named in the note " +
+  "(a restaurant, shop, ticket or item, e.g. 'Osteria', 'Leclerc', 'Kino', " +
+  "'Brëll', or a merchant refund 'REMBOURSEMENT …') gets the category of that " +
+  "purchase (food, groceries, leisure, health…), NOT income: it is a refund. " +
+  "Money received with no such purchase (pocket money, 'Taeschegeld', birthday, " +
+  "gift, payment for work) is income.\n" +
   "Use 'other' ONLY as a true last resort: an unfamiliar merchant name still " +
   "deserves your best guess from the specific categories above.\n" +
   "Return ONLY minified JSON of the form {\"cats\":[{\"id\":\"<id>\"," +

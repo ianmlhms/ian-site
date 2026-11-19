@@ -13,6 +13,8 @@ const LIST_STEP = 60;
 const REFRESH_MS = 5 * 60 * 1000;
 const TOTAL_KEY = "_total";
 const NON_SPENDING = new Set(["investment", "transfer"]);
+/* Incoming money in these categories is income, not a refund. */
+const NOT_REFUND_CATS = new Set(["income", "dividend", "other"]);
 const TRADE_TYPES = ["buy", "sell", "savings_plan"];
 const RULE_TYPES = "type.is.null,type.in.(card,card_refund,other,transfer_out)";
 const CHART_RANGES = [["1M", 30], ["3M", 91], ["1J", 365], ["Alles", 0]];
@@ -81,7 +83,9 @@ function spendOf(row) {
   const cat = row.cat || "other";
   if (NON_SPENDING.has(cat)) return null;
   if (row.kind === "out") return { cat, value: Number(row.amount) };
-  if (row.kind === "in" && row.type === "card_refund") return { cat, value: -Number(row.amount) };
+  /* Money back for a purchase ("Réckbezuelung"): any incoming row that carries a
+   * spending category, or a card refund, lowers that category. */
+  if (row.kind === "in" && (row.type === "card_refund" || !NOT_REFUND_CATS.has(cat))) return { cat, value: -Number(row.amount) };
   return null;
 }
 function spending(rows) {
@@ -165,7 +169,7 @@ async function setCategory(tx, cat) {
     await one(sb.from("geld_tx").update({
       cat, cat_locked: true, is_transfer: cat === "transfer", updated_at: new Date().toISOString(),
     }).eq("id", tx.id), "Kategorie");
-    if (key) {
+    if (key && tx.kind === "out") {
       await one(sb.from("geld_rules").upsert({ merchant_key: key, cat }, { onConflict: "merchant_key" }), "Regel");
       await one(
         sb.from("geld_tx").update({ cat, updated_at: new Date().toISOString() })
@@ -358,7 +362,7 @@ function txRow(t) {
     ? `<button type="button" class="g-catchip" data-pick="${esc(t.id)}" aria-label="Kategorie änneren: ${esc(catLabel(cat))}">${catIcon(cat)} <span class="n">${esc(catLabel(cat))}</span>${t.cat_locked ? '<span class="g-lock" title="Vun Hand gesat">●</span>' : ""}</button>`
     : `<button type="button" class="g-catchip none" data-pick="${esc(t.id)}" aria-label="Kategorie wielen">＋ <span class="n">Kategorie</span></button>`;
   return `<div class="g-row"><div class="main"><div class="t">${esc(t.merchant || TRADE_LABEL[t.type] || "—")}</div>
-    <div class="s">${esc(dayLabel(lbDay(t.at)))} · ${esc(t.account)}</div></div>
+    <div class="s">${esc(dayLabel(lbDay(t.at)))} · ${esc(t.account)}${t.kind === "in" && spendOf(t) ? " · ↩ Réckbezuelung" : ""}</div></div>
     <div class="amt ${cls}">${t.kind === "in" ? "+" : "−"}${numFmt.format(Number(t.amount))}${CURRENCY_SUFFIX}</div>${chip}</div>`;
 }
 

@@ -9,6 +9,8 @@ export const TOTAL_KEY = "_total";
 export const ALERT_LEVELS = [80, 100] as const;
 /* Not spending: money that stays Ian's own or goes into the depot. */
 const NON_SPENDING_CATS = new Set(["investment", "transfer"]);
+/* Incoming money in these categories is income, not a refund. */
+const NOT_REFUND_CATS = new Set(["income", "dividend", "other"]);
 /* A transfer is "own account" when the counterparty is one of the family
  * members who share this Trade Republic account. */
 // "Einzahlung" = a card/Apple Pay top-up from one of our own accounts.
@@ -92,7 +94,9 @@ export function spendOf(row: SpendRow): { cat: string; value: number } | null {
   const cat = row.cat ?? "other";
   if (NON_SPENDING_CATS.has(cat)) return null;
   if (row.kind === "out") return { cat, value: Number(row.amount) };
-  if (row.kind === "in" && row.type === "card_refund") return { cat, value: -Number(row.amount) };
+  /* Money back for a purchase ("Réckbezuelung"): any incoming row that carries a
+   * spending category, or a card refund, lowers that category. */
+  if (row.kind === "in" && (row.type === "card_refund" || !NOT_REFUND_CATS.has(cat))) return { cat, value: -Number(row.amount) };
   return null;
 }
 
