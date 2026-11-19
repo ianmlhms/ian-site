@@ -68,7 +68,12 @@ export const counterpartyIban = (tx: BankTx) => (tx.kind === "out" ? tx.creditor
 
 export function merchantOf(tx: BankTx): string {
   const name = counterpartyName(tx);
-  return clean((name || tx.remittance.join(" ")).replace(/\s+/g, " "), MAX_MERCHANT);
+  const memo = tx.remittance.join(" ");
+  /* For money received the message says what it is for ("Taeschegeld",
+   * "cantineskaart", "Osteria"), which the categoriser needs. Outgoing rows keep
+   * the bare name so merchant rules stay stable. */
+  const text = name && memo && tx.kind === "in" ? `${name} · ${memo}` : name || memo;
+  return clean(text.replace(/\s+/g, " "), MAX_MERCHANT);
 }
 
 export function looksLikeCard(tx: BankTx): boolean {

@@ -119,7 +119,7 @@ Deno.test("card payment becomes a positive out row at noon UTC with a cleaned me
 
 Deno.test("income uses the debtor; remittance text is the fallback merchant; refunds are card_refund", async () => {
   const [inc] = await mapBankTxs([parsed({ credit_debit_indicator: "CRDT", debtor: { name: "Employer SA" }, creditor: undefined, remittance_information: ["Salaire"] })], await ctx());
-  assertEquals([inc.kind, inc.merchant, inc.type, inc.cat], ["in", "Employer SA", "other", null]);
+  assertEquals([inc.kind, inc.merchant, inc.type, inc.cat], ["in", "Employer SA · Salaire", "other", null]);
   const [text] = await mapBankTxs([parsed({ creditor: undefined, remittance_information: ["Loyer", "novembre"] })], await ctx());
   assertEquals(text.merchant, "Loyer novembre");
   const [refund] = await mapBankTxs([parsed({ credit_debit_indicator: "CRDT", debtor: { name: "Shop" }, creditor: undefined })], await ctx());
