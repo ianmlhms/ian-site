@@ -19,7 +19,8 @@ Deno.test("default categories follow the type", () => {
   assertEquals(defaultCat("atm", "Bank"), "cash");
   assertEquals(defaultCat("card", "Test Cafe"), null);
   assertEquals(defaultCat("transfer_in", "Max Muster"), "income");
-  assertEquals(defaultCat("transfer_in", "Raoul Example"), "transfer");
+  assertEquals(defaultCat("transfer_in", "Ian Example"), "transfer");
+  assertEquals(defaultCat("transfer_in", "M. RAOUL MULHEIMS"), "income"); // own only when paired with Ian's bank (SQL)
   assertEquals(defaultCat("transfer_in", "Einzahlung"), "transfer");
   assertEquals(defaultCat("transfer_out", "Max Muster"), null);
 });
@@ -29,7 +30,7 @@ Deno.test("event becomes a positive row with direction and own-transfer flag", (
   assertEquals([out.amount, out.kind, out.account, out.is_transfer, out.cat], [4.5, "out", "Trade Republic", false, null]);
   const refund = eventToRow(ev({ type: "card_refund", amount: 4.5 }), new Map(), NOW);
   assertEquals(refund.kind, "in");
-  const own = eventToRow(ev({ type: "transfer_in", amount: 50, merchant: "Raoul Example" }), new Map(), NOW);
+  const own = eventToRow(ev({ type: "transfer_in", amount: 50, merchant: "Ian Example" }), new Map(), NOW);
   assertEquals([own.is_transfer, own.cat], [true, "transfer"]);
 });
 
@@ -110,8 +111,8 @@ Deno.test("canteen paid by the parents is neither spending nor a refund", () => 
   assertEquals(spendOf({ ...base, amount: 100, kind: "in", cat: "parents" }), null);
 });
 
-Deno.test("Osteria and canteen card payments are paid by the parents", () => {
+Deno.test("canteen card payments are paid by the parents, Osteria is not", () => {
   const ev = (merchant: string) => ({ id: "e", at: "2026-06-24T18:00:00Z", amount: -84.8, currency: "EUR", type: "card", merchant, isin: null, shares: null, status: "EXECUTED", event_type: "CARD_TRANSACTION" }) as Ev;
-  assertEquals(eventToRow(ev("L'Osteria"), new Map(), "2026-06-24T18:00:00Z").cat, "parents");
+  assertEquals(eventToRow(ev("L'Osteria"), new Map(), "2026-06-24T18:00:00Z").cat, null);
   assertEquals(eventToRow(ev("Restopolis"), new Map(), "2026-06-24T18:00:00Z").cat, "parents");
 });
