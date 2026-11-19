@@ -20,6 +20,7 @@ Deno.test("default categories follow the type", () => {
   assertEquals(defaultCat("card", "Test Cafe"), null);
   assertEquals(defaultCat("transfer_in", "Max Muster"), "income");
   assertEquals(defaultCat("transfer_in", "Raoul Example"), "transfer");
+  assertEquals(defaultCat("transfer_in", "Einzahlung"), "transfer");
   assertEquals(defaultCat("transfer_out", "Max Muster"), null);
 });
 

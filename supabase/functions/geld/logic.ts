@@ -11,7 +11,8 @@ export const ALERT_LEVELS = [80, 100] as const;
 const NON_SPENDING_CATS = new Set(["investment", "transfer"]);
 /* A transfer is "own account" when the counterparty is one of the family
  * members who share this Trade Republic account. */
-const OWN_COUNTERPARTY = /\b(raoul|ian)\b/i;
+// "Einzahlung" = a card/Apple Pay top-up from one of our own accounts.
+const OWN_COUNTERPARTY = /\b(raoul|ian|einzahlung)\b/i;
 
 const DEFAULT_CAT_BY_TYPE: Partial<Record<TxType, string>> = {
   buy: "investment", sell: "investment", savings_plan: "investment",

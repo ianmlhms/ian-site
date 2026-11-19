@@ -5,7 +5,7 @@
 --   supabase db query --linked -f scripts/geld-v1.sql
 --
 -- Owner only: every table is readable AND writable
--- by konto@ian.lu alone (JWT email). The edge function
+-- by konto@ian.lu alone (pinned auth.uid). The edge function
 -- writes with the service role, which bypasses RLS.
 -- No dollar-quoting, short lines (editor paste-safe).
 
@@ -129,50 +129,50 @@ drop policy if exists geld_tx_owner
   on public.geld_tx;
 create policy geld_tx_owner
   on public.geld_tx for all
-  using (auth.jwt() ->> 'email' = 'konto@ian.lu')
-  with check (auth.jwt() ->> 'email' = 'konto@ian.lu');
+  using (auth.uid() = 'a40ba59a-3460-4ef2-a8e8-3db0c91eac66'::uuid)
+  with check (auth.uid() = 'a40ba59a-3460-4ef2-a8e8-3db0c91eac66'::uuid);
 
 drop policy if exists geld_positions_owner
   on public.geld_positions;
 create policy geld_positions_owner
   on public.geld_positions for all
-  using (auth.jwt() ->> 'email' = 'konto@ian.lu')
-  with check (auth.jwt() ->> 'email' = 'konto@ian.lu');
+  using (auth.uid() = 'a40ba59a-3460-4ef2-a8e8-3db0c91eac66'::uuid)
+  with check (auth.uid() = 'a40ba59a-3460-4ef2-a8e8-3db0c91eac66'::uuid);
 
 drop policy if exists geld_daily_owner
   on public.geld_daily;
 create policy geld_daily_owner
   on public.geld_daily for all
-  using (auth.jwt() ->> 'email' = 'konto@ian.lu')
-  with check (auth.jwt() ->> 'email' = 'konto@ian.lu');
+  using (auth.uid() = 'a40ba59a-3460-4ef2-a8e8-3db0c91eac66'::uuid)
+  with check (auth.uid() = 'a40ba59a-3460-4ef2-a8e8-3db0c91eac66'::uuid);
 
 drop policy if exists geld_rules_owner
   on public.geld_rules;
 create policy geld_rules_owner
   on public.geld_rules for all
-  using (auth.jwt() ->> 'email' = 'konto@ian.lu')
-  with check (auth.jwt() ->> 'email' = 'konto@ian.lu');
+  using (auth.uid() = 'a40ba59a-3460-4ef2-a8e8-3db0c91eac66'::uuid)
+  with check (auth.uid() = 'a40ba59a-3460-4ef2-a8e8-3db0c91eac66'::uuid);
 
 drop policy if exists geld_budgets_owner
   on public.geld_budgets;
 create policy geld_budgets_owner
   on public.geld_budgets for all
-  using (auth.jwt() ->> 'email' = 'konto@ian.lu')
-  with check (auth.jwt() ->> 'email' = 'konto@ian.lu');
+  using (auth.uid() = 'a40ba59a-3460-4ef2-a8e8-3db0c91eac66'::uuid)
+  with check (auth.uid() = 'a40ba59a-3460-4ef2-a8e8-3db0c91eac66'::uuid);
 
 drop policy if exists geld_alerts_sent_owner
   on public.geld_alerts_sent;
 create policy geld_alerts_sent_owner
   on public.geld_alerts_sent for all
-  using (auth.jwt() ->> 'email' = 'konto@ian.lu')
-  with check (auth.jwt() ->> 'email' = 'konto@ian.lu');
+  using (auth.uid() = 'a40ba59a-3460-4ef2-a8e8-3db0c91eac66'::uuid)
+  with check (auth.uid() = 'a40ba59a-3460-4ef2-a8e8-3db0c91eac66'::uuid);
 
 drop policy if exists geld_sync_owner
   on public.geld_sync;
 create policy geld_sync_owner
   on public.geld_sync for all
-  using (auth.jwt() ->> 'email' = 'konto@ian.lu')
-  with check (auth.jwt() ->> 'email' = 'konto@ian.lu');
+  using (auth.uid() = 'a40ba59a-3460-4ef2-a8e8-3db0c91eac66'::uuid)
+  with check (auth.uid() = 'a40ba59a-3460-4ef2-a8e8-3db0c91eac66'::uuid);
 
 -- Signed-in role only; anon gets nothing at all.
 revoke all on public.geld_tx from anon;
