@@ -111,8 +111,9 @@ Deno.test("canteen paid by the parents is neither spending nor a refund", () => 
   assertEquals(spendOf({ ...base, amount: 100, kind: "in", cat: "parents" }), null);
 });
 
-Deno.test("canteen and Osteria card payments are paid by the parents", () => {
+Deno.test("canteen and Osteria di Niederanven are paid by the parents, L'Osteria is not", () => {
   const ev = (merchant: string) => ({ id: "e", at: "2026-06-24T18:00:00Z", amount: -84.8, currency: "EUR", type: "card", merchant, isin: null, shares: null, status: "EXECUTED", event_type: "CARD_TRANSACTION" }) as Ev;
-  assertEquals(eventToRow(ev("L'Osteria"), new Map(), "2026-06-24T18:00:00Z").cat, "parents");
+  assertEquals(eventToRow(ev("L'Osteria"), new Map(), "2026-06-24T18:00:00Z").cat, null);
+  assertEquals(eventToRow(ev("Osteria Di Niederanven"), new Map(), "2026-06-24T18:00:00Z").cat, "parents");
   assertEquals(eventToRow(ev("Restopolis"), new Map(), "2026-06-24T18:00:00Z").cat, "parents");
 });

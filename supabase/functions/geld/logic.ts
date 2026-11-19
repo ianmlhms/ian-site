@@ -38,10 +38,14 @@ export type ExistingTx = { id: string; cat: string | null; cat_locked: boolean; 
 export const merchantKey = (merchant: string) => merchant.trim().toLowerCase();
 
 /* Things Mum/Dad always pay back 100 % (Ian, 20 Nov 2026) via Digicash/Payconiq,
- * Wero or bank transfer: the school canteen and the Osteria dinners. The payment and its repayment both get "parents", which is
+ * Wero or bank transfer: the school canteen and Osteria di Niederanven (NOT
+ * L'Osteria on Place Guillaume II — that is Ian's own money). Their repayments
+ * just say "osteria", so incoming money matches the looser pattern. The payment and its repayment both get "parents", which is
  * neither spending nor income. Matches bank lines with date suffixes too. */
-const PARENTS_PAY = /restopolis|restsco|osteria|cantine|kantin|iessengeld/i;
-export const parentsPay = (merchant: string | null | undefined) => PARENTS_PAY.test(merchant ?? "");
+const PARENTS_PAY_OUT = /restopolis|restsco|osteria di niederanven/i;
+const PARENTS_PAY_IN = /restopolis|cantine|kantin|iessengeld|osteria/i;
+export const parentsPay = (merchant: string | null | undefined, kind: string) =>
+  (kind === "in" ? PARENTS_PAY_IN : PARENTS_PAY_OUT).test(merchant ?? "");
 
 export function isOwnTransfer(type: string, merchant: string): boolean {
   return (type === "transfer_in" || type === "transfer_out") && OWN_COUNTERPARTY.test(merchant);
@@ -60,7 +64,7 @@ export function defaultCat(type: string, merchant: string): string | null {
 export function eventToRow(ev: Ev, rules: Map<string, string>, nowISO: string): TxRow {
   const isTransfer = isOwnTransfer(ev.type, ev.merchant);
   const cat = defaultCat(ev.type, ev.merchant) ?? rules.get(merchantKey(ev.merchant)) ??
-    (ev.type === "card" && parentsPay(ev.merchant) ? "parents" : null);
+    (ev.type === "card" && parentsPay(ev.merchant, "out") ? "parents" : null);
   return {
     id: ev.id, at: ev.at, amount: Math.abs(ev.amount), kind: ev.amount >= 0 ? "in" : "out",
     account: TR_ACCOUNT, source: "tr", type: ev.type, merchant: ev.merchant, isin: ev.isin,

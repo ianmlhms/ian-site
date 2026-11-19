@@ -100,7 +100,7 @@ export async function mapBankTx(tx: BankTx, ctx: MapContext, id: string): Promis
   return {
     id, at: atOf(tx.date), amount: tx.amount, kind: tx.kind, account: ctx.label,
     source: BANK_ACCOUNT_SOURCE, type, merchant, isin: null, shares: null,
-    cat: own ? "transfer" : ctx.rules.get(merchantKey(merchant)) ?? (parentsPay(merchant) ? "parents" : unnamedIncome(merchant, tx.kind) ? "income" : null),
+    cat: own ? "transfer" : ctx.rules.get(merchantKey(merchant)) ?? (parentsPay(merchant, tx.kind) ? "parents" : unnamedIncome(merchant, tx.kind) ? "income" : null),
     cat_locked: false, is_transfer: own, status: "BOOK", event_type: tx.code || null,
     updated_at: ctx.nowISO,
   };
