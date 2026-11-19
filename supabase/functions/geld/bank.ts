@@ -137,11 +137,40 @@ async function storeRows(rows: TxRow[]): Promise<{ inserted: number; updated: nu
   return { inserted: merged.length - updated, updated };
 }
 
+/* Some banks refuse long ranges with a bare ASPSP_ERROR (Banque de
+ * Luxembourg: ~90 days max, seen 19 Nov 2026). For the first full-history
+ * fetch, step down to shorter windows instead of failing the account. */
+const FALLBACK_DAYS = [365, 180, 89] as const;
+const DAY_MS = 86_400_000;
+
+const isRangeRefusal = (e: unknown) => e instanceof EbError && e.status === 400 && e.code === "ASPSP_ERROR";
+
+async function fetchWithFallback(
+  eb: EbClient, uid: string, window: { dateFrom: string; strategy?: "longest" }, psu: Psu | undefined, nowMs: number,
+): Promise<unknown[]> {
+  try {
+    return await fetchAllTransactions(eb, uid, { dateFrom: window.dateFrom, strategy: window.strategy }, psu);
+  } catch (e) {
+    if (!window.strategy || !isRangeRefusal(e)) throw e;
+    let last: unknown = e;
+    for (const days of FALLBACK_DAYS) {
+      const dateFrom = new Date(nowMs - days * DAY_MS).toISOString().slice(0, 10);
+      try {
+        return await fetchAllTransactions(eb, uid, { dateFrom }, psu);
+      } catch (err) {
+        if (!isRangeRefusal(err)) throw err;
+        console.error("geld bank: range refused, trying shorter", days);
+        last = err;
+      }
+    }
+    throw last;
+  }
+}
+
 async function syncOne(
   eb: EbClient, acct: AccountDb, shared: { own: Set<string>; rules: Map<string, string> }, psu: Psu | undefined, nowMs: number,
 ): Promise<AccountSummary> {
-  const window = syncWindow(acct.last_sync_at, nowMs);
-  const raw = await fetchAllTransactions(eb, acct.uid, { dateFrom: window.dateFrom, strategy: window.strategy }, psu);
+  const raw = await fetchWithFallback(eb, acct.uid, syncWindow(acct.last_sync_at, nowMs), psu, nowMs);
   const txs = raw.map(parseBankTx).filter((t): t is BankTx => t !== null);
   const rows = await mapBankTxs(txs, {
     uid: acct.uid, key: await accountKey(acct.iban_hash, acct.uid),

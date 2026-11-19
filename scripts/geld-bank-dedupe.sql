@@ -83,3 +83,14 @@ from public.geld_tx
 where account in ('Spuerkeess', 'BDL')
 group by account
 order by account;
+
+-- From the first bank-delivered day on, the bank feed is complete; legacy
+-- rows left in that period are CSV duplicates (short "VIR"/"DEB" lines next
+-- to the detailed ones). Drop them per account.
+delete from public.geld_tx l
+where l.source = 'legacy'
+  and l.account in ('Spuerkeess', 'BDL')
+  and l.at >= (
+    select min(b.at)::date from public.geld_tx b
+    where b.source = 'bank' and b.account = l.account
+  );
