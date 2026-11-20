@@ -79,9 +79,9 @@
     <section data-lang="en" lang="en">
       <header class="p-head c full top">
         <h1 class="ui-title">KartTracker for iPhone &amp; Apple Watch: privacy policy</h1>
-        <p class="updated">Last updated: 25 October 2026</p>
+        <p class="updated">Last updated: 20 November 2026</p>
       </header>
-      <p class="lead c full">KartTracker is a free karting lap timer for Apple Watch with a companion iPhone app, made by Ian Mulheims in Luxembourg as a hobby project. This page explains what the app stores, what leaves your devices and how to delete it. The Garmin version has <a href="karttracker-privacy.html">its own policy</a>; for the rest of ian.lu, see the <a href="privacy.html">general privacy policy</a>.</p>
+      <p class="lead c full">KartTracker is a free karting lap timer for Apple Watch with a companion iPhone app, made by Ian Mulheims in Luxembourg as a hobby project. This page explains what the app stores, what leaves your devices and how to delete it. The Garmin version has <a href="karttracker-privacy.html">its own policy</a>; for the rest of ian.lu, see the <a href="privacy.html">general privacy policy</a>. Help and support: <a href="karttracker-ios.html">karttracker-ios.html</a>.</p>
 
       <div class="c full">
         <h2>Who is responsible</h2>
@@ -92,7 +92,7 @@
         <h2>In short</h2>
         <ul>
           <li>Your sessions, tracks, location and heart rate stay on your iPhone and Apple Watch.</li>
-          <li>Something is uploaded only when you tap <strong>Share Web Link</strong> on a session, or when you link an optional karting account (then new sessions are saved to it).</li>
+          <li>Something is uploaded only when you tap <strong>Share Web Link</strong> on a session, or when you link an optional karting account (then new sessions are saved to it). Until then the app does not contact ian.lu at all.</li>
           <li>A shared session is visible to whoever has its link, and to no one else. <strong>Stop Sharing</strong> deletes it.</li>
           <li>No account needed, no ads, no analytics or tracking in the app, nothing is sold.</li>
           <li>Health data is never used for advertising and never stored in iCloud by the app.</li>
@@ -108,7 +108,7 @@
 
       <div class="c full">
         <h3><span class="ico num" aria-hidden="true">2</span> Heart rate and Apple Health</h3>
-        <p>If you allow it, the watch reads your heart rate during a session to show it live and to save the average and maximum with the session. The session is also saved as a workout in Apple Health, which keeps the app running while your wrist is down. Health data is handled by Apple on your devices; KartTracker does not send it anywhere unless you share a session (see 4).</p>
+        <p>If you allow it, the watch reads your heart rate during a session to show it live and to save the average and maximum with the session. The session is also saved as a workout in Apple Health, which keeps the app running while your wrist is down. Health data is handled by Apple on your devices; KartTracker does not send it anywhere unless you share a session (see 4). You can leave heart rate out of everything that is uploaded: <strong>Settings › Sharing › Include heart rate</strong>.</p>
       </div>
 
       <div class="c full">
@@ -123,7 +123,7 @@
           <tr><th>Data</th><th>Why</th></tr>
           <tr><td>Lap times, date, track name</td><td>the session page</td></tr>
           <tr><td>GPS track with speed (at most 1,500 points)</td><td>the racing line on the map and the speed view</td></tr>
-          <tr><td>Average and maximum heart rate</td><td>session stats (only if recorded)</td></tr>
+          <tr><td>Average and maximum heart rate</td><td>session stats (only if recorded, and not if you switched off “Include heart rate”)</td></tr>
           <tr><td>A random share ID and a random edit key</td><td>the link, and making sure only your iPhone can update or delete it (ian.lu stores only a one-way hash of the key)</td></tr>
         </table></div>
         <p>The link (<code>ian.lu/kart.html?s=…</code>) contains a long random ID. Anyone you give it to can view the session; it is not listed or searchable anywhere. As the site operator, Ian can see shared sessions to run and fix the service. Your name, email address and Apple Account are never sent.</p>
@@ -131,8 +131,8 @@
 
       <div class="c full">
         <h3><span class="ico num" aria-hidden="true">5</span> Karting account (optional)</h3>
-        <p>In <strong>Settings › Karting account</strong> you can link the app to a free ian.lu karting account, the same one the Garmin app uses. The app creates a random 128-bit code for your iPhone and keeps it in the iPhone's keychain; ian.lu stores only a one-way hash of it. Linking opens <code>ian.lu/kart-link.html</code>, where you sign in or create the account (email address, password and a username). The app then shows your username, also on the watch.</p>
-        <p>While linked, new sessions (the data listed in 4) are saved to your account automatically; you can turn that off, or save sessions one by one. On <a href="kart-account.html">My karting</a> you can rename and delete sessions, unlink devices and delete the account. <strong>Unlink this iPhone</strong> in the app stops new uploads and creates a new code; sessions already saved stay in the account.</p>
+        <p>In <strong>Settings › Karting account</strong> you can link the app to a free ian.lu karting account, the same one the Garmin app uses. The app creates a random 128-bit code for your iPhone and keeps it in the iPhone's keychain; ian.lu stores only a one-way hash of it. Linking opens <code>ian.lu/kart-link.html</code>, where you sign in or create the account (email address, password and a username). The app then shows your username, also on the watch. From the moment you open that page, the app asks ian.lu when it starts whether this iPhone is linked; it sends only the random code.</p>
+        <p>While linked, new sessions (the data listed in 4) are saved to your account automatically; you can turn that off, or save sessions one by one. On <a href="kart-account.html">My karting</a> you can rename and delete sessions, unlink devices and delete the account. <strong>Delete karting account…</strong> in the app opens that page. <strong>Unlink this iPhone</strong> in the app stops new uploads and creates a new code; sessions already saved stay in the account.</p>
       </div>
 
       <div class="c full">
@@ -142,7 +142,7 @@
 
       <div class="c full">
         <h2>Keeping and deleting data</h2>
-        <p>Data on your devices stays until you delete it: swipe to delete a session or lap in the app, or delete the app to remove everything. A shared session stays online until you tap <strong>Stop Sharing</strong> on it in the iPhone app. If you no longer have the iPhone it was shared from, send the link to <a href="mailto:konto@ian.lu">konto@ian.lu</a> and it will be deleted. Sessions in a karting account can be deleted on <a href="kart-account.html">My karting</a>, where you can also delete the whole account with all its sessions (<a href="kart-account.html#delete-account">Delete account</a>).</p>
+        <p>Data on your devices stays until you delete it: swipe to delete a session or lap in the app, or delete the app to remove everything. A shared session stays online until you tap <strong>Stop Sharing</strong> on it in the iPhone app. When you delete a shared session in the iPhone app, it asks whether the online copy should be deleted too. A shared session that you delete on the watch stays on the iPhone, so that you can still remove its online copy. If you no longer have the iPhone it was shared from, send the link to <a href="mailto:konto@ian.lu">konto@ian.lu</a> and it will be deleted. Sessions in a karting account can be deleted on <a href="kart-account.html">My karting</a>, where you can also delete the whole account with all its sessions (<a href="kart-account.html#delete-account">Delete account</a>).</p>
       </div>
 
       <div class="c full">
