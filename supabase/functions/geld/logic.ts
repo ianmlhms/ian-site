@@ -45,8 +45,12 @@ export const merchantKey = (merchant: string) => merchant.trim().toLowerCase();
  * neither spending nor income. Matches bank lines with date suffixes too. */
 const PARENTS_PAY_OUT = /restopolis|restsco|osteria di niederanven|plus 12 month family|duolingo/i;
 const PARENTS_PAY_IN = /restopolis|cantine|kantin|iessengeld|osteria/i;
-export const parentsPay = (merchant: string | null | undefined, kind: string) =>
-  (kind === "in" ? PARENTS_PAY_IN : PARENTS_PAY_OUT).test(merchant ?? "");
+/* Claude Max is paid by Dad from December 2026 on (Ian, 20 Nov 2026). */
+const DAD_PAYS_CLAUDE_FROM = "2026-12-01";
+const CLAUDE = /anthropic|claude\.ai/i;
+export const parentsPay = (merchant: string | null | undefined, kind: string, at = "") =>
+  (kind === "in" ? PARENTS_PAY_IN : PARENTS_PAY_OUT).test(merchant ?? "") ||
+  (kind === "out" && at >= DAD_PAYS_CLAUDE_FROM && CLAUDE.test(merchant ?? ""));
 
 export function isOwnTransfer(type: string, merchant: string): boolean {
   return (type === "transfer_in" || type === "transfer_out") && OWN_COUNTERPARTY.test(merchant);
@@ -65,7 +69,7 @@ export function defaultCat(type: string, merchant: string): string | null {
 export function eventToRow(ev: Ev, rules: Map<string, string>, nowISO: string): TxRow {
   const isTransfer = isOwnTransfer(ev.type, ev.merchant);
   const cat = defaultCat(ev.type, ev.merchant) ?? rules.get(merchantKey(ev.merchant)) ??
-    (ev.type === "card" && parentsPay(ev.merchant, "out") ? "parents" : null);
+    (ev.type === "card" && parentsPay(ev.merchant, "out", ev.at) ? "parents" : null);
   return {
     id: ev.id, at: ev.at, amount: Math.abs(ev.amount), kind: ev.amount >= 0 ? "in" : "out",
     account: TR_ACCOUNT, source: "tr", type: ev.type, merchant: ev.merchant, isin: ev.isin,

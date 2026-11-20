@@ -117,3 +117,9 @@ Deno.test("canteen and Osteria di Niederanven are paid by the parents, L'Osteria
   assertEquals(eventToRow(ev("Osteria Di Niederanven"), new Map(), "2026-06-24T18:00:00Z").cat, "parents");
   assertEquals(eventToRow(ev("Restopolis"), new Map(), "2026-06-24T18:00:00Z").cat, "parents");
 });
+
+Deno.test("Claude Max is paid by Dad from December 2026", () => {
+  const ev = (at: string) => ({ id: "e", at, amount: -65.08, currency: "EUR", type: "card", merchant: "Anthropic", isin: null, shares: null, status: "EXECUTED", event_type: "CARD_TRANSACTION" }) as Ev;
+  assertEquals(eventToRow(ev("2026-11-11T10:00:00Z"), new Map(), "2026-11-11T10:00:00Z").cat, null);
+  assertEquals(eventToRow(ev("2026-12-11T10:00:00Z"), new Map(), "2026-12-11T10:00:00Z").cat, "parents");
+});
