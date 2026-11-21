@@ -501,3 +501,13 @@ can keep or drop them.
   (net/freeride.js, lobby setting `mode`), park bodies (views.js + snow-shader uParkRect), look leftovers (evening shade, strata AA,
   firs), drag-lift track beside the pylons. Tests: `scripts/ski/round7-test.mjs` (spawn / exit spots of every lift, tunnels, avalanches,
   tags, braking physics), `round6-test.mjs`.
+- **R7 A follow-up (coordinator review, 22 Nov)**: (1) the "vertical stretched terrain wall" beside the piste in the carve shot was the
+  debug orbit camera (`__ski.orbit`) placed INSIDE an uphill bank (it had no ground clearance): it now keeps 0.6 m over the snow; the
+  physics ground there is at most 35 degrees. Real seams were checked too: right after a teleport the full-detail tiles need ~1.5 s to
+  mesh (coarse tiles and half-built skirts show meanwhile), so every fast travel / lift skip now meshes the ground round the target
+  behind the fade (`meshedAround`, the terrain gets a 12 ms slice, at most 2.5 s). ground-check.mjs: a 21 x 21 ray grid (+-100 m) at
+  the spawn and six pistes per resort (drawn vs physics: no crack / wall > 0.5 m), the moment after two far jumps, and the play camera
+  over the snow while carving. (2) plough: the V was inverted (Ry(+) turns the +x tip to -z): tips 0.19 m, tails ~1.1 m; (3) hockey
+  stop: skis parallel and across the travel, together, on the snow (IK lifts the whole figure when a knee is at its limit); (4) softer
+  plough knees / forward torso. `scripts/ski/pose-check.mjs` (frozen poses, geometry + shots, all 5 resorts): all green.
+  Sheet: `~/Library/Caches/ski-work/round7/sheet-a-fixes-webkit.jpg`.
