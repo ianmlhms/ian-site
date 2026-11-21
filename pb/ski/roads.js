@@ -36,7 +36,7 @@ function material(env) {
       ${FOG_GLSL}
       void main(){
         float a = abs(vRoad.x);                                 // 0 centre, 1 the edge, > 1 the snow bank
-        if (a > 1.37) discard;                                  // round 7: the bank is a painted strip just past the edge                                  // round 7: beyond the painted bank (the lattice cells reach farther)
+        if (a > 1.37) discard;                                  // round 7: the bank is a painted strip just past the edge
         vec4 nz = texture2D(uNoise, vW.xz * 0.11);
         vec4 nl = texture2D(uNoise, vW.xz * 0.013 + 0.3);
         float fade = 1.0 - smoothstep(120.0, 600.0, vDist);   // tyre tracks blur into one grey far away
