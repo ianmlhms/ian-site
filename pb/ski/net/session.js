@@ -90,6 +90,7 @@ export function createSession({ code, me, roster, name, racing = () => false, on
     peers.set(r.id, { id: r.id, present: false, nonce: '', link: null, relay: null, tries: 0, connecting: false, everOpen: false, lostAt: 0, presentSince: 0, lastRecv: 0, samples: [], rtt: 0, offset: 0, status: 'wait', bye: false, retryTimer: 0 });
   }
   let sb = null, ch = null, ice = [...NET.ICE_SERVERS], closed = false, lastTick = performance.now(), tickTimer = 0, pingTimer = 0;
+  const started = performance.now();
   const pairs = new Map();          // peer id -> relay channel
 
   const sendCh = (event, payload) => { if (ch) { try { ch.send({ type: 'broadcast', event, payload }); } catch (error) { /* closing */ } } };
@@ -203,10 +204,10 @@ export function createSession({ code, me, roster, name, racing = () => false, on
     if (p.bye) return 'gone';
     const l = openLink(p);
     if (l) return now - p.lastRecv > (l.kind === 'relay' ? NET.SILENT_RELAY : NET.SILENT) ? 'away' : 'here';
-    if (!p.everOpen) return p.present ? 'wait' : (now - started > NET.GONE * 2 ? 'gone' : 'wait');
+    // never met: present (still trying, then the relay) or not here at all; neither may hold the match up for ever
+    if (!p.everOpen) return now - started > NET.GONE * (p.present ? 3 : 2) ? 'gone' : 'wait';
     return now - p.lostAt > NET.GONE ? 'gone' : 'away';
   }
-  const started = performance.now();
   function evaluate() {
     const now = performance.now();
     for (const p of peers.values()) {

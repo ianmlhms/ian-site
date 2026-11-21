@@ -56,7 +56,7 @@ export function createMpHud(root) {
       }
       if (table) {
         const t = el('div', 'mp-table');
-        t.append(el('span', 'hd', '#'), el('span', 'hd', 'Laf'), el('span', 'hd r', 'Zäit'), el('span', 'hd r', 'Pkt'));
+        t.append(el('span', 'hd', '#'), el('span', 'hd', 'Spiller'), el('span', 'hd r', 'Zäit'), el('span', 'hd r', 'Pkt'));
         for (const r of table) {
           const cls = r.id === me ? ' me' : '';
           t.append(el('span', `c${cls}`, r.place ? String(r.place) : '–'), el('span', `c n${cls}`, r.name), el('span', `c r${cls}`, resText(r.res, statusOf(r.id))), el('span', `c r${cls}`, r.points ? `+${r.points}` : ''));

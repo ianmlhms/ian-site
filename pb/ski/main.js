@@ -259,7 +259,7 @@ async function boot() {
     readyFor = ready ? p.id : null;
   }
 
-  function startRun(p, mode) {
+  function startRun(p, mode, lateral = 0) {     // lateral: m right of the line at the start gate (online race: side by side)
     if (!p) return;
     if (mapScreen) { mapScreen.close(); mapScreen = null; pisteMap = null; }
     if (finishCard) { finishCard.close(); finishCard = null; }
@@ -269,7 +269,7 @@ async function boot() {
     game.mode = mode;
     game.run = createRun({ piste: p, mode });
     const a = p.at(2, {});
-    placeAt(a.x, a.z, Math.atan2(a.dz, a.dx));
+    placeAt(a.x - a.dz * lateral, a.z + a.dx * lateral, Math.atan2(a.dz, a.dx));
     if (runProps) runProps.dispose();
     runProps = createRunProps({ scene, piste: p, height: (x, z) => surface.height(x, z), gates: game.run.gates });
     const g = mode === MODES.run ? decodeGhost(store.get().ghosts[pisteKey(rid, p.id)]) : null;
@@ -567,7 +567,7 @@ async function boot() {
   if (mpCtx) {
     mp = createMp({ ctx: mpCtx, host: {
       game, rid, pistes, streamer, terrain, surface, scene, camera, canvas, env, hud, input, audio, chase, uiRoot: document.getElementById('ui'),
-      outfit: () => outfit, level: () => level, startRun: (p) => startRun(p, MODES.run),
+      outfit: () => outfit, level: () => level, startRun: (p, lateral) => startRun(p, MODES.run, lateral),
     } });
     mp.begin();
   } else if (params.auto) {

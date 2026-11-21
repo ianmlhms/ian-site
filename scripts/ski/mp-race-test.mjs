@@ -69,6 +69,15 @@ function world(ids, { lat = 40 } = {}) {
   return { players, step, status, links, get t() { return t; }, inject: (from, to, msg) => q.push({ at: t, from, to, msg }) };
 }
 {
+  // before anybody is linked: nobody starts on his own (the players ahead in the roster are 'wait', not gone)
+  const w0 = world(['host1', 'emma2']);
+  w0.players.get('emma2').race.localReady(0); w0.players.get('host1').race.localReady(0);
+  w0.step(2000);
+  eq([w0.players.get('host1').race.phase, w0.players.get('emma2').race.phase, w0.players.get('emma2').race.coordinator()], ['prep', 'prep', 'host1'], 'not linked yet: no lonely start, the host stays coordinator');
+  w0.step(RACE.LOAD_TIMEOUT);
+  eq(w0.players.get('host1').race.phase, 'go', '... until LOAD_TIMEOUT (a player who never shows up holds nobody up)');
+}
+{
   const w = world(['host1', 'emma2', 'max33']);
   const P = (id) => w.players.get(id);
   w.status();

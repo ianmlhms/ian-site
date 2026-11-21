@@ -68,7 +68,9 @@ export function createRace({ me, roster, runs, now, send, latency = () => 0, min
   }
   const emit = (type, extra = {}) => onEvent({ type, run: s.run, ...extra });
 
-  function coordinator() { return ids.find((id) => status.get(id) === 'here') || me; }
+  /* the first player in roster order who is here, or not met yet ('wait': nobody starts a match on his own before the players
+   * ahead of him in the roster had their chance to connect; the session turns a 'wait' that never shows up into 'gone') */
+  function coordinator() { return ids.find((id) => status.get(id) === 'here' || status.get(id) === 'wait') || me; }
   const isCoord = () => coordinator() === me;
   /* a control message counts when its sender is the coordinator I see, or ranks before it (it may know better) */
   const trusted = (from) => rank(from) >= 0 && rank(from) <= rank(coordinator());
@@ -112,7 +114,7 @@ export function createRace({ me, roster, runs, now, send, latency = () => 0, min
     const t = now();
     if (s.phase === 'prep') {
       const here = ids.filter((id) => status.get(id) === 'here');
-      const allReady = here.every((id) => s.ready.has(id));
+      const allReady = here.every((id) => s.ready.has(id)) && !ids.some((id) => status.get(id) === 'wait');
       const waited = t - s.prepAt;
       if ((allReady && s.ready.has(me)) || (waited > RACE.LOAD_TIMEOUT && s.ready.has(me)) || waited > RACE.LOAD_TIMEOUT * 1.5) sendGo();
     } else if (s.phase === 'go') {

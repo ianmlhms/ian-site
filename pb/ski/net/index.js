@@ -9,6 +9,7 @@ import { createSession } from './session.js';
 import { createRemotes, packState } from './remotes.js';
 import { createMpHud, resText } from './hud.js';
 import { minRunMs } from '../progress.js';
+import { OUTFITS } from '../skier-model.js';
 import { sanitizeCfg } from '../../../mp-games.js?v=6';
 
 const GAME = 'ski';
@@ -80,11 +81,18 @@ export function createMp({ ctx, host }) {
     if (m.k === 'hi') { meet(from, typeof m.o === 'string' ? m.o : ''); return; }
     race.receive(from, m);
   }
-  function meet(id, outfit) {
+  /* the outfit a player chose; if mine or another skier's already looks like that, the next free one (everybody stays recognisable) */
+  function displayOutfit(id, wanted) {
+    const taken = new Set([host.outfit(), ...remotes.all().filter((r) => r.id !== id).map((r) => r.outfit)]);
+    if (OUTFITS.some((o) => o.id === wanted) && !taken.has(wanted)) return wanted;
+    const free = OUTFITS.find((o) => !taken.has(o.id));
+    return free ? free.id : wanted;
+  }
+  function meet(id, wanted) {
     const r = remotes.get(id);
-    if (r && r.outfit === outfit) return;
+    if (r && r.wanted === wanted) return;
     if (r) remotes.remove(id);
-    remotes.add(id, nameOf.get(id), outfit);
+    remotes.add(id, nameOf.get(id), displayOutfit(id, wanted)).wanted = wanted;
     remotes.setLink(id, session.viaRelay(id));
   }
   function onPeer(id, status) {
@@ -113,7 +121,9 @@ export function createMp({ ctx, host }) {
     local.goAt = null; local.spectate = null;
     env.setWeather(plan.weather, false); env.setTime(plan.time, false); env.snap();
     remotes.clearRun();
-    host.startRun(p);
+    // mass start side by side across the piste, in roster order (no collisions between skiers anyway: ghosts)
+    const n = ctx.roster.length, gap = Math.min(1.9, (p.halfWidth * 1.4) / Math.max(1, n - 1));
+    host.startRun(p, (ctx.roster.findIndex((x) => x.id === ctx.me) - (n - 1) / 2) * gap);
     mpHud.show(true);
     refreshBoard();
     if (race.started === r && !race.result(r, ctx.me)) {               // reloaded during this run: no second try
