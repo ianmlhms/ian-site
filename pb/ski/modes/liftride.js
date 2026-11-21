@@ -25,7 +25,9 @@ export const KIND_OF_CODE = Object.freeze(Object.fromEntries(Object.entries(KIND
 /** Seconds a ride takes at the game's speed (path = lift-path.js createLiftPath). */
 export function rideSeconds(path, factor = RIDE.factor) {
   const k = path.kind;
-  return Math.max(0, path.len - RIDE.enter[k] - RIDE.exit[k]) / (path.spec.speed * factor);
+  // the same boarding / leaving stretch as createRide (clamped to 10 % of the line on very short lifts: the 60 m Leisee-Shuttle)
+  const s0 = Math.min(RIDE.enter[k], path.len * 0.1), s1 = Math.max(s0 + 1, path.len - Math.min(RIDE.exit[k], path.len * 0.1));
+  return Math.max(0, s1 - s0) / (path.spec.speed * factor);
 }
 
 /** The carrier and the rider at s along the line (up side): { cx, cy, cz (rope point / rail top), x, y, z (rider), heading, yaw, pitch }.
