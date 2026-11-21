@@ -77,7 +77,7 @@ export const flow = {
       console.log(`    resort picker after ${((tReady - t0) / 1000).toFixed(1)} s, ${(bytesUntil(tReady) / MB).toFixed(2)} MB (graphics level ${boot.level})`);
       await h.shot("ipad-picker");
 
-      h.step("tap Val d'Isère · Tignes: the piste map; wait until Start is live");
+      h.step(`tap ${RESORT || "Val d'Isère · Tignes"}: the piste map; wait until Start is live`);
       await tap(RESORT ? `.resort.ready[data-id="${RESORT}"]` : ".resort.ready");
       await page.waitForFunction(() => document.documentElement.dataset.skiStartReady === "1", null, { timeout: 120000, polling: 50 });
       const tStart = Date.now();

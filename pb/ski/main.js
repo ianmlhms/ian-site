@@ -19,6 +19,7 @@ import { createShadows } from './shadows.js';
 import { createPoles, createRunProps, createSigns } from './props.js';
 import { createLifts } from './lifts.js';
 import { createVillage } from './village.js';
+import { createLandmarks } from './landmarks.js';
 import { createPisteSet } from './pistes.js';
 import { createSkierState, stepSkier } from './skier.js';
 import { createSkierModel, readOutfit, writeOutfit, OUTFITS } from './skier-model.js';
@@ -44,6 +45,15 @@ function param(name) {
   try { const own = new URLSearchParams(location.search).get(name); if (own !== null) return own; } catch (error) { /* ignore */ }
   try { if (window.parent !== window) return new URLSearchParams(window.parent.location.search).get(name); } catch (error) { /* cross-origin parent */ }
   return null;
+}
+/** Set by switchResort for the arcade frame (its URL can't carry ?map=1): the next boot opens the piste map once. */
+const OPEN_MAP_KEY = 'pb_ski_open_map';
+function takeOpenMapFlag() {
+  try {
+    const isSet = sessionStorage.getItem(OPEN_MAP_KEY) === '1';
+    sessionStorage.removeItem(OPEN_MAP_KEY);
+    return isSet;
+  } catch (error) { return false; }
 }
 const GFX = () => window.ArcadeGfx || { level: () => 'medium', choice: () => 'auto', set() {}, onChange() {}, LEVELS: ['low', 'medium', 'high'], LABELS: { auto: 'Automatesch', low: 'Niddreg', medium: 'Mëttel', high: 'Héich', title: 'Grafik' }, pixelRatio: () => 1 };
 
@@ -82,10 +92,10 @@ async function boot() {
   const boards = createBoards(window.Arcade);
 
   LOAD.set(0.25, 'Skigebitt gëtt gelueden …');
-  // the resort of the URL, else the one skied last, else Espace Killy (one resort is loaded per page: picking another reloads)
+  // the resort: ?resort=, else the one picked last (the picker saves it and reloads), else Espace Killy
   const isReady = (id) => RESORTS.some((r) => r.id === id && r.ready);
-  const lastResort = (store.get().last || {}).resort;
-  const rid = isReady(params.resort) ? params.resort : isReady(lastResort) ? lastResort : 'killy';
+  const savedResort = (store.get().last || {}).resort;
+  const rid = isReady(params.resort) ? params.resort : isReady(savedResort) ? savedResort : 'killy';
   const core = await loadResortCore(rid, (p) => LOAD.set(0.25 + p * 0.45, 'Bierger ginn opgebaut …'));
   mark('core');
   const { resort } = core;
@@ -124,7 +134,7 @@ async function boot() {
   const chase = createChaseCamera(surface);
   let snowfall = createSnowfall({ scene, env, count: quality.snowflakes });
   const spray = createSpray({ scene, count: quality.spray });
-  let lifts = null, village = null;
+  let lifts = null, village = null, landmarks = null;
 
   // streamed height tiles change the heights under them: drop every cache that read them
   streamer.onTile((rect) => {
@@ -139,6 +149,7 @@ async function boot() {
     if (streamer.done() && !lifts) {
       lifts = createLifts({ scene, resort, height: (x, z) => field.height(x, z) });
       createSigns({ scene, resort, height: (x, z) => field.height(x, z) });
+      landmarks = createLandmarks({ scene, resort, height: (x, z) => surface.height(x, z), pistes });
       mark('lifts');
     }
   });
@@ -174,18 +185,24 @@ async function boot() {
   function showPicker() {
     game.screen = 'picker';
     hud.show(false); input.showTouch(false);
-    picker = ui.showResorts({
-      onPick: (id) => {
-        if (id && id !== rid) { switchResort(id); return; }
-        picker.close(); picker = null; showMap();
-      },
-    });
+    picker = ui.showResorts({ current: rid, onPick: (id) => { if (id && id !== rid) { switchResort(id); return; } picker.close(); picker = null; showMap(); } });
     document.documentElement.dataset.skiScreen = 'picker';
   }
+  /** Another resort: one resort per page life (its tiles, textures and caches go with it), so remember the pick and load the page again,
+   * straight onto that resort's piste map. Standalone: ?resort=<id>&map=1 (shareable). In the arcade's srcdoc frame the URL can't change:
+   * the saved pick chooses the resort and a session flag opens the map. */
   function switchResort(id) {
-    const q = new URLSearchParams(location.search);
-    q.set('resort', id); q.set('map', '1'); q.delete('piste');
-    location.search = q.toString();
+    store.set(withLast(store.get(), id, null));
+    LOAD.set(0.1, 'Skigebitt gëtt gewiesselt …');
+    try { sessionStorage.setItem(OPEN_MAP_KEY, '1'); } catch (error) { /* private mode: the picker shows again */ }
+    try {
+      const u = new URL(location.href);
+      if (/^https?:$/.test(u.protocol)) {
+        u.searchParams.set('resort', id); u.searchParams.set('map', '1'); u.searchParams.delete('piste');
+        location.replace(u.href); return;
+      }
+    } catch (error) { /* about:srcdoc inside the arcade: a plain reload */ }
+    location.reload();
   }
   function showMap() {
     game.screen = 'map';
@@ -201,7 +218,7 @@ async function boot() {
     pisteMap = createPisteMap({ canvas: mapScreen.canvas, resort, imageUrl: core.root + resort.map.file, pistes, onPick: (p) => selectPiste(p, false) });
     mapScreen.zoomButtons.forEach((b) => b.addEventListener('click', () => pisteMap.zoomBy(b.dataset.z === 'in' ? 1.5 : 1 / 1.5)));
     const last = store.get().last;
-    const first = (last && last.resort === rid && pistes.byId.get(last.piste)) || pistes.byId.get(resort.start || DEFAULT_PISTE) || pistes.list[0];
+    const first = (last && last.resort === rid && pistes.byId.get(last.piste)) || pistes.byId.get(resort.start) || pistes.byId.get(DEFAULT_PISTE) || pistes.list[0];
     selectPiste(first, true);
     document.documentElement.dataset.skiScreen = 'map';
   }
@@ -433,6 +450,7 @@ async function boot() {
       poles.update(camera.position.x, camera.position.z, quality.markerRadius);
       if (lifts) lifts.update(time, camera.position.x, camera.position.z, quality.liftRadius);
       if (village) village.update(camera.position.x, camera.position.z, quality.buildingRadius);
+      if (landmarks) landmarks.update(camera.position.x, camera.position.z, quality.buildingRadius);
     }
     env.update(dt, time, camera);
     snowfall.update(time, camera, pixelRatio());
@@ -493,7 +511,7 @@ async function boot() {
 
   // debug / flows
   window.__ski = {
-    get game() { return game; }, get state() { return game.state; }, get level() { return level; }, renderer, scene, camera, env, pistes, streamer, terrain, scatterView, field, surface,
+    get game() { return game; }, get state() { return game.state; }, get level() { return level; }, renderer, scene, camera, env, pistes, get landmarks() { return landmarks; }, streamer, terrain, scatterView, field, surface,
     setInput(o) { game.override = o; },
     /** Debug camera circling the skier: angle (deg from the skier's heading), distance, height; null = off. */
     orbit(angle, dist = 4, h = 1.2, fov = 40) { if (angle === null) { game.orbit = null; game.camPose = null; return; } game.orbit = { angle, dist, h, fov }; },
@@ -507,8 +525,8 @@ async function boot() {
 
   // first build around the default piste behind the loading screen, then the picker (or straight onto the piste with ?auto=1)
   LOAD.set(0.75, 'Pisten ginn opgebaut …');
-  const lastPiste = lastResort === rid ? (store.get().last || {}).piste : null;
-  const startPiste = pistes.byId.get(params.piste) || pistes.byId.get(lastPiste) || pistes.byId.get(resort.start || DEFAULT_PISTE) || pistes.list[0];
+  const lastRun = store.get().last || {};
+  const startPiste = pistes.byId.get(params.piste) || (lastRun.resort === rid && pistes.byId.get(lastRun.piste)) || pistes.byId.get(resort.start) || pistes.byId.get(DEFAULT_PISTE) || pistes.list[0];
   game.piste = startPiste;
   const a0 = startPiste.at(2, {});
   streamer.focus(a0.x, a0.z);
@@ -527,7 +545,7 @@ async function boot() {
     await streamer.ready(a0.x, a0.z, 1500);
     placeAt(a0.x, a0.z, Math.atan2(a0.dz, a0.dx));
     startRun(startPiste, MODES.run);
-  } else if (param('map') === '1') showMap();          // came from the picker of another resort (switchResort)
+  } else if (param('map') === '1' || takeOpenMapFlag()) showMap();          // came from the picker of another resort (switchResort)
   else showPicker();
   mark('ready');
 }

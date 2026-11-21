@@ -16,9 +16,17 @@ Sources (each a function below; RESORTS[rid]["dem"] / ["far"] list them in prior
                       copernicus-dem-30m, read with range requests. © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH
                       2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved (free licence
                       with attribution).
+    bz-dtm            Autonomous Province of Bolzano - South Tyrol, DTM 2.5 m (LiDAR), WCS 2.0.1 of the provincial GeoServer
+                      (coverage p_bz-Elevation__DigitalTerrainModel-2.5m, ETRS89 / UTM 32N, GeoTIFF float32, nodata -9999 outside the
+                      province). One GetCoverage per 1280 m tile at 5 m (SCALEFACTOR, deflated, ~0.2 MB), cached in dem/raw/. Licence CC0 1.0 (open data
+                      portal South Tyrol, attribution given anyway).
+    at-dgm            Austria-wide ALS DTM 1 m of the BEV (Bundesamt für Eich- und Vermessungswesen), the mosaic of the Länder airborne
+                      laser scans (Tirol, Vorarlberg, ...), 50 km cloud-optimised GeoTIFFs in EPSG:3035 on data.bev.gv.at, read with
+                      range requests from the 4 m overview. Licence CC BY 4.0. Chosen over the tiris WCS of Land Tirol (gis.tirol.gv.at
+                      does not answer from outside Austria: connection timeout) and the per-district zip downloads of data.gv.at
+                      (Gigabytes for a 20 km box); the BEV mosaic is the same Länder data, open, and covers Tirol and Vorarlberg at once.
     swissalti3d / vda-dtm: in dem_merge.py (swisstopo swissALTI3D 2 m via the STAC API, Regione Valle d'Aosta lidar DTM 2 m),
                       merged with a feather across the border (Zermatt-Cervinia). --remerge redoes the merge from the cached sources.
-    bz-dtm / at-dgm:  planned (Provincia di Bolzano DTM, Land Tirol / Vorarlberg DGM via data.gv.at); not implemented here.
 """
 from __future__ import annotations
 
@@ -51,6 +59,91 @@ def ign_grid(frame, rid, e0, n_top, nx, nz, step, cache):
     a = a.reshape(nz, nx).copy()
     a[a < NODATA_BELOW] = np.nan
     return a
+
+
+BZ_WCS = ("https://geoservices9.civis.bz.it/geoserver/ows?service=WCS&version=2.0.1&request=GetCoverage"
+          "&coverageId=p_bz-Elevation__Di" "gitalTerrainModel-2.5m&format=image/tiff&subset=E({x0:.2f},{x1:.2f})&subset=N({y0:.2f},{y1:.2f})"
+          "&SCALEFACTOR={scale:g}&geotiff:compression=Deflate")              # served at the frame step (2.5 m -> 5 m) and deflated: ~0.2 MB a tile
+BEV_DTM = "https://data.bev.gv.at/download/ALS/DTM/{date}/ALS_DTM_CRS3035RES50000mN{n}E{e}.tif"
+BEV_DATES = ("20250915", "20240915", "20230915", "20220915", "20190915")     # newest first; a tile is filled from the newest file that has data
+BEV_TILE = 50000
+BEV_OVERVIEW = 1                                                            # overview level 1 = 4 m (level 0 = 2 m)
+
+
+def _gdal_env():
+    os.environ.setdefault("GDAL_HTTP_USERAGENT", "ian-site-ski/1.0 (https://ian.lu)")
+    os.environ.setdefault("GDAL_DISABLE_READDIR_ON_OPEN", "EMPTY_DIR")
+    os.environ.setdefault("CPL_VSIL_CURL_ALLOWED_EXTENSIONS", ".tif")
+    os.environ.setdefault("GDAL_HTTP_MAX_RETRY", "4")
+    os.environ.setdefault("GDAL_HTTP_RETRY_DELAY", "3")
+
+
+def raster_onto(frame, src, e0, n_top, nx, nz, step):
+    """Any rasterio dataset resampled (bilinear) onto the frame grid nodes (e0 + i*step, n_top - j*step); NaN where it has no data."""
+    import rasterio
+    from rasterio.transform import from_origin
+    from rasterio.warp import Resampling, reproject
+    out = np.full((nz, nx), np.nan, np.float32)
+    reproject(rasterio.band(src, 1), out, src_nodata=src.nodata, dst_transform=from_origin(e0 - step / 2, n_top + step / 2, step, step),
+              dst_crs=frame.crs, dst_nodata=np.nan, resampling=Resampling.bilinear)
+    out[out < NODATA_BELOW] = np.nan
+    return out
+
+
+def frame_bounds_in(frame, crs, e0, n_top, nx, nz, step, pad):
+    """(x0, y0, x1, y1) of the frame grid rectangle (+ pad m) in another CRS."""
+    from pyproj import Transformer
+    t = Transformer.from_crs(frame.crs, crs, always_xy=True)
+    xs, ys = [], []
+    for e in np.linspace(e0 - pad, e0 + (nx - 1) * step + pad, 5):
+        for n in np.linspace(n_top + pad, n_top - (nz - 1) * step - pad, 5):
+            x, y = t.transform(e, n)
+            xs.append(x)
+            ys.append(y)
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def bz_grid(frame, e0, n_top, nx, nz, step, cache):
+    """South Tyrol DTM 2.5 m via WCS: one GeoTIFF of the rectangle (+ 10 m) in EPSG:25832 at the frame step, resampled onto the frame nodes."""
+    import rasterio
+    x0, y0, x1, y1 = frame_bounds_in(frame, "EPSG:25832", e0, n_top, nx, nz, step, 10.0)
+    body = http_get(BZ_WCS.format(x0=x0, x1=x1, y0=y0, y1=y1, scale=min(1.0, 2.5 / step)), cache, timeout=240, pause=1.0)
+    if body[:2] not in (b"II", b"MM"):
+        os.remove(cache)
+        raise SystemExit("South Tyrol WCS did not answer a GeoTIFF: %r" % body[:300])
+    with rasterio.open(cache) as src:
+        return raster_onto(frame, src, e0, n_top, nx, nz, step)
+
+
+_bev_ok = {}
+
+
+def bev_grid(frame, e0, n_top, nx, nz, step):
+    """Austria ALS DTM (BEV, CC BY 4.0) from the 4 m overview of the 50 km COGs, newest file first; NaN outside Austria."""
+    import rasterio
+    _gdal_env()
+    out = np.full((nz, nx), np.nan, np.float32)
+    x0, y0, x1, y1 = frame_bounds_in(frame, "EPSG:3035", e0, n_top, nx, nz, step, 20.0)
+    for tn in range(int(y0 // BEV_TILE), int(y1 // BEV_TILE) + 1):
+        for te in range(int(x0 // BEV_TILE), int(x1 // BEV_TILE) + 1):
+            for date in BEV_DATES:
+                url = BEV_DTM.format(date=date, n=tn * BEV_TILE, e=te * BEV_TILE)
+                if _bev_ok.get(url) is False:
+                    continue
+                try:
+                    with rasterio.open("/vsicurl/" + url, overview_level=BEV_OVERVIEW) as src:
+                        part = raster_onto(frame, src, e0, n_top, nx, nz, step)
+                    _bev_ok[url] = True
+                except Exception as err:  # noqa: BLE001  (no file of that date for this 50 km tile)
+                    if url not in _bev_ok:
+                        print("  bev: no file", url.rsplit("/", 2)[-2:], str(err)[:70])
+                    _bev_ok[url] = False
+                    continue
+                keep = np.isnan(out) & ~np.isnan(part)
+                out[keep] = part[keep]
+                if not np.isnan(out).any():
+                    return out
+    return out
 
 
 def copernicus_grid(frame, e0, n_top, nx, nz, step):
@@ -111,6 +204,10 @@ def fetch_near(rid, frame):
                     part = ign_grid(frame, rid, e0, n_top, n, n, NEAR_STEP, os.path.join(work_dir(rid, "dem", "raw"), "ign5_%d_%d.bil" % (tx, tz)))
                 elif src == "copernicus-glo30":
                     part = copernicus_grid(frame, e0, n_top, n, n, NEAR_STEP)
+                elif src == "bz-dtm":
+                    part = bz_grid(frame, e0, n_top, n, n, NEAR_STEP, os.path.join(work_dir(rid, "dem", "raw"), "bz_%d_%d.tif" % (tx, tz)))
+                elif src == "at-dgm":
+                    part = bev_grid(frame, e0, n_top, n, n, NEAR_STEP)
                 else:
                     raise SystemExit("DEM source %s is not implemented yet" % src)
                 keep = np.isnan(grid) & ~np.isnan(part)

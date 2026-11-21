@@ -98,6 +98,14 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick }) {
       g.fillStyle = '#16171a'; g.beginPath(); g.moveTo(x, y - 5); g.lineTo(x + 4, y + 2); g.lineTo(x - 4, y + 2); g.closePath(); g.fill();
       label(`${p.name} ${Math.round(p.ele)}`, x, y + 12, '600 10px Geist, system-ui, sans-serif', '#16171a');
     }
+    // landmarks (resort.json "landmarks"): a small violet diamond and the name; a race piste is named on its start
+    for (const lm of resort.landmarks || []) {
+      if (lm.house === false) continue;                       // the second part of a race course: one label is enough
+      const [x, y] = toScreen(lm.x, lm.z, sz);
+      if (x < -60 || y < -20 || x > sz.w + 60 || y > sz.h + 20) continue;
+      g.fillStyle = '#6b3fa0'; g.beginPath(); g.moveTo(x, y - 6); g.lineTo(x + 5, y); g.lineTo(x, y + 6); g.lineTo(x - 5, y); g.closePath(); g.fill();
+      label(lm.kind === 'worldcup' ? `${lm.name} (Weltcup)` : lm.name, x, y - 13, '700 11px Geist, system-ui, sans-serif', '#6b3fa0');
+    }
     if (zoom > 2.2) {
       for (const p of pistes.list) {
         const m = p.at(p.length * 0.45, {});

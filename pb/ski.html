@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex">
 <title>Ski Alpen · Arcade</title>
 <link rel="icon" href="data:,">
-<link rel="modulepreload" href="/pb/ski/main.js?v=3">
+<link rel="modulepreload" href="/pb/ski/main.js?v=4">
 <script>
 /* Starts the first resort's files right away (they download while the code loads); resort-data.js takes them from window.__skiPre.
  * Only the resort of ?resort= or the one the player last skied (default: Espace Killy) is fetched (main.js ignores it if not ready); the height tiles stream later, nearest first. */
@@ -64,7 +64,7 @@ if (!window.THREE) {
 <script src="/pb/boot-probe.js?v=1"></script>
 <script type="module">
   // Absolute imports: inside the arcade this page runs as a srcdoc iframe (relative URLs inside main.js come from import.meta.url).
-  if (window.bootProbe) window.bootProbe("/pb/ski/main.js?v=3", window.__skiLoad); else import("/pb/ski/main.js?v=3");
+  if (window.bootProbe) window.bootProbe("/pb/ski/main.js?v=4", window.__skiLoad); else import("/pb/ski/main.js?v=4");
 </script>
 </body>
 </html>

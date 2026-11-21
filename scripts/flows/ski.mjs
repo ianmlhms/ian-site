@@ -22,11 +22,11 @@ export const flow = {
     const errors = [];
     page.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) errors.push(m.text()); });
 
-    h.step("open: resort picker with three ready resorts and two coming");
+    h.step("open: resort picker with all five resorts ready");
     await h.goto(`/pb/ski.html?debug=1&bot=1&timescale=4&q=low`);
     await page.waitForFunction(() => document.documentElement.dataset.skiScreen === "picker" || document.documentElement.dataset.bootError, null, { timeout: 90000 });
     h.eq(await page.evaluate(() => document.documentElement.dataset.bootError || ""), "", "boots without an error");
-    h.eq(await page.$$eval(".resort", (b) => b.map((x) => x.classList.contains("ready"))), [true, true, true, false, false], "Val d'Isère · Tignes, 3 Vallées, Zermatt · Cervinia ready, two resorts 'geschwënn'");
+    h.eq(await page.$$eval(".resort", (b) => b.map((x) => (x.classList.contains("ready") ? x.dataset.id : "-"))), ["killy", "3vallees", "zermatt", "arlberg", "kronplatz"], "Val d'Isère · Tignes first, all five resorts ready");
     await h.shot("picker");
 
     h.step("piste map: pick a piste from the list, weather and time controls");

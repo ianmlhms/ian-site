@@ -68,8 +68,24 @@ RESORTS = {
                      ("Méribel Mottaret", 6.5810, 45.3738, 480, "chalet"), ("Méribel Village", 6.5800, 45.4120, 300, "chalet"), ("Brides-les-Bains", 6.5680, 45.4530, 500),
                      ("Saint-Martin-de-Belleville", 6.5055, 45.3800, 450, "chalet"), ("Les Menuires", 6.5360, 45.3250, 950), ("Val Thorens", 6.5800, 45.2975, 700),
                  ]},
-    "kronplatz": {"name": "Kronplatz", "short": "Plan de Corones", "country": "IT", "crs": "EPSG:25832",
-                  "bbox": (46.700, 11.850, 46.790, 11.990), "dem": ["bz-dtm", "copernicus-glo30"], "far": ["copernicus-glo30"], "villages": []},
+    # Kronplatz: the whole Kronplatz / Plan de Corones area from Reischach (Bruneck) and Olang to St. Vigil and the Piz de Plaies /
+    # Piculin side, all inside South Tyrol, so the 5 m tiles come from the province's 2.5 m DTM (WCS, ETRS89 / UTM 32N = the frame).
+    "kronplatz": {
+        "name": "Kronplatz", "short": "Plan de Corones", "country": "IT", "crs": "EPSG:25832",
+        "bbox": (46.668, 11.868, 46.803, 12.030),
+        "dem": ["bz-dtm", "copernicus-glo30"], "far": ["copernicus-glo30"],
+        "start": "Sylvester",
+        "tree_line": 2250.0, "derived_forest": 2050.0,       # spruce / larch up to about 2100 m on the Kronplatz flanks, the summit dome bare
+        "villages": [
+            ("Reischach", 11.9530, 46.7880, 700), ("Olang", 12.0200, 46.7480, 900), ("St. Vigil", 11.9420, 46.6990, 800),
+            ("Gassl", 12.0050, 46.7370, 300), ("Piculin", 11.9030, 46.6780, 400), ("Kronplatz", 11.9575, 46.7390, 260),
+        ],
+        "landmarks": [
+            # kind, name, lon, lat (+ kind options); placed on the terrain by the bake, drawn by pb/ski/landmarks.js
+            {"kind": "bell", "name": "Concordia 2000", "lon": 11.95827, "lat": 46.73876},          # OSM man_made=tower, 21.8 m
+            {"kind": "mmm", "name": "Messner Mountain Museum Corones", "lon": 11.95440, "lat": 46.73731, "face": 215, "clear": 30},  # OSM footprint; glass towards the Dolomites
+        ],
+    },
     # Matterhorn ski paradise: Zermatt (Sunnegga / Rothorn, Gornergrat / Stockhorn, Schwarzsee / Klein Matterhorn / Theodul glacier) and
     # Breuil-Cervinia + Valtournenche on the Italian side. The box crosses the border on the main ridge (Plateau Rosa / Theodulpass):
     # swissALTI3D north of it, the Aosta Valley lidar DTM south of it, merged with a feather (fetch_dem.py merge_sources).
@@ -87,8 +103,33 @@ RESORTS = {
                     ("Plateau Rosa", 7.7080, 45.9370, 180), ("Breuil-Cervinia", 7.6300, 45.9345, 900), ("Plan Maison", 7.6465, 45.9400, 200),
                     ("Valtournenche", 7.6235, 45.8775, 550), ("Salette", 7.6400, 45.8800, 200),
                 ]},
-    "arlberg": {"name": "St. Anton · Arlberg", "short": "Ski Arlberg", "country": "AT", "crs": "EPSG:31287",
-                "bbox": (47.100, 10.060, 47.250, 10.320), "dem": ["at-dgm", "copernicus-glo30"], "far": ["copernicus-glo30"], "villages": []},
+    # Ski Arlberg: St. Anton, St. Christoph, Stuben and Rendl, plus Zürs and Lech over the Flexen pass (Flexenbahn). Warth-Schröcken and
+    # Sonnenkopf stay out (data budget). ETRS89 / UTM 32N frame (not MGI Lambert: no datum shift between the DEM, OSM and the frame).
+    "arlberg": {
+        "name": "St. Anton · Arlberg", "short": "Ski Arlberg", "country": "AT", "crs": "EPSG:25832",
+        "bbox": (47.095, 10.088, 47.232, 10.312),
+        "dem": ["at-dgm", "copernicus-glo30"], "far": ["copernicus-glo30"],
+        "start": "Kandahar-Kapall",
+        "near_keep": 350.0,                                  # 5 m tiles only this close to pistes, lifts, houses (10 MB budget)
+        "tree_line": 2000.0, "derived_forest": 1850.0,       # north side of the Alps: the forest ends near 1900 m (St. Anton 1300 m, St. Christoph 1800 m bare)
+        "villages": [
+            ("St. Anton", 10.2660, 47.1290, 1300), ("Nasserein", 10.2860, 47.1340, 500), ("St. Jakob", 10.2990, 47.1390, 450),
+            ("St. Christoph", 10.1960, 47.1310, 450), ("Stuben", 10.1580, 47.1360, 400), ("Alpe Rauz", 10.1790, 47.1370, 250),
+            ("Zürs", 10.1680, 47.1700, 650), ("Lech", 10.1420, 47.2080, 1100), ("Oberlech", 10.1270, 47.2000, 450),
+            ("Zug", 10.1280, 47.2200, 350),
+        ],
+        "landmarks": [
+            # spots from the OSM buildings / roads: Vallugabahn II top station, Galzigbahn top station, the B197 at the Hospiz, the
+            # Christophorus chapel next to the Hospiz
+            {"kind": "summit-station", "name": "Valluga 2811 m", "lon": 10.21330, "lat": 47.15770, "antenna": True, "face": 150},
+            {"kind": "summit-station", "name": "Galzig", "lon": 10.23089, "lat": 47.13082, "big": True, "face": 130, "clear": 22},
+            {"kind": "pass", "name": "Arlbergpass 1793 m", "lon": 10.21345, "lat": 47.12768, "face": 135},
+            {"kind": "chapel", "name": "St. Christoph", "lon": 10.21329, "lat": 47.12738},
+            # the World Cup course: OSM has it as two pistes (Kapall start -> Galzig); nets on both, the start house on the first
+            {"kind": "worldcup", "name": "Kandahar", "piste": "Kandahar-Kapall"},
+            {"kind": "worldcup", "name": "Kandahar", "piste": "Kandahar-Galzig", "house": False},
+        ],
+    },
 }
 
 # Height tiles: TILE_CELLS cells of NEAR_STEP metres (the files hold TILE_CELLS + 1 nodes per side, neighbours share their edge).
@@ -106,6 +147,8 @@ SOURCE_CREDITS = {
     "ign-rgealti": "Gelänn: IGN RGE ALTI® 5 m (© IGN, Licence Ouverte / Etalab 2.0), iwwer de Géoplateforme",
     "swissalti3d": "Gelänn Schwäiz: swissALTI3D 2 m (© swisstopo, Open Government Data, fräi Notzung mat Quellenugab)",
     "vda-dtm": "Gelänn Italien: DTM 2005/2008 Lidar 2 m (© Regione Autonoma Valle d'Aosta, CC BY 4.0)",
+    "bz-dtm": "Gelänn: Digitaalt Terrainmodell 2,5 m vun der Autonomer Provënz Bozen - Südtirol (Open Data Südtirol, CC0 1.0)",
+    "at-dgm": "Gelänn: ALS-DTM Éisträich 1 m (Datenquell: BEV - Bundesamt für Eich- und Vermessungswesen, aus de Laserscans vun de Bundesländer, CC BY 4.0)",
     "copernicus-glo30": "Bierger an der Distanz: Copernicus DEM GLO-30 (© DLR e.V. 2010-2014 an © Airbus Defence and Space GmbH 2014-2018, ënnert COPERNICUS vun der EU an der ESA)",
 }
 OSM_CREDIT = "Pisten, Liften, Haiser, Bësch: © OpenStreetMap-Mataarbechter (ODbL 1.0)"
