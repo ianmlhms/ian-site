@@ -111,6 +111,20 @@ const SCORE_FORMATS = {
     const m = Math.floor(ms / 60000), s = Math.floor(ms % 60000 / 1000), t = ms % 1000;
     return m + ":" + String(s).padStart(2, "0") + "." + String(t).padStart(3, "0");
   },
+  // Ski Alpen: a piste time in milliseconds, LOWER is better (GAMES lowerIsBetter + scripts/ski-v1.sql). Shown as m:ss.mmm.
+  ski(score) {
+    const ms = Number(score);
+    if (!Number.isFinite(ms) || ms < 0) return String(score);
+    const m = Math.floor(ms / 60000), s = Math.floor(ms % 60000 / 1000), t = Math.round(ms % 1000);
+    return m + ":" + String(s).padStart(2, "0") + "." + String(t).padStart(3, "0");
+  },
+  // Ski Alpen snow park (board ski-<resort>-park): park POINTS, higher is better, stored as 1,000,000 - points so the board stays
+  // lower-is-better like every ski-* board (GAMES lowerIsBetter, scripts/ski-v1.sql, pb/ski/modes/park.js PARK_BASE). Shown as points.
+  skipark(score) {
+    const points = 1_000_000 - Number(score);
+    if (!Number.isFinite(points) || points < 0) return String(score);
+    return Math.round(points).toLocaleString("de-LU") + " Pkt.";
+  },
   // MTB Mëllerdall: a trail time is stored as MTB_TIME_BASE - milliseconds (higher is better, no SQL needed). Shown as m:ss.mmm.
   mtb(score) {
     const ms = 10_000_000 - score;
