@@ -463,10 +463,55 @@ def classes_raster(frame, dem_raw, areas_osm, piste_lines, piste_areas, building
     free = (out & CLASS_BITS["forest"]) == 0
     out[derived & free & ~dense] |= CLASS_BITS["scrub"]
     out[dense & free] |= CLASS_BITS["forest"]
+    # bare rock in winter: replaces the mapped rock (a summer map: most of it lies under the snow); mapped scree only where steep
+    osm_rock = (out & CLASS_BITS["rock"]) > 0
+    rock = winter_rock(dem_raw.g, nz, nx, osm_rock, (out & CLASS_BITS["glacier"]) > 0, (out & CLASS_BITS["water"]) > 0, pm)
+    out &= ~np.uint8(CLASS_BITS["rock"])
+    out[rock] |= CLASS_BITS["rock"]
+    out[slope < 24] &= ~np.uint8(CLASS_BITS["scree"])
     no_tree = (pm > 0.15) | area_m | (h > tree_line) | ((out & CLASS_BITS["water"]) > 0) | (slope > 42) | ((out & CLASS_BITS["built"]) > 0)
     out[no_tree] &= ~tree_bits
     log("classes", {k: int(((out & v) > 0).sum()) for k, v in CLASS_BITS.items()})
     return out, nx, nz
+
+
+# Winter rock (the class bit "rock"): what a real face keeps bare under the snow, from the 5 m terrain. The threshold slope falls on
+# convex ground (ridges, buttresses: wind-scoured), on sunny faces and high up, and rises in hollows and gullies (they fill with snow);
+# painted strata (layers of ROCK_BAND m with a noisy phase) expose rock bands and keep snow on the ledge between them; the real ledges of
+# the 5 m model hold snow by themselves (their slope is low). OSM bare rock / cliffs only count where they are steep enough to stay bare.
+ROCK_SLOPE = 38.5                  # degrees: the base threshold (Matterhorn faces 40-55, Face de Bellevarde 30-40 deg)
+ROCK_BAND = 32.0                   # m: the painted strata period
+
+
+def winter_rock(raw, nz, nx, osm_rock, glacier, water, pm):
+    """Bool (nz, nx) at CLASS_STEP of the bare winter rock, from the 5 m mosaic `raw`."""
+    g = raw[:nz * 2 + 1, :nx * 2 + 1].astype(np.float32)
+    gz5, gx5 = np.gradient(g, NEAR_STEP)
+    slope5 = np.degrees(np.arctan(np.hypot(gx5, gz5)))
+    def down(a):
+        return a[:nz * 2, :nx * 2].reshape(nz, 2, nx, 2).mean(axis=(1, 3))
+    slope = down(slope5)
+    h = down(g)
+    sm = ndimage.gaussian_filter(h, 2.0)                       # 20 m: the shape of ridges and gullies, not single boulders
+    curv = -ndimage.laplace(sm) / (CLASS_STEP * CLASS_STEP)    # 1/m, > 0 convex (ridge), < 0 concave (gully)
+    convex = np.clip(curv * 60.0, -1, 1)
+    gz, gx = np.gradient(sm, CLASS_STEP)
+    sunny = np.clip(-gz / np.maximum(np.hypot(gx, gz), 1e-6), -1, 1)      # +1: the face looks south
+    rng = np.random.default_rng(23)
+    noise = ndimage.gaussian_filter(rng.random((nz, nx)), 3)
+    noise = (noise - noise.mean()) / (noise.std() + 1e-9)
+    phase = h / ROCK_BAND + 0.35 * noise
+    band = np.cos(2 * np.pi * phase)                           # +1 in the middle of a rock band, -1 on the ledge between two
+    high = np.clip((h - 2600.0) / 600.0, 0, 1)
+    thr = ROCK_SLOPE - 6.0 * convex - 2.5 * sunny - 3.0 * high - 3.0 * band - 1.5 * noise
+    thr = np.where(glacier, thr + 12.0, thr)                   # glaciers stay white up to their seracs
+    rock = slope > thr
+    rock |= osm_rock & (slope > thr - 8.0)
+    rock &= ~water & (pm < 0.3)
+    rock = ndimage.median_filter(rock.astype(np.uint8), 3) > 0                 # no salt-and-pepper (and a smaller RLE)
+    log("winter rock: %.1f %% of the box (slope p50 %.0f, p90 %.0f deg; convex p10 %.2f p90 %.2f)" % (
+        100.0 * rock.mean(), np.percentile(slope, 50), np.percentile(slope, 90), np.percentile(convex, 10), np.percentile(convex, 90)))
+    return rock
 
 
 def join_rings(parts):
@@ -750,8 +795,8 @@ def paint_map(frame, mosaic, classes, outp):
     col = snow_lo + (snow_hi - snow_lo) * light[..., None]
     rock = np.clip((slope - 36) / 10, 0, 1)
     cls = np.asarray(Image.fromarray(classes).resize((W, H), Image.NEAREST))
-    rock = np.maximum(rock, ((cls & CLASS_BITS["rock"]) > 0) * 0.55 * np.clip((slope - 25) / 12, 0, 1))
-    rock_col = np.array([0.42, 0.38, 0.37]) * (0.55 + 0.6 * light[..., None])
+    rock = np.maximum(rock, ((cls & CLASS_BITS["rock"]) > 0) * 0.85)
+    rock_col = np.array([0.40, 0.39, 0.40]) * (0.55 + 0.6 * light[..., None])
     col = col * (1 - rock[..., None]) + rock_col * rock[..., None]
     rng = np.random.default_rng(7)
     noise = ndimage.gaussian_filter(rng.random((H, W)), 1.2)

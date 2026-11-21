@@ -234,6 +234,16 @@ export function createField({ resort, far, classes, net, kickers = createKickers
     return (classBit(i, j, bit) * (1 - fx) + classBit(i + 1, j, bit) * fx) * (1 - fz) + (classBit(i, j + 1, bit) * (1 - fx) + classBit(i + 1, j + 1, bit) * fx) * fz;
   }
 
+  /** Winter rock share: a coarse tile's vertex stands for lod x lod metres, so it averages a 3 x 3 spread of the 10 m raster (thin
+   *  rock bands would flicker in and out of single samples). */
+  function rockShare(x, z, lod) {
+    if (lod <= DATA.classStep * 1.5) return classShare(x, z, bits.rock);
+    const d = lod / 3;
+    let sum = 0;
+    for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) sum += classShare(x + i * d, z + j * d, bits.rock);
+    return sum / 9;
+  }
+
   /** Ground attributes at (x, z) into out = { piste, diff, forest, rock, built, water }; `lod` = node spacing of the caller (softer piste edge). */
   function attrs(x, z, out, lod = LATTICE) {
     net.query(x, z, pq, Math.max(5, lod));
@@ -242,7 +252,7 @@ export function createField({ resort, far, classes, net, kickers = createKickers
     out.diff = pq.diff;
     out.dist = area > 0.05 ? -1 : pq.dist;
     out.forest = Math.min(1, classShare(x, z, bits.forest) + 0.55 * classShare(x, z, bits.scrub));
-    out.rock = Math.min(1, classShare(x, z, bits.rock) + 0.6 * classShare(x, z, bits.scree));
+    out.rock = Math.min(1, rockShare(x, z, lod) + 0.35 * classShare(x, z, bits.scree));
     out.built = classShare(x, z, bits.built);
     out.water = classShare(x, z, bits.water);
     out.glacier = classShare(x, z, bits.glacier);

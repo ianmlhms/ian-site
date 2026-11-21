@@ -107,17 +107,32 @@ export function createSnowMaterial(env, { cheap = false, treeRadius = 400, fores
         vec3 lake = mix(snow * vec3(0.94, 0.965, 1.0), ice, iceShow * 0.45);
         lake = mix(lake, lake * vec3(0.8, 0.86, 0.92), crack * 0.35 * aa + shore * 0.35);
         snow = mix(snow, lake, smoothstep(0.05, 0.3, waterSoft));
-        // ---- rock where it is too steep for snow (strata in the height), more of it in the mapped rock areas
+        // ---- bare rock: the baked winter rock (aInfo.z, from the 5 m terrain: steepness, ridges, aspect, height, strata; right at every
+        //      distance) and, near by or outside the baked box, whatever is too steep for snow by the mesh normal (coarse far tiles are
+        //      smoother than the real faces: their threshold is lower). Flat bits inside the rock (ledges) keep their snow.
         float slope = 1.0 - N.y;
-        float rockAmt = smoothstep(0.31, 0.42, slope + (nA.g - 0.5) * 0.12);
-        rockAmt = max(rockAmt, rockCls * smoothstep(0.24, 0.35, slope + (nB.b - 0.5) * 0.16) * 0.85);
-        rockAmt *= (1.0 - piste) * (1.0 - water);
-        float sPhase = vWorld.y * 0.55 + nA.r * 4.0;
-        float strata = 0.5 + 0.5 * sin(sPhase) * clamp(1.2 - fwidth(sPhase) * 0.8, 0.0, 1.0);
-        vec3 rockCol = mix(vec3(0.44, 0.41, 0.39), vec3(0.62, 0.57, 0.52), strata * 0.6 + nB.r * 0.4);
+        float farK = smoothstep(250.0, 3000.0, vDist);
+        float s0 = mix(0.30, 0.2, farK);
+        float rockSteep = smoothstep(s0, s0 + 0.1, slope + (nA.g - 0.5) * 0.1);
+        float ledge = mix(0.09, 0.015, farK);
+        float rockBaked = rockCls * smoothstep(ledge, ledge + 0.08, slope + (nB.b - 0.5) * 0.06);
+        float rockAmt = max(rockSteep, rockBaked) * (1.0 - piste) * (1.0 - water);
+        // strata: grey layers of ~8 m (light and dark), snow in broken lines on some layers' ledges; less snow the steeper
+        float sPhase = vWorld.y * 0.12 + nA.r * 2.0 + nB.g * 1.2 + nL.g * 2.0;
+        float sAA = clamp(1.0 - fwidth(sPhase) * 1.5, 0.0, 1.0);
+        float sLayer = fract(sPhase);
+        float strata = 0.5 + 0.5 * sin(sPhase * 6.2832) * sAA;
+        vec3 rockCol = mix(vec3(0.33, 0.33, 0.345), vec3(0.55, 0.535, 0.52), strata * 0.35 + nB.r * 0.65);
+        rockCol *= 0.92 + 0.16 * nL.b;                                                  // big patches: darker and lighter faces
         float rockLit = band(smoothstep(-0.2, 0.75, dot(N, uSunDir)) * sunVis);
         rockCol = rockCol * (shade * 0.8 * (1.0 - 0.25 * max(ao, 0.0)) + uSunColor * rockLit * 0.9);
-        rockAmt *= 1.0 - 0.75 * smoothstep(0.45, 0.8, nB.g * 0.6 + nA.b * 0.4) * smoothstep(0.55, 0.3, slope);   // snow on ledges and in gullies
+        float snowLine = smoothstep(0.8, 0.88, sLayer) * (1.0 - smoothstep(0.9, 0.98, sLayer)) * smoothstep(0.45, 0.65, nB.a) * sAA * (1.0 - smoothstep(0.35, 0.7, slope));
+        float snowPatch = smoothstep(0.5, 0.78, nB.g * 0.6 + nA.b * 0.4) * (1.0 - smoothstep(0.22, 0.5, slope));     // snow patches in the hollows
+        // snow streaks down the gullies, long along the fall line (they read at every distance, unlike the thin strata lines)
+        vec2 acrossFall = vec2(-fall.y, fall.x);
+        float streakN = texture2D(uNoise, vec2(dot(wp, acrossFall) * 0.021, dot(wp, fall) * 0.0032) + 0.55).g * 0.75 + nL.r * 0.25;
+        float streak = smoothstep(0.56, 0.7, streakN) * (1.0 - smoothstep(0.4, 0.8, slope));
+        rockAmt *= 1.0 - clamp(snowLine * 0.85 + snowPatch * 0.8 + streak * 0.85, 0.0, 1.0);
         vec3 col = mix(snow, rockCol, rockAmt);
         // ---- forests beyond the instanced trees: a dark underlay where the far tree cards stand (forest-far.js draws the trees)
         float fRaster = uForestOn > 0.5 ? texture2D(uForestTex, wp / uForestSize).r : forest;
