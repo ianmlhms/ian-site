@@ -57,7 +57,7 @@ export default async function shots(page, { shoot }) {
   // a challenge gate: seen from above on the piste (label), then skied into (the prompt)
   await ev(() => {
     const S = window.__ski, m = S.markers.byId('face') || S.markers.list[5];
-    S.place(m.x - Math.cos(m.heading) * 38, m.z - Math.sin(m.heading) * 38, m.heading);
+    S.place(m.x - Math.cos(m.heading) * 30 + Math.sin(m.heading) * 6, m.z - Math.sin(m.heading) * 30 - Math.cos(m.heading) * 6, m.heading);
     S.setInput({ steer: 0, tuck: 0, brake: 1, push: 0, jump: false });
   });
   await settle(3500);
@@ -71,13 +71,15 @@ export default async function shots(page, { shoot }) {
   await page.reload();
   await page.waitForFunction(() => document.documentElement.dataset.skiScreen === 'ski' && window.__ski.game.phase === 'running', null, { timeout: 90000 });
   await settle(2500);
+  await ev(() => { const S = window.__ski, p = S.pistes.byId.get('face') || S.pistes.list[0], q = p.at(p.length * 0.6, {}); S.place(q.x, q.z, Math.atan2(q.dz, q.dx)); S.setInput({ steer: 0, tuck: 0, brake: 1, push: 0, jump: false }); });
+  await settle(2500);
   for (const id of ['allmountain', 'carving', 'race', 'powder', 'park']) {
-    await ev((sid) => { const S = window.__ski; S.setSki(sid); S.orbit(140, 2.3, 0.9, 38); }, id);
+    await ev((sid) => { const S = window.__ski; S.setSki(sid); S.orbit(150, 3.3, 1.9, 40); }, id);
     await settle(700);
     await shoot(`ski-${id}`);
   }
-  await ev(() => window.__ski.orbit(null));
-  await settle(800);
+  await ev(() => { window.__ski.orbit(null); window.__ski.setInput(null); window.__ski.goFree(window.__ski.spawn.id); });
+  await settle(3000);
   await page.waitForFunction(() => !document.getElementById('skiSwap').hidden, null, { timeout: 10000 }).catch(() => {});
   await ev(() => window.__ski.openSkiCard());
   await settle(600);

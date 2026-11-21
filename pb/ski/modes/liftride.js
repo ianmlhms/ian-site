@@ -88,14 +88,14 @@ export function rideCamera(path, w, mode, ground) {
     // from the rider's eyes: a chair looks a little down (the safety bar and the chairs ahead), a cabin out of its front window (the
     // ceiling and the posts frame the view), a drag lift up the track
     const eye = k === 'chair' ? 1.02 : 1.62;
-    const ahead = k === 'chair' ? 0.08 : k === 'drag' ? 0.2 : k === 'train' ? -1 : -0.05;
+    const ahead = k === 'chair' ? 0.08 : k === 'drag' ? 0.2 : k === 'train' ? -1 : 0.12;
     out.x = w.x + fx * ahead; out.z = w.z + fz * ahead; out.y = w.y + eye;
     const look = 40;
     const tx = w.x + fx * look, tz = w.z + fz * look;
     const climb = k === 'drag' || k === 'train' ? (ground(w.x + fx * 20, w.z + fz * 20) - ground(w.x, w.z)) / 20 : path.slope(w.s || 0);
-    const pitch = k === 'chair' ? Math.atan(climb) - 0.32 : k === 'drag' ? Math.atan(climb) * 0.7 - 0.1 : Math.atan(climb) * 0.6 - 0.05;
+    const pitch = k === 'chair' ? Math.atan(climb) - 0.5 : k === 'drag' ? Math.atan(climb) * 0.7 - 0.1 : Math.atan(climb) * 0.6 - 0.05;
     out.tx = tx; out.tz = tz; out.ty = out.y + look * Math.tan(pitch);
-    out.fov = k === 'chair' ? 78 : 72;
+    out.fov = k === 'chair' ? 80 : 74;
   } else {
     const back = k === 'cable' ? 13 : k === 'gondola' ? 7.5 : k === 'train' ? 16 : k === 'drag' ? 5.5 : 5.2;
     const side = k === 'cable' ? 6 : k === 'gondola' ? 3.6 : k === 'train' ? 5 : k === 'drag' ? 1.6 : 2.6;
@@ -104,6 +104,10 @@ export function rideCamera(path, w, mode, ground) {
     out.y = w.y + up + (k === 'chair' ? 0.4 : 0);
     out.tx = w.x + fx * 4; out.tz = w.z + fz * 4; out.ty = w.y + (k === 'chair' ? 0.5 : k === 'drag' ? 1 : 1.2);
     out.fov = 58;
+    if (k === 'chair') {               // a chair from behind is only its backrest: beside it, a little ahead, looking back at the rider
+      out.x = w.x + fx * 2.6 + rx * 3.3; out.z = w.z + fz * 2.6 + rz * 3.3; out.y = w.y + 1.1;
+      out.tx = w.x - fx * 1.2; out.tz = w.z - fz * 1.2; out.ty = w.y + 0.2; out.fov = 60;
+    }
   }
   const g = ground(out.x, out.z) + 0.8;
   if (out.y < g) out.y = g;

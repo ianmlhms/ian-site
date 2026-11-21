@@ -49,7 +49,7 @@ function cabinParts(L, Wd, H, floor, colour, dark, arms) {
   P.push([box(0.06, low, Wd), colour, at(L / 2, floor + low / 2, 0)]);
   P.push([box(0.06, low, Wd), colour, at(-L / 2, floor + low / 2, 0)]);
   P.push([box(L + 0.04, 0.1, Wd + 0.04), dark, at(0, floor + low, 0)]);
-  P.push([box(L + 0.06, 0.12, Wd + 0.06), dark, at(0, roof - 0.06, 0)]);
+  P.push([box(L + 0.06, 0.12, Wd + 0.06), 0xd5d8dd, at(0, roof - 0.06, 0)]);
   for (const x of [-L / 2, L / 2]) for (const z of [-Wd / 2, Wd / 2]) P.push([box(0.08, H, 0.08), dark, at(x, mid, z)]);
   P.push([box(0.05, H - low, 0.04), dark, at(0, floor + low + (H - low) / 2, Wd / 2 + 0.02)]);
   // glass above the panels
