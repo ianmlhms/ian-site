@@ -11,7 +11,7 @@ import { createSurface } from './surface.js';
 import { setRoot } from './quadtree.js';
 import { createTerrainView } from './terrain-view.js';
 import { createSnowMaterial } from './snow-shader.js';
-import { createEnv, createNoiseTexture, WEATHER_LABEL, TIME_LABEL } from './env.js';
+import { createEnv, createNoiseTexture, createDetailTexture, createFarNormalTexture, WEATHER_LABEL, TIME_LABEL } from './env.js';
 import { createScatter } from './scatter.js';
 import { createScatterView } from './scatter-view.js';
 import { createFarForest } from './forest-far.js';
@@ -91,7 +91,10 @@ async function boot() {
   canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); console.warn('[ski] WebGL context lost: reloading'); setTimeout(() => location.reload(), 600); });
 
   const noise = createNoiseTexture();
-  const env = createEnv({ scene, noise, params });
+  const maxAniso = renderer.capabilities.getMaxAnisotropy();
+  noise.anisotropy = Math.min(4, maxAniso);
+  const detail = createDetailTexture(Math.min(8, maxAniso));           // round 5: fine ground detail (grain, crags, sparkle)
+  const env = createEnv({ scene, noise, detail, params });
   const shadows = createShadows({ renderer, sun: env.sun, u: env.u });
   shadows.setLevel(level);
   const ui = createUi(document.getElementById('ui'));
@@ -111,9 +114,13 @@ async function boot() {
   const core = await loadResortCore(rid, (p) => LOAD.set(0.25 + p * 0.45, 'Bierger ginn opgebaut …'));
   mark('core');
   const { resort } = core;
-  if (resort.shadows) {
+  {
     const st = resort.far.step, m = resort.far.margin;
-    env.setShadows((time) => core.root + resort.shadows.file.replace('{time}', time), [-m - st / 2, -m - st / 2, resort.far.nx * st, resort.far.nz * st]);
+    const farRect = [-m - st / 2, -m - st / 2, resort.far.nx * st, resort.far.nz * st];      // the far grid's rectangle (pixel edges)
+    env.u.uShadowRect.value.set(...farRect);
+    if (resort.shadows) env.setShadows((time) => core.root + resort.shadows.file.replace('{time}', time), farRect);
+    env.setFarNormals(createFarNormalTexture(core.far, st));               // round 5: the far mountains are lit per pixel from the 40 m grid
+    mark('far normals');
   }
   const net = createPisteNet(resort.network);
   const parkLayout = parkLayoutOf(resort);                                   // round 4A: the snow park is part of the height function
@@ -132,7 +139,7 @@ async function boot() {
     t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true; t.needsUpdate = true;
     return { texture: t, width: nx * resort.classes.step, depth: nz * resort.classes.step };
   })();
-  let snowMat = createSnowMaterial(env, { cheap: quality.cheapSnow, treeRadius: quality.treeRadius, forest: forestTex });
+  let snowMat = createSnowMaterial(env, { cheap: quality.cheapSnow, treeRadius: quality.treeRadius, forest: forestTex, lodScale: quality.lodScale });
   const terrain = createTerrainView({ scene, surface, field, material: snowMat, quality });
   const scatterView = createScatterView({ scene, scatter, env, quality, normalAt: (x, z, o) => surface.normal(x, z, o, 2.5) });
   const farForest = createFarForest({ scene, env, classes: core.classes, resort, field, quality });
@@ -527,7 +534,7 @@ async function boot() {
     level = next; quality = QUALITY[level];
     post.setSpec(quality.res); resize();
     camera.far = quality.far * 1.3; camera.updateProjectionMatrix();
-    snowMat = createSnowMaterial(env, { cheap: quality.cheapSnow, treeRadius: quality.treeRadius, forest: forestTex });
+    snowMat = createSnowMaterial(env, { cheap: quality.cheapSnow, treeRadius: quality.treeRadius, forest: forestTex, lodScale: quality.lodScale });
     terrain.setMaterial(snowMat);
     scatterView.setQuality(quality);
     farForest.setQuality(quality);
