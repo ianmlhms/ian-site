@@ -143,12 +143,12 @@ function lattice(height, width, color) {
   const g = new THREE.Group();
   const w = width / 2;
   const corners = [[-w, -w], [w, -w], [w, w], [-w, w]];
-  for (const [x, z] of corners) g.add(beam(new THREE.Vector3(x, 0, z), new THREE.Vector3(x * 0.7, height, z * 0.7), 0.3, color));
+  for (const [x, z] of corners) g.add(beam(new THREE.Vector3(x, 0, z), new THREE.Vector3(x * 0.7, height, z * 0.7), 0.55, color));
   for (let y = 3; y < height; y += 3.5) {
     const k = 1 - 0.3 * y / height;
     for (let i = 0; i < 4; i++) {
       const [ax, az] = corners[i], [bx, bz] = corners[(i + 1) % 4];
-      g.add(beam(new THREE.Vector3(ax * k, y, az * k), new THREE.Vector3(bx * k, y, bz * k), 0.18, color));
+      g.add(beam(new THREE.Vector3(ax * k, y, az * k), new THREE.Vector3(bx * k, y, bz * k), 0.32, color));
     }
   }
   return g;
@@ -162,10 +162,10 @@ function summitStation(lm) {
   }
   if (lm.antenna) {
     // the white lattice mast with its dishes on the summit, the summit cross beside it (the station itself is the OSM building)
-    const mast = lattice(20, 4.5, COL.antenna);
+    const mast = lattice(22, 6, COL.antenna);
     mast.position.set(6, 0, -3);
     g.add(mast);
-    for (const [y, r] of [[15.5, 1.3], [12, 1.0]]) {
+    for (const [y, r] of [[17, 1.8], [13, 1.4], [9, 1.1]]) {
       const dish = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.35, 16), mat(COL.antenna));
       dish.rotation.x = Math.PI / 2; dish.position.set(6, y, -0.6);
       g.add(dish);
@@ -200,16 +200,20 @@ function pass(lm) {
 }
 
 function chapel() {
+  // the tower rises above the neighbouring hotel roofs (the Hospiz), a tall dark four-sided spire with a gilt cross
+  const T = 19, S = 15;
   const g = new THREE.Group();
-  g.add(box(6, 14, 6, COL.white, 0, -2, 0));
-  const spire = new THREE.Mesh(new THREE.ConeGeometry(4.0, 12, 4), mat(COL.roofDark));
-  spire.position.y = 12 + 6; spire.rotation.y = Math.PI / 4;
+  g.add(box(6, T + 2, 6, COL.white, 0, -2, 0));
+  const spire = new THREE.Mesh(new THREE.ConeGeometry(4.0, S, 4), mat(COL.roofDark));
+  spire.position.y = T + S / 2; spire.rotation.y = Math.PI / 4;
   g.add(spire);
-  g.add(beam(new THREE.Vector3(0, 24, 0), new THREE.Vector3(0, 26.4, 0), 0.18, 0xc9a24a));
-  g.add(beam(new THREE.Vector3(-0.7, 25.6, 0), new THREE.Vector3(0.7, 25.6, 0), 0.16, 0xc9a24a));
-  const clock = new THREE.Mesh(new THREE.CircleGeometry(1.2, 18), mat(0xf6f3ea));
-  clock.position.set(0, 9.5, 3.02);
-  g.add(clock);
+  g.add(beam(new THREE.Vector3(0, T + S - 0.5, 0), new THREE.Vector3(0, T + S + 2.4, 0), 0.18, 0xc9a24a));
+  g.add(beam(new THREE.Vector3(-0.7, T + S + 1.6, 0), new THREE.Vector3(0.7, T + S + 1.6, 0), 0.16, 0xc9a24a));
+  for (const [x, z, ry] of [[0, 3.02, 0], [0, -3.02, Math.PI], [3.02, 0, Math.PI / 2], [-3.02, 0, -Math.PI / 2]]) {
+    const clock = new THREE.Mesh(new THREE.CircleGeometry(1.2, 18), mat(0xf6f3ea));
+    clock.position.set(x, T - 2.5, z); clock.rotation.y = ry;
+    g.add(clock);
+  }
   return { group: g, footprint: 5 };
 }
 
