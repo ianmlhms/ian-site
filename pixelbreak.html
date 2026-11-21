@@ -669,7 +669,7 @@ _omOpener=null;
 /* Games that have the shared lobby (lobby.html, see mp-games.js) open it instead of a bare room link.
  * 4-letter codes belong to the lobby; older 6-character room codes still join the old way. */
 var MPG=null;
-import('./mp-games.js?v=5').then(function(m){MPG=m}).catch(function(){});
+import('./mp-games.js?v=6').then(function(m){MPG=m}).catch(function(){});
 function lobbyIdFor(href){if(!MPG)return null;var ids=Object.keys(MPG.MP_GAMES);for(var i=0;i<ids.length;i++){var g=MPG.MP_GAMES[ids[i]];if(g.lobby&&g.page===href)return g.id}return null}
 /* A lobby game (pong, tank-wars, fighters, air-hockey) runs in the sandboxed frame and may not navigate this page itself: it asks, and only the
  * game frame's own request for a lobby.html link is honoured. */

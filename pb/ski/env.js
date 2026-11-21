@@ -5,6 +5,7 @@
  * The player chooses both in the menu and in game ("Zoufälleg" = random is the default; the choice is stored per player). Weather never
  * changes a time or a score. */
 import { shadowUniforms } from './shadows.js';
+import { RANDOM_WEATHER, RANDOM_TIME } from './config.js';
 
 const THREE = window.THREE;
 
@@ -15,8 +16,6 @@ export const WEATHER_LABEL = Object.freeze({ random: 'Zoufälleg', sun: 'Sonn', 
 export const WEATHER_ICON = Object.freeze({ sun: '☀️', cloudy: '☁️', snow: '🌨️', fog: '🌫️' });
 export const TIME_ICON = Object.freeze({ morning: '🌅', midday: '🕛', evening: '🌇' });
 const STORE = Object.freeze({ time: 'pb_ski_time', weather: 'pb_ski_weather' });
-const RANDOM_WEATHER = ['sun', 'sun', 'sun', 'cloudy', 'snow', 'fog'];
-const RANDOM_TIME = ['morning', 'midday', 'midday', 'evening'];
 
 const c = (r, g, b) => [r, g, b];
 /* sun azimuth (deg from north, clockwise) and elevation; colours are display values (the renderer does no sRGB conversion) */
@@ -186,15 +185,16 @@ export function createEnv({ scene, noise, params = {} }) {
     setWeather(weatherMode);
     return weatherMode;
   }
-  function setTime(mode) {
-    timeMode = mode; writeChoice(STORE.time, mode);
+  /* save = false: a race sets the weather / time for everybody (pb/ski/net), the player's own stored choice stays */
+  function setTime(mode, save = true) {
+    timeMode = mode; if (save) writeChoice(STORE.time, mode);
     timeId = mode === 'random' ? pick(RANDOM_TIME) : mode;
     state.timeId = timeId; state.timeMode = mode;
     u.uShadowOn.value = 0;
     loadShadow();
   }
-  function setWeather(mode) {
-    weatherMode = mode; writeChoice(STORE.weather, mode);
+  function setWeather(mode, save = true) {
+    weatherMode = mode; if (save) writeChoice(STORE.weather, mode);
     weatherId = mode === 'random' ? pick(RANDOM_WEATHER) : mode;
     state.weatherId = weatherId; state.weatherMode = mode;
   }

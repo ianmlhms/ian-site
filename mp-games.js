@@ -10,6 +10,8 @@
  *   settings  host options shown in the lobby, declarative so the lobby page never needs the game's code:
  *               { key, type: "multi",  label:{lb,de,en}, options:[{v,label}], min, def:[v...] }
  *               { key, type: "choice", label:{lb,de,en}, options:[{v,label}], def:v }
+ *             a choice may depend on another one: dependsOn: "<key>" + options with when: "<value>" are only offered (and only
+ *             valid) while that other setting has that value (Ski Alpen: the named pistes of the chosen resort)
  *             the chosen values reach the game as ctx.cfg (see mp-gate.js)
  */
 export const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ";   // no I / O: easy to read out loud
@@ -25,6 +27,36 @@ const INTRO_CATEGORIES = ["🔥 Charts", "📀 2000er", "💿 2010er", "🎤 Rap
 // casino games (roulette, blackjack): rounds per match and the play chips everybody starts with
 const CASINO_ROUNDS = Object.freeze([5, 10, 15, 20].map((v) => Object.freeze({ v, label: String(v) })));
 const CASINO_CHIPS = Object.freeze([500, 1000, 2500, 5000].map((v) => Object.freeze({ v, label: String(v) })));
+
+// Ski Alpen (live race on one piste, 2-8 players): resort + piste (a few named pistes per resort, or random of a colour), weather /
+// time of day (random by default), runs. The game resolves "random" itself from the lobby code + roster (pb/ski/net/plan.js), so every
+// player loads the same resort and piste without a server. Keep the piste ids in step with pb/ski/data/<resort>/resort.json.
+const SKI_RESORTS = Object.freeze([["killy", "Espace Killy"], ["3vallees", "Les 3 Vallées"], ["zermatt", "Zermatt"], ["arlberg", "St. Anton"], ["kronplatz", "Kronplatz"]]);
+const SKI_PISTES = Object.freeze([
+  ["killy", "coupe-du-monde", "🔴 Coupe du Monde · 3.3 km"], ["killy", "face-de-bellevarde", "⚫ Face de Bellevarde · 2.5 km"], ["killy", "face", "🔴 Face · 1.1 km"],
+  ["killy", "orange", "🔴 Orange · 1.6 km"], ["killy", "diebold", "🔵 Diebold · 2.2 km"], ["killy", "edelweiss", "🔵 Edelweiss · 1.7 km"], ["killy", "verte", "🟢 Verte · 2.2 km"],
+  ["3vallees", "combe-de-la-saulire", "🔴 Combe de la Saulire · 2.2 km"], ["3vallees", "l-eclipse", "⚫ L'Éclipse · 2.5 km"], ["3vallees", "jean-blanc", "⚫ Jean Blanc · 2.1 km"],
+  ["3vallees", "roc-de-fer", "🔵 Roc de Fer · 3.0 km"], ["3vallees", "moraine", "🔵 Moraine · 2.1 km"], ["3vallees", "plan-fontaine", "🟢 Plan Fontaine · 1.9 km"],
+  ["zermatt", "riffelalp", "🔴 Riffelalp · 1.9 km"], ["zermatt", "gornergrat", "🔵 Gornergrat · 2.1 km"], ["zermatt", "white-hare", "🔴 White Hare · 2.3 km"],
+  ["zermatt", "furgg-furi", "⚫ Furgg - Furi · 2.7 km"], ["zermatt", "untere-national", "🔴 Untere National · 1.6 km"], ["zermatt", "obere-national", "⚫ Obere National · 1.4 km"],
+  ["arlberg", "kandahar", "⚫ Kandahar · 2.3 km"], ["arlberg", "st-christoph", "🔵 St. Christoph · 2.4 km"], ["arlberg", "balmen-unten", "🔴 Balmen unten · 1.9 km"],
+  ["arlberg", "mittelstation-passage-stuben", "🔴 Passage Stuben · 2.0 km"], ["arlberg", "seekopf-standard", "🔵 Seekopf Standard · 2.2 km"], ["arlberg", "gampberg", "🔴 Gampberg · 1.2 km"],
+  ["kronplatz", "sylvester", "⚫ Sylvester · 4.1 km"], ["kronplatz", "gassl", "🔴 Gassl · 2.9 km"], ["kronplatz", "piculin", "⚫ Piculin · 1.9 km"],
+  ["kronplatz", "ruipa", "🔵 Ruipa · 1.9 km"], ["kronplatz", "spitzhorn", "🔵 Spitzhorn · 1.6 km"], ["kronplatz", "col-toron", "🔴 Col Toron · 1.6 km"],
+]);
+const opt = (v, label, when) => Object.freeze(when ? { v, label, when } : { v, label });
+const SKI_SETTINGS = Object.freeze([
+  { key: "resort", type: "choice", def: "random", label: { lb: "Skigebitt", de: "Skigebiet", en: "Resort" },
+    options: Object.freeze([opt("random", "🎲 Zoufälleg"), ...SKI_RESORTS.map(([v, label]) => opt(v, label))]) },
+  { key: "piste", type: "choice", def: "random", dependsOn: "resort", label: { lb: "Pist", de: "Piste", en: "Piste" },
+    options: Object.freeze([opt("random", "🎲 Zoufälleg"), opt("green", "🟢 Gréng"), opt("blue", "🔵 Blo"), opt("red", "🔴 Rout"), opt("black", "⚫ Schwaarz"),
+      ...SKI_PISTES.map(([r, id, label]) => opt(`${r}/${id}`, label, r))]) },
+  { key: "weather", type: "choice", def: "random", label: { lb: "Wieder", de: "Wetter", en: "Weather" },
+    options: Object.freeze([opt("random", "🎲 Zoufälleg"), opt("sun", "☀️ Sonn"), opt("cloudy", "☁️ Wolleken"), opt("snow", "🌨️ Schnéi"), opt("fog", "🌫️ Niwwel")]) },
+  { key: "time", type: "choice", def: "random", label: { lb: "Zäit", de: "Tageszeit", en: "Time of day" },
+    options: Object.freeze([opt("random", "🎲 Zoufälleg"), opt("morning", "🌅 Moien"), opt("midday", "🕛 Mëtteg"), opt("evening", "🌇 Owend")]) },
+  { key: "runs", type: "choice", def: 3, label: { lb: "Leef", de: "Läufe", en: "Runs" }, options: Object.freeze([1, 3, 5].map((v) => opt(v, String(v)))) },
+]);
 
 const G = (o) => Object.freeze({ lobby: false, arcade: "", ai: false, settings: Object.freeze([]), ...o });
 
@@ -84,6 +116,7 @@ export const MP_GAMES = Object.freeze({
       { key: "chips", type: "choice", def: 1000, label: { lb: "Jetonen", de: "Chips", en: "Chips" }, options: CASINO_CHIPS },
     ]),
   }),
+  ski: G({ id: "ski", name: "Ski Alpen", emoji: "⛷️", page: "pb/ski.html", arcade: "ski", min: 2, max: 8, lobby: true, settings: SKI_SETTINGS }),
   "kart-letzebuerg": G({ id: "kart-letzebuerg", name: "Kart Lëtzebuerg", emoji: "🏎️", page: "pb/kart-letzebuerg.html", min: 2, max: 8 }),
 });
 
@@ -124,13 +157,16 @@ export function gameUrl(id, room, role, code) {
 /** where "play against the computer" leads (the lobby's entry link) */
 export const offlineUrl = (id) => { const g = gameInfo(id); return !g ? "pixelbreak.html" : g.arcade ? `pixelbreak.html?g=${g.arcade}` : `${g.page}?ai=1`; };
 
+/** the options of setting `s` on offer for the values chosen so far (a dependsOn setting comes after the one it depends on) */
+export const optionsFor = (s, cfg) => (s.dependsOn ? s.options.filter((o) => !o.when || o.when === cfg?.[s.dependsOn]) : s.options);
+
 /** Validate a host-chosen config (it travels through Realtime presence, so peers treat it as untrusted). */
 export function sanitizeCfg(id, raw) {
   const g = gameInfo(id);
   const src = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
   const out = {};
   for (const s of g?.settings || []) {
-    const values = new Set(s.options.map((o) => o.v));
+    const values = new Set(optionsFor(s, out).map((o) => o.v));
     if (s.type === "multi") {
       const list = Array.isArray(src[s.key]) ? [...new Set(src[s.key].filter((v) => values.has(v)))].sort((a, b) => a - b) : [];
       out[s.key] = list.length >= (s.min || 1) ? list : [...s.def];

@@ -34,6 +34,7 @@ import { createStore, recordRun, withLast, pisteKey, createBoards, formatTime } 
 import { createUi } from './ui.js';
 import { createAudio } from './audio.js';
 import { createPisteMap } from './map.js';
+import { readMpContext, mpResort, createMp } from './net/index.js';
 
 const THREE = window.THREE;
 const LOAD = window.__skiLoad || { set() {}, done() {}, fail() {} };
@@ -96,7 +97,11 @@ async function boot() {
   // the resort: ?resort=, else the one picked last (the picker saves it and reloads), else Espace Killy
   const isReady = (id) => RESORTS.some((r) => r.id === id && r.ready);
   const savedResort = (store.get().last || {}).resort;
-  const rid = isReady(params.resort) ? params.resort : isReady(savedResort) ? savedResort : 'killy';
+  // online race (lobby context from mp-gate.js): the match decides the resort, the same on every player's device
+  const mpCtx = readMpContext();
+  let mp = null;
+  const rid = mpCtx ? mpResort(mpCtx, RESORTS.filter((r) => r.ready).map((r) => r.id))
+    : isReady(params.resort) ? params.resort : isReady(savedResort) ? savedResort : 'killy';
   const core = await loadResortCore(rid, (p) => LOAD.set(0.25 + p * 0.45, 'Bierger ginn opgebaut …'));
   mark('core');
   const { resort } = core;
@@ -195,7 +200,7 @@ async function boot() {
   function showPicker() {
     game.screen = 'picker';
     hud.show(false); input.showTouch(false);
-    picker = ui.showResorts({ current: rid, onPick: (id) => { if (id && id !== rid) { switchResort(id); return; } picker.close(); picker = null; showMap(); } });
+    picker = ui.showResorts({ current: rid, onOnline: window.MPGate && window.MPGate.openLobby ? () => window.MPGate.openLobby('new') : null, onPick: (id) => { if (id && id !== rid) { switchResort(id); return; } picker.close(); picker = null; showMap(); } });
     document.documentElement.dataset.skiScreen = 'picker';
   }
   /** Another resort: one resort per page life (its tiles, textures and caches go with it), so remember the pick and load the page again,
@@ -280,6 +285,7 @@ async function boot() {
     streamer.focus(a.x, a.z);
     if (mode === MODES.run) { game.phase = 'countdown'; game.countdown = params.auto ? 0.01 : 3; }
     else { game.phase = 'running'; hud.count(''); }
+    if (mp) { game.phase = 'hold'; game.ghost = null; hud.count(''); }          // online race: net/index.js starts the 3-2-1 for everybody
     if (window.Arcade && window.Arcade.startRun) window.Arcade.startRun();
     canvas.focus({ preventScroll: true });
     mark('start');
@@ -304,6 +310,7 @@ async function boot() {
         boards.submit(rid, p, resort.short, ev.ms);
       }
     }
+    if (mp) { hud.count(''); mp.onFinish(result); return; }                  // online race: its own results screen
     const conts = pistes.continuations(p);
     const order = pistes.list;
     const next = conts[0] || order[(order.indexOf(p) + 1) % order.length];
@@ -349,6 +356,7 @@ async function boot() {
   }
 
   function onAction(action) {
+    if (mp && mp.onAction(action)) return;
     if (action === 'weather') { const m = env.cycleWeather(); hud.toast(`Wieder: ${WEATHER_LABEL[m]}${m === 'random' ? ` (${WEATHER_LABEL[env.state.weatherId]})` : ''}`); }
     else if (action === 'time') { const m = env.cycleTime(); hud.toast(`Zäit: ${TIME_LABEL[m]}${m === 'random' ? ` (${TIME_LABEL[env.state.timeId]})` : ''}`); }
     else if (action === 'reset') { if (game.screen === 'ski' && game.phase === 'running') respawn('Zréck op d\'Pist'); }
@@ -357,7 +365,7 @@ async function boot() {
     else if (action === 'mute') { const next = !audio.isMuted(); audio.setMuted(next); hud.toast(next ? 'Toun aus' : 'Toun un'); }
     else if (action === 'confirm') { if (game.screen === 'map' && readyFor) startRun(game.piste, MODES.run); }
   }
-  if (window.Arcade && window.Arcade.onRestart) window.Arcade.onRestart(() => { if (game.piste) startRun(game.piste, MODES.run); });
+  if (window.Arcade && window.Arcade.onRestart) window.Arcade.onRestart(() => { if (game.piste && !mp) startRun(game.piste, MODES.run); });
 
   // quality: the shared Grafik level; a watchdog only ever steps down
   function applyQuality(next) {
@@ -390,6 +398,7 @@ async function boot() {
     const dt = Math.min(MAX_FRAME_S, rawDt);
     time += dt;
     const s = game.state;
+    if (mp) mp.frame(now);
     if (game.screen === 'ski' && !game.paused && s) {
       if (game.phase === 'countdown') {
         game.countdown -= dt;
@@ -434,10 +443,12 @@ async function boot() {
         const o = game.orbit, a = st.heading + o.angle * Math.PI / 180;
         game.camPose = { x: st.x + Math.cos(a) * o.dist, z: st.z + Math.sin(a) * o.dist, y: st.y + o.h, tx: st.x, ty: st.y + 0.8, tz: st.z, fov: o.fov || 40 };
       }
-      const cam = game.camPose || chase.update(st, dt, time);        // camPose: a fixed view (reference-photo comparisons, flows)
+      const view = (mp && mp.viewState()) || st;                     // online race: watching another skier after my finish
+      const cam = game.camPose || chase.update(view, dt, time);      // camPose: a fixed view (reference-photo comparisons, flows)
       camera.position.set(cam.x, cam.y, cam.z);
       camera.lookAt(cam.tx, cam.ty, cam.tz);
       if (Math.abs(camera.fov - cam.fov) > 0.05) { camera.fov = cam.fov; camera.updateProjectionMatrix(); }
+      if (mp) mp.render(now, time);
       // ghost of the best run
       if (game.ghost && game.screen === 'ski' && game.run && game.run.timed && game.phase !== 'countdown') {
         const gq = ghostAt(game.ghost, game.run.elapsed * 1000);
@@ -553,7 +564,13 @@ async function boot() {
   LOAD.set(0.95, '');
   LOAD.done();
   document.documentElement.dataset.skiReady = '1';
-  if (params.auto) {
+  if (mpCtx) {
+    mp = createMp({ ctx: mpCtx, host: {
+      game, rid, pistes, streamer, terrain, surface, scene, camera, canvas, env, hud, input, audio, chase, uiRoot: document.getElementById('ui'),
+      outfit: () => outfit, level: () => level, startRun: (p) => startRun(p, MODES.run),
+    } });
+    mp.begin();
+  } else if (params.auto) {
     await streamer.ready(a0.x, a0.z, 1500);
     placeAt(a0.x, a0.z, Math.atan2(a0.dz, a0.dx));
     startRun(startPiste, MODES.run);

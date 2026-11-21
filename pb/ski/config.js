@@ -117,6 +117,10 @@ export const DIFF = Object.freeze({
 });
 export const DIFF_IDS = Object.freeze(['green', 'blue', 'red', 'black']);
 
+/* "Zoufälleg" weather / time of day: the odds (env.js; a race draws from the same lists with a shared seed, pb/ski/net/plan.js) */
+export const RANDOM_WEATHER = Object.freeze(['sun', 'sun', 'sun', 'cloudy', 'snow', 'fog']);
+export const RANDOM_TIME = Object.freeze(['morning', 'midday', 'midday', 'evening']);
+
 /* Modes. Only 'run' and 'free' exist in phase 1; the others are the hooks for the next rounds (stars / challenges, the snowpark,
  * free ride across the whole area, live races through the lobby). game.js switches on these ids, so a new mode is one new branch. */
 export const MODES = Object.freeze({ run: 'run', free: 'free', challenge: 'challenge', park: 'park', race: 'race' });

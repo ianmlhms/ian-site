@@ -25,9 +25,9 @@ export function createUi(root) {
   const api = {};
 
   /* ---------------- resort picker ---------------- */
-  api.showResorts = function showResorts({ onPick, current = null }) {
+  api.showResorts = function showResorts({ onPick, current = null, onOnline = null }) {
     const s = el(`<section class="screen" id="resortScreen" aria-label="Skigebitt wielen">
-      <header><h1>Ski Alpen</h1><span class="sub">Wiel e Skigebitt</span></header>
+      <header><h1>Ski Alpen</h1><span class="sub">Wiel e Skigebitt</span>${onOnline ? '<button type="button" class="btn" id="skiOnline">👥 Online-Rennen</button>' : ''}</header>
       <p class="intro">Fuer déi richteg Pisten vu richtege Skigebidder erof, géint d'Auer an géint däi Geescht.</p>
       <p class="intro small">Gelänn: IGN RGE ALTI (Etalab 2.0), Provënz Bozen - Südtirol (CC0), BEV Éisträich (CC BY 4.0), Copernicus DEM · Kaart: © OpenStreetMap-Mataarbechter (ODbL) · alles selwer gemoolt.</p>
       <div class="resorts">${RESORTS.map((r) => `
@@ -38,6 +38,7 @@ export function createUi(root) {
         </button>`).join('')}</div>
     </section>`);
     s.querySelectorAll('.resort.ready').forEach((b) => b.addEventListener('click', () => onPick(b.dataset.id)));
+    if (onOnline) s.querySelector('#skiOnline').addEventListener('click', onOnline);
     root.appendChild(s);
     return { el: s, close() { s.remove(); } };
   };

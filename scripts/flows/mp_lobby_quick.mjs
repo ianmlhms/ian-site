@@ -23,7 +23,7 @@ export const flow = {
       const sql = fs.readFileSync(new URL("../mp-lobby-v1.sql", import.meta.url), "utf8");
       const seed = [...sql.matchAll(/\('([a-z0-9-]+)',\s*'[^']*',\s*'([^']+)',\s*(\d+),\s*(\d+),\s*(true|false)\)/g)].map((m) => ({ id: m[1], page: m[2], min: +m[3], max: +m[4], lobby: m[5] === "true" }));
       /* the enable files flip the lobby flag afterwards (v2: batch 2, later files: further batches) */
-      for (const f of fs.readdirSync(new URL("../", import.meta.url)).filter((n) => /^mp-(lobby-v\d+-enable|casino-v\d+)\.sql$/.test(n)).sort()) {
+      for (const f of fs.readdirSync(new URL("../", import.meta.url)).filter((n) => /^mp-(lobby-v\d+-enable|casino-v\d+|ski-v\d+)\.sql$/.test(n)).sort()) {
         const upd = fs.readFileSync(new URL("../" + f, import.meta.url), "utf8").replace(/--[^\n]*/g, "");
         for (const m of upd.matchAll(/\('([a-z0-9-]+)',\s*'[^']*',\s*'([^']+)',\s*(\d+),\s*(\d+),\s*(true|false)\)/g)) seed.push({ id: m[1], page: m[2], min: +m[3], max: +m[4], lobby: m[5] === "true" });   // games added by a later file
         for (const m of upd.matchAll(/update public\.mp_games set lobby = true\s+where id in \(([^)]*)\)/g)) {
