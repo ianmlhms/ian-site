@@ -253,3 +253,60 @@ hudTick / finishRun / finishPark / rideUp / end / onTiles).
 - Still rough: kickers are snow-shaded terrain (the lip paint marks them; no side walls); the pipe is a mini-pipe on the 2.5 m
   lattice; the scripted park rider rarely gets pipe air (players do with a steep line); trick button + pad flip not yet tried on a
   real iPad; MODES.challenge is only an alias (every run is the challenge).
+
+## Round 5 (21 Nov 2026): the look (resolution, antialiasing, snow, rock, sky, park features) + rounds 4A and 4B merged
+Ian: "it doesn't look really good visually yet, it's still really pixely". Branch = round 4B + round 4A (merged here) + this round.
+- **Picture pipeline** (`post.js`, new): the scene is drawn into an offscreen target at an INTERNAL pixel ratio (MSAA where WebGL 2 gives
+  it), one full-screen pass puts it on the canvas, which now always has the screen's own resolution (CSS size x devicePixelRatio, max 2):
+  FXAA on edges (alpha-tested cards, thin shader lines), unsharp mask elsewhere (stronger the more the picture is stretched), a little
+  grade, a dither against 8-bit bands. `renderer.info.autoReset` is off; the counters restart at the sky's `onBeforeRender` (= after the
+  shadow pass, as three's own reset), so `__ski.info()` counts as before (+1 for the final quad).
+- **Dynamic resolution**: `QUALITY[level].res` (config.js) = { start, min, max, samples, sharpen, supersample } against CSS pixels:
+  Niddreg 1.25 (0.9..1.5, MSAA 2), Mëttel 1.5 (1.1..2, MSAA 4), Héich 2 (1.5..2, MSAA 4; 1.5x supersampling on a 1x screen). The
+  controller (post.js `tick`) only knows frame times (Safari has no GPU timer): frames over budget that our own JavaScript does not
+  explain (JS < 72 % of the frame) step down 9 % (18 % when far over) after 0.45 s; 2.6 s on the display's beat tries one step up; a step
+  up that fails within 6 s is remembered and its retry wait doubles (12 s .. 90 s), so it does not saw. The Grafik watchdog only steps
+  the LEVEL down once the resolution sits on its floor. `?res=fixed` freezes it (picture tests); `__ski.resolution()` reports it.
+  Old Niddreg was pixel ratio 1 without any antialiasing, stretched 2x by the browser.
+- **Snow / rock** (`snow-shader.js`): a detail texture (`env.js createDetailTexture`: 256 px tileable, RG = slope of a grainy surface,
+  B = sparkle grains, A = crags; mipmaps + anisotropy 8) bends the light at 2.3 m / 17.5 m / 107 m repeats; corduroy at 34 rad/m, lit as
+  ridges, faded by its own pixel footprint (`fwidth` of the across-piste coordinate: no moire) out to 70-160 m; clearer blue shade, warm
+  white sun; Mëttel / Héich: a sheen towards a low sun and sparkling grains (view dependent, two grain sizes). Rock: the baked rock share
+  is painted as crisp patches of that share (thresholded by the crags) instead of a grey blend, crag-lit normals, warm / cool faces,
+  snow in the cracks. Aerial haze 0.6 x (1 - exp(-d * 6.2e-5)) in every painted material (FOG_GLSL), fog brighter towards the sun.
+- **Far mountains**: `env.js createFarNormalTexture(far, 40)` turns the far grid into a normal map at load (RG normal, B relief: ridges /
+  gullies; ~10 ms, nothing shipped; NOTE `far.step` is the height quantum, the node spacing is `resort.far.step`). The terrain shader
+  blends from the mesh normal to it between 1200 x lodScale and twice that (uFarFrom): far tiles are much coarser than 40 m, per-pixel
+  light keeps ridges, gullies and faces crisp on every level (Niddreg gains most). uShadowRect is now always set (the map shares it).
+- **Sky** (`env.js`): three-stop gradient, sun disc + halo + low-sun glow, a pale bright patch behind overcast, clouds = four noise
+  octaves in one read + small tufts, a brushed edge, lit from the sun's side, grey-blue bellies, a structured ceiling when overcast;
+  horizon haze with the sun's glow; `uMilk` (the weather's white-out share) veils the sky in fog / snowfall. Evening ambient bluer.
+- **Trees**: far 3D trees are two stacked cones (spruce skirt + top, slim larch on a trunk); the far tree cards go out through alpha to
+  coverage (smooth silhouettes with MSAA), atlas anisotropy 4.
+- **Snow park** (`modes/views.js createParkView`, asked by the coordinator): every kicker wears its size's colour (S green, M blue,
+  L red): lip board, landing line at the knuckle, cut side cheeks along the run-up (packed-snow walls with a coloured top edge), two
+  flags at the lip, a lettered size sign; boxes with steel edges, striped sides and end plates; rails with an under-tube and orange end
+  caps; a continuous orange coping on both halfpipe lips + a PIPE sign; a gate with the park's banner across the drop-in. The lettering
+  is one canvas atlas (`parkAtlas`), one extra draw call (`ski-park-boards`). Physics untouched.
+- **Merge**: round 4A (`worktree-agent-a6c20504503382119`) merged; both sides kept in ski.html, env.js (RANDOM_* from config.js + DAY_KEYS),
+  main.js (mp + modes hooks; an online race may start on a locked piste), run_all.mjs (ski-mp + the three mode flows).
+- **Shot tooling** (the real look: Mac GPU through ANGLE Metal, DPR 2 = an iPad's 2160 x 1620): `shot.mjs --gpu --dpr 2 --root <other
+  copy> --shots "name=tp:250;name=pose:..;name=orbit:..;name=tp:900@fog/midday" --script file.mjs`; `look-shots.sh OUT [ROOT]` (5 resorts
+  x Niddreg / Héich: run, vista, Killy close-ups + weather), `look-park.sh` + `look-park.mjs` (star map, park), `look-sheets.sh DIR`
+  (`look_sheet.py`: stacked, labelled, one column). Flows `ski`, `ski-resorts`, `ski-park` now run at deviceScaleFactor 2
+  (`flow.deviceScaleFactor` in lib.mjs). `perf-probe.mjs --gpu` prints the average internal resolution.
+  Sheets: `~/Library/Caches/ski-work/round5/sheet-*.jpg` (before / after), raw shots in `before/` and `after/`.
+- **Perf** (`perf-probe.mjs --levels low --resort <rid> --gpu`: iPad profile 1080 x 810 at DPR 2, CPU x4, the Mini's GPU; a scripted
+  run from the start piste): Niddreg holds 16.7 ms p50 on all five; the internal resolution averages 1.33-1.40x and reaches the 1.5x
+  ceiling (old Niddreg: 1.0x, no AA): Killy 1.39x (running after 3.5 s, 136 draw calls, 373k triangles), 3 Vallées 1.38x (4.8 s, 139,
+  416k; p95 33 ms), Zermatt 1.33x (3.9 s, 150, 360k), Arlberg 1.40x (3.7 s, 160, 457k), Kronplatz 1.35x (5.1 s, 148, 357k). The
+  controller holds for 6 s from a run's start (`post.hold`: tiles, trees and shaders settle; without it the start hitches pushed the
+  resolution to its floor). Flow `ski-ipad-start` (Start live, with the Mini's load near 50): Killy 6.8 s, 3 Vallées 8.6 s, Zermatt
+  7.1 s, Arlberg 6.5 s, Kronplatz 8.2 s. Héich at 2x + MSAA 4 with shadows is GPU-bound on the Mini in 3 Vallées (p95 33 ms): it then steps down.
+- Tests green at the end of the round: flows ski, ski-ipad-start (x5 resorts), ski-resorts, ski-mp, ski-challenges, ski-park,
+  ski-freeride, home-page, arcade-pad; `harness.js <rid> --all` on all five; `--park`; mp-race-test.
+- Still wrong / open: evening snow in the shade is still rather violet; no real-iPad GPU measurement (the controller is built for it, the floor of Niddreg costs about what the old
+  Niddreg did + MSAA 2 + the final pass); MSAA does not smooth shader detail, far strata lines can still crawl a little in motion (no
+  temporal AA); near trees are still plain tiered cones (no bark / needle detail); the frozen lakes still read mostly as snow; the
+  kickers' snow body is the 2.5 m terrain lattice (rounded), only the dressing is crisp; halfpipe walls show the lattice as saw teeth
+  from inside; buildings and lifts untouched this round; name tags / HUD untouched.
