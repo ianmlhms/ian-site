@@ -16,12 +16,12 @@ import { createScatter } from './scatter.js';
 import { createScatterView } from './scatter-view.js';
 import { createFarForest } from './forest-far.js';
 import { createShadows } from './shadows.js';
-import { createPoles, createRunProps } from './props.js';
+import { createPoles, createRunProps, createSigns } from './props.js';
 import { createLifts } from './lifts.js';
 import { createVillage } from './village.js';
 import { createPisteSet } from './pistes.js';
 import { createSkierState, stepSkier } from './skier.js';
-import { createSkierModel } from './skier-model.js';
+import { createSkierModel, readOutfit, writeOutfit, OUTFITS } from './skier-model.js';
 import { createChaseCamera } from './camera.js';
 import { createInput } from './input.js';
 import { createSnowfall, createSpray } from './effects.js';
@@ -30,6 +30,7 @@ import { createBot } from './bot.js';
 import { encodeGhost, decodeGhost, ghostAt } from './ghost.js';
 import { createStore, recordRun, withLast, pisteKey, createBoards, formatTime } from './progress.js';
 import { createUi } from './ui.js';
+import { createAudio } from './audio.js';
 import { createPisteMap } from './map.js';
 
 const THREE = window.THREE;
@@ -76,6 +77,7 @@ async function boot() {
   const shadows = createShadows({ renderer, sun: env.sun, u: env.u });
   shadows.setLevel(level);
   const ui = createUi(document.getElementById('ui'));
+  const audio = createAudio({ win: window });
   const store = createStore();
   const boards = createBoards(window.Arcade);
 
@@ -109,8 +111,11 @@ async function boot() {
   const scatterView = createScatterView({ scene, scatter, env, quality, normalAt: (x, z, o) => surface.normal(x, z, o, 2.5) });
   const farForest = createFarForest({ scene, env, classes: core.classes, resort, field, quality });
   const poles = createPoles({ scene, resort, height: (x, z) => field.height(x, z) });
-  const skier = createSkierModel({});
-  const ghostModel = createSkierModel({ ghost: true });
+  let outfit = readOutfit();
+  const skier = createSkierModel({ outfit });
+  skier.setBlob(level === 'low');
+  const ghostModel = createSkierModel({ ghost: true, outfit });
+  const setOutfit = (id) => { outfit = id; writeOutfit(id); skier.setOutfit(id); ghostModel.setOutfit(id); };
   scene.add(skier.root, ghostModel.root);
   ghostModel.setVisible(false);
   const chase = createChaseCamera(surface);
@@ -130,6 +135,7 @@ async function boot() {
     if (streamer.done()) document.documentElement.dataset.skiTilesDone = '1';
     if (streamer.done() && !lifts) {
       lifts = createLifts({ scene, resort, height: (x, z) => field.height(x, z) });
+      createSigns({ scene, resort, height: (x, z) => field.height(x, z) });
       mark('lifts');
     }
   });
@@ -174,7 +180,7 @@ async function boot() {
     hud.show(false); input.showTouch(false); input.setEnabled(false);
     if (finishCard) { finishCard.close(); finishCard = null; }
     mapScreen = ui.showMap({
-      resort, pistes, best: pisteBest, env, gfx: GFX(),
+      resort, pistes, best: pisteBest, env, gfx: GFX(), outfits: OUTFITS, outfit: () => outfit, onOutfit: setOutfit,
       onSelect: (p, center) => selectPiste(p, center),
       onStart: () => startRun(game.piste, MODES.run),
       onBack: () => { mapScreen.close(); mapScreen = null; pisteMap = null; showPicker(); },
@@ -240,6 +246,7 @@ async function boot() {
 
   function finish(ev) {
     game.phase = 'finished';
+    audio.event('finish');
     input.setEnabled(false);
     const p = game.piste;
     const key = pisteKey(rid, p.id);
@@ -293,7 +300,7 @@ async function boot() {
     game.paused = true;
     input.setEnabled(false);
     menuCard = ui.showMenu({
-      env, gfx: GFX(),
+      env, gfx: GFX(), outfits: OUTFITS, outfit: () => outfit, onOutfit: setOutfit, sound: { muted: () => audio.isMuted(), set: (m) => audio.setMuted(m) },
       onResume: () => { menuCard = null; game.paused = false; input.setEnabled(game.phase !== 'finished'); },
       onAgain: () => { menuCard = null; game.paused = false; startRun(game.piste, MODES.run); },
       onMap: () => { menuCard = null; game.paused = false; showMap(); },
@@ -306,6 +313,7 @@ async function boot() {
     else if (action === 'reset') { if (game.screen === 'ski' && game.phase === 'running') respawn('Zréck op d\'Pist'); }
     else if (action === 'menu') { if (menuCard) { menuCard.close(); menuCard = null; game.paused = false; input.setEnabled(true); } else openMenu(); }
     else if (action === 'map') { if (game.screen === 'ski') showMap(); }
+    else if (action === 'mute') { const next = !audio.isMuted(); audio.setMuted(next); hud.toast(next ? 'Toun aus' : 'Toun un'); }
     else if (action === 'confirm') { if (game.screen === 'map' && readyFor) startRun(game.piste, MODES.run); }
   }
   if (window.Arcade && window.Arcade.onRestart) window.Arcade.onRestart(() => { if (game.piste) startRun(game.piste, MODES.run); });
@@ -321,6 +329,7 @@ async function boot() {
     farForest.setQuality(quality);
     shadows.setLevel(level);
     if (village) village.setLevel(level);
+    skier.setBlob(level === 'low');
     poles.reset();
     mark(`quality ${level}`);
   }
@@ -328,7 +337,7 @@ async function boot() {
   let slowFor = 0;
 
   // ---------------- loop ----------------
-  let last = performance.now(), acc = 0, hudT = 0, time = 0;
+  let last = performance.now(), acc = 0, hudT = 0, time = 0, audioT = 0, liftDist = Infinity, nearVillage = 0;
   const ghostPos = {};
   const frameTimes = [];
   function frame(now) {
@@ -344,7 +353,9 @@ async function boot() {
       if (game.phase === 'countdown') {
         game.countdown -= dt;
         hud.count(game.countdown > 0 ? String(Math.ceil(game.countdown)) : 'Lass!');
-        if (game.countdown <= 0) { game.phase = 'running'; document.documentElement.dataset.skiRunning = '1'; setTimeout(() => hud.count(''), 700); mark('go'); }
+        const tick = Math.ceil(game.countdown);
+        if (tick !== game.lastTick) { game.lastTick = tick; if (tick > 0) audio.event('count'); }
+        if (game.countdown <= 0) { audio.event('go'); game.phase = 'running'; document.documentElement.dataset.skiRunning = '1'; setTimeout(() => hud.count(''), 700); mark('go'); }
       }
       if (game.phase === 'running' || game.phase === 'finished') {
         acc += dt * timescale;
@@ -355,8 +366,10 @@ async function boot() {
             : game.override ? game.override : game.bot ? game.bot(game.state) : input.read();
           if (game.override || game.bot) game.assisted = true;
           if (game.override || game.bot) input.read(inp);
-          const wasCrash = game.state.crash > 0;
+          const wasCrash = game.state.crash > 0, wasAir = !game.state.grounded, vyAir = game.state.vy;
           game.state = stepSkier(game.state, inp, world);
+          if (wasAir && game.state.grounded && game.state.crash === 0) audio.event('land', { impact: Math.min(1, Math.abs(vyAir) / 8) });
+          if (!wasCrash && game.state.crash > 0) audio.event('crash');
           if (!wasCrash && game.state.crash > 0) hud.toast(game.state.crashKind === 'tree' ? 'Aua, e Bam!' : game.state.crashKind === 'rock' ? 'Aua, e Steen!' : 'Gefall!');
           if (wasCrash && game.state.crash === 0) respawn('');
           if (game.phase === 'running') {
@@ -364,7 +377,8 @@ async function boot() {
             for (const ev of events) {
               if (ev.type === 'finish' || ev.type === 'invalid') { finish(ev); break; }
               if (ev.type === 'offpiste') respawn('Zréck op d\'Pist');
-              if (ev.type === 'missed-gate') { hud.toast('Paart verpasst: +5 s'); if (runProps) runProps.markGate(ev.index, false); }
+              if (ev.type === 'missed-gate') { audio.event('miss'); hud.toast('Paart verpasst: +5 s'); if (runProps) runProps.markGate(ev.index, false); }
+              if (ev.type === 'gate') audio.event(ev.ok === false ? 'miss' : 'gate');
             }
             if (game.mode !== MODES.run && game.run.progress > game.piste.length - 15 && game.phase === 'running') finish(null);
           }
@@ -374,7 +388,11 @@ async function boot() {
     }
     const st = game.state;
     if (st) {
-      skier.pose(st, (x, z, o) => surface.normal(x, z, o), time);
+      skier.pose(st, (x, z, o) => surface.normal(x, z, o), time, (x, z) => surface.height(x, z));
+      if (game.orbit) {                                                // debug: a camera that circles the skier (model checks)
+        const o = game.orbit, a = st.heading + o.angle * Math.PI / 180;
+        game.camPose = { x: st.x + Math.cos(a) * o.dist, z: st.z + Math.sin(a) * o.dist, y: st.y + o.h, tx: st.x, ty: st.y + 0.8, tz: st.z, fov: o.fov || 40 };
+      }
       const cam = game.camPose || chase.update(st, dt, time);        // camPose: a fixed view (reference-photo comparisons, flows)
       camera.position.set(cam.x, cam.y, cam.z);
       camera.lookAt(cam.tx, cam.ty, cam.tz);
@@ -415,8 +433,21 @@ async function boot() {
       }
       void t0;
     }
+    if (st && audioT >= 0.05) {
+      audioT = 0;
+      const riding = game.screen === 'ski' && (game.phase === 'running' || game.phase === 'finished');
+      const info3 = surface.info(st.x, st.z, 3);
+      audio.update({
+        riding, paused: game.paused, speed: st.speed, edge: st.edge, slip: st.slip, brake: st.brake, grounded: st.grounded,
+        piste: surface.info(st.x, st.z, 0), forest: surface.info(st.x, st.z, 1), village: Math.max(0, -info3) > 0.05 ? 1 : nearVillage,
+        lift: lifts ? liftDist : Infinity, altitude: st.y, weather: env.state.weatherId,
+      });
+    }
+    audioT += dt;
     hudT += dt;
     if (hudT >= HUD_EVERY) {
+      if (st && lifts) liftDist = lifts.nearest(st.x, st.z);
+      if (st) nearVillage = village ? Math.max(0, Math.min(1, -surface.info(st.x + 60, st.z, 3) - surface.info(st.x - 60, st.z, 3) - surface.info(st.x, st.z + 60, 3) - surface.info(st.x, st.z - 60, 3))) * 0.6 : 0;
       hudT = 0;
       if (st) env.setSunScale(sunVisibility(st.x, st.y + 1, st.z));
       if (game.screen === 'map') updateStartStatus();
@@ -451,6 +482,8 @@ async function boot() {
   window.__ski = {
     get game() { return game; }, get state() { return game.state; }, get level() { return level; }, renderer, scene, camera, env, pistes, streamer, terrain, scatterView, field, surface,
     setInput(o) { game.override = o; },
+    /** Debug camera circling the skier: angle (deg from the skier's heading), distance, height; null = off. */
+    orbit(angle, dist = 4, h = 1.2, fov = 40) { if (angle === null) { game.orbit = null; game.camPose = null; return; } game.orbit = { angle, dist, h, fov }; },
     /** Fixed camera at (x, z) heightAbove m over the ground looking at (tx, tz) heightAbove2 m over its ground; null = chase camera again. */
     setCamera(x, z, above, tx, tz, above2 = 0, fov = 55) { if (x === null) { game.camPose = null; return; } game.camPose = { x, z, y: field.height(x, z) + above, tx, tz, ty: field.height(tx, tz) + above2, fov }; streamer.focus(x, z); }, start(id) { startRun(pistes.byId.get(id) || game.piste, MODES.run); }, select(id) { selectPiste(pistes.byId.get(id), true); },
     frames: () => { const f = [...frameTimes].sort((a, b) => a - b); return { n: f.length, p50: f[Math.floor(f.length * 0.5)], p95: f[Math.floor(f.length * 0.95)], max: f[f.length - 1] }; },

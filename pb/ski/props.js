@@ -1,9 +1,30 @@
 /* Piste furniture: edge poles in the piste colour along every piste of the network (both sides, every 26 m, rebuilt around the camera),
- * and the run objects: start gate, finish arch, slalom gates (flag pairs, red and blue alternating). Plain Lambert materials (scene lights + fog). */
+ * orange safety nets on the edges where the slope falls away steeply beside the piste, signposts with the piste's name in its colour at
+ * the top of every piste, and the run objects: start gate, finish arch, slalom gates (flag pairs, red and blue alternating).
+ * Plain Lambert materials (scene lights, shadows + fog). */
 import { DIFF } from './config.js';
 
 const THREE = window.THREE;
 const POLE_GAP = 26;
+const NET_GAP = 6, NET_H = 1.6, NET_CAP = 1500, NET_RADIUS = 320;
+
+/** The orange safety net: a painted mesh with diamond holes (alpha), a thicker top rope. */
+function netTexture() {
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 128;
+  const g = c.getContext('2d');
+  g.clearRect(0, 0, 128, 128);
+  g.strokeStyle = '#f2641c'; g.lineWidth = 5;
+  for (let i = -128; i < 256; i += 21) {
+    g.beginPath(); g.moveTo(i, 128); g.lineTo(i + 128, 0); g.stroke();
+    g.beginPath(); g.moveTo(i, 0); g.lineTo(i + 128, 128); g.stroke();
+  }
+  g.fillStyle = '#d9480f'; g.fillRect(0, 0, 128, 10);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = THREE.RepeatWrapping;
+  t.repeat.set(NET_GAP / NET_H, 1);
+  return t;
+}
 const REBUILD = 45;
 const DIFF_OF_LETTER = { g: 'green', b: 'blue', r: 'red', k: 'black' };
 
@@ -30,7 +51,17 @@ export function createPoles({ scene, resort, height }) {
   const caps = new THREE.InstancedMesh(capGeo, capMat, CAP);
   poles.count = 0; caps.count = 0;
   poles.frustumCulled = false; caps.frustumCulled = false;
+  poles.castShadow = true;
   scene.add(poles, caps);
+  // safety nets: one instanced panel per edge segment (x 0..1 along the segment, y 0..1.6), a painted orange mesh with holes
+  const netGeo = new THREE.PlaneGeometry(1, NET_H).translate(0.5, NET_H / 2 - 0.25, 0);
+  const netMat = new THREE.MeshLambertMaterial({ map: netTexture(), alphaTest: 0.5, side: THREE.DoubleSide });
+  const nets = new THREE.InstancedMesh(netGeo, netMat, NET_CAP);
+  nets.count = 0; nets.frustumCulled = false; nets.castShadow = true;
+  const netPostGeo = new THREE.CylinderGeometry(0.04, 0.05, NET_H + 0.3, 5).translate(0, (NET_H + 0.3) / 2 - 0.3, 0);
+  const netPosts = new THREE.InstancedMesh(netPostGeo, new THREE.MeshLambertMaterial({ color: 0x2d3138 }), NET_CAP);
+  netPosts.count = 0; netPosts.frustumCulled = false;
+  scene.add(nets, netPosts);
   // every pole position once (both edges of every line)
   const all = [];
   for (const line of resort.network) {
@@ -51,10 +82,58 @@ export function createPoles({ scene, resort, height }) {
   const m = new THREE.Matrix4(), col = new THREE.Color();
   const colours = Object.fromEntries(Object.entries(DIFF).map(([k, v]) => [k, new THREE.Color(v.hex)]));
   let last = { x: 1e9, z: 1e9 };
+  // net candidates: consecutive pole positions on one edge, [ax, az, bx, bz, ox, oz] (o = outward unit vector); whether a segment gets a
+  // net is decided from the heights when it first comes near (the height tiles may still be streaming at load)
+  const netSegs = [];
+  for (const line of resort.network) {
+    if (line.a) continue;
+    const p = line.p, hw = line.w + 0.6;
+    for (let k = 0; k + 3 < p.length; k += 2) {
+      const ax = p[k], az = p[k + 1], dx = p[k + 2] - ax, dz = p[k + 3] - az, L = Math.hypot(dx, dz);
+      if (L < 4) continue;
+      const ux = dx / L, uz = dz / L;
+      const parts = Math.max(1, Math.round(L / NET_GAP));
+      for (let i = 0; i < parts; i++) {
+        const t0 = i / parts * L, t1 = (i + 1) / parts * L;
+        for (const side of [-1, 1]) {
+          const ox = -uz * side, oz = ux * side;
+          netSegs.push([ax + ux * t0 + ox * hw, az + uz * t0 + oz * hw, ax + ux * t1 + ox * hw, az + uz * t1 + oz * hw, ox, oz, -1]);
+        }
+      }
+    }
+  }
+  /** A net where, 10 m beyond the edge, the ground has dropped by more than ~0.9 m per 1 m (a steep fall-away: you would not stop). */
+  function needsNet(sg) {
+    if (sg[6] >= 0) return sg[6] === 1;
+    const mx = (sg[0] + sg[2]) / 2, mz = (sg[1] + sg[3]) / 2;
+    const h0 = height(mx, mz), h1 = height(mx + sg[4] * 10, mz + sg[5] * 10);
+    const along = Math.abs(height(sg[2], sg[3]) - height(sg[0], sg[1])) / Math.max(1, Math.hypot(sg[2] - sg[0], sg[3] - sg[1]));
+    sg[6] = h0 - h1 > 8.5 || (h0 - h1 > 5.5 && along > 0.35) ? 1 : 0;
+    return sg[6] === 1;
+  }
+  const q4 = new THREE.Quaternion(), v3 = new THREE.Vector3(), s3 = new THREE.Vector3(), yAxis = new THREE.Vector3(0, 1, 0);
   function update(px, pz, radius) {
     if (Math.hypot(px - last.x, pz - last.z) < REBUILD) return;
     last = { x: px, z: pz };
     const r2 = radius * radius;
+    let nn = 0, np = 0;
+    const netR2 = Math.min(r2, NET_RADIUS * NET_RADIUS);
+    for (const sg of netSegs) {
+      if (nn >= NET_CAP) break;
+      const dx = sg[0] - px, dz = sg[1] - pz;
+      if (dx * dx + dz * dz > netR2 || !needsNet(sg)) continue;
+      const ya = height(sg[0], sg[1]), yb = height(sg[2], sg[3]);
+      const L = Math.hypot(sg[2] - sg[0], sg[3] - sg[1]);
+      // a panel from a to b: rotate x onto the segment (yaw) and shear it down the slope by lifting the far end with the matrix
+      q4.setFromAxisAngle(yAxis, -Math.atan2(sg[3] - sg[1], sg[2] - sg[0]));
+      m.compose(v3.set(sg[0], ya, sg[1]), q4, s3.set(L, 1, 1));
+      const shear = new THREE.Matrix4().set(1, 0, 0, 0, (yb - ya), 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
+      m.multiply(shear);
+      nets.setMatrixAt(nn++, m);
+      if (np < NET_CAP) { m.makeTranslation(sg[0], ya, sg[1]); netPosts.setMatrixAt(np++, m); }
+    }
+    nets.count = nn; netPosts.count = np;
+    nets.instanceMatrix.needsUpdate = true; netPosts.instanceMatrix.needsUpdate = true;
     let n = 0;
     for (let i = 0; i < all.length && n < CAP; i += 3) {
       const x = all[i], z = all[i + 1];
@@ -70,6 +149,61 @@ export function createPoles({ scene, resort, height }) {
     if (poles.instanceColor) poles.instanceColor.needsUpdate = true;
   }
   return { update, total: all.length / 3, mesh: poles, reset() { last = { x: 1e9, z: 1e9 }; } };
+}
+
+/** Signposts at the top of every piste (where it leaves the lift or the piste above: the junctions): a larch post with a board in the
+ *  piste's colour, its name in white, readable from both sides, facing the skiers coming down. All boards share one painted atlas. */
+export function createSigns({ scene, resort, height }) {
+  const list = resort.pistes;
+  const BW = 256, BH = 48, cols = 8, rows = Math.ceil(list.length / cols);
+  const c = document.createElement('canvas');
+  c.width = BW * cols; c.height = BH * Math.max(1, rows);
+  const g = c.getContext('2d');
+  list.forEach((p, i) => {
+    const x = (i % cols) * BW, y = Math.floor(i / cols) * BH;
+    g.fillStyle = (DIFF[p.diff] || DIFF.blue).css; g.fillRect(x, y, BW, BH);
+    g.fillStyle = 'rgba(255,255,255,0.9)'; g.fillRect(x + 3, y + 3, BW - 6, 3); g.fillRect(x + 3, y + BH - 6, BW - 6, 3);
+    g.fillStyle = '#ffffff'; g.font = '700 26px system-ui, -apple-system, sans-serif'; g.textBaseline = 'middle';
+    const name = p.name.length > 15 ? p.name.slice(0, 14) + '…' : p.name;
+    g.fillText(name, x + 14, y + BH / 2 + 1, BW - 56);
+    g.beginPath(); g.moveTo(x + BW - 34, y + 12); g.lineTo(x + BW - 14, y + BH / 2); g.lineTo(x + BW - 34, y + BH - 12); g.closePath(); g.fill();   // arrow
+  });
+  const tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = 4;
+  const pos = [], nrm = [], uv = [];
+  const post = [];
+  const quad = (a, b, cc, d, n, uvs) => { for (const k of [0, 1, 2, 0, 2, 3]) { const q = [a, b, cc, d][k]; pos.push(...q); nrm.push(...n); uv.push(...uvs[k]); } };
+  list.forEach((p, i) => {
+    const l = p.line;
+    if (l.length < 4) return;
+    const dx = l[2] - l[0], dz = l[3] - l[1], L = Math.hypot(dx, dz) || 1;
+    const ux = dx / L, uz = dz / L;
+    const side = (p.hw || 15) + 3;
+    const x = l[0] + -uz * side + ux * 6, z = l[1] + ux * side + uz * 6;
+    const y = height(x, z);
+    post.push(x, y, z);
+    // the board: across the piste (its face looks up the piste), 2.1 .. 2.5 m above the snow
+    const w = 1.9, y0 = y + 2.0, y1 = y + 2.42;
+    const ax = x - uz * 0.1, az = z + ux * 0.1;
+    const ex = ax + uz * w, ez = az - ux * w;           // the board reaches in towards the piste
+    const u0 = (i % cols) / cols, u1 = u0 + 1 / cols, v1 = 1 - Math.floor(i / cols) / rows, v0 = v1 - 1 / rows;
+    quad([ax, y0, az], [ex, y0, ez], [ex, y1, ez], [ax, y1, az], [-ux, 0, -uz], [[u1, v0], [u0, v0], [u0, v1], [u1, v1]]);   // seen from uphill
+    quad([ex, y0, ez], [ax, y0, az], [ax, y1, az], [ex, y1, ez], [ux, 0, uz], [[u1, v0], [u0, v0], [u0, v1], [u1, v1]]);     // seen from below
+  });
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  geo.computeBoundingSphere();
+  const boards = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: tex }));
+  boards.castShadow = true;
+  const postGeo = new THREE.BoxGeometry(0.14, 2.7, 0.14).translate(0, 1.2, 0);
+  const posts = new THREE.InstancedMesh(postGeo, new THREE.MeshLambertMaterial({ color: 0x6b4a30 }), Math.max(1, post.length / 3));
+  const m = new THREE.Matrix4();
+  for (let i = 0; i < post.length / 3; i++) { m.makeTranslation(post[i * 3], post[i * 3 + 1] - 0.2, post[i * 3 + 2]); posts.setMatrixAt(i, m); }
+  posts.castShadow = true;
+  scene.add(boards, posts);
+  return { boards, posts, count: post.length / 3 };
 }
 
 /** The objects of one run: start gate at the top, finish arch at the bottom, slalom gates. dispose() removes them. */

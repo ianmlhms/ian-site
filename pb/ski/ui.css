@@ -76,6 +76,9 @@ button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
 .seg{display:flex;flex-wrap:wrap;gap:0}
 .seg button{border:1px solid var(--soft);background:var(--white);min-height:36px;padding:0 9px;font-size:13px;margin:-1px 0 0 -1px}
 .seg button.on{border-color:var(--ink);background:var(--ink);color:#fff;z-index:1}
+.seg.swatches button{width:40px;padding:0;display:grid;place-items:center}
+.seg.swatches i{display:block;width:24px;height:24px;border:1px solid rgba(0,0,0,.35)}
+.seg.swatches button.on i{outline:2px solid #fff;outline-offset:-4px}
 .setrow{display:flex;flex-direction:column;gap:4px}
 .setrow > span{font-family:var(--mono);font-size:11px;color:var(--muted)}
 .badge{font-family:var(--mono);font-size:11px;border:1px solid var(--ink);padding:1px 5px;font-weight:500}
