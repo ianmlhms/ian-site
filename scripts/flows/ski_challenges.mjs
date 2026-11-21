@@ -66,11 +66,13 @@ export const flow = {
     h.expect(unlockedSeen, "a finish card announced: Op: rout Pisten");
     const listStars = await page.$$eval(".prow .pst", (b) => b.filter((x) => /★/.test(x.textContent)).length);
     h.expect(listStars >= 2, `${listStars} pistes show won stars in the list`);
-    await page.evaluate(() => window.__ski.select("face"));
-    await h.pause(200);
-    await page.click('[data-z="in"]'); await page.click('[data-z="in"]');
+    await page.evaluate((id) => window.__ski.select(id), blues[runs - 1]);
+    await h.pause(300);
+    await page.click('[data-z="in"]');
     await h.pause(400);
     await h.shot("star-map");
+    await page.evaluate(() => window.__ski.select("face"));
+    await h.pause(200);
     h.eq(await html("skiLocked"), "0", "the red is open now");
 
     h.step("a played piste is never locked again (fewer stars than the threshold)");

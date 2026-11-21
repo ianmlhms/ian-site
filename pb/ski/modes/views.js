@@ -126,7 +126,7 @@ export function createParkView({ scene, layout, height }) {
     // paint on the kicker lips (a blue line across the lip) and on the halfpipe coping (dashes)
     for (const k of layout.kickers) {
       const p = at(k.lip, k.v);
-      parts.push([new THREE.BoxGeometry(0.25, 0.04, k.w - 1.2), PARK_COL.paint, place(p.x, height(p.x, p.z) + 0.02, p.z, yaw)]);
+      parts.push([new THREE.BoxGeometry(0.3, 0.12, k.w - 1.2), PARK_COL.paint, place(p.x, height(p.x, p.z) + 0.04, p.z, yaw)]);
     }
     if (layout.pipe) {
       for (let s = layout.pipe.s0; s < layout.pipe.s1; s += 6) for (const side of [-1, 1]) {
