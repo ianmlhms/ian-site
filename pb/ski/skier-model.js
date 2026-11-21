@@ -129,7 +129,47 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {})
   blob.scale.set(1.25, 1, 0.55);
   blob.visible = false;
   blob.renderOrder = 3;
-  root.traverse((o) => { if (o.isMesh) { o.castShadow = !ghost; o.receiveShadow = !ghost; o.frustumCulled = false; } });
+  // one draw call per bone: the parts of each group are merged into a single vertex-coloured mesh (slot per vertex, so the outfit can
+  // be recoloured); ~16 draw calls for the whole figure instead of ~50
+  const SLOTS = Object.keys(M);
+  const slotOf = new Map(SLOTS.map((k, i) => [M[k], i]));
+  const shared = ghost ? new THREE.MeshLambertMaterial({ vertexColors: true, transparent: true, opacity: 0.38, depthWrite: false }) : new THREE.MeshLambertMaterial({ vertexColors: true });
+  const merged = [];
+  const groups = [];
+  root.traverse((o) => { if (o.isGroup || o === root) groups.push(o); });
+  for (const g of groups) {
+    const kids = g.children.filter((c) => c.isMesh);
+    if (!kids.length) continue;
+    const pos = [], nrm = [], idx = [], slots = [];
+    let base = 0;
+    for (const m of kids) {
+      m.updateMatrix();
+      const geo = m.geometry.clone().applyMatrix4(m.matrix);
+      const P = geo.attributes.position, N = geo.attributes.normal, sl = slotOf.get(m.material) || 0;
+      for (let i = 0; i < P.count; i++) { pos.push(P.getX(i), P.getY(i), P.getZ(i)); nrm.push(N.getX(i), N.getY(i), N.getZ(i)); slots.push(sl); }
+      if (geo.index) for (let i = 0; i < geo.index.count; i++) idx.push(geo.index.getX(i) + base);
+      else for (let i = 0; i < P.count; i++) idx.push(base + i);
+      base += P.count;
+      g.remove(m); m.geometry.dispose(); geo.dispose();
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(slots.length * 3), 3));
+    geo.setIndex(idx);
+    geo.userData.slots = Uint8Array.from(slots);
+    const mesh = new THREE.Mesh(geo, shared);
+    mesh.castShadow = !ghost; mesh.receiveShadow = !ghost; mesh.frustumCulled = false;
+    g.add(mesh);
+    merged.push(mesh);
+  }
+  function recolour() {
+    for (const mesh of merged) {
+      const col = mesh.geometry.attributes.color, sl = mesh.geometry.userData.slots;
+      for (let i = 0; i < sl.length; i++) { const c = M[SLOTS[sl[i]]].color; col.setXYZ(i, c.r, c.g, c.b); }
+      col.needsUpdate = true;
+    }
+  }
   blob.castShadow = false; blob.receiveShadow = false;
   if (ghost) root.renderOrder = 5;
   const group = new THREE.Group();
@@ -140,8 +180,10 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {})
     M.jacket.color.setHex(o.jacket); M.accent.color.setHex(o.accent); M.trousers.color.setHex(o.trousers); M.helmet.color.setHex(o.helmet);
     M.ski.color.setHex(ghost ? 0x9ad1ff : o.ski);
     if (ghost) for (const k of ['jacket', 'accent', 'trousers', 'helmet']) M[k].color.lerp(new THREE.Color(0x9ad1ff), 0.5);
+    if (merged.length) recolour();
   }
   setOutfit(outfit);
+  recolour();
 
   /** Two-bone leg: hip at height h above the ankle; returns [hip angle (forward), knee bend, hip x offset]. */
   function solveLeg(h) {
