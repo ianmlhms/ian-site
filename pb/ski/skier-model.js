@@ -253,15 +253,22 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {})
       A.pole.rotation.set(A.side * 0.1, 0, -1.45);
     }
   }
-  /** Standing in a cabin or a carriage: upright, arms down, looking out. */
+  /** Standing in a cabin or a carriage: upright, looking out; round 7: the skis are carried, upright beside him in the right hand
+   *  (tips up, bases together), the poles stay hidden (they would poke through the floor). */
   function poseStand(t) {
     tilt.rotation.set(0, 0, 0); tilt.position.set(0, 0, 0); lean.rotation.set(0, 0, 0);
     torso.rotation.set(0, 0, -0.04);
     neck.rotation.set(0, Math.sin(t * 0.35) * 0.35, 0.05);
     for (let i = 0; i < 2; i++) {
       const A = arms[i];
-      A.sh.rotation.set(-A.side * 0.1, 0, 0.12 + (i ? 0.05 : 0));
-      A.elbow.rotation.set(0, 0, 0.35);
+      if (A.side > 0) { A.sh.rotation.set(-0.32, 0, 0.42); A.elbow.rotation.set(0, 0, 0.95); }      // the right hand round the skis
+      else { A.sh.rotation.set(0.1, 0, 0.12); A.elbow.rotation.set(0, 0, 0.35); }
+    }
+    for (let i = 0; i < 2; i++) {
+      const sk = skis[i];
+      sk.g.position.set(0.3, 0.9, 0.4 + i * 0.05);
+      sk.g.rotation.set(0, 0, Math.PI / 2 - 0.05);
+      sk.edge.rotation.set(Math.PI / 2, 0, 0);
     }
   }
   /** Pulled up a drag lift: skis on the snow, a little back, the outside hand on the bar's pole. */
@@ -368,7 +375,7 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {})
     // round 6: riding a lift: seated on a chair, standing in a cabin (skis and poles in the rack), pulled up a drag lift
     const ride = state.ride || '';
     const hideGear = ride === 'stand';
-    if (hideGear !== gearHidden) { gearHidden = hideGear; for (const sk of skis) sk.g.visible = !hideGear; for (const p of poles) p.visible = !hideGear; }
+    if (hideGear !== gearHidden) { gearHidden = hideGear; for (const p of poles) p.visible = !hideGear; }      // round 7: skis carried, poles away
     if (ride === 'sit') poseSit(t);
     else if (ride === 'stand') poseStand(t);
     else if (ride === 'drag') poseDrag();

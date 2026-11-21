@@ -163,7 +163,7 @@ button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
 .hud .tr .minimap + *{margin-top:0}
 .liftbtn{position:absolute;left:50%;bottom:calc(110px + env(safe-area-inset-bottom));transform:translateX(-50%);pointer-events:auto;min-height:52px;padding:0 20px;border:1px solid #fff;background:rgba(31,122,77,.85);color:#fff;font-weight:750;font-size:17px;border-radius:0}
 #touchControls .tbtn.trick{background:rgba(107,63,160,.6)}
-#skiFade{position:absolute;inset:0;background:#f6f6f3;opacity:0;pointer-events:none;transition:opacity .3s;z-index:25}#skiFade.on{opacity:1}
+#skiFade{position:absolute;inset:0;background:#f6f6f3;opacity:0;pointer-events:none;transition:opacity .3s;z-index:25}#skiFade.on{opacity:1}#skiFade.dark{background:#07080a;transition:opacity .2s}
 @media (max-width:620px){.hud .minimap{width:96px;height:96px}.hud .minimap canvas{width:96px!important;height:96px!important}}
 
 /* round 6: lift rides, challenge gates, ski types */

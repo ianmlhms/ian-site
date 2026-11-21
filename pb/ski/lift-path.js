@@ -48,11 +48,30 @@ export function createLiftPath(src, height) {
   }
   const q = {};
   let supports;
+  let tunnels = [];
   if (kind === 'train') {
-    // the track lies on the ground: a support every 10 m keeps the rail on the snow (bridges over dips are left to the data)
+    // the track lies on the ground: a support every 10 m keeps the rail on the snow (bridges over dips are left to the data).
+    // Round 7: an underground funicular (data `tunnel`: Funival, Perce-Neige, Sunnegga) runs on a straight grade from its bottom to its top
+    // station and never above the ground; where the rock over it is deeper than TUNNEL.cover it is in the tunnel (lifts.js: portals,
+    // modes/tunnel.js: the tube while riding).
     supports = [];
-    for (let s = 0; s < len; s += 10) { at(s, q); supports.push({ s, y: height(q.x, q.z) + 0.35 }); }
-    at(len, q); supports.push({ s: len, y: height(q.x, q.z) + 0.35 });
+    const groundAt = (s) => { at(s, q); return height(q.x, q.z); };
+    for (let s = 0; s < len; s += 10) supports.push({ s, y: groundAt(s) + 0.35 });
+    supports.push({ s: len, y: groundAt(len) + 0.35 });
+    if (src.tunnel) {
+      // the grade: TUNNEL.depth under the ground (smoothed, a ramp down from each station), never above the straight line between them
+      const y0 = supports[0].y, y1 = supports[supports.length - 1].y;
+      const deep = supports.map((p) => p.y - TUNNEL.depth * Math.min(1, p.s / TUNNEL.ramp, (len - p.s) / TUNNEL.ramp));
+      const R = 4;
+      supports.forEach((p, i) => {
+        let sum = 0, c = 0;
+        for (let k = Math.max(0, i - R); k <= Math.min(deep.length - 1, i + R); k++) { sum += deep[k]; c++; }
+        const ramp = Math.min(1, p.s / TUNNEL.ramp, (len - p.s) / TUNNEL.ramp);
+        const smooth = deep[i] + (sum / c - deep[i]) * ramp;              // the stations themselves stay on the ground
+        p.y = Math.min(p.y, smooth, y0 + (y1 - y0) * (p.s / (len || 1)));
+      });
+      tunnels = tunnelSpans(supports, groundAt);
+    }
   } else {
     supports = [{ s: 0, y: height(sx[0], sz[0]) + spec.station[1] * 1.25 }];          // the bull-wheel stands above the hall
     const towers = kind === 'cable' && !(src.pylons && src.pylons.length) ? [len / 2] : (src.pylons || []);
@@ -81,5 +100,28 @@ export function createLiftPath(src, height) {
   /** The rope's climb at s (dy / ds): carriages tilt with it (trains), the window view looks along it. */
   const slope = (s) => (cableY(Math.min(len, s + 4)) - cableY(Math.max(0, s - 4))) / Math.max(1, Math.min(len, s + 4) - Math.max(0, s - 4));
   const cx = (sx[0] + sx[n - 1]) / 2, cz = (sz[0] + sz[n - 1]) / 2;
-  return { src, kind, spec, len, at, cableY, slope, supports, cx, cz, radius: len / 2, seats: Number(src.seats) || (kind === 'chair' ? 4 : kind === 'gondola' ? 8 : 0) };
+  /** Round 7: is s (m along the line) inside a tunnel (with `margin` m of the portal mouth counted in)? */
+  const underground = (s, margin = 0) => tunnels.some(([a, b]) => s >= a - margin && s <= b + margin);
+  return { src, kind, spec, len, at, cableY, slope, supports, cx, cz, radius: len / 2, seats: Number(src.seats) || (kind === 'chair' ? 4 : kind === 'gondola' ? 8 : 0), tunnels, underground };
+}
+
+/* Round 7: the underground stretches of a tunnel funicular. */
+export const TUNNEL = Object.freeze({
+  depth: 16,                // m: the rail runs this deep under the ground between the portals
+  ramp: 70,                 // m: from each station down to that depth (the portal comes after ~15 m)
+  cover: 1.2,               // m of ground over the rail top: from here on the line is in the tunnel (the portal stands there, ~10 m past the station)
+  minSpan: 30,              // m: a shorter dip under a bump stays a cutting (no portal pair for 20 m)
+  width: 9.2, height: 6.6,  // m: the tube's inside (two tracks), its floor is the rail top - 0.4
+});
+/** [[s0, s1], ...] where the ground stands more than TUNNEL.cover over the rail (supports = [{ s, y }] every 10 m, ground(s)). */
+export function tunnelSpans(supports, ground) {
+  const out = [];
+  let open = null;
+  for (const p of supports) {
+    const deep = ground(p.s) - p.y > TUNNEL.cover;
+    if (deep && open === null) open = p.s;
+    if (!deep && open !== null) { if (p.s - open >= TUNNEL.minSpan) out.push([open, p.s]); open = null; }
+  }
+  if (open !== null) { const end = supports[supports.length - 1].s; if (end - open >= TUNNEL.minSpan) out.push([open, end]); }
+  return out;
 }

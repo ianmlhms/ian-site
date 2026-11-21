@@ -153,57 +153,71 @@ export function createPoles({ scene, resort, height }) {
 
 /** Signposts at the top of every piste (where it leaves the lift or the piste above: the junctions): a larch post with a board in the
  *  piste's colour, its name in white, readable from both sides, facing the skiers coming down. All boards share one painted atlas. */
-export function createSigns({ scene, resort, height }) {
-  const list = resort.pistes;
-  const BW = 256, BH = 48, cols = 8, rows = Math.ceil(list.length / cols);
+/* Round 7: the boards are drawn into several atlases of at most ATLAS_ROWS x 8 boards (2048 x 2016 px), one mesh each, so any resort
+ * size works (one 4096 px atlas ran out at ~680 pistes; 3 Vallées has 480, Arlberg 356: two atlases = two draw calls). */
+const SIGN_W = 256, SIGN_H = 48, SIGN_COLS = 8, ATLAS_ROWS = 42;
+export const SIGNS_PER_ATLAS = SIGN_COLS * ATLAS_ROWS;
+function signAtlas(list) {
+  const rows = Math.max(1, Math.ceil(list.length / SIGN_COLS));
   const c = document.createElement('canvas');
-  c.width = BW * cols; c.height = BH * Math.max(1, rows);
+  c.width = SIGN_W * SIGN_COLS; c.height = SIGN_H * rows;
   const g = c.getContext('2d');
   list.forEach((p, i) => {
-    const x = (i % cols) * BW, y = Math.floor(i / cols) * BH;
-    g.fillStyle = (DIFF[p.diff] || DIFF.blue).css; g.fillRect(x, y, BW, BH);
-    g.fillStyle = 'rgba(255,255,255,0.9)'; g.fillRect(x + 3, y + 3, BW - 6, 3); g.fillRect(x + 3, y + BH - 6, BW - 6, 3);
+    const x = (i % SIGN_COLS) * SIGN_W, y = Math.floor(i / SIGN_COLS) * SIGN_H;
+    g.fillStyle = (DIFF[p.diff] || DIFF.blue).css; g.fillRect(x, y, SIGN_W, SIGN_H);
+    g.fillStyle = 'rgba(255,255,255,0.9)'; g.fillRect(x + 3, y + 3, SIGN_W - 6, 3); g.fillRect(x + 3, y + SIGN_H - 6, SIGN_W - 6, 3);
     g.fillStyle = '#ffffff'; g.font = '700 26px system-ui, -apple-system, sans-serif'; g.textBaseline = 'middle';
     const name = p.name.length > 15 ? p.name.slice(0, 14) + '…' : p.name;
-    g.fillText(name, x + 44, y + BH / 2 + 1, BW - 56);
-    g.beginPath(); g.moveTo(x + 32, y + 12); g.lineTo(x + 12, y + BH / 2); g.lineTo(x + 32, y + BH - 12); g.closePath(); g.fill();   // arrow: towards the piste
+    g.fillText(name, x + 44, y + SIGN_H / 2 + 1, SIGN_W - 56);
+    g.beginPath(); g.moveTo(x + 32, y + 12); g.lineTo(x + 12, y + SIGN_H / 2); g.lineTo(x + 32, y + SIGN_H - 12); g.closePath(); g.fill();   // arrow: towards the piste
   });
   const tex = new THREE.CanvasTexture(c);
   tex.anisotropy = 4;
-  const pos = [], nrm = [], uv = [];
+  return { tex, rows };
+}
+export function createSigns({ scene, resort, height }) {
+  const all = resort.pistes;
   const post = [];
-  const quad = (a, b, cc, d, n, uvs) => { for (const k of [0, 1, 2, 0, 2, 3]) { const q = [a, b, cc, d][k]; pos.push(...q); nrm.push(...n); uv.push(...uvs[k]); } };
-  list.forEach((p, i) => {
-    const l = p.line;
-    if (l.length < 4) return;
-    const dx = l[2] - l[0], dz = l[3] - l[1], L = Math.hypot(dx, dz) || 1;
-    const ux = dx / L, uz = dz / L;
-    const side = (p.hw || 15) + 3;
-    const x = l[0] + -uz * side + ux * 6, z = l[1] + ux * side + uz * 6;
-    const y = height(x, z);
-    post.push(x, y, z);
-    // the board: across the piste (its face looks up the piste), 2.1 .. 2.5 m above the snow
-    const w = 1.9, y0 = y + 2.0, y1 = y + 2.42;
-    const ax = x - uz * 0.1, az = z + ux * 0.1;
-    const ex = ax + uz * w, ez = az - ux * w;           // the board reaches in towards the piste
-    const u0 = (i % cols) / cols, u1 = u0 + 1 / cols, v1 = 1 - Math.floor(i / cols) / rows, v0 = v1 - 1 / rows;
-    quad([ex, y0, ez], [ax, y0, az], [ax, y1, az], [ex, y1, ez], [-ux, 0, -uz], [[u0, v0], [u1, v0], [u1, v1], [u0, v1]]);   // seen from uphill
-    quad([ax, y0, az], [ex, y0, ez], [ex, y1, ez], [ax, y1, az], [ux, 0, uz], [[u0, v0], [u1, v0], [u1, v1], [u0, v1]]);     // seen from below
-  });
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
-  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-  geo.computeBoundingSphere();
-  const boards = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: tex }));
-  boards.castShadow = true;
+  const boards = [];
+  for (let first = 0; first < Math.max(1, all.length); first += SIGNS_PER_ATLAS) {
+    const list = all.slice(first, first + SIGNS_PER_ATLAS);
+    const { tex, rows } = signAtlas(list);
+    const pos = [], nrm = [], uv = [];
+    const quad = (a, b, cc, d, n, uvs) => { for (const k of [0, 1, 2, 0, 2, 3]) { const q = [a, b, cc, d][k]; pos.push(...q); nrm.push(...n); uv.push(...uvs[k]); } };
+    list.forEach((p, i) => {
+      const l = p.line;
+      if (l.length < 4) return;
+      const dx = l[2] - l[0], dz = l[3] - l[1], L = Math.hypot(dx, dz) || 1;
+      const ux = dx / L, uz = dz / L;
+      const side = (p.hw || 15) + 3;
+      const x = l[0] + -uz * side + ux * 6, z = l[1] + ux * side + uz * 6;
+      const y = height(x, z);
+      post.push(x, y, z);
+      // the board: across the piste (its face looks up the piste), 2.1 .. 2.5 m above the snow
+      const w = 1.9, y0 = y + 2.0, y1 = y + 2.42;
+      const ax = x - uz * 0.1, az = z + ux * 0.1;
+      const ex = ax + uz * w, ez = az - ux * w;           // the board reaches in towards the piste
+      const u0 = (i % SIGN_COLS) / SIGN_COLS, u1 = u0 + 1 / SIGN_COLS, v1 = 1 - Math.floor(i / SIGN_COLS) / rows, v0 = v1 - 1 / rows;
+      quad([ex, y0, ez], [ax, y0, az], [ax, y1, az], [ex, y1, ez], [-ux, 0, -uz], [[u0, v0], [u1, v0], [u1, v1], [u0, v1]]);   // seen from uphill
+      quad([ax, y0, az], [ex, y0, ez], [ex, y1, ez], [ax, y1, az], [ux, 0, uz], [[u0, v0], [u1, v0], [u1, v1], [u0, v1]]);     // seen from below
+    });
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.computeBoundingSphere();
+    const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: tex }));
+    mesh.name = 'ski-signs';
+    mesh.castShadow = true;
+    boards.push(mesh);
+  }
   const postGeo = new THREE.BoxGeometry(0.14, 2.7, 0.14).translate(0, 1.2, 0);
   const posts = new THREE.InstancedMesh(postGeo, new THREE.MeshLambertMaterial({ color: 0x6b4a30 }), Math.max(1, post.length / 3));
   const m = new THREE.Matrix4();
   for (let i = 0; i < post.length / 3; i++) { m.makeTranslation(post[i * 3], post[i * 3 + 1] - 0.2, post[i * 3 + 2]); posts.setMatrixAt(i, m); }
   posts.castShadow = true;
-  scene.add(boards, posts);
-  return { boards, posts, count: post.length / 3 };
+  scene.add(...boards, posts);
+  return { boards, posts, count: post.length / 3, atlases: boards.length };
 }
 
 /** The objects of one run: start gate at the top, finish arch at the bottom, slalom gates. dispose() removes them. */

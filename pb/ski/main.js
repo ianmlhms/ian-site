@@ -44,6 +44,7 @@ import { attachModePanel, starRow, createRideHud, createChallengePrompt, showSki
 // round 6: lift rides, challenge gates on the mountain, ski types
 import { createRide, rideCamera } from './modes/liftride.js';
 import { createCarrier } from './modes/carriers.js';
+import { createTunnel } from './modes/tunnel.js';
 import { createMarkers, markerList, MARKER } from './modes/markers.js';
 import { SKI_BY_ID, DEFAULT_SKI, skiParams, addSkiStats, skiOpen } from './modes/skis.js';
 import { spawnLift } from './modes/freeride.js';
@@ -167,6 +168,7 @@ async function boot() {
   const chase = createChaseCamera(surface);
   let snowfall = createSnowfall({ scene, env, count: quality.snowflakes });
   const spray = createSpray({ scene, count: quality.spray });
+  let signs = null;
   let lifts = null, village = null, landmarks = null, roads = null, roadRows = null, extrasBuilt = false, liftsEarly = false, markers = null;
   /** Round 6: the lift view (lifts.js). Built once every tile is in; a ride before that builds it early on the heights there are, and it
    *  is built again (between rides) once all tiles are in. */
@@ -199,7 +201,7 @@ async function boot() {
     if (streamer.done() && !extrasBuilt) {
       extrasBuilt = true;
       buildLifts();
-      createSigns({ scene, resort, height: (x, z) => field.height(x, z) });
+      signs = createSigns({ scene, resort, height: (x, z) => field.height(x, z) });
       landmarks = createLandmarks({ scene, resort, height: (x, z) => surface.height(x, z), pistes });
       if (modes) modes.ensureParkView();
       mark('lifts');
@@ -269,7 +271,7 @@ async function boot() {
     if (m.park) startPark(); else startRun(m.piste, MODES.run);
   }
   // ---- round 6: lift rides ----
-  let ride = null, carrier = null, rideView = 'chase', rideCam = null, skipping = false;
+  let ride = null, carrier = null, rideView = 'chase', rideCam = null, skipping = false, tunnel = null, inTunnel = false;
   const rideHud = createRideHud(hud.el, { onSkip: () => skipRide(), onView: () => toggleRideView() });
   const outfitOpen = (o) => modes.outfitOpen(o);
   const starsText = (p) => { const m = modes.pisteInfo(p).mask; return [1, 2, 4].map((b) => (m & b ? '★' : '☆')).join(''); };
@@ -623,6 +625,8 @@ async function boot() {
     if (!path) { hud.toast('Dëse Lift fiert net'); return; }
     ride = createRide({ lift, path, height: (x, z) => surface.height(x, z) });
     carrier = createCarrier({ scene, kind: path.kind, seats: path.seats });
+    tunnel = path.tunnels && path.tunnels.length ? createTunnel({ scene, path }) : null;     // round 7: the tube of an underground funicular
+    inTunnel = false;
     modes.rideStart(lift);
     chPrompt.show(null);
     game.phase = 'lift';
@@ -642,6 +646,15 @@ async function boot() {
     if (lifts) lifts.setRide(ride.lift.index, ride.s);
     carrier.place(w);
     streamer.focus(w.x + Math.cos(w.heading) * 120, w.z + Math.sin(w.heading) * 120);
+    // round 7: through a tunnel portal (in or out) the picture dips to dark for a moment: the cut between daylight and the lit tube
+    const under = !!(tunnel && ride.path.underground(ride.s - (rideView === 'window' ? 0 : 12), 2));
+    if (under !== inTunnel) {
+      inTunnel = under;
+      document.documentElement.dataset.skiTunnel = under ? '1' : '0';
+      const fade = fader();
+      fade.classList.add('dark', 'on');
+      setTimeout(() => { fade.classList.remove('on'); setTimeout(() => fade.classList.remove('dark'), 320); }, 220);
+    }
     if (ride.done && !skipping) arrive();
   }
   function rideCamera1(dt) {
@@ -653,7 +666,7 @@ async function boot() {
     else { const k = 1 - Math.exp(-dt * 3); for (const key of Object.keys(off)) rideCam.off[key] += (off[key] - rideCam.off[key]) * k; }
     const o = rideCam.off;
     const out = { x: w.x + o.x, y: w.y + o.y, z: w.z + o.z, tx: w.x + o.tx, ty: w.y + o.ty, tz: w.z + o.tz, fov: o.fov };
-    if (rideView !== 'window') out.y = Math.max(out.y, surface.height(out.x, out.z) + 0.8);
+    if (rideView !== 'window' && !want.inTunnel) out.y = Math.max(out.y, surface.height(out.x, out.z) + 0.8);
     return out;
   }
   function toggleRideView() {
@@ -683,6 +696,8 @@ async function boot() {
     ride = null; skipping = false;
     if (lifts) lifts.setRide(r.lift.index, null);
     if (carrier) { carrier.dispose(); carrier = null; }
+    if (tunnel) { tunnel.dispose(); tunnel = null; }
+    inTunnel = false; document.documentElement.dataset.skiTunnel = '0';
     rideHud.show(null);
     const spot = modes.lifts.startAt(r.lift, (x, z) => surface.height(x, z));
     if (modes.freeRun) modes.freeRun.moved(spot);
@@ -883,7 +898,7 @@ async function boot() {
       if (st && lifts) liftDist = lifts.nearest(st.x, st.z);
       if (st) nearVillage = village ? Math.max(0, Math.min(1, -surface.info(st.x + 60, st.z, 3) - surface.info(st.x - 60, st.z, 3) - surface.info(st.x, st.z + 60, 3) - surface.info(st.x, st.z - 60, 3))) * 0.6 : 0;
       hudT = 0;
-      if (st) env.setSunScale(sunVisibility(st.x, st.y + 1, st.z));
+      if (st) env.setSunScale(inTunnel ? 0.04 : sunVisibility(st.x, st.y + 1, st.z));        // round 7: no sun in a tunnel
       if (game.screen === 'map') updateStartStatus();
       if (game.screen === 'ski' && st) {
         hud.setSpeed(st.speed * 3.6);
@@ -958,7 +973,7 @@ async function boot() {
     modes, parkLayout, startPark, startFree: (id) => startFree(id ? modes.lifts.byId.get(id) : game.freeLift || modes.lifts.list[0]), rideUp, setMapMode,
     // round 6
     goFree: (id) => goFree(id ? modes.lifts.byId.get(id) : spawn), boardLift, skipRide, toggleRideView, get ride() { return ride; }, get rideView() { return rideView; }, get spawn() { return spawn; },
-    get lifts() { return lifts; }, markers, setSki, get skiType() { return skiType; }, get world() { return world; }, openSkiCard, resumeFree, acceptChallenge, showMap,
+    get lifts() { return lifts; }, get signs() { return signs; }, get tunnel() { return tunnel; }, get inTunnel() { return inTunnel; }, markers, setSki, get skiType() { return skiType; }, get world() { return world; }, openSkiCard, resumeFree, acceptChallenge, showMap,
     place(x, z, heading) { placeAt(x, z, heading); },
   };
 

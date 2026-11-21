@@ -38,7 +38,7 @@ export function riderAt(path, s, height, out = {}) {
   const fx = q.dx, fz = q.dz;                                        // along the line, uphill
   const rx = -fz, rz = fx;                                           // the up side's offset direction (lifts.js: x - dz * off)
   const cx = q.x + rx * side, cz = q.z + rz * side;
-  const cy = k === 'drag' ? path.cableY(s) : k === 'train' ? height(cx, cz) + 0.35 : path.cableY(s);
+  const cy = k === 'drag' ? path.cableY(s) : k === 'train' ? (path.tunnels && path.tunnels.length ? path.cableY(s) : height(cx, cz) + 0.35) : path.cableY(s);   // round 7: a tunnel's rail is its grade
   out.cx = cx; out.cy = cy; out.cz = cz; out.s = s;
   out.heading = Math.atan2(fz, fx);
   out.pitch = k === 'train' ? Math.atan(path.slope(s)) : 0;
@@ -89,15 +89,17 @@ export function rideCamera(path, w, mode, ground) {
   if (mode === 'window') {
     // from the rider's eyes: a chair looks a little down (the safety bar and the chairs ahead), a cabin out of its front window (the
     // ceiling and the posts frame the view), a drag lift up the track
-    const eye = k === 'chair' ? 1.02 : 1.62;
-    const ahead = k === 'chair' ? 0.08 : k === 'drag' ? 0.2 : k === 'train' ? -1 : 0.12;
+    // round 7: in a cabin the eyes stand nearer the front window and a little lower, the view climbs only a little with the rope: the
+    // ceiling is a thin frame at the top, not a wide band
+    const eye = k === 'chair' ? 1.02 : k === 'drag' ? 1.62 : 1.5;
+    const ahead = k === 'chair' ? 0.08 : k === 'drag' ? 0.2 : k === 'train' ? -1 : k === 'cable' ? 1.5 : 0.5;
     out.x = w.x + fx * ahead; out.z = w.z + fz * ahead; out.y = w.y + eye;
     const look = 40;
     const tx = w.x + fx * look, tz = w.z + fz * look;
     const climb = k === 'drag' || k === 'train' ? (ground(w.x + fx * 20, w.z + fz * 20) - ground(w.x, w.z)) / 20 : path.slope(w.s || 0);
-    const pitch = k === 'chair' ? Math.atan(climb) - 0.5 : k === 'drag' ? Math.atan(climb) * 0.7 - 0.1 : Math.atan(climb) * 0.6 - 0.05;
+    const pitch = k === 'chair' ? Math.atan(climb) - 0.5 : k === 'drag' ? Math.atan(climb) * 0.7 - 0.1 : k === 'train' ? Math.atan(climb) * 0.6 - 0.05 : Math.atan(climb) * 0.3 - 0.07;
     out.tx = tx; out.tz = tz; out.ty = out.y + look * Math.tan(pitch);
-    out.fov = k === 'chair' ? 80 : 74;
+    out.fov = k === 'chair' ? 80 : k === 'train' ? 74 : 70;
   } else {
     const back = k === 'cable' ? 13 : k === 'gondola' ? 7.5 : k === 'train' ? 16 : k === 'drag' ? 5.5 : 5.2;
     const side = k === 'cable' ? 6 : k === 'gondola' ? 3.6 : k === 'train' ? 5 : k === 'drag' ? 1.6 : 2.6;
@@ -111,6 +113,14 @@ export function rideCamera(path, w, mode, ground) {
       out.tx = w.x - fx * 1.2; out.tz = w.z - fz * 1.2; out.ty = w.y + 0.2; out.fov = 60;
     }
   }
+  // round 7: an underground funicular: the chase camera rides inside the tube, behind the carriage over the middle of the tunnel
+  const tunnel = path.tunnels && path.tunnels.length;
+  if (tunnel && mode !== 'window') {
+    const sideIn = -path.spec.side;                                  // the carriage runs on the up side: back to the tunnel's middle
+    out.x = w.x - fx * 11 + rx * sideIn; out.z = w.z - fz * 11 + rz * sideIn; out.y = w.y + 2.0 - Math.tan(w.pitch || 0) * 11;
+    out.tx = w.x + fx * 8; out.tz = w.z + fz * 8; out.ty = w.y + 1.2 + Math.tan(w.pitch || 0) * 8; out.fov = 62;
+  }
+  if (tunnel && path.underground((w.s || 0) - 12, 6)) { out.inTunnel = true; return out; }     // under the mountain: no ground clamp
   const g = ground(out.x, out.z) + 0.8;
   if (out.y < g) out.y = g;
   return out;

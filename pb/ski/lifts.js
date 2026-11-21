@@ -38,6 +38,7 @@ export function createLifts({ scene, resort, height }) {
   let ti = 0;
   const cablePts = [];
   const stationParts = [];             // [geometry, colour]: merged into one vertex-coloured mesh
+  const holeParts = [];                // round 7: the dark tunnel mouths (hidden while the player rides that lift: he sees out of them)
   for (const l of lifts) {
     const { spec } = l;
     for (const s of l.supports) {
@@ -56,12 +57,18 @@ export function createLifts({ scene, resort, height }) {
     for (const off of sides) {
       for (let k = 0; k + 1 < l.supports.length; k++) {
         const a = l.supports[k], b = l.supports[k + 1];
+        if (l.tunnels.length && l.underground(a.s) && l.underground(b.s)) continue;        // round 7: no rails drawn under the mountain
         const qa = l.at(a.s), qb = l.at(b.s);
         cablePts.push(qa.x - qa.dz * off, a.y, qa.z + qa.dx * off, qb.x - qb.dz * off, b.y, qb.z + qb.dx * off);
       }
     }
     // stations: a concrete / timber hall with a glass band, and over it, at cable height, the bull-wheel under its snow-covered canopy
     for (const end of [0, l.len]) stationParts.push(...stationGeometry(l, end, height));
+    // round 7: a concrete portal where an underground funicular goes into the mountain (and comes out), a dark mouth behind it
+    for (const [a, b] of l.tunnels) {
+      if (a > 1) { stationParts.push(...portalGeometry(l, a, 1, height)); holeParts.push(...portalHole(l, a, 1)); }
+      if (b < l.len - 1) { stationParts.push(...portalGeometry(l, b, -1, height)); holeParts.push(...portalHole(l, b, -1)); }
+    }
   }
   towers.instanceMatrix.needsUpdate = true; bars.instanceMatrix.needsUpdate = true;
   group.add(towers, bars);
@@ -73,6 +80,13 @@ export function createLifts({ scene, resort, height }) {
     group.add(st);
     disposables.push(geo, mat);
   }
+  let holes = null;
+  if (holeParts.length) {
+    const geo = mergeColoured(holeParts), mat = new THREE.MeshBasicMaterial({ vertexColors: true });
+    holes = new THREE.Mesh(geo, mat);
+    group.add(holes);
+    disposables.push(geo, mat);
+  }
   towers.castShadow = true; bars.castShadow = true; towers.receiveShadow = true;
   const cg = new THREE.BufferGeometry();
   cg.setAttribute('position', new THREE.Float32BufferAttribute(cablePts, 3));
@@ -81,28 +95,58 @@ export function createLifts({ scene, resort, height }) {
   group.add(cables);
   disposables.push(cg);
 
-  // carriers (local frame: +z = the direction of travel, y = 0 at the rope; a chair's rider faces +z, the backrest is behind him)
-  const chairGeo = (() => {
-    const seat = new THREE.BoxGeometry(1.9, 0.12, 0.6).translate(0, -2.1, -0.05);
-    const back = new THREE.BoxGeometry(1.9, 0.75, 0.1).translate(0, -1.7, -0.35);
-    const hang = new THREE.BoxGeometry(0.08, 2.1, 0.08).translate(0, -1.05, -0.3);
-    const bar = new THREE.BoxGeometry(1.9, 0.06, 0.06).translate(0, -1.6, 0.42);
-    const foot = new THREE.BoxGeometry(1.7, 0.05, 0.2).translate(0, -2.62, 0.5);
-    return mergeBoxes([seat, back, hang, bar, foot]);
-  })();
-  const cabinGeo = new THREE.BoxGeometry(2.0, 2.2, 2.0).translate(0, -3.0, 0);
-  const bigCabinGeo = new THREE.BoxGeometry(4.5, 3.2, 7).translate(0, -4.5, 0);
+  // carriers (local frame: +z = the direction of travel, y = 0 at the rope; a chair's rider faces +z, the backrest is behind him).
+  // Round 7: every carrier far and near is a small vertex-coloured model, still one instanced draw call per kind: a chair with its
+  // hanger, cushions and yellow bar; a gondola = an octagonal cabin (roof, window band, coloured lower body) on its hanger arm; the big
+  // cabin with its window band and roof gear; a carriage with windows (modes/carriers.js has the ridden one in more detail).
+  const C = { frame: [0.2, 0.22, 0.26], steel: [0.55, 0.58, 0.63], cushion: [0.13, 0.36, 0.78], bar: [0.95, 0.7, 0.1], red: [0.78, 0.2, 0.17], redDark: [0.55, 0.14, 0.12], glass: [0.12, 0.17, 0.24], roof: [0.88, 0.89, 0.91], cable: [0.85, 0.86, 0.88] };
+  const B = (w, h, d, x, y, z) => new THREE.BoxGeometry(w, h, d).translate(x, y, z);
+  const oct = (r0, r1, h, y) => new THREE.CylinderGeometry(r1, r0, h, 8, 1, false).rotateY(Math.PI / 8).translate(0, y, 0);
+  const chairGeo = mergeColoured([
+    [B(0.1, 0.12, 0.16, 0, -0.06, -0.3), C.steel],
+    [B(0.08, 2.0, 0.08, 0, -1.05, -0.3), C.frame],
+    [B(1.95, 0.07, 0.07, 0, -1.4, -0.32), C.frame],
+    [B(1.9, 0.12, 0.6, 0, -2.1, -0.05), C.cushion],
+    [B(1.9, 0.75, 0.1, 0, -1.7, -0.35), C.cushion],
+    [B(0.07, 0.5, 0.07, -0.97, -1.85, -0.05), C.frame], [B(0.07, 0.5, 0.07, 0.97, -1.85, -0.05), C.frame],
+    [B(1.9, 0.06, 0.06, 0, -1.6, 0.42), C.bar],
+    [B(1.7, 0.05, 0.2, 0, -2.62, 0.5), C.bar],
+  ]);
+  const cabinGeo = mergeColoured([
+    [B(0.16, 0.18, 0.3, 0, -0.05, 0), C.steel],
+    [B(0.09, 1.75, 0.09, 0, -0.95, 0), C.frame],
+    [oct(1.02, 0.82, 0.22, -1.86), C.roof],
+    [oct(1.06, 1.02, 0.95, -2.45), C.glass],
+    [oct(0.88, 1.06, 1.05, -3.45), C.red],
+    [oct(0.55, 0.88, 0.2, -4.08), C.redDark],
+  ]);
+  const bigCabinGeo = mergeColoured([
+    [B(0.35, 1.2, 1.6, 0, -0.6, -1.3), C.frame], [B(0.35, 1.2, 1.6, 0, -0.6, 1.3), C.frame],
+    [B(1.6, 0.5, 4.0, 0, -1.5, 0), C.steel],
+    [B(4.5, 0.25, 7, 0, -2.95, 0), C.roof],
+    [B(4.5, 1.6, 7, 0, -3.9, 0), C.glass],
+    [B(4.5, 1.4, 7, 0, -5.4, 0), C.cable],
+    [B(4.3, 0.2, 6.8, 0, -6.2, 0), C.frame],
+  ]);
   const tbarGeo = mergeBoxes([new THREE.BoxGeometry(0.05, 2.4, 0.05).translate(0, -1.2, 0), new THREE.BoxGeometry(1.0, 0.08, 0.08).translate(0, -2.4, 0)]);
-  const trainGeo = mergeBoxes([new THREE.BoxGeometry(2.6, 2.7, 13).translate(0, 1.75, 0), new THREE.BoxGeometry(2.2, 0.5, 11).translate(0, 0.25, 0)]);
+  const trainGeo = mergeColoured([
+    [B(2.2, 0.5, 11, 0, 0.25, 0), C.frame],
+    [B(2.6, 1.05, 13, 0, 1.0, 0), C.red],
+    [B(2.62, 1.2, 12.6, 0, 2.1, 0), C.glass],
+    [B(2.7, 0.3, 13.1, 0, 2.85, 0), C.red],
+    [B(2.4, 0.15, 12.6, 0, 3.05, 0), C.roof],
+  ]);
   const MAX = 1400;
+  const carrierMat = new THREE.MeshLambertMaterial({ vertexColors: true });
   const pools = {
-    chair: new THREE.InstancedMesh(chairGeo, dark, MAX),
-    gondola: new THREE.InstancedMesh(cabinGeo, new THREE.MeshLambertMaterial({ color: 0xc8372e }), 500),
-    cable: new THREE.InstancedMesh(bigCabinGeo, new THREE.MeshLambertMaterial({ color: 0xd9dde3 }), 20),
+    chair: new THREE.InstancedMesh(chairGeo, carrierMat, MAX),
+    gondola: new THREE.InstancedMesh(cabinGeo, carrierMat, 500),
+    cable: new THREE.InstancedMesh(bigCabinGeo, carrierMat, 20),
     drag: new THREE.InstancedMesh(tbarGeo, dark, 600),
-    train: new THREE.InstancedMesh(trainGeo, new THREE.MeshLambertMaterial({ color: 0xb8322b }), 12),
+    train: new THREE.InstancedMesh(trainGeo, carrierMat, 12),
   };
-  for (const p of Object.values(pools)) { p.count = 0; p.frustumCulled = false; p.castShadow = true; group.add(p); disposables.push(p.geometry, p.material); }
+  for (const p of Object.values(pools)) { p.count = 0; p.frustumCulled = false; p.castShadow = true; group.add(p); disposables.push(p.geometry); }
+  disposables.push(carrierMat);
   let lastT = 0;
 
   function update(t, camX, camZ, radius) {
@@ -142,6 +186,7 @@ export function createLifts({ scene, resort, height }) {
       if (l.ride !== null) { const gap = l.spec.gap || l.len; l.offset = (((l.ride - lastT * l.spec.speed) % gap) + gap) % gap; }
       l.ride = null;
     } else l.ride = Math.max(0, Math.min(l.len, s));
+    if (holes && l.tunnels.length) holes.visible = l.ride === null;            // riding a tunnel: he looks out of its mouths
   }
   /** Metres from (x, z) to the nearest lift line (stations included): the lift hum fades with it. */
   function nearest(x, z) {
@@ -218,6 +263,30 @@ function stationGeometry(l, end, height) {
   add(new THREE.BoxGeometry(2 * R + 3, 0.4, 2 * R + 2), COL.steel, d * 0.2, cable + 1.6, 0);
   add(new THREE.BoxGeometry(2 * R + 2.8, 0.4, 2 * R + 1.8), COL.snow, d * 0.2, cable + 1.95, 0);
   return out;
+}
+
+/** Round 7: the frame of a tunnel portal at s (dir 1 = the mouth faces down the line, -1 = up it): wing walls, a lintel with a snow lip. */
+function portalFrame(l, s, dir) {
+  const q = l.at(s), rail = l.cableY(s);
+  const ang = -Math.atan2(q.dz, q.dx) + (dir > 0 ? 0 : Math.PI);
+  return new THREE.Matrix4().compose(new THREE.Vector3(q.x, rail - 0.4, q.z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), ang), new THREE.Vector3(1, 1, 1));
+}
+function portalGeometry(l, s, dir, height) {
+  const q = l.at(s), g = height(q.x, q.z), rail = l.cableY(s);
+  const m = portalFrame(l, s, dir);
+  const out = [];
+  const add = (geo, colour, x = 0, y = 0, z = 0) => out.push([geo.translate(x, y, z).applyMatrix4(m), colour]);
+  const W = 9.2 / 2, H = 6.6, top = Math.max(H + 0.8, g - rail + 2.2);
+  for (const side of [-1, 1]) add(new THREE.BoxGeometry(2.2, top, 1.4), COL.concrete, -0.6, top / 2, side * (W + 1.0));
+  add(new THREE.BoxGeometry(1.6, top - H, 2 * W + 0.2), COL.concrete, -0.6, H + (top - H) / 2, 0);
+  add(new THREE.BoxGeometry(1.8, 0.35, 2 * W + 4.6), COL.stone, -0.6, top + 0.15, 0);
+  add(new THREE.BoxGeometry(1.7, 0.3, 2 * W + 4.4), COL.snow, -0.6, top + 0.45, 0);
+  add(new THREE.BoxGeometry(0.5, 0.5, 2 * W + 2.4), COL.accent, 0.25, H + 0.35, 0);
+  return out;
+}
+/** The dark mouth behind a portal (seen from outside; hidden while riding that lift). */
+function portalHole(l, s, dir) {
+  return [[new THREE.BoxGeometry(0.6, 6.6, 9.2).translate(1.0, 3.3, 0).applyMatrix4(portalFrame(l, s, dir)), [0.03, 0.03, 0.035]]];
 }
 
 function mergeColoured(parts) {

@@ -61,6 +61,8 @@ GROOM_EDGE = 9.0                   # m of soft edge of the groomed band
 BENCH_EDGE = 11.0                  # m beyond a piste's edge over which the bench cut fades back into the slope
 BENCH_MAX = 8.0                    # m: never cut / fill more than this (a line that is off on the map must not dig a trench)
 BENCH_STRENGTH = 0.85
+FAR_QUANT = 1.0       # m height step of far.bin (round 7: was 0.25; -29 % bytes, the bicubic sampling hides the rounding)
+
 def credits(rid):
     """The credit lines of the DEM sources this resort's data came from (fetch_dem.py records them in dem/sources.json), then OSM."""
     path = os.path.join(work_dir(rid, "dem"), "sources.json")
@@ -1538,7 +1540,7 @@ def main():
     far[o:o + down.shape[0], o:o + down.shape[1]] = down
     fj, fi = np.unravel_index(int(np.nanargmax(far)), far.shape)
     log("far grid %dx%d, highest %.0f m at world x %.0f z %.0f" % (far.shape[1], far.shape[0], far[fj, fi], fi * FAR_STEP - FAR_MARGIN, fj * FAR_STEP - FAR_MARGIN))
-    far_blob, far_dec = encode(far, 0.25, float(np.floor(np.nanmin(far))))
+    far_blob, far_dec = encode(far, FAR_QUANT, float(np.floor(np.nanmin(far))))   # round 7: 1 m (first play; see far-quant.mjs)
     sun_shadows(far_dec.astype(np.float32), out)
     with open(os.path.join(out, "far.bin"), "wb") as fh:
         fh.write(far_blob)
