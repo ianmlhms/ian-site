@@ -11,7 +11,7 @@
 import { client, session, onAuth, openAuthModal, isKartAccount } from "./auth.js?v=47";
 import { isStudioEmail } from "./studio-allow.js?v=1";
 import { loadWeekly, countdownText, weeklyGameLabel } from "./arcade-weekly.js?v=14";
-import "./quick-open.js?v=13"; // same URL theme.js loads, so this is the same module instance
+import "./quick-open.js?v=14"; // same URL theme.js loads, so this is the same module instance
 
 const TESTER_CLASS = "4C6";
 const GATES_KEY = "homeGates";

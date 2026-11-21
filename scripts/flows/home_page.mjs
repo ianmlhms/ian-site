@@ -105,7 +105,7 @@ export const flow = {
     h.eq(await visibleIndex(page), [
       { col: "school", items: ["grades.html"] },
       { col: "friends", items: ["messenger.html", "friends.html"] },
-      { col: "travel", items: ["bus.html"] },
+      { col: "travel", items: ["bus.html", "trails/", "mtb/"] },
     ], "visitor: public entries only, empty 'Mäin' column dropped");
     h.eq(await page.$$eval("#gtIndex .kont", (els) => els.filter((e) => e.offsetParent).length), 3, "visitor: three 'Kont' tags");
     h.expect(await page.isVisible("#gtFree"), "visitor: 'gratis Kont' link shown");
@@ -142,7 +142,7 @@ export const flow = {
     h.eq(await visibleIndex(page), [
       { col: "school", items: ["grades.html"] },
       { col: "friends", items: ["messenger.html", "friends.html"] },
-      { col: "travel", items: ["bus.html"] },
+      { col: "travel", items: ["bus.html", "trails/", "mtb/"] },
     ], "member: no Tester, no studios, no Ian-only entries");
     h.eq(await page.$$eval("#gtIndex .kont", (els) => els.filter((e) => e.offsetParent).length), 0, "member: no 'Kont' tags");
     h.eq(await page.textContent("#gtAcct"), "Gilles", "member: nav shows the name");
@@ -156,7 +156,7 @@ export const flow = {
     h.eq(await visibleIndex(page), [
       { col: "school", items: ["grades.html", "exams.html", "ppt.html", "doc.html"] },
       { col: "friends", items: ["messenger.html", "friends.html"] },
-      { col: "travel", items: ["bus.html"] },
+      { col: "travel", items: ["bus.html", "trails/", "mtb/"] },
       { col: "mine", items: ["karts.html", "hotel.html", "me.html"] },
     ], "Ian: Tester, studios and the 'Mäin' column");
     h.expect(await page.isVisible(".gt-admin"), "Ian: admin row shown");

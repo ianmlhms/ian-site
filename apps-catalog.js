@@ -50,6 +50,10 @@ export const APPS = Object.freeze([
 
   { url: "bus.html", name: "Bus & Zuch", icon: "🚌", group: "grp.maps", locked: false,
     keywords: ["train", "zuch", "tram", "departures", "horaire", "fahrplan"] },
+  { url: "trails/", name: "Auto-Pédestres", icon: "🥾", group: "grp.maps", locked: false,
+    keywords: ["wandern", "trails", "walks", "randonnée", "circuits", "auto-pédestre", "spadséieren", "weeër"] },
+  { url: "mtb/", name: "MTB Trails", icon: "🚵", group: "grp.maps", locked: false,
+    keywords: ["mountainbike", "vtt", "bike", "vëlo", "trails", "singletrail"] },
   { url: "moien.html", name: "Moien", icon: "🌤️", group: "grp.maps", locked: false,
     keywords: ["weather", "wieder", "météo", "forecast", "prévisions"] },
   { url: "skylens.html", name: "SkyLens", icon: "🛩️", group: "grp.maps", locked: false,
