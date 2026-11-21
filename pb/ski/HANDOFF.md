@@ -457,3 +457,62 @@ Ian's requests; our own design (no other game's look, UI, names or content). Bra
   the window view still shows a wide ceiling band; skis vanish in cabins (no outside rack); the gate posts' base takes the banner tint;
   no shared free ride online yet (only the "riding lift X at s" wire state and its drawing); no real train in today's data (checked
   with a synthetic rack railway); the ride's exit can land beside a summit building (it uses the nearest piste start within 80 m).
+
+## R7-C (21 Nov 2026): map teleport, first-lift spawn, first person, snow spray, avalanches, the challenge course
+Parallel agent C of round 7 (A: render / look.js, B: lifts / stations, D: online free ride). New modules; shared files only got small
+hooks marked "R7-C" (main.js, map.js, game.js, markers.js, input.js, progress.js, cloud.js, freeride.js, liftride.js, config.js, ui.css).
+- **Obstacles** (`modes/clear.js`, pure): buildings.json boxes (once loaded), lift station halls (both ends, LIFT_SPEC sizes), lift lines,
+  trees (scatter.hit), class raster (rock / water / built). `blocked(x, z, r)`, `wallAhead(x, z, heading, height, 25)` (house, hall,
+  tree, or ground rising > 30° above the eyes), `liftSpot(lift)` (the boarding spot: polar search round the bottom station within 38 m,
+  facing the boarding area / up the line, turned up to 75° only if needed for an open view, the chase camera not in a wall),
+  `safeSpot(tap)` (nearest piste point / lift spot inside the discovered cells, clear, <= 32°), `courseGate(piste)` (see course).
+- **First lift** (config `FIRST_LIFT`, by name): Killy Olympique, 3 Vallées Verdons (Courchevel 1850), Zermatt Matterhorn Express 1,
+  Arlberg Galzigbahn, Kronplatz Kronplatz I (Reischach). `explore.first`; main.js `spawn` uses it; `goFree` now waits for the tiles AND
+  the buildings, THEN picks the spot (`boardSpot` = `liftSpot`), so the skier stands on the final ground. A tile arriving under a
+  standing skier re-snaps his height. Boarding zone widened 30 -> 42 m (freeride.js BOTTOM_RADIUS, liftride.js RIDE.boardRadius):
+  where a big station building fills the front (Val d'Isère), the spot stands further out. **B (stations) should keep this radius or
+  give liftSpot the real boarding area.**
+- **Discovery + map teleport** (`modes/discovery.js` pure, `modes/explore.js` glue): 100 m cells; seen = within 140 m of the skier
+  (HUD rate), 220 m round a station reached (45 m), the whole line of a lift ridden; the first lift's 320 m always. Saved as run-length
+  text: local `progress.disc[rid]`, cloud record `d: { rid: text }` (+ `w: { rid: Lawin mask }`), merge = union of runs (no grid size
+  needed), dropped resort by resort (largest first) only after the best times when the record would pass 7 KB. Map (free ride tab):
+  fog over the undiscovered cells (map.js `setFog`, a grid-sized canvas drawn smoothed), a tap -> "Nach net entdeckt" or a pin + "Hei hin
+  teleportéieren?" (Jo / Nee) -> `goFree(null, safeSpot)`; a tap within 12 px of a lift's bottom dot still picks the lift (round 6).
+  "⌂ Bei den éischte Lift" always (top left of the map). The lift list: undiscovered lifts are faded, "Bei de Lift" disabled with
+  "Nach net entdeckt". Debug: `__ski.explore.discoverAll()`.
+- **First person** (`firstperson.js`, a camera MODE; main.js switches: `camMode` 'fp' | 'chase', saved `pb_ski_cam`, C key / 👁 HUD
+  button `#hCam`): eyes 1.62 m (tuck 1.15), 0.42 m behind the boots, ~20° down so the tips show at the bottom; skis follow the slope and
+  the edge (FIRST_PERSON.skiRoll), poles + gloves in camera space; head bob, landing dip, lean = edge x 0.13, FOV 74 + 16 (5 -> 24 m/s),
+  the CSS motion streak `#fpStreak` on Mëttel / Héich only (no draw call). The body model is hidden (not on a lift). On a lift the first
+  person is the window view. `cam.roll` -> `camera.rotateZ` after lookAt (the only change to the camera path; A's look.js can keep it).
+- **Snow spray** (`spray.js`, replaces effects.js createSpray): carve arc (a fan off the outside ski, rate and power from speed x edge),
+  skid / plough sheet, powder cloud off the piste (big slow puffs), backlit dust (grains towards the sun glow warm), ski tracks in fresh
+  snow (ring buffer of ground quads, 60 s fade). Budget `SPRAY_BUDGET`: Niddreg 160 grains + 90 track pieces, Mëttel 320 + 260, Héich
+  520 + 420; 2 draw calls; rebuilt on a Grafik change. Grains closer than ~2 m to the camera fade (first person).
+- **Avalanches** (`avalanche.js`): release only in the free ride, grounded skier > 2 m/s entering a new 40 m cell that is `releasable`
+  (no piste within 45 m, slope >= 35° over 6 m, no forest / rock / houses), roll = rng(sessionSeed ^ hash(cell)) < 0.06. Slab = blocks
+  on a crown 18-32 m above the cell, width 50-110 m; flow on the 40 m FAR grid (the same on every device), fixed 1/30 s steps, friction
+  tan 22° growing after 380 m of travel, drag; caught = a moving block within 7 m -> crash 'avalanche', white-out, respawn on the nearest
+  piste (60 m up it); escaped (it stopped, never closer than 160 m... or outrun) -> "Entkomm!". Drawn: tumbling blocks (instanced
+  icosahedra) + soft cloud billboards (2 draw calls), yellow-black checkered warning flags (piste edges beside steep open faces + the
+  face tops, 2 calls), HUD "⚠ Lawinegefor" on steep off-piste. **Lawin challenge**: 3 faces per resort (`findFaces`: steepest long open
+  faces in the shipped tiles, a gentler second pass for wooded Kronplatz), prompt at the top -> Start -> the slab releases behind ->
+  won when it stops without catching him (progress.lawin bit, cloud `w`).
+  **Sync API for D (online free ride)**: `__ski.avalanches.triggerAvalanche(id, seed, t)` (id = `a<ix>_<iz>`, the 40 m cell; seed uint32;
+  t = start time in `avalanches.clock()` seconds), `avalanches.onTrigger(({ id, seed, t }) => broadcast)` for local releases,
+  `avalanches.setClock(fn)` to put every device on the shared match clock. Same (id, seed) -> the same blocks and the same flow
+  (checked in Node and in the page).
+- **Challenge course** (`modes/course.js`, Ian's "Bouc Blanc" report): the start gate moves down the piste (<= 90 m) until the posts
+  and the skier are clear (7 m) of houses, stations, lift lines, trees, rock (`courseGate`; markers.js `regate` once the houses are
+  loaded); the run starts there (`createRun({ startS })`). At 0 a push of 4.8 m/s (17 km/h) along the course. While a timed run is on:
+  orange net panels along BOTH edges (every 6 m, following the slope), chevron boards at junctions (other pistes meeting at > 30°) and
+  every 250 m, pointing where the course goes; a red "ZIL" arch with a checkered line at the line's real end (finish = length - 12 m,
+  the bake trims pistes to their lowest point); HUD: distance bar "… m bis ZIL" + an arrow to the next waypoint. Leaving the course
+  (> halfwidth + 12 m): "Zréck op d'Pist" + an arrow back, NEVER a teleport (game.js 'offpiste' no longer respawns a timed run); after
+  8 s off: "Challenge ofgebrach" (Nach eng Kéier / Weider fräi fueren). A crash respawns where he was on the line (no longer "furthest
+  point - 18 m", which could be the start when the projection was lost); game.js re-projects on the whole line when it lost it.
+- **Tests**: `node scripts/ski/round7c-check.mjs [rid] [--rides]` (all five: spawn, 200 teleport taps, discovery save, Lawin faces +
+  flow + determinism, never on a piste, every gate, barriers, with --rides every course ridden by the scripted skier with game.js +
+  course.js). Flows: `ski-teleport`, `ski-spawn` (5 resorts), `ski-firstperson` (5 resorts: piste carve + off-piste powder),
+  `ski-avalanche` (5 resorts: caught / escape / determinism, natural release, Lawin), `ski-course` (5 resorts, Bouc Blanc first).
+  `SKI_RESORTS=killy` / `SKI_COURSES=rid:piste` narrow them. Shots: `~/Library/Caches/ski-work/round7c/`.

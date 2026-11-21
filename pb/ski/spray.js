@@ -125,7 +125,7 @@ export function createSnowSpray({ scene, env, level = 'medium', height }) {
           ox * power * (1 - brakeFan * 0.5) + fx * power * brakeFan * 0.6 + s.vx * 0.5,
           1.2 + 3.2 * k * (0.5 + edge),
           oz * power * (1 - brakeFan * 0.5) + fz * power * brakeFan * 0.6 + s.vz * 0.5,
-          fresh > 0.5 ? 0.16 + 0.22 * Math.random() : 0.06 + 0.12 * Math.random(), 0, 1.6 + Math.random() * 0.4);
+          fresh > 0.5 ? 0.18 + 0.24 * Math.random() : 0.1 + 0.16 * Math.random(), 0, 1.4 + Math.random() * 0.4);
       }
       // powder: a cloud round the boots off the piste
       puffCarry += grounded && fresh > 0.4 && speed > 1.5 ? fresh * (0.25 + 0.75 * smoothstep(2, 16, speed)) * dt * 34 : 0;

@@ -68,6 +68,7 @@ export const flow = {
     const chairId = await page.evaluate(() => { const L = window.__ski.modes.lifts.list.filter((l) => l.kind === "chair" && l.len > 500 && l.len < 1300); return (L.find((l) => /Grattalu|Fresse|Borsat/.test(l.name)) || L[0]).id; });
     await page.keyboard.press("m");
     await page.waitForFunction(() => document.documentElement.dataset.skiScreen === "map", null, { timeout: 10000 });
+    await page.evaluate(() => window.__ski.explore.discoverAll());      // R7-C: fast travel goes only to discovered lifts
     await page.click(`.lrow[data-lift="${chairId}"]`);
     await page.waitForFunction(() => document.documentElement.dataset.skiFreeReady === "1", null, { timeout: 60000 });
     await page.click("#freeStart");

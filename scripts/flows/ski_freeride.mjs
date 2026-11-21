@@ -29,6 +29,7 @@ export const flow = {
     const rows = await page.$$eval(".lrow", (r) => r.length);
     h.expect(rows > 40, `${rows} lifts to travel to`);
     const liftId = await page.evaluate(() => { const l = window.__ski.modes.lifts.list.find((x) => /Grattalu/.test(x.name)) || window.__ski.modes.lifts.list[0]; return l.id; });
+    await page.evaluate(() => window.__ski.explore.discoverAll());      // R7-C: fast travel goes only to discovered lifts
     await page.click(`.lrow[data-lift="${liftId}"]`);
     await page.waitForFunction(() => document.documentElement.dataset.skiFreeReady === "1", null, { timeout: 60000 });
     h.eq((await page.textContent("#freeStart")).trim(), "Bei de Lift", "the button travels to the lift");
@@ -40,7 +41,7 @@ export const flow = {
     h.expect(await page.evaluate(() => !document.getElementById("freeHud").hidden && !!document.querySelector(".minimap canvas")), "the free ride HUD and the minimap are up");
     const lift = await page.evaluate((id) => { const l = window.__ski.modes.lifts.byId.get(id); return { id: l.id, name: l.name, top: l.top, bottom: l.bottom, seconds: l.seconds }; }, liftId);
     const s0 = await state();
-    h.expect(Math.hypot(s0.x - lift.bottom.x, s0.z - lift.bottom.z) < 32, `at the bottom of ${lift.name} (${Math.round(Math.hypot(s0.x - lift.bottom.x, s0.z - lift.bottom.z))} m from the station)`);
+    h.expect(Math.hypot(s0.x - lift.bottom.x, s0.z - lift.bottom.z) < 42, `at the bottom of ${lift.name} (${Math.round(Math.hypot(s0.x - lift.bottom.x, s0.z - lift.bottom.z))} m from the station)`);
     h.expect(s0.hour >= 9 && s0.hour < 16.5, `day clock at ${s0.hour.toFixed(2)} h`);
     await page.waitForFunction(() => !document.getElementById("liftBtn").hidden, null, { timeout: 8000 });
     h.expect(/Astegen/.test(await page.textContent("#liftBtn")), `the lift button: ${(await page.textContent("#liftBtn")).trim()}`);
