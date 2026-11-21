@@ -8,6 +8,7 @@ const THREE = window.THREE;
 
 import { createLiftPath } from './lift-path.js';
 
+const CARRIER_NEAR = 320;            // round 7 (A): m: nearer carriers are the detailed models
 export function createLifts({ scene, resort, height }) {
   const lifts = [];
   const byIndex = new Map();
@@ -138,9 +139,15 @@ export function createLifts({ scene, resort, height }) {
   ]);
   const MAX = 1400;
   const carrierMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+  // round 7 (A): far carriers (beyond CARRIER_NEAR m) are the cheap shapes (a chair: seat + back + hanger, a cabin: one coloured box on
+  // its hanger), so the many chairs of a resort fit Niddreg's triangle budget; near ones are the detailed models above
+  const chairFarGeo = mergeColoured([[B(0.08, 2.0, 0.08, 0, -1.05, -0.3), C.frame], [B(1.9, 0.12, 0.6, 0, -2.1, -0.05), C.cushion], [B(1.9, 0.75, 0.1, 0, -1.7, -0.35), C.cushion]]);
+  const cabinFarGeo = mergeColoured([[B(0.09, 1.9, 0.09, 0, -0.95, 0), C.frame], [B(1.9, 1.0, 1.9, 0, -2.45, 0), C.glass], [B(1.9, 1.1, 1.9, 0, -3.5, 0), C.red]]);
   const pools = {
     chair: new THREE.InstancedMesh(chairGeo, carrierMat, MAX),
     gondola: new THREE.InstancedMesh(cabinGeo, carrierMat, 500),
+    chairFar: new THREE.InstancedMesh(chairFarGeo, carrierMat, MAX),
+    gondolaFar: new THREE.InstancedMesh(cabinFarGeo, carrierMat, 500),
     cable: new THREE.InstancedMesh(bigCabinGeo, carrierMat, 20),
     drag: new THREE.InstancedMesh(tbarGeo, dark, 600),
     train: new THREE.InstancedMesh(trainGeo, carrierMat, 12),
@@ -151,7 +158,7 @@ export function createLifts({ scene, resort, height }) {
 
   function update(t, camX, camZ, radius) {
     lastT = t;
-    const counts = { chair: 0, gondola: 0, cable: 0, drag: 0, train: 0 };
+    const counts = { chair: 0, gondola: 0, cable: 0, drag: 0, train: 0, chairFar: 0, gondolaFar: 0 };
     for (const l of lifts) {
       const d = Math.hypot(l.cx - camX, l.cz - camZ) - l.radius;
       if (d > radius) continue;
@@ -173,7 +180,9 @@ export function createLifts({ scene, resort, height }) {
         if (kind === 'train') { eul.set(-Math.atan(l.slope(s)) * (upSide ? 1 : -1), yaw, 0); q4.setFromEuler(eul); }
         else q4.setFromAxisAngle(up, yaw);
         m4.compose(v3.set(x, l.cableY(s), z), q4, s3.set(1, 1, 1));
-        pool.setMatrixAt(counts[kind]++, m4);
+        const far = (kind === 'chair' || kind === 'gondola') && Math.hypot(x - camX, z - camZ) > CARRIER_NEAR;
+        const k2 = far ? `${kind}Far` : kind;
+        if (counts[k2] < pools[k2].instanceMatrix.count) pools[k2].setMatrixAt(counts[k2]++, m4);
       }
     }
     for (const [k, p] of Object.entries(pools)) { p.count = counts[k]; p.instanceMatrix.needsUpdate = true; }

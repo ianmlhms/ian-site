@@ -1098,7 +1098,7 @@ async function boot() {
       if (lifts) lifts.update(time, camera.position.x, camera.position.z, quality.liftRadius);
       if (village) village.update(camera.position.x, camera.position.z, quality.buildingRadius);
       if (landmarks) landmarks.update(camera.position.x, camera.position.z, quality.buildingRadius);
-      if (roads) roads.update(camera.position.x, camera.position.z, quality.buildingRadius);
+      if (roads) roads.update(camera.position.x, camera.position.z, Math.min(quality.buildingRadius, level === 'low' ? 1300 : 2400));      // round 7 (A): streets near only
       modes.update(camera.position.x, camera.position.z, quality.buildingRadius);
       if (parkBodies) parkBodies.update(camera.position.x, camera.position.z, Math.min(900, quality.buildingRadius));      // the bodies are small: near only
     }
