@@ -511,3 +511,6 @@ can keep or drop them.
   stop: skis parallel and across the travel, together, on the snow (IK lifts the whole figure when a knee is at its limit); (4) softer
   plough knees / forward torso. `scripts/ski/pose-check.mjs` (frozen poses, geometry + shots, all 5 resorts): all green.
   Sheet: `~/Library/Caches/ski-work/round7/sheet-a-fixes-webkit.jpg`.
+- **Niddreg triangles (R7 A)**: the ski flow's 450k budget was exceeded by the new carrier models and the lattice streets; far chairs /
+  cabins (> 320 m, `CARRIER_NEAR`) are cheap shapes in their own pools (+2 draw calls), streets merge in 640 m cells and are drawn within
+  1.3 km on Niddreg: flow `ski` 397k triangles, 142 calls (the base branch measured 452k on the same probe).
