@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="lb">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f6f3">
+<meta name="robots" content="noindex">
+<title>Ski Alpen · Arcade</title>
+<link rel="icon" href="data:,">
+<link rel="modulepreload" href="/pb/ski/main.js?v=1">
+<script>
+/* Starts the first resort's files right away (they download while the code loads); resort-data.js takes them from window.__skiPre.
+ * Only the resort the player last skied (default: Espace Killy) is fetched; the height tiles stream later, nearest first. */
+(function () {
+  var resort = "killy";
+  try { var last = JSON.parse(localStorage.getItem("pb_ski_save") || "null"); if (last && last.last && /^[a-z0-9]+$/.test(last.last.resort) && last.last.resort === "killy") resort = last.last.resort; } catch (error) { /* private mode */ }
+  var pre = window.__skiPre = { resort: resort, files: {} };
+  "resort.json far.bin classes.bin".split(" ").forEach(function (name) {
+    try {
+      var p = fetch("/pb/ski/data/" + resort + "/" + name).then(function (res) { if (!res.ok) throw new Error(name + ": HTTP " + res.status); return res.arrayBuffer(); }).then(function (buf) { return new Uint8Array(buf); });
+      p.catch(function () {});
+      pre.files[name] = p;
+    } catch (error) { /* the module loads it again */ }
+  });
+})();
+</script>
+<link rel="stylesheet" href="/pb/ski/ui.css?v=1">
+<script src="/pb/arcade-kit.js?v=56" data-arcade-id="ski" data-arcade-title="Ski Alpen" data-arcade-lower-is-better></script>
+<script src="/pb/gfx-quality.js?v=1"></script>
+<script src="/pb/game-data.js?v=1" defer></script>
+</head>
+<body>
+<main id="shell">
+  <canvas id="skiCanvas" tabindex="0" role="img" aria-label="Skifueren: d'Kamera hannert dem Skifuerer op enger Pist."></canvas>
+  <div id="ui"></div>
+  <div id="loading" role="status"><div class="box"><div class="ico">⛷️</div><b>Ski Alpen</b><div id="bar"><i></i></div><small id="loadMsg">…</small><div class="slow" id="loadSlow" hidden><span>Dauert méi laang wéi gewinnt …</span><br><button type="button" id="loadRetry">Nei probéieren</button></div></div></div>
+</main>
+<script>
+/* Loading screen: honest progress (main.js calls set(p, label) between its real steps) and a retry offer after 12 s without progress. */
+(function () {
+  var bar = document.querySelector("#bar i"), msg = document.getElementById("loadMsg"), slow = document.getElementById("loadSlow");
+  var STALL_MS = 12000, last = Date.now(), value = 0, done = false;
+  function setBar(p) { bar.style.transform = "scaleX(" + Math.max(0, Math.min(1, p)) + ")"; }
+  window.__skiLoad = {
+    set: function (p, label) { if (done) return; value = Math.max(value, p); last = Date.now(); slow.hidden = true; setBar(value); if (label) msg.textContent = label; },
+    done: function () { if (done) return; done = true; setBar(1); clearInterval(timer); document.getElementById("loading").classList.add("done"); },
+    fail: function (text) { done = true; clearInterval(timer); if (text) msg.textContent = text; slow.hidden = false; }
+  };
+  document.getElementById("loadRetry").addEventListener("click", function () { location.reload(); });
+  var timer = setInterval(function () { if (!done && Date.now() - last > STALL_MS) slow.hidden = false; }, 1000);
+  window.__skiLoad.set(0.03, "Code gëtt gelueden …");
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+window.addEventListener("error", function (event) { document.documentElement.dataset.bootError = event.message || "script-error"; });
+if (!window.THREE) {
+  document.documentElement.dataset.bootError = "three-missing";
+  if (window.__skiLoad) window.__skiLoad.fail("three.js r160 konnt net geluede ginn");
+  throw new Error("three.js r160 failed to load");
+}
+</script>
+<script src="/pb/boot-probe.js?v=1"></script>
+<script type="module">
+  // Absolute imports: inside the arcade this page runs as a srcdoc iframe (relative URLs inside main.js come from import.meta.url).
+  if (window.bootProbe) window.bootProbe("/pb/ski/main.js?v=1", window.__skiLoad); else import("/pb/ski/main.js?v=1");
+</script>
+</body>
+</html>

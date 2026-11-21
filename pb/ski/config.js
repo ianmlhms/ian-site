@@ -52,8 +52,8 @@ export const SKI = Object.freeze({
   muGroomed: 0.035,         // ski-snow friction on the piste
   muPowder: 0.1,            // ... in deep snow
   powderDrag: 0.011,        // extra speed-squared drag in deep snow (1/m): a 30 degree powder slope tops out near 60 km/h
-  cdaUpright: 0.55,         // m2 of air drag standing
-  cdaTuck: 0.24,            // ... tucked
+  cdaUpright: 0.8,          // m2 of air drag standing (with the arms out: a 10 degree blue run tops out near 60 km/h)
+  cdaTuck: 0.42,            // ... tucked (about 80 km/h on the same run)
   airDensity: 1.0,          // thin mountain air (kg/m3)
   maxSpeed: 33,             // hard cap, m/s (119 km/h)
   gripGroomed: 1.25,        // max lateral acceleration while carving, in g

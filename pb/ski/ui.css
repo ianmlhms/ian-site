@@ -1,0 +1,126 @@
+/* Ski Alpen: Gitter look like the rest of the arcade (paper / ink / ONE green, hairlines, radius 0, Geist). Screens are light paper;
+ * the HUD straight on the snow is white text with a dark halo, no boxes. */
+@font-face{font-family:"Geist";font-style:normal;font-weight:400 800;font-display:swap;src:url("/assets/fonts/geist-latin.woff2") format("woff2")}
+@font-face{font-family:"Geist Mono";font-style:normal;font-weight:500;font-display:swap;src:url("/assets/fonts/geist-mono-500-latin.woff2") format("woff2")}
+:root{--paper:#f6f6f3;--white:#fcfcfa;--ink:#16171a;--muted:#62656a;--soft:rgba(22,23,26,.14);--tint:rgba(22,23,26,.05);--green:#1f7a4d;--danger:#a32121;
+  --mono:"Geist Mono",ui-monospace,"SF Mono",Menlo,monospace;--halo:0 0 2px #000,0 0 3px #000a,0 1px 5px #0009;color-scheme:light;
+  --d-green:#2f9a4c;--d-blue:#2a66d0;--d-red:#d0352c;--d-black:#1d1f24}
+*{box-sizing:border-box}
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:var(--paper);font-family:"Geist",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink)}
+body{display:flex;flex-direction:column;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+button,select{font:inherit;color:inherit;cursor:pointer}
+[hidden]{display:none!important}
+button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+#shell{position:relative;width:100%;flex:1 1 auto;min-height:0;isolation:isolate;background:#dfe6ee}
+#skiCanvas{display:block;width:100%;height:100%;touch-action:none;outline:none}
+#ui{position:absolute;inset:0;pointer-events:none;z-index:5}
+#ui > *{pointer-events:auto}
+
+/* loading */
+#loading{position:absolute;inset:0;z-index:50;display:grid;place-items:center;background:var(--paper);transition:opacity .35s}
+#loading.done{opacity:0;pointer-events:none}
+#loading .box{text-align:center;min-width:240px}
+#loading .ico{font-size:44px;line-height:1}
+#loading b{display:block;font-size:24px;font-weight:800;letter-spacing:-.03em;margin:8px 0 12px}
+#bar{height:6px;background:var(--soft);overflow:hidden}#bar i{display:block;height:100%;background:var(--green);transform:scaleX(0);transform-origin:0 50%;transition:transform .2s}
+#loading small{display:block;margin-top:8px;color:var(--muted);font-size:13px}
+#loading .slow{margin-top:10px;color:var(--muted);font-size:13px}
+#loading .slow button{margin-top:8px;border:1px solid var(--ink);background:var(--white);padding:8px 14px;min-height:44px}
+
+/* buttons */
+.btn{min-height:44px;padding:0 16px;border:1px solid var(--ink);background:var(--white);font-weight:650;font-size:15px;display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:0}
+.btn.primary{background:var(--green);border-color:var(--green);color:#fff}
+.btn.primary:disabled{background:#9db8a9;border-color:#9db8a9;cursor:default}
+.btn.ghost{border-color:var(--soft);background:transparent}
+.btn.big{min-height:54px;font-size:18px;padding:0 26px}
+
+/* screens (resort picker, piste map, finish, menu) */
+.screen{position:absolute;inset:0;background:var(--paper);display:flex;flex-direction:column;z-index:20;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+.screen header{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--ink);min-height:56px}
+.screen header h1{font-size:20px;font-weight:800;letter-spacing:-.03em;margin:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.screen header .sub{font-family:var(--mono);font-size:12px;color:var(--muted)}
+
+/* resort picker */
+.resorts{flex:1;overflow:auto;padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:0;align-content:start}
+.resort{border:1px solid var(--soft);margin:-1px 0 0 -1px;background:var(--white);padding:16px;text-align:left;min-height:150px;display:flex;flex-direction:column;gap:6px;position:relative}
+.resort b{font-size:18px;font-weight:800;letter-spacing:-.02em}
+.resort .c{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.resort .meta{margin-top:auto;font-size:13px;color:var(--muted)}
+.resort.ready{border-color:var(--ink);z-index:1}
+.resort.ready .go{margin-top:auto;align-self:flex-start}
+.resort.soon{opacity:.55;cursor:default}
+.resort .tag{position:absolute;top:10px;right:10px;font-family:var(--mono);font-size:11px;border:1px solid var(--soft);padding:2px 6px}
+.intro{padding:16px 16px 0;color:var(--muted);font-size:14px;max-width:720px}
+
+/* piste map */
+.mapwrap{flex:1;display:flex;min-height:0}
+.mapbox{position:relative;flex:1;min-width:0;border-right:1px solid var(--ink)}
+#mapCanvas{width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+.zoom{position:absolute;right:10px;top:10px;display:flex;flex-direction:column}
+.zoom button{width:44px;height:44px;border:1px solid var(--ink);background:var(--white);font-size:20px;margin-top:-1px}
+.legend{position:absolute;left:10px;bottom:10px;background:var(--white);border:1px solid var(--soft);padding:6px 8px;font-size:12px;display:flex;gap:10px}
+.legend i{display:inline-block;width:12px;height:4px;margin-right:4px;vertical-align:middle}
+.side{width:340px;display:flex;flex-direction:column;min-height:0;background:var(--white)}
+.side .list{flex:1;overflow:auto;border-bottom:1px solid var(--ink)}
+.side .grp{font-family:var(--mono);font-size:11px;color:var(--muted);padding:10px 12px 4px;text-transform:uppercase;letter-spacing:.06em}
+.prow{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:0;border-top:1px solid var(--tint);background:transparent;padding:0 12px;min-height:44px;font-size:14px}
+.prow.sel{background:rgba(31,122,77,.1)}
+.prow .chip{width:12px;height:12px;flex:none}
+.prow .n{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.prow .m{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.chip.green{background:var(--d-green)}.chip.blue{background:var(--d-blue)}.chip.red{background:var(--d-red)}.chip.black{background:var(--d-black)}
+.pick{padding:12px;display:flex;flex-direction:column;gap:8px}
+.pick h2{margin:0;font-size:19px;font-weight:800;letter-spacing:-.02em;display:flex;align-items:center;gap:8px}
+.pick .facts{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.pick .bestline{font-size:14px}
+.seg{display:flex;flex-wrap:wrap;gap:0}
+.seg button{border:1px solid var(--soft);background:var(--white);min-height:36px;padding:0 9px;font-size:13px;margin:-1px 0 0 -1px}
+.seg button.on{border-color:var(--ink);background:var(--ink);color:#fff;z-index:1}
+.setrow{display:flex;flex-direction:column;gap:4px}
+.setrow > span{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.badge{font-family:var(--mono);font-size:11px;border:1px solid var(--ink);padding:1px 5px;font-weight:500}
+.status{font-family:var(--mono);font-size:12px;color:var(--muted);min-height:16px}
+@media (max-width:760px),(max-height:520px) and (orientation:landscape){.side{width:290px}}
+@media (max-width:620px){.mapwrap{flex-direction:column}.mapbox{border-right:0;border-bottom:1px solid var(--ink);flex:1 1 52%}.side{width:auto;flex:1 1 48%}}
+
+/* HUD */
+.hud{position:absolute;inset:0;pointer-events:none;z-index:10}
+.hud .tl{position:absolute;left:calc(12px + env(safe-area-inset-left));top:calc(10px + env(safe-area-inset-top));max-width:46vw;color:#fff;text-shadow:var(--halo)}
+.hud .pname{font-size:16px;font-weight:750;display:flex;align-items:center;gap:7px;white-space:nowrap}
+.hud .pname .chip{width:12px;height:12px;box-shadow:0 0 0 1px #fff}
+.hud .clock{font-family:var(--mono);font-size:30px;font-weight:500;letter-spacing:-.02em;line-height:1.1}
+.hud .clock.pen{color:#ffd2cc}
+.hud .split{font-family:var(--mono);font-size:13px}
+.hud .tr{position:absolute;right:calc(12px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top));text-align:right;color:#fff;text-shadow:var(--halo)}
+.hud .speed b{font-family:var(--mono);font-size:30px;font-weight:500}
+.hud .speed small{font-family:var(--mono);font-size:12px}
+.hud .hbtns{position:absolute;right:calc(10px + env(safe-area-inset-right));top:calc(64px + env(safe-area-inset-top));display:flex;flex-direction:column;gap:6px;pointer-events:auto}
+.hbtn{width:44px;height:44px;border:1px solid rgba(255,255,255,.8);background:rgba(22,23,26,.38);color:#fff;font-size:19px;display:grid;place-items:center;border-radius:0}
+.hud .toast{position:absolute;left:50%;top:22%;transform:translateX(-50%);color:#fff;text-shadow:var(--halo);font-size:22px;font-weight:800;white-space:nowrap;transition:opacity .3s}
+.hud .count{position:absolute;left:50%;top:34%;transform:translate(-50%,-50%);color:#fff;text-shadow:var(--halo);font-size:84px;font-weight:800;font-family:var(--mono)}
+.hud .hint{position:absolute;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));transform:translateX(-50%);color:#fff;text-shadow:var(--halo);font-size:14px;white-space:nowrap;font-family:var(--mono)}
+.hud .gates{font-family:var(--mono);font-size:13px}
+
+/* touch controls (bottom corners, together far under 15 % of the screen) */
+#touchControls{position:absolute;inset:auto 0 0 0;height:0;z-index:12;pointer-events:none}
+#touchControls .pad{position:absolute;left:calc(14px + env(safe-area-inset-left));bottom:calc(16px + env(safe-area-inset-bottom));width:150px;height:72px;border:1px solid rgba(255,255,255,.85);background:rgba(22,23,26,.28);pointer-events:auto;touch-action:none;display:grid;place-items:center}
+#touchControls .pad .knob{width:40px;height:40px;background:rgba(255,255,255,.9);transition:transform .05s}
+#touchControls .pad .lbl{position:absolute;bottom:2px;font-size:10px;color:#fff;opacity:.85}
+#touchControls .btns{position:absolute;right:calc(14px + env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));display:flex;gap:8px;align-items:flex-end;pointer-events:auto}
+#touchControls .tbtn{width:58px;height:58px;border:1px solid rgba(255,255,255,.85);background:rgba(22,23,26,.32);color:#fff;font-size:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;touch-action:none;border-radius:0;padding:0}
+#touchControls .tbtn.big{width:76px;height:76px;background:rgba(31,122,77,.55)}
+#touchControls .tbtn small{font-size:10px;font-weight:600}
+#touchControls .on{background:rgba(255,255,255,.45)!important}
+
+/* finish card + menu */
+.card{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(420px,calc(100% - 24px));background:var(--white);border:1px solid var(--ink);padding:16px;z-index:30;display:flex;flex-direction:column;gap:10px;max-height:calc(100% - 24px);overflow:auto}
+.card h2{margin:0;font-size:20px;font-weight:800;letter-spacing:-.02em;display:flex;align-items:center;gap:8px}
+.card .time{font-family:var(--mono);font-size:40px;font-weight:500;letter-spacing:-.03em}
+.card .rows{font-size:14px;display:grid;grid-template-columns:auto 1fr;gap:4px 12px}
+.card .rows span:nth-child(odd){color:var(--muted)}
+.card .rows span:nth-child(even){font-family:var(--mono)}
+.card .new{color:var(--green);font-weight:800}
+.card .warn{color:var(--danger);font-size:14px}
+.card .acts{display:flex;flex-wrap:wrap;gap:8px}
+.card .acts .btn{flex:1 1 auto}
+.card.top{top:auto;bottom:calc(16px + env(safe-area-inset-bottom));transform:translateX(-50%)}

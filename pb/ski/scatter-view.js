@@ -1,0 +1,223 @@
+/* Trees and boulders in the scene: instanced, painted (vertex colours + the shared light), two detail levels for the trees.
+ * The instance lists are rebuilt from scatter.js blocks when the camera has moved REBUILD m (the blocks themselves are cached). */
+import { BLOCK } from './scatter.js';
+
+const THREE = window.THREE;
+const REBUILD = 30;
+
+/* ---------------- geometry (pure arrays) ---------------- */
+function pushCone(pos, nrm, col, cx, y0, y1, r, sides, colour, snow, rot = 0) {
+  for (let i = 0; i < sides; i++) {
+    const a0 = rot + i / sides * Math.PI * 2, a1 = rot + (i + 1) / sides * Math.PI * 2;
+    const p0 = [Math.cos(a0) * r, y0, Math.sin(a0) * r], p1 = [Math.cos(a1) * r, y0, Math.sin(a1) * r], tip = [0, y1, 0];
+    const am = (a0 + a1) / 2, slope = r / (y1 - y0);
+    const nn = [Math.cos(am), slope, Math.sin(am)];
+    const l = Math.hypot(...nn);
+    for (const p of [p0, tip, p1]) {
+      pos.push(p[0] + cx, p[1], p[2]);
+      nrm.push(nn[0] / l, nn[1] / l, nn[2] / l);
+      const isTip = p === tip;
+      col.push(colour[0], colour[1], colour[2], isTip ? snow * 0.6 : snow);
+    }
+  }
+}
+function pushPrism(pos, nrm, col, y0, y1, r, sides, colour) {
+  for (let i = 0; i < sides; i++) {
+    const a0 = i / sides * Math.PI * 2, a1 = (i + 1) / sides * Math.PI * 2;
+    const x0 = Math.cos(a0) * r, z0 = Math.sin(a0) * r, x1 = Math.cos(a1) * r, z1 = Math.sin(a1) * r;
+    const am = (a0 + a1) / 2, nx = Math.cos(am), nz = Math.sin(am);
+    for (const [x, y, z] of [[x0, y0, z0], [x0, y1, z0], [x1, y1, z1], [x0, y0, z0], [x1, y1, z1], [x1, y0, z1]]) {
+      pos.push(x, y, z); nrm.push(nx, 0, nz); col.push(colour[0], colour[1], colour[2], 0);
+    }
+  }
+}
+function build(fn) {
+  const pos = [], nrm = [], col = [];
+  fn(pos, nrm, col);
+  const g = new THREE.InstancedBufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 4));
+  return g;
+}
+const SPRUCE = [0.13, 0.27, 0.22], SPRUCE_DARK = [0.09, 0.2, 0.17], BARK = [0.3, 0.22, 0.17], LARCH = [0.46, 0.38, 0.31], LARCH_TWIG = [0.38, 0.31, 0.26];
+const spruceNear = () => build((p, n, c) => {
+  pushPrism(p, n, c, -0.3, 1.6, 0.2, 5, BARK);
+  pushCone(p, n, c, 0, 1.0, 5.2, 2.1, 7, SPRUCE_DARK, 0.75);
+  pushCone(p, n, c, 0, 3.2, 7.4, 1.6, 7, SPRUCE, 0.85, 0.4);
+  pushCone(p, n, c, 0, 5.4, 9.4, 1.05, 6, SPRUCE, 0.95, 0.9);
+});
+const spruceFar = () => build((p, n, c) => { pushCone(p, n, c, 0, 0.6, 9.4, 2.0, 5, SPRUCE_DARK, 0.7); });
+const larchNear = () => build((p, n, c) => {
+  pushPrism(p, n, c, -0.3, 8.8, 0.18, 5, BARK);
+  pushCone(p, n, c, 0, 1.6, 9.6, 1.9, 6, LARCH, 0.25);
+  pushCone(p, n, c, 0, 4.0, 9.2, 1.2, 5, LARCH_TWIG, 0.3, 0.6);
+});
+const larchFar = () => build((p, n, c) => { pushCone(p, n, c, 0, 1.0, 9.6, 1.8, 5, LARCH, 0.2); });
+
+function rockGeometry() {
+  const g = new THREE.IcosahedronGeometry(1, 1);
+  const pos = g.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    const k = 0.78 + 0.32 * Math.abs(Math.sin(x * 3.1 + z * 2.3) * Math.cos(y * 2.7 + x));
+    pos.setXYZ(i, x * k * 1.15, y * k * 0.8, z * k);
+  }
+  g.computeVertexNormals();
+  const n = g.attributes.normal;
+  const col = [];
+  for (let i = 0; i < pos.count; i++) col.push(0.4, 0.37, 0.35, Math.max(0, n.getY(i) - 0.35) * 1.6);
+  const ig = new THREE.InstancedBufferGeometry();
+  ig.setAttribute('position', g.attributes.position);
+  ig.setAttribute('normal', g.attributes.normal);
+  ig.setAttribute('color', new THREE.Float32BufferAttribute(col, 4));
+  ig.setIndex(g.index);
+  return ig;
+}
+
+/* ---------------- material ---------------- */
+function scatterMaterial(env) {
+  return new THREE.ShaderMaterial({
+    uniforms: env.u,
+    vertexShader: `
+      attribute vec4 color; attribute vec4 aInst; attribute float aSeed;
+      varying vec4 vCol; varying vec3 vN; varying float vDist; varying float vSeed; varying float vH;
+      void main(){
+        float a = aSeed * 6.2831;
+        float c = cos(a), s = sin(a);
+        vec3 p = position * aInst.w;
+        p.xz = mat2(c, -s, s, c) * p.xz;
+        vec3 n = normal; n.xz = mat2(c, -s, s, c) * n.xz;
+        vec4 w = vec4(p + aInst.xyz, 1.0);
+        vCol = color; vN = n; vSeed = aSeed; vH = position.y;
+        vec4 mv = viewMatrix * w; vDist = -mv.z;
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: `
+      uniform vec3 uSunDir, uSunColor, uAmbSky, uAmbGround, uFogColor; uniform float uFogDensity;
+      varying vec4 vCol; varying vec3 vN; varying float vDist; varying float vSeed; varying float vH;
+      void main(){
+        vec3 N = normalize(vN);
+        float nl = dot(N, uSunDir);
+        float lit = smoothstep(-0.15, 0.7, nl);
+        lit = mix(lit, floor(lit * 3.0 + 0.5) / 3.0, 0.3);
+        vec3 amb = mix(uAmbGround, uAmbSky, 0.5 + 0.5 * N.y);
+        vec3 base = vCol.rgb * (0.86 + 0.28 * vSeed);
+        // snow resting on the upward faces
+        float snow = vCol.a * smoothstep(0.15, 0.55, N.y + (fract(vSeed * 37.0 + vH * 0.7) - 0.5) * 0.35);
+        base = mix(base, vec3(0.93, 0.95, 1.0), snow);
+        vec3 col = base * (amb * 0.62 + uSunColor * lit * 0.85);
+        float f = 1.0 - exp(-pow(uFogDensity * vDist, 2.0));
+        float aerial = (1.0 - exp(-vDist * 0.000045)) * 0.38;
+        gl_FragColor = vec4(mix(col, uFogColor, clamp(max(f, aerial), 0.0, 1.0)), 1.0);
+      }`,
+  });
+}
+
+function instanced(geometry, material, capacity) {
+  const inst = new Float32Array(capacity * 4), seed = new Float32Array(capacity);
+  geometry.setAttribute('aInst', new THREE.InstancedBufferAttribute(inst, 4).setUsage(THREE.DynamicDrawUsage));
+  geometry.setAttribute('aSeed', new THREE.InstancedBufferAttribute(seed, 1).setUsage(THREE.DynamicDrawUsage));
+  geometry.instanceCount = 0;
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.frustumCulled = false;
+  return { mesh, inst, seed, capacity, count: 0 };
+}
+
+export function createScatterView({ scene, scatter, env, quality }) {
+  const material = scatterMaterial(env);
+  const cap = 26000;
+  const sets = {
+    spruceNear: instanced(spruceNear(), material, 6000), spruceFar: instanced(spruceFar(), material, cap),
+    larchNear: instanced(larchNear(), material, 4000), larchFar: instanced(larchFar(), material, cap),
+    rocks: instanced(rockGeometry(), material, 4000),
+  };
+  const group = new THREE.Group();
+  group.name = 'ski-scatter';
+  for (const s of Object.values(sets)) group.add(s.mesh);
+  scene.add(group);
+  let last = { x: 1e9, z: 1e9 };
+  let q = quality;
+  const stats = { trees: 0, near: 0, rocks: 0 };
+
+  function put(set, x, y, z, scale, seed) {
+    if (set.count >= set.capacity) return;
+    const i = set.count++;
+    set.inst[i * 4] = x; set.inst[i * 4 + 1] = y; set.inst[i * 4 + 2] = z; set.inst[i * 4 + 3] = scale; set.seed[i] = seed;
+  }
+  function commit(set) {
+    const g = set.mesh.geometry;
+    g.instanceCount = set.count;
+    const a = g.getAttribute('aInst'), b = g.getAttribute('aSeed');
+    a.clearUpdateRanges ? a.clearUpdateRanges() : null;
+    a.needsUpdate = true; b.needsUpdate = true;
+  }
+
+  const pending = [];
+  const pendingKeys = new Set();
+  let dirty = false, sinceRebuild = 0;
+  /** Only blocks that are already generated are drawn; missing ones are queued and generated within a time budget per frame. */
+  const ready = (bx, bz) => {
+    if (scatter.has(bx, bz)) return true;
+    const k = bx + ',' + bz;
+    if (!pendingKeys.has(k)) { pendingKeys.add(k); pending.push([bx, bz]); }
+    return false;
+  };
+
+  function rebuild(px, pz) {
+    for (const s of Object.values(sets)) s.count = 0;
+    pending.length = 0; pendingKeys.clear();
+    const R = q.treeRadius, near2 = q.treeNear * q.treeNear, R2 = R * R;
+    const b0x = Math.floor((px - R) / BLOCK), b1x = Math.floor((px + R) / BLOCK);
+    const b0z = Math.floor((pz - R) / BLOCK), b1z = Math.floor((pz + R) / BLOCK);
+    for (let bz = b0z; bz <= b1z; bz++) {
+      for (let bx = b0x; bx <= b1x; bx++) {
+        const cx = Math.max(bx * BLOCK, Math.min(px, (bx + 1) * BLOCK)) - px, cz = Math.max(bz * BLOCK, Math.min(pz, (bz + 1) * BLOCK)) - pz;
+        if (cx * cx + cz * cz > R2) continue;
+        if (!ready(bx, bz)) continue;
+        const t = scatter.treeBlock(bx, bz);
+        for (let i = 0; i < t.length; i += 6) {
+          if (t[i + 5] > q.treeDensity) continue;
+          const dx = t[i] - px, dz = t[i + 2] - pz, d2 = dx * dx + dz * dz;
+          if (d2 > R2) continue;
+          const larch = t[i + 4] > 0.5;
+          put(d2 < near2 ? (larch ? sets.larchNear : sets.spruceNear) : (larch ? sets.larchFar : sets.spruceFar), t[i], t[i + 1], t[i + 2], t[i + 3], t[i + 5]);
+        }
+      }
+    }
+    const RR = q.rockRadius, RR2 = RR * RR;
+    for (let bz = Math.floor((pz - RR) / BLOCK); bz <= Math.floor((pz + RR) / BLOCK); bz++) {
+      for (let bx = Math.floor((px - RR) / BLOCK); bx <= Math.floor((px + RR) / BLOCK); bx++) {
+        if (!ready(bx, bz)) continue;
+        const r = scatter.rockBlock(bx, bz);
+        for (let i = 0; i < r.length; i += 5) {
+          const dx = r[i] - px, dz = r[i + 2] - pz;
+          if (dx * dx + dz * dz < RR2) put(sets.rocks, r[i], r[i + 1], r[i + 2], r[i + 3], r[i + 4]);
+        }
+      }
+    }
+    for (const s of Object.values(sets)) commit(s);
+    stats.trees = sets.spruceNear.count + sets.spruceFar.count + sets.larchNear.count + sets.larchFar.count;
+    stats.near = sets.spruceNear.count + sets.larchNear.count;
+    stats.rocks = sets.rocks.count;
+    last = { x: px, z: pz };
+  }
+
+  return {
+    group, stats,
+    /** budgetMs: wall-clock time for generating missing blocks this frame (Infinity on the loading screen). */
+    update(px, pz, force = false, budgetMs = 2.5, dt = 0.016) {
+      sinceRebuild += dt;
+      if (force || Math.hypot(px - last.x, pz - last.z) > REBUILD) rebuild(px, pz);
+      if (!pending.length) return;
+      const t0 = performance.now();
+      // nearest first
+      pending.sort((a, b) => Math.hypot(a[0] * BLOCK + 40 - px, a[1] * BLOCK + 40 - pz) - Math.hypot(b[0] * BLOCK + 40 - px, b[1] * BLOCK + 40 - pz));
+      while (pending.length && performance.now() - t0 < budgetMs) { const [bx, bz] = pending.shift(); scatter.treeBlock(bx, bz); scatter.rockBlock(bx, bz); dirty = true; }
+      if (dirty && (!pending.length || sinceRebuild > 0.6)) { dirty = false; sinceRebuild = 0; rebuild(px, pz); }
+    },
+    pending: () => pending.length,
+    setQuality(next) { q = next; last = { x: 1e9, z: 1e9 }; },
+    invalidate() { last = { x: 1e9, z: 1e9 }; },
+  };
+}

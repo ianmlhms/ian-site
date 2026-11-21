@@ -39,10 +39,11 @@ from common import (CLASS_STEP, FAR_MARGIN, FAR_STEP, NEAR_KEEP, NEAR_STEP, RESO
                     resort_arg, work_dir)
 
 DIFF_OF = {"novice": "green", "easy": "blue", "intermediate": "red", "advanced": "black", "expert": "black"}
+DIFF_LETTER = {"green": "g", "blue": "b", "red": "r", "black": "k"}
 HALF_WIDTH = {"green": 17, "blue": 18, "red": 15, "black": 13}
 CLASS_BITS = {"forest": 1, "scrub": 2, "rock": 4, "water": 8, "built": 16, "piste": 32, "glacier": 64, "scree": 128}
 TREE_LINE = 2450.0                 # m: no forest above this, whatever the map says
-DERIVED_FOREST = 2150.0            # m: open stands are added below this where OSM maps no forest (see classes_raster)
+DERIVED_FOREST = 2000.0            # m: open stands are added below this where OSM maps no forest (see classes_raster)
 MIN_RUN_LENGTH = 350.0
 MIN_RUN_DROP = 70.0
 SLALOM_COUNT = 4
@@ -363,12 +364,12 @@ def classes_raster(frame, dem_raw, areas_osm, piste_lines, piste_areas, building
     gz, gx = np.gradient(h, s)
     slope = np.degrees(np.arctan(np.hypot(gx, gz)))
     tree_bits = np.uint8(CLASS_BITS["forest"] | CLASS_BITS["scrub"])
-    # OSM maps only part of the larch and spruce stands of the valleys: below DERIVED_FOREST m, on slopes of 12..38 degrees, away from
+    # OSM maps only part of the larch and spruce stands of the valleys: below DERIVED_FOREST m (Tignes le Lac, 2100 m, stays bare), on slopes of 12..38 degrees, away from
     # pistes, villages and water, the gaps get open stands (scrub bit = sparse trees) in patches, the way the real lower slopes look
     rng = np.random.default_rng(11)
     patches = ndimage.gaussian_filter(rng.random((nz, nx)), 6)
     patches = (patches - patches.mean()) / (patches.std() + 1e-9)
-    derived = (h < DERIVED_FOREST) & (slope > 12) & (slope < 38) & (patches > -0.2 + (h - 1800) / 600)
+    derived = (h < DERIVED_FOREST) & (slope > 14) & (slope < 38) & (patches > -0.1 + (h - 1750) / 400)
     out[derived & ((out & CLASS_BITS["forest"]) == 0)] |= CLASS_BITS["scrub"]
     no_tree = (pm > 0.15) | (h > TREE_LINE) | ((out & CLASS_BITS["water"]) > 0) | (slope > 42) | ((out & CLASS_BITS["built"]) > 0)
     out[no_tree] &= ~tree_bits
@@ -680,9 +681,9 @@ def main():
     network = []
     for ln in lines:
         q = dp_simplify(ln["p"], 1.5)
-        network.append({"d": ln["diff"][0], "w": round(ln["hw"], 1), "p": flat(q)})
+        network.append({"d": DIFF_LETTER[ln["diff"]], "w": round(ln["hw"], 1), "p": flat(q)})
     for a in areas:
-        network.append({"d": a["diff"][0], "a": 1, "p": flat(dp_simplify(a["poly"], 1.5))})
+        network.append({"d": DIFF_LETTER[a["diff"]], "a": 1, "p": flat(dp_simplify(a["poly"], 1.5))})
     pistes = []
     for r in runs:
         q = resample(r["p"], 10.0)
