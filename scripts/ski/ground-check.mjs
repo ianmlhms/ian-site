@@ -9,6 +9,10 @@
  *   carve     a scripted carve on the spawn slope: the skis never more than 2 cm under the snow
  *   coplanar  the village meshes near every village spot: no two overlapping triangles in the same plane (z-fighting: the flickering
  *             balcony rails); the count of overlapping pairs must be 0
+ *   terrain   (round 7 A) at the spawn and on six pistes (the longest red at 300 m among them): once the tiles there are meshed, a
+ *             21 x 21 grid of rays straight down over +-100 m (the full-detail ring) onto the drawn terrain vs the physics: a crack
+ *             (no hit, or the ray falls through to a skirt / a lower tile: drawn > 0.5 m under the physics) or a wall (drawn > 0.5 m
+ *             over it) must not exist; a skirt seen as a tall smeared wall is exactly such a crack
  * plus a ground-level screenshot of each village spot (--shots). Exit 1 on any failure; a per-resort table at the end. */
 import fs from "node:fs";
 import path from "node:path";
@@ -138,6 +142,61 @@ try {
         }
         rows.push(r);
       }
+      // terrain cracks / walls at the spawn and on six pistes
+      const terrain = await page.evaluate(async () => {
+        const S = window.__ski, T = window.THREE, out = [];
+        const reds = S.pistes.list.filter((q) => q.diff === 'red' && q.length > 900).sort((a, b) => b.length - a.length);
+        const pick = [reds[0] ? [reds[0], 300] : null, ...S.pistes.list.filter((q, i) => i % Math.max(1, Math.floor(S.pistes.list.length / 5)) === 0).slice(0, 5).map((q) => [q, q.length / 2])].filter(Boolean);
+        const spots = [{ name: 'spawn', x: S.state.x, z: S.state.z, h: S.state.heading }, ...pick.map(([p, at]) => { const a = p.at(Math.min(at, p.length - 5), {}); return { name: p.name, x: a.x, z: a.z, h: Math.atan2(a.dz, a.dx) }; })];
+        const ray = new T.Raycaster();
+        const grp = S.scene.getObjectByName('ski-terrain');
+        for (const sp of spots) {
+          S.place(sp.x, sp.z, sp.h);
+          await S.streamer.ready(sp.x, sp.z, 300);
+          for (let i = 0; i < 80 && (S.terrain.stats.pending > 0 || i < 8); i++) await new Promise((r) => setTimeout(r, 100));
+          let cracks = 0, walls = 0, worst = 0, where = null, n = 0;
+          for (let gz = -10; gz <= 10; gz++) for (let gx = -10; gx <= 10; gx++) {
+            const x = sp.x + gx * 10, z = sp.z + gz * 10, h = S.surface.height(x, z);
+            ray.set(new T.Vector3(x, h + 60, z), new T.Vector3(0, -1, 0)); ray.far = 200;
+            const hit = ray.intersectObject(grp, true)[0];
+            n++;
+            const d = hit ? hit.point.y - h : -99;
+            if (d < -0.5) cracks++; else if (d > 0.5) walls++;
+            if (Math.abs(d) > Math.abs(worst)) { worst = d; where = [Math.round(x), Math.round(z)]; }
+          }
+          out.push({ name: sp.name, cracks, walls, worst: +worst.toFixed(2), where, n });
+        }
+        return out;
+      });
+      // fast travel: the moment the fade lifts after a jump to a far lift, the full-detail ground there is already meshed (no coarse
+      // tiles, no skirt walls)
+      const jumps = await page.evaluate(async () => {
+        const S = window.__ski, T = window.THREE, ray = new T.Raycaster(), grp = S.scene.getObjectByName('ski-terrain');
+        const here = S.state, lifts = [...S.modes.lifts.list].sort((a, b) => Math.hypot(b.bottom.x - here.x, b.bottom.z - here.z) - Math.hypot(a.bottom.x - here.x, a.bottom.z - here.z));
+        const out = [];
+        for (const l of [lifts[0], lifts[Math.floor(lifts.length / 2)]]) {
+          await S.goFree(l.id);
+          const fade = document.getElementById('skiFade');
+          for (let i = 0; i < 200 && fade && fade.classList.contains('on'); i++) await new Promise((r) => setTimeout(r, 25));
+          await new Promise((r) => setTimeout(r, 300));                   // the fade's own transition: now the picture is seen
+          const st = S.state;
+          const tiles = S.terrain.tiles.size, pending = S.terrain.stats.pending;
+          let bad = 0, worst = 0;
+          for (let gz = -8; gz <= 8; gz++) for (let gx = -8; gx <= 8; gx++) {
+            const x = st.x + gx * 8, z = st.z + gz * 8, h = S.surface.height(x, z);
+            ray.set(new T.Vector3(x, h + 80, z), new T.Vector3(0, -1, 0)); ray.far = 300;
+            const hit = ray.intersectObject(grp, true)[0];
+            const d = hit ? hit.point.y - h : -99;
+            if (Math.abs(d) > 0.5) bad++;
+            if (Math.abs(d) > Math.abs(worst)) worst = d;
+          }
+          out.push({ lift: l.name, bad, worst: +worst.toFixed(2), tiles, pending, at: [Math.round(st.x), Math.round(st.z)], dist: Math.round(Math.hypot(st.x - l.bottom.x, st.z - l.bottom.z)) });
+        }
+        return out;
+      });
+      for (const j of jumps) terrain.push({ name: `jump ${j.lift}`, cracks: j.bad, walls: 0, worst: j.worst, tiles: j.tiles, pending: j.pending, dist: j.dist });
+      const cracks = terrain.reduce((m, t) => m + t.cracks + t.walls, 0);
+      if (process.env.COP_DEBUG || cracks) console.log(JSON.stringify(terrain));
       // a scripted carve on the spawn slope: the skis stay on the snow
       const carve = await page.evaluate(async () => {
         const S = window.__ski;
@@ -161,9 +220,9 @@ try {
       const minClear = Math.min(...rows.map((r) => r.clear), 0.5);
       const copKinds = {}; for (const r of rows) for (const [k, v] of Object.entries(r.copKinds || {})) copKinds[k] = (copKinds[k] || 0) + v;
       const coplanar = rows.reduce((m, r) => m + r.coplanar, 0), villageTris = rows.reduce((m, r) => m + r.villageTris, 0);
-      const ok = Math.abs(spawn.above) < 0.3 && Math.abs(spawnLate) < 0.3 && Math.abs(worstStreet) <= 0.06 && Math.abs(worstRay) <= 0.06 && minClear >= -0.02 && carve.worst >= -0.02 && coplanar === 0 && !errors.length;
+      const ok = Math.abs(spawn.above) < 0.3 && Math.abs(spawnLate) < 0.3 && Math.abs(worstStreet) <= 0.06 && Math.abs(worstRay) <= 0.06 && minClear >= -0.02 && carve.worst >= -0.02 && coplanar === 0 && cracks === 0 && !errors.length;
       if (!ok) fails++;
-      const line = { engine, rid, ok, spawnAbove: +spawn.above.toFixed(3), spawnLate: +spawnLate.toFixed(3), villages: rows.length, worstStreet: +worstStreet.toFixed(3), worstRay: +worstRay.toFixed(3), worstWhat, minSkiClear: +minClear.toFixed(3), coplanar, copKinds, villageTris, carveSki: +carve.worst.toFixed(3), errors: errors.slice(0, 3) };
+      const line = { engine, rid, ok, spawnAbove: +spawn.above.toFixed(3), spawnLate: +spawnLate.toFixed(3), villages: rows.length, worstStreet: +worstStreet.toFixed(3), worstRay: +worstRay.toFixed(3), worstWhat, minSkiClear: +minClear.toFixed(3), coplanar, copKinds, villageTris, terrainSpots: terrain.length, terrainCracks: cracks, terrainWorst: Math.max(...terrain.map((t) => Math.abs(t.worst))), carveSki: +carve.worst.toFixed(3), errors: errors.slice(0, 3) };
       if (process.env.COP_DEBUG) console.log(JSON.stringify(rows.map((r) => r.copSamples)));
       table.push(line);
       console.log(JSON.stringify(line));

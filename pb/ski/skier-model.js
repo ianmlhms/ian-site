@@ -315,8 +315,8 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {})
     const [a1, kb] = solveLeg(reach);
     const hipX = -(THIGH * Math.sin(a1) + SHIN * Math.sin(a1 - kb));
     L.hip.position.set(hipX, legH[i], legZ[i]);
-    L.hip.rotation.set(L.side * plough * 0.1, 0, a1);                   // round 7: knees in (the shins angle out to the wide tails)
-    L.knee.rotation.set(-L.side * plough * 0.22, 0, -kb);
+    L.hip.rotation.set(L.side * plough * 0.17, 0, a1);                   // round 7: knees in (the shins angle out to the wide tails)
+    L.knee.rotation.set(-L.side * plough * 0.34, 0, -kb);
     L.ankle.rotation.set(0, 0, -(a1 - kb));
     sk.g.position.set(0, (legH[i] - ANKLE) - (THIGH * Math.cos(a1) + SHIN * Math.cos(a1 - kb)), L.side * (0.13 + plough * 0.16));
   }
@@ -333,17 +333,19 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {})
    *  knee more; two passes (a lift changes the ski's tilt only a little). */
   function plantSkis(ground, plough) {
     const k = Math.max(0.5, Math.cos(lean.rotation.x) * Math.cos(tilt.rotation.z));
-    for (let pass = 0; pass < 2; pass++) {
+    for (let pass = 0; pass < 4; pass++) {
       root.updateMatrixWorld(true);
       let moved = false;
       for (let i = 0; i < 2; i++) {
         const c = skiClear(i, ground);
-        if (c < -0.004) { legLift[i] = Math.min(0.5, legLift[i] - c / k + 0.004); setLeg(i, plough); moved = true; }
+        if (c < -0.004) { legLift[i] = Math.min(0.55, legLift[i] - c / k + 0.006); setLeg(i, plough); moved = true; }
       }
       if (!moved) break;
     }
     root.updateMatrixWorld(true);
     lastClear = Math.min(skiClear(0, ground), skiClear(1, ground));
+    // a knee can only bend so far (a hard edge set on a steep side slope): what is left lifts the whole figure a little
+    if (lastClear < -0.004) { root.position.y -= lastClear - 0.002; root.updateMatrixWorld(true); lastClear = Math.min(skiClear(0, ground), skiClear(1, ground)); }
   }
   const tmp = { x: 0, y: 1, z: 0 };
   const qN = new THREE.Quaternion(), qH = new THREE.Quaternion(), nv = new THREE.Vector3(), Y_AXIS = new THREE.Vector3(0, 1, 0);
@@ -382,7 +384,7 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {})
     lean.rotation.set(edge * 0.62 + Math.atan2(across, tmp.y) * 0.2 * (state.grounded ? 1 : 0), 0, 0);
     const skiEdge = edge * 0.45;
     // legs
-    const baseH = 0.88 - crouch * 0.36 - plough * 0.13;       // athletic stance: knees and ankles flexed (round 7: lower in the plough)
+    const baseH = 0.88 - crouch * 0.36 - plough * 0.19;       // athletic stance: knees and ankles flexed (round 7: lower in the plough)
     const tuckAir = air * (1 - crouch) * 0.22;              // knees pulled up in the air
     for (let i = 0; i < 2; i++) {
       const L = legs[i];
@@ -392,7 +394,7 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {})
       legZ[i] = L.side * (0.11 + plough * 0.07 + (state.speed < 5 && state.grounded && !plough ? 0.03 : 0));
       setLeg(i, plough);
       const sk = skis[i];
-      sk.g.rotation.set(0, -L.side * plough * 0.38, 0);                 // tips in, tails out
+      sk.g.rotation.set(0, L.side * plough * 0.34, 0);                  // tips in, tails out (Ry(+) turns the +x tip towards -z)
       sk.edge.rotation.set(skiEdge - L.side * plough * 0.2, 0, air * 0.12);       // on the inside edges
     }
     // torso: forward bend with the crouch, counter-roll against the lean (angulation), a little back in the plough
@@ -400,7 +402,7 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {})
     const [ta1, tkb] = solveLeg(hipY - ANKLE);
     const pelvisX = -(THIGH * Math.sin(ta1) + SHIN * Math.sin(ta1 - tkb));
     torso.position.set(pelvisX, hipY, 0);
-    torso.rotation.set(-edge * 0.32, 0, -(0.22 + crouch * 0.95 + plough * 0.12 + air * 0.1));      // round 7: forward in the plough, not back
+    torso.rotation.set(-edge * 0.32, 0, -(0.22 + crouch * 0.95 + plough * 0.24 + air * 0.1));      // round 7: forward in the plough, not back
     neck.rotation.set(edge * 0.15, 0, 0.25 + crouch * 0.75);          // keep the eyes on the slope ahead
     // arms: forward and out; tuck: hands in front of the face, poles back under the arms; air: wide; plant: the inside pole reaches forward
     for (let i = 0; i < 2; i++) {
@@ -457,5 +459,13 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {})
     for (const mesh of merged) mesh.visible = !firstPerson || gearGroups.has(mesh.parent);
     if (firstPerson) blob.visible = false;
   }
-  return { root: group, pose, setOutfit, setSki, setFirstPerson, get skiClearance() { return lastClear; }, get firstPerson() { return firstPerson; }, setBlob(on) { blob.visible = !!on && !ghost && !firstPerson; }, setVisible(v) { group.visible = v; } };
+  /** Round 7 (A), tests: the world tips and tails of both skis [{ tip: {x, y, z}, tail: {x, y, z} }] after the last pose. */
+  function skiEnds() {
+    root.updateMatrixWorld(true);
+    return skis.map((sk) => {
+      const tip = new THREE.Vector3(0.95, 0, 0).applyMatrix4(sk.edge.matrixWorld), tail = new THREE.Vector3(-0.8, 0, 0).applyMatrix4(sk.edge.matrixWorld);
+      return { tip: { x: tip.x, y: tip.y, z: tip.z }, tail: { x: tail.x, y: tail.y, z: tail.z } };
+    });
+  }
+  return { root: group, pose, setOutfit, setSki, setFirstPerson, skiEnds, get skiClearance() { return lastClear; }, get firstPerson() { return firstPerson; }, setBlob(on) { blob.visible = !!on && !ghost && !firstPerson; }, setVisible(v) { group.visible = v; } };
 }

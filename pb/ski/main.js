@@ -678,6 +678,18 @@ async function boot() {
     const s = liftSpot(lift, { builtAt, index: boxIndex, slope: slopeAt });
     return s ? { x: s.x, z: s.z, heading: s.heading, blocked: s.blocked } : modes.lifts.boardAt(lift, 14);
   }
+  /** Round 7 (A): behind a fade, the full-detail terrain round a new spot is meshed before the fade lifts (right after a jump the tiles
+   *  there were still the coarse ones and the skirts of the half-built ones showed as tall smeared walls for ~1.5 s). The terrain gets a
+   *  bigger time slice meanwhile; at most 2.5 s. */
+  let meshRush = false, rushAt = null;
+  async function meshedAround(p) {
+    meshRush = true; rushAt = { x: p.x, z: p.z };
+    const camX = p.x, camZ = p.z;
+    const t0 = performance.now();
+    terrain.update(camX, camZ, 20);
+    while (performance.now() - t0 < 2500 && terrain.stats.pending > 0) await new Promise((res) => setTimeout(res, 50));
+    meshRush = false;
+  }
   /** Round 6: free ride from a lift's bottom station (fast travel: a short fade while the tiles there arrive) or from a spot. */
   async function goFree(lift, spotIn = null) {
     if (!lift && !spotIn) return;
@@ -690,6 +702,7 @@ async function boot() {
     streamer.focus(spot.x, spot.z);
     // round 7: the ground under the spot is the real 5 m terrain before he stands on it (never under the snow); a late tile re-snaps
     await Promise.race([streamer.ready(spot.x, spot.z, 420), new Promise((res) => setTimeout(res, 8000))]);
+    await meshedAround(spot);
     await new Promise((res) => setTimeout(res, 120));
     startFree(lift, spot);
     fade.classList.remove('on');
@@ -831,6 +844,7 @@ async function boot() {
     const top = ride.where();
     streamer.focus(top.x, top.z);
     await Promise.race([streamer.ready(top.x, top.z, 500), new Promise((res) => setTimeout(res, 3000))]);
+    await meshedAround(ride ? ride.where() : top);
     arrive();
     fade.classList.remove('on');
   }
@@ -1074,7 +1088,8 @@ async function boot() {
     const fx = st ? st.x : resort.width / 2, fz = st ? st.z : resort.depth / 2;
     if (game.screen === 'ski' || game.screen === 'map') {
       streamer.focus(fx, fz);
-      terrain.update(camera.position.x, camera.position.z, game.screen === 'map' ? 12 : 2.5);
+      if (meshRush && rushAt) terrain.update(rushAt.x, rushAt.z, 12);            // round 7 (A): meshing the jump target behind the fade
+      else terrain.update(camera.position.x, camera.position.z, game.screen === 'map' ? 12 : 2.5);
       scatterView.update(camera.position.x, camera.position.z, false, game.screen === 'map' ? 12 : 2.5, dt);
       farForest.update(camera.position.x, camera.position.z, game.screen === 'map' ? 8 : 1.5);
       poles.update(camera.position.x, camera.position.z, quality.markerRadius);

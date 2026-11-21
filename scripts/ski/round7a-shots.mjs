@@ -40,7 +40,8 @@ try {
       return { id: p.id, x: a.x, z: a.z };
     });
     await page.evaluate(({ x, z }) => window.__ski.streamer.ready(x, z, 500), setup);
-    await page.waitForTimeout(1500);
+    // as a fast travel does (main.js meshedAround): the full-detail ground meshed before the shots
+    await page.evaluate(async () => { const S = window.__ski; for (let i = 0; i < 80 && (S.terrain.stats.pending > 0 || i < 10); i++) await new Promise((r) => setTimeout(r, 100)); });
     // the scripted piste skier (bot.js) steers; `input` only overrides what it says (tuck, brake, hard...); steer: 'bot' keeps its steering
     await page.evaluate(async (id) => {
       const { createBot } = await import('/pb/ski/bot.js');
