@@ -36,7 +36,7 @@ function material(env) {
       ${FOG_GLSL}
       void main(){
         float a = abs(vRoad.x);                                 // 0 centre, 1 the edge, > 1 the snow bank
-        if (a > 1.35) discard;                                  // round 7: beyond the painted bank (the lattice cells reach farther)
+        if (a > 1.37) discard;                                  // round 7: the bank is a painted strip just past the edge                                  // round 7: beyond the painted bank (the lattice cells reach farther)
         vec4 nz = texture2D(uNoise, vW.xz * 0.11);
         vec4 nl = texture2D(uNoise, vW.xz * 0.013 + 0.3);
         float fade = 1.0 - smoothstep(120.0, 600.0, vDist);   // tyre tracks blur into one grey far away
@@ -88,7 +88,9 @@ export function createRoads({ scene, roads, env, height }) {
         const key = nk(i, j);
         const old = nodeVal.get(key);
         if (!old || d < old[0]) nodeVal.set(key, [d, along + t]);
-        if (d * r.hw <= r.hw + BANK + LAT * 0.75) { covered.add(nk(i, j)); covered.add(nk(i - 1, j)); covered.add(nk(i, j - 1)); covered.add(nk(i - 1, j - 1)); }
+        // the cell (i, j) (nodes i..i+1, j..j+1) is touched when the street passes within its half diagonal of the cell's middle
+        const cx = x + LAT / 2, cz = z + LAT / 2, tc = Math.max(0, Math.min(L, (cx - ax) * ux + (cz - az) * uz));
+        if (Math.hypot(cx - (ax + ux * tc), cz - (az + uz * tc)) <= r.hw + BANK * 0.6 + LAT * 0.71) covered.add(key);
       }
       along += L;
     }
