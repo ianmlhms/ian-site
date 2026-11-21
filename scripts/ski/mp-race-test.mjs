@@ -74,8 +74,8 @@ function world(ids, { lat = 40 } = {}) {
   w0.players.get('emma2').race.localReady(0); w0.players.get('host1').race.localReady(0);
   w0.step(2000);
   eq([w0.players.get('host1').race.phase, w0.players.get('emma2').race.phase, w0.players.get('emma2').race.coordinator()], ['prep', 'prep', 'host1'], 'not linked yet: no lonely start, the host stays coordinator');
-  w0.step(RACE.LOAD_TIMEOUT);
-  eq(w0.players.get('host1').race.phase, 'go', '... until LOAD_TIMEOUT (a player who never shows up holds nobody up)');
+  w0.step(RACE.MEET_TIMEOUT);
+  eq(w0.players.get('host1').race.phase, 'go', '... until MEET_TIMEOUT (a player who never shows up holds nobody up)');
 }
 {
   const w = world(['host1', 'emma2', 'max33']);

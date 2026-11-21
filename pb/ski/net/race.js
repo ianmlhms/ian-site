@@ -114,9 +114,10 @@ export function createRace({ me, roster, runs, now, send, latency = () => 0, min
     const t = now();
     if (s.phase === 'prep') {
       const here = ids.filter((id) => status.get(id) === 'here');
-      const allReady = here.every((id) => s.ready.has(id)) && !ids.some((id) => status.get(id) === 'wait');
-      const waited = t - s.prepAt;
-      if ((allReady && s.ready.has(me)) || (waited > RACE.LOAD_TIMEOUT && s.ready.has(me)) || waited > RACE.LOAD_TIMEOUT * 1.5) sendGo();
+      const unmet = ids.some((id) => status.get(id) === 'wait');
+      const allReady = here.every((id) => s.ready.has(id)) && !unmet;
+      const waited = t - s.prepAt, limit = unmet ? RACE.MEET_TIMEOUT : RACE.LOAD_TIMEOUT;
+      if ((allReady && s.ready.has(me)) || (waited > limit && s.ready.has(me)) || waited > limit * 1.5) sendGo();
     } else if (s.phase === 'go') {
       const res = s.results[s.run];
       const open = ids.filter((id) => !res[id] && status.get(id) !== 'gone' && status.get(id) !== 'wait');

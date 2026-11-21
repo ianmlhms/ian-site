@@ -34,6 +34,7 @@ export const NET = Object.freeze({
 
 export const RACE = Object.freeze({
   LOAD_TIMEOUT: 30000,          // ms the coordinator waits for slow devices; then the countdown starts without them (they start late)
+  MEET_TIMEOUT: 50000,          // ... and for a player it has not met yet (two WebRTC attempts + the relay take ~25 s on a bad network)
   GO_LEAD: 4200,                // ms between the "go" message and the start (the last 3 s are the 3-2-1)
   FINISH_GRACE: 45000,          // ms after the first finish before the run is closed for the rest (DNF) ...
   FINISH_GRACE_SHARE: 0.6,      // ... or this share of the winner's time, whichever is longer

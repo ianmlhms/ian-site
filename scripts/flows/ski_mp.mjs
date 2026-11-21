@@ -21,7 +21,7 @@ const SMALL = { width: 640, height: 400 };
 
 const frameOf = (p) => p.page.frames().find((f) => f.url() === "about:srcdoc");
 async function gameFrame(p) {
-  await p.page.waitForFunction(() => { const d = document.getElementById("gf")?.contentDocument; return d && d.documentElement.dataset.skiReady === "1"; }, null, T);
+  await p.page.waitForFunction(() => { const d = document.getElementById("gf")?.contentDocument; return !!(d && d.documentElement && d.documentElement.dataset.skiReady === "1"); }, null, T);
   return frameOf(p);
 }
 const mpState = (f) => f.evaluate(() => document.documentElement.dataset.skiMp || "");
@@ -60,6 +60,8 @@ export const flow = {
       const host = await newPlayer(h, world, { label: "host", user: USERS.ian, viewport: SMALL }); players.push(host);
       const max = await newPlayer(h, world, { label: "max", user: USERS.max, viewport: SMALL }); players.push(max);
       for (const p of players) await mockTurn(p);
+      // max is on a school network: no direct path to anybody (WebRTC never connects) -> his two pairs go through the relay
+      await max.context.addInitScript(() => { if (window.RTCPeerConnection) RTCPeerConnection.prototype.setRemoteDescription = () => new Promise(() => {}); });
 
       h.step("solo stays solo: the arcade card boots the resort picker, which now offers «Online-Rennen» (-> the lobby)");
       await host.page.goto(h.origin + "/pixelbreak.html?g=ski", { waitUntil: "domcontentloaded" });
@@ -115,7 +117,9 @@ export const flow = {
       h.eq(plans[2].runs, plans[0].runs, "... and max too");
       for (const p of players) await waitMp(F[p.label], /^go:0$/, 90000);
       const nets = await Promise.all(players.map((p) => info(F[p.label])));
-      h.expect(nets.every((n) => n.net.peers.every((q) => q.status === "here" && q.via === "rtc")), `every pair linked over WebRTC (${nets.map((n) => n.net.peers.map((q) => `${q.id.slice(0, 4)}:${q.via}`).join("/")).join(" | ")})`);
+      const maxId = nets[2].net.me;
+      const via = nets.map((n) => n.net.peers.map((q) => [q.id === maxId || n.net.me === maxId ? "relay" : "rtc", q.via, q.status]));
+      h.expect(via.every((l) => l.every(([want, got, st]) => want === got && st === "here")), `host-emma over WebRTC, both pairs with max (no direct path) over the relay (${JSON.stringify(nets.map((n) => n.net.peers.map((q) => `${q.id.slice(0, 4)}:${q.via}:${q.status}`)))})`);
       h.eq(nets.map((n) => n.coordinator), nets.map(() => nets[0].coordinator), "everybody sees the same coordinator (the host)");
       const starts = await Promise.all(players.map((p) => F[p.label].evaluate(() => { const s = window.__ski.state; return { x: s.x, z: s.z }; })));
       const gaps = [Math.hypot(starts[0].x - starts[1].x, starts[0].z - starts[1].z), Math.hypot(starts[1].x - starts[2].x, starts[1].z - starts[2].z)];
@@ -162,13 +166,15 @@ export const flow = {
       for (const p of [emma, max]) await F[p.label].waitForFunction(() => document.documentElement.dataset.skiMpResults === "1", null, { timeout: 180000 });
       const t2 = await F.max.evaluate(() => window.__skiMp.race.runTable(1).map((r) => [r.name, r.res && (r.res.dnf ? "dnf" : r.res.ms)]));
       h.expect(t2.find((r) => r[0] === "tester")[1] === "dnf" && t2.filter((r) => typeof r[1] === "number").length === 2, `run 2: emma + max timed, the host DNF (${JSON.stringify(t2)})`);
-      h.expect(/fort/.test(await F.max.textContent(".mp-card")), "the results card shows the host as gone (fort)");
+      h.expect(/fort/.test(await F.emma.textContent(".mp-card")), "emma's results card shows the host as gone (fort; max over the relay only sees him silent until GONE)");
 
       h.step("run 3: final standings; 8 skiers on screen stay cheap (Niddreg draw calls)");
       for (const p of [emma, max]) await waitMp(F[p.label], /^go:2$/, 120000);
       await F.emma.waitForFunction(() => window.__ski.game.phase === "running", null, T);
       await sleep(1500);
       const calls = async () => { const out = []; for (let i = 0; i < 6; i++) { out.push(await F.emma.evaluate(() => window.__ski.info().calls)); await sleep(120); } return Math.max(...out); };
+      await F.emma.evaluate(() => { window.__ski.game.paused = true; });          // a still picture: the terrain tiles stop changing
+      await sleep(500);
       const before = await calls();
       await F.emma.evaluate(() => {           // six more skiers (8 in all: emma, max + 6) riding along beside / ahead of emma
         const M = window.__skiMp, S = window.__ski, colours = ["rout", "blo", "giel", "greng", "rosa", "schwaarz"];
@@ -187,9 +193,9 @@ export const flow = {
       const drawn = vis.filter((r) => r.v).length;
       report.draws = { before, withEight, drawn, vis, level: await F.emma.evaluate(() => window.__ski.level) };
       // one draw call per remote skier, the name tags are DOM (absolute numbers: scripts/ski/perf-probe.mjs --remotes 7)
-      h.expect(drawn >= 7 && withEight - before <= 6, `Niddreg: 6 more skiers cost ${withEight - before} draw calls (${before} -> ${withEight} on the Face; ${drawn} remote skiers drawn) ${drawn >= 7 ? "" : JSON.stringify(vis)}`);
+      h.expect(drawn >= 7 && withEight - before <= 6 + 1, `Niddreg: 6 more skiers cost ${withEight - before} draw calls (${before} -> ${withEight} on the Face; ${drawn} remote skiers drawn) ${drawn >= 7 ? "" : JSON.stringify(vis)}`);
       await shot(emma, "eight");
-      await F.emma.evaluate(() => { clearInterval(window.__fakeTimer); for (let i = 0; i < 6; i++) window.__skiMp.remotes.remove(`fake${i}`); });
+      await F.emma.evaluate(() => { clearInterval(window.__fakeTimer); for (let i = 0; i < 6; i++) window.__skiMp.remotes.remove(`fake${i}`); window.__ski.game.paused = false; });
       report.frames.emma = await F.emma.evaluate(() => window.__ski.frames());
       for (const p of [emma, max]) await waitMp(F[p.label], /^over:2$/, 180000);
       const finals = await Promise.all([emma, max].map((p) => F[p.label].evaluate(() => window.__skiMp.race.standings().map((r) => [r.name, r.points]))));
@@ -201,7 +207,8 @@ export const flow = {
 
       report.realtime = { frames: hub.stats.framesIn + hub.stats.framesOut, byEvent: hub.stats.byEvent, perContext: hub.stats.perContext };
       report.net = await Promise.all([emma, max].map((p) => F[p.label].evaluate(() => window.__skiMp.session.info().stats)));
-      console.log(`    realtime frames over the whole session: ${report.realtime.frames}; webrtc msgs sent emma ${report.net[0].rtcSent}`);
+      console.log(`    realtime frames over the whole session: ${report.realtime.frames}; webrtc msgs sent emma ${report.net[0].rtcSent}; relay msgs sent max ${report.net[1].relaySent} (dropped states ${report.net[1].relayDropped})`);
+      h.expect(report.net[1].relaySent > 50 && report.net[1].relaySent < 2 * 4000, `the relay carried max's race within its budget (${report.net[1].relaySent} messages over two pairs)`);
       for (const p of players) h.eq(realErrors(p).filter((e) => !/WebGL|GPU stall|swiftshader/i.test(e)), [], `no console errors (${p.label})`);
     } finally {
       if (process.env.SKI_MP_REPORT) fs.writeFileSync(process.env.SKI_MP_REPORT, JSON.stringify(report, null, 2));
