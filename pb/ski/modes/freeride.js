@@ -32,7 +32,7 @@ export function createLiftNet(resort, heightAt, pistes = null) {
     // the lift's own direction at the top (bottom -> top): the start spot is ahead of the top station and a little to the side
     const ux = (top.x - bottom.x) / (Math.hypot(top.x - bottom.x, top.z - bottom.z) || 1), uz = (top.z - bottom.z) / (Math.hypot(top.x - bottom.x, top.z - bottom.z) || 1);
     // round 6: the line's own start is its bottom in the baked data (bake.py orients every lift uphill); `reversed` if not
-    list.push({ id: `l${i}`, index: i, name: l.name || kindName(cls), kind: cls, bottom, top, len, seconds: len / LIFT_SPEC[cls].speed, ux, uz, reversed: a.y > b.y, seats: l.seats || 0 });
+    list.push({ id: `l${i}`, index: i, name: l.name || kindName(cls), kind: cls, bottom, top, len, seconds: len / LIFT_SPEC[cls].speed, ux, uz, reversed: a.y > b.y, seats: l.seats || 0, tunnel: !!l.tunnel });
   }
   /** Where a skier starts at a lift's top: on the piste that starts nearest the top station (a few metres down it, facing along it),
    *  else 14 m past the station facing down the fall line (measured over 40 m, so a small dip does not turn the skier round). */
@@ -70,8 +70,8 @@ export function kindName(kind) {
   return kind === 'chair' ? 'Sesselbunn' : kind === 'gondola' ? 'Gondel' : kind === 'cable' ? 'Seelbunn' : kind === 'drag' ? 'Schlepplift' : kind === 'train' ? 'Zuch' : 'Lift';
 }
 
-/** Round 6: where a resort's free ride starts: the bottom station of a lift in a village (chairs, cabins and trains before drag lifts,
- *  near the resort's start piste breaks ties). lifts = createLiftNet; places = resort.json places. */
+/** Round 6: where a resort's free ride starts: the bottom station of a lift in a village (chairs, cabins and trains before drag lifts and
+ *  underground funiculars, near the resort's start piste breaks ties). lifts = createLiftNet; places = resort.json places. */
 export function spawnLift(lifts, places, near = null) {
   const villages = (places || []).filter((p) => p.kind === 'village' || p.kind === 'town');
   const pool = villages.length ? villages : (places || []);
@@ -79,7 +79,8 @@ export function spawnLift(lifts, places, near = null) {
   for (const l of lifts.list) {
     let d = 4000;
     for (const v of pool) d = Math.min(d, Math.hypot(v.x - l.bottom.x, v.z - l.bottom.z));
-    const score = d + (l.kind === 'drag' ? 900 : 0) + (near ? 0.08 * Math.hypot(near.x - l.bottom.x, near.z - l.bottom.z) : 0) - Math.min(400, (l.top.y - l.bottom.y) * 0.4);
+    const score = d + (l.kind === 'drag' || l.tunnel ? 900 : 0) +          // (an underground funicular is no start: the ride is unseen)
+      (near ? 0.08 * Math.hypot(near.x - l.bottom.x, near.z - l.bottom.z) : 0) - Math.min(400, (l.top.y - l.bottom.y) * 0.4);
     if (score < bs) { bs = score; best = l; }
   }
   return best || lifts.list[0] || null;
