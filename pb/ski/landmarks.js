@@ -156,28 +156,29 @@ function lattice(height, width, color) {
 function summitStation(lm) {
   const g = new THREE.Group();
   if (lm.big) {
-    g.add(box(30, 9, 16, 0x5d5a57, 0, -2, 0));
-    const glass = box(26, 5.5, 0.4, COL.glass, 0, 1.5, 8.1);
-    g.add(glass, box(32, 0.9, 18, COL.roofDark, 0, 7, 0));
-  } else {
-    g.add(box(9, 6, 7, 0x6a645c, 0, -2, 0), box(10, 0.7, 8, COL.roofDark, 0, 4, 0));
+    // a large top station (replaces the OSM box, option "clear"): dark timber-grey hall, a glass band towards the valley, flat roof
+    g.add(box(30, 10, 16, 0x5a5550, 0, -2, 0), box(26, 5.2, 0.4, COL.glass, 0, 1.8, 8.1), box(32, 0.9, 18, COL.roofDark, 0, 8, 0));
   }
   if (lm.antenna) {
-    const mast = lattice(20, 5, COL.antenna);
-    mast.position.set(lm.big ? 12 : 3, 4.5, 0);
+    // the white lattice mast with its dishes on the summit, the summit cross beside it (the station itself is the OSM building)
+    const mast = lattice(20, 4.5, COL.antenna);
+    mast.position.set(6, 0, -3);
     g.add(mast);
-    for (const [y, r] of [[16, 1.3], [12.5, 1.0]]) {
+    for (const [y, r] of [[15.5, 1.3], [12, 1.0]]) {
       const dish = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.35, 16), mat(COL.antenna));
-      dish.rotation.z = Math.PI / 2; dish.position.set((lm.big ? 12 : 3) + 2.2, 4.5 + y, 0.8);
+      dish.rotation.x = Math.PI / 2; dish.position.set(6, y, -0.6);
       g.add(dish);
     }
-    g.add(beam(new THREE.Vector3(-4, 4.5, -2), new THREE.Vector3(-4, 10, -2), 0.25, 0x3b2f25));   // summit cross
-    g.add(beam(new THREE.Vector3(-5.4, 8.6, -2), new THREE.Vector3(-2.6, 8.6, -2), 0.22, 0x3b2f25));
+    g.add(beam(new THREE.Vector3(-6, -0.5, -2), new THREE.Vector3(-6, 6.5, -2), 0.3, 0x3b2f25));
+    g.add(beam(new THREE.Vector3(-7.6, 4.8, -2), new THREE.Vector3(-4.4, 4.8, -2), 0.26, 0x3b2f25));
   }
-  const name = board(lm.name.split(/\s(?=\d)/), lm.big ? 10 : 6, lm.big ? 3.75 : 2.25);
-  name.position.set(0, lm.big ? 9.5 : 6.3, lm.big ? 8.3 : 3.7);
+  const [title, sub] = lm.name.split(/\s(?=\d)/);
+  const name = board([title, sub || ''].filter(Boolean), lm.big ? 10 : 5, lm.big ? 3.75 : 2.1);
+  name.position.set(0, lm.big ? 10.5 : 2.6, lm.big ? 8.3 : 2);
   g.add(name);
-  return { group: g, footprint: lm.big ? 18 : 8 };
+  if (!lm.big) g.add(box(0.16, 3.2, 0.16, COL.steel, -2, -0.5, 1.95), box(0.16, 3.2, 0.16, COL.steel, 2, -0.5, 1.95));
+  g.rotation.y = -THREE.MathUtils.degToRad(lm.face ?? 180) + Math.PI;      // the board (+z) looks towards `face`
+  return { group: g, footprint: lm.big ? 18 : 4 };
 }
 
 function pass(lm) {
@@ -186,14 +187,15 @@ function pass(lm) {
   const sign = board([title, sub || ''].filter(Boolean), 5.2, 2.2, { bg: '#f7f6f1', fg: '#20304a', border: '#20304a' });
   sign.position.set(0, 3.6, 0);
   g.add(sign, box(0.16, 4.7, 0.16, COL.steel, -2.2, -0.5, -0.05), box(0.16, 4.7, 0.16, COL.steel, 2.2, -0.5, -0.05));
-  // a row of flag poles: Austria, Tirol, Vorarlberg, the EU (painted cloths, no logos)
+  // a row of flag poles beside it (painted red-white-red and white-red cloths, one blue; no emblems)
   const flags = [[0xd2322b, 0xffffff, 0xd2322b], [0xffffff, 0xd2322b, 0xffffff], [0xd2322b, 0xffffff, 0xd2322b], [0x2b4fa8, 0x2b4fa8, 0x2b4fa8], [0xd2322b, 0xffffff, 0xd2322b], [0xffffff, 0xd2322b, 0xffffff]];
   flags.forEach((bands, i) => {
-    const x = 6 + i * 3.4;
-    g.add(box(0.14, 9, 0.14, COL.white, x, -0.5, 1.5));
-    bands.forEach((c, k) => { const b = box(0.06, 0.9, 1.6, c, x, 8.5 - 3 - k * 0.9 - 0.4, 1.5 + 0.9); g.add(b); });
+    const x = -6 - i * 3.4;
+    g.add(box(0.14, 9, 0.14, COL.white, x, -0.5, -1.5));
+    bands.forEach((c, k) => g.add(box(1.6, 0.9, 0.06, c, x + 0.85, 8.5 - 0.4 - k * 0.9 - 0.45, -1.5)));
   });
-  return { group: g, footprint: 26 };
+  g.rotation.y = -THREE.MathUtils.degToRad(lm.face ?? 180) + Math.PI;      // the sign (+z) looks towards `face`
+  return { group: g, footprint: 4 };
 }
 
 function chapel() {

@@ -93,10 +93,12 @@ RESORTS = {
             ("Zug", 10.1280, 47.2200, 350),
         ],
         "landmarks": [
-            {"kind": "summit-station", "name": "Valluga 2811 m", "lon": 10.21330, "lat": 47.15770},
-            {"kind": "summit-station", "name": "Galzig 2185 m", "lon": 10.22920, "lat": 47.13780},
-            {"kind": "pass", "name": "Arlbergpass 1793 m", "lon": 10.21180, "lat": 47.12960},
-            {"kind": "chapel", "name": "St. Christoph", "lon": 10.19650, "lat": 47.13120},
+            # spots from the OSM buildings / roads: Vallugabahn II top station, Galzigbahn top station, the B197 at the Hospiz, the
+            # Christophorus chapel next to the Hospiz
+            {"kind": "summit-station", "name": "Valluga 2811 m", "lon": 10.21330, "lat": 47.15770, "antenna": True, "face": 150},
+            {"kind": "summit-station", "name": "Galzig", "lon": 10.23089, "lat": 47.13082, "big": True, "face": 130, "clear": 22},
+            {"kind": "pass", "name": "Arlbergpass 1793 m", "lon": 10.21345, "lat": 47.12768, "face": 135},
+            {"kind": "chapel", "name": "St. Christoph", "lon": 10.21329, "lat": 47.12738},
             {"kind": "worldcup", "name": "Kandahar", "piste": "Kandahar-Galzig"},
         ],
     },
