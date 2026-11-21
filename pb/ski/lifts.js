@@ -15,7 +15,8 @@ import { createLiftWorld, frames } from './lift-site.js';
 import { carrierGeometry } from './modes/carriers.js';
 import { mergeParts } from './modes/views.js';
 
-const NEAR_R = 230;                    // m: carriers closer than this get the full model, the rest the far one
+const NEAR_R = 130;                    // m: carriers closer than this get the full model, the rest the far one
+const FAR_R = { chair: 1100, drag: 500, gondola: 1600, cable: 3000, train: 3000 };      // m: beyond this a carrier is below a pixel
 const DWELL = 8;                       // s a jig-back cabin / train waits at a station
 
 export function createLifts({ scene, resort, height }) {
@@ -80,7 +81,7 @@ export function createLifts({ scene, resort, height }) {
       const g = height(q.x, q.z) - 0.5;
       const top = s.y + 0.55 - g;
       const thin = l.sub === 'rope';
-      cylAt(thin ? 0.08 : 0.28, thin ? 0.1 : 0.42, top, q.x, g + top / 2, q.z, 0x8a9099, 8);
+      cylAt(thin ? 0.08 : 0.28, thin ? 0.1 : 0.42, top, q.x, g + top / 2, q.z, 0x8a9099, 6);
       const span = l.side + l.back + (thin ? 0.4 : 1.4), mid = l.sign * (l.side - l.back) / 2;
       boxAt(0.5, thin ? 0.12 : 0.35, span, q.x - q.dz * mid, s.y + (thin ? 0.3 : 0.72), q.z + q.dx * mid, q.dx, q.dz, 0x343a44);
       if (!thin) for (const lat of [l.side * l.sign, -l.back * l.sign]) boxAt(kind === 'drag' ? 1.0 : 1.8, 0.22, 0.26, q.x - q.dz * lat, s.y + 0.38, q.z + q.dx * lat, q.dx, q.dz, 0x2b2f36);
@@ -192,12 +193,25 @@ export function createLifts({ scene, resort, height }) {
     group.add(m);
     return m;
   };
+  // the stations and pylons in 2.5 km chunks (one mesh each), shown within the lift radius
+  const CHUNK = 2500;
+  const chunks = [];
   if (parts.length) {
-    const geo = mergeParts(parts);
-    const st = new THREE.Mesh(geo, vmat);
-    st.castShadow = true; st.receiveShadow = true; st.name = 'ski-lift-stations';
-    group.add(st);
-    disposables.push(geo);
+    const byCell = new Map();
+    for (const part of parts) {
+      const e = part[2].elements, k = Math.floor(e[12] / CHUNK) + ',' + Math.floor(e[14] / CHUNK);
+      if (!byCell.has(k)) byCell.set(k, []);
+      byCell.get(k).push(part);
+    }
+    for (const [k, list] of byCell) {
+      const [i, j] = k.split(',').map(Number);
+      const geo = mergeParts(list);
+      const st = new THREE.Mesh(geo, vmat);
+      st.castShadow = true; st.receiveShadow = true; st.name = chunks.length ? 'ski-lift-stations-' + k : 'ski-lift-stations';
+      group.add(st);
+      disposables.push(geo);
+      chunks.push({ mesh: st, cx: (i + 0.5) * CHUNK, cz: (j + 0.5) * CHUNK });
+    }
   }
   const trackMat = new THREE.MeshLambertMaterial({ color: 0xd3d9e2, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   disposables.push(trackMat);
@@ -260,7 +274,9 @@ export function createLifts({ scene, resort, height }) {
   let lastT = 0;
   const SWING = { chair: 0.03, gondola: 0.022, cable: 0.006, drag: 0.05, train: 0 };
   function put(pool, l, w, k, t, camX, camZ) {
-    const far = pool.far && Math.hypot(w.x - camX, w.z - camZ) > NEAR_R;
+    const dc = Math.hypot(w.x - camX, w.z - camZ);
+    if (dc > FAR_R[l.kind]) return;
+    const far = pool.far && dc > NEAR_R;
     const roll = w.turn ? 0 : SWING[l.kind] * Math.sin(t * 1.3 + k * 0.77 + l.index);
     const pitch = l.kind === 'train' ? Math.atan(l.slope(w.s)) * (w.up ? 1 : -1) : 0;
     eul.set(roll, -w.heading, pitch); q4.setFromEuler(eul);
@@ -281,6 +297,7 @@ export function createLifts({ scene, resort, height }) {
 
   function update(t, camX, camZ, radius) {
     lastT = t;
+    for (const c of chunks) c.mesh.visible = Math.hypot(c.cx - camX, c.cz - camZ) - CHUNK * 0.71 < radius;
     for (const p of pools.values()) { p.n = 0; p.nf = 0; }
     beltTex.offset.y = -(t * 1.4) / 2;
     for (const l of lifts) {

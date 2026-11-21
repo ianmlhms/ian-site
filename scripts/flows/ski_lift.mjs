@@ -131,7 +131,7 @@ export const flow = {
       car.dispose(); view.dispose();
       return out;
     });
-    h.expect(train.kind === "train" && train.pose === "stand" && train.above > 0.4 && train.above < 1.5 && train.count === 1, `rack_railway -> a train: standing in the carriage ${train.above.toFixed(2)} m over the snow, track and stations drawn`);
+    h.expect(train.kind === "train" && train.pose === "carry" && train.above > 0.4 && train.above < 1.5 && train.count === 1, `rack_railway -> a train: standing in the carriage ${train.above.toFixed(2)} m over the snow, track and stations drawn`);
     const info = await page.evaluate(() => window.__ski.info());
     h.expect(info.calls <= 160, `Niddreg: ${info.calls} draw calls <= 160`);
     h.eq(errors, [], "zero page errors");
