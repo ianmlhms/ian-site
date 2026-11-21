@@ -78,6 +78,13 @@ export const SKI = Object.freeze({
   jumpCooldown: 0.6,
   crashSeconds: 1.6,        // tumble before the respawn
   offPisteLimit: 420,       // m from the nearest piste: beyond that the skier is sent back
+  // tricks (round 4A: snow park and free ride, world.tricks)
+  spinRate: 9,              // rad/s spin at full steer in the air (a 1080 takes about 2.1 s)
+  flipRate: 6.6,            // rad/s flip at full up / down (one flip about 0.95 s: only the big kickers give that air)
+  spinClean: 0.3, spinCrash: 0.85,   // rad off a whole half turn at touch-down: clean below, a fall above
+  flipClean: 0.5, flipCrash: 1.0,    // rad off a whole flip
+  spinSettle: 2.4, flipSettle: 2.2,  // rad/s the rotation settles onto a whole half turn / flip without input
+  parkHardLanding: 12.5,    // m/s into the ground: a fall (park landings are built steep, a little more forgiving)
 });
 
 export const CAMERA = Object.freeze({
@@ -123,4 +130,6 @@ export const RANDOM_TIME = Object.freeze(['morning', 'midday', 'midday', 'evenin
 
 /* Modes. Only 'run' and 'free' exist in phase 1; the others are the hooks for the next rounds (stars / challenges, the snowpark,
  * free ride across the whole area, live races through the lobby). game.js switches on these ids, so a new mode is one new branch. */
-export const MODES = Object.freeze({ run: 'run', free: 'free', challenge: 'challenge', park: 'park', race: 'race' });
+export const MODES = Object.freeze({ run: 'run', free: 'free', challenge: 'challenge', park: 'park', race: 'race', freeride: 'freeride' });
+/* Round 4A: every 'run' is also the piste's star challenge (modes/challenges.js; 'challenge' stays an alias hook), 'park' = a scored snow
+ * park run (modes/park.js), 'freeride' = the whole area all day from a lift top (modes/freeride.js); 'free' = the old guided free ride. */

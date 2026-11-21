@@ -1,4 +1,4 @@
-# Ski Alpen: handoff (phase 1 + rounds 2B / 2C, 21 Nov 2026)
+# Ski Alpen: handoff (phase 1 + rounds 2-3 + 4A modes, 21 Nov 2026)
 
 Arcade id `ski`, page `pb/ski.html`, code `pb/ski/`, pipeline `scripts/ski/`, data `pb/ski/data/<resort>/`. Phase 1 = the engine and one
 resort, Espace Killy (Val d'Isère + Tignes). The game must NOT go live before the other four resorts are in (3 Vallées, Zermatt-Cervinia,
@@ -205,4 +205,51 @@ anti-cheat think higher is better otherwise). Bot / scripted runs never post (fl
 - The Concordia bell is only seen from the summit dome itself (the convex top hides it from lower plateau views).
 - Sound is synthesised only (no menu music); not heard on a real iPad yet.
 - Frame times measured on the Mini (CPU x4, GPU not throttled): every level holds 60 fps there; a real-iPad GPU check is still due.
-- Skier is a box-and-capsule figure (stylised); no tricks yet, no cloud save of the progress (local only).
+- Skier is a box-and-capsule figure (stylised). Tricks and the cloud save came in round 4A (below).
+
+## Round 4A (21 Nov 2026): game modes (stars, snow park, free ride all day)
+All in `pb/ski/modes/` (pure modules first, then views / DOM); main.js, ui.js, map.js, input.js, env.js, field.js, skier.js,
+skier-model.js got small hooks marked "round 4A". main.js talks to the modes only through `modes/host.js` (begin / step / after /
+hudTick / finishRun / finishPark / rideUp / end / onTiles).
+- **Stars** (`challenges.js`): every timed run is also the piste's challenge. ★1 finish (valid run), ★2 under the target time = a 1D
+  ride down the piste's own far-grid profile (friction, drag, colour speed cap, bend limit, slalom section capped 12 m/s) x 1.10,
+  rounded up to 0.5 s; the careful scripted skier makes it on nearly every piste (harness D prints `bot time / ★2 target`: median
+  0.94-0.95, p90 ~1.0). ★3 drawn per piste from its id (FNV): slalom pistes "all gates clean", else nocrash / flags (4-10 flags along
+  the line, alternating sides, `views.js createFlagsView`, one instanced draw call) / speed (85 % of the profile's tuck top speed,
+  5 km/h steps, 40-105). Stars = bit mask per piste under `"<resort>/<hash5 of id>"`, OR-ed, never lost.
+- **Unlocks**: greens / blues always open; reds / blacks at `UNLOCK[rid]` stars in that resort (Killy 6 / 18, 3 Vallées 8 / 24, Zermatt
+  5 / 15, Arlberg 6 / 18, Kronplatz 4 / 12); a piste with a best time, a run or a star is always open. Old saves: a best time = ★1
+  (`migrateStars`). The map opens on an open piste (`openPisteNear`: the resort's start piste if open, else the open piste whose top is
+  nearest to it). Outfits Neon 10 ★, Retro 30, Gold 60, Weltcup 120 (OUTFITS `stars`); the six old ones stay free.
+- **Cloud save** (`cloud.js`): arcade game_saves row `ski` via the `__pbSave` / `__pbWantSave` / `__pbLoadSave` protocol (as MTB). The
+  record is compact: `{ v, tb: total stars (monotone, the keep-progress trigger), s: {rid: "hhhhhm…"}, p: {rid: park points},
+  b: {rid: "hhhhhtttttt…" best times, dropped first} }`; all 746 pistes x 3 stars ≈ 4.6 KB. Merge = union. Test mode: nothing.
+- **Snow park** (`park.js`): `resort.json "park"` from `scripts/ski/park_osm.py` (OSM `piste:type=snow_park`, new fetch_osm layer
+  `parks`; fun zones / cross / kids parks skipped) + `scripts/ski/park_site.mjs <rid>` (straight line down the fall line 260-420 m,
+  scored on gradient / smoothness / open snow / lift; else placed by a lift). bake.py keeps an existing `park`. Parks: Killy
+  "Snowpark Grattalu" (Tignes), 3 Vallées "VT Park", Zermatt "Snowpark Furggsattel", Kronplatz "Korer Snow Park" (260 m, no L),
+  Arlberg "SANTON Park" (Rendl, 260 m). The corridor (hw 18 m + 10 m feather) is flattened to the baked profile through
+  `createField({ park })` (no relief / piste kickers inside, counts as groomed). Features in lanes: kickers S/M/L (terrain:
+  run-up h = H q^3.4, table, landing), 2 boxes + 2 rails (objects, fed by 6 m snow ramps), halfpipe (2.8 m deep, 45° walls on the
+  lattice) when the line is ≥ 340 m. Physics `stepPark` around stepSkier: run-up holds the skier down, the lip launches him along
+  its analytic slope (the 2.5 m lattice rounds lips off), rail capture / slide (steer = across), pipe lip turns the flight upward,
+  soft speed check 15 m/s. `skier.js` trick mode (`world.tricks`): spin 9 rad/s by steering, flip 6.6 rad/s by pitch, grab = trick
+  held, settling onto the nearest half turn / flip without input, landing judged (clean / sketchy / fall; SKI.spin*/flip*).
+  Judge (`createTrickJudge`): spins 180-1080, flips, grabs, air time, feature multiplier (S 1, M 1.3, L 1.6, pipe 1.25, natural
+  0.6), sketchy x0.5, combo x1.25 per trick within 4 s (max x3), a fall loses the open combo. Board `ski-<rid>-park`, stored
+  **1,000,000 - points** (all ski-* boards stay lower-is-better), format `skipark` in pixelbreak-records.js (?v=71); make_sql.py
+  adds `max_ms` to ski_board_floors and one row per park (stored 750,000..999,999 = 1..250,000 points). SQL NOT applied.
+  Park view (`views.js createParkView`): one merged mesh (rails, boxes, legs, lip paint, coping dashes, nets, sign).
+- **Controls**: F / Shift = trick (grab), W / S in the air = flip, steer in the air = spin, L / Enter = ride the lift; touch: a
+  Trick button (park / free ride) + the pad dragged up / down while Trick is held = flip; gamepad Y, stick.
+- **Free ride all day** (`freeride.js`): map tab "Fräi fueren" lists every lift (dots on the map, tap one); start on the piste that
+  begins nearest its top. No clock, off-piste anywhere inside the box (150 m margin), rails slide here too. At a lift bottom (28 m,
+  < 6 m/s) "Mam Lift erop" (L): fade, wait for the top's tiles (≤ 4 s), up; the clock moves on by the ride time. Day clock 9:00 ->
+  16:30 (1 game hour = 4 real min); `env.setDayHour` blends the three looks while the time choice is "Zoufälleg" (a fixed time
+  keeps its light). HUD: clock, km / vertical / lifts, minimap (`minimap.js`, 1.4 km, north up).
+- Tests: `node pb/ski/harness.js <rid> --park` (section E, `modes/park-check.js`: every kicker, 360 / 720 grab / backflip, every
+  rail / box, the pipe, a scored run; all 5 resorts green); flows `ski-challenges`, `ski-park`, `ski-freeride` (+ ski, ski-resorts,
+  ski-ipad-start seeded / adjusted: reds need stars now). Shots: `~/Library/Caches/ski-work/round4a/`.
+- Still rough: kickers are snow-shaded terrain (the lip paint marks them; no side walls); the pipe is a mini-pipe on the 2.5 m
+  lattice; the scripted park rider rarely gets pipe air (players do with a steep line); trick button + pad flip not yet tried on a
+  real iPad; MODES.challenge is only an alias (every run is the challenge).

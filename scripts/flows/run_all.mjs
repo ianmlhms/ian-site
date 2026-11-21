@@ -92,6 +92,9 @@ import { flow as skiGame } from "./ski.mjs";
 import { flow as skiIpadStart } from "./ski_ipad_start.mjs";
 import { flow as skiResorts } from "./ski_resorts.mjs";
 import { flow as skiMp } from "./ski_mp.mjs";
+import { flow as skiChallenges } from "./ski_challenges.mjs";
+import { flow as skiPark } from "./ski_park.mjs";
+import { flow as skiFreeride } from "./ski_freeride.mjs";
 import { flow as mtbIpadStart } from "./mtb_ipad_start.mjs";
 import { flow as gameCache } from "./game_cache.mjs";
 import { flow as halloween } from "./halloween.mjs";
@@ -99,7 +102,7 @@ import { flow as homePage } from "./home_page.mjs";
 import { flow as advent } from "./advent.mjs";
 import { flow as webcamArcade, flowCamera as webcamArcadeCamera, flowPortrait as webcamArcadePortrait } from "./webcam_arcade.mjs";
 
-const ALL = [homePage, advent, webcamArcade, webcamArcadeCamera, webcamArcadePortrait, gameCache, halloween, mtbWorld, mtbHoles, mtbRide, mtbTrails, mtbMenu, mtbTouch, mtbSmooth, mtbIpadStart, skiGame, skiIpadStart, skiResorts, skiMp, fouerWorld, fouerModels, fouerBigModels, fouerGame, fouerMigration, fouerWalk, fouerRides, fouerAccess, fouerLaunch, fouerIpadStart, invitePop, invitesLight, mpLobbyConnect4, mpLobbySlf, mpLobbyQuick, mpLobbyGames, mpLobbyColor, mpLobbyParty, mpLobbyArcade, mpLobbyRoulette, mpLobbyBlackjack, trainSim, trainSimAudio, trainSimTouch, trainSimOverlap, trainSimCareerLock, trainSimResumeCloud, trainSimWorld, trainSimRoutes, trainSimAbroad, trainSimTramHoles, trainSimStock, trainSimTiming, trainSimOverbridges, trainSimIpadStart, paketExpress, kartLetzebuerg, kartLetzebuergMp, kartLetzebuergArcade, clientCommands, inboxCloud, busTycoon, newGroup, addMember, mediaCache, friendsAdd, geldPage, slfRound, arcadePad, leaderboardTags, adminOnlineNotice, adminKartSaves, ccSigninHint, accountCheck, quickLogin, profilePage, arcadeWeeklyStreak, idleRebirthHalloween, idleMoreContent, idleSoftcap, idleLiveGift, idleResetSafety, leaderboardBigScores, driveMadLevels, testMode, mordsfall, kartIpadStart, small3dIpadStart];
+const ALL = [homePage, advent, webcamArcade, webcamArcadeCamera, webcamArcadePortrait, gameCache, halloween, mtbWorld, mtbHoles, mtbRide, mtbTrails, mtbMenu, mtbTouch, mtbSmooth, mtbIpadStart, skiGame, skiIpadStart, skiResorts, skiMp, skiChallenges, skiPark, skiFreeride, fouerWorld, fouerModels, fouerBigModels, fouerGame, fouerMigration, fouerWalk, fouerRides, fouerAccess, fouerLaunch, fouerIpadStart, invitePop, invitesLight, mpLobbyConnect4, mpLobbySlf, mpLobbyQuick, mpLobbyGames, mpLobbyColor, mpLobbyParty, mpLobbyArcade, mpLobbyRoulette, mpLobbyBlackjack, trainSim, trainSimAudio, trainSimTouch, trainSimOverlap, trainSimCareerLock, trainSimResumeCloud, trainSimWorld, trainSimRoutes, trainSimAbroad, trainSimTramHoles, trainSimStock, trainSimTiming, trainSimOverbridges, trainSimIpadStart, paketExpress, kartLetzebuerg, kartLetzebuergMp, kartLetzebuergArcade, clientCommands, inboxCloud, busTycoon, newGroup, addMember, mediaCache, friendsAdd, geldPage, slfRound, arcadePad, leaderboardTags, adminOnlineNotice, adminKartSaves, ccSigninHint, accountCheck, quickLogin, profilePage, arcadeWeeklyStreak, idleRebirthHalloween, idleMoreContent, idleSoftcap, idleLiveGift, idleResetSafety, leaderboardBigScores, driveMadLevels, testMode, mordsfall, kartIpadStart, small3dIpadStart];
 const words = process.argv.slice(2);
 const flows = words.length ? ALL.filter((f) => words.some((w) => f.name.includes(w))) : ALL;
 if (!flows.length) { console.error(`No flow matches: ${words.join(", ")}\nAvailable: ${ALL.map((f) => f.name).join(", ")}`); process.exit(2); }

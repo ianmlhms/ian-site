@@ -146,7 +146,9 @@ export function createKickers(pistes) {
  *   far     = decoded MBG1 grid (nodes at -margin + i * farStep)
  *   classes = { nx, nz, data: Uint8Array } (cells of DATA.classStep m, bit field resort.classes.bits)
  */
-export function createField({ resort, far, classes, net, kickers = createKickers(resort.pistes) }) {
+export function createField({ resort, far, classes, net, kickers = createKickers(resort.pistes), park = null }) {
+  // park (round 4A, pb/ski/modes/park.js): { mask(x, z) 0..1, shape(x, z, base, lod) } flattens the snow park corridor to its baked profile
+  // and adds its kickers / halfpipe; inside it the piste relief and the piste kickers are off and the snow counts as groomed piste.
   const bits = resort.classes.bits;
   const margin = resort.far.margin, farStep = resort.far.step;
   const tilesX = resort.tiles.nx, tilesZ = resort.tiles.nz;
@@ -256,11 +258,13 @@ export function createField({ resort, far, classes, net, kickers = createKickers
     out.built = classShare(x, z, bits.built);
     out.water = classShare(x, z, bits.water);
     out.glacier = classShare(x, z, bits.glacier);
+    out.park = park ? park.mask(x, z) : 0;
+    if (out.park > 0) { out.piste = Math.max(out.piste, out.park); out.dist = -1; }
     return out;
   }
 
   function relief(x, z, a) {
-    const calm = (1 - a.built) * (1 - a.water);
+    const calm = (1 - a.built) * (1 - a.water) * (1 - (a.park || 0));
     if (calm <= 0) return 0;
     const drift = (valueNoise(x / RELIEF.driftScale, z / (RELIEF.driftScale * 0.6), 3) * 2 - 1) * 0.7 + (valueNoise(x / 7.3, z / 9.1, 5) * 2 - 1) * 0.3;
     const roll = valueNoise(x / RELIEF.pisteScale, z / RELIEF.pisteScale, 9) * 2 - 1;
@@ -269,13 +273,15 @@ export function createField({ resort, far, classes, net, kickers = createKickers
 
   const scratch = { piste: 0, diff: -1, forest: 0, rock: 0, built: 0, water: 0, glacier: 0 };
   /** Full-detail height with attributes already known (the physics lattice). */
-  function heightWith(x, z, a) { return baseHeight(x, z) + relief(x, z, a) + kickers.at(x, z); }
+  const ground = (x, z, a, lod) => (park && a.park > 0 ? park.shape(x, z, baseHeight(x, z), lod) : baseHeight(x, z));
+  function heightWith(x, z, a) { return ground(x, z, a, LATTICE) + relief(x, z, a) + kickers.at(x, z) * (1 - (a.park || 0)); }
   function height(x, z) { return heightWith(x, z, attrs(x, z, scratch)); }
   /** What a lattice of spacing `lod` shows: the relief fades out between 2.5 and 10 m spacing (it cannot be sampled coarser). */
   function heightForStep(x, z, lod, a) {
     const k = 1 - smoothstep(LATTICE, 10, lod);
-    if (k <= 0) return baseHeight(x, z);
-    return baseHeight(x, z) + k * (relief(x, z, a || attrs(x, z, scratch, lod)) + kickers.at(x, z));
+    const at = a || attrs(x, z, scratch, lod);
+    if (k <= 0) return ground(x, z, at, lod);
+    return ground(x, z, at, lod) + k * (relief(x, z, at) + kickers.at(x, z) * (1 - (at.park || 0)));
   }
 
   /** A height tile arrived: returns the world rectangle whose heights changed (the tile + the feather of its neighbours). */
@@ -291,7 +297,7 @@ export function createField({ resort, far, classes, net, kickers = createKickers
   function groomDir(x, z, out) { net.query(x, z, gq); out.x = gq.gx; out.z = gq.gz; return out; }
 
   return {
-    baseHeight, height, heightWith, kickers, heightForStep, attrs, farHeight, addTile, groomDir,
+    baseHeight, height, heightWith, kickers, park, heightForStep, attrs, farHeight, addTile, groomDir,
     hasTile: (tx, tz) => tiles.has(tx * 1000 + tz),
     isShipped: (tx, tz) => shipped.has(tx * 1000 + tz),
     tileCount: () => tiles.size,

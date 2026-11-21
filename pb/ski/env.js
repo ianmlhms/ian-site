@@ -16,6 +16,7 @@ export const WEATHER_LABEL = Object.freeze({ random: 'Zoufälleg', sun: 'Sonn', 
 export const WEATHER_ICON = Object.freeze({ sun: '☀️', cloudy: '☁️', snow: '🌨️', fog: '🌫️' });
 export const TIME_ICON = Object.freeze({ morning: '🌅', midday: '🕛', evening: '🌇' });
 const STORE = Object.freeze({ time: 'pb_ski_time', weather: 'pb_ski_weather' });
+const DAY_KEYS = Object.freeze({ morning: 9.5, midday: 12.5, evening: 16.2 });       // the hour each look stands for (free ride day clock)
 
 const c = (r, g, b) => [r, g, b];
 /* sun azimuth (deg from north, clockwise) and elevation; colours are display values (the renderer does no sRGB conversion) */
@@ -103,6 +104,18 @@ export function createEnv({ scene, noise, params = {} }) {
       shadowTarget = 1;
     }, undefined, (error) => console.warn('[ski] shadow raster failed', error && error.message));
   }
+  // round 4A free ride: a day clock (hours) blends the light between the three times of day while the time choice is "random"
+  let dayHour = null;
+  const blendTimes = (h) => {
+    const keys = [[DAY_KEYS.morning, TIMES.morning], [DAY_KEYS.midday, TIMES.midday], [DAY_KEYS.evening, TIMES.evening]];
+    if (h <= keys[0][0]) return TIMES.morning;
+    if (h >= keys[2][0]) return TIMES.evening;
+    const i = h < keys[1][0] ? 0 : 1;
+    const t = (h - keys[i][0]) / (keys[i + 1][0] - keys[i][0]);
+    const a = keys[i][1], b = keys[i + 1][1], out = {};
+    for (const k of Object.keys(a)) out[k] = Array.isArray(a[k]) ? lerp3(a[k], b[k], t) : lerp(a[k], b[k], t);
+    return out;
+  };
   let cur = { ...WEATHER[weatherId] };
   let curTime = { ...TIMES[timeId] };
   const state = { timeId, weatherId, timeMode, weatherMode, snowfall: 0 };
@@ -114,7 +127,7 @@ export function createEnv({ scene, noise, params = {} }) {
 
   function apply(dt, snap) {
     const k = snap ? 1 : Math.min(1, dt * 0.7);
-    const tw = WEATHER[weatherId], tt = TIMES[timeId];
+    const tw = WEATHER[weatherId], tt = dayHour === null ? TIMES[timeId] : blendTimes(dayHour);
     for (const key of Object.keys(tw)) cur[key] = lerp(cur[key], tw[key], k);
     for (const key of Object.keys(tt)) curTime[key] = Array.isArray(tt[key]) ? lerp3(curTime[key], tt[key], k) : lerp(curTime[key], tt[key], k);
     const T = curTime;
@@ -213,7 +226,14 @@ export function createEnv({ scene, noise, params = {} }) {
     cycleTime, cycleWeather, setTime, setWeather,
     /** urlOf(timeId) -> the shadow raster URL; rect = [x0, z0, width, depth] of the raster in world metres (pixel edges). */
     setShadows(urlOf, rect) { shadowUrl = urlOf; u.uShadowRect.value.set(rect[0], rect[1], rect[2], rect[3]); shadowFor = null; loadShadow(); },
-    sunDir: () => TIMES[timeId],
+    sunDir: () => (dayHour === null ? TIMES[timeId] : blendTimes(dayHour)),
+    /** Round 4A free ride: the light follows this hour (null = the chosen time of day again); the shadow raster of the nearest time. */
+    setDayHour(h) {
+      dayHour = h === null || timeMode !== 'random' ? null : h;
+      if (dayHour === null) return;
+      const near = dayHour < (DAY_KEYS.morning + DAY_KEYS.midday) / 2 ? 'morning' : dayHour < (DAY_KEYS.midday + DAY_KEYS.evening) / 2 ? 'midday' : 'evening';
+      if (near !== timeId) { timeId = near; state.timeId = near; loadShadow(); }
+    },
     /** 0..1: how much sun reaches the skier (main.js marches a ray to the sun over the terrain); dims the sun on the plain materials. */
     setSunScale(k) { sunScale = sunScale + (k - sunScale) * 0.25; },
     /** 0..1: how strong the sun is now (weather share; shadows are skipped below 0.3). */

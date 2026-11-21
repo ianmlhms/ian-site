@@ -93,7 +93,7 @@ export const flow = {
       const secGo = (tGo - t0) / 1000;
       console.log(`    skiing after ${secGo.toFixed(1)} s (incl. the ${COUNTDOWN_SECONDS} s countdown), ${(bytesUntil(tGo) / MB).toFixed(2)} MB`);
       h.expect(secGo <= MAX_SECONDS + COUNTDOWN_SECONDS + 1, `skiing within ${MAX_SECONDS} s + the countdown (${secGo.toFixed(1)} s)`);
-      const touch = await page.evaluate(() => { const r = (s) => document.querySelector(s).getBoundingClientRect(); const pad = r("#touchControls .pad"); const btns = [...document.querySelectorAll("#touchControls .tbtn")].map((b) => b.getBoundingClientRect()); const area = pad.width * pad.height + btns.reduce((s, b) => s + b.width * b.height, 0); return { visible: !document.getElementById("touchControls").hidden, share: area / (innerWidth * innerHeight), minSide: Math.min(pad.height, ...btns.map((b) => Math.min(b.width, b.height))) }; });
+      const touch = await page.evaluate(() => { const r = (s) => document.querySelector(s).getBoundingClientRect(); const pad = r("#touchControls .pad"); const btns = [...document.querySelectorAll("#touchControls .tbtn:not([hidden])")].map((b) => b.getBoundingClientRect()); const area = pad.width * pad.height + btns.reduce((s, b) => s + b.width * b.height, 0); return { visible: !document.getElementById("touchControls").hidden, share: area / (innerWidth * innerHeight), minSide: Math.min(pad.height, ...btns.map((b) => Math.min(b.width, b.height))) }; });
       h.expect(touch.visible && touch.share < 0.15 && touch.minSide >= 44, `touch controls shown, ${(touch.share * 100).toFixed(1)} % of the screen, smallest target ${Math.round(touch.minSide)} px`);
       await h.pause(2500);
       await h.shot("ipad-ski");

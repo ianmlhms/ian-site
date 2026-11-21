@@ -24,6 +24,11 @@ export const OUTFITS = Object.freeze([
   { id: 'greng', name: 'Gréng', jacket: 0x2f8f5b, accent: 0xf28a1c, trousers: 0x23262b, helmet: 0xf3f3f1, ski: 0xf28a1c },
   { id: 'rosa', name: 'Rosa', jacket: 0xe85d9c, accent: 0xffffff, trousers: 0x3b3f6e, helmet: 0xf6f2f4, ski: 0x6e4fd0 },
   { id: 'schwaarz', name: 'Schwaarz', jacket: 0x22252b, accent: 0xff6a1a, trousers: 0x22252b, helmet: 0xff6a1a, ski: 0x9aa3ad },
+  // round 4A: unlocked by the total of stars over all resorts (modes/challenges.js outfitOpen)
+  { id: 'neon', name: 'Neon', jacket: 0xc6f01e, accent: 0xff2e88, trousers: 0x1b1d22, helmet: 0xff2e88, ski: 0xc6f01e, stars: 10 },
+  { id: 'retro', name: 'Retro', jacket: 0x6a3fb5, accent: 0x31c4c9, trousers: 0xf0e6d2, helmet: 0xf0e6d2, ski: 0xf2a21c, stars: 30 },
+  { id: 'gold', name: 'Gold', jacket: 0xd9a520, accent: 0x1b1d22, trousers: 0x1b1d22, helmet: 0xe8c25a, ski: 0x1b1d22, stars: 60 },
+  { id: 'weltcup', name: 'Weltcup', jacket: 0xffffff, accent: 0xd0352c, trousers: 0xd0352c, helmet: 0xd0352c, ski: 0xffffff, stars: 120 },
 ]);
 const OUTFIT_KEY = 'pb_ski_outfit';
 export function readOutfit() {
@@ -195,7 +200,8 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {})
 
   const tmp = { x: 0, y: 1, z: 0 };
   const qN = new THREE.Quaternion(), qH = new THREE.Quaternion(), nv = new THREE.Vector3(), Y_AXIS = new THREE.Vector3(0, 1, 0);
-  let lastEdge = 0, plant = 0, plantSide = 1, prevT = 0, smEdge = 0, smCrouch = 0, smPlough = 0, smAir = 0;
+  let lastEdge = 0, plant = 0, plantSide = 1, prevT = 0, smEdge = 0, smCrouch = 0, smPlough = 0, smAir = 0, lastGrab = 0, smGrab = 0;
+  const HIP_PIVOT = 0.85;                    // flips turn the body round the hips, not the feet
   /** state = physics state; normal(x, z, out) = slope normal; t = time (s); ground(x, z) = snow height (for the blob in the air). */
   function pose(state, normal, t, ground) {
     const dt = clamp(t - prevT, 0, 0.1); prevT = t;
@@ -207,10 +213,17 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {})
     const along = tmp.x * fx + tmp.z * fz;                          // > 0 when the slope falls away ahead
     const across = -tmp.x * fz + tmp.z * fx;
     tilt.rotation.set(0, 0, -Math.atan2(along, tmp.y) * (state.grounded ? 1 : 0.4));
+    // round 4A tricks: a flip pitches the whole figure round the hips; a grab (the trick button held in the air) pulls the knees up
+    // and one hand down to the ski
+    const flip = !state.grounded && state.flip ? -state.flip : 0;
+    if (flip) { tilt.rotation.z += flip; tilt.position.set(HIP_PIVOT * Math.sin(flip), HIP_PIVOT * (1 - Math.cos(flip)), 0); } else tilt.position.set(0, 0, 0);
+    const grabbing = !state.grounded && (state.grab || 0) > lastGrab;
+    lastGrab = state.grounded ? 0 : state.grab || 0;
+    smGrab += ((grabbing ? 1 : 0) - smGrab) * Math.min(1, dt * 14);
     // smoothed drivers
     smEdge += (clamp(state.edge, -1.1, 1.1) - smEdge) * k;
     const landing = state.landed > 0 ? Math.sin(Math.min(1, state.landed / 0.35) * Math.PI) : 0;
-    smCrouch += (clamp(state.tuck * 0.95 + landing * 0.8, 0, 1) - smCrouch) * k;
+    smCrouch += (clamp(state.tuck * 0.95 + landing * 0.8 + smGrab, 0, 1) - smCrouch) * k;
     smPlough += (clamp(state.brake, 0, 1) - smPlough) * k;
     smAir += ((state.grounded ? 0 : Math.min(1, state.air * 2.5)) - smAir) * k;
     const edge = smEdge, crouch = smCrouch, plough = smPlough, air = smAir;
@@ -252,6 +265,10 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {})
       const p = plant * (A.side === plantSide ? 1 : 0);
       A.sh.rotation.set(-A.side * (0.18 + air * 0.7 + plough * 0.1 - crouch * 0.12), 0, 0.55 + crouch * 1.05 + p * 0.45 + air * 0.25);
       A.elbow.rotation.set(0, 0, 0.55 + crouch * 0.85 - air * 0.3 + Math.sin(t * 2.6 + i) * 0.02);
+      if (smGrab > 0.05 && A.side > 0) {                         // the grab hand reaches down the outside of the right ski
+        A.sh.rotation.set(-0.35 * smGrab, 0, A.sh.rotation.z + (1.9 - A.sh.rotation.z) * smGrab);
+        A.elbow.rotation.z += (0.15 - A.elbow.rotation.z) * smGrab;
+      }
       A.pole.rotation.set(A.side * 0.12, 0, -(0.95 + crouch * 1.25) + p * 0.75);       // poles trail back, tips near the snow
     }
     // crash: roll over and slide, then lie still
