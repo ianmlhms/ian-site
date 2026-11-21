@@ -246,7 +246,15 @@ export function createAvalanches({ scene, field, surface, pistes, hud, uiRoot, l
     for (const cb of listeners) { try { cb({ id, seed, t }); } catch (error) { console.warn('[ski] avalanche listener failed', error); } }
   }
   /** Each frame: release check (free ride, grounded skier), the flow (fixed steps up to now), caught / escaped, the view. */
+  let flagT = 0;
   function update(st, dt, { freeride = false, running = false } = {}) {
+    flagT += dt;
+    if (st && flagT > 1) {                       // the warning flags only cost draw calls where one is within 1.5 km
+      flagT = 0;
+      let near = false;
+      for (const f of flags) if (Math.abs(f.x - st.x) < 1500 && Math.abs(f.z - st.z) < 1500) { near = true; break; }
+      flagMesh.visible = postMesh.visible = near;
+    }
     if (st && freeride && running && !active && st.grounded && st.crash === 0 && st.speed > 2) {
       const id = cellId(st.x, st.z);
       if (id !== lastCell) {
@@ -275,7 +283,7 @@ export function createAvalanches({ scene, field, surface, pistes, hud, uiRoot, l
       if (moving === 0 || target >= AV.maxTime) {
         active.done = true; active.doneAt = clock();
         document.documentElement.dataset.skiAvalanche = active.caught ? 'caught' : 'stopped';
-        if (!active.caught && active.near < 160) { stats.escaped++; hud.toast('Entkomm!', 2000); if (active.lawin) lawinWon(active.lawin); }
+        if (!active.caught && active.near < 300) { stats.escaped++; hud.toast('Entkomm!', 2000); if (active.lawin) lawinWon(active.lawin); }
       }
     }
     if (active && active.done && clock() - active.doneAt > 25) { active = null; document.documentElement.dataset.skiAvalanche = ''; }

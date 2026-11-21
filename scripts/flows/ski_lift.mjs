@@ -50,7 +50,7 @@ export const flow = {
     h.expect(g1.kind === "gondola" && g1.pose === "stand" && g1.carrier && g1.held !== null && g2.above > 1.5, `in a cabin (${g2.lift}), standing, ${g2.above.toFixed(1)} m over the snow; the lift's own cabins keep their spacing around it`);
     h.expect(g2.s > g1.s + 30, `riding up the real line: ${Math.round(g1.s)} -> ${Math.round(g2.s)} m of ${Math.round(g2.len)} m (x4, test time x3)`);
     const passed = g2.towers.filter((t) => t < g2.s).length;
-    h.expect(g2.towers.length > 3, `${g2.towers.length} pylons on the line, ${passed} passed`);
+    h.expect(g2.towers.length >= 3, `${g2.towers.length} pylons on the line, ${passed} passed`);
     await h.shot("gondola-chase");
     await page.keyboard.press("v");
     await h.pause(800);

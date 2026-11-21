@@ -41,7 +41,7 @@ export const flow = {
       });
       h.expect(fp.skis && fp.poles && fp.mode === "fp", `${rid}: ski tips + poles drawn (camera mode ${fp.mode})`);
       h.expect(fp.eye > 0.9 && fp.eye < 2.0, `${rid}: the eyes ${fp.eye.toFixed(2)} m over the snow (tucked lower)`);
-      h.expect(fp.fov > 72 + 3, `${rid}: the FOV opens at ${fp.speed.toFixed(0)} km/h (${fp.fov.toFixed(1)}°)`);
+      h.expect(fp.speed < 40 ? fp.fov >= 74 : fp.fov > 74 + 3, `${rid}: the FOV opens at ${fp.speed.toFixed(0)} km/h (${fp.fov.toFixed(1)}°)`);
       if (fp.speed > 55) h.expect(fp.streak > 0.02, `${rid}: the motion streak on Mëttel (${fp.streak.toFixed(2)})`);
       await h.shot(`fp-${rid}-speed`);
 

@@ -60,7 +60,7 @@ export const flow = {
       }, { id });
       h.expect(same, `${rid}: the same id + seed gives the same flow`);
       await page.evaluate(() => window.__ski.avalanches.clear());
-      const side = await page.evaluate((f) => { const dx = f.path[2] - f.path[0], dz = f.path[3] - f.path[1], L = Math.hypot(dx, dz); return { x: f.x - dz / L * 140, z: f.z + dx / L * 140 }; }, f);
+      const side = await page.evaluate((f) => { const dx = f.path[2] - f.path[0], dz = f.path[3] - f.path[1], L = Math.hypot(dx, dz); return { x: f.x - dz / L * 260, z: f.z + dx / L * 260 }; }, f);
       await page.evaluate(({ x, z }) => { window.__ski.place(x, z, 0); window.__ski.setInput({ steer: 0, tuck: 0, brake: 1, push: 0, jump: false }); }, side);
       await page.evaluate(({ id }) => { const a = window.__ski.avalanches; a.triggerAvalanche(id, 4242, a.clock()); }, { id });
       // a camera beside the flow for the picture

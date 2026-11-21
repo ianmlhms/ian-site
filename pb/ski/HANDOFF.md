@@ -493,7 +493,7 @@ hooks marked "R7-C" (main.js, map.js, game.js, markers.js, input.js, progress.js
   (no piste within 45 m, slope >= 35° over 6 m, no forest / rock / houses), roll = rng(sessionSeed ^ hash(cell)) < 0.06. Slab = blocks
   on a crown 18-32 m above the cell, width 50-110 m; flow on the 40 m FAR grid (the same on every device), fixed 1/30 s steps, friction
   tan 22° growing after 380 m of travel, drag; caught = a moving block within 7 m -> crash 'avalanche', white-out, respawn on the nearest
-  piste (60 m up it); escaped (it stopped, never closer than 160 m... or outrun) -> "Entkomm!". Drawn: tumbling blocks (instanced
+  piste (60 m up it); escaped (it stopped without catching him and came within 300 m) -> "Entkomm!". Drawn: tumbling blocks (instanced
   icosahedra) + soft cloud billboards (2 draw calls), yellow-black checkered warning flags (piste edges beside steep open faces + the
   face tops, 2 calls), HUD "⚠ Lawinegefor" on steep off-piste. **Lawin challenge**: 3 faces per resort (`findFaces`: steepest long open
   faces in the shipped tiles, a gentler second pass for wooded Kronplatz), prompt at the top -> Start -> the slab releases behind ->

@@ -823,7 +823,7 @@ async function boot() {
   }
   /** At "0": a start-gate kick down the course (COURSE.push m/s), no start from standstill. */
   function pushStart() {
-    if (!game.run || !game.piste || game.mode === MODES.freeride) return;
+    if (!game.run || !game.piste || game.mode !== MODES.run) return;          // challenges only (the park has its own drop-in)
     const a = game.piste.at(game.run.startS || 2, {});
     const s = game.state;
     game.state = { ...s, vx: a.dx * COURSE.push, vz: a.dz * COURSE.push, speed: COURSE.push, heading: Math.atan2(a.dz, a.dx) };
@@ -849,7 +849,8 @@ async function boot() {
   }
   /** Caught by an avalanche: a crash, then the respawn on the nearest piste (the free run's safe spot), never in the flow. */
   function avalancheCaught(st) {
-    const n = pistes.nearest(st.x, st.z, 5000);
+    let n = null;
+    for (const p of pistes.list) { const r = p.project(st.x, st.z, null, 0, {}); if (!n || r.dist < n.proj.dist) n = { piste: p, proj: r }; }      // the nearest piste, however far
     if (n && modes.freeRun) { const a = n.piste.at(Math.max(2, n.proj.s - 60), {}); modes.freeRun.moved({ x: a.x, z: a.z, heading: Math.atan2(a.dz, a.dx) }); }
     game.state = { ...game.state, crash: SKI.crashSeconds, crashKind: 'avalanche', vx: game.state.vx * 0.3, vz: game.state.vz * 0.3 };
     audio.event('crash');
