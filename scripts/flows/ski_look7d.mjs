@@ -111,22 +111,29 @@ export const flow = {
         // ---- a challenge gate: base white, banner in the piste colour (rendered pixels)
         const gate = await page.evaluate(async () => {
           const S = window.__ski, M = S.markers, list = M.list;
-          S.env.setTime("midday", false); S.env.snap();                            // a white base under the orange evening sun is orange
-          const i = list.findIndex((m) => !m.park && (m.diff === "red" || m.diff === "blue"));
+          const alone = (m) => list.every((o) => o === m || Math.hypot(o.x - m.x, o.z - m.z) > 35);      // no other gate in the picture
+          let i = list.findIndex((m) => !m.park && (m.diff === "red" || m.diff === "blue") && alone(m));
+          if (i < 0) i = list.findIndex((m) => !m.park && (m.diff === "red" || m.diff === "blue"));
           const m = list[i];
           const T = window.THREE;
           const mat4 = new T.Matrix4(); M.mesh.getMatrixAt(i, mat4);
           const base = new T.Vector3(0, 0.28, 3.5).applyMatrix4(mat4), banner = new T.Vector3(0, 2.9, 0).applyMatrix4(mat4);
           const hx = Math.cos(m.heading), hz = Math.sin(m.heading);
-          // a camera 7 m down the piste from the gate, looking at its right post at knee height
+          // the gates' own mesh and material, alone in a plain white light (no terrain or streaming in the way): what the shader does
+          // with the instance colour, seen 7 m down the piste, looking at the right post between its base and the banner
           const cam = new T.PerspectiveCamera(50, 1, 0.3, 3000);
-          cam.position.set(m.x + hx * 7 + hz * 1.5, S.surface.height(m.x, m.z) + 1.6, m.z + hz * 7 - hx * 1.5);
+          cam.position.set(m.x + hx * 7 + hz * 1.5, (base.y + banner.y) / 2 + 0.3, m.z + hz * 7 - hx * 1.5);
           cam.lookAt((base.x + banner.x) / 2, (base.y + banner.y) / 2, (base.z + banner.z) / 2);
           cam.updateMatrixWorld(); cam.updateProjectionMatrix();
-          S.setCamera(cam.position.x, cam.position.z, 1.6, m.x, m.z, 1.6, 50);       // streams the tiles there
-          await new Promise((r) => setTimeout(r, 1200));
+          const scene = new T.Scene(), parent = M.mesh.parent;
+          scene.background = new T.Color(0x000000);
+          const sun = new T.DirectionalLight(0xffffff, 1.6); sun.position.set(cam.position.x - m.x, 20, cam.position.z - m.z);
+          scene.add(new T.AmbientLight(0xffffff, 1.6), sun, sun.target); sun.target.position.set(0, 0, 0);
+          sun.position.add(new T.Vector3(m.x, 0, m.z)); sun.target.position.set(m.x, base.y, m.z);
+          scene.add(M.mesh);
           const W = 512, rt = new T.WebGLRenderTarget(W, W);
-          S.renderer.setRenderTarget(rt); S.renderer.render(S.scene, cam); S.renderer.setRenderTarget(null);
+          S.renderer.setRenderTarget(rt); S.renderer.render(scene, cam); S.renderer.setRenderTarget(null);
+          parent.add(M.mesh);
           const px = (p) => {
             const q = p.clone().project(cam), x = Math.round((q.x * 0.5 + 0.5) * W), y = Math.round((q.y * 0.5 + 0.5) * W);
             const out = new Uint8Array(4 * 9); S.renderer.readRenderTargetPixels(rt, x - 1, y - 1, 3, 3, out);
@@ -138,8 +145,8 @@ export const flow = {
           return res;
         });
         const sat = (c) => Math.max(...c) - Math.min(...c);
-        const want = gate.diff === "red" ? gate.banner.rgb[0] > gate.banner.rgb[2] + 30 : gate.banner.rgb[2] > gate.banner.rgb[0] + 30;
-        h.expect(gate.tint && sat(gate.base.rgb) < 50 && gate.base.rgb[0] - gate.base.rgb[1] < 25 && Math.min(...gate.base.rgb) > 90, `${rid} ${q}: gate base stays white / neutral: rgb ${gate.base.rgb.join(",")} at ${gate.base.at}`);
+        const want = gate.diff === "red" ? gate.banner.rgb[0] > gate.banner.rgb[2] + 30 && gate.banner.rgb[0] > gate.banner.rgb[1] + 20 : gate.banner.rgb[2] > gate.banner.rgb[0] + 30;
+        h.expect(gate.tint && sat(gate.base.rgb) < 30 && Math.min(...gate.base.rgb) > 120, `${rid} ${q}: gate base stays white / neutral: rgb ${gate.base.rgb.join(",")} at ${gate.base.at}`);
         h.expect(want, `${rid} ${q}: gate banner wears the ${gate.diff} piste colour: rgb ${gate.banner.rgb.join(",")}`);
 
         // ---- shaders: nothing logged, every program runnable
