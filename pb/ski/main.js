@@ -247,7 +247,8 @@ async function boot() {
     if (!mapScreen || !game.piste) return;
     const p = game.piste;
     const pending = streamer.pendingNear(p.top.x, p.top.z, 1500);
-    const ready = pending === 0 && terrain.stats.pending === 0;
+    // once a piste was ready it stays ready (tiles streaming in elsewhere re-queue terrain work: Start must not flicker off under a tap)
+    const ready = readyFor === p.id || (pending === 0 && terrain.stats.pending === 0);
     mapScreen.status(ready ? 'Prett.' : `Pist gëtt gelueden … (${pending} Stécker)`, ready);
     document.documentElement.dataset.skiStartReady = ready ? '1' : '0';
     readyFor = ready ? p.id : null;
