@@ -6,7 +6,7 @@
 const THREE = window.THREE;
 
 /** Merge [geometry, colour hex, matrix] parts into one non-indexed geometry with a colour attribute. */
-function mergeParts(parts) {
+export function mergeParts(parts) {
   let count = 0;
   const flat = parts.map(([geo, color, matrix]) => {
     const g = (geo.index ? geo.toNonIndexed() : geo.clone());

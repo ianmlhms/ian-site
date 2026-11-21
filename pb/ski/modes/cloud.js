@@ -4,7 +4,8 @@
  * limit of game_saves even with every star of all five resorts):
  *   { v: 1, tb: total stars (monotone: the game_saves_keep_progress trigger keeps the save with more), s: { <resort>: "hhhhhm..." }
  *     (5 characters of piste-id hash + the star mask digit per piste), p: { <resort>: best park points }, b: { <resort>: "hhhhhtttttt..." }
- *     (best times in ms, base 36, dropped first when the record would not fit) }
+ *     (best times in ms, base 36, dropped first when the record would not fit), x: { o: metres off the piste, t: top speed in
+ *     0.1 m/s, k: the picked ski type } (round 6: the ski unlocks; an old game ignores it, an old record without it reads as zero) }
  * Merging is always a union: stars OR-ed, park points and times keep the better one. Nothing is ever taken away from a player.
  * Test mode (window.__pbTestMode): nothing is sent or applied (the arcade keeps test saves apart). Standalone: local only. */
 import { cleanMask, starCount, totalStars } from './challenges.js';
@@ -32,7 +33,8 @@ export function encodeCloud(progress) {
     const rid = k.slice(0, cut);
     b[rid] = (b[rid] || '') + k.slice(cut + 1) + Math.round(ms).toString(36).padStart(TIME, '0');
   }
-  const rec = { v: CLOUD_VERSION, tb: totalStars(progress), s, p, b };
+  const st = progress.stats || {};
+  const rec = { v: CLOUD_VERSION, tb: totalStars(progress), s, p, b, x: { o: Math.round(st.off || 0), t: Math.round((st.top || 0) * 10), k: typeof progress.ski === 'string' ? progress.ski : 'allmountain' } };
   if (JSON.stringify(rec).length > LIMIT) delete rec.b;            // best times go first (the boards keep them anyway)
   return rec;
 }
@@ -58,7 +60,10 @@ export function decodeCloud(raw) {
       if (ms > 0) bestHash[`${rid}/${text.slice(i, i + HASH)}`] = ms;
     }
   }
-  return { stars, park, bestHash };
+  const x = isRecord(data.x) ? data.x : {};
+  const stats = { off: Number.isFinite(x.o) && x.o > 0 ? Math.min(1e8, Math.round(x.o)) : 0, top: Number.isFinite(x.t) && x.t > 0 ? Math.min(60, x.t / 10) : 0 };
+  const ski = typeof x.k === 'string' && /^[a-z]{2,16}$/.test(x.k) ? x.k : null;
+  return { stars, park, bestHash, stats, ski };
 }
 
 /** A NEW progress with a decoded cloud record merged in (stars OR-ed, the better park score and time). */
@@ -70,12 +75,14 @@ export function mergeCloud(progress, cloud) {
   for (const [rid, pts] of Object.entries(cloud.park)) park[rid] = Math.max(park[rid] || 0, pts);
   const bestHash = { ...(progress.bestHash || {}) };
   for (const [k, ms] of Object.entries(cloud.bestHash)) if (!(bestHash[k] > 0) || ms < bestHash[k]) bestHash[k] = ms;
-  return { ...progress, stars, park, bestHash };
+  const mine = progress.stats || { off: 0, top: 0 }, theirs = cloud.stats || { off: 0, top: 0 };
+  const stats = { off: Math.max(mine.off || 0, theirs.off || 0), top: Math.max(mine.top || 0, theirs.top || 0) };
+  return { ...progress, stars, park, bestHash, stats };
 }
 
 /** Did the merge add anything? (stars, park points, times) */
 export function cloudGain(before, after) {
-  const count = (p) => totalStars(p) * 1e6 + Object.values(p.park || {}).reduce((a, b) => a + b, 0);
+  const count = (p) => totalStars(p) * 1e6 + Object.values(p.park || {}).reduce((a, b) => a + b, 0) + ((p.stats && p.stats.off) || 0) * 1e-3 + ((p.stats && p.stats.top) || 0) * 1e-6;
   return count(after) !== count(before) || Object.keys(after.bestHash || {}).length !== Object.keys(before.bestHash || {}).length;
 }
 

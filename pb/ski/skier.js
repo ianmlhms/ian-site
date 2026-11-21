@@ -43,16 +43,17 @@ export function stepSkier(prev, input, world, dt = SKI.dt) {
 }
 
 function groundStep(s, input, world, dt) {
+  const K = world.ski || SKI;          // round 6: the ski type's numbers (modes/skis.js), else the reference set
   world.normal(s.x, s.z, n);
   const snow = world.snow(s.x, s.z);
   s.snow = snow;
   let vx = s.vx, vy = s.vy, vz = s.vz;
   let v = Math.hypot(vx, vy, vz);
-  const grip = (SKI.gripPowder + (SKI.gripGroomed - SKI.gripPowder) * snow) * G * (1 - 0.35 * s.brake);
+  const grip = (K.gripPowder + (K.gripGroomed - K.gripPowder) * snow) * G * (1 - 0.35 * s.brake);
 
   // heading: pivots freely when slow, carves (limited by grip / speed) when fast
-  const authority = (1 - s.tuck * (1 - SKI.tuckSteer)) * (1 - s.brake * (1 - SKI.brakeSteer));
-  const rate = Math.min(SKI.pivotRate, SKI.carveGain * grip / Math.max(v, 0.6));
+  const authority = (1 - s.tuck * (1 - K.tuckSteer)) * (1 - s.brake * (1 - K.brakeSteer));
+  const rate = Math.min(K.pivotRate, K.carveGain * grip / Math.max(v, 0.6));
   s.heading = wrapAngle(s.heading + s.steer * rate * authority * dt);
 
   // skis direction in the slope plane, and the lateral axis
@@ -75,12 +76,12 @@ function groundStep(s, input, world, dt) {
   } else {
     const vf = vx * fx + vy * fy + vz * fz, vl = vx * lx + vy * ly + vz * lz;
     const theta = Math.atan2(vl, vf);
-    const want = theta * (1 - Math.exp(-SKI.edgeLock * dt));
+    const want = theta * (1 - Math.exp(-K.edgeLock * dt));
     const maxTurn = grip * dt / v;
     const turn = clamp(want, -maxTurn, maxTurn);
     const nt = theta - turn;
     slip = Math.abs(Math.sin(nt));
-    const scrub = SKI.skidLoss * slip * (0.6 + 1.4 * s.brake) * dt * 1.6;
+    const scrub = K.skidLoss * slip * (0.6 + 1.4 * s.brake) * dt * 1.6;
     const sp = v * Math.max(0, 1 - scrub);
     const c = Math.cos(nt), si = Math.sin(nt);
     vx = (fx * c + lx * si) * sp; vy = (fy * c + ly * si) * sp; vz = (fz * c + lz * si) * sp;
@@ -90,24 +91,24 @@ function groundStep(s, input, world, dt) {
   // resistances along the motion
   v = Math.hypot(vx, vy, vz);
   if (v > 1e-4) {
-    const mu = SKI.muPowder + (SKI.muGroomed - SKI.muPowder) * snow;
-    const cda = SKI.cdaUpright + (SKI.cdaTuck - SKI.cdaUpright) * s.tuck;
-    let dec = mu * G * n.y + 0.5 * SKI.airDensity * cda * v * v / SKI.mass + (1 - snow) * SKI.powderDrag * v * v;
-    dec += SKI.brakeDecel * s.brake * smoothstep(0, 2.5, v);
+    const mu = K.muPowder + (K.muGroomed - K.muPowder) * snow;
+    const cda = K.cdaUpright + (K.cdaTuck - K.cdaUpright) * s.tuck;
+    let dec = mu * G * n.y + 0.5 * K.airDensity * cda * v * v / K.mass + (1 - snow) * K.powderDrag * v * v;
+    dec += K.brakeDecel * s.brake * smoothstep(0, 2.5, v);
     const nv = Math.max(0, v - dec * dt);
     const k = nv / v;
     vx *= k; vy *= k; vz *= k;
     v = nv;
   }
   // skating on the flat
-  if ((input.push || 0) > 0 && v < SKI.pushMaxSpeed && s.brake < 0.5) {
-    let a = SKI.pushAccel * input.push * (1 - v / SKI.pushMaxSpeed);
+  if ((input.push || 0) > 0 && v < K.pushMaxSpeed && s.brake < 0.5) {
+    let a = K.pushAccel * input.push * (1 - v / K.pushMaxSpeed);
     // herringbone / side-step: slow, the skier walks up a short rise (a flat with a bump, the way back onto the piste) instead of
-    // sliding back: the push also beats the slope and the snow friction, up to SKI.climbMax
-    if (v < SKI.climbSpeed) {
+    // sliding back: the push also beats the slope and the snow friction, up to K.climbMax
+    if (v < K.climbSpeed) {
       const gf = G * n.y * (n.x * fx + n.z * fz) + (-G + G * n.y * n.y) * fy;          // gravity along the skis (< 0: uphill)
-      const mu = SKI.muPowder + (SKI.muGroomed - SKI.muPowder) * snow;
-      if (gf < 0.3) a += Math.min(Math.max(0, -gf) + mu * G * n.y, SKI.climbMax) * input.push * (1 - v / SKI.climbSpeed * 0.5);
+      const mu = K.muPowder + (K.muGroomed - K.muPowder) * snow;
+      if (gf < 0.3) a += Math.min(Math.max(0, -gf) + mu * G * n.y, K.climbMax) * input.push * (1 - v / K.climbSpeed * 0.5);
     }
     vx += fx * a * dt; vy += fy * a * dt; vz += fz * a * dt;
   }
@@ -115,7 +116,7 @@ function groundStep(s, input, world, dt) {
   const vn = vx * n.x + vy * n.y + vz * n.z;
   vx -= vn * n.x; vy -= vn * n.y; vz -= vn * n.z;
   v = Math.hypot(vx, vy, vz);
-  if (v > SKI.maxSpeed) { const k = SKI.maxSpeed / v; vx *= k; vy *= k; vz *= k; v = SKI.maxSpeed; }
+  if (v > K.maxSpeed) { const k = K.maxSpeed / v; vx *= k; vy *= k; vz *= k; v = K.maxSpeed; }
 
   // move, then stay on the ground or take off
   const nx2 = s.x + vx * dt, nz2 = s.z + vz * dt;
@@ -127,11 +128,11 @@ function groundStep(s, input, world, dt) {
   const fallAway = (vyNext - vyNow) / dt;                     // < 0: the ground drops away
   s.x = nx2; s.z = nz2;
   if (input.jump && s.jumpCd <= 0 && v > 1) {
-    s.vx = vx + n.x * SKI.jumpPop; s.vy = vyNow + n.y * SKI.jumpPop; s.vz = vz + n.z * SKI.jumpPop;
+    s.vx = vx + n.x * K.jumpPop; s.vy = vyNow + n.y * K.jumpPop; s.vz = vz + n.z * K.jumpPop;
     s.y = Math.max(ground, s.y + vyNow * dt) + 0.02;
-    s.grounded = false; s.air = 0; s.jumpCd = SKI.jumpCooldown;
+    s.grounded = false; s.air = 0; s.jumpCd = K.jumpCooldown;
     s.spin = 0; s.flip = 0; s.grab = 0;
-  } else if (fallAway < -SKI.leaveGround * G && v > 6) {
+  } else if (fallAway < -K.leaveGround * G && v > 6) {
     s.vx = vx; s.vy = vyNow; s.vz = vz;
     s.y = Math.max(ground, s.y + vyNow * dt);
     s.grounded = false; s.air = 0;
@@ -146,31 +147,33 @@ function groundStep(s, input, world, dt) {
 }
 
 function airStep(s, input, world, dt) {
+  const K = world.ski || SKI;
   s.air += dt;
   s.vy -= G * dt;
   const v = Math.hypot(s.vx, s.vy, s.vz);
-  const cda = SKI.cdaUpright + (SKI.cdaTuck - SKI.cdaUpright) * s.tuck;
-  const k = Math.max(0, 1 - 0.5 * SKI.airDensity * cda * v / SKI.mass * dt);
+  const cda = K.cdaUpright + (K.cdaTuck - K.cdaUpright) * s.tuck;
+  const k = Math.max(0, 1 - 0.5 * K.airDensity * cda * v / K.mass * dt);
   s.vx *= k; s.vy *= k; s.vz *= k;
-  const tricks = world.tricks === true;
+  // round 6: free ride = 'hold': the air turns into a trick only while the trick button is held (or a rotation is already going)
+  const tricks = world.tricks === true || (world.tricks === 'hold' && (input.trick || Math.abs(s.spin || 0) > 0.05 || Math.abs(s.flip || 0) > 0.05));
   if (tricks) {
     // snow park / free ride: steering spins (fast), up / down flips, the trick button grabs; judged at the landing
     // (the raw input, not the smoothed steer: a spin stops when the key is let go); without input the rotation settles onto the
     // nearest half turn / whole flip when it is close (a little landing help)
     const steer = clamp(input.steer || 0, -1, 1), pitch = clamp(input.pitch || 0, -1, 1);
-    let turn = steer * SKI.spinRate * dt;
-    if (Math.abs(steer) < 0.15) { const r = (s.spin || 0) - Math.round((s.spin || 0) / Math.PI) * Math.PI; if (Math.abs(r) < 0.9) turn = -Math.sign(r) * Math.min(Math.abs(r), SKI.spinSettle * dt); }
+    let turn = steer * K.spinRate * dt;
+    if (Math.abs(steer) < 0.15) { const r = (s.spin || 0) - Math.round((s.spin || 0) / Math.PI) * Math.PI; if (Math.abs(r) < 0.9) turn = -Math.sign(r) * Math.min(Math.abs(r), K.spinSettle * dt); }
     s.heading = wrapAngle(s.heading + turn);
     s.spin = (s.spin || 0) + turn;
-    let flipTurn = pitch * SKI.flipRate * dt;
-    if (Math.abs(pitch) < 0.15) { const r = wrapAngle(s.flip || 0); if (Math.abs(r) < 1.4) flipTurn = -Math.sign(r) * Math.min(Math.abs(r), SKI.flipSettle * dt); }
+    let flipTurn = pitch * K.flipRate * dt;
+    if (Math.abs(pitch) < 0.15) { const r = wrapAngle(s.flip || 0); if (Math.abs(r) < 1.4) flipTurn = -Math.sign(r) * Math.min(Math.abs(r), K.flipSettle * dt); }
     s.flip = (s.flip || 0) + flipTurn;
     s.grab = input.trick ? (s.grab || 0) + dt : s.grab || 0;
   } else s.heading = wrapAngle(s.heading + (input.steer || 0) * 1.1 * dt);      // style only: the skis turn in the air, the flight line does not
   s.x += s.vx * dt; s.y += s.vy * dt; s.z += s.vz * dt;
   s.edge = approach(s.edge, 0, 3, dt);
   const ground = world.height(s.x, s.z);
-  if (s.y <= ground + SKI.stickGap) {
+  if (s.y <= ground + K.stickGap) {
     world.normal(s.x, s.z, n);
     const into = -(s.vx * n.x + s.vy * n.y + s.vz * n.z);
     s.y = ground;
@@ -183,13 +186,13 @@ function airStep(s, input, world, dt) {
       const sres = hv > 3 ? Math.min(off, Math.PI - off) : 0;
       const fres = Math.abs(wrapAngle(s.flip || 0));
       s.flip = 0;
-      if (into > SKI.parkHardLanding || sres > SKI.spinCrash || fres > SKI.flipCrash) { s.landQ = 2; return startCrash(s, fres > SKI.flipCrash ? 'flip' : into > SKI.parkHardLanding ? 'landing' : 'sideways'); }
-      s.landQ = sres > SKI.spinClean || fres > SKI.flipClean || into > SKI.parkHardLanding * 0.7 || input.trick ? 1 : 0;
+      if (into > K.parkHardLanding || sres > K.spinCrash || fres > K.flipCrash) { s.landQ = 2; return startCrash(s, fres > K.flipCrash ? 'flip' : into > K.parkHardLanding ? 'landing' : 'sideways'); }
+      s.landQ = sres > K.spinClean || fres > K.flipClean || into > K.parkHardLanding * 0.7 || input.trick ? 1 : 0;
       if (off > Math.PI / 2) s.heading = wrapAngle(s.heading + Math.PI);  // landed switch: the skier turns round (forgiving)
       s.speed = Math.hypot(s.vx, s.vy, s.vz);
       return collide(s, world);
     }
-    if (into > SKI.hardLanding || (off > 1.45 && off < Math.PI - 0.3 && hv > 9)) return startCrash(s, into > SKI.hardLanding ? 'landing' : 'sideways');
+    if (into > K.hardLanding || (off > 1.45 && off < Math.PI - 0.3 && hv > 9)) return startCrash(s, into > K.hardLanding ? 'landing' : 'sideways');
     if (off > Math.PI / 2) s.heading = wrapAngle(s.heading + Math.PI);  // landed backwards at low angle: turn the skis round (forgiving)
   }
   s.speed = Math.hypot(s.vx, s.vy, s.vz);
@@ -197,10 +200,11 @@ function airStep(s, input, world, dt) {
 }
 
 function collide(s, world) {
-  const hit = world.hit(s.x, s.z, SKI.bodyRadius, s.y);
+  const K = world.ski || SKI;
+  const hit = world.hit(s.x, s.z, K.bodyRadius, s.y);
   if (!hit) return s;
   const into = -(s.vx * hit.nx + s.vz * hit.nz);
-  if (into > SKI.hitCrash) { s.x += hit.nx * hit.pen; s.z += hit.nz * hit.pen; return startCrash(s, hit.kind); }
+  if (into > K.hitCrash) { s.x += hit.nx * hit.pen; s.z += hit.nz * hit.pen; return startCrash(s, hit.kind); }
   s.x += hit.nx * hit.pen; s.z += hit.nz * hit.pen;
   if (into > 0) { s.vx += into * hit.nx; s.vz += into * hit.nz; }
   return s;
@@ -213,6 +217,7 @@ function startCrash(s, kind) {
 
 /** Tumbling: slides to a stop on the ground. */
 function crashStep(s, world, dt) {
+  const K = world.ski || SKI;
   s.crash = Math.max(0, s.crash - dt);
   const k = Math.max(0, 1 - 2.6 * dt);
   s.vx *= k; s.vz *= k; s.vy = 0;
@@ -220,7 +225,7 @@ function crashStep(s, world, dt) {
   s.y = world.height(s.x, s.z);
   s.grounded = true;
   s.speed = Math.hypot(s.vx, s.vz);
-  const hit = world.hit(s.x, s.z, SKI.bodyRadius, s.y);
+  const hit = world.hit(s.x, s.z, K.bodyRadius, s.y);
   if (hit) { s.x += hit.nx * hit.pen; s.z += hit.nz * hit.pen; s.vx = 0; s.vz = 0; }
   return s;
 }

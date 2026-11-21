@@ -29,13 +29,13 @@ export function createUi(root) {
   api.showResorts = function showResorts({ onPick, current = null, onOnline = null }) {
     const s = el(`<section class="screen" id="resortScreen" aria-label="Skigebitt wielen">
       <header><h1>Ski Alpen</h1><span class="sub">Wiel e Skigebitt</span>${onOnline ? '<button type="button" class="btn" id="skiOnline">👥 Online-Rennen</button>' : ''}</header>
-      <p class="intro">Fuer déi richteg Pisten vu richtege Skigebidder erof, géint d'Auer an géint däi Geescht.</p>
+      <p class="intro">Fuer fräi duerch richteg Skigebidder: op an nieft de Pisten, mat de richtege Liften erop, an d'Challengen um Bierg.</p>
       <p class="intro small">Gelänn: IGN RGE ALTI (Etalab 2.0), Provënz Bozen - Südtirol (CC0), BEV Éisträich (CC BY 4.0), Copernicus DEM · Kaart: © OpenStreetMap-Mataarbechter (ODbL) · alles selwer gemoolt.</p>
       <div class="resorts">${RESORTS.map((r) => `
         <button type="button" class="resort ${r.ready ? 'ready' : 'soon'}" data-id="${r.id}" ${r.ready ? '' : 'disabled aria-disabled="true"'}>
           ${r.ready ? '' : '<span class="tag">geschwënn</span>'}
           <b>${esc(r.name)}</b><span class="c">${esc(r.short)} · ${r.country}</span>
-          ${r.ready ? `<span class="btn primary go">${r.id === current || !current ? 'Pistekaart' : 'Lueden'}</span>` : '<span class="meta">Kënnt an enger nächster Versioun.</span>'}
+          ${r.ready ? `<span class="btn primary go">${r.id === current || !current ? 'Lass fueren' : 'Lueden'}</span>` : '<span class="meta">Kënnt an enger nächster Versioun.</span>'}
         </button>`).join('')}</div>
     </section>`);
     s.querySelectorAll('.resort.ready').forEach((b) => b.addEventListener('click', () => onPick(b.dataset.id)));
@@ -45,10 +45,10 @@ export function createUi(root) {
   };
 
   /* ---------------- piste map ---------------- */
-  api.showMap = function showMap({ resort, pistes, best, env, gfx, outfits = [], outfit = () => '', onOutfit = () => {}, outfitOpen = () => true, starsOf = null, lockedOf = () => false, onSelect, onStart, onBack }) {
+  api.showMap = function showMap({ resort, pistes, best, env, gfx, outfits = [], outfit = () => '', onOutfit = () => {}, outfitOpen = () => true, starsOf = null, lockedOf = () => false, onSelect, onStart, onBack, onResume = null }) {
     const groups = DIFF_IDS.map((d) => ({ d, list: pistes.list.filter((p) => p.diff === d).sort((a, b) => a.name.localeCompare(b.name, 'fr')) })).filter((g) => g.list.length);
     const s = el(`<section class="screen" id="mapScreen" aria-label="Pistekaart">
-      <header><button type="button" class="btn ghost" data-act="back" aria-label="Zréck">←</button><h1>${esc(resort.name)}</h1><span class="sub">Piste wielen</span><button type="button" class="btn ghost" data-act="credits" aria-label="Quellen">ⓘ</button></header>
+      <header><button type="button" class="btn ghost" data-act="back" aria-label="Zréck">←</button><h1>${esc(resort.name)}</h1><span class="sub">Pistekaart</span>${onResume ? '<button type="button" class="btn primary" data-act="resume" id="mapResume">Weiderfueren ✕</button>' : ''}<button type="button" class="btn ghost" data-act="credits" aria-label="Quellen">ⓘ</button></header>
       <div class="mapwrap">
         <div class="mapbox"><canvas id="mapCanvas" aria-label="Pistekaart: tipp op eng Pist"></canvas>
           <div class="zoom"><button type="button" data-z="in" aria-label="Méi no">+</button><button type="button" data-z="out" aria-label="Méi wäit">−</button></div>
@@ -81,6 +81,7 @@ export function createUi(root) {
     bindOutfit($('#segOutfit'), outfit, onOutfit, setSeg);
     s.querySelectorAll('.prow').forEach((b) => b.addEventListener('click', () => onSelect(pistes.byId.get(b.dataset.id), true)));
     $('[data-act="back"]').addEventListener('click', onBack);
+    if (onResume) $('[data-act="resume"]').addEventListener('click', onResume);
     $('[data-act="credits"]').addEventListener('click', () => {
       if (s.querySelector('#creditsCard')) return;
       const c = el(`<div class="card" id="creditsCard" role="dialog" aria-label="Quellen"><h2>Quellen</h2>
@@ -151,7 +152,7 @@ export function createUi(root) {
   };
 
   /* ---------------- finish card ---------------- */
-  api.showFinish = function showFinish({ piste, result, bestMs, improved, next, cont, extra = '', onAgain, onNext, onContinue, onMap }) {
+  api.showFinish = function showFinish({ piste, result, bestMs, improved, next, cont, extra = '', onAgain, onNext, onContinue, onMap, onFree = null }) {
     const rows = [];
     if (result) {
       rows.push(['Zäit', formatTime(result.ms)]);
@@ -167,14 +168,15 @@ export function createUi(root) {
       ${rows.length ? `<div class="rows">${rows.map(([a, b]) => `<span>${a}</span><span>${esc(b)}</span>`).join('')}</div>` : ''}
       ${extra}
       <div class="acts">
-        <button type="button" class="btn primary" data-a="again">Nach eng Kéier</button>
+        ${onFree ? '<button type="button" class="btn primary" data-a="free">Weider fräi fueren</button>' : ''}
+        <button type="button" class="btn${onFree ? '' : ' primary'}" data-a="again">Nach eng Kéier</button>
         ${next ? `<button type="button" class="btn" data-a="next">Nächst Pist: ${esc(next.name)}</button>` : ''}
         ${cont ? `<button type="button" class="btn" data-a="cont">Weiderfueren: ${esc(cont.name)}</button>` : ''}
         <button type="button" class="btn ghost" data-a="map">Pistekaart</button>
       </div>
     </div>`);
     root.appendChild(c);
-    const on = { again: onAgain, next: onNext, cont: onContinue, map: onMap };
+    const on = { again: onAgain, next: onNext, cont: onContinue, map: onMap, free: onFree };
     c.querySelectorAll('[data-a]').forEach((b) => b.addEventListener('click', () => { c.remove(); on[b.dataset.a](); }));
     return { el: c, close() { c.remove(); } };
   };
@@ -188,8 +190,8 @@ export function createUi(root) {
       <div class="setrow"><span>${esc(gfx.LABELS.title)}</span><div class="seg" id="mGfx">${['auto', ...gfx.LEVELS].map((q) => `<button type="button" data-v="${q}">${esc(gfx.LABELS[q])}</button>`).join('')}</div></div>
       ${outfitRow(outfits, 'mOutfit', outfitOpen)}
       ${sound ? '<div class="setrow"><span>Toun</span><div class="seg" id="mSound"><button type="button" data-v="on">Un</button><button type="button" data-v="off">Aus</button></div></div>' : ''}
-      <div class="rows"><span>Steieren</span><span>A D / ◀ ▶</span><span>Hocken</span><span>Leerzeechen</span><span>Bremsen</span><span>S / ▼</span><span>Schreiden</span><span>W / ▲</span><span>Sprangen</span><span>E</span><span>Trick (Park)</span><span>F · W / S = Flip</span><span>Lift (fräi)</span><span>L</span><span>Wieder / Zäit</span><span>G / T</span><span>Toun</span><span>N</span></div>
-      <div class="acts"><button type="button" class="btn primary" data-a="resume">Weider</button><button type="button" class="btn" data-a="again">${esc(againLabel)}</button><button type="button" class="btn ghost" data-a="map">Pistekaart</button></div>
+      <div class="rows"><span>Steieren</span><span>A D / ◀ ▶</span><span>Hocken</span><span>Leerzeechen</span><span>Bremsen</span><span>S / ▼</span><span>Schreiden</span><span>W / ▲</span><span>Sprangen</span><span>E</span><span>Trick (Park)</span><span>F · W / S = Flip</span><span>Astegen / Iwwersprangen</span><span>L / Enter</span><span>Vue am Lift</span><span>V</span><span>Wieder / Zäit</span><span>G / T</span><span>Toun</span><span>N</span></div>
+      <div class="acts"><button type="button" class="btn primary" data-a="resume">Weider</button>${againLabel ? `<button type="button" class="btn" data-a="again">${esc(againLabel)}</button>` : ''}<button type="button" class="btn ghost" data-a="map">Pistekaart</button></div>
     </div>`);
     root.appendChild(c);
     const setSeg = (seg, v) => seg.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.v === v));

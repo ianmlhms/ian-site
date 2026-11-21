@@ -13,6 +13,7 @@ import { createFlagsView, createParkView } from './views.js';
 import { createMinimap } from './minimap.js';
 import { createCloudSave, mergeCloud, cloudGain } from './cloud.js';
 import { finishStarsHtml, showParkFinish, createFreeHud, parkHudText, trickToast } from './panel.js';
+import { SKI_TYPES, skiStatsOf, skiUnlock } from './skis.js';
 
 /** The park layout for field.js (call before createField). */
 export const parkLayoutOf = (resort) => createParkLayout(resort.park);
@@ -22,8 +23,10 @@ export function createModeHost(ctx) {
   const challenges = new Map();
   const challengeOf = (p) => { if (!p || p.id === 'park') return null; let c = challenges.get(p.id); if (!c) { c = challengeFor(p, field.farHeight); challenges.set(p.id, c); } return c; };
   const lifts = createLiftNet(resort, field.farHeight, pistes);
-  let tracker = null, flags = null, judge = null, parkView = null, freeRun = null, clock = null, minimap = null, liftAt = null, parkBest0 = 0;
-  const freeHud = createFreeHud(hud.el, { onLift: () => ctx.onRideUp() });
+  let tracker = null, flags = null, judge = null, parkView = null, freeRun = null, clock = null, minimap = null, liftAt = null, parkBest0 = 0, clock0 = null;
+  const freeHud = createFreeHud(hud.el, { onLift: () => ctx.onRideUp(), onSkis: () => ctx.onSkis && ctx.onSkis() });
+  // round 6: the session's free ride counters live across challenges, fast travel and lift rides (one page life)
+  const sessionStats = { distance: 0, vertical: 0, lifts: 0, top: 0, time: 0, off: 0 };
   const arcade = () => (window.Arcade && typeof window.Arcade.setBoard === 'function' && typeof window.Arcade.score === 'function' ? window.Arcade : null);
 
   // old saves: a piste with a best time has its first star; then the cloud copy (the arcade's injected save, then the cloud)
@@ -41,7 +44,10 @@ export function createModeHost(ctx) {
 
   const host = {
     lifts, layout, challengeOf, cloud,
-    get judge() { return judge; }, get tracker() { return tracker; }, get freeRun() { return freeRun; }, get clock() { return clock; },
+    get judge() { return judge; }, get tracker() { return tracker; }, get freeRun() { return freeRun; }, get clock() { return clock; }, sessionStats,
+    /** Round 6: what the player has done towards the ski unlocks, and the open ski ids. */
+    skiStats: () => skiStatsOf(store.get(), totalStars(store.get())),
+    openSkis() { const st = host.skiStats(); return SKI_TYPES.filter((t) => skiUnlock(t, st).open).map((t) => t.id); },
     start() { cloud.start(); },
 
     /* ---------------- stars, locks, outfits ---------------- */
@@ -82,7 +88,9 @@ export function createModeHost(ctx) {
         if (a) { try { a.setBoard({ id: parkBoardId(rid), name: parkBoardName(resort.short), format: 'skipark' }); } catch (error) { console.warn('[ski] park board select failed', error.message); } }
       } else if (game.mode === MODES.freeride) {
         input.setTrick(true);
-        clock = createDayClock(startHourFor(env.state.timeMode === 'random' ? 'morning' : env.state.timeId));      // a random time: the whole day from 9:00
+        world.tricks = 'hold';                       // round 6: in the air, the trick button turns a jump into a trick (skier.js)
+        clock = clock0 || createDayClock(startHourFor(env.state.timeMode === 'random' ? 'morning' : env.state.timeId));      // a random time: the day from 9:00
+        clock0 = clock;
         if (!minimap) minimap = createMinimap({ parent: hud.el.querySelector('.tr'), resort, imageUrl: root + resort.map.file, park: resort.park });
         minimap.show(true);
         freeHud.show(true);
@@ -92,9 +100,22 @@ export function createModeHost(ctx) {
     /** The run object for a mode that is not a piste (main.js createRun stays the timed / guided one). */
     createRun(game, start) {
       if (game.mode !== MODES.freeride) return null;
-      freeRun = createFreeRun({ resort, pistes, lifts, start });
+      freeRun = createFreeRun({ resort, pistes, lifts, start, stats: sessionStats });
       return freeRun;
     },
+    /** Round 6: a real lift ride starts (main.js): the lift counter, the day clock moves on by the ride's real time. */
+    rideStart(lift) {
+      if (!freeRun) return;
+      if (clock) clock.addMinutes(lift.seconds / 60);
+      freeRun.stats.lifts += 1;
+      liftAt = null; freeHud.lift(null);
+    },
+    /** Round 6: the newly opened ski types between two progress states (for the toasts and the finish card). */
+    newSkis(before, after) {
+      const a = skiStatsOf(before, totalStars(before)), b = skiStatsOf(after, totalStars(after));
+      return SKI_TYPES.filter((t) => !skiUnlock(t, a).open && skiUnlock(t, b).open);
+    },
+    freeHud,
     /** Leaving a run (map, another run): tear down the mode parts. */
     end() {
       if (flags) { flags.dispose(); flags = null; }
@@ -143,7 +164,6 @@ export function createModeHost(ctx) {
         env.setDayHour(fixed ? null : clock.hour);
         freeHud.set({ hour: clock.hour, stats: freeRun.stats, fixedTime: fixed });
         minimap.draw(game.state.x, game.state.z, Math.atan2(game.state.vz, game.state.vx) || game.state.heading);
-        if (clock.done && !host.dayOver) { host.dayOver = true; hud.toast('Hallwer 5: d\'Lifte maachen zou. Fuer nach erof!', 2600); }
       }
     },
 
@@ -151,7 +171,7 @@ export function createModeHost(ctx) {
     get liftAt() { return liftAt; },
     /** Ride the lift at hand: the day clock moves on by its ride time; returns the start spot at its top (or null). */
     rideUp() {
-      if (!freeRun || !liftAt || (clock && clock.done)) return null;
+      if (!freeRun || !liftAt) return null;                     // round 6: the lifts never close (free ride is the main game)
       const lift = liftAt;
       if (clock) clock.addMinutes(lift.seconds / 60);
       const spot = freeRun.rideUp(lift, (x, z) => surface.height(x, z));
@@ -172,10 +192,8 @@ export function createModeHost(ctx) {
       if (r.gained) {
         store.set(r.progress);
         const t = thresholds(rid), had = resortStars(before, rid), has = resortStars(r.progress, rid);
-        if (had < t.red && has >= t.red) unlocked.push('rout Pisten');
-        if (had < t.black && has >= t.black) unlocked.push('schwaarz Pisten');
-        const tb = totalStars(before), ta = totalStars(r.progress);
-        for (const o of outfits) if (o.stars > tb && o.stars <= ta) unlocked.push(`Kleedung ${o.name}`);
+        void t; void had; void has; void outfits;
+        for (const sk of host.newSkis(before, r.progress)) unlocked.push(`Ski ${sk.name}`);           // round 6: the stars open ski types
       }
       if (ev && ev.valid && !assisted && ev.ms > 0) {
         const bh = store.get().bestHash || {};

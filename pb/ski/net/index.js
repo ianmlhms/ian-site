@@ -50,7 +50,7 @@ export function createMp({ ctx, host }) {
   const saveKey = `${SAVE_PREFIX}${ctx.code}:${ctx.seed}`;
   const mpHud = createMpHud(host.uiRoot);
   mpHud.show(false);
-  const remotes = createRemotes({ scene: host.scene, camera: host.camera, surface: host.surface, overlay: host.uiRoot });
+  const remotes = createRemotes({ scene: host.scene, camera: host.camera, surface: host.surface, overlay: host.uiRoot, liftPath: (i) => (host.liftPath ? host.liftPath(i) : null) });
   remotes.setShadows(host.level() !== 'low');
   const local = { ready: -1, goAt: null, started: -1, lastSend: 0, spectate: null, resultsCard: null, nextAt: 0, over: false, prepToken: 0 };
   const root = document.documentElement;

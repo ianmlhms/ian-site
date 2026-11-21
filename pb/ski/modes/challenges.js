@@ -9,8 +9,8 @@
  *         flags    pick up all flags (placed along the line, a little off it, alternating sides)
  *         speed    reach the top speed target (from the profile: about 85 % of what a tuck can reach there)
  * Stars are a bit mask per piste (1 finish, 2 time, 4 special) OR-ed into the save: a star once won is never lost.
- * Unlocks: every resort opens with its green and blue pistes; reds and blacks open at a number of stars won in that resort; a piste the
- * player has already skied (a best time, a run or a star) is never locked again. Outfits unlock at total-star milestones. */
+ * Unlocks (round 6): none any more for pistes and outfits (all open); the stars unlock the ski types (modes/skis.js). UNLOCK below is
+ * only kept for old callers. */
 import { DIFF } from '../config.js';
 
 export const STAR = Object.freeze({ finish: 1, time: 2, special: 4 });
@@ -203,17 +203,14 @@ export const thresholds = (rid) => UNLOCK[rid] || UNLOCK_DEFAULT;
 
 export const pisteStars = (progress, rid, pisteId) => cleanMask(progress.stars[starKey(rid, pisteId)]);
 
-/** Is this piste open? { open, need (stars needed), have } — played pistes are always open. */
+/** Is this piste open? Round 6 (Ian): everything is open from the start: every resort, every piste, every outfit. Stars stay the
+ *  measure of progress and unlock the ski types (modes/skis.js). { open, need, have } kept for the callers. */
 export function lockState(progress, rid, piste) {
-  const key = `${rid}/${piste.id}`;
-  const have = resortStars(progress, rid);
-  if (piste.diff !== 'red' && piste.diff !== 'black') return { open: true, need: 0, have };
-  if (progress.best[key] > 0 || progress.runs[key] > 0 || cleanMask(progress.stars[starKey(rid, piste.id)]) > 0) return { open: true, need: 0, have, played: true };
-  const need = thresholds(rid)[piste.diff];
-  return { open: have >= need, need, have };
+  void piste;
+  return { open: true, need: 0, have: resortStars(progress, rid) };
 }
 
-/** Outfits that need stars (skier-model.js OUTFITS entries with a `stars` field): unlocked when the total reaches it. */
-export const outfitOpen = (outfit, total) => !(outfit.stars > 0) || total >= outfit.stars;
+/** Outfits: all open since round 6 (the `stars` field of skier-model.js OUTFITS is no longer a lock). */
+export const outfitOpen = () => true;
 
 export const diffName = (d) => (DIFF[d] ? DIFF[d].name : d);
