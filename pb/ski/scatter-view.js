@@ -48,10 +48,13 @@ const spruceNear = () => build((p, n, c) => {
   pushCone(p, n, c, 0, 5.4, 9.4, 1.05, 6, SPRUCE, 0.95, 0.9);
 });
 const spruceFar = () => build((p, n, c) => { pushCone(p, n, c, 0, 0.6, 9.4, 2.0, 5, SPRUCE_DARK, 0.7); });
+/* a larch in winter: a straight trunk and thin layered tiers of bare twigs (open, so the snow behind shows through the gaps) */
 const larchNear = () => build((p, n, c) => {
-  pushPrism(p, n, c, -0.3, 8.8, 0.18, 5, BARK);
-  pushCone(p, n, c, 0, 1.6, 9.6, 1.9, 6, LARCH, 0.25);
-  pushCone(p, n, c, 0, 4.0, 9.2, 1.2, 5, LARCH_TWIG, 0.3, 0.6);
+  pushPrism(p, n, c, -0.3, 9.4, 0.17, 5, BARK);
+  for (let k = 0; k < 5; k++) {
+    const y = 2.0 + k * 1.5, r = 1.9 - k * 0.33;
+    pushCone(p, n, c, 0, y, y + 0.9, r, 6, k % 2 ? LARCH_TWIG : LARCH, 0.35, k * 0.7);
+  }
 });
 const larchFar = () => build((p, n, c) => { pushCone(p, n, c, 0, 1.0, 9.6, 1.8, 5, LARCH, 0.2); });
 
@@ -81,7 +84,7 @@ function scatterMaterial(env) {
     uniforms: env.u,
     vertexShader: `
       attribute vec4 color; attribute vec4 aInst; attribute float aSeed;
-      varying vec4 vCol; varying vec3 vN; varying float vDist; varying float vSeed; varying float vH;
+      varying vec4 vCol; varying vec3 vN; varying float vDist; varying float vSeed; varying float vH; varying vec2 vXZ;
       void main(){
         float a = aSeed * 6.2831;
         float c = cos(a), s = sin(a);
@@ -89,17 +92,17 @@ function scatterMaterial(env) {
         p.xz = mat2(c, -s, s, c) * p.xz;
         vec3 n = normal; n.xz = mat2(c, -s, s, c) * n.xz;
         vec4 w = vec4(p + aInst.xyz, 1.0);
-        vCol = color; vN = n; vSeed = aSeed; vH = position.y;
+        vCol = color; vN = n; vSeed = aSeed; vH = position.y; vXZ = w.xz;
         vec4 mv = viewMatrix * w; vDist = -mv.z;
         gl_Position = projectionMatrix * mv;
       }`,
     fragmentShader: `
-      uniform vec3 uSunDir, uSunColor, uAmbSky, uAmbGround, uFogColor; uniform float uFogDensity;
-      varying vec4 vCol; varying vec3 vN; varying float vDist; varying float vSeed; varying float vH;
+      uniform vec3 uSunDir, uSunColor, uAmbSky, uAmbGround, uFogColor; uniform float uFogDensity, uShadowOn; uniform sampler2D uShadow; uniform vec4 uShadowRect;
+      varying vec4 vCol; varying vec3 vN; varying float vDist; varying float vSeed; varying float vH; varying vec2 vXZ;
       void main(){
         vec3 N = normalize(vN);
         float nl = dot(N, uSunDir);
-        float lit = smoothstep(-0.15, 0.7, nl);
+        float lit = smoothstep(-0.15, 0.7, nl) * mix(1.0, texture2D(uShadow, (vXZ - uShadowRect.xy) / uShadowRect.zw).r, uShadowOn);
         lit = mix(lit, floor(lit * 3.0 + 0.5) / 3.0, 0.3);
         vec3 amb = mix(uAmbGround, uAmbSky, 0.5 + 0.5 * N.y);
         vec3 base = vCol.rgb * (0.86 + 0.28 * vSeed);

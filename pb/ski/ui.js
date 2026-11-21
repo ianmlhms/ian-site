@@ -17,6 +17,7 @@ export function createUi(root) {
     const s = el(`<section class="screen" id="resortScreen" aria-label="Skigebitt wielen">
       <header><h1>Ski Alpen</h1><span class="sub">Wiel e Skigebitt</span></header>
       <p class="intro">Fuer déi richteg Pisten vu richtege Skigebidder erof, géint d'Auer an géint däi Geescht.</p>
+      <p class="intro small">Gelänn: IGN RGE ALTI (Etalab 2.0), Copernicus DEM · Kaart: © OpenStreetMap-Mataarbechter (ODbL) · alles selwer gemoolt.</p>
       <div class="resorts">${RESORTS.map((r) => `
         <button type="button" class="resort ${r.ready ? 'ready' : 'soon'}" data-id="${r.id}" ${r.ready ? '' : 'disabled aria-disabled="true"'}>
           ${r.ready ? '' : '<span class="tag">geschwënn</span>'}
@@ -33,7 +34,7 @@ export function createUi(root) {
   api.showMap = function showMap({ resort, pistes, best, env, gfx, onSelect, onStart, onBack }) {
     const groups = DIFF_IDS.map((d) => ({ d, list: pistes.list.filter((p) => p.diff === d).sort((a, b) => a.name.localeCompare(b.name, 'fr')) })).filter((g) => g.list.length);
     const s = el(`<section class="screen" id="mapScreen" aria-label="Pistekaart">
-      <header><button type="button" class="btn ghost" data-act="back" aria-label="Zréck">←</button><h1>${esc(resort.name)}</h1><span class="sub">Piste wielen</span></header>
+      <header><button type="button" class="btn ghost" data-act="back" aria-label="Zréck">←</button><h1>${esc(resort.name)}</h1><span class="sub">Piste wielen</span><button type="button" class="btn ghost" data-act="credits" aria-label="Quellen">ⓘ</button></header>
       <div class="mapwrap">
         <div class="mapbox"><canvas id="mapCanvas" aria-label="Pistekaart: tipp op eng Pist"></canvas>
           <div class="zoom"><button type="button" data-z="in" aria-label="Méi no">+</button><button type="button" data-z="out" aria-label="Méi wäit">−</button></div>
@@ -64,6 +65,14 @@ export function createUi(root) {
     $('#segGfx').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; gfx.set(b.dataset.v); setSeg($('#segGfx'), b.dataset.v); });
     s.querySelectorAll('.prow').forEach((b) => b.addEventListener('click', () => onSelect(pistes.byId.get(b.dataset.id), true)));
     $('[data-act="back"]').addEventListener('click', onBack);
+    $('[data-act="credits"]').addEventListener('click', () => {
+      if (s.querySelector('#creditsCard')) return;
+      const c = el(`<div class="card" id="creditsCard" role="dialog" aria-label="Quellen"><h2>Quellen</h2>
+        <div class="credits">${resort.credits.map((t) => `<p>${esc(t)}</p>`).join('')}<p>Alles ass gemoolt: kee Satellittebild, keng Fotoen. D'Form vum Terrain an d'Lag vun de Pisten, Liften an Haiser si richteg.</p></div>
+        <div class="acts"><button type="button" class="btn primary" data-a="ok">OK</button></div></div>`);
+      c.querySelector('[data-a="ok"]').addEventListener('click', () => c.remove());
+      s.appendChild(c);
+    });
     $('#startBtn').addEventListener('click', () => { if (!$('#startBtn').disabled) onStart(); });
     return {
       el: s,

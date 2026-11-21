@@ -43,7 +43,7 @@ DIFF_LETTER = {"green": "g", "blue": "b", "red": "r", "black": "k"}
 HALF_WIDTH = {"green": 17, "blue": 18, "red": 15, "black": 13}
 CLASS_BITS = {"forest": 1, "scrub": 2, "rock": 4, "water": 8, "built": 16, "piste": 32, "glacier": 64, "scree": 128}
 TREE_LINE = 2450.0                 # m: no forest above this, whatever the map says
-DERIVED_FOREST = 2000.0            # m: open stands are added below this where OSM maps no forest (see classes_raster)
+DERIVED_FOREST = 2150.0            # m: open stands are added below this on shady slopes (150 m lower on sunny ones) where OSM maps no forest
 MIN_RUN_LENGTH = 350.0
 MIN_RUN_DROP = 70.0
 SLALOM_COUNT = 4
@@ -217,8 +217,16 @@ def build_pistes(frame, dem):
             p = np.concatenate([ch[0]["p"]] + [s["p"][1:] for s in ch[1:]])
             p = resample(p, 5.0)
             p = smooth_line(p, 3)
-            length = polyline_len(p)
             h = dem(p[:, 0], p[:, 1])
+            # the run goes from its highest point (in the first third) to its lowest (in the last third): OSM lines often run on
+            # over a flat or up the far side of a dip to the next lift, which would be a skate uphill at the finish
+            n3 = max(1, len(h) // 3)
+            i0 = int(np.argmax(h[:n3]))
+            i1 = len(h) - n3 + int(np.argmin(h[-n3:]))
+            p, h = p[i0:i1 + 1], h[i0:i1 + 1]
+            if len(p) < 3:
+                continue
+            length = polyline_len(p)
             drop = float(h[0] - h[-1])
             if length < MIN_RUN_LENGTH or drop < MIN_RUN_DROP:
                 continue
@@ -369,8 +377,13 @@ def classes_raster(frame, dem_raw, areas_osm, piste_lines, piste_areas, building
     rng = np.random.default_rng(11)
     patches = ndimage.gaussian_filter(rng.random((nz, nx)), 6)
     patches = (patches - patches.mean()) / (patches.std() + 1e-9)
-    derived = (h < DERIVED_FOREST) & (slope > 14) & (slope < 38) & (patches > -0.1 + (h - 1750) / 400)
-    out[derived & ((out & CLASS_BITS["forest"]) == 0)] |= CLASS_BITS["scrub"]
+    north = gz   # dh/dz > 0: the ground rises to the south, i.e. the slope faces north (shady, where the real stands are densest)
+    shady = np.clip(north / np.maximum(np.hypot(gx, gz), 1e-6), -1, 1)
+    derived = (h < DERIVED_FOREST - 150 + 150 * np.clip(shady, 0, 1)) & (slope > 16) & (slope < 42) & (patches > -0.35 + (h - 1700) / 450 - 0.35 * shady)
+    dense = derived & (patches > 0.35 - 0.3 * shady)
+    free = (out & CLASS_BITS["forest"]) == 0
+    out[derived & free & ~dense] |= CLASS_BITS["scrub"]
+    out[dense & free] |= CLASS_BITS["forest"]
     no_tree = (pm > 0.15) | (h > TREE_LINE) | ((out & CLASS_BITS["water"]) > 0) | (slope > 42) | ((out & CLASS_BITS["built"]) > 0)
     out[no_tree] &= ~tree_bits
     log("classes", {k: int(((out & v) > 0).sum()) for k, v in CLASS_BITS.items()})
@@ -593,6 +606,32 @@ def paint_map(frame, mosaic, classes, outp):
     return W, H
 
 
+# ---------------------------------------------------------------- mountain shadows
+# The sun of the three times of day, the same numbers as TIMES in pb/ski/env.js (azimuth from north, clockwise; elevation; degrees).
+SUNS = {"morning": (128, 16), "midday": (182, 29), "evening": (236, 7)}
+
+
+def sun_shadows(far, out):
+    """One soft shadow raster per time of day on the far grid (40 m): 255 = in the sun, 0 = in a mountain's shadow. The browser reads
+    the one of the current time (shadow-<time>.webp), so the valleys lie in the shade of the ridges like the real ones."""
+    from scipy.ndimage import map_coordinates
+    nz, nx = far.shape
+    jj, ii = np.mgrid[0:nz, 0:nx].astype(np.float32)
+    for name, (az, el) in SUNS.items():
+        a, e = math.radians(az), math.radians(el)
+        dx, dz = math.sin(a), -math.cos(a)                 # towards the sun in grid steps (x east, z south)
+        tan_e = math.tan(e)
+        shade = np.zeros_like(far, dtype=np.float32)
+        for k in range(1, 260):
+            d = k * 1.0
+            sample = map_coordinates(far, [jj + dz * d, ii + dx * d], order=1, mode="nearest")
+            over = sample - (far + d * FAR_STEP * tan_e)
+            shade = np.maximum(shade, np.clip(over / (12.0 + d * 1.5), 0, 1))
+        lit = 1 - ndimage.gaussian_filter(shade, 0.8)
+        Image.fromarray(np.clip(lit * 255, 0, 255).astype(np.uint8), "L").save(os.path.join(out, "shadow-%s.webp" % name), "WEBP", quality=72, method=6)
+        log("shadow", name, "%.0f %% of the area in shade" % (100 * float((lit < 0.5).mean())))
+
+
 # ---------------------------------------------------------------- main
 def main():
     rid = resort_arg()
@@ -662,7 +701,8 @@ def main():
     far[o:o + down.shape[0], o:o + down.shape[1]] = down
     fj, fi = np.unravel_index(int(np.nanargmax(far)), far.shape)
     log("far grid %dx%d, highest %.0f m at world x %.0f z %.0f" % (far.shape[1], far.shape[0], far[fj, fi], fi * FAR_STEP - FAR_MARGIN, fj * FAR_STEP - FAR_MARGIN))
-    far_blob, _ = encode(far, 0.25, float(np.floor(np.nanmin(far))))
+    far_blob, far_dec = encode(far, 0.25, float(np.floor(np.nanmin(far))))
+    sun_shadows(far_dec.astype(np.float32), out)
     with open(os.path.join(out, "far.bin"), "wb") as fh:
         fh.write(far_blob)
     log("far.bin %.2f MB" % (len(far_blob) / 1e6))
@@ -699,6 +739,7 @@ def main():
         "far": {"step": FAR_STEP, "margin": FAR_MARGIN, "nx": int(far.shape[1]), "nz": int(far.shape[0])},
         "classes": {"step": CLASS_STEP, "nx": cnx, "nz": cnz, "bits": CLASS_BITS},
         "map": {"file": "map.webp", "w": mw, "h": mh},
+        "shadows": {"file": "shadow-{time}.webp", "suns": SUNS},
         "pistes": pistes, "network": network, "lifts": lifts, "peaks": peaks, "places": places,
         "credits": CREDITS,
         "bake": {"date": time.strftime("%Y-%m-%d"), "script": "scripts/ski/bake.py"},

@@ -90,12 +90,61 @@ function networkDiff(letter) {
   return letter === 'g' ? 0 : letter === 'b' ? 1 : letter === 'r' ? 2 : 3;
 }
 
+/* Kickers: small natural-looking snow bumps with a lip, on the selectable blue / red / black pistes every KICK_GAP m (from 150 m after the
+ * start to 160 m before the finish), centred on the piste line, narrow enough to ski round. They are part of THE height function, so the
+ * picture and the physics agree; the skier takes off at the lip by itself (skier.js leaveGround). Deterministic from resort.json. */
+const KICK_GAP = 320, KICK_LEN = 15, KICK_HALF_W = 4.5;
+const KICK_H = { blue: 0.7, red: 0.95, black: 1.15 };
+export function createKickers(pistes) {
+  const list = [];
+  for (const p of pistes) {
+    const h = KICK_H[p.diff];
+    if (!h) continue;
+    const L = p.line, n = L.length / 2;
+    let s = 0, next = 150;
+    for (let i = 1; i < n; i++) {
+      const dx = L[2 * i] - L[2 * i - 2], dz = L[2 * i + 1] - L[2 * i - 1], d = Math.hypot(dx, dz);
+      if (s + d >= next && next < p.len - 160) {
+        const k = (next - s) / d;
+        list.push({ x: L[2 * i - 2] + dx * k, z: L[2 * i - 1] + dz * k, ux: dx / d, uz: dz / d, h });
+        next += KICK_GAP;
+      }
+      s += d;
+    }
+  }
+  const CELL = 64, grid = new Map();
+  const key = (i, j) => i * 65536 + j;
+  list.forEach((b, idx) => {
+    for (let i = Math.floor((b.x - KICK_LEN) / CELL); i <= Math.floor((b.x + KICK_LEN) / CELL); i++)
+      for (let j = Math.floor((b.z - KICK_LEN) / CELL); j <= Math.floor((b.z + KICK_LEN) / CELL); j++) { const kk = key(i, j); let l = grid.get(kk); if (!l) grid.set(kk, (l = [])); l.push(idx); }
+  });
+  const empty = [];
+  /** Extra height at (x, z): rises over 70 % of the length (the run-up), drops off over the last 30 % (the lip and landing). */
+  function at(x, z) {
+    const l = grid.get(key(Math.floor(x / CELL), Math.floor(z / CELL))) || empty;
+    let best = 0;
+    for (let n = 0; n < l.length; n++) {
+      const b = list[l[n]];
+      const rx = x - b.x, rz = z - b.z;
+      const u = (rx * b.ux + rz * b.uz) / KICK_LEN + 0.5;        // 0 .. 1 along the fall line
+      const v = (rx * -b.uz + rz * b.ux) / KICK_HALF_W;           // -1 .. 1 across
+      if (u <= 0 || u >= 1 || v <= -1 || v >= 1) continue;
+      const along = u < 0.7 ? smoothstep(0, 0.7, u) : 1 - smoothstep(0.7, 1, u) ;
+      const across = 0.5 + 0.5 * Math.cos(Math.PI * v);
+      const hh = b.h * along * across;
+      if (hh > best) best = hh;
+    }
+    return best;
+  }
+  return { at, list };
+}
+
 /**
  * createField({ resort, far, classes }) -> field. Height tiles arrive later through addTile(tx, tz, grid).
  *   far     = decoded MBG1 grid (nodes at -margin + i * farStep)
  *   classes = { nx, nz, data: Uint8Array } (cells of DATA.classStep m, bit field resort.classes.bits)
  */
-export function createField({ resort, far, classes, net }) {
+export function createField({ resort, far, classes, net, kickers = createKickers(resort.pistes) }) {
   const bits = resort.classes.bits;
   const margin = resort.far.margin, farStep = resort.far.step;
   const tilesX = resort.tiles.nx, tilesZ = resort.tiles.nz;
@@ -208,13 +257,13 @@ export function createField({ resort, far, classes, net }) {
 
   const scratch = { piste: 0, diff: -1, forest: 0, rock: 0, built: 0, water: 0, glacier: 0 };
   /** Full-detail height with attributes already known (the physics lattice). */
-  function heightWith(x, z, a) { return baseHeight(x, z) + relief(x, z, a); }
+  function heightWith(x, z, a) { return baseHeight(x, z) + relief(x, z, a) + kickers.at(x, z); }
   function height(x, z) { return heightWith(x, z, attrs(x, z, scratch)); }
   /** What a lattice of spacing `lod` shows: the relief fades out between 2.5 and 10 m spacing (it cannot be sampled coarser). */
   function heightForStep(x, z, lod, a) {
     const k = 1 - smoothstep(LATTICE, 10, lod);
     if (k <= 0) return baseHeight(x, z);
-    return baseHeight(x, z) + k * relief(x, z, a || attrs(x, z, scratch, lod));
+    return baseHeight(x, z) + k * (relief(x, z, a || attrs(x, z, scratch, lod)) + kickers.at(x, z));
   }
 
   /** A height tile arrived: returns the world rectangle whose heights changed (the tile + the feather of its neighbours). */
@@ -226,7 +275,7 @@ export function createField({ resort, far, classes, net }) {
   }
 
   return {
-    baseHeight, height, heightWith, heightForStep, attrs, farHeight, addTile,
+    baseHeight, height, heightWith, kickers, heightForStep, attrs, farHeight, addTile,
     hasTile: (tx, tz) => tiles.has(tx * 1000 + tz),
     isShipped: (tx, tz) => shipped.has(tx * 1000 + tz),
     tileCount: () => tiles.size,

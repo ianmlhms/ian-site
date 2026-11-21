@@ -35,7 +35,7 @@ export const LATTICE = QUADTREE.minSize / QUADTREE.cells;      // 2.5 m
 /* Relief added on top of the DEM (part of THE height function, so render and physics agree): wind drifts off the piste, soft rollers on it. */
 export const RELIEF = Object.freeze({
   driftAmp: 0.42, driftScale: 17,     // off-piste: wind-blown snow, about 0.4 m high, 17 m apart
-  pisteAmp: 0.12, pisteScale: 23,     // groomed: very soft rollers
+  pisteAmp: 0.22, pisteScale: 26,     // groomed: soft rollers (small airs at speed)
 });
 
 export const QUALITY = Object.freeze({
@@ -67,7 +67,7 @@ export const SKI = Object.freeze({
   brakeSteer: 0.7,
   pushAccel: 1.8,           // skating on flats (W / up), only below pushMaxSpeed
   pushMaxSpeed: 6,
-  leaveGround: 1.25,        // the ground falls away faster than this many g: the skier takes off
+  leaveGround: 0.95,        // the ground falls away faster than this many g: the skier takes off
   stickGap: 0.06,           // m: closer than this to the ground counts as touching
   hardLanding: 10.5,        // m/s into the ground at landing: a crash
   hitCrash: 5,              // m/s into a trunk or rock: a crash (slower: a bump that stops you)

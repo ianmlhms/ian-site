@@ -80,6 +80,10 @@ async function boot() {
   const core = await loadResortCore(rid, (p) => LOAD.set(0.25 + p * 0.45, 'Bierger ginn opgebaut …'));
   mark('core');
   const { resort } = core;
+  if (resort.shadows) {
+    const st = resort.far.step, m = resort.far.margin;
+    env.setShadows((time) => core.root + resort.shadows.file.replace('{time}', time), [-m - st / 2, -m - st / 2, resort.far.nx * st, resort.far.nz * st]);
+  }
   const net = createPisteNet(resort.network);
   const field = createField({ resort, far: core.far, classes: core.classes, net });
   const surface = createSurface(field);
@@ -87,7 +91,16 @@ async function boot() {
   const streamer = createTileStreamer({ resort, field, root: core.root });
   const pistes = createPisteSet(resort);
   const scatter = createScatter(field);
-  let snowMat = createSnowMaterial(env, { cheap: quality.cheapSnow });
+  // the forest share of every 10 m class cell as a texture (the painted canopy far away; scatter.js places the near trees)
+  const forestTex = (() => {
+    const { nx, nz, data } = core.classes, b = resort.classes.bits;
+    const px = new Uint8Array(nx * nz);
+    for (let i = 0; i < px.length; i++) px[i] = data[i] & b.forest ? 255 : data[i] & b.scrub ? 150 : 0;
+    const t = new THREE.DataTexture(px, nx, nz, THREE.RedFormat);
+    t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true; t.needsUpdate = true;
+    return { texture: t, width: nx * resort.classes.step, depth: nz * resort.classes.step };
+  })();
+  let snowMat = createSnowMaterial(env, { cheap: quality.cheapSnow, treeRadius: quality.treeRadius, forest: forestTex });
   const terrain = createTerrainView({ scene, surface, field, material: snowMat, quality });
   const scatterView = createScatterView({ scene, scatter, env, quality });
   const poles = createPoles({ scene, resort, height: (x, z) => field.height(x, z) });
@@ -296,7 +309,7 @@ async function boot() {
     level = next; quality = QUALITY[level];
     renderer.setPixelRatio(pixelRatio()); resize();
     camera.far = quality.far * 1.3; camera.updateProjectionMatrix();
-    snowMat = createSnowMaterial(env, { cheap: quality.cheapSnow });
+    snowMat = createSnowMaterial(env, { cheap: quality.cheapSnow, treeRadius: quality.treeRadius, forest: forestTex });
     terrain.setMaterial(snowMat);
     scatterView.setQuality(quality);
     poles.reset();
@@ -394,6 +407,7 @@ async function boot() {
     hudT += dt;
     if (hudT >= HUD_EVERY) {
       hudT = 0;
+      if (st) env.setSunScale(sunVisibility(st.x, st.y + 1, st.z));
       if (game.screen === 'map') updateStartStatus();
       if (game.screen === 'ski' && st) {
         hud.setSpeed(st.speed * 3.6);
@@ -410,6 +424,16 @@ async function boot() {
         }
       }
     }
+  }
+
+  /** Is the sun hidden by a ridge at this point? A ray towards the sun over the far grid (the same rule as the baked shadow rasters). */
+  function sunVisibility(x, y, z) {
+    const sd = env.sunDir();
+    const a = sd.az * Math.PI / 180, e = sd.el * Math.PI / 180;
+    const dx = Math.sin(a), dz = -Math.cos(a), t = Math.tan(e);
+    let shade = 0;
+    for (let d = 40; d < 9000; d *= 1.18) shade = Math.max(shade, Math.min(1, (field.farHeight(x + dx * d, z + dz * d) - (y + d * t)) / (12 + d * 0.04)));
+    return 0.25 + 0.75 * (1 - shade);
   }
 
   // debug / flows

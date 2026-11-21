@@ -4,9 +4,9 @@
  * aInfo = (piste, forest, rock, built + 2 * water) from the tile builder. `cheap` = the low-quality variant (no glints, one noise read less). */
 const THREE = window.THREE;
 
-export function createSnowMaterial(env, { cheap = false } = {}) {
+export function createSnowMaterial(env, { cheap = false, treeRadius = 400, forest = null } = {}) {
   return new THREE.ShaderMaterial({
-    uniforms: env.u,
+    uniforms: { ...env.u, uTreeRadius: { value: treeRadius }, uForestTex: { value: forest ? forest.texture : env.u.uNoise.value }, uForestSize: { value: new THREE.Vector2(forest ? forest.width : 1, forest ? forest.depth : 1) }, uForestOn: { value: forest ? 1 : 0 } },
     defines: cheap ? { CHEAP: 1 } : {},
     vertexShader: `
       attribute vec4 aInfo;
@@ -19,9 +19,10 @@ export function createSnowMaterial(env, { cheap = false } = {}) {
         gl_Position = projectionMatrix * mv;
       }`,
     fragmentShader: `
-      uniform vec3 uSunDir, uSunColor, uAmbSky, uAmbGround, uFogColor; uniform float uFogDensity, uTime, uOvercast, uSnowfall; uniform sampler2D uNoise;
+      uniform vec3 uSunDir, uSunColor, uAmbSky, uAmbGround, uFogColor; uniform float uFogDensity, uTime, uOvercast, uSnowfall, uTreeRadius, uShadowOn; uniform sampler2D uNoise, uShadow, uForestTex; uniform vec4 uShadowRect; uniform vec2 uForestSize; uniform float uForestOn;
       varying vec3 vWorld; varying vec3 vNormal; varying vec4 vInfo; varying float vDist;
       float band(float x){ return mix(x, floor(x * 4.0 + 0.5) / 4.0, 0.22); }
+      vec3 snowShade(vec3 shade){ return mix(vec3(0.78), vec3(0.84, 0.9, 1.0), 0.75) * (shade * 0.95 + 0.12); }
       void main(){
         vec3 N = normalize(vNormal);
         float piste = clamp(vInfo.x, 0.0, 1.0), forest = clamp(vInfo.y, 0.0, 1.0), rockCls = clamp(vInfo.z, 0.0, 1.0);
@@ -45,7 +46,8 @@ export function createSnowMaterial(env, { cheap = false } = {}) {
         Nb = normalize(Nb);
         // light: soft gouache ramp with a brushed edge, a few bands
         float nl = dot(Nb, uSunDir);
-        float lit = band(smoothstep(-0.06 + (nA.a - 0.5) * 0.12, 0.6, nl));
+        float sunVis = mix(1.0, texture2D(uShadow, (wp - uShadowRect.xy) / uShadowRect.zw).r, uShadowOn);    // in a ridge's shadow?
+        float lit = band(smoothstep(-0.06 + (nA.a - 0.5) * 0.12, 0.6, nl) * sunVis);
         float sky = 0.5 + 0.5 * Nb.y;
         vec3 shade = mix(uAmbGround, uAmbSky, sky);
         // snow: blue-grey in the shade (the sky's light), warm white in the sun; never brighter than paper white
@@ -74,12 +76,20 @@ export function createSnowMaterial(env, { cheap = false } = {}) {
         rockAmt *= 1.0 - piste;
         float sPhase = vWorld.y * 0.55 + nA.r * 4.0;
         float strata = 0.5 + 0.5 * sin(sPhase) * clamp(1.2 - fwidth(sPhase) * 0.8, 0.0, 1.0);   // bands only where a pixel can show them
-        vec3 rockCol = mix(vec3(0.36, 0.33, 0.32), vec3(0.5, 0.46, 0.42), strata * 0.6 + nB.r * 0.4);
-        float rockLit = band(smoothstep(-0.2, 0.75, dot(N, uSunDir)));
+        vec3 rockCol = mix(vec3(0.46, 0.43, 0.41), vec3(0.62, 0.57, 0.52), strata * 0.6 + nB.r * 0.4);
+        float rockLit = band(smoothstep(-0.2, 0.75, dot(N, uSunDir)) * sunVis);
         rockCol = rockCol * (shade * 0.8 + uSunColor * rockLit * 0.9);
         // snow caught on ledges of the rock
-        rockAmt *= 1.0 - 0.6 * smoothstep(0.55, 0.85, nB.g) * smoothstep(0.45, 0.25, slope);
+        rockAmt *= 1.0 - 0.75 * smoothstep(0.45, 0.8, nB.g * 0.6 + nA.b * 0.4) * smoothstep(0.55, 0.3, slope);   // snow lying on ledges and in gullies
         vec3 col = mix(snow, rockCol, rockAmt);
+        // forests beyond the instanced trees: painted canopy from the land-cover raster (crisp at any distance): dark crowns in a stipple,
+        // snow between them, fading in where the instanced trees end
+        float fRaster = uForestOn > 0.5 ? texture2D(uForestTex, wp / uForestSize).r : forest;
+        float canopy = fRaster * smoothstep(uTreeRadius * 0.75, uTreeRadius * 1.0, vDist) * (1.0 - piste);
+        float crowns = smoothstep(0.3, 0.62, texture2D(uNoise, wp * 0.16).g * 0.7 + nB.a * 0.3);
+        vec3 green = mix(vec3(0.07, 0.13, 0.11), vec3(0.14, 0.2, 0.17), nA.g);
+        vec3 canopyCol = green * (shade * 0.7 + uSunColor * smoothstep(-0.2, 0.7, nl) * sunVis * 0.5);
+        col = mix(col, canopyCol, canopy * (0.5 + 0.42 * crowns));
         #ifndef CHEAP
         // glints: tiny bright sparkles in the sun, close by
         vec4 nC = texture2D(uNoise, wp * 1.7 + floor(uTime * 0.0) );

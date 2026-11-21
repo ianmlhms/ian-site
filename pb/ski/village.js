@@ -44,11 +44,11 @@ function material(env) {
     side: THREE.DoubleSide,
     vertexShader: `
       attribute vec2 aUv; attribute vec4 aInfo;
-      varying vec2 vUv; varying vec4 vInfo; varying vec3 vN; varying float vDist;
-      void main(){ vUv = aUv; vInfo = aInfo; vN = normal; vec4 mv = viewMatrix * vec4(position, 1.0); vDist = -mv.z; gl_Position = projectionMatrix * mv; }`,
+      varying vec2 vUv; varying vec4 vInfo; varying vec3 vN; varying float vDist; varying vec2 vXZ;
+      void main(){ vUv = aUv; vInfo = aInfo; vN = normal; vXZ = position.xz; vec4 mv = viewMatrix * vec4(position, 1.0); vDist = -mv.z; gl_Position = projectionMatrix * mv; }`,
     fragmentShader: `
-      uniform vec3 uSunDir, uSunColor, uAmbSky, uAmbGround, uFogColor; uniform float uFogDensity, uGlow, uOvercast;
-      varying vec2 vUv; varying vec4 vInfo; varying vec3 vN; varying float vDist;
+      uniform vec3 uSunDir, uSunColor, uAmbSky, uAmbGround, uFogColor; uniform float uFogDensity, uGlow, uOvercast, uShadowOn; uniform sampler2D uShadow; uniform vec4 uShadowRect;
+      varying vec2 vUv; varying vec4 vInfo; varying vec3 vN; varying float vDist; varying vec2 vXZ;
       float h1(float n){ return fract(sin(n) * 43758.5453); }
       void main(){
         vec3 N = normalize(vN);
@@ -64,8 +64,8 @@ function material(env) {
           vec3 stone = mix(vec3(0.55, 0.53, 0.5), vec3(0.66, 0.63, 0.58), h1(seed * 17.0));
           vec3 plaster = mix(vec3(0.86, 0.8, 0.7), vec3(0.93, 0.88, 0.8), h1(seed * 53.0));
           if (kind < 0.5) col = vUv.y < 2.8 ? stone : wood;                          // chalet
-          else if (kind < 1.5) {                                                    // apartment block: plaster with wooden balcony bands
-            col = plaster;
+          else if (kind < 1.5) {                                                    // big block: plaster or Savoy stone-and-wood, wooden balcony bands
+            col = h1(seed * 7.0) < 0.5 ? plaster : (vUv.y < 3.0 ? stone : wood);
             float band = fract((vUv.y - 0.2) / 2.9);
             if (vUv.y > 3.0 && band < 0.16) col = wood * 0.9;
           } else if (kind < 2.5) col = vec3(0.93, 0.92, 0.88);                      // chapel
@@ -80,7 +80,7 @@ function material(env) {
           col = mix(col, vec3(0.2, 0.24, 0.3), win);
           glow = win * on * uGlow;
         }
-        float lit = smoothstep(-0.1, 0.6, dot(N, uSunDir));
+        float lit = smoothstep(-0.1, 0.6, dot(N, uSunDir)) * mix(1.0, texture2D(uShadow, (vXZ - uShadowRect.xy) / uShadowRect.zw).r, uShadowOn);
         lit = mix(lit, floor(lit * 3.0 + 0.5) / 3.0, 0.3);
         vec3 amb = mix(uAmbGround, uAmbSky, 0.5 + 0.5 * N.y);
         vec3 c = col * (amb * 0.62 + uSunColor * lit * 0.82) + glow * vec3(1.0, 0.72, 0.36) * 0.9;

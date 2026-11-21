@@ -124,3 +124,6 @@ button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
 .card .acts{display:flex;flex-wrap:wrap;gap:8px}
 .card .acts .btn{flex:1 1 auto}
 .card.top{top:auto;bottom:calc(16px + env(safe-area-inset-bottom));transform:translateX(-50%)}
+
+.intro.small{font-size:12px;padding-top:6px;font-family:var(--mono)}
+.credits{font-size:13px;color:var(--ink)}.credits p{margin:0 0 8px}

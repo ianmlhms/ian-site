@@ -11,6 +11,7 @@ export function createSkierModel({ jacket = 0xd8392f, trousers = 0x22303f, helme
     : new THREE.MeshLambertMaterial({ color }));
   const M = { jacket: mat(jacket), trousers: mat(trousers), helmet: mat(helmet), dark: mat(0x1b1d22), ski: mat(ghost ? 0x9ad1ff : 0x2a5bd7), goggle: mat(0xf2a33a), skin: mat(0xe8b796), pole: mat(0x9aa3ad) };
   const box = (w, h, d, m) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
+  const cap = (r, len, m) => new THREE.Mesh(new THREE.CapsuleGeometry(r, len, 3, 8), m);
   const root = new THREE.Group();            // feet position, heading
   const tilt = new THREE.Group();            // slope pitch
   const lean = new THREE.Group();            // roll into the turn
@@ -29,30 +30,32 @@ export function createSkierModel({ jacket = 0xd8392f, trousers = 0x22303f, helme
   const legs = [];
   for (const side of [-1, 1]) {
     const hip = new THREE.Group(); hip.position.set(0, 0.92, side * 0.13);
-    const thigh = box(0.16, 0.46, 0.16, M.trousers); thigh.position.y = -0.23;
+    const thigh = cap(0.085, 0.34, M.trousers); thigh.position.y = -0.23;
     const knee = new THREE.Group(); knee.position.y = -0.46;
-    const shin = box(0.15, 0.44, 0.15, M.trousers); shin.position.y = -0.22;
-    const boot = box(0.3, 0.16, 0.16, M.dark); boot.position.set(0.04, -0.42, 0);
+    const shin = cap(0.075, 0.32, M.trousers); shin.position.y = -0.2;
+    const boot = box(0.3, 0.2, 0.15, M.dark); boot.position.set(0.04, -0.4, 0);
     knee.add(shin, boot); hip.add(thigh, knee);
     lean.add(hip); legs.push({ hip, knee });
   }
   const torso = new THREE.Group(); torso.position.y = 0.92;
-  const body = box(0.26, 0.58, 0.4, M.jacket); body.position.y = 0.3;
+  const body = cap(0.17, 0.32, M.jacket); body.position.y = 0.3; body.scale.set(0.85, 1, 1.15);
+  const belt = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.08, 10), M.trousers); belt.position.y = 0.06; belt.scale.set(0.85, 1, 1.15);
   const neck = new THREE.Group(); neck.position.y = 0.62;
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 8), M.helmet); head.position.y = 0.14;
-  const face = box(0.05, 0.1, 0.2, M.goggle); face.position.set(0.13, 0.13, 0);
+  const face = box(0.06, 0.08, 0.22, M.goggle); face.position.set(0.12, 0.13, 0);
   const chin = box(0.04, 0.06, 0.12, M.skin); chin.position.set(0.12, 0.03, 0);
   neck.add(head, face, chin);
-  torso.add(body, neck);
+  torso.add(body, belt, neck);
   const arms = [];
   for (const side of [-1, 1]) {
     const sh = new THREE.Group(); sh.position.set(0, 0.52, side * 0.25);
-    const upper = box(0.12, 0.34, 0.12, M.jacket); upper.position.y = -0.17;
+    const upper = cap(0.06, 0.24, M.jacket); upper.position.y = -0.17;
     const elbow = new THREE.Group(); elbow.position.y = -0.34;
-    const fore = box(0.11, 0.3, 0.11, M.jacket); fore.position.y = -0.15;
-    const glove = box(0.12, 0.1, 0.12, M.dark); glove.position.y = -0.32;
-    const pole = box(0.025, 1.15, 0.025, M.pole); pole.position.set(-0.1, -0.85, 0); pole.rotation.z = 0.25;
-    elbow.add(fore, glove, pole); sh.add(upper, elbow);
+    const fore = cap(0.055, 0.2, M.jacket); fore.position.y = -0.15;
+    const glove = new THREE.Mesh(new THREE.SphereGeometry(0.065, 8, 6), M.dark); glove.position.y = -0.31;
+    const pole = box(0.022, 1.2, 0.022, M.pole); pole.position.set(-0.16, -0.82, 0); pole.rotation.z = 0.32;
+    const basket = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.01, 8), M.dark); basket.position.set(-0.32, -1.3, 0);
+    elbow.add(fore, glove, pole, basket); sh.add(upper, elbow);
     torso.add(sh); arms.push({ sh, elbow });
   }
   lean.add(torso);

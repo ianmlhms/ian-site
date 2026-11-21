@@ -80,7 +80,27 @@ export function createEnv({ scene, noise, params = {} }) {
     uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uSunColor: { value: V() }, uSkyTop: { value: V() }, uSkyHorizon: { value: V() },
     uAmbSky: { value: V() }, uAmbGround: { value: V() }, uFogColor: { value: V() }, uFogDensity: { value: 3e-5 },
     uTime: { value: 0 }, uCloud: { value: 0 }, uSnowfall: { value: 0 }, uGlow: { value: 0 }, uOvercast: { value: 0 }, uNoise: { value: noise },
+    // mountain shadows of the current time of day (baked, see scripts/ski/bake.py sun_shadows): a raster over the far grid
+    uShadow: { value: noise }, uShadowOn: { value: 0 }, uShadowRect: { value: new THREE.Vector4(0, 0, 1, 1) },
   };
+  let shadowUrl = null, shadowFor = null, shadowTarget = 0, sunScale = 1;
+  const loader = new THREE.TextureLoader();
+  function loadShadow() {
+    if (!shadowUrl || shadowFor === timeId) return;
+    const want = timeId;
+    shadowFor = want;
+    shadowTarget = 0;
+    loader.load(shadowUrl(want), (tex) => {
+      if (timeId !== want) { tex.dispose(); return; }
+      tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false;
+      tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+      tex.flipY = false;                               // row 0 of the raster is the north edge (z = rect.y): no flip
+      const old = u.uShadow.value;
+      u.uShadow.value = tex;
+      if (old && old !== noise) old.dispose();
+      shadowTarget = 1;
+    }, undefined, (error) => console.warn('[ski] shadow raster failed', error && error.message));
+  }
   let cur = { ...WEATHER[weatherId] };
   let curTime = { ...TIMES[timeId] };
   const state = { timeId, weatherId, timeMode, weatherMode, snowfall: 0 };
@@ -112,11 +132,12 @@ export function createEnv({ scene, noise, params = {} }) {
     u.uFogDensity.value = cur.fog;
     u.uCloud.value = cur.cloud; u.uSnowfall.value = cur.snow; u.uGlow.value = T.glow * (1 - cur.grey); u.uOvercast.value = cur.grey;
     state.snowfall = cur.snow;
+    u.uShadowOn.value = lerp(u.uShadowOn.value, shadowTarget, snap ? 1 : Math.min(1, dt * 2));
     hemi.color.setRGB(u.uAmbSky.value.x * 0.85, u.uAmbSky.value.y * 0.85, u.uAmbSky.value.z * 0.85);
     hemi.groundColor.setRGB(u.uAmbGround.value.x * 0.9, u.uAmbGround.value.y * 0.9, u.uAmbGround.value.z * 0.9);     // snow throws a lot of light back up
     sun.color.setRGB(u.uSunColor.value.x, u.uSunColor.value.y, u.uSunColor.value.z);
     hemi.intensity = Math.PI;                       // three r160 lights are physically based: x PI gives colour * cos as authored
-    sun.intensity = Math.PI * 0.7;
+    sun.intensity = Math.PI * 0.7 * sunScale;
     scene.fog.color.setRGB(fog[0], fog[1], fog[2]);
     scene.fog.density = cur.fog;
   }
@@ -132,7 +153,7 @@ export function createEnv({ scene, noise, params = {} }) {
         float up = max(d.y, 0.0);
         vec3 col = mix(uSkyHorizon, uSkyTop, pow(up, 0.55));
         float sd = max(dot(d, uSunDir), 0.0);
-        col += uSunColor * (pow(sd, 900.0) * 3.0 + pow(sd, 12.0) * 0.18 * (1.0 - uOvercast) + pow(sd, 3.0) * 0.12 * uGlow);
+        col += uSunColor * (pow(sd, 1400.0) * 3.0 + pow(sd, 40.0) * 0.16 * (1.0 - uOvercast) + pow(sd, 4.0) * 0.1 * uGlow);
         // painted clouds: two noise octaves projected on a flat layer, drifting
         vec2 cp = d.xz / max(d.y + 0.08, 0.06) * 0.22 + vec2(uTime * 0.0035, uTime * 0.0012);
         float n = texture2D(uNoise, cp).r * 0.62 + texture2D(uNoise, cp * 2.7).g * 0.38;
@@ -166,6 +187,8 @@ export function createEnv({ scene, noise, params = {} }) {
     timeMode = mode; writeChoice(STORE.time, mode);
     timeId = mode === 'random' ? pick(RANDOM_TIME) : mode;
     state.timeId = timeId; state.timeMode = mode;
+    u.uShadowOn.value = 0;
+    loadShadow();
   }
   function setWeather(mode) {
     weatherMode = mode; writeChoice(STORE.weather, mode);
@@ -185,5 +208,10 @@ export function createEnv({ scene, noise, params = {} }) {
     },
     snap() { apply(0, true); },
     cycleTime, cycleWeather, setTime, setWeather,
+    /** urlOf(timeId) -> the shadow raster URL; rect = [x0, z0, width, depth] of the raster in world metres (pixel edges). */
+    setShadows(urlOf, rect) { shadowUrl = urlOf; u.uShadowRect.value.set(rect[0], rect[1], rect[2], rect[3]); shadowFor = null; loadShadow(); },
+    sunDir: () => TIMES[timeId],
+    /** 0..1: how much sun reaches the skier (main.js marches a ray to the sun over the terrain); dims the sun on the plain materials. */
+    setSunScale(k) { sunScale = sunScale + (k - sunScale) * 0.25; },
   };
 }
