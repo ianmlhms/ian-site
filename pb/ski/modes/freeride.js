@@ -9,7 +9,7 @@
 import { liftClass, LIFT_SPEC } from '../lift-path.js';
 
 export const DAY = Object.freeze({ start: 9, end: 16.5, hoursPerSecond: 1 / 240 });     // one game hour = 4 real minutes
-const BOTTOM_RADIUS = 30;      // m from the bottom station: the boarding zone (round 6: modes/liftride.js RIDE.boardRadius)
+const BOTTOM_RADIUS = 12;      // m from the bottom station: the boarding zone (round 7: was 30, the button boarded from anywhere near; RIDE.boardRadius)
 const EXIT_PISTE = 80;         // m: a piste that starts this close to a top station is where the skier gets off
 const SAFE_EVERY = 1.5;        // s between respawn spots
 const EDGE = 150;              // m inside the box edge: beyond it the skier is sent back
@@ -55,7 +55,8 @@ export function createLiftNet(resort, heightAt, pistes = null) {
   }
   function nearestBottom(x, z, radius = BOTTOM_RADIUS) {
     let best = null, bd = radius;
-    for (const l of list) { const d = Math.hypot(l.bottom.x - x, l.bottom.z - z); if (d < bd) { bd = d; best = l; } }
+    // round 7: the zone is round the station AND round its boarding spot (modes/spawn.js liftSpot, set by main.js as lift.board)
+    for (const l of list) { const d = Math.min(Math.hypot(l.bottom.x - x, l.bottom.z - z), l.board ? Math.hypot(l.board.x - x, l.board.z - z) + 2 : Infinity); if (d < bd) { bd = d; best = l; } }
     return best;
   }
   function nearestTop(x, z, radius = 400) {

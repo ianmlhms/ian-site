@@ -6,9 +6,9 @@ import { FOG_GLSL } from './snow-shader.js';
 
 const THREE = window.THREE;
 const CELL = 2560;
-const STEP = 6;                       // m: the ribbon follows the ground at least this often
-const LIFT = 0.22;                    // m above the ground (and a polygon offset): no z-fighting with the terrain
-const BANK = 1.7;                     // m of ploughed snow bank beyond the edge
+const STEP = 1.25;                    // m: the ribbon follows the physics lattice (2.5 m) closely: drawn street = the snow the skier stands on
+const LIFT = 0.03;                    // m above the ground; far away the vertex shader pulls the street towards the camera instead
+const BANK = 1.1;                     // m of ploughed snow bank beyond the edge (painted, flat: round 7, no raised ridge)
 
 /** roads.json -> [{ hw, pts: [[x, z], ...] }] */
 export function decodeRoads(json) {
@@ -37,7 +37,10 @@ function material(env) {
     polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4, side: THREE.DoubleSide,
     vertexShader: `
       attribute vec2 aRoad; varying vec2 vRoad; varying vec3 vW; varying vec3 vN; varying float vDist;
-      void main(){ vRoad = aRoad; vW = position; vN = normal; vec4 mv = viewMatrix * vec4(position, 1.0); vDist = -mv.z; gl_Position = projectionMatrix * mv; }`,
+      void main(){ vRoad = aRoad; vW = position; vN = normal; vec4 mv = viewMatrix * vec4(position, 1.0); vDist = -mv.z;
+        // round 7: exact close by; farther away (coarser terrain tiles) pulled along the view ray towards the camera so it stays on top
+        mv.xyz *= 1.0 - clamp((vDist - 40.0) * 0.00004, 0.0, 0.05);
+        gl_Position = projectionMatrix * mv; }`,
     fragmentShader: `
       uniform vec3 uSunDir, uSunColor, uAmbSky, uAmbGround, uFogColor; uniform float uFogDensity, uOvercast; uniform sampler2D uNoise;
       varying vec2 vRoad; varying vec3 vW; varying vec3 vN; varying float vDist;
@@ -74,7 +77,7 @@ export function createRoads({ scene, roads, env, height }) {
     if (!c) cells.set(key, (c = { pos: [], road: [], idx: [], cx: (Math.floor(mx / CELL) + 0.5) * CELL, cz: (Math.floor(mz / CELL) + 0.5) * CELL }));
     const base = c.pos.length / 3;
     // five rails across: bank out, edge, centre, edge, bank out (the bank rises a little: a ridge of ploughed snow)
-    const rails = [[-(r.hw + BANK), -1.4, 0.55], [-r.hw, -1, 0], [0, 0, 0], [r.hw, 1, 0], [r.hw + BANK, 1.4, 0.55]];
+    const rails = [[-(r.hw + BANK), -1.4, -0.01], [-r.hw, -1, 0], [-r.hw * 0.5, -0.5, 0], [0, 0, 0], [r.hw * 0.5, 0.5, 0], [r.hw, 1, 0], [r.hw + BANK, 1.4, -0.01]];
     pts.forEach(([x, z], i) => {
       const [px, pz] = pts[Math.max(0, i - 1)], [qx, qz] = pts[Math.min(pts.length - 1, i + 1)];
       let nx = -(qz - pz), nz = qx - px;
@@ -85,8 +88,8 @@ export function createRoads({ scene, roads, env, height }) {
         c.road.push(v, 0);
       }
       if (i) {
-        const a = base + (i - 1) * 5, b = base + i * 5;
-        for (let k = 0; k < 4; k++) c.idx.push(a + k, b + k, a + k + 1, a + k + 1, b + k, b + k + 1);
+        const R = rails.length, a = base + (i - 1) * R, b = base + i * R;
+        for (let k = 0; k < R - 1; k++) c.idx.push(a + k, b + k, a + k + 1, a + k + 1, b + k, b + k + 1);
       }
     });
   }

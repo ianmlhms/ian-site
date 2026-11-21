@@ -46,12 +46,13 @@ import { createParkBodies } from './modes/views.js';
 import { parkLayoutOf, createModeHost } from './modes/host.js';
 import { attachModePanel, starRow, createRideHud, createChallengePrompt, showSkiCard } from './modes/panel.js';
 // round 6: lift rides, challenge gates on the mountain, ski types
-import { createRide, rideCamera } from './modes/liftride.js';
+import { createRide, rideCamera, RIDE } from './modes/liftride.js';
 import { createCarrier } from './modes/carriers.js';
 import { createTunnel } from './modes/tunnel.js';
 import { createMarkers, markerList, MARKER } from './modes/markers.js';
 import { SKI_BY_ID, DEFAULT_SKI, skiParams, addSkiStats, skiOpen } from './modes/skis.js';
 import { spawnLift } from './modes/freeride.js';
+import { firstLift, liftSpot, exitSpot, buildingBoxes, createBoxIndex } from './modes/spawn.js';
 import { pisteStars, specialText } from './modes/challenges.js';
 
 const THREE = window.THREE;
@@ -193,12 +194,14 @@ async function boot() {
   // the village streets are draped on the 5 m ground: built once the extras and every height tile are in
   const tryRoads = () => {
     if (roads || !roadRows || !streamer.done()) return;
-    try { roads = createRoads({ scene, roads: roadRows, env, height: (x, z) => field.height(x, z) }); mark('roads'); } catch (error) { console.warn('[ski] streets failed', error); roads = { update() {} }; }
+    try { roads = createRoads({ scene, roads: roadRows, env, height: (x, z) => surface.height(x, z) }); mark('roads'); } catch (error) { console.warn('[ski] streets failed', error); roads = { update() {} }; }
   };
 
   // streamed height tiles change the heights under them: drop every cache that read them
   streamer.onTile((rect) => {
     surface.invalidate(...rect);
+    // round 7: a finer tile under a skier who stands (or would be under the snow): back onto the real ground
+    { const st = game.state; if (st && !st.ride && st.crash === 0 && st.x >= rect[0] - 5 && st.x <= rect[2] + 5 && st.z >= rect[1] - 5 && st.z <= rect[3] + 5) { const h = surface.height(st.x, st.z); if (st.y < h - 0.02 || (st.grounded && st.speed < 1.5 && Math.abs(st.y - h) > 0.02)) game.state = { ...st, y: h, vy: 0, grounded: true }; } }
     terrain.invalidate(...rect);
     scatter.invalidate(...rect);
     scatterView.invalidate();
@@ -220,7 +223,10 @@ async function boot() {
       tryRoads();
     }
   });
-  loadExtras(core.root).then(({ buildings, roads: streets }) => {
+  let boxIndex = null;                                                       // round 7: building footprints (spawn spots never face a wall)
+  const extrasReady = loadExtras(core.root).then(({ buildings, roads: streets }) => {
+    try { boxIndex = createBoxIndex(buildingBoxes(buildings)); } catch (error) { console.warn('[ski] building index failed', error); }
+    for (const l of modes.lifts.list) { const b = boardSpot(l); l.board = { x: b.x, z: b.z }; }        // round 7: the boarding zones
     village = createVillage({ scene, rows: buildings, env, height: (x, z) => field.baseHeight(x, z), level }); mark('village');
     roadRows = decodeRoads(streets); tryRoads();
   }).catch((error) => console.warn('[ski] buildings failed', error.message));
@@ -338,6 +344,7 @@ async function boot() {
     if (m.lawin) startLawin(m); else if (m.park) startPark(); else startRun(m.piste, MODES.run);
   }
   // ---- round 6: lift rides ----
+  let boarding = null, actionLock = 0;
   let ride = null, carrier = null, rideView = camMode === 'first' ? 'window' : 'chase', rideCam = null, skipping = false, tunnel = null, inTunnel = false;
   const rideHud = createRideHud(hud.el, { onSkip: () => skipRide(), onView: () => toggleRideView() });
   const outfitOpen = (o) => modes.outfitOpen(o);
@@ -616,28 +623,23 @@ async function boot() {
    *  (no houses under him or under the chase camera behind him: the class raster's built share, which knows the villages from the start). */
   const attrs0 = {};
   const builtAt = (x, z) => { let b = 0; for (const [dx, dz] of [[0, 0], [5, 0], [-5, 0], [0, 5], [0, -5]]) b += field.attrs(x + dx, z + dz, attrs0).built || 0; return b / 5; };
+  /** Round 7 (modes/spawn.js): in front of the station, facing it, the view from the camera to 25 m ahead free of buildings. */
+  const slopeAt = (x, z) => Math.hypot(field.farHeight(x + 6, z) - field.farHeight(x - 6, z), field.farHeight(x, z + 6) - field.farHeight(x, z - 6)) / 12;
   function boardSpot(lift) {
-    let best = null, bs = Infinity;
-    for (const m of [12, 18, 24]) {
-      for (const lat of [0, 7, -7, 14, -14]) {
-        const b = modes.lifts.boardAt(lift, m);
-        const rx = -Math.sin(b.heading), rz = Math.cos(b.heading);
-        const x = b.x + rx * lat, z = b.z + rz * lat;
-        const cx = x - Math.cos(b.heading) * 7, cz = z - Math.sin(b.heading) * 7;
-        const score = builtAt(x, z) * 100 + builtAt(cx, cz) * 70 + Math.abs(m - 14) * 0.15 + Math.abs(lat) * 0.25;
-        if (score < bs) { bs = score; best = { x, z, heading: b.heading }; }
-      }
-    }
-    return best;
+    const s = liftSpot(lift, { builtAt, index: boxIndex, slope: slopeAt });
+    return s ? { x: s.x, z: s.z, heading: s.heading, blocked: s.blocked } : modes.lifts.boardAt(lift, 14);
   }
   /** Round 6: free ride from a lift's bottom station (fast travel: a short fade while the tiles there arrive) or from a spot. */
   async function goFree(lift, spotIn = null) {
-    const spot = spotIn || (lift ? boardSpot(lift) : null);
-    if (!spot) return;
+    if (!lift && !spotIn) return;
     const fade = fader();
     fade.classList.add('on');
+    if (!spotIn) await Promise.race([extrasReady.catch(() => null), new Promise((res) => setTimeout(res, 2500))]);      // the footprints
+    const spot = spotIn || boardSpot(lift);
     streamer.focus(spot.x, spot.z);
-    await Promise.race([streamer.ready(spot.x, spot.z, 600), new Promise((res) => setTimeout(res, 6000))]);
+    // round 7: the ground under the spot is the real 5 m terrain before he stands on it (never under the snow); a late tile re-snaps
+    await Promise.race([streamer.ready(spot.x, spot.z, 600), new Promise((res) => setTimeout(res, 8000))]);
+    for (let i = 0; i < 20 && terrain.stats.pending > 0; i++) await new Promise((res) => setTimeout(res, 60));
     await new Promise((res) => setTimeout(res, 120));
     startFree(lift, spot);
     fade.classList.remove('on');
@@ -690,7 +692,11 @@ async function boot() {
     if (!lift) return;
     const path = buildLifts().pathOf(lift.index);
     if (!path) { hud.toast('Dëse Lift fiert net'); return; }
+    if (performance.now() < actionLock) return;
     ride = createRide({ lift, path, height: (x, z) => surface.height(x, z) });
+    // round 7: no teleport onto the line: he skates the last metres into the station to the carrier waiting there, then it leaves
+    boarding = { t: 0, from: { ...game.state } };
+    actionLock = performance.now() + 1400;                          // one press = one boarding (a double tap must not skip the ride)
     carrier = createCarrier({ scene, kind: path.kind, seats: path.seats });
     tunnel = path.tunnels && path.tunnels.length ? createTunnel({ scene, path }) : null;     // round 7: the tube of an underground funicular
     inTunnel = false;
@@ -707,6 +713,18 @@ async function boot() {
     mark('ride');
   }
   function stepRide(dt) {
+    if (boarding) {
+      boarding.t += dt;
+      const k = Math.min(1, boarding.t / RIDE.boardTime), e = k * k * (3 - 2 * k);
+      const to = ride.state(boarding.from), f = boarding.from;
+      const dh = Math.atan2(Math.sin(to.heading - f.heading), Math.cos(to.heading - f.heading));
+      game.state = k >= 1 ? to : { ...f, x: f.x + (to.x - f.x) * e, z: f.z + (to.z - f.z) * e, y: k < 0.6 ? surface.height(f.x + (to.x - f.x) * e, f.z + (to.z - f.z) * e) : f.y + (to.y - f.y) * e, heading: f.heading + dh * e, speed: 2, vx: 0, vz: 0, vy: 0, ride: k > 0.6 ? to.ride : '', grounded: true };
+      if (k >= 1) boarding = null;
+      const w0 = ride.where();
+      if (lifts) lifts.setRide(ride.lift.index, ride.s);
+      carrier.place(w0);
+      return;
+    }
     ride.step(dt);
     game.state = ride.state(game.state);
     const w = ride.where();
@@ -751,7 +769,7 @@ async function boot() {
   }
   function toggleRideView() { setCamMode(camMode === 'first' ? 'third' : 'first'); }
   async function skipRide() {
-    if (!ride || skipping) return;
+    if (!ride || skipping || boarding || performance.now() < actionLock) return;
     skipping = true;
     const fade = fader();
     fade.classList.add('on');
@@ -774,7 +792,10 @@ async function boot() {
     if (tunnel) { tunnel.dispose(); tunnel = null; }
     inTunnel = false; document.documentElement.dataset.skiTunnel = '0';
     rideHud.show(null);
-    const spot = modes.lifts.startAt(r.lift, (x, z) => surface.height(x, z));
+    // round 7: off on the exit side, outside every building (the station's own included), facing down onto open snow
+    const prefer = modes.lifts.startAt(r.lift, (x, z) => surface.height(x, z));
+    const ex = exitSpot(r.lift, { index: boxIndex, builtAt, farHeight: (x, z) => field.farHeight(x, z), prefer });
+    const spot = ex ? { x: ex.x, z: ex.z, heading: ex.heading } : prefer;
     if (modes.freeRun) modes.freeRun.moved(spot);
     placeAt(spot.x, spot.z, spot.heading);
     game.phase = 'running';
@@ -1103,7 +1124,8 @@ async function boot() {
   game.piste = startPiste;
   // round 6: the free ride starts at the bottom station of a lift in a village; the first build happens there unless the page was opened
   // onto a piste (?piste= / ?auto=1 / ?map=1) or into an online race
-  spawn = spawnLift(modes.lifts, resort.places, startPiste.bottom);
+  for (const l of modes.lifts.list) if (!l.board) { const b = boardSpot(l); l.board = { x: b.x, z: b.z }; }      // round 7 (the raster only until the footprints arrive)
+  spawn = firstLift(modes.lifts, rid) || spawnLift(modes.lifts, resort.places, startPiste.bottom);      // round 7: the resort's first lift
   const openFlag = takeOpenMapFlag();
   const intoFree = (!mpCtx || mpFreeMode) && !params.auto && !params.piste && param('map') !== '1' && openFlag !== '1' && !!spawn;
   const a0 = intoFree ? (() => { const b = boardSpot(spawn); return { x: b.x, z: b.z, dx: Math.cos(b.heading), dz: Math.sin(b.heading) }; })() : startPiste.at(2, {});

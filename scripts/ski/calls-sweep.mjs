@@ -10,6 +10,7 @@ const args = process.argv.slice(2);
 const opt = (name, def) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : def; };
 const resort = opt("--resort", "killy"), q = opt("--q", "low"), every = Number(opt("--every", "1")), top = Number(opt("--top", "8")), wait = Number(opt("--wait", "450"));
 const only = opt("--only", "");
+const asRun = args.includes("--run");              // each piste as a timed run (start gate, finish arch, slalom gates, star flags)
 
 const browser = await launchBrowser({ fullChromium: true, args: args.includes("--gpu") ? ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist"] : [] });
 const { server, origin } = await startServer();
@@ -43,8 +44,9 @@ try {
   console.log(`${resort} ${q}: ${spots.length} spots`);
   const results = [];
   for (const sp of spots) {
-    const r = await page.evaluate(async ({ sp, wait }) => {
+    const r = await page.evaluate(async ({ sp, wait, asRun }) => {
       const S = window.__ski;
+      if (asRun && (!S.game.piste || S.game.piste.id !== sp.id || S.game.mode !== 'run')) { S.start(sp.id); await new Promise((res) => setTimeout(res, 300)); }
       S.place(sp.x, sp.z, sp.h);
       S.setInput({ steer: 0, tuck: 0, brake: 1, push: 0, jump: false });
       await new Promise((res) => setTimeout(res, wait));
@@ -53,7 +55,7 @@ try {
       await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
       const by = { ...window.__callCounts };
       return { calls: S.info().calls, by };
-    }, { sp, wait });
+    }, { sp, wait, asRun });
     results.push({ ...sp, ...r });
   }
   results.sort((a, b) => b.calls - a.calls);

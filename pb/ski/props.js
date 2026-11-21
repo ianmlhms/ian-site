@@ -220,58 +220,81 @@ export function createSigns({ scene, resort, height }) {
   return { boards, posts, count: post.length / 3, atlases: boards.length };
 }
 
-/** The objects of one run: start gate at the top, finish arch at the bottom, slalom gates. dispose() removes them. */
+/** The objects of one run: start gate at the top, finish arch at the bottom, slalom gates. dispose() removes them.
+ *  Round 7: few draw calls whatever the slalom (a slalom with 30 gates was ~110 calls): the posts and banner frames of both arches are
+ *  one merged mesh, each banner face one textured quad pair, every slalom pole one instanced mesh and every flag another (the colour per
+ *  instance: red / blue, grey once missed). */
 export function createRunProps({ scene, piste, height, gates }) {
   const group = new THREE.Group();
   group.name = 'ski-run';
-  const post = new THREE.MeshLambertMaterial({ color: 0x2b2f36 });
+  const disposables = [];
   const top = piste.at(0, {}), end = piste.at(piste.length, {});
+  const frame = [];                                   // [geometry, matrix] of the dark posts / banner boxes (merged)
   const arch = (p, text, bg, fg, width) => {
-    const g = new THREE.Group();
     const y = height(p.x, p.z);
     const h = 4.2;
-    for (const side of [-1, 1]) {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(0.35, h, 0.35), post);
-      m.position.set(side * width / 2, h / 2 - 0.3, 0);
-      g.add(m);
-    }
+    const m = new THREE.Matrix4().compose(new THREE.Vector3(p.x, y, p.z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.atan2(p.dz, p.dx) + Math.PI / 2), new THREE.Vector3(1, 1, 1));
+    for (const side of [-1, 1]) frame.push(new THREE.BoxGeometry(0.35, h, 0.35).translate(side * width / 2, h / 2 - 0.3, 0).applyMatrix4(m));
+    frame.push(new THREE.BoxGeometry(width, 1.0, 0.1).translate(0, h - 0.6, 0).applyMatrix4(m));
+    // the banner: the same text on both faces (a plane each, a hair in front of the box)
     const tex = bannerTexture(text, bg, fg);
-    const banner = new THREE.Mesh(new THREE.BoxGeometry(width, 1.0, 0.12), [post, post, post, post, new THREE.MeshLambertMaterial({ map: tex }), new THREE.MeshLambertMaterial({ map: tex })]);
-    banner.position.set(0, h - 0.6, 0);
-    g.add(banner);
-    g.position.set(p.x, y, p.z);
-    g.rotation.y = -Math.atan2(p.dz, p.dx) + Math.PI / 2;           // the banner faces along the piste
-    group.add(g);
-    return g;
+    const bm = new THREE.MeshLambertMaterial({ map: tex });
+    const g = new THREE.BufferGeometry();
+    const front = new THREE.PlaneGeometry(width, 1.0).translate(0, h - 0.6, 0.07).applyMatrix4(m);
+    const back = new THREE.PlaneGeometry(width, 1.0).rotateY(Math.PI).translate(0, h - 0.6, -0.07).applyMatrix4(m);
+    const P = [], N = [], U = [];
+    for (const q of [front, back]) { const n = q.toNonIndexed(); P.push(...n.attributes.position.array); N.push(...n.attributes.normal.array); U.push(...n.attributes.uv.array); n.dispose(); q.dispose(); }
+    g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
+    const banner = new THREE.Mesh(g, bm);
+    group.add(banner);
+    disposables.push(g, bm, tex);
   };
   arch(top, 'START', '#1f7a4d', '#ffffff', 9);
   const finishPoint = piste.at(Math.max(0, piste.length - 2), {});
   arch(finishPoint, 'ZIL', '#d0352c', '#ffffff', Math.min(30, piste.halfWidth * 2 + 4));
-  // slalom gates: an inner pole with a flag and an outer pole 4 m further out
-  const flagGeo = new THREE.PlaneGeometry(0.75, 0.55).translate(0.4, 1.35, 0);
-  const poleGeo = new THREE.CylinderGeometry(0.025, 0.025, 1.8, 5).translate(0, 0.9, 0);
-  const red = new THREE.MeshLambertMaterial({ color: 0xd8392f, side: THREE.DoubleSide }), blue = new THREE.MeshLambertMaterial({ color: 0x2f6fd8, side: THREE.DoubleSide });
-  const gateMeshes = [];
-  gates.forEach((g, i) => {
-    const mat = i % 2 ? blue : red;
-    const one = new THREE.Group();
-    for (const extra of [0, 4]) {
-      const off = g.off + Math.sign(g.off) * extra;
-      const x = g.x - g.dz * (off - g.off), z = g.z + g.dx * (off - g.off);
-      const pole = new THREE.Mesh(poleGeo, mat);
-      pole.position.set(x, height(x, z) - 0.1, z);
-      const flag = new THREE.Mesh(flagGeo, mat);
-      flag.position.copy(pole.position);
-      flag.rotation.y = -Math.atan2(g.dz, g.dx);
-      one.add(pole, flag);
-    }
-    group.add(one);
-    gateMeshes.push(one);
-  });
+  void end;
+  {
+    const P = [], N = [];
+    for (const f of frame) { const n = f.toNonIndexed(); P.push(...n.attributes.position.array); N.push(...n.attributes.normal.array); n.dispose(); f.dispose(); }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3));
+    const mat = new THREE.MeshLambertMaterial({ color: 0x2b2f36 });
+    group.add(new THREE.Mesh(g, mat));
+    disposables.push(g, mat);
+  }
+  // slalom gates: an inner pole with a flag and an outer pole 4 m further out (instanced: 2 draw calls for all of them)
+  const RED = new THREE.Color(0xd8392f), BLUE = new THREE.Color(0x2f6fd8), GREY = new THREE.Color(0x777777);
+  let poles = null, flags = null;
+  if (gates.length) {
+    const flagGeo = new THREE.PlaneGeometry(0.75, 0.55).translate(0.4, 1.35, 0);
+    const poleGeo = new THREE.CylinderGeometry(0.025, 0.025, 1.8, 5).translate(0, 0.9, 0);
+    const mat = new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+    poles = new THREE.InstancedMesh(poleGeo, mat, gates.length * 2);
+    flags = new THREE.InstancedMesh(flagGeo, mat, gates.length * 2);
+    const d = new THREE.Object3D();
+    gates.forEach((g, i) => {
+      [0, 4].forEach((extra, k) => {
+        const off = g.off + Math.sign(g.off) * extra;
+        const x = g.x - g.dz * (off - g.off), z = g.z + g.dx * (off - g.off);
+        d.position.set(x, height(x, z) - 0.1, z); d.rotation.set(0, 0, 0); d.updateMatrix(); poles.setMatrixAt(i * 2 + k, d.matrix);
+        d.rotation.set(0, -Math.atan2(g.dz, g.dx), 0); d.updateMatrix(); flags.setMatrixAt(i * 2 + k, d.matrix);
+        poles.setColorAt(i * 2 + k, i % 2 ? BLUE : RED); flags.setColorAt(i * 2 + k, i % 2 ? BLUE : RED);
+      });
+    });
+    poles.instanceMatrix.needsUpdate = true; flags.instanceMatrix.needsUpdate = true;
+    poles.computeBoundingSphere(); flags.computeBoundingSphere();
+    group.add(poles, flags);
+    disposables.push(flagGeo, poleGeo, mat);
+  }
   scene.add(group);
   return {
     group,
-    markGate(i, ok) { const one = gateMeshes[i]; if (!one) return; one.children.forEach((c) => { c.material = ok ? c.material : new THREE.MeshLambertMaterial({ color: 0x777777, side: THREE.DoubleSide }); }); },
-    dispose() { scene.remove(group); group.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); },
+    get drawCalls() { return group.children.length; },
+    markGate(i, ok) {
+      if (!poles || ok || i < 0 || i >= gates.length) return;
+      for (const k of [0, 1]) { poles.setColorAt(i * 2 + k, GREY); flags.setColorAt(i * 2 + k, GREY); }
+      poles.instanceColor.needsUpdate = true; flags.instanceColor.needsUpdate = true;
+    },
+    dispose() { scene.remove(group); for (const x of disposables) x.dispose(); if (poles) poles.dispose(); if (flags) flags.dispose(); },
   };
 }
