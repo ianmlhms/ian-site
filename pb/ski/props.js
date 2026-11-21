@@ -165,8 +165,8 @@ export function createSigns({ scene, resort, height }) {
     g.fillStyle = 'rgba(255,255,255,0.9)'; g.fillRect(x + 3, y + 3, BW - 6, 3); g.fillRect(x + 3, y + BH - 6, BW - 6, 3);
     g.fillStyle = '#ffffff'; g.font = '700 26px system-ui, -apple-system, sans-serif'; g.textBaseline = 'middle';
     const name = p.name.length > 15 ? p.name.slice(0, 14) + '…' : p.name;
-    g.fillText(name, x + 14, y + BH / 2 + 1, BW - 56);
-    g.beginPath(); g.moveTo(x + BW - 34, y + 12); g.lineTo(x + BW - 14, y + BH / 2); g.lineTo(x + BW - 34, y + BH - 12); g.closePath(); g.fill();   // arrow
+    g.fillText(name, x + 44, y + BH / 2 + 1, BW - 56);
+    g.beginPath(); g.moveTo(x + 32, y + 12); g.lineTo(x + 12, y + BH / 2); g.lineTo(x + 32, y + BH - 12); g.closePath(); g.fill();   // arrow: towards the piste
   });
   const tex = new THREE.CanvasTexture(c);
   tex.anisotropy = 4;
@@ -187,8 +187,8 @@ export function createSigns({ scene, resort, height }) {
     const ax = x - uz * 0.1, az = z + ux * 0.1;
     const ex = ax + uz * w, ez = az - ux * w;           // the board reaches in towards the piste
     const u0 = (i % cols) / cols, u1 = u0 + 1 / cols, v1 = 1 - Math.floor(i / cols) / rows, v0 = v1 - 1 / rows;
-    quad([ax, y0, az], [ex, y0, ez], [ex, y1, ez], [ax, y1, az], [-ux, 0, -uz], [[u1, v0], [u0, v0], [u0, v1], [u1, v1]]);   // seen from uphill
-    quad([ex, y0, ez], [ax, y0, az], [ax, y1, az], [ex, y1, ez], [ux, 0, uz], [[u1, v0], [u0, v0], [u0, v1], [u1, v1]]);     // seen from below
+    quad([ex, y0, ez], [ax, y0, az], [ax, y1, az], [ex, y1, ez], [-ux, 0, -uz], [[u0, v0], [u1, v0], [u1, v1], [u0, v1]]);   // seen from uphill
+    quad([ax, y0, az], [ex, y0, ez], [ex, y1, ez], [ax, y1, az], [ux, 0, uz], [[u0, v0], [u1, v0], [u1, v1], [u0, v1]]);     // seen from below
   });
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));

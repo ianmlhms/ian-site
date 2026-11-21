@@ -80,7 +80,7 @@ export function createSnowMaterial(env, { cheap = false, treeRadius = 400, fores
         float ao = clamp(occ, -0.6, 1.0);
         vec3 shade = mix(uAmbGround, uAmbSky, sky) * (1.0 - 0.32 * max(ao, 0.0) + 0.08 * max(-ao, 0.0));
         // snow: blue-grey in the shade (the sky's light), warm white in the sun; never brighter than paper white
-        vec3 shadeC = mix(vec3(0.8), vec3(0.84, 0.9, 1.0), 0.6 + 0.25 * max(ao, 0.0)) * (shade * 0.95 + 0.12);
+        vec3 shadeC = mix(vec3(0.8), vec3(0.84, 0.9, 1.0), (0.6 + 0.25 * max(ao, 0.0)) * (1.0 - 0.55 * uOvercast)) * (shade * 0.95 + 0.12);   // overcast light is whiter
         float top = max(shadeC.r, max(shadeC.g, shadeC.b));
         shadeC *= mix(1.0, 0.97 / top, smoothstep(0.9, 1.15, top));              // bright overcast light: a soft shoulder, hue kept, no cyan clip
         vec3 litC = max(shadeC * 1.02, shadeC * 0.3 + uSunColor * 0.76);         // a weak sun (fog, cloud) never makes the lit side darker than the shade
@@ -93,18 +93,18 @@ export function createSnowMaterial(env, { cheap = false, treeRadius = 400, fores
         snow *= 1.0 - 0.045 * edgeLine;
         // ---- off-piste: wind-scoured crusts (a little greyer) and fresh powder pillows (brighter)
         float crust = smoothstep(0.55, 0.85, nW.g * 0.7 + nB.r * 0.3);
-        snow *= 1.0 - (1.0 - piste) * (0.045 * crust - 0.02 * smoothstep(0.4, 0.8, nL.b));
+        snow *= 1.0 - (1.0 - piste) * (1.0 - water) * (0.045 * crust - 0.02 * smoothstep(0.4, 0.8, nL.b));
         // ---- under the trees: blue-grey dappled shade, needle litter
         float under = forest * (0.55 + 0.45 * nB.a);
         snow = mix(snow, snow * vec3(0.8, 0.84, 0.92), under * 0.5);
         // ---- villages: trodden, ploughed snow and wet tracks
         snow = mix(snow, snow * vec3(0.9, 0.9, 0.92) * (0.92 + 0.1 * nA.g), built * 0.6);
         // ---- frozen lakes: dead flat, snow drifted in long streaks over grey-blue ice, a few pressure cracks, a darker icy shore
-        float iceShow = smoothstep(0.45, 0.68, nL.a * 0.55 + nW.b * 0.3 + nB.b * 0.15) * smoothstep(0.75, 1.0, waterSoft);
+        float iceShow = smoothstep(0.52, 0.78, nL.a * 0.6 + texture2D(uNoise, wp * 0.006 + 0.4).b * 0.4) * smoothstep(0.75, 1.0, waterSoft);
         float crack = 1.0 - smoothstep(0.0, 0.02, abs(texture2D(uNoise, wp * 0.0045 + 0.2).g - 0.5));
         vec3 ice = mix(vec3(0.62, 0.71, 0.8), vec3(0.74, 0.8, 0.87), nB.r) * (shade * 0.75 + uSunColor * lit * 0.45);
         float shore = smoothstep(0.08, 0.35, waterSoft) * (1.0 - smoothstep(0.45, 0.8, waterSoft));
-        vec3 lake = mix(snow * vec3(0.93, 0.96, 1.0), ice, iceShow * 0.7);
+        vec3 lake = mix(snow * vec3(0.94, 0.965, 1.0), ice, iceShow * 0.45);
         lake = mix(lake, lake * vec3(0.8, 0.86, 0.92), crack * 0.35 * aa + shore * 0.35);
         snow = mix(snow, lake, smoothstep(0.05, 0.3, waterSoft));
         // ---- rock where it is too steep for snow (strata in the height), more of it in the mapped rock areas
