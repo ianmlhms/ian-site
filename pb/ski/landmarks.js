@@ -15,7 +15,7 @@
 const THREE = window.THREE;
 
 const COL = {
-  stone: 0x8c8174, concrete: 0xc9c6bf, steel: 0x9aa1a9, bronze: 0x7a5f3a, glass: 0x2c3946, wood: 0x6b4a32, roofDark: 0x3d4148,
+  stone: 0x8c8174, concrete: 0xbab7b0, steel: 0x9aa1a9, bronze: 0x7a5f3a, glass: 0x2c3946, wood: 0x6b4a32, roofDark: 0x3d4148,
   white: 0xf2f2ee, red: 0xd2322b, antenna: 0xe9edf0, sign: 0xf4f1e8, netRed: 0xe0362a,
 };
 
@@ -66,7 +66,7 @@ function board(lines, width, height, opts) {
 /* ---------------- kinds ---------------- */
 function bell() {
   const g = new THREE.Group();
-  const R = 7.2, H = 4.2;
+  const R = 6.4, H = 3.6;
   const drum = new THREE.Mesh(new THREE.CylinderGeometry(R, R + 0.4, H + 2, 28), mat(COL.stone));
   drum.position.y = H / 2 - 1;
   const rim = new THREE.Mesh(new THREE.CylinderGeometry(R + 0.35, R + 0.25, 0.9, 28), mat(COL.concrete));
@@ -74,68 +74,66 @@ function bell() {
   const door = box(3.2, 3.0, 1.2, 0x34302c, 0, -0.2, R - 0.3);
   g.add(drum, rim, door);
   // four slanted steel legs from the rim to the tip, a ring frame half way, a cross on top
-  const top = new THREE.Vector3(0, H + 24, 0);
+  const top = new THREE.Vector3(0, H + 15.2, 0);           // 21.8 m in all (OSM height)
   for (let k = 0; k < 4; k++) {
     const a = Math.PI / 4 + k * Math.PI / 2;
     const foot = new THREE.Vector3(Math.cos(a) * (R + 1.2), H - 1.5, Math.sin(a) * (R + 1.2));
     g.add(beam(foot, top, 0.7, COL.steel));
   }
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(3.2, 0.22, 6, 20), mat(COL.steel));
-  ring.rotation.x = Math.PI / 2; ring.position.y = H + 13.5;
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(2.6, 0.2, 6, 20), mat(COL.steel));
+  ring.rotation.x = Math.PI / 2; ring.position.y = H + 9.6;
   g.add(ring);
   g.add(beam(new THREE.Vector3(0, top.y, 0), new THREE.Vector3(0, top.y + 2.6, 0), 0.25, COL.steel));
   g.add(beam(new THREE.Vector3(-0.9, top.y + 1.8, 0), new THREE.Vector3(0.9, top.y + 1.8, 0), 0.22, COL.steel));
   // bell frame (two posts + yoke) and the bell
-  g.add(beam(new THREE.Vector3(-2.3, H + 0.5, 0), new THREE.Vector3(-2.3, H + 12.5, 0), 0.45, COL.steel));
-  g.add(beam(new THREE.Vector3(2.3, H + 0.5, 0), new THREE.Vector3(2.3, H + 12.5, 0), 0.45, COL.steel));
-  g.add(box(5.4, 0.9, 1.0, COL.steel, 0, H + 11.6, 0));
-  g.add(box(1.6, 1.2, 0.5, COL.steel, 0, H + 10.4, 0));
+  g.add(beam(new THREE.Vector3(-2.1, H + 0.5, 0), new THREE.Vector3(-2.1, H + 9.2, 0), 0.4, COL.steel));
+  g.add(beam(new THREE.Vector3(2.1, H + 0.5, 0), new THREE.Vector3(2.1, H + 9.2, 0), 0.4, COL.steel));
+  g.add(box(5.0, 0.8, 0.9, COL.steel, 0, H + 8.4, 0));
+  g.add(box(1.5, 1.1, 0.5, COL.steel, 0, H + 7.3, 0));
   const prof = [[0, 0], [1.55, 0], [1.6, 0.25], [1.35, 0.6], [1.05, 1.4], [0.95, 2.2], [0.8, 2.6], [0.45, 2.85], [0, 2.9]].map(([x, y]) => new THREE.Vector2(x, y));
   const bellMesh = new THREE.Mesh(new THREE.LatheGeometry(prof, 22), mat(COL.bronze));
-  bellMesh.position.y = H + 7.5;
+  bellMesh.position.y = H + 4.4;
   g.add(bellMesh);
   return { group: g, footprint: R + 1.5 };
 }
 
-/** A wedge-shaped canopy: a slab rising out of the ground from back (y = 0) to a front edge (height h), w wide, d deep; glass under the front. */
-function canopy(w, d, h, skew) {
+/** A concrete cowl rising out of the slope: side profile (z back -> front, y up) extruded across w, a pointed visor over a dark glass front,
+ * sheared sideways by `skew` (the angular Hadid look). The front faces -z. */
+function cowl(w, d, h, skew) {
   const g = new THREE.Group();
   const shape = new THREE.Shape();
-  shape.moveTo(-w / 2, 0); shape.lineTo(w / 2 + skew, 0); shape.lineTo(w / 2 - skew * 0.4, d); shape.lineTo(-w / 2 + skew * 0.6, d * 0.92); shape.closePath();
-  const slab = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: 0.9, bevelEnabled: false }), mat(COL.concrete));
-  // the shape lies in x / y; turn it so y -> -z (towards the front) and tilt the front up
-  slab.rotation.x = -Math.PI / 2 + Math.atan2(h, d);
-  g.add(slab);
-  const front = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.86, h * 0.92), mat(COL.glass, { side: THREE.DoubleSide }));
-  front.position.set(skew * 0.1, h * 0.46 - 0.3, -d * Math.cos(Math.atan2(h, d)) + 0.6);
-  g.add(front);
-  // side walls (concrete) under the slab
-  for (const sx of [-1, 1]) {
-    const wall = new THREE.Mesh(new THREE.BufferGeometry(), mat(COL.concrete, { side: THREE.DoubleSide }));
-    const x = sx * w * 0.45, zf = -d * Math.cos(Math.atan2(h, d)) + 0.6;
-    wall.geometry.setAttribute('position', new THREE.Float32BufferAttribute([x, -1, 0, x, -1, zf, x, h - 0.2, zf], 3));
-    wall.geometry.computeVertexNormals();
-    g.add(wall);
-  }
+  shape.moveTo(d, -1.5); shape.lineTo(d, 0); shape.quadraticCurveTo(d * 0.45, h * 0.95, 0, h); shape.lineTo(-2.6, h + 0.7);
+  shape.lineTo(-1.6, h - 0.9); shape.lineTo(0, h - 1.4); shape.lineTo(0, -1.5); shape.closePath();
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: w, bevelEnabled: false, curveSegments: 6 });
+  // profile x -> world -z (front), profile y -> up, extrusion -> x; shear: the front edge leans sideways
+  geo.applyMatrix4(new THREE.Matrix4().set(0, 0, 1, -w / 2, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 0, 1));
+  geo.applyMatrix4(new THREE.Matrix4().set(1, skew / Math.max(1, h), 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1));
+  geo.computeVertexNormals();
+  g.add(new THREE.Mesh(geo, mat(COL.concrete)));
+  const glass = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.78, h - 2.2), mat(COL.glass, { side: THREE.DoubleSide }));
+  glass.position.set(skew * 0.5, (h - 2.2) / 2 + 0.1, -0.15);
+  glass.rotation.y = Math.PI;
+  g.add(glass);
   return g;
 }
 
 function mmm(lm) {
   const g = new THREE.Group();
-  const parts = [[0, 0, 0, 16, 20, 7.5, 2.5], [-15, 6, 0.35, 11, 15, 5.5, -1.5], [13, 9, -0.3, 10, 13, 4.8, 1.2]];
+  // [x, z, rotation, width, depth, height, skew]: the main hall and two smaller cowls stepping down the summit's south side
+  const parts = [[0, 0, 0, 15, 22, 8, 3], [-16, 7, 0.4, 10, 16, 6, -2.5], [14, 10, -0.35, 9, 14, 5.2, 2]];
   for (const [x, z, rot, w, d, h, skew] of parts) {
-    const c = canopy(w, d, h, skew);
+    const c = cowl(w, d, h, skew);
     c.position.set(x, 0, z);
     c.rotation.y = rot;
     g.add(c);
   }
-  // the long viewing window cantilevered out of the main canopy
-  const tube = box(3.2, 2.4, 13, COL.concrete, 2, 2.2, -14);
-  tube.rotation.x = -0.12;
-  const win = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.6), mat(COL.glass, { side: THREE.DoubleSide }));
-  win.position.set(2, 3.6, -20.6);
+  // the long viewing window cantilevered out of the main cowl
+  const tube = box(3.4, 2.6, 12, COL.concrete, 3, 2.4, -6);
+  tube.rotation.x = -0.1;
+  const win = new THREE.Mesh(new THREE.PlaneGeometry(2.8, 1.8), mat(COL.glass, { side: THREE.DoubleSide }));
+  win.position.set(3, 4.3, -12.1);
   g.add(tube, win);
-  g.rotation.y = Math.PI - THREE.MathUtils.degToRad(lm.face || 180);    // canopy fronts look towards `face`
+  g.rotation.y = -THREE.MathUtils.degToRad(lm.face ?? 180);    // the glass fronts (local -z) look towards `face` (azimuth: x east, z south)
   return { group: g, footprint: 22 };
 }
 

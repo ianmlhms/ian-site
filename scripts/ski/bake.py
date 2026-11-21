@@ -42,8 +42,9 @@ DIFF_OF = {"novice": "green", "easy": "blue", "intermediate": "red", "advanced":
 DIFF_LETTER = {"green": "g", "blue": "b", "red": "r", "black": "k"}
 HALF_WIDTH = {"green": 17, "blue": 18, "red": 15, "black": 13}
 CLASS_BITS = {"forest": 1, "scrub": 2, "rock": 4, "water": 8, "built": 16, "piste": 32, "glacier": 64, "scree": 128}
-TREE_LINE = 2450.0                 # m: no forest above this, whatever the map says
+TREE_LINE = 2450.0                 # m: no forest above this, whatever the map says (per resort: RESORTS[rid]["tree_line"])
 DERIVED_FOREST = 2150.0            # m: open stands are added below this on shady slopes (150 m lower on sunny ones) where OSM maps no forest
+                                   # (per resort: RESORTS[rid]["derived_forest"]; the north side of the Alps has a lower tree line)
 MIN_RUN_LENGTH = 350.0
 MIN_RUN_DROP = 70.0
 SLALOM_COUNT = 4
@@ -391,12 +392,14 @@ def classes_raster(frame, dem_raw, areas_osm, piste_lines, piste_areas, building
     patches = (patches - patches.mean()) / (patches.std() + 1e-9)
     north = gz   # dh/dz > 0: the ground rises to the south, i.e. the slope faces north (shady, where the real stands are densest)
     shady = np.clip(north / np.maximum(np.hypot(gx, gz), 1e-6), -1, 1)
-    derived = (h < DERIVED_FOREST - 150 + 150 * np.clip(shady, 0, 1)) & (slope > 16) & (slope < 42) & (patches > -0.35 + (h - 1700) / 450 - 0.35 * shady)
+    cfg = RESORTS[frame.rid]
+    tree_line, derived_top = cfg.get("tree_line", TREE_LINE), cfg.get("derived_forest", DERIVED_FOREST)
+    derived = (h < derived_top - 150 + 150 * np.clip(shady, 0, 1)) & (slope > 16) & (slope < 42) & (patches > -0.35 + (h - (derived_top - 450)) / 450 - 0.35 * shady)
     dense = derived & (patches > 0.35 - 0.3 * shady)
     free = (out & CLASS_BITS["forest"]) == 0
     out[derived & free & ~dense] |= CLASS_BITS["scrub"]
     out[dense & free] |= CLASS_BITS["forest"]
-    no_tree = (pm > 0.15) | (h > TREE_LINE) | ((out & CLASS_BITS["water"]) > 0) | (slope > 42) | ((out & CLASS_BITS["built"]) > 0)
+    no_tree = (pm > 0.15) | (h > tree_line) | ((out & CLASS_BITS["water"]) > 0) | (slope > 42) | ((out & CLASS_BITS["built"]) > 0)
     out[no_tree] &= ~tree_bits
     log("classes", {k: int(((out & v) > 0).sum()) for k, v in CLASS_BITS.items()})
     return out, nx, nz
@@ -573,6 +576,16 @@ def build_poi(frame):
     return peaks, places
 
 
+def clear_for_landmarks(frame, cfg, buildings):
+    """Drops the OSM buildings a landmark replaces (landmark option "clear": radius in m around it), e.g. the museum drawn as a box."""
+    spots = [(frame.to_world(lm["lon"], lm["lat"]), lm["clear"]) for lm in cfg.get("landmarks", []) if lm.get("clear") and "lon" in lm]
+    if not spots:
+        return buildings
+    keep = [b for b in buildings if all(math.hypot(b["row"][0] - x, b["row"][1] - z) > r for (x, z), r in spots)]
+    log("landmarks replace", len(buildings) - len(keep), "buildings")
+    return keep
+
+
 def build_landmarks(frame, dem, cfg, runs):
     """The resort's landmarks (RESORTS[rid]["landmarks"]): world position and ground height, or the piste they dress (kind "worldcup").
     Drawn by pb/ski/landmarks.js; the piste map labels them."""
@@ -691,7 +704,7 @@ def main():
     raw = load_mosaic(rid, frame)
     dem_raw = Dem(raw)
     lines, areas, runs = build_pistes(frame, dem_raw)
-    buildings = build_buildings(frame, dem_raw)
+    buildings = clear_for_landmarks(frame, cfg, build_buildings(frame, dem_raw))
     lifts = build_lifts(frame, dem_raw)
     peaks, places = build_poi(frame)
 

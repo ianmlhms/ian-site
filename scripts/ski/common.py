@@ -65,14 +65,15 @@ RESORTS = {
         "bbox": (46.668, 11.868, 46.803, 12.030),
         "dem": ["bz-dtm", "copernicus-glo30"], "far": ["copernicus-glo30"],
         "start": "Sylvester",
+        "tree_line": 2250.0, "derived_forest": 2050.0,       # spruce / larch up to about 2100 m on the Kronplatz flanks, the summit dome bare
         "villages": [
             ("Reischach", 11.9530, 46.7880, 700), ("Olang", 12.0200, 46.7480, 900), ("St. Vigil", 11.9420, 46.6990, 800),
             ("Gassl", 12.0050, 46.7370, 300), ("Piculin", 11.9030, 46.6780, 400), ("Kronplatz", 11.9575, 46.7390, 260),
         ],
         "landmarks": [
             # kind, name, lon, lat (+ kind options); placed on the terrain by the bake, drawn by pb/ski/landmarks.js
-            {"kind": "bell", "name": "Concordia 2000", "lon": 11.95655, "lat": 46.73960},
-            {"kind": "mmm", "name": "Messner Mountain Museum Corones", "lon": 11.95805, "lat": 46.73845, "face": 200},
+            {"kind": "bell", "name": "Concordia 2000", "lon": 11.95827, "lat": 46.73876},          # OSM man_made=tower, 21.8 m
+            {"kind": "mmm", "name": "Messner Mountain Museum Corones", "lon": 11.95440, "lat": 46.73731, "face": 215, "clear": 30},  # OSM footprint; glass towards the Dolomites
             {"kind": "plateau", "name": "Kronplatz 2275 m", "lon": 11.9575, "lat": 46.7392, "r": 210},
         ],
     },
@@ -85,6 +86,7 @@ RESORTS = {
         "bbox": (47.095, 10.088, 47.232, 10.312),
         "dem": ["at-dgm", "copernicus-glo30"], "far": ["copernicus-glo30"],
         "start": "Kandahar-Galzig",
+        "tree_line": 2000.0, "derived_forest": 1850.0,       # north side of the Alps: the forest ends near 1900 m (St. Anton 1300 m, St. Christoph 1800 m bare)
         "villages": [
             ("St. Anton", 10.2660, 47.1290, 1300), ("Nasserein", 10.2860, 47.1340, 500), ("St. Jakob", 10.2990, 47.1390, 450),
             ("St. Christoph", 10.1960, 47.1310, 450), ("Stuben", 10.1580, 47.1360, 400), ("Alpe Rauz", 10.1790, 47.1370, 250),
