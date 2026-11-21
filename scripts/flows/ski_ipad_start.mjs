@@ -12,7 +12,8 @@ import path from "node:path";
 import zlib from "node:zlib";
 import { runIfMain, createBackend, mockSupabase, REPO } from "./lib.mjs";
 
-const PAGE = "/pb/ski.html";
+const RESORT = /^[a-z0-9]+$/.test(process.env.SKI_RESORT || "") ? process.env.SKI_RESORT : "";   // env SKI_RESORT=arlberg: open that resort (?resort=)
+const PAGE = RESORT ? `/pb/ski.html?resort=${RESORT}` : "/pb/ski.html";
 const IPAD_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15";
 const MAX_SECONDS = 10;
 const COUNTDOWN_SECONDS = 3;
@@ -75,8 +76,8 @@ export const flow = {
       console.log(`    resort picker after ${((tReady - t0) / 1000).toFixed(1)} s, ${(bytesUntil(tReady) / MB).toFixed(2)} MB (graphics level ${boot.level})`);
       await h.shot("ipad-picker");
 
-      h.step("tap Val d'Isère · Tignes: the piste map; wait until Start is live");
-      await tap(".resort.ready");
+      h.step(`tap ${RESORT || "Val d'Isère · Tignes"}: the piste map; wait until Start is live`);
+      await tap(RESORT ? `.resort.ready[data-id="${RESORT}"]` : ".resort.ready");
       await page.waitForFunction(() => document.documentElement.dataset.skiStartReady === "1", null, { timeout: 120000, polling: 50 });
       const tStart = Date.now();
       const secStart = (tStart - t0) / 1000;

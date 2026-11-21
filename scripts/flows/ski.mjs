@@ -22,11 +22,12 @@ export const flow = {
     const errors = [];
     page.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) errors.push(m.text()); });
 
-    h.step("open: resort picker with one ready resort and four coming");
+    h.step("open: resort picker, Val d'Isère · Tignes ready (and the other ready resorts)");
     await h.goto(`/pb/ski.html?debug=1&bot=1&timescale=4&q=low`);
     await page.waitForFunction(() => document.documentElement.dataset.skiScreen === "picker" || document.documentElement.dataset.bootError, null, { timeout: 90000 });
     h.eq(await page.evaluate(() => document.documentElement.dataset.bootError || ""), "", "boots without an error");
-    h.eq(await page.$$eval(".resort", (b) => b.map((x) => x.classList.contains("ready"))), [true, false, false, false, false], "Val d'Isère · Tignes ready, four resorts 'geschwënn'");
+    const ready = await page.$$eval(".resort", (b) => b.filter((x) => x.classList.contains("ready")).map((x) => x.dataset.id));
+    h.expect(ready[0] === "killy" && ready.includes("kronplatz") && ready.includes("arlberg"), `Val d'Isère · Tignes first and ready, Kronplatz and St. Anton ready too (${ready.join(", ")})`);
     await h.shot("picker");
 
     h.step("piste map: pick a piste from the list, weather and time controls");
