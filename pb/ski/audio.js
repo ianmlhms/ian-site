@@ -142,6 +142,7 @@ export function createAudio({ win = window } = {}) {
   const EVENTS = {
     land: (o) => { const k = clamp((o && o.impact) || 0.5, 0.2, 1); tone(110, 42, 0.22, 'sine', 0.45 * k); noiseHit(0.18, 700, 0.35 * k); },
     crash: () => { noiseHit(0.5, 900, 0.5); tone(90, 35, 0.3, 'sine', 0.5); tone(80, 30, 0.25, 'sine', 0.35, 0.28); noiseHit(0.35, 600, 0.3, 0.3); noiseHit(0.6, 1500, 0.18, 0.55, 'bandpass'); },
+    avalanche: () => { noiseHit(3.6, 200, 0.6); noiseHit(2.6, 480, 0.32, 0.35); tone(48, 30, 3.2, 'sine', 0.4); noiseHit(1.2, 1400, 0.12, 0.1, 'bandpass'); },        // round 7: a deep rumble
     count: () => tone(660, 660, 0.14, 'triangle', 0.22),
     go: () => tone(990, 990, 0.38, 'triangle', 0.28),
     gate: () => tone(1320, 1500, 0.09, 'triangle', 0.12),

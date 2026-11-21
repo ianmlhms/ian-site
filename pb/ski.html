@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex">
 <title>Ski Alpen · Arcade</title>
 <link rel="icon" href="data:,">
-<link rel="modulepreload" href="/pb/ski/main.js?v=8">
+<link rel="modulepreload" href="/pb/ski/main.js?v=9">
 <!-- online races: the lobby context (lobby.html -> pixelbreak.html?g=ski&room=..&lb=..); a bare visit stays on the game (data-menu) -->
 <script src="/mp-gate.js?v=8" data-game="ski" data-menu data-adopt="#mpLobbyBtn"></script>
 <script>
@@ -30,7 +30,7 @@
   });
 })();
 </script>
-<link rel="stylesheet" href="/pb/ski/ui.css?v=4">
+<link rel="stylesheet" href="/pb/ski/ui.css?v=5">
 <link rel="stylesheet" href="/pb/ski/net/net.css?v=1">
 <script src="/pb/arcade-kit.js?v=57" data-arcade-id="ski" data-arcade-title="Ski Alpen" data-arcade-lower-is-better></script>
 <script src="/pb/gfx-quality.js?v=1"></script>
@@ -71,7 +71,7 @@ if (!window.THREE) {
 <script src="/pb/boot-probe.js?v=1"></script>
 <script type="module">
   // Absolute imports: inside the arcade this page runs as a srcdoc iframe (relative URLs inside main.js come from import.meta.url).
-  if (window.bootProbe) window.bootProbe("/pb/ski/main.js?v=8", window.__skiLoad); else import("/pb/ski/main.js?v=8");
+  if (window.bootProbe) window.bootProbe("/pb/ski/main.js?v=9", window.__skiLoad); else import("/pb/ski/main.js?v=9");
 </script>
 </body>
 </html>

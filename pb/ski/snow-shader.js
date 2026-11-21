@@ -21,14 +21,19 @@ export const FOG_GLSL = `
     return mix(col, fogCol, clamp(max(f, aerial), 0.0, 1.0));
   }`;
 
-export function createSnowMaterial(env, { cheap = false, treeRadius = 400, forest = null, lodScale = 1 } = {}) {
+/** Round 7: the park cut-outs (modes/views.js createParkBodies): oriented rects where the terrain is not drawn (the bodies are). */
+export function parkUniforms() {
+  const T = window.THREE;
+  return { uParkO: { value: new T.Vector4(0, 0, 1, 0) }, uParkRect: { value: Array.from({ length: 8 }, () => new T.Vector4()) }, uParkN: { value: 0 } };
+}
+export function createSnowMaterial(env, { cheap = false, treeRadius = 400, forest = null, lodScale = 1, body = false } = {}) {
   return new THREE.ShaderMaterial({
     uniforms: {
       ...env.u, uTreeRadius: { value: treeRadius }, uForestTex: { value: forest ? forest.texture : env.u.uNoise.value },
       uForestSize: { value: new THREE.Vector2(forest ? forest.width : 1, forest ? forest.depth : 1) }, uForestOn: { value: forest ? 1 : 0 },
       uFarFrom: { value: 1200 * lodScale },          // from here the far grid's normal map takes over from the (coarser and coarser) mesh normals
     },
-    defines: cheap ? { CHEAP: 1 } : {},
+    defines: { ...(cheap ? { CHEAP: 1 } : {}), ...(body ? { PARK_BODY: 1 } : {}) },
     extensions: { derivatives: true },
     vertexShader: `
       attribute vec4 aInfo; attribute vec4 aExtra;
@@ -48,8 +53,16 @@ export function createSnowMaterial(env, { cheap = false, treeRadius = 400, fores
       ${cheap ? '' : SHADOW_GLSL}
       ${FOG_GLSL}
       float band(float x){ return mix(x, floor(x * 4.0 + 0.5) / 4.0, 0.22); }
+      uniform vec4 uParkO; uniform vec4 uParkRect[8]; uniform float uParkN;
       void main(){
         vec2 wp = vWorld.xz;
+        #ifndef PARK_BODY
+        if (uParkN > 0.5) {                       // round 7: the park's real kicker / pipe bodies are drawn here instead of the terrain
+          vec2 pr = wp - uParkO.xy;
+          float ps = dot(pr, uParkO.zw), pv = dot(pr, vec2(-uParkO.w, uParkO.z));
+          for (int i = 0; i < 8; i++) { if (float(i) >= uParkN) break; vec4 q = uParkRect[i]; if (ps > q.x && ps < q.y && pv > q.z && pv < q.w) discard; }
+        }
+        #endif
         vec3 V = normalize(cameraPosition - vWorld);
         // ---- the ground normal: the mesh close by, the far grid's normal map (40 m, per pixel) where the tiles get coarse
         vec2 fuv = (wp - uShadowRect.xy) / uShadowRect.zw;
@@ -157,7 +170,9 @@ export function createSnowMaterial(env, { cheap = false, treeRadius = 400, fores
         float rockAmt = max(rockSteep, rockBaked) * (1.0 - piste) * (1.0 - water);
         // strata: grey layers of ~8 m (light and dark), snow in broken lines on some layers' ledges; less snow the steeper
         float sPhase = vWorld.y * 0.12 + nA.r * 2.0 + nB.g * 1.2 + nL.g * 2.0;
-        float sAA = clamp(1.0 - fwidth(sPhase) * 1.5, 0.0, 1.0);
+        float sFw = fwidth(sPhase);
+        float sAA = (1.0 - smoothstep(0.1, 0.32, sFw)) * (1.0 - smoothstep(1800.0, 4200.0, vDist));     // round 7: gone before they alias (no crawl)
+        float lineAA = 1.0 - smoothstep(0.03, 0.1, sFw);                                                // the thin snow lines go first
         float sLayer = fract(sPhase);
         float steepK = smoothstep(mix(0.22, 0.1, farK), mix(0.42, 0.25, farK), slope);                                 // layers only on real faces: gentle rock is blotchy
         float strata = 0.5 + 0.5 * sin(sPhase * 6.2832) * sAA * steepK;
@@ -169,7 +184,7 @@ export function createSnowMaterial(env, { cheap = false, treeRadius = 400, fores
         vec3 Nr = normalize(N + vec3(d3.r - 0.5, 0.0, d3.g - 0.5) * (0.5 + 0.4 * farK) + vec3(d2.r - 0.5, 0.0, d2.g - 0.5) * 0.7 * midK);
         float rockLit = band(smoothstep(-0.2, 0.75, dot(Nr, uSunDir)) * sunVis);
         rockCol = rockCol * (shade * vec3(0.74, 0.8, 0.9) * (1.0 - 0.25 * max(ao, 0.0)) + uSunColor * rockLit * 0.95);
-        float snowLine = smoothstep(0.8, 0.88, sLayer) * (1.0 - smoothstep(0.9, 0.98, sLayer)) * smoothstep(0.45, 0.65, nB.a) * sAA * steepK * (1.0 - smoothstep(0.35, 0.7, slope));
+        float snowLine = smoothstep(0.8, 0.88, sLayer) * (1.0 - smoothstep(0.9, 0.98, sLayer)) * smoothstep(0.45, 0.65, nB.a) * sAA * lineAA * steepK * (1.0 - smoothstep(0.35, 0.7, slope));
         float snowPatch = smoothstep(0.5, 0.78, nB.g * 0.6 + nA.b * 0.4) * (1.0 - smoothstep(0.22, 0.5, slope));     // snow patches in the hollows
         float snowLedge = (1.0 - smoothstep(0.34, 0.52, crag)) * (1.0 - smoothstep(0.3, 0.62, slope)) * 0.45;                 // snow lying in the cracks and on the ledges between crags
         // snow streaks down the gullies, long along the fall line (they read at every distance, unlike the thin strata lines)

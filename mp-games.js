@@ -28,7 +28,7 @@ const INTRO_CATEGORIES = ["🔥 Charts", "📀 2000er", "💿 2010er", "🎤 Rap
 const CASINO_ROUNDS = Object.freeze([5, 10, 15, 20].map((v) => Object.freeze({ v, label: String(v) })));
 const CASINO_CHIPS = Object.freeze([500, 1000, 2500, 5000].map((v) => Object.freeze({ v, label: String(v) })));
 
-// Ski Alpen (live race on one piste, 2-8 players): resort + piste (a few named pistes per resort, or random of a colour), weather /
+// Ski Alpen (live race on one piste, or since round 7 a free ride on the whole mountain, 2-8 players): mode, resort + piste (a few named pistes per resort, or random of a colour), weather /
 // time of day (random by default), runs. The game resolves "random" itself from the lobby code + roster (pb/ski/net/plan.js), so every
 // player loads the same resort and piste without a server. Keep the piste ids in step with pb/ski/data/<resort>/resort.json.
 const SKI_RESORTS = Object.freeze([["killy", "Espace Killy"], ["3vallees", "Les 3 Vallées"], ["zermatt", "Zermatt"], ["arlberg", "St. Anton"], ["kronplatz", "Kronplatz"]]);
@@ -46,6 +46,9 @@ const SKI_PISTES = Object.freeze([
 ]);
 const opt = (v, label, when) => Object.freeze(when ? { v, label, when } : { v, label });
 const SKI_SETTINGS = Object.freeze([
+  // round 7: "free" = an online free ride on the whole mountain (piste + runs only count for a race)
+  { key: "mode", type: "choice", def: "race", label: { lb: "Modus", de: "Modus", en: "Mode" },
+    options: Object.freeze([opt("race", "🏁 Rennen"), opt("free", "🏔️ Fräi fueren")]) },
   { key: "resort", type: "choice", def: "random", label: { lb: "Skigebitt", de: "Skigebiet", en: "Resort" },
     options: Object.freeze([opt("random", "🎲 Zoufälleg"), ...SKI_RESORTS.map(([v, label]) => opt(v, label))]) },
   { key: "piste", type: "choice", def: "random", dependsOn: "resort", label: { lb: "Pist", de: "Piste", en: "Piste" },

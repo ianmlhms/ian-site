@@ -220,7 +220,7 @@ export function createChallengePrompt(hudEl, { onStart, onNo }) {
       current = marker;
       box.hidden = !marker;
       if (!marker) return;
-      box.querySelector('#chText').innerHTML = marker.park ? `Snowpark: <b>${esc(marker.name)}</b> → Start?` : `Challenge: <b>${esc(marker.name)}</b> ${starRow(mask)} → Start?`;
+      box.querySelector('#chText').innerHTML = marker.lawin ? `⚠ <b>${esc(marker.name)}</b> → Start?` : marker.park ? `Snowpark: <b>${esc(marker.name)}</b> → Start?` : `Challenge: <b>${esc(marker.name)}</b> ${starRow(mask)} → Start?`;
       box.querySelector('#chGoal').textContent = goal;
     },
   };

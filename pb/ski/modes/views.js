@@ -134,6 +134,73 @@ function boardGeometry(quads) {
 }
 
 /** layout = park.js createParkLayout; height(x, z) = the snow (surface.height). Returns { mesh, rebuild(), dispose() }. */
+/* Round 7: the snow bodies of the park features as REAL geometry: the kickers (run-up, sharp lip, table, landing, cut side walls) and
+ * the halfpipe walls on a fine grid of the exact park function (layout.profileAt + featureHeight), drawn with the painted snow material
+ * (groomed, corduroy along the line). The terrain is cut away under them (snow-shader.js uParkRect: the 2.5 m lattice rounded the lips
+ * off and showed the pipe walls as saw teeth). Physics untouched (it already uses the exact lip slope). One draw call. */
+const BODY = Object.freeze({ kickStep: 0.45, pipeAlong: 0.8, pipeAcross: 0.4, margin: 1.6, lift: 0.02, maxRects: 8 });
+export function parkBodyRects(layout) {
+  const rects = [];
+  for (const k of layout.kickers) rects.push([k.s0 - 0.4, k.end + 0.4, k.v - k.w / 2 - BODY.margin, k.v + k.w / 2 + BODY.margin]);
+  if (layout.pipe) rects.push([layout.pipe.s0 - layout.pipe.inRamp, layout.pipe.s1 + layout.pipe.outRamp, -layout.deck - 0.8, layout.deck + 0.8]);
+  return rects.slice(0, BODY.maxRects);
+}
+export function parkBodyGeometry(layout) {
+  const pos = [], idx = [], info = [], extra = [];
+  const q = {};
+  for (const [s0, s1, v0, v1] of parkBodyRects(layout)) {
+    const pipe = layout.pipe && Math.abs(s0 - (layout.pipe.s0 - layout.pipe.inRamp)) < 1e-6;
+    const ds = pipe ? BODY.pipeAlong : BODY.kickStep, dv = pipe ? BODY.pipeAcross : BODY.kickStep;
+    const ns = Math.max(2, Math.ceil((s1 - s0) / ds) + 1), nv = Math.max(2, Math.ceil((v1 - v0) / dv) + 1);
+    const base = pos.length / 3;
+    for (let i = 0; i < ns; i++) {
+      const s = s0 + (s1 - s0) * i / (ns - 1);
+      for (let j = 0; j < nv; j++) {
+        const v = v0 + (v1 - v0) * j / (nv - 1);
+        layout.world(s, v, q);
+        pos.push(q.x, layout.profileAt(s) + layout.featureHeight(s, v) + BODY.lift, q.z);
+        info.push(1, 0, 0, 0); extra.push(layout.ux, layout.uz, 0, 0);
+      }
+    }
+    for (let i = 0; i + 1 < ns; i++) for (let j = 0; j + 1 < nv; j++) {
+      const a = base + i * nv + j, b = a + 1, c = a + nv, d = c + 1;
+      idx.push(a, b, c, b, d, c);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('aInfo', new THREE.Float32BufferAttribute(info, 4));
+  g.setAttribute('aExtra', new THREE.Float32BufferAttribute(extra, 4));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  // the grid winds the other way round in this frame: make the normals point up
+  const n = g.attributes.normal;
+  let up = 0;
+  for (let i = 0; i < n.count; i++) up += n.getY(i);
+  if (up < 0) { for (let i = 0; i < n.count; i++) n.setXYZ(i, -n.getX(i), -n.getY(i), -n.getZ(i)); const ix = g.index.array; for (let t = 0; t < ix.length; t += 3) { const k = ix[t + 1]; ix[t + 1] = ix[t + 2]; ix[t + 2] = k; } }
+  g.computeBoundingSphere();
+  return g;
+}
+/** The park bodies mesh; env.u.uParkO / uParkRect / uParkN cut the terrain under them while they are shown. */
+export function createParkBodies({ scene, layout, material, env }) {
+  const geo = parkBodyGeometry(layout);
+  const mesh = new THREE.Mesh(geo, material);
+  mesh.name = 'ski-park-bodies';
+  mesh.receiveShadow = true; mesh.castShadow = true;
+  scene.add(mesh);
+  const rects = parkBodyRects(layout);
+  env.u.uParkO.value.set(layout.x0, layout.z0, layout.ux, layout.uz);
+  rects.forEach((r, i) => env.u.uParkRect.value[i].set(r[0], r[1], r[2], r[3]));
+  const setOn = (on) => { mesh.visible = on; env.u.uParkN.value = on ? rects.length : 0; };
+  setOn(true);
+  return {
+    mesh, rects,
+    setMaterial(m) { mesh.material = m; },
+    update(cx, cz, radius) { setOn(Math.hypot(cx - layout.x0, cz - layout.z0) < radius + layout.len); },
+    dispose() { scene.remove(mesh); geo.dispose(); env.u.uParkN.value = 0; },
+  };
+}
+
 export function createParkView({ scene, layout, height }) {
   const mat = new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x2a2622 });      // a little self-light: the nets and rails read in the shade
   let mesh = null, boards = null;

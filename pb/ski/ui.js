@@ -127,8 +127,10 @@ export function createUi(root) {
         <button type="button" class="hbtn" data-b="weather" aria-label="Wieder (G)" id="hWeather">☀️</button>
         <button type="button" class="hbtn" data-b="time" aria-label="Zäit vum Dag (T)" id="hTime">🕛</button>
         <button type="button" class="hbtn" data-b="reset" aria-label="Zréck op d'Pist (R)">↺</button>
+        <button type="button" class="hbtn" data-b="view" aria-label="Kamera: vu baussen / mat den eegenen Aen (V)" id="hView">🎥</button>
       </div>
       <div class="toast" id="hToast" style="opacity:0"></div>
+      <div class="ava-risk" id="hRisk" hidden>⚠ Lawinegefor</div>
       <div class="count" id="hCount" hidden></div>
       <div class="hint" id="hHint" hidden></div>
     </div>`);

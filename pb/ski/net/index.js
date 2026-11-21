@@ -10,7 +10,7 @@ import { createRemotes, packState } from './remotes.js';
 import { createMpHud, resText } from './hud.js';
 import { minRunMs } from '../progress.js';
 import { OUTFITS } from '../skier-model.js';
-import { sanitizeCfg } from '../../../mp-games.js?v=6';
+import { sanitizeCfg } from '../../../mp-games.js?v=7';
 
 const GAME = 'ski';
 const CTX_KEY = 'mpl.ctx';

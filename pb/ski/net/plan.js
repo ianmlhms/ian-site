@@ -42,6 +42,14 @@ export function racePistes(list) {
     .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
 
+/** Round 7: the online free ride's shared weather and time of day (the lobby's choice, else drawn from the seed). */
+export function resolveFree(cfg, seed) {
+  return Object.freeze({
+    weather: WEATHERS.includes(cfg.weather) ? cfg.weather : pickOf(RANDOM_WEATHER, seed, 'weather', 'free'),
+    time: TIMES.includes(cfg.time) ? cfg.time : pickOf(RANDOM_TIME, seed, 'time', 'free'),
+  });
+}
+
 /** One entry per run: { piste (id), weather, time }. cfg.piste = "<resort>/<id>" | a colour | "random". */
 export function resolveRuns(cfg, rid, pisteList, seed) {
   const runs = Math.max(1, Math.min(5, Math.round(Number(cfg.runs)) || 1));

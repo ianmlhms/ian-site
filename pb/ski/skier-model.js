@@ -391,5 +391,15 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {})
       blob.scale.set(1.25 * (1 + up * 0.08), 1, 0.55 * (1 + up * 0.08));
     }
   }
-  return { root: group, pose, setOutfit, setSki, setBlob(on) { blob.visible = !!on && !ghost; }, setVisible(v) { group.visible = v; } };
+  /** Round 7: first person: only what the skier sees of himself, the skis (their merged meshes under the ski groups) and the poles. */
+  const gearGroups = new Set();
+  for (const sk of skis) { sk.g.traverse((o) => gearGroups.add(o)); }
+  for (const p of poles) p.traverse((o) => gearGroups.add(o));
+  let firstPerson = false;
+  function setFirstPerson(on) {
+    firstPerson = !!on;
+    for (const mesh of merged) mesh.visible = !firstPerson || gearGroups.has(mesh.parent);
+    if (firstPerson) blob.visible = false;
+  }
+  return { root: group, pose, setOutfit, setSki, setFirstPerson, get firstPerson() { return firstPerson; }, setBlob(on) { blob.visible = !!on && !ghost && !firstPerson; }, setVisible(v) { group.visible = v; } };
 }

@@ -23,7 +23,7 @@ const c = (r, g, b) => [r, g, b];
 const TIMES = Object.freeze({
   morning: { az: 128, el: 16, sun: c(1.0, 0.93, 0.84), i: 1.0, top: c(0.32, 0.5, 0.82), hor: c(0.86, 0.86, 0.9), amb: c(0.5, 0.62, 0.86), gnd: c(0.62, 0.64, 0.7), fog: c(0.78, 0.84, 0.94), glow: 0.5 },
   midday: { az: 182, el: 29, sun: c(1.0, 0.97, 0.9), i: 1.06, top: c(0.22, 0.44, 0.82), hor: c(0.74, 0.84, 0.95), amb: c(0.5, 0.62, 0.84), gnd: c(0.66, 0.68, 0.74), fog: c(0.74, 0.83, 0.95), glow: 0.1 },
-  evening: { az: 236, el: 7, sun: c(1.0, 0.66, 0.4), i: 0.95, top: c(0.26, 0.36, 0.66), hor: c(1.0, 0.74, 0.56), amb: c(0.47, 0.56, 0.8), gnd: c(0.57, 0.56, 0.64), fog: c(0.92, 0.76, 0.7), glow: 1.0 },
+  evening: { az: 236, el: 7, sun: c(1.0, 0.66, 0.4), i: 0.95, top: c(0.26, 0.36, 0.66), hor: c(1.0, 0.74, 0.56), amb: c(0.45, 0.58, 0.8), gnd: c(0.54, 0.58, 0.66), fog: c(0.92, 0.76, 0.7), glow: 1.0 },      // round 7: shade bluer, less violet
 });
 /* cloud cover, sun share, fog density (1/m), greyness, ambient boost, snowfall, milky white-out */
 const WEATHER = Object.freeze({

@@ -23,13 +23,17 @@ function pushCone(pos, nrm, col, cx, y0, y1, r, sides, colour, snow, rot = 0) {
     }
   }
 }
-/* a spruce tier: a cone whose rim zig-zags (branch tips out, gaps in), the tips drooping a little: reads as a fir, not a party hat */
-function pushTier(pos, nrm, col, y0, y1, r, tips, colour, snow, rot = 0) {
+/* a spruce tier: a cone whose rim zig-zags (branch tips out, gaps in), the tips drooping a little: reads as a fir, not a party hat.
+ * Round 7: jitter (0..1) makes every branch tip its own length and droop (seeded: the same tree every time), so the outline is ragged */
+const jit = (k) => { const v = Math.sin(k * 12.9898 + 78.233) * 43758.5453; return v - Math.floor(v); };
+function pushTier(pos, nrm, col, y0, y1, r, tips, colour, snow, rot = 0, jitter = 0, droop = 0.18) {
   const n = tips * 2;
+  const tipR = (i) => (i % 2 ? r * (0.58 - 0.1 * jitter * jit(i + rot * 7)) : r * (1 - jitter * 0.3 + jitter * 0.45 * jit(i * 3.1 + rot)));
+  const tipD = (i) => (i % 2 ? 0.12 : -droop * (1 + jitter * 0.9 * jit(i * 1.7 + rot * 3)));
   for (let i = 0; i < n; i++) {
     const a0 = rot + i / n * Math.PI * 2, a1 = rot + (i + 1) / n * Math.PI * 2;
-    const r0 = i % 2 ? r * 0.62 : r, r1 = (i + 1) % 2 ? r * 0.62 : r;
-    const d0 = i % 2 ? 0.12 : -0.18, d1 = (i + 1) % 2 ? 0.12 : -0.18;
+    const r0 = tipR(i % n), r1 = tipR((i + 1) % n);
+    const d0 = tipD(i % n), d1 = tipD((i + 1) % n);
     const p0 = [Math.cos(a0) * r0, y0 + d0, Math.sin(a0) * r0], p1 = [Math.cos(a1) * r1, y0 + d1, Math.sin(a1) * r1], tip = [0, y1, 0];
     const am = (a0 + a1) / 2, slope = r / (y1 - y0);
     const nn = [Math.cos(am), slope, Math.sin(am)];
@@ -63,10 +67,13 @@ function build(fn) {
   return g;
 }
 const SPRUCE = [0.13, 0.27, 0.22], SPRUCE_DARK = [0.09, 0.2, 0.17], BARK = [0.3, 0.22, 0.17], LARCH = [0.44, 0.39, 0.35], LARCH_TWIG = [0.36, 0.31, 0.28];
+/* round 7: a fir with eight drooping, ragged layers (wide and dark at the foot, the layers shorter and denser upwards), a thin leader on
+ * top and the trunk showing under the lowest layer: ~330 triangles, one instanced draw call as before */
 const spruceNear = () => build((p, n, c) => {
-  pushPrism(p, n, c, -0.3, 1.8, 0.2, 5, BARK);
-  const tiers = [[0.9, 3.6, 2.25, 8], [2.4, 5.0, 1.9, 8], [3.8, 6.4, 1.55, 7], [5.2, 7.8, 1.2, 7], [6.6, 9.6, 0.8, 6]];
-  tiers.forEach(([y0, y1, r, tips], k) => pushTier(p, n, c, y0, y1, r, tips, k % 2 ? SPRUCE : SPRUCE_DARK, 0.72 + k * 0.05, k * 0.9));
+  pushPrism(p, n, c, -0.3, 2.2, 0.2, 5, BARK);
+  const tiers = [[0.75, 2.7, 2.4, 9], [1.75, 3.7, 2.15, 9], [2.75, 4.6, 1.85, 8], [3.7, 5.5, 1.58, 8], [4.6, 6.4, 1.3, 7], [5.5, 7.3, 1.02, 7], [6.4, 8.3, 0.76, 6], [7.3, 9.2, 0.5, 5]];
+  tiers.forEach(([y0, y1, r, tips], k) => pushTier(p, n, c, y0, y1, r, tips, k % 2 ? SPRUCE : SPRUCE_DARK, 0.66 + k * 0.04, k * 0.9 + 0.3, 1, 0.32 - k * 0.02));
+  pushCone(p, n, c, 0, 8.9, 10.3, 0.16, 4, SPRUCE, 0.5);                                // the leader
 });
 /* far trees (round 5): two stacked cones each, so a far spruce still has a skirt and a top and a far larch stays slim (a single cone read as a party hat) */
 const spruceFar = () => build((p, n, c) => { pushCone(p, n, c, 0, 0.5, 6.4, 2.15, 5, SPRUCE_DARK, 0.62); pushCone(p, n, c, 0, 3.9, 9.6, 1.3, 5, SPRUCE, 0.8, 0.6); });
@@ -75,7 +82,7 @@ const larchNear = () => build((p, n, c) => {
   pushPrism(p, n, c, -0.3, 10.2, 0.17, 5, BARK);
   for (let k = 0; k < 9; k++) {                      // many slim whorls of drooping bare twigs: a narrow, see-through winter larch
     const y = 1.9 + k * 0.88, r = 1.3 * (1 - k / 10) + 0.18;
-    pushTier(p, n, c, y - 0.35, y + 0.75, r, 5, k % 2 ? LARCH_TWIG : LARCH, 0.2, k * 1.3);
+    pushTier(p, n, c, y - 0.35, y + 0.75, r, 6, k % 2 ? LARCH_TWIG : LARCH, 0.2, k * 1.3, 1, 0.3);      // round 7: ragged twig whorls
   }
 });
 const larchFar = () => build((p, n, c) => { pushPrism(p, n, c, -0.3, 3.0, 0.16, 4, BARK); pushCone(p, n, c, 0, 1.6, 7.0, 1.25, 5, LARCH_TWIG, 0.25); pushCone(p, n, c, 0, 4.6, 10.0, 0.75, 5, LARCH, 0.3, 0.6); });

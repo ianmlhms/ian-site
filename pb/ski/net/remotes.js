@@ -7,10 +7,11 @@ import { createSkierModel, OUTFITS } from '../skier-model.js';
 import { packState, unpackState } from './wire.js';
 import { riderAt, KIND_OF_CODE } from '../modes/liftride.js';
 import { createCarrier } from '../modes/carriers.js';
+import { declutterTags, tagWidth, TAGS } from './tags.js';
 
 const THREE = window.THREE;
 const VIEW_DIST = 900;           // m: farther skiers are not drawn
-const TAG_DIST = 600;
+const TAG_DIST = TAGS.TAG_DIST;
 const MAX_BUF = 40;
 const wrapAngle = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
 
@@ -79,7 +80,7 @@ export function createRemotes({ scene, camera, surface, overlay, liftPath = () =
     tag.append(dot, label);
     tag.hidden = true;
     tagBox.appendChild(tag);
-    const r = { id, name, outfit: o.id, model, mesh, tag, buf: [], state: null, shown: false, delay: NET.INTERP_DELAY, extrap: NET.EXTRAP_MAX, away: false, run: -1 };
+    const r = { id, name, outfit: o.id, model, mesh, tag, tagW: tagWidth(label.textContent), buf: [], state: null, shown: false, delay: NET.INTERP_DELAY, extrap: NET.EXTRAP_MAX, away: false, run: -1 };
     list.set(id, r);
     return r;
   }
@@ -112,6 +113,7 @@ export function createRemotes({ scene, camera, surface, overlay, liftPath = () =
     for (let i = b.length - 1; i > 0; i--) {
       if (b[i - 1].t <= t && t <= b[i].t) {
         const A = b[i - 1].s, B = b[i].s, k = (t - b[i - 1].t) / Math.max(1, b[i].t - b[i - 1].t);
+        if (Math.abs(B.x - A.x) + Math.abs(B.z - A.z) > 80) return { ...(k < 0.5 ? A : B) };      // round 7: a jump (fast travel, a lift top): no slide across the map
         const L = (p) => A[p] + (B[p] - A[p]) * k;
         const out = { ...B, x: L('x'), y: L('y'), z: L('z'), heading: A.heading + wrapAngle(B.heading - A.heading) * k, speed: L('speed'), edge: L('edge'), tuck: L('tuck'), brake: L('brake'), air: L('air'), progress: L('progress'), grounded: k < 0.5 ? A.grounded : B.grounded, crash: B.crash };
         if (A.ride && B.ride && A.rideLift === B.rideLift) out.rideS = L('rideS');
@@ -129,6 +131,7 @@ export function createRemotes({ scene, camera, surface, overlay, liftPath = () =
     pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     frustum.setFromProjectionMatrix(pv);
     const cx = camera.position.x, cz = camera.position.z;
+    const tagged = [], boxes = [];
     for (const r of list.values()) {
       const st = sample(r, now - r.delay);
       r.state = st;
@@ -151,15 +154,24 @@ export function createRemotes({ scene, camera, surface, overlay, liftPath = () =
       // the name tag over the helmet
       v3.set(st.x, st.y + 2.15, st.z).project(camera);
       const onScreen = visible && d < TAG_DIST && v3.z < 1 && Math.abs(v3.x) < 1.05 && Math.abs(v3.y) < 1.05;
-      r.tag.hidden = !onScreen;
-      if (onScreen) {
-        const sx = (v3.x * 0.5 + 0.5) * width, sy = (-v3.y * 0.5 + 0.5) * height;
-        r.tag.style.transform = `translate(${Math.round(sx)}px, ${Math.round(sy)}px) translate(-50%, -100%) scale(${Math.max(0.7, Math.min(1, 60 / Math.max(d, 1))).toFixed(2)})`;
-      }
+      if (!onScreen) { r.tag.hidden = true; continue; }
+      const sc = Math.max(0.7, Math.min(1, 60 / Math.max(d, 1)));
+      tagged.push({ r, sc }); boxes.push({ x: (v3.x * 0.5 + 0.5) * width, y: (-v3.y * 0.5 + 0.5) * height, w: r.tagW * sc, h: TAGS.HEIGHT_PX * sc, d });
     }
+    // round 7: decluttered, nearest first: stacked over each other, the far ones faded, the overlapping rest hidden
+    const place = declutterTags(boxes);
+    tagged.forEach(({ r, sc }, i) => {
+      const p = place[i], b = boxes[i];
+      r.tag.hidden = !p.show;
+      if (!p.show) return;
+      r.tag.style.transform = `translate(${Math.round(b.x)}px, ${Math.round(b.y - p.dy)}px) translate(-50%, -100%) scale(${sc.toFixed(2)})`;
+      r.tag.style.opacity = p.alpha.toFixed(2);
+    });
+    lastTags = place.filter((p) => p.show).length;
   }
+  let lastTags = 0;
   function setShadows(on) { castShadow = !!on; for (const r of list.values()) r.mesh.castShadow = castShadow; }
   function setVisible(v) { tagBox.hidden = !v; if (!v) for (const r of list.values()) r.model.setVisible(false); }
 
-  return { add, remove, push, update, setLink, setAway, clearRun, setShadows, setVisible, get: (id) => list.get(id), all: () => [...list.values()] };
+  return { add, remove, push, update, setLink, setAway, clearRun, setShadows, setVisible, get: (id) => list.get(id), all: () => [...list.values()], get tagsShown() { return lastTags; } };
 }
