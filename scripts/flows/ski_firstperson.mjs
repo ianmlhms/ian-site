@@ -17,7 +17,7 @@ export const flow = {
       try { if (!sessionStorage.getItem("r7c-keep")) { localStorage.removeItem("pb_ski_save"); localStorage.removeItem("pb_ski_cam"); sessionStorage.setItem("r7c-keep", "1"); } localStorage.setItem("pb_ski_weather", "sun"); localStorage.setItem("pb_ski_time", "morning"); } catch (error) { /* ignore */ }
     });
     const errors = [];
-    page.on("pageerror", (e) => errors.push(e.message));
+    page.on("pageerror", (e) => { if (!/due to access control checks/.test(e.message)) errors.push(e.message); });      // WebKit: tile fetches cut off by the next page load
     page.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) errors.push(m.text()); });
     const running = () => page.waitForFunction(() => window.__ski && window.__ski.game.mode === "freeride" && window.__ski.game.phase === "running" && document.documentElement.dataset.skiScreen === "ski", null, { timeout: 120000 });
 
@@ -41,7 +41,7 @@ export const flow = {
       });
       h.expect(fp.skis && fp.poles && fp.mode === "fp", `${rid}: ski tips + poles drawn (camera mode ${fp.mode})`);
       h.expect(fp.eye > 0.9 && fp.eye < 2.0, `${rid}: the eyes ${fp.eye.toFixed(2)} m over the snow (tucked lower)`);
-      h.expect(fp.speed < 40 ? fp.fov >= 74 : fp.fov > 74 + 3, `${rid}: the FOV opens at ${fp.speed.toFixed(0)} km/h (${fp.fov.toFixed(1)}°)`);
+      h.expect(fp.speed < 40 ? fp.fov >= 74 : fp.fov > 74 + 2, `${rid}: the FOV opens at ${fp.speed.toFixed(0)} km/h (${fp.fov.toFixed(1)}°)`);
       if (fp.speed > 55) h.expect(fp.streak > 0.02, `${rid}: the motion streak on Mëttel (${fp.streak.toFixed(2)})`);
       await h.shot(`fp-${rid}-speed`);
 

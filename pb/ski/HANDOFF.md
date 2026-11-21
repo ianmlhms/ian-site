@@ -515,4 +515,20 @@ hooks marked "R7-C" (main.js, map.js, game.js, markers.js, input.js, progress.js
   flow + determinism, never on a piste, every gate, barriers, with --rides every course ridden by the scripted skier with game.js +
   course.js). Flows: `ski-teleport`, `ski-spawn` (5 resorts), `ski-firstperson` (5 resorts: piste carve + off-piste powder),
   `ski-avalanche` (5 resorts: caught / escape / determinism, natural release, Lawin), `ski-course` (5 resorts, Bouc Blanc first).
-  `SKI_RESORTS=killy` / `SKI_COURSES=rid:piste` narrow them. Shots: `~/Library/Caches/ski-work/round7c/`.
+  `SKI_RESORTS=killy` / `SKI_COURSES=rid:piste` narrow them. Shots: `~/Library/Caches/ski-work/round7c/` (`scripts/ski/round7c-shots.sh`:
+  GPU Chromium DPR 2 + WebKit, sheets `sheet-<resort>-{gpu,webkit}.jpg`, `sheet-spawn-*.jpg`).
+- **Results (21 Nov, end of R7-C)**: Node check all five green: spawn Killy Olympique 20 m, 3V Verdons 20 m, Zermatt ME1 24 m, Arlberg
+  Galzigbahn 24 m, Kronplatz I 20 m (all 0.00 m above the ground, nothing within 25 m ahead); teleport 195-200 / 200 taps with a safe
+  spot, 0 unsafe; 3 Lawin faces each; gates on open snow 234/235, 480/480, 206/209, 354/356, 70/71; course rides 235/235, 480/480,
+  207/209, 352/356, 71/71, 0 silent resets. Flows Chromium: all 14 ski-* green; WebKit: ski-teleport, ski-spawn, ski-firstperson,
+  ski-avalanche, ski-course, ski-freeride, ski-park green. Niddreg park view 147 draw calls (as before).
+- **Gotchas**: `__ski.teleport(s)` is the OLD piste teleport (flows / pose-shots use it); the map teleport is `__ski.teleportTo(spot)`.
+  WebKit reports tile fetches cut off by a page load as page errors: multi-resort WebKit flows wait for `skiTilesDone` before the next goto.
+- **Still wrong / open (R7-C)**: blocked start gates left: Killy verbindung-bleuets (building), Zermatt libera / du-col /
+  verbindung-matterhorn-expres-3, Arlberg 2, Kronplatz verbindung-gondel-kronplatz (lift line) — they keep s = 2; courses the scripted
+  skier did not finish (flat ends / bot stuck): Zermatt rotenboden, cieloalto-cervinia, Arlberg skiroute-madloch-zug (32 m short),
+  woster-bockbachtal, riffel, waldabfahrt; the powder cloud is weak at low speed (WebKit shot at 5 km/h shows none); first-person
+  gloves are plain boxes; the finish line is flat at the arch's ground height (sinks on a cross slope); barriers are visual only (no
+  physics), they can cross houses where a piste runs through a village; the spawn sheets were shot before the last spawn tweak (room
+  to the sides, 20-24 m out now); Lawin faces on Kronplatz are gentle (29-33°); the avalanche runs on the 40 m far grid, so the blocks
+  float / sink a little over 5 m detail (drawn at the 5 m height); no sound for the avalanche yet.

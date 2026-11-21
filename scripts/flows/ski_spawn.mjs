@@ -15,7 +15,7 @@ export const flow = {
     const { page } = h;
     await page.addInitScript(() => { try { localStorage.removeItem("pb_ski_save"); localStorage.setItem("pb_ski_cam", "chase"); localStorage.setItem("pb_ski_weather", "sun"); localStorage.setItem("pb_ski_time", "midday"); } catch (error) { /* ignore */ } });
     const errors = [];
-    page.on("pageerror", (e) => errors.push(e.message));
+    page.on("pageerror", (e) => { if (!/due to access control checks/.test(e.message)) errors.push(e.message); });      // WebKit: tile fetches cut off by the next page load
     page.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) errors.push(m.text()); });
     const lines = [];
     for (const rid of RESORTS) {
@@ -38,6 +38,8 @@ export const flow = {
       h.expect(r.face < 80, `${rid}: facing the lift / up its line (${r.face.toFixed(0)}° off)`);
       lines.push(`${rid}: ${r.name}, ${r.d.toFixed(0)} m, ${r.above.toFixed(2)} m, ${r.wall || "open"}, ${r.face.toFixed(0)}°`);
       await h.shot(`spawn-${rid}`);
+      // every tile in before the next page load (WebKit reports fetches cut off by a navigation as page errors)
+      await page.waitForFunction(() => document.documentElement.dataset.skiTilesDone === "1", null, { timeout: 240000 }).catch(() => {});
     }
     console.log(lines.map((l) => `      ${l}`).join("\n"));
     h.eq(errors, [], "no page errors");
