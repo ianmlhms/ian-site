@@ -163,6 +163,40 @@ anti-cheat think higher is better otherwise). Bot / scripted runs never post (fl
   - Dev tools: `scripts/ski/poses.py <rid> [names]` (look-check cameras by lon / lat for shot.mjs --poses), perf-probe.mjs `--resort`.
     Sheets (photo / before / after): `~/Library/Caches/ski-work/round3/sheet-*.jpg`.
 
+## Round 4B (21 Nov 2026): live online races (pb/ski/net/, separate from the game modes of round 4A)
+- Lobby: `mp-games.js` id `ski` (arcade frame game, 2-8 players, settings resort / piste / weather / time / runs 1-3-5). A choice may now
+  depend on another (`dependsOn` + option `when`, `optionsFor()`; mp-lobby.js offers only the matching chips, sanitizeCfg drops a stale
+  one): the piste list follows the resort (6-7 named pistes each + random / random of a colour). SQL row: `scripts/mp-ski-v1.sql`
+  (NOT applied yet; mp_invite refuses `ski` until it is). The picker has «👥 Online-Rennen» (MPGate.openLobby). ski.html loads
+  mp-gate.js (`data-menu`, a bare visit stays solo) and adopts `#mpLobbyBtn` as «‹ Lobby».
+- Plan (`net/plan.js`): random resort / piste / weather / time drawn from a seed of lobby code + roster ids: every device resolves the
+  same match without a server (a rematch through the lobby draws anew). Random pistes: 0.9-3.6 km, >= 200 m drop, no repeat.
+- Transport (`net/session.js`, `net/link.js`, the Kart pattern): full mesh, one RtcLink per pair (reliable "ev" + unreliable "st"),
+  non-trickle SDP over the Realtime channel `ski:CODE` (presence with a nonce per page life: a reload is noticed and relinked), TURN
+  from `turn?for=kart`. Two failed WebRTC attempts -> the pair's own relay channel `ski:CODE:r:A:B` (3 msgs/s, 2 states each, 4000
+  msgs per pair + direction per match, the rate drops at 60 / 85 %). Pings: RTT + clock offset (lowest-RTT sample of 8).
+- Race (`net/race.js`, pure, `node scripts/ski/mp-race-test.mjs`): each player skis and times his own run (normal physics, normal
+  clock, normal board post through main.js finish()); a 'fin' counts only for the player whose link it came over. The coordinator
+  (first roster player who is here or not yet met) paces: prep (all ready, else LOAD_TIMEOUT 30 s / MEET_TIMEOUT 50 s for unmet
+  players) -> 'go' at now + 4.2 s in its clock (receivers convert with the link latency) -> end when everybody not gone has a result,
+  FINISH_GRACE 45 s (or 60 % of the winner's time) after the first finish, or HARD_CAP -> results 9 s -> next run. Control messages
+  only ever move a player forward; the host leaving = the next in roster order carries on. Points 10-8-6-5-4-3-2-1, standings by
+  points / runs finished / total time. A reload keeps the match (sessionStorage `pb_ski_mp:CODE:seed`); a player who already started the
+  run is DNF for it (no second try), a late loader starts late (his time is his own).
+- View (`net/remotes.js`): snapshot interpolation 140 ms (relay 560 ms), extrapolation 300 / 800 ms; each remote skier = ONE
+  SkinnedMesh (the figure's groups are the bones, every part bound rigidly) + a DOM name tag; distinct outfits on screen. Mass start
+  side by side (main.js startRun `lateral`). After the finish: live table, «👁 Zuschauen» (chase camera on another skier).
+- main.js hooks (small, all `if (mp)`): readMpContext / mpResort at boot, startRun -> 'hold', finish -> mp.onFinish, onAction,
+  frame / render, viewState for the camera. env.setWeather / setTime got `save = false` (a race never overwrites the player's choice);
+  RANDOM_WEATHER / RANDOM_TIME moved to config.js.
+- Tests: flow `ski-mp` (3 contexts: picker -> lobby settings -> start -> WebRTC + one relay-only player -> 3 runs, host leaves in run 2
+  -> final standings, 8 skiers' draw calls), `node scripts/ski/mp-race-test.mjs`, `perf-probe.mjs --remotes 7` (Niddreg, iPad profile,
+  Coupe du Monde: 144 solo -> 152 with 8 players). Shots: `~/Library/Caches/ski-work/round4b/`.
+- Still wrong / open: the hand-shake and the relay go through Realtime broadcast, which does not authenticate senders (someone who
+  scripts the page could forge an offer or join a pair's relay channel and speak for that player in the in-race table; boards are
+  safe: every board post comes from the player's own device through the normal score path). TURN uses the edge function's `for=kart`
+  tier (an own `for=ski` needs a redeploy). A remote player behind a relay is seen ~0.6 s late. Name tags overlap in a pack.
+
 ## Known gaps (honest)
 - Mid-distance terrain self-shadowing beyond the shadow box is still only the baked 40 m raster (+ the occlusion term).
 - Streets are draped ribbons: on coarse far tiles they can sink into / float over the terrain (shown only within the building radius).
