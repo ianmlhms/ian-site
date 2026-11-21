@@ -6,7 +6,7 @@
  *   gamepad:  left stick steer, A / RT tuck, B / LT brake, X jump, up on the stick skates
  * read() returns { steer, tuck, brake, push, jump, source } each frame. */
 const KEYS = { left: ['KeyA', 'ArrowLeft'], right: ['KeyD', 'ArrowRight'], tuck: ['Space'], brake: ['KeyS', 'ArrowDown'], push: ['KeyW', 'ArrowUp'], jump: ['KeyE', 'KeyJ'] };
-const ACTION_KEYS = { KeyR: 'reset', KeyG: 'weather', KeyT: 'time', KeyM: 'map', Escape: 'menu', Enter: 'confirm' };
+const ACTION_KEYS = { KeyR: 'reset', KeyG: 'weather', KeyT: 'time', KeyM: 'map', KeyN: 'mute', Escape: 'menu', Enter: 'confirm' };
 const PAD_RADIUS = 60;
 const DEADZONE = 0.14;
 

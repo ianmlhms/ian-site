@@ -49,10 +49,38 @@ anti-cheat think higher is better otherwise). Bot / scripted runs never post (fl
 - Free ride all day: `MODES.free` exists (after a finish, "Weiderfueren" onto a connected piste); a whole-area free ride needs a start
   point picker on the map and no guide line.
 
+## Round 2C (look and sound, 21 Nov 2026): what changed, all resort-generic
+- Shadows: `shadows.js` = THREE's sun shadow map (Mëttel 1024 / 95 m box, Héich 2048 / 150 m box, ahead of the camera, texel-snapped),
+  sampled by every painted shader through `SHADOW_GLSL` (bilinear PCF, normal offset); terrain tiles, trees (own depth material),
+  buildings, lifts, signs, nets and the skier cast. Off in fog / thick cloud (sunStrength < 0.3). Niddreg: blob shadows (skier blob,
+  tilted blobs under near trees / rocks in `scatter-view.js`). Terrain occlusion per vertex (`tile-mesh.js occlusion()`: curvature in
+  3 rings, every second node, ~0.7 ms per tile) darkens hollows and gullies.
+- Tile vertex attribute `aExtra` = (groom direction x, z, occlusion, 0); `aInfo.w` is now `water - built` (signed, interpolates cleanly).
+- Snow (`snow-shader.js`): corduroy along the nearest piste line (field.groomDir) in groomer lanes, no check pattern; packed piste vs
+  wind-crusted powder; frozen lakes (flat, ice streaks, cracks, darker shore); white-blue flat light in fog (env.js WEATHER + milk).
+- Distant forests: `forest-far.js` painted tree cards (canvas atlas, alpha-sharpened) from the class raster, rings per level
+  (1.7 / 2.8 / 4.2 km); the painted canopy on the ground is only a light underlay now.
+- Buildings: `bake.py build_buildings` appends [footprint (dm, simplified), roof code, levels] to each row (old 9-field rows still work).
+  `village.js` builds chalets (stone base, wood, shutters, gable balconies, snow cap, chimney), gabled Savoy / plaster blocks, chapels
+  with a bell tower, and the big purpose-built blocks (> 1300 m2, or OSM flat roof) from the real footprint with terraces stepping
+  back uphill; two detail levels per 1280 m cell. Lift stations: hall + bull-wheel + canopy (`lifts.js stationGeometry`).
+- Pistes: `bake.py widen_from_areas` (half width from the mapped piste area where the line has no width tag), `bench()` cuts every
+  piste line flat across (BENCH_* constants; mean 1.2 m, max 6.7 m on Killy). Props: orange safety nets where the ground falls away
+  > 8.5 m within 10 m of the edge, signposts with the name at every piste top (`props.js createSigns`, one atlas).
+- Skier (`skier-model.js`): new figure, merged into one draw call per bone, outfits (OUTFITS, `pb_ski_outfit`, "Kleedung" in the map
+  card and the pause menu), two-bone leg solve, carve lean + angulation, pole plant, tuck, plough, jump tuck, landing absorb, tumble.
+  `effects.js` spray: off the outside ski in a fan, bursts on landing and crashes.
+- Sound (`audio.js`): all synthesised (wind by speed, carve / powder / scrape / glide, lift hum + clacks, birds, village murmur,
+  land / crash / countdown / gate / finish); honours pb_muted + `arcade:mute`; menu "Toun" and key N. Credit line in the map's ⓘ.
+- Dev tools: `scripts/ski/pose-shots.mjs` (skier poses via `__ski.orbit`), `perf-probe.mjs` (iPad profile per level),
+  `before_after.py` (sheets). Shots: `~/Library/Caches/ski-work/round2c/` (compare-photos, gameplay, new-details).
+- Other resorts: rebake them with this bake.py (footprints, widths from areas, benches); the client copes with old data meanwhile.
+
 ## Known gaps (honest)
-- No terrain self-shadowing at 2.5 m (only the baked 40 m mountain shadows); no cast shadows of trees, buildings or the skier.
-- Corduroy direction follows the fall line by blending two axis-aligned stripe sets (a faint check pattern on flat-ish ground).
-- Buildings are oriented boxes with gable roofs (no L-shapes, no flat-roofed blocks); lift stations are plain boxes.
-- Pistes are OSM lines with a width per colour; real piste widths and cross slopes (benches on traverses) are not modelled.
-- Skier is a simple low-poly figure; no sound yet; no cloud save of the progress (local only).
-- Real-iPad performance is measured on the Mini (CPU x4, network throttled), not on a device.
+- Mid-distance terrain self-shadowing beyond the shadow box is still only the baked 40 m raster (+ the occlusion term).
+- Roads and village streets are not drawn (OSM roads.json is fetched but unused); villages read lighter than the photos from far.
+- Building styles are guessed from size and tags (no per-village style); L-shaped chalets use their oriented box.
+- No dam wall at Lac du Chevril; lake drawdown banks are not modelled.
+- Sound is synthesised only (no menu music); not heard on a real iPad yet.
+- Frame times measured on the Mini (CPU x4, GPU not throttled): every level holds 60 fps there; a real-iPad GPU check is still due.
+- Skier is a box-and-capsule figure (stylised); no tricks yet, no cloud save of the progress (local only).

@@ -27,10 +27,10 @@ export function createLifts({ scene, resort, height }) {
       return { x: sx[i] + (sx[i + 1] - sx[i]) * k, z: sz[i] + (sz[i + 1] - sz[i]) * k, dx: (sx[i + 1] - sx[i]) / ((ss[i + 1] - ss[i]) || 1), dz: (sz[i + 1] - sz[i]) / ((ss[i + 1] - ss[i]) || 1) };
     };
     // support points of the cable: station tops at both ends, pylon tops between
-    const supports = [{ s: 0, y: height(sx[0], sz[0]) + spec.station[1] * 0.8 }];
+    const supports = [{ s: 0, y: height(sx[0], sz[0]) + spec.station[1] * 1.25 }];          // the bull-wheel stands above the hall
     const towers = src.kind === 'cable' && !src.pylons.length ? [len / 2] : src.pylons;
     for (const s of towers) { const q = at(s); supports.push({ s, y: height(q.x, q.z) + spec.tower, tower: true }); }
-    supports.push({ s: len, y: height(sx[n - 1], sz[n - 1]) + spec.station[1] * 0.8 });
+    supports.push({ s: len, y: height(sx[n - 1], sz[n - 1]) + spec.station[1] * 1.25 });
     supports.sort((a, b) => a.s - b.s);
     // a cable must clear the ground between supports: lift a support where the straight line would cut the slope
     for (let pass = 0; pass < 2; pass++) {
@@ -59,8 +59,6 @@ export function createLifts({ scene, resort, height }) {
   scene.add(group);
   const metal = new THREE.MeshLambertMaterial({ color: 0x8a9099 });
   const dark = new THREE.MeshLambertMaterial({ color: 0x343a44 });
-  const station = new THREE.MeshLambertMaterial({ color: 0x9aa1aa });
-  const roof = new THREE.MeshLambertMaterial({ color: 0xeef2f8 });
   const cableMat = new THREE.LineBasicMaterial({ color: 0x23262c });
   const m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), v3 = new THREE.Vector3(), s3 = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
 
@@ -73,7 +71,7 @@ export function createLifts({ scene, resort, height }) {
   const bars = new THREE.InstancedMesh(barGeo, dark, Math.max(1, towerCount));
   let ti = 0;
   const cablePts = [];
-  const stationBodies = [], stationRoofs = [];
+  const stationParts = [];             // [geometry, colour]: merged into one vertex-coloured mesh
   for (const l of lifts) {
     const { spec } = l;
     for (const s of l.supports) {
@@ -96,21 +94,17 @@ export function createLifts({ scene, resort, height }) {
         cablePts.push(qa.x - qa.dz * off, a.y, qa.z + qa.dx * off, qb.x - qb.dz * off, b.y, qb.z + qb.dx * off);
       }
     }
-    // stations (merged into two meshes below: one draw call for all bodies, one for all roofs)
-    for (const end of [0, l.len]) {
-      const q = l.at(end);
-      const [w, h, d] = spec.station;
-      const g = height(q.x, q.z);
-      q4.setFromAxisAngle(up, -Math.atan2(q.dz, q.dx));
-      m4.compose(v3.set(q.x, g + h / 2 - 0.4, q.z), q4, s3.set(1, 1, 1));
-      stationBodies.push(new THREE.BoxGeometry(d, h, w).applyMatrix4(m4));
-      m4.compose(v3.set(q.x, g + h - 0.1, q.z), q4, s3.set(1, 1, 1));
-      stationRoofs.push(new THREE.BoxGeometry(d + 1.2, 0.9, w + 1.2).applyMatrix4(m4));
-    }
+    // stations: a concrete / timber hall with a glass band, and over it, at cable height, the bull-wheel under its snow-covered canopy
+    for (const end of [0, l.len]) stationParts.push(...stationGeometry(l, end, height));
   }
   towers.instanceMatrix.needsUpdate = true; bars.instanceMatrix.needsUpdate = true;
   group.add(towers, bars);
-  if (stationBodies.length) group.add(new THREE.Mesh(mergeBoxes(stationBodies), station), new THREE.Mesh(mergeBoxes(stationRoofs), roof));
+  if (stationParts.length) {
+    const st = new THREE.Mesh(mergeColoured(stationParts), new THREE.MeshLambertMaterial({ vertexColors: true }));
+    st.castShadow = true; st.receiveShadow = true;
+    group.add(st);
+  }
+  towers.castShadow = true; bars.castShadow = true; towers.receiveShadow = true;
   const cg = new THREE.BufferGeometry();
   cg.setAttribute('position', new THREE.Float32BufferAttribute(cablePts, 3));
   const cables = new THREE.LineSegments(cg, cableMat);
@@ -134,7 +128,7 @@ export function createLifts({ scene, resort, height }) {
     cable: new THREE.InstancedMesh(bigCabinGeo, new THREE.MeshLambertMaterial({ color: 0xd9dde3 }), 20),
     drag: new THREE.InstancedMesh(tbarGeo, dark, 600),
   };
-  for (const p of Object.values(pools)) { p.count = 0; p.frustumCulled = false; group.add(p); }
+  for (const p of Object.values(pools)) { p.count = 0; p.frustumCulled = false; p.castShadow = true; group.add(p); }
 
   function update(t, camX, camZ, radius) {
     const counts = { chair: 0, gondola: 0, cable: 0, drag: 0 };
@@ -162,7 +156,80 @@ export function createLifts({ scene, resort, height }) {
     }
     for (const [k, p] of Object.entries(pools)) { p.count = counts[k]; p.instanceMatrix.needsUpdate = true; }
   }
-  return { group, update, count: lifts.length };
+  /** Metres from (x, z) to the nearest lift line (stations included): the lift hum fades with it. */
+  function nearest(x, z) {
+    let best = Infinity;
+    for (const l of lifts) {
+      if (Math.hypot(l.cx - x, l.cz - z) - l.radius > best) continue;
+      const p = l.src.pts;
+      for (let k = 0; k + 3 < p.length; k += 2) {
+        const ax = p[k], az = p[k + 1], dx = p[k + 2] - ax, dz = p[k + 3] - az, L2 = dx * dx + dz * dz || 1;
+        const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L2));
+        const d = Math.hypot(ax + dx * t - x, az + dz * t - z) + (t <= 0 || t >= 1 ? 0 : 25);      // the stations hum more than the line
+        if (d < best) best = d;
+      }
+    }
+    return best;
+  }
+  return { group, update, nearest, count: lifts.length };
+}
+
+const COL = { concrete: [0.68, 0.67, 0.64], timber: [0.5, 0.34, 0.21], glass: [0.2, 0.26, 0.33], steel: [0.42, 0.46, 0.52], wheel: [0.25, 0.27, 0.3], snow: [0.95, 0.96, 0.99], accent: [0.78, 0.2, 0.16] };
+/** One end of a lift: the hall (sized by the lift kind), the bull-wheel at cable height, the canopy over it with snow on top. */
+function stationGeometry(l, end, height) {
+  const { spec } = l;
+  const q = l.at(end);
+  const g = height(q.x, q.z);
+  const out = [];
+  const ang = -Math.atan2(q.dz, q.dx);
+  const m = new THREE.Matrix4().compose(new THREE.Vector3(q.x, g, q.z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), ang), new THREE.Vector3(1, 1, 1));
+  const add = (geo, colour, x = 0, y = 0, z = 0) => out.push([geo.translate(x, y, z).applyMatrix4(m), colour]);
+  const [w, h, d] = spec.station;
+  const cable = (l.supports[end === 0 ? 0 : l.supports.length - 1].y) - g;
+  const timber = (Math.round(q.x + q.z) % 2) === 0;
+  if (l.src.kind === 'drag') {
+    add(new THREE.BoxGeometry(3.2, 2.6, 2.6), COL.timber, 0, 1.1, -3);
+    add(new THREE.BoxGeometry(3.8, 0.35, 3.2), COL.snow, 0, 2.55, -3);
+    add(new THREE.CylinderGeometry(0.35, 0.45, cable + 0.5, 6), COL.steel, 0, (cable + 0.5) / 2 - 0.5, 0);
+    add(new THREE.CylinderGeometry(1.0, 1.0, 0.25, 12), COL.wheel, 0, cable, 0);
+    return out;
+  }
+  const hallH = Math.max(3.5, Math.min(h, cable - 1.2));
+  // hall: base plinth, wall body, glass band, flat roof with a snow slab
+  add(new THREE.BoxGeometry(d, 1.0, w), COL.concrete, -d * 0.15, 0.1, 0);
+  add(new THREE.BoxGeometry(d, hallH - 1.2, w), timber ? COL.timber : COL.concrete, -d * 0.15, 0.6 + (hallH - 1.2) / 2, 0);
+  add(new THREE.BoxGeometry(d * 0.92, 1.1, w + 0.06), COL.glass, -d * 0.15, hallH - 1.3, 0);
+  add(new THREE.BoxGeometry(d + 0.8, 0.45, w + 0.8), COL.concrete, -d * 0.15, hallH, 0);
+  add(new THREE.BoxGeometry(d + 0.6, 0.35, w + 0.6), COL.snow, -d * 0.15, hallH + 0.38, 0);
+  // the bull-wheel housing at cable height (the carriers turn round it), on two steel legs
+  const R = spec.side + 0.7;
+  add(new THREE.CylinderGeometry(R, R, 0.9, 20), COL.wheel, d * 0.2, cable, 0);
+  add(new THREE.CylinderGeometry(R * 0.35, R * 0.35, 1.3, 10), COL.accent, d * 0.2, cable + 0.6, 0);
+  for (const side of [-1, 1]) add(new THREE.BoxGeometry(0.6, cable - hallH + 0.5, 0.6), COL.steel, d * 0.2, hallH + (cable - hallH + 0.5) / 2 - 0.2, side * R * 0.5);
+  // canopy: a shallow roof over the wheel, snow on top
+  add(new THREE.BoxGeometry(2 * R + 3, 0.4, 2 * R + 2), COL.steel, d * 0.2, cable + 1.6, 0);
+  add(new THREE.BoxGeometry(2 * R + 2.8, 0.4, 2 * R + 1.8), COL.snow, d * 0.2, cable + 1.95, 0);
+  return out;
+}
+
+function mergeColoured(parts) {
+  const pos = [], nrm = [], col = [], idx = [];
+  let base = 0;
+  for (const [g0, c] of parts) {
+    const g = g0.index ? g0 : g0;
+    const p = g.attributes.position, n = g.attributes.normal;
+    for (let i = 0; i < p.count; i++) { pos.push(p.getX(i), p.getY(i), p.getZ(i)); nrm.push(n.getX(i), n.getY(i), n.getZ(i)); col.push(c[0], c[1], c[2]); }
+    if (g.index) for (let i = 0; i < g.index.count; i++) idx.push(g.index.getX(i) + base);
+    else for (let i = 0; i < p.count; i++) idx.push(i + base);
+    base += p.count;
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  out.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+  out.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  out.setIndex(idx);
+  out.computeBoundingSphere();
+  return out;
 }
 
 function mergeBoxes(list) {

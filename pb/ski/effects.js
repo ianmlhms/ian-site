@@ -41,49 +41,72 @@ export function createSnowfall({ scene, env, count }) {
 }
 
 export function createSpray({ scene, count }) {
-  const N = Math.max(8, count);
-  const pos = new Float32Array(N * 3), life = new Float32Array(N), vel = new Float32Array(N * 3);
+  const N = Math.max(16, count * 2);
+  const pos = new Float32Array(N * 3), life = new Float32Array(N), vel = new Float32Array(N * 3), size = new Float32Array(N);
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
   g.setAttribute('aLife', new THREE.BufferAttribute(life, 1).setUsage(THREE.DynamicDrawUsage));
+  g.setAttribute('aSize', new THREE.BufferAttribute(size, 1).setUsage(THREE.DynamicDrawUsage));
   const u = { uPx: { value: 1 } };
   const mat = new THREE.ShaderMaterial({
     uniforms: u, transparent: true, depthWrite: false,
-    vertexShader: `attribute float aLife; uniform float uPx; varying float vL; void main(){ vL = aLife; vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv; gl_PointSize = uPx * (8.0 + 40.0 * (1.0 - aLife)) / max(-mv.z * 0.25, 1.0); }`,
-    fragmentShader: `varying float vL; void main(){ vec2 c = gl_PointCoord - 0.5; float r = dot(c, c); if (r > 0.25 || vL <= 0.0) discard; gl_FragColor = vec4(0.97, 0.98, 1.0, vL * 0.75 * (1.0 - r * 3.5)); }`,
+    vertexShader: `attribute float aLife; attribute float aSize; uniform float uPx; varying float vL;
+      void main(){ vL = aLife; vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv;
+        gl_PointSize = uPx * aSize * (0.35 + 1.4 * (1.0 - aLife)) * 260.0 / max(-mv.z, 0.5); }`,
+    fragmentShader: `varying float vL; void main(){ vec2 c = gl_PointCoord - 0.5; float r = dot(c, c) * 4.0; if (r > 1.0 || vL <= 0.0) discard;
+      float a = exp(-r * 2.6) * vL * vL * 0.55; gl_FragColor = vec4(0.96, 0.975, 1.0, a); }`,
   });
   const points = new THREE.Points(g, mat);
   points.frustumCulled = false;
   points.renderOrder = 7;
   scene.add(points);
-  let next = 0, carry = 0;
-  function emit(x, y, z, vx, vy, vz) {
+  let next = 0, carry = 0, wasLanded = 0, wasCrash = 0;
+  function emit(x, y, z, vx, vy, vz, sz) {
     const i = next; next = (next + 1) % N;
     pos[i * 3] = x; pos[i * 3 + 1] = y; pos[i * 3 + 2] = z;
-    vel[i * 3] = vx; vel[i * 3 + 1] = vy; vel[i * 3 + 2] = vz; life[i] = 1;
+    vel[i * 3] = vx; vel[i * 3 + 1] = vy; vel[i * 3 + 2] = vz; life[i] = 1; size[i] = sz;
+  }
+  /** A ring of snow thrown up all round (a landing, a fall). */
+  function burst(s, n, power) {
+    for (let k = 0; k < n; k++) {
+      const a = Math.random() * Math.PI * 2, v = power * (0.4 + Math.random() * 0.8);
+      emit(s.x + Math.cos(a) * 0.4, s.y + 0.1, s.z + Math.sin(a) * 0.4, Math.cos(a) * v + s.vx * 0.3, 1 + Math.random() * power * 0.6, Math.sin(a) * v + s.vz * 0.3, 0.1 + Math.random() * 0.12);
+    }
   }
   return {
-    /** amount 0..1: how much snow the skis throw this frame. */
+    /** amount 0..1: how much snow the skis throw this frame (carving: off the outside ski's edge in a fan; braking: ahead of both). */
     update(dt, s, amount, pixelRatio) {
       u.uPx.value = pixelRatio;
-      carry += amount * dt * 90;
-      const side = { x: -Math.sin(s.heading), z: Math.cos(s.heading) };
+      if (s.landed > 0.3 && wasLanded <= 0.3 && s.speed > 3) burst(s, 26, 2.5);
+      if (s.crash > 0 && wasCrash <= 0) burst(s, 40, 3.5);
+      wasLanded = s.landed; wasCrash = s.crash;
+      carry += amount * dt * 160;
+      const fx = Math.cos(s.heading), fz = Math.sin(s.heading);
+      const side = { x: -fz, z: fx };
       const turn = Math.sign(s.edge || 0.0001);
       while (carry > 1) {
         carry -= 1;
-        const k = Math.random();
-        emit(s.x - Math.cos(s.heading) * 0.5 + side.x * turn * 0.3, s.y + 0.1, s.z - Math.sin(s.heading) * 0.5 + side.z * turn * 0.3,
-          side.x * turn * (2 + 4 * k) + s.vx * 0.4, 1.5 + 2.5 * k, side.z * turn * (2 + 4 * k) + s.vz * 0.4);
+        const k = Math.random(), j = Math.random();
+        const out = -turn;                                   // the snow flies to the outside of the turn
+        const back = -0.2 - 0.8 * j;                          // somewhere along the ski's rear half
+        const x = s.x + fx * back + side.x * out * 0.22, z = s.z + fz * back + side.z * out * 0.22;
+        const sp = 1.5 + 4.5 * k * Math.min(1, s.speed / 14);
+        const brakeFan = s.brake > 0.4 ? 1 : 0;
+        emit(x, s.y + 0.05, z,
+          side.x * out * sp * (1 - brakeFan * 0.5) + fx * sp * brakeFan * 0.6 + s.vx * 0.55,
+          0.8 + 2.2 * k,
+          side.z * out * sp * (1 - brakeFan * 0.5) + fz * sp * brakeFan * 0.6 + s.vz * 0.55,
+          0.05 + 0.1 * Math.random());
       }
       for (let i = 0; i < N; i++) {
         if (life[i] <= 0) continue;
-        life[i] -= dt * 1.4;
-        vel[i * 3 + 1] -= 6 * dt;
-        const drag = Math.max(0, 1 - 2.2 * dt);
+        life[i] -= dt * 1.7;
+        vel[i * 3 + 1] -= 5 * dt;
+        const drag = Math.max(0, 1 - 2.6 * dt);
         vel[i * 3] *= drag; vel[i * 3 + 2] *= drag;
         pos[i * 3] += vel[i * 3] * dt; pos[i * 3 + 1] += vel[i * 3 + 1] * dt; pos[i * 3 + 2] += vel[i * 3 + 2] * dt;
       }
-      g.attributes.position.needsUpdate = true; g.attributes.aLife.needsUpdate = true;
+      g.attributes.position.needsUpdate = true; g.attributes.aLife.needsUpdate = true; g.attributes.aSize.needsUpdate = true;
     },
   };
 }

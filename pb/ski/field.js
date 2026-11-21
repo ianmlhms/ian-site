@@ -66,7 +66,7 @@ export function createPisteNet(network) {
   /** out = { mask, diff, dist }: soft groomed mask (soft edge widened to `soft` m), colour of the nearest line, distance beyond its edge. */
   function query(x, z, out, soft = 5) {
     const list = grid.get(key(Math.floor(x / CELL), Math.floor(z / CELL))) || empty;
-    let best = 0, bestEdge = 1e9, diff = -1;
+    let best = 0, bestEdge = 1e9, diff = -1, gx = 1, gz = 0;
     for (let n = 0; n < list.length; n++) {
       const s = segs[list[n]];
       const ax = s[0], az = s[1], dx = s[2] - ax, dz = s[3] - az;
@@ -75,11 +75,13 @@ export function createPisteNet(network) {
       t = t < 0 ? 0 : t > 1 ? 1 : t;
       const ex = ax + dx * t - x, ez = az + dz * t - z;
       const edge = Math.sqrt(ex * ex + ez * ez) - s[4];
-      if (edge < bestEdge) { bestEdge = edge; diff = s[5]; }
+      if (edge < bestEdge) { bestEdge = edge; diff = s[5]; gx = dx; gz = dz; }
       const m = smoothstep(soft, -3, edge);
       if (m > best) best = m;
     }
     out.mask = best; out.diff = diff; out.dist = bestEdge;
+    const gl = Math.hypot(gx, gz) || 1;
+    out.gx = gx / gl; out.gz = gz / gl;            // direction of the nearest piste line (the groomer drives along it: the corduroy)
     return out;
   }
   return { query, segments: segs };
@@ -274,8 +276,12 @@ export function createField({ resort, far, classes, net, kickers = createKickers
     return [tx * tileSize - pad, tz * tileSize - pad, (tx + 1) * tileSize + pad, (tz + 1) * tileSize + pad];
   }
 
+  /** Unit direction of the nearest piste line at (x, z) into out = { x, z } (render only: the corduroy runs along it). */
+  const gq = { mask: 0, diff: -1, dist: 1e9, gx: 1, gz: 0 };
+  function groomDir(x, z, out) { net.query(x, z, gq); out.x = gq.gx; out.z = gq.gz; return out; }
+
   return {
-    baseHeight, height, heightWith, kickers, heightForStep, attrs, farHeight, addTile,
+    baseHeight, height, heightWith, kickers, heightForStep, attrs, farHeight, addTile, groomDir,
     hasTile: (tx, tz) => tiles.has(tx * 1000 + tz),
     isShipped: (tx, tz) => shipped.has(tx * 1000 + tz),
     tileCount: () => tiles.size,

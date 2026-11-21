@@ -12,7 +12,9 @@ Writes
     t/<tx>_<tz>.bin    MBG1 grids, NEAR_STEP m, (TILE_CELLS+1)^2 nodes: only tiles within NEAR_KEEP of a piste, lift or village are shipped.
                        Pistes are groomed in (heights smoothed under the piste mask)
     classes.bin        RLE raster, CLASS_STEP m over the box, bit field (see CLASS_BITS)
-    buildings.json     one oriented box per building: [cx, cz, length, width, angle, eave, ridge, ground, kind]
+    buildings.json     one row per building: [cx, cz, length, width, angle, eave, ridge, ground, kind, footprint, roof, levels]
+                       (oriented box, kind 0 chalet / 1 block / 2 chapel / 3 hut; footprint = [dx, dz, ...] in dm from the centre;
+                       roof = ROOF_CODE or -1 unknown)
     map.webp           the painted base of the piste map (pistes, lifts and labels are drawn on top in the browser)
 
 Piste difficulty (France): novice = green, easy = blue, intermediate = red, advanced / expert = black. freeride itineraries are not pistes.
@@ -52,6 +54,9 @@ H_STEP = 0.1                       # height quantum of the baked grids (m)
 MAP_W = 1600
 GROOM_SIGMA = 1.6                  # nodes (8 m): how much a piste smooths the terrain under it
 GROOM_EDGE = 9.0                   # m of soft edge of the groomed band
+BENCH_EDGE = 11.0                  # m beyond a piste's edge over which the bench cut fades back into the slope
+BENCH_MAX = 8.0                    # m: never cut / fill more than this (a line that is off on the map must not dig a trench)
+BENCH_STRENGTH = 0.85
 def credits(rid):
     """The credit lines of the DEM sources this resort's data came from (fetch_dem.py records them in dem/sources.json), then OSM."""
     path = os.path.join(work_dir(rid, "dem"), "sources.json")
@@ -199,8 +204,9 @@ def build_pistes(frame, dem):
             except ValueError:
                 pass
         hw = max(6.0, min(40.0, width / 2)) if width else HALF_WIDTH[diff]
-        lines.append({"id": e["id"], "name": name, "ref": t.get("piste:ref") or t.get("ref") or "", "diff": diff, "p": p, "h": h, "hw": hw})
+        lines.append({"id": e["id"], "name": name, "ref": t.get("piste:ref") or t.get("ref") or "", "diff": diff, "p": p, "h": h, "hw": hw, "tagged": bool(width)})
     log("piste ways", len(lines), "areas", len(areas))
+    widen_from_areas(frame, lines, areas)
 
     # chain the named ways of one name + colour into runs (end of one ~ start of the next)
     groups = {}
@@ -267,6 +273,64 @@ def build_pistes(frame, dem):
         r["slalom"] = True
     log("runs", len(runs), "slalom", [r["id"] for r in runs if r.get("slalom")])
     return lines, areas, runs
+
+
+def widen_from_areas(frame, lines, areas):
+    """A piste line without a width tag that runs inside a mapped piste area takes its half width from the area (the median distance
+    from the line to the area's edge), so wide slopes get wide groomed bands, poles at the real edge and the right shading."""
+    if not areas:
+        return
+    s = NEAR_STEP
+    shape = (int(frame.depth / s) + 1, int(frame.width / s) + 1)
+    inside = raster_draw(shape, s, lambda d, sc: [d.polygon([(float(x) / sc, float(z) / sc) for x, z in a["poly"]], fill=255) for a in areas])
+    dist_in = ndimage.distance_transform_edt(inside) * s
+    n = 0
+    for ln in lines:
+        if ln["tagged"]:
+            continue
+        q = resample(ln["p"], 10.0)
+        i = np.clip((q[:, 0] / s).astype(int), 0, shape[1] - 1)
+        j = np.clip((q[:, 1] / s).astype(int), 0, shape[0] - 1)
+        d = dist_in[j, i]
+        if (d > 0).mean() < 0.6:
+            continue
+        hw = float(np.median(d[d > 0]))
+        if hw > ln["hw"]:
+            ln["hw"] = min(45.0, hw)
+            n += 1
+    log("piste half widths from areas:", n, "lines")
+
+
+def bench(mosaic, lines):
+    """Cuts every piste line flat across (a traverse gets its bench: cut into the slope above, fill below), the way pistes are built
+    and groomed. Each node within a line's half width takes the height of the nearest point of the (along-line smoothed) centre line;
+    the change fades out over BENCH_EDGE m beyond the edge, is capped at BENCH_MAX m and softened at the seams between lines."""
+    s = NEAR_STEP
+    seed = np.zeros(mosaic.shape, np.float32)
+    seed_hw = np.zeros(mosaic.shape, np.float32)
+    has = np.zeros(mosaic.shape, bool)
+    for ln in lines:
+        q = resample(ln["p"], s * 0.5)
+        if len(q) < 3:
+            continue
+        i = np.clip(np.round(q[:, 0] / s).astype(int), 0, mosaic.shape[1] - 1)
+        j = np.clip(np.round(q[:, 1] / s).astype(int), 0, mosaic.shape[0] - 1)
+        h = mosaic[j, i].astype(np.float64)
+        k = 9
+        hs = np.convolve(np.pad(h, k, mode="edge"), np.ones(2 * k + 1) / (2 * k + 1), mode="same")[k:-k]
+        seed[j, i] = hs
+        seed_hw[j, i] = ln["hw"]
+        has[j, i] = True
+    dist, (jy, ix) = ndimage.distance_transform_edt(~has, return_indices=True)
+    dist = dist * s
+    target = seed[jy, ix]
+    hw = seed_hw[jy, ix]
+    t = np.clip((hw + BENCH_EDGE - dist) / BENCH_EDGE, 0, 1)
+    w = t * t * (3 - 2 * t) * BENCH_STRENGTH
+    delta = np.clip(target - mosaic, -BENCH_MAX, BENCH_MAX) * w
+    delta = ndimage.gaussian_filter(delta, 1.0, mode="nearest")
+    log("bench: mean |cut/fill| under pistes %.2f m, max %.1f m" % (float(np.abs(delta)[w > 0.5].mean()), float(np.abs(delta).max())))
+    return (mosaic + delta).astype(np.float32)
 
 
 # ---------------------------------------------------------------- rasters
@@ -508,7 +572,13 @@ def build_buildings(frame, dem_raw):
             eave = levels * 2.9 + 0.6
         ridge = eave + min(W * 0.42, 6.5) if kind != 1 or W < 26 else eave + 2.5
         ground = float(np.min(dem_raw(np.r_[p[:, 0], cx], np.r_[p[:, 1], cz])))
-        out.append({"poly": p, "row": [round(cx, 1), round(cz, 1), round(L, 1), round(W, 1), round(ang % math.pi, 3), round(eave, 1), round(ridge, 1), round(ground, 1), kind]})
+        # the footprint itself (simplified, relative to the centre, decimetres) and what OSM says about the roof, for the renderer's
+        # stepped blocks and L-shapes; appended to the row so older readers (the box) keep working
+        q = dp_simplify(p, 0.6) if len(p) > 4 else p          # open ring: first and last vertex are kept
+        foot = [int(round(v * 10)) for xy in (q - np.array([cx, cz])) for v in xy]
+        roof = ROOF_CODE.get(t.get("roof:shape", ""), -1)
+        out.append({"poly": p, "row": [round(cx, 1), round(cz, 1), round(L, 1), round(W, 1), round(ang % math.pi, 3), round(eave, 1), round(ridge, 1), round(ground, 1), kind,
+                                       foot, roof, int(round(levels))]})
     log("buildings", len(out))
     return out
 
@@ -542,6 +612,7 @@ def build_aeroways(frame):
     log("aeroway polygons", len(out))
     return out
 
+ROOF_CODE = {"gabled": 0, "flat": 1, "hipped": 2, "skillion": 3, "half-hipped": 2, "pyramidal": 4, "gambrel": 0, "mansard": 2}
 
 LIFT_KIND = {"chair_lift": "chair", "gondola": "gondola", "cable_car": "cable", "mixed_lift": "gondola", "drag_lift": "drag", "t-bar": "drag",
              "j-bar": "drag", "platter": "drag", "rope_tow": "drag", "magic_carpet": "carpet"}
@@ -696,7 +767,7 @@ def main():
     # groom the pistes into the 5 m mosaic
     strips = build_aeroways(frame)                            # snow-covered runways (the Courchevel altiport): groomed, no trees
     mask = piste_mask(raw.shape, NEAR_STEP, lines, areas + strips)
-    groomed = groom(raw, mask)
+    groomed = groom(bench(raw, lines), mask)
     log("groomed: mean |change| under pistes %.2f m" % float(np.abs(groomed - raw)[mask > 0.5].mean()))
 
     # which height tiles are shipped

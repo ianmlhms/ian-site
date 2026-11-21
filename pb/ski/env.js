@@ -4,6 +4,8 @@
  *   weather: sun, cloudy (flat white light, soft shadows), snow (snowfall, short sight), fog (a milky white-out a few hundred metres deep)
  * The player chooses both in the menu and in game ("Zoufälleg" = random is the default; the choice is stored per player). Weather never
  * changes a time or a score. */
+import { shadowUniforms } from './shadows.js';
+
 const THREE = window.THREE;
 
 export const TIME_IDS = Object.freeze(['morning', 'midday', 'evening']);
@@ -27,8 +29,8 @@ const TIMES = Object.freeze({
 const WEATHER = Object.freeze({
   sun: { cloud: 0.12, sun: 1, fog: 2.6e-5, grey: 0, amb: 1, snow: 0, milk: 0 },
   cloudy: { cloud: 1, sun: 0.22, fog: 5.5e-5, grey: 0.55, amb: 1.55, snow: 0, milk: 0.2 },
-  snow: { cloud: 1, sun: 0.1, fog: 3.2e-4, grey: 0.72, amb: 1.6, snow: 1, milk: 0.55 },
-  fog: { cloud: 0.9, sun: 0.12, fog: 2.4e-3, grey: 0.82, amb: 1.7, snow: 0.08, milk: 1 },
+  snow: { cloud: 1, sun: 0.1, fog: 3.2e-4, grey: 0.72, amb: 1.75, snow: 1, milk: 0.55 },
+  fog: { cloud: 0.9, sun: 0.14, fog: 2.1e-3, grey: 0.8, amb: 1.95, snow: 0.08, milk: 1 },     // bright alpine white-out: white-blue, never mud grey
 });
 
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -82,6 +84,7 @@ export function createEnv({ scene, noise, params = {} }) {
     uTime: { value: 0 }, uCloud: { value: 0 }, uSnowfall: { value: 0 }, uGlow: { value: 0 }, uOvercast: { value: 0 }, uNoise: { value: noise },
     // mountain shadows of the current time of day (baked, see scripts/ski/bake.py sun_shadows): a raster over the far grid
     uShadow: { value: noise }, uShadowOn: { value: 0 }, uShadowRect: { value: new THREE.Vector4(0, 0, 1, 1) },
+    ...shadowUniforms(),
   };
   let shadowUrl = null, shadowFor = null, shadowTarget = 0, sunScale = 1;
   const loader = new THREE.TextureLoader();
@@ -117,7 +120,7 @@ export function createEnv({ scene, noise, params = {} }) {
     for (const key of Object.keys(tt)) curTime[key] = Array.isArray(tt[key]) ? lerp3(curTime[key], tt[key], k) : lerp(curTime[key], tt[key], k);
     const T = curTime;
     const grey = (col, g, dim = 1) => { const m = (col[0] + col[1] + col[2]) / 3; return [lerp(col[0], m * 0.97, g) * dim, lerp(col[1], m * 0.99, g) * dim, lerp(col[2], m * 1.02, g) * dim]; };
-    const milk = (col, t) => lerp3(col, [0.88, 0.9, 0.93], t);
+    const milk = (col, t) => lerp3(col, [0.9, 0.935, 0.985], t);          // the white-out: bright, a breath of blue
     const sky = milk(grey(T.top, cur.grey * 0.9), cur.milk * 0.8), hor = milk(grey(T.hor, cur.grey), cur.milk);
     u.uSkyTop.value.set(...sky); u.uSkyHorizon.value.set(...hor);
     const fog = milk(grey(T.fog, cur.grey), cur.milk);
@@ -213,5 +216,7 @@ export function createEnv({ scene, noise, params = {} }) {
     sunDir: () => TIMES[timeId],
     /** 0..1: how much sun reaches the skier (main.js marches a ray to the sun over the terrain); dims the sun on the plain materials. */
     setSunScale(k) { sunScale = sunScale + (k - sunScale) * 0.25; },
+    /** 0..1: how strong the sun is now (weather share; shadows are skipped below 0.3). */
+    sunStrength: () => cur.sun,
   };
 }
