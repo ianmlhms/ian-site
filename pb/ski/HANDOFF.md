@@ -482,7 +482,7 @@ All resort-generic; checked on all five resorts in Chromium and WebKit. Shared f
 - **Gate base** (`modes/markers.js`): a per-vertex `aTint` (1 = banner + flag) and a two-line `onBeforeCompile`: only the banner takes the
   instance colour; posts, base and top edge keep theirs.
 - **Checks**: `node scripts/ski/look7d-check.mjs` (Node, all parks: every mesh vertex / 11k sampled points incl. walls and rims vs physics
-  <= 4.3 cm, a scripted rider over every kicker / ramp / the pipe: grounded skier vs mesh <= 1.8 cm, never inside it; terrain never
+  <= 4.3 cm, a scripted rider over every kicker / ramp / the pipe: grounded skier vs mesh <= 3.3 cm (pipe), <= 2 cm on kickers, never inside it in the air; terrain never
   above a feature, pipe trough on LOD 5 / 10 nodes; tree triangle budgets) and flow `ski-look7d` (in run_all; `FLOW_BROWSER=webkit`
   works: per resort one page, trees one call per kind, rays onto the park meshes == physics <= 2.8 cm, gate base pixels neutral vs banner
   in colour, all shader programs runnable, no console error; Niddreg once). Shots: `scripts/ski/look7d-shots.sh OUT [chromium|webkit]`
