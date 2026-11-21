@@ -8,7 +8,12 @@
                      upgrades:{[trainId]:{motor,brakes,comfort,capacity,paint}}, best:{[routeId]:points}, services, endlessBest }
    tb = rail.lifetime + tram.lifetime: monotonic (the server drops saves with a lower tb) and what the arcade compares.
    Old flat saves (v1: lifetime/wallet/owned/... at the top level) become the rail career unchanged; tram vehicles/routes they
-   owned move to the tram career, which otherwise starts fresh (see normalize). */
+   owned move to the tram career, which otherwise starts fresh (see normalize).
+   Since 21 Nov 2026 every train and route of a career is owned from the start (owned / routes always list all of them, so an old save,
+   local or cloud, can never lock anything again); money buys upgrades only. Retired train ids (config.retiredTrains) are moved over in
+   normalizeCareer: owned / selected train -> the kept train, upgrades -> the higher level on the kept train, and the money paid for the levels
+   that can't be carried over -> the wallet. The normalized save only holds kept ids, so this happens exactly once (normalize is idempotent);
+   lifetime (and so tb) is never touched by it. */
 (function () {
   'use strict';
   const TS = (window.TS = window.TS || {});
@@ -17,11 +22,15 @@
   const CAREERS = C.careers.order;
   const DEFAULT_CAREER = 'rail';
   const TEST_MODE_EUROS = 5000000;
-  const MAX_LEVELS = Object.freeze(Object.fromEntries(C.upgradeKinds.map((k) => [k, C.upgrades.railcar[k].length])));
+  const MAX_LEVELS = C.upgradeMaxLevels;
+  const RETIRED = C.retiredTrains || {};
 
   const num = (n) => (typeof n === 'number' && Number.isFinite(n) ? Math.max(0, Math.min(MAX, Math.floor(n))) : 0);
   const isObj = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
   const trainById = (id) => C.trains.find((t) => t.id === id) || null;
+  /* a retired train id -> the kept train that replaced it; any other id unchanged */
+  const resolveTrainId = (id) => (typeof id === 'string' && Object.prototype.hasOwnProperty.call(RETIRED, id) ? RETIRED[id].to : id);
+  const retiredInto = (keptId) => Object.keys(RETIRED).filter((old) => RETIRED[old].to === keptId);
   /* Return direction: route id + '~r'. It belongs to the same career, price and ownership as the forward route; only the records (best) are per direction. */
   const REV = '~r';
   const baseOf = (routeId) => (typeof routeId === 'string' && routeId.endsWith(REV) ? routeId.slice(0, -REV.length) : routeId);
@@ -39,28 +48,44 @@
   };
   const trainIdsOf = (cid) => C.trains.filter((t) => careerOfTrain(t) === cid).map((t) => t.id);
   const routeIdsOf = (cid) => C.routeOrder.filter((id) => careerOfRoute(id) === cid);
-  const freeTrainsOf = (cid) => C.trains.filter((t) => careerOfTrain(t) === cid && t.price === 0).map((t) => t.id);
-  const freeRoutesOf = (cid) => routeIdsOf(cid).filter((id) => C.routeRules[id].price === 0);
+  /* the start train / route of a career (a fresh save, or a selection that no longer exists) */
+  const startTrainOf = (cid, trainIds) => (trainIds.includes(C.careers[cid].startTrain) ? C.careers[cid].startTrain : trainIds[0]);
+  const startRouteOf = (cid, routeIds) => (routeIds.includes(C.careers[cid].startRoute) ? C.careers[cid].startRoute : routeIds[0]);
+  const paidFor = (table, level) => (table || []).slice(0, level).reduce((a, p) => a + p, 0);
+
+  /* The upgrade levels of a career's kept trains, with the retired trains folded in: per kind the highest level among the kept train and the
+     retired ones that became it stays (ties: the kept train's own); every other level among them was paid for and is refunded at the price it cost. */
+  function mergeUpgrades(trainIds, raw) {
+    const src = isObj(raw) ? raw : {};
+    const levelOf = (id, k) => Math.min(MAX_LEVELS[k], num(isObj(src[id]) ? src[id][k] : 0));
+    const upgrades = {};
+    let refund = 0;
+    for (const id of trainIds) {
+      const family = [id, ...retiredInto(id)];
+      upgrades[id] = {};
+      for (const k of C.upgradeKinds) {
+        const entries = family.map((tid) => ({ level: levelOf(tid, k), table: (C.upgrades[tid] || (C.retiredUpgrades || {})[tid] || {})[k] }));
+        const keep = entries.reduce((best, e, i) => (e.level > entries[best].level ? i : best), 0);
+        upgrades[id][k] = entries[keep].level;
+        refund += entries.reduce((sum, e, i) => (i === keep ? sum : sum + paidFor(e.table, e.level)), 0);
+      }
+    }
+    return { upgrades, refund };
+  }
 
   function normalizeCareer(cid, input) {
     const d = isObj(input) ? input : {};
     const trainIds = trainIdsOf(cid);
     const routeIds = routeIdsOf(cid);
-    const freeTrains = freeTrainsOf(cid);
-    const freeRoutes = freeRoutesOf(cid);
     const lifetime = num(d.lifetime);
-    const owned = unique([...freeTrains, ...(Array.isArray(d.owned) ? d.owned : [])], trainIds);
-    const routes = unique([...freeRoutes, ...(Array.isArray(d.routes) ? d.routes : [])], routeIds);
-    const upgrades = {};
-    for (const id of trainIds) {
-      upgrades[id] = {};
-      for (const k of C.upgradeKinds) upgrades[id][k] = Math.min(MAX_LEVELS[k], num(d.upgrades && d.upgrades[id] && d.upgrades[id][k]));
-    }
+    const { upgrades, refund } = mergeUpgrades(trainIds, d.upgrades);
     const best = {};
     if (isObj(d.best)) for (const id of routeIds) for (const key of [id, id + REV]) if (num(d.best[key])) best[key] = num(d.best[key]);
+    const train = resolveTrainId(d.train);
     return {
-      lifetime, wallet: Math.min(lifetime, num(d.wallet)), owned, routes,
-      train: owned.includes(d.train) ? d.train : freeTrains[0], route: routes.includes(d.route) ? d.route : freeRoutes[0],
+      // the refund only comes from money that was spent out of lifetime, so the cap (wallet <= lifetime) never eats it
+      lifetime, wallet: Math.min(lifetime, num(d.wallet) + refund), owned: trainIds.slice(), routes: routeIds.slice(),
+      train: trainIds.includes(train) ? train : startTrainOf(cid, trainIds), route: routeIds.includes(d.route) ? d.route : startRouteOf(cid, routeIds),
       upgrades, best, services: num(d.services), endlessBest: num(d.endlessBest),
     };
   }
@@ -157,25 +182,17 @@
     const cid = careerOfRoute(routeId);
     const c = s[cid];
     if (!c.routes.includes(baseOf(routeId))) return { ok: false, reason: 'needsRoute', needs: trainsForRoute(routeId) };
-    const id = trainId || c.train;
+    const id = resolveTrainId(trainId || c.train);
     if (!trainById(id)) return { ok: false, reason: 'unknownTrain', needs: trainsForRoute(routeId) };
     if (careerOfTrain(id) !== cid || !trainCompatible(id, routeId)) return { ok: false, reason: 'wrongTrainKind', needs: trainsForRoute(routeId) };
     if (!c.owned.includes(id)) return { ok: false, reason: 'trainNotOwned', needs: [] };
     return { ok: true, reason: '', needs: [] };
   }
 
-  const hasRequired = (c, routeId) => (rule(routeId).requires || []).every((id) => c.routes.includes(id));
-
-  // ---- purchases (return new save or null). Each one spends the wallet of the career the item belongs to.
-  function buyTrain(save, id) {
-    const s = normalize(save);
-    const t = trainById(id);
-    if (!t) return null;
-    const cid = careerOfTrain(t);
-    const c = s[cid];
-    if (c.owned.includes(id) || c.wallet < t.price) return null;
-    return withCareer(s, cid, { owned: [...c.owned, id], train: id, wallet: c.wallet - t.price });
-  }
+  // ---- purchases (return new save or null). Only upgrades cost money now (they spend the wallet of the career the train belongs to);
+  // trains and routes are all owned from the start, so buying one always returns null (kept for old callers).
+  const buyTrain = () => null;
+  const buyRoute = () => null;
   function upgradePrice(save, trainId, kind) {
     const s = normalize(save);
     const table = C.upgrades[trainId] && C.upgrades[trainId][kind];
@@ -193,45 +210,22 @@
     const upgrades = { ...c.upgrades, [trainId]: { ...c.upgrades[trainId], [kind]: c.upgrades[trainId][kind] + 1 } };
     return withCareer(s, cid, { upgrades, wallet: c.wallet - price });
   }
-  function buyRoute(save, routeId) {
-    const s = normalize(save);
-    const r = rule(routeId);
-    if (!r) return null;
-    const cid = careerOfRoute(routeId);
-    const c = s[cid];
-    if (c.routes.includes(routeId) || c.wallet < r.price || !hasRequired(c, routeId)) return null;
-    if (!c.owned.some((id) => trainCompatible(id, routeId))) return null; // no point buying a line you can't drive
-    return withCareer(s, cid, { routes: [...c.routes, routeId], wallet: c.wallet - r.price });
-  }
   function select(save, trainId) {
     const s = normalize(save);
-    const cid = careerOfTrain(trainId);
-    return cid && s[cid].owned.includes(trainId) ? withCareer(s, cid, { train: trainId }) : null;
+    const id = resolveTrainId(trainId);
+    const cid = careerOfTrain(id);
+    return cid && s[cid].owned.includes(id) ? withCareer(s, cid, { train: id }) : null;
   }
   function selectRoute(save, routeId) {
     const s = normalize(save);
     const cid = careerOfRoute(routeId);
     return cid && s[cid].routes.includes(baseOf(routeId)) ? withCareer(s, cid, { route: baseOf(routeId) }) : null;
   }
-  /* Why can't I buy? -> { ok, reason, price }. */
+  /* Why can't I buy? -> { ok, reason, price }. Trains and routes: always owned already. */
   function canBuy(save, kind, id, extra) {
     const s = normalize(save);
-    if (kind === 'train') {
-      const t = trainById(id);
-      if (!t) return { ok: false, reason: 'unknownTrain', price: 0 };
-      const c = s[careerOfTrain(t)];
-      if (c.owned.includes(id)) return { ok: false, reason: 'owned', price: t.price };
-      return { ok: c.wallet >= t.price, reason: c.wallet >= t.price ? '' : 'needsMoney', price: t.price };
-    }
-    if (kind === 'route') {
-      const r = rule(id);
-      if (!r) return { ok: false, reason: 'unknownRoute', price: 0 };
-      const c = s[careerOfRoute(id)];
-      if (c.routes.includes(id)) return { ok: false, reason: 'owned', price: r.price };
-      if (!c.owned.some((tid) => trainCompatible(tid, id))) return { ok: false, reason: 'needsTrain', price: r.price };
-      if (!hasRequired(c, id)) return { ok: false, reason: 'needsSections', price: r.price };
-      return { ok: c.wallet >= r.price, reason: c.wallet >= r.price ? '' : 'needsMoney', price: r.price };
-    }
+    if (kind === 'train') return trainById(id) ? { ok: false, reason: 'owned', price: 0 } : { ok: false, reason: 'unknownTrain', price: 0 };
+    if (kind === 'route') return rule(id) ? { ok: false, reason: 'owned', price: 0 } : { ok: false, reason: 'unknownRoute', price: 0 };
     if (kind === 'upgrade') {
       const trainId = extra || s[s.career].train;
       const cid = careerOfTrain(trainId);
@@ -451,7 +445,7 @@
   TS.career = {
     defaults, normalize, merge, of, setCareer, applyLock, setHints, buyTrain, buyUpgrade, buyRoute, select, selectRoute, canBuy, upgradePrice,
     applyUpgrades, routeAvailable, endlessOrder, routeClass, trainCompatible, trainsForRoute, requiredTrain,
-    baseRouteId: baseOf, careerOfTrain, careerOfRoute, trainIdsOf, routeIdsOf, unlockedAll, CAREERS,
+    baseRouteId: baseOf, careerOfTrain, careerOfRoute, trainIdsOf, routeIdsOf, unlockedAll, CAREERS, resolveTrainId,
     rank, rankInfo, reward, completeService, punctualityScore, accuracyScore, MAX_LEVELS,
   };
 })();

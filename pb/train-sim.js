@@ -110,7 +110,7 @@
   let phase = 'boot';            // boot | menu | loading | running | paused | summary | transition
   let mode = 'career';           // career | endless
   const EMPTY_CAREER = { lifetime: 0, wallet: 0, owned: [], routes: [], train: '', route: '', upgrades: {}, best: {}, services: 0, endlessBest: 0 };
-  let save = safe('career defaults', () => (ARCADE_TEST ? TS.career.unlockedAll() : TS.career.defaults()), { hints: true, tb: 0, career: 'rail', rail: { ...EMPTY_CAREER, owned: ['railcar'], routes: ['west'], train: 'railcar', route: 'west' }, tram: { ...EMPTY_CAREER, owned: ['tram'], routes: ['luxtram-stad'], train: 'tram', route: 'luxtram-stad' } });
+  let save = safe('career defaults', () => (ARCADE_TEST ? TS.career.unlockedAll() : TS.career.defaults()), { hints: true, tb: 0, career: 'rail', rail: { ...EMPTY_CAREER, owned: ['emu'], routes: ['west'], train: 'emu', route: 'west' }, tram: { ...EMPTY_CAREER, owned: ['tram'], routes: ['luxtram-stad'], train: 'tram', route: 'luxtram-stad' } });
   save = safe('career lock', () => TS.career.applyLock(save), save);   // an arcade tile opens one career only (TS.careerLock)
   let muted = readStore('pb_muted') === '1';
   /* weather + time-of-day choice (menu and in-game popover), remembered per player in localStorage; 'random' = pick per service */
@@ -247,7 +247,7 @@
     return save[cid || save.career] || save[save.career] || EMPTY_CAREER;
   }
   function effectiveTrain(trainId) {
-    const base = trainDef(trainId) || { id: 'railcar', kind: 'rail', maxKmh: 90, accel: 0.55, brake: 0.8, emergency: 1.2, massT: 45, cars: 1, capacity: 90, doorsPerSide: 2, carLength: 22, cab: 'railcar', model: 'railcar', sound: 'diesel', livery: { body: '#a82a26', accent: '#e9dcc0', stripe: '#e9dcc0' } };
+    const base = trainDef(trainId) || { id: 'emu', kind: 'rail', maxKmh: 90, accel: 0.55, brake: 0.8, emergency: 1.2, massT: 45, cars: 1, capacity: 90, doorsPerSide: 2, carLength: 22, cab: 'emu', model: 'emu', sound: 'electric', livery: { body: '#a82a26', accent: '#e9dcc0', stripe: '#e9dcc0' } };
     return safe('applyUpgrades', () => TS.career.applyUpgrades(base, save), null) || base;
   }
 
@@ -411,6 +411,11 @@
   }
   const saveSnapshotNow = () => { if (world) armSnapshot(world.state); if (snapshotReady()) writeSnapshot(); };
 
+  /* a saved service of a train that left the roster carries on with the train it became: say so on the card */
+  function retiredNote(oldId) {
+    const old = oldId ? safe('retired train', () => TS.config.retiredTrains[oldId], null) : null;
+    return old ? ' · ' + t('resumeRetired', { name: nameOf(old.name) }) : '';
+  }
   /* the card at the top of the start menu */
   function resumeCardData(snap) {
     const def = routeDefOf(snap.route), train = trainDef(snap.train), a = TS.resume.ago(Date.now() - snap.at);
@@ -419,7 +424,7 @@
     const cash = (snap.en ? snap.en.total.cash : 0) + snap.live;
     return {
       route: def ? nameOf(def.name) : snap.route,
-      train: (train ? nameOf(train.name) : snap.train) + (snap.mode === 'endless' ? ' · ' + t('modeEndless') : ''),
+      train: (train ? nameOf(train.name) : snap.train) + (snap.mode === 'endless' ? ' · ' + t('modeEndless') : '') + retiredNote(snap.from),
       next: snap.nextName ? t('resumeNext', { name: snap.nextName }) : '', ago: t(a.key, { n: a.n }), cash: '€ ' + fmtInt(cash),
       loop: snap.en ? t('endlessLine', { n: snap.en.index + 1, total: snap.en.order.length }) + (snap.en.loops > 0 ? ' · ' + t('resumeLoop', { n: snap.en.loops + 1 }) : '') : '',
       focus, onResume: resumeFromMenu, onDiscard: discardFromMenu,
@@ -2079,8 +2084,9 @@
     phase = 'summary';
     showSummary(res, reward, rankUp, careerPlayed);
   }
-  async function startService(routeId, trainId, startMode, opts = {}) {
+  async function startService(routeId, trainIdIn, startMode, opts = {}) {
     if (!initRenderer()) return false;
+    const trainId = safe('resolve train', () => TS.career.resolveTrainId(trainIdIn), trainIdIn);   // a retired train id (old link / caller) runs as the train it became
     demoToken += 1;   // a menu backdrop that is still being built must not replace this service's world
     showCanvas(true);
     const route = routeDefOf(routeId);

@@ -134,7 +134,7 @@ export const flow = {
       h.step("D. Zuchsimulator: the data of a started service stays on the device");
       const trainMenu = () => window.__tsTest && window.__tsTest.state().phase === "menu" && !document.getElementById("bootStatus")?.textContent;
       const startService = async (page) => {
-        await page.evaluate(() => window.__tsTest.startService("west", "railcar", "career"));
+        await page.evaluate(() => window.__tsTest.startService("west", "emu", "career"));
         await page.waitForFunction(() => window.__tsTest.state().phase === "running", null, { timeout: BOOT_TIMEOUT });
       };
       const trainCold = await open(TRAIN_URL, trainMenu, startService);

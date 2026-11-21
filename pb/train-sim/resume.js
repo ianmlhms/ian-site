@@ -87,11 +87,15 @@
 
     const mode = raw.mode === 'endless' ? 'endless' : raw.mode === 'career' ? 'career' : '';
     if (!mode) return reject('mode');
-    const route = text(raw.route, 60), train = text(raw.train, 40);
+    const K = TS.career;
+    /* a train that left the roster (config.retiredTrains, 21 Nov 2026) carries on as the train it became: the sim state has nothing train-specific
+       (position, clock, stops), the passenger totals are clamped to the new train below (clampWorld); `from` = the old id, for the menu's note */
+    const savedTrain = text(raw.train, 40), route = text(raw.route, 60);
+    const train = K && K.resolveTrainId ? K.resolveTrainId(savedTrain) : savedTrain;
+    const from = train !== savedTrain ? savedTrain : '';
     const routeDef = route && TS.routes && TS.routes.get ? TS.routes.get(route) : null;
     if (!routeDef) return reject('unknown route');
     if (!TS.config || !TS.config.trains.some((x) => x.id === train)) return reject('unknown train');
-    const K = TS.career;
     const career = K.careerOfTrain(train);
     if (!career || K.careerOfRoute(route) !== career) return reject('route and train are from different careers');
     if (ctx.lock && career !== ctx.lock) return reject(OTHER_CAREER, true);   // the other arcade tile owns this service: leave it stored for that tile
@@ -121,7 +125,7 @@
     }
 
     const out = {
-      v: VERSION, at: raw.at, mode, route, train, career, svc, life, en, fresh: raw.fresh ? 1 : 0,
+      v: VERSION, at: raw.at, mode, route, train, from, career, svc, life, en, fresh: raw.fresh ? 1 : 0,
       cam: CAMERAS.includes(raw.cam) ? raw.cam : 'cab', nextName: text(raw.nn, 80), next: int(raw.ni, 0, MAX_STATIONS), live: int(raw.live, 0, MAX_COUNT * 100),
       wxp: text(raw.wxp, 12), todp: text(raw.todp, 12),
     };

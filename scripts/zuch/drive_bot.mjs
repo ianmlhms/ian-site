@@ -1,6 +1,6 @@
 /* A scripted driver on the game's own simulation (no rendering, no shell): can a normal driver keep the timetable of a route, and how long does he stand at a stop AFTER the
  * passengers are done?
- *   node scripts/zuch/drive_bot.mjs [--root <repo>] [--train railcar] [--share 0.9,0.97] [--leave exact|free|early:<s>] [--table] [--md] [--seed 7] [route ...]
+ *   node scripts/zuch/drive_bot.mjs [--root <repo>] [--train emu] [--share 0.9,0.97] [--leave exact|free|early:<s>] [--table] [--md] [--seed 7] [route ...]
  * The bot accelerates at full power, keeps `share` x the line limit, brakes along a 0.45 x service-brake curve to every stop and to every lower limit, opens the doors one second
  * after it stands, closes them one second after the exchange is finished and leaves as soon as the rules allow it:
  *   --leave exact      the scheduled departure time (what the HUD printed before the timing rework)
@@ -20,12 +20,12 @@ const bool = (n) => { const i = args.indexOf('--' + n); if (i < 0) return false;
 const root = flag('root', undefined); const trainFlag = flag('train', ''); const shares = flag('share', '0.9').split(',').map(Number);
 const dumpFile = flag('dump', ''); const leave = flag('leave', 'free'); const seedArg = Number(flag('seed', '7')); const table = bool('table'); const md = bool('md');
 const ROUTES = {
-  west: ['railcar', 'emu'], south: ['railcar', 'emu'], north: ['railcar', 'emu'], east: ['railcar', 'emu'], wittlich: ['railcar', 'emu'], trier: ['railcar', 'emu'],
-  metz: ['kiss'], brussels: ['kiss'], paris: ['hst'],
+  west: ['emu', 'c2400'], south: ['emu', 'c2400'], north: ['emu', 'c2400'], east: ['emu', 'c2400'], wittlich: ['emu', 'c2400'], trier: ['emu', 'c2400'],
+  metz: ['c2400'], brussels: ['c2400'], paris: ['hst'],
   'luxtram-kierchbierg': ['tram'], 'luxtram-stad': ['tram'], 'luxtram-sud': ['tram'], luxtram: ['tram'],
 };
 const wanted = args.length ? args : Object.keys(ROUTES);
-const runs = []; for (const id of wanted) for (const tr of trainFlag ? [trainFlag] : ROUTES[id] || ['railcar']) runs.push([id, tr]);
+const runs = []; for (const id of wanted) for (const tr of trainFlag ? [trainFlag] : ROUTES[id] || ['emu']) runs.push([id, tr]);
 
 const sim = await openSim({ quality: 'low', root });
 const out = []; const dump = [];

@@ -16,7 +16,9 @@
     cfl2: { body: '#dfe3e6', accent: '#b02a28', stripe: '#1b3a6b' },
     sncb: { body: '#cfd6de', accent: '#1d4f93', stripe: '#f2c230' },
   });
-  const YARD_MODEL = Object.freeze({ cfl: 'kiss', cfl2: 'z2200' });   // yard train kind -> train model (config.js)
+  const YARD_MODEL = Object.freeze({ cfl: 'kiss', cfl2: 'z2200' });   // yard train kind -> train model (trains.js)
+  /* the first liveries the 2300 KISS and the 2200 had in config.js before they left the playable roster (21 Nov 2026): the parked sets keep their real colours */
+  const MODEL_LIVERY = Object.freeze({ kiss: { body: '#e6e8ea', accent: '#ef3b45', stripe: '#2a2d34' }, z2200: { body: '#cfd2d5', accent: '#ef3b45', stripe: '#7b1220' } });
   const CAR_GAP = 0.35;
 
   /* the point of a real track (patch coordinates) at x = target near z = zc, with its direction; null if no track is there */
@@ -48,7 +50,7 @@
         const x0 = Math.min(...xs); const x1 = Math.max(...xs); const z0 = Math.min(...zs); const z1 = Math.max(...zs);
         const modelId = YARD_MODEL[spec.kind] || spec.model || 'emu';   // the CFL sets at Gare Centrale are the real ones now (2300 KISS, 2200); the SNCB one stays a regional unit
         const cfgTrain = TS.config && TS.config.trains.find((t) => t.id === modelId);
-        const livery = YARD_MODEL[spec.kind] && cfgTrain ? cfgTrain.livery : LIVERIES[spec.kind] || LIVERIES.cfl;
+        const livery = YARD_MODEL[spec.kind] && (cfgTrain ? cfgTrain.livery : MODEL_LIVERY[modelId]) || LIVERIES[spec.kind] || LIVERIES.cfl;
         const model = TS.trains.create({ model: modelId, cars: spec.cars || 2 }, { quality: 'low', livery });
         const total = model.totalLength + CAR_GAP * (model.cars.length - 1);
         // the platform is wider than a train: stand it in its middle, then look for the track beside it (right edge first), moving along the platform until one is found

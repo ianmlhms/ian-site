@@ -2,7 +2,7 @@
  * Real touch events (CDP Input.dispatchTouchEvent -> pointer events with pointerType "touch"), no key is pressed anywhere:
  * the menu, the on-screen lever + buttons (doors, horn, lights, parking brake, timetable, announcement, emergency brake),
  * the HUD buttons (camera, pause, help, weather, reverse, 2x), two fingers at once, a Luxtram leg from stop to stop
- * (departure, speed control, braking to the marker, doors) and a CFL (railcar) stop. Layout: the controls are thumb-sized,
+ * (departure, speed control, braking to the marker, doors) and a CFL (Lokalzuch) stop. Layout: the controls are thumb-sized,
  * inside the screen and never cover the route strip, the clocks, the speed box or the other HUD buttons (portrait and landscape).
  * Supabase is mocked; no real account. */
 import { runIfMain } from './lib.mjs';
@@ -266,7 +266,7 @@ export const flow = {
     h.expect((await S(frame)).events.some((e) => /exchange|board|stop/i.test(JSON.stringify(e))) || (await S(frame)).visited.includes(1), 'stop 2 was served (counted as visited)');
     await h.shot('luxtram-stop2');
 
-    h.step('a CFL (railcar) stop by touch');
+    h.step('a CFL (Lokalzuch) stop by touch');
     await frame.evaluate(() => __tsTest.toMenu());
     await waitState(frame, () => window.__tsTest.state().phase === 'menu', null, 30000);
     await kit.tap(frame.locator('[data-test="career-rail"]'));
@@ -276,17 +276,17 @@ export const flow = {
     await frame.evaluate(() => { __tsTest.setSeed(20261014); __tsTest.setCalm(true); });
     await waitState(frame, () => window.__tsTest.cabSettled(), null, 30000);
     s = await S(frame);
-    h.eq([s.routeId, s.trainId], ['west', 'railcar'], 'the west line with the railcar');
+    h.eq([s.routeId, s.trainId], ['west', 'emu'], 'the west line with the Lokalzuch');
     await kit.tap(frame.locator('#btnFast'));
     if (!(await S(frame)).fast) await kit.tap(frame.locator('#btnFast'));
     await serveByTouch(h, frame, kit);
     await waitState(frame, () => { const x = window.__tsTest.state(); return x.readyToDepart && x.departureWaitSec <= 0; }, null, 120000);
     await dragLever(h, frame, kit, 4);
     await waitState(frame, () => window.__tsTest.state().kmh > 15, null, 40000);
-    h.expect(true, 'the railcar pulls away under touch power (' + Math.round((await S(frame)).kmh) + ' km/h)');
+    h.expect(true, 'the Lokalzuch pulls away under touch power (' + Math.round((await S(frame)).kmh) + ' km/h)');
     await frame.evaluate(() => { __tsTest.teleport(1); });
     await waitState(frame, () => window.__tsTest.state().nextStationIndex === 1 && window.__tsTest.state().distanceToHeading < 80, null, 10000);
-    h.expect(await driveLegByTouch(h, frame, kit, 1, 90), 'the railcar stops at the platform by touch braking');
+    h.expect(await driveLegByTouch(h, frame, kit, 1, 90), 'the Lokalzuch stops at the platform by touch braking');
     await serveByTouch(h, frame, kit);
     h.expect((await S(frame)).visited.includes(1), 'CFL stop 2 served by touch');
     await h.shot('cfl-stop2');

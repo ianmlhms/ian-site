@@ -106,7 +106,6 @@
 .ts-menu__grid--trains{grid-template-columns:repeat(3,minmax(0,1fr))}
 .ts-menu__card{position:relative;border-right:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--card);display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:minmax(0,1fr) auto;overflow:hidden;transition:background .15s}
 .ts-menu__card[data-selected="true"]{background:var(--card);box-shadow:inset 0 0 0 2px var(--green)}
-.ts-menu__card[data-locked="true"] .ts-menu__pick{opacity:.6}
 .ts-menu__dir{all:unset;grid-column:2;grid-row:1;align-self:start;margin:10px 10px 0 0;width:44px;height:44px;display:grid;place-items:center;font-size:18px;cursor:pointer;background:transparent;border:1px solid var(--hair);color:var(--ink);z-index:2;box-sizing:border-box}
 .ts-menu__dir:hover{border-color:var(--ink)}
 .ts-menu__dir[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
@@ -122,6 +121,8 @@
 .ts-menu__tagline{font-size:12.5px;color:var(--soft);line-height:1.4}
 .ts-menu__badge2{display:inline-flex;align-items:center;gap:5px;font:500 11.5px/1.5 var(--mono);letter-spacing:.02em;padding:1px 7px;border:1px solid var(--green);color:var(--green);text-transform:uppercase;width:max-content}
 .ts-menu__badge2--warn{border-color:var(--red);color:var(--red)}
+.ts-menu__fits{width:auto;max-width:100%;text-transform:none;letter-spacing:0;white-space:normal}
+.ts-menu__real{font:500 12px/1.4 var(--mono);color:var(--soft);margin-top:-2px}
 .ts-menu__badge2--gold{border-color:var(--ink);color:var(--ink)}
 .ts-menu__foot{padding:0 14px 14px;display:flex;gap:8px;align-items:center}
 .ts-menu__btn{flex:1;min-height:44px;border:1px solid var(--ink);background:transparent;font-weight:600;font-size:14px;padding:0 14px;display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:background .15s,color .15s}
@@ -430,7 +431,7 @@
   }
 
   /* --------------------------------------------------------------- state */
-  const ctx = { reverse: {}, container: null, root: null, opts: {}, save: null, career: 'rail', routeId: 'west', trainId: 'railcar', toast: null, toastTimer: 0, heroTrain: null, env: { weather: 'random', tod: 'random' } };
+  const ctx = { reverse: {}, container: null, root: null, opts: {}, save: null, career: 'rail', routeId: 'west', trainId: 'emu', toast: null, toastTimer: 0, heroTrain: null, env: { weather: 'random', tod: 'random' } };
 
   function setSave(save) {
     ctx.save = K.normalize(save);
@@ -465,7 +466,7 @@
   function doBuy(kind, id, extra) {
     const check = K.canBuy(ctx.save, kind, id, extra);
     if (!check.ok) {
-      showToast(t(check.reason === 'needsTrain' ? 'needsRoute' : check.reason === 'needsSections' ? 'needsSections' : check.reason === 'needsMoney' ? 'needsMoney' : 'locked'), true);
+      showToast(t(check.reason === 'needsMoney' ? 'needsMoney' : check.reason === 'maxLevel' ? 'maxLevel' : 'locked'), true);
       paint();
       return;
     }
@@ -642,32 +643,23 @@
     return h('section', { class: 'ts-menu__env', 'aria-label': t('weather') + ' / ' + t('timeOfDay') }, row('weather', t('weather')), row('tod', t('timeOfDay')), gfxRow, h('p', { class: 'ts-menu__small', text: t('envInfo') }));
   }
 
+  /* Every route is open. A route that not every train may run (the long lines abroad, Paris) says which ones do; red while the chosen train is not one of them
+     (picking the route switches to the first train that fits). */
   function routeCard(id) {
     const s = cs();
-    const rule = C.routeRules[id];
     const info = routeInfo(routeKey(id));
-    const owned = s.routes.includes(id);
     const selected = ctx.routeId === id;
-    const needNames = K.trainsForRoute(id).map((tid) => pick(trainById(tid).name));
-    const needsLabel = needNames.length > 1 ? t('needsTrainOrBetter', { name: needNames[0] }) : t('needsTrain', { name: needNames[0] || '?' });
-    const check = K.canBuy(ctx.save, 'route', id);
-    const ownsFit = s.owned.some((tid) => K.trainCompatible(tid, id));
-    const badge = owned
-      ? (ownsFit ? h('span', { class: 'ts-menu__badge2', text: '✓ ' + t('unlocked') }) : h('span', { class: 'ts-menu__badge2 ts-menu__badge2--warn', text: needsLabel }))
-      : h('span', { class: 'ts-menu__badge2 ts-menu__badge2--gold', text: '🔒 ' + t('locked') });
-    const foot = owned
-      ? null
-      : h('div', { class: 'ts-menu__foot' },
-        h('button', { type: 'button', class: 'ts-menu__btn ts-menu__btn--buy', disabled: !check.ok, 'data-fid': 'buy-route-' + id, 'data-test': 'buy-route-' + id, on: { click: () => doBuy('route', id) },
-          title: check.reason === 'needsTrain' ? needsLabel : '' }, check.reason === 'needsTrain' ? needsLabel : check.reason === 'needsSections' ? t('needsSections') : t('unlock') + ' · ' + money(rule.price)));
-    return h('article', { class: 'ts-menu__card', 'data-selected': String(selected && owned), 'data-locked': String(!owned), 'data-route': id },
-      h('button', { type: 'button', class: 'ts-menu__pick', disabled: !owned, 'aria-pressed': String(selected && owned), 'data-fid': 'route-' + id, 'data-test': 'route-' + id, on: { click: () => doSelectRoute(id) } },
+    const fits = K.trainsForRoute(id);
+    const allFit = careerTrains().every((tr) => fits.includes(tr.id));
+    const fitsNote = allFit ? null : h('span', { class: 'ts-menu__badge2 ts-menu__fits' + (K.trainCompatible(ctx.trainId, id) ? '' : ' ts-menu__badge2--warn'), 'data-test': 'fits-' + id,
+      text: t('runsWith', { names: fits.map((tid) => pick(trainById(tid).name)).join(', ') }) });
+    return h('article', { class: 'ts-menu__card', 'data-selected': String(selected), 'data-route': id },
+      h('button', { type: 'button', class: 'ts-menu__pick', 'aria-pressed': String(selected), 'data-fid': 'route-' + id, 'data-test': 'route-' + id, on: { click: () => doSelectRoute(id) } },
         h('div', { class: 'ts-menu__rowHead' }, h('span', { class: 'ts-menu__kind', 'aria-hidden': 'true', text: KIND_ICON[info.kind] || '🚆' }), h('h3', { text: info.name })),
         h('div', { class: 'ts-menu__meta' }, h('span', { text: t('stationsN', { n: info.stops }) }), info.km ? h('span', { text: Math.round(info.km) + ' km' }) : null, h('span', { text: t(KIND_KEY[info.kind] || 'kindRail') }),
-          h('span', { class: 'ts-menu__price', text: owned ? '' : money(rule.price) }), owned && s.best[routeKey(id)] ? h('span', { text: '★ ' + s.best[routeKey(id)] }) : null),
-        badge),
-      h('button', { type: 'button', class: 'ts-menu__dir', 'aria-pressed': String(!!ctx.reverse[id]), title: t('dirToggle'), 'aria-label': t('dirToggle'), 'data-fid': 'dir-' + id, 'data-test': 'dir-' + id, text: '⇄', on: { click: () => doToggleDir(id) } }),
-      foot);
+          s.best[routeKey(id)] ? h('span', { text: '★ ' + s.best[routeKey(id)] }) : null),
+        fitsNote),
+      h('button', { type: 'button', class: 'ts-menu__dir', 'aria-pressed': String(!!ctx.reverse[id]), title: t('dirToggle'), 'aria-label': t('dirToggle'), 'data-fid': 'dir-' + id, 'data-test': 'dir-' + id, text: '⇄', on: { click: () => doToggleDir(id) } }));
   }
 
   function statRow(label, value, max, valueText) {
@@ -675,29 +667,23 @@
     return [h('span', { text: label }), h('div', { class: 'bar' }, h('i', { style: `width:${pct}%` })), h('b', { text: valueText })];
   }
 
+  /* Every train is free: the card says what it is (name + the real unit), what it is good at, its stats, and picks it. */
   function trainCard(train) {
-    const s = cs();
-    const owned = s.owned.includes(train.id);
     const selected = ctx.trainId === train.id;
     const eff = K.applyUpgrades(train, ctx.save);
-    const check = K.canBuy(ctx.save, 'train', train.id);
     const maxSpeed = 320, maxCap = 750, maxAccel = 1.3, maxBrake = 1.4;
     const stats = h('div', { class: 'ts-menu__stats' },
       statRow(t('statSpeed'), eff.maxKmh, maxSpeed, eff.maxKmh + ' km/h'),
       statRow(t('statCapacity'), eff.capacity, maxCap, String(eff.capacity)),
       statRow(t('statAccel'), eff.accel, maxAccel, eff.accel.toFixed(2) + ' m/s²'),
       statRow(t('statBrake'), eff.brake, maxBrake, eff.brake.toFixed(2) + ' m/s²'));
-    let action;
-    if (owned) {
-      action = h('button', { type: 'button', class: 'ts-menu__btn', disabled: selected, 'aria-pressed': String(selected), 'data-fid': 'select-' + train.id, 'data-test': 'select-' + train.id, on: { click: () => doSelectTrain(train.id) } }, selected ? '✓ ' + t('selected') : t('select'));
-    } else {
-      action = h('button', { type: 'button', class: 'ts-menu__btn ts-menu__btn--buy', disabled: !check.ok, 'data-fid': 'buy-train-' + train.id, 'data-test': 'buy-train-' + train.id, on: { click: () => doBuy('train', train.id) },
-        title: check.ok ? '' : t('needsMoney') }, t('buy') + ' · ' + money(train.price));
-    }
-    return h('article', { class: 'ts-menu__card', 'data-selected': String(selected && owned), 'data-train': train.id, 'data-owned': String(owned) },
+    const action = h('button', { type: 'button', class: 'ts-menu__btn', disabled: selected, 'aria-pressed': String(selected), 'data-fid': 'select-' + train.id, 'data-test': 'select-' + train.id, on: { click: () => doSelectTrain(train.id) } }, selected ? '✓ ' + t('selected') : t('select'));
+    return h('article', { class: 'ts-menu__card', 'data-selected': String(selected), 'data-train': train.id },
       h('div', { class: 'ts-menu__pick', style: 'cursor:default' },
         h('div', { class: 'ts-menu__stage' }, svgNode(train.silhouette || train.model, eff.livery, 'ts-menu__svg', pick(train.name))),
-        h('div', { class: 'ts-menu__rowHead' }, h('h3', { text: pick(train.name) }), owned ? h('span', { class: 'ts-menu__badge2', text: t('owned') }) : h('span', { class: 'ts-menu__badge2 ts-menu__badge2--gold', text: '🔒' })),
+        h('div', { class: 'ts-menu__rowHead' }, h('h3', { text: pick(train.name) })),
+        train.real ? h('p', { class: 'ts-menu__real', text: pick(train.real) }) : null,
+        train.blurb ? h('p', { class: 'ts-menu__tagline', 'data-test': 'blurb-' + train.id, text: pick(train.blurb) }) : null,
         h('div', { class: 'ts-menu__meta' }, h('span', { text: t('cars', { n: eff.cars }) }), h('span', { text: t('seats', { n: eff.capacity }) }), h('span', { text: t(KIND_KEY[train.kind === 'tram' ? 'tram' : 'rail']) })),
         stats),
       h('div', { class: 'ts-menu__foot' }, action));
@@ -763,6 +749,7 @@
       h('section', { class: 'ts-menu__sec', 'aria-labelledby': 'ts-menu-routes' }, h('h2', { id: 'ts-menu-routes', text: t('routes') }),
         h('div', { class: 'ts-menu__grid ts-menu__grid--routes' }, careerRoutes().map(routeCard))),
       h('section', { class: 'ts-menu__sec', 'aria-labelledby': 'ts-menu-garage' }, h('h2', { id: 'ts-menu-garage', text: t('garage') }),
+        h('p', { class: 'ts-menu__small', text: t(ctx.career === 'tram' ? 'garageInfoTram' : 'garageInfo') }),
         h('div', { class: 'ts-menu__grid ts-menu__grid--trains' }, careerTrains().map(trainCard))),
       upgradesPanel(),
       helpPanel(),

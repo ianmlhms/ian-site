@@ -1,20 +1,20 @@
 /* Career economy of the routes (no driving): expected fare per service from the game's own passenger model (train-sim.js planFor / exchange: boarding by station size, alighting 22 - 55 %,
  * capacity of the train, passenger km along the game track) with career.js' fare formula, per route and train, next to the timetable length and the route price.
- *   node scripts/zuch/career_probe.mjs [--root <repo>] [--train railcar] [route ...]
+ *   node scripts/zuch/career_probe.mjs [--root <repo>] [--train emu] [route ...]
  * Covers the rail routes and the four Luxtram sections. Output: one line per route { stops, km, minutes, passengers, fare (mean base fare of a service, x routeRules.fareScale), perfect (+25 % punctuality +15 % accuracy), eurPerMin, price, runsToBuy } */
 import { openSim } from './zlib.mjs';
 
 const args = process.argv.slice(2);
 const flag = (n, d) => { const i = args.indexOf('--' + n); if (i < 0) return d; const v = args[i + 1]; args.splice(i, 2); return v; };
 const root = flag('root', undefined); const trainFlag = flag('train', '');
-const TRAIN_FOR = { trier: 'kiss', metz: 'z2200', brussels: 'kiss', paris: 'hst', 'luxtram-kierchbierg': 'tram', 'luxtram-stad': 'tram', 'luxtram-sud': 'tram', luxtram: 'tram' };   // the cheapest train the route accepts (config.js routeRules.needs); the others take the free railcar
+const TRAIN_FOR = { trier: 'c2400', metz: 'c2400', brussels: 'c2400', paris: 'hst', 'luxtram-kierchbierg': 'tram', 'luxtram-stad': 'tram', 'luxtram-sud': 'tram', luxtram: 'tram' };   // a train the route accepts (config.js routeRules.needs); the others take the Lokalzuch (emu)
 const BOARD_BASE = { 1: 9, 2: 20, 3: 36 }; const ALIGHT = [0.22, 0.55];
 const sim = await openSim({ quality: 'low', root });
 const routes = args.length ? args : ['west', 'south', 'east', 'wittlich', 'north', 'trier', 'metz', 'brussels', 'paris', 'luxtram-kierchbierg', 'luxtram-stad', 'luxtram-sud', 'luxtram'];
 const rows = [];
 try {
   for (const id of routes) {
-    const trainId = trainFlag || TRAIN_FOR[id] || 'railcar';
+    const trainId = trainFlag || TRAIN_FOR[id] || 'emu';
     await sim.start(id, trainId, { lazy: true });
     const d = await sim.page.evaluate(() => {
       const w = __tsTest.internals().world; const t = w.track;

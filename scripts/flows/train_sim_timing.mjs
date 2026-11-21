@@ -11,10 +11,11 @@ import { runIfMain } from './lib.mjs';
 import { simOnPage } from '../zuch/zlib.mjs';
 import { driveService, summarize } from '../zuch/bot_lib.mjs';
 
-const SAMPLE = [['west', 'railcar'], ['south', 'emu'], ['metz', 'kiss'], ['luxtram-stad', 'tram'], ['luxtram-sud', 'tram']];
+const SAMPLE = [['west', 'emu'], ['south', 'emu'], ['metz', 'c2400'], ['luxtram-stad', 'tram'], ['luxtram-sud', 'tram']];
 const MEDIAN_WAIT_MAX = 5, WAIT_MAX = 12, LATE_MAX_90 = 30, LATE_MAX_85 = 60, EARLY_FREE_S = 10;
-/* measured with scripts/zuch/exchange_probe.mjs (medium quality, means of 8 runs): [train, alighting, boarding, seconds]; the model must stay within 30 % */
-const MEASURED = [['railcar', 25, 25, 31.9], ['railcar', 10, 12, 14.6], ['emu', 25, 25, 15.2], ['emu', 60, 50, 27.1], ['kiss', 40, 40, 18.2], ['ic', 100, 60, 29.5], ['hst', 150, 80, 53.9], ['tram', 25, 25, 24], ['tram', 100, 60, 46.8]];
+/* measured with scripts/zuch/exchange_probe.mjs (medium quality, means of 8 runs): [train, alighting, boarding, seconds]; the model must stay within 30 %
+   (21 Nov 2026 roster: the Schinnebus rows went with the Schinnebus; the KISS row is checked on the Coradia, the same 3 cars x 2 doors a side) */
+const MEASURED = [['emu', 25, 25, 15.2], ['emu', 60, 50, 27.1], ['c2400', 40, 40, 18.2], ['ic', 100, 60, 29.5], ['hst', 150, 80, 53.9], ['tram', 25, 25, 24], ['tram', 100, 60, 46.8]];
 
 export const flow = {
   name: 'train-sim-timing', fullChromium: true,
@@ -59,7 +60,7 @@ export const flow = {
     }
 
     h.step('early departure: the lever may go to power 10 s before the scheduled time; earlier than that is an early departure');
-    await sim.start('west', 'railcar', { lazy: true });
+    await sim.start('west', 'emu', { lazy: true });
     const early = await sim.page.evaluate(() => {
       const w = __tsTest.internals().world, sm = w.sim, P = 20;
       const doorCycle = (idx) => {
@@ -87,7 +88,7 @@ export const flow = {
     h.expect(!early.patient.early && early.patient.departed && early.patient.waitAtGo <= EARLY_FREE_S + 0.2, `going when "clear to depart" shows (${early.patient.waitAtGo.toFixed(1)} s before the scheduled time) is free`);
 
     h.step('HUD: a driver that is ahead of time sees when the way is free, and why he waits');
-    await sim.start('west', 'railcar', { lazy: true });
+    await sim.start('west', 'emu', { lazy: true });
     const hud = await sim.page.evaluate(() => {
       const w = __tsTest.internals().world, sm = w.sim;
       __tsTest.teleport(1); __tsTest.stopAtMarker(-0.8);
@@ -104,7 +105,7 @@ export const flow = {
     h.expect(/fräi an|frei in|Clear to depart in/.test(text.badge), `the badge counts down to "clear to depart": ${text.badge}`);
 
     h.step('resume: a snapshot with the old timetable (30 - 45 s dwell, 75 s origin) still resumes with exactly those times');
-    await sim.start('west', 'railcar', { lazy: true });
+    await sim.start('west', 'emu', { lazy: true });
     const legacy = await sim.page.evaluate(() => {
       __tsTest.teleport(2); __tsTest.stopAtMarker(-0.8);
       if (!__tsTest.saveSnapshot()) return { saved: false };

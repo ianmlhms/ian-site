@@ -71,7 +71,7 @@ export const flow = {
     h.step('device A: a service is running; its first snapshot is uploaded at once to the rail slot');
     let frame = await openTrain(h);
     await waitCareerSave(frame);
-    await frame.evaluate(() => window.__tsTest.startService('west', 'railcar', 'career'));
+    await frame.evaluate(() => window.__tsTest.startService('west', 'emu', 'career'));
     await frame.waitForFunction(() => window.__tsTest.state().phase === 'running' && window.__tsTest.state().simT > 0.3, null, { timeout: 60000 });
     await frame.evaluate(() => window.__tsTest.teleport(1));
     await frame.waitForFunction(() => window.__tsTest.state().atStationIndex === 1 || window.__tsTest.state().s > 100, null, { timeout: 30000 });
@@ -83,7 +83,7 @@ export const flow = {
     h.eq(sent && [sent.user_id, sent.slot], [ME, SLOT], 'user_id and slot (train-sim_rail)');
     // (the running game also saves every few seconds on its own: compare the upload with itself, not with whatever the key holds by now)
     const upload = sent && JSON.parse(sent.data);
-    h.expect(upload && upload.v === 1 && upload.route === 'west' && upload.train === 'railcar' && upload.mode === 'career', 'data is the snapshot text of the running service');
+    h.expect(upload && upload.v === 1 && upload.route === 'west' && upload.train === 'emu' && upload.mode === 'career', 'data is the snapshot text of the running service');
     h.eq(sent && sent.snap_at, upload && new Date(upload.at).toISOString(), 'snap_at is the snapshot time');
     h.expect(first[0] && /on_conflict=user_id(%2C|,)slot/.test(first[0].query), 'upsert on (user_id,slot)');
     h.expect(rows.has(SLOT) && rows.size === 1, 'the table holds exactly that row');
@@ -116,7 +116,7 @@ export const flow = {
     await frame.locator('[data-test="resume-go"]').click();
     await frame.waitForFunction(() => window.__tsTest.state().phase === 'running', null, { timeout: 60000 });
     const resumed = await S(frame);
-    h.eq([resumed.routeId, resumed.trainId, resumed.mode], ['west', 'railcar', 'career'], 'resumed the same route and train');
+    h.eq([resumed.routeId, resumed.trainId, resumed.mode], ['west', 'emu', 'career'], 'resumed the same route and train');
 
     h.step('discarding the service ("Neies Service") deletes the cloud row');
     await frame.evaluate(() => window.__tsTest.toMenu());
@@ -129,7 +129,7 @@ export const flow = {
     h.eq(await h.page.evaluate(() => localStorage.getItem('pb_resume_train-sim_rail')), null, 'and the local key is gone');
 
     h.step('a cloud row that fails the check (expired) is thrown away: locally and in the cloud');
-    const expired = { v: 1, at: Date.now() - 30 * HOUR_MS, mode: 'endless', fresh: 1, route: 'west', train: 'railcar', svc: 3, life: 3000, en: { order: ['west'], i: 0, loops: 0, cash: 0, pts: 0 } };
+    const expired = { v: 1, at: Date.now() - 30 * HOUR_MS, mode: 'endless', fresh: 1, route: 'west', train: 'emu', svc: 3, life: 3000, en: { order: ['west'], i: 0, loops: 0, cash: 0, pts: 0 } };
     rows.set(SLOT, { user_id: ME, slot: SLOT, data: JSON.stringify(expired), snap_at: new Date(expired.at).toISOString(), updated_at: new Date().toISOString() });
     const deletesBefore = calls(h, 'DELETE').length;
     await wipeDevice(h);
@@ -141,7 +141,7 @@ export const flow = {
     h.expect(calls(h, 'DELETE').length > deletesBefore && !rows.has(SLOT), 'the game asked for the row to be deleted and the table no longer has it');
 
     h.step('a local ride the cloud does not have goes up when the train sim opens (older device)');
-    const ride = { v: 1, at: Date.now() - 60000, mode: 'endless', fresh: 1, route: 'west', train: 'railcar', svc: 3, life: 3000, en: { order: await frame.evaluate(() => TS.career.endlessOrder('railcar')), i: 0, loops: 0, cash: 0, pts: 0 } };
+    const ride = { v: 1, at: Date.now() - 60000, mode: 'endless', fresh: 1, route: 'west', train: 'emu', svc: 3, life: 3000, en: { order: await frame.evaluate(() => TS.career.endlessOrder('emu')), i: 0, loops: 0, cash: 0, pts: 0 } };
     await h.page.evaluate((text) => localStorage.setItem('pb_resume_train-sim_rail', text), JSON.stringify(ride));
     const postsBefore = calls(h, 'POST').length;
     frame = await openTrain(h);
@@ -162,8 +162,8 @@ export const flow = {
     frame = h.page.frames().find((f) => f.parentFrame());
     await frame.waitForFunction(() => window.__tsTest.state().phase === 'menu' && !document.getElementById('bootStatus').textContent, null, { timeout: 60000 });
     h.expect(await frame.evaluate(() => window.__pbTestMode === true && window.__tsTest.state().arcadeTest), 'the game is in arcade test mode');
-    await frame.evaluate(() => window.__tsTest.pokeSnapshot(JSON.stringify({ v: 1, at: Date.now(), mode: 'endless', fresh: 1, route: 'west', train: 'railcar', svc: 0, life: 0, en: { order: ['west'], i: 0, loops: 0, cash: 0, pts: 0 } })));
-    await frame.evaluate(() => window.__tsTest.startService('west', 'railcar', 'career'));
+    await frame.evaluate(() => window.__tsTest.pokeSnapshot(JSON.stringify({ v: 1, at: Date.now(), mode: 'endless', fresh: 1, route: 'west', train: 'emu', svc: 0, life: 0, en: { order: ['west'], i: 0, loops: 0, cash: 0, pts: 0 } })));
+    await frame.evaluate(() => window.__tsTest.startService('west', 'emu', 'career'));
     await frame.waitForFunction(() => window.__tsTest.state().phase === 'running', null, { timeout: 60000 });
     await frame.evaluate(() => window.__tsTest.teleport(1));
     await frame.evaluate(() => window.__tsTest.saveSnapshot());
