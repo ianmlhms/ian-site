@@ -4,6 +4,7 @@ side by side or stacked into one phone-readable sheet. The photos are reference 
 never shipped).
 
     ~/Library/Caches/luxtram-work/.venv/bin/python scripts/ski/compare.py OUT.png "label|photo.jpg|shot.png" ...
+    ... "label|photo.jpg|before.png|after.png"   (three stacked: the photo, the game before and after a fix)
 """
 import sys
 
@@ -38,9 +39,13 @@ def main():
     out, pairs = sys.argv[1], sys.argv[2:]
     blocks = []
     for p in pairs:
-        label, photo, shot = p.split("|")
-        a, b = fit(photo), fit(shot)
-        blocks += [bar(label, "Foto (Wikimedia Commons)"), a, bar(label, "Ski Alpen"), b, Image.new("RGB", (W, 18), (246, 246, 243))]
+        parts = p.split("|")
+        label, photo, shots = parts[0], parts[1], parts[2:]
+        blocks += [bar(label, "Foto (Wikimedia Commons)"), fit(photo)]
+        subs = ["Ski Alpen"] if len(shots) == 1 else ["Ski Alpen: virdrun", "Ski Alpen: duerno"]
+        for sub, shot in zip(subs, shots):
+            blocks += [bar(label, sub), fit(shot)]
+        blocks.append(Image.new("RGB", (W, 18), (246, 246, 243)))
     H = sum(x.height for x in blocks)
     sheet = Image.new("RGB", (W, H), (246, 246, 243))
     y = 0

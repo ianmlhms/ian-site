@@ -47,6 +47,7 @@ DERIVED_FOREST = 2150.0            # m: open stands are added below this on shad
 MIN_RUN_LENGTH = 350.0
 MIN_RUN_DROP = 70.0
 SLALOM_COUNT = 4
+BUILDING_NEAR = 160.0              # m: with RESORTS[rid]["buildings"] == "villages", buildings this close to a piste or lift stay
 H_STEP = 0.1                       # height quantum of the baked grids (m)
 MAP_W = 1600
 GROOM_SIGMA = 1.6                  # nodes (8 m): how much a piste smooths the terrain under it
@@ -179,7 +180,7 @@ def build_pistes(frame, dem):
             continue
         t = e.get("tags", {})
         diff = DIFF_OF.get(t.get("piste:difficulty", ""))
-        if not diff or t.get("abandoned") or t.get("piste:abandoned") == "yes":
+        if not diff or t.get("abandoned") or t.get("piste:abandoned") == "yes" or e["id"] in RESORTS[frame.rid].get("skip_ways", ()):
             continue
         p = way_xz(frame, e["geometry"])
         closed = len(p) > 3 and math.hypot(*(p[0] - p[-1])) < 0.5
@@ -711,6 +712,19 @@ def main():
         mark(a["poly"])
     for lf in lifts:
         mark(np.array(lf["pts"]).reshape(-1, 2))
+    if cfg.get("buildings") == "villages":
+        # a big area (3 Vallées): only the buildings of the listed villages and those next to a piste or lift (huts, stations)
+        # are kept, so the valley towns below the ski area (Bozel, Saint-Jean, Moûtiers' outskirts) do not pull in height tiles
+        lift_d = ndimage.distance_transform_edt(~interest) * 40
+        vill = [(*frame.to_world(v[1], v[2]), v[3]) for v in cfg.get("villages", ())]
+        def wanted(b):
+            cx, cz = b["poly"].mean(axis=0)
+            i = min(max(int(cx / 40), 0), interest.shape[1] - 1)
+            j = min(max(int(cz / 40), 0), interest.shape[0] - 1)
+            return lift_d[j, i] <= BUILDING_NEAR or any(math.hypot(cx - vx, cz - vz) <= vr for vx, vz, vr in vill)
+        before = len(buildings)
+        buildings = [b for b in buildings if wanted(b)]
+        log("buildings kept near the villages / pistes", len(buildings), "of", before)
     for b in buildings:
         mark(b["poly"])
     for _, lon, lat, radius in cfg.get("keep", ()):            # landmarks far from the pistes (the Matterhorn) get their 5 m tiles too

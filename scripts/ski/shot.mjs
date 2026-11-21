@@ -2,6 +2,7 @@
 /* Developer tool: open Ski Alpen headless, wait, optionally run JS, save screenshots.
  *   node scripts/ski/shot.mjs OUT_PREFIX [--url "/pb/ski.html?auto=1&bot=1&debug=1&q=high"] [--size 1280x720] [--until running|ready|map]
  *        [--eval "js"] [--at 1500,6000,12000] (ms after "until", one PNG each: OUT_PREFIX-<ms>.png)
+ *        [--poses "name:x,z,above,tx,tz,above2,fov;..." [--wait 6000]] (fixed cameras instead of --at: OUT_PREFIX-<name>.png)
  * Uses the flow harness (local static server, full Chromium). Run it through ~/Library/Caches/browser-slot.py (one browser at a time). */
 import { launchBrowser, startServer } from "../flows/lib.mjs";
 
@@ -29,6 +30,21 @@ try {
   if (err) throw new Error("boot error: " + err);
   console.log(`${until} after ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   if (evalJs) console.log("eval ->", JSON.stringify(await page.evaluate(evalJs)));
+  // --poses "name:x,z,above,tx,tz,above2,fov;name2:..." one fixed camera each (window.__ski.setCamera), OUT_PREFIX-<name>.png after --wait ms
+  const poses = opt("--poses", "");
+  if (poses) {
+    const wait = Number(opt("--wait", "6000"));
+    await page.evaluate(() => { const s = window.__ski; s.game.bot = null; s.setInput({ steer: 0, tuck: 0, brake: 1, push: 0, jump: false }); });
+    for (const item of poses.split(";").filter(Boolean)) {
+      const [name, nums] = item.split(":");
+      const v = nums.split(",").map(Number);
+      await page.evaluate((a) => window.__ski.setCamera(...a), v);
+      await page.waitForTimeout(wait);
+      await page.screenshot({ path: `${out}-${name}.png` });
+      console.log("pose", name, JSON.stringify(await page.evaluate(() => window.__ski.info())));
+    }
+    at.length = 0;
+  }
   let waited = 0;
   for (const ms of at) {
     await page.waitForTimeout(Math.max(0, ms - waited));

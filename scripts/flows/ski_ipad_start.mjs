@@ -5,14 +5,16 @@
  * it (no debug flag, no quality override: the auto level of an iPad = low). Three.js comes from the real CDN, throttled like the rest.
  * Steps, each tapped at once: resort picker up ("ready") -> tap Val d'Isère · Tignes -> piste map, Start live ("start") -> tap Start ->
  * 3-2-1 -> "Lass!" ("skiing"). Gate: the Start button is live within 10 s of opening the page; skiing = that + the 3 s countdown + 1 s.
- * Then the remaining height tiles stream in while skiing; the total is reported. Env SKI_START_REPORT=1 prints the per-file list. */
+ * Then the remaining height tiles stream in while skiing; the total is reported. Env SKI_START_REPORT=1 prints the per-file list;
+ * SKI_RESORT=<id> opens /pb/ski.html?resort=<id> and taps that resort (a returning player of it, or a shared link). */
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import zlib from "node:zlib";
 import { runIfMain, createBackend, mockSupabase, REPO } from "./lib.mjs";
 
-const PAGE = "/pb/ski.html";
+const RESORT = /^[a-z0-9]+$/.test(process.env.SKI_RESORT || "") ? process.env.SKI_RESORT : "";   // SKI_RESORT=zermatt: a returning player of that resort (?resort=)
+const PAGE = RESORT ? `/pb/ski.html?resort=${RESORT}` : "/pb/ski.html";
 const IPAD_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15";
 const MAX_SECONDS = 10;
 const COUNTDOWN_SECONDS = 3;
@@ -76,7 +78,7 @@ export const flow = {
       await h.shot("ipad-picker");
 
       h.step("tap Val d'Isère · Tignes: the piste map; wait until Start is live");
-      await tap(".resort.ready");
+      await tap(RESORT ? `.resort.ready[data-id="${RESORT}"]` : ".resort.ready");
       await page.waitForFunction(() => document.documentElement.dataset.skiStartReady === "1", null, { timeout: 120000, polling: 50 });
       const tStart = Date.now();
       const secStart = (tStart - t0) / 1000;

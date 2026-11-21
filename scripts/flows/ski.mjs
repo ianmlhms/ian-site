@@ -22,11 +22,11 @@ export const flow = {
     const errors = [];
     page.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) errors.push(m.text()); });
 
-    h.step("open: resort picker with one ready resort and four coming");
+    h.step("open: resort picker with three ready resorts and two coming");
     await h.goto(`/pb/ski.html?debug=1&bot=1&timescale=4&q=low`);
     await page.waitForFunction(() => document.documentElement.dataset.skiScreen === "picker" || document.documentElement.dataset.bootError, null, { timeout: 90000 });
     h.eq(await page.evaluate(() => document.documentElement.dataset.bootError || ""), "", "boots without an error");
-    h.eq(await page.$$eval(".resort", (b) => b.map((x) => x.classList.contains("ready"))), [true, false, false, false, false], "Val d'Isère · Tignes ready, four resorts 'geschwënn'");
+    h.eq(await page.$$eval(".resort", (b) => b.map((x) => x.classList.contains("ready"))), [true, true, true, false, false], "Val d'Isère · Tignes, 3 Vallées, Zermatt · Cervinia ready, two resorts 'geschwënn'");
     await h.shot("picker");
 
     h.step("piste map: pick a piste from the list, weather and time controls");
@@ -105,6 +105,26 @@ export const flow = {
     console.log(`    frames p50 ${fr.p50?.toFixed(1)} ms, p95 ${fr.p95?.toFixed(1)} ms, max ${fr.max?.toFixed(1)} ms; ${fr.calls} draw calls, ${fr.triangles} triangles, level ${fr.level}`);
     h.expect(fr.level === "low" && fr.p95 <= 25 && fr.calls <= 160 && fr.triangles <= 450000, `Niddreg: p95 ${fr.p95?.toFixed(1)} ms <= 25, ${fr.calls} draw calls <= 160, ${fr.triangles} triangles <= 450k`);
     await h.shot("low");
+
+    for (const [rid, name] of [["zermatt", "Zermatt · Cervinia"], ["3vallees", "Les 3 Vallées"]]) {
+      h.step(`another resort: back to the picker, pick ${name}: the page reloads onto its piste map`);
+      if (await page.evaluate(() => document.documentElement.dataset.skiScreen !== "map")) {
+        await page.keyboard.press("Escape");
+        await page.waitForSelector("#menuCard");
+        await page.click('#menuCard [data-a="map"]');
+        await page.waitForFunction(() => document.documentElement.dataset.skiScreen === "map", null, { timeout: 10000 });
+      }
+      await page.click('[data-act="back"]');
+      await page.waitForFunction(() => document.documentElement.dataset.skiScreen === "picker", null, { timeout: 10000 });
+      await Promise.all([page.waitForURL(new RegExp(`resort=${rid}`), { timeout: 30000 }), page.click(`.resort.ready[data-id="${rid}"]`)]);
+      await page.waitForFunction(() => document.documentElement.dataset.skiScreen === "map" || document.documentElement.dataset.bootError, null, { timeout: 90000 });
+      h.eq(await page.evaluate(() => document.documentElement.dataset.bootError || ""), "", `${name} boots without an error`);
+      const n = await page.$$eval(".prow", (r) => r.length);
+      const board = await page.evaluate(() => window.__board && window.__board.id);
+      h.expect(n > 60 && new RegExp(`^ski-${rid}-`).test(board || ""), `${n} pistes listed, board ${board}`);
+      await page.waitForFunction(() => document.documentElement.dataset.skiStartReady === "1", null, { timeout: 60000 });
+      await h.shot(`map-${rid}`);
+    }
     h.eq(errors, [], "zero console errors");
   },
 };

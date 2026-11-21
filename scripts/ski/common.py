@@ -57,10 +57,10 @@ RESORTS = {
     },
     # All three valleys: Courchevel / La Tania (east), Méribel / Brides (middle), Les Menuires / Val Thorens / Saint-Martin and the Orelle
     # side down to Plan Bouchet (west and south). Valmorel (west of 6.475), La Plagne / Champagny (north-east) and the Maurienne below
-    # Orelle stay out. near_keep is tighter than Killy's (3 Vallées has twice the pistes; the data budget is ~10 MB).
+    # Orelle stay out. near_keep is tighter than Killy's and only the buildings of the villages below + those next to pistes / lifts are kept (twice the pistes of Killy in a ~10 MB budget).
     "3vallees": {"name": "Les 3 Vallées", "short": "Courchevel · Méribel · Val Thorens", "country": "FR", "crs": "EPSG:2154",
                  "bbox": (45.236, 6.475, 45.456, 6.690), "dem": ["ign-rgealti"], "far": ["ign-rgealti", "copernicus-glo30"],
-                 "near_keep": 420.0,
+                 "near_keep": 250.0, "buildings": "villages",
                  "villages": [
                      ("Courchevel 1850", 6.6345, 45.4150, 850, "chalet"), ("Courchevel Moriond", 6.6480, 45.4235, 450, "chalet"), ("Courchevel Village", 6.6310, 45.4300, 380, "chalet"),
                      ("Courchevel Le Praz", 6.6280, 45.4405, 380, "chalet"), ("La Tania", 6.5935, 45.4315, 380, "chalet"), ("Méribel", 6.5660, 45.3960, 900, "chalet"),
@@ -75,8 +75,10 @@ RESORTS = {
     # "keep" = extra places whose 5 m tiles are always shipped (the Matterhorn itself lies 2-3 km from the nearest piste).
     "zermatt": {"name": "Zermatt · Cervinia", "short": "Matterhorn", "country": "CH", "crs": "EPSG:2056",
                 "bbox": (45.862, 7.600, 46.040, 7.830), "dem": ["swissalti3d", "vda-dtm", "copernicus-glo30"], "far": ["copernicus-glo30"],
-                "near_keep": 520.0,
-                "keep": [("Matterhorn", 7.6586, 45.9763, 1300)],
+                "near_keep": 300.0,
+                "keep": [("Matterhorn", 7.6586, 45.9763, 800)],
+                "skip_ways": [1305881375],                 # OSM piste ways left out: "Grenzpiste (stillgelegt)", closed and ungroomed
+                "start": "riffelalp",                      # the first piste on the map: Riffelberg -> Riffelalp, the Matterhorn ahead
                 "villages": [
                     ("Zermatt", 7.7480, 46.0190, 1250, "chalet"), ("Furi", 7.7300, 46.0040, 260, "chalet"), ("Zum See", 7.7350, 46.0050, 160, "chalet"), ("Riffelalp", 7.7640, 46.0045, 220, "chalet"),
                     ("Riffelberg", 7.7745, 45.9935, 160), ("Gornergrat", 7.7845, 45.9835, 140), ("Findeln", 7.7640, 46.0115, 260, "chalet"), ("Sunnegga", 7.7710, 46.0165, 160),

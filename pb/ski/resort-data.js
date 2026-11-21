@@ -6,8 +6,8 @@ import { decodeGrid, decodeRle } from './codec.js';
 
 export const RESORTS = Object.freeze([
   { id: 'killy', name: "Val d'Isère · Tignes", short: 'Espace Killy', country: 'FR', ready: true },
-  { id: '3vallees', name: 'Les 3 Vallées', short: 'Courchevel · Méribel · Val Thorens', country: 'FR', ready: false },
-  { id: 'zermatt', name: 'Zermatt · Cervinia', short: 'Matterhorn', country: 'CH', ready: false },
+  { id: '3vallees', name: 'Les 3 Vallées', short: 'Courchevel · Méribel · Val Thorens', country: 'FR', ready: true },
+  { id: 'zermatt', name: 'Zermatt · Cervinia', short: 'Matterhorn', country: 'CH', ready: true },
   { id: 'arlberg', name: 'St. Anton · Arlberg', short: 'Ski Arlberg', country: 'AT', ready: false },
   { id: 'kronplatz', name: 'Kronplatz', short: 'Plan de Corones', country: 'IT', ready: false },
 ]);
