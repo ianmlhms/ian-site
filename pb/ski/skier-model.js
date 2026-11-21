@@ -271,13 +271,31 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {})
       sk.edge.rotation.set(Math.PI / 2, 0, 0);
     }
   }
-  /** Pulled up a drag lift: skis on the snow, a little back, the outside hand on the bar's pole. */
-  function poseDrag() {
-    torso.rotation.z = -0.12;
+  /** Pulled up a drag lift (round 7): STANDING upright in the track, leaning back a little against the bar, both skis flat on the
+   *  snow along the slope (the body does not tilt with the slope: that looked like sitting), knees soft, a small sideways wobble; one hand
+   *  on the bar's pole, the poles in the other hand. slopePitch = the track's pitch (rad, + = climbing). */
+  function poseDrag(t, slopePitch) {
+    tilt.rotation.set(0, 0, 0); tilt.position.set(0, 0, 0);
+    lean.rotation.set(Math.sin(t * 1.7) * 0.03, 0, 0);
+    for (let i = 0; i < 2; i++) {
+      const L = legs[i], sk = skis[i];
+      const [a1, kb] = solveLeg(0.84 - ANKLE);
+      const hipX = -(THIGH * Math.sin(a1) + SHIN * Math.sin(a1 - kb));
+      L.hip.position.set(hipX - 0.04, 0.84, L.side * 0.12);
+      L.hip.rotation.set(0, 0, a1); L.knee.rotation.set(0, 0, -kb); L.ankle.rotation.set(0, 0, -(a1 - kb) + slopePitch);
+      sk.g.position.set(0, 0.84 - ANKLE - (THIGH * Math.cos(a1) + SHIN * Math.cos(a1 - kb)), L.side * 0.13);
+      sk.g.rotation.set(0, 0, slopePitch);
+      sk.edge.rotation.set(0, 0, 0);
+    }
+    torso.position.set(-0.08, 0.84, 0);
+    torso.rotation.set(0, 0, 0.12);                          // leaning back against the bar
+    neck.rotation.set(0, 0, -0.05);
     const A = arms[1];
     A.sh.rotation.set(-0.2, 0, 1.55);
     A.elbow.rotation.set(0, 0, 0.45);
     A.pole.rotation.set(0.12, 0, -1.4);
+    const B = arms[0];
+    B.sh.rotation.set(0.15, 0, 0.35); B.elbow.rotation.set(0, 0, 0.5); B.pole.rotation.set(-0.1, 0, -0.6);
   }
 
   /** Two-bone leg: hip at height h above the ankle; returns [hip angle (forward), knee bend, hip x offset]. */
@@ -378,7 +396,7 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {})
     if (hideGear !== gearHidden) { gearHidden = hideGear; for (const p of poles) p.visible = !hideGear; }      // round 7: skis carried, poles away
     if (ride === 'sit') poseSit(t);
     else if (ride === 'stand') poseStand(t);
-    else if (ride === 'drag') poseDrag();
+    else if (ride === 'drag') poseDrag(t, Math.atan2(along, tmp.y));
     // blob under the skis
     if (blob.visible) {
       const gy = ground ? ground(state.x, state.z) : state.y;

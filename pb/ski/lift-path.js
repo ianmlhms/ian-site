@@ -22,7 +22,7 @@ export const LIFT_SPEC = Object.freeze({
   chair: { tower: 10.5, gap: 22, speed: 5, hang: 2.9, side: 2.4, station: [10, 5, 6] },
   gondola: { tower: 15, gap: 55, speed: 6, hang: 4.6, side: 3.0, station: [18, 8, 10] },
   cable: { tower: 34, gap: 0, speed: 10, hang: 6.6, side: 5, station: [22, 12, 14] },
-  drag: { tower: 6.5, gap: 14, speed: 3, hang: 2.5, side: 0, station: [5, 3.5, 4] },
+  drag: { tower: 6.5, gap: 14, speed: 3, hang: 2.5, side: 1.9, station: [5, 3.5, 4] },     // round 7: the track runs beside the pylons, under the arm
   train: { tower: 0, gap: 0, speed: 5, hang: 0, side: 2.1, station: [24, 6, 9] },
 });
 

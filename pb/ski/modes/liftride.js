@@ -43,7 +43,7 @@ export function riderAt(path, s, height, out = {}) {
   out.cx = cx; out.cy = cy; out.cz = cz; out.s = s;
   out.heading = Math.atan2(fz, fx);
   out.pitch = k === 'train' ? Math.atan(path.slope(s)) : 0;
-  if (k === 'drag') { out.x = q.x; out.z = q.z; out.y = height(q.x, q.z); }
+  if (k === 'drag') { out.x = cx; out.z = cz; out.y = height(cx, cz); }               // round 7: in the track beside the pylon line, never through a pylon
   else if (k === 'chair') {
     const slot = Math.min(0.45, 0.25 * Math.max(1, (path.seats || 4) / 2 - 0.5));     // a seat left of the middle
     out.x = cx - fx * 0.05 - rx * slot; out.z = cz - fz * 0.05 - rz * slot; out.y = cy + RIDE.seat.chair;
