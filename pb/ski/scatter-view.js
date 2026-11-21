@@ -24,7 +24,7 @@ function pushCone(pos, nrm, col, cx, y0, y1, r, sides, colour, snow, rot = 0) {
   }
 }
 /* a spruce tier: a cone whose rim zig-zags (branch tips out, gaps in), the tips drooping a little: reads as a fir, not a party hat */
-function pushTier(pos, nrm, col, y0, y1, r, tips, colour, snow, rot = 0) {
+function pushTier(pos, nrm, col, y0, y1, r, tips, colour, snow, rot = 0, under = true) {
   const n = tips * 2;
   for (let i = 0; i < n; i++) {
     const a0 = rot + i / n * Math.PI * 2, a1 = rot + (i + 1) / n * Math.PI * 2;
@@ -40,15 +40,15 @@ function pushTier(pos, nrm, col, y0, y1, r, tips, colour, snow, rot = 0) {
       col.push(colour[0], colour[1], colour[2], p === tip ? snow * 0.5 : snow);
     }
     // underside (dark, no snow): closes the tier seen from below on steep slopes
-    for (const p of [p0, p1, [0, y0 + 0.35, 0]]) { pos.push(p[0], p[1], p[2]); nrm.push(0, -1, 0); col.push(colour[0] * 0.6, colour[1] * 0.6, colour[2] * 0.6, 0); }
+    if (under) for (const p of [p0, p1, [0, y0 + 0.35, 0]]) { pos.push(p[0], p[1], p[2]); nrm.push(0, -1, 0); col.push(colour[0] * 0.6, colour[1] * 0.6, colour[2] * 0.6, 0); }
   }
 }
-function pushPrism(pos, nrm, col, y0, y1, r, sides, colour) {
+function pushPrism(pos, nrm, col, y0, y1, r, sides, colour, rTop = r) {          // R7-D: rTop tapers it (a trunk)
   for (let i = 0; i < sides; i++) {
     const a0 = i / sides * Math.PI * 2, a1 = (i + 1) / sides * Math.PI * 2;
-    const x0 = Math.cos(a0) * r, z0 = Math.sin(a0) * r, x1 = Math.cos(a1) * r, z1 = Math.sin(a1) * r;
+    const c0 = Math.cos(a0), s0 = Math.sin(a0), c1 = Math.cos(a1), s1 = Math.sin(a1);
     const am = (a0 + a1) / 2, nx = Math.cos(am), nz = Math.sin(am);
-    for (const [x, y, z] of [[x0, y0, z0], [x0, y1, z0], [x1, y1, z1], [x0, y0, z0], [x1, y1, z1], [x1, y0, z1]]) {
+    for (const [x, y, z] of [[c0 * r, y0, s0 * r], [c0 * rTop, y1, s0 * rTop], [c1 * rTop, y1, s1 * rTop], [c0 * r, y0, s0 * r], [c1 * rTop, y1, s1 * rTop], [c1 * r, y0, s1 * r]]) {
       pos.push(x, y, z); nrm.push(nx, 0, nz); col.push(colour[0], colour[1], colour[2], 0);
     }
   }
@@ -63,22 +63,87 @@ function build(fn) {
   return g;
 }
 const SPRUCE = [0.13, 0.27, 0.22], SPRUCE_DARK = [0.09, 0.2, 0.17], BARK = [0.3, 0.22, 0.17], LARCH = [0.44, 0.39, 0.35], LARCH_TWIG = [0.36, 0.31, 0.28];
-const spruceNear = () => build((p, n, c) => {
-  pushPrism(p, n, c, -0.3, 1.8, 0.2, 5, BARK);
-  const tiers = [[0.9, 3.6, 2.25, 8], [2.4, 5.0, 1.9, 8], [3.8, 6.4, 1.55, 7], [5.2, 7.8, 1.2, 7], [6.6, 9.6, 0.8, 6]];
-  tiers.forEach(([y0, y1, r, tips], k) => pushTier(p, n, c, y0, y1, r, tips, k % 2 ? SPRUCE : SPRUCE_DARK, 0.72 + k * 0.05, k * 0.9));
-});
-/* far trees (round 5): two stacked cones each, so a far spruce still has a skirt and a top and a far larch stays slim (a single cone read as a party hat) */
-const spruceFar = () => build((p, n, c) => { pushCone(p, n, c, 0, 0.5, 6.4, 2.15, 5, SPRUCE_DARK, 0.62); pushCone(p, n, c, 0, 3.9, 9.6, 1.3, 5, SPRUCE, 0.8, 0.6); });
-/* a larch in winter: a straight trunk and thin layered tiers of bare twigs (open, so the snow behind shows through the gaps) */
-const larchNear = () => build((p, n, c) => {
-  pushPrism(p, n, c, -0.3, 10.2, 0.17, 5, BARK);
-  for (let k = 0; k < 9; k++) {                      // many slim whorls of drooping bare twigs: a narrow, see-through winter larch
-    const y = 1.9 + k * 0.88, r = 1.3 * (1 - k / 10) + 0.18;
-    pushTier(p, n, c, y - 0.35, y + 0.75, r, 5, k % 2 ? LARCH_TWIG : LARCH, 0.2, k * 1.3);
+/* ---- R7-D: near trees with branches (still one instanced draw call per kind; spruce ~230, larch ~330 triangles) ---- */
+/** One triangle whose normal faces `ref` (outwards / up / down), the vertex normal softened towards `soft`; colours rgba (a = snow). */
+function pushTri(pos, nrm, col, a, b, c, ref, soft, ca, cb = ca, cc = ca) {
+  const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+  let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+  if (nx * ref[0] + ny * ref[1] + nz * ref[2] < 0) { [b, c] = [c, b]; [cb, cc] = [cc, cb]; nx = -nx; ny = -ny; nz = -nz; }
+  const l = Math.hypot(nx, ny, nz) || 1;
+  nx = nx / l + soft[0]; ny = ny / l + soft[1]; nz = nz / l + soft[2];
+  const m = Math.hypot(nx, ny, nz) || 1;
+  for (const [p, q] of [[a, ca], [b, cb], [c, cc]]) { pos.push(p[0], p[1], p[2]); nrm.push(nx / m, ny / m, nz / m); col.push(q[0], q[1], q[2], q[3]); }
+}
+/** A small seeded random: the trees look the same on every load. */
+function seeded(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+const shadeOf = (c, k, snow) => [c[0] * k, c[1] * k, c[2] * k, snow];
+/* A spruce / fir tier with real branches: every tip its own length and droop (a few long jagged ones), a shoulder between the trunk and
+ * the tips (the branches go out, then hang), gaps tucked in between the tips, a dark underside. 5 triangles per tip. */
+function pushSpruceTier(pos, nrm, col, rnd, { y0, y1, r, tips, colour, snow, rot, jag = 0.18 }) {
+  const A = [0, y1, 0], T = [], M = [];
+  for (let i = 0; i < tips; i++) {
+    const a = rot + (i + (rnd() - 0.5) * 0.35) / tips * Math.PI * 2;
+    const long = rnd() < jag ? 1.22 : 1;
+    const ri = r * (0.84 + 0.3 * rnd()) * long, droop = 0.16 + 0.34 * rnd() + (long > 1 ? 0.2 : 0);
+    T.push([Math.cos(a) * ri, y0 - droop, Math.sin(a) * ri, a, ri]);
+    const ym = y0 - droop + (y1 - y0 + droop) * 0.5 + (y1 - y0) * 0.16;          // above the straight line apex -> tip: the shoulder
+    M.push([Math.cos(a) * ri * 0.5, ym, Math.sin(a) * ri * 0.5]);
   }
+  const cTip = () => shadeOf(colour, 1.05 + 0.14 * rnd(), snow * (0.5 + 0.4 * rnd()));
+  const cA = shadeOf(colour, 0.82, snow * 0.6), cM = shadeOf(colour, 0.96, snow), cG = shadeOf(colour, 0.78, snow * 0.7), cU = shadeOf(colour, 0.55, 0);
+  const C = [0, y0 + 0.45, 0];
+  for (let i = 0; i < tips; i++) {
+    const j = (i + 1) % tips, t0 = T[i], t1 = T[j], m0 = M[i], m1 = M[j];
+    const ga = (t0[3] + t1[3]) / 2 + (j === 0 ? Math.PI : 0), gr = 0.56 * (t0[4] + t1[4]) / 2;
+    const G = [Math.cos(ga) * gr, y0 + 0.22 + (y1 - y0) * 0.1, Math.sin(ga) * gr];
+    const out0 = [Math.cos(t0[3]), 0.6, Math.sin(t0[3])], outG = [Math.cos(ga), 0.6, Math.sin(ga)];
+    const soft0 = [Math.cos(t0[3]) * 0.45, 0.25, Math.sin(t0[3]) * 0.45], softG = [Math.cos(ga) * 0.45, 0.25, Math.sin(ga) * 0.45];
+    pushTri(pos, nrm, col, A, m0, m1, [0, 1, 0], [0, 0.3, 0], cA, cM, cM);
+    pushTri(pos, nrm, col, m0, t0, G, out0, soft0, cM, cTip(), cG);
+    pushTri(pos, nrm, col, m0, G, m1, outG, softG, cM, cG, cM);
+    pushTri(pos, nrm, col, m1, G, t1, outG, softG, cM, cG, cTip());
+    pushTri(pos, nrm, col, C, t0, t1, [0, -1, 0], [0, -0.3, 0], cU);           // underside: closes the tier seen from below on steep slopes
+  }
+}
+/* One bare larch branch: a drooping spray of twigs, wide at the end (the snow shows through between the branches), both faces. 8 triangles. */
+function pushLarchBranch(pos, nrm, col, rnd, y, a, L, colour, snow) {
+  const ca = Math.cos(a), sa = Math.sin(a), px = -sa, pz = ca;
+  const droop = 0.32 + 0.3 * rnd(), w = 0.34 + 0.16 * rnd();
+  const P = (d, h, s) => [ca * d + px * s, y + h, sa * d + pz * s];
+  const B = P(0.1, 0, 0), ML = P(L * 0.5, 0.1, -w * 0.45), MR = P(L * 0.5, 0.1, w * 0.45);
+  const TL = P(L * 0.95, -droop, -w), TR = P(L * 0.95, -droop, w), TT = P(L * 1.08, -droop - 0.22, 0);
+  const top = shadeOf(colour, 0.95 + 0.15 * rnd(), snow), tip = shadeOf(colour, 1.12, snow * 0.4), under = shadeOf(colour, 0.62, 0);
+  for (const [face, c0, c1] of [[1, top, tip], [-1, under, under]]) {
+    const ref = [0, face, 0], soft = [ca * 0.3, 0.3 * face, sa * 0.3];
+    pushTri(pos, nrm, col, B, ML, MR, ref, soft, c0);
+    pushTri(pos, nrm, col, ML, TL, TT, ref, soft, c0, c1, c1);
+    pushTri(pos, nrm, col, ML, TT, MR, ref, soft, c0, c1, c0);
+    pushTri(pos, nrm, col, MR, TT, TR, ref, soft, c0, c1, c1);
+  }
+}
+const spruceNear = () => build((p, n, c) => {
+  const rnd = seeded(7);
+  pushPrism(p, n, c, -0.3, 2.2, 0.21, 5, BARK, 0.15);                               // the trunk shows under the lowest skirt
+  const tiers = [[1.15, 3.3, 2.35, 9, 0.3], [2.3, 4.6, 2.05, 9, 0.22], [3.5, 5.8, 1.72, 8, 0.18], [4.7, 7.0, 1.36, 7, 0.12], [5.9, 8.25, 1.0, 6, 0.1], [7.05, 9.35, 0.64, 5, 0]];
+  tiers.forEach(([y0, y1, r, tips, jag], k) => pushSpruceTier(p, n, c, rnd, { y0, y1, r, tips, jag, colour: k % 2 ? SPRUCE : SPRUCE_DARK, snow: 0.7 + k * 0.05, rot: k * 0.9 + rnd() }));
+  pushCone(p, n, c, 0, 9.0, 10.1, 0.18, 3, SPRUCE, 0.5);                            // the leader
+});
+/* far trees (round 5): two stacked cones each, so a far spruce still has a skirt and a top and a far larch stays slim (a single cone read
+ * as a party hat); R7-D: the far skirt zig-zags too (no underside), so the near / far switch keeps the silhouette */
+const spruceFar = () => build((p, n, c) => { pushTier(p, n, c, 0.7, 6.4, 2.2, 5, SPRUCE_DARK, 0.62, 0, false); pushTier(p, n, c, 3.9, 9.6, 1.3, 4, SPRUCE, 0.8, 0.6, false); });
+/* a larch in winter: a straight tapering trunk to the top and whorls of bare drooping branches, airy: the snow behind shows through */
+const larchNear = () => build((p, n, c) => {
+  const rnd = seeded(11);
+  pushPrism(p, n, c, -0.3, 10.6, 0.2, 5, BARK, 0.05);
+  for (let k = 0; k < 8; k++) {
+    const y = 1.8 + k * 1.05, L = 1.6 * (1 - k / 9) + 0.32, n5 = k < 6 ? 5 : 4;
+    for (let b = 0; b < n5; b++) pushLarchBranch(p, n, c, rnd, y + (rnd() - 0.5) * 0.3, k * 2.4 + (b + (rnd() - 0.5) * 0.5) / n5 * Math.PI * 2, L * (0.85 + 0.3 * rnd()), b % 2 ? LARCH_TWIG : LARCH, 0.22);
+  }
+  pushCone(p, n, c, 0, 9.9, 11.0, 0.22, 3, LARCH_TWIG, 0.2);
 });
 const larchFar = () => build((p, n, c) => { pushPrism(p, n, c, -0.3, 3.0, 0.16, 4, BARK); pushCone(p, n, c, 0, 1.6, 7.0, 1.25, 5, LARCH_TWIG, 0.25); pushCone(p, n, c, 0, 4.6, 10.0, 0.75, 5, LARCH, 0.3, 0.6); });
+/** R7-D: the tree geometries (the look checks count their triangles). */
+export const TREE_GEOMETRY = Object.freeze({ spruceNear, spruceFar, larchNear, larchFar });
 
 function rockGeometry() {
   const g = new THREE.IcosahedronGeometry(1, 1);

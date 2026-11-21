@@ -54,6 +54,11 @@ const PLAN_A = Object.freeze([
 ]);
 const PLAN_B = Object.freeze([[268, 'kicker', 'M', -1], [270, 'rail', 'rail', 1], [308, 'kicker', 'L', 0]]);
 const PIPE_AT = 266, PIPE_MAX = 135;
+/* R7-D: the meshes' extents: the ramps' side walls, the pipe deck beside the lips, the trough under the pipe (terrain only): in / out of
+ * the lip line, how far past the pipe's ends, how much deeper than the pipe */
+const RAMP_SIDE = 0.7;
+export const PIPE_DECK = 4.6;               // > TROUGH.out + the lattice's diagonal (3.54 m): the trough's slope never reaches the deck's rim
+const TROUGH = Object.freeze({ in: 1.0, out: 0.5, ends: 4, extra: 0.5, cover: 4 });
 
 /** The park layout of a resort (null when resort.json has no park). */
 export function createParkLayout(site) {
@@ -86,7 +91,7 @@ export function createParkLayout(site) {
       const k = KICKERS[size];
       const end = s + k.run + k.table + k.land;
       if (end > len - 12) continue;
-      kickers.push({ s0: s, size, v, ...k, end, id: kickers.length, lip: s + k.run, lipSlope: LIP_POW * k.h / k.run });
+      kickers.push({ s0: s, size, v, ...k, end, id: kickers.length, lip: s + k.run, lipSlope: LIP_POW * k.h / k.run, side: clamp(k.h * 0.8, 0.9, 2.4) });   // R7-D: side = the side walls' width
       lastEnd = Math.max(lastEnd, end);
     } else {
       const r = RAIL[kind];
@@ -101,37 +106,55 @@ export function createParkLayout(site) {
   const pipe = withPipe ? { ...PIPE, s0: PIPE_AT, s1: Math.min(len - 4, PIPE_AT + PIPE_MAX) } : null;
   const deck = PIPE.flat / 2 + PIPE.wall;
 
-  /** Extra height of the features at local (s, v) over the flattened ground (lod fades them out on coarse far tiles). */
+  /* R7-D: the kickers, the rail ramps and the halfpipe are real meshes now (modes/views.js createParkView), built from these analytic
+   * shapes, and the physics reads the same shapes (solidAt, through surface.js): drawn == skied, crisp lips, straight side walls, a
+   * smooth pipe. The terrain lattice under them only keeps the flattened corridor plus a trough under the pipe (cut deeper than the
+   * pipe's own surface, so the 2.5 m lattice never shows through the curved walls). */
+  const kickerAlong = (k, t) => (t < k.run ? Math.pow(t / k.run, LIP_POW) : t < k.run + k.table ? 1 : 1 - smoothstep(0, 1, (t - k.run - k.table) / k.land));
+  const rampAlong = (r, s) => (s <= r.s1 ? smoothstep(r.s0 - 0.5, r.s1, s) : 1 - smoothstep(r.s1, r.s1 + 0.6, s));
+  /** across share of a crisp snow body: flat top |dv| <= half, straight side walls `side` m wide */
+  const crisp = (dv, half, side) => { const a = Math.abs(dv); return a <= half ? 1 : Math.max(0, 1 - (a - half) / side); };
+  const pipeDepthK = (s) => (s < pipe.s0 ? smoothstep(pipe.s0 - pipe.inRamp, pipe.s0, s) : s > pipe.s1 ? 1 - smoothstep(pipe.s1, pipe.s1 + pipe.outRamp, s) : 1);
+  /** The pipe surface at (s, v) under the deck (<= 0). */
+  function pipeHeight(s, v) {
+    if (!pipe || s <= pipe.s0 - pipe.inRamp || s >= pipe.s1 + pipe.outRamp) return 0;
+    const av = Math.abs(v);
+    if (av >= deck) return 0;
+    const t = av < pipe.flat / 2 ? 0 : (av - pipe.flat / 2) / pipe.wall;
+    return -pipe.depth * pipeDepthK(s) * (1 - t * t);
+  }
+  /** Extra height of the features at local (s, v) over the flattened ground: what is drawn and what is skied. */
   function featureHeight(s, v) {
     let h = 0;
     for (const k of kickers) {
       if (s < k.s0 || s > k.end) continue;
-      const across = 1 - smoothstep(k.w / 2 - 1.2, k.w / 2 + 1.6, Math.abs(v - k.v));
-      if (across <= 0) continue;
-      const t = s - k.s0;
-      let along;
-      if (t < k.run) along = Math.pow(t / k.run, LIP_POW);
-      else if (t < k.run + k.table) along = 1;
-      else along = 1 - smoothstep(0, 1, (t - k.run - k.table) / k.land);
-      h = Math.max(h, k.h * along * across);
+      const across = crisp(v - k.v, k.w / 2, k.side);
+      if (across > 0) h = Math.max(h, k.h * kickerAlong(k, s - k.s0) * across);
     }
     for (const r of ramps) {
       if (s < r.s0 - 0.5 || s > r.s1 + 0.6) continue;
-      const across = 1 - smoothstep(r.w / 2 - 0.4, r.w / 2 + 0.9, Math.abs(v - r.v));
-      if (across <= 0) continue;
-      const along = s <= r.s1 ? smoothstep(r.s0 - 0.5, r.s1, s) : 1 - smoothstep(r.s1, r.s1 + 0.6, s);
-      h = Math.max(h, r.h * along * across);
+      const across = crisp(v - r.v, r.w / 2, RAMP_SIDE);
+      if (across > 0) h = Math.max(h, r.h * rampAlong(r, s) * across);
     }
-    if (pipe && s > pipe.s0 - pipe.inRamp && s < pipe.s1 + pipe.outRamp) {
-      const depthK = s < pipe.s0 ? smoothstep(pipe.s0 - pipe.inRamp, pipe.s0, s) : s > pipe.s1 ? 1 - smoothstep(pipe.s1, pipe.s1 + pipe.outRamp, s) : 1;
-      const av = Math.abs(v);
-      if (av < deck) {
-        const t = av < pipe.flat / 2 ? 0 : (av - pipe.flat / 2) / pipe.wall;
-        h -= pipe.depth * depthK * (1 - t * t);
-      }
-    }
-    return h;
+    return h + pipeHeight(s, v);
   }
+  /** What the terrain lattice gets: only the trough under the pipe (deeper than the pipe and wider, hidden by the pipe mesh). */
+  function terrainExtra(s, v) {
+    if (!pipe || s <= pipe.s0 - pipe.inRamp - TROUGH.ends || s >= pipe.s1 + pipe.outRamp + TROUGH.ends) return 0;
+    const av = Math.abs(v), edge = deck + TROUGH.out;
+    if (av >= edge) return 0;
+    const ends = smoothstep(pipe.s0 - pipe.inRamp - TROUGH.ends, pipe.s0 - TROUGH.ends * 0.3, s) * (1 - smoothstep(pipe.s1 + TROUGH.ends * 0.3, pipe.s1 + pipe.outRamp + TROUGH.ends, s));
+    const across = av <= deck - TROUGH.in ? 1 : (edge - av) / (TROUGH.in + TROUGH.out);
+    return -(pipe.depth + TROUGH.extra) * ends * across;
+  }
+  /** The footprint boxes of the meshes: inside one, the physics reads the analytic shape (solidAt). */
+  const boxes = [
+    ...kickers.map((k) => [k.s0 - 0.5, k.end + 0.5, k.v - k.w / 2 - k.side - 0.5, k.v + k.w / 2 + k.side + 0.5]),        // R7-D: each box 0.5 m wider than its mesh
+    ...ramps.map((r) => [r.s0 - 1, r.s1 + 1.1, r.v - r.w / 2 - RAMP_SIDE - 0.5, r.v + r.w / 2 + RAMP_SIDE + 0.5]),
+    ...(pipe ? [[pipe.s0 - pipe.inRamp - TROUGH.ends - TROUGH.cover - 0.5, pipe.s1 + pipe.outRamp + TROUGH.ends + TROUGH.cover + 0.5, -deck - PIPE_DECK - 0.5, deck + PIPE_DECK + 0.5]] : []),
+  ];
+  /** the pipe mesh's extent along the line (the trough + its lattice slope + a margin) */
+  const pipeSpan = pipe ? [pipe.s0 - pipe.inRamp - TROUGH.ends - TROUGH.cover, pipe.s1 + pipe.outRamp + TROUGH.ends + TROUGH.cover] : null;
 
   const q = { s: 0, v: 0 };
   /** 0..1: the share of the park ground at (x, z) (the corridor, feathered at the sides and the ends). */
@@ -148,8 +171,14 @@ export function createParkLayout(site) {
     const m = mask(x, z);
     if (m <= 0) return base;
     const flat = base + (profileAt(q.s) - base) * m;
-    const k = 1 - smoothstep(2.5, 12, lod);
-    return k > 0 ? flat + featureHeight(q.s, q.v) * k : flat;
+    return flat + terrainExtra(q.s, q.v) * m;          // R7-D: the features are meshes; the trough is kept on every level (the pipe mesh covers it)
+  }
+  /** R7-D: the analytic snow surface where a park mesh lies (kickers, ramps, the pipe and its deck), NaN elsewhere (then the lattice). */
+  function solidAt(x, z) {
+    local(x, z, q);
+    if (q.s < -30 || q.s > len + 30 || Math.abs(q.v) > hw) return NaN;
+    for (const b of boxes) if (q.s >= b[0] && q.s <= b[1] && q.v >= b[2] && q.v <= b[3]) return profileAt(q.s) + featureHeight(q.s, q.v);
+    return NaN;
   }
 
   /** The run line (a piste for game.js / pistes.js: projection, respawn, the START / ZIL arches). */
@@ -168,6 +197,7 @@ export function createParkLayout(site) {
   return {
     site, name: site.name || 'Snowpark', len, hw, ux, uz, x0, z0, kickers, rails, ramps, pipe, run, deck,
     profileAt, featureHeight, mask, shape, local, world, railTop, featureAt,
+    solidAt, terrainExtra, kickerAlong, rampAlong, boxes, pipeSpan, rampSide: RAMP_SIDE, pipeDeck: PIPE_DECK, trough: TROUGH,      // R7-D
     top: world(-4, 0), bottom: world(len, 0),
     heading: Math.atan2(uz, ux),
   };

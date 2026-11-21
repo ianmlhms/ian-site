@@ -133,10 +133,113 @@ function boardGeometry(quads) {
   return geo;
 }
 
-/** layout = park.js createParkLayout; height(x, z) = the snow (surface.height). Returns { mesh, rebuild(), dispose() }. */
-export function createParkView({ scene, layout, height }) {
+/* ---------------- R7-D: the park's snow bodies as real meshes ----------------
+ * Kickers (run-up curve, sharp lip, flat table, rounded knuckle, landing, straight side walls), the rail ramps, the halfpipe (flat,
+ * curved walls, a crisp lip, a deck either side). Every vertex is the analytic shape of modes/park.js (`layout.featureHeight` over the
+ * profile), which the physics reads too (surface.js -> layout.solidAt): drawn == skied. Each surface is its own patch (shared vertices
+ * inside a patch: smooth light; none across a lip or a wall edge: crisp edges). The outer rim sinks a little into the terrain (no seam,
+ * no z-fight). One merged geometry, drawn with the terrain's painted snow material (aInfo = groomed piste, aExtra = the park's line). */
+const SINK = 0.06, LIFT = 0.008;
+export function parkSnowGeometry(layout) {
+  const pos = [], nrm = [], info = [], extra = [], idx = [];
+  const { ux, uz } = layout;
+  /** a patch: rows along s (sList), columns across (cols(s) -> [[v, y, sink?, occ], ...]); smooth normals inside the patch */
+  function patch(sList, cols) {
+    const base = pos.length / 3;
+    let n = 0;
+    for (const s of sList) {
+      const row = cols(s);
+      n = row.length;
+      for (const [v, y, sink, occ = 0] of row) {
+        const p = layout.world(s, v);
+        pos.push(p.x, y + (sink ? -SINK : LIFT), p.z);
+        info.push(1, 0, 0, 0); extra.push(ux, uz, occ, 0); nrm.push(0, 0, 0);
+      }
+    }
+    for (let i = 0; i < sList.length - 1; i++) for (let j = 0; j < n - 1; j++) {
+      const a = base + i * n + j, b = a + 1, c = a + n, d = c + 1;
+      idx.push(a, b, c, b, d, c);                 // counter-clockwise seen from above (v runs to the left of s)
+    }
+  }
+  const ground = (s) => layout.profileAt(s);
+  const range = (a, b, step) => { const out = []; const n = Math.max(1, Math.ceil((b - a) / step)); for (let i = 0; i <= n; i++) out.push(a + (b - a) * i / n); return out; };
+  // kickers: top (run-up | table + knuckle + landing), two side walls (same split), so the lip and the wall edges stay crisp
+  for (const k of layout.kickers) {
+    const hw = k.w / 2, out = hw + k.side;
+    const runS = range(0, 1, 1 / 18).map((q) => k.s0 + k.run * (1 - Math.pow(1 - q, 1.6)));         // denser towards the lip
+    const restS = [...range(k.lip, k.lip + k.table, 1.5), ...range(k.lip + k.table, k.end, 0.9).slice(1)];
+    const top = (s) => ground(s) + k.h * layout.kickerAlong(k, s - k.s0);
+    const atEnd = (s) => s <= k.s0 + 1e-6 || s >= k.end - 1e-6;
+    for (const sList of [runS, restS]) {
+      patch(sList, (s) => [-hw, -hw / 2, 0, hw / 2, hw].map((dv) => [k.v + dv, top(s), atEnd(s)]));
+      for (const side of [-1, 1]) patch(sList, (s) => (side < 0 ? [[k.v - out, ground(s), true], [k.v - hw, top(s), atEnd(s)]] : [[k.v + hw, top(s), atEnd(s)], [k.v + out, ground(s), true]]));
+    }
+  }
+  // the ramps in front of the rails / boxes: one top (it rises, then drops just before the rail) and two side walls
+  for (const r of layout.ramps) {
+    const hw = r.w / 2, out = hw + layout.rampSide;
+    const sList = [...range(r.s0 - 0.5, r.s1 - 0.6, 0.8), ...range(r.s1 - 0.6, r.s1 + 0.6, 0.2).slice(1)];
+    const top = (s) => ground(s) + r.h * layout.rampAlong(r, s);
+    const atEnd = (s) => s <= r.s0 - 0.5 + 1e-6 || s >= r.s1 + 0.6 - 1e-6;
+    patch(sList, (s) => [-hw, 0, hw].map((dv) => [r.v + dv, top(s), atEnd(s)]));
+    for (const side of [-1, 1]) patch(sList, (s) => (side < 0 ? [[r.v - out, ground(s), true], [r.v - hw, top(s), atEnd(s)]] : [[r.v + hw, top(s), atEnd(s)], [r.v + out, ground(s), true]]));
+  }
+  // the halfpipe: inside (wall - flat - wall) and the two decks, along the whole trough under it
+  const P = layout.pipe;
+  if (P) {
+    const deck = layout.deck, edge = deck + layout.pipeDeck;
+    const [a, b] = layout.pipeSpan;
+    const sList = [...range(a, P.s0, 1), ...range(P.s0, P.s1, 2).slice(1), ...range(P.s1, b, 1).slice(1)];
+    const atEnd = (s) => s <= a + 1e-6 || s >= b - 1e-6;
+    const wall = [];
+    for (let i = 0; i <= 14; i++) { const t = 1 - i / 14; wall.push(P.flat / 2 + P.wall * (1 - Math.pow(1 - t, 1.35))); }   // denser towards the lip (steepest)
+    const across = [...wall.map((v) => -v), -P.flat / 4, 0, P.flat / 4, ...wall.slice().reverse()];
+    patch(sList, (s) => across.map((v) => {
+      const tt = Math.max(0, Math.abs(v) - P.flat / 2) / P.wall, h = layout.featureHeight(s, v);
+      return [v, ground(s) + h, atEnd(s), 0.35 * (1 - tt) * Math.min(1, -h)];             // a little sky light less down in the pipe
+    }));
+    for (const side of [-1, 1]) patch(sList, (s) => [side * deck, side * (deck + 1.2), side * (edge - 0.8), side * edge].sort((p, q) => p - q).map((v) => [v, ground(s), Math.abs(v) >= edge - 1e-6 || atEnd(s)]));
+  }
+  // normals: area-weighted, per patch (vertices are not shared across patches)
+  for (let i = 0; i < idx.length; i += 3) {
+    const [a, b, c] = [idx[i] * 3, idx[i + 1] * 3, idx[i + 2] * 3];
+    const e1x = pos[b] - pos[a], e1y = pos[b + 1] - pos[a + 1], e1z = pos[b + 2] - pos[a + 2];
+    const e2x = pos[c] - pos[a], e2y = pos[c + 1] - pos[a + 1], e2z = pos[c + 2] - pos[a + 2];
+    const nx = e1y * e2z - e1z * e2y, ny = e1z * e2x - e1x * e2z, nz = e1x * e2y - e1y * e2x;
+    for (const o of [a, b, c]) { nrm[o] += nx; nrm[o + 1] += ny; nrm[o + 2] += nz; }
+  }
+  for (let o = 0; o < nrm.length; o += 3) {
+    let [x, y, z] = [nrm[o], nrm[o + 1], nrm[o + 2]];
+    if (y < 0) { x = -x; y = -y; z = -z; }
+    const l = Math.hypot(x, y, z) || 1;
+    nrm[o] = x / l; nrm[o + 1] = y / l || 1; nrm[o + 2] = z / l;
+  }
+  return { pos, nrm, info, extra, idx };
+}
+
+/** layout = park.js createParkLayout; height(x, z) = the snow (surface.height); snowMaterial() = the terrain's painted snow (R7-D).
+ *  Returns { mesh, rebuild(), dispose() }. */
+export function createParkView({ scene, layout, height, snowMaterial = null }) {
   const mat = new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x2a2622 });      // a little self-light: the nets and rails read in the shade
-  let mesh = null, boards = null;
+  let mesh = null, boards = null, snow = null;
+  const fallbackSnow = new THREE.MeshLambertMaterial({ color: 0xf2f5fa });
+  const snowMat = () => (snowMaterial && snowMaterial()) || fallbackSnow;
+  function buildSnow() {
+    const g = parkSnowGeometry(layout);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(g.pos, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(g.nrm, 3));
+    geo.setAttribute('aInfo', new THREE.Float32BufferAttribute(g.info, 4));
+    geo.setAttribute('aExtra', new THREE.Float32BufferAttribute(g.extra, 4));
+    geo.setIndex(g.idx);
+    geo.computeBoundingSphere();
+    if (snow) { scene.remove(snow); snow.geometry.dispose(); }
+    snow = new THREE.Mesh(geo, snowMat());
+    snow.name = 'ski-park-snow';
+    snow.castShadow = true;
+    snow.frustumCulled = true;
+    scene.add(snow);
+  }
   const boardMat = new THREE.MeshLambertMaterial({ map: parkAtlas(layout.name), side: THREE.DoubleSide, emissive: 0x3a3a3a });
   const yaw = layout.heading;
   function build() {
@@ -174,31 +277,33 @@ export function createParkView({ scene, layout, height }) {
         parts.push([new THREE.BoxGeometry(0.08, h, r.kind === 'rail' ? 0.08 : r.half * 1.6), PARK_COL.leg, place(p.x, ground - 0.3 + h / 2, p.z, yaw)]);
       }
     }
-    // kickers: the snow shape is terrain (physics); here it gets what makes it read as a built kicker: a coloured lip board, cut side
-    // cheeks along the run-up (packed-snow walls with a coloured top edge), a landing line at the knuckle, flags at the lip, a size sign
+    // kickers (R7-D: the snow body is parkSnowGeometry): a coloured strip on the lip, coloured edges along the run-up and the table,
+    // a landing line at the knuckle, flags beside the lip, a size sign
     const quads = [];
     for (const k of layout.kickers) {
       const col = SIZE_COL[k.size] || PARK_COL.paint;
-      const p = at(k.lip, k.v);
-      parts.push([new THREE.BoxGeometry(0.5, 0.18, k.w - 1.8), col, place(p.x, height(p.x, p.z) + 0.05, p.z, yaw)]);
+      const hw = k.w / 2;
+      const yOn = (s, v) => { const p = at(s, v); return height(p.x, p.z); };
+      const slopeAt = (s) => Math.atan2(layout.profileAt(s + 1) - layout.profileAt(s - 1), 2);
+      const p = at(k.lip - 0.15, k.v);
+      parts.push([new THREE.BoxGeometry(0.34, 0.07, k.w + 0.02), col, place(p.x, yOn(k.lip + 0.02, k.v) - 0.015, p.z, yaw, slopeAt(k.lip))]);
       const kn = at(k.s0 + k.run + k.table, k.v);
-      parts.push([new THREE.BoxGeometry(0.35, 0.08, k.w - 1.8), col, place(kn.x, height(kn.x, kn.z) + 0.03, kn.z, yaw)]);
+      parts.push([new THREE.BoxGeometry(0.35, 0.05, k.w - 0.4), col, place(kn.x, yOn(k.s0 + k.run + k.table, k.v) + 0.005, kn.z, yaw, slopeAt(k.s0 + k.run + k.table))]);
       for (const side of [-1, 1]) {
-        const vIn = k.v + side * (k.w / 2 - 1.0), vOut = k.v + side * (k.w / 2 + 2.4);
-        const n = 6, sFrom = k.s0 + k.run * 0.3, sTo = k.lip + 0.5;
-        for (let i = 0; i < n; i++) {
-          const sA = sFrom + (sTo - sFrom) * i / n, sB = sFrom + (sTo - sFrom) * (i + 1) / n, len = sB - sA;
-          const a = at(sA, vIn), b = at(sB, vIn), m = at((sA + sB) / 2, vIn), o = at((sA + sB) / 2, vOut);
-          const ya = height(a.x, a.z), yb = height(b.x, b.z), top = (ya + yb) / 2, rise = top - height(o.x, o.z);
-          if (rise < 0.2) continue;
-          const pitch = Math.atan2(yb - ya, len);
-          parts.push([new THREE.BoxGeometry(len + 0.05, rise + 1.2, 0.16), PARK_COL.cut, place(m.x, top - (rise + 1.2) / 2, m.z, yaw, pitch)]);
-          parts.push([new THREE.BoxGeometry(len + 0.05, 0.08, 0.24), col, place(m.x, top + 0.03, m.z, yaw, pitch)]);
+        const vE = k.v + side * (hw - 0.06);
+        const n = 7, sFrom = k.s0 + k.run * 0.35;
+        const edgeS = [];
+        for (let i = 0; i <= n; i++) edgeS.push(sFrom + (k.lip - sFrom) * Math.pow(i / n, 0.8));
+        edgeS.push(k.lip + k.table);
+        for (let i = 0; i < edgeS.length - 1; i++) {
+          const sA = edgeS[i], sB = edgeS[i + 1], ya = yOn(sA, vE), yb = yOn(Math.min(sB, k.lip + k.table) - (i === n - 1 ? 0.01 : 0), vE);
+          const len = Math.hypot(sB - sA, yb - ya), m = at((sA + sB) / 2, vE);
+          parts.push([new THREE.BoxGeometry(len + 0.04, 0.05, 0.14), col, place(m.x, (ya + yb) / 2 + 0.005, m.z, yaw, Math.atan2(yb - ya, sB - sA))]);
         }
-        const f = at(k.lip, k.v + side * (k.w / 2 + 0.2));
+        const f = at(k.lip, k.v + side * (hw + k.side + 0.35));
         const fg = height(f.x, f.z);
-        parts.push([new THREE.CylinderGeometry(0.035, 0.035, 2.6, 6), PARK_COL.leg, place(f.x, fg + 1.1, f.z)]);
-        parts.push([new THREE.BoxGeometry(0.7, 0.42, 0.03), col, place(f.x, fg + 2.15, f.z, yaw).multiply(m4().makeTranslation(-0.36, 0, 0))]);
+        parts.push([new THREE.CylinderGeometry(0.035, 0.035, 2.6 + k.h * 0.6, 6), PARK_COL.leg, place(f.x, fg + 1.1 + k.h * 0.3, f.z)]);
+        parts.push([new THREE.BoxGeometry(0.7, 0.42, 0.03), col, place(f.x, fg + 2.15 + k.h * 0.6, f.z, yaw).multiply(m4().makeTranslation(-0.36, 0, 0))]);
       }
       // the size sign, a few metres before the run-up on the outer side
       const out = k.v >= 0 ? 1 : -1;
@@ -210,10 +315,10 @@ export function createParkView({ scene, layout, height }) {
     }
     // the halfpipe: an orange coping along both lips, a sign at its entry
     if (layout.pipe) {
-      for (let s = layout.pipe.s0; s < layout.pipe.s1; s += 4) for (const side of [-1, 1]) {
-        const a = at(s, side * (layout.deck - 0.3)), b = at(Math.min(layout.pipe.s1, s + 4), side * (layout.deck - 0.3)), m = at(Math.min(layout.pipe.s1, s + 2), side * (layout.deck - 0.3));
-        const ya = height(a.x, a.z), yb = height(b.x, b.z);
-        parts.push([new THREE.BoxGeometry(4.05, 0.14, 0.22), PARK_COL.coping, place(m.x, (ya + yb) / 2 + 0.05, m.z, yaw, Math.atan2(yb - ya, 4))]);
+      for (let s = layout.pipe.s0 - 2; s < layout.pipe.s1 + 2; s += 4) for (const side of [-1, 1]) {     // R7-D: right on the lip line
+        const v = side * layout.deck, sB = Math.min(layout.pipe.s1 + 2, s + 4);
+        const ya = layout.profileAt(s), yb = layout.profileAt(sB), m = at((s + sB) / 2, v);
+        parts.push([new THREE.BoxGeometry(sB - s + 0.05, 0.1, 0.24), PARK_COL.coping, place(m.x, (ya + yb) / 2 + 0.02, m.z, yaw, Math.atan2(yb - ya, sB - s))]);
       }
       const pp = at(layout.pipe.s0 - 6, layout.deck + 1.2);
       const pg = height(pp.x, pp.z);
@@ -240,6 +345,7 @@ export function createParkView({ scene, layout, height }) {
     quads.push([bw, bw / 4, place(gp.x, gy + 8.1 - bw / 8, gp.z, yaw).multiply(m4().makeTranslation(-0.08, 0, 0)), 0, 0.5, 1, 1]);
     quads.push([bw, bw / 4, place(gp.x, gy + 8.1 - bw / 8, gp.z, yaw + Math.PI).multiply(m4().makeTranslation(-0.08, 0, 0)), 0, 0.5, 1, 1]);
     const geo = mergeParts(parts);
+    buildSnow();
     if (mesh) { scene.remove(mesh); mesh.geometry.dispose(); }
     if (boards) { scene.remove(boards); boards.geometry.dispose(); }
     boards = new THREE.Mesh(boardGeometry(quads), boardMat);
@@ -253,9 +359,13 @@ export function createParkView({ scene, layout, height }) {
   build();
   return {
     get mesh() { return mesh; },
+    get snow() { return snow; },
     rebuild: build,
-    setVisible(v) { if (mesh) mesh.visible = v; if (boards) boards.visible = v; },
-    update(cx, cz, radius) { if (mesh) { mesh.visible = Math.hypot(cx - layout.x0, cz - layout.z0) < radius + layout.len; if (boards) boards.visible = mesh.visible; } },
-    dispose() { if (mesh) { scene.remove(mesh); mesh.geometry.dispose(); } if (boards) { scene.remove(boards); boards.geometry.dispose(); } mat.dispose(); boardMat.map.dispose(); boardMat.dispose(); },
+    setVisible(v) { if (mesh) mesh.visible = v; if (boards) boards.visible = v; if (snow) snow.visible = v; },
+    update(cx, cz, radius) {
+      if (mesh) { mesh.visible = Math.hypot(cx - layout.x0, cz - layout.z0) < radius + layout.len; if (boards) boards.visible = mesh.visible; }
+      if (snow) { snow.visible = !mesh || mesh.visible; const m = snowMat(); if (snow.material !== m) snow.material = m; }      // R7-D: follows the terrain's material (quality switch)
+    },
+    dispose() { if (mesh) { scene.remove(mesh); mesh.geometry.dispose(); } if (boards) { scene.remove(boards); boards.geometry.dispose(); } if (snow) { scene.remove(snow); snow.geometry.dispose(); } mat.dispose(); fallbackSnow.dispose(); boardMat.map.dispose(); boardMat.dispose(); },
   };
 }

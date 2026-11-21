@@ -36,25 +36,26 @@ export function markerAt(list, x, z, radius = MARKER.trigger) {
 export function createMarkers({ scene, list, height, overlay, starsOf }) {
   // one gate: two posts with a white base, the banner across, a small flag on the left post
   const parts = [];
-  const add = (geo, color, x, y, z) => { const g = geo.toNonIndexed(); g.translate(x, y, z); parts.push([g, color]); };
+  // R7-D: tint = 1 only on the banner and the little flag (they take the piste colour); posts, base and top edge keep their own colour
+  const add = (geo, color, x, y, z, tint = 0) => { const g = geo.toNonIndexed(); g.translate(x, y, z); parts.push([g, color, tint]); };
   const W = MARKER.width, H = MARKER.height;
   for (const z of [-W / 2, W / 2]) {
     add(new THREE.CylinderGeometry(0.09, 0.11, H, 6), 0x2b2f36, 0, H / 2, z);
     add(new THREE.CylinderGeometry(0.2, 0.24, 0.35, 8), 0xffffff, 0, 0.17, z);
   }
-  add(new THREE.BoxGeometry(0.08, 0.85, W), 0xffffff, 0, H - 0.5, 0);                 // banner (tinted per gate)
+  add(new THREE.BoxGeometry(0.08, 0.85, W), 0xffffff, 0, H - 0.5, 0, 1);              // banner (tinted per gate)
   add(new THREE.BoxGeometry(0.1, 0.16, W + 0.1), 0xf4f6f9, 0, H - 0.02, 0);             // white top edge
-  add(new THREE.BoxGeometry(0.03, 0.4, 0.62), 0xffffff, 0, H + 0.25, -W / 2 + 0.33);    // the little flag (tinted too)
+  add(new THREE.BoxGeometry(0.03, 0.4, 0.62), 0xffffff, 0, H + 0.25, -W / 2 + 0.33, 1); // the little flag (tinted too)
   let count = 0;
   for (const [g] of parts) count += g.attributes.position.count;
-  const pos = new Float32Array(count * 3), nrm = new Float32Array(count * 3), col = new Float32Array(count * 3);
+  const pos = new Float32Array(count * 3), nrm = new Float32Array(count * 3), col = new Float32Array(count * 3), tints = new Float32Array(count);
   let o = 0;
   const c = new THREE.Color();
-  for (const [g, hex] of parts) {
+  for (const [g, hex, tint] of parts) {
     c.setHex(hex);
     const P = g.attributes.position, N = g.attributes.normal;
     for (let i = 0; i < P.count; i++, o++) {
-      pos.set([P.getX(i), P.getY(i), P.getZ(i)], o * 3); nrm.set([N.getX(i), N.getY(i), N.getZ(i)], o * 3); col.set([c.r, c.g, c.b], o * 3);
+      pos.set([P.getX(i), P.getY(i), P.getZ(i)], o * 3); nrm.set([N.getX(i), N.getY(i), N.getZ(i)], o * 3); col.set([c.r, c.g, c.b], o * 3); tints[o] = tint;
     }
     g.dispose();
   }
@@ -62,7 +63,18 @@ export function createMarkers({ scene, list, height, overlay, starsOf }) {
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   geo.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  geo.setAttribute('aTint', new THREE.BufferAttribute(tints, 1));
   const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
+  // R7-D: the instance colour only reaches the vertices with aTint = 1 (three multiplies every vertex by it otherwise)
+  mat.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <color_pars_vertex>', '#include <color_pars_vertex>\nattribute float aTint;')
+      .replace('#include <color_vertex>', `#include <color_vertex>
+        #ifdef USE_INSTANCING_COLOR
+          vColor.xyz = color.xyz * mix(vec3(1.0), instanceColor.xyz, aTint);
+        #endif`);
+  };
+  mat.customProgramCacheKey = () => 'ski-gate-tint';
   const mesh = new THREE.InstancedMesh(geo, mat, Math.max(1, list.length));
   mesh.name = 'ski-challenge-gates';
   mesh.frustumCulled = false;
