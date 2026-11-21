@@ -43,7 +43,11 @@ export const flow = {
     h.eq(spawn.kind, "gondola", `spawn at ${spawn.name}`);
     await page.waitForFunction(() => !document.getElementById("liftBtn").hidden, null, { timeout: 10000 });
     await page.keyboard.press("l");
+    await page.keyboard.press("l");                                       // round 7: a double tap boards once, it never skips the ride
     await page.waitForFunction(() => window.__ski.game.phase === "lift", null, { timeout: 5000 });
+    await h.pause(1200);                                                  // round 7: he skates into the station first (RIDE.boardTime)
+    const g0 = await page.evaluate(() => ({ share: window.__ski.ride ? window.__ski.ride.share : -1 }));
+    h.expect(g0.share >= 0 && g0.share < 0.5, `the double tap boarded once and did not skip the ride (${(g0.share * 100).toFixed(0)} % of the line)`);
     const g1 = await ride();
     await h.pause(2500);
     const g2 = await ride();
