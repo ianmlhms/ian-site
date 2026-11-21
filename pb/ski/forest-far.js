@@ -67,13 +67,13 @@ function paintAtlas() {
       const t = k / 33;
       const y = base - 30 - t * (base - 50 - top);
       const half = 46 * (1 - t) + 6;
-      g.strokeStyle = k % 3 ? 'rgba(122,98,80,0.9)' : 'rgba(150,124,100,0.85)';
+      g.strokeStyle = k % 3 ? 'rgba(112,98,88,0.9)' : 'rgba(136,120,104,0.85)';
       g.lineWidth = 2.2;
       for (const sgn of [-1, 1]) {
         g.beginPath(); g.moveTo(cx, y); g.quadraticCurveTo(cx + sgn * half * 0.6, y - 2, cx + sgn * half * (0.75 + rnd() * 0.3), y + 5 + rnd() * 4); g.stroke();
       }
     }
-    g.fillStyle = 'rgba(150,120,95,0.35)';
+    g.fillStyle = 'rgba(128,114,102,0.22)';
     g.beginPath(); g.moveTo(cx - 50, base - 30); g.lineTo(cx, top + 10); g.lineTo(cx + 50, base - 30); g.closePath(); g.fill();
   };
   spruce(0, false); spruce(128, true); larch(256);

@@ -208,8 +208,11 @@ function block(w, row, seed, detail, style, slopeDir) {
   if (poly.length < 3) { const P = frameOf(row); poly = [[-L / 2, -W / 2], [L / 2, -W / 2], [L / 2, W / 2], [-L / 2, W / 2]].map(([u, v]) => { const p = P(u, v, 0); return [p[0], p[2]]; }); }
   if (signedArea(poly) < 0) poly.reverse();          // counter-clockwise in (x, z): walls face out
   const levels = levelsRow || Math.max(2, Math.round((eave - 0.6) / FLOOR));
-  const gable = roof === 0 || roof === 2 || (roof === -1 && W < 18 && levels <= 5 && h1(seed * 2.2) < 0.55);
-  if (gable && poly.length <= 6) { chalet(w, row, seed, detail, style); return; }
+  // Alpine default: a gable roof. Flat roofs (and the terraces) only where OSM says so, or for the very big purpose-built blocks of the
+  // 1960s-70s resorts (Tignes, Val Claret, La Daille), recognised by their size
+  const big = L * W > 1300 && W >= 16;
+  const gable = roof === 0 || roof === 2 || roof === 3 || (roof === -1 && !big);
+  if (gable) { chalet(w, row, seed, detail, style === CONCRETE ? SAVOY : style); return; }
   const g0 = ground - SINK;
   // terraces: a tall block on a slope steps back towards the uphill side, every 2-3 floors (the stepped profile of Val Claret)
   const stepped = levels >= 5 && W >= 13 && !!slopeDir && h1(seed * 8.8) < 0.75;
@@ -253,7 +256,9 @@ function styleOf(row, seed) {
   if (kind === 3) return HUT;
   if (kind === 0) return CHALET;
   const r = h1(seed * 13.7);
-  return r < 0.4 ? SAVOY : r < 0.72 ? CONCRETE : PLASTER;
+  const big = row[2] * row[3] > 1300 && row[3] >= 16;
+  if (big) return r < 0.55 ? CONCRETE : r < 0.8 ? SAVOY : PLASTER;
+  return r < 0.6 ? SAVOY : PLASTER;
 }
 
 /* ---------------- material ---------------- */

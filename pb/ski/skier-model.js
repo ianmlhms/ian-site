@@ -118,8 +118,15 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {})
   }
   lean.add(torso);
   // blob shadow (Niddreg)
-  const blob = new THREE.Mesh(new THREE.CircleGeometry(0.9, 18).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x3a4766, transparent: true, opacity: 0.3, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
-  blob.scale.set(1.2, 1, 0.75);
+  const blobTex = (() => {
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const g = c.getContext('2d'); const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.55, 'rgba(255,255,255,0.6)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+    return new THREE.CanvasTexture(c);
+  })();
+  const blob = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.5).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x33405e, alphaMap: blobTex, transparent: true, opacity: 0.38, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+  blob.scale.set(1.25, 1, 0.55);
   blob.visible = false;
   blob.renderOrder = 3;
   root.traverse((o) => { if (o.isMesh) { o.castShadow = !ghost; o.receiveShadow = !ghost; o.frustumCulled = false; } });
@@ -224,8 +231,8 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {})
       qH.setFromAxisAngle(Y_AXIS, -state.heading);
       blob.quaternion.copy(qN).multiply(qH);
       const up = clamp(state.y - gy, 0, 6);
-      blob.material.opacity = 0.3 * (1 - up / 7);
-      blob.scale.set(1.2 * (1 + up * 0.08), 1, 0.75 * (1 + up * 0.08));
+      blob.material.opacity = 0.38 * (1 - up / 7);
+      blob.scale.set(1.25 * (1 + up * 0.08), 1, 0.55 * (1 + up * 0.08));
     }
   }
   return { root: group, pose, setOutfit, setBlob(on) { blob.visible = !!on && !ghost; }, setVisible(v) { group.visible = v; } };

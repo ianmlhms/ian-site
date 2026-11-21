@@ -62,7 +62,7 @@ function build(fn) {
   g.setAttribute('color', new THREE.Float32BufferAttribute(col, 4));
   return g;
 }
-const SPRUCE = [0.13, 0.27, 0.22], SPRUCE_DARK = [0.09, 0.2, 0.17], BARK = [0.3, 0.22, 0.17], LARCH = [0.46, 0.38, 0.31], LARCH_TWIG = [0.38, 0.31, 0.26];
+const SPRUCE = [0.13, 0.27, 0.22], SPRUCE_DARK = [0.09, 0.2, 0.17], BARK = [0.3, 0.22, 0.17], LARCH = [0.44, 0.39, 0.35], LARCH_TWIG = [0.36, 0.31, 0.28];
 const spruceNear = () => build((p, n, c) => {
   pushPrism(p, n, c, -0.3, 1.8, 0.2, 5, BARK);
   const tiers = [[0.9, 3.6, 2.25, 8], [2.4, 5.0, 1.9, 8], [3.8, 6.4, 1.55, 7], [5.2, 7.8, 1.2, 7], [6.6, 9.6, 0.8, 6]];
@@ -72,9 +72,9 @@ const spruceFar = () => build((p, n, c) => { pushCone(p, n, c, 0, 0.6, 9.4, 2.0,
 /* a larch in winter: a straight trunk and thin layered tiers of bare twigs (open, so the snow behind shows through the gaps) */
 const larchNear = () => build((p, n, c) => {
   pushPrism(p, n, c, -0.3, 10.2, 0.17, 5, BARK);
-  for (let k = 0; k < 8; k++) {                      // many thin whorls of drooping bare twigs: open and see-through like a winter larch
-    const y = 2.2 + k * 0.98, r = 1.75 * (1 - k / 9) + 0.25;
-    pushTier(p, n, c, y, y + 0.55, r, 5, k % 2 ? LARCH_TWIG : LARCH, 0.25, k * 1.3);
+  for (let k = 0; k < 9; k++) {                      // many slim whorls of drooping bare twigs: a narrow, see-through winter larch
+    const y = 1.9 + k * 0.88, r = 1.3 * (1 - k / 10) + 0.18;
+    pushTier(p, n, c, y - 0.35, y + 0.75, r, 5, k % 2 ? LARCH_TWIG : LARCH, 0.2, k * 1.3);
   }
 });
 const larchFar = () => build((p, n, c) => { pushCone(p, n, c, 0, 1.0, 9.6, 1.8, 5, LARCH, 0.2); });
