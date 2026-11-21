@@ -457,3 +457,47 @@ Ian's requests; our own design (no other game's look, UI, names or content). Bra
   the window view still shows a wide ceiling band; skis vanish in cabins (no outside rack); the gate posts' base takes the banner tint;
   no shared free ride online yet (only the "riding lift X at s" wire state and its drawing); no real train in today's data (checked
   with a synthetic rack railway); the ride's exit can land beside a summit building (it uses the nearest piste start within 80 m).
+
+## Round 7 A (21-22 Nov 2026): Safari / ground / spawn / skier / camera / buildings (+ the first R7 items before the split)
+Branch `worktree-agent-a77ab887e8a786804` (from the data round ae58a6ad). The coordinator split R7 into A (this), B (lifts), C (map +
+features), D (online + perf + look). Before the split this branch had already done parts of B / C / D; they are listed last, so the merge
+can keep or drop them.
+- **Safari / WebKit**: `scripts/flows/ski_webkit.mjs` (flow `ski-webkit`, run with `FLOW_BROWSER=webkit` and without): every resort, no
+  shader / GL / console error, the picture has colour + snow detail + sky detail, skier on the ground, free look; green in WebKit.
+  Headless WebKit on the Mini renders the same as Chromium; Ian's "flat blue sky + flat snow" was the camera facing / inside a building
+  wall at the spawn (below). Safety net in main.js: `renderer.debug.onShaderError` records shader failures; `pictureCheck()` reads the
+  canvas 3.5 s into the free ride: a one-colour picture or a shader error steps down (cheap snow -> post.fallback(1) no MSAA ->
+  post.fallback(2) no post pass). `scripts/ski/webkit-probe.mjs` = side-by-side screenshots + GL caps per engine.
+- **Spawn** (`modes/spawn.js`, pure): FIRST_LIFT per resort (Solaise, Verdons, Matterhorn Express 1, Galzigbahn, Kronplatz 2000);
+  `liftSpot`: beside / in front of the station looking UP THE LINE (a point 45 m up the rope), the view from the chase camera to 25 m
+  ahead free of every building footprint (buildings.json boxes, `createBoxIndex`), nothing built under skier / camera; `exitSpot`: the
+  top exit outside all buildings, facing down the fall line, 15 m clear (used by `arrive()`). Lift boarding zone = 12 m round the
+  station or its board spot (`lift.board`), the rider skates into the station (RIDE.boardTime 1.1 s), one press = one boarding
+  (`actionLock` 1.4 s, a double tap never skips the ride). goFree waits for the footprints and the tiles under the spot; a finer tile
+  arriving under a standing skier re-snaps him (main.js onTile).
+- **Ground = physics**: streets (`roads.js`) are now emitted ON the 2.5 m physics lattice (the ground's own triangles, same diagonal rule,
+  +3 cm, far away pulled towards the camera in the vertex shader) and painted from the distance to the centre line (no raised banks, no
+  ribbon cutting across the lattice: the skier stood 10 cm deep in streets, banks crossed streets as spikes). `scripts/ski/ground-check.mjs`
+  (all 5 resorts x Chromium + WebKit): spawn on the ground, 5 village spots each: street vertices vs physics, 40 rays down vs physics
+  (<= 6 cm), ski clearance, a scripted carve (skis >= -2 cm), a coplanar-triangle scan of the village meshes (z-fighting): 10 / 10 green.
+- **Skier**: leg IK on the terrain (`skier-model.js plantSkis`: tips / middle / tails of both skis vs the ground, the knee bends to lift
+  a ski that would cut the snow; `skiClearance`); plough = tips in / tails out on the inner edges, knees in, low and forward; hockey stop
+  (skier.js `stop` / `stopSide`, config HOCKEY*): a player's brake above 25 km/h (or brake + hard steer) swings the skis across, digs
+  in, spray burst; scripted input never does it (`input.hard`). Braking always ends in a full stop that HOLDS (`state.hold`, plough
+  decel now counters the slope); a placed skier holds until input; only > 38 degrees side-slips.
+- **Camera**: `look.js` = free 360 look (right drag / C + mouse / two-finger swipe on Mac, a drag on the free screen on the iPad, never
+  the steering; eases back after 0.9 s, faster at speed; 'orbit' for third person + lift chase, 'head' for first person + cabin window)
+  and `createCameraGuard` (the line skier -> camera never through ground, pylons, station halls, trees or houses; eases out). The chase
+  camera climbs and drops back with the speed (CAMERA.rise*). Shadow acne: slope-scaled offsets (`uSunL`). Horizon: FOG_GLSL fades the
+  last stretch before `uFarEnd` (= quality.far) and the far grid's last 3.5 km into the horizon haze; far rock only on steep faces.
+- **Buildings**: railings with thickness (two coplanar back-to-back faces flickered), balcony slabs off the wall and per-house heights
+  (neighbours' balconies z-fought), stone plinths down to the lowest ground on slopes, windows ~1.1 x 1.35 m with shutters, half of
+  the big "chalet" houses in the Savoy mix.
+- **Done here before the split (B / C / D may keep or replace)**: far.bin height step 1 m (`scripts/ski/far-quant.mjs`, bake.py
+  FAR_QUANT; 3 Vallées first play 4.51 -> 3.57 MB), sign atlases (props.js, 336 per 2048 px atlas), tunnel funiculars (lift-path.js
+  `tunnels`, modes/tunnel.js tube + portals + dark fade), carrier models (lifts.js), cabin window camera, carried skis, gate tint
+  (markers.js aTint), name-tag declutter (net/tags.js), run props batched (slalom 256 -> ~140 calls), `scripts/ski/calls-sweep.mjs`,
+  first person (fpcam.js, V / 🎥), spray + tracks (effects.js), avalanches + Lawin (modes/avalanche.js), online free ride
+  (net/freeride.js, lobby setting `mode`), park bodies (views.js + snow-shader uParkRect), look leftovers (evening shade, strata AA,
+  firs), drag-lift track beside the pylons. Tests: `scripts/ski/round7-test.mjs` (spawn / exit spots of every lift, tunnels, avalanches,
+  tags, braking physics), `round6-test.mjs`.
