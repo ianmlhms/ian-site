@@ -5,7 +5,7 @@ const LIMIT = { green: 14, blue: 17, red: 19, black: 20 };     // m/s
 const wrap = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
 
 export function createBot(piste, { speedScale = 1 } = {}) {
-  const p = {};
+  const p = {}, q = {};
   const proj = {};
   const gates = piste.slalomGates();
   let hint = 0;
@@ -25,7 +25,10 @@ export function createBot(piste, { speedScale = 1 } = {}) {
     const want = Math.atan2(tz - state.z, tx - state.x);
     const err = wrap(want - state.heading);
     const steer = Math.max(-1, Math.min(1, err * 2.4));
-    const limit = (LIMIT[piste.diff] || 16) * speedScale;
+    // slow down before a sharp bend of the line (a hairpin overshot at full speed ends in the deep snow below it)
+    piste.at(proj.s + look + 30, q);
+    const bend = Math.abs(wrap(Math.atan2(q.dz, q.dx) - Math.atan2(p.dz, p.dx)));
+    const limit = (LIMIT[piste.diff] || 16) * speedScale * (bend > 0.5 ? Math.max(0.45, 1 - (bend - 0.5) * 0.7) : 1);
     return { steer, tuck: Math.abs(err) < 0.12 && state.speed < limit * 0.9 ? 1 : 0, brake: state.speed > limit ? 1 : 0, push: state.speed < 4 ? 1 : 0, jump: false };
   };
 }

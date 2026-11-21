@@ -54,6 +54,16 @@ RESORTS = {
             ("Tignes le Lac", 6.9070, 45.4690, 700), ("Val Claret", 6.9030, 45.4560, 550), ("Le Lavachet", 6.9180, 45.4730, 350),
             ("Tignes 1800", 6.9350, 45.4880, 450), ("Les Boisses", 6.9280, 45.4980, 350), ("Les Brévières", 6.9230, 45.5050, 400),
         ],
+        # winter drawdown of the reservoir (bake.py apply_drawdown): the ice lies `drop` m below the full level, the banks slope down to it
+        # over `bank` m (EDF empties Lac du Chevril through the winter: the frozen lake sits deep between bare banks)
+        "reservoirs": [{"name": "Lac du Chevril", "drop": 40.0, "bank": 65.0}],
+        "landmarks": [
+            # Barrage du Chevril / de Tignes (OSM way 30195773, 181 m, 1953): the arch along the middle of the OSM outline, convex towards
+            # the lake (`toward`), Jean-Marie Pierret's painted giant (1989) on the downstream face; crest = the lake's full level + 4 m
+            {"kind": "dam", "name": "Barrage du Chevril", "lon": 6.9315, "lat": 45.4949, "reservoir": "Lac du Chevril", "toward": [6.9360, 45.4900],
+             "line": [[6.92966, 45.49530], [6.93035, 45.49495], [6.93100, 45.49481], [6.93160, 45.49483], [6.93210, 45.49497],
+                      [6.93260, 45.49522], [6.93300, 45.49555], [6.93325, 45.49600], [6.93335, 45.49645]]},
+        ],
     },
     # All three valleys: Courchevel / La Tania (east), Méribel / Brides (middle), Les Menuires / Val Thorens / Saint-Martin and the Orelle
     # side down to Plan Bouchet (west and south). Valmorel (west of 6.475), La Plagne / Champagny (north-east) and the Maurienne below
@@ -78,7 +88,7 @@ RESORTS = {
         "tree_line": 2250.0, "derived_forest": 2050.0,       # spruce / larch up to about 2100 m on the Kronplatz flanks, the summit dome bare
         "villages": [
             ("Reischach", 11.9530, 46.7880, 700), ("Olang", 12.0200, 46.7480, 900), ("St. Vigil", 11.9420, 46.6990, 800),
-            ("Gassl", 12.0050, 46.7370, 300), ("Piculin", 11.9030, 46.6780, 400), ("Kronplatz", 11.9575, 46.7390, 260),
+            ("Gassl", 12.0050, 46.7370, 300), ("Piculin", 11.9030, 46.6780, 400), ("Kronplatz", 11.9575, 46.7390, 330, "modern"),
         ],
         "landmarks": [
             # kind, name, lon, lat (+ kind options); placed on the terrain by the bake, drawn by pb/ski/landmarks.js
@@ -95,11 +105,17 @@ RESORTS = {
                 "near_keep": 220.0,
                 "keep": [("Matterhorn", 7.6586, 45.9763, 800)],
                 "skip_ways": [1305881375],                 # OSM piste ways left out: "Grenzpiste (stillgelegt)", closed and ungroomed
+                "landmarks": [
+                    # Matterhorn glacier paradise: the top station where the cable arrives (glass front towards the Matterhorn, NW) and the
+                    # summit deck with its cross on the Klein Matterhorn (3883 m); the OSM box under the station goes ("clear")
+                    {"kind": "summit-station", "name": "Matterhorn glacier paradise 3821 m", "lon": 7.72950, "lat": 45.93927, "glacier": True, "face": 307, "clear": 25},
+                    {"kind": "summit-station", "name": "Klein Matterhorn 3883 m", "lon": 7.72989, "lat": 45.93836, "cross": True},
+                ],
                 "start": "riffelalp",                      # the first piste on the map: Riffelberg -> Riffelalp, the Matterhorn ahead
                 "villages": [
                     ("Zermatt", 7.7480, 46.0190, 1250, "chalet"), ("Furi", 7.7300, 46.0040, 260, "chalet"), ("Zum See", 7.7350, 46.0050, 160, "chalet"), ("Riffelalp", 7.7505, 46.0017, 220, "chalet"),
                     ("Riffelberg", 7.7543, 45.9930, 160), ("Gornergrat", 7.7830, 45.9834, 140), ("Findeln", 7.7640, 46.0115, 260, "chalet"), ("Sunnegga", 7.7698, 46.0174, 160),
-                    ("Schwarzsee", 7.7090, 45.9915, 160), ("Trockener Steg", 7.7215, 45.9710, 160), ("Klein Matterhorn", 7.7295, 45.9385, 120),
+                    ("Schwarzsee", 7.7090, 45.9915, 160), ("Trockener Steg", 7.7215, 45.9710, 160, "modern"), ("Klein Matterhorn", 7.7295, 45.9385, 160, "modern"),
                     ("Plateau Rosa", 7.7080, 45.9370, 180), ("Breuil-Cervinia", 7.6300, 45.9345, 900), ("Plan Maison", 7.6465, 45.9400, 200),
                     ("Valtournenche", 7.6235, 45.8775, 550), ("Salette", 7.6400, 45.8800, 200),
                 ]},
@@ -109,7 +125,9 @@ RESORTS = {
         "name": "St. Anton · Arlberg", "short": "Ski Arlberg", "country": "AT", "crs": "EPSG:25832",
         "bbox": (47.095, 10.088, 47.232, 10.312),
         "dem": ["at-dgm", "copernicus-glo30"], "far": ["copernicus-glo30"],
-        "start": "Kandahar-Kapall",
+        "start": "Kandahar",
+        # the World Cup course is two OSM pistes (Kapall start -> Galzig, then on to the finish): one timed run of the two
+        "chains": [{"name": "Kandahar", "pistes": ["Kandahar-Kapall", "Kandahar-Galzig"]}],
         "near_keep": 350.0,                                  # 5 m tiles only this close to pistes, lifts, houses (10 MB budget)
         "tree_line": 2000.0, "derived_forest": 1850.0,       # north side of the Alps: the forest ends near 1900 m (St. Anton 1300 m, St. Christoph 1800 m bare)
         "villages": [
@@ -121,13 +139,12 @@ RESORTS = {
         "landmarks": [
             # spots from the OSM buildings / roads: Vallugabahn II top station, Galzigbahn top station, the B197 at the Hospiz, the
             # Christophorus chapel next to the Hospiz
-            {"kind": "summit-station", "name": "Valluga 2811 m", "lon": 10.21330, "lat": 47.15770, "antenna": True, "face": 150},
+            {"kind": "summit-station", "name": "Valluga 2811 m", "lon": 10.21330, "lat": 47.15770, "antenna": True, "face": 150, "clear": 14},
             {"kind": "summit-station", "name": "Galzig", "lon": 10.23089, "lat": 47.13082, "big": True, "face": 130, "clear": 22},
             {"kind": "pass", "name": "Arlbergpass 1793 m", "lon": 10.21345, "lat": 47.12768, "face": 135},
             {"kind": "chapel", "name": "St. Christoph", "lon": 10.21329, "lat": 47.12738},
-            # the World Cup course: OSM has it as two pistes (Kapall start -> Galzig); nets on both, the start house on the first
-            {"kind": "worldcup", "name": "Kandahar", "piste": "Kandahar-Kapall"},
-            {"kind": "worldcup", "name": "Kandahar", "piste": "Kandahar-Galzig", "house": False},
+            # the World Cup course (chained from its two OSM pistes): nets where it is steep, the start house at the top
+            {"kind": "worldcup", "name": "Kandahar", "piste": "Kandahar"},
         ],
     },
 }

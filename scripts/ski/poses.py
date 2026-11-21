@@ -17,10 +17,11 @@ from common import Frame  # noqa: E402
 # name: (cam lon, lat, above, target lon, lat, above2, fov)
 POSES = {
     "killy": {
-        "face": (6.9800, 45.4475, 4, 6.9640, 45.4530, 150, 55),             # Face de Bellevarde from the village
+        "face": (6.9810, 45.4470, 45, 6.9640, 45.4530, 150, 55),             # Face de Bellevarde from the village
         "faceup": (6.9925, 45.4440, 250, 6.9640, 45.4545, 100, 50),
-        "chevril": (6.9180, 45.5130, 30, 6.9360, 45.5020, 0, 60),           # Lac du Chevril from Les Brévières side
-        "dam": (6.9475, 45.5085, 25, 6.9349, 45.5036, 0, 55),
+        "chevril": (6.9380, 45.4890, 4, 6.9530, 45.4740, 30, 60),           # on the frozen Lac du Chevril, looking up the lake
+        "dam": (6.9400, 45.4890, 50, 6.9315, 45.4950, -30, 55),            # the dam from the lake side
+        "giant": (6.9318, 45.5000, 80, 6.9312, 45.4950, 40, 50),            # the painted giant on the downstream face
         "tignes": (6.9290, 45.4720, 300, 6.9200, 45.4560, 0, 60),
     },
     "3vallees": {

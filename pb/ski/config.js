@@ -67,6 +67,8 @@ export const SKI = Object.freeze({
   brakeSteer: 0.7,
   pushAccel: 1.8,           // skating on flats (W / up), only below pushMaxSpeed
   pushMaxSpeed: 6,
+  climbSpeed: 2.2,          // below this the push walks uphill (herringbone): no flat, rise or hollow leaves a player stuck
+  climbMax: 4.6,            // m/s2: the steepest it climbs is about 20 degrees (40 %) on the piste
   leaveGround: 0.95,        // the ground falls away faster than this many g: the skier takes off
   stickGap: 0.06,           // m: closer than this to the ground counts as touching
   hardLanding: 10.5,        // m/s into the ground at landing: a crash

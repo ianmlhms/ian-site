@@ -6,6 +6,9 @@
  *           1970s concrete with balcony bands; tall ones step back in terraces up the slope (the stepped Val Claret / La Daille profile),
  *           flat snowed-in roofs with a parapet, or a gable when OSM says so
  *   chapel  white walls, a steep roof and a small bell tower;   hut  dark wood, small
+ *   modern  today's mountain architecture (summit stations, the Kronplatz restaurants): stone plinth, vertical larch slats, glass
+ *           ribbons, flat roofs with a dark fascia (row kind 4, villages flagged "modern" in common.py)
+ *   tower   a slender transmitter shaft with red-white bands and an antenna (row kind 5: OSM man_made=tower)
  * Variety from a per-building seed (wood and stone tones, shutter colour, roof pitch, balcony sides). Painted in one shader (wall
  * patterns, windows, snow); merged per 1280 m cell, two detail levels per cell (balconies, chimneys and terraces only near).
  * Rows: [cx, cz, L, W, angle, eave, ridge, ground, kind, footprint?, roof?, levels?] (scripts/ski/bake.py; old 9-field rows: the box). */
@@ -19,7 +22,7 @@ const SINK = 1.6;                    // walls go this far below the lowest groun
 /* parts (aInfo.w) */
 const WALL = 0, SNOW = 1, WOOD = 2, RAIL = 3, STONE = 4, TERRACE = 5;
 /* styles (aInfo.x) */
-const CHALET = 0, PLASTER = 1, SAVOY = 2, CONCRETE = 3, CHAPEL = 4, HUT = 5;
+const CHALET = 0, PLASTER = 1, SAVOY = 2, CONCRETE = 3, CHAPEL = 4, HUT = 5, MODERN = 6, TOWER = 7;
 export const DETAIL_RADIUS = Object.freeze({ low: 700, medium: 1300, high: 2200 });
 
 const h1 = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
@@ -211,7 +214,7 @@ function block(w, row, seed, detail, style, slopeDir) {
   // Alpine default: a gable roof. Flat roofs (and the terraces) only where OSM says so, or for the very big purpose-built blocks of the
   // 1960s-70s resorts (Tignes, Val Claret, La Daille), recognised by their size
   const big = L * W > 1300 && W >= 16;
-  const gable = roof === 0 || roof === 2 || roof === 3 || (roof === -1 && !big);
+  const gable = style !== MODERN && (roof === 0 || roof === 2 || roof === 3 || (roof === -1 && !big));
   if (gable) { chalet(w, row, seed, detail, style === CONCRETE ? SAVOY : style); return; }
   const g0 = ground - SINK;
   // terraces: a tall block on a slope steps back towards the uphill side, every 2-3 floors (the stepped profile of Val Claret)
@@ -250,8 +253,27 @@ function prismRail(w, poly, y) {
   }
 }
 
+/** A transmitter tower: an eight-sided concrete shaft tapering up, a platform ring, the antenna on top. */
+function tower(w, row) {
+  const [cx, cz, L, W, , eave, , ground] = row;
+  const r0 = Math.min(3.2, Math.max(1.6, Math.min(L, W) / 2)), r1 = r0 * 0.6, top = ground + eave, N = 8;
+  const ring = (r, y) => Array.from({ length: N }, (_, i) => [cx + Math.cos(i / N * Math.PI * 2) * r, y, cz + Math.sin(i / N * Math.PI * 2) * r]);
+  const a = ring(r0, ground - SINK), b = ring(r1, top);
+  for (let i = 0; i < N; i++) {
+    const j = (i + 1) % N;
+    const mid = (i + 0.5) / N * Math.PI * 2, n = [Math.cos(mid), 0, Math.sin(mid)];
+    const u0 = i * 2, u1 = u0 + 2;
+    w.quad(a[j], a[i], b[i], b[j], n, [[u1, a[j][1] - ground], [u0, a[i][1] - ground], [u0, b[i][1] - ground], [u1, b[j][1] - ground]], WALL);
+  }
+  const P = (u, v, y) => [cx + u, y, cz + v];
+  box(w, P, -r1 - 1.2, r1 + 1.2, -r1 - 1.2, r1 + 1.2, top - 6, top - 4.8, STONE, ground);
+  box(w, P, -0.35, 0.35, -0.35, 0.35, top, top + eave * 0.25, WALL, ground);
+}
+
 function styleOf(row, seed) {
   const kind = row[8];
+  if (kind === 4) return MODERN;
+  if (kind === 5) return TOWER;
   if (kind === 2) return CHAPEL;
   if (kind === 3) return HUT;
   if (kind === 0) return CHALET;
@@ -297,7 +319,7 @@ function material(env, cheap) {
           col = mix(wood * 0.45, wood * 1.05, mix(0.8, board, fadeFar));
           col = mix(col, vec3(0.93, 0.95, 1.0), step(0.86, vUv.y) * 0.85);              // snow on the handrail
         } else if (part > 3.5 && part < 4.5) {                                          // chimney, parapet: stone / concrete
-          col = style > 2.5 && style < 3.5 ? concrete : stone;
+          col = style > 2.5 && style < 3.5 ? concrete : style > 5.5 && style < 6.5 ? vec3(0.2, 0.21, 0.23) : stone;
           float course = step(0.88, fract(vUv.y / 0.45)) * fadeFar;
           col *= 1.0 - 0.12 * course;
         } else {
@@ -312,7 +334,14 @@ function material(env, cheap) {
           else if (style < 2.5) col = y < 3.0 ? stoneWall : (y < 6.0 && h1(seed * 3.3) < 0.5 ? plaster : woodWall);   // Savoy: stone base, wood above
           else if (style < 3.5) col = concrete * (1.0 - 0.06 * fadeFar * step(0.95, fract(vUv.x / 3.2)));  // 1970s concrete, panel joints
           else if (style < 4.5) col = vec3(0.94, 0.93, 0.89);                                           // chapel
-          else col = woodWall * 0.78;                                                                    // hut
+          else if (style < 5.5) col = woodWall * 0.78;                                                   // hut
+          else if (style < 6.5) {                                                                        // modern: stone plinth, vertical larch slats
+            float slat = fadeFar * step(0.72, fract(vUv.x / 0.32));
+            col = y < 3.2 ? stoneWall * 0.92 : mix(vec3(0.58, 0.42, 0.28), vec3(0.66, 0.5, 0.33), h1(seed * 91.0)) * (1.0 - 0.28 * slat);
+          } else {                                                                                       // tower: concrete, red-white bands up top
+            float band = step(eaveH * 0.55, y) * step(0.5, fract(y / 6.0));
+            col = mix(vec3(0.74, 0.73, 0.7), vec3(0.78, 0.2, 0.17), band);
+          }
           // balcony bands of the blocks: a wooden slab every floor
           if (style > 0.5 && style < 3.5 && y > 3.0) {
             float b = fract((y - 0.25) / 2.9);
@@ -334,6 +363,14 @@ function material(env, cheap) {
           float on = step(0.5, h1(floor(vUv.x / wu) * 7.3 + floorIx * 3.1 + seed * 13.0));
           col = mix(col, vec3(0.17, 0.21, 0.27) + vec3(0.05, 0.07, 0.1) * step(0.5, fract(fv * 2.0 + fu)), win);
           glow = win * on * uGlow;
+          // modern: wide glass ribbons on every floor above the plinth, thin dark mullions; the sky in the glass
+          if (style > 5.5 && style < 6.5) {
+            float gu = fract(vUv.x / 3.6), gv = fract((y - 3.2) / 3.1);
+            float ribbon = step(3.2, y) * step(y, eaveH - 0.4) * step(0.12, gv) * step(gv, 0.86) * step(0.04, gu) * step(gu, 0.96);
+            vec3 glassC = mix(vec3(0.16, 0.2, 0.26), vec3(0.42, 0.52, 0.64), clamp(gv * 0.8 + 0.1, 0.0, 1.0));
+            col = mix(col, glassC, mix(ribbon * 0.9, step(3.2, y) * 0.45, 1.0 - fadeFar));
+            glow = max(glow, ribbon * uGlow * 0.6);
+          }
           // snow pushed against the wall at the foot, a dark damp line above it
           col = mix(col, vec3(0.92, 0.94, 0.98), (1.0 - smoothstep(0.0, 0.45, y + 0.2)) * 0.9);
         }
@@ -372,14 +409,15 @@ export function createVillage({ scene, rows, env, height, level = 'medium' }) {
     const seed = (i * 0.618034) % 1;
     const style = styleOf(row, seed);
     let downhill = null;
-    if (height && row[8] === 1) {
+    if (height && (row[8] === 1 || row[8] === 4)) {
       const d = 25, gx = height(row[0] + d, row[1]) - height(row[0] - d, row[1]), gz = height(row[0], row[1] + d) - height(row[0], row[1] - d);
       const l = Math.hypot(gx, gz);
       if (l > 2) downhill = [-gx / l, -gz / l];       // only on a real slope
     }
     for (const [w, detail] of [[cell.near, true], [cell.far, false]]) {
       w.set(style, row[5], seed);
-      if (row[8] === 1) block(w, row, seed, detail, style, downhill);
+      if (row[8] === 5) tower(w, row);
+      else if (row[8] === 1 || row[8] === 4) block(w, row, seed, detail, style, downhill);
       else chalet(w, row, seed, detail, style);
     }
   });

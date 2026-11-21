@@ -5,7 +5,7 @@
  *            towards the skis; a turn across the fall line scrubs speed (skidding)
  *   speed:   gravity along the slope, ski friction (groomed vs deep snow), air drag (upright vs tuck), extra drag in deep snow
  *   brake:   snowplough (S / down): a strong deceleration, slower turns
- *   push:    skating on flats (W / up) below 6 m/s
+ *   push:    skating on flats (W / up) below 6 m/s; slow, it walks up short rises (herringbone) instead of sliding back
  *   jumps:   the skier leaves the ground where it falls away faster than gravity can follow (crests, rollers, wind drifts); the jump key pops
  *   crashes: a trunk or rock hit above SKI.hitCrash m/s, a landing harder than SKI.hardLanding m/s -> state.crash counts down, then the
  *            caller respawns the skier on the piste
@@ -99,7 +99,14 @@ function groundStep(s, input, world, dt) {
   }
   // skating on the flat
   if ((input.push || 0) > 0 && v < SKI.pushMaxSpeed && s.brake < 0.5) {
-    const a = SKI.pushAccel * input.push * (1 - v / SKI.pushMaxSpeed);
+    let a = SKI.pushAccel * input.push * (1 - v / SKI.pushMaxSpeed);
+    // herringbone / side-step: slow, the skier walks up a short rise (a flat with a bump, the way back onto the piste) instead of
+    // sliding back: the push also beats the slope and the snow friction, up to SKI.climbMax
+    if (v < SKI.climbSpeed) {
+      const gf = G * n.y * (n.x * fx + n.z * fz) + (-G + G * n.y * n.y) * fy;          // gravity along the skis (< 0: uphill)
+      const mu = SKI.muPowder + (SKI.muGroomed - SKI.muPowder) * snow;
+      if (gf < 0.3) a += Math.min(Math.max(0, -gf) + mu * G * n.y, SKI.climbMax) * input.push * (1 - v / SKI.climbSpeed * 0.5);
+    }
     vx += fx * a * dt; vy += fy * a * dt; vz += fz * a * dt;
   }
   // keep the velocity in the slope plane, cap

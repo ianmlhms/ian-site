@@ -174,7 +174,7 @@ export function createLifts({ scene, resort, height }) {
   return { group, update, nearest, count: lifts.length };
 }
 
-const COL = { concrete: [0.68, 0.67, 0.64], timber: [0.5, 0.34, 0.21], glass: [0.2, 0.26, 0.33], steel: [0.42, 0.46, 0.52], wheel: [0.25, 0.27, 0.3], snow: [0.95, 0.96, 0.99], accent: [0.78, 0.2, 0.16] };
+const COL = { concrete: [0.68, 0.67, 0.64], stone: [0.47, 0.44, 0.41], timber: [0.5, 0.34, 0.21], glass: [0.2, 0.26, 0.33], steel: [0.42, 0.46, 0.52], wheel: [0.25, 0.27, 0.3], snow: [0.95, 0.96, 0.99], accent: [0.78, 0.2, 0.16] };
 /** One end of a lift: the hall (sized by the lift kind), the bull-wheel at cable height, the canopy over it with snow on top. */
 function stationGeometry(l, end, height) {
   const { spec } = l;
@@ -195,6 +195,15 @@ function stationGeometry(l, end, height) {
     return out;
   }
   const hallH = Math.max(3.5, Math.min(h, cable - 1.2));
+  // seated on the terrain: on a ridge or a steep slope the ground falls away under the hall, so a stone foundation runs down to the
+  // lowest ground under the footprint (a summit station never hangs in the air)
+  const c = Math.cos(ang), s = Math.sin(ang);
+  let low = g;
+  for (const [u, v] of [[-d * 0.65, -w / 2], [d * 0.35, -w / 2], [d * 0.35, w / 2], [-d * 0.65, w / 2], [-d * 0.15, 0], [-d * 0.65, 0], [d * 0.35, 0], [-d * 0.15, -w / 2], [-d * 0.15, w / 2]]) {
+    low = Math.min(low, height(q.x + u * c + v * s, q.z - u * s + v * c));
+  }
+  const drop = g - low;
+  if (drop > 0.4) add(new THREE.BoxGeometry(d + 0.6, drop + 1.6, w + 0.6), COL.stone, -d * 0.15, 0.4 - (drop + 1.6) / 2, 0);
   // hall: base plinth, wall body, glass band, flat roof with a snow slab
   add(new THREE.BoxGeometry(d, 1.0, w), COL.concrete, -d * 0.15, 0.1, 0);
   add(new THREE.BoxGeometry(d, hallH - 1.2, w), timber ? COL.timber : COL.concrete, -d * 0.15, 0.6 + (hallH - 1.2) / 2, 0);

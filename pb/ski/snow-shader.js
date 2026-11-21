@@ -100,12 +100,12 @@ export function createSnowMaterial(env, { cheap = false, treeRadius = 400, fores
         // ---- villages: trodden, ploughed snow and wet tracks
         snow = mix(snow, snow * vec3(0.9, 0.9, 0.92) * (0.92 + 0.1 * nA.g), built * 0.6);
         // ---- frozen lakes: dead flat, snow drifted in long streaks over grey-blue ice, a few pressure cracks, a darker icy shore
-        float iceShow = smoothstep(0.52, 0.78, nL.a * 0.6 + texture2D(uNoise, wp * 0.006 + 0.4).b * 0.4) * smoothstep(0.75, 1.0, waterSoft);
+        float iceShow = smoothstep(0.44, 0.72, nL.a * 0.6 + texture2D(uNoise, wp * 0.006 + 0.4).b * 0.4) * smoothstep(0.75, 1.0, waterSoft);
         float crack = 1.0 - smoothstep(0.0, 0.02, abs(texture2D(uNoise, wp * 0.0045 + 0.2).g - 0.5));
         vec3 ice = mix(vec3(0.62, 0.71, 0.8), vec3(0.74, 0.8, 0.87), nB.r) * (shade * 0.75 + uSunColor * lit * 0.45);
         float shore = smoothstep(0.08, 0.35, waterSoft) * (1.0 - smoothstep(0.45, 0.8, waterSoft));
-        vec3 lake = mix(snow * vec3(0.94, 0.965, 1.0), ice, iceShow * 0.45);
-        lake = mix(lake, lake * vec3(0.8, 0.86, 0.92), crack * 0.35 * aa + shore * 0.35);
+        vec3 lake = mix(snow * vec3(0.94, 0.965, 1.0), ice, iceShow * 0.62);
+        lake = mix(lake, lake * vec3(0.8, 0.86, 0.92), crack * 0.35 * aa + shore * 0.5);
         snow = mix(snow, lake, smoothstep(0.05, 0.3, waterSoft));
         // ---- bare rock: the baked winter rock (aInfo.z, from the 5 m terrain: steepness, ridges, aspect, height, strata; right at every
         //      distance) and, near by or outside the baked box, whatever is too steep for snow by the mesh normal (coarse far tiles are

@@ -97,46 +97,51 @@ function bell() {
   return { group: g, footprint: R + 1.5 };
 }
 
-/** A concrete cowl rising out of the slope: side profile (z back -> front, y up) extruded across w, a pointed visor over a dark glass front,
- * sheared sideways by `skew` (the angular Hadid look). The returned group's front faces -z. */
-function cowl(w, d, h, skew) {
-  const g = new THREE.Group();
-  const shape = new THREE.Shape();
-  shape.moveTo(d, -1.5); shape.lineTo(d, 0); shape.quadraticCurveTo(d * 0.45, h * 0.95, 0, h); shape.lineTo(-2.6, h + 0.7);
-  shape.lineTo(-1.6, h - 0.9); shape.lineTo(0, h - 1.4); shape.lineTo(0, -1.5); shape.closePath();
-  const geo = new THREE.ExtrudeGeometry(shape, { depth: w, bevelEnabled: false, curveSegments: 6 });
-  // profile x -> world -z (front), profile y -> up, extrusion -> x; shear: the front edge leans sideways
-  geo.applyMatrix4(new THREE.Matrix4().set(0, 0, 1, -w / 2, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 0, 1));
-  geo.applyMatrix4(new THREE.Matrix4().set(1, skew / Math.max(1, h), 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1));
+/** One concrete shard of the MMM Corones, cut out of the slope: a faceted wedge whose back is buried in the ridge (y < 0 behind) and
+ * whose front leans out as a sharp visor over a dark glass face. w = width, d = depth into the ridge, h = visor height, lean = how far
+ * the visor overhangs, skew = sideways shift of the top (the Hadid shear). Front faces -z. Flat-shaded triangles. */
+function shard(w, d, h, lean, skew) {
+  const A = [-w / 2, 0, 0], B = [w / 2, 0, 0];                                  // front foot (on the snow)
+  const C = [w * 0.36 + skew, h, -lean], D = [-w * 0.3 + skew, h * 0.78, -lean * 0.6];   // visor tips
+  const E = [-w / 2 - 1, -4, d], F = [w / 2 + 1, -4, d];                       // back corners, buried in the ridge
+  const tris = [[D, C, F], [D, F, E], [A, D, E], [B, F, C]];                    // roof (two facets), sides
+  const pos = [];
+  for (const t of tris) for (const p of t) pos.push(...p);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   geo.computeVertexNormals();
-  g.add(new THREE.Mesh(geo, mat(COL.concrete)));
-  const glass = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.78, h - 2.2), mat(COL.glass, { side: THREE.DoubleSide }));
-  glass.position.set(skew * 0.5, (h - 2.2) / 2 + 0.1, 0.15);
-  g.add(glass);
-  const turned = new THREE.Group();              // the extrusion's front faces +z: turn it to face -z like every landmark
-  g.rotation.y = Math.PI;
-  turned.add(g);
-  return turned;
+  const g = new THREE.Group();
+  g.add(new THREE.Mesh(geo, mat(COL.concrete, { side: THREE.DoubleSide })));
+  // the glass face, set back under the visor (a quad A B C D pulled 1.2 m in)
+  const inset = (p, k) => [p[0] * 0.94, p[1] * k, p[2] + 1.2];
+  const gl = [inset(A, 1), inset(B, 1), inset(C, 0.93), inset(A, 1), inset(C, 0.93), inset(D, 0.93)];
+  const gg = new THREE.BufferGeometry();
+  gg.setAttribute('position', new THREE.Float32BufferAttribute(gl.flat(), 3));
+  gg.computeVertexNormals();
+  g.add(new THREE.Mesh(gg, mat(COL.glass, { side: THREE.DoubleSide })));
+  return g;
 }
 
 function mmm(lm) {
+  // Zaha Hadid's museum lies inside the summit ridge; what shows are angular concrete shards breaking out of the snow, each with a glass
+  // face (the entrance hall, two viewing windows) and the long viewing platform cantilevered towards the Dolomites (`face`).
   const g = new THREE.Group();
-  // [x, z, rotation, width, depth, height, skew]: the main hall and two smaller cowls stepping down the summit's south side
-  const parts = [[0, 0, 0, 15, 22, 8, 3], [-16, 7, 0.4, 10, 16, 6, -2.5], [14, 10, -0.35, 9, 14, 5.2, 2]];
-  for (const [x, z, rot, w, d, h, skew] of parts) {
-    const c = cowl(w, d, h, skew);
+  // [x, z, rotation, width, depth, visor height, lean, skew]
+  const parts = [[0, 0, 0, 16, 20, 7.5, 4.5, 1.5], [-15, 6, 0.55, 9, 14, 5.5, 3.5, -1.2], [13, 8, -0.5, 8, 12, 4.8, 3, 1]];
+  for (const [x, z, rot, w, d, h, lean, skew] of parts) {
+    const c = shard(w, d, h, lean, skew);
     c.position.set(x, 0, z);
     c.rotation.y = rot;
     g.add(c);
   }
-  // the long viewing window cantilevered out of the main cowl
-  const tube = box(3.4, 2.6, 12, COL.concrete, 3, 2.4, -6);
-  tube.rotation.x = -0.1;
-  const win = new THREE.Mesh(new THREE.PlaneGeometry(2.8, 1.8), mat(COL.glass, { side: THREE.DoubleSide }));
-  win.position.set(3, 4.3, -12.1);
+  // the viewing platform: a long angular concrete tube cantilevered out of the main shard, its end all glass
+  const tube = box(3.6, 3.0, 15, COL.concrete, 4, 1.6, -9);
+  tube.rotation.x = -0.08; tube.rotation.y = 0.12;
+  const win = new THREE.Mesh(new THREE.PlaneGeometry(3.0, 2.2), mat(COL.glass, { side: THREE.DoubleSide }));
+  win.position.set(5, 3.2, -16.6); win.rotation.y = 0.12;
   g.add(tube, win);
   g.rotation.y = -THREE.MathUtils.degToRad(lm.face ?? 180);    // the glass fronts (local -z) look towards `face` (azimuth: x east, z south)
-  return { group: g, footprint: 5 };          // dug into the summit: sits at its centre height, the slope may cover the back
+  return { group: g, footprint: 5 };          // cut into the summit: sits at its centre height, the slope covers the backs
 }
 
 function lattice(height, width, color) {
@@ -154,32 +159,68 @@ function lattice(height, width, color) {
   return g;
 }
 
+/** A railing ring of steel posts and a top rail around (cx, cz) at y (a viewing deck's edge). */
+function railing(g, cx, cz, r, y) {
+  const N = 16;
+  for (let i = 0; i < N; i++) {
+    const a0 = i / N * Math.PI * 2, a1 = (i + 1) / N * Math.PI * 2;
+    const p0 = new THREE.Vector3(cx + Math.cos(a0) * r, y, cz + Math.sin(a0) * r), p1 = new THREE.Vector3(cx + Math.cos(a1) * r, y, cz + Math.sin(a1) * r);
+    g.add(beam(p0, p0.clone().setY(y + 1.1), 0.1, COL.steel));
+    g.add(beam(p0.clone().setY(y + 1.1), p1.clone().setY(y + 1.1), 0.08, COL.steel));
+  }
+}
+
 function summitStation(lm) {
   const g = new THREE.Group();
+  const SINK = 30;                                            // foundations run this far down: on a ridge the station never hangs
   if (lm.big) {
-    // a large top station (replaces the OSM box, option "clear"): dark timber-grey hall, a glass band towards the valley, flat roof
-    g.add(box(30, 10, 16, 0x5a5550, 0, -2, 0), box(26, 5.2, 0.4, COL.glass, 0, 1.8, 8.1), box(32, 0.9, 18, COL.roofDark, 0, 8, 0));
+    // a large top station (replaces the OSM boxes, option "clear"): dark timber-grey hall, a glass band towards the valley, flat roof
+    g.add(box(30, 10 + SINK, 16, 0x5a5550, 0, -2 - SINK, 0), box(26, 5.2, 0.4, COL.glass, 0, 1.8, 8.1), box(32, 0.9, 18, COL.roofDark, 0, 8, 0));
   }
   if (lm.antenna) {
-    // the white lattice mast with its dishes on the summit, the summit cross beside it (the station itself is the OSM building)
-    const mast = lattice(22, 6, COL.antenna);
-    mast.position.set(6, 0, -3);
+    // the Valluga top station: a squat stone-clad hall sitting on the summit rock, a glass band, the roof a viewing deck with a railing,
+    // the white lattice mast with its dishes on top, the summit cross beside it
+    g.add(box(13, 7 + SINK, 9, 0x6d665e, 0, -SINK, 0));
+    g.add(box(11, 2.0, 0.3, COL.glass, 0, 3.6, 4.55), box(0.3, 2.0, 7, COL.glass, 6.55, 3.6, 0));
+    g.add(box(14, 0.6, 10, COL.concrete, 0, 7, 0), box(13.6, 0.3, 9.6, COL.white, 0, 7.6, 0));
+    railing(g, 0, 0, 6.4, 7.6);
+    const mast = lattice(20, 5, COL.antenna);
+    mast.position.set(3, 7.6, -1.5);
     g.add(mast);
-    for (const [y, r] of [[17, 1.8], [13, 1.4], [9, 1.1]]) {
+    for (const [y, r] of [[24, 1.8], [20, 1.4], [16, 1.1]]) {
       const dish = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.35, 16), mat(COL.antenna));
-      dish.rotation.x = Math.PI / 2; dish.position.set(6, y, -0.6);
+      dish.rotation.x = Math.PI / 2; dish.position.set(3, y, 1.0);
       g.add(dish);
     }
-    g.add(beam(new THREE.Vector3(-6, -0.5, -2), new THREE.Vector3(-6, 6.5, -2), 0.3, 0x3b2f25));
-    g.add(beam(new THREE.Vector3(-7.6, 4.8, -2), new THREE.Vector3(-4.4, 4.8, -2), 0.26, 0x3b2f25));
+    g.add(beam(new THREE.Vector3(-8.5, -0.5, -3), new THREE.Vector3(-8.5, 7.5, -3), 0.32, 0x3b2f25));
+    g.add(beam(new THREE.Vector3(-10.4, 5.5, -3), new THREE.Vector3(-6.6, 5.5, -3), 0.28, 0x3b2f25));
+  }
+  if (lm.glacier) {
+    // Matterhorn glacier paradise (Klein Matterhorn): the long top station cut into the rock below the summit, stone plinth, a two-storey
+    // glass front towards the Matterhorn, a flat roof terrace, the cable's steel portal frame on the valley side
+    g.add(box(44, 11 + SINK, 18, 0x5d5a56, 0, -SINK, 0));
+    g.add(box(40, 6.5, 0.4, COL.glass, 0, 3.6, 9.05), box(0.4, 6.5, 14, COL.glass, 22.05, 3.6, 0));
+    g.add(box(46, 0.8, 20, COL.concrete, 0, 11, 0), box(45.6, 0.35, 19.6, COL.white, 0, 11.8, 0));
+    for (const x of [-21, 21]) for (const z of [-7, 7]) g.add(beam(new THREE.Vector3(x * 0.5 - 18, 11.5, z), new THREE.Vector3(x * 0.35 - 18, 24, z * 0.6), 0.7, COL.steel));
+    g.add(box(18, 1.2, 9, COL.steel, -18, 23.5, 0));
+  }
+  if (lm.cross) {
+    // a summit: steel viewing deck with a railing and the big summit cross
+    g.add(new THREE.Mesh(new THREE.CylinderGeometry(7, 7.5, 2 + SINK * 0.3, 16), mat(0x5d5a56)).translateY(1 - SINK * 0.15));
+    g.add(new THREE.Mesh(new THREE.CylinderGeometry(7.4, 7.4, 0.4, 16), mat(COL.steel)).translateY(2.2));
+    railing(g, 0, 0, 7.2, 2.4);
+    g.add(beam(new THREE.Vector3(0, 2.2, 0), new THREE.Vector3(0, 12, 0), 0.45, COL.steel));
+    g.add(beam(new THREE.Vector3(-2.4, 9.4, 0), new THREE.Vector3(2.4, 9.4, 0), 0.4, COL.steel));
+    return { group: g, footprint: 3 };
   }
   const [title, sub] = lm.name.split(/\s(?=\d)/);
-  const name = board([title, sub || ''].filter(Boolean), lm.big ? 10 : 5, lm.big ? 3.75 : 2.1);
-  name.position.set(0, lm.big ? 10.5 : 2.6, lm.big ? 8.3 : 2);
+  const big = lm.big || lm.glacier;
+  const name = board([title, sub || ''].filter(Boolean), big ? 10 : 5, big ? 3.75 : 2.1);
+  name.position.set(0, lm.glacier ? 13.6 : lm.big ? 10.5 : lm.antenna ? 9.6 : 2.6, lm.glacier ? 9.3 : lm.big ? 8.3 : lm.antenna ? 4.8 : 2);
   g.add(name);
-  if (!lm.big) g.add(box(0.16, 3.2, 0.16, COL.steel, -2, -0.5, 1.95), box(0.16, 3.2, 0.16, COL.steel, 2, -0.5, 1.95));
+  if (!big && !lm.antenna) g.add(box(0.16, 3.2, 0.16, COL.steel, -2, -0.5, 1.95), box(0.16, 3.2, 0.16, COL.steel, 2, -0.5, 1.95));
   g.rotation.y = -THREE.MathUtils.degToRad(lm.face ?? 180) + Math.PI;      // the board (+z) looks towards `face`
-  return { group: g, footprint: lm.big ? 18 : 4 };
+  return { group: g, footprint: lm.glacier ? 6 : lm.big ? 18 : lm.antenna ? 3 : 4 };
 }
 
 function pass(lm) {
@@ -267,7 +308,177 @@ function worldcup(lm, piste, height) {
   return { group: g, footprint: 0, absolute: true, centre: [lm.x, lm.z], radius: piste.length };
 }
 
+/** The painted face of the dam: concrete in pour blocks with rust and damp streaks, and the giant of Jean-Marie Pierret (1989) in our own
+ * brush: a huge pale-blue figure leaning on the wall, arms spread to hold it up, drawn in soft outline. u = along the crest, v = down. */
+function damTexture(lengthM, heightM) {
+  const W = 2048, H = Math.round(Math.min(1024, W * heightM / lengthM / 4) * 4) || 512;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  const grad = g.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, '#c9c6bf'); grad.addColorStop(1, '#a9a59d');
+  g.fillStyle = grad; g.fillRect(0, 0, W, H);
+  // pour blocks (vertical joints every ~15 m), horizontal lifts, streaks running down
+  const px = W / lengthM;
+  g.strokeStyle = 'rgba(70,66,60,0.35)'; g.lineWidth = 2;
+  for (let x = 15 * px; x < W; x += 15 * px) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); }
+  for (let y = H / 12; y < H; y += H / 12) { g.globalAlpha = 0.25; g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); g.globalAlpha = 1; }
+  let seed = 7;
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  for (let k = 0; k < 140; k++) {
+    const x = rnd() * W, len = H * (0.15 + 0.6 * rnd());
+    g.fillStyle = rnd() < 0.3 ? 'rgba(120,80,50,0.10)' : 'rgba(60,60,58,0.10)';
+    g.fillRect(x, 0, 2 + rnd() * 7, len);
+  }
+  // the giant: centred, two thirds of the height, painted in pale blues with a darker outline
+  const cx = W * 0.5, top = H * 0.08, s = H * 0.82;
+  g.lineJoin = 'round'; g.lineCap = 'round';
+  const body = (fill, stroke, width) => {
+    g.fillStyle = fill; g.strokeStyle = stroke; g.lineWidth = width;
+    g.beginPath();                                            // head
+    g.ellipse(cx, top + s * 0.1, s * 0.07, s * 0.09, 0, 0, Math.PI * 2);
+    g.fill(); g.stroke();
+    g.beginPath();                                            // torso, arms spread up and out to the wall, legs apart
+    g.moveTo(cx - s * 0.13, top + s * 0.22);
+    g.quadraticCurveTo(cx - s * 0.32, top + s * 0.12, cx - s * 0.55, top + s * 0.02);        // left arm up
+    g.lineTo(cx - s * 0.58, top + s * 0.1);
+    g.quadraticCurveTo(cx - s * 0.33, top + s * 0.24, cx - s * 0.15, top + s * 0.36);
+    g.quadraticCurveTo(cx - s * 0.17, top + s * 0.52, cx - s * 0.12, top + s * 0.6);         // waist
+    g.lineTo(cx - s * 0.22, top + s * 0.98);                                                  // left leg
+    g.lineTo(cx - s * 0.11, top + s * 0.98);
+    g.lineTo(cx, top + s * 0.68);
+    g.lineTo(cx + s * 0.11, top + s * 0.98);                                                  // right leg
+    g.lineTo(cx + s * 0.22, top + s * 0.98);
+    g.lineTo(cx + s * 0.12, top + s * 0.6);
+    g.quadraticCurveTo(cx + s * 0.17, top + s * 0.52, cx + s * 0.15, top + s * 0.36);
+    g.quadraticCurveTo(cx + s * 0.33, top + s * 0.24, cx + s * 0.58, top + s * 0.1);         // right arm up
+    g.lineTo(cx + s * 0.55, top + s * 0.02);
+    g.quadraticCurveTo(cx + s * 0.32, top + s * 0.12, cx + s * 0.13, top + s * 0.22);
+    g.closePath();
+    g.fill(); g.stroke();
+  };
+  body('rgba(150,182,206,0.92)', 'rgba(38,52,70,0.85)', Math.max(4, H * 0.012));
+  // muscle shading: soft darker strokes
+  g.strokeStyle = 'rgba(70,96,122,0.55)'; g.lineWidth = Math.max(3, H * 0.008);
+  for (const [a, b, c2, d] of [[-0.08, 0.3, 0, 0.36], [0.08, 0.3, 0, 0.36], [-0.06, 0.45, 0.06, 0.45], [0, 0.36, 0, 0.58], [-0.3, 0.13, -0.18, 0.22], [0.3, 0.13, 0.18, 0.22]]) {
+    g.beginPath(); g.moveTo(cx + a * s, top + b * s); g.lineTo(cx + c2 * s, top + d * s); g.stroke();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.anisotropy = 4;
+  return t;
+}
+
+/** The arch dam of a reservoir (`line` = the crest in world x, z pairs, convex towards `toward` = the lake): crest at `crest` m, the
+ * downstream face battered down into the gorge (to the lowest ground below it) carries the painted giant; the upstream face shows above
+ * the drawn-down ice. Two meshes. */
+function dam(lm, height) {
+  const g = new THREE.Group();
+  const src = [];
+  for (let i = 0; i + 1 < lm.line.length; i += 2) src.push([lm.line[i], lm.line[i + 1]]);
+  // resample every ~6 m
+  const pts = [];
+  for (let i = 0; i + 1 < src.length; i++) {
+    const [ax, az] = src[i], [bx, bz] = src[i + 1];
+    const n = Math.max(1, Math.round(Math.hypot(bx - ax, bz - az) / 6));
+    for (let k = 0; k < n; k++) pts.push([ax + (bx - ax) * k / n, az + (bz - az) * k / n]);
+  }
+  pts.push(src[src.length - 1]);
+  const [lx, lz] = lm.toward || [lm.x, lm.z + 100];
+  let crest = lm.crest || 0;
+  if (!crest) for (const [x, z] of pts) crest = Math.max(crest, height(x, z));
+  const HALF = 4;                                             // crest 8 m wide
+  const rows = pts.map(([x, z], i) => {
+    const [px, pz] = pts[Math.max(0, i - 1)], [qx, qz] = pts[Math.min(pts.length - 1, i + 1)];
+    let nx = -(qz - pz), nz = qx - px;
+    const l = Math.hypot(nx, nz) || 1; nx /= l; nz /= l;
+    if (nx * (lx - x) + nz * (lz - z) > 0) { nx = -nx; nz = -nz; }   // n points downstream (away from the lake)
+    let bottom = crest;
+    for (let d = 0; d <= 90; d += 6) bottom = Math.min(bottom, height(x + nx * d, z + nz * d));
+    const drop = Math.max(0, crest - bottom);
+    const batter = drop * 0.16;
+    return { x, z, nx, nz, bottom: bottom - 3, batter, up: height(x - nx * 12, z - nz * 12) - 3 };
+  });
+  let len = 0;
+  const us = rows.map((r, i) => (i ? (len += Math.hypot(r.x - rows[i - 1].x, r.z - rows[i - 1].z)) : 0));
+  const maxDrop = Math.max(...rows.map((r) => crest - r.bottom), 20);
+  // downstream face (textured)
+  const fp = [], fu = [], fi = [];
+  rows.forEach((r, i) => {
+    fp.push(r.x + r.nx * HALF, crest, r.z + r.nz * HALF, r.x + r.nx * (HALF + r.batter), r.bottom, r.z + r.nz * (HALF + r.batter));
+    fu.push(us[i] / len, 1, us[i] / len, 1 - (crest - r.bottom) / maxDrop);
+    if (i) { const a = (i - 1) * 2; fi.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+  });
+  const fg = new THREE.BufferGeometry();
+  fg.setAttribute('position', new THREE.Float32BufferAttribute(fp, 3));
+  fg.setAttribute('uv', new THREE.Float32BufferAttribute(fu, 2));
+  fg.setIndex(fi);
+  fg.computeVertexNormals();
+  g.add(new THREE.Mesh(fg, new THREE.MeshLambertMaterial({ map: damTexture(len, maxDrop), side: THREE.DoubleSide })));
+  // crest (snow on top), parapets and the upstream face down to the ice
+  const cp = [], ci = [];
+  const quadStrip = (a, b) => {                              // a(i), b(i): two rails of points -> triangles
+    const base = cp.length / 3;
+    rows.forEach((r, i) => { cp.push(...a(r), ...b(r)); if (i) { const k = base + (i - 1) * 2; ci.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); } });
+  };
+  quadStrip((r) => [r.x - r.nx * HALF, crest, r.z - r.nz * HALF], (r) => [r.x + r.nx * HALF, crest, r.z + r.nz * HALF]);
+  quadStrip((r) => [r.x - r.nx * HALF, r.up, r.z - r.nz * HALF], (r) => [r.x - r.nx * HALF, crest + 1.1, r.z - r.nz * HALF]);
+  quadStrip((r) => [r.x + r.nx * HALF, crest, r.z + r.nz * HALF], (r) => [r.x + r.nx * HALF, crest + 1.1, r.z + r.nz * HALF]);
+  const cg = new THREE.BufferGeometry();
+  cg.setAttribute('position', new THREE.Float32BufferAttribute(cp, 3));
+  cg.setIndex(ci);
+  cg.computeVertexNormals();
+  g.add(new THREE.Mesh(cg, new THREE.MeshLambertMaterial({ color: 0xc2beb6, side: THREE.DoubleSide })));
+  const sg = new THREE.BufferGeometry();
+  const sp = [], si = [];
+  rows.forEach((r, i) => {
+    sp.push(r.x - r.nx * (HALF - 0.4), crest + 0.25, r.z - r.nz * (HALF - 0.4), r.x + r.nx * (HALF - 0.4), crest + 0.25, r.z + r.nz * (HALF - 0.4));
+    if (i) { const k = (i - 1) * 2; si.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
+  });
+  sg.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3));
+  sg.setIndex(si);
+  sg.computeVertexNormals();
+  g.add(new THREE.Mesh(sg, mat(0xf4f6fa, { side: THREE.DoubleSide })));
+  return { group: g, footprint: 0, absolute: true, centre: [lm.x, lm.z], radius: len };
+}
+
 const BUILD = { bell, mmm, 'summit-station': summitStation, pass, chapel };
+
+/** Merges a landmark's plain meshes (one Lambert colour each, no texture, not transparent, not instanced) into one mesh per material,
+ * with the group's own rotation baked in: a landmark costs a few draw calls instead of dozens. Textured boards, nets and instanced poles stay. */
+function flatten(g) {
+  g.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4();                            // g has no parent yet: matrixWorld = its own transform, baked in
+  const byMat = new Map();
+  const keep = [];
+  g.traverse((o) => {
+    if (!o.isMesh || o === g) return;
+    if (o.isInstancedMesh || o.material.map || o.material.transparent) { keep.push(o); return; }
+    const geo = (o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone()).applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld));
+    if (!geo.attributes.normal) geo.computeVertexNormals();
+    if (!byMat.has(o.material)) byMat.set(o.material, []);
+    byMat.get(o.material).push(geo);
+  });
+  const out = new THREE.Group();
+  for (const [m, geos] of byMat) {
+    let n = 0;
+    for (const q of geos) n += q.attributes.position.count;
+    const pos = new Float32Array(n * 3), nrm = new Float32Array(n * 3);
+    let o = 0;
+    for (const q of geos) { pos.set(q.attributes.position.array, o * 3); nrm.set(q.attributes.normal.array, o * 3); o += q.attributes.position.count; }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+    geo.computeBoundingSphere();
+    out.add(new THREE.Mesh(geo, m));
+  }
+  for (const o of keep) {
+    const c = new THREE.Mesh(o.geometry, o.material);
+    if (o.isInstancedMesh) { out.add(o); continue; }
+    new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld).decompose(c.position, c.quaternion, c.scale);
+    out.add(c);
+  }
+  return out;
+}
 
 export function createLandmarks({ scene, resort, height, pistes }) {
   const group = new THREE.Group();
@@ -278,9 +489,11 @@ export function createLandmarks({ scene, resort, height, pistes }) {
     try {
       let built;
       if (lm.kind === 'worldcup') built = worldcup(lm, pistes && pistes.byId.get(lm.piste), height);
+      else if (lm.kind === 'dam') built = dam(lm, height);
       else if (BUILD[lm.kind]) built = BUILD[lm.kind](lm);
       else continue;
-      const { group: g, footprint, absolute } = built;
+      const { footprint, absolute } = built;
+      const g = flatten(built.group);
       if (!absolute) {
         // sit on the lowest ground under the footprint (the base sinks in a little on a slope, never floats)
         let y = height(lm.x, lm.z);

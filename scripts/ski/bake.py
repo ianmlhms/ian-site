@@ -103,6 +103,40 @@ def load_mosaic(rid, frame):
     return big
 
 
+def apply_drawdown(frame, cfg, raw, areas_osm):
+    """Winter drawdown of the resort's reservoirs (RESORTS[rid]["reservoirs"]): inside the named lake the 5 m mosaic is lowered to the
+    ice level (full level - drop), the banks fall to it over `bank` m from the shore. Returns (raw, levels {name: full level}, banks mask
+    at CLASS_STEP: the exposed banks, no longer water)."""
+    levels, banks = {}, []
+    for rv in cfg.get("reservoirs", ()):
+        polys = []
+        for e in areas_osm:
+            if e.get("tags", {}).get("name") == rv["name"] and e["type"] == "way" and "geometry" in e:
+                polys.append(way_xz(frame, e["geometry"]))
+        if not polys:
+            log("reservoir not found in the OSM areas:", rv["name"])
+            continue
+        img = Image.new("L", (raw.shape[1], raw.shape[0]), 0)
+        d = ImageDraw.Draw(img)
+        for p in polys:
+            d.polygon([(float(x) / NEAR_STEP, float(z) / NEAR_STEP) for x, z in p], fill=255)
+        lake = np.asarray(img) > 0
+        level = float(np.median(raw[lake]))
+        dist = ndimage.distance_transform_edt(lake) * NEAR_STEP
+        t = np.clip(dist / rv["bank"], 0, 1)
+        fall = rv["drop"] * (1 - (1 - t) ** 1.6)                    # steep near the shore, flattening onto the ice
+        raw = np.where(lake, np.minimum(raw, level - fall), raw).astype(np.float32)
+        levels[rv["name"]] = level
+        banks.append((lake & (dist < rv["bank"] * 0.82))[:-1, :-1])
+        log("reservoir %s: full level %.0f m, ice at %.0f m, banks %.0f m wide" % (rv["name"], level, level - rv["drop"], rv["bank"]))
+    bank10 = None
+    if banks:
+        b = np.any(banks, axis=0)
+        nz, nx = b.shape[0] // 2, b.shape[1] // 2
+        bank10 = b[:nz * 2, :nx * 2].reshape(nz, 2, nx, 2).mean(axis=(1, 3)) > 0.5
+    return raw, levels, bank10
+
+
 class Dem:
     """Bilinear read of the near mosaic in world metres."""
 
@@ -178,6 +212,50 @@ def flat(p, nd=1):
 
 
 # ---------------------------------------------------------------- pistes
+CHAIN_GAP = 160.0                  # m: the most a named run may jump between two of its pistes (a straight link across the gap)
+DIFF_ORDER = ["green", "blue", "red", "black"]
+
+
+def chain_runs(chains, runs, dem):
+    """Named runs made of several OSM pistes in order (RESORTS[rid]["chains"]: {"name", "pistes": [piste names]}), e.g. the Kandahar
+    = Kandahar-Kapall + Kandahar-Galzig: one timed run from the first's top to the last's bottom, the hardest colour of its parts.
+    The parts are dropped as runs of their own."""
+    for ch in chains:
+        parts = []
+        for name in ch["pistes"]:
+            cand = [r for r in runs if r["name"].lower() == name.lower()]
+            if not cand:
+                log("chain %s: no run named %s" % (ch["name"], name))
+                parts = []
+                break
+            parts.append(max(cand, key=lambda r: r["len"]))
+        if not parts:
+            continue
+        pts = [parts[0]["p"]]
+        ok = True
+        for a, b in zip(parts, parts[1:]):
+            gap = float(math.hypot(*(a["p"][-1] - b["p"][0])))
+            if gap > CHAIN_GAP:
+                log("chain %s: %s -> %s are %.0f m apart, not chained" % (ch["name"], a["name"], b["name"], gap))
+                ok = False
+                break
+            if gap > 5:
+                link = np.linspace(a["p"][-1], b["p"][0], max(2, int(gap / 5) + 1))[1:-1]
+                if len(link):
+                    pts.append(link)
+            pts.append(b["p"])
+        if not ok:
+            continue
+        p = resample(np.concatenate(pts), 5.0)
+        h = dem(p[:, 0], p[:, 1])
+        diff = max((r["diff"] for r in parts), key=DIFF_ORDER.index)
+        run = {"name": ch["name"], "ref": parts[0]["ref"], "diff": ch.get("diff", diff), "p": p, "h": h, "len": polyline_len(p),
+               "drop": float(h[0] - h[-1]), "hw": float(np.median([r["hw"] for r in parts]))}
+        runs = [r for r in runs if all(r is not q for q in parts)] + [run]
+        log("chain %s: %s, %.0f m, %.0f m drop" % (ch["name"], " + ".join(r["name"] for r in parts), run["len"], run["drop"]))
+    return runs
+
+
 def build_pistes(frame, dem):
     els = load_osm(frame.rid, "pistes")
     lines, areas = [], []
@@ -250,6 +328,7 @@ def build_pistes(frame, dem):
                 continue
             runs.append({"name": ch[0]["name"], "ref": ch[0]["ref"], "diff": diff, "p": p, "h": h, "len": length, "drop": drop,
                          "hw": float(np.median([s["hw"] for s in ch]))})
+    runs = chain_runs(RESORTS[frame.rid].get("chains", ()), runs, dem)
     # one run per name + colour (the longest), unique ids
     best = {}
     for r in runs:
@@ -562,6 +641,9 @@ def build_buildings(frame, dem_raw):
     out = []
     # villages flagged "chalet" (Méribel, Courchevel: a building code that wants wood and stone) paint even big blocks as chalets
     chalet = [(*frame.to_world(v[1], v[2]), v[3]) for v in RESORTS[frame.rid].get("villages", ()) if len(v) > 4 and v[4] == "chalet"]
+    # villages flagged "modern" (the Kronplatz summit, Klein Matterhorn): today's mountain architecture, kind 4 (wood, glass, stone, flat
+    # roofs, at most 3 floors unless OSM says more)
+    modern = [(*frame.to_world(v[1], v[2]), v[3]) for v in RESORTS[frame.rid].get("villages", ()) if len(v) > 4 and v[4] == "modern"]
     for e in load_osm(frame.rid, "buildings"):
         if e["type"] != "way" or "geometry" not in e:
             continue
@@ -615,6 +697,12 @@ def build_buildings(frame, dem_raw):
             kind = 3
         if kind == 1 and any(math.hypot(cx_ - vx, cz_ - vz) < vr for vx, vz, vr in chalet for cx_, cz_ in [p.mean(axis=0)]):
             kind = 0
+        if kind in (0, 1) and any(math.hypot(cx_ - vx, cz_ - vz) < vr for vx, vz, vr in modern for cx_, cz_ in [p.mean(axis=0)]):
+            kind = 4
+            if lv is None:
+                levels = min(levels, 3)
+        if t.get("man_made") in ("tower", "mast") or t.get("tower:type") == "communication":
+            kind = 5                                           # a slender tower (the Kronplatz transmitter), not a 50 m block
         try:
             eave = float(str(t.get("height", "")).replace("m", "")) * 0.8
         except ValueError:
@@ -726,23 +814,46 @@ def build_poi(frame):
     return peaks, places
 
 
+def point_in_poly(poly, x, z):
+    inside = False
+    n = len(poly)
+    for i in range(n):
+        (x0, z0), (x1, z1) = poly[i], poly[(i + 1) % n]
+        if (z0 > z) != (z1 > z) and x < x0 + (z - z0) * (x1 - x0) / (z1 - z0):
+            inside = not inside
+    return inside
+
+
 def clear_for_landmarks(frame, cfg, buildings):
     """Drops the OSM buildings a landmark replaces (landmark option "clear": radius in m around it), e.g. the museum drawn as a box."""
     spots = [(frame.to_world(lm["lon"], lm["lat"]), lm["clear"]) for lm in cfg.get("landmarks", []) if lm.get("clear") and "lon" in lm]
     if not spots:
         return buildings
-    keep = [b for b in buildings if all(math.hypot(b["row"][0] - x, b["row"][1] - z) > r for (x, z), r in spots)]
+    def near(b, x, z, r):                                     # the landmark within r of the footprint (not only of its centre)
+        poly = b["poly"]
+        if float(np.min(np.hypot(poly[:, 0] - x, poly[:, 1] - z))) <= r or math.hypot(b["row"][0] - x, b["row"][1] - z) <= r:
+            return True
+        return point_in_poly(poly, x, z)
+    keep = [b for b in buildings if not any(near(b, x, z, r) for (x, z), r in spots)]
     log("landmarks replace", len(buildings) - len(keep), "buildings")
     return keep
 
 
-def build_landmarks(frame, dem, cfg, runs):
+def build_landmarks(frame, dem, cfg, runs, lake_levels=None):
     """The resort's landmarks (RESORTS[rid]["landmarks"]): world position and ground height, or the piste they dress (kind "worldcup").
     Drawn by pb/ski/landmarks.js; the piste map labels them."""
     out = []
     by_name = {r["name"].lower(): r for r in runs}
     for lm in cfg.get("landmarks", []):
-        row = {k: v for k, v in lm.items() if k not in ("lon", "lat")}
+        row = {k: v for k, v in lm.items() if k not in ("lon", "lat", "line", "toward")}
+        if "line" in lm:                                       # a polyline landmark (the dam's crest): world x, z pairs
+            pts = [frame.to_world(lo, la) for lo, la in lm["line"]]
+            row["line"] = [round(float(c), 1) for p in pts for c in p]
+        if "toward" in lm:
+            tx, tz = frame.to_world(*lm["toward"])
+            row["toward"] = [round(float(tx), 1), round(float(tz), 1)]
+        if lm.get("reservoir") and lake_levels and lm["reservoir"] in lake_levels:
+            row["crest"] = round(lake_levels[lm["reservoir"]] + 4.0, 1)
         if "piste" in lm:
             r = by_name.get(lm["piste"].lower())
             if not r:
@@ -852,6 +963,7 @@ def main():
     os.makedirs(os.path.join(out, "t"), exist_ok=True)
     log("frame", frame.tiles_x, "x", frame.tiles_z, "tiles", frame.width, frame.depth)
     raw = load_mosaic(rid, frame)
+    raw, lake_levels, banks = apply_drawdown(frame, cfg, raw, load_osm(rid, "areas"))
     dem_raw = Dem(raw)
     lines, areas, runs = build_pistes(frame, dem_raw)
     buildings = clear_for_landmarks(frame, cfg, build_buildings(frame, dem_raw))
@@ -937,6 +1049,11 @@ def main():
     log("far.bin %.2f MB" % (len(far_blob) / 1e6))
 
     classes, cnx, cnz = classes_raster(frame, dem_raw, load_osm(rid, "areas"), lines, areas + strips, buildings)
+    if banks is not None:                                     # the drawn-down banks: snow-covered ground, not ice
+        h_, w_ = min(banks.shape[0], cnz), min(banks.shape[1], cnx)
+        bm = np.zeros_like(classes, bool)
+        bm[:h_, :w_] = banks[:h_, :w_]
+        classes[bm] &= ~np.uint8(CLASS_BITS["water"])
     cblob = rle(classes)
     with open(os.path.join(out, "classes.bin"), "wb") as fh:
         fh.write(cblob)
@@ -970,7 +1087,7 @@ def main():
         "map": {"file": "map.webp", "w": mw, "h": mh},
         "shadows": {"file": "shadow-{time}.webp", "suns": SUNS},
         "pistes": pistes, "network": network, "lifts": lifts, "peaks": peaks, "places": places,
-        "landmarks": build_landmarks(frame, Dem(groomed), cfg, runs), "start": default_piste(cfg, runs),
+        "landmarks": build_landmarks(frame, Dem(groomed), cfg, runs, lake_levels), "start": default_piste(cfg, runs),
         "credits": credits(rid),
         "bake": {"date": time.strftime("%Y-%m-%d"), "script": "scripts/ski/bake.py"},
     }

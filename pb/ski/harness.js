@@ -1,4 +1,4 @@
-/* Node checks of the pure Ski Alpen code (no browser):  node pb/ski/harness.js [resort] [--rides N] [--all]
+/* Node checks of the pure Ski Alpen code (no browser):  node pb/ski/harness.js [resort] [--rides N] [--all] [--only id,id] [--trace]
  *   A  data decodes, tiles match resort.json
  *   B  the height function is continuous: across every tile edge, with and without the neighbour loaded (streaming), and at the feather
  *   C  render == physics: the LOD 0 tile vertices are the physics lattice
@@ -25,6 +25,9 @@ const args = process.argv.slice(2);
 const rid = args.find((a) => !a.startsWith('--') && !/^\d+$/.test(a)) || 'killy';
 const ridesArg = args.indexOf('--rides');
 const RIDES = args.includes('--all') ? Infinity : ridesArg >= 0 ? Number(args[ridesArg + 1]) : 8;
+const onlyArg = args.indexOf('--only');
+const ONLY = onlyArg >= 0 ? new Set(args[onlyArg + 1].split(',')) : null;      // ride just these pistes
+const TRACE = args.includes('--trace');                                          // one line per second of each ride
 const dir = path.join(here, 'data', rid);
 let failed = 0, passed = 0;
 const check = (ok, msg) => { if (ok) passed++; else failed++; console.log(`${ok ? '  ok  ' : '  FAIL'} ${msg}`); return ok; };
@@ -105,7 +108,8 @@ const order = [...set.list].sort((a, b) => (a.src.slalom === b.src.slalom ? 0 : 
 let rides = 0, finished = 0;
 const summary = [];
 for (const piste of order) {
-  if (rides >= RIDES) break;
+  if (ONLY && !ONLY.has(piste.id)) continue;
+  if (rides >= RIDES && !ONLY) break;
   rides++;
   const pt = piste.at(2, {});
   let s = createSkierState(pt.x, pt.z, Math.atan2(pt.dz, pt.dx), surface.height(pt.x, pt.z));
@@ -126,7 +130,10 @@ for (const piste of order) {
     if (!s.grounded) air += SKI.dt;
     piste.project(s.x, s.z, best, 150, proj);
     best = Math.max(best, proj.s);
-    if (Math.floor(t) !== Math.floor(t - SKI.dt)) { if (best - lastS < 0.5) stuck++; else stuck = 0; lastS = best; }
+    if (Math.floor(t) !== Math.floor(t - SKI.dt)) {
+      if (best - lastS < 0.5) stuck++; else stuck = 0; lastS = best;
+      if (TRACE) console.log(`      t ${t.toFixed(0)} s ${proj.s.toFixed(0)} off ${proj.off.toFixed(1)} v ${s.speed.toFixed(1)} snow ${s.snow.toFixed(2)} crash ${s.crash.toFixed(1)} ${s.crashKind || ''} y ${s.y.toFixed(1)} push ${input.push} brake ${input.brake}`);
+    }
     if (stuck > 25) break;
     if (best > piste.length - 25) break;
   }
