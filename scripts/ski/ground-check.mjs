@@ -7,6 +7,8 @@
  *   ground    40 random rays straight down within 50 m: the first visible surface (terrain tiles + streets) vs surface.height <= 6 cm
  *   skis      the skier standing on the street: the lowest ski point is not under the snow (>= -2 cm)
  *   carve     a scripted carve on the spawn slope: the skis never more than 2 cm under the snow
+ *   coplanar  the village meshes near every village spot: no two overlapping triangles in the same plane (z-fighting: the flickering
+ *             balcony rails); the count of overlapping pairs must be 0
  * plus a ground-level screenshot of each village spot (--shots). Exit 1 on any failure; a per-resort table at the end. */
 import fs from "node:fs";
 import path from "node:path";
@@ -91,7 +93,42 @@ try {
             const d = hit.point.y - h;
             if (Math.abs(d) > Math.abs(worstRay)) { worstRay = d; worstWhat = `${hit.object.parent ? hit.object.parent.name : ''}/${hit.object.name} r${rr.toFixed(0)}`; }
           }
-          return { worstStreet, streetVerts: n, worstRay, worstWhat, rays, clear: S.skierClear, above: S.state.y - S.surface.height(S.state.x, S.state.z) };
+          // coplanar overlaps in the village meshes within 120 m (the near detail level is built there)
+          let coplanar = 0, tris = 0; const copKinds = {}, copSamples = [];
+          const vg = S.scene.getObjectByName('ski-village');
+          if (vg) vg.traverse((o) => {
+            if (!o.isMesh || !o.visible) return;
+            const P = o.geometry.attributes.position;
+            if (!P) return;
+            const groups = new Map();
+            for (let t = 0; t + 2 < P.count; t += 3) {
+              const a = [P.getX(t), P.getY(t), P.getZ(t)], b = [P.getX(t + 1), P.getY(t + 1), P.getZ(t + 1)], c = [P.getX(t + 2), P.getY(t + 2), P.getZ(t + 2)];
+              if (Math.abs(a[0] - x) > 120 || Math.abs(a[2] - z) > 120) continue;
+              const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+              let nx = u[1] * v[2] - u[2] * v[1], ny = u[2] * v[0] - u[0] * v[2], nz = u[0] * v[1] - u[1] * v[0];
+              const area = Math.hypot(nx, ny, nz) / 2;
+              if (area < 0.01) continue;
+              nx /= area * 2; ny /= area * 2; nz /= area * 2;
+              if (nx < -1e-6 || (Math.abs(nx) < 1e-6 && (ny < -1e-6 || (Math.abs(ny) < 1e-6 && nz < 0)))) { nx = -nx; ny = -ny; nz = -nz; }
+              const d = nx * (a[0] - x) + ny * a[1] * 0 + nz * (a[2] - z) + ny * (a[1] - S.state.y);      // local origin: small numbers, a stable key
+              const key = `${Math.round(nx * 300)},${Math.round(ny * 300)},${Math.round(nz * 300)},${Math.round(d * 100)}`;
+              let g = groups.get(key); if (!g) groups.set(key, (g = [])); const I = o.geometry.attributes.aInfo; g.push([a, b, c, nx, ny, nz, I ? I.getW(t) : -1, I ? I.getX(t) : -1]);
+              tris++;
+            }
+            // 2D separating-axis test on the plane's two dominant axes, each triangle shrunk 1 cm towards its middle (shared edges do not count)
+            const proj = (tri, ax, ay) => { const m = [0, 1, 2].map((i) => (tri[0][i] + tri[1][i] + tri[2][i]) / 3); return [0, 1, 2].map((k) => { const p = tri[k]; const dx = p[ax] - m[ax], dy = p[ay] - m[ay]; const l = Math.hypot(dx, dy) || 1; const sh = Math.max(0, l - 0.01) / l; return [m[ax] + dx * sh, m[ay] + dy * sh]; }); };
+            const sep = (A, B) => { for (const T of [A, B]) for (let i = 0; i < 3; i++) { const p = T[i], q = T[(i + 1) % 3]; const nx2 = q[1] - p[1], ny2 = p[0] - q[0]; let a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity; for (const r of A) { const d2 = r[0] * nx2 + r[1] * ny2; a0 = Math.min(a0, d2); a1 = Math.max(a1, d2); } for (const r of B) { const d2 = r[0] * nx2 + r[1] * ny2; b0 = Math.min(b0, d2); b1 = Math.max(b1, d2); } if (a1 <= b0 + 1e-6 || b1 <= a0 + 1e-6) return true; } return false; };
+            for (const g of groups.values()) {
+              if (g.length < 2 || g.length > 600) continue;
+              const [, , , nx, ny, nz] = g[0];
+              const dom = Math.abs(nx) > Math.abs(ny) && Math.abs(nx) > Math.abs(nz) ? 0 : Math.abs(ny) > Math.abs(nz) ? 1 : 2;
+              const ax = dom === 0 ? 1 : 0, ay = dom === 2 ? 1 : 2;
+              const pr = g.map((t) => proj(t, ax, ay));
+              const onPlane = (A, B) => B.slice(0, 3).every((q) => Math.abs(A[3] * (q[0] - A[0][0]) + A[4] * (q[1] - A[0][1]) + A[5] * (q[2] - A[0][2])) < 0.003);
+              for (let i = 0; i < pr.length; i++) for (let j = i + 1; j < pr.length; j++) if (onPlane(g[i], g[j]) && !sep(pr[i], pr[j])) { coplanar++; const k2 = `p${g[i][6]}/${g[j][6]} s${g[i][7]} n${ny.toFixed(2)}`; copKinds[k2] = (copKinds[k2] || 0) + 1; if (copSamples.length < 4) copSamples.push([g[i].slice(0, 3).map((q) => q.map((v) => +v.toFixed(2))), g[j].slice(0, 3).map((q) => q.map((v) => +v.toFixed(2)))]); }
+            }
+          });
+          return { coplanar, copKinds, copSamples, villageTris: tris, worstStreet, streetVerts: n, worstRay, worstWhat, rays, clear: S.skierClear, above: S.state.y - S.surface.height(S.state.x, S.state.z) };
         }, { x, z });
         if (shots) {
           await page.evaluate(({ x, z }) => { window.__ski.setCamera(x - 14, z - 9, 2.2, x + 10, z + 6, 1.0, 62); }, { x, z });
@@ -122,9 +159,12 @@ try {
       const worstRay = rows.reduce((m, r) => (Math.abs(r.worstRay) > Math.abs(m) ? r.worstRay : m), 0);
       const worstWhat = (rows.find((r) => r.worstRay === worstRay) || {}).worstWhat || '';
       const minClear = Math.min(...rows.map((r) => r.clear), 0.5);
-      const ok = Math.abs(spawn.above) < 0.3 && Math.abs(spawnLate) < 0.3 && Math.abs(worstStreet) <= 0.06 && Math.abs(worstRay) <= 0.06 && minClear >= -0.02 && carve.worst >= -0.02 && !errors.length;
+      const copKinds = {}; for (const r of rows) for (const [k, v] of Object.entries(r.copKinds || {})) copKinds[k] = (copKinds[k] || 0) + v;
+      const coplanar = rows.reduce((m, r) => m + r.coplanar, 0), villageTris = rows.reduce((m, r) => m + r.villageTris, 0);
+      const ok = Math.abs(spawn.above) < 0.3 && Math.abs(spawnLate) < 0.3 && Math.abs(worstStreet) <= 0.06 && Math.abs(worstRay) <= 0.06 && minClear >= -0.02 && carve.worst >= -0.02 && coplanar === 0 && !errors.length;
       if (!ok) fails++;
-      const line = { engine, rid, ok, spawnAbove: +spawn.above.toFixed(3), spawnLate: +spawnLate.toFixed(3), villages: rows.length, worstStreet: +worstStreet.toFixed(3), worstRay: +worstRay.toFixed(3), worstWhat, minSkiClear: +minClear.toFixed(3), carveSki: +carve.worst.toFixed(3), errors: errors.slice(0, 3) };
+      const line = { engine, rid, ok, spawnAbove: +spawn.above.toFixed(3), spawnLate: +spawnLate.toFixed(3), villages: rows.length, worstStreet: +worstStreet.toFixed(3), worstRay: +worstRay.toFixed(3), worstWhat, minSkiClear: +minClear.toFixed(3), coplanar, copKinds, villageTris, carveSki: +carve.worst.toFixed(3), errors: errors.slice(0, 3) };
+      if (process.env.COP_DEBUG) console.log(JSON.stringify(rows.map((r) => r.copSamples)));
       table.push(line);
       console.log(JSON.stringify(line));
       await ctx.close();
