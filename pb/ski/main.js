@@ -1028,7 +1028,9 @@ async function boot() {
       skier.setVisible(!(ride && rideView === 'window' && ride.pose === 'stand' && !game.camPose));     // round 6: in a cabin, the window view is his own eyes
       if (game.orbit) {                                                // debug: a camera that circles the skier (model checks)
         const o = game.orbit, a = st.heading + o.angle * Math.PI / 180;
-        game.camPose = { x: st.x + Math.cos(a) * o.dist, z: st.z + Math.sin(a) * o.dist, y: st.y + o.h, tx: st.x, ty: st.y + 0.8, tz: st.z, fov: o.fov || 40 };
+        const ox = st.x + Math.cos(a) * o.dist, oz = st.z + Math.sin(a) * o.dist;
+        // round 7 (A): never under the snow (an uphill bank beside the skier put this debug camera inside the slope: a 'wall' of skirts)
+        game.camPose = { x: ox, z: oz, y: Math.max(st.y + o.h, surface.height(ox, oz) + 0.6), tx: st.x, ty: st.y + 0.8, tz: st.z, fov: o.fov || 40 };
       }
       const mpView = mp && mp.viewState();
       const view = mpView || st;                                         // online race: watching another skier after my finish

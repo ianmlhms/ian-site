@@ -203,16 +203,17 @@ try {
         const p = S.pistes.list.find((q) => q.diff === 'red' && q.length > 800) || S.pistes.list[0];
         const a = p.at(Math.min(200, p.length / 3), {});
         S.place(a.x, a.z, Math.atan2(a.dz, a.dx));
-        let worst = 0;
+        let worst = 0, camLow = 99;
         const t0 = performance.now();
         while (performance.now() - t0 < 6000) {
           const t = (performance.now() - t0) / 1000;
           S.setInput({ steer: Math.sin(t * 1.6) > 0 ? 1 : -1, tuck: 0, brake: 0, push: 0, jump: false });
           await new Promise((res) => requestAnimationFrame(res));
           if (S.state.grounded && S.state.crash === 0) worst = Math.min(worst, S.skierClear);
+          camLow = Math.min(camLow, S.camera.position.y - S.surface.height(S.camera.position.x, S.camera.position.z));
         }
         S.setInput(null);
-        return { worst, kmh: S.state.speed * 3.6 };
+        return { worst, camLow, kmh: S.state.speed * 3.6 };
       });
       const worstStreet = rows.reduce((m, r) => (Math.abs(r.worstStreet) > Math.abs(m) ? r.worstStreet : m), 0);
       const worstRay = rows.reduce((m, r) => (Math.abs(r.worstRay) > Math.abs(m) ? r.worstRay : m), 0);
@@ -220,9 +221,9 @@ try {
       const minClear = Math.min(...rows.map((r) => r.clear), 0.5);
       const copKinds = {}; for (const r of rows) for (const [k, v] of Object.entries(r.copKinds || {})) copKinds[k] = (copKinds[k] || 0) + v;
       const coplanar = rows.reduce((m, r) => m + r.coplanar, 0), villageTris = rows.reduce((m, r) => m + r.villageTris, 0);
-      const ok = Math.abs(spawn.above) < 0.3 && Math.abs(spawnLate) < 0.3 && Math.abs(worstStreet) <= 0.06 && Math.abs(worstRay) <= 0.06 && minClear >= -0.02 && carve.worst >= -0.02 && coplanar === 0 && cracks === 0 && !errors.length;
+      const ok = Math.abs(spawn.above) < 0.3 && Math.abs(spawnLate) < 0.3 && Math.abs(worstStreet) <= 0.06 && Math.abs(worstRay) <= 0.06 && minClear >= -0.02 && carve.worst >= -0.02 && coplanar === 0 && cracks === 0 && carve.camLow >= 0.3 && !errors.length;
       if (!ok) fails++;
-      const line = { engine, rid, ok, spawnAbove: +spawn.above.toFixed(3), spawnLate: +spawnLate.toFixed(3), villages: rows.length, worstStreet: +worstStreet.toFixed(3), worstRay: +worstRay.toFixed(3), worstWhat, minSkiClear: +minClear.toFixed(3), coplanar, copKinds, villageTris, terrainSpots: terrain.length, terrainCracks: cracks, terrainWorst: Math.max(...terrain.map((t) => Math.abs(t.worst))), carveSki: +carve.worst.toFixed(3), errors: errors.slice(0, 3) };
+      const line = { engine, rid, ok, spawnAbove: +spawn.above.toFixed(3), spawnLate: +spawnLate.toFixed(3), villages: rows.length, worstStreet: +worstStreet.toFixed(3), worstRay: +worstRay.toFixed(3), worstWhat, minSkiClear: +minClear.toFixed(3), coplanar, copKinds, villageTris, terrainSpots: terrain.length, terrainCracks: cracks, terrainWorst: Math.max(...terrain.map((t) => Math.abs(t.worst))), carveSki: +carve.worst.toFixed(3), camOverSnow: +carve.camLow.toFixed(2), errors: errors.slice(0, 3) };
       if (process.env.COP_DEBUG) console.log(JSON.stringify(rows.map((r) => r.copSamples)));
       table.push(line);
       console.log(JSON.stringify(line));
