@@ -234,16 +234,20 @@ def chain_runs(chains, runs, dem):
         pts = [parts[0]["p"]]
         ok = True
         for a, b in zip(parts, parts[1:]):
-            gap = float(math.hypot(*(a["p"][-1] - b["p"][0])))
-            if gap > CHAIN_GAP:
+            # the next piste joins where it passes closest to this one's end (often its start; the Kandahar's lower part runs on from
+            # Galzig, and the Kapall part merges into it half way down)
+            d = np.hypot(b["p"][:, 0] - a["p"][-1][0], b["p"][:, 1] - a["p"][-1][1])
+            k = int(np.argmin(d))
+            gap = float(d[k])
+            if gap > CHAIN_GAP or k > len(b["p"]) - 3:
                 log("chain %s: %s -> %s are %.0f m apart, not chained" % (ch["name"], a["name"], b["name"], gap))
                 ok = False
                 break
             if gap > 5:
-                link = np.linspace(a["p"][-1], b["p"][0], max(2, int(gap / 5) + 1))[1:-1]
+                link = np.linspace(a["p"][-1], b["p"][k], max(2, int(gap / 5) + 1))[1:-1]
                 if len(link):
                     pts.append(link)
-            pts.append(b["p"])
+            pts.append(b["p"][k:])
         if not ok:
             continue
         p = resample(np.concatenate(pts), 5.0)
@@ -642,7 +646,7 @@ def build_buildings(frame, dem_raw):
     # villages flagged "chalet" (Méribel, Courchevel: a building code that wants wood and stone) paint even big blocks as chalets
     chalet = [(*frame.to_world(v[1], v[2]), v[3]) for v in RESORTS[frame.rid].get("villages", ()) if len(v) > 4 and v[4] == "chalet"]
     # villages flagged "modern" (the Kronplatz summit, Klein Matterhorn): today's mountain architecture, kind 4 (wood, glass, stone, flat
-    # roofs, at most 3 floors unless OSM says more)
+    # roofs, at most 2 floors unless OSM says more: the summit restaurants and stations sit low, the Concordia bell stands above them)
     modern = [(*frame.to_world(v[1], v[2]), v[3]) for v in RESORTS[frame.rid].get("villages", ()) if len(v) > 4 and v[4] == "modern"]
     for e in load_osm(frame.rid, "buildings"):
         if e["type"] != "way" or "geometry" not in e:
@@ -700,7 +704,7 @@ def build_buildings(frame, dem_raw):
         if kind in (0, 1) and any(math.hypot(cx_ - vx, cz_ - vz) < vr for vx, vz, vr in modern for cx_, cz_ in [p.mean(axis=0)]):
             kind = 4
             if lv is None:
-                levels = min(levels, 3)
+                levels = min(levels, 2)
         if t.get("man_made") in ("tower", "mast") or t.get("tower:type") == "communication":
             kind = 5                                           # a slender tower (the Kronplatz transmitter), not a 50 m block
         try:
@@ -717,6 +721,66 @@ def build_buildings(frame, dem_raw):
         out.append({"poly": p, "row": [round(cx, 1), round(cz, 1), round(L, 1), round(W, 1), round(ang % math.pi, 3), round(eave, 1), round(ridge, 1), round(ground, 1), kind,
                                        foot, roof, int(round(levels))]})
     log("buildings", len(out))
+    return out
+
+
+# Village streets (roads.json, drawn by pb/ski/roads.js as cleared / snowy streets): OSM roads inside the villages and next to their
+# houses, never on a piste. Half widths in m per highway class; tracks stay under the snow.
+ROAD_HALF = {"primary": 4.2, "secondary": 3.8, "tertiary": 3.4, "unclassified": 3.0, "residential": 3.0, "road": 3.0,
+             "living_street": 2.6, "pedestrian": 2.6, "service": 2.2}
+ROAD_NEAR_HOUSES = 45.0           # m: a street counts as a village street this close to a kept building
+
+
+def build_roads(frame, cfg, buildings, pmask):
+    """[[half width dm, x0, z0, dx, dz, ...]] in half metres (deltas after the first point), for roads.json."""
+    path = os.path.join(work_dir(frame.rid, "osm"), "roads.json")
+    if not os.path.exists(path):
+        return []
+    C = 20.0
+    nz, nx = int(frame.depth / C) + 1, int(frame.width / C) + 1
+    near = np.zeros((nz, nx), bool)
+    for b in buildings:
+        i, j = int(b["row"][0] / C), int(b["row"][1] / C)
+        if 0 <= i < nx and 0 <= j < nz:
+            near[j, i] = True
+    near = ndimage.distance_transform_edt(~near) * C <= ROAD_NEAR_HOUSES
+    jj, ii = np.mgrid[0:nz, 0:nx]
+    for v in cfg.get("villages", ()):
+        vx, vz = frame.to_world(v[1], v[2])
+        near |= np.hypot(ii * C + C / 2 - vx, jj * C + C / 2 - vz) <= v[3] * 0.9
+    out, total = [], 0.0
+    for e in load_osm(frame.rid, "roads"):
+        hw = ROAD_HALF.get(e.get("tags", {}).get("highway"))
+        if not hw or e["type"] != "way" or "geometry" not in e or e.get("tags", {}).get("tunnel") == "yes":
+            continue
+        q = resample(way_xz(frame, e["geometry"]), 5.0)
+        if len(q) < 2:
+            continue
+        i = np.clip((q[:, 0] / C).astype(int), 0, nx - 1)
+        j = np.clip((q[:, 1] / C).astype(int), 0, nz - 1)
+        pi = np.clip((q[:, 0] / NEAR_STEP).astype(int), 0, pmask.shape[1] - 1)
+        pj = np.clip((q[:, 1] / NEAR_STEP).astype(int), 0, pmask.shape[0] - 1)
+        inside = (q[:, 0] >= 0) & (q[:, 0] <= frame.width) & (q[:, 1] >= 0) & (q[:, 1] <= frame.depth)
+        keep = near[j, i] & (pmask[pj, pi] < 0.3) & inside
+        k = 0
+        while k < len(q):
+            if not keep[k]:
+                k += 1
+                continue
+            m = k
+            while m < len(q) and keep[m]:
+                m += 1
+            seg = q[k:m]
+            if len(seg) >= 3:
+                seg = dp_simplify(seg, 1.2)
+                h2 = np.round(seg * 2).astype(int)
+                flat_ = [int(round(hw * 10)), int(h2[0, 0]), int(h2[0, 1])]
+                for a, b in zip(h2[:-1], h2[1:]):
+                    flat_ += [int(b[0] - a[0]), int(b[1] - a[1])]
+                out.append(flat_)
+                total += polyline_len(seg)
+            k = m
+    log("village streets: %d polylines, %.1f km" % (len(out), total / 1000))
     return out
 
 
@@ -1061,6 +1125,8 @@ def main():
 
     with open(os.path.join(out, "buildings.json"), "w", encoding="utf-8") as fh:
         json.dump([b["row"] for b in buildings], fh, separators=(",", ":"))
+    with open(os.path.join(out, "roads.json"), "w", encoding="utf-8") as fh:
+        json.dump({"v": 1, "unit": 0.5, "roads": build_roads(frame, cfg, buildings, mask)}, fh, separators=(",", ":"))
 
     mw, mh = paint_map(frame, groomed, classes, os.path.join(out, "map.webp"))
 

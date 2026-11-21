@@ -126,8 +126,9 @@ RESORTS = {
         "bbox": (47.095, 10.088, 47.232, 10.312),
         "dem": ["at-dgm", "copernicus-glo30"], "far": ["copernicus-glo30"],
         "start": "Kandahar",
-        # the World Cup course is two OSM pistes (Kapall start -> Galzig, then on to the finish): one timed run of the two
-        "chains": [{"name": "Kandahar", "pistes": ["Kandahar-Kapall", "Kandahar-Galzig"]}],
+        # the World Cup course is two OSM pistes: Kandahar-Kapall from the start, then "Fang" down to the finish in St. Anton (the
+        # Kandahar-Galzig is a separate upper part that joins lower down; it stays a run of its own)
+        "chains": [{"name": "Kandahar", "pistes": ["Kandahar-Kapall", "Fang"]}],
         "near_keep": 350.0,                                  # 5 m tiles only this close to pistes, lifts, houses (10 MB budget)
         "tree_line": 2000.0, "derived_forest": 1850.0,       # north side of the Alps: the forest ends near 1900 m (St. Anton 1300 m, St. Christoph 1800 m bare)
         "villages": [

@@ -19,6 +19,7 @@ import { createShadows } from './shadows.js';
 import { createPoles, createRunProps, createSigns } from './props.js';
 import { createLifts } from './lifts.js';
 import { createVillage } from './village.js';
+import { createRoads, decodeRoads } from './roads.js';
 import { createLandmarks } from './landmarks.js';
 import { createPisteSet } from './pistes.js';
 import { createSkierState, stepSkier } from './skier.js';
@@ -134,7 +135,12 @@ async function boot() {
   const chase = createChaseCamera(surface);
   let snowfall = createSnowfall({ scene, env, count: quality.snowflakes });
   const spray = createSpray({ scene, count: quality.spray });
-  let lifts = null, village = null, landmarks = null;
+  let lifts = null, village = null, landmarks = null, roads = null, roadRows = null;
+  // the village streets are draped on the 5 m ground: built once the extras and every height tile are in
+  const tryRoads = () => {
+    if (roads || !roadRows || !streamer.done()) return;
+    try { roads = createRoads({ scene, roads: roadRows, env, height: (x, z) => field.height(x, z) }); mark('roads'); } catch (error) { console.warn('[ski] streets failed', error); roads = { update() {} }; }
+  };
 
   // streamed height tiles change the heights under them: drop every cache that read them
   streamer.onTile((rect) => {
@@ -151,9 +157,13 @@ async function boot() {
       createSigns({ scene, resort, height: (x, z) => field.height(x, z) });
       landmarks = createLandmarks({ scene, resort, height: (x, z) => surface.height(x, z), pistes });
       mark('lifts');
+      tryRoads();
     }
   });
-  loadExtras(core.root).then(({ buildings }) => { village = createVillage({ scene, rows: buildings, env, height: (x, z) => field.baseHeight(x, z), level }); mark('village'); }).catch((error) => console.warn('[ski] buildings failed', error.message));
+  loadExtras(core.root).then(({ buildings, roads: streets }) => {
+    village = createVillage({ scene, rows: buildings, env, height: (x, z) => field.baseHeight(x, z), level }); mark('village');
+    roadRows = decodeRoads(streets); tryRoads();
+  }).catch((error) => console.warn('[ski] buildings failed', error.message));
 
   // ---------------- game state ----------------
   const game = {
@@ -451,6 +461,7 @@ async function boot() {
       if (lifts) lifts.update(time, camera.position.x, camera.position.z, quality.liftRadius);
       if (village) village.update(camera.position.x, camera.position.z, quality.buildingRadius);
       if (landmarks) landmarks.update(camera.position.x, camera.position.z, quality.buildingRadius);
+      if (roads) roads.update(camera.position.x, camera.position.z, quality.buildingRadius);
     }
     env.update(dt, time, camera);
     snowfall.update(time, camera, pixelRatio());

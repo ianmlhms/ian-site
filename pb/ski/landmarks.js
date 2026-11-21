@@ -78,7 +78,7 @@ function bell() {
   for (let k = 0; k < 4; k++) {
     const a = Math.PI / 4 + k * Math.PI / 2;
     const foot = new THREE.Vector3(Math.cos(a) * (R + 2.2), -0.5, Math.sin(a) * (R + 2.2));     // the legs stand outside the drum
-    g.add(beam(foot, top, 0.7, COL.steel));
+    g.add(beam(foot, top, 1.0, 0x5f666e));                    // dark steel: the spire reads against the sky from across the plateau
   }
   const ring = new THREE.Mesh(new THREE.TorusGeometry(2.6, 0.2, 6, 20), mat(COL.steel));
   ring.rotation.x = Math.PI / 2; ring.position.y = H + 9.6;

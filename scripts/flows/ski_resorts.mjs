@@ -7,8 +7,8 @@ import { runIfMain } from "./lib.mjs";
 
 const CASES = {
   "3vallees": { title: "Les 3 Vallées", start: "combe-de-la-saulire", credit: /IGN/, landmarks: 0, minPistes: 150 },
-  zermatt: { title: "Zermatt · Cervinia", start: "riffelalp", credit: /swisstopo/, landmarks: 0, minPistes: 60 },
-  arlberg: { title: "St. Anton · Arlberg", start: "kandahar-kapall", credit: /BEV/, landmarks: 6, minPistes: 60 },
+  zermatt: { title: "Zermatt · Cervinia", start: "riffelalp", credit: /swisstopo/, landmarks: 2, minPistes: 60 },
+  arlberg: { title: "St. Anton · Arlberg", start: "kandahar", credit: /BEV/, landmarks: 5, minPistes: 60 },
   kronplatz: { title: "Kronplatz", start: "sylvester", credit: /Bozen - Südtirol/, landmarks: 2, minPistes: 30 },
 };
 

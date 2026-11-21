@@ -106,7 +106,9 @@ export function createTileStreamer({ resort, field, root }) {
 
 /** Buildings and the painted map come after the start (not needed for the first run). */
 export async function loadExtras(root) {
-  const res = await fetch(root + 'buildings.json');
+  const [res, streets] = await Promise.all([fetch(root + 'buildings.json'), fetch(root + 'roads.json').catch(() => null)]);
   if (!res.ok) throw new Error(`buildings.json: HTTP ${res.status}`);
-  return { buildings: await res.json() };
+  let roads = null;
+  try { if (streets && streets.ok) roads = await streets.json(); } catch (error) { console.warn('[ski] roads.json unreadable', error.message); }
+  return { buildings: await res.json(), roads };            // roads.json is optional (data baked before round 3 has none)
 }

@@ -121,17 +121,18 @@ export function createSnowMaterial(env, { cheap = false, treeRadius = 400, fores
         float sPhase = vWorld.y * 0.12 + nA.r * 2.0 + nB.g * 1.2 + nL.g * 2.0;
         float sAA = clamp(1.0 - fwidth(sPhase) * 1.5, 0.0, 1.0);
         float sLayer = fract(sPhase);
-        float strata = 0.5 + 0.5 * sin(sPhase * 6.2832) * sAA;
+        float steepK = smoothstep(mix(0.22, 0.1, farK), mix(0.42, 0.25, farK), slope);                                 // layers only on real faces: gentle rock is blotchy
+        float strata = 0.5 + 0.5 * sin(sPhase * 6.2832) * sAA * steepK;
         vec3 rockCol = mix(vec3(0.33, 0.33, 0.345), vec3(0.55, 0.535, 0.52), strata * 0.35 + nB.r * 0.65);
         rockCol *= 0.92 + 0.16 * nL.b;                                                  // big patches: darker and lighter faces
         float rockLit = band(smoothstep(-0.2, 0.75, dot(N, uSunDir)) * sunVis);
         rockCol = rockCol * (shade * 0.8 * (1.0 - 0.25 * max(ao, 0.0)) + uSunColor * rockLit * 0.9);
-        float snowLine = smoothstep(0.8, 0.88, sLayer) * (1.0 - smoothstep(0.9, 0.98, sLayer)) * smoothstep(0.45, 0.65, nB.a) * sAA * (1.0 - smoothstep(0.35, 0.7, slope));
+        float snowLine = smoothstep(0.8, 0.88, sLayer) * (1.0 - smoothstep(0.9, 0.98, sLayer)) * smoothstep(0.45, 0.65, nB.a) * sAA * steepK * (1.0 - smoothstep(0.35, 0.7, slope));
         float snowPatch = smoothstep(0.5, 0.78, nB.g * 0.6 + nA.b * 0.4) * (1.0 - smoothstep(0.22, 0.5, slope));     // snow patches in the hollows
         // snow streaks down the gullies, long along the fall line (they read at every distance, unlike the thin strata lines)
         vec2 acrossFall = vec2(-fall.y, fall.x);
         float streakN = texture2D(uNoise, vec2(dot(wp, acrossFall) * 0.021, dot(wp, fall) * 0.0032) + 0.55).g * 0.75 + nL.r * 0.25;
-        float streak = smoothstep(0.56, 0.7, streakN) * (1.0 - smoothstep(0.4, 0.8, slope));
+        float streak = smoothstep(0.56, 0.7, streakN) * steepK * (1.0 - smoothstep(0.4, 0.8, slope));
         rockAmt *= 1.0 - clamp(snowLine * 0.85 + snowPatch * 0.8 + streak * 0.85, 0.0, 1.0);
         vec3 col = mix(snow, rockCol, rockAmt);
         // ---- forests beyond the instanced trees: a dark underlay where the far tree cards stand (forest-far.js draws the trees)

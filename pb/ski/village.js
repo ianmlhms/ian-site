@@ -256,7 +256,7 @@ function prismRail(w, poly, y) {
 /** A transmitter tower: an eight-sided concrete shaft tapering up, a platform ring, the antenna on top. */
 function tower(w, row) {
   const [cx, cz, L, W, , eave, , ground] = row;
-  const r0 = Math.min(3.2, Math.max(1.6, Math.min(L, W) / 2)), r1 = r0 * 0.6, top = ground + eave, N = 8;
+  const r0 = Math.min(2.2, Math.max(1.4, Math.min(L, W) / 3)), r1 = r0 * 0.55, top = ground + eave, N = 8;
   const ring = (r, y) => Array.from({ length: N }, (_, i) => [cx + Math.cos(i / N * Math.PI * 2) * r, y, cz + Math.sin(i / N * Math.PI * 2) * r]);
   const a = ring(r0, ground - SINK), b = ring(r1, top);
   for (let i = 0; i < N; i++) {
