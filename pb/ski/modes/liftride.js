@@ -92,7 +92,7 @@ export function createRide({ lift, path, site, height, factor = RIDE.factor, fro
   const tIn = k === 'drag' ? (path.sub === 'rope' ? 0.4 : RIDE.barDrop) : k === 'carpet' ? 0.3 : RIDE.getIn;
   const uLoad = path.shuttle ? s0 : path.upU(s0);
   const tNeed = tStep + tMove + tIn;
-  let u0 = startU === null ? uLoad - path.spec.speed * tNeed : startU;
+  let u0 = startU === null || !Number.isFinite(startU) ? uLoad - path.spec.speed * tNeed : startU;
   if (path.shuttle) u0 = uLoad;
   const approach = uLoad - u0;
   const tArrive = path.shuttle ? tNeed : Math.max(tNeed, Math.min(approach / path.spec.speed, tNeed + RIDE.wait));

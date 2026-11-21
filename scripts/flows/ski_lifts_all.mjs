@@ -103,6 +103,7 @@ export const flow = {
         return by;
       });
       for (const [k, l] of Object.entries(kinds)) {
+        try {
         await page.evaluate((id) => window.__ski.goFree(id), l.id);
         await page.waitForFunction((id) => window.__ski.game.phase === "running" && window.__ski.modes.liftAt && window.__ski.modes.liftAt.id === id, l.id, { timeout: 30000 });
         const zone = await page.evaluate(() => !document.getElementById("liftBtn").hidden);
@@ -135,6 +136,12 @@ export const flow = {
           (on.kind !== "drag" || Math.abs(on.ground) < 0.03) && after.moved < 0.01 && after.speed === 0;
         h.expect(okRide, `${rid} ${k} (${l.name}): button only in the zone (${zone}/${outBtn}), L outside: ${outRide ? "RODE" : "nothing"}, L twice: one boarding (${twice.phase}), on the carrier (${on.pose}${on.kind === "drag" ? `, skis ${(on.ground * 100).toFixed(1)} cm` : ""}), off at the top: ${after.moved.toFixed(3)} m / ${after.speed} m/s in 3 s`);
         summary.push({ rid, k, ok: okRide });
+        } catch (error) {
+          const st = await page.evaluate(() => ({ phase: window.__ski.game.phase, ride: window.__ski.ride && window.__ski.ride.phase, liftAt: window.__ski.modes.liftAt && window.__ski.modes.liftAt.name })).catch(() => ({}));
+          h.expect(false, `${rid} ${k} (${l.name}): ${String(error.message).split("\n")[0]} (${JSON.stringify(st)})`);
+          await page.evaluate(() => { const S = window.__ski; if (S.ride) S.skipRide(); }).catch(() => {});
+          await page.waitForFunction(() => window.__ski.game.phase === "running" && !window.__ski.ride, null, { timeout: 60000 }).catch(() => {});
+        }
       }
       summary.push({ rid, all, holds });
     }

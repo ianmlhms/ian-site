@@ -135,7 +135,7 @@ export function createFreeRun({ resort, pistes, lifts, start, stats: shared = nu
       return s;
     },
     /** Round 6: the skier was moved (fast travel, the end of a challenge): no distance across the jump, a safe spot here. */
-    moved(spot) { lastX = spot.x; lastZ = spot.z; lastY = null; atLift = null; safe = { x: spot.x, z: spot.z, heading: spot.heading || 0 }; },
+    moved(spot) { lastX = spot.x; lastZ = spot.z; lastY = null; safe = { x: spot.x, z: spot.z, heading: spot.heading || 0 }; },     // (R7-B: atLift stays, so the next step reports a change of zone)
   };
   return run;
 }

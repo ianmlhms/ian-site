@@ -331,7 +331,7 @@ export function createLifts({ scene, resort, height }) {
   /** The loop parameter of the next carrier that will reach uTarget (the loading point) at least `minAhead` m away. */
   function nextCarrier(index, uTarget, minAhead = 0) {
     const l = byIndex.get(index);
-    if (!l || l.shuttle) return { u: uTarget - minAhead, d: minAhead };
+    if (!l || l.shuttle || !(l.spec.gap > 0)) return { u: uTarget - minAhead, d: minAhead };       // (a rope tow has no carriers)
     const gap = l.spec.gap;
     const phase = l.rideU !== null ? l.rideU : lastT * l.spec.speed + l.offset;
     let d = (((uTarget - phase) % gap) + gap) % gap;

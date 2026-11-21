@@ -50,9 +50,9 @@ export const flow = {
     const hourBefore = s0.hour;
     await page.click("#liftBtn");
     await page.waitForFunction(() => window.__ski.game.phase === "lift", null, { timeout: 5000 });
-    await h.pause(1500);
+    await page.waitForFunction(() => window.__ski.ride && window.__ski.ride.canSkip, null, { timeout: 20000 });     // R7-B: on the carrier first
     await page.click("#rSkip");
-    await page.waitForFunction(() => window.__ski.game.phase === "running" && document.documentElement.dataset.skiLifts === "1", null, { timeout: 15000 });
+    await page.waitForFunction(() => window.__ski.game.phase === "running" && document.documentElement.dataset.skiLifts === "1", null, { timeout: 40000 });
     const s3 = await state();
     h.expect(Math.hypot(s3.x - lift.top.x, s3.z - lift.top.z) < 120 && s3.stats.lifts === 1, `at the top of ${lift.name} (${Math.round(Math.hypot(s3.x - lift.top.x, s3.z - lift.top.z))} m from the station), 1 lift ridden`);
     h.expect(s3.hour - hourBefore > lift.seconds / 3600 * 0.9, `the clock moved on by the ride (${((s3.hour - hourBefore) * 60).toFixed(1)} min)`);
@@ -120,7 +120,7 @@ export const flow = {
     await page.evaluate(() => window.__ski.env.setTime("random"));
     await page.evaluate(() => window.__ski.modes.clock.set(16.5));
     await h.pause(400);
-    h.expect(await page.evaluate(() => { const l = window.__ski.modes.lifts.list[0]; window.__ski.place(l.bottom.x + 6, l.bottom.z + 6, 0); window.__ski.setInput({ steer: 0, tuck: 0, brake: 1, push: 0, jump: false }); return true; }), "at a lift at half past four");
+    h.expect(await page.evaluate(() => { const l = window.__ski.modes.lifts.list[0], w = window.__ski.modes.lifts.boardAt(l); window.__ski.place(w.x, w.z, w.heading); window.__ski.setInput({ steer: 0, tuck: 0, brake: 1, push: 0, jump: false }); return true; }), "at a lift at half past four");
     await page.waitForFunction(() => !document.getElementById("liftBtn").hidden, null, { timeout: 8000 });
     h.expect(true, "the lifts never close (free ride is the main game)");
     const info = await page.evaluate(() => window.__ski.info());

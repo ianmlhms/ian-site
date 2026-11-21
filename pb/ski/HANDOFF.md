@@ -457,3 +457,45 @@ Ian's requests; our own design (no other game's look, UI, names or content). Bra
   the window view still shows a wide ceiling band; skis vanish in cabins (no outside rack); the gate posts' base takes the banner tint;
   no shared free ride online yet (only the "riding lift X at s" wire state and its drawing); no real train in today's data (checked
   with a synthetic rack railway); the ride's exit can land beside a summit building (it uses the nearest piste start within 80 m).
+
+## Round 7-B (21-22 Nov 2026): every lift real (stations, carriers on the cable, drag lifts, tunnels, aisles)
+Ian's play feedback (Safari, 3 Vallées). Everything is resort-generic and checked on ALL five resorts and EVERY lift.
+- **`lift-site.js` (new, pure)**: both stations of every lift by type (oriented boxes in the end's own frame: a = outward along the
+  line, b = across, +b = the up lane's / boarding side): chair `platform` (deck, canopy on four posts over the wheel, operator hut on the
+  return side, boarding gates), gondola `hall` (open hall, back wall, glazed return-side wall, platform side open), cable car `terminal`
+  (roof over the docked cabin, machine building behind), drag `hut` (wheel mast, hut beside the track start, start line), carpet `belt`
+  ends, rail `rail` (platform hall, buffer wall); tunnel portals for underground funiculars (fixed arc 36 m from each end); a train's
+  `stops` = mid stations (only where the data has them). `solid` parts collide (skier: `world.hit` in main.js, carriers, exits);
+  `pruneCrossings` cuts any part standing in another lift's carrier path or on its riders' walks (twin lifts, shared stations:
+  Matterhorn Express 2/3, Falkenkopf, Vallugagrat), by the ground plan only so drawn and collider worlds agree. `createLiftWorld`:
+  boarding zones (`boardingAt`), `exitOf` (24 directions + points down a piste starting at the top, outside every station / building /
+  low lane, walkable (<= 0.6, else <= 1.0) snow, facing downhill, 15 m clear, the way out clear of parts, buildings, trees and low lanes;
+  `via` = a walk down the piste), `keepBuilding` (OSM buildings in a station or a low lane are left out of the village), `treeBlocked`.
+- **`lift-path.js`**: stations' wheels at boarding height (chair seat at knee height, cabin floor level with the platform), the rope
+  level through the hall (`STATION_LEN`), sag per span (never below the clearance need), wide chairs get their rope farther out (no
+  inner seat at the pylon), a real loop (`loopAt`: up lane, round the top wheel, down lane, round the bottom wheel), jig-back cabins /
+  trains shuttle between their docks (`shuttleAt`, `docks`), drag lifts: track = up lane `side` m beside the pylon line, return rope
+  `back` m on the other side, `track: -1` (bake) puts the track on the left; direction blended over 8 m at polyline bends (no lane
+  jumps); `tunnel` lines dive 15 m per 70 m into the hill (vault under the ground between the portals); new class `carpet`.
+- **Carriers** (`modes/carriers.js` = one part list for the instanced pools of lifts.js AND the player's own carrier): grip + hanger arm
+  on every chair / cabin, near + far LOD per model (chairs per seat count), swing, round the bull-wheels; empty pool chairs have the
+  bar up, the player's comes down 9 m out of the station; T-bar / platter / J-bar per OSM kind on a spring line (retracted when empty,
+  reels out to the rider's hips); rope tows: the rider holds the rope; carpets: a moving belt texture; worn drag track ribbon.
+- **Rides** (`modes/liftride.js`): phases `board` (cabins: step out of the skis, carry them on the shoulder to the door; chair / drag /
+  carpet: skate to the loading line; the NEXT carrier of the lift's own loop arrives: `lifts.nextCarrier`, at most 2.5 s wait) ->
+  `ride` (skip only here, after 0.6 s: one press = one boarding) -> `alight` (off onto the outer platform, out of the station to the
+  exit, cabins: skis down + click in) -> done; then main.js `game.hold`: 0 km/h until steer / push / tuck / jump / brake (also in the
+  boarding zone after fast travel). Window view in cabins from just behind the front glass (no ceiling band); tunnel: the chase camera
+  stays in the tube (`inside`, no ground clamp). Hook for agent A's look module: `window.__skiLook.apply(cam, { inside, kind, lift })`.
+  skier-model.js pose `carry` (skis on the right shoulder, walking gait from `state.walk`); wire pose codes 2/3/5 = carry, 6 = belt.
+- **Bake** (`scripts/ski/lift_sites.py`, called by bake.py): twin drag lifts mapped on top of each other set 10 m apart, drag track
+  side away from neighbours, pylons moved along their line out of another lift's lane, level station pads (<= 9 m cut/fill, 12 m
+  blend), tree aisles in the class raster (aisle half widths AISLE, kept where the carriers pass >= 15 m over the treetops; stations +4 m
+  and pylon bases cleared). scatter.js takes `opts.guard` (lift-site.js `liftTreeGuard`) so no near tree or boulder stands in an aisle.
+  All five resorts rebaked (park kept).
+- **Tests**: `node scripts/ski/round7b-test.mjs` (every lift of every resort on the 5 m heights: both stations, waiting spot in its own
+  zone and clear, 6 m outside = no boarding, no skip while boarding, board > ride > alight > done once, no jump, rider + every carrier
+  of the loop never touch a pylon / station part / tree (exact rectangle SAT), drag skis on the track within 3 cm beside the pylon
+  line, the return loop, tunnels underground, the exit rules); flow `ski-lifts-all` (FLOW_SKI_RESORTS=..., Chromium and
+  FLOW_BROWSER=webkit: the same per-lift checks with the page's own objects, 0 km/h for 3 s after every exit, one real ride per kind with
+  the keys incl. the double press). Shots: `scripts/ski/round7b-shots.mjs` (through shot.mjs --script).
