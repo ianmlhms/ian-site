@@ -74,7 +74,6 @@ RESORTS = {
             # kind, name, lon, lat (+ kind options); placed on the terrain by the bake, drawn by pb/ski/landmarks.js
             {"kind": "bell", "name": "Concordia 2000", "lon": 11.95827, "lat": 46.73876},          # OSM man_made=tower, 21.8 m
             {"kind": "mmm", "name": "Messner Mountain Museum Corones", "lon": 11.95440, "lat": 46.73731, "face": 215, "clear": 30},  # OSM footprint; glass towards the Dolomites
-            {"kind": "plateau", "name": "Kronplatz 2275 m", "lon": 11.9575, "lat": 46.7392, "r": 210},
         ],
     },
     "zermatt": {"name": "Zermatt · Cervinia", "short": "Matterhorn", "country": "CH", "crs": "EPSG:2056",

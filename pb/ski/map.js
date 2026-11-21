@@ -100,7 +100,6 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick }) {
     }
     // landmarks (resort.json "landmarks"): a small violet diamond and the name; a race piste is named on its start
     for (const lm of resort.landmarks || []) {
-      if (lm.kind === 'plateau' && zoom > 2.5) continue;
       const [x, y] = toScreen(lm.x, lm.z, sz);
       if (x < -60 || y < -20 || x > sz.w + 60 || y > sz.h + 20) continue;
       g.fillStyle = '#6b3fa0'; g.beginPath(); g.moveTo(x, y - 6); g.lineTo(x + 5, y); g.lineTo(x, y + 6); g.lineTo(x - 5, y); g.closePath(); g.fill();

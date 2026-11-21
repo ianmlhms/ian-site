@@ -5,7 +5,6 @@
  *                   hanging in a frame inside
  *   mmm             Messner Mountain Museum Corones (Zaha Hadid): angular concrete canopies rising out of the summit slope, dark glass
  *                   fronts, the long viewing window cantilevered towards `face` (degrees from north)
- *   plateau         a summit plateau: only a label on the piste map (the terrain itself is the landmark)
  *   summit-station  a summit cable car station: `antenna` = the white lattice mast of the Valluga, `big` = a large glass-fronted top
  *                   station (Galzig), a name board either way
  *   pass            a pass: the road sign with the name and a row of flag poles (Arlberg pass at St. Christoph)
@@ -15,7 +14,7 @@
 const THREE = window.THREE;
 
 const COL = {
-  stone: 0x8c8174, concrete: 0xbab7b0, steel: 0x9aa1a9, bronze: 0x7a5f3a, glass: 0x2c3946, wood: 0x6b4a32, roofDark: 0x3d4148,
+  stone: 0x6c5f53, concrete: 0xbab7b0, steel: 0x7b838c, bronze: 0x7a5f3a, glass: 0x2c3946, wood: 0x6b4a32, roofDark: 0x3d4148,
   white: 0xf2f2ee, red: 0xd2322b, antenna: 0xe9edf0, sign: 0xf4f1e8, netRed: 0xe0362a,
 };
 
@@ -77,7 +76,7 @@ function bell() {
   const top = new THREE.Vector3(0, H + 15.2, 0);           // 21.8 m in all (OSM height)
   for (let k = 0; k < 4; k++) {
     const a = Math.PI / 4 + k * Math.PI / 2;
-    const foot = new THREE.Vector3(Math.cos(a) * (R + 1.2), H - 1.5, Math.sin(a) * (R + 1.2));
+    const foot = new THREE.Vector3(Math.cos(a) * (R + 2.2), -0.5, Math.sin(a) * (R + 2.2));     // the legs stand outside the drum
     g.add(beam(foot, top, 0.7, COL.steel));
   }
   const ring = new THREE.Mesh(new THREE.TorusGeometry(2.6, 0.2, 6, 20), mat(COL.steel));
@@ -98,7 +97,7 @@ function bell() {
 }
 
 /** A concrete cowl rising out of the slope: side profile (z back -> front, y up) extruded across w, a pointed visor over a dark glass front,
- * sheared sideways by `skew` (the angular Hadid look). The front faces -z. */
+ * sheared sideways by `skew` (the angular Hadid look). The returned group's front faces -z. */
 function cowl(w, d, h, skew) {
   const g = new THREE.Group();
   const shape = new THREE.Shape();
@@ -111,10 +110,12 @@ function cowl(w, d, h, skew) {
   geo.computeVertexNormals();
   g.add(new THREE.Mesh(geo, mat(COL.concrete)));
   const glass = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.78, h - 2.2), mat(COL.glass, { side: THREE.DoubleSide }));
-  glass.position.set(skew * 0.5, (h - 2.2) / 2 + 0.1, -0.15);
-  glass.rotation.y = Math.PI;
+  glass.position.set(skew * 0.5, (h - 2.2) / 2 + 0.1, 0.15);
   g.add(glass);
-  return g;
+  const turned = new THREE.Group();              // the extrusion's front faces +z: turn it to face -z like every landmark
+  g.rotation.y = Math.PI;
+  turned.add(g);
+  return turned;
 }
 
 function mmm(lm) {
@@ -134,7 +135,7 @@ function mmm(lm) {
   win.position.set(3, 4.3, -12.1);
   g.add(tube, win);
   g.rotation.y = -THREE.MathUtils.degToRad(lm.face ?? 180);    // the glass fronts (local -z) look towards `face` (azimuth: x east, z south)
-  return { group: g, footprint: 22 };
+  return { group: g, footprint: 5 };          // dug into the summit: sits at its centre height, the slope may cover the back
 }
 
 function lattice(height, width, color) {
