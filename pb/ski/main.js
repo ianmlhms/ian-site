@@ -75,14 +75,13 @@ async function boot() {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
   THREE.ColorManagement.enabled = false;
   renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
-  const post = createPost({ renderer, spec: quality.res });
-  if (param('res')) { post.setDynamic(false); }                       // ?res=fixed: tests that compare pictures keep the starting resolution
-  const pixelRatio = () => post.ratio();                               // the internal pixel ratio (point sprites)
+  let post = null;
+  const pixelRatio = () => (post ? post.ratio() : 1);                  // the internal pixel ratio (point sprites)
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(CAMERA.fov, 1, CAMERA.near, quality.far * 1.3);
   function resize() {
     const w = canvas.clientWidth || window.innerWidth, h = canvas.clientHeight || window.innerHeight;
-    post.setSize(w, h);
+    if (post) post.setSize(w, h);
     camera.aspect = w / Math.max(1, h);
     camera.updateProjectionMatrix();
   }
@@ -95,6 +94,9 @@ async function boot() {
   noise.anisotropy = Math.min(4, maxAniso);
   const detail = createDetailTexture(Math.min(8, maxAniso));           // round 5: fine ground detail (grain, crags, sparkle)
   const env = createEnv({ scene, noise, detail, params });
+  post = createPost({ renderer, spec: quality.res, first: env.sky });
+  if (param('res') === 'fixed') post.setDynamic(false);                 // ?res=fixed: tests that compare pictures keep the starting resolution
+  resize();
   const shadows = createShadows({ renderer, sun: env.sun, u: env.u });
   shadows.setLevel(level);
   const ui = createUi(document.getElementById('ui'));
@@ -373,6 +375,7 @@ async function boot() {
     if (mp) { game.phase = 'hold'; game.ghost = null; hud.count(''); }          // online race: net/index.js starts the 3-2-1 for everybody
     if (window.Arcade && window.Arcade.startRun) window.Arcade.startRun();
     canvas.focus({ preventScroll: true });
+    post.hold(6000);                         // the countdown + the first seconds: tiles, trees and shaders still settle
     mark('start');
   }
 

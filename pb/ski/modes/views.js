@@ -229,14 +229,16 @@ export function createParkView({ scene, layout, height }) {
       parts.push([new THREE.CylinderGeometry(0.035, 0.035, 1.2, 5), PARK_COL.leg, place(a.x, ya + 0.45, a.z)]);
     }
     // the gate at the drop-in: two posts and the park's banner across the line
-    const gp = at(-7, 0);
-    const gl = at(-7, -(layout.hw - 2)), gr = at(-7, layout.hw - 2);
+    // (behind and above the START arch of the run props: 12 m wide, the banner 6.6 m up)
+    const GATE_S = -13, GATE_HALF = 6;
+    const gp = at(GATE_S, 0);
+    const gl = at(GATE_S, -GATE_HALF), gr = at(GATE_S, GATE_HALF);
     const gy = Math.max(height(gl.x, gl.z), height(gr.x, gr.z), height(gp.x, gp.z));
-    for (const q of [gl, gr]) { const g0 = height(q.x, q.z); parts.push([new THREE.BoxGeometry(0.22, gy + 5.2 - g0 + 0.6, 0.22), PARK_COL.sign, place(q.x, (gy + 5.2 + g0 - 0.6) / 2, q.z, yaw)]); }
-    const bw = (layout.hw - 2) * 2;
-    parts.push([new THREE.BoxGeometry(0.14, bw / 4 + 0.16, bw + 0.3), PARK_COL.sign, place(gp.x, gy + 5.2 - bw / 8, gp.z, yaw)]);
-    quads.push([bw, bw / 4, place(gp.x, gy + 5.2 - bw / 8, gp.z, yaw).multiply(m4().makeTranslation(-0.08, 0, 0)), 0, 0.5, 1, 1]);
-    quads.push([bw, bw / 4, place(gp.x, gy + 5.2 - bw / 8, gp.z, yaw + Math.PI).multiply(m4().makeTranslation(-0.08, 0, 0)), 0, 0.5, 1, 1]);
+    for (const q of [gl, gr]) { const g0 = height(q.x, q.z); parts.push([new THREE.BoxGeometry(0.22, gy + 8.1 - g0 + 0.6, 0.22), PARK_COL.sign, place(q.x, (gy + 8.1 + g0 - 0.6) / 2, q.z, yaw)]); }
+    const bw = GATE_HALF * 2;
+    parts.push([new THREE.BoxGeometry(0.14, bw / 4 + 0.16, bw + 0.3), PARK_COL.sign, place(gp.x, gy + 8.1 - bw / 8, gp.z, yaw)]);
+    quads.push([bw, bw / 4, place(gp.x, gy + 8.1 - bw / 8, gp.z, yaw).multiply(m4().makeTranslation(-0.08, 0, 0)), 0, 0.5, 1, 1]);
+    quads.push([bw, bw / 4, place(gp.x, gy + 8.1 - bw / 8, gp.z, yaw + Math.PI).multiply(m4().makeTranslation(-0.08, 0, 0)), 0, 0.5, 1, 1]);
     const geo = mergeParts(parts);
     if (mesh) { scene.remove(mesh); mesh.geometry.dispose(); }
     if (boards) { scene.remove(boards); boards.geometry.dispose(); }

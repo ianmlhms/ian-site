@@ -51,7 +51,7 @@ const FRAG = `
   }`;
 
 /** spec = QUALITY[level].res: { start, min, max, samples, sharpen, supersample } (pixel ratios against CSS pixels). */
-export function createPost({ renderer, spec }) {
+export function createPost({ renderer, spec, first = null }) {
   let cfg = spec, cssW = 1, cssH = 1, ratio = spec.start, target = null, dynamic = true;
   const material = new THREE.ShaderMaterial({
     uniforms: { tSrc: { value: null }, uTexel: { value: new THREE.Vector2(1, 1) }, uSharpen: { value: 0.4 }, uGrade: { value: 1 } },
@@ -63,6 +63,8 @@ export function createPost({ renderer, spec }) {
   quadScene.add(quad);
   const quadCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
   renderer.info.autoReset = false;                   // two render calls a frame: the numbers of a frame are reset by hand below
+  // `first` = the first mesh of the main pass (the sky): the counters restart there, after the shadow pass, as three's own reset does
+  if (first) first.onBeforeRender = () => renderer.info.reset();
 
   const screenRatio = () => Math.min(window.devicePixelRatio || 1, 2);
   const limits = () => {
@@ -70,7 +72,7 @@ export function createPost({ renderer, spec }) {
     return { top, floor: Math.min(cfg.min, top) };
   };
   // controller state
-  const ctl = { ema: BUDGET_MS, cpu: 0, over: 0, calm: 0, failedAt: Infinity, retryAt: 0, upAt: -1e9, retryWait: RETRY_MS, sum: 0, n: 0, changes: 0 };
+  const ctl = { ema: BUDGET_MS, cpu: 0, over: 0, calm: 0, failedAt: Infinity, retryAt: 0, upAt: -1e9, holdUntil: 0, retryWait: RETRY_MS, sum: 0, n: 0, changes: 0 };
 
   function allocate() {
     const w = Math.max(2, Math.round(cssW * ratio)), h = Math.max(2, Math.round(cssH * ratio));
@@ -121,6 +123,7 @@ export function createPost({ renderer, spec }) {
     /** Once a frame while the game runs: frameMs = time since the last frame, cpuMs = our own JavaScript in it. */
     tick(frameMs, cpuMs) {
       if (frameMs > 250) return;                                  // a hitch (tab switch, a tile burst): not the steady state
+      if (performance.now() < ctl.holdUntil) { ctl.over = 0; ctl.calm = 0; ctl.ema = BUDGET_MS; return; }   // a run just started: tiles, trees and shaders are still settling
       ctl.ema += (frameMs - ctl.ema) * 0.12; ctl.cpu += (cpuMs - ctl.cpu) * 0.12;
       ctl.sum += ratio; ctl.n++;
       if (!dynamic) return;
@@ -141,6 +144,8 @@ export function createPost({ renderer, spec }) {
       }
     },
     setDynamic(on) { dynamic = on; },
+    /** No resolution changes for this long (the first seconds of a run are full of one-off work that is not the steady state). */
+    hold(ms) { ctl.holdUntil = performance.now() + ms; },
     /** The internal pixel ratio (point sprites size themselves by it). */
     ratio: () => ratio,
     atFloor: () => ratio <= limits().floor + 1e-3,

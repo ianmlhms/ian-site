@@ -16,6 +16,7 @@ export const flow = {
   name: "ski-resorts",
   fullChromium: true,
   viewport: { width: 1180, height: 820 },
+  deviceScaleFactor: 2,                    // round 5: a retina screen, so the flow's screenshots show the game as an iPad does
   async run(h) {
     const { page } = h;
     await page.addInitScript(() => {
