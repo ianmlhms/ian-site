@@ -6,7 +6,6 @@ import { FOG_GLSL } from './snow-shader.js';
 
 const THREE = window.THREE;
 const CELL = 2560;
-const STEP = 1.25;                    // m: the ribbon follows the physics lattice (2.5 m) closely: drawn street = the snow the skier stands on
 const LIFT = 0.03;                    // m above the ground; far away the vertex shader pulls the street towards the camera instead
 const BANK = 1.1;                     // m of ploughed snow bank beyond the edge (painted, flat: round 7, no raised ridge)
 
@@ -19,16 +18,6 @@ export function decodeRoads(json) {
     for (let i = 3; i + 1 < r.length; i += 2) { const [x, z] = pts[pts.length - 1]; pts.push([x + r[i] * unit, z + r[i + 1] * unit]); }
     return { hw: r[0] / 10, pts };
   });
-}
-
-function densify(pts) {
-  const out = [pts[0]];
-  for (let i = 1; i < pts.length; i++) {
-    const [ax, az] = pts[i - 1], [bx, bz] = pts[i];
-    const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / STEP));
-    for (let k = 1; k <= n; k++) out.push([ax + (bx - ax) * k / n, az + (bz - az) * k / n]);
-  }
-  return out;
 }
 
 function material(env) {
@@ -47,6 +36,7 @@ function material(env) {
       ${FOG_GLSL}
       void main(){
         float a = abs(vRoad.x);                                 // 0 centre, 1 the edge, > 1 the snow bank
+        if (a > 1.35) discard;                                  // round 7: beyond the painted bank (the lattice cells reach farther)
         vec4 nz = texture2D(uNoise, vW.xz * 0.11);
         vec4 nl = texture2D(uNoise, vW.xz * 0.013 + 0.3);
         float fade = 1.0 - smoothstep(120.0, 600.0, vDist);   // tyre tracks blur into one grey far away
@@ -65,33 +55,67 @@ function material(env) {
   });
 }
 
-/** roads = decodeRoads(roads.json); height(x, z) = the ground. */
+/* Round 7 (A): the streets are drawn ON THE PHYSICS LATTICE. A ribbon with its own vertices cut across the 2.5 m triangles of the
+ * ground and stood up to 10 cm above them between its vertices (Ian, Safari: the skier's feet in the street). Now every 2.5 m cell a
+ * street touches is emitted with the ground's own two triangles (surface.js diagonalIsMain, the same node heights) a hair above it, and
+ * the shader paints the street from the distance to the street's centre line (aRoad.x = across / half width; fragments beyond the bank
+ * are discarded, so the edges stay smooth). Where streets cross, the nearest one paints. */
+import { diagonalIsMain } from './surface.js';
+const LAT = 2.5;
+/** roads = decodeRoads(roads.json); height(x, z) = the PHYSICS ground (surface.height: exact at the lattice nodes). */
 export function createRoads({ scene, roads, env, height }) {
-  const cells = new Map();
+  const cells = new Map();                    // render cell key -> { nodes: Map(nodeKey -> index), pos, road, idx, mark: Set(cellKey) }
+  const nodeVal = new Map();                  // lattice node key -> [|across| / hw, along] of the nearest street
+  const covered = new Set();                  // lattice cells touched by a street (+ its bank)
+  const nk = (i, j) => i * 200003 + j;
   for (const r of roads) {
-    const pts = densify(r.pts);
+    const pts = r.pts;
     if (pts.length < 2) continue;
-    const [mx, mz] = pts[Math.floor(pts.length / 2)];
-    const key = Math.floor(mx / CELL) + ',' + Math.floor(mz / CELL);
-    let c = cells.get(key);
-    if (!c) cells.set(key, (c = { pos: [], road: [], idx: [], cx: (Math.floor(mx / CELL) + 0.5) * CELL, cz: (Math.floor(mz / CELL) + 0.5) * CELL }));
-    const base = c.pos.length / 3;
-    // five rails across: bank out, edge, centre, edge, bank out (the bank rises a little: a ridge of ploughed snow)
-    const rails = [[-(r.hw + BANK), -1.4, -0.01], [-r.hw, -1, 0], [-r.hw * 0.5, -0.5, 0], [0, 0, 0], [r.hw * 0.5, 0.5, 0], [r.hw, 1, 0], [r.hw + BANK, 1.4, -0.01]];
-    pts.forEach(([x, z], i) => {
-      const [px, pz] = pts[Math.max(0, i - 1)], [qx, qz] = pts[Math.min(pts.length - 1, i + 1)];
-      let nx = -(qz - pz), nz = qx - px;
-      const l = Math.hypot(nx, nz) || 1; nx /= l; nz /= l;
-      for (const [off, v, up] of rails) {
-        const vx = x + nx * off, vz = z + nz * off;
-        c.pos.push(vx, height(vx, vz) + LIFT + up, vz);
-        c.road.push(v, 0);
+    const reach = r.hw + BANK + LAT;
+    let along = 0;
+    for (let k = 0; k + 1 < pts.length; k++) {
+      const [ax, az] = pts[k], [bx, bz] = pts[k + 1];
+      const L = Math.hypot(bx - ax, bz - az);
+      if (L < 0.01) continue;
+      const ux = (bx - ax) / L, uz = (bz - az) / L;
+      const i0 = Math.floor((Math.min(ax, bx) - reach) / LAT), i1 = Math.ceil((Math.max(ax, bx) + reach) / LAT);
+      const j0 = Math.floor((Math.min(az, bz) - reach) / LAT), j1 = Math.ceil((Math.max(az, bz) + reach) / LAT);
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+        const x = i * LAT, z = j * LAT;
+        const t = Math.max(0, Math.min(L, (x - ax) * ux + (z - az) * uz));
+        const px = ax + ux * t, pz = az + uz * t;
+        const d = Math.hypot(x - px, z - pz) / r.hw;
+        const key = nk(i, j);
+        const old = nodeVal.get(key);
+        if (!old || d < old[0]) nodeVal.set(key, [d, along + t]);
+        if (d * r.hw <= r.hw + BANK + LAT * 0.75) { covered.add(nk(i, j)); covered.add(nk(i - 1, j)); covered.add(nk(i, j - 1)); covered.add(nk(i - 1, j - 1)); }
       }
-      if (i) {
-        const R = rails.length, a = base + (i - 1) * R, b = base + i * R;
-        for (let k = 0; k < R - 1; k++) c.idx.push(a + k, b + k, a + k + 1, a + k + 1, b + k, b + k + 1);
-      }
-    });
+      along += L;
+    }
+  }
+  const nodeOf = (c, i, j) => {
+    const key = nk(i, j);
+    let v = c.nodes.get(key);
+    if (v !== undefined) return v;
+    v = c.pos.length / 3;
+    const x = i * LAT, z = j * LAT;
+    c.pos.push(x, height(x, z) + LIFT, z);
+    const nv = nodeVal.get(key) || [9, 0];
+    c.road.push(nv[0], nv[1]);
+    c.nodes.set(key, v);
+    return v;
+  };
+  for (const key of covered) {
+    const i = Math.floor(key / 200003), j = key - i * 200003;
+    // the cell (i, j) spans nodes i..i+1, j..j+1; skip cells whose four nodes are all beyond the bank
+    const vals = [nodeVal.get(nk(i, j)), nodeVal.get(nk(i + 1, j)), nodeVal.get(nk(i, j + 1)), nodeVal.get(nk(i + 1, j + 1))];
+    if (vals.every((v) => !v || v[0] > 1.45)) continue;
+    const ck = Math.floor((i * LAT) / CELL) + ',' + Math.floor((j * LAT) / CELL);
+    let c = cells.get(ck);
+    if (!c) cells.set(ck, (c = { nodes: new Map(), pos: [], road: [], idx: [], cx: (Math.floor((i * LAT) / CELL) + 0.5) * CELL, cz: (Math.floor((j * LAT) / CELL) + 0.5) * CELL }));
+    const a = nodeOf(c, i, j), b = nodeOf(c, i + 1, j), cc = nodeOf(c, i, j + 1), d = nodeOf(c, i + 1, j + 1);
+    if (diagonalIsMain(i, j)) c.idx.push(a, d, b, a, cc, d);          // split along 00-11 (surface.js)
+    else c.idx.push(a, cc, b, b, cc, d);                                 // split along 10-01
   }
   const mat = material(env);
   const group = new THREE.Group();

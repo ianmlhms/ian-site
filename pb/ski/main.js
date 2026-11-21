@@ -53,6 +53,7 @@ import { createMarkers, markerList, MARKER } from './modes/markers.js';
 import { SKI_BY_ID, DEFAULT_SKI, skiParams, addSkiStats, skiOpen } from './modes/skis.js';
 import { spawnLift } from './modes/freeride.js';
 import { firstLift, liftSpot, exitSpot, buildingBoxes, createBoxIndex } from './modes/spawn.js';
+import { createLook, applyLook, createCameraGuard } from './look.js';             // round 7 (A): free look + camera collision
 import { pisteStars, specialText } from './modes/challenges.js';
 
 const THREE = window.THREE;
@@ -173,6 +174,32 @@ async function boot() {
   scene.add(skier.root, ghostModel.root);
   ghostModel.setVisible(false);
   const chase = createChaseCamera(surface);
+  // ---- round 7 (A): free 360 look (drag / right mouse / C + mouse) and the camera guard (never through ground, pylons, trees, houses) ----
+  const look = createLook({ el: document.getElementById('shell'), accept: (e) => game.screen === 'ski' && !e.target.closest('button, a, input, .pad, #touchControls, .card, .minimap, .chprompt, .mp-bar, .mp-card, [role="dialog"]') });
+  let pylonGrid = null;                                     // 20 m buckets of [x, z, topY, r] (pylons, the station halls), built with the lifts
+  function pylonsOf(l) {
+    const out = [], q = {};
+    for (let i = 0; i < resort.lifts.length; i++) {
+      const p = l.pathOf(i);
+      if (!p) continue;
+      for (const s of p.supports) if (s.tower) { p.at(s.s, q); out.push([q.x, q.z, s.y + 1, 0.9]); }
+      for (const e of [0, p.len]) { p.at(e, q); out.push([q.x, q.z, field.height(q.x, q.z) + p.spec.station[1] + 2, p.spec.station[0] * 0.3]); }
+    }
+    const g = new Map();
+    for (const o of out) { const k = Math.floor(o[0] / 20) * 100003 + Math.floor(o[1] / 20); let a = g.get(k); if (!a) g.set(k, (a = [])); a.push(o); }
+    return g;
+  }
+  function camBlocked(x, y, z) {
+    if (boxIndex) { const b = boxIndex.hit(x, z, 0.35); if (b && y < b[6]) return true; }
+    if (pylonGrid) {
+      for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
+        const a = pylonGrid.get((Math.floor(x / 20) + dx) * 100003 + Math.floor(z / 20) + dz);
+        if (a) for (const o of a) if (y < o[2] && Math.hypot(x - o[0], z - o[1]) < o[3] + 0.4) return true;
+      }
+    }
+    return !!scatter.hit(x, z, 1.1, y, quality.treeDensity);
+  }
+  const camGuard = createCameraGuard({ ground: (x, z) => surface.height(x, z), blocked: camBlocked });
   let snowfall = createSnowfall({ scene, env, count: quality.snowflakes });
   const spray = createSpray({ scene, count: quality.spray, env });
   const tracks = createTracks({ scene, segments: level === 'low' ? 360 : 700 });         // round 7: grooves in fresh snow
@@ -189,6 +216,7 @@ async function boot() {
     if (lifts) lifts.dispose();
     lifts = createLifts({ scene, resort, height: (x, z) => field.height(x, z) });
     liftsEarly = !streamer.done();
+    try { pylonGrid = pylonsOf(lifts); } catch (error) { console.warn('[ski] pylon grid failed', error); }      // round 7 (A): camera guard
     return lifts;
   }
   // the village streets are draped on the 5 m ground: built once the extras and every height tile are in
@@ -944,6 +972,15 @@ async function boot() {
       const fp = camMode === 'first' && !riding && !mpView && !game.camPose && game.screen === 'ski' && st.crash === 0;
       const cam = game.camPose || (riding ? rideCamera1(dt) : fp ? fpCam.update(st, dt, time) : chaseCam);      // camPose: a fixed view (flows)
       if (!fp) fpCam.snap(st);
+      // round 7 (A): the free look (orbit round the skier / turn the head) and the camera guard
+      if (!game.camPose && game.screen === 'ski') {
+        look.step(dt, st.speed || 0);
+        const head = fp || (riding && rideView === 'window');
+        const pv = view, pivot = { x: pv.x, y: pv.y + (st.ride === 'sit' ? 0.6 : 1.2), z: pv.z };
+        applyLook(cam, pivot, look, head ? 'head' : 'orbit');
+        if (!head && !(riding && inTunnel)) camGuard.guard(cam, pivot, dt);
+        document.documentElement.dataset.skiLook = `${look.yaw.toFixed(2)},${look.pitch.toFixed(2)}`;
+      }
       camera.position.set(cam.x, cam.y, cam.z);
       camera.lookAt(cam.tx, cam.ty, cam.tz);
       if (fp && cam.roll) camera.rotateZ(cam.roll);
@@ -1114,7 +1151,7 @@ async function boot() {
     place(x, z, heading) { placeAt(x, z, heading); },
     // round 7
     avalanches, startAvalanche: (ev) => startAvalanche(ev || avalanches.forced(game.state), true), startLawin: (i = 0) => startLawin(avalanches.spots[i]), get lawin() { return lawin; },
-    setCamMode, get camMode() { return camMode; }, fpCam, spray, tracks, get mpf() { return mpf; }, get freshHere() { return freshHere; }, get riskHere() { return riskHere; },
+    get skierClear() { return skier.skiClearance; }, skier, get roadRows() { return roadRows; }, get boxIndex() { return boxIndex; }, look, camGuard, camBlocked, setCamMode, get camMode() { return camMode; }, fpCam, spray, tracks, get mpf() { return mpf; }, get freshHere() { return freshHere; }, get riskHere() { return riskHere; },
   };
 
   // first build around the default piste behind the loading screen, then the picker (or straight onto the piste with ?auto=1)

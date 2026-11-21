@@ -25,7 +25,8 @@ export function firstLift(lifts, rid) {
 
 /** Building footprints as oriented boxes [cx, cz, cos, sin, halfL, halfW] (buildings.json rows: [cx, cz, L, W, angle, ...]). */
 export function buildingBoxes(rows) {
-  return (rows || []).map((r) => [r[0], r[1], Math.cos(r[4]), Math.sin(r[4]), r[2] / 2, r[3] / 2]);
+  // [6] = the roof top (absolute m: ground + ridge height), for the camera guard (look.js)
+  return (rows || []).map((r) => [r[0], r[1], Math.cos(r[4]), Math.sin(r[4]), r[2] / 2, r[3] / 2, (r[7] || 0) + Math.max(r[5] || 0, r[6] || 0) + 0.6]);
 }
 /** Is (x, z) inside a building (grown by m metres)? Boxes are bucketed on a 50 m grid for speed (index = createBoxIndex). */
 export function createBoxIndex(boxes) {
