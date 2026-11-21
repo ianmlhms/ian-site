@@ -60,11 +60,12 @@ RESORTS = {
     # Orelle stay out. near_keep is tighter than Killy's and only the buildings of the villages below + those next to pistes / lifts are kept (twice the pistes of Killy in a ~10 MB budget).
     "3vallees": {"name": "Les 3 Vallées", "short": "Courchevel · Méribel · Val Thorens", "country": "FR", "crs": "EPSG:2154",
                  "bbox": (45.236, 6.475, 45.456, 6.690), "dem": ["ign-rgealti"], "far": ["ign-rgealti", "copernicus-glo30"],
-                 "near_keep": 250.0, "buildings": "villages",
+                 "near_keep": 150.0, "buildings": "villages",
+                 "start": "combe-de-la-saulire",            # the first piste on the map: Saulire -> Courchevel 1850
                  "villages": [
                      ("Courchevel 1850", 6.6345, 45.4150, 850, "chalet"), ("Courchevel Moriond", 6.6480, 45.4235, 450, "chalet"), ("Courchevel Village", 6.6310, 45.4300, 380, "chalet"),
-                     ("Courchevel Le Praz", 6.6280, 45.4405, 380, "chalet"), ("La Tania", 6.5935, 45.4315, 380, "chalet"), ("Méribel", 6.5660, 45.3960, 900, "chalet"),
-                     ("Méribel Mottaret", 6.5850, 45.3745, 480, "chalet"), ("Méribel Village", 6.5800, 45.4120, 300, "chalet"), ("Brides-les-Bains", 6.5680, 45.4530, 500),
+                     ("Courchevel Le Praz", 6.6280, 45.4405, 380, "chalet"), ("La Tania", 6.5935, 45.4315, 380, "chalet"), ("Méribel", 6.5666, 45.3991, 900, "chalet"),
+                     ("Méribel Mottaret", 6.5810, 45.3738, 480, "chalet"), ("Méribel Village", 6.5800, 45.4120, 300, "chalet"), ("Brides-les-Bains", 6.5680, 45.4530, 500),
                      ("Saint-Martin-de-Belleville", 6.5055, 45.3800, 450, "chalet"), ("Les Menuires", 6.5360, 45.3250, 950), ("Val Thorens", 6.5800, 45.2975, 700),
                  ]},
     "kronplatz": {"name": "Kronplatz", "short": "Plan de Corones", "country": "IT", "crs": "EPSG:25832",
@@ -75,14 +76,14 @@ RESORTS = {
     # "keep" = extra places whose 5 m tiles are always shipped (the Matterhorn itself lies 2-3 km from the nearest piste).
     "zermatt": {"name": "Zermatt · Cervinia", "short": "Matterhorn", "country": "CH", "crs": "EPSG:2056",
                 "bbox": (45.862, 7.600, 46.040, 7.830), "dem": ["swissalti3d", "vda-dtm", "copernicus-glo30"], "far": ["copernicus-glo30"],
-                "near_keep": 300.0,
+                "near_keep": 220.0,
                 "keep": [("Matterhorn", 7.6586, 45.9763, 800)],
                 "skip_ways": [1305881375],                 # OSM piste ways left out: "Grenzpiste (stillgelegt)", closed and ungroomed
                 "start": "riffelalp",                      # the first piste on the map: Riffelberg -> Riffelalp, the Matterhorn ahead
                 "villages": [
-                    ("Zermatt", 7.7480, 46.0190, 1250, "chalet"), ("Furi", 7.7300, 46.0040, 260, "chalet"), ("Zum See", 7.7350, 46.0050, 160, "chalet"), ("Riffelalp", 7.7640, 46.0045, 220, "chalet"),
-                    ("Riffelberg", 7.7745, 45.9935, 160), ("Gornergrat", 7.7845, 45.9835, 140), ("Findeln", 7.7640, 46.0115, 260, "chalet"), ("Sunnegga", 7.7710, 46.0165, 160),
-                    ("Schwarzsee", 7.7090, 45.9915, 160), ("Trockener Steg", 7.7180, 45.9635, 160), ("Klein Matterhorn", 7.7295, 45.9385, 120),
+                    ("Zermatt", 7.7480, 46.0190, 1250, "chalet"), ("Furi", 7.7300, 46.0040, 260, "chalet"), ("Zum See", 7.7350, 46.0050, 160, "chalet"), ("Riffelalp", 7.7505, 46.0017, 220, "chalet"),
+                    ("Riffelberg", 7.7543, 45.9930, 160), ("Gornergrat", 7.7830, 45.9834, 140), ("Findeln", 7.7640, 46.0115, 260, "chalet"), ("Sunnegga", 7.7698, 46.0174, 160),
+                    ("Schwarzsee", 7.7090, 45.9915, 160), ("Trockener Steg", 7.7215, 45.9710, 160), ("Klein Matterhorn", 7.7295, 45.9385, 120),
                     ("Plateau Rosa", 7.7080, 45.9370, 180), ("Breuil-Cervinia", 7.6300, 45.9345, 900), ("Plan Maison", 7.6465, 45.9400, 200),
                     ("Valtournenche", 7.6235, 45.8775, 550), ("Salette", 7.6400, 45.8800, 200),
                 ]},

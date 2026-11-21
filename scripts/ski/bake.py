@@ -439,7 +439,8 @@ def classes_raster(frame, dem_raw, areas_osm, piste_lines, piste_areas, building
     bm = ndimage.binary_dilation(np.asarray(bimg) > 0, iterations=1)
     out[bm] |= CLASS_BITS["built"]
     # piste areas
-    fill(CLASS_BITS["piste"], [a["poly"] for a in piste_areas])
+    area_m = fill(CLASS_BITS["piste"], [a["poly"] for a in piste_areas])
+    area_m = ndimage.binary_dilation(area_m, iterations=2)       # no trees on piste areas / runways, nor within 20 m of them
     # no forest on pistes, above the tree line, on water, or on very steep ground
     pm = piste_mask((nz, nx), s, piste_lines, [])
     zz, xx = np.mgrid[0:nz, 0:nx]
@@ -459,7 +460,7 @@ def classes_raster(frame, dem_raw, areas_osm, piste_lines, piste_areas, building
     free = (out & CLASS_BITS["forest"]) == 0
     out[derived & free & ~dense] |= CLASS_BITS["scrub"]
     out[dense & free] |= CLASS_BITS["forest"]
-    no_tree = (pm > 0.15) | (h > TREE_LINE) | ((out & CLASS_BITS["water"]) > 0) | (slope > 42) | ((out & CLASS_BITS["built"]) > 0)
+    no_tree = (pm > 0.15) | area_m | (h > TREE_LINE) | ((out & CLASS_BITS["water"]) > 0) | (slope > 42) | ((out & CLASS_BITS["built"]) > 0)
     out[no_tree] &= ~tree_bits
     log("classes", {k: int(((out & v) > 0).sum()) for k, v in CLASS_BITS.items()})
     return out, nx, nz
