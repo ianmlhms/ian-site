@@ -4,32 +4,18 @@
  * shadow, culled by distance and view; the name tags are plain DOM (no draw call at all). Ghost-style: nobody collides with anybody. */
 import { NET } from './config.js';
 import { createSkierModel, OUTFITS } from '../skier-model.js';
+import { packState, unpackState } from './wire.js';
+import { riderAt, KIND_OF_CODE } from '../modes/liftride.js';
+import { createCarrier } from '../modes/carriers.js';
 
 const THREE = window.THREE;
 const VIEW_DIST = 900;           // m: farther skiers are not drawn
 const TAG_DIST = 600;
 const MAX_BUF = 40;
-const r2 = (v) => Math.round(v * 100) / 100;
-const r3 = (v) => Math.round(v * 1000) / 1000;
-const num = (v, d = 0) => (Number.isFinite(v) ? v : d);
 const wrapAngle = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
 
-/* ---------- the wire format of one skier state ---------- */
-export function packState(st, progress, finished) {
-  const flags = (st.grounded ? 1 : 0) | (finished ? 2 : 0);
-  return [r2(st.x), r2(st.y), r2(st.z), r3(st.heading), r2(st.speed), r3(st.edge), r2(st.tuck), r2(st.brake), flags, r2(st.air || 0), r2(st.crash || 0), r2(st.landed || 0), Math.round(progress || 0), r2(st.vx || 0), r2(st.vz || 0), r2(st.vy || 0)];
-}
-export function unpackState(a) {
-  if (!Array.isArray(a) || a.length < 16) return null;
-  const v = a.map((x) => Number(x));
-  if (!v.slice(0, 4).every(Number.isFinite) || Math.abs(v[0]) > 1e5 || Math.abs(v[2]) > 1e5) return null;
-  return {
-    x: v[0], y: num(v[1]), z: v[2], heading: v[3], speed: Math.min(60, Math.abs(num(v[4]))), edge: Math.max(-1.5, Math.min(1.5, num(v[5]))),
-    tuck: Math.max(0, Math.min(1, num(v[6]))), brake: Math.max(0, Math.min(1, num(v[7]))), grounded: (v[8] & 1) === 1, finished: (v[8] & 2) === 2,
-    air: Math.max(0, num(v[9])), crash: Math.max(0, Math.min(3, num(v[10]))), landed: Math.max(0, Math.min(1, num(v[11]))), progress: Math.max(0, num(v[12])),
-    vx: Math.max(-60, Math.min(60, num(v[13]))), vz: Math.max(-60, Math.min(60, num(v[14]))), vy: Math.max(-60, Math.min(60, num(v[15]))),
-  };
-}
+/* ---------- the wire format of one skier state: net/wire.js (round 6: + "riding lift X at s") ---------- */
+export { packState, unpackState };
 
 /* ---------- one skinned mesh per skier ---------- */
 let sharedMat = null;
@@ -70,7 +56,8 @@ function createRemoteFigure(outfit) {
   return { model, mesh };
 }
 
-export function createRemotes({ scene, camera, surface, overlay }) {
+/* liftPath(index) = the line of a resort lift (lifts.js pathOf) once the lifts are built: a friend riding one sits in his own carrier */
+export function createRemotes({ scene, camera, surface, overlay, liftPath = () => null }) {
   const list = new Map();
   const frustum = new THREE.Frustum(), pv = new THREE.Matrix4(), sphere = new THREE.Sphere(new THREE.Vector3(), 2.5), v3 = new THREE.Vector3();
   const tagBox = document.createElement('div');
@@ -100,6 +87,7 @@ export function createRemotes({ scene, camera, surface, overlay }) {
     const r = list.get(id);
     if (!r) return;
     scene.remove(r.model.root); r.mesh.geometry.dispose(); r.tag.remove();
+    if (r.carrier) r.carrier.dispose();
     list.delete(id);
   }
   /** a state of player id for run `run`, stamped with its local arrival-corrected time t (ms) */
@@ -125,7 +113,9 @@ export function createRemotes({ scene, camera, surface, overlay }) {
       if (b[i - 1].t <= t && t <= b[i].t) {
         const A = b[i - 1].s, B = b[i].s, k = (t - b[i - 1].t) / Math.max(1, b[i].t - b[i - 1].t);
         const L = (p) => A[p] + (B[p] - A[p]) * k;
-        return { ...B, x: L('x'), y: L('y'), z: L('z'), heading: A.heading + wrapAngle(B.heading - A.heading) * k, speed: L('speed'), edge: L('edge'), tuck: L('tuck'), brake: L('brake'), air: L('air'), progress: L('progress'), grounded: k < 0.5 ? A.grounded : B.grounded, crash: B.crash };
+        const out = { ...B, x: L('x'), y: L('y'), z: L('z'), heading: A.heading + wrapAngle(B.heading - A.heading) * k, speed: L('speed'), edge: L('edge'), tuck: L('tuck'), brake: L('brake'), air: L('air'), progress: L('progress'), grounded: k < 0.5 ? A.grounded : B.grounded, crash: B.crash };
+        if (A.ride && B.ride && A.rideLift === B.rideLift) out.rideS = L('rideS');
+        return out;
       }
     }
     const last = b[b.length - 1], dt = Math.min(t - last.t, r.extrap) / 1000, s = last.s;
@@ -143,7 +133,16 @@ export function createRemotes({ scene, camera, surface, overlay }) {
       const st = sample(r, now - r.delay);
       r.state = st;
       if (!st) { r.model.setVisible(false); r.tag.hidden = true; continue; }
-      if (st.grounded && st.crash <= 0) { const g = surface.height(st.x, st.z); if (st.y < g + 0.6) st.y = g; }
+      if (st.grounded && st.crash <= 0 && !st.ride) { const g = surface.height(st.x, st.z); if (st.y < g + 0.6) st.y = g; }
+      // round 6: riding a lift: in his own chair / cabin on the real line (the figure sits where the carrier holds him)
+      const path = st.ride ? liftPath(st.rideLift) : null;
+      if (path) {
+        const kind = KIND_OF_CODE[st.rideKind] || path.kind;
+        if (!r.carrier || r.carrier.kind !== kind) { if (r.carrier) r.carrier.dispose(); r.carrier = createCarrier({ scene, kind, seats: path.seats }); }
+        const w = riderAt(path, st.rideS, (x, z) => surface.height(x, z));
+        r.carrier.place(w); r.carrier.setVisible(true);
+        st.x = w.x; st.y = w.y; st.z = w.z; st.heading = w.heading;
+      } else if (r.carrier) r.carrier.setVisible(false);
       const d = Math.hypot(st.x - cx, st.z - cz);
       sphere.center.set(st.x, st.y + 0.9, st.z);
       const visible = d < VIEW_DIST && frustum.intersectsSphere(sphere);

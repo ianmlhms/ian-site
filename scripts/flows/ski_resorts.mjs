@@ -1,7 +1,8 @@
 /* Flow: Ski Alpen resort switching and the round 2B resorts. From the picker of the default resort (Espace Killy) the player picks
- * St. Anton am Arlberg: the page reloads into that resort (one resort per page life, ?resort=<id>&map=1) straight onto its piste
- * map with its pistes, the Kandahar is preselected with its board, the credits name the BEV terrain; the landmarks are built once the
- * tiles are in. Then the same for Kronplatz (South Tyrol terrain, Concordia bell + MMM Corones). Zero page errors.
+ * St. Anton am Arlberg: the page reloads into that resort (one resort per page life, ?resort=<id>&go=1) straight into the free ride
+ * at a village lift's bottom station (round 6); the piste map (M) over it lists its pistes (tab Challengen), the Kandahar is preselected
+ * with its board, the credits name the BEV terrain; the landmarks are built once the tiles are in. Then the same for Kronplatz (South
+ * Tyrol terrain, Concordia bell + MMM Corones). Zero page errors.
  * Then Les 3 Vallées and Zermatt-Cervinia the same way. Env SKI_RESORTS=arlberg,kronplatz (default all four). */
 import { runIfMain } from "./lib.mjs";
 
@@ -16,11 +17,15 @@ export const flow = {
   name: "ski-resorts",
   fullChromium: true,
   viewport: { width: 1180, height: 820 },
+  deviceScaleFactor: 2,                    // round 5: a retina screen, so the flow's screenshots show the game as an iPad does
   async run(h) {
     const { page } = h;
     await page.addInitScript(() => {
       // a fresh save once per tab (the resort switch reloads the page and must find the picked resort in it)
-      try { if (!sessionStorage.getItem("skiFlowInit")) { sessionStorage.setItem("skiFlowInit", "1"); localStorage.removeItem("pb_ski_save"); } } catch (error) { /* ignore */ }
+      // round 4A: the start pistes are reds / blacks, open at a number of stars per resort: this player has them
+      const stars = {};
+      for (const rid of ["killy", "3vallees", "zermatt", "arlberg", "kronplatz"]) for (let i = 0; i < 9; i++) stars[`${rid}/seed${i}`] = 7;
+      try { if (!sessionStorage.getItem("skiFlowInit")) { sessionStorage.setItem("skiFlowInit", "1"); localStorage.setItem("pb_ski_save", JSON.stringify({ v: 1, best: {}, ghosts: {}, runs: {}, stars, park: {}, bestHash: {}, last: null, ghostOrder: [] })); } } catch (error) { /* ignore */ }
       window.addEventListener("arcade:board", (e) => { window.__board = e.detail.board; });
     });
     const errors = [];
@@ -36,14 +41,21 @@ export const flow = {
     const ids = (process.env.SKI_RESORTS || Object.keys(CASES).join(",")).split(",").filter((id) => CASES[id]);
     for (const id of ids) {
       const c = CASES[id];
-      h.step(`pick ${c.title}: the page reloads straight onto its piste map`);
-      await Promise.all([page.waitForURL(new RegExp(`resort=${id}&map=1`), { timeout: 30000 }), page.click(`.resort.ready[data-id="${id}"]`)]);
-      await page.waitForFunction((want) => (document.documentElement.dataset.skiScreen === "map" || document.documentElement.dataset.bootError) && window.__ski && window.__ski.game
+      h.step(`pick ${c.title}: the page reloads straight into the free ride at a village lift`);
+      await Promise.all([page.waitForURL(new RegExp(`resort=${id}&go=1`), { timeout: 30000 }), page.click(`.resort.ready[data-id="${id}"]`)]);
+      await page.waitForFunction((want) => ((document.documentElement.dataset.skiScreen === "ski" && window.__ski && window.__ski.game.mode === "freeride" && window.__ski.game.phase === "running") || document.documentElement.dataset.bootError)
         && (JSON.parse(localStorage.getItem("pb_ski_save") || "{}").last || {}).resort === want, id, { timeout: 90000 });
       h.eq(await page.evaluate(() => document.documentElement.dataset.bootError || ""), "", `${id} boots without an error`);
+      const at = await page.evaluate(() => { const s = window.__ski.state, l = window.__ski.spawn; return { name: l.name, kind: l.kind, d: Math.hypot(s.x - l.bottom.x, s.z - l.bottom.z) }; });
+      h.expect(at.d < 32 && at.kind !== "drag", `free ride at the bottom of ${at.name} (${at.kind}, ${Math.round(at.d)} m from the station)`);
+      await page.waitForFunction(() => !document.getElementById("liftBtn").hidden, null, { timeout: 10000 });
+      await h.pause(1500);
+      await h.shot(`${id}-spawn`);
 
-      h.step(`${c.title}: piste map, the start piste and its board`);
+      h.step(`${c.title}: piste map (M), the start piste and its board`);
+      await page.keyboard.press("m");
       await page.waitForSelector("#mapCanvas");
+      await page.click('.modetabs [data-mode="piste"]');
       h.eq((await page.textContent("#mapScreen h1")).trim(), c.title, "the map is that resort's");
       const listed = await page.$$eval(".prow", (r) => r.length);
       h.expect(listed >= c.minPistes, `${listed} pistes listed`);

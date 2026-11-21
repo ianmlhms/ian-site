@@ -2,7 +2,8 @@
  *   A  data decodes, tiles match resort.json
  *   B  the height function is continuous: across every tile edge, with and without the neighbour loaded (streaming), and at the feather
  *   C  render == physics: the LOD 0 tile vertices are the physics lattice
- *   D  the scripted skier rides pistes top to bottom: finishes, crashes, times, top speeds (every piste with --all)
+ *   D  the scripted skier rides pistes top to bottom: finishes, crashes, times, top speeds, the ★2 target times (every piste with --all)
+ *   E  the snow park (modes/park-check.js): every kicker, tricks, rails / boxes, the halfpipe, a scored run (--park: only A-C + E)
  * Exit code 1 on a failed check. */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -20,6 +21,9 @@ const { createBot } = await import('./bot.js');
 const { setRoot, selectTiles } = await import('./quadtree.js');
 const { computeTileNodes, buildTileMesh } = await import('./tile-mesh.js');
 const { SKI, LATTICE, DATA } = await import('./config.js');
+const { challengeFor } = await import('./modes/challenges.js');
+const { createParkLayout } = await import('./modes/park.js');
+const { runParkChecks } = await import('./modes/park-check.js');
 
 const args = process.argv.slice(2);
 const rid = args.find((a) => !a.startsWith('--') && !/^\d+$/.test(a)) || 'killy';
@@ -28,6 +32,7 @@ const RIDES = args.includes('--all') ? Infinity : ridesArg >= 0 ? Number(args[ri
 const onlyArg = args.indexOf('--only');
 const ONLY = onlyArg >= 0 ? new Set(args[onlyArg + 1].split(',')) : null;      // ride just these pistes
 const TRACE = args.includes('--trace');                                          // one line per second of each ride
+const PARK_ONLY = args.includes('--park');                                       // only the data and the snow park (section E)
 const dir = path.join(here, 'data', rid);
 let failed = 0, passed = 0;
 const check = (ok, msg) => { if (ok) passed++; else failed++; console.log(`${ok ? '  ok  ' : '  FAIL'} ${msg}`); return ok; };
@@ -40,7 +45,7 @@ const classes = decodeRle(new Uint8Array(fs.readFileSync(path.join(dir, 'classes
 check(far.nx === resort.far.nx && far.nz === resort.far.nz, `far grid ${far.nx}x${far.nz}`);
 check(classes.nx === resort.classes.nx && classes.nz === resort.classes.nz, `classes ${classes.nx}x${classes.nz}`);
 const net = createPisteNet(resort.network);
-const field = createField({ resort, far, classes, net });
+const field = createField({ resort, far, classes, net, park: createParkLayout(resort.park) });
 const grids = new Map();
 for (const [tx, tz, bytes] of resort.tiles.list) {
   const buf = new Uint8Array(fs.readFileSync(path.join(dir, 't', `${tx}_${tz}.bin`)));
@@ -107,7 +112,9 @@ const set = createPisteSet(resort);
 const order = [...set.list].sort((a, b) => (a.src.slalom === b.src.slalom ? 0 : a.src.slalom ? -1 : 1));
 let rides = 0, finished = 0;
 const summary = [];
+const ratios = [];                       // bot time / star target time (round 4A: the ★2 target must be fair on every piste)
 for (const piste of order) {
+  if (PARK_ONLY) break;
   if (ONLY && !ONLY.has(piste.id)) continue;
   if (rides >= RIDES && !ONLY) break;
   rides++;
@@ -139,9 +146,20 @@ for (const piste of order) {
   }
   const ok = best > piste.length - 25;
   if (ok) finished++;
-  summary.push(`${piste.id.padEnd(28)} ${piste.diff.padEnd(5)} ${String(Math.round(piste.length)).padStart(5)} m ${ok ? `${t.toFixed(1).padStart(6)} s` : `STOPPED at ${Math.round(best)} m`}  top ${(top * 3.6).toFixed(0)} km/h  air ${air.toFixed(1)} s  crashes ${crashes}${piste.src.slalom ? '  slalom' : ''}`);
+  const ch = challengeFor(piste, field.farHeight);
+  if (ok) ratios.push({ id: piste.id, diff: piste.diff, r: t * 1000 / ch.targetMs });
+  summary.push(`${piste.id.padEnd(28)} ${piste.diff.padEnd(5)} ${String(Math.round(piste.length)).padStart(5)} m ${ok ? `${t.toFixed(1).padStart(6)} s` : `STOPPED at ${Math.round(best)} m`}  ★2 ${(ch.targetMs / 1000).toFixed(1)} s  ★3 ${ch.special}${ch.special === 'speed' ? ' ' + ch.speedKmh : ''}  top ${(top * 3.6).toFixed(0)} km/h  air ${air.toFixed(1)} s  crashes ${crashes}${piste.src.slalom ? '  slalom' : ''}`);
 }
 for (const line of summary) console.log('      ' + line);
-check(finished >= Math.ceil(rides * 0.8), `${finished}/${rides} pistes ridden to the bottom by the scripted skier`);
+if (ratios.length) {
+  const rs = ratios.map((o) => o.r).sort((a, b) => a - b);
+  const q = (f) => rs[Math.min(rs.length - 1, Math.floor(rs.length * f))].toFixed(2);
+  console.log(`      bot time / ★2 target: p10 ${q(0.1)}  median ${q(0.5)}  p90 ${q(0.9)}  max ${q(1)}  (${rs.length} pistes)`);
+  for (const o of ratios.filter((o) => o.r > 1.35 || o.r < 0.75)) console.log(`        outlier ${o.id} ${o.diff} ${o.r.toFixed(2)}`);
+  check(rs[Math.floor(rs.length * 0.5)] > 0.85 && rs[Math.floor(rs.length * 0.5)] < 1.25, 'the ★2 target time is near what the careful scripted skier takes (median 0.85..1.25)');
+}
+if (!PARK_ONLY) check(finished >= Math.ceil(rides * 0.8), `${finished}/${rides} pistes ridden to the bottom by the scripted skier`);
+console.log('E snow park');
+runParkChecks({ resort, world: { ...world, tricks: true }, check, trace: TRACE });
 console.log(`\n${passed} passed, ${failed} failed (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
 process.exit(failed ? 1 : 0);

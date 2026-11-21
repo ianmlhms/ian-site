@@ -15,7 +15,10 @@ export const boardName = (pisteName, resortShort) => `${BOARD_PREFIX}${pisteName
 export const minRunMs = (length) => Math.floor(length / PLAY.maxRunSpeed) * 1000;
 
 export function emptyProgress() {
-  return { v: SAVE_VERSION, best: {}, ghosts: {}, runs: {}, stars: {}, park: {}, last: null, ghostOrder: [] };
+  // stars: { "<resort>/<hash5>": mask } and bestHash (the best times under the same short keys, for the cloud record): modes/challenges.js
+  // park: { <resort>: best park points } (round 4A)
+  // stats: { off: metres skied off the piste, top: top speed m/s } and ski: the picked ski type (round 6, modes/skis.js)
+  return { v: SAVE_VERSION, best: {}, ghosts: {}, runs: {}, stars: {}, park: {}, bestHash: {}, last: null, ghostOrder: [], stats: { off: 0, top: 0 }, ski: 'allmountain' };
 }
 
 export function normalize(raw) {
@@ -24,8 +27,11 @@ export function normalize(raw) {
   for (const [k, v] of Object.entries(raw.best || {})) if (Number.isFinite(v) && v > 0) p.best[k] = Math.round(v);
   for (const [k, v] of Object.entries(raw.ghosts || {})) if (typeof v === 'string' && v.length < 40000) p.ghosts[k] = v;
   for (const [k, v] of Object.entries(raw.runs || {})) if (Number.isInteger(v) && v > 0) p.runs[k] = v;
-  if (raw.stars && typeof raw.stars === 'object') p.stars = { ...raw.stars };
-  if (raw.park && typeof raw.park === 'object') p.park = { ...raw.park };
+  for (const [k, v] of Object.entries(raw.stars && typeof raw.stars === 'object' ? raw.stars : {})) if (Number.isInteger(v) && v > 0 && v < 8) p.stars[k] = v;
+  for (const [k, v] of Object.entries(raw.park && typeof raw.park === 'object' ? raw.park : {})) if (Number.isFinite(v) && v > 0) p.park[k] = Math.round(v);
+  for (const [k, v] of Object.entries(raw.bestHash && typeof raw.bestHash === 'object' ? raw.bestHash : {})) if (Number.isFinite(v) && v > 0) p.bestHash[k] = Math.round(v);
+  if (raw.stats && typeof raw.stats === 'object') p.stats = { off: Number.isFinite(raw.stats.off) && raw.stats.off > 0 ? Math.round(raw.stats.off) : 0, top: Number.isFinite(raw.stats.top) && raw.stats.top > 0 ? Math.min(60, raw.stats.top) : 0 };
+  if (typeof raw.ski === 'string' && /^[a-z]{2,16}$/.test(raw.ski)) p.ski = raw.ski;
   if (raw.last && typeof raw.last.resort === 'string') p.last = { resort: raw.last.resort, piste: typeof raw.last.piste === 'string' ? raw.last.piste : null };
   p.ghostOrder = Array.isArray(raw.ghostOrder) ? raw.ghostOrder.filter((k) => p.ghosts[k]) : Object.keys(p.ghosts);
   return p;

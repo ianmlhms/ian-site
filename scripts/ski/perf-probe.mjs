@@ -13,7 +13,8 @@ const piste = opt("--piste", resort ? "" : "coupe-du-monde");  // empty: the res
 const cpu = Number(opt("--cpu", "4"));
 const remotes = Number(opt("--remotes", "0"));
 
-const browser = await launchBrowser({ fullChromium: true });
+// --gpu: the Mac's GPU (ANGLE Metal), as the look shots; the dynamic resolution (post.js) is reported as the average internal pixel ratio
+const browser = await launchBrowser({ fullChromium: true, args: args.includes("--gpu") ? ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist"] : [] });
 const { server, origin } = await startServer();
 try {
   for (const q of levels) {
@@ -47,6 +48,7 @@ try {
       tick();
       window.__remotesProbe = R;
     }, remotes);
+    await page.evaluate(() => window.__ski.post.resetStats());
     const samples = [];
     for (let i = 0; i < 4; i++) {
       await page.waitForTimeout(2500);
@@ -54,6 +56,8 @@ try {
     }
     const p50 = samples.map((s) => s.fr.p50).sort((a, b) => a - b)[2], p95 = Math.max(...samples.map((s) => s.fr.p95));
     const calls = Math.max(...samples.map((s) => s.calls)), tris = Math.max(...samples.map((s) => s.triangles));
+    const res = await page.evaluate(() => window.__ski.resolution());
+    console.log(`${q.padEnd(6)} resolution: average ${res.average}x (now ${res.ratio}x = ${res.width}x${res.height}, MSAA ${res.samples}, screen ${res.screen}x, ${res.changes} changes, frame ema ${res.frameEma} ms, js ${res.cpuEma} ms)`);
     console.log(`${q.padEnd(6)} running after ${tRun.toFixed(1)} s | frame p50 ${p50.toFixed(1)} ms p95 ${p95.toFixed(1)} ms | draw calls <= ${calls} | triangles <= ${(tris / 1000).toFixed(0)}k | cards ${samples[3].cards} trees ${samples[3].trees} | level now ${samples[3].level}${remotes ? ` | ${remotes} remote skiers (${await page.evaluate(() => window.__remotesProbe.all().filter((r) => r.model.root.visible).length)} drawn)` : ''}`);
     await ctx.close();
   }

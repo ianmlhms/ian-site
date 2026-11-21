@@ -12,6 +12,9 @@ REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 DATA = os.path.join(REPO, "pb", "ski", "data")
 OUT = os.path.join(REPO, "scripts", "ski-v1.sql")
 MAX_RUN_SPEED = 40      # m/s along the piste line, the same as PLAY.maxRunSpeed in pb/ski/config.js
+PARK_BASE = 1000000     # snow park boards store PARK_BASE - points (pb/ski/modes/park.js)
+PARK_MAX_POINTS = 250000
+PARK_MIN_POINTS = 1
 
 HEAD = """-- =============================================
 -- Ski Alpen (pb/ski.html, arcade id "ski"): leaderboards are TIMES.
@@ -25,6 +28,12 @@ HEAD = """-- =============================================
 --    Instead ski-* times get:
 -- 3. a floor per board: a time faster than the piste length / 40 m/s along the piste line is impossible (the game never posts one
 --    either: pb/ski/progress.js minRunMs) and is dropped by a trigger. Unknown ski-* boards get a 20 s floor.
+--
+-- 4. (round 4A) one snow park board per resort, ski-<resort>-park: park POINTS (higher is better for the player), stored as
+--    1,000,000 - points so the board stays lower-is-better like every other ski-* board (no change to merge_score_is_better, the
+--    arcade's GAMES entry or the keep-best trigger; the client format "skipark" prints the points). Its row in ski_board_floors holds
+--    the stored range: min_ms = 1,000,000 - 250,000 (the points ceiling: a perfect run with every feature scores far less), max_ms =
+--    999,999 (at least 1 point). The game never posts outside it either (pb/ski/modes/park.js validParkPoints).
 --
 -- Keep the game lists in step with the latest versions: scores-numeric-v1.sql (merge_score_is_better) and
 -- anticheat-webcam-v1.sql (is_idle_game).
@@ -49,16 +58,18 @@ create table if not exists public.ski_board_floors (
   board text primary key check (board like 'ski-%'),
   min_ms integer not null check (min_ms >= 0)
 );
+-- round 4A: an upper bound per board (the snow park boards); null = the general 1 h ceiling
+alter table public.ski_board_floors add column if not exists max_ms integer check (max_ms is null or max_ms >= min_ms);
 alter table public.ski_board_floors enable row level security;
 revoke all on table public.ski_board_floors from anon, authenticated;
 
 create or replace function public.ski_time_floor()
 returns trigger language plpgsql security definer set search_path = public as $$
-declare floor_ms integer;
+declare floor_ms integer; ceil_ms integer;
 begin
   if new.game_id not like 'ski-%' then return new; end if;
-  select f.min_ms into floor_ms from public.ski_board_floors f where f.board = new.game_id;
-  if new.score is null or new.score < coalesce(floor_ms, 20000) or new.score > 3600000 then
+  select f.min_ms, f.max_ms into floor_ms, ceil_ms from public.ski_board_floors f where f.board = new.game_id;
+  if new.score is null or new.score < coalesce(floor_ms, 20000) or new.score > coalesce(ceil_ms, 3600000) then
     if tg_op = 'UPDATE' then return old; end if;
     return null;
   end if;
@@ -70,7 +81,7 @@ drop trigger if exists ski_time_floor on public.scores;
 create trigger ski_time_floor before insert or update on public.scores
   for each row execute function public.ski_time_floor();
 
--- one row per piste board: length / 40 m/s, rounded down to whole seconds
+-- one row per piste board: length / 40 m/s, rounded down to whole seconds; one per snow park (stored points range)
 """
 
 
@@ -84,8 +95,11 @@ def main():
             resort = json.load(fh)
         for p in resort["pistes"]:
             board = ("ski-%s-%s" % (rid, p["id"]))[:48]
-            rows.append("  ('%s', %d)" % (board, int(p["len"] / MAX_RUN_SPEED) * 1000))
-    body = HEAD + "insert into public.ski_board_floors (board, min_ms) values\n" + ",\n".join(rows) + "\non conflict (board) do update set min_ms = excluded.min_ms;\n"
+            rows.append("  ('%s', %d, null)" % (board, int(p["len"] / MAX_RUN_SPEED) * 1000))
+        if resort.get("park"):
+            assert not any(p["id"] == "park" for p in resort["pistes"]), "a piste called park would share the snow park board"
+            rows.append("  ('ski-%s-park', %d, %d)" % (rid, PARK_BASE - PARK_MAX_POINTS, PARK_BASE - PARK_MIN_POINTS))
+    body = HEAD + "insert into public.ski_board_floors (board, min_ms, max_ms) values\n" + ",\n".join(rows) + "\non conflict (board) do update set min_ms = excluded.min_ms, max_ms = excluded.max_ms;\n"
     with open(OUT, "w", encoding="utf-8") as fh:
         fh.write(body)
     print("wrote", OUT, len(rows), "boards")

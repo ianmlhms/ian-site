@@ -68,7 +68,8 @@ const spruceNear = () => build((p, n, c) => {
   const tiers = [[0.9, 3.6, 2.25, 8], [2.4, 5.0, 1.9, 8], [3.8, 6.4, 1.55, 7], [5.2, 7.8, 1.2, 7], [6.6, 9.6, 0.8, 6]];
   tiers.forEach(([y0, y1, r, tips], k) => pushTier(p, n, c, y0, y1, r, tips, k % 2 ? SPRUCE : SPRUCE_DARK, 0.72 + k * 0.05, k * 0.9));
 });
-const spruceFar = () => build((p, n, c) => { pushCone(p, n, c, 0, 0.6, 9.4, 2.0, 5, SPRUCE_DARK, 0.7); });
+/* far trees (round 5): two stacked cones each, so a far spruce still has a skirt and a top and a far larch stays slim (a single cone read as a party hat) */
+const spruceFar = () => build((p, n, c) => { pushCone(p, n, c, 0, 0.5, 6.4, 2.15, 5, SPRUCE_DARK, 0.62); pushCone(p, n, c, 0, 3.9, 9.6, 1.3, 5, SPRUCE, 0.8, 0.6); });
 /* a larch in winter: a straight trunk and thin layered tiers of bare twigs (open, so the snow behind shows through the gaps) */
 const larchNear = () => build((p, n, c) => {
   pushPrism(p, n, c, -0.3, 10.2, 0.17, 5, BARK);
@@ -77,7 +78,7 @@ const larchNear = () => build((p, n, c) => {
     pushTier(p, n, c, y - 0.35, y + 0.75, r, 5, k % 2 ? LARCH_TWIG : LARCH, 0.2, k * 1.3);
   }
 });
-const larchFar = () => build((p, n, c) => { pushCone(p, n, c, 0, 1.0, 9.6, 1.8, 5, LARCH, 0.2); });
+const larchFar = () => build((p, n, c) => { pushPrism(p, n, c, -0.3, 3.0, 0.16, 4, BARK); pushCone(p, n, c, 0, 1.6, 7.0, 1.25, 5, LARCH_TWIG, 0.25); pushCone(p, n, c, 0, 4.6, 10.0, 0.75, 5, LARCH, 0.3, 0.6); });
 
 function rockGeometry() {
   const g = new THREE.IcosahedronGeometry(1, 1);

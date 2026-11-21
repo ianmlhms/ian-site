@@ -6,7 +6,7 @@ import { DIFF } from './config.js';
 const DIFF_OF_LETTER = { g: 'green', b: 'blue', r: 'red', k: 'black' };
 const HIT_PX = 22;
 
-export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick }) {
+export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPickLift = null }) {
   const g = canvas.getContext('2d');
   const img = new Image();
   let ready = false;
@@ -16,6 +16,8 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick }) {
   const W = resort.width, D = resort.depth;
   let view = { s: 1, x: 0, z: 0 };          // world point at the canvas centre, pixels per metre
   let selected = null, hover = null, best = new Map();
+  // round 4A (modes): stars per piste id (mask), locked piste ids, the snow park line, the lifts of the free ride and the picked one
+  let marks = { stars: new Map(), locked: new Set() }, mode = 'piste', park = null, lifts = [], liftSel = null, player = null;
   let fitScale = 1;
   const dpr = () => Math.min(2, window.devicePixelRatio || 1);
 
@@ -70,8 +72,38 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick }) {
       const [ax, ay] = toScreen(l.pts[0], l.pts[1], sz), [bx, by] = toScreen(l.pts[l.pts.length - 2], l.pts[l.pts.length - 1], sz);
       g.fillStyle = '#16171a'; g.fillRect(ax - 2, ay - 2, 4, 4); g.fillRect(bx - 2.5, by - 2.5, 5, 5);
     }
+    // locked pistes: a pale dashed veil over their line (round 4A)
+    if (marks.locked.size && mode === 'piste') {
+      g.setLineDash([5, 5]); g.strokeStyle = '#f6f6f3dd'; g.lineWidth = lw + 1;
+      for (const p of pistes.list) if (marks.locked.has(p.id)) { line(Array.from(p.src.line), sz); g.stroke(); }
+      g.setLineDash([]);
+    }
+    // the snow park: a violet band down its line
+    if (park) {
+      const [ax, ay] = toScreen(park.line[0], park.line[1], sz), [bx, by] = toScreen(park.line[2], park.line[3], sz);
+      g.strokeStyle = '#ffffff'; g.lineWidth = Math.max(6, lw * 2.4) + 3; g.beginPath(); g.moveTo(ax, ay); g.lineTo(bx, by); g.stroke();
+      g.strokeStyle = '#6b3fa0'; g.lineWidth = Math.max(6, lw * 2.4); g.stroke();
+    }
+    // free ride: every lift's bottom station a dot (round 6: fast travel goes there), the picked lift red
+    if (mode === 'freeride') {
+      for (const l of lifts) {
+        const [x, y] = toScreen(l.bottom.x, l.bottom.z, sz);
+        const on = l === liftSel;
+        if (on) { const [x1, y1] = toScreen(l.top.x, l.top.z, sz); g.strokeStyle = '#d0352c'; g.lineWidth = 4; g.beginPath(); g.moveTo(x, y); g.lineTo(x1, y1); g.stroke(); }
+        g.fillStyle = on ? '#d0352c' : '#ffffff'; g.strokeStyle = '#16171a'; g.lineWidth = 2;
+        g.beginPath(); g.arc(x, y, on ? 8 : 5, 0, Math.PI * 2); g.fill(); g.stroke();
+      }
+    }
+    // round 6: where the skier is (the map over a free ride)
+    if (player) {
+      const [x, y] = toScreen(player.x, player.z, sz);
+      g.fillStyle = '#ffffff'; g.beginPath(); g.arc(x, y, 11, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#1f7a4d'; g.beginPath(); g.arc(x, y, 7.5, 0, Math.PI * 2); g.fill();
+      g.font = '800 12px Geist, system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 3; g.strokeStyle = '#ffffffd9';
+      g.strokeText('Du', x, y - 18); g.fillStyle = '#1f7a4d'; g.fillText('Du', x, y - 18);
+    }
     // hovered / selected piste on top, thick, with start and finish
-    for (const p of [hover, selected]) {
+    for (const p of mode === 'piste' ? [hover, selected] : []) {
       if (!p) continue;
       line(Array.from(p.src.line), sz);
       g.strokeStyle = '#ffffff'; g.lineWidth = lw * 2.6 + 4; g.stroke();
@@ -114,6 +146,19 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick }) {
         label(p.name, x, y - 9, '700 11px Geist, system-ui, sans-serif', DIFF[p.diff].css);
       }
     }
+    // stars won per piste (gold) once zoomed in a little, and always on the picked piste (round 4A)
+    if (mode === 'piste' && marks.stars.size) {
+      for (const p of pistes.list) {
+        const mask = marks.stars.get(p.id) || 0;
+        if (!mask || (zoom < 1.5 && p !== selected)) continue;
+        const m = p.at(p.length * 0.45, {});
+        const [x, y] = toScreen(m.x, m.z, sz);
+        if (x < 0 || y < 0 || x > sz.w || y > sz.h) continue;
+        const text = [1, 2, 4].map((b) => (mask & b ? '★' : '☆')).join('');
+        label(text, x, y + 8, '700 12px Geist, system-ui, sans-serif', '#c48a00');
+      }
+    }
+    if (park) { const [x, y] = toScreen(park.line[0], park.line[1], sz); label(park.name || 'Snowpark', x, y - 12, '800 12px Geist, system-ui, sans-serif', '#6b3fa0'); }
   }
 
   function pickAt(px, py) {
@@ -164,8 +209,13 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick }) {
     if (ptrs.size < 2) pinch0 = null;
     if (had && ptrs.size === 0 && downAt && moved <= 6) {
       const r = canvas.getBoundingClientRect();
-      const p = pickAt(e.clientX - r.left, e.clientY - r.top);
-      if (p) { select(p); onPick(p); }
+      if (mode === 'freeride' && onPickLift) {
+        const l = liftAt(e.clientX - r.left, e.clientY - r.top);
+        if (l) { liftSel = l; draw(); onPickLift(l); }
+      } else if (mode === 'piste') {
+        const p = pickAt(e.clientX - r.left, e.clientY - r.top);
+        if (p) { select(p); onPick(p); }
+      }
     }
     if (ptrs.size === 0) downAt = null;
   };
@@ -174,6 +224,27 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick }) {
   canvas.addEventListener('wheel', (e) => { e.preventDefault(); zoomBy(e.deltaY < 0 ? 1.2 : 1 / 1.2); }, { passive: false });
 
   function zoomBy(k) { view.s *= k; clampView(); draw(); }
+  /** The lift whose top is nearest the tap (within 28 px), or its line (round 4A free ride). */
+  function liftAt(px, py) {
+    const sz = size();
+    let bd = 28, found = null;
+    for (const l of lifts) {
+      const [x0, y0] = toScreen(l.top.x, l.top.z, sz), [x, y] = toScreen(l.bottom.x, l.bottom.z, sz);
+      const dx = x - x0, dy = y - y0, L2 = dx * dx + dy * dy || 1;
+      const t = Math.max(0, Math.min(1, ((px - x0) * dx + (py - y0) * dy) / L2));
+      const d = Math.min(Math.hypot(px - x, py - y) * 0.8, Math.hypot(px - x0 - dx * t, py - y0 - dy * t) + 6);
+      if (d < bd) { bd = d; found = l; }
+    }
+    return found;
+  }
+  /** Centre on a world box [x0, z0, x1, z1] with a margin (m). */
+  function focusBox(x0, z0, x1, z1, margin = 900) {
+    const sz = size();
+    if (!sz.w) return;
+    view.x = (x0 + x1) / 2; view.z = (z0 + z1) / 2;
+    view.s = Math.max(view.s, Math.min(sz.w / (Math.abs(x1 - x0) + margin), sz.h / (Math.abs(z1 - z0) + margin)));
+    clampView(); draw();
+  }
   function select(p, center = false) {
     selected = p;
     if (center && p) {
@@ -191,5 +262,15 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick }) {
   const ro = new ResizeObserver(() => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { const keep = { ...view }; fit(); if (keep.s > fitScale) view = keep; clampView(); draw(); }, 60); });
   ro.observe(canvas);
   fit();
-  return { draw, select, zoomBy, fit: () => { fit(); draw(); }, setBest(m) { best = m; draw(); }, get selected() { return selected; }, screenOf: (p) => toScreen(p.x, p.z, size()) };
+  return {
+    draw, select, zoomBy, fit: () => { fit(); draw(); }, setBest(m) { best = m; draw(); }, get selected() { return selected; }, screenOf: (p) => toScreen(p.x, p.z, size()),
+    /** Round 4A: stars / locks per piste, the park, the mode ('piste' | 'park' | 'freeride') with its lifts. */
+    setMarks(next) { marks = { stars: next.stars || new Map(), locked: next.locked || new Set() }; draw(); },
+    setPark(p) { park = p; draw(); },
+    setMode(m, liftList = lifts) { mode = m; lifts = liftList; draw(); },
+    /** Round 6: the skier's spot (null = none). */
+    setPlayer(x, z) { player = Number.isFinite(x) ? { x, z } : null; if (player) { view.x = x; view.z = z; view.s = Math.max(view.s, fitScale * 2.2); clampView(); } draw(); },
+    selectLift(l, center = false) { liftSel = l; if (center && l) focusBox(Math.min(l.top.x, l.bottom.x), Math.min(l.top.z, l.bottom.z), Math.max(l.top.x, l.bottom.x), Math.max(l.top.z, l.bottom.z), 1400); else draw(); },
+    focusBox, liftAt,
+  };
 }

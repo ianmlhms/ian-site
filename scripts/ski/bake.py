@@ -1598,12 +1598,21 @@ def main():
         "credits": credits(rid),
         "bake": {"date": time.strftime("%Y-%m-%d"), "script": "scripts/ski/bake.py"},
     }
+    # the snow park (round 4A) is picked after the bake by scripts/ski/park_site.mjs: keep the one already there (rerun that script
+    # when the terrain or the pistes around the park changed)
+    try:
+        with open(os.path.join(out, "resort.json"), encoding="utf-8") as fh:
+            old_park = json.load(fh).get("park")
+        if old_park:
+            resort["park"] = old_park
+    except (OSError, ValueError):
+        pass
     with open(os.path.join(out, "resort.json"), "w", encoding="utf-8") as fh:
         json.dump(resort, fh, ensure_ascii=False, separators=(",", ":"))
     sizes = {f: os.path.getsize(os.path.join(out, f)) for f in os.listdir(out) if os.path.isfile(os.path.join(out, f))}
     log("sizes", {k: "%.0f KB" % (v / 1024) for k, v in sizes.items()}, "total %.2f MB" % ((sum(sizes.values()) + tile_bytes) / 1e6))
     log("pistes", len(pistes), "network", len(network), "lifts", len(lifts), "peaks", len(peaks), "buildings", len(buildings))
-    log("next: python3 scripts/ski/make_sql.py (leaderboard floors in scripts/ski-v1.sql)")
+    log("next: node scripts/ski/park_site.mjs %s (snow park), python3 scripts/ski/make_sql.py (leaderboard floors in scripts/ski-v1.sql)" % rid)
 
 if __name__ == "__main__":
     main()

@@ -39,9 +39,11 @@ export const RELIEF = Object.freeze({
 });
 
 export const QUALITY = Object.freeze({
-  low: { pixelRatio: 1, lodScale: 0.55, far: 17000, treeRadius: 240, treeDensity: 0.55, treeNear: 70, rockRadius: 160, markerRadius: 260, liftRadius: 1800, buildingRadius: 2600, snowflakes: 500, spray: 40, cheapSnow: true },
-  medium: { pixelRatio: 1.25, lodScale: 0.75, far: 23000, treeRadius: 380, treeDensity: 0.8, treeNear: 95, rockRadius: 240, markerRadius: 380, liftRadius: 2600, buildingRadius: 4000, snowflakes: 1100, spray: 70, cheapSnow: false },
-  high: { pixelRatio: 2, lodScale: 1, far: 30000, treeRadius: 560, treeDensity: 1, treeNear: 130, rockRadius: 320, markerRadius: 520, liftRadius: 3600, buildingRadius: 6000, snowflakes: 2000, spray: 110, cheapSnow: false },
+  // res (round 5, post.js): the INTERNAL pixel ratio against CSS pixels: where it starts, the floor and ceiling of the dynamic resolution,
+  // MSAA samples, how much the final pass sharpens; supersample = the ceiling on a 1x screen. The canvas is always the screen's own resolution.
+  low: { res: { start: 1.25, min: 0.9, max: 1.5, samples: 2, sharpen: 0.55 }, lodScale: 0.55, far: 17000, treeRadius: 240, treeDensity: 0.55, treeNear: 70, rockRadius: 160, markerRadius: 260, liftRadius: 1800, buildingRadius: 2600, snowflakes: 500, spray: 40, cheapSnow: true },
+  medium: { res: { start: 1.5, min: 1.1, max: 2, samples: 4, sharpen: 0.45, supersample: 1.25 }, lodScale: 0.75, far: 23000, treeRadius: 380, treeDensity: 0.8, treeNear: 95, rockRadius: 240, markerRadius: 380, liftRadius: 2600, buildingRadius: 4000, snowflakes: 1100, spray: 70, cheapSnow: false },
+  high: { res: { start: 2, min: 1.5, max: 2, samples: 4, sharpen: 0.3, supersample: 1.5 }, lodScale: 1, far: 30000, treeRadius: 560, treeDensity: 1, treeNear: 130, rockRadius: 320, markerRadius: 520, liftRadius: 3600, buildingRadius: 6000, snowflakes: 2000, spray: 110, cheapSnow: false },
 });
 export const FRAME_BUDGET_MS = Object.freeze({ low: 40, medium: 30, high: 24 });   // the watchdog steps the level down after 3 s above this
 
@@ -78,6 +80,13 @@ export const SKI = Object.freeze({
   jumpCooldown: 0.6,
   crashSeconds: 1.6,        // tumble before the respawn
   offPisteLimit: 420,       // m from the nearest piste: beyond that the skier is sent back
+  // tricks (round 4A: snow park and free ride, world.tricks)
+  spinRate: 9,              // rad/s spin at full steer in the air (a 1080 takes about 2.1 s)
+  flipRate: 6.6,            // rad/s flip at full up / down (one flip about 0.95 s: only the big kickers give that air)
+  spinClean: 0.3, spinCrash: 0.85,   // rad off a whole half turn at touch-down: clean below, a fall above
+  flipClean: 0.5, flipCrash: 1.0,    // rad off a whole flip
+  spinSettle: 2.4, flipSettle: 2.2,  // rad/s the rotation settles onto a whole half turn / flip without input
+  parkHardLanding: 12.5,    // m/s into the ground: a fall (park landings are built steep, a little more forgiving)
 });
 
 export const CAMERA = Object.freeze({
@@ -123,4 +132,6 @@ export const RANDOM_TIME = Object.freeze(['morning', 'midday', 'midday', 'evenin
 
 /* Modes. Only 'run' and 'free' exist in phase 1; the others are the hooks for the next rounds (stars / challenges, the snowpark,
  * free ride across the whole area, live races through the lobby). game.js switches on these ids, so a new mode is one new branch. */
-export const MODES = Object.freeze({ run: 'run', free: 'free', challenge: 'challenge', park: 'park', race: 'race' });
+export const MODES = Object.freeze({ run: 'run', free: 'free', challenge: 'challenge', park: 'park', race: 'race', freeride: 'freeride' });
+/* Round 4A: every 'run' is also the piste's star challenge (modes/challenges.js; 'challenge' stays an alias hook), 'park' = a scored snow
+ * park run (modes/park.js), 'freeride' = the whole area all day from a lift top (modes/freeride.js); 'free' = the old guided free ride. */
