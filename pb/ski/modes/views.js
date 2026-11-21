@@ -141,7 +141,7 @@ function boardGeometry(quads) {
  * no z-fight). One merged geometry, drawn with the terrain's painted snow material (aInfo = groomed piste, aExtra = the park's line). */
 const SINK = 0.06, LIFT = 0.008, DECK_LIFT = 0.012;      // m; the pipe deck a little more (flat over a terrain lowered by 8 cm)
 export function parkSnowGeometry(layout) {
-  const pos = [], nrm = [], info = [], extra = [], idx = [];
+  const pos = [], nrm = [], info = [], extra = [], idx = [], rim = [];          // rim: 1 = a vertex under the snow (the hidden edge)
   const { ux, uz } = layout;
   /** a patch: rows along s (sList), columns across (cols(s) -> [[v, y, sink?, occ], ...]); smooth normals inside the patch */
   function patch(sList, cols) {
@@ -150,9 +150,10 @@ export function parkSnowGeometry(layout) {
     for (const s of sList) {
       const row = cols(s);
       n = row.length;
-      for (const [v, y, sink, occ = 0] of row) {
+      for (const [v, y, sink, occ = 0, under = false] of row) {
         const p = layout.world(s, v);
         pos.push(p.x, y + (sink ? -SINK : LIFT), p.z);
+        rim.push(sink || under ? 1 : 0);
         info.push(1, 0, 0, 0); extra.push(ux, uz, occ, 0); nrm.push(0, 0, 0);
       }
     }
@@ -162,27 +163,35 @@ export function parkSnowGeometry(layout) {
     }
   }
   const ground = (s) => layout.profileAt(s);
+  /** a side wall's two columns: its top edge, and its foot carried on along the wall's own plane SINK m under the snow (so the wall
+   *  above the snow is exactly the physics' wall, and its foot never shows) */
+  const wallCols = (cv, half, width, side, g, top, end) => {
+    const rise = Math.max(top - g, 0.02), dv = Math.min(width + 0.6, width * (1 + (SINK + LIFT) / rise));
+    const foot = [cv + side * (half + dv), g - SINK - LIFT, false, 0, true], edge = [cv + side * half, top, end];
+    const mid = [cv + side * (half + width / 2), (top + g) / 2, end], toe = [cv + side * (half + width), g, end];     // on the physics' wall
+    return side < 0 ? [foot, toe, mid, edge] : [edge, mid, toe, foot];
+  };
   const range = (a, b, step) => { const out = []; const n = Math.max(1, Math.ceil((b - a) / step)); for (let i = 0; i <= n; i++) out.push(a + (b - a) * i / n); return out; };
   // kickers: top (run-up | table + knuckle + landing), two side walls (same split), so the lip and the wall edges stay crisp
   for (const k of layout.kickers) {
-    const hw = k.w / 2, out = hw + k.side;
+    const hw = k.w / 2;
     const runS = range(0, 1, 1 / 18).map((q) => k.s0 + k.run * (1 - Math.pow(1 - q, 1.6)));         // denser towards the lip
     const restS = [...range(k.lip, k.lip + k.table, 1.5), ...range(k.lip + k.table, k.end, 0.9).slice(1)];
     const top = (s) => ground(s) + k.h * layout.kickerAlong(k, s - k.s0);
     const atEnd = (s) => s <= k.s0 + 1e-6 || s >= k.end - 1e-6;
     for (const sList of [runS, restS]) {
       patch(sList, (s) => [-hw, -hw / 2, 0, hw / 2, hw].map((dv) => [k.v + dv, top(s), atEnd(s)]));
-      for (const side of [-1, 1]) patch(sList, (s) => (side < 0 ? [[k.v - out, ground(s), true], [k.v - hw, top(s), atEnd(s)]] : [[k.v + hw, top(s), atEnd(s)], [k.v + out, ground(s), true]]));
+      for (const side of [-1, 1]) patch(sList, (s) => wallCols(k.v, hw, k.side, side, ground(s), top(s), atEnd(s)));
     }
   }
   // the ramps in front of the rails / boxes: one top (it rises, then drops just before the rail) and two side walls
   for (const r of layout.ramps) {
-    const hw = r.w / 2, out = hw + layout.rampSide;
-    const sList = [...range(r.s0 - 0.5, r.s1 - 0.6, 0.8), ...range(r.s1 - 0.6, r.s1 + 0.6, 0.2).slice(1)];
+    const hw = r.w / 2;
+    const sList = [...range(r.s0 - 0.5, r.s1 - 0.6, 0.8), ...range(r.s1 - 0.6, r.s1 + 0.6, 0.08).slice(1)];
     const top = (s) => ground(s) + r.h * layout.rampAlong(r, s);
     const atEnd = (s) => s <= r.s0 - 0.5 + 1e-6 || s >= r.s1 + 0.6 - 1e-6;
     patch(sList, (s) => [-hw, 0, hw].map((dv) => [r.v + dv, top(s), atEnd(s)]));
-    for (const side of [-1, 1]) patch(sList, (s) => (side < 0 ? [[r.v - out, ground(s), true], [r.v - hw, top(s), atEnd(s)]] : [[r.v + hw, top(s), atEnd(s)], [r.v + out, ground(s), true]]));
+    for (const side of [-1, 1]) patch(sList, (s) => wallCols(r.v, hw, layout.rampSide, side, ground(s), top(s), atEnd(s)));
   }
   // the halfpipe: inside (wall - flat - wall) and the two decks, along the whole trough under it
   const P = layout.pipe;
@@ -214,7 +223,7 @@ export function parkSnowGeometry(layout) {
     const l = Math.hypot(x, y, z) || 1;
     nrm[o] = x / l; nrm[o + 1] = y / l || 1; nrm[o + 2] = z / l;
   }
-  return { pos, nrm, info, extra, idx };
+  return { pos, nrm, info, extra, idx, rim };
 }
 
 /** layout = park.js createParkLayout; height(x, z) = the snow (surface.height); snowMaterial() = the terrain's painted snow (R7-D).

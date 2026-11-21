@@ -92,7 +92,7 @@ for (const rid of ALL) {
   for (let i = 0; i < n; i++) {
     const x = g.pos[i * 3], y = g.pos[i * 3 + 1], z = g.pos[i * 3 + 2];
     const h = surface.height(x, z);
-    sunk[i] = y < h - 0.03;
+    sunk[i] = g.rim[i] === 1;
     const lq = layout.local(x, z, {});
     if (!sunk[i] && Math.abs(y - h) > worstV) { worstV = Math.abs(y - h); if (process.env.DEBUG) console.log('   worst vertex', lq.s.toFixed(2), lq.v.toFixed(2), y.toFixed(3), h.toFixed(3)); }
     if (!(layout.solidAt(x, z) === layout.solidAt(x, z))) { outside++; if (process.env.DEBUG && outside < 5) console.log('   outside', lq.s.toFixed(2), lq.v.toFixed(2)); }
@@ -107,18 +107,25 @@ for (const rid of ALL) {
     for (let i = 0; i < 1500; i++) {
       const s = s0 + (s1 - s0) * rnd(), v = v0 + (v1 - v0) * rnd();
       const p = layout.world(s, v);
+      // what the eye sees there: the mesh or, along its hidden rim, the terrain over it
+      const all = meshAt(p.x, p.z, { all: true });
+      if (all !== all) continue;
+      samples++;
+      const seen = Math.max(all, lattice.height(p.x, p.z));
+      const d = Math.abs(seen - surface.height(p.x, p.z));
+      if (d > worstP) { worstP = d; worstAt = `s ${s.toFixed(1)} v ${v.toFixed(1)}`; }
       const m = meshAt(p.x, p.z);
       if (m !== m) continue;
-      samples++;
-      const d = Math.abs(m - surface.height(p.x, p.z));
-      if (d > worstP) { worstP = d; worstAt = `s ${s.toFixed(1)} v ${v.toFixed(1)}`; }
       const above = lattice.height(p.x, p.z) - m;
-      if (Math.abs(layout.featureHeight(s, v)) < 0.05) { worstFlat = Math.max(worstFlat, above); continue; }      // the pipe deck / flat ends: snow on snow
+      if (Math.abs(layout.featureHeight(s, v)) < 0.05) {          // flat snow: the pipe deck must stay on top; a wall's toe meets the snow
+        if (layout.pipe && Math.abs(v) >= layout.deck && s > layout.pipeSpan[0] && s < layout.pipeSpan[1]) worstFlat = Math.max(worstFlat, above);
+        continue;
+      }
       if (above > worstT) { worstT = above; if (process.env.DEBUG) console.log('   terrain above', s.toFixed(2), v.toFixed(2), worstT.toFixed(3)); }
     }
   }
-  check(samples > 3000 && worstP <= TOL, `${samples} points on the meshes: drawn vs skied worst ${(worstP * 100).toFixed(1)} cm (${worstAt})`);
-  check(worstT < 0.005 && worstFlat < 0.005, `LOD 0 terrain under the meshes: at most ${(worstT * 100).toFixed(1)} cm above the kickers / ramps / pipe walls (never shows through), ${(worstFlat * 100).toFixed(1)} cm on the flat deck`);
+  check(samples > 3000 && worstP <= TOL, `${samples} points on the meshes (walls and rims included): seen vs skied worst ${(worstP * 100).toFixed(1)} cm (${worstAt})`);
+  check(worstT < 0.005 && worstFlat < 0.005, `LOD 0 terrain under the meshes: at most ${(worstT * 100).toFixed(1)} cm above the kickers / ramps / pipe walls (never shows through), ${worstFlat === -1 ? "no pipe deck" : (worstFlat * 100).toFixed(1) + " cm on the pipe deck"}`);
   // the pipe's trough on the coarse levels (their nodes; their chords are shorter than the trough is wide)
   if (layout.pipe) {
     let worstL = -1;

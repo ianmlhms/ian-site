@@ -156,8 +156,8 @@ export function createParkLayout(site) {
   }
   /** The footprint boxes of the meshes: inside one, the physics reads the analytic shape (solidAt). */
   const boxes = [
-    ...kickers.map((k) => [k.s0 - 0.5, k.end + 0.5, k.v - k.w / 2 - k.side - 0.5, k.v + k.w / 2 + k.side + 0.5]),        // R7-D: each box 0.5 m wider than its mesh
-    ...ramps.map((r) => [r.s0 - 1, r.s1 + 1.1, r.v - r.w / 2 - RAMP_SIDE - 0.5, r.v + r.w / 2 + RAMP_SIDE + 0.5]),
+    ...kickers.map((k) => [k.s0 - 0.5, k.end + 0.5, k.v - k.w / 2 - k.side - 0.9, k.v + k.w / 2 + k.side + 0.9]),        // R7-D: each box wider than its mesh
+    ...ramps.map((r) => [r.s0 - 1, r.s1 + 1.1, r.v - r.w / 2 - RAMP_SIDE - 0.9, r.v + r.w / 2 + RAMP_SIDE + 0.9]),
     ...(pipe ? [[pipe.s0 - pipe.inRamp - TROUGH.ends - TROUGH.cover - 0.5, pipe.s1 + pipe.outRamp + TROUGH.ends + TROUGH.cover + 0.5, -deck - PIPE_DECK - 0.5, deck + PIPE_DECK + 0.5]] : []),
   ];
   /** the pipe mesh's extent along the line (the trough + its lattice slope + a margin) */

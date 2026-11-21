@@ -105,20 +105,26 @@ function pushSpruceTier(pos, nrm, col, rnd, { y0, y1, r, tips, colour, snow, rot
     pushTri(pos, nrm, col, C, t0, t1, [0, -1, 0], [0, -0.3, 0], cU);           // underside: closes the tier seen from below on steep slopes
   }
 }
-/* One bare larch branch: a drooping spray of twigs, wide at the end (the snow shows through between the branches), both faces. 8 triangles. */
+/* One bare larch branch: a slim stem arching out and down, two curtains of drooping twigs hanging from it (airy: the snow behind
+ * shows through everywhere), both faces lit like thin twigs (no black undersides). 8 triangles. */
 function pushLarchBranch(pos, nrm, col, rnd, y, a, L, colour, snow) {
   const ca = Math.cos(a), sa = Math.sin(a), px = -sa, pz = ca;
-  const droop = 0.42 + 0.38 * rnd(), w = 0.17 + 0.1 * rnd();
+  const droop = 0.35 + 0.35 * rnd(), w = 0.07 + 0.04 * rnd();
   const P = (d, h, s) => [ca * d + px * s, y + h, sa * d + pz * s];
-  const B = P(0.1, 0, 0), ML = P(L * 0.5, 0.1, -w * 0.45), MR = P(L * 0.5, 0.1, w * 0.45);
-  const TL = P(L * 0.95, -droop, -w), TR = P(L * 0.95, -droop, w), TT = P(L * 1.08, -droop - 0.22, 0);
-  const top = shadeOf(colour, 0.95 + 0.15 * rnd(), snow), tip = shadeOf(colour, 1.12, snow * 0.4), under = shadeOf(colour, 0.82, 0);
-  for (const [face, c0, c1] of [[1, top, tip], [-1, under, under]]) {
-    const ref = [0, face, 0], soft = [ca * 0.3, 0.3 * face, sa * 0.3];
-    pushTri(pos, nrm, col, B, ML, MR, ref, soft, c0);
-    pushTri(pos, nrm, col, ML, TL, TT, ref, soft, c0, c1, c1);
-    pushTri(pos, nrm, col, ML, TT, MR, ref, soft, c0, c1, c0);
-    pushTri(pos, nrm, col, MR, TT, TR, ref, soft, c0, c1, c1);
+  const arc = (f) => droop * f * f;                                              // the stem rises a touch, then hangs
+  const B = P(0.1, 0, 0), T = P(L, -arc(1), 0);
+  const ML = P(L * 0.55, 0.08 - arc(0.55), -w), MR = P(L * 0.55, 0.08 - arc(0.55), w);
+  const stem = shadeOf(colour, 0.9 + 0.12 * rnd(), snow), tip = shadeOf(colour, 1.15, snow * 0.3), twig = shadeOf(colour, 1.08, 0);
+  const lit = [ca * 0.8, 0.9, sa * 0.8];                                         // thin twigs: lit from every side
+  for (const f of [1, -1]) {
+    pushTri(pos, nrm, col, B, ML, MR, [0, f, 0], lit, stem);
+    pushTri(pos, nrm, col, ML, T, MR, [0, f, 0], lit, stem, tip, stem);
+  }
+  // two hanging curtains of twigs below the stem, a little to either side
+  for (const [f0, f1, hang, side] of [[0.3, 0.62, 0.5 + 0.25 * rnd(), -1], [0.6, 1.0, 0.4 + 0.2 * rnd(), 1]]) {
+    const A = P(L * f0, 0.08 - arc(f0), 0), C = P(L * f1, 0.04 - arc(f1), 0);
+    const D = P(L * (f0 + f1) / 2 + 0.05, -arc((f0 + f1) / 2) - hang, side * 0.12);
+    for (const f of [1, -1]) pushTri(pos, nrm, col, A, C, D, [px * f * side, 0, pz * f * side], lit, stem, stem, twig);
   }
 }
 const spruceNear = () => build((p, n, c) => {
@@ -272,6 +278,7 @@ export function createScatterView({ scene, scatter, env, quality, normalAt }) {
     rocks: instanced(rockGeometry(), material, 4000),
   };
   for (const k of ['spruceNear', 'larchNear', 'rocks', 'spruceFar', 'larchFar']) { sets[k].mesh.castShadow = true; sets[k].mesh.customDepthMaterial = depthMaterial; }
+  for (const [k, st] of Object.entries(sets)) st.mesh.name = `ski-${k}`;          // R7-D: named (the look checks find each kind)
   // blob shadows (Niddreg only)
   const blobGeo = blobGeometry();
   const BLOB_CAP = 3000;
@@ -280,7 +287,7 @@ export function createScatterView({ scene, scatter, env, quality, normalAt }) {
   blobGeo.setAttribute('aNrm', new THREE.InstancedBufferAttribute(blobNrm, 3).setUsage(THREE.DynamicDrawUsage));
   blobGeo.instanceCount = 0;
   const blobs = new THREE.Mesh(blobGeo, blobMaterial(env));
-  blobs.frustumCulled = false; blobs.renderOrder = 2;
+  blobs.frustumCulled = false; blobs.renderOrder = 2; blobs.name = 'ski-blobs';
   const group = new THREE.Group();
   group.name = 'ski-scatter';
   for (const s of Object.values(sets)) group.add(s.mesh);
