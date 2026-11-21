@@ -1,9 +1,9 @@
-/* Flow: Ski Alpen free ride all day (round 4A). The "Fräi fueren" tab of the piste map: the lifts as the start list and as dots on the
- * map, pick one, start at its top (no clock, no countdown). The HUD: the day clock, distance / vertical / lifts, the minimap. Skiing
+/* Flow: Ski Alpen free ride (round 4A, round 6: the main game). The "Fräi fueren" tab of the piste map: the lifts as the list and as
+ * dots at their bottom stations, pick one, fast travel to its bottom station (no clock, no countdown): the "Astegen" button is up there.
+ * Board, ride (a real ride: phase 'lift'), skip to the top: the lift count goes up and the day clock moves on by the ride. Skiing
  * downhill counts distance and vertical metres; off-piste between pistes is allowed (no "back to the piste"); the piste under the skier
- * changes from one to the next. At the bottom of a lift the "Mam Lift erop" button appears; riding up fades to its top, the lift count
- * goes up and the clock moves on by the ride. The light follows the day clock while the time choice is random; a fixed time keeps it.
- * Zero page errors. */
+ * changes from one to the next. The map (M) over a free ride is a pause: "Weiderfueren" goes on from the same spot, the session
+ * counters stay. The light follows the day clock while the time choice is random; a fixed time keeps it. Zero page errors. */
 import { runIfMain } from "./lib.mjs";
 
 export const flow = {
@@ -18,7 +18,7 @@ export const flow = {
     const errors = [];
     page.on("pageerror", (e) => errors.push(e.message));
     page.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) errors.push(m.text()); });
-    const state = () => page.evaluate(() => { const s = window.__ski.state, r = window.__ski.game.run; return { x: s.x, z: s.z, y: s.y, speed: s.speed, piste: r && r.piste ? r.piste.id : null, stats: r && r.stats ? { ...r.stats } : null, hour: window.__ski.modes.clock ? window.__ski.modes.clock.hour : null }; });
+    const state = () => page.evaluate(() => { const s = window.__ski.state, r = window.__ski.game.run; return { x: s.x, z: s.z, y: s.y, speed: s.speed, piste: r && r.piste ? r.piste.id : null, stats: r && r.stats ? { ...r.stats } : null, hour: window.__ski.modes.clock ? window.__ski.modes.clock.hour : null, phase: window.__ski.game.phase }; });
 
     h.step("piste map: the Fräi fueren tab lists the lifts");
     await h.goto("/pb/ski.html?resort=killy&map=1&debug=1&timescale=3&q=low");
@@ -27,19 +27,35 @@ export const flow = {
     await page.click('.modetabs [data-mode="freeride"]');
     await page.waitForSelector(".lrow");
     const rows = await page.$$eval(".lrow", (r) => r.length);
-    h.expect(rows > 40, `${rows} lifts to start from`);
-    // the highest lift top of Tignes' Grande Motte area is first; pick the Grattalu chair (next to the park) by name if there
+    h.expect(rows > 40, `${rows} lifts to travel to`);
     const liftId = await page.evaluate(() => { const l = window.__ski.modes.lifts.list.find((x) => /Grattalu/.test(x.name)) || window.__ski.modes.lifts.list[0]; return l.id; });
     await page.click(`.lrow[data-lift="${liftId}"]`);
     await page.waitForFunction(() => document.documentElement.dataset.skiFreeReady === "1", null, { timeout: 60000 });
+    h.eq((await page.textContent("#freeStart")).trim(), "Bei de Lift", "the button travels to the lift");
     await h.shot("free-map");
 
-    h.step("start at the lift's top: day clock, counters, minimap");
+    h.step("fast travel to its bottom station: free ride, the day clock, counters, minimap, Astegen");
     await page.click("#freeStart");
-    await page.waitForFunction(() => window.__ski.game.mode === "freeride" && window.__ski.game.phase === "running", null, { timeout: 10000 });
+    await page.waitForFunction(() => window.__ski.game.mode === "freeride" && window.__ski.game.phase === "running", null, { timeout: 15000 });
     h.expect(await page.evaluate(() => !document.getElementById("freeHud").hidden && !!document.querySelector(".minimap canvas")), "the free ride HUD and the minimap are up");
+    const lift = await page.evaluate((id) => { const l = window.__ski.modes.lifts.byId.get(id); return { id: l.id, name: l.name, top: l.top, bottom: l.bottom, seconds: l.seconds }; }, liftId);
     const s0 = await state();
+    h.expect(Math.hypot(s0.x - lift.bottom.x, s0.z - lift.bottom.z) < 32, `at the bottom of ${lift.name} (${Math.round(Math.hypot(s0.x - lift.bottom.x, s0.z - lift.bottom.z))} m from the station)`);
     h.expect(s0.hour >= 9 && s0.hour < 16.5, `day clock at ${s0.hour.toFixed(2)} h`);
+    await page.waitForFunction(() => !document.getElementById("liftBtn").hidden, null, { timeout: 8000 });
+    h.expect(/Astegen/.test(await page.textContent("#liftBtn")), `the lift button: ${(await page.textContent("#liftBtn")).trim()}`);
+    await h.shot("free-lift-button");
+
+    h.step("board, ride, skip: at the top, the lift counted, the clock moved on by the ride");
+    const hourBefore = s0.hour;
+    await page.click("#liftBtn");
+    await page.waitForFunction(() => window.__ski.game.phase === "lift", null, { timeout: 5000 });
+    await h.pause(1500);
+    await page.click("#rSkip");
+    await page.waitForFunction(() => window.__ski.game.phase === "running" && document.documentElement.dataset.skiLifts === "1", null, { timeout: 15000 });
+    const s3 = await state();
+    h.expect(Math.hypot(s3.x - lift.top.x, s3.z - lift.top.z) < 120 && s3.stats.lifts === 1, `at the top of ${lift.name} (${Math.round(Math.hypot(s3.x - lift.top.x, s3.z - lift.top.z))} m from the station), 1 lift ridden`);
+    h.expect(s3.hour - hourBefore > lift.seconds / 3600 * 0.9, `the clock moved on by the ride (${((s3.hour - hourBefore) * 60).toFixed(1)} min)`);
 
     h.step("ski down the piste from the top (the scripted skier steers): distance and vertical count");
     const first = await page.evaluate(async () => { const { createBot } = await import("/pb/ski/bot.js"); const s = window.__ski.state; const n = window.__ski.pistes.nearest(s.x, s.z, 250); window.__ski.game.bot = createBot(n.piste); return n.piste.id; });
@@ -49,6 +65,19 @@ export const flow = {
     const s1 = await state();
     h.expect(s1.stats.distance > 60 && s1.stats.vertical > 10, `${Math.round(s1.stats.distance)} m ridden down ${first}, ${Math.round(s1.stats.vertical)} m down`);
     await h.shot("free-ride");
+
+    h.step("the map over the free ride is a pause: Weiderfueren goes on from the same spot, the counters stay");
+    const before = await state();
+    await page.keyboard.press("m");
+    await page.waitForFunction(() => document.documentElement.dataset.skiScreen === "map" && document.documentElement.dataset.skiMapResume === "1", null, { timeout: 10000 });
+    h.eq(await page.evaluate(() => document.querySelector(".modetabs .on").dataset.mode), "freeride", "the map opens on the Fräi fueren tab");
+    await page.click('.modetabs [data-mode="piste"]');
+    await page.click('.prow[data-id="face"]');
+    await h.pause(400);
+    await page.click("#mapResume");
+    await page.waitForFunction(() => document.documentElement.dataset.skiScreen === "ski" && window.__ski.game.phase === "running", null, { timeout: 10000 });
+    const after = await state();
+    h.expect(Math.hypot(after.x - before.x, after.z - before.z) < 3 && after.stats.distance >= before.stats.distance && after.stats.lifts === 1, `back where he stood (${Math.hypot(after.x - before.x, after.z - before.z).toFixed(1)} m), counters kept`);
 
     h.step("from piste to piste: the piste under the skier changes, between them no reset");
     const two = await page.evaluate(() => {
@@ -75,18 +104,6 @@ export const flow = {
     const s2 = await state();
     h.expect(off && Math.hypot(s2.x - off[0], s2.z - off[1]) < 40 && s2.piste === null, "off-piste between pistes: no piste, the skier stays there");
 
-    h.step("at a lift's bottom: Mam Lift erop, up to its top, the clock moves on");
-    const lift = await page.evaluate((id) => { const l = window.__ski.modes.lifts.byId.get(id); window.__ski.place(l.bottom.x + 8, l.bottom.z + 8, 0); window.__ski.setInput({ steer: 0, tuck: 0, brake: 1, push: 0, jump: false }); return { id: l.id, name: l.name, top: l.top, seconds: l.seconds }; }, liftId);
-    await page.waitForFunction(() => !document.getElementById("liftBtn").hidden, null, { timeout: 8000 });
-    h.expect(/Mam Lift erop/.test(await page.textContent("#liftBtn")), `the lift button: ${(await page.textContent("#liftBtn")).trim()}`);
-    await h.shot("free-lift-button");
-    const hourBefore = (await state()).hour;
-    await page.click("#liftBtn");
-    await page.waitForFunction(() => document.documentElement.dataset.skiLifts === "1", null, { timeout: 15000 });
-    const s3 = await state();
-    h.expect(Math.hypot(s3.x - lift.top.x, s3.z - lift.top.z) < 60 && s3.stats.lifts === 1, `at the top of ${lift.name} (${Math.round(Math.hypot(s3.x - lift.top.x, s3.z - lift.top.z))} m from the station), 1 lift ridden`);
-    h.expect(s3.hour - hourBefore > lift.seconds / 3600 * 0.9, `the clock moved on by the ride (${((s3.hour - hourBefore) * 60).toFixed(1)} min)`);
-
     h.step("the light follows the day clock (time random); a fixed time keeps it");
     await page.evaluate(() => window.__ski.modes.clock.set(16.2));
     await h.pause(600);
@@ -101,6 +118,11 @@ export const flow = {
     await h.pause(600);
     h.eq(await page.evaluate(() => window.__ski.env.state.timeId), "morning", "the player fixed the morning: the clock does not change it");
     await page.evaluate(() => window.__ski.env.setTime("random"));
+    await page.evaluate(() => window.__ski.modes.clock.set(16.5));
+    await h.pause(400);
+    h.expect(await page.evaluate(() => { const l = window.__ski.modes.lifts.list[0]; window.__ski.place(l.bottom.x + 6, l.bottom.z + 6, 0); window.__ski.setInput({ steer: 0, tuck: 0, brake: 1, push: 0, jump: false }); return true; }), "at a lift at half past four");
+    await page.waitForFunction(() => !document.getElementById("liftBtn").hidden, null, { timeout: 8000 });
+    h.expect(true, "the lifts never close (free ride is the main game)");
     const info = await page.evaluate(() => window.__ski.info());
     h.expect(info.calls <= 160, `Niddreg free ride: ${info.calls} draw calls <= 160`);
     h.eq(errors, [], "zero page errors");

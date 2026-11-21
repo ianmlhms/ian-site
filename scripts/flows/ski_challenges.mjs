@@ -1,8 +1,7 @@
-/* Flow: Ski Alpen challenges and stars (round 4A). A new player on Espace Killy: the greens and blues are open, a red is locked (🔒 in
- * the list, Start off, the lock line with the stars it needs); the piste card lists the three stars (finish, the target time, the
- * piste's special). The scripted skier (game time x8, allowed to count) skis short blues until the resort has the stars for the reds:
- * each finish card shows the stars of the run, the map shows them, the red opens ("Op: rout Pisten"). A piste already played stays open
- * even with fewer stars. Outfits that need more stars are locked in the menu. Cloud save: inside a parent frame the game posts its
+/* Flow: Ski Alpen challenges and stars (round 4A, round 6). A new player on Espace Killy: since round 6 EVERYTHING is open (every piste,
+ * every outfit); the piste card lists the three stars (finish, the target time, the piste's special). The scripted skier (game time x8,
+ * allowed to count) skis short blues until he has 10 stars: each finish card shows the stars of the run, the map shows them, and the
+ * 10th star opens the Carving ski ("Op: Ski Carving"; the stars unlock ski types now). Cloud save: inside a parent frame the game posts its
  * compact record ({__pbSave}, game id ski) and merges a cloud record sent back ({__pbLoadSave}). Zero page errors. */
 import { runIfMain } from "./lib.mjs";
 
@@ -28,24 +27,23 @@ export const flow = {
     await h.goto("/pb/ski.html?resort=killy&map=1&debug=1&bot=1&timescale=8&q=low");
     await page.waitForFunction(() => document.documentElement.dataset.skiScreen === "map" || document.documentElement.dataset.bootError, null, { timeout: 90000 });
     h.eq(await html("bootError"), "", "boots without an error");
-    h.eq(await page.$$eval(".modetabs button", (b) => b.map((x) => x.textContent)), ["Pisten", "Snowpark", "Fräi fueren"], "mode tabs: Pisten, Snowpark, Fräi fueren");
+    h.eq(await page.$$eval(".modetabs button", (b) => b.map((x) => x.textContent)), ["Fräi fueren", "Challengen", "Snowpark", "Skier"], "mode tabs: Fräi fueren, Challengen, Snowpark, Skier");
     const lockedRows = await page.$$eval(".prow.locked", (r) => r.length);
-    const pick0 = await page.evaluate(() => window.__ski.game.piste.diff);
-    h.expect(lockedRows > 50 && (pick0 === "blue" || pick0 === "green"), `reds and blacks locked (${lockedRows} rows), an open ${pick0} piste preselected`);
+    h.eq(lockedRows, 0, "round 6: no piste is locked");
 
-    h.step("a red piste is locked: Start off, the lock line names the stars it needs");
+    h.step("a red piste is open from the start: no lock line, Start goes live");
     await page.click(`.prow[data-id="${RED}"]`);
     await h.pause(300);
-    h.eq(await html("skiLocked"), "1", "the red is locked");
-    h.expect(await page.$eval("#startBtn", (b) => b.disabled), "Start is off");
-    const lockText = await page.textContent("#pkStars .lock");
-    h.expect(/Gespaart: 6 ★/.test(lockText || ""), `lock line: ${lockText && lockText.trim()}`);
+    h.eq(await html("skiLocked"), "0", "the red is open");
+    h.eq(await page.$$eval("#pkStars .lock", (l) => l.length), 0, "no lock line");
+    await page.waitForFunction(() => document.documentElement.dataset.skiStartReady === "1", null, { timeout: 60000 });
+    h.expect(!(await page.$eval("#startBtn", (b) => b.disabled)), "Start is live");
 
     h.step("the scripted skier earns stars on short blues");
-    const blues = await page.evaluate(() => window.__ski.pistes.list.filter((p) => p.diff === "blue" && !p.src.slalom && p.length > 380).sort((a, b) => a.length - b.length).slice(0, 8).map((p) => p.id));
+    const blues = await page.evaluate(() => window.__ski.pistes.list.filter((p) => p.diff === "blue" && !p.src.slalom && p.length > 380).sort((a, b) => a.length - b.length).slice(0, 9).map((p) => p.id));
     let stars = 0, runs = 0, unlockedSeen = false, firstCard = "";
     for (const id of blues) {
-      if (stars >= 6) break;
+      if (stars >= 10) break;
       await page.evaluate((pid) => window.__ski.select(pid), id);
       const goals = await page.$$eval("#pkStars .goals li", (l) => l.map((x) => x.textContent.trim()));
       if (!runs) h.expect(goals.length === 3 && /Ukommen/.test(goals[0]) && /Ënner \d/.test(goals[1]), `three goals on the card: ${goals.join(" | ")}`);
@@ -55,15 +53,15 @@ export const flow = {
       runs++;
       const card = await page.textContent("#finishCard");
       if (!firstCard) { firstCard = card; await h.shot("finish-stars"); }
-      if (/Op: rout Pisten/.test(card)) { unlockedSeen = true; await h.shot("finish-unlock"); }
+      if (/Op: Ski Carving/.test(card)) { unlockedSeen = true; await h.shot("finish-unlock"); }
       stars = await page.evaluate(() => window.__ski.modes.pisteInfo(window.__ski.game.piste).resortStars);
       console.log(`      ${id}: stars on this piste ${await html("skiStars")}, resort ${stars}`);
       await page.click('#finishCard [data-a="map"]');
       await toMap();
     }
     h.expect(/★/.test(firstCard) && /Ukommen/.test(firstCard), "the finish card shows the stars of the run");
-    h.expect(stars >= 6, `${stars} stars in ${runs} runs`);
-    h.expect(unlockedSeen, "a finish card announced: Op: rout Pisten");
+    h.expect(stars >= 10, `${stars} stars in ${runs} runs`);
+    h.expect(unlockedSeen, "a finish card announced: Op: Ski Carving");
     const listStars = await page.$$eval(".prow .pst", (b) => b.filter((x) => /★/.test(x.textContent)).length);
     h.expect(listStars >= 2, `${listStars} pistes show won stars in the list`);
     await page.evaluate((id) => window.__ski.select(id), blues[runs - 1]);
@@ -73,9 +71,9 @@ export const flow = {
     await h.shot("star-map");
     await page.evaluate(() => window.__ski.select("face"));
     await h.pause(200);
-    h.eq(await html("skiLocked"), "0", "the red is open now");
+    h.eq(await html("skiLocked"), "0", "the red is open");
 
-    h.step("a played piste is never locked again (fewer stars than the threshold)");
+    h.step("nothing is ever locked: a fresh save, a save with times only");
     const kept = await page.evaluate(() => {
       const prog = window.__ski.progress();
       const p = window.__ski.pistes.byId.get("face");
@@ -86,11 +84,12 @@ export const flow = {
         return [c.lockState(poor, "killy", p).open, c.lockState(fresh, "killy", p).open, ch.isOpen(p)];
       });
     });
-    h.eq(kept, [true, false, true], "with a best time but no stars the red stays open; a fresh save keeps it shut");
+    h.eq(kept, [true, true, true], "the red is open with any save");
 
-    h.step("outfits: the star outfits show their price");
+    h.step("outfits: all open (round 6)");
     const outfitLocks = await page.$$eval("#segOutfit button.locked", (b) => b.map((x) => x.title));
-    h.expect(outfitLocks.length >= 3 && outfitLocks.some((t) => /30 ★/.test(t)), `locked outfits: ${outfitLocks.join(", ")}`);
+    const outfitCount = await page.$$eval("#segOutfit button", (b) => b.length);
+    h.expect(outfitLocks.length === 0 && outfitCount >= 10, `${outfitCount} outfits, none locked`);
 
     h.step("cloud: the compact record fits game_saves with every star of all five resorts");
     const sizes = await page.evaluate(async () => {

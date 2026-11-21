@@ -308,7 +308,8 @@ async function boot() {
       if (parkLayout) { const a = parkLayout.top, b = parkLayout.bottom; pisteMap.focusBox(Math.min(a.x, b.x), Math.min(a.z, b.z), Math.max(a.x, b.x), Math.max(a.z, b.z), 1200); streamer.focus(a.x, a.z); }
     } else if (m === 'freeride') {
       const me = game.resume ? game.resume.state : null;
-      if (!game.freeLift) game.freeLift = me ? modes.lifts.nearestBottom(me.x, me.z, 1e9) : spawn;
+      if (me && !game.mapPicked) game.freeLift = modes.lifts.nearestBottom(me.x, me.z, 1e9);
+      if (!game.freeLift) game.freeLift = spawn;
       pickLift(game.freeLift);
     } else if (m === 'skis') {
       modePanel.showSkis({ stats: modes.skiStats(), selected: skiType, onPick: (id) => { if (setSki(id)) setMapMode('skis'); } });
@@ -361,6 +362,7 @@ async function boot() {
     chPrompt.show(null);
     if (!resumable) modes.end();
     if (resumable) game.mapMode = 'freeride';
+    game.mapPicked = false;
     mapScreen = ui.showMap({
       resort, pistes, best: pisteBest, env, gfx: GFX(), outfits: OUTFITS, outfit: () => outfit, onOutfit: setOutfit,
       outfitOpen, starsOf: starsText, lockedOf: (p) => !modes.isOpen(p),
@@ -369,9 +371,9 @@ async function boot() {
       onBack: () => { mapScreen.close(); mapScreen = null; pisteMap = null; modePanel = null; game.resume = null; modes.end(); showPicker(); },
       onResume: resumable ? () => resumeFree() : null,
     });
-    pisteMap = createPisteMap({ canvas: mapScreen.canvas, resort, imageUrl: core.root + resort.map.file, pistes, onPick: (p) => selectPiste(p, false), onPickLift: (l) => pickLift(l) });
+    pisteMap = createPisteMap({ canvas: mapScreen.canvas, resort, imageUrl: core.root + resort.map.file, pistes, onPick: (p) => selectPiste(p, false), onPickLift: (l) => { game.mapPicked = true; pickLift(l); } });
     mapScreen.zoomButtons.forEach((b) => b.addEventListener('click', () => pisteMap.zoomBy(b.dataset.z === 'in' ? 1.5 : 1 / 1.5)));
-    modePanel = attachModePanel(mapScreen.el, { onMode: (m) => setMapMode(m), onParkStart: () => startPark(), onFreeStart: () => goFree(game.freeLift), onPickLift: (l) => pickLift(l) });
+    modePanel = attachModePanel(mapScreen.el, { onMode: (m) => setMapMode(m), onParkStart: () => startPark(), onFreeStart: () => goFree(game.freeLift), onPickLift: (l) => { game.mapPicked = true; pickLift(l); } });
     pisteMap.setPark(resort.park ? { line: resort.park.line, name: resort.park.name } : null);
     pisteMap.setMarks(modes.marks());
     if (game.resume) pisteMap.setPlayer(game.resume.state.x, game.resume.state.z);
@@ -534,9 +536,27 @@ async function boot() {
     if (!parkLayout) { hud.toast('Kee Snowpark hei'); return; }
     startRun(parkLayout.run, MODES.park);
   }
+  /** Round 6: where a skier waits for a lift: in front of its bottom station inside the boarding zone, facing up the line, on open snow
+   *  (no houses under him or under the chase camera behind him: the class raster's built share, which knows the villages from the start). */
+  const attrs0 = {};
+  const builtAt = (x, z) => { let b = 0; for (const [dx, dz] of [[0, 0], [5, 0], [-5, 0], [0, 5], [0, -5]]) b += field.attrs(x + dx, z + dz, attrs0).built || 0; return b / 5; };
+  function boardSpot(lift) {
+    let best = null, bs = Infinity;
+    for (const m of [12, 18, 24]) {
+      for (const lat of [0, 7, -7, 14, -14]) {
+        const b = modes.lifts.boardAt(lift, m);
+        const rx = -Math.sin(b.heading), rz = Math.cos(b.heading);
+        const x = b.x + rx * lat, z = b.z + rz * lat;
+        const cx = x - Math.cos(b.heading) * 7, cz = z - Math.sin(b.heading) * 7;
+        const score = builtAt(x, z) * 100 + builtAt(cx, cz) * 70 + Math.abs(m - 14) * 0.15 + Math.abs(lat) * 0.25;
+        if (score < bs) { bs = score; best = { x, z, heading: b.heading }; }
+      }
+    }
+    return best;
+  }
   /** Round 6: free ride from a lift's bottom station (fast travel: a short fade while the tiles there arrive) or from a spot. */
   async function goFree(lift, spotIn = null) {
-    const spot = spotIn || (lift ? modes.lifts.boardAt(lift) : null);
+    const spot = spotIn || (lift ? boardSpot(lift) : null);
     if (!spot) return;
     const fade = fader();
     fade.classList.add('on');
@@ -565,7 +585,7 @@ async function boot() {
     game.mode = MODES.freeride;
     game.resume = null;
     if (lift) game.freeLift = lift;
-    const spot = spotIn || modes.lifts.boardAt(lift);
+    const spot = spotIn || boardSpot(lift);
     const near = pistes.nearest(spot.x, spot.z, 400);
     game.piste = near ? near.piste : game.piste;
     if (runProps) { runProps.dispose(); runProps = null; }
@@ -619,10 +639,14 @@ async function boot() {
   function rideCamera1(dt) {
     const w = ride.where();
     const want = rideCamera(ride.path, w, rideView, (x, z) => surface.height(x, z));
-    if (rideView === 'window' || !rideCam) { rideCam = { ...want }; return rideCam; }
-    const k = 1 - Math.exp(-dt * 4);
-    for (const key of ['x', 'y', 'z', 'tx', 'ty', 'tz', 'fov']) rideCam[key] += (want[key] - rideCam[key]) * k;
-    return rideCam;
+    // chase: the camera rides with the carrier (no lag at x4); only its offset round the rider eases (a bend of the line turns it softly)
+    const off = { x: want.x - w.x, y: want.y - w.y, z: want.z - w.z, tx: want.tx - w.x, ty: want.ty - w.y, tz: want.tz - w.z, fov: want.fov };
+    if (rideView === 'window' || !rideCam) rideCam = { off };
+    else { const k = 1 - Math.exp(-dt * 3); for (const key of Object.keys(off)) rideCam.off[key] += (off[key] - rideCam.off[key]) * k; }
+    const o = rideCam.off;
+    const out = { x: w.x + o.x, y: w.y + o.y, z: w.z + o.z, tx: w.x + o.tx, ty: w.y + o.ty, tz: w.z + o.tz, fov: o.fov };
+    if (rideView !== 'window') out.y = Math.max(out.y, surface.height(out.x, out.z) + 0.8);
+    return out;
   }
   function toggleRideView() {
     rideView = rideView === 'chase' ? 'window' : 'chase';
@@ -782,6 +806,7 @@ async function boot() {
     const st = game.state;
     if (st) {
       skier.pose(st, (x, z, o) => surface.normal(x, z, o), time, (x, z) => surface.height(x, z));
+      skier.setVisible(!(ride && rideView === 'window' && ride.pose === 'stand' && !game.camPose));     // round 6: in a cabin, the window view is his own eyes
       if (game.orbit) {                                                // debug: a camera that circles the skier (model checks)
         const o = game.orbit, a = st.heading + o.angle * Math.PI / 180;
         game.camPose = { x: st.x + Math.cos(a) * o.dist, z: st.z + Math.sin(a) * o.dist, y: st.y + o.h, tx: st.x, ty: st.y + 0.8, tz: st.z, fov: o.fov || 40 };
@@ -939,7 +964,7 @@ async function boot() {
   spawn = spawnLift(modes.lifts, resort.places, startPiste.bottom);
   const openFlag = takeOpenMapFlag();
   const intoFree = !mpCtx && !params.auto && !params.piste && param('map') !== '1' && openFlag !== '1' && !!spawn;
-  const a0 = intoFree ? (() => { const b = modes.lifts.boardAt(spawn); return { x: b.x, z: b.z, dx: Math.cos(b.heading), dz: Math.sin(b.heading) }; })() : startPiste.at(2, {});
+  const a0 = intoFree ? (() => { const b = boardSpot(spawn); return { x: b.x, z: b.z, dx: Math.cos(b.heading), dz: Math.sin(b.heading) }; })() : startPiste.at(2, {});
   streamer.focus(a0.x, a0.z);
   placeAt(a0.x, a0.z, Math.atan2(a0.dz, a0.dx));
   const camOut = chase.update(game.state, 0.016, 0);

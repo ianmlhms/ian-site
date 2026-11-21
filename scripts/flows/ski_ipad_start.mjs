@@ -3,8 +3,8 @@
  * "Macintosh" + touch), CDP network throttling 20 Mbit/s down / 5 Mbit/s up / 40 ms latency, CDP CPU throttling 4x, brand-new browser
  * context (cold cache), text files served gzip-compressed like the live site (own tiny server). The page is opened the way players open
  * it (no debug flag, no quality override: the auto level of an iPad = low). Three.js comes from the real CDN, throttled like the rest.
- * Steps, each tapped at once: resort picker up ("ready") -> tap Val d'Isère · Tignes -> piste map, Start live ("start") -> tap Start ->
- * 3-2-1 -> "Lass!" ("skiing"). Gate: the Start button is live within 10 s of opening the page; skiing = that + the 3 s countdown + 1 s.
+ * Steps, each tapped at once: resort picker up ("ready") -> tap Val d'Isère · Tignes -> round 6: straight into the free ride at a
+ * village lift's bottom station ("skiing": no countdown in the free ride). Gate: skiing within 10 s of opening the page.
  * Then the remaining height tiles stream in while skiing; the total is reported. Env SKI_START_REPORT=1 prints the per-file list;
  * SKI_RESORT=<id> opens /pb/ski.html?resort=<id> and taps that resort (a returning player of it, or a shared link). */
 import http from "node:http";
@@ -77,22 +77,15 @@ export const flow = {
       console.log(`    resort picker after ${((tReady - t0) / 1000).toFixed(1)} s, ${(bytesUntil(tReady) / MB).toFixed(2)} MB (graphics level ${boot.level})`);
       await h.shot("ipad-picker");
 
-      h.step(`tap ${RESORT || "Val d'Isère · Tignes"}: the piste map; wait until Start is live`);
+      h.step(`tap ${RESORT || "Val d'Isère · Tignes"}: straight into the free ride at a village lift`);
       await tap(RESORT ? `.resort.ready[data-id="${RESORT}"]` : ".resort.ready");
-      await page.waitForFunction(() => document.documentElement.dataset.skiStartReady === "1", null, { timeout: 120000, polling: 50 });
+      await page.waitForFunction(() => document.documentElement.dataset.skiScreen === "ski" && document.documentElement.dataset.skiRunning === "1", null, { timeout: 120000, polling: 50 });
       const tStart = Date.now();
       const secStart = (tStart - t0) / 1000;
-      console.log(`    Start live after ${secStart.toFixed(1)} s, ${(bytesUntil(tStart) / MB).toFixed(2)} MB`);
-      h.expect(secStart <= MAX_SECONDS, `Start live within ${MAX_SECONDS} s (${secStart.toFixed(1)} s)`);
-      await h.shot("ipad-map");
-
-      h.step("tap Start: 3-2-1, then skiing");
-      await tap("#startBtn");
-      await page.waitForFunction(() => document.documentElement.dataset.skiRunning === "1", null, { timeout: 60000, polling: 50 });
-      const tGo = Date.now();
-      const secGo = (tGo - t0) / 1000;
-      console.log(`    skiing after ${secGo.toFixed(1)} s (incl. the ${COUNTDOWN_SECONDS} s countdown), ${(bytesUntil(tGo) / MB).toFixed(2)} MB`);
-      h.expect(secGo <= MAX_SECONDS + COUNTDOWN_SECONDS + 1, `skiing within ${MAX_SECONDS} s + the countdown (${secGo.toFixed(1)} s)`);
+      const tGo = tStart, secGo = secStart;
+      console.log(`    skiing (free ride) after ${secGo.toFixed(1)} s, ${(bytesUntil(tGo) / MB).toFixed(2)} MB`);
+      h.expect(secGo <= MAX_SECONDS, `skiing within ${MAX_SECONDS} s (${secGo.toFixed(1)} s)`);
+      void COUNTDOWN_SECONDS;
       const touch = await page.evaluate(() => { const r = (s) => document.querySelector(s).getBoundingClientRect(); const pad = r("#touchControls .pad"); const btns = [...document.querySelectorAll("#touchControls .tbtn:not([hidden])")].map((b) => b.getBoundingClientRect()); const area = pad.width * pad.height + btns.reduce((s, b) => s + b.width * b.height, 0); return { visible: !document.getElementById("touchControls").hidden, share: area / (innerWidth * innerHeight), minSide: Math.min(pad.height, ...btns.map((b) => Math.min(b.width, b.height))) }; });
       h.expect(touch.visible && touch.share < 0.15 && touch.minSide >= 44, `touch controls shown, ${(touch.share * 100).toFixed(1)} % of the screen, smallest target ${Math.round(touch.minSide)} px`);
       await h.pause(2500);

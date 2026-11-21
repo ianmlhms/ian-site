@@ -1,4 +1,4 @@
-/* Flow: Ski Alpen gameplay. Menu -> piste -> a finished timed run (scripted skier, game time x4), the leaderboard post (mocked: the
+/* Flow: Ski Alpen gameplay. Menu -> (round 6) the free ride at a village lift -> the piste map (M) -> Challengen: piste -> a finished timed run (scripted skier, game time x4), the leaderboard post (mocked: the
  * standalone arcade kit fires "arcade:score"), weather and time switches by key and by HUD button, the ghost on the next run, the
  * keyboard controls, the pause menu, frame times on "Niddreg", zero page errors.
  * The scripted skier normally never posts a time; the flow opts in with window.__skiAllowBotScore. */
@@ -33,9 +33,18 @@ export const flow = {
     h.eq(await page.$$eval(".resort", (b) => b.map((x) => (x.classList.contains("ready") ? x.dataset.id : "-"))), ["killy", "3vallees", "zermatt", "arlberg", "kronplatz"], "Val d'Isère · Tignes first, all five resorts ready");
     await h.shot("picker");
 
-    h.step("piste map: pick a piste from the list, weather and time controls");
+    h.step("pick the resort: the free ride starts at a village lift's bottom station");
     await page.click(".resort.ready");
+    await page.waitForFunction(() => document.documentElement.dataset.skiScreen === "ski" && window.__ski.game.mode === "freeride" && window.__ski.game.phase === "running", null, { timeout: 60000 });
+    h.expect(await page.evaluate(() => !document.getElementById("freeHud").hidden), "free ride HUD up");
+    await h.pause(1500);
+    await h.shot("free-spawn");
+
+    h.step("piste map (M) over the free ride: Challengen tab, pick a piste from the list, weather and time controls");
+    await page.keyboard.press("m");
     await page.waitForSelector("#mapCanvas");
+    h.expect(await page.evaluate(() => !!document.getElementById("mapResume")), "the map over the free ride can go back to it (Weiderfueren)");
+    await page.click('.modetabs [data-mode="piste"]');
     const listed = await page.$$eval(".prow", (r) => r.length);
     h.expect(listed > 100, `${listed} pistes listed`);
     await page.click(`.prow[data-id="${PISTE}"]`);
@@ -111,7 +120,7 @@ export const flow = {
     await h.shot("low");
 
     for (const [rid, name] of [["zermatt", "Zermatt · Cervinia"], ["3vallees", "Les 3 Vallées"]]) {
-      h.step(`another resort: back to the picker, pick ${name}: the page reloads onto its piste map`);
+      h.step(`another resort: back to the picker, pick ${name}: the page reloads into its free ride, M = its piste map`);
       if (await page.evaluate(() => document.documentElement.dataset.skiScreen !== "map")) {
         await page.keyboard.press("Escape");
         await page.waitForSelector("#menuCard");
@@ -121,8 +130,11 @@ export const flow = {
       await page.click('[data-act="back"]');
       await page.waitForFunction(() => document.documentElement.dataset.skiScreen === "picker", null, { timeout: 10000 });
       await Promise.all([page.waitForURL(new RegExp(`resort=${rid}`), { timeout: 30000 }), page.click(`.resort.ready[data-id="${rid}"]`)]);
-      await page.waitForFunction(() => document.documentElement.dataset.skiScreen === "map" || document.documentElement.dataset.bootError, null, { timeout: 90000 });
-      h.eq(await page.evaluate(() => document.documentElement.dataset.bootError || ""), "", `${name} boots without an error`);
+      await page.waitForFunction(() => (document.documentElement.dataset.skiScreen === "ski" && window.__ski && window.__ski.game.mode === "freeride") || document.documentElement.dataset.bootError, null, { timeout: 90000 });
+      h.eq(await page.evaluate(() => document.documentElement.dataset.bootError || ""), "", `${name} boots without an error, into the free ride`);
+      await page.keyboard.press("m");
+      await page.waitForSelector("#mapCanvas");
+      await page.click('.modetabs [data-mode="piste"]');
       const n = await page.$$eval(".prow", (r) => r.length);
       const board = await page.evaluate(() => window.__board && window.__board.id);
       h.expect(n > 60 && new RegExp(`^ski-${rid}-`).test(board || ""), `${n} pistes listed, board ${board}`);

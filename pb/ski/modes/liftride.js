@@ -85,14 +85,17 @@ export function rideCamera(path, w, mode, ground) {
   const fx = Math.cos(w.heading), fz = Math.sin(w.heading), rx = -fz, rz = fx;
   const out = {};
   if (mode === 'window') {
-    const eye = k === 'chair' ? 1.02 : k === 'drag' ? 1.62 : 1.62;
-    const ahead = k === 'chair' ? 0.25 : k === 'drag' ? 0.2 : 0.6;
+    // from the rider's eyes: a chair looks a little down (the safety bar and the chairs ahead), a cabin out of its front window (the
+    // ceiling and the posts frame the view), a drag lift up the track
+    const eye = k === 'chair' ? 1.02 : 1.62;
+    const ahead = k === 'chair' ? 0.08 : k === 'drag' ? 0.2 : k === 'train' ? -1 : -0.05;
     out.x = w.x + fx * ahead; out.z = w.z + fz * ahead; out.y = w.y + eye;
     const look = 40;
     const tx = w.x + fx * look, tz = w.z + fz * look;
-    const dy = k === 'drag' || k === 'train' ? (ground(tx, tz) - ground(w.x, w.z)) : (path.cableY(Math.min(path.len, (w.s || 0) + look)) - path.cableY(w.s || 0));
-    out.tx = tx; out.tz = tz; out.ty = out.y + dy * 0.85 - (k === 'chair' ? 6 : 3);
-    out.fov = 68;
+    const climb = k === 'drag' || k === 'train' ? (ground(w.x + fx * 20, w.z + fz * 20) - ground(w.x, w.z)) / 20 : path.slope(w.s || 0);
+    const pitch = k === 'chair' ? Math.atan(climb) - 0.32 : k === 'drag' ? Math.atan(climb) * 0.7 - 0.1 : Math.atan(climb) * 0.6 - 0.05;
+    out.tx = tx; out.tz = tz; out.ty = out.y + look * Math.tan(pitch);
+    out.fov = k === 'chair' ? 78 : 72;
   } else {
     const back = k === 'cable' ? 13 : k === 'gondola' ? 7.5 : k === 'train' ? 16 : k === 'drag' ? 5.5 : 5.2;
     const side = k === 'cable' ? 6 : k === 'gondola' ? 3.6 : k === 'train' ? 5 : k === 'drag' ? 1.6 : 2.6;
