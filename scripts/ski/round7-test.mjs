@@ -60,8 +60,8 @@ for (const rid of resorts) {
     if (e.blocked > 0) exitBlocked.push(`${l.name} (${e.blocked} m)`);
     const down = fh(e.x + Math.cos(e.heading) * 20, e.z + Math.sin(e.heading) * 20) - fh(e.x, e.z);
     ok(down < 3, `${rid} ${l.name}: the exit faces down the slope (${down.toFixed(1)} m over 20 m)`);
-    const face = Math.cos(s.heading) * (l.bottom.x - s.x) + Math.sin(s.heading) * (l.bottom.z - s.z);
-    ok(face > 0, `${rid} ${l.name}: faces the station`);
+    const face = Math.cos(s.heading) * (l.top.x - l.bottom.x) + Math.sin(s.heading) * (l.top.z - l.bottom.z);
+    ok(face > 0, `${rid} ${l.name}: looks up the line`);
     if (s.blocked > 0) blockedLifts.push(`${l.name} (${s.blocked} m)`);
     if (index.hit(s.x, s.z, 0.5)) built.push(l.name);
   }

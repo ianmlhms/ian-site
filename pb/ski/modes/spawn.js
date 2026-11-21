@@ -12,7 +12,7 @@ export const FIRST_LIFT = Object.freeze({
   arlberg: 'Galzigbahn',                     // St. Anton
   kronplatz: 'Kronplatz 2000',               // Reischach
 });
-export const SPAWN = Object.freeze({ dists: [8, 9.5, 11, 13, 15, 18, 22], lats: [0, 4, -4, 8, -8, 12, -12, 17, -17, 22, -22], camBack: 7, ahead: 25, margin: 1.6, station: 9, board: 26, hall: 14, want: 10.5 });
+export const SPAWN = Object.freeze({ rings: [10, 12, 14, 17, 20, 24, 28], angles: [0, 25, -25, 50, -50, 75, -75, 100, -100, 125, -125, 150, -150], look: 45, camBack: 7, ahead: 25, margin: 1.6, board: 26, hall: 14, want: 12 });
 /* the top exit: past the top station, facing down the slope, nothing built in front for EXIT.clear m */
 export const EXIT = Object.freeze({ dists: [10, 14, 18, 24, 30, 38, 48, 60], lats: [0, 6, -6, 12, -12, 20, -20, 30, -30], clear: 15, back: 6 });
 
@@ -56,39 +56,26 @@ export function createBoxIndex(boxes) {
  * The best spot in front of a lift's bottom station: { x, z, heading, blocked (metres of the view that cross a building), score }.
  * lift = createLiftNet entry; builtAt(x, z) = 0..1 built share (class raster); index = createBoxIndex or null; slope(x, z) = rise per m.
  */
-/** The station's own buildings (OSM halls round the station point): the view may end at them, nobody stands in them. */
-function hallsAt(index, x, z) {
-  const out = new Set();
-  if (!index) return out;
-  for (let k = 0; k < 12; k++) {
-    for (const r of [0, SPAWN.hall * 0.5, SPAWN.hall]) {
-      const b = index.hit(x + Math.cos(k * Math.PI / 6) * r, z + Math.sin(k * Math.PI / 6) * r, 0);
-      if (b) out.add(b);
-    }
-  }
-  return out;
-}
 export function liftSpot(lift, { builtAt = () => 0, index = null, slope = () => 0 } = {}) {
-  const halls = hallsAt(index, lift.bottom.x, lift.bottom.z);
+  // round 7 (second try, after the WebKit shots): facing the station from 10 m meant facing its hall (OSM draws the real station
+  // building): a wall. Now he stands beside / in front of the station and looks UP THE LINE (a point 45 m up the rope), so the picture is
+  // the station at the side and the cabins / chairs climbing away; the whole view (camera behind him to 25 m ahead) must be free of
+  // every building, the station's own hall included.
   const d = Math.hypot(lift.top.x - lift.bottom.x, lift.top.z - lift.bottom.z) || 1;
   const ux = (lift.top.x - lift.bottom.x) / d, uz = (lift.top.z - lift.bottom.z) / d;
+  const tx = lift.bottom.x + ux * SPAWN.look, tz = lift.bottom.z + uz * SPAWN.look;
   let best = null;
-  for (const m of SPAWN.dists) {
-    for (const lat of SPAWN.lats) {
-      const x = lift.bottom.x - ux * m - uz * lat, z = lift.bottom.z - uz * m + ux * lat;
-      if (Math.hypot(x - lift.bottom.x, z - lift.bottom.z) > SPAWN.board) continue;
-      const heading = Math.atan2(lift.bottom.z - z, lift.bottom.x - x);         // facing the station
+  for (const r of SPAWN.rings) {
+    for (const ang of SPAWN.angles) {
+      const a = Math.atan2(-uz, -ux) + ang * Math.PI / 180;               // 0 = straight down the line from the station
+      const x = lift.bottom.x + Math.cos(a) * r, z = lift.bottom.z + Math.sin(a) * r;
+      const heading = Math.atan2(tz - z, tx - x);
       const fx = Math.cos(heading), fz = Math.sin(heading);
       let blocked = 0;
-      for (let t = -SPAWN.camBack; t <= SPAWN.ahead; t += 1.5) {
-        const px = x + fx * t, pz = z + fz * t;
-        if (Math.hypot(px - lift.bottom.x, pz - lift.bottom.z) < SPAWN.station) break;      // the station itself is what he should see
-        if (index && index.hit(px, pz, SPAWN.margin, halls)) blocked += 1.5;
-        else if (t < 0 && index && index.hit(px, pz, 0.3)) blocked += 1.5;                    // the camera never inside a hall either
-      }
-      const inside = index && index.hit(x, z, 0.8) ? 1 : 0;
+      for (let t = -SPAWN.camBack; t <= SPAWN.ahead; t += 1.5) if (index && index.hit(x + fx * t, z + fz * t, t < 0 ? 0.4 : SPAWN.margin)) blocked += 1.5;
+      const inside = index && index.hit(x, z, 1.2) ? 1 : 0;
       const under = builtAt(x, z) * 30 + builtAt(x - fx * SPAWN.camBack, z - fz * SPAWN.camBack) * 20;
-      const score = inside * 1e5 + blocked * 40 + under + Math.abs(m - SPAWN.want) * 0.9 + (Math.hypot(m, lat) > 11.5 ? 25 : 0) + Math.abs(lat) * 0.35 + Math.max(0, slope(x, z) - 0.18) * 60;
+      const score = inside * 1e5 + blocked * 40 + under + Math.abs(r - SPAWN.want) * 0.9 + Math.abs(ang) * 0.02 + Math.max(0, slope(x, z) - 0.18) * 60;
       if (!best || score < best.score) best = { x, z, heading, blocked, score };
     }
   }
