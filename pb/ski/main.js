@@ -16,6 +16,7 @@ import { createScatter } from './scatter.js';
 import { createScatterView } from './scatter-view.js';
 import { createFarForest } from './forest-far.js';
 import { createShadows } from './shadows.js';
+import { createPost } from './post.js';
 import { createPoles, createRunProps, createSigns } from './props.js';
 import { createLifts } from './lifts.js';
 import { createVillage } from './village.js';
@@ -70,16 +71,18 @@ async function boot() {
   let level = ['low', 'medium', 'high'].includes(params.q) ? params.q : GFX().level();
   let quality = QUALITY[level];
   const canvas = document.getElementById('skiCanvas');
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: level !== 'low', powerPreference: 'high-performance' });
+  // round 5: the scene goes through post.js (internal resolution, MSAA, FXAA + sharpen onto the canvas), so the canvas itself needs no antialias
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
   THREE.ColorManagement.enabled = false;
   renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
-  const pixelRatio = () => Math.min(window.devicePixelRatio || 1, quality.pixelRatio);
-  renderer.setPixelRatio(pixelRatio());
+  const post = createPost({ renderer, spec: quality.res });
+  if (param('res')) { post.setDynamic(false); }                       // ?res=fixed: tests that compare pictures keep the starting resolution
+  const pixelRatio = () => post.ratio();                               // the internal pixel ratio (point sprites)
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(CAMERA.fov, 1, CAMERA.near, quality.far * 1.3);
   function resize() {
     const w = canvas.clientWidth || window.innerWidth, h = canvas.clientHeight || window.innerHeight;
-    renderer.setSize(w, h, false);
+    post.setSize(w, h);
     camera.aspect = w / Math.max(1, h);
     camera.updateProjectionMatrix();
   }
@@ -522,7 +525,7 @@ async function boot() {
   // quality: the shared Grafik level; a watchdog only ever steps down
   function applyQuality(next) {
     level = next; quality = QUALITY[level];
-    renderer.setPixelRatio(pixelRatio()); resize();
+    post.setSpec(quality.res); resize();
     camera.far = quality.far * 1.3; camera.updateProjectionMatrix();
     snowMat = createSnowMaterial(env, { cheap: quality.cheapSnow, treeRadius: quality.treeRadius, forest: forestTex });
     terrain.setMaterial(snowMat);
@@ -545,6 +548,7 @@ async function boot() {
     requestAnimationFrame(frame);
     if (document.hidden) { last = now; return; }
     const rawDt = (now - last) / 1000;
+    const frameStart = performance.now();
     frameTimes.push(rawDt * 1000); if (frameTimes.length > 240) frameTimes.shift();
     last = now;
     const dt = Math.min(MAX_FRAME_S, rawDt);
@@ -636,8 +640,10 @@ async function boot() {
     if (game.screen === 'ski') {
       const t0 = performance.now();
       shadows.update(camera, env.u.uSunDir.value, env.sunStrength());
-      renderer.render(scene, camera);
-      if (!params.q && game.phase === 'running' && level !== 'low') {
+      post.render(scene, camera);
+      // dynamic resolution first; the Grafik level only steps down once the resolution is at its floor
+      if (game.phase === 'running' && !game.paused) post.tick(rawDt * 1000, performance.now() - frameStart);
+      if (!params.q && game.phase === 'running' && level !== 'low' && post.atFloor()) {
         slowFor = rawDt * 1000 > FRAME_BUDGET_MS[level] ? slowFor + rawDt : Math.max(0, slowFor - rawDt * 0.5);
         if (slowFor > 3) { slowFor = 0; const down = level === 'high' ? 'medium' : 'low'; applyQuality(down); hud.toast(`Grafik: ${GFX().LABELS[down]}`); }
       }
@@ -699,6 +705,7 @@ async function boot() {
     /** Fixed camera at (x, z) heightAbove m over the ground looking at (tx, tz) heightAbove2 m over its ground; null = chase camera again. */
     setCamera(x, z, above, tx, tz, above2 = 0, fov = 55) { if (x === null) { game.camPose = null; return; } game.camPose = { x, z, y: field.height(x, z) + above, tx, tz, ty: field.height(tx, tz) + above2, fov }; streamer.focus(x, z); }, start(id) { startRun(pistes.byId.get(id) || game.piste, MODES.run); }, select(id) { selectPiste(pistes.byId.get(id), true); },
     frames: () => { const f = [...frameTimes].sort((a, b) => a - b); return { n: f.length, p50: f[Math.floor(f.length * 0.5)], p95: f[Math.floor(f.length * 0.95)], max: f[f.length - 1] }; },
+    resolution: () => post.stats(), post,
     info: () => ({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, tiles: terrain.stats.leaves, trees: scatterView.stats.trees, cards: farForest.stats.cards, tilesLoaded: streamer.stats.loaded, tilesTotal: streamer.stats.total, level }),
     teleport(s) { if (game.run) { const p = game.piste.at(s, {}); placeAt(p.x, p.z, Math.atan2(p.dz, p.dx)); } },
     progress: () => store.get(),

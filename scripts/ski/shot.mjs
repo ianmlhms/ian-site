@@ -51,6 +51,14 @@ try {
     }
     at.length = 0;
   }
+  // --script file.mjs: default export async (page, { shoot(name), wait }) drives the page itself (menus, modes) and names its PNGs
+  const script = opt("--script", "");
+  if (script) {
+    const wait = Number(opt("--wait", "5000"));
+    const run = (await import(new URL(script, `file://${process.cwd()}/`).href)).default;
+    await run(page, { wait, shoot: async (name) => { await page.screenshot({ path: `${out}-${name}.png` }); console.log("shot", name); } });
+    at.length = 0;
+  }
   const shots = opt("--shots", "");
   if (shots) {
     const wait = Number(opt("--wait", "5000"));
