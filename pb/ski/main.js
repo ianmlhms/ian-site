@@ -90,6 +90,15 @@ async function boot() {
   const canvas = document.getElementById('skiCanvas');
   // round 5: the scene goes through post.js (internal resolution, MSAA, FXAA + sharpen onto the canvas), so the canvas itself needs no antialias
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
+  // round 7 (A): a shader that fails to compile (Safari / WebKit differ from Chromium) must never silently ruin the whole look: it is
+  // recorded, and the picture check below steps down to safer paths (cheap snow, no MSAA, no post pass)
+  const shaderErrors = [];
+  renderer.debug.onShaderError = (gl, program, vs, fs) => {
+    const log = (gl.getShaderInfoLog(fs) || '') + (gl.getShaderInfoLog(vs) || '') + (gl.getProgramInfoLog(program) || '');
+    shaderErrors.push(log.slice(0, 400));
+    console.error('[ski] shader failed to compile', log.slice(0, 600));
+    document.documentElement.dataset.skiShaderError = String(shaderErrors.length);
+  };
   THREE.ColorManagement.enabled = false;
   renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
   let post = null;
@@ -712,6 +721,7 @@ async function boot() {
     if (window.Arcade && window.Arcade.startRun) window.Arcade.startRun();
     canvas.focus({ preventScroll: true });
     mark('free');
+    if (!pictureChecks) setTimeout(pictureCheck, 3500);                 // round 7 (A): the picture check
   }
   /** Round 6: board the lift at hand (the skier is in its boarding zone): a real ride up its line, then off at the top. */
   function boardLift() {
@@ -897,6 +907,33 @@ async function boot() {
   GFX().onChange((l) => { if (!params.q) applyQuality(l); });
   let slowFor = 0;
 
+  // ---- round 7 (A): the picture check (WebKit / Safari safety net): a few seconds into the first ride, read the canvas back; a
+  // one-colour picture or a shader error steps down: cheap snow (Niddreg shaders), then no MSAA, then no post pass ----
+  function pictureColours() {
+    try {
+      const k = document.createElement('canvas'); k.width = 48; k.height = 36;
+      const g = k.getContext('2d');
+      post.render(scene, camera);
+      g.drawImage(canvas, 0, 0, 48, 36);
+      const d = g.getImageData(0, 0, 48, 36).data, set = new Set();
+      for (let i = 0; i < d.length; i += 4) set.add((d[i] >> 4) * 256 + (d[i + 1] >> 4) * 16 + (d[i + 2] >> 4));
+      return set.size;
+    } catch (error) { return -1; }                                       // a tainted / unreadable canvas: no verdict
+  }
+  let pictureChecks = 0;
+  function pictureCheck() {
+    if (game.screen !== 'ski' || pictureChecks > 3) return;
+    const n = pictureColours();
+    document.documentElement.dataset.skiPicture = String(n);
+    if (n < 0 || (n >= 12 && !shaderErrors.length)) return;
+    pictureChecks++;
+    const step = pictureChecks;
+    console.warn(`[ski] the picture looks broken (${n} colours, ${shaderErrors.length} shader errors): safety step ${step}`);
+    if (step === 1 && level !== 'low') { applyQuality('low'); }
+    else post.fallback(Math.min(2, step - (level === 'low' ? 0 : 1)));
+    document.documentElement.dataset.skiSafe = String(post.safe);
+    setTimeout(pictureCheck, 1500);
+  }
   // ---------------- loop ----------------
   const attrsHud = {};
   const streaks = Object.assign(document.createElement('div'), { id: 'skiStreaks' });
@@ -1140,7 +1177,7 @@ async function boot() {
     /** Fixed camera at (x, z) heightAbove m over the ground looking at (tx, tz) heightAbove2 m over its ground; null = chase camera again. */
     setCamera(x, z, above, tx, tz, above2 = 0, fov = 55) { if (x === null) { game.camPose = null; return; } game.camPose = { x, z, y: field.height(x, z) + above, tx, tz, ty: field.height(tx, tz) + above2, fov }; streamer.focus(x, z); }, start(id) { startRun(pistes.byId.get(id) || game.piste, MODES.run); }, select(id) { selectPiste(pistes.byId.get(id), true); },
     frames: () => { const f = [...frameTimes].sort((a, b) => a - b); return { n: f.length, p50: f[Math.floor(f.length * 0.5)], p95: f[Math.floor(f.length * 0.95)], max: f[f.length - 1] }; },
-    resolution: () => post.stats(), post,
+    resolution: () => post.stats(), post, get shaderErrors() { return shaderErrors; }, pictureColours, pictureCheck,
     info: () => ({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, tiles: terrain.stats.leaves, trees: scatterView.stats.trees, cards: farForest.stats.cards, tilesLoaded: streamer.stats.loaded, tilesTotal: streamer.stats.total, level }),
     teleport(s) { if (game.run) { const p = game.piste.at(s, {}); placeAt(p.x, p.z, Math.atan2(p.dz, p.dx)); } },
     progress: () => store.get(),
