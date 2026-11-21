@@ -260,10 +260,16 @@ async function boot() {
       tryRoads();
     }
   });
-  let boxIndex = null;                                                       // round 7: building footprints (spawn spots never face a wall)
+  let boxIndex = null, respotLift = null;                                                       // round 7: building footprints (spawn spots never face a wall)
   const extrasReady = loadExtras(core.root).then(({ buildings, roads: streets }) => {
     try { boxIndex = createBoxIndex(buildingBoxes(buildings)); } catch (error) { console.warn('[ski] building index failed', error); }
     for (const l of modes.lifts.list) { const b = boardSpot(l); l.board = { x: b.x, z: b.z }; }        // round 7: the boarding zones
+    // the first spot was chosen before the footprints: if he still stands there and the better spot is elsewhere, put him there
+    if (respotLift && game.state && game.screen === 'ski' && game.phase === 'running' && !ride && game.state.hold && game.state.speed === 0) {
+      const b = boardSpot(respotLift);
+      if (Math.hypot(b.x - game.state.x, b.z - game.state.z) > 1) { const fade = fader(); fade.classList.add('on'); setTimeout(() => { placeAt(b.x, b.z, b.heading); if (modes.freeRun) modes.freeRun.moved(b); fade.classList.remove('on'); }, 260); }
+    }
+    respotLift = null;
     village = createVillage({ scene, rows: buildings, env, height: (x, z) => field.baseHeight(x, z), level }); mark('village');
     roadRows = decodeRoads(streets); tryRoads();
   }).catch((error) => console.warn('[ski] buildings failed', error.message));
@@ -671,12 +677,13 @@ async function boot() {
     if (!lift && !spotIn) return;
     const fade = fader();
     fade.classList.add('on');
-    if (!spotIn) await Promise.race([extrasReady.catch(() => null), new Promise((res) => setTimeout(res, 2500))]);      // the footprints
+    // the spot from the building footprints once they are in; before that (the first play: no waiting for buildings.json) from the
+    // class raster, and re-placed with the footprints when they arrive if he is still standing there (round 7 A)
     const spot = spotIn || boardSpot(lift);
+    respotLift = !spotIn && !boxIndex ? lift : null;
     streamer.focus(spot.x, spot.z);
     // round 7: the ground under the spot is the real 5 m terrain before he stands on it (never under the snow); a late tile re-snaps
     await Promise.race([streamer.ready(spot.x, spot.z, 600), new Promise((res) => setTimeout(res, 8000))]);
-    for (let i = 0; i < 20 && terrain.stats.pending > 0; i++) await new Promise((res) => setTimeout(res, 60));
     await new Promise((res) => setTimeout(res, 120));
     startFree(lift, spot);
     fade.classList.remove('on');
