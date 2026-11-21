@@ -261,7 +261,13 @@ async function boot() {
     }
   });
   let boxIndex = null, respotLift = null;                                                       // round 7: building footprints (spawn spots never face a wall)
-  const extrasReady = loadExtras(core.root).then(({ buildings, roads: streets }) => {
+  // round 7 (A): the buildings / streets download starts once the skier is on the snow (or after 6 s on a menu): they are not part of
+  // the first play's bytes (the spawn spot is chosen from the class raster first and refined when the footprints are in)
+  let extrasStarted = false, extrasGo = null;
+  const extrasGate = new Promise((res) => { extrasGo = res; });
+  const startExtras = () => { if (!extrasStarted) { extrasStarted = true; extrasGo(); } };
+  setTimeout(startExtras, 6000);
+  const extrasReady = extrasGate.then(() => loadExtras(core.root)).then(({ buildings, roads: streets }) => {
     try { boxIndex = createBoxIndex(buildingBoxes(buildings)); } catch (error) { console.warn('[ski] building index failed', error); }
     for (const l of modes.lifts.list) { const b = boardSpot(l); l.board = { x: b.x, z: b.z }; }        // round 7: the boarding zones
     // the first spot was chosen before the footprints: if he still stands there and the better spot is elsewhere, put him there
@@ -683,7 +689,7 @@ async function boot() {
     respotLift = !spotIn && !boxIndex ? lift : null;
     streamer.focus(spot.x, spot.z);
     // round 7: the ground under the spot is the real 5 m terrain before he stands on it (never under the snow); a late tile re-snaps
-    await Promise.race([streamer.ready(spot.x, spot.z, 600), new Promise((res) => setTimeout(res, 8000))]);
+    await Promise.race([streamer.ready(spot.x, spot.z, 420), new Promise((res) => setTimeout(res, 8000))]);
     await new Promise((res) => setTimeout(res, 120));
     startFree(lift, spot);
     fade.classList.remove('on');
@@ -728,6 +734,7 @@ async function boot() {
     if (window.Arcade && window.Arcade.startRun) window.Arcade.startRun();
     canvas.focus({ preventScroll: true });
     mark('free');
+    setTimeout(startExtras, 400);                                       // round 7 (A): the houses and streets after the first frames
     if (!pictureChecks) setTimeout(pictureCheck, 3500);                 // round 7 (A): the picture check
   }
   /** Round 6: board the lift at hand (the skier is in its boarding zone): a real ride up its line, then off at the top. */
