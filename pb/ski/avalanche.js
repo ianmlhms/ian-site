@@ -292,7 +292,8 @@ export function createAvalanches({ scene, field, surface, pistes, hud, uiRoot, l
   }
   const m4 = THREE ? new THREE.Matrix4() : null, qq = THREE ? new THREE.Quaternion() : null, ee = THREE ? new THREE.Euler() : null, vv = THREE ? new THREE.Vector3() : null, ss = THREE ? new THREE.Vector3() : null;
   function draw() {
-    if (!active) { blockMesh.count = 0; cloudGeo.instanceCount = 0; return; }
+    if (!active) { blockMesh.count = 0; cloudGeo.instanceCount = 0; blockMesh.visible = cloudMesh.visible = false; return; }      // no draw calls without a slab
+    blockMesh.visible = cloudMesh.visible = true;
     const b = active.slab.blocks, t = active.steps * AV.step;
     const fade = active.done ? clamp(1 - (clock() - active.doneAt) / 25, 0, 1) : 1;
     let k = 0, c = 0;

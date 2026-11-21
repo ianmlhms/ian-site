@@ -67,7 +67,7 @@ export function createSnowSpray({ scene, env, level = 'medium', height }) {
   tracks.renderOrder = 2;
   scene.add(tracks);
 
-  let next = 0, carry = 0, puffCarry = 0, wasLanded = 0, wasCrash = 0, tNext = 0, time = 0;
+  let next = 0, carry = 0, puffCarry = 0, wasLanded = 0, wasCrash = 0, tNext = 0, time = 0, lastTrackT = -1e9;
   let last = null;                                    // last track point { x, z, hx, hz }
   const stats = { emitted: 0, powder: 0, tracks: 0 };
   function emit(x, y, z, vx, vy, vz, sz, k = 0, dec = 1.7) {
@@ -90,7 +90,7 @@ export function createSnowSpray({ scene, env, level = 'medium', height }) {
     const v = [ax - rx, ya, az - rz, bx - rx, yb, bz - rz, bx + rx, yb, bz + rz, ax - rx, ya, az - rz, bx + rx, yb, bz + rz, ax + rx, ya, az + rz];
     tPos.set(v, i);
     tBorn.fill(time, (tNext % M) * 6, (tNext % M) * 6 + 6);
-    tNext++; stats.tracks++;
+    tNext++; stats.tracks++; lastTrackT = time;
   }
   return {
     stats, points, tracks,
@@ -156,6 +156,7 @@ export function createSnowSpray({ scene, env, level = 'medium', height }) {
       }
       g.attributes.position.needsUpdate = true; g.attributes.aLife.needsUpdate = true; g.attributes.aSize.needsUpdate = true; g.attributes.aKind.needsUpdate = true;
       if (stats.tracks) { tg.attributes.position.needsUpdate = true; tg.attributes.aBorn.needsUpdate = true; }
+      tracks.visible = stats.tracks > 0 && time - lastTrackT < 70;      // no draw call when there are no tracks
       void pixelRatio;
     },
     /** Live grains (tests). */
