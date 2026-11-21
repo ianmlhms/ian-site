@@ -35,7 +35,7 @@ from scipy import ndimage
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from codec import encode  # noqa: E402
-from common import (CLASS_STEP, FAR_MARGIN, FAR_STEP, NEAR_KEEP, NEAR_STEP, RESORTS, TILE_CELLS, TILE_SIZE, Frame, out_dir,  # noqa: E402
+from common import (CLASS_STEP, FAR_MARGIN, FAR_STEP, NEAR_KEEP, NEAR_STEP, OSM_CREDIT, RESORTS, SOURCE_CREDITS, TILE_CELLS, TILE_SIZE, Frame, out_dir,  # noqa: E402
                     resort_arg, work_dir)
 
 DIFF_OF = {"novice": "green", "easy": "blue", "intermediate": "red", "advanced": "black", "expert": "black"}
@@ -51,11 +51,21 @@ H_STEP = 0.1                       # height quantum of the baked grids (m)
 MAP_W = 1600
 GROOM_SIGMA = 1.6                  # nodes (8 m): how much a piste smooths the terrain under it
 GROOM_EDGE = 9.0                   # m of soft edge of the groomed band
-CREDITS = [
-    "Gelänn: IGN RGE ALTI® 5 m (© IGN, Licence Ouverte / Etalab 2.0), iwwer de Géoplateforme",
-    "Bierger an der Distanz: Copernicus DEM GLO-30 (© DLR e.V. 2010-2014 an © Airbus Defence and Space GmbH 2014-2018, ënnert COPERNICUS vun der EU an der ESA)",
-    "Pisten, Liften, Haiser, Bësch: © OpenStreetMap-Mataarbechter (ODbL 1.0)",
-]
+def credits(rid):
+    """The credit lines of the DEM sources this resort's data came from (fetch_dem.py records them in dem/sources.json), then OSM."""
+    path = os.path.join(work_dir(rid, "dem"), "sources.json")
+    used = []
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as fh:
+            used = json.load(fh)
+    else:
+        used = RESORTS[rid]["dem"] + RESORTS[rid]["far"]
+    out = []
+    for src in used:
+        line = SOURCE_CREDITS.get(src)
+        if line and line not in out:
+            out.append(line)
+    return out + [OSM_CREDIT]
 
 
 def log(*a):
@@ -436,6 +446,8 @@ def rle(raster):
 # ---------------------------------------------------------------- buildings, lifts, peaks
 def build_buildings(frame, dem_raw):
     out = []
+    # villages flagged "chalet" (Méribel, Courchevel: a building code that wants wood and stone) paint even big blocks as chalets
+    chalet = [(*frame.to_world(v[1], v[2]), v[3]) for v in RESORTS[frame.rid].get("villages", ()) if len(v) > 4 and v[4] == "chalet"]
     for e in load_osm(frame.rid, "buildings"):
         if e["type"] != "way" or "geometry" not in e:
             continue
@@ -487,6 +499,8 @@ def build_buildings(frame, dem_raw):
             kind = 1
         elif area < 60 or t.get("building") in ("shed", "hut", "cabin", "service"):
             kind = 3
+        if kind == 1 and any(math.hypot(cx_ - vx, cz_ - vz) < vr for vx, vz, vr in chalet for cx_, cz_ in [p.mean(axis=0)]):
+            kind = 0
         try:
             eave = float(str(t.get("height", "")).replace("m", "")) * 0.8
         except ValueError:
@@ -495,6 +509,36 @@ def build_buildings(frame, dem_raw):
         ground = float(np.min(dem_raw(np.r_[p[:, 0], cx], np.r_[p[:, 1], cz])))
         out.append({"poly": p, "row": [round(cx, 1), round(cz, 1), round(L, 1), round(W, 1), round(ang % math.pi, 3), round(eave, 1), round(ridge, 1), round(ground, 1), kind]})
     log("buildings", len(out))
+    return out
+
+
+def build_aeroways(frame):
+    """Runways, aprons, taxiways (OSM aeroway, optional layer) as piste-like polygons: [{"poly"}]. In winter the altiport runway is
+    groomed snow, so it is smoothed like a piste and painted as one (never listed as a run)."""
+    path = os.path.join(work_dir(frame.rid, "osm"), "aeroway.json")
+    if not os.path.exists(path):
+        return []
+    out = []
+    for e in load_osm(frame.rid, "aeroway"):
+        if e["type"] != "way" or "geometry" not in e:
+            continue
+        t = e.get("tags", {})
+        p = way_xz(frame, e["geometry"])
+        if len(p) > 3 and math.hypot(*(p[0] - p[-1])) < 1:
+            out.append({"poly": p})
+            continue
+        try:
+            hw = float(str(t.get("width", "")).replace("m", "").strip()) / 2
+        except ValueError:
+            hw = 20.0 if t.get("aeroway") == "runway" else 8.0
+        for a, b in zip(p[:-1], p[1:]):                       # a line: one rectangle per segment
+            d = b - a
+            L = math.hypot(*d)
+            if L < 0.5:
+                continue
+            nrm = np.array([-d[1], d[0]]) / L * hw
+            out.append({"poly": np.array([a + nrm, b + nrm, b - nrm, a - nrm])})
+    log("aeroway polygons", len(out))
     return out
 
 
@@ -649,7 +693,8 @@ def main():
     peaks, places = build_poi(frame)
 
     # groom the pistes into the 5 m mosaic
-    mask = piste_mask(raw.shape, NEAR_STEP, lines, areas)
+    strips = build_aeroways(frame)                            # snow-covered runways (the Courchevel altiport): groomed, no trees
+    mask = piste_mask(raw.shape, NEAR_STEP, lines, areas + strips)
     groomed = groom(raw, mask)
     log("groomed: mean |change| under pistes %.2f m" % float(np.abs(groomed - raw)[mask > 0.5].mean()))
 
@@ -668,7 +713,11 @@ def main():
         mark(np.array(lf["pts"]).reshape(-1, 2))
     for b in buildings:
         mark(b["poly"])
-    near = ndimage.distance_transform_edt(~interest) * 40 <= NEAR_KEEP
+    for _, lon, lat, radius in cfg.get("keep", ()):            # landmarks far from the pistes (the Matterhorn) get their 5 m tiles too
+        kx, kz = frame.to_world(lon, lat)
+        jj, ii = np.mgrid[0:interest.shape[0], 0:interest.shape[1]]
+        interest |= np.hypot(ii * 40 + 20 - kx, jj * 40 + 20 - kz) <= radius
+    near = ndimage.distance_transform_edt(~interest) * 40 <= cfg.get("near_keep", NEAR_KEEP)
     shipped = []
     for tz in range(frame.tiles_z):
         for tx in range(frame.tiles_x):
@@ -692,8 +741,9 @@ def main():
     far = np.load(os.path.join(work_dir(rid, "dem"), "far.npy"))
     # the WMS answers at 40 m repeat about one column in six and carry a few single-node spikes: despike, soften, and inside the box
     # replace it by the (groomed) 5 m mosaic averaged down, so near and far agree where they meet
-    med = ndimage.median_filter(far, 3)
-    far = np.where(np.abs(far - med) > 120, med, far)
+    if "ign-rgealti" in cfg["far"]:                           # (only the WMS answers have the spikes: elsewhere it would blunt real peaks)
+        med = ndimage.median_filter(far, 3)
+        far = np.where(np.abs(far - med) > 120, med, far)
     far = ndimage.gaussian_filter(far, 0.7, mode="nearest")
     k = int(round(FAR_STEP / NEAR_STEP))
     o = int(round(FAR_MARGIN / FAR_STEP))
@@ -707,7 +757,7 @@ def main():
         fh.write(far_blob)
     log("far.bin %.2f MB" % (len(far_blob) / 1e6))
 
-    classes, cnx, cnz = classes_raster(frame, dem_raw, load_osm(rid, "areas"), lines, areas, buildings)
+    classes, cnx, cnz = classes_raster(frame, dem_raw, load_osm(rid, "areas"), lines, areas + strips, buildings)
     cblob = rle(classes)
     with open(os.path.join(out, "classes.bin"), "wb") as fh:
         fh.write(cblob)
@@ -740,8 +790,8 @@ def main():
         "classes": {"step": CLASS_STEP, "nx": cnx, "nz": cnz, "bits": CLASS_BITS},
         "map": {"file": "map.webp", "w": mw, "h": mh},
         "shadows": {"file": "shadow-{time}.webp", "suns": SUNS},
-        "pistes": pistes, "network": network, "lifts": lifts, "peaks": peaks, "places": places,
-        "credits": CREDITS,
+        "pistes": pistes, "network": network, "lifts": lifts, "peaks": peaks, "places": places, "start": cfg.get("start"),
+        "credits": credits(rid),
         "bake": {"date": time.strftime("%Y-%m-%d"), "script": "scripts/ski/bake.py"},
     }
     with open(os.path.join(out, "resort.json"), "w", encoding="utf-8") as fh:

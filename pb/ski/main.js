@@ -76,7 +76,10 @@ async function boot() {
   const boards = createBoards(window.Arcade);
 
   LOAD.set(0.25, 'Skigebitt gëtt gelueden …');
-  const rid = RESORTS.some((r) => r.id === params.resort && r.ready) ? params.resort : 'killy';
+  // the resort of the URL, else the one skied last, else Espace Killy (one resort is loaded per page: picking another reloads)
+  const isReady = (id) => RESORTS.some((r) => r.id === id && r.ready);
+  const lastResort = (store.get().last || {}).resort;
+  const rid = isReady(params.resort) ? params.resort : isReady(lastResort) ? lastResort : 'killy';
   const core = await loadResortCore(rid, (p) => LOAD.set(0.25 + p * 0.45, 'Bierger ginn opgebaut …'));
   mark('core');
   const { resort } = core;
@@ -159,8 +162,18 @@ async function boot() {
   function showPicker() {
     game.screen = 'picker';
     hud.show(false); input.showTouch(false);
-    picker = ui.showResorts({ onPick: () => { picker.close(); picker = null; showMap(); } });
+    picker = ui.showResorts({
+      onPick: (id) => {
+        if (id && id !== rid) { switchResort(id); return; }
+        picker.close(); picker = null; showMap();
+      },
+    });
     document.documentElement.dataset.skiScreen = 'picker';
+  }
+  function switchResort(id) {
+    const q = new URLSearchParams(location.search);
+    q.set('resort', id); q.set('map', '1'); q.delete('piste');
+    location.search = q.toString();
   }
   function showMap() {
     game.screen = 'map';
@@ -176,7 +189,7 @@ async function boot() {
     pisteMap = createPisteMap({ canvas: mapScreen.canvas, resort, imageUrl: core.root + resort.map.file, pistes, onPick: (p) => selectPiste(p, false) });
     mapScreen.zoomButtons.forEach((b) => b.addEventListener('click', () => pisteMap.zoomBy(b.dataset.z === 'in' ? 1.5 : 1 / 1.5)));
     const last = store.get().last;
-    const first = (last && last.resort === rid && pistes.byId.get(last.piste)) || pistes.byId.get(DEFAULT_PISTE) || pistes.list[0];
+    const first = (last && last.resort === rid && pistes.byId.get(last.piste)) || pistes.byId.get(resort.start || DEFAULT_PISTE) || pistes.list[0];
     selectPiste(first, true);
     document.documentElement.dataset.skiScreen = 'map';
   }
@@ -450,7 +463,8 @@ async function boot() {
 
   // first build around the default piste behind the loading screen, then the picker (or straight onto the piste with ?auto=1)
   LOAD.set(0.75, 'Pisten ginn opgebaut …');
-  const startPiste = pistes.byId.get(params.piste) || pistes.byId.get((store.get().last || {}).piste) || pistes.byId.get(DEFAULT_PISTE) || pistes.list[0];
+  const lastPiste = lastResort === rid ? (store.get().last || {}).piste : null;
+  const startPiste = pistes.byId.get(params.piste) || pistes.byId.get(lastPiste) || pistes.byId.get(resort.start || DEFAULT_PISTE) || pistes.list[0];
   game.piste = startPiste;
   const a0 = startPiste.at(2, {});
   streamer.focus(a0.x, a0.z);
@@ -468,7 +482,8 @@ async function boot() {
     await streamer.ready(a0.x, a0.z, 1500);
     placeAt(a0.x, a0.z, Math.atan2(a0.dz, a0.dx));
     startRun(startPiste, MODES.run);
-  } else showPicker();
+  } else if (param('map') === '1') showMap();          // came from the picker of another resort (switchResort)
+  else showPicker();
   mark('ready');
 }
 

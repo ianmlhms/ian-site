@@ -28,7 +28,8 @@ def queries(bbox, margin=0.03):
                  'way["waterway"="riverbank"](%s););out geom tags;' % ((wide,) * 5),
         "water": '[out:json][timeout:240];(way["waterway"~"^(river|stream)$"](%s););out geom tags;' % wide,
         "roads": '[out:json][timeout:240];(way["highway"~"^(primary|secondary|tertiary|unclassified|residential|service|living_street|pedestrian|track)$"](%s););out geom tags;' % box,
-        "poi": '[out:json][timeout:240];(node["natural"~"^(peak|saddle|glacier)$"](%s);node["place"~"^(village|hamlet|town|locality|isolated_dwelling|suburb|neighbourhood)$"](%s);'
+        "aeroway": '[out:json][timeout:240];(way["aeroway"~"^(runway|apron|taxiway|helipad)$"](%s););out geom tags;' % box,
+        "poi":'[out:json][timeout:240];(node["natural"~"^(peak|saddle|glacier)$"](%s);node["place"~"^(village|hamlet|town|locality|isolated_dwelling|suburb|neighbourhood)$"](%s);'
                'node["mountain_pass"="yes"](%s);node["amenity"~"^(restaurant|cafe|bar)$"](%s););out center tags;' % (wide, wide, wide, box),
     }
 

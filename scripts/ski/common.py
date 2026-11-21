@@ -49,19 +49,41 @@ RESORTS = {
         "bbox": (45.395, 6.845, 45.515, 7.060),
         "dem": ["ign-rgealti"],
         "far": ["ign-rgealti", "copernicus-glo30"],
-        "villages": [                              # name, lon, lat, radius m (buildings are kept within these circles)
+        "villages": [                              # name, lon, lat, radius m [, "chalet": paint even big blocks as wood-and-stone chalets]
             ("Val d'Isère", 6.9797, 45.4486, 1300), ("La Daille", 6.9600, 45.4680, 450), ("Le Fornet", 7.0150, 45.4370, 400),
             ("Tignes le Lac", 6.9070, 45.4690, 700), ("Val Claret", 6.9030, 45.4560, 550), ("Le Lavachet", 6.9180, 45.4730, 350),
             ("Tignes 1800", 6.9350, 45.4880, 450), ("Les Boisses", 6.9280, 45.4980, 350), ("Les Brévières", 6.9230, 45.5050, 400),
         ],
     },
-    # --- planned (later rounds) ---
+    # All three valleys: Courchevel / La Tania (east), Méribel / Brides (middle), Les Menuires / Val Thorens / Saint-Martin and the Orelle
+    # side down to Plan Bouchet (west and south). Valmorel (west of 6.475), La Plagne / Champagny (north-east) and the Maurienne below
+    # Orelle stay out. near_keep is tighter than Killy's (3 Vallées has twice the pistes; the data budget is ~10 MB).
     "3vallees": {"name": "Les 3 Vallées", "short": "Courchevel · Méribel · Val Thorens", "country": "FR", "crs": "EPSG:2154",
-                 "bbox": (45.260, 6.480, 45.430, 6.660), "dem": ["ign-rgealti"], "far": ["ign-rgealti", "copernicus-glo30"], "villages": []},
+                 "bbox": (45.236, 6.475, 45.456, 6.690), "dem": ["ign-rgealti"], "far": ["ign-rgealti", "copernicus-glo30"],
+                 "near_keep": 420.0,
+                 "villages": [
+                     ("Courchevel 1850", 6.6345, 45.4150, 850, "chalet"), ("Courchevel Moriond", 6.6480, 45.4235, 450, "chalet"), ("Courchevel Village", 6.6310, 45.4300, 380, "chalet"),
+                     ("Courchevel Le Praz", 6.6280, 45.4405, 380, "chalet"), ("La Tania", 6.5935, 45.4315, 380, "chalet"), ("Méribel", 6.5660, 45.3960, 900, "chalet"),
+                     ("Méribel Mottaret", 6.5850, 45.3745, 480, "chalet"), ("Méribel Village", 6.5800, 45.4120, 300, "chalet"), ("Brides-les-Bains", 6.5680, 45.4530, 500),
+                     ("Saint-Martin-de-Belleville", 6.5055, 45.3800, 450, "chalet"), ("Les Menuires", 6.5360, 45.3250, 950), ("Val Thorens", 6.5800, 45.2975, 700),
+                 ]},
     "kronplatz": {"name": "Kronplatz", "short": "Plan de Corones", "country": "IT", "crs": "EPSG:25832",
                   "bbox": (46.700, 11.850, 46.790, 11.990), "dem": ["bz-dtm", "copernicus-glo30"], "far": ["copernicus-glo30"], "villages": []},
+    # Matterhorn ski paradise: Zermatt (Sunnegga / Rothorn, Gornergrat / Stockhorn, Schwarzsee / Klein Matterhorn / Theodul glacier) and
+    # Breuil-Cervinia + Valtournenche on the Italian side. The box crosses the border on the main ridge (Plateau Rosa / Theodulpass):
+    # swissALTI3D north of it, the Aosta Valley lidar DTM south of it, merged with a feather (fetch_dem.py merge_sources).
+    # "keep" = extra places whose 5 m tiles are always shipped (the Matterhorn itself lies 2-3 km from the nearest piste).
     "zermatt": {"name": "Zermatt · Cervinia", "short": "Matterhorn", "country": "CH", "crs": "EPSG:2056",
-                "bbox": (45.900, 7.580, 46.040, 7.800), "dem": ["swissalti3d", "vda-dtm", "copernicus-glo30"], "far": ["copernicus-glo30"], "villages": []},
+                "bbox": (45.862, 7.600, 46.040, 7.830), "dem": ["swissalti3d", "vda-dtm", "copernicus-glo30"], "far": ["copernicus-glo30"],
+                "near_keep": 520.0,
+                "keep": [("Matterhorn", 7.6586, 45.9763, 1300)],
+                "villages": [
+                    ("Zermatt", 7.7480, 46.0190, 1250, "chalet"), ("Furi", 7.7300, 46.0040, 260, "chalet"), ("Zum See", 7.7350, 46.0050, 160, "chalet"), ("Riffelalp", 7.7640, 46.0045, 220, "chalet"),
+                    ("Riffelberg", 7.7745, 45.9935, 160), ("Gornergrat", 7.7845, 45.9835, 140), ("Findeln", 7.7640, 46.0115, 260, "chalet"), ("Sunnegga", 7.7710, 46.0165, 160),
+                    ("Schwarzsee", 7.7090, 45.9915, 160), ("Trockener Steg", 7.7180, 45.9635, 160), ("Klein Matterhorn", 7.7295, 45.9385, 120),
+                    ("Plateau Rosa", 7.7080, 45.9370, 180), ("Breuil-Cervinia", 7.6300, 45.9345, 900), ("Plan Maison", 7.6465, 45.9400, 200),
+                    ("Valtournenche", 7.6235, 45.8775, 550), ("Salette", 7.6400, 45.8800, 200),
+                ]},
     "arlberg": {"name": "St. Anton · Arlberg", "short": "Ski Arlberg", "country": "AT", "crs": "EPSG:31287",
                 "bbox": (47.100, 10.060, 47.250, 10.320), "dem": ["at-dgm", "copernicus-glo30"], "far": ["copernicus-glo30"], "villages": []},
 }
@@ -74,6 +96,16 @@ FAR_STEP = 40.0                        # distant-mountains grid
 FAR_MARGIN = 14000.0                   # the far grid reaches this far beyond the box on every side
 CLASS_STEP = 10.0                      # land-cover raster (forest, rock, water, built-up)
 NEAR_KEEP = 700.0                      # a height tile is shipped when it lies within this distance of a piste, a lift or a village
+                                       # (a resort may set its own "near_keep"; "keep" lists extra (name, lon, lat, radius m) to ship)
+
+# In-game credit line (Luxembourgish) of every DEM source; bake.py lists the ones a resort uses, then OSM.
+SOURCE_CREDITS = {
+    "ign-rgealti": "Gelänn: IGN RGE ALTI® 5 m (© IGN, Licence Ouverte / Etalab 2.0), iwwer de Géoplateforme",
+    "swissalti3d": "Gelänn Schwäiz: swissALTI3D 2 m (© swisstopo, Open Government Data, fräi Notzung mat Quellenugab)",
+    "vda-dtm": "Gelänn Italien: DTM 2005/2008 Lidar 2 m (© Regione Autonoma Valle d'Aosta, CC BY 4.0)",
+    "copernicus-glo30": "Bierger an der Distanz: Copernicus DEM GLO-30 (© DLR e.V. 2010-2014 an © Airbus Defence and Space GmbH 2014-2018, ënnert COPERNICUS vun der EU an der ESA)",
+}
+OSM_CREDIT = "Pisten, Liften, Haiser, Bësch: © OpenStreetMap-Mataarbechter (ODbL 1.0)"
 
 
 def resort_arg(argv=None):

@@ -16,8 +16,9 @@ Sources (each a function below; RESORTS[rid]["dem"] / ["far"] list them in prior
                       copernicus-dem-30m, read with range requests. © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH
                       2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved (free licence
                       with attribution).
-    swissalti3d / bz-dtm / vda-dtm / at-dgm: planned for the next resorts (swisstopo swissALTI3D, Provincia di Bolzano DTM,
-                      Regione Valle d'Aosta DTM, Land Tirol / Vorarlberg DGM via data.gv.at); not implemented yet.
+    swissalti3d / vda-dtm: in dem_merge.py (swisstopo swissALTI3D 2 m via the STAC API, Regione Valle d'Aosta lidar DTM 2 m),
+                      merged with a feather across the border (Zermatt-Cervinia). --remerge redoes the merge from the cached sources.
+    bz-dtm / at-dgm:  planned (Provincia di Bolzano DTM, Land Tirol / Vorarlberg DGM via data.gv.at); not implemented here.
 """
 from __future__ import annotations
 
@@ -87,6 +88,12 @@ def copernicus_grid(frame, e0, n_top, nx, nz, step):
 
 def fetch_near(rid, frame):
     srcs = RESORTS[rid]["dem"]
+    if any(s in ("swissalti3d", "vda-dtm") for s in srcs):     # several DEMs across a border: whole-box mosaics merged (dem_merge.py)
+        from dem_merge import fetch_near_merged
+        if "--remerge" in sys.argv or not all(os.path.exists(os.path.join(work_dir(rid, "dem"), "near_%d_%d.npy" % (tx, tz)))
+                                              for tz in range(frame.tiles_z) for tx in range(frame.tiles_x)):
+            fetch_near_merged(rid, frame, srcs)
+        return
     n = TILE_CELLS + 1
     total = frame.tiles_x * frame.tiles_z
     done = 0
