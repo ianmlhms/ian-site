@@ -9,6 +9,7 @@
  * Merging is always a union: stars OR-ed, park points and times keep the better one. Nothing is ever taken away from a player.
  * Test mode (window.__pbTestMode): nothing is sent or applied (the arcade keeps test saves apart). Standalone: local only. */
 import { cleanMask, starCount, totalStars } from './challenges.js';
+import { mergeRle, rleIntervals } from './discovery.js';
 
 export const CLOUD_VERSION = 1;
 const LIMIT = 7000;                 // bytes of JSON (game_saves: jsonb <= 8192)
@@ -35,7 +36,20 @@ export function encodeCloud(progress) {
   }
   const st = progress.stats || {};
   const rec = { v: CLOUD_VERSION, tb: totalStars(progress), s, p, b, x: { o: Math.round(st.off || 0), t: Math.round((st.top || 0) * 10), k: typeof progress.ski === 'string' ? progress.ski : 'allmountain' } };
+  // round 7-C: the discovered map cells per resort (run-length text, modes/discovery.js) and the Lawin challenges won; an old game
+  // ignores `d`, an old record has none (= nothing discovered there yet). Dropped resort by resort (largest first) after the times.
+  const d = {};
+  for (const [rid, text] of Object.entries(progress.disc || {})) if (typeof text === 'string' && text) d[rid] = text;
+  const w = {};
+  for (const [rid, m] of Object.entries(progress.lawin || {})) if (Number.isInteger(m) && m > 0) w[rid] = m;
+  if (Object.keys(d).length) rec.d = d;
+  if (Object.keys(w).length) rec.w = w;
   if (JSON.stringify(rec).length > LIMIT) delete rec.b;            // best times go first (the boards keep them anyway)
+  while (rec.d && JSON.stringify(rec).length > LIMIT) {
+    const big = Object.keys(rec.d).sort((a, b) => rec.d[b].length - rec.d[a].length)[0];
+    delete rec.d[big];
+    if (!Object.keys(rec.d).length) delete rec.d;
+  }
   return rec;
 }
 
@@ -63,7 +77,10 @@ export function decodeCloud(raw) {
   const x = isRecord(data.x) ? data.x : {};
   const stats = { off: Number.isFinite(x.o) && x.o > 0 ? Math.min(1e8, Math.round(x.o)) : 0, top: Number.isFinite(x.t) && x.t > 0 ? Math.min(60, x.t / 10) : 0 };
   const ski = typeof x.k === 'string' && /^[a-z]{2,16}$/.test(x.k) ? x.k : null;
-  return { stars, park, bestHash, stats, ski };
+  const disc = {}, lawin = {};
+  for (const [rid, text] of Object.entries(isRecord(data.d) ? data.d : {})) if (/^[a-z0-9]{1,16}$/.test(rid) && rleIntervals(text).length) disc[rid] = text;
+  for (const [rid, m] of Object.entries(isRecord(data.w) ? data.w : {})) if (/^[a-z0-9]{1,16}$/.test(rid) && Number.isInteger(m) && m > 0 && m < 256) lawin[rid] = m;
+  return { stars, park, bestHash, stats, ski, disc, lawin };
 }
 
 /** A NEW progress with a decoded cloud record merged in (stars OR-ed, the better park score and time). */
@@ -77,13 +94,18 @@ export function mergeCloud(progress, cloud) {
   for (const [k, ms] of Object.entries(cloud.bestHash)) if (!(bestHash[k] > 0) || ms < bestHash[k]) bestHash[k] = ms;
   const mine = progress.stats || { off: 0, top: 0 }, theirs = cloud.stats || { off: 0, top: 0 };
   const stats = { off: Math.max(mine.off || 0, theirs.off || 0), top: Math.max(mine.top || 0, theirs.top || 0) };
-  return { ...progress, stars, park, bestHash, stats };
+  const disc = { ...(progress.disc || {}) };
+  for (const [rid, text] of Object.entries(cloud.disc || {})) disc[rid] = disc[rid] ? mergeRle(disc[rid], text) : text;
+  const lawin = { ...(progress.lawin || {}) };
+  for (const [rid, m] of Object.entries(cloud.lawin || {})) lawin[rid] = (lawin[rid] || 0) | m;
+  return { ...progress, stars, park, bestHash, stats, disc, lawin };
 }
 
 /** Did the merge add anything? (stars, park points, times) */
 export function cloudGain(before, after) {
   const count = (p) => totalStars(p) * 1e6 + Object.values(p.park || {}).reduce((a, b) => a + b, 0) + ((p.stats && p.stats.off) || 0) * 1e-3 + ((p.stats && p.stats.top) || 0) * 1e-6;
-  return count(after) !== count(before) || Object.keys(after.bestHash || {}).length !== Object.keys(before.bestHash || {}).length;
+  const extra = (p) => JSON.stringify(p.disc || {}) + JSON.stringify(p.lawin || {});
+  return count(after) !== count(before) || Object.keys(after.bestHash || {}).length !== Object.keys(before.bestHash || {}).length || extra(after) !== extra(before);
 }
 
 export const starTotalOf = (stars) => Object.values(stars).reduce((n, m) => n + starCount(cleanMask(m)), 0);

@@ -198,3 +198,26 @@ button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
 .skidraw i{position:absolute;left:4%;top:50%;width:var(--len);height:var(--wid);transform:translateY(-50%);border:1px solid var(--ink);border-radius:2px 11px 11px 2px;box-shadow:inset -14px 0 0 var(--tip)}
 .skidraw.twin i{border-radius:11px;box-shadow:inset -14px 0 0 var(--tip),inset 14px 0 0 var(--tip)}
 .skicardbox{width:min(520px,calc(100% - 24px))}
+/* R7-C: map teleport (fog, pin, confirm, "Bei den éischte Lift"), first person streak, challenge course HUD, avalanche */
+.tpui{position:absolute;inset:0;pointer-events:none}
+.tpui>*{pointer-events:auto}
+.tpfirst{position:absolute;left:10px;top:10px;background:var(--white)}
+.tptoast{position:absolute;left:50%;top:14px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 14px;font-weight:650;font-size:14px;pointer-events:none}
+.tpconfirm{position:absolute;left:50%;bottom:52px;transform:translateX(-50%);background:var(--white);border:1px solid var(--ink);padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-width:240px;max-width:calc(100% - 32px)}
+.tpconfirm span{font-size:13px;color:var(--muted)}
+.tpconfirm .acts{display:flex;gap:8px;margin-top:4px}
+.lrow.fogged{opacity:.5}
+#fpStreak{position:absolute;inset:0;pointer-events:none;opacity:0;background:repeating-conic-gradient(from 0deg at 50% 46%,rgba(255,255,255,0) 0deg 3.1deg,rgba(255,255,255,.5) 3.1deg 3.5deg);-webkit-mask-image:radial-gradient(ellipse at 50% 46%,transparent 34%,#000 78%);mask-image:radial-gradient(ellipse at 50% 46%,transparent 34%,#000 78%)}
+#courseHud{position:absolute;left:50%;top:calc(58px + env(safe-area-inset-top));transform:translateX(-50%);display:flex;align-items:center;gap:10px;color:#fff;text-shadow:var(--halo);font-weight:700;pointer-events:none}
+#courseHud .bar{width:min(300px,42vw);height:8px;border:1px solid rgba(255,255,255,.9);background:rgba(22,23,26,.3)}
+#courseHud .bar i{display:block;height:100%;width:0;background:#fff}
+#courseHud .arrow{width:34px;height:34px;display:grid;place-items:center;font-size:26px;line-height:1}
+#courseWarn{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);background:rgba(163,33,33,.88);color:#fff;padding:10px 18px;font-weight:800;font-size:20px;display:flex;align-items:center;gap:10px;pointer-events:none}
+#courseWarn .arrow{font-size:30px;display:inline-block}
+.coursecard{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:var(--white);border:1px solid var(--ink);padding:18px;width:min(420px,calc(100% - 32px));display:flex;flex-direction:column;gap:10px}
+.coursecard .acts{display:flex;gap:8px;flex-wrap:wrap}
+#avWarn{position:absolute;right:calc(14px + env(safe-area-inset-right));top:calc(118px + env(safe-area-inset-top));background:#f2c200;color:#16171a;border:2px solid #16171a;padding:5px 10px;font-weight:800;font-size:14px;pointer-events:none}
+#avFlash{position:absolute;inset:0;background:#f4f7fb;opacity:0;pointer-events:none;transition:opacity .25s}
+#avFlash.on{opacity:.92;transition:opacity .08s}
+.avprompt{position:absolute;left:50%;bottom:calc(120px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--white);border:1px solid var(--ink);padding:12px 14px;display:flex;flex-direction:column;gap:6px;width:min(380px,calc(100% - 32px));pointer-events:auto}
+.avprompt .acts{display:flex;gap:8px}

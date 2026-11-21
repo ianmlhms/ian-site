@@ -9,7 +9,7 @@
 import { liftClass, LIFT_SPEC } from '../lift-path.js';
 
 export const DAY = Object.freeze({ start: 9, end: 16.5, hoursPerSecond: 1 / 240 });     // one game hour = 4 real minutes
-const BOTTOM_RADIUS = 30;      // m from the bottom station: the boarding zone (round 6: modes/liftride.js RIDE.boardRadius)
+const BOTTOM_RADIUS = 42;      // m from the bottom station: the boarding zone (R7-C: 42, the first-lift spot may stand up to 38 m out where a big station building fills the front)
 const EXIT_PISTE = 80;         // m: a piste that starts this close to a top station is where the skier gets off
 const SAFE_EVERY = 1.5;        // s between respawn spots
 const EDGE = 150;              // m inside the box edge: beyond it the skier is sent back

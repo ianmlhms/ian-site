@@ -11,7 +11,7 @@ import { LIFT_SPEC } from '../lift-path.js';
 
 export const RIDE = Object.freeze({
   factor: 4,                 // x the real line speed
-  boardRadius: 30,           // m from the bottom station: the boarding zone
+  boardRadius: 42,           // m from the bottom station: the boarding zone (R7-C: = freeride.js BOTTOM_RADIUS)
   boardSpeed: 6,             // m/s: slower than this to board
   enter: { chair: 6, gondola: 5, cable: 7, drag: 3, train: 9 },       // m past the bottom wheel / buffer where the rider gets on
   exit: { chair: 7, gondola: 6, cable: 8, drag: 4, train: 10 },       // m before the top one where he gets off

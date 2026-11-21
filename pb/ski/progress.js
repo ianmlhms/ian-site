@@ -18,7 +18,7 @@ export function emptyProgress() {
   // stars: { "<resort>/<hash5>": mask } and bestHash (the best times under the same short keys, for the cloud record): modes/challenges.js
   // park: { <resort>: best park points } (round 4A)
   // stats: { off: metres skied off the piste, top: top speed m/s } and ski: the picked ski type (round 6, modes/skis.js)
-  return { v: SAVE_VERSION, best: {}, ghosts: {}, runs: {}, stars: {}, park: {}, bestHash: {}, last: null, ghostOrder: [], stats: { off: 0, top: 0 }, ski: 'allmountain' };
+  return { v: SAVE_VERSION, best: {}, ghosts: {}, runs: {}, stars: {}, park: {}, bestHash: {}, last: null, ghostOrder: [], stats: { off: 0, top: 0 }, ski: 'allmountain', disc: {}, lawin: {} };
 }
 
 export function normalize(raw) {
@@ -32,6 +32,9 @@ export function normalize(raw) {
   for (const [k, v] of Object.entries(raw.bestHash && typeof raw.bestHash === 'object' ? raw.bestHash : {})) if (Number.isFinite(v) && v > 0) p.bestHash[k] = Math.round(v);
   if (raw.stats && typeof raw.stats === 'object') p.stats = { off: Number.isFinite(raw.stats.off) && raw.stats.off > 0 ? Math.round(raw.stats.off) : 0, top: Number.isFinite(raw.stats.top) && raw.stats.top > 0 ? Math.min(60, raw.stats.top) : 0 };
   if (typeof raw.ski === 'string' && /^[a-z]{2,16}$/.test(raw.ski)) p.ski = raw.ski;
+  // round 7-C: discovered cells per resort (modes/discovery.js run-length text) and the Lawin challenges won (bit mask per resort)
+  for (const [k, v] of Object.entries(raw.disc && typeof raw.disc === 'object' ? raw.disc : {})) if (/^[a-z0-9]{1,16}$/.test(k) && typeof v === 'string' && v.length <= 12000 && /^[0-9a-z,]*$/.test(v)) p.disc[k] = v;
+  for (const [k, v] of Object.entries(raw.lawin && typeof raw.lawin === 'object' ? raw.lawin : {})) if (/^[a-z0-9]{1,16}$/.test(k) && Number.isInteger(v) && v > 0 && v < 256) p.lawin[k] = v;
   if (raw.last && typeof raw.last.resort === 'string') p.last = { resort: raw.last.resort, piste: typeof raw.last.piste === 'string' ? raw.last.piste : null };
   p.ghostOrder = Array.isArray(raw.ghostOrder) ? raw.ghostOrder.filter((k) => p.ghosts[k]) : Object.keys(p.ghosts);
   return p;
