@@ -32,7 +32,7 @@ export function createSurface(field) {
         const n = j * SIDE + i;
         field.attrs(x, z, attr);
         h[n] = field.heightWith(x, z, attr);
-        info[n * ATTR] = attr.piste; info[n * ATTR + 1] = attr.forest; info[n * ATTR + 2] = attr.rock; info[n * ATTR + 3] = attr.built + attr.water * 2;
+        info[n * ATTR] = attr.piste; info[n * ATTR + 1] = attr.forest; info[n * ATTR + 2] = attr.rock; info[n * ATTR + 3] = attr.water - attr.built;          // water and built-up land hardly overlap: one signed channel interpolates cleanly
       }
     }
     b = { bx, bz, x0, z0, h, info, side: SIDE, apron: APRON };

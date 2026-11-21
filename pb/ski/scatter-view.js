@@ -1,6 +1,8 @@
 /* Trees and boulders in the scene: instanced, painted (vertex colours + the shared light), two detail levels for the trees.
  * The instance lists are rebuilt from scatter.js blocks when the camera has moved REBUILD m (the blocks themselves are cached). */
 import { BLOCK } from './scatter.js';
+import { SHADOW_GLSL, instancedDepthMaterial } from './shadows.js';
+import { FOG_GLSL } from './snow-shader.js';
 
 const THREE = window.THREE;
 const REBUILD = 30;
@@ -19,6 +21,26 @@ function pushCone(pos, nrm, col, cx, y0, y1, r, sides, colour, snow, rot = 0) {
       const isTip = p === tip;
       col.push(colour[0], colour[1], colour[2], isTip ? snow * 0.6 : snow);
     }
+  }
+}
+/* a spruce tier: a cone whose rim zig-zags (branch tips out, gaps in), the tips drooping a little: reads as a fir, not a party hat */
+function pushTier(pos, nrm, col, y0, y1, r, tips, colour, snow, rot = 0) {
+  const n = tips * 2;
+  for (let i = 0; i < n; i++) {
+    const a0 = rot + i / n * Math.PI * 2, a1 = rot + (i + 1) / n * Math.PI * 2;
+    const r0 = i % 2 ? r * 0.62 : r, r1 = (i + 1) % 2 ? r * 0.62 : r;
+    const d0 = i % 2 ? 0.12 : -0.18, d1 = (i + 1) % 2 ? 0.12 : -0.18;
+    const p0 = [Math.cos(a0) * r0, y0 + d0, Math.sin(a0) * r0], p1 = [Math.cos(a1) * r1, y0 + d1, Math.sin(a1) * r1], tip = [0, y1, 0];
+    const am = (a0 + a1) / 2, slope = r / (y1 - y0);
+    const nn = [Math.cos(am), slope, Math.sin(am)];
+    const l = Math.hypot(...nn);
+    for (const p of [p0, tip, p1]) {
+      pos.push(p[0], p[1], p[2]);
+      nrm.push(nn[0] / l, nn[1] / l, nn[2] / l);
+      col.push(colour[0], colour[1], colour[2], p === tip ? snow * 0.5 : snow);
+    }
+    // underside (dark, no snow): closes the tier seen from below on steep slopes
+    for (const p of [p0, p1, [0, y0 + 0.35, 0]]) { pos.push(p[0], p[1], p[2]); nrm.push(0, -1, 0); col.push(colour[0] * 0.6, colour[1] * 0.6, colour[2] * 0.6, 0); }
   }
 }
 function pushPrism(pos, nrm, col, y0, y1, r, sides, colour) {
@@ -42,18 +64,17 @@ function build(fn) {
 }
 const SPRUCE = [0.13, 0.27, 0.22], SPRUCE_DARK = [0.09, 0.2, 0.17], BARK = [0.3, 0.22, 0.17], LARCH = [0.46, 0.38, 0.31], LARCH_TWIG = [0.38, 0.31, 0.26];
 const spruceNear = () => build((p, n, c) => {
-  pushPrism(p, n, c, -0.3, 1.6, 0.2, 5, BARK);
-  pushCone(p, n, c, 0, 1.0, 5.2, 2.1, 7, SPRUCE_DARK, 0.75);
-  pushCone(p, n, c, 0, 3.2, 7.4, 1.6, 7, SPRUCE, 0.85, 0.4);
-  pushCone(p, n, c, 0, 5.4, 9.4, 1.05, 6, SPRUCE, 0.95, 0.9);
+  pushPrism(p, n, c, -0.3, 1.8, 0.2, 5, BARK);
+  const tiers = [[0.9, 3.6, 2.25, 8], [2.4, 5.0, 1.9, 8], [3.8, 6.4, 1.55, 7], [5.2, 7.8, 1.2, 7], [6.6, 9.6, 0.8, 6]];
+  tiers.forEach(([y0, y1, r, tips], k) => pushTier(p, n, c, y0, y1, r, tips, k % 2 ? SPRUCE : SPRUCE_DARK, 0.72 + k * 0.05, k * 0.9));
 });
 const spruceFar = () => build((p, n, c) => { pushCone(p, n, c, 0, 0.6, 9.4, 2.0, 5, SPRUCE_DARK, 0.7); });
 /* a larch in winter: a straight trunk and thin layered tiers of bare twigs (open, so the snow behind shows through the gaps) */
 const larchNear = () => build((p, n, c) => {
-  pushPrism(p, n, c, -0.3, 9.4, 0.17, 5, BARK);
-  for (let k = 0; k < 5; k++) {
-    const y = 2.0 + k * 1.5, r = 1.9 - k * 0.33;
-    pushCone(p, n, c, 0, y, y + 0.9, r, 6, k % 2 ? LARCH_TWIG : LARCH, 0.35, k * 0.7);
+  pushPrism(p, n, c, -0.3, 10.2, 0.17, 5, BARK);
+  for (let k = 0; k < 8; k++) {                      // many thin whorls of drooping bare twigs: open and see-through like a winter larch
+    const y = 2.2 + k * 0.98, r = 1.75 * (1 - k / 9) + 0.25;
+    pushTier(p, n, c, y, y + 0.55, r, 5, k % 2 ? LARCH_TWIG : LARCH, 0.25, k * 1.3);
   }
 });
 const larchFar = () => build((p, n, c) => { pushCone(p, n, c, 0, 1.0, 9.6, 1.8, 5, LARCH, 0.2); });
@@ -79,12 +100,9 @@ function rockGeometry() {
 }
 
 /* ---------------- material ---------------- */
-function scatterMaterial(env) {
-  return new THREE.ShaderMaterial({
-    uniforms: env.u,
-    vertexShader: `
+const SCATTER_VERTEX = `
       attribute vec4 color; attribute vec4 aInst; attribute float aSeed;
-      varying vec4 vCol; varying vec3 vN; varying float vDist; varying float vSeed; varying float vH; varying vec2 vXZ;
+      varying vec4 vCol; varying vec3 vN; varying float vDist; varying float vSeed; varying float vH; varying vec2 vXZ; varying vec3 vW;
       void main(){
         float a = aSeed * 6.2831;
         float c = cos(a), s = sin(a);
@@ -92,29 +110,80 @@ function scatterMaterial(env) {
         p.xz = mat2(c, -s, s, c) * p.xz;
         vec3 n = normal; n.xz = mat2(c, -s, s, c) * n.xz;
         vec4 w = vec4(p + aInst.xyz, 1.0);
-        vCol = color; vN = n; vSeed = aSeed; vH = position.y; vXZ = w.xz;
+        vCol = color; vN = n; vSeed = aSeed; vH = position.y; vXZ = w.xz; vW = w.xyz;
         vec4 mv = viewMatrix * w; vDist = -mv.z;
         gl_Position = projectionMatrix * mv;
-      }`,
+      }`;
+function scatterMaterial(env, cheap) {
+  return new THREE.ShaderMaterial({
+    uniforms: env.u,
+    defines: cheap ? { CHEAP: 1 } : {},
+    vertexShader: SCATTER_VERTEX,
     fragmentShader: `
+      #include <packing>
+      ${SHADOW_GLSL}
+      ${FOG_GLSL}
       uniform vec3 uSunDir, uSunColor, uAmbSky, uAmbGround, uFogColor; uniform float uFogDensity, uShadowOn; uniform sampler2D uShadow; uniform vec4 uShadowRect;
-      varying vec4 vCol; varying vec3 vN; varying float vDist; varying float vSeed; varying float vH; varying vec2 vXZ;
+      varying vec4 vCol; varying vec3 vN; varying float vDist; varying float vSeed; varying float vH; varying vec2 vXZ; varying vec3 vW;
       void main(){
         vec3 N = normalize(vN);
         float nl = dot(N, uSunDir);
-        float lit = smoothstep(-0.15, 0.7, nl) * mix(1.0, texture2D(uShadow, (vXZ - uShadowRect.xy) / uShadowRect.zw).r, uShadowOn);
+        float vis = mix(1.0, texture2D(uShadow, (vXZ - uShadowRect.xy) / uShadowRect.zw).r, uShadowOn);
+        #ifndef CHEAP
+        vis = min(vis, sunMapShadow(vW, N));
+        #endif
+        float lit = smoothstep(-0.15, 0.7, nl) * vis;
         lit = mix(lit, floor(lit * 3.0 + 0.5) / 3.0, 0.3);
-        vec3 amb = mix(uAmbGround, uAmbSky, 0.5 + 0.5 * N.y);
+        vec3 amb = mix(uAmbGround, uAmbSky, 0.5 + 0.5 * N.y) * (0.72 + 0.28 * smoothstep(0.0, 8.0, vH));     // darker deep inside / low in the crown
         vec3 base = vCol.rgb * (0.86 + 0.28 * vSeed);
         // snow resting on the upward faces
         float snow = vCol.a * smoothstep(0.15, 0.55, N.y + (fract(vSeed * 37.0 + vH * 0.7) - 0.5) * 0.35);
         base = mix(base, vec3(0.93, 0.95, 1.0), snow);
         vec3 col = base * (amb * 0.62 + uSunColor * lit * 0.85);
-        float f = 1.0 - exp(-pow(uFogDensity * vDist, 2.0));
-        float aerial = (1.0 - exp(-vDist * 0.000045)) * 0.38;
-        gl_FragColor = vec4(mix(col, uFogColor, clamp(max(f, aerial), 0.0, 1.0)), 1.0);
+        gl_FragColor = vec4(applyFog(col, vDist, uFogColor, uFogDensity), 1.0);
       }`,
   });
+}
+
+/* Niddreg: a soft blue-grey blob under each near tree (and rock), stretched away from the sun, laid onto the slope. */
+const BLOB_VERTEX = `
+  attribute vec4 aInst; attribute vec3 aNrm;
+  uniform vec3 uSunDir;
+  varying vec2 vUv; varying float vDist;
+  void main(){
+    vec3 n = normalize(aNrm);
+    vec2 away = -uSunDir.xz / max(length(uSunDir.xz), 1e-3);
+    float stretch = 1.0 + 1.4 * (1.0 - smoothstep(0.1, 0.9, uSunDir.y));
+    vec2 q = position.xz * aInst.w * 0.32;
+    vec2 d2 = q + away * dot(q, away) * (stretch - 1.0) + away * aInst.w * 0.16 * stretch;
+    vec3 p = aInst.xyz + vec3(d2.x, 0.12 - dot(d2, n.xz) / max(n.y, 0.25), d2.y);      // on the plane of the slope
+    vUv = position.xz;
+    vec4 mv = viewMatrix * vec4(p, 1.0); vDist = -mv.z;
+    gl_Position = projectionMatrix * mv;
+  }`;
+function blobMaterial(env) {
+  return new THREE.ShaderMaterial({
+    uniforms: env.u, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+    vertexShader: BLOB_VERTEX,
+    fragmentShader: `
+      uniform float uOvercast;
+      varying vec2 vUv; varying float vDist;
+      void main(){
+        float r = length(vUv);
+        float a = (1.0 - smoothstep(0.35, 1.0, r)) * (0.3 - 0.2 * uOvercast) * (1.0 - smoothstep(60.0, 90.0, vDist));
+        gl_FragColor = vec4(0.28, 0.34, 0.5, a);
+      }`,
+  });
+}
+function blobGeometry() {
+  const g = new THREE.InstancedBufferGeometry();
+  const pos = [], idx = [];
+  const n = 10;
+  pos.push(0, 0, 0);
+  for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2; pos.push(Math.cos(a), 0, Math.sin(a)); idx.push(0, 1 + ((i + 1) % n), 1 + i); }
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx);
+  return g;
 }
 
 function instanced(geometry, material, capacity) {
@@ -127,18 +196,31 @@ function instanced(geometry, material, capacity) {
   return { mesh, inst, seed, capacity, count: 0 };
 }
 
-export function createScatterView({ scene, scatter, env, quality }) {
-  const material = scatterMaterial(env);
+export function createScatterView({ scene, scatter, env, quality, normalAt }) {
+  let material = scatterMaterial(env, quality.cheapSnow);
+  const depthMaterial = instancedDepthMaterial(SCATTER_VERTEX);
   const cap = 26000;
   const sets = {
     spruceNear: instanced(spruceNear(), material, 6000), spruceFar: instanced(spruceFar(), material, cap),
     larchNear: instanced(larchNear(), material, 4000), larchFar: instanced(larchFar(), material, cap),
     rocks: instanced(rockGeometry(), material, 4000),
   };
+  for (const k of ['spruceNear', 'larchNear', 'rocks', 'spruceFar', 'larchFar']) { sets[k].mesh.castShadow = true; sets[k].mesh.customDepthMaterial = depthMaterial; }
+  // blob shadows (Niddreg only)
+  const blobGeo = blobGeometry();
+  const BLOB_CAP = 3000;
+  const blobInst = new Float32Array(BLOB_CAP * 4), blobNrm = new Float32Array(BLOB_CAP * 3);
+  blobGeo.setAttribute('aInst', new THREE.InstancedBufferAttribute(blobInst, 4).setUsage(THREE.DynamicDrawUsage));
+  blobGeo.setAttribute('aNrm', new THREE.InstancedBufferAttribute(blobNrm, 3).setUsage(THREE.DynamicDrawUsage));
+  blobGeo.instanceCount = 0;
+  const blobs = new THREE.Mesh(blobGeo, blobMaterial(env));
+  blobs.frustumCulled = false; blobs.renderOrder = 2;
   const group = new THREE.Group();
   group.name = 'ski-scatter';
   for (const s of Object.values(sets)) group.add(s.mesh);
+  group.add(blobs);
   scene.add(group);
+  const nrm = { x: 0, y: 1, z: 0 };
   let last = { x: 1e9, z: 1e9 };
   let q = quality;
   const stats = { trees: 0, near: 0, rocks: 0 };
@@ -200,6 +282,25 @@ export function createScatterView({ scene, scatter, env, quality }) {
       }
     }
     for (const s of Object.values(sets)) commit(s);
+    // blobs under the near trees and rocks (Niddreg: there is no shadow map)
+    let nb = 0;
+    if (q.cheapSnow && normalAt) {
+      for (const set of [sets.spruceNear, sets.larchNear, sets.rocks]) {
+        const rock = set === sets.rocks;
+        for (let i = 0; i < set.count && nb < BLOB_CAP; i++) {
+          const x = set.inst[i * 4], z = set.inst[i * 4 + 2];
+          const dx = x - px, dz = z - pz;
+          if (dx * dx + dz * dz > 85 * 85) continue;
+          normalAt(x, z, nrm);
+          blobInst[nb * 4] = x; blobInst[nb * 4 + 1] = set.inst[i * 4 + 1] + (rock ? 0 : 0.25); blobInst[nb * 4 + 2] = z; blobInst[nb * 4 + 3] = set.inst[i * 4 + 3] * (rock ? 2.2 : 9);
+          blobNrm[nb * 3] = nrm.x; blobNrm[nb * 3 + 1] = nrm.y; blobNrm[nb * 3 + 2] = nrm.z;
+          nb++;
+        }
+      }
+    }
+    blobGeo.instanceCount = nb;
+    blobGeo.getAttribute('aInst').needsUpdate = true; blobGeo.getAttribute('aNrm').needsUpdate = true;
+    blobs.visible = nb > 0;
     stats.trees = sets.spruceNear.count + sets.spruceFar.count + sets.larchNear.count + sets.larchFar.count;
     stats.near = sets.spruceNear.count + sets.larchNear.count;
     stats.rocks = sets.rocks.count;
@@ -220,7 +321,10 @@ export function createScatterView({ scene, scatter, env, quality }) {
       if (dirty && (!pending.length || sinceRebuild > 0.6)) { dirty = false; sinceRebuild = 0; rebuild(px, pz); }
     },
     pending: () => pending.length,
-    setQuality(next) { q = next; last = { x: 1e9, z: 1e9 }; },
+    setQuality(next) {
+      if (next.cheapSnow !== q.cheapSnow) { material.dispose(); material = scatterMaterial(env, next.cheapSnow); for (const st of Object.values(sets)) st.mesh.material = material; }
+      q = next; last = { x: 1e9, z: 1e9 };
+    },
     invalidate() { last = { x: 1e9, z: 1e9 }; },
   };
 }

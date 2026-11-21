@@ -59,7 +59,7 @@ export function createSkierModel({ jacket = 0xd8392f, trousers = 0x22303f, helme
     torso.add(sh); arms.push({ sh, elbow });
   }
   lean.add(torso);
-  root.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.frustumCulled = false; } });
+  root.traverse((o) => { if (o.isMesh) { o.castShadow = !ghost; o.receiveShadow = !ghost; o.frustumCulled = false; } });
   if (ghost) root.renderOrder = 5;
 
   const tmp = { x: 0, y: 1, z: 0 };

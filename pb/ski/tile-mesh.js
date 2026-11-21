@@ -4,7 +4,7 @@
  * Heights: LOD 0 tiles (2.5 m) read the physics surface blocks (same numbers), coarser tiles sample field.heightForStep().
  * Stitching: a boundary vertex that touches a COARSER tile takes the value of that tile's edge polyline (exactly what the coarser tile
  * renders there), corners included. A skirt hangs under every boundary vertex.
- * Per vertex: aInfo = (piste 0..1, forest 0..1, rock 0..1, built + 2 * water). */
+ * Per vertex: aInfo = (piste 0..1, forest 0..1, rock 0..1, water - built). */
 import { QUADTREE, LATTICE } from './config.js';
 import { diagonalIsMain, ATTR } from './surface.js';
 import { tilesTouching, leafAt } from './quadtree.js';
@@ -30,7 +30,7 @@ export function computeTileNodes(leaf, surface, field) {
       const n = j * APRON_SIDE + i, x = x0 + (i - 1) * step, z = z0 + (j - 1) * step;
       field.attrs(x, z, a, step);
       h[n] = field.heightForStep(x, z, step, a);
-      info[n * ATTR] = a.piste; info[n * ATTR + 1] = a.forest; info[n * ATTR + 2] = a.rock; info[n * ATTR + 3] = a.built + a.water * 2;
+      info[n * ATTR] = a.piste; info[n * ATTR + 1] = a.forest; info[n * ATTR + 2] = a.rock; info[n * ATTR + 3] = a.water - a.built;
     }
   }
   return { h, info, shared: false };
@@ -82,6 +82,28 @@ export function stitchesOf(leaf, split) {
   return out;
 }
 
+const gdir = { x: 1, z: 0 };
+const AO_RINGS = Object.freeze([[10, 0.5, 6], [34, 0.32, 4], [95, 0.18, 4]]);    // [radius m, weight, directions]     // [radius m, weight]: gullies, hollows, valleys
+/** -1 (sharp ridge) .. 1 (deep hollow): how far the ground around rises above this point on average, by ring (the curvature: a plane
+ *  gives 0 whatever its slope). A cheap ambient occlusion of the terrain in the vertex data; rings finer than the tile spacing are
+ *  skipped, so far tiles only darken the big hollows. */
+function occlusion(field, x, z, y, step) {
+  let ao = 0;
+  for (let r = 0; r < AO_RINGS.length; r++) {
+    const [rad, w, dirs] = AO_RINGS[r];
+    if (rad < step * 0.9) continue;
+    let rise = 0;
+    const turn = r * 0.7;
+    for (let d = 0; d < dirs; d++) {
+      const a = turn + d / dirs * Math.PI * 2;
+      const hx = field.baseHeight(x + Math.cos(a) * rad, z + Math.sin(a) * rad) - y;
+      rise += hx / rad;                            // tangent of the rise (signed: the downhill side cancels the uphill one)
+    }
+    ao += w * Math.max(-1, Math.min(1, (rise / dirs) * 4));
+  }
+  return ao;
+}
+
 /** A string that changes exactly when the stitched geometry of the leaf would change. */
 export function stitchSignature(leaf, split) {
   return stitchesOf(leaf, split).map((s) => `${s.v}@${s.tile.key}`).join('|');
@@ -98,6 +120,7 @@ export function buildTileMesh(leaf, nodes, split, field) {
   const positions = new Float32Array((vertexCount + skirtVerts) * 3);
   const normals = new Float32Array((vertexCount + skirtVerts) * 3);
   const info = new Float32Array((vertexCount + skirtVerts) * ATTR);
+  const extra = new Float32Array((vertexCount + skirtVerts) * 4);      // (groom direction x, z, ambient occlusion, 0)
   const skirtDepth = QUADTREE.skirtDepth + QUADTREE.skirtPerStep * step;
   const stitchAt = new Map();
   for (const st of stitchesOf(leaf, split)) stitchAt.set(st.v, st);
@@ -115,6 +138,16 @@ export function buildTileMesh(leaf, nodes, split, field) {
       const inv = 1 / Math.hypot(dhdx, 1, dhdz);
       normals[v * 3] = -dhdx * inv; normals[v * 3 + 1] = inv; normals[v * 3 + 2] = -dhdz * inv;
       for (let k = 0; k < ATTR; k++) info[v * ATTR + k] = src[a * ATTR + k];
+      const wx = x0 + i * step, wz = z0 + j * step;
+      if (src[a * ATTR] > 0.01 && field.groomDir) { field.groomDir(wx, wz, gdir); extra[v * 4] = gdir.x; extra[v * 4 + 1] = gdir.z; } else { extra[v * 4] = 1; extra[v * 4 + 1] = 0; }
+      if (!(i & 1) && !(j & 1)) extra[v * 4 + 2] = occlusion(field, wx, wz, y, step);       // every second node; the rest is interpolated below
+    }
+  }
+  for (let j = 0; j <= CELLS; j++) {
+    for (let i = 0; i <= CELLS; i++) {
+      if (!(i & 1) && !(j & 1)) continue;
+      const i0 = i & ~1, j0 = j & ~1, i1 = i & 1 ? i0 + 2 : i0, j1 = j & 1 ? j0 + 2 : j0;
+      extra[(j * SIDE + i) * 4 + 2] = 0.25 * (extra[(j0 * SIDE + i0) * 4 + 2] + extra[(j0 * SIDE + i1) * 4 + 2] + extra[(j1 * SIDE + i0) * 4 + 2] + extra[(j1 * SIDE + i1) * 4 + 2]);
     }
   }
   // skirts: duplicate every boundary vertex lower down (order: north row, south row, west column, east column)
@@ -124,6 +157,7 @@ export function buildTileMesh(leaf, nodes, split, field) {
     positions[sv * 3] = positions[v * 3]; positions[sv * 3 + 1] = positions[v * 3 + 1] - skirtDepth; positions[sv * 3 + 2] = positions[v * 3 + 2];
     normals[sv * 3] = normals[v * 3]; normals[sv * 3 + 1] = normals[v * 3 + 1]; normals[sv * 3 + 2] = normals[v * 3 + 2];
     for (let k = 0; k < ATTR; k++) info[sv * ATTR + k] = info[v * ATTR + k];
+    for (let k = 0; k < 4; k++) extra[sv * 4 + k] = extra[v * 4 + k];
     skirtOf[v] = sv++;
   };
   for (let i = 0; i <= CELLS; i++) addSkirt(i);
@@ -153,7 +187,7 @@ export function buildTileMesh(leaf, nodes, split, field) {
   for (let i = 0; i < CELLS; i++) wall(CELLS * SIDE + i + 1, CELLS * SIDE + i);             // south edge
   for (let j = 0; j < CELLS; j++) wall((j + 1) * SIDE, j * SIDE);                           // west edge
   for (let j = 0; j < CELLS; j++) wall(j * SIDE + CELLS, (j + 1) * SIDE + CELLS);           // east edge
-  return { positions, normals, info, indices: indices.subarray(0, n), vertexCount: vertexCount + skirtVerts, gridVertexCount: vertexCount, signature: [...stitchAt.values()].map((st) => `${st.v}@${st.tile.key}`).join('|'), size, x0, z0, step };
+  return { positions, normals, info, extra, indices: indices.subarray(0, n), vertexCount: vertexCount + skirtVerts, gridVertexCount: vertexCount, signature: [...stitchAt.values()].map((st) => `${st.v}@${st.tile.key}`).join('|'), size, x0, z0, step };
 }
 
 /** Exact height of the built mesh (grid triangles only, no skirts) at a world point inside the tile, by vertical ray vs triangle. */

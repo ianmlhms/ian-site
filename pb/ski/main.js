@@ -14,6 +14,8 @@ import { createSnowMaterial } from './snow-shader.js';
 import { createEnv, createNoiseTexture, WEATHER_LABEL, TIME_LABEL } from './env.js';
 import { createScatter } from './scatter.js';
 import { createScatterView } from './scatter-view.js';
+import { createFarForest } from './forest-far.js';
+import { createShadows } from './shadows.js';
 import { createPoles, createRunProps } from './props.js';
 import { createLifts } from './lifts.js';
 import { createVillage } from './village.js';
@@ -71,6 +73,8 @@ async function boot() {
 
   const noise = createNoiseTexture();
   const env = createEnv({ scene, noise, params });
+  const shadows = createShadows({ renderer, sun: env.sun, u: env.u });
+  shadows.setLevel(level);
   const ui = createUi(document.getElementById('ui'));
   const store = createStore();
   const boards = createBoards(window.Arcade);
@@ -102,7 +106,8 @@ async function boot() {
   })();
   let snowMat = createSnowMaterial(env, { cheap: quality.cheapSnow, treeRadius: quality.treeRadius, forest: forestTex });
   const terrain = createTerrainView({ scene, surface, field, material: snowMat, quality });
-  const scatterView = createScatterView({ scene, scatter, env, quality });
+  const scatterView = createScatterView({ scene, scatter, env, quality, normalAt: (x, z, o) => surface.normal(x, z, o, 2.5) });
+  const farForest = createFarForest({ scene, env, classes: core.classes, resort, field, quality });
   const poles = createPoles({ scene, resort, height: (x, z) => field.height(x, z) });
   const skier = createSkierModel({});
   const ghostModel = createSkierModel({ ghost: true });
@@ -119,6 +124,7 @@ async function boot() {
     terrain.invalidate(...rect);
     scatter.invalidate(...rect);
     scatterView.invalidate();
+    farForest.invalidate(...rect);
     poles.reset();
     if (runProps && game.piste) { runProps.dispose(); runProps = createRunProps({ scene, piste: game.piste, height: (x, z) => surface.height(x, z), gates: game.run ? game.run.gates : [] }); }
     if (streamer.done()) document.documentElement.dataset.skiTilesDone = '1';
@@ -127,7 +133,7 @@ async function boot() {
       mark('lifts');
     }
   });
-  loadExtras(core.root).then(({ buildings }) => { village = createVillage({ scene, rows: buildings, env }); mark('village'); }).catch((error) => console.warn('[ski] buildings failed', error.message));
+  loadExtras(core.root).then(({ buildings }) => { village = createVillage({ scene, rows: buildings, env, height: (x, z) => field.baseHeight(x, z), level }); mark('village'); }).catch((error) => console.warn('[ski] buildings failed', error.message));
 
   // ---------------- game state ----------------
   const game = {
@@ -312,6 +318,9 @@ async function boot() {
     snowMat = createSnowMaterial(env, { cheap: quality.cheapSnow, treeRadius: quality.treeRadius, forest: forestTex });
     terrain.setMaterial(snowMat);
     scatterView.setQuality(quality);
+    farForest.setQuality(quality);
+    shadows.setLevel(level);
+    if (village) village.setLevel(level);
     poles.reset();
     mark(`quality ${level}`);
   }
@@ -389,6 +398,7 @@ async function boot() {
       streamer.focus(fx, fz);
       terrain.update(camera.position.x, camera.position.z, game.screen === 'map' ? 12 : 2.5);
       scatterView.update(camera.position.x, camera.position.z, false, game.screen === 'map' ? 12 : 2.5, dt);
+      farForest.update(camera.position.x, camera.position.z, game.screen === 'map' ? 8 : 1.5);
       poles.update(camera.position.x, camera.position.z, quality.markerRadius);
       if (lifts) lifts.update(time, camera.position.x, camera.position.z, quality.liftRadius);
       if (village) village.update(camera.position.x, camera.position.z, quality.buildingRadius);
@@ -397,6 +407,7 @@ async function boot() {
     snowfall.update(time, camera, pixelRatio());
     if (game.screen === 'ski') {
       const t0 = performance.now();
+      shadows.update(camera, env.u.uSunDir.value, env.sunStrength());
       renderer.render(scene, camera);
       if (!params.q && game.phase === 'running' && level !== 'low') {
         slowFor = rawDt * 1000 > FRAME_BUDGET_MS[level] ? slowFor + rawDt : Math.max(0, slowFor - rawDt * 0.5);
@@ -443,7 +454,7 @@ async function boot() {
     /** Fixed camera at (x, z) heightAbove m over the ground looking at (tx, tz) heightAbove2 m over its ground; null = chase camera again. */
     setCamera(x, z, above, tx, tz, above2 = 0, fov = 55) { if (x === null) { game.camPose = null; return; } game.camPose = { x, z, y: field.height(x, z) + above, tx, tz, ty: field.height(tx, tz) + above2, fov }; streamer.focus(x, z); }, start(id) { startRun(pistes.byId.get(id) || game.piste, MODES.run); }, select(id) { selectPiste(pistes.byId.get(id), true); },
     frames: () => { const f = [...frameTimes].sort((a, b) => a - b); return { n: f.length, p50: f[Math.floor(f.length * 0.5)], p95: f[Math.floor(f.length * 0.95)], max: f[f.length - 1] }; },
-    info: () => ({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, tiles: terrain.stats.leaves, trees: scatterView.stats.trees, tilesLoaded: streamer.stats.loaded, tilesTotal: streamer.stats.total, level }),
+    info: () => ({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, tiles: terrain.stats.leaves, trees: scatterView.stats.trees, cards: farForest.stats.cards, tilesLoaded: streamer.stats.loaded, tilesTotal: streamer.stats.total, level }),
     teleport(s) { if (game.run) { const p = game.piste.at(s, {}); placeAt(p.x, p.z, Math.atan2(p.dz, p.dx)); } },
     progress: () => store.get(),
   };
@@ -458,6 +469,7 @@ async function boot() {
   const camOut = chase.update(game.state, 0.016, 0);
   camera.position.set(camOut.x, camOut.y, camOut.z);
   terrain.buildAll(camOut.x, camOut.z);
+  farForest.update(camOut.x, camOut.z, Infinity);
   renderer.compile(scene, camera);
   mark('first build');
   requestAnimationFrame(frame);
