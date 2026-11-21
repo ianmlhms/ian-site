@@ -240,6 +240,27 @@ Free ride is becoming the main mode, so a missing link piste = a place the playe
 - Checks: `check_official.py <rid> OFFICIAL.json ...` compares with an official lift / piste list (kept outside the repo, never shipped:
   `~/Library/Caches/ski-work/data-round/official/`) and says per missing name whether OSM lacks it, has it outside the box, or has it
   but it is no run.
+- Result (before -> after; km = sum of the run centre lines; first play = bytes until Start live on the iPad profile, cold cache):
+
+  | Resort | pistes | km | lifts | total MB | first play MB | iPad start |
+  |---|---|---|---|---|---|---|
+  | 3 Vallées | 297 -> 480 | 414 -> 503 (network 543) | 166 -> 180 | 10.5 -> 14.5 | 4.83 -> 4.65 | 6.8 -> 6.0 s |
+  | Killy | 138 -> 235 | 170 -> 239 (256) | 82 -> 84 | 7.6 -> 8.4 | 6.33 -> 2.82 | 7.5 -> 4.1 s |
+  | Zermatt | 122 -> 209 | 171 -> 232 (248) | 64 -> 68 | 10.2 -> 12.7 | 3.18 -> 3.29 | 5.8 -> 4.6 s |
+  | Arlberg | 139 -> 356 | 171 -> 402 (440) | 75 -> 101 | 10.2 -> 19.9 | 4.71 -> 4.15 | 5.9 -> 5.8 s |
+  | Kronplatz | 50 -> 71 | 65 -> 76 (82) | 28 -> 28 | 8.4 -> 8.8 | 4.98 -> 3.03 | 8.1 -> 6.1 s |
+
+  Harness `--all`: 233/235, 480/480, 207/209, 349/356, 71/71 to the bottom, zero tile steps. `round6-test.mjs`: 1927/1927 (every lift
+  ridden end to end). Official lists (missing names, why): Arlberg + Warth + Sonnenkopf 0 of 110 lifts / 5 of 242 pistes missing (was
+  39 / 102), all OSM gaps (Sichelmahd, Fun Slope, Paulis Abenteuerland, Tal-Abfahrt Vermalen; "Madloch - Lech" is in OSM under another
+  piste:name). Zermatt 0 / 25 lifts, 4 / 35 pistes (snowpark, unnamed Italian service tracks). Kronplatz 6 / 32 lifts, 10 / 47 pistes:
+  the not-connected satellites of the Kronplatz pass (Terenten, Riepen, Gsies, Guggenberg, Antermoia) and names OSM does not carry.
+  3 Vallées 9 / 156 lifts (magic carpets not in OSM), 26 / 358 pistes (fun zones, kids areas, "Bd ..." boulevards not in OSM). Killy:
+  the official list could only be read for 4 Tignes sectors (all found but one carpet).
+- Still open: 3 Vallées first play 4.65 MB (far.bin 1.4 MB + classes.z 0.7 + map.webp 0.6 for the 20 x 29 km box): a coarser far
+  margin or a tiled classes raster would cut it (render side). The signs atlas (props.js) is 8 boards wide x 48 px per piste: 480
+  pistes = 2880 px high, the limit of 4096 px comes at ~680 pistes. Underground funiculars (`tunnel: true`) are ridden like trains on
+  the surface by lift-path.js (round 6). Kronplatz satellites and Valmorel / La Plagne / Monterosa stay out (not connected).
 
 ## Known gaps (honest)
 - Mid-distance terrain self-shadowing beyond the shadow box is still only the baked 40 m raster (+ the occlusion term).
