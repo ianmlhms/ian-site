@@ -94,13 +94,14 @@ function paintAtlas() {
   tex.generateMipmaps = true;
   tex.minFilter = THREE.LinearMipmapLinearFilter;
   tex.magFilter = THREE.LinearFilter;
-  tex.anisotropy = 2;
+  tex.anisotropy = 4;
   return tex;
 }
 
 function material(env, atlas) {
   return new THREE.ShaderMaterial({
     uniforms: { ...env.u, uAtlas: { value: atlas } },
+    alphaToCoverage: true,
     extensions: { derivatives: true },
     vertexShader: `
       attribute vec4 aInst; attribute vec2 aKind;
@@ -130,14 +131,14 @@ function material(env, atlas) {
         vec4 t = texture2D(uAtlas, vec2(vUv.x, 1.0 - vUv.y));
         // alpha sharpening: crisp silhouettes at every mip level (no fizzle, no thinning far away)
         float a = (t.a - 0.45) / max(fwidth(t.a), 1e-4) + 0.5;
-        if (a < 0.5) discard;
+        if (a < 0.03) discard;                            // round 5: the edge goes out as coverage (MSAA + alpha to coverage): smooth silhouettes
         float u = fract(vUv.x * 4.0) * 2.0 - 1.0;
         float snow = smoothstep(0.75, 0.9, max(t.r, max(t.g, t.b)));
         float vis = mix(1.0, texture2D(uShadow, (vXZ - uShadowRect.xy) / uShadowRect.zw).r, uShadowOn);
         float lit = clamp(0.45 + 0.55 * u * vSide, 0.0, 1.0) * vis;
         vec3 amb = mix(uAmbGround, uAmbSky, 0.6 + 0.4 * snow);
         vec3 col = t.rgb * (0.88 + 0.24 * vSeed) * (amb * 0.66 + uSunColor * lit * 0.62);
-        gl_FragColor = vec4(applyFog(col, vDist, uFogColor, uFogDensity), 1.0);
+        gl_FragColor = vec4(applyFog(col, vDist, uFogColor, uFogDensity), clamp(a, 0.0, 1.0));
       }`,
   });
 }

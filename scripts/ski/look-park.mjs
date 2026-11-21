@@ -27,9 +27,9 @@ export default async function steps(page, { shoot, wait }) {
     await page.waitForTimeout(wait);
     await shoot(name);
   };
-  await view("park", 4, null);                                                  // the drop-in, chase camera
-  const big = L.kickers[L.kickers.length - 1];
-  if (big) await view("park-kicker", Math.max(2, big.lip - 16), 205, 13, 3.4, 50);    // the biggest kicker from behind and beside
-  if (L.rails[0]) await view("park-rails", Math.max(2, L.rails[0].s0 - 10), 200, 9, 2.6, 52);
+  await view("park", 10, 18, 15, 2.6, 55);                                      // the gate and the first features, looking back up the line
+  const big = L.kickers.reduce((a, b) => (b.lip > a.lip ? b : a), L.kickers[0]);
+  if (big) await view("park-kicker", Math.max(2, big.lip - 13), 158, 9, 3.6, 55);     // the last (biggest) kicker ahead, from behind and beside
+  if (L.rails[0]) await view("park-rails", Math.max(2, L.rails[0].s0 - 7), 163, 7, 2.6, 55);
   if (L.pipe) await view("park-pipe", L.pipe.s0 + 6, 180, 10, 4.5, 58);
 }
