@@ -19,18 +19,29 @@ export const flow = {
   fullChromium: true,
   viewport: { width: 1024, height: 700 },
   async run(h) {
-    const { page } = h;
+    let page = h.page;
     const errors = [];
-    page.on("pageerror", (e) => errors.push(e.message));
-    page.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource|favicon/.test(m.text())) errors.push(m.text().slice(0, 300)); });
+    const watch = (p) => {
+      p.on("pageerror", (e) => errors.push(e.message));
+      p.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource|favicon/.test(m.text())) errors.push(m.text().slice(0, 300)); });
+    };
+    watch(page);
     const engine = await page.evaluate(() => navigator.userAgent).catch(() => "");
+    let first = true;
     const only = process.argv.slice(2).filter((a) => RESORTS.includes(a));
     for (const rid of only.length ? only : RESORTS) {
       for (const q of ["high", "low"]) {
         if (q === "low" && rid !== "killy") continue;                         // the cheap shader variant: once is enough (resort-generic code)
         errors.length = 0;
         h.step(`${rid} (${q}): boot into the free ride`);
-        await h.goto(`/pb/ski.html?resort=${rid}&go=1&debug=1&q=${q}&weather=sun&time=evening&res=fixed`);
+        // every resort in a page of its own: the previous page's cancelled tile fetches (WebKit reports them as page errors) stay there
+        if (!first) {
+          const next = await h.context.newPage(); watch(next);
+          if (page === h.page) await page.goto("about:blank"); else await page.close();          // the harness keeps using h.page
+          page = next;
+        }
+        first = false;
+        await page.goto(h.origin + `/pb/ski.html?resort=${rid}&go=1&debug=1&q=${q}&weather=sun&time=evening&res=fixed`, { waitUntil: "domcontentloaded" });
         await page.waitForFunction(() => (document.documentElement.dataset.skiScreen === "ski" && window.__ski && window.__ski.game.phase === "running") || document.documentElement.dataset.bootError, null, { timeout: 240000 });
         h.eq(await page.evaluate(() => document.documentElement.dataset.bootError || ""), "", `${rid} ${q}: no boot error (${engine.replace(/^Mozilla\/5.0 /, "").slice(0, 60)})`);
         await page.evaluate(() => { const s = window.__ski; s.game.bot = null; s.setInput({ steer: 0, tuck: 0, brake: 1, push: 0, jump: false }); });
@@ -155,9 +166,10 @@ export const flow = {
         // WebKit reports the previous page's tile fetches that the navigation cancelled ("... due to access control checks"): not this page
         const own = errors.filter((e) => !(/access control checks/.test(e) && /\/pb\/ski\/data\//.test(e) && !e.includes(`/pb/ski/data/${rid}/`)));
         h.expect(own.length === 0, `${rid} ${q}: no console / page error${own.length ? ": " + own.slice(0, 3).join(" | ") : ""}${errors.length > own.length ? ` (${errors.length - own.length} cancelled fetches of the previous resort ignored)` : ""}`);
-        await h.shot(`${rid}-${q}`);
+        if (process.env.FLOW_SHOTS_DIR) await page.screenshot({ path: `${process.env.FLOW_SHOTS_DIR}/ski-look7d.${rid}-${q}.png` }).catch(() => {});
       }
     }
+    if (h.failures.length) console.log(`    failures: ${h.failures.join(" | ").slice(0, 600)}`);
   },
 };
 
