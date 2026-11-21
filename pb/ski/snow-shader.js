@@ -22,7 +22,6 @@ export function createSnowMaterial(env, { cheap = false, treeRadius = 400, fores
       uniform vec3 uSunDir, uSunColor, uAmbSky, uAmbGround, uFogColor; uniform float uFogDensity, uTime, uOvercast, uSnowfall, uTreeRadius, uShadowOn; uniform sampler2D uNoise, uShadow, uForestTex; uniform vec4 uShadowRect; uniform vec2 uForestSize; uniform float uForestOn;
       varying vec3 vWorld; varying vec3 vNormal; varying vec4 vInfo; varying float vDist;
       float band(float x){ return mix(x, floor(x * 4.0 + 0.5) / 4.0, 0.22); }
-      vec3 snowShade(vec3 shade){ return mix(vec3(0.78), vec3(0.84, 0.9, 1.0), 0.75) * (shade * 0.95 + 0.12); }
       void main(){
         vec3 N = normalize(vNormal);
         float piste = clamp(vInfo.x, 0.0, 1.0), forest = clamp(vInfo.y, 0.0, 1.0), rockCls = clamp(vInfo.z, 0.0, 1.0);
@@ -42,7 +41,7 @@ export function createSnowMaterial(env, { cheap = false, treeRadius = 400, fores
         float cord = (sin(px) * wx + sin(pz) * wz) * aa * smoothstep(0.03, 0.1, length(N.xz));   // no grooves on the flat (no fall line to follow)
         float drift = nB.g - 0.5;
         vec3 Nb = N;
-        Nb.xz += vec2(wx, wz) * cord * 0.035 * piste + fall * drift * 0.22 * (1.0 - piste) * (0.4 + 0.6 * near);
+        Nb.xz += vec2(wx, wz) * cord * 0.02 * piste + fall * drift * 0.22 * (1.0 - piste) * (0.4 + 0.6 * near);
         Nb = normalize(Nb);
         // light: soft gouache ramp with a brushed edge, a few bands
         float nl = dot(Nb, uSunDir);
@@ -51,13 +50,14 @@ export function createSnowMaterial(env, { cheap = false, treeRadius = 400, fores
         float sky = 0.5 + 0.5 * Nb.y;
         vec3 shade = mix(uAmbGround, uAmbSky, sky);
         // snow: blue-grey in the shade (the sky's light), warm white in the sun; never brighter than paper white
-        vec3 shadeC = mix(vec3(0.78), vec3(0.84, 0.9, 1.0), 0.75) * (shade * 0.95 + 0.12);
-        vec3 litC = shadeC * 0.3 + uSunColor * 0.76;
+        vec3 shadeC = mix(vec3(0.8), vec3(0.84, 0.9, 1.0), 0.6) * (shade * 0.95 + 0.12);
+        shadeC /= 1.0 + max(0.0, max(shadeC.b, shadeC.g) - 0.9);                 // bright overcast light: keep the hue, never clip to cyan
+        vec3 litC = max(shadeC * 1.02, shadeC * 0.3 + uSunColor * 0.76);   // a weak sun (fog, cloud) never makes the lit side darker than the shade
         vec3 snow = mix(shadeC, litC, lit);
         snow *= 0.96 + 0.06 * nA.b;
         // groomed: smoother, a touch brighter, faint corduroy shading, a soft packed-snow edge line
         float edgeLine = smoothstep(0.25, 0.5, piste) * (1.0 - smoothstep(0.5, 0.8, piste));
-        snow = mix(snow, snow * (1.0 + 0.04 * cord), piste);
+        snow = mix(snow, snow * (1.0 + 0.025 * cord), piste);
         snow *= 1.0 - 0.05 * edgeLine;
         // off-piste: wind texture, ski-track-free powder
         snow *= 1.0 - (1.0 - piste) * 0.04 * smoothstep(0.3, 0.8, nB.r);

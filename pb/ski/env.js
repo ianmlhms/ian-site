@@ -122,7 +122,7 @@ export function createEnv({ scene, noise, params = {} }) {
     u.uSkyTop.value.set(...sky); u.uSkyHorizon.value.set(...hor);
     const fog = milk(grey(T.fog, cur.grey), cur.milk);
     u.uFogColor.value.set(...fog);
-    const amb = grey(T.amb, cur.grey * 0.6);
+    const amb = grey(T.amb, cur.grey * 0.95);                 // overcast light is neutral white, not sky blue
     u.uAmbSky.value.set(amb[0] * cur.amb, amb[1] * cur.amb, amb[2] * cur.amb);
     u.uAmbGround.value.set(...grey(T.gnd, cur.grey * 0.4));
     const az = T.az * Math.PI / 180, el = T.el * Math.PI / 180;
