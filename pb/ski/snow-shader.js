@@ -30,16 +30,18 @@ export function createSnowMaterial(env, { cheap = false } = {}) {
         vec2 wp = vWorld.xz;
         vec4 nA = texture2D(uNoise, wp * 0.013);
         vec4 nB = texture2D(uNoise, wp * 0.071 + 0.3);
-        // fall line (downhill) for the corduroy and the drift streaks
+        // fall line (downhill) for the drift streaks
         vec2 fall = N.xz / max(length(N.xz), 1e-3);
         vec2 across = vec2(-fall.y, fall.x);
-        // bump: drifts off the piste, corduroy on it (faded out where a pixel spans several grooves: no moire)
-        float phase = dot(wp, across) * 7.0 + nA.r * 3.0;
-        float cordAA = clamp(1.4 - fwidth(phase) * 0.9, 0.0, 1.0) * (1.0 - smoothstep(10.0, 60.0, vDist));
-        float cord = sin(phase) * cordAA;
+        // corduroy: grooves along the fall line, drawn as two world-axis stripe sets blended by the fall direction (a groove direction
+        // taken from the faceted normals swirls; this one stays straight), faded out where a pixel spans several grooves (no moire)
+        float px = wp.x * 7.0 + nA.r * 2.0, pz = wp.y * 7.0 + nA.r * 2.0;
+        float wx = fall.y * fall.y, wz = fall.x * fall.x;
+        float aa = clamp(1.4 - max(fwidth(px), fwidth(pz)) * 0.9, 0.0, 1.0) * (1.0 - smoothstep(10.0, 55.0, vDist));
+        float cord = (sin(px) * wx + sin(pz) * wz) * aa * smoothstep(0.03, 0.1, length(N.xz));   // no grooves on the flat (no fall line to follow)
         float drift = nB.g - 0.5;
         vec3 Nb = N;
-        Nb.xz += across * cord * 0.06 * piste + fall * drift * 0.22 * (1.0 - piste) * (0.4 + 0.6 * near);
+        Nb.xz += vec2(wx, wz) * cord * 0.035 * piste + fall * drift * 0.22 * (1.0 - piste) * (0.4 + 0.6 * near);
         Nb = normalize(Nb);
         // light: soft gouache ramp with a brushed edge, a few bands
         float nl = dot(Nb, uSunDir);

@@ -708,11 +708,7 @@ def main():
     sizes = {f: os.path.getsize(os.path.join(out, f)) for f in os.listdir(out) if os.path.isfile(os.path.join(out, f))}
     log("sizes", {k: "%.0f KB" % (v / 1024) for k, v in sizes.items()}, "total %.2f MB" % ((sum(sizes.values()) + tile_bytes) / 1e6))
     log("pistes", len(pistes), "network", len(network), "lifts", len(lifts), "peaks", len(peaks), "buildings", len(buildings))
-    # the anti-cheat floors (scripts/ski-v1.sql): length / PLAY.maxRunSpeed, rounded down to whole seconds
-    with open(os.path.join(work_dir(rid), "floors.sql"), "w", encoding="utf-8") as fh:
-        rows = ",\n  ".join("('ski-%s-%s', %d)" % (rid, p["id"], int(p["len"] / 32) * 1000) for p in pistes)
-        fh.write("insert into public.ski_board_floors (board, min_ms) values\n  %s\non conflict (board) do update set min_ms = excluded.min_ms;\n" % rows)
-
+    log("next: python3 scripts/ski/make_sql.py (leaderboard floors in scripts/ski-v1.sql)")
 
 if __name__ == "__main__":
     main()

@@ -127,7 +127,8 @@ export function createUi(root) {
       <h2><span class="chip ${piste.diff}"></span>${esc(piste.name)}</h2>
       ${result ? `<div class="time">${formatTime(result.ms)}</div>` : '<div class="time">Ënn vun der Pist</div>'}
       ${result && improved && result.valid ? '<div class="new">Nei Bestzäit!</div>' : ''}
-      ${result && !result.valid ? `<div class="warn">${result.missedCheckpoints ? 'Du bass vun der Pist ofgefuer: dës Zäit zielt net.' : 'Dës Zäit ass ze séier fir richteg ze sinn: si zielt net.'}</div>` : ''}
+      ${result && result.assisted ? '<div class="warn">Automatesch gefuer: dës Zäit zielt net.</div>' : ''}
+      ${result && !result.valid && !result.assisted ? `<div class="warn">${result.missedCheckpoints ? 'Du bass vun der Pist ofgefuer: dës Zäit zielt net.' : 'Dës Zäit ass ze séier fir richteg ze sinn: si zielt net.'}</div>` : ''}
       ${rows.length ? `<div class="rows">${rows.map(([a, b]) => `<span>${a}</span><span>${esc(b)}</span>`).join('')}</div>` : ''}
       <div class="acts">
         <button type="button" class="btn primary" data-a="again">Nach eng Kéier</button>

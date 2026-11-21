@@ -34,7 +34,7 @@ try {
     await page.waitForTimeout(Math.max(0, ms - waited));
     waited = ms;
     await page.screenshot({ path: `${out}-${ms}.png` });
-    const info = await page.evaluate(() => (window.__ski ? { ...window.__ski.info(), speed: Math.round((window.__ski.state?.speed || 0) * 3.6), screen: document.documentElement.dataset.skiScreen, x: Math.round(window.__ski.state?.x), z: Math.round(window.__ski.state?.z) } : null));
+    const info = await page.evaluate(() => (window.__ski ? { ...window.__ski.info(), fr: window.__ski.frames(), speed: Math.round((window.__ski.state?.speed || 0) * 3.6), screen: document.documentElement.dataset.skiScreen, x: Math.round(window.__ski.state?.x), z: Math.round(window.__ski.state?.z) } : null));
     console.log(ms, JSON.stringify(info));
   }
 } finally {

@@ -47,6 +47,8 @@ const GFX = () => window.ArcadeGfx || { level: () => 'medium', choice: () => 'au
 async function boot() {
   mark('boot');
   const params = { resort: param('resort'), piste: param('piste'), auto: param('auto') === '1', bot: param('bot') === '1', q: param('q'), weather: param('weather'), time: param('time'), debug: param('debug') === '1' };
+  // tests only: game time runs this many times faster (the physics step stays 1/120 s, so a run is the same run, only sooner)
+  const timescale = params.debug ? Math.min(8, Math.max(1, Number(param('timescale')) || 1)) : 1;
   let level = ['low', 'medium', 'high'].includes(params.q) ? params.q : GFX().level();
   let quality = QUALITY[level];
   const canvas = document.getElementById('skiCanvas');
@@ -106,6 +108,7 @@ async function boot() {
     scatterView.invalidate();
     poles.reset();
     if (runProps && game.piste) { runProps.dispose(); runProps = createRunProps({ scene, piste: game.piste, height: (x, z) => surface.height(x, z), gates: game.run ? game.run.gates : [] }); }
+    if (streamer.done()) document.documentElement.dataset.skiTilesDone = '1';
     if (streamer.done() && !lifts) {
       lifts = createLifts({ scene, resort, height: (x, z) => field.height(x, z) });
       mark('lifts');
@@ -202,6 +205,7 @@ async function boot() {
     game.ghost = g;
     ghostModel.setVisible(false);
     game.bot = params.bot ? createBot(p) : null;
+    game.assisted = false;
     store.set(withLast(store.get(), rid, p.id));
     boards.select(rid, p, resort.short);
     hud.show(true); hud.setPiste(p, mode); hud.setClock(mode === MODES.run ? 0 : null, 0); hud.setSplit(''); hud.setGates(game.run.gates.length ? `Slalom: 0 / ${game.run.gates.length}` : '');
@@ -222,9 +226,10 @@ async function boot() {
     const key = pisteKey(rid, p.id);
     let improved = false;
     let result = null;
+    const assisted = (game.bot || game.override || game.assisted) && !window.__skiAllowBotScore;     // a scripted run never counts (flows may opt in)
     if (ev && game.mode === MODES.run) {
-      result = ev;
-      if (ev.valid) {
+      result = assisted ? { ...ev, valid: false, assisted: true } : ev;
+      if (ev.valid && !assisted) {
         const ghost = encodeGhost(game.run.samples());
         const r = recordRun(store.get(), key, ev.ms, ghost);
         store.set(r.progress);
@@ -303,10 +308,12 @@ async function boot() {
   // ---------------- loop ----------------
   let last = performance.now(), acc = 0, hudT = 0, time = 0;
   const ghostPos = {};
+  const frameTimes = [];
   function frame(now) {
     requestAnimationFrame(frame);
     if (document.hidden) { last = now; return; }
     const rawDt = (now - last) / 1000;
+    frameTimes.push(rawDt * 1000); if (frameTimes.length > 240) frameTimes.shift();
     last = now;
     const dt = Math.min(MAX_FRAME_S, rawDt);
     time += dt;
@@ -318,12 +325,13 @@ async function boot() {
         if (game.countdown <= 0) { game.phase = 'running'; document.documentElement.dataset.skiRunning = '1'; setTimeout(() => hud.count(''), 700); mark('go'); }
       }
       if (game.phase === 'running' || game.phase === 'finished') {
-        acc += dt;
+        acc += dt * timescale;
         let steps = 0;
-        while (acc >= SKI.dt && steps < 6) {
+        while (acc >= SKI.dt && steps < 6 * timescale) {
           acc -= SKI.dt; steps++;
           const inp = game.phase === 'finished' ? { steer: 0, tuck: 0, brake: 1, push: 0, jump: false }
             : game.override ? game.override : game.bot ? game.bot(game.state) : input.read();
+          if (game.override || game.bot) game.assisted = true;
           if (game.override || game.bot) input.read(inp);
           const wasCrash = game.state.crash > 0;
           game.state = stepSkier(game.state, inp, world);
@@ -339,7 +347,7 @@ async function boot() {
             if (game.mode !== MODES.run && game.run.progress > game.piste.length - 15 && game.phase === 'running') finish(null);
           }
         }
-        if (acc > SKI.dt * 6) acc = 0;
+        if (acc > SKI.dt * 6 * timescale) acc = 0;
       } else acc = 0;
     }
     const st = game.state;
@@ -410,6 +418,7 @@ async function boot() {
     setInput(o) { game.override = o; },
     /** Fixed camera at (x, z) heightAbove m over the ground looking at (tx, tz) heightAbove2 m over its ground; null = chase camera again. */
     setCamera(x, z, above, tx, tz, above2 = 0, fov = 55) { if (x === null) { game.camPose = null; return; } game.camPose = { x, z, y: field.height(x, z) + above, tx, tz, ty: field.height(tx, tz) + above2, fov }; streamer.focus(x, z); }, start(id) { startRun(pistes.byId.get(id) || game.piste, MODES.run); }, select(id) { selectPiste(pistes.byId.get(id), true); },
+    frames: () => { const f = [...frameTimes].sort((a, b) => a - b); return { n: f.length, p50: f[Math.floor(f.length * 0.5)], p95: f[Math.floor(f.length * 0.95)], max: f[f.length - 1] }; },
     info: () => ({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, tiles: terrain.stats.leaves, trees: scatterView.stats.trees, tilesLoaded: streamer.stats.loaded, tilesTotal: streamer.stats.total, level }),
     teleport(s) { if (game.run) { const p = game.piste.at(s, {}); placeAt(p.x, p.z, Math.atan2(p.dz, p.dx)); } },
     progress: () => store.get(),
