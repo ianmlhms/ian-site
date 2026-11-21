@@ -152,7 +152,9 @@ export const flow = {
         // ---- shaders: nothing logged, every program runnable
         const progs = await page.evaluate(() => { const P = window.__ski.renderer.info.programs || []; return { n: P.length, bad: P.filter((p) => p.diagnostics && !p.diagnostics.runnable).map((p) => p.name || p.cacheKey.slice(0, 40)) }; });
         h.expect(progs.n > 10 && progs.bad.length === 0, `${rid} ${q}: ${progs.n} shader programs compiled, ${progs.bad.length} not runnable ${progs.bad.join(" ")}`);
-        h.expect(errors.length === 0, `${rid} ${q}: no console / page error${errors.length ? ": " + errors.slice(0, 3).join(" | ") : ""}`);
+        // WebKit reports the previous page's tile fetches that the navigation cancelled ("... due to access control checks"): not this page
+        const own = errors.filter((e) => !(/access control checks/.test(e) && /\/pb\/ski\/data\//.test(e) && !e.includes(`/pb/ski/data/${rid}/`)));
+        h.expect(own.length === 0, `${rid} ${q}: no console / page error${own.length ? ": " + own.slice(0, 3).join(" | ") : ""}${errors.length > own.length ? ` (${errors.length - own.length} cancelled fetches of the previous resort ignored)` : ""}`);
         await h.shot(`${rid}-${q}`);
       }
     }
