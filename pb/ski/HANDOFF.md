@@ -6,7 +6,8 @@ St. Anton, Kronplatz): Kronplatz and St. Anton are in since round 2B; the picker
 
 ## Data pipeline (resort-generic, one `RESORTS` entry per resort in `scripts/ski/common.py`)
 Venv: `~/Library/Caches/luxtram-work/.venv/bin/python`. Raw downloads cache in `~/Library/Caches/ski-work/<resort>/`.
-1. `fetch_osm.py <rid>`: Overpass (pistes, lifts, buildings, land cover, water, roads, peaks / places).
+1. `fetch_osm.py <rid> [layer ...]`: Overpass (pistes, lifts, buildings, land cover, water, roads, peaks / places); then `coverage.py <rid>`
+   (is anything of the resort cut by the box?). See "Data round" below for what counts as a piste / lift.
 2. `fetch_dem.py <rid>`: 5 m height tiles (1280 m, 257x257 nodes) + the 40 m far grid (box + 14 km). Sources per resort in `RESORTS[rid]["dem"]`
    / `["far"]`: `ign-rgealti` (Géoplateforme WMS-R, BIL float32, Lambert-93, 1 request/s) and `copernicus-glo30` (AWS COGs, range reads) are
    implemented, `swissalti3d` + `vda-dtm` (round 2A, `dem_merge.py`), and since round 2B `bz-dtm` (South Tyrol WCS) and `at-dgm` (BEV ALS
@@ -196,6 +197,49 @@ anti-cheat think higher is better otherwise). Bot / scripted runs never post (fl
   scripts the page could forge an offer or join a pair's relay channel and speak for that player in the in-race table; boards are
   safe: every board post comes from the player's own device through the normal score path). TURN uses the edge function's `for=kart`
   tier (an own `for=ski` needs a redeploy). A remote player behind a relay is seen ~0.6 s late. Name tags overlap in a pack.
+
+## Data round (21 Nov 2026): every piste and lift, like the real ski areas (pipeline + data only)
+Free ride is becoming the main mode, so a missing link piste = a place the player cannot reach. All five resorts rebaked.
+- OSM downloads of this round: `$SKI_WORK/data-round/<rid>/osm/` (common.py `OSM_ROUND`, `osm_path`: a layer not downloaded again falls
+  back to `$SKI_WORK/<rid>/osm/`). Pistes and lifts are asked for in the box + 0.03 deg, so `coverage.py <rid>` lists what of a resort
+  is cut by the box edge (and which neighbouring areas sit in the margin). Overpass: 5 mirrors (lz4 / z overpass-api.de added, mail.ru
+  dropped: self-signed), exponential back-off up to 10 rounds, a reply with an error `remark` is never cached.
+- A box that changed gets its own cache folder (`RESORTS[rid]["work"]`, e.g. `arlberg-r5`): `fetch_dem.py` hard-links the old 5 m tiles
+  under their new indices (`work_from` = old folder, old east0 / north0; tile origins are whole-tile multiples), fetches only the new
+  tiles and a new far grid. The old folders stay untouched (other branches bake from them).
+- Pistes (`bake.py build_pistes`): every `piste:type=downhill` way, any difficulty (freeride / extreme -> black), route relations (their
+  name / ref / difficulty go to member ways that lack them; bare members become lines), multipolygon areas (outer rings), ski routes
+  (`piste:grooming=backcountry`, freeride difficulty, "Skiroute ..."): flagged `route` in the runs and `"r":1` in the network, never
+  benched or groomed. A line without a difficulty takes the colour of the pistes at its ends (else its gradient). Ways leaving the box
+  are cut at the edge; a way mostly outside (a neighbour's piste) or inside `RESORTS[rid]["exclude"]` circles is dropped.
+- Runs: the ways of one name + colour are split into longest downhill paths (`longest_paths`: end -> start within 25 m, or 120 m when
+  the next starts lower: a piste interrupted by a road or a station). The first path is the run; a later one lying >= 50 % within 30 m of
+  it is a second mapping (dropped), one touching it is a branch (a run "<name> (Variante)" when >= 250 m / 40 m drop, else only painted),
+  one elsewhere is a second piste of that name ("<name> (2)"). Unnamed ways chain the same way into links named from what they lead to
+  (`name_links`, never an invented name): "Verbindung → <lift>" (a lift's bottom station within 150 m of the end: Luxembourgish kind in
+  front unless the name says it, "Sessellift Grand Pré", "TSD6 Tichot"), "Verbindung → <piste>" (joins it within 40 m), else the nearest
+  named lift / piste / place within 600 m; duplicates become "Verbindung <from> → <to>" / "(2)". Runs >= 120 m long and >= 12 m drop
+  (was 350 m / 70 m, named only). resort.json piste flags `link`, `route`, `variant` (optional; old clients ignore them). Board ids of the
+  old pistes are unchanged (checked: every id of before still exists except `arlberg/skiroute-madloch-lech`, renamed in OSM itself).
+  Slalom pistes and online races (net/plan.js `racePistes`) never pick links or ski routes.
+- Lifts (`build_lifts`): every aerialway kind (`type` = the OSM kind: chair_lift, gondola, cable_car, mixed_lift, drag_lift, t-bar,
+  j-bar, platter, rope_tow, magic_carpet), funiculars (several OSM ways merged: surface part + tunnel + passing loop, `tunnel: true` when
+  mostly underground: Funival, Perce-Neige, Sunnegga) and listed railways (`RESORTS[rid]["railways"]`: the Gornergrat Bahn, tag match +
+  its real name, with `stops` = [arc m, station name]). Kinds `funicular` / `train` are new: lifts.js skips unknown kinds (no cable drawn),
+  the map draws them as lines. New optional fields: `osm` (way id), `ref`, `type`, `rise`, `cap` (aerialway:capacity / h), `dur` (min),
+  `heated` / `bubble` / `detachable`, `bottom` / `top` = {x, z, y ground, name of the OSM station within 60 m, osm = the mapped station
+  position}. Lifts with an end outside the box are dropped (another resort's).
+- Coverage: default `near_keep` 700 m everywhere again (the 150 / 220 / 350 m budget cuts are gone: streaming makes the size free), boxes
+  widened where coverage.py found cut pistes / lifts: Killy east (Le Fornet / Pays Désert), 3 Vallées south (Orelle gondola), Arlberg
+  north-west (Warth-Schröcken, Sonnenkopf) and south (Rossfall route).
+- First play (main.js / resort-data.js, small loader change): `streamer.hold(startRadius + 200)` at boot = only the tiles around the
+  start load until Start is live (or a run starts), then `release()` and the rest streams nearest-the-player first (the focus follows
+  the skier, so tiles near where he goes / where a lift ride ends come first). Before, every tile streamed at once and the terrain
+  re-meshing of far tiles held Start back. `classes.z` = classes.bin zlib-deflated, inflated with DecompressionStream (fallback
+  classes.bin; ski.html preloads the one it will use): half the classes bytes.
+- Checks: `check_official.py <rid> OFFICIAL.json ...` compares with an official lift / piste list (kept outside the repo, never shipped:
+  `~/Library/Caches/ski-work/data-round/official/`) and says per missing name whether OSM lacks it, has it outside the box, or has it
+  but it is no run.
 
 ## Known gaps (honest)
 - Mid-distance terrain self-shadowing beyond the shadow box is still only the baked 40 m raster (+ the occlusion term).
