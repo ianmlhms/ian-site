@@ -62,11 +62,11 @@ export function createFirstPerson({ scene, overlay, look }) {
   for (const side of [-1, 1]) {
     const shaft = new THREE.CylinderGeometry(0.009, 0.009, 1.2, 6); shaft.translate(0, -0.6, 0);
     const grip = new THREE.CylinderGeometry(0.019, 0.017, 0.13, 8); grip.translate(0, 0.02, 0);
-    const glove = new THREE.BoxGeometry(0.085, 0.1, 0.11); glove.translate(0, 0.03, 0.01);
+    const glove = new THREE.BoxGeometry(0.06, 0.075, 0.08); glove.translate(0, 0.03, 0.01);
     const basket = new THREE.CylinderGeometry(0.045, 0.045, 0.012, 10); basket.translate(0, -1.08, 0);
     for (const [g, hex] of [[shaft, 0x9aa3ad], [grip, 0x16171a], [glove, 0x1f2c45], [basket, 0x16171a]]) {
       g.rotateX(0.62); g.rotateZ(side * 0.2);                 // tilted forward-out, as held while skiing
-      g.translate(side * 0.25, -0.38, -0.38);
+      g.translate(side * 0.34, -0.34, -0.55);
       poleParts.push(coloured(g, hex));
     }
   }
@@ -100,7 +100,7 @@ export function createFirstPerson({ scene, overlay, look }) {
     q.setFromUnitVectors(up, nv).multiply(qy);
     skis.position.set(s.x, feetY + (s.grounded ? 0.01 : 0), s.z);
     skis.quaternion.copy(q);
-    skis.rotateX(-(s.edge || 0) * 0.5);
+    skis.rotateX(-(s.edge || 0) * FP.skiRoll);
     // the head: tuck lowers it, the bumps and the speed bob it, a landing dips it, the turn leans it
     const tuck = s.tuck || 0;
     const eye = FP.eye + (FP.eyeTuck - FP.eye) * tuck;
@@ -115,7 +115,8 @@ export function createFirstPerson({ scene, overlay, look }) {
     const ax = s.x + cy * 12, az = s.z + sy * 12;
     const aheadY = Math.min(feetY, height(ax, az) + 0.4);
     out.tx = ax; out.tz = az;
-    out.ty = aheadY * 0.6 + feetY * 0.4 - 1.1 - tuck * 0.5;
+    // about 20° down: the horizon in the upper third, the ski tips at the bottom of the picture
+    out.ty = aheadY * 0.5 + feetY * 0.5 + eye - 4.6 - tuck * 0.4;
     const wantFov = FP.fov + FP.fovKick * smoothstep(FP.kickFrom, FP.kickTo, speed);
     fovNow += (wantFov - fovNow) * Math.min(1, dt * (wantFov > fovNow ? 2.2 : 1.4));
     out.fov = fovNow;

@@ -39,7 +39,12 @@ export function courseLayout(piste, startS = 2, pistes = null) {
     const h = Math.atan2(a.dz, a.dx);
     for (const side of [-1, 1]) barriers.push({ x: a.x - a.dz * side * (hw + 0.5), z: a.z + a.dx * side * (hw + 0.5), h, side });
   }
-  const arrowAt = (s) => { piste.at(s, a); const h = Math.atan2(a.dz, a.dx); for (const side of [-1, 1]) arrows.push({ x: a.x - a.dz * side * (hw - 1.5), z: a.z + a.dx * side * (hw - 1.5), h, side, s }); };
+  const b2 = {};
+  const arrowAt = (s) => {
+    piste.at(s, a); piste.at(Math.min(finishS, s + 60), b2);
+    const h = Math.atan2(a.dz, a.dx), turn = a.dx * b2.dz - a.dz * b2.dx;        // > 0: the course bends right (seen going down)
+    for (const side of [-1, 1]) arrows.push({ x: a.x - a.dz * side * (hw - 1.5), z: a.z + a.dx * side * (hw - 1.5), h, side, s, turn });
+  };
   const junctions = [];
   if (pistes) {
     const hash = pisteHash(pistes);
@@ -107,27 +112,38 @@ function checkerTexture() {
 export function createCourseView({ scene, layout, height }) {
   const objs = [];
   const dummy = new THREE.Object3D();
-  // barriers: a fence panel (orange net + two posts), one instanced mesh
+  // barriers: fence panels (orange net), one instanced mesh; each panel follows the slope along its length (no end in the air or buried)
   const panel = new THREE.BoxGeometry(COURSE.barrierEvery - 0.2, 1.05, 0.06); panel.translate(0, 0.62, 0);
   const net = new THREE.InstancedMesh(panel, new THREE.MeshLambertMaterial({ color: 0xff6a13 }), Math.max(1, layout.barriers.length));
-  layout.barriers.forEach((b, i) => { dummy.position.set(b.x, height(b.x, b.z) - 0.05, b.z); dummy.rotation.set(0, -b.h, 0); dummy.updateMatrix(); net.setMatrixAt(i, dummy.matrix); });
+  const half = (COURSE.barrierEvery - 0.2) / 2;
+  layout.barriers.forEach((b, i) => {
+    const cx = Math.cos(b.h), cz = Math.sin(b.h);
+    const ya = height(b.x - cx * half, b.z - cz * half), yb = height(b.x + cx * half, b.z + cz * half);
+    dummy.position.set(b.x, (ya + yb) / 2 - 0.05, b.z);
+    dummy.rotation.set(0, -b.h, Math.atan2(yb - ya, half * 2), 'XYZ');
+    dummy.updateMatrix(); net.setMatrixAt(i, dummy.matrix);
+  });
   net.count = layout.barriers.length; net.name = 'ski-course-barriers'; net.frustumCulled = false;
   objs.push(net);
-  // arrows: a yellow board with a black chevron on a post, facing the skier coming down
+  // arrows: a yellow board with a black chevron on a post, facing the skier coming down; the chevron points the way the course goes
+  // from there (up = straight on, right / left = the course bends that way within 60 m)
   const ac = document.createElement('canvas'); ac.width = 64; ac.height = 64;
   const ag = ac.getContext('2d'); ag.fillStyle = '#f2c200'; ag.fillRect(0, 0, 64, 64); ag.fillStyle = '#16171a';
   ag.beginPath(); ag.moveTo(20, 10); ag.lineTo(46, 32); ag.lineTo(20, 54); ag.lineTo(12, 46); ag.lineTo(30, 32); ag.lineTo(12, 18); ag.closePath(); ag.fill();
-  const board = new THREE.PlaneGeometry(1.1, 1.1); board.translate(0, 1.7, 0);
+  const board = new THREE.PlaneGeometry(1.1, 1.1);
   const arrowMat = new THREE.MeshLambertMaterial({ map: new THREE.CanvasTexture(ac), side: THREE.DoubleSide });
   const arrows = new THREE.InstancedMesh(board, arrowMat, Math.max(1, layout.arrows.length));
+  const postGeo = new THREE.CylinderGeometry(0.035, 0.04, 1.75, 5); postGeo.translate(0, 0.85, 0);
+  const posts = new THREE.InstancedMesh(postGeo, new THREE.MeshLambertMaterial({ color: 0x2b2f36 }), Math.max(1, layout.arrows.length));
   layout.arrows.forEach((a, i) => {
-    // the board faces up the piste; the chevron points along the course (the board turned so its +x runs down the piste, seen from above)
-    dummy.position.set(a.x, height(a.x, a.z), a.z);
-    dummy.rotation.set(0, -a.h - Math.PI / 2, 0);
-    dummy.updateMatrix(); arrows.setMatrixAt(i, dummy.matrix);
+    const y = height(a.x, a.z);
+    const th = Math.atan2(-Math.cos(a.h), -Math.sin(a.h));           // the board's face looks back up the piste
+    const roll = Math.PI / 2 * (1 - Math.max(-1, Math.min(1, (a.turn || 0) * 3)));
+    dummy.position.set(a.x, y + 2.15, a.z); dummy.rotation.set(0, th, roll, 'YXZ'); dummy.updateMatrix(); arrows.setMatrixAt(i, dummy.matrix);
+    dummy.position.set(a.x, y - 0.1, a.z); dummy.rotation.set(0, 0, 0); dummy.updateMatrix(); posts.setMatrixAt(i, dummy.matrix);
   });
-  arrows.count = layout.arrows.length; arrows.name = 'ski-course-arrows'; arrows.frustumCulled = false;
-  objs.push(arrows);
+  arrows.count = posts.count = layout.arrows.length; arrows.name = 'ski-course-arrows'; posts.name = 'ski-course-arrow-posts'; arrows.frustumCulled = posts.frustumCulled = false;
+  objs.push(arrows, posts);
   // finish: two red pillars, a cross beam with "ZIL" both ways, a checkered line on the snow
   const f = layout.finish, hw = layout.halfWidth + 1.5, fh = Math.atan2(f.dz, f.dx);
   const g0 = height(f.x, f.z);
@@ -141,7 +157,7 @@ export function createCourseView({ scene, layout, height }) {
     pillar.position.set(0, (7 + (g0 - gh)) / 2 - (g0 - gh), side * hw);
     arch.add(pillar);
   }
-  const zil = textTexture('ZIL');
+  const zil = textTexture('ZIL', Math.min(2048, Math.round(128 * (hw * 2 + 0.9) / 2.2)), 128);       // the canvas has the beam's shape
   const zilMat = new THREE.MeshLambertMaterial({ map: zil });
   // the beam across the piste (local z); its two faces towards and away from the skier (+x, -x) carry "ZIL"
   const banner = new THREE.Mesh(new THREE.BoxGeometry(0.4, 2.2, hw * 2 + 0.9), [zilMat, zilMat, red, red, red, red]);
@@ -191,4 +207,18 @@ export function createCourseHud(hudEl) {
       document.documentElement.dataset.skiCourseWarn = c.warn ? '1' : '';
     },
   };
+}
+
+/** "Challenge ofgebrach": the skier left the course too long. A choice, never an automatic teleport. */
+export function showCourseAbort(root, { name, onAgain, onFree }) {
+  const c = document.createElement('div');
+  c.className = 'coursecard'; c.id = 'courseAbort';
+  c.innerHTML = `<b>Challenge ofgebrach</b><span></span>
+    <div class="acts"><button type="button" class="btn primary" data-a="again">Nach eng Kéier</button><button type="button" class="btn" data-a="free">Weider fräi fueren</button></div>`;
+  c.querySelector('span').textContent = `Du bass ze laang nieft der Pist${name ? ` ${name}` : ''} gefuer.`;
+  root.appendChild(c);
+  c.querySelector('[data-a="again"]').addEventListener('click', () => { c.remove(); onAgain(); });
+  c.querySelector('[data-a="free"]').addEventListener('click', () => { c.remove(); onFree(); });
+  document.documentElement.dataset.skiCourse = 'aborted';
+  return { close() { c.remove(); } };
 }

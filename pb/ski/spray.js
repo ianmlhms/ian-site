@@ -32,7 +32,7 @@ export function createSnowSpray({ scene, env, level = 'medium', height }) {
         gl_PointSize = clamp(aSize * grow * uScale / max(-mv.z, 0.4), 0.0, 200.0);
         vec3 toP = normalize(position - uCam);
         vGlow = uSun * pow(max(dot(toP, uSunDir), 0.0), 5.0);          // looking towards the sun through the dust
-        vA = aLife; vK = aKind;
+        vA = aLife * smoothstep(0.7, 2.6, -mv.z); vK = aKind;          // grains right in front of the eyes (first person) fade out
       }`,
     fragmentShader: `varying float vA, vK, vGlow;
       void main(){
@@ -128,7 +128,7 @@ export function createSnowSpray({ scene, env, level = 'medium', height }) {
           fresh > 0.5 ? 0.16 + 0.22 * Math.random() : 0.06 + 0.12 * Math.random(), 0, 1.6 + Math.random() * 0.4);
       }
       // powder: a cloud round the boots off the piste
-      puffCarry += grounded && fresh > 0.4 && speed > 3 ? fresh * smoothstep(3, 18, speed) * dt * 34 : 0;
+      puffCarry += grounded && fresh > 0.4 && speed > 1.5 ? fresh * (0.25 + 0.75 * smoothstep(2, 16, speed)) * dt * 34 : 0;
       while (puffCarry > 1) {
         puffCarry -= 1;
         const a = Math.random() * Math.PI * 2, r = Math.random() * 0.6;

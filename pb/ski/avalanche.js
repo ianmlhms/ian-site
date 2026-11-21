@@ -102,7 +102,7 @@ export function findFaces(field, resort, count = AV.faces) {
       if (field.isShipped && !field.isShipped(Math.floor(x / 1280), Math.floor(z / 1280))) continue;
       if (slopeDeg(far, x, z, 40) < AV.slope - 3) continue;
       field.attrs(x, z, attrs);
-      if (attrs.piste > 0.02 || attrs.dist < 90 || attrs.forest > 0.15 || attrs.rock > 0.35 || attrs.built > 0 || attrs.glacier > 0.5) continue;
+      if (attrs.piste > 0.02 || attrs.dist < 90 || attrs.forest > 0.15 || attrs.rock > 0.12 || attrs.built > 0 || attrs.glacier > 0.5) continue;      // open snow, no rock / scree
       // follow the fall line down: the face length while it stays steep and open
       const path = [x, z];
       let px = x, pz = z, len = 0, steep = 0, ok = true;
@@ -114,7 +114,7 @@ export function findFaces(field, resort, count = AV.faces) {
         path.push(px, pz);
         if (Math.atan(gl) * 180 / Math.PI > 30) steep += 15;
         field.attrs(px, pz, attrs);
-        if (attrs.forest > 0.5 || attrs.built > 0.1 || attrs.water > 0.2) { ok = false; break; }
+        if (attrs.forest > 0.5 || attrs.built > 0.1 || attrs.water > 0.2 || (len < 200 && attrs.rock > 0.3)) { ok = false; break; }
       }
       if (!ok || steep < 180 || len < 250) continue;
       cand.push({ x, z, path, len, steep, slope: slopeDeg(far, x, z, 40) });
@@ -202,7 +202,8 @@ export function createAvalanches({ scene, field, surface, pistes, hud, uiRoot, l
     vertexShader: `attribute vec4 aP; varying vec2 vUv; varying float vA;
       void main(){ vUv = position.xy; vA = fract(aP.w); float size = floor(aP.w) * 0.1;
         vec4 mv = viewMatrix * vec4(aP.xyz, 1.0); mv.xy += position.xy * size; gl_Position = projectionMatrix * mv; }`,
-    fragmentShader: `varying vec2 vUv; varying float vA; void main(){ float r = dot(vUv, vUv); if (r > 1.0) discard; gl_FragColor = vec4(0.95, 0.965, 0.985, exp(-r * 2.2) * vA); }`,
+    // soft puffs: no hard rim, the lower part fades into the snow it rolls over (no cut line where it meets the ground)
+    fragmentShader: `varying vec2 vUv; varying float vA; void main(){ float r = dot(vUv, vUv); if (r > 1.0) discard; float a = (1.0 - r) * (1.0 - r) * smoothstep(-0.95, 0.1, vUv.y) * vA; gl_FragColor = vec4(0.95, 0.965, 0.985, a); }`,
   });
   const cloudMesh = new THREE.Mesh(cloudGeo, cloudMat);
   cloudMesh.name = 'ski-avalanche-cloud'; cloudMesh.frustumCulled = false; cloudMesh.renderOrder = 8;
@@ -311,7 +312,7 @@ export function createAvalanches({ scene, field, surface, pistes, hud, uiRoot, l
           const size = (4 + v * 0.55 + j * 3) * (0.8 + 0.3 * Math.sin(bl.spin + j));
           const vn = v > 0.1 ? 1 / v : 0;
           cPos[c * 4] = bl.x - bl.vx * vn * back; cPos[c * 4 + 2] = bl.z - bl.vz * vn * back;
-          cPos[c * 4 + 1] = height(cPos[c * 4], cPos[c * 4 + 2]) + size * 0.55;
+          cPos[c * 4 + 1] = height(cPos[c * 4], cPos[c * 4 + 2]) + size * 0.75;
           cPos[c * 4 + 3] = Math.floor(size * 10) + clamp(cloud * (0.55 - j * 0.12), 0, 0.99);
           c++;
         }

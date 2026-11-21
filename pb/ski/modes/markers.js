@@ -11,10 +11,10 @@ const DIFF_HEX = { green: 0x2f9a4c, blue: 0x2a66d0, red: 0xd0352c, black: 0x1d1f
 const GOLD = 0xd9a520, PARK = 0x6b3fa0;
 
 /** The start gates: [{ id, piste | null, park, name, diff, x, z, heading }]. pistes = createPisteSet, layout = the park layout. */
-export function markerList(pistes, layout) {
+export function markerList(pistes, layout, startOf = () => 2) {      // R7-C: startOf(piste) = the start gate on open snow (clear.js)
   const out = [];
   for (const p of pistes.list) {
-    const a = p.at(2, {});
+    const a = p.at(startOf(p), {});
     out.push({ id: p.id, piste: p, park: false, name: p.name, diff: p.diff, x: a.x, z: a.z, heading: Math.atan2(a.dz, a.dx) });
   }
   if (layout) out.push({ id: 'park', piste: null, park: true, name: layout.name || 'Snowpark', diff: 'park', x: layout.top.x, z: layout.top.z, heading: Math.atan2(layout.uz, layout.ux) });
@@ -137,6 +137,8 @@ export function createMarkers({ scene, list, height, overlay, starsOf }) {
   return {
     mesh, list,
     update, paint, reseat: seat,
+    /** R7-C: move the piste gates to their start on open snow (clear.js courseGate, once the buildings are known). */
+    regate(startOf) { for (const m of list) { if (!m.piste) continue; const a = m.piste.at(startOf(m.piste), {}); m.x = a.x; m.z = a.z; m.heading = Math.atan2(a.dz, a.dx); } seat(); },
     at: (x, z) => markerAt(list, x, z),
     byId: (id) => list.find((m) => m.id === id) || null,
     setVisible(v) { visible = v; mesh.visible = v; if (!v) for (const t of tags) t.el.hidden = true; },

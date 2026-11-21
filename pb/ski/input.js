@@ -8,7 +8,7 @@
  *             W / S (touch: Trick held + the pad dragged up / down, gamepad stick up / down) = flip; steering in the air = spin
  * read() returns { steer, tuck, brake, push, jump, trick, pitch, source } each frame. */
 const KEYS = { left: ['KeyA', 'ArrowLeft'], right: ['KeyD', 'ArrowRight'], tuck: ['Space'], brake: ['KeyS', 'ArrowDown'], push: ['KeyW', 'ArrowUp'], jump: ['KeyE', 'KeyJ'], trick: ['KeyF', 'ShiftLeft', 'ShiftRight'] };
-const ACTION_KEYS = { KeyR: 'reset', KeyG: 'weather', KeyT: 'time', KeyM: 'map', KeyN: 'mute', KeyL: 'lift', KeyV: 'view', Escape: 'menu', Enter: 'confirm' };
+const ACTION_KEYS = { KeyR: 'reset', KeyG: 'weather', KeyT: 'time', KeyM: 'map', KeyN: 'mute', KeyL: 'lift', KeyV: 'view', KeyC: 'camera', Escape: 'menu', Enter: 'confirm' };      // R7-C: C = first person / chase
 const PAD_RADIUS = 60;
 const DEADZONE = 0.14;
 
