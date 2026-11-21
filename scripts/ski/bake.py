@@ -11,7 +11,8 @@ Writes
     far.bin            MBG1 grid, FAR_STEP m, box + FAR_MARGIN (distant mountains, and the fallback everywhere)
     t/<tx>_<tz>.bin    MBG1 grids, NEAR_STEP m, (TILE_CELLS+1)^2 nodes: only tiles within NEAR_KEEP of a piste, lift or village are shipped.
                        Pistes are groomed in (heights smoothed under the piste mask)
-    classes.bin        RLE raster, CLASS_STEP m over the box, bit field (see CLASS_BITS)
+    classes.bin        RLE raster, CLASS_STEP m over the box, bit field (see CLASS_BITS); classes.z = the same file zlib-deflated (the
+                       browser inflates it with DecompressionStream: the server sends .bin uncompressed)
     buildings.json     one row per building: [cx, cz, length, width, angle, eave, ridge, ground, kind, footprint, roof, levels]
                        (oriented box, kind 0 chalet / 1 block / 2 chapel / 3 hut; footprint = [dx, dz, ...] in dm from the centre;
                        roof = ROOF_CODE or -1 unknown)
@@ -31,6 +32,7 @@ import struct
 import sys
 import time
 import unicodedata
+import zlib
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
@@ -273,7 +275,7 @@ LINK_PISTE_NEAR = 40.0                     # m: ... to a named piste when its en
 LINK_FEATURE_NEAR = 600.0                  # m: otherwise to the nearest named lift / piste / place this close to its end
 LIFT_WORD = {"chair": "Sessellift", "gondola": "Gondel", "cable": "Seelbunn", "drag": "Schlepplift", "carpet": "Förderband",
              "funicular": "Standseelbunn", "train": "Zuch"}
-LIFT_TYPE_WORDS = re.compile(r"(?i)\b(ts|tsd|tsf|tc|tk|tph|tps|dmc|télé\w*|tele\w*|sessel\w*|gondel\w*|\w*bahn|\w*lift|express|funi\w*|seggiovia|cabinovia|skilift|ovovia|funivia|chair|gondola)\b")
+LIFT_TYPE_WORDS = re.compile(r"(?i)\b(tsd?f?\d*|tcd?\d*|tk|tph|tps|dmc|tc|télé\w*|tele\w*|sessel\w*|gondel\w*|\w*bahn|\w*lift|express|funi\w*|seggiovia|cabinovia|skilift|ovovia|funivia|chair|gondola)\b")
 
 
 def piste_ways(frame):
@@ -1521,7 +1523,10 @@ def main():
     cblob = rle(classes)
     with open(os.path.join(out, "classes.bin"), "wb") as fh:
         fh.write(cblob)
-    log("classes.bin %.2f MB" % (len(cblob) / 1e6))
+    zblob = zlib.compress(cblob, 9)                           # classes.z: the same raster deflated (half the bytes on the first play)
+    with open(os.path.join(out, "classes.z"), "wb") as fh:
+        fh.write(zblob)
+    log("classes.bin %.2f MB, classes.z %.2f MB" % (len(cblob) / 1e6, len(zblob) / 1e6))
 
     with open(os.path.join(out, "buildings.json"), "w", encoding="utf-8") as fh:
         json.dump([b["row"] for b in buildings], fh, separators=(",", ":"))

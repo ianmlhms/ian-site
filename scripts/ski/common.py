@@ -26,11 +26,12 @@ REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 USER_AGENT = "ian-site-ski/1.0 (https://ian.lu)"
 WORK_ROOT = os.environ.get("SKI_WORK", os.path.expanduser("~/Library/Caches/ski-work"))
 
-OVERPASS_MIRRORS = [
+OVERPASS_MIRRORS = [                 # (maps.mail.ru dropped: its certificate is self-signed)
     "https://overpass-api.de/api/interpreter",
     "https://overpass.private.coffee/api/interpreter",
+    "https://lz4.overpass-api.de/api/interpreter",
     "https://overpass.kumi.systems/api/interpreter",
-    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+    "https://z.overpass-api.de/api/interpreter",
 ]
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -277,7 +278,7 @@ def osm_path(rid, layer, write=False):
     return os.path.join(WORK_ROOT, rid, "osm", layer + ".json")
 
 
-def overpass(rid, query, layer, tries=4):
+def overpass(rid, query, layer, tries=10):
     """POST an Overpass query, cache the JSON under $SKI_WORK/OSM_ROUND/<resort>/osm/<layer>.json, rotate through mirrors with
     back-off (Overpass is often overloaded: 429 / 502 / 504)."""
     path = osm_path(rid, layer, write=True)
@@ -303,5 +304,7 @@ def overpass(rid, query, layer, tries=4):
                 last = err
                 print("  overpass retry", layer, url, str(err)[:90], file=sys.stderr)
                 time.sleep(5)
-        time.sleep(30 * (attempt + 1))
+        wait = min(300, 20 * 2 ** attempt)                   # exponential back-off, at most 5 minutes between rounds
+        print("  overpass: all mirrors busy, round %d/%d, waiting %d s" % (attempt + 1, tries, wait), file=sys.stderr)
+        time.sleep(wait)
     raise SystemExit("All Overpass mirrors failed for %s: %s" % (layer, last))

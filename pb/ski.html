@@ -21,7 +21,7 @@
   var mp = window.MPGate && window.MPGate.ctx;
   if (mp && mp.game === "ski") { if (mp.cfg && ok.test(mp.cfg.resort) && mp.cfg.resort !== "random") resort = mp.cfg.resort; else return; }
   var pre = window.__skiPre = { resort: resort, files: {} };
-  "resort.json far.bin classes.bin".split(" ").forEach(function (name) {
+  ("resort.json far.bin " + (typeof DecompressionStream === "function" ? "classes.z" : "classes.bin")).split(" ").forEach(function (name) {   // classes.z: see resort-data.js
     try {
       var p = fetch("/pb/ski/data/" + resort + "/" + name).then(function (res) { if (!res.ok) throw new Error(name + ": HTTP " + res.status); return res.arrayBuffer(); }).then(function (buf) { return new Uint8Array(buf); });
       p.catch(function () {});

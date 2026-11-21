@@ -28,11 +28,26 @@ function preloaded(rid, name) {
   return p;
 }
 
+/* classes.z = classes.bin deflated (zlib): about half the bytes on the first play (the server sends .bin files uncompressed). Browsers
+ * without DecompressionStream, or data baked without classes.z, take classes.bin. */
+export const CLASSES_Z = typeof DecompressionStream === 'function';
+
+async function inflate(bytes) {
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate'));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
 /** { resort, far, classes } (decoded) for one resort. */
 export async function loadResortCore(rid, onProgress = () => {}) {
   const root = base(rid);
   const get = (name) => preloaded(rid, name) || fetchBytes(root + name);
-  const [jsonBytes, farBytes, classBytes] = await Promise.all([get('resort.json'), get('far.bin'), get('classes.bin')]);
+  const getClasses = async () => {
+    if (CLASSES_Z) {
+      try { return await inflate(await get('classes.z')); } catch (error) { console.warn('[ski] classes.z unusable, taking classes.bin', error.message); }
+    }
+    return get('classes.bin');
+  };
+  const [jsonBytes, farBytes, classBytes] = await Promise.all([get('resort.json'), get('far.bin'), getClasses()]);
   onProgress(0.5);
   const resort = JSON.parse(new TextDecoder().decode(jsonBytes));
   const far = decodeGrid(farBytes);
