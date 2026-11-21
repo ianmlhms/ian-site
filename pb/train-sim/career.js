@@ -27,9 +27,9 @@
 
   const num = (n) => (typeof n === 'number' && Number.isFinite(n) ? Math.max(0, Math.min(MAX, Math.floor(n))) : 0);
   const isObj = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
-  const trainById = (id) => C.trains.find((t) => t.id === id) || null;
   /* a retired train id -> the kept train that replaced it; any other id unchanged */
   const resolveTrainId = (id) => (typeof id === 'string' && Object.prototype.hasOwnProperty.call(RETIRED, id) ? RETIRED[id].to : id);
+  const trainById = (id) => C.trains.find((t) => t.id === resolveTrainId(id)) || null;   // an old id (a caller, a link) means its successor
   const retiredInto = (keptId) => Object.keys(RETIRED).filter((old) => RETIRED[old].to === keptId);
   /* Return direction: route id + '~r'. It belongs to the same career, price and ownership as the forward route; only the records (best) are per direction. */
   const REV = '~r';

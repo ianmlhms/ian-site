@@ -1767,7 +1767,7 @@ export const flow = {
     if (process.env.TS_STOP_AFTER_RESUME) return;
 
     h.step('endless mode plays all compatible routes in order, then loops');
-    await frame.locator('[data-test="select-emu"]').click();
+    if (await frame.locator('[data-test="select-emu"]').isEnabled()) await frame.locator('[data-test="select-emu"]').click();   // (the Lokalzuch is the start train: usually selected already)
     await frame.locator('[data-test="mode-endless"]').click();
     await waitState(frame, () => window.__tsTest.state().phase === 'running' && window.__tsTest.state().mode === 'endless');
     const order = (await S(frame)).endless.order;
