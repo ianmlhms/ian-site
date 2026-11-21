@@ -142,7 +142,7 @@ function startInvitePop() {
   if (_g.inviteScheduled) return;
   _g.inviteScheduled = true;
   const load = () => {
-    _g.inviteModule = import("./invite-pop.js?v=1");
+    _g.inviteModule = import("./invite-pop.js?v=2");
     startInvitePop();
   };
   if ("requestIdleCallback" in window) window.requestIdleCallback(load, { timeout: 3000 });

@@ -39,8 +39,8 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module">
-import { mountLobby } from "./mp-lobby.js?v=18";
-import { gameInfo } from "./mp-games.js?v=5";
+import { mountLobby } from "./mp-lobby.js?v=19";
+import { gameInfo } from "./mp-games.js?v=6";
 const g = gameInfo(new URLSearchParams(location.search).get("g") || "");
 if (g) document.getElementById("lobbyH1").textContent = g.name;
 mountLobby(document.getElementById("mpl")).catch((error) => {

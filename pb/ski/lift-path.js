@@ -1,0 +1,85 @@
+/* One lift's line in the world (pure: no THREE, no DOM; lifts.js draws it, modes/liftride.js rides it).
+ * Works for whatever lifts the resort data has: the kind string of the data (bake.py LIFT_KIND: chair, gondola, cable, drag, carpet,
+ * and the rail kinds funicular / railway / rack / train of the bigger data) is mapped onto five classes:
+ *   chair    open chairs hanging under the haul rope (sit)
+ *   gondola  small cabins (stand inside)
+ *   cable    a big cabin per direction, jig-back (stand inside)
+ *   drag     T-bars / platters / rope tows: pulled up on the snow
+ *   train    funiculars and rack railways: a carriage on rails on the ground
+ * The haul rope rests on the station tops and the pylon tops, and is lifted wherever a straight span would cut the slope. */
+
+export const LIFT_CLASS = Object.freeze({
+  chair: 'chair', chair_lift: 'chair', gondola: 'gondola', mixed_lift: 'gondola', cable: 'cable', cable_car: 'cable',
+  drag: 'drag', 't-bar': 'drag', 'j-bar': 'drag', platter: 'drag', rope_tow: 'drag',
+  train: 'train', funicular: 'train', railway: 'train', rack: 'train', rack_railway: 'train', narrow_gauge: 'train',
+});
+/** The lift class of a data kind (null = not ridden / not drawn, e.g. magic carpets). */
+export const liftClass = (kind) => LIFT_CLASS[kind] || null;
+
+/* Per class: pylon height above the ground (m), carrier gap (m, 0 = one per direction), REAL line speed (m/s), carrier hang below the
+ * rope (m), rope offset to each side of the line (m), station hall [width, height, depth] (m) */
+export const LIFT_SPEC = Object.freeze({
+  chair: { tower: 10.5, gap: 22, speed: 5, hang: 2.9, side: 2.4, station: [10, 5, 6] },
+  gondola: { tower: 15, gap: 55, speed: 6, hang: 4.6, side: 3.0, station: [18, 8, 10] },
+  cable: { tower: 34, gap: 0, speed: 10, hang: 6.6, side: 5, station: [22, 12, 14] },
+  drag: { tower: 6.5, gap: 14, speed: 3, hang: 2.5, side: 0, station: [5, 3.5, 4] },
+  train: { tower: 0, gap: 0, speed: 5, hang: 0, side: 2.1, station: [24, 6, 9] },
+});
+
+/** The line of one data lift (resort.json lifts[i]: { kind, pts, pylons, seats? }) over the height function height(x, z).
+ *  Returns null for a kind that is not ridden. at(s) = { x, z, dx, dz } along the ground line, cableY(s) = the rope (train: the rail top). */
+export function createLiftPath(src, height) {
+  const kind = liftClass(src.kind);
+  if (!kind || !src.pts || src.pts.length < 4) return null;
+  const spec = LIFT_SPEC[kind];
+  const p = src.pts;
+  const n = p.length / 2;
+  const sx = new Float64Array(n), sz = new Float64Array(n), ss = new Float64Array(n);
+  for (let i = 0; i < n; i++) { sx[i] = p[2 * i]; sz[i] = p[2 * i + 1]; if (i) ss[i] = ss[i - 1] + Math.hypot(sx[i] - sx[i - 1], sz[i] - sz[i - 1]); }
+  const len = ss[n - 1];
+  function at(s, out = {}) {
+    let i = 0;
+    while (i < n - 2 && ss[i + 1] < s) i++;
+    const seg = (ss[i + 1] - ss[i]) || 1;
+    const k = Math.min(1, Math.max(0, (s - ss[i]) / seg));
+    out.x = sx[i] + (sx[i + 1] - sx[i]) * k; out.z = sz[i] + (sz[i + 1] - sz[i]) * k;
+    out.dx = (sx[i + 1] - sx[i]) / seg; out.dz = (sz[i + 1] - sz[i]) / seg;
+    return out;
+  }
+  const q = {};
+  let supports;
+  if (kind === 'train') {
+    // the track lies on the ground: a support every 10 m keeps the rail on the snow (bridges over dips are left to the data)
+    supports = [];
+    for (let s = 0; s < len; s += 10) { at(s, q); supports.push({ s, y: height(q.x, q.z) + 0.35 }); }
+    at(len, q); supports.push({ s: len, y: height(q.x, q.z) + 0.35 });
+  } else {
+    supports = [{ s: 0, y: height(sx[0], sz[0]) + spec.station[1] * 1.25 }];          // the bull-wheel stands above the hall
+    const towers = kind === 'cable' && !(src.pylons && src.pylons.length) ? [len / 2] : (src.pylons || []);
+    for (const s of towers) { if (s <= 0 || s >= len) continue; at(s, q); supports.push({ s, y: height(q.x, q.z) + spec.tower, tower: true }); }
+    supports.push({ s: len, y: height(sx[n - 1], sz[n - 1]) + spec.station[1] * 1.25 });
+    supports.sort((a, b) => a.s - b.s);
+    // a rope must clear the ground between supports: lift a support where the straight line would cut the slope
+    for (let pass = 0; pass < 2; pass++) {
+      for (let k = 0; k + 1 < supports.length; k++) {
+        const a = supports[k], b = supports[k + 1];
+        for (let s = a.s + 10; s < b.s; s += 10) {
+          at(s, q);
+          const y = a.y + (b.y - a.y) * (s - a.s) / (b.s - a.s);
+          const need = height(q.x, q.z) + spec.hang + 2;
+          if (y < need) { const up = need - y; if (b.tower) b.y += up; if (a.tower) a.y += up; }
+        }
+      }
+    }
+  }
+  function cableY(s) {
+    let k = 0;
+    while (k < supports.length - 2 && supports[k + 1].s < s) k++;
+    const a = supports[k], b = supports[k + 1];
+    return a.y + (b.y - a.y) * Math.min(1, Math.max(0, (s - a.s) / ((b.s - a.s) || 1)));
+  }
+  /** The rope's climb at s (dy / ds): carriages tilt with it (trains), the window view looks along it. */
+  const slope = (s) => (cableY(Math.min(len, s + 4)) - cableY(Math.max(0, s - 4))) / Math.max(1, Math.min(len, s + 4) - Math.max(0, s - 4));
+  const cx = (sx[0] + sx[n - 1]) / 2, cz = (sz[0] + sz[n - 1]) / 2;
+  return { src, kind, spec, len, at, cableY, slope, supports, cx, cz, radius: len / 2, seats: Number(src.seats) || (kind === 'chair' ? 4 : kind === 'gondola' ? 8 : 0) };
+}

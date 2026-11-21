@@ -1,0 +1,54 @@
+#!/usr/bin/env python3
+"""Download the OpenStreetMap vectors of one resort (cached in $SKI_WORK/<resort>/osm/):
+pistes (piste:type=downhill ways, route relations and multipolygon areas, any difficulty, ski routes included), lifts (every aerialway,
+stations, pylons, funiculars and the rack railways a resort lists), snow parks, buildings, land cover, water, roads, peaks and places.
+Pistes and lifts are asked for in the box + `margin` degrees, so `coverage.py` can tell what of the resort lies outside the box.
+
+    ~/Library/Caches/luxtram-work/.venv/bin/python scripts/ski/fetch_osm.py killy [layer ...]
+
+© OpenStreetMap contributors, ODbL 1.0 (credited in the game).
+"""
+import os
+import sys
+import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from common import RESORTS, overpass, resort_arg  # noqa: E402
+
+
+def queries(bbox, margin=0.03):
+    s, w, n, e = bbox
+    box = "%.4f,%.4f,%.4f,%.4f" % (s, w, n, e)
+    wide = "%.4f,%.4f,%.4f,%.4f" % (s - margin, w - margin, n + margin, e + margin)
+    return {
+        # every downhill piste: ways (lines and areas), route relations (name / difficulty often only on the relation, the member ways
+        # bare) and multipolygon areas; relations come with their members' geometry
+        "pistes": '[out:json][timeout:300];(way["piste:type"="downhill"](%s);relation["piste:type"="downhill"](%s););out body geom;' % (wide, wide),
+        # every aerialway (+ station nodes / areas, pylons), funiculars and railways (bake.py keeps the railways a resort lists)
+        "lifts": '[out:json][timeout:300];(way["aerialway"](%s);node["aerialway"~"^(pylon|station)$"](%s);'
+                 'way["railway"~"^(funicular|narrow_gauge|rail|light_rail|monorail)$"](%s);node["railway"~"^(station|halt|stop)$"](%s););'
+                 'out geom tags;' % (wide, wide, wide, wide),
+        "buildings": '[out:json][timeout:240];(way["building"](%s);relation["building"](%s););out geom tags;' % (box, box),
+        "areas": '[out:json][timeout:240];(way["landuse"~"^(forest|residential|meadow|grass|commercial|retail|construction|reservoir|basin)$"](%s);'
+                 'way["natural"~"^(wood|water|bare_rock|scree|glacier|cliff|scrub|heath|grassland|shingle|rock)$"](%s);'
+                 'relation["natural"~"^(wood|water|bare_rock|scree|glacier)$"](%s);relation["landuse"~"^(forest|reservoir)$"](%s);'
+                 'way["waterway"="riverbank"](%s););out geom tags;' % ((wide,) * 5),
+        "water": '[out:json][timeout:240];(way["waterway"~"^(river|stream)$"](%s););out geom tags;' % wide,
+        "roads": '[out:json][timeout:240];(way["highway"~"^(primary|secondary|tertiary|unclassified|residential|service|living_street|pedestrian|track)$"](%s););out geom tags;' % box,
+        # snow parks (round 4A): piste:type=snow_park (the documented tag) or leisure / sport variants some mappers use
+        "parks": '[out:json][timeout:240];(way["piste:type"="snow_park"](%s);relation["piste:type"="snow_park"](%s);node["piste:type"="snow_park"](%s);'
+                 'way["leisure"="snow_park"](%s);way["piste:type"="downhill"]["name"~"[Pp]ark"](%s););out geom tags;' % ((box,) * 5),
+        "aeroway": '[out:json][timeout:240];(way["aeroway"~"^(runway|apron|taxiway|helipad)$"](%s););out geom tags;' % box,
+        "poi":'[out:json][timeout:240];(node["natural"~"^(peak|saddle|glacier)$"](%s);node["place"~"^(village|hamlet|town|locality|isolated_dwelling|suburb|neighbourhood)$"](%s);'
+               'node["mountain_pass"="yes"](%s);node["amenity"~"^(restaurant|cafe|bar)$"](%s););out center tags;' % (wide, wide, wide, box),
+    }
+
+
+if __name__ == "__main__":
+    rid = resort_arg()
+    names = [a for a in sys.argv[2:] if not a.startswith("-")]
+    q = queries(RESORTS[rid]["bbox"])
+    for name in names or list(q):
+        data = overpass(rid, q[name], name)
+        print(name, len(data["elements"]))
+        time.sleep(2)

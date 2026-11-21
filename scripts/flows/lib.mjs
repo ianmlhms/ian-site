@@ -356,7 +356,7 @@ export async function runFlow(flow, { browser, origin, shotsDir = process.env.FL
   const tmpVideos = fs.mkdtempSync(path.join(os.tmpdir(), "flow-video-"));
   const viewport = flow.viewport || VIEWPORT;          // a flow may ask for another size (a game in landscape)
   const context = await theBrowser.newContext({
-    viewport, screenSize: viewport, deviceScaleFactor: 1, serviceWorkers: flow.serviceWorkers || "block",
+    viewport, screenSize: viewport, deviceScaleFactor: flow.deviceScaleFactor || 1, serviceWorkers: flow.serviceWorkers || "block",
     hasTouch: !!flow.touch, isMobile: !!flow.touch,
     ...(flow.permissions ? { permissions: flow.permissions } : {}),
     ...(process.env.FLOW_COLOR_SCHEME ? { colorScheme: process.env.FLOW_COLOR_SCHEME } : {}),   // FLOW_COLOR_SCHEME=dark emulates prefers-color-scheme
