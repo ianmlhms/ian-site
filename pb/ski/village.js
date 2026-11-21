@@ -283,8 +283,8 @@ function material(env, cheap) {
         float style = vInfo.x, eaveH = vInfo.y, seed = vInfo.z, part = vInfo.w;
         vec3 wood = mix(vec3(0.5, 0.33, 0.2), vec3(0.66, 0.45, 0.27), h1(seed * 91.0));
         vec3 stone = mix(vec3(0.53, 0.51, 0.48), vec3(0.66, 0.62, 0.56), h1(seed * 17.0));
-        vec3 plaster = mix(vec3(0.86, 0.8, 0.7), vec3(0.94, 0.9, 0.82), h1(seed * 53.0));
-        vec3 concrete = mix(vec3(0.66, 0.64, 0.6), vec3(0.76, 0.73, 0.68), h1(seed * 29.0));
+        vec3 plaster = mix(vec3(0.8, 0.74, 0.64), vec3(0.9, 0.85, 0.76), h1(seed * 53.0));
+        vec3 concrete = mix(vec3(0.56, 0.55, 0.52), vec3(0.68, 0.65, 0.6), h1(seed * 29.0));
         vec3 shutter = h1(seed * 71.0) < 0.6 ? wood * 0.75 : (h1(seed * 73.0) < 0.5 ? vec3(0.32, 0.42, 0.33) : vec3(0.55, 0.22, 0.17));
         float fadeFar = 1.0 - smoothstep(160.0, 420.0, vDist);         // detail patterns would shimmer far away: their average tone instead
         vec3 col; float glow = 0.0; float snowy = 0.0;
