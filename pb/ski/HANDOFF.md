@@ -1,4 +1,4 @@
-# Ski Alpen: handoff (phase 1 + rounds 2-3 + 4A modes, 21 Nov 2026)
+# Ski Alpen: handoff (phase 1 + rounds 2-5 + round 6: free ride main game, lift rides, ski types; 21 Nov 2026)
 
 Arcade id `ski`, page `pb/ski.html`, code `pb/ski/`, pipeline `scripts/ski/`, data `pb/ski/data/<resort>/`. Phase 1 = the engine and one
 resort, Espace Killy (Val d'Isère + Tignes). The game must NOT go live before the other four resorts are in (3 Vallées, Zermatt-Cervinia,
@@ -310,3 +310,77 @@ Ian: "it doesn't look really good visually yet, it's still really pixely". Branc
   temporal AA); near trees are still plain tiered cones (no bark / needle detail); the frozen lakes still read mostly as snow; the
   kickers' snow body is the 2.5 m terrain lattice (rounded), only the dressing is crisp; halfpipe walls show the lattice as saw teeth
   from inside; buildings and lifts untouched this round; name tags / HUD untouched.
+
+## Round 6 (21 Nov 2026): free ride is the main game, real lift rides, challenges on the mountain, everything unlocked, ski types
+Ian's requests; our own design (no other game's look, UI, names or content). Branch = round 5 + this round.
+- **Game flow**: picker -> straight into the FREE RIDE at the bottom station of a lift in a village (`freeride.js spawnLift`: the lift
+  bottom nearest a `village` / `town` place, chairs / cabins / trains before drag lifts, a bigger rise preferred; main.js `boardSpot`
+  = inside the boarding zone, facing up the line, on open snow: the class raster's built share under the skier and under the chase
+  camera). The first build behind the loading screen happens there (iPad start). `?go=1` / session flag `pb_ski_open_map = 'free'` =
+  straight into the free ride (switchResort uses it, the URL becomes `?resort=<id>&go=1`); `?map=1` still opens the map (flows), `?piste=`
+  / `?auto=1` / online races as before. Time and weather follow the menu choice (random default, G / T and the HUD in game).
+- **Free ride** (`MODES.freeride`): ski anywhere (off piste inside the box), no timer, the lifts never close (the 4A 16:30 closing is
+  gone; the day clock still moves the light while the time is random). Session counters (distance, vertical, lifts, off-piste metres)
+  live for the page life (`host.sessionStats`), across challenges, fast travel and rides. Tricks in the free ride: `world.tricks = 'hold'`
+  (skier.js: an air turns into a trick only while the trick button is held or a rotation is going), so a steer in a small air never spins.
+- **Map = pause overlay** over a free ride (M / ☰ Pistekaart; `#mapResume` "Weiderfueren", M / Esc go back to the same spot, nothing is
+  torn down; `game.resume` keeps the skier where he was while the map picks pistes). Tabs: **Fräi fueren** (first; lift list + dots at
+  the BOTTOM stations, "Du" marker, "Bei de Lift" = fast travel with a fade until the tiles there are in, <= 6 s), **Challengen** (the
+  old piste list: Start = teleport to the start gate + 3-2-1), **Snowpark**, **Skier** (ski types).
+- **Lift rides** (any lift of the data, no lists): `lift-path.js` (pure) maps the data kind onto five classes (`LIFT_CLASS`: chair,
+  gondola (+ mixed_lift), cable, drag (t-bar, j-bar, platter, rope_tow), train (funicular, railway, rack, rack_railway, narrow_gauge,
+  train); carpets are not ridden) and builds the rope over the pylons (lifted where a span would cut the slope; `hang` raised so cabins
+  clear the snow). lifts.js draws from it (+ trains: two tracks of rails, carriages tilted with the slope, platform stations), `setRide`
+  holds one carrier at the player's s (the pool skips it, the others keep their spacing and carry on smoothly afterwards), `dispose`;
+  main.js `buildLifts` builds the view early for a ride before every tile is in and again (between rides) once all are in.
+  `modes/liftride.js` (pure): `createRide` (boarding RIDE.enter m past the bottom wheel, off RIDE.exit m before the top one, RIDE.factor
+  = 4 x the real line speed), `riderAt` (carrier + rider: seated on a chair, standing in a cabin / carriage, on the snow behind a T-bar),
+  `rideCamera` ('chase' = beside / behind the carrier, riding with it, its offset eased; 'window' = the rider's eyes: chair looks 18°
+  down to the bar and the chairs ahead, cabins through the front window from the middle, the figure hidden in a cabin). `modes/carriers.js`
+  = the player's own carrier in detail (chair with the data's seat count, cushions, bar and footrest; gondola / cable car with glass;
+  T-bar; train carriage). Poses in skier-model.js (`state.ride` = 'sit' | 'stand' | 'drag'; skis and poles in the rack in a cabin).
+  Controls: in the boarding zone (30 m, < 6 m/s) "Astegen: <lift>" (L / Enter / button) and 🎿 (ski card); riding: "Iwwersprangen"
+  (Enter / L / button, a short fade), "Vue" (V / button). Off at the top: `lifts.startAt` (a piste that starts within 80 m, else 14 m
+  past the station down the fall line). The day clock moves on by the real ride time.
+- **Multiplayer**: `net/wire.js` (pure; remotes.js re-exports) adds three numbers while riding: [kind code, lift index, s] ("riding
+  lift X at s"); a friend on a lift is drawn in his own carrier on the real line (`createRemotes({ liftPath })`, main passes
+  `lifts.pathOf`). The online race itself has no lifts; a shared free ride would be the next step.
+- **Challenges on the mountain** (`modes/markers.js`): a start gate (posts + banner in the piste colour, gold at ★★★, violet for the
+  park) at every piste's start (`at(2)`, where the timed run starts) and at the park's drop-in: ONE instanced mesh per resort, DOM labels
+  (name + stars) on the nearest 4 within 260 m (free ride only). Skiing into a gate (9 m) shows "Challenge: <piste> ★★☆ → Start?" with
+  the goals (`#chPrompt`, Enter / Start / Nee; it re-arms 30 m away); Start = the normal timed run (3-2-1, ghost, board); every finish
+  card (piste and park) has "Weider fräi fueren" (free ride on from the bottom). The challenge list in the map stays.
+- **Everything unlocked**: `challenges.js lockState` is always open, `outfitOpen` always true (the UNLOCK table stays only for callers).
+  Stars stay the progress measure and unlock skis.
+- **Ski types** (`modes/skis.js`; skier.js reads `world.ski`, a full SKI copy with factors; config.js SKI untouched):
+
+  | ski | handling (factors on SKI) | unlock |
+  | --- | --- | --- |
+  | All-Mountain | reference | from the start |
+  | Carving | grip 1.3, carve 1.25, edge lock 1.35, skid 0.8; powder: grip 0.78, friction 1.25, drag 1.45 | 10 ★ |
+  | Race GS | tuck drag 0.86, friction 0.88, carve 0.74, pivot 0.8, landing 1.12 | 30 ★ + 90 km/h top speed once |
+  | Powder | powder drag 0.42, powder friction 0.62, powder grip 1.35; piste friction 1.35, grip 0.82 | 10 km off the piste |
+  | Park twin-tip | spin 1.22, flip 1.18, landing tolerance 1.25-1.6, settle 1.3-1.4, slower (drag 1.08, friction 1.08, cap 0.92) | 5,000 points in one park run |
+
+  Measured (scripts/ski/round6-test.mjs, a plane): piste 12° tuck top speed AM 85 / Carving 85 / Race 92 / Powder 82 / Park 82 km/h;
+  powder 22°: 51 / 42 / 48 / 74 / 51 km/h; a 90° turn at speed 1.85 / 1.34 / 2.07 / 2.30 / 1.83 s. On the real mountain (flow ski-skis):
+  Powder 20 m vs AM 17 m off piste in 4 s, carve 0.6 s at 58 km/h: Carving 27°, AM 18°, Race 14°.
+  **Fairness (decided)**: every run that is timed or scored against others (star challenges = the piste boards, the park board, online
+  races) runs on the reference (All-Mountain) physics whatever ski is on (the look stays; `data-ski-physics` = 'fair'); the boards stay
+  one fair list and the star targets (a 1D ride of the reference skier) stay right. The ski types shape the free ride (the main game).
+  The Skier tab says so. Look per ski: base colour, tip colour, one top-sheet pattern (stripe / chevron / race / dots / zigzag, recoloured
+  vertex slots: no extra draw call), length / width (edge group scale), twin tip (its own group, +2 draw calls only on that ski).
+  Picking: Skier tab, the 🎿 card at a lift station. New skis open with a toast (free ride) or "Op: Ski <name>" on the finish card.
+- **Saves**: local `progress.stats = { off: m off the piste, top: m/s }` (free ride, never from scripted / bot input) and `progress.ski`;
+  cloud record `x = { o: metres, t: top speed x10, k: ski }` (an old game ignores it, an old record reads as zero, merge = max; `tb` is
+  unchanged, so the keep-progress trigger behaves as before). Stars and best times untouched.
+- **For the bigger data (parallel agent)**: nothing is listed by hand. Every resort.json lift with a known kind (`LIFT_CLASS`; add a new
+  kind string there) and >= 25 m rise is rideable and travelable; `seats` sets the chair width; every piste gets a gate; the spawn comes
+  from `places`. Rail kinds ride as trains (checked with a synthetic rack railway in flow ski-lift; no real train in today's data).
+- **Tests**: `node scripts/ski/round6-test.mjs` (every lift of every resort ridden start to end, no jumps, cabins above the far grid, the
+  spawn, the gates, the ski table, unlocks, saves / cloud, the wire); flows `ski-lift` (gondola at the village: L, cabin, pylons, window
+  view, Iwwersprangen, off facing downhill; chair via the map's fast travel: seated, held carrier, rides to the top on its own; drag lift
+  on the snow + the wire state; synthetic rack railway), `ski-skis` (locked tab, the 10th star opens Carving, 20 m more off piste with
+  real keys open Powder, measured handling, fair timed run, lift card, save + cloud), and updated `ski`, `ski-challenges`, `ski-freeride`,
+  `ski-park`, `ski-mp`, `ski-resorts`, `ski-ipad-start` (now: skiing = the free ride running, gate 10 s).
+- Shots: `~/Library/Caches/ski-work/round6/` (`scripts/ski/round6-shots.mjs` through shot.mjs --gpu --dpr 2; sheets with look_sheet.py).
