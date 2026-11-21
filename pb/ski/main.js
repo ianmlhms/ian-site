@@ -17,6 +17,7 @@ import { createScatterView } from './scatter-view.js';
 import { createPoles, createRunProps } from './props.js';
 import { createLifts } from './lifts.js';
 import { createVillage } from './village.js';
+import { createLandmarks } from './landmarks.js';
 import { createPisteSet } from './pistes.js';
 import { createSkierState, stepSkier } from './skier.js';
 import { createSkierModel } from './skier-model.js';
@@ -76,7 +77,10 @@ async function boot() {
   const boards = createBoards(window.Arcade);
 
   LOAD.set(0.25, 'Skigebitt gëtt gelueden …');
-  const rid = RESORTS.some((r) => r.id === params.resort && r.ready) ? params.resort : 'killy';
+  // the resort: ?resort=, else the one picked last (the picker saves it and reloads), else Espace Killy
+  const isReady = (id) => RESORTS.some((r) => r.id === id && r.ready);
+  const savedResort = (store.get().last || {}).resort;
+  const rid = isReady(params.resort) ? params.resort : isReady(savedResort) ? savedResort : 'killy';
   const core = await loadResortCore(rid, (p) => LOAD.set(0.25 + p * 0.45, 'Bierger ginn opgebaut …'));
   mark('core');
   const { resort } = core;
@@ -111,7 +115,7 @@ async function boot() {
   const chase = createChaseCamera(surface);
   let snowfall = createSnowfall({ scene, env, count: quality.snowflakes });
   const spray = createSpray({ scene, count: quality.spray });
-  let lifts = null, village = null;
+  let lifts = null, village = null, landmarks = null;
 
   // streamed height tiles change the heights under them: drop every cache that read them
   streamer.onTile((rect) => {
@@ -124,6 +128,7 @@ async function boot() {
     if (streamer.done()) document.documentElement.dataset.skiTilesDone = '1';
     if (streamer.done() && !lifts) {
       lifts = createLifts({ scene, resort, height: (x, z) => field.height(x, z) });
+      landmarks = createLandmarks({ scene, resort, height: (x, z) => surface.height(x, z), pistes });
       mark('lifts');
     }
   });
@@ -159,8 +164,18 @@ async function boot() {
   function showPicker() {
     game.screen = 'picker';
     hud.show(false); input.showTouch(false);
-    picker = ui.showResorts({ onPick: () => { picker.close(); picker = null; showMap(); } });
+    picker = ui.showResorts({ current: rid, onPick: (id) => { if (id && id !== rid) { switchResort(id); return; } picker.close(); picker = null; showMap(); } });
     document.documentElement.dataset.skiScreen = 'picker';
+  }
+  /** Another resort: remember it and load the page again (one resort per page life: its tiles, textures and caches go with it). */
+  function switchResort(id) {
+    store.set(withLast(store.get(), id, null));
+    LOAD.set(0.1, 'Skigebitt gëtt gewiesselt …');
+    try {
+      const u = new URL(location.href);
+      if (/^https?:$/.test(u.protocol) && u.searchParams.has('resort')) { u.searchParams.set('resort', id); u.searchParams.delete('piste'); location.replace(u.href); return; }
+    } catch (error) { /* about:srcdoc inside the arcade: a plain reload */ }
+    location.reload();
   }
   function showMap() {
     game.screen = 'map';
@@ -176,7 +191,7 @@ async function boot() {
     pisteMap = createPisteMap({ canvas: mapScreen.canvas, resort, imageUrl: core.root + resort.map.file, pistes, onPick: (p) => selectPiste(p, false) });
     mapScreen.zoomButtons.forEach((b) => b.addEventListener('click', () => pisteMap.zoomBy(b.dataset.z === 'in' ? 1.5 : 1 / 1.5)));
     const last = store.get().last;
-    const first = (last && last.resort === rid && pistes.byId.get(last.piste)) || pistes.byId.get(DEFAULT_PISTE) || pistes.list[0];
+    const first = (last && last.resort === rid && pistes.byId.get(last.piste)) || pistes.byId.get(resort.start) || pistes.byId.get(DEFAULT_PISTE) || pistes.list[0];
     selectPiste(first, true);
     document.documentElement.dataset.skiScreen = 'map';
   }
@@ -392,6 +407,7 @@ async function boot() {
       poles.update(camera.position.x, camera.position.z, quality.markerRadius);
       if (lifts) lifts.update(time, camera.position.x, camera.position.z, quality.liftRadius);
       if (village) village.update(camera.position.x, camera.position.z, quality.buildingRadius);
+      if (landmarks) landmarks.update(camera.position.x, camera.position.z, quality.buildingRadius);
     }
     env.update(dt, time, camera);
     snowfall.update(time, camera, pixelRatio());
@@ -438,7 +454,7 @@ async function boot() {
 
   // debug / flows
   window.__ski = {
-    get game() { return game; }, get state() { return game.state; }, get level() { return level; }, renderer, scene, camera, env, pistes, streamer, terrain, scatterView, field, surface,
+    get game() { return game; }, get state() { return game.state; }, get level() { return level; }, renderer, scene, camera, env, pistes, get landmarks() { return landmarks; }, streamer, terrain, scatterView, field, surface,
     setInput(o) { game.override = o; },
     /** Fixed camera at (x, z) heightAbove m over the ground looking at (tx, tz) heightAbove2 m over its ground; null = chase camera again. */
     setCamera(x, z, above, tx, tz, above2 = 0, fov = 55) { if (x === null) { game.camPose = null; return; } game.camPose = { x, z, y: field.height(x, z) + above, tx, tz, ty: field.height(tx, tz) + above2, fov }; streamer.focus(x, z); }, start(id) { startRun(pistes.byId.get(id) || game.piste, MODES.run); }, select(id) { selectPiste(pistes.byId.get(id), true); },
@@ -450,7 +466,8 @@ async function boot() {
 
   // first build around the default piste behind the loading screen, then the picker (or straight onto the piste with ?auto=1)
   LOAD.set(0.75, 'Pisten ginn opgebaut …');
-  const startPiste = pistes.byId.get(params.piste) || pistes.byId.get((store.get().last || {}).piste) || pistes.byId.get(DEFAULT_PISTE) || pistes.list[0];
+  const lastRun = store.get().last || {};
+  const startPiste = pistes.byId.get(params.piste) || (lastRun.resort === rid && pistes.byId.get(lastRun.piste)) || pistes.byId.get(resort.start) || pistes.byId.get(DEFAULT_PISTE) || pistes.list[0];
   game.piste = startPiste;
   const a0 = startPiste.at(2, {});
   streamer.focus(a0.x, a0.z);

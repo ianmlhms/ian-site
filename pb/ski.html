@@ -10,10 +10,12 @@
 <link rel="modulepreload" href="/pb/ski/main.js?v=1">
 <script>
 /* Starts the first resort's files right away (they download while the code loads); resort-data.js takes them from window.__skiPre.
- * Only the resort the player last skied (default: Espace Killy) is fetched; the height tiles stream later, nearest first. */
+ * Only the resort the player last picked (default: Espace Killy; the ready ones are listed in the test below) is fetched; the height tiles stream later, nearest first. */
 (function () {
   var resort = "killy";
-  try { var last = JSON.parse(localStorage.getItem("pb_ski_save") || "null"); if (last && last.last && /^[a-z0-9]+$/.test(last.last.resort) && last.last.resort === "killy") resort = last.last.resort; } catch (error) { /* private mode */ }
+  var READY = /^(killy|kronplatz|arlberg)$/;
+  try { var last = JSON.parse(localStorage.getItem("pb_ski_save") || "null"); if (last && last.last && READY.test(last.last.resort)) resort = last.last.resort; } catch (error) { /* private mode */ }
+  try { var asked = new URLSearchParams(location.search).get("resort"); if (asked && READY.test(asked)) resort = asked; } catch (error) { /* about:srcdoc */ }
   var pre = window.__skiPre = { resort: resort, files: {} };
   "resort.json far.bin classes.bin".split(" ").forEach(function (name) {
     try {

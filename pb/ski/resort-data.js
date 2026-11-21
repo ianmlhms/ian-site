@@ -8,8 +8,8 @@ export const RESORTS = Object.freeze([
   { id: 'killy', name: "Val d'Isère · Tignes", short: 'Espace Killy', country: 'FR', ready: true },
   { id: '3vallees', name: 'Les 3 Vallées', short: 'Courchevel · Méribel · Val Thorens', country: 'FR', ready: false },
   { id: 'zermatt', name: 'Zermatt · Cervinia', short: 'Matterhorn', country: 'CH', ready: false },
-  { id: 'arlberg', name: 'St. Anton · Arlberg', short: 'Ski Arlberg', country: 'AT', ready: false },
-  { id: 'kronplatz', name: 'Kronplatz', short: 'Plan de Corones', country: 'IT', ready: false },
+  { id: 'arlberg', name: 'St. Anton · Arlberg', short: 'Ski Arlberg', country: 'AT', ready: true },
+  { id: 'kronplatz', name: 'Kronplatz', short: 'Plan de Corones', country: 'IT', ready: true },
 ]);
 
 const base = (rid) => new URL(`./data/${rid}/`, import.meta.url).href;

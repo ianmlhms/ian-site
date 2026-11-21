@@ -58,12 +58,47 @@ RESORTS = {
     # --- planned (later rounds) ---
     "3vallees": {"name": "Les 3 Vallées", "short": "Courchevel · Méribel · Val Thorens", "country": "FR", "crs": "EPSG:2154",
                  "bbox": (45.260, 6.480, 45.430, 6.660), "dem": ["ign-rgealti"], "far": ["ign-rgealti", "copernicus-glo30"], "villages": []},
-    "kronplatz": {"name": "Kronplatz", "short": "Plan de Corones", "country": "IT", "crs": "EPSG:25832",
-                  "bbox": (46.700, 11.850, 46.790, 11.990), "dem": ["bz-dtm", "copernicus-glo30"], "far": ["copernicus-glo30"], "villages": []},
+    # Kronplatz: the whole Kronplatz / Plan de Corones area from Reischach (Bruneck) and Olang to St. Vigil and the Piz de Plaies /
+    # Piculin side, all inside South Tyrol, so the 5 m tiles come from the province's 2.5 m DTM (WCS, ETRS89 / UTM 32N = the frame).
+    "kronplatz": {
+        "name": "Kronplatz", "short": "Plan de Corones", "country": "IT", "crs": "EPSG:25832",
+        "bbox": (46.668, 11.868, 46.803, 12.030),
+        "dem": ["bz-dtm", "copernicus-glo30"], "far": ["copernicus-glo30"],
+        "start": "Sylvester",
+        "villages": [
+            ("Reischach", 11.9530, 46.7880, 700), ("Olang", 12.0200, 46.7480, 900), ("St. Vigil", 11.9420, 46.6990, 800),
+            ("Gassl", 12.0050, 46.7370, 300), ("Piculin", 11.9030, 46.6780, 400), ("Kronplatz", 11.9575, 46.7390, 260),
+        ],
+        "landmarks": [
+            # kind, name, lon, lat (+ kind options); placed on the terrain by the bake, drawn by pb/ski/landmarks.js
+            {"kind": "bell", "name": "Concordia 2000", "lon": 11.95655, "lat": 46.73960},
+            {"kind": "mmm", "name": "Messner Mountain Museum Corones", "lon": 11.95805, "lat": 46.73845, "face": 200},
+            {"kind": "plateau", "name": "Kronplatz 2275 m", "lon": 11.9575, "lat": 46.7392, "r": 210},
+        ],
+    },
     "zermatt": {"name": "Zermatt · Cervinia", "short": "Matterhorn", "country": "CH", "crs": "EPSG:2056",
                 "bbox": (45.900, 7.580, 46.040, 7.800), "dem": ["swissalti3d", "vda-dtm", "copernicus-glo30"], "far": ["copernicus-glo30"], "villages": []},
-    "arlberg": {"name": "St. Anton · Arlberg", "short": "Ski Arlberg", "country": "AT", "crs": "EPSG:31287",
-                "bbox": (47.100, 10.060, 47.250, 10.320), "dem": ["at-dgm", "copernicus-glo30"], "far": ["copernicus-glo30"], "villages": []},
+    # Ski Arlberg: St. Anton, St. Christoph, Stuben and Rendl, plus Zürs and Lech over the Flexen pass (Flexenbahn). Warth-Schröcken and
+    # Sonnenkopf stay out (data budget). ETRS89 / UTM 32N frame (not MGI Lambert: no datum shift between the DEM, OSM and the frame).
+    "arlberg": {
+        "name": "St. Anton · Arlberg", "short": "Ski Arlberg", "country": "AT", "crs": "EPSG:25832",
+        "bbox": (47.095, 10.088, 47.232, 10.312),
+        "dem": ["at-dgm", "copernicus-glo30"], "far": ["copernicus-glo30"],
+        "start": "Kandahar-Galzig",
+        "villages": [
+            ("St. Anton", 10.2660, 47.1290, 1300), ("Nasserein", 10.2860, 47.1340, 500), ("St. Jakob", 10.2990, 47.1390, 450),
+            ("St. Christoph", 10.1960, 47.1310, 450), ("Stuben", 10.1580, 47.1360, 400), ("Alpe Rauz", 10.1790, 47.1370, 250),
+            ("Zürs", 10.1680, 47.1700, 650), ("Lech", 10.1420, 47.2080, 1100), ("Oberlech", 10.1270, 47.2000, 450),
+            ("Zug", 10.1280, 47.2200, 350),
+        ],
+        "landmarks": [
+            {"kind": "summit-station", "name": "Valluga 2811 m", "lon": 10.21330, "lat": 47.15770},
+            {"kind": "summit-station", "name": "Galzig 2185 m", "lon": 10.22920, "lat": 47.13780},
+            {"kind": "pass", "name": "Arlbergpass 1793 m", "lon": 10.21180, "lat": 47.12960},
+            {"kind": "chapel", "name": "St. Christoph", "lon": 10.19650, "lat": 47.13120},
+            {"kind": "worldcup", "name": "Kandahar", "piste": "Kandahar-Galzig"},
+        ],
+    },
 }
 
 # Height tiles: TILE_CELLS cells of NEAR_STEP metres (the files hold TILE_CELLS + 1 nodes per side, neighbours share their edge).

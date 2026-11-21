@@ -51,11 +51,23 @@ H_STEP = 0.1                       # height quantum of the baked grids (m)
 MAP_W = 1600
 GROOM_SIGMA = 1.6                  # nodes (8 m): how much a piste smooths the terrain under it
 GROOM_EDGE = 9.0                   # m of soft edge of the groomed band
-CREDITS = [
-    "Gelänn: IGN RGE ALTI® 5 m (© IGN, Licence Ouverte / Etalab 2.0), iwwer de Géoplateforme",
-    "Bierger an der Distanz: Copernicus DEM GLO-30 (© DLR e.V. 2010-2014 an © Airbus Defence and Space GmbH 2014-2018, ënnert COPERNICUS vun der EU an der ESA)",
-    "Pisten, Liften, Haiser, Bësch: © OpenStreetMap-Mataarbechter (ODbL 1.0)",
-]
+# In-game credits: one line per height source of the resort (RESORTS[rid]["dem"] + ["far"], in that order), then OpenStreetMap.
+SOURCE_CREDITS = {
+    "ign-rgealti": "Gelänn: IGN RGE ALTI® 5 m (© IGN, Licence Ouverte / Etalab 2.0), iwwer de Géoplateforme",
+    "bz-dtm": "Gelänn: Digitaalt Terrainmodell 2,5 m vun der Autonomer Provënz Bozen - Südtirol (Open Data Südtirol, CC0 1.0)",
+    "at-dgm": "Gelänn: ALS-DTM Éisträich 1 m (Datenquell: BEV - Bundesamt für Eich- und Vermessungswesen, aus de Laserscans vun de Bundesländer, CC BY 4.0)",
+    "copernicus-glo30": "Bierger an der Distanz: Copernicus DEM GLO-30 (© DLR e.V. 2010-2014 an © Airbus Defence and Space GmbH 2014-2018, ënnert COPERNICUS vun der EU an der ESA)",
+}
+OSM_CREDIT = "Pisten, Liften, Haiser, Bësch: © OpenStreetMap-Mataarbechter (ODbL 1.0)"
+
+
+def credits_for(cfg):
+    out = []
+    for src in list(cfg["dem"]) + list(cfg["far"]):
+        line = SOURCE_CREDITS.get(src)
+        if line and line not in out:
+            out.append(line)
+    return out + [OSM_CREDIT]
 
 
 def log(*a):
@@ -561,6 +573,41 @@ def build_poi(frame):
     return peaks, places
 
 
+def build_landmarks(frame, dem, cfg, runs):
+    """The resort's landmarks (RESORTS[rid]["landmarks"]): world position and ground height, or the piste they dress (kind "worldcup").
+    Drawn by pb/ski/landmarks.js; the piste map labels them."""
+    out = []
+    by_name = {r["name"].lower(): r for r in runs}
+    for lm in cfg.get("landmarks", []):
+        row = {k: v for k, v in lm.items() if k not in ("lon", "lat")}
+        if "piste" in lm:
+            r = by_name.get(lm["piste"].lower())
+            if not r:
+                log("landmark: no piste named", lm["piste"])
+                continue
+            row["piste"] = r["id"]
+            x, z = r["p"][0]
+        else:
+            x, z = frame.to_world(lm["lon"], lm["lat"])
+        if not (0 <= x <= frame.width and 0 <= z <= frame.depth):
+            log("landmark outside the box", lm["name"])
+            continue
+        row.update({"x": round(float(x), 1), "z": round(float(z), 1), "y": round(float(dem(x, z)), 1)})
+        out.append(row)
+    log("landmarks", [r["name"] for r in out])
+    return out
+
+
+def default_piste(cfg, runs):
+    """The piste the map opens on the first time: RESORTS[rid]["start"] (a piste name) or the longest red."""
+    want = (cfg.get("start") or "").lower()
+    for r in runs:
+        if r["name"].lower() == want:
+            return r["id"]
+    reds = sorted((r for r in runs if r["diff"] == "red"), key=lambda r: -r["len"])
+    return (reds or runs)[0]["id"] if runs else ""
+
+
 # ---------------------------------------------------------------- map
 def paint_map(frame, mosaic, classes, outp):
     """The painted base of the piste map: snow light and shade, rock on steep faces, forests, lakes, villages. No pistes (drawn live)."""
@@ -741,7 +788,8 @@ def main():
         "map": {"file": "map.webp", "w": mw, "h": mh},
         "shadows": {"file": "shadow-{time}.webp", "suns": SUNS},
         "pistes": pistes, "network": network, "lifts": lifts, "peaks": peaks, "places": places,
-        "credits": CREDITS,
+        "landmarks": build_landmarks(frame, Dem(groomed), cfg, runs), "start": default_piste(cfg, runs),
+        "credits": credits_for(cfg),
         "bake": {"date": time.strftime("%Y-%m-%d"), "script": "scripts/ski/bake.py"},
     }
     with open(os.path.join(out, "resort.json"), "w", encoding="utf-8") as fh:

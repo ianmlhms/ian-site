@@ -13,16 +13,16 @@ export function createUi(root) {
   const api = {};
 
   /* ---------------- resort picker ---------------- */
-  api.showResorts = function showResorts({ onPick }) {
+  api.showResorts = function showResorts({ onPick, current = null }) {
     const s = el(`<section class="screen" id="resortScreen" aria-label="Skigebitt wielen">
       <header><h1>Ski Alpen</h1><span class="sub">Wiel e Skigebitt</span></header>
       <p class="intro">Fuer déi richteg Pisten vu richtege Skigebidder erof, géint d'Auer an géint däi Geescht.</p>
-      <p class="intro small">Gelänn: IGN RGE ALTI (Etalab 2.0), Copernicus DEM · Kaart: © OpenStreetMap-Mataarbechter (ODbL) · alles selwer gemoolt.</p>
+      <p class="intro small">Gelänn: IGN RGE ALTI (Etalab 2.0), Provënz Bozen - Südtirol (CC0), BEV Éisträich (CC BY 4.0), Copernicus DEM · Kaart: © OpenStreetMap-Mataarbechter (ODbL) · alles selwer gemoolt.</p>
       <div class="resorts">${RESORTS.map((r) => `
         <button type="button" class="resort ${r.ready ? 'ready' : 'soon'}" data-id="${r.id}" ${r.ready ? '' : 'disabled aria-disabled="true"'}>
           ${r.ready ? '' : '<span class="tag">geschwënn</span>'}
           <b>${esc(r.name)}</b><span class="c">${esc(r.short)} · ${r.country}</span>
-          ${r.ready ? '<span class="btn primary go">Pistekaart</span>' : '<span class="meta">Kënnt an enger nächster Versioun.</span>'}
+          ${r.ready ? `<span class="btn primary go">${r.id === current || !current ? 'Pistekaart' : 'Lueden'}</span>` : '<span class="meta">Kënnt an enger nächster Versioun.</span>'}
         </button>`).join('')}</div>
     </section>`);
     s.querySelectorAll('.resort.ready').forEach((b) => b.addEventListener('click', () => onPick(b.dataset.id)));
