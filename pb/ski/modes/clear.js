@@ -141,7 +141,10 @@ export function liftSpot(lift, obs, height, { maxDist = 38, view = 25 } = {}) {
         // the chase camera 4-8 m behind him must not sit in (or right against) a house or a station hall
         let camHit = 0;
         for (const back of [4, 6, 8]) { const qx = x - Math.cos(heading) * back, qz = z - Math.sin(heading) * back; if (obs.inBuilding(qx, qz, 2) || obs.nearStation(qx, qz, 2)) camHit++; }
-        const score = base + Math.abs(turn) * 0.12 + (wall ? 400 + (view - wall.d) * 10 : 0) + camHit * 60;
+        // and room to the sides (not a narrow alley between two houses)
+        let tight = 0;
+        for (const sd of [-1, 1]) for (const d of [3, 6, 9]) { const qx = x - Math.sin(heading) * sd * d, qz = z + Math.cos(heading) * sd * d; if (obs.inBuilding(qx, qz, 0.5) || obs.nearStation(qx, qz, 0.5)) { tight += (10 - d) * 3; break; } }
+        const score = base + Math.abs(turn) * 0.12 + (wall ? 400 + (view - wall.d) * 10 : 0) + camHit * 60 + tight;
         if (score < bs) { bs = score; best = { x, z, heading, turn, ok: !wall && slope < 22, why: wall ? `${wall.what} ${wall.d.toFixed(0)} m ahead` : slope >= 22 ? `slope ${slope.toFixed(0)}°` : '' }; }
         if (!wall) break;
       }
