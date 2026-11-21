@@ -139,7 +139,7 @@ function boardGeometry(quads) {
  * profile), which the physics reads too (surface.js -> layout.solidAt): drawn == skied. Each surface is its own patch (shared vertices
  * inside a patch: smooth light; none across a lip or a wall edge: crisp edges). The outer rim sinks a little into the terrain (no seam,
  * no z-fight). One merged geometry, drawn with the terrain's painted snow material (aInfo = groomed piste, aExtra = the park's line). */
-const SINK = 0.06, LIFT = 0.008;
+const SINK = 0.06, LIFT = 0.008, DECK_LIFT = 0.012;      // m; the pipe deck a little more (flat over a terrain lowered by 8 cm)
 export function parkSnowGeometry(layout) {
   const pos = [], nrm = [], info = [], extra = [], idx = [];
   const { ux, uz } = layout;
@@ -196,9 +196,9 @@ export function parkSnowGeometry(layout) {
     const across = [...wall.map((v) => -v), -P.flat / 4, 0, P.flat / 4, ...wall.slice().reverse()];
     patch(sList, (s) => across.map((v) => {
       const tt = Math.max(0, Math.abs(v) - P.flat / 2) / P.wall, h = layout.featureHeight(s, v);
-      return [v, ground(s) + h, atEnd(s), 0.35 * (1 - tt) * Math.min(1, -h)];             // a little sky light less down in the pipe
+      return [v, ground(s) + h, atEnd(s), 0.5 * (1 - tt * tt) * Math.min(1, -h)];         // less sky light down in the pipe
     }));
-    for (const side of [-1, 1]) patch(sList, (s) => [side * deck, side * (deck + 1.2), side * (edge - 0.8), side * edge].sort((p, q) => p - q).map((v) => [v, ground(s), Math.abs(v) >= edge - 1e-6 || atEnd(s)]));
+    for (const side of [-1, 1]) patch(sList, (s) => [side * deck, side * (deck + 1.2), side * (edge - 0.8), side * edge].sort((p, q) => p - q).map((v) => [v, ground(s) + DECK_LIFT, Math.abs(v) >= edge - 1e-6 || atEnd(s)]));
   }
   // normals: area-weighted, per patch (vertices are not shared across patches)
   for (let i = 0; i < idx.length; i += 3) {
@@ -319,6 +319,12 @@ export function createParkView({ scene, layout, height, snowMaterial = null }) {
         const v = side * layout.deck, sB = Math.min(layout.pipe.s1 + 2, s + 4);
         const ya = layout.profileAt(s), yb = layout.profileAt(sB), m = at((s + sB) / 2, v);
         parts.push([new THREE.BoxGeometry(sB - s + 0.05, 0.1, 0.24), PARK_COL.coping, place(m.x, (ya + yb) / 2 + 0.02, m.z, yaw, Math.atan2(yb - ya, sB - s))]);
+      }
+      // R7-D: a blue dye line where each wall leaves the flat (it draws the pipe's shape in flat light)
+      for (let s = layout.pipe.s0; s < layout.pipe.s1; s += 4) for (const side of [-1, 1]) {
+        const v = side * (layout.pipe.flat / 2 + 0.15), sB = Math.min(layout.pipe.s1, s + 4);
+        const ya = layout.profileAt(s) + layout.featureHeight(s, v), yb = layout.profileAt(sB) + layout.featureHeight(sB, v), m = at((s + sB) / 2, v);
+        parts.push([new THREE.BoxGeometry(sB - s + 0.02, 0.03, 0.16), PARK_COL.paint, place(m.x, (ya + yb) / 2 + 0.005, m.z, yaw, Math.atan2(yb - ya, sB - s))]);
       }
       const pp = at(layout.pipe.s0 - 6, layout.deck + 1.2);
       const pg = height(pp.x, pp.z);

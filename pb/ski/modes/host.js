@@ -222,7 +222,8 @@ export function createModeHost(ctx) {
     /* ---------------- world upkeep ---------------- */
     ensureParkView() {
       if (!layout || parkView) return;
-      try { parkView = createParkView({ scene, layout, height: (x, z) => surface.height(x, z), snowMaterial: ctx.snowMaterial }); }     // R7-D: snow bodies in the terrain's material catch (error) { console.warn('[ski] park view failed', error); }
+      // R7-D: the snow bodies are drawn in the terrain's material
+      try { parkView = createParkView({ scene, layout, height: (x, z) => surface.height(x, z), snowMaterial: ctx.snowMaterial }); } catch (error) { console.warn('[ski] park view failed', error); }
     },
     /** A height tile arrived: the flags and the park sit on the new snow. */
     onTiles(rect) {

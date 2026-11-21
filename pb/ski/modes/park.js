@@ -58,7 +58,7 @@ const PIPE_AT = 266, PIPE_MAX = 135;
  * the lip line, how far past the pipe's ends, how much deeper than the pipe */
 const RAMP_SIDE = 0.7;
 export const PIPE_DECK = 4.6;               // > TROUGH.out + the lattice's diagonal (3.54 m): the trough's slope never reaches the deck's rim
-const TROUGH = Object.freeze({ in: 1.0, out: 0.5, ends: 4, extra: 0.5, cover: 4 });
+const TROUGH = Object.freeze({ in: 1.0, out: 0.5, ends: 4, extra: 0.5, cover: 4, drop: 0.08 });
 
 /** The park layout of a resort (null when resort.json has no park). */
 export function createParkLayout(site) {
@@ -140,12 +140,19 @@ export function createParkLayout(site) {
   }
   /** What the terrain lattice gets: only the trough under the pipe (deeper than the pipe and wider, hidden by the pipe mesh). */
   function terrainExtra(s, v) {
-    if (!pipe || s <= pipe.s0 - pipe.inRamp - TROUGH.ends || s >= pipe.s1 + pipe.outRamp + TROUGH.ends) return 0;
-    const av = Math.abs(v), edge = deck + TROUGH.out;
-    if (av >= edge) return 0;
+    if (!pipe) return 0;
+    // under the whole pipe mesh the terrain sits a few cm lower (the 2.5 m lattice cuts the profile's 10 m kinks by up to ~4 cm),
+    // back to the profile over the mesh's outer band, so the terrain never shows through the flat deck
+    const av = Math.abs(v), rim = deck + PIPE_DECK;
+    const band = Math.min(rim - av, s - (pipe.s0 - pipe.inRamp - TROUGH.ends - TROUGH.cover), pipe.s1 + pipe.outRamp + TROUGH.ends + TROUGH.cover - s);
+    if (band <= 0) return 0;
+    const drop = -TROUGH.drop * clamp((band - 0.4) / (TROUGH.cover - 0.6), 0, 1);
+    if (s <= pipe.s0 - pipe.inRamp - TROUGH.ends || s >= pipe.s1 + pipe.outRamp + TROUGH.ends) return drop;
+    const edge = deck + TROUGH.out;
+    if (av >= edge) return drop;
     const ends = smoothstep(pipe.s0 - pipe.inRamp - TROUGH.ends, pipe.s0 - TROUGH.ends * 0.3, s) * (1 - smoothstep(pipe.s1 + TROUGH.ends * 0.3, pipe.s1 + pipe.outRamp + TROUGH.ends, s));
     const across = av <= deck - TROUGH.in ? 1 : (edge - av) / (TROUGH.in + TROUGH.out);
-    return -(pipe.depth + TROUGH.extra) * ends * across;
+    return Math.min(drop, -(pipe.depth + TROUGH.extra) * ends * across);
   }
   /** The footprint boxes of the meshes: inside one, the physics reads the analytic shape (solidAt). */
   const boxes = [

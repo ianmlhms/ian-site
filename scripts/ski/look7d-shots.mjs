@@ -54,12 +54,17 @@ export default async function shots(page, { shoot }) {
     const w = (s, v) => L.world(s, v);
     const out = {};
     if (big) { const c = w(big.lip - 1, big.v + 15), t = w(big.lip + 1, big.v); out.kicker = [c.x, c.z, 2.2, t.x, t.z, 1.4, 50]; const c2 = w(big.s0 - 9, big.v + 6), t2 = w(big.lip + 4, big.v); out.kicker2 = [c2.x, c2.z, 2.0, t2.x, t2.z, 1.6, 55]; }
-    if (L.pipe) { const c = w(L.pipe.s0 + 8, 1), t = w(L.pipe.s0 + 36, -3); out.pipe = [c.x, c.z, 1.6, t.x, t.z, 0.5, 62]; }
+    // (setCamera heights are over field.height: under the pipe that is the terrain's trough, 3.3 m below the deck)
+    if (L.pipe) {
+      const c = w(L.pipe.s0 + 6, L.deck + 3), t = w(L.pipe.s0 + 34, -L.deck + 2); out.pipe = [c.x, c.z, 2.2, t.x, t.z, 1.5, 58];
+      const c2 = w(L.pipe.s0 + 4, -1), t2 = w(L.pipe.s0 + 30, 6); out.pipeIn = [c2.x, c2.z, 1.4, t2.x, t2.z, 2.5, 62];
+    }
     return out;
   });
   await pose('park-kicker', park && park.kicker);
   await pose('park-runup', park && park.kicker2);
   await pose('park-pipe', park && park.pipe);
+  await pose('park-pipe-in', park && park.pipeIn);
   // evening: a run view down the start piste and a view towards the evening sun (the slopes facing away from it are in the shade)
   const ev1 = await ev(() => {
     const S = window.__ski, p = S.pistes.byId.get(S.game.piste && S.game.piste.id) || S.pistes.list[0];

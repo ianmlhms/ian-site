@@ -98,7 +98,7 @@ for (const rid of ALL) {
     if (!(layout.solidAt(x, z) === layout.solidAt(x, z))) { outside++; if (process.env.DEBUG && outside < 5) console.log('   outside', lq.s.toFixed(2), lq.v.toFixed(2)); }
   }
   const tris = g.idx.length / 3;
-  check(tris > 800 && worstV < 0.02 && outside === 0, `${layout.name}: ${layout.kickers.length} kickers, ${layout.ramps.length} ramps, pipe ${layout.pipe ? 'yes' : 'no'}; snow mesh ${n} vertices, ${tris} triangles; worst vertex vs physics ${(worstV * 100).toFixed(1)} cm; ${outside} outside the physics boxes`);
+  check(tris > 800 && worstV < 0.025 && outside === 0, `${layout.name}: ${layout.kickers.length} kickers, ${layout.ramps.length} ramps, pipe ${layout.pipe ? 'yes' : 'no'}; snow mesh ${n} vertices, ${tris} triangles; worst vertex vs physics ${(worstV * 100).toFixed(1)} cm; ${outside} outside the physics boxes`);
   const meshAt = meshLookup(g, sunk);
   // points sampled over every feature box (inside the triangles: the mesh is flat between its vertices, the physics curved)
   let worstP = 0, worstT = -1, worstFlat = -1, samples = 0, worstAt = '';
@@ -118,7 +118,7 @@ for (const rid of ALL) {
     }
   }
   check(samples > 3000 && worstP <= TOL, `${samples} points on the meshes: drawn vs skied worst ${(worstP * 100).toFixed(1)} cm (${worstAt})`);
-  check(worstT < 0.02 && worstFlat < 0.05, `LOD 0 terrain under the meshes: at most ${(worstT * 100).toFixed(1)} cm above the kickers / ramps / pipe walls (never shows through), ${(worstFlat * 100).toFixed(1)} cm on the flat deck (the profile's own 10 m kinks on the 2.5 m lattice)`);
+  check(worstT < 0.005 && worstFlat < 0.005, `LOD 0 terrain under the meshes: at most ${(worstT * 100).toFixed(1)} cm above the kickers / ramps / pipe walls (never shows through), ${(worstFlat * 100).toFixed(1)} cm on the flat deck`);
   // the pipe's trough on the coarse levels (their nodes; their chords are shorter than the trough is wide)
   if (layout.pipe) {
     let worstL = -1;

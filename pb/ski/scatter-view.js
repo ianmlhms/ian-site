@@ -62,7 +62,7 @@ function build(fn) {
   g.setAttribute('color', new THREE.Float32BufferAttribute(col, 4));
   return g;
 }
-const SPRUCE = [0.13, 0.27, 0.22], SPRUCE_DARK = [0.09, 0.2, 0.17], BARK = [0.3, 0.22, 0.17], LARCH = [0.44, 0.39, 0.35], LARCH_TWIG = [0.36, 0.31, 0.28];
+const SPRUCE = [0.13, 0.27, 0.22], SPRUCE_DARK = [0.09, 0.2, 0.17], BARK = [0.3, 0.22, 0.17], LARCH = [0.4, 0.36, 0.33], LARCH_TWIG = [0.33, 0.29, 0.27];          // R7-D: a little greyer (bare twigs)
 /* ---- R7-D: near trees with branches (still one instanced draw call per kind; spruce ~230, larch ~330 triangles) ---- */
 /** One triangle whose normal faces `ref` (outwards / up / down), the vertex normal softened towards `soft`; colours rgba (a = snow). */
 function pushTri(pos, nrm, col, a, b, c, ref, soft, ca, cb = ca, cc = ca) {
@@ -108,11 +108,11 @@ function pushSpruceTier(pos, nrm, col, rnd, { y0, y1, r, tips, colour, snow, rot
 /* One bare larch branch: a drooping spray of twigs, wide at the end (the snow shows through between the branches), both faces. 8 triangles. */
 function pushLarchBranch(pos, nrm, col, rnd, y, a, L, colour, snow) {
   const ca = Math.cos(a), sa = Math.sin(a), px = -sa, pz = ca;
-  const droop = 0.32 + 0.3 * rnd(), w = 0.34 + 0.16 * rnd();
+  const droop = 0.42 + 0.38 * rnd(), w = 0.17 + 0.1 * rnd();
   const P = (d, h, s) => [ca * d + px * s, y + h, sa * d + pz * s];
   const B = P(0.1, 0, 0), ML = P(L * 0.5, 0.1, -w * 0.45), MR = P(L * 0.5, 0.1, w * 0.45);
   const TL = P(L * 0.95, -droop, -w), TR = P(L * 0.95, -droop, w), TT = P(L * 1.08, -droop - 0.22, 0);
-  const top = shadeOf(colour, 0.95 + 0.15 * rnd(), snow), tip = shadeOf(colour, 1.12, snow * 0.4), under = shadeOf(colour, 0.62, 0);
+  const top = shadeOf(colour, 0.95 + 0.15 * rnd(), snow), tip = shadeOf(colour, 1.12, snow * 0.4), under = shadeOf(colour, 0.82, 0);
   for (const [face, c0, c1] of [[1, top, tip], [-1, under, under]]) {
     const ref = [0, face, 0], soft = [ca * 0.3, 0.3 * face, sa * 0.3];
     pushTri(pos, nrm, col, B, ML, MR, ref, soft, c0);
