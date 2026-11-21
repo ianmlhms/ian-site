@@ -29,6 +29,7 @@ export function createTerrainView({ scene, surface, field, material: initialMate
     g.setAttribute('position', new THREE.BufferAttribute(mesh.positions, 3));
     g.setAttribute('normal', new THREE.BufferAttribute(mesh.normals, 3));
     g.setAttribute('aInfo', new THREE.BufferAttribute(mesh.info, 4));
+    g.setAttribute('aExtra', new THREE.BufferAttribute(mesh.extra, 4));
     g.setIndex(new THREE.BufferAttribute(mesh.indices, 1));
     let lo = Infinity, hi = -Infinity;
     for (let i = 1; i < mesh.positions.length; i += 3) { const y = mesh.positions[i]; if (y < lo) lo = y; if (y > hi) hi = y; }
@@ -64,6 +65,7 @@ export function createTerrainView({ scene, surface, field, material: initialMate
     const mesh = new THREE.Mesh(geometry, material);
     mesh.position.set(leaf.x0, 0, leaf.z0);
     mesh.matrixAutoUpdate = false; mesh.updateMatrix();
+    mesh.castShadow = true;                 // ridges and banks shade the snow next to them (the shadow map near the skier)
     mesh.name = `tile ${leaf.key}`;
     group.add(mesh);
     tiles.set(leaf.key, { mesh, signature: data.signature, leaf });
