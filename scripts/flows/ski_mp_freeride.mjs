@@ -93,6 +93,7 @@ export const flow = {
         await host.page.waitForFunction(() => !document.getElementById("mplStart").disabled, null, T);
         await host.page.click("#mplStart");
         for (const p of players) await p.page.waitForURL(/pixelbreak\.html\?g=ski&room=/, T);
+        for (const p of players) await gameFrame(p);              // (WebKit: a reload in the middle of the boot logs a cancelled module import)
         for (const p of players) await p.page.goto(p.page.url() + DEBUG_Q, { waitUntil: "domcontentloaded" });
         const F = {};
         for (const p of players) F[p.label] = await gameFrame(p);
@@ -175,6 +176,15 @@ export const flow = {
         R.teleport = { lift: other, shownOff: maxSeen ? +dist(maxSeen, there).toFixed(1) : null, jumps: maxSeen ? maxSeen.jumps : null };
         h.expect(!!maxSeen && dist(maxSeen, there) < 6, `${rid}: emma sees max at the new lift (${R.teleport.shownOff} m off; relay pair)`);
 
+        h.step(`${rid}: «Bei e Frënd» brings emma next to a friend`);
+        await F.emma.waitForSelector(".mp-friend:not([hidden])", { timeout: 15000 });
+        await F.emma.click(".mp-friend");
+        await F.emma.waitForFunction(() => window.__ski.game.phase === "running", null, { timeout: 20000 });
+        await sleep(2500);
+        const [eNow, hNow, mNow] = await Promise.all([me(F.emma), me(F.host), me(F.max)]);
+        R.toFriend = +Math.min(dist(eNow, hNow), dist(eNow, mNow)).toFixed(1);
+        h.expect(R.toFriend < 15, `${rid}: emma is ${R.toFriend} m from a friend`);
+
         h.step(`${rid}: name tags never overlap (the three, then 6 more skiers bunched)`);
         if (await F.host.evaluate(() => !!window.__ski.ride)) { await F.host.evaluate(() => window.__ski.skipRide()); await F.host.waitForFunction(() => !window.__ski.ride && window.__ski.game.phase === "running", null, { timeout: 20000 }); }
         for (const p of [emma, host]) await F[p.label].evaluate(() => window.__ski.goFree());
@@ -185,7 +195,7 @@ export const flow = {
           window.__fakeTimer = setInterval(() => {
             const s = S.state, fx = Math.cos(s.heading), fz = Math.sin(s.heading);
             for (let i = 0; i < 6; i++) {
-              const side = (i % 2 ? 1 : -1) * (0.8 + Math.floor(i / 2) * 0.9), ahead = 9 + i * 1.2;
+              const side = (i % 2 ? 1 : -1) * (0.5 + Math.floor(i / 2) * 0.5), ahead = 10 + i * 0.6;
               M.remotes.push(`fake${i}`, 0, performance.now(), [s.x + fx * ahead - fz * side, s.y, s.z + fz * ahead + fx * side, s.heading, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]);
             }
           }, 70);

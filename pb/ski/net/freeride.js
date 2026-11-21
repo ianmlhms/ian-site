@@ -70,6 +70,11 @@ export function createFreeMp({ ctx, host }) {
   const saveKey = `${SAVE_PREFIX}${ctx.code}:${ctx.seed}`;
   const mpHud = createMpHud(host.uiRoot);
   mpHud.show(false);
+  // "to a friend": one small button under the friends list (no bar over the skier)
+  const friendBtn = document.createElement('button');
+  friendBtn.type = 'button'; friendBtn.className = 'btn mp-friend'; friendBtn.textContent = '👥 Bei e Frënd'; friendBtn.hidden = true;
+  friendBtn.addEventListener('click', () => toFriend());
+  mpHud.el.appendChild(friendBtn);
   const remotes = createRemotes({ scene: host.scene, camera: host.camera, surface: host.surface, overlay: host.uiRoot, liftPath: (i) => host.liftPath(i), farTags: true });
   remotes.setShadows(host.level() !== 'low');
   const local = { lastSend: 0, lastPos: 0, lastEnv: 0, epoch: 0, sent: null, sentAt: 0, follow: 0, lastAv: new Map(), envFrom: null, began: false };
@@ -170,13 +175,14 @@ export function createFreeMp({ ctx, host }) {
       if (r && r.state && me && st !== 'gone') {
         const d = Math.hypot(r.state.x - me.x, r.state.z - me.z);
         sort = d;
-        text = r.state.ride ? `um Lift${host.liftName(r.state.rideLift) ? `: ${host.liftName(r.state.rideLift)}` : ''}` : r.paused ? `${distText(d)} · Kaart` : distText(d);
+        const where = d < 25 ? 'bei dir' : distText(d);
+        text = r.state.ride ? `um Lift${host.liftName(r.state.rideLift) ? `: ${host.liftName(r.state.rideLift)}` : ''}` : r.paused ? `${where} · Kaart` : where;
       }
       return { name: p.name + (p.id === hostId() ? ' ★' : ''), me: false, text, away: st === 'away' || st === 'gone', sort };
     }).sort((a, b) => a.sort - b.sort);
     mpHud.board(`Fräi fueren · ${1 + ctx.roster.filter((p) => p.id !== ctx.me && statusOf(p.id) === 'here').length} / ${ctx.roster.length}`, [{ name: 'Du', me: true, text: '' }, ...rows]);
-    const ok = friendsToJoin().length > 0 && game.phase === 'running' && !game.paused;
-    mpHud.bar(ok ? 'Zesumme fueren' : '', ok ? [{ label: '👥 Bei e Frënd', on: () => toFriend() }] : []);
+    friendBtn.hidden = !(friendsToJoin().length > 0 && game.phase === 'running' && !game.paused);
+    mpHud.el.querySelector('.mp-board').appendChild(friendBtn);          // the list is rebuilt each time: the button goes under it
     root.dataset.skiMpFree = String(remotes.all().filter((x) => x.state).length);
   }
   /** friends standing / skiing on the snow (not on a lift, not in the map) */
