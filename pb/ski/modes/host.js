@@ -82,7 +82,7 @@ export function createModeHost(ctx) {
         if (a) { try { a.setBoard({ id: parkBoardId(rid), name: parkBoardName(resort.short), format: 'skipark' }); } catch (error) { console.warn('[ski] park board select failed', error.message); } }
       } else if (game.mode === MODES.freeride) {
         input.setTrick(true);
-        clock = createDayClock(startHourFor(env.state.timeId));
+        clock = createDayClock(startHourFor(env.state.timeMode === 'random' ? 'morning' : env.state.timeId));      // a random time: the whole day from 9:00
         if (!minimap) minimap = createMinimap({ parent: hud.el.querySelector('.tr'), resort, imageUrl: root + resort.map.file, park: resort.park });
         minimap.show(true);
         freeHud.show(true);

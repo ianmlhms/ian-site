@@ -93,7 +93,7 @@ const PARK_COL = Object.freeze({ rail: 0xc9ced6, railDark: 0x3a3f48, box: 0x2f6f
 
 /** layout = park.js createParkLayout; height(x, z) = the snow (surface.height). Returns { mesh, rebuild(), dispose() }. */
 export function createParkView({ scene, layout, height }) {
-  const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
+  const mat = new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x2a2622 });      // a little self-light: the nets and rails read in the shade
   let mesh = null;
   const yaw = layout.heading;
   function build() {

@@ -21,7 +21,7 @@ export const flow = {
     const state = () => page.evaluate(() => { const s = window.__ski.state, r = window.__ski.game.run; return { x: s.x, z: s.z, y: s.y, speed: s.speed, piste: r && r.piste ? r.piste.id : null, stats: r && r.stats ? { ...r.stats } : null, hour: window.__ski.modes.clock ? window.__ski.modes.clock.hour : null }; });
 
     h.step("piste map: the Fräi fueren tab lists the lifts");
-    await h.goto("/pb/ski.html?resort=killy&map=1&debug=1&q=low");
+    await h.goto("/pb/ski.html?resort=killy&map=1&debug=1&timescale=3&q=low");
     await page.waitForFunction(() => document.documentElement.dataset.skiScreen === "map" || document.documentElement.dataset.bootError, null, { timeout: 90000 });
     h.eq(await page.evaluate(() => document.documentElement.dataset.bootError || ""), "", "boots without an error");
     await page.click('.modetabs [data-mode="freeride"]');
@@ -41,13 +41,13 @@ export const flow = {
     const s0 = await state();
     h.expect(s0.hour >= 9 && s0.hour < 16.5, `day clock at ${s0.hour.toFixed(2)} h`);
 
-    h.step("ski down the fall line: distance and vertical count, off-piste is fine");
-    await page.evaluate(() => window.__ski.setInput({ steer: 0, tuck: 1, brake: 0, push: 1, jump: false }));
-    await h.pause(6000);
-    await page.evaluate(() => window.__ski.setInput({ steer: 0, tuck: 0, brake: 1, push: 0, jump: false }));
+    h.step("ski down the piste from the top (the scripted skier steers): distance and vertical count");
+    const first = await page.evaluate(async () => { const { createBot } = await import("/pb/ski/bot.js"); const s = window.__ski.state; const n = window.__ski.pistes.nearest(s.x, s.z, 250); window.__ski.game.bot = createBot(n.piste); return n.piste.id; });
+    await h.pause(7000);
+    await page.evaluate(() => { window.__ski.game.bot = null; window.__ski.setInput({ steer: 0, tuck: 0, brake: 1, push: 0, jump: false }); });
     await h.pause(1200);
     const s1 = await state();
-    h.expect(s1.stats.distance > 40 && s1.stats.vertical > 8, `${Math.round(s1.stats.distance)} m ridden, ${Math.round(s1.stats.vertical)} m down`);
+    h.expect(s1.stats.distance > 60 && s1.stats.vertical > 10, `${Math.round(s1.stats.distance)} m ridden down ${first}, ${Math.round(s1.stats.vertical)} m down`);
     await h.shot("free-ride");
 
     h.step("from piste to piste: the piste under the skier changes, between them no reset");
