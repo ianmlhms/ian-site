@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Download the OpenStreetMap vectors of one resort (cached in $SKI_WORK/<resort>/osm/):
-pistes (piste:type=downhill ways + relations), aerialways (+ pylons), buildings, land cover, water, roads, peaks and places.
+pistes (piste:type=downhill ways + relations), snow parks, aerialways (+ pylons), buildings, land cover, water, roads, peaks and places.
 
     ~/Library/Caches/luxtram-work/.venv/bin/python scripts/ski/fetch_osm.py killy [layer ...]
 
@@ -28,6 +28,9 @@ def queries(bbox, margin=0.03):
                  'way["waterway"="riverbank"](%s););out geom tags;' % ((wide,) * 5),
         "water": '[out:json][timeout:240];(way["waterway"~"^(river|stream)$"](%s););out geom tags;' % wide,
         "roads": '[out:json][timeout:240];(way["highway"~"^(primary|secondary|tertiary|unclassified|residential|service|living_street|pedestrian|track)$"](%s););out geom tags;' % box,
+        # snow parks (round 4A): piste:type=snow_park (the documented tag) or leisure / sport variants some mappers use
+        "parks": '[out:json][timeout:240];(way["piste:type"="snow_park"](%s);relation["piste:type"="snow_park"](%s);node["piste:type"="snow_park"](%s);'
+                 'way["leisure"="snow_park"](%s);way["piste:type"="downhill"]["name"~"[Pp]ark"](%s););out geom tags;' % ((box,) * 5),
         "aeroway": '[out:json][timeout:240];(way["aeroway"~"^(runway|apron|taxiway|helipad)$"](%s););out geom tags;' % box,
         "poi":'[out:json][timeout:240];(node["natural"~"^(peak|saddle|glacier)$"](%s);node["place"~"^(village|hamlet|town|locality|isolated_dwelling|suburb|neighbourhood)$"](%s);'
                'node["mountain_pass"="yes"](%s);node["amenity"~"^(restaurant|cafe|bar)$"](%s););out center tags;' % (wide, wide, wide, box),

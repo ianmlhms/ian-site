@@ -22,6 +22,8 @@ export function createSkierState(x, z, heading, y) {
   return {
     x, y, z, vx: 0, vy: 0, vz: 0, heading, grounded: true, air: 0, steer: 0, tuck: 0, brake: 0, edge: 0, crash: 0, crashKind: '',
     jumpCd: 0, speed: 0, snow: 1, slip: 0, landed: 0, t: 0,
+    // tricks (round 4A, world.tricks): rotation since the take-off (rad), grab time (s), landing judgement 0 clean / 1 sketchy, rail slid
+    spin: 0, flip: 0, grab: 0, landQ: 0, rail: -1,
   };
 }
 
@@ -128,10 +130,12 @@ function groundStep(s, input, world, dt) {
     s.vx = vx + n.x * SKI.jumpPop; s.vy = vyNow + n.y * SKI.jumpPop; s.vz = vz + n.z * SKI.jumpPop;
     s.y = Math.max(ground, s.y + vyNow * dt) + 0.02;
     s.grounded = false; s.air = 0; s.jumpCd = SKI.jumpCooldown;
+    s.spin = 0; s.flip = 0; s.grab = 0;
   } else if (fallAway < -SKI.leaveGround * G && v > 6) {
     s.vx = vx; s.vy = vyNow; s.vz = vz;
     s.y = Math.max(ground, s.y + vyNow * dt);
     s.grounded = false; s.air = 0;
+    s.spin = 0; s.flip = 0; s.grab = 0;
   } else {
     s.vx = vx; s.vy = vyNext; s.vz = vz;
     s.y = ground;
@@ -148,7 +152,21 @@ function airStep(s, input, world, dt) {
   const cda = SKI.cdaUpright + (SKI.cdaTuck - SKI.cdaUpright) * s.tuck;
   const k = Math.max(0, 1 - 0.5 * SKI.airDensity * cda * v / SKI.mass * dt);
   s.vx *= k; s.vy *= k; s.vz *= k;
-  s.heading = wrapAngle(s.heading + (input.steer || 0) * 1.1 * dt);      // style only: the skis turn in the air, the flight line does not
+  const tricks = world.tricks === true;
+  if (tricks) {
+    // snow park / free ride: steering spins (fast), up / down flips, the trick button grabs; judged at the landing
+    // (the raw input, not the smoothed steer: a spin stops when the key is let go); without input the rotation settles onto the
+    // nearest half turn / whole flip when it is close (a little landing help)
+    const steer = clamp(input.steer || 0, -1, 1), pitch = clamp(input.pitch || 0, -1, 1);
+    let turn = steer * SKI.spinRate * dt;
+    if (Math.abs(steer) < 0.15) { const r = (s.spin || 0) - Math.round((s.spin || 0) / Math.PI) * Math.PI; if (Math.abs(r) < 0.9) turn = -Math.sign(r) * Math.min(Math.abs(r), SKI.spinSettle * dt); }
+    s.heading = wrapAngle(s.heading + turn);
+    s.spin = (s.spin || 0) + turn;
+    let flipTurn = pitch * SKI.flipRate * dt;
+    if (Math.abs(pitch) < 0.15) { const r = wrapAngle(s.flip || 0); if (Math.abs(r) < 1.4) flipTurn = -Math.sign(r) * Math.min(Math.abs(r), SKI.flipSettle * dt); }
+    s.flip = (s.flip || 0) + flipTurn;
+    s.grab = input.trick ? (s.grab || 0) + dt : s.grab || 0;
+  } else s.heading = wrapAngle(s.heading + (input.steer || 0) * 1.1 * dt);      // style only: the skis turn in the air, the flight line does not
   s.x += s.vx * dt; s.y += s.vy * dt; s.z += s.vz * dt;
   s.edge = approach(s.edge, 0, 3, dt);
   const ground = world.height(s.x, s.z);
@@ -160,6 +178,17 @@ function airStep(s, input, world, dt) {
     const hv = Math.hypot(s.vx, s.vz);
     const off = hv > 1 ? Math.abs(wrapAngle(Math.atan2(s.vz, s.vx) - s.heading)) : 0;
     s.grounded = true; s.landed = 0.35;
+    if (tricks) {
+      // a spin must end near a whole half turn (a switch landing is fine), a flip near a whole turn; still grabbing: sketchy
+      const sres = hv > 3 ? Math.min(off, Math.PI - off) : 0;
+      const fres = Math.abs(wrapAngle(s.flip || 0));
+      s.flip = 0;
+      if (into > SKI.parkHardLanding || sres > SKI.spinCrash || fres > SKI.flipCrash) { s.landQ = 2; return startCrash(s, fres > SKI.flipCrash ? 'flip' : into > SKI.parkHardLanding ? 'landing' : 'sideways'); }
+      s.landQ = sres > SKI.spinClean || fres > SKI.flipClean || into > SKI.parkHardLanding * 0.7 || input.trick ? 1 : 0;
+      if (off > Math.PI / 2) s.heading = wrapAngle(s.heading + Math.PI);  // landed switch: the skier turns round (forgiving)
+      s.speed = Math.hypot(s.vx, s.vy, s.vz);
+      return collide(s, world);
+    }
     if (into > SKI.hardLanding || (off > 1.45 && off < Math.PI - 0.3 && hv > 9)) return startCrash(s, into > SKI.hardLanding ? 'landing' : 'sideways');
     if (off > Math.PI / 2) s.heading = wrapAngle(s.heading + Math.PI);  // landed backwards at low angle: turn the skis round (forgiving)
   }
