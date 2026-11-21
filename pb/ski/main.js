@@ -111,7 +111,7 @@ async function boot() {
   noise.anisotropy = Math.min(4, maxAniso);
   const detail = createDetailTexture(Math.min(8, maxAniso));           // round 5: fine ground detail (grain, crags, sparkle)
   const env = createEnv({ scene, noise, detail, params });
-  Object.assign(env.u, parkUniforms());                                   // round 7: the park bodies cut the terrain (before any snow material)
+  Object.assign(env.u, parkUniforms(), { uFarEnd: { value: quality.far } });      // round 7 (A): + the horizon fade (FOG_GLSL)                                   // round 7: the park bodies cut the terrain (before any snow material)
   post = createPost({ renderer, spec: quality.res, first: env.sky });
   if (param('res') === 'fixed') post.setDynamic(false);                 // ?res=fixed: tests that compare pictures keep the starting resolution
   resize();
@@ -882,6 +882,7 @@ async function boot() {
     level = next; quality = QUALITY[level];
     post.setSpec(quality.res); resize();
     camera.far = quality.far * 1.3; camera.updateProjectionMatrix();
+    env.u.uFarEnd.value = quality.far;
     snowMat = createSnowMaterial(env, { cheap: quality.cheapSnow, treeRadius: quality.treeRadius, forest: forestTex, lodScale: quality.lodScale });
     terrain.setMaterial(snowMat);
     if (parkBodyMat) { parkBodyMat.dispose(); parkBodyMat = null; if (parkBodies) parkBodies.setMaterial(bodyMat()); }

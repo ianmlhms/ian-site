@@ -76,7 +76,7 @@ export function createSpray({ scene, count, env }) {
   points.frustumCulled = false;
   points.renderOrder = 7;
   scene.add(points);
-  let next = 0, carry = 0, powderCarry = 0, wasLanded = 0, wasCrash = 0;
+  let next = 0, carry = 0, powderCarry = 0, wasLanded = 0, wasCrash = 0, wasStop = 0;
   function emit(x, y, z, vx, vy, vz, sz, slow = 1) {
     const i = next; next = (next + 1) % N;
     pos[i * 3] = x; pos[i * 3 + 1] = y; pos[i * 3 + 2] = z;
@@ -99,7 +99,8 @@ export function createSpray({ scene, count, env }) {
       u.uSun.value = sunVisible;
       if (s.landed > 0.3 && wasLanded <= 0.3 && s.speed > 3) burst(s, powder > 0.5 ? 34 : 26, 2.5, powder > 0.5);
       if (s.crash > 0 && wasCrash <= 0) burst(s, 44, 3.5, powder > 0.5);
-      wasLanded = s.landed; wasCrash = s.crash;
+      if ((s.stop || 0) > 0.35 && wasStop <= 0.35 && s.speed > 4) burst(s, 34, 3.8, powder > 0.5);      // round 7: the hockey stop's wall of snow
+      wasLanded = s.landed; wasCrash = s.crash; wasStop = s.stop || 0;
       const speedK = Math.min(1, s.speed / 14);
       const edgeK = Math.min(1, Math.abs(s.edge || 0) / 0.8);
       carry += amount * dt * (110 + 260 * speedK * edgeK);                // the arc grows with the speed AND the edge angle

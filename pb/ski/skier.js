@@ -16,6 +16,7 @@ const G = 9.81;
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const smoothstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 const approach = (v, target, rate, dt) => v + (target - v) * Math.min(1, rate * dt);
+const HOLD_COS = Math.cos(38 * Math.PI / 180);       // round 7: steeper than this a stop can not hold (side-slip)
 const wrapAngle = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
 
 export function createSkierState(x, z, heading, y) {
@@ -24,6 +25,7 @@ export function createSkierState(x, z, heading, y) {
     jumpCd: 0, speed: 0, snow: 1, slip: 0, landed: 0, t: 0,
     // tricks (round 4A, world.tricks): rotation since the take-off (rad), grab time (s), landing judgement 0 clean / 1 sketchy, rail slid
     spin: 0, flip: 0, grab: 0, landQ: 0, rail: -1,
+    hold: 1,                // round 7: standing still on the edges (a placed skier waits for input; braking to a stop holds there)
   };
 }
 
@@ -55,6 +57,20 @@ function groundStep(s, input, world, dt) {
   const authority = (1 - s.tuck * (1 - K.tuckSteer)) * (1 - s.brake * (1 - K.brakeSteer));
   const rate = Math.min(K.pivotRate, K.carveGain * grip / Math.max(v, 0.6));
   s.heading = wrapAngle(s.heading + s.steer * rate * authority * dt);
+  // round 7: the hockey stop: a player braking fast (or braking with a hard steer) swings both skis across the motion and digs the
+  // edges in (strong deceleration, a big spray); slow, the brake stays the snowplough. Scripted input (bots, flows) never does it.
+  const hockeyFrom = K.hockeyFrom || SKI.hockeyFrom || 7;
+  const wantStop = input.brake && input.hard && v > 1.5 && (v > hockeyFrom || (Math.abs(input.steer || 0) > 0.5 && v > 4)) ? 1 : 0;
+  if ((s.stop || 0) < 0.05 && wantStop) {
+    const mh = Math.atan2(vz, vx), off = wrapAngle(s.heading - mh);
+    s.stopSide = Math.sign(input.steer || 0) || Math.sign(off) || 1;
+  }
+  s.stop = approach(s.stop || 0, wantStop, wantStop ? 6 : 3, dt);
+  if (s.stop > 0.01 && v > 1.2) {
+    const target = Math.atan2(vz, vx) + (s.stopSide || 1) * Math.PI / 2 * 0.9;
+    const d = wrapAngle(target - s.heading), maxStep = (K.hockeyTurn || SKI.hockeyTurn || 7.5) * s.stop * dt;
+    s.heading = wrapAngle(s.heading + clamp(d, -maxStep, maxStep));
+  }
 
   // skis direction in the slope plane, and the lateral axis
   let fx = Math.cos(s.heading), fz = Math.sin(s.heading), fy = 0;
@@ -94,12 +110,20 @@ function groundStep(s, input, world, dt) {
     const mu = K.muPowder + (K.muGroomed - K.muPowder) * snow;
     const cda = K.cdaUpright + (K.cdaTuck - K.cdaUpright) * s.tuck;
     let dec = mu * G * n.y + 0.5 * K.airDensity * cda * v * v / K.mass + (1 - snow) * K.powderDrag * v * v;
-    dec += K.brakeDecel * s.brake * smoothstep(0, 2.5, v);
+    dec += (K.brakeDecel + 0.9 * G * Math.sqrt(Math.max(0, 1 - n.y * n.y))) * s.brake * smoothstep(0, 0.5, v) * (1 - 0.6 * (s.stop || 0))      /* round 7: the edges hold against the slope: a full stop on any piste */ + (K.hockeyDecel || SKI.hockeyDecel || 5.5) * (s.stop || 0) * smoothstep(0.5, 3, v);
     const nv = Math.max(0, v - dec * dt);
     const k = nv / v;
     vx *= k; vy *= k; vz *= k;
     v = nv;
   }
+  // round 7: a full stop that holds. Braking below walking pace sets the edges (plough or sideways): 0 km/h, and he stays there,
+  // on any piste slope, until the player steers, pushes, tucks or jumps (a placed skier starts in this hold too). Only very steep
+  // ground (> HOLD_MAX degrees, off piste) is too steep to hold: there he side-slips slowly.
+  const moving = (input.push || 0) > 0 || (input.tuck || 0) > 0 || Math.abs(input.steer || 0) > 0.05 || !!input.jump;
+  const holdable = n.y > HOLD_COS;
+  if (moving || !holdable) s.hold = 0;
+  else if (input.brake && v < 0.9) s.hold = 1;
+  if (s.hold) { vx = 0; vy = 0; vz = 0; v = 0; }
   // skating on the flat
   if ((input.push || 0) > 0 && v < K.pushMaxSpeed && s.brake < 0.5) {
     let a = K.pushAccel * input.push * (1 - v / K.pushMaxSpeed);
@@ -142,7 +166,7 @@ function groundStep(s, input, world, dt) {
     s.y = ground;
   }
   s.speed = v;
-  s.edge = approach(s.edge, clamp(s.steer * rate * authority * v / G, -1.1, 1.1), 8, dt);
+  s.edge = approach(s.edge, clamp(s.steer * rate * authority * v / G, -1.1, 1.1) * (1 - (s.stop || 0)) + (s.stopSide || 1) * 1.0 * (s.stop || 0), 8, dt);
   return collide(s, world);
 }
 

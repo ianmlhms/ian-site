@@ -315,10 +315,10 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {})
     const [a1, kb] = solveLeg(reach);
     const hipX = -(THIGH * Math.sin(a1) + SHIN * Math.sin(a1 - kb));
     L.hip.position.set(hipX, legH[i], legZ[i]);
-    L.hip.rotation.set(L.side * plough * 0.12, 0, a1);
-    L.knee.rotation.set(-L.side * plough * 0.18, 0, -kb);
+    L.hip.rotation.set(L.side * plough * 0.1, 0, a1);                   // round 7: knees in (the shins angle out to the wide tails)
+    L.knee.rotation.set(-L.side * plough * 0.22, 0, -kb);
     L.ankle.rotation.set(0, 0, -(a1 - kb));
-    sk.g.position.set(0, (legH[i] - ANKLE) - (THIGH * Math.cos(a1) + SHIN * Math.cos(a1 - kb)), L.side * (0.13 + plough * 0.2));
+    sk.g.position.set(0, (legH[i] - ANKLE) - (THIGH * Math.cos(a1) + SHIN * Math.cos(a1 - kb)), L.side * (0.13 + plough * 0.16));
   }
   const SKI_PTS = [[0.8, 0, 0.04], [0.8, 0, -0.04], [0, 0, 0.04], [0, 0, -0.04], [-0.78, 0, 0.04], [-0.78, 0, -0.04]].map(([x, y, z]) => new THREE.Vector3(x, y, z));
   const wv = new THREE.Vector3();
@@ -370,8 +370,8 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {})
     // smoothed drivers
     smEdge += (clamp(state.edge, -1.1, 1.1) - smEdge) * k;
     const landing = state.landed > 0 ? Math.sin(Math.min(1, state.landed / 0.35) * Math.PI) : 0;
-    smCrouch += (clamp(state.tuck * 0.95 + landing * 0.8 + smGrab, 0, 1) - smCrouch) * k;
-    smPlough += (clamp(state.brake, 0, 1) - smPlough) * k;
+    smCrouch += (clamp(state.tuck * 0.95 + landing * 0.8 + smGrab + (state.stop || 0) * 0.45, 0, 1) - smCrouch) * k;
+    smPlough += (clamp(state.brake, 0, 1) * (1 - clamp(state.stop || 0, 0, 1)) - smPlough) * k;      // round 7: the hockey stop is no plough
     smAir += ((state.grounded ? 0 : Math.min(1, state.air * 2.5)) - smAir) * k;
     const edge = smEdge, crouch = smCrouch, plough = smPlough, air = smAir;
     // pole plant when the turn changes side at speed
@@ -382,25 +382,25 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {})
     lean.rotation.set(edge * 0.62 + Math.atan2(across, tmp.y) * 0.2 * (state.grounded ? 1 : 0), 0, 0);
     const skiEdge = edge * 0.45;
     // legs
-    const baseH = 0.88 - crouch * 0.36 - plough * 0.05;       // athletic stance: knees and ankles flexed
+    const baseH = 0.88 - crouch * 0.36 - plough * 0.13;       // athletic stance: knees and ankles flexed (round 7: lower in the plough)
     const tuckAir = air * (1 - crouch) * 0.22;              // knees pulled up in the air
     for (let i = 0; i < 2; i++) {
       const L = legs[i];
       const inside = Math.sign(edge) === L.side ? 1 : 0;     // the leg on the inside of the turn (edge > 0: turning right, the right leg)
       legH[i] = baseH - inside * Math.abs(edge) * 0.2 - tuckAir;
       legLift[i] = 0;
-      legZ[i] = L.side * (0.11 + plough * 0.15 + (state.speed < 5 && state.grounded && !plough ? 0.03 : 0));
+      legZ[i] = L.side * (0.11 + plough * 0.07 + (state.speed < 5 && state.grounded && !plough ? 0.03 : 0));
       setLeg(i, plough);
       const sk = skis[i];
-      sk.g.rotation.set(0, L.side * plough * 0.32, 0);
-      sk.edge.rotation.set(skiEdge + L.side * plough * 0.18, 0, air * 0.12);
+      sk.g.rotation.set(0, -L.side * plough * 0.38, 0);                 // tips in, tails out
+      sk.edge.rotation.set(skiEdge - L.side * plough * 0.2, 0, air * 0.12);       // on the inside edges
     }
     // torso: forward bend with the crouch, counter-roll against the lean (angulation), a little back in the plough
     const hipY = baseH - Math.abs(edge) * 0.1 - tuckAir;
     const [ta1, tkb] = solveLeg(hipY - ANKLE);
     const pelvisX = -(THIGH * Math.sin(ta1) + SHIN * Math.sin(ta1 - tkb));
     torso.position.set(pelvisX, hipY, 0);
-    torso.rotation.set(-edge * 0.32, 0, -(0.22 + crouch * 0.95 - plough * 0.08 + air * 0.1));
+    torso.rotation.set(-edge * 0.32, 0, -(0.22 + crouch * 0.95 + plough * 0.12 + air * 0.1));      // round 7: forward in the plough, not back
     neck.rotation.set(edge * 0.15, 0, 0.25 + crouch * 0.75);          // keep the eyes on the slope ahead
     // arms: forward and out; tuck: hands in front of the face, poles back under the arms; air: wide; plant: the inside pole reaches forward
     for (let i = 0; i < 2; i++) {
