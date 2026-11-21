@@ -12,6 +12,8 @@
  *               { key, type: "choice", label:{lb,de,en}, options:[{v,label}], def:v }
  *             a choice may depend on another one: dependsOn: "<key>" + options with when: "<value>" are only offered (and only
  *             valid) while that other setting has that value (Ski Alpen: the named pistes of the chosen resort)
+ *             a setting with showIf: { <key>: <value> } is only shown while that other setting has that value (R7-D: Ski Alpen's
+ *             piste / runs only in the race mode); sanitizeCfg still fills it (the game ignores it)
  *             the chosen values reach the game as ctx.cfg (see mp-gate.js)
  */
 export const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ";   // no I / O: easy to read out loud
@@ -46,16 +48,19 @@ const SKI_PISTES = Object.freeze([
 ]);
 const opt = (v, label, when) => Object.freeze(when ? { v, label, when } : { v, label });
 const SKI_SETTINGS = Object.freeze([
+  // R7-D: race (one piste, timed runs) or a shared free ride over the whole ski area (lifts together, no clock)
+  { key: "mode", type: "choice", def: "race", label: { lb: "Modus", de: "Modus", en: "Mode" },
+    options: Object.freeze([opt("race", "🏁 Rennen"), opt("free", "🏔️ Fräi fueren")]) },
   { key: "resort", type: "choice", def: "random", label: { lb: "Skigebitt", de: "Skigebiet", en: "Resort" },
     options: Object.freeze([opt("random", "🎲 Zoufälleg"), ...SKI_RESORTS.map(([v, label]) => opt(v, label))]) },
-  { key: "piste", type: "choice", def: "random", dependsOn: "resort", label: { lb: "Pist", de: "Piste", en: "Piste" },
+  { key: "piste", type: "choice", def: "random", dependsOn: "resort", showIf: Object.freeze({ mode: "race" }), label: { lb: "Pist", de: "Piste", en: "Piste" },
     options: Object.freeze([opt("random", "🎲 Zoufälleg"), opt("green", "🟢 Gréng"), opt("blue", "🔵 Blo"), opt("red", "🔴 Rout"), opt("black", "⚫ Schwaarz"),
       ...SKI_PISTES.map(([r, id, label]) => opt(`${r}/${id}`, label, r))]) },
   { key: "weather", type: "choice", def: "random", label: { lb: "Wieder", de: "Wetter", en: "Weather" },
     options: Object.freeze([opt("random", "🎲 Zoufälleg"), opt("sun", "☀️ Sonn"), opt("cloudy", "☁️ Wolleken"), opt("snow", "🌨️ Schnéi"), opt("fog", "🌫️ Niwwel")]) },
   { key: "time", type: "choice", def: "random", label: { lb: "Zäit", de: "Tageszeit", en: "Time of day" },
     options: Object.freeze([opt("random", "🎲 Zoufälleg"), opt("morning", "🌅 Moien"), opt("midday", "🕛 Mëtteg"), opt("evening", "🌇 Owend")]) },
-  { key: "runs", type: "choice", def: 3, label: { lb: "Leef", de: "Läufe", en: "Runs" }, options: Object.freeze([1, 3, 5].map((v) => opt(v, String(v)))) },
+  { key: "runs", type: "choice", def: 3, showIf: Object.freeze({ mode: "race" }), label: { lb: "Leef", de: "Läufe", en: "Runs" }, options: Object.freeze([1, 3, 5].map((v) => opt(v, String(v)))) },
 ]);
 
 const G = (o) => Object.freeze({ lobby: false, arcade: "", ai: false, settings: Object.freeze([]), ...o });
@@ -159,6 +164,9 @@ export const offlineUrl = (id) => { const g = gameInfo(id); return !g ? "pixelbr
 
 /** the options of setting `s` on offer for the values chosen so far (a dependsOn setting comes after the one it depends on) */
 export const optionsFor = (s, cfg) => (s.dependsOn ? s.options.filter((o) => !o.when || o.when === cfg?.[s.dependsOn]) : s.options);
+
+/** is setting `s` shown for the values chosen so far (showIf) */
+export const settingShown = (s, cfg) => !s.showIf || Object.entries(s.showIf).every(([k, v]) => cfg?.[k] === v);
 
 /** Validate a host-chosen config (it travels through Realtime presence, so peers treat it as untrusted). */
 export function sanitizeCfg(id, raw) {

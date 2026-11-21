@@ -81,7 +81,7 @@ function subscribe(ch, onJoined) {
  * code (lobby code), me (my roster id), roster [{id, name}], name, racing() -> bool (the relay batches only while racing),
  * onMessage(from, msg, reliable), onPeer(id, status)
  */
-export function createSession({ code, me, roster, name, racing = () => false, onMessage = () => {}, onPeer = () => {} }) {
+export function createSession({ code, me, roster, name, racing = () => false, onMessage = () => {}, onPeer = () => {}, relay: relayOpts = null }) {
   const nonce = nonceOf();
   const ids = new Set(roster.map((r) => r.id));
   const peers = new Map();
@@ -147,7 +147,7 @@ export function createSession({ code, me, roster, name, racing = () => false, on
     const pc = sb.channel(`ski:${code}:r:${a}:${b}`, { config: { broadcast: { self: false } } });
     pairs.set(p.id, pc);
     const relay = new RelayLink({
-      peerId: p.id, racing,
+      peerId: p.id, racing, ...(relayOpts || {}),
       tx: (m) => { if (pc.state === 'joined') pc.send({ type: 'broadcast', event: 'rl', payload: { f: me, m } }); },
       dispose: () => { try { sb.removeChannel(pc); } catch (error) { /* closing */ } pairs.delete(p.id); },
       onmessage: (m, r) => onLinkMessage(p, relay, m, r),

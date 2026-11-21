@@ -75,8 +75,9 @@ export const flow = {
       h.expect(/^[A-HJ-NP-Z]{4}$/.test(code), `lobby code ${code}`);
 
       h.step("lobby settings: resort, piste (follows the resort), weather, time, runs");
-      const group = (i) => host.page.locator("#mplSettings .mpl-setting").nth(i);
-      h.eq(await host.page.$$eval("#mplSettings .mpl-setting h4", (e) => e.map((x) => x.textContent)), ["Skigebitt", "Pist", "Wieder", "Zäit", "Leef"], "five ski settings");
+      const group = (i) => host.page.locator("#mplSettings .mpl-setting").nth(i + 1);          // R7-D: 0 = Modus (race by default)
+      h.eq(await host.page.$$eval("#mplSettings .mpl-setting h4", (e) => e.map((x) => x.textContent)), ["Modus", "Skigebitt", "Pist", "Wieder", "Zäit", "Leef"], "six ski settings (mode first)");
+      h.eq(await host.page.locator('#mplSettings .mpl-setting').nth(0).locator('[aria-pressed="true"]').getAttribute("data-v"), "race", "mode: race by default");
       h.eq(await group(1).locator("button").count(), 5, "resort random: the piste offers random + four colours");
       await group(0).locator('[data-v="zermatt"]').click();
       h.expect(await group(1).locator('[data-v="zermatt/riffelalp"]').count() === 1 && await group(1).locator('[data-v="killy/face"]').count() === 0, "Zermatt: Zermatt's pistes are offered, none of Killy's");

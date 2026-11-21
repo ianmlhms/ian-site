@@ -30,6 +30,8 @@ export const NET = Object.freeze({
   RELAY_SLOW: Object.freeze([[0.6, 1.5], [0.85, 1]]),
   RELAY_HELLO_MS: 1000,         // until the other side answers on the pair channel
   MAX_PLAYERS: 8,
+  /* R7-D free ride: a session lasts as long as friends ski (not one match): a bigger relay budget at a lower rate (4 states / s) */
+  FREE_RELAY: Object.freeze({ budget: 14000, hzMax: 2 }),
 });
 
 export const RACE = Object.freeze({

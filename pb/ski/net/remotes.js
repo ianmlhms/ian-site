@@ -7,10 +7,14 @@ import { createSkierModel, OUTFITS } from '../skier-model.js';
 import { packState, unpackState } from './wire.js';
 import { riderAt, KIND_OF_CODE } from '../modes/liftride.js';
 import { createCarrier } from '../modes/carriers.js';
+import { layoutTags, tagWidth, distText } from './tags.js';
 
 const THREE = window.THREE;
 const VIEW_DIST = 900;           // m: farther skiers are not drawn
 const TAG_DIST = 600;
+const FAR_TAG_DIST = 12000;      // R7-D free ride: a friend anywhere in the ski area keeps his tag (with the distance)
+const FAR_LABEL_FROM = 250;      // m: from here a free-ride tag says how far away he is
+const JUMP = 120;                // m between two states: a teleport (fast travel, map jump, lift skip): snap, never slide across
 const MAX_BUF = 40;
 const wrapAngle = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
 
@@ -57,9 +61,10 @@ function createRemoteFigure(outfit) {
 }
 
 /* liftPath(index) = the line of a resort lift (lifts.js pathOf) once the lifts are built: a friend riding one sits in his own carrier */
-export function createRemotes({ scene, camera, surface, overlay, liftPath = () => null }) {
+export function createRemotes({ scene, camera, surface, overlay, liftPath = () => null, farTags = false }) {
   const list = new Map();
   const frustum = new THREE.Frustum(), pv = new THREE.Matrix4(), sphere = new THREE.Sphere(new THREE.Vector3(), 2.5), v3 = new THREE.Vector3();
+  const tagItems = [];
   const tagBox = document.createElement('div');
   tagBox.className = 'mp-tags';
   overlay.appendChild(tagBox);
@@ -76,10 +81,12 @@ export function createRemotes({ scene, camera, surface, overlay, liftPath = () =
     tag.className = 'mp-tag';
     const dot = document.createElement('i'); dot.style.background = `#${o.jacket.toString(16).padStart(6, '0')}`;
     const label = document.createElement('span'); label.textContent = String(name || '?').slice(0, 16);
-    tag.append(dot, label);
+    const more = document.createElement('b'); more.className = 'more'; more.hidden = true;           // R7-D: "+N" folded-in tags
+    tag.append(dot, label, more);
     tag.hidden = true;
     tagBox.appendChild(tag);
-    const r = { id, name, outfit: o.id, model, mesh, tag, buf: [], state: null, shown: false, delay: NET.INTERP_DELAY, extrap: NET.EXTRAP_MAX, away: false, run: -1 };
+    const short = String(name || '?').slice(0, 16);
+    const r = { id, name, outfit: o.id, model, mesh, tag, label, more, short, text: short, buf: [], state: null, shown: false, delay: NET.INTERP_DELAY, extrap: NET.EXTRAP_MAX, away: false, run: -1, jumps: 0 };
     list.set(id, r);
     return r;
   }
@@ -97,6 +104,8 @@ export function createRemotes({ scene, camera, surface, overlay, liftPath = () =
     if (!st || !Number.isFinite(t)) return;
     if (run !== r.run) { r.buf = []; r.run = run; }
     if (r.buf.length && t <= r.buf[r.buf.length - 1].t) return;            // late or doubled: the unreliable channel reorders
+    // R7-D: a jump of more than JUMP m (teleport / fast travel / lift skip) starts a new buffer: he appears there, never slides over
+    if (r.buf.length) { const q = r.buf[r.buf.length - 1].s; if (Math.hypot(st.x - q.x, st.z - q.z) > JUMP && !(st.ride && q.ride && st.rideLift === q.rideLift)) { r.buf = []; r.jumps++; } }
     r.buf.push({ t, s: st });
     if (r.buf.length > MAX_BUF) r.buf.shift();
   }
@@ -148,18 +157,39 @@ export function createRemotes({ scene, camera, surface, overlay, liftPath = () =
       const visible = d < VIEW_DIST && frustum.intersectsSphere(sphere);
       r.model.setVisible(visible);
       if (visible) r.model.pose(st, (x, z, out) => surface.normal(x, z, out), time, (x, z) => surface.height(x, z));
-      // the name tag over the helmet
-      v3.set(st.x, st.y + 2.15, st.z).project(camera);
-      const onScreen = visible && d < TAG_DIST && v3.z < 1 && Math.abs(v3.x) < 1.05 && Math.abs(v3.y) < 1.05;
-      r.tag.hidden = !onScreen;
-      if (onScreen) {
-        const sx = (v3.x * 0.5 + 0.5) * width, sy = (-v3.y * 0.5 + 0.5) * height;
-        r.tag.style.transform = `translate(${Math.round(sx)}px, ${Math.round(sy)}px) translate(-50%, -100%) scale(${Math.max(0.7, Math.min(1, 60 / Math.max(d, 1))).toFixed(2)})`;
-      }
+      // the name tag over the helmet (R7-D: laid out together below, no overlaps; free ride: far friends keep a tag with the distance)
+      v3.set(st.x, st.y + 2.15, st.z).applyMatrix4(camera.matrixWorldInverse);
+      const inFront = v3.z < -0.5;
+      if (inFront) v3.applyMatrix4(camera.projectionMatrix);
+      const onScreen = inFront && (visible || (farTags && d >= VIEW_DIST)) && d < (farTags ? FAR_TAG_DIST : TAG_DIST) && Math.abs(v3.x) < 1.05 && Math.abs(v3.y) < 1.05;
+      if (!onScreen) { r.tag.hidden = true; continue; }
+      const text = farTags && d >= FAR_LABEL_FROM ? `${r.short} · ${distText(d)}` : r.short;
+      if (text !== r.text) { r.text = text; r.label.textContent = text; }
+      tagItems.push({ id: r.id, x: (v3.x * 0.5 + 0.5) * width, y: (-v3.y * 0.5 + 0.5) * height, d, w: tagWidth(text), r });
     }
+    placeTags();
+  }
+  /** R7-D: the declutter (net/tags.js): nearest few always in full, the rest stacked, dots or folded into a "+N" */
+  function placeTags() {
+    if (!tagItems.length) return;
+    const lay = layoutTags(tagItems);
+    for (const it of tagItems) {
+      const r = it.r, l = lay.get(r.id);
+      const shown = l && l.mode !== 'merged';
+      r.tag.hidden = !shown;
+      r.tagMode = l ? l.mode : 'hidden';
+      if (!shown) continue;
+      r.tag.classList.toggle('dot', l.mode === 'dot');
+      r.more.hidden = !l.more;
+      if (l.more) r.more.textContent = `+${l.more}`;
+      r.tag.style.opacity = l.alpha.toFixed(2);
+      r.tag.style.transform = `translate(${Math.round(l.x)}px, ${Math.round(l.y)}px) translate(-50%, -100%) scale(${l.scale.toFixed(2)})`;
+      r.tagBox = { x: l.x, y: l.y, scale: l.scale, mode: l.mode };
+    }
+    tagItems.length = 0;
   }
   function setShadows(on) { castShadow = !!on; for (const r of list.values()) r.mesh.castShadow = castShadow; }
   function setVisible(v) { tagBox.hidden = !v; if (!v) for (const r of list.values()) r.model.setVisible(false); }
 
-  return { add, remove, push, update, setLink, setAway, clearRun, setShadows, setVisible, get: (id) => list.get(id), all: () => [...list.values()] };
+  return { add, remove, push, update, setLink, setAway, clearRun, setShadows, setVisible, get: (id) => list.get(id), all: () => [...list.values()], setFarTags(v) { farTags = !!v; } };
 }

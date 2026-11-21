@@ -104,20 +104,21 @@ export class RelayLink {
   constructor(o) {
     Object.assign(this, { id: o.peerId, kind: 'relay', open: false, closed: false, tx: o.tx, dispose: o.dispose, racing: o.racing || (() => false), onmessage: o.onmessage, onopen: o.onopen, onclose: o.onclose });
     this.count = 0; this.q = []; this.st = []; this.lastAccept = 0; this.timer = 0; this.lastRecv = performance.now(); this.born = performance.now();
+    this.budget = o.budget || NET.RELAY_MATCH_MSGS; this.hzMax = o.hzMax || NET.RELAY_HZ;          // R7-D: the free ride's own budget
     this.hello = setInterval(() => { if (!this.open && !this.closed) this.out({ k: 'hello' }); else clearInterval(this.hello); }, NET.RELAY_HELLO_MS);
     this.out({ k: 'hello' });
   }
   hz() {
-    const frac = this.count / NET.RELAY_MATCH_MSGS;
-    let hz = NET.RELAY_HZ;
+    const frac = this.count / this.budget;
+    let hz = this.hzMax;
     for (const [f, h] of NET.RELAY_SLOW) if (frac >= f) hz = Math.min(hz, h);
     return hz;
   }
   out(msg) {
     if (this.closed) return false;
-    if (this.count >= NET.RELAY_MATCH_MSGS) { this.bye('budget'); return false; }
+    if (this.count >= this.budget) { this.bye('budget'); return false; }
     this.count++; netStats.relaySent++;
-    if (this.count === Math.floor(NET.RELAY_MATCH_MSGS * 0.6) || this.count === Math.floor(NET.RELAY_MATCH_MSGS * 0.85)) console.warn(`[ski-net] relay to ${this.id}: ${this.count}/${NET.RELAY_MATCH_MSGS} messages, rate lowered`);
+    if (this.count === Math.floor(this.budget * 0.6) || this.count === Math.floor(this.budget * 0.85)) console.warn(`[ski-net] relay to ${this.id}: ${this.count}/${this.budget} messages, rate lowered`);
     try { this.tx(msg); } catch (error) { return false; }
     return true;
   }

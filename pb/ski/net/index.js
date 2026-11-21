@@ -8,9 +8,10 @@ import { createRace } from './race.js';
 import { createSession } from './session.js';
 import { createRemotes, packState } from './remotes.js';
 import { createMpHud, resText } from './hud.js';
+import { createFreeMp } from './freeride.js';
 import { minRunMs } from '../progress.js';
 import { OUTFITS } from '../skier-model.js';
-import { sanitizeCfg } from '../../../mp-games.js?v=6';
+import { sanitizeCfg } from '../../../mp-games.js?v=7';
 
 const GAME = 'ski';
 const CTX_KEY = 'mpl.ctx';
@@ -43,6 +44,7 @@ function save(key, v) { try { sessionStorage.setItem(key, JSON.stringify(v)); } 
  *         startRun(piste), level() }
  */
 export function createMp({ ctx, host }) {
+  if (ctx.cfg.mode === 'free') return createFreeMp({ ctx, host });          // R7-D: the online free ride (net/freeride.js)
   const { game, pistes, env, hud, input, audio } = host;
   const runs = resolveRuns(ctx.cfg, host.rid, pistes.list, ctx.seed);
   const pisteOf = (r) => pistes.byId.get(runs[r].piste) || pistes.list[0];
@@ -269,8 +271,8 @@ export function createMp({ ctx, host }) {
     setInterval(refreshBoard, BOARD_MS);
     if (race.phase === 'results' || race.phase === 'over') { host.startRun(pisteOf(race.run)); game.phase = 'finished'; endRun(race.phase === 'over'); }
     else prepare(race.run);
-    window.__skiMp = { race, session, remotes, runs, ctx, info: () => ({ run: race.run, phase: race.phase, coordinator: race.coordinator(), net: session.info(), standings: race.standings(), table: race.runTable(race.run) }) };
+    window.__skiMp = { kind: 'race', race, session, remotes, runs, ctx, info: () => ({ run: race.run, phase: race.phase, coordinator: race.coordinator(), net: session.info(), standings: race.standings(), table: race.runTable(race.run) }) };
   }
 
-  return { begin, frame, render, onFinish, onAction, viewState, get active() { return true; } };
+  return { kind: 'race', begin, frame, render, onFinish, onAction, viewState, get active() { return true; } };
 }

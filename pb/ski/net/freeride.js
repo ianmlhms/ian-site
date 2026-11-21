@@ -1,0 +1,258 @@
+/* R7-D: the online FREE RIDE (lobby setting mode = "free"): friends ski the whole ski area together, no clock, no race.
+ * Same transport as the race (session.js: full mesh, WebRTC + the capped Realtime relay, presence with a nonce per page life) and the
+ * same remote skiers (remotes.js: interpolated, in their own chair / cabin while riding a lift, decluttered name tags).
+ *   - Everybody starts side by side at the resort's start lift (the same on every device: no saved piste decides it).
+ *   - States go out at FREE.SEND_HZ while moving or riding (school Wi-Fi: 60 Mbit up, a state is ~150 bytes), FREE.IDLE_HZ standing.
+ *   - Riding a lift = the wire's "riding lift X at s" (lift index of resort.json + metres along its line), never station geometry:
+ *     every device draws the friend in his carrier on its own line, whatever lifts.js builds there.
+ *   - Teleports (fast travel, a map jump, a lift skip, the restart spot) bump an epoch in the state message: the others snap him there
+ *     (remotes.js also snaps any jump > 120 m), nobody sees a skier slide across the mountain.
+ *   - Avalanches: a local trigger goes out as an event {id, seed, t}; the others run it with the same seed at the same moment (their
+ *     clock), through the game's triggerAvalanche(id, seed, t) when it exists (round 7 C). Max one per player per FREE.AVALANCHE_GAP.
+ *   - The host (the first roster player who is here: host handover as in the race) shares weather, time of day and the day clock.
+ *   - Join / leave any time: a player who comes later or reloads appears where he is (his own last spot is kept per tab), a player who
+ *     leaves goes after GONE; nobody waits for anybody.
+ *   - Fair: a state only ever moves the player whose link it came over; nobody can move, stop or knock over somebody else (env and
+ *     avalanches are world events, the env only from the current host). */
+import { NET } from './config.js';
+import { draw, WEATHERS, TIMES } from './plan.js';
+import { createSession } from './session.js';
+import { createRemotes, packState } from './remotes.js';
+import { createMpHud } from './hud.js';
+import { distText } from './tags.js';
+import { OUTFITS } from '../skier-model.js';
+import { RANDOM_WEATHER } from '../config.js';
+
+export const FREE = Object.freeze({
+  SEND_HZ: 15,              // states / s while moving or riding a lift (smooth on a 60 Mbit uplink: 7 peers x 15 x ~150 B = 16 KB/s)
+  IDLE_HZ: 4,               // standing still, paused, in the map
+  MOVING: 0.4,              // m/s: slower counts as standing
+  ENV_EVERY: 4000,          // ms: the host repeats weather / time / day clock
+  CLOCK_SLACK: 0.04,        // h: a day clock this close to the host's is left alone
+  POS_EVERY: 2000,          // ms: my own spot saved for a reload (rejoin where I was)
+  BOARD_MS: 500,
+  AVALANCHE_GAP: 15000,     // ms: at most one avalanche event per player in this time
+  AVALANCHE_LATE: 8000,     // ms: an event older than this (in my clock) is too late to show
+  SIDE_GAP: 2.2,            // m between two players at the start
+  TELEPORT: 60,             // m between two sent states within one send period: count it as a teleport (epoch + 1)
+});
+
+const SAVE_PREFIX = 'pb_ski_mpfree:';
+const loadSaved = (key) => { try { return JSON.parse(sessionStorage.getItem(key) || 'null'); } catch (error) { return null; } };
+const save = (key, v) => { try { sessionStorage.setItem(key, JSON.stringify(v)); } catch (error) { /* storage blocked: a reload starts at the lift */ } };
+const finite = (...v) => v.every(Number.isFinite);
+
+/** The look of the shared day: the lobby's weather / time, "random" drawn from the match seed (the same on every device). */
+export function freePlan(cfg, seed) {
+  return Object.freeze({
+    weather: WEATHERS.includes(cfg.weather) ? cfg.weather : RANDOM_WEATHER[Math.floor(draw(seed, 'free-weather') * RANDOM_WEATHER.length) % RANDOM_WEATHER.length],
+    time: TIMES.includes(cfg.time) ? cfg.time : 'random',
+  });
+}
+
+/** Roster order -> metres right of the start spot (side by side, centred). */
+export const sideOffset = (roster, me, gap = FREE.SIDE_GAP) => {
+  const n = roster.length, i = Math.max(0, roster.findIndex((r) => r.id === me));
+  return (i - (n - 1) / 2) * gap;
+};
+
+/** The host of the shared things: the first roster player who is here (me included). */
+export const freeHost = (roster, me, statusOf) => (roster.find((r) => r.id === me || statusOf(r.id) === 'here') || roster[0]).id;
+
+/**
+ * host: { game, env, hud, input, audio, scene, camera, canvas, surface, uiRoot, outfit(), level(), liftPath(i), liftName(i),
+ *         startSpot(lateral) -> spot, startFree(spot), dayClock() -> clock | null, avalanche: { trigger(id, seed, t) } | null }
+ */
+export function createFreeMp({ ctx, host }) {
+  const { game, env, hud } = host;
+  const nameOf = new Map(ctx.roster.map((r) => [r.id, r.name]));
+  const plan = freePlan(ctx.cfg, ctx.seed);
+  const saveKey = `${SAVE_PREFIX}${ctx.code}:${ctx.seed}`;
+  const mpHud = createMpHud(host.uiRoot);
+  mpHud.show(false);
+  const remotes = createRemotes({ scene: host.scene, camera: host.camera, surface: host.surface, overlay: host.uiRoot, liftPath: (i) => host.liftPath(i), farTags: true });
+  remotes.setShadows(host.level() !== 'low');
+  const local = { lastSend: 0, lastPos: 0, lastEnv: 0, epoch: 0, sent: null, sentAt: 0, follow: 0, lastAv: new Map(), envFrom: null, began: false };
+  const root = document.documentElement;
+  let session = null;
+
+  /* ---------- messages ---------- */
+  function onMessage(from, m) {
+    if (m.k === 's') {
+      if (!remotes.get(from) || !Array.isArray(m.a)) return;
+      const t = session.toLocal(from, Number(m.t));
+      remotes.push(from, Number(m.e) | 0, t === null ? performance.now() : t, m.a);        // a new epoch = a teleport: the buffer restarts
+      const r = remotes.get(from);
+      if (r) { r.paused = !!m.p; r.epoch = Number(m.e) | 0; }
+      return;
+    }
+    if (m.k === 'hi') { meet(from, typeof m.o === 'string' ? m.o : ''); return; }
+    if (m.k === 'env') { applyEnv(from, m); return; }
+    if (m.k === 'av') { remoteAvalanche(from, m); }
+  }
+  function displayOutfit(id, wanted) {
+    const taken = new Set([host.outfit(), ...remotes.all().filter((r) => r.id !== id).map((r) => r.outfit)]);
+    if (OUTFITS.some((o) => o.id === wanted) && !taken.has(wanted)) return wanted;
+    const free = OUTFITS.find((o) => !taken.has(o.id));
+    return free ? free.id : wanted;
+  }
+  function meet(id, wanted) {
+    const r = remotes.get(id);
+    if (r && r.wanted === wanted) return;
+    if (r) remotes.remove(id);
+    remotes.add(id, nameOf.get(id), displayOutfit(id, wanted)).wanted = wanted;
+    remotes.setLink(id, session.viaRelay(id));
+  }
+  function onPeer(id, status) {
+    const r = remotes.get(id);
+    if (status === 'here') {
+      session.send(id, { k: 'hi', o: host.outfit() }, true);
+      if (!r) { meet(id, ''); if (local.began) hud.toast(`${nameOf.get(id) || '?'} ass derbäi`, 1800); }
+      if (isHost()) sendEnv(id);                   // a newcomer gets the day at once
+    }
+    if (status === 'gone' && r) { remotes.remove(id); hud.toast(`${nameOf.get(id) || '?'} ass fort`, 1800); }
+    remotes.setAway(id, status === 'away');
+    remotes.setLink(id, session.viaRelay(id));
+    root.dataset.skiMpHost = hostId();
+    refreshBoard();
+  }
+
+  /* ---------- the shared day (host only; handover = the next roster player who is here) ---------- */
+  const statusOf = (id) => (session ? session.status(id) : 'wait');
+  const hostId = () => freeHost(ctx.roster, ctx.me, statusOf);
+  const isHost = () => hostId() === ctx.me;
+  function envMsg() {
+    const clock = host.dayClock();
+    return { k: 'env', w: env.state.weatherId, tm: env.state.timeMode === 'random' ? 'random' : env.state.timeId, h: clock ? Math.round(clock.hour * 1000) / 1000 : null };
+  }
+  function sendEnv(to = null) {
+    local.lastEnv = performance.now();
+    const m = envMsg();
+    if (to) session.send(to, m, true); else session.broadcast(m, true);
+  }
+  function applyEnv(from, m) {
+    if (from !== hostId()) return;                                         // only the current host speaks for the day
+    if (WEATHERS.includes(m.w) && m.w !== env.state.weatherId) env.setWeather(m.w, false);
+    if (m.tm === 'random') { if (env.state.timeMode !== 'random') env.setTime('random', false); }
+    else if (TIMES.includes(m.tm) && (env.state.timeMode !== m.tm)) env.setTime(m.tm, false);
+    const clock = host.dayClock(), h = Number(m.h);
+    if (clock && Number.isFinite(h) && Math.abs(clock.hour - h) > FREE.CLOCK_SLACK) clock.set(h);
+    local.envFrom = from;
+    root.dataset.skiMpEnv = `${env.state.weatherId}/${env.state.timeMode}`;
+  }
+
+  /* ---------- avalanches: world events with a seed, shown at the same moment everywhere ---------- */
+  function shareAvalanche(id, seed, t = performance.now()) {
+    if (!session || typeof id !== 'string' || id.length > 64 || !Number.isFinite(Number(seed))) return;
+    session.broadcast({ k: 'av', id, s: Number(seed) >>> 0, t: Math.round(t) }, true);
+  }
+  function remoteAvalanche(from, m) {
+    const now = performance.now();
+    if (typeof m.id !== 'string' || m.id.length > 64 || !Number.isFinite(Number(m.s))) return;
+    if (now - (local.lastAv.get(from) || -Infinity) < FREE.AVALANCHE_GAP) return;           // one per player per gap (no spam)
+    const t = session.toLocal(from, Number(m.t));
+    const at = t === null ? now : t;
+    if (now - at > FREE.AVALANCHE_LATE) return;
+    local.lastAv.set(from, now);
+    root.dataset.skiMpAvalanche = `${m.id}:${m.s >>> 0}`;
+    if (host.avalanche && typeof host.avalanche.trigger === 'function') {
+      try { host.avalanche.trigger(m.id, Number(m.s) >>> 0, at); } catch (error) { console.warn('[ski-mp] avalanche', error); }
+    }
+  }
+
+  /* ---------- the friends list (top left) + "to a friend" ---------- */
+  function refreshBoard() {
+    const me = game.state;
+    const rows = ctx.roster.filter((p) => p.id !== ctx.me).map((p) => {
+      const r = remotes.get(p.id), st = statusOf(p.id);
+      let text = st === 'wait' ? 'kënnt …' : st === 'gone' ? 'fort' : '';
+      let sort = 1e9;
+      if (r && r.state && me && st !== 'gone') {
+        const d = Math.hypot(r.state.x - me.x, r.state.z - me.z);
+        sort = d;
+        text = r.state.ride ? `um Lift${host.liftName(r.state.rideLift) ? `: ${host.liftName(r.state.rideLift)}` : ''}` : r.paused ? `${distText(d)} · Kaart` : distText(d);
+      }
+      return { name: p.name + (p.id === hostId() ? ' ★' : ''), me: false, text, away: st === 'away' || st === 'gone', sort };
+    }).sort((a, b) => a.sort - b.sort);
+    mpHud.board(`Fräi fueren · ${1 + ctx.roster.filter((p) => p.id !== ctx.me && statusOf(p.id) === 'here').length} / ${ctx.roster.length}`, [{ name: 'Du', me: true, text: '' }, ...rows]);
+    const ok = friendsToJoin().length > 0 && game.phase === 'running' && !game.paused;
+    mpHud.bar(ok ? 'Zesumme fueren' : '', ok ? [{ label: '👥 Bei e Frënd', on: () => toFriend() }] : []);
+    root.dataset.skiMpFree = String(remotes.all().filter((x) => x.state).length);
+  }
+  /** friends standing / skiing on the snow (not on a lift, not in the map) */
+  const friendsToJoin = () => remotes.all().filter((r) => r.state && !r.state.ride && statusOf(r.id) === 'here');
+  /** fast travel next to the next friend in turn (a teleport like any other: the others see me appear there) */
+  function toFriend() {
+    const list = friendsToJoin();
+    if (!list.length || !game.state) return false;
+    const r = list[local.follow++ % list.length], s = r.state;
+    const h = Math.hypot(s.vx, s.vz) > 1 ? Math.atan2(s.vz, s.vx) : s.heading;
+    const spot = { x: s.x - Math.cos(h) * 6 + Math.sin(h) * 3, z: s.z - Math.sin(h) * 6 - Math.cos(h) * 3, heading: h };
+    host.startFree(spot);
+    hud.toast(`Bei ${r.name}`, 1400);
+    return true;
+  }
+
+  /* ---------- per frame ---------- */
+  function frame(now) {
+    const st = game.state;
+    if (!st || !session) return;
+    const moving = game.phase === 'lift' || (game.phase === 'running' && !game.paused && st.speed > FREE.MOVING);
+    const hz = moving ? FREE.SEND_HZ : FREE.IDLE_HZ;
+    if (now - local.lastSend >= 1000 / hz - 2) {
+      // a teleport: farther than any skier gets between two sends (not while riding: the line can be long between skips)
+      if (local.sent && !(st.ride && local.sent.ride && st.rideLift === local.sent.rideLift) && Math.hypot(st.x - local.sent.x, st.z - local.sent.z) > FREE.TELEPORT * Math.max(1, (now - local.sentAt) / 1000)) local.epoch++;
+      local.lastSend = now; local.sentAt = now;
+      local.sent = { x: st.x, z: st.z, ride: st.ride, rideLift: st.rideLift };
+      session.broadcast({ k: 's', e: local.epoch, t: Math.round(now), p: game.screen === 'map' || game.paused ? 1 : 0, a: packState(st, 0, false) }, false);
+      root.dataset.skiMpEpoch = String(local.epoch);
+    }
+    if (now - local.lastPos >= FREE.POS_EVERY && game.phase === 'running' && finite(st.x, st.z)) {
+      local.lastPos = now;
+      save(saveKey, { x: Math.round(st.x * 10) / 10, z: Math.round(st.z * 10) / 10, h: Math.round(st.heading * 1000) / 1000 });
+    }
+    if (isHost() && now - local.lastEnv >= FREE.ENV_EVERY) sendEnv();
+  }
+  function render(now, time) {
+    const c = host.canvas;
+    remotes.update(now, time, c.clientWidth || window.innerWidth, c.clientHeight || window.innerHeight);
+  }
+
+  function onAction(action) {
+    if (action === 'weather' || action === 'time') {
+      if (!isHost()) { hud.toast(`D'Wieder an d'Zäit bestëmmt ${nameOf.get(hostId()) || 'den Host'}`); return true; }
+      setTimeout(() => sendEnv(), 0);                 // the game changes it first, then everybody gets it
+      return false;
+    }
+    if (action === 'friend') { toFriend(); return true; }
+    return false;
+  }
+
+  async function begin() {
+    root.dataset.skiMp = 'connecting';
+    mpHud.show(true);
+    env.setWeather(plan.weather, false); env.setTime(plan.time, false);
+    if (env.snap) env.snap();
+    session = createSession({ code: ctx.code, me: ctx.me, roster: ctx.roster, name: nameOf.get(ctx.me), racing: () => true, relay: NET.FREE_RELAY, onMessage, onPeer });
+    // a reload / a rejoin goes on where I was; else side by side at the start lift
+    const back = loadSaved(saveKey);
+    const spot = back && finite(back.x, back.z, back.h) ? { x: back.x, z: back.z, heading: back.h } : host.startSpot(sideOffset(ctx.roster, ctx.me));
+    host.startFree(spot);
+    local.began = true;
+    try { await session.start(); } catch (error) { console.error('[ski-mp] no connection', error); hud.toast('Keng Verbindung: du fiers eleng weider', 2600); }
+    root.dataset.skiMp = 'free';
+    root.dataset.skiMpHost = hostId();
+    setInterval(refreshBoard, FREE.BOARD_MS);
+    window.__skiMp = {
+      kind: 'free', session, remotes, ctx, plan, toFriend, shareAvalanche, hostId, get epoch() { return local.epoch; },
+      info: () => ({ kind: 'free', host: hostId(), epoch: local.epoch, net: session.info(), env: envMsg(), seen: remotes.all().map((r) => ({ id: r.id, has: !!r.state, ride: r.state ? r.state.ride || '' : '', tag: r.tagMode || 'hidden', jumps: r.jumps })) }),
+    };
+  }
+
+  return {
+    kind: 'free', begin, frame, render, onAction, shareAvalanche,
+    onFinish() { /* a challenge run in the free ride is a solo run (main.js handles it) */ },
+    viewState: () => null,
+    get active() { return true; },
+  };
+}

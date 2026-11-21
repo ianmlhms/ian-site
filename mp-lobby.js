@@ -16,8 +16,8 @@
  *
  * Everything that arrives over Realtime is untrusted: names, avatars, settings are sanitised before they are rendered. */
 import {
-  gameInfo, CODE_ALPHABET, CODE_LEN, cleanCode, isCode, lobbyUrl, gameUrl, offlineUrl, sanitizeCfg, defaultCfg, optionsFor,
-} from "./mp-games.js?v=6";
+  gameInfo, CODE_ALPHABET, CODE_LEN, cleanCode, isCode, lobbyUrl, gameUrl, offlineUrl, sanitizeCfg, defaultCfg, optionsFor, settingShown,
+} from "./mp-games.js?v=7";
 
 /* ------------------------------------------------------------------ constants */
 const CTX_KEY = "mpl.ctx";               // handed to mp-gate.js in the game page
@@ -767,7 +767,7 @@ export async function mountLobby(root, options = {}) {
     const sig = JSON.stringify([st.cfg, host]);
     if (els.settings.dataset.sig === sig) return;
     els.settings.dataset.sig = sig;
-    els.settings.replaceChildren(h("h3", {}, t("settings")), ...defs.map((d) => {
+    els.settings.replaceChildren(h("h3", {}, t("settings")), ...defs.filter((d) => settingShown(d, st.cfg)).map((d) => {      // R7-D: showIf
       const label = d.label[lang] || d.label.en;
       const cur = st.cfg[d.key];
       const chips = optionsFor(d, st.cfg).map((o) => {
