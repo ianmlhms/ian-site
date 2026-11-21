@@ -17,7 +17,8 @@ Writes
                        roof = ROOF_CODE or -1 unknown)
     map.webp           the painted base of the piste map (pistes, lifts and labels are drawn on top in the browser)
 
-Piste difficulty (France): novice = green, easy = blue, intermediate = red, advanced / expert = black. freeride itineraries are not pistes.
+Piste difficulty (France): novice = green, easy = blue, intermediate = red, advanced / expert = black. Ski routes (piste:grooming=backcountry,
+difficulty freeride / extreme) are runs too, flagged "route" (black unless OSM gives a colour; never groomed or benched).
 """
 from __future__ import annotations
 
@@ -37,18 +38,18 @@ from scipy import ndimage
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from codec import encode  # noqa: E402
-from common import (CLASS_STEP, FAR_MARGIN, FAR_STEP, NEAR_KEEP, NEAR_STEP, OSM_CREDIT, RESORTS, SOURCE_CREDITS, TILE_CELLS, TILE_SIZE, Frame, out_dir,  # noqa: E402
+from common import (CLASS_STEP, FAR_MARGIN, FAR_STEP, NEAR_KEEP, NEAR_STEP, OSM_CREDIT, RESORTS, SOURCE_CREDITS, TILE_CELLS, TILE_SIZE, Frame, osm_path, out_dir,  # noqa: E402
                     resort_arg, work_dir)
 
-DIFF_OF = {"novice": "green", "easy": "blue", "intermediate": "red", "advanced": "black", "expert": "black"}
+DIFF_OF = {"novice": "green", "easy": "blue", "intermediate": "red", "advanced": "black", "expert": "black", "freeride": "black", "extreme": "black"}
 DIFF_LETTER = {"green": "g", "blue": "b", "red": "r", "black": "k"}
 HALF_WIDTH = {"green": 17, "blue": 18, "red": 15, "black": 13}
 CLASS_BITS = {"forest": 1, "scrub": 2, "rock": 4, "water": 8, "built": 16, "piste": 32, "glacier": 64, "scree": 128}
 TREE_LINE = 2450.0                 # m: no forest above this, whatever the map says (per resort: RESORTS[rid]["tree_line"])
 DERIVED_FOREST = 2150.0            # m: open stands are added below this on shady slopes (150 m lower on sunny ones) where OSM maps no forest
                                    # (per resort: RESORTS[rid]["derived_forest"]; the north side of the Alps has a lower tree line)
-MIN_RUN_LENGTH = 350.0
-MIN_RUN_DROP = 70.0
+MIN_RUN_LENGTH = 120.0             # m: every mapped piste is a run (short links between pistes too), only stubs are left out
+MIN_RUN_DROP = 12.0
 SLALOM_COUNT = 4
 BUILDING_NEAR = 160.0              # m: with RESORTS[rid]["buildings"] == "villages", buildings this close to a piste or lift stay
 H_STEP = 0.1                       # height quantum of the baked grids (m)
@@ -87,7 +88,7 @@ def slug(text):
 
 # ---------------------------------------------------------------- loading
 def load_osm(rid, name):
-    with open(os.path.join(work_dir(rid, "osm"), name + ".json"), encoding="utf-8") as fh:
+    with open(osm_path(rid, name), encoding="utf-8") as fh:
         return json.load(fh)["elements"]
 
 
@@ -260,25 +261,277 @@ def chain_runs(chains, runs, dem):
     return runs
 
 
-def build_pistes(frame, dem):
+ROUTE_DIFFS = ("freeride", "extreme")      # ski routes / itineraries: marked and secured, never groomed
+JOIN = 25.0                                # m: two ways of one piste meet when an end lies this close to the next one's start
+NAMED_GAP = 120.0                          # m: ... or this close, for ways of the same name when the next one starts lower down
+OVERLAP = 30.0                             # m: a candidate run lying this close to runs already kept ...
+OVERLAP_SHARE = 0.5                        # ... over this share of its length is a second mapping of the same piste: not a run
+VARIANT_MIN_LENGTH = 250.0                 # m: a branch of a named piste is a run of its own ("<name> (Variante)") when this long ...
+VARIANT_MIN_DROP = 40.0                    # ... and with this drop
+LINK_LIFT_NEAR = 150.0                     # m: an unnamed link leads to a lift when its end lies this close to the lift's bottom station
+LINK_PISTE_NEAR = 40.0                     # m: ... to a named piste when its end lies this close to the piste's line
+LINK_FEATURE_NEAR = 600.0                  # m: otherwise to the nearest named lift / piste / place this close to its end
+LIFT_WORD = {"chair": "Sessellift", "gondola": "Gondel", "cable": "Seelbunn", "drag": "Schlepplift", "carpet": "Förderband",
+             "funicular": "Standseelbunn", "train": "Zuch"}
+LIFT_TYPE_WORDS = re.compile(r"(?i)\b(ts|tsd|tsf|tc|tk|tph|tps|dmc|télé\w*|tele\w*|sessel\w*|gondel\w*|\w*bahn|\w*lift|express|funi\w*|seggiovia|cabinovia|skilift|ovovia|funivia|chair|gondola)\b")
+
+
+def piste_ways(frame):
+    """Every downhill piste way of the OSM download: [(way id, geometry, tags)], each way's own tags laid over those of the route
+    relations it belongs to (OSM often keeps a piste's name / difficulty on the relation only), relation members without piste tags of
+    their own included; and the outer rings of piste multipolygons as areas [(relation id, ring geometry, tags)]."""
     els = load_osm(frame.rid, "pistes")
-    lines, areas = [], []
+    ways, inherit, mp_areas = {}, {}, []
     for e in els:
-        if e["type"] != "way" or "geometry" not in e:
+        if e["type"] == "way" and e.get("geometry"):
+            ways[e["id"]] = (e["geometry"], e.get("tags", {}))
+    keys = ("name", "piste:name", "ref", "piste:ref", "piste:difficulty", "piste:grooming", "piste:type")
+    for e in els:
+        if e["type"] != "relation":
             continue
         t = e.get("tags", {})
+        members = [m for m in e.get("members", []) if m.get("type") == "way" and m.get("geometry")]
+        if t.get("type") == "multipolygon" or t.get("area") == "yes":
+            for m in members:
+                if m.get("role") == "outer":
+                    mp_areas.append((e["id"], m["ref"], [g for g in m["geometry"] if g], t))
+            continue
+        rel = {k: t[k] for k in keys if k in t}
+        for m in members:
+            if m["ref"] not in ways:
+                ways[m["ref"]] = ([g for g in m["geometry"] if g], {})
+            got = inherit.setdefault(m["ref"], {})
+            for k, v in rel.items():
+                got.setdefault(k, v)
+    out = []
+    for wid, (geom, tags) in ways.items():
+        merged = dict(inherit.get(wid, {}))
+        merged.update(tags)
+        out.append((wid, geom, merged))
+    return out, mp_areas
+
+
+def inside_parts(frame, p, inset=2.0):
+    """The pieces of a polyline inside the box (a way that leaves the box is cut at its edge, each inside stretch kept)."""
+    ok = (p[:, 0] >= inset) & (p[:, 0] <= frame.width - inset) & (p[:, 1] >= inset) & (p[:, 1] <= frame.depth - inset)
+    if ok.all():
+        return [p]
+    parts, k = [], 0
+    while k < len(p):
+        if not ok[k]:
+            k += 1
+            continue
+        m = k
+        while m < len(p) and ok[m]:
+            m += 1
+        if m - k >= 2:
+            parts.append(p[k:m])
+        k = m
+    return parts
+
+
+def is_route(t):
+    """A ski route / itinerary (marked, avalanche-secured, not groomed): OSM piste:grooming=backcountry or a freeride difficulty."""
+    name = (t.get("piste:name") or t.get("name") or "").lower().replace(" ", "")
+    return t.get("piste:grooming") == "backcountry" or t.get("piste:difficulty") in ROUTE_DIFFS or name.startswith("skiroute")
+
+
+def infer_diffs(lines):
+    """Lines without a piste:difficulty: the colour of the pistes they touch (most of their ends), else from the gradient."""
+    known = [ln for ln in lines if ln["diff"]]
+    ends = np.array([q for ln in known for q in (ln["p"][0], ln["p"][-1])]) if known else np.zeros((0, 2))
+    owner = [ln["diff"] for ln in known for _ in (0, 1)]
+    for ln in lines:
+        if ln["diff"]:
+            continue
+        votes = {}
+        for q in (ln["p"][0], ln["p"][-1]):
+            if len(ends):
+                d = np.hypot(ends[:, 0] - q[0], ends[:, 1] - q[1])
+                for i in np.flatnonzero(d < JOIN):
+                    votes[owner[i]] = votes.get(owner[i], 0) + 1
+        if votes:
+            ln["diff"] = max(votes, key=lambda k: (votes[k], DIFF_ORDER.index(k)))
+        else:
+            g = (ln["h"][0] - ln["h"][-1]) / max(polyline_len(ln["p"]), 1.0)
+            ln["diff"] = "green" if g < 0.12 else "blue" if g < 0.25 else "red" if g < 0.4 else "black"
+        ln["guessed"] = True
+
+
+def longest_paths(segs, gap=JOIN):
+    """Splits a set of downhill ways into chains (the end of one within JOIN m of the start of the next, or within `gap` m when the next
+    starts below this one's end: one named piste interrupted by a road or a lift station), longest first: the longest path through all
+    of them, then the longest through the rest, ... Ways are ordered by their top height, an edge only goes down that order (so the
+    graph has no cycles)."""
+    order = sorted(range(len(segs)), key=lambda i: -float(segs[i]["h"][0]))
+    segs = [segs[i] for i in order]
+    n = len(segs)
+    starts = np.array([s["p"][0] for s in segs])
+    lens = np.array([polyline_len(s["p"]) for s in segs])
+    succ = []
+    for i, s in enumerate(segs):
+        d = np.hypot(starts[:, 0] - s["p"][-1][0], starts[:, 1] - s["p"][-1][1])
+        succ.append([j for j in np.flatnonzero(d < gap).tolist() if j > i and (d[j] < JOIN or segs[j]["h"][0] <= s["h"][-1] + 5.0)])
+    used = np.zeros(n, bool)
+    out = []
+    while not used.all():
+        best = np.zeros(n)
+        nxt = np.full(n, -1)
+        for i in range(n - 1, -1, -1):
+            if used[i]:
+                continue
+            best[i] = lens[i]
+            for j in succ[i]:
+                if not used[j] and lens[i] + best[j] > best[i]:
+                    best[i] = lens[i] + best[j]
+                    nxt[i] = j
+        i = int(np.argmax(np.where(used, -1, best)))
+        path = []
+        while i >= 0:
+            path.append(segs[i])
+            used[i] = True
+            i = int(nxt[i])
+        out.append(path)
+    return out
+
+
+def make_run(chain, dem):
+    """One run from a chain of ways: resampled, smoothed, trimmed from its highest point (first third) to its lowest (last third);
+    None when it is too short or too flat to be a run."""
+    p = np.concatenate([chain[0]["p"]] + [s["p"][1:] for s in chain[1:]])
+    p = resample(p, 5.0)
+    p = smooth_line(p, 3)
+    h = dem(p[:, 0], p[:, 1])
+    # OSM lines often run on over a flat or up the far side of a dip to the next lift, which would be a skate uphill at the finish
+    n3 = max(1, len(h) // 3)
+    i0 = int(np.argmax(h[:n3]))
+    i1 = len(h) - n3 + int(np.argmin(h[-n3:]))
+    p, h = p[i0:i1 + 1], h[i0:i1 + 1]
+    if len(p) < 3:
+        return None
+    length = polyline_len(p)
+    drop = float(h[0] - h[-1])
+    if length < MIN_RUN_LENGTH or drop < MIN_RUN_DROP:
+        return None
+    s0 = chain[0]
+    return {"name": s0["name"], "ref": s0["ref"], "diff": s0["diff"], "p": p, "h": h, "len": length, "drop": drop,
+            "hw": float(np.median([s["hw"] for s in chain])), "route": all(s["route"] for s in chain), "ways": [s["id"] for s in chain]}
+
+
+class Near:
+    """Distance from points to a set of polylines (5 m samples in a 100 m hash)."""
+
+    def __init__(self, polylines, cell=100.0):
+        self.cell = cell
+        self.grid = {}
+        for k, p in enumerate(polylines):
+            for q in resample(p, 5.0):
+                self.grid.setdefault((int(q[0] // cell), int(q[1] // cell)), []).append((float(q[0]), float(q[1]), k))
+
+    def nearest(self, x, z, r):
+        """(distance, index of the polyline) of the closest sample within r m, or (inf, -1)."""
+        best, who = math.inf, -1
+        c = self.cell
+        for i in range(int((x - r) // c), int((x + r) // c) + 1):
+            for j in range(int((z - r) // c), int((z + r) // c) + 1):
+                for qx, qz, k in self.grid.get((i, j), ()):
+                    d = math.hypot(qx - x, qz - z)
+                    if d < best:
+                        best, who = d, k
+        return (best, who) if best <= r else (math.inf, -1)
+
+    def share_near(self, p, r):
+        q = resample(p, 10.0)
+        return float(np.mean([self.nearest(float(x), float(z), r)[0] <= r for x, z in q]))
+
+
+def lift_label(lf):
+    """'Sessellift Grand Pré' (the Luxembourgish kind in front, unless the name says what it is already)."""
+    name = lf["name"] or lf.get("ref") or ""
+    if not name:
+        return ""
+    return name if LIFT_TYPE_WORDS.search(name) else "%s %s" % (LIFT_WORD.get(lf["kind"], "Lift"), name)
+
+
+def name_links(links, named, lifts, places):
+    """Names for the runs of unnamed OSM ways, from what they lead to (never an invented name): "Verbindung → <lift>" when the run ends
+    at a lift's bottom station, "Verbindung → <piste>" when it joins a named piste, else the nearest named lift / piste / place."""
+    lift_bottoms = [(lf["bottom"]["x"], lf["bottom"]["z"], lift_label(lf)) for lf in lifts if lift_label(lf) and lf["kind"] != "carpet"]
+    lift_tops = [(lf["top"]["x"], lf["top"]["z"], lift_label(lf)) for lf in lifts if lift_label(lf) and lf["kind"] != "carpet"]
+    near_named = Near([r["p"] for r in named]) if named else None
+
+    def closest(pts, x, z, r):
+        best = (math.inf, "")
+        for px, pz, label in pts:
+            d = math.hypot(px - x, pz - z)
+            if d < best[0] and d <= r:
+                best = (d, label)
+        return best
+
+    def target(x, z):
+        d, label = closest(lift_bottoms, x, z, LINK_LIFT_NEAR)
+        if label:
+            return label
+        if near_named:
+            d, k = near_named.nearest(x, z, LINK_PISTE_NEAR)
+            if k >= 0:
+                return named[k]["name"]
+        cands = [closest(lift_bottoms + lift_tops, x, z, LINK_FEATURE_NEAR), closest([(p["x"], p["z"], p["name"]) for p in places], x, z, LINK_FEATURE_NEAR)]
+        if near_named:
+            d, k = near_named.nearest(x, z, LINK_FEATURE_NEAR)
+            if k >= 0:
+                cands.append((d, named[k]["name"]))
+        d, label = min(cands, key=lambda c: c[0])
+        return label
+
+    def source(x, z):
+        d, label = closest(lift_tops, x, z, LINK_LIFT_NEAR)
+        if label:
+            return label
+        if near_named:
+            d, k = near_named.nearest(x, z, LINK_PISTE_NEAR)
+            if k >= 0:
+                return named[k]["name"]
+        return ""
+
+    taken = {r["name"].lower() for r in named}
+    for r in links:
+        to = target(*r["p"][-1])
+        frm = source(*r["p"][0])
+        name = "Verbindung → %s" % to if to else ("Verbindung vun %s" % frm if frm else "Verbindung")
+        if name.lower() in taken and frm and to:
+            name = "Verbindung %s → %s" % (frm, to)
+        base, n = name, 2
+        while name.lower() in taken:
+            name = "%s (%d)" % (base, n)
+            n += 1
+        taken.add(name.lower())
+        r["name"] = name
+        r["link"] = True
+
+
+def build_pistes(frame, dem, lifts=(), places=()):
+    cfg = RESORTS[frame.rid]
+    ways, mp_areas = piste_ways(frame)
+    lines, areas = [], []
+    skipped = {"abandoned": 0, "outside": 0}
+    for wid, geom, t in ways:
+        if t.get("abandoned") or t.get("piste:abandoned") == "yes" or t.get("disused") == "yes" or wid in cfg.get("skip_ways", ()):
+            skipped["abandoned"] += 1
+            continue
+        if t.get("piste:type", "downhill") != "downhill" or len(geom) < 2:
+            continue
         diff = DIFF_OF.get(t.get("piste:difficulty", ""))
-        if not diff or t.get("abandoned") or t.get("piste:abandoned") == "yes" or e["id"] in RESORTS[frame.rid].get("skip_ways", ()):
-            continue
-        p = way_xz(frame, e["geometry"])
+        p = way_xz(frame, geom)
         closed = len(p) > 3 and math.hypot(*(p[0] - p[-1])) < 0.5
-        if t.get("area") == "yes" or (closed and t.get("area") != "no" and polyline_len(p) < 4000 and not t.get("name")):
-            areas.append({"diff": diff, "poly": p})
-            continue
         name = (t.get("piste:name") or t.get("name") or "").strip()
-        h = dem(p[:, 0], p[:, 1])
-        if h[0] < h[-1]:                      # orient downhill
-            p, h = p[::-1].copy(), h[::-1].copy()
+        if t.get("area") == "yes" or (closed and t.get("area") != "no" and polyline_len(p) < 4000 and not name):
+            c = p.mean(axis=0)
+            if 0 <= c[0] <= frame.width and 0 <= c[1] <= frame.depth:
+                areas.append({"diff": diff, "poly": p})
+            else:
+                skipped["outside"] += 1
+            continue
         width = None
         for key in ("piste:width", "width"):
             try:
@@ -286,60 +539,78 @@ def build_pistes(frame, dem):
                 break
             except ValueError:
                 pass
-        hw = max(6.0, min(40.0, width / 2)) if width else HALF_WIDTH[diff]
-        lines.append({"id": e["id"], "name": name, "ref": t.get("piste:ref") or t.get("ref") or "", "diff": diff, "p": p, "h": h, "hw": hw, "tagged": bool(width)})
-    log("piste ways", len(lines), "areas", len(areas))
+        parts = inside_parts(frame, p)
+        if not parts:
+            skipped["outside"] += 1
+        for q in parts:
+            h = dem(q[:, 0], q[:, 1])
+            if h[0] < h[-1]:                      # orient downhill
+                q, h = q[::-1].copy(), h[::-1].copy()
+            lines.append({"id": wid, "name": name, "ref": t.get("piste:ref") or t.get("ref") or "", "diff": diff, "p": q, "h": h,
+                          "hw": max(6.0, min(40.0, width / 2)) if width else None, "tagged": bool(width), "route": is_route(t)})
+    for _rel, _way, geom, t in mp_areas:
+        if len(geom) > 2:
+            p = way_xz(frame, geom)
+            c = p.mean(axis=0)
+            if 0 <= c[0] <= frame.width and 0 <= c[1] <= frame.depth:
+                areas.append({"diff": DIFF_OF.get(t.get("piste:difficulty", "")), "poly": p})
+    infer_diffs(lines)
+    for ln in lines:
+        if ln["hw"] is None:
+            ln["hw"] = HALF_WIDTH[ln["diff"]] * (0.7 if ln["route"] else 1.0)
+    for a in areas:
+        a["diff"] = a["diff"] or "blue"
+    log("piste ways: %d lines (%d unnamed, %d ski routes, %d difficulty guessed), %d areas (%d from multipolygons); skipped %s" % (
+        len(lines), sum(1 for ln in lines if not ln["name"]), sum(1 for ln in lines if ln["route"]), sum(1 for ln in lines if ln.get("guessed")),
+        len(areas), len(mp_areas), skipped))
     widen_from_areas(frame, lines, areas)
 
-    # chain the named ways of one name + colour into runs (end of one ~ start of the next)
+    # runs: the named ways of one name + colour chained into the longest downhill paths (a piste split into several OSM ways is one
+    # run; a branch of it is a run of its own "(Variante)" when long enough; a second mapping of the same piste is dropped), then the
+    # unnamed ways chained the same way into links, named after what they lead to
     groups = {}
     for ln in lines:
         if ln["name"]:
             groups.setdefault((ln["name"].lower(), ln["diff"]), []).append(ln)
-    runs = []
-    for (_, diff), segs in groups.items():
-        chains = [[s] for s in segs]
-        merged = True
-        while merged:
-            merged = False
-            for a in chains:
-                for b in chains:
-                    if a is b:
-                        continue
-                    if math.hypot(*(a[-1]["p"][-1] - b[0]["p"][0])) < 25:
-                        a.extend(b)
-                        chains.remove(b)
-                        merged = True
-                        break
-                if merged:
-                    break
-        for ch in chains:
-            p = np.concatenate([ch[0]["p"]] + [s["p"][1:] for s in ch[1:]])
-            p = resample(p, 5.0)
-            p = smooth_line(p, 3)
-            h = dem(p[:, 0], p[:, 1])
-            # the run goes from its highest point (in the first third) to its lowest (in the last third): OSM lines often run on
-            # over a flat or up the far side of a dip to the next lift, which would be a skate uphill at the finish
-            n3 = max(1, len(h) // 3)
-            i0 = int(np.argmax(h[:n3]))
-            i1 = len(h) - n3 + int(np.argmin(h[-n3:]))
-            p, h = p[i0:i1 + 1], h[i0:i1 + 1]
-            if len(p) < 3:
+    named, kept = [], None
+    for (_, diff), segs in sorted(groups.items(), key=lambda kv: -sum(polyline_len(s["p"]) for s in kv[1])):
+        mains = []
+        for chain in longest_paths(segs, NAMED_GAP):
+            run = make_run(chain, dem)
+            if run is None:
                 continue
-            length = polyline_len(p)
-            drop = float(h[0] - h[-1])
-            if length < MIN_RUN_LENGTH or drop < MIN_RUN_DROP:
+            if mains:
+                near = Near([m["p"] for m in mains])
+                share = near.share_near(run["p"], OVERLAP)
+                if share >= OVERLAP_SHARE:
+                    continue                                  # the same piste mapped twice
+                if share > 0:                                 # a branch of the piste
+                    if run["len"] < VARIANT_MIN_LENGTH or run["drop"] < VARIANT_MIN_DROP:
+                        continue                              # a short branch stays a painted piste, not a run
+                    run["name"] = "%s (Variante)" % run["name"]
+                    run["variant"] = True
+                else:                                         # another piste of the same name elsewhere
+                    run["name"] = "%s (%d)" % (run["name"], 1 + sum(1 for m in mains if not m.get("variant")))
+            mains.append(run)
+        named.extend(mains)
+    named = chain_runs(cfg.get("chains", ()), named, dem)
+    near_all = Near([r["p"] for r in named]) if named else None
+    links = []
+    unnamed = [ln for ln in lines if not ln["name"]]
+    by_diff = {}
+    for ln in unnamed:
+        by_diff.setdefault(ln["diff"], []).append(ln)
+    for diff, segs in by_diff.items():
+        for chain in longest_paths(segs):
+            run = make_run(chain, dem)
+            if run is None:
                 continue
-            runs.append({"name": ch[0]["name"], "ref": ch[0]["ref"], "diff": diff, "p": p, "h": h, "len": length, "drop": drop,
-                         "hw": float(np.median([s["hw"] for s in ch]))})
-    runs = chain_runs(RESORTS[frame.rid].get("chains", ()), runs, dem)
-    # one run per name + colour (the longest), unique ids
-    best = {}
-    for r in runs:
-        k = (r["name"].lower(), r["diff"])
-        if k not in best or r["len"] > best[k]["len"]:
-            best[k] = r
-    runs = sorted(best.values(), key=lambda r: (-r["drop"]))
+            if near_all and near_all.share_near(run["p"], OVERLAP) >= OVERLAP_SHARE:
+                continue                                      # an unnamed second line along a named piste
+            links.append(run)
+    name_links(links, named, lifts, places)
+    runs = named + links
+    runs.sort(key=lambda r: (bool(r.get("link")), -r["drop"]))
     used = set()
     for r in runs:
         base = slug(r["name"])
@@ -350,12 +621,14 @@ def build_pistes(frame, dem):
             n += 1
         used.add(rid)
         r["id"] = rid
-    # slalom pistes: blue / red runs of 0.8 .. 2.2 km with a steady gradient, the steadiest first
-    cand = [r for r in runs if r["diff"] in ("blue", "red") and 800 <= r["len"] <= 2200]
+    # slalom pistes: blue / red named runs of 0.8 .. 2.2 km with a steady gradient, the steadiest first
+    cand = [r for r in runs if r["diff"] in ("blue", "red") and 800 <= r["len"] <= 2200 and not r.get("link") and not r.get("route")]
     cand.sort(key=lambda r: abs(r["drop"] / r["len"] - 0.2))
     for r in cand[:SLALOM_COUNT]:
         r["slalom"] = True
-    log("runs", len(runs), "slalom", [r["id"] for r in runs if r.get("slalom")])
+    log("runs %d (%d named, %d variants, %d links, %d ski routes), %.0f km; network %.0f km; slalom %s" % (
+        len(runs), len(named), sum(1 for r in runs if r.get("variant")), len(links), sum(1 for r in runs if r.get("route")),
+        sum(r["len"] for r in runs) / 1000, sum(polyline_len(ln["p"]) for ln in lines) / 1000, [r["id"] for r in runs if r.get("slalom")]))
     return lines, areas, runs
 
 
@@ -733,7 +1006,7 @@ ROAD_NEAR_HOUSES = 45.0           # m: a street counts as a village street this 
 
 def build_roads(frame, cfg, buildings, pmask):
     """[[half width dm, x0, z0, dx, dz, ...]] in half metres (deltas after the first point), for roads.json."""
-    path = os.path.join(work_dir(frame.rid, "osm"), "roads.json")
+    path = osm_path(frame.rid, "roads")
     if not os.path.exists(path):
         return []
     C = 20.0
@@ -787,7 +1060,7 @@ def build_roads(frame, cfg, buildings, pmask):
 def build_aeroways(frame):
     """Runways, aprons, taxiways (OSM aeroway, optional layer) as piste-like polygons: [{"poly"}]. In winter the altiport runway is
     groomed snow, so it is smoothed like a piste and painted as one (never listed as a run)."""
-    path = os.path.join(work_dir(frame.rid, "osm"), "aeroway.json")
+    path = osm_path(frame.rid, "aeroway")
     if not os.path.exists(path):
         return []
     out = []
@@ -817,30 +1090,130 @@ ROOF_CODE = {"gabled": 0, "flat": 1, "hipped": 2, "skillion": 3, "half-hipped": 
 
 LIFT_KIND = {"chair_lift": "chair", "gondola": "gondola", "cable_car": "cable", "mixed_lift": "gondola", "drag_lift": "drag", "t-bar": "drag",
              "j-bar": "drag", "platter": "drag", "rope_tow": "drag", "magic_carpet": "carpet"}
-PYLON_GAP = {"chair": 110, "gondola": 220, "cable": 600, "drag": 70, "carpet": 0}
+PYLON_GAP = {"chair": 110, "gondola": 220, "cable": 600, "drag": 70, "carpet": 0, "funicular": 0, "train": 0}
+DEFAULT_SEATS = {"chair": 4, "gondola": 10, "cable": 120, "drag": 1, "carpet": 0, "funicular": 200, "train": 200}
+STATION_NEAR = 60.0                # m: an OSM aerialway=station (node or area) this close to a lift's end is that end's station
+
+
+def tag_number(v):
+    """'2400', '2 400', '2400 p/h', '7.5' -> float; None when no number."""
+    m = re.search(r"\d+(?:[.,]\d+)?", str(v or "").replace(" ", ""))
+    return float(m.group(0).replace(",", ".")) if m else None
+
+
+def tag_minutes(v):
+    """aerialway:duration: minutes ('7', '7.5') or 'mm:ss' / 'hh:mm:ss' -> minutes; None when unreadable."""
+    s = str(v or "").strip()
+    if re.fullmatch(r"\d+(:\d{1,2}){1,2}", s):
+        parts = [int(x) for x in s.split(":")]
+        return parts[0] * 60 + parts[1] + parts[2] / 60 if len(parts) == 3 else parts[0] + parts[1] / 60
+    return tag_number(s)
+
+
+def rail_line(frame, ways, dem_raw):
+    """One railway (a rack railway split into many OSM ways, with passing loops) as one line from its lowest to its highest point:
+    the shortest path through the network of its ways' vertices (shared OSM nodes = identical coordinates)."""
+    import heapq
+    pts, index, adj = [], {}, {}
+    for geom in ways:
+        prev = None
+        for g in geom:
+            key = (round(g["lon"], 7), round(g["lat"], 7))
+            if key not in index:
+                index[key] = len(pts)
+                pts.append(frame.to_world(g["lon"], g["lat"]))
+            k = index[key]
+            if prev is not None and prev != k:
+                d = math.hypot(pts[k][0] - pts[prev][0], pts[k][1] - pts[prev][1])
+                adj.setdefault(k, []).append((prev, d))
+                adj.setdefault(prev, []).append((k, d))
+            prev = k
+    if len(pts) < 2:
+        return None
+    P = np.array(pts)
+    h = dem_raw(P[:, 0], P[:, 1])
+    a, b = int(np.argmin(h)), int(np.argmax(h))
+    dist, back, heap = {a: 0.0}, {}, [(0.0, a)]
+    while heap:
+        d, k = heapq.heappop(heap)
+        if k == b:
+            break
+        if d > dist.get(k, math.inf):
+            continue
+        for m, w in adj.get(k, ()):
+            if d + w < dist.get(m, math.inf):
+                dist[m], back[m] = d + w, k
+                heapq.heappush(heap, (d + w, m))
+    if b not in dist:
+        return None
+    path = [b]
+    while path[-1] != a:
+        path.append(back[path[-1]])
+    return P[path[::-1]]
 
 
 def build_lifts(frame, dem_raw):
+    """Every lift of the resort: all aerialway kinds, funiculars (also underground ones, "tunnel": true) and the railways the resort lists
+    in RESORTS[rid]["railways"] (name patterns: the Gornergrat Bahn), oriented bottom -> top, with the real name / ref, the OSM kind, seats
+    per carrier, capacity / ride time when tagged, the pylons, and both stations (end point, ground height, the OSM station's name)."""
+    cfg = RESORTS[frame.rid]
     els = load_osm(frame.rid, "lifts")
     pylons = np.array([frame.to_world(e["lon"], e["lat"]) for e in els if e["type"] == "node" and e.get("tags", {}).get("aerialway") == "pylon"]) if els else np.zeros((0, 2))
-    out = []
+    stations = []
     for e in els:
-        if e["type"] != "way" or "geometry" not in e:
+        t = e.get("tags", {})
+        if t.get("aerialway") != "station" and not (t.get("railway") in ("station", "halt") and t.get("name")):
+            continue
+        if e["type"] == "node":
+            x, z = frame.to_world(e["lon"], e["lat"])
+        elif e.get("geometry"):
+            x, z = way_xz(frame, e["geometry"]).mean(axis=0)
+        else:
+            continue
+        stations.append((float(x), float(z), t.get("name", "")))
+    rail_pat = [re.compile(p, re.I) for p in cfg.get("railways", ())]
+    items = []                                                 # (osm id, kind, raw kind, tags, polyline)
+    rails = {}
+    for e in els:
+        if e["type"] != "way" or not e.get("geometry"):
             continue
         t = e.get("tags", {})
-        kind = LIFT_KIND.get(t.get("aerialway", ""))
-        if not kind or t.get("tunnel") == "yes" or t.get("layer", "0").startswith("-"):
+        if t.get("disused") == "yes" or t.get("abandoned") == "yes" or t.get("construction"):
             continue
-        p = way_xz(frame, e["geometry"])
+        aw = t.get("aerialway", "")
+        if aw in LIFT_KIND:
+            if t.get("tunnel") == "yes" or t.get("layer", "0").startswith("-"):
+                continue                                       # (no underground aerialways in these resorts)
+            items.append((e["id"], LIFT_KIND[aw], aw, t, way_xz(frame, e["geometry"])))
+        elif t.get("railway") == "funicular":                # (often several ways: a surface part, the tunnel, the passing loop)
+            rails.setdefault(("funicular", t.get("name") or e["id"]), []).append(e)
+        elif t.get("railway") and t.get("name") and any(p.search(t["name"]) for p in rail_pat) and t.get("service") not in ("yard", "siding", "spur"):
+            rails.setdefault(("train", t["name"]), []).append(e)
+    for (kind, _), ways in rails.items():
+        p = rail_line(frame, [w["geometry"] for w in ways], dem_raw)
+        if p is None:
+            continue
+        t = dict(max(ways, key=lambda w: len(w["geometry"])).get("tags", {}))
+        under = sum(len(w["geometry"]) for w in ways if w.get("tags", {}).get("tunnel") == "yes" or w.get("tags", {}).get("layer", "0").startswith("-"))
+        t["tunnel"] = "yes" if under * 2 > sum(len(w["geometry"]) for w in ways) else "no"
+        t.pop("layer", None)
+        raw = "funicular" if kind == "funicular" else "rack_railway" if t.get("rack") not in (None, "no") else t.get("railway")
+        items.append((ways[0]["id"], kind, raw, t, p))
+    out, dropped = [], 0
+    for oid, kind, raw, t, p in items:
         h = dem_raw(p[:, 0], p[:, 1])
         if h[0] > h[-1]:
             p, h = p[::-1].copy(), h[::-1].copy()
+        ends_in = all(0 <= q[0] <= frame.width and 0 <= q[1] <= frame.depth for q in (p[0], p[-1]))
+        if not ends_in:
+            dropped += 1                                       # another resort's lift in the download margin (or cut: see coverage.py)
+            continue
         length = polyline_len(p)
         if length < 30:
             continue
         # pylons: the mapped ones near the line, else evenly spaced
         tow = []
-        if len(pylons) and kind != "carpet":
+        if len(pylons) and PYLON_GAP[kind]:
             seg_pts = resample(p, 2.0)
             for q in pylons:
                 d = np.hypot(seg_pts[:, 0] - q[0], seg_pts[:, 1] - q[1])
@@ -850,13 +1223,39 @@ def build_lifts(frame, dem_raw):
             n = max(1, int(length // PYLON_GAP[kind]))
             tow = [length * (i + 0.5) / n for i in range(n)] if n > 1 else [length / 2]
         tow = sorted(set(round(s, 1) for s in tow if 8 < s < length - 8))
-        seats = t.get("aerialway:occupancy")
-        try:
-            seats = int(seats)
-        except (TypeError, ValueError):
-            seats = {"chair": 4, "gondola": 10, "cable": 120, "drag": 1, "carpet": 0}[kind]
-        out.append({"name": t.get("name", ""), "kind": kind, "seats": seats, "pts": flat(dp_simplify(p, 0.8)), "pylons": tow, "len": round(length)})
-    log("lifts", len(out))
+        seats = tag_number(t.get("aerialway:occupancy"))
+        seats = int(seats) if seats else DEFAULT_SEATS[kind]
+
+        def station(q, y):
+            row = {"x": round(float(q[0]), 1), "z": round(float(q[1]), 1), "y": round(float(y), 1)}
+            best = min(stations, key=lambda s: math.hypot(s[0] - q[0], s[1] - q[1]), default=None)
+            if best and math.hypot(best[0] - q[0], best[1] - q[1]) <= STATION_NEAR:
+                if best[2]:
+                    row["name"] = best[2]
+                row["osm"] = [round(best[0], 1), round(best[1], 1)]       # the mapped station (node / building centre)
+            return row
+        row = {"name": t.get("name", "") or t.get("ref", ""), "kind": kind, "seats": seats, "pts": flat(dp_simplify(p, 0.8)), "pylons": tow,
+               "len": round(length), "osm": oid, "type": raw, "rise": round(float(h[-1] - h[0])),
+               "bottom": station(p[0], h[0]), "top": station(p[-1], h[-1])}
+        if t.get("ref"):
+            row["ref"] = t["ref"]
+        cap = tag_number(t.get("aerialway:capacity"))
+        if cap:
+            row["cap"] = int(cap)
+        dur = tag_minutes(t.get("aerialway:duration"))
+        if dur:
+            row["dur"] = round(dur, 2)
+        for key, out_key in (("aerialway:heating", "heated"), ("aerialway:bubble", "bubble"), ("aerialway:detachable", "detachable")):
+            if t.get(key) in ("yes", "no"):
+                row[out_key] = t[key] == "yes"
+        if t.get("tunnel") == "yes" or t.get("layer", "0").startswith("-"):
+            row["tunnel"] = True
+        out.append(row)
+    kinds = {}
+    for r in out:
+        kinds[r["type"]] = kinds.get(r["type"], 0) + 1
+    log("lifts", len(out), kinds, "dropped outside", dropped, "stations named %d of %d ends" % (
+        sum(1 for r in out for e in ("bottom", "top") if r[e].get("name")), 2 * len(out)))
     return out
 
 
@@ -1029,15 +1428,16 @@ def main():
     raw = load_mosaic(rid, frame)
     raw, lake_levels, banks = apply_drawdown(frame, cfg, raw, load_osm(rid, "areas"))
     dem_raw = Dem(raw)
-    lines, areas, runs = build_pistes(frame, dem_raw)
-    buildings = clear_for_landmarks(frame, cfg, build_buildings(frame, dem_raw))
     lifts = build_lifts(frame, dem_raw)
     peaks, places = build_poi(frame)
+    lines, areas, runs = build_pistes(frame, dem_raw, lifts, places)
+    buildings = clear_for_landmarks(frame, cfg, build_buildings(frame, dem_raw))
 
-    # groom the pistes into the 5 m mosaic
+    # groom the pistes into the 5 m mosaic (ski routes stay natural ground: not benched, not smoothed)
     strips = build_aeroways(frame)                            # snow-covered runways (the Courchevel altiport): groomed, no trees
-    mask = piste_mask(raw.shape, NEAR_STEP, lines, areas + strips)
-    groomed = groom(bench(raw, lines), mask)
+    groomed_lines = [ln for ln in lines if not ln["route"]]
+    mask = piste_mask(raw.shape, NEAR_STEP, groomed_lines, areas + strips)
+    groomed = groom(bench(raw, groomed_lines), mask)
     log("groomed: mean |change| under pistes %.2f m" % float(np.abs(groomed - raw)[mask > 0.5].mean()))
 
     # which height tiles are shipped
@@ -1133,7 +1533,10 @@ def main():
     network = []
     for ln in lines:
         q = dp_simplify(ln["p"], 1.5)
-        network.append({"d": DIFF_LETTER[ln["diff"]], "w": round(ln["hw"], 1), "p": flat(q)})
+        row = {"d": DIFF_LETTER[ln["diff"]], "w": round(ln["hw"], 1), "p": flat(q)}
+        if ln["route"]:
+            row["r"] = 1                                      # a ski route: marked, not groomed
+        network.append(row)
     for a in areas:
         network.append({"d": DIFF_LETTER[a["diff"]], "a": 1, "p": flat(dp_simplify(a["poly"], 1.5))})
     pistes = []
@@ -1142,6 +1545,9 @@ def main():
         pistes.append({"id": r["id"], "name": r["name"], "ref": r["ref"], "diff": r["diff"], "len": round(r["len"]), "drop": round(r["drop"]),
                        "top": round(float(r["h"][0])), "bottom": round(float(r["h"][-1])), "hw": round(r["hw"], 1),
                        "slalom": bool(r.get("slalom")), "line": flat(q)})
+        for flag in ("link", "route", "variant"):              # link = a run of unnamed OSM ways, named after where it leads
+            if r.get(flag):
+                pistes[-1][flag] = True
     lon0, lat0 = frame.to_lonlat(0, 0)
     resort = {
         "v": 1, "id": rid, "name": cfg["name"], "short": cfg["short"], "country": cfg["country"], "crs": frame.crs,

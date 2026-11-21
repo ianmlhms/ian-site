@@ -45,6 +45,9 @@ export async function loadResortCore(rid, onProgress = () => {}) {
 /**
  * Streams the height tiles of a resort into the field.
  *   focus(x, z)       sets the point the queue is sorted around (nearest tiles first)
+ *   hold(r)           until release(): only tiles within r m of the focus (or of a ready() waiter) load, so the first play fetches
+ *                     just the tiles around the start and the CPU is not busy decoding / meshing the rest (start <= 10 s on an iPad)
+ *   release()         the rest of the resort streams in the background, nearest the focus first (the focus follows the player)
  *   ready(x, z, r)    resolves when every shipped tile within r m of (x, z) is in
  *   onTile(fn)        fn(rect) after a tile was added (the caller invalidates its terrain caches)
  */
@@ -53,6 +56,7 @@ export function createTileStreamer({ resort, field, root }) {
   const size = DATA.tileSize;
   let fx = resort.width / 2, fz = resort.depth / 2;
   let active = 0;
+  let reach = Infinity;                                              // m around the focus that may load (hold / release)
   const listeners = new Set();
   const waiters = [];
   const stats = { loaded: 0, bytes: 0, failed: 0, total: list.length };
@@ -64,7 +68,11 @@ export function createTileStreamer({ resort, field, root }) {
   function pump() {
     while (active < DATA.fetchConcurrency) {
       let best = null, bd = Infinity;
-      for (const t of list) if (t.state === 'wait') { const d = dist(t); if (d < bd) { bd = d; best = t; } }
+      for (const t of list) {
+        if (t.state !== 'wait') continue;
+        const d = dist(t);
+        if (d < bd && (d <= reach || waiters.some((w) => within(t, w.x, w.z, w.r)))) { bd = d; best = t; }
+      }
       if (!best) return;
       best.state = 'load';
       active++;
@@ -95,6 +103,9 @@ export function createTileStreamer({ resort, field, root }) {
   return {
     stats,
     focus(x, z) { fx = x; fz = z; pump(); },
+    hold(r) { reach = r; },
+    release() { if (reach !== Infinity) { reach = Infinity; pump(); } },
+    get held() { return reach !== Infinity; },
     ready(x, z, r = DATA.startRadius) {
       return new Promise((resolve) => { waiters.push({ x, z, r, resolve }); checkWaiters(); pump(); });
     },

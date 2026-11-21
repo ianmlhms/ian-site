@@ -179,7 +179,46 @@ def copernicus_grid(frame, e0, n_top, nx, nz, step):
     return out
 
 
+def adopt_old_tiles(rid, frame):
+    """A resort whose box changed gets a new cache folder (RESORTS[rid]["work"]); its height tiles that the old box had already are
+    hard-linked from the old folder under their new indices (RESORTS[rid]["work_from"] = (old folder, old east0, old north0): tile
+    origins sit on whole TILE_SIZE multiples, so a tile keeps its data, only its index moves). The far grid is fetched again (its size
+    depends on the box)."""
+    src = RESORTS[rid].get("work_from")
+    if not src:
+        return
+    old, e0, n0 = src
+    old_dir = os.path.join(os.path.dirname(work_dir(rid)), old, "dem")
+    dx, dz = int(round((e0 - frame.east0) / TILE_SIZE)), int(round((frame.north0 - n0) / TILE_SIZE))
+    linked = 0
+    for prefix, sub in (("near_", ()), ("ign5_", ("raw",)), ("bz_", ("raw",))):
+        d = os.path.join(old_dir, *sub)
+        if not os.path.isdir(d):
+            continue
+        for name in os.listdir(d):
+            if not name.startswith(prefix):
+                continue
+            stem, ext = os.path.splitext(name[len(prefix):])
+            try:
+                tx, tz = (int(v) for v in stem.split("_"))
+            except ValueError:
+                continue
+            nx_, nz_ = tx + dx, tz + dz
+            if not (0 <= nx_ < frame.tiles_x and 0 <= nz_ < frame.tiles_z):
+                continue
+            dst = os.path.join(work_dir(rid, "dem", *sub), "%s%d_%d%s" % (prefix, nx_, nz_, ext))
+            if not os.path.exists(dst):
+                os.link(os.path.join(d, name), dst)
+                linked += 1
+    for name in ("sources.json",):
+        if os.path.exists(os.path.join(old_dir, name)) and not os.path.exists(os.path.join(work_dir(rid, "dem"), name)):
+            os.link(os.path.join(old_dir, name), os.path.join(work_dir(rid, "dem"), name))
+    if linked:
+        print("adopted %d cached tiles from %s (index shift %+d, %+d)" % (linked, old, dx, dz))
+
+
 def fetch_near(rid, frame):
+    adopt_old_tiles(rid, frame)
     srcs = RESORTS[rid]["dem"]
     if any(s in ("swissalti3d", "vda-dtm") for s in srcs):     # several DEMs across a border: whole-box mosaics merged (dem_merge.py)
         from dem_merge import fetch_near_merged

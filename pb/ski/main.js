@@ -4,7 +4,7 @@
  * URL: ?resort=killy ?piste=<id> ?auto=1 (straight onto the piste, no screens) ?bot=1 (scripted skier) ?q=low|medium|high
  *      ?weather=sun|cloudy|snow|fog|random ?time=morning|midday|evening|random ?debug=1 (window.__ski)
  * The page is also loaded as a srcdoc iframe by the arcade: every URL is absolute or built from import.meta.url. */
-import { QUALITY, FRAME_BUDGET_MS, SKI, MODES, CAMERA, LATTICE } from './config.js';
+import { QUALITY, FRAME_BUDGET_MS, SKI, MODES, CAMERA, LATTICE, DATA } from './config.js';
 import { loadResortCore, createTileStreamer, loadExtras, RESORTS } from './resort-data.js';
 import { createField, createPisteNet } from './field.js';
 import { createSurface } from './surface.js';
@@ -114,6 +114,7 @@ async function boot() {
   const surface = createSurface(field);
   setRoot(resort.width, resort.depth);
   const streamer = createTileStreamer({ resort, field, root: core.root });
+  streamer.hold(DATA.startRadius + 200);                    // first play: only the tiles around the start, the rest after Start is live
   const pistes = createPisteSet(resort);
   const scatter = createScatter(field);
   // the forest share of every 10 m class cell as a texture (the painted canopy far away; scatter.js places the near trees)
@@ -257,6 +258,7 @@ async function boot() {
     mapScreen.status(ready ? 'Prett.' : `Pist gëtt gelueden … (${pending} Stécker)`, ready);
     document.documentElement.dataset.skiStartReady = ready ? '1' : '0';
     readyFor = ready ? p.id : null;
+    if (ready) streamer.release();
   }
 
   function startRun(p, mode, lateral = 0) {     // lateral: m right of the line at the start gate (online race: side by side)
@@ -283,6 +285,7 @@ async function boot() {
     input.showTouch(input.isTouch() || matchMedia('(pointer: coarse)').matches);
     input.setEnabled(true);
     streamer.focus(a.x, a.z);
+    streamer.release();
     if (mode === MODES.run) { game.phase = 'countdown'; game.countdown = params.auto ? 0.01 : 3; }
     else { game.phase = 'running'; hud.count(''); }
     if (mp) { game.phase = 'hold'; game.ghost = null; hud.count(''); }          // online race: net/index.js starts the 3-2-1 for everybody

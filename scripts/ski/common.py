@@ -46,9 +46,11 @@ RESORTS = {
         "short": "Espace Killy",
         "country": "FR",
         "crs": "EPSG:2154",                       # Lambert-93, the native CRS of IGN RGE ALTI
-        "bbox": (45.395, 6.845, 45.515, 7.060),
+        "bbox": (45.395, 6.845, 45.515, 7.075),
         "dem": ["ign-rgealti"],
         "far": ["ign-rgealti", "copernicus-glo30"],
+        # the box grew east in the data round (Le Fornet / Pays Désert / Montet were cut at 7.060): own cache folder, old tiles reused
+        "work": "killy-r5", "work_from": ("killy", 999680.0, 6499840.0),
         "villages": [                              # name, lon, lat, radius m [, "chalet": paint even big blocks as wood-and-stone chalets]
             ("Val d'Isère", 6.9797, 45.4486, 1300), ("La Daille", 6.9600, 45.4680, 450), ("Le Fornet", 7.0150, 45.4370, 400),
             ("Tignes le Lac", 6.9070, 45.4690, 700), ("Val Claret", 6.9030, 45.4560, 550), ("Le Lavachet", 6.9180, 45.4730, 350),
@@ -69,8 +71,10 @@ RESORTS = {
     # side down to Plan Bouchet (west and south). Valmorel (west of 6.475), La Plagne / Champagny (north-east) and the Maurienne below
     # Orelle stay out. near_keep is tighter than Killy's and only the buildings of the villages below + those next to pistes / lifts are kept (twice the pistes of Killy in a ~10 MB budget).
     "3vallees": {"name": "Les 3 Vallées", "short": "Courchevel · Méribel · Val Thorens", "country": "FR", "crs": "EPSG:2154",
-                 "bbox": (45.236, 6.475, 45.456, 6.690), "dem": ["ign-rgealti"], "far": ["ign-rgealti", "copernicus-glo30"],
-                 "near_keep": 150.0, "buildings": "villages",
+                 "bbox": (45.203, 6.475, 45.456, 6.690), "dem": ["ign-rgealti"], "far": ["ign-rgealti", "copernicus-glo30"],
+                 "buildings": "villages",
+                 # the box grew south in the data round (the Orelle gondola starts at 45.208): own cache folder, old tiles reused
+                 "work": "3vallees-r5", "work_from": ("3vallees", 970240.0, 6490880.0),
                  "start": "combe-de-la-saulire",            # the first piste on the map: Saulire -> Courchevel 1850
                  "villages": [
                      ("Courchevel 1850", 6.6345, 45.4150, 850, "chalet"), ("Courchevel Moriond", 6.6480, 45.4235, 450, "chalet"), ("Courchevel Village", 6.6310, 45.4300, 380, "chalet"),
@@ -102,8 +106,8 @@ RESORTS = {
     # "keep" = extra places whose 5 m tiles are always shipped (the Matterhorn itself lies 2-3 km from the nearest piste).
     "zermatt": {"name": "Zermatt · Cervinia", "short": "Matterhorn", "country": "CH", "crs": "EPSG:2056",
                 "bbox": (45.862, 7.600, 46.040, 7.830), "dem": ["swissalti3d", "vda-dtm", "copernicus-glo30"], "far": ["copernicus-glo30"],
-                "near_keep": 220.0,
                 "keep": [("Matterhorn", 7.6586, 45.9763, 800)],
+                "railways": ["Gornergrat"],              # the Gornergrat Bahn (rack railway, Zermatt -> Gornergrat) is a ski lift too
                 "skip_ways": [1305881375],                 # OSM piste ways left out: "Grenzpiste (stillgelegt)", closed and ungroomed
                 "landmarks": [
                     # Matterhorn glacier paradise: the top station where the cable arrives (glass front towards the Matterhorn, NW) and the
@@ -119,17 +123,19 @@ RESORTS = {
                     ("Plateau Rosa", 7.7080, 45.9370, 180), ("Breuil-Cervinia", 7.6300, 45.9345, 900), ("Plan Maison", 7.6465, 45.9400, 200),
                     ("Valtournenche", 7.6235, 45.8775, 550), ("Salette", 7.6400, 45.8800, 200),
                 ]},
-    # Ski Arlberg: St. Anton, St. Christoph, Stuben and Rendl, plus Zürs and Lech over the Flexen pass (Flexenbahn). Warth-Schröcken and
-    # Sonnenkopf stay out (data budget). ETRS89 / UTM 32N frame (not MGI Lambert: no datum shift between the DEM, OSM and the frame).
+    # Ski Arlberg: St. Anton, St. Christoph, Stuben and Rendl, Zürs and Lech over the Flexen pass (Flexenbahn), Warth-Schröcken (Auenfeldjet
+    # from Lech) and Sonnenkopf above Klösterle (its own lifts, a bus away). ETRS89 / UTM 32N frame (not MGI Lambert: no datum shift between
+    # the DEM, OSM and the frame).
     "arlberg": {
         "name": "St. Anton · Arlberg", "short": "Ski Arlberg", "country": "AT", "crs": "EPSG:25832",
-        "bbox": (47.095, 10.088, 47.232, 10.312),
+        "bbox": (47.095, 10.010, 47.290, 10.312),
         "dem": ["at-dgm", "copernicus-glo30"], "far": ["copernicus-glo30"],
         "start": "Kandahar",
         # the World Cup course is two OSM pistes: Kandahar-Kapall from the start, then "Fang" down to the finish in St. Anton (the
         # Kandahar-Galzig is a separate upper part that joins lower down; it stays a run of its own)
         "chains": [{"name": "Kandahar", "pistes": ["Kandahar-Kapall", "Fang"]}],
-        "near_keep": 350.0,                                  # 5 m tiles only this close to pistes, lifts, houses (10 MB budget)
+        # the box grew north-west in the data round (Warth-Schröcken, Sonnenkopf): own cache folder, old tiles reused under new indices
+        "work": "arlberg-r5", "work_from": ("arlberg", 581120.0, 5232640.0),
         "tree_line": 2000.0, "derived_forest": 1850.0,       # north side of the Alps: the forest ends near 1900 m (St. Anton 1300 m, St. Christoph 1800 m bare)
         "villages": [
             ("St. Anton", 10.2660, 47.1290, 1300), ("Nasserein", 10.2860, 47.1340, 500), ("St. Jakob", 10.2990, 47.1390, 450),
@@ -180,8 +186,14 @@ def resort_arg(argv=None):
     return rid
 
 
+def cache_name(rid):
+    """The folder of a resort's raw downloads below $SKI_WORK: the resort id, or RESORTS[rid]["work"] when its box changed (a new box
+    needs new height tiles; the old folder stays as it was for branches baked from it)."""
+    return RESORTS[rid].get("work", rid)
+
+
 def work_dir(rid, *parts):
-    path = os.path.join(WORK_ROOT, rid, *parts)
+    path = os.path.join(WORK_ROOT, cache_name(rid), *parts)
     os.makedirs(path if not os.path.splitext(path)[1] else os.path.dirname(path), exist_ok=True)
     return path
 
@@ -252,9 +264,23 @@ def http_get(url, path=None, timeout=120, tries=4, pause=1.2):
     raise SystemExit("GET failed: %s: %s" % (url, last))
 
 
-def overpass(rid, query, cache_name, tries=3):
-    """POST an Overpass query, cache the JSON under $SKI_WORK/<resort>/osm/<cache_name>.json, rotate through mirrors."""
-    path = os.path.join(work_dir(rid, "osm"), cache_name + ".json")
+# OpenStreetMap downloads of the data round (Nov 2026: every piste, lift, ski route) live in $SKI_WORK/OSM_ROUND/<resort>/osm/; a layer
+# not downloaded again is read from the older $SKI_WORK/<resort>/osm/ (osm_path).
+OSM_ROUND = "data-round"
+
+
+def osm_path(rid, layer, write=False):
+    new = os.path.join(WORK_ROOT, OSM_ROUND, rid, "osm", layer + ".json")
+    if write or os.path.exists(new):
+        os.makedirs(os.path.dirname(new), exist_ok=True)
+        return new
+    return os.path.join(WORK_ROOT, rid, "osm", layer + ".json")
+
+
+def overpass(rid, query, layer, tries=4):
+    """POST an Overpass query, cache the JSON under $SKI_WORK/OSM_ROUND/<resort>/osm/<layer>.json, rotate through mirrors with
+    back-off (Overpass is often overloaded: 429 / 502 / 504)."""
+    path = osm_path(rid, layer, write=True)
     if os.path.exists(path) and os.path.getsize(path) > 50:
         with open(path, encoding="utf-8") as fh:
             return json.load(fh)
@@ -266,12 +292,16 @@ def overpass(rid, query, cache_name, tries=3):
                 req = urllib.request.Request(url, data=body, headers={"User-Agent": USER_AGENT})
                 with urllib.request.urlopen(req, timeout=300) as resp:
                     data = json.load(resp)
+                remark = str(data.get("remark", ""))
+                if "error" in remark.lower():          # a timed-out / out-of-memory answer is incomplete: never cache it
+                    raise RuntimeError("overpass remark: " + remark[:120])
                 with open(path, "w", encoding="utf-8") as fh:
                     json.dump(data, fh)
-                print("overpass ok", cache_name, url, len(data.get("elements", [])), "elements")
+                print("overpass ok", layer, url, len(data.get("elements", [])), "elements")
                 return data
             except Exception as err:  # noqa: BLE001  (a mirror may be down, busy or rate limited: try the next one)
                 last = err
-                print("  overpass retry", cache_name, url, str(err)[:90], file=sys.stderr)
-        time.sleep(10 * (attempt + 1))
-    raise SystemExit("All Overpass mirrors failed for %s: %s" % (cache_name, last))
+                print("  overpass retry", layer, url, str(err)[:90], file=sys.stderr)
+                time.sleep(5)
+        time.sleep(30 * (attempt + 1))
+    raise SystemExit("All Overpass mirrors failed for %s: %s" % (layer, last))

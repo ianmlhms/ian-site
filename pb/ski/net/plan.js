@@ -33,9 +33,12 @@ export function resolveResort(cfg, seed, readyIds) {
 }
 
 const dropOf = (p) => (p.src ? p.src.drop : p.drop) || 0;
-/** Pistes that suit a race: length / drop window, sorted by id (the same order on every device). */
+const flagOf = (p, k) => !!(p.src ? p.src[k] : p[k]);
+/** Pistes that suit a race: length / drop window, named pistes only (no unnamed links, no ski routes), sorted by id (the same order on
+ * every device). */
 export function racePistes(list) {
-  return list.filter((p) => p.length >= RACE_PISTES.minLength && p.length <= RACE_PISTES.maxLength && dropOf(p) >= RACE_PISTES.minDrop)
+  return list.filter((p) => p.length >= RACE_PISTES.minLength && p.length <= RACE_PISTES.maxLength && dropOf(p) >= RACE_PISTES.minDrop
+    && !flagOf(p, 'link') && !flagOf(p, 'route'))
     .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
 
