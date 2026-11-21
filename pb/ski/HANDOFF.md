@@ -384,3 +384,10 @@ Ian's requests; our own design (no other game's look, UI, names or content). Bra
   real keys open Powder, measured handling, fair timed run, lift card, save + cloud), and updated `ski`, `ski-challenges`, `ski-freeride`,
   `ski-park`, `ski-mp`, `ski-resorts`, `ski-ipad-start` (now: skiing = the free ride running, gate 10 s).
 - Shots: `~/Library/Caches/ski-work/round6/` (`scripts/ski/round6-shots.mjs` through shot.mjs --gpu --dpr 2; sheets with look_sheet.py).
+- **Perf** (Mini, Niddreg, load < 40): flow `ski` p50 16.7 / p95 16.8 ms, 136 draw calls, 419k triangles; free ride 91 calls; riding a
+  chair / gondola / drag lift 141 calls (+1-2 for the own carrier, +1 gates). iPad start (`ski-ipad-start`, Killy): picker 4.4 s,
+  skiing in the free ride 7.2 s (3.5 MB). With the Mini at load ~400 the same flow measured p95 33 ms (not the game).
+- **Still wrong / open**: the instanced chairs / cabins far away are still plain boxes (only the ridden one is detailed); in a cabin
+  the window view still shows a wide ceiling band; skis vanish in cabins (no outside rack); the gate posts' base takes the banner tint;
+  no shared free ride online yet (only the "riding lift X at s" wire state and its drawing); no real train in today's data (checked
+  with a synthetic rack railway); the ride's exit can land beside a summit building (it uses the nearest piste start within 80 m).
