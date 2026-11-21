@@ -108,7 +108,11 @@ RESORTS = {
     "zermatt": {"name": "Zermatt · Cervinia", "short": "Matterhorn", "country": "CH", "crs": "EPSG:2056",
                 "bbox": (45.862, 7.600, 46.040, 7.830), "dem": ["swissalti3d", "vda-dtm", "copernicus-glo30"], "far": ["copernicus-glo30"],
                 "keep": [("Matterhorn", 7.6586, 45.9763, 800)],
-                "railways": ["Gornergrat"],              # the Gornergrat Bahn (rack railway, Zermatt -> Gornergrat) is a ski lift too
+                # the Gornergrat Bahn (rack railway Zermatt -> Gornergrat, a ski lift too): its OSM ways carry no name, only usage=tourism
+                # (the Matterhorn Gotthard Bahn up the valley is usage=branch)
+                "railways": [{"match": {"railway": "narrow_gauge", "usage": "tourism"}, "name": "Gornergrat Bahn"}],
+                # Monterosa Ski (Frachey / Lago Ciarcerio above Champoluc) reaches into the south-east corner of the box: not this resort
+                "exclude": [("Monterosa Ski", 7.745, 45.852, 1800)],
                 "skip_ways": [1305881375],                 # OSM piste ways left out: "Grenzpiste (stillgelegt)", closed and ungroomed
                 "landmarks": [
                     # Matterhorn glacier paradise: the top station where the cable arrives (glass front towards the Matterhorn, NW) and the
@@ -129,7 +133,7 @@ RESORTS = {
     # the DEM, OSM and the frame).
     "arlberg": {
         "name": "St. Anton · Arlberg", "short": "Ski Arlberg", "country": "AT", "crs": "EPSG:25832",
-        "bbox": (47.095, 10.010, 47.290, 10.312),
+        "bbox": (47.080, 10.012, 47.278, 10.312),
         "dem": ["at-dgm", "copernicus-glo30"], "far": ["copernicus-glo30"],
         "start": "Kandahar",
         # the World Cup course is two OSM pistes: Kandahar-Kapall from the start, then "Fang" down to the finish in St. Anton (the
@@ -143,6 +147,8 @@ RESORTS = {
             ("St. Christoph", 10.1960, 47.1310, 450), ("Stuben", 10.1580, 47.1360, 400), ("Alpe Rauz", 10.1790, 47.1370, 250),
             ("Zürs", 10.1680, 47.1700, 650), ("Lech", 10.1420, 47.2080, 1100), ("Oberlech", 10.1270, 47.2000, 450),
             ("Zug", 10.1280, 47.2200, 350),
+            ("Warth", 10.1800, 47.2580, 500), ("Hochkrumbach", 10.1310, 47.2640, 250), ("Schröcken", 10.0930, 47.2575, 400),
+            ("Klösterle", 10.0600, 47.1300, 450), ("Sonnenkopf", 10.0560, 47.1110, 160),
         ],
         "landmarks": [
             # spots from the OSM buildings / roads: Vallugabahn II top station, Galzigbahn top station, the B197 at the Hospiz, the

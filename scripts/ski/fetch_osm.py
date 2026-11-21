@@ -26,7 +26,8 @@ def queries(bbox, margin=0.03):
         "pistes": '[out:json][timeout:300];(way["piste:type"="downhill"](%s);relation["piste:type"="downhill"](%s););out body geom;' % (wide, wide),
         # every aerialway (+ station nodes / areas, pylons), funiculars and railways (bake.py keeps the railways a resort lists)
         "lifts": '[out:json][timeout:300];(way["aerialway"](%s);node["aerialway"~"^(pylon|station)$"](%s);'
-                 'way["railway"~"^(funicular|narrow_gauge|rail|light_rail|monorail)$"](%s););out geom tags;' % (wide, wide, wide),
+                 'way["railway"~"^(funicular|narrow_gauge|rail|light_rail|monorail)$"](%s);node["railway"~"^(station|halt|stop)$"](%s););'
+                 'out geom tags;' % (wide, wide, wide, wide),
         "buildings": '[out:json][timeout:240];(way["building"](%s);relation["building"](%s););out geom tags;' % (box, box),
         "areas": '[out:json][timeout:240];(way["landuse"~"^(forest|residential|meadow|grass|commercial|retail|construction|reservoir|basin)$"](%s);'
                  'way["natural"~"^(wood|water|bare_rock|scree|glacier|cliff|scrub|heath|grassland|shingle|rock)$"](%s);'

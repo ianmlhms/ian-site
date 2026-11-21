@@ -27,12 +27,16 @@ TYPE_WORDS = re.compile(r"\b(tsd\d*|tsf\d*|ts\d*|tc\d*|tk|tph|tps|dmc|tsdb\d*|tc
                         r"schlepplift|express|bahn|lift|jet|piste|abfahrt|skiroute|route|run|the|de|du|des|la|le|les|l|d|di|del|della|der|die|das)\b")
 
 
+ROMAN = {"i": "1", "ii": "2", "iii": "3", "iv": "4", "v": "5", "vi": "6", "deux": "2", "trois": "3", "zwei": "2", "drei": "3", "due": "2", "tre": "3"}
+
+
 def norm(name):
     t = unicodedata.normalize("NFKD", name or "").encode("ascii", "ignore").decode().lower()
     t = re.sub(r"\(.*?\)", " ", t)
     t = re.sub(r"[^a-z0-9]+", " ", t)
     t = re.sub(r"^\s*([a-z]|\d+)\s+(?=\w{3,})", " ", t)           # "A Sonnenkopfbahn", "12 Schindler"
     t = TYPE_WORDS.sub(" ", t)
+    t = " ".join(ROMAN.get(w, w) for w in t.split())          # "Olang II" = "Olang 2"
     t = re.sub(r"(bahn|lift|jet|express)\b", " ", t)
     return " ".join(t.split())
 
@@ -60,6 +64,8 @@ def osm_names(rid, layer, frame):
         if not name:
             continue
         geom = e.get("geometry") or [g for m in e.get("members", []) for g in (m.get("geometry") or []) if g]
+        if "lat" in e:
+            geom = [{"lat": e["lat"], "lon": e["lon"]}]
         inside = False
         for g in geom[::3]:
             x, z = frame.to_world(g["lon"], g["lat"])

@@ -541,7 +541,14 @@ def build_pistes(frame, dem, lifts=(), places=()):
                 break
             except ValueError:
                 pass
+        zones = [(*frame.to_world(lo, la), r) for _, lo, la, r in cfg.get("exclude", ())]
+        mid = p[len(p) // 2]
+        if any(math.hypot(mid[0] - x, mid[1] - z) <= r for x, z, r in zones):
+            skipped["outside"] += 1                           # a neighbouring ski area inside the box (RESORTS[rid]["exclude"])
+            continue
         parts = inside_parts(frame, p)
+        if parts and sum(polyline_len(q) for q in parts) < 0.5 * polyline_len(p):
+            parts = []                                        # mostly outside: a neighbouring ski area's piste, not a stub of it
         if not parts:
             skipped["outside"] += 1
         for q in parts:
@@ -1146,8 +1153,10 @@ def rail_line(frame, ways, dem_raw):
             if d + w < dist.get(m, math.inf):
                 dist[m], back[m] = d + w, k
                 heapq.heappush(heap, (d + w, m))
-    if b not in dist:
-        return None
+    if b not in dist:                                         # not one connected track (two parallel cabins of an inclined lift)
+        best = max(ways, key=lambda g: len(g))
+        p = way_xz(frame, best)
+        return p if len(p) > 1 else None
     path = [b]
     while path[-1] != a:
         path.append(back[path[-1]])
@@ -1172,8 +1181,13 @@ def build_lifts(frame, dem_raw):
             x, z = way_xz(frame, e["geometry"]).mean(axis=0)
         else:
             continue
-        stations.append((float(x), float(z), t.get("name", "")))
-    rail_pat = [re.compile(p, re.I) for p in cfg.get("railways", ())]
+        stations.append((float(x), float(z), t.get("name", ""), bool(t.get("aerialway"))))
+    rails_cfg = cfg.get("railways", ())                      # [{"match": {tag: value}, "name": the line's real name}]
+    out_zones = [(*frame.to_world(lo, la), r) for _, lo, la, r in cfg.get("exclude", ())]
+
+    def excluded(p):
+        c = p[len(p) // 2]
+        return any(math.hypot(c[0] - x, c[1] - z) <= r for x, z, r in out_zones)
     items = []                                                 # (osm id, kind, raw kind, tags, polyline)
     rails = {}
     for e in els:
@@ -1187,15 +1201,19 @@ def build_lifts(frame, dem_raw):
             if t.get("tunnel") == "yes" or t.get("layer", "0").startswith("-"):
                 continue                                       # (no underground aerialways in these resorts)
             items.append((e["id"], LIFT_KIND[aw], aw, t, way_xz(frame, e["geometry"])))
-        elif t.get("railway") == "funicular":                # (often several ways: a surface part, the tunnel, the passing loop)
-            rails.setdefault(("funicular", t.get("name") or e["id"]), []).append(e)
-        elif t.get("railway") and t.get("name") and any(p.search(t["name"]) for p in rail_pat) and t.get("service") not in ("yard", "siding", "spur"):
-            rails.setdefault(("train", t["name"]), []).append(e)
-    for (kind, _), ways in rails.items():
+        elif t.get("railway") == "funicular" and t.get("service") not in ("yard", "siding", "spur"):
+            rails.setdefault(("funicular", t.get("name") or e["id"]), []).append(e)    # (often several ways: surface part, tunnel, loop)
+        elif t.get("railway") and t.get("service") not in ("yard", "siding", "spur", "crossover"):
+            for rc in rails_cfg:
+                if all(t.get(k) == v for k, v in rc["match"].items()):
+                    rails.setdefault(("train", rc["name"]), []).append(e)
+    for (kind, key), ways in rails.items():
         p = rail_line(frame, [w["geometry"] for w in ways], dem_raw)
         if p is None:
             continue
         t = dict(max(ways, key=lambda w: len(w["geometry"])).get("tags", {}))
+        if kind == "train":
+            t["name"] = key
         under = sum(len(w["geometry"]) for w in ways if w.get("tags", {}).get("tunnel") == "yes" or w.get("tags", {}).get("layer", "0").startswith("-"))
         t["tunnel"] = "yes" if under * 2 > sum(len(w["geometry"]) for w in ways) else "no"
         t.pop("layer", None)
@@ -1207,7 +1225,7 @@ def build_lifts(frame, dem_raw):
         if h[0] > h[-1]:
             p, h = p[::-1].copy(), h[::-1].copy()
         ends_in = all(0 <= q[0] <= frame.width and 0 <= q[1] <= frame.depth for q in (p[0], p[-1]))
-        if not ends_in:
+        if not ends_in or excluded(p):
             dropped += 1                                       # another resort's lift in the download margin (or cut: see coverage.py)
             continue
         length = polyline_len(p)
@@ -1230,7 +1248,8 @@ def build_lifts(frame, dem_raw):
 
         def station(q, y):
             row = {"x": round(float(q[0]), 1), "z": round(float(q[1]), 1), "y": round(float(y), 1)}
-            best = min(stations, key=lambda s: math.hypot(s[0] - q[0], s[1] - q[1]), default=None)
+            own = [s_ for s_ in stations if s_[3] == (kind not in ("train", "funicular")) or kind == "funicular"]
+            best = min(own, key=lambda s: math.hypot(s[0] - q[0], s[1] - q[1]), default=None)
             if best and math.hypot(best[0] - q[0], best[1] - q[1]) <= STATION_NEAR:
                 if best[2]:
                     row["name"] = best[2]
@@ -1252,6 +1271,17 @@ def build_lifts(frame, dem_raw):
                 row[out_key] = t[key] == "yes"
         if t.get("tunnel") == "yes" or t.get("layer", "0").startswith("-"):
             row["tunnel"] = True
+        if kind == "train":                                   # the stops on the way up: [arc length m, name]
+            q = resample(p, 5.0)
+            stops = []
+            for sx, sz, sname, aerial in stations:
+                if aerial:
+                    continue
+                d = np.hypot(q[:, 0] - sx, q[:, 1] - sz)
+                k = int(np.argmin(d))
+                if sname and d[k] <= 40 and 20 < k * 5.0 < length - 20:
+                    stops.append([round(k * 5.0), sname])
+            row["stops"] = sorted(stops)
         out.append(row)
     kinds = {}
     for r in out:
