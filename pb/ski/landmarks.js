@@ -9,7 +9,8 @@
  *                   station (Galzig), a name board either way
  *   pass            a pass: the road sign with the name and a row of flag poles (Arlberg pass at St. Christoph)
  *   chapel          a white chapel with a square tower and a tall dark spire
- *   worldcup        a race piste (`piste` = its id): red safety nets along both edges, a start house and finish banners
+ *   worldcup        a race piste (`piste` = its id): red safety nets along both edges where it is steep, a start house with a banner
+ *                   at the top (`house: false`: nets only, for the second part of a course)
  * Built once the height tiles are in (like the lifts); hidden beyond `radius`. */
 const THREE = window.THREE;
 
@@ -248,7 +249,8 @@ function worldcup(lm, piste, height) {
     posts.forEach(([x, y, z], i) => { m4.makeTranslation(x, y, z); pole.setMatrixAt(i, m4); });
     g.add(pole);
   }
-  // start house: a small timber hut with a banner, across the top of the run
+  // start house: a small timber hut with a banner, across the top of the run (house: false = only the nets)
+  if (lm.house === false) return { group: g, footprint: 0, absolute: true, centre: [lm.x, lm.z], radius: piste.length };
   piste.at(0, q);
   const hut = new THREE.Group();
   hut.add(box(5, 3.2, 4, COL.wood, 0, -0.4, -4), box(5.6, 0.5, 4.6, COL.roofDark, 0, 2.8, -4));

@@ -6,7 +6,7 @@
 import { runIfMain } from "./lib.mjs";
 
 const CASES = {
-  arlberg: { title: "St. Anton · Arlberg", start: "kandahar-galzig", credit: /BEV/, landmarks: 5, minPistes: 60 },
+  arlberg: { title: "St. Anton · Arlberg", start: "kandahar-kapall", credit: /BEV/, landmarks: 6, minPistes: 60 },
   kronplatz: { title: "Kronplatz", start: "sylvester", credit: /Bozen - Südtirol/, landmarks: 2, minPistes: 30 },
 };
 

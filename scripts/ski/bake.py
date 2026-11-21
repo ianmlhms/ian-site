@@ -800,7 +800,7 @@ def main():
         mark(np.array(lf["pts"]).reshape(-1, 2))
     for b in buildings:
         mark(b["poly"])
-    near = ndimage.distance_transform_edt(~interest) * 40 <= NEAR_KEEP
+    near = ndimage.distance_transform_edt(~interest) * 40 <= cfg.get("near_keep", NEAR_KEEP)      # per resort: the data budget
     shipped = []
     for tz in range(frame.tiles_z):
         for tx in range(frame.tiles_x):

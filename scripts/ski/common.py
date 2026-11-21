@@ -84,7 +84,8 @@ RESORTS = {
         "name": "St. Anton · Arlberg", "short": "Ski Arlberg", "country": "AT", "crs": "EPSG:25832",
         "bbox": (47.095, 10.088, 47.232, 10.312),
         "dem": ["at-dgm", "copernicus-glo30"], "far": ["copernicus-glo30"],
-        "start": "Kandahar-Galzig",
+        "start": "Kandahar-Kapall",
+        "near_keep": 350.0,                                  # 5 m tiles only this close to pistes, lifts, houses (10 MB budget)
         "tree_line": 2000.0, "derived_forest": 1850.0,       # north side of the Alps: the forest ends near 1900 m (St. Anton 1300 m, St. Christoph 1800 m bare)
         "villages": [
             ("St. Anton", 10.2660, 47.1290, 1300), ("Nasserein", 10.2860, 47.1340, 500), ("St. Jakob", 10.2990, 47.1390, 450),
@@ -99,7 +100,9 @@ RESORTS = {
             {"kind": "summit-station", "name": "Galzig", "lon": 10.23089, "lat": 47.13082, "big": True, "face": 130, "clear": 22},
             {"kind": "pass", "name": "Arlbergpass 1793 m", "lon": 10.21345, "lat": 47.12768, "face": 135},
             {"kind": "chapel", "name": "St. Christoph", "lon": 10.21329, "lat": 47.12738},
-            {"kind": "worldcup", "name": "Kandahar", "piste": "Kandahar-Galzig"},
+            # the World Cup course: OSM has it as two pistes (Kapall start -> Galzig); nets on both, the start house on the first
+            {"kind": "worldcup", "name": "Kandahar", "piste": "Kandahar-Kapall"},
+            {"kind": "worldcup", "name": "Kandahar", "piste": "Kandahar-Galzig", "house": False},
         ],
     },
 }
