@@ -457,3 +457,35 @@ Ian's requests; our own design (no other game's look, UI, names or content). Bra
   the window view still shows a wide ceiling band; skis vanish in cabins (no outside rack); the gate posts' base takes the banner tint;
   no shared free ride online yet (only the "riding lift X at s" wire state and its drawing); no real train in today's data (checked
   with a synthetic rack railway); the ride's exit can land beside a summit building (it uses the nearest piste start within 80 m).
+
+## R7-D look (21 Nov 2026, helper branch `worktree-agent-a72d7342b7aa82cd0`): evening shade, strata, trees, park meshes, gate base
+All resort-generic; checked on all five resorts in Chromium and WebKit. Shared files carry `// R7-D` marks; `main.js?v=9`.
+- **Evening shade** (`snow-shader.js`): under a warm low sun (sun colour blue / red < 0.72, so morning / midday are untouched) the
+  shade colour keeps its brightness but loses most of the doubled sky tint: (100,137,220) violet-blue -> (116,139,189) blue-grey on screen.
+  env.js / sky / post.js untouched.
+- **Rock strata**: faded by their own pixel footprint (`fwidth` of the layer phase): bands only while a layer spans >= ~6 px, the thin
+  snow ledge lines only >= ~16 px (then their average share), so far faces no longer crawl.
+- **Trees** (`scatter-view.js`, still one instanced draw call per kind, depth material / blob shadows as before; `TREE_GEOMETRY` exported,
+  meshes named `ski-<kind>`): spruce = 6 tiers of real branches (each tip its own length and droop, a few long jagged ones, a shoulder
+  then hanging tips, tucked gaps, dark underside), a visible trunk under the skirt, a leader: 233 triangles (was 154). Larch = tapering
+  trunk to the top, 8 whorls of slim arching stems each with two hanging twig curtains, lit from both sides (airy, the snow shows through):
+  317 (was 190). Far spruce: zig-zag skirts 18 (was 10); far larch unchanged. Placement / collisions (scatter.js) untouched.
+- **Snow park** (`modes/park.js`, `modes/views.js parkSnowGeometry`, `surface.js`): kickers (run-up curve, sharp lip, table, rounded
+  knuckle, landing, straight side walls `k.side` = 0.8 H), the rail ramps and the halfpipe (flat, parabolic walls, crisp lip, a 4.6 m deck
+  each side, blue dye lines where the walls leave the flat, coping on the lip line) are ONE merged mesh in the terrain's own snow material
+  (`ski-park-snow`, shadows, + `ski-park` dressing + `ski-park-boards` = 3 draw calls). Drawn == skied: `surface.height` returns
+  `layout.solidAt` (the analytic shape) inside the feature boxes, so physics, camera and markers read exactly what the mesh draws; the
+  terrain lattice only keeps the flat corridor + a trough under the pipe (0.5 m deeper than the pipe, 8 cm lower under the deck, back to
+  the profile within the deck's outer 4 m), so the 2.5 m lattice never shows through. Patches meet without shared vertices (crisp lip /
+  wall edges); the rim and the walls' feet run on under the snow along the wall's own plane. Kicker airs got a little longer (crisp
+  lip: L 1.70 -> 1.85 s), every harness park check unchanged otherwise.
+- **Gate base** (`modes/markers.js`): a per-vertex `aTint` (1 = banner + flag) and a two-line `onBeforeCompile`: only the banner takes the
+  instance colour; posts, base and top edge keep theirs.
+- **Checks**: `node scripts/ski/look7d-check.mjs` (Node, all parks: every mesh vertex / 11k sampled points incl. walls and rims vs physics
+  <= 4.3 cm, a scripted rider over every kicker / ramp / the pipe: grounded skier vs mesh <= 1.8 cm, never inside it; terrain never
+  above a feature, pipe trough on LOD 5 / 10 nodes; tree triangle budgets) and flow `ski-look7d` (in run_all; `FLOW_BROWSER=webkit`
+  works: per resort one page, trees one call per kind, rays onto the park meshes == physics <= 2.8 cm, gate base pixels neutral vs banner
+  in colour, all shader programs runnable, no console error; Niddreg once). Shots: `scripts/ski/look7d-shots.sh OUT [chromium|webkit]`
+  (+ `look7d-shots.mjs`), sheets in `~/Library/Caches/ski-work/round7d/look/`.
+- **Open**: the halfpipe walls stay parabolic (37 deg at the lip; the physics' lip pop stands in for a vertical) - a real vert needs new pipe
+  physics; at midday the lit pipe wall is white on white (the dye lines carry its shape); the larch curtains are stylised triangles.
