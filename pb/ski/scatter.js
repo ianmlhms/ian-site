@@ -10,7 +10,9 @@ const GRID = 5;
 const TREE_KEEP = 0.62;          // share of the 5 m candidates that hold a tree in full forest (about one tree per 40 m2)
 const ROCK_GRID = 10;
 
-export function createScatter(field) {
+/** opts.guard(x, z, y) -> true = no tree here (round 7-B: the lift aisles, stations and pylon bases, lift-site.js liftTreeGuard). */
+export function createScatter(field, opts = {}) {
+  const guard = opts.guard || null;
   const trees = new Map();       // block key -> Float32Array [x, y, z, scale, species, seed] * n
   const rocks = new Map();       // block key -> Float32Array [x, y, z, radius, seed] * n
   const key = (bx, bz) => bx * 100003 + bz;
@@ -41,6 +43,7 @@ export function createScatter(field) {
           if (a.piste > 0.01 || a.dist < 2.5 || a.rock > 0.45 || a.built > 0.2 || a.water > 0.05) continue;
           if (slopeAt(x, z) > 0.9) continue;
           const y = field.height(x, z) - 0.25;
+          if (guard && guard(x, z, y)) continue;
           const h = hash2(gi, gj, 14);
           const larch = hash2(gi, gj, 15) < 0.36 && y < 2250 ? 1 : 0;
           const scale = 0.7 + 0.7 * h * h + (y < 1900 ? 0.25 : 0);
@@ -72,6 +75,7 @@ export function createScatter(field) {
           if (hash2(gi, gj, 23) > 0.55 * a.rock) continue;
           const sl = slopeAt(x, z);
           if (sl > 1.1) continue;                                   // a cliff face is the terrain itself (painted rock)
+          if (guard && guard(x, z, field.height(x, z))) continue;                // (no boulders in a station or a lift track either)
           const rad = 0.7 + 2.2 * Math.pow(hash2(gi, gj, 24), 2);
           out.push(x, field.height(x, z) - rad * 0.35, z, rad, hash2(gi, gj, 25));
         }

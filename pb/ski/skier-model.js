@@ -264,6 +264,29 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {})
       A.elbow.rotation.set(0, 0, 0.35);
     }
   }
+  /** R7-B: walking with the skis on the right shoulder (boarding a cabin, in it, out of the top station); walk = metres walked (gait). */
+  function poseCarry(t, walk) {
+    poseStand(t);
+    const ph = walk * 2.6;
+    for (let i = 0; i < 2; i++) {
+      const L = legs[i];
+      const sw = walk > 0 ? Math.sin(ph + (i ? Math.PI : 0)) * 0.38 : 0;
+      L.hip.rotation.z += sw;
+      L.knee.rotation.z -= walk > 0 ? Math.max(0, -Math.sin(ph + (i ? Math.PI : 0))) * 0.5 : 0;
+      L.ankle.rotation.z -= sw * 0.6;
+      // the skis on the shoulder, base to base, tips forward and up
+      const sk = skis[i];
+      sk.g.position.set(0.02, 1.52 + i * 0.03, 0.2 + i * 0.035);
+      sk.g.rotation.set(0, 0, 0.5);
+      sk.edge.rotation.set(1.5, 0, 0);
+    }
+    root.position.y += walk > 0 ? Math.abs(Math.sin(ph)) * 0.035 : 0;
+    const A = arms.find((a) => a.side > 0) || arms[1];
+    A.sh.rotation.set(-0.25, 0, 2.35);                 // the right hand up on the skis
+    A.elbow.rotation.set(0, 0, 1.75);
+    const B = arms.find((a) => a !== A);
+    B.pole.rotation.set(0.05, 0, -0.1);                 // the poles in the other hand, pointing down
+  }
   /** Pulled up a drag lift: skis on the snow, a little back, the outside hand on the bar's pole. */
   function poseDrag() {
     torso.rotation.z = -0.12;
@@ -372,6 +395,7 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {})
     if (ride === 'sit') poseSit(t);
     else if (ride === 'stand') poseStand(t);
     else if (ride === 'drag') poseDrag();
+    else if (ride === 'carry') poseCarry(t, state.walk || 0);         // R7-B ('skisdown' / 'clickin' / 'belt': the skis on the snow, standing)
     // blob under the skis
     if (blob.visible) {
       const gy = ground ? ground(state.x, state.z) : state.y;

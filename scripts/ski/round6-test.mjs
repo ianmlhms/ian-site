@@ -14,6 +14,7 @@ const { decodeGrid, decodeRle } = await imp('codec.js');
 const { createField, createPisteNet } = await imp('field.js');
 const { createPisteSet } = await imp('pistes.js');
 const { createLiftPath, liftClass } = await imp('lift-path.js');
+const { createLiftSite } = await imp('lift-site.js');
 const { createRide, riderAt, rideSeconds, RIDE, KIND_CODE } = await imp('modes/liftride.js');
 const { createLiftNet, spawnLift } = await imp('modes/freeride.js');
 const { markerList, markerAt } = await imp('modes/markers.js');
@@ -45,20 +46,21 @@ for (const rid of resorts) {
     ok(!!p, `${rid} ${lift.name}: has a line`);
     if (!p) continue;
     kinds[p.kind] = (kinds[p.kind] || 0) + 1;
-    const r = createRide({ lift, path: p, height: h });
-    let prev = null, steps = 0;
+    const r = createRide({ lift, path: p, site: net.world.sites.get(lift.index), height: h });      // R7-B: from station to station
+    let prev = null, steps = 0, rideSteps = 0, midState = null;
     while (!r.done && steps < 200000) {
       r.step(1 / 60); steps++;
+      if (r.phase === 'ride') { rideSteps++; if (!midState) midState = r.state(createSkierState(0, 0, 0, 0)); }
       const w = r.where();
       if (prev) worstJump = Math.max(worstJump, Math.hypot(w.x - prev.x, w.y - prev.y, w.z - prev.z));
-      if (p.kind !== 'drag' && p.kind !== 'train') worstClear = Math.min(worstClear, w.y - h(w.x, w.z));
+      if (w.onCarrier && p.kind !== 'drag' && p.kind !== 'train' && p.kind !== 'carpet') worstClear = Math.min(worstClear, w.y - h(w.x, w.z));
       prev = { ...w };
     }
     ok(r.done, `${rid} ${lift.name} (${p.kind}): the ride ends`);
-    const secs = steps / 60;
+    const secs = rideSteps / 60;
     longest = Math.max(longest, secs);
     ok(Math.abs(secs - rideSeconds(p)) < 0.2, `${rid} ${lift.name}: ${secs.toFixed(1)} s = rideSeconds ${rideSeconds(p).toFixed(1)}`);
-    const st = r.state(createSkierState(0, 0, 0, 0));
+    const st = midState || {};
     ok(st.ride && st.rideLift === lift.index && st.rideKind === KIND_CODE[p.kind], `${rid} ${lift.name}: the ride state carries the lift`);
     const top = net.startAt(lift, h);
     ok(Math.hypot(top.x - lift.top.x, top.z - lift.top.z) < 120, `${rid} ${lift.name}: off at the top (${Math.round(Math.hypot(top.x - lift.top.x, top.z - lift.top.z))} m from the station)`);
@@ -80,11 +82,11 @@ for (const rid of resorts) {
 }
 
 // lift classes of the bigger data
-ok(liftClass('funicular') === 'train' && liftClass('rack_railway') === 'train' && liftClass('t-bar') === 'drag' && liftClass('carpet') === null, 'lift classes: rail kinds ride as a train, carpets are not ridden');
+ok(liftClass('funicular') === 'train' && liftClass('rack_railway') === 'train' && liftClass('t-bar') === 'drag' && liftClass('carpet') === 'carpet', 'lift classes: rail kinds ride as a train, carpets ride on the belt (R7-B)');
 const fake = createLiftPath({ kind: 'funicular', pts: [0, 0, 300, 400, 900, 1200], pylons: [] }, (x, z) => 1600 + 0.4 * Math.hypot(x, z));
-const fr = createRide({ lift: { index: 99, name: 'Test' }, path: fake, height: (x, z) => 1600 + 0.4 * Math.hypot(x, z) });
-let n = 0; while (!fr.done && n < 1e5) { fr.step(1 / 60); n++; }
-ok(fr.done && fake.kind === 'train' && Math.abs(fr.where().pitch - Math.atan(0.4)) < 0.05, `a funicular rides as a train on its rails (pitch ${fr.where().pitch.toFixed(2)})`);
+const fr = createRide({ lift: { index: 99, name: 'Test' }, path: fake, site: createLiftSite(fake), height: (x, z) => 1600 + 0.4 * Math.hypot(x, z) });
+let n = 0, pitch = 0; while (!fr.done && n < 1e5) { fr.step(1 / 60); n++; if (fr.phase === 'ride') pitch = fr.where().pitch; }
+ok(fr.done && fake.kind === 'train' && Math.abs(pitch - Math.atan(0.4)) < 0.05, `a funicular rides as a train on its rails (pitch ${pitch.toFixed(2)})`);
 
 /* ---------------- ski types: the handling on a test slope ---------------- */
 function slopeWorld(deg, snow, ski) {

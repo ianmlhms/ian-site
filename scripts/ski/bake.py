@@ -40,6 +40,7 @@ from scipy import ndimage
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from codec import encode  # noqa: E402
+from lift_sites import aisle_mask, arrange, pad_stations  # noqa: E402
 from common import (CLASS_STEP, FAR_MARGIN, FAR_STEP, NEAR_KEEP, NEAR_STEP, OSM_CREDIT, RESORTS, SOURCE_CREDITS, TILE_CELLS, TILE_SIZE, Frame, osm_path, out_dir,  # noqa: E402
                     resort_arg, work_dir)
 
@@ -731,7 +732,7 @@ def groom(mosaic, mask):
     return (mosaic + mask * (smooth - mosaic)).astype(np.float32)
 
 
-def classes_raster(frame, dem_raw, areas_osm, piste_lines, piste_areas, buildings):
+def classes_raster(frame, dem_raw, areas_osm, piste_lines, piste_areas, buildings, lifts=()):
     nx, nz = int(frame.width / CLASS_STEP), int(frame.depth / CLASS_STEP)
     s = CLASS_STEP
     out = np.zeros((nz, nx), np.uint8)
@@ -835,6 +836,10 @@ def classes_raster(frame, dem_raw, areas_osm, piste_lines, piste_areas, building
     out[rock] |= CLASS_BITS["rock"]
     out[slope < 24] &= ~np.uint8(CLASS_BITS["scree"])
     no_tree = (pm > 0.15) | area_m | (h > tree_line) | ((out & CLASS_BITS["water"]) > 0) | (slope > 42) | ((out & CLASS_BITS["built"]) > 0)
+    if lifts:                                                 # round 7-B: the lift aisles, stations and pylon bases (lift_sites.py)
+        aisles = aisle_mask((nz, nx), s, lifts, dem_raw)
+        log("lift aisles: %d forest cells cleared" % int((aisles & ((out & tree_bits) > 0)).sum()))
+        no_tree |= aisles
     out[no_tree] &= ~tree_bits
     log("classes", {k: int(((out & v) > 0).sum()) for k, v in CLASS_BITS.items()})
     return out, nx, nz
@@ -1461,6 +1466,7 @@ def main():
     raw, lake_levels, banks = apply_drawdown(frame, cfg, raw, load_osm(rid, "areas"))
     dem_raw = Dem(raw)
     lifts = build_lifts(frame, dem_raw)
+    arrange(lifts, log)                                       # round 7-B: drag tracks away from neighbours, pylons out of other lanes
     peaks, places = build_poi(frame)
     lines, areas, runs = build_pistes(frame, dem_raw, lifts, places)
     buildings = clear_for_landmarks(frame, cfg, build_buildings(frame, dem_raw))
@@ -1470,6 +1476,7 @@ def main():
     groomed_lines = [ln for ln in lines if not ln["route"]]
     mask = piste_mask(raw.shape, NEAR_STEP, groomed_lines, areas + strips)
     groomed = groom(bench(raw, groomed_lines), mask)
+    groomed = pad_stations(groomed, lifts, NEAR_STEP, log)   # round 7-B: every lift station on a level pad
     log("groomed: mean |change| under pistes %.2f m" % float(np.abs(groomed - raw)[mask > 0.5].mean()))
 
     # which height tiles are shipped
@@ -1544,7 +1551,7 @@ def main():
         fh.write(far_blob)
     log("far.bin %.2f MB" % (len(far_blob) / 1e6))
 
-    classes, cnx, cnz = classes_raster(frame, dem_raw, load_osm(rid, "areas"), lines, areas + strips, buildings)
+    classes, cnx, cnz = classes_raster(frame, dem_raw, load_osm(rid, "areas"), lines, areas + strips, buildings, lifts)
     if banks is not None:                                     # the drawn-down banks: snow-covered ground, not ice
         h_, w_ = min(banks.shape[0], cnz), min(banks.shape[1], cnx)
         bm = np.zeros_like(classes, bool)

@@ -5,7 +5,7 @@ const r2 = (v) => Math.round(v * 100) / 100;
 const r3 = (v) => Math.round(v * 1000) / 1000;
 const num = (v, d = 0) => (Number.isFinite(v) ? v : d);
 export const RIDE_FLAG = 4;
-const POSE_OF_CODE = { 1: 'sit', 2: 'stand', 3: 'stand', 4: 'drag', 5: 'stand' };
+const POSE_OF_CODE = { 1: 'sit', 2: 'carry', 3: 'carry', 4: 'drag', 5: 'carry', 6: 'belt' };      // R7-B: skis on the shoulder in cabins; 6 = carpet
 
 export function packState(st, progress, finished) {
   const riding = !!st.ride && Number.isInteger(st.rideLift);

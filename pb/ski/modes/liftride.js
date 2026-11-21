@@ -1,107 +1,261 @@
-/* Real lift rides (round 6, pure: no THREE, no DOM; Node tests use the same code).
- * A ride follows one lift's real line (lift-path.js: the data's polyline, the rope over the pylon tops) from the boarding point just past
- * the bottom station to the exit just before the top one, at RIDE.factor times the real line speed (the real lines are long), and it can
- * be skipped. Where the rider is comes from the carrier:
- *   chair    seated on a chair under the rope (pose 'sit'), the safety bar down
- *   gondola  standing in a small cabin, cable  standing in the big cabin, train  standing in the carriage (pose 'stand', skis in the rack)
- *   drag     on the snow, pulled up the track by a T-bar (pose 'drag', skis on the snow)
- * The ride state that goes on the wire (multiplayer: a friend on the same lift sits in his own chair) is { lift index, s, kind }.
- * The camera: 'chase' = third person beside / behind the carrier, 'window' = from the rider's eyes along the line. */
-import { LIFT_SPEC } from '../lift-path.js';
+/* Real lift rides (round 6, round 7-B: from station to station; pure: no THREE, no DOM; the Node tests use the same code).
+ * A ride follows one lift's real line (lift-path.js: the data's polyline, the rope over the pylon tops with its sag) between the stations
+ * of lift-site.js, at RIDE.factor times the real line speed (the real lines are long), and the ride itself can be skipped.
+ *   board   from the waiting zone in the bottom station to the loading line: gondola / cable car / train: step out of the skis, carry
+ *           them on the shoulder to the door; chair / drag lift / carpet: skate up to the line. The rider's own carrier comes round
+ *           the bull-wheel (the next one of the lift's own loop: lifts.js nextCarrier) and picks him up there; a T-bar's spring line
+ *           reels out to his hips
+ *   ride    seated on the chair (the bar comes down once out of the station), standing in the cabin / carriage with the skis on the
+ *           shoulder, on the snow in the track behind the bar (skis on the snow), on the belt
+ *   alight  at the top: off onto the platform on the outer side, then out of the station to the exit spot (lift-site.js exitOf:
+ *           outside every building, on snow, facing downhill, 15 m clear); cabins: walk out carrying the skis, put them down and click
+ *           in. Then he stands still (main.js holds him at 0 km/h until the player steers or pushes)
+ * The ride state that goes on the wire (multiplayer: a friend on the same lift sits in his own chair) is { lift index, s, kind } while
+ * he is on the carrier. The camera: 'chase' = third person beside / behind, 'window' = from the rider's eyes along the line. */
+import { LIFT_SPEC, carrierBox } from '../lift-path.js';
+import { BOARD, UNLOAD } from '../lift-site.js';
 
 export const RIDE = Object.freeze({
   factor: 4,                 // x the real line speed
-  boardRadius: 30,           // m from the bottom station: the boarding zone
-  boardSpeed: 6,             // m/s: slower than this to board
-  enter: { chair: 6, gondola: 5, cable: 7, drag: 3, train: 9 },       // m past the bottom wheel / buffer where the rider gets on
-  exit: { chair: 7, gondola: 6, cable: 8, drag: 4, train: 10 },       // m before the top one where he gets off
-  seat: { chair: -2.0, gondola: -4.05, cable: -6.05, drag: 0, train: 0.5 },   // the rider's feet / seat below the rope (train: above the rail)
+  boardSpeed: 6,             // m/s: slower than this to board (in the zone)
+  enter: BOARD, exit: UNLOAD,
+  seat: { chair: -2.0, gondola: -4.05, cable: -6.05, drag: 0, train: 0.5, carpet: 0.18 },   // the rider below the rope (train: on the rail)
   minRide: 1.5,              // s: even a skipped ride shows the carrier this long
+  walk: 1.7, glide: 2.2, out: 3.0,    // m/s: walking with the skis, skating to the loading line, skiing out of the station
+  stepOut: 0.7, getIn: 0.55, clickIn: 1.3, barDrop: 0.9, getOut: 0.6, turn: 0.6,
+  wait: 2.5,                 // s at most the rider waits for the next carrier (beyond that the lift catches up)
 });
-export const POSE_OF = Object.freeze({ chair: 'sit', gondola: 'stand', cable: 'stand', train: 'stand', drag: 'drag' });
-export const KIND_CODE = Object.freeze({ chair: 1, gondola: 2, cable: 3, drag: 4, train: 5 });
+export const POSE_OF = Object.freeze({ chair: 'sit', gondola: 'carry', cable: 'carry', train: 'carry', drag: 'drag', carpet: 'belt' });
+export const KIND_CODE = Object.freeze({ chair: 1, gondola: 2, cable: 3, drag: 4, train: 5, carpet: 6 });
 export const KIND_OF_CODE = Object.freeze(Object.fromEntries(Object.entries(KIND_CODE).map(([k, v]) => [v, k])));
+const CARRY = new Set(['gondola', 'cable', 'train']);
+const ease = (k) => (k <= 0 ? 0 : k >= 1 ? 1 : k * k * (3 - 2 * k));
+const lerp = (a, b, k) => a + (b - a) * k;
+const angLerp = (a, b, k) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * k;
 
-/** Seconds a ride takes at the game's speed (path = lift-path.js createLiftPath). */
+/** The stretch of line a ride covers: [s0, s1] (clamped to 20 % of the line on very short lifts: the 60 m Leisee-Shuttle). */
+export function rideSpan(path) {
+  const key = path.kind === 'drag' && path.sub === 'rope' ? 'rope' : path.kind;
+  const s0 = Math.min(BOARD[key], path.len * 0.2), s1 = Math.max(s0 + 1, path.len - Math.min(UNLOAD[key], path.len * 0.2));
+  return [s0, s1];
+}
+/** Seconds the ride on the carrier takes at the game's speed (path = lift-path.js createLiftPath). */
 export function rideSeconds(path, factor = RIDE.factor) {
-  const k = path.kind;
-  // the same boarding / leaving stretch as createRide (clamped to 10 % of the line on very short lifts: the 60 m Leisee-Shuttle)
-  const s0 = Math.min(RIDE.enter[k], path.len * 0.1), s1 = Math.max(s0 + 1, path.len - Math.min(RIDE.exit[k], path.len * 0.1));
+  const [s0, s1] = rideSpan(path);
   return Math.max(0, s1 - s0) / (path.spec.speed * factor);
 }
 
-/** The carrier and the rider at s along the line (up side): { cx, cy, cz (rope point / rail top), x, y, z (rider), heading, yaw, pitch }.
- *  height(x, z) is the snow (drag lifts and trains sit on it). */
+/** The carrier and the rider at s along the line (up lane): { cx, cy, cz (rope grip / rail top / belt), x, y, z (rider), heading, pitch,
+ *  hip (drag: where the bar holds him) }. height(x, z) is the snow (drag lifts, belts and trains sit on it). */
 export function riderAt(path, s, height, out = {}) {
-  const q = path.at(s, {});
-  const k = path.kind, side = path.spec.side;
-  const fx = q.dx, fz = q.dz;                                        // along the line, uphill
-  const rx = -fz, rz = fx;                                           // the up side's offset direction (lifts.js: x - dz * off)
-  const cx = q.x + rx * side, cz = q.z + rz * side;
-  const cy = k === 'drag' ? path.cableY(s) : k === 'train' ? height(cx, cz) + 0.35 : path.cableY(s);
-  out.cx = cx; out.cy = cy; out.cz = cz; out.s = s;
-  out.heading = Math.atan2(fz, fx);
-  out.pitch = k === 'train' ? Math.atan(path.slope(s)) : 0;
-  if (k === 'drag') { out.x = q.x; out.z = q.z; out.y = height(q.x, q.z); }
+  const k = path.kind;
+  const c = path.shuttle ? path.shuttleAt(s, 1, true, {}) : path.loopAt(path.upU(s), {});
+  const fx = Math.cos(c.heading), fz = Math.sin(c.heading);
+  const rx = -fz, rz = fx;
+  out.s = s; out.heading = c.heading; out.pitch = 0; out.roll = out.roll || 0;
+  out.cx = c.x; out.cz = c.z;
+  if (k === 'train') { out.cy = c.y; out.pitch = Math.atan(path.slope(s)); }
+  else if (k === 'carpet') out.cy = height(c.x, c.z) + 0.18;
+  else out.cy = c.y;
+  if (k === 'drag') {
+    const lat = path.sub === 'rope' ? -0.45 * path.sign : 0;       // a rope tow: the rope at his outer hand
+    out.x = c.x + rx * lat; out.z = c.z + rz * lat; out.y = height(out.x, out.z); out.hip = out.y + (path.sub === 'platter' ? 0.78 : 0.86);
+  } else if (k === 'carpet') { out.x = c.x; out.z = c.z; out.y = out.cy; }
   else if (k === 'chair') {
-    const slot = Math.min(0.45, 0.25 * Math.max(1, (path.seats || 4) / 2 - 0.5));     // a seat left of the middle
-    out.x = cx - fx * 0.05 - rx * slot; out.z = cz - fz * 0.05 - rz * slot; out.y = cy + RIDE.seat.chair;
+    const slot = Math.min(0.45, 0.25 * Math.max(1, (path.seats || 4) / 2 - 0.5));     // a seat left of the middle (towards the line)
+    out.x = c.x - fx * 0.05 - rx * slot; out.z = c.z - fz * 0.05 - rz * slot; out.y = c.y + RIDE.seat.chair;
   } else if (k === 'train') {
-    out.x = cx + fx * 3; out.z = cz + fz * 3; out.y = cy + RIDE.seat.train + Math.tan(out.pitch) * 3;
-  } else { out.x = cx + fx * 0.35; out.z = cz + fz * 0.35; out.y = cy + RIDE.seat[k]; }
+    out.x = c.x + fx * 3; out.z = c.z + fz * 3; out.y = c.y + RIDE.seat.train + Math.tan(out.pitch) * 3;
+  } else { out.x = c.x + fx * 0.35; out.z = c.z + fz * 0.35; out.y = c.y + RIDE.seat[k]; }
   return out;
 }
 
-/** One ride. lift = the free ride lift (modes/freeride.js createLiftNet entry), path = its line. */
-export function createRide({ lift, path, height, factor = RIDE.factor }) {
+/**
+ * One ride. lift = the free ride lift (modes/freeride.js createLiftNet entry), path = its line, site = lift-site.js createLiftSite,
+ * from = where the rider stands (in the waiting zone; default: the zone's waiting spot), startU = the loop parameter of the carrier that
+ * will pick him up (lifts.js nextCarrier; default: one line-speed approach behind the loading point), exitAt() = the exit spot at the
+ * top ({ x, z, heading }; asked for when he gets off, so the tiles there are in).
+ */
+export function createRide({ lift, path, site, height, factor = RIDE.factor, from = null, startU = null, exitAt = null }) {
   const k = path.kind;
-  const s0 = Math.min(RIDE.enter[k], path.len * 0.1), s1 = Math.max(s0 + 1, path.len - Math.min(RIDE.exit[k], path.len * 0.1));
+  const [s0, s1] = rideSpan(path);
   const speed = path.spec.speed * factor;
-  let s = s0, t = 0, skipped = false;
-  const pose = {};
+  const carry = CARRY.has(k);
+  const start = from || site.wait;
+  const load = site.load;
+  const seatAt0 = riderAt(path, s0, height, {});
+  // the boarding timeline
+  const tStep = carry ? RIDE.stepOut : 0;
+  const moveD = Math.hypot(load.x - start.x, load.z - start.z);
+  const tMove = Math.max(0.8, moveD / (carry ? RIDE.walk : RIDE.glide));
+  const tIn = k === 'drag' ? (path.sub === 'rope' ? 0.4 : RIDE.barDrop) : k === 'carpet' ? 0.3 : RIDE.getIn;
+  const uLoad = path.shuttle ? s0 : path.upU(s0);
+  const tNeed = tStep + tMove + tIn;
+  let u0 = startU === null ? uLoad - path.spec.speed * tNeed : startU;
+  if (path.shuttle) u0 = uLoad;
+  const approach = uLoad - u0;
+  const tArrive = path.shuttle ? tNeed : Math.max(tNeed, Math.min(approach / path.spec.speed, tNeed + RIDE.wait));
+  let phase = 'board', t = 0, s = s0, skipped = false, tRide = 0, alight = null;
+  const pose = { roll: 0 };
   const ride = {
-    lift, path, kind: k, pose: POSE_OF[k], speed,
-    get s() { return s; }, get t() { return t; }, get done() { return s >= s1 && t >= (skipped ? RIDE.minRide * 0.5 : 0); },
-    get share() { return (s - s0) / (s1 - s0); },
-    /** Seconds left at the game's speed. */
-    get left() { return Math.max(0, (s1 - s) / speed); },
-    step(dt) { t += dt; s = Math.min(s1, s + speed * dt); return ride.done; },
-    skip() { skipped = true; s = s1; },
-    /** Where the carrier and the rider are now. */
-    where() { return riderAt(path, s, height, pose); },
-    /** A skier state for the figure (skier-model.js pose: ride = 'sit' | 'stand' | 'drag'). */
+    lift, path, site, kind: k, pose: POSE_OF[k], speed, carry,
+    get phase() { return phase; },
+    get s() { return s; }, get t() { return t; },
+    get done() { return phase === 'done'; },
+    get share() { return phase === 'board' ? 0 : phase === 'ride' ? (s - s0) / (s1 - s0) : 1; },
+    /** Seconds left on the carrier at the game's speed. */
+    get left() { return phase === 'ride' ? Math.max(0, (s1 - s) / speed) : phase === 'board' ? rideSeconds(path, factor) : 0; },
+    /** The loop parameter of the rider's own carrier while it holds him (lifts.js setRide), else null (the lift's own loop has it). */
+    get carrierU() {
+      if (phase === 'board') return path.shuttle ? uLoad : u0 + approach * Math.min(1, t / tArrive);
+      if (phase === 'ride') return path.upU(s);
+      return null;
+    },
+    get canSkip() { return phase === 'ride' && tRide > 0.6; },
+    get exit() { return alight ? alight.exit : null; },
+    step(dt) {
+      t += dt;
+      if (phase === 'board' && t >= tArrive) { phase = 'ride'; tRide = 0; }
+      else if (phase === 'ride') {
+        tRide += dt;
+        s = Math.min(s1, s + speed * dt);
+        if (s >= s1 && tRide >= (skipped ? RIDE.minRide * 0.5 : 0)) beginAlight();
+      } else if (phase === 'alight') {
+        alight.t += dt;
+        if (alight.t >= alight.total) phase = 'done';
+      }
+      return ride.done;
+    },
+    skip() { if (phase !== 'ride') return false; skipped = true; s = s1; return true; },
+    /** Where the carrier and the rider are now: riderAt() + { onCarrier, walk (m walked: the gait), pose }. */
+    where() { return place(); },
+    /** A skier state for the figure (skier-model.js pose: ride = 'sit' | 'carry' | 'drag' | 'belt' | '' (on his skis)). */
     state(base) {
-      const w = riderAt(path, s, height, pose);
-      return { ...base, x: w.x, y: w.y, z: w.z, heading: w.heading, vx: Math.cos(w.heading) * speed, vz: Math.sin(w.heading) * speed, vy: 0, speed: k === 'drag' ? speed : 0,
-        grounded: true, air: 0, crash: 0, tuck: 0, brake: 0, edge: 0, steer: 0, slip: 0, landed: 0, spin: 0, flip: 0, grab: 0, rail: -1, ride: POSE_OF[k], rideLift: lift.index, rideS: s, rideKind: KIND_CODE[k] };
+      const w = place();
+      const moving = phase === 'ride' ? speed : 0;
+      const st = { ...base, x: w.x, y: w.y, z: w.z, heading: w.heading, vx: Math.cos(w.heading) * moving, vz: Math.sin(w.heading) * moving, vy: 0, speed: k === 'drag' && phase === 'ride' ? speed : w.glide || 0,
+        grounded: true, air: 0, crash: 0, tuck: 0, brake: 0, edge: 0, steer: 0, slip: 0, landed: 0, spin: 0, flip: 0, grab: 0, rail: -1, ride: w.pose, walk: w.walk || 0 };
+      if (w.onCarrier) { st.rideLift = lift.index; st.rideS = s; st.rideKind = KIND_CODE[k]; }
+      else { delete st.rideLift; delete st.rideS; delete st.rideKind; }
+      return st;
     },
     /** The wire form (multiplayer): [kind code, lift index, s]. */
     wire: () => [KIND_CODE[k], lift.index, Math.round(s * 10) / 10],
   };
+  function beginAlight() {
+    phase = 'alight';
+    const inCar = riderAt(path, s1, height, {});
+    const off = site.off;
+    const ex = (exitAt && exitAt()) || { x: off.x, z: off.z, heading: inCar.heading };
+    const tOut = k === 'drag' || k === 'carpet' ? 0.5 : RIDE.getOut;
+    const d = Math.hypot(ex.x - off.x, ex.z - off.z);
+    const tGo = Math.min(8, Math.max(0.6, d / (carry ? RIDE.walk * 1.4 : RIDE.out)));
+    alight = { t: 0, inCar, off, exit: ex, tOut, tGo, tClick: carry ? RIDE.clickIn : 0, total: tOut + tGo + RIDE.turn + (carry ? RIDE.clickIn : 0) };
+  }
+  function place() {
+    const w = pose;
+    w.onCarrier = false; w.walk = 0; w.glide = 0;
+    if (phase === 'ride' || (phase === 'board' && t >= tArrive)) {
+      riderAt(path, s, height, w);
+      w.onCarrier = true; w.pose = POSE_OF[k];
+      w.barDown = k === 'chair' && s - s0 > 9 && s1 - s > 12;
+      return w;
+    }
+    if (phase === 'board') {
+      // the carrier comes in; the rider steps out of his skis (cabins), walks / skates to the loading line, gets in as it arrives
+      const cu = u0 + approach * Math.min(1, t / tArrive);
+      const c = path.shuttle ? path.shuttleAt(s0, 1, true, {}) : path.loopAt(cu, {});
+      w.cx = c.x; w.cz = c.z; w.cy = k === 'carpet' ? height(c.x, c.z) + 0.18 : c.y; w.heading = c.heading; w.pitch = k === 'train' ? Math.atan(path.slope(s0)) : 0;
+      w.barDown = false;
+      w.hip = undefined;
+      const tm = t - tStep;
+      if (tm <= 0) { setGround(w, start.x, start.z, start.heading); w.pose = carry ? 'carry' : ''; return w; }
+      if (tm < tMove) {
+        const kk = ease(tm / tMove);
+        const hx = Math.atan2(load.z - start.z, load.x - start.x);
+        setGround(w, lerp(start.x, load.x, kk), lerp(start.z, load.z, kk), moveD > 0.3 ? angLerp(start.heading, hx, Math.min(1, tm / 0.4)) : start.heading);
+        w.pose = carry ? 'carry' : ''; w.walk = moveD * kk; w.glide = carry ? 0 : moveD / tMove;
+        if (tm > tMove - 0.4) w.heading = angLerp(w.heading, load.heading, (tm - (tMove - 0.4)) / 0.4);
+        return w;
+      }
+      // at the loading line (waiting, then getting in)
+      const tin = t - (tArrive - tIn);
+      setGround(w, load.x, load.z, load.heading);
+      w.pose = carry ? 'carry' : k === 'drag' ? 'drag' : '';
+      if (tin > 0) {
+        const kk = ease(tin / tIn);
+        if (k === 'drag') { const g = w.y; w.hip = lerp(w.cy - 1.4, g + 0.85, kk); }
+        else if (k !== 'carpet') {
+          const seat = seatAt0;
+          w.x = lerp(load.x, seat.x, kk); w.z = lerp(load.z, seat.z, kk); w.y = lerp(w.y, seat.y, kk);
+          if (kk > 0.5) w.pose = POSE_OF[k];
+        } else w.y = lerp(w.y, w.cy, kk);
+      }
+      return w;
+    }
+    // alight: off the carrier onto the platform, out of the station to the exit, (cabins: skis down, click in)
+    const a = alight;
+    const ex = a.exit;
+    w.cx = a.inCar.cx; w.cy = a.inCar.cy; w.cz = a.inCar.cz;
+    if (phase === 'done') { setGround(w, ex.x, ex.z, ex.heading); w.pose = ''; return w; }
+    if (a.t < a.tOut) {
+      const kk = ease(a.t / a.tOut);
+      const gy = height(a.off.x, a.off.z);
+      w.x = lerp(a.inCar.x, a.off.x, kk); w.z = lerp(a.inCar.z, a.off.z, kk); w.y = lerp(a.inCar.y, gy, kk); w.heading = a.inCar.heading;
+      w.pose = carry ? 'carry' : kk < 0.5 && k === 'chair' ? 'sit' : '';
+      return w;
+    }
+    const tg = a.t - a.tOut;
+    const hx = Math.atan2(ex.z - a.off.z, ex.x - a.off.x);
+    if (tg < a.tGo) {
+      const kk = ease(tg / a.tGo);
+      setGround(w, lerp(a.off.x, ex.x, kk), lerp(a.off.z, ex.z, kk), angLerp(a.inCar.heading, hx, Math.min(1, tg / 0.5)));
+      w.pose = carry ? 'carry' : ''; w.walk = Math.hypot(ex.x - a.off.x, ex.z - a.off.z) * kk; w.glide = carry ? 0 : Math.hypot(ex.x - a.off.x, ex.z - a.off.z) / a.tGo;
+      return w;
+    }
+    const tt = tg - a.tGo;
+    setGround(w, ex.x, ex.z, angLerp(hx, ex.heading, ease(tt / RIDE.turn)));
+    w.pose = carry && tt < RIDE.turn ? 'carry' : carry && tt < RIDE.turn + a.tClick * 0.35 ? 'skisdown' : carry && tt < RIDE.turn + a.tClick ? 'clickin' : '';
+    return w;
+  }
+  function setGround(w, x, z, heading) { w.x = x; w.z = z; w.y = height(x, z); w.heading = heading; }
   return ride;
 }
 
-/** The ride cameras. mode 'chase' | 'window'; w = riderAt(); returns { x, y, z, tx, ty, tz, fov } (the caller smooths 'chase'). */
+/** The ride cameras. mode 'chase' | 'window'; w = ride.where(); returns { x, y, z, tx, ty, tz, fov, inside? } (the caller smooths
+ *  'chase'; `inside` = in a tunnel: never lifted over the ground). */
 export function rideCamera(path, w, mode, ground) {
   const k = path.kind;
   const fx = Math.cos(w.heading), fz = Math.sin(w.heading), rx = -fz, rz = fx;
   const out = {};
-  if (mode === 'window') {
-    // from the rider's eyes: a chair looks a little down (the safety bar and the chairs ahead), a cabin out of its front window (the
-    // ceiling and the posts frame the view), a drag lift up the track
-    const eye = k === 'chair' ? 1.02 : 1.62;
-    const ahead = k === 'chair' ? 0.08 : k === 'drag' ? 0.2 : k === 'train' ? -1 : 0.12;
+  const tunnel = !!path.tunnel && w.onCarrier && ground(w.x, w.z) - w.y > 3;
+  if (!w.onCarrier) {
+    // boarding / getting off: behind him on the platform, a little to the outer side
+    out.x = w.x - fx * 5.2 + rx * 1.8; out.z = w.z - fz * 5.2 + rz * 1.8; out.y = w.y + 2.3;
+    out.tx = w.x + fx * 3; out.tz = w.z + fz * 3; out.ty = w.y + 1.0; out.fov = 60;
+  } else if (mode === 'window') {
+    // from the rider's eyes: a chair looks a little down (the safety bar and the chairs ahead); a cabin from just behind its front
+    // window, eyes level with the glass (no ceiling band), skis on his shoulder; a drag lift up the track
+    const half = k === 'gondola' ? 1.0 : k === 'cable' ? 3.5 : k === 'train' ? 6.25 : 0;
+    const eye = k === 'chair' ? 1.02 : k === 'drag' || k === 'carpet' ? 1.62 : 1.48;
+    const ahead = k === 'chair' ? 0.08 : k === 'drag' ? 0.2 : k === 'carpet' ? 0.25 : k === 'train' ? half - 3.35 : half - 0.35 - 0.35;
     out.x = w.x + fx * ahead; out.z = w.z + fz * ahead; out.y = w.y + eye;
     const look = 40;
-    const tx = w.x + fx * look, tz = w.z + fz * look;
-    const climb = k === 'drag' || k === 'train' ? (ground(w.x + fx * 20, w.z + fz * 20) - ground(w.x, w.z)) / 20 : path.slope(w.s || 0);
-    const pitch = k === 'chair' ? Math.atan(climb) - 0.5 : k === 'drag' ? Math.atan(climb) * 0.7 - 0.1 : Math.atan(climb) * 0.6 - 0.05;
-    out.tx = tx; out.tz = tz; out.ty = out.y + look * Math.tan(pitch);
-    out.fov = k === 'chair' ? 80 : 74;
+    const climb = k === 'drag' || k === 'train' || k === 'carpet' ? (ground(w.x + fx * 20, w.z + fz * 20) - ground(w.x, w.z)) / 20 : path.slope(w.s || 0);
+    const pitch = k === 'chair' ? Math.atan(climb) - 0.5 : k === 'drag' || k === 'carpet' ? Math.atan(climb) * 0.7 - 0.1 : k === 'train' ? Math.atan(path.slope(w.s || 0)) - 0.04 : Math.atan(climb) * 0.45 - 0.12;
+    out.tx = w.x + fx * look; out.tz = w.z + fz * look; out.ty = out.y + look * Math.tan(pitch);
+    out.fov = k === 'chair' ? 80 : k === 'drag' || k === 'carpet' ? 74 : 68;
+  } else if (tunnel) {
+    // in the tunnel: behind the carriage, between the two tracks, under the vault
+    out.x = w.x - fx * 9 - rx * path.side * 0.9; out.z = w.z - fz * 9 - rz * path.side * 0.9;
+    out.y = w.y + 2.3 - Math.tan(Math.atan(path.slope(w.s || 0))) * 9;
+    out.tx = w.x + fx * 6; out.tz = w.z + fz * 6; out.ty = w.y + 1.3 + Math.tan(Math.atan(path.slope(w.s || 0))) * 6; out.fov = 64;
+    out.inside = true;
+    return out;
   } else {
-    const back = k === 'cable' ? 13 : k === 'gondola' ? 7.5 : k === 'train' ? 16 : k === 'drag' ? 5.5 : 5.2;
-    const side = k === 'cable' ? 6 : k === 'gondola' ? 3.6 : k === 'train' ? 5 : k === 'drag' ? 1.6 : 2.6;
-    const up = k === 'cable' ? 2.5 : k === 'gondola' ? 1.9 : k === 'train' ? 4 : k === 'drag' ? 2.3 : 1.9;
+    const back = k === 'cable' ? 13 : k === 'gondola' ? 7.5 : k === 'train' ? 16 : k === 'drag' ? 5.5 : k === 'carpet' ? 5 : 5.2;
+    const side = k === 'cable' ? 6 : k === 'gondola' ? 3.6 : k === 'train' ? 5 : k === 'drag' ? 1.6 : k === 'carpet' ? 1.5 : 2.6;
+    const up = k === 'cable' ? 2.5 : k === 'gondola' ? 1.9 : k === 'train' ? 4 : k === 'drag' ? 2.3 : k === 'carpet' ? 2.2 : 1.9;
     out.x = w.x - fx * back + rx * side; out.z = w.z - fz * back + rz * side;
     out.y = w.y + up + (k === 'chair' ? 0.4 : 0);
     out.tx = w.x + fx * 4; out.tz = w.z + fz * 4; out.ty = w.y + (k === 'chair' ? 0.5 : k === 'drag' ? 1 : 1.2);
@@ -111,8 +265,9 @@ export function rideCamera(path, w, mode, ground) {
       out.tx = w.x - fx * 1.2; out.tz = w.z - fz * 1.2; out.ty = w.y + 0.2; out.fov = 60;
     }
   }
+  if (tunnel) { out.inside = true; return out; }
   const g = ground(out.x, out.z) + 0.8;
   if (out.y < g) out.y = g;
   return out;
 }
-export { LIFT_SPEC };
+export { LIFT_SPEC, carrierBox };
