@@ -253,7 +253,7 @@ export function createAvalanches({ scene, field, surface, pistes, hud, uiRoot, l
       flagT = 0;
       let near = false;
       for (const f of flags) if (Math.abs(f.x - st.x) < 1500 && Math.abs(f.z - st.z) < 1500) { near = true; break; }
-      flagMesh.visible = postMesh.visible = near;
+      flagMesh.visible = postMesh.visible = near && freeride;      // a warning for the free ride (not over a challenge or the park)
     }
     if (st && freeride && running && !active && st.grounded && st.crash === 0 && st.speed > 2) {
       const id = cellId(st.x, st.z);

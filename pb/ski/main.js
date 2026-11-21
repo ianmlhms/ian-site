@@ -1094,7 +1094,7 @@ async function boot() {
     place(x, z, heading) { placeAt(x, z, heading); },
     // R7-C
     get explore() { return explore; }, get avalanches() { return avalanches; }, get course() { return course; }, get lastCourse() { return lastCourse; }, get spray() { return spray; },
-    get camMode() { return camMode; }, setCamMode, fp, gateOf, startLawin, teleport: (spot) => goFree(null, spot), firstLift: () => goFree(spawn), get pisteMap() { return pisteMap; },
+    get camMode() { return camMode; }, setCamMode, fp, gateOf, startLawin, teleportTo: (spot) => goFree(null, spot), firstLift: () => goFree(spawn), get pisteMap() { return pisteMap; },
   };
 
   // first build around the default piste behind the loading screen, then the picker (or straight onto the piste with ?auto=1)
