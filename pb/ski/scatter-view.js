@@ -67,11 +67,11 @@ function build(fn) {
   return g;
 }
 const SPRUCE = [0.13, 0.27, 0.22], SPRUCE_DARK = [0.09, 0.2, 0.17], BARK = [0.3, 0.22, 0.17], LARCH = [0.44, 0.39, 0.35], LARCH_TWIG = [0.36, 0.31, 0.28];
-/* round 7: a fir with eight drooping, ragged layers (wide and dark at the foot, the layers shorter and denser upwards), a thin leader on
- * top and the trunk showing under the lowest layer: ~330 triangles, one instanced draw call as before */
+/* round 7: a fir with six drooping, ragged layers (wide and dark at the foot, the layers shorter and denser upwards), a thin leader on
+ * top and the trunk showing under the lowest layer: ~240 triangles, one instanced draw call as before */
 const spruceNear = () => build((p, n, c) => {
   pushPrism(p, n, c, -0.3, 2.2, 0.2, 5, BARK);
-  const tiers = [[0.75, 2.7, 2.4, 9], [1.75, 3.7, 2.15, 9], [2.75, 4.6, 1.85, 8], [3.7, 5.5, 1.58, 8], [4.6, 6.4, 1.3, 7], [5.5, 7.3, 1.02, 7], [6.4, 8.3, 0.76, 6], [7.3, 9.2, 0.5, 5]];
+  const tiers = [[0.8, 3.0, 2.35, 8], [2.1, 4.3, 1.95, 8], [3.4, 5.6, 1.55, 7], [4.7, 6.9, 1.15, 6], [6.0, 8.2, 0.8, 5], [7.2, 9.3, 0.48, 4]];      // Niddreg budget: ~240 triangles
   tiers.forEach(([y0, y1, r, tips], k) => pushTier(p, n, c, y0, y1, r, tips, k % 2 ? SPRUCE : SPRUCE_DARK, 0.66 + k * 0.04, k * 0.9 + 0.3, 1, 0.32 - k * 0.02));
   pushCone(p, n, c, 0, 8.9, 10.3, 0.16, 4, SPRUCE, 0.5);                                // the leader
 });

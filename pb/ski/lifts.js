@@ -101,14 +101,14 @@ export function createLifts({ scene, resort, height }) {
   // cabin with its window band and roof gear; a carriage with windows (modes/carriers.js has the ridden one in more detail).
   const C = { frame: [0.2, 0.22, 0.26], steel: [0.55, 0.58, 0.63], cushion: [0.13, 0.36, 0.78], bar: [0.95, 0.7, 0.1], red: [0.78, 0.2, 0.17], redDark: [0.55, 0.14, 0.12], glass: [0.12, 0.17, 0.24], roof: [0.88, 0.89, 0.91], cable: [0.85, 0.86, 0.88] };
   const B = (w, h, d, x, y, z) => new THREE.BoxGeometry(w, h, d).translate(x, y, z);
-  const oct = (r0, r1, h, y) => new THREE.CylinderGeometry(r1, r0, h, 8, 1, false).rotateY(Math.PI / 8).translate(0, y, 0);
+  // six-sided bands, open where the next band covers them (the triangle budget of Niddreg: ~1400 carriers can be in view)
+  const oct = (r0, r1, h, y, open = false) => new THREE.CylinderGeometry(r1, r0, h, 6, 1, open).rotateY(Math.PI / 6).translate(0, y, 0);
   const chairGeo = mergeColoured([
     [B(0.1, 0.12, 0.16, 0, -0.06, -0.3), C.steel],
     [B(0.08, 2.0, 0.08, 0, -1.05, -0.3), C.frame],
     [B(1.95, 0.07, 0.07, 0, -1.4, -0.32), C.frame],
     [B(1.9, 0.12, 0.6, 0, -2.1, -0.05), C.cushion],
     [B(1.9, 0.75, 0.1, 0, -1.7, -0.35), C.cushion],
-    [B(0.07, 0.5, 0.07, -0.97, -1.85, -0.05), C.frame], [B(0.07, 0.5, 0.07, 0.97, -1.85, -0.05), C.frame],
     [B(1.9, 0.06, 0.06, 0, -1.6, 0.42), C.bar],
     [B(1.7, 0.05, 0.2, 0, -2.62, 0.5), C.bar],
   ]);
@@ -116,8 +116,8 @@ export function createLifts({ scene, resort, height }) {
     [B(0.16, 0.18, 0.3, 0, -0.05, 0), C.steel],
     [B(0.09, 1.75, 0.09, 0, -0.95, 0), C.frame],
     [oct(1.02, 0.82, 0.22, -1.86), C.roof],
-    [oct(1.06, 1.02, 0.95, -2.45), C.glass],
-    [oct(0.88, 1.06, 1.05, -3.45), C.red],
+    [oct(1.06, 1.02, 0.95, -2.45, true), C.glass],
+    [oct(0.88, 1.06, 1.05, -3.45, true), C.red],
     [oct(0.55, 0.88, 0.2, -4.08), C.redDark],
   ]);
   const bigCabinGeo = mergeColoured([

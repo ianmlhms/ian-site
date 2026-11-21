@@ -138,7 +138,7 @@ function boardGeometry(quads) {
  * the halfpipe walls on a fine grid of the exact park function (layout.profileAt + featureHeight), drawn with the painted snow material
  * (groomed, corduroy along the line). The terrain is cut away under them (snow-shader.js uParkRect: the 2.5 m lattice rounded the lips
  * off and showed the pipe walls as saw teeth). Physics untouched (it already uses the exact lip slope). One draw call. */
-const BODY = Object.freeze({ kickStep: 0.45, pipeAlong: 0.8, pipeAcross: 0.4, margin: 1.6, lift: 0.02, maxRects: 8 });
+const BODY = Object.freeze({ kickStep: 0.6, pipeAlong: 1.0, pipeAcross: 0.5, margin: 1.6, lift: 0.02, maxRects: 8 });
 export function parkBodyRects(layout) {
   const rects = [];
   for (const k of layout.kickers) rects.push([k.s0 - 0.4, k.end + 0.4, k.v - k.w / 2 - BODY.margin, k.v + k.w / 2 + BODY.margin]);

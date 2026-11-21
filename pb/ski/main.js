@@ -1083,7 +1083,7 @@ async function boot() {
       if (landmarks) landmarks.update(camera.position.x, camera.position.z, quality.buildingRadius);
       if (roads) roads.update(camera.position.x, camera.position.z, quality.buildingRadius);
       modes.update(camera.position.x, camera.position.z, quality.buildingRadius);
-      if (parkBodies) parkBodies.update(camera.position.x, camera.position.z, quality.buildingRadius);
+      if (parkBodies) parkBodies.update(camera.position.x, camera.position.z, Math.min(900, quality.buildingRadius));      // the bodies are small: near only
     }
     env.update(dt, time, camera);
     snowfall.update(time, camera, pixelRatio());
