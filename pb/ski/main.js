@@ -34,6 +34,9 @@ import { createStore, recordRun, withLast, pisteKey, createBoards, formatTime } 
 import { createUi } from './ui.js';
 import { createAudio } from './audio.js';
 import { createPisteMap } from './map.js';
+// round 4A: game modes (stars / snow park / free ride all day), see modes/host.js
+import { parkLayoutOf, createModeHost } from './modes/host.js';
+import { attachModePanel, starRow } from './modes/panel.js';
 
 const THREE = window.THREE;
 const LOAD = window.__skiLoad || { set() {}, done() {}, fail() {} };
@@ -105,7 +108,8 @@ async function boot() {
     env.setShadows((time) => core.root + resort.shadows.file.replace('{time}', time), [-m - st / 2, -m - st / 2, resort.far.nx * st, resort.far.nz * st]);
   }
   const net = createPisteNet(resort.network);
-  const field = createField({ resort, far: core.far, classes: core.classes, net });
+  const parkLayout = parkLayoutOf(resort);                                   // round 4A: the snow park is part of the height function
+  const field = createField({ resort, far: core.far, classes: core.classes, net, park: parkLayout });
   const surface = createSurface(field);
   setRoot(resort.width, resort.depth);
   const streamer = createTileStreamer({ resort, field, root: core.root });
@@ -151,11 +155,13 @@ async function boot() {
     farForest.invalidate(...rect);
     poles.reset();
     if (runProps && game.piste) { runProps.dispose(); runProps = createRunProps({ scene, piste: game.piste, height: (x, z) => surface.height(x, z), gates: game.run ? game.run.gates : [] }); }
+    if (modes) modes.onTiles(rect);
     if (streamer.done()) document.documentElement.dataset.skiTilesDone = '1';
     if (streamer.done() && !lifts) {
       lifts = createLifts({ scene, resort, height: (x, z) => field.height(x, z) });
       createSigns({ scene, resort, height: (x, z) => field.height(x, z) });
       landmarks = createLandmarks({ scene, resort, height: (x, z) => surface.height(x, z), pistes });
+      if (modes) modes.ensureParkView();
       mark('lifts');
       tryRoads();
     }
@@ -181,6 +187,20 @@ async function boot() {
   input.showTouch(false);
   const hud = ui.createHud({ onButton: onAction });
   hud.show(false);
+  // ---- round 4A: the game modes (stars, snow park, free ride all day) ----
+  const modes = createModeHost({
+    scene, resort, rid, pistes, field, surface, store, hud, uiRoot: document.getElementById('ui'), input, env, audio, world, layout: parkLayout,
+    root: core.root, outfits: OUTFITS, onRideUp: () => rideUp(), onProgressChanged: () => refreshMapMarks(),
+  });
+  const outfitOpen = (o) => modes.outfitOpen(o);
+  const starsText = (p) => { const m = modes.pisteInfo(p).mask; return [1, 2, 4].map((b) => (m & b ? '★' : '☆')).join(''); };
+  /** The piste the map opens on: the saved one / the resort's start piste if open, else the open piste whose top is nearest to it. */
+  function openPisteNear(p) {
+    if (!p || modes.isOpen(p)) return p;
+    let best = null, bd = Infinity;
+    for (const q of pistes.list) { if (!modes.isOpen(q)) continue; const d = Math.hypot(q.top.x - p.top.x, q.top.z - p.top.z) - (q.diff === 'blue' ? 150 : 0); if (d < bd) { bd = d; best = q; } }
+    return best || p;
+  }
 
   function placeAt(x, z, heading) {
     const y = surface.height(x, z);
@@ -189,6 +209,39 @@ async function boot() {
   }
 
   function pisteBest(p) { return store.get().best[pisteKey(rid, p.id)] || 0; }
+  let modePanel = null;
+  function refreshMapMarks() {
+    if (!mapScreen || !pisteMap) return;
+    pisteMap.setMarks(modes.marks());
+    mapScreen.refreshList();
+    if (game.piste && modePanel) modePanel.showPiste(modes.pisteInfo(game.piste));
+    updateStartStatus();
+  }
+  /** Round 4A: the piste map's mode tab (piste / park / freeride). */
+  function setMapMode(m) {
+    game.mapMode = m;
+    if (!mapScreen) return;
+    modePanel.setMode(m);
+    pisteMap.setMode(m, modes.lifts.list);
+    document.documentElement.dataset.skiMapMode = m;
+    if (m === 'park') {
+      modePanel.showPark({ layout: parkLayout, best: modes.parkBest(), ready: false });
+      if (parkLayout) { const a = parkLayout.top, b = parkLayout.bottom; pisteMap.focusBox(Math.min(a.x, b.x), Math.min(a.z, b.z), Math.max(a.x, b.x), Math.max(a.z, b.z), 1200); streamer.focus(a.x, a.z); }
+    } else if (m === 'freeride') {
+      if (!game.freeLift) game.freeLift = modes.lifts.nearestTop(game.piste ? game.piste.top.x : resort.width / 2, game.piste ? game.piste.top.z : resort.depth / 2, 1e9);
+      pickLift(game.freeLift);
+    } else if (game.piste) selectPiste(game.piste, true);
+    updateStartStatus();
+  }
+  function pickLift(l) {
+    if (!l) return;
+    game.freeLift = l;
+    readyLift = null;
+    streamer.focus(l.top.x, l.top.z);
+    if (modePanel) modePanel.showFree({ lifts: modes.lifts, selected: l, ready: false });
+    if (pisteMap) pisteMap.selectLift(l, true);
+    updateStartStatus();
+  }
 
   // ---------------- screens ----------------
   let picker = null, mapScreen = null, pisteMap = null, finishCard = null, menuCard = null;
@@ -219,17 +272,23 @@ async function boot() {
     game.phase = 'idle';
     hud.show(false); input.showTouch(false); input.setEnabled(false);
     if (finishCard) { finishCard.close(); finishCard = null; }
+    modes.end();
     mapScreen = ui.showMap({
       resort, pistes, best: pisteBest, env, gfx: GFX(), outfits: OUTFITS, outfit: () => outfit, onOutfit: setOutfit,
+      outfitOpen, starsOf: starsText, lockedOf: (p) => !modes.isOpen(p),
       onSelect: (p, center) => selectPiste(p, center),
       onStart: () => startRun(game.piste, MODES.run),
-      onBack: () => { mapScreen.close(); mapScreen = null; pisteMap = null; showPicker(); },
+      onBack: () => { mapScreen.close(); mapScreen = null; pisteMap = null; modePanel = null; showPicker(); },
     });
-    pisteMap = createPisteMap({ canvas: mapScreen.canvas, resort, imageUrl: core.root + resort.map.file, pistes, onPick: (p) => selectPiste(p, false) });
+    pisteMap = createPisteMap({ canvas: mapScreen.canvas, resort, imageUrl: core.root + resort.map.file, pistes, onPick: (p) => selectPiste(p, false), onPickLift: (l) => pickLift(l) });
     mapScreen.zoomButtons.forEach((b) => b.addEventListener('click', () => pisteMap.zoomBy(b.dataset.z === 'in' ? 1.5 : 1 / 1.5)));
+    modePanel = attachModePanel(mapScreen.el, { onMode: (m) => setMapMode(m), onParkStart: () => startPark(), onFreeStart: () => startFree(game.freeLift), onPickLift: (l) => pickLift(l) });
+    pisteMap.setPark(resort.park ? { line: resort.park.line, name: resort.park.name } : null);
+    pisteMap.setMarks(modes.marks());
     const last = store.get().last;
-    const first = (last && last.resort === rid && pistes.byId.get(last.piste)) || pistes.byId.get(resort.start) || pistes.byId.get(DEFAULT_PISTE) || pistes.list[0];
+    const first = openPisteNear((last && last.resort === rid && pistes.byId.get(last.piste)) || pistes.byId.get(resort.start) || pistes.byId.get(DEFAULT_PISTE) || pistes.list[0]);
     selectPiste(first, true);
+    if (game.mapMode && game.mapMode !== 'piste') setMapMode(game.mapMode);
     document.documentElement.dataset.skiScreen = 'map';
   }
   function selectPiste(p, center) {
@@ -239,24 +298,40 @@ async function boot() {
     const a = p.at(2, {});
     placeAt(a.x, a.z, Math.atan2(a.dz, a.dx));
     boards.select(rid, p, resort.short);
-    if (mapScreen) { mapScreen.show(p, pisteBest(p)); pisteMap.select(p, center); }
+    if (mapScreen) { mapScreen.show(p, pisteBest(p)); pisteMap.select(p, center); if (modePanel) modePanel.showPiste(modes.pisteInfo(p)); }
     updateStartStatus();
   }
-  let readyFor = null;
+  let readyFor = null, readyPark = false, readyLift = null;
   function updateStartStatus() {
     if (!mapScreen || !game.piste) return;
     const p = game.piste;
     const pending = streamer.pendingNear(p.top.x, p.top.z, 1500);
     // once a piste was ready it stays ready (tiles streaming in elsewhere re-queue terrain work: Start must not flicker off under a tap)
     const ready = readyFor === p.id || (pending === 0 && terrain.stats.pending === 0);
-    mapScreen.status(ready ? 'Prett.' : `Pist gëtt gelueden … (${pending} Stécker)`, ready);
-    document.documentElement.dataset.skiStartReady = ready ? '1' : '0';
+    const open = modes.isOpen(p);
+    mapScreen.status(!open ? 'Gespaart: méi Stäre sammelen.' : ready ? 'Prett.' : `Pist gëtt gelueden … (${pending} Stécker)`, ready && open);
+    document.documentElement.dataset.skiStartReady = ready && open ? '1' : '0';
+    document.documentElement.dataset.skiLocked = open ? '0' : '1';
     readyFor = ready ? p.id : null;
+    // round 4A: the park and the free ride start spot
+    if (modePanel && game.mapMode === 'park' && parkLayout) {
+      readyPark = readyPark || (streamer.pendingNear(parkLayout.top.x, parkLayout.top.z, 900) === 0 && terrain.stats.pending === 0);
+      modePanel.parkReady(readyPark);
+      document.documentElement.dataset.skiParkReady = readyPark ? '1' : '0';
+    }
+    if (modePanel && game.mapMode === 'freeride' && game.freeLift) {
+      const l = game.freeLift;
+      const ok = readyLift === l.id || (streamer.pendingNear(l.top.x, l.top.z, 1200) === 0 && terrain.stats.pending === 0);
+      readyLift = ok ? l.id : null;
+      modePanel.freeReady(ok);
+      document.documentElement.dataset.skiFreeReady = ok ? '1' : '0';
+    }
   }
 
   function startRun(p, mode) {
     if (!p) return;
-    if (mapScreen) { mapScreen.close(); mapScreen = null; pisteMap = null; }
+    if (mode === MODES.run && !modes.isOpen(p) && !params.debug) { hud.toast('Gespaart'); return; }
+    if (mapScreen) { mapScreen.close(); mapScreen = null; pisteMap = null; modePanel = null; }
     if (finishCard) { finishCard.close(); finishCard = null; }
     game.screen = 'ski';
     document.documentElement.dataset.skiScreen = 'ski';
@@ -270,15 +345,15 @@ async function boot() {
     const g = mode === MODES.run ? decodeGhost(store.get().ghosts[pisteKey(rid, p.id)]) : null;
     game.ghost = g;
     ghostModel.setVisible(false);
-    game.bot = params.bot ? createBot(p) : null;
+    game.bot = params.bot && mode !== MODES.park ? createBot(p) : null;
     game.assisted = false;
-    store.set(withLast(store.get(), rid, p.id));
-    boards.select(rid, p, resort.short);
+    if (mode !== MODES.park) { store.set(withLast(store.get(), rid, p.id)); boards.select(rid, p, resort.short); }
+    modes.begin(game);                                                       // round 4A: stars / park / free ride parts
     hud.show(true); hud.setPiste(p, mode); hud.setClock(mode === MODES.run ? 0 : null, 0); hud.setSplit(''); hud.setGates(game.run.gates.length ? `Slalom: 0 / ${game.run.gates.length}` : '');
     input.showTouch(input.isTouch() || matchMedia('(pointer: coarse)').matches);
     input.setEnabled(true);
     streamer.focus(a.x, a.z);
-    if (mode === MODES.run) { game.phase = 'countdown'; game.countdown = params.auto ? 0.01 : 3; }
+    if (mode === MODES.run || mode === MODES.park) { game.phase = 'countdown'; game.countdown = params.auto ? 0.01 : 3; }
     else { game.phase = 'running'; hud.count(''); }
     if (window.Arcade && window.Arcade.startRun) window.Arcade.startRun();
     canvas.focus({ preventScroll: true });
@@ -304,13 +379,21 @@ async function boot() {
         boards.submit(rid, p, resort.short, ev.ms);
       }
     }
-    const conts = pistes.continuations(p);
-    const order = pistes.list;
+    hud.count('');
+    if (game.mode === MODES.park) {                                          // round 4A: the park card (points, record, tricks)
+      finishCard = modes.finishPark({ assisted, onAgain: () => startPark(), onMap: () => showMap() });
+      document.documentElement.dataset.skiScreen = 'finish';
+      document.documentElement.dataset.skiLast = 'park';
+      return;
+    }
+    const extra = game.mode === MODES.run ? modes.finishRun(ev, p, assisted) : '';
+    if (game.mode === MODES.run && ev && ev.valid && !assisted) refreshMapMarks();
+    const conts = pistes.continuations(p).filter((q) => modes.isOpen(q));
+    const order = pistes.list.filter((q) => q === p || modes.isOpen(q));
     const next = conts[0] || order[(order.indexOf(p) + 1) % order.length];
     const cont = conts[0] || null;
-    hud.count('');
     finishCard = ui.showFinish({
-      piste: p, result, bestMs: store.get().best[key] || 0, improved, next, cont: cont && cont !== next ? cont : (cont ? cont : null),
+      piste: p, result, bestMs: store.get().best[key] || 0, improved, next, cont: cont && cont !== next ? cont : (cont ? cont : null), extra,
       onAgain: () => startRun(p, MODES.run),
       onNext: () => startRun(next, MODES.run),
       onContinue: () => continueFree(cont),
@@ -336,14 +419,77 @@ async function boot() {
     if (text) hud.toast(text);
   }
 
+  // ---- round 4A: snow park run, free ride all day, the lift ----
+  function startPark() {
+    if (!parkLayout) { hud.toast('Kee Snowpark hei'); return; }
+    startRun(parkLayout.run, MODES.park);
+  }
+  function startFree(lift) {
+    if (!lift) return;
+    if (mapScreen) { mapScreen.close(); mapScreen = null; pisteMap = null; modePanel = null; }
+    if (finishCard) { finishCard.close(); finishCard = null; }
+    game.screen = 'ski';
+    document.documentElement.dataset.skiScreen = 'ski';
+    game.mode = MODES.freeride;
+    game.freeLift = lift;
+    const spot = modes.lifts.startAt(lift, (x, z) => surface.height(x, z));
+    const near = pistes.nearest(spot.x, spot.z, 400);
+    game.piste = near ? near.piste : game.piste;
+    if (runProps) { runProps.dispose(); runProps = null; }
+    game.ghost = null; ghostModel.setVisible(false);
+    game.bot = null; game.assisted = false;
+    modes.begin(game);
+    game.run = modes.createRun(game, spot);
+    placeAt(spot.x, spot.z, spot.heading);
+    hud.show(true); hud.setPiste(null, MODES.freeride); hud.setClock(null, 0); hud.setSplit(''); hud.setGates('');
+    input.showTouch(input.isTouch() || matchMedia('(pointer: coarse)').matches);
+    input.setEnabled(true);
+    streamer.focus(spot.x, spot.z);
+    game.phase = 'running'; hud.count('');
+    document.documentElement.dataset.skiRunning = '1';
+    hud.toast(`Fräi fueren: ${lift.name}`);
+    if (window.Arcade && window.Arcade.startRun) window.Arcade.startRun();
+    canvas.focus({ preventScroll: true });
+    mark('free');
+  }
+  let riding = false;
+  /** At a lift's bottom: fade out, wait for the tiles at the top (at most 4 s), up, fade in. */
+  async function rideUp() {
+    if (game.mode !== MODES.freeride || game.phase !== 'running' || riding || !modes.liftAt) return;
+    const r = modes.rideUp();
+    if (!r) { hud.toast('D\'Lifte sinn zou'); return; }
+    riding = true;
+    input.setEnabled(false);
+    const fade = document.getElementById('skiFade') || Object.assign(document.createElement('div'), { id: 'skiFade' });
+    if (!fade.parentNode) document.getElementById('ui').appendChild(fade);
+    fade.classList.add('on');
+    audio.event('count');
+    streamer.focus(r.spot.x, r.spot.z);
+    await Promise.race([streamer.ready(r.spot.x, r.spot.z, 500), new Promise((res) => setTimeout(res, 4000))]);
+    await new Promise((res) => setTimeout(res, 350));
+    placeAt(r.spot.x, r.spot.z, r.spot.heading);
+    fade.classList.remove('on');
+    input.setEnabled(true);
+    riding = false;
+    hud.toast(`${r.lift.name}: uewen op ${Math.round(r.lift.top.y)} m`);
+    document.documentElement.dataset.skiLifts = String(modes.freeRun ? modes.freeRun.stats.lifts : 0);
+  }
+  /** Again in the current mode (menu, Arcade restart). */
+  function again() {
+    if (game.mode === MODES.park) startPark();
+    else if (game.mode === MODES.freeride) showMap();
+    else if (game.piste) startRun(game.piste, MODES.run);
+  }
+
   function openMenu() {
     if (game.screen !== 'ski' || menuCard || finishCard) return;
     game.paused = true;
     input.setEnabled(false);
     menuCard = ui.showMenu({
-      env, gfx: GFX(), outfits: OUTFITS, outfit: () => outfit, onOutfit: setOutfit, sound: { muted: () => audio.isMuted(), set: (m) => audio.setMuted(m) },
+      env, gfx: GFX(), outfits: OUTFITS, outfit: () => outfit, onOutfit: setOutfit, outfitOpen, sound: { muted: () => audio.isMuted(), set: (m) => audio.setMuted(m) },
+      againLabel: game.mode === MODES.freeride ? 'Neie Startpunkt' : game.mode === MODES.park ? 'Park nach eng Kéier' : 'Nach eng Kéier',
       onResume: () => { menuCard = null; game.paused = false; input.setEnabled(game.phase !== 'finished'); },
-      onAgain: () => { menuCard = null; game.paused = false; startRun(game.piste, MODES.run); },
+      onAgain: () => { menuCard = null; game.paused = false; again(); },
       onMap: () => { menuCard = null; game.paused = false; showMap(); },
     });
   }
@@ -355,9 +501,15 @@ async function boot() {
     else if (action === 'menu') { if (menuCard) { menuCard.close(); menuCard = null; game.paused = false; input.setEnabled(true); } else openMenu(); }
     else if (action === 'map') { if (game.screen === 'ski') showMap(); }
     else if (action === 'mute') { const next = !audio.isMuted(); audio.setMuted(next); hud.toast(next ? 'Toun aus' : 'Toun un'); }
-    else if (action === 'confirm') { if (game.screen === 'map' && readyFor) startRun(game.piste, MODES.run); }
+    else if (action === 'lift') rideUp();
+    else if (action === 'confirm') {
+      if (game.screen === 'ski' && game.mode === MODES.freeride) rideUp();
+      else if (game.screen === 'map' && game.mapMode === 'park') { if (readyPark) startPark(); }
+      else if (game.screen === 'map' && game.mapMode === 'freeride') { if (readyLift) startFree(game.freeLift); }
+      else if (game.screen === 'map' && readyFor && modes.isOpen(game.piste)) startRun(game.piste, MODES.run);
+    }
   }
-  if (window.Arcade && window.Arcade.onRestart) window.Arcade.onRestart(() => { if (game.piste) startRun(game.piste, MODES.run); });
+  if (window.Arcade && window.Arcade.onRestart) window.Arcade.onRestart(() => again());
 
   // quality: the shared Grafik level; a watchdog only ever steps down
   function applyQuality(next) {
@@ -408,14 +560,17 @@ async function boot() {
           if (game.override || game.bot) game.assisted = true;
           if (game.override || game.bot) input.read(inp);
           const wasCrash = game.state.crash > 0, wasAir = !game.state.grounded, vyAir = game.state.vy;
-          game.state = stepSkier(game.state, inp, world);
+          const prevState = game.state;
+          game.state = modes.step(prevState, inp, game.mode);                // round 4A: rails / park tricks, else stepSkier
           if (wasAir && game.state.grounded && game.state.crash === 0) audio.event('land', { impact: Math.min(1, Math.abs(vyAir) / 8) });
           if (!wasCrash && game.state.crash > 0) audio.event('crash');
           if (!wasCrash && game.state.crash > 0) hud.toast(game.state.crashKind === 'tree' ? 'Aua, e Bam!' : game.state.crashKind === 'rock' ? 'Aua, e Steen!' : 'Gefall!');
           if (wasCrash && game.state.crash === 0) respawn('');
+          modes.after(prevState, game.state, SKI.dt, game);
           if (game.phase === 'running') {
             const events = game.run.update(game.state, SKI.dt);
             for (const ev of events) {
+              if (ev.type === 'lift') { modes.freeEvent(ev); continue; }
               if (ev.type === 'finish' || ev.type === 'invalid') { finish(ev); break; }
               if (ev.type === 'offpiste') respawn('Zréck op d\'Pist');
               if (ev.type === 'missed-gate') { audio.event('miss'); hud.toast('Paart verpasst: +5 s'); if (runProps) runProps.markGate(ev.index, false); }
@@ -463,6 +618,7 @@ async function boot() {
       if (village) village.update(camera.position.x, camera.position.z, quality.buildingRadius);
       if (landmarks) landmarks.update(camera.position.x, camera.position.z, quality.buildingRadius);
       if (roads) roads.update(camera.position.x, camera.position.z, quality.buildingRadius);
+      modes.update(camera.position.x, camera.position.z, quality.buildingRadius);
     }
     env.update(dt, time, camera);
     snowfall.update(time, camera, pixelRatio());
@@ -507,6 +663,8 @@ async function boot() {
           const n = pistes.nearest(st.x, st.z, 120);
           hud.setPiste(n ? n.piste : game.piste, MODES.free);
         }
+        if (game.mode === MODES.freeride && time - game.lastNearest > 1) { game.lastNearest = time; hud.setPiste(game.run && game.run.piste, MODES.freeride); }
+        modes.hudTick(game);
       }
     }
   }
@@ -533,12 +691,15 @@ async function boot() {
     info: () => ({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, tiles: terrain.stats.leaves, trees: scatterView.stats.trees, cards: farForest.stats.cards, tilesLoaded: streamer.stats.loaded, tilesTotal: streamer.stats.total, level }),
     teleport(s) { if (game.run) { const p = game.piste.at(s, {}); placeAt(p.x, p.z, Math.atan2(p.dz, p.dx)); } },
     progress: () => store.get(),
+    // round 4A
+    modes, parkLayout, startPark, startFree: (id) => startFree(id ? modes.lifts.byId.get(id) : game.freeLift || modes.lifts.list[0]), rideUp, setMapMode,
+    place(x, z, heading) { placeAt(x, z, heading); },
   };
 
   // first build around the default piste behind the loading screen, then the picker (or straight onto the piste with ?auto=1)
   LOAD.set(0.75, 'Pisten ginn opgebaut …');
   const lastRun = store.get().last || {};
-  const startPiste = pistes.byId.get(params.piste) || (lastRun.resort === rid && pistes.byId.get(lastRun.piste)) || pistes.byId.get(resort.start) || pistes.byId.get(DEFAULT_PISTE) || pistes.list[0];
+  const startPiste = pistes.byId.get(params.piste) || openPisteNear((lastRun.resort === rid && pistes.byId.get(lastRun.piste)) || pistes.byId.get(resort.start) || pistes.byId.get(DEFAULT_PISTE) || pistes.list[0]);
   game.piste = startPiste;
   const a0 = startPiste.at(2, {});
   streamer.focus(a0.x, a0.z);
@@ -553,6 +714,7 @@ async function boot() {
   LOAD.set(0.95, '');
   LOAD.done();
   document.documentElement.dataset.skiReady = '1';
+  modes.start();                                                             // round 4A: the cloud save (arcade game_saves)
   if (params.auto) {
     await streamer.ready(a0.x, a0.z, 1500);
     placeAt(a0.x, a0.z, Math.atan2(a0.dz, a0.dx));

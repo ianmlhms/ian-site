@@ -20,7 +20,10 @@ export const flow = {
     const { page } = h;
     await page.addInitScript(() => {
       // a fresh save once per tab (the resort switch reloads the page and must find the picked resort in it)
-      try { if (!sessionStorage.getItem("skiFlowInit")) { sessionStorage.setItem("skiFlowInit", "1"); localStorage.removeItem("pb_ski_save"); } } catch (error) { /* ignore */ }
+      // round 4A: the start pistes are reds / blacks, open at a number of stars per resort: this player has them
+      const stars = {};
+      for (const rid of ["killy", "3vallees", "zermatt", "arlberg", "kronplatz"]) for (let i = 0; i < 9; i++) stars[`${rid}/seed${i}`] = 7;
+      try { if (!sessionStorage.getItem("skiFlowInit")) { sessionStorage.setItem("skiFlowInit", "1"); localStorage.setItem("pb_ski_save", JSON.stringify({ v: 1, best: {}, ghosts: {}, runs: {}, stars, park: {}, bestHash: {}, last: null, ghostOrder: [] })); } } catch (error) { /* ignore */ }
       window.addEventListener("arcade:board", (e) => { window.__board = e.detail.board; });
     });
     const errors = [];

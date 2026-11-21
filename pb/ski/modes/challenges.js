@@ -157,7 +157,11 @@ export function createTracker(challenge) {
   };
 }
 
-/* ---------------- stars in the save ---------------- */
+/* ---------------- stars in the save ----------------
+ * progress.stars = { "<resort>/<hash5 of the piste id>": mask }: a short fixed-width key (5 base-36 characters, 60 M values: no clash
+ * among a resort's few hundred pistes), so the cloud record (modes/cloud.js) holds every star of all five resorts in a few KB. */
+export const hash5 = (id) => hashString(id).toString(36).padStart(7, '0').slice(-5);
+export const starKey = (rid, pisteId) => `${rid}/${hash5(pisteId)}`;
 export const starCount = (mask) => ((mask & 1) ? 1 : 0) + ((mask & 2) ? 1 : 0) + ((mask & 4) ? 1 : 0);
 export const cleanMask = (v) => (Number.isInteger(v) && v > 0 ? v & 7 : 0);
 
@@ -185,21 +189,26 @@ export function totalStars(progress) {
 export function migrateStars(progress) {
   let stars = null;
   for (const k of Object.keys(progress.best || {})) {
-    if (cleanMask(progress.stars[k]) & STAR.finish) continue;
+    const cut = k.indexOf('/');
+    if (cut < 1) continue;
+    const sk = starKey(k.slice(0, cut), k.slice(cut + 1));
+    if (cleanMask(progress.stars[sk]) & STAR.finish) continue;
     stars = stars || { ...progress.stars };
-    stars[k] = cleanMask(stars[k]) | STAR.finish;
+    stars[sk] = cleanMask(stars[sk]) | STAR.finish;
   }
   return stars ? { ...progress, stars } : progress;
 }
 
 export const thresholds = (rid) => UNLOCK[rid] || UNLOCK_DEFAULT;
 
+export const pisteStars = (progress, rid, pisteId) => cleanMask(progress.stars[starKey(rid, pisteId)]);
+
 /** Is this piste open? { open, need (stars needed), have } — played pistes are always open. */
 export function lockState(progress, rid, piste) {
   const key = `${rid}/${piste.id}`;
   const have = resortStars(progress, rid);
   if (piste.diff !== 'red' && piste.diff !== 'black') return { open: true, need: 0, have };
-  if (progress.best[key] > 0 || progress.runs[key] > 0 || cleanMask(progress.stars[key]) > 0) return { open: true, need: 0, have, played: true };
+  if (progress.best[key] > 0 || progress.runs[key] > 0 || cleanMask(progress.stars[starKey(rid, piste.id)]) > 0) return { open: true, need: 0, have, played: true };
   const need = thresholds(rid)[piste.diff];
   return { open: have >= need, need, have };
 }

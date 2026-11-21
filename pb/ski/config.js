@@ -126,4 +126,6 @@ export const DIFF_IDS = Object.freeze(['green', 'blue', 'red', 'black']);
 
 /* Modes. Only 'run' and 'free' exist in phase 1; the others are the hooks for the next rounds (stars / challenges, the snowpark,
  * free ride across the whole area, live races through the lobby). game.js switches on these ids, so a new mode is one new branch. */
-export const MODES = Object.freeze({ run: 'run', free: 'free', challenge: 'challenge', park: 'park', race: 'race' });
+export const MODES = Object.freeze({ run: 'run', free: 'free', challenge: 'challenge', park: 'park', race: 'race', freeride: 'freeride' });
+/* Round 4A: every 'run' is also the piste's star challenge (modes/challenges.js; 'challenge' stays an alias hook), 'park' = a scored snow
+ * park run (modes/park.js), 'freeride' = the whole area all day from a lift top (modes/freeride.js); 'free' = the old guided free ride. */

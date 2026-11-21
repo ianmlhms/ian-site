@@ -17,7 +17,10 @@ export const flow = {
       window.__scores = [];
       window.addEventListener("arcade:score", (e) => window.__scores.push(e.detail));
       window.addEventListener("arcade:board", (e) => { window.__board = e.detail.board; });
-      try { localStorage.removeItem("pb_ski_save"); localStorage.setItem("pb_ski_weather", "random"); localStorage.setItem("pb_ski_time", "random"); } catch (error) { /* ignore */ }
+      // round 4A: reds and blacks open at a number of stars per resort; this player has them (placeholder star keys count like real ones)
+      const stars = {};
+      for (const rid of ["killy", "3vallees", "zermatt"]) for (let i = 0; i < 9; i++) stars[`${rid}/seed${i}`] = 7;
+      try { localStorage.setItem("pb_ski_save", JSON.stringify({ v: 1, best: {}, ghosts: {}, runs: {}, stars, park: {}, bestHash: {}, last: null, ghostOrder: [] })); localStorage.setItem("pb_ski_weather", "random"); localStorage.setItem("pb_ski_time", "random"); } catch (error) { /* ignore */ }
     });
     const errors = [];
     page.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) errors.push(m.text()); });
