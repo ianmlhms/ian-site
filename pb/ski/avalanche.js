@@ -77,7 +77,7 @@ export function stepSlab(slab, t, far) {
     const g2 = gx * gx + gz * gz, cos2 = 1 / (1 + g2), cos = Math.sqrt(cos2);
     let ax = -G * gx * cos2, az = -G * gz * cos2;            // along the slope
     const v = Math.hypot(b.vx, b.vz);
-    const mu = MU + Math.max(0, (b.d || 0) - RUN) / 600;
+    const mu = MU + Math.max(0, (b.d || 0) - RUN) / 250;
     if (v > 0.05) { const f = mu * G * cos + DRAG * v * v; ax -= f * b.vx / v; az -= f * b.vz / v; }
     else if (Math.hypot(ax, az) < mu * G * cos) { ax = 0; az = 0; }
     b.vx += ax * dt; b.vz += az * dt;
@@ -90,42 +90,47 @@ export function stepSlab(slab, t, far) {
   return moving;
 }
 
-/** The "Lawin" challenge faces of a resort: the steepest long open off-piste faces inside the shipped tiles, at least 1.5 km apart.
- *  Each { id, index, top: {x, z}, path: [x, z, ...] down the fall line, len, slope }. Deterministic (far grid + classes). */
+/** The "Lawin" challenge faces of a resort: the steepest long open off-piste faces inside the shipped tiles, at least 1.2 km apart.
+ *  Each { id, index, top: {x, z}, path: [x, z, ...] down the fall line, len, slope }. Deterministic (far grid + classes). A wooded
+ *  resort (Kronplatz) gets a second, gentler pass so it still has its faces. */
 export function findFaces(field, resort, count = AV.faces) {
   const far = (x, z) => field.farHeight(x, z);
   const attrs = {};
-  const cand = [];
-  const step = 80, edge = 400;
-  for (let z = edge; z < resort.depth - edge; z += step) {
-    for (let x = edge; x < resort.width - edge; x += step) {
-      if (field.isShipped && !field.isShipped(Math.floor(x / 1280), Math.floor(z / 1280))) continue;
-      if (slopeDeg(far, x, z, 40) < AV.slope - 3) continue;
-      field.attrs(x, z, attrs);
-      if (attrs.piste > 0.02 || attrs.dist < 90 || attrs.forest > 0.15 || attrs.rock > 0.12 || attrs.built > 0 || attrs.glacier > 0.5) continue;      // open snow, no rock / scree
-      // follow the fall line down: the face length while it stays steep and open
-      const path = [x, z];
-      let px = x, pz = z, len = 0, steep = 0, ok = true;
-      for (let k = 0; k < 60; k++) {
-        const [gx, gz] = grad(far, px, pz, 20);
-        const gl = Math.hypot(gx, gz);
-        if (gl < 0.18) break;                                     // flatter than ~10°: the runout
-        px -= gx / gl * 15; pz -= gz / gl * 15; len += 15;
-        path.push(px, pz);
-        if (Math.atan(gl) * 180 / Math.PI > 30) steep += 15;
-        field.attrs(px, pz, attrs);
-        if (attrs.forest > 0.5 || attrs.built > 0.1 || attrs.water > 0.2 || (len < 200 && attrs.rock > 0.3)) { ok = false; break; }
-      }
-      if (!ok || steep < 180 || len < 250) continue;
-      cand.push({ x, z, path, len, steep, slope: slopeDeg(far, x, z, 40) });
-    }
-  }
-  cand.sort((a, b) => b.steep * b.slope - a.steep * a.slope);
   const faces = [];
-  for (const c of cand) {
+  const passes = [{ slope: AV.slope - 5, forest: 0.15, steepDeg: 30, steep: 180, gap: 90 }, { slope: AV.slope - 8, forest: 0.3, steepDeg: 27, steep: 120, gap: 60 }];
+  for (const P of passes) {
     if (faces.length >= count) break;
-    if (faces.some((f) => Math.hypot(f.top.x - c.x, f.top.z - c.z) < 1500)) continue;
-    faces.push({ id: `lawin${faces.length}`, index: faces.length, top: { x: c.x, z: c.z }, path: c.path, len: c.len, slope: c.slope });
+    const cand = [];
+    const step = 80, edge = 400;
+    for (let z = edge; z < resort.depth - edge; z += step) {
+      for (let x = edge; x < resort.width - edge; x += step) {
+        if (field.isShipped && !field.isShipped(Math.floor(x / 1280), Math.floor(z / 1280))) continue;
+        if (slopeDeg(far, x, z, 40) < P.slope) continue;
+        field.attrs(x, z, attrs);
+        if (attrs.piste > 0.02 || attrs.dist < P.gap || attrs.forest > P.forest || attrs.rock > 0.25 || attrs.built > 0 || attrs.glacier > 0.5) continue;      // open snow, no rock / scree
+        // follow the fall line down: the face length while it stays steep and open
+        const path = [x, z];
+        let px = x, pz = z, len = 0, steep = 0, ok = true;
+        for (let k = 0; k < 60; k++) {
+          const [gx, gz] = grad(far, px, pz, 20);
+          const gl = Math.hypot(gx, gz);
+          if (gl < 0.18) break;                                     // flatter than ~10°: the runout
+          px -= gx / gl * 15; pz -= gz / gl * 15; len += 15;
+          path.push(px, pz);
+          if (Math.atan(gl) * 180 / Math.PI > P.steepDeg) steep += 15;
+          field.attrs(px, pz, attrs);
+          if (attrs.forest > 0.5 || attrs.built > 0.1 || attrs.water > 0.2 || (len < 200 && attrs.rock > 0.3)) { ok = false; break; }
+        }
+        if (!ok || steep < P.steep || len < 200) continue;
+        cand.push({ x, z, path, len, steep, slope: slopeDeg(far, x, z, 40) });
+      }
+    }
+    cand.sort((a, b) => b.steep * b.slope - a.steep * a.slope);
+    for (const c of cand) {
+      if (faces.length >= count) break;
+      if (faces.some((f) => Math.hypot(f.top.x - c.x, f.top.z - c.z) < 1200)) continue;
+      faces.push({ id: `lawin${faces.length}`, index: faces.length, top: { x: c.x, z: c.z }, path: c.path, len: c.len, slope: c.slope });
+    }
   }
   return faces;
 }
