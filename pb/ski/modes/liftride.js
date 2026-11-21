@@ -65,7 +65,8 @@ export function riderAt(path, s, height, out = {}) {
     const slot = Math.min(0.45, 0.25 * Math.max(1, (path.seats || 4) / 2 - 0.5));     // a seat left of the middle (towards the line)
     out.x = c.x - fx * 0.05 - rx * slot; out.z = c.z - fz * 0.05 - rz * slot; out.y = c.y + RIDE.seat.chair;
   } else if (k === 'train') {
-    out.x = c.x + fx * 3; out.z = c.z + fz * 3; out.y = c.y + RIDE.seat.train + Math.tan(out.pitch) * 3;
+    const f = path.shuttleAt(Math.min(path.len, s + 3), 1, true, {});      // 3 m ahead in the carriage, on the line (smooth in the curves)
+    out.x = f.x; out.z = f.z; out.y = f.y + RIDE.seat.train;
   } else { out.x = c.x + fx * 0.35; out.z = c.z + fz * 0.35; out.y = c.y + RIDE.seat[k]; }
   return out;
 }
@@ -148,9 +149,13 @@ export function createRide({ lift, path, site, height, factor = RIDE.factor, fro
     const off = site.off;
     const ex = (exitAt && exitAt()) || { x: off.x, z: off.z, heading: inCar.heading };
     const tOut = k === 'drag' || k === 'carpet' ? 0.5 : RIDE.getOut;
-    const d = Math.hypot(ex.x - off.x, ex.z - off.z);
+    // the way out: straight, or down the piste that starts at the station (exit.via)
+    const way = [off, ...(ex.via || []), ex];
+    const cum = [0];
+    for (let n = 1; n < way.length; n++) cum.push(cum[n - 1] + Math.hypot(way[n].x - way[n - 1].x, way[n].z - way[n - 1].z));
+    const d = cum[cum.length - 1];
     const tGo = Math.min(8, Math.max(0.6, d / (carry ? RIDE.walk * 1.4 : RIDE.out)));
-    alight = { t: 0, inCar, off, exit: ex, tOut, tGo, tClick: carry ? RIDE.clickIn : 0, total: tOut + tGo + RIDE.turn + (carry ? RIDE.clickIn : 0) };
+    alight = { t: 0, inCar, off, exit: ex, tOut, tGo, way, cum, tClick: carry ? RIDE.clickIn : 0, total: tOut + tGo + RIDE.turn + (carry ? RIDE.clickIn : 0) };
   }
   function place() {
     const w = pose;
@@ -206,11 +211,17 @@ export function createRide({ lift, path, site, height, factor = RIDE.factor, fro
       return w;
     }
     const tg = a.t - a.tOut;
-    const hx = Math.atan2(ex.z - a.off.z, ex.x - a.off.x);
+    const total = a.cum[a.cum.length - 1];
+    const last = a.way.length - 1;
+    const hx = Math.atan2(ex.z - a.way[last - 1].z, ex.x - a.way[last - 1].x);
     if (tg < a.tGo) {
-      const kk = ease(tg / a.tGo);
-      setGround(w, lerp(a.off.x, ex.x, kk), lerp(a.off.z, ex.z, kk), angLerp(a.inCar.heading, hx, Math.min(1, tg / 0.5)));
-      w.pose = carry ? 'carry' : ''; w.walk = Math.hypot(ex.x - a.off.x, ex.z - a.off.z) * kk; w.glide = carry ? 0 : Math.hypot(ex.x - a.off.x, ex.z - a.off.z) / a.tGo;
+      const m = ease(tg / a.tGo) * total;
+      let n = 1;
+      while (n < last && a.cum[n] < m) n++;
+      const A = a.way[n - 1], B = a.way[n], f = (m - a.cum[n - 1]) / ((a.cum[n] - a.cum[n - 1]) || 1);
+      const hseg = Math.atan2(B.z - A.z, B.x - A.x);
+      setGround(w, lerp(A.x, B.x, f), lerp(A.z, B.z, f), angLerp(a.inCar.heading, hseg, Math.min(1, tg / 0.5)));
+      w.pose = carry ? 'carry' : ''; w.walk = m; w.glide = carry ? 0 : total / a.tGo;
       return w;
     }
     const tt = tg - a.tGo;

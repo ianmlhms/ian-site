@@ -81,8 +81,50 @@ def at(p, s):
     return float(x), float(z), float(d[0]), float(d[1])
 
 
+TWIN_GAP = 10.0                   # m: twin drag lifts mapped (almost) on top of each other are set this far apart
+
+
+def separate_twins(lifts, log=print):
+    """Two drag lifts mapped within a few metres of each other along most of their length (OSM: "Rosolin I" / "Rosolin II" 1.6 m
+    apart) are moved apart sideways to TWIN_GAP m, each half the way, so each gets its own track and return rope."""
+    drags = [i for i, lf in enumerate(lifts) if lf["kind"] == "drag"]
+    moved = 0
+    for n, i in enumerate(drags):
+        for j in drags[n + 1:]:
+            p, q = pts_of(lifts[i]), pts_of(lifts[j])
+            length = float(np.hypot(*(np.diff(p, axis=0).T)).sum())
+            samples = np.arange(0, length, 10.0)
+            ds, rels = [], []
+            for s in samples:
+                x, z, dx, dz = at(p, s)
+                sj, _, d = project(q, x, z)
+                ox, oz, _, _ = at(q, sj)
+                ds.append(d)
+                rels.append((ox - x) * -dz + (oz - z) * dx)
+            ds = np.array(ds)
+            if len(ds) < 3 or (ds < TWIN_GAP - 2).mean() < 0.7:
+                continue
+            gap = float(np.median(ds))
+            push = (TWIN_GAP - gap) / 2
+            side = 1.0 if np.median(rels) >= 0 else -1.0          # j lies on the +r side of i
+            for k, sgn in ((i, -side), (j, side)):
+                a = pts_of(lifts[k])
+                d0 = a[-1] - a[0]
+                d0 = d0 / (np.hypot(*d0) or 1)
+                r = np.array([-d0[1], d0[0]])
+                rr = r if k == i else r * np.sign(np.dot(r, np.array([-(p[-1] - p[0])[1], (p[-1] - p[0])[0]])) or 1)
+                shifted = a + rr * sgn * push
+                lifts[k]["pts"] = [round(float(v), 1) for v in shifted.reshape(-1)]
+                for e, idx in (("bottom", 0), ("top", -1)):
+                    lifts[k][e]["x"] = round(float(shifted[idx][0]), 1)
+                    lifts[k][e]["z"] = round(float(shifted[idx][1]), 1)
+            moved += 1
+    log("twin drag lifts set apart: %d pairs" % moved)
+
+
 def arrange(lifts, log=print):
     """The drag lifts' track side and the pylons out of other lifts' lanes (in place on the baked rows, before they are written)."""
+    separate_twins(lifts, log)
     lines = [pts_of(lf) for lf in lifts]
     centres = [(p.mean(axis=0), float(np.hypot(*(np.diff(p, axis=0).T)).sum())) for p in lines]
     flipped = 0

@@ -24,7 +24,7 @@ export const flow = {
       if (!r) return null;
       const g = window.__ski.surface.height(s.x, s.z);
       const towers = r.path.supports.filter((t) => t.tower).map((t) => t.s);
-      return { kind: r.kind, pose: s.ride, s: r.s, len: r.path.len, above: s.y - g, towers, carrier: !!window.__ski.scene.getObjectByName(`ski-ride-${r.kind}`), held: window.__ski.lifts.pathOf(r.lift.index).ride, view: window.__ski.rideView, lift: r.lift.name, top: r.lift.top };
+      return { kind: r.kind, pose: s.ride, s: r.s, len: r.path.len, above: s.y - g, towers, carrier: !!window.__ski.scene.getObjectByName(`ski-ride-${r.kind}`), held: window.__ski.lifts.heldOf(r.lift.index), phase: r.phase, view: window.__ski.rideView, lift: r.lift.name, top: r.lift.top };
     });
     const arrived = async (top) => {
       await page.waitForFunction(() => window.__ski.game.phase === "running" && !window.__ski.ride, null, { timeout: 120000 });
@@ -44,10 +44,11 @@ export const flow = {
     await page.waitForFunction(() => !document.getElementById("liftBtn").hidden, null, { timeout: 10000 });
     await page.keyboard.press("l");
     await page.waitForFunction(() => window.__ski.game.phase === "lift", null, { timeout: 5000 });
+    await page.waitForFunction(() => window.__ski.ride && window.__ski.ride.phase === "ride", null, { timeout: 20000 });     // R7-B: he walks in with the skis first
     const g1 = await ride();
     await h.pause(2500);
     const g2 = await ride();
-    h.expect(g1.kind === "gondola" && g1.pose === "stand" && g1.carrier && g1.held !== null && g2.above > 1.5, `in a cabin (${g2.lift}), standing, ${g2.above.toFixed(1)} m over the snow; the lift's own cabins keep their spacing around it`);
+    h.expect(g1.kind === "gondola" && g1.pose === "carry" && g1.carrier && g1.held !== null && g2.above > 1.5, `in a cabin (${g2.lift}), standing, ${g2.above.toFixed(1)} m over the snow; the lift's own cabins keep their spacing around it`);
     h.expect(g2.s > g1.s + 30, `riding up the real line: ${Math.round(g1.s)} -> ${Math.round(g2.s)} m of ${Math.round(g2.len)} m (x4, test time x3)`);
     const passed = g2.towers.filter((t) => t < g2.s).length;
     h.expect(g2.towers.length > 3, `${g2.towers.length} pylons on the line, ${passed} passed`);
@@ -74,6 +75,7 @@ export const flow = {
     await page.waitForFunction((id) => window.__ski.game.phase === "running" && window.__ski.modes.liftAt && window.__ski.modes.liftAt.id === id, chairId, { timeout: 20000 });
     await page.click("#liftBtn");
     await page.waitForFunction(() => window.__ski.game.phase === "lift", null, { timeout: 5000 });
+    await page.waitForFunction(() => window.__ski.ride && window.__ski.ride.phase === "ride", null, { timeout: 20000 });
     await h.pause(3000);
     const c1 = await ride();
     h.expect(c1.kind === "chair" && c1.pose === "sit" && c1.carrier && c1.held !== null && c1.above > 2, `seated on a chair of ${c1.lift}, ${c1.above.toFixed(1)} m over the snow`);
@@ -86,7 +88,7 @@ export const flow = {
     const a2 = await arrived(c1.top);
     h.expect(a2.d < 120 && a2.downhill, `off at the top of ${c1.lift} (${Math.round(a2.d)} m), facing downhill`);
     h.eq(await page.evaluate(() => document.documentElement.dataset.skiLifts), "2", "two lifts ridden");
-    h.eq(await page.evaluate(() => window.__ski.lifts.pathOf(window.__ski.modes.lifts.byId.get(window.__ski.game.freeLift.id).index).ride), null, "the chair is let go again");
+    h.eq(await page.evaluate(() => window.__ski.lifts.heldOf(window.__ski.modes.lifts.byId.get(window.__ski.game.freeLift.id).index)), null, "the chair is let go again");
 
     h.step("a drag lift: pulled up on the snow");
     const dragId = await page.evaluate(() => { const L = window.__ski.modes.lifts.list.filter((l) => l.kind === "drag" && l.len > 250 && l.len < 700); return L[0].id; });
@@ -94,7 +96,8 @@ export const flow = {
     await page.waitForFunction((id) => window.__ski.game.phase === "running" && window.__ski.modes.liftAt && window.__ski.modes.liftAt.id === id, dragId, { timeout: 20000 });
     await page.keyboard.press("l");
     await page.waitForFunction(() => window.__ski.game.phase === "lift", null, { timeout: 5000 });
-    await h.pause(2000);
+    await page.waitForFunction(() => window.__ski.ride && window.__ski.ride.phase === "ride", null, { timeout: 20000 });
+    await h.pause(1000);
     const d1 = await ride();
     h.expect(d1.kind === "drag" && d1.pose === "drag" && Math.abs(d1.above) < 0.3, `on ${d1.lift}: skis on the snow (${d1.above.toFixed(2)} m)`);
     const wire = await page.evaluate(async () => { const { packState, unpackState } = await import("/pb/ski/net/wire.js"); const a = packState(window.__ski.state, 0, false); const u = unpackState(a); return { n: a.length, ride: u.ride, lift: u.rideLift, s: u.rideS }; });
@@ -109,17 +112,19 @@ export const flow = {
       const { createLifts } = await import("/pb/ski/lifts.js");
       const { createLiftPath } = await import("/pb/ski/lift-path.js");
       const { createRide } = await import("/pb/ski/modes/liftride.js");
+      const { createLiftSite } = await import("/pb/ski/lift-site.js");
       const { createCarrier } = await import("/pb/ski/modes/carriers.js");
       const pts = [s.x, s.z, s.x + 300, s.z + 200, s.x + 700, s.z + 260];
       const src = { kind: "rack_railway", name: "Test-Bunn", pts, pylons: [] };
       const h = (x, z) => S.surface.height(x, z);
       const view = createLifts({ scene: S.scene, resort: { lifts: [src] }, height: h });
       const path = createLiftPath(src, h);
-      const r = createRide({ lift: { index: 0, name: "Test-Bunn", kind: "train" }, path, height: h });
+      const r = createRide({ lift: { index: 0, name: "Test-Bunn", kind: "train" }, path, site: createLiftSite(path), height: h });
       const car = createCarrier({ scene: S.scene, kind: "train" });
+      for (let i = 0; i < 900 && r.phase !== "ride"; i++) r.step(1 / 60);
       for (let i = 0; i < 120; i++) r.step(1 / 60);
       const w = r.where();
-      car.place(w); view.setRide(0, r.s); view.update(1, s.x, s.z, 5000);
+      car.place(w); view.setRide(0, r.carrierU); view.update(1, s.x, s.z, 5000);
       const st = r.state(s);
       S.renderer.render(S.scene, S.camera);
       const out = { kind: path.kind, pose: st.ride, above: st.y - h(st.x, st.z), count: view.count };

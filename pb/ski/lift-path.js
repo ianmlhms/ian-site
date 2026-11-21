@@ -58,6 +58,7 @@ export const BOARD = Object.freeze({ chair: 3.2, gondola: 6, cable: 7, drag: 3, 
 export const UNLOAD = Object.freeze({ chair: 4, gondola: 6, cable: 7, drag: 5, rope: 3, carpet: 0.8, train: 9 });
 /** m of line inside a station hall where the rope runs level at the wheel's height (the carriers pass at boarding height). */
 const STATION_LEN = Object.freeze({ chair: 5.5, gondola: 14.8, cable: 14, drag: 0, rope: 0, carpet: 0, train: 0 });
+const CORNER = 8;                    // m over which the line's direction turns at a bend of the polyline
 const TUNNEL_DEPTH = 9;              // m of rock over the tunnel roof in the middle of an underground funicular
 const TUNNEL_RAMP = 70;              // m over which the line dives from the station into the hill
 
@@ -86,7 +87,20 @@ export function createLiftPath(src, height) {
     const seg = (ss[i + 1] - ss[i]) || 1;
     const k = Math.min(1, Math.max(0, (s - ss[i]) / seg));
     out.x = sx[i] + (sx[i + 1] - sx[i]) * k; out.z = sz[i] + (sz[i + 1] - sz[i]) * k;
-    out.dx = (sx[i + 1] - sx[i]) / seg; out.dz = (sz[i + 1] - sz[i]) / seg;
+    let dx = (sx[i + 1] - sx[i]) / seg, dz = (sz[i + 1] - sz[i]) / seg;
+    // round 7-B: the direction turns smoothly over a few metres at a bend, so the lanes beside the line (a drag track, the ropes)
+    // stay continuous instead of jumping at the polyline's corners
+    const into = s - ss[i], left = ss[i + 1] - s;
+    if (i > 0 && into < CORNER) {
+      const B = Math.min(CORNER, seg / 2, (ss[i] - ss[i - 1]) / 2), w = into < B ? 0.5 * (1 - into / B) : 0;
+      const pl = (ss[i] - ss[i - 1]) || 1;
+      dx += ((sx[i] - sx[i - 1]) / pl - dx) * w; dz += ((sz[i] - sz[i - 1]) / pl - dz) * w;
+    } else if (i + 2 < n && left < CORNER) {
+      const nl = (ss[i + 2] - ss[i + 1]) || 1, B = Math.min(CORNER, seg / 2, nl / 2), w = left < B ? 0.5 * (1 - left / B) : 0;
+      dx += ((sx[i + 2] - sx[i + 1]) / nl - dx) * w; dz += ((sz[i + 2] - sz[i + 1]) / nl - dz) * w;
+    }
+    const dl = Math.hypot(dx, dz) || 1;
+    out.dx = dx / dl; out.dz = dz / dl;
     return out;
   }
   const q = {};

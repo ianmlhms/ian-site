@@ -617,13 +617,11 @@ async function boot() {
     const st = game.state;
     if (!site.inZone(st.x, st.z)) return;                                   // only from inside the zone (no jump onto the line)
     const height = (x, z) => surface.height(x, z);
-    const probe = createRide({ lift, path, site, height, from: { x: st.x, z: st.z, heading: st.heading } });
-    const uLoad = probe.carrierU;           // (board phase at t = 0: the default approach start; the loading point is that + approach)
-    void uLoad;
+    // the next carrier of the lift's own loop that reaches the loading line at least 1.6 s from now picks him up
     const loadU = path.shuttle ? null : path.upU(Math.min(RIDE.enter[site.key], path.len * 0.2));
     const next = loadU === null ? null : view.nextCarrier(lift.index, loadU, path.spec.speed * 1.6);
     ride = createRide({ lift, path, site, height, from: { x: st.x, z: st.z, heading: st.heading }, startU: next ? next.u : null,
-      exitAt: () => modes.lifts.world.exitOf(lift.index, height, (x, z) => !!scatter.hit(x, z, 0.4, -1e9, quality.treeDensity), pistes.list.map((p) => p.top)) });
+      exitAt: () => modes.lifts.world.exitOf(lift.index, height, (x, z) => !!scatter.hit(x, z, 0.4, -1e9, quality.treeDensity), pistes.list) });
     carrier = createCarrier({ scene, kind: path.kind, seats: path.seats, sub: path.sub });
     modes.rideStart(lift);
     chPrompt.show(null);
@@ -978,6 +976,9 @@ async function boot() {
     goFree: (id) => goFree(id ? modes.lifts.byId.get(id) : spawn), boardLift, skipRide, toggleRideView, get ride() { return ride; }, get rideView() { return rideView; }, get spawn() { return spawn; },
     get lifts() { return lifts; }, markers, setSki, get skiType() { return skiType; }, get world() { return world; }, openSkiCard, resumeFree, acceptChallenge, showMap,
     place(x, z, heading) { placeAt(x, z, heading); },
+    // R7-B (flows): stand still at (x, z) like after a lift (0 km/h until an input), the scatter for the tree checks
+    placeHold(x, z, heading) { placeAt(x, z, heading); game.hold = true; if (modes.freeRun) modes.freeRun.moved({ x, z, heading }); },
+    get hold() { return !!game.hold; }, scatter, quality,
   };
 
   // first build around the default piste behind the loading screen, then the picker (or straight onto the piste with ?auto=1)

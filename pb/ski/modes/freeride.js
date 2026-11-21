@@ -41,7 +41,7 @@ export function createLiftNet(resort, heightAt, pistes = null) {
     // round 6: the line's own start is its bottom in the baked data (bake.py orients every lift uphill); `reversed` if not
     list.push({ id: `l${i}`, index: i, name: l.name || kindName(cls), kind: cls, bottom, top, len, seconds: len / LIFT_SPEC[cls].speed, ux, uz, reversed: a.y > b.y, seats: l.seats || 0, tunnel: !!l.tunnel, sub: paths.get(i).sub });
   }
-  const pisteStarts = pistes ? pistes.list.map((p) => p.top) : null;
+  const pisteStarts = pistes ? pistes.list : null;               // (exitOf: their tops, and points down the ones starting at a top)
   /** Where a skier stands after a lift (round 7-B: lift-site.js exitOf: out of the top station on snow, facing downhill, 15 m clear;
    *  the old guess was the nearest piste start, which could be inside a building). tree(x, z) = a tree there (scatter), optional. */
   function startAt(lift, height = heightAt, tree = null) {
@@ -72,7 +72,7 @@ export function createLiftNet(resort, heightAt, pistes = null) {
   return {
     list, byId: new Map(list.map((l) => [l.id, l])), byIndex, startAt, boardAt, boardingAt, nearestBottom, nearestTop, paths,
     get world() { return world; },
-    setBuildings(rows) { world = createLiftWorld(paths, { buildings: rows }); return world; },
+    setBuildings(rows) { world = createLiftWorld(paths, { buildings: rows, cutsFrom: world }); return world; },
   };
 }
 

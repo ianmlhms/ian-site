@@ -361,6 +361,9 @@ export function createLifts({ scene, resort, height }) {
     group, update, nearest, setRide, nextCarrier, dispose, count: lifts.length,
     pathOf: (index) => (byIndex.get(index) ? byIndex.get(index).path : null),
     siteOf: (index) => (byIndex.get(index) ? byIndex.get(index).site : null),
+    /** The loop parameter of the carrier held for the player on lift `index` (null: none). */
+    heldOf: (index) => (byIndex.get(index) ? byIndex.get(index).rideU : null),
+    world,
     /** Round 7-B (tests): the instanced carriers drawn now, per pool key. */
     poolCounts: () => Object.fromEntries([...pools].map(([k, p]) => [k, p.n + p.nf])),
   };

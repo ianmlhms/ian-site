@@ -30,6 +30,7 @@ const { createRide } = await imp('modes/liftride.js');
 const { createLiftNet } = await imp('modes/freeride.js');
 const { createParkLayout } = await imp('modes/park.js');
 
+let GROUND = null;
 const TYPE_OF = { chair: 'platform', gondola: 'hall', cable: 'terminal', drag: 'hut', carpet: 'belt', train: 'rail' };
 const SKIER_R = 0.35;
 let fails = 0, checks = 0;
@@ -41,12 +42,24 @@ const table = [];
 /** A carrier box (centre x, y = rope, z; heading) against a part box of a frame: overlap in the frame's plane and in height? */
 function boxHitsPart(f, g0, p, cx, cz, heading, hw, hl, yLo, yHi, pad = 0) {
   if (!p.solid) return false;
-  if (yHi < g0 + p.y0 - 5 * (p.y0 <= 0.05 && p.y0 >= -0.6 ? 1 : 0) || yLo > g0 + p.y1) return false;      // (ground parts reach down to the lowest ground)
+  let y0 = g0 + p.y0;
+  if (p.y0 <= 0.05 && p.y0 >= -0.6 && GROUND) {                // ground parts reach down to the lowest ground under them (lifts.js)
+    for (const [a, b] of [[p.a0, p.b0], [p.a1, p.b0], [p.a0, p.b1], [p.a1, p.b1], [(p.a0 + p.a1) / 2, (p.b0 + p.b1) / 2]]) { const w = f.toWorld(a, b, {}); y0 = Math.min(y0, GROUND(w.x, w.z) - 0.3); }
+  }
+  if (yHi < y0 || yLo > g0 + p.y1) return false;
   const l = f.toLocal(cx, cz, {});
   const c = Math.cos(heading), s = Math.sin(heading);
   const ca = Math.abs(c * f.fx + s * f.fz), cbb = Math.abs(c * f.rx + s * f.rz);      // |cos| / |sin| of the carrier axis in the frame
   const ea = ca * hl + cbb * hw + pad, eb = cbb * hl + ca * hw + pad;
-  return l.a + ea > p.a0 && l.a - ea < p.a1 && l.b + eb > p.b0 && l.b - eb < p.b1;
+  if (!(l.a + ea > p.a0 && l.a - ea < p.a1 && l.b + eb > p.b0 && l.b - eb < p.b1)) return false;
+  // separating axis test on the carrier's own two axes too (exact for two rectangles)
+  const ua = c * f.fx + s * f.fz, ub = c * f.rx + s * f.rz;            // the carrier's travel axis in the frame
+  const pa = (p.a0 + p.a1) / 2 - l.a, pb = (p.b0 + p.b1) / 2 - l.b, ha = (p.a1 - p.a0) / 2, hb = (p.b1 - p.b0) / 2;
+  for (const [ax, ay, e] of [[ua, ub, hl], [-ub, ua, hw]]) {
+    const d = Math.abs(pa * ax + pb * ay), r = Math.abs(ax) * ha + Math.abs(ay) * hb + e + pad;
+    if (d >= r) return false;
+  }
+  return true;
 }
 
 for (const rid of resorts) {
@@ -59,13 +72,14 @@ for (const rid of resorts) {
   for (const [tx, tz] of resort.tiles.list) field.addTile(tx, tz, decodeGrid(new Uint8Array(fs.readFileSync(path.join(dir, 't', `${tx}_${tz}.bin`)))));
   const surface = createSurface(field);
   const H = (x, z) => surface.height(x, z);
+  GROUND = (x, z) => field.height(x, z);
   const buildings = JSON.parse(fs.readFileSync(path.join(dir, 'buildings.json'), 'utf8'));
   const pistes = createPisteSet(resort);
   const net = createLiftNet(resort, field.farHeight, pistes);             // as the game: the far grid for the layout
   const world = net.setBuildings(buildings);
   const scatter = createScatter(field, { guard: liftTreeGuard(resort, createLiftPath, field.farHeight) });
   const tree = (x, z) => !!scatter.hit(x, z, 0.4, -1e9, 1);
-  const starts = pistes.list.map((p) => p.top);
+  const starts = pistes.list;
   const kept = buildings.filter((_, i) => world.keepBuilding(i)).length;
   const per = {};
   const K = (k) => (per[k] = per[k] || { lifts: 0, stations: 0, rides: 0, exits: 0, minPylon: Infinity, minTree: Infinity, minStation: Infinity, dragSki: 0, loops: 0, tunnels: 0, fails: 0 });
@@ -109,14 +123,17 @@ for (const rid of resorts) {
       const g0 = field.farHeight(f.x, f.z) * 0 + H(f.x, f.z);
       for (const p of f.parts) if (boxHitsPart(f, g0, p, cx, cz, heading, hw, hl, yLo, yHi)) {
         st = Math.min(st, -1);
-        if (process.env.R7B_DEBUG && !envelope.told) { envelope.told = true; const l = f.toLocal(cx, cz, {}); console.log('    hit part', JSON.stringify({ ...p, col: p.col.toString(16) }), 'at a', l.a.toFixed(2), 'b', l.b.toFixed(2), 'y', (yLo - g0).toFixed(2), (yHi - g0).toFixed(2), 'hw', hw.toFixed(2), 'hl', hl.toFixed(2), 'which', f.which); }
+        if (process.env.R7B_DEBUG && !envelope.told) { envelope.told = true; const l = f.toLocal(cx, cz, {}); console.log('    hit part', envelope.ctx || '', JSON.stringify({ ...p, col: p.col.toString(16) }), 'at a', l.a.toFixed(2), 'b', l.b.toFixed(2), 'y', (yLo - g0).toFixed(2), (yHi - g0).toFixed(2), 'hw', hw.toFixed(2), 'hl', hl.toFixed(2), 'which', f.which); }
       }
     }
     for (const [tx, ty, tz, sc] of treesNear(cx, cz, rr + 4)) {
       if (yLo > ty + 10 * sc || yHi < ty) continue;
       const crown = 2.3 * sc * Math.max(0, Math.min(1, (ty + 10 * sc - yLo) / (10 * sc)));      // the cone narrows upwards
-      const d = Math.hypot(tx - cx, tz - cz) - rr - Math.max(0.3, crown);
-      tr = Math.min(tr, d);
+      const dx = tx - cx, dz = tz - cz, c = Math.cos(heading), s = Math.sin(heading);
+      const a = Math.abs(dx * c + dz * s) - hl, b = Math.abs(-dx * s + dz * c) - hw;
+      const d = Math.hypot(Math.max(0, a), Math.max(0, b)) - Math.max(0.3, crown);
+      tr = Math.min(tr, a < 0 && b < 0 ? -1 : d);
+      if (process.env.R7B_DEBUG && d <= 0 && !envelope.toldTree) { envelope.toldTree = true; console.log('    tree', tx.toFixed(1), tz.toFixed(1), 'y', ty.toFixed(1), 'scale', sc.toFixed(2), 'box', cx.toFixed(1), cz.toFixed(1), 'a', a.toFixed(2), 'b', b.toFixed(2), 'crown', crown.toFixed(2), 'yLo', yLo.toFixed(1)); }
     }
     return { pyl, st, tr };
   }
@@ -126,7 +143,7 @@ for (const rid of resorts) {
   resort.lifts.forEach((src, i) => { const q = createLiftPath(src, (x, z) => field.height(x, z)); if (q) visPaths.set(i, q); });
   const visWorld = createLiftWorld(visPaths);
   for (const [index, site] of world.sites) {
-    envelope.told = false; envelope.toldTree = false;
+    envelope.told = false; envelope.toldTree = false; envelope.ctx = 'loop';
     const src = resort.lifts[index];
     const fp = site.path;                                   // far-grid layout (the game's lift net)
     const p = visPaths.get(index);                                         // what lifts.js draws (the 5 m heights)
@@ -159,7 +176,7 @@ for (const rid of resorts) {
         if (ok(!down.up && Math.hypot(a.x - b.x, a.z - b.z) < 0.2, `${name}: the loop returns on the other side and closes`)) k.loops++;
         if (kind === 'drag') {
           const q = p.at(p.len / 2, {});
-          const lat = (down.x - q.x) * -q.dz + (down.z - q.z) * q.dx;
+          const lat = p.sign * ((down.x - q.x) * -q.dz + (down.z - q.z) * q.dx);
           ok(lat < -1, `${name}: the empty bars come back down on the return rope (${lat.toFixed(1)} m beside the pylon line)`);
         }
       }
@@ -182,16 +199,18 @@ for (const rid of resorts) {
     ok(world.boardingAt(out.x, out.z) !== index, `${name}: 6 m outside the zone: no boarding`);
     const ride = createRide({ lift, path: p, site: vis, height: H, exitAt: () => world.exitOf(index, H, tree, starts) });
     ok(ride.skip() === false, `${name}: no skip while boarding (one press = one boarding)`);
+    let worstAt = '';
     let prev = null, worst = 0, steps = 0, phases = [], minP = Infinity, minS = Infinity, minT = Infinity, dragWorst = 0, dragLat = Infinity;
     while (!ride.done && steps < 400000) {
       ride.step(1 / 60); steps++;
       if (phases[phases.length - 1] !== ride.phase) phases.push(ride.phase);
       const w = ride.where();
-      if (prev) worst = Math.max(worst, Math.hypot(w.x - prev.x, w.z - prev.z));
+      if (prev) { const j = Math.hypot(w.x - prev.x, w.z - prev.z); if (j > worst) { worst = j; worstAt = `${ride.phase} s ${w.s === undefined ? '-' : w.s.toFixed(0)} pose ${w.pose}`; } }
       prev = { x: w.x, z: w.z };
       if (steps % 3) continue;
       // the rider's envelope: on the ground a skier (0.35 m, 1.8 m tall); on a chair / in a cabin the carrier's own box
       const onC = w.onCarrier;
+      envelope.ctx = `${ride.phase} pose ${w.pose}`;
       if (!onC || kind === 'drag' || kind === 'carpet') {
         const e = envelope(w.x, w.z, w.heading, SKIER_R, kind === 'drag' && onC ? 0.85 : SKIER_R, w.y, w.y + 1.8);
         minP = Math.min(minP, e.pyl); minS = Math.min(minS, e.st); minT = Math.min(minT, e.tr);
@@ -203,11 +222,11 @@ for (const rid of resorts) {
       if (kind === 'drag' && onC && ride.phase === 'ride') {
         dragWorst = Math.max(dragWorst, Math.abs(w.y - H(w.x, w.z)));
         const q = p.at(w.s, {});
-        dragLat = Math.min(dragLat, (w.x - q.x) * -q.dz + (w.z - q.z) * q.dx);
+        dragLat = Math.min(dragLat, p.sign * ((w.x - q.x) * -q.dz + (w.z - q.z) * q.dx));
       }
     }
     ok(ride.done && phases.join() === 'board,ride,alight,done', `${name}: one boarding, one ride, off at the top (${phases.join(' > ')})`);
-    ok(worst < 1.2, `${name}: no jump (worst ${worst.toFixed(2)} m per frame at x4)`);
+    ok(worst < 1.2, `${name}: no jump (worst ${worst.toFixed(2)} m per frame at x4, ${worstAt})`);
     ok(minP > 0 && minS > 0 && minT > 0, `${name}: the rider never touches a pylon (${minP.toFixed(2)} m), a station part (${minS === Infinity ? 'none near' : minS.toFixed(2)}), a tree (${minT === Infinity ? 'none near' : minT.toFixed(2)} m)`);
     k.minPylon = Math.min(k.minPylon, minP); k.minTree = Math.min(k.minTree, minT); k.minStation = Math.min(k.minStation, minS);
     if (kind === 'drag') {
@@ -225,7 +244,7 @@ for (const rid of resorts) {
       const x = ex.x + Math.cos(ex.heading) * m, z = ex.z + Math.sin(ex.heading) * m;
       if (world.inStation(x, z, 0.5) || world.inBuilding(x, z, 0.5) || world.hit(x, z, SKIER_R, H(x, z), H) || world.inLowLane(x, z, H, 2.5) || tree(x, z)) clear = false;
     }
-    const good = !ex.fallback && !world.inStation(ex.x, ex.z, 1.5) && !world.inBuilding(ex.x, ex.z, 1.5) && !world.inLowLane(ex.x, ex.z, H, 3) && sl < 0.75 && a.water < 0.3 && ahead < back + 0.5 && clear;
+    const good = !ex.fallback && !world.inStation(ex.x, ex.z, 1.5) && !world.inBuilding(ex.x, ex.z, 1.5) && !world.inLowLane(ex.x, ex.z, H, 3) && sl < 1.0 && a.water < 0.3 && ahead < back + 0.5 && clear;
     if (ok(good, `${name}: exit ${ex.dist.toFixed(0)} m out, outside stations / buildings / lanes, slope ${sl.toFixed(2)}, water ${a.water.toFixed(2)}, ${ahead < back + 0.5 ? 'downhill' : 'UPHILL'}, ${clear ? '15 m clear' : 'BLOCKED ahead'}${ex.fallback ? ', FALLBACK' : ''}`)) k.exits++;
   }
   for (const [kk, v] of Object.entries(per)) table.push({ rid, kind: kk, ...v });

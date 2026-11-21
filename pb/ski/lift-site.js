@@ -81,19 +81,19 @@ export function createLiftSite(path) {
       add(a1 - 0.4, a1, b0, b1, 0, roof, COL.concrete, true, { wall: true });                         // back wall
       add(a0 + 4, a1 - 0.4, b0, b0 + 0.4, 0, roof * 0.42, COL.timber, true, { wall: true });           // return side: low wall,
       add(a0 + 4, a1 - 0.4, b0 + 0.05, b0 + 0.35, roof * 0.42, roof, COL.glass, true, { wall: true });  // glazed above
-      for (const a of [a0 + 0.3, (a0 + a1) / 2 - 2]) post(a, b1 - 0.4, roof, 0.25, COL.concrete);
+      for (const a of [a0 + 0.3, a1 - 1.0]) post(a, b1 - 0.4, roof, 0.25, COL.concrete);       // (the platform side stays open)
       post(a0 + 0.3, b0 + 0.3, roof, 0.25, COL.concrete);
       add(a1 - 0.6, a1 - 0.4, bOut + 1, bOut + 3.5, 2.2, 3.4, COL.accent, false);                    // a sign board on the back wall
     } else if (key === 'cable') {
       type = 'terminal';
       const roof = wheel + 1.3, b0 = bIn - 3.6, b1 = bOut + 3.6;
       add(-13.5, 1.0, b0, b1, -0.4, 0.04, COL.deck, false, { deck: true });
-      add(-13.5, 1.0, b0, b1, roof, roof + 0.6, COL.steel, true, { roof: true });
-      add(-13.7, 1.2, b0 - 0.2, b1 + 0.2, roof + 0.6, roof + 0.95, COL.snow, false, { cap: true });
-      for (const b of [b0 + 0.3, b1 - 0.3, -0.0]) post(-13.2, b, roof, 0.3, COL.concrete);
+      add(-11.4, 1.0, b0, b1, roof, roof + 0.6, COL.steel, true, { roof: true });              // over the docked cabin only
+      add(-11.6, 1.2, b0 - 0.2, b1 + 0.2, roof + 0.6, roof + 0.95, COL.snow, false, { cap: true });
+      for (const b of [b0 + 0.3, b1 - 0.3, -0.0]) post(-11.1, b, roof, 0.3, COL.concrete);
       // the machine building behind the dock (the track ropes are anchored in it)
-      add(1.0, 13, b0 - 0.5, b1 + 0.5, 0, roof + 3.5, COL.concrete, true, { wall: true, building: true });
-      add(0.9, 13.1, b0 - 0.6, b1 + 0.6, roof + 3.5, roof + 3.9, COL.snow, false, { cap: true });
+      add(1.0, 9, b0 + 1.2, b1 - 1.2, 0, roof + 3.5, COL.concrete, true, { wall: true, building: true });
+      add(0.9, 9.1, b0 + 1.1, b1 - 1.1, roof + 3.5, roof + 3.9, COL.snow, false, { cap: true });
       add(0.95, 1.0, b0 + 1, b1 - 1, wheel - 1.2, wheel + 0.8, COL.glass, false);
       for (const tr of [side, -back]) add(-0.2, 1.0, tr - 0.9, tr + 0.9, wheel - 0.6, wheel + 0.6, COL.wheel, false);
     } else if (key === 'drag' || key === 'rope') {
@@ -116,7 +116,7 @@ export function createLiftSite(path) {
       type = 'rail';
       // the roof over the highest rail under the hall (the track climbs through it)
       let rail = 0.35;
-      for (let d = 0; d <= Math.min(20, len); d += 2) rail = Math.max(rail, path.cableY(which ? len - d : d) - path.ground(s));
+      for (let d = 0; d <= Math.min(27, len); d += 1.5) rail = Math.max(rail, path.cableY(which ? len - d : d) - path.ground(s));
       const roof = rail + 4.25, b0 = bIn - 3.4, b1 = bOut + 3.4, a0 = -18;
       add(a0, 1.6, b0, b1, -0.4, 0.04, COL.deck, false, { deck: true });
       add(a0 + 2, -2, bOut + 0.1, b1 - 0.4, 0.04, 0.14, COL.concrete, false, { deck: true });         // the platform edge
@@ -147,7 +147,7 @@ export function createLiftSite(path) {
   const bottom = ends[0], top = ends[1];
   const zc = bottom.toWorld((zoneB.a0 + zoneB.a1) / 2, (zoneB.b0 + zoneB.b1) / 2, {});
   const upHeading = Math.atan2(-bottom.fz, -bottom.fx);
-  const off = key === 'drag' || key === 'rope' || key === 'carpet' ? null : top.toWorld(-unloadS, bOut + 1.4, {});
+  const off = key === 'carpet' ? null : top.toWorld(key === 'drag' || key === 'rope' ? -unloadS + 0.5 : -unloadS, bOut + (key === 'drag' || key === 'rope' ? 0.9 : 1.4), {});
   const site = {
     path, key, kind: path.kind, ends, bottom, top, boardS, unloadS, zone: zoneB,
     /** The waiting spot in the zone (fast travel lands here): facing up the line. */
@@ -204,15 +204,18 @@ export const frames = (site) => [...site.ends, ...site.portals, ...site.stops];
 
 /* ---------------- the resort's lift world ---------------- */
 const CELL = 60;
+/** The exit search's directions (rad in a top station's frame, 0 = straight out of the outer side), nearest to it first. */
+const ANGLES = [0, ...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].flatMap((k) => [k * Math.PI / 12, -k * Math.PI / 12]), Math.PI];
 /**
  * paths = Map(lift index -> createLiftPath) (any height function: the layout is x / z; heights only rate the lanes).
  * opts.buildings = buildings.json rows (optional): the ones in a station or a low lift lane are left out (`keepBuilding`), the rest
- * blocks the exits.
+ * blocks the exits. opts.cutsFrom = a world over the same lifts whose pruning is copied (no second pass).
  */
 export function createLiftWorld(paths, opts = {}) {
   const sites = new Map();
   for (const [i, p] of paths) if (p) sites.set(i, createLiftSite(p));
-  pruneCrossings(sites);
+  if (opts.cutsFrom) copyCuts(sites, opts.cutsFrom);
+  else pruneCrossings(sites);
   // grid of station frames, pylons and lane segments
   const grid = new Map();
   const key = (i, j) => i * 100003 + j;
@@ -247,7 +250,7 @@ export function createLiftWorld(paths, opts = {}) {
     for (let s = 0; s < p.len; s += step) {
       const s1 = Math.min(p.len, s + step);
       const a = p.at(s, {}), b = p.at(s1, {});
-      const w = Math.max(AISLE[site.key], p.side + p.carrier.hw + 1);
+      const w = Math.max(AISLE[site.key], Math.max(p.side, p.back) + p.carrier.hw + 4.2);
       put(Math.min(a.x, b.x) - w, Math.min(a.z, b.z) - w, Math.max(a.x, b.x) + w, Math.max(a.z, b.z) + w, { t: 'lane', index, s0: s, s1, ax: a.x, az: a.z, bx: b.x, bz: b.z });
     }
   }
@@ -294,19 +297,23 @@ export function createLiftWorld(paths, opts = {}) {
     return best;
   }
   /** Is (x, z) in a lift lane where the carriers hang lower than `clear` m over the ground (or on a drag lift's track / belt)? */
-  function inLowLane(x, z, height, clear = 3.2, skipIndex = -1) {
+  function inLowLane(x, z, height, clear = 3.2, skipIndex = -1, lanesOut = null) {
     for (const it of near(x, z, 14)) {
-      if (it.t !== 'lane' || it.index === skipIndex) continue;
+      if (it.t !== 'lane' || it.index === skipIndex || (skipIndex instanceof Set && skipIndex.has(it.index))) continue;
       const p = sites.get(it.index).path;
       const dx = it.bx - it.ax, dz = it.bz - it.az, L2 = dx * dx + dz * dz || 1;
-      const t = Math.max(0, Math.min(1, ((x - it.ax) * dx + (z - it.az) * dz) / L2));
+      const tu = ((x - it.ax) * dx + (z - it.az) * dz) / L2, Ls = Math.sqrt(L2);
+      const ext = (p.shuttle ? 0 : p.wheelR) + p.carrier.hl + 1;             // the loop's bulge round the wheel beyond the line's end
+      if (tu < 0 && (it.s0 > 0 || -tu * Ls > ext)) continue;                 // (an inner joint: the segment before covers it)
+      if (tu > 1 && (it.s1 < p.len || (tu - 1) * Ls > ext)) continue;
+      const t = Math.max(0, Math.min(1, tu));
       const s = it.s0 + (it.s1 - it.s0) * t;
       const px = it.ax + dx * t, pz = it.az + dz * t;
       const lat = p.sign * ((x - px) * -dz + (z - pz) * dx) / Math.sqrt(L2);    // + = the up side
       if (lat < -p.back - p.carrier.hw - 1 || lat > p.side + p.carrier.hw + 1) continue;
-      if (p.kind === 'drag' || p.kind === 'carpet' || (p.kind === 'train' && !p.tunnel)) return true;
+      if (p.kind === 'drag' || p.kind === 'carpet' || (p.kind === 'train' && !p.tunnel)) { if (lanesOut) lanesOut.add(it.index); else return true; continue; }
       if (p.kind === 'train') continue;
-      if (p.cableY(s) - p.carrier.drop - height(x, z) < clear) return true;
+      if (p.cableY(s) - p.carrier.drop - height(x, z) < clear) { if (lanesOut) lanesOut.add(it.index); else return true; }
     }
     return false;
   }
@@ -416,7 +423,8 @@ export function createLiftWorld(paths, opts = {}) {
   /** The exit at a lift's top: { x, z, heading, from: { x, z } (where he gets off) }. height = the snow; tree(x, z) = a tree there?
    *  Outside every station, building and low lane (2 m), on snow, facing down the fall line with 15 m clear ahead, the nearest such
    *  spot to where he got off (a piste start nearby is preferred). */
-  function exitOf(index, height, tree = null, pisteStarts = null) {
+  function exitOf(index, height, tree = null, pisteStarts = null, why = null) {
+    const no = (r) => { if (why) why[r] = (why[r] || 0) + 1; };
     const site = sites.get(index);
     if (!site) return null;
     const top = site.top, from = site.off;
@@ -426,50 +434,91 @@ export function createLiftWorld(paths, opts = {}) {
       return Math.hypot(gx, gz) > 0.03 ? Math.atan2(-gz, -gx) : null;
     };
     const blocked = (x, z, m) => inStation(x, z, m) || inBuilding(x, z, m) || nearPylon(x, z, m + 0.4) || inLowLane(x, z, height, 3.2);
-    let best = null, bs = Infinity;
     const lc = {};
     const toL = top.toLocal(from.x, from.z, lc);
-    for (const ang of [0, 0.5, -0.5, 1.0, -1.0, 1.45, -1.45, 2.0, -2.0, 2.6, -2.6, Math.PI]) {
-      // directions in the top's frame: 0 = straight out of the outer side (+b), +- towards behind / in front of the station
+    // the lanes he gets off in (a drag track / belt; a station shared with the next lift: its cabins dock there) do not block the way
+    // out of them (the exit itself must be outside every lane)
+    const own = new Set();
+    inLowLane(from.x, from.z, height, 2.6, -1, own);
+    if (site.path.kind === 'drag' || site.path.kind === 'carpet') own.add(index);
+    // the candidates: straight lines out of the station in 24 directions, and points down a piste that starts at this top
+    const candidates = [];
+    for (const ang of ANGLES) {
       const da = Math.sin(ang), db = Math.cos(ang);
-      for (const dist of [4, 7, 10, 14, 19, 25, 33, 44, 58, 75]) {
-        const a = toL.a + da * dist, b = toL.b + db * dist;
-        const P = top.toWorld(a, b, {});
-        if (blocked(P.x, P.z, 2)) continue;
-        // the way out from where he got off: clear of every other solid part and building on the way (his own deck is fine)
-        let wayOk = true;
-        for (let k = 1; k < 10 && wayOk; k++) {
-          const W = top.toWorld(toL.a + da * dist * k / 10, toL.b + db * dist * k / 10, {});
-          if (hit(W.x, W.z, 0.45, height(W.x, W.z), height) || inBuilding(W.x, W.z, 0.5) || (inStation(W.x, W.z, 0, top) && dist * k / 10 > 3)) wayOk = false;
-          if (inLowLane(W.x, W.z, height, 2.6, index)) wayOk = false;         // (out of his own lane: the end point checks it)
-        }
-        if (!wayOk) continue;
-        const sl = Math.hypot(height(P.x + 2, P.z) - height(P.x - 2, P.z), height(P.x, P.z + 2) - height(P.x, P.z - 2)) / 4;
-        if (sl > 0.6) continue;                                        // walkable: no exit on a steep face
-        let heading = fall(P.x, P.z);
-        const flat = heading === null;
-        if (flat) heading = Math.atan2(P.z - from.z, P.x - from.x);
-        // facing downhill over the next 15 m too (a 30 m gradient can hide a small rise): else the local fall line, else skip it
-        const rises = (h) => height(P.x + Math.cos(h) * 15, P.z + Math.sin(h) * 15) > height(P.x - Math.cos(h) * 15, P.z - Math.sin(h) * 15) + 0.3;
-        if (rises(heading)) {
-          const g = 8, gx = (height(P.x + g, P.z) - height(P.x - g, P.z)) / (2 * g), gz = (height(P.x, P.z + g) - height(P.x, P.z - g)) / (2 * g);
-          heading = Math.atan2(-gz, -gx);
-          if (rises(heading)) continue;
-        }
-        // 15 m clear ahead
-        let clear = true;
-        const hx = Math.cos(heading), hz = Math.sin(heading);
-        for (let m = 1.5; m <= 15 && clear; m += 1.5) {
-          const x = P.x + hx * m, z = P.z + hz * m;
-          if (blocked(x, z, 0.8) || hit(x, z, 0.4, height(x, z), height) || (tree && tree(x, z))) clear = false;
-        }
-        if (!clear) continue;
-        if (tree && tree(P.x, P.z)) continue;
-        let score = dist + (flat ? 25 : 0) + Math.abs(ang) * 2;
-        if (pisteStarts) { let d0 = 1e9; for (const ps of pisteStarts) d0 = Math.min(d0, Math.hypot(ps.x - P.x, ps.z - P.z)); score += Math.min(60, d0) * 0.25; }
-        if (score < bs) { bs = score; best = { x: P.x, z: P.z, heading, from: { x: from.x, z: from.z }, dist }; }
+      for (const dist of [4, 7, 10, 14, 19, 25, 33, 44, 58, 75, 95, 120]) candidates.push({ P: top.toWorld(toL.a + da * dist, toL.b + db * dist, {}), dist, ang, da, db });
+    }
+    for (const ps of pisteStarts || []) {
+      if (!ps.at || Math.hypot(ps.top.x - from.x, ps.top.z - from.z) > 80) continue;
+      for (const s0 of [6, 10, 15, 20, 30, 45, 60, 80]) {
+        if (s0 > ps.length * 0.6) break;
+        const q = ps.at(s0, {});
+        const l2 = top.toLocal(q.x, q.z, {});
+        const dist = Math.hypot(l2.a - toL.a, l2.b - toL.b) || 1;
+        // the way out runs down the piste itself (it may pass under a lift near the station: the pistes are made for that)
+        // (joining it where it passes nearest to where he got off)
+        let tj = 0, dj = Infinity;
+        for (let t = 0; t < s0; t += 1) { const w = ps.at(t, {}); const d = Math.hypot(w.x - from.x, w.z - from.z); if (d < dj) { dj = d; tj = t; } }
+        const way = [{ x: from.x, z: from.z }];
+        for (let t = tj; t < s0; t += 2) { const w = ps.at(t, {}); way.push({ x: w.x, z: w.z }); }
+        way.push({ x: q.x, z: q.z });
+        let L = 0;
+        for (let k = 1; k < way.length; k++) L += Math.hypot(way[k].x - way[k - 1].x, way[k].z - way[k - 1].z);
+        candidates.push({ P: { x: q.x, z: q.z }, dist: L, ang: 0, heading: Math.atan2(q.dz, q.dx), piste: true, way });
       }
     }
+    const search = (maxSlope, ahead = 15, laneClear = 2.6) => {
+      let best = null, bs = Infinity;
+      for (const cand of candidates) {
+        {
+          const { P, dist, ang } = cand;
+          if (blocked(P.x, P.z, 2)) { no(inStation(P.x, P.z, 2) ? 'station' : inBuilding(P.x, P.z, 2) ? 'building' : nearPylon(P.x, P.z, 2.4) ? 'pylon' : 'lane'); continue; }
+          const sl = Math.hypot(height(P.x + 2, P.z) - height(P.x - 2, P.z), height(P.x, P.z + 2) - height(P.x, P.z - 2)) / 4;
+          if (sl > maxSlope) { no('slope'); continue; }                    // walkable: no exit on a steep face
+          // the way out from where he got off: clear of every solid part, building, tree and low lane on the way (his own deck is fine)
+          let wayOk = true;
+          const legs = cand.way || [from, P];
+          for (let g = 1; g < legs.length && wayOk; g++) {
+            const A = legs[g - 1], B = legs[g], d = Math.hypot(B.x - A.x, B.z - A.z), n = Math.max(1, Math.ceil(d / 0.5));
+            for (let k = 1; k <= n && wayOk; k++) {
+              const x = A.x + (B.x - A.x) * k / n, z = A.z + (B.z - A.z) * k / n;
+              if (hit(x, z, 0.55, height(x, z), height)) { wayOk = false; no('way-part'); }
+              else if (inBuilding(x, z, 0.5)) { wayOk = false; no('way-building'); }
+              else if (!cand.way && inLowLane(x, z, height, laneClear, own)) { wayOk = false; no('way-lane'); }
+              else if (tree && tree(x, z)) { wayOk = false; no('way-tree'); }
+            }
+          }
+          if (!wayOk) continue;
+          let heading = cand.heading !== undefined ? cand.heading : fall(P.x, P.z);
+          const flat = heading === null;
+          if (flat) heading = Math.atan2(P.z - from.z, P.x - from.x);
+          // facing downhill over the next 15 m too (a 30 m gradient can hide a small rise): else the local fall line, else skip it
+          const rises = (h) => height(P.x + Math.cos(h) * 15, P.z + Math.sin(h) * 15) > height(P.x - Math.cos(h) * 15, P.z - Math.sin(h) * 15) + 0.3;
+          if (rises(heading)) {
+            const g = 8, gx = (height(P.x + g, P.z) - height(P.x - g, P.z)) / (2 * g), gz = (height(P.x, P.z + g) - height(P.x, P.z - g)) / (2 * g);
+            heading = Math.atan2(-gz, -gx);
+            if (rises(heading)) { no('uphill'); continue; }
+          }
+          // 15 m clear ahead
+          let clear = true;
+          const hx = Math.cos(heading), hz = Math.sin(heading);
+          for (let m = 1; m <= ahead && clear; m += 1) {
+            const x = P.x + hx * m, z = P.z + hz * m;
+            if (blocked(x, z, 0.8) || hit(x, z, 0.4, height(x, z), height) || (tree && tree(x, z))) clear = false;
+          }
+          if (!clear) { no('ahead'); continue; }
+          let score = dist + (flat ? 25 : 0) + Math.abs(ang) * 2 + sl * 20;
+          if (pisteStarts) { let d0 = 1e9; for (const ps of pisteStarts) { const t = ps.top || ps; d0 = Math.min(d0, Math.hypot(t.x - P.x, t.z - P.z)); } score += Math.min(60, d0) * 0.25; }
+          if (cand.piste) score -= 4;
+          if (score < bs) { bs = score; best = { x: P.x, z: P.z, heading, from: { x: from.x, z: from.z }, dist, slope: sl, via: cand.way ? cand.way.slice(1, -1) : null }; }
+        }
+      }
+      return best;
+    };
+    // walkable snow first; at a summit station on a steep ridge (Valluga, Klein Matterhorn) the gentlest spot that is still skiable
+    // (and on the two tightest summits of the data, Vallugagrat and the Leisee shuttle's top in the Sunnegga station: 10 m clear,
+    // under the carriers where they still pass 1.5 m over the snow)
+    let best = search(0.6) || search(1.0) || search(1.25, 10, 1.5) || search(9, 5, 1.0);
+    if (best && best.slope > 1.0) best.steep = true;
     if (!best) {                                    // nothing clear (never in the data so far): 30 m out of the outer side
       const P = top.toWorld(toL.a, toL.b + 30, {});
       best = { x: P.x, z: P.z, heading: fall(P.x, P.z) ?? Math.atan2(top.fz, top.fx), from: { x: from.x, z: from.z }, dist: 30, fallback: true };
@@ -491,47 +540,72 @@ export function createLiftWorld(paths, opts = {}) {
  *  carrier lane (at the carriers' height) is left out (`cut`: not drawn, not solid), with the snow on it. */
 function pruneCrossings(sites) {
   const list = [...sites.values()];
-  const tmp = {};
+  // the station frames in a 40 m grid (each in every cell its footprint + 5 m touches)
+  const G = 40, fgrid = new Map();
+  const gk = (i, j) => i * 100003 + j;
   for (const site of list) {
     for (const f of frames(site)) {
-      const g0 = site.path.ground(f.s !== undefined ? f.s : 0);
-      for (const p of f.parts) {
-        if (p.deck || p.cut) continue;
-        const pts = [[(p.a0 + p.a1) / 2, (p.b0 + p.b1) / 2], [p.a0, p.b0], [p.a1, p.b0], [p.a0, p.b1], [p.a1, p.b1]].map(([a, b]) => f.toWorld(a, b, {}));
-        let hitIt = false;
-        for (const o of list) {
-          if (o === site || hitIt) continue;
-          const q = o.path;
-          if (Math.hypot(q.cx - pts[0].x, q.cz - pts[0].z) > q.radius + 40) continue;
-          const src = q.src.pts;
-          for (const w of pts) {
-            let best = Infinity, bs = 0, blat = 0, acc = 0;
-            for (let k = 0; k + 3 < src.length; k += 2) {
-              const ax = src[k], az = src[k + 1], dx = src[k + 2] - ax, dz = src[k + 3] - az, L = Math.hypot(dx, dz) || 1;
-              const t = Math.max(0, Math.min(1, ((w.x - ax) * dx + (w.z - az) * dz) / (L * L)));
-              const px = ax + dx * t, pz = az + dz * t, d = Math.hypot(w.x - px, w.z - pz);
-              if (d < best) { best = d; bs = acc + t * L; blat = q.sign * ((w.x - px) * -dz + (w.z - pz) * dx) / L; }
-              acc += L;
-            }
-            const cb = q.carrier;
-            const ext = Math.max(p.a1 - p.a0, p.b1 - p.b0) / 2;
-            if (blat < -q.back - cb.hw - 0.5 - ext * 0.2 || blat > q.side + cb.hw + 0.5 + ext * 0.2) continue;
-            if (bs < -cb.hl || bs > q.len + cb.hl) continue;
-            const lo = q.kind === 'train' || q.kind === 'carpet' || q.kind === 'drag' ? q.ground(bs) - 1 : q.cableY(bs) - cb.drop - 0.4;
-            const hi = q.kind === 'train' ? q.cableY(bs) + cb.top + 0.4 : q.cableY(bs) + cb.top + 0.4;
-            if (g0 + p.y1 < lo || g0 + p.y0 > hi) continue;
-            if (q.kind === 'train' && q.tunnel && q.ground(bs) - q.cableY(bs) > 6) continue;
-            hitIt = true; break;
-          }
-        }
-        if (hitIt) {
-          p.cut = true; p.solid = false;
-          for (const c of f.parts) if (c.cap && Math.abs(c.y0 - p.y1) < 0.05 && c.a0 < p.a1 && c.a1 > p.a0 && c.b0 < p.b1 && c.b1 > p.b0) c.cut = true;
-        }
+      const r = f.rect, cs = [[r.a0, r.b0], [r.a1, r.b0], [r.a0, r.b1], [r.a1, r.b1]].map(([a, b]) => f.toWorld(a, b, {}));
+      const x0 = Math.min(...cs.map((c) => c.x)) - 5, x1 = Math.max(...cs.map((c) => c.x)) + 5, z0 = Math.min(...cs.map((c) => c.z)) - 5, z1 = Math.max(...cs.map((c) => c.z)) + 5;
+      for (let j = Math.floor(z0 / G); j <= Math.floor(z1 / G); j++) for (let i = Math.floor(x0 / G); i <= Math.floor(x1 / G); i++) {
+        let c = fgrid.get(gk(i, j));
+        if (!c) fgrid.set(gk(i, j), (c = []));
+        c.push({ site, f });
       }
     }
   }
-  void tmp;
+  const l = {};
+  /** A carrier (or the rider) of `owner` at (x, z) heading h with half sizes hw / hl: cut every other lift's part it overlaps (by the
+   *  ground plan only, so the drawn stations (5 m heights) and the colliders (far grid) always agree), with the snow on it. */
+  const test = (x, z, h, hw, hl, owner) => {
+    const cell = fgrid.get(gk(Math.floor(x / G), Math.floor(z / G)));
+    if (!cell) return;
+    const c = Math.cos(h), sn = Math.sin(h);
+    for (const { site, f } of cell) {
+      if (site === owner) continue;
+      f.toLocal(x, z, l);
+      const ca = Math.abs(c * f.fx + sn * f.fz), cr = Math.abs(c * f.rx + sn * f.rz);
+      const ea = ca * hl + cr * hw, eb = cr * hl + ca * hw;
+      if (l.a + ea < f.rect.a0 || l.a - ea > f.rect.a1 || l.b + eb < f.rect.b0 || l.b - eb > f.rect.b1) continue;
+      for (const p of f.parts) {
+        if (p.deck || p.cut || (!p.solid && !p.cap)) continue;
+        if (l.a + ea < p.a0 || l.a - ea > p.a1 || l.b + eb < p.b0 || l.b - eb > p.b1) continue;
+        p.cut = true; p.solid = false;
+        for (const cp of f.parts) if (cp.cap && Math.abs(cp.y0 - p.y1) < 0.05 && cp.a0 < p.a1 && cp.a1 > p.a0 && cp.b0 < p.b1 && cp.b1 > p.b0) cp.cut = true;
+      }
+    }
+  };
+  const w = {};
+  for (const site of list) {
+    const p = site.path;
+    // every carrier position 2 m apart round the loop (drag bars, chairs, cabins, trains; not under the ground)
+    if (!(p.kind === 'carpet' || (p.kind === 'drag' && p.sub === 'rope'))) {
+      const cb = p.carrier, hw = cb.hw + cb.drop * 0.035 + 0.3, hl = cb.hl + 0.3;
+      for (let u = 0; u < p.loopLen; u += 2) {
+        p.loopAt(u, w);
+        if (p.tunnel && p.ground(w.s) - w.y > 6) continue;
+        test(w.x, w.z, w.heading, hw, hl, site);
+      }
+    }
+    // the rider's walks in the stations (the waiting spot to the loading line, the carrier to where he gets off): two lifts
+    // sharing a station (Matterhorn Express 2 / 3, Falkenkopf) must not have the other's posts on them
+    const tq = p.at(Math.max(0, p.len - site.unloadS), {});
+    const carAt = { x: tq.x - tq.dz * p.side * p.sign, z: tq.z + tq.dx * p.side * p.sign };
+    for (const [a, b] of [[site.wait, site.load], [carAt, site.off]]) {
+      const d = Math.hypot(b.x - a.x, b.z - a.z), h = Math.atan2(b.z - a.z, b.x - a.x);
+      for (let m = 0; m <= d; m += 0.5) test(a.x + Math.cos(h) * m, a.z + Math.sin(h) * m, h, 0.6, 0.6, site);
+    }
+  }
+}
+
+/** Copy the cuts of another world built over the same lifts (lifts.js: the 5 m heights; the game's world: the far grid). */
+function copyCuts(sites, from) {
+  for (const [i, site] of sites) {
+    const o = from.sites.get(i);
+    if (!o) continue;
+    const fa = frames(site), fb = frames(o);
+    fa.forEach((f, k) => { const g = fb[k]; if (!g || g.parts.length !== f.parts.length) return; f.parts.forEach((p, n) => { if (g.parts[n].cut) { p.cut = true; p.solid = false; } }); });
+  }
 }
 
 /** For the scatter (scatter.js): a tree guard from the resort's lifts (any height function, the far grid is fine). */
