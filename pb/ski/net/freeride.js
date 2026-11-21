@@ -14,50 +14,20 @@
  *     leaves goes after GONE; nobody waits for anybody.
  *   - Fair: a state only ever moves the player whose link it came over; nobody can move, stop or knock over somebody else (env and
  *     avalanches are world events, the env only from the current host). */
-import { NET } from './config.js';
-import { draw, WEATHERS, TIMES } from './plan.js';
+import { NET, FREE } from './config.js';
+import { WEATHERS, TIMES, freePlan, sideOffset, freeHost } from './plan.js';
 import { createSession } from './session.js';
 import { createRemotes, packState } from './remotes.js';
 import { createMpHud } from './hud.js';
 import { distText } from './tags.js';
 import { OUTFITS } from '../skier-model.js';
-import { RANDOM_WEATHER } from '../config.js';
 
-export const FREE = Object.freeze({
-  SEND_HZ: 15,              // states / s while moving or riding a lift (smooth on a 60 Mbit uplink: 7 peers x 15 x ~150 B = 16 KB/s)
-  IDLE_HZ: 4,               // standing still, paused, in the map
-  MOVING: 0.4,              // m/s: slower counts as standing
-  ENV_EVERY: 4000,          // ms: the host repeats weather / time / day clock
-  CLOCK_SLACK: 0.04,        // h: a day clock this close to the host's is left alone
-  POS_EVERY: 2000,          // ms: my own spot saved for a reload (rejoin where I was)
-  BOARD_MS: 500,
-  AVALANCHE_GAP: 15000,     // ms: at most one avalanche event per player in this time
-  AVALANCHE_LATE: 8000,     // ms: an event older than this (in my clock) is too late to show
-  SIDE_GAP: 2.2,            // m between two players at the start
-  TELEPORT: 60,             // m between two sent states within one send period: count it as a teleport (epoch + 1)
-});
+export { FREE, freePlan, sideOffset, freeHost };
 
 const SAVE_PREFIX = 'pb_ski_mpfree:';
 const loadSaved = (key) => { try { return JSON.parse(sessionStorage.getItem(key) || 'null'); } catch (error) { return null; } };
 const save = (key, v) => { try { sessionStorage.setItem(key, JSON.stringify(v)); } catch (error) { /* storage blocked: a reload starts at the lift */ } };
 const finite = (...v) => v.every(Number.isFinite);
-
-/** The look of the shared day: the lobby's weather / time, "random" drawn from the match seed (the same on every device). */
-export function freePlan(cfg, seed) {
-  return Object.freeze({
-    weather: WEATHERS.includes(cfg.weather) ? cfg.weather : RANDOM_WEATHER[Math.floor(draw(seed, 'free-weather') * RANDOM_WEATHER.length) % RANDOM_WEATHER.length],
-    time: TIMES.includes(cfg.time) ? cfg.time : 'random',
-  });
-}
-
-/** Roster order -> metres right of the start spot (side by side, centred). */
-export const sideOffset = (roster, me, gap = FREE.SIDE_GAP) => {
-  const n = roster.length, i = Math.max(0, roster.findIndex((r) => r.id === me));
-  return (i - (n - 1) / 2) * gap;
-};
-
-/** The host of the shared things: the first roster player who is here (me included). */
-export const freeHost = (roster, me, statusOf) => (roster.find((r) => r.id === me || statusOf(r.id) === 'here') || roster[0]).id;
 
 /**
  * host: { game, env, hud, input, audio, scene, camera, canvas, surface, uiRoot, outfit(), level(), liftPath(i), liftName(i),

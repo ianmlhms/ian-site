@@ -153,26 +153,47 @@ export function createPoles({ scene, resort, height }) {
 
 /** Signposts at the top of every piste (where it leaves the lift or the piste above: the junctions): a larch post with a board in the
  *  piste's colour, its name in white, readable from both sides, facing the skiers coming down. All boards share one painted atlas. */
+/* R7-D: the sign atlas scales. One 2048 x 768 atlas of 128 board slots (8 x 16, 256 x 48 px each) is filled ON DEMAND with the boards
+ * within SIGN.radius of the camera (a board is 1.9 m wide: unreadable much farther), nearest first; a board keeps its slot while it stays
+ * in range, a freed slot is painted anew. Any number of pistes (Arlberg 356, 3 Vallées 480, ...) costs the same texture and still ONE
+ * draw call for the boards (+ one for the posts); the merged board mesh is rebuilt only after the camera moved SIGN.move metres. */
+export const SIGN = Object.freeze({ BW: 256, BH: 48, cols: 8, rows: 16, radius: 1100, move: 120 });      // 128 slots: the busiest spot of all five resorts sees 39
+
+/** Pure (Node test): keep the slots of boards still wanted, free the others, give free slots to new boards (nearest first, they come
+ * first in `wanted`). prev: Map id -> slot. Returns { slots: Map id -> slot, paint: [id, slot] newly placed }. */
+export function assignSlots(prev, wanted, capacity) {
+  const keep = new Set(wanted.slice(0, capacity));
+  const slots = new Map();
+  const used = new Set();
+  for (const [id, slot] of prev) if (keep.has(id)) { slots.set(id, slot); used.add(slot); }
+  const free = [];
+  for (let i = capacity - 1; i >= 0; i--) if (!used.has(i)) free.push(i);
+  const paint = [];
+  for (const id of wanted.slice(0, capacity)) if (!slots.has(id)) { const slot = free.pop(); slots.set(id, slot); paint.push([id, slot]); }
+  return { slots, paint };
+}
+
 export function createSigns({ scene, resort, height }) {
   const list = resort.pistes;
-  const BW = 256, BH = 48, cols = 8, rows = Math.ceil(list.length / cols);
+  const { BW, BH, cols, rows } = SIGN, capacity = cols * rows;
   const c = document.createElement('canvas');
-  c.width = BW * cols; c.height = BH * Math.max(1, rows);
+  c.width = BW * cols; c.height = BH * rows;
   const g = c.getContext('2d');
-  list.forEach((p, i) => {
-    const x = (i % cols) * BW, y = Math.floor(i / cols) * BH;
+  function paint(p, slot) {
+    const x = (slot % cols) * BW, y = Math.floor(slot / cols) * BH;
+    g.clearRect(x, y, BW, BH);
     g.fillStyle = (DIFF[p.diff] || DIFF.blue).css; g.fillRect(x, y, BW, BH);
     g.fillStyle = 'rgba(255,255,255,0.9)'; g.fillRect(x + 3, y + 3, BW - 6, 3); g.fillRect(x + 3, y + BH - 6, BW - 6, 3);
     g.fillStyle = '#ffffff'; g.font = '700 26px system-ui, -apple-system, sans-serif'; g.textBaseline = 'middle';
     const name = p.name.length > 15 ? p.name.slice(0, 14) + '…' : p.name;
     g.fillText(name, x + 44, y + BH / 2 + 1, BW - 56);
     g.beginPath(); g.moveTo(x + 32, y + 12); g.lineTo(x + 12, y + BH / 2); g.lineTo(x + 32, y + BH - 12); g.closePath(); g.fill();   // arrow: towards the piste
-  });
+  }
   const tex = new THREE.CanvasTexture(c);
   tex.anisotropy = 4;
-  const pos = [], nrm = [], uv = [];
+  // every board's two quads (12 vertices) once; the merged mesh copies the boards in range with their slot's uv
+  const boardsOf = [];
   const post = [];
-  const quad = (a, b, cc, d, n, uvs) => { for (const k of [0, 1, 2, 0, 2, 3]) { const q = [a, b, cc, d][k]; pos.push(...q); nrm.push(...n); uv.push(...uvs[k]); } };
   list.forEach((p, i) => {
     const l = p.line;
     if (l.length < 4) return;
@@ -186,24 +207,59 @@ export function createSigns({ scene, resort, height }) {
     const w = 1.9, y0 = y + 2.0, y1 = y + 2.42;
     const ax = x - uz * 0.1, az = z + ux * 0.1;
     const ex = ax + uz * w, ez = az - ux * w;           // the board reaches in towards the piste
-    const u0 = (i % cols) / cols, u1 = u0 + 1 / cols, v1 = 1 - Math.floor(i / cols) / rows, v0 = v1 - 1 / rows;
-    quad([ex, y0, ez], [ax, y0, az], [ax, y1, az], [ex, y1, ez], [-ux, 0, -uz], [[u0, v0], [u1, v0], [u1, v1], [u0, v1]]);   // seen from uphill
-    quad([ax, y0, az], [ex, y0, ez], [ex, y1, ez], [ax, y1, az], [ux, 0, uz], [[u0, v0], [u1, v0], [u1, v1], [u0, v1]]);     // seen from below
+    const A = [ex, y0, ez], B = [ax, y0, az], C = [ax, y1, az], D = [ex, y1, ez];
+    const pos = [], nrm = [], corner = [];
+    const quad = (a, b, cc, d, n) => { for (const k of [0, 1, 2, 0, 2, 3]) { pos.push(...[a, b, cc, d][k]); nrm.push(...n); corner.push(k); } };
+    quad(A, B, C, D, [-ux, 0, -uz]);                    // seen from uphill
+    quad(B, A, D, C, [ux, 0, uz]);                      // seen from below
+    boardsOf.push({ id: i, p, x, z, pos, nrm, corner });
   });
+  const max = Math.min(capacity, boardsOf.length);
   const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
-  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-  geo.computeBoundingSphere();
+  const P = new Float32Array(max * 12 * 3), N = new Float32Array(max * 12 * 3), U = new Float32Array(max * 12 * 2);
+  geo.setAttribute('position', new THREE.BufferAttribute(P, 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(N, 3));
+  geo.setAttribute('uv', new THREE.BufferAttribute(U, 2));
+  geo.setDrawRange(0, 0);
   const boards = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: tex }));
+  boards.name = 'ski-signs';
   boards.castShadow = true;
   const postGeo = new THREE.BoxGeometry(0.14, 2.7, 0.14).translate(0, 1.2, 0);
   const posts = new THREE.InstancedMesh(postGeo, new THREE.MeshLambertMaterial({ color: 0x6b4a30 }), Math.max(1, post.length / 3));
+  posts.name = 'ski-sign-posts';
   const m = new THREE.Matrix4();
   for (let i = 0; i < post.length / 3; i++) { m.makeTranslation(post[i * 3], post[i * 3 + 1] - 0.2, post[i * 3 + 2]); posts.setMatrixAt(i, m); }
   posts.castShadow = true;
   scene.add(boards, posts);
-  return { boards, posts, count: post.length / 3 };
+
+  let slots = new Map(), lastX = Infinity, lastZ = Infinity;
+  const stats = { shown: 0, painted: 0, rebuilds: 0 };
+  /** the boards within SIGN.radius of (cx, cz): slots, paint, one merged mesh (only after the camera moved SIGN.move m) */
+  function update(cx, cz, force = false) {
+    if (!force && Math.hypot(cx - lastX, cz - lastZ) < SIGN.move) return;
+    lastX = cx; lastZ = cz;
+    const near = boardsOf.map((b) => ({ b, d: Math.hypot(b.x - cx, b.z - cz) })).filter((o) => o.d < SIGN.radius).sort((a, b) => a.d - b.d).slice(0, max);
+    const byId = new Map(near.map((o) => [o.b.id, o.b]));
+    const r = assignSlots(slots, near.map((o) => o.b.id), capacity);
+    slots = r.slots;
+    for (const [id, slot] of r.paint) paint(byId.get(id).p, slot);
+    if (r.paint.length) { tex.needsUpdate = true; stats.painted += r.paint.length; }
+    let n = 0;
+    for (const o of near) {
+      const b = o.b, slot = slots.get(b.id);
+      const u0 = (slot % cols) / cols, u1 = u0 + 1 / cols, v1 = 1 - Math.floor(slot / cols) / rows, v0 = v1 - 1 / rows;
+      const uvs = [[u0, v0], [u1, v0], [u1, v1], [u0, v1]];
+      P.set(b.pos, n * 36); N.set(b.nrm, n * 36);
+      for (let k = 0; k < 12; k++) { const q = uvs[b.corner[k]]; U[n * 24 + k * 2] = q[0]; U[n * 24 + k * 2 + 1] = q[1]; }
+      n++;
+    }
+    geo.setDrawRange(0, n * 12);
+    geo.attributes.position.needsUpdate = true; geo.attributes.normal.needsUpdate = true; geo.attributes.uv.needsUpdate = true;
+    geo.computeBoundingSphere();
+    boards.visible = n > 0;
+    stats.shown = n; stats.rebuilds++;
+  }
+  return { boards, posts, count: post.length / 3, update, stats, slotsOf: () => slots, atlas: { width: c.width, height: c.height } };
 }
 
 /** The objects of one run: start gate at the top, finish arch at the bottom, slalom gates. dispose() removes them. */

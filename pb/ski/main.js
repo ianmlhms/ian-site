@@ -170,6 +170,7 @@ async function boot() {
   const chase = createChaseCamera(surface);
   let snowfall = createSnowfall({ scene, env, count: quality.snowflakes });
   const spray = createSpray({ scene, count: quality.spray });
+  let signs = null;                                                          // R7-D
   let lifts = null, village = null, landmarks = null, roads = null, roadRows = null, extrasBuilt = false, liftsEarly = false, markers = null;
   /** Round 6: the lift view (lifts.js). Built once every tile is in; a ride before that builds it early on the heights there are, and it
    *  is built again (between rides) once all tiles are in. */
@@ -202,7 +203,8 @@ async function boot() {
     if (streamer.done() && !extrasBuilt) {
       extrasBuilt = true;
       buildLifts();
-      createSigns({ scene, resort, height: (x, z) => field.height(x, z) });
+      signs = createSigns({ scene, resort, height: (x, z) => field.height(x, z) });          // R7-D: atlas slots on demand (update below)
+      signs.update(camera.position.x, camera.position.z, true);
       landmarks = createLandmarks({ scene, resort, height: (x, z) => surface.height(x, z), pistes });
       if (modes) modes.ensureParkView();
       mark('lifts');
@@ -852,6 +854,7 @@ async function boot() {
       farForest.update(camera.position.x, camera.position.z, game.screen === 'map' ? 8 : 1.5);
       poles.update(camera.position.x, camera.position.z, quality.markerRadius);
       if (lifts) lifts.update(time, camera.position.x, camera.position.z, quality.liftRadius);
+      if (signs) signs.update(camera.position.x, camera.position.z);              // R7-D: the sign atlas follows the camera
       if (village) village.update(camera.position.x, camera.position.z, quality.buildingRadius);
       if (landmarks) landmarks.update(camera.position.x, camera.position.z, quality.buildingRadius);
       if (roads) roads.update(camera.position.x, camera.position.z, quality.buildingRadius);
@@ -962,7 +965,7 @@ async function boot() {
     modes, parkLayout, startPark, startFree: (id) => startFree(id ? modes.lifts.byId.get(id) : game.freeLift || modes.lifts.list[0]), rideUp, setMapMode,
     // round 6
     goFree: (id) => goFree(id ? modes.lifts.byId.get(id) : spawn), boardLift, skipRide, toggleRideView, get ride() { return ride; }, get rideView() { return rideView; }, get spawn() { return spawn; },
-    get lifts() { return lifts; }, markers, setSki, get skiType() { return skiType; }, get world() { return world; }, openSkiCard, resumeFree, acceptChallenge, showMap,
+    get lifts() { return lifts; }, get signs() { return signs; }, markers, setSki, get skiType() { return skiType; }, get world() { return world; }, openSkiCard, resumeFree, acceptChallenge, showMap,
     place(x, z, heading) { placeAt(x, z, heading); },
   };
 

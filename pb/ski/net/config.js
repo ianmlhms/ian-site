@@ -49,3 +49,18 @@ export const RACE = Object.freeze({
 
 /* pistes that make a good race when the lobby says "random" (or a colour): neither a 300 m link nor a 6 km valley run */
 export const RACE_PISTES = Object.freeze({ minLength: 900, maxLength: 3600, minDrop: 200 });
+
+/* R7-D: the online free ride (net/freeride.js) */
+export const FREE = Object.freeze({
+  SEND_HZ: 15,              // states / s while moving or riding a lift (smooth on a 60 Mbit uplink: 7 peers x 15 x ~150 B = 16 KB/s)
+  IDLE_HZ: 4,               // standing still, paused, in the map
+  MOVING: 0.4,              // m/s: slower counts as standing
+  ENV_EVERY: 4000,          // ms: the host repeats weather / time / day clock
+  CLOCK_SLACK: 0.04,        // h: a day clock this close to the host's is left alone
+  POS_EVERY: 2000,          // ms: my own spot saved for a reload (rejoin where I was)
+  BOARD_MS: 500,
+  AVALANCHE_GAP: 15000,     // ms: at most one avalanche event per player in this time
+  AVALANCHE_LATE: 8000,     // ms: an event older than this (in my clock) is too late to show
+  SIDE_GAP: 2.2,            // m between two players at the start
+  TELEPORT: 60,             // m between two sent states within one send period: count it as a teleport (epoch + 1)
+});
