@@ -1063,3 +1063,23 @@ No data / bake / SQL changes (R8d re-bakes in parallel). Nothing depends on lift
 - **Spawn view**: main.js `stationFrame`: standing in a station, candidate camera spots (back / side / height) judged by `roofShare` (rays
   through the top fifth hitting a station part / house within 40 m) and a clear line to him (kept inside 78 % of the half view), eased in;
   `window.__ski.roofShare()`. Check: scripts/ski/spawn-view-check.mjs (spawn + 6 fast travels per resort, <= 40 % roof).
+**Round 8e checks (22 Nov, Chromium only — see WebKit below; machine load 30-420 from other jobs during the flows)**
+- round7c-check (Node, all 5): run-in clear 1351/1351, banners clear of other pistes 1351/1351, prompt 1351/1351 (never crossing at
+  61 km/h), course rides with the game's collisions 1350/1351 -> folyeres-variante-blue fixed after (pocket escape; single re-run ok);
+  full re-run log: ~/Library/Caches/ski-work/round8e/r7c-rides.log. security-test, mp-race-test, round7b-test 5983, r7d-test 1424,
+  round7-test 30, look7d-check 68 green; round6-test 2306/2307: Zermatt "Klein Matterhorn Glacier Ride" (now funitel class, wider
+  lanes) exits 128 m from its top station (limit 120; the top station sits in the rock).
+- pose-check (5 resorts, Chromium): all green (290 checks: plough 0-10 km/h, boots on the bindings, real hockey stop end + held 2 s).
+- lift-pose-check: 60 ok, 3 FAIL before the last fix: Arlberg Mattunbahn chair "no ski over the footrest" (all other chairs 0.1-0.6 cm
+  over the bar; not looked into), Arlberg platter / T-bar rod 13-14 deg (high rope: now dragBack() from the rope height, NOT re-run).
+- spawn-view-check: 34/35 views <= 40 % roof (spawn: 3V 32 %, Killy 21 %); Kronplatz "Alpen Connecting" fast travel 46 %.
+- tree-crash-check: 50 tree crashes, camera in a crown 0 / 17836 frames; 3 "not free" (one respawned facing the same tree -> clearSpot
+  now wants 12 m clear ahead; "free" threshold 1 m in 2 s) — NOT re-run after those two changes.
+- Flows Chromium (load 275-420): ski, ski-resorts, ski-challenges, ski-park, ski-freeride, ski-lift, ski-skis PASS; ski-ipad-start
+  (13.8 s > 10 s to skiing: load), ski-mp (start gap 6.1 m > 6, +8 calls for 7 remotes: not investigated, maybe the push at "go" under
+  load), ski-lifts-all (3V Télécorde rope tow pose '' at the sample: likely the short ride over under load) FAIL; the rest (firstperson,
+  course, teleport, spawn, avalanche, webkit, look7d, mp-freeride) were still running: ~/Library/Caches/ski-work/round8e/flows-chromium.log.
+- WebKit: NOT run. Playwright WebKit hangs on this Mini since ~06:36 (newPage never returns: the WebKit network process blocks in
+  CFNetwork's resource-loader thread start, `sample` shows it); killing R8b's hung orphan queue (qC.sh, slot1) did not help.
+**Still open after 8e**: re-run everything above in WebKit once WebKit starts again; ski-mp / ski-lifts-all / ski-ipad-start at normal
+load; Arlberg Mattunbahn footrest; Kronplatz Alpen Connecting framing; Glacier Ride exit distance; no "before" WebKit shots in round8e/.
