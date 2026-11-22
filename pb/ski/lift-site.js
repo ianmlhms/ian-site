@@ -417,6 +417,32 @@ export function createLiftWorld(paths, opts = {}) {
       }
     }
   });
+  // R8 (early QA: cabins through hotels / OSM station buildings, up to 17 m): a building whose roof reaches into a carrier's path (its
+  // lowest point every 5 m round the loop, 1 m margin) goes too: the lift was there first in the data
+  {
+    const bx = new Map();
+    rows.forEach((row, i) => {
+      if (!keep[i]) return;
+      const [cx, cz, L, W] = row, r = Math.hypot(L, W) / 2 + 2;
+      for (let j = Math.floor((cz - r) / CELL); j <= Math.floor((cz + r) / CELL); j++) for (let ii = Math.floor((cx - r) / CELL); ii <= Math.floor((cx + r) / CELL); ii++) { const kk = key(ii, j); if (!bx.has(kk)) bx.set(kk, []); bx.get(kk).push(i); }
+    });
+    const w = {};
+    for (const [, site] of sites) {
+      const p = site.path;
+      if (!p.loopAt || p.kind === 'carpet' || p.kind === 'train') continue;
+      const cb = p.carrier, rr = Math.max(cb.hw, cb.hl) + 1;
+      for (let u = 0; u < p.loopLen; u += 2) {
+        p.loopAt(u, w);
+        for (const i of bx.get(key(Math.floor(w.x / CELL), Math.floor(w.z / CELL))) || []) {
+          if (!keep[i]) continue;
+          const [cx, cz, L, W, ang, eave, ridge] = rows[i];
+          if (Math.max(eave || 0, ridge || 0) < w.y - cb.drop - p.ground(w.s) - 3) continue;      // heights over each one's own ground (far grid vs tiles)
+          const c = Math.cos(ang), sn = Math.sin(ang), dx = w.x - cx, dz = w.z - cz;
+          if (Math.abs(dx * c + dz * sn) <= L / 2 + rr && Math.abs(-dx * sn + dz * c) <= W / 2 + rr) keep[i] = false;
+        }
+      }
+    }
+  }
   rows.forEach((row, i) => {
     if (!keep[i]) return;
     const [cx, cz, L, W, ang] = row;

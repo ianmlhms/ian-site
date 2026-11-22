@@ -6,7 +6,7 @@ import { FOG_GLSL } from './snow-shader.js';
 
 const THREE = window.THREE;
 const CELL = 640;                      // round 7 (A): smaller merge cells: the far streets drop out (triangles)
-const LIFT = 0.03;                    // m above the ground; far away the vertex shader pulls the street towards the camera instead
+const LIFT = 0.006;                   // R8 (QA: the skis sank into the street): a hair over the ground, the polygon offset does the rest; m above the ground; far away the vertex shader pulls the street towards the camera instead
 const BANK = 1.1;                     // m of ploughed snow bank beyond the edge (painted, flat: round 7, no raised ridge)
 
 /** roads.json -> [{ hw, pts: [[x, z], ...] }] */

@@ -78,7 +78,7 @@ try {
             for (let k = 0; k < p.count; k++) {
               const vx = p.getX(k), vz = p.getZ(k);
               if (Math.abs(vx - x) > 80 || Math.abs(vz - z) > 80) continue;
-              const d = p.getY(k) - S.surface.height(vx, vz) - 0.03;
+              const d = p.getY(k) - S.surface.height(vx, vz) - 0.006;      // R8: roads.js LIFT
               n++; if (Math.abs(d) > Math.abs(worstStreet)) worstStreet = d;
             }
           });
