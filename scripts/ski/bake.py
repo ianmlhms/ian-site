@@ -607,6 +607,7 @@ def build_pistes(frame, dem, lifts=(), places=()):
             mains.append(run)
         named.extend(mains)
     named = chain_runs(cfg.get("chains", ()), named, dem)
+    named = join_fragments(named, dem)                        # R8c: a piste cut into pieces in OSM is one run again
     near_all = Near([r["p"] for r in named]) if named else None
     links = []
     unnamed = [ln for ln in lines if not ln["name"]]
@@ -1118,6 +1119,125 @@ def display_name(name, ref, diff):
     return "%s %s" % (word, n or r) if (n or r) else "%s Pist" % word
 
 
+def with_colour(name, diff):
+    """'Ried' -> 'Ried (Rout)', 'Ried (2)' -> 'Ried (Rout 2)', 'Ried (Variante)' -> 'Ried (Rout, Variante)'."""
+    word = DIFF_WORD.get(diff, "")
+    m = re.match(r"^(.*) \((\d+|Variante)\)$", name)
+    if not word:
+        return name
+    if not m:
+        return "%s (%s)" % (name, word)
+    return "%s (%s %s)" % (m.group(1), word, m.group(2)) if m.group(2).isdigit() else "%s (%s, %s)" % (m.group(1), word, m.group(2))
+
+
+# R8c (3V QA: Bouc Blanc in four pieces of 570 / 798 / 242 / 167 m, the real piste ~3 km): runs of the same name and colour whose end is
+# within JOIN_GAP m of the next one's start (and not below it by more than JOIN_RISE m) are one run.
+JOIN_GAP, JOIN_RISE = 150.0, 8.0
+
+
+def join_fragments(runs, dem):
+    base = lambda r: re.sub(r" \(\d+\)$", "", r["name"]).lower()
+    out = [dict(r) for r in runs]
+    merged = True
+    while merged:
+        merged = False
+        for a in out:
+            if a.get("variant"):
+                continue
+            for b in out:
+                if b is a or b.get("variant") or base(b) != base(a) or b["diff"] != a["diff"]:
+                    continue
+                gap = float(np.hypot(*(a["p"][-1] - b["p"][0])))
+                if gap > JOIN_GAP or float(b["h"][0]) > float(a["h"][-1]) + JOIN_RISE:
+                    continue
+                p = np.concatenate([a["p"], b["p"]])
+                h = dem(p[:, 0], p[:, 1])
+                log("join %s + %s: %.0f + %.0f m, gap %.0f m" % (a["name"], b["name"], a["len"], b["len"], gap))
+                a.update({"p": p, "h": h, "len": polyline_len(p), "drop": float(h[0] - h[-1]), "name": re.sub(r" \(\d+\)$", "", a["name"]),
+                          "ways": a.get("ways", []) + b.get("ways", []), "route": a.get("route") and b.get("route")})
+                out = [r for r in out if r is not b]
+                merged = True
+                break
+            if merged:
+                break
+    # what is left of one name and colour in several pieces is numbered 1, 2, ... again (the first keeps the plain name)
+    seen = {}
+    for r in sorted(out, key=lambda r: -r["len"]):
+        if r.get("variant"):
+            continue
+        k = (base(r), r["diff"])
+        seen[k] = seen.get(k, 0) + 1
+        plain = re.sub(r" \(\d+\)$", "", r["name"])
+        r["name"] = plain if seen[k] == 1 else "%s (%d)" % (plain, seen[k])
+    return out
+
+
+# R8c (QA: La Norma, Valloire, Monterosa, Sonnenkopf ... in the data; the Courchevel ski-jump funicular and 40-130 m inclined lifts
+# rideable as "Zuch"): the resort is its connected ski network. A lift belongs to a piste when a station is within NET_LIFT m of its
+# line, two lifts when their stations are, two pistes when an end of one is within NET_RUN m of the other; the main network (the most
+# lifts) and every other piece within NET_KEEP m of it stay (St. Anton's Rendl across the village, the village nursery lifts).
+NET_LIFT, NET_RUN, NET_KEEP = 150.0, 60.0, 1000.0
+SHORT_TRAIN, KEEP_SHORT_TRAINS = 150.0, ("leisee",)
+NON_SKI_TRAIN = re.compile(r"tremplin|sprungschanze|ski.?jump", re.I)
+
+
+def tidy_network(lifts, runs, log):
+    def span(lf):
+        return math.hypot(lf["top"]["x"] - lf["bottom"]["x"], lf["top"]["z"] - lf["bottom"]["z"])
+    keep_l = []
+    for lf in lifts:
+        name = lf.get("name") or ""
+        if lf["kind"] in ("train", "funicular") and not lf.get("tunnel") and (
+                NON_SKI_TRAIN.search(name) or (span(lf) < SHORT_TRAIN and not any(k in name.lower() for k in KEEP_SHORT_TRAINS))):
+            log("drop non-ski train %s (%.0f m)" % (name or "(no name)", span(lf)))
+            continue
+        keep_l.append(lf)
+    lifts = keep_l
+    nl, nr = len(lifts), len(runs)
+    par = list(range(nl + nr))
+
+    def find(i):
+        while par[i] != i:
+            par[i] = par[par[i]]
+            i = par[i]
+        return i
+
+    def join(a, b):
+        par[find(a)] = find(b)
+    rp = [r["p"][::2] for r in runs]
+    st = [np.array([[lf["bottom"]["x"], lf["bottom"]["z"]], [lf["top"]["x"], lf["top"]["z"]]]) for lf in lifts]
+
+    def near(q, pts, d):
+        return bool((np.hypot(pts[:, 0] - q[0], pts[:, 1] - q[1]) < d).any())
+    for i in range(nl):
+        for j in range(nr):
+            if near(st[i][0], rp[j], NET_LIFT) or near(st[i][1], rp[j], NET_LIFT):
+                join(i, nl + j)
+        for k in range(i + 1, nl):
+            if near(st[i][0], st[k], NET_LIFT) or near(st[i][1], st[k], NET_LIFT):
+                join(i, k)
+    for j in range(nr):
+        for k in range(nr):
+            if k != j and (near(runs[j]["p"][0], rp[k], NET_RUN) or near(runs[j]["p"][-1], rp[k], NET_RUN)):
+                join(nl + j, nl + k)
+    comps = {}
+    for i in range(nl + nr):
+        comps.setdefault(find(i), []).append(i)
+    main = max(comps.values(), key=lambda c: (sum(1 for i in c if i < nl), len(c)))
+    main_pts = np.concatenate([st[i] if i < nl else rp[i - nl] for i in main])
+    drop = set()
+    for c in comps.values():
+        if c is main:
+            continue
+        pts = np.concatenate([st[i] if i < nl else rp[i - nl] for i in c])
+        gap = min(float(np.hypot(main_pts[:, 0] - q[0], main_pts[:, 1] - q[1]).min()) for q in pts)
+        if gap > NET_KEEP:
+            drop.update(c)
+            log("drop a separate ski area %.0f m from the network: lifts %s, pistes %s" % (
+                gap, [lifts[i]["name"] for i in c if i < nl], [runs[i - nl]["name"] for i in c if i >= nl]))
+    return [lf for i, lf in enumerate(lifts) if i not in drop], [r for j, r in enumerate(runs) if nl + j not in drop]
+
+
 ROOF_CODE = {"gabled": 0, "flat": 1, "hipped": 2, "skillion": 3, "half-hipped": 2, "pyramidal": 4, "gambrel": 0, "mansard": 2}
 
 LIFT_KIND = {"chair_lift": "chair", "gondola": "gondola", "cable_car": "cable", "mixed_lift": "gondola", "drag_lift": "drag", "t-bar": "drag",
@@ -1488,6 +1608,7 @@ def main():
     drop_drag_pylons_under(lifts, log)                        # R8: a drag pylon left under an aerial lift's chairs goes
     peaks, places = build_poi(frame)
     lines, areas, runs = build_pistes(frame, dem_raw, lifts, places)
+    lifts, runs = tidy_network(lifts, runs, log)              # R8c: no lifts / pistes of other ski areas, no non-ski trains
     buildings = clear_for_landmarks(frame, cfg, build_buildings(frame, dem_raw))
 
     # groom the pistes into the 5 m mosaic (ski routes stay natural ground: not benched, not smoothed)
@@ -1601,9 +1722,15 @@ def main():
     for a in areas:
         network.append({"d": DIFF_LETTER[a["diff"]], "a": 1, "p": flat(dp_simplify(a["poly"], 1.5))})
     pistes = []
+    colours_of = {}
+    for r in runs:
+        colours_of.setdefault(r["name"].lower(), set()).add(r["diff"])
     for r in runs:
         q = resample(r["p"], 10.0)
-        pistes.append({"id": r["id"], "name": display_name(r["name"], r["ref"], r["diff"]), "ref": r["ref"], "diff": r["diff"], "len": round(r["len"]), "drop": round(r["drop"]),
+        shown = display_name(r["name"], r["ref"], r["diff"])
+        if len(colours_of.get(r["name"].lower(), ())) > 1 and shown == r["name"]:
+            shown = with_colour(shown, r["diff"])            # R8c: "Bouc Blanc" red and black -> "Bouc Blanc (Rout)", "... (Schwaarz)"
+        pistes.append({"id": r["id"], "name": shown, "ref": r["ref"], "diff": r["diff"], "len": round(r["len"]), "drop": round(r["drop"]),
                        "top": round(float(r["h"][0])), "bottom": round(float(r["h"][-1])), "hw": round(r["hw"], 1),
                        "slalom": bool(r.get("slalom")), "line": flat(q)})
         for flag in ("link", "route", "variant"):              # link = a run of unnamed OSM ways, named after where it leads
