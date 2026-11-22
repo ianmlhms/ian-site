@@ -58,7 +58,15 @@ function groundStep(s, input, world, dt) {
   // heading: pivots freely when slow, carves (limited by grip / speed) when fast
   const authority = (1 - s.tuck * (1 - K.tuckSteer)) * (1 - s.brake * (1 - K.brakeSteer));
   const rate = Math.min(K.pivotRate, K.carveGain * grip / Math.max(v, 0.6));
-  s.heading = wrapAngle(s.heading + s.steer * rate * authority * dt);
+  // R8e (pose-check: held on the brake after a hockey stop, a steer key pivoted the skis back down the fall line): standing in the
+  // stop the steering does not pivot him; the skis settle across the fall line (that is what holds him there)
+  const settled = (s.stop || 0) > 0.5 && v < 1.2;
+  s.heading = wrapAngle(s.heading + s.steer * rate * authority * dt * (settled ? 0 : 1));
+  if (settled && Math.hypot(n.x, n.z) > 0.05) {
+    const fall = Math.atan2(n.z, n.x), a = wrapAngle(s.heading - fall), want = fall + (a >= 0 ? Math.PI / 2 : -Math.PI / 2);
+    const d = wrapAngle(want - s.heading), step = 1.5 * dt;
+    s.heading = wrapAngle(s.heading + clamp(d, -step, step));
+  }
   // round 7: the hockey stop: a player braking fast (or braking with a hard steer) swings both skis across the motion and digs the
   // edges in (strong deceleration, a big spray); slow, the brake stays the snowplough. Scripted input (bots, flows) never does it.
   const hockeyFrom = K.hockeyFrom || SKI.hockeyFrom || 7;

@@ -81,7 +81,8 @@ export function createLiftNet(resort, heightAt, pistes = null) {
   };
 }
 
-export function kindName(kind) {
+export function kindName(kind, sub = '') {
+  if (sub === 'funitel') return 'Funitel';                                 // R8e: the twin-rope lifts (lift-path.js isFunitel)
   return kind === 'chair' ? 'Sesselbunn' : kind === 'gondola' ? 'Gondel' : kind === 'cable' ? 'Seelbunn' : kind === 'drag' ? 'Schlepplift' : kind === 'train' ? 'Zuch' : kind === 'carpet' ? 'Zauberteppech' : 'Lift';
 }
 

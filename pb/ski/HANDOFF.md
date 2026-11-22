@@ -1132,3 +1132,67 @@ discovered = true, fast travel waits at "Sonnenkopfbahn" (shot round8d/drv/chrom
   legs of one piste side by side, the hint started on the other leg; in the game the skier skis there) -> 140/140; failing pistes named.
 **Tools**: r8d-drv.py (client for r8c-drv.mjs without the word in the URL), r8d-helpers.js (`__r8d.meshes()`: triangles / calls per mesh
 name), r8d-sweeps.sh, r8d-checks.sh (ground / pose / calls in a row through browser-slot), r8d-spot.js, r8d-sonnenkopf.js, floors-check.mjs.
+
+## Round 8e (22 Nov 2026, branch `worktree-agent-a7fe481f6c8cd50fd`, from R8b 8bd7cc9d): 11 open items (flows, poses, trees, lifts, banners, map, spawn)
+No data / bake / SQL changes (R8d re-bakes in parallel). Nothing depends on lift ids (funitels are classed by name / seats / capacity).
+- **Flows** ski-course: Kronplatz sylvester stopped dead 30 m below its gate against a lift station ON the OSM line (the 10 s stuck timer
+  was right). clear.js `courseGate` now also wants the first `COURSE.runIn` (60) m below the gate clear of houses / stations; bot.js takes
+  `blocked(x, z)` (main.js `window.__ski.blocked` = station parts / pylons / houses, 2.5 m margin) and aims beside the line round them
+  (+ sideways along a wide house, + a pocket escape after 1.5 s stuck); course.js `courseLayout().openAt(s, side)`: the net is left open
+  (drawn AND no soft collision) where a house / hall reaches within 3 m of it (Killy joseray runs through a 33 x 31 m hotel); main.js
+  passes it to `createCourse({ open })`. round7c-check rides now collide like main.js (trees + R7-B lift world + kept houses), respawn
+  like main.js clearSpot, and check: run-in clear 1351/1351. ski-firstperson: the flow now carves on a piste point whose next 120 m fall
+  >= 12 deg and waits for > 30 km/h (Kronplatz's middle piste was a flat: 7 km/h, spray / lean are 0 below 3 m/s by design).
+- **Hockey stop end**: the R8b "stop" shots were a PLOUGH at 0 km/h (the sheet braked below SKI.hockeyFrom 25 km/h) seen from 200 deg: the
+  old V (0.34 rad on boots 0.29 m out) crossed its tips and the boots stood 15 cm off the bindings. skier-model.js: the legs spread in the
+  plough (hip roll solved by forward kinematics `footOffset`), each ski sits exactly under its boot, PLOUGH_YAW 0.24 (tips ~12 cm, tails
+  ~0.95 m); a held brake keeps the V at 0 km/h (R8's "parallel when held" dropped). skier.js: standing in a hockey stop (stop > 0.5,
+  < 1.2 m/s) the steer no longer pivots him and the skis settle across the fall line; the body leans less at a standstill.
+  round8-sheet `stop` now reaches > 32 km/h first (a real hockey stop). pose-check: plough held / 1 / 4 / 7 / 8 / 10 km/h (V 15-70 deg,
+  tips not crossed), boots on the bindings (< 5 cm, ski frame) in every pose, and a REAL hockey stop from 40 km/h down the fall line:
+  parallel, side by side, across the fall line, edged, at the stop and held 2 s.
+- **Trees**: scatter.js `inCrown(x, y, z, density, margin)` (the drawn spruce: 1.15-10.1 m, 2.35 m wide at the bottom, x scale);
+  main.js camBlocked counts crowns, lookCam lifts the camera out of a crown (to its top at most); respawn() goes through `clearSpot`
+  (trunks 2.2 m, houses, lift parts, the chase camera's spot and his head out of every crown; else the nearest piste point, else rings).
+  Check: scripts/ski/tree-crash-check.mjs.
+- **Funitel**: lift-path.js `isFunitel` (name Funitel / DMC / 3S / Glacier Ride, a gondola with >= 32 seats, or a "cable car" whose
+  hourly capacity is > 1.4 x what two shuttling cabins could carry: Thorens) and `normaliseLifts` (run by linepack.js unpackResort):
+  kind gondola, type / sub 'funitel', LIFT_SPEC.funitel (gap 110 m, side 4.1), carrierBox + carriers.js big cabin on two grips, lifts.js
+  twin haul ropes 3.2 m apart + its own carrier pool, liftride seat / cameras, HUD "Funitel". 3V: Funitel 3 Vallées, Thorens, Grand
+  Fond, Péclet; Zermatt: both Glacier Rides.
+- **Cable cars**: lifts.js jig-back pairs run at the ride speed (SHUTTLE_FACTOR 4); `dockShuttle` on a fast travel / the spawn (behind
+  the fade), `holdShuttle` keeps a docked up-track cabin while he stands in the zone, `shuttleBoard` = the wait + the cabin's schedule;
+  liftride.js `createRide({ shuttle })`: boarding waits for the scheduled cabin (drawn coming down its rope), toast "D'Kabin kënnt (n s)".
+- **Chair**: carriers.js footrest bar 2.495 m under the rope (right under the seated boots), its struts at the bar's ends (outside every
+  seat); poseSit skis level on it.
+- **Platter / T-bar**: liftride.js the rider 1.8 m behind the spring box (DRAG_BACK, the bar grabbed 1.8 m up the line), `hand` = a
+  point 0.55 m up the rod; carriers.js the rod from the box to the disc / T between his legs; skier-model `reachHand` (2-bone IK).
+- **Banners**: clear.js obstacles `setPistes` / `otherPisteIn` (Liang-Barsky on 50 m cells): courseGate keeps the banner (+-5.5 m across,
+  +-10 m along) clear of every OTHER piste's line; markers.js `promptable(m, st)`: "Start?" only < 3 m/s or skiing into the gate from
+  above along the piste. round7c-check: banner check (independent 0.5 m sampling) + prompt check over every gate.
+- **Map**: map.js a tap off every piste in the piste tab goes to the teleport ask (discovered -> "Hei hin teleportéieren?", fog -> "Nach
+  net entdeckt"); ski-teleport flow has the step.
+- **Spawn view**: main.js `stationFrame`: standing in a station, candidate camera spots (back / side / height) judged by `roofShare` (rays
+  through the top fifth hitting a station part / house within 40 m) and a clear line to him (kept inside 78 % of the half view), eased in;
+  `window.__ski.roofShare()`. Check: scripts/ski/spawn-view-check.mjs (spawn + 6 fast travels per resort, <= 40 % roof).
+**Round 8e checks (22 Nov, Chromium only — see WebKit below; machine load 30-420 from other jobs during the flows)**
+- round7c-check (Node, all 5): run-in clear 1351/1351, banners clear of other pistes 1351/1351, prompt 1351/1351 (never crossing at
+  61 km/h), course rides with the game's collisions 1350/1351 -> folyeres-variante-blue fixed after (pocket escape; single re-run ok);
+  full re-run log: ~/Library/Caches/ski-work/round8e/r7c-rides.log. security-test, mp-race-test, round7b-test 5983, r7d-test 1424,
+  round7-test 30, look7d-check 68 green; round6-test 2306/2307: Zermatt "Klein Matterhorn Glacier Ride" (now funitel class, wider
+  lanes) exits 128 m from its top station (limit 120; the top station sits in the rock).
+- pose-check (5 resorts, Chromium): all green (290 checks: plough 0-10 km/h, boots on the bindings, real hockey stop end + held 2 s).
+- lift-pose-check: 60 ok, 3 FAIL before the last fix: Arlberg Mattunbahn chair "no ski over the footrest" (all other chairs 0.1-0.6 cm
+  over the bar; not looked into), Arlberg platter / T-bar rod 13-14 deg (high rope: now dragBack() from the rope height, NOT re-run).
+- spawn-view-check: 34/35 views <= 40 % roof (spawn: 3V 32 %, Killy 21 %); Kronplatz "Alpen Connecting" fast travel 46 %.
+- tree-crash-check: 50 tree crashes, camera in a crown 0 / 17836 frames; 3 "not free" (one respawned facing the same tree -> clearSpot
+  now wants 12 m clear ahead; "free" threshold 1 m in 2 s) — NOT re-run after those two changes.
+- Flows Chromium (load 275-420): ski, ski-resorts, ski-challenges, ski-park, ski-freeride, ski-lift, ski-skis PASS; ski-ipad-start
+  (13.8 s > 10 s to skiing: load), ski-mp (start gap 6.1 m > 6, +8 calls for 7 remotes: not investigated, maybe the push at "go" under
+  load), ski-lifts-all (3V Télécorde rope tow pose '' at the sample: likely the short ride over under load) FAIL; the rest (firstperson,
+  course, teleport, spawn, avalanche, webkit, look7d, mp-freeride) NEVER RAN: the run aborted inside ski-lifts-all ("browser has been
+  closed" at load ~400; before that Zermatt train Ascensore di Cheneil: ride null after boarding). Re-run them first.
+- WebKit: NOT run. Playwright WebKit hangs on this Mini since ~06:36 (newPage never returns: the WebKit network process blocks in
+  CFNetwork's resource-loader thread start, `sample` shows it); killing R8b's hung orphan queue (qC.sh, slot1) did not help.
+**Still open after 8e**: re-run everything above in WebKit once WebKit starts again; ski-mp / ski-lifts-all / ski-ipad-start at normal
+load; Arlberg Mattunbahn footrest; Kronplatz Alpen Connecting framing; Glacier Ride exit distance; no "before" WebKit shots in round8e/.

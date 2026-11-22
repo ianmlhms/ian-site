@@ -130,6 +130,31 @@ export function createScatter(field, opts = {}) {
     }
   }
 
+  /** R8e (3V QA: the camera stuck in a tree after a crash): the tree whose drawn crown (scatter-view.js spruceNear: tiers from 1.15 m
+   *  to 10.1 m, 2.35 m wide at the bottom, tapering to the top; larches a little slimmer; all times the tree's scale) holds the point
+   *  (x, y, z) grown by `margin` m, or null. Returns { x, z, top } (top = the crown's top, absolute m). */
+  const crownOut = { x: 0, z: 0, top: 0 };
+  function inCrown(x, y, z, density = 1, margin = 0) {
+    const bx = Math.floor(x / BLOCK), bz = Math.floor(z / BLOCK);
+    for (let dz = -1; dz <= 1; dz++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const lx = (bx + dx) * BLOCK, lz = (bz + dz) * BLOCK;
+        if (x < lx - 4 || x > lx + BLOCK + 4 || z < lz - 4 || z > lz + BLOCK + 4) continue;
+        const t = treeBlock(bx + dx, bz + dz);
+        for (let i = 0; i < t.length; i += 6) {
+          if (t[i + 5] > density) continue;
+          const sc = t[i + 3], ddx = x - t[i], ddz = z - t[i + 2];
+          if (Math.abs(ddx) > 3 * sc + margin || Math.abs(ddz) > 3 * sc + margin) continue;
+          const h = (y - t[i + 1]) / sc;
+          if (h < -margin / sc || h > 10.2 + margin / sc) continue;
+          const rr = (h < 1.15 ? 0.3 : 0.3 + 2.15 * Math.max(0, 1 - (h - 1.15) / 9)) * sc + margin;
+          if (ddx * ddx + ddz * ddz < rr * rr) { crownOut.x = t[i]; crownOut.z = t[i + 2]; crownOut.top = t[i + 1] + 10.2 * sc; return crownOut; }
+        }
+      }
+    }
+    return null;
+  }
+
   const has = (bx, bz) => trees.has(key(bx, bz)) && rocks.has(key(bx, bz));
-  return { treeBlock, rockBlock, hit, invalidate, has };
+  return { treeBlock, rockBlock, hit, inCrown, invalidate, has };
 }

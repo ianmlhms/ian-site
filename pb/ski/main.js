@@ -46,7 +46,7 @@ import { attachModePanel, starRow, createRideHud, createChallengePrompt, showSki
 // round 6: lift rides, challenge gates on the mountain, ski types
 import { createRide, rideCamera, RIDE } from './modes/liftride.js';
 import { createCarrier } from './modes/carriers.js';
-import { createMarkers, markerList, MARKER } from './modes/markers.js';
+import { createMarkers, markerList, MARKER, promptable } from './modes/markers.js';
 import { SKI_BY_ID, DEFAULT_SKI, skiParams, addSkiStats, skiOpen } from './modes/skis.js';
 import { spawnLift, startHourFor } from './modes/freeride.js';
 import { createLook, applyLook, createCameraGuard, buildingBoxes, createBoxIndex } from './look.js';      // R7-A: free look + camera collision
@@ -235,7 +235,7 @@ async function boot() {
     // R8: the stations by their real solid parts (lift-site.js: walls, posts, roofs, huts), the camera as a 0.5 m box round its point
     // (only near a station end: the lift world's lookup allocates, and this runs ~20 times a frame)
     if (nearStation(x, z) && modes.lifts.world.hit(x, z, 0.3, y - 0.25, (gx, gz) => surface.height(gx, gz), 0.5)) return true;
-    return !!scatter.hit(x, z, 1.1, y, quality.treeDensity);
+    return !!scatter.hit(x, z, 1.1, y, quality.treeDensity) || !!scatter.inCrown(x, y, z, quality.treeDensity, 0.35);      // R8e: the crowns too
   }
   let stationGrid = null;                                   // R8: 50 m cells holding a station end (the camera guard's cheap pre-test)
   const nearStation = (x, z) => !!stationGrid && stationGrid.has(Math.floor(x / 50) * 100003 + Math.floor(z / 50));
@@ -262,6 +262,9 @@ async function boot() {
       // R8 (early QA: the free look put the camera under the street): never under the snow, whatever the guard's minimum distance did
       const gy = surface.height(cam.x, cam.z) + 0.45;
       if (cam.y < gy) cam.y = gy;
+      // R8e (3V QA: after a crash next to a trunk the guard's 1.1 m minimum still sat in the branches): out of a crown upwards (the
+      // crown narrows with height), at most to its top
+      for (let i = 0, c = scatter.inCrown(cam.x, cam.y, cam.z, quality.treeDensity, 0.35); c && i < 24; i++, c = scatter.inCrown(cam.x, cam.y, cam.z, quality.treeDensity, 0.35)) cam.y = Math.min(cam.y + 0.5, c.top + 0.6);
     }
     return cam;
   }
@@ -284,6 +287,7 @@ async function boot() {
     if (lifts && ride) { liftsEarly = true; return lifts; }                 // riding: rebuilt when the ride ends
     if (lifts) lifts.dispose();
     lifts = createLifts({ scene, resort, height: (x, z) => field.height(x, z) });
+    if (game.freeLift && modes.liftAt === game.freeLift && game.phase !== 'lift') lifts.dockShuttle(game.freeLift.index);      // R8e: the spawn
     liftsEarly = !streamer.done();
     try { stationGrid = stationCells(lifts); } catch (error) { console.warn('[ski] station grid failed', error); }
     // R8b: the decks exist now: a skier standing in a station (the spawn) stands on its deck, not in it
@@ -379,6 +383,65 @@ async function boot() {
     snow: (x, z) => Math.min(1, surface.info(x, z, 0) * 1.25),
     hit: (x, z, r, y) => scatter.hit(x, z, r, y, quality.treeDensity) || modes.lifts.world.hit(x, z, r, y, (gx, gz) => surface.height(gx, gz)) || buildingHit(x, z, r, y),     // R7-B: pylons + stations; R8: houses
   };
+  /* R8e (3V QA: at the spawn the station roof filled the top quarter of the screen): standing in a station (the spawn, a fast travel, a
+   * lift exit) the chase camera is framed so the lift and the slope show: candidate spots round him (back / side / height) are judged
+   * by rays through the top fifth of their view (roofShare: the share that hits a station part or a house within 40 m) and by a clear
+   * line to him; the best one is eased in, the chase camera takes over again as soon as he moves. */
+  const rayV = { x: 0, y: 0, z: 0 };
+  function roofShare(cx, cy, cz, tx, ty, tz, fov, aspect = (canvas.clientWidth || 4) / (canvas.clientHeight || 3)) {
+    let fx = tx - cx, fy = ty - cy, fz = tz - cz; const fl = Math.hypot(fx, fy, fz) || 1; fx /= fl; fy /= fl; fz /= fl;
+    let rx = -fz, rz = fx; const rl = Math.hypot(rx, rz) || 1; rx /= rl; rz /= rl;                       // right (horizontal)
+    const ux = -rz * fy, uy = rz * fx - rx * fz, uz = rx * fy;                                            // up = right x forward
+    const th = Math.tan(fov * Math.PI / 360), tw = th * aspect;
+    let hit = 0, n = 0;
+    for (const v of [0.62, 0.72, 0.82, 0.92]) {
+      for (const u of [-0.85, -0.55, -0.25, 0.05, 0.35, 0.65, 0.9]) {
+        n++;
+        rayV.x = fx + rx * u * tw + ux * v * th; rayV.y = fy + uy * v * th; rayV.z = fz + rz * u * tw + uz * v * th;
+        const l = Math.hypot(rayV.x, rayV.y, rayV.z);
+        for (let d = 0.6; d <= 40; d += d < 10 ? 0.5 : 1) {
+          const x = cx + rayV.x / l * d, y = cy + rayV.y / l * d, z = cz + rayV.z / l * d;
+          if (y < surface.height(x, z)) break;                                                            // the slope: fine
+          if ((nearStation(x, z) && modes.lifts.world.hit(x, z, 0.15, y - 0.1, (gx, gz) => surface.height(gx, gz), 0.2)) || (boxIndex && (() => { const b = boxIndex.hit(x, z, 0); return b && y < b[6]; })())) { hit++; break; }
+        }
+      }
+    }
+    return hit / n;
+  }
+  let frameAt = null, frameK = 0;
+  function stationFrame(cam, view, dt) {
+    const still = view.speed < 0.4 && view.grounded && !view.ride && view.crash === 0 && game.phase === 'running' && !!modes.lifts.world.inStation(view.x, view.z, 0.5);
+    if (still && (!frameAt || Math.hypot(frameAt.x - view.x, frameAt.z - view.z) > 0.5)) {
+      const fx = Math.cos(view.heading), fz = Math.sin(view.heading), rx = -fz, rz = fx, y0 = view.y;
+      const tx = view.x + fx * 14, tz = view.z + fz * 14, ty = Math.max(y0 + 2.4, surface.height(tx, tz) + 1.8);       // him + the line up
+      let best = null;
+      for (const [back, lat, up] of [[5.2, 0, 2.3], [4.2, 0, 1.5], [5.2, 3, 2.0], [5.2, -3, 2.0], [4.5, 5.5, 1.8], [4.5, -5.5, 1.8], [3.5, 7.5, 2.4], [3.5, -7.5, 2.4], [6.5, 9, 3.2], [6.5, -9, 3.2], [2.5, 10, 1.8], [2.5, -10, 1.8], [0, 9, 2.6], [0, -9, 2.6], [1.5, 12.5, 3.2], [1.5, -12.5, 3.2]]) {
+        const cx = view.x - fx * back + rx * lat, cz = view.z - fz * back + rz * lat, cy = Math.max(y0 + up, surface.height(cx, cz) + 0.6);
+        if (camBlocked(cx, cy, cz)) continue;
+        let seen = true;                                                                                  // a clear line to his chest
+        for (let k = 0.1; k < 0.95 && seen; k += 0.1) if (camBlocked(cx + (view.x - cx) * k, cy + (y0 + 1.2 - cy) * k, cz + (view.z - cz) * k)) seen = false;
+        if (!seen) continue;
+        const share = roofShare(cx, cy, cz, tx, ty, tz, CAMERA.fov);
+        // he must stay well inside the picture (not cut at its edge): the angle between the view axis and him, horizontally
+        const aAxis = Math.atan2(tz - cz, tx - cx), aHim = Math.atan2(view.z - cz, view.x - cx);
+        const off = Math.abs(Math.atan2(Math.sin(aHim - aAxis), Math.cos(aHim - aAxis))), halfH = Math.atan(Math.tan(CAMERA.fov * Math.PI / 360) * (canvas.clientWidth || 4) / (canvas.clientHeight || 3));
+        const score = share + Math.hypot(back - 5.2, lat, up - 2.3) * 0.01 + (off > halfH * 0.78 ? 1 : 0);
+        if (!best || score < best.score) best = { x: cx, y: cy, z: cz, tx, ty, tz, share, score };
+        if (share === 0 && back === 5.2 && lat === 0) break;
+      }
+      frameAt = best ? { ...best, sx: view.x, sz: view.z } : null;
+      if (frameAt) { frameAt.x0 = view.x; frameAt.z0 = view.z; }
+      document.documentElement.dataset.skiStationFrame = best ? best.share.toFixed(2) : '';
+    }
+    if (still && frameAt && Math.hypot(frameAt.sx - view.x, frameAt.sz - view.z) > 0.5) frameAt = null;
+    frameK += ((still && frameAt ? 1 : 0) - frameK) * Math.min(1, dt * (still ? 2.5 : 4));
+    if (!still && frameK < 0.01) frameAt = null;
+    if (!frameAt || frameK < 0.001) return cam;
+    const k = frameK, m = (a, b) => a + (b - a) * k;
+    return { ...cam, x: m(cam.x, frameAt.x), y: m(cam.y, frameAt.y), z: m(cam.z, frameAt.z), tx: m(cam.tx, frameAt.tx), ty: m(cam.ty, frameAt.ty), tz: m(cam.tz, frameAt.tz) };
+  }
+  /** R8e: a station part / pylon / house at (x, z) (the scripted bot skis round it; window.__ski.blocked for the flows). */
+  const botBlocked = (x, z) => { const y = standHeight(x, z); return !!(modes.lifts.world.hit(x, z, 2.5, y, (gx, gz) => surface.height(gx, gz)) || buildingHit(x, z, 2.5, y)); };      // 2.5 m: he carves wide
   /** R8 (early QA: he skied through chalets): the houses collide like the station walls: out by the nearest face of the footprint box. */
   const houseHit = { nx: 0, nz: 0, pen: 0, kind: 'house' };
   function buildingHit(x, z, r, y) {
@@ -646,8 +709,9 @@ async function boot() {
     game.run = createRun({ piste: p, mode, startS: s0, finishS: f0 });
     const a = p.at(s0, {});
     if (mode === MODES.run) {
-      try { courseView = createCourseView({ scene, layout: courseLayout(p, s0, pistes, explore ? explore.obs : null, f0), height: (x, z) => surface.height(x, z) }); } catch (error) { console.warn('[ski] course view failed', error); }
-      course = createCourse({ piste: p, startS: s0, finishS: f0 });
+      let lay = null;
+      try { lay = courseLayout(p, s0, pistes, explore ? explore.obs : null, f0); courseView = createCourseView({ scene, layout: lay, height: (x, z) => surface.height(x, z) }); } catch (error) { console.warn('[ski] course view failed', error); }
+      course = createCourse({ piste: p, startS: s0, finishS: f0, open: lay ? lay.openAt : null });      // R8e: no net = no collision
       courseHud.show(true);
       document.documentElement.dataset.skiCourse = 'on';
     }
@@ -659,7 +723,7 @@ async function boot() {
     const g = mode === MODES.run ? decodeGhost(store.get().ghosts[pisteKey(rid, p.id)]) : null;
     game.ghost = g;
     ghostModel.setVisible(false);
-    game.bot = params.bot && mode !== MODES.park ? createBot(p) : null;
+    game.bot = params.bot && mode !== MODES.park ? createBot(p, { blocked: botBlocked }) : null;
     game.assisted = false;
     if (mode !== MODES.park) { store.set(withLast(store.get(), rid, p.id)); boards.select(rid, p, resort.short); }
     modes.begin(game);                                                       // round 4A: stars / park / free ride parts
@@ -735,9 +799,40 @@ async function boot() {
     hud.toast(`Weider op: ${p.name}`);
   }
 
+  /** R8e (3V QA "Aua, e Bam!": after a tree crash the camera sat in the tree, the skier against the trunk): a respawn spot clear of
+   *  trunks (2.2 m), houses and lift parts, no trunk in the 12 m ahead, with the chase camera's spot (5 m behind, 2.6 m up) outside every crown. Else the nearest
+   *  piste point within 80 m (no tree stands on a piste), else rings out to 40 m; the heading then follows the piste / the fall line. */
+  function clearSpot(r) {
+    const d = quality.treeDensity;
+    const ok = (x, z, h) => {
+      if (scatter.hit(x, z, 2.2, -1e9, d) || buildingHit(x, z, 1.5) || modes.lifts.world.hit(x, z, 1.5)) return false;
+      for (let k = 2; k <= 12; k += 2) if (scatter.hit(x + Math.cos(h) * k, z + Math.sin(h) * k, 1.2, -1e9, d)) return false;      // not facing the same tree again
+      const cx = x - Math.cos(h) * 5, cz = z - Math.sin(h) * 5;
+      return !scatter.inCrown(cx, surface.height(cx, cz) + 2.6, cz, d, 0.6) && !scatter.inCrown(x, surface.height(x, z) + 1.6, z, d, 0.3);
+    };
+    if (ok(r.x, r.z, r.heading)) return r;
+    const n = pistes.nearest(r.x, r.z, 80);
+    if (n) {
+      for (const ds of [0, -8, 8, -16, 16, -30]) {
+        const a = n.piste.at(Math.max(2, Math.min(n.piste.length - 2, n.proj.s + ds)), {});
+        const h = Math.atan2(a.dz, a.dx);
+        if (ok(a.x, a.z, h)) return { x: a.x, z: a.z, heading: h, s: r.s };
+      }
+    }
+    const nn = surface.normal(r.x, r.z, {});
+    const fall = Math.hypot(nn.x, nn.z) > 0.05 ? Math.atan2(nn.z, nn.x) : r.heading;
+    for (let dist = 3; dist <= 40; dist += 3) {
+      for (let k = 0; k < 12; k++) {
+        const a = r.heading + Math.PI + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * Math.PI / 6;     // behind him first, then round
+        const x = r.x + Math.cos(a) * dist, z = r.z + Math.sin(a) * dist;
+        if (ok(x, z, fall)) return { x, z, heading: fall, s: r.s };
+      }
+    }
+    return r;
+  }
   function respawn(text) {
     if (!game.run) return;
-    const r = game.run.respawnPoint();
+    const r = clearSpot(game.run.respawnPoint());
     placeAt(r.x, r.z, r.heading);
     if (course) course.rebase();                                             // R7-C2: the HUD distance from where he stands again
     if (text) hud.toast(text);
@@ -800,6 +895,7 @@ async function boot() {
     game.mode = MODES.freeride;
     game.resume = null;
     if (lift) game.freeLift = lift;
+    if (lift && lifts) lifts.dockShuttle(lift.index);                         // R8e: a cable car's cabin waits at the bottom (behind the fade)
     const spot = spotIn || boardSpot(lift);
     const near = pistes.nearest(spot.x, spot.z, 400);
     game.piste = near ? near.piste : game.piste;
@@ -840,9 +936,10 @@ async function boot() {
     // the next carrier of the lift's own loop that reaches the loading line at least 1.6 s from now picks him up
     const loadU = path.shuttle ? null : path.upU(Math.min(RIDE.enter[site.key], path.len * 0.2));
     const next = loadU === null ? null : view.nextCarrier(lift.index, loadU, path.spec.speed * 1.6);
-    ride = createRide({ lift, path, site, height, from: { x: st.x, z: st.z, heading: st.heading }, startU: next ? next.u : null,
+    ride = createRide({ lift, path, site, height, from: { x: st.x, z: st.z, heading: st.heading }, startU: next ? next.u : null, shuttle: path.shuttle ? view.shuttleBoard(lift.index) : null,
       exitAt: () => modes.lifts.world.exitOf(lift.index, height, (x, z) => !!scatter.hit(x, z, 0.4, -1e9, quality.treeDensity), pistes.list) });
     carrier = createCarrier({ scene, kind: path.kind, seats: path.seats, sub: path.sub });
+    if (path.shuttle) { const sw = view.shuttleBoard(lift.index); if (sw && sw.wait > 2) hud.toast(`D'Kabin kënnt (${Math.ceil(sw.wait)} s)`, 2200); }
     if (camMode === 'fp') { rideView = 'window'; rideCam = null; }          // R7-C: first person = the window view on a lift
     explore.rode(lift);
     modes.rideStart(lift);
@@ -1183,6 +1280,7 @@ async function boot() {
       if (!game.camPose && game.screen === 'ski') look.step(dt, st.speed || 0);
       // round 7 (A): the free look + camera guard (the lift camera gets it through R7-B's window.__skiLook seam in rideCamera1)
       let cam = game.camPose || (riding ? rideCamera1(dt) : fpNow ? fp.update(view, dt, time, (x, z, o) => surface.normal(x, z, o), (x, z) => surface.height(x, z)) : chase.update(view, dt, time));      // camPose: a fixed view (flows)
+      if (!game.camPose && !riding && !fpNow && game.screen === 'ski') cam = stationFrame(cam, view, dt);      // R8e: standing under a roof
       if (!game.camPose && !riding && !fpNow && game.screen === 'ski') cam = lookCam({ ...cam }, { x: view.x, y: view.y + 1.2, z: view.z }, false);
       document.documentElement.dataset.skiLook = `${look.yaw.toFixed(2)},${look.pitch.toFixed(2)}`;
       camera.position.set(cam.x, cam.y, cam.z);
@@ -1285,8 +1383,11 @@ async function boot() {
   /** Round 6 (HUD rate): the challenge gate the skier is in, the ski stats (off-piste metres, top speed) and the ski unlocks they bring. */
   let statT = 0, statTop = 0, statOff0 = 0;
   function freeTick(st) {
+    if (lifts && modes.liftAt && game.phase === 'running') lifts.holdShuttle(modes.liftAt.index);      // R8e: the docked cabin waits for him
     if (game.mode === MODES.freeride && game.phase === 'running' && !game.paused) {
-      const m = markers.at(st.x, st.z);
+      // R8e (3V QA "Lac des Creux": the prompt popped mid-run as he crossed a start at 61 km/h): only nearly stopped, or skiing into
+      // the gate from its start side (above the banner, within its posts, along the piste)
+      const m0 = markers.at(st.x, st.z), m = m0 && promptable(m0, st) ? m0 : null;
       if (dismissed && (!m || m.id !== dismissed)) { const d = markers.byId(dismissed); if (!d || Math.hypot(d.x - st.x, d.z - st.z) > MARKER.rearm) dismissed = null; }
       const show = m && m.id !== dismissed ? m : null;
       if (show !== chPrompt.current) chPrompt.show(show, show ? promptInfo(show) : undefined);
@@ -1320,7 +1421,9 @@ async function boot() {
   // debug / flows
   window.__ski = {
     get game() { return game; }, get state() { return game.state; }, get level() { return level; }, renderer, scene, camera, env, pistes, get landmarks() { return landmarks; }, streamer, terrain, scatterView, field, surface,
-    setInput(o) { game.override = o; },
+    setInput(o) { game.override = o; }, blocked: (x, z) => botBlocked(x, z),
+    /** R8e: the share of the top fifth of the current view that hits a station part / house within 40 m (the spawn framing check). */
+    roofShare: () => { const d = new THREE.Vector3(); camera.getWorldDirection(d); const p = camera.position; return roofShare(p.x, p.y, p.z, p.x + d.x * 10, p.y + d.y * 10, p.z + d.z * 10, camera.fov); },
     /** Debug camera circling the skier: angle (deg from the skier's heading), distance, height; null = off. */
     orbit(angle, dist = 4, h = 1.2, fov = 40) { if (angle === null) { game.orbit = null; game.camPose = null; return; } game.orbit = { angle, dist, h, fov }; },
     /** Fixed camera at (x, z) heightAbove m over the ground looking at (tx, tz) heightAbove2 m over its ground; null = chase camera again. */
@@ -1336,7 +1439,7 @@ async function boot() {
     // round 4A
     modes, parkLayout, startPark, startFree: (id) => startFree(id ? modes.lifts.byId.get(id) : game.freeLift || modes.lifts.list[0]), rideUp, setMapMode,
     // round 6
-    goFree: (id) => goFree(id ? modes.lifts.byId.get(id) : spawn), boardLift, skipRide, toggleRideView, get ride() { return ride; }, get rideView() { return rideView; }, get spawn() { return spawn; },
+    goFree: (id) => goFree(id ? modes.lifts.byId.get(id) : spawn), boardLift, skipRide, toggleRideView, get ride() { return ride; }, get carrier() { return carrier; }, get rideView() { return rideView; }, get spawn() { return spawn; },
     get lifts() { return lifts; }, get signs() { return signs; }, markers, setSki, get skiType() { return skiType; }, get world() { return world; }, openSkiCard, resumeFree, acceptChallenge, showMap,
     place(x, z, heading) { placeAt(x, z, heading); },
     // R7-B (flows): stand still at (x, z) like after a lift (0 km/h until an input), the scatter for the tree checks

@@ -246,6 +246,9 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
       } else if (mode === 'piste') {
         const p = pickAt(e.clientX - r.left, e.clientY - r.top);
         if (p) { select(p); onPick(p); }
+        // R8e (3V QA: tapping the empty map in the piste tab did nothing): off every piste the same teleport ask as the free ride tab
+        // (discovered -> "Hei hin teleportéieren?" to the nearest safe spot, else "Nach net entdeckt")
+        else if (tapWorld) { const [wx, wz] = toWorld(e.clientX - r.left, e.clientY - r.top, size()); tapWorld(wx, wz); }
       }
     }
     if (ptrs.size === 0) downAt = null;

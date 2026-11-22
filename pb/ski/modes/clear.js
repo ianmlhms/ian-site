@@ -106,7 +106,48 @@ export function createObstacles({ resort, field, scatter = null, density = 1, li
     const gx = (height(x + span, z) - height(x - span, z)) / (2 * span), gz = (height(x, z + span) - height(x, z - span)) / (2 * span);
     return Math.atan(Math.hypot(gx, gz)) * 180 / Math.PI;
   }
-  return { blocked, wallAhead, slopeAt, setBuildings, inBuilding, nearStation, nearLine, stations, hasBuildings: () => buckets.size > 0 };
+  // R8e (3V QA: the "Lac des Creux" start banner spanned the Creux piste, a skier rode through it at 61 km/h): the piste lines in 50 m
+  // cells, so a challenge's start banner can keep clear of every OTHER piste (courseGate)
+  const pisteCells = new Map();
+  function setPistes(list) {
+    pisteCells.clear();
+    for (const p of list) {
+      for (let i = 0; i + 1 < p.n; i++) {
+        const seg = [p.x[i], p.z[i], p.x[i + 1], p.z[i + 1], p.id];
+        for (let cx = Math.floor(Math.min(seg[0], seg[2]) / 50); cx <= Math.floor(Math.max(seg[0], seg[2]) / 50); cx++) {
+          for (let cz = Math.floor(Math.min(seg[1], seg[3]) / 50); cz <= Math.floor(Math.max(seg[1], seg[3]) / 50); cz++) {
+            const k = cx * 100003 + cz; let a = pisteCells.get(k); if (!a) pisteCells.set(k, (a = [])); a.push(seg);
+          }
+        }
+      }
+    }
+  }
+  /** Another piste's line (not `selfId`) through the rectangle centred on (x, z) with unit axis (ux, uz): +-ha along it, +-hb across;
+   *  returns that piste's id or null. */
+  function otherPisteIn(x, z, ux, uz, ha, hb, selfId) {
+    if (!pisteCells.size) return null;
+    const r = Math.hypot(ha, hb), seen = new Set();
+    for (let cx = Math.floor((x - r) / 50); cx <= Math.floor((x + r) / 50); cx++) {
+      for (let cz = Math.floor((z - r) / 50); cz <= Math.floor((z + r) / 50); cz++) {
+        for (const g of pisteCells.get(cx * 100003 + cz) || []) {
+          if (g[4] === selfId || seen.has(g)) continue;
+          seen.add(g);
+          // the segment in the rectangle's frame (a along, b across), clipped (Liang-Barsky)
+          const a0 = (g[0] - x) * ux + (g[1] - z) * uz, b0 = -(g[0] - x) * uz + (g[1] - z) * ux;
+          const a1 = (g[2] - x) * ux + (g[3] - z) * uz, b1 = -(g[2] - x) * uz + (g[3] - z) * ux;
+          let t0 = 0, t1 = 1, ok = true;
+          for (const [p, q] of [[-(a1 - a0), a0 + ha], [a1 - a0, ha - a0], [-(b1 - b0), b0 + hb], [b1 - b0, hb - b0]]) {
+            if (Math.abs(p) < 1e-9) { if (q < 0) { ok = false; break; } continue; }
+            const t = q / p;
+            if (p < 0) { if (t > t1) { ok = false; break; } if (t > t0) t0 = t; } else { if (t < t0) { ok = false; break; } if (t < t1) t1 = t; }
+          }
+          if (ok && t0 <= t1) return g[4];
+        }
+      }
+    }
+    return null;
+  }
+  return { blocked, wallAhead, slopeAt, setBuildings, setPistes, otherPisteIn, inBuilding, nearStation, nearLine, stations, hasBuildings: () => buckets.size > 0 };
 }
 
 /** The resort's first lift (FIRST_LIFT names in order, else the village lift of round 6). lifts = createLiftNet. */
@@ -189,7 +230,7 @@ export function safeSpot(x, z, { obs, pistes, lifts, height, isOpen = () => true
  *  and the skier's spot are clear (no building, station, lift line, tree or rock within COURSE.gateClear m). A piste that starts right
  *  beside a station hall or runs under a lift line gets its gate beside it, not in it. Returns { s, lat, ok, why }. */
 export function courseGate(piste, obs, halfGate = 3.5) {
-  const a = {};
+  const a = {}, b = {};
   let why = '';
   const hw = piste.halfWidth;
   const maxLat = Math.max(0, hw - halfGate - 1.5);
@@ -204,6 +245,15 @@ export function courseGate(piste, obs, halfGate = 3.5) {
       for (const [k, r] of [[0, COURSE.gateClear], [halfGate, COURSE.gateClear * 0.6], [-halfGate, COURSE.gateClear * 0.6]]) {
         const w = obs.blocked(a.x + rx * (lat + k), a.z + rz * (lat + k), r, { trees: true, edge: 8 });
         if (w) { why = w; break; }
+      }
+      // R8e (3V QA "Lac des Creux"): the banner (+-halfGate + 2 m across, +-10 m along) spans no other piste's line
+      if (!why && obs.otherPisteIn) { const o = obs.otherPisteIn(a.x + rx * lat, a.z + rz * lat, a.dx, a.dz, COURSE.bannerAlong, halfGate + 2, piste.id); if (o) why = `piste ${o}`; }
+      // R8e (ski-course flow: Kronplatz sylvester's push start ran into a station 30 m below the gate): the first 60 m of the run-in
+      // (the line at this gate's side offset) clear of houses / stations / lift parts too
+      for (let d = 3; !why && d <= COURSE.runIn; d += 3) {
+        piste.at(s + d, b);
+        const w = obs.blocked(b.x - b.dz * lat, b.z + b.dx * lat, 1, { lift: false, trees: false, built: false, edge: 8 });
+        if (w === 'building' || w === 'station') why = `run-in ${w}`;
       }
       if (!why) return { s, lat, ok: true, why: '' };
     }

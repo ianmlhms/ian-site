@@ -39,12 +39,16 @@ export function courseLayout(piste, startS = 2, pistes = null, obs = null, finis
   const pr = {};
   // the inside of a bend tighter than the barrier offset folds the offset line back over the course: those points are left out
   const inside = (x, z, s) => { piste.project(x, z, s, 40, pr); return pr.dist < hw + 0.5 - 0.3 || (obs && (obs.inBuilding(x, z, 0.4) || obs.nearStation(x, z, 0.4))); };
+  // R8e (Killy joseray: the line runs through a 33 x 31 m hotel, the net beside it closed the only way round): a house / station hall
+  // reaching into the course within 3 m of the net opens the net there too, so he can ski round it; openAt(s, side) tells course.js
+  const intrudes = (x, z, s) => { piste.at(s, a2); const dx = a2.x - x, dz = a2.z - z, d = Math.hypot(dx, dz) || 1; const ix = x + dx / d * 3, iz = z + dz / d * 3; return !!obs && (obs.inBuilding(ix, iz, 2.5) || !!obs.nearStation(ix, iz, 2.5)); };
+  const a2 = {}, openS = { [-1]: [], [1]: [] };
   for (let s = startS + 4; s < finishS; s += COURSE.barrierEvery) {
     piste.at(s + COURSE.barrierEvery / 2, a);
     const h = Math.atan2(a.dz, a.dx);
     for (const side of [-1, 1]) {
       const x = a.x - a.dz * side * (hw + 0.5), z = a.z + a.dx * side * (hw + 0.5);
-      if (!inside(x, z, a.s)) barriers.push({ x, z, h, side });
+      if (!inside(x, z, a.s) && !intrudes(x, z, a.s)) barriers.push({ x, z, h, side });
     }
   }
   // R7-C2: the net itself = a ribbon per side whose bottom lies on the snow every NET_STEP m (no rigid panel floating over a dip or
@@ -57,7 +61,7 @@ export function courseLayout(piste, startS = 2, pistes = null, obs = null, finis
     for (let s = startS + 4; s <= finishS + 1e-6; s += NET_STEP) {
       piste.at(s, a);
       const x = a.x - a.dz * side * (hw + 0.5), z = a.z + a.dx * side * (hw + 0.5);
-      if (inside(x, z, s)) { cut(); openLen += NET_STEP; continue; }
+      if (inside(x, z, s) || intrudes(x, z, s)) { cut(); openLen += NET_STEP; openS[side].push(s); continue; }
       // the outside of a kink in the 10 m line jumps by metres: fill the corner so no vertex is more than NET_STEP from the next
       const k = run.length;
       if (k) {
@@ -97,12 +101,14 @@ export function courseLayout(piste, startS = 2, pistes = null, obs = null, finis
   for (const s of junctions) arrowAt(Math.max(startS + 8, s - 15));
   for (let s = startS + ARROW_EVERY; s < finishS - 60; s += ARROW_EVERY) if (!junctions.some((t) => Math.abs(t - s) < 80)) arrowAt(s);
   piste.at(finishS, a);
-  return { startS, finishS, finish: { x: a.x, z: a.z, dx: a.dx, dz: a.dz }, barriers, rails, openLen, arrows, junctions, halfWidth: hw };
+  /** R8e: is the net on `side` (+1 = right of the line) left open at s (no soft collision there either: course.js createCourse open)? */
+  const openAt = (s, side) => { const L = openS[side > 0 ? 1 : -1]; let lo = 0, hi = L.length - 1; while (lo <= hi) { const m = (lo + hi) >> 1; if (Math.abs(L[m] - s) <= NET_STEP * 0.75) return true; if (L[m] < s) lo = m + 1; else hi = m - 1; } return false; };
+  return { startS, finishS, finish: { x: a.x, z: a.z, dx: a.dx, dz: a.dz }, barriers, rails, openLen, arrows, junctions, halfWidth: hw, openAt };
 }
 
 /** Where the skier is on the course (pure). update(state, dt) -> { s, remaining, share, dist, warn, abort, back {x, z}, next {x, z} }.
  *  R7-C2: collide(prev, state) -> the state deflected by the barriers (soft: pushed back inside along the barrier, slowed a little). */
-export function createCourse({ piste, startS = 2, finishS: finishIn = null }) {
+export function createCourse({ piste, startS = 2, finishS: finishIn = null, open = null }) {      // R8e: open(s, side) = courseLayout().openAt
   const finishS = Math.max(startS + 30, finishIn !== null ? finishIn : piste.length - COURSE.finishBack);
   const proj = {}, nxt = {}, back = {}, full = {}, cp = {}, ca = {}, wp = {};
   let hint = startS, offFor = 0, aborted = false, cHint = startS, lastOff = 0, hits = 0, low = Infinity;
@@ -157,6 +163,7 @@ export function createCourse({ piste, startS = 2, finishS: finishIn = null }) {
     if (!st.grounded && st.air > 0.25) return st;                         // a real jump clears the net (it is 1.1 m high)
     piste.at(cp.s, ca);
     const side = Math.sign(cp.off), rx = -ca.dz * side, rz = ca.dx * side;     // the outward normal of this barrier
+    if (open && open(cp.s, side)) return st;                               // R8e: the net is open here (a house reaches into the course)
     // no net here: the inside of a bend tighter than the net's offset is left open (courseLayout), so is the wall
     piste.project(ca.x + rx * (piste.halfWidth + 0.5), ca.z + rz * (piste.halfWidth + 0.5), cp.s, 40, wp);
     if (wp.dist < piste.halfWidth + 0.2) return st;

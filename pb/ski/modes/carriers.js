@@ -56,8 +56,10 @@ function chairParts(seats, lod, barUp) {
   } else {
     P.push([box(0.06, 0.06, W), COL.bar, at(0.42, -1.58, 0)]);
     for (const z of [-W / 2 - 0.02, W / 2 + 0.02]) P.push([box(0.78, 0.06, 0.06), COL.bar, at(0.04, -1.5, z)]);
-    P.push([box(0.24, 0.05, W * 0.9), COL.bar, at(0.56, -2.62, 0)]);
-    for (const z of [-W * 0.3, W * 0.3]) P.push([box(0.05, 1.04, 0.05), COL.bar, at(0.48, -2.1, z)]);
+    // R8e (3V QA "Bouc Blanc": skis and poles through the footrest): the footrest bar right under the seated riders' boots (their skis
+    // rest on it: skier-model.js poseSit, ski bases 2.46 m under the rope), its two struts at the bar's ends, outside every seat
+    P.push([box(0.3, 0.05, W * 0.92), COL.bar, at(0.6, -2.495, 0)]);
+    for (const z of [-W * 0.47, W * 0.47]) P.push([box(0.05, 0.93, 0.05), COL.bar, at(0.5, -2.02, z)]);
   }
   return { parts: P, glass: [] };
 }
@@ -179,6 +181,8 @@ function dragEnd(sub, y) {
 /** The parts of one carrier. */
 export function carrierParts(kind, { seats = 4, sub = '', lod = 'near', barUp = true } = {}) {
   if (kind === 'chair') return chairParts(seats, lod, barUp);
+  // R8e: a funitel cabin: big and wide (across the travel), hung from the two haul ropes 3.2 m apart by two grips (lift-path.js carrierBox)
+  if (kind === 'gondola' && sub === 'funitel') return cabinParts(2.6, 3.4, 2.3, -4.8, COL.cabin, COL.cabinDark, [-1.6, 1.6], lod);
   if (kind === 'gondola') return cabinParts(2.0, 1.9, 2.15, -4.1, COL.cabin, COL.cabinDark, [0], lod);
   if (kind === 'cable') return cabinParts(7.0, 4.4, 3.2, -6.1, 0xd9dde3, 0x5a616c, [-1.2, 1.2], lod);
   if (kind === 'train') return trainParts(lod);
@@ -193,6 +197,7 @@ export function carrierGeometry(kind, opts) {
 
 /** kind = lift-path.js class; seats / sub from the data. place(w) with w = liftride.js riderAt(): { cx, cy, cz, heading, pitch, roll,
  *  barDown, hip (drag: the rider's hip height, the pole reaches down to it) }. */
+const DOWN = new THREE.Vector3(0, -1, 0), rodV = new THREE.Vector3(), rodD = new THREE.Vector3();
 export function createCarrier({ scene, kind, seats = 4, sub = '' }) {
   const group = new THREE.Group();
   group.name = `ski-ride-${kind}`;
@@ -217,7 +222,7 @@ export function createCarrier({ scene, kind, seats = 4, sub = '' }) {
       disposables.push(pole.geometry, pmat, end.geometry);
     }
   } else {
-    const g = carrierGeometry(kind, { seats });
+    const g = carrierGeometry(kind, { seats, sub });                     // R8e: a funitel cabin
     mesh(g.frame);
     if (g.glass) {
       const gmat = new THREE.MeshLambertMaterial({ color: GLASS.color, transparent: true, opacity: GLASS.opacity, depthWrite: false, side: THREE.DoubleSide });
@@ -237,9 +242,20 @@ export function createCarrier({ scene, kind, seats = 4, sub = '' }) {
       if (pole) {
         // the spring line reels out to the rider's hips (the bar behind his thighs); an empty bar hangs retracted
         const hip = w.hip !== undefined ? w.hip : w.cy - 1.4;
-        const len = Math.max(0.5, w.cy - 0.65 - hip);
-        pole.scale.set(1, len, 1); pole.position.set(0, -0.65, 0); pole.rotation.set(0, 0, -0.1);
-        end.position.set(-0.1 * len, -0.65 - len, 0);
+        if (w.x !== undefined && w.hip !== undefined) {
+          // R8e: the rod from the spring box down and back to the disc / T between his legs (he rides 1 m behind the box, liftride.js)
+          group.updateMatrixWorld(true);
+          rodV.set(w.x + Math.cos(w.heading) * 0.04, hip, w.z + Math.sin(w.heading) * 0.04);
+          group.worldToLocal(rodV);
+          rodD.set(rodV.x, rodV.y + 0.65, rodV.z);
+          const len = Math.max(0.5, rodD.length());
+          pole.position.set(0, -0.65, 0); pole.scale.set(1, len, 1); pole.quaternion.setFromUnitVectors(DOWN, rodD.normalize());
+          end.position.copy(rodV); end.rotation.set(0, 0, 0);
+        } else {
+          const len = Math.max(0.5, w.cy - 0.65 - hip);
+          pole.scale.set(1, len, 1); pole.position.set(0, -0.65, 0); pole.rotation.set(0, 0, -0.1);
+          end.position.set(-0.1 * len, -0.65 - len, 0);
+        }
       }
     },
     setVisible(v) { group.visible = v; },
