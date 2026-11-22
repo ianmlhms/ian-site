@@ -717,3 +717,28 @@ ride, carve, stop, drag per resort). Frame probe: `scripts/ski/frame-probe.mjs` 
 radius (freeride.js BOTTOM_RADIUS) — the spawn must land on B's zone `boardAt(firstLift)`; C's `!mp` avalanche guards -> `!isRace()`;
 C's Node scripts must `unpackResort`; re-run round7c-check. D's free ride already calls `window.__ski.avalanches.triggerAvalanche` when
 it exists.
+**Round 8 STATUS at hand-over (22 Nov ~04:10, context limit)** — head = this branch's last commit.
+- Merged + verified: B (base), A, D-look, D. NOT merged: **R7-C2** (worktree-agent-acb90fde7a15074ac @ 61fe6f92) — next agent: merge it
+  per "For C2" above (+ `unpackResort` in round7c-check.mjs, C's avalanche `!mp` -> `!isRace()`, wire D's free-ride avalanche event to
+  C's `triggerAvalanche`, C's spawn = B's zone wait spot of FIRST_LIFT), then re-run round7c-check --rides and round7c2-shots.sh.
+- Node (all green): round7b-test 5981/5981 (every lift: stations, zones, rides, exits incl. the new slope / drop / stand-5 s / push-off
+  checks, carriers vs pylons / stations / trees / kept buildings), round7-test 30/30, round6-test 2307/2307, look7d-check 68/68,
+  r7d-test 1424/1424, harness --all: killy 23, 3vallees 23, zermatt 23, arlberg 19, kronplatz 19, 0 failed.
+- Chromium flows (load ~30): 14/15 — home-page, ski (Niddreg p95 16.7 ms, 140 calls, 386k tris), ski-ipad-start, ski-resorts, ski-mp,
+  ski-challenges, ski-park, ski-freeride, ski-lift, ski-skis, ski-lifts-all, ski-webkit, ski-look7d, arcade-pad PASS; ski-mp-freeride
+  FAILED on the lift step (it read the state during B's boarding walk) -> flow fixed to wait for `ride.phase === 'ride'`, NOT re-run.
+- WebKit flows: run started at load 74 (other agents): `ski` FAILED (Niddreg p95 57 ms, max 836 ms hitch; then a Zermatt boot
+  selector timeout under that load). Mitigations committed after it ran (name-sign atlas 12 slots / no mips / 1.2 s, camera guard's
+  station test gated by a 50 m grid); B measured 28 ms before the merge. Re-run the WebKit `ski` flow at normal load and use
+  `scripts/ski/frame-probe.mjs --engine webkit` to find the long frames if it still fails. Log: ~/Library/Caches/ski-work/round8/flows-webkit.log.
+- Not yet run on the merged head: ground-check.mjs and pose-check.mjs (both engines), ski-mp-freeride re-run, D's calls-sweep7d
+  (the lift-name signs add 1 draw call; fold them into D's sign atlas if the 160 budget is hit).
+- WebKit contact sheets: ~/Library/Caches/ski-work/round8/sheet-<resort>-webkit.jpg (+ webkit-<resort>-<shot>.png). Seen: shade light
+  blue-grey, stations detailed with readable names, Kronplatz station no longer in a hotel, streets clean, gondola speedo 22 km/h. The
+  "stop" shots there still show the old crossed-V end pose (fixed afterwards: the hockey stance holds while he stands on the brake).
+- Early-QA items still OPEN: Zürs flat-roof concrete blocks -> chalet style; villages 494-645k triangles / Kandahar p95; rock "circuit
+  board" lines on Face de Bellevarde (check after D-look's strata fade); cable-car window lower panel; Gornergrat carriage interior;
+  map list highlight != card and "30002959 m" (map.js, C's area); piste named "0"; Korer park scores 0 + "jump with E" hint; Grattalu park
+  start too flat; floating piste labels at the screen edge (D's labels); HUD text contrast in fog; first-person floating poles (C);
+  boarding-zone views inside canopies (camera under the hall roof at the spawn); perf hitches on fast travel (meshedAround behind the
+  fade is by design, the 170-215 ms WebKit placement hitch is not yet profiled).
