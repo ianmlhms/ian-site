@@ -42,6 +42,7 @@ const SCENES = [
   { name: "31-world-edge", url: `${BASE}&q=high&time=noon`, setup: `${at(0.1)} ${flyCam(200, 2500, 40, 180, -3, 75)}`, wait: 4000 },
 ];
 
+process.env.FLOW_FULL ??= "1";      // a screenshot tool: full pixels and frame rate, never power mode (flows/lib.mjs)
 const browser = await launchBrowser({ fullChromium: true });
 const { server, origin } = await startServer();
 const log = [];

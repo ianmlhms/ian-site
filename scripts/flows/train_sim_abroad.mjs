@@ -32,6 +32,7 @@ export const flow = {
     const sim = await simOnPage(await h.context.newPage(), h.origin, { quality: 'high' });
     for (const [id, spec] of Object.entries(LINES)) {
       h.step(`${id}: the real stop pattern, geometry and scenery`);
+      await h.releaseMemory({ page: sim.page, blank: false });      // the last route's garbage now, not late (lib.mjs; power test 22 Nov 2026)
       await sim.start(id);
       const rep = await sim.evalGame(({ track }) => ({
         st: track.stations.map((s) => s.name), len: track.length, tunnels: track.tunnels.length, bridges: track.bridges.length, crossings: track.crossings.length,
@@ -69,6 +70,7 @@ export const flow = {
 
     h.step('hole detector: no hole, no pit, no missing terrain on the abroad routes');
     for (const id of Object.keys(LINES)) {
+      await h.releaseMemory({ page: sim.page, blank: false });      // the last route's garbage now, not late (lib.mjs; power test 22 Nov 2026)
       const rep = await scanRoute(sim, id, { step: 300, rayStep: 60 });
       h.eq([rep.flaggedPoses.slice(0, 2), rep.rayFailures.filter((f) => f.kind !== 'step').slice(0, 2)], [[], []], `${id}: ${rep.poses} render poses and ${rep.rays} rays, no holes`);
       h.eq(rep.rayFailures.filter((f) => f.kind === 'step' && Math.abs(f.dy) > 1.0).slice(0, 2), [], `${id}: no terrain-function / mesh step above 1.0 m`);

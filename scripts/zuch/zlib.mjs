@@ -12,7 +12,8 @@ import path from 'node:path';
 import { launchBrowser, startServer } from '../flows/lib.mjs';
 
 export async function openSim({ quality = 'high', width = 1280, height = 720, train = 'emu', root = undefined, weather = 'clear', tod = 'noon' } = {}) {
-  const [browser, { server, origin }] = await Promise.all([launchBrowser({ fullChromium: true }), startServer(root)]);
+  // the zuch tools (shots, contact sheets, probes) look at the game: full pixels and frame rate, never power mode (flows/lib.mjs)
+  const [browser, { server, origin }] = await Promise.all([launchBrowser({ fullChromium: true, power: false }), startServer(root)]);
   const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
   await context.addInitScript(([q, w, t]) => { try { localStorage.setItem('ts_quality', q); localStorage.setItem('ts_weather', w); localStorage.setItem('ts_tod', t); } catch (_) { /* no storage */ } }, [quality, weather, tod]);
   const page = await context.newPage();

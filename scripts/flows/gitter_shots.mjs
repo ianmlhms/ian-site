@@ -10,6 +10,7 @@ const PREFIX = process.env.GITTER_PREFIX || "pages";
 
 export const flow = {
   name: "gitter-shots",
+  fullQuality: true,           // a screenshot tool: real pixels and frame rate even in power mode (lib.mjs)
   backend: {
     rpc: {
       has_pin: () => true, is_view_restricted: () => false, admin_user_ids: () => [],

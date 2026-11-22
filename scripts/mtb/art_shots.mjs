@@ -28,6 +28,7 @@ export const POSES = [
   { name: "e1-overview", time: "noon", weather: "clear", pose: { at: [1500, 1250], up: 150, yaw: 20, pitch: -16, fov: 62 } },
 ];
 
+process.env.FLOW_FULL ??= "1";      // a screenshot tool: full pixels and frame rate, never power mode (flows/lib.mjs)
 const browser = await launchBrowser({ fullChromium: true });
 const { server, origin } = await startServer();
 try {

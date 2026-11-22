@@ -15,6 +15,7 @@ const q = opt("--q", "high");
 const parts = (opt("--parts", "trails,falls,weather,menu,finish") || "").split(",");
 const IDS = ["ernz-waldwee", "hallerbach-flow", "schiessentuempel", "binzelt-rocks", "waschbrunnen-black", "maratoun"];
 fs.mkdirSync(outDir, { recursive: true });
+process.env.FLOW_FULL ??= "1";      // a screenshot tool: full pixels and frame rate, never power mode (flows/lib.mjs)
 const browser = await launchBrowser({ fullChromium: true });
 const { server, origin } = await startServer();
 try {

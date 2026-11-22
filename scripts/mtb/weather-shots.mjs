@@ -16,6 +16,7 @@ const poses = opt("--poses", "38,780,1130").split(",").map(Number);
 const weathers = ["clear", "cloudy", "fog", "rain"];
 const PY = path.join(os.homedir(), "Library/Caches/luxtram-work/.venv/bin/python");
 fs.mkdirSync(out, { recursive: true });
+process.env.FLOW_FULL ??= "1";      // a screenshot tool: full pixels and frame rate, never power mode (flows/lib.mjs)
 const browser = await launchBrowser({ fullChromium: true });
 const { server, origin } = await startServer();
 const files = [];

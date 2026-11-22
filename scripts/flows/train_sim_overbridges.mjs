@@ -21,6 +21,7 @@ export const flow = {
     const sim = await simOnPage(await h.context.newPage(), h.origin, { quality: 'medium' });
     for (const [id, min] of Object.entries(ROUTES)) {
       h.step(`${id}: road overbridges (plan, clearance, ramp, meshes)`);
+      await h.releaseMemory({ page: sim.page, blank: false });      // the last route's garbage now, not late (lib.mjs; power test 22 Nov 2026)
       await sim.start(id);
       const rep = await sim.evalGame(({ track }, k) => {
         const base = track.base || track;

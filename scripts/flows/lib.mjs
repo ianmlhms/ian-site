@@ -5,8 +5,10 @@
  * auth (/auth/v1), edge functions (/functions/v1) and the Realtime WebSocket.
  * FLOW_OFFLINE_SUPABASE=/path/to/pinned-umd.js also blocks all off-site assets
  * and serves local pages by interception when loopback sockets are unavailable.
- * Nothing ever reaches a real account or the live site. Each run records a
- * video to <video dir>/<flow>.webm.
+ * Nothing ever reaches a real account or the live site. Flows run in power mode
+ * by default (no video, half pixels + 30 fps for 3D, see "power mode" below;
+ * FLOW_POWER=0 turns it off); a failed flow is re-run at full quality and
+ * records a video to <video dir>/<flow>.webm.
  *
  * Playwright is not a repo dependency: it is looked up in $PLAYWRIGHT_DIR, then
  * as a normal "playwright" import, then in the global playwright-cli install.
@@ -80,31 +82,55 @@ function linuxGlArgs() {
   return process.platform === "linux" ? ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] : [];
 }
 
-/* ---------- power / memory economy (scripts/power/REPORT.md, 22 Nov 2026), all opt-in, default = unchanged ----------
- * FLOW_POWER=1         the measured best setup in one switch: FLOW_NO_VIDEO=1 FLOW_ECONOMY=1 FLOW_CHROME=shell
- *                      (6 flows incl. ski-freeride, mtb-ride: -55 % CPU seconds, -22 % peak memory, all green);
- *                      each part can be switched back off: FLOW_NO_VIDEO=0, FLOW_ECONOMY=0, FLOW_CHROME=full
- * FLOW_NO_VIDEO=1      no video recording (each flow otherwise encodes a webm and saves it into OneDrive)
- * FLOW_ECONOMY=1       3D flows (fullChromium): deviceScaleFactor 0.5 (same CSS layout, 1/4 of the pixels to render),
- *                      requestAnimationFrame capped at FLOW_FPS (default 30). The Grafik level stays the flow's own choice:
- *                      a forced "low" changes what a game offers (train-sim builds no saloon on low: no "inside" camera)
- * FLOW_ECONOMY_GFX=low also force the Grafik level (localStorage arcade_gfx) where the flow set none
- * FLOW_ECONOMY_DSF=x   another scale factor for FLOW_ECONOMY (1 = full pixels)
- * FLOW_FPS=n           cap requestAnimationFrame at n frames per second (any flow; 0 = no cap; never a flow with measuresFrames: true)
- * FLOW_CHROME=shell    every flow in chrome-headless-shell instead of Google Chrome for Testing (new headless). On macOS it gets
- *                      --use-angle=metal --enable-gpu --ignore-gpu-blocklist (without them the shell falls back to SwiftShader:
- *                      the 3D flows then fail and burn 5-12x the CPU); FLOW_SHELL_ARGS replaces those flags
- * FLOW_CHROME=full     every flow in Google Chrome for Testing (what run_all does once one 3D flow is in the list)
- * FLOW_CDP=ws://...    connect to an already running CDP browser (Lightpanda) instead of launching one */
-const POWER = process.env.FLOW_POWER === "1";
-const on = (name) => process.env[name] === "1" || (POWER && process.env[name] !== "0");      // FLOW_POWER=1 FLOW_NO_VIDEO=0: power, with video
-const ECONOMY = on("FLOW_ECONOMY");
-const NO_VIDEO = on("FLOW_NO_VIDEO");
-const CHROME = process.env.FLOW_CHROME || (POWER ? "shell" : "");
+/* ---------- power mode (scripts/power/REPORT.md, 22 Nov 2026): ON by default for every flow run ----------
+ * A flow run (runFlow, runIfMain, run_all) has no video, runs in chrome-headless-shell on Metal, and its 3D flows
+ * (fullChromium) render at deviceScaleFactor 0.5 with requestAnimationFrame capped at 30 fps. Each flow keeps its own Grafik
+ * level. Measured: -55 % CPU seconds, -22 % peak memory, every flow green. When a flow fails in power mode, run_all (and a
+ * standalone `node scripts/flows/<flow>.mjs`) runs it once more at full quality with video and reports both results.
+ *   FLOW_POWER=0         off: the setup from before (video, Chrome for Testing for 3D flows, real pixels and frame rate)
+ *   FLOW_FULL=1          the same, for look / screenshot / contact-sheet runs (full pixels)
+ *   FLOW_SHOTS_DIR=dir   step screenshots: the flows run at real pixels and frame rate (no video, the shell on Metal)
+ *   flow.measuresFrames  a flow that measures frame times (p95 / p99 budgets) always runs at real pixels and frame rate
+ *   flow.fullQuality     the same for a flow that is a screenshot tool (gitter-shots)
+ * The parts, each on or off on its own (FLOW_POWER=1 FLOW_NO_VIDEO=0 = power mode with video):
+ *   FLOW_NO_VIDEO=1|0    video recording (it otherwise encodes a webm per flow and saves it into OneDrive)
+ *   FLOW_ECONOMY=1|0     3D flows at deviceScaleFactor 0.5 (same CSS layout, 1/4 of the pixels) + requestAnimationFrame at FLOW_FPS
+ *   FLOW_ECONOMY_GFX=low also force the Grafik level (localStorage arcade_gfx) where the flow set none. Not by default: a forced
+ *                        "low" changes what a game offers (train-sim builds no saloon on low: no "inside" camera)
+ *   FLOW_ECONOMY_DSF=x   another scale factor for FLOW_ECONOMY (1 = full pixels)
+ *   FLOW_FPS=n           cap requestAnimationFrame at n frames per second (any flow; 0 = no cap; default 30 with FLOW_ECONOMY)
+ *   FLOW_CHROME=shell    every flow in chrome-headless-shell. On macOS it gets --use-angle=metal --enable-gpu --ignore-gpu-blocklist
+ *                        (without them the shell falls back to SwiftShader: the 3D flows then fail and burn 5-12x the CPU);
+ *                        FLOW_SHELL_ARGS replaces those flags
+ *   FLOW_CHROME=full     every flow in Google Chrome for Testing (new headless)
+ *   FLOW_CDP=ws://...    connect to an already running CDP browser (Lightpanda) instead of launching one
+ * Scripts that call launchBrowser() themselves (screenshot, sheet, bake and perf tools) are not flow runs: they keep the
+ * browser from before unless they pass { power: true } or FLOW_POWER=1 is set; the screenshot / sheet tools also set FLOW_FULL=1. */
 const SHELL_GPU_ARGS = process.platform === "darwin" ? "--use-angle=metal --enable-gpu --ignore-gpu-blocklist" : "";
-const ECONOMY_DSF = Number(process.env.FLOW_ECONOMY_DSF) || 0.5;
-const ECONOMY_GFX = ["low", "medium", "high"].includes(process.env.FLOW_ECONOMY_GFX) ? process.env.FLOW_ECONOMY_GFX : "";
-const FPS_CAP = process.env.FLOW_FPS !== undefined ? Number(process.env.FLOW_FPS) : (ECONOMY ? 30 : 0);
+const ECONOMY_FPS = 30;
+const ECONOMY_DSF = 0.5;
+const GFX_LEVELS = ["low", "medium", "high"];
+
+/** Power mode for a flow run, read when the run starts (a script may set process.env.FLOW_FULL first). */
+export function powerDefault() {
+  return process.env.FLOW_POWER !== "0" && process.env.FLOW_FULL !== "1";
+}
+
+/* strict: ignore the part switches in the environment (the re-run after a failure is always full quality with video) */
+function powerSettings(power, { strict = false } = {}) {
+  const env = (name) => (strict ? undefined : process.env[name]);
+  const on = (name) => env(name) === "1" || (power && env(name) !== "0");
+  const economy = on("FLOW_ECONOMY");
+  const fps = env("FLOW_FPS");
+  return {
+    economy,
+    noVideo: on("FLOW_NO_VIDEO"),
+    chrome: env("FLOW_CHROME") || (power ? "shell" : ""),
+    fpsCap: fps !== undefined ? Number(fps) : (economy ? ECONOMY_FPS : 0),
+    dsf: Number(env("FLOW_ECONOMY_DSF")) || ECONOMY_DSF,
+    gfx: GFX_LEVELS.includes(env("FLOW_ECONOMY_GFX")) ? env("FLOW_ECONOMY_GFX") : "",
+  };
+}
 
 /* Init script: requestAnimationFrame callbacks run at most `fps` times a second. Between two frames the page sleeps on a
  * setTimeout (no vsync wake-ups), so the GPU process renders 30 instead of 60 frames. Games clamp their frame dt
@@ -131,16 +157,19 @@ function rafCapScript(fps) {
 
 /* FLOW_BROWSER=webkit runs the flow in Playwright WebKit (the engine of the school iPads) instead of Chromium (the default).
  * WebKit has no --mute-audio: the games of this repo only make sound after a tap, which a headless flow never makes unless it says so. */
-export async function launchBrowser({ fullChromium: wantsFull = false, args = [] } = {}) {
+export async function launchBrowser({ fullChromium: wantsFull = false, args = [], power = process.env.FLOW_POWER === "1" && process.env.FLOW_FULL !== "1", strict = false } = {}) {
   const playwright = await importPlaywright();
-  const fullChromium = wantsFull || CHROME === "full";   // FLOW_CHROME=full: every flow in Chrome for Testing
+  const { chrome } = powerSettings(power, { strict });
+  const fullChromium = wantsFull || chrome === "full";   // FLOW_CHROME=full: every flow in Chrome for Testing
   if (process.env.FLOW_CDP) return playwright.chromium.connectOverCDP(process.env.FLOW_CDP);
   // every flow, not only the 3D ones: arcade-pad opens canvas / WebGL games and costs 9x the CPU in the shell on SwiftShader
-  if (CHROME === "shell" && process.env.FLOW_BROWSER !== "webkit") {
+  if (chrome === "shell" && process.env.FLOW_BROWSER !== "webkit") {
     const shell = cachedChromiumPaths(false)[0];
-    if (!shell) throw new Error("FLOW_CHROME=shell: no chromium_headless_shell in ~/Library/Caches/ms-playwright (npx playwright install --only-shell chromium)");
-    const gpu = (process.env.FLOW_SHELL_ARGS ?? SHELL_GPU_ARGS).split(" ").filter(Boolean);
-    return playwright.chromium.launch({ executablePath: shell, args: [...linuxGlArgs(), ...gpu, "--mute-audio", ...args] });
+    if (shell) {
+      const gpu = (process.env.FLOW_SHELL_ARGS ?? SHELL_GPU_ARGS).split(" ").filter(Boolean);
+      return playwright.chromium.launch({ executablePath: shell, args: [...linuxGlArgs(), ...gpu, "--mute-audio", ...args] });
+    }
+    console.log("  (power mode: no chromium_headless_shell in ~/Library/Caches/ms-playwright, `npx playwright install --only-shell chromium`; using the browser from before)");
   }
   if (process.env.FLOW_BROWSER === "webkit") {
     if (!playwright.webkit) throw new Error("FLOW_BROWSER=webkit: this Playwright has no webkit");
@@ -408,26 +437,29 @@ export async function mockRealtime(context, options = {}) {
 const failuresOf = (h) => h.failures;
 
 /* flow = { name, touch?: boolean, serviceWorkers?: "allow" (default "block": most flows must not see the worker), run: async (h) => void }
- * h = { page, context, origin, backend, expect, eq, step, pause, shot, signIn, goto } */
-export async function runFlow(flow, { browser, origin, shotsDir = process.env.FLOW_SHOTS_DIR } = {}) {
+ * h = { page, context, origin, backend, expect, eq, step, pause, shot, signIn, goto, releaseMemory }
+ * power: power mode (see "power mode" above); strict: ignore the FLOW_* part switches (the full-quality re-run) */
+export async function runFlow(flow, { browser, origin, shotsDir = process.env.FLOW_SHOTS_DIR, power = powerDefault(), strict = false } = {}) {
   const ownBrowser = !browser || !!flow.chromiumArgs;   // a flow that needs special browser flags (fake camera) gets its own browser
-  const own = ownBrowser ? await Promise.all([launchBrowser({ fullChromium: !!flow.fullChromium, args: flow.chromiumArgs || [] }), startServer()]) : null;
+  const own = ownBrowser ? await Promise.all([launchBrowser({ fullChromium: !!flow.fullChromium, args: flow.chromiumArgs || [], power, strict }), startServer()]) : null;
   const theBrowser = own ? own[0] : browser;
   const theOrigin = own ? own[1].origin : origin;
   const tmpVideos = fs.mkdtempSync(path.join(os.tmpdir(), "flow-video-"));
   const viewport = flow.viewport || VIEWPORT;          // a flow may ask for another size (a game in landscape)
-  // a flow that measures frame times (the ski flow: p95 on Niddreg) sets `measuresFrames: true`: it always runs at real
-  // pixels and frame rate, or its budget would measure the economy instead of the game
-  const economy = ECONOMY && !!flow.fullChromium && !flow.measuresFrames;
+  const settings = powerSettings(power, { strict });
+  // a flow that measures frame times (mtb-smooth: p99) sets `measuresFrames: true`, a screenshot tool `fullQuality: true`, and a run
+  // with step screenshots (FLOW_SHOTS_DIR) is a look run: real pixels and frame rate, or they would show the economy, not the game
+  const realFrames = !!flow.measuresFrames || !!flow.fullQuality || !!shotsDir;
+  const economy = settings.economy && !!flow.fullChromium && !realFrames;
   const context = await theBrowser.newContext({
-    viewport, screenSize: viewport, deviceScaleFactor: economy ? ECONOMY_DSF : flow.deviceScaleFactor || 1, serviceWorkers: flow.serviceWorkers || "block",
+    viewport, screenSize: viewport, deviceScaleFactor: economy ? settings.dsf : 1, serviceWorkers: flow.serviceWorkers || "block",
     hasTouch: !!flow.touch, isMobile: !!flow.touch,
     ...(flow.permissions ? { permissions: flow.permissions } : {}),
     ...(process.env.FLOW_COLOR_SCHEME ? { colorScheme: process.env.FLOW_COLOR_SCHEME } : {}),   // FLOW_COLOR_SCHEME=dark emulates prefers-color-scheme
-    ...(NO_VIDEO ? {} : { recordVideo: { dir: tmpVideos, size: viewport } }),
+    ...(settings.noVideo ? {} : { recordVideo: { dir: tmpVideos, size: viewport } }),
   });
-  if (economy && ECONOMY_GFX) await context.addInitScript((level) => { try { if (!localStorage.getItem("arcade_gfx")) localStorage.setItem("arcade_gfx", level); } catch { /* private mode */ } }, ECONOMY_GFX);
-  if (FPS_CAP > 0 && !flow.measuresFrames) await context.addInitScript(rafCapScript, FPS_CAP);
+  if (economy && settings.gfx) await context.addInitScript((level) => { try { if (!localStorage.getItem("arcade_gfx")) localStorage.setItem("arcade_gfx", level); } catch { /* private mode */ } }, settings.gfx);
+  if (settings.fpsCap > 0 && !realFrames) await context.addInitScript(rafCapScript, settings.fpsCap);
   const base = flow.backend || {};
   const backend = createBackend({
     rpc: {
@@ -498,12 +530,14 @@ export async function runFlow(flow, { browser, origin, shotsDir = process.env.FL
     }, [SESSION_KEY, fakeSession(), ME_NAME]);
   };
   h.goto = async (rel) => { await page.goto(theOrigin + rel, { waitUntil: "domcontentloaded" }); };
-  /* Between two heavy page loads in ONE page (a Ski resort after another): leave the page and collect its garbage now. V8 frees the
-   * last document's heap late; without this 5 Ski resorts in one page reached 2.7-3.5 GB and browser-slot.py killed the job
-   * (scripts/power/REPORT.md). Chromium only (CDP); elsewhere it is just the blank page. */
-  h.releaseMemory = async () => {
-    await page.goto("about:blank");
-    try { const cdp = await context.newCDPSession(page); await cdp.send("HeapProfiler.collectGarbage"); await cdp.detach(); } catch { /* WebKit, Lightpanda: no CDP heap */ }
+  /* Between two heavy loads in ONE page (a Ski resort after another, a train route after another): collect the last one's garbage
+   * now. V8 frees it late; without this 5 Ski resorts in one page reached 2.7-3.5 GB and browser-slot.py killed the job
+   * (scripts/power/REPORT.md). Default: leave the page for about:blank first (the flow loads the next resort with h.goto).
+   * { page }: another page of the flow (a sim page); { blank: false }: stay on the page (a game that switches routes in place).
+   * Chromium only (CDP); elsewhere it only does the blank page. */
+  h.releaseMemory = async ({ page: target = page, blank = true } = {}) => {
+    if (blank) await target.goto("about:blank");
+    try { const cdp = await target.context().newCDPSession(target); await cdp.send("HeapProfiler.collectGarbage"); await cdp.detach(); } catch { /* WebKit, Lightpanda: no CDP heap */ }
   };
 
   console.log(`\n▶ ${flow.name}`);
@@ -515,7 +549,7 @@ export async function runFlow(flow, { browser, origin, shotsDir = process.env.FL
     try { await h.shot("aborted"); } catch { /* page may be gone */ }
   }
   await h.pause(800);
-  const video = NO_VIDEO ? null : page.video();
+  const video = page.video();
   await context.close();
   let videoPath = null;
   if (video) try {
@@ -528,13 +562,38 @@ export async function runFlow(flow, { browser, origin, shotsDir = process.env.FL
   if (ownBrowser) { await theBrowser.close(); own[1].server.close(); }
   const ok = failuresOf(h).length === 0;
   console.log(`${ok ? "✔ PASS" : "✘ FAIL"} ${flow.name}${videoPath ? `  → ${videoPath}` : ""}`);
-  return { name: flow.name, ok, failures: h.failures, video: videoPath };
+  return { name: flow.name, ok, failures: h.failures, video: videoPath, power: !!power };
 }
 
-/* Lets each flow file run standalone: `node scripts/flows/<file>.mjs`. */
+/* A flow that failed in power mode, once more at full quality with video (its own browser and server). The result is the
+ * full-quality run's, with the power run's failures in `powerFailures`. A pass here means power mode broke the flow (or it is
+ * flaky): the summary says so. */
+export async function rerunFull(flow, powerResult) {
+  console.log(`\n↻ ${flow.name} failed in power mode: once more at full quality, with video`);
+  const full = await runFlow(flow, { power: false, strict: true });
+  return { ...full, rerun: true, powerFailures: powerResult.failures };
+}
+
+/* The summary lines of one result (a re-run shows both results) */
+export function summaryLines(r) {
+  const fails = (list) => list.map((f) => "        " + f);
+  if (!r.rerun) return [`${r.ok ? "PASS" : "FAIL"}  ${r.name}`, ...(r.ok ? [] : fails(r.failures))];
+  return [
+    `${r.ok ? "PASS" : "FAIL"}  ${r.name}  (failed in power mode, ${r.ok ? "passed" : "failed again"} at full quality${r.video ? `, video ${r.video}` : ""})`,
+    "        power mode:", ...fails(r.powerFailures),
+    ...(r.ok ? ["        -> only power mode breaks it (or it is flaky): mark it measuresFrames / fullQuality, or fix it"] : ["        full quality:", ...fails(r.failures)]),
+  ];
+}
+
+/* Lets each flow file run standalone: `node scripts/flows/<file>.mjs` (a power-mode failure is re-run like in run_all). */
 export function runIfMain(importMetaUrl, flow) {
   if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === importMetaUrl) {
-    runFlow(flow).then((r) => process.exit(r.ok ? 0 : 1), (e) => { console.error(e); process.exit(2); });
+    (async () => {
+      const first = await runFlow(flow);
+      const r = !first.ok && first.power ? await rerunFull(flow, first) : first;
+      if (r.rerun) console.log("\n" + summaryLines(r).join("\n"));
+      return r;
+    })().then((r) => process.exit(r.ok ? 0 : 1), (e) => { console.error(e); process.exit(2); });
   }
 }
 

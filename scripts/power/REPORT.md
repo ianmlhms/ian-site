@@ -1,5 +1,14 @@
 # Power-efficient testing on the Mac mini (22 Nov 2026)
 
+> **Now the default on main (22 Nov 2026).** Every flow run (`runFlow`, `runIfMain`, `run_all`, `run_webkit`) is in power
+> mode unless `FLOW_POWER=0` or `FLOW_FULL=1`. A flow that fails in power mode is run once more at full quality with a
+> video, and the summary shows both results. `measuresFrames: true` (mtb-smooth) and `fullQuality: true` (gitter-shots,
+> gitter-audit) flows and runs with `FLOW_SHOTS_DIR` keep real pixels and frame rate. Scripts that call `launchBrowser()`
+> themselves (shots, sheets, bakes, perf probes) keep the old browser; the shot / sheet tools also set `FLOW_FULL=1`.
+> Train Sim flows that start several routes in one page call `h.releaseMemory({ page: sim.page, blank: false })` between
+> routes. `ski-ground-node.mjs` (section 6) stays on the Ski branch, since Ski is not on main yet. The text below is the
+> trial as measured, when all of this was opt-in.
+
 Measured on the 16 GB Mac mini (Apple M1, Chrome for Testing / headless shell 155.0.8059.12, Playwright 1.64-alpha), with
 the Ski Alpen round running next to it. Flows came from the integrated Ski branch `worktree-agent-af10f0221a941c5fa` @ 8bd7cc9d
 (exported read-only, never touched in place). Every browser job ran through `python3 ~/Library/Caches/browser-slot.py`

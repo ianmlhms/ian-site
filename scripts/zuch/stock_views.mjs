@@ -24,6 +24,7 @@ const outDir = args[0];
 if (!outDir) { console.error('usage: stock_views.mjs <outDir> [--trains a,b] [--views side,sidehead,front,rear,cab,saloon,head,noseside] [--stats]'); process.exit(2); }
 fs.mkdirSync(outDir, { recursive: true });
 
+process.env.FLOW_FULL ??= '1';      // a screenshot tool: full pixels and frame rate, never power mode (flows/lib.mjs)
 const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js';
 const [browser, { server, origin }] = await Promise.all([launchBrowser({ fullChromium: true }), startServer()]);
 try {

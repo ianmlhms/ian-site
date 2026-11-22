@@ -1,7 +1,7 @@
 #!/bin/zsh
 # Runs flows x configs through measure.py (and so through ~/Library/Caches/browser-slot.py), one job at a time.
 #   FLOWS_DIR=<checkout with the flows>  OUT=<results.jsonl>  zsh scripts/power/matrix.sh "<flow files>" "<configs>"
-# configs: base novideo full econ econ-dsf1 shell shell-gpu fps20 fps30 shell-gpu-econ
+# configs: base power novideo full econ econ-dsf1 shell shell-gpu fps20 fps30 shell-gpu-econ
 set -u
 HERE=${0:A:h}
 FLOWS_DIR=${FLOWS_DIR:-$PWD}
@@ -11,9 +11,10 @@ TAG=${TAG:-}
 mkdir -p $VIDEOS
 for flow in ${=1}; do
   for cfg in ${=2}; do
-    envs=(--env FLOW_VIDEO_DIR=$VIDEOS)
+    envs=(--env FLOW_VIDEO_DIR=$VIDEOS --env FLOW_POWER=0)   # power mode is the default since 22 Nov 2026: each config starts from the old setup
     case $cfg in
       base) ;;
+      power) envs=(--env FLOW_VIDEO_DIR=$VIDEOS) ;;
       novideo) envs+=(--env FLOW_NO_VIDEO=1) ;;
       full) envs+=(--env FLOW_NO_VIDEO=1 --env FLOW_CHROME=full) ;;
       econ) envs+=(--env FLOW_NO_VIDEO=1 --env FLOW_ECONOMY=1) ;;

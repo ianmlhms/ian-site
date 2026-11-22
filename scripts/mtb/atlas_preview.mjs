@@ -5,6 +5,7 @@ import fs from "node:fs";
 import { launchBrowser, startServer } from "../flows/lib.mjs";
 
 const out = process.argv[2] || "atlas.png";
+process.env.FLOW_FULL ??= "1";      // a screenshot tool: full pixels and frame rate, never power mode (flows/lib.mjs)
 const browser = await launchBrowser({ fullChromium: true });
 const { server, origin } = await startServer();
 try {
