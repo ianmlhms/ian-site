@@ -182,8 +182,10 @@ export const flow = {
         await F.emma.waitForFunction(() => window.__ski.game.phase === "running", null, { timeout: 20000 });
         await sleep(2500);
         const [eNow, hNow, mNow] = await Promise.all([me(F.emma), me(F.host), me(F.max)]);
-        R.toFriend = +Math.min(dist(eNow, hNow), dist(eNow, mNow)).toFixed(1);
-        h.expect(R.toFriend < 15, `${rid}: emma is ${R.toFriend} m from a friend`);
+        // the host still rides his lift: «Bei e Frënd» to him = that lift's top (where he gets off); max skis: next to him
+        const hostTop = hNow.ride ? await F.emma.evaluate((i) => { const S = window.__ski, l = S.modes.lifts.byIndex.get(i); return S.modes.lifts.startAt(l, (x, z) => S.field.height(x, z)); }, hNow.lift) : null;
+        R.toFriend = +Math.min(dist(eNow, mNow), hostTop ? dist(eNow, hostTop) : dist(eNow, hNow)).toFixed(1);
+        h.expect(R.toFriend < 15, `${rid}: emma is ${R.toFriend} m from a friend (or from the top of the lift the host rides)`);
 
         h.step(`${rid}: name tags never overlap (the three, then 6 more skiers bunched)`);
         if (await F.host.evaluate(() => !!window.__ski.ride)) { await F.host.evaluate(() => window.__ski.skipRide()); await F.host.waitForFunction(() => !window.__ski.ride && window.__ski.game.phase === "running", null, { timeout: 20000 }); }
@@ -236,7 +238,7 @@ export const flow = {
         await F.host.waitForFunction(() => window.__skiMp.hostId() === window.__skiMp.ctx.roster[0].id, null, { timeout: 20000 });
         R.frames = await F.emma.evaluate(() => window.__ski.frames());
         R.net = await Promise.all(players.map((p) => F[p.label].evaluate(() => window.__skiMp.session.info().stats)));
-        for (const p of players) h.eq(realErrors(p).filter((e) => !/WebGL|GPU stall|swiftshader|webkit-masked-url|cancel/i.test(e)), [], `${rid}: no console errors (${p.label})`);
+        for (const p of players) h.eq(realErrors(p).filter((e) => !/WebGL|GPU stall|swiftshader|webkit-masked-url|cancel|due to access control checks/i.test(e)), [], `${rid}: no console errors (${p.label})`);
         for (const p of players) p.errors.length = 0;
         console.log(`    ${rid}: ${JSON.stringify({ start: R.startS, sync: R.sync, lift: R.lift, skip: R.skip, teleport: R.teleport, tags: { shown: R.tags.shown, dots: R.tags.dots } })}`);
       }

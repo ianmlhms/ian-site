@@ -533,7 +533,7 @@ net/freeride.js, mp-games `mode`): the integration takes ONE per feature; the di
   A worst spot spends ~100 calls on terrain tiles, ~16 on the local skier (one call per bone group), 5-10 village, 7 lifts (instanced),
   3-16 landmarks (Arlberg / Kronplatz). The margin to 160 is thin: each online friend in view adds 1 (his skinned figure). Next wins if
   needed: the local skier as ONE skinned mesh like the remotes (remotes.js `createRemoteFigure`; skier-model.js is R7-A's IK area),
-  landmarks merged per material across landmarks. Face de Bellevarde (~245 in round 5 at another level / camera) is 140-150 now.
+  landmarks merged per material across landmarks. Face de Bellevarde (~245 in round 5) is no longer in Killy's top 8 (<= 151).
   Logs: `~/Library/Caches/ski-work/round7d/perf/`.
 - **Tests**: `node scripts/ski/r7d-test.mjs` (Node: 400 random tag crowds never overlap / nearest 3 full / every tag counted; sign slots;
   every resort's busiest sign radius fits the atlas; free-ride plan / host handover / side offsets; the wire's lift state; packed lines
