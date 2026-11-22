@@ -286,7 +286,10 @@ export function createEnv({ scene, noise, detail = null, params = {} }) {
     u.uCloud.value = cur.cloud; u.uSnowfall.value = cur.snow; u.uGlow.value = T.glow * (1 - cur.grey); u.uOvercast.value = cur.grey; u.uMilk.value = cur.milk;
     state.snowfall = cur.snow;
     u.uShadowOn.value = lerp(u.uShadowOn.value, shadowTarget, snap ? 1 : Math.min(1, dt * 2));
-    hemi.color.setRGB(u.uAmbSky.value.x * 0.85, u.uAmbSky.value.y * 0.85, u.uAmbSky.value.z * 0.85);
+    // R8d (QA: station decks / shaded lift parts dark navy in the morning and evening): the Lambert objects (stations, lifts, skier) get
+    // the sky light half desaturated and a little brighter: grey stays grey in the shade, the snow shader keeps its own blue-grey
+    const ambL = u.uAmbSky.value.x * 0.3 + u.uAmbSky.value.y * 0.59 + u.uAmbSky.value.z * 0.11;
+    hemi.color.setRGB((u.uAmbSky.value.x + ambL) * 0.47, (u.uAmbSky.value.y + ambL) * 0.47, (u.uAmbSky.value.z + ambL) * 0.47);
     hemi.groundColor.setRGB(u.uAmbGround.value.x * 0.9, u.uAmbGround.value.y * 0.9, u.uAmbGround.value.z * 0.9);     // snow throws a lot of light back up
     sun.color.setRGB(u.uSunColor.value.x, u.uSunColor.value.y, u.uSunColor.value.z);
     hemi.intensity = Math.PI;                       // three r160 lights are physically based: x PI gives colour * cos as authored
