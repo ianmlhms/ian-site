@@ -1213,3 +1213,29 @@ load; Arlberg Mattunbahn footrest; Kronplatz Alpen Connecting framing; Glacier R
   streets). Find it (wrap THREE.BufferGeometry to count by caller, teleport 10 x). The village meshes hold 107 MB of vertex arrays.
 - Test tooling: every browser check is one resort / one flow per fresh browser (`r8d-flows.sh`, run_all `=name` exact match,
   `r8d-sweeps.sh` starts a driver per level x resort and writes mem-<level>-<rid>.json).
+**Round 8d, part 3: checks on the final branch (after the 09:38 reboot; machine rules: one browser job, a tree > 2.5 GB is killed)**
+- Node, all green on the merged head (R8d + R8c + R8e): round7b-test 5682, round7-test 30, round6-test 2192 (after the funitel 150 m
+  limit), look7d-check 68, r7d-test 1424, r8c-check 36302, round7c-check 120 (no rides) and --rides 130/130 (every course of all 1324
+  pistes finished, barriers 140/140 arlberg), harness 25/25/25/21/21, floors-check 1324 + 5 parks == ski-v1.sql (1329 rows),
+  security-test all, mp-race-test all.
+- Village sweep, Niddreg (max of every village centre x 4 headings): killy 349k / 126 calls, 3V 413k (Courchevel) / 135, zermatt 384k /
+  129, arlberg 367k / 131, kronplatz 333k / 125 -> all <= 450k / 160. Mëttel: killy 425k / 156, 3V 583k / 164 (Courchevel), zermatt 493k
+  / 154, arlberg 517k / 158 (St. Anton), kronplatz 525k / 165 -> all <= 600k. (The earlier Mëttel numbers in part 1, 377-472k, were taken
+  while the 3 x 3 PCF shader did not compile: ignore them.) JSON + mem readouts: ~/Library/Caches/ski-work/round8d/final/village/.
+- calls-sweep7d (Niddreg, every piste start / lift top, one resort per browser): worst killy 142 (Rogoney, 389k), 3V 141 (Rhodos, 382k),
+  zermatt 132, arlberg 137, kronplatz <= 139; p95 126-129.
+- ground-check, one resort per browser: Chromium 4/5 (3V: 3 coplanar plinth caps of two overlapping huts -> fixed 1b9d09d0, WebKit 3V then
+  green), WebKit 5/5; spawn on the ground, rays 6 mm, decks 0 cm, skis >= -4 mm, 0 terrain cracks.
+- pose-check: Chromium 5/5, WebKit 5/5 (incl. R8e's hockey end pose + plough).
+- Flows (one flow per browser, `scripts/ski/r8d-flows.sh <out> "flows-chromium flows-webkit sheets sonnenkopf"`, FLOWS="..." to pick):
+  Chromium so far: home-page, ski, ski-ipad-start PASS; ski-resorts and ski-mp KILLED by the 2.5 GB rule (ski-resorts at the 4th resort
+  of one page that reloads per resort; ski-mp = 3 game pages) -> these two need less memory per page (see below) or a per-flow
+  exception. Earlier full Chromium run on the pre-R8e head (before the memory rule): PASS home-page, ski-ipad-start, ski-resorts,
+  ski-challenges, ski-park, ski-freeride, ski-lift, ski-skis, ski-teleport, ski-spawn, ski-firstperson; FAIL ski (the "Face (Rout)" name:
+  flow fixed, now PASS), ski-mp (relay pairing under load 140+), ski-lifts-all (Zermatt Leisee-Shuttle, a 60 m funicular kept by R8c:
+  one of carrier / onCarrier / held false right after boarding: look at the flow's `on` values), ski-webkit (arlberg look yaw 0.18 after
+  release, load), ski-look7d (gate pick: fixed, markers.order), ski-mp-freeride (host ahead on the line, timing), ski-avalanche (scripted
+  trigger timed out 60 s at load ~140). NOT yet run on the final head: the rest of the Chromium flows, every WebKit flow, the sheets.
+- MEMORY per page is the open blocker for the long flows: JS heap at load 340-640 MB (killy..zermatt), 960-1050 MB after a 15-18 village
+  tour (arlberg / kronplatz), village vertex arrays ~107 MB (kept in JS after upload), +10 three geometries / +25 MB heap per teleport
+  (may be first uploads of new village / terrain cells = bounded; check by teleporting back and forth between two spots 10 x).
