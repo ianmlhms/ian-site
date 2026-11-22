@@ -40,9 +40,10 @@ for (const rid of resorts) {
     let gap = Infinity;
     for (const q of ptsOf(c)) for (const m of mainPts) { const d = Math.hypot(q[0] - m[0], q[1] - m[1]); if (d < gap) gap = d; }
     c.gap = gap;
+    if (gap <= 1000) bad--;                            // within NET_KEEP of the main network: kept on purpose (bake.py tidy_network)
     console.log(`  outside (${Math.round(gap)} m from the main network): ${c.lifts.length} lifts [${c.lifts.map((l) => l.name).slice(0, 6).join(', ')}] ${c.runs.length} pistes [${c.runs.map((u) => u.name).slice(0, 4).join(', ')}] at ${at.map(Math.round).join(',')}`);
   }
-  for (const l of lifts) if (l.kind === 'train' || l.kind === 'funicular') console.log(`  train: ${l.name || '(no name)'} ${Math.round(l.len)} m${l.len < SHORT_TRAIN ? '  <- short' : ''}`);
+  for (const l of lifts) if (l.kind === 'train' || l.kind === 'funicular') { const short = l.len < SHORT_TRAIN && !/leisee/i.test(l.name || ''); if (short || /tremplin/i.test(l.name || '')) bad++; console.log(`  train: ${l.name || '(no name)'} ${Math.round(l.len)} m${short ? '  <- short, not a ski lift' : ''}`); }
   const byName = new Map();
   for (const u of runs) { const k = u.name.toLowerCase().replace(/ \((variante|\d+)[^)]*\)$/, ''); if (!byName.has(k)) byName.set(k, []); byName.get(k).push(u); }
   const same = [...byName].filter(([, v]) => v.length > 1);

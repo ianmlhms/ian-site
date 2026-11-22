@@ -1723,12 +1723,13 @@ def main():
         network.append({"d": DIFF_LETTER[a["diff"]], "a": 1, "p": flat(dp_simplify(a["poly"], 1.5))})
     pistes = []
     colours_of = {}
+    base_name = lambda n: re.sub(r" \((\d+|Variante)\)$", "", n).lower()
     for r in runs:
-        colours_of.setdefault(r["name"].lower(), set()).add(r["diff"])
+        colours_of.setdefault(base_name(r["name"]), set()).add(r["diff"])
     for r in runs:
         q = resample(r["p"], 10.0)
         shown = display_name(r["name"], r["ref"], r["diff"])
-        if len(colours_of.get(r["name"].lower(), ())) > 1 and shown == r["name"]:
+        if len(colours_of.get(base_name(r["name"]), ())) > 1 and shown == r["name"]:
             shown = with_colour(shown, r["diff"])            # R8c: "Bouc Blanc" red and black -> "Bouc Blanc (Rout)", "... (Schwaarz)"
         pistes.append({"id": r["id"], "name": shown, "ref": r["ref"], "diff": r["diff"], "len": round(r["len"]), "drop": round(r["drop"]),
                        "top": round(float(r["h"][0])), "bottom": round(float(r["h"][-1])), "hw": round(r["hw"], 1),

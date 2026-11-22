@@ -18,8 +18,8 @@ const KEEP_FOREST = 0.85, KEEP_SCRUB = 0.3;
 /* ring per quality level: inner = a little inside the 3D trees' radius, outer = where the cards stop, thin = from here the cards thin out
  * (and grow, so the forest keeps its tone) */
 export const FAR_FOREST = Object.freeze({
-  low: { outer: 1700, thin: 900, keep: 0.55 },
-  medium: { outer: 2800, thin: 1500, keep: 0.8 },
+  low: { outer: 1600, thin: 850, keep: 0.45 },          // R8c: triangle budget (Niddreg / Mëttel <= 450k in every village)
+  medium: { outer: 2500, thin: 1350, keep: 0.66 },
   high: { outer: 4200, thin: 2200, keep: 1 },
 });
 

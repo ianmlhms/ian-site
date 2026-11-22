@@ -32,7 +32,7 @@ const WALL = 0, SNOW = 1, WOOD = 2, RAIL = 3, STONE = 4, TERRACE = 5;
 /* styles (aInfo.x) */
 const CHALET = 0, PLASTER = 1, SAVOY = 2, CONCRETE = 3, CHAPEL = 4, HUT = 5, MODERN = 6, TOWER = 7, HOTEL = 8;
 /** R8c: the detail layer's radius (m from the camera to the detail cell) per quality level */
-export const DETAIL_RADIUS = Object.freeze({ low: 220, medium: 420, high: 800 });
+export const DETAIL_RADIUS = Object.freeze({ low: 150, medium: 380, high: 800 });
 const DCELL = 320;                   // m: the detail layer's merge cell
 /** R8c: resorts whose villages are Alpine (no 1960s-70s purpose-built blocks like Tignes / Val Claret / Les Menuires / Val Thorens) */
 export const ALPINE_RESORTS = Object.freeze(new Set(['zermatt', 'arlberg', 'kronplatz']));
