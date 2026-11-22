@@ -128,12 +128,13 @@ export function createSnowSpray({ scene, env, level = 'medium', height }) {
           fresh > 0.5 ? 0.18 + 0.24 * Math.random() : 0.1 + 0.16 * Math.random(), 0, 1.4 + Math.random() * 0.4);
       }
       // powder: a cloud round the boots off the piste
-      puffCarry += grounded && fresh > 0.4 && speed > 1.5 ? fresh * (0.25 + 0.75 * smoothstep(2, 16, speed)) * dt * 34 : 0;
+      // R7-C2: a slow turn in deep snow still kicks up a visible cloud (it was ~8 puffs / s at walking speed, none showed)
+      puffCarry += grounded && fresh > 0.4 && speed > 0.8 ? fresh * (0.7 + 0.5 * smoothstep(2, 16, speed)) * dt * 40 : 0;
       while (puffCarry > 1) {
         puffCarry -= 1;
         const a = Math.random() * Math.PI * 2, r = Math.random() * 0.6;
         emit(s.x + Math.cos(a) * r - fx * 0.4, s.y + 0.2 + Math.random() * 0.4, s.z + Math.sin(a) * r - fz * 0.4,
-          s.vx * 0.25 + Math.cos(a) * 0.8, 0.6 + Math.random() * 1.4, s.vz * 0.25 + Math.sin(a) * 0.8, 0.5 + Math.random() * 0.9, 1, 0.55 + Math.random() * 0.25);
+          s.vx * 0.25 + Math.cos(a) * 0.8, 0.6 + Math.random() * 1.4, s.vz * 0.25 + Math.sin(a) * 0.8, 0.7 + Math.random() * 1.0, 1, 0.5 + Math.random() * 0.2);
         stats.powder++;
       }
       // tracks in fresh snow (two lines, one per ski)

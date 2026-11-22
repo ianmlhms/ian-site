@@ -33,7 +33,7 @@ const { createLiftNet } = await imp('modes/freeride.js');
 const { createParkLayout } = await imp('modes/park.js');
 const { createObstacles, firstLift, liftSpot, safeSpot, courseGate } = await imp('modes/clear.js');
 const { createDiscovery, mergeRle, rleIntervals } = await imp('modes/discovery.js');
-const { findFaces, releasable, createSlab, stepSlab, cellId, slopeDeg } = await imp('avalanche.js');
+const { findFaces, releasable, createSlab, stepSlab, cellId, slopeDeg, lowestPiste, faceView } = await imp('avalanche.js');
 const { createCourse, courseLayout, courseSeats, distanceText } = await imp('modes/course.js');
 const { createRun } = await imp('game.js');
 const { createSkierState, stepSkier } = await imp('skier.js');
@@ -100,9 +100,10 @@ for (const rid of rids.length ? rids : ALL) {
 
   // ---- avalanche ----
   const tF = Date.now();
-  const faces = findFaces(field, resort);
+  const faces = findFaces(field, resort, AVALANCHE.faces, { minY: lowestPiste(pistes, (x, z) => field.farHeight(x, z)) });
   row.faces = faces.map((f) => `${Math.round(f.slope)}°/${Math.round(f.len)}m`).join(' ');
   check(faces.length === AVALANCHE.faces, `avalanche: ${faces.length} Lawin faces (${row.faces}) in ${Date.now() - tF} ms`);
+  check(faces.every((f) => f.slope >= AVALANCHE.slope && !f.gentle), `avalanche: every Lawin face starts >= ${AVALANCHE.slope}° steep (${faces.map((f) => Math.round(f.slope)).join(', ')}°)`);
   for (const f of faces) {
     const id = cellId(f.top.x, f.top.z);
     const run = (seed) => { const sl = createSlab(id, seed, (x, z) => field.farHeight(x, z)); let t = 0, moving = 1; while (moving && t < AVALANCHE.maxTime) { moving = stepSlab(sl, t, (x, z) => field.farHeight(x, z)); t += AVALANCHE.step; } return { sl, t }; };
@@ -112,6 +113,9 @@ for (const rid of rids.length ? rids : ALL) {
     const same = a.sl.blocks.every((q, i) => q.x === b.sl.blocks[i].x && q.z === b.sl.blocks[i].z);
     check(drop > 60 && a.t < AVALANCHE.maxTime && same, `avalanche ${f.id}: the slab flows ${drop.toFixed(0)} m down, stops after ${a.t.toFixed(1)} s, deterministic ${same}`);
   }
+  // R7-C2: the avalanche camera: a clear view of every face's flow, >= 0.6 m above the snow, nothing of the mountain in between
+  const views = faces.map((f) => faceView(f, height));
+  check(views.every((v) => v && v.clear && v.above >= 0.6), `avalanche camera: ${views.filter((v) => v && v.clear).length}/${faces.length} faces watched from a clear spot (${views.map((v) => `${Math.round(v.above)} m up`).join(', ')}), never in the rock`);
   let onPiste = 0;
   for (const p of pistes.list.slice(0, 200)) { const a = p.at(p.length / 2, {}); if (releasable(field, a.x, a.z, height)) onPiste++; }
   check(onPiste === 0, `avalanche: never releasable on a piste (${onPiste} of 200 piste middles)`);
@@ -203,7 +207,7 @@ for (const rid of rids.length ? rids : ALL) {
         const prev = s;
         s = stepSkier(s, bot(s), world);
         s = course.collide(prev, s);
-        if (was && s.crash === 0) { const r = run.respawnPoint(); s = createSkierState(r.x, r.z, r.heading, height(r.x, r.z)); fresh = true; }
+        if (was && s.crash === 0) { const r = run.respawnPoint(); s = createSkierState(r.x, r.z, r.heading, height(r.x, r.z)); fresh = true; course.rebase(); }
         const c = course.update(s, SKI.dt);
         if (c.warn) warned++;
         // the HUD distance: falls along the ride (a crash puts him back up to 10 m: a new reference)

@@ -90,14 +90,31 @@ export function stepSlab(slab, t, far) {
   return moving;
 }
 
+/** How far (m, mean height drop of its blocks) the slab of (id, seed) runs down before it stops (0 if it never stops). */
+export function slabDrop(id, seed, far) {
+  const sl = createSlab(id, seed, far);
+  if (!sl) return 0;
+  let t = 0, moving = 1;
+  while (moving && t < AV.maxTime) { moving = stepSlab(sl, t, far); t += AV.step; }
+  if (moving) return 0;                                              // still sliding at the end: no clean runout, not a challenge face
+  const y0 = far(sl.crown.x, sl.crown.z);
+  return sl.blocks.reduce((m, q) => m + (y0 - far(q.x, q.z)), 0) / sl.blocks.length;
+}
+
 /** The "Lawin" challenge faces of a resort: the steepest long open off-piste faces inside the shipped tiles, at least 1.2 km apart.
- *  Each { id, index, top: {x, z}, path: [x, z, ...] down the fall line, len, slope }. Deterministic (far grid + classes). A wooded
- *  resort (Kronplatz) gets a second, gentler pass so it still has its faces. */
-export function findFaces(field, resort, count = AV.faces) {
+ *  Each { id, index, top: {x, z}, path: [x, z, ...] down the fall line, len, slope }. Deterministic (far grid + classes).
+ *  R7-C2: every face starts at least AV.slope (35°) steep: first long open faces, then (wooded Kronplatz) shorter open faces between the
+ *  trees, only then a gentler fallback (`gentle: true`, none of the five resorts needs it now). minY: no face below the lowest piste
+ *  end (a valley gorge is no avalanche slope). */
+export function findFaces(field, resort, count = AV.faces, { minY = -Infinity } = {}) {
   const far = (x, z) => field.farHeight(x, z);
   const attrs = {};
   const faces = [];
-  const passes = [{ slope: AV.slope - 5, forest: 0.15, steepDeg: 30, steep: 180, gap: 90 }, { slope: AV.slope - 8, forest: 0.3, steepDeg: 27, steep: 120, gap: 60 }];
+  const passes = [
+    { slope: AV.slope, forest: 0.15, steepDeg: 30, steep: 180, gap: 90, len: 200, pathForest: 0.5 },
+    { slope: AV.slope, forest: 0.3, steepDeg: 30, steep: 100, gap: 60, len: 150, pathForest: 0.65 },
+    { slope: AV.slope - 8, forest: 0.3, steepDeg: 27, steep: 120, gap: 60, len: 200, pathForest: 0.5, gentle: true },
+  ];
   for (const P of passes) {
     if (faces.length >= count) break;
     const cand = [];
@@ -105,7 +122,7 @@ export function findFaces(field, resort, count = AV.faces) {
     for (let z = edge; z < resort.depth - edge; z += step) {
       for (let x = edge; x < resort.width - edge; x += step) {
         if (field.isShipped && !field.isShipped(Math.floor(x / 1280), Math.floor(z / 1280))) continue;
-        if (slopeDeg(far, x, z, 40) < P.slope) continue;
+        if (slopeDeg(far, x, z, 40) < P.slope || far(x, z) < minY) continue;
         field.attrs(x, z, attrs);
         if (attrs.piste > 0.02 || attrs.dist < P.gap || attrs.forest > P.forest || attrs.rock > 0.25 || attrs.built > 0 || attrs.glacier > 0.5) continue;      // open snow, no rock / scree
         // follow the fall line down: the face length while it stays steep and open
@@ -119,20 +136,65 @@ export function findFaces(field, resort, count = AV.faces) {
           path.push(px, pz);
           if (Math.atan(gl) * 180 / Math.PI > P.steepDeg) steep += 15;
           field.attrs(px, pz, attrs);
-          if (attrs.forest > 0.5 || attrs.built > 0.1 || attrs.water > 0.2 || (len < 200 && attrs.rock > 0.3)) { ok = false; break; }
+          if (attrs.forest > P.pathForest || attrs.built > 0.1 || attrs.water > 0.2 || (len < 200 && attrs.rock > 0.3)) { ok = false; break; }
         }
-        if (!ok || steep < P.steep || len < 200) continue;
-        cand.push({ x, z, path, len, steep, slope: slopeDeg(far, x, z, 40) });
+        if (!ok || steep < P.steep || len < P.len) continue;
+        cand.push({ x, z, path, len, steep, slope: slopeDeg(far, x, z, 40), gentle: !!P.gentle });
       }
     }
     cand.sort((a, b) => b.steep * b.slope - a.steep * a.slope);
     for (const c of cand) {
       if (faces.length >= count) break;
       if (faces.some((f) => Math.hypot(f.top.x - c.x, f.top.z - c.z) < 1200)) continue;
-      faces.push({ id: `lawin${faces.length}`, index: faces.length, top: { x: c.x, z: c.z }, path: c.path, len: c.len, slope: c.slope });
+      if (slabDrop(cellId(c.x, c.z), 7001 + faces.length, far) < 80) continue;      // R7-C2: the challenge's own slab must really run
+      faces.push({ id: `lawin${faces.length}`, index: faces.length, top: { x: c.x, z: c.z }, path: c.path, len: c.len, slope: c.slope, gentle: c.gentle });
     }
   }
   return faces;
+}
+
+/** Is the straight line from a to b clear of the terrain (margin m below the ray, the last `skip` share near b not tested)? */
+export function lineClear(height, ax, ay, az, bx, by, bz, margin = 1.5, skip = 0.08, n = 48) {
+  for (let i = 1; i < n; i++) {
+    const t = i / n;
+    if (t > 1 - skip) break;
+    const x = ax + (bx - ax) * t, z = az + (bz - az) * t, y = ay + (by - ay) * t;
+    if (height(x, z) > y - margin) return false;
+  }
+  return true;
+}
+
+/** R7-C2: a camera spot that watches a Lawin face's flow from the side: >= 0.6 m above the snow (in practice 25-70 m), nothing of
+ *  the terrain between it and the flow (no camera against / inside a rock face), the snow round it lower than the lens. Pure.
+ *  Returns { x, y, z, tx, ty, tz, clear } (clear false = the least bad spot). */
+export function faceView(face, height, { dists = [150, 200, 260, 330], ups = [25, 40, 60, 85] } = {}) {
+  const p = face.path, k = Math.min(p.length / 2 - 1, Math.max(1, Math.round(p.length / 2 * 0.35)));
+  const tx = p[2 * k], tz = p[2 * k + 1], ty = height(tx, tz) + 6;
+  const fx = p[p.length - 2] - p[0], fz = p[p.length - 1] - p[1], fl = Math.hypot(fx, fz) || 1;
+  const ux = fx / fl, uz = fz / fl;                                    // the flow direction (down the face)
+  let best = null;
+  for (let a = 0; a < 24; a++) {
+    const ang = a / 24 * Math.PI * 2, cx = Math.cos(ang), cz = Math.sin(ang);
+    const along = cx * ux + cz * uz;                                    // 0 = from the side, -1 = from above the release
+    for (const d of dists) {
+      for (const up of ups) {
+        const x = tx + cx * d, z = tz + cz * d, g = height(x, z), y = g + up;
+        let ring = true;
+        for (let r = 0; r < 8 && ring; r++) { const q = r / 8 * Math.PI * 2; if (height(x + Math.cos(q) * 10, z + Math.sin(q) * 10) > y - 0.6) ring = false; }
+        const clear = ring && lineClear(height, x, y, z, tx, ty, tz);
+        const score = (clear ? 0 : 1000) + Math.abs(along) * 60 + (along > 0.5 ? 40 : 0) + up * 0.5 + d * 0.08;
+        if (!best || score < best.score) best = { x, y, z, tx, ty, tz, clear, score, above: y - g };
+      }
+    }
+  }
+  return best;
+}
+
+/** The lowest piste end (far grid): Lawin faces stay above it. */
+export function lowestPiste(pistes, far) {
+  let y = Infinity;
+  for (const p of pistes.list) y = Math.min(y, far(p.bottom.x, p.bottom.z));
+  return Number.isFinite(y) ? y : -Infinity;
 }
 
 /** Warning flag spots: piste edges where the terrain just beside the piste is a steep open face (cap per resort). */
@@ -167,11 +229,11 @@ function flagTexture() {
   const t = new THREE.CanvasTexture(c); t.magFilter = THREE.NearestFilter; return t;
 }
 
-export function createAvalanches({ scene, field, surface, pistes, hud, uiRoot, level = "medium", onCaught, onLawinStart = null, onLawinWon = null, lawinMask = () => 0 }) {
+export function createAvalanches({ scene, field, surface, pistes, hud, uiRoot, level = "medium", onCaught, onLawinStart = null, onLawinWon = null, lawinMask = () => 0, sound = null }) {
   const far = (x, z) => field.farHeight(x, z);
   const height = (x, z) => surface.height(x, z);
   const quality = level === 'low' ? 0.6 : 1;
-  const faces = findFaces(field, { width: field.width, depth: field.depth });
+  const faces = findFaces(field, { width: field.width, depth: field.depth }, AV.faces, { minY: lowestPiste(pistes, far) });
   const flags = warningSpots(field, pistes, faces);
   // warning flags: one instanced mesh (post + checkered flag)
   const flagGeo = new THREE.PlaneGeometry(0.9, 0.9); flagGeo.translate(0.45, 2.2, 0);
@@ -237,6 +299,7 @@ export function createAvalanches({ scene, field, surface, pistes, hud, uiRoot, l
     caughtNow = false;
     stats.triggered++;
     document.documentElement.dataset.skiAvalanche = 'flowing';
+    if (sound) { const st = lastState; const d = st ? Math.hypot(slab.crown.x - st.x, slab.crown.z - st.z) : 300; sound('avalanche', { near: clamp(1 - d / 700, 0.25, 1) }); }
     hud.toast('Lawin! Fuer ewech!', 2200);
     return slab;
   }
@@ -246,9 +309,10 @@ export function createAvalanches({ scene, field, surface, pistes, hud, uiRoot, l
     for (const cb of listeners) { try { cb({ id, seed, t }); } catch (error) { console.warn('[ski] avalanche listener failed', error); } }
   }
   /** Each frame: release check (free ride, grounded skier), the flow (fixed steps up to now), caught / escaped, the view. */
-  let flagT = 0;
+  let flagT = 0, lastState = null;
   function update(st, dt, { freeride = false, running = false } = {}) {
     flagT += dt;
+    lastState = st;
     if (st && flagT > 1) {                       // the warning flags only cost draw calls where one is within 1.5 km
       flagT = 0;
       let near = false;
@@ -320,7 +384,7 @@ export function createAvalanches({ scene, field, surface, pistes, hud, uiRoot, l
         blockMesh.setMatrixAt(k++, m4);
       }
       if (started && c < cloudN) {
-        const cloud = clamp(v / 14, 0, 1) * fade;
+        const cloud = (bl.moving ? clamp(0.35 + v / 12, 0, 1) : clamp(v / 14, 0, 1)) * fade;      // R7-C2: a slow slab still smokes
         for (let j = 0; j < 3 && c < cloudN; j++) {
           const back = j * 5 + 2;
           const size = (4 + v * 0.55 + j * 3) * (0.8 + 0.3 * Math.sin(bl.spin + j));
@@ -375,10 +439,19 @@ export function createAvalanches({ scene, field, surface, pistes, hud, uiRoot, l
     if (onLawinWon) onLawinWon(face);
   }
   return {
-    faces, flags, stats, triggerAvalanche, update, hudTick, startLawin, reseat: seatFlags,
+    faces, flags, stats, triggerAvalanche, view: (i) => (faces[i] ? faceView(faces[i], height) : null), update, hudTick, startLawin, reseat: seatFlags,
     get active() { return active; }, get nearest() { return nearest; },
     onTrigger(cb) { listeners.push(cb); return () => { listeners = listeners.filter((x) => x !== cb); }; },
     setClock(fn) { clock = fn; },
+    /** R7-C2: how loud the rumble is (0..1): the share of the slab still moving, by the distance to the skier (or the camera). */
+    loudness(x, z) {
+      if (!active) return 0;
+      const bl = active.slab.blocks, t = active.steps * AV.step;
+      let moving = 0, d = Infinity;
+      for (const b of bl) { if (!b.moving || t < b.delay) continue; moving++; const q = Math.hypot(b.x - x, b.z - z); if (q < d) d = q; }
+      const fade = active.done ? clamp(1 - (clock() - active.doneAt) / 4, 0, 1) : 1;
+      return clamp(moving / bl.length * 1.6, 0, 1) * clamp(1.15 - d / 900, 0.12, 1) * fade;
+    },
     clock: () => clock(),
     /** Tests: a fixed session seed (the release rolls), clear the current one. */
     setSessionSeed(s) { sessionSeed = s >>> 0; lastCell = ''; },

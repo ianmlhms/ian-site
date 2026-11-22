@@ -100,7 +100,7 @@ export function courseLayout(piste, startS = 2, pistes = null) {
 export function createCourse({ piste, startS = 2 }) {
   const finishS = Math.max(startS + 30, piste.length - COURSE.finishBack);
   const proj = {}, nxt = {}, back = {}, full = {}, cp = {}, ca = {};
-  let hint = startS, offFor = 0, aborted = false, cHint = startS, lastOff = 0, hits = 0;
+  let hint = startS, offFor = 0, aborted = false, cHint = startS, lastOff = 0, hits = 0, low = Infinity;
   const out = { s: startS, remaining: finishS - startS, share: 0, dist: 0, warn: false, abort: false, back: { x: 0, z: 0 }, next: { x: 0, z: 0 }, offFor: 0 };
   /** The projection that follows the skier: near the last spot, the whole line when he is far from it (a teleport, a respawn). */
   function follow(x, z, h, o) {
@@ -115,7 +115,9 @@ export function createCourse({ piste, startS = 2 }) {
     follow(st.x, st.z, hint, proj);
     hint = proj.s;
     out.s = proj.s; out.dist = proj.dist;
-    out.remaining = Math.max(0, finishS - proj.s);
+    // the HUD distance only falls (a hairpin or a line crossing itself must not make it jump back up); rebase() after a respawn
+    low = Math.min(low, Math.max(0, finishS - proj.s));
+    out.remaining = low;
     out.share = Math.min(1, Math.max(0, (proj.s - startS) / (finishS - startS)));
     piste.at(Math.min(finishS, proj.s + 45), nxt); out.next.x = nxt.x; out.next.z = nxt.z;
     piste.at(proj.s, back); out.back.x = back.x; out.back.z = back.z;
@@ -157,7 +159,9 @@ export function createCourse({ piste, startS = 2 }) {
     lastOff = side * (wall - 0.05);
     return { ...st, x, z, vx, vz, speed: Math.hypot(vx, vz), heading };
   }
-  return { update, collide, finishS, startS, get hits() { return hits; }, get aborted() { return aborted; }, reset() { aborted = false; offFor = 0; } };
+  /** A respawn put him back a few metres: the distance may rise once to where he stands now. */
+  function rebase() { low = Infinity; }
+  return { update, collide, rebase, finishS, startS, get hits() { return hits; }, get aborted() { return aborted; }, reset() { aborted = false; offFor = 0; } };
 }
 
 /** Where every course object stands (pure: the view and the Node check share it): barrier panels following the slope, arrow boards

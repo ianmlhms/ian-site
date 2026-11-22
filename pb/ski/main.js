@@ -589,6 +589,7 @@ async function boot() {
     if (!game.run) return;
     const r = game.run.respawnPoint();
     placeAt(r.x, r.z, r.heading);
+    if (course) course.rebase();                                             // R7-C2: the HUD distance from where he stands again
     if (text) hud.toast(text);
   }
 
@@ -876,6 +877,7 @@ async function boot() {
   avalanches = createAvalanches({
     scene, field, surface, pistes, hud, uiRoot: document.getElementById('ui'), level,
     onCaught: (st) => avalancheCaught(st),
+    sound: (name, opts) => audio.event(name, opts),                          // R7-C2: the release crack
     onLawinStart: (face) => startLawin(face),
     onLawinWon: (face) => { const p = store.get(); const lw = { ...(p.lawin || {}) }; lw[rid] = (lw[rid] || 0) | (1 << face.index); store.set({ ...p, lawin: lw }); modes.cloud.push(store.get()); },
     lawinMask: () => (store.get().lawin || {})[rid] || 0,
@@ -1011,6 +1013,7 @@ async function boot() {
         riding, paused: game.paused, speed: st.speed, edge: st.edge, slip: st.slip, brake: st.brake, grounded: st.grounded,
         piste: surface.info(st.x, st.z, 0), forest: surface.info(st.x, st.z, 1), village: Math.max(0, -info3) > 0.05 ? 1 : nearVillage,
         lift: lifts ? liftDist : Infinity, altitude: st.y, weather: env.state.weatherId,
+        avalanche: avalanches ? avalanches.loudness(camera.position.x, camera.position.z) : 0,          // R7-C2: the rumble
       });
     }
     audioT += dt;
@@ -1088,7 +1091,10 @@ async function boot() {
     /** Debug camera circling the skier: angle (deg from the skier's heading), distance, height; null = off. */
     orbit(angle, dist = 4, h = 1.2, fov = 40) { if (angle === null) { game.orbit = null; game.camPose = null; return; } game.orbit = { angle, dist, h, fov }; },
     /** Fixed camera at (x, z) heightAbove m over the ground looking at (tx, tz) heightAbove2 m over its ground; null = chase camera again. */
-    setCamera(x, z, above, tx, tz, above2 = 0, fov = 55) { if (x === null) { game.camPose = null; return; } game.camPose = { x, z, y: field.height(x, z) + above, tx, tz, ty: field.height(tx, tz) + above2, fov }; streamer.focus(x, z); }, start(id) { startRun(pistes.byId.get(id) || game.piste, MODES.run); }, select(id) { selectPiste(pistes.byId.get(id), true); },
+    // R7-C2: the drawn snow (surface), never closer than 0.6 m to it
+    setCamera(x, z, above, tx, tz, above2 = 0, fov = 55) { if (x === null) { game.camPose = null; return; } game.camPose = { x, z, y: surface.height(x, z) + Math.max(0.6, above), tx, tz, ty: surface.height(tx, tz) + above2, fov }; streamer.focus(x, z); },
+    /** R7-C2: watch Lawin face i from a clear spot (avalanche.js faceView); returns the spot. */
+    avalancheView(i = 0, fov = 50) { const v = avalanches && avalanches.view(i); if (v) { game.camPose = { x: v.x, y: v.y, z: v.z, tx: v.tx, ty: v.ty, tz: v.tz, fov }; streamer.focus(v.x, v.z); } return v; }, start(id) { startRun(pistes.byId.get(id) || game.piste, MODES.run); }, select(id) { selectPiste(pistes.byId.get(id), true); },
     frames: () => { const f = [...frameTimes].sort((a, b) => a - b); return { n: f.length, p50: f[Math.floor(f.length * 0.5)], p95: f[Math.floor(f.length * 0.95)], max: f[f.length - 1] }; },
     resolution: () => post.stats(), post,
     info: () => ({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, tiles: terrain.stats.leaves, trees: scatterView.stats.trees, cards: farForest.stats.cards, tilesLoaded: streamer.stats.loaded, tilesTotal: streamer.stats.total, level }),
