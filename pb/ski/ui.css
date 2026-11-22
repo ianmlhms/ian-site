@@ -105,7 +105,7 @@ button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
 .hud .gates{font-family:var(--mono);font-size:13px}
 /* R8c (QA: white HUD text unreadable in fog / on bright snow): a soft dark backdrop behind the text blocks (no hard edge), plus the
    stronger halo above */
-.hud .tl::before,.hud .tr .speed::before{content:"";position:absolute;z-index:-1;inset:-10px -26px -12px -14px;background:radial-gradient(closest-side,rgba(14,16,20,.34),rgba(14,16,20,.2) 62%,rgba(14,16,20,0));pointer-events:none}
+.hud .tl::before,.hud .tr .speed::before{content:"";position:absolute;z-index:-1;inset:-2px -6px -4px -6px;background:rgba(16,18,22,.34);box-shadow:0 0 14px 9px rgba(16,18,22,.34);pointer-events:none}
 .hud .tl,.hud .tr .speed{isolation:isolate}
 .hud .tr .speed{position:relative}
 .hud .toast,.hud .hint{background:radial-gradient(closest-side,rgba(14,16,20,.3),rgba(14,16,20,0));padding:4px 18px}

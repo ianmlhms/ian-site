@@ -470,6 +470,9 @@ function material(env, cheap) {
         float lit = smoothstep(-0.1, 0.6, dot(N, uSunDir)) * vis;
         lit = mix(lit, floor(lit * 3.0 + 0.5) / 3.0, 0.3);
         vec3 amb = mix(uAmbGround, uAmbSky, 0.5 + 0.5 * N.y) * (snowy > 0.5 ? 1.08 : 1.0);
+        // R8c: snow on a roof in the shade is the same soft light blue-grey as the snow on the ground (R8 snow-shader shadeL2), not the
+        //      saturated sky blue (the shaded roof sides read as blue tin roofs from above)
+        amb = mix(amb, vec3(dot(amb, vec3(0.3, 0.59, 0.11))) * vec3(0.93, 0.98, 1.08) * 1.06, snowy * 0.62);
         vec3 c = col * (amb * 0.62 + uSunColor * lit * 0.82) + glow * vec3(1.0, 0.72, 0.36) * 0.9;
         gl_FragColor = vec4(applyFog(c, vDist, uFogColor, uFogDensity), 1.0);
       }`,

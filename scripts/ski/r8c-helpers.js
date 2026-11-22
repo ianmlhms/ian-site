@@ -77,6 +77,30 @@ window.__r8 = {
     }
     return out;
   },
+  /** the HUD text boxes (CSS px) for scripts/ski/r8c-hud.py */
+  hudRects() {
+    const out = {};
+    for (const [k, sel] of [['name', '#hName'], ['clock', '.hud .freehud .day'], ['stats', '.hud .freehud .fstats'], ['speed', '#hSpeed']]) {
+      const e = document.querySelector(sel);
+      if (!e) continue;
+      const rg = document.createRange(); rg.selectNodeContents(e);          // the glyphs' own box, not the block's width
+      const r = rg.getBoundingClientRect();
+      if (r.width > 2) out[k] = [r.left, r.top, r.right, r.bottom].map(Math.round);
+    }
+    return out;
+  },
+  /** the floating labels on screen: boxes, overlaps, outside the viewport margin */
+  labelBoxes() {
+    const host = document.querySelector('.ch-tags'), hr = host.getBoundingClientRect();
+    const boxes = [...document.querySelectorAll('.ch-tags .ch-tag')].filter((e) => !e.hidden && e.getBoundingClientRect().left > -1000).map((e) => { const r = e.getBoundingClientRect(); return [r.left - hr.left, r.top - hr.top, r.right - hr.left, r.bottom - hr.top]; });
+    let overlaps = 0, outside = 0;
+    for (let i = 0; i < boxes.length; i++) {
+      const a = boxes[i];
+      if (a[0] < 8 || a[1] < 8 || a[2] > hr.width - 8 || a[3] > hr.height - 8) outside++;
+      for (let j = i + 1; j < boxes.length; j++) { const b = boxes[j]; if (a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1]) overlaps++; }
+    }
+    return { n: boxes.length, overlaps, outside, boxes: boxes.map((b) => b.map(Math.round)) };
+  },
   stats() {
     const S = window.__ski, v = S.scene.getObjectByName('ski-village');
     let vt = 0;
