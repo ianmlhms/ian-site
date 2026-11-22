@@ -6,7 +6,7 @@ import { NET } from './config.js';
 import { matchSeed, resolveResort, resolveRuns } from './plan.js';
 import { createRace } from './race.js';
 import { createSession } from './session.js';
-import { createRemotes, packState } from './remotes.js';
+import { createRemotes, packState, outfitOf, MEET_GAP_MS } from './remotes.js';
 import { createMpHud, resText } from './hud.js';
 import { createFreeMp } from './freeride.js';
 import { minRunMs } from '../progress.js';
@@ -25,7 +25,7 @@ export function readMpContext() {
   const gate = window.MPGate;
   const ctx = gate && gate.ctx;
   if (!ctx || ctx.game !== GAME || !ctx.code || !Array.isArray(ctx.roster) || ctx.roster.length < 1) return null;
-  const roster = ctx.roster.filter((r) => ID_RE.test(r.id)).slice(0, NET.MAX_PLAYERS).map((r) => Object.freeze({ id: r.id, name: r.name || '?', uid: r.uid || '' }));
+  const roster = ctx.roster.filter((r) => r && typeof r.id === 'string' && ID_RE.test(r.id)).slice(0, NET.MAX_PLAYERS).map((r) => Object.freeze({ id: r.id, name: String(r.name || '?').slice(0, 16), uid: typeof r.uid === 'string' ? r.uid : '' }));      // LOW 5: names <= 16
   let me = '';
   try { const raw = JSON.parse(sessionStorage.getItem(CTX_KEY) || 'null'); if (raw && raw.code === ctx.code && typeof raw.me === 'string') me = raw.me; } catch (error) { /* storage blocked */ }
   if (!roster.some((r) => r.id === me)) me = ctx.role === 'host' ? roster[0].id : '';
@@ -80,7 +80,7 @@ export function createMp({ ctx, host }) {
       remotes.push(from, m.r, t === null ? performance.now() : t, m.a);
       return;
     }
-    if (m.k === 'hi') { meet(from, typeof m.o === 'string' ? m.o : ''); return; }
+    if (m.k === 'hi') { meet(from, outfitOf(m.o)); return; }
     race.receive(from, m);
   }
   /* the outfit a player chose; if mine or another skier's already looks like that, the next free one (everybody stays recognisable) */
@@ -93,8 +93,9 @@ export function createMp({ ctx, host }) {
   function meet(id, wanted) {
     const r = remotes.get(id);
     if (r && r.wanted === wanted) return;
+    if (r && r.wanted && performance.now() - (r.metAt || 0) < MEET_GAP_MS) return;       // LOW 1: no rebuild loop
     if (r) remotes.remove(id);
-    remotes.add(id, nameOf.get(id), displayOutfit(id, wanted)).wanted = wanted;
+    Object.assign(remotes.add(id, nameOf.get(id), displayOutfit(id, wanted)), { wanted, metAt: performance.now() });
     remotes.setLink(id, session.viaRelay(id));
   }
   function onPeer(id, status) {

@@ -15,6 +15,11 @@ const SUPABASE_SRI = 'sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1
 const ICE_KEY = 'ski_ice_v1';
 const ICE_URL = /^(stun|turn|turns):[^\s]{3,200}$/;
 const TICK_MS = 250;
+/* security (pre-launch review M1 / LOW 1): the hand-shake and the relay go through unauthenticated Realtime broadcast, so a lobby
+ * member (or anybody who guesses the code) can forge them. These limits keep a forgery from cutting or taking over a working link. */
+const MAX_SDP = 20000;                 // chars: a real non-trickle SDP with all candidates is 1-6 KB
+const LIVE_MS = 3000;                  // ms: a link that delivered a packet this recently is healthy (pings run every second)
+const BUCKET = Object.freeze({ rel: { rate: 60, cap: 130 }, st: { rate: 40, cap: 40 } });    // messages / s and burst per peer
 const nonceOf = () => Math.random().toString(36).slice(2, 10);
 
 function loadScript(src, integrity) {
@@ -87,7 +92,7 @@ export function createSession({ code, me, roster, name, racing = () => false, on
   const peers = new Map();
   for (const r of roster) {
     if (r.id === me) continue;
-    peers.set(r.id, { id: r.id, present: false, nonce: '', link: null, relay: null, tries: 0, connecting: false, everOpen: false, lostAt: 0, presentSince: 0, lastRecv: 0, samples: [], rtt: 0, offset: 0, status: 'wait', bye: false, retryTimer: 0 });
+    peers.set(r.id, { id: r.id, present: false, nonce: '', pendingNonce: '', bucket: { rel: BUCKET.rel.cap, st: BUCKET.st.cap, at: performance.now() }, link: null, relay: null, tries: 0, connecting: false, everOpen: false, lostAt: 0, presentSince: 0, lastRecv: 0, samples: [], rtt: 0, offset: 0, status: 'wait', bye: false, retryTimer: 0 });
   }
   let sb = null, ch = null, ice = [...NET.ICE_SERVERS], closed = false, lastTick = performance.now(), tickTimer = 0, pingTimer = 0;
   const started = performance.now();
@@ -95,9 +100,23 @@ export function createSession({ code, me, roster, name, racing = () => false, on
 
   const sendCh = (event, payload) => { if (ch) { try { ch.send({ type: 'broadcast', event, payload }); } catch (error) { /* closing */ } } };
   const openLink = (p) => (p.link && p.link.open ? p.link : p.relay && p.relay.open ? p.relay : null);
+  /** a link (rtc or relay) that is open and delivered something lately: a hand-shake message may never replace it */
+  const healthy = (p) => !!openLink(p) && performance.now() - p.lastRecv < Math.max(LIVE_MS, openLink(p).kind === 'relay' ? NET.SILENT_RELAY : 0);
+  /** LOW 1: a token bucket per peer and channel kind; a flood is dropped, never queued */
+  function allow(p, reliable) {
+    const b = p.bucket, now = performance.now(), dt = Math.max(0, now - b.at) / 1000;
+    b.at = now;
+    b.rel = Math.min(BUCKET.rel.cap, b.rel + dt * BUCKET.rel.rate);
+    b.st = Math.min(BUCKET.st.cap, b.st + dt * BUCKET.st.rate);
+    const key = reliable ? 'rel' : 'st';
+    if (b[key] < 1) { netStats.flooded = (netStats.flooded || 0) + 1; return false; }
+    b[key] -= 1;
+    return true;
+  }
 
   /* ---------- links ---------- */
   function onLinkMessage(p, link, m, reliable) {
+    if (!allow(p, reliable)) return;
     p.lastRecv = performance.now();
     if (m.k === 'p') { link.send({ k: 'q', t: m.t, u: performance.now() }, true); return; }
     if (m.k === 'q') { pong(p, m); return; }
@@ -148,14 +167,19 @@ export function createSession({ code, me, roster, name, racing = () => false, on
     pairs.set(p.id, pc);
     const relay = new RelayLink({
       peerId: p.id, racing, ...(relayOpts || {}),
-      tx: (m) => { if (pc.state === 'joined') pc.send({ type: 'broadcast', event: 'rl', payload: { f: me, m } }); },
+      tx: (m) => { if (pc.state === 'joined') pc.send({ type: 'broadcast', event: 'rl', payload: { f: me, n: nonce, m } }); },
       dispose: () => { try { sb.removeChannel(pc); } catch (error) { /* closing */ } pairs.delete(p.id); },
       onmessage: (m, r) => onLinkMessage(p, relay, m, r),
       onopen: () => { p.everOpen = true; p.lastRecv = performance.now(); ping(p); evaluate(); },
       onclose: (reason, wasOpen) => { if (p.relay !== relay) return; p.relay = null; if (wasOpen) p.lostAt = performance.now(); if (/budget/.test(reason)) console.warn('[ski-net] relay budget used up'); evaluate(); },
     });
     p.relay = relay;
-    pc.on('broadcast', { event: 'rl' }, ({ payload }) => { if (payload && payload.f === p.id && p.relay === relay) relay.receive(payload.m); });
+    // M1: the sender must be the pair's other player in his current page life (his presence nonce; an old client sends none)
+    pc.on('broadcast', { event: 'rl' }, ({ payload }) => {
+      if (!payload || payload.f !== p.id || p.relay !== relay) return;
+      if (typeof payload.n === 'string' && p.nonce && payload.n !== p.nonce) return;
+      relay.receive(payload.m);
+    });
     try { await subscribe(pc); relay.out({ k: 'hello' }); } catch (error) { console.warn('[ski-net] relay channel failed', error.message); relay.close('channel'); }
   }
   function drop(p, why) {
@@ -171,13 +195,15 @@ export function createSession({ code, me, roster, name, racing = () => false, on
     if (!m || m.to !== me || typeof m.from !== 'string' || !ids.has(m.from) || closed) return;
     const p = peers.get(m.from);
     if (!p) return;
+    if (typeof m.d === 'string' && m.d.length > MAX_SDP) return;
     if (m.t === 'offer' && typeof m.d === 'string') {
-      if (p.nonce && m.n && m.n !== p.nonce) p.nonce = m.n;
+      if (healthy(p)) return;                         // M1: a (forged) offer never replaces a working link; a real reload sends 'bye' first
+      if (p.nonce && typeof m.n === 'string' && m.n && m.n !== p.nonce) { p.nonce = m.n.slice(0, 16); p.pendingNonce = ''; }
       p.bye = false;
       makeRtc(p, false).acceptOffer(m.d);
     } else if (m.t === 'answer' && typeof m.d === 'string') {
       if (p.link && p.link.initiator && !p.link.open) p.link.acceptAnswer(m.d);
-    } else if (m.t === 'relay') startRelay(p);
+    } else if (m.t === 'relay' && !healthy(p)) startRelay(p);
   }
   function onPresence() {
     if (!ch || closed) return;
@@ -191,12 +217,18 @@ export function createSession({ code, me, roster, name, racing = () => false, on
       p.present = n !== undefined;
       if (p.present && !was) p.presentSince = now;
       if (p.present && p.nonce && n !== p.nonce) {      // the same player in a new page life (reload): start over with him
-        p.nonce = n; p.bye = false; p.tries = 0; p.samples = []; p.rtt = 0; p.offset = 0; drop(p, 'reload');      // R7-D: his clock restarted
-      } else if (p.present) p.nonce = n;
+        // M1: presence is forgeable: while his link is healthy the new nonce only waits (tick() applies it once the link is not)
+        if (healthy(p)) p.pendingNonce = n;
+        else restart(p, n);
+      } else if (p.present) { p.nonce = n; p.pendingNonce = ''; }
       if (p.present) p.bye = false;
       if (p.present && me < p.id && !openLink(p) && !p.connecting && !p.relay) connect(p);
     }
     evaluate();
+  }
+
+  function restart(p, n) {
+    p.nonce = n; p.pendingNonce = ''; p.bye = false; p.tries = 0; p.samples = []; p.rtt = 0; p.offset = 0; drop(p, 'reload');      // R7-D: his clock restarted
   }
 
   /* ---------- status ---------- */
@@ -220,6 +252,7 @@ export function createSession({ code, me, roster, name, racing = () => false, on
     lastTick = now;
     if (gap > NET.STALL_FRAME) for (const p of peers.values()) { if (p.lastRecv) p.lastRecv = Math.min(now, p.lastRecv + gap); if (p.lostAt) p.lostAt = Math.min(now, p.lostAt + gap); }
     for (const p of peers.values()) {
+      if (p.pendingNonce && p.present && !healthy(p)) { restart(p, p.pendingNonce); if (me < p.id) connect(p); }
       // the side that waits for an offer: no link after both attempts' time -> the relay (the other side does the same)
       if (p.present && !openLink(p) && !p.relay && !p.bye && me > p.id && now - p.presentSince > NET.CONNECT_TIMEOUT * NET.RTC_TRIES + NET.RETRY_MS * 2 + 6000 && (!p.link || p.link.closed)) startRelay(p);
     }

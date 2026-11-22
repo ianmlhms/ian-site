@@ -17,7 +17,7 @@
 import { NET, FREE } from './config.js';
 import { WEATHERS, TIMES, freePlan, sideOffset, freeHost } from './plan.js';
 import { createSession } from './session.js';
-import { createRemotes, packState } from './remotes.js';
+import { createRemotes, packState, outfitOf, MEET_GAP_MS } from './remotes.js';
 import { createMpHud } from './hud.js';
 import { distText } from './tags.js';
 import { OUTFITS } from '../skier-model.js';
@@ -28,6 +28,8 @@ const SAVE_PREFIX = 'pb_ski_mpfree:';
 const loadSaved = (key) => { try { return JSON.parse(sessionStorage.getItem(key) || 'null'); } catch (error) { return null; } };
 const save = (key, v) => { try { sessionStorage.setItem(key, JSON.stringify(v)); } catch (error) { /* storage blocked: a reload starts at the lift */ } };
 const finite = (...v) => v.every(Number.isFinite);
+const AVALANCHE_ID = /^[A-Za-z0-9_:.-]{1,64}$/;
+const AVALANCHE_AHEAD = 2000;        // ms: an avalanche "later than now" in my clock is a forgery (LOW 3)
 
 /**
  * host: { game, env, hud, input, audio, scene, camera, canvas, surface, uiRoot, outfit(), level(), liftPath(i), liftName(i),
@@ -61,7 +63,7 @@ export function createFreeMp({ ctx, host }) {
       if (r) { r.paused = !!m.p; r.epoch = Number(m.e) | 0; }
       return;
     }
-    if (m.k === 'hi') { meet(from, typeof m.o === 'string' ? m.o : ''); return; }
+    if (m.k === 'hi') { meet(from, outfitOf(m.o)); return; }
     if (m.k === 'env') { applyEnv(from, m); return; }
     if (m.k === 'av') { remoteAvalanche(from, m); }
   }
@@ -74,8 +76,9 @@ export function createFreeMp({ ctx, host }) {
   function meet(id, wanted) {
     const r = remotes.get(id);
     if (r && r.wanted === wanted) return;
+    if (r && r.wanted && performance.now() - (r.metAt || 0) < MEET_GAP_MS) return;       // LOW 1: no rebuild loop
     if (r) remotes.remove(id);
-    remotes.add(id, nameOf.get(id), displayOutfit(id, wanted)).wanted = wanted;
+    Object.assign(remotes.add(id, nameOf.get(id), displayOutfit(id, wanted)), { wanted, metAt: performance.now() });
     remotes.setLink(id, session.viaRelay(id));
   }
   function onPeer(id, status) {
@@ -123,11 +126,12 @@ export function createFreeMp({ ctx, host }) {
   }
   function remoteAvalanche(from, m) {
     const now = performance.now();
-    if (typeof m.id !== 'string' || m.id.length > 64 || !Number.isFinite(Number(m.s))) return;
+    if (typeof m.id !== 'string' || !AVALANCHE_ID.test(m.id) || typeof m.s !== 'number' || !Number.isFinite(m.s) || typeof m.t !== 'number' || !Number.isFinite(m.t)) return;
+    if (host.avalanche && typeof host.avalanche.known === 'function' && !host.avalanche.known(m.id)) return;      // round 7 C: a real zone only
     if (now - (local.lastAv.get(from) || -Infinity) < FREE.AVALANCHE_GAP) return;           // one per player per gap (no spam)
-    const t = session.toLocal(from, Number(m.t));
+    const t = session.toLocal(from, m.t);
     const at = t === null ? now : t;
-    if (now - at > FREE.AVALANCHE_LATE) return;
+    if (!Number.isFinite(at) || now - at > FREE.AVALANCHE_LATE || at - now > AVALANCHE_AHEAD) return;
     local.lastAv.set(from, now);
     root.dataset.skiMpAvalanche = `${m.id}:${m.s >>> 0}`;
     if (host.avalanche && typeof host.avalanche.trigger === 'function') {

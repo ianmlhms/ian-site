@@ -101,7 +101,14 @@ export function createRace({ me, roster, runs, now, send, latency = () => 0, min
     }
     if (run === s.run && s.phase === 'go' && (phase === 'results' || phase === 'over')) enterEnd();
   }
-  const localTime = (from, at, sentNow) => now() + (Number(at) - Number(sentNow)) - latency(from);
+  /* LOW 2: a start time from a peer, in my clock: null when it is not a number; never more than GO_LEAD + a margin ahead (a forged
+   * 1e12 would hold the race for ever) and never further back than the hard cap of a run (a sync mid-run carries the real past start) */
+  const GO_AHEAD_MAX = RACE.GO_LEAD + 6000;
+  function localTime(from, at, sentNow) {
+    const g = now() + (Number(at) - Number(sentNow)) - latency(from);
+    if (typeof at !== 'number' || typeof sentNow !== 'number' || !Number.isFinite(g)) return null;
+    return Math.min(now() + GO_AHEAD_MAX, Math.max(now() - RACE.HARD_CAP, g));
+  }
 
   /* ---------- the coordinator's duties ---------- */
   function sendGo() {
@@ -162,12 +169,15 @@ export function createRace({ me, roster, runs, now, send, latency = () => 0, min
         if (!entry) break;
         const old = s.results[r][from];
         if (old && !old.dnf && entry.dnf) break;                 // a time stays a time
+        if (old && !!old.dnf === !!entry.dnf && old.ms === entry.ms && old.valid === entry.valid && (old.pen || 0) === (entry.pen || 0)) break;   // LOW 1: a repeat changes nothing
         noteFinish(from, r, entry);
         break;
       }
-      case 'go':
-        if (trusted(from)) catchUp(r, 'go', localTime(from, m.at, m.now));
+      case 'go': {
+        const g = localTime(from, m.at, m.now);
+        if (trusted(from) && g !== null) catchUp(r, 'go', g);
         break;
+      }
       case 'end':
         if (trusted(from)) catchUp(r, r >= runs - 1 ? 'over' : 'results');
         break;
@@ -175,9 +185,13 @@ export function createRace({ me, roster, runs, now, send, latency = () => 0, min
         if (trusted(from) && r === s.run + 1 && (s.phase === 'results')) enterPrep(r);
         else if (trusted(from) && r > s.run + 1) enterPrep(r);
         break;
-      case 'sync':
-        if (trusted(from) && PHASES.includes(m.ph)) catchUp(r, m.ph, m.ph === 'go' ? localTime(from, m.at, m.now) : null);
+      case 'sync': {
+        if (!trusted(from) || !PHASES.includes(m.ph)) break;
+        const g = m.ph === 'go' ? localTime(from, m.at, m.now) : null;
+        if (m.ph === 'go' && g === null) break;
+        catchUp(r, m.ph, g);
         break;
+      }
       default:
     }
   }
