@@ -11,7 +11,7 @@
  * Stars are a bit mask per piste (1 finish, 2 time, 4 special) OR-ed into the save: a star once won is never lost.
  * Unlocks (round 6): none any more for pistes and outfits (all open); the stars unlock the ski types (modes/skis.js). UNLOCK below is
  * only kept for old callers. */
-import { DIFF } from '../config.js';
+import { DIFF, SKI } from '../config.js';
 
 export const STAR = Object.freeze({ finish: 1, time: 2, special: 4 });
 export const SPECIALS = Object.freeze(['nocrash', 'flags', 'speed']);          // drawn for the pistes without slalom gates
@@ -67,6 +67,11 @@ export function profileRide(piste, heightAt) {
     radius[i] = da > 1e-4 ? ds / da : 1e9;
   }
   const gated = piste.src && piste.src.slalom ? [70, piste.length - 60] : null;
+  const smooth = (a, b, x) => { const u = Math.min(1, Math.max(0, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
+  const riseFull = G * Math.sin(6 * Math.PI / 180), riseNone = G * Math.sin(12 * Math.PI / 180);
+  // launch follow-up: a good run holds forward, so the arcade assist below SKI.assistTo helps on flats and rises like in the game
+  // (skier.js groundStep)
+  const assist = (v, gAlong) => (SKI.assistAccel + SKI.assistFlat * (1 - smooth(0, riseFull, gAlong))) * (1 - smooth(riseFull, riseNone, -gAlong)) * (1 - smooth(SKI.assistFull, SKI.assistTo, v));
   const ride = (cap) => {
     let v = 2, t = 0, peak = 0;
     for (let i = 1; i < n; i++) {
@@ -76,7 +81,7 @@ export function profileRide(piste, heightAt) {
       const len = Math.hypot(ds, dy);
       const sin = dy / len, cos = ds / len;
       const drag = 0.5 * TARGET.air * TARGET.cda * v * v / TARGET.mass;
-      const a = G * sin - TARGET.mu * G * cos - drag;
+      const a = G * sin - TARGET.mu * G * cos - drag + assist(v, G * sin);
       let v2 = Math.max(TARGET.skate * TARGET.skate, v * v + 2 * a * len);
       let nv = Math.sqrt(v2);
       if (c) nv = Math.min(nv, c, Math.sqrt(TARGET.lateralG * G * radius[i]));

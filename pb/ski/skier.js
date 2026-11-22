@@ -17,6 +17,7 @@ const G = 9.81;
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const smoothstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 const approach = (v, target, rate, dt) => v + (target - v) * Math.min(1, rate * dt);
+const RISE_FULL = G * Math.sin(6 * Math.PI / 180), RISE_NONE = G * Math.sin(12 * Math.PI / 180);     // m/s2 of gravity against him: the assist's rise gate
 const HOCKEY_MAX = 9.5;                 // R8: m/s2, the hockey stop's strongest deceleration
 const HOLD_COS = Math.cos(38 * Math.PI / 180);       // round 7: steeper than this a stop can not hold (side-slip)
 const wrapAngle = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
@@ -149,6 +150,20 @@ function groundStep(s, input, world, dt) {
       if (gf < 0.3) a += Math.min(Math.max(0, -gf) + mu * G * n.y, K.climbMax) * input.push * (1 - v / K.climbSpeed * 0.5);
     }
     vx += fx * a * dt; vy += fy * a * dt; vz += fz * a * dt;
+  }
+  // launch follow-up (Ian: "accelerate faster to at least ~45 km/h"): the arcade assist below K.assistTo. Along the motion (the skis
+  // when slow), gated by the slope along it: downhill (>= ~1 degree) on its own; with push / tuck held also on flats and rises (full up
+  // to a 6 degree rise, gone at 12: well inside the herringbone's ~20 degree climb limit; OSM links that climb through a dip were a
+  // 100 m crawl at 8 km/h); never braking, in a stop or in the edge hold
+  const quiet = !input.brake && s.brake < 0.05 && (s.stop || 0) < 0.02 && !s.hold;
+  if (quiet && (K.assistAccel || 0) > 0 && v < K.assistTo) {
+    const moves = v > 1.2;
+    const dx = moves ? vx / v : fx, dy = moves ? vy / v : fy, dz = moves ? vz / v : fz;
+    const gAlong = -G * dy;                                               // m/s2 of gravity along that direction (< 0: uphill)
+    const wants = (input.push || 0) > 0 || (input.tuck || 0) > 0;
+    const gate = wants ? 1 - smoothstep(RISE_FULL, RISE_NONE, -gAlong) : smoothstep(0.05, 0.25, gAlong);
+    const a = (K.assistAccel + (K.assistFlat || 0) * (1 - smoothstep(0, RISE_FULL, gAlong))) * gate * (1 - smoothstep(K.assistFull, K.assistTo, v));
+    if (a > 0) { vx += dx * a * dt; vy += dy * a * dt; vz += dz * a * dt; }
   }
   // keep the velocity in the slope plane, cap
   const vn = vx * n.x + vy * n.y + vz * n.z;

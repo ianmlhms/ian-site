@@ -74,6 +74,13 @@ export const SKI = Object.freeze({
   brakeSteer: 0.7,
   pushAccel: 1.8,           // skating on flats (W / up), only below pushMaxSpeed
   pushMaxSpeed: 6,
+  // launch follow-up (22 Nov 2026, Ian: "at low speed ... accelerate faster to at least ~45 km/h"): an arcade push on the snow below
+  // ~45 km/h (skier.js groundStep): full below assistFull, faded out smoothly by assistTo; downhill on its own, on flats and gentle rises
+  // (up to ~3 degrees) while push or tuck is held; never braking, in a stop, in the air, on a lift or above the climb limits
+  assistAccel: 2.6,         // m/s2
+  assistFlat: 0.9,          // m/s2 more where gravity does not help (flat or a rise; nothing extra from 6 degrees downhill)
+  assistFull: 10.5,         // m/s (38 km/h)
+  assistTo: 13.9,           // m/s (50 km/h): no assist from here on
   climbSpeed: 2.2,          // below this the push walks uphill (herringbone): no flat, rise or hollow leaves a player stuck
   climbMax: 4.6,            // m/s2: the steepest it climbs is about 20 degrees (40 %) on the piste
   leaveGround: 0.95,        // the ground falls away faster than this many g: the skier takes off
