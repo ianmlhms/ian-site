@@ -42,6 +42,11 @@ const RAIL = Object.freeze({ rail: { h: 0.75, half: 0.06, tol: 0.65, len: 12 }, 
 const RAMP = 6;                             // m: the snow ramp before a rail / box (wide and long enough for the 2.5 m lattice to show it)
 const PIPE = Object.freeze({ depth: 2.8, flat: 8, wall: 7.5, inRamp: 14, outRamp: 16, minLen: 70, mult: 1.25, pop: 1.05, minPop: 3.2, back: 0.9 });
 const LANE = 7;                             // m between the lane centres
+/** R8c: the in-run: at least `slope` average fall over the first `len` m of the park; the start deck behind it (where the run starts,
+ *  s = -4) falls at least `deckSlope` */
+export const DROP_IN = Object.freeze({ len: 24, slope: 0.22, deckSlope: 0.12 });
+/** R8c (QA: a straight run over the kickers scored 0): a clean straight air off a kicker counts (x the kicker's multiplier) */
+export const STRAIGHT_AIR = Object.freeze({ minAir: 0.3, points: 100 });
 const SPEED_CHECK = 15;                     // m/s: faster than this on the ground in the park, a soft brake pulls the speed back
 /* The features in order down the line: [s from the top, kind, size / type, lane (-1 left .. +1 right)]. After the first big kicker a
  * long park gets the halfpipe (PIPE_AT ..), a shorter one a second line of kickers and a rail. */
@@ -71,13 +76,23 @@ export function createParkLayout(site) {
   const last = prof.length - 1;
   const slopeEnd = (prof[last] - prof[last - 1]) / step, slopeStart = (prof[1] - prof[0]) / step;
   /** Ground profile at arc length s (extrapolated beyond the ends with the end slopes). */
-  function profileAt(s) {
+  function profileRaw(s) {
     if (s <= 0) return prof[0] + slopeStart * s;
     const f = s / step;
     if (f >= last) return prof[last] + slopeEnd * (s - last * step);
     const i = Math.floor(f), t = f - i;
     return prof[i] + (prof[i + 1] - prof[i]) * t;
   }
+  // R8c (QA: Grattalu's start almost flat, 6.5 s to 10 km/h): a drop-in. Where the first DROP_IN.len m fall less than DROP_IN.slope on
+  // average, the start is raised (a smooth bump, steepest at the top, none at the end of the in-run); behind it the start deck (the run
+  // starts there, s = -4) falls at least DROP_IN.deckSlope. Ground, meshes and physics all read profileAt.
+  const dropIn = Math.max(0, DROP_IN.slope * DROP_IN.len - (profileRaw(0) - profileRaw(DROP_IN.len)));
+  const p0 = profileRaw(0);
+  const profileAt = (s) => {
+    if (s >= DROP_IN.len) return profileRaw(s);
+    if (s > 0) { const t = 1 - s / DROP_IN.len; return profileRaw(s) + dropIn * t * t; }
+    return p0 + dropIn + Math.max(profileRaw(s) - p0, -DROP_IN.deckSlope * s);       // the deck: never flatter than deckSlope
+  };
   const local = (x, z, out) => { const rx = x - x0, rz = z - z0; out.s = rx * ux + rz * uz; out.v = rx * -uz + rz * ux; return out; };
   const world = (s, v, out = {}) => { out.x = x0 + ux * s - uz * v; out.z = z0 + uz * s + ux * v; return out; };
 
@@ -385,11 +400,14 @@ export function createTrickJudge(layout) {
         const grabT = prev.grab || 0;
         const grab = grabT >= 0.25;
         const airT = a.time || 0;
-        if (!spinDeg && !flips && !grab && airT < 0.7) return events;
+        const kicker = a.feature === 'S' || a.feature === 'M' || a.feature === 'L';
+        const straight = !spinDeg && !flips && !grab;
+        if (straight && !(kicker && airT >= STRAIGHT_AIR.minAir) && airT < 0.7) return events;
         const quality = cur.landQ === 1 ? 'sketchy' : 'clean';
         const mult = a.feature === 'S' || a.feature === 'M' || a.feature === 'L' ? KICKERS[a.feature].mult : a.feature === 'pipe' ? PIPE.mult : a.feature === 'rail' ? 1 : NATURAL_MULT;
-        const pts = (SPIN_POINTS[spinDeg] || 0) + flips * FLIP_POINTS + (grab ? Math.min(450, 150 + 100 * Math.floor((grabT - 0.25) / 0.5)) : 0) + Math.floor(airT / 0.5) * 50;
-        events.push(land(pts * mult * QUALITY_MULT[quality], trickName({ spinDeg, flips, flipDir: Math.sign(prev.flip || 0), grab }), quality, a.feature));
+        const pts = (SPIN_POINTS[spinDeg] || 0) + flips * FLIP_POINTS + (grab ? Math.min(450, 150 + 100 * Math.floor((grabT - 0.25) / 0.5)) : 0) + Math.floor(airT / 0.5) * 50
+          + (straight && kicker ? STRAIGHT_AIR.points : 0);
+        events.push(land(pts * mult * QUALITY_MULT[quality], straight && kicker ? 'Straight Air' : trickName({ spinDeg, flips, flipDir: Math.sign(prev.flip || 0), grab }), quality, a.feature));
       }
       if (prev.crash === 0 && cur.crash > 0 && cur.grounded && !air) { if (comboPoints) events.push({ type: 'fall' }); comboPoints = 0; combo = 0; }
       return events;

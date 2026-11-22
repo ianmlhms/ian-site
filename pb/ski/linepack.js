@@ -56,9 +56,26 @@ export function packLine(arr) {
   return s;
 }
 
-/** resort.json object: "lz" -> "line" on pistes, "pz" -> "p" on the network (in place; returns it) */
+/** R8c (QA: a piste called "0" in the HUD: OSM puts the piste number in name=): a name that is only a number / a number with a letter /
+ *  a single letter ("0", "2a", "G", "3J", "3000") is the piste's ref, shown as "<colour> <ref>" ("Rout 12", "Blo 0"); an empty name
+ *  with a ref the same; anything else as it is. The same rule as scripts/ski/bake.py display_name. */
+export const DIFF_WORD = Object.freeze({ green: 'Gréng', blue: 'Blo', red: 'Rout', black: 'Schwaarz' });
+const BARE_REF = /^(?:\d+[a-z]?|[a-z]\d?|\d[a-z]\d?)$/i;
+export function pisteDisplayName(name, ref, diff) {
+  const n = String(name || '').trim(), r = String(ref || '').trim();
+  const word = DIFF_WORD[diff] || 'Pist';
+  if (n && !BARE_REF.test(n)) return n;
+  const id = n || r;
+  return id ? `${word} ${id}` : `${word} Pist`;
+}
+
+/** resort.json object: "lz" -> "line" on pistes, "pz" -> "p" on the network (in place; returns it); R8c: piste display names */
 export function unpackResort(r) {
-  for (const p of r.pistes || []) if (typeof p.lz === 'string' && !p.line) { p.line = unpackLine(p.lz); delete p.lz; }
+  for (const p of r.pistes || []) {
+    if (typeof p.lz === 'string' && !p.line) { p.line = unpackLine(p.lz); delete p.lz; }
+    const shown = pisteDisplayName(p.name, p.ref, p.diff);
+    if (shown !== p.name) { p.osmName = p.name; p.name = shown; }
+  }
   for (const n of r.network || []) if (typeof n.pz === 'string' && !n.p) { n.p = unpackLine(n.pz); delete n.pz; }
   return r;
 }

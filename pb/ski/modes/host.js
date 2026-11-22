@@ -18,12 +18,15 @@ import { SKI_TYPES, skiStatsOf, skiUnlock } from './skis.js';
 /** The park layout for field.js (call before createField). */
 export const parkLayoutOf = (resort) => createParkLayout(resort.park);
 
+const PARK_HINT_S = 14;                       // R8c: s of riding the park hint stays up
+
 export function createModeHost(ctx) {
   const { scene, resort, rid, pistes, field, surface, store, hud, uiRoot, input, env, audio, world, layout, root, outfits } = ctx;
   const challenges = new Map();
   const challengeOf = (p) => { if (!p || p.id === 'park') return null; let c = challenges.get(p.id); if (!c) { c = challengeFor(p, field.farHeight); challenges.set(p.id, c); } return c; };
   const lifts = createLiftNet(resort, field.farHeight, pistes);
   let tracker = null, flags = null, judge = null, parkView = null, freeRun = null, clock = null, minimap = null, liftAt = null, parkBest0 = 0, clock0 = null;
+  let parkHintT = 0;
   const freeHud = createFreeHud(hud.el, { onLift: () => ctx.onRideUp(), onSkis: () => ctx.onSkis && ctx.onSkis() });
   // round 6: the session's free ride counters live across challenges, fast travel and lift rides (one page life)
   const sessionStats = { distance: 0, vertical: 0, lifts: 0, top: 0, time: 0, off: 0 };
@@ -80,6 +83,8 @@ export function createModeHost(ctx) {
         if (c && c.flags.length) flags = createFlagsView({ scene, flags: c.flags, height: (x, z) => surface.height(x, z), heading: Math.atan2(game.piste.at(0, {}).dz, game.piste.at(0, {}).dx) });
       } else if (game.mode === MODES.park && layout) {
         judge = createTrickJudge(layout);
+        parkHintT = PARK_HINT_S;                     // R8c (QA: a straight run scored 0, nobody knew E jumps): the controls, bottom middle
+        hud.hint(input.isTouch() ? 'Sprong mat ⤒ · Trick mat ✦' : 'Sprong mat E · Trick mat F (A / D dréinen) · W: ufueren');
         parkBest0 = store.get().park[rid] || 0;
         world.tricks = true;
         input.setTrick(true);
@@ -121,6 +126,7 @@ export function createModeHost(ctx) {
     end() {
       if (flags) { flags.dispose(); flags = null; }
       tracker = null; judge = null; freeRun = null; liftAt = null;
+      if (parkHintT > 0) { parkHintT = 0; hud.hint(''); }
       world.tricks = false;
       input.setTrick(false);
       freeHud.show(false); freeHud.lift(null);
@@ -146,6 +152,7 @@ export function createModeHost(ctx) {
         }
       }
       if (judge && game.phase === 'running') {
+        if (parkHintT > 0) { parkHintT -= dt; if (parkHintT <= 0) hud.hint(''); }
         for (const ev of judge.update(prev, cur, dt)) {
           if (ev.type === 'trick') { hud.toast(trickToast(ev), 1700); audio.event(ev.quality === 'clean' ? 'gate' : 'miss'); }
           else if (ev.type === 'fall') hud.toast('Gefall: Kombo fort', 1300);

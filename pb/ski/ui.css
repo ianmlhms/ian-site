@@ -3,7 +3,7 @@
 @font-face{font-family:"Geist";font-style:normal;font-weight:400 800;font-display:swap;src:url("/assets/fonts/geist-latin.woff2") format("woff2")}
 @font-face{font-family:"Geist Mono";font-style:normal;font-weight:500;font-display:swap;src:url("/assets/fonts/geist-mono-500-latin.woff2") format("woff2")}
 :root{--paper:#f6f6f3;--white:#fcfcfa;--ink:#16171a;--muted:#62656a;--soft:rgba(22,23,26,.14);--tint:rgba(22,23,26,.05);--green:#1f7a4d;--danger:#a32121;
-  --mono:"Geist Mono",ui-monospace,"SF Mono",Menlo,monospace;--halo:0 0 2px #000,0 0 3px #000a,0 1px 5px #0009;color-scheme:light;
+  --mono:"Geist Mono",ui-monospace,"SF Mono",Menlo,monospace;--halo:0 0 1px #000,0 0 2px #000,0 0 4px #000b,0 1px 8px #0009,0 0 14px #0006;color-scheme:light;
   --d-green:#2f9a4c;--d-blue:#2a66d0;--d-red:#d0352c;--d-black:#1d1f24}
 *{box-sizing:border-box}
 html,body{width:100%;height:100%;margin:0;overflow:hidden;background:var(--paper);font-family:"Geist",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink)}
@@ -103,6 +103,12 @@ button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
 .hud .count{position:absolute;left:50%;top:max(34%, calc(150px + env(safe-area-inset-top)));transform:translate(-50%,-50%);color:#fff;text-shadow:var(--halo);font-size:84px;font-weight:800;font-family:var(--mono)}
 .hud .hint{position:absolute;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));transform:translateX(-50%);color:#fff;text-shadow:var(--halo);font-size:14px;white-space:nowrap;font-family:var(--mono)}
 .hud .gates{font-family:var(--mono);font-size:13px}
+/* R8c (QA: white HUD text unreadable in fog / on bright snow): a soft dark backdrop behind the text blocks (no hard edge), plus the
+   stronger halo above */
+.hud .tl::before,.hud .tr .speed::before{content:"";position:absolute;z-index:-1;inset:-10px -26px -12px -14px;background:radial-gradient(closest-side,rgba(14,16,20,.34),rgba(14,16,20,.2) 62%,rgba(14,16,20,0));pointer-events:none}
+.hud .tl,.hud .tr .speed{isolation:isolate}
+.hud .tr .speed{position:relative}
+.hud .toast,.hud .hint{background:radial-gradient(closest-side,rgba(14,16,20,.3),rgba(14,16,20,0));padding:4px 18px}
 
 /* touch controls (bottom corners, together far under 15 % of the screen) */
 #touchControls{position:absolute;inset:auto 0 0 0;height:0;z-index:12;pointer-events:none}

@@ -1103,6 +1103,21 @@ def build_aeroways(frame):
     log("aeroway polygons", len(out))
     return out
 
+# R8c (QA: a piste called "0" in the HUD): a name that is only a number / number + letter / one letter ("0", "2a", "G", "3000") is the
+# piste's ref: shown as "<colour> <ref>" ("Rout 12"). Applied when resort.json is written, AFTER the ids (they stay as they were);
+# the same rule as pb/ski/linepack.js pisteDisplayName (the game applies it to older bakes too).
+DIFF_WORD = {"green": "Gréng", "blue": "Blo", "red": "Rout", "black": "Schwaarz"}
+BARE_REF = re.compile(r"^(?:\d+[a-z]?|[a-z]\d?|\d[a-z]\d?)$", re.I)
+
+
+def display_name(name, ref, diff):
+    n, r = (name or "").strip(), (ref or "").strip()
+    word = DIFF_WORD.get(diff, "Pist")
+    if n and not BARE_REF.match(n):
+        return n
+    return "%s %s" % (word, n or r) if (n or r) else "%s Pist" % word
+
+
 ROOF_CODE = {"gabled": 0, "flat": 1, "hipped": 2, "skillion": 3, "half-hipped": 2, "pyramidal": 4, "gambrel": 0, "mansard": 2}
 
 LIFT_KIND = {"chair_lift": "chair", "gondola": "gondola", "cable_car": "cable", "mixed_lift": "gondola", "drag_lift": "drag", "t-bar": "drag",
@@ -1588,7 +1603,7 @@ def main():
     pistes = []
     for r in runs:
         q = resample(r["p"], 10.0)
-        pistes.append({"id": r["id"], "name": r["name"], "ref": r["ref"], "diff": r["diff"], "len": round(r["len"]), "drop": round(r["drop"]),
+        pistes.append({"id": r["id"], "name": display_name(r["name"], r["ref"], r["diff"]), "ref": r["ref"], "diff": r["diff"], "len": round(r["len"]), "drop": round(r["drop"]),
                        "top": round(float(r["h"][0])), "bottom": round(float(r["h"][-1])), "hw": round(r["hw"], 1),
                        "slalom": bool(r.get("slalom")), "line": flat(q)})
         for flag in ("link", "route", "variant"):              # link = a run of unnamed OSM ways, named after where it leads
