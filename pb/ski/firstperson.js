@@ -5,6 +5,7 @@
  *   ride    on a lift the window view of liftride.js is the first-person view (main.js forces it while this mode is on)
  * The choice is saved (localStorage pb_ski_cam = 'fp' | 'chase'). Two draw calls: one merged ski mesh, one merged pole mesh. */
 import { FIRST_PERSON as FP } from './config.js';
+import { handParts } from './fp-hands.js';
 
 const THREE = window.THREE;
 const KEY = 'pb_ski_cam';
@@ -69,6 +70,7 @@ export function createFirstPerson({ scene, overlay, look }) {
       g.translate(side * 0.34, -0.34, -0.55);
       poleParts.push(coloured(g, hex));
     }
+    for (const [g, hex] of handParts(side, [side * 0.335, -0.325, -0.54])) poleParts.push(coloured(g, hex));      // R8c: gloves + sleeves (fp-hands.js)
   }
   const poles = new THREE.Mesh(merge(poleParts), new THREE.MeshLambertMaterial({ vertexColors: true }));
   poles.name = 'ski-fp-poles'; poles.frustumCulled = false; poles.visible = false; poles.renderOrder = 9;
