@@ -80,20 +80,30 @@ function linuxGlArgs() {
   return process.platform === "linux" ? ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] : [];
 }
 
-/* FLOW_BROWSER=webkit runs the flow in Playwright WebKit (the engine of the school iPads) instead of Chromium (the default).
- * WebKit has no --mute-audio: the games of this repo only make sound after a tap, which a headless flow never makes unless it says so. */
-/* ---------- power / memory economy (scripts/power/, 22 Nov 2026), all opt-in, default = unchanged ----------
+/* ---------- power / memory economy (scripts/power/REPORT.md, 22 Nov 2026), all opt-in, default = unchanged ----------
+ * FLOW_POWER=1         the measured best setup in one switch: FLOW_NO_VIDEO=1 FLOW_ECONOMY=1 FLOW_CHROME=shell
+ *                      (6 flows incl. ski-freeride, mtb-ride: -58 % CPU seconds, -26 % peak memory, all green);
+ *                      each part can be switched back off: FLOW_NO_VIDEO=0, FLOW_ECONOMY=0, FLOW_CHROME=full
  * FLOW_NO_VIDEO=1      no video recording (each flow otherwise encodes a webm and saves it into OneDrive)
  * FLOW_ECONOMY=1       3D flows (fullChromium): deviceScaleFactor 0.5 (same CSS layout, 1/4 of the pixels to render),
- *                      Grafik "low" (localStorage arcade_gfx), requestAnimationFrame capped at FLOW_FPS (default 30)
+ *                      requestAnimationFrame capped at FLOW_FPS (default 30). The Grafik level stays the flow's own choice:
+ *                      a forced "low" changes what a game offers (train-sim builds no saloon on low: no "inside" camera)
+ * FLOW_ECONOMY_GFX=low also force the Grafik level (localStorage arcade_gfx) where the flow set none
  * FLOW_ECONOMY_DSF=x   another scale factor for FLOW_ECONOMY (1 = full pixels)
  * FLOW_FPS=n           cap requestAnimationFrame at n frames per second (any flow; 0 = no cap; never a flow with measuresFrames: true)
- * FLOW_CHROME=shell    WebGL flows in chrome-headless-shell instead of Google Chrome for Testing (new headless)
+ * FLOW_CHROME=shell    every flow in chrome-headless-shell instead of Google Chrome for Testing (new headless). On macOS it gets
+ *                      --use-angle=metal --enable-gpu --ignore-gpu-blocklist (without them the shell falls back to SwiftShader:
+ *                      the 3D flows then fail and burn 5-12x the CPU); FLOW_SHELL_ARGS replaces those flags
  * FLOW_CHROME=full     every flow in Google Chrome for Testing (what run_all does once one 3D flow is in the list)
  * FLOW_CDP=ws://...    connect to an already running CDP browser (Lightpanda) instead of launching one */
-const ECONOMY = process.env.FLOW_ECONOMY === "1";
-const NO_VIDEO = process.env.FLOW_NO_VIDEO === "1";
+const POWER = process.env.FLOW_POWER === "1";
+const on = (name) => process.env[name] === "1" || (POWER && process.env[name] !== "0");      // FLOW_POWER=1 FLOW_NO_VIDEO=0: power, with video
+const ECONOMY = on("FLOW_ECONOMY");
+const NO_VIDEO = on("FLOW_NO_VIDEO");
+const CHROME = process.env.FLOW_CHROME || (POWER ? "shell" : "");
+const SHELL_GPU_ARGS = process.platform === "darwin" ? "--use-angle=metal --enable-gpu --ignore-gpu-blocklist" : "";
 const ECONOMY_DSF = Number(process.env.FLOW_ECONOMY_DSF) || 0.5;
+const ECONOMY_GFX = ["low", "medium", "high"].includes(process.env.FLOW_ECONOMY_GFX) ? process.env.FLOW_ECONOMY_GFX : "";
 const FPS_CAP = process.env.FLOW_FPS !== undefined ? Number(process.env.FLOW_FPS) : (ECONOMY ? 30 : 0);
 
 /* Init script: requestAnimationFrame callbacks run at most `fps` times a second. Between two frames the page sleeps on a
@@ -119,14 +129,18 @@ function rafCapScript(fps) {
   window.cancelAnimationFrame = (id) => { cancelled.add(id); };
 }
 
+/* FLOW_BROWSER=webkit runs the flow in Playwright WebKit (the engine of the school iPads) instead of Chromium (the default).
+ * WebKit has no --mute-audio: the games of this repo only make sound after a tap, which a headless flow never makes unless it says so. */
 export async function launchBrowser({ fullChromium: wantsFull = false, args = [] } = {}) {
   const playwright = await importPlaywright();
-  const fullChromium = wantsFull || process.env.FLOW_CHROME === "full";   // FLOW_CHROME=full: every flow in Chrome for Testing
+  const fullChromium = wantsFull || CHROME === "full";   // FLOW_CHROME=full: every flow in Chrome for Testing
   if (process.env.FLOW_CDP) return playwright.chromium.connectOverCDP(process.env.FLOW_CDP);
-  if (process.env.FLOW_CHROME === "shell" && fullChromium) {
+  // every flow, not only the 3D ones: arcade-pad opens canvas / WebGL games and costs 9x the CPU in the shell on SwiftShader
+  if (CHROME === "shell" && process.env.FLOW_BROWSER !== "webkit") {
     const shell = cachedChromiumPaths(false)[0];
     if (!shell) throw new Error("FLOW_CHROME=shell: no chromium_headless_shell in ~/Library/Caches/ms-playwright (npx playwright install --only-shell chromium)");
-    return playwright.chromium.launch({ executablePath: shell, args: ["--mute-audio", ...(process.env.FLOW_SHELL_ARGS || "").split(" ").filter(Boolean), ...args] });
+    const gpu = (process.env.FLOW_SHELL_ARGS ?? SHELL_GPU_ARGS).split(" ").filter(Boolean);
+    return playwright.chromium.launch({ executablePath: shell, args: [...linuxGlArgs(), ...gpu, "--mute-audio", ...args] });
   }
   if (process.env.FLOW_BROWSER === "webkit") {
     if (!playwright.webkit) throw new Error("FLOW_BROWSER=webkit: this Playwright has no webkit");
@@ -136,7 +150,8 @@ export async function launchBrowser({ fullChromium: wantsFull = false, args = []
   const { chromium } = playwright;
   const errors = [];
   // WebGL flows need Chromium's full headless compositor. Headless Shell forces
-  // SwiftShader on macOS and can stall rendering/input for tens of seconds.
+  // SwiftShader on macOS and can stall rendering/input for tens of seconds
+  // (unless it gets the Metal flags: FLOW_CHROME=shell above, measured in scripts/power/REPORT.md).
   const attempts = fullChromium
     ? [...cachedChromiumPaths(true).map(executablePath => ({ executablePath, args: linuxGlArgs() })), { channel: "chromium" }, { channel: "chrome" }, { args: linuxGlArgs() }]
     : [{}, ...cachedChromiumPaths().map(executablePath => ({ executablePath })), { channel: "chrome" }];
@@ -409,7 +424,7 @@ export async function runFlow(flow, { browser, origin, shotsDir = process.env.FL
     ...(process.env.FLOW_COLOR_SCHEME ? { colorScheme: process.env.FLOW_COLOR_SCHEME } : {}),   // FLOW_COLOR_SCHEME=dark emulates prefers-color-scheme
     ...(NO_VIDEO ? {} : { recordVideo: { dir: tmpVideos, size: viewport } }),
   });
-  if (economy) await context.addInitScript(() => { try { if (!localStorage.getItem("arcade_gfx")) localStorage.setItem("arcade_gfx", "low"); } catch { /* private mode */ } });
+  if (economy && ECONOMY_GFX) await context.addInitScript((level) => { try { if (!localStorage.getItem("arcade_gfx")) localStorage.setItem("arcade_gfx", level); } catch { /* private mode */ } }, ECONOMY_GFX);
   if (FPS_CAP > 0 && !flow.measuresFrames) await context.addInitScript(rafCapScript, FPS_CAP);
   const base = flow.backend || {};
   const backend = createBackend({
@@ -481,6 +496,13 @@ export async function runFlow(flow, { browser, origin, shotsDir = process.env.FL
     }, [SESSION_KEY, fakeSession(), ME_NAME]);
   };
   h.goto = async (rel) => { await page.goto(theOrigin + rel, { waitUntil: "domcontentloaded" }); };
+  /* Between two heavy page loads in ONE page (a Ski resort after another): leave the page and collect its garbage now. V8 frees the
+   * last document's heap late; without this 5 Ski resorts in one page reached 2.7-3.5 GB and browser-slot.py killed the job
+   * (scripts/power/REPORT.md). Chromium only (CDP); elsewhere it is just the blank page. */
+  h.releaseMemory = async () => {
+    await page.goto("about:blank");
+    try { const cdp = await context.newCDPSession(page); await cdp.send("HeapProfiler.collectGarbage"); await cdp.detach(); } catch { /* WebKit, Lightpanda: no CDP heap */ }
+  };
 
   console.log(`\n▶ ${flow.name}`);
   try {

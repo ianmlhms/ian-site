@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /* Power test (22 Nov 2026): does one long-lived browser grow when Ski Alpen switches resort again and again?
- *   node scripts/power/resort-switch.mjs [--root <checkout with pb/ski>] [--mode long|context|browser] [--cycle killy,3vallees,...]
+ *   node scripts/power/resort-switch.mjs [--root <checkout with pb/ski>] [--mode long|context|browser] [--cycle killy,3vallees,...] [--gc]
  *     long     one browser, one page: each switch is a location.replace (what the game's switchResort does)
  *     context  one browser, a new context + page per resort (what runFlow does per flow in run_all)
  *     browser  a new browser per resort (one browser per flow)
@@ -17,6 +17,7 @@ const ROOT = path.resolve(opt("--root", process.cwd()));
 const MODE = opt("--mode", "long");
 const CYCLE = opt("--cycle", "killy,3vallees,zermatt,arlberg,kronplatz,killy,3vallees,zermatt,arlberg,kronplatz").split(",");
 const SETTLE_MS = Number(opt("--settle", "8000"));
+const GC = args.includes("--gc");
 const { launchBrowser, startServer } = await import(pathToFileURL(path.join(ROOT, "scripts/flows/lib.mjs")).href);
 
 const UNITS = { K: 1 / 1024, M: 1, G: 1024, B: 1 / 1048576 };
@@ -65,6 +66,12 @@ try {
     await page.waitForFunction("document.documentElement.dataset.skiRunning === '1' || !!document.documentElement.dataset.bootError", null, { timeout: 240000 });
     const bootMs = Date.now() - t0;
     await page.waitForTimeout(SETTLE_MS);
+    if (GC) {                       // --gc: a full garbage collection first, so the numbers are what is still referenced (a leak), not garbage
+      const cdp = await context.newCDPSession(page);
+      await cdp.send("HeapProfiler.collectGarbage");
+      await cdp.detach();
+      await page.waitForTimeout(1500);
+    }
     const info = await page.evaluate(() => {
       const r = window.__ski && window.__ski.renderer, m = r ? r.info.memory : {};
       return { geometries: m.geometries, textures: m.textures, programs: r && r.info.programs ? r.info.programs.length : null,

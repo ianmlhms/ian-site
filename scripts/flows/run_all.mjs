@@ -112,5 +112,6 @@ try {
 console.log("\n──────── flows ────────");
 for (const r of results) console.log(`${r.ok ? "PASS" : "FAIL"}  ${r.name}${r.ok ? "" : "\n        " + r.failures.join("\n        ")}`);
 const failed = results.filter((r) => !r.ok).length;
-console.log(`${results.length - failed}/${results.length} passed · videos in ${videoDir()}`);
+const videosOff = process.env.FLOW_NO_VIDEO === "1" || process.env.FLOW_POWER === "1";
+console.log(`${results.length - failed}/${results.length} passed · ${videosOff ? "no videos (FLOW_NO_VIDEO / FLOW_POWER)" : `videos in ${videoDir()}`}`);
 process.exit(failed ? 1 : 0);
