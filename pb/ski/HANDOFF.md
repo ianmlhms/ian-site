@@ -489,3 +489,32 @@ All resort-generic; checked on all five resorts in Chromium and WebKit. Shared f
   (+ `look7d-shots.mjs`), sheets in `~/Library/Caches/ski-work/round7d/look/`.
 - **Open**: the halfpipe walls stay parabolic (37 deg at the lip; the physics' lip pop stands in for a vertical) - a real vert needs new pipe
   physics; at midday the lit pipe wall is white on white (the dye lines carry its shape); the larch curtains are stylised triangles.
+
+## R7-D (22 Nov 2026, branch `worktree-agent-a9b2af7426e434baa`): online free ride, name tags, perf / data (+ the look helper above)
+Shared files carry `R7-D` marks. R7-A built its own versions of some of this before the split (see "Round 7 A": sign atlases, tags,
+net/freeride.js, mp-games `mode`): the integration takes ONE per feature; the differences are listed under "vs R7-A".
+- **Online free ride** (`net/freeride.js`, lobby `mode` = race | free in `mp-games.js?v=7`; piste + runs carry `showIf: {mode: race}`,
+  mp-lobby.js `settingShown`, `mp-lobby.js?v=20`): main.js picks it through `createMp` (`kind` 'race' | 'free'; every old `if (mp)` race
+  hook is now `isRace()`). Everybody starts side by side (`sideOffset`, 2.2 m) at the SAME start lift (spawn from the resort's start
+  piste, never a saved piste). States at 15 / s while moving or riding (`FREE.SEND_HZ`; 4 / s standing / in the map), interpolated as in
+  the race. Lifts: the wire's "riding lift X at s" (lift index + metres), each device draws the friend in his own carrier on its own
+  line (`liftPath` now builds the lift view early, once, when a friend rides before I did). Teleports (fast travel, map jump, lift
+  skip, «Bei e Frënd») bump an epoch in the state message and remotes.js snaps any jump > 120 m: nobody slides across the mountain.
+  The host (first roster player here; handover when he leaves) shares weather / time / the day clock every 4 s and to newcomers.
+  Join / leave any time: a reload / rejoin goes on at the player's own last spot (sessionStorage, every 2 s); session.js forgets a
+  reloaded peer's clock samples (his performance.now restarted). Avalanches: `mp.shareAvalanche(id, seed, tMs)` broadcasts, the others
+  call `window.__ski.avalanches.triggerAvalanche(id, seed, t s)` (R7-C's API: main.js subscribes `onTrigger` when it exists; at most one
+  per player per 15 s, dropped when > 8 s late). INTEGRATION: R7-C's main.js disables avalanches with `!mp`: make that `!isRace()`.
+  «👥 Bei e Frënd» (under the friends list) = fast travel next to the next friend (on a lift: its top). Relay pairs get their own
+  budget for long sessions (`NET.FREE_RELAY` 14000 msgs, 2 msgs / s x 2 states). Fair: a state only moves the player whose link it came
+  over; the env only from the current host; avalanches are world events.
+- **Name tags** (`net/tags.js`, pure): nearest 3 always in full (stacked up as far as needed), the others stacked up to 3 steps, else a
+  colour dot, else folded into a "+N" badge on the tag they hit; fade + shrink with distance; free ride: friends anywhere keep a tag with
+  the distance ("Emma · 1.2 km"). Every tag keeps room for the badge (the 3 Vallées flow run caught a "+2" badge overlapping).
+- **Sign atlas on demand** (`props.js createSigns`): ONE 2048 x 768 atlas of 128 slots filled with the boards within 1100 m of the camera
+  (the busiest spot of all five resorts sees 39), a board keeps its slot while in range; one merged board mesh rebuilt after 120 m of
+  camera travel: 1 draw call + 1 for the posts at any resort size (`assignSlots` pure, `__ski.signs.stats`).
+- **First play**: resort.json piste / network lines packed (`scripts/ski/linepack.py` + `pb/ski/linepack.js`: decimetres, second
+  differences, zigzag varints, base64; lossless; bake.py packs, the loader and every Node script that reads lines call `unpackResort`;
+  old unpacked data still loads). 3 Vallées resort.json 1.20 -> 0.44 MB (gzip 440 -> 174 KB). The minimap's painted base loads 4 s after
+  the free ride starts. INTEGRATION: any new Node script that reads resort.json lines must call `unpackResort` (R7-A / B / C scripts).
