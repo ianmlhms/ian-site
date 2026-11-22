@@ -72,7 +72,7 @@ const LAT = 2.5;
  * the camera to the cell) the street on the 2.5 m physics lattice as before (skis on it); farther a COARSE copy on a 10 m lattice (1/16 of
  * the triangles; the vertex shader's pull towards the camera keeps it on top of the far, coarser terrain tiles). */
 const LAT_FAR = 10;
-export const FINE_RADIUS = Object.freeze({ low: 260, medium: 360, high: 650 });          // main.js passes no level: medium
+export const FINE_RADIUS = Object.freeze({ low: 150, medium: 360, high: 650 });          // R8d: main.js passes the level (low 260 -> 150)
 
 /** The cells of one lattice (lat m): Map key -> { pos, nrm, segA, segB, hw, cx, cz }. ground = true: the ground's own triangle split. */
 function latticeCells(roads, lat, height, ground) {

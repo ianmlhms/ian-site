@@ -15,8 +15,10 @@ import { createLiftWorld, frames } from './lift-site.js';
 import { carrierGeometry, GLASS } from './modes/carriers.js';
 import { mergeParts } from './modes/views.js';
 
+const FINE = Object.freeze({ size: 2.1, cell: 1250, share: 0.25, max: 700 });     // R8d: small station parts within share x liftRadius (<= max m)
+const TRACK_R = 900;                   // R8d: m to a drag track cell's box within which its worn tracks are drawn (a 1.25 m strip)
 const NEAR_R = 130;                    // m: carriers closer than this get the full model, the rest the far one
-const FAR_R = { chair: 750, drag: 450, gondola: 1300, cable: 3000, train: 3000 };      // m: beyond this a carrier is ~2 px (R8c: chairs 1100 -> 750, gondolas 1600 -> 1300: Courchevel drew 159k triangles of carriers)
+const FAR_R = { chair: 750, drag: 320, gondola: 1300, cable: 3000, train: 3000 };      // m: beyond this a carrier is ~2 px (R8c: chairs 1100 -> 750, gondolas 1600 -> 1300: Courchevel drew 159k triangles of carriers; R8d: drag bars 450 -> 320, 14k at Courchevel)
 const DWELL = 8;                       // s a jig-back cabin / train waits at a station
 /* R8: the lift-name signs on the stations (lift-site.js `sign` parts): the nearest SIGN.slots signs within SIGN.radius get their name in
  * one shared canvas atlas, one merged mesh = one draw call; re-chosen every SIGN.every s as the skier moves. */
@@ -43,8 +45,12 @@ export function createLifts({ scene, resort, height }) {
   // ---------------- static parts: pylons, ropes, stations, tracks, belts, tunnels ----------------
   const parts = [];                                     // [geometry, colour, matrix] merged into one mesh
   const rot = (fx, fz) => new THREE.Matrix4().makeRotationY(-Math.atan2(fz, fx));
-  const boxAt = (w, h, d, x, y, z, fx, fz, colour) => parts.push([new THREE.BoxGeometry(w, h, d), colour, rot(fx, fz).setPosition(x, y, z)]);
-  const cylAt = (r0, r1, h, x, y, z, colour, n = 8) => parts.push([new THREE.CylinderGeometry(r0, r1, h, n), colour, new THREE.Matrix4().makeTranslation(x, y, z)]);
+  // R8d (Niddreg budget: Courchevel drew ~68k triangles of stations / pylons): the small parts (rails, gates, lamps, sheave frames,
+  // hubs: every side < FINE.size m) go into `fine` cells drawn only near the camera; the big ones stay in the 2.5 km chunks
+  const fine = [];
+  const bin = (w, h, d) => (Math.max(w, h, d) < FINE.size ? fine : parts);
+  const boxAt = (w, h, d, x, y, z, fx, fz, colour) => bin(w, h, d).push([new THREE.BoxGeometry(w, h, d), colour, rot(fx, fz).setPosition(x, y, z)]);
+  const cylAt = (r0, r1, h, x, y, z, colour, n = 8) => bin(2 * Math.max(r0, r1), h, 2 * Math.max(r0, r1)).push([new THREE.CylinderGeometry(r0, r1, h, n), colour, new THREE.Matrix4().makeTranslation(x, y, z)]);
   const tmpW = {};
   const signSpots = [];                 // R8: { x, y, z, nx, nz, w, h, text } of every uncut name sign
   /** One station frame's parts in the world, seated on the ground (a part that touches the ground reaches down to its lowest point). */
@@ -240,13 +246,48 @@ export function createLifts({ scene, resort, height }) {
       chunks.push({ mesh: st, cx: (i + 0.5) * CHUNK, cz: (j + 0.5) * CHUNK });
     }
   }
+  // R8d: the fine parts per FINE.cell m cell, shown within FINE.share x the lift radius
+  const fineCells = [];
+  if (fine.length) {
+    const byCell = new Map();
+    for (const part of fine) {
+      const e = part[2].elements, k = Math.floor(e[12] / FINE.cell) + ',' + Math.floor(e[14] / FINE.cell);
+      if (!byCell.has(k)) byCell.set(k, []);
+      byCell.get(k).push(part);
+    }
+    for (const [k, list] of byCell) {
+      const [i, j] = k.split(',').map(Number);
+      const geo = mergeParts(list);
+      const m = new THREE.Mesh(geo, vmat);
+      m.castShadow = true; m.receiveShadow = true; m.name = 'ski-lift-fine-' + k; m.visible = false;
+      group.add(m);
+      disposables.push(geo);
+      fineCells.push({ mesh: m, x0: i * FINE.cell, z0: j * FINE.cell });
+    }
+  }
   const trackMat = new THREE.MeshLambertMaterial({ color: 0xd3d9e2, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   disposables.push(trackMat);
-  const trackMesh = meshFromRibbons(trackParts, trackMat);
+  // R8d (Niddreg budget: all of 3 Vallées' drag tracks were one 17k mesh drawn everywhere): one track mesh per CHUNK cell (by the
+  // ribbon's middle), shown when the camera is within TRACK_R m of its box
+  const trackCells = [];
+  {
+    const byCell = new Map();
+    for (const r of trackParts) {
+      const n = r.pos.length / 3, mx = r.pos[3 * (n >> 1)], mz = r.pos[3 * (n >> 1) + 2];
+      const k = Math.floor(mx / CHUNK) + ',' + Math.floor(mz / CHUNK);
+      if (!byCell.has(k)) byCell.set(k, []);
+      byCell.get(k).push(r);
+    }
+    for (const [k, list] of byCell) {
+      const m = meshFromRibbons(list, trackMat);
+      m.name = trackCells.length ? 'ski-lift-tracks-' + k : 'ski-lift-tracks'; m.renderOrder = 1;
+      m.geometry.computeBoundingBox();
+      trackCells.push({ mesh: m, box: m.geometry.boundingBox });
+    }
+  }
   // R8b: the worn track is a decal on the snow: drawn after the ground, never writing depth, so skis standing in it are never hidden
   // (the lift-path ground it follows differs from the drawn snow by a few cm)
   trackMat.depthWrite = false;
-  if (trackMesh) { trackMesh.name = 'ski-lift-tracks'; trackMesh.renderOrder = 1; }
   // the belt: a dark rubber strip with cleats; its texture runs up the belt
   const beltTex = (() => {
     const c = document.createElement('canvas'); c.width = 8; c.height = 32;
@@ -423,6 +464,15 @@ export function createLifts({ scene, resort, height }) {
     if (signs) signs.update(lastT === null ? 0.6 : Math.max(0, t - lastT), camX, camZ);
     lastT = t;
     for (const c of chunks) c.mesh.visible = Math.hypot(c.cx - camX, c.cz - camZ) - CHUNK * 0.71 < radius;
+    for (const c of trackCells) {
+      const b = c.box, dx = Math.max(b.min.x - camX, 0, camX - b.max.x), dz = Math.max(b.min.z - camZ, 0, camZ - b.max.z);
+      c.mesh.visible = Math.hypot(dx, dz) < Math.min(TRACK_R, radius);
+    }
+    const fineR = Math.min(FINE.max, radius * FINE.share);
+    for (const c of fineCells) {
+      const dx = Math.max(c.x0 - camX, 0, camX - c.x0 - FINE.cell), dz = Math.max(c.z0 - camZ, 0, camZ - c.z0 - FINE.cell);
+      c.mesh.visible = Math.hypot(dx, dz) < fineR;
+    }
     for (const p of pools.values()) { p.n = 0; p.nf = 0; }
     beltTex.offset.y = -(t * 1.4) / 2;
     for (const l of lifts) {

@@ -294,7 +294,7 @@ async function boot() {
   // the village streets are draped on the 5 m ground: built once the extras and every height tile are in
   const tryRoads = () => {
     if (roads || !roadRows || !streamer.done()) return;
-    try { roads = createRoads({ scene, roads: roadRows, env, height: (x, z) => surface.height(x, z) }); mark('roads'); } catch (error) { console.warn('[ski] streets failed', error); roads = { update() {} }; }
+    try { roads = createRoads({ scene, roads: roadRows, env, level, height: (x, z) => surface.height(x, z) }); mark('roads'); } catch (error) { console.warn('[ski] streets failed', error); roads = { update() {} }; }
   };
 
   // streamed height tiles change the heights under them: drop every cache that read them
@@ -989,6 +989,7 @@ async function boot() {
     farForest.setQuality(quality);
     shadows.setLevel(level);
     if (village) village.setLevel(level);
+    if (roads && roads.setLevel) roads.setLevel(level);                 // R8d: the fine streets radius per level (was always medium)
     skier.setBlob(level === 'low');
     poles.reset();
     spray.dispose(); spray = createSnowSpray({ scene, env, level, height: (x, z) => surface.height(x, z) });     // R7-C: the spray budget
@@ -1213,7 +1214,7 @@ async function boot() {
       if (signs) signs.update(camera.position.x, camera.position.z);              // R7-D: the sign atlas follows the camera
       if (village) village.update(camera.position.x, camera.position.z, quality.buildingRadius);
       if (landmarks) landmarks.update(camera.position.x, camera.position.z, quality.buildingRadius);
-      if (roads) roads.update(camera.position.x, camera.position.z, Math.min(quality.buildingRadius, level === 'low' ? 1300 : 2400));      // round 7 (A): streets near only
+      if (roads) roads.update(camera.position.x, camera.position.z, Math.min(quality.buildingRadius, level === 'low' ? 1000 : 2400));      // round 7 (A): streets near only (R8d: Niddreg 1300 -> 1000)
       modes.update(camera.position.x, camera.position.z, quality.buildingRadius);
     }
     env.update(dt, time, camera);

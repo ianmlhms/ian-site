@@ -27,6 +27,15 @@ function grip(P, z = 0, long = 0.5) {
 function chairParts(seats, lod, barUp) {
   const W = chairWidth(seats);
   const P = [];
+  if (lod === 'far') {
+    // R8d (Niddreg budget): a far chair (130-750 m, a few pixels) = grip, one hanger, the seat (cushion colour) and the backrest:
+    // 4 boxes / 48 triangles (was 10 / 120)
+    P.push([box(0.42, 0.22, 0.22), COL.grip, at(0, 0, 0)]);
+    P.push([box(0.09, 2.0, 0.09), COL.frame, at(-0.2, -1.05, 0)]);
+    P.push([box(0.62, 0.14, W), COL.cushion, at(-0.02, -2.08, 0)]);
+    P.push([box(0.1, 0.72, W), COL.frame, at(-0.36, -1.66, 0)]);
+    return { parts: P, glass: [] };
+  }
   grip(P, 0, 0.42);
   P.push([box(0.08, 1.45, 0.08), COL.frame, at(-0.3, -0.78, 0)]);               // hanger arm, bent back over the seat
   P.push([box(0.32, 0.08, 0.08), COL.frame, at(-0.15, -0.08, 0)]);
@@ -34,7 +43,6 @@ function chairParts(seats, lod, barUp) {
   for (const z of [-W / 2, W / 2]) P.push([box(0.07, 0.62, 0.07), COL.frame, at(-0.33, -1.75, z)]);
   P.push([box(0.62, 0.1, W), COL.frame, at(-0.02, -2.1, 0)]);                   // seat pan
   P.push([box(0.08, 0.7, W), COL.frame, at(-0.36, -1.62, 0)]);                  // backrest
-  if (lod === 'far') { P.push([box(0.5, 0.08, W - 0.1), COL.cushion, at(0, -2.02, 0)]); return { parts: P, glass: [] }; }
   const n = Math.max(2, Math.min(8, seats));
   for (let i = 0; i < n; i++) {
     const z = -W / 2 + (i + 0.5) * (W / n), c = i % 2 ? COL.cushion : COL.cushion2;
@@ -57,6 +65,15 @@ function chairParts(seats, lod, barUp) {
 function cabinParts(L, Wd, H, floor, colour, dark, arms, lod) {
   const P = [], G = [];
   const roof = floor + H, mid = (floor + roof) / 2;
+  if (lod === 'far') {
+    // R8d (Niddreg budget): a far cabin = per arm one hanger from the rope, the roof, the coloured lower body and the window band:
+    // 4-5 boxes (was 8-10)
+    for (const z of arms) P.push([box(0.12, -roof + 0.1, 0.12), COL.frame, at(0, roof / 2 + 0.05, z)]);
+    P.push([box(L + 0.1, 0.16, Wd + 0.1), COL.roof, at(0, roof + 0.08, 0)]);
+    P.push([box(L, H * 0.4, Wd), colour, at(0, floor + H * 0.2, 0)]);
+    P.push([box(L - 0.04, H * 0.6 - 0.1, Wd - 0.04), 0x5b6f80, at(0, floor + H * 0.7 - 0.05, 0)]);
+    return { parts: P, glass: G };
+  }
   for (const z of arms) {
     grip(P, z, 0.6);
     P.push([box(0.1, -roof, 0.1), COL.frame, at(0, roof / 2, z)]);              // the hanger arm down to the roof
@@ -64,11 +81,6 @@ function cabinParts(L, Wd, H, floor, colour, dark, arms, lod) {
   }
   P.push([box(L + 0.1, 0.16, Wd + 0.1), COL.roof, at(0, roof + 0.08, 0)]);
   P.push([box(L, 0.12, Wd), COL.floor, at(0, floor - 0.06, 0)]);
-  if (lod === 'far') {
-    P.push([box(L, H * 0.4, Wd), colour, at(0, floor + H * 0.2, 0)]);
-    P.push([box(L - 0.04, H * 0.6 - 0.1, Wd - 0.04), 0x5b6f80, at(0, floor + H * 0.7 - 0.05, 0)]);
-    return { parts: P, glass: G };
-  }
   // R8c (QA: the cable car's window view = a blank slate-blue panel over the lower third): the big cabins are glazed down to ~0.85 m
   const low = H > 3 ? 0.85 : H * 0.36;
   P.push([box(L, low, 0.06), colour, at(0, floor + low / 2, Wd / 2)]);
@@ -161,7 +173,7 @@ function dragParts(sub, pole = 0.75) {
 function dragEnd(sub, y) {
   if (sub === 'tbar') return [[box(0.08, 0.08, 1.1), COL.bar, at(0, y, 0)], [box(0.06, 0.18, 0.06), COL.bar, at(0, y + 0.07, 0)]];
   if (sub === 'jbar') return [[box(0.08, 0.08, 0.55), COL.bar, at(0, y, 0.27)]];
-  return [[cyl(0.19, 0.19, 0.06, 12), COL.platter, at(0, y - 0.03, 0)]];          // platter (Poma disc)
+  return [[cyl(0.19, 0.19, 0.06, 8), COL.platter, at(0, y - 0.03, 0)]];          // platter (Poma disc)
 }
 
 /** The parts of one carrier. */

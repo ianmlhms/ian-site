@@ -13,7 +13,7 @@ window.__r8d = {
       for (let p = o.parent; p; p = p.parent) if (!p.visible) { vis = false; break; }
       if (!vis) continue;
       o.visible = false; const [t, c] = draw(); o.visible = true;
-      const k = (o.name || o.type).replace(/[-_]?\d+(,\d+)?$/, '').replace(/-\d+,-?\d+$/, '');
+      const k = (o.name || ((o.parent && o.parent.name) || 'scene') + '/' + o.type + (o.isInstancedMesh ? '' : '')).replace(/[-_]?\d+(,\d+)?$/, '').replace(/-\d+,-?\d+$/, '');
       if (!out[k]) out[k] = { tris: 0, calls: 0, n: 0 };
       out[k].tris += all - t; out[k].calls += calls - c; out[k].n++;
     }

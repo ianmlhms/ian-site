@@ -21,16 +21,16 @@ function distToBox(px, pz, x0, z0, size) {
 
 /**
  * select(px, pz, { previous, maxDistance, scale }) -> { leaves: [{ key, x0, z0, size, step }], split: Set<key> }
- *  scale < 1 makes the tiles beyond QUADTREE.protectedSize coarser (quality low), > 1 finer; the tiles around the skier are never coarsened.   previous = the split set of the last call (hysteresis).
+ *  scale < 1 makes the tiles beyond `protect` (QUADTREE.protectedSize; R8d: quality.protect, Niddreg 160) coarser (quality low), > 1 finer; the skier's 80 m tiles are never coarsened.   previous = the split set of the last call (hysteresis).
  */
-export function selectTiles(px, pz, { previous = null, maxDistance = 11000, scale = 1 } = {}) {
+export function selectTiles(px, pz, { previous = null, maxDistance = 11000, scale = 1, protect = QUADTREE.protectedSize } = {}) {
   const leaves = [];
   const split = new Set();
   function visit(x0, z0, size) {
     const dist = distToBox(px, pz, x0, z0, size);
     if (dist > maxDistance) return;                                   // beyond the fog: no tile (never visible)
     const key = tileKey(size, x0, z0);
-    let wantSplit = size > QUADTREE.minSize && (dist < size * QUADTREE.splitFactor * (size > QUADTREE.protectedSize ? scale : 1) * (previous && previous.has(key) ? 1 + QUADTREE.splitHysteresis : 1 - QUADTREE.splitHysteresis));
+    let wantSplit = size > QUADTREE.minSize && (dist < size * QUADTREE.splitFactor * (size > protect ? scale : 1) * (previous && previous.has(key) ? 1 + QUADTREE.splitHysteresis : 1 - QUADTREE.splitHysteresis));
     if (size <= QUADTREE.minSize) wantSplit = false;
     if (wantSplit) {
       split.add(key);

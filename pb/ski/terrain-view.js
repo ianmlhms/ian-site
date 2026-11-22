@@ -78,7 +78,7 @@ export function createTerrainView({ scene, surface, field, material: initialMate
     frame += 1;
     if (Math.hypot(px - last.x, pz - last.z) > RESELECT_DISTANCE || lastScale !== quality.lodScale) {
       lastScale = quality.lodScale;
-      const sel = selectTiles(px, pz, { previous: split, scale: quality.lodScale, maxDistance: quality.far * 1.45 });
+      const sel = selectTiles(px, pz, { previous: split, scale: quality.lodScale, protect: quality.protect || undefined, maxDistance: quality.far * 1.45 });
       const dirty = changedBoxes(split, sel.split);
       split = sel.split;
       last = { x: px, z: pz };
