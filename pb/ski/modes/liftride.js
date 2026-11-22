@@ -26,6 +26,11 @@ export const RIDE = Object.freeze({
   wait: 2.5,                 // s at most the rider waits for the next carrier (beyond that the lift catches up)
 });
 const DRAG_BACK = 1.8;                // R8e: m the rider of a platter / T-bar is pulled behind the spring box (the rod ~20 deg off the vertical)
+/** R8e: how far behind the spring box he rides: the rod ~22 deg off the vertical whatever the rope's height over the track. */
+function dragBack(path, s, height) {
+  const q = path.at(s, {}), up = path.cableY(s) - 0.65 - (height(q.x, q.z) + 0.8);
+  return Math.max(DRAG_BACK, Math.min(3.2, up * 0.42));
+}
 const FUNITEL_SEAT = -4.75;            // R8e: the rider's feet below the ropes in a funitel cabin (carriers.js: floor 4.8 m down)
 export const POSE_OF = Object.freeze({ chair: 'sit', gondola: 'carry', cable: 'carry', train: 'carry', drag: 'drag', carpet: 'belt' });
 export const KIND_CODE = Object.freeze({ chair: 1, gondola: 2, cable: 3, drag: 4, train: 5, carpet: 6 });
@@ -63,7 +68,7 @@ export function riderAt(path, s, height, out = {}) {
     const lat = path.sub === 'rope' ? -0.45 * path.sign : 0;       // a rope tow: the rope at his outer hand
     // R8e (3V QA "Belvédère": the platter rod hung straight down behind him, not held): he is pulled 1 m behind the spring box, the rod
     // runs from it down and back to the disc / T between his legs, his hand holds it ~0.55 m up from there (skier-model.js poseDrag)
-    const back = path.sub === 'rope' ? 0 : DRAG_BACK;
+    const back = path.sub === 'rope' ? 0 : dragBack(path, s, height);
     out.x = c.x + rx * lat - fx * back; out.z = c.z + rz * lat - fz * back; out.y = height(out.x, out.z); out.hip = out.y + (path.sub === 'platter' ? 0.78 : 0.86);
     if (back) {
       const bx = out.x + fx * 0.04, bz = out.z + fz * 0.04, ty = c.y - 0.65, dx = c.x - bx, dy = ty - out.hip, dz = c.z - bz, L = Math.hypot(dx, dy, dz) || 1;
@@ -101,7 +106,7 @@ export function createRide({ lift, path, site, height, factor = RIDE.factor, fro
   const moveD = Math.hypot(load.x - start.x, load.z - start.z);
   const tMove = Math.max(0.8, moveD / (carry ? RIDE.walk : RIDE.glide));
   const tIn = k === 'drag' ? (path.sub === 'rope' ? 0.4 : RIDE.barDrop) : k === 'carpet' ? 0.3 : RIDE.getIn;
-  const sLoad = k === 'drag' && path.sub !== 'rope' ? Math.min(s1 - 1, s0 + DRAG_BACK) : s0;      // R8e: the bar's box 1 m ahead of him
+  const sLoad = k === 'drag' && path.sub !== 'rope' ? Math.min(s1 - 1, s0 + dragBack(path, s0, height)) : s0;      // R8e: the bar's box 1 m ahead of him
   const uLoad = path.shuttle ? s0 : path.upU(sLoad);
   const tNeed = tStep + tMove + tIn;
   let u0 = startU === null || !Number.isFinite(startU) ? uLoad - path.spec.speed * tNeed : startU;
