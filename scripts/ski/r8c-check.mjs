@@ -116,6 +116,7 @@ for (const rid of resorts) {
     const k = liftClass(src.kind) || liftClass(src.type);
     if (!k || k === 'train' || k === 'carpet') return;
     const p = createLiftPath(src, field.farHeight);
+    if (!p) return;                                       // (an OSM stub the game does not draw: lift-path.js)
     for (let s = 0; s <= p.len; s += 25) {
       const q = p.at(s, {});
       for (let bz = Math.floor((q.z - 6) / FAR_BLOCK); bz <= Math.floor((q.z + 6) / FAR_BLOCK); bz++) for (let bx = Math.floor((q.x - 6) / FAR_BLOCK); bx <= Math.floor((q.x + 6) / FAR_BLOCK); bx++) {

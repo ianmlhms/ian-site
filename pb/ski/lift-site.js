@@ -41,6 +41,17 @@ export function createLiftSite(path) {
   const bIn = -back - cb.hw - 0.6, bOut = side + cb.hw + 0.6;          // the carriers' lanes (and their swing)
   const aBack = loop ? R + cb.hl + 0.6 : 0.6;                          // how far the loop bulges behind the end
   const boardS = Math.min(BOARD[key], len * 0.2), unloadS = Math.min(UNLOAD[key], len * 0.2);
+  // After launch (Ian, 3V Tovets: "you pass THROUGH the barrier and get scooped"): a chair's loading in the bottom frame. The rider waits
+  // in the zone beside the lane, the gate in the fence opens, he steps through into the lane: a detachable chair (4+ seats) has a
+  // loading belt there that carries him forward to the loading line; a fixed-grip one: he steps right onto the line. His spot across
+  // the lane is his seat's (riderAt in liftride.js: a seat left of the middle).
+  const chair = key === 'chair' ? (() => {
+    const detach = (path.seats || 4) >= 4;
+    const slot = Math.min(0.45, 0.25 * Math.max(1, (path.seats || 4) / 2 - 0.5));
+    const aLoad = -boardS, bRider = side - slot * path.sign;
+    const aEntry = detach ? aLoad + Math.min(2.0, Math.max(0.8, boardS * 0.6)) : aLoad;
+    return { detach, aLoad, bRider, aEntry, aGate: aEntry, bGate: side + cb.hw + 0.6 + 0.6, gateHalf: 0.75, belt: detach ? { a0: aLoad - 0.6, a1: aEntry + 0.6, b0: bRider - 0.55, b1: bRider + 0.55 } : null };
+  })() : null;
   const ends = [makeEnd(0), makeEnd(1)];
 
   function makeEnd(which) {
@@ -83,10 +94,20 @@ export function createLiftSite(path) {
       add(-4.4, -1.2, bIn - 4.4, bIn - 1.6, 0, 2.6, COL.timber, true, { hut: true });
       add(-4.6, -1.0, bIn - 4.6, bIn - 1.4, 2.6, 2.95, COL.snow, false, { cap: true });
       add(-4.3, -1.3, bIn - 1.58, bIn - 1.56, 1.2, 2.1, COL.glass, false);
-      if (!which) {           // the boarding gates: posts with a gap where the rider passes, yellow bars, a sign
-        for (const da of [-2.4, -0.8, 0.8, 2.4]) post(work + da, bOut + 0.6, 1.05, 0.06, COL.dark);
-        for (const da of [-1.6, 1.6]) add(work + da - 0.7, work + da + 0.7, bOut + 0.57, bOut + 0.63, 0.82, 0.9, COL.gate, false);
-        add(work - 2.5, work + 2.5, bOut + 0.55, bOut + 0.65, 1.05, 1.1, COL.dark, false);
+      if (!which) {           // the boarding fence: posts, yellow bars, a gate (two leaves, lifts.js swings them open) where he passes
+        const g = chair.aGate, h = chair.gateHalf, bg = chair.bGate;
+        for (const a of [g - h - 1.7, g - h, g + h, g + h + 1.7]) post(a, bg, 1.05, 0.06, COL.dark);
+        for (const [a0, a1] of [[g - h - 1.7, g - h], [g + h, g + h + 1.7]]) {
+          add(a0 + 0.06, a1 - 0.06, bg - 0.03, bg + 0.03, 0.82, 0.9, COL.gate, false);
+          add(a0 - 0.06, a1 + 0.06, bg - 0.05, bg + 0.05, 1.05, 1.1, COL.dark, false);
+        }
+        // the leaves, closed: hinged at the gate posts, each reaching to the middle (gateLeaf: drawn and turned by lifts.js)
+        for (const side of [-1, 1]) {
+          const hinge = g + side * h;
+          add(Math.min(hinge, g + side * 0.03), Math.max(hinge, g + side * 0.03), bg - 0.025, bg + 0.025, 0.3, 0.98, COL.gate, false, { gateLeaf: { hinge, side } });
+        }
+        // the loading belt (detachable chairs): flush on the deck, under the arriving chairs, from the gate to past the loading line
+        if (chair.belt) { const B = chair.belt; add(B.a0, B.a1, B.b0, B.b1, 0.04, 0.075, COL.rubber, false, { deck: true, belt: true }); }
       }
     } else if (key === 'gondola') {
       type = 'hall';
@@ -191,7 +212,7 @@ export function createLiftSite(path) {
   const zoneB = key === 'drag' ? { a0: -boardS - 1.8, a1: -boardS + 1.2, b0: side - 0.75, b1: side + 0.75 }
     : key === 'rope' ? { a0: -boardS - 1.6, a1: -boardS + 1.0, b0: side - 1.1, b1: side - 0.1 }
       : key === 'carpet' ? { a0: 0.2, a1: 2.0, b0: -0.6, b1: 0.6 }
-        : key === 'chair' ? { a0: -boardS - 1.6, a1: -boardS + 1.6, b0: bOut + 1.2, b1: bOut + 3.4 }
+        : key === 'chair' ? { a0: chair.aGate - 1.6, a1: chair.aGate + 1.6, b0: bOut + 1.2, b1: bOut + 3.4 }
           : { a0: -boardS - 2.2, a1: -boardS + 2.2, b0: bOut + 0.9, b1: bOut + 2.9 };
   const bottom = ends[0], top = ends[1];
   // Launch fix (Ian could not find where to board): the boarding zone is marked, a yellow mat on the platform (stood on, like a
@@ -209,7 +230,7 @@ export function createLiftSite(path) {
   const upHeading = Math.atan2(-bottom.fz, -bottom.fx);
   const off = key === 'carpet' ? null : top.toWorld(key === 'drag' || key === 'rope' ? -unloadS + 0.5 : -unloadS, bOut + (key === 'drag' || key === 'rope' ? 0.9 : 1.4), {});
   const site = {
-    path, key, kind: path.kind, ends, bottom, top, boardS, unloadS, zone: zoneB,
+    path, key, kind: path.kind, ends, bottom, top, boardS, unloadS, zone: zoneB, chair,
     /** The waiting spot in the zone (fast travel lands here): facing up the line. */
     wait: { x: zc.x, z: zc.z, heading: upHeading },
     /** The rider's feet where the carrier picks him up (the loading line on the up lane). */
@@ -775,6 +796,8 @@ function relocateHut(site, f, g, near, hits) {
     const moved = group.map((q) => ({ ...q, a0: q.a0 + da, a1: q.a1 + da, b0: q.b0 + db, b1: q.b1 + db, cut: false, solid: q === hut, added: true }));
     const mh = moved[group.indexOf(hut)];
     if (mh.b1 > lane0 && mh.b0 < lane1) continue;                                          // in its own lift's lanes
+    const Z = site.zone;                                                                   // its own boarding zone and the way in
+    if (f === site.bottom && Z && mh.a1 > Z.a0 - 0.6 && mh.a0 < Z.a1 + 0.6 && mh.b1 > Math.min(Z.b0, lane1) - 0.6 && mh.b0 < Z.b1 + 0.6) continue;
     if (moved.some((q) => (q.solid || q.cap) && near.some((pr) => hits(f, g, q, pr)))) continue;
     for (const q of group) { q.cut = true; q.solid = false; }
     for (const q of moved) addPart(f, q);

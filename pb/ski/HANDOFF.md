@@ -1472,3 +1472,22 @@ Arlberg riffel / valfagehr / seekopf-standard / hoppelweg ..., Kronplatz pedaga)
   nothing left after the abort / at every finish), ski-challenges, ski-freeride, ski: PASS. WebKit not run.
 - Shots: ~/Library/Caches/ski-work/r8g/{before,after}/<rid>-<piste>-{close,high}.png (`scripts/ski/r8g-net-shots.mjs` via shot.mjs
   --script; before = a copy of origin/main served with --root). main.js?v=16.
+## After launch: boarding a chairlift like a real one (22 Nov 2026; Ian at 3V Tovets: "through the barrier, scooped abruptly")
+- Before: the walk from the zone went straight through the fence (a full-width bar at 1.05 m), he waited on the line and the chair
+  swung in at line speed (5 m/s) and he lerped onto it.
+- lift-site.js `site.chair` (bottom frame): a fence with a 1.5 m GATE (two leaves, `gateLeaf`, drawn by lifts.js as one instanced
+  mesh and swung open by `lifts.setGate(index, 0..1)` from main.js stepRide); detachable chairs (>= 4 seats) a LOADING BELT
+  (`belt` deck part, drawn with the carpets' running texture, cleats towards the line) from the gate to past the loading line; his
+  spot across the lane = his seat's. The chair zone is centred on the gate. A moved hut never lands on the zone / the way in.
+- liftride.js `chairPlan` (chairs only): his chair = the next one that can reach the line once he is there (else the one after); he
+  waits behind the closed gate, it opens (0.45 s) in time, he skates through into the lane (turning up the line), the belt carries
+  him (1.4 m/s) to the loading line (fixed-grip: a step), he stands, the chair comes up BEHIND him at the station crawl (2.0 / 2.6 m/s
+  for the last 1.6 s, a 1 s ramp; the whole lift's chairs follow the held one as before), he sits in 0.5 s as it arrives, then it
+  speeds up over 1.6 s to the ride speed (`rideSeconds` counts that). The gate closes behind him. Boarding camera: on the platform
+  beside the lane, ahead of him, the first spot with no station post within 1.1 m of the sight lines (else the camera guard pulls it
+  onto his head); it eases into the ride camera (main.js: no cut for chairs). One tap = one boarding, zone rule and exits unchanged.
+- round7b-test per chair (all resorts): boarded through the plan, belt there (4+ seats), both gate leaves there, through the gate only
+  while it is >= 95 % open, the chair never in front of / through him in the lane before he sits, sit within 0.3 s of the chair's
+  arrival: 11791 / 11791. Shots `scripts/ski/chair-board-shots.mjs` (SHOT_LIFT, SHOT_CAM side | ride; works on the old build via
+  shot.mjs --root for before / after): ~/Library/Caches/ski-work/launch-lifts/chair/ (before / after / ridecam / fixed sheets).
+- r8c-check skips lifts the game does not draw (lift-path.js stubs: it crashed on them since 3513fd60). main.js?v=17.

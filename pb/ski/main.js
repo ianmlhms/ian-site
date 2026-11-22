@@ -976,7 +976,7 @@ async function boot() {
     game.state = ride.state(game.state);
     const w = ride.where();
     const u = ride.carrierU;
-    if (lifts) lifts.setRide(ride.lift.index, u);
+    if (lifts) { lifts.setRide(ride.lift.index, u); lifts.setGate(ride.lift.index, ride.gate); }      // after launch: the chair gate swings
     if (carrier && u === null) { carrier.dispose(); carrier = null; }        // off: the lift's own loop takes the carrier on
     if (carrier) carrier.place(w);
     document.documentElement.dataset.skiRidePhase = ride.phase;
@@ -988,7 +988,8 @@ async function boot() {
     const want = rideCamera(ride.path, w, rideView, (x, z) => surface.height(x, z));
     // chase: the camera rides with the carrier (no lag at x4); only its offset round the rider eases (a bend of the line turns it softly)
     const off = { x: want.x - w.x, y: want.y - w.y, z: want.z - w.z, tx: want.tx - w.x, ty: want.ty - w.y, tz: want.tz - w.z, fov: want.fov };
-    if (rideView === 'window' || !rideCam || rideCam.onCarrier !== w.onCarrier) rideCam = { off, onCarrier: w.onCarrier };
+    // (after launch: a chair's boarding camera eases into the ride camera as he sits down, no cut)
+    if (rideView === 'window' || !rideCam || (rideCam.onCarrier !== w.onCarrier && ride.kind !== 'chair')) rideCam = { off, onCarrier: w.onCarrier };
     else { const k = 1 - Math.exp(-dt * 3); for (const key of Object.keys(off)) rideCam.off[key] += (off[key] - rideCam.off[key]) * k; }
     const o = rideCam.off;
     const out = { x: w.x + o.x, y: w.y + o.y, z: w.z + o.z, tx: w.x + o.tx, ty: w.y + o.ty, tz: w.z + o.tz, fov: o.fov };
@@ -1026,7 +1027,7 @@ async function boot() {
     if (!ride) return;
     const r = ride;
     ride = null; skipping = false;
-    if (lifts) lifts.setRide(r.lift.index, null);
+    if (lifts) { lifts.setRide(r.lift.index, null); lifts.setGate(r.lift.index, 0); }
     if (carrier) { carrier.dispose(); carrier = null; }
     rideHud.show(null);
     if (game.phase === 'lift') game.phase = 'running';
@@ -1037,7 +1038,7 @@ async function boot() {
     if (!ride) return;
     const r = ride;
     ride = null; skipping = false;
-    if (lifts) lifts.setRide(r.lift.index, null);
+    if (lifts) { lifts.setRide(r.lift.index, null); lifts.setGate(r.lift.index, 0); }
     if (carrier) { carrier.dispose(); carrier = null; }
     rideHud.show(null);
     const ex = r.exit || modes.lifts.startAt(r.lift, (x, z) => surface.height(x, z));

@@ -62,6 +62,8 @@ export function createLifts({ scene, resort, height }) {
     const g0 = height(f.x, f.z);
     for (const p of f.parts) {
       if (p.cut) continue;
+      if (p.gateLeaf) { leaves.push({ l, f, p, g0 }); continue; }                // after launch: the chair gates (instanced, they swing)
+      if (p.belt) { beltQuad(f, p, g0); continue; }                                  // after launch: a chair's loading belt (it runs)
       if (p.sign && l) {
         const name = String((l.src && l.src.name) || '').trim();
         if (name) {
@@ -86,6 +88,13 @@ export function createLifts({ scene, resort, height }) {
       if (p.post && Math.abs(p.a1 - p.a0 - (p.b1 - p.b0)) < 1e-3) cylAt((p.a1 - p.a0) / 2, (p.a1 - p.a0) / 2, h, tmpW.x, y0 + h / 2, tmpW.z, p.col);
       else boxAt(p.a1 - p.a0, h, p.b1 - p.b0, tmpW.x, y0 + h / 2, tmpW.z, f.fx, f.fz, p.col);
     }
+  }
+  const leaves = [];                    // after launch: the chair stations' gate leaves { l, f, p, g0 }
+  /** A chair's loading belt: a flat quad on the deck in the frame (a0..a1 x b0..b1) at its top, the cleats running towards -a. */
+  function beltQuad(f, p, g0) {
+    const y = g0 + p.y1 + 0.003, pos = [], uv = [];
+    for (const [a, b, u] of [[p.a0, p.b0, 0], [p.a0, p.b1, 1], [p.a1, p.b0, 0], [p.a1, p.b1, 1]]) { const w = f.toWorld(a, b, {}); pos.push(w.x, y, w.z); uv.push(u, -a / 2); }
+    beltParts.push({ pos, uv, idx: [0, 1, 2, 1, 3, 2, 0, 2, 1, 1, 2, 3] });
   }
   const cablePts = [];
   const trackParts = [];                // drag-lift tracks (one ribbon mesh)
@@ -308,6 +317,34 @@ export function createLifts({ scene, resort, height }) {
   disposables.push(beltTex, beltMat);
   const beltMesh = meshFromRibbons(beltParts, beltMat);
   if (beltMesh) beltMesh.name = 'ski-lift-belts';
+  // after launch: the chair gates, one instanced mesh; closed unless a ride opens one (setGate)
+  const leafMesh = leaves.length ? new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({ color: 0xf2b21c }), leaves.length) : null;
+  const leafOf = new Map();             // lift index -> instance indices
+  const leafM = new THREE.Matrix4(), leafS = new THREE.Vector3(), leafQ = new THREE.Quaternion(), leafP = new THREE.Vector3(), leafY = new THREE.Vector3(0, 1, 0);
+  function placeLeaf(i, open) {
+    const { f, p, g0 } = leaves[i], G = p.gateLeaf, len = p.a1 - p.a0, th = Math.max(0, Math.min(1, open)) * Math.PI / 2;
+    const da = -G.side * Math.cos(th), db = -Math.sin(th);                         // swings in, towards the lane (-b)
+    const c = f.toWorld(G.hinge + da * len / 2, (p.b0 + p.b1) / 2 + db * len / 2, {});
+    const vx = f.fx * da + f.rx * db, vz = f.fz * da + f.rz * db;
+    leafQ.setFromAxisAngle(leafY, -Math.atan2(vz, vx));
+    leafP.set(c.x, g0 + (p.y0 + p.y1) / 2, c.z); leafS.set(len, p.y1 - p.y0, p.b1 - p.b0);
+    leafMesh.setMatrixAt(i, leafM.compose(leafP, leafQ, leafS));
+  }
+  if (leafMesh) {
+    leaves.forEach((lf, i) => { placeLeaf(i, 0); if (!leafOf.has(lf.l.index)) leafOf.set(lf.l.index, []); leafOf.get(lf.l.index).push(i); });
+    leafMesh.instanceMatrix.needsUpdate = true;
+    leafMesh.name = 'ski-lift-gates'; leafMesh.frustumCulled = false; leafMesh.castShadow = false;
+    group.add(leafMesh); disposables.push(leafMesh.geometry, leafMesh.material);
+  }
+  const gateOpen = new Map();
+  /** After launch: open (0..1) the boarding gate of chair lift `index` (the ride's timeline; 0 = closed). */
+  function setGate(index, open) {
+    const ids = leafOf.get(index);
+    if (!ids || (gateOpen.get(index) || 0) === open) return;
+    gateOpen.set(index, open);
+    for (const i of ids) placeLeaf(i, open);
+    leafMesh.instanceMatrix.needsUpdate = true;
+  }
   const tunnelMat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
   disposables.push(tunnelMat);
   const tunnelMesh = meshFromRibbons(tunnelParts, tunnelMat);
@@ -326,7 +363,7 @@ export function createLifts({ scene, resort, height }) {
   disposables.push(cg, cableMat);
   // R8f (memory): the source parts (thousands of BoxGeometry / CylinderGeometry, ribbons, rope points) are merged now; the closures
   // below keep this function's context alive for the page's life, so the lists are emptied (else every part stays in memory)
-  parts.length = 0; fine.length = 0; trackParts.length = 0; beltParts.length = 0; tunnelParts.length = 0; tunnelLamps.length = 0; cablePts.length = 0;
+  parts.length = 0; fine.length = 0; trackParts.length = 0; for (const lf of leaves) { lf.l = { index: lf.l.index }; } beltParts.length = 0; tunnelParts.length = 0; tunnelLamps.length = 0; cablePts.length = 0;
 
   // ---------------- carriers: instanced pools per model (near + far detail) ----------------
   const pools = new Map();               // key -> { near, far, glass, count }
@@ -582,7 +619,7 @@ export function createLifts({ scene, resort, height }) {
     for (const d of disposables) { try { d.dispose(); } catch (error) { /* already gone */ } }
   }
   return {
-    group, update, nearest, setRide, nextCarrier, shuttleBoard, holdShuttle, dockShuttle, dispose, count: lifts.length,
+    group, update, nearest, setRide, setGate, nextCarrier, shuttleBoard, holdShuttle, dockShuttle, dispose, count: lifts.length,
     pathOf: (index) => (byIndex.get(index) ? byIndex.get(index).path : null),
     siteOf: (index) => (byIndex.get(index) ? byIndex.get(index).site : null),
     /** The loop parameter of the carrier held for the player on lift `index` (null: none). */

@@ -15,6 +15,8 @@
  *                missing only in a shared station where a neighbour's roof stands within 30 m); no part floats (every kept part stands
  *                on the ground or on one that does), every bull-wheel is held, no part is bigger than a station; the boarding zone is
  *                marked and can be reached over the snow (a clear 12 m way in from at least one side)
+ *   chairs       (after launch) boarded through a gate that is open while he passes, detachable ones (4+ seats) over a loading belt,
+ *                the chair comes up behind him (never in front of / through him) and he sits within 0.3 s of its arrival
  *   node scripts/ski/round7b-test.mjs [resort ...]    exit 0 = all green; prints a table per resort and lift kind */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -262,10 +264,29 @@ for (const rid of resorts) {
     ok(ride.skip() === false, `${name}: no skip while boarding (one press = one boarding)`);
     let worstAt = '';
     let prev = null, worst = 0, steps = 0, phases = [], minP = Infinity, minS = Infinity, minT = Infinity, dragWorst = 0, dragLat = Infinity;
+    // after launch (Ian, 3V Tovets): chairs are boarded through an opening gate (detachable: onto a loading belt), the chair comes up
+    // behind him and he sits as it arrives
+    const CP = ride.chairPlan, CS = vis.chair, FB = vis.bottom, uLoadT = p.upU(ride.s);
+    let gateBad = null, behindBad = null, tSit = null, tChair = null;
+    if (kind === 'chair') {
+      ok(!!CP && !!CS, `${name}: boarded through the chair plan`);
+      if (CS && CS.detach) ok(FB.parts.some((q) => q.belt && !q.cut), `${name}: the loading belt is there (${p.seats}-seater)`);
+      if (CS) ok(FB.parts.filter((q) => q.gateLeaf && !q.cut).length === 2, `${name}: the gate's two leaves are there`);
+    }
     while (!ride.done && steps < 400000) {
       ride.step(1 / 60); steps++;
       if (phases[phases.length - 1] !== ride.phase) phases.push(ride.phase);
       const w = ride.where();
+      if (CP && CS) {
+        const l = FB.toLocal(w.x, w.z, {});
+        if (ride.phase === 'board' && !gateBad && Math.abs(l.a - CS.aGate) < CS.gateHalf + 0.3 && Math.abs(l.b - CS.bGate) < 0.5 && ride.gate < 0.95) gateBad = `${ride.gate.toFixed(2)} open at t ${ride.t.toFixed(2)}`;
+        if (tSit === null && w.pose === 'sit') tSit = ride.t;
+        if (tChair === null && ride.carrierU !== null && ride.carrierU >= uLoadT - 0.02) tChair = ride.t;
+        if (ride.phase === 'board' && !behindBad && ride.t < CP.tSit0 && Math.abs(l.b - CS.bRider) < 0.5) {
+          const lc = FB.toLocal(w.cx, w.cz, {});
+          if (Math.abs(lc.b - CS.bRider) < 1.6 && lc.a < l.a + 0.8 && lc.a > l.a - 6) behindBad = `chair ${(lc.a - l.a).toFixed(2)} m behind him at t ${ride.t.toFixed(2)}`;
+        }
+      }
       if (prev) { const j = Math.hypot(w.x - prev.x, w.z - prev.z); if (j > worst) { worst = j; worstAt = `${ride.phase} s ${w.s === undefined ? '-' : w.s.toFixed(0)} pose ${w.pose}`; } }
       prev = { x: w.x, z: w.z };
       if (steps % 3) continue;
@@ -287,6 +308,11 @@ for (const rid of resorts) {
       }
     }
     ok(ride.done && phases.join() === 'board,ride,alight,done', `${name}: one boarding, one ride, off at the top (${phases.join(' > ')})`);
+    if (CP && CS) {
+      ok(!gateBad, `${name}: through the gate only when it is open${gateBad ? ` (${gateBad})` : ''}`);
+      ok(!behindBad, `${name}: his chair comes up behind him${behindBad ? ` (${behindBad})` : ''}`);
+      ok(tSit !== null && tChair !== null && Math.abs(tSit - tChair) <= 0.3, `${name}: sits as the chair arrives (sit ${tSit === null ? '-' : tSit.toFixed(2)} s, chair ${tChair === null ? '-' : tChair.toFixed(2)} s)`);
+    }
     ok(worst < 1.2, `${name}: no jump (worst ${worst.toFixed(2)} m per frame at x4, ${worstAt})`);
     ok(minP > 0 && minS > 0 && minT > 0, `${name}: the rider never touches a pylon (${minP.toFixed(2)} m), a station part (${minS === Infinity ? 'none near' : minS.toFixed(2)}), a tree (${minT === Infinity ? 'none near' : minT.toFixed(2)} m)`);
     k.minPylon = Math.min(k.minPylon, minP); k.minTree = Math.min(k.minTree, minT); k.minStation = Math.min(k.minStation, minS);
