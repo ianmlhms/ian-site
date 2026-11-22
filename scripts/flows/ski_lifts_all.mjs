@@ -121,11 +121,17 @@ export const flow = {
         await page.keyboard.press("l");                                         // the double press of Ian's test
         const twice = await page.evaluate(() => ({ phase: window.__ski.ride && window.__ski.ride.phase, s: window.__ski.ride && window.__ski.ride.s, carrier: !!window.__ski.scene.getObjectByName(`ski-ride-${window.__ski.ride.kind}`) }));
         await page.waitForFunction(() => window.__ski.ride && window.__ski.ride.phase === "ride", null, { timeout: 30000 });
-        await h.pause(300);
-        const on = await page.evaluate(() => {
-          const S = window.__ski, r = S.ride, w = r.where(), st = S.state;
-          return { kind: r.kind, onCarrier: w.onCarrier, pose: st.ride, ground: st.y - S.surface.height(st.x, st.z), held: S.lifts.heldOf(r.lift.index) !== null, sub: r.path.sub };
-        });
+        // R8f (Zermatt Leisee-Shuttle, a 60 m funicular: at game time x8 its whole ride lasts ~1 s, the old fixed 300 ms wait read it at
+        // the top already): the first frame of the ride where he sits on the carrier (else the last one seen before the ride ends)
+        const on = await (await page.waitForFunction(() => {
+          const S = window.__ski, r = S.ride;
+          if (!r || r.phase !== "ride") return window.__lastOn || { kind: "?", onCarrier: false, held: false, pose: "", ground: 0 };
+          const w = r.where(), st = S.state;
+          const o = { kind: r.kind, onCarrier: w.onCarrier, pose: st.ride, ground: st.y - S.surface.height(st.x, st.z), held: S.lifts.heldOf(r.lift.index) !== null, sub: r.path.sub };
+          window.__lastOn = o;
+          return o.onCarrier && o.held && o.pose ? o : null;
+        }, null, { timeout: 8000, polling: 50 }).catch(() => page.evaluateHandle(() => window.__lastOn || {}))).jsonValue();
+        await page.evaluate(() => { window.__lastOn = null; });
         if (on.kind === "gondola" || on.kind === "cable" || on.kind === "train") await h.shot(`${rid}-${k}-ride`);
         await page.keyboard.press("Enter");
         await page.waitForFunction(() => window.__ski.game.phase === "running" && !window.__ski.ride, null, { timeout: 120000 });

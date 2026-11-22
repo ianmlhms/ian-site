@@ -62,11 +62,13 @@ export const flow = {
         S.look.turn(-260, 0);
         await new Promise((r) => setTimeout(r, 200));
         const moved = S.camera.position.distanceTo(c0), h1 = S.state.heading;
-        await new Promise((r) => setTimeout(r, 3500));
-        return { moved, turned: Math.abs(h1 - h0), back: Math.abs(S.look.yaw) };
+        // R8f: the ease back runs on the game's frame clock (dt is capped per frame): a slow test machine needs more wall time than 3.5 s
+        const t0 = performance.now();
+        while (performance.now() - t0 < 12000 && Math.abs(S.look.yaw) >= 0.05) await new Promise((r) => setTimeout(r, 250));
+        return { moved, turned: Math.abs(h1 - h0), back: Math.abs(S.look.yaw), waited: Math.round(performance.now() - t0 + 200) };
       });
       h.expect(look.moved > 2 && look.turned < 1e-6, `${rid}: the free look moved the camera ${look.moved.toFixed(1)} m, the skier's heading unchanged`);
-      h.expect(look.back < 0.05, `${rid}: released, the view eased back behind the skier (yaw ${look.back.toFixed(3)})`);
+      h.expect(look.back < 0.05, `${rid}: released, the view eased back behind the skier (yaw ${look.back.toFixed(3)} after ${look.waited} ms)`);
       await h.shot(`ski-webkit-${engine}-${rid}`);
       h.eq(errors.filter((e) => !/Failed to load resource/.test(e)), [], `${rid}: zero console errors`);
       const fps = await page.evaluate(async () => { const t0 = performance.now(); let n = 0; while (performance.now() - t0 < 2000) { await new Promise((r) => requestAnimationFrame(r)); n++; } return n / ((performance.now() - t0) / 1000); });

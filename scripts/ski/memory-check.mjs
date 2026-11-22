@@ -4,10 +4,11 @@
  *        [--size 1180x820] [--dpr 2] [--multi 3] [--json out.json] [--no-check]
  * Per resort (a fresh page): the memory after the free ride is up at the first lift ("load") and after putting the skier down at up
  * to --tour village centres ("tour"). Then ONE page switches resorts --switches times the way the game does (location.replace, a page
- * life per resort) and must not grow: the same resort's footprint at the last visit is within +-50 MB of its first visit.
+ * life per resort) and must not grow: the same resort's renderer + GPU footprint at a later visit is within +-50 MB of its first.
  * Readouts: the page's JS heap (Chromium performance.memory), three's geometries / textures, the scene's vertex bytes (JS side), and the
  * REAL footprint (top's MEM, compressed memory included) of the browser's process tree, split into renderer / GPU / the rest.
- * Targets (renderer process = the page): <= 450 MB after load, <= 700 MB after the tour, switch growth <= 50 MB. Exit 1 when one fails. */
+ * Targets (renderer process = the page): <= 450 MB after load, <= 700 MB after the tour, switch growth <= 50 MB, --multi pages
+ *          <= 2200 MB tree. Exit 1 when one fails. */
 import fs from "node:fs";
 import { execFileSync } from "node:child_process";
 import { startServer, launchBrowser, REPO } from "../flows/lib.mjs";
@@ -179,7 +180,13 @@ try {
       const row = await measure(page, `#${i + 1} ${rid}`);
       results.switches.push(row);
       if (!firstOf[rid]) firstOf[rid] = row;
-      else if (row.treeMB - firstOf[rid].treeMB > LIMIT.growth) fail(`switch #${i + 1} ${rid}: tree ${row.treeMB} MB, ${row.treeMB - firstOf[rid].treeMB} MB more than its first visit (${firstOf[rid].treeMB})`);
+      else {
+        // the page's own memory = its renderer + the GPU process. The browser's other processes also hold the test context's HTTP cache,
+        // which lives in memory in a Playwright (incognito) context and grows by each resort's data files (8-19 MB) on their first visit
+        const own = (r) => r.rendererMB + r.gpuMB, grow = own(row) - own(firstOf[rid]);
+        console.log(`    vs first visit: renderer + gpu ${grow >= 0 ? "+" : ""}${grow} MB, tree ${row.treeMB - firstOf[rid].treeMB >= 0 ? "+" : ""}${row.treeMB - firstOf[rid].treeMB} MB`);
+        if (Math.abs(grow) > LIMIT.growth) fail(`switch #${i + 1} ${rid}: renderer + gpu ${own(row)} MB, ${grow} MB vs its first visit (${own(firstOf[rid])})`);
+      }
     }
     await ctx.close();
   }
