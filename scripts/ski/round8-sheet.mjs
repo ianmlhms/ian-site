@@ -22,6 +22,8 @@ const out = opt("--out", path.join(process.env.HOME, "Library/Caches/ski-work/ro
 const only = opt("--only", "") ? opt("--only", "").split(",") : null;
 const q = opt("--q", "medium");
 const time = opt("--time", "midday");
+const liftName = opt("--lift", "");                   // R8d: start at this lift instead of the resort's first lift
+const tag = opt("--tag", "") ? "-" + opt("--tag", "") : "";
 fs.mkdirSync(out, { recursive: true });
 process.env.FLOW_BROWSER = engine;
 const browser = await launchBrowser({ fullChromium: true, args: engine === "chromium" ? ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist"] : [] });
@@ -38,12 +40,21 @@ try {
     await page.goto(`${origin}/pb/ski.html?go=1&debug=1&q=${q}&weather=sun&time=${time}&resort=${rid}`, { waitUntil: "domcontentloaded" });
     await page.waitForFunction("document.documentElement.dataset.skiRunning === '1' || !!document.documentElement.dataset.bootError", null, { timeout: 240000 });
     await page.waitForTimeout(5000);
-    const shot = async (name) => { await page.screenshot({ path: path.join(out, `${engine}-${rid}-${name}.png`) }); console.log(`  ${rid} ${name}`); };
+    const shot = async (name) => { await page.screenshot({ path: path.join(out, `${engine}-${rid}${tag}-${name}.png`) }); console.log(`  ${rid}${tag} ${name}`); };
     const ev = (f, a) => page.evaluate(f, a);
     const settle = (ms) => page.waitForTimeout(ms);
     const meshed = () => ev(async () => { const S = window.__ski; for (let i = 0; i < 80 && (S.terrain.stats.pending > 0 || i < 10); i++) await new Promise((r) => setTimeout(r, 100)); });
+    if (liftName) {
+      // R8d: --lift NAME: the sheet of another area of the resort (Sonnenkopf): fast travel to that lift's boarding zone first
+      await ev(async (name) => { const S = window.__ski; const l = S.modes.lifts.list.find((q) => q.name === name); if (l) await S.goFree(l.id); }, liftName);
+      await settle(6000);
+    }
     if (want("spawn")) await shot("spawn");
-    const spawn = await ev(() => { const S = window.__ski; return { id: S.spawn.id, index: S.spawn.index, name: S.spawn.name, x: S.state.x, z: S.state.z }; });
+    const spawn = await ev((name) => {
+      const S = window.__ski, l = name ? S.modes.lifts.list.find((q) => q.name === name) : null;
+      const sp = l ? { id: l.id, index: l.index, name: l.name } : S.spawn;
+      return { id: sp.id, index: sp.index, name: sp.name, x: S.state.x, z: S.state.z };
+    }, liftName);
     await page.waitForFunction(() => document.documentElement.dataset.skiTilesDone === '1' && !!window.__ski.lifts, null, { timeout: 300000, polling: 500 }).catch(() => {});
     await page.waitForFunction(() => !!window.__ski.roadRows && !!window.__ski.boxIndex, null, { timeout: 60000 }).catch(() => {});
     await settle(1500);
