@@ -65,7 +65,9 @@ export function createShadows({ renderer, sun, u }) {
   function setLevel(level) {
     spec = SHADOW_SPEC[level] || null;
     renderer.shadowMap.enabled = !!spec;
-    renderer.shadowMap.type = THREE.BasicShadowMap;          // we filter ourselves; three's Lambert receivers (skier, lifts) get the plain lookup
+    // we filter ourselves; R8d (QA: stair-step shadows on the station decks): three's Lambert receivers (skier, lifts, stations) get
+    // three's PCF (r160 still packs the depth into RGBA for every type but VSM, so sunMapShadow's own unpack is unchanged)
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.shadowMap.autoUpdate = true;
     sun.castShadow = !!spec;
     if (spec) {
