@@ -182,6 +182,12 @@ button,.game-card,.genre-filter{touch-action:manipulation}
 }
 @media(prefers-reduced-motion:reduce){#om .go{transition:none}}
 body.game-open #themeFab,body.game-open #themePop,body.game-open #pwaRefresh,body.game-open #pwaInstall,body.game-open #appNav{display:none!important}
+/* While a game is open the hub must neither scroll nor show through: iOS Safari scrolls the page behind a fixed
+   overlay when a drag in the game frame isn't consumed, and its translucent top bar showed the home tiles. */
+html.game-lock,html.game-lock body{overflow:hidden!important;overscroll-behavior:none;height:100%}
+html.game-lock body{position:fixed;left:0;right:0;width:100%;touch-action:none}
+body.game-open main.gt-page,body.game-open .skip,body.game-open .arc-foot{visibility:hidden}
+#overlay{overscroll-behavior:none;touch-action:none}
 </style>
 <script data-goatcounter="https://ianm.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
@@ -543,6 +549,22 @@ if(!lock)return html;
 var tag='<script>window.__tsCareerLock='+JSON.stringify(lock)+';<\/script>';
 return html.indexOf('<head>')>-1?html.replace('<head>','<head>'+tag):tag+html;
 }
+// Freeze the hub page under an open game (position:fixed keeps iOS Safari from scrolling it) and restore the scroll on close.
+var lockedScrollY=0;
+function lockPage(on){
+var root=document.documentElement,body=document.body;
+if(on){
+if(root.classList.contains('game-lock'))return;
+lockedScrollY=window.scrollY||0;
+body.style.top=(-lockedScrollY)+'px';
+root.classList.add('game-lock');
+}else{
+if(!root.classList.contains('game-lock'))return;
+root.classList.remove('game-lock');
+body.style.top='';
+window.scrollTo(0,lockedScrollY);
+}
+}
 function openGame(idx,fromHistory){
 var g=GAMES[idx];
 if(!g||!g.src)return;
@@ -564,6 +586,7 @@ document.documentElement.dataset.liveGame='1';   // invite-pop.js: an invite is 
 // Arrows only for games steered with keys; tap/drag games (Solitaire, Minesweeper…) don't need them.
 document.body.classList.toggle('game-no-pad',!g.pad);
 document.body.style.overflow='hidden';
+lockPage(true);
 // The owner is asked "Test mode or Normal?" while the game downloads (PB.chooseMode); everyone else resolves false at once.
 var pick=(window.PB&&PB.chooseMode)?PB.chooseMode(g):Promise.resolve(false);
 var load=fetch(g.src,{cache:'no-cache'}).then(function(r){
@@ -603,6 +626,7 @@ delete document.documentElement.dataset.liveGame;
 document.body.classList.remove('game-no-pad');
 document.getElementById('gf').srcdoc='';
 document.body.style.overflow='';
+lockPage(false);
 document.title=tr('arc.title');
 if(_cnEl)_cnEl.href=_cn0;
 if(_mdEl)_mdEl.content=_md0;

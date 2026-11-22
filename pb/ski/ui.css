@@ -6,7 +6,7 @@
   --mono:"Geist Mono",ui-monospace,"SF Mono",Menlo,monospace;--halo:0 0 1px #000,0 0 2px #000,0 0 4px #000b,0 1px 8px #0009,0 0 14px #0006;color-scheme:light;
   --d-green:#2f9a4c;--d-blue:#2a66d0;--d-red:#d0352c;--d-black:#1d1f24}
 *{box-sizing:border-box}
-html,body{width:100%;height:100%;margin:0;overflow:hidden;background:var(--paper);font-family:"Geist",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink)}
+html,body{width:100%;height:100%;margin:0;overflow:hidden;overscroll-behavior:none;background:var(--paper);font-family:"Geist",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink)}
 body{display:flex;flex-direction:column;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
 button,select{font:inherit;color:inherit;cursor:pointer}
 [hidden]{display:none!important}
