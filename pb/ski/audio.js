@@ -5,6 +5,8 @@
  *   glide     the low hiss of skis running straight
  *   lift hum  motor and bull-wheel drone with a slow roller clack, by the distance to the nearest lift station / line
  *   ambient   birds below the tree line in sun, a distant village murmur near the houses
+ *   avalanche a deep rumble while a slab flows (low-passed brown-ish noise + a wobbling sub tone), louder the closer and the more of
+ *             it moves (R7-C2); the release: a sharp crack and a heavy whump
  *   one-shots landing thump, crash tumble, countdown beeps and go, slalom gate tick, missed gate buzz, finish chime
  * The context starts on the first user gesture (iOS). The arcade's global mute (localStorage pb_muted, the `arcade:mute` event and the
  * bar's sound button) is honoured; setMuted() is the in-game toggle (menu, M key). update() only moves AudioParams (setTargetAtTime). */
@@ -19,7 +21,7 @@ export function createAudio({ win = window } = {}) {
   let ctx = null, master = null, muted = readMuted();
   let layers = null;
   let birdAt = 0, clackAt = 0;
-  const last = { liftNear: 0 };
+  const last = { liftNear: 0, rumble: 0 };
 
   function readMuted() { try { return win.localStorage.getItem('pb_muted') === '1'; } catch (error) { return false; } }
 
@@ -81,7 +83,13 @@ export function createAudio({ win = window } = {}) {
     // village murmur: very low band-passed pink noise
     const villBp = filter('bandpass', 380, 0.9), villG = gain(0);
     chain(loop(pink, 0.5), [villBp], villG); villG.connect(master);
-    layers = { windBp, windG, airG, airLp, carveBp, carveG, powderG, powderLp, scrapeBp, scrapeG, glideG, humG, villG, am };
+    // avalanche rumble: pink noise at a quarter speed through two lowpasses (a deep roar), a sub tone wobbling under it
+    const rumLp = filter('lowpass', 160, 0.9), rumLp2 = filter('lowpass', 420, 0.5), rumG = gain(0);
+    chain(loop(pink, 0.25), [rumLp, rumLp2], rumG); rumG.connect(master);
+    const sub = ctx.createOscillator(); sub.type = 'sine'; sub.frequency.value = 36;
+    const subWob = ctx.createOscillator(); subWob.frequency.value = 0.7; const subDepth = gain(6); subWob.connect(subDepth); subDepth.connect(sub.frequency);
+    const subG = gain(0); sub.connect(subG); subG.connect(master); sub.start(); subWob.start();
+    layers = { windBp, windG, airG, airLp, carveBp, carveG, powderG, powderLp, scrapeBp, scrapeG, glideG, humG, villG, am, rumG, rumLp, subG };
     return true;
   }
 
@@ -148,10 +156,13 @@ export function createAudio({ win = window } = {}) {
     miss: () => tone(180, 150, 0.25, 'square', 0.08),
     finish: () => { [523, 659, 784, 1047].forEach((f, i) => tone(f, f, 0.35, 'triangle', 0.18, i * 0.11)); },
     click: () => tone(1800, 1600, 0.03, 'square', 0.04),
+    avalanche: (o) => { const k = clamp((o && o.near) || 0.6, 0.25, 1); noiseHit(0.12, 2600, 0.5 * k, 0, 'highpass'); tone(70, 28, 0.9, 'sine', 0.6 * k, 0.05); noiseHit(1.4, 220, 0.6 * k, 0.08); },
   };
 
   return {
     isMuted: () => muted,
+    /** Tests: the avalanche rumble's target level (0..1) of the last update. */
+    get rumble() { return last.rumble; },
     setMuted,
     resume: ensure,
     event(name, opts) { if (!ctx || muted) return; const fn = EVENTS[name]; if (fn) { try { fn(opts); } catch (error) { console.warn('[ski] sound event failed', name, error); } } },
@@ -197,6 +208,12 @@ export function createAudio({ win = window } = {}) {
       const birdy = (f.altitude || 3000) < 2200 && (f.weather === 'sun' || f.weather === 'cloudy') ? clamp((f.forest || 0) * 1.5 + (f.village || 0), 0, 1) : 0;
       if (birdy > 0.15 && now > birdAt) { birdAt = now + (3 + Math.random() * 7) / birdy; bird(now + 0.05); }
       last.liftNear = liftK;
+      // the avalanche: f.avalanche = 0..1 (avalanche.js loudness: how much flows, how near)
+      const av = clamp(f.avalanche || 0, 0, 1);
+      set(L.rumG.gain, av * 0.9, 0.25);
+      set(L.rumLp.frequency, 110 + 160 * av, 0.4);
+      set(L.subG.gain, av * av * 0.35, 0.3);
+      last.rumble = av;
     },
   };
 }

@@ -6,7 +6,7 @@ import { DIFF } from './config.js';
 const DIFF_OF_LETTER = { g: 'green', b: 'blue', r: 'red', k: 'black' };
 const HIT_PX = 22;
 
-export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPickLift = null }) {
+export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPickLift = null, onTapWorld = null }) {
   const g = canvas.getContext('2d');
   const img = new Image();
   let ready = false;
@@ -19,6 +19,8 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
   // round 4A (modes): stars per piste id (mask), locked piste ids, the snow park line, the lifts of the free ride and the picked one
   let marks = { stars: new Map(), locked: new Set() }, mode = 'piste', park = null, lifts = [], liftSel = null, player = null;
   let fitScale = 1;
+  // round 7-C: the fog over the cells not discovered yet (a grid-sized canvas, drawn scaled and smoothed: soft edges), the teleport pin
+  let fog = null, fogCanvas = null, fogVersion = -1, pin = null, tapWorld = onTapWorld;
   const dpr = () => Math.min(2, window.devicePixelRatio || 1);
 
   function size() {
@@ -71,6 +73,20 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
       line(l.pts, sz); g.stroke();
       const [ax, ay] = toScreen(l.pts[0], l.pts[1], sz), [bx, by] = toScreen(l.pts[l.pts.length - 2], l.pts[l.pts.length - 1], sz);
       g.fillStyle = '#16171a'; g.fillRect(ax - 2, ay - 2, 4, 4); g.fillRect(bx - 2.5, by - 2.5, 5, 5);
+    }
+    // round 7-C: fog of the undiscovered cells (free ride tab: where a tap can teleport to)
+    if (fog && mode === 'freeride') {
+      if (fogVersion !== fog.version || !fogCanvas) {
+        fogCanvas = fogCanvas || document.createElement('canvas');
+        fogCanvas.width = fog.nx; fogCanvas.height = fog.nz;
+        const fg = fogCanvas.getContext('2d'), im = fg.createImageData(fog.nx, fog.nz);
+        for (let k = 0; k < fog.bits.length; k++) { const o = k * 4; im.data[o] = 214; im.data[o + 1] = 221; im.data[o + 2] = 231; im.data[o + 3] = fog.bits[k] ? 0 : 215; }
+        fg.putImageData(im, 0, 0);
+        fogVersion = fog.version;
+      }
+      const [x0, y0] = toScreen(0, 0, sz), [x1, y1] = toScreen(fog.nx * fog.cell, fog.nz * fog.cell, sz);
+      g.imageSmoothingEnabled = true;
+      g.drawImage(fogCanvas, x0, y0, x1 - x0, y1 - y0);
     }
     // locked pistes: a pale dashed veil over their line (round 4A)
     if (marks.locked.size && mode === 'piste') {
@@ -159,6 +175,18 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
       }
     }
     if (park) { const [x, y] = toScreen(park.line[0], park.line[1], sz); label(park.name || 'Snowpark', x, y - 12, '800 12px Geist, system-ui, sans-serif', '#6b3fa0'); }
+    // round 7-C: the teleport pin (where the finger went down) and the safe spot it snaps to
+    if (pin) {
+      const [x, y] = toScreen(pin.x, pin.z, sz);
+      if (pin.spot) {
+        const [sx, sy] = toScreen(pin.spot.x, pin.spot.z, sz);
+        g.setLineDash([4, 4]); g.strokeStyle = '#16171a'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(x, y); g.lineTo(sx, sy); g.stroke(); g.setLineDash([]);
+        g.fillStyle = '#1f7a4d'; g.strokeStyle = '#fff'; g.lineWidth = 2.5; g.beginPath(); g.arc(sx, sy, 7, 0, Math.PI * 2); g.fill(); g.stroke();
+      }
+      g.strokeStyle = pin.ok ? '#16171a' : '#a32121'; g.lineWidth = 2;
+      g.beginPath(); g.moveTo(x - 9, y); g.lineTo(x + 9, y); g.moveTo(x, y - 9); g.lineTo(x, y + 9); g.stroke();
+      g.beginPath(); g.arc(x, y, 5, 0, Math.PI * 2); g.stroke();
+    }
   }
 
   function pickAt(px, py) {
@@ -209,9 +237,12 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
     if (ptrs.size < 2) pinch0 = null;
     if (had && ptrs.size === 0 && downAt && moved <= 6) {
       const r = canvas.getBoundingClientRect();
-      if (mode === 'freeride' && onPickLift) {
-        const l = liftAt(e.clientX - r.left, e.clientY - r.top);
-        if (l) { liftSel = l; draw(); onPickLift(l); }
+      if (mode === 'freeride' && (onPickLift || tapWorld)) {
+        // round 7-C: a tap right on a lift's bottom dot picks the lift (round 6); anywhere else it asks to teleport to that exact spot
+        const px = e.clientX - r.left, py = e.clientY - r.top;
+        const l = liftAt(px, py, 12);
+        if (l && onPickLift) { liftSel = l; draw(); onPickLift(l); }
+        else if (tapWorld) { const [wx, wz] = toWorld(px, py, size()); tapWorld(wx, wz); }
       } else if (mode === 'piste') {
         const p = pickAt(e.clientX - r.left, e.clientY - r.top);
         if (p) { select(p); onPick(p); }
@@ -225,9 +256,9 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
 
   function zoomBy(k) { view.s *= k; clampView(); draw(); }
   /** The lift whose top is nearest the tap (within 28 px), or its line (round 4A free ride). */
-  function liftAt(px, py) {
+  function liftAt(px, py, radius = 28) {
     const sz = size();
-    let bd = 28, found = null;
+    let bd = radius, found = null;
     for (const l of lifts) {
       const [x0, y0] = toScreen(l.top.x, l.top.z, sz), [x, y] = toScreen(l.bottom.x, l.bottom.z, sz);
       const dx = x - x0, dy = y - y0, L2 = dx * dx + dy * dy || 1;
@@ -272,5 +303,13 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
     setPlayer(x, z) { player = Number.isFinite(x) ? { x, z } : null; if (player) { view.x = x; view.z = z; view.s = Math.max(view.s, fitScale * 2.2); clampView(); } draw(); },
     selectLift(l, center = false) { liftSel = l; if (center && l) focusBox(Math.min(l.top.x, l.bottom.x), Math.min(l.top.z, l.bottom.z), Math.max(l.top.x, l.bottom.x), Math.max(l.top.z, l.bottom.z), 1400); else draw(); },
     focusBox, liftAt,
+    /** Round 7-C: the discovery fog (modes/discovery.js), the tap-to-teleport handler, the pin; CSS pixels <-> world metres. */
+    setFog(d) { fog = d; fogVersion = -1; draw(); },
+    setTapWorld(fn) { tapWorld = fn; },
+    setPin(p) { pin = p; draw(); },
+    screenXY: (x, z) => toScreen(x, z, size()),
+    worldXY: (px, py) => toWorld(px, py, size()),
+    get zoom() { return view.s / fitScale; },
+    center(x, z, zoom = 3) { view.x = x; view.z = z; view.s = Math.max(view.s, fitScale * zoom); clampView(); draw(); },
   };
 }

@@ -2,17 +2,18 @@
  * gate), the finish, the respawn point after a crash, and the ghost recording. Modes: MODES.run (timed) and MODES.free (no clock: the
  * piste is only the guide line); 'challenge', 'park' and 'race' are the hooks for the next rounds (they fall back to 'free' here).
  * update() returns a list of events: { type: 'checkpoint' | 'gate' | 'missed-gate' | 'finish' | 'invalid' | 'offpiste' } */
-import { PLAY, SKI, MODES } from './config.js';
+import { PLAY, SKI, MODES, COURSE } from './config.js';
 import { minRunMs } from './progress.js';
 
-export function createRun({ piste, mode = MODES.run }) {
+export function createRun({ piste, mode = MODES.run, startS = 2 }) {      // R7-C: startS = the start gate on open snow (clear.js courseGate)
   const timed = mode === MODES.run;
   const checkpoints = timed ? piste.checkpoints().map((s) => ({ s, passed: false })) : [];
   const gates = timed ? piste.slalomGates().map((g) => ({ ...g, result: null })) : [];
   const proj = {};
   const tmp = {};
   const samples = [];
-  let hint = 0, best = 0, elapsed = 0, penalty = 0, finished = null, sampleT = 0, offFor = 0;
+  let hint = startS, best = startS, elapsed = 0, penalty = 0, finished = null, sampleT = 0, offFor = 0;
+  const finishS = Math.max(startS + 30, piste.length - COURSE.finishBack);      // R7-C: the finish line of the course (the line's real end)
   const run = {
     piste, mode, timed, checkpoints, gates,
     get elapsed() { return elapsed; }, get penalty() { return penalty; }, get progress() { return best; }, get finished() { return finished; },
@@ -25,6 +26,7 @@ export function createRun({ piste, mode = MODES.run }) {
     const events = [];
     if (finished) return events;
     piste.project(state.x, state.z, hint, 220, proj);
+    if (proj.dist > 300) piste.project(state.x, state.z, null, 0, proj);     // R7-C: lost the line (a jump, a respawn): the whole piste
     hint = proj.s;
     if (proj.dist < piste.halfWidth + PLAY.checkpointSlack) best = Math.max(best, proj.s);
     if (!timed) {
@@ -54,7 +56,7 @@ export function createRun({ piste, mode = MODES.run }) {
     if (sampleT >= PLAY.ghostEvery) { sampleT = 0; samples.push({ t: elapsed * 1000, s: proj.s, o: proj.off }); }
     offFor = proj.dist > SKI.offPisteLimit ? offFor + dt : 0;
     if (offFor > 0.5) { offFor = 0; events.push({ type: 'offpiste' }); }
-    if (proj.s > piste.length - 6 && proj.dist < piste.halfWidth + PLAY.finishRadius) {
+    if (proj.s >= finishS && proj.dist < piste.halfWidth + PLAY.finishRadius) {
       for (const g of gates) if (g.result === null) { g.result = false; penalty += PLAY.slalomMiss; }
       samples.push({ t: elapsed * 1000, s: piste.length, o: proj.off });
       const missed = checkpoints.filter((c) => !c.passed).length;
@@ -68,9 +70,12 @@ export function createRun({ piste, mode = MODES.run }) {
 
   /** Where to put the skier back after a crash or off-piste: on the line, a little behind the furthest point reached, facing down. */
   run.respawnPoint = function respawnPoint() {
-    const p = piste.at(Math.max(2, best - 18), {});
+    // R7-C: where the skier was when on the course (never far back to the start because the furthest point was lost)
+    const here = proj.dist !== undefined && proj.dist < piste.halfWidth + 80 ? proj.s : best;
+    const p = piste.at(Math.max(startS, Math.min(best, here) - 10), {});
     return { x: p.x, z: p.z, heading: Math.atan2(p.dz, p.dx), s: p.s };
   };
   run.samples = () => samples;
+  run.startS = startS; run.finishS = finishS;
   return run;
 }

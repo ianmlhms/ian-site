@@ -2,6 +2,8 @@
  * points along it, checkpoints, slalom gates, and which pistes continue from the bottom of another. Pure (no THREE, no DOM). */
 import { PLAY, DIFF } from './config.js';
 
+const PROJECT_SLACK = 25, PROJECT_JUMP = 0.08;      // m along the line free from the hint, then m of distance per m of jump
+
 export function createPiste(src) {
   const n = src.line.length / 2;
   const x = new Float32Array(n), z = new Float32Array(n), s = new Float32Array(n);
@@ -37,8 +39,11 @@ export function createPiste(src) {
       t = t < 0 ? 0 : t > 1 ? 1 : t;
       const qx = ax + dx * t, qz = az + dz * t;
       const d = Math.hypot(px - qx, pz - qz);
-      if (d < best) {
-        best = d;
+      // R7-C2: with a hint, stay on the stretch the skier is on: a line that loops back close to itself (OSM ways chained into a
+      // hairpin or a loop: Zermatt rotenboden, Arlberg riffel / waldabfahrt ...) must not snap him 100 m back along it
+      const cost = hint === null ? d : d + Math.max(0, Math.abs(s[i] + t * Math.sqrt(L2) - hint) - PROJECT_SLACK) * PROJECT_JUMP;
+      if (cost < best) {
+        best = cost;
         const L = Math.sqrt(L2);
         out.s = s[i] + t * L;
         out.off = ((px - ax) * -dz + (pz - az) * dx) / L;     // + = right of travel (x east, z south: right of (dx, dz) is (-dz, dx))

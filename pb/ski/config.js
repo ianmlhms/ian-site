@@ -139,3 +139,45 @@ export const RANDOM_TIME = Object.freeze(['morning', 'midday', 'midday', 'evenin
 export const MODES = Object.freeze({ run: 'run', free: 'free', challenge: 'challenge', park: 'park', race: 'race', freeride: 'freeride' });
 /* Round 4A: every 'run' is also the piste's star challenge (modes/challenges.js; 'challenge' stays an alias hook), 'park' = a scored snow
  * park run (modes/park.js), 'freeride' = the whole area all day from a lift top (modes/freeride.js); 'free' = the old guided free ride. */
+
+/* Round 7-C: the first lift of each resort (the main village lift a real visitor takes first; matched by name in resort.json, else
+ * modes/freeride.js spawnLift picks one), the discovery grid behind the map teleport, the first-person camera, the avalanches, the
+ * challenge course (start gate on open snow, push start, barriers, arrows, finish arch, leaving the course). */
+export const FIRST_LIFT = Object.freeze({
+  killy: ['Olympique', 'Solaise'],                         // Val d'Isère centre: the Olympique gondola up to Bellevarde
+  '3vallees': ['Verdons', 'Jardin Alpin'],                 // Courchevel 1850: the Verdons gondola
+  zermatt: ['Matterhorn Express 1', 'Zermatt - Furi'],     // Zermatt village: the Matterhorn Express from Schluhmatt
+  arlberg: ['Galzigbahn', 'Nassereinbahn'],                // St. Anton: the Galzigbahn from the village centre
+  kronplatz: ['Kronplatz I - Plan de Corones I', 'Ried'],  // Reischach / Riscone: Kronplatz I
+});
+export const DISCOVERY = Object.freeze({
+  cell: 100,                // m: the discovery grid
+  reveal: 140,              // m round the skier that count as seen
+  station: 220,             // m round a reached lift station
+  spawn: 320,               // m round the first lift (always discovered)
+});
+export const FIRST_PERSON = Object.freeze({ eye: 1.62, eyeTuck: 1.15, back: 0.42, fov: 74, fovKick: 16, kickFrom: 5, kickTo: 24, streakFrom: 12, bob: 0.022, lean: 0.13, skiRoll: 0.3 });
+export const AVALANCHE = Object.freeze({
+  slope: 35,                // degrees: release only on slopes at least this steep
+  pisteGap: 45,             // m off the nearest piste line (never on groomed pistes)
+  chance: 0.06,             // per new steep cell crossed (seeded: the same crossing gives the same answer)
+  cell: 40,                 // m: the release cells (the far grid)
+  width: [50, 110],         // m: slab width
+  step: 1 / 30,             // s: fixed simulation step (deterministic for the online free ride)
+  caught: 7,                // m from a flowing block = caught
+  maxTime: 75,              // s: an avalanche ends at the latest after this
+  faces: 3,                 // "Lawin" challenge faces per resort
+});
+export const COURSE = Object.freeze({
+  push: 4.8,                // m/s (17 km/h) start kick down the fall line at "0"
+  gateSearch: 160,          // m along the piste the start gate may move to find open snow (at most 45 % of the piste; R7-C2: 90 -> 160)
+  gateClear: 7,             // m round the gate posts that must be free of buildings, lifts and trees
+  barrierEvery: 3,          // m between barrier panels (R7-C2: 6 -> 3, short panels follow the snow without gaps)
+  warnAfter: 12,            // m beyond the barriers: "Zréck op d'Pist"
+  abortAfter: 8,            // s off the course before "Challenge ofgebrach"
+  finishBack: 12,           // m before the line's end: the finish line
+  archHeight: 6,            // m: the top of the ZIL beam over the higher pillar's snow (R7-C2: no course object stands higher)
+  barrierBody: 0.45,        // m: the skier's half width against a barrier (R7-C2: soft collision)
+  barrierSlow: 0.93,        // share of the speed kept per barrier contact
+  barrierBounce: 0.25,      // share of the speed into the net that comes back as a bounce
+});

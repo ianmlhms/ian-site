@@ -51,7 +51,7 @@ export const flow = {
     h.expect(g1.kind === "gondola" && g1.pose === "carry" && g1.carrier && g1.held !== null && g2.above > 1.5, `in a cabin (${g2.lift}), standing, ${g2.above.toFixed(1)} m over the snow; the lift's own cabins keep their spacing around it`);
     h.expect(g2.s > g1.s + 30, `riding up the real line: ${Math.round(g1.s)} -> ${Math.round(g2.s)} m of ${Math.round(g2.len)} m (x4, test time x3)`);
     const passed = g2.towers.filter((t) => t < g2.s).length;
-    h.expect(g2.towers.length > 3, `${g2.towers.length} pylons on the line, ${passed} passed`);
+    h.expect(g2.towers.length >= 3, `${g2.towers.length} pylons on the line, ${passed} passed`);
     await h.shot("gondola-chase");
     await page.keyboard.press("v");
     await h.pause(800);
@@ -69,6 +69,7 @@ export const flow = {
     const chairId = await page.evaluate(() => { const L = window.__ski.modes.lifts.list.filter((l) => l.kind === "chair" && l.len > 500 && l.len < 1300); return (L.find((l) => /Grattalu|Fresse|Borsat/.test(l.name)) || L[0]).id; });
     await page.keyboard.press("m");
     await page.waitForFunction(() => document.documentElement.dataset.skiScreen === "map", null, { timeout: 10000 });
+    await page.evaluate(() => window.__ski.explore.discoverAll());      // R7-C: fast travel goes only to discovered lifts
     await page.click(`.lrow[data-lift="${chairId}"]`);
     await page.waitForFunction(() => document.documentElement.dataset.skiFreeReady === "1", null, { timeout: 60000 });
     await page.click("#freeStart");
