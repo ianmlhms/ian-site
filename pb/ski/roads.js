@@ -73,10 +73,12 @@ const LAT = 2.5;
  * the camera to the cell) the street on the 2.5 m physics lattice as before (skis on it); farther a COARSE copy on a 10 m lattice (1/16 of
  * the triangles; the vertex shader's pull towards the camera keeps it on top of the far, coarser terrain tiles). */
 const LAT_FAR = 10;
+const FINE_KEEP = 300;                 // R8d: m beyond the fine radius before a cell's fine lattice is dropped (no rebuild back and forth)
+const FINE_BUILDS = 2;                 // R8d: fine cells built per update at most
 export const FINE_RADIUS = Object.freeze({ low: 150, medium: 360, high: 650 });          // R8d: main.js passes the level (low 260 -> 150)
 
 /** The cells of one lattice (lat m): Map key -> { pos, nrm, segA, segB, hw, cx, cz }. ground = true: the ground's own triangle split. */
-function latticeCells(roads, lat, height, ground) {
+function latticeCells(roads, lat, height, ground, clip = null) {
   const cells = new Map();
   const nodeVal = new Map();                  // lattice node key -> [|across| / hw] of the nearest street
   const covered = new Map();                  // lattice cells touched by a street (+ its bank) -> [d, road, segment] nearest its middle
@@ -91,8 +93,10 @@ function latticeCells(roads, lat, height, ground) {
       const L = Math.hypot(bx - ax, bz - az);
       if (L < 0.01) continue;
       const ux = (bx - ax) / L, uz = (bz - az) / L;
-      const i0 = Math.floor((Math.min(ax, bx) - reach) / lat), i1 = Math.ceil((Math.max(ax, bx) + reach) / lat);
-      const j0 = Math.floor((Math.min(az, bz) - reach) / lat), j1 = Math.ceil((Math.max(az, bz) + reach) / lat);
+      let i0 = Math.floor((Math.min(ax, bx) - reach) / lat), i1 = Math.ceil((Math.max(ax, bx) + reach) / lat);
+      let j0 = Math.floor((Math.min(az, bz) - reach) / lat), j1 = Math.ceil((Math.max(az, bz) + reach) / lat);
+      // R8d: one render cell only (the fine lattice is built per cell when the camera comes near): its nodes + the next row
+      if (clip) { i0 = Math.max(i0, Math.floor(clip[0] / lat)); i1 = Math.min(i1, Math.ceil(clip[2] / lat) + 1); j0 = Math.max(j0, Math.floor(clip[1] / lat)); j1 = Math.min(j1, Math.ceil(clip[3] / lat) + 1); if (i0 > i1 || j0 > j1) continue; }
       for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
         const x = i * lat, z = j * lat;
         const t = Math.max(0, Math.min(L, (x - ax) * ux + (z - az) * uz));
@@ -202,7 +206,9 @@ export function roundRoads(roads) {
 /** roads = decodeRoads(roads.json); height(x, z) = the PHYSICS ground (surface.height: exact at the lattice nodes); level = quality. */
 export function createRoads({ scene, roads, env, height, level = 'medium' }) {
   const gentle = gentleRoads(roundRoads(roads), height);                 // R8d: round bends
-  const fine = latticeCells(gentle, LAT, height, true), coarse = latticeCells(gentle, LAT_FAR, height, false);
+  // R8d (memory: Kronplatz built ~180 MB of street vertices up front, the browser passed 2.5 GB): the coarse lattice for the whole resort,
+  // the fine 2.5 m lattice per render cell only when the camera comes within the fine radius, dropped again beyond it + FINE_KEEP m
+  const coarse = latticeCells(gentle, LAT_FAR, height, false);
   const mat = material(env);
   const group = new THREE.Group();
   group.name = 'ski-roads';
@@ -221,21 +227,26 @@ export function createRoads({ scene, roads, env, height, level = 'medium' }) {
     return m;
   };
   const list = [];
-  for (const [key, c] of fine) {
-    const far = coarse.get(key);
-    list.push({ fine: mesh(c), coarse: far ? mesh(far) : null, x0: c.x0, z0: c.z0 });
-  }
-  for (const [key, c] of coarse) if (!fine.has(key)) list.push({ fine: null, coarse: mesh(c), x0: c.x0, z0: c.z0 });
+  for (const [key, c] of coarse) list.push({ key, fine: null, coarse: mesh(c), x0: c.x0, z0: c.z0 });     // fine: null = not built, false = none
   scene.add(group);
   let fineR = FINE_RADIUS[level] || FINE_RADIUS.medium;
   const tris = (m) => (m ? m.geometry.attributes.position.count / 3 : 0);
-  const stats = { cells: list.length, fineTriangles: list.reduce((a, c) => a + tris(c.fine), 0), coarseTriangles: list.reduce((a, c) => a + tris(c.coarse), 0), triangles: 0 };
+  const stats = { cells: list.length, fineBuilt: 0, coarseTriangles: list.reduce((a, c) => a + tris(c.coarse), 0), triangles: 0 };
+  /** The fine lattice of one render cell (null when no street cell of it is drawn at 2.5 m). */
+  function buildFine(c) {
+    const cells = latticeCells(gentle, LAT, height, true, [c.x0, c.z0, c.x0 + CELL, c.z0 + CELL]);
+    const f = cells.get(c.key);
+    return f && f.pos.length ? mesh(f) : false;
+  }
+  function dropFine(c) { if (c.fine) { group.remove(c.fine); c.fine.geometry.dispose(); stats.fineBuilt--; } c.fine = null; }
   return {
     count: roads.length, cells: list.length, stats,
     update(px, pz, radius) {
-      let t = 0;
+      let t = 0, built = 0;
       for (const c of list) {
         const dx = Math.max(c.x0 - px, 0, px - c.x0 - CELL), dz = Math.max(c.z0 - pz, 0, pz - c.z0 - CELL), d = Math.hypot(dx, dz);
+        if (d < fineR && c.fine === null && built < FINE_BUILDS) { c.fine = buildFine(c); built++; if (c.fine) stats.fineBuilt++; }
+        else if (d > fineR + FINE_KEEP && c.fine !== null) dropFine(c);
         const nearCell = d < fineR && !!c.fine;
         if (c.fine) c.fine.visible = nearCell;
         if (c.coarse) c.coarse.visible = !nearCell && d < radius;
