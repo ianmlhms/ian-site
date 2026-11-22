@@ -6,7 +6,7 @@ OUT=${1:-$HOME/Library/Caches/ski-work/round8d}
 STEPS=${2:-"calls village ground pose flows-chromium flows-webkit sheets sonnenkopf"}
 SLOT="python3 $HOME/Library/Caches/browser-slot.py"
 export BROWSER_POOL=ski
-export FLOW_NO_VIDEO=${FLOW_NO_VIDEO:-1}       # R8f: no flow video (the encoder costs ~60 % CPU of a 3D flow)
+
 mkdir -p "$OUT"
 for s in $STEPS; do
   case $s in
@@ -15,7 +15,7 @@ for s in $STEPS; do
     flows-chromium|flows-webkit)
       eng=${s#flows-}
       for f in ${FLOWS:-home-page ski ski-ipad-start ski-resorts ski-mp ski-challenges ski-park ski-freeride ski-lift ski-skis ski-lifts-all ski-webkit ski-look7d ski-mp-freeride ski-teleport ski-spawn ski-firstperson ski-avalanche ski-course mp-lobby-connect4 mp-lobby-slf mp-lobby-quick-match mp-lobby-games mp-lobby-color mp-lobby-party mp-lobby-arcade mp-lobby-roulette mp-lobby-blackjack arcade-pad}; do
-        FLOW_BROWSER=$eng $SLOT node scripts/flows/run_all.mjs "=$f" > "$OUT/flow-$eng-$f.log" 2>&1; echo "flow $eng $f exit $?"
+        FLOW_POWER=${FLOW_POWER:-1} FLOW_BROWSER=$eng $SLOT node scripts/flows/run_all.mjs "=$f" > "$OUT/flow-$eng-$f.log" 2>&1; echo "flow $eng $f exit $?"
       done ;;
     calls) for r in killy 3vallees zermatt arlberg kronplatz; do $SLOT node scripts/ski/calls-sweep7d.mjs --resorts $r --json "$OUT/calls-sweep-$r.json" > "$OUT/calls-sweep-$r.log" 2>&1; echo "calls $r exit $?"; done ;;
     village) PORT=8795 scripts/ski/r8d-sweeps.sh "low medium" "killy 3vallees zermatt arlberg kronplatz" "$OUT/village" > "$OUT/village-sweep.log" 2>&1; echo "village exit $?" ;;

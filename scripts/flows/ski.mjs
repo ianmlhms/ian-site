@@ -9,6 +9,7 @@ const PISTE = "face";            // a red slalom piste, 1.1 km (Tignes)
 export const flow = {
   name: "ski",
   fullChromium: true,
+  measuresFrames: true,                    // R8f: the Niddreg p95 budget: real pixels + frame rate under FLOW_POWER
   viewport: { width: 1180, height: 820 },
   deviceScaleFactor: 2,                    // round 5: a retina screen, so the flow's screenshots show the game as an iPad does
   async run(h) {

@@ -1282,7 +1282,9 @@ Switching (one page, 10 x): before the trees went 1191 / 1592 / 1489 / 1645 / 17
 renderer 506 -> 794 on its second visit); after 980 / 1124 / 1082 / 1188 / 1086 then 1059 / 1202 / 1075 / 1239 / 1124, the page's own
 renderer + GPU vs its first visit: killy +34, 3V +45, zermatt -31, arlberg +42, kronplatz +23 MB (the rest of the tree's growth is the
 incognito test context's in-memory HTTP cache: each resort's data files once). Three killy pages at once: tree 2043 MB (was over 2.5 GB).
-**Flows**: `FLOW_NO_VIDEO=1` (lib.mjs) records no video (r8d-flows.sh sets it by default; the encoder took ~60 % of the CPU of a 3D
+**Flows**: merged `claude/test-power-59c669` (FLOW_POWER: no video + headless shell on Metal + dsf 0.5 + 30 fps, `measuresFrames`
+ flows at full quality (R8f: the ski flow sets it), h.releaseMemory()); R8f's own FLOW_NO_VIDEO switch dropped for it (r8d-flows.sh runs the
+ flows with FLOW_POWER=1, sheets / shots without). Earlier note: the video encoder took ~60 % of the CPU of a 3D
 flow). lib.mjs launches Chromium with `--disable-features=WebUIOmniboxPopup,WebUIOmniboxFullPopup,WebUIOmniboxAimPopup`: full Chromium
 built 2-3 chrome:// omnibox renderers (~80 MB) per browser context (ski-mp: ~250 MB). ski-mp: a gate on each player's resort.json from
 the start click, the three game pages boot one after the other (the mesh waits for everybody).
