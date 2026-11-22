@@ -199,7 +199,8 @@ async function boot() {
     scatterView.invalidate();
     farForest.invalidate(...rect);
     poles.reset();
-    if (runProps && game.piste) { runProps.dispose(); runProps = createRunProps({ scene, piste: game.piste, height: (x, z) => surface.height(x, z), gates: game.run ? game.run.gates : [] }); }
+    if (runProps && game.piste) { runProps.dispose(); runProps = createRunProps({ scene, piste: game.piste, height: (x, z) => surface.height(x, z), gates: game.run ? game.run.gates : [], ...runPropsOpts }); }
+    if (courseView) courseView.reseat();                                     // R7-C2: barriers, arrows and the ZIL arch onto the final snow
     if (modes) modes.onTiles(rect);
     if (streamer.done()) document.documentElement.dataset.skiTilesDone = '1';
     if (markers) markers.reseat();
@@ -221,7 +222,7 @@ async function boot() {
   });
   loadExtras(core.root).then(({ buildings, roads: streets }) => {
     village = createVillage({ scene, rows: buildings, env, height: (x, z) => field.baseHeight(x, z), level }); mark('village');
-    if (explore) { explore.setBuildings(buildings); gateS.clear(); if (markers) markers.regate(gateOf); }      // R7-C: gates clear of houses
+    if (explore) { explore.setBuildings(buildings); gateS.clear(); if (markers) markers.regate(gateAt); }      // R7-C: gates clear of houses
     roadRows = decodeRoads(streets); tryRoads();
   }).catch((error) => console.warn('[ski] buildings failed', error.message));
 
@@ -229,13 +230,15 @@ async function boot() {
   let explore = null, avalanches = null, course = null, courseView = null, courseAbort = null;      // R7-C
   const gateS = new Map();
   /** R7-C: a challenge's start s on open snow (clear.js courseGate: clear of buildings, stations, lift lines and trees). */
-  const gateOf = (p) => { if (!explore) return 2; if (!gateS.has(p.id)) gateS.set(p.id, courseGate(p, explore.obs).s); return gateS.get(p.id); };
+  // R7-C2: the gate may also stand beside the line (lat m right of it) where a station or a lift line takes the middle
+  const gateAt = (p) => { if (!explore) return { s: 2, lat: 0 }; if (!gateS.has(p.id)) gateS.set(p.id, courseGate(p, explore.obs)); return gateS.get(p.id); };
+  const gateOf = (p) => gateAt(p).s;
   // ---------------- game state ----------------
   const game = {
     screen: 'picker', piste: null, mode: MODES.run, run: null, state: null, phase: 'idle', countdown: 0, paused: false, ghost: null,
     override: null, bot: null, freeRide: false, lastNearest: 0,
   };
-  let runProps = null;
+  let runProps = null, runPropsOpts = {};
   const world = {
     height: (x, z) => surface.height(x, z),
     normal: (x, z, out) => surface.normal(x, z, out),
@@ -289,7 +292,7 @@ async function boot() {
     skiCard = showSkiCard(document.getElementById('ui'), { stats: modes.skiStats(), selected: skiType, onPick: (id) => { if (setSki(id)) hud.toast(`Ski: ${SKI_BY_ID.get(id).name}`); }, onClose: () => { skiCard = null; game.paused = false; input.setEnabled(game.phase === 'running'); } });
   }
   // ---- round 6: the challenge start gates on the mountain ----
-  markers = createMarkers({ scene, list: markerList(pistes, parkLayout, gateOf), height: (x, z) => surface.height(x, z), overlay: document.getElementById('ui'), starsOf: (m) => (m.piste ? pisteStars(store.get(), rid, m.piste.id) : 0) });
+  markers = createMarkers({ scene, list: markerList(pistes, parkLayout, gateAt), height: (x, z) => surface.height(x, z), overlay: document.getElementById('ui'), starsOf: (m) => (m.piste ? pisteStars(store.get(), rid, m.piste.id) : 0) });
   let dismissed = null;
   const chPrompt = createChallengePrompt(hud.el, { onStart: (m) => acceptChallenge(m), onNo: (m) => { dismissed = m.id; chPrompt.show(null); } });
   function promptInfo(m) {
@@ -488,7 +491,9 @@ async function boot() {
     game.piste = p;
     game.mode = mode;
     endCourse();
-    const s0 = mode === MODES.run ? gateOf(p) : 2;                          // R7-C: the start gate on open snow
+    const gate = mode === MODES.run ? gateAt(p) : { s: 2, lat: 0 };          // R7-C: the start gate on open snow
+    const s0 = gate.s;
+    const lat = lateral || gate.lat || 0;                                    // R7-C2: beside a station / under a lift line
     game.run = createRun({ piste: p, mode, startS: s0 });
     const a = p.at(s0, {});
     if (mode === MODES.run) {
@@ -497,9 +502,11 @@ async function boot() {
       courseHud.show(true);
       document.documentElement.dataset.skiCourse = 'on';
     }
-    placeAt(a.x - a.dz * lateral, a.z + a.dx * lateral, Math.atan2(a.dz, a.dx));
+    placeAt(a.x - a.dz * lat, a.z + a.dx * lat, Math.atan2(a.dz, a.dx));
     if (runProps) runProps.dispose();
-    runProps = createRunProps({ scene, piste: p, height: (x, z) => surface.height(x, z), gates: game.run.gates });
+    const startAt = { x: a.x - a.dz * lat, z: a.z + a.dx * lat, dx: a.dx, dz: a.dz };
+    runPropsOpts = { start: startAt, finish: mode !== MODES.run };            // R7-C2: START at the gate, one ZIL arch (the course's)
+    runProps = createRunProps({ scene, piste: p, height: (x, z) => surface.height(x, z), gates: game.run.gates, ...runPropsOpts });
     const g = mode === MODES.run ? decodeGhost(store.get().ghosts[pisteKey(rid, p.id)]) : null;
     game.ghost = g;
     ghostModel.setVisible(false);
@@ -911,6 +918,7 @@ async function boot() {
           const wasCrash = game.state.crash > 0, wasAir = !game.state.grounded, vyAir = game.state.vy;
           const prevState = game.state;
           game.state = modes.step(prevState, inp, game.mode);                // round 4A: rails / park tricks, else stepSkier
+          if (course && game.phase === 'running') game.state = course.collide(prevState, game.state);     // R7-C2: the barriers hold him (soft)
           if (wasAir && game.state.grounded && game.state.crash === 0) audio.event('land', { impact: Math.min(1, Math.abs(vyAir) / 8) });
           if (!wasCrash && game.state.crash > 0) audio.event('crash');
           if (!wasCrash && game.state.crash > 0) hud.toast(game.state.crashKind === 'tree' ? 'Aua, e Bam!' : game.state.crashKind === 'rock' ? 'Aua, e Steen!' : 'Gefall!');
@@ -1094,7 +1102,7 @@ async function boot() {
     place(x, z, heading) { placeAt(x, z, heading); },
     // R7-C
     get explore() { return explore; }, get avalanches() { return avalanches; }, get course() { return course; }, get lastCourse() { return lastCourse; }, get spray() { return spray; },
-    get camMode() { return camMode; }, setCamMode, fp, gateOf, startLawin, teleportTo: (spot) => goFree(null, spot), firstLift: () => goFree(spawn), get pisteMap() { return pisteMap; },
+    get camMode() { return camMode; }, setCamMode, fp, gateOf, gateAt, startLawin, teleportTo: (spot) => goFree(null, spot), firstLift: () => goFree(spawn), get pisteMap() { return pisteMap; },
   };
 
   // first build around the default piste behind the loading screen, then the picker (or straight onto the piste with ?auto=1)

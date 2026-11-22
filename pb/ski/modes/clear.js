@@ -73,8 +73,8 @@ export function createObstacles({ resort, field, scatter = null, density = 1 }) 
     return false;
   }
   /** The first thing within r m of (x, z), or null: 'building' | 'station' | 'lift' | 'tree' | 'rock' | 'water' | 'built'. */
-  function blocked(x, z, r = 1, { lift = true, trees = true, built = true } = {}) {
-    if (x < 50 || z < 50 || x > resort.width - 50 || z > resort.depth - 50) return 'edge';
+  function blocked(x, z, r = 1, { lift = true, trees = true, built = true, edge = 50 } = {}) {
+    if (x < edge || z < edge || x > resort.width - edge || z > resort.depth - edge) return 'edge';
     if (inBuilding(x, z, r)) return 'building';
     if (nearStation(x, z, r)) return 'station';
     if (lift && nearLine(x, z, r)) return 'lift';
@@ -181,20 +181,29 @@ export function safeSpot(x, z, { obs, pistes, lifts, height, isOpen = () => true
   return found[0] || null;
 }
 
-/** A challenge's start on open snow: the first s from 2 m on (up to COURSE.gateSearch m) where both gate posts and the skier's spot are
- *  clear (no building, station, lift line, tree or rock within COURSE.gateClear m). Returns { s, ok, why }. */
+/** A challenge's start on open snow: the first s from 2 m on (up to COURSE.gateSearch m, keeping >= 45 m of course) and the lateral
+ *  offset across the piste (R7-C2: the middle first, then towards either edge, the gate staying inside the piste) where both gate posts
+ *  and the skier's spot are clear (no building, station, lift line, tree or rock within COURSE.gateClear m). A piste that starts right
+ *  beside a station hall or runs under a lift line gets its gate beside it, not in it. Returns { s, lat, ok, why }. */
 export function courseGate(piste, obs, halfGate = 3.5) {
   const a = {};
   let why = '';
-  for (let s = 2; s <= Math.min(COURSE.gateSearch, piste.length * 0.3); s += 4) {
+  const hw = piste.halfWidth;
+  const maxLat = Math.max(0, hw - halfGate - 1.5);
+  const lats = [0];
+  for (const f of [0.3, 0.55, 0.8, 1]) { const l = Math.round(maxLat * f * 10) / 10; if (l > 0.5 && !lats.includes(l)) lats.push(l, -l); }
+  const sMax = Math.min(COURSE.gateSearch, Math.max(30, piste.length * 0.45, piste.length - COURSE.finishBack - 45));     // >= 45 m of course left
+  for (let s = 2; s <= sMax; s += 4) {
     piste.at(s, a);
     const rx = -a.dz, rz = a.dx;
-    why = '';
-    for (const [k, r] of [[0, COURSE.gateClear], [halfGate, COURSE.gateClear * 0.6], [-halfGate, COURSE.gateClear * 0.6]]) {
-      const w = obs.blocked(a.x + rx * k, a.z + rz * k, r, { trees: true });
-      if (w) { why = w; break; }
+    for (const lat of lats) {
+      why = '';
+      for (const [k, r] of [[0, COURSE.gateClear], [halfGate, COURSE.gateClear * 0.6], [-halfGate, COURSE.gateClear * 0.6]]) {
+        const w = obs.blocked(a.x + rx * (lat + k), a.z + rz * (lat + k), r, { trees: true, edge: 8 });
+        if (w) { why = w; break; }
+      }
+      if (!why) return { s, lat, ok: true, why: '' };
     }
-    if (!why) return { s, ok: true, why: '' };
   }
-  return { s: 2, ok: false, why };
+  return { s: 2, lat: 0, ok: false, why };
 }

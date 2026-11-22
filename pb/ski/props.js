@@ -207,7 +207,7 @@ export function createSigns({ scene, resort, height }) {
 }
 
 /** The objects of one run: start gate at the top, finish arch at the bottom, slalom gates. dispose() removes them. */
-export function createRunProps({ scene, piste, height, gates }) {
+export function createRunProps({ scene, piste, height, gates, start = null, finish = true }) {     // R7-C2: start = the course's gate point, finish false = the course draws its own ZIL arch
   const group = new THREE.Group();
   group.name = 'ski-run';
   const post = new THREE.MeshLambertMaterial({ color: 0x2b2f36 });
@@ -230,9 +230,8 @@ export function createRunProps({ scene, piste, height, gates }) {
     group.add(g);
     return g;
   };
-  arch(top, 'START', '#1f7a4d', '#ffffff', 9);
-  const finishPoint = piste.at(Math.max(0, piste.length - 2), {});
-  arch(finishPoint, 'ZIL', '#d0352c', '#ffffff', Math.min(30, piste.halfWidth * 2 + 4));
+  arch(start || top, 'START', '#1f7a4d', '#ffffff', 9);
+  if (finish) arch(piste.at(Math.max(0, piste.length - 2), {}), 'ZIL', '#d0352c', '#ffffff', Math.min(30, piste.halfWidth * 2 + 4));
   // slalom gates: an inner pole with a flag and an outer pole 4 m further out
   const flagGeo = new THREE.PlaneGeometry(0.75, 0.55).translate(0.4, 1.35, 0);
   const poleGeo = new THREE.CylinderGeometry(0.025, 0.025, 1.8, 5).translate(0, 0.9, 0);

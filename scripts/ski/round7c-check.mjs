@@ -10,6 +10,11 @@
  *   course     EVERY piste's challenge: the start gate clear of buildings / stations / lifts / trees, the barriers line the piste (both
  *              edges, continuous), the finish = the line's real end; with --rides the scripted skier rides each course with game.js
  *              createRun + course.js and must finish inside the barriers (leaving them gives a warning event, never a reset)
+ *   R7-C2      every start gate on open snow (0 blocked, beside the line where a station / lift line takes the middle); every course
+ *              object (barrier panels, arrow boards + posts, ZIL pillars + beam, the finish strip) stands on the snow (<= 0.5 m gap) and
+ *              no higher than 6 m above it, at its intended size; the barriers hold a skier aimed at them (pushed back inside, slowed
+ *              a little, never stopped, never through); with --rides the HUD distance falls along every ride (no rise > 15 m) and is
+ *              < 30 m when he crosses the ZIL, the skier never ends up outside a barrier he hit
  * Exit code 1 on a failed check. */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -29,7 +34,7 @@ const { createParkLayout } = await imp('modes/park.js');
 const { createObstacles, firstLift, liftSpot, safeSpot, courseGate } = await imp('modes/clear.js');
 const { createDiscovery, mergeRle, rleIntervals } = await imp('modes/discovery.js');
 const { findFaces, releasable, createSlab, stepSlab, cellId, slopeDeg } = await imp('avalanche.js');
-const { createCourse, courseLayout } = await imp('modes/course.js');
+const { createCourse, courseLayout, courseSeats, distanceText } = await imp('modes/course.js');
 const { createRun } = await imp('game.js');
 const { createSkierState, stepSkier } = await imp('skier.js');
 const { createBot } = await imp('bot.js');
@@ -112,47 +117,113 @@ for (const rid of rids.length ? rids : ALL) {
   check(onPiste === 0, `avalanche: never releasable on a piste (${onPiste} of 200 piste middles)`);
 
   // ---- course ----
-  let clear = 0, moved = 0, lined = 0;
-  const blocked = [];
+  let clear = 0, moved = 0, beside = 0, lined = 0, seatsOk = 0, worstBury = 0, worstGap = 0;
+  const blocked = [], badSeats = [], unlined = [];
+  const gates = new Map();
   for (const p of pistes.list) {
     if (ONLY && !ONLY.has(p.id)) continue;
     const g = courseGate(p, obs);
+    gates.set(p.id, g);
     if (g.ok) clear++; else blocked.push(`${p.id} (${g.why})`);
     if (g.s > 2) moved++;
-    const lay = courseLayout(p, g.s);
-    const cover = lay.barriers.length * COURSE.barrierEvery / 2 / Math.max(1, lay.finishS - g.s);
-    if (cover > 0.95 && lay.finish && Math.hypot(lay.finish.x - p.bottom.x, lay.finish.z - p.bottom.z) < COURSE.finishBack + 1) lined++;
+    if (g.lat) beside++;
+    const lay = courseLayout(p, g.s, pistes);
+    // the nets: both sides from the start gate to the finish (the inside of a tight bend may be left out)
+    let netLen = 0;
+    for (const r of lay.rails) for (let i = 2; i < r.length; i += 2) netLen += Math.hypot(r[i] - r[i - 2], r[i + 1] - r[i - 1]);
+    const cover = netLen / 2 / Math.max(1, lay.finishS - g.s - 4);
+    if (cover > 0.8 && lay.finish && Math.hypot(lay.finish.x - p.bottom.x, lay.finish.z - p.bottom.z) < COURSE.finishBack + 1) lined++;
+    else unlined.push(`${p.id} (${(cover * 100).toFixed(0)} % netted)`);
+    // R7-C2: every course object on the snow, nothing higher than 6 m above it, nothing bigger than meant
+    const st = courseSeats(lay, height);
+    const all = [...st.barriers, ...st.arrows, ...st.posts, ...st.pillars, st.beam, st.line];
+    const hwArch = lay.halfWidth + 1.5, cross = Math.abs(st.pillars[0].ground[0] - st.pillars[1].ground[0]);
+    const maxSize = { barrier: [0.1, 1.3, 0.1], arrow: [1.1, 1.1, 0.05], post: [0.1, 1.8, 0.1], pillar: [0.9, COURSE.archHeight + 0.4 + cross + 0.01, 0.9], beam: [0.4, 1.4, hwArch * 2 + 0.9], line: [1.6, 0, hwArch * 2] };
+    const bad = all.find((o) => o.top - o.ground[1] > COURSE.archHeight + 0.01 || (o.kind !== 'beam' && o.kind !== 'arrow' && o.y - o.ground[0] > 0.3) || (o.kind === 'arrow' && o.y - o.ground[0] > 1.7)
+      || st.netGap > 0.3 || st.netSunk > 0.3
+      || o.size.some((v, i) => v > maxSize[o.kind][i] + 1e-6) || !Number.isFinite(o.y + o.top));
+    if (!bad) seatsOk++; else badSeats.push(`${p.id}: ${bad.kind} ${(bad.y - bad.ground[0]).toFixed(1)}..${(bad.top - bad.ground[1]).toFixed(1)} m, net gap ${st.netGap.toFixed(2)} sunk ${st.netSunk.toFixed(2)}, ${bad.size.map((v) => v.toFixed(1)).join('x')}`);
+    worstGap = Math.max(worstGap, st.netGap); worstBury = Math.max(worstBury, st.netSunk);
   }
   const total = ONLY ? ONLY.size : pistes.list.length;
-  check(blocked.length <= Math.ceil(total * 0.01), `course: ${clear}/${total} start gates on open snow (${moved} moved down the piste)${blocked.length ? `; blocked: ${blocked.slice(0, 8).join(', ')}` : ''}`);
-  check(lined === total, `course: ${lined}/${total} courses lined with barriers on both edges, finish at the line's real end`);
+  check(blocked.length === 0, `course: ${clear}/${total} start gates on open snow (${moved} moved down the piste, ${beside} beside the line)${blocked.length ? `; blocked: ${blocked.slice(0, 8).join(', ')}` : ''}`);
+  check(lined === total, `course: ${lined}/${total} courses lined with barriers on both edges, finish at the line's real end${unlined.length ? `; not: ${unlined.slice(0, 6).join(', ')}` : ''}`);
+  check(seatsOk === total, `course objects: ${seatsOk}/${total} courses with every barrier / arrow / post / ZIL pillar / beam / finish strip on the snow, <= ${COURSE.archHeight} m above it, intended size (net edge over the snow <= ${worstGap.toFixed(2)} m, into it <= ${worstBury.toFixed(2)} m)${badSeats.length ? `; bad: ${badSeats.slice(0, 6).join('; ')}` : ''}`);
   row.gates = `${clear}/${total}`;
+  // R7-C2: the barriers hold: a skier at 15 m/s aimed 35° at the net, on the ground, every 5th course
+  const world = { height, normal: (x, z, o) => surface.normal(x, z, o), snow: (x, z) => Math.min(1, surface.info(x, z, 0) * 1.25), hit: (x, z, r, y) => scatter.hit(x, z, r, y, 0.8) };
+  let hold = 0, holdN = 0, through = 0, stopped = 0, minKeep = 1, missed = 0;
+  for (const [i, p] of pistes.list.entries()) {
+    if (ONLY ? !ONLY.has(p.id) : i % 5) continue;
+    const g = gates.get(p.id) || courseGate(p, obs);
+    for (const side of [-1, 1]) {
+      const sA = Math.min(p.length - 40, g.s + 60 + (p.length - g.s) * 0.3);
+      if (sA < g.s + 20) continue;
+      holdN++;
+      const c = createCourse({ piste: p, startS: g.s });
+      const a = p.at(sA, {});
+      const h0 = Math.atan2(a.dz, a.dx) + side * 35 * Math.PI / 180;      // + = towards the right edge
+      const x0 = a.x - a.dz * side * (p.halfWidth - 3), z0 = a.z + a.dx * side * (p.halfWidth - 3);
+      let s = { ...createSkierState(x0, z0, h0, height(x0, z0)), vx: Math.cos(h0) * 15, vz: Math.sin(h0) * 15, speed: 15 };
+      c.collide(s, s);
+      let worst = 0, hitAt = -1;
+      for (let k = 0; k < 240; k++) {
+        const prev = s;
+        s = stepSkier(s, { steer: 0, tuck: 0, brake: 0, push: 0, jump: false }, world);
+        const before = c.hits;
+        s = c.collide(prev, s);
+        if (c.hits > before && hitAt < 0) { hitAt = k; minKeep = Math.min(minKeep, s.speed / Math.max(0.1, prev.speed)); }
+        const pr = p.project(s.x, s.z, sA, 120, {});
+        worst = Math.max(worst, Math.abs(pr.off) - (p.halfWidth + 0.5));
+      }
+      if (worst > 0.05) through++;
+      if (hitAt < 0) { missed++; holdN--; continue; }                    // fell / stopped before the net (a tree, a crest): no contact
+      if (s.speed < 1 && s.crash === 0) stopped++;
+      if (worst <= 0.05) hold++;
+    }
+  }
+  check(through === 0 && stopped === 0 && hold === holdN && holdN > 0, `barriers: ${hold}/${holdN} skiers aimed at the net at 54 km/h held inside (${through} through, ${stopped} stopped, ${missed} never reached it), speed kept at the hit >= ${(minKeep * 100).toFixed(0)} %`);
   if (RIDES) {
-    const world = { height, normal: (x, z, o) => surface.normal(x, z, o), snow: (x, z) => Math.min(1, surface.info(x, z, 0) * 1.25), hit: (x, z, r, y) => scatter.hit(x, z, r, y, 0.8) };
-    let fin = 0, resets = 0, warned = 0;
-    const stuck = [];
+    let fin = 0, resets = 0, warned = 0, hudBad = 0, hits = 0, outside = 0;
+    const stuck = [], hudFail = [];
     for (const p of pistes.list) {
       if (ONLY && !ONLY.has(p.id)) continue;
-      const g = courseGate(p, obs);
+      const g = gates.get(p.id);
       const run = createRun({ piste: p, mode: MODES.run, startS: g.s });
       const course = createCourse({ piste: p, startS: g.s });
       const a = p.at(g.s, {});
-      let s = createSkierState(a.x, a.z, Math.atan2(a.dz, a.dx), height(a.x, a.z));
+      const x0 = a.x - a.dz * (g.lat || 0), z0 = a.z + a.dx * (g.lat || 0);
+      let s = createSkierState(x0, z0, Math.atan2(a.dz, a.dx), height(x0, z0));
       s = { ...s, vx: a.dx * COURSE.push, vz: a.dz * COURSE.push, speed: COURSE.push };
       const bot = createBot(p);
-      let t = 0, done = false;
-      while (t < 900 && !done) {
+      let t = 0, done = false, low = Infinity, rise = 0, atFinish = null, lastRemain = null, fresh = true;
+      const limit = 300 + p.length / 3;                       // long flat ski routes (Arlberg woster-bockbachtal: 8.2 km) take time
+      while (t < limit && !done) {
         const was = s.crash > 0;
+        const prev = s;
         s = stepSkier(s, bot(s), world);
-        if (was && s.crash === 0) { const r = run.respawnPoint(); s = createSkierState(r.x, r.z, r.heading, height(r.x, r.z)); }
-        for (const ev of run.update(s, SKI.dt)) { if (ev.type === 'finish' || ev.type === 'invalid') done = true; if (ev.type === 'offpiste') resets++; }
+        s = course.collide(prev, s);
+        if (was && s.crash === 0) { const r = run.respawnPoint(); s = createSkierState(r.x, r.z, r.heading, height(r.x, r.z)); fresh = true; }
         const c = course.update(s, SKI.dt);
         if (c.warn) warned++;
+        // the HUD distance: falls along the ride (a crash puts him back up to 10 m: a new reference)
+        if (fresh) { low = c.remaining; fresh = false; } else { rise = Math.max(rise, c.remaining - low); low = Math.min(low, c.remaining); }
+        lastRemain = c.remaining;
+        for (const ev of run.update(s, SKI.dt)) {
+          if (ev.type === 'finish' || ev.type === 'invalid') { done = true; atFinish = lastRemain; }
+          if (ev.type === 'offpiste') resets++;
+        }
         t += SKI.dt;
       }
+      hits += course.hits;
+      const pr = p.project(s.x, s.z, null, 0, {});
+      if (pr.dist > p.halfWidth + 0.6 && course.hits) outside++;
       if (done) fin++; else stuck.push(`${p.id}@${Math.round(run.progress)}/${Math.round(p.length)}`);
+      const startText = distanceText(course.finishS - g.s), endText = atFinish === null ? '-' : distanceText(atFinish);
+      if (!done || atFinish >= 30 || rise > 15) { hudBad++; hudFail.push(`${p.id}: ${startText} -> ${endText}, rise ${rise.toFixed(0)} m`); }
     }
-    check(fin >= Math.ceil(total * 0.97) && resets === 0, `course rides: ${fin}/${total} finished by the scripted skier inside the course, ${resets} silent resets${stuck.length ? `; not finished: ${stuck.slice(0, 10).join(', ')}` : ''}`);
+    check(fin === total && resets === 0, `course rides: ${fin}/${total} finished by the scripted skier inside the course, ${resets} silent resets${stuck.length ? `; not finished: ${stuck.slice(0, 10).join(', ')}` : ''}`);
+    check(hudBad === 0, `course HUD: the distance falls along all ${total} rides and reads < 30 m at the ZIL (${hits} barrier contacts, ${outside} ended outside a barrier)${hudFail.length ? `; bad: ${hudFail.slice(0, 6).join('; ')}` : ''}`);
     row.rides = `${fin}/${total}`;
   }
   console.log(`  (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
