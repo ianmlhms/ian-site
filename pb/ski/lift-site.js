@@ -693,10 +693,16 @@ function copyCuts(sites, from) {
   }
 }
 
-/** For the scatter (scatter.js): a tree guard from the resort's lifts (any height function, the far grid is fine). */
+/** For the scatter (scatter.js): a tree guard from the resort's lifts (any height function, the far grid is fine).
+ *  R8c: one per resort object (the far forest cards of forest-far.js use the same guard: no second build of every lift path). */
+const treeGuards = new WeakMap();
 export function liftTreeGuard(resort, createPath, height) {
+  const known = treeGuards.get(resort);
+  if (known) return known;
   const paths = new Map();
   resort.lifts.forEach((src, i) => { if (liftClass(src.kind) || liftClass(src.type)) paths.set(i, createPath(src, height)); });
   const world = createLiftWorld(paths);
-  return (x, z, y) => world.treeBlocked(x, z, y);
+  const guard = (x, z, y) => world.treeBlocked(x, z, y);
+  treeGuards.set(resort, guard);
+  return guard;
 }

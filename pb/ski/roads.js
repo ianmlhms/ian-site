@@ -66,9 +66,15 @@ function material(env) {
  * are discarded, so the edges stay smooth). Where streets cross, the nearest one paints. */
 import { diagonalIsMain } from './surface.js';
 const LAT = 2.5;
-/** roads = decodeRoads(roads.json); height(x, z) = the PHYSICS ground (surface.height: exact at the lattice nodes). */
-export function createRoads({ scene, roads, env, height }) {
-  const cells = new Map();                    // render cell key -> { pos, segA, segB, hw } (R8: unshared vertices, 6 per lattice cell)
+/* R8c (QA: 494-645k triangles in the villages; the streets were 40-90k of them): two levels per render cell. Near (FINE_RADIUS m from
+ * the camera to the cell) the street on the 2.5 m physics lattice as before (skis on it); farther a COARSE copy on a 10 m lattice (1/16 of
+ * the triangles; the vertex shader's pull towards the camera keeps it on top of the far, coarser terrain tiles). */
+const LAT_FAR = 10;
+export const FINE_RADIUS = Object.freeze({ low: 260, medium: 360, high: 650 });          // main.js passes no level: medium
+
+/** The cells of one lattice (lat m): Map key -> { pos, nrm, segA, segB, hw, cx, cz }. ground = true: the ground's own triangle split. */
+function latticeCells(roads, lat, height, ground) {
+  const cells = new Map();
   const nodeVal = new Map();                  // lattice node key -> [|across| / hw] of the nearest street
   const covered = new Map();                  // lattice cells touched by a street (+ its bank) -> [d, road, segment] nearest its middle
   const nk = (i, j) => i * 200003 + j;
@@ -76,63 +82,67 @@ export function createRoads({ scene, roads, env, height }) {
     const r = roads[ri];
     const pts = r.pts;
     if (pts.length < 2) continue;
-    const reach = r.hw + BANK + LAT;
-    let along = 0;
+    const reach = r.hw + BANK + lat;
     for (let k = 0; k + 1 < pts.length; k++) {
       const [ax, az] = pts[k], [bx, bz] = pts[k + 1];
       const L = Math.hypot(bx - ax, bz - az);
       if (L < 0.01) continue;
       const ux = (bx - ax) / L, uz = (bz - az) / L;
-      const i0 = Math.floor((Math.min(ax, bx) - reach) / LAT), i1 = Math.ceil((Math.max(ax, bx) + reach) / LAT);
-      const j0 = Math.floor((Math.min(az, bz) - reach) / LAT), j1 = Math.ceil((Math.max(az, bz) + reach) / LAT);
+      const i0 = Math.floor((Math.min(ax, bx) - reach) / lat), i1 = Math.ceil((Math.max(ax, bx) + reach) / lat);
+      const j0 = Math.floor((Math.min(az, bz) - reach) / lat), j1 = Math.ceil((Math.max(az, bz) + reach) / lat);
       for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
-        const x = i * LAT, z = j * LAT;
+        const x = i * lat, z = j * lat;
         const t = Math.max(0, Math.min(L, (x - ax) * ux + (z - az) * uz));
-        const px = ax + ux * t, pz = az + uz * t;
-        const d = Math.hypot(x - px, z - pz) / r.hw;
+        const d = Math.hypot(x - (ax + ux * t), z - (az + uz * t)) / r.hw;
         const key = nk(i, j);
         const old = nodeVal.get(key);
-        if (!old || d < old[0]) nodeVal.set(key, [d, along + t]);
+        if (!old || d < old[0]) nodeVal.set(key, [d]);
         // the cell (i, j) (nodes i..i+1, j..j+1) is touched when the street passes within its half diagonal of the cell's middle
-        const cx = x + LAT / 2, cz = z + LAT / 2, tc = Math.max(0, Math.min(L, (cx - ax) * ux + (cz - az) * uz));
+        const cx = x + lat / 2, cz = z + lat / 2, tc = Math.max(0, Math.min(L, (cx - ax) * ux + (cz - az) * uz));
         const dc = Math.hypot(cx - (ax + ux * tc), cz - (az + uz * tc));
-        if (dc <= r.hw + BANK * 0.6 + LAT * 0.71) { const o = covered.get(key); if (!o || dc / r.hw < o[0]) covered.set(key, [dc / r.hw, ri, k]); }
+        if (dc <= r.hw + BANK * 0.6 + lat * 0.71) { const o = covered.get(key); if (!o || dc / r.hw < o[0]) covered.set(key, [dc / r.hw, ri, k]); }
       }
-      along += L;
     }
   }
   const hCache = new Map();
-  const hAt = (i, j) => { const key = nk(i, j); let h = hCache.get(key); if (h === undefined) { h = height(i * LAT, j * LAT) + LIFT; hCache.set(key, h); } return h; };
+  const hAt = (i, j) => { const key = nk(i, j); let h = hCache.get(key); if (h === undefined) { h = height(i * lat, j * lat) + LIFT; hCache.set(key, h); } return h; };
   for (const [key, near] of covered) {
     const i = Math.floor(key / 200003), j = key - i * 200003;
-    // the cell (i, j) spans nodes i..i+1, j..j+1; skip cells whose four nodes are all beyond the bank
-    const vals = [nodeVal.get(nk(i, j)), nodeVal.get(nk(i + 1, j)), nodeVal.get(nk(i, j + 1)), nodeVal.get(nk(i + 1, j + 1))];
-    if (vals.every((v) => !v || v[0] > 1.45)) continue;
-    const ck = Math.floor((i * LAT) / CELL) + ',' + Math.floor((j * LAT) / CELL);
+    // skip cells whose four nodes are all beyond the bank (the coarse lattice keeps every touched cell: its nodes are far apart)
+    if (ground) {
+      const vals = [nodeVal.get(nk(i, j)), nodeVal.get(nk(i + 1, j)), nodeVal.get(nk(i, j + 1)), nodeVal.get(nk(i + 1, j + 1))];
+      if (vals.every((v) => !v || v[0] > 1.45)) continue;
+    }
+    const ci = Math.floor((i * lat) / CELL), cj = Math.floor((j * lat) / CELL), ck = ci + ',' + cj;
     let c = cells.get(ck);
-    if (!c) cells.set(ck, (c = { pos: [], nrm: [], segA: [], segB: [], hw: [], cx: (Math.floor((i * LAT) / CELL) + 0.5) * CELL, cz: (Math.floor((j * LAT) / CELL) + 0.5) * CELL }));
+    if (!c) cells.set(ck, (c = { pos: [], nrm: [], segA: [], segB: [], hw: [], x0: ci * CELL, z0: cj * CELL }));
     // the nearest segment to the cell's middle and the nearer of its two neighbours (a bend stays round)
     const r = roads[near[1]], k = near[2], P = r.pts;
-    const mx = (i + 0.5) * LAT, mz = (j + 0.5) * LAT;
+    const mx = (i + 0.5) * lat, mz = (j + 0.5) * lat;
     const segDist = (q) => { if (q < 0 || q + 1 >= P.length) return Infinity; const [ax, az] = P[q], [bx, bz] = P[q + 1]; const L2 = (bx - ax) ** 2 + (bz - az) ** 2 || 1e-6; const t = Math.max(0, Math.min(1, ((mx - ax) * (bx - ax) + (mz - az) * (bz - az)) / L2)); return Math.hypot(mx - ax - (bx - ax) * t, mz - az - (bz - az) * t); };
     const k2 = segDist(k - 1) < segDist(k + 1) ? k - 1 : k + 1 < P.length - 1 ? k + 1 : k;
     const A = [P[k][0], P[k][1], P[k + 1][0], P[k + 1][1]];
     const B = k2 >= 0 && k2 + 1 < P.length ? [P[k2][0], P[k2][1], P[k2 + 1][0], P[k2 + 1][1]] : A;
     const corner = { a: [i, j], b: [i + 1, j], c: [i, j + 1], d: [i + 1, j + 1] };
-    const tri = diagonalIsMain(i, j) ? ['a', 'd', 'b', 'a', 'c', 'd'] : ['a', 'c', 'b', 'b', 'c', 'd'];      // the ground's own split (surface.js)
+    const tri = !ground || diagonalIsMain(i, j) ? ['a', 'd', 'b', 'a', 'c', 'd'] : ['a', 'c', 'b', 'b', 'c', 'd'];      // the ground's own split (surface.js)
     for (const n of tri) {
       const [ii, jj] = corner[n];
-      c.pos.push(ii * LAT, hAt(ii, jj), jj * LAT);
-      const nx = hAt(ii - 1, jj) - hAt(ii + 1, jj), nz = hAt(ii, jj - 1) - hAt(ii, jj + 1), nl = Math.hypot(nx, 2 * LAT, nz);
-      c.nrm.push(nx / nl, 2 * LAT / nl, nz / nl);                       // smooth: the ground's slope at the node
+      c.pos.push(ii * lat, hAt(ii, jj), jj * lat);
+      const nx = hAt(ii - 1, jj) - hAt(ii + 1, jj), nz = hAt(ii, jj - 1) - hAt(ii, jj + 1), nl = Math.hypot(nx, 2 * lat, nz);
+      c.nrm.push(nx / nl, 2 * lat / nl, nz / nl);                       // smooth: the ground's slope at the node
       c.segA.push(...A); c.segB.push(...B); c.hw.push(r.hw);
     }
   }
+  return cells;
+}
+
+/** roads = decodeRoads(roads.json); height(x, z) = the PHYSICS ground (surface.height: exact at the lattice nodes); level = quality. */
+export function createRoads({ scene, roads, env, height, level = 'medium' }) {
+  const fine = latticeCells(roads, LAT, height, true), coarse = latticeCells(roads, LAT_FAR, height, false);
   const mat = material(env);
   const group = new THREE.Group();
   group.name = 'ski-roads';
-  const list = [];
-  for (const c of cells.values()) {
+  const mesh = (c) => {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(c.pos, 3));
     g.setAttribute('aSegA', new THREE.Float32BufferAttribute(c.segA, 4));
@@ -143,13 +153,31 @@ export function createRoads({ scene, roads, env, height }) {
     const m = new THREE.Mesh(g, mat);
     m.receiveShadow = false;
     group.add(m);
-    list.push({ m, cx: c.cx, cz: c.cz });
+    return m;
+  };
+  const list = [];
+  for (const [key, c] of fine) {
+    const far = coarse.get(key);
+    list.push({ fine: mesh(c), coarse: far ? mesh(far) : null, x0: c.x0, z0: c.z0 });
   }
+  for (const [key, c] of coarse) if (!fine.has(key)) list.push({ fine: null, coarse: mesh(c), x0: c.x0, z0: c.z0 });
   scene.add(group);
+  let fineR = FINE_RADIUS[level] || FINE_RADIUS.medium;
+  const tris = (m) => (m ? m.geometry.attributes.position.count / 3 : 0);
+  const stats = { cells: list.length, fineTriangles: list.reduce((a, c) => a + tris(c.fine), 0), coarseTriangles: list.reduce((a, c) => a + tris(c.coarse), 0), triangles: 0 };
   return {
-    count: roads.length, cells: list.length,
+    count: roads.length, cells: list.length, stats,
     update(px, pz, radius) {
-      for (const c of list) c.m.visible = Math.hypot(c.cx - px, c.cz - pz) - CELL * 0.71 < radius;
+      let t = 0;
+      for (const c of list) {
+        const dx = Math.max(c.x0 - px, 0, px - c.x0 - CELL), dz = Math.max(c.z0 - pz, 0, pz - c.z0 - CELL), d = Math.hypot(dx, dz);
+        const nearCell = d < fineR && !!c.fine;
+        if (c.fine) c.fine.visible = nearCell;
+        if (c.coarse) c.coarse.visible = !nearCell && d < radius;
+        t += (nearCell ? tris(c.fine) : 0) + (!nearCell && d < radius ? tris(c.coarse) : 0);
+      }
+      stats.triangles = t;
     },
+    setLevel(next) { fineR = FINE_RADIUS[next] || FINE_RADIUS.medium; },
   };
 }

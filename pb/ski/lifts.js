@@ -12,7 +12,7 @@ const THREE = window.THREE;
 
 import { createLiftPath } from './lift-path.js';
 import { createLiftWorld, frames } from './lift-site.js';
-import { carrierGeometry } from './modes/carriers.js';
+import { carrierGeometry, GLASS } from './modes/carriers.js';
 import { mergeParts } from './modes/views.js';
 
 const NEAR_R = 130;                    // m: carriers closer than this get the full model, the rest the far one
@@ -275,7 +275,7 @@ export function createLifts({ scene, resort, height }) {
 
   // ---------------- carriers: instanced pools per model (near + far detail) ----------------
   const pools = new Map();               // key -> { near, far, glass, count }
-  const glassMat = new THREE.MeshLambertMaterial({ color: 0xcfe2f0, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide });
+  const glassMat = new THREE.MeshLambertMaterial({ color: GLASS.color, transparent: true, opacity: GLASS.opacity, depthWrite: false, side: THREE.DoubleSide });   // R8c
   disposables.push(glassMat);
   const variantOf = (l) => (l.kind === 'chair' ? `chair:${l.seats}` : l.kind === 'drag' ? `drag:${l.sub}` : l.kind);
   const need = new Map();

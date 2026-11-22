@@ -5,9 +5,11 @@
  * Instances are generated per 320 m block (cached, time-sliced) and re-collected when the camera has moved REBUILD m. */
 import { hash2 } from './noise.js';
 import { FOG_GLSL } from './snow-shader.js';
+import { liftTreeGuard } from './lift-site.js';
+import { createLiftPath } from './lift-path.js';
 
-const THREE = window.THREE;
-const BLOCK = 320;
+const THREE = typeof window !== 'undefined' ? window.THREE : null;     // R8c: the Node checks import farTreesOfBlock
+export const BLOCK = 320;
 const CELL = 10;                 // the class raster's cell
 const REBUILD = 70;
 const CAP = 90000;
@@ -143,6 +145,36 @@ function material(env, atlas) {
   });
 }
 
+/** The far tree cards of one BLOCK (pure): Float32Array [x, y, z, scale, kind, seed] * n. guard(x, z, y) = true: no tree there (R8c: the
+ *  lift aisles of lift-site.js; the cards stood in the Gornergrat Bahn's corridor and in every chair lift's aisle beyond the 3D trees). */
+export function farTreesOfBlock(bx, bz, { classes, bits, field, guard = null }) {
+  const out = [];
+  const n = BLOCK / CELL, cnx = classes.nx, cnz = classes.nz;
+  for (let j = 0; j < n; j++) {
+    for (let i = 0; i < n; i++) {
+      const ci = bx * n + i, cj = bz * n + j;
+      if (ci < 0 || cj < 0 || ci >= cnx || cj >= cnz) continue;
+      const v = classes.data[cj * cnx + ci];
+      if (v & (bits.piste | bits.built | bits.water | bits.rock)) continue;
+      const forest = v & bits.forest, scrub = v & bits.scrub;
+      if (!forest && !scrub) continue;
+      for (let t = 0; t < 2; t++) {                      // up to two trees per 10 m cell in a full forest
+        const r = hash2(ci, cj, 41 + t * 17);
+        if (r > (forest ? KEEP_FOREST : KEEP_SCRUB) * (t ? 0.75 : 1)) continue;
+        const x = (ci + 0.1 + 0.8 * hash2(ci, cj, 42 + t * 17)) * CELL, z = (cj + 0.1 + 0.8 * hash2(ci, cj, 43 + t * 17)) * CELL;
+        const ground = field.baseHeight(x, z);
+        if (guard && guard(x, z, ground)) continue;
+        const y = ground - 2.2;
+        const larch = scrub || (hash2(ci, cj, 44 + t * 17) < 0.3 && y < 2250);
+        const k = larch ? 2 : y < 1850 && hash2(ci, cj, 45 + t * 17) < 0.3 ? 3 : hash2(ci, cj, 46 + t * 17) < 0.5 ? 1 : 0;
+        const s = 0.9 + 0.5 * hash2(ci, cj, 47 + t * 17) + (y < 1900 ? 0.2 : 0);
+        out.push(x, y, z, s, k, hash2(ci, cj, 48 + t * 17));
+      }
+    }
+  }
+  return new Float32Array(out);
+}
+
 export function createFarForest({ scene, env, classes, resort, field, quality }) {
   const bits = resort.classes.bits;
   const cnx = classes.nx, cnz = classes.nz;
@@ -165,30 +197,9 @@ export function createFarForest({ scene, env, classes, resort, field, quality })
   const pending = [], pendingKeys = new Set(), stale = [];
   const stats = { cards: 0, blocks: 0 };
 
+  const guard = liftTreeGuard(resort, createLiftPath, field.farHeight);       // R8c: the lift aisles (the same guard as scatter.js)
   function genBlock(bx, bz) {
-    const out = [];
-    const n = BLOCK / CELL;
-    for (let j = 0; j < n; j++) {
-      for (let i = 0; i < n; i++) {
-        const ci = bx * n + i, cj = bz * n + j;
-        if (ci < 0 || cj < 0 || ci >= cnx || cj >= cnz) continue;
-        const v = classes.data[cj * cnx + ci];
-        if (v & (bits.piste | bits.built | bits.water | bits.rock)) continue;
-        const forest = v & bits.forest, scrub = v & bits.scrub;
-        if (!forest && !scrub) continue;
-        for (let t = 0; t < 2; t++) {                      // up to two trees per 10 m cell in a full forest
-          const r = hash2(ci, cj, 41 + t * 17);
-          if (r > (forest ? KEEP_FOREST : KEEP_SCRUB) * (t ? 0.75 : 1)) continue;
-          const x = (ci + 0.1 + 0.8 * hash2(ci, cj, 42 + t * 17)) * CELL, z = (cj + 0.1 + 0.8 * hash2(ci, cj, 43 + t * 17)) * CELL;
-          const y = field.baseHeight(x, z) - 2.2;
-          const larch = scrub || (hash2(ci, cj, 44 + t * 17) < 0.3 && y < 2250);
-          const k = larch ? 2 : y < 1850 && hash2(ci, cj, 45 + t * 17) < 0.3 ? 3 : hash2(ci, cj, 46 + t * 17) < 0.5 ? 1 : 0;
-          const s = 0.9 + 0.5 * hash2(ci, cj, 47 + t * 17) + (y < 1900 ? 0.2 : 0);
-          out.push(x, y, z, s, k, hash2(ci, cj, 48 + t * 17));
-        }
-      }
-    }
-    const arr = new Float32Array(out);
+    const arr = farTreesOfBlock(bx, bz, { classes, bits, field, guard });
     blocks.set(key(bx, bz), arr);
     if (blocks.size > 1500) blocks.delete(blocks.keys().next().value);
     return arr;

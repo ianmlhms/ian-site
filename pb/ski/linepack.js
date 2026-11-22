@@ -76,6 +76,13 @@ export function unpackResort(r) {
     const shown = pisteDisplayName(p.name, p.ref, p.diff);
     if (shown !== p.name) { p.osmName = p.name; p.name = shown; }
   }
+  // R8c: two pistes of one colour with the same name ("Doron (Variante)" twice) are numbered: "Doron (Variante 2)"
+  const count = new Map();
+  for (const p of r.pistes || []) {
+    const k = `${p.name.toLowerCase()}|${p.diff}`, n = (count.get(k) || 0) + 1;
+    count.set(k, n);
+    if (n > 1) { p.osmName = p.osmName || p.name; p.name = p.name.endsWith(')') ? `${p.name.slice(0, -1)} ${n})` : `${p.name} (${n})`; }
+  }
   for (const n of r.network || []) if (typeof n.pz === 'string' && !n.p) { n.p = unpackLine(n.pz); delete n.pz; }
   return r;
 }
