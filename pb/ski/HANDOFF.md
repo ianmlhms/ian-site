@@ -1244,3 +1244,49 @@ load; Arlberg Mattunbahn footrest; Kronplatz Alpen Connecting framing; Glacier R
   mp-lobby-roulette mp-lobby-blackjack arcade-pad" scripts/ski/r8d-flows.sh ~/Library/Caches/ski-work/round8d/final flows-chromium`, then
   all flows in WebKit (`... flows-webkit` without FLOWS), then `... "sheets sonnenkopf"` (WebKit sheets per resort + the Sonnenkopf sheet
   into round8d/final/sheet/; stack with look_sheet.py and LOOK at every shot). ski-resorts / ski-mp need the memory work first.
+
+## Round 8f (22 Nov 2026, branch `worktree-agent-a0d4425b31d1efc10`, from R8d 949a6855): memory, flows without video, evening shade
+**Memory** (the Mini's browser guard kills a test job whose process tree passes 2.5 GB real footprint: ski-resorts died at the 4th
+resort, ski-mp with its three game pages). Measured with `scripts/ski/memory-check.mjs` (new): per resort a fresh page, "load" = every
+height tile + village + streets in, then a tour over up to 18 village centres; then ONE page switching resorts 10 x the game's way
+(location.replace); then 3 pages of one resort at once (the online race). Readouts: JS heap (gc first), three's geometries / textures,
+the scene's JS vertex bytes, and top's MEM of the browser tree split renderer / GPU / other (1180 x 820 @2, q=low, Chromium).
+Causes found (heap snapshots + CDP sampling heap profiles + Chrome memory-infra dumps, scripts in the R8f report):
+- village.js: `rows.forEach` (a closure) put `cells` / `details` into createVillage's closure context, which update() / setLevel()
+  kept alive for the page's life: every PLAIN JS vertex array of the build (8 bytes a number + growth slack) stayed in memory, 260-330 MB
+  at Kronplatz / Arlberg, plus the Float32 copies three keeps after the upload (~105 MB). Now: the writer fills growing Float32Arrays
+  (finish() = exact copies); the village is built PER 1280 m CELL when the camera comes within buildingRadius + 500 m (nearest first,
+  3 ms a frame, 40 ms when it is close), its meshes go to the GPU at once (gpu-mem.js uploadNow) and drop their JS copies (gpuOnly), a
+  cell is dropped again beyond the radius + 1500 m. `window.__ski.village.buildNear(x, z, r)` for checks right after a jump
+  (ground-check uses it). Same rows / seeds / per-cell order: the houses are the same.
+- lifts.js: the part lists (thousands of Box / CylinderGeometry, ribbons, rope points) stayed in the closure context: emptied after the
+  merge; the merged station / pylon chunks are GPU-only (+ uploadNow after createLifts).
+- roads.js: the coarse 10 m street lattice is built per 640 m render cell too (2 a frame, nearest first, within the street radius,
+  dropped beyond + 800 m), like R8d's fine lattice; GPU-only meshes.
+- Height tiles: codec.js `decodeGrid(bytes, 0, true)` keeps 16-bit steps (`u`, `qmin`): half the memory, LOSSLESS (every one of the 952
+  tiles: fround(h0 + (u + qmin) * step) === the old Float32 value); field.js reads both forms.
+- The far normal map and the forest raster drop their pixels after the upload (textureGpuOnly); surface blocks LRU 900 -> 420, terrain
+  node cache 700 -> 400 (24.5 KB each).
+- pagehide: every geometry disposed, renderer.dispose() + forceContextLoss() (the GPU memory of the old resort goes at once on a switch);
+  a page restored from the back-forward cache reloads. A WebGL context restore with GPU-only geometry reloads the page (no JS copy left).
+- `?debug=1&keep=1` keeps every JS copy (ground-check reads village / street vertices back; it now opens the page with keep=1).
+Numbers (renderer = the page's process, MB; tree = the whole browser; Chromium 1180 x 820 @2, q=low; logs
+~/Library/Caches/ski-work/round8f/mem-before.log / mem-after.log, JSON next to them):
+| resort | heap before -> after | renderer load before -> after | renderer tour peak before -> after | tree load before -> after |
+| killy | 245 -> 90 | 525 -> 353 | 525 -> 353 | 1235 -> 1026 |
+| 3vallees | 533 -> 145 | 824 -> 401 | 824 -> 413 | 1556 -> 1063 |
+| zermatt | 386 -> 101 | 676 -> 380 | 676 -> 380 | 1353 -> 1001 |
+| arlberg | 605 -> 133 | 855 -> 439 | 873 -> 439 | 1584 -> 1115 |
+| kronplatz | 585 -> 83 | 893 -> 335 | 893 -> 335 | 1564 -> 1013 |
+Switching (one page, 10 x): before the trees went 1191 / 1592 / 1489 / 1645 / 1736 then 1554 / 1691 / 1582 / 1749 / 1718 (killy's
+renderer 506 -> 794 on its second visit); after 980 / 1124 / 1082 / 1188 / 1086 then 1059 / 1202 / 1075 / 1239 / 1124, the page's own
+renderer + GPU vs its first visit: killy +34, 3V +45, zermatt -31, arlberg +42, kronplatz +23 MB (the rest of the tree's growth is the
+incognito test context's in-memory HTTP cache: each resort's data files once). Three killy pages at once: tree 2043 MB (was over 2.5 GB).
+**Flows**: `FLOW_NO_VIDEO=1` (lib.mjs) records no video (r8d-flows.sh sets it by default; the encoder took ~60 % of the CPU of a 3D
+flow). lib.mjs launches Chromium with `--disable-features=WebUIOmniboxPopup,WebUIOmniboxFullPopup,WebUIOmniboxAimPopup`: full Chromium
+built 2-3 chrome:// omnibox renderers (~80 MB) per browser context (ski-mp: ~250 MB). ski-mp: a gate on each player's resort.json from
+the start click, the three game pages boot one after the other (the mesh waits for everybody).
+**Game fixes**: online race lanes = the start gate's side offset + the lane (the middle racer, lane 0, stood at the gate's 4.2 m offset
+while the others stood +-1.9 m from the line: 6.1 m apart, ski-mp "side by side" failed); evening shade (Ian: still a fairly dark
+blue-grey): snow-shader under the low evening sun (evK) the shade is ~1.3 x lighter and soft (blue / red ~1.14): on screen (WebKit,
+Zermatt village in the shade) ~(135, 156, 197) -> ~(172, 184, 202); village.js snowy roofs in the shade the same (they stayed slate).
