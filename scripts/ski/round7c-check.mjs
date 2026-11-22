@@ -189,6 +189,23 @@ for (const rid of rids.length ? rids : ALL) {
       if (worst <= 0.05) hold++;
     }
   }
+  // put down 30 m outside the net (the map / a flow / a respawn): never pulled back in through it
+  let pulled = 0, placedN = 0;
+  for (const [i, p] of pistes.list.entries()) {
+    if (ONLY ? !ONLY.has(p.id) : i % 25) continue;
+    const g = gates.get(p.id) || courseGate(p, obs);
+    const sA = Math.min(p.length - 40, g.s + 80);
+    if (sA < g.s + 20) continue;
+    placedN++;
+    const c = createCourse({ piste: p, startS: g.s }), a = p.at(sA, {});
+    let s = { ...createSkierState(a.x, a.z, Math.atan2(a.dz, a.dx), height(a.x, a.z)) };
+    for (let k = 0; k < 30; k++) { const prev = s; s = c.collide(prev, stepSkier(s, { steer: 0, tuck: 0, brake: 1, push: 0, jump: false }, world)); }
+    const ox = a.x - a.dz * (p.halfWidth + 30), oz = a.z + a.dx * (p.halfWidth + 30);
+    s = { ...createSkierState(ox, oz, Math.atan2(a.dz, a.dx), height(ox, oz)) };
+    for (let k = 0; k < 30; k++) { const prev = s; s = c.collide(prev, stepSkier(s, { steer: 0, tuck: 0, brake: 1, push: 0, jump: false }, world)); }
+    if (Math.hypot(s.x - ox, s.z - oz) > 5) pulled++;
+  }
+  check(pulled === 0, `barriers: ${placedN - pulled}/${placedN} skiers put down outside the net stay there (no pull through it)`);
   check(through === 0 && stopped === 0 && hold === holdN && holdN > 0, `barriers: ${hold}/${holdN} skiers aimed at the net at 54 km/h held inside (${through} through, ${stopped} stopped, ${missed} never reached it), speed kept at the hit >= ${(minKeep * 100).toFixed(0)} %`);
   if (RIDES) {
     let fin = 0, resets = 0, warned = 0, hudBad = 0, hits = 0, outside = 0;

@@ -137,7 +137,14 @@ export function createCourse({ piste, startS = 2 }) {
    *  (on the ground or in a low hop) is put back inside it, his speed into the net turned into a small bounce, his speed cut by
    *  COURSE.barrierSlow: he slides along the net, never through it, never to a standstill. Already outside (he came round the end,
    *  a respawn or a teleport put him there): no wall, he may ski back in. */
+  let lastX = NaN, lastZ = NaN;
   function collide(prev, st) {
+    const moved = Number.isFinite(lastX) && Math.hypot(prev.x - lastX, prev.z - lastZ) > 2;
+    const out = collideStep(prev, st, moved);
+    lastX = out.x; lastZ = out.z;
+    return out;
+  }
+  function collideStep(prev, st, moved) {
     follow(st.x, st.z, cHint, cp);
     cHint = cp.s;
     const wall = piste.halfWidth + 0.5 - COURSE.barrierBody;
@@ -145,8 +152,8 @@ export function createCourse({ piste, startS = 2 }) {
     lastOff = cp.off;
     if (cp.s < startS + 4 || cp.s > finishS || st.crash > 0 || st.ride) return st;
     if (Math.abs(cp.off) <= wall || Math.abs(was) > wall + 1.5) return st;
-    // put down elsewhere (place / teleport / respawn): no physics step goes that far past the net, so it is not a crossing
-    if (Math.hypot(st.x - prev.x, st.z - prev.z) > 2 || Math.abs(cp.off) - wall > 1.5) return st;
+    // put down elsewhere since the last step (place / teleport / respawn): not a crossing, he may ski back in from there
+    if (moved || Math.hypot(st.x - prev.x, st.z - prev.z) > 2) return st;
     if (!st.grounded && st.air > 0.25) return st;                         // a real jump clears the net (it is 1.1 m high)
     piste.at(cp.s, ca);
     const side = Math.sign(cp.off), rx = -ca.dz * side, rz = ca.dx * side;     // the outward normal of this barrier
