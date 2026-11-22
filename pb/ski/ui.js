@@ -138,7 +138,7 @@ export function createUi(root) {
     let toastTimer = 0;
     return {
       el: h,
-      setPiste(p, mode) { $('hChip').className = `chip ${p ? p.diff : ''}`; $('hName').textContent = p ? p.name + (mode === 'free' ? ' · Fräi' : '') : ''; },
+      setPiste(p, mode) { $('hChip').className = `chip ${p ? p.diff : ''}`; $('hChip').hidden = !p;      /* R8: no empty square */ $('hName').textContent = p ? p.name + (mode === 'free' ? ' · Fräi' : '') : ''; },
       setClock(ms, penalty) { const c = $('hClock'); c.textContent = ms === null ? '' : formatClock(ms); c.classList.toggle('pen', penalty > 0); },
       setSplit(text) { $('hSplit').textContent = text || ''; },
       setGates(text) { $('hGates').textContent = text || ''; },

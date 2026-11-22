@@ -93,7 +93,7 @@ export function createLifts({ scene, resort, height }) {
       const g = height(q.x, q.z) - 0.5;
       const thin = l.sub === 'rope';
       const top = s.y + (kind === 'drag' && !thin ? 0.9 : 0.55) - g;          // R8: a drag column reaches its boom and cap
-      cylAt(thin ? 0.08 : 0.28, thin ? 0.1 : 0.42, top, q.x, g + top / 2, q.z, 0x8a9099, 6);
+      cylAt(thin ? 0.08 : kind === 'drag' ? 0.17 : 0.28, thin ? 0.1 : kind === 'drag' ? 0.25 : 0.42, top, q.x, g + top / 2, q.z, 0x8a9099, 6);      // R8: a drag column is a slim steel tube
       const span = l.side + l.back + (thin ? 0.4 : 1.4), mid = l.sign * (l.side - l.back) / 2;
       if (kind === 'drag' && !thin) {
         // R8 (review: crude drag pylon heads): a slim boom over both ropes, a red cap on the column, and at each rope a sheave train
@@ -168,6 +168,9 @@ export function createLifts({ scene, resort, height }) {
     let s0 = null, s1 = null;
     for (let s = 0; s <= l.len; s += 2) { if (l.ground(s) - l.cableY(s) > 1) { if (s0 === null) s0 = s; s1 = s; } }
     if (s0 === null) return;
+    // R8: the tube starts at the portals (lift-site.js) and its vault never rises out of the hill (it showed as a black wedge on the snow)
+    if (l.site && l.site.portals.length === 2) { s0 = Math.max(s0, l.site.portals[0].s); s1 = Math.min(s1, l.site.portals[1].s); }
+    if (s1 <= s0) return;
     const bL = -l.back - 1.32 - 1.0, bR = l.side + 1.32 + 1.0;
     const prof = [[bL, -0.5], [bL, 3.4], [bL * 0.7, 5.0], [0, 5.7], [bR * 0.7, 5.0], [bR, 3.4], [bR, -0.5], [bL, -0.5]];
     const n = Math.ceil((s1 - s0) / 5);
@@ -179,7 +182,8 @@ export function createLifts({ scene, resort, height }) {
       const lamp = Math.exp(-Math.pow(((s % 25) + 25) % 25 > 12.5 ? 25 - (((s % 25) + 25) % 25) : ((s % 25) + 25) % 25, 2) / 40);
       for (let i = 0; i < prof.length; i++) {
         const [b, h] = prof[i];
-        pos.push(q2.x + rx * b, y + h, q2.z + rz * b);
+        const px = q2.x + rx * b, pz = q2.z + rz * b;
+        pos.push(px, h > 0 ? Math.max(y + Math.min(h, 2.6), Math.min(y + h, height(px, pz) - 0.25)) : y + h, pz);
         const shade = (i === 0 || i === prof.length - 1 || i === prof.length - 2 ? 0.28 : 0.5) * (0.35 + 0.65 * lamp);
         col.push(0.52 * shade + 0.04, 0.5 * shade + 0.04, 0.47 * shade + 0.04);
       }
@@ -329,7 +333,7 @@ export function createLifts({ scene, resort, height }) {
     const tex = new THREE.CanvasTexture(canvas);
     tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter; tex.anisotropy = 4; tex.generateMipmaps = true;
     const pos = new Float32Array(SIGN.slots * 4 * 3), uv = new Float32Array(SIGN.slots * 4 * 2), idx = [];
-    for (let i = 0; i < SIGN.slots; i++) { const a = i * 4; idx.push(a, a + 1, a + 2, a + 2, a + 1, a + 3); }
+    for (let i = 0; i < SIGN.slots; i++) { const a = i * 4; idx.push(a, a + 2, a + 1, a + 2, a + 3, a + 1); }      // front faces the reader
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
@@ -358,7 +362,7 @@ export function createLifts({ scene, resort, height }) {
     }
     function place(slot, sp, uMax) {
       const ox = sp.nx * 0.02, oz = sp.nz * 0.02;
-      const tx = -sp.nz, tz = sp.nx;                                     // along the board, left to right seen from the front
+      const tx = sp.nz, tz = -sp.nx;                                     // along the board, left to right seen from the front
       const hw = sp.w / 2, hh = sp.h / 2;
       const P = [[-hw, hh], [hw, hh], [-hw, -hh], [hw, -hh]];
       for (let k = 0; k < 4; k++) {

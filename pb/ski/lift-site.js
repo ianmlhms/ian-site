@@ -62,6 +62,7 @@ export function createLiftSite(path) {
       det(ha0, ha1, C - wid, C + wid, y, y + 0.35, COL.housingDark);
       det(ha0 + 0.1, ha1 - 0.1, C - wid + 0.1, C + wid - 0.1, y + 0.35, y + high, COL.housing);
       det(ha0 + 0.05, ha1 - 0.05, C - wid + 0.05, C + wid - 0.05, y + high, y + high + 0.18, COL.housingDark);
+      det(ha0 + 0.05, ha1 - 0.05, C - wid + 0.05, C + wid - 0.05, y + high * 0.72, y + high * 0.86, COL.accent);       // the lift company's red band
       for (const db of [-wid + 0.6, wid - 0.6]) det(ha0 + 0.6, ha1 - 0.6, C + db - 0.25, C + db + 0.25, y + high * 0.55, y + high * 0.8, COL.dark);
     };
     /** A lift-name sign board (lifts.js writes the name on it): face = +1 / -1 along b, the board's centre a, its y. */
@@ -314,7 +315,7 @@ export function createLiftWorld(paths, opts = {}) {
   }
   /** Solid station parts and pylons overlapping a disc (x, z, r) up to height y (feet; y = -Infinity: any height): for the skier. */
   const hitOut = { nx: 0, nz: 0, pen: 0, kind: 'lift' };
-  function hit(x, z, r, y = -Infinity, ground = null) {
+  function hit(x, z, r, y = -Infinity, ground = null, body = 1.8) {        // body (R8): the height above y that counts (camera: a small box)
     let best = null;
     for (const it of near(x, z, r + 1)) {
       if (it.t === 'pylon') {
@@ -328,7 +329,7 @@ export function createLiftWorld(paths, opts = {}) {
       const g0 = ground ? ground(f.x, f.z) : 0;
       for (const p of f.parts) {
         if (!p.solid) continue;
-        if (y !== -Infinity && ground && (y > g0 + p.y1 || y + 1.8 < g0 + p.y0)) continue;         // flying over / walking under it
+        if (y !== -Infinity && ground && (y > g0 + p.y1 || y + body < g0 + p.y0)) continue;         // flying over / walking under it
         const ca = Math.max(p.a0, Math.min(p.a1, l.a)), cbb = Math.max(p.b0, Math.min(p.b1, l.b));
         const da = l.a - ca, db = l.b - cbb, d = Math.hypot(da, db);
         let pen, na, nb;
@@ -514,7 +515,9 @@ export function createLiftWorld(paths, opts = {}) {
         candidates.push({ P: { x: q.x, z: q.z }, dist: L, ang: 0, heading: Math.atan2(q.dz, q.dx), piste: true, way });
       }
     }
-    const search = (maxSlope, ahead = 15, laneClear = 2.6) => {
+    // R8 (early QA: summit exits facing a cliff): how steeply the ground falls over the next 40 m along a heading (worst average from P)
+    const dropAhead = (P, h) => { let d = 0; for (let m = 5; m <= 40; m += 5) d = Math.max(d, (height(P.x, P.z) - height(P.x + Math.cos(h) * m, P.z + Math.sin(h) * m)) / m); return d; };
+    const search = (maxSlope, ahead = 15, laneClear = 2.6, maxDrop = Infinity) => {
       let best = null, bs = Infinity;
       for (const cand of candidates) {
         {
@@ -546,6 +549,13 @@ export function createLiftWorld(paths, opts = {}) {
             heading = Math.atan2(-gz, -gx);
             if (rises(heading)) { no('uphill'); continue; }
           }
+          // R8: no drop ahead: the fall line first, else a traverse up to 75 degrees off it (never uphill), else skip the spot
+          if (maxDrop < Infinity && dropAhead(P, heading) > maxDrop) {
+            const h0 = heading;
+            heading = null;
+            for (const off of [0.35, -0.35, 0.7, -0.7, 1.05, -1.05, 1.3, -1.3]) { const h = h0 + off; if (!rises(h) && dropAhead(P, h) <= maxDrop) { heading = h; break; } }
+            if (heading === null) { no('drop'); continue; }
+          }
           // 15 m clear ahead
           let clear = true;
           const hx = Math.cos(heading), hz = Math.sin(heading);
@@ -565,8 +575,9 @@ export function createLiftWorld(paths, opts = {}) {
     // walkable snow first; at a summit station on a steep ridge (Valluga, Klein Matterhorn) the gentlest spot that is still skiable
     // (and on the two tightest summits of the data, Vallugagrat and the Leisee shuttle's top in the Sunnegga station: 10 m clear,
     // under the carriers where they still pass 1.5 m over the snow)
-    let best = search(0.6) || search(1.0) || search(1.25, 10, 1.5) || search(9, 5, 1.0);
-    if (best && best.slope > 1.0) best.steep = true;
+    let best = search(0.47, 15, 2.6, 0.7) || search(0.6, 15, 2.6, 0.8);
+    if (best && best.slope > 0.47) best.steep = true;
+    if (!best) { best = search(0.6) || search(1.0) || search(1.25, 10, 1.5) || search(9, 5, 1.0); if (best) best.steep = true; }
     if (!best) {                                    // nothing clear (never in the data so far): 30 m out of the outer side
       const P = top.toWorld(toL.a, toL.b + 30, {});
       best = { x: P.x, z: P.z, heading: fall(P.x, P.z) ?? Math.atan2(top.fz, top.fx), from: { x: from.x, z: from.z }, dist: 30, fallback: true };

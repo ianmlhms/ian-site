@@ -314,9 +314,10 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {})
     torso.rotation.set(0, 0, 0.12);                          // leaning back against the bar
     neck.rotation.set(0, 0, -0.05);
     const A = arms[1];
-    A.sh.rotation.set(-0.2, 0, 1.55);
-    A.elbow.rotation.set(0, 0, 0.45);
-    A.pole.rotation.set(0.12, 0, -1.4);
+    // R8 (early QA: the hand was raised over the head): the hand holds the bar's stem at chest height, the ski pole hangs down from it
+    A.sh.rotation.set(-0.3, 0, 0.85);
+    A.elbow.rotation.set(0, 0, 1.0);
+    A.pole.rotation.set(0.1, 0, -1.6);
     const B = arms[0];
     B.sh.rotation.set(0.15, 0, 0.35); B.elbow.rotation.set(0, 0, 0.5); B.pole.rotation.set(-0.1, 0, -0.6);
   }
@@ -395,7 +396,7 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {})
     // smoothed drivers
     smEdge += (clamp(state.edge, -1.1, 1.1) - smEdge) * k;
     const landing = state.landed > 0 ? Math.sin(Math.min(1, state.landed / 0.35) * Math.PI) : 0;
-    smCrouch += (clamp(state.tuck * 0.95 + landing * 0.8 + smGrab + (state.stop || 0) * 0.45, 0, 1) - smCrouch) * k;
+    smCrouch += (clamp(state.tuck * 0.95 + landing * 0.8 + smGrab + (state.stop || 0) * 0.25, 0, 1) - smCrouch) * k;
     smPlough += (clamp(state.brake, 0, 1) * (1 - clamp(state.stop || 0, 0, 1)) - smPlough) * k;      // round 7: the hockey stop is no plough
     smAir += ((state.grounded ? 0 : Math.min(1, state.air * 2.5)) - smAir) * k;
     const edge = smEdge, crouch = smCrouch, plough = smPlough, air = smAir;

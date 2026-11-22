@@ -16,6 +16,7 @@ const G = 9.81;
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const smoothstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 const approach = (v, target, rate, dt) => v + (target - v) * Math.min(1, rate * dt);
+const HOCKEY_MAX = 8;                 // R8: m/s2, the hockey stop's strongest deceleration
 const HOLD_COS = Math.cos(38 * Math.PI / 180);       // round 7: steeper than this a stop can not hold (side-slip)
 const wrapAngle = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
 
@@ -51,6 +52,7 @@ function groundStep(s, input, world, dt) {
   s.snow = snow;
   let vx = s.vx, vy = s.vy, vz = s.vz;
   let v = Math.hypot(vx, vy, vz);
+  const vStart = v;                    // R8: the hockey stop's deceleration is capped against this (below)
   const grip = (K.gripPowder + (K.gripGroomed - K.gripPowder) * snow) * G * (1 - 0.35 * s.brake);
 
   // heading: pivots freely when slow, carves (limited by grip / speed) when fast
@@ -60,14 +62,15 @@ function groundStep(s, input, world, dt) {
   // round 7: the hockey stop: a player braking fast (or braking with a hard steer) swings both skis across the motion and digs the
   // edges in (strong deceleration, a big spray); slow, the brake stays the snowplough. Scripted input (bots, flows) never does it.
   const hockeyFrom = K.hockeyFrom || SKI.hockeyFrom || 7;
-  const wantStop = input.brake && input.hard && v > 1.5 && (v > hockeyFrom || (Math.abs(input.steer || 0) > 0.5 && v > 4)) ? 1 : 0;
+  const wantStop = input.brake && input.hard && v > 1.5 && (v > hockeyFrom || (Math.abs(input.steer || 0) > 0.5 && v > 4) || (s.stop || 0) > 0.5) ? 1 : 0;      // R8: once across, it stays a hockey stop to the end
   if ((s.stop || 0) < 0.05 && wantStop) {
     const mh = Math.atan2(vz, vx), off = wrapAngle(s.heading - mh);
     s.stopSide = Math.sign(input.steer || 0) || Math.sign(off) || 1;
+    s.stopDir = mh;                                       // R8: the skis turn across THIS travel direction (no spin as he slows)
   }
   s.stop = approach(s.stop || 0, wantStop, wantStop ? 6 : 3, dt);
   if (s.stop > 0.01 && v > 1.2) {
-    const target = Math.atan2(vz, vx) + (s.stopSide || 1) * Math.PI / 2 * 0.9;
+    const target = (s.stopDir !== undefined ? s.stopDir : Math.atan2(vz, vx)) + (s.stopSide || 1) * Math.PI / 2 * 0.9;
     const d = wrapAngle(target - s.heading), maxStep = (K.hockeyTurn || SKI.hockeyTurn || 7.5) * s.stop * dt;
     s.heading = wrapAngle(s.heading + clamp(d, -maxStep, maxStep));
   }
@@ -97,7 +100,7 @@ function groundStep(s, input, world, dt) {
     const turn = clamp(want, -maxTurn, maxTurn);
     const nt = theta - turn;
     slip = Math.abs(Math.sin(nt));
-    const scrub = K.skidLoss * slip * (0.6 + 1.4 * s.brake) * dt * 1.6;
+    const scrub = K.skidLoss * slip * (0.6 + 1.4 * s.brake) * dt * 1.6 * (1 - 0.6 * (s.stop || 0));      // R8: a hockey stop scrubs over ~1.5 s, not a wall
     const sp = v * Math.max(0, 1 - scrub);
     const c = Math.cos(nt), si = Math.sin(nt);
     vx = (fx * c + lx * si) * sp; vy = (fy * c + ly * si) * sp; vz = (fz * c + lz * si) * sp;
@@ -116,6 +119,8 @@ function groundStep(s, input, world, dt) {
     vx *= k; vy *= k; vz *= k;
     v = nv;
   }
+  // R8 (early QA: 33 -> 0 km/h in 0.6 s, a wall): a hockey stop bites at most HOCKEY_MAX m/s2 (33 km/h -> 0 in ~1.4 s)
+  if ((s.stop || 0) > 0.05 && v > 1e-4 && v < vStart - HOCKEY_MAX * dt) { const k = Math.max(0, vStart - HOCKEY_MAX * dt) / v; vx *= k; vy *= k; vz *= k; v *= k; }
   // round 7: a full stop that holds. Braking below walking pace sets the edges (plough or sideways): 0 km/h, and he stays there,
   // on any piste slope, until the player steers, pushes, tucks or jumps (a placed skier starts in this hold too). Only very steep
   // ground (> HOLD_MAX degrees, off piste) is too steep to hold: there he side-slips slowly.

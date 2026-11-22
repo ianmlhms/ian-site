@@ -25,17 +25,21 @@ function material(env) {
     uniforms: env.u,
     polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4, side: THREE.DoubleSide,
     vertexShader: `
-      attribute vec2 aRoad; varying vec2 vRoad; varying vec3 vW; varying vec3 vN; varying float vDist;
-      void main(){ vRoad = aRoad; vW = position; vN = normal; vec4 mv = viewMatrix * vec4(position, 1.0); vDist = -mv.z;
+      attribute vec4 aSegA; attribute vec4 aSegB; attribute float aHw;
+      varying vec4 vSegA; varying vec4 vSegB; varying float vHw; varying vec3 vW; varying vec3 vN; varying float vDist;
+      void main(){ vSegA = aSegA; vSegB = aSegB; vHw = aHw; vW = position; vN = normal; vec4 mv = viewMatrix * vec4(position, 1.0); vDist = -mv.z;
         // round 7: exact close by; farther away (coarser terrain tiles) pulled along the view ray towards the camera so it stays on top
         mv.xyz *= 1.0 - clamp((vDist - 40.0) * 0.00004, 0.0, 0.05);
         gl_Position = projectionMatrix * mv; }`,
     fragmentShader: `
       uniform vec3 uSunDir, uSunColor, uAmbSky, uAmbGround, uFogColor; uniform float uFogDensity, uOvercast; uniform sampler2D uNoise;
-      varying vec2 vRoad; varying vec3 vW; varying vec3 vN; varying float vDist;
+      varying vec4 vSegA; varying vec4 vSegB; varying float vHw; varying vec3 vW; varying vec3 vN; varying float vDist;
       ${FOG_GLSL}
+      float segD(vec2 p, vec4 s){ vec2 ab = s.zw - s.xy; float t = clamp(dot(p - s.xy, ab) / max(dot(ab, ab), 1e-4), 0.0, 1.0); return length(p - s.xy - ab * t); }
       void main(){
-        float a = abs(vRoad.x);                                 // 0 centre, 1 the edge, > 1 the snow bank
+        // R8 (early QA: zigzag bands along the streets): the distance to the street's centre line per PIXEL (the cell's nearest segment and
+        // its neighbour, the same for all of the cell's vertices), no longer interpolated between lattice nodes
+        float a = min(segD(vW.xz, vSegA), segD(vW.xz, vSegB)) / vHw;      // 0 centre, 1 the edge, > 1 the snow bank
         if (a > 1.37) discard;                                  // round 7: the bank is a painted strip just past the edge
         vec4 nz = texture2D(uNoise, vW.xz * 0.11);
         vec4 nl = texture2D(uNoise, vW.xz * 0.013 + 0.3);
@@ -64,11 +68,12 @@ import { diagonalIsMain } from './surface.js';
 const LAT = 2.5;
 /** roads = decodeRoads(roads.json); height(x, z) = the PHYSICS ground (surface.height: exact at the lattice nodes). */
 export function createRoads({ scene, roads, env, height }) {
-  const cells = new Map();                    // render cell key -> { nodes: Map(nodeKey -> index), pos, road, idx, mark: Set(cellKey) }
-  const nodeVal = new Map();                  // lattice node key -> [|across| / hw, along] of the nearest street
-  const covered = new Set();                  // lattice cells touched by a street (+ its bank)
+  const cells = new Map();                    // render cell key -> { pos, segA, segB, hw } (R8: unshared vertices, 6 per lattice cell)
+  const nodeVal = new Map();                  // lattice node key -> [|across| / hw] of the nearest street
+  const covered = new Map();                  // lattice cells touched by a street (+ its bank) -> [d, road, segment] nearest its middle
   const nk = (i, j) => i * 200003 + j;
-  for (const r of roads) {
+  for (let ri = 0; ri < roads.length; ri++) {
+    const r = roads[ri];
     const pts = r.pts;
     if (pts.length < 2) continue;
     const reach = r.hw + BANK + LAT;
@@ -90,34 +95,38 @@ export function createRoads({ scene, roads, env, height }) {
         if (!old || d < old[0]) nodeVal.set(key, [d, along + t]);
         // the cell (i, j) (nodes i..i+1, j..j+1) is touched when the street passes within its half diagonal of the cell's middle
         const cx = x + LAT / 2, cz = z + LAT / 2, tc = Math.max(0, Math.min(L, (cx - ax) * ux + (cz - az) * uz));
-        if (Math.hypot(cx - (ax + ux * tc), cz - (az + uz * tc)) <= r.hw + BANK * 0.6 + LAT * 0.71) covered.add(key);
+        const dc = Math.hypot(cx - (ax + ux * tc), cz - (az + uz * tc));
+        if (dc <= r.hw + BANK * 0.6 + LAT * 0.71) { const o = covered.get(key); if (!o || dc / r.hw < o[0]) covered.set(key, [dc / r.hw, ri, k]); }
       }
       along += L;
     }
   }
-  const nodeOf = (c, i, j) => {
-    const key = nk(i, j);
-    let v = c.nodes.get(key);
-    if (v !== undefined) return v;
-    v = c.pos.length / 3;
-    const x = i * LAT, z = j * LAT;
-    c.pos.push(x, height(x, z) + LIFT, z);
-    const nv = nodeVal.get(key) || [9, 0];
-    c.road.push(nv[0], nv[1]);
-    c.nodes.set(key, v);
-    return v;
-  };
-  for (const key of covered) {
+  const hCache = new Map();
+  const hAt = (i, j) => { const key = nk(i, j); let h = hCache.get(key); if (h === undefined) { h = height(i * LAT, j * LAT) + LIFT; hCache.set(key, h); } return h; };
+  for (const [key, near] of covered) {
     const i = Math.floor(key / 200003), j = key - i * 200003;
     // the cell (i, j) spans nodes i..i+1, j..j+1; skip cells whose four nodes are all beyond the bank
     const vals = [nodeVal.get(nk(i, j)), nodeVal.get(nk(i + 1, j)), nodeVal.get(nk(i, j + 1)), nodeVal.get(nk(i + 1, j + 1))];
     if (vals.every((v) => !v || v[0] > 1.45)) continue;
     const ck = Math.floor((i * LAT) / CELL) + ',' + Math.floor((j * LAT) / CELL);
     let c = cells.get(ck);
-    if (!c) cells.set(ck, (c = { nodes: new Map(), pos: [], road: [], idx: [], cx: (Math.floor((i * LAT) / CELL) + 0.5) * CELL, cz: (Math.floor((j * LAT) / CELL) + 0.5) * CELL }));
-    const a = nodeOf(c, i, j), b = nodeOf(c, i + 1, j), cc = nodeOf(c, i, j + 1), d = nodeOf(c, i + 1, j + 1);
-    if (diagonalIsMain(i, j)) c.idx.push(a, d, b, a, cc, d);          // split along 00-11 (surface.js)
-    else c.idx.push(a, cc, b, b, cc, d);                                 // split along 10-01
+    if (!c) cells.set(ck, (c = { pos: [], nrm: [], segA: [], segB: [], hw: [], cx: (Math.floor((i * LAT) / CELL) + 0.5) * CELL, cz: (Math.floor((j * LAT) / CELL) + 0.5) * CELL }));
+    // the nearest segment to the cell's middle and the nearer of its two neighbours (a bend stays round)
+    const r = roads[near[1]], k = near[2], P = r.pts;
+    const mx = (i + 0.5) * LAT, mz = (j + 0.5) * LAT;
+    const segDist = (q) => { if (q < 0 || q + 1 >= P.length) return Infinity; const [ax, az] = P[q], [bx, bz] = P[q + 1]; const L2 = (bx - ax) ** 2 + (bz - az) ** 2 || 1e-6; const t = Math.max(0, Math.min(1, ((mx - ax) * (bx - ax) + (mz - az) * (bz - az)) / L2)); return Math.hypot(mx - ax - (bx - ax) * t, mz - az - (bz - az) * t); };
+    const k2 = segDist(k - 1) < segDist(k + 1) ? k - 1 : k + 1 < P.length - 1 ? k + 1 : k;
+    const A = [P[k][0], P[k][1], P[k + 1][0], P[k + 1][1]];
+    const B = k2 >= 0 && k2 + 1 < P.length ? [P[k2][0], P[k2][1], P[k2 + 1][0], P[k2 + 1][1]] : A;
+    const corner = { a: [i, j], b: [i + 1, j], c: [i, j + 1], d: [i + 1, j + 1] };
+    const tri = diagonalIsMain(i, j) ? ['a', 'd', 'b', 'a', 'c', 'd'] : ['a', 'c', 'b', 'b', 'c', 'd'];      // the ground's own split (surface.js)
+    for (const n of tri) {
+      const [ii, jj] = corner[n];
+      c.pos.push(ii * LAT, hAt(ii, jj), jj * LAT);
+      const nx = hAt(ii - 1, jj) - hAt(ii + 1, jj), nz = hAt(ii, jj - 1) - hAt(ii, jj + 1), nl = Math.hypot(nx, 2 * LAT, nz);
+      c.nrm.push(nx / nl, 2 * LAT / nl, nz / nl);                       // smooth: the ground's slope at the node
+      c.segA.push(...A); c.segB.push(...B); c.hw.push(r.hw);
+    }
   }
   const mat = material(env);
   const group = new THREE.Group();
@@ -126,9 +135,10 @@ export function createRoads({ scene, roads, env, height }) {
   for (const c of cells.values()) {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(c.pos, 3));
-    g.setAttribute('aRoad', new THREE.Float32BufferAttribute(c.road, 2));
-    g.setIndex(c.idx);
-    g.computeVertexNormals();
+    g.setAttribute('aSegA', new THREE.Float32BufferAttribute(c.segA, 4));
+    g.setAttribute('aSegB', new THREE.Float32BufferAttribute(c.segB, 4));
+    g.setAttribute('aHw', new THREE.Float32BufferAttribute(c.hw, 1));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(c.nrm, 3));
     g.computeBoundingSphere();
     const m = new THREE.Mesh(g, mat);
     m.receiveShadow = false;

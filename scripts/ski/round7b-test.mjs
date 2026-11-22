@@ -29,6 +29,8 @@ const { createLiftSite, createLiftWorld, liftTreeGuard, frames, TREE_TOP } = awa
 const { createRide } = await imp('modes/liftride.js');
 const { createLiftNet } = await imp('modes/freeride.js');
 const { createParkLayout } = await imp('modes/park.js');
+const { createSkierState, stepSkier } = await imp('skier.js');
+const { SKI } = await imp('config.js');
 
 let GROUND = null;
 const TYPE_OF = { chair: 'platform', gondola: 'hall', cable: 'terminal', drag: 'hut', carpet: 'belt', train: 'rail' };
@@ -102,6 +104,22 @@ for (const rid of resorts) {
     }
     return out;
   };
+  // R8 (early QA: the Flexenbahn line ran into a 4-storey block): the KEPT buildings (village.js draws them) with their roof tops
+  const bGrid = new Map();
+  buildings.forEach((b, i) => {
+    if (!world.keepBuilding(i)) return;
+    const [cx, cz, L, Wd, ang, eave, ridge, ground] = b, r = Math.hypot(L, Wd) / 2;
+    const item = { cx, cz, c: Math.cos(ang), s: Math.sin(ang), hl: L / 2, hw: Wd / 2, top: (ground || 0) + Math.max(eave || 0, ridge || 0), name: i };
+    for (let j = Math.floor((cz - r) / 50); j <= Math.floor((cz + r) / 50); j++) for (let k = Math.floor((cx - r) / 50); k <= Math.floor((cx + r) / 50); k++) { const key = k * 100003 + j; if (!bGrid.has(key)) bGrid.set(key, []); bGrid.get(key).push(item); }
+  });
+  const buildingUnder = (x, z, rr, yLo) => {
+    for (const b of bGrid.get(Math.floor(x / 50) * 100003 + Math.floor(z / 50)) || []) {
+      if (yLo > b.top) continue;
+      const dx = x - b.cx, dz = z - b.cz, u = Math.abs(dx * b.c + dz * b.s) - b.hl, v = Math.abs(-dx * b.s + dz * b.c) - b.hw;
+      if (Math.hypot(Math.max(0, u), Math.max(0, v)) < rr) return b;
+    }
+    return null;
+  };
   const framesNear = (x, z, r) => {
     const out = [];
     for (const [, site] of visWorld.sites) for (const f of frames(site)) if (Math.hypot(f.x - x, f.z - z) < r + 60) out.push(f);
@@ -167,6 +185,8 @@ for (const rid of resorts) {
           continue;
         }
         const e = envelope(w.x, w.z, w.heading, cb.hw + cb.drop * 0.035, cb.hl, w.y - cb.drop, w.y + cb.top * 0.5);
+        const hb = buildingUnder(w.x, w.z, Math.max(cb.hw, cb.hl), w.y - cb.drop);
+        if (hb) { ok(false, `${name}: a carrier at u ${u.toFixed(0)} (s ${w.s.toFixed(0)}) runs into a kept building (#${hb.name}, roof ${(hb.top - (w.y - cb.drop)).toFixed(1)} m over its bottom)`); break; }
         k.minPylon = Math.min(k.minPylon, e.pyl); k.minStation = Math.min(k.minStation, e.st); k.minTree = Math.min(k.minTree, e.tr);
         if (e.pyl <= 0 || e.st <= 0 || e.tr <= 0) { ok(false, `${name}: a carrier at u ${u.toFixed(0)} / ${p.loopLen.toFixed(0)} (s ${w.s.toFixed(0)}) touches a ${e.pyl <= 0 ? 'pylon' : e.st <= 0 ? 'station part' : 'tree'}`); break; }
       }
@@ -246,6 +266,20 @@ for (const rid of resorts) {
     }
     const good = !ex.fallback && !world.inStation(ex.x, ex.z, 1.5) && !world.inBuilding(ex.x, ex.z, 1.5) && !world.inLowLane(ex.x, ex.z, H, 3) && sl < 1.0 && a.water < 0.3 && ahead < back + 0.5 && clear;
     if (ok(good, `${name}: exit ${ex.dist.toFixed(0)} m out, outside stations / buildings / lanes, slope ${sl.toFixed(2)}, water ${a.water.toFixed(2)}, ${ahead < back + 0.5 ? 'downhill' : 'UPHILL'}, ${clear ? '15 m clear' : 'BLOCKED ahead'}${ex.fallback ? ', FALLBACK' : ''}`)) k.exits++;
+    // R8 (early QA, Zermatt / Arlberg: summit exits where he slid off a cliff): a gentle spot (<= 25 deg, <= 31 on the tightest summits),
+    // no drop ahead (the ground over the next 40 m never falls steeper than 40 deg on average from the spot), and the physics: standing
+    // there 5 s without input he stays at 0 km/h; pushing off and letting run for 6 s (light brake) he does not crash
+    let drop = 0;
+    for (let m = 5; m <= 40; m += 5) drop = Math.max(drop, (g(ex.x, ex.z) - g(ex.x + Math.cos(ex.heading) * m, ex.z + Math.sin(ex.heading) * m)) / m);
+    ok(sl <= (ex.steep ? 0.6 : 0.47) + 1e-9 && drop <= 0.84, `${name}: exit slope ${sl.toFixed(2)} (<= ${ex.steep ? 0.6 : 0.47}), steepest drop ahead ${drop.toFixed(2)} (<= 0.84)`);
+    const W = { height: H, normal: (x, z, o) => surface.normal(x, z, o), snow: () => 1, hit: () => null };
+    let st = createSkierState(ex.x, ex.z, ex.heading, H(ex.x, ex.z));
+    const none = { steer: 0, tuck: 0, brake: 0, push: 0, jump: false };
+    for (let i = 0; i < 5 / SKI.dt; i++) st = stepSkier(st, none, W);
+    ok(st.speed < 0.05 && Math.hypot(st.x - ex.x, st.z - ex.z) < 0.1 && st.crash === 0, `${name}: 5 s at the exit with no input: ${(st.speed * 3.6).toFixed(1)} km/h, moved ${Math.hypot(st.x - ex.x, st.z - ex.z).toFixed(2)} m`);
+    let crashed = false, vmax = 0;
+    for (let i = 0; i < 6 / SKI.dt; i++) { st = stepSkier(st, i < 1 / SKI.dt ? { ...none, push: 1 } : { ...none, brake: 0.4 }, W); crashed = crashed || st.crash > 0; vmax = Math.max(vmax, st.speed); }
+    ok(!crashed && vmax < 16, `${name}: off from the exit (push, then a light brake, 6 s): ${crashed ? 'CRASH' : 'no crash'}, top ${(vmax * 3.6).toFixed(0)} km/h`);
   }
   for (const [kk, v] of Object.entries(per)) table.push({ rid, kind: kk, ...v });
   console.log(`${rid}: ${world.sites.size} lifts drawn, ${net.list.length} ridden, ${kept} of ${buildings.length} buildings kept, ${fails - failsBefore} fails (${((Date.now() - t0) / 1000).toFixed(0)} s)`);

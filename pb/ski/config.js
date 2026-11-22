@@ -68,7 +68,7 @@ export const SKI = Object.freeze({
   brakeDecel: 4.2,          // m/s2 of snowplough braking at full input (fades below 2 m/s)
   hockeyFrom: 7,            // round 7: above this (25 km/h), or braking with a hard steer above 4 m/s, the brake is a parallel hockey stop
   hockeyTurn: 7.5,          // rad/s the skis swing across the motion
-  hockeyDecel: 5.5,         // m/s2 on top of the edge scrub: edges dig in
+  hockeyDecel: 4,         // m/s2 on top of the edge scrub: edges dig in
   brakeSteer: 0.7,
   pushAccel: 1.8,           // skating on flats (W / up), only below pushMaxSpeed
   pushMaxSpeed: 6,

@@ -41,6 +41,11 @@ export function createLiftNet(resort, heightAt, pistes = null) {
     // round 6: the line's own start is its bottom in the baked data (bake.py orients every lift uphill); `reversed` if not
     list.push({ id: `l${i}`, index: i, name: l.name || kindName(cls), kind: cls, bottom, top, len, seconds: len / LIFT_SPEC[cls].speed, ux, uz, reversed: a.y > b.y, seats: l.seats || 0, tunnel: !!l.tunnel, sub: paths.get(i).sub });
   }
+  // R8 (early QA: 3 x "Plan Maison", 2 x "Kumme" in the lift list): lifts sharing a name get a number, bottom (lowest) first;
+  // `baseName` keeps the data's name (a first-lift lookup by name still finds it)
+  const byName = new Map();
+  for (const l of list) { l.baseName = l.name; if (!byName.has(l.name)) byName.set(l.name, []); byName.get(l.name).push(l); }
+  for (const same of byName.values()) if (same.length > 1) [...same].sort((a, b) => a.bottom.y - b.bottom.y || a.index - b.index).forEach((l, k) => { l.name = `${l.baseName} ${k + 1}`; });
   const pisteStarts = pistes ? pistes.list : null;               // (exitOf: their tops, and points down the ones starting at a top)
   /** Where a skier stands after a lift (round 7-B: lift-site.js exitOf: out of the top station on snow, facing downhill, 15 m clear;
    *  the old guess was the nearest piste start, which could be inside a building). tree(x, z) = a tree there (scatter), optional. */

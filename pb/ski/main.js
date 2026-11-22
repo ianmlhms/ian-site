@@ -48,7 +48,7 @@ import { createRide, rideCamera, RIDE } from './modes/liftride.js';
 import { createCarrier } from './modes/carriers.js';
 import { createMarkers, markerList, MARKER } from './modes/markers.js';
 import { SKI_BY_ID, DEFAULT_SKI, skiParams, addSkiStats, skiOpen } from './modes/skis.js';
-import { spawnLift } from './modes/freeride.js';
+import { spawnLift, startHourFor } from './modes/freeride.js';
 import { createLook, applyLook, createCameraGuard, buildingBoxes, createBoxIndex } from './look.js';      // R7-A: free look + camera collision
 import { pisteStars, specialText } from './modes/challenges.js';
 
@@ -193,15 +193,15 @@ async function boot() {
     return g;
   }
   function camBlocked(x, y, z) {
-    if (boxIndex) { const b = boxIndex.hit(x, z, 0.35); if (b && y < b[6]) return true; }
+    if (boxIndex) { const b = boxIndex.hit(x, z, 0.7); if (b && y < b[6] + 0.4) return true; }      // R8: a wider margin (the near plane)
     if (pylonGrid) {
       for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
         const a = pylonGrid.get((Math.floor(x / 20) + dx) * 100003 + Math.floor(z / 20) + dz);
         if (a) for (const o of a) if (y < o[2] && Math.hypot(x - o[0], z - o[1]) < o[3] + 0.4) return true;
       }
     }
-    // R8: the stations by their real solid parts (lift-site.js: walls, posts, roofs, huts; a part within 1.8 m over the camera counts)
-    if (modes.lifts.world.hit(x, z, 0.3, y, (gx, gz) => surface.height(gx, gz))) return true;
+    // R8: the stations by their real solid parts (lift-site.js: walls, posts, roofs, huts), the camera as a 0.5 m box round its point
+    if (modes.lifts.world.hit(x, z, 0.3, y - 0.25, (gx, gz) => surface.height(gx, gz), 0.5)) return true;
     return !!scatter.hit(x, z, 1.1, y, quality.treeDensity);
   }
   const camGuard = createCameraGuard({ ground: (x, z) => surface.height(x, z), blocked: camBlocked });
@@ -209,7 +209,12 @@ async function boot() {
   /** R8: the look offset + the camera guard for a camera round a pivot (head = turn round the eye: cabin window / tunnel). */
   function lookCam(cam, pivot, head) {
     applyLook(cam, pivot, look, head ? 'head' : 'orbit');
-    if (!head) camGuard.guard(cam, pivot, lookDt);
+    if (!head) {
+      camGuard.guard(cam, pivot, lookDt);
+      // R8 (early QA: the free look put the camera under the street): never under the snow, whatever the guard's minimum distance did
+      const gy = surface.height(cam.x, cam.z) + 0.45;
+      if (cam.y < gy) cam.y = gy;
+    }
     return cam;
   }
   // R7-B's seam in rideCamera1: the lift camera turns with the same look
@@ -808,7 +813,7 @@ async function boot() {
   function onAction(action) {
     if (mp && mp.onAction(action)) return;
     if (action === 'weather') { const m = env.cycleWeather(); hud.toast(`Wieder: ${WEATHER_LABEL[m]}${m === 'random' ? ` (${WEATHER_LABEL[env.state.weatherId]})` : ''}`); }
-    else if (action === 'time') { const m = env.cycleTime(); hud.toast(`Zäit: ${TIME_LABEL[m]}${m === 'random' ? ` (${TIME_LABEL[env.state.timeId]})` : ''}`); }
+    else if (action === 'time') { const m = env.cycleTime(); if (modes.clock && m !== 'random') modes.clock.set(startHourFor(m)); hud.toast(`Zäit: ${TIME_LABEL[m]}${m === 'random' ? ` (${TIME_LABEL[env.state.timeId]})` : ''}`); }
     else if (action === 'reset') { if (game.screen === 'ski' && game.phase === 'running') respawn('Zréck op d\'Pist'); }
     else if (action === 'menu') { if (skiCard) skiCard.close(); else if (menuCard) { menuCard.close(); menuCard = null; game.paused = false; input.setEnabled(game.phase === 'running' || game.phase === 'countdown'); } else if (game.screen === 'map' && game.resume) resumeFree(); else openMenu(); }
     else if (action === 'map') { if (game.screen === 'ski') showMap(); else if (game.screen === 'map' && game.resume) resumeFree(); }
@@ -1019,7 +1024,8 @@ async function boot() {
       if (st) env.setSunScale(sunVisibility(st.x, st.y + 1, st.z));
       if (game.screen === 'map') updateStartStatus();
       if (game.screen === 'ski' && st) {
-        hud.setSpeed(st.speed * 3.6);
+        // R8 (early QA: 43 km/h on the speedo while dragged up a T-bar at x4): on a lift the speedo shows the lift's real line speed
+        hud.setSpeed(ride ? (ride.phase === 'ride' ? ride.path.spec.speed * 3.6 : 0) : st.speed * 3.6);
         hud.setEnv(env.state.weatherId, env.state.timeId);
         if (game.run && game.run.timed && game.phase !== 'countdown') {
           hud.setClock(game.run.ms, game.run.penalty);

@@ -42,6 +42,15 @@ for (const rid of resorts) {
       if (hard) ok(Math.abs(Math.abs(Math.sin(s2.heading)) - 1) < 0.35 || deg < 10, `${label}: the hockey stop turned the skis across the slope`);
     }
   }
+  // R8 (early QA: the hockey stop was a wall): from 33 km/h on a blue slope it takes 1.2 - 1.9 s
+  {
+    const w14 = slopeWorld(14);
+    let s3 = createSkierState(0, 0, 0, 0);
+    for (let i = 0; i < 20 / SKI.dt && s3.speed < 9.2; i++) s3 = stepSkier(s3, go, w14);
+    let t = 0;
+    for (; t < 8 && s3.speed > 0.01; t += SKI.dt) s3 = stepSkier(s3, { steer: 0.2, tuck: 0, brake: 1, push: 0, jump: false, hard: true }, w14);
+    ok(t >= 1.2 && t <= 1.9, `hockey stop from 33 km/h on 14 deg: ${t.toFixed(2)} s (1.2 - 1.9)`);
+  }
   const w = slopeWorld(20);
   const placed = run(w, createSkierState(0, 0, 0, 0), { steer: 0, tuck: 0, brake: 0, push: 0, jump: false }, 5);
   ok(placed.speed === 0 && placed.x === 0, 'a placed skier stays put without input');
