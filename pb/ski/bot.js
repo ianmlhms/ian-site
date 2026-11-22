@@ -18,8 +18,11 @@ export function createBot(piste, { speedScale = 1, blocked = null } = {}) {
   const p = {}, q = {};
   const proj = {};
   const gates = piste.slalomGates();
-  let hint = 0;
+  let hint = 0, stuckT = 0, lastT = null;
   return function drive(state) {
+    const dt = lastT === null ? 0 : Math.max(0, Math.min(0.1, (state.t || 0) - lastT));
+    lastT = state.t || 0;
+    stuckT = state.speed < 0.6 && state.crash === 0 ? stuckT + dt : 0;
     piste.project(state.x, state.z, hint, 120, proj);
     if (proj.dist > 60) piste.project(state.x, state.z, null, 0, proj);     // R7-C2: put down somewhere else (a teleport): find the line again
     hint = proj.s;
@@ -38,6 +41,18 @@ export function createBot(piste, { speedScale = 1, blocked = null } = {}) {
       for (const o of AVOID) {
         const ox = tx - p.dz * o, oz = tz + p.dx * o;
         if (!blocked(ox, oz) && pathClear(blocked, state.x, state.z, ox, oz)) { tx = ox; tz = oz; side = o; break; }
+      }
+      // pinned in a pocket (a house and a station hall either side of the line) for > 1.5 s: back to a clear point of the line, behind
+      // him if need be, then on from there
+      if (!side && stuckT > 1.5 && blocked) {
+        for (const ds of [8, 14, 22, -6, -12, -20]) {
+          piste.at(Math.max(0, proj.s + ds), q);
+          for (const o of [0, 3, -3, 6, -6]) {
+            const ox = q.x - q.dz * o, oz = q.z + q.dx * o;
+            if (!blocked(ox, oz) && pathClear(blocked, state.x, state.z, ox, oz)) { tx = ox; tz = oz; side = 99; break; }
+          }
+          if (side) break;
+        }
       }
       // pressed against a wide house: nothing clear ahead, so first sideways along it (a few metres down the line), round its corner
       if (!side) {
