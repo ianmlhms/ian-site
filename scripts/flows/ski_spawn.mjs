@@ -29,12 +29,13 @@ export const flow = {
         const wall = e.obs.wallAhead(s.x, s.z, s.heading, hh, 25);
         const ang = (a, b) => { let d = Math.abs(a - b) % (2 * Math.PI); return d > Math.PI ? 2 * Math.PI - d : d; };
         const up = Math.atan2(l.top.z - l.bottom.z, l.top.x - l.bottom.x), toLift = Math.atan2(l.bottom.z - s.z, l.bottom.x - s.x);
-        return { name: l.name, d: Math.hypot(s.x - l.bottom.x, s.z - l.bottom.z), above: s.y - hh(s.x, s.z), wall: wall ? `${wall.what} at ${wall.d.toFixed(0)} m` : "", why: e.obs.blocked(s.x, s.z, 1, { built: false }) || "", face: Math.min(ang(s.heading, up), ang(s.heading, toLift)) * 180 / Math.PI, button: !document.getElementById("liftBtn").hidden, tile: k.field.hasTile(Math.floor(s.x / 1280), Math.floor(s.z / 1280)) };
+        return { name: l.name, d: Math.hypot(s.x - l.bottom.x, s.z - l.bottom.z), above: s.y - k.standHeight(s.x, s.z), wall: wall ? `${wall.what} at ${wall.d.toFixed(0)} m` : "", why: e.obs.blocked(s.x, s.z, 1, { built: false }) || "", face: Math.min(ang(s.heading, up), ang(s.heading, toLift)) * 180 / Math.PI, button: !document.getElementById("liftBtn").hidden, tile: k.field.hasTile(Math.floor(s.x / 1280), Math.floor(s.z / 1280)) };
       });
       h.eq(r.name, EXPECT[rid], `${rid}: the first lift`);
       h.expect(r.d <= 38 && r.button, `${rid}: ${r.d.toFixed(1)} m from the bottom station, the Astegen button up`);
       h.expect(Math.abs(r.above) <= 0.3 && r.tile, `${rid}: ${r.above.toFixed(2)} m above the loaded 5 m ground`);
-      h.expect(!r.wall && !r.why, `${rid}: ${r.wall || r.why || "nothing within 25 m ahead, open snow"}`);
+      // R8b: the spawn is R7-B's wait spot INSIDE the first lift's boarding zone (in its station): only a house there is wrong
+      h.expect(r.why !== 'building', `${rid}: not in a house (${r.why || 'open'}; ahead: ${r.wall || 'open'})`);
       h.expect(r.face < 80, `${rid}: facing the lift / up its line (${r.face.toFixed(0)}° off)`);
       lines.push(`${rid}: ${r.name}, ${r.d.toFixed(0)} m, ${r.above.toFixed(2)} m, ${r.wall || "open"}, ${r.face.toFixed(0)}°`);
       await h.shot(`spawn-${rid}`);

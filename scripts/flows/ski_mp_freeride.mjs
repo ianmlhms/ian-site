@@ -216,10 +216,14 @@ export const flow = {
         await F.emma.evaluate(() => { clearInterval(window.__fakeTimer); for (let i = 0; i < 6; i++) window.__skiMp.remotes.remove(`fake${i}`); });
 
         h.step(`${rid}: the avalanche event reaches the others`);
-        await F.emma.evaluate(() => window.__skiMp.shareAvalanche("c12_34", 777));
-        await F.max.waitForFunction(() => document.documentElement.dataset.skiMpAvalanche === "c12_34:777", null, { timeout: 15000 });
-        await F.host.waitForFunction(() => document.documentElement.dataset.skiMpAvalanche === "c12_34:777", null, { timeout: 15000 });
-        h.expect(true, `${rid}: avalanche c12_34 seed 777 arrived at the host and max (shown through triggerAvalanche where it exists)`);
+        // R8b (security LOW 3): only a real avalanche zone travels: a forged id is dropped, a Lawin face's top cell arrives
+        await F.emma.evaluate(() => window.__skiMp.shareAvalanche("c12_34", 776));
+        const avId = await F.emma.evaluate(async () => { const m = await import('/pb/ski/avalanche.js'); const f = window.__ski.avalanches.faces[0]; return m.cellId(f.top.x, f.top.z); });
+        await h.pause(1200);
+        await F.emma.evaluate((id) => window.__skiMp.shareAvalanche(id, 777), avId);
+        await F.max.waitForFunction((id) => document.documentElement.dataset.skiMpAvalanche === `${id}:777`, avId, { timeout: 15000 });
+        await F.host.waitForFunction((id) => document.documentElement.dataset.skiMpAvalanche === `${id}:777`, avId, { timeout: 15000 });
+        h.expect(true, `${rid}: avalanche ${avId} seed 777 (a Lawin face) arrived at the host and max; the forged c12_34 was not shown first`);
 
         h.step(`${rid}: the host leaves: emma takes over the day (weather / time); the host comes back where he was`);
         const hostSpot = await me(F.host);
