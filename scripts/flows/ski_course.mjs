@@ -32,13 +32,13 @@ export const flow = {
       await page.evaluate((id) => window.__ski.start(id), id);
       await page.waitForFunction(() => window.__ski.game.phase === "countdown", null, { timeout: 15000 });
       const set = await page.evaluate(() => {
-        const k = window.__ski, r = k.game.run, p = k.game.piste, a = p.at(r.startS, {});
-        const why = [0, 3.5, -3.5].map((o) => k.explore.obs.blocked(a.x - a.dz * o, a.z + a.dx * o, 4)).filter(Boolean);
+        const k = window.__ski, r = k.game.run, p = k.game.piste, a = p.at(r.startS, {}), lat = k.gateAt ? k.gateAt(p).lat || 0 : 0;     // R7-C2: the gate may stand beside the line
+        const why = [0, 3.5, -3.5].map((o) => k.explore.obs.blocked(a.x - a.dz * (lat + o), a.z + a.dx * (lat + o), 4)).filter(Boolean);
         const names = k.scene.children.map((o) => o.name);
         const bar = k.scene.children.find((o) => o.name === "ski-course-barriers");
-        return { s: r.startS, why, barriers: bar ? bar.count : 0, arrows: (k.scene.children.find((o) => o.name === "ski-course-arrows") || {}).count || 0, arch: names.includes("ski-course-finish"), hud: !document.getElementById("courseHud").hidden, len: p.length, hw: p.halfWidth };
+        return { s: r.startS, lat, why, barriers: bar ? bar.count : 0, arrows: (k.scene.children.find((o) => o.name === "ski-course-arrows") || {}).count || 0, arch: names.includes("ski-course-finish"), hud: !document.getElementById("courseHud").hidden, len: p.length, hw: p.halfWidth };
       });
-      h.expect(set.why.length === 0, `${id}: start gate at ${set.s} m on open snow${set.why.length ? ` (blocked: ${set.why.join(", ")})` : ""}`);
+      h.expect(set.why.length === 0, `${id}: start gate at ${set.s} m${set.lat ? ` (${set.lat.toFixed(1)} m beside the line)` : ""} on open snow${set.why.length ? ` (blocked: ${set.why.join(", ")})` : ""}`);
       h.expect(set.barriers > (set.len - set.s - 20) / 6 * 2 * 0.9 && set.arch && set.hud, `${id}: ${set.barriers} barrier panels on both edges, ${set.arrows} arrows, the ZIL arch, the HUD bar`);
       await page.waitForFunction(() => window.__ski.game.phase === "running", null, { timeout: 15000 });
       const v0 = await page.evaluate(() => window.__ski.state.speed);
