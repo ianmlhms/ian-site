@@ -78,8 +78,7 @@ export function createTileStreamer({ resort, field, root }) {
   const listeners = new Set();
   const waiters = [];
   const stats = { loaded: 0, bytes: 0, failed: 0, total: list.length };
-  const abort = typeof AbortController === 'function' ? new AbortController() : null;   // R8f: stop() when the page goes away
-  let stopped = false;
+  let stopped = false;                                               // R8f: stop() when the page goes away
 
   const dist = (t) => {
     const dx = Math.max(t.tx * size - fx, 0, fx - (t.tx + 1) * size), dz = Math.max(t.tz * size - fz, 0, fz - (t.tz + 1) * size);
@@ -96,7 +95,7 @@ export function createTileStreamer({ resort, field, root }) {
       if (!best) return;
       best.state = 'load';
       active++;
-      fetchBytes(`${root}t/${best.tx}_${best.tz}.bin`, abort ? abort.signal : undefined).then((bytes) => {
+      fetchBytes(`${root}t/${best.tx}_${best.tz}.bin`).then((bytes) => {
         if (stopped) return;
         const grid = decodeGrid(bytes, 0, true);                         // R8f: 16-bit heights (half the memory, same numbers)
         if (grid.nx !== DATA.tileCells + 1 || grid.nz !== DATA.tileCells + 1) throw new Error(`tile ${best.tx}_${best.tz}: ${grid.nx}x${grid.nz}`);
@@ -125,9 +124,9 @@ export function createTileStreamer({ resort, field, root }) {
   return {
     stats,
     focus(x, z) { fx = x; fz = z; pump(); },
-    /** R8f: the page goes away (a resort switch): the loads in flight are cancelled quietly (WebKit logged every one cut by the
-     *  navigation as an "access control checks" page error) and nothing new starts. */
-    stop() { stopped = true; if (abort) abort.abort(); },
+    /** R8f: the page goes away (a resort switch): no new tile load starts and the ones in flight are ignored (an AbortController made
+     *  WebKit log even more "access control checks" errors for the loads the navigation cuts, so they are left to the browser). */
+    stop() { stopped = true; },
     hold(r) { reach = r; },
     want(x, z, r) { if (!wanted || wanted.x !== x || wanted.z !== z || wanted.r !== r) { wanted = { x, z, r }; pump(); } },
     release() { if (reach !== Infinity) { reach = Infinity; pump(); } },

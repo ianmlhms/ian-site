@@ -143,6 +143,13 @@ export const flow = {
       await h.shot(`map-${rid}`);
     }
     h.eq(errors, [], "zero console errors");
+    // R8f (WebKit): a resort switch (location.replace) cuts the old page's height-tile loads; WebKit reports each as an uncaught
+    // "... due to access control checks" page error (like ski-mp's reload at the start): only those, for the game's own data, are dropped
+    if (process.env.FLOW_BROWSER === "webkit") {
+      const cut = h.failures.filter((f) => /^uncaught page error: .*\/pb\/ski\/data\/[a-z0-9]+\/t\/\d+_\d+\.bin due to access control checks\.$/.test(f));
+      if (cut.length) console.log(`    (WebKit: ${cut.length} tile loads cut by the resort switches, not counted)`);
+      h.failures.splice(0, h.failures.length, ...h.failures.filter((f) => !cut.includes(f)));
+    }
   },
 };
 
