@@ -19,12 +19,19 @@ export function gatesNear(list, x, z, radius = GATE_DRAW) {
   return out;
 }
 
+/** R7-C2: startOf(piste) = s, or { s, lat } (the gate lat m right of the line). */
+function gatePoint(p, startOf) {
+  const g = startOf(p), s = typeof g === 'number' ? g : g.s, lat = typeof g === 'number' ? 0 : g.lat || 0;
+  const a = p.at(s, {});
+  return { x: a.x - a.dz * lat, z: a.z + a.dx * lat, heading: Math.atan2(a.dz, a.dx) };
+}
+
 /** The start gates: [{ id, piste | null, park, name, diff, x, z, heading }]. pistes = createPisteSet, layout = the park layout. */
-export function markerList(pistes, layout) {
+export function markerList(pistes, layout, startOf = () => 2) {      // R7-C: startOf(piste) = the start gate on open snow (clear.js)
   const out = [];
   for (const p of pistes.list) {
-    const a = p.at(2, {});
-    out.push({ id: p.id, piste: p, park: false, name: p.name, diff: p.diff, x: a.x, z: a.z, heading: Math.atan2(a.dz, a.dx) });
+    const g = gatePoint(p, startOf);
+    out.push({ id: p.id, piste: p, park: false, name: p.name, diff: p.diff, x: g.x, z: g.z, heading: g.heading });
   }
   if (layout) out.push({ id: 'park', piste: null, park: true, name: layout.name || 'Snowpark', diff: 'park', x: layout.top.x, z: layout.top.z, heading: Math.atan2(layout.uz, layout.ux) });
   return out;
@@ -244,6 +251,8 @@ export function createMarkers({ scene, list, height, overlay, starsOf }) {
   return {
     mesh, list,
     update, paint, reseat: seat,
+    /** R7-C: move the piste gates to their start on open snow (clear.js courseGate, once the buildings are known). */
+    regate(startOf) { for (const m of list) { if (!m.piste) continue; const g = gatePoint(m.piste, startOf); m.x = g.x; m.z = g.z; m.heading = g.heading; } seat(); },
     at: (x, z) => markerAt(list, x, z),
     byId: (id) => list.find((m) => m.id === id) || null,
     setVisible(v) { visible = v; mesh.visible = v; if (!v) for (const t of tags) t.el.hidden = true; },

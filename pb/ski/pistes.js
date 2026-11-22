@@ -2,10 +2,35 @@
  * points along it, checkpoints, slalom gates, and which pistes continue from the bottom of another. Pure (no THREE, no DOM). */
 import { PLAY, DIFF } from './config.js';
 
+const PROJECT_SLACK = 25, PROJECT_JUMP = 0.08;      // m along the line free from the hint, then m of distance per m of jump
+
+/** R8b: an OSM-chained line that runs out a dead end and straight back along itself (Zermatt cieloalto-cervinia: 25 m up a spur and
+ *  back down; 14 such spurs in the five resorts) loses the spur: at a reversal (> ~140 deg), the points out and back that lie within
+ *  SPUR_GAP m of each other for at least two samples are cut. A hairpin's legs part at once and are kept. Returns a NEW array. */
+const SPUR_COS = -0.77, SPUR_GAP = 8;
+export function dropSpurs(line) {
+  let L = Array.from(line);
+  for (let guard = 0; guard < 20; guard++) {
+    const m = L.length / 2;
+    let cut = null;
+    for (let k = 1; k < m - 1 && !cut; k++) {
+      const ax = L[2 * k] - L[2 * k - 2], az = L[2 * k + 1] - L[2 * k - 1], bx = L[2 * k + 2] - L[2 * k], bz = L[2 * k + 3] - L[2 * k + 1];
+      if ((ax * bx + az * bz) / (Math.hypot(ax, az) * Math.hypot(bx, bz) || 1) > SPUR_COS) continue;
+      let j = 1;
+      while (k - j - 1 >= 0 && k + j + 1 < m && Math.hypot(L[2 * (k - j - 1)] - L[2 * (k + j + 1)], L[2 * (k - j - 1) + 1] - L[2 * (k + j + 1) + 1]) < SPUR_GAP) j++;
+      if (j >= 2) cut = [k - j + 1, k + j - 1];
+    }
+    if (!cut) break;
+    L = [...L.slice(0, 2 * cut[0]), ...L.slice(2 * (cut[1] + 1))];
+  }
+  return L;
+}
+
 export function createPiste(src) {
-  const n = src.line.length / 2;
+  const line = dropSpurs(src.line);
+  const n = line.length / 2;
   const x = new Float32Array(n), z = new Float32Array(n), s = new Float32Array(n);
-  for (let i = 0; i < n; i++) { x[i] = src.line[2 * i]; z[i] = src.line[2 * i + 1]; if (i) s[i] = s[i - 1] + Math.hypot(x[i] - x[i - 1], z[i] - z[i - 1]); }
+  for (let i = 0; i < n; i++) { x[i] = line[2 * i]; z[i] = line[2 * i + 1]; if (i) s[i] = s[i - 1] + Math.hypot(x[i] - x[i - 1], z[i] - z[i - 1]); }
   const length = s[n - 1];
   const halfWidth = src.hw || DIFF[src.diff].width / 2;
 
@@ -37,8 +62,11 @@ export function createPiste(src) {
       t = t < 0 ? 0 : t > 1 ? 1 : t;
       const qx = ax + dx * t, qz = az + dz * t;
       const d = Math.hypot(px - qx, pz - qz);
-      if (d < best) {
-        best = d;
+      // R7-C2: with a hint, stay on the stretch the skier is on: a line that loops back close to itself (OSM ways chained into a
+      // hairpin or a loop: Zermatt rotenboden, Arlberg riffel / waldabfahrt ...) must not snap him 100 m back along it
+      const cost = hint === null ? d : d + Math.max(0, Math.abs(s[i] + t * Math.sqrt(L2) - hint) - PROJECT_SLACK) * PROJECT_JUMP;
+      if (cost < best) {
+        best = cost;
         const L = Math.sqrt(L2);
         out.s = s[i] + t * L;
         out.off = ((px - ax) * -dz + (pz - az) * dx) / L;     // + = right of travel (x east, z south: right of (dx, dz) is (-dz, dx))

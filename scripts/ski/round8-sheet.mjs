@@ -7,6 +7,7 @@
  *   carve     a red piste: the skier carving (orbit camera from the front side)
  *   stop      the hockey stop at the end of a fast run
  *   drag      a drag lift from the side (pylon head, the up + return rope)
+ *   fp        (R8b) first person carving the red piste;  map  (R8b) the piste map's free ride tab (list row vs card checked)
  *   node scripts/ski/round8-sheet.mjs [--resorts killy,...] [--engine webkit|chromium] [--out DIR] [--only spawn,street,...]
  * PNGs <engine>-<resort>-<shot>.png; stack them with scripts/ski/look_sheet.py. Run through browser-slot.py (one browser). */
 import fs from "node:fs";
@@ -93,7 +94,7 @@ try {
         await page.waitForFunction(() => window.__ski.game.phase === 'running' && !window.__ski.ride, null, { timeout: 90000 }).catch(() => {});
       }
     }
-    if (want("carve") || want("stop")) {
+    if (want("carve") || want("stop") || want("fp")) {
       const setup = await ev(() => {
         const S = window.__ski;
         const p = S.pistes.list.filter((q) => q.diff === 'red' && q.length > 900).sort((a, b) => b.length - a.length)[0] || S.pistes.list[0];
@@ -126,6 +127,13 @@ try {
         report.push(`${rid}: stop at ${v.toFixed(1)} km/h`);
         await ev(() => window.__ski.orbit(null));
       }
+      if (want("fp")) {
+        // R8b: first person (firstperson.js) carving down the same piste
+        await ev(() => { const S = window.__ski; S.game.camPose = null; S.setCamMode('fp'); });
+        await drive({ steer: 'bot', tuck: 0, brake: 0, push: 1, jump: false }, 2500);
+        await shot("fp");
+        await ev(() => window.__ski.setCamMode('chase'));
+      }
       await ev(() => { window.__drive.input = null; window.__ski.setInput(null); });
     }
     if (want("drag")) {
@@ -143,6 +151,17 @@ try {
         return { name: L[0].name };
       });
       if (d) { await settle(4500); await shot("drag"); await ev(() => window.__ski.setCamera(null)); }
+    }
+    if (want("map")) {
+      // R8b: the piste map over the free ride, the free ride tab (lift list + card, fog, the first-lift button)
+      await ev(() => window.__ski.setCamera(null));
+      await page.keyboard.press("m");
+      await page.waitForSelector("#mapCanvas", { timeout: 20000 }).catch(() => {});
+      await page.click('.modetabs [data-mode="freeride"]').catch(() => {});
+      await settle(1500);
+      const sel = await ev(() => { const r = document.querySelector('.lrow.sel .n'), h = document.querySelector('#modePane h2'); return { row: r ? r.textContent : null, card: h ? h.textContent : null }; });
+      report.push(`${rid}: map list ${sel.row} / card ${sel.card}${sel.row && sel.card && sel.card.trim() !== sel.row.trim() ? '  <-- MISMATCH' : ''}`);
+      await shot("map");
     }
     report.push(`${rid}: spawn ${spawn.name}, ${errors.length} page errors${errors.length ? ': ' + errors[0] : ''}`);
     await ctx.close();

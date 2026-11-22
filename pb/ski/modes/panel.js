@@ -14,6 +14,9 @@ export const MODE_TABS = Object.freeze([['freeride', 'Fräi fueren'], ['piste', 
 const fmtPts = (n) => Math.round(n).toLocaleString('de-LU');
 
 /** ★★☆ as HTML (won stars gold, the others grey). */
+/** R8b: a lift's name in the list: a bare number ("3000", Tignes) gets its kind in front, so it never reads as part of the height. */
+const listName = (l) => (/^\d[\d\s.]*$/.test(l.name) ? `${kindName(l.kind)} ${l.name}` : l.name);
+
 export function starRow(mask, size = '') {
   return `<span class="stars ${size}" aria-label="${starCount(mask)} vun 3 Stären">${[STAR.finish, STAR.time, STAR.special].map((b) => `<i class="${mask & b ? 'on' : ''}">★</i>`).join('')}</span>`;
 }
@@ -72,7 +75,7 @@ export function attachModePanel(mapEl, { onMode, onParkStart, onFreeStart, onPic
     showFree({ lifts, selected, ready }) {
       if (!list.childElementCount) {
         const sorted = [...lifts.list].sort((a, b) => b.top.y - a.top.y);
-        list.innerHTML = `<div class="grp">Bei e Lift (${sorted.length})</div>${sorted.map((l) => `<button type="button" class="prow lrow" data-lift="${l.id}"><span class="chip lift"></span><span class="n">${esc(l.name)}</span><span class="m">${Math.round(l.top.y)} m</span></button>`).join('')}`;
+        list.innerHTML = `<div class="grp">Bei e Lift (${sorted.length})</div>${sorted.map((l) => `<button type="button" class="prow lrow" data-lift="${l.id}"><span class="chip lift"></span><span class="n">${esc(listName(l))}</span><span class="m" title="uewen">↑ ${Math.round(l.top.y)} m</span></button>`).join('')}`;
         list.addEventListener('click', (e) => { const b = e.target.closest('[data-lift]'); if (b) onPickLift(lifts.byId.get(b.dataset.lift)); });
       }
       list.querySelectorAll('.lrow').forEach((b) => { const on = selected && b.dataset.lift === selected.id; b.classList.toggle('sel', on); if (on) b.scrollIntoView({ block: 'nearest' }); });
