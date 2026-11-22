@@ -888,3 +888,51 @@ it exists.
   start too flat; floating piste labels at the screen edge (D's labels); HUD text contrast in fog; first-person floating poles (C);
   boarding-zone views inside canopies (camera under the hall roof at the spawn); perf hitches on fast travel (meshedAround behind the
   fade is by design, the 170-215 ms WebKit placement hitch is not yet profiled).
+
+## Security (pre-launch) (22 Nov 2026, branch `worktree-agent-acf4147b279b85622`, review: ~/Library/Caches/ski-work/security/REVIEW.md)
+Test: `node scripts/ski/security-test.mjs` (Node, ~3 s, runs itself in a child with a hard timeout so a frozen loop is a FAIL): feeds the
+exploit payloads into the REAL modules — wire.js, remotes.js with the real three.js (the CDN file, checked against the page's SRI hash,
+cached in ~/Library/Caches/ski-work/), session.js + link.js on a fake Realtime / fake WebRTC, freeride.js, race.js, cloud.js, index.js
+readMpContext. On the old code it hangs at the 1e300 heading (verified), on this branch 65 checks green.
+- **H1** `net/wire.js`: at most 19 fields, numbers only (`"100"` is no longer a number), heading wrapped by `wrapAngle` (exact `a % 2pi`,
+  constant time; also right for 3e16 where the floor() form drifts), y -500..9000, air 0..30, progress 0..1e5. `remotes.js` imports
+  that `wrapAngle` (its while loop froze every tab on a heading of 1e300 / 1e12).
+- **M1** `net/session.js`: a hand-shake message never replaces a HEALTHY link (open and a packet within 3 s, relay 6.5 s): an offer or a
+  'relay' then is ignored; a new presence nonce while healthy waits in `pendingNonce` and tick() applies it once the link is not (a real
+  reload whose 'bye' got lost still recovers, ~3-4 s later); SDP over 20 KB dropped; relay payloads carry `n` (my nonce) and are only
+  taken from the pair's other player with his current presence nonce (an old client without `n` still passes).
+  **Still open**: Realtime broadcast does not authenticate senders, so a forged ANSWER to my own pending offer, or a forged presence +
+  offer while the link is down, can still take a pair over. The real fix is Realtime Authorization (private channels + RLS on
+  realtime.messages, the JWT's user = the roster uid) — a server change, not done here.
+- **LOW 1**: per-peer token bucket in `onLinkMessage` (reliable 60/s burst 130 = one relay batch, states 40/s; dropped, counted in
+  `netStats.flooded`); 'hi' outfit must be a known id (`remotes.js outfitOf`, else "any free one") and a figure is rebuilt at most once
+  per 2 s (`MEET_GAP_MS`, index.js + freeride.js); race.js ignores a repeated identical fin/dnf (no save + table rebuild per message).
+- **LOW 2** race.js: go / sync start times must be numbers; capped to now + GO_LEAD + 6 s and now - HARD_CAP (a real go is unchanged).
+- **LOW 3** freeride.js avalanches: id `^[A-Za-z0-9_:.-]{1,64}$`, numeric seed and t, a start more than 2 s in the future is dropped;
+  optional `host.avalanche.known(id)` hook — **C2: wire it in main.js to the real zone ids** when avalanche.js lands.
+- **LOW 4** `modes/cloud.js`: posts to `location.origin` (not '*'), listens only to `event.origin === location.origin` ('*' kept only for
+  an opaque 'null' origin). No discovery grid `d` in cloud.js on this branch — **C2 adds it: validate it in decodeCloud** (type, length,
+  charset) like `s` / `b`.
+- **LOW 5** roster names `String(name).slice(0, 16)` in readMpContext (+ the board row), entries without a string id dropped.
+- **LOW 6** `window.__ski` stays (cosmetic: it cannot post a valid time).
+- **M3** three.js `integrity="sha384-qOkzR5Ke/XkQxuGVJ9hpFEpDlcoLtWwVYhnJf06cLIZa2vaIptSqaubivErzmD5O" crossorigin="anonymous"` on
+  pb/ski.html, mtb.html, lux-drive.html, train-sim.html (all four load exactly `three@0.160.0/build/three.min.js`; hash computed from that
+  URL with curl + openssl, same as fouer.html). A new three.js version needs a new hash (the test checks it).
+- **SQL (NOT applied — Ian / orchestrator at launch)**:
+  H2: `scores_guard_row` lives in ONE block of `scripts/security-fix-scores-v1.sql` (`-- >>> scores_guard_row` .. `<<<`) and
+  `make_sql.py` copies it into `ski-v1.sql` after `ski_board_floors` (with its trigger), so either file can run first or again: once the
+  table exists, a ski-* row needs a board listed there and ski-* rows are not part of the 300; before it, ski-* ids are ordinary games.
+  M2: `ski_time_floor` drops a bare 'ski' row and unknown ski-* boards (`not found`; was a 20 s floor).
+  M4: floors = `floor(length / 33 m/s)` (SKI.maxSpeed) with the length measured exactly like pistes.js (Float32 sums of the packed line,
+  `make_sql.py client_length`): resort.json `len` differed by up to 16 m, so 38 boards (76 at 33 m/s) had an SQL floor 1 s above the
+  game's — the game could post a time the server silently dropped. Now all 1351 piste floors == `minRunMs` (client `PLAY.maxRunSpeed 33`).
+  Checked on PGlite (Postgres 16.4 in WASM, scratch only, 19 checks) with a fake scores table: both files in every order, 300 cap, 1351 ski rows on
+  top, unknown / bare / under-floor / NaN / > 1 h / park range, game_id rename.
+  **Caveat (M4)**: the checkpoints (every 220 m, radius half width + 60 m) let a skier cut bends: on 555 of 1351 pistes the shortest
+  path through them is under 33/40 of the line length, so a bold off-piste line could be faster than length / 33 and be marked invalid
+  ("ongëlteg") — the same rule as before, only stricter. If players hit it: tighter checkpoints on winding pistes, not a lower speed.
+  Park ceiling per layout: not done (halfpipe hits repeat, so features x best trick x combo is no real bound); stays 250,000.
+Browser runs (22 Nov, this branch, browser-slot ski pool, one at a time): ski-mp + ski-mp-freeride Chromium PASS, WebKit PASS (first
+WebKit try: every race check ok, only emma's frame logged one boot-probe "Importing a module script failed" — a load flake under the
+Mini's load, the rerun was clean); ski-challenges (cloud origin) Chromium PASS; all 9 mp-lobby-* Chromium + WebKit PASS. Node:
+security-test, mp-race-test, r7d-test (1424), round6-test (2307) green.

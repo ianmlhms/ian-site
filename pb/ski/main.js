@@ -1331,7 +1331,10 @@ async function boot() {
       startFree: (spot) => goFree(spawn && Math.hypot(spot.x - spawn.bottom.x, spot.z - spawn.bottom.z) < 60 ? spawn : null, spot),
       dayClock: () => modes.clock,
       liftTop: (i) => { const l = modes.lifts.byIndex.get(i); return l ? modes.lifts.startAt(l, (x, z) => surface.height(x, z)) : null; },
-      avalanche: { trigger: (id, seed, tMs) => { const a = avalancheApi(); if (a && a.triggerAvalanche) a.triggerAvalanche(id, seed, tMs / 1000); } },
+      avalanche: {
+        trigger: (id, seed, tMs) => { const a = avalancheApi(); if (a && a.triggerAvalanche) a.triggerAvalanche(id, seed, tMs / 1000); },
+        known: (id) => { const a = avalancheApi(); return !!(a && a.known && a.known(id)); },          // R8b: security LOW 3, a real zone only
+      },
     } });
     mp.begin();
     { const a = avalancheApi(); if (mpFree && a && a.onTrigger) a.onTrigger((e) => mp.shareAvalanche(e.id, e.seed, e.t * 1000)); }

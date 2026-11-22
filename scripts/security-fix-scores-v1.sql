@@ -46,6 +46,10 @@
 -- =============================================================
 
 -- ---------- 1 + 2. scores ----------
+-- >>> scores_guard_row (scripts/ski/make_sql.py copies this block into ski-v1.sql: edit it HERE, then re-run make_sql.py)
+-- Ski Alpen (ski-v1.sql, security review H2 22 Nov 2026): 1356 per-piste boards would hit the 300-row cap and silently stop every
+-- game's saves. Once public.ski_board_floors exists, a ski-* row is allowed only for a board listed there and ski-* rows do not count
+-- towards the 300. Before that table exists (ski-v1.sql not applied) ski-* ids are ordinary games. Safe to re-run in any order.
 create or replace function public.scores_guard_row()
  returns trigger
  language plpgsql
@@ -55,6 +59,7 @@ as $function$
 declare
   c_max_rows constant integer := 300;
   c_max_name constant integer := 80;
+  has_ski boolean := to_regclass('public.ski_board_floors') is not null;
 begin
   if tg_op = 'UPDATE' then
     -- a score belongs to the game it was made in
@@ -68,11 +73,20 @@ begin
   end if;
   new.game_name := left(new.game_name, c_max_name);
   -- An upsert of an existing row also passes here: only NEW boards count.
-  if not exists (select 1 from public.scores s
-                  where s.user_id = new.user_id
-                    and s.game_id = new.game_id)
-     and (select count(*) from public.scores s
-           where s.user_id = new.user_id) >= c_max_rows then
+  if exists (select 1 from public.scores s
+              where s.user_id = new.user_id
+                and s.game_id = new.game_id) then
+    return new;
+  end if;
+  if has_ski and new.game_id like 'ski-%' then
+    if not exists (select 1 from public.ski_board_floors f where f.board = new.game_id) then
+      return null;
+    end if;
+    return new;
+  end if;
+  if (select count(*) from public.scores s
+       where s.user_id = new.user_id
+         and (not has_ski or s.game_id not like 'ski-%')) >= c_max_rows then
     return null;
   end if;
   return new;
@@ -83,6 +97,7 @@ drop trigger if exists aa_scores_guard_row on public.scores;
 create trigger aa_scores_guard_row
   before insert or update on public.scores
   for each row execute function public.scores_guard_row();
+-- <<< scores_guard_row
 
 -- ---------- 2. game_saves ----------
 create or replace function public.game_saves_guard_row()

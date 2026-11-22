@@ -6,12 +6,18 @@
 Run it again after baking a new resort (the floors table gets the new boards). The SQL is for review: the builder never applies it.
 """
 import json
+import math
 import os
+import struct
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from linepack import unpack_line  # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DATA = os.path.join(REPO, "pb", "ski", "data")
 OUT = os.path.join(REPO, "scripts", "ski-v1.sql")
-MAX_RUN_SPEED = 40      # m/s along the piste line, the same as PLAY.maxRunSpeed in pb/ski/config.js
+MAX_RUN_SPEED = 33      # m/s along the piste line = the physics hard cap (SKI.maxSpeed); the same as PLAY.maxRunSpeed in pb/ski/config.js
 PARK_BASE = 1000000     # snow park boards store PARK_BASE - points (pb/ski/modes/park.js)
 PARK_MAX_POINTS = 250000
 PARK_MIN_POINTS = 1
@@ -26,14 +32,20 @@ HEAD = """-- =============================================
 -- 2. is_idle_game: ski-* boards skip only the 1.5x "new #1" ratio rule. Boards are per piste (140+ of them) and young: a first good
 --    skier beats a few casual runs by far more than 1.5x (150 s -> 95 s), which would ban honest players. The young-account rule stays.
 --    Instead ski-* times get:
--- 3. a floor per board: a time faster than the piste length / 40 m/s along the piste line is impossible (the game never posts one
---    either: pb/ski/progress.js minRunMs) and is dropped by a trigger. Unknown ski-* boards get a 20 s floor.
+-- 3. a floor per board: a time faster than the piste length / 33 m/s (the physics hard cap) along the piste line is impossible (the
+--    game never posts one either: pb/ski/progress.js minRunMs) and is dropped by a trigger. Unknown ski-* boards and a bare "ski" board
+--    are dropped too (security review M2, 22 Nov 2026: they used to get a 20 s floor).
 --
 -- 4. (round 4A) one snow park board per resort, ski-<resort>-park: park POINTS (higher is better for the player), stored as
 --    1,000,000 - points so the board stays lower-is-better like every other ski-* board (no change to merge_score_is_better, the
 --    arcade's GAMES entry or the keep-best trigger; the client format "skipark" prints the points). Its row in ski_board_floors holds
 --    the stored range: min_ms = 1,000,000 - 250,000 (the points ceiling: a perfect run with every feature scores far less), max_ms =
 --    999,999 (at least 1 point). The game never posts outside it either (pb/ski/modes/park.js validParkPoints).
+--
+-- 5. (security review H2, 22 Nov 2026) scores_guard_row (security-fix-scores-v1.sql: at most 300 score rows per player) would stop
+--    EVERY game's saves for a player who skis 300 of the 1356 boards. Here it is replaced by the same function with one exception: a
+--    ski-* row counts only when its board is in ski_board_floors, and ski-* rows are not part of the 300. security-fix-scores-v1.sql
+--    carries the identical function (guarded by to_regclass), so running the two files in any order gives the same result.
 --
 -- Keep the game lists in step with the latest versions: scores-numeric-v1.sql (merge_score_is_better) and
 -- anticheat-webcam-v1.sql (is_idle_game).
@@ -67,9 +79,13 @@ create or replace function public.ski_time_floor()
 returns trigger language plpgsql security definer set search_path = public as $$
 declare floor_ms integer; ceil_ms integer;
 begin
+  if new.game_id = 'ski' then
+    if tg_op = 'UPDATE' then return old; end if;
+    return null;
+  end if;
   if new.game_id not like 'ski-%' then return new; end if;
   select f.min_ms, f.max_ms into floor_ms, ceil_ms from public.ski_board_floors f where f.board = new.game_id;
-  if new.score is null or new.score < coalesce(floor_ms, 20000) or new.score > coalesce(ceil_ms, 3600000) then
+  if not found or new.score is null or new.score < floor_ms or new.score > coalesce(ceil_ms, 3600000) then
     if tg_op = 'UPDATE' then return old; end if;
     return null;
   end if;
@@ -81,8 +97,68 @@ drop trigger if exists ski_time_floor on public.scores;
 create trigger ski_time_floor before insert or update on public.scores
   for each row execute function public.ski_time_floor();
 
--- one row per piste board: length / 40 m/s, rounded down to whole seconds; one per snow park (stored points range)
+-- H2: the per-player row cap of security-fix-scores-v1.sql, with the ski boards bounded by ski_board_floors instead (see 5. above).
+-- KEEP IDENTICAL to the copy in scripts/security-fix-scores-v1.sql.
+{GUARD}
+
+-- one row per piste board: length / 33 m/s, rounded down to whole seconds; one per snow park (stored points range)
 """
+
+
+SCORES_FIX = os.path.join(REPO, "scripts", "security-fix-scores-v1.sql")
+
+
+def f32(v):
+    return struct.unpack("f", struct.pack("f", v))[0]
+
+
+SPUR_COS, SPUR_GAP = -0.77, 8.0
+
+
+def drop_spurs(line):
+    """pb/ski/pistes.js dropSpurs (R8b), the same steps: an out-and-back dead end of an OSM-chained line is cut (Zermatt
+    cieloalto-cervinia), so the length here stays the game's length."""
+    L = list(line)
+    for _ in range(20):
+        m = len(L) // 2
+        cut = None
+        for k in range(1, m - 1):
+            ax, az = L[2 * k] - L[2 * k - 2], L[2 * k + 1] - L[2 * k - 1]
+            bx, bz = L[2 * k + 2] - L[2 * k], L[2 * k + 3] - L[2 * k + 1]
+            den = math.hypot(ax, az) * math.hypot(bx, bz) or 1
+            if (ax * bx + az * bz) / den > SPUR_COS:
+                continue
+            j = 1
+            while k - j - 1 >= 0 and k + j + 1 < m and math.hypot(L[2 * (k - j - 1)] - L[2 * (k + j + 1)], L[2 * (k - j - 1) + 1] - L[2 * (k + j + 1) + 1]) < SPUR_GAP:
+                j += 1
+            if j >= 2:
+                cut = (k - j + 1, k + j - 1)
+                break
+        if not cut:
+            break
+        L = L[:2 * cut[0]] + L[2 * (cut[1] + 1):]
+    return L
+
+
+def client_length(p):
+    """The piste length exactly as pb/ski/pistes.js createPiste measures it (Float32Array x / z / s of the packed line), so the SQL
+    floor and the game's minRunMs agree to the millisecond (resort.json "len" is the bake's length and differs by up to 16 m)."""
+    line = drop_spurs(p["line"] if "line" in p else unpack_line(p["lz"]))
+    xs = [f32(v) for v in line[0::2]]
+    zs = [f32(v) for v in line[1::2]]
+    s = 0.0
+    for i in range(1, len(xs)):
+        s = f32(s + math.hypot(xs[i] - xs[i - 1], zs[i] - zs[i - 1]))
+    return s
+
+
+def guard_block():
+    """The scores_guard_row block of security-fix-scores-v1.sql (one source, so the two files can never undo each other)."""
+    with open(SCORES_FIX, encoding="utf-8") as fh:
+        text = fh.read()
+    start = text.index("-- >>> scores_guard_row")
+    end = text.index("-- <<< scores_guard_row") + len("-- <<< scores_guard_row")
+    return text[start:end]
 
 
 def main():
@@ -95,11 +171,11 @@ def main():
             resort = json.load(fh)
         for p in resort["pistes"]:
             board = ("ski-%s-%s" % (rid, p["id"]))[:48]
-            rows.append("  ('%s', %d, null)" % (board, int(p["len"] / MAX_RUN_SPEED) * 1000))
+            rows.append("  ('%s', %d, null)" % (board, math.floor(client_length(p) / MAX_RUN_SPEED) * 1000))
         if resort.get("park"):
             assert not any(p["id"] == "park" for p in resort["pistes"]), "a piste called park would share the snow park board"
             rows.append("  ('ski-%s-park', %d, %d)" % (rid, PARK_BASE - PARK_MAX_POINTS, PARK_BASE - PARK_MIN_POINTS))
-    body = HEAD + "insert into public.ski_board_floors (board, min_ms, max_ms) values\n" + ",\n".join(rows) + "\non conflict (board) do update set min_ms = excluded.min_ms, max_ms = excluded.max_ms;\n"
+    body = HEAD.replace("{GUARD}", guard_block()) + "insert into public.ski_board_floors (board, min_ms, max_ms) values\n" + ",\n".join(rows) + "\non conflict (board) do update set min_ms = excluded.min_ms, max_ms = excluded.max_ms;\n"
     with open(OUT, "w", encoding="utf-8") as fh:
         fh.write(body)
     print("wrote", OUT, len(rows), "boards")

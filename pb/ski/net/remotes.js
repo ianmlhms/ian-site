@@ -4,7 +4,7 @@
  * shadow, culled by distance and view; the name tags are plain DOM (no draw call at all). Ghost-style: nobody collides with anybody. */
 import { NET } from './config.js';
 import { createSkierModel, OUTFITS } from '../skier-model.js';
-import { packState, unpackState } from './wire.js';
+import { packState, unpackState, wrapAngle } from './wire.js';
 import { riderAt, KIND_OF_CODE } from '../modes/liftride.js';
 import { createCarrier } from '../modes/carriers.js';
 import { layoutTags, tagWidth, distText } from './tags.js';
@@ -16,10 +16,13 @@ const FAR_TAG_DIST = 12000;      // R7-D free ride: a friend anywhere in the ski
 const FAR_LABEL_FROM = 250;      // m: from here a free-ride tag says how far away he is
 const JUMP = 120;                // m between two states: a teleport (fast travel, map jump, lift skip): snap, never slide across
 const MAX_BUF = 40;
-const wrapAngle = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
 
 /* ---------- the wire format of one skier state: net/wire.js (round 6: + "riding lift X at s") ---------- */
 export { packState, unpackState };
+/** LOW 1: a peer's outfit wish: a known outfit id or '' (the next free one) */
+export const outfitOf = (o) => (typeof o === 'string' && OUTFITS.some((x) => x.id === o) ? o : '');
+/** LOW 1: at most one figure rebuild per peer in this time (a skinned mesh per 'hi' with a new outfit) */
+export const MEET_GAP_MS = 2000;
 
 /* ---------- one skinned mesh per skier ---------- */
 let sharedMat = null;

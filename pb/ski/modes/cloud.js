@@ -78,8 +78,10 @@ export function decodeCloud(raw) {
   const stats = { off: Number.isFinite(x.o) && x.o > 0 ? Math.min(1e8, Math.round(x.o)) : 0, top: Number.isFinite(x.t) && x.t > 0 ? Math.min(60, x.t / 10) : 0 };
   const ski = typeof x.k === 'string' && /^[a-z]{2,16}$/.test(x.k) ? x.k : null;
   const disc = {}, lawin = {};
-  for (const [rid, text] of Object.entries(isRecord(data.d) ? data.d : {})) if (/^[a-z0-9]{1,16}$/.test(rid) && rleIntervals(text).length) disc[rid] = text;
-  for (const [rid, m] of Object.entries(isRecord(data.w) ? data.w : {})) if (/^[a-z0-9]{1,16}$/.test(rid) && Number.isInteger(m) && m > 0 && m < 256) lawin[rid] = m;
+  // security (R8b): the discovery grid d = { rid: run-length text } is checked like s / b: at most 16 resorts, rid [a-z0-9]{1,16}, a
+  // string of base-36 runs (discovery.js rleIntervals: <= MAX_RLE characters, every cell index < MAX_CELLS), else dropped
+  for (const [rid, text] of Object.entries(isRecord(data.d) ? data.d : {}).slice(0, 16)) if (/^[a-z0-9]{1,16}$/.test(rid) && typeof text === 'string' && rleIntervals(text).length) disc[rid] = text;
+  for (const [rid, m] of Object.entries(isRecord(data.w) ? data.w : {}).slice(0, 16)) if (/^[a-z0-9]{1,16}$/.test(rid) && Number.isInteger(m) && m > 0 && m < 256) lawin[rid] = m;
   return { stars, park, bestHash, stats, ski, disc, lawin };
 }
 
@@ -115,6 +117,9 @@ export function createCloudSave({ win = window, onIncoming }) {
   const parent = win.parent;
   const standalone = !parent || parent === win;
   const testMode = () => win.__pbTestMode === true;
+  // LOW 4: the arcade frame is same-origin: only talk to (and listen to) our own origin, never '*'
+  const origin = (win.location && win.location.origin) || '';
+  const target = origin && origin !== 'null' ? origin : '*';
   let timer = 0, lastJson = '', pending = null;
   function send() {
     timer = 0;
@@ -124,10 +129,10 @@ export function createCloudSave({ win = window, onIncoming }) {
     const json = JSON.stringify(rec);
     if (json === lastJson) return;
     if (json.length > LIMIT) { console.warn('[ski] cloud save too large, not sent', json.length); return; }
-    try { parent.postMessage({ __pbSave: 1, data: rec }, '*'); lastJson = json; } catch (error) { console.warn('[ski] could not send the cloud save', error); }
+    try { parent.postMessage({ __pbSave: 1, data: rec }, target); lastJson = json; } catch (error) { console.warn('[ski] could not send the cloud save', error); }
   }
   const onMessage = (event) => {
-    if (standalone || event.source !== parent || !isRecord(event.data) || event.data.__pbLoadSave !== 1 || testMode()) return;
+    if (standalone || event.source !== parent || (target !== '*' && event.origin !== origin) || !isRecord(event.data) || event.data.__pbLoadSave !== 1 || testMode()) return;
     const decoded = decodeCloud(event.data.data);
     if (decoded) onIncoming(decoded);
   };
@@ -140,7 +145,7 @@ export function createCloudSave({ win = window, onIncoming }) {
       if (testMode()) return;
       const injected = decodeCloud(win.__pbSave);
       if (injected) onIncoming(injected);
-      if (!standalone) { try { parent.postMessage({ __pbWantSave: 1 }, '*'); } catch (error) { console.warn('[ski] could not ask for the cloud save', error); } }
+      if (!standalone) { try { parent.postMessage({ __pbWantSave: 1 }, target); } catch (error) { console.warn('[ski] could not ask for the cloud save', error); } }
     },
     push(progress) { pending = progress; clearTimeout(timer); timer = setTimeout(send, SAVE_DELAY_MS); },
     flush,

@@ -32,7 +32,7 @@ export function createMpHud(root) {
     board(title, rows) {
       board.replaceChildren(el('div', 'mp-bt', title), ...rows.map((r, i) => {
         const row = el('div', `mp-row${r.me ? ' me' : ''}${r.away ? ' away' : ''}`);
-        row.append(el('span', 'p', String(i + 1)), el('span', 'n', r.name), el('span', 't', r.text || ''));
+        row.append(el('span', 'p', String(i + 1)), el('span', 'n', String(r.name || '?').slice(0, 18)), el('span', 't', r.text || ''));      // LOW 5 (+ ' ★')
         return row;
       }));
     },

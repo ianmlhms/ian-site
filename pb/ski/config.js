@@ -112,7 +112,7 @@ export const PLAY = Object.freeze({
   countdown: 3,
   checkpointEvery: 220,     // m along the piste between the (invisible) checkpoints a run must pass
   checkpointSlack: 60,      // m beyond the piste half width a checkpoint still counts
-  maxRunSpeed: 40,          // m/s along the piste line: a run faster than length / this is impossible (never saved, never posted; same floor in scripts/ski-v1.sql)
+  maxRunSpeed: 33,          // m/s along the piste line = SKI.maxSpeed (security review M4): a run faster than length / this is impossible (never saved, never posted; same floor in scripts/ski-v1.sql)
   slalomGap: 42,            // m between slalom gates
   slalomMiss: 5000,         // ms added per missed gate
   slalomHalfWidth: 3.2,     // m between the gate's inner pole and the centre line

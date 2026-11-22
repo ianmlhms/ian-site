@@ -33,7 +33,7 @@ const { createLiftNet } = await imp('modes/freeride.js');
 const { createParkLayout } = await imp('modes/park.js');
 const { createObstacles, firstLift, liftSpot, safeSpot, courseGate } = await imp('modes/clear.js');
 const { createDiscovery, mergeRle, rleIntervals } = await imp('modes/discovery.js');
-const { findFaces, releasable, createSlab, stepSlab, cellId, slopeDeg, lowestPiste, faceView } = await imp('avalanche.js');
+const { findFaces, releasable, createSlab, stepSlab, cellId, slopeDeg, lowestPiste, faceView, knownZone } = await imp('avalanche.js');
 const { createCourse, courseLayout, courseSeats, distanceText } = await imp('modes/course.js');
 const { createRun } = await imp('game.js');
 const { createSkierState, stepSkier } = await imp('skier.js');
@@ -125,6 +125,21 @@ for (const rid of rids.length ? rids : ALL) {
   let onPiste = 0;
   for (const p of pistes.list.slice(0, 200)) { const a = p.at(p.length / 2, {}); if (releasable(field, a.x, a.z, height)) onPiste++; }
   check(onPiste === 0, `avalanche: never releasable on a piste (${onPiste} of 200 piste middles)`);
+  // R8b (security LOW 3): a friend's avalanche id must be a real zone (avalanche.js knownZone): every cell a skier can release here is
+  // known (by the far grid, before any tile is in), the piste middles and forged ids are not
+  {
+    const zf = typeof faces !== 'undefined' ? faces : [];
+    let rel = 0, relKnown = 0, pisteKnown = 0;
+    const rr = (() => { let a = 777; return () => { a = (a * 1103515245 + 12345) & 0x7fffffff; return a / 0x7fffffff; }; })();
+    for (let k = 0; k < 60000 && rel < 400; k++) {
+      const x = 200 + rr() * (resort.width - 400), z = 200 + rr() * (resort.depth - 400);
+      if (!releasable(field, x, z, height)) continue;
+      rel++; if (knownZone(field, zf, cellId(x, z))) relKnown++;
+    }
+    for (const p of pistes.list.slice(0, 200)) { const a = p.at(p.length / 2, {}); if (knownZone(field, zf, cellId(a.x, a.z))) pisteKnown++; }
+    const forged = ['a-5_3', 'a999999_1', 'x1_2', 'a1_2;', '', 'a1.5_2'].filter((id) => knownZone(field, zf, id)).length;
+    check(rel === 0 || (relKnown / rel >= 0.97 && pisteKnown <= 2 && forged === 0), `avalanche zones: ${relKnown}/${rel} releasable cells known to a friend, ${pisteKnown}/200 piste middles and ${forged} forged ids accepted`);
+  }
 
   // ---- course ----
   let clear = 0, moved = 0, beside = 0, lined = 0, seatsOk = 0, worstBury = 0, worstGap = 0, netInHouse = 0, openTotal = 0, edgeTotal = 0;

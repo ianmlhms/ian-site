@@ -8,6 +8,7 @@ import { DISCOVERY } from '../config.js';
 
 const RLE_RE = /^[0-9a-z]+(,[0-9a-z]+)*$/;
 export const MAX_RLE = 12000;          // characters per resort (a fully explored 3 Vallées is far less: its runs are long)
+export const MAX_CELLS = 1 << 20;      // security: no resort box has more 100 m cells (3 Vallées ~ 300 x 230); a run past this = a forgery
 
 /** Runs text -> [[start, end), ...] of discovered cells. Bad text -> []. */
 export function rleIntervals(text) {
@@ -16,7 +17,7 @@ export function rleIntervals(text) {
   let i = 0, on = false;
   for (const w of text.split(',')) {
     const n = parseInt(w, 36);
-    if (!Number.isFinite(n) || n < 0) return [];
+    if (!Number.isFinite(n) || n < 0 || i + n > MAX_CELLS) return [];
     if (on && n > 0) out.push([i, i + n]);
     i += n; on = !on;
   }

@@ -38,6 +38,23 @@ export function releasable(field, x, z, heightAt, attrs = {}) {
   return slopeDeg(heightAt, x, z, 6) >= AV.slope;
 }
 export const cellId = (x, z) => `a${Math.floor(x / AV.cell)}_${Math.floor(z / AV.cell)}`;
+/** R8b (security LOW 3): is `id` a real avalanche zone of this resort (a friend's release in the online free ride)? A Lawin face's
+ *  top cell, or a 40 m cell inside the resort where some point is releasable by the far grid (the same on every device, before any
+ *  tile is in; the slope gentler than the local test, which reads the finer snow). Pure. */
+export function knownZone(field, faces, id) {
+  const c = typeof id === 'string' ? cellCentre(id) : null;
+  if (!c || c.x < 0 || c.z < 0 || c.x > field.width || c.z > field.depth) return false;
+  if (faces.some((f) => cellId(f.top.x, f.top.z) === id)) return true;
+  const far = (x, z) => field.farHeight(x, z);
+  const q = AV.cell * 0.35, a = {};
+  for (const [dx, dz] of [[0, 0], [q, q], [-q, q], [q, -q], [-q, -q], [q, 0], [-q, 0], [0, q], [0, -q]]) {
+    const x = c.x + dx, z = c.z + dz;
+    field.attrs(x, z, a);
+    if (a.piste > 0.05 || a.dist < AV.pisteGap * 0.7 || a.park > 0 || a.forest > 0.5 || a.rock > 0.7 || a.built > 0.05 || a.water > 0.2) continue;
+    if (slopeDeg(far, x, z, 6) >= AV.slope - 15) return true;           // the far grid smooths the steep snow by up to ~10 deg
+  }
+  return false;
+}
 export function cellCentre(id) {
   const m = /^a(-?\d+)_(-?\d+)$/.exec(id);
   if (!m) return null;
@@ -450,6 +467,10 @@ export function createAvalanches({ scene, field, surface, pistes, hud, uiRoot, l
     get active() { return active; }, get nearest() { return nearest; },
     onTrigger(cb) { listeners.push(cb); return () => { listeners = listeners.filter((x) => x !== cb); }; },
     setClock(fn) { clock = fn; },
+    /** R8b (security LOW 3): is `id` a real avalanche zone of this resort (a friend's release in the online free ride)? A Lawin face's
+     *  top cell, or a 40 m cell inside the resort where some point is releasable by the far grid (the same on every device, before any
+     *  tile is in; the slope a little gentler than the local test, which reads the finer snow). */
+    known: (id) => knownZone(field, faces, id),
     /** R7-C2: how loud the rumble is (0..1): the share of the slab still moving, by the distance to the skier (or the camera). */
     loudness(x, z) {
       if (!active) return 0;
