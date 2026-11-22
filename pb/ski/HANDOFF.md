@@ -1292,3 +1292,11 @@ the start click, the three game pages boot one after the other (the mesh waits f
 while the others stood +-1.9 m from the line: 6.1 m apart, ski-mp "side by side" failed); evening shade (Ian: still a fairly dark
 blue-grey): snow-shader under the low evening sun (evK) the shade is ~1.3 x lighter and soft (blue / red ~1.14): on screen (WebKit,
 Zermatt village in the shade) ~(135, 156, 197) -> ~(172, 184, 202); village.js snowy roofs in the shade the same (they stayed slate).
+**Checks on the R8f head** (logs ~/Library/Caches/ski-work/round8f/final/flow-<engine>-<flow>.log):
+- Node: round7b-test 5682, round7-test 30, round6-test 2192, look7d-check 68, r7d-test 1424, r8c-check 36302, round7c-check 120,
+  harness 25/25/25/21/21, floors-check 1324 + parks, security-test, mp-race-test: all green.
+- Chromium, all 29 PASS: home-page, ski, ski-ipad-start, ski-resorts (all 4 resorts in one page now), ski-mp (3 game pages, tree peak
+  ~2.3 GB), ski-challenges, ski-park, ski-freeride, ski-lift, ski-skis (these 10 full Chrome, video off), ski-lifts-all (incl. Zermatt
+  Leisee-Shuttle: the flow now reads the ride on its first seated frame), ski-webkit (the look waits for the ease back: it runs on the
+  capped frame clock), ski-look7d, ski-mp-freeride, ski-teleport, ski-spawn, ski-firstperson, ski-avalanche, ski-course, mp-lobby-connect4
+  / slf / quick-match / games / color / party / arcade / roulette / blackjack, arcade-pad (these 19 with FLOW_POWER=1).
