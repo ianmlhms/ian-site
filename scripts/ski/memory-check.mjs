@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* R8f: memory check over the resorts (run through browser-slot.py: ONE browser, its tree must stay < 2.5 GB).
  *   node scripts/ski/memory-check.mjs [--engine chromium|webkit] [--resorts killy,3vallees,...] [--q low] [--tour 18] [--switches 10]
- *        [--size 1180x820] [--dpr 2] [--json out.json] [--no-check]
+ *        [--size 1180x820] [--dpr 2] [--multi 3] [--json out.json] [--no-check]
  * Per resort (a fresh page): the memory after the free ride is up at the first lift ("load") and after putting the skier down at up
  * to --tour village centres ("tour"). Then ONE page switches resorts --switches times the way the game does (location.replace, a page
  * life per resort) and must not grow: the same resort's footprint at the last visit is within +-50 MB of its first visit.
@@ -23,7 +23,8 @@ const [W, H] = opt("size", "1180x820").split("x").map(Number);
 const DPR = Number(opt("dpr", "2"));
 const JSON_OUT = opt("json", "");
 const CHECK = !args.includes("--no-check");
-const LIMIT = { load: 450, tour: 700, growth: 50 };
+const MULTI = Number(opt("multi", "3"));
+const LIMIT = { load: 450, tour: 700, growth: 50, multi: 2200 };      // multi: the whole tree with MULTI game pages (the 2.5 GB guard, lobby pages on top)
 process.env.FLOW_BROWSER = ENGINE;
 
 const helpers = fs.readFileSync(`${REPO}/scripts/ski/r8c-helpers.js`, "utf8");
@@ -181,6 +182,24 @@ try {
       else if (row.treeMB - firstOf[rid].treeMB > LIMIT.growth) fail(`switch #${i + 1} ${rid}: tree ${row.treeMB} MB, ${row.treeMB - firstOf[rid].treeMB} MB more than its first visit (${firstOf[rid].treeMB})`);
     }
     await ctx.close();
+  }
+  // 3. the online race (ski-mp flow): MULTI game pages of the first resort in one browser at once (960 x 600 + 640 x 400, dpr 1)
+  if (MULTI > 0) {
+    const rid = RESORTS[0];
+    console.log(`\n${MULTI} pages of ${rid} at once (the online race)`);
+    const open = [];
+    for (let i = 0; i < MULTI; i++) {
+      const vp = i === 0 ? { width: 960, height: 600 } : { width: 640, height: 400 };
+      const ctx = await browser.newContext({ viewport: vp, deviceScaleFactor: 1, serviceWorkers: "block" });
+      const page = await ctx.newPage();
+      await page.goto(urlOf(rid), { waitUntil: "domcontentloaded" });
+      open.push({ ctx, page });
+    }
+    for (const { page } of open) await whenUp(page);
+    const row = await measure(open[0].page, `${MULTI} x ${rid}`);
+    results.multi = row;
+    if (row.treeMB > LIMIT.multi) fail(`${MULTI} pages of ${rid}: tree ${row.treeMB} MB > ${LIMIT.multi}`);
+    for (const { ctx } of open) await ctx.close();
   }
 } catch (error) {
   fail(`aborted: ${String(error.message || error).split("\n")[0]}`);

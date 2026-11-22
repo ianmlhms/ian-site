@@ -8,7 +8,7 @@ export const BLOCK = QUADTREE.minSize;                 // 80 m: one LOD 0 tile
 const CELLS = QUADTREE.cells;                          // 32 cells of 2.5 m
 const APRON = 1;
 const SIDE = CELLS + 1 + 2 * APRON;
-const MAX_BLOCKS = 900;
+const MAX_BLOCKS = 420;                 // R8f (memory): 24.5 KB a block; ~30-120 are in use around the skier (was 900)
 export const ATTR = 4;                                 // per node: piste, forest, rock, built (see field.attrs)
 
 /** The quad (i, j) of the GLOBAL lattice is split along 00-11 when (i + j) is even, along 10-01 when odd (same rule in the index buffer). */

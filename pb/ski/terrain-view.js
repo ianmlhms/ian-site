@@ -6,7 +6,7 @@ import { computeTileNodes, buildTileMesh, stitchSignature } from './tile-mesh.js
 
 const THREE = window.THREE;
 const RESELECT_DISTANCE = QUADTREE.reselectDistance;   // m the skier moves before the tile set is re-evaluated
-const CACHE_LIMIT = 700;
+const CACHE_LIMIT = 400;                // R8f (memory): node data of the coarser tiles, 24.5 KB each (was 700)
 const TILE_BUDGET_MS = 2;             // wall-clock ms per frame spent building terrain tiles (at least one tile per frame, even if it takes longer)
 
 export function createTerrainView({ scene, surface, field, material: initialMaterial, quality }) {

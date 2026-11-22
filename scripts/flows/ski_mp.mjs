@@ -60,6 +60,19 @@ export const flow = {
       const host = await newPlayer(h, world, { label: "host", user: USERS.ian, viewport: SMALL }); players.push(host);
       const max = await newPlayer(h, world, { label: "max", user: USERS.max, viewport: SMALL }); players.push(max);
       for (const p of players) await mockTurn(p);
+      // R8f: a gate on each player's resort data: closed from the start click until that player's turn (three 3D pages booting at the
+      // same moment in ONE test browser pass the Mini's 2.5 GB guard; real players boot on their own devices; the mesh waits for all)
+      const gates = new Map();
+      for (const p of players) {
+        const g = { open: true, waiters: [] };
+        gates.set(p.label, g);
+        await p.context.route(/\/pb\/ski\/data\/[^/]+\/resort\.json/, async (route) => {
+          if (!g.open) await new Promise((r) => g.waiters.push(r));
+          try { await route.continue(); } catch { /* the page went away meanwhile (the reload at the start) */ }
+        });
+      }
+      const closeGates = () => { for (const g of gates.values()) g.open = false; };
+      const openGate = (p) => { const g = gates.get(p.label); g.open = true; for (const w of g.waiters.splice(0)) w(); };
       // max is on a school network: no direct path to anybody (WebRTC never connects) -> his two pairs go through the relay
       await max.context.addInitScript(() => { if (window.RTCPeerConnection) RTCPeerConnection.prototype.setRemoteDescription = () => new Promise(() => {}); });
 
@@ -102,13 +115,21 @@ export const flow = {
       await host.page.waitForFunction(() => document.querySelectorAll("#mplRoster .mpl-row:not(.mpl-empty):not(.mpl-invited)").length === 3, null, T);
       for (const g of [emma, max]) await g.page.click("#mplReady");
       await host.page.waitForFunction(() => !document.getElementById("mplStart").disabled, null, T);
+      closeGates();
       await host.page.click("#mplStart");
       for (const p of players) await p.page.waitForURL(/pixelbreak\.html\?g=ski&room=/, T);
       h.expect(host.page.url().includes(`g=ski&room=${code.toLowerCase()}&role=host&lb=${code}`), `host -> ${host.page.url().replace(h.origin, "")}`);
       // test speed: the same links with the scripted skier and game time x4 (also a reload right at the start: the mesh must cope)
-      for (const p of players) { p.errMark = p.errors.length; await p.page.goto(p.page.url() + DEBUG_Q, { waitUntil: "domcontentloaded" }); }
+      // R8f: one page boots after the other (three 3D pages loading at the same moment in ONE test browser passed the Mini's 2.5 GB
+      // guard; real players load on their own devices): the mesh waits for everybody before the countdown
       const F = {};
-      for (const p of players) { F[p.label] = await gameFrame(p); await spyScores(p, F[p.label]); }
+      for (const p of players) {
+        p.errMark = p.errors.length;
+        await p.page.goto(p.page.url() + DEBUG_Q, { waitUntil: "domcontentloaded" });
+        openGate(p);
+        F[p.label] = await gameFrame(p);
+      }
+      for (const p of players) await spyScores(p, F[p.label]);
       // R7-D (WebKit): the reload right at the start cancels the old page's script / REST loads, WebKit logs those: only they are dropped
       for (const p of players) p.errors = p.errors.filter((e, i) => i < p.errMark || !/access control checks|load https:|load \/|cancel/i.test(e));
 

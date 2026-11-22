@@ -546,11 +546,15 @@ export function seatRows(rows, height) {
   });
 }
 
-export function createVillage({ scene, rows, env, height, level = 'medium', resort = '' }) {
+/** R8f (memory): the village is built per CELL (1280 m) cell when the camera comes within the building radius + LAZY.ahead m (the
+ *  nearest first, time-sliced: LAZY.budget ms a frame, LAZY.nearBudget when the camera is close to it) and dropped again beyond the
+ *  radius + LAZY.keep m. Built cells go to the GPU at once (upload(object): gpu-mem.js uploadNow; their JS copies go). Before, the whole
+ *  resort's houses stayed built: Kronplatz ~105 MB of vertices on the GPU and (until R8f) again in JS. */
+export const LAZY = Object.freeze({ ahead: 500, keep: 1500, budget: 3, nearBudget: 40 });
+
+export function createVillage({ scene, rows, env, height, level = 'medium', resort = '', upload = null }) {
   HEIGHT = height || null;
   const alpine = ALPINE_RESORTS.has(resort);
-  // R8f (memory): one base cell at a time (its rows, its detail cells: a DCELL cell lies inside one CELL cell), its writers dropped
-  // once its meshes are made, so the build never holds more than one cell's vertices besides the finished meshes
   const byCell = new Map();
   rows.forEach((row0, i) => {
     const row = tameRow(row0, alpine);
@@ -562,68 +566,111 @@ export function createVillage({ scene, rows, env, height, level = 'medium', reso
   let mat = material(env, level === 'low');
   const group = new THREE.Group();
   group.name = 'ski-village';
-  const list = [], detailList = [];
+  scene.add(group);
+  // cells: { items, cx, cz, base: Mesh | null, dets: [{ m, x0, z0 }], built, job }
+  const cells = [];
   for (const [k, items] of byCell) {
     const [ci, cj] = k.split(',').map(Number);
-    const cw = writer();
-    const details = new Map();
-    for (const [row, i] of items) {
-      const di = Math.floor(row[0] / DCELL), dj = Math.floor(row[1] / DCELL), dk = di + ',' + dj;
-      let det = details.get(dk);
-      if (!det) details.set(dk, (det = { w: writer(), x0: di * DCELL, z0: dj * DCELL }));
-      const seed = (i * 0.618034) % 1;
-      const style = styleOf(row, seed, alpine);
-      let downhill = null;
-      if (height && (row[8] === 1 || row[8] === 4)) {
-        const d = 25, gx = height(row[0] + d, row[1]) - height(row[0] - d, row[1]), gz = height(row[0], row[1] + d) - height(row[0], row[1] - d);
-        const l = Math.hypot(gx, gz);
-        if (l > 2) downhill = [-gx / l, -gz / l];       // only on a real slope
-      }
-      cw.set(style, row[5], seed);
-      det.w.set(style, row[5], seed);
-      if (row[8] === 5) tower(cw, row);
-      else if (row[8] === 1 || row[8] === 4) block(cw, row, seed, det.w, style, downhill);
-      else chalet(cw, row, seed, det.w, style);
+    cells.push({ items, cx: (ci + 0.5) * CELL, cz: (cj + 0.5) * CELL, base: null, dets: [], built: false, job: null });
+  }
+  byCell.clear();
+  let detailR = DETAIL_RADIUS[level] || DETAIL_RADIUS.medium;
+  const tris = (m) => m.geometry.attributes.position.count / 3;
+  const stats = { cells: cells.length, details: 0, triangles: 0, built: 0, builds: 0, drops: 0 };
+  let active = null;                                                          // the cell being built (its job runs over frames)
+
+  function buildRow(J, row, i) {
+    const di = Math.floor(row[0] / DCELL), dj = Math.floor(row[1] / DCELL), dk = di + ',' + dj;
+    let det = J.details.get(dk);
+    if (!det) J.details.set(dk, (det = { w: writer(), x0: di * DCELL, z0: dj * DCELL }));
+    const seed = (i * 0.618034) % 1;
+    const style = styleOf(row, seed, alpine);
+    let downhill = null;
+    if (height && (row[8] === 1 || row[8] === 4)) {
+      const d = 25, gx = height(row[0] + d, row[1]) - height(row[0] - d, row[1]), gz = height(row[0], row[1] + d) - height(row[0], row[1] - d);
+      const l = Math.hypot(gx, gz);
+      if (l > 2) downhill = [-gx / l, -gz / l];       // only on a real slope
     }
-    if (cw.count) list.push({ base: toMesh(cw, mat), cx: (ci + 0.5) * CELL, cz: (cj + 0.5) * CELL });
-    for (const det of details.values()) {
+    J.cw.set(style, row[5], seed);
+    det.w.set(style, row[5], seed);
+    if (row[8] === 5) tower(J.cw, row);
+    else if (row[8] === 1 || row[8] === 4) block(J.cw, row, seed, det.w, style, downhill);
+    else chalet(J.cw, row, seed, det.w, style);
+  }
+  /** Runs cell c's build until done (true) or the budget is spent (false). */
+  function stepBuild(c, t0, budget) {
+    if (!c.job) c.job = { n: 0, cw: writer(), details: new Map() };
+    const J = c.job;
+    while (J.n < c.items.length) {
+      const [row, i] = c.items[J.n++];
+      buildRow(J, row, i);
+      if (performance.now() - t0 > budget) break;
+    }
+    if (J.n < c.items.length) return false;
+    const fresh = new THREE.Group();
+    if (J.cw.count) { c.base = toMesh(J.cw, mat); fresh.add(c.base); }
+    for (const det of J.details.values()) {
       if (!det.w.count) continue;
       const m = toMesh(det.w, mat);
       m.castShadow = false;                                                // small parts: the base casts the house's shadow
-      detailList.push({ m, x0: det.x0, z0: det.z0 });
+      c.dets.push({ m, x0: det.x0, z0: det.z0 });
+      fresh.add(m);
     }
+    c.job = null;
+    c.built = true;
+    stats.built++; stats.builds++; stats.details += c.dets.length;
+    if (upload) upload(fresh);                                             // on the GPU now: the JS copies go (gpuOnly)
+    for (const o of [...fresh.children]) group.add(o);
+    return true;
   }
-  byCell.clear();                     // (the forEach closure above keeps this function's context alive with update() / setLevel())
-  for (const c of list) group.add(c.base);
-  for (const c of detailList) group.add(c.m);
-  scene.add(group);
-  let detailR = DETAIL_RADIUS[level] || DETAIL_RADIUS.medium;
-  const tris = (m) => m.geometry.attributes.position.count / 3;
-  const stats = {
-    cells: list.length, details: detailList.length, triangles: 0,
-    baseTriangles: list.reduce((a, c) => a + tris(c.base), 0), detailTriangles: detailList.reduce((a, c) => a + tris(c.m), 0),
-  };
-  return {
+  function drop(c) {
+    if (c.base) { group.remove(c.base); c.base.geometry.dispose(); }
+    for (const d of c.dets) { group.remove(d.m); d.m.geometry.dispose(); }
+    stats.details -= c.dets.length;
+    c.base = null; c.dets = []; c.built = false; c.job = null;
+    stats.built--; stats.drops++;
+  }
+  const reach = (c, px, pz) => Math.hypot(c.cx - px, c.cz - pz) - CELL * 0.71;      // m from the camera to the cell's circle
+
+  const api = {
     group, count: rows.length, stats,
+    /** Builds / drops cells around (px, pz) and shows the base meshes within `radius`, the details within the detail radius. */
     update(px, pz, radius) {
-      let t = 0;
-      for (const c of list) {
-        c.base.visible = Math.hypot(c.cx - px, c.cz - pz) - CELL * 0.71 < radius;
-        if (c.base.visible) t += tris(c.base);
+      const t0 = performance.now();
+      for (const c of cells) if (c.built && reach(c, px, pz) > radius + LAZY.keep) drop(c);
+      if (active && reach(active, px, pz) > radius + LAZY.keep) { active.job = null; active = null; }
+      // the nearest missing cell (a running job first unless a nearer one is needed now)
+      let best = null, bd = Infinity;
+      for (const c of cells) { if (c.built) continue; const d = reach(c, px, pz); if (d < radius + LAZY.ahead && d < bd) { bd = d; best = c; } }
+      if (best && (!active || bd < reach(active, px, pz) - 200)) active = best;
+      if (active) {
+        const near = reach(active, px, pz) < detailR + 300;
+        if (stepBuild(active, t0, near ? LAZY.nearBudget : LAZY.budget)) active = null;
       }
-      for (const c of detailList) {
-        const dx = Math.max(c.x0 - px, 0, px - c.x0 - DCELL), dz = Math.max(c.z0 - pz, 0, pz - c.z0 - DCELL);   // to the cell's square
-        c.m.visible = Math.hypot(dx, dz) < detailR;
-        if (c.m.visible) t += tris(c.m);
+      let t = 0;
+      for (const c of cells) {
+        if (!c.built) continue;
+        if (c.base) { c.base.visible = reach(c, px, pz) < radius; if (c.base.visible) t += tris(c.base); }
+        for (const d of c.dets) {
+          const dx = Math.max(d.x0 - px, 0, px - d.x0 - DCELL), dz = Math.max(d.z0 - pz, 0, pz - d.z0 - DCELL);   // to the cell's square
+          d.m.visible = Math.hypot(dx, dz) < detailR;
+          if (d.m.visible) t += tris(d.m);
+        }
       }
       stats.triangles = t;
     },
+    /** Builds every cell within `radius` of (px, pz) now (flows / checks that look at the houses right after a jump). */
+    buildNear(px, pz, radius) {
+      for (const c of cells) if (!c.built && reach(c, px, pz) < radius) { while (!stepBuild(c, performance.now(), Infinity)) { /* runs to the end */ } if (active === c) active = null; }
+      api.update(px, pz, radius);
+    },
+    pending: (px, pz, radius) => cells.filter((c) => !c.built && reach(c, px, pz) < radius).length,
     setLevel(next) {
       detailR = DETAIL_RADIUS[next] || DETAIL_RADIUS.medium;
       const m = material(env, next === 'low');
-      for (const c of list) c.base.material = m;
-      for (const c of detailList) c.m.material = m;
+      for (const c of cells) { if (c.base) c.base.material = m; for (const d of c.dets) d.m.material = m; }
       mat.dispose(); mat = m;
     },
   };
+  return api;
 }

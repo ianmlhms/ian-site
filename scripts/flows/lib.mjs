@@ -99,7 +99,9 @@ export async function launchBrowser({ fullChromium = false, args = [] } = {}) {
     : [{}, ...cachedChromiumPaths().map(executablePath => ({ executablePath })), { channel: "chrome" }];
   for (const opts of attempts) {
     // --mute-audio: the games' sound must never play on the machine running the tests
-    try { return await chromium.launch({ ...opts, args: [...(opts.args || []), "--mute-audio", ...args] }); } catch (error) { errors.push(String(error.message).split("\n")[0]); }
+    // R8f: no omnibox popup WebUI (full Chromium built 2-3 chrome:// renderers of ~80 MB per browser context for an address bar
+    // nobody sees: ~250 MB of a three-player flow; unknown feature names are ignored by older builds)
+    try { return await chromium.launch({ ...opts, args: [...(opts.args || []), "--mute-audio", "--disable-features=WebUIOmniboxPopup,WebUIOmniboxFullPopup,WebUIOmniboxAimPopup", ...args] }); } catch (error) { errors.push(String(error.message).split("\n")[0]); }
   }
   throw new Error("Could not launch Chromium:\n" + errors.join("\n"));
 }

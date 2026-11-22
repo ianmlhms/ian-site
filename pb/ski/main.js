@@ -311,7 +311,7 @@ async function boot() {
   // the village streets are draped on the 5 m ground: built once the extras and every height tile are in
   const tryRoads = () => {
     if (roads || !roadRows || !streamer.done()) return;
-    try { roads = createRoads({ scene, roads: roadRows, env, level, height: (x, z) => surface.height(x, z) }); uploadNow(renderer, roads.group, camera); mark('roads'); } catch (error) { console.warn('[ski] streets failed', error); roads = { update() {} }; }
+    try { roads = createRoads({ scene, roads: roadRows, env, level, height: (x, z) => surface.height(x, z), upload: (o) => uploadNow(renderer, o, camera) }); mark('roads'); } catch (error) { console.warn('[ski] streets failed', error); roads = { update() {} }; }
   };
 
   // streamed height tiles change the heights under them: drop every cache that read them
@@ -363,8 +363,7 @@ async function boot() {
     try { drawn = seatRows(drawn, (x, z) => field.baseHeight(x, z)); } catch (error) { console.warn('[ski] seating the big houses failed', error); }   // R8d: big blocks not half buried
     // the houses that are drawn (R7-B leaves out the ones in stations / lift paths): camera guard + skier collision (R8)
     try { boxIndex = createBoxIndex(buildingBoxes(drawn)); } catch (error) { console.warn('[ski] building index failed', error); }
-    village = createVillage({ scene, rows: drawn, env, height: (x, z) => field.baseHeight(x, z), level, resort: rid }); mark('village');      // R8c: resort = Alpine villages
-    uploadNow(renderer, village.group, camera);                          // R8f: every cell on the GPU now, its JS copy goes (gpu-mem.js)
+    village = createVillage({ scene, rows: drawn, env, height: (x, z) => field.baseHeight(x, z), level, resort: rid, upload: (o) => uploadNow(renderer, o, camera) }); mark('village');      // R8c: Alpine villages; R8f: built per cell near the camera, straight to the GPU
     // R7-C: gates / teleport spots clear of the drawn houses (B's stations replace the dropped OSM station buildings)
     if (explore) { explore.setBuildings(drawn); gateS.clear(); finishS.clear(); if (markers) markers.regate(gateAt); }
     tryRoads();
@@ -718,7 +717,9 @@ async function boot() {
     dropRide();                                                              // R8b
     const gate = mode === MODES.run ? gateAt(p) : { s: 2, lat: 0 };          // R7-C: the start gate on open snow
     const s0 = gate.s;
-    const lat = lateral || gate.lat || 0;                                    // R7-C2: beside a station / under a lift line
+    // R7-C2: beside a station / under a lift line; R8f (ski-mp: the middle racer, lateral 0, stood at the gate's 4.2 m side offset while
+    // the others stood +-1.9 m off the line, 6.1 m apart): in an online race every lane is the gate's offset + its own
+    const lat = isRace() ? (gate.lat || 0) + lateral : lateral || gate.lat || 0;
     const f0 = mode === MODES.run ? finishAt(p, s0) : null;                 // R8b: the ZIL on open snow
     game.run = createRun({ piste: p, mode, startS: s0, finishS: f0 });
     const a = p.at(s0, {});
@@ -1460,6 +1461,7 @@ async function boot() {
     placeHold(x, z, heading) { placeAt(x, z, heading); game.hold = true; if (modes.freeRun) modes.freeRun.moved({ x, z, heading }); },
     get hold() { return !!game.hold; }, scatter, quality,
     // round 7 (A)
+    get village() { return village; },                                      // R8f: buildNear(x, z, r) for checks after a jump
     get skierClear() { return skier.skiClearance; }, skier, standHeight, deckAt, get roadRows() { return roadRows; }, get boxIndex() { return boxIndex; }, look, camGuard, camBlocked,
     // R7-C
     get explore() { return explore; }, get avalanches() { return avalanches; }, get course() { return course; }, get lastCourse() { return lastCourse; }, get spray() { return spray; },

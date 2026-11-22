@@ -69,6 +69,7 @@ try {
         const r = await page.evaluate(async ({ x, z }) => {
           const S = window.__ski, T = window.THREE;
           S.place(x, z, 0);
+          if (S.village && S.village.buildNear) S.village.buildNear(x, z, 400);        // R8f: the village is built per cell near the camera
           S.setInput({ steer: 0, tuck: 0, brake: 1, push: 0, jump: false });
           await new Promise((res) => setTimeout(res, 1800));
           // streets: every vertex near by vs the physics surface
