@@ -106,9 +106,11 @@ export const flow = {
       for (const p of players) await p.page.waitForURL(/pixelbreak\.html\?g=ski&room=/, T);
       h.expect(host.page.url().includes(`g=ski&room=${code.toLowerCase()}&role=host&lb=${code}`), `host -> ${host.page.url().replace(h.origin, "")}`);
       // test speed: the same links with the scripted skier and game time x4 (also a reload right at the start: the mesh must cope)
-      for (const p of players) await p.page.goto(p.page.url() + DEBUG_Q, { waitUntil: "domcontentloaded" });
+      for (const p of players) { p.errMark = p.errors.length; await p.page.goto(p.page.url() + DEBUG_Q, { waitUntil: "domcontentloaded" }); }
       const F = {};
       for (const p of players) { F[p.label] = await gameFrame(p); await spyScores(p, F[p.label]); }
+      // R7-D (WebKit): the reload right at the start cancels the old page's script / REST loads, WebKit logs those: only they are dropped
+      for (const p of players) p.errors = p.errors.filter((e, i) => i < p.errMark || !/access control checks|load https:|load \/|cancel/i.test(e));
 
       h.step("everybody: same resort + piste, linked (mesh), side by side at the start, synced countdown");
       for (const p of players) await waitMp(F[p.label], /^(go|prep):0$/);

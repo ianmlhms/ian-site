@@ -98,7 +98,7 @@ export const flow = {
         const F = {};
         for (const p of players) F[p.label] = await gameFrame(p);
         // WebKit logs the old page's requests that the reload cancelled (a script / REST call in flight) as errors: only those are dropped
-        for (const p of players) p.errors = p.errors.filter((e, i) => i < p.errMark || !/access control checks|load https:|cancel/i.test(e));
+        for (const p of players) p.errors = p.errors.filter((e, i) => i < p.errMark || !/access control checks|load https:|load \/|cancel/i.test(e));
         const t0 = Date.now();
         for (const p of players) await F[p.label].waitForFunction(() => document.documentElement.dataset.skiMp === "free" && document.documentElement.dataset.skiRunning === "1" && window.__ski.game.phase === "running", null, T);
         R.startS = +((Date.now() - t0) / 1000).toFixed(1);
