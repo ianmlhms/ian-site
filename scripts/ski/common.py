@@ -141,6 +141,9 @@ RESORTS = {
         "chains": [{"name": "Kandahar", "pistes": ["Kandahar-Kapall", "Fang"]}],
         # the box grew north-west in the data round (Warth-Schröcken, Sonnenkopf): own cache folder, old tiles reused under new indices
         "work": "arlberg-r5", "work_from": ("arlberg", 581120.0, 5232640.0),
+        # R8d (Ian): Sonnenkopf (Klösterle) is on the Ski Arlberg pass: its own network 3.4 km from Stuben, kept by bake.py tidy_network
+        # (reached by the ski bus: pb/ski/config.js BUS_AREAS discovers its valley station from the start)
+        "keep_areas": ("Sonnenkopfbahn",),
         "tree_line": 2000.0, "derived_forest": 1850.0,       # north side of the Alps: the forest ends near 1900 m (St. Anton 1300 m, St. Christoph 1800 m bare)
         "villages": [
             ("St. Anton", 10.2660, 47.1290, 1300), ("Nasserein", 10.2860, 47.1340, 500), ("St. Jakob", 10.2990, 47.1390, 450),

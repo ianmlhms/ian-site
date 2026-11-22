@@ -198,6 +198,8 @@ for (const rid of rids.length ? rids : ALL) {
   // R7-C2: the barriers hold: a skier at 15 m/s aimed 35° at the net, on the ground, every 5th course
   const world = { height, normal: (x, z, o) => surface.normal(x, z, o), snow: (x, z) => Math.min(1, surface.info(x, z, 0) * 1.25), hit: (x, z, r, y) => scatter.hit(x, z, r, y, 0.8) };
   let hold = 0, holdN = 0, through = 0, stopped = 0, minKeep = 1, missed = 0;
+  const holdBad = [];
+  let openGap = 0;
   for (const [i, p] of pistes.list.entries()) {
     if (ONLY ? !ONLY.has(p.id) : i % 5) continue;
     const g = gates.get(p.id) || courseGate(p, obs);
@@ -210,6 +212,9 @@ for (const rid of rids.length ? rids : ALL) {
       const h0 = Math.atan2(a.dz, a.dx) + side * 35 * Math.PI / 180;      // + = towards the right edge
       const x0 = a.x - a.dz * side * (p.halfWidth - 3), z0 = a.z + a.dx * side * (p.halfWidth - 3);
       let s = { ...createSkierState(x0, z0, h0, height(x0, z0)), hold: 0, vx: Math.cos(h0) * 15, vz: Math.sin(h0) * 15, speed: 15 };
+      // R8d: the course follows the skier down from the gate (in the game he skis there): walk its projection hint down the line, so
+      // a piste whose own legs lie side by side (arlberg stapf: two 45 m wide legs 90 m apart) is not read on the wrong leg
+      for (let w = g.s; w < sA; w += 20) { const q = p.at(w, {}); const st0 = createSkierState(q.x, q.z, 0, height(q.x, q.z)); c.collide(st0, st0); }
       c.collide(s, s);
       let worst = 0, hitAt = -1;
       for (let k = 0; k < 240; k++) {
@@ -221,9 +226,16 @@ for (const rid of rids.length ? rids : ALL) {
         const pr = p.project(s.x, s.z, sA, 120, {});
         worst = Math.max(worst, Math.abs(pr.off) - (p.halfWidth + 0.5));
       }
-      if (worst > 0.05) through++;
+      if (worst > 0.05) {
+        // R8d: through where the net is left open on purpose (a house / station beside the piste: courseLayout openLen) is no fault
+        const lay = courseLayout(p, g.s, pistes, obs, finishes.get(p.id));
+        let near = Infinity;
+        for (const r of lay.rails) for (let i = 0; i < r.length; i += 2) near = Math.min(near, Math.hypot(r[i] - s.x, r[i + 1] - s.z));
+        if (near > 4) { openGap++; holdN--; continue; }
+        through++; holdBad.push(`${p.id} side ${side} through ${worst.toFixed(2)} m at s ${Math.round(sA)} (net ${near.toFixed(1)} m away)`);
+      }
       if (hitAt < 0) { missed++; holdN--; continue; }                    // fell / stopped before the net (a tree, a crest): no contact
-      if (s.speed < 1 && s.crash === 0) stopped++;
+      if (s.speed < 1 && s.crash === 0) { stopped++; holdBad.push(`${p.id} side ${side} stopped at s ${Math.round(sA)}`); }
       if (worst <= 0.05) hold++;
     }
   }
@@ -244,7 +256,7 @@ for (const rid of rids.length ? rids : ALL) {
     if (Math.hypot(s.x - ox, s.z - oz) > 5) pulled++;
   }
   check(pulled === 0, `barriers: ${placedN - pulled}/${placedN} skiers put down outside the net stay there (no pull through it)`);
-  check(through === 0 && stopped === 0 && hold === holdN && holdN > 0, `barriers: ${hold}/${holdN} skiers aimed at the net at 54 km/h held inside (${through} through, ${stopped} stopped, ${missed} never reached it), speed kept at the hit >= ${(minKeep * 100).toFixed(0)} %`);
+  check(through === 0 && stopped === 0 && hold === holdN && holdN > 0, `barriers: ${hold}/${holdN} skiers aimed at the net at 54 km/h held inside (${through} through, ${stopped} stopped, ${missed} never reached it, ${openGap} out through a gap left open at a house / station), speed kept at the hit >= ${(minKeep * 100).toFixed(0)} %${holdBad.length ? `; bad: ${holdBad.slice(0, 6).join('; ')}` : ''}`);
   if (RIDES) {
     let fin = 0, resets = 0, warned = 0, hudBad = 0, hits = 0, outside = 0;
     const stuck = [], hudFail = [];

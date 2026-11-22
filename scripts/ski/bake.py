@@ -1181,7 +1181,8 @@ SHORT_TRAIN, KEEP_SHORT_TRAINS = 150.0, ("leisee",)
 NON_SKI_TRAIN = re.compile(r"tremplin|sprungschanze|ski.?jump", re.I)
 
 
-def tidy_network(lifts, runs, log):
+def tidy_network(lifts, runs, log, keep_areas=()):
+    """keep_areas: lift names whose separate area stays (R8d: Sonnenkopf, on the Ski Arlberg pass, 3.4 km from the rest)."""
     def span(lf):
         return math.hypot(lf["top"]["x"] - lf["bottom"]["x"], lf["top"]["z"] - lf["bottom"]["z"])
     keep_l = []
@@ -1231,7 +1232,11 @@ def tidy_network(lifts, runs, log):
             continue
         pts = np.concatenate([st[i] if i < nl else rp[i - nl] for i in c])
         gap = min(float(np.hypot(main_pts[:, 0] - q[0], main_pts[:, 1] - q[1]).min()) for q in pts)
-        if gap > NET_KEEP:
+        kept_by = [lifts[i]["name"] for i in c if i < nl and lifts[i].get("name") in keep_areas]
+        if gap > NET_KEEP and kept_by:
+            log("keep the separate ski area %.0f m from the network (resort keep_areas %s): %d lifts, %d pistes" % (
+                gap, kept_by, sum(1 for i in c if i < nl), sum(1 for i in c if i >= nl)))
+        elif gap > NET_KEEP:
             drop.update(c)
             log("drop a separate ski area %.0f m from the network: lifts %s, pistes %s" % (
                 gap, [lifts[i]["name"] for i in c if i < nl], [runs[i - nl]["name"] for i in c if i >= nl]))
@@ -1608,7 +1613,7 @@ def main():
     drop_drag_pylons_under(lifts, log)                        # R8: a drag pylon left under an aerial lift's chairs goes
     peaks, places = build_poi(frame)
     lines, areas, runs = build_pistes(frame, dem_raw, lifts, places)
-    lifts, runs = tidy_network(lifts, runs, log)              # R8c: no lifts / pistes of other ski areas, no non-ski trains
+    lifts, runs = tidy_network(lifts, runs, log, cfg.get("keep_areas", ()))   # R8c: no lifts / pistes of other ski areas, no non-ski trains
     buildings = clear_for_landmarks(frame, cfg, build_buildings(frame, dem_raw))
 
     # groom the pistes into the 5 m mosaic (ski routes stay natural ground: not benched, not smoothed)

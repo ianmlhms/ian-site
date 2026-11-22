@@ -6,16 +6,23 @@
  *              -> the nearest safe spot (clear.js safeSpot), the "Bei den éischte Lift" button, undiscovered lifts in the list locked */
 import { createObstacles, firstLift, liftSpot, safeSpot } from './clear.js';
 import { createDiscovery } from './discovery.js';
-import { DISCOVERY } from '../config.js';
+import { DISCOVERY, BUS_AREAS } from '../config.js';
 
 const SAVE_EVERY = 4;            // s between saves of a changed discovery
 const STATION_REACH = 45;        // m from a station = reached
+
+/** The valley lifts of the resort's ski-bus areas (config BUS_AREAS), by name; always discovered. */
+export function busLifts(rid, lifts) {
+  return (BUS_AREAS[rid] || []).map((name) => lifts.list.find((q) => q.name === name && !q.tunnel)).filter(Boolean);
+}
 
 export function createExplore({ rid, resort, store, cloud, field, scatter, density = 1, lifts, pistes, height }) {
   const obs = createObstacles({ resort, field, scatter, density, liftWorld: () => lifts.world });      // R8b: R7-B's stations too
   const disc = createDiscovery({ width: resort.width, depth: resort.depth, saved: (store.get().disc || {})[rid] || '' });
   const first = firstLift(rid, lifts, resort.places, null);
   if (first) disc.reveal(first.bottom.x, first.bottom.z, DISCOVERY.spawn);
+  const bus = busLifts(rid, lifts);                                                    // R8d: Sonnenkopf & co. (ski bus areas)
+  for (const l of bus) disc.reveal(l.bottom.x, l.bottom.z, DISCOVERY.spawn);
   let lastSaved = (store.get().disc || {})[rid] || '', saveT = 0;
   let buildingsReady = false, resolveBuildings = null;
   const buildingsPromise = new Promise((res) => { resolveBuildings = res; });
@@ -98,7 +105,7 @@ export function createExplore({ rid, resort, store, cloud, field, scatter, densi
   function detachMap() { if (map) { map.ui.remove(); map = null; } }
 
   return {
-    obs, disc, first, rode, tick, save, liftOpen, attachMap, detachMap,
+    obs, disc, first, bus, rode, tick, save, liftOpen, attachMap, detachMap,
     /** The buildings arrived (loadExtras): the obstacle checks know the houses now. */
     setBuildings(rows) { obs.setBuildings(rows); buildingsReady = true; resolveBuildings(); },
     buildings: () => (buildingsReady ? Promise.resolve() : buildingsPromise),

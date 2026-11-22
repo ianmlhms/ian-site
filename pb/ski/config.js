@@ -152,6 +152,12 @@ export const FIRST_LIFT = Object.freeze({
   arlberg: ['Galzigbahn', 'Nassereinbahn'],                // St. Anton: the Galzigbahn from the village centre
   kronplatz: ['Kronplatz I - Plan de Corones I', 'Ried'],  // Reischach / Riscone: Kronplatz I
 });
+// R8d (Ian): separate areas of a resort's pass, reached by the ski bus (no piste / lift links them): the valley station of each listed
+// lift is discovered from the start like the first lift, so the map teleport and the lift list reach it (Sonnenkopf: Klösterle, bus
+// from Stuben / Langen on the Ski Arlberg pass)
+export const BUS_AREAS = Object.freeze({
+  arlberg: ['Sonnenkopfbahn'],
+});
 export const DISCOVERY = Object.freeze({
   cell: 100,                // m: the discovery grid
   reveal: 140,              // m round the skier that count as seen
