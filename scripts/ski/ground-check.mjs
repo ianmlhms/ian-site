@@ -93,7 +93,7 @@ try {
             const h = S.surface.height(px, pz);
             ray.set(new T.Vector3(px, h + 30, pz), new T.Vector3(0, -1, 0));
             ray.far = 60;
-            const hit = ray.intersectObjects(targets, true)[0];
+            const hit = ray.intersectObjects(targets, true).find((h) => h.object.visible !== false);       // R8d: R8c's hidden coarse street copies
             if (!hit) continue;
             rays++;
             const d = hit.point.y - h;

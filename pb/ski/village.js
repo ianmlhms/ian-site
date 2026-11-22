@@ -275,7 +275,9 @@ function block(w, row, seed, wd, style, slopeDir) {
   if (HEIGHT) {
     let low = Infinity;
     for (const p of poly) low = Math.min(low, HEIGHT(p[0], p[1]));
-    if (low < g0 + 0.2) prism(w, poly, low - 0.6, ground + 0.35, ground, STONE);
+    // grown 0.12 m out from the middle (like chalet()'s plinth box): never in the plane of the walls (z-fighting)
+    const grown = poly.map(([x, z]) => { const dx = x - cx, dz = z - cz, d = Math.hypot(dx, dz) || 1; return [x + dx / d * 0.12, z + dz / d * 0.12]; });
+    if (low < g0 + 0.2) prism(w, grown, low - 0.6, ground + 0.35, ground, STONE);
   }
   // terraces: a tall block on a slope steps back towards the uphill side, every 2-3 floors (the stepped profile of Val Claret)
   const stepped = levels >= 5 && W >= 13 && !!slopeDir && h1(seed * 8.8) < 0.75;
