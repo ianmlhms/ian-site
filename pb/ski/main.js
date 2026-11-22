@@ -794,12 +794,13 @@ async function boot() {
   }
 
   /** R8e (3V QA "Aua, e Bam!": after a tree crash the camera sat in the tree, the skier against the trunk): a respawn spot clear of
-   *  trunks (2.2 m), houses and lift parts, with the chase camera's spot (5 m behind, 2.6 m up) outside every crown. Else the nearest
+   *  trunks (2.2 m), houses and lift parts, no trunk in the 12 m ahead, with the chase camera's spot (5 m behind, 2.6 m up) outside every crown. Else the nearest
    *  piste point within 80 m (no tree stands on a piste), else rings out to 40 m; the heading then follows the piste / the fall line. */
   function clearSpot(r) {
     const d = quality.treeDensity;
     const ok = (x, z, h) => {
       if (scatter.hit(x, z, 2.2, -1e9, d) || buildingHit(x, z, 1.5) || modes.lifts.world.hit(x, z, 1.5)) return false;
+      for (let k = 2; k <= 12; k += 2) if (scatter.hit(x + Math.cos(h) * k, z + Math.sin(h) * k, 1.2, -1e9, d)) return false;      // not facing the same tree again
       const cx = x - Math.cos(h) * 5, cz = z - Math.sin(h) * 5;
       return !scatter.inCrown(cx, surface.height(cx, cz) + 2.6, cz, d, 0.6) && !scatter.inCrown(x, surface.height(x, z) + 1.6, z, d, 0.3);
     };

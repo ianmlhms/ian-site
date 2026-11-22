@@ -8,9 +8,9 @@ const wrap = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI)
  * (a station / pylon / house there; main.js window.__ski.blocked) the bot looks along its aim line and, when something is in the way,
  * aims beside the line instead (the smallest clear side offset), like a player skiing round the station. */
 const AVOID = [3, -3, 6, -6, 9, -9, 12, -12, 16, -16, 20, -20, 25, -25];
-function pathClear(blocked, x0, z0, x1, z1) {
+function pathClear(blocked, x0, z0, x1, z1, from = 0) {        // from: m near him not tested (pressed against a wall: its margin)
   const d = Math.hypot(x1 - x0, z1 - z0), n = Math.max(1, Math.ceil(d / 2));
-  for (let i = 1; i <= n; i++) if (blocked(x0 + (x1 - x0) * i / n, z0 + (z1 - z0) * i / n)) return false;
+  for (let i = 1; i <= n; i++) if (d * i / n >= from && blocked(x0 + (x1 - x0) * i / n, z0 + (z1 - z0) * i / n)) return false;
   return true;
 }
 
@@ -49,7 +49,7 @@ export function createBot(piste, { speedScale = 1, blocked = null } = {}) {
           piste.at(Math.max(0, proj.s + ds), q);
           for (const o of [0, 3, -3, 6, -6]) {
             const ox = q.x - q.dz * o, oz = q.z + q.dx * o;
-            if (!blocked(ox, oz) && pathClear(blocked, state.x, state.z, ox, oz)) { tx = ox; tz = oz; side = 99; break; }
+            if (!blocked(ox, oz) && pathClear(blocked, state.x, state.z, ox, oz, 3.5)) { tx = ox; tz = oz; side = 99; break; }
           }
           if (side) break;
         }
