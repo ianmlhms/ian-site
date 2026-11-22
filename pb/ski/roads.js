@@ -26,21 +26,22 @@ function material(env) {
     polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4, side: THREE.DoubleSide,
     transparent: true, depthWrite: false,          // R8c (3V QA: sawtooth street edges, faceted banks): the bank fades into the snow
     vertexShader: `
-      attribute vec4 aSegA; attribute vec4 aSegB; attribute float aHw;
-      varying vec4 vSegA; varying vec4 vSegB; varying float vHw; varying vec3 vW; varying vec3 vN; varying float vDist;
-      void main(){ vSegA = aSegA; vSegB = aSegB; vHw = aHw; vW = position; vN = normal; vec4 mv = viewMatrix * vec4(position, 1.0); vDist = -mv.z;
+      attribute vec4 aSegA; attribute vec4 aSegB; attribute vec4 aSegC; attribute float aHw;
+      varying vec4 vSegA; varying vec4 vSegB; varying vec4 vSegC; varying float vHw; varying vec3 vW; varying vec3 vN; varying float vDist;
+      void main(){ vSegA = aSegA; vSegB = aSegB; vSegC = aSegC; vHw = aHw; vW = position; vN = normal; vec4 mv = viewMatrix * vec4(position, 1.0); vDist = -mv.z;
         // round 7: exact close by; farther away (coarser terrain tiles) pulled along the view ray towards the camera so it stays on top
         mv.xyz *= 1.0 - clamp((vDist - 40.0) * 0.00004, 0.0, 0.05);
         gl_Position = projectionMatrix * mv; }`,
     fragmentShader: `
       uniform vec3 uSunDir, uSunColor, uAmbSky, uAmbGround, uFogColor; uniform float uFogDensity, uOvercast; uniform sampler2D uNoise;
-      varying vec4 vSegA; varying vec4 vSegB; varying float vHw; varying vec3 vW; varying vec3 vN; varying float vDist;
+      varying vec4 vSegA; varying vec4 vSegB; varying vec4 vSegC; varying float vHw; varying vec3 vW; varying vec3 vN; varying float vDist;
       ${FOG_GLSL}
       float segD(vec2 p, vec4 s){ vec2 ab = s.zw - s.xy; float t = clamp(dot(p - s.xy, ab) / max(dot(ab, ab), 1e-4), 0.0, 1.0); return length(p - s.xy - ab * t); }
       void main(){
         // R8 (early QA: zigzag bands along the streets): the distance to the street's centre line per PIXEL (the cell's nearest segment and
         // its neighbour, the same for all of the cell's vertices), no longer interpolated between lattice nodes
-        float a = min(segD(vW.xz, vSegA), segD(vW.xz, vSegB)) / vHw;      // 0 centre, 1 the edge, > 1 the snow bank
+        float a = min(min(segD(vW.xz, vSegA), segD(vW.xz, vSegB)), segD(vW.xz, vSegC)) / vHw;    // R8d: + the other street at a junction
+            // 0 centre, 1 the edge, > 1 the snow bank
         if (a > 1.37) discard;                                  // round 7: the bank is a painted strip just past the edge
         float edgeA = 1.0 - smoothstep(0.98, 1.36, a);           // R8c: soft, no hard lattice-stepped rim
         vec4 nz = texture2D(uNoise, vW.xz * 0.11);
@@ -65,7 +66,7 @@ function material(env) {
  * ground and stood up to 10 cm above them between its vertices (Ian, Safari: the skier's feet in the street). Now every 2.5 m cell a
  * street touches is emitted with the ground's own two triangles (surface.js diagonalIsMain, the same node heights) a hair above it, and
  * the shader paints the street from the distance to the street's centre line (aRoad.x = across / half width; fragments beyond the bank
- * are discarded, so the edges stay smooth). Where streets cross, the nearest one paints. */
+ * are discarded, so the edges stay smooth). Where streets cross, the nearest one paints (R8d: and the nearest other one too). */
 import { diagonalIsMain } from './surface.js';
 const LAT = 2.5;
 /* R8c (QA: 494-645k triangles in the villages; the streets were 40-90k of them): two levels per render cell. Near (FINE_RADIUS m from
@@ -102,7 +103,14 @@ function latticeCells(roads, lat, height, ground) {
         // the cell (i, j) (nodes i..i+1, j..j+1) is touched when the street passes within its half diagonal of the cell's middle
         const cx = x + lat / 2, cz = z + lat / 2, tc = Math.max(0, Math.min(L, (cx - ax) * ux + (cz - az) * uz));
         const dc = Math.hypot(cx - (ax + ux * tc), cz - (az + uz * tc));
-        if (dc <= r.hw + BANK * 0.6 + lat * 0.71) { const o = covered.get(key); if (!o || dc / r.hw < o[0]) covered.set(key, [dc / r.hw, ri, k]); }
+        if (dc <= r.hw + BANK * 0.6 + lat * 0.71) {
+          // R8d (QA: rectangular cuts where two streets meet): the nearest street AND the nearest other street of the cell are kept
+          const o = covered.get(key), v = dc / r.hw;
+          if (!o) covered.set(key, [v, ri, k, null]);
+          else if (o[1] === ri) { if (v < o[0]) { o[0] = v; o[2] = k; } }
+          else if (v < o[0]) covered.set(key, [v, ri, k, [o[0], o[1], o[2]]]);
+          else if (!o[3] || v < o[3][0]) o[3] = [v, ri, k];
+        }
       }
     }
   }
@@ -117,7 +125,7 @@ function latticeCells(roads, lat, height, ground) {
     }
     const ci = Math.floor((i * lat) / CELL), cj = Math.floor((j * lat) / CELL), ck = ci + ',' + cj;
     let c = cells.get(ck);
-    if (!c) cells.set(ck, (c = { pos: [], nrm: [], segA: [], segB: [], hw: [], x0: ci * CELL, z0: cj * CELL }));
+    if (!c) cells.set(ck, (c = { pos: [], nrm: [], segA: [], segB: [], segC: [], hw: [], x0: ci * CELL, z0: cj * CELL }));
     // the nearest segment to the cell's middle and the nearer of its two neighbours (a bend stays round)
     const r = roads[near[1]], k = near[2], P = r.pts;
     const mx = (i + 0.5) * lat, mz = (j + 0.5) * lat;
@@ -125,6 +133,8 @@ function latticeCells(roads, lat, height, ground) {
     const k2 = segDist(k - 1) < segDist(k + 1) ? k - 1 : k + 1 < P.length - 1 ? k + 1 : k;
     const A = [P[k][0], P[k][1], P[k + 1][0], P[k + 1][1]];
     const B = k2 >= 0 && k2 + 1 < P.length ? [P[k2][0], P[k2][1], P[k2 + 1][0], P[k2 + 1][1]] : A;
+    let C = A;                                                                    // R8d: the other street at a junction (else A again)
+    if (near[3]) { const Q = roads[near[3][1]].pts, q = near[3][2]; C = [Q[q][0], Q[q][1], Q[q + 1][0], Q[q + 1][1]]; }
     const corner = { a: [i, j], b: [i + 1, j], c: [i, j + 1], d: [i + 1, j + 1] };
     const tri = !ground || diagonalIsMain(i, j) ? ['a', 'd', 'b', 'a', 'c', 'd'] : ['a', 'c', 'b', 'b', 'c', 'd'];      // the ground's own split (surface.js)
     for (const n of tri) {
@@ -132,7 +142,7 @@ function latticeCells(roads, lat, height, ground) {
       c.pos.push(ii * lat, hAt(ii, jj), jj * lat);
       const nx = hAt(ii - 1, jj) - hAt(ii + 1, jj), nz = hAt(ii, jj - 1) - hAt(ii, jj + 1), nl = Math.hypot(nx, 2 * lat, nz);
       c.nrm.push(nx / nl, 2 * lat / nl, nz / nl);                       // smooth: the ground's slope at the node
-      c.segA.push(...A); c.segB.push(...B); c.hw.push(r.hw);
+      c.segA.push(...A); c.segB.push(...B); c.segC.push(...C); c.hw.push(r.hw);
     }
   }
   return cells;
@@ -201,6 +211,7 @@ export function createRoads({ scene, roads, env, height, level = 'medium' }) {
     g.setAttribute('position', new THREE.Float32BufferAttribute(c.pos, 3));
     g.setAttribute('aSegA', new THREE.Float32BufferAttribute(c.segA, 4));
     g.setAttribute('aSegB', new THREE.Float32BufferAttribute(c.segB, 4));
+    g.setAttribute('aSegC', new THREE.Float32BufferAttribute(c.segC, 4));
     g.setAttribute('aHw', new THREE.Float32BufferAttribute(c.hw, 1));
     g.setAttribute('normal', new THREE.Float32BufferAttribute(c.nrm, 3));
     g.computeBoundingSphere();

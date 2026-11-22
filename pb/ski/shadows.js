@@ -37,11 +37,11 @@ export const SHADOW_GLSL = `
     vec2 size = 1.0 / uSunTexel;
     vec2 t = c.xy * size - 0.5;
     vec2 i0 = floor(t + 0.5), d = t - i0;
-    vec2 wm = 0.5 * (0.5 - d) * (0.5 - d), wp = 0.5 * (0.5 + d) * (0.5 + d), w0 = 0.75 - d * d;
+    vec2 wLo = 0.5 * (0.5 - d) * (0.5 - d), wHi = 0.5 * (0.5 + d) * (0.5 + d), w0 = 0.75 - d * d;
     vec2 b = (i0 + 0.5) * uSunTexel, e = uSunTexel;
-    float s = wm.y * (wm.x * sunTap(b + vec2(-e.x, -e.y), z) + w0.x * sunTap(b + vec2(0.0, -e.y), z) + wp.x * sunTap(b + vec2(e.x, -e.y), z))
-            + w0.y * (wm.x * sunTap(b + vec2(-e.x, 0.0), z) + w0.x * sunTap(b, z) + wp.x * sunTap(b + vec2(e.x, 0.0), z))
-            + wp.y * (wm.x * sunTap(b + vec2(-e.x, e.y), z) + w0.x * sunTap(b + vec2(0.0, e.y), z) + wp.x * sunTap(b + vec2(e.x, e.y), z));
+    float s = wLo.y * (wLo.x * sunTap(b + vec2(-e.x, -e.y), z) + w0.x * sunTap(b + vec2(0.0, -e.y), z) + wHi.x * sunTap(b + vec2(e.x, -e.y), z))
+            + w0.y * (wLo.x * sunTap(b + vec2(-e.x, 0.0), z) + w0.x * sunTap(b, z) + wHi.x * sunTap(b + vec2(e.x, 0.0), z))
+            + wHi.y * (wLo.x * sunTap(b + vec2(-e.x, e.y), z) + w0.x * sunTap(b + vec2(0.0, e.y), z) + wHi.x * sunTap(b + vec2(e.x, e.y), z));
     float edge = smoothstep(0.0, 0.12, min(min(c.x, 1.0 - c.x), min(c.y, 1.0 - c.y)));
     return mix(1.0, s, edge);
   }`;
