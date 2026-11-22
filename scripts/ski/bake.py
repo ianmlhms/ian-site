@@ -1112,7 +1112,9 @@ BARE_REF = re.compile(r"^(?:\d+[a-z]?|[a-z]\d?|\d[a-z]\d?)$", re.I)
 
 
 def display_name(name, ref, diff):
-    n, r = (name or "").strip(), (ref or "").strip()
+    raw, r = (name or "").strip(), (ref or "").strip()
+    stripped = re.sub(r"^0+\s+(?=\S)", "", raw)  # launch: "0 Lumen" -> "Lumen" (same rule as linepack.js)
+    n = raw if BARE_REF.match(stripped) else stripped
     word = DIFF_WORD.get(diff, "Pist")
     if n and not BARE_REF.match(n):
         return n

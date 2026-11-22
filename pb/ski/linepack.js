@@ -62,8 +62,11 @@ export function packLine(arr) {
  *  with a ref the same; anything else as it is. The same rule as scripts/ski/bake.py display_name. */
 export const DIFF_WORD = Object.freeze({ green: 'Gréng', blue: 'Blo', red: 'Rout', black: 'Schwaarz' });
 const BARE_REF = /^(?:\d+[a-z]?|[a-z]\d?|\d[a-z]\d?)$/i;
+const ZERO_PREFIX = /^0+\s+(?=\S)/;  // launch: OSM "0 Lumen" (Kronplatz) = piste number 0 glued to the name -> "Lumen"
 export function pisteDisplayName(name, ref, diff) {
-  const n = String(name || '').trim(), r = String(ref || '').trim();
+  const raw = String(name || '').trim(), r = String(ref || '').trim();
+  const stripped = raw.replace(ZERO_PREFIX, '');
+  const n = BARE_REF.test(stripped) ? raw : stripped;
   const word = DIFF_WORD[diff] || 'Pist';
   if (n && !BARE_REF.test(n)) return n;
   const id = n || r;
