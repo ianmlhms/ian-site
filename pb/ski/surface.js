@@ -51,8 +51,11 @@ export function createSurface(field) {
     return { gx, gz, fx, fz, h00: h[o], h10: h[o + 1], h01: h[o + SIDE], h11: h[o + SIDE + 1], b, o };
   }
 
-  /** Height of the triangulated lattice at (x, z). */
+  /** Height of the triangulated lattice at (x, z); R7-D: on a snow park mesh (kicker, ramp, halfpipe) the park's analytic shape, which
+   *  is exactly what that mesh draws (modes/park.js solidAt). */
+  const park = field.park && field.park.solidAt ? field.park : null;
   function height(x, z) {
+    if (park) { const h = park.solidAt(x, z); if (h === h) return h; }
     const { gx, gz, fx, fz, h00, h10, h01, h11 } = cell(x, z);
     if (diagonalIsMain(gx, gz)) return fx >= fz ? h00 + (h10 - h00) * fx + (h11 - h10) * fz : h00 + (h11 - h01) * fx + (h01 - h00) * fz;
     return fx + fz <= 1 ? h00 + (h10 - h00) * fx + (h01 - h00) * fz : h11 + (h01 - h11) * (1 - fx) + (h10 - h11) * (1 - fz);

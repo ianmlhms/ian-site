@@ -118,6 +118,11 @@ export function createSnowMaterial(env, { cheap = false, treeRadius = 400, fores
         // snow: clear blue in the shade (the sky's light), warm white in the sun; never brighter than paper white
         float blue = (0.72 + 0.25 * max(ao, 0.0)) * (1.0 - 0.6 * uOvercast);
         vec3 shadeC = mix(vec3(0.8), vec3(0.79, 0.895, 1.04), blue) * (shade * 0.95 + 0.12);   // overcast light is whiter
+        // R7-D: under a low warm evening sun (its blue / red ratio, so morning and midday stay as they were) the sky light on the snow
+        //       is a cool blue-grey, not the saturated violet-blue of the doubled sky tint: keep the brightness, take out most of the colour
+        float evK = smoothstep(0.72, 0.5, uSunColor.b / max(uSunColor.r, 1e-3)) * (1.0 - uOvercast);
+        float shadeL = dot(shadeC, vec3(0.3, 0.59, 0.11));
+        shadeC = mix(shadeC, shadeL * vec3(0.9, 0.975, 1.12) * 1.04, 0.62 * evK);
         float top = max(shadeC.r, max(shadeC.g, shadeC.b));
         shadeC *= mix(1.0, 0.97 / top, smoothstep(0.9, 1.15, top));              // bright overcast light: a soft shoulder, hue kept, no cyan clip
         vec3 litC = max(shadeC * 1.02, shadeC * vec3(0.3, 0.28, 0.24) + uSunColor * vec3(0.775, 0.79, 0.815));   // a weak sun (fog, cloud) never makes the lit side darker than the shade
@@ -165,7 +170,11 @@ export function createSnowMaterial(env, { cheap = false, treeRadius = 400, fores
         rockAmt *= mix(1.0, smoothstep(0.42, 0.6, slope), farRock);
         // strata: grey layers of ~8 m (light and dark), snow in broken lines on some layers' ledges; less snow the steeper
         float sPhase = vWorld.y * 0.12 + nA.r * 2.0 + nB.g * 1.2 + nL.g * 2.0;
-        float sAA = clamp(1.0 - fwidth(sPhase) * 1.5, 0.0, 1.0);
+        // R7-D: faded by the layers' own pixel footprint (as the corduroy): bands only while one layer spans >= ~6 px, the thin snow
+        //       lines on the ledges only while it spans >= ~16 px, so far faces show an even tone instead of lines crawling in motion
+        float sFw = fwidth(sPhase);
+        float sAA = 1.0 - smoothstep(0.06, 0.17, sFw);
+        float sLineAA = 1.0 - smoothstep(0.025, 0.06, sFw);
         float sLayer = fract(sPhase);
         float steepK = smoothstep(mix(0.22, 0.1, farK), mix(0.42, 0.25, farK), slope);                                 // layers only on real faces: gentle rock is blotchy
         float strata = 0.5 + 0.5 * sin(sPhase * 6.2832) * sAA * steepK;
@@ -177,7 +186,7 @@ export function createSnowMaterial(env, { cheap = false, treeRadius = 400, fores
         vec3 Nr = normalize(N + vec3(d3.r - 0.5, 0.0, d3.g - 0.5) * (0.5 + 0.4 * farK) + vec3(d2.r - 0.5, 0.0, d2.g - 0.5) * 0.7 * midK);
         float rockLit = band(smoothstep(-0.2, 0.75, dot(Nr, uSunDir)) * sunVis);
         rockCol = rockCol * (shade * vec3(0.74, 0.8, 0.9) * (1.0 - 0.25 * max(ao, 0.0)) + uSunColor * rockLit * 0.95);
-        float snowLine = smoothstep(0.8, 0.88, sLayer) * (1.0 - smoothstep(0.9, 0.98, sLayer)) * smoothstep(0.45, 0.65, nB.a) * sAA * steepK * (1.0 - smoothstep(0.35, 0.7, slope));
+        float snowLine = mix(0.09, smoothstep(0.8, 0.88, sLayer) * (1.0 - smoothstep(0.9, 0.98, sLayer)), sLineAA) * smoothstep(0.45, 0.65, nB.a) * steepK * (1.0 - smoothstep(0.35, 0.7, slope));   // R7-D: their average share once too thin to draw
         float snowPatch = smoothstep(0.5, 0.78, nB.g * 0.6 + nA.b * 0.4) * (1.0 - smoothstep(0.22, 0.5, slope));     // snow patches in the hollows
         float snowLedge = (1.0 - smoothstep(0.34, 0.52, crag)) * (1.0 - smoothstep(0.3, 0.62, slope)) * 0.45;                 // snow lying in the cracks and on the ledges between crags
         // snow streaks down the gullies, long along the fall line (they read at every distance, unlike the thin strata lines)

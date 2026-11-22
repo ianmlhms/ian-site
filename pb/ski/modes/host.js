@@ -89,6 +89,7 @@ export function createModeHost(ctx) {
       } else if (game.mode === MODES.freeride) {
         input.setTrick(true);
         world.tricks = 'hold';                       // round 6: in the air, the trick button turns a jump into a trick (skier.js)
+        host.ensureParkView();                       // R7-D: the park's kickers / pipe are meshes the physics already reads: draw them from the start
         clock = clock0 || createDayClock(startHourFor(env.state.timeMode === 'random' ? 'morning' : env.state.timeId));      // a random time: the day from 9:00
         clock0 = clock;
         if (!minimap) minimap = createMinimap({ parent: hud.el.querySelector('.tr'), resort, imageUrl: root + resort.map.file, park: resort.park });
@@ -221,7 +222,8 @@ export function createModeHost(ctx) {
     /* ---------------- world upkeep ---------------- */
     ensureParkView() {
       if (!layout || parkView) return;
-      try { parkView = createParkView({ scene, layout, height: (x, z) => surface.height(x, z) }); } catch (error) { console.warn('[ski] park view failed', error); }
+      // R7-D: the snow bodies are drawn in the terrain's material
+      try { parkView = createParkView({ scene, layout, height: (x, z) => surface.height(x, z), snowMaterial: ctx.snowMaterial }); } catch (error) { console.warn('[ski] park view failed', error); }
     },
     /** A height tile arrived: the flags and the park sit on the new snow. */
     onTiles(rect) {
