@@ -1091,3 +1091,44 @@ main.js createVillage resolved: R8c `resort: rid` + R7-C `explore.setBuildings/r
   ids shifted with the dropped lifts (l65 is no longer the Gornergrat Bahn: anything that stored lift ids / index-based names must use
   names); ski-v1.sql regenerated (1301 boards) but NOT applied; round7c-check barrier 126/127; WebKit / Chromium flows not run on this
   branch (R8b runs them; budget numbers above are from the r8c driver at 1180x820, dpr 1).
+
+## Round 8d (22 Nov 2026, branch `worktree-agent-acbed7815bfc2304c`): R8b + R8c merged, Sonnenkopf back, Niddreg budget, R8c leftovers
+**Merge**: R8b head 8bd7cc9d + `ski-r8c` @ 42b8a16e (merge base 56640959). Taken: R8c's re-baked data (all 5) + its village / roads /
+snow shader / carriers / park / labels / HUD / fp-hands; R8b's code (make_sql.py spur-aware `client_length`, pistes.js `dropSpurs`, C2,
+security). Conflicts: firstperson.js (R8c's fp-hands gloves kept, put on R8b's lower / wider pole grips `[side*0.365, -0.385, -0.59]`; R8b's
+mitten dropped), HANDOFF (both sections), ski-v1.sql (regenerated). `scripts/ski/floors-check.mjs` (new): every board's client floor
+(`minRunMs(createPiste(..).length)`) == its ski-v1.sql row, every piste has one row, no stray rows.
+**Sonnenkopf restored** (Ian: it is on the Ski Arlberg pass): `common.py` arlberg `keep_areas: ("Sonnenkopfbahn",)`; `bake.py tidy_network`
+keeps a separate area (> NET_KEEP) when one of its lifts is listed (log line "keep the separate ski area 3437 m ..."); R8c's other drops
+stay (La Norma, Raffort / Planchamps, Porte Brune / Télégraphe, Poucet, Monterosa Stafal / Sant'Anna, Ski Pfalzen, Fuchslochlift, Hochkar,
+non-ski trains). Arlberg re-baked alone: 100 lifts (was 90), 353 pistes (was 325), manifest + ski-v1.sql (1329 boards). Reaching it:
+`config.js BUS_AREAS = { arlberg: ['Sonnenkopfbahn'] }` -> `explore.js busLifts` discovers the valley station like the first lift
+(the real bus from Stuben / Langen), so the map teleport and the lift list (fast travel) reach it; its 28 pistes get gates / courses /
+boards like every piste (round7c-check arlberg 353/353 gates + rides). Checked in the browser (`scripts/ski/r8d-sonnenkopf.js`):
+discovered = true, fast travel waits at "Sonnenkopfbahn" (shot round8d/drv/chromium-sonnenkopf-spawn2.png).
+**Niddreg budget** (r8d-sweeps.sh = R8c's village sweep, every village / hamlet centre x 4 headings, Chromium 1180x820 dpr 1):
+- lifts.js: parts with every side < 2.1 m (rails, gates, lamps, sheave frames, hubs) go to `ski-lift-fine-*` 1250 m cells drawn within
+  min(700, 0.25 x liftRadius) (Niddreg 450 m); drag tracks one mesh per 2.5 km cell within 900 m (`TRACK_R`; was one 17k mesh everywhere);
+  drag bars FAR_R 450 -> 320 m, platter 8-sided. carriers.js: far chair = 4 boxes (48 tris, was 120), far cabin = 4-5 boxes.
+- roads.js gets the quality level (main.js never passed it: always medium): FINE_RADIUS low 150 (was 260 never used), coarse radius on
+  Niddreg 1300 -> 1000 m.
+- quadtree.js `selectTiles({ protect })` + config QUALITY.low.protect = 160: on Niddreg the 320 m nodes are coarsened by lodScale too
+  (the skier's 80 m tiles never): Courchevel terrain 243k -> ~196k.
+- Result Niddreg (max of 4 headings): killy 351k / 126 calls, 3vallees 410k (Courchevel) / 135, zermatt 383k / 129, arlberg 367k / 131,
+  kronplatz 333k / 124 (was 3V 500k / 161, Val Thorens 460k, Freney 456k). Mëttel: killy 377k / 146, 3V 472k / 155, zermatt 417k / 139,
+  arlberg 413k / 147 (St. Anton, was ~590k), kronplatz 379k / 142. JSON: ~/Library/Caches/ski-work/round8d/sweep-<level>-<rid>.json.
+**R8c leftovers**:
+- Brides roof across the street: roads.js `housesOnStreets` (a street's middle half crosses a house footprint > 2 m -> the house is not
+  drawn, not solid: main.js `drawn`, round7c-check mirrors it): killy 73 / 1980, 3V 171 / 5553, zermatt 111 / 4335, arlberg 164 / 5428,
+  kronplatz 175 / 6748.
+- Half-buried big blocks (Courchevel 14149,4851: 16.6 of 20.9 m of wall in the hill): village.js `seatRows` raises a house > 400 m2 until
+  at most 40 % of its walls are under the ground at its highest corner; block() got chalet()'s stone plinth on the low side (grown 0.12 m).
+- Angular street bends: roads.js `roundRoads` (Chaikin x 3 on corners > 10 deg, cuts <= 7 m) before the lattice; junctions: every lattice
+  cell also gets the nearest OTHER street (`aSegC`), no rectangular cuts where two streets meet (shots drv/chromium-brides-street3.png).
+- Stair-step shadows: snow shader `sunMapShadow` = 3 x 3 quadratic B-spline PCF (was 2 x 2 bilinear); three's own receivers (station decks,
+  lifts, skier) PCFShadowMap (was Basic: the deck shadows were texel stairs). Navy decks in the morning / evening: the hemisphere light (the
+  Lambert objects' sky light) half desaturated (env.js). The snow shader's own shade colour is unchanged (evening shade still blue-grey).
+- round7c-check barrier test: the course's projection hint walks down from the gate before the aimed skier (arlberg stapf: two 45 m wide
+  legs of one piste side by side, the hint started on the other leg; in the game the skier skis there) -> 140/140; failing pistes named.
+**Tools**: r8d-drv.py (client for r8c-drv.mjs without the word in the URL), r8d-helpers.js (`__r8d.meshes()`: triangles / calls per mesh
+name), r8d-sweeps.sh, r8d-checks.sh (ground / pose / calls in a row through browser-slot), r8d-spot.js, r8d-sonnenkopf.js, floors-check.mjs.
