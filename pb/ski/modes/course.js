@@ -31,8 +31,8 @@ function pisteHash(pistes) {
 }
 
 /** The course of a piste from startS: { startS, finishS, finish {x, z, dx, dz}, barriers [{x, z, h, side}], arrows [{x, z, h, side, s}] }. */
-export function courseLayout(piste, startS = 2, pistes = null, obs = null) {      // R7-C2: obs (clear.js): no net through a house or a station
-  const finishS = Math.max(startS + 30, piste.length - COURSE.finishBack);
+export function courseLayout(piste, startS = 2, pistes = null, obs = null, finishIn = null) {      // R7-C2: obs (clear.js): no net through a house or a station
+  const finishS = Math.max(startS + 30, finishIn !== null ? finishIn : piste.length - COURSE.finishBack);      // R8b: clear.js courseFinish
   const a = {};
   const barriers = [], arrows = [];
   const hw = piste.halfWidth;
@@ -102,8 +102,8 @@ export function courseLayout(piste, startS = 2, pistes = null, obs = null) {    
 
 /** Where the skier is on the course (pure). update(state, dt) -> { s, remaining, share, dist, warn, abort, back {x, z}, next {x, z} }.
  *  R7-C2: collide(prev, state) -> the state deflected by the barriers (soft: pushed back inside along the barrier, slowed a little). */
-export function createCourse({ piste, startS = 2 }) {
-  const finishS = Math.max(startS + 30, piste.length - COURSE.finishBack);
+export function createCourse({ piste, startS = 2, finishS: finishIn = null }) {
+  const finishS = Math.max(startS + 30, finishIn !== null ? finishIn : piste.length - COURSE.finishBack);
   const proj = {}, nxt = {}, back = {}, full = {}, cp = {}, ca = {}, wp = {};
   let hint = startS, offFor = 0, aborted = false, cHint = startS, lastOff = 0, hits = 0, low = Infinity;
   const out = { s: startS, remaining: finishS - startS, share: 0, dist: 0, warn: false, abort: false, back: { x: 0, z: 0 }, next: { x: 0, z: 0 }, offFor: 0 };

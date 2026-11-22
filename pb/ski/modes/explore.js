@@ -12,7 +12,7 @@ const SAVE_EVERY = 4;            // s between saves of a changed discovery
 const STATION_REACH = 45;        // m from a station = reached
 
 export function createExplore({ rid, resort, store, cloud, field, scatter, density = 1, lifts, pistes, height }) {
-  const obs = createObstacles({ resort, field, scatter, density });
+  const obs = createObstacles({ resort, field, scatter, density, liftWorld: () => lifts.world });      // R8b: R7-B's stations too
   const disc = createDiscovery({ width: resort.width, depth: resort.depth, saved: (store.get().disc || {})[rid] || '' });
   const first = firstLift(rid, lifts, resort.places, null);
   if (first) disc.reveal(first.bottom.x, first.bottom.z, DISCOVERY.spawn);

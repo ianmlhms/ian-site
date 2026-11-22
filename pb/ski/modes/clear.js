@@ -15,7 +15,7 @@ import { FIRST_LIFT, COURSE } from '../config.js';
 const BUCKET = 100;
 const TAN = (deg) => Math.tan(deg * Math.PI / 180);
 
-export function createObstacles({ resort, field, scatter = null, density = 1 }) {
+export function createObstacles({ resort, field, scatter = null, density = 1, liftWorld = null }) {      // R8b: liftWorld() = R7-B's lift world (stations, pylons)
   const attrs = {};
   const buckets = new Map();             // building boxes per 100 m cell
   const stations = [];                   // { x, z, r, lift }
@@ -77,6 +77,9 @@ export function createObstacles({ resort, field, scatter = null, density = 1 }) 
     if (x < edge || z < edge || x > resort.width - edge || z > resort.depth - edge) return 'edge';
     if (inBuilding(x, z, r)) return 'building';
     if (nearStation(x, z, r)) return 'station';
+    // R8b (3V QA: start gates in station parts): R7-B's real stations (the whole frame: halls, decks, huts) and pylons
+    const lw = liftWorld ? liftWorld() : null;
+    if (lw && (lw.inStation(x, z, r) || lw.hit(x, z, r))) return 'station';
     if (lift && nearLine(x, z, r)) return 'lift';
     if (trees && scatter && scatter.hit(x, z, r + 0.4, -1e9, density)) return 'tree';
     field.attrs(x, z, attrs);
@@ -206,4 +209,25 @@ export function courseGate(piste, obs, halfGate = 3.5) {
     }
   }
   return { s: 2, lat: 0, ok: false, why };
+}
+
+/** R8b (3V QA: Bouc Blanc finished inside the chair lift's bottom station, the ZIL arch out of view): the finish line of a challenge on
+ *  open snow. From the line's end (length - COURSE.finishBack) up the piste in 4 m steps (at most COURSE.finishSearch m, keeping >= 60 m
+ *  of course) to the first s where both arch pillars and the middle are clear of houses, station halls and lift parts, and the 60 m
+ *  run-in before it too (the arch is seen from there). Returns { s, ok, why }. */
+export function courseFinish(piste, obs, startS = 2) {
+  const a = {}, hw = piste.halfWidth;
+  const end = piste.length - COURSE.finishBack;
+  const sMin = Math.max(startS + 60, end - (COURSE.finishSearch || 140));
+  const opts = { lift: false, trees: false, built: false, edge: 8 };
+  let why = '';
+  for (let s = end; s >= sMin; s -= 4) {
+    why = '';
+    piste.at(s, a);
+    const rx = -a.dz, rz = a.dx;
+    for (const k of [0, hw + 0.8, -(hw + 0.8)]) { const w = obs.blocked(a.x + rx * k, a.z + rz * k, 1.6, opts); if (w === 'building' || w === 'station') { why = `arch ${w}`; break; } }
+    for (let d = 10; !why && d <= 60; d += 10) { piste.at(s - d, a); const w = obs.blocked(a.x, a.z, 2, opts); if (w === 'building' || w === 'station') why = `run-in ${w}`; }
+    if (!why) return { s, ok: true, why: '' };
+  }
+  return { s: end, ok: false, why };
 }

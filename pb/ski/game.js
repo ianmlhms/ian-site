@@ -5,7 +5,7 @@
 import { PLAY, SKI, MODES, COURSE } from './config.js';
 import { minRunMs } from './progress.js';
 
-export function createRun({ piste, mode = MODES.run, startS = 2 }) {      // R7-C: startS = the start gate on open snow (clear.js courseGate)
+export function createRun({ piste, mode = MODES.run, startS = 2, finishS: finishIn = null }) {      // R8b: finishS = clear.js courseFinish      // R7-C: startS = the start gate on open snow (clear.js courseGate)
   const timed = mode === MODES.run;
   const checkpoints = timed ? piste.checkpoints().map((s) => ({ s, passed: false })) : [];
   const gates = timed ? piste.slalomGates().map((g) => ({ ...g, result: null })) : [];
@@ -13,7 +13,7 @@ export function createRun({ piste, mode = MODES.run, startS = 2 }) {      // R7-
   const tmp = {};
   const samples = [];
   let hint = startS, best = startS, elapsed = 0, penalty = 0, finished = null, sampleT = 0, offFor = 0;
-  const finishS = Math.max(startS + 30, piste.length - COURSE.finishBack);      // R7-C: the finish line of the course (the line's real end)
+  const finishS = Math.max(startS + 30, finishIn !== null ? finishIn : piste.length - COURSE.finishBack);      // R7-C: the finish line (the line's end; R8b: on open snow)
   const run = {
     piste, mode, timed, checkpoints, gates,
     get elapsed() { return elapsed; }, get penalty() { return penalty; }, get progress() { return best; }, get finished() { return finished; },

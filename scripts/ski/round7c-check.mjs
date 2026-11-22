@@ -31,7 +31,7 @@ const { createScatter } = await imp('scatter.js');
 const { createPisteSet } = await imp('pistes.js');
 const { createLiftNet } = await imp('modes/freeride.js');
 const { createParkLayout } = await imp('modes/park.js');
-const { createObstacles, firstLift, liftSpot, safeSpot, courseGate } = await imp('modes/clear.js');
+const { createObstacles, firstLift, liftSpot, safeSpot, courseGate, courseFinish } = await imp('modes/clear.js');
 const { createDiscovery, mergeRle, rleIntervals } = await imp('modes/discovery.js');
 const { findFaces, releasable, createSlab, stepSlab, cellId, slopeDeg, lowestPiste, faceView, knownZone } = await imp('avalanche.js');
 const { createCourse, courseLayout, courseSeats, distanceText } = await imp('modes/course.js');
@@ -65,7 +65,7 @@ for (const rid of rids.length ? rids : ALL) {
   const scatter = createScatter(field);
   const pistes = createPisteSet(resort);
   const lifts = createLiftNet(resort, (x, z) => field.farHeight(x, z), pistes);
-  const obs = createObstacles({ resort, field, scatter, density: 0.8 });
+  const obs = createObstacles({ resort, field, scatter, density: 0.8, liftWorld: () => lifts.world });      // R8b: R7-B's stations too
   // R8b: like main.js: R7-B's stations replace the OSM station buildings, the obstacles know the kept (drawn) houses
   const buildingRows = JSON.parse(fs.readFileSync(path.join(dir, 'buildings.json'), 'utf8'));
   const liftWorld = lifts.setBuildings(buildingRows);
@@ -144,7 +144,10 @@ for (const rid of rids.length ? rids : ALL) {
   // ---- course ----
   let clear = 0, moved = 0, beside = 0, lined = 0, seatsOk = 0, worstBury = 0, worstGap = 0, netInHouse = 0, openTotal = 0, edgeTotal = 0;
   const blocked = [], badSeats = [], unlined = [];
-  const gates = new Map();
+  const gates = new Map(), finishes = new Map();
+  let gateHits = 0, finishBad = 0, finishMoved = 0;
+  const gateHitList = [], finishBadList = [];
+  const gp = {};
   for (const p of pistes.list) {
     if (ONLY && !ONLY.has(p.id)) continue;
     const g = courseGate(p, obs);
@@ -152,14 +155,26 @@ for (const rid of rids.length ? rids : ALL) {
     if (g.ok) clear++; else blocked.push(`${p.id} (${g.why})`);
     if (g.s > 2) moved++;
     if (g.lat) beside++;
-    const lay = courseLayout(p, g.s, pistes, obs);
+    // R8b (3V QA: 13/481 gates touched houses / lift parts): independent of courseGate, the gate's posts and the skier's spot vs R7-B's
+    // station frames + solid parts + pylons (lifts.world) and the kept (drawn) houses
+    p.at(g.s, gp);
+    for (const k of [0, 3.5, -3.5]) {
+      const x = gp.x - gp.dz * ((g.lat || 0) + k), z = gp.z + gp.dx * ((g.lat || 0) + k);
+      if (lifts.world.inStation(x, z, 1) || lifts.world.hit(x, z, 1) || obs.inBuilding(x, z, 1)) { gateHits++; gateHitList.push(p.id); break; }
+    }
+    const f = courseFinish(p, obs, g.s);
+    finishes.set(p.id, f.s);
+    if (f.s < p.length - COURSE.finishBack) finishMoved++;
+    p.at(f.s, gp);
+    if (!f.ok || [0, p.halfWidth + 0.8, -(p.halfWidth + 0.8)].some((k) => { const x = gp.x - gp.dz * k, z = gp.z + gp.dx * k; return lifts.world.inStation(x, z, 1) || obs.inBuilding(x, z, 1); })) { finishBad++; finishBadList.push(`${p.id} (${f.why})`); }
+    const lay = courseLayout(p, g.s, pistes, obs, f.s);
     for (const r of lay.rails) for (let i = 0; i < r.length; i += 8) if (obs.inBuilding(r[i], r[i + 1], 0) || obs.nearStation(r[i], r[i + 1], 0)) netInHouse++;
     // the nets: both sides from the start gate to the finish (the inside of a tight bend may be left out)
     let netLen = 0;
     for (const r of lay.rails) for (let i = 2; i < r.length; i += 2) netLen += Math.hypot(r[i] - r[i - 2], r[i + 1] - r[i - 1]);
     const cover = (netLen + lay.openLen) / 2 / Math.max(1, lay.finishS - g.s - 4);      // netted or left open on purpose (a house, a hairpin)
     openTotal += lay.openLen; edgeTotal += 2 * Math.max(1, lay.finishS - g.s - 4);
-    if (cover > 0.95 && lay.finish && Math.hypot(lay.finish.x - p.bottom.x, lay.finish.z - p.bottom.z) < COURSE.finishBack + 1) lined++;
+    if (cover > 0.95 && lay.finish && lay.finishS === Math.max(g.s + 30, f.s)) lined++;
     else unlined.push(`${p.id} (${(cover * 100).toFixed(0)} % netted)`);
     // R7-C2: every course object on the snow, nothing higher than 6 m above it, nothing bigger than meant
     const st = courseSeats(lay, height);
@@ -173,6 +188,8 @@ for (const rid of rids.length ? rids : ALL) {
     worstGap = Math.max(worstGap, st.netGap); worstBury = Math.max(worstBury, st.netSunk);
   }
   const total = ONLY ? ONLY.size : pistes.list.length;
+  check(gateHits === 0, `course: ${gateHits} start gates touch a station / lift part / house (R7-B world + kept houses)${gateHitList.length ? `: ${gateHitList.slice(0, 8).join(', ')}` : ''}`);
+  check(finishBad === 0, `course: every ZIL on open snow, clear of stations / houses with a clear 60 m run-in (${finishMoved} moved up the line)${finishBadList.length ? `; not: ${finishBadList.slice(0, 8).join(', ')}` : ''}`);
   check(blocked.length === 0, `course: ${clear}/${total} start gates on open snow (${moved} moved down the piste, ${beside} beside the line)${blocked.length ? `; blocked: ${blocked.slice(0, 8).join(', ')}` : ''}`);
   check(netInHouse === 0, `course: no net through a house or a station hall (${netInHouse} net points inside one)`);
   check(lined === total, `course: ${lined}/${total} courses lined with barriers on both edges (${(openTotal / edgeTotal * 100).toFixed(1)} % of the edges left open at houses / stations / hairpins), finish at the line's real end${unlined.length ? `; not: ${unlined.slice(0, 6).join(', ')}` : ''}`);
@@ -234,8 +251,8 @@ for (const rid of rids.length ? rids : ALL) {
     for (const p of pistes.list) {
       if (ONLY && !ONLY.has(p.id)) continue;
       const g = gates.get(p.id);
-      const run = createRun({ piste: p, mode: MODES.run, startS: g.s });
-      const course = createCourse({ piste: p, startS: g.s });
+      const run = createRun({ piste: p, mode: MODES.run, startS: g.s, finishS: finishes.get(p.id) });
+      const course = createCourse({ piste: p, startS: g.s, finishS: finishes.get(p.id) });
       const a = p.at(g.s, {});
       const x0 = a.x - a.dz * (g.lat || 0), z0 = a.z + a.dx * (g.lat || 0);
       let s = createSkierState(x0, z0, Math.atan2(a.dz, a.dx), height(x0, z0));

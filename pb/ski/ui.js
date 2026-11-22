@@ -170,7 +170,7 @@ export function createUi(root) {
       <div class="acts">
         ${onFree ? '<button type="button" class="btn primary" data-a="free">Weider fräi fueren</button>' : ''}
         <button type="button" class="btn${onFree ? '' : ' primary'}" data-a="again">Nach eng Kéier</button>
-        ${next ? `<button type="button" class="btn" data-a="next">Nächst Pist: ${esc(next.name)}</button>` : ''}
+        ${next && !(cont && cont.id === next.id) ? `<button type="button" class="btn" data-a="next">Nächst Pist: ${esc(next.name)}</button>` : ''}
         ${cont ? `<button type="button" class="btn" data-a="cont">Weiderfueren: ${esc(cont.name)}</button>` : ''}
         <button type="button" class="btn ghost" data-a="map">Pistekaart</button>
       </div>

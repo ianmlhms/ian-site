@@ -42,7 +42,7 @@
   /* leave for the lobby: a normal page navigates, a sandboxed arcade frame asks the shell to (it may not touch the top window itself) */
   function jump(url) {
     if (inFrame) { try { window.parent.postMessage({ __pbLobby: { url: url } }, "*"); } catch (e) { /* no shell */ } }
-    else location.href = url;
+    else location.href = new URL(url, location.origin + "/").href;      // standalone /pb/<game>.html: the lobby is /lobby.html (not /pb/lobby.html)
   }
 
   var hasRoom = params.has("room"), isAi = params.get("ai") === "1";

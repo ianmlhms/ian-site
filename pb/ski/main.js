@@ -53,7 +53,7 @@ import { createLook, applyLook, createCameraGuard, buildingBoxes, createBoxIndex
 import { pisteStars, specialText } from './modes/challenges.js';
 // R7-C: map teleport to discovered places + the first-lift spawn, first person, snow spray, avalanches, the challenge course
 import { createExplore } from './modes/explore.js';
-import { courseGate } from './modes/clear.js';
+import { courseGate, courseFinish } from './modes/clear.js';
 import { createCourse, createCourseView, createCourseHud, courseLayout, showCourseAbort } from './modes/course.js';
 import { createFirstPerson, readCamMode, writeCamMode } from './firstperson.js';
 import { createSnowSpray } from './spray.js';
@@ -97,7 +97,8 @@ async function boot() {
   // recorded, and the picture check below steps down to safer paths (cheap snow, no MSAA, no post pass)
   const shaderErrors = [];
   renderer.debug.onShaderError = (gl, program, vs, fs) => {
-    const log = (gl.getShaderInfoLog(fs) || '') + (gl.getShaderInfoLog(vs) || '') + (gl.getProgramInfoLog(program) || '');
+    let log = '';
+    try { log = (gl.getShaderInfoLog(fs) || '') + (gl.getShaderInfoLog(vs) || '') + (gl.getProgramInfoLog(program) || ''); } catch (error) { log = `no log (${error.message})`; }
     shaderErrors.push(log.slice(0, 400));
     console.error('[ski] shader failed to compile', log.slice(0, 600));
     document.documentElement.dataset.skiShaderError = String(shaderErrors.length);
@@ -116,7 +117,28 @@ async function boot() {
   }
   window.addEventListener('resize', resize);
   resize();
-  canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); console.warn('[ski] WebGL context lost: reloading'); setTimeout(() => location.reload(), 600); });
+  // R8b (3V QA: WebKit lost the context once, then a TypeError in three's getShaderInfoLog(...).trim() every frame): while lost nothing
+  // is drawn or compiled; restored within 2.5 s -> carry on (three re-uploads), else a card "Neu lueden" (a reload keeps the save)
+  let glLost = false, glCard = null;
+  canvas.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault();
+    glLost = true;
+    document.documentElement.dataset.skiGlLost = '1';
+    console.warn('[ski] WebGL context lost');
+    setTimeout(() => {
+      if (!glLost || glCard) return;
+      glCard = Object.assign(document.createElement('div'), { className: 'card', id: 'glLostCard', role: 'dialog' });
+      glCard.innerHTML = '<h2>D\'Grafik ass ewech</h2><p class="m">De Browser huet d\'3D-Grafik zougemaach (vill aner Tabs oder wéineg Späicher).</p><div class="acts"><button type="button" class="btn primary" id="glReload">Neu lueden</button></div>';
+      document.getElementById('ui').appendChild(glCard);
+      glCard.querySelector('#glReload').addEventListener('click', () => { try { if (typeof modes !== 'undefined' && modes.cloud) modes.cloud.flush(); } catch (error) { console.warn('[ski] save before reload failed', error); } location.reload(); });
+    }, 2500);
+  });
+  canvas.addEventListener('webglcontextrestored', () => {
+    glLost = false;
+    document.documentElement.dataset.skiGlLost = '';
+    if (glCard) { glCard.remove(); glCard = null; }
+    console.warn('[ski] WebGL context restored');
+  });
 
   const noise = createNoiseTexture();
   const maxAniso = renderer.capabilities.getMaxAnisotropy();
@@ -264,6 +286,8 @@ async function boot() {
     lifts = createLifts({ scene, resort, height: (x, z) => field.height(x, z) });
     liftsEarly = !streamer.done();
     try { stationGrid = stationCells(lifts); } catch (error) { console.warn('[ski] station grid failed', error); }
+    // R8b: the decks exist now: a skier standing in a station (the spawn) stands on its deck, not in it
+    if (game.state && game.phase !== 'lift' && game.state.grounded && game.state.speed < 1.5) game.state = { ...game.state, y: standHeight(game.state.x, game.state.z) };
     try { pylonGrid = pylonsOf(lifts); } catch (error) { console.warn('[ski] pylon grid failed', error); }      // round 7 (A): camera guard
     return lifts;
   }
@@ -291,7 +315,7 @@ async function boot() {
     // R7-C: a skier standing still where a tile just arrived stands on the final ground (never under the snow)
     if (game.state && game.screen === 'ski' && game.phase !== 'lift' && game.state.grounded && game.state.speed < 1.5) {
       const s = game.state;
-      if (s.x >= rect[0] && s.x <= rect[2] && s.z >= rect[1] && s.z <= rect[3]) game.state = { ...s, y: surface.height(s.x, s.z) };
+      if (s.x >= rect[0] && s.x <= rect[2] && s.z >= rect[1] && s.z <= rect[3]) game.state = { ...s, y: standHeight(s.x, s.z) };
     }
     if (avalanches) avalanches.reseat();
     if (streamer.done() && !extrasBuilt) {
@@ -318,7 +342,7 @@ async function boot() {
     try { boxIndex = createBoxIndex(buildingBoxes(buildings.filter((_, i) => liftWorld.keepBuilding(i)))); } catch (error) { console.warn('[ski] building index failed', error); }
     village = createVillage({ scene, rows: buildings.filter((_, i) => liftWorld.keepBuilding(i)), env, height: (x, z) => field.baseHeight(x, z), level }); mark('village');
     // R7-C: gates / teleport spots clear of the drawn houses (B's stations replace the dropped OSM station buildings)
-    if (explore) { explore.setBuildings(buildings.filter((_, i) => liftWorld.keepBuilding(i))); gateS.clear(); if (markers) markers.regate(gateAt); }
+    if (explore) { explore.setBuildings(buildings.filter((_, i) => liftWorld.keepBuilding(i))); gateS.clear(); finishS.clear(); if (markers) markers.regate(gateAt); }
     roadRows = decodeRoads(streets); tryRoads();
   }).catch((error) => console.warn('[ski] buildings failed', error.message));
 
@@ -329,15 +353,23 @@ async function boot() {
   // R7-C2: the gate may also stand beside the line (lat m right of it) where a station or a lift line takes the middle
   const gateAt = (p) => { if (!explore) return { s: 2, lat: 0 }; if (!gateS.has(p.id)) gateS.set(p.id, courseGate(p, explore.obs)); return gateS.get(p.id); };
   const gateOf = (p) => gateAt(p).s;
+  // R8b: the ZIL on open snow (clear.js courseFinish: not in a station / house, a clear run-in), cached with the gates
+  const finishS = new Map();
+  const finishAt = (p, s0) => { if (!explore) return null; const k = `${p.id}@${s0}`; if (!finishS.has(k)) finishS.set(k, courseFinish(p, explore.obs, s0).s); return finishS.get(k); };
   // ---------------- game state ----------------
   const game = {
     screen: 'picker', piste: null, mode: MODES.run, run: null, state: null, phase: 'idle', countdown: 0, paused: false, ghost: null,
     override: null, bot: null, freeRide: false, lastNearest: 0,
   };
   let runProps = null, runPropsOpts = {};
+  // R8b (3V QA: skis sank into every boarding platform): the skier stands on a station deck where one is drawn above the snow
+  const snowAt = (x, z) => field.height(x, z);                                // lifts.js draws the decks on field.height at the frame
+  const deckAt = (x, z) => (nearStation(x, z) ? modes.lifts.world.deckTop(x, z, snowAt) : -Infinity);
+  const standHeight = (x, z) => { const g = surface.height(x, z), d = deckAt(x, z); return d > g ? d : g; };
+  const standNormal = (x, z, out) => { if (deckAt(x, z) > surface.height(x, z)) { out.x = 0; out.y = 1; out.z = 0; return out; } return surface.normal(x, z, out); };
   const world = {
-    height: (x, z) => surface.height(x, z),
-    normal: (x, z, out) => surface.normal(x, z, out),
+    height: standHeight,
+    normal: standNormal,
     snow: (x, z) => Math.min(1, surface.info(x, z, 0) * 1.25),
     hit: (x, z, r, y) => scatter.hit(x, z, r, y, quality.treeDensity) || modes.lifts.world.hit(x, z, r, y, (gx, gz) => surface.height(gx, gz)) || buildingHit(x, z, r, y),     // R7-B: pylons + stations; R8: houses
   };
@@ -428,7 +460,7 @@ async function boot() {
   }
 
   function placeAt(x, z, heading) {
-    const y = surface.height(x, z);
+    const y = standHeight(x, z);
     game.state = createSkierState(x, z, heading, y);
     chase.snap(game.state);
   }
@@ -603,11 +635,12 @@ async function boot() {
     const gate = mode === MODES.run ? gateAt(p) : { s: 2, lat: 0 };          // R7-C: the start gate on open snow
     const s0 = gate.s;
     const lat = lateral || gate.lat || 0;                                    // R7-C2: beside a station / under a lift line
-    game.run = createRun({ piste: p, mode, startS: s0 });
+    const f0 = mode === MODES.run ? finishAt(p, s0) : null;                 // R8b: the ZIL on open snow
+    game.run = createRun({ piste: p, mode, startS: s0, finishS: f0 });
     const a = p.at(s0, {});
     if (mode === MODES.run) {
-      try { courseView = createCourseView({ scene, layout: courseLayout(p, s0, pistes, explore ? explore.obs : null), height: (x, z) => surface.height(x, z) }); } catch (error) { console.warn('[ski] course view failed', error); }
-      course = createCourse({ piste: p, startS: s0 });
+      try { courseView = createCourseView({ scene, layout: courseLayout(p, s0, pistes, explore ? explore.obs : null, f0), height: (x, z) => surface.height(x, z) }); } catch (error) { console.warn('[ski] course view failed', error); }
+      course = createCourse({ piste: p, startS: s0, finishS: f0 });
       courseHud.show(true);
       document.documentElement.dataset.skiCourse = 'on';
     }
@@ -795,7 +828,7 @@ async function boot() {
     if (!path || !site) { hud.toast('Dëse Lift fiert net'); return; }
     const st = game.state;
     if (!site.inZone(st.x, st.z)) return;                                   // only from inside the zone (no jump onto the line)
-    const height = (x, z) => surface.height(x, z);
+    const height = standHeight;                                               // R8b: the walk to the loading line is on the deck
     // the next carrier of the lift's own loop that reaches the loading line at least 1.6 s from now picks him up
     const loadU = path.shuttle ? null : path.upU(Math.min(RIDE.enter[site.key], path.len * 0.2));
     const next = loadU === null ? null : view.nextCarrier(lift.index, loadU, path.spec.speed * 1.6);
@@ -967,9 +1000,13 @@ async function boot() {
     game.state = { ...s, hold: 0, vx: a.dx * COURSE.push, vz: a.dz * COURSE.push, speed: COURSE.push, heading: Math.atan2(a.dz, a.dx) };      // R8b: out of the standing hold (R7-A), else the kick is zeroed until an input
     document.documentElement.dataset.skiPush = String(COURSE.push);
   }
+  let stuckFor = 0;
   function courseTick(dt) {
     lastCourse = course.update(game.state, dt);
-    if (lastCourse.abort && !isRace() && !courseAbort) {
+    // R8b (3V QA: a blocked start trapped him for 3 min): 10 s without getting anywhere (< 1 m/s, no crash) -> the same abort choice
+    stuckFor = game.state.speed < 1 && game.state.crash === 0 && !game.paused ? stuckFor + dt : 0;
+    if ((lastCourse.abort || stuckFor > 10) && !isRace() && !courseAbort) {
+      stuckFor = 0;
       game.paused = true; input.setEnabled(false);
       courseAbort = showCourseAbort(hud.el, {
         name: game.piste ? game.piste.name : '',
@@ -1048,7 +1085,7 @@ async function boot() {
   const frameTimes = [];
   function frame(now) {
     requestAnimationFrame(frame);
-    if (document.hidden) { last = now; return; }
+    if (document.hidden || glLost) { last = now; return; }                  // R8b: nothing drawn while the WebGL context is lost
     const rawDt = (now - last) / 1000;
     const frameStart = performance.now();
     frameTimes.push(rawDt * 1000); if (frameTimes.length > 240) frameTimes.shift();
@@ -1079,7 +1116,7 @@ async function boot() {
           let held = false;
           if (game.hold && game.phase === 'running') {
             if (inp.steer || inp.push || inp.tuck || inp.jump || inp.brake) game.hold = false;
-            else { game.state = { ...game.state, vx: 0, vy: 0, vz: 0, speed: 0, y: surface.height(game.state.x, game.state.z), grounded: true, crash: 0 }; held = true; }
+            else { game.state = { ...game.state, vx: 0, vy: 0, vz: 0, speed: 0, y: standHeight(game.state.x, game.state.z), grounded: true, crash: 0 }; held = true; }
           }
           const wasCrash = game.state.crash > 0, wasAir = !game.state.grounded, vyAir = game.state.vy;
           const prevState = game.state;
@@ -1109,7 +1146,7 @@ async function boot() {
     if (avalanches) avalanches.update(game.screen === 'ski' ? game.state : null, dt, { freeride: game.mode === MODES.freeride && !isRace(), running: game.screen === 'ski' && game.phase === 'running' && !game.paused });
     const st = game.state;
     if (st) {
-      skier.pose(st, (x, z, o) => surface.normal(x, z, o), time, (x, z) => surface.height(x, z));
+      skier.pose(st, standNormal, time, standHeight);
       // R7-C: first person = a camera mode of its own (firstperson.js): only the ski tips and poles, the body hidden
       const fpNow = camMode === 'fp' && game.screen === 'ski' && !game.camPose && !game.orbit && !(mp && mp.viewState && mp.viewState());
       skier.setVisible(!(ride && rideView === 'window' && ride.carry && ride.where().onCarrier && !game.camPose) && !(fpNow && !ride));     // in a cabin, the window view is his own eyes
@@ -1285,7 +1322,7 @@ async function boot() {
     placeHold(x, z, heading) { placeAt(x, z, heading); game.hold = true; if (modes.freeRun) modes.freeRun.moved({ x, z, heading }); },
     get hold() { return !!game.hold; }, scatter, quality,
     // round 7 (A)
-    get skierClear() { return skier.skiClearance; }, skier, get roadRows() { return roadRows; }, get boxIndex() { return boxIndex; }, look, camGuard, camBlocked,
+    get skierClear() { return skier.skiClearance; }, skier, standHeight, deckAt, get roadRows() { return roadRows; }, get boxIndex() { return boxIndex; }, look, camGuard, camBlocked,
     // R7-C
     get explore() { return explore; }, get avalanches() { return avalanches; }, get course() { return course; }, get lastCourse() { return lastCourse; }, get spray() { return spray; },
     get camMode() { return camMode; }, setCamMode, fp, gateOf, gateAt, startLawin, teleportTo: (spot) => goFree(null, spot), firstLift: () => goFree(spawn), get pisteMap() { return pisteMap; },

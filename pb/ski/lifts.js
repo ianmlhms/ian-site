@@ -142,7 +142,7 @@ export function createLifts({ scene, resort, height }) {
     // a drag lift's worn track: a packed, darker strip under the up rope
     if (kind === 'drag') {
       const w = l.sub === 'rope' ? 0.9 : 1.25, lat = l.sign * (l.sub === 'rope' ? l.side - 0.45 : l.side);
-      ribbon(trackParts, l, lat, w, 0.035, 0, l.len, 3);
+      ribbon(trackParts, l, lat, w, 0.012, 0, l.len, 3);          // R8b: 1.2 cm (polygon offset keeps it on top): skis no longer sink into it
     }
     if (kind === 'carpet') ribbon(beltParts, l, 0, 0.9, 0.18, 0, l.len, 1.5);
     if (l.tunnel) tunnelTube(tunnelParts, l);

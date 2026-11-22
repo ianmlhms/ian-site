@@ -6,6 +6,8 @@
  *   streets   every street vertex within 80 m: |drawn - physics| (the street ribbon vs surface.height) <= 6 cm (no spikes, no banks in the air)
  *   ground    40 random rays straight down within 50 m: the first visible surface (terrain tiles + streets) vs surface.height <= 6 cm
  *   skis      the skier standing on the street: the lowest ski point is not under the snow (>= -2 cm)
+ *   decks     (R8b) waiting in the boarding zone of 14 lifts: the drawn surface under the boots (terrain + station decks) is <= 3 cm over
+ *             where he stands (no skis inside a platform), the lowest ski point >= -2 cm
  *   carve     a scripted carve on the spawn slope: the skis never more than 2 cm under the snow
  *   coplanar  the village meshes near every village spot: no two overlapping triangles in the same plane (z-fighting: the flickering
  *             balcony rails); the count of overlapping pairs must be 0
@@ -43,11 +45,11 @@ try {
       await page.goto(`${origin}/pb/ski.html?go=1&debug=1&q=low&res=fixed&weather=sun&time=midday&resort=${rid}`, { waitUntil: "domcontentloaded" });
       await page.waitForFunction("document.documentElement.dataset.skiRunning === '1' || !!document.documentElement.dataset.bootError", null, { timeout: 240000 });
       await page.waitForTimeout(2500);
-      const spawn = await page.evaluate(() => { const S = window.__ski, s = S.state; return { above: s.y - S.surface.height(s.x, s.z), clear: S.skierClear }; });
+      const spawn = await page.evaluate(() => { const S = window.__ski, s = S.state; return { above: s.y - S.standHeight(s.x, s.z), clear: S.skierClear }; });      // R8b: snow or station deck
       await page.waitForFunction("document.documentElement.dataset.skiTilesDone === '1'", null, { timeout: 300000, polling: 500 });
       await page.waitForFunction(() => !!window.__ski.roadRows, null, { timeout: 60000 });
       await page.waitForTimeout(2500);
-      const spawnLate = await page.evaluate(() => { const S = window.__ski, s = S.state; return s.y - S.surface.height(s.x, s.z); });
+      const spawnLate = await page.evaluate(() => { const S = window.__ski, s = S.state; return s.y - S.standHeight(s.x, s.z); });
       // village spots: street points spread over the resort (farthest-point sampling), inside the shipped tiles
       const spots = await page.evaluate((n) => {
         const S = window.__ski, pts = [];
@@ -197,6 +199,33 @@ try {
       for (const j of jumps) terrain.push({ name: `jump ${j.lift}`, cracks: j.bad, walls: 0, worst: j.worst, tiles: j.tiles, pending: j.pending, dist: j.dist });
       const cracks = terrain.reduce((m, t) => m + t.cracks + t.walls, 0);
       if (process.env.COP_DEBUG || cracks) console.log(JSON.stringify(terrain));
+      // R8b (3V QA: skis sank into every boarding platform): the skier waiting in the boarding zone of up to 14 lifts (the nearest to
+      // the spawn first): the drawn surface under his boots (terrain + station decks, a ray straight down) vs where he stands, and his
+      // lowest ski point: never under the drawn deck
+      const decks = await page.evaluate(async () => {
+        const S = window.__ski, T = window.THREE, ray = new T.Raycaster();
+        const targets = [S.scene.getObjectByName('ski-terrain'), S.scene.getObjectByName('ski-lifts')].filter(Boolean);
+        const here = { x: S.state.x, z: S.state.z };
+        const lifts = [...S.modes.lifts.list].filter((l) => !l.tunnel).sort((a, b) => Math.hypot(a.bottom.x - here.x, a.bottom.z - here.z) - Math.hypot(b.bottom.x - here.x, b.bottom.z - here.z)).slice(0, 14);
+        const out = [];
+        for (const l of lifts) {
+          const w = S.modes.lifts.boardAt(l);
+          S.placeHold(w.x, w.z, w.heading);
+          await S.streamer.ready(w.x, w.z, 200);
+          await new Promise((r) => setTimeout(r, 700));
+          const st = S.state;
+          let worst = 0, what = '';
+          for (const [dx, dz] of [[0, 0], [0.4, 0], [-0.4, 0], [0, 0.4], [0, -0.4]]) {
+            ray.set(new T.Vector3(st.x + dx, st.y + 3, st.z + dz), new T.Vector3(0, -1, 0)); ray.far = 8;
+            const hit = ray.intersectObjects(targets, true).find((h) => h.object.visible !== false && h.face && h.face.normal && Math.abs(h.face.normal.y) > 0.5);
+            if (hit && hit.point.y - S.standHeight(st.x + dx, st.z + dz) > worst) { worst = hit.point.y - S.standHeight(st.x + dx, st.z + dz); what = hit.object.name || (hit.object.parent && hit.object.parent.name) || hit.object.type; }
+          }
+          out.push({ lift: l.name, deck: S.deckAt(st.x, st.z) > S.surface.height(st.x, st.z), over: +worst.toFixed(3), what, clear: +S.skierClear.toFixed(3) });
+        }
+        return out;
+      });
+      const deckWorst = decks.reduce((m, d) => Math.max(m, d.over), 0), deckClear = decks.reduce((m, d) => Math.min(m, d.clear), 0.5);
+      if (process.env.COP_DEBUG || deckWorst > 0.03 || deckClear < -0.02) console.log(JSON.stringify(decks));
       // a scripted carve on the spawn slope: the skis stay on the snow
       const carve = await page.evaluate(async () => {
         const S = window.__ski;
@@ -221,9 +250,9 @@ try {
       const minClear = Math.min(...rows.map((r) => r.clear), 0.5);
       const copKinds = {}; for (const r of rows) for (const [k, v] of Object.entries(r.copKinds || {})) copKinds[k] = (copKinds[k] || 0) + v;
       const coplanar = rows.reduce((m, r) => m + r.coplanar, 0), villageTris = rows.reduce((m, r) => m + r.villageTris, 0);
-      const ok = Math.abs(spawn.above) < 0.3 && Math.abs(spawnLate) < 0.3 && Math.abs(worstStreet) <= 0.06 && Math.abs(worstRay) <= 0.06 && minClear >= -0.02 && carve.worst >= -0.02 && coplanar === 0 && cracks === 0 && carve.camLow >= 0.3 && !errors.length;
+      const ok = Math.abs(spawn.above) < 0.3 && Math.abs(spawnLate) < 0.3 && Math.abs(worstStreet) <= 0.06 && Math.abs(worstRay) <= 0.06 && minClear >= -0.02 && carve.worst >= -0.02 && deckWorst <= 0.03 && deckClear >= -0.02 && coplanar === 0 && cracks === 0 && carve.camLow >= 0.3 && !errors.length;
       if (!ok) fails++;
-      const line = { engine, rid, ok, spawnAbove: +spawn.above.toFixed(3), spawnLate: +spawnLate.toFixed(3), villages: rows.length, worstStreet: +worstStreet.toFixed(3), worstRay: +worstRay.toFixed(3), worstWhat, minSkiClear: +minClear.toFixed(3), coplanar, copKinds, villageTris, terrainSpots: terrain.length, terrainCracks: cracks, terrainWorst: Math.max(...terrain.map((t) => Math.abs(t.worst))), carveSki: +carve.worst.toFixed(3), camOverSnow: +carve.camLow.toFixed(2), errors: errors.slice(0, 3) };
+      const line = { engine, rid, ok, spawnAbove: +spawn.above.toFixed(3), spawnLate: +spawnLate.toFixed(3), villages: rows.length, worstStreet: +worstStreet.toFixed(3), worstRay: +worstRay.toFixed(3), worstWhat, minSkiClear: +minClear.toFixed(3), coplanar, copKinds, villageTris, terrainSpots: terrain.length, terrainCracks: cracks, terrainWorst: Math.max(...terrain.map((t) => Math.abs(t.worst))), carveSki: +carve.worst.toFixed(3), decks: decks.length, onDeck: decks.filter((d) => d.deck).length, deckWorst, deckClear, camOverSnow: +carve.camLow.toFixed(2), errors: errors.slice(0, 3) };
       if (process.env.COP_DEBUG) console.log(JSON.stringify(rows.map((r) => r.copSamples)));
       table.push(line);
       console.log(JSON.stringify(line));

@@ -618,7 +618,25 @@ export function createLiftWorld(paths, opts = {}) {
     }
     return null;
   }
-  return { sites, inStation, inBuilding, inLowLane, hit, treeBlocked, exitOf, boardingAt, keepBuilding: (i) => keep[i] !== false, nearPylon };
+  /** R8b (3V QA: skis sank into every boarding platform): the top of the station deck / platform at (x, z), or -Infinity off every deck.
+   *  The decks are flat boxes at their frame's ground (ground(f.x, f.z)), so on a slope they stand above the snow: the skier stands
+   *  on them (main.js standHeight = max(snow, deck)). */
+  function deckTop(x, z, ground) {
+    let top = -Infinity;
+    for (const it of near(x, z, 1)) {
+      if (it.t !== 'frame') continue;
+      const f = it.f, l = f.toLocal(x, z, tmpL);
+      if (l.a < f.rect.a0 || l.a > f.rect.a1 || l.b < f.rect.b0 || l.b > f.rect.b1) continue;
+      let g0 = null;
+      for (const p of f.parts) {
+        if (!p.deck || p.cut || l.a < p.a0 || l.a > p.a1 || l.b < p.b0 || l.b > p.b1) continue;
+        if (g0 === null) g0 = ground(f.x, f.z);
+        top = Math.max(top, g0 + p.y1);
+      }
+    }
+    return top;
+  }
+  return { sites, inStation, inBuilding, inLowLane, hit, treeBlocked, exitOf, boardingAt, keepBuilding: (i) => keep[i] !== false, nearPylon, deckTop };
 }
 
 /** Where lifts share ground (twin drag lifts, a line passing a neighbour's station): a station part standing in another lift's
