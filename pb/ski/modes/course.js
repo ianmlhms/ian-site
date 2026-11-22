@@ -104,7 +104,7 @@ export function courseLayout(piste, startS = 2, pistes = null, obs = null) {    
  *  R7-C2: collide(prev, state) -> the state deflected by the barriers (soft: pushed back inside along the barrier, slowed a little). */
 export function createCourse({ piste, startS = 2 }) {
   const finishS = Math.max(startS + 30, piste.length - COURSE.finishBack);
-  const proj = {}, nxt = {}, back = {}, full = {}, cp = {}, ca = {};
+  const proj = {}, nxt = {}, back = {}, full = {}, cp = {}, ca = {}, wp = {};
   let hint = startS, offFor = 0, aborted = false, cHint = startS, lastOff = 0, hits = 0, low = Infinity;
   const out = { s: startS, remaining: finishS - startS, share: 0, dist: 0, warn: false, abort: false, back: { x: 0, z: 0 }, next: { x: 0, z: 0 }, offFor: 0 };
   /** The projection that follows the skier: near the last spot, the whole line when he is far from it (a teleport, a respawn). */
@@ -148,6 +148,9 @@ export function createCourse({ piste, startS = 2 }) {
     if (!st.grounded && st.air > 0.25) return st;                         // a real jump clears the net (it is 1.1 m high)
     piste.at(cp.s, ca);
     const side = Math.sign(cp.off), rx = -ca.dz * side, rz = ca.dx * side;     // the outward normal of this barrier
+    // no net here: the inside of a bend tighter than the net's offset is left open (courseLayout), so is the wall
+    piste.project(ca.x + rx * (piste.halfWidth + 0.5), ca.z + rz * (piste.halfWidth + 0.5), cp.s, 40, wp);
+    if (wp.dist < piste.halfWidth + 0.2) return st;
     const vo = st.vx * rx + st.vz * rz;                                    // m/s towards the net
     const v = Math.hypot(st.vx, st.vz) || 1e-6, vt = st.vx * ca.dx + st.vz * ca.dz;
     // deflected along the net (down the course when he hit it square on): most of the speed kept, a little more lost the more
@@ -156,7 +159,9 @@ export function createCourse({ piste, startS = 2 }) {
     const along = v * (COURSE.barrierSlow - 0.2 * Math.max(0, vo) / v);
     const bounce = Math.min(1.5, Math.max(0, vo) * COURSE.barrierBounce);
     const vx = vo > 0 ? ca.dx * dirT * along - rx * bounce : st.vx, vz = vo > 0 ? ca.dz * dirT * along - rz * bounce : st.vz;
-    const x = ca.x + rx * (wall - 0.05), z = ca.z + rz * (wall - 0.05);
+    // pushed straight back in by how far he went past the wall (his progress along the course is kept: no snapping to a corner)
+    const pen = Math.abs(cp.off) - wall + 0.05;
+    const x = st.x - rx * pen, z = st.z - rz * pen;
     // the skis turn along the barrier (no heading into the net)
     const hx = Math.cos(st.heading), hz = Math.sin(st.heading), ho = hx * rx + hz * rz;
     const heading = ho > 0 ? Math.atan2(ca.dz * dirT, ca.dx * dirT) : st.heading;
