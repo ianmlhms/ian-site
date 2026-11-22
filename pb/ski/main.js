@@ -24,7 +24,7 @@ import { createLifts } from './lifts.js';
 import { createLiftPath } from './lift-path.js';       // R7-B: the tree aisles along the lifts
 import { liftTreeGuard } from './lift-site.js';
 import { createVillage } from './village.js';
-import { createRoads, decodeRoads } from './roads.js';
+import { createRoads, decodeRoads, housesOnStreets } from './roads.js';
 import { createLandmarks } from './landmarks.js';
 import { createPisteSet } from './pistes.js';
 import { createSkierState, stepSkier } from './skier.js';
@@ -338,12 +338,17 @@ async function boot() {
   extrasGate.then(() => loadExtras(core.root)).then(({ buildings, roads: streets }) => {
     // R7-B: the lift stations replace the OSM station buildings (and nothing stands in a lift lane); the exits keep clear of the rest
     const liftWorld = modes.lifts.setBuildings(buildings);
+    roadRows = decodeRoads(streets);
+    // R8d: an OSM house a street runs through is left out (Brides: a roof lying across the street)
+    let onStreet = new Set();
+    try { onStreet = housesOnStreets(buildings, roadRows); } catch (error) { console.warn('[ski] street / house check failed', error); }
+    const drawn = buildings.filter((_, i) => liftWorld.keepBuilding(i) && !onStreet.has(i));
     // the houses that are drawn (R7-B leaves out the ones in stations / lift paths): camera guard + skier collision (R8)
-    try { boxIndex = createBoxIndex(buildingBoxes(buildings.filter((_, i) => liftWorld.keepBuilding(i)))); } catch (error) { console.warn('[ski] building index failed', error); }
-    village = createVillage({ scene, rows: buildings.filter((_, i) => liftWorld.keepBuilding(i)), env, height: (x, z) => field.baseHeight(x, z), level, resort: rid }); mark('village');      // R8c: resort = Alpine villages
+    try { boxIndex = createBoxIndex(buildingBoxes(drawn)); } catch (error) { console.warn('[ski] building index failed', error); }
+    village = createVillage({ scene, rows: drawn, env, height: (x, z) => field.baseHeight(x, z), level, resort: rid }); mark('village');      // R8c: resort = Alpine villages
     // R7-C: gates / teleport spots clear of the drawn houses (B's stations replace the dropped OSM station buildings)
-    if (explore) { explore.setBuildings(buildings.filter((_, i) => liftWorld.keepBuilding(i))); gateS.clear(); finishS.clear(); if (markers) markers.regate(gateAt); }
-    roadRows = decodeRoads(streets); tryRoads();
+    if (explore) { explore.setBuildings(drawn); gateS.clear(); finishS.clear(); if (markers) markers.regate(gateAt); }
+    tryRoads();
   }).catch((error) => console.warn('[ski] buildings failed', error.message));
 
   let spawn = null;                                                          // round 6: the free ride's village lift

@@ -164,9 +164,34 @@ export function gentleRoads(roads, height) {
   return out;
 }
 
+/** R8d (QA: street bends read angular up close): the OSM polyline's corners are rounded before the lattice is built. Chaikin corner
+ *  cutting, ROUND_PASSES times, on corners turning more than ROUND_MIN_TURN rad; each cut at 25 % of the neighbouring segments, at most
+ *  ROUND_MAX_CUT m from the corner (a short segment between two bends keeps its middle). Pure; the ends stay. */
+const ROUND_PASSES = 3, ROUND_MIN_TURN = 0.17, ROUND_MAX_CUT = 7;
+export function roundRoads(roads) {
+  return roads.map((r) => {
+    let P = r.pts;
+    for (let pass = 0; pass < ROUND_PASSES && P.length > 2; pass++) {
+      const out = [P[0]];
+      for (let k = 1; k + 1 < P.length; k++) {
+        const [ax, az] = P[k - 1], [bx, bz] = P[k], [cx, cz] = P[k + 1];
+        const l0 = Math.hypot(bx - ax, bz - az), l1 = Math.hypot(cx - bx, cz - bz);
+        if (l0 < 1e-3 || l1 < 1e-3) { out.push(P[k]); continue; }
+        const turn = Math.acos(Math.max(-1, Math.min(1, ((bx - ax) * (cx - bx) + (bz - az) * (cz - bz)) / (l0 * l1))));
+        if (turn < ROUND_MIN_TURN) { out.push(P[k]); continue; }
+        const c0 = Math.min(ROUND_MAX_CUT, l0 * 0.25) / l0, c1 = Math.min(ROUND_MAX_CUT, l1 * 0.25) / l1;
+        out.push([bx - (bx - ax) * c0, bz - (bz - az) * c0], [bx + (cx - bx) * c1, bz + (cz - bz) * c1]);
+      }
+      out.push(P[P.length - 1]);
+      P = out;
+    }
+    return { hw: r.hw, pts: P };
+  });
+}
+
 /** roads = decodeRoads(roads.json); height(x, z) = the PHYSICS ground (surface.height: exact at the lattice nodes); level = quality. */
 export function createRoads({ scene, roads, env, height, level = 'medium' }) {
-  const gentle = gentleRoads(roads, height);
+  const gentle = gentleRoads(roundRoads(roads), height);                 // R8d: round bends
   const fine = latticeCells(gentle, LAT, height, true), coarse = latticeCells(gentle, LAT_FAR, height, false);
   const mat = material(env);
   const group = new THREE.Group();
@@ -209,4 +234,52 @@ export function createRoads({ scene, roads, env, height, level = 'medium' }) {
     },
     setLevel(next) { fineR = FINE_RADIUS[next] || FINE_RADIUS.medium; },
   };
+}
+
+/** R8d (QA: a house roof lying across the Brides street at (8388, 926)): the OSM houses a street runs through. A house is left out when
+ *  a street's middle half (its centreline grown by half its half-width, less 0.5 m) crosses its footprint for more than 2 m.
+ *  rows = buildings.json rows ([x, z, w, d, angle, ...]), roads = decodeRoads(roads.json). Returns a Set of row indices. */
+export function housesOnStreets(rows, roads) {
+  const G = 50, grid = new Map();
+  const gk = (i, j) => i * 100003 + j;
+  for (const r of roads) {
+    for (let k = 0; k + 1 < r.pts.length; k++) {
+      const [ax, az] = r.pts[k], [bx, bz] = r.pts[k + 1];
+      for (let i = Math.floor(Math.min(ax, bx) / G); i <= Math.floor(Math.max(ax, bx) / G); i++) {
+        for (let j = Math.floor(Math.min(az, bz) / G); j <= Math.floor(Math.max(az, bz) / G); j++) {
+          const key = gk(i, j); let a = grid.get(key); if (!a) grid.set(key, (a = [])); a.push([ax, az, bx, bz, r.hw]);
+        }
+      }
+    }
+  }
+  /** length of the segment p0 -> p1 inside the box |x| <= hx, |z| <= hz (Liang-Barsky) */
+  const inside = (x0, z0, x1, z1, hx, hz) => {
+    let t0 = 0, t1 = 1;
+    const dx = x1 - x0, dz = z1 - z0;
+    for (const [p, q] of [[-dx, x0 + hx], [dx, hx - x0], [-dz, z0 + hz], [dz, hz - z0]]) {
+      if (p === 0) { if (q < 0) return 0; continue; }
+      const t = q / p;
+      if (p < 0) t0 = Math.max(t0, t); else t1 = Math.min(t1, t);
+    }
+    return Math.max(0, t1 - t0) * Math.hypot(dx, dz);
+  };
+  const out = new Set();
+  rows.forEach((b, idx) => {
+    const c = Math.cos(b[4]), s = Math.sin(b[4]), R = Math.hypot(b[2], b[3]) / 2 + 4;
+    const seen = new Set();
+    for (let i = Math.floor((b[0] - R) / G); i <= Math.floor((b[0] + R) / G); i++) {
+      for (let j = Math.floor((b[1] - R) / G); j <= Math.floor((b[1] + R) / G); j++) {
+        for (const g of grid.get(gk(i, j)) || []) {
+          if (seen.has(g)) continue;
+          seen.add(g);
+          const grow = g[4] * 0.5 - 0.5;
+          const hx = b[2] / 2 + grow, hz = b[3] / 2 + grow;
+          if (hx <= 0 || hz <= 0) continue;
+          const lx = (x, z) => (x - b[0]) * c + (z - b[1]) * s, lz = (x, z) => -(x - b[0]) * s + (z - b[1]) * c;
+          if (inside(lx(g[0], g[1]), lz(g[0], g[1]), lx(g[2], g[3]), lz(g[2], g[3]), hx, hz) > 2) { out.add(idx); return; }
+        }
+      }
+    }
+  });
+  return out;
 }

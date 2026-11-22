@@ -40,6 +40,7 @@ const { createSkierState, stepSkier } = await imp('skier.js');
 const { createBot } = await imp('bot.js');
 const { SKI, AVALANCHE, MODES, COURSE } = await imp('config.js');
 const { unpackResort } = await imp('linepack.js');                 // R8b: resort.json carries packed piste lines (R7-D)
+const { housesOnStreets, decodeRoads } = await imp('roads.js');                 // R8d: houses a street runs through
 
 const args = process.argv.slice(2);
 const RIDES = args.includes('--rides');
@@ -69,7 +70,9 @@ for (const rid of rids.length ? rids : ALL) {
   // R8b: like main.js: R7-B's stations replace the OSM station buildings, the obstacles know the kept (drawn) houses
   const buildingRows = JSON.parse(fs.readFileSync(path.join(dir, 'buildings.json'), 'utf8'));
   const liftWorld = lifts.setBuildings(buildingRows);
-  obs.setBuildings(buildingRows.filter((_, i) => liftWorld.keepBuilding(i)));
+  // R8d: like main.js, a house a street runs through is not drawn either
+  const onStreet = housesOnStreets(buildingRows, decodeRoads(JSON.parse(fs.readFileSync(path.join(dir, 'roads.json'), 'utf8'))));
+  obs.setBuildings(buildingRows.filter((_, i) => liftWorld.keepBuilding(i) && !onStreet.has(i)));
   const row = { rid };
 
   // ---- spawn ----
