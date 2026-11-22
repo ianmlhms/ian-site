@@ -8,6 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { unpackResort } from './linepack.js';      // R7-D: packed piste lines
 
 globalThis.window = globalThis.window || {};
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -39,7 +40,7 @@ const check = (ok, msg) => { if (ok) passed++; else failed++; console.log(`${ok 
 const t0 = Date.now();
 
 console.log('A data');
-const resort = JSON.parse(fs.readFileSync(path.join(dir, 'resort.json'), 'utf8'));
+const resort = unpackResort(JSON.parse(fs.readFileSync(path.join(dir, 'resort.json'), 'utf8')));
 const far = decodeGrid(new Uint8Array(fs.readFileSync(path.join(dir, 'far.bin'))));
 const classes = decodeRle(new Uint8Array(fs.readFileSync(path.join(dir, 'classes.bin'))));
 check(far.nx === resort.far.nx && far.nz === resort.far.nz, `far grid ${far.nx}x${far.nz}`);

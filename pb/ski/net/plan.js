@@ -1,7 +1,7 @@
 /* The match plan, resolved the same way on every device without a server: the lobby hands everybody the same settings and the same
  * roster (mp-gate.js ctx), so "random" (resort, piste, weather, time) is drawn from a seed of the lobby code + roster ids. A rematch
  * goes through the lobby again (new roster ids), so it draws anew. Pure module (the Node test imports it). */
-import { RACE_PISTES } from './config.js';
+import { RACE_PISTES, FREE } from './config.js';
 import { RANDOM_WEATHER, RANDOM_TIME } from '../config.js';
 
 export const WEATHERS = Object.freeze(['sun', 'cloudy', 'snow', 'fog']);
@@ -58,3 +58,21 @@ export function resolveRuns(cfg, rid, pisteList, seed) {
     time: TIMES.includes(cfg.time) ? cfg.time : pickOf(RANDOM_TIME, seed, 'time', r),
   })));
 }
+
+/* ---------- R7-D: the online free ride (net/freeride.js) ---------- */
+/** The look of the shared day: the lobby's weather / time, "random" drawn from the match seed (the same on every device). */
+export function freePlan(cfg, seed) {
+  return Object.freeze({
+    weather: WEATHERS.includes(cfg.weather) ? cfg.weather : RANDOM_WEATHER[Math.floor(draw(seed, 'free-weather') * RANDOM_WEATHER.length) % RANDOM_WEATHER.length],
+    time: TIMES.includes(cfg.time) ? cfg.time : 'random',
+  });
+}
+
+/** Roster order -> metres right of the start spot (side by side, centred). */
+export const sideOffset = (roster, me, gap = FREE.SIDE_GAP) => {
+  const n = roster.length, i = Math.max(0, roster.findIndex((r) => r.id === me));
+  return (i - (n - 1) / 2) * gap;
+};
+
+/** The host of the shared things: the first roster player who is here (me included). */
+export const freeHost = (roster, me, statusOf) => (roster.find((r) => r.id === me || statusOf(r.id) === 'here') || roster[0]).id;

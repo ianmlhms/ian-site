@@ -134,6 +134,9 @@ async function boot() {
   // online race (lobby context from mp-gate.js): the match decides the resort, the same on every player's device
   const mpCtx = readMpContext();
   let mp = null;
+  // R7-D: the lobby mode: 'race' (net/index.js) or the shared free ride (net/freeride.js: no clock, the whole area, lifts together)
+  const mpFree = !!mpCtx && mpCtx.cfg.mode === 'free';
+  const isRace = () => !!mp && mp.kind !== 'free';
   const rid = mpCtx ? mpResort(mpCtx, RESORTS.filter((r) => r.ready).map((r) => r.id))
     : isReady(params.resort) ? params.resort : isReady(savedResort) ? savedResort : 'killy';
   const core = await loadResortCore(rid, (p) => LOAD.set(0.25 + p * 0.45, 'Bierger ginn opgebaut …'));
@@ -231,7 +234,8 @@ async function boot() {
   };
   let snowfall = createSnowfall({ scene, env, count: quality.snowflakes });
   const spray = createSpray({ scene, count: quality.spray });
-  let signs = null, lifts = null, village = null, landmarks = null, roads = null, roadRows = null, extrasBuilt = false, liftsEarly = false, markers = null;
+  let signs = null;                                                          // R7-D
+  let lifts = null, village = null, landmarks = null, roads = null, roadRows = null, extrasBuilt = false, liftsEarly = false, markers = null;
   /** Round 6: the lift view (lifts.js). Built once every tile is in; a ride before that builds it early on the heights there are, and it
    *  is built again (between rides) once all tiles are in. */
   function buildLifts() {
@@ -266,7 +270,8 @@ async function boot() {
     if (streamer.done() && !extrasBuilt) {
       extrasBuilt = true;
       buildLifts();
-      signs = createSigns({ scene, resort, height: (x, z) => field.height(x, z) });
+      signs = createSigns({ scene, resort, height: (x, z) => field.height(x, z) });          // R7-D: atlas slots on demand (update below)
+      signs.update(camera.position.x, camera.position.z, true);
       landmarks = createLandmarks({ scene, resort, height: (x, z) => surface.height(x, z), pistes });
       if (modes) modes.ensureParkView();
       mark('lifts');
@@ -325,7 +330,7 @@ async function boot() {
   });
   // ---- round 6: ski types (physics per type; timed / scored runs use the reference set: modes/skis.js FAIRNESS) ----
   let skiType = DEFAULT_SKI;
-  const fairNow = () => !!mp || game.mode === MODES.run || game.mode === MODES.park;
+  const fairNow = () => isRace() || game.mode === MODES.run || game.mode === MODES.park;
   function applySkiPhysics() { world.ski = skiParams(skiType, fairNow()); document.documentElement.dataset.skiPhysics = fairNow() ? 'fair' : skiType; }
   function setSki(id, save = true) {
     const t = SKI_BY_ID.get(id);
@@ -532,7 +537,7 @@ async function boot() {
 
   function startRun(p, mode, lateral = 0) {     // lateral: m right of the line at the start gate (online race: side by side)
     if (!p) return;
-    if (mode === MODES.run && !mp && !modes.isOpen(p) && !params.debug) { hud.toast('Gespaart'); return; }      // an online race may be on any piste
+    if (mode === MODES.run && !isRace() && !modes.isOpen(p) && !params.debug) { hud.toast('Gespaart'); return; }      // an online race may be on any piste
     if (mapScreen) { mapScreen.close(); mapScreen = null; pisteMap = null; modePanel = null; }
     if (finishCard) { finishCard.close(); finishCard = null; }
     game.screen = 'ski';
@@ -561,7 +566,7 @@ async function boot() {
     game.hold = false;                                                       // R7-B
     if (mode === MODES.run || mode === MODES.park) { game.phase = 'countdown'; game.countdown = params.auto ? 0.01 : 3; }
     else { game.phase = 'running'; hud.count(''); }
-    if (mp) { game.phase = 'hold'; game.ghost = null; hud.count(''); }          // online race: net/index.js starts the 3-2-1 for everybody
+    if (isRace()) { game.phase = 'hold'; game.ghost = null; hud.count(''); }          // online race: net/index.js starts the 3-2-1 for everybody
     if (window.Arcade && window.Arcade.startRun) window.Arcade.startRun();
     canvas.focus({ preventScroll: true });
     post.hold(6000);                         // the countdown + the first seconds: tiles, trees and shaders still settle
@@ -588,7 +593,7 @@ async function boot() {
       }
     }
     hud.count('');
-    if (mp) { mp.onFinish(result); return; }                                 // online race: its own results screen
+    if (isRace()) { mp.onFinish(result); return; }                                 // online race: its own results screen
     if (game.mode === MODES.park) {                                          // round 4A: the park card (points, record, tricks)
       finishCard = modes.finishPark({ assisted, onAgain: () => startPark(), onMap: () => showMap(), onFree: () => freeFromHere() });
       document.documentElement.dataset.skiScreen = 'finish';
@@ -846,7 +851,7 @@ async function boot() {
       else if (game.screen === 'map' && readyFor && modes.isOpen(game.piste)) startRun(game.piste, MODES.run);
     }
   }
-  if (window.Arcade && window.Arcade.onRestart) window.Arcade.onRestart(() => { if (!mp) again(); });
+  if (window.Arcade && window.Arcade.onRestart) window.Arcade.onRestart(() => { if (!isRace()) again(); });
 
   // quality: the shared Grafik level; a watchdog only ever steps down
   function applyQuality(next) {
@@ -1003,6 +1008,7 @@ async function boot() {
       farForest.update(camera.position.x, camera.position.z, game.screen === 'map' ? 8 : 1.5);
       poles.update(camera.position.x, camera.position.z, quality.markerRadius);
       if (lifts) lifts.update(time, camera.position.x, camera.position.z, quality.liftRadius);
+      if (signs) signs.update(camera.position.x, camera.position.z);              // R7-D: the sign atlas follows the camera
       if (village) village.update(camera.position.x, camera.position.z, quality.buildingRadius);
       if (landmarks) landmarks.update(camera.position.x, camera.position.z, quality.buildingRadius);
       if (roads) roads.update(camera.position.x, camera.position.z, Math.min(quality.buildingRadius, level === 'low' ? 1300 : 2400));      // round 7 (A): streets near only
@@ -1130,9 +1136,10 @@ async function boot() {
   game.piste = startPiste;
   // round 6: the free ride starts at the bottom station of a lift in a village; the first build happens there unless the page was opened
   // onto a piste (?piste= / ?auto=1 / ?map=1) or into an online race
-  spawn = spawnLift(modes.lifts, resort.places, startPiste.bottom);
+  // (R7-D: the online free ride starts everybody at the same lift: the resort's start piste decides, never a player's saved piste)
+  spawn = spawnLift(modes.lifts, resort.places, mpFree ? (pistes.byId.get(resort.start) || pistes.list[0]).bottom : startPiste.bottom);
   const openFlag = takeOpenMapFlag();
-  const intoFree = !mpCtx && !params.auto && !params.piste && param('map') !== '1' && openFlag !== '1' && !!spawn;
+  const intoFree = (!mpCtx || mpFree) && !params.auto && !params.piste && param('map') !== '1' && openFlag !== '1' && !!spawn;
   const a0 = intoFree ? (() => { const b = boardSpot(spawn); return { x: b.x, z: b.z, dx: Math.cos(b.heading), dz: Math.sin(b.heading) }; })() : startPiste.at(2, {});
   streamer.focus(a0.x, a0.z);
   placeAt(a0.x, a0.z, Math.atan2(a0.dz, a0.dx));
@@ -1148,11 +1155,23 @@ async function boot() {
   document.documentElement.dataset.skiReady = '1';
   modes.start();                                                             // round 4A: the cloud save (arcade game_saves)
   if (mpCtx) {
+    // R7-D: avalanches of round 7 C (window.__ski.avalanches: onTrigger / triggerAvalanche(id, seed, t s)) are shared in the free ride
+    const avalancheApi = () => (window.__ski && window.__ski.avalanches) || null;
     mp = createMp({ ctx: mpCtx, host: {
       game, rid, pistes, streamer, terrain, surface, scene, camera, canvas, env, hud, input, audio, chase, uiRoot: document.getElementById('ui'),
-      outfit: () => outfit, level: () => level, startRun: (p, lateral) => startRun(p, MODES.run, lateral), liftPath: (i) => (lifts ? lifts.pathOf(i) : null),
+      outfit: () => outfit, level: () => level, startRun: (p, lateral) => startRun(p, MODES.run, lateral),
+      // R7-D: a friend on a lift is drawn in his carrier even before this device rode one (the lift view is built early, once)
+      liftPath: (i) => { if (!lifts) buildLifts(); return lifts ? lifts.pathOf(i) : null; },
+      // R7-D free ride
+      liftName: (i) => { const l = modes.lifts.byIndex.get(i); return l ? l.name : ''; },
+      startSpot: (lateral) => { const b = boardSpot(spawn); return { x: b.x - Math.sin(b.heading) * lateral, z: b.z + Math.cos(b.heading) * lateral, heading: b.heading }; },
+      startFree: (spot) => goFree(spawn && Math.hypot(spot.x - spawn.bottom.x, spot.z - spawn.bottom.z) < 60 ? spawn : null, spot),
+      dayClock: () => modes.clock,
+      liftTop: (i) => { const l = modes.lifts.byIndex.get(i); return l ? modes.lifts.startAt(l, (x, z) => surface.height(x, z)) : null; },
+      avalanche: { trigger: (id, seed, tMs) => { const a = avalancheApi(); if (a && a.triggerAvalanche) a.triggerAvalanche(id, seed, tMs / 1000); } },
     } });
     mp.begin();
+    { const a = avalancheApi(); if (mpFree && a && a.onTrigger) a.onTrigger((e) => mp.shareAvalanche(e.id, e.seed, e.t * 1000)); }
   } else if (params.auto) {
     await streamer.ready(a0.x, a0.z, 1500);
     placeAt(a0.x, a0.z, Math.atan2(a0.dz, a0.dx));

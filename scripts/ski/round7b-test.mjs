@@ -29,6 +29,7 @@ const { createLiftSite, createLiftWorld, liftTreeGuard, frames, TREE_TOP } = awa
 const { createRide } = await imp('modes/liftride.js');
 const { createLiftNet } = await imp('modes/freeride.js');
 const { createParkLayout } = await imp('modes/park.js');
+const { unpackResort } = await imp('linepack.js');
 const { createSkierState, stepSkier } = await imp('skier.js');
 const { SKI } = await imp('config.js');
 
@@ -67,7 +68,7 @@ function boxHitsPart(f, g0, p, cx, cz, heading, hw, hl, yLo, yHi, pad = 0) {
 for (const rid of resorts) {
   const t0 = Date.now();
   const dir = path.join(root, 'data', rid);
-  const resort = JSON.parse(fs.readFileSync(path.join(dir, 'resort.json'), 'utf8'));
+  const resort = unpackResort(JSON.parse(fs.readFileSync(path.join(dir, 'resort.json'), 'utf8')));      // R7-D: packed piste lines
   const far = decodeGrid(new Uint8Array(fs.readFileSync(path.join(dir, 'far.bin'))));
   const classes = decodeRle(new Uint8Array(fs.readFileSync(path.join(dir, 'classes.bin'))));
   const field = createField({ resort, far, classes, net: createPisteNet(resort.network), park: createParkLayout(resort.park) });

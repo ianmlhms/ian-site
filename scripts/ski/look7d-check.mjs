@@ -9,6 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { unpackResort } from '../../pb/ski/linepack.js';      // R7-D: packed piste lines
 
 globalThis.window = { THREE: { InstancedBufferGeometry: class { setAttribute(k, v) { this[k] = v; } }, Float32BufferAttribute: class { constructor(a, n) { this.array = a; this.count = a.length / n; } } } };
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -75,7 +76,7 @@ function meshLookup(g, sinkY) {
 for (const rid of ALL) {
   console.log(`park ${rid}`);
   const dir = path.join(SKI_DIR, 'data', rid);
-  const resort = JSON.parse(fs.readFileSync(path.join(dir, 'resort.json'), 'utf8'));
+  const resort = unpackResort(JSON.parse(fs.readFileSync(path.join(dir, 'resort.json'), 'utf8')));      // R7-D: packed piste lines
   const layout = createParkLayout(resort.park);
   if (!check(!!layout, `${rid}: a park in resort.json (${resort.park ? resort.park.name : 'none'})`)) continue;
   const far = decodeGrid(new Uint8Array(fs.readFileSync(path.join(dir, 'far.bin'))));

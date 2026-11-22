@@ -41,6 +41,7 @@ from scipy import ndimage
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from codec import encode  # noqa: E402
 from lift_sites import aisle_mask, arrange, drop_drag_pylons_under, pad_stations  # noqa: E402
+from linepack import pack_resort  # noqa: E402  (R7-D)
 from common import (CLASS_STEP, FAR_MARGIN, FAR_STEP, NEAR_KEEP, NEAR_STEP, OSM_CREDIT, RESORTS, SOURCE_CREDITS, TILE_CELLS, TILE_SIZE, Frame, osm_path, out_dir,  # noqa: E402
                     resort_arg, work_dir)
 
@@ -1617,6 +1618,7 @@ def main():
             resort["park"] = old_park
     except (OSError, ValueError):
         pass
+    pack_resort(resort)                     # R7-D: piste lines as "lz" / "pz" (linepack.py; the game decodes with pb/ski/linepack.js)
     with open(os.path.join(out, "resort.json"), "w", encoding="utf-8") as fh:
         json.dump(resort, fh, ensure_ascii=False, separators=(",", ":"))
     sizes = {f: os.path.getsize(os.path.join(out, f)) for f in os.listdir(out) if os.path.isfile(os.path.join(out, f))}

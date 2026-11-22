@@ -3,6 +3,7 @@
  * The page may have started the first files already (window.__skiPre, see ski.html): they are taken from there. */
 import { DATA } from './config.js';
 import { decodeGrid, decodeRle } from './codec.js';
+import { unpackResort } from './linepack.js';
 
 export const RESORTS = Object.freeze([
   { id: 'killy', name: "Val d'Isère · Tignes", short: 'Espace Killy', country: 'FR', ready: true },
@@ -49,7 +50,7 @@ export async function loadResortCore(rid, onProgress = () => {}) {
   };
   const [jsonBytes, farBytes, classBytes] = await Promise.all([get('resort.json'), get('far.bin'), getClasses()]);
   onProgress(0.5);
-  const resort = JSON.parse(new TextDecoder().decode(jsonBytes));
+  const resort = unpackResort(JSON.parse(new TextDecoder().decode(jsonBytes)));          // R7-D: packed piste lines (linepack.js)
   const far = decodeGrid(farBytes);
   if (far.nx !== resort.far.nx || far.nz !== resort.far.nz) throw new Error(`far.bin does not match resort.json (${far.nx}x${far.nz})`);
   const classes = decodeRle(classBytes);
