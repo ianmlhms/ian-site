@@ -1,5 +1,5 @@
 /* mp-gate.js — the small in-game half of the shared lobby. Classic script, first <script> in the game page:
- *   <script src="mp-gate.js?v=7" data-game="connect4"></script>
+ *   <script src="mp-gate.js?v=10" data-game="connect4"></script>
  *
  * 1. Gate: a visit with neither ?room= nor ?ai=1 (arcade card, old bookmark, ?lobby=CODE) is sent to lobby.html. The old
  *    links page?room=CODE&role=host|guest and page?ai=1 keep working untouched — they never see the lobby.
