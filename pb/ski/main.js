@@ -632,6 +632,7 @@ async function boot() {
     game.piste = p;
     game.mode = mode;
     endCourse();
+    dropRide();                                                              // R8b
     const gate = mode === MODES.run ? gateAt(p) : { s: 2, lat: 0 };          // R7-C: the start gate on open snow
     const s0 = gate.s;
     const lat = lateral || gate.lat || 0;                                    // R7-C2: beside a station / under a lift line
@@ -784,6 +785,7 @@ async function boot() {
   function startFree(lift, spotIn = null) {
     if (!lift && !spotIn) return;
     endCourse();                                                             // R7-C
+    dropRide();                                                              // R8b
     streamer.release();                                      // skiing: the rest of the resort streams in, nearest the skier first
     if (mapScreen) { mapScreen.close(); mapScreen = null; pisteMap = null; modePanel = null; }
     if (finishCard) { finishCard.close(); finishCard = null; }
@@ -897,6 +899,18 @@ async function boot() {
     skipping = false;
     fade.classList.remove('on');
     if (ride && ride.done) arrive();
+  }
+  /** R8b (3V QA: a stale "Funiculaire …" ride line stayed on the HUD): a ride cut short by a fast travel / teleport / challenge / park
+   *  start ends cleanly (no carrier, no ride HUD, the lift's own loop takes its carrier back). */
+  function dropRide() {
+    if (!ride) return;
+    const r = ride;
+    ride = null; skipping = false;
+    if (lifts) lifts.setRide(r.lift.index, null);
+    if (carrier) { carrier.dispose(); carrier = null; }
+    rideHud.show(null);
+    if (game.phase === 'lift') game.phase = 'running';
+    input.setEnabled(true);
   }
   /** Off at the top: the ride has brought him out of the station to the exit spot; he stands still there until the player moves. */
   function arrive() {
