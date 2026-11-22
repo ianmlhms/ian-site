@@ -936,3 +936,46 @@ Browser runs (22 Nov, this branch, browser-slot ski pool, one at a time): ski-mp
 WebKit try: every race check ok, only emma's frame logged one boot-probe "Importing a module script failed" — a load flake under the
 Mini's load, the rerun was clean); ski-challenges (cloud origin) Chromium PASS; all 9 mp-lobby-* Chromium + WebKit PASS. Node:
 security-test, mp-race-test, r7d-test (1424), round6-test (2307) green.
+
+## Round 8b (22 Nov 2026, branch `worktree-agent-af10f0221a941c5fa`): R7-C2 + security merged, checks re-run, 3 Vallées QA fixes
+**Merged**: R7-C2 (`worktree-agent-acb90fde7a15074ac` @ 61fe6f92, contains R7-C) and the security branch (`worktree-agent-acf4147b279b85622`
+@ 74c5d016) onto the R8 integration head 1b93cf27. One implementation per feature:
+- From C: first person (firstperson.js, C key / 👁), spray.js (spray + tracks), avalanche.js (+ Lawin ≥ 35°, rumble / crack sound),
+  map tap-teleport to discovered places + fog + "⌂ Bei den éischte Lift" (explore.js / discovery.js, cloud field `d`, Lawin `w`), challenge
+  course (gates on open snow, push start 17 km/h, net barriers + soft collision, upright ZIL + snow strip, distance HUD, "Zréck op d'Pist",
+  8 s off -> abort choice), pistes.js loop-projection fix, config FIRST_LIFT.
+- DROPPED from C: the 42 m boarding radius (freeride.js BOTTOM_RADIUS stays 30, liftride.js RIDE = R7-B's) and C's liftSpot / boardSpot:
+  the spawn waits at R7-B's boarding-zone spot `modes.lifts.boardAt(FIRST_LIFT)`; a map teleport onto a lift (safeSpot kind 'lift') is a
+  fast travel to that lift's zone (goFree). C's `!mp` guards -> `!isRace()` (avalanches + the course abort also in the online free ride).
+- D's free-ride avalanche events go straight to C's `avalanches` (main.js host.avalanche.trigger / known; no `window.__ski` needed).
+- Security merge: (1) `host.avalanche.known(id)` = avalanche.js `knownZone(field, faces, id)`: a Lawin face's top cell or a 40 m cell
+  inside the resort with a releasable point by the FAR grid (the same on every device before tiles load; slope >= AV.slope - 15, piste /
+  forest / rock / houses filtered); round7c-check: 389-398 / 400 releasable cells known per resort (a friend's rare release on a steep
+  edge cell can be dropped locally), 0-1 / 200 piste middles, 0 forged ids. (2) cloud `d` / `w`: <= 16 resorts each, rid [a-z0-9]{1,16},
+  discovery.js rleIntervals now also rejects a run past MAX_CELLS (2^20; was: any length up to MAX_RLE chars), security-test.mjs has 5 new
+  C2 cloud checks (replacing the "no d yet" placeholder). (3) `make_sql.py client_length` drops the same OSM spurs as pistes.js
+  (`drop_spurs`), ski-v1.sql regenerated: 11 floors changed (e.g. arlberg familienabfahrt-variante-blu 22 -> 18 s); client minRunMs ==
+  SQL floor stays true. NOT applied (SQL is for launch).
+**Fixes in this round** (each with a check over all five resorts):
+- pistes.js `dropSpurs`: OSM lines that run out a dead end and back along themselves (14 in the five resorts: Zermatt cieloalto-cervinia
+  was unfinishable, the bot rode up a 25 m spur and back forever) lose the spur. round7c-check --rides 1351/1351.
+- Push start: main.js `pushStart` leaves R7-A's standing hold (`hold: 0`): the 17 km/h kick was zeroed until the first input.
+- Draw calls (Niddreg): the local skier + ghost are ONE skinned mesh (skier-model.js `skinned: true`, bones = the per-bone groups like
+  remotes.js; hidden groups (poles in a cabin, twin tips, first person = all but the gear) get a zero bone matrix), avalanche flag + post
+  in one instanced mesh. calls-sweep7d (no --gpu): worst 169 / 166 / 162 / 162 / 168 -> 153 / 151 / 148 / 145 / 151 (Killy / 3V /
+  Zermatt / Arlberg / Kronplatz), p95 136-140, median 119-125. The lift-name sign layer stays its own call (not needed to fold).
+- 3V QA blockers: gates vs R7-B's real stations: clear.js `createObstacles({ liftWorld })` asks `lifts.world.inStation / hit` (frames,
+  solid parts, pylons) + the kept houses; round7c-check checks independently: 0 gates touching a station / lift part / house in all five
+  (1351 gates; 117 moved down, 251 beside the line). A blocked start can't trap: 10 s under 1 m/s on a course -> the abort card.
+  ZIL on open snow: clear.js `courseFinish` moves the finish up the line (<= 140 m) until both pillars + the middle are clear of stations /
+  houses with a clear 60 m run-in (Killy 23, 3V 48, Zermatt 13, Arlberg 36, Kronplatz 16 moved), game.js / course.js take `finishS`.
+- Skis in station platforms: lift-site.js `world.deckTop(x, z, ground)`; main.js `standHeight` = max(snow, deck) for the physics
+  (world.height / normal), placeAt, the hold, the boarding walk and the figure's leg IK; the skier is re-snapped when the lifts (decks)
+  are built. ground-check.mjs `decks`: 14 boarding spots per resort, a ray onto terrain + 'ski-lifts' <= 3 cm over where he stands.
+  Drag tracks drawn 1.2 cm (was 3.5) over the lift-path ground.
+- WebGL context lost (WebKit): nothing drawn while lost (no TypeError loop), restored -> carries on, else after 2.5 s a "Neu lueden" card.
+- Stale ride HUD: `dropRide()` when a fast travel / teleport / challenge / park starts during a ride. Standalone "Online-Rennen":
+  mp-gate.js jumps to `/lobby.html` (was relative -> /pb/lobby.html 404). Finish card: no "Nächst Pist" twin of "Weiderfueren".
+  Lift list: a bare-number lift name gets its kind ("Sessellift 3000"), the height reads "↑ 2959 m" (was "30002959 m").
+- Tools: frame-probe.mjs `--travel N` (frames after N fast travels, every upkeep method wrapped), round8-sheet.mjs `fp` + `map` shots
+  (the map shot reports list row vs card), pose-check waits 60 drawn frames (a half-blended plough failed under load).
