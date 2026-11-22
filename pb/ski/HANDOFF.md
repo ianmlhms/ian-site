@@ -1078,7 +1078,8 @@ No data / bake / SQL changes (R8d re-bakes in parallel). Nothing depends on lift
 - Flows Chromium (load 275-420): ski, ski-resorts, ski-challenges, ski-park, ski-freeride, ski-lift, ski-skis PASS; ski-ipad-start
   (13.8 s > 10 s to skiing: load), ski-mp (start gap 6.1 m > 6, +8 calls for 7 remotes: not investigated, maybe the push at "go" under
   load), ski-lifts-all (3V Télécorde rope tow pose '' at the sample: likely the short ride over under load) FAIL; the rest (firstperson,
-  course, teleport, spawn, avalanche, webkit, look7d, mp-freeride) were still running: ~/Library/Caches/ski-work/round8e/flows-chromium.log.
+  course, teleport, spawn, avalanche, webkit, look7d, mp-freeride) NEVER RAN: the run aborted inside ski-lifts-all ("browser has been
+  closed" at load ~400; before that Zermatt train Ascensore di Cheneil: ride null after boarding). Re-run them first.
 - WebKit: NOT run. Playwright WebKit hangs on this Mini since ~06:36 (newPage never returns: the WebKit network process blocks in
   CFNetwork's resource-loader thread start, `sample` shows it); killing R8b's hung orphan queue (qC.sh, slot1) did not help.
 **Still open after 8e**: re-run everything above in WebKit once WebKit starts again; ski-mp / ski-lifts-all / ski-ipad-start at normal
