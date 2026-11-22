@@ -121,7 +121,7 @@ for (const rid of rids.length ? rids : ALL) {
   check(onPiste === 0, `avalanche: never releasable on a piste (${onPiste} of 200 piste middles)`);
 
   // ---- course ----
-  let clear = 0, moved = 0, beside = 0, lined = 0, seatsOk = 0, worstBury = 0, worstGap = 0;
+  let clear = 0, moved = 0, beside = 0, lined = 0, seatsOk = 0, worstBury = 0, worstGap = 0, netInHouse = 0, openTotal = 0, edgeTotal = 0;
   const blocked = [], badSeats = [], unlined = [];
   const gates = new Map();
   for (const p of pistes.list) {
@@ -131,12 +131,14 @@ for (const rid of rids.length ? rids : ALL) {
     if (g.ok) clear++; else blocked.push(`${p.id} (${g.why})`);
     if (g.s > 2) moved++;
     if (g.lat) beside++;
-    const lay = courseLayout(p, g.s, pistes);
+    const lay = courseLayout(p, g.s, pistes, obs);
+    for (const r of lay.rails) for (let i = 0; i < r.length; i += 8) if (obs.inBuilding(r[i], r[i + 1], 0) || obs.nearStation(r[i], r[i + 1], 0)) netInHouse++;
     // the nets: both sides from the start gate to the finish (the inside of a tight bend may be left out)
     let netLen = 0;
     for (const r of lay.rails) for (let i = 2; i < r.length; i += 2) netLen += Math.hypot(r[i] - r[i - 2], r[i + 1] - r[i - 1]);
-    const cover = netLen / 2 / Math.max(1, lay.finishS - g.s - 4);
-    if (cover > 0.8 && lay.finish && Math.hypot(lay.finish.x - p.bottom.x, lay.finish.z - p.bottom.z) < COURSE.finishBack + 1) lined++;
+    const cover = (netLen + lay.openLen) / 2 / Math.max(1, lay.finishS - g.s - 4);      // netted or left open on purpose (a house, a hairpin)
+    openTotal += lay.openLen; edgeTotal += 2 * Math.max(1, lay.finishS - g.s - 4);
+    if (cover > 0.95 && lay.finish && Math.hypot(lay.finish.x - p.bottom.x, lay.finish.z - p.bottom.z) < COURSE.finishBack + 1) lined++;
     else unlined.push(`${p.id} (${(cover * 100).toFixed(0)} % netted)`);
     // R7-C2: every course object on the snow, nothing higher than 6 m above it, nothing bigger than meant
     const st = courseSeats(lay, height);
@@ -151,7 +153,8 @@ for (const rid of rids.length ? rids : ALL) {
   }
   const total = ONLY ? ONLY.size : pistes.list.length;
   check(blocked.length === 0, `course: ${clear}/${total} start gates on open snow (${moved} moved down the piste, ${beside} beside the line)${blocked.length ? `; blocked: ${blocked.slice(0, 8).join(', ')}` : ''}`);
-  check(lined === total, `course: ${lined}/${total} courses lined with barriers on both edges, finish at the line's real end${unlined.length ? `; not: ${unlined.slice(0, 6).join(', ')}` : ''}`);
+  check(netInHouse === 0, `course: no net through a house or a station hall (${netInHouse} net points inside one)`);
+  check(lined === total, `course: ${lined}/${total} courses lined with barriers on both edges (${(openTotal / edgeTotal * 100).toFixed(1)} % of the edges left open at houses / stations / hairpins), finish at the line's real end${unlined.length ? `; not: ${unlined.slice(0, 6).join(', ')}` : ''}`);
   check(seatsOk === total, `course objects: ${seatsOk}/${total} courses with every barrier / arrow / post / ZIL pillar / beam / finish strip on the snow, <= ${COURSE.archHeight} m above it, intended size (net edge over the snow <= ${worstGap.toFixed(2)} m, into it <= ${worstBury.toFixed(2)} m)${badSeats.length ? `; bad: ${badSeats.slice(0, 6).join('; ')}` : ''}`);
   row.gates = `${clear}/${total}`;
   // R7-C2: the barriers hold: a skier at 15 m/s aimed 35° at the net, on the ground, every 5th course

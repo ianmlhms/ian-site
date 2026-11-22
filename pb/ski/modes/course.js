@@ -31,14 +31,14 @@ function pisteHash(pistes) {
 }
 
 /** The course of a piste from startS: { startS, finishS, finish {x, z, dx, dz}, barriers [{x, z, h, side}], arrows [{x, z, h, side, s}] }. */
-export function courseLayout(piste, startS = 2, pistes = null) {
+export function courseLayout(piste, startS = 2, pistes = null, obs = null) {      // R7-C2: obs (clear.js): no net through a house or a station
   const finishS = Math.max(startS + 30, piste.length - COURSE.finishBack);
   const a = {};
   const barriers = [], arrows = [];
   const hw = piste.halfWidth;
   const pr = {};
   // the inside of a bend tighter than the barrier offset folds the offset line back over the course: those points are left out
-  const inside = (x, z, s) => { piste.project(x, z, s, 40, pr); return pr.dist < hw + 0.5 - 0.3; };
+  const inside = (x, z, s) => { piste.project(x, z, s, 40, pr); return pr.dist < hw + 0.5 - 0.3 || (obs && (obs.inBuilding(x, z, 0.4) || obs.nearStation(x, z, 0.4))); };
   for (let s = startS + 4; s < finishS; s += COURSE.barrierEvery) {
     piste.at(s + COURSE.barrierEvery / 2, a);
     const h = Math.atan2(a.dz, a.dx);
@@ -50,21 +50,26 @@ export function courseLayout(piste, startS = 2, pistes = null) {
   // R7-C2: the net itself = a ribbon per side whose bottom lies on the snow every NET_STEP m (no rigid panel floating over a dip or
   // sunk into a bump); runs [x, z, ...] broken where a point was left out
   const rails = [];
+  let openLen = 0;                                        // m of edge left open (tight bends, houses, station halls)
   for (const side of [-1, 1]) {
     let run = [];
+    const cut = () => { if (run.length >= 4) rails.push(run); run = []; };
     for (let s = startS + 4; s <= finishS + 1e-6; s += NET_STEP) {
       piste.at(s, a);
       const x = a.x - a.dz * side * (hw + 0.5), z = a.z + a.dx * side * (hw + 0.5);
-      if (inside(x, z, s)) { if (run.length >= 4) rails.push(run); run = []; continue; }
+      if (inside(x, z, s)) { cut(); openLen += NET_STEP; continue; }
       // the outside of a kink in the 10 m line jumps by metres: fill the corner so no vertex is more than NET_STEP from the next
       const k = run.length;
       if (k) {
         const px = run[k - 2], pz = run[k - 1], d = Math.hypot(x - px, z - pz), m = Math.ceil(d / NET_STEP);
-        for (let j = 1; j < m; j++) run.push(px + (x - px) * j / m, pz + (z - pz) * j / m);
+        const fill = [];
+        let blocked = false;
+        for (let j = 1; j < m && !blocked; j++) { const fx = px + (x - px) * j / m, fz = pz + (z - pz) * j / m; if (obs && (obs.inBuilding(fx, fz, 0.4) || obs.nearStation(fx, fz, 0.4))) blocked = true; else fill.push(fx, fz); }
+        if (blocked) cut(); else run.push(...fill);
       }
       run.push(x, z);
     }
-    if (run.length >= 4) rails.push(run);
+    cut();
   }
   const b2 = {};
   const arrowAt = (s) => {
@@ -92,7 +97,7 @@ export function courseLayout(piste, startS = 2, pistes = null) {
   for (const s of junctions) arrowAt(Math.max(startS + 8, s - 15));
   for (let s = startS + ARROW_EVERY; s < finishS - 60; s += ARROW_EVERY) if (!junctions.some((t) => Math.abs(t - s) < 80)) arrowAt(s);
   piste.at(finishS, a);
-  return { startS, finishS, finish: { x: a.x, z: a.z, dx: a.dx, dz: a.dz }, barriers, rails, arrows, junctions, halfWidth: hw };
+  return { startS, finishS, finish: { x: a.x, z: a.z, dx: a.dx, dz: a.dz }, barriers, rails, openLen, arrows, junctions, halfWidth: hw };
 }
 
 /** Where the skier is on the course (pure). update(state, dt) -> { s, remaining, share, dist, warn, abort, back {x, z}, next {x, z} }.

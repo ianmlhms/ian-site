@@ -75,10 +75,25 @@ export const flow = {
       }
 
       h.step(`${id}: the scripted skier reaches the ZIL inside the barriers`);
-      await page.evaluate(async () => { const { createBot } = await import("/pb/ski/bot.js"); window.__ski.game.bot = createBot(window.__ski.game.piste); });
+      // R7-C2: the HUD distance is sampled all along the ride: it must fall and read < 30 m at the arch (it once stuck at "4.8 km")
+      await page.evaluate(async () => {
+        const k = window.__ski, log = [];
+        window.__skiHudLog = log;
+        const tick = () => { const c = k.lastCourse; const el = document.getElementById("cLeft"); if (c) log.push([c.remaining, el ? el.textContent : ""]); if (k.game.phase === "running") setTimeout(tick, 150); };
+        tick();
+        const { createBot } = await import("/pb/ski/bot.js"); k.game.bot = createBot(k.game.piste);
+      });
       await page.waitForFunction(() => document.documentElement.dataset.skiScreen === "finish", null, { timeout: 240000 });
-      const fin = await page.evaluate(() => ({ last: document.documentElement.dataset.skiLast, warned: document.documentElement.dataset.skiCourseWarn }));
+      const fin = await page.evaluate(() => ({ last: document.documentElement.dataset.skiLast, warned: document.documentElement.dataset.skiCourseWarn, hits: window.__ski.course ? window.__ski.course.hits : null }));
       h.expect(!!fin.last, `${id}: finished (${fin.last}), the finish card is up`);
+      const hud = await page.evaluate(() => {
+        const log = window.__skiHudLog || [];
+        let rise = 0, low = Infinity;
+        for (const [r] of log) { rise = Math.max(rise, r - low); low = Math.min(low, r); }
+        const end = log.length ? log[log.length - 1] : [NaN, ""];
+        return { n: log.length, first: log.length ? log[0][1] : "", end: end[1], endM: end[0], rise };
+      });
+      h.expect(hud.n > 5 && hud.endM < 30 && hud.rise < 15 && /m bis ZIL/.test(hud.end), `${id}: HUD "${hud.first}" -> "${hud.end}" at the arch (${hud.n} samples, rise ${hud.rise.toFixed(0)} m)`);
     }
     h.eq(errors, [], "no page errors");
   },

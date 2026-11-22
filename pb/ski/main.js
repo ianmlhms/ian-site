@@ -497,7 +497,7 @@ async function boot() {
     game.run = createRun({ piste: p, mode, startS: s0 });
     const a = p.at(s0, {});
     if (mode === MODES.run) {
-      try { courseView = createCourseView({ scene, layout: courseLayout(p, s0, pistes), height: (x, z) => surface.height(x, z) }); } catch (error) { console.warn('[ski] course view failed', error); }
+      try { courseView = createCourseView({ scene, layout: courseLayout(p, s0, pistes, explore ? explore.obs : null), height: (x, z) => surface.height(x, z) }); } catch (error) { console.warn('[ski] course view failed', error); }
       course = createCourse({ piste: p, startS: s0 });
       courseHud.show(true);
       document.documentElement.dataset.skiCourse = 'on';

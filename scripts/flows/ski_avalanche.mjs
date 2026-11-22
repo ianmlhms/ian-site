@@ -63,9 +63,11 @@ export const flow = {
       const side = await page.evaluate((f) => { const dx = f.path[2] - f.path[0], dz = f.path[3] - f.path[1], L = Math.hypot(dx, dz); return { x: f.x - dz / L * 260, z: f.z + dx / L * 260 }; }, f);
       await page.evaluate(({ x, z }) => { window.__ski.place(x, z, 0); window.__ski.setInput({ steer: 0, tuck: 0, brake: 1, push: 0, jump: false }); }, side);
       await page.evaluate(({ id }) => { const a = window.__ski.avalanches; a.triggerAvalanche(id, 4242, a.clock()); }, { id });
-      // a camera beside the flow for the picture
-      await page.evaluate((f) => { const p = f.path, k = Math.min(p.length - 2, 20); window.__ski.setCamera(p[k] + 160, p[k + 1] + 60, 60, p[k], p[k + 1], 0, 55); }, f);
+      // R7-C2: the avalanche camera (avalanche.js faceView): clear of the snow and of the mountain; the rumble layer is driven
+      const view = await page.evaluate(() => { const v = window.__ski.avalancheView(0); return v ? { clear: v.clear, above: v.above } : null; });
       await h.pause(2500);
+      const cam = await page.evaluate(() => { const k = window.__ski, c = k.camera.position; return { above: c.y - k.surface.height(c.x, c.z), rumble: k.avalanches.loudness(c.x, c.z) }; });
+      h.expect(view && view.clear && cam.above >= 0.6 && cam.rumble > 0.05, `${rid}: avalanche camera ${cam.above.toFixed(1)} m above the snow, a clear line to the flow, rumble ${cam.rumble.toFixed(2)}`);
       await h.shot(`avalanche-${rid}-flow`);
       await page.waitForFunction(() => document.documentElement.dataset.skiAvalanche === "stopped" || document.documentElement.dataset.skiAvalanche === "caught", null, { timeout: 40000 });
       const end = await page.evaluate(() => ({ state: document.documentElement.dataset.skiAvalanche, stats: window.__ski.avalanches.stats, moving: window.__ski.avalanches.blocks().filter((b) => b.moving).length }));
