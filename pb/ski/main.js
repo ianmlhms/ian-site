@@ -1007,6 +1007,7 @@ async function boot() {
       startSpot: (lateral) => { const b = boardSpot(spawn); return { x: b.x - Math.sin(b.heading) * lateral, z: b.z + Math.cos(b.heading) * lateral, heading: b.heading }; },
       startFree: (spot) => goFree(spawn && Math.hypot(spot.x - spawn.bottom.x, spot.z - spawn.bottom.z) < 60 ? spawn : null, spot),
       dayClock: () => modes.clock,
+      liftTop: (i) => { const l = modes.lifts.byIndex.get(i); return l ? modes.lifts.startAt(l, (x, z) => surface.height(x, z)) : null; },
       avalanche: { trigger: (id, seed, tMs) => { const a = avalancheApi(); if (a && a.triggerAvalanche) a.triggerAvalanche(id, seed, tMs / 1000); } },
     } });
     mp.begin();

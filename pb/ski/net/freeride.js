@@ -31,7 +31,7 @@ const finite = (...v) => v.every(Number.isFinite);
 
 /**
  * host: { game, env, hud, input, audio, scene, camera, canvas, surface, uiRoot, outfit(), level(), liftPath(i), liftName(i),
- *         startSpot(lateral) -> spot, startFree(spot), dayClock() -> clock | null, avalanche: { trigger(id, seed, t) } | null }
+ *         startSpot(lateral) -> spot, startFree(spot), liftTop(index) -> spot | null, dayClock() -> clock | null, avalanche: { trigger(id, seed, t) } | null }
  */
 export function createFreeMp({ ctx, host }) {
   const { game, env, hud } = host;
@@ -155,13 +155,15 @@ export function createFreeMp({ ctx, host }) {
     mpHud.el.querySelector('.mp-board').appendChild(friendBtn);          // the list is rebuilt each time: the button goes under it
     root.dataset.skiMpFree = String(remotes.all().filter((x) => x.state).length);
   }
-  /** friends standing / skiing on the snow (not on a lift, not in the map) */
-  const friendsToJoin = () => remotes.all().filter((r) => r.state && !r.state.ride && statusOf(r.id) === 'here');
+  /** friends I can join (on the snow, or on a lift: then at its top, where he gets off) */
+  const friendsToJoin = () => remotes.all().filter((r) => r.state && statusOf(r.id) === 'here');
   /** fast travel next to the next friend in turn (a teleport like any other: the others see me appear there) */
   function toFriend() {
     const list = friendsToJoin();
     if (!list.length || !game.state) return false;
     const r = list[local.follow++ % list.length], s = r.state;
+    const top = s.ride ? host.liftTop(s.rideLift) : null;
+    if (top) { host.startFree(top); hud.toast(`${r.name} ass um Lift: du waars uewen op hien`, 1800); return true; }
     const h = Math.hypot(s.vx, s.vz) > 1 ? Math.atan2(s.vz, s.vx) : s.heading;
     const spot = { x: s.x - Math.cos(h) * 6 + Math.sin(h) * 3, z: s.z - Math.sin(h) * 6 - Math.cos(h) * 3, heading: h };
     host.startFree(spot);
