@@ -964,7 +964,7 @@ async function boot() {
     if (!game.run || !game.piste || game.mode !== MODES.run) return;          // challenges only (the park has its own drop-in)
     const a = game.piste.at(game.run.startS || 2, {});
     const s = game.state;
-    game.state = { ...s, vx: a.dx * COURSE.push, vz: a.dz * COURSE.push, speed: COURSE.push, heading: Math.atan2(a.dz, a.dx) };
+    game.state = { ...s, hold: 0, vx: a.dx * COURSE.push, vz: a.dz * COURSE.push, speed: COURSE.push, heading: Math.atan2(a.dz, a.dx) };      // R8b: out of the standing hold (R7-A), else the kick is zeroed until an input
     document.documentElement.dataset.skiPush = String(COURSE.push);
   }
   function courseTick(dt) {

@@ -224,7 +224,7 @@ for (const rid of rids.length ? rids : ALL) {
       const a = p.at(g.s, {});
       const x0 = a.x - a.dz * (g.lat || 0), z0 = a.z + a.dx * (g.lat || 0);
       let s = createSkierState(x0, z0, Math.atan2(a.dz, a.dx), height(x0, z0));
-      s = { ...s, vx: a.dx * COURSE.push, vz: a.dz * COURSE.push, speed: COURSE.push };
+      s = { ...s, hold: 0, vx: a.dx * COURSE.push, vz: a.dz * COURSE.push, speed: COURSE.push };      // the push start (main.js pushStart) ends the standing hold
       const bot = createBot(p);
       let t = 0, done = false, low = Infinity, rise = 0, atFinish = null, lastRemain = null, fresh = true;
       const limit = 300 + p.length / 3;                       // long flat ski routes (Arlberg woster-bockbachtal: 8.2 km) take time
@@ -244,6 +244,7 @@ for (const rid of rids.length ? rids : ALL) {
           if (ev.type === 'offpiste') resets++;
         }
         t += SKI.dt;
+        if (process.env.R7C_TRACE === p.id && Math.round(t / SKI.dt) % 120 === 0) console.log(`    t ${t.toFixed(0)} s ${Math.round(run.progress)} v ${s.speed.toFixed(1)} hold ${s.hold} crash ${s.crash.toFixed(1)} y ${s.y.toFixed(0)} off ${p.project(s.x, s.z, null, 0, {}).off.toFixed(1)}`);
       }
       hits += course.hits;
       const pr = p.project(s.x, s.z, null, 0, {});
