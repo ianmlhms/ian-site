@@ -177,7 +177,7 @@ for (const rid of rids.length ? rids : ALL) {
       const a = p.at(sA, {});
       const h0 = Math.atan2(a.dz, a.dx) + side * 35 * Math.PI / 180;      // + = towards the right edge
       const x0 = a.x - a.dz * side * (p.halfWidth - 3), z0 = a.z + a.dx * side * (p.halfWidth - 3);
-      let s = { ...createSkierState(x0, z0, h0, height(x0, z0)), vx: Math.cos(h0) * 15, vz: Math.sin(h0) * 15, speed: 15 };
+      let s = { ...createSkierState(x0, z0, h0, height(x0, z0)), hold: 0, vx: Math.cos(h0) * 15, vz: Math.sin(h0) * 15, speed: 15 };
       c.collide(s, s);
       let worst = 0, hitAt = -1;
       for (let k = 0; k < 240; k++) {
