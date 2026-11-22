@@ -1300,3 +1300,17 @@ Zermatt village in the shade) ~(135, 156, 197) -> ~(172, 184, 202); village.js s
   Leisee-Shuttle: the flow now reads the ride on its first seated frame), ski-webkit (the look waits for the ease back: it runs on the
   capped frame clock), ski-look7d, ski-mp-freeride, ski-teleport, ski-spawn, ski-firstperson, ski-avalanche, ski-course, mp-lobby-connect4
   / slf / quick-match / games / color / party / arcade / roulette / blackjack, arcade-pad (these 19 with FLOW_POWER=1).
+- WebKit (the coordinator's launch set, FLOW_POWER=1): ski, ski-freeride, ski-lift, ski-spawn, ski-course, ski-webkit, ski-mp-freeride
+  all PASS. ski needed: the tile streamer stops starting loads on pagehide (resort-data.js stop()) and the flow (WebKit only) drops the
+  "…/pb/ski/data/<rid>/t/x_z.bin due to access control checks" page errors of loads the resort switch cuts (32 in one run; an
+  AbortController made WebKit log more). The other WebKit flows were not run in R8f (launch priority).
+- ground-check Chromium 3 Vallées: green (now with keep=1 + village.buildNear).
+- WebKit contact sheets (full quality, no FLOW_POWER): ~/Library/Caches/ski-work/round8f/final/sheet/sheet-<resort>.jpg (3 x 3 grids
+  of the round8-sheet shots) + sheet-sonnenkopf.jpg. Looked at all six: villages / streets / stations / rides / carve / fp / maps fine
+  in every resort, Sonnenkopf spawn at the Sonnenkopfbahn OK.
+**After launch (not blocking)**: hockey-stop end pose in Arlberg / Sonnenkopf still has one ski pointing at the camera (killy / 3V / Zermatt
+/ Kronplatz look right); Sonnenkopf "street" shot: the camera stands against a house wall (sheet framing or the street pick); Kronplatz has
+no drag shot (no drag lift picked); drag shots without the rider (Zermatt); the remaining WebKit flows (ski-ipad-start, ski-resorts,
+ski-mp, ski-challenges, ski-park, ski-skis, ski-lifts-all, ski-look7d, ski-teleport, ski-firstperson, ski-avalanche, mp-lobby-*); GPU per
+page still ~300-450 MB (ANGLE/Metal; village cells are lazy now, a compact vertex format could save ~35 % more); per-frame garbage
+after all tiles are in (heap climbs ~100 MB before each GC).
