@@ -532,3 +532,74 @@ hooks marked "R7-C" (main.js, map.js, game.js, markers.js, input.js, progress.js
   physics), they can cross houses where a piste runs through a village; the spawn sheets were shot before the last spawn tweak (room
   to the sides, 20-24 m out now); Lawin faces on Kronplatz are gentle (29-33°); the avalanche runs on the 40 m far grid, so the blocks
   float / sink a little over 5 m detail (drawn at the 5 m height); no sound for the avalanche yet.
+
+## Round 7 C2 (22 Nov 2026): R7-C leftovers (challenge course, avalanches)
+Fresh agent on C's branch (worktree-agent-a7bc9c6f4f82d4fc6 @ 83c59ce9, fast-forwarded). Every fix has a check over all five resorts in
+`node scripts/ski/round7c-check.mjs [rid] [--rides]` (Node, no browser) and in-page checks in `scripts/ski/round7c2-shots.mjs` (shots).
+- **Start gates** (`clear.js courseGate`): the gate may also stand BESIDE the line (lateral offset up to the piste edge, middle first)
+  where a station hall or a lift line takes the middle, and searches further down (`COURSE.gateSearch` 160 m, short pistes keep >= 45 m
+  of course); the resort-box edge margin is 8 m for gates (Zermatt libera lies within 50 m of the box). `courseGate` returns
+  `{ s, lat, ok, why }`; main.js `gateAt(p)` (cached) feeds `startRun` (skier placed `lat` m right of the line), the START arch and
+  `markers.regate` / `markerList` (accept `s` or `{ s, lat }`). Result: gates on open snow killy 235/235, 3vallees 480/480, zermatt 209/209, arlberg 356/356, kronplatz 71/71 (1351/1351; 122 moved down, 260 beside the line).
+- **Unfinishable courses** were NOT flat ends: their OSM-chained lines loop back within a few metres of themselves (Zermatt rotenboden
+  s 70 / 195, cieloalto-cervinia, Arlberg madloch-zug, riffel, waldabfahrt; 14 such lines in all), and the windowed projection snapped
+  the skier ~110 m back along the line -> the bot rode the loop forever. `pistes.js project(…, hint)` now pays 0.08 m per m of jump
+  beyond 25 m from the hint (no hint = unchanged nearest point). Woster-bockbachtal (8.2 km ski route) only needed more time in the check
+  (300 s + length / 3). Result: all 1351 courses finished by the scripted skier (235 / 480 / 209 / 356 / 71), 0 silent resets.
+- **Finish** (`course.js courseSeats` + view): ONE ZIL arch (round 1's props.js arch at the line's very end is no longer drawn in a timed
+  run, `createRunProps({ start, finish })`; its START arch stands at the gate now). Two pillars stand on their own snow, the beam is
+  level on top (`COURSE.archHeight` 6 m over the higher pillar's snow: upright on a cross slope), the checkered finish line is a strip
+  whose vertices lie on the snow every ~1.5 m across the piste (no flat plane sinking into a cross slope).
+- **Barriers**: the 6 m rigid panels (floated over dips, sank into bumps by up to 1 m at the 10 m line's kinks) are now one net RIBBON
+  mesh per course (both sides, 0.5 m vertices on the snow, corner fill on the outside of kinks, an orange net texture with a white top
+  edge) on thin posts every 3 m (instanced, the old `ski-course-barriers` name). Left open: the inside of bends tighter than the offset,
+  houses and station halls (`courseLayout(piste, s, pistes, obs)`). Soft collision: `createCourse().collide(prev, state)` (main.js after
+  every physics step of a timed run): crossing a net from the inside -> put back 5 cm inside it, the velocity turned along the net (down
+  the course when hit square on), speed x (0.93 - 0.2 x share into the net), a small bounce back in, skis turned along it; a jump with
+  air > 0.25 s clears it; put down elsewhere since the last step (place / teleport / respawn: `prev` differs from the last
+  state collide() returned) or already outside = no wall, he may ski back in; no wall where the net is left open at a tight bend.
+  The contact pushes back by the overshoot only (no snapping to the line point: at a 10 m line corner that pinned Arlberg
+  valluga-pazieltal 14 000 times). Config `COURSE.barrierBody/Slow/Bounce`. bot.js re-finds the line after a teleport (> 60 m off).
+- **HUD distance**: the round-7C "4.8 km at the start AND at the arch" was the shot script: it only moved the CAMERA to the arch, the
+  skier stayed at the start. Still made robust: the course tracker re-projects on the whole line when it is > halfwidth + 40 m off, the
+  shown distance only falls (`rebase()` after a respawn), `distanceText()` is shared by the HUD and the check. Checked on every
+  scripted ride (Node) and in the `ski-course` flow (sampled along the ride, < 30 m at the arch).
+- **The red cube** near the ZIL arch (Zermatt course-finish shot): NOT a course object. Probe (scene traverse round the camera): it is a
+  `ski-lifts` instance, colour c8372e, 2.7 x 2.2 x 2.7 m, 10 m above the camera = a red GONDOLA CABIN of the lift crossing the finish,
+  drawn as a plain box (R7-B's carriers / cabins-on-the-cable work replaces those). Check added anyway: every course object on the snow
+  (<= 0.3 m gap; net ribbon edge vs snow <= 0.25 m over / 0.28 m into the snow between two vertices), nothing > 6 m above it, nothing bigger than meant (Node: `courseSeats`; page:
+  bounding boxes of every `ski-course-*` mesh / instance against `surface.height`).
+- **Avalanche camera** (the round-7C shot stood 40 m over the snow against a rock face): `avalanche.js faceView(face, height)` picks a
+  spot in front of the face and to the side (24 directions x 200-560 m x 25-100 m up) with a clear line to the crown, the middle and the
+  runout (`lineClear`), the snow within 25 m of the lens >= 0.6 m below it, and preferably an open foreground (a margin widening away
+  from the lens: no slope filling the picture); `__ski.avalancheView(i)`; `__ski.setCamera` now uses the drawn snow (`surface`) and
+  never goes below 0.6 m. Checked for every face (Node: 15/15 clear, all open foreground), in the `ski-avalanche` flow and in the shots
+  (the chase camera after a teleport: 2.3-2.5 m up, clear line to the skier). R7-A's look.js was not merged.
+- **Lawin faces**: all three faces of every resort start >= 35° now (`findFaces` passes: long open faces >= 35°, then shorter open faces
+  between the trees >= 35° (Kronplatz), only then a `gentle` fallback no resort uses; no face below the lowest piste end; the challenge's
+  own slab (seed 7001 + i) must run >= 80 m and stop). Faces now: Killy 38° / 37° / 37°, 3 Vallées 39° / 37° / 40°, Zermatt 42° / 36° / 48°, Arlberg 48° / 44° / 37°, Kronplatz 36° / 35° / 37° (was 33 / 32 / 29°; Kronplatz's are shorter: 660 / 390 / 195 m). Saved Lawin bits (`progress.lawin`, cloud `w`) refer to face indices:
+  Killy's and Kronplatz's faces changed (pre-launch, fine).
+- **Powder**: the skier's powder cloud now starts at 0.8 m/s with ~28 puffs / s at walking speed (was ~8 from 1.5 m/s), bigger puffs; the
+  avalanche cloud keeps >= 35 % density while a block moves (it vanished on slow blocks).
+- **Avalanche sound** (`audio.js`, all procedural, through the master gain = off with the game's / arcade's mute): a deep rumble (pink
+  noise at quarter speed, two lowpasses + a 36 Hz sub wobbling) driven by `avalanches.loudness(camera)` (share of the slab still moving x
+  distance), and a release crack + whump (`audio.event('avalanche', { near })`). `audio.rumble` reads the level (flows).
+- **WebKit tint**: on THIS branch WebKit (Playwright) and Chromium GPU render the same picture: per-channel means / std of every pair
+  of shots agree within 1/255 (round7c and round7c2). So the "blue, low contrast" look is NOT WebKit-only here: both engines show the
+  same strongly blue snow in shade / morning light. R7-A's post / shader fix is not on this branch; integration should compare
+  against R7-A's sheet (round7/sheet-a-fixes-webkit.jpg) and re-shoot with `scripts/ski/round7c2-shots.sh` after the merge.
+- **Checks** (22 Nov): `node scripts/ski/round7c-check.mjs --rides`: 100 passed, 0 failed (all five: gates 1351/1351, rides 1351/1351, HUD
+  < 30 m at every ZIL, 0 silent resets, barriers held 533/533 aimed hits (0 through, 0 stopped), 57/57 put down outside stay outside,
+  every course object on the snow and <= 6 m, no net through a house, Lawin faces >= 35° with clear camera spots 15/15). In-page
+  (`round7c2-shots.mjs`, Chromium GPU + WebKit, all five): 0 bad course objects (worst float 0.06 m), HUD start -> middle -> arch e.g.
+  Zermatt "4.8 km" -> "2.4 km" -> "26 m", avalanche camera 25-100 m up with a clear line, rumble 0.5-0.7 while the slab flows, chase
+  camera after a teleport 2.3-2.5 m up with a clear line. Flows: `ski-avalanche` green in Chromium AND WebKit; `ski-course` green in Chromium AND WebKit (5 resorts, the HUD sampled along each scripted ride: e.g. Kronplatz sylvester "4.1 km" -> "4 m" at the arch, never rising). A first WebKit run under load 74 timed out in the countdown; re-run at load < 30 green.
+- **Shots**: `~/Library/Caches/ski-work/round7c2/` (`gpu/`, `webkit/`, `sheet-<resort>.jpg` = course start / mid / finish / avalanche,
+  Chromium GPU DPR 2 left + WebKit right). Script: `scripts/ski/round7c2-shots.mjs` (prints `R7C2 {json}` with the in-page checks).
+- **Still open**: the red gondola cabin over the Zermatt finish is still a plain box (R7-B's carriers); on a strong cross slope the LOWER
+  ZIL pillar stands up to ~10 m (Kronplatz gassl-variante: 3.8 m across the piste; the beam is level and <= 6 m over the higher side);
+  where the net is left open at a house the soft wall is still there (open only at tight bends), the house itself stops him anyway;
+  a square-on barrier hit keeps >= 59 % of the speed (worst case of the check, 35° hits keep ~80 %); Kronplatz's steep open faces are
+  short between the trees (195-660 m); the avalanche still flows on the 40 m far grid; the shots' avalanche frames show the free-ride
+  "Astegen" button (the skier waits at the first lift, far from the slab); snow reads blue in shade in BOTH engines (see WebKit above);
+  first-person gloves are still plain boxes (not in this round).
