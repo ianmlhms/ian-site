@@ -28,7 +28,7 @@ default setup was **killed by the guard** (2583 MB at train-sim-touch); `FLOW_PO
 1. **Video recording is the biggest CPU cost.** Turning it off cuts 3D flows by 58–63 % of CPU seconds (ski 98.7 → 36.1 s).
    It also stops ~1.2 GB of webm syncing into OneDrive.
 2. **The headless shell with Metal flags** (`--use-angle=metal --enable-gpu --ignore-gpu-blocklist`) passes every 3D flow
-   I tried, at 20–40 % less memory than Chrome for Testing. Without the flags it falls back to SwiftShader: 3D flows then
+   I tried that passes in Chrome for Testing, at 20–40 % less memory than Chrome for Testing. Without the flags it falls back to SwiftShader: 3D flows then
    fail and burn 5–12× the CPU. That fallback is why `lib.mjs` currently says "the shell stalls".
 3. **No leak when switching resort**, but the old resort's garbage is collected late. One page visiting several resorts
    piles up 2.6–3.5 GB, and **the guard kills `ski-spawn`, `ski-lifts-all` and `train-sim-routes` today**. A new
