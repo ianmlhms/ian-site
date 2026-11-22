@@ -95,7 +95,7 @@ export function createTileStreamer({ resort, field, root }) {
       best.state = 'load';
       active++;
       fetchBytes(`${root}t/${best.tx}_${best.tz}.bin`).then((bytes) => {
-        const grid = decodeGrid(bytes);
+        const grid = decodeGrid(bytes, 0, true);                         // R8f: 16-bit heights (half the memory, same numbers)
         if (grid.nx !== DATA.tileCells + 1 || grid.nz !== DATA.tileCells + 1) throw new Error(`tile ${best.tx}_${best.tz}: ${grid.nx}x${grid.nz}`);
         const rect = field.addTile(best.tx, best.tz, grid);
         best.state = 'done';

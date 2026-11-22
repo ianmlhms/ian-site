@@ -22,6 +22,7 @@
  *           Niddreg beyond a short radius). A street of chalets is ~40 triangles per house from afar instead of ~200. */
 import { SHADOW_GLSL } from './shadows.js';
 import { FOG_GLSL } from './snow-shader.js';
+import { gpuOnly } from './gpu-mem.js';
 
 const THREE = window.THREE;
 const CELL = 1280;
@@ -43,24 +44,41 @@ const SMALL_AREA = 150;              // m2: a small house (3 storeys at most in 
 const h1 = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
 
 /* ---------------- geometry writer ---------------- */
+// R8f (memory): the vertices go straight into growing Float32Arrays (the plain JS number arrays of before took 8 bytes a number plus
+// their growth slack: ~400 MB at the peak of Kronplatz's build); finish() hands out exact-length copies for the mesh
+const QUAD_ORDER = [0, 1, 2, 0, 2, 3], TRI_ORDER = [0, 1, 2];
 function writer() {
-  const pos = [], nrm = [], uv = [], info = [];
+  let cap = 0, n = 0;
+  let pos = null, nrm = null, uv = null, info = null;
   let style = 0, eave = 0, seed = 0;
+  const grow = (need) => {
+    let c = Math.max(1024, cap * 2);
+    while (c < need) c *= 2;
+    const more = (old, k) => { const a = new Float32Array(c * k); if (old) a.set(old.subarray(0, n * k)); return a; };
+    pos = more(pos, 3); nrm = more(nrm, 3); uv = more(uv, 2); info = more(info, 4);
+    cap = c;
+  };
+  const put = (p, nv, t, part) => {
+    if (n >= cap) grow(n + 1);
+    pos[n * 3] = p[0]; pos[n * 3 + 1] = p[1]; pos[n * 3 + 2] = p[2];
+    nrm[n * 3] = nv[0]; nrm[n * 3 + 1] = nv[1]; nrm[n * 3 + 2] = nv[2];
+    uv[n * 2] = t[0]; uv[n * 2 + 1] = t[1];
+    info[n * 4] = style; info[n * 4 + 1] = eave; info[n * 4 + 2] = seed; info[n * 4 + 3] = part;
+    n++;
+  };
   return {
-    pos, nrm, uv, info,
+    get count() { return n; },
+    /** { pos, nrm, uv, info }: exact-length Float32Arrays of everything written (the writer can be dropped afterwards) */
+    finish() { return { pos: pos.slice(0, n * 3), nrm: nrm.slice(0, n * 3), uv: uv.slice(0, n * 2), info: info.slice(0, n * 4) }; },
     set(st, ev, sd) { style = st; eave = ev; seed = sd; },
     /** quad a b c d (counter-clockwise from the front), normal n, uvs [[u, v] x 4], part */
-    quad(a, b, c, d, n, uvs, part) {
-      for (const k of [0, 1, 2, 0, 2, 3]) {
-        const p = [a, b, c, d][k];
-        pos.push(p[0], p[1], p[2]); nrm.push(n[0], n[1], n[2]); uv.push(uvs[k][0], uvs[k][1]); info.push(style, eave, seed, part);
-      }
+    quad(a, b, c, d, nv, uvs, part) {
+      const q = [a, b, c, d];
+      for (const k of QUAD_ORDER) put(q[k], nv, uvs[k], part);
     },
-    tri(a, b, c, n, uvs, part) {
-      for (const k of [0, 1, 2]) {
-        const p = [a, b, c][k];
-        pos.push(p[0], p[1], p[2]); nrm.push(n[0], n[1], n[2]); uv.push(uvs[k][0], uvs[k][1]); info.push(style, eave, seed, part);
-      }
+    tri(a, b, c, nv, uvs, part) {
+      const q = [a, b, c];
+      for (const k of TRI_ORDER) put(q[k], nv, uvs[k], part);
     },
   };
 }
@@ -490,13 +508,15 @@ function material(env, cheap) {
   });
 }
 
-function toMesh(cell, mat) {
+function toMesh(w, mat) {
+  const { pos, nrm, uv, info } = w.finish();
   const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(cell.pos, 3));
-  g.setAttribute('normal', new THREE.Float32BufferAttribute(cell.nrm, 3));
-  g.setAttribute('aUv', new THREE.Float32BufferAttribute(cell.uv, 2));
-  g.setAttribute('aInfo', new THREE.Float32BufferAttribute(cell.info, 4));
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+  g.setAttribute('aUv', new THREE.BufferAttribute(uv, 2));
+  g.setAttribute('aInfo', new THREE.BufferAttribute(info, 4));
   g.computeBoundingSphere();
+  gpuOnly(g);                                                            // R8f: drawn only, the JS copy goes after the upload
   const m = new THREE.Mesh(g, mat);
   m.castShadow = true;
   return m;
@@ -529,45 +549,53 @@ export function seatRows(rows, height) {
 export function createVillage({ scene, rows, env, height, level = 'medium', resort = '' }) {
   HEIGHT = height || null;
   const alpine = ALPINE_RESORTS.has(resort);
-  const cells = new Map(), details = new Map();
+  // R8f (memory): one base cell at a time (its rows, its detail cells: a DCELL cell lies inside one CELL cell), its writers dropped
+  // once its meshes are made, so the build never holds more than one cell's vertices besides the finished meshes
+  const byCell = new Map();
   rows.forEach((row0, i) => {
     const row = tameRow(row0, alpine);
-    const ci = Math.floor(row[0] / CELL), cj = Math.floor(row[1] / CELL), k = ci + ',' + cj;
-    let cell = cells.get(k);
-    if (!cell) cells.set(k, (cell = { w: writer(), cx: (ci + 0.5) * CELL, cz: (cj + 0.5) * CELL }));
-    const di = Math.floor(row[0] / DCELL), dj = Math.floor(row[1] / DCELL), dk = di + ',' + dj;
-    let det = details.get(dk);
-    if (!det) details.set(dk, (det = { w: writer(), x0: di * DCELL, z0: dj * DCELL }));
-    const seed = (i * 0.618034) % 1;
-    const style = styleOf(row, seed, alpine);
-    let downhill = null;
-    if (height && (row[8] === 1 || row[8] === 4)) {
-      const d = 25, gx = height(row[0] + d, row[1]) - height(row[0] - d, row[1]), gz = height(row[0], row[1] + d) - height(row[0], row[1] - d);
-      const l = Math.hypot(gx, gz);
-      if (l > 2) downhill = [-gx / l, -gz / l];       // only on a real slope
-    }
-    cell.w.set(style, row[5], seed);
-    det.w.set(style, row[5], seed);
-    if (row[8] === 5) tower(cell.w, row);
-    else if (row[8] === 1 || row[8] === 4) block(cell.w, row, seed, det.w, style, downhill);
-    else chalet(cell.w, row, seed, det.w, style);
+    const k = Math.floor(row[0] / CELL) + ',' + Math.floor(row[1] / CELL);
+    let l = byCell.get(k);
+    if (!l) byCell.set(k, (l = []));
+    l.push([row, i]);
   });
   let mat = material(env, level === 'low');
   const group = new THREE.Group();
   group.name = 'ski-village';
   const list = [], detailList = [];
-  for (const cell of cells.values()) {
-    const base = toMesh(cell.w, mat);
-    group.add(base);
-    list.push({ base, cx: cell.cx, cz: cell.cz });
+  for (const [k, items] of byCell) {
+    const [ci, cj] = k.split(',').map(Number);
+    const cw = writer();
+    const details = new Map();
+    for (const [row, i] of items) {
+      const di = Math.floor(row[0] / DCELL), dj = Math.floor(row[1] / DCELL), dk = di + ',' + dj;
+      let det = details.get(dk);
+      if (!det) details.set(dk, (det = { w: writer(), x0: di * DCELL, z0: dj * DCELL }));
+      const seed = (i * 0.618034) % 1;
+      const style = styleOf(row, seed, alpine);
+      let downhill = null;
+      if (height && (row[8] === 1 || row[8] === 4)) {
+        const d = 25, gx = height(row[0] + d, row[1]) - height(row[0] - d, row[1]), gz = height(row[0], row[1] + d) - height(row[0], row[1] - d);
+        const l = Math.hypot(gx, gz);
+        if (l > 2) downhill = [-gx / l, -gz / l];       // only on a real slope
+      }
+      cw.set(style, row[5], seed);
+      det.w.set(style, row[5], seed);
+      if (row[8] === 5) tower(cw, row);
+      else if (row[8] === 1 || row[8] === 4) block(cw, row, seed, det.w, style, downhill);
+      else chalet(cw, row, seed, det.w, style);
+    }
+    if (cw.count) list.push({ base: toMesh(cw, mat), cx: (ci + 0.5) * CELL, cz: (cj + 0.5) * CELL });
+    for (const det of details.values()) {
+      if (!det.w.count) continue;
+      const m = toMesh(det.w, mat);
+      m.castShadow = false;                                                // small parts: the base casts the house's shadow
+      detailList.push({ m, x0: det.x0, z0: det.z0 });
+    }
   }
-  for (const det of details.values()) {
-    if (!det.w.pos.length) continue;
-    const m = toMesh(det.w, mat);
-    m.castShadow = false;                                                // small parts: the base casts the house's shadow
-    group.add(m);
-    detailList.push({ m, x0: det.x0, z0: det.z0 });
-  }
+  byCell.clear();                     // (the forEach closure above keeps this function's context alive with update() / setLevel())
+  for (const c of list) group.add(c.base);
+  for (const c of detailList) group.add(c.m);
   scene.add(group);
   let detailR = DETAIL_RADIUS[level] || DETAIL_RADIUS.medium;
   const tris = (m) => m.geometry.attributes.position.count / 3;

@@ -42,7 +42,7 @@ try {
       const errors = [];
       page.on("pageerror", (e) => errors.push(String(e).slice(0, 300)));
       page.on("console", (m) => { if (m.type() === "error") errors.push(m.text().slice(0, 300)); });
-      await page.goto(`${origin}/pb/ski.html?go=1&debug=1&q=low&res=fixed&weather=sun&time=midday&resort=${rid}`, { waitUntil: "domcontentloaded" });
+      await page.goto(`${origin}/pb/ski.html?go=1&debug=1&keep=1&q=low&res=fixed&weather=sun&time=midday&resort=${rid}`, { waitUntil: "domcontentloaded" });
       await page.waitForFunction("document.documentElement.dataset.skiRunning === '1' || !!document.documentElement.dataset.bootError", null, { timeout: 240000 });
       await page.waitForTimeout(2500);
       const spawn = await page.evaluate(() => { const S = window.__ski, s = S.state; return { above: s.y - S.standHeight(s.x, s.z), clear: S.skierClear }; });      // R8b: snow or station deck

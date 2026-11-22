@@ -11,7 +11,8 @@
  * Playwright is not a repo dependency: it is looked up in $PLAYWRIGHT_DIR, then
  * as a normal "playwright" import, then in the global playwright-cli install.
  * Video dir: $FLOW_VIDEO_DIR, else the overnight videos folder (when it exists),
- * else a temp folder. */
+ * else a temp folder. FLOW_NO_VIDEO=1 records no video (the encoder costs ~60 %
+ * of the CPU of a 3D flow; test machines under load). */
 import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
@@ -345,6 +346,7 @@ export async function mockRealtime(context, options = {}) {
 
 /* ---------- flow runner ---------- */
 const failuresOf = (h) => h.failures;
+const NO_VIDEO = process.env.FLOW_NO_VIDEO === "1";
 
 /* flow = { name, touch?: boolean, serviceWorkers?: "allow" (default "block": most flows must not see the worker), run: async (h) => void }
  * h = { page, context, origin, backend, expect, eq, step, pause, shot, signIn, goto } */
@@ -353,14 +355,14 @@ export async function runFlow(flow, { browser, origin, shotsDir = process.env.FL
   const own = ownBrowser ? await Promise.all([launchBrowser({ fullChromium: !!flow.fullChromium, args: flow.chromiumArgs || [] }), startServer()]) : null;
   const theBrowser = own ? own[0] : browser;
   const theOrigin = own ? own[1].origin : origin;
-  const tmpVideos = fs.mkdtempSync(path.join(os.tmpdir(), "flow-video-"));
+  const tmpVideos = NO_VIDEO ? null : fs.mkdtempSync(path.join(os.tmpdir(), "flow-video-"));
   const viewport = flow.viewport || VIEWPORT;          // a flow may ask for another size (a game in landscape)
   const context = await theBrowser.newContext({
     viewport, screenSize: viewport, deviceScaleFactor: flow.deviceScaleFactor || 1, serviceWorkers: flow.serviceWorkers || "block",
     hasTouch: !!flow.touch, isMobile: !!flow.touch,
     ...(flow.permissions ? { permissions: flow.permissions } : {}),
     ...(process.env.FLOW_COLOR_SCHEME ? { colorScheme: process.env.FLOW_COLOR_SCHEME } : {}),   // FLOW_COLOR_SCHEME=dark emulates prefers-color-scheme
-    recordVideo: { dir: tmpVideos, size: viewport },
+    ...(NO_VIDEO ? {} : { recordVideo: { dir: tmpVideos, size: viewport } }),
   });
   const base = flow.backend || {};
   const backend = createBackend({
@@ -442,16 +444,18 @@ export async function runFlow(flow, { browser, origin, shotsDir = process.env.FL
     try { await h.shot("aborted"); } catch { /* page may be gone */ }
   }
   await h.pause(800);
-  const video = page.video();
+  const video = NO_VIDEO ? null : page.video();
   await context.close();
   let videoPath = null;
-  try {
-    const target = path.join(videoDir(), `${flow.name}.webm`);
-    fs.mkdirSync(path.dirname(target), { recursive: true });
-    await video.saveAs(target);
-    videoPath = target;
-  } catch (error) { console.log(`    (video not saved: ${error.message})`); }
-  fs.rmSync(tmpVideos, { recursive: true, force: true });
+  if (video) {
+    try {
+      const target = path.join(videoDir(), `${flow.name}.webm`);
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      await video.saveAs(target);
+      videoPath = target;
+    } catch (error) { console.log(`    (video not saved: ${error.message})`); }
+    fs.rmSync(tmpVideos, { recursive: true, force: true });
+  }
   if (ownBrowser) { await theBrowser.close(); own[1].server.close(); }
   const ok = failuresOf(h).length === 0;
   console.log(`${ok ? "✔ PASS" : "✘ FAIL"} ${flow.name}${videoPath ? `  → ${videoPath}` : ""}`);

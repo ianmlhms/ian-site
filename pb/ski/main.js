@@ -8,6 +8,7 @@
  * The page is also loaded as a srcdoc iframe by the arcade: every URL is absolute or built from import.meta.url. */
 import { QUALITY, FRAME_BUDGET_MS, SKI, MODES, CAMERA, LATTICE, DATA, COURSE } from './config.js';
 import { loadResortCore, createTileStreamer, loadExtras, RESORTS } from './resort-data.js';
+import { released as gpuReleased, uploadNow, textureGpuOnly } from './gpu-mem.js';
 import { createField, createPisteNet } from './field.js';
 import { createSurface } from './surface.js';
 import { setRoot } from './quadtree.js';
@@ -119,7 +120,7 @@ async function boot() {
   resize();
   // R8b (3V QA: WebKit lost the context once, then a TypeError in three's getShaderInfoLog(...).trim() every frame): while lost nothing
   // is drawn or compiled; restored within 2.5 s -> carry on (three re-uploads), else a card "Neu lueden" (a reload keeps the save)
-  let glLost = false, glCard = null;
+  let glLost = false, glCard = null, leaving = false;           // leaving: R8f pagehide below
   canvas.addEventListener('webglcontextlost', (e) => {
     e.preventDefault();
     glLost = true;
@@ -134,11 +135,22 @@ async function boot() {
     }, 2500);
   });
   canvas.addEventListener('webglcontextrestored', () => {
+    // R8f: drawn-only geometry (gpu-mem.js) has no JS copy left to upload again: load the page again (the save is kept)
+    if (gpuReleased() && !leaving) { try { if (typeof modes !== 'undefined' && modes.cloud) modes.cloud.flush(); } catch (error) { console.warn('[ski] save before reload failed', error); } location.reload(); return; }
     glLost = false;
     document.documentElement.dataset.skiGlLost = '';
     if (glCard) { glCard.remove(); glCard = null; }
     console.warn('[ski] WebGL context restored');
   });
+  // R8f (memory: a resort switch = a new page life): when the page goes away (switchResort's location.replace, a reload, the arcade
+  // closing the frame) its GPU memory is given back at once (three's programs / buffers / targets, then the context itself) instead of
+  // whenever the old document is collected; a page restored from the back-forward cache has no context left: it loads again.
+  window.addEventListener('pagehide', () => {
+    if (leaving) return;
+    leaving = true;
+    try { scene.traverse((o) => { if (o.geometry && o.geometry.dispose) o.geometry.dispose(); }); renderer.renderLists.dispose(); renderer.dispose(); renderer.forceContextLoss(); } catch (error) { console.warn('[ski] GPU release on leave failed', error); }
+  });
+  window.addEventListener('pageshow', (e) => { if (e.persisted && leaving) location.reload(); });
 
   const noise = createNoiseTexture();
   const maxAniso = renderer.capabilities.getMaxAnisotropy();
@@ -176,7 +188,7 @@ async function boot() {
     const farRect = [-m - st / 2, -m - st / 2, resort.far.nx * st, resort.far.nz * st];      // the far grid's rectangle (pixel edges)
     env.u.uShadowRect.value.set(...farRect);
     if (resort.shadows) env.setShadows((time) => core.root + resort.shadows.file.replace('{time}', time), farRect);
-    env.setFarNormals(createFarNormalTexture(core.far, st));               // round 5: the far mountains are lit per pixel from the 40 m grid
+    env.setFarNormals(textureGpuOnly(createFarNormalTexture(core.far, st)));             // round 5: the far mountains are lit per pixel from the 40 m grid
     mark('far normals');
   }
   const net = createPisteNet(resort.network);
@@ -194,7 +206,7 @@ async function boot() {
     const px = new Uint8Array(nx * nz);
     for (let i = 0; i < px.length; i++) px[i] = data[i] & b.forest ? 255 : data[i] & b.scrub ? 150 : 0;
     const t = new THREE.DataTexture(px, nx, nz, THREE.RedFormat);
-    t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true; t.needsUpdate = true;
+    t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true; t.needsUpdate = true; textureGpuOnly(t);   // R8f
     return { texture: t, width: nx * resort.classes.step, depth: nz * resort.classes.step };
   })();
   let snowMat = createSnowMaterial(env, { cheap: quality.cheapSnow, treeRadius: quality.treeRadius, forest: forestTex, lodScale: quality.lodScale });
@@ -287,6 +299,7 @@ async function boot() {
     if (lifts && ride) { liftsEarly = true; return lifts; }                 // riding: rebuilt when the ride ends
     if (lifts) lifts.dispose();
     lifts = createLifts({ scene, resort, height: (x, z) => field.height(x, z) });
+    uploadNow(renderer, lifts.group, camera);                            // R8f: the merged stations / pylons on the GPU, JS copies gone
     if (game.freeLift && modes.liftAt === game.freeLift && game.phase !== 'lift') lifts.dockShuttle(game.freeLift.index);      // R8e: the spawn
     liftsEarly = !streamer.done();
     try { stationGrid = stationCells(lifts); } catch (error) { console.warn('[ski] station grid failed', error); }
@@ -298,7 +311,7 @@ async function boot() {
   // the village streets are draped on the 5 m ground: built once the extras and every height tile are in
   const tryRoads = () => {
     if (roads || !roadRows || !streamer.done()) return;
-    try { roads = createRoads({ scene, roads: roadRows, env, level, height: (x, z) => surface.height(x, z) }); mark('roads'); } catch (error) { console.warn('[ski] streets failed', error); roads = { update() {} }; }
+    try { roads = createRoads({ scene, roads: roadRows, env, level, height: (x, z) => surface.height(x, z) }); uploadNow(renderer, roads.group, camera); mark('roads'); } catch (error) { console.warn('[ski] streets failed', error); roads = { update() {} }; }
   };
 
   // streamed height tiles change the heights under them: drop every cache that read them
@@ -351,6 +364,7 @@ async function boot() {
     // the houses that are drawn (R7-B leaves out the ones in stations / lift paths): camera guard + skier collision (R8)
     try { boxIndex = createBoxIndex(buildingBoxes(drawn)); } catch (error) { console.warn('[ski] building index failed', error); }
     village = createVillage({ scene, rows: drawn, env, height: (x, z) => field.baseHeight(x, z), level, resort: rid }); mark('village');      // R8c: resort = Alpine villages
+    uploadNow(renderer, village.group, camera);                          // R8f: every cell on the GPU now, its JS copy goes (gpu-mem.js)
     // R7-C: gates / teleport spots clear of the drawn houses (B's stations replace the dropped OSM station buildings)
     if (explore) { explore.setBuildings(drawn); gateS.clear(); finishS.clear(); if (markers) markers.regate(gateAt); }
     tryRoads();

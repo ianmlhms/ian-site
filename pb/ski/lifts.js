@@ -14,6 +14,7 @@ import { createLiftPath } from './lift-path.js';
 import { createLiftWorld, frames } from './lift-site.js';
 import { carrierGeometry, GLASS } from './modes/carriers.js';
 import { mergeParts } from './modes/views.js';
+import { gpuOnly } from './gpu-mem.js';
 
 const FINE = Object.freeze({ size: 2.1, cell: 1250, share: 0.25, max: 700 });     // R8d: small station parts within share x liftRadius (<= max m)
 const TRACK_R = 900;                   // R8d: m to a drag track cell's box within which its worn tracks are drawn (a 1.25 m strip)
@@ -245,7 +246,7 @@ export function createLifts({ scene, resort, height }) {
     }
     for (const [k, list] of byCell) {
       const [i, j] = k.split(',').map(Number);
-      const geo = mergeParts(list);
+      const geo = gpuOnly(mergeParts(list));                         // R8f: drawn only (ground-check: keep=1)
       const st = new THREE.Mesh(geo, vmat);
       st.castShadow = true; st.receiveShadow = true; st.name = chunks.length ? 'ski-lift-stations-' + k : 'ski-lift-stations';
       group.add(st);
@@ -264,7 +265,7 @@ export function createLifts({ scene, resort, height }) {
     }
     for (const [k, list] of byCell) {
       const [i, j] = k.split(',').map(Number);
-      const geo = mergeParts(list);
+      const geo = gpuOnly(mergeParts(list));                         // R8f: drawn only (ground-check: keep=1)
       const m = new THREE.Mesh(geo, vmat);
       m.castShadow = true; m.receiveShadow = true; m.name = 'ski-lift-fine-' + k; m.visible = false;
       group.add(m);
@@ -323,6 +324,9 @@ export function createLifts({ scene, resort, height }) {
   cables.frustumCulled = false;
   group.add(cables);
   disposables.push(cg, cableMat);
+  // R8f (memory): the source parts (thousands of BoxGeometry / CylinderGeometry, ribbons, rope points) are merged now; the closures
+  // below keep this function's context alive for the page's life, so the lists are emptied (else every part stays in memory)
+  parts.length = 0; fine.length = 0; trackParts.length = 0; beltParts.length = 0; tunnelParts.length = 0; tunnelLamps.length = 0; cablePts.length = 0;
 
   // ---------------- carriers: instanced pools per model (near + far detail) ----------------
   const pools = new Map();               // key -> { near, far, glass, count }

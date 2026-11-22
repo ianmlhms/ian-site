@@ -127,6 +127,10 @@ export function createSnowMaterial(env, { cheap = false, treeRadius = 400, fores
         //    soft, light blue-grey. Lift it a little and take most of the saturation out (blue / red ~1.25 instead of ~2), hue kept.
         float shadeL2 = dot(shadeC, vec3(0.3, 0.59, 0.11));
         shadeC = mix(shadeC, shadeL2 * vec3(0.92, 0.985, 1.1) * 1.1, 0.66 * (1.0 - 0.5 * uOvercast));
+        // R8f (Ian: evening shade still a fairly dark blue-grey): under the low evening sun the shade takes midday's soft blue-grey, hue
+        //     (blue / red ~1.38) and brightness (midday shade luminance ~0.64 vs evening ~0.59 before), so it reads as light shade
+        float shadeL3 = dot(shadeC, vec3(0.3, 0.59, 0.11));
+        shadeC = mix(shadeC, shadeL3 * vec3(0.894, 1.011, 1.23) * 1.1, evK);
         float top = max(shadeC.r, max(shadeC.g, shadeC.b));
         shadeC *= mix(1.0, 0.97 / top, smoothstep(0.9, 1.15, top));              // bright overcast light: a soft shoulder, hue kept, no cyan clip
         vec3 litC = max(shadeC * 1.02, shadeC * vec3(0.3, 0.28, 0.24) + uSunColor * vec3(0.775, 0.79, 0.815));   // a weak sun (fog, cloud) never makes the lit side darker than the shade

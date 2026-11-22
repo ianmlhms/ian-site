@@ -6,6 +6,7 @@ OUT=${1:-$HOME/Library/Caches/ski-work/round8d}
 STEPS=${2:-"calls village ground pose flows-chromium flows-webkit sheets sonnenkopf"}
 SLOT="python3 $HOME/Library/Caches/browser-slot.py"
 export BROWSER_POOL=ski
+export FLOW_NO_VIDEO=${FLOW_NO_VIDEO:-1}       # R8f: no flow video (the encoder costs ~60 % CPU of a 3D flow)
 mkdir -p "$OUT"
 for s in $STEPS; do
   case $s in

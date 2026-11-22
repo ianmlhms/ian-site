@@ -6,8 +6,9 @@ const HEADER_BYTES = 18;
 const BLOCK_SIDE = 8;
 const WIDTH_BITS = 4;
 
-/** Decodes one MBG1 grid. Returns { nx, nz, step, h0, data: Float32Array (row-major, z rows) }. Throws a descriptive Error on a corrupt file. */
-export function decodeGrid(bytes, offset = 0) {
+/** Decodes one MBG1 grid. Returns { nx, nz, step, h0, data: Float32Array (row-major, z rows) }; quantised (R8f): { nx, nz, step, h0, u:
+ *  Uint16Array, qmin } when the grid spans <= 65535 steps. Throws a descriptive Error on a corrupt file. */
+export function decodeGrid(bytes, offset = 0, quantised = false) {
   const view = new DataView(bytes.buffer, bytes.byteOffset + offset, bytes.byteLength - offset);
   const magic = String.fromCharCode(view.getUint8(0), view.getUint8(1), view.getUint8(2), view.getUint8(3));
   if (magic !== MAGIC) throw new Error(`terrain grid: bad magic "${magic}" at offset ${offset}`);
@@ -49,6 +50,17 @@ export function decodeGrid(bytes, offset = 0) {
           q[y * nx + x] = p + r;
         }
       }
+    }
+  }
+  if (quantised) {
+    // R8f (memory): the heights as 16-bit steps over the grid's lowest one (half the bytes of the Float32 heights, lossless: a height
+    // is Math.fround(h0 + (u + qmin) * step), the very same number as data[i] below)
+    let qmin = Infinity, qmax = -Infinity;
+    for (let i = 0; i < q.length; i++) { const v = q[i]; if (v < qmin) qmin = v; if (v > qmax) qmax = v; }
+    if (qmax - qmin <= 65535) {
+      const u = new Uint16Array(nx * nz);
+      for (let i = 0; i < u.length; i++) u[i] = q[i] - qmin;
+      return { nx, nz, step, h0, u, qmin };
     }
   }
   const data = new Float32Array(nx * nz);

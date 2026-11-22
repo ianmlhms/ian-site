@@ -193,7 +193,7 @@ export function createField({ resort, far, classes, net, kickers = createKickers
     let t = tiles.get(tx * 1000 + tz);
     if (!t && i === 0 && tx > 0) { const o = tiles.get((tx - 1) * 1000 + tz); if (o) { t = o; tx -= 1; i = CELLS; } }
     if (!t && j === 0 && tz > 0) { const o = tiles.get(tx * 1000 + tz - 1); if (o) { t = o; tz -= 1; j = CELLS; } }
-    return t ? t.data[j * SIDE + i] : farHeight(gi * step, gj * step);
+    return t ? (t.data ? t.data[j * SIDE + i] : Math.fround(t.h0 + (t.u[j * SIDE + i] + t.qmin) * t.qs)) : farHeight(gi * step, gj * step);
   }
 
   function nearHeight(t, tx, tz, x, z) {
@@ -204,9 +204,17 @@ export function createField({ resort, far, classes, net, kickers = createKickers
     const r = [0, 0, 0, 0];
     if (li >= 1 && li <= CELLS - 2 && lj >= 1 && lj <= CELLS - 2) {        // fast path: the 4 x 4 stencil lies in this tile
       const data = t.data;
-      for (let k = 0; k < 4; k++) {
-        const o = (lj - 1 + k) * SIDE + li - 1;
-        r[k] = cr(wx, data[o], data[o + 1], data[o + 2], data[o + 3]);
+      if (data) {
+        for (let k = 0; k < 4; k++) {
+          const o = (lj - 1 + k) * SIDE + li - 1;
+          r[k] = cr(wx, data[o], data[o + 1], data[o + 2], data[o + 3]);
+        }
+      } else {
+        const u = t.u, h0 = t.h0, qm = t.qmin, qs = t.qs, f = Math.fround;          // R8f: 16-bit tile (codec.js quantised)
+        for (let k = 0; k < 4; k++) {
+          const o = (lj - 1 + k) * SIDE + li - 1;
+          r[k] = cr(wx, f(h0 + (u[o] + qm) * qs), f(h0 + (u[o + 1] + qm) * qs), f(h0 + (u[o + 2] + qm) * qs), f(h0 + (u[o + 3] + qm) * qs));
+        }
       }
     } else {
       for (let k = 0; k < 4; k++) r[k] = cr(wx, node(gi - 1, gj - 1 + k), node(gi, gj - 1 + k), node(gi + 1, gj - 1 + k), node(gi + 2, gj - 1 + k));
@@ -286,7 +294,8 @@ export function createField({ resort, far, classes, net, kickers = createKickers
 
   /** A height tile arrived: returns the world rectangle whose heights changed (the tile + the feather of its neighbours). */
   function addTile(tx, tz, grid) {
-    tiles.set(tx * 1000 + tz, { data: grid.data, near: [] });
+    // R8f: a quantised grid (codec.js decodeGrid(.., true)) keeps 16-bit steps: height = fround(h0 + (u + qmin) * qs)
+    tiles.set(tx * 1000 + tz, grid.u ? { data: null, u: grid.u, h0: grid.h0, qmin: grid.qmin, qs: grid.step, near: [] } : { data: grid.data, near: [] });
     refreshNeighbours();
     const pad = feather + 2 * DATA.nearStep;
     return [tx * tileSize - pad, tz * tileSize - pad, (tx + 1) * tileSize + pad, (tz + 1) * tileSize + pad];

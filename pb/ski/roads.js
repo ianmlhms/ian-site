@@ -68,6 +68,7 @@ function material(env) {
  * the shader paints the street from the distance to the street's centre line (aRoad.x = across / half width; fragments beyond the bank
  * are discarded, so the edges stay smooth). Where streets cross, the nearest one paints (R8d: and the nearest other one too). */
 import { diagonalIsMain } from './surface.js';
+import { gpuOnly } from './gpu-mem.js';
 const LAT = 2.5;
 /* R8c (QA: 494-645k triangles in the villages; the streets were 40-90k of them): two levels per render cell. Near (FINE_RADIUS m from
  * the camera to the cell) the street on the 2.5 m physics lattice as before (skis on it); farther a COARSE copy on a 10 m lattice (1/16 of
@@ -221,6 +222,7 @@ export function createRoads({ scene, roads, env, height, level = 'medium' }) {
     g.setAttribute('aHw', new THREE.Float32BufferAttribute(c.hw, 1));
     g.setAttribute('normal', new THREE.Float32BufferAttribute(c.nrm, 3));
     g.computeBoundingSphere();
+    gpuOnly(g);                                                          // R8f: drawn only (ground-check opens the page with keep=1)
     const m = new THREE.Mesh(g, mat);
     m.receiveShadow = false;
     group.add(m);
@@ -240,7 +242,7 @@ export function createRoads({ scene, roads, env, height, level = 'medium' }) {
   }
   function dropFine(c) { if (c.fine) { group.remove(c.fine); c.fine.geometry.dispose(); stats.fineBuilt--; } c.fine = null; }
   return {
-    count: roads.length, cells: list.length, stats,
+    group, count: roads.length, cells: list.length, stats,
     update(px, pz, radius) {
       let t = 0, built = 0;
       for (const c of list) {
