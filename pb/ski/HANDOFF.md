@@ -1196,3 +1196,20 @@ No data / bake / SQL changes (R8d re-bakes in parallel). Nothing depends on lift
   CFNetwork's resource-loader thread start, `sample` shows it); killing R8b's hung orphan queue (qC.sh, slot1) did not help.
 **Still open after 8e**: re-run everything above in WebKit once WebKit starts again; ski-mp / ski-lifts-all / ski-ipad-start at normal
 load; Arlberg Mattunbahn footrest; Kronplatz Alpen Connecting framing; Glacier Ride exit distance; no "before" WebKit shots in round8e/.
+**Round 8d, part 2 (after the coordinator's notes)**:
+- R8e merged (`worktree-agent-a7fe481f6c8cd50fd` @ 2a3c7ff9, from R8b 8bd7cc9d, no data change): conflicts liftride.js (R8c's window eye
+  heights + R8e's funitel half length), markers.js (R8c placeLabels + R8e promptable), round7c-check (imports; R8e's house box index = main's
+  drawn houses). round6-test: the Klein Matterhorn Glacier Ride (now a 3S / funitel station, R8e) lets him off 128 m out: the limit is
+  150 m for funitels (120 m for the rest).
+- More R8c leftovers found on the way: street junctions painted from the nearest OTHER street too (`aSegC`), station decks' shadows via
+  three's PCF, Lambert sky light half desaturated (navy decks), the block plinth grown 0.12 m (z-fighting found by ground-check coplanar),
+  ground-check rays skip hidden meshes (R8c's hidden coarse street copies made 0.6-1.9 m "errors").
+- Browser MEMORY (22 Nov rule: a browser tree > 2.5 GB is killed): Kronplatz Niddreg had a 1.7 GB JS heap at load: roads.js built the fine
+  2.5 m street lattice for the whole resort (183 MB of vertex arrays + the plain JS arrays behind them). Now only the 10 m coarse lattice is
+  built up front; each 640 m render cell builds its fine lattice when the camera comes within the fine radius (<= 2 per frame) and drops it
+  beyond radius + 300 m. Heap at load 1726 -> 555 MB; the 18-village tour (killed at 2.6 GB before) ends at ~1.0 GB heap.
+  STILL GROWING: +25 MB heap and ~+10 three geometries per teleport (94 -> 283 geometries over 18 spots while the scene's attribute bytes
+  stay ~150 MB): something builds geometries and drops them from the scene without dispose() (not the terrain tiles, not the fine
+  streets). Find it (wrap THREE.BufferGeometry to count by caller, teleport 10 x). The village meshes hold 107 MB of vertex arrays.
+- Test tooling: every browser check is one resort / one flow per fresh browser (`r8d-flows.sh`, run_all `=name` exact match,
+  `r8d-sweeps.sh` starts a driver per level x resort and writes mem-<level>-<rid>.json).
