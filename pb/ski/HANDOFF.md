@@ -1396,3 +1396,15 @@ there but nothing showed where it was.
   Chromium flows ski-teleport, ski-spawn, ski-freeride, ski-lift, ski-lifts-all PASS. GPU shots looked at (Champagny / Vanoise bottom +
   top + a real board -> ride -> off at the top for both; 5 formerly broken stations per resort). WebKit not run (still hangs on the Mini).
   No data / bake / SQL change. main.js?v=13, ui.css?v=12.
+
+## After launch: the jump (22 Nov 2026; Ian, iPad: "when I jump (Sprong) it's like when I crouch")
+- Cause: the pop put him 2 cm over the snow with 3.2 m/s up, and airStep landed anything within `stickGap` (6 cm) the very next step:
+  the jump key only ever showed the crouch / air pose for a frame (crests still threw him, so it looked fine there). It also needed
+  > 1 m/s, and a touch tap shorter than a frame could be missed.
+- skier.js: the jump = `jumpWind` 0.12 s crouch (model dips fast), then the pop (`jumpPop` 4.2 m/s along the normal) at any speed;
+  rising from a pop (first 0.2 s, moving away from the slope) he is never "landed"; crest take-offs unchanged. skier-model.js: legs
+  stretch the first ~0.3 s after the pop. input.js: a jump press is latched (one press = one jump, even a < 1 frame tap / key tap).
+- Numbers (round7-test, a 50 ms tap): off the snow 125 ms after the press; flat 0.90 m up / 0.84 s in the air (standing too), 14 deg
+  0.94 m, 25 deg 1.07 m, no crash. Flow ski-teleport: a real touch tap on Sprong -> airborne 130 ms later, 0.91 m (+ the minimap tap).
+- Node checks green (round6 2222, round7 38, round7b, round7c 120 incl. barriers, look7d 68 park, harness); flows ski-teleport,
+  ski-park, ski-freeride PASS. main.js?v=14.

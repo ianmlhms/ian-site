@@ -4,7 +4,7 @@
  * way) on that place asks "Hei hin teleportéieren?" with a pin exactly where the finger went down, "Jo" puts the skier on the nearest
  * safe spot there (on a piste / at a station, on the loaded ground). Discovery is saved locally (pb_ski_save disc) and goes into the
  * cloud record (`d`). Launch: every lift is open for teleport (a tap on an undiscovered lift, the lift list's "Bei de Lift"), a tap on
- * the minimap opens the map. Zero page errors.  FLOW_BROWSER=webkit for Safari's engine. */
+ * the minimap opens the map (a real touch tap); a touch tap on Sprong jumps (off the snow <= 0.5 s, > 0.3 m). Zero page errors.  FLOW_BROWSER=webkit for Safari's engine. */
 import { runIfMain } from "./lib.mjs";
 
 export const flow = {
@@ -149,6 +149,17 @@ export const flow = {
     h.expect(Math.hypot(tp.x - target.x, tp.z - target.z) < 120, `teleported ${Math.hypot(tp.x - target.x, tp.z - target.z).toFixed(0)} m from the tap, on the piste ${tp.piste}`);
     h.expect(!tp.why && tp.slope < 32 && Math.abs(tp.above) <= 0.3 && tp.tiles, `a safe spot: ${tp.why || "open snow"}, ${tp.slope.toFixed(0)}°, ${tp.above.toFixed(2)} m above the loaded 5 m ground`);
     await h.shot("teleported");
+
+    h.step("launch fix (Ian, iPad: 'the jump is like a crouch'): a real touch tap on Sprong: a short crouch, then he is off the snow");
+    const jb = page.locator('#touchControls [data-k="jump"]');
+    h.expect(await jb.isVisible(), "the Sprong button is on screen (touch)");
+    const jbox = await jb.boundingBox();
+    await page.evaluate(() => { window.__jumpProbe = { air: false, top: 0, t0: performance.now(), tAir: null }; const tick = () => { const k = window.__ski, s = k.state, p = window.__jumpProbe, up = s.y - k.surface.height(s.x, s.z); if (!s.grounded && !p.air) { p.air = true; p.tAir = performance.now() - p.t0; } p.top = Math.max(p.top, s.grounded ? 0 : up); if (performance.now() - p.t0 < 2500) requestAnimationFrame(tick); }; requestAnimationFrame(tick); });
+    await page.touchscreen.tap(jbox.x + jbox.width / 2, jbox.y + jbox.height / 2);
+    await h.pause(1500);
+    const jp = await page.evaluate(() => window.__jumpProbe);
+    h.expect(jp.air && jp.tAir !== null && jp.tAir <= 500, `airborne ${jp.tAir === null ? 'never' : Math.round(jp.tAir) + ' ms'} after the tap (<= 500)`);
+    h.expect(jp.top > 0.3, `${jp.top.toFixed(2)} m over the snow (> 0.3)`);
 
     h.step("R8e: the piste tab too: a tap on the empty (discovered) map asks to teleport, on the fog 'Nach net entdeckt'");
     await page.keyboard.press("m");

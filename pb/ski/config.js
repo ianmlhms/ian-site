@@ -81,7 +81,8 @@ export const SKI = Object.freeze({
   hardLanding: 10.5,        // m/s into the ground at landing: a crash
   hitCrash: 5,              // m/s into a trunk or rock: a crash (slower: a bump that stops you)
   bodyRadius: 0.35,
-  jumpPop: 3.2,             // m/s upward pop of the jump key
+  jumpPop: 4.2,             // m/s upward pop of the jump key (launch fix: 3.2 read as a crouch; 4.2 = ~0.9 m up, ~0.85 s in the air on the flat)
+  jumpWind: 0.12,           // s of crouch before the pop (the model dips, then he takes off)
   jumpCooldown: 0.6,
   crashSeconds: 1.6,        // tumble before the respawn
   offPisteLimit: 420,       // m from the nearest piste: beyond that the skier is sent back

@@ -483,7 +483,9 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false, skinne
     // smoothed drivers
     smEdge += (clamp(state.edge, -1.1, 1.1) - smEdge) * k;
     const landing = state.landed > 0 ? Math.sin(Math.min(1, state.landed / 0.35) * Math.PI) : 0;
-    smCrouch += (clamp(state.tuck * 0.95 + landing * 0.8 + smGrab + (state.stop || 0) * 0.25, 0, 1) - smCrouch) * k;
+    // launch fix: the jump's crouch (state.jumpWind) dips fast, the first ~0.3 s after the pop the legs stretch (then knees up)
+    const winding = (state.jumpWind || 0) > 0 && state.grounded;
+    smCrouch += (clamp(state.tuck * 0.95 + landing * 0.8 + smGrab + (state.stop || 0) * 0.25 + (winding ? 0.9 : 0), 0, 1) - smCrouch) * (winding ? 1 - Math.exp(-dt * 40) : k);
     // round 7: the hockey stop is no plough; R8e: standing on the brake (held at 0 km/h) keeps the V (R8 dropped it there because the V
     // crossed its tips); a placed / waiting skier (brake released) stands parallel
     smPlough += (clamp(state.brake, 0, 1) * (1 - clamp(state.stop || 0, 0, 1)) - smPlough) * k;
@@ -500,7 +502,8 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false, skinne
     const skiEdge = edge * 0.45;
     // legs
     const baseH = 0.88 - crouch * 0.36 - plough * 0.19;       // athletic stance: knees and ankles flexed (round 7: lower in the plough)
-    const tuckAir = air * (1 - crouch) * 0.22;              // knees pulled up in the air
+    const popping = !state.grounded && (state.jumpCd || 0) > 0.3;          // just popped (jumpCooldown 0.6): legs long
+    const tuckAir = popping ? -0.05 : air * (1 - crouch) * 0.22;           // knees pulled up in the air
     for (let i = 0; i < 2; i++) {
       const L = legs[i];
       const inside = Math.sign(edge) === L.side ? 1 : 0;     // the leg on the inside of the turn (edge > 0: turning right, the right leg)

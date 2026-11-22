@@ -6,7 +6,8 @@
  *   speed:   gravity along the slope, ski friction (groomed vs deep snow), air drag (upright vs tuck), extra drag in deep snow
  *   brake:   snowplough (S / down): a strong deceleration, slower turns
  *   push:    skating on flats (W / up) below 6 m/s; slow, it walks up short rises (herringbone) instead of sliding back
- *   jumps:   the skier leaves the ground where it falls away faster than gravity can follow (crests, rollers, wind drifts); the jump key pops
+ *   jumps:   the skier leaves the ground where it falls away faster than gravity can follow (crests, rollers, wind drifts); the jump key (a
+ *            short crouch, then) pops
  *   crashes: a trunk or rock hit above SKI.hitCrash m/s, a landing harder than SKI.hardLanding m/s -> state.crash counts down, then the
  *            caller respawns the skier on the piste
  * world = { height(x, z), normal(x, z, out), snow(x, z) -> 0..1 groomed, hit(x, z, r) -> { nx, nz, pen, kind } | null } */
@@ -23,7 +24,7 @@ const wrapAngle = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Mat
 export function createSkierState(x, z, heading, y) {
   return {
     x, y, z, vx: 0, vy: 0, vz: 0, heading, grounded: true, air: 0, steer: 0, tuck: 0, brake: 0, edge: 0, crash: 0, crashKind: '',
-    jumpCd: 0, speed: 0, snow: 1, slip: 0, landed: 0, t: 0,
+    jumpCd: 0, jumpWind: 0, speed: 0, snow: 1, slip: 0, landed: 0, t: 0,
     // tricks (round 4A, world.tricks): rotation since the take-off (rad), grab time (s), landing judgement 0 clean / 1 sketchy, rail slid
     spin: 0, flip: 0, grab: 0, landQ: 0, rail: -1,
     hold: 1,                // round 7: standing still on the edges (a placed skier waits for input; braking to a stop holds there)
@@ -164,7 +165,12 @@ function groundStep(s, input, world, dt) {
   const vyNow = -(n0x * vx + n0z * vz) / n0y;
   const fallAway = (vyNext - vyNow) / dt;                     // < 0: the ground drops away
   s.x = nx2; s.z = nz2;
-  if (input.jump && s.jumpCd <= 0 && v > 1) {
+  // launch fix (Ian, iPad: "the jump is like a crouch"): the jump key is a short crouch (K.jumpWind s, the model dips) and then the
+  // pop off the snow, at any speed (standing too); one press = one jump, released or not during the crouch
+  let pop = false;
+  if (s.jumpWind > 0) { s.jumpWind = Math.max(0, s.jumpWind - dt); pop = s.jumpWind <= 1e-9; if (pop) s.jumpWind = 0; }
+  else if (input.jump && s.jumpCd <= 0) s.jumpWind = K.jumpWind ?? SKI.jumpWind;
+  if (pop) {
     s.vx = vx + n.x * K.jumpPop; s.vy = vyNow + n.y * K.jumpPop; s.vz = vz + n.z * K.jumpPop;
     s.y = Math.max(ground, s.y + vyNow * dt) + 0.02;
     s.grounded = false; s.air = 0; s.jumpCd = K.jumpCooldown;
@@ -186,6 +192,7 @@ function groundStep(s, input, world, dt) {
 function airStep(s, input, world, dt) {
   const K = world.ski || SKI;
   s.air += dt;
+  s.jumpWind = 0;                                             // (a crest took him off during the crouch: no pop on landing)
   s.vy -= G * dt;
   const v = Math.hypot(s.vx, s.vy, s.vz);
   const cda = K.cdaUpright + (K.cdaTuck - K.cdaUpright) * s.tuck;
@@ -210,7 +217,12 @@ function airStep(s, input, world, dt) {
   s.x += s.vx * dt; s.y += s.vy * dt; s.z += s.vz * dt;
   s.edge = approach(s.edge, 0, 3, dt);
   const ground = world.height(s.x, s.z);
-  if (s.y <= ground + K.stickGap) {
+  // launch fix: right after a pop he rises from ~2 cm over the snow: within stickGap the old check landed him the next step (the
+  // jump key only ever showed the crouch); rising from a pop (the first 0.2 s) he only stays on top of the snow (crests: unchanged)
+  let rising = false;
+  if (s.air < 0.2 && s.jumpCd > (K.jumpCooldown ?? SKI.jumpCooldown) - 0.2) { world.normal(s.x, s.z, n); rising = s.vx * n.x + s.vy * n.y + s.vz * n.z > 0.5; }      // popped, moving away from the slope
+  if (rising && s.y < ground) s.y = ground;
+  if (!rising && s.y <= ground + K.stickGap) {
     world.normal(s.x, s.z, n);
     const into = -(s.vx * n.x + s.vy * n.y + s.vz * n.z);
     s.y = ground;

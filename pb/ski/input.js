@@ -18,13 +18,14 @@ export function createInput({ root, onAction }) {
   let usedTouch = false, usedKeyboard = false, enabled = true;
   const state = { steer: 0, tuck: 0, brake: 0, push: 0, jump: false, trick: false, pitch: 0, source: 'none' };
   let trickMode = false;
+  let jumpLatch = false;          // launch fix: a jump press shorter than a frame (a quick tap, a key tapped) still jumps once
 
   const onKey = (e, isDown) => {
     if (e.target && /input|textarea|select/i.test(e.target.tagName)) return;
     const code = e.code;
     const control = Object.values(KEYS).some((l) => l.includes(code));
     if (control && enabled) { if (!(code === 'Space' && e.target && e.target.tagName === 'BUTTON')) e.preventDefault(); usedKeyboard = true; }
-    if (isDown) { if (!down.has(code)) { down.add(code); if (ACTION_KEYS[code]) onAction(ACTION_KEYS[code], e); } } else down.delete(code);
+    if (isDown) { if (!down.has(code)) { down.add(code); if (KEYS.jump.includes(code) && enabled) jumpLatch = true; if (ACTION_KEYS[code]) onAction(ACTION_KEYS[code], e); } } else down.delete(code);
   };
   window.addEventListener('keydown', (e) => onKey(e, true));
   window.addEventListener('keyup', (e) => onKey(e, false));
@@ -47,6 +48,7 @@ export function createInput({ root, onAction }) {
       e.preventDefault();
       try { el.setPointerCapture(e.pointerId); } catch (error) { /* synthetic pointer (tests) */ }
       pointers.set(e.pointerId, { kind, x0: e.clientX, x: e.clientX, y0: e.clientY, y: e.clientY }); usedTouch = true; el.classList.add('on');
+      if (kind === 'jump' && enabled) jumpLatch = true;
     });
     el.addEventListener('pointermove', (e) => { const p = pointers.get(e.pointerId); if (p) { p.x = e.clientX; p.y = e.clientY; } });
     const up = (e) => { pointers.delete(e.pointerId); el.classList.remove('on'); };
@@ -89,14 +91,15 @@ export function createInput({ root, onAction }) {
       state.tuck = Math.max(held('tuck') ? 1 : 0, t.tuck, p ? p.tuck : 0);
       state.brake = Math.max(held('brake') ? 1 : 0, t.brake, p ? p.brake : 0);
       state.push = Math.max(held('push') ? 1 : 0, p ? p.push : 0);
-      state.jump = held('jump') || t.jump || (p ? p.jump : false);
+      state.jump = held('jump') || t.jump || (p ? p.jump : false) || jumpLatch;
+      jumpLatch = false;
       state.trick = trickMode && (held('trick') || t.trick || (p ? p.trick : false));
       state.pitch = trickMode ? ((held('push') ? 1 : 0) - (held('brake') ? 1 : 0) || t.pitch || (p ? p.pitch : 0)) : 0;
       state.source = usedTouch ? 'touch' : usedKeyboard ? 'keyboard' : 'none';
       state.hard = true;                     // round 7: a player's brake may become a hockey stop (scripted input never does)
       return state;
     },
-    setEnabled(v) { enabled = v; if (!v) { pointers.clear(); } },
+    setEnabled(v) { enabled = v; if (!v) { pointers.clear(); jumpLatch = false; } },
     isTouch: () => usedTouch,
     showTouch(v) { ui.hidden = !v; },
     /** Snow park / free ride: the trick button and the flip input (round 4A). */
