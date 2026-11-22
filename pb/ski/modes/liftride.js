@@ -247,13 +247,21 @@ export function rideCamera(path, w, mode, ground) {
   } else if (mode === 'window') {
     // from the rider's eyes: a chair looks a little down (the safety bar and the chairs ahead); a cabin from just behind its front
     // window, eyes level with the glass (no ceiling band), skis on his shoulder; a drag lift up the track
+    // R8c (QA: the cable car's window view was a blank panel over the lower third, the gondola's showed no cabin at all): standing in
+    //     the cable car ~2 m behind the front glass (eyes 1.72 m: the parapet, the handrail, the mullions and the head band frame the
+    //     view), sitting on the gondola's back bench; the view never looks down into the parapet (pitch floor)
     const half = k === 'gondola' ? 1.0 : k === 'cable' ? 3.5 : k === 'train' ? 6.25 : 0;
-    const eye = k === 'chair' ? 1.02 : k === 'drag' || k === 'carpet' ? 1.62 : 1.48;
-    const ahead = k === 'chair' ? 0.08 : k === 'drag' ? 0.2 : k === 'carpet' ? 0.25 : k === 'train' ? half - 3.35 : half - 0.35 - 0.35;
+    const eye = k === 'chair' ? 1.02 : k === 'drag' || k === 'carpet' ? 1.62 : k === 'cable' ? 1.72 : k === 'gondola' ? 1.25 : 1.48;
+    const ahead = k === 'chair' ? 0.08 : k === 'drag' ? 0.2 : k === 'carpet' ? 0.25 : k === 'train' ? half - 3.35 : k === 'cable' ? half - 2.0 : -0.5;
     out.x = w.x + fx * ahead; out.z = w.z + fz * ahead; out.y = w.y + eye;
+    if (k === 'train' && Number.isFinite(w.cx)) {
+      // R8c: from a seat in the carriage's front bay (the rider stands off its middle): the benches, the end wall and its window in view
+      const a = half - 2.6, sl = path.slope(w.s || 0), up = sl / Math.sqrt(1 + sl * sl);
+      out.x = w.cx + fx * a; out.z = w.cz + fz * a; out.y = w.cy + 0.55 + 1.3 + a * up;
+    }
     const look = 40;
     const climb = k === 'drag' || k === 'train' || k === 'carpet' ? (ground(w.x + fx * 20, w.z + fz * 20) - ground(w.x, w.z)) / 20 : path.slope(w.s || 0);
-    const pitch = k === 'chair' ? Math.atan(climb) - 0.5 : k === 'drag' || k === 'carpet' ? Math.atan(climb) * 0.7 - 0.1 : k === 'train' ? Math.atan(path.slope(w.s || 0)) - 0.04 : Math.atan(climb) * 0.45 - 0.12;
+    const pitch = k === 'chair' ? Math.atan(climb) - 0.5 : k === 'drag' || k === 'carpet' ? Math.atan(climb) * 0.7 - 0.1 : k === 'train' ? Math.atan(path.slope(w.s || 0)) - 0.04 : Math.max(-0.04, Math.atan(climb) * 0.45 - 0.12);
     out.tx = w.x + fx * look; out.tz = w.z + fz * look; out.ty = out.y + look * Math.tan(pitch);
     out.fov = k === 'chair' ? 80 : k === 'drag' || k === 'carpet' ? 74 : 68;
   } else if (tunnel) {

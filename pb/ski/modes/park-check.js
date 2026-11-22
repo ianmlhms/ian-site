@@ -59,6 +59,20 @@ export function rideParkPlan(layout, world, plan, { trace = false, maxT = 120 } 
   return { judge, events, crashes, airs, slides, maxAir, finished, t, points: judge.finish() };
 }
 
+/** R8c: seconds from rest at the park's start (s = -4, the run's start gate) to `v` m/s, tucked straight down (one push to get off the
+ *  deck, as the player does), or Infinity after 20 s. */
+export function parkStartTime(layout, world, v) {
+  const top = layout.world(-4, 0);
+  let s = createSkierState(top.x, top.z, layout.heading, world.height(top.x, top.z)), t = 0;
+  while (t < 20) {
+    s = stepPark(layout, s, { steer: 0, tuck: 1, brake: 0, push: t < 0.5 ? 1 : 0, jump: false, trick: false, pitch: 0 }, world, SKI.dt);
+    t += SKI.dt;
+    if (typeof process !== 'undefined' && process.env.PARK_TRACE && Math.round(t / SKI.dt) % Math.round(0.25 / SKI.dt) === 0) console.log(`      ${t.toFixed(2)} s: s ${layout.local(s.x, s.z, {}).s.toFixed(1)} m, ${(s.speed * 3.6).toFixed(1)} km/h${s.grounded ? '' : ' (air)'}`);
+    if (s.speed >= v) return t;
+  }
+  return Infinity;
+}
+
 /** The checks; `check(ok, msg)` from the harness. */
 export function runParkChecks({ resort, world, check, trace = false }) {
   const layout = createParkLayout(resort.park);
@@ -104,5 +118,12 @@ export function runParkChecks({ resort, world, check, trace = false }) {
   plan.push({ v: 0, until: 1e9 });
   const run = rideParkPlan(layout, world, plan, { trace });
   check(run.finished && run.points > 500, `a whole park run: ${run.points} points, ${run.events.filter((e) => e.type === 'trick').length} tricks, ${run.crashes} falls, ${run.t.toFixed(0)} s`);
+  // 6 R8c (QA Korer: a straight run over the kickers scored 0): straight down the kicker lane, no tricks, scores
+  const k0 = layout.kickers[0];
+  const straight = rideParkPlan(layout, world, [{ v: k0 ? k0.v : 0, until: 1e9, speed: 11 }], { trace });
+  check(straight.finished && straight.points > 0, `a straight run (no tricks): ${straight.points} points (${straight.events.filter((e) => e.type === 'trick').map((e) => e.name).join(', ') || 'no airs'})`);
+  // 7 R8c (QA Grattalu: 6.5 s to 10 km/h from the start): the drop-in: from the start (rest, s = -4) tucked, 10 km/h within 4 s
+  const t10 = parkStartTime(layout, world, 10 / 3.6);
+  check(t10 <= 4, `the drop-in: 10 km/h after ${t10.toFixed(1)} s tucked from the start (<= 4 s)`);
   return layout;
 }

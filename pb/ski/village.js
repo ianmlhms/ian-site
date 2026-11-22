@@ -11,7 +11,15 @@
  *   tower   a slender transmitter shaft with red-white bands and an antenna (row kind 5: OSM man_made=tower)
  * Variety from a per-building seed (wood and stone tones, shutter colour, roof pitch, balcony sides). Painted in one shader (wall
  * patterns, windows, snow); merged per 1280 m cell, two detail levels per cell (balconies, chimneys and terraces only near).
- * Rows: [cx, cz, L, W, angle, eave, ridge, ground, kind, footprint?, roof?, levels?] (scripts/ski/bake.py; old 9-field rows: the box). */
+ * Rows: [cx, cz, L, W, angle, eave, ridge, ground, kind, footprint?, roof?, levels?] (scripts/ski/bake.py; old 9-field rows: the box).
+ * R8c (QA: Zürs / Kronplatz = grey 5-storey flat-roof blocks; 494-645k triangles in the villages):
+ *   alpine  in the Austrian / Swiss / South Tyrol resorts (ALPINE_RESORTS) every house is Alpine: the big ones are hotels (white plaster
+ *           below, larch wood above, a wooden balcony along both long sides on every upper floor, a 26-31 deg gable roof with a wide
+ *           overhang), at most 4 storeys under the eaves (3 for small houses; OSM levels capped), never a flat roof (only the "modern"
+ *           summit buildings keep theirs)
+ *   LOD     every house = a BASE (walls, roof, snow edges, plinth: the silhouette) merged per 1280 m cell, and a DETAIL layer (balconies,
+ *           chimneys, terrace rails, roof housings) merged per DCELL m cell and drawn only within DETAIL_RADIUS m of the camera (not on
+ *           Niddreg beyond a short radius). A street of chalets is ~40 triangles per house from afar instead of ~200. */
 import { SHADOW_GLSL } from './shadows.js';
 import { FOG_GLSL } from './snow-shader.js';
 
@@ -22,8 +30,15 @@ const SINK = 1.6;                    // walls go this far below the lowest groun
 /* parts (aInfo.w) */
 const WALL = 0, SNOW = 1, WOOD = 2, RAIL = 3, STONE = 4, TERRACE = 5;
 /* styles (aInfo.x) */
-const CHALET = 0, PLASTER = 1, SAVOY = 2, CONCRETE = 3, CHAPEL = 4, HUT = 5, MODERN = 6, TOWER = 7;
-export const DETAIL_RADIUS = Object.freeze({ low: 700, medium: 1300, high: 2200 });
+const CHALET = 0, PLASTER = 1, SAVOY = 2, CONCRETE = 3, CHAPEL = 4, HUT = 5, MODERN = 6, TOWER = 7, HOTEL = 8;
+/** R8c: the detail layer's radius (m from the camera to the detail cell) per quality level */
+export const DETAIL_RADIUS = Object.freeze({ low: 150, medium: 380, high: 800 });
+const DCELL = 320;                   // m: the detail layer's merge cell
+/** R8c: resorts whose villages are Alpine (no 1960s-70s purpose-built blocks like Tignes / Val Claret / Les Menuires / Val Thorens) */
+export const ALPINE_RESORTS = Object.freeze(new Set(['zermatt', 'arlberg', 'kronplatz']));
+/** R8c: storeys under the eaves at most: Alpine houses (small / big), anywhere else (the tallest real Tignes blocks have ~10) */
+export const MAX_FLOORS = Object.freeze({ alpineSmall: 3, alpine: 4, other: 10 });
+const SMALL_AREA = 150;              // m2: a small house (3 storeys at most in the Alpine villages)
 
 const h1 = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
 
@@ -121,7 +136,7 @@ function gableRoof(w, P, hl, hw, e, pitch, over, gableOver, ground) {
   return r;
 }
 
-function chalet(w, row, seed, detail, style) {
+function chalet(w, row, seed, wd, style) {
   const [, , L, W, , eave, , ground] = row;
   const P = frameOf(row);
   const hl = L / 2, hw = W / 2;
@@ -141,11 +156,15 @@ function chalet(w, row, seed, detail, style) {
     wall(w, a[0], a[2], b[0], b[2], g0, e, ground, WALL, u);
     u += Math.hypot(b[0] - a[0], b[2] - a[2]);
   }
-  const pitch = style === CHAPEL ? 0.95 : style === HUT ? 0.5 : 0.36 + 0.14 * h1(seed * 3.1);     // Savoy chalets: low, wide roofs
-  const over = style === CHAPEL ? 0.5 : 1.1 + 0.5 * h1(seed * 5.3);
+  // Savoy chalets: low, wide roofs; R8c Alpine hotels: 26-31 deg with a deep overhang
+  const pitch = style === CHAPEL ? 0.95 : style === HUT ? 0.5 : style === HOTEL ? 0.49 + 0.11 * h1(seed * 3.1) : 0.36 + 0.14 * h1(seed * 3.1);
+  const over = style === CHAPEL ? 0.5 : style === HOTEL ? 1.35 + 0.35 * h1(seed * 5.3) : 1.1 + 0.5 * h1(seed * 5.3);
   const r = gableRoof(w, P, hl, hw, e, pitch, over, style === CHAPEL ? 0.4 : over * 0.9, ground);
-  if (!detail) return;
-  if ((style === CHALET || style === SAVOY) && eave > 4) {
+  if (style === CHAPEL) chapelTower(w, P, hl, hw, r, ground);           // the bell tower is part of the silhouette: base layer
+  if (!wd) return;
+  w = wd;                                                                // R8c: from here on the detail layer
+  if (style === HOTEL) { hotelBalconies(w, P, hl, hw, eave, ground, seed); }
+  else if ((style === CHALET || style === SAVOY) && eave > 4) {
     // balconies on the gable ends (and on one long side for the bigger ones), one per upper floor: slab, rail, two posts
     const floors = Math.max(1, Math.floor((eave - 0.5) / FLOOR));
     const longSide = L > 11 && h1(seed * 7.7) < 0.6;
@@ -180,14 +199,37 @@ function chalet(w, row, seed, detail, style) {
     const yr = e + (hw - Math.abs(cv)) * pitch;
     box(w, P, cu - 0.4, cu + 0.4, cv - 0.4, cv + 0.4, yr - 0.5, Math.max(r, yr + 1.4) + 0.3, STONE, ground);
   }
-  if (style === CHAPEL) {
-    // bell tower at one gable end: a square shaft above the ridge with a steep pyramid cap of snow
-    const tu = hl - 1.4, s = Math.min(1.3, hw * 0.45);
-    const top = r + 3.2;
-    box(w, P, tu - s, tu + s, -s, s, r - 1.5, top, WALL, ground);
-    const apex = P(tu, 0, top + 3.4);
-    const c4 = [P(tu - s - 0.2, -s - 0.2, top), P(tu + s + 0.2, -s - 0.2, top), P(tu + s + 0.2, s + 0.2, top), P(tu - s - 0.2, s + 0.2, top)];
-    for (let i = 0; i < 4; i++) { const a = c4[i], b = c4[(i + 1) % 4]; let n = faceN(a, b, apex); if (n[1] < 0) n = n.map((v) => -v); w.tri(a, b, apex, n, [[0, 0], [1, 0], [0.5, 1]], SNOW); }
+}
+
+/** bell tower at one gable end: a square shaft above the ridge with a steep pyramid cap of snow */
+function chapelTower(w, P, hl, hw, r, ground) {
+  const tu = hl - 1.4, s = Math.min(1.3, hw * 0.45);
+  const top = r + 3.2;
+  box(w, P, tu - s, tu + s, -s, s, r - 1.5, top, WALL, ground);
+  const apex = P(tu, 0, top + 3.4);
+  const c4 = [P(tu - s - 0.2, -s - 0.2, top), P(tu + s + 0.2, -s - 0.2, top), P(tu + s + 0.2, s + 0.2, top), P(tu - s - 0.2, s + 0.2, top)];
+  for (let i = 0; i < 4; i++) { const a = c4[i], b = c4[(i + 1) % 4]; let n = faceN(a, b, apex); if (n[1] < 0) n = n.map((v) => -v); w.tri(a, b, apex, n, [[0, 0], [1, 0], [0.5, 1]], SNOW); }
+}
+
+/** R8c: an Alpine hotel's balconies: one along each long side on every upper floor (slab, a board rail, a post at each end); the big
+ *  ones get one on the gable ends too. */
+function hotelBalconies(w, P, hl, hw, eave, ground, seed) {
+  const floors = Math.max(1, Math.floor((eave - 0.5) / FLOOR));
+  const depth = 1.35, inset = Math.min(1.2, hl * 0.15);
+  const jitter = h1(seed * 31.7) * 0.04;                                 // neighbours' balconies never share a plane (z-fighting)
+  for (let f = 1; f < floors; f++) {
+    const y = ground + f * FLOOR - 0.2 + jitter;
+    if (y > ground + eave - 1.6) break;
+    for (const side of [-1, 1]) {
+      const Ps = (a, b, yy) => P(a, side * (hw + b), yy);
+      box(w, Ps, -hl + inset, hl - inset, 0.03, depth, y - 0.2, y, WOOD, ground);
+      const q0 = Ps(-hl + inset, depth, y), q1 = Ps(hl - inset, depth, y);
+      if (side > 0) rail(w, q0[0], q0[2], q1[0], q1[2], y, y + 1.05, y); else rail(w, q1[0], q1[2], q0[0], q0[2], y, y + 1.05, y);
+      for (const a of [-hl + inset, hl - inset]) {
+        const s0 = Ps(a, 0, y), s1 = Ps(a, depth, y);
+        rail(w, s0[0], s0[2], s1[0], s1[2], y, y + 1.05, y);
+      }
+    }
   }
 }
 
@@ -215,7 +257,7 @@ function cap(w, poly, y, part) {
 }
 
 /** The big blocks: footprint walls, terraces stepping back up the slope, a flat snowed-in roof with a parapet (or a gable). */
-function block(w, row, seed, detail, style, slopeDir) {
+function block(w, row, seed, wd, style, slopeDir) {
   const downhill = slopeDir || [1, 0];
   const [cx, cz, L, W, , eave, , ground, , foot, roof, levelsRow] = row;
   let poly = [];
@@ -227,7 +269,7 @@ function block(w, row, seed, detail, style, slopeDir) {
   // 1960s-70s resorts (Tignes, Val Claret, La Daille), recognised by their size
   const big = L * W > 1300 && W >= 16;
   const gable = style !== MODERN && (roof === 0 || roof === 2 || roof === 3 || (roof === -1 && !big));
-  if (gable) { chalet(w, row, seed, detail, style === CONCRETE ? SAVOY : style); return; }
+  if (gable) { chalet(w, row, seed, wd, style === CONCRETE ? SAVOY : style); return; }
   const g0 = ground - SINK;
   // terraces: a tall block on a slope steps back towards the uphill side, every 2-3 floors (the stepped profile of Val Claret)
   const stepped = levels >= 5 && W >= 13 && !!slopeDir && h1(seed * 8.8) < 0.75;
@@ -244,7 +286,7 @@ function block(w, row, seed, detail, style, slopeDir) {
     prism(w, tp, y, y1, base, WALL);
     if (k < tiers - 1) {
       cap(w, tp, y1 + 0.02, TERRACE);
-      if (detail) prismRail(w, tp, y1);
+      if (wd) prismRail(wd, tp, y1);
     }
     y = y1;
   }
@@ -253,9 +295,9 @@ function block(w, row, seed, detail, style, slopeDir) {
   const roofPoly = last || poly.map((p) => { const d = p[0] * downhill[0] + p[1] * downhill[1] - dmin; const m = d * (1 - (tiers - 1) * Math.min(0.24, 9 / Math.max(depth, 1)) - 1); return [p[0] + downhill[0] * m, p[1] + downhill[1] * m]; });
   prism(w, roofPoly, top, top + 0.7, ground, STONE);
   cap(w, roofPoly, top + 0.55, SNOW);
-  if (detail && L * W > 500) {
+  if (wd && L * W > 500) {
     const P = frameOf(row);
-    box(w, P, -1.6, 1.6, -1.6, 1.6, top + 0.5, top + 2.6, STONE, ground);
+    box(wd, P, -1.6, 1.6, -1.6, 1.6, top + 0.5, top + 2.6, STONE, ground);
   }
 }
 function prismRail(w, poly, y) {
@@ -282,12 +324,14 @@ function tower(w, row) {
   box(w, P, -0.35, 0.35, -0.35, 0.35, top, top + eave * 0.25, WALL, ground);
 }
 
-function styleOf(row, seed) {
+function styleOf(row, seed, alpine) {
   const kind = row[8];
   if (kind === 4) return MODERN;
   if (kind === 5) return TOWER;
   if (kind === 2) return CHAPEL;
   if (kind === 3) return HUT;
+  // R8c: an Alpine village: the big houses are hotels, the rest chalets (wood above a stone or plaster base)
+  if (alpine) return row[2] * row[3] > 260 ? (kind === 0 && h1(seed * 21.3) < 0.4 ? SAVOY : HOTEL) : h1(seed * 21.3) < 0.75 ? CHALET : SAVOY;
   // round 7 (A): a big house flagged chalet (Méribel, Courchevel, Zermatt) was a giant wooden block: half of them get the Savoy mix
   // (stone and plaster below, wood above)
   if (kind === 0) return row[2] * row[3] > 260 && h1(seed * 21.3) < 0.5 ? SAVOY : CHALET;
@@ -297,11 +341,36 @@ function styleOf(row, seed) {
   return r < 0.6 ? SAVOY : PLASTER;
 }
 
+/** R8c: a row as the village draws it: in an Alpine resort every block is a gabled house (kind 0) and no house is taller than
+ *  MAX_FLOORS storeys under the eaves (the OSM levels capped); the "modern" summit buildings, chapels, huts and towers stay as they are.
+ *  Returns a new row (the input is never changed). */
+export function tameRow(row, alpine) {
+  const kind = row[8];
+  if (kind !== 0 && kind !== 1) return row;
+  const floors = alpine ? (row[2] * row[3] < SMALL_AREA ? MAX_FLOORS.alpineSmall : MAX_FLOORS.alpine) : MAX_FLOORS.other;
+  const eaveMax = floors * FLOOR + 0.6;
+  if (!alpine && row[5] <= eaveMax) return row;
+  const out = row.slice();
+  if (alpine) { out[8] = 0; out[10] = 0; }                           // gabled
+  if (out[5] > eaveMax) {
+    const drop = out[5] - eaveMax;
+    out[5] = eaveMax; out[6] = Math.max(eaveMax + 1, out[6] - drop);
+    if (out.length > 11 && out[11]) out[11] = Math.min(out[11], floors);
+  }
+  return out;
+}
+/** R8c: what one row is drawn as: { style, alpine row } (for the checks) */
+export function houseOf(row, i, alpine) {
+  const r = tameRow(row, alpine), seed = (i * 0.618034) % 1;
+  return { row: r, style: styleOf(r, seed, alpine), floors: Math.round((r[5] - 0.6) / FLOOR), flat: (r[8] === 1 || r[8] === 4) && r[10] === 1 };
+}
+
 /* ---------------- material ---------------- */
 function material(env, cheap) {
   return new THREE.ShaderMaterial({
     uniforms: env.u,
     side: THREE.DoubleSide,
+    extensions: { derivatives: true },
     defines: cheap ? { CHEAP: 1 } : {},
     vertexShader: `
       attribute vec2 aUv; attribute vec4 aInfo;
@@ -329,7 +398,9 @@ function material(env, cheap) {
         } else if (part > 1.5 && part < 2.5) {                                          // soffit, balcony slab: wood
           col = wood * 0.85;
         } else if (part > 2.5 && part < 3.5) {                                          // balcony rail: vertical boards, dark gaps
-          float board = step(0.35, fract(vUv.x / 0.16));
+          // R8c (QA: railing moire at 30-50 m): the boards anti-aliased by their own pixel footprint, their average once sub-pixel
+          float bx = vUv.x / 0.16, bw = fwidth(bx);
+          float board = mix(smoothstep(0.35 - bw, 0.35 + bw, fract(bx)), 0.65, smoothstep(0.3, 0.6, bw));
           col = mix(wood * 0.45, wood * 1.05, mix(0.8, board, fadeFar));
           col = mix(col, vec3(0.93, 0.95, 1.0), step(0.86, vUv.y) * 0.85);              // snow on the handrail
         } else if (part > 3.5 && part < 4.5) {                                          // chimney, parapet: stone / concrete
@@ -349,6 +420,11 @@ function material(env, cheap) {
           else if (style < 3.5) col = concrete * (1.0 - 0.06 * fadeFar * step(0.95, fract(vUv.x / 3.2)));  // 1970s concrete, panel joints
           else if (style < 4.5) col = vec3(0.94, 0.93, 0.89);                                           // chapel
           else if (style < 5.5) col = woodWall * 0.78;                                                   // hut
+          else if (style > 7.5) {                                                                        // R8c Alpine hotel: plaster below, larch above
+            float plasterUp = step(0.55, h1(seed * 3.3)) * 2.9;                                          // some keep the plaster one floor higher
+            col = y < 0.7 ? stoneWall : y < 3.3 + plasterUp ? plaster * 1.04 : woodWall * 0.92;
+            col = mix(col, wood * 0.55, step(3.3 + plasterUp, y) * step(y, 3.48 + plasterUp));         // the dark beam where the wood starts
+          }
           else if (style < 6.5) {                                                                        // modern: stone plinth, vertical larch slats
             float slat = fadeFar * step(0.72, fract(vUv.x / 0.32));
             col = y < 3.2 ? stoneWall * 0.92 : mix(vec3(0.58, 0.42, 0.28), vec3(0.66, 0.5, 0.33), h1(seed * 91.0)) * (1.0 - 0.28 * slat);
@@ -366,12 +442,13 @@ function material(env, cheap) {
           float wu = style < 0.5 ? 2.5 : 2.7;
           float fu = fract(vUv.x / wu), fv = fract((y - 0.6) / 2.9);
           float floorIx = floor((y - 0.6) / 2.9);
-          float inRange = step(0.9, y) * step(y, eaveH - 0.6) * step(style, 4.5);
+          float isHotel = step(7.5, style);
+          float inRange = step(0.9, y) * step(y, eaveH - 0.6) * max(step(style, 4.5), isHotel);
           // round 7 (A): windows ~1.1 x 1.35 m on a 2.9 m storey, shutters ~0.5 m beside them
           float win = fadeFar * step(0.27, fu) * step(fu, 0.73) * step(0.32, fv) * step(fv, 0.79) * inRange;
           float frame = fadeFar * step(0.25, fu) * step(fu, 0.75) * step(0.29, fv) * step(fv, 0.82) * inRange - win;
           float shut = style < 0.5 || style > 4.5 ? fadeFar * (step(0.05, fu) * step(fu, 0.24) + step(0.76, fu) * step(fu, 0.95)) * step(0.32, fv) * step(fv, 0.79) * inRange : 0.0;
-          col = mix(col, col * 0.8, (1.0 - fadeFar) * step(0.9, y) * step(style, 4.5) * 0.55);
+          col = mix(col, col * 0.8, (1.0 - fadeFar) * step(0.9, y) * max(step(style, 4.5), isHotel) * 0.55);
           col = mix(col, shutter, shut);
           col = mix(col, vec3(0.93, 0.92, 0.88) * 0.8, frame * step(0.5, style) * step(style, 3.5));
           col = mix(col, wood * 0.5, frame * (1.0 - step(0.5, style) * step(style, 3.5)));
@@ -396,6 +473,9 @@ function material(env, cheap) {
         float lit = smoothstep(-0.1, 0.6, dot(N, uSunDir)) * vis;
         lit = mix(lit, floor(lit * 3.0 + 0.5) / 3.0, 0.3);
         vec3 amb = mix(uAmbGround, uAmbSky, 0.5 + 0.5 * N.y) * (snowy > 0.5 ? 1.08 : 1.0);
+        // R8c: snow on a roof in the shade is the same soft light blue-grey as the snow on the ground (R8 snow-shader shadeL2), not the
+        //      saturated sky blue (the shaded roof sides read as blue tin roofs from above)
+        amb = mix(amb, vec3(dot(amb, vec3(0.3, 0.59, 0.11))) * vec3(0.93, 0.98, 1.08) * 1.06, snowy * 0.62);
         vec3 c = col * (amb * 0.62 + uSunColor * lit * 0.82) + glow * vec3(1.0, 0.72, 0.36) * 0.9;
         gl_FragColor = vec4(applyFog(c, vDist, uFogColor, uFogDensity), 1.0);
       }`,
@@ -414,60 +494,78 @@ function toMesh(cell, mat) {
   return m;
 }
 
-/** rows = buildings.json; height(x, z) = the ground (for the downhill side of the terraced blocks); quality = QUALITY[level]. */
+/** rows = buildings.json; height(x, z) = the ground (for the downhill side of the terraced blocks); quality = QUALITY[level];
+ *  resort = the resort id (R8c: Alpine villages, ALPINE_RESORTS). */
 let HEIGHT = null;                    // round 7 (A): the ground for the plinths (set by createVillage)
-export function createVillage({ scene, rows, env, height, level = 'medium' }) {
+export function createVillage({ scene, rows, env, height, level = 'medium', resort = '' }) {
   HEIGHT = height || null;
-  const cells = new Map();
-  rows.forEach((row, i) => {
-    const k = Math.floor(row[0] / CELL) + ',' + Math.floor(row[1] / CELL);
+  const alpine = ALPINE_RESORTS.has(resort);
+  const cells = new Map(), details = new Map();
+  rows.forEach((row0, i) => {
+    const row = tameRow(row0, alpine);
+    const ci = Math.floor(row[0] / CELL), cj = Math.floor(row[1] / CELL), k = ci + ',' + cj;
     let cell = cells.get(k);
-    if (!cell) cells.set(k, (cell = { near: writer(), far: writer(), cx: (Math.floor(row[0] / CELL) + 0.5) * CELL, cz: (Math.floor(row[1] / CELL) + 0.5) * CELL, tris: 0 }));
+    if (!cell) cells.set(k, (cell = { w: writer(), cx: (ci + 0.5) * CELL, cz: (cj + 0.5) * CELL }));
+    const di = Math.floor(row[0] / DCELL), dj = Math.floor(row[1] / DCELL), dk = di + ',' + dj;
+    let det = details.get(dk);
+    if (!det) details.set(dk, (det = { w: writer(), x0: di * DCELL, z0: dj * DCELL }));
     const seed = (i * 0.618034) % 1;
-    const style = styleOf(row, seed);
+    const style = styleOf(row, seed, alpine);
     let downhill = null;
     if (height && (row[8] === 1 || row[8] === 4)) {
       const d = 25, gx = height(row[0] + d, row[1]) - height(row[0] - d, row[1]), gz = height(row[0], row[1] + d) - height(row[0], row[1] - d);
       const l = Math.hypot(gx, gz);
       if (l > 2) downhill = [-gx / l, -gz / l];       // only on a real slope
     }
-    for (const [w, detail] of [[cell.near, true], [cell.far, false]]) {
-      w.set(style, row[5], seed);
-      if (row[8] === 5) tower(w, row);
-      else if (row[8] === 1 || row[8] === 4) block(w, row, seed, detail, style, downhill);
-      else chalet(w, row, seed, detail, style);
-    }
+    cell.w.set(style, row[5], seed);
+    det.w.set(style, row[5], seed);
+    if (row[8] === 5) tower(cell.w, row);
+    else if (row[8] === 1 || row[8] === 4) block(cell.w, row, seed, det.w, style, downhill);
+    else chalet(cell.w, row, seed, det.w, style);
   });
   let mat = material(env, level === 'low');
   const group = new THREE.Group();
   group.name = 'ski-village';
-  const list = [];
+  const list = [], detailList = [];
   for (const cell of cells.values()) {
-    const near = toMesh(cell.near, mat), far = toMesh(cell.far, mat);
-    group.add(near, far);
-    list.push({ near, far, cx: cell.cx, cz: cell.cz });
+    const base = toMesh(cell.w, mat);
+    group.add(base);
+    list.push({ base, cx: cell.cx, cz: cell.cz });
+  }
+  for (const det of details.values()) {
+    if (!det.w.pos.length) continue;
+    const m = toMesh(det.w, mat);
+    m.castShadow = false;                                                // small parts: the base casts the house's shadow
+    group.add(m);
+    detailList.push({ m, x0: det.x0, z0: det.z0 });
   }
   scene.add(group);
   let detailR = DETAIL_RADIUS[level] || DETAIL_RADIUS.medium;
-  const stats = { cells: list.length, triangles: 0 };
+  const tris = (m) => m.geometry.attributes.position.count / 3;
+  const stats = {
+    cells: list.length, details: detailList.length, triangles: 0,
+    baseTriangles: list.reduce((a, c) => a + tris(c.base), 0), detailTriangles: detailList.reduce((a, c) => a + tris(c.m), 0),
+  };
   return {
     group, count: rows.length, stats,
     update(px, pz, radius) {
-      let tris = 0;
+      let t = 0;
       for (const c of list) {
-        const d = Math.hypot(c.cx - px, c.cz - pz) - CELL * 0.71;
-        const show = d < radius;
-        c.near.visible = show && d < detailR;
-        c.far.visible = show && !c.near.visible;
-        if (c.near.visible) tris += c.near.geometry.attributes.position.count / 3;
-        else if (c.far.visible) tris += c.far.geometry.attributes.position.count / 3;
+        c.base.visible = Math.hypot(c.cx - px, c.cz - pz) - CELL * 0.71 < radius;
+        if (c.base.visible) t += tris(c.base);
       }
-      stats.triangles = tris;
+      for (const c of detailList) {
+        const dx = Math.max(c.x0 - px, 0, px - c.x0 - DCELL), dz = Math.max(c.z0 - pz, 0, pz - c.z0 - DCELL);   // to the cell's square
+        c.m.visible = Math.hypot(dx, dz) < detailR;
+        if (c.m.visible) t += tris(c.m);
+      }
+      stats.triangles = t;
     },
     setLevel(next) {
       detailR = DETAIL_RADIUS[next] || DETAIL_RADIUS.medium;
       const m = material(env, next === 'low');
-      for (const c of list) { c.near.material = m; c.far.material = m; }
+      for (const c of list) c.base.material = m;
+      for (const c of detailList) c.m.material = m;
       mat.dispose(); mat = m;
     },
   };

@@ -163,7 +163,8 @@ export function createSnowMaterial(env, { cheap = false, treeRadius = 400, fores
         float farK = smoothstep(250.0, 3000.0, vDist);
         float crag = d2.a * (1.0 - farK) + d3.a * farK;                         // craggy breakup at the scale the distance can show
         float s0 = mix(0.30, mix(0.2, 0.26, farMix), farK) - relief * 0.04;    // the normal map shows the real 40 m faces: no lowered threshold there
-        float rockSteep = smoothstep(s0, s0 + 0.1, slope + (nA.g - 0.5) * 0.1 + (crag - 0.5) * 0.07);
+        // R8c (QA: soft diagonal grey bands on far peaks): far away the 40 m facets' slopes step from face to face; a wider ramp there
+        float rockSteep = smoothstep(s0, s0 + 0.1 + 0.16 * farK, slope + (nA.g - 0.5) * 0.1 + (crag - 0.5) * 0.07);
         float ledge = mix(0.09, mix(0.015, 0.04, farMix), farK);
         // the baked share of rock in this spot, painted as crisp patches of that share (thresholded by the crags), not as a grey blend
         float rockBaked = smoothstep(-0.1, 0.1, rockCls - (0.22 + 0.56 * crag)) * smoothstep(ledge, ledge + 0.08, slope + (nB.b - 0.5) * 0.06);
@@ -173,7 +174,9 @@ export function createSnowMaterial(env, { cheap = false, treeRadius = 400, fores
         float farRock = smoothstep(2500.0, 9000.0, vDist);
         rockAmt *= mix(1.0, smoothstep(0.42, 0.6, slope), farRock);
         // strata: grey layers of ~8 m (light and dark), snow in broken lines on some layers' ledges; less snow the steeper
-        float sPhase = vWorld.y * 0.12 + nA.r * 2.0 + nB.g * 1.2 + nL.g * 2.0;
+        // R8c (QA: white "circuit board" lines on Face de Bellevarde): the height is planar inside each 2.5 m triangle, so the layer lines
+        //      were straight segments with kinks at the triangle edges; a smooth wobble from the 17.5 m and 14 m noise bends them
+        float sPhase = vWorld.y * 0.12 + nA.r * 2.0 + nB.g * 1.2 + nL.g * 2.0 + ((d2.b - 0.5) * 1.4 + (nB.r - 0.5) * 0.7) * (1.0 - farK);
         // R7-D: faded by the layers' own pixel footprint (as the corduroy): bands only while one layer spans >= ~6 px, the thin snow
         //       lines on the ledges only while it spans >= ~16 px, so far faces show an even tone instead of lines crawling in motion
         float sFw = fwidth(sPhase);
@@ -190,15 +193,25 @@ export function createSnowMaterial(env, { cheap = false, treeRadius = 400, fores
         vec3 Nr = normalize(N + vec3(d3.r - 0.5, 0.0, d3.g - 0.5) * (0.5 + 0.4 * farK) + vec3(d2.r - 0.5, 0.0, d2.g - 0.5) * 0.7 * midK);
         float rockLit = band(smoothstep(-0.2, 0.75, dot(Nr, uSunDir)) * sunVis);
         rockCol = rockCol * (shade * vec3(0.74, 0.8, 0.9) * (1.0 - 0.25 * max(ao, 0.0)) + uSunColor * rockLit * 0.95);
-        float snowLine = mix(0.09, smoothstep(0.8, 0.88, sLayer) * (1.0 - smoothstep(0.9, 0.98, sLayer)), sLineAA) * smoothstep(0.45, 0.65, nB.a) * steepK * (1.0 - smoothstep(0.35, 0.7, slope));   // R7-D: their average share once too thin to draw
+        // R8c: the line's edges anti-aliased by the layer's own pixel footprint (sFw), and only on real cliffs (>= ~50 deg): on the
+        //      moderate rocky slopes the lines read as contour lines
+        float lw = max(sFw * 1.2, 0.015);
+        float sLine = smoothstep(0.8 - lw, 0.86 + lw, sLayer) * (1.0 - smoothstep(0.9 - lw, 0.96 + lw, sLayer));
+        float snowLine = mix(0.09, sLine, sLineAA) * smoothstep(0.45, 0.65, nB.a) * steepK * smoothstep(0.3, 0.44, slope) * (1.0 - smoothstep(0.5, 0.75, slope));   // R7-D: their average share once too thin to draw
         float snowPatch = smoothstep(0.5, 0.78, nB.g * 0.6 + nA.b * 0.4) * (1.0 - smoothstep(0.22, 0.5, slope));     // snow patches in the hollows
         float snowLedge = (1.0 - smoothstep(0.34, 0.52, crag)) * (1.0 - smoothstep(0.3, 0.62, slope)) * 0.45;                 // snow lying in the cracks and on the ledges between crags
         // snow streaks down the gullies, long along the fall line (they read at every distance, unlike the thin strata lines)
-        vec2 acrossFall = vec2(-fall.y, fall.x);
-        float streakN = texture2D(uNoise, vec2(dot(wp, acrossFall) * 0.021, dot(wp, fall) * 0.0032) + 0.55).g * 0.75 + nL.r * 0.25;
+        // R8c (QA: white "circuit board" lines on Face de Bellevarde): the streaks were read in a frame turned to the fall line around
+        //      the WORLD origin, so a tiny turn of the normal from one triangle to the next moved them by tens of metres (|wp| x angle):
+        //      concentric zigzag bands. Now two world-fixed samples, stretched along x and along z, blended by the fall direction.
+        float streakX = texture2D(uNoise, vec2(wp.x * 0.0032, wp.y * 0.021) + 0.55).g, streakZ = texture2D(uNoise, vec2(wp.x * 0.021, wp.y * 0.0032) + 0.55).g;
+        float streakN = mix(streakZ, streakX, fall.x * fall.x) * 0.75 + nL.r * 0.25;
         float streak = smoothstep(0.56, 0.7, streakN - relief * 0.12) * steepK * (1.0 - smoothstep(0.4, 0.8, slope));
         rockAmt *= 1.0 - clamp(snowLine * 0.85 + snowPatch * 0.8 + streak * 0.85 + snowLedge, 0.0, 1.0);
-        rockAmt = smoothstep(0.22, 0.7, rockAmt);                                // a crisp painted edge between snow and rock, no grey mush
+        // a crisp painted edge between snow and rock, no grey mush; R8c: never sharper than a pixel (fwidth: the edge of a thin snow
+        // line or a crag patch no longer flickers into stair-stepped white lines)
+        float rw = max(0.24, fwidth(rockAmt) * 1.5);
+        rockAmt = smoothstep(0.46 - rw, 0.46 + rw, rockAmt);
         vec3 col = mix(snow, rockCol, rockAmt);
         // ---- forests beyond the instanced trees: a dark underlay where the far tree cards stand (forest-far.js draws the trees)
         float fRaster = uForestOn > 0.5 ? texture2D(uForestTex, wp / uForestSize).r : forest;

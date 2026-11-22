@@ -12,6 +12,8 @@ import { chairWidth } from '../lift-path.js';
 const THREE = window.THREE;
 const COL = Object.freeze({ frame: 0x3a3f48, steel: 0x8e96a3, grip: 0x5d6570, cushion: 0x2a66d0, cushion2: 0x1f4fa8, bar: 0xf2b21c, cabin: 0xc8372e, cabinDark: 0x8f2620, roof: 0xe8eaee, floor: 0x2b2f36, train: 0xb8322b, trainDark: 0x6f1d18, rubber: 0x1b1d22, spring: 0x2f343c, platter: 0xd8402e });
 
+/** R8c: the carriers' glass (here and lifts.js): a little more there than before (0.22), so a cabin or a carriage reads closed */
+export const GLASS = Object.freeze({ color: 0xbcd3e6, opacity: 0.32 });
 const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
 const cyl = (r0, r1, h, n = 8) => new THREE.CylinderGeometry(r0, r1, h, n);
 const at = (x, y, z) => new THREE.Matrix4().makeTranslation(x, y, z);
@@ -67,7 +69,8 @@ function cabinParts(L, Wd, H, floor, colour, dark, arms, lod) {
     P.push([box(L - 0.04, H * 0.6 - 0.1, Wd - 0.04), 0x5b6f80, at(0, floor + H * 0.7 - 0.05, 0)]);
     return { parts: P, glass: G };
   }
-  const low = H * 0.36;
+  // R8c (QA: the cable car's window view = a blank slate-blue panel over the lower third): the big cabins are glazed down to ~0.85 m
+  const low = H > 3 ? 0.85 : H * 0.36;
   P.push([box(L, low, 0.06), colour, at(0, floor + low / 2, Wd / 2)]);
   P.push([box(L, low, 0.06), colour, at(0, floor + low / 2, -Wd / 2)]);
   P.push([box(0.06, low, Wd), colour, at(L / 2, floor + low / 2, 0)]);
@@ -75,7 +78,21 @@ function cabinParts(L, Wd, H, floor, colour, dark, arms, lod) {
   P.push([box(L + 0.04, 0.1, Wd + 0.04), dark, at(0, floor + low, 0)]);
   P.push([box(L + 0.06, 0.12, Wd + 0.06), 0xd5d8dd, at(0, roof - 0.06, 0)]);
   for (const x of [-L / 2, L / 2]) for (const z of [-Wd / 2, Wd / 2]) P.push([box(0.08, H, 0.08), dark, at(x, mid, z)]);
-  P.push([box(0.05, H - low, 0.04), dark, at(0, floor + low + (H - low) / 2, Wd / 2 + 0.02)]);
+  // R8c: window mullions on every side (thirds on the cable cars, halves on the gondolas), a window head band under the roof, a steel
+  //      handrail round the inside at hip height, a darker floor mat: the window view looks out of a cabin, not over a blank wall
+  const n = H > 3 ? 3 : 2, mh = H - low - 0.06, my = floor + low + mh / 2;
+  for (let i = 1; i < n; i++) {
+    const x = -L / 2 + (L * i) / n, z = -Wd / 2 + (Wd * i) / n;
+    for (const sz of [-1, 1]) P.push([box(0.06, mh, 0.05), dark, at(x, my, sz * (Wd / 2 + 0.01))]);
+    for (const sx of [-1, 1]) P.push([box(0.05, mh, 0.06), dark, at(sx * (L / 2 + 0.01), my, z)]);
+  }
+  P.push([box(L - 0.02, 0.2, Wd - 0.02), dark, at(0, roof - 0.22, 0)]);          // the head band (the inside of the roof edge)
+  P.push([box(L - 0.2, 0.06, Wd - 0.2), 0x2b2f36, at(0, roof - 0.1, 0)]);
+  const rail = floor + Math.min(1.0, low + 0.12);
+  for (const sz of [-1, 1]) P.push([box(L - 0.3, 0.04, 0.04), COL.steel, at(0, rail, sz * (Wd / 2 - 0.12))]);
+  for (const sx of [-1, 1]) P.push([box(0.04, 0.04, Wd - 0.3), COL.steel, at(sx * (L / 2 - 0.12), rail, 0)]);
+  P.push([box(L - 0.3, 0.02, Wd - 0.3), 0x3a3f48, at(0, floor + 0.01, 0)]);      // floor mat
+  if (H <= 3) for (const sx of [-1, 1]) P.push([box(0.42, 0.42, Wd - 0.16), 0x4a4f58, at(sx * (L / 2 - 0.27), floor + 0.21, 0)]);   // gondola benches
   const gh = H - low - 0.12, gy = floor + low + gh / 2 + 0.05;
   G.push([box(L - 0.1, gh, 0.02), 0xffffff, at(0, gy, Wd / 2)], [box(L - 0.1, gh, 0.02), 0xffffff, at(0, gy, -Wd / 2)]);
   G.push([box(0.02, gh, Wd - 0.1), 0xffffff, at(L / 2, gy, 0)], [box(0.02, gh, Wd - 0.1), 0xffffff, at(-L / 2, gy, 0)]);
@@ -87,13 +104,43 @@ function trainParts(lod) {
   const L = 12.5, Wd = 2.6, floor = 0.55, H = 2.45;
   P.push([box(L - 2, 0.45, Wd - 0.5), COL.rubber, at(0, 0.3, 0)]);
   const low = 0.95, roof = floor + H;
-  P.push([box(L, low, Wd), COL.train, at(0, floor + low / 2, 0)]);
-  P.push([box(L, 0.1, Wd + 0.02), 0xf4f1ea, at(0, floor + low, 0)]);
+  // R8c: the lower body as four panels (it was one solid block: from the seats the carriage was full of red up to the sills)
+  for (const z of [-Wd / 2 + 0.04, Wd / 2 - 0.04]) {
+    P.push([box(L, low, 0.08), COL.train, at(0, floor + low / 2, z)]);
+    P.push([box(L, 0.1, 0.1), 0xf4f1ea, at(0, floor + low, z + Math.sign(z) * 0.02)]);
+  }
+  for (const x of [-L / 2 + 0.04, L / 2 - 0.04]) P.push([box(0.08, low, Wd), COL.train, at(x, floor + low / 2, 0)]);
+  if (lod !== 'far') P.push([box(L - 0.2, 0.06, Wd - 0.2), 0x3a3f48, at(0, floor + 0.1, 0)]);   // the floor inside
   P.push([box(L + 0.1, 0.25, Wd + 0.1), COL.train, at(0, roof + 0.1, 0)]);
   if (lod === 'far') { P.push([box(L - 0.1, H - low, Wd - 0.04), 0x5b6f80, at(0, floor + low + (H - low) / 2, 0)]); return { parts: P, glass: G }; }
   for (let x = -L / 2; x <= L / 2 + 0.01; x += L / 6) for (const z of [-Wd / 2, Wd / 2]) P.push([box(0.12, H - low, 0.08), COL.trainDark, at(x, floor + low + (H - low) / 2, z)]);
   P.push([box(L, 0.08, Wd - 0.1), COL.floor, at(0, floor + 0.02, 0)]);
-  for (const x of [L / 2 - 0.3, -L / 2 + 0.3]) P.push([box(0.12, 0.35, 1.2), 0xfff2c6, at(x + Math.sign(x) * 0.02, floor + 0.55, 0)]);   // head lamps
+  for (const sx of [-1, 1]) P.push([box(0.06, 0.3, 1.2), 0xfff2c6, at(sx * (L / 2 + 0.04), floor + 0.55, 0)]);   // head lamps (outside the end walls)
+  // R8c (QA: the Gornergrat carriage read as an open red frame, no walls, no seats): a closed car. Window frames (sill + head rail along
+  //      both sides), end walls with a driver's window, benches facing each other in bays (no pantograph: the tunnel funiculars share the model)
+  const top = roof - 0.02;
+  for (const z of [-Wd / 2, Wd / 2]) {
+    P.push([box(L, 0.1, 0.12), COL.trainDark, at(0, floor + low + 0.05, z)]);                     // sill
+    P.push([box(L, 0.28, 0.1), COL.train, at(0, top - 0.14, z)]);                                // the band above the windows
+  }
+  for (const sx of [-1, 1]) {
+    const x = sx * (L / 2 - 0.02);
+    P.push([box(0.08, H - low, 0.5), COL.train, at(x, floor + low + (H - low) / 2, -Wd / 2 + 0.25)]);   // end wall piers either side of the window
+    P.push([box(0.08, H - low, 0.5), COL.train, at(x, floor + low + (H - low) / 2, Wd / 2 - 0.25)]);
+    P.push([box(0.08, 0.3, Wd), COL.train, at(x, top - 0.15, 0)]);
+  }
+  const bay = 1.85;
+  for (let x = -L / 2 + 1.1; x < L / 2 - 1.0; x += bay) {
+    for (const sz of [-1, 1]) {
+      const z = sz * (Wd / 2 - 0.5);
+      for (const face of [-1, 1]) {
+        const bx = x + face * 0.55;
+        P.push([box(0.48, 0.1, 0.8), 0x2a3550, at(bx, floor + 0.48, z)]);                         // seat
+        P.push([box(0.1, 0.62, 0.8), 0x2a3550, at(bx + face * 0.26, floor + 0.84, z)]);           // backrest (to the bay's outside)
+      }
+      P.push([box(0.4, 0.05, 0.5), 0x8e96a3, at(x, floor + 0.75, sz * (Wd / 2 - 0.3))]);         // window table
+    }
+  }
   const gh = H - low - 0.1, gy = floor + low + gh / 2 + 0.05;
   G.push([box(L - 0.2, gh, 0.02), 0xffffff, at(0, gy, Wd / 2)], [box(L - 0.2, gh, 0.02), 0xffffff, at(0, gy, -Wd / 2)]);
   G.push([box(0.02, gh, Wd - 0.2), 0xffffff, at(L / 2, gy, 0)], [box(0.02, gh, Wd - 0.2), 0xffffff, at(-L / 2, gy, 0)]);
@@ -161,7 +208,7 @@ export function createCarrier({ scene, kind, seats = 4, sub = '' }) {
     const g = carrierGeometry(kind, { seats });
     mesh(g.frame);
     if (g.glass) {
-      const gmat = new THREE.MeshLambertMaterial({ color: 0xcfe2f0, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide });
+      const gmat = new THREE.MeshLambertMaterial({ color: GLASS.color, transparent: true, opacity: GLASS.opacity, depthWrite: false, side: THREE.DoubleSide });
       const glass = new THREE.Mesh(g.glass, gmat);
       glass.renderOrder = 4; glass.frustumCulled = false;
       group.add(glass);

@@ -12,11 +12,11 @@ const THREE = window.THREE;
 
 import { createLiftPath } from './lift-path.js';
 import { createLiftWorld, frames } from './lift-site.js';
-import { carrierGeometry } from './modes/carriers.js';
+import { carrierGeometry, GLASS } from './modes/carriers.js';
 import { mergeParts } from './modes/views.js';
 
 const NEAR_R = 130;                    // m: carriers closer than this get the full model, the rest the far one
-const FAR_R = { chair: 1100, drag: 500, gondola: 1600, cable: 3000, train: 3000 };      // m: beyond this a carrier is below a pixel
+const FAR_R = { chair: 750, drag: 450, gondola: 1300, cable: 3000, train: 3000 };      // m: beyond this a carrier is ~2 px (R8c: chairs 1100 -> 750, gondolas 1600 -> 1300: Courchevel drew 159k triangles of carriers)
 const DWELL = 8;                       // s a jig-back cabin / train waits at a station
 /* R8: the lift-name signs on the stations (lift-site.js `sign` parts): the nearest SIGN.slots signs within SIGN.radius get their name in
  * one shared canvas atlas, one merged mesh = one draw call; re-chosen every SIGN.every s as the skier moves. */
@@ -278,7 +278,7 @@ export function createLifts({ scene, resort, height }) {
 
   // ---------------- carriers: instanced pools per model (near + far detail) ----------------
   const pools = new Map();               // key -> { near, far, glass, count }
-  const glassMat = new THREE.MeshLambertMaterial({ color: 0xcfe2f0, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide });
+  const glassMat = new THREE.MeshLambertMaterial({ color: GLASS.color, transparent: true, opacity: GLASS.opacity, depthWrite: false, side: THREE.DoubleSide });   // R8c
   disposables.push(glassMat);
   const variantOf = (l) => (l.kind === 'chair' ? `chair:${l.seats}` : l.kind === 'drag' ? `drag:${l.sub}` : l.kind);
   const need = new Map();
