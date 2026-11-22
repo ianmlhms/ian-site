@@ -148,6 +148,7 @@ async function boot() {
   window.addEventListener('pagehide', () => {
     if (leaving) return;
     leaving = true;
+    try { if (typeof streamer !== 'undefined' && streamer) streamer.stop(); } catch (error) { /* not created yet */ }
     try { scene.traverse((o) => { if (o.geometry && o.geometry.dispose) o.geometry.dispose(); }); renderer.renderLists.dispose(); renderer.dispose(); renderer.forceContextLoss(); } catch (error) { console.warn('[ski] GPU release on leave failed', error); }
   });
   window.addEventListener('pageshow', (e) => { if (e.persisted && leaving) location.reload(); });

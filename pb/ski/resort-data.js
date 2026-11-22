@@ -78,13 +78,15 @@ export function createTileStreamer({ resort, field, root }) {
   const listeners = new Set();
   const waiters = [];
   const stats = { loaded: 0, bytes: 0, failed: 0, total: list.length };
+  const abort = typeof AbortController === 'function' ? new AbortController() : null;   // R8f: stop() when the page goes away
+  let stopped = false;
 
   const dist = (t) => {
     const dx = Math.max(t.tx * size - fx, 0, fx - (t.tx + 1) * size), dz = Math.max(t.tz * size - fz, 0, fz - (t.tz + 1) * size);
     return Math.hypot(dx, dz);
   };
   function pump() {
-    while (active < DATA.fetchConcurrency) {
+    while (!stopped && active < DATA.fetchConcurrency) {
       let best = null, bd = Infinity;
       for (const t of list) {
         if (t.state !== 'wait') continue;
@@ -94,7 +96,8 @@ export function createTileStreamer({ resort, field, root }) {
       if (!best) return;
       best.state = 'load';
       active++;
-      fetchBytes(`${root}t/${best.tx}_${best.tz}.bin`).then((bytes) => {
+      fetchBytes(`${root}t/${best.tx}_${best.tz}.bin`, abort ? abort.signal : undefined).then((bytes) => {
+        if (stopped) return;
         const grid = decodeGrid(bytes, 0, true);                         // R8f: 16-bit heights (half the memory, same numbers)
         if (grid.nx !== DATA.tileCells + 1 || grid.nz !== DATA.tileCells + 1) throw new Error(`tile ${best.tx}_${best.tz}: ${grid.nx}x${grid.nz}`);
         const rect = field.addTile(best.tx, best.tz, grid);
@@ -102,6 +105,7 @@ export function createTileStreamer({ resort, field, root }) {
         stats.loaded++; stats.bytes += bytes.length;
         for (const fn of listeners) { try { fn(rect); } catch (error) { console.error('[ski] tile listener failed', error); } }
       }).catch((error) => {
+        if (stopped) return;
         console.warn('[ski] height tile failed, retrying later', best.tx, best.tz, error.message);
         stats.failed++;
         best.state = stats.failed > 40 ? 'dead' : 'wait';            // a dead tile: the far grid stays there (no hole, just coarser)
@@ -121,6 +125,9 @@ export function createTileStreamer({ resort, field, root }) {
   return {
     stats,
     focus(x, z) { fx = x; fz = z; pump(); },
+    /** R8f: the page goes away (a resort switch): the loads in flight are cancelled quietly (WebKit logged every one cut by the
+     *  navigation as an "access control checks" page error) and nothing new starts. */
+    stop() { stopped = true; if (abort) abort.abort(); },
     hold(r) { reach = r; },
     want(x, z, r) { if (!wanted || wanted.x !== x || wanted.z !== z || wanted.r !== r) { wanted = { x, z, r }; pump(); } },
     release() { if (reach !== Infinity) { reach = Infinity; pump(); } },
