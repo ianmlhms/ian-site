@@ -204,8 +204,20 @@ async function boot() {
       }
     }
     // R8: the stations by their real solid parts (lift-site.js: walls, posts, roofs, huts), the camera as a 0.5 m box round its point
-    if (modes.lifts.world.hit(x, z, 0.3, y - 0.25, (gx, gz) => surface.height(gx, gz), 0.5)) return true;
+    // (only near a station end: the lift world's lookup allocates, and this runs ~20 times a frame)
+    if (nearStation(x, z) && modes.lifts.world.hit(x, z, 0.3, y - 0.25, (gx, gz) => surface.height(gx, gz), 0.5)) return true;
     return !!scatter.hit(x, z, 1.1, y, quality.treeDensity);
+  }
+  let stationGrid = null;                                   // R8: 50 m cells holding a station end (the camera guard's cheap pre-test)
+  const nearStation = (x, z) => !!stationGrid && stationGrid.has(Math.floor(x / 50) * 100003 + Math.floor(z / 50));
+  function stationCells(l) {
+    const g = new Set(), q = {};
+    for (let i = 0; i < resort.lifts.length; i++) {
+      const p = l.pathOf(i);
+      if (!p) continue;
+      for (const e of [0, p.len]) { p.at(e, q); for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) g.add((Math.floor(q.x / 50) + dx) * 100003 + Math.floor(q.z / 50) + dz); }
+    }
+    return g;
   }
   const camGuard = createCameraGuard({ ground: (x, z) => surface.height(x, z), blocked: camBlocked });
   let lookDt = 1 / 60;
@@ -244,6 +256,7 @@ async function boot() {
     if (lifts) lifts.dispose();
     lifts = createLifts({ scene, resort, height: (x, z) => field.height(x, z) });
     liftsEarly = !streamer.done();
+    try { stationGrid = stationCells(lifts); } catch (error) { console.warn('[ski] station grid failed', error); }
     try { pylonGrid = pylonsOf(lifts); } catch (error) { console.warn('[ski] pylon grid failed', error); }      // round 7 (A): camera guard
     return lifts;
   }

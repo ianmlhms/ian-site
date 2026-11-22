@@ -141,6 +141,8 @@ export const flow = {
         await sleep(800);
         await F.emma.evaluate(() => window.__ski.boardLift());
         await F.emma.waitForFunction(() => window.__ski.game.phase === "lift", null, { timeout: 15000 });
+        // R8: R7-B's boarding walks / skates them to the loading line first and the next carrier of the loop picks them up there
+        for (const p of [host, emma]) await F[p.label].waitForFunction(() => window.__ski.ride && window.__ski.ride.phase === "ride", null, { timeout: 30000 });
         await sleep(2500);
         const [hr, er] = await Promise.all([me(F.host), me(F.emma)]);
         h.expect(hr.ride && er.ride && hr.lift === er.lift, `${rid}: both ride lift ${hr.lift} (${hr.ride} / ${er.ride})`);

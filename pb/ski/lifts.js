@@ -20,7 +20,7 @@ const FAR_R = { chair: 1100, drag: 500, gondola: 1600, cable: 3000, train: 3000 
 const DWELL = 8;                       // s a jig-back cabin / train waits at a station
 /* R8: the lift-name signs on the stations (lift-site.js `sign` parts): the nearest SIGN.slots signs within SIGN.radius get their name in
  * one shared canvas atlas, one merged mesh = one draw call; re-chosen every SIGN.every s as the skier moves. */
-const SIGN = Object.freeze({ slots: 24, radius: 450, every: 0.6, slotW: 512, slotH: 64, cols: 2 });
+const SIGN = Object.freeze({ slots: 12, radius: 320, every: 1.2, slotW: 512, slotH: 64, cols: 2 });      // (a small atlas: WebKit uploads it whole)
 
 export function createLifts({ scene, resort, height }) {
   const lifts = [];
@@ -331,7 +331,7 @@ export function createLifts({ scene, resort, height }) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
     const tex = new THREE.CanvasTexture(canvas);
-    tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter; tex.anisotropy = 4; tex.generateMipmaps = true;
+    tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter; tex.generateMipmaps = false;      // no mip chain to rebuild per upload
     const pos = new Float32Array(SIGN.slots * 4 * 3), uv = new Float32Array(SIGN.slots * 4 * 2), idx = [];
     for (let i = 0; i < SIGN.slots; i++) { const a = i * 4; idx.push(a, a + 2, a + 1, a + 2, a + 3, a + 1); }      // front faces the reader
     const geo = new THREE.BufferGeometry();
