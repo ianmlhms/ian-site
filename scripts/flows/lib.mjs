@@ -82,8 +82,52 @@ function linuxGlArgs() {
 
 /* FLOW_BROWSER=webkit runs the flow in Playwright WebKit (the engine of the school iPads) instead of Chromium (the default).
  * WebKit has no --mute-audio: the games of this repo only make sound after a tap, which a headless flow never makes unless it says so. */
-export async function launchBrowser({ fullChromium = false, args = [] } = {}) {
+/* ---------- power / memory economy (scripts/power/, 22 Nov 2026), all opt-in, default = unchanged ----------
+ * FLOW_NO_VIDEO=1      no video recording (each flow otherwise encodes a webm and saves it into OneDrive)
+ * FLOW_ECONOMY=1       3D flows (fullChromium): deviceScaleFactor 0.5 (same CSS layout, 1/4 of the pixels to render),
+ *                      Grafik "low" (localStorage arcade_gfx), requestAnimationFrame capped at FLOW_FPS (default 30)
+ * FLOW_ECONOMY_DSF=x   another scale factor for FLOW_ECONOMY (1 = full pixels)
+ * FLOW_FPS=n           cap requestAnimationFrame at n frames per second (any flow; 0 = no cap; never a flow with measuresFrames: true)
+ * FLOW_CHROME=shell    WebGL flows in chrome-headless-shell instead of Google Chrome for Testing (new headless)
+ * FLOW_CHROME=full     every flow in Google Chrome for Testing (what run_all does once one 3D flow is in the list)
+ * FLOW_CDP=ws://...    connect to an already running CDP browser (Lightpanda) instead of launching one */
+const ECONOMY = process.env.FLOW_ECONOMY === "1";
+const NO_VIDEO = process.env.FLOW_NO_VIDEO === "1";
+const ECONOMY_DSF = Number(process.env.FLOW_ECONOMY_DSF) || 0.5;
+const FPS_CAP = process.env.FLOW_FPS !== undefined ? Number(process.env.FLOW_FPS) : (ECONOMY ? 30 : 0);
+
+/* Init script: requestAnimationFrame callbacks run at most `fps` times a second. Between two frames the page sleeps on a
+ * setTimeout (no vsync wake-ups), so the GPU process renders 30 instead of 60 frames. Games clamp their frame dt
+ * (ski: 50 ms), so game time stays right down to 20 fps. */
+function rafCapScript(fps) {
+  const interval = 1000 / fps;
+  const nativeRaf = window.requestAnimationFrame.bind(window);
+  let queue = [], timer = null, next = 0, seq = 0;
+  const cancelled = new Set();
+  const pump = (t) => {
+    next = Math.max(next + interval, t - interval / 2);
+    const run = queue; queue = []; timer = null;
+    for (const [id, cb] of run) { if (cancelled.delete(id)) continue; try { cb(t); } catch (error) { setTimeout(() => { throw error; }); } }
+  };
+  window.requestAnimationFrame = (cb) => {
+    const id = ++seq;
+    queue.push([id, cb]);
+    // wake half a vsync early, so the native frame that follows is the one due (not the one after it)
+    if (timer === null) timer = setTimeout(() => nativeRaf(pump), Math.max(0, next - performance.now() - 8));
+    return id;
+  };
+  window.cancelAnimationFrame = (id) => { cancelled.add(id); };
+}
+
+export async function launchBrowser({ fullChromium: wantsFull = false, args = [] } = {}) {
   const playwright = await importPlaywright();
+  const fullChromium = wantsFull || process.env.FLOW_CHROME === "full";   // FLOW_CHROME=full: every flow in Chrome for Testing
+  if (process.env.FLOW_CDP) return playwright.chromium.connectOverCDP(process.env.FLOW_CDP);
+  if (process.env.FLOW_CHROME === "shell" && fullChromium) {
+    const shell = cachedChromiumPaths(false)[0];
+    if (!shell) throw new Error("FLOW_CHROME=shell: no chromium_headless_shell in ~/Library/Caches/ms-playwright (npx playwright install --only-shell chromium)");
+    return playwright.chromium.launch({ executablePath: shell, args: ["--mute-audio", ...(process.env.FLOW_SHELL_ARGS || "").split(" ").filter(Boolean), ...args] });
+  }
   if (process.env.FLOW_BROWSER === "webkit") {
     if (!playwright.webkit) throw new Error("FLOW_BROWSER=webkit: this Playwright has no webkit");
     try { return await playwright.webkit.launch(); } catch (error) { throw new Error(`FLOW_BROWSER=webkit: WebKit did not start (npx playwright install webkit?): ${String(error.message).split("\n")[0]}`, { cause: error }); }
@@ -355,13 +399,18 @@ export async function runFlow(flow, { browser, origin, shotsDir = process.env.FL
   const theOrigin = own ? own[1].origin : origin;
   const tmpVideos = fs.mkdtempSync(path.join(os.tmpdir(), "flow-video-"));
   const viewport = flow.viewport || VIEWPORT;          // a flow may ask for another size (a game in landscape)
+  // a flow that measures frame times (the ski flow: p95 on Niddreg) sets `measuresFrames: true`: it always runs at real
+  // pixels and frame rate, or its budget would measure the economy instead of the game
+  const economy = ECONOMY && !!flow.fullChromium && !flow.measuresFrames;
   const context = await theBrowser.newContext({
-    viewport, screenSize: viewport, deviceScaleFactor: 1, serviceWorkers: flow.serviceWorkers || "block",
+    viewport, screenSize: viewport, deviceScaleFactor: economy ? ECONOMY_DSF : 1, serviceWorkers: flow.serviceWorkers || "block",
     hasTouch: !!flow.touch, isMobile: !!flow.touch,
     ...(flow.permissions ? { permissions: flow.permissions } : {}),
     ...(process.env.FLOW_COLOR_SCHEME ? { colorScheme: process.env.FLOW_COLOR_SCHEME } : {}),   // FLOW_COLOR_SCHEME=dark emulates prefers-color-scheme
-    recordVideo: { dir: tmpVideos, size: viewport },
+    ...(NO_VIDEO ? {} : { recordVideo: { dir: tmpVideos, size: viewport } }),
   });
+  if (economy) await context.addInitScript(() => { try { if (!localStorage.getItem("arcade_gfx")) localStorage.setItem("arcade_gfx", "low"); } catch { /* private mode */ } });
+  if (FPS_CAP > 0 && !flow.measuresFrames) await context.addInitScript(rafCapScript, FPS_CAP);
   const base = flow.backend || {};
   const backend = createBackend({
     rpc: {
@@ -445,7 +494,7 @@ export async function runFlow(flow, { browser, origin, shotsDir = process.env.FL
   const video = page.video();
   await context.close();
   let videoPath = null;
-  try {
+  if (video) try {
     const target = path.join(videoDir(), `${flow.name}.webm`);
     fs.mkdirSync(path.dirname(target), { recursive: true });
     await video.saveAs(target);
