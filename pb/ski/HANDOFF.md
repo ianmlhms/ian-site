@@ -1314,3 +1314,17 @@ no drag shot (no drag lift picked); drag shots without the rider (Zermatt); the 
 ski-mp, ski-challenges, ski-park, ski-skis, ski-lifts-all, ski-look7d, ski-teleport, ski-firstperson, ski-avalanche, mp-lobby-*); GPU per
 page still ~300-450 MB (ANGLE/Metal; village cells are lazy now, a compact vertex format could save ~35 % more); per-frame garbage
 after all tiles are in (heap climbs ~100 MB before each GC).
+
+## Launch (22 Nov 2026): LIVE on ian.lu
+- Merged origin/main 0b25030f (FLOW_POWER flows: main's run_all.mjs / lib.mjs / scripts/power kept, R8f's omnibox flag re-added);
+  gamedata_manifest.py (lux-drive in sw.js GAMEDATA_GAMES + pb/lux-drive/data-hashes.json); mp-gate.js v10, friends.js v72; check_site clean.
+- Text: Arcade tile names the 5 areas (lb / de / en); linepack.js + bake.py display name drop a leading "0 " ("0 Lumen" -> "Lumen";
+  Kronplatz's short top "Lumen" becomes "Lumen (2)"). "Boïu" (Killy) is the real OSM name, kept.
+- SQL APPLIED on production: scripts/ski-v1.sql (ski_board_floors 1329 rows == floors-check, ski_time_floor, scores_guard_row with the
+  ski exception) + scripts/mp-ski-v1.sql (mp_games 'ski'). No existing score changed (1259 rows, 0 ski rows at launch).
+- Checks at launch: every Node check green; all 29 Chromium flows PASS (ski-mp: one mesh-link timing flake, re-run PASS);
+  memory-check 1-2 marginal FAILs (Killy second visit +55 / +71 MB vs 50; 3V renderer 462 vs 450 MB once): noise, no memory code changed.
+- **Owed after launch**: the WebKit flows (ski, ski-freeride, ski-webkit + the R8f after-launch list) — Playwright WebKit hangs on the Mini
+  at startup (network process stuck in CoreAnalytics::Client::get(); still after Ian restarted analyticsd at ~15:35). Run them once
+  WebKit starts again (a reboot cleared it this morning). The same game code passed WebKit in the final QA (13:40). Ian tests real Safari
+  on the Neo.
