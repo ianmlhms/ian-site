@@ -1065,7 +1065,7 @@ No data / bake / SQL changes (R8d re-bakes in parallel). Nothing depends on lift
   `window.__ski.roofShare()`. Check: scripts/ski/spawn-view-check.mjs (spawn + 6 fast travels per resort, <= 40 % roof).
 **Round 8e checks (22 Nov, Chromium only — see WebKit below; machine load 30-420 from other jobs during the flows)**
 - round7c-check (Node, all 5): run-in clear 1351/1351, banners clear of other pistes 1351/1351, prompt 1351/1351 (never crossing at
-  61 km/h), course rides with the game's collisions 1350/1351 -> folyeres-variante-blue fixed after (pocket escape; single re-run ok);
+  61 km/h), course rides with the game's collisions 1351/1351 (full re-run on the final bot: 130 passed, 0 failed);
   full re-run log: ~/Library/Caches/ski-work/round8e/r7c-rides.log. security-test, mp-race-test, round7b-test 5983, r7d-test 1424,
   round7-test 30, look7d-check 68 green; round6-test 2306/2307: Zermatt "Klein Matterhorn Glacier Ride" (now funitel class, wider
   lanes) exits 128 m from its top station (limit 120; the top station sits in the rock).
