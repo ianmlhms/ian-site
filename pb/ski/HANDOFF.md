@@ -1491,3 +1491,36 @@ Arlberg riffel / valfagehr / seekopf-standard / hoppelweg ..., Kronplatz pedaga)
   arrival: 11791 / 11791. Shots `scripts/ski/chair-board-shots.mjs` (SHOT_LIFT, SHOT_CAM side | ride; works on the old build via
   shot.mjs --root for before / after): ~/Library/Caches/ski-work/launch-lifts/chair/ (before / after / ridecam / fixed sheets).
 - r8c-check skips lifts the game does not draw (lift-path.js stubs: it crashed on them since 3513fd60). main.js?v=17.
+
+## Map clarity (22 Nov 2026): the big map opens on you, what you can ride stays vivid, tap cards, overview inset
+Ian (iPad landscape): "when you open the map you're a bit lost". What was confusing (before shots, Killy / Zermatt / Kronplatz):
+the map opened centred on the auto-picked lift (pickLift -> focusBox) or the first piste (selectPiste centre), not on the skier; the
+skier was a small green dot (green = green pistes, "Du" under labels), no view direction; the discovery fog was drawn OVER the
+pistes and lifts, so ~99 % of every resort was pastel and nothing read as rideable; lifts = thin black lines like black pistes, no
+names; piste labels at a fixed 45 % point overlapped ("Sonne (Rout)" / "Sonne (Blo)") and ran off screen; the picked lift was a red
+line + red dot (louder than you, red = red piste); legend only the 4 colours; no scale, no north, no overview; pinch zoomed round
+the canvas centre; a tap on a piste in the free ride tab only asked to teleport (no name / length / drop).
+- `map.js` (rewritten draw): fog UNDER the pistes / lifts (veils the terrain only); pistes thicker (2.2-6.5 px by zoom); lifts black
+  over a white casing, white bottom / black top station dots, names in black pills; labels placed by tier without overlaps (villages,
+  park, lifts + pistes nearest the skier first, landmarks, peaks; connectors / variants only zoomed in; zoomed out only pistes >= 1.5 km;
+  never under the buttons / legend / inset / card / scale bar); "you": orange arrow (#ff6a00, no piste colour) in a white ring, view
+  cone, "Du" pill, a CSS pulse (3x, `.mappulse`), an edge arrow when off screen; picked lift = yellow glow. Opens over a free ride
+  centred on the skier, 3 km across (`setPlayer(x, z, heading)`, recentring held until the opening task ends; a lift picked ON the map
+  never moves the view). Smooth +/- (rAF, log-space zoom), pinch round the fingers' middle (+ pan), wheel round the pointer, ◎ back to
+  me (`#mapMe`), ⤢ whole area (`#mapFit`), overview inset `.mapov` (whole resort + view frame + me; tap / drag = look there; hidden
+  when the map box < 560 px wide, e.g. iPad portrait), scale bar + north. `dispose()` on `ski-map-close` (ui.js close) / disconnect.
+- `explore.js`: the tap card `#mapCard` (top centre): piste / lift info (`pisteInfo` / `liftInfo`: colour or kind, length, drop / rise,
+  heights) above the unchanged `#tpConfirm` question; on the fog a piste's card says "Nach net entdeckt" (toast + dataset as before).
+  A tap on a lift in the free ride tab now picks it in the list AND shows the card (map.js passes the lift: `tapWorld(x, z, lift)`).
+- `ui.js` / `ui.css`: legend 2 rows (colours; Lift, Snowpark, Du, Nach net entdeckt), ◎ / ⤢ buttons, toast at the bottom centre.
+- Minimap (light, Ian: "basically good"): view cone, the piste you are on thicker (host.js passes `game.run.piste`), the nearest lift's
+  name (<= 450 m), lift casing + station dots, arrow orange (the red arrow vanished on red pistes).
+- **2D, no 3D relief**: the confusion came from the open position, the fog over the pistes, the weak marker and the labels, all fixed
+  in 2D; a tilted 3D view hides pistes behind ridges, needs labels / taps re-projected, and costs a second GPU context or the game
+  renderer's tiles on the iPad. The painted base already carries the relief shading; the inset gives the whole-resort context.
+- Tools: `scripts/ski/map-shots.mjs` (HUD, minimap, map open, piste / lift tap, zoomed out; `--tag`, `--size 820x1180`),
+  `scripts/ski/map-memory.mjs` (map open / close x10 with pan / zoom / ◎ / ⤢ / tap: heap, DOM nodes, listeners after GC).
+  Shots: ~/Library/Caches/ski-work/map-ui/<resort>-{before,after}-*.png. main.js?v=18, ui.css?v=13.
+- Checks: map-memory (Killy, open / close x10): heap +0.75 MB, DOM nodes +0, listeners +0, 0 page errors. Chromium flows PASS:
+  ski, ski-teleport, ski-freeride, ski-spawn (+ challenges, park, lift, skis, lifts-all, webkit-in-Chromium, look7d, mp-freeride,
+  firstperson, avalanche). WebKit not run (hangs on the Mini).

@@ -641,7 +641,7 @@ async function boot() {
     pisteMap.setPark(resort.park ? { line: resort.park.line, name: resort.park.name } : null);
     pisteMap.setMarks(modes.marks());
     explore.attachMap({ mapEl: mapScreen.el, pisteMap, onTeleport: (spot) => goFree(null, spot), onFirstLift: () => goFree(spawn) });      // R7-C
-    if (game.resume) pisteMap.setPlayer(game.resume.state.x, game.resume.state.z);
+    if (game.resume) { const st = game.resume.state; pisteMap.setPlayer(st.x, st.z, Math.hypot(st.vx, st.vz) > 1 ? Math.atan2(st.vz, st.vx) : st.heading); }      // map clarity: + view direction
     const last = store.get().last;
     const first = openPisteNear((last && last.resort === rid && pistes.byId.get(last.piste)) || pistes.byId.get(resort.start) || pistes.byId.get(DEFAULT_PISTE) || pistes.list[0]);
     selectPiste(first, true);

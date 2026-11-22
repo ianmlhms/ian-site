@@ -172,7 +172,7 @@ export function createModeHost(ctx) {
         const fixed = env.state.timeMode !== 'random';
         env.setDayHour(fixed ? null : clock.hour);
         freeHud.set({ hour: clock.hour, stats: freeRun.stats, fixedTime: fixed });
-        minimap.draw(game.state.x, game.state.z, Math.atan2(game.state.vz, game.state.vx) || game.state.heading);
+        minimap.draw(game.state.x, game.state.z, Math.atan2(game.state.vz, game.state.vx) || game.state.heading, game.run && game.run.piste);      // map clarity: + the piste you are on
       }
     },
 

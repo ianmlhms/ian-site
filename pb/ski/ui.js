@@ -35,8 +35,9 @@ export function createUi(root) {
       <header><button type="button" class="btn ghost" data-act="back" aria-label="Zréck">←</button><h1>${esc(resort.name)}</h1><span class="sub">Pistekaart</span>${onResume ? '<button type="button" class="btn primary" data-act="resume" id="mapResume">Weiderfueren ✕</button>' : ''}<button type="button" class="btn ghost" data-act="credits" aria-label="Quellen">ⓘ</button></header>
       <div class="mapwrap">
         <div class="mapbox"><canvas id="mapCanvas" aria-label="Pistekaart: tipp op eng Pist"></canvas>
-          <div class="zoom"><button type="button" data-z="in" aria-label="Méi no">+</button><button type="button" data-z="out" aria-label="Méi wäit">−</button></div>
-          <div class="legend">${DIFF_IDS.map((d) => `<span><i style="background:${DIFF[d].css}"></i>${DIFF_LB[d]}</span>`).join('')}</div>
+          <div class="zoom"><button type="button" data-z="in" aria-label="Méi no">+</button><button type="button" data-z="out" aria-label="Méi wäit">−</button><button type="button" data-mz="me" id="mapMe" aria-label="Bei mech" title="Bei mech" hidden><i class="mzme"></i></button><button type="button" data-mz="fit" id="mapFit" aria-label="Ganzt Skigebitt" title="Ganzt Skigebitt">⤢</button></div>
+          <div class="legend" id="mapLegend"><div>${DIFF_IDS.map((d) => `<span><i style="background:${DIFF[d].css}"></i>${DIFF_LB[d]}</span>`).join('')}</div>
+            <div><span><i class="lg-lift"></i>Lift</span><span><i class="lg-park"></i>Snowpark</span><span class="lg-yourow"><i class="lg-you"></i>Du</span><span class="lg-fogrow"><i class="lg-fog"></i>Nach net entdeckt</span></div></div>
         </div>
         <div class="side">
           <div class="list">${groups.map((g) => `<div class="grp">${DIFF_LB[g.d]} (${g.list.length})</div>${g.list.map((p) => `
@@ -97,7 +98,7 @@ export function createUi(root) {
           const st = b.querySelector('.pst'); if (st && starsOf) st.textContent = starsOf(p);
         });
       },
-      close() { s.remove(); },
+      close() { $("#mapCanvas").dispatchEvent(new Event("ski-map-close")); s.remove(); },      // map clarity: map.js lets go of its observer / animation
     };
   };
 
