@@ -81,7 +81,7 @@ export const flow = {
         window.__skiHudLog = log;
         const tick = () => { const c = k.lastCourse; const el = document.getElementById("cLeft"); if (c) log.push([c.remaining, el ? el.textContent : ""]); if (k.game.phase === "running") setTimeout(tick, 150); };
         tick();
-        const { createBot } = await import("/pb/ski/bot.js"); k.game.bot = createBot(k.game.piste);
+        const { createBot } = await import("/pb/ski/bot.js"); k.game.bot = createBot(k.game.piste, { blocked: k.blocked });
       });
       await page.waitForFunction(() => document.documentElement.dataset.skiScreen === "finish", null, { timeout: 240000 });
       const fin = await page.evaluate(() => ({ last: document.documentElement.dataset.skiLast, warned: document.documentElement.dataset.skiCourseWarn, hits: window.__ski.course ? window.__ski.course.hits : null }));

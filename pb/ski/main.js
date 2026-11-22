@@ -235,7 +235,7 @@ async function boot() {
     // R8: the stations by their real solid parts (lift-site.js: walls, posts, roofs, huts), the camera as a 0.5 m box round its point
     // (only near a station end: the lift world's lookup allocates, and this runs ~20 times a frame)
     if (nearStation(x, z) && modes.lifts.world.hit(x, z, 0.3, y - 0.25, (gx, gz) => surface.height(gx, gz), 0.5)) return true;
-    return !!scatter.hit(x, z, 1.1, y, quality.treeDensity);
+    return !!scatter.hit(x, z, 1.1, y, quality.treeDensity) || !!scatter.inCrown(x, y, z, quality.treeDensity, 0.35);      // R8e: the crowns too
   }
   let stationGrid = null;                                   // R8: 50 m cells holding a station end (the camera guard's cheap pre-test)
   const nearStation = (x, z) => !!stationGrid && stationGrid.has(Math.floor(x / 50) * 100003 + Math.floor(z / 50));
@@ -262,6 +262,9 @@ async function boot() {
       // R8 (early QA: the free look put the camera under the street): never under the snow, whatever the guard's minimum distance did
       const gy = surface.height(cam.x, cam.z) + 0.45;
       if (cam.y < gy) cam.y = gy;
+      // R8e (3V QA: after a crash next to a trunk the guard's 1.1 m minimum still sat in the branches): out of a crown upwards (the
+      // crown narrows with height), at most to its top
+      for (let i = 0, c = scatter.inCrown(cam.x, cam.y, cam.z, quality.treeDensity, 0.35); c && i < 24; i++, c = scatter.inCrown(cam.x, cam.y, cam.z, quality.treeDensity, 0.35)) cam.y = Math.min(cam.y + 0.5, c.top + 0.6);
     }
     return cam;
   }
@@ -373,6 +376,8 @@ async function boot() {
     snow: (x, z) => Math.min(1, surface.info(x, z, 0) * 1.25),
     hit: (x, z, r, y) => scatter.hit(x, z, r, y, quality.treeDensity) || modes.lifts.world.hit(x, z, r, y, (gx, gz) => surface.height(gx, gz)) || buildingHit(x, z, r, y),     // R7-B: pylons + stations; R8: houses
   };
+  /** R8e: a station part / pylon / house at (x, z) (the scripted bot skis round it; window.__ski.blocked for the flows). */
+  const botBlocked = (x, z) => { const y = standHeight(x, z); return !!(modes.lifts.world.hit(x, z, 1, y, (gx, gz) => surface.height(gx, gz)) || buildingHit(x, z, 1, y)); };
   /** R8 (early QA: he skied through chalets): the houses collide like the station walls: out by the nearest face of the footprint box. */
   const houseHit = { nx: 0, nz: 0, pen: 0, kind: 'house' };
   function buildingHit(x, z, r, y) {
@@ -653,7 +658,7 @@ async function boot() {
     const g = mode === MODES.run ? decodeGhost(store.get().ghosts[pisteKey(rid, p.id)]) : null;
     game.ghost = g;
     ghostModel.setVisible(false);
-    game.bot = params.bot && mode !== MODES.park ? createBot(p) : null;
+    game.bot = params.bot && mode !== MODES.park ? createBot(p, { blocked: botBlocked }) : null;
     game.assisted = false;
     if (mode !== MODES.park) { store.set(withLast(store.get(), rid, p.id)); boards.select(rid, p, resort.short); }
     modes.begin(game);                                                       // round 4A: stars / park / free ride parts
@@ -729,9 +734,39 @@ async function boot() {
     hud.toast(`Weider op: ${p.name}`);
   }
 
+  /** R8e (3V QA "Aua, e Bam!": after a tree crash the camera sat in the tree, the skier against the trunk): a respawn spot clear of
+   *  trunks (2.2 m), houses and lift parts, with the chase camera's spot (5 m behind, 2.6 m up) outside every crown. Else the nearest
+   *  piste point within 80 m (no tree stands on a piste), else rings out to 40 m; the heading then follows the piste / the fall line. */
+  function clearSpot(r) {
+    const d = quality.treeDensity;
+    const ok = (x, z, h) => {
+      if (scatter.hit(x, z, 2.2, -1e9, d) || buildingHit(x, z, 1.5) || modes.lifts.world.hit(x, z, 1.5)) return false;
+      const cx = x - Math.cos(h) * 5, cz = z - Math.sin(h) * 5;
+      return !scatter.inCrown(cx, surface.height(cx, cz) + 2.6, cz, d, 0.6) && !scatter.inCrown(x, surface.height(x, z) + 1.6, z, d, 0.3);
+    };
+    if (ok(r.x, r.z, r.heading)) return r;
+    const n = pistes.nearest(r.x, r.z, 80);
+    if (n) {
+      for (const ds of [0, -8, 8, -16, 16, -30]) {
+        const a = n.piste.at(Math.max(2, Math.min(n.piste.length - 2, n.proj.s + ds)), {});
+        const h = Math.atan2(a.dz, a.dx);
+        if (ok(a.x, a.z, h)) return { x: a.x, z: a.z, heading: h, s: r.s };
+      }
+    }
+    const nn = surface.normal(r.x, r.z, {});
+    const fall = Math.hypot(nn.x, nn.z) > 0.05 ? Math.atan2(nn.z, nn.x) : r.heading;
+    for (let dist = 3; dist <= 40; dist += 3) {
+      for (let k = 0; k < 12; k++) {
+        const a = r.heading + Math.PI + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * Math.PI / 6;     // behind him first, then round
+        const x = r.x + Math.cos(a) * dist, z = r.z + Math.sin(a) * dist;
+        if (ok(x, z, fall)) return { x, z, heading: fall, s: r.s };
+      }
+    }
+    return r;
+  }
   function respawn(text) {
     if (!game.run) return;
-    const r = game.run.respawnPoint();
+    const r = clearSpot(game.run.respawnPoint());
     placeAt(r.x, r.z, r.heading);
     if (course) course.rebase();                                             // R7-C2: the HUD distance from where he stands again
     if (text) hud.toast(text);
@@ -1313,7 +1348,7 @@ async function boot() {
   // debug / flows
   window.__ski = {
     get game() { return game; }, get state() { return game.state; }, get level() { return level; }, renderer, scene, camera, env, pistes, get landmarks() { return landmarks; }, streamer, terrain, scatterView, field, surface,
-    setInput(o) { game.override = o; },
+    setInput(o) { game.override = o; }, blocked: (x, z) => botBlocked(x, z),
     /** Debug camera circling the skier: angle (deg from the skier's heading), distance, height; null = off. */
     orbit(angle, dist = 4, h = 1.2, fov = 40) { if (angle === null) { game.orbit = null; game.camPose = null; return; } game.orbit = { angle, dist, h, fov }; },
     /** Fixed camera at (x, z) heightAbove m over the ground looking at (tx, tz) heightAbove2 m over its ground; null = chase camera again. */

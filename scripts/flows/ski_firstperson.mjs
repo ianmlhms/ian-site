@@ -31,10 +31,30 @@ export const flow = {
       }
       await page.waitForFunction(() => window.__ski.camMode === "fp", null, { timeout: 4000 });
       // a red / black piste in the resort, the middle: carve down it
-      const spot = await page.evaluate(() => { const L = window.__ski.pistes.list.filter((p) => (p.diff === "red" || p.diff === "blue") && p.length > 900); const p = L[Math.floor(L.length / 2)]; const a = p.at(p.length * 0.4, {}); window.__ski.place(a.x, a.z, Math.atan2(a.dz, a.dx)); return { id: p.id, x: a.x, z: a.z }; });
+      // R8e (Kronplatz: the middle piste's 40 % point was a flat, 7 km/h, no carve to judge): the first point of those pistes whose next
+      // 120 m fall >= 12° on average (a real carving slope), so the spray / lean are judged at carving speed
+      const spot = await page.evaluate(() => {
+        const k = window.__ski, L = k.pistes.list.filter((p) => (p.diff === "red" || p.diff === "blue") && p.length > 900);
+        const order = [...L.keys()].sort((a, b) => Math.abs(a - L.length / 2) - Math.abs(b - L.length / 2));
+        let pick = null;
+        for (const i of order) {
+          const p = L[i];
+          for (const f of [0.4, 0.3, 0.5, 0.2, 0.6]) {
+            const a = p.at(p.length * f, {}), b = p.at(Math.min(p.length, p.length * f + 120), {});
+            const drop = k.surface.height(a.x, a.z) - k.surface.height(b.x, b.z);
+            if (Math.atan2(drop, 120) * 180 / Math.PI >= 12) { pick = { p, a }; break; }
+          }
+          if (pick) break;
+        }
+        if (!pick) { const p = L[Math.floor(L.length / 2)]; pick = { p, a: p.at(p.length * 0.4, {}) }; }
+        const { p, a } = pick;
+        k.place(a.x, a.z, Math.atan2(a.dz, a.dx));
+        return { id: p.id, x: a.x, z: a.z };
+      });
       await page.evaluate(({ x, z }) => window.__ski.streamer.ready(x, z, 400), spot);
       await page.evaluate(() => window.__ski.setInput({ steer: 0, tuck: 1, brake: 0, push: 1, jump: false }));
       await h.pause(2500);
+      await page.waitForFunction(() => window.__ski.state.speed * 3.6 > 30, null, { timeout: 8000 }).catch(() => {});      // R8e: up to carving speed
       const fp = await page.evaluate(() => {
         const k = window.__ski, s = k.state, c = k.camera;
         return { eye: c.position.y - k.surface.height(c.position.x, c.position.z), skis: k.fp.meshes.skis().visible, poles: k.fp.meshes.poles.visible, body: k.scene.children.some((o) => o.visible && /skier/i.test(o.name || "")) , fov: c.fov, speed: s.speed * 3.6, streak: Number(getComputedStyle(document.getElementById("fpStreak")).opacity), mode: document.documentElement.dataset.skiCam };

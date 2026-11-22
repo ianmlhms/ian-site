@@ -13,6 +13,7 @@ const STATION_REACH = 45;        // m from a station = reached
 
 export function createExplore({ rid, resort, store, cloud, field, scatter, density = 1, lifts, pistes, height }) {
   const obs = createObstacles({ resort, field, scatter, density, liftWorld: () => lifts.world });      // R8b: R7-B's stations too
+  obs.setPistes(pistes.list);                                              // R8e: start banners clear of other pistes
   const disc = createDiscovery({ width: resort.width, depth: resort.depth, saved: (store.get().disc || {})[rid] || '' });
   const first = firstLift(rid, lifts, resort.places, null);
   if (first) disc.reveal(first.bottom.x, first.bottom.z, DISCOVERY.spawn);

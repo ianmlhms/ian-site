@@ -121,10 +121,14 @@ try {
       }
       if (want("stop")) {
         await drive({ steer: 'bot', tuck: 1, brake: 0, push: 1, jump: false }, 3000);
+        // R8e: a real hockey stop needs > 25 km/h (SKI.hockeyFrom); slower, the brake is the plough (that was the R8b "stop" shot)
+        for (let i = 0; i < 12 && (await ev(() => window.__ski.state.speed)) < 9; i++) await drive({ steer: 'bot', tuck: 1, brake: 0, push: 1, jump: false }, 500);
+        const v0 = await ev(() => window.__ski.state.speed * 3.6);
         await drive({ steer: 0.2, tuck: 0, brake: 1, push: 0, jump: false, hard: true }, 2600);
         const v = await ev(() => window.__ski.state.speed * 3.6);
         await ev(() => window.__ski.orbit(200, 4.5, 1.0, 45)); await settle(300); await shot("stop");
-        report.push(`${rid}: stop at ${v.toFixed(1)} km/h`);
+        const sk = await ev(() => { const S = window.__ski, e = S.skier.skiEnds(), d = (k) => Math.atan2(k.tip.z - k.tail.z, k.tip.x - k.tail.x); const a = Math.abs(Math.atan2(Math.sin(d(e[0]) - d(e[1])), Math.cos(d(e[0]) - d(e[1])))) * 180 / Math.PI; return { apart: a, st: { hold: S.state.hold, stop: S.state.stop, brake: S.state.brake, edge: S.state.edge, crash: S.state.crash, ride: S.state.ride }, rot: S.skier.debugSkis ? S.skier.debugSkis() : null }; });
+        report.push(`${rid}: hockey stop from ${v0.toFixed(0)} km/h, at ${v.toFixed(1)} km/h, skis ${sk.apart.toFixed(0)} deg apart ${JSON.stringify(sk.st)} ${JSON.stringify(sk.rot)}`);
         await ev(() => window.__ski.orbit(null));
       }
       if (want("fp")) {

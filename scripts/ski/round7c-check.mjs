@@ -40,6 +40,7 @@ const { createSkierState, stepSkier } = await imp('skier.js');
 const { createBot } = await imp('bot.js');
 const { SKI, AVALANCHE, MODES, COURSE } = await imp('config.js');
 const { unpackResort } = await imp('linepack.js');                 // R8b: resort.json carries packed piste lines (R7-D)
+const { buildingBoxes, createBoxIndex } = await imp('look.js');     // R8e: the rides collide with the houses like main.js
 
 const args = process.argv.slice(2);
 const RIDES = args.includes('--rides');
@@ -66,6 +67,7 @@ for (const rid of rids.length ? rids : ALL) {
   const pistes = createPisteSet(resort);
   const lifts = createLiftNet(resort, (x, z) => field.farHeight(x, z), pistes);
   const obs = createObstacles({ resort, field, scatter, density: 0.8, liftWorld: () => lifts.world });      // R8b: R7-B's stations too
+  obs.setPistes(pistes.list);                                              // R8e: start banners clear of other pistes
   // R8b: like main.js: R7-B's stations replace the OSM station buildings, the obstacles know the kept (drawn) houses
   const buildingRows = JSON.parse(fs.readFileSync(path.join(dir, 'buildings.json'), 'utf8'));
   const liftWorld = lifts.setBuildings(buildingRows);
@@ -196,7 +198,56 @@ for (const rid of rids.length ? rids : ALL) {
   check(seatsOk === total, `course objects: ${seatsOk}/${total} courses with every barrier / arrow / post / ZIL pillar / beam / finish strip on the snow, <= ${COURSE.archHeight} m above it, intended size (net edge over the snow <= ${worstGap.toFixed(2)} m, into it <= ${worstBury.toFixed(2)} m)${badSeats.length ? `; bad: ${badSeats.slice(0, 6).join('; ')}` : ''}`);
   row.gates = `${clear}/${total}`;
   // R7-C2: the barriers hold: a skier at 15 m/s aimed 35° at the net, on the ground, every 5th course
-  const world = { height, normal: (x, z, o) => surface.normal(x, z, o), snow: (x, z) => Math.min(1, surface.info(x, z, 0) * 1.25), hit: (x, z, r, y) => scatter.hit(x, z, r, y, 0.8) };
+  // R8e (ski-course flow: Kronplatz sylvester stopped dead against a station 33 m below the gate, the Node rides only knew the
+  // trees): the rides collide like main.js world.hit = trees + R7-B's pylons / station parts + the kept houses
+  const boxIndex = createBoxIndex(buildingBoxes(buildingRows.filter((_, i) => liftWorld.keepBuilding(i))));
+  const houseOut = { nx: 0, nz: 0, pen: 0, kind: 'house' };
+  const houseHit = (x, z, r, y) => {
+    const b = boxIndex.hit(x, z, r);
+    if (!b || (y !== undefined && y > b[6])) return null;
+    const dx = x - b[0], dz = z - b[1], u = dx * b[2] + dz * b[3], v = -dx * b[3] + dz * b[2];
+    const pu = b[4] + r - Math.abs(u), pv = b[5] + r - Math.abs(v);
+    if (pu < pv) { const su = Math.sign(u) || 1; houseOut.nx = b[2] * su; houseOut.nz = b[3] * su; houseOut.pen = pu; } else { const sv = Math.sign(v) || 1; houseOut.nx = -b[3] * sv; houseOut.nz = b[2] * sv; houseOut.pen = pv; }
+    return houseOut;
+  };
+  const world = { height, normal: (x, z, o) => surface.normal(x, z, o), snow: (x, z) => Math.min(1, surface.info(x, z, 0) * 1.25), hit: (x, z, r, y) => scatter.hit(x, z, r, y, 0.8) || lifts.world.hit(x, z, r, y, height) || houseHit(x, z, r, y) };
+  // R8e: the first 60 m below every start gate (the push start) run on open snow: no station / pylon / house on the line
+  let runInBad = 0;
+  const runInList = [];
+  for (const p of pistes.list) {
+    if (ONLY && !ONLY.has(p.id)) continue;
+    const g = gates.get(p.id);
+    for (let d = 0; d <= 60; d += 3) {
+      p.at(g.s + d, gp);
+      const x = gp.x - gp.dz * (g.lat || 0), z = gp.z + gp.dx * (g.lat || 0);
+      if (lifts.world.inStation(x, z, 1) || lifts.world.hit(x, z, 1, -Infinity) || obs.inBuilding(x, z, 1)) { runInBad++; runInList.push(`${p.id}@+${d}`); break; }
+    }
+  }
+  // R8e (3V QA "Lac des Creux"): independent of courseGate, no OTHER piste's line through any start banner (+-5.5 m across, +-10 m
+  // along), sampled every 0.5 m
+  let bannerBad = 0;
+  const bannerList = [], q0 = {};
+  for (const p of pistes.list) {
+    if (ONLY && !ONLY.has(p.id)) continue;
+    const g = gates.get(p.id);
+    p.at(g.s, gp);
+    const gx = gp.x - gp.dz * (g.lat || 0), gz = gp.z + gp.dx * (g.lat || 0), ux = gp.dx, uz = gp.dz;
+    for (const q of pistes.list) {
+      if (q === p) continue;
+      if (gx < Math.min(q.top.x, q.bottom.x) - 3000 || gx > Math.max(q.top.x, q.bottom.x) + 3000) continue;
+      const pr = q.project(gx, gz, null, 0, {});
+      if (pr.dist > 20) continue;
+      let hitQ = false;
+      for (let d = -30; d <= 30 && !hitQ; d += 0.5) {
+        q.at(Math.max(0, Math.min(q.length, pr.s + d)), q0);
+        const a = (q0.x - gx) * ux + (q0.z - gz) * uz, b = -(q0.x - gx) * uz + (q0.z - gz) * ux;
+        if (Math.abs(a) <= COURSE.bannerAlong && Math.abs(b) <= 5.5) hitQ = true;
+      }
+      if (hitQ) { bannerBad++; bannerList.push(`${p.id}x${q.id}`); break; }
+    }
+  }
+  check(bannerBad === 0, `course: no other piste's line through any of the ${total} start banners (+-5.5 m across, +-${COURSE.bannerAlong} m along)${bannerList.length ? ` (${bannerBad} not: ${bannerList.slice(0, 8).join(', ')})` : ''}`);
+  check(runInBad === 0, `course: the first 60 m below all ${total} start gates clear of stations / lift parts / houses${runInList.length ? ` (${runInBad} not: ${runInList.slice(0, 8).join(', ')})` : ''}`);
   let hold = 0, holdN = 0, through = 0, stopped = 0, minKeep = 1, missed = 0;
   for (const [i, p] of pistes.list.entries()) {
     if (ONLY ? !ONLY.has(p.id) : i % 5) continue;
@@ -257,7 +308,7 @@ for (const rid of rids.length ? rids : ALL) {
       const x0 = a.x - a.dz * (g.lat || 0), z0 = a.z + a.dx * (g.lat || 0);
       let s = createSkierState(x0, z0, Math.atan2(a.dz, a.dx), height(x0, z0));
       s = { ...s, hold: 0, vx: a.dx * COURSE.push, vz: a.dz * COURSE.push, speed: COURSE.push };      // the push start (main.js pushStart) ends the standing hold
-      const bot = createBot(p);
+      const bot = createBot(p, { blocked: (x, z) => { const y = height(x, z); return !!(lifts.world.hit(x, z, 1, y, height) || houseHit(x, z, 1, y)); } });      // R8e: round a station on the line
       let t = 0, done = false, low = Infinity, rise = 0, atFinish = null, lastRemain = null, fresh = true;
       const limit = 300 + p.length / 3;                       // long flat ski routes (Arlberg woster-bockbachtal: 8.2 km) take time
       while (t < limit && !done) {
@@ -276,7 +327,7 @@ for (const rid of rids.length ? rids : ALL) {
           if (ev.type === 'offpiste') resets++;
         }
         t += SKI.dt;
-        if (process.env.R7C_TRACE === p.id && Math.round(t / SKI.dt) % 120 === 0) console.log(`    t ${t.toFixed(0)} s ${Math.round(run.progress)} v ${s.speed.toFixed(1)} hold ${s.hold} crash ${s.crash.toFixed(1)} y ${s.y.toFixed(0)} off ${p.project(s.x, s.z, null, 0, {}).off.toFixed(1)}`);
+        if (process.env.R7C_TRACE === p.id && Math.round(t / SKI.dt) % 120 === 0) console.log(`    t ${t.toFixed(0)} s ${Math.round(run.progress)} v ${s.speed.toFixed(1)} hold ${s.hold} crash ${s.crash.toFixed(1)} y ${s.y.toFixed(0)} off ${p.project(s.x, s.z, null, 0, {}).off.toFixed(1)} at ${s.x.toFixed(0)},${s.z.toFixed(0)} in ${lifts.world.inStation(s.x, s.z, 1) ? 'station' : lifts.world.hit(s.x, s.z, 1, -Infinity) ? 'lift part' : houseHit(s.x, s.z, 1) ? 'house' : scatter.hit(s.x, s.z, 1, undefined, 0.8) ? 'tree' : '-'}`);
       }
       hits += course.hits;
       const pr = p.project(s.x, s.z, null, 0, {});

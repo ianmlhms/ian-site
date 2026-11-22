@@ -101,6 +101,39 @@ export const flow = {
     h.expect(!tp.why && tp.slope < 32 && Math.abs(tp.above) <= 0.3 && tp.tiles, `a safe spot: ${tp.why || "open snow"}, ${tp.slope.toFixed(0)}°, ${tp.above.toFixed(2)} m above the loaded 5 m ground`);
     await h.shot("teleported");
 
+    h.step("R8e: the piste tab too: a tap on the empty (discovered) map asks to teleport, on the fog 'Nach net entdeckt'");
+    await page.keyboard.press("m");
+    await page.waitForFunction(() => document.documentElement.dataset.skiScreen === "map", null, { timeout: 10000 });
+    await page.evaluate(() => window.__ski.setMapMode("piste"));
+    await page.waitForFunction(() => document.documentElement.dataset.skiMapMode === "piste", null, { timeout: 5000 });
+    const empty = await page.evaluate(() => {
+      const k = window.__ski, s = k.state, e = k.explore;
+      for (let d = 60; d <= 400; d += 20) for (let a = 0; a < 12; a++) {
+        const x = s.x + Math.cos(a / 12 * Math.PI * 2) * d, z = s.z + Math.sin(a / 12 * Math.PI * 2) * d;
+        const n = k.pistes.nearest(x, z, 90);
+        if (!n && e.disc.has(x, z)) return { x, z };
+      }
+      return null;
+    });
+    h.expect(!!empty, "a discovered spot off every piste");
+    if (empty) {
+      await page.evaluate(() => { const el = document.getElementById("tpToast"); if (el) el.hidden = true; document.documentElement.dataset.skiTeleport = ""; });
+      await tapWorld(empty.x, empty.z);
+      await page.waitForFunction(() => document.documentElement.dataset.skiTeleport === "confirm", null, { timeout: 4000 }).catch(() => {});
+      h.eq(await page.evaluate(() => document.documentElement.dataset.skiTeleport), "confirm", "piste tab, empty discovered map: 'Hei hin teleportéieren?'");
+      await h.shot("map-piste-tab-empty-tap");
+      await page.click("#tpNo");
+    }
+    const fog = await page.evaluate(() => { const k = window.__ski, e = k.explore; for (let i = 0; i < 4000; i++) { const x = 200 + (i * 7919) % 20000, z = 200 + (i * 104729) % 20000; if (x < k.field.width - 200 && z < k.field.depth - 200 && !e.disc.has(x, z) && !k.pistes.nearest(x, z, 150)) return { x, z }; } return null; });
+    if (fog) {
+      await page.evaluate(() => { document.documentElement.dataset.skiTeleport = ""; });
+      await tapWorld(fog.x, fog.z);
+      await page.waitForFunction(() => document.documentElement.dataset.skiTeleport === "refused", null, { timeout: 3000 }).catch(() => {});
+      h.eq(await page.evaluate(() => document.documentElement.dataset.skiTeleport), "refused", "piste tab, the fog: 'Nach net entdeckt'");
+    }
+    await page.evaluate(() => window.__ski.setMapMode("freeride"));
+    await page.click("#mapResume").catch(() => {});
+
     h.step("discovery is saved (locally and in the cloud record) and survives a reload");
     await page.evaluate(() => window.__ski.explore.save(true));
     const saved = await page.evaluate(async () => { const p = JSON.parse(localStorage.getItem("pb_ski_save")); const { encodeCloud } = await import("/pb/ski/modes/cloud.js"); const rec = encodeCloud(window.__ski.progress()); return { local: (p.disc || {}).killy || "", cloud: (rec.d || {}).killy || "", size: JSON.stringify(rec).length }; });
