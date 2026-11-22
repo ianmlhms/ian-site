@@ -221,13 +221,18 @@ export function courseFinish(piste, obs, startS = 2) {
   const sMin = Math.max(startS + 60, end - (COURSE.finishSearch || 140));
   const opts = { lift: false, trees: false, built: false, edge: 8 };
   let why = '';
-  for (let s = end; s >= sMin; s -= 4) {
-    why = '';
-    piste.at(s, a);
-    const rx = -a.dz, rz = a.dx;
-    for (const k of [0, hw + 0.8, -(hw + 0.8)]) { const w = obs.blocked(a.x + rx * k, a.z + rz * k, 1.6, opts); if (w === 'building' || w === 'station') { why = `arch ${w}`; break; } }
-    for (let d = 10; !why && d <= 60; d += 10) { piste.at(s - d, a); const w = obs.blocked(a.x, a.z, 2, opts); if (w === 'building' || w === 'station') why = `run-in ${w}`; }
-    if (!why) return { s, ok: true, why: '' };
+  // pass 1 also keeps lift lines out of the arch and its last 20 m (R8b shots: a chair-lift pylon in the arch); many pistes end
+  // along a lift's line into its bottom station, so pass 2 only asks for no station / house
+  for (const strict of [true, false]) {
+    for (let s = end; s >= sMin; s -= 4) {
+      why = '';
+      piste.at(s, a);
+      const rx = -a.dz, rz = a.dx;
+      for (const k of [0, hw + 0.8, -(hw + 0.8)]) { const w = obs.blocked(a.x + rx * k, a.z + rz * k, 1.6, opts); if (w === 'building' || w === 'station') { why = `arch ${w}`; break; } }
+      for (let d = 0; strict && !why && d <= 20; d += 5) { piste.at(s - d, a); for (const k of [0, hw * 0.6, -hw * 0.6]) if (obs.nearLine(a.x - a.dz * k, a.z + a.dx * k, 2.5)) { why = 'lift line'; break; } }
+      for (let d = 10; !why && d <= 60; d += 10) { piste.at(s - d, a); const w = obs.blocked(a.x, a.z, 2, opts); if (w === 'building' || w === 'station') why = `run-in ${w}`; }
+      if (!why) return { s, ok: true, why: '', liftFree: strict };
+    }
   }
-  return { s: end, ok: false, why };
+  return { s: end, ok: false, why, liftFree: false };
 }
