@@ -979,3 +979,44 @@ security-test, mp-race-test, r7d-test (1424), round6-test (2307) green.
   Lift list: a bare-number lift name gets its kind ("Sessellift 3000"), the height reads "↑ 2959 m" (was "30002959 m").
 - Tools: frame-probe.mjs `--travel N` (frames after N fast travels, every upkeep method wrapped), round8-sheet.mjs `fp` + `map` shots
   (the map shot reports list row vs card), pose-check waits 60 drawn frames (a half-blended plough failed under load).
+**Round 8b checks (22 Nov, this branch; machine load 7-30, one browser job at a time)**
+- Node, all green: round7c-check --rides 115/115 (spawn in B's zone 9 m, teleport 195-200/200 safe, Lawin faces >= 35°, avalanche zones
+  known 389-398/400, gates 1351/1351 on open snow and 0 touching a station / pylon / house, every ZIL clear (Killy 52, 3V 86, Zermatt 29,
+  Arlberg 64, Kronplatz 25 moved up), course rides 1351/1351, HUD < 30 m at the ZIL, barriers 533/533 aimed hits held, 0 through),
+  security-test all passed (incl. 5 C2 cloud checks), mp-race-test, round7b-test 5981, round6-test 2307, round7-test 30, r7d-test 1424,
+  look7d-check 68, harness --all 23/23/23/19/19.
+- ground-check (both engines, before the deck fix): 10/10. After the deck fix + the new `decks` test: spawn on the deck (0.00 m), every deck
+  spot 0 cm, failures only Killy Combe Folle (drag start line 8.5 cm, now a deck) + drag tracks 3.5-5 cm (now a depth-free decal, the test
+  skips decals) -> NOT re-run after those two fixes: re-run `ground-check.mjs --engines chromium,webkit` (expect 10/10).
+- pose-check: WebKit all green; Chromium all green after the 60-frame settle (first run: 3V plough tails 0.42 m half-blended).
+- calls-sweep7d (Niddreg, no --gpu): worst 153 / 151 / 148 / 145 / 151 (was 169 / 166 / 162 / 162 / 168), all <= 160.
+- frame-probe WebKit (load ~10): fast travel x 6 lifts: p95 18 ms, max 46 ms after the fade (no 200 ms hitch any more); Niddreg diebold
+  p95 58 / max 699 ms before the skinned skier -> WebKit `ski` flow now p95 26 ms / max 28 ms (127 calls, 438k tris): 1 ms over the
+  25 ms gate (headless WebKit, software paths); Chromium `ski` p95 16.7 ms.
+- Flows Chromium (load ~8): 25/29 PASS (home-page, ski, ski-ipad-start, ski-resorts, ski-mp, ski-challenges, ski-park, ski-freeride,
+  ski-lift, ski-skis, ski-lifts-all, ski-webkit, ski-look7d, ski-teleport, ski-avalanche, all 9 mp-lobby-*, arcade-pad). FAILED:
+  ski-mp-freeride (its fake avalanche id "c12_34" is now refused by known(): flow fixed to send a real Lawin-face id, PASS in WebKit),
+  ski-spawn (C's "nothing within 25 m ahead" vs B's in-station wait spot: flow fixed, PASS in WebKit), ski-firstperson (Kronplatz: 0
+  powder grains carving at 7 km/h + view lean -0.0°; WebKit also 3V lean -1.6°: the bot's carve there is too slow / too straight for the
+  flow's thresholds, or the lean sign; NOT fixed), ski-course (Kronplatz sylvester 4.1 km: not at the ZIL within the flow's 240 s; suspect
+  the new 10 s "stuck -> abort card" pausing the run when the scripted skier slows on a flat, or the moved finish; NOT fixed — check
+  `stuckFor` (main.js courseTick) against a slow-but-moving bot, maybe count only < 0.3 m/s or only off the line's progress).
+- Flows WebKit: ran on the live tree during the fixes (see ~/Library/Caches/ski-work/round8b/flows-webkit.log): ski p95 26 ms (FAIL by
+  1 ms), ski-ipad-start is Chromium-only (CDP), ski-firstperson + ski-course as above, the rest PASS through mp-lobby-party at the time of
+  writing. Logs: round8b/flows-chromium.log, flows-webkit.log.
+- WebKit sheets: ~/Library/Caches/ski-work/round8b/sheet/sheet-<resort>-webkit.jpg (spawn, street, station, ride, carve, stop, drag, fp,
+  map) + c2/ (course start / mid / finish / avalanche, checks.txt). Seen: skinned skier correct, stations with names, decks fine.
+**Still wrong / open after 8b** (A / B areas unless noted):
+- Hockey stop END pose at 0 km/h: one ski under the boots, the other ~90° across beside him (Arlberg / Zermatt / Kronplatz stop shots;
+  also in R8's pre-skinning shot round8/webkit-arlberg-stop.png, so not the skinned mesh). pose-check only tests it at speed.
+- Spawn camera under the station roof (roof fills the top quarter); first-person hands still read blocky (mittens added, not re-shot).
+- 3V QA not done here: camera stuck in a tree after a crash; Funitel drawn as a 2-cabin tram + chase cam in the cabin roof; cable cars
+  without a waiting cabin at the bottom; chair skis through the footrest; platter rod not held; plough at 0-7 km/h (the hold / hockey
+  states win over the plough); Lac des Creux banner across another piste; tapping empty map in piste mode does nothing.
+- Morning light: shaded pistes read dark blue-grey in the course shots (R8 shade colour, look area).
+**NEXT (coordinator, 06:50)**: merge `ski-r8c` @ 42b8a16e (contains 56640959), take R8c's re-baked data, then: restore SONNENKOPF in the
+Arlberg bake (keep R8c's other drops), re-bake arlberg only, `python3 scripts/ski/make_sql.py` (this branch's spur-aware lengths) +
+data-hashes, re-run security-test; check nothing depends on fixed lift ids (lift ids = `l<index>`: saves only store piste ids / disc
+cells / Lawin face indices; avalanche ids are 40 m cells; flows use names) ; round7c-check barrier 89/90 on R8c data -> 0 through; then
+everything above again on the merged head (+ R8c open items: Brides roof across the street (8388,926), half-buried blocks
+(14149,4851), navy evening shade + stair-step station shadows, angular street bends; 3V Courchevel 500k tris / 161 calls).
