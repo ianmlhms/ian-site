@@ -761,3 +761,7 @@ readMpContext. On the old code it hangs at the 1e300 heading (verified), on this
   path through them is under 33/40 of the line length, so a bold off-piste line could be faster than length / 33 and be marked invalid
   ("ongëlteg") — the same rule as before, only stricter. If players hit it: tighter checkpoints on winding pistes, not a lower speed.
   Park ceiling per layout: not done (halfpipe hits repeat, so features x best trick x combo is no real bound); stays 250,000.
+Browser runs (22 Nov, this branch, browser-slot ski pool, one at a time): ski-mp + ski-mp-freeride Chromium PASS, WebKit PASS (first
+WebKit try: every race check ok, only emma's frame logged one boot-probe "Importing a module script failed" — a load flake under the
+Mini's load, the rerun was clean); ski-challenges (cloud origin) Chromium PASS; all 9 mp-lobby-* Chromium + WebKit PASS. Node:
+security-test, mp-race-test, r7d-test (1424), round6-test (2307) green.
