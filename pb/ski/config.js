@@ -66,6 +66,9 @@ export const SKI = Object.freeze({
   edgeLock: 9,              // 1/s: how fast the velocity follows the skis while the edges hold
   skidLoss: 0.9,            // share of the lateral speed that is scrubbed (not turned) when the skis skid
   brakeDecel: 4.2,          // m/s2 of snowplough braking at full input (fades below 2 m/s)
+  hockeyFrom: 7,            // round 7: above this (25 km/h), or braking with a hard steer above 4 m/s, the brake is a parallel hockey stop
+  hockeyTurn: 7.5,          // rad/s the skis swing across the motion
+  hockeyDecel: 5.5,         // m/s2 on top of the edge scrub: edges dig in
   brakeSteer: 0.7,
   pushAccel: 1.8,           // skating on flats (W / up), only below pushMaxSpeed
   pushMaxSpeed: 6,
@@ -102,6 +105,7 @@ export const CAMERA = Object.freeze({
   fovTo: 26,
   shake: 0.04,
   clearanceProbe: 6,
+  riseFrom: 9, riseTo: 26, riseUp: 2.6, riseBack: 2.2, riseLook: 0.7,      // round 7 (A): the chase camera climbs with the speed (m/s, m)
 });
 
 export const PLAY = Object.freeze({

@@ -49,6 +49,7 @@ import { createCarrier } from './modes/carriers.js';
 import { createMarkers, markerList, MARKER } from './modes/markers.js';
 import { SKI_BY_ID, DEFAULT_SKI, skiParams, addSkiStats, skiOpen } from './modes/skis.js';
 import { spawnLift } from './modes/freeride.js';
+import { createLook, applyLook, createCameraGuard, buildingBoxes, createBoxIndex } from './look.js';      // R7-A: free look + camera collision
 import { pisteStars, specialText } from './modes/challenges.js';
 
 const THREE = window.THREE;
@@ -85,6 +86,15 @@ async function boot() {
   const canvas = document.getElementById('skiCanvas');
   // round 5: the scene goes through post.js (internal resolution, MSAA, FXAA + sharpen onto the canvas), so the canvas itself needs no antialias
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
+  // round 7 (A): a shader that fails to compile (Safari / WebKit differ from Chromium) must never silently ruin the whole look: it is
+  // recorded, and the picture check below steps down to safer paths (cheap snow, no MSAA, no post pass)
+  const shaderErrors = [];
+  renderer.debug.onShaderError = (gl, program, vs, fs) => {
+    const log = (gl.getShaderInfoLog(fs) || '') + (gl.getShaderInfoLog(vs) || '') + (gl.getProgramInfoLog(program) || '');
+    shaderErrors.push(log.slice(0, 400));
+    console.error('[ski] shader failed to compile', log.slice(0, 600));
+    document.documentElement.dataset.skiShaderError = String(shaderErrors.length);
+  };
   THREE.ColorManagement.enabled = false;
   renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
   let post = null;
@@ -106,6 +116,7 @@ async function boot() {
   noise.anisotropy = Math.min(4, maxAniso);
   const detail = createDetailTexture(Math.min(8, maxAniso));           // round 5: fine ground detail (grain, crags, sparkle)
   const env = createEnv({ scene, noise, detail, params });
+  Object.assign(env.u, { uFarEnd: { value: quality.far } });          // round 7 (A): the horizon fade (FOG_GLSL)
   post = createPost({ renderer, spec: quality.res, first: env.sky });
   if (param('res') === 'fixed') post.setDynamic(false);                 // ?res=fixed: tests that compare pictures keep the starting resolution
   resize();
@@ -167,9 +178,50 @@ async function boot() {
   scene.add(skier.root, ghostModel.root);
   ghostModel.setVisible(false);
   const chase = createChaseCamera(surface);
+  // ---- round 7 (A): free 360 look (drag / right mouse / C + mouse) and the camera guard (never through ground, pylons, trees, houses) ----
+  const look = createLook({ el: document.getElementById('shell'), accept: (e) => game.screen === 'ski' && !e.target.closest('button, a, input, .pad, #touchControls, .card, .minimap, .chprompt, .mp-bar, .mp-card, [role="dialog"]') });
+  let pylonGrid = null, boxIndex = null;                    // 20 m buckets of [x, z, topY, r] (pylons, the station halls); building boxes
+  function pylonsOf(l) {
+    const out = [], q = {};
+    for (let i = 0; i < resort.lifts.length; i++) {
+      const p = l.pathOf(i);
+      if (!p) continue;
+      for (const sp of p.supports) if (sp.tower) { p.at(sp.s, q); out.push([q.x, q.z, sp.y + 1, 0.9]); }
+      for (const e of [0, p.len]) { p.at(e, q); out.push([q.x, q.z, field.height(q.x, q.z) + p.spec.station[1] + 2, p.spec.station[0] * 0.3]); }
+    }
+    const g = new Map();
+    for (const o of out) { const k = Math.floor(o[0] / 20) * 100003 + Math.floor(o[1] / 20); let a = g.get(k); if (!a) g.set(k, (a = [])); a.push(o); }
+    return g;
+  }
+  function camBlocked(x, y, z) {
+    if (boxIndex) { const b = boxIndex.hit(x, z, 0.35); if (b && y < b[6]) return true; }
+    if (pylonGrid) {
+      for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
+        const a = pylonGrid.get((Math.floor(x / 20) + dx) * 100003 + Math.floor(z / 20) + dz);
+        if (a) for (const o of a) if (y < o[2] && Math.hypot(x - o[0], z - o[1]) < o[3] + 0.4) return true;
+      }
+    }
+    return !!scatter.hit(x, z, 1.1, y, quality.treeDensity);
+  }
+  const camGuard = createCameraGuard({ ground: (x, z) => surface.height(x, z), blocked: camBlocked });
+  let lookDt = 1 / 60;
+  /** R8: the look offset + the camera guard for a camera round a pivot (head = turn round the eye: cabin window / tunnel). */
+  function lookCam(cam, pivot, head) {
+    applyLook(cam, pivot, look, head ? 'head' : 'orbit');
+    if (!head) camGuard.guard(cam, pivot, lookDt);
+    return cam;
+  }
+  // R7-B's seam in rideCamera1: the lift camera turns with the same look
+  window.__skiLook = {
+    apply(cam, o = {}) {
+      const w = ride ? ride.where() : game.state;
+      if (!w) return cam;
+      return lookCam(cam, { x: w.x, y: w.y + (game.state && game.state.ride === 'sit' ? 0.6 : 1.2), z: w.z }, !!o.inside);
+    },
+  };
   let snowfall = createSnowfall({ scene, env, count: quality.snowflakes });
   const spray = createSpray({ scene, count: quality.spray });
-  let lifts = null, village = null, landmarks = null, roads = null, roadRows = null, extrasBuilt = false, liftsEarly = false, markers = null;
+  let signs = null, lifts = null, village = null, landmarks = null, roads = null, roadRows = null, extrasBuilt = false, liftsEarly = false, markers = null;
   /** Round 6: the lift view (lifts.js). Built once every tile is in; a ride before that builds it early on the heights there are, and it
    *  is built again (between rides) once all tiles are in. */
   function buildLifts() {
@@ -178,17 +230,20 @@ async function boot() {
     if (lifts) lifts.dispose();
     lifts = createLifts({ scene, resort, height: (x, z) => field.height(x, z) });
     liftsEarly = !streamer.done();
+    try { pylonGrid = pylonsOf(lifts); } catch (error) { console.warn('[ski] pylon grid failed', error); }      // round 7 (A): camera guard
     return lifts;
   }
   // the village streets are draped on the 5 m ground: built once the extras and every height tile are in
   const tryRoads = () => {
     if (roads || !roadRows || !streamer.done()) return;
-    try { roads = createRoads({ scene, roads: roadRows, env, height: (x, z) => field.height(x, z) }); mark('roads'); } catch (error) { console.warn('[ski] streets failed', error); roads = { update() {} }; }
+    try { roads = createRoads({ scene, roads: roadRows, env, height: (x, z) => surface.height(x, z) }); mark('roads'); } catch (error) { console.warn('[ski] streets failed', error); roads = { update() {} }; }
   };
 
   // streamed height tiles change the heights under them: drop every cache that read them
   streamer.onTile((rect) => {
     surface.invalidate(...rect);
+    // round 7 (A): a finer tile under a skier who stands (or would be under the snow): back onto the real ground
+    { const st = game.state; if (st && !st.ride && st.crash === 0 && st.x >= rect[0] - 5 && st.x <= rect[2] + 5 && st.z >= rect[1] - 5 && st.z <= rect[3] + 5) { const h = surface.height(st.x, st.z); if (st.y < h - 0.02 || (st.grounded && st.speed < 1.5 && Math.abs(st.y - h) > 0.02)) game.state = { ...st, y: h, vy: 0, grounded: true }; } }
     terrain.invalidate(...rect);
     scatter.invalidate(...rect);
     scatterView.invalidate();
@@ -201,14 +256,21 @@ async function boot() {
     if (streamer.done() && !extrasBuilt) {
       extrasBuilt = true;
       buildLifts();
-      createSigns({ scene, resort, height: (x, z) => field.height(x, z) });
+      signs = createSigns({ scene, resort, height: (x, z) => field.height(x, z) });
       landmarks = createLandmarks({ scene, resort, height: (x, z) => surface.height(x, z), pistes });
       if (modes) modes.ensureParkView();
       mark('lifts');
       tryRoads();
     }
   });
-  loadExtras(core.root).then(({ buildings, roads: streets }) => {
+  // round 7 (A): the buildings / streets download starts once the skier is on the snow (or after 6 s on a menu): they are not part of
+  // the first play's bytes (the boarding spot is the lift station's own zone, R7-B, so nothing has to be re-placed when they arrive)
+  let extrasStarted = false, extrasGo = null;
+  const extrasGate = new Promise((res) => { extrasGo = res; });
+  const startExtras = () => { if (!extrasStarted) { extrasStarted = true; extrasGo(); } };
+  setTimeout(startExtras, 6000);
+  extrasGate.then(() => loadExtras(core.root)).then(({ buildings, roads: streets }) => {
+    try { boxIndex = createBoxIndex(buildingBoxes(buildings)); } catch (error) { console.warn('[ski] building index failed', error); }
     // R7-B: the lift stations replace the OSM station buildings (and nothing stands in a lift lane); the exits keep clear of the rest
     const liftWorld = modes.lifts.setBuildings(buildings);
     village = createVillage({ scene, rows: buildings.filter((_, i) => liftWorld.keepBuilding(i)), env, height: (x, z) => field.baseHeight(x, z), level }); mark('village');
@@ -550,6 +612,17 @@ async function boot() {
   }
   /** Where a skier waits for a lift (R7-B): in its bottom station's boarding zone, facing up the line (lift-site.js). */
   const boardSpot = (lift) => modes.lifts.boardAt(lift);
+  /** Round 7 (A): behind a fade, the full-detail terrain round a new spot is meshed before the fade lifts (right after a jump the tiles
+   *  there were still the coarse ones and the skirts of the half-built ones showed as tall smeared walls for ~1.5 s). The terrain gets a
+   *  bigger time slice meanwhile; at most 2.5 s. */
+  let meshRush = false, rushAt = null;
+  async function meshedAround(p) {
+    meshRush = true; rushAt = { x: p.x, z: p.z };
+    const t0 = performance.now();
+    terrain.update(p.x, p.z, 20);
+    while (performance.now() - t0 < 2500 && terrain.stats.pending > 0) await new Promise((res) => setTimeout(res, 50));
+    meshRush = false;
+  }
   /** Round 6: free ride from a lift's bottom station (fast travel: a short fade while the tiles there arrive) or from a spot. */
   async function goFree(lift, spotIn = null) {
     const spot = spotIn || (lift ? boardSpot(lift) : null);
@@ -558,6 +631,7 @@ async function boot() {
     fade.classList.add('on');
     streamer.focus(spot.x, spot.z);
     await Promise.race([streamer.ready(spot.x, spot.z, 600), new Promise((res) => setTimeout(res, 6000))]);
+    await meshedAround(spot);                                                // round 7 (A): no coarse-tile skirts after the fade
     await new Promise((res) => setTimeout(res, 120));
     startFree(lift, spot);
     fade.classList.remove('on');
@@ -603,6 +677,8 @@ async function boot() {
     if (window.Arcade && window.Arcade.startRun) window.Arcade.startRun();
     canvas.focus({ preventScroll: true });
     mark('free');
+    setTimeout(startExtras, 400);                                       // round 7 (A): the houses and streets after the first frames
+    if (!pictureChecks) setTimeout(pictureCheck, 3500);                 // round 7 (A): the picture check
   }
   /** Round 6 / R7-B: board the lift at hand (the skier stands in its boarding zone): one press = one boarding. The ride walks / skates
    *  him to the loading line, the next carrier of the lift's own loop picks him up there, up the real line, off at the top station, out
@@ -678,6 +754,7 @@ async function boot() {
     const top = ride.lift.top;
     streamer.focus(top.x, top.z);
     await Promise.race([streamer.ready(top.x, top.z, 500), new Promise((res) => setTimeout(res, 3000))]);
+    await meshedAround(top);
     if (ride) { ride.skip(); stepRide(0); }
     skipping = false;
     fade.classList.remove('on');
@@ -752,6 +829,7 @@ async function boot() {
     level = next; quality = QUALITY[level];
     post.setSpec(quality.res); resize();
     camera.far = quality.far * 1.3; camera.updateProjectionMatrix();
+    env.u.uFarEnd.value = quality.far;
     snowMat = createSnowMaterial(env, { cheap: quality.cheapSnow, treeRadius: quality.treeRadius, forest: forestTex, lodScale: quality.lodScale });
     terrain.setMaterial(snowMat);
     scatterView.setQuality(quality);
@@ -764,6 +842,34 @@ async function boot() {
   }
   GFX().onChange((l) => { if (!params.q) applyQuality(l); });
   let slowFor = 0;
+
+  // ---- round 7 (A): the picture check (WebKit / Safari safety net): a few seconds into the first ride, read the canvas back; a
+  // one-colour picture or a shader error steps down: cheap snow (Niddreg shaders), then no MSAA, then no post pass ----
+  function pictureColours() {
+    try {
+      const k = document.createElement('canvas'); k.width = 48; k.height = 36;
+      const g = k.getContext('2d');
+      post.render(scene, camera);
+      g.drawImage(canvas, 0, 0, 48, 36);
+      const d = g.getImageData(0, 0, 48, 36).data, set = new Set();
+      for (let i = 0; i < d.length; i += 4) set.add((d[i] >> 4) * 256 + (d[i + 1] >> 4) * 16 + (d[i + 2] >> 4));
+      return set.size;
+    } catch (error) { return -1; }                                       // a tainted / unreadable canvas: no verdict
+  }
+  let pictureChecks = 0;
+  function pictureCheck() {
+    if (game.screen !== 'ski' || pictureChecks > 3) return;
+    const n = pictureColours();
+    document.documentElement.dataset.skiPicture = String(n);
+    if (n < 0 || (n >= 12 && !shaderErrors.length)) return;
+    pictureChecks++;
+    const step = pictureChecks;
+    console.warn(`[ski] the picture looks broken (${n} colours, ${shaderErrors.length} shader errors): safety step ${step}`);
+    if (step === 1 && level !== 'low') { applyQuality('low'); }
+    else post.fallback(Math.min(2, step - (level === 'low' ? 0 : 1)));
+    document.documentElement.dataset.skiSafe = String(post.safe);
+    setTimeout(pictureCheck, 1500);
+  }
 
   // ---------------- loop ----------------
   let last = performance.now(), acc = 0, hudT = 0, time = 0, audioT = 0, liftDist = Infinity, nearVillage = 0;
@@ -833,10 +939,18 @@ async function boot() {
       skier.setVisible(!(ride && rideView === 'window' && ride.carry && ride.where().onCarrier && !game.camPose));     // in a cabin, the window view is his own eyes
       if (game.orbit) {                                                // debug: a camera that circles the skier (model checks)
         const o = game.orbit, a = st.heading + o.angle * Math.PI / 180;
-        game.camPose = { x: st.x + Math.cos(a) * o.dist, z: st.z + Math.sin(a) * o.dist, y: st.y + o.h, tx: st.x, ty: st.y + 0.8, tz: st.z, fov: o.fov || 40 };
+        const ox = st.x + Math.cos(a) * o.dist, oz = st.z + Math.sin(a) * o.dist;
+        // round 7 (A): never under the snow (an uphill bank beside the skier put this debug camera inside the slope: a 'wall' of skirts)
+        game.camPose = { x: ox, z: oz, y: Math.max(st.y + o.h, surface.height(ox, oz) + 0.6), tx: st.x, ty: st.y + 0.8, tz: st.z, fov: o.fov || 40 };
       }
       const view = (mp && mp.viewState()) || st;                     // online race: watching another skier after my finish
-      const cam = game.camPose || (ride && game.phase === 'lift' ? rideCamera1(dt) : chase.update(view, dt, time));      // camPose: a fixed view (flows)
+      const riding = !!(ride && game.phase === 'lift');
+      lookDt = dt;
+      if (!game.camPose && game.screen === 'ski') look.step(dt, st.speed || 0);
+      // round 7 (A): the free look + camera guard (the lift camera gets it through R7-B's window.__skiLook seam in rideCamera1)
+      let cam = game.camPose || (riding ? rideCamera1(dt) : chase.update(view, dt, time));      // camPose: a fixed view (flows)
+      if (!game.camPose && !riding && game.screen === 'ski') cam = lookCam({ ...cam }, { x: view.x, y: view.y + 1.2, z: view.z }, false);
+      document.documentElement.dataset.skiLook = `${look.yaw.toFixed(2)},${look.pitch.toFixed(2)}`;
       camera.position.set(cam.x, cam.y, cam.z);
       camera.lookAt(cam.tx, cam.ty, cam.tz);
       if (Math.abs(camera.fov - cam.fov) > 0.05) { camera.fov = cam.fov; camera.updateProjectionMatrix(); }
@@ -859,14 +973,15 @@ async function boot() {
     const fx = st ? st.x : resort.width / 2, fz = st ? st.z : resort.depth / 2;
     if (game.screen === 'ski' || game.screen === 'map') {
       streamer.focus(fx, fz);
-      terrain.update(camera.position.x, camera.position.z, game.screen === 'map' ? 12 : 2.5);
+      if (meshRush && rushAt) terrain.update(rushAt.x, rushAt.z, 12);            // round 7 (A): meshing the jump target behind the fade
+      else terrain.update(camera.position.x, camera.position.z, game.screen === 'map' ? 12 : 2.5);
       scatterView.update(camera.position.x, camera.position.z, false, game.screen === 'map' ? 12 : 2.5, dt);
       farForest.update(camera.position.x, camera.position.z, game.screen === 'map' ? 8 : 1.5);
       poles.update(camera.position.x, camera.position.z, quality.markerRadius);
       if (lifts) lifts.update(time, camera.position.x, camera.position.z, quality.liftRadius);
       if (village) village.update(camera.position.x, camera.position.z, quality.buildingRadius);
       if (landmarks) landmarks.update(camera.position.x, camera.position.z, quality.buildingRadius);
-      if (roads) roads.update(camera.position.x, camera.position.z, quality.buildingRadius);
+      if (roads) roads.update(camera.position.x, camera.position.z, Math.min(quality.buildingRadius, level === 'low' ? 1300 : 2400));      // round 7 (A): streets near only
       modes.update(camera.position.x, camera.position.z, quality.buildingRadius);
     }
     env.update(dt, time, camera);
@@ -966,7 +1081,7 @@ async function boot() {
     /** Fixed camera at (x, z) heightAbove m over the ground looking at (tx, tz) heightAbove2 m over its ground; null = chase camera again. */
     setCamera(x, z, above, tx, tz, above2 = 0, fov = 55) { if (x === null) { game.camPose = null; return; } game.camPose = { x, z, y: field.height(x, z) + above, tx, tz, ty: field.height(tx, tz) + above2, fov }; streamer.focus(x, z); }, start(id) { startRun(pistes.byId.get(id) || game.piste, MODES.run); }, select(id) { selectPiste(pistes.byId.get(id), true); },
     frames: () => { const f = [...frameTimes].sort((a, b) => a - b); return { n: f.length, p50: f[Math.floor(f.length * 0.5)], p95: f[Math.floor(f.length * 0.95)], max: f[f.length - 1] }; },
-    resolution: () => post.stats(), post,
+    resolution: () => post.stats(), post, get shaderErrors() { return shaderErrors; }, pictureColours, pictureCheck,
     info: () => ({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, tiles: terrain.stats.leaves, trees: scatterView.stats.trees, cards: farForest.stats.cards, tilesLoaded: streamer.stats.loaded, tilesTotal: streamer.stats.total, level }),
     teleport(s) { if (game.run) { const p = game.piste.at(s, {}); placeAt(p.x, p.z, Math.atan2(p.dz, p.dx)); } },
     progress: () => store.get(),
@@ -974,11 +1089,13 @@ async function boot() {
     modes, parkLayout, startPark, startFree: (id) => startFree(id ? modes.lifts.byId.get(id) : game.freeLift || modes.lifts.list[0]), rideUp, setMapMode,
     // round 6
     goFree: (id) => goFree(id ? modes.lifts.byId.get(id) : spawn), boardLift, skipRide, toggleRideView, get ride() { return ride; }, get rideView() { return rideView; }, get spawn() { return spawn; },
-    get lifts() { return lifts; }, markers, setSki, get skiType() { return skiType; }, get world() { return world; }, openSkiCard, resumeFree, acceptChallenge, showMap,
+    get lifts() { return lifts; }, get signs() { return signs; }, markers, setSki, get skiType() { return skiType; }, get world() { return world; }, openSkiCard, resumeFree, acceptChallenge, showMap,
     place(x, z, heading) { placeAt(x, z, heading); },
     // R7-B (flows): stand still at (x, z) like after a lift (0 km/h until an input), the scatter for the tree checks
     placeHold(x, z, heading) { placeAt(x, z, heading); game.hold = true; if (modes.freeRun) modes.freeRun.moved({ x, z, heading }); },
     get hold() { return !!game.hold; }, scatter, quality,
+    // round 7 (A)
+    get skierClear() { return skier.skiClearance; }, skier, get roadRows() { return roadRows; }, get boxIndex() { return boxIndex; }, look, camGuard, camBlocked,
   };
 
   // first build around the default piste behind the loading screen, then the picker (or straight onto the piste with ?auto=1)

@@ -95,7 +95,7 @@ for (const rid of resorts) {
   };
   const pylonsNear = (x, z, r) => {
     const out = [];
-    for (const [, site] of world.sites) {
+    for (const [, site] of visWorld.sites) {                  // R8: the drawn pylons (5 m heights), like the carriers they are checked against
       const p = site.path;
       if (Math.hypot(p.cx - x, p.cz - z) > p.radius + r) continue;
       for (const sp of p.supports) if (sp.tower) { const q = p.at(sp.s, {}); if (Math.hypot(q.x - x, q.z - z) < r) out.push({ x: q.x, z: q.z, top: sp.y + 0.55 }); }

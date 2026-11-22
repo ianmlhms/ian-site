@@ -253,15 +253,22 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {})
       A.pole.rotation.set(A.side * 0.1, 0, -1.45);
     }
   }
-  /** Standing in a cabin or a carriage: upright, arms down, looking out. */
+  /** Standing in a cabin or a carriage: upright, looking out; round 7: the skis are carried, upright beside him in the right hand
+   *  (tips up, bases together), the poles stay hidden (they would poke through the floor). */
   function poseStand(t) {
     tilt.rotation.set(0, 0, 0); tilt.position.set(0, 0, 0); lean.rotation.set(0, 0, 0);
     torso.rotation.set(0, 0, -0.04);
     neck.rotation.set(0, Math.sin(t * 0.35) * 0.35, 0.05);
     for (let i = 0; i < 2; i++) {
       const A = arms[i];
-      A.sh.rotation.set(-A.side * 0.1, 0, 0.12 + (i ? 0.05 : 0));
-      A.elbow.rotation.set(0, 0, 0.35);
+      if (A.side > 0) { A.sh.rotation.set(-0.32, 0, 0.42); A.elbow.rotation.set(0, 0, 0.95); }      // the right hand round the skis
+      else { A.sh.rotation.set(0.1, 0, 0.12); A.elbow.rotation.set(0, 0, 0.35); }
+    }
+    for (let i = 0; i < 2; i++) {
+      const sk = skis[i];
+      sk.g.position.set(0.3, 0.9, 0.4 + i * 0.05);
+      sk.g.rotation.set(0, 0, Math.PI / 2 - 0.05);
+      sk.edge.rotation.set(Math.PI / 2, 0, 0);
     }
   }
   /** R7-B: walking with the skis on the right shoulder (boarding a cabin, in it, out of the top station); walk = metres walked (gait). */
@@ -287,13 +294,31 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {})
     const B = arms.find((a) => a !== A);
     B.pole.rotation.set(0.05, 0, -0.1);                 // the poles in the other hand, pointing down
   }
-  /** Pulled up a drag lift: skis on the snow, a little back, the outside hand on the bar's pole. */
-  function poseDrag() {
-    torso.rotation.z = -0.12;
+  /** Pulled up a drag lift (round 7): STANDING upright in the track, leaning back a little against the bar, both skis flat on the
+   *  snow along the slope (the body does not tilt with the slope: that looked like sitting), knees soft, a small sideways wobble; one hand
+   *  on the bar's pole, the poles in the other hand. slopePitch = the track's pitch (rad, + = climbing). */
+  function poseDrag(t, slopePitch) {
+    tilt.rotation.set(0, 0, 0); tilt.position.set(0, 0, 0);
+    lean.rotation.set(Math.sin(t * 1.7) * 0.03, 0, 0);
+    for (let i = 0; i < 2; i++) {
+      const L = legs[i], sk = skis[i];
+      const [a1, kb] = solveLeg(0.84 - ANKLE);
+      const hipX = -(THIGH * Math.sin(a1) + SHIN * Math.sin(a1 - kb));
+      L.hip.position.set(hipX - 0.04, 0.84, L.side * 0.12);
+      L.hip.rotation.set(0, 0, a1); L.knee.rotation.set(0, 0, -kb); L.ankle.rotation.set(0, 0, -(a1 - kb) + slopePitch);
+      sk.g.position.set(0, 0.84 - ANKLE - (THIGH * Math.cos(a1) + SHIN * Math.cos(a1 - kb)), L.side * 0.13);
+      sk.g.rotation.set(0, 0, slopePitch);
+      sk.edge.rotation.set(0, 0, 0);
+    }
+    torso.position.set(-0.08, 0.84, 0);
+    torso.rotation.set(0, 0, 0.12);                          // leaning back against the bar
+    neck.rotation.set(0, 0, -0.05);
     const A = arms[1];
     A.sh.rotation.set(-0.2, 0, 1.55);
     A.elbow.rotation.set(0, 0, 0.45);
     A.pole.rotation.set(0.12, 0, -1.4);
+    const B = arms[0];
+    B.sh.rotation.set(0.15, 0, 0.35); B.elbow.rotation.set(0, 0, 0.5); B.pole.rotation.set(-0.1, 0, -0.6);
   }
 
   /** Two-bone leg: hip at height h above the ankle; returns [hip angle (forward), knee bend, hip x offset]. */
@@ -304,6 +329,47 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {})
     return [a1, kb];
   }
 
+  /* round 7: one leg from its hip height (lean frame) with its foot lifted by legLift[i] (the terrain IK below): the hip stays, the knee
+   * bends more, the ski rises; the skis never cut into the snow when the body leans into a carve */
+  const legH = [0.88, 0.88], legLift = [0, 0], legZ = [-0.11, 0.11];
+  function setLeg(i, plough = 0) {
+    const L = legs[i], sk = skis[i];
+    const reach = legH[i] - ANKLE - legLift[i];
+    const [a1, kb] = solveLeg(reach);
+    const hipX = -(THIGH * Math.sin(a1) + SHIN * Math.sin(a1 - kb));
+    L.hip.position.set(hipX, legH[i], legZ[i]);
+    L.hip.rotation.set(L.side * plough * 0.17, 0, a1);                   // round 7: knees in (the shins angle out to the wide tails)
+    L.knee.rotation.set(-L.side * plough * 0.34, 0, -kb);
+    L.ankle.rotation.set(0, 0, -(a1 - kb));
+    sk.g.position.set(0, (legH[i] - ANKLE) - (THIGH * Math.cos(a1) + SHIN * Math.cos(a1 - kb)), L.side * (0.13 + plough * 0.16));
+  }
+  const SKI_PTS = [[0.8, 0, 0.04], [0.8, 0, -0.04], [0, 0, 0.04], [0, 0, -0.04], [-0.78, 0, 0.04], [-0.78, 0, -0.04]].map(([x, y, z]) => new THREE.Vector3(x, y, z));
+  const wv = new THREE.Vector3();
+  let lastClear = 0;
+  /** Lowest point of ski i against the ground (m, < 0 = in the snow). */
+  function skiClear(i, ground) {
+    let m = Infinity;
+    for (const p of SKI_PTS) { wv.copy(p).applyMatrix4(skis[i].edge.matrixWorld); m = Math.min(m, wv.y - ground(wv.x, wv.z)); }
+    return m;
+  }
+  /** Plants both skis on the terrain: a ski under the snow (lean, edge, a cross slope, a bump under the tip) is lifted by bending its
+   *  knee more; two passes (a lift changes the ski's tilt only a little). */
+  function plantSkis(ground, plough) {
+    const k = Math.max(0.5, Math.cos(lean.rotation.x) * Math.cos(tilt.rotation.z));
+    for (let pass = 0; pass < 4; pass++) {
+      root.updateMatrixWorld(true);
+      let moved = false;
+      for (let i = 0; i < 2; i++) {
+        const c = skiClear(i, ground);
+        if (c < -0.004) { legLift[i] = Math.min(0.55, legLift[i] - c / k + 0.006); setLeg(i, plough); moved = true; }
+      }
+      if (!moved) break;
+    }
+    root.updateMatrixWorld(true);
+    lastClear = Math.min(skiClear(0, ground), skiClear(1, ground));
+    // a knee can only bend so far (a hard edge set on a steep side slope): what is left lifts the whole figure a little
+    if (lastClear < -0.004) { root.position.y -= lastClear - 0.002; root.updateMatrixWorld(true); lastClear = Math.min(skiClear(0, ground), skiClear(1, ground)); }
+  }
   const tmp = { x: 0, y: 1, z: 0 };
   const qN = new THREE.Quaternion(), qH = new THREE.Quaternion(), nv = new THREE.Vector3(), Y_AXIS = new THREE.Vector3(0, 1, 0);
   let lastEdge = 0, plant = 0, plantSide = 1, prevT = 0, smEdge = 0, smCrouch = 0, smPlough = 0, smAir = 0, lastGrab = 0, smGrab = 0;
@@ -329,8 +395,8 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {})
     // smoothed drivers
     smEdge += (clamp(state.edge, -1.1, 1.1) - smEdge) * k;
     const landing = state.landed > 0 ? Math.sin(Math.min(1, state.landed / 0.35) * Math.PI) : 0;
-    smCrouch += (clamp(state.tuck * 0.95 + landing * 0.8 + smGrab, 0, 1) - smCrouch) * k;
-    smPlough += (clamp(state.brake, 0, 1) - smPlough) * k;
+    smCrouch += (clamp(state.tuck * 0.95 + landing * 0.8 + smGrab + (state.stop || 0) * 0.45, 0, 1) - smCrouch) * k;
+    smPlough += (clamp(state.brake, 0, 1) * (1 - clamp(state.stop || 0, 0, 1)) - smPlough) * k;      // round 7: the hockey stop is no plough
     smAir += ((state.grounded ? 0 : Math.min(1, state.air * 2.5)) - smAir) * k;
     const edge = smEdge, crouch = smCrouch, plough = smPlough, air = smAir;
     // pole plant when the turn changes side at speed
@@ -341,29 +407,25 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {})
     lean.rotation.set(edge * 0.62 + Math.atan2(across, tmp.y) * 0.2 * (state.grounded ? 1 : 0), 0, 0);
     const skiEdge = edge * 0.45;
     // legs
-    const baseH = 0.88 - crouch * 0.36 - plough * 0.05;       // athletic stance: knees and ankles flexed
+    const baseH = 0.88 - crouch * 0.36 - plough * 0.19;       // athletic stance: knees and ankles flexed (round 7: lower in the plough)
     const tuckAir = air * (1 - crouch) * 0.22;              // knees pulled up in the air
     for (let i = 0; i < 2; i++) {
       const L = legs[i];
       const inside = Math.sign(edge) === L.side ? 1 : 0;     // the leg on the inside of the turn (edge > 0: turning right, the right leg)
-      const h = baseH - inside * Math.abs(edge) * 0.2 - tuckAir;
-      const [a1, kb] = solveLeg(h - ANKLE);
-      const hipX = -(THIGH * Math.sin(a1) + SHIN * Math.sin(a1 - kb));
-      L.hip.position.set(hipX, h, L.side * (0.11 + plough * 0.15 + (state.speed < 5 && state.grounded && !plough ? 0.03 : 0)));
-      L.hip.rotation.set(L.side * plough * 0.12, 0, a1);
-      L.knee.rotation.set(-L.side * plough * 0.18, 0, -kb);
-      L.ankle.rotation.set(0, 0, -(a1 - kb));
+      legH[i] = baseH - inside * Math.abs(edge) * 0.2 - tuckAir;
+      legLift[i] = 0;
+      legZ[i] = L.side * (0.11 + plough * 0.07 + (state.speed < 5 && state.grounded && !plough ? 0.03 : 0));
+      setLeg(i, plough);
       const sk = skis[i];
-      sk.g.position.set(0, (h - ANKLE) - (THIGH * Math.cos(a1) + SHIN * Math.cos(a1 - kb)) + 0.0, L.side * (0.13 + plough * 0.2));
-      sk.g.rotation.set(0, L.side * plough * 0.32, 0);
-      sk.edge.rotation.set(skiEdge + L.side * plough * 0.18, 0, air * 0.12);
+      sk.g.rotation.set(0, L.side * plough * 0.34, 0);                  // tips in, tails out (Ry(+) turns the +x tip towards -z)
+      sk.edge.rotation.set(skiEdge - L.side * plough * 0.2, 0, air * 0.12);       // on the inside edges
     }
     // torso: forward bend with the crouch, counter-roll against the lean (angulation), a little back in the plough
     const hipY = baseH - Math.abs(edge) * 0.1 - tuckAir;
     const [ta1, tkb] = solveLeg(hipY - ANKLE);
     const pelvisX = -(THIGH * Math.sin(ta1) + SHIN * Math.sin(ta1 - tkb));
     torso.position.set(pelvisX, hipY, 0);
-    torso.rotation.set(-edge * 0.32, 0, -(0.22 + crouch * 0.95 - plough * 0.08 + air * 0.1));
+    torso.rotation.set(-edge * 0.32, 0, -(0.22 + crouch * 0.95 + plough * 0.24 + air * 0.1));      // round 7: forward in the plough, not back
     neck.rotation.set(edge * 0.15, 0, 0.25 + crouch * 0.75);          // keep the eyes on the slope ahead
     // arms: forward and out; tuck: hands in front of the face, poles back under the arms; air: wide; plant: the inside pole reaches forward
     for (let i = 0; i < 2; i++) {
@@ -391,11 +453,14 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {})
     // round 6: riding a lift: seated on a chair, standing in a cabin (skis and poles in the rack), pulled up a drag lift
     const ride = state.ride || '';
     const hideGear = ride === 'stand';
-    if (hideGear !== gearHidden) { gearHidden = hideGear; for (const sk of skis) sk.g.visible = !hideGear; for (const p of poles) p.visible = !hideGear; }
+    if (hideGear !== gearHidden) { gearHidden = hideGear; for (const p of poles) p.visible = !hideGear; }      // round 7: skis carried, poles away
     if (ride === 'sit') poseSit(t);
     else if (ride === 'stand') poseStand(t);
-    else if (ride === 'drag') poseDrag();
+    else if (ride === 'drag') poseDrag(t, Math.atan2(along, tmp.y));
     else if (ride === 'carry') poseCarry(t, state.walk || 0);         // R7-B ('skisdown' / 'clickin' / 'belt': the skis on the snow, standing)
+    // round 7: both skis on the snow (carving, plough, tuck, landing, a traverse): the leg IK against the real terrain
+    if (ground && state.grounded && state.crash <= 0 && !ride) plantSkis(ground, plough);
+    else lastClear = 0;
     // blob under the skis
     if (blob.visible) {
       const gy = ground ? ground(state.x, state.z) : state.y;
@@ -408,5 +473,23 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {})
       blob.scale.set(1.25 * (1 + up * 0.08), 1, 0.55 * (1 + up * 0.08));
     }
   }
-  return { root: group, pose, setOutfit, setSki, setBlob(on) { blob.visible = !!on && !ghost; }, setVisible(v) { group.visible = v; } };
+  /** Round 7: first person: only what the skier sees of himself, the skis (their merged meshes under the ski groups) and the poles. */
+  const gearGroups = new Set();
+  for (const sk of skis) { sk.g.traverse((o) => gearGroups.add(o)); }
+  for (const p of poles) p.traverse((o) => gearGroups.add(o));
+  let firstPerson = false;
+  function setFirstPerson(on) {
+    firstPerson = !!on;
+    for (const mesh of merged) mesh.visible = !firstPerson || gearGroups.has(mesh.parent);
+    if (firstPerson) blob.visible = false;
+  }
+  /** Round 7 (A), tests: the world tips and tails of both skis [{ tip: {x, y, z}, tail: {x, y, z} }] after the last pose. */
+  function skiEnds() {
+    root.updateMatrixWorld(true);
+    return skis.map((sk) => {
+      const tip = new THREE.Vector3(0.95, 0, 0).applyMatrix4(sk.edge.matrixWorld), tail = new THREE.Vector3(-0.8, 0, 0).applyMatrix4(sk.edge.matrixWorld);
+      return { tip: { x: tip.x, y: tip.y, z: tip.z }, tail: { x: tail.x, y: tail.y, z: tail.z } };
+    });
+  }
+  return { root: group, pose, setOutfit, setSki, setFirstPerson, skiEnds, get skiClearance() { return lastClear; }, get firstPerson() { return firstPerson; }, setBlob(on) { blob.visible = !!on && !ghost && !firstPerson; }, setVisible(v) { group.visible = v; } };
 }

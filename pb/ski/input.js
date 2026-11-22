@@ -81,7 +81,7 @@ export function createInput({ root, onAction }) {
     state, ui,
     /** One frame of input; a scripted override (flows, bot) replaces everything. */
     read(override) {
-      if (override) { Object.assign(state, override, { source: 'script' }); return state; }
+      if (override) { Object.assign(state, { hard: false }, override, { source: 'script' }); return state; }
       if (!enabled) { Object.assign(state, { steer: 0, tuck: 0, brake: 0, push: 0, jump: false, trick: false, pitch: 0 }); return state; }
       const t = readTouch(), p = readPad();
       const k = (held('right') ? 1 : 0) - (held('left') ? 1 : 0);
@@ -93,6 +93,7 @@ export function createInput({ root, onAction }) {
       state.trick = trickMode && (held('trick') || t.trick || (p ? p.trick : false));
       state.pitch = trickMode ? ((held('push') ? 1 : 0) - (held('brake') ? 1 : 0) || t.pitch || (p ? p.pitch : 0)) : 0;
       state.source = usedTouch ? 'touch' : usedKeyboard ? 'keyboard' : 'none';
+      state.hard = true;                     // round 7: a player's brake may become a hockey stop (scripted input never does)
       return state;
     },
     setEnabled(v) { enabled = v; if (!v) { pointers.clear(); } },

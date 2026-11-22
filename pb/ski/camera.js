@@ -8,7 +8,7 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const smoothstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 
 export function createChaseCamera(surface) {
-  let yaw = null, height = null, fovNow = CAMERA.fov;
+  let yaw = null, height = null, fovNow = CAMERA.fov, rise = 0;
   const out = { x: 0, y: 0, z: 0, tx: 0, ty: 0, tz: 0, fov: CAMERA.fov };
 
   function snap(state) { yaw = Math.atan2(state.vz, state.vx); if (Math.hypot(state.vx, state.vz) < 1) yaw = state.heading; height = null; }
@@ -28,9 +28,11 @@ export function createChaseCamera(surface) {
     if (height === null) height = skierY;
     height += (skierY - height) * Math.min(1, dt * 6);
     const speed = Math.hypot(state.vx, state.vy, state.vz);
-    const dist = CAMERA.followDistance + Math.min(2.2, speed * 0.07);
+    // round 7 (A): at speed the camera climbs and drops back, looking down the slope from above (eased both ways, ~1.5 s)
+    rise += (smoothstep(CAMERA.riseFrom, CAMERA.riseTo, speed) - rise) * Math.min(1, dt * 1.3);
+    const dist = CAMERA.followDistance + Math.min(2.2, speed * 0.07) + CAMERA.riseBack * rise;
     const wantX = state.x - cy * dist, wantZ = state.z - sy * dist;
-    const wantY = height + CAMERA.followHeight + Math.min(1.2, speed * 0.035);
+    const wantY = height + CAMERA.followHeight + Math.min(1.2, speed * 0.035) + CAMERA.riseUp * rise;
     const eyeX = state.x, eyeY = skierY + 1.2, eyeZ = state.z;
     let t = 1;
     for (let k = CAMERA.clearanceProbe; k >= 1; k--) {
@@ -44,11 +46,11 @@ export function createChaseCamera(surface) {
     out.x = px + Math.sin(time * 53) * amp * 0.5; out.z = pz + Math.cos(time * 47) * amp * 0.5;
     out.y = Math.max(py, surface.height(out.x, out.z) + CAMERA.minClearance);
     out.tx = state.x + cy * CAMERA.lookAhead; out.tz = state.z + sy * CAMERA.lookAhead;
-    out.ty = skierY * 0.45 + Math.min(skierY, surface.height(out.tx, out.tz)) * 0.55 + CAMERA.lookHeight;     // look down the slope, not at the sky
+    out.ty = skierY * 0.45 + Math.min(skierY, surface.height(out.tx, out.tz)) * 0.55 + CAMERA.lookHeight - CAMERA.riseLook * rise;     // look down the slope, not at the sky
     const targetFov = CAMERA.fov + CAMERA.fovGain * smoothstep(CAMERA.fovFrom, CAMERA.fovTo, speed);
     fovNow += (targetFov - fovNow) * Math.min(1, dt * (targetFov > fovNow ? 1.8 : 1.2));
     out.fov = fovNow;
     return out;
   }
-  return { update, snap, out };
+  return { update, snap, out, get rise() { return rise; } };
 }

@@ -1,12 +1,12 @@
 /* How long does the REAL passenger module (passengers.js) need for one door cycle?  Stands the train at a few stops of a route, runs startExchange with a synthetic clock
  * (__tsTest.exchangeSeconds) for a grid of counts and prints the seconds, so the timetable's dwell model can be fitted to it.
- *   node scripts/zuch/exchange_probe.mjs [--root <repo>] [--train railcar] [--stops 3] route
+ *   node scripts/zuch/exchange_probe.mjs [--root <repo>] [--train emu] [--stops 3] route
  * Output: one line per (alighting, boarding) with mean / min / max seconds of `reps` runs, from the first door-open to the last person aboard. */
 import { openSim } from './zlib.mjs';
 
 const args = process.argv.slice(2);
 const flag = (n, d) => { const i = args.indexOf('--' + n); if (i < 0) return d; const v = args[i + 1]; args.splice(i, 2); return v; };
-const root = flag('root', undefined); const trainId = flag('train', 'railcar'); const stopsWanted = Number(flag('stops', '2'));
+const root = flag('root', undefined); const trainId = flag('train', 'emu'); const stopsWanted = Number(flag('stops', '2'));
 const reps = Number(flag('reps', '5'));
 const GRID = [[0, 6], [6, 6], [10, 12], [15, 25], [25, 25], [40, 40], [60, 50], [100, 60], [150, 80]];
 const quality = flag('quality', 'low');

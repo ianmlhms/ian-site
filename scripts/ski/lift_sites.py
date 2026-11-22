@@ -175,6 +175,44 @@ def arrange(lifts, log=print):
     log("lift layout: %d drag tracks on the left, %d pylons moved out of another lift's lane" % (flipped, moved))
 
 
+DRAG_SPAN_MAX = 170.0             # m: R8: a drag lift's span may grow to this when one of its pylons has to go
+
+
+def drop_drag_pylons_under(lifts, log=print):
+    """R8: a drag lift's pylon that arrange() could not move out of an AERIAL lift's lane (Inuits under the Altiport 8-seater in Courchevel:
+    both start at the same spot and run side by side) stands under that lift's chairs: the pylon goes when the span it leaves stays
+    <= DRAG_SPAN_MAX (in place on the rows; idempotent, so it also runs on already baked resort.json rows)."""
+    lines = [pts_of(lf) for lf in lifts]
+    centres = [(p.mean(axis=0), float(np.hypot(*(np.diff(p, axis=0).T)).sum())) for p in lines]
+    aerial = [i for i, lf in enumerate(lifts) if lf["kind"] in ("chair", "gondola", "cable")]
+    dropped = 0
+    for j, lf in enumerate(lifts):
+        if lf["kind"] != "drag" or not lf.get("pylons"):
+            continue
+        keep = []
+        pyl = sorted(lf["pylons"])
+        for n, s0 in enumerate(pyl):
+            x, z, _, _ = at(lines[j], s0)
+            under = False
+            for i in aerial:
+                if np.hypot(*(centres[i][0] - (x, z))) > centres[i][1] / 2 + 30:
+                    continue
+                side, back, hw, _, _, _ = lane(lifts[i])
+                s, lat, _ = project(lines[i], x, z)
+                if 0.01 < s < centres[i][1] - 0.01 and -back - hw - 1.4 < lat < side + hw + 1.4:
+                    under = True
+                    break
+            prev = keep[-1] if keep else 0.0
+            nxt = pyl[n + 1] if n + 1 < len(pyl) else centres[j][1]
+            if under and nxt - prev <= DRAG_SPAN_MAX:
+                dropped += 1
+                continue
+            keep.append(s0)
+        lf["pylons"] = keep
+    log("drag pylons under an aerial lift dropped: %d" % dropped)
+    return dropped
+
+
 def in_other_lane(lifts, lines, centres, j, x, z, pad=1.4):
     for i, lf in enumerate(lifts):
         if i == j or lf["kind"] == "carpet" or (lf["kind"] in ("funicular", "train") and lf.get("tunnel")):

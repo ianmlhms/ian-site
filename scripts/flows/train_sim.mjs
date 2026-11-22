@@ -1,6 +1,6 @@
 /* Lokféierer (train-sim): real arcade iframe, keyboard driving, doors/interlock, SPAD, passenger exchange,
- * service end -> score + monotonic save, endless order, purchase, phone block and touch controls.
- * Two separate careers (Zuch + Tram, the Luxtram only): wallets, purchases, tb monotonic, endless per career,
+ * service end -> score + monotonic save, endless order, upgrade purchase, phone block and touch controls.
+ * Two separate careers (Zuch + Tram, the Luxtram only), everything unlocked from the start: wallets, upgrades, tb monotonic, endless per career,
  * old-format save migration, merge, and the arcade-wide test mode (everything unlocked, nothing saved or scored).
  * Supabase is mocked; no real account. */
 import { runIfMain } from './lib.mjs';
@@ -31,6 +31,7 @@ const key = (h, k) => h.page.keyboard.press(k);
 /* endless: every route there and back (forward, then the return direction '~r'), then the next route */
 // tram endless drives the whole line Findel -> Stadion without a stop at Rout Bréck, then back (the sub-stretches are not part of endless)
 const LUXTRAM_ORDER = ['luxtram', 'luxtram~r'];
+const TRAM_ROUTES = ['luxtram-kierchbierg', 'luxtram-stad', 'luxtram-sud', 'luxtram'];   // every Luxtram section, owned from the start
 /* Ian's real save before the two-career split (flat v1 shape). */
 const OLD_SAVE = { v: 1, tb: 6800, lifetime: 6800, wallet: 3300, savedAt: 1700000000000, owned: ['railcar'], routes: ['west'], train: 'railcar', route: 'west',
   upgrades: { railcar: { motor: 2, brakes: 1, comfort: 1, capacity: 0, paint: 1 } }, best: { west: 292 }, services: 4, endlessBest: 0, hints: false, hintsSet: true };
@@ -1145,7 +1146,7 @@ async function serveStation(h, frame, index) {
 async function driveTwoStops(h, frame, seed) {
   await waitState(frame, () => window.__tsTest.state().demo === true, null, 60000);   // the menu backdrop is built (it draws random numbers too): a seeded run must start after it
   await h.pause(300);
-  await frame.evaluate((sd) => { __tsTest.setSeed(sd); return __tsTest.startService('west', 'railcar', 'career'); }, seed);
+  await frame.evaluate((sd) => { __tsTest.setSeed(sd); return __tsTest.startService('west', 'emu', 'career'); }, seed);
   await waitState(frame, () => window.__tsTest.state().phase === 'running' && window.__tsTest.state().simT > 0.3, null, 60000);   // (the first frames draw the start station's crowd: keep the random order the same every run)
   await serveStation(h, frame, 1);
   await serveStation(h, frame, 2);
@@ -1176,7 +1177,7 @@ async function resumeChecks(h, frame) {
   const snapKey = 'pb_resume_train-sim';
   await frame.evaluate(() => { __tsTest.pokeSnapshot(null); __tsTest.toMenu(); });
   await waitState(frame, () => window.__tsTest.state().phase === 'menu');
-  await frame.locator('[data-test="select-railcar"]').click().catch(() => {});
+  await frame.locator('[data-test="select-emu"]').click().catch(() => {});
 
   h.step('resume: control run (no reload) gives the reference reward; the snapshot is gone after the summary');
   const ctrlBefore = await driveTwoStops(h, frame, 424242);
@@ -1195,7 +1196,7 @@ async function resumeChecks(h, frame) {
   const before = await driveTwoStops(h, frame, 424242);
   if (process.env.TS_DEBUG) console.log('    control before: ' + JSON.stringify({ ...ctrlBefore, text: undefined }) + '\n    resumed before: ' + JSON.stringify({ ...before, text: undefined }));
   const snap = JSON.parse(before.text);
-  h.expect(snap.v === 1 && snap.route === 'west' && snap.train === 'railcar' && snap.mode === 'career' && Array.isArray(snap.tt) && snap.sim && snap.plan && snap.env && snap.w, 'snapshot has version, route, train, mode, timetable, sim, plan, environment and passengers');
+  h.expect(snap.v === 1 && snap.route === 'west' && snap.train === 'emu' && snap.mode === 'career' && Array.isArray(snap.tt) && snap.sim && snap.plan && snap.env && snap.w, 'snapshot has version, route, train, mode, timetable, sim, plan, environment and passengers');
   await h.pause(1500);
   frame = await reloadToMenu(h);
   h.eq(await h.page.evaluate((k) => localStorage.getItem(k) !== null, snapKey), true, 'the snapshot survived the reload (normal mode key)');
@@ -1265,7 +1266,7 @@ async function resumeChecks(h, frame) {
   await waitState(frame, () => window.__tsTest.state().phase === 'menu');
 
   h.step('resume: a snapshot taken while the doors are open and people are boarding comes back with the doors closed, the stop record kept, nobody counted twice');
-  await frame.evaluate(() => { __tsTest.setSeed(31337); return __tsTest.startService('west', 'railcar', 'career'); });
+  await frame.evaluate(() => { __tsTest.setSeed(31337); return __tsTest.startService('west', 'emu', 'career'); });
   await waitState(frame, () => window.__tsTest.state().phase === 'running', null, 60000);
   await frame.evaluate(() => { __tsTest.teleport(1); __tsTest.stopAtMarker(-0.8); });
   await waitState(frame, () => window.__tsTest.state().atStationIndex === 1);
@@ -1296,7 +1297,7 @@ async function resumeChecks(h, frame) {
   await waitState(frame, () => window.__tsTest.state().phase === 'menu');
 
   h.step('resume: Nei ufänken throws the snapshot away; a broken, old, foreign or tampered snapshot is ignored without noise');
-  await frame.evaluate(() => { __tsTest.setSeed(99); return __tsTest.startService('west', 'railcar', 'career'); });
+  await frame.evaluate(() => { __tsTest.setSeed(99); return __tsTest.startService('west', 'emu', 'career'); });
   await waitState(frame, () => window.__tsTest.state().phase === 'running', null, 60000);
   await serveStation(h, frame, 1);
   await frame.evaluate(() => { __tsTest.setSpeed(0); __tsTest.forceSimStep(0.5, -4); __tsTest.saveSnapshot(); });
@@ -1319,7 +1320,7 @@ async function resumeChecks(h, frame) {
     bad('unknown route', (o) => { o.route = 'atlantis'; }),
     bad('unknown train', (o) => { o.train = 'warp'; }),
     bad('a Luxtram on a rail line (wrong career)', (o) => { o.train = 'tram'; }),
-    bad('a train that is not owned', (o) => { o.train = 'hst'; o.route = 'paris'; }),
+    bad('a train that cannot run the line (Lokalzuch on the TGV line)', (o) => { o.route = 'paris'; }),
     bad('a later service was already paid (svc too low)', (o) => { o.svc = Math.max(0, o.svc - 1); }),
     bad('plan with garbage', (o) => { o.plan = { p: 'XX' }; }),
     { label: 'not json', text: '{"v":1,' },
@@ -1332,10 +1333,17 @@ async function resumeChecks(h, frame) {
     const shown = await frame.locator('[data-test="resume-card"]').count();
     const kept = await frame.evaluate(() => __tsTest.peekSnapshot() !== null);
     h.expect(shown === 0, c.label + ': no card');
-    h.expect(!kept || c.label.startsWith('a train that is not owned'), c.label + ': the broken copy is deleted' + (kept ? ' (kept: it may become valid once the cloud save arrives)' : ''));
+    h.expect(!kept, c.label + ': the broken copy is deleted' + (kept ? ' (kept: it may become valid once the cloud save arrives)' : ''));
   }
   h.page.off('console', onConsole);
   h.expect(warnings.some((w) => /saved service ignored/.test(w)), 'ignored snapshots only leave a console.warn');
+  /* a service saved with a train that left the roster (21 Nov 2026) carries on with the train it became, and the card says so */
+  await frame.evaluate((g) => { const o = JSON.parse(g); o.train = 'railcar'; __tsTest.pokeSnapshot(JSON.stringify(o)); __tsTest.toMenu(); }, good);
+  await waitState(frame, () => !!document.querySelector('[data-test="resume-card"]'));
+  const retiredCard = await frame.locator('[data-test="resume-card"]').innerText();
+  h.expect(/Lokalzuch/.test(retiredCard) && /Schinnebus/.test(retiredCard), 'a Schinnebus snapshot is offered as the Lokalzuch, with a note (' + retiredCard.replace(/\s+/g, ' ').slice(0, 120) + ')');
+  await frame.locator('[data-test="resume-new"]').click();
+  await h.pause(300);
   /* a snapshot that looks fine but does not fit the track: found out while building, thrown away quietly, back in the menu */
   for (const [label, edit] of [['s outside the track', (o) => { o.sim.s = 99999999; }], ['timetable of another line', (o) => { o.tt = o.tt.slice(0, 2); }], ['visits of another line', (o) => { o.sim.visits = o.sim.visits.slice(0, 2); }]]) {
     await frame.evaluate(([g, code]) => { const o = JSON.parse(g); (new Function('o', code))(o); __tsTest.pokeSnapshot(JSON.stringify(o)); __tsTest.toMenu(); }, [good, '(' + edit.toString() + ')(o)']);
@@ -1464,18 +1472,23 @@ export const flow = {
     await h.pause(300);
     h.expect(await frame.evaluate(() => !!document.querySelector('.ts-menu')), 'D2 menu rendered');
 
-    h.step('fresh save: two careers, the tram is playable immediately');
+    h.step('fresh save: two careers, every train and route unlocked from the start, the tram is playable immediately');
     let s = await S(frame);
     h.eq(s.career, 'rail', 'the menu starts on the Zuch career');
-    h.eq([s.careers.rail.owned, s.careers.rail.routes], [['railcar'], ['west']], 'Zuch career: railcar + west line');
-    h.eq([s.careers.tram.owned, s.careers.tram.routes], [['tram'], ['luxtram-stad']], 'Tram career: the Luxtram + the free Luxtram section from the start');
+    const allIds = await frame.evaluate(() => ({ railTrains: TS.career.trainIdsOf('rail'), railRoutes: TS.career.routeIdsOf('rail'), tramRoutes: TS.career.routeIdsOf('tram') }));
+    h.eq([s.careers.rail.owned, s.careers.rail.routes, s.saveTrain], [allIds.railTrains, allIds.railRoutes, 'emu'], 'Zuch career: every train and every line from the start, the Lokalzuch selected');
+    h.eq([s.careers.tram.owned, s.careers.tram.routes], [['tram'], allIds.tramRoutes], 'Tram career: the Luxtram + every Luxtram section from the start');
+    h.expect(allIds.railRoutes.length === 9 && allIds.tramRoutes.length === 4, 'all 9 rail lines and 4 Luxtram sections');
+    const lockUi = await frame.evaluate(() => ({ buy: document.querySelectorAll('[data-test^="buy-train-"],[data-test^="buy-route-"]').length, lock: (document.querySelector('.ts-menu').innerText.match(/🔒|Gespaart|Fräischalten/g) || []).length,
+      picks: [...document.querySelectorAll('[data-test^="route-"]')].filter((b) => !b.disabled).length, selects: document.querySelectorAll('[data-test^="select-"]').length, blurbs: document.querySelectorAll('[data-test^="blurb-"]').length,
+      ups: document.querySelectorAll('[data-test^="up-"]').length }));
+    h.eq(lockUi, { buy: 0, lock: 0, picks: 9, selects: 5, blurbs: 5, ups: 5 }, 'menu: no buy / lock / price UI for trains and lines; 9 pickable lines, 5 trains with a description, the upgrade shop (5 kinds)');
     h.eq([s.careers.rail.wallet, s.careers.tram.wallet, s.tb], [0, 0, 0], 'both wallets and tb start at 0');
     h.expect(await frame.locator('[data-test="career-rail"]').isVisible() && await frame.locator('[data-test="career-tram"]').isVisible(), 'career switch (Zuch | Tram) shown at the top');
     h.expect(await frame.evaluate(() => !TS.routes.get('tram') && !TS.config.routeRules.tram && !TS.config.routeOrder.includes('tram')), 'the fictional tram line is gone');
     h.expect(await frame.evaluate(() => TS.config.trains.filter((tr) => tr.kind === 'tram').length === 1 && TS.config.trains.find((tr) => tr.id === 'tram').price === 0), 'exactly one tram vehicle (the Luxtram), free');
     h.eq(await frame.locator('[data-test="route-tram"]').count(), 0, 'no fictional tram route card in the menu');
-    h.expect(await frame.evaluate(() => TS.career.canBuy(TS.career.defaults(), 'route', 'luxtram-kierchbierg').price < TS.career.canBuy(TS.career.defaults(), 'route', 'luxtram-sud').price
-      && TS.career.canBuy(TS.career.defaults(), 'route', 'luxtram-sud').price < TS.career.canBuy(TS.career.defaults(), 'route', 'luxtram').price), 'Luxtram prices rise: first section < last section < full line');
+    h.expect(await frame.evaluate(() => ['luxtram-kierchbierg', 'luxtram-sud', 'luxtram'].every((id) => TS.career.routeAvailable(TS.career.defaults(), id, 'tram').ok)), 'every Luxtram section (and the full line) is drivable on a fresh save');
 
     h.step('career service starts in the cab');
     await frame.locator('[data-test="mode-career"]').click();
@@ -1675,7 +1688,7 @@ export const flow = {
     h.expect(true, 'forced emergency brake clears after standstill');
 
     h.step('express service (RE) passes a station without a missed-stop penalty; RB stops everywhere');
-    await frame.evaluate(() => { __tsTest.forcePlan({ pattern: 'RE', pass: [1] }); return __tsTest.startService('west', 'railcar', 'career'); });
+    await frame.evaluate(() => { __tsTest.forcePlan({ pattern: 'RE', pass: [1] }); return __tsTest.startService('west', 'emu', 'career'); });
     await waitState(frame, () => window.__tsTest.state().phase === 'running' && window.__tsTest.state().pattern === 'RE', null, 60000);
     s = await S(frame);
     h.eq(s.passIndices, [1], 'station 1 is passed');
@@ -1729,7 +1742,7 @@ export const flow = {
     h.expect(s.wallet > 0 && s.tb === s.careers.rail.lifetime + s.careers.tram.lifetime && s.career === 'rail', 'rail wallet earned; tb = rail lifetime + tram lifetime');
     const savesBeforeMenu = saves.length;
 
-    h.step('back to the menu, hints toggle, buying a train spends wallet only');
+    h.step('back to the menu, hints toggle, buying an upgrade spends wallet only');
     await frame.locator('#sumMenu').click();
     await waitState(frame, () => window.__tsTest.state().phase === 'menu');
     h.expect((await S(frame)).hints, 'hints are on by default');
@@ -1740,11 +1753,12 @@ export const flow = {
     await frame.evaluate(() => __tsTest.grant(30000));
     s = await S(frame);
     const before = { wallet: s.wallet, tb: s.tb };
-    await frame.locator('[data-test="buy-train-emu"]').click();
-    await waitState(frame, () => window.__tsTest.state().owned.includes('emu'));
+    const motorPrice = await frame.evaluate(() => TS.config.upgrades.emu.motor[__tsTest.state().careers.rail.upgrades.emu.motor]);
+    const motorBefore = s.careers.rail.upgrades.emu.motor;
+    await frame.locator('[data-test="up-motor"]').click();
+    await waitState(frame, (n) => window.__tsTest.state().careers.rail.upgrades.emu.motor === n, motorBefore + 1);
     s = await S(frame);
-    const emuPrice = await frame.evaluate(() => TS.config.trains.find((tr) => tr.id === 'emu').price);
-    h.eq(s.wallet, before.wallet - emuPrice, 'train price leaves the wallet');
+    h.eq(s.wallet, before.wallet - motorPrice, 'the motor upgrade price (' + motorPrice + ' €) leaves the wallet');
     h.eq(s.tb, before.tb, 'purchase leaves tb (lifetime) untouched');
     h.eq([s.careers.tram.wallet, s.careers.tram.lifetime], [0, 0], 'the Zuch purchase did not touch the tram career');
     h.expect((await h.page.evaluate(() => window.__tsMessages.filter((m) => m.__pbSave).length)) > savesBeforeMenu, 'purchase saves');
@@ -1753,11 +1767,11 @@ export const flow = {
     if (process.env.TS_STOP_AFTER_RESUME) return;
 
     h.step('endless mode plays all compatible routes in order, then loops');
-    await frame.locator('[data-test="select-railcar"]').click();
+    if (await frame.locator('[data-test="select-emu"]').isEnabled()) await frame.locator('[data-test="select-emu"]').click();   // (the Lokalzuch is the start train: usually selected already)
     await frame.locator('[data-test="mode-endless"]').click();
     await waitState(frame, () => window.__tsTest.state().phase === 'running' && window.__tsTest.state().mode === 'endless');
     const order = (await S(frame)).endless.order;
-    const expected = await frame.evaluate(() => __tsTest.career().endlessOrder('railcar'));
+    const expected = await frame.evaluate(() => __tsTest.career().endlessOrder('emu'));
     h.eq(order, expected, 'endless order = all compatible routes');
     h.expect(order.length >= 3, 'several routes in the endless cycle');
     await frame.evaluate(() => { window.__sawSummary = false; clearInterval(window.__sumTimer); window.__sumTimer = setInterval(() => { if (!document.getElementById('summary').hidden) window.__sawSummary = true; }, 50); });
@@ -1793,7 +1807,7 @@ export const flow = {
     await waitState(frame, () => window.__tsTest.state().career === 'tram');
     h.eq(await frame.locator('[data-test="route-west"]').count(), 0, 'the Zuch routes are not listed in the Tram career');
     h.eq(await frame.locator('[data-test="route-luxtram-stad"]').count(), 1, 'the free Luxtram section is listed');
-    h.eq(await frame.locator('[data-test="buy-train-emu"]').count(), 0, 'the Zuch garage is not shown in the Tram career');
+    h.eq(await frame.locator('[data-test="select-emu"]').count(), 0, 'the Zuch garage is not shown in the Tram career');
     h.expect(await frame.locator('[data-test="mode-career"]').isEnabled(), 'Karriär is playable right away in the Tram career');
     h.expect((await frame.locator('[data-test="wallet"]').innerText()).startsWith('0'), 'the hero shows the tram wallet (0 €), not the Zuch wallet');
     await h.shot('menu-tram');
@@ -1815,32 +1829,24 @@ export const flow = {
     await waitState(frame, () => window.__tsTest.state().phase === 'menu');
     h.eq((await S(frame)).career, 'tram', 'the menu stays on the last chosen career');
 
-    h.step('tram purchases spend tram money only; the full line comes last');
+    h.step('tram: every section is open without paying; upgrades spend tram money only');
     await frame.evaluate(() => __tsTest.grant(30000, 'tram'));
     s = await S(frame);
     const tramA = { wallet: s.careers.tram.wallet, tb: s.tb, rail: s.careers.rail };
-    const priceKb = await frame.evaluate(() => TS.config.routeRules['luxtram-kierchbierg'].price);
-    await frame.locator('[data-test="buy-route-luxtram-kierchbierg"]').click();
-    await waitState(frame, () => window.__tsTest.state().careers.tram.routes.includes('luxtram-kierchbierg'));
+    h.eq(await frame.locator('[data-test^="buy-route-"]').count(), 0, 'no buy buttons on the Luxtram sections');
+    await frame.locator('[data-test="route-luxtram"]').click();
+    await waitState(frame, () => document.querySelector('[data-route="luxtram"]').getAttribute('data-selected') === 'true');
+    h.expect(await frame.locator('[data-test="mode-career"]').isEnabled(), 'the full line is selectable and drivable right away');
     s = await S(frame);
-    h.eq(s.careers.tram.wallet, tramA.wallet - priceKb, 'the section price leaves the tram wallet');
-    h.eq(s.careers.rail, tramA.rail, 'rail wallet and rail career unchanged by the tram purchase');
-    h.eq(s.tb, tramA.tb, 'tb untouched by a purchase');
-    h.expect(await frame.locator('[data-test="buy-route-luxtram"]').isDisabled(), 'the full line is locked until the other sections are owned');
-    await frame.evaluate(() => __tsTest.grant(60000, 'tram'));
-    await frame.locator('[data-test="buy-route-luxtram"]').click({ force: true });
-    h.expect(!(await S(frame)).careers.tram.routes.includes('luxtram'), 'the full line cannot be bought before the sections');
-    await frame.locator('[data-test="buy-route-luxtram-sud"]').click();
-    await waitState(frame, () => window.__tsTest.state().careers.tram.routes.includes('luxtram-sud'));
-    await frame.locator('[data-test="buy-route-luxtram"]').click();
-    await waitState(frame, () => window.__tsTest.state().careers.tram.routes.includes('luxtram'));
-    h.eq((await S(frame)).careers.rail, tramA.rail, 'rail career still untouched after buying the whole line');
+    h.eq([s.careers.tram.wallet, s.tb, s.careers.rail], [tramA.wallet, tramA.tb, tramA.rail], 'picking a section costs nothing');
     const upBefore = (await S(frame)).careers.tram;
+    const comfortPrice = await frame.evaluate((lv) => TS.config.upgrades.tram.comfort[lv], upBefore.upgrades.tram.comfort);
     await frame.locator('[data-test="up-comfort"]').click();
     await waitState(frame, (n) => window.__tsTest.state().careers.tram.upgrades.tram.comfort === n, upBefore.upgrades.tram.comfort + 1);
-    h.expect((await S(frame)).careers.tram.wallet < upBefore.wallet && (await S(frame)).careers.rail.wallet === tramA.rail.wallet, 'a tram upgrade is paid with tram money only');
-    const kissBuy = await frame.evaluate(() => __tsTest.buy('train', 'kiss'));
-    h.eq([kissBuy, (await S(frame)).careers.rail.owned.includes('kiss')], [undefined, false], 'tram money cannot buy a Zuch (rail wallet too small)');
+    s = await S(frame);
+    h.eq([s.careers.tram.wallet, s.careers.rail.wallet, s.tb], [upBefore.wallet - comfortPrice, tramA.rail.wallet, tramA.tb], 'a tram upgrade is paid with tram money only (' + comfortPrice + ' €), tb untouched');
+    const trainBuy = await frame.evaluate(() => __tsTest.buy('train', 'c2400'));
+    h.eq([trainBuy, (await S(frame)).careers.rail.wallet], [undefined, tramA.rail.wallet], 'buying a train is not a thing any more (nothing spent)');
     await frame.evaluate(() => __tsTest.grant(500000, 'rail'));
     h.expect((await S(frame)).careers.tram.wallet < 100000, 'a rail grant does not change the tram wallet');
     await h.shot('menu-tram-bought');
@@ -1899,11 +1905,11 @@ export const flow = {
       return { m, again: K.normalize(m), withTram, mergeAB: K.merge(a, b).tb, mergeBA: K.merge(b, a).tb, tie: K.merge(a, { ...a, savedAt: a.savedAt + 5 }).savedAt === a.savedAt + 5 };
     }, OLD_SAVE);
     h.eq([pure.m.rail.lifetime, pure.m.rail.wallet, pure.m.tb], [6800, 3300, 6800], 'rail keeps lifetime 6800 / wallet 3300; tb stays 6800');
-    h.eq([pure.m.rail.owned, pure.m.rail.routes, pure.m.rail.services, pure.m.rail.best], [['railcar'], ['west'], 4, { west: 292 }], 'rail keeps owned, routes, services, bests');
-    h.eq(pure.m.rail.upgrades.railcar, OLD_SAVE.upgrades.railcar, 'rail keeps its upgrades');
-    h.eq([pure.m.tram.lifetime, pure.m.tram.wallet, pure.m.tram.services, pure.m.tram.owned, pure.m.tram.routes], [0, 0, 0, ['tram'], ['luxtram-stad']], 'tram starts fresh');
+    h.eq([pure.m.rail.owned, pure.m.rail.routes.length, pure.m.rail.train, pure.m.rail.services, pure.m.rail.best], [['emu', 'c2400', 'dosto', 'ic', 'hst'], 9, 'emu', 4, { west: 292 }], 'rail keeps services and bests; every train and line is owned now, the old Schinnebus became the Lokalzuch');
+    h.eq(pure.m.rail.upgrades.emu, OLD_SAVE.upgrades.railcar, 'the Schinnebus upgrades moved to the Lokalzuch');
+    h.eq([pure.m.tram.lifetime, pure.m.tram.wallet, pure.m.tram.services, pure.m.tram.owned, pure.m.tram.routes], [0, 0, 0, ['tram'], TRAM_ROUTES], 'tram starts fresh (with every section open)');
     h.eq(pure.again, pure.m, 'normalizing twice changes nothing');
-    h.eq([pure.withTram.career, pure.withTram.tram.routes.includes('luxtram-sud'), pure.withTram.tram.routes.includes('tram'), pure.withTram.tram.upgrades.tram.motor, pure.withTram.rail.owned], ['tram', true, false, 2, ['railcar']],
+    h.eq([pure.withTram.career, pure.withTram.tram.routes.includes('luxtram-sud'), pure.withTram.tram.routes.includes('tram'), pure.withTram.tram.upgrades.tram.motor, pure.withTram.rail.owned], ['tram', true, false, 2, ['emu', 'c2400', 'dosto', 'ic', 'hst']],
       'an old save that owned tram things moves them to the tram career (the fictional line is dropped)');
     h.eq([pure.mergeAB, pure.mergeBA], [6100, 6100], 'merge picks the save with the higher TOTAL (tram progress counts), in both directions, inputs frozen');
     h.expect(pure.tie, 'equal totals: the newer savedAt wins');
@@ -1912,7 +1918,7 @@ export const flow = {
     frame = await gameFrame(h);
     s = await S(frame);
     h.eq([s.career, s.careers.rail.lifetime, s.careers.rail.wallet, s.tb], ['rail', 6800, 3300, 6800], 'the loaded game shows Ian\'s old save as the rail career');
-    h.eq([s.careers.tram.wallet, s.careers.tram.owned, s.careers.tram.routes], [0, ['tram'], ['luxtram-stad']], 'and a fresh tram career');
+    h.eq([s.careers.tram.wallet, s.careers.tram.owned, s.careers.tram.routes], [0, ['tram'], TRAM_ROUTES], 'and a fresh tram career');
     h.expect((await frame.locator('[data-test="wallet-rail"]').innerText()).replace(/\D/g, '') === '3300', 'the Zuch tab shows the 3 300 wallet');
     await frame.evaluate((d) => __tsTest.mergeSave(d), { ...OLD_SAVE, tb: 100, lifetime: 100, wallet: 100, savedAt: 1 });
     h.eq((await S(frame)).tb, 6800, 'a cloud save with lower progress does not replace the local one');

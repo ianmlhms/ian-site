@@ -52,7 +52,7 @@ const FRAG = `
 
 /** spec = QUALITY[level].res: { start, min, max, samples, sharpen, supersample } (pixel ratios against CSS pixels). */
 export function createPost({ renderer, spec, first = null }) {
-  let cfg = spec, cssW = 1, cssH = 1, ratio = spec.start, target = null, dynamic = true;
+  let cfg = spec, cssW = 1, cssH = 1, ratio = spec.start, target = null, dynamic = true, safe = 0;      // safe: round 7 (A) fallback level
   const material = new THREE.ShaderMaterial({
     uniforms: { tSrc: { value: null }, uTexel: { value: new THREE.Vector2(1, 1) }, uSharpen: { value: 0.4 }, uGrade: { value: 1 } },
     vertexShader: VERT, fragmentShader: FRAG, depthTest: false, depthWrite: false, fog: false,
@@ -76,10 +76,10 @@ export function createPost({ renderer, spec, first = null }) {
 
   function allocate() {
     const w = Math.max(2, Math.round(cssW * ratio)), h = Math.max(2, Math.round(cssH * ratio));
-    if (target && target.samples === cfg.samples) target.setSize(w, h);
+    if (target && target.samples === (safe >= 1 ? 0 : cfg.samples)) target.setSize(w, h);
     else {
       if (target) target.dispose();
-      target = new THREE.WebGLRenderTarget(w, h, { samples: cfg.samples, depthBuffer: true, stencilBuffer: false, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, generateMipmaps: false });
+      target = new THREE.WebGLRenderTarget(w, h, { samples: safe >= 1 ? 0 : cfg.samples, depthBuffer: true, stencilBuffer: false, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, generateMipmaps: false });
     }
     material.uniforms.tSrc.value = target.texture;
     material.uniforms.uTexel.value.set(1 / w, 1 / h);
@@ -96,7 +96,13 @@ export function createPost({ renderer, spec, first = null }) {
     return true;
   }
 
+  /* round 7 (A): Safari / WebKit safety net. If the picture comes out broken (a shader that did not compile, an MSAA target the GPU
+   * refuses), main.js steps down: 1 = no MSAA in the scene target, 2 = no post pass at all (the scene straight onto the canvas). The
+   * look stays the painted look either way; only the antialiasing / sharpening is lost. */
   return {
+    /** Steps the safety level up (1: no MSAA, 2: direct). Returns the new level. */
+    fallback(level) { if (level > safe) { safe = level; if (safe === 2) renderer.setPixelRatio(Math.min(screenRatio(), 1.5)); allocate(); } return safe; },
+    get safe() { return safe; },
     /** The canvas takes the screen's resolution (CSS size x device pixel ratio, at most 2); the scene target the internal one. */
     setSize(w, h) {
       cssW = w; cssH = h;
@@ -115,6 +121,7 @@ export function createPost({ renderer, spec, first = null }) {
     },
     render(scene, camera) {
       renderer.info.reset();
+      if (safe >= 2) { renderer.setRenderTarget(null); renderer.render(scene, camera); return; }       // round 7 (A): the direct fallback
       renderer.setRenderTarget(target);
       renderer.render(scene, camera);
       renderer.setRenderTarget(null);

@@ -15,10 +15,14 @@ const THREE = window.THREE;
 
 /** Shared GLSL: the fog of every painted material (weather fog + a blue aerial perspective that grows with distance, so depth reads). */
 export const FOG_GLSL = `
+  uniform float uFarEnd;
   vec3 applyFog(vec3 col, float dist, vec3 fogCol, float density){
     float f = 1.0 - exp(-pow(density * dist, 2.0));
     float aerial = (1.0 - exp(-dist * 0.000062)) * 0.6;
-    return mix(col, fogCol, clamp(max(f, aerial), 0.0, 1.0));
+    // round 7 (A): the last stretch before the end of the drawn terrain melts into the horizon haze (the sky's colour there): no hard
+    // edge of the world against the sky
+    float farEnd = uFarEnd > 0.0 ? smoothstep(uFarEnd * 0.62, uFarEnd * 0.97, dist) : 0.0;
+    return mix(col, fogCol, clamp(max(max(f, aerial), farEnd), 0.0, 1.0));
   }`;
 
 export function createSnowMaterial(env, { cheap = false, treeRadius = 400, forest = null, lodScale = 1 } = {}) {
@@ -155,6 +159,10 @@ export function createSnowMaterial(env, { cheap = false, treeRadius = 400, fores
         // the baked share of rock in this spot, painted as crisp patches of that share (thresholded by the crags), not as a grey blend
         float rockBaked = smoothstep(-0.1, 0.1, rockCls - (0.22 + 0.56 * crag)) * smoothstep(ledge, ledge + 0.08, slope + (nB.b - 0.5) * 0.06);
         float rockAmt = max(rockSteep, rockBaked) * (1.0 - piste) * (1.0 - water);
+        // round 7 (A): far away a winter mountain reads white: only the steepest faces stay rock, and what remains is lighter (snow
+        // dusted); this was a grey-white striping at 5-15 km
+        float farRock = smoothstep(2500.0, 9000.0, vDist);
+        rockAmt *= mix(1.0, smoothstep(0.42, 0.6, slope), farRock);
         // strata: grey layers of ~8 m (light and dark), snow in broken lines on some layers' ledges; less snow the steeper
         float sPhase = vWorld.y * 0.12 + nA.r * 2.0 + nB.g * 1.2 + nL.g * 2.0;
         float sAA = clamp(1.0 - fwidth(sPhase) * 1.5, 0.0, 1.0);
@@ -198,6 +206,10 @@ export function createSnowMaterial(env, { cheap = false, treeRadius = 400, fores
         #endif
         // fog and haze: brighter towards the sun (light scattered forward), the same glow as the sky's horizon
         vec3 fogC = uFogColor + uSunColor * pow(max(dot(-V, uSunDir), 0.0), 5.0) * 0.14 + vec3(1.0, 0.985, 0.95) * uMilk * pow(max(dot(-V, uSunDir), 0.0), 10.0) * 0.1;
+        // round 7 (A): the far grid ends 14 km outside the resort: its last 3.5 km fade into the haze (never a cut edge)
+        vec2 er = min(wp - uShadowRect.xy, uShadowRect.xy + uShadowRect.zw - wp);
+        float edgeFade = 1.0 - smoothstep(0.0, 3500.0, min(er.x, er.y));
+        col = mix(col, fogC, edgeFade * smoothstep(1500.0, 6000.0, vDist));
         gl_FragColor = vec4(applyFog(col, vDist, fogC, uFogDensity), 1.0);
       }`,
   });

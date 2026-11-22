@@ -60,6 +60,14 @@ function wall(w, x0, z0, x1, z1, y0, y1, base, part, u0 = 0) {
   const n = norm([z1 - z0, 0, -(x1 - x0)]);
   w.quad([x0, y0, z0], [x1, y0, z1], [x1, y1, z1], [x0, y1, z0], n, [[u0, y0 - base], [u0 + L, y0 - base], [u0 + L, y1 - base], [u0, y1 - base]], part);
 }
+/** Round 7 (A): a railing panel with a real thickness (RAIL_T): two faces back to back in ONE plane flickered (z-fighting, the
+ *  material is double sided); now the two faces stand RAIL_T apart, each facing out. */
+const RAIL_T = 0.05;
+function rail(w, x0, z0, x1, z1, y0, y1, base) {
+  const L = Math.hypot(x1 - x0, z1 - z0) || 1, nx = (z1 - z0) / L * RAIL_T / 2, nz = -(x1 - x0) / L * RAIL_T / 2;
+  wall(w, x0 + nx, z0 + nz, x1 + nx, z1 + nz, y0, y1, base, RAIL);
+  wall(w, x1 - nx, z1 - nz, x0 - nx, z0 - nz, y0, y1, base, RAIL);
+}
 /** An axis box in a local frame (u along, v across, y up) mapped by P(u, v, y). */
 function box(w, P, u0, u1, v0, v1, y0, y1, part, base) {
   const c = [[u0, v0], [u1, v0], [u1, v1], [u0, v1]];
@@ -118,6 +126,13 @@ function chalet(w, row, seed, detail, style) {
   const P = frameOf(row);
   const hl = L / 2, hw = W / 2;
   const g0 = ground - SINK, e = ground + eave;
+  // round 7 (A): seated on the slope: where the ground under a corner lies lower than the walls reach, a stone plinth carries the house
+  // down to it (Ian: "they stand awkwardly on uneven ground")
+  if (HEIGHT) {
+    let low = Infinity;
+    for (const [u, v] of [[-hl, -hw], [hl, -hw], [hl, hw], [-hl, hw], [0, -hw], [0, hw], [-hl, 0], [hl, 0]]) { const q = P(u, v, 0); low = Math.min(low, HEIGHT(q[0], q[2])); }
+    if (low < g0 + 0.2) box(w, P, -hl - 0.12, hl + 0.12, -hw - 0.12, hw + 0.12, low - 0.6, ground + 0.35, STONE, ground);
+  }
   // walls
   const corners = [[-hl, -hw], [hl, -hw], [hl, hw], [-hl, hw]];
   let u = 0;
@@ -135,30 +150,27 @@ function chalet(w, row, seed, detail, style) {
     const floors = Math.max(1, Math.floor((eave - 0.5) / FLOOR));
     const longSide = L > 11 && h1(seed * 7.7) < 0.6;
     for (let f = 1; f < floors + 1; f++) {
-      const y = ground + f * FLOOR - 0.2;
+      const y = ground + f * FLOOR - 0.2 + h1(seed * 31.7) * 0.04;      // round 7 (A): neighbours' balconies never share a plane (z-fighting)
       if (y > e - 1.6) break;
       const depth = 1.3;
       for (const end of [-1, 1]) {
         const Pe = (a, b, yy) => P(end * (hl + a), b, yy);
         // slab: a = 0..depth outwards, b = -hw+0.3 .. hw-0.3
-        box(w, (a, b, yy) => Pe(a, b, yy), 0, depth, -hw + 0.3, hw - 0.3, y - 0.18, y, WOOD, ground);
+        box(w, (a, b, yy) => Pe(a, b, yy), 0.03, depth, -hw + 0.3, hw - 0.3, y - 0.18, y, WOOD, ground);
         // rail at the outer edge and the two sides
         const r0 = Pe(depth, -hw + 0.3, y), r1 = Pe(depth, hw - 0.3, y);
-        wall(w, r0[0], r0[2], r1[0], r1[2], y, y + 1.0, y, RAIL);
-        wall(w, r1[0], r1[2], r0[0], r0[2], y, y + 1.0, y, RAIL);
+        rail(w, r0[0], r0[2], r1[0], r1[2], y, y + 1.0, y);
         for (const b of [-hw + 0.3, hw - 0.3]) {
           const s0 = Pe(0, b, y), s1 = Pe(depth, b, y);
-          wall(w, s0[0], s0[2], s1[0], s1[2], y, y + 1.0, y, RAIL);
-          wall(w, s1[0], s1[2], s0[0], s0[2], y, y + 1.0, y, RAIL);
+          rail(w, s0[0], s0[2], s1[0], s1[2], y, y + 1.0, y);
         }
       }
       if (longSide) {
         const side = h1(seed * 9.1) < 0.5 ? 1 : -1;
         const Ps = (a, b, yy) => P(a, side * (hw + b), yy);
-        box(w, Ps, -hl + 0.4, hl - 0.4, 0, 1.2, y - 0.18, y, WOOD, ground);
+        box(w, Ps, -hl + 0.4, hl - 0.4, 0.03, 1.2, y - 0.18, y, WOOD, ground);
         const q0 = Ps(-hl + 0.4, 1.2, y), q1 = Ps(hl - 0.4, 1.2, y);
-        wall(w, q0[0], q0[2], q1[0], q1[2], y, y + 1.0, y, RAIL);
-        wall(w, q1[0], q1[2], q0[0], q0[2], y, y + 1.0, y, RAIL);
+        rail(w, q0[0], q0[2], q1[0], q1[2], y, y + 1.0, y);
       }
     }
   }
@@ -276,7 +288,9 @@ function styleOf(row, seed) {
   if (kind === 5) return TOWER;
   if (kind === 2) return CHAPEL;
   if (kind === 3) return HUT;
-  if (kind === 0) return CHALET;
+  // round 7 (A): a big house flagged chalet (Méribel, Courchevel, Zermatt) was a giant wooden block: half of them get the Savoy mix
+  // (stone and plaster below, wood above)
+  if (kind === 0) return row[2] * row[3] > 260 && h1(seed * 21.3) < 0.5 ? SAVOY : CHALET;
   const r = h1(seed * 13.7);
   const big = row[2] * row[3] > 1300 && row[3] >= 16;
   if (big) return r < 0.55 ? CONCRETE : r < 0.8 ? SAVOY : PLASTER;
@@ -349,13 +363,14 @@ function material(env, cheap) {
             col = mix(col, wood * 0.5, step(0.13, b) * step(b, 0.2) * 0.6);              // the shadow under the slab
           }
           // windows (with shutters on the chalets), lit in the evening
-          float wu = style < 0.5 ? 2.3 : 2.6;
+          float wu = style < 0.5 ? 2.5 : 2.7;
           float fu = fract(vUv.x / wu), fv = fract((y - 0.6) / 2.9);
           float floorIx = floor((y - 0.6) / 2.9);
           float inRange = step(0.9, y) * step(y, eaveH - 0.6) * step(style, 4.5);
-          float win = fadeFar * step(0.36, fu) * step(fu, 0.64) * step(0.3, fv) * step(fv, 0.78) * inRange;
-          float frame = fadeFar * step(0.33, fu) * step(fu, 0.67) * step(0.26, fv) * step(fv, 0.82) * inRange - win;
-          float shut = style < 0.5 || style > 4.5 ? fadeFar * (step(0.2, fu) * step(fu, 0.33) + step(0.67, fu) * step(fu, 0.8)) * step(0.3, fv) * step(fv, 0.78) * inRange : 0.0;
+          // round 7 (A): windows ~1.1 x 1.35 m on a 2.9 m storey, shutters ~0.5 m beside them
+          float win = fadeFar * step(0.27, fu) * step(fu, 0.73) * step(0.32, fv) * step(fv, 0.79) * inRange;
+          float frame = fadeFar * step(0.25, fu) * step(fu, 0.75) * step(0.29, fv) * step(fv, 0.82) * inRange - win;
+          float shut = style < 0.5 || style > 4.5 ? fadeFar * (step(0.05, fu) * step(fu, 0.24) + step(0.76, fu) * step(fu, 0.95)) * step(0.32, fv) * step(fv, 0.79) * inRange : 0.0;
           col = mix(col, col * 0.8, (1.0 - fadeFar) * step(0.9, y) * step(style, 4.5) * 0.55);
           col = mix(col, shutter, shut);
           col = mix(col, vec3(0.93, 0.92, 0.88) * 0.8, frame * step(0.5, style) * step(style, 3.5));
@@ -400,7 +415,9 @@ function toMesh(cell, mat) {
 }
 
 /** rows = buildings.json; height(x, z) = the ground (for the downhill side of the terraced blocks); quality = QUALITY[level]. */
+let HEIGHT = null;                    // round 7 (A): the ground for the plinths (set by createVillage)
 export function createVillage({ scene, rows, env, height, level = 'medium' }) {
+  HEIGHT = height || null;
   const cells = new Map();
   rows.forEach((row, i) => {
     const k = Math.floor(row[0] / CELL) + ',' + Math.floor(row[1] / CELL);

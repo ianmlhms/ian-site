@@ -2,7 +2,7 @@
  *   - every level crossing of every rail route has a real road on both sides: long enough, smooth, on the terrain (terrain function = design height, the strip mesh
  *     carries it), no NaN, with the barriers' traffic (vehicles queue in front of the stop line while the barriers are closed and drive on afterwards)
  *   - east / wittlich / trier share one line: same stations and crossings at the same positions; trier passes the stations it does not serve (RE), the others stop
- *     everywhere; stop counts; the new route is registered with a price and an order position
+ *     everywhere; stop counts; the new route is registered (open from the start) with an order position
  *   - Munsbach: the real LiDAR relief, buildings and trees are built around the station, no console errors
  *   - station patch geometry (scripts/zuch/patch_geometry_check.mjs): no degenerate / huge / twisted / floating LOD2 faces
  *   - hole detector (scripts/zuch/hole_lib.mjs): no hole / pit in the ground on west and east, no missing terrain under any ray
@@ -137,8 +137,8 @@ export const flow = {
     h.eq([lines.east.pass.length, lines.wittlich.pass.length, lines.trier.pass.length, lines.trier.stops], [0, 0, 14, 12], 'east and wittlich stop everywhere, trier runs through 14 of 26 and stops 12 times');
     h.eq(lines.trier.passIdx, lines.trier.pass, 'the express plan passes exactly the fixed stations');
     h.eq(lines.wittlich.st.map((s) => s[0]).slice(0, 11), ['Lëtzebuerg', 'Cents-Hamm', 'Sandweiler-Contern', 'Oetrange', 'Munsbach', 'Roodt-Syr', 'Betzder', 'Wecker', 'Manternach', 'Mertert', 'Wasserbëlleg'], 'east stop list: Munsbach, Roodt and Wecker are on the line');
-    const cfg = await page.evaluate(() => ({ price: TS.config.routeRules.wittlich && TS.config.routeRules.wittlich.price, order: TS.config.routeOrder.slice(), route: !!TS.routes.get('wittlich') && !!TS.routes.get('wittlich~r') }));
-    h.expect(cfg.price > 0 && cfg.order.includes('wittlich') && cfg.route, `wittlich is registered (price ${cfg.price}, order ${cfg.order.join(',')}) with a return direction`);
+    const cfg = await page.evaluate(() => ({ open: !!TS.config.routeRules.wittlich && TS.career.routeAvailable(TS.career.defaults(), 'wittlich', 'emu').ok, order: TS.config.routeOrder.slice(), route: !!TS.routes.get('wittlich') && !!TS.routes.get('wittlich~r') }));
+    h.expect(cfg.open && cfg.order.includes('wittlich') && cfg.route, `wittlich is registered (open from the start, order ${cfg.order.join(',')}) with a return direction`);
     for (const id of ['wittlich~r', 'trier~r']) {
       await sim.start(id);
       const back = await sim.evalGame(({ track }) => ({ n: track.stations.length, first: track.stations[0].name, pass: track.passFixed.length }));
