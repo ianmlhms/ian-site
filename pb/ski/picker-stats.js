@@ -2,8 +2,8 @@
  * pistes, km of pistes, lifts, highest / lowest point in m. */
 export const PICKER_STATS = Object.freeze({
   "killy": {"pistes": 234, "km": 239, "lifts": 83, "top": 3456, "low": 1559},
-  "3vallees": {"pistes": 472, "km": 499, "lifts": 166, "top": 3221, "low": 610},
+  "3vallees": {"pistes": 472, "km": 499, "lifts": 165, "top": 3221, "low": 610},
   "zermatt": {"pistes": 194, "km": 218, "lifts": 61, "top": 3897, "low": 1558},
-  "arlberg": {"pistes": 353, "km": 397, "lifts": 100, "top": 2806, "low": 995},
+  "arlberg": {"pistes": 353, "km": 397, "lifts": 99, "top": 2806, "low": 995},
   "kronplatz": {"pistes": 71, "km": 76, "lifts": 27, "top": 2273, "low": 925},
 });

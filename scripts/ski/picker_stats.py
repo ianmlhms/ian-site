@@ -16,7 +16,9 @@ RESORTS = ("killy", "3vallees", "zermatt", "arlberg", "kronplatz")
 def stats(rid):
     with open(os.path.join(DATA, rid, "resort.json"), encoding="utf-8") as f:
         d = json.load(f)
-    pistes, lifts = d["pistes"], d["lifts"]
+    pistes = d["pistes"]
+    # the lifts the game draws (lift-path.js: OSM stubs, a chair / gondola / cable car < 100 m with < 3 m rise, are left out)
+    lifts = [l for l in d["lifts"] if not (l.get("kind") in ("chair", "gondola", "cable") and l.get("len", 0) < 100 and not (l.get("rise") or 0) >= 3)]
     tops = [p["top"] for p in pistes] + [l["top"]["y"] for l in lifts if isinstance(l.get("top"), dict) and "y" in l["top"]]
     lows = [p["bottom"] for p in pistes] + [l["bottom"]["y"] for l in lifts if isinstance(l.get("bottom"), dict) and "y" in l["bottom"]]
     return {
