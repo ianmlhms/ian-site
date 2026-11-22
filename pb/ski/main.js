@@ -23,7 +23,7 @@ import { createPoles, createRunProps, createSigns } from './props.js';
 import { createLifts } from './lifts.js';
 import { createLiftPath } from './lift-path.js';       // R7-B: the tree aisles along the lifts
 import { liftTreeGuard } from './lift-site.js';
-import { createVillage } from './village.js';
+import { seatRows, createVillage } from './village.js';
 import { createRoads, decodeRoads, housesOnStreets } from './roads.js';
 import { createLandmarks } from './landmarks.js';
 import { createPisteSet } from './pistes.js';
@@ -342,7 +342,8 @@ async function boot() {
     // R8d: an OSM house a street runs through is left out (Brides: a roof lying across the street)
     let onStreet = new Set();
     try { onStreet = housesOnStreets(buildings, roadRows); } catch (error) { console.warn('[ski] street / house check failed', error); }
-    const drawn = buildings.filter((_, i) => liftWorld.keepBuilding(i) && !onStreet.has(i));
+    let drawn = buildings.filter((_, i) => liftWorld.keepBuilding(i) && !onStreet.has(i));
+    try { drawn = seatRows(drawn, (x, z) => field.baseHeight(x, z)); } catch (error) { console.warn('[ski] seating the big houses failed', error); }   // R8d: big blocks not half buried
     // the houses that are drawn (R7-B leaves out the ones in stations / lift paths): camera guard + skier collision (R8)
     try { boxIndex = createBoxIndex(buildingBoxes(drawn)); } catch (error) { console.warn('[ski] building index failed', error); }
     village = createVillage({ scene, rows: drawn, env, height: (x, z) => field.baseHeight(x, z), level, resort: rid }); mark('village');      // R8c: resort = Alpine villages

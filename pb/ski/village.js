@@ -271,6 +271,12 @@ function block(w, row, seed, wd, style, slopeDir) {
   const gable = style !== MODERN && (roof === 0 || roof === 2 || roof === 3 || (roof === -1 && !big));
   if (gable) { chalet(w, row, seed, wd, style === CONCRETE ? SAVOY : style); return; }
   const g0 = ground - SINK;
+  // R8d: a block seated higher on its slope (seatRows) stands on a stone plinth down to the ground on its low side, like chalet()
+  if (HEIGHT) {
+    let low = Infinity;
+    for (const p of poly) low = Math.min(low, HEIGHT(p[0], p[1]));
+    if (low < g0 + 0.2) prism(w, poly, low - 0.6, ground + 0.35, ground, STONE);
+  }
   // terraces: a tall block on a slope steps back towards the uphill side, every 2-3 floors (the stepped profile of Val Claret)
   const stepped = levels >= 5 && W >= 13 && !!slopeDir && h1(seed * 8.8) < 0.75;
   const tiers = stepped ? Math.min(4, Math.max(2, Math.floor(levels / 2.5))) : 1;
@@ -497,6 +503,27 @@ function toMesh(cell, mat) {
 /** rows = buildings.json; height(x, z) = the ground (for the downhill side of the terraced blocks); quality = QUALITY[level];
  *  resort = the resort id (R8c: Alpine villages, ALPINE_RESORTS). */
 let HEIGHT = null;                    // round 7 (A): the ground for the plinths (set by createVillage)
+/** R8d (QA: big blocks half buried at Courchevel (14149, 4851): a 60 x 54 m residence with its baked ground at the lowest corner had
+ *  16.6 of its 20.9 m walls in the hill on the uphill side): a big house (footprint > SEAT.area m2) is raised until at most SEAT.share
+ *  of its walls stand in the ground at the highest corner; the stone plinth of chalet() / block() carries it down on the low side.
+ *  rows = buildings.json rows, height(x, z) = the drawn ground. Returns new rows (the input is not changed). */
+const SEAT = Object.freeze({ area: 400, share: 0.4 });
+export function seatRows(rows, height) {
+  return rows.map((b) => {
+    if (b[2] * b[3] <= SEAT.area || !(b[5] > 0)) return b;
+    const c = Math.cos(b[4]), s = Math.sin(b[4]);
+    let hi = -Infinity;
+    for (const [u, v] of [[-1, -1], [1, -1], [1, 1], [-1, 1], [0, 1], [0, -1], [1, 0], [-1, 0]]) {
+      hi = Math.max(hi, height(b[0] + c * u * b[2] / 2 - s * v * b[3] / 2, b[1] + s * u * b[2] / 2 + c * v * b[3] / 2));
+    }
+    const ground = hi - SEAT.share * b[5];
+    if (!(ground > b[7])) return b;
+    const out = b.slice();
+    out[7] = ground;
+    return out;
+  });
+}
+
 export function createVillage({ scene, rows, env, height, level = 'medium', resort = '' }) {
   HEIGHT = height || null;
   const alpine = ALPINE_RESORTS.has(resort);

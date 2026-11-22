@@ -1,6 +1,6 @@
 /* Sun shadows near the skier (Mëttel / Héich): THREE renders the sun's shadow map (terrain, trees, buildings, lifts and the skier cast
  * into it; the instanced trees bring their own depth material), and every painted material samples it itself through the GLSL below
- * (a 2 x 2 bilinear PCF with a normal offset, faded out at the edge of the shadow box). The box follows the camera, a little ahead of it,
+ * (R8d: a 3 x 3 B-spline PCF, was 2 x 2 bilinear; with a normal offset, faded out at the edge of the shadow box). The box follows the camera, a little ahead of it,
  * snapped to whole texels so the shadow edges do not crawl. Beyond the box the baked mountain shadows (env.js uShadow) take over.
  * Niddreg has no shadow map: blob shadows under the skier and the near trees instead (skier-model.js, scatter-view.js). */
 const THREE = window.THREE;
@@ -32,12 +32,16 @@ export const SHADOW_GLSL = `
     vec3 c = sc.xyz / sc.w;
     if (c.x <= 0.0 || c.x >= 1.0 || c.y <= 0.0 || c.y >= 1.0 || c.z >= 1.0) return 1.0;
     float z = c.z - 0.0006 - 0.0014 * graze * graze;
+    // R8d (QA: stair-step shadow edges at the stations): a 3 x 3 tap quadratic B-spline (the 2 x 2 bilinear PCF averaged over a texel):
+    //      smooth edges instead of the texel staircase; separable weights round the nearest texel centre
     vec2 size = 1.0 / uSunTexel;
     vec2 t = c.xy * size - 0.5;
-    vec2 f = fract(t);
-    vec2 b = (floor(t) + 0.5) * uSunTexel;
-    float s = mix(mix(sunTap(b, z), sunTap(b + vec2(uSunTexel.x, 0.0), z), f.x),
-                  mix(sunTap(b + vec2(0.0, uSunTexel.y), z), sunTap(b + uSunTexel, z), f.x), f.y);
+    vec2 i0 = floor(t + 0.5), d = t - i0;
+    vec2 wm = 0.5 * (0.5 - d) * (0.5 - d), wp = 0.5 * (0.5 + d) * (0.5 + d), w0 = 0.75 - d * d;
+    vec2 b = (i0 + 0.5) * uSunTexel, e = uSunTexel;
+    float s = wm.y * (wm.x * sunTap(b + vec2(-e.x, -e.y), z) + w0.x * sunTap(b + vec2(0.0, -e.y), z) + wp.x * sunTap(b + vec2(e.x, -e.y), z))
+            + w0.y * (wm.x * sunTap(b + vec2(-e.x, 0.0), z) + w0.x * sunTap(b, z) + wp.x * sunTap(b + vec2(e.x, 0.0), z))
+            + wp.y * (wm.x * sunTap(b + vec2(-e.x, e.y), z) + w0.x * sunTap(b + vec2(0.0, e.y), z) + wp.x * sunTap(b + vec2(e.x, e.y), z));
     float edge = smoothstep(0.0, 0.12, min(min(c.x, 1.0 - c.x), min(c.y, 1.0 - c.y)));
     return mix(1.0, s, edge);
   }`;
