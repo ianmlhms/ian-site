@@ -888,3 +888,74 @@ it exists.
   start too flat; floating piste labels at the screen edge (D's labels); HUD text contrast in fog; first-person floating poles (C);
   boarding-zone views inside canopies (camera under the hall roof at the spawn); perf hitches on fast travel (meshedAround behind the
   fade is by design, the 170-215 ms WebKit placement hitch is not yet profiled).
+
+## Round 8c (22 Nov 2026, branch `ski-r8c`): look QA items (villages, rock, cabins, parks, names, labels, HUD, first person) + 3V QA data
+Base = R8 integration 1b93cf27; **R8b merged in at 56640959** (C2 + R8b fixes) to add the hands to C's firstperson.js (one conflict in
+main.js createVillage resolved: R8c `resort: rid` + R7-C `explore.setBuildings/regate`). Sheets: ~/Library/Caches/ski-work/round8c/.
+**DATA RE-BAKED: all 5 resorts** (bake.py, ~1 min each, `scripts/ski/r8c-rebake.sh`), manifest (data-hashes.json) and scripts/ski-v1.sql
+(1301 boards) regenerated. R8b / the next integration must take this data.
+- **Villages** (village.js): Alpine resorts (`ALPINE_RESORTS` = zermatt, arlberg, kronplatz; main.js passes `resort: rid`): every house
+  gabled (`tameRow`: OSM flat roofs and the blocks become kind 0), at most 4 storeys under the eaves (3 under 150 m2); the big ones are
+  HOTEL style 8 (stone plinth, white plaster below, larch above, a dark beam, shutters, a wooden balcony along both long sides on every
+  upper floor, 26-31 deg roofs, 1.35-1.7 m overhang). Killy / 3V keep their blocks. LOD: a BASE mesh per 1280 m cell (walls, roof, snow
+  edges, plinth, chapel tower) + a DETAIL layer per 320 m cell (balconies, chimneys, terrace rails, roof housings) drawn within
+  `DETAIL_RADIUS` (150 / 380 / 800 m). Railing boards anti-aliased (fwidth), shaded roof snow blue-grey (was saturated blue).
+  Check: r8c-check.mjs villages (Alpine: 0 houses over 4 storeys, 0 flat roofs; arlberg 790 / kronplatz 1291 / zermatt 469 hotels).
+- **Triangles**: gates instanced near the camera only (markers.js `gatesNear`, 1500 m: ~53k triangles were drawn everywhere), streets
+  fine (2.5 m lattice) only within 360 m and a 10 m coarse copy beyond (roads.js), the village LOD above, far tree cards medium
+  {2500, 1350, 0.66} / low {1600, 850, 0.45} (forest-far.js), Mëttel lodScale 0.75 -> 0.66 (config.js). Sweep (every village / hamlet
+  centre x 4 headings, WebKit, `scripts/ski/r8c-sweeps.sh`): Niddreg max per resort (every village / town centre x 4 headings): killy 396k / 153 calls, zermatt 421k / 154, arlberg
+  441k / 155, kronplatz 375k / 156, 3vallees 540k / 161 at Courchevel (over: Courchevel's lifts are 134k there: stations 58k, carriers
+  ~53k, drag tracks 17k; carriers since cut to 750 m chairs / 1300 m gondolas -> Courchevel 500k, Val Thorens 460k, Freney 456k: still
+  over). Before (QA / my sweep): 494-910k; Nasserein Niddreg 566k -> 431k, Mëttel 735k -> 590k (Mëttel not re-swept after the lodScale /
+  forest cut; expected ~-90k). Breakdown at a spot: `window.__r8.breakdown()` (r8c-helpers.js).
+- **Rock lines** (snow-shader.js): the "circuit board" lines were the gully snow STREAKS, read in a frame turned to the fall line round
+  the WORLD origin (|wp| x the normal's turn between triangles = tens of metres: concentric zigzags); now two world-fixed stretched
+  samples blended by the fall direction. Also: strata snow lines AA by their footprint and only on cliffs (>= ~50 deg), the final
+  rock/snow edge never sharper than a pixel (fwidth), a wider far rock ramp (far facets). Line score (`scripts/ski/r8c-lines.py`, share
+  of 1-2 px bright ridges in the rock area): Face de Bellevarde low view 3.41 % -> 2.12 %, chase view 2.79 % -> 2.11 % (snow grain is
+  ~2 %: the lines are gone, see the shots). 3V spots (Mauduit, Bouc Blanc top, Brides) and the far Saulire ridge from Bouc Blanc: no lines / zebra in the WebKit shots.
+- **Cabins** (carriers.js, liftride.js): cable cars glazed down to 0.85 m, mullions on every side, head band, handrail, floor mat, gondola
+  benches; window camera standing 2 m behind the cable car's front glass (eyes 1.72 m), on the gondola's back bench (1.25 m), pitch
+  floor -0.04 rad: the parapet is a ~7 % strip with the handrail (was 35 % blank panel). Gornergrat carriage: lower body as panels (was
+  one solid block), sills, window band, end walls, benches in bays with tables, head lamps outside; window camera in the front bay.
+  Glass 0.32 tinted (carriers.js `GLASS`, lifts.js). Trees: far tree cards keep the lift aisles too (forest-far.js `farTreesOfBlock` +
+  lift-site.js `liftTreeGuard`, memoized per resort). Check r8c-check rails: 0 trees + 0 far cards within 4.3 m of every surface railway
+  (Gornergrat Bahn 9 km: 0 / 0), 0 far cards where the lift guard forbids trees, all resorts.
+- **Parks** (park.js, host.js, park-check.js): a drop-in (first 24 m at least 22 % average, the start deck >= 12 %): tucked from the start
+  10 km/h after 2.1-2.2 s in all 5 (was killy 4.5, kronplatz 5.9, arlberg never); a clean straight air off a kicker scores "Straight
+  Air" (100 x the kicker's multiplier): straight run 1010-1061 points (was 0 at low speed); park hint bottom middle for 14 s
+  ("Sprong mat E · Trick mat F (A / D dréinen) · W: ufueren", touch "Sprong mat ⤒ · Trick mat ✦"). harness --park: 19-23 / resort green.
+- **Names** (linepack.js `pisteDisplayName` on unpack + bake.py `display_name` / `with_colour`): a bare ref ("0", "2a", "G", "3000")
+  shows as "<Faarf> <ref>" (kronplatz "0" -> "Blo 0"); the same name in two colours gets the colour ("Bouc Blanc (Rout)" / "(Schwaarz)");
+  same name + colour numbered ("Doron (Variante 2)"). Ids unchanged by the names. r8c-check: 0 bare, 0 duplicates in all 5.
+- **Labels** (markers.js `placeLabels`): nearest first, pushed inside a 10 px margin (never more than half their width from the gate),
+  lifted once when they hit a placed label or the HUD (.tl, .tr, .hbtns, hint), else dropped; sizes measured once per name. Check:
+  2000 random scenes, 7497 labels, 0 overlaps / cut / on the HUD. In the browser `window.__r8.labelBoxes()` (no spawn had a gate in view: 0 labels; not verified on screen).
+- **HUD** (ui.css): stronger halo + a soft dark pill behind the top-left block and the speed. Contrast (`scripts/ski/r8c-hud.py`, fog,
+  WebKit): name 2.25 -> 5.2, clock 2.23 -> 5.27, stats 1.77 -> 3.83, speed 4.82 -> 9.02.
+- **First person** (fp-hands.js, 2 lines in firstperson.js): padded gloves round the grips (fist, knuckle roll, thumb), cuff and sleeve
+  down out of the picture (> 0.3 m: the near plane); C's small glove box removed.
+- **Streets** (roads.js `gentleRoads`): pieces steeper than 17 deg are not drawn (segments > 25 deg: 3V 58 -> 0, arlberg 73 -> 0, killy
+  33, zermatt 52, kronplatz 44 -> 0; steepest 45-60 -> 16.7 deg), the bank fades into the snow (alpha, no hard lattice rim).
+- **Data** (bake.py `tidy_network`, `join_fragments`; check `node scripts/ski/r8c-network.mjs --check`): the resort = its connected ski
+  network (lift station <= 150 m from a piste or station, piste end <= 60 m from another piste) + pieces within 1 km of it (St. Anton's
+  Rendl across the village, nursery lifts). Dropped: 3V La Norma (5 lifts), Raffort/Planchamps, Porte Brune/Télégraphe, Poucet;
+  Zermatt Monterosa Stafal/Sant'Anna (6 lifts), Fontanafredda/Libera pistes; Arlberg Sonnenkopf (10 lifts, 28 pistes: a separate area of
+  the Ski Arlberg pass, 3.4 km away), Fuchslochlift, Hochkar piste; Kronplatz Ski Pfalzen. Non-ski trains dropped: Courchevel ski-jump
+  funicular (Tremplins), Brelin, La Croisette, the 107 m unnamed one, Killy Brévières 132 m, Cheneil lift (Leisee-Shuttle kept).
+  Fragments joined (same name + colour, end -> start <= 150 m): Crêtes, Arcosses, Schöniplätz, Spielboden. Bouc Blanc NOT joined: its red
+  pieces are 610 m apart in OSM (no line between); shown as "Bouc Blanc (Rout)", "(Rout 2)", "(Schwaarz)".
+- **Node checks** (all on the re-baked data): round7b-test 5545/5545, round7-test 30/30, round6-test 2142/2142, look7d-check 68/68,
+  r7d-test 1424/1424, r8c-check all green, harness x5 green, round7c-check 89/90 (barriers: 126/127 aimed skiers held — one goes through
+  after the data change; C2/R8b's test, not looked into). `scripts/ski/r8c-node-all.sh` runs them all.
+- **Tools**: r8c-drv.mjs (one long-lived page over HTTP), r8c-helpers.js (spot, ride, sweep, breakdown, hudRects, labelBoxes),
+  r8c-sweeps.sh, r8c-lines.py, r8c-hud.py, r8c-network.mjs, r8c-check.mjs, r8c-node-all.sh, r8c-rebake.sh.
+- **Still open**: 3V Niddreg budget at Courchevel / Val Thorens / Freney (lift stations + carriers + drag tracks: a station LOD in lifts.js /
+  lift-site.js is the next step); Niddreg calls 161 in Courchevel; Mëttel ≤ 450k not reached (terrain ~240k + far cards); streets near
+  by still read as angular grey tyre tracks at bends (the per-cell nearest segment; a proper ribbon distance would fix it); house roof
+  across the Brides street (8388,926) not looked into; big blocks half buried (14149,4851); evening shade at stations dark navy, station
+  shadow stair-steps; dyn-res thrash (post.js already backs off; QA ran at high load); Bouc Blanc's red pieces stay apart (OSM gap); lift
+  ids shifted with the dropped lifts (l65 is no longer the Gornergrat Bahn: anything that stored lift ids / index-based names must use
+  names); ski-v1.sql regenerated (1301 boards) but NOT applied; round7c-check barrier 126/127; WebKit / Chromium flows not run on this
+  branch (R8b runs them; budget numbers above are from the r8c driver at 1180x820, dpr 1).
