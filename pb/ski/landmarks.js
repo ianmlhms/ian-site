@@ -12,6 +12,9 @@
  *   worldcup        a race piste (`piste` = its id): red safety nets along both edges where it is steep, a start house with a banner
  *                   at the top (`house: false`: nets only, for the second part of a course)
  * Built once the height tiles are in (like the lifts); hidden beyond `radius`. */
+import { createLineIndex } from './pistes.js';
+import { createNetMaterial } from './netmesh.js';
+
 const THREE = window.THREE;
 
 const COL = {
@@ -258,36 +261,80 @@ function chapel() {
   return { group: g, footprint: 5 };
 }
 
-/** Red A-nets along both edges of a race piste (where it is steep), a start house at the top, finish banners at the bottom. */
-function worldcup(lm, piste, height) {
-  const g = new THREE.Group();
-  if (!piste) return { group: g, footprint: 0, absolute: true };
-  const pos = [], idx = [];
-  const posts = [];
-  const NET_H = 3.6, STEP = 8, hw = piste.halfWidth + 3;
+/** R8g: where the race piste's A-nets stand (pure: the view and scripts/ski/barrier-check.mjs share it). Runs of [x, y, z, ...] (the
+ *  snow under each vertex, every STEP m) and the post spots. The nets stood ACROSS every piste that crosses or joins the race piste
+ *  (Ian, Arlberg: Stallmähder-Fang, Fasch, Nasserein ... crossed the Kandahar's nets, a 3.6 m red wall across their courses). Now a
+ *  net is left open wherever it would come within CLEAR m of ANOTHER piste's corridor (its line + half width) and on the inside of the
+ *  race piste's own tight bends (folded back over its own snow): a skier on any piste never meets one. */
+export const WORLDCUP_NET_H = 3.6;
+const WC_STEP = 4, WC_CLEAR = 2.5;
+export function worldcupNets(piste, height, pistes = null) {
+  const runs = [], posts = [];
+  const hw = piste.halfWidth + 3;
   const q = {}, q2 = {};
+  const others = pistes ? createLineIndex(pistes.list.filter((p) => p !== piste)) : null;
+  const own = createLineIndex([piste]);
+  const clear = (x, z) => own.distance(x, z, hw) >= hw - 1 && (!others || others.clearance(x, z, 120) >= WC_CLEAR);
   for (const side of [-1, 1]) {
-    let prev = null;
-    for (let s = 40; s < piste.length - 40; s += STEP) {
+    let run = [];
+    const cut = () => { if (run.length >= 6) runs.push(run); run = []; };
+    for (let s = 40; s < piste.length - 40; s += WC_STEP) {
       piste.at(s, q); piste.at(s + 30, q2);
       const steep = (height(q.x, q.z) - height(q2.x, q2.z)) / 30 > 0.22;
       const x = q.x - q.dz * hw * side, z = q.z + q.dx * hw * side;
+      if (!steep || !clear(x, z)) { cut(); continue; }
+      // the stretch from the last vertex (the outside of a bend jumps by metres) must be clear too
+      const k = run.length;
+      if (k && [0.25, 0.5, 0.75].some((t) => !clear(run[k - 3] + (x - run[k - 3]) * t, run[k - 1] + (z - run[k - 1]) * t))) cut();
       const y = height(x, z);
-      if (!steep) { prev = null; continue; }
-      if (prev) {
-        const base = pos.length / 3;
-        pos.push(prev.x, prev.y + 0.2, prev.z, x, y + 0.2, z, x, y + NET_H, z, prev.x, prev.y + NET_H, prev.z);
-        idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
-      }
-      if (Math.round(s / STEP) % 2 === 0) posts.push([x, y, z]);
-      prev = { x, y, z };
+      run.push(x, y, z);
+      if (Math.round(s / WC_STEP) % 2 === 0) posts.push([x, y, z]);
+    }
+    cut();
+  }
+  // a post only where a net hangs
+  const onNet = new Set();
+  for (const r of runs) for (let i = 0; i < r.length; i += 3) onNet.add(`${r[i]},${r[i + 2]}`);
+  return { runs, posts: posts.filter(([x, , z]) => onNet.has(`${x},${z}`)) };
+}
+
+/** R8g: the start hut + banner stand at the race piste's top; only where no OTHER piste runs through that spot (Arlberg: the Fasch
+ *  passes 0.7 m from the Kandahar's top, the Kapall ski route ends there: the hut stood in their courses). Pure. */
+export function worldcupHouseClear(piste, pistes) {
+  if (!pistes) return true;
+  const others = createLineIndex(pistes.list.filter((p) => p !== piste));
+  const q = piste.at(0, {});
+  const spots = [[0, 0], [4, 0], [4, 2.8], [4, -2.8], [-0.5, 6], [-0.5, -6]];        // along the run, across it: hut corners, banner posts
+  return spots.every(([a, c]) => others.clearance(q.x + q.dx * a - q.dz * c, q.z + q.dz * a + q.dx * c, 120) >= 1.5);
+}
+
+/** Red A-nets along both edges of a race piste (where it is steep), a start house at the top, finish banners at the bottom. */
+function worldcup(lm, piste, height, pistes) {
+  const g = new THREE.Group();
+  if (!piste) return { group: g, footprint: 0, absolute: true };
+  const pos = [], uv = [], idx = [];
+  const NET_H = WORLDCUP_NET_H;
+  const { runs, posts } = worldcupNets(piste, height, pistes);
+  // one ribbon per run: bottom 0.2 m over the snow, u / v = metres along / up (one mesh tile per square metre)
+  for (const r of runs) {
+    let d = 0;
+    for (let i = 0; i < r.length; i += 3) {
+      if (i) d += Math.hypot(r[i] - r[i - 3], r[i + 2] - r[i - 1]);
+      const v = pos.length / 3;
+      pos.push(r[i], r[i + 1] + 0.2, r[i + 2], r[i], r[i + 1] + NET_H, r[i + 2]);
+      uv.push(d, 0, d, NET_H - 0.2);
+      if (i) idx.push(v - 2, v, v - 1, v - 1, v, v + 1);
     }
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   geo.setIndex(idx);
   geo.computeVertexNormals();
-  g.add(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: COL.netRed, transparent: true, opacity: 0.72, side: THREE.DoubleSide, depthWrite: false })));
+  // R8g: a see-through red mesh (25 cm diamonds), not a 72 % opaque red wall
+  const netMesh = new THREE.Mesh(geo, createNetMaterial({ color: '#e0362a', cells: 4, rows: 4 }));
+  netMesh.name = 'ski-race-nets';
+  g.add(netMesh);
   if (posts.length) {
     const pole = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.07, 0.07, NET_H + 0.4, 5).translate(0, (NET_H + 0.4) / 2, 0), mat(0x30343a), posts.length);
     const m4 = new THREE.Matrix4();
@@ -295,8 +342,8 @@ function worldcup(lm, piste, height) {
     g.add(pole);
   }
   // start house: a small timber hut with a banner, across the top of the run (house: false = only the nets)
-  if (lm.house === false) return { group: g, footprint: 0, absolute: true, centre: [lm.x, lm.z], radius: piste.length };
-  piste.at(0, q);
+  if (lm.house === false || !worldcupHouseClear(piste, pistes)) return { group: g, footprint: 0, absolute: true, centre: [lm.x, lm.z], radius: piste.length };
+  const q = piste.at(0, {});
   const hut = new THREE.Group();
   hut.add(box(5, 3.2, 4, COL.wood, 0, -0.4, -4), box(5.6, 0.5, 4.6, COL.roofDark, 0, 2.8, -4));
   const banner = board([lm.name.toUpperCase()], 12, 1.8, { bg: '#d2322b', fg: '#ffffff', border: '#ffffff' });
@@ -488,7 +535,7 @@ export function createLandmarks({ scene, resort, height, pistes }) {
   for (const lm of resort.landmarks || []) {
     try {
       let built;
-      if (lm.kind === 'worldcup') built = worldcup(lm, pistes && pistes.byId.get(lm.piste), height);
+      if (lm.kind === 'worldcup') built = worldcup(lm, pistes && pistes.byId.get(lm.piste), height, pistes);
       else if (lm.kind === 'dam') built = dam(lm, height);
       else if (BUILD[lm.kind]) built = BUILD[lm.kind](lm);
       else continue;

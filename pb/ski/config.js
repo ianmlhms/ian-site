@@ -196,6 +196,7 @@ export const COURSE = Object.freeze({
   barrierEvery: 3,          // m between barrier panels (R7-C2: 6 -> 3, short panels follow the snow without gaps)
   warnAfter: 12,            // m beyond the barriers: "Zréck op d'Pist"
   abortAfter: 8,            // s off the course before "Challenge ofgebrach"
+  stuckAfter: 10,           // R8g (was main.js R8b's 10 s): s standing still without progress down the course before the same choice
   finishBack: 12,           // m before the line's end: the finish line
   archHeight: 6,            // m: the top of the ZIL beam over the higher pillar's snow (R7-C2: no course object stands higher)
   barrierBody: 0.45,        // m: the skier's half width against a barrier (R7-C2: soft collision)

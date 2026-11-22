@@ -103,6 +103,63 @@ export function createPiste(src) {
   return { id: src.id, name: src.name, ref: src.ref, diff: src.diff, src, length, halfWidth, n, x, z, s, at, project, checkpoints, slalomGates, top: { x: x[0], z: z[0] }, bottom: { x: x[n - 1], z: z[n - 1] } };
 }
 
+/** R8g: a grid over the segments of some piste lines (or a stretch of one: { piste, s0, s1 }), for "how far is the nearest line from
+ *  (x, z)" without scanning every line. clearance(x, z, r, skip) = min over the indexed lines within r m of (distance to the line -
+ *  that piste's half width); Infinity when none is that near. Pure. */
+export function createLineIndex(items, cell = 40) {
+  const grid = new Map();
+  const key = (i, j) => i * 65536 + j;
+  for (const it of items) {
+    const p = it.piste || it, s0 = it.s0 ?? 0, s1 = it.s1 ?? p.length;
+    for (let i = 0; i + 1 < p.n; i++) {
+      if (p.s[i + 1] < s0 || p.s[i] > s1) continue;
+      // the indexed stretch: the segment clipped to [s0, s1]
+      const L = p.s[i + 1] - p.s[i] || 1e-9, t0 = Math.max(0, (s0 - p.s[i]) / L), t1 = Math.min(1, (s1 - p.s[i]) / L);
+      const ax = p.x[i] + (p.x[i + 1] - p.x[i]) * t0, az = p.z[i] + (p.z[i + 1] - p.z[i]) * t0;
+      const bx = p.x[i] + (p.x[i + 1] - p.x[i]) * t1, bz = p.z[i] + (p.z[i + 1] - p.z[i]) * t1;
+      const seg = { p, ax, az, bx, bz, hw: p.halfWidth };
+      for (let gi = Math.floor(Math.min(ax, bx) / cell); gi <= Math.floor(Math.max(ax, bx) / cell); gi++) {
+        for (let gj = Math.floor(Math.min(az, bz) / cell); gj <= Math.floor(Math.max(az, bz) / cell); gj++) {
+          const k = key(gi, gj);
+          if (!grid.has(k)) grid.set(k, []);
+          grid.get(k).push(seg);
+        }
+      }
+    }
+  }
+  const segDist = (q, x, z) => {
+    const dx = q.bx - q.ax, dz = q.bz - q.az, L2 = dx * dx + dz * dz || 1e-9;
+    const t = Math.max(0, Math.min(1, ((x - q.ax) * dx + (z - q.az) * dz) / L2));
+    return Math.hypot(x - q.ax - dx * t, z - q.az - dz * t);
+  };
+  /** Every indexed segment within r m of (x, z) (cb(seg, dist)). */
+  function near(x, z, r, cb) {
+    const seen = new Set();
+    for (let gi = Math.floor((x - r) / cell); gi <= Math.floor((x + r) / cell); gi++) {
+      for (let gj = Math.floor((z - r) / cell); gj <= Math.floor((z + r) / cell); gj++) {
+        for (const q of grid.get(key(gi, gj)) || []) {
+          if (seen.has(q)) continue;
+          seen.add(q);
+          const d = segDist(q, x, z);
+          if (d <= r) cb(q, d);
+        }
+      }
+    }
+  }
+  function clearance(x, z, r = 80, skip = null) {
+    let best = Infinity;
+    near(x, z, r, (q, d) => { if (q.p !== skip) best = Math.min(best, d - q.hw); });
+    return best;
+  }
+  /** The distance to the nearest indexed line (no half width). */
+  function distance(x, z, r = 80) {
+    let best = Infinity;
+    near(x, z, r, (q, d) => { best = Math.min(best, d); });
+    return best;
+  }
+  return { near, clearance, distance };
+}
+
 /** All pistes of a resort plus the "continues into" graph. */
 export function createPisteSet(resort) {
   const list = resort.pistes.map(createPiste);

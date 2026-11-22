@@ -42,6 +42,7 @@ const { SKI, AVALANCHE, MODES, COURSE } = await imp('config.js');
 const { unpackResort } = await imp('linepack.js');                 // R8b: resort.json carries packed piste lines (R7-D)
 const { housesOnStreets, decodeRoads } = await imp('roads.js');                 // R8d: houses a street runs through
 const { buildingBoxes, createBoxIndex } = await imp('look.js');
+const { worldcupNets } = await imp('landmarks.js');                             // R8g: the race piste's nets (Arlberg Kandahar)
 const { markerList, markerAt, promptable } = await imp('modes/markers.js');      // R8e: the challenge prompt     // R8e: the rides collide with the houses like main.js
 
 const args = process.argv.slice(2);
@@ -329,13 +330,33 @@ for (const rid of rids.length ? rids : ALL) {
   check(pulled === 0, `barriers: ${placedN - pulled}/${placedN} skiers put down outside the net stay there (no pull through it)`);
   check(through === 0 && stopped === 0 && hold === holdN && holdN > 0, `barriers: ${hold}/${holdN} skiers aimed at the net at 54 km/h held inside (${through} through, ${stopped} stopped, ${missed} never reached it, ${openGap} out through a gap left open at a house / station), speed kept at the hit >= ${(minKeep * 100).toFixed(0)} %${holdBad.length ? `; bad: ${holdBad.slice(0, 6).join('; ')}` : ''}`);
   if (RIDES) {
-    let fin = 0, resets = 0, warned = 0, hudBad = 0, hits = 0, outside = 0;
-    const stuck = [], hudFail = [];
+    let fin = 0, resets = 0, warned = 0, hudBad = 0, hits = 0, outside = 0, timeouts = 0, crossed = 0, jumpedOver = 0, stalls = 0;
+    const stallList = [];
+    const stuck = [], hudFail = [], timeoutList = [], crossList = [];
+    // R8g: every barrier the rider could meet: the race nets (permanent) + each course's own net ribbons, as a 20 m grid of segments
+    const raceSegs = [];
+    for (const lm of resort.landmarks || []) if (lm.kind === 'worldcup' && pistes.byId.get(lm.piste)) for (const r of worldcupNets(pistes.byId.get(lm.piste), height, pistes).runs) for (let i = 3; i < r.length; i += 3) raceSegs.push([r[i - 3], r[i - 1], r[i], r[i + 2]]);
+    const segGrid = (segs) => { const g = new Map(); for (const q of segs) for (let i = Math.floor(Math.min(q[0], q[2]) / 20); i <= Math.floor(Math.max(q[0], q[2]) / 20); i++) for (let j = Math.floor(Math.min(q[1], q[3]) / 20); j <= Math.floor(Math.max(q[1], q[3]) / 20); j++) { const k = i * 65536 + j; if (!g.has(k)) g.set(k, []); g.get(k).push(q); } return g; };
+    const cross = (g, ax, az, bx, bz) => {
+      const ka = Math.floor(ax / 20) * 65536 + Math.floor(az / 20), kb = Math.floor(bx / 20) * 65536 + Math.floor(bz / 20);
+      for (const q of ka === kb ? g.get(kb) || [] : [...(g.get(ka) || []), ...(g.get(kb) || [])]) {
+        const d1 = (bx - ax) * (q[1] - az) - (bz - az) * (q[0] - ax), d2 = (bx - ax) * (q[3] - az) - (bz - az) * (q[2] - ax);
+        const d3 = (q[2] - q[0]) * (az - q[1]) - (q[3] - q[1]) * (ax - q[0]), d4 = (q[2] - q[0]) * (bz - q[1]) - (q[3] - q[1]) * (bx - q[0]);
+        if (d1 * d2 < 0 && d3 * d4 < 0) return true;
+      }
+      return false;
+    };
     for (const p of pistes.list) {
       if (ONLY && !ONLY.has(p.id)) continue;
       const g = gates.get(p.id);
       const run = createRun({ piste: p, mode: MODES.run, startS: g.s, finishS: finishes.get(p.id) });
-      const course = createCourse({ piste: p, startS: g.s, finishS: finishes.get(p.id), open: courseLayout(p, g.s, pistes, obs, finishes.get(p.id)).openAt });      // R8e: like main.js
+      const lay = courseLayout(p, g.s, pistes, obs, finishes.get(p.id));
+      const course = createCourse({ piste: p, startS: g.s, finishS: finishes.get(p.id), open: lay.openAt });      // R8e: like main.js
+      const own = [...raceSegs];
+      for (const r of lay.rails) for (let i = 2; i < r.length; i += 2) own.push([r[i - 2], r[i - 1], r[i], r[i + 1]]);
+      const bars = segGrid(own);
+      let timedOut = null, crossedAt = null, stalled = null;
+      const trail = [];                                       // [t, run progress] of the last stuckAfter + 1 s: progress before a timer ran out
       const a = p.at(g.s, {});
       const x0 = a.x - a.dz * (g.lat || 0), z0 = a.z + a.dx * (g.lat || 0);
       let s = createSkierState(x0, z0, Math.atan2(a.dz, a.dx), height(x0, z0));
@@ -346,7 +367,8 @@ for (const rid of rids.length ? rids : ALL) {
       while (t < limit && !done) {
         const was = s.crash > 0;
         const prev = s;
-        s = stepSkier(s, bot(s), world);
+        const inp = bot(s);
+        s = stepSkier(s, inp, world);
         s = course.collide(prev, s);
         if (was && s.crash === 0) {
           let r = run.respawnPoint();
@@ -355,8 +377,22 @@ for (const rid of rids.length ? rids : ALL) {
           if (stuckAt(r.x, r.z)) for (const ds of [8, -8, 16, -16, 30]) { const a = p.at(Math.max(2, Math.min(p.length - 2, (r.s || run.progress) + ds)), {}); if (!stuckAt(a.x, a.z)) { r = { x: a.x, z: a.z, heading: Math.atan2(a.dz, a.dx), s: a.s }; break; } }
           s = createSkierState(r.x, r.z, r.heading, height(r.x, r.z)); fresh = true; course.rebase();
         }
+        // R8g: the skier never passes through a net on his way (a put-down after a crash is no crossing)
+        // a jump that carries him over the net (> 1.1 m above the snow there) is no crossing: it is counted apart
+        if (!fresh && crossedAt === null && cross(bars, prev.x, prev.z, s.x, s.z) && !s.grounded && Math.max(prev.y - height(prev.x, prev.z), s.y - height(s.x, s.z)) > 1.05) jumpedOver++;
+        else if (!fresh && crossedAt === null && cross(bars, prev.x, prev.z, s.x, s.z)) { const q = p.project(s.x, s.z, null, 0, {}); crossedAt = `${Math.round(q.s)} (off ${q.off.toFixed(1)} m, hw ${p.halfWidth.toFixed(1)}, ${s.crash > 0 ? 'crash' : !s.grounded ? `air ${s.air.toFixed(2)} s` : `${s.speed.toFixed(1)} m/s`}, t ${t.toFixed(0)} s${process.env.R7C_TRACE === p.id ? `, open ${lay.openAt(q.s, Math.sign(q.off))} prev off ${p.project(prev.x, prev.z, null, 0, {}).off.toFixed(2)} at ${s.x.toFixed(1)},${s.z.toFixed(1)}` : ''})`; }
         const c = course.update(s, SKI.dt);
         if (c.warn) warned++;
+        // R8g: neither course timer ("Zréck op d'Pist" 8 s off the course, 10 s standing without progress) runs out on a ride
+        // the stuck timer (no 1 m of progress for COURSE.stuckAfter s, < 1 m/s) is a stall of the scripted skier (listed apart); any
+        // other timer, or one while he still got anywhere, is a fault
+        trail.push([t, c.s]); while (trail.length && trail[0][0] < t - COURSE.stuckAfter - 1) trail.shift();
+        if (c.abort && timedOut === null && stalled === null) {
+          const gain = Math.max(...trail.map((q) => q[1])) - trail[0][1];
+          const at = `at s ${Math.round(c.s)} after ${t.toFixed(0)} s`;
+          // the stuck timer only runs out without 1 m beyond the best point reached (he may have slid back and forth): a stall
+          if (c.why === 'stuck') stalled = at; else timedOut = `${c.why} ${at}, ${gain.toFixed(0)} m gained in the last ${COURSE.stuckAfter} s`;
+        }
         // the HUD distance: falls along the ride (a crash puts him back up to 10 m: a new reference)
         if (fresh) { low = c.remaining; fresh = false; } else { rise = Math.max(rise, c.remaining - low); low = Math.min(low, c.remaining); }
         lastRemain = c.remaining;
@@ -365,8 +401,11 @@ for (const rid of rids.length ? rids : ALL) {
           if (ev.type === 'offpiste') resets++;
         }
         t += SKI.dt;
-        if (process.env.R7C_TRACE === p.id && Math.round(t / SKI.dt) % 120 === 0) console.log(`    t ${t.toFixed(0)} s ${Math.round(run.progress)} v ${s.speed.toFixed(1)} hold ${s.hold} crash ${s.crash.toFixed(1)} y ${s.y.toFixed(0)} off ${p.project(s.x, s.z, null, 0, {}).off.toFixed(1)} at ${s.x.toFixed(0)},${s.z.toFixed(0)} in ${lifts.world.inStation(s.x, s.z, 1) ? 'station' : lifts.world.hit(s.x, s.z, 1, -Infinity) ? 'lift part' : houseHit(s.x, s.z, 1) ? 'house' : scatter.hit(s.x, s.z, 1, undefined, 0.8) ? 'tree' : '-'}`);
+        if (process.env.R7C_TRACE === p.id && Math.round(t / SKI.dt) % 120 === 0) console.log(`    t ${t.toFixed(0)} steer ${inp.steer.toFixed(2)} push ${inp.push} hd ${(s.heading * 57.3).toFixed(0)} line ${(Math.atan2(p.at(run.progress, {}).dz, p.at(run.progress, {}).dx) * 57.3).toFixed(0)} s ${Math.round(run.progress)} v ${s.speed.toFixed(1)} hold ${s.hold} crash ${s.crash.toFixed(1)} y ${s.y.toFixed(0)} off ${p.project(s.x, s.z, null, 0, {}).off.toFixed(1)} at ${s.x.toFixed(0)},${s.z.toFixed(0)} in ${lifts.world.inStation(s.x, s.z, 1) ? 'station' : lifts.world.hit(s.x, s.z, 1, -Infinity) ? 'lift part' : houseHit(s.x, s.z, 1) ? 'house' : scatter.hit(s.x, s.z, 1, undefined, 0.8) ? 'tree' : '-'}`);
       }
+      if (timedOut !== null) { timeouts++; timeoutList.push(`${p.id} (${timedOut})`); }
+      if (stalled !== null) { stalls++; stallList.push(`${p.id} ${stalled}`); }
+      if (crossedAt !== null) { crossed++; crossList.push(`${p.id} at s ${crossedAt}`); }
       hits += course.hits;
       const pr = p.project(s.x, s.z, null, 0, {});
       if (pr.dist > p.halfWidth + 0.6 && course.hits) outside++;
@@ -376,7 +415,10 @@ for (const rid of rids.length ? rids : ALL) {
     }
     check(fin === total && resets === 0, `course rides: ${fin}/${total} finished by the scripted skier inside the course, ${resets} silent resets${stuck.length ? `; not finished: ${stuck.slice(0, 10).join(', ')}` : ''}`);
     check(hudBad === 0, `course HUD: the distance falls along all ${total} rides and reads < 30 m at the ZIL (${hits} barrier contacts, ${outside} ended outside a barrier)${hudFail.length ? `; bad: ${hudFail.slice(0, 6).join('; ')}` : ''}`);
-    row.rides = `${fin}/${total}`;
+    check(timeouts === 0, `course timers: ${timeouts} of ${total} rides timed out while getting anywhere (off course 8 s, or standing with progress)${timeoutList.length ? `; ${timeoutList.slice(0, 8).join(', ')}` : ''}`);
+    console.log(`  info  course stalls: ${stalls} rides where the scripted skier stood ${COURSE.stuckAfter} s without 1 m of progress (the stuck choice would come up)${stallList.length ? `: ${stallList.join(', ')}` : ''}`);
+    check(crossed === 0, `course barriers: ${total - crossed}/${total} rides reach the ZIL without passing through a net (course + race nets; ${jumpedOver} times a jump carried him over one)${crossList.length ? `; through: ${crossList.slice(0, 8).join(', ')}` : ''}`);
+    row.rides = `${fin}/${total}, ${timeouts} timeouts, ${stalls} stalls, ${crossed} through a net`;
   }
   console.log(`  (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
   report.push(row);

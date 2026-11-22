@@ -6,11 +6,15 @@
  *             Nach eng Kéier / Weider fräi fueren). NEVER a silent teleport (pure: createCourse)
  *   view      instanced barriers + arrows, the arch (4 draw calls; built on start, disposed at the end), the HUD bits (DOM) */
 import { COURSE } from '../config.js';
+import { createLineIndex } from '../pistes.js';
+import { createNetMaterial } from '../netmesh.js';
 
 const THREE = typeof window !== 'undefined' ? window.THREE : null;
 const ARROW_EVERY = 250;
 const NET_STEP = 0.5;               // m between the net ribbon's vertices
 const NET_H = 1.05;                 // m: the net's height over the snow
+const INTRUDE_PAD = 12;             // R8g: m the net stays open beyond a house / station hall reaching into the course
+const LINE_CLEAR = 0.2;             // R8g: m a net point stays beyond the half width from EVERY part of the course line
 const JUNCTION_GAP = 60;
 
 /** Spatial hash of every piste's 10 m samples (junction search), built once per piste set. */
@@ -36,9 +40,11 @@ export function courseLayout(piste, startS = 2, pistes = null, obs = null, finis
   const a = {};
   const barriers = [], arrows = [];
   const hw = piste.halfWidth;
-  const pr = {};
-  // the inside of a bend tighter than the barrier offset folds the offset line back over the course: those points are left out
-  const inside = (x, z, s) => { piste.project(x, z, s, 40, pr); return pr.dist < hw + 0.5 - 0.3 || (obs && (obs.inBuilding(x, z, 0.4) || obs.nearStation(x, z, 0.4))); };
+  // the inside of a bend tighter than the barrier offset folds the offset line back over the course: those points are left out.
+  // R8g: measured against the WHOLE course (gate -> ZIL), not +-40 m round s: where the line loops back near itself or a hairpin's
+  // other leg runs alongside, the net of one leg stood across the other (27 of 1324 courses: Killy myrtilles, Arlberg riffel ...)
+  const line = createLineIndex([{ piste, s0: startS, s1: finishS }]);
+  const inside = (x, z) => line.distance(x, z, hw + 1) < hw + LINE_CLEAR || (obs && (obs.inBuilding(x, z, 0.4) || obs.nearStation(x, z, 0.4)));
   // R8e (Killy joseray: the line runs through a 33 x 31 m hotel, the net beside it closed the only way round): a house / station hall
   // reaching into the course within 3 m of the net opens the net there too, so he can ski round it; openAt(s, side) tells course.js
   const intrudes = (x, z, s) => { piste.at(s, a2); const dx = a2.x - x, dz = a2.z - z, d = Math.hypot(dx, dz) || 1; const ix = x + dx / d * 3, iz = z + dz / d * 3; return !!obs && (obs.inBuilding(ix, iz, 2.5) || !!obs.nearStation(ix, iz, 2.5)); };
@@ -55,21 +61,32 @@ export function courseLayout(piste, startS = 2, pistes = null, obs = null, finis
   // sunk into a bump); runs [x, z, ...] broken where a point was left out
   const rails = [];
   let openLen = 0;                                        // m of edge left open (tight bends, houses, station halls)
+  const nS = Math.floor((finishS + 1e-6 - startS - 4) / NET_STEP) + 1;
   for (const side of [-1, 1]) {
-    let run = [];
-    const cut = () => { if (run.length >= 4) rails.push(run); run = []; };
-    for (let s = startS + 4; s <= finishS + 1e-6; s += NET_STEP) {
+    // R8g: where a house / station hall opens the net, the gap reaches INTRUDE_PAD m further both ways: the skier (and the scripted
+    // one, 2.5 m round it) goes round the house outside the net line and must find the gap open on his way back in too
+    const open = new Uint8Array(nS), pad = Math.round(INTRUDE_PAD / NET_STEP);
+    for (let i = 0; i < nS; i++) {
+      const s = startS + 4 + i * NET_STEP;
       piste.at(s, a);
       const x = a.x - a.dz * side * (hw + 0.5), z = a.z + a.dx * side * (hw + 0.5);
-      if (inside(x, z, s) || intrudes(x, z, s)) { cut(); openLen += NET_STEP; openS[side].push(s); continue; }
+      if (intrudes(x, z, s)) for (let j = Math.max(0, i - pad); j <= Math.min(nS - 1, i + pad); j++) open[j] = 1;
+    }
+    let run = [];
+    const cut = () => { if (run.length >= 4) rails.push(run); run = []; };
+    for (let i = 0; i < nS; i++) {
+      const s = startS + 4 + i * NET_STEP;
+      piste.at(s, a);
+      const x = a.x - a.dz * side * (hw + 0.5), z = a.z + a.dx * side * (hw + 0.5);
+      if (open[i] || inside(x, z, s)) { cut(); openLen += NET_STEP; openS[side].push(s); continue; }
       // the outside of a kink in the 10 m line jumps by metres: fill the corner so no vertex is more than NET_STEP from the next
       const k = run.length;
       if (k) {
         const px = run[k - 2], pz = run[k - 1], d = Math.hypot(x - px, z - pz), m = Math.ceil(d / NET_STEP);
         const fill = [];
         let blocked = false;
-        for (let j = 1; j < m && !blocked; j++) { const fx = px + (x - px) * j / m, fz = pz + (z - pz) * j / m; if (obs && (obs.inBuilding(fx, fz, 0.4) || obs.nearStation(fx, fz, 0.4))) blocked = true; else fill.push(fx, fz); }
-        if (blocked) cut(); else run.push(...fill);
+        for (let j = 1; j < m && !blocked; j++) { const fx = px + (x - px) * j / m, fz = pz + (z - pz) * j / m; if (inside(fx, fz)) blocked = true; else fill.push(fx, fz); }
+        if (blocked) { cut(); openS[side].push(s); } else run.push(...fill);
       }
       run.push(x, z);
     }
@@ -111,8 +128,8 @@ export function courseLayout(piste, startS = 2, pistes = null, obs = null, finis
 export function createCourse({ piste, startS = 2, finishS: finishIn = null, open = null }) {      // R8e: open(s, side) = courseLayout().openAt
   const finishS = Math.max(startS + 30, finishIn !== null ? finishIn : piste.length - COURSE.finishBack);
   const proj = {}, nxt = {}, back = {}, full = {}, cp = {}, ca = {}, wp = {};
-  let hint = startS, offFor = 0, aborted = false, cHint = startS, lastOff = 0, hits = 0, low = Infinity;
-  const out = { s: startS, remaining: finishS - startS, share: 0, dist: 0, warn: false, abort: false, back: { x: 0, z: 0 }, next: { x: 0, z: 0 }, offFor: 0 };
+  let hint = startS, offFor = 0, aborted = false, cHint = startS, lastOff = 0, hits = 0, low = Infinity, stuckFor = 0, bestS = startS;
+  const out = { s: startS, remaining: finishS - startS, share: 0, dist: 0, warn: false, abort: false, why: '', back: { x: 0, z: 0 }, next: { x: 0, z: 0 }, offFor: 0, stuckFor: 0 };
   /** The projection that follows the skier: near the last spot, the whole line when he is far from it (a teleport, a respawn). */
   function follow(x, z, h, o) {
     piste.project(x, z, h, 160, o);
@@ -136,7 +153,14 @@ export function createCourse({ piste, startS = 2, finishS: finishIn = null, open
     offFor = off ? offFor + dt : Math.max(0, offFor - dt * 2);
     out.warn = off;
     out.offFor = offFor;
-    if (!aborted && offFor > COURSE.abortAfter) { aborted = true; out.abort = true; } else out.abort = false;
+    // R8b (3V QA: a blocked start trapped him for 3 min) -> R8g: the stuck timer lives here (main.js and the Node rides share it) and
+    // never runs while he gets anywhere: COURSE.stuckAfter s standing (< 1 m/s, no crash) WITHOUT 1 m of progress down the course
+    const moving = st.speed >= 1 || st.crash > 0;
+    if (proj.s > bestS + 1 && proj.dist <= piste.halfWidth + COURSE.warnAfter) { bestS = proj.s; stuckFor = 0; }
+    stuckFor = moving ? 0 : stuckFor + dt;
+    out.stuckFor = stuckFor;
+    out.abort = false;
+    if (!aborted && (offFor > COURSE.abortAfter || stuckFor > COURSE.stuckAfter)) { aborted = true; out.abort = true; out.why = offFor > COURSE.abortAfter ? 'off' : 'stuck'; }
     return out;
   }
   /** The barriers stand at halfWidth + 0.5 m on both sides from the start gate to the finish. A skier crossing one from the inside
@@ -156,11 +180,13 @@ export function createCourse({ piste, startS = 2, finishS: finishIn = null, open
     const wall = piste.halfWidth + 0.5 - COURSE.barrierBody;
     const was = lastOff;
     lastOff = cp.off;
-    if (cp.s < startS + 4 || cp.s > finishS || st.crash > 0 || st.ride) return st;
+    if (cp.s < startS + 4 || cp.s > finishS || st.ride) return st;          // R8g: a crash slides into the net too (it catches him)
     if (Math.abs(cp.off) <= wall || Math.abs(was) > wall + 1.5) return st;
     // put down elsewhere since the last step (place / teleport / respawn): not a crossing, he may ski back in from there
     if (moved || Math.hypot(st.x - prev.x, st.z - prev.z) > 2) return st;
-    if (!st.grounded && st.air > 0.25) return st;                         // a real jump clears the net (it is 1.1 m high)
+    // R8g: no jump clears the net any more (it used to after 0.25 s of air: a hop off a bump at the edge flew him out of the course
+    // and he skied back in through the net further down, Killy couloir-de-la-table-d-orient, Arlberg schweinstroge): in the air too
+    // the net turns him back along the course
     piste.at(cp.s, ca);
     const side = Math.sign(cp.off), rx = -ca.dz * side, rz = ca.dx * side;     // the outward normal of this barrier
     if (open && open(cp.s, side)) return st;                               // R8e: the net is open here (a house reaches into the course)
@@ -187,7 +213,7 @@ export function createCourse({ piste, startS = 2, finishS: finishIn = null, open
   }
   /** A respawn put him back a few metres: the distance may rise once to where he stands now. */
   function rebase() { low = Infinity; }
-  return { update, collide, rebase, finishS, startS, get hits() { return hits; }, get aborted() { return aborted; }, reset() { aborted = false; offFor = 0; } };
+  return { update, collide, rebase, finishS, startS, get hits() { return hits; }, get aborted() { return aborted; }, reset() { aborted = false; offFor = 0; stuckFor = 0; } };
 }
 
 /** Where every course object stands (pure: the view and the Node check share it): barrier panels following the slope, arrow boards
@@ -262,14 +288,8 @@ export function createCourseView({ scene, layout, height }) {
   const postG = new THREE.CylinderGeometry(0.03, 0.035, 1, 5); postG.translate(0, 0.5, 0);
   const net = new THREE.InstancedMesh(postG, new THREE.MeshLambertMaterial({ color: 0x3a3f47 }), Math.max(1, layout.barriers.length));
   net.count = layout.barriers.length; net.name = 'ski-course-barriers'; net.frustumCulled = false;
-  const nc = document.createElement('canvas'); nc.width = 32; nc.height = 32;
-  const ng = nc.getContext('2d');
-  ng.fillStyle = '#ff6a13'; ng.fillRect(0, 0, 32, 32);
-  ng.strokeStyle = 'rgba(150, 45, 0, 0.55)'; ng.lineWidth = 2;                      // the net's mesh, a few diamonds per metre
-  ng.beginPath(); ng.moveTo(0, 0); ng.lineTo(32, 32); ng.moveTo(32, 0); ng.lineTo(0, 32); ng.stroke();
-  ng.fillStyle = '#ffffff'; ng.fillRect(0, 0, 32, 3);                                  // white top edge
-  const netTex = new THREE.CanvasTexture(nc); netTex.wrapS = netTex.wrapT = THREE.RepeatWrapping;
-  const ribbon = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshLambertMaterial({ map: netTex, side: THREE.DoubleSide }));
+  // R8g: a see-through orange mesh (4 x 4 diamonds per metre) with a white top edge, not a solid orange wall
+  const ribbon = new THREE.Mesh(new THREE.BufferGeometry(), createNetMaterial({ color: '#ff6a13', cells: 4, rows: 4, band: '#ffffff' }));
   ribbon.name = 'ski-course-nets'; ribbon.frustumCulled = false;
   objs.push(net, ribbon);
   // arrows: a yellow board with a black chevron on a post, facing the skier coming down; the chevron points the way the course goes
@@ -394,12 +414,14 @@ export function createCourseHud(hudEl) {
 }
 
 /** "Challenge ofgebrach": the skier left the course too long. A choice, never an automatic teleport. */
-export function showCourseAbort(root, { name, onAgain, onFree }) {
+export function showCourseAbort(root, { name, why = 'off', onAgain, onFree }) {
   const c = document.createElement('div');
   c.className = 'coursecard'; c.id = 'courseAbort';
   c.innerHTML = `<b>Challenge ofgebrach</b><span></span>
     <div class="acts"><button type="button" class="btn primary" data-a="again">Nach eng Kéier</button><button type="button" class="btn" data-a="free">Weider fräi fueren</button></div>`;
-  c.querySelector('span').textContent = `Du bass ze laang nieft der Pist${name ? ` ${name}` : ''} gefuer.`;
+  // R8g: say what ran out (Ian read a stop in front of a net as "the challenge timed out")
+  c.querySelector('span').textContent = why === 'stuck' ? `Du bass ze laang${name ? ` op der ${name}` : ''} stoe bliwwen.` : `Du bass ze laang nieft der Pist${name ? ` ${name}` : ''} gefuer.`;
+  c.dataset.why = why;
   root.appendChild(c);
   c.querySelector('[data-a="again"]').addEventListener('click', () => { c.remove(); onAgain(); });
   c.querySelector('[data-a="free"]').addEventListener('click', () => { c.remove(); onFree(); });

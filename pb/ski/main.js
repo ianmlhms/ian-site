@@ -1135,16 +1135,14 @@ async function boot() {
     game.state = launchState(s, a);      // R8b: out of the standing hold (R7-A), else the kick is zeroed until an input; launch follow-up: to 45 km/h
     document.documentElement.dataset.skiPush = String(COURSE.push);
   }
-  let stuckFor = 0;
   function courseTick(dt) {
-    lastCourse = course.update(game.state, dt);
-    // R8b (3V QA: a blocked start trapped him for 3 min): 10 s without getting anywhere (< 1 m/s, no crash) -> the same abort choice
-    stuckFor = game.state.speed < 1 && game.state.crash === 0 && !game.paused ? stuckFor + dt : 0;
-    if ((lastCourse.abort || stuckFor > 10) && !isRace() && !courseAbort) {
-      stuckFor = 0;
+    // R8b: 10 s without getting anywhere -> the same abort choice; R8g: that stuck timer is course.js's now (no progress = no abort
+    // while he moves down the course), the card says which ran out
+    lastCourse = course.update(game.state, game.paused ? 0 : dt);
+    if (lastCourse.abort && !isRace() && !courseAbort) {
       game.paused = true; input.setEnabled(false);
       courseAbort = showCourseAbort(hud.el, {
-        name: game.piste ? game.piste.name : '',
+        name: game.piste ? game.piste.name : '', why: lastCourse.why,
         onAgain: () => { courseAbort = null; game.paused = false; startRun(game.piste, MODES.run); },
         onFree: () => { courseAbort = null; game.paused = false; endCourse(); freeFromHere(); },
       });
@@ -1152,6 +1150,9 @@ async function boot() {
   }
   function endCourse() {
     if (courseView) { courseView.dispose(); courseView = null; }
+    // R8g: a course's run props (the START arch at the gate, slalom gates) go with it: after a finish / an abort nothing of the
+    // challenge stays on the mountain (startRun builds them again)
+    if (course && runProps) { runProps.dispose(); runProps = null; }
     if (courseAbort) { courseAbort.close(); courseAbort = null; game.paused = false; }
     course = null; lastCourse = null;
     courseHud.show(false);

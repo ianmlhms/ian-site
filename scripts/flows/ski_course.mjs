@@ -68,8 +68,9 @@ export const flow = {
         await page.evaluate(() => window.__ski.setInput(null));
         await page.click('#courseAbort [data-a="free"]');
         await page.waitForFunction(() => window.__ski.game.mode === "freeride" && window.__ski.game.phase === "running", null, { timeout: 8000 });
-        const fr = await page.evaluate(() => ({ x: window.__ski.state.x, z: window.__ski.state.z, course: document.documentElement.dataset.skiCourse, barriers: window.__ski.scene.children.some((o) => o.name === "ski-course-barriers") }));
-        h.expect(Math.hypot(fr.x - off.x, fr.z - off.z) < 25 && !fr.barriers, "Weider fräi fueren: on from that spot, the course taken down");
+        // R8g: nothing of the challenge stays up in the free ride (nets, posts, arrows, the ZIL arch, the START arch / gates)
+        const fr = await page.evaluate(() => ({ x: window.__ski.state.x, z: window.__ski.state.z, course: document.documentElement.dataset.skiCourse, left: window.__ski.scene.children.filter((o) => /^ski-course|^ski-run$/.test(o.name)).map((o) => o.name) }));
+        h.expect(Math.hypot(fr.x - off.x, fr.z - off.z) < 25 && !fr.left.length, `Weider fräi fueren: on from that spot, the course taken down${fr.left.length ? ` (left: ${fr.left.join(", ")})` : ""}`);
         await page.evaluate((id) => window.__ski.start(id), id);
         await page.waitForFunction(() => window.__ski.game.phase === "running", null, { timeout: 15000 });
       }
@@ -84,8 +85,9 @@ export const flow = {
         const { createBot } = await import("/pb/ski/bot.js"); k.game.bot = createBot(k.game.piste, { blocked: k.blocked });
       });
       await page.waitForFunction(() => document.documentElement.dataset.skiScreen === "finish", null, { timeout: 240000 });
-      const fin = await page.evaluate(() => ({ last: document.documentElement.dataset.skiLast, warned: document.documentElement.dataset.skiCourseWarn, hits: window.__ski.course ? window.__ski.course.hits : null }));
+      const fin = await page.evaluate(() => ({ last: document.documentElement.dataset.skiLast, warned: document.documentElement.dataset.skiCourseWarn, hits: window.__ski.course ? window.__ski.course.hits : null, left: window.__ski.scene.children.filter((o) => /^ski-course|^ski-run$/.test(o.name)).map((o) => o.name) }));
       h.expect(!!fin.last, `${id}: finished (${fin.last}), the finish card is up`);
+      h.expect(!fin.left.length, `${id}: at the finish every course object is taken down${fin.left.length ? ` (left: ${fin.left.join(", ")})` : ""}`);      // R8g
       const hud = await page.evaluate(() => {
         const log = window.__skiHudLog || [];
         let rise = 0, low = Infinity;

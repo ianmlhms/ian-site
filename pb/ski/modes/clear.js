@@ -147,7 +147,7 @@ export function createObstacles({ resort, field, scatter = null, density = 1, li
     }
     return null;
   }
-  return { blocked, wallAhead, slopeAt, setBuildings, setPistes, otherPisteIn, inBuilding, nearStation, nearLine, stations, hasBuildings: () => buckets.size > 0 };
+  return { blocked, wallAhead, slopeAt, setBuildings, setPistes, otherPisteIn, inBuilding, nearStation, nearLine, stations, hasBuildings: () => buckets.size > 0, heightAt: (x, z) => field.height(x, z) };
 }
 
 /** The resort's first lift (FIRST_LIFT names in order, else the village lift of round 6). lifts = createLiftNet. */
@@ -254,6 +254,14 @@ export function courseGate(piste, obs, halfGate = 3.5) {
         piste.at(s + d, b);
         const w = obs.blocked(b.x - b.dz * lat, b.z + b.dx * lat, 1, { lift: false, trees: false, built: false, edge: 8 });
         if (w === 'building' || w === 'station') why = `run-in ${w}`;
+      }
+      // R8g (Zermatt furggsattel: the gate stood 21 m beside the line and 23 m BELOW it, the push start rolled him into the hollow and
+      // the stuck timer ended every try): the gate no lower than the line beside it, and the line ahead (where he heads) not above him
+      if (!why && obs.heightAt) {
+        const gy = obs.heightAt(a.x + rx * lat, a.z + rz * lat);
+        piste.at(s + 15, b);
+        if (lat && gy < obs.heightAt(a.x, a.z) - 1.5) why = 'below the line';
+        else if (obs.heightAt(b.x, b.z) > gy + 1) why = 'uphill start';
       }
       if (!why) return { s, lat, ok: true, why: '' };
     }

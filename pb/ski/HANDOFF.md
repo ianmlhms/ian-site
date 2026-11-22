@@ -1427,3 +1427,48 @@ Ian: "at low speed (starting, flat bits) it's annoying, accelerate faster to at 
   routes with tours in them: Woster-Bockbachtal, Vorderes Maroital).
 - r8c-check crashes on origin/main since 3513fd60 (lift-path.js createLiftPath returns null for a lift: `p.len` at r8c-check.mjs:119),
   not from this change.
+## Round 8g (22 Nov 2026): a red net across the Stallmähder-Fang course (Ian, iPad, Arlberg)
+**Cause**: NOT the challenge's own nets. The Kandahar is a `worldcup` landmark (landmarks.js): 3.6 m red A-nets (72 % opaque, black
+poles) along both edges of the race piste wherever it is steep, drawn ALWAYS (free ride too). Every piste that crosses or joins the
+Kandahar got that wall across its line: Stallmähder-Fang crosses it 3x (s ~1060, ~1480, ~2900), also Fasch, Nasserein (+red),
+Hoppelweg-Variante, Gstans-Variante, Plattiwald, Skiroute Eisfall, Stallmähder-Fang Variante (9 courses). Ian stopped in front of it
+and the R8b stuck timer (10 s < 1 m/s) offered "Challenge ofgebrach" with the wrong text ("ze laang nieft der Pist"); the race net was
+still there in the free ride because it is a landmark. Separately the course's OWN net ribbons crossed the line in 18 courses: the
+"inside of a bend" test looked only +-40 m round s, so where a line loops back or a hairpin's other leg runs alongside, one leg's net
+stood across the other (Killy myrtilles / petit-col / cugnai-red, 3V retour-sud / verbindung-preyerand ..., Zermatt rotenboden,
+Arlberg riffel / valfagehr / seekopf-standard / hoppelweg ..., Kronplatz pedaga).
+- **Race nets** (`landmarks.js worldcupNets`, pure, 4 m steps): left open wherever a net point comes within 2.5 m of ANOTHER piste's
+  corridor (line + half width, `pistes.js createLineIndex` grid) or folds back over the race piste's own snow; posts only where a net
+  hangs. The start hut + banner are left out where another piste runs through them (`worldcupHouseClear`: Fasch and the Kapall route
+  pass the Kandahar's top). Look: a see-through red mesh (`netmesh.js createNetMaterial`: canvas diamonds, transparent, 1 draw call
+  + the instanced poles), not a coloured wall.
+- **Course nets** (`course.js courseLayout`): a net point is cut when it lies within half width + 0.2 m of ANY part of the course line
+  (gate -> ZIL, `createLineIndex`), the corner fill too (recorded in openAt: no soft wall there either); a house / station hall opening
+  reaches 12 m further both ways (`INTRUDE_PAD`: the scripted skier went round Killy joseray's hotel and came back in through the net).
+  Look: see-through orange mesh with the white top edge (same material maker). Still 2 draw calls (posts + ribbon).
+- **No jump through the net**: `collide` no longer lets a jump clear it (was: any air > 0.25 s; a hop off a bump at the edge flew the
+  skier out of the course and he skied back in through the net further down: Killy couloir-de-la-table-d-orient, Arlberg
+  schweinstroge, Zermatt verbindung-sessellift-bontad). In the air the net turns him back along the course like on the ground.
+- **Timers**: the stuck timer moved from main.js into `createCourse.update` (shared with the Node rides): `COURSE.stuckAfter` 10 s
+  standing (< 1 m/s, no crash) WITHOUT 1 m of progress down the course; `out.why` 'off' | 'stuck'; the abort card says which
+  ("Du bass ze laang op der X stoe bliwwen." vs "... nieft der Pist gefuer."). A timer never runs out while he gets anywhere.
+- **Start gate** (`clear.js courseGate`, `obs.heightAt`): no gate beside the line more than 1.5 m below it, no gate with the line 15 m
+  ahead > 1 m above it (Zermatt furggsattel: the gate stood 21 m beside and 23 m below the line, every try ended stuck at the start).
+- **Lifetime**: `endCourse` also disposes the course's run props (START arch, slalom gates). After a finish and after an abort ->
+  Weider fräi fueren nothing named `ski-course-*` / `ski-run` is in the scene (flow ski-course + r8g-net-shots check it).
+- **New check** `node scripts/ski/barrier-check.mjs [rid] [--list]`: every course (1324: 234 / 472 / 194 / 353 / 71, Sonnenkopf is in
+  arlberg) against its own nets AND the resort's race nets: no barrier segment crosses or comes within 2 m of the line gate -> ZIL;
+  the corridor across the line (every 2 m) >= 6 m; race start hut only where no piste runs. BEFORE: 27 courses crossed (18 by their
+  own nets, 9 by the Kandahar's), 1 corridor < 6 m (myrtilles 3.6 m). AFTER: 0 / 0 (nearest net 6.5 m from a line, narrowest 13 m).
+- **round7c-check --rides** now also: every ride's path vs every net segment (course + race; a jump > 1.1 m over one counted apart),
+  the course timers (off-course or standing-with-progress = fault; a stall = no 1 m of progress in 10 s is listed as `info`).
+  BEFORE (old course/landmark code): 29 of 1324 rides passed through a net (5 / 4 / 3 / 17 / 0). AFTER: 0 through a net, 0 timeouts,
+  1324/1324 finished; 5 stalls listed as info (the scripted skier stood 10 s without progress, so the "stoe bliwwen" choice would come
+  up): Killy vallee-perdue s 1931 (the OSM line climbs a 15 m DEM hump, the natural way is the gully just outside the net) and
+  aiguille-percee s 191 (a ridge across the line), 3V folyeres-variante-blue s 200 (pinned by a house), Arlberg furmesle s 2007 and
+  waldschneise s 2341. Not fixed here: 88 courses have a line that climbs > 3 m somewhere; the rides carry speed over all but these.
+- Results (22 Nov): barrier-check 11/0, round7c-check --rides 140/0, round7b-test 10821, round7-test 30, round6-test 2222,
+  floors-check 1324 + parks == ski-v1.sql (unchanged, no SQL), security-test, speed-check 52/0. Chromium flows ski-course (x2, +
+  nothing left after the abort / at every finish), ski-challenges, ski-freeride, ski: PASS. WebKit not run.
+- Shots: ~/Library/Caches/ski-work/r8g/{before,after}/<rid>-<piste>-{close,high}.png (`scripts/ski/r8g-net-shots.mjs` via shot.mjs
+  --script; before = a copy of origin/main served with --root). main.js?v=16.
