@@ -512,6 +512,6 @@ Ian's play feedback (Safari, 3 Vallées). Everything is resort-generic and check
   ski-skis green; Niddreg 141 calls, 397k triangles (was 419k). WebKit: ski-lifts-all, ski-lift, ski-freeride green; ski green except
   its frame-time gate (p95 28 ms in software-rendered headless WebKit; Chromium 16.8 ms).
 - **Still open**: exits are computed when he gets off (one ~50-150 ms search on the iPad, once per ride); the lift stations are our own
-  type models (not the real buildings' shapes); 4 of the 1,004 station ends lose a part to a neighbour's lane (pruned, logged nowhere:
-  check `part.cut`); Vallugagrat's exit is a walk down the Vallugagrat piste (the only clear way); A's look module not merged here
+  type models (not the real buildings' shapes); 69 of 933 station frames lose 245 parts (posts, roofs, huts) to a neighbour's
+  carrier path or rider walk (`part.cut`; shared / twin stations look incomplete there); Vallugagrat's exit is a walk down the Vallugagrat piste (the only clear way); A's look module not merged here
   (hook `window.__skiLook.apply` in main.js rideCamera1).
