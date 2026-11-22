@@ -250,6 +250,8 @@ export function createMarkers({ scene, list, height, overlay, starsOf }) {
   }
   return {
     mesh, list,
+    /** R8d: the list indices of the drawn gates (instance k = list[order[k]]; R8c draws only the gates near the camera) */
+    get order() { return order; },
     update, paint, reseat: seat,
     /** R7-C: move the piste gates to their start on open snow (clear.js courseGate, once the buildings are known). */
     regate(startOf) { for (const m of list) { if (!m.piste) continue; const g = gatePoint(m.piste, startOf); m.x = g.x; m.z = g.z; m.heading = g.heading; } seat(); },

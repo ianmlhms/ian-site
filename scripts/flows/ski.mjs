@@ -48,7 +48,7 @@ export const flow = {
     const listed = await page.$$eval(".prow", (r) => r.length);
     h.expect(listed > 100, `${listed} pistes listed`);
     await page.click(`.prow[data-id="${PISTE}"]`);
-    h.eq(await page.textContent("#pkName"), "Face", "the picked piste shows in the card");
+    h.eq(await page.textContent("#pkName"), "Face (Rout)", "the picked piste shows in the card (R8c: a name used by two colours carries its colour)");
     h.eq(await page.evaluate(() => window.__board && window.__board.id), `ski-killy-${PISTE}`, "its leaderboard is selected (ski-<resort>-<piste>)");
     await page.click('#segWeather [data-v="snow"]');
     await page.click('#segTime [data-v="evening"]');

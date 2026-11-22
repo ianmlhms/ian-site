@@ -123,11 +123,14 @@ export const flow = {
         const gate = await page.evaluate(async () => {
           const S = window.__ski, M = S.markers, list = M.list;
           const alone = (m) => list.every((o) => o === m || Math.hypot(o.x - m.x, o.z - m.z) > 35);      // no other gate in the picture
-          let i = list.findIndex((m) => !m.park && (m.diff === "red" || m.diff === "blue") && alone(m));
-          if (i < 0) i = list.findIndex((m) => !m.park && (m.diff === "red" || m.diff === "blue"));
+          // R8d: R8c draws only the gates near the camera (instance k = list[M.order[k]]): pick among the drawn ones
+          const drawn = (M.order || list.map((_, j) => j)).slice(0, M.mesh.count);
+          const ok = (m) => !m.park && (m.diff === "red" || m.diff === "blue");
+          let i = drawn.find((j) => ok(list[j]) && alone(list[j]));
+          if (i === undefined) i = drawn.find((j) => ok(list[j]));
           const m = list[i];
           const T = window.THREE;
-          const mat4 = new T.Matrix4(); M.mesh.getMatrixAt(i, mat4);
+          const mat4 = new T.Matrix4(); M.mesh.getMatrixAt(drawn.indexOf(i), mat4);
           const base = new T.Vector3(0, 0.28, 3.5).applyMatrix4(mat4), banner = new T.Vector3(0, 2.9, 0).applyMatrix4(mat4);
           const hx = Math.cos(m.heading), hz = Math.sin(m.heading);
           // the gates' own mesh and material, alone in a plain white light (no terrain or streaming in the way): what the shader does
