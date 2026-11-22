@@ -499,3 +499,19 @@ Ian's play feedback (Safari, 3 Vallées). Everything is resort-generic and check
   line, the return loop, tunnels underground, the exit rules); flow `ski-lifts-all` (FLOW_SKI_RESORTS=..., Chromium and
   FLOW_BROWSER=webkit: the same per-lift checks with the page's own objects, 0 km/h for 3 s after every exit, one real ride per kind with
   the keys incl. the double press). Shots: `scripts/ski/round7b-shots.mjs` (through shot.mjs --script).
+- **Boarding rule (final, R7-B owns it; R7-A's 12 m and R7-C's 42 m radii are replaced when merging)**: there is no radius any more.
+  A lift is boarded only from its boarding ZONE, a small rectangle in its own bottom station (lift-site.js `zone`: chair 3.2 x 2.2 m
+  behind the gates beside the chairs' lane, gondola / cable car / train ~4.4 x 2 m on the platform beside the cabin's door, drag lift
+  the track start, carpet the belt start), tested by `freeride.js boardingAt` -> `liftAt` (button + L) and again by main.js `boardLift`
+  (`site.inZone`). Fast travel / the spawn put the skier on the zone's waiting spot (`boardAt` = `site.wait`). R7-C's 42 m came from the
+  Val d'Isère OSM station building pushing the spawn away from the line end: the OSM buildings in or over a station are now left out of
+  the village (`keepBuilding`), so the waiting spot is always inside the station and clear (checked for every lift of every resort).
+- **Results** (22 Nov, 00:45): round7b-test 4625 / 4625 (5 resorts, 459 drawn lifts, 452 ridden), round6-test 2307 / 2307, harness all
+  five green. Chromium: ski-lifts-all (all 5 resorts: every lift's stations, zone, exit, 3 s still; 32 real rides, one per kind per
+  resort, incl. the double press), ski-lift, ski, ski-freeride, ski-ipad-start, ski-resorts, ski-mp, ski-challenges, ski-park,
+  ski-skis green; Niddreg 141 calls, 397k triangles (was 419k). WebKit: ski-lifts-all, ski-lift, ski-freeride green; ski green except
+  its frame-time gate (p95 28 ms in software-rendered headless WebKit; Chromium 16.8 ms).
+- **Still open**: exits are computed when he gets off (one ~50-150 ms search on the iPad, once per ride); the lift stations are our own
+  type models (not the real buildings' shapes); 4 of the 1,004 station ends lose a part to a neighbour's lane (pruned, logged nowhere:
+  check `part.cut`); Vallugagrat's exit is a walk down the Vallugagrat piste (the only clear way); A's look module not merged here
+  (hook `window.__skiLook.apply` in main.js rideCamera1).
