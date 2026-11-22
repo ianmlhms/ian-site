@@ -8,11 +8,20 @@ const SIZE = 132;               // CSS px
 const SPAN = 1400;              // m across
 const MAP_DELAY_MS = 4000;      // R7-D
 
-export function createMinimap({ parent, resort, imageUrl, park = null }) {
+export function createMinimap({ parent, resort, imageUrl, park = null, onOpen = null }) {
   const wrap = document.createElement('div');
   wrap.className = 'minimap';
-  wrap.innerHTML = `<canvas width="${SIZE}" height="${SIZE}" aria-label="Kaart ronderëm"></canvas><b class="north">N</b>`;
+  wrap.innerHTML = `<canvas width="${SIZE}" height="${SIZE}" aria-hidden="true"></canvas><b class="north">N</b>`;
   parent.appendChild(wrap);
+  // launch (Ian: the map easier to reach): a tap / click on the minimap opens the full map, like the M key / the menu's map
+  if (onOpen) {
+    wrap.classList.add('open');
+    wrap.setAttribute('role', 'button');
+    wrap.setAttribute('tabindex', '0');
+    wrap.setAttribute('aria-label', 'Kaart opmaachen');
+    wrap.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); wrap.blur(); onOpen(); });
+    wrap.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onOpen(); } });
+  }
   const canvas = wrap.querySelector('canvas');
   const k = Math.min(2, window.devicePixelRatio || 1);
   canvas.width = SIZE * k; canvas.height = SIZE * k;

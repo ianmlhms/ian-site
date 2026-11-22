@@ -194,6 +194,17 @@ export function createLiftSite(path) {
         : key === 'chair' ? { a0: -boardS - 1.6, a1: -boardS + 1.6, b0: bOut + 1.2, b1: bOut + 3.4 }
           : { a0: -boardS - 2.2, a1: -boardS + 2.2, b0: bOut + 0.9, b1: bOut + 2.9 };
   const bottom = ends[0], top = ends[1];
+  // Launch fix (Ian could not find where to board): the boarding zone is marked, a yellow mat on the platform (stood on, like a
+  // deck), drag lifts / rope tows two yellow poles beside the track start (the skis stay on the snow there)
+  {
+    const z = zoneB, mark = (p) => { bottom.parts.push(p); const r = bottom.rect; r.a0 = Math.min(r.a0, p.a0); r.a1 = Math.max(r.a1, p.a1); r.b0 = Math.min(r.b0, p.b0); r.b1 = Math.max(r.b1, p.b1); };
+    if (key === 'drag' || key === 'rope') {
+      for (const a of [z.a0, z.a1]) mark({ a0: a - 0.05, a1: a + 0.05, b0: z.b1 + 0.35, b1: z.b1 + 0.45, y0: 0, y1: 1.25, col: COL.gate, solid: false, zoneMark: true });
+    } else if (key !== 'carpet') {
+      const floor = key === 'gondola' ? 0.12 : key === 'train' ? 0.14 : 0.04;
+      mark({ ...z, y0: floor, y1: floor + 0.02, col: COL.gate, solid: false, deck: true, zoneMark: true });
+    }
+  }
   const zc = bottom.toWorld((zoneB.a0 + zoneB.a1) / 2, (zoneB.b0 + zoneB.b1) / 2, {});
   const upHeading = Math.atan2(-bottom.fz, -bottom.fx);
   const off = key === 'carpet' ? null : top.toWorld(key === 'drag' || key === 'rope' ? -unloadS + 0.5 : -unloadS, bOut + (key === 'drag' || key === 'rope' ? 0.9 : 1.4), {});
@@ -263,8 +274,7 @@ const ANGLES = [0, ...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].flatMap((k) => [k * Ma
 export function createLiftWorld(paths, opts = {}) {
   const sites = new Map();
   for (const [i, p] of paths) if (p) sites.set(i, createLiftSite(p));
-  if (opts.cutsFrom) copyCuts(sites, opts.cutsFrom);
-  else pruneCrossings(sites);
+  pruneCrossings(sites);                // (opts.cutsFrom: kept for callers; the decision is remembered per resort anyway)
   // grid of station frames, pylons and lane segments
   const grid = new Map();
   const key = (i, j) => i * 100003 + j;
@@ -640,74 +650,206 @@ export function createLiftWorld(paths, opts = {}) {
 }
 
 /** Where lifts share ground (twin drag lifts, a line passing a neighbour's station): a station part standing in another lift's
- *  carrier lane (at the carriers' height) is left out (`cut`: not drawn, not solid), with the snow on it. */
+ *  carrier lane AT the carriers' height is left out (`cut`: not drawn, not solid), with the snow on it.
+ *  Launch fix (Ian, Tignes Champagny T-bar: "no real station, can't ride"): the old rule was the ground plan only, so a cable car
+ *  passing 40 m overhead cut a drag lift's wheel mast and hut and left the bull-wheel and the hut's window floating. Now:
+ *   - heights count: a part goes only where the carrier (or the rider's walk) comes within CUT_MARGIN m of it vertically (a cabin
+ *     docking in a shared hall passes under the neighbour's roof like under its own);
+ *   - a roof the neighbour's carriers graze goes up (ROOF_RAISE) over them, with its snow, drive and sign, the posts grow;
+ *   - a hut that has to go moves (across the line, back or forward) to a spot no other lift's carrier or rider reaches;
+ *   - nothing floats: in a frame that lost parts, every part that no longer rests on / touches a part standing on the ground goes too;
+ *   - every bull-wheel stays held: when the part carrying it (canopy, roof, mast) is gone, a steel column (`mount`) goes under it;
+ *   - ONE decision per resort: the first world built over a resort's lifts decides (in the game: the far grid, liftTreeGuard / the
+ *     lift net), every later world (lifts.js on the 5 m heights, setBuildings) applies the same cuts, raised roofs, moved huts and
+ *     mounts (part lists identical); round7b-test checks the drawn world's carriers against every kept part. */
+const CUT_MARGIN = 0.5;                         // m of vertical clearance between a neighbour's carrier and a part that keeps the part
+const ROOF_RAISE = [0.5, 1.0, 1.6, 2.2];       // m a roof may go up to clear a neighbour's carriers (a shared station's canopy)
+const TOUCH = 0.16;                             // m: two parts closer than this in all three axes hold each other
+const pruneCache = new WeakMap();               // lift src -> per frame { n, cut: [indices], added: [parts], shift: [[index, dy0, dy1]] }
+
 function pruneCrossings(sites) {
   const list = [...sites.values()];
-  // the station frames in a 40 m grid (each in every cell its footprint + 5 m touches)
-  const G = 40, fgrid = new Map();
+  if (list.length && list.every((s) => s.path.src && pruneCache.has(s.path.src))) { applyCuts(list); return; }
+  const G = 40;
   const gk = (i, j) => i * 100003 + j;
-  for (const site of list) {
-    for (const f of frames(site)) {
-      const r = f.rect, cs = [[r.a0, r.b0], [r.a1, r.b0], [r.a0, r.b1], [r.a1, r.b1]].map(([a, b]) => f.toWorld(a, b, {}));
-      const x0 = Math.min(...cs.map((c) => c.x)) - 5, x1 = Math.max(...cs.map((c) => c.x)) + 5, z0 = Math.min(...cs.map((c) => c.z)) - 5, z1 = Math.max(...cs.map((c) => c.z)) + 5;
-      for (let j = Math.floor(z0 / G); j <= Math.floor(z1 / G); j++) for (let i = Math.floor(x0 / G); i <= Math.floor(x1 / G); i++) {
-        let c = fgrid.get(gk(i, j));
-        if (!c) fgrid.set(gk(i, j), (c = []));
-        c.push({ site, f });
-      }
-    }
-  }
-  const l = {};
-  /** A carrier (or the rider) of `owner` at (x, z) heading h with half sizes hw / hl: cut every other lift's part it overlaps (by the
-   *  ground plan only, so the drawn stations (5 m heights) and the colliders (far grid) always agree), with the snow on it. */
-  const test = (x, z, h, hw, hl, owner) => {
-    const cell = fgrid.get(gk(Math.floor(x / G), Math.floor(z / G)));
-    if (!cell) return;
-    const c = Math.cos(h), sn = Math.sin(h);
-    for (const { site, f } of cell) {
-      if (site === owner) continue;
-      f.toLocal(x, z, l);
-      const ca = Math.abs(c * f.fx + sn * f.fz), cr = Math.abs(c * f.rx + sn * f.rz);
-      const ea = ca * hl + cr * hw, eb = cr * hl + ca * hw;
-      if (l.a + ea < f.rect.a0 || l.a - ea > f.rect.a1 || l.b + eb < f.rect.b0 || l.b - eb > f.rect.b1) continue;
-      for (const p of f.parts) {
-        if (p.deck || p.cut || (!p.solid && !p.cap)) continue;
-        if (l.a + ea < p.a0 || l.a - ea > p.a1 || l.b + eb < p.b0 || l.b - eb > p.b1) continue;
-        p.cut = true; p.solid = false;
-        for (const cp of f.parts) if (cp.cap && Math.abs(cp.y0 - p.y1) < 0.05 && cp.a0 < p.a1 && cp.a1 > p.a0 && cp.b0 < p.b1 && cp.b1 > p.b0) cp.cut = true;
-      }
-    }
+  // every carrier position 2 m apart round each loop (drag bars, chairs, cabins, trains; not under the ground) and the rider's walks
+  // in the stations, as boxes with their height range, in a 40 m grid by their centre
+  const probes = new Map();
+  const probe = (x, z, h, hw, hl, owner, yLo, yHi) => {
+    const k = gk(Math.floor(x / G), Math.floor(z / G));
+    let c = probes.get(k);
+    if (!c) probes.set(k, (c = []));
+    c.push({ x, z, c: Math.cos(h), sn: Math.sin(h), hw, hl, owner, yLo, yHi, r: Math.hypot(hw, hl) });
   };
   const w = {};
   for (const site of list) {
     const p = site.path;
-    // every carrier position 2 m apart round the loop (drag bars, chairs, cabins, trains; not under the ground)
     if (!(p.kind === 'carpet' || (p.kind === 'drag' && p.sub === 'rope'))) {
       const cb = p.carrier, hw = cb.hw + cb.drop * 0.035 + 0.3, hl = cb.hl + 0.3;
+      const train = p.kind === 'train';
       for (let u = 0; u < p.loopLen; u += 2) {
         p.loopAt(u, w);
         if (p.tunnel && p.ground(w.s) - w.y > 6) continue;
-        test(w.x, w.z, w.heading, hw, hl, site);
+        probe(w.x, w.z, w.heading, hw, hl, site, train ? w.y : w.y - cb.drop - 0.3, train ? w.y + cb.top : w.y + cb.top * 0.5 + 0.3);
       }
     }
-    // the rider's walks in the stations (the waiting spot to the loading line, the carrier to where he gets off): two lifts
-    // sharing a station (Matterhorn Express 2 / 3, Falkenkopf) must not have the other's posts on them
+    // the rider's walks (the waiting spot to the loading line, the carrier to where he gets off): two lifts sharing a station
+    // (Matterhorn Express 2 / 3, Falkenkopf) must not have the other's posts on them
     const tq = p.at(Math.max(0, p.len - site.unloadS), {});
     const carAt = { x: tq.x - tq.dz * p.side * p.sign, z: tq.z + tq.dx * p.side * p.sign };
-    for (const [a, b] of [[site.wait, site.load], [carAt, site.off]]) {
+    for (const [a, b, g] of [[site.wait, site.load, p.ground(0)], [carAt, site.off, p.ground(p.len)]]) {
       const d = Math.hypot(b.x - a.x, b.z - a.z), h = Math.atan2(b.z - a.z, b.x - a.x);
-      for (let m = 0; m <= d; m += 0.5) test(a.x + Math.cos(h) * m, a.z + Math.sin(h) * m, h, 0.6, 0.6, site);
+      for (let m = 0; m <= d; m += 0.5) probe(a.x + Math.cos(h) * m, a.z + Math.sin(h) * m, h, 0.6, 0.6, site, g - 0.5, g + 2.2);
     }
+  }
+  const l = {};
+  /** Does a probe overlap part p of frame f (ground g) in the ground plan and come within CUT_MARGIN m of it in height? */
+  const hits = (f, g, p, q) => {
+    f.toLocal(q.x, q.z, l);
+    const ca = Math.abs(q.c * f.fx + q.sn * f.fz), cr = Math.abs(q.c * f.rx + q.sn * f.rz);
+    const ea = ca * q.hl + cr * q.hw, eb = cr * q.hl + ca * q.hw;
+    if (l.a + ea < p.a0 || l.a - ea > p.a1 || l.b + eb < p.b0 || l.b - eb > p.b1) return false;
+    const lo = p.y0 <= 0.05 ? -Infinity : g + p.y0, hi = g + p.y1 + 0.4;              // ground parts reach down; the snow on top
+    return !(q.yHi < lo - CUT_MARGIN || q.yLo > hi + CUT_MARGIN);                     // (else it passes over / under it)
+  };
+  /** The other lifts' probes near a frame. */
+  const probesNear = (site, f) => {
+    const r = f.rect, cs = [[r.a0, r.b0], [r.a1, r.b0], [r.a0, r.b1], [r.a1, r.b1]].map(([a, b]) => f.toWorld(a, b, {}));
+    const x0 = Math.min(...cs.map((c) => c.x)) - 12, x1 = Math.max(...cs.map((c) => c.x)) + 12, z0 = Math.min(...cs.map((c) => c.z)) - 12, z1 = Math.max(...cs.map((c) => c.z)) + 12;
+    const out = [];
+    for (let j = Math.floor(z0 / G); j <= Math.floor(z1 / G); j++) for (let i = Math.floor(x0 / G); i <= Math.floor(x1 / G); i++) for (const q of probes.get(gk(i, j)) || []) if (q.owner !== site && q.x > x0 && q.x < x1 && q.z > z0 && q.z < z1) out.push(q);
+    return out;
+  };
+  for (const site of list) {
+    for (const f of frames(site)) {
+      const near = probesNear(site, f);
+      if (!near.length) continue;
+      const g = site.path.ground(f.s);                                          // the frame's own ground (lifts.js seats it there)
+      for (const p of f.parts) {
+        if (p.deck || p.cut || (!p.solid && !p.cap)) continue;
+        if (!near.some((q) => hits(f, g, p, q))) continue;
+        if (p.roof && !p.shift) {                 // a roof the neighbour's carriers graze: raised over them (with all on it) if it can be
+          // (1.5 m spare each way: the decision is made on the far grid, the drawn world's ropes may sit a little higher or lower)
+          const dy = ROOF_RAISE.find((d) => !near.some((q) => hits(f, g, { ...p, y0: p.y0 + d - 1.5, y1: p.y1 + d + 1.5 }, q)));
+          if (dy) { raiseRoof(f, p, dy); continue; }
+        }
+        p.cut = true; p.solid = false;
+        for (const cp of f.parts) if (cp.cap && Math.abs(cp.y0 - p.y1) < 0.05 && cp.a0 < p.a1 && cp.a1 > p.a0 && cp.b0 < p.b1 && cp.b1 > p.b0) cp.cut = true;
+      }
+      // a station hut that had to go (twin drag lifts, a chair's operator hut in the next lift's lane) moves to a free spot: across the
+      // line on the return side, or further back / forward (hut, its snow and its window move together)
+      const hut = f.parts.find((p) => p.hut);
+      if (hut && hut.cut && site.ends.includes(f)) relocateHut(site, f, g, near, hits);
+    }
+  }
+  for (const site of list) for (const f of frames(site)) if (f.parts.some((q) => q.cut)) dropFloating(f);
+  for (const site of list) mountWheels(site);
+  // remember the decision (cut part indices + the added parts per frame) for every later world over the same lifts
+  for (const site of list) {
+    if (!site.path.src) continue;
+    pruneCache.set(site.path.src, frames(site).map((f) => ({ n: f.parts.length, cut: f.parts.flatMap((q, k) => (q.cut ? [k] : [])), added: f.parts.filter((q) => q.added).map((q) => ({ ...q })), shift: f.parts.flatMap((q, k) => (q.shift && !q.added ? [[k, q.shift[0], q.shift[1]]] : [])) })));
   }
 }
 
-/** Copy the cuts of another world built over the same lifts (lifts.js: the 5 m heights; the game's world: the far grid). */
-function copyCuts(sites, from) {
-  for (const [i, site] of sites) {
-    const o = from.sites.get(i);
-    if (!o) continue;
-    const fa = frames(site), fb = frames(o);
-    fa.forEach((f, k) => { const g = fb[k]; if (!g || g.parts.length !== f.parts.length) return; f.parts.forEach((p, n) => { if (g.parts[n].cut) { p.cut = true; p.solid = false; } }); });
+/** Raise a roof by dy with everything on and under its edge (snow, drive housing, fascia, name sign, lights); the posts and walls
+ *  that carry it grow with it. Each change is kept in `shift` ([dy0, dy1]) so the other worlds repeat it. */
+function raiseRoof(f, roof, dy) {
+  const y = roof.y0;
+  for (const q of f.parts) {
+    if (q.deck || q.cut) continue;
+    if (q === roof || q.y0 >= y - 0.4) shiftPart(q, dy, dy);
+    else if (Math.abs(q.y1 - y) < 0.05) shiftPart(q, 0, dy);
+  }
+}
+const shiftPart = (q, d0, d1) => { q.y0 += d0; q.y1 += d1; q.shift = [(q.shift ? q.shift[0] : 0) + d0, (q.shift ? q.shift[1] : 0) + d1]; };
+
+/** Move a cut hut (with the parts that belong to it) to the first spot no other lift's probe reaches; nothing found: it stays cut. */
+function relocateHut(site, f, g, near, hits) {
+  const hut = f.parts.find((p) => p.hut);
+  const group = f.parts.filter((p) => p === hut || (!p.deck && !p.post && !p.mount && p.a0 >= hut.a0 - 0.3 && p.a1 <= hut.a1 + 0.3 && p.b0 >= hut.b0 - 0.3 && p.b1 <= hut.b1 + 0.3));
+  const p = site.path, bw = hut.b1 - hut.b0;
+  const lane0 = -p.back - p.carrier.hw - 1.0, lane1 = p.side + p.carrier.hw + 1.0;      // the lift's own lanes (never there)
+  const mirror = hut.b0 > 0 ? lane0 - 1.4 - bw - hut.b0 : lane1 + 1.4 - hut.b0;          // the b shift to the other side of the line
+  const shifts = [[0, mirror], [-6, 0], [6, 0], [-6, mirror], [6, mirror], [-11, 0], [-11, mirror], [0, hut.b0 > 0 ? 2.5 : -2.5]];
+  for (const [da, db] of shifts) {
+    const moved = group.map((q) => ({ ...q, a0: q.a0 + da, a1: q.a1 + da, b0: q.b0 + db, b1: q.b1 + db, cut: false, solid: q === hut, added: true }));
+    const mh = moved[group.indexOf(hut)];
+    if (mh.b1 > lane0 && mh.b0 < lane1) continue;                                          // in its own lift's lanes
+    if (moved.some((q) => (q.solid || q.cap) && near.some((pr) => hits(f, g, q, pr)))) continue;
+    for (const q of group) { q.cut = true; q.solid = false; }
+    for (const q of moved) addPart(f, q);
+    return true;
+  }
+  return false;
+}
+
+/** Apply the remembered decision (same lifts, maybe other heights): the same parts cut, the same moved huts and wheel mounts. */
+function applyCuts(list) {
+  for (const site of list) {
+    const memo = pruneCache.get(site.path.src), fs = frames(site);
+    fs.forEach((f, k) => {
+      const m = memo[k];
+      if (!m) return;
+      const base = m.n - m.added.length;                    // moved huts and wheel mounts were appended after the type's own parts
+      if (f.parts.length !== base) return;
+      for (const [i, d0, d1] of m.shift) if (f.parts[i]) shiftPart(f.parts[i], d0, d1);
+      for (const q of m.added) addPart(f, { ...q });
+      for (const i of m.cut) if (f.parts[i]) { f.parts[i].cut = true; f.parts[i].solid = false; }
+    });
+  }
+}
+
+/** Append a part to a frame (a moved hut, a wheel mount) and grow its footprint over it. */
+function addPart(f, q) {
+  f.parts.push(q);
+  f.rect.a0 = Math.min(f.rect.a0, q.a0); f.rect.a1 = Math.max(f.rect.a1, q.a1); f.rect.b0 = Math.min(f.rect.b0, q.b0); f.rect.b1 = Math.max(f.rect.b1, q.b1);
+}
+
+/** Two parts hold each other: their boxes overlap or are closer than TOUCH m in a, b and y. */
+const touches = (p, q) => p.a0 - TOUCH <= q.a1 && q.a0 - TOUCH <= p.a1 && p.b0 - TOUCH <= q.b1 && q.b0 - TOUCH <= p.b1 && p.y0 - TOUCH <= q.y1 && q.y0 - TOUCH <= p.y1;
+
+/** The parts of a frame that stand: on the ground (y0 <= 0.05), or (transitively) resting on / fixed to one that does. */
+export function standingParts(f) {
+  const ok = new Set();
+  const live = f.parts.filter((p) => !p.cut);
+  for (const p of live) if (p.y0 <= 0.05) ok.add(p);
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const p of live) {
+      if (ok.has(p)) continue;
+      for (const q of ok) if (touches(p, q)) { ok.add(p); grew = true; break; }
+    }
+  }
+  return ok;
+}
+
+/** In a frame that lost parts: what no longer stands goes too (a hut's window, the drive housing on a cut canopy, the name sign). */
+function dropFloating(f) {
+  const ok = standingParts(f);
+  for (const p of f.parts) if (!p.cut && !ok.has(p)) { p.cut = true; p.solid = false; }
+  // a post that only held a part that is gone (a terminal's roof posts) goes too: no bare 8 m columns
+  const top = (p, q) => Math.abs(q.y0 - p.y1) < TOUCH && p.a0 - TOUCH <= q.a1 && q.a0 - TOUCH <= p.a1 && p.b0 - TOUCH <= q.b1 && q.b0 - TOUCH <= p.b1;
+  for (const p of f.parts) {
+    if (p.cut || !p.post || p.mount || p.y1 < 2.5) continue;
+    if (f.parts.some((q) => q.cut && top(p, q)) && !f.parts.some((q) => !q.cut && q !== p && top(p, q))) { p.cut = true; p.solid = false; }
+  }
+}
+
+/** The bull-wheel of a loop lift at an end (a = 0, b = wheelC, at the rope height over the frame ground): held by a standing part
+ *  over or under it (canopy / roof / the drag mast), else a steel column under it is added (`mount`). */
+export function wheelHeld(site, f) {
+  const p = site.path;
+  if (p.shuttle || p.kind === 'carpet' || p.kind === 'train') return true;
+  const y = p.cableY(f.which ? p.len : 0) - p.ground(f.which ? p.len : 0), C = p.wheelC || 0;
+  const ok = standingParts(f);
+  for (const q of ok) if (q.a0 <= 0.3 && q.a1 >= -0.3 && q.b0 <= C + 0.3 && q.b1 >= C - 0.3 && q.y1 >= y - 0.6 && (q.roof || q.post || q.mount || q.y0 <= y + 1.5)) return true;
+  return false;
+}
+function mountWheels(site) {
+  for (const f of site.ends) {
+    if (wheelHeld(site, f)) continue;
+    const p = site.path, y = p.cableY(f.which ? p.len : 0) - p.ground(f.which ? p.len : 0), C = p.wheelC || 0, r = p.kind === 'drag' ? 0.28 : 0.32;
+    addPart(f, { a0: -r, a1: r, b0: C - r, b1: C + r, y0: 0, y1: y + 0.2, col: COL.steel, solid: true, post: true, mount: true, added: true });
   }
 }
 

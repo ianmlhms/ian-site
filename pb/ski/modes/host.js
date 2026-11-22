@@ -97,7 +97,7 @@ export function createModeHost(ctx) {
         host.ensureParkView();                       // R7-D: the park's kickers / pipe are meshes the physics already reads: draw them from the start
         clock = clock0 || createDayClock(startHourFor(env.state.timeMode === 'random' ? 'morning' : env.state.timeId));      // a random time: the day from 9:00
         clock0 = clock;
-        if (!minimap) minimap = createMinimap({ parent: hud.el.querySelector('.tr'), resort, imageUrl: root + resort.map.file, park: resort.park });
+        if (!minimap) minimap = createMinimap({ parent: hud.el.querySelector('.tr'), resort, imageUrl: root + resort.map.file, park: resort.park, onOpen: ctx.onMap || null });
         minimap.show(true);
         freeHud.show(true);
         hud.setClock(null, 0);
@@ -162,6 +162,7 @@ export function createModeHost(ctx) {
     },
     /** A free run event (main.js run.update loop). */
     freeEvent(ev) {
+      if (ev.type === 'lift' && ev.near) { if (!liftAt) hud.toast(`${ev.near.name}: op déi giel Plaz fueren fir anzesteigen`, 2600); return; }
       if (ev.type === 'lift') { liftAt = ev.lift; freeHud.lift(ev.lift); if (ev.lift) hud.toast(`Lift: ${ev.lift.name}`, 1200); }
     },
     /** HUD tick (10 Hz): the park score / the free ride block and minimap and light. */

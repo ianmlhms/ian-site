@@ -3,12 +3,14 @@
  *              resort locally (progress.disc) and in the cloud record (cloud.js `d`), the cloud copy is merged in (union)
  *   first lift the resort's first lift (config FIRST_LIFT) and its boarding spot (clear.js liftSpot); always discovered
  *   map        the fog over the undiscovered cells (map.js setFog), a tap -> "Nach net entdeckt" or "Hei hin teleportéieren?" (Jo / Nee)
- *              -> the nearest safe spot (clear.js safeSpot), the "Bei den éischte Lift" button, undiscovered lifts in the list locked */
+ *              -> the nearest safe spot (clear.js safeSpot), the "Bei den éischte Lift" button; launch: a tap on ANY lift (line or
+ *              bottom dot) and the lift list's "Bei de Lift" go to that lift's boarding zone, discovered or not */
 import { createObstacles, firstLift, liftSpot, safeSpot } from './clear.js';
 import { createDiscovery } from './discovery.js';
 import { DISCOVERY, BUS_AREAS } from '../config.js';
 
 const SAVE_EVERY = 4;            // s between saves of a changed discovery
+const LIFT_TAP = 12;             // CSS px round a lift's line / bottom dot on the map: a tap there teleports to that lift
 const STATION_REACH = 45;        // m from a station = reached
 
 /** The valley lifts of the resort's ski-bus areas (config BUS_AREAS), by name; always discovered. */
@@ -60,7 +62,8 @@ export function createExplore({ rid, resort, store, cloud, field, scatter, densi
     disc.reveal(lift.top.x, lift.top.z, DISCOVERY.station);
     save(true);
   }
-  const liftOpen = (l) => !!l && (disc.has(l.bottom.x, l.bottom.z) || disc.has(l.top.x, l.top.z));
+  // launch (Ian: "teleport to every lift"): every lift is open for fast travel from the start (the fog stays for other places)
+  const liftOpen = (l) => !!l;
 
   // ---- the map overlay ----
   let map = null;
@@ -82,7 +85,29 @@ export function createExplore({ rid, resort, store, cloud, field, scatter, densi
     };
     const close = () => { pending = null; $('#tpConfirm').hidden = true; pisteMap.setPin(null); document.documentElement.dataset.skiTeleport = ''; };
     pisteMap.setFog(disc);
+    /** The lift drawn under a tap (its bottom dot or its line, LIFT_TAP CSS px), discovered or not. */
+    const liftTapped = (x, z) => {
+      const [px, py] = pisteMap.screenXY(x, z);
+      let best = null, bd = LIFT_TAP;
+      for (const l of lifts.list) {
+        const [x0, y0] = pisteMap.screenXY(l.top.x, l.top.z), [x1, y1] = pisteMap.screenXY(l.bottom.x, l.bottom.z);
+        const dx = x1 - x0, dy = y1 - y0, L2 = dx * dx + dy * dy || 1, t = Math.max(0, Math.min(1, ((px - x0) * dx + (py - y0) * dy) / L2));
+        const d = Math.min(Math.hypot(px - x1, py - y1) * 0.8, Math.hypot(px - x0 - dx * t, py - y0 - dy * t) + 4);
+        if (d < bd) { bd = d; best = l; }
+      }
+      return best;
+    };
     pisteMap.setTapWorld((x, z) => {
+      const tl = liftTapped(x, z);
+      if (tl) {                     // a lift: always (its boarding zone, lift-site.js), whether discovered or not
+        const w = lifts.boardAt(tl);
+        pending = { x: w.x, z: w.z, heading: w.heading, kind: 'lift', lift: tl.id };
+        pisteMap.setPin({ x: w.x, z: w.z, ok: true, spot: pending });
+        $('#tpWhere').textContent = `Beim Lift ${tl.name}`;
+        $('#tpConfirm').hidden = false;
+        document.documentElement.dataset.skiTeleport = 'confirm';
+        return;
+      }
       if (!disc.has(x, z)) {
         close(); pisteMap.setPin({ x, z, ok: false }); toast('Nach net entdeckt');
         document.documentElement.dataset.skiTeleport = 'refused';

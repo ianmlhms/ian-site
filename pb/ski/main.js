@@ -476,6 +476,7 @@ async function boot() {
   const modes = createModeHost({
     scene, resort, rid, pistes, field, surface, store, hud, uiRoot: document.getElementById('ui'), input, env, audio, world, layout: parkLayout,
     root: core.root, outfits: OUTFITS, onRideUp: () => boardLift(), onProgressChanged: () => refreshMapMarks(), onSkis: () => openSkiCard(),
+    onMap: () => onAction('map'),                                            // launch: a tap on the minimap opens the map (like M)
     snowMaterial: () => snowMat,                                             // R7-D: the park's snow meshes share the terrain's material
   });
   // ---- round 6: ski types (physics per type; timed / scored runs use the reference set: modes/skis.js FAIRNESS) ----

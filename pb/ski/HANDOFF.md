@@ -1363,3 +1363,36 @@ Ian (iPad 9, Safari, touch, in the Arcade): on Killy's "Face (Schwaarz)" "you ca
 - **Check**: `node scripts/ski/speed-check.mjs` (~40 s): Face de Bellevarde tucked 80-119 km/h + >= 80 km/h on >= 20 deg; the longest
   plain blue per resort upright p75 40-70 km/h, tucked under the cap; every black not named "Verbindung / Umfahrung ..." >= 60 km/h
   tucked; 15 fps = 60 fps speeds (+-3 %) and the clock at real time; SKI.maxSpeed == PLAY.maxRunSpeed. Before the fix: 12 FAILs.
+## After launch: lift stations, every lift rideable, teleport to every lift, minimap -> map (22 Nov 2026)
+Ian (iPad, Tignes, at "Leisse (Rout)"): "I can't ride the chairlift and it has no real station" (a flat black disc floating, a dark
+floating box, no hut). It was the **Champagny T-bar** (Killy #80, bottom at the Grande Motte cable car's line; there is no Leisse lift
+in OSM): R7-B's `pruneCrossings` cut by the ground plan only, so the cable car passing ~40 m overhead cut the T-bar's wheel mast and
+hut; the bull-wheel disc (lifts.js, rope height) and the hut's window stayed, floating. The zone (3 x 1.5 m at the track start) was
+there but nothing showed where it was.
+- **lift-site.js pruning** (resort-generic): a part goes only where a neighbour's carrier / rider walk comes within `CUT_MARGIN` 0.5 m
+  of it in HEIGHT (each relative to its own ground); a roof the neighbour's carriers graze is raised (`ROOF_RAISE` up to 2.2 m, 1.5 m
+  spare each way, with its snow / drive / sign, posts and walls grow) instead of cut; a cut hut moves (across the line / back / forward,
+  `relocateHut`) to a spot no other lift reaches; in a frame that lost parts nothing floats (`standingParts`: every kept part stands on
+  the ground or on one that does; posts that only held a cut roof go); every bull-wheel is held (`wheelHeld`, else a steel column
+  `mount`). ONE decision per resort (`pruneCache` by lift src): the first world decides (the game: the far grid, liftTreeGuard), every
+  later world (lifts.js on the 5 m heights, setBuildings) repeats the same cuts / raises / moves / mounts (`cutsFrom` is a no-op now).
+- **Boarding zone marked**: a yellow mat on the platform (deck, +2 cm) / two yellow poles at drag lifts and rope tows; a toast
+  "<lift>: op déi giel Plaz fueren fir anzesteigen" when he stands < 18 m from a zone but not in it (freeride.js `nearZone`, host.js).
+- **Every drawn lift rideable**: rope tows from 2 m rise (`MIN_RISE_DRAG`; Fontany, Replat, Balmengrat, Märchenland + 2 nursery tows
+  were drawn but not rideable); OSM stubs not drawn (lift-path.js: zero length, or a chair / gondola / cable car < 100 m with < 3 m
+  rise: 3V #164 58 m, Arlberg #91 0 m). Drawn = rideable: Killy 83/83, 3V 165/165, Zermatt 61/61, Arlberg 99/99, Kronplatz 27/27.
+- **Teleport to every lift** (explore.js): `liftOpen` = every lift (the lift list's "Bei de Lift"), a map tap within 12 px of any lift
+  line / bottom dot asks "Hei hin teleportéieren? Beim Lift X" -> its boarding zone, discovered or not (the fog stays for other places,
+  "Bei den éischte Lift" stays). **Minimap** = a button "Kaart opmaachen" (tap / click / Enter -> `onAction('map')`, like M).
+- Counts (`node scripts/ski/station-diag.mjs <resort> zzz`, all 5 resorts, before -> after): floating parts 448 -> 0, unheld
+  bull-wheels 52 -> 0, ends missing their type's main part 70 -> 19 (all in shared stations with a neighbour's roof within 30 m:
+  Olympe, Matterhorn Express, Vallugagrat, Kronplatz top ...), drawn-but-not-rideable lifts 7 -> 0 (2 stubs no longer drawn).
+- Tests: round7b-test now also checks per drawn lift: rideable, no floating part, wheel held, no oversized part, the type's main parts
+  (or a shared roof within 30 m), zone marked, the zone reachable over the snow (12 m clear way in): 10821 / 10821. Shots:
+  `scripts/ski/launch-station-shots.mjs` (SHOT_LIFTS="index:which[:b],..."), ~/Library/Caches/ski-work/launch-lifts/. Flow ski-teleport:
+  + undiscovered lift via the list / a map tap, minimap tap -> map.
+- Results: Node round7b-test 10821/10821, round6-test 2222/2222 (more ridden lifts), round7-test 30, round7c-check 120, floors-check
+  1324 + parks == ski-v1.sql (unchanged), security-test, look7d-check 68, r7d-test 1424, mp-race-test, harness 25/25/25/21/21: green.
+  Chromium flows ski-teleport, ski-spawn, ski-freeride, ski-lift, ski-lifts-all PASS. GPU shots looked at (Champagny / Vanoise bottom +
+  top + a real board -> ride -> off at the top for both; 5 formerly broken stations per resort). WebKit not run (still hangs on the Mini).
+  No data / bake / SQL change. main.js?v=13, ui.css?v=12.

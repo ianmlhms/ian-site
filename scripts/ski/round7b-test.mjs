@@ -10,6 +10,11 @@
  *   envelope     the rider (on the ground and on the carrier) and every carrier of the loop never touch a pylon, a station part or
  *                a tree (minimum distance > 0)
  *   tunnels      underground funiculars run under the ground between their portals
+ *   launch fix   (Ian, Tignes Champagny: "no real station, can't ride") every drawn lift is rideable; each end keeps its type's main
+ *                parts (chair canopy + hut, hall / rail roof, terminal roof + machine house, drag hut + wheel mast; a roof may be
+ *                missing only in a shared station where a neighbour's roof stands within 30 m); no part floats (every kept part stands
+ *                on the ground or on one that does), every bull-wheel is held, no part is bigger than a station; the boarding zone is
+ *                marked and can be reached over the snow (a clear 12 m way in from at least one side)
  *   node scripts/ski/round7b-test.mjs [resort ...]    exit 0 = all green; prints a table per resort and lift kind */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -25,7 +30,7 @@ const { createSurface } = await imp('surface.js');
 const { createScatter, BLOCK } = await imp('scatter.js');
 const { createPisteSet } = await imp('pistes.js');
 const { createLiftPath, liftClass } = await imp('lift-path.js');
-const { createLiftSite, createLiftWorld, liftTreeGuard, frames, TREE_TOP } = await imp('lift-site.js');
+const { createLiftSite, createLiftWorld, liftTreeGuard, frames, TREE_TOP, standingParts, wheelHeld } = await imp('lift-site.js');
 const { createRide } = await imp('modes/liftride.js');
 const { createLiftNet } = await imp('modes/freeride.js');
 const { createParkLayout } = await imp('modes/park.js');
@@ -173,6 +178,41 @@ for (const rid of resorts) {
     const vis = visWorld.sites.get(index);
     const both = vis.ends.length === 2 && vis.ends.every((e) => e.parts.length > 0 && e.type === TYPE_OF[kind]);
     if (ok(both, `${name}: both stations (${vis.ends.map((e) => `${e.type}/${e.parts.length}`).join(', ')})`)) k.stations += 2;
+    ok(!!net.byIndex.get(index), `${name}: rideable (every drawn lift is)`);
+    for (const e of vis.ends) {
+      const where = `${name} ${e.which ? 'top' : 'bottom'}`;
+      const live = e.parts.filter((q) => !q.cut), standing = standingParts(e);
+      const floating = live.filter((q) => !standing.has(q));
+      ok(!floating.length, `${where}: no floating part (${floating.length} of ${live.length} stand on nothing)`);
+      ok(wheelHeld(vis, e), `${where}: the bull-wheel is held (canopy, roof, mast or a column)`);
+      const big = live.filter((q) => q.a1 - q.a0 > 60 || q.b1 - q.b0 > 30 || q.y1 - q.y0 > 25 || q.y1 > 26);
+      ok(!big.length, `${where}: no part bigger than a station (${big.length})`);
+      const has = (f) => live.some(f);
+      const sharedRoof = () => { for (const [j, o] of visWorld.sites) { if (j === index) continue; for (const oe of o.ends) if (Math.hypot(oe.x - e.x, oe.z - e.z) < 30 && oe.parts.some((q) => q.roof && !q.cut)) return true; } return false; };
+      const roofOk = has((q) => q.roof) || sharedRoof();
+      const need = e.type === 'platform' ? [['canopy', roofOk], ['hut', has((q) => q.hut)]]
+        : e.type === 'hall' || e.type === 'rail' ? [['roof', roofOk]]
+          : e.type === 'terminal' ? [['roof', roofOk], ['machine house', has((q) => q.building) || sharedRoof()]]
+            : e.type === 'hut' ? [['wheel mast', has((q) => q.post || q.mount)], ...(e.which === 0 && p.sub !== 'rope' ? [['hut', has((q) => q.hut)]] : [])] : [];
+      for (const [what, there] of need) ok(there, `${where}: the ${e.type} has its ${what}`);
+    }
+    if (net.byIndex.get(index) && kind !== 'carpet') ok(vis.bottom.parts.some((q) => q.zoneMark), `${name}: the boarding zone is marked`);
+    {
+      // reachable: a clear 12 m way into the waiting spot from at least one side (no solid part, building, tree; walkable)
+      let way = false;
+      for (let k2 = 0; k2 < 24 && !way; k2++) {
+        const h = (k2 / 24) * Math.PI * 2;
+        let clear = true;
+        for (let m = 1; m <= 12 && clear; m += 0.5) {
+          const x = site.wait.x + Math.cos(h) * m, z = site.wait.z + Math.sin(h) * m;
+          if (world.hit(x, z, SKIER_R, H(x, z), H) || world.inBuilding(x, z, 0.3) || tree(x, z)) clear = false;
+        }
+        const ex = site.wait.x + Math.cos(h) * 12, ez = site.wait.z + Math.sin(h) * 12;
+        const sl = Math.hypot(H(ex + 2, ez) - H(ex - 2, ez), H(ex, ez + 2) - H(ex, ez - 2)) / 4;
+        if (clear && sl < 0.7) way = true;
+      }
+      ok(way, `${name}: the boarding zone can be reached over the snow`);
+    }
     // the carriers' loop: every carrier position (2 m apart) clear of pylons (other than the one it passes under), stations, trees
     if (kind !== 'carpet' && !(kind === 'drag' && p.sub === 'rope')) {
       const cb = p.carrier;

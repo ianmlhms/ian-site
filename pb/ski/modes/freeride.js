@@ -10,7 +10,9 @@ import { liftClass, LIFT_SPEC, createLiftPath } from '../lift-path.js';
 import { createLiftWorld } from '../lift-site.js';
 
 export const DAY = Object.freeze({ start: 9, end: 16.5, hoursPerSecond: 1 / 240 });     // one game hour = 4 real minutes
+const NEAR_ZONE = 18;          // m from a boarding zone's waiting spot: the hint where to stand (outside the zone)
 const BOTTOM_RADIUS = 30;      // m from a bottom station: "the lift nearest here" for the map (round 7-B: boarding = lift-site.js zones)
+const MIN_RISE_DRAG = 2;       // m: launch fix ("every lift rideable"): the nursery rope tows (Fontany, Replat, Balmengrat: 4-5 m) ride too
 const MIN_RISE = 8;            // m: lower lifts (flat links) are not ridden (round 7-B: was 25; magic carpets ride from 15 m long)
 const EXIT_PISTE = 80;         // m: a piste that starts this close to a top station is where the skier gets off
 const SAFE_EVERY = 1.5;        // s between respawn spots
@@ -33,7 +35,7 @@ export function createLiftNet(resort, heightAt, pistes = null) {
     const p = l.pts, n = p.length / 2;
     const a = { x: p[0], z: p[1], y: heightAt(p[0], p[1]) }, b = { x: p[2 * n - 2], z: p[2 * n - 1], y: heightAt(p[2 * n - 2], p[2 * n - 1]) };
     const [bottom, top] = a.y <= b.y ? [a, b] : [b, a];
-    if (cls === 'carpet' ? paths.get(i).len < 15 : top.y - bottom.y < MIN_RISE) continue;      // flat links
+    if (cls === 'carpet' ? paths.get(i).len < 15 : top.y - bottom.y < (cls === 'drag' ? MIN_RISE_DRAG : MIN_RISE)) continue;      // flat links
     let len = 0;
     for (let k = 1; k < n; k++) len += Math.hypot(p[2 * k] - p[2 * k - 2], p[2 * k + 1] - p[2 * k - 1]);
     // the lift's own direction at the top (bottom -> top): the start spot is ahead of the top station and a little to the side
@@ -63,6 +65,12 @@ export function createLiftNet(resort, heightAt, pistes = null) {
     const i = world.boardingAt(x, z);
     return i === null ? null : byIndex.get(i) || null;
   }
+  /** The rideable lift whose boarding zone's waiting spot is nearest (x, z) within r m, or null. */
+  function nearZone(x, z, r) {
+    let best = null, bd = r;
+    for (const l of list) { const s = world.sites.get(l.index); if (!s) continue; const d = Math.hypot(s.wait.x - x, s.wait.z - z); if (d < bd) { bd = d; best = l; } }
+    return best;
+  }
   function nearestBottom(x, z, radius = BOTTOM_RADIUS) {
     let best = null, bd = radius;
     for (const l of list) { const d = Math.hypot(l.bottom.x - x, l.bottom.z - z); if (d < bd) { bd = d; best = l; } }
@@ -75,7 +83,7 @@ export function createLiftNet(resort, heightAt, pistes = null) {
   }
   const byIndex = new Map(list.map((l) => [l.index, l]));
   return {
-    list, byId: new Map(list.map((l) => [l.id, l])), byIndex, startAt, boardAt, boardingAt, nearestBottom, nearestTop, paths,
+    list, byId: new Map(list.map((l) => [l.id, l])), byIndex, startAt, boardAt, boardingAt, nearZone, nearestBottom, nearestTop, paths,
     get world() { return world; },
     setBuildings(rows) { world = createLiftWorld(paths, { buildings: rows, cutsFrom: world }); return world; },
   };
@@ -105,7 +113,7 @@ export function spawnLift(lifts, places, near = null) {
 /** The run of a whole-area free ride. pistes = createPisteSet, lifts = createLiftNet. */
 export function createFreeRun({ resort, pistes, lifts, start, stats: shared = null }) {
   const stats = shared || { distance: 0, vertical: 0, lifts: 0, top: 0, time: 0, off: 0 };       // off: metres skied off the piste (round 6: the Powder ski)
-  let safe = { x: start.x, z: start.z, heading: start.heading }, safeT = 0, lastX = start.x, lastY = null, lastZ = start.z, atLift = null, current = null, nearT = 99;
+  let safe = { x: start.x, z: start.z, heading: start.heading }, safeT = 0, lastX = start.x, lastY = null, lastZ = start.z, atLift = null, atNear = null, current = null, nearT = 99;
   const run = {
     mode: 'freeride', timed: false, gates: [], checkpoints: [], stats,
     get piste() { return current; }, get progress() { return 0; }, get elapsed() { return stats.time; }, get finished() { return null; }, get penalty() { return 0; }, get ms() { return 0; },
@@ -127,6 +135,9 @@ export function createFreeRun({ resort, pistes, lifts, start, stats: shared = nu
       if (safeT > SAFE_EVERY && state.grounded && state.crash === 0 && state.speed > 1) { safeT = 0; safe = { x: state.x, z: state.z, heading: Math.atan2(state.vz, state.vx) }; }
       const lift = state.speed < 6 && !state.ride ? lifts.boardingAt(state.x, state.z) : null;      // round 7-B: only in the zone
       if (lift !== atLift) { atLift = lift; events.push({ type: 'lift', lift }); }
+      // launch fix (Ian stood beside a lift and found no way on): slow near a bottom station but not in its zone: say where it is
+      const near = !lift && state.speed < 3 && !state.ride ? lifts.nearZone(state.x, state.z, NEAR_ZONE) : null;
+      if (near !== atNear) { atNear = near; if (near) events.push({ type: 'lift', lift: null, near }); }
       nearT += dt;
       if (nearT > 1) { nearT = 0; const n = pistes.nearest(state.x, state.z, 90); current = n ? n.piste : null; }
       if (state.x < EDGE || state.z < EDGE || state.x > resort.width - EDGE || state.z > resort.depth - EDGE) events.push({ type: 'offpiste' });

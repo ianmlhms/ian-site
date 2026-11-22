@@ -104,6 +104,9 @@ export function createLiftPath(src, height) {
   const sx = new Float64Array(n), sz = new Float64Array(n), ss = new Float64Array(n);
   for (let i = 0; i < n; i++) { sx[i] = p[2 * i]; sz[i] = p[2 * i + 1]; if (i) ss[i] = ss[i - 1] + Math.hypot(sx[i] - sx[i - 1], sz[i] - sz[i - 1]); }
   const len = ss[n - 1];
+  // launch fix ("every lift rideable"): an aerial lift of the data that is no lift at all (a zero-length way, a 48 / 58 m chair with no
+  // rise: OSM stubs) is not drawn, so every drawn lift can be ridden
+  if (len < 1 || ((kind === 'chair' || kind === 'gondola' || kind === 'cable') && len < 100 && !(Number(src.rise) >= 3))) return null;
   function at(s, out = {}) {
     let i = 0;
     while (i < n - 2 && ss[i + 1] < s) i++;
