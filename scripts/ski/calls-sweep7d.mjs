@@ -66,7 +66,7 @@ try {
       r.renderBufferDirect = (cam, scene, geo, mat, obj, group) => {
         let o = obj, name = "";
         while (o && !name) { name = o.name || ""; o = o.parent; }
-        const key = `${name || obj.type}${obj.isInstancedMesh ? " (inst)" : ""}`;
+        const key = `${(name || obj.type).replace(/\s.*$/, "")}${obj.isInstancedMesh ? " (inst)" : ""}`;
         counts[key] = (counts[key] || 0) + 1;
         return orig(cam, scene, geo, mat, obj, group);
       };

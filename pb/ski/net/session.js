@@ -191,7 +191,7 @@ export function createSession({ code, me, roster, name, racing = () => false, on
       p.present = n !== undefined;
       if (p.present && !was) p.presentSince = now;
       if (p.present && p.nonce && n !== p.nonce) {      // the same player in a new page life (reload): start over with him
-        p.nonce = n; p.bye = false; p.tries = 0; drop(p, 'reload');
+        p.nonce = n; p.bye = false; p.tries = 0; p.samples = []; p.rtt = 0; p.offset = 0; drop(p, 'reload');      // R7-D: his clock restarted
       } else if (p.present) p.nonce = n;
       if (p.present) p.bye = false;
       if (p.present && me < p.id && !openLink(p) && !p.connecting && !p.relay) connect(p);

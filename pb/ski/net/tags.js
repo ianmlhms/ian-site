@@ -15,12 +15,13 @@ export const TAGS = Object.freeze({
   NEAR_SCALE_AT: 60,    // m: full size nearer than this
   DOT: 12,              // px: a collapsed tag
   H: 22,                // px: tag height at scale 1 (13 px bold + padding)
-  CHAR_W: 7.4,          // px per character at scale 1 (13 px bold, a rough mean)
+  CHAR_W: 7.8,          // px per character at scale 1 (13 px bold, on the wide side)
   PAD_W: 28,            // px: padding + the colour square
+  BADGE_W: 26,          // px kept free on every tag for a "+N" badge (it is only known after the layout)
 });
 
 /** width (px, scale 1) of a tag with this label */
-export const tagWidth = (label) => TAGS.PAD_W + TAGS.CHAR_W * String(label || '').length;
+export const tagWidth = (label) => TAGS.PAD_W + TAGS.BADGE_W + TAGS.CHAR_W * String(label || '').length;
 
 const overlaps = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
 

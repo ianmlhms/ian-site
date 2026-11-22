@@ -6,6 +6,7 @@ import { DIFF } from '../config.js';
 const DIFF_OF_LETTER = { g: 'green', b: 'blue', r: 'red', k: 'black' };
 const SIZE = 132;               // CSS px
 const SPAN = 1400;              // m across
+const MAP_DELAY_MS = 4000;      // R7-D
 
 export function createMinimap({ parent, resort, imageUrl, park = null }) {
   const wrap = document.createElement('div');
@@ -21,7 +22,8 @@ export function createMinimap({ parent, resort, imageUrl, park = null }) {
   let ready = false;
   img.onload = () => { ready = true; };
   img.onerror = () => console.warn('[ski] minimap: map image failed');
-  img.src = imageUrl;
+  // R7-D: first play: the painted base (0.3-0.7 MB) waits until the tiles round the start had the bandwidth; the lines draw at once
+  setTimeout(() => { img.src = imageUrl; }, MAP_DELAY_MS);
   // bounding boxes of the network lines and lifts (skip what is far away)
   const lines = resort.network.filter((n) => !n.a).map((n) => {
     let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
