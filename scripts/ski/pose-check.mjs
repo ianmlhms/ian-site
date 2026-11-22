@@ -52,7 +52,8 @@ try {
         const st = { ...S.state, x: spot.x, z: spot.z, y, heading: spot.h, grounded: true, air: 0, crash: 0, ride: '', landed: 0, slip: P.stop ? 0.9 : 0,
           brake: P.brake, stop: P.stop, stopSide: P.stopSide || 1, edge: P.edge, tuck: P.tuck, speed: P.speed, vx: Math.cos(motion) * P.speed, vz: Math.sin(motion) * P.speed, vy: 0 };
         S.game.state = st;
-        await new Promise((res) => setTimeout(res, 900));      // the figure's smoothed drivers settle
+        // the figure's smoothed drivers settle: 900 ms AND 60 drawn frames (R8b: under machine load 900 ms were ~20 frames, half a plough)
+        await new Promise((res) => { const t0 = performance.now(); let n = 0; const f = () => { n++; if (n >= 60 && performance.now() - t0 >= 900) res(); else requestAnimationFrame(f); }; requestAnimationFrame(f); });
         const ends = S.skier.skiEnds();
         const dir = (e) => Math.atan2(e.tip.z - e.tail.z, e.tip.x - e.tail.x);
         const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
