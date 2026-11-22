@@ -82,7 +82,7 @@ function linuxGlArgs() {
 
 /* ---------- power / memory economy (scripts/power/REPORT.md, 22 Nov 2026), all opt-in, default = unchanged ----------
  * FLOW_POWER=1         the measured best setup in one switch: FLOW_NO_VIDEO=1 FLOW_ECONOMY=1 FLOW_CHROME=shell
- *                      (6 flows incl. ski-freeride, mtb-ride: -58 % CPU seconds, -26 % peak memory, all green);
+ *                      (6 flows incl. ski-freeride, mtb-ride: -55 % CPU seconds, -22 % peak memory, all green);
  *                      each part can be switched back off: FLOW_NO_VIDEO=0, FLOW_ECONOMY=0, FLOW_CHROME=full
  * FLOW_NO_VIDEO=1      no video recording (each flow otherwise encodes a webm and saves it into OneDrive)
  * FLOW_ECONOMY=1       3D flows (fullChromium): deviceScaleFactor 0.5 (same CSS layout, 1/4 of the pixels to render),

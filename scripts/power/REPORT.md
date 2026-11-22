@@ -19,9 +19,11 @@ economy settings too, but that saving is not in these numbers.
 |---|---|---:|---:|---:|---|
 | today (video, Chrome for Testing) | run_all | 131.4 | 1621 | 94.5 | 6/6 |
 | no video + economy | run_all | 64.5 (−51 %) | 1422 (−12 %) | 92.6 | 6/6 |
-| **`FLOW_POWER=1`** (no video + economy + headless shell on Metal) | run_all | **55.3 (−58 %)** | **1199 (−26 %)** | 90.9 | 6/6 |
+| **`FLOW_POWER=1`** (no video + economy + headless shell on Metal) | run_all | **58.7 (−55 %)** | **1257 (−22 %)** | 92.8 | 6/6 |
 
-\* home-page, arcade-pad, mp-lobby-connect4, ski-freeride, mtb-ride, ski-ipad-start.
+\* home-page, arcade-pad, mp-lobby-connect4, ski-freeride, mtb-ride, ski-ipad-start. On 10 more 3D flows in one run the
+default setup was **killed by the guard** (2583 MB at train-sim-touch); `FLOW_POWER` got through at a 1749 MB peak
+(section 7).
 
 1. **Video recording is the biggest CPU cost.** Turning it off cuts 3D flows by 58–63 % of CPU seconds (ski 98.7 → 36.1 s).
    It also stops ~1.2 GB of webm syncing into OneDrive.
@@ -37,6 +39,8 @@ economy settings too, but that saving is not in these numbers.
 6. **Node instead of a browser**: a proof moves two of `ground-check`'s checks into Node. All 5 resorts take 23 s
    (one 2-engine browser run is ~10 × 42 s). The Node version covers every house instead of 5 spots, and finds
    overlapping same-plane triangles (possible z-fighting) the browser check never looks at.
+7. **Economy must not force Grafik "low".** Train Sim builds no saloon on low, so `train-sim-touch` lost its "inside"
+   camera. Economy is now half pixels + 30 fps only, and the flow keeps its own Grafik level.
 
 ## 1. Chromium headless shell vs Chrome for Testing
 
@@ -61,9 +65,11 @@ for 3D. `arcade-pad` in the plain shell is a hidden cost today: 57 CPU s on Swif
 
 ## 2. Economy mode for 3D flows
 
-`FLOW_ECONOMY=1`: deviceScaleFactor 0.5 (same CSS layout, ¼ of the pixels), Grafik `low` (`localStorage arcade_gfx`, only
-if the flow set nothing), requestAnimationFrame capped at 30 fps by an init script (sleeps on setTimeout between frames,
-no vsync wake-ups). The ski game clamps dt at 50 ms, so game time stays right down to 20 fps. I chose deviceScaleFactor
+`FLOW_ECONOMY=1`: deviceScaleFactor 0.5 (same CSS layout, ¼ of the pixels) and requestAnimationFrame capped at 30 fps by
+an init script (sleeps on setTimeout between frames, no vsync wake-ups). The first version also forced Grafik `low`
+(`localStorage arcade_gfx`). That changed what games offer: Train Sim builds no saloon on low (`hasSaloonCam`), so
+`train-sim-touch` lost its "inside" camera, and `paket-express` timed out waiting for its traffic count. It is now off by
+default (`FLOW_ECONOMY_GFX=low` opts in). The tables below with "economy" used the first version where they say so. The ski game clamps dt at 50 ms, so game time stays right down to 20 fps. I chose deviceScaleFactor
 over a 640×400 viewport because a smaller viewport changes the layout and the tap targets. Settle times are not shortened:
 most pauses wait for game time (distance after 7 s, light after 600 ms), so shortening them breaks checks rather than
 saving power.
@@ -72,17 +78,19 @@ saving power.
 |---|---:|---:|---:|---|
 | base (video) | 26.6 | 1548 | 43.0 | ✔ |
 | no video | 26.6 | 1489 | 17.2 | ✔ |
-| no video + economy (dsf 0.5, low, 30 fps) | 26.9 | 1371 | 14.2 | ✔ |
-| … economy at dsf 1 | 26.7 | 1464 | 13.6 | ✔ |
-| … economy at 20 fps | 27.3 | 1443 | 12.7 | ✔ |
-| shell + Metal + economy | 26.2 | 1234 | 11.7 | ✔ |
+| no video + economy v1 (dsf 0.5, gfx low, 30 fps) | 26.9 | 1371 | 14.2 | ✔ |
+| … economy v1 at dsf 1 | 26.7 | 1464 | 13.6 | ✔ |
+| … economy v1 at 20 fps | 27.3 | 1443 | 12.7 | ✔ |
+| shell + Metal + economy v1 | 26.2 | 1234 | 11.7 | ✔ |
+| **`FLOW_POWER=1`** (final: shell + Metal, dsf 0.5, 30 fps, no video) | 26.3 | 1206 | 11.7 | ✔ |
 
 | mtb-ride | wall s | peak MB | CPU s | pass |
 |---|---:|---:|---:|---|
 | base (video) | 22.6 | 1246 | 43.9 | ✔ |
 | no video | 22.2 | 1081 | 16.8 | ✔ |
-| no video + economy | 22.2 | 1067 | 15.8 | ✔ |
-| shell + Metal + economy | 22.4 | 935 | 15.1 | ✔ |
+| no video + economy v1 | 22.2 | 1067 | 15.8 | ✔ |
+| shell + Metal + economy v1 | 22.4 | 935 | 15.1 | ✔ |
+| **`FLOW_POWER=1`** (final) | 22.4 | 993 | 14.9 | ✔ |
 
 | ski-ipad-start (mostly boot) | wall s | peak MB | CPU s | pass |
 |---|---:|---:|---:|---|
@@ -96,7 +104,7 @@ Chrome for Testing. **What the flows still test:** gameplay, state and DOM check
 under economy:** the `ski` flow's frame budget (p95 ≤ 25 ms on Niddreg) failed at 30 fps (p95 66.6 ms, a 30 fps frame
 is 33 ms by design). Such flows now set `measuresFrames: true` and always run at real pixels and frame rate. Screenshots
 and videos under economy are half resolution, so a look/compare run (shots, sheets) should run without it.
-FLOW_POWER on 10 further 3D flows: see section 7.
+`FLOW_POWER` on 10 further 3D flows: see section 7.
 
 ## 3. Short-lived browsers and resort switching
 
@@ -125,7 +133,10 @@ Arlberg), `ski-lifts-all` (2670 MB), `train-sim-routes` (2640 MB). The `run_all`
 `train-sim-touch` (2583 MB, section 7).
 **Fix (proof):** `h.releaseMemory()` in `lib.mjs` (go to about:blank, CDP `HeapProfiler.collectGarbage`) between resorts.
 `ski-spawn` with it: **✔ 5/5 resorts, peak 1850 MB**, 35.7 s, 38.3 CPU s (`FLOW_POWER=1`: ✔, 1948 MB, 34.3 CPU s).
-`ski-lifts-all` and `train-sim-routes` with it / `FLOW_POWER`: see section 7.
+`ski-lifts-all` with it: still **killed** in Chrome for Testing (2560 MB at 3vallees, the resort alone with every tile
+loaded is that big). With it + `FLOW_POWER`: **✔ 389 s, peak 2458 MB, 176.6 CPU s**, only just under the limit, so it
+should move to Node (section 6). `train-sim-routes` (one context per line already) with `FLOW_POWER`: **✔ 133.5 s,
+2044 MB**, killed at 2640 MB without it.
 
 Side note for the Ski agent (not a test problem): Kronplatz's boot peaks at 1.4–2.5 GB JS heap on q=low. On a 3 GB iPad
 that transient matters more than the 747 MB it keeps.
@@ -195,11 +206,34 @@ Candidates (estimates from the timings above; a 3D browser check ≈ 1–2 CPU s
 | `train-sim-routes`, `-timing`, `-stock` | stop lists, timing model, roster/migration (no shots, no pixels; "about 4 / 2 minutes") | likely pure data/logic (scripts/zuch has a drive bot) | minutes each; to check with the train agent |
 | not candidates | `*-holes` (magenta pixel truth), frame budgets, screenshots / look sheets, touch/input flows | | |
 
+## 7. FLOW_POWER on more 3D flows
+
+`run_all` of game-cache, mtb-holes, mtb-smooth, fouer-world, fouer-rides, train-sim-touch, paket-express,
+kart-letzebuerg-arcade, test-mode, small3d-ipad-start in one browser:
+
+| setup | result | peak MB | CPU s | wall s |
+|---|---|---:|---:|---:|
+| today (video, Chrome for Testing) | **KILLED by the guard** at train-sim-touch (2583 MB), 5/5 passed before | 2589 | – | – |
+| `FLOW_POWER=1` v1 (gfx low) | 7/10: ✘ train-sim-touch, paket-express (gfx low, see section 2), kart-letzebuerg-arcade | 1749 | 373 | 815 |
+
+The failures, flow by flow (alone, no video):
+
+| flow | Chrome for Testing | shell + Metal | economy v1 (gfx low) | `FLOW_POWER` final |
+|---|---|---|---|---|
+| train-sim-touch | ✔ 165 s · 2436 MB · 157.6 CPU s | ✔ 175 s · 2187 MB · 155.8 | ✘ no "inside" camera | **✔ 157 s · 2154 MB · 118.1** |
+| paket-express | ✔ 45 s · 1555 MB · 29.4 | ✔ 51 s · 1146 MB · 29.0 | ✘ traffic count timeout | **✔ 45 s · 1222 MB · 23.2** |
+| kart-letzebuerg-arcade | ✘ | ✘ | ✘ | ✘ 39 s · 937 MB · 17.8 |
+
+`kart-letzebuerg-arcade` fails the same way everywhere ("Supabase requests stay low": 34 > 30, double `scores` posts).
+It is already broken on this branch, not caused by the setup. The mtb-holes pass under the shell at half pixels is a good
+sign that the shell on Metal renders the same picture: it is the magenta-pixel hole check. The 7 flows that passed under
+v1 were not re-run under the final version, which only drops the forced gfx low.
+
 ## Recommended setup
 
-1. **`FLOW_POWER=1` for every agent run** = `FLOW_NO_VIDEO=1 FLOW_ECONOMY=1 FLOW_CHROME=shell` (shell on Metal). Video
-   only when someone wants to watch one (`FLOW_POWER=1` minus `FLOW_NO_VIDEO`: set `FLOW_NO_VIDEO=0` … see below), and
-   look/screenshot rounds without economy.
+1. **`FLOW_POWER=1` for every agent run** = `FLOW_NO_VIDEO=1 FLOW_ECONOMY=1 FLOW_CHROME=shell` (shell on Metal). Each
+   part can be switched back off: `FLOW_NO_VIDEO=0` when someone wants to watch a video, `FLOW_ECONOMY=0` for look /
+   screenshot rounds (full pixels), `FLOW_CHROME=full` to compare with Chrome for Testing.
 2. **Flows that load several heavy pages** (resorts, routes) call `h.releaseMemory()` between them.
 3. **Move pure-geometry checks to Node** (ground-check, pose-check, ski-lifts-all), and drop `ski-spawn`, which is a
    duplicate of round7c-check.
@@ -208,13 +242,16 @@ Candidates (estimates from the timings above; a 3D browser check ≈ 1–2 CPU s
 ## Exact changes
 
 **Already on branch `claude/test-power-59c669`** (opt-in, default behaviour unchanged):
-- `scripts/flows/lib.mjs`: `FLOW_POWER`, `FLOW_NO_VIDEO`, `FLOW_ECONOMY` (+`FLOW_ECONOMY_DSF`), `FLOW_FPS`,
+- `scripts/flows/lib.mjs`: `FLOW_POWER`, `FLOW_NO_VIDEO`, `FLOW_ECONOMY` (+`FLOW_ECONOMY_DSF`, `FLOW_ECONOMY_GFX`), `FLOW_FPS`,
   `FLOW_CHROME=shell|full` (shell gets the Metal flags on macOS, `FLOW_SHELL_ARGS` overrides), `FLOW_CDP`,
   `flow.measuresFrames`, `h.releaseMemory()`.
 - `scripts/power/`: `measure.py`, `matrix.sh`, `summarize.py`, `lightpanda-run.sh`, `resort-switch.mjs`,
   `safari-ski.mjs`, `ski-ground-node.mjs`, this report.
 
-**For the Ski branch** (the Ski agent should apply these; I only changed my exported copy):
+- `scripts/flows/run_all.mjs`: says "no videos" when they are off.
+
+**For the Ski branch** (the Ski agent should apply these; I only changed my exported copy). All of it is in
+`~/Library/Caches/ski-work/power-test/ski-branch.patch` (`git apply --check` clean on the ski worktree @ 8bd7cc9d):
 - Merge the `lib.mjs` change (the ski lib has `flow.deviceScaleFactor || 1`; keep it as the non-economy value).
 - `scripts/flows/ski.mjs`: `measuresFrames: true`.
 - `ski_spawn.mjs` and `ski_lifts_all.mjs`: `await h.releaseMemory()` before each next resort (2 lines, shown working in
@@ -227,6 +264,8 @@ Candidates (estimates from the timings above; a 3D browser check ≈ 1–2 CPU s
   `env = dict(os.environ); env.setdefault("FLOW_POWER", "1")` and `Popen(..., env=env)`. A job that wants video or full
   pixels sets `FLOW_POWER=0`.
 - `WATCH_S = 10 → 3`: the tree went from under 2.5 GB to 3.4–3.5 GB between two 10 s checks before it was killed.
-- Keep `MAX_TREE_MB = 2500`. With `releaseMemory` and the shell every measured flow stays under it (peak 1948 MB).
+- Keep `MAX_TREE_MB = 2500`. With `releaseMemory` and `FLOW_POWER` every measured flow stays under it, but
+  `ski-lifts-all` only just (2458 MB) and `train-sim-touch` at 2154 MB. Those two should not run at the same time as
+  another big job.
 - Optional, for a fair kill decision: count launchd-spawned WebKit XPC processes (`com.apple.WebKit.*`) while a job runs
   with `FLOW_BROWSER=webkit`. Today they are invisible to the guard.
