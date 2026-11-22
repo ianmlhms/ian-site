@@ -39,12 +39,16 @@ export default async function shots(page, { shoot }) {
   await shoot('course-mid');
   // just before the arch: from 70 m out, the bot rides in; shoot when the HUD says < 30 m (the course is taken down at the finish)
   await ev(async () => { const k = window.__ski, r = k.game.run, a = k.game.piste.at(r.finishS, {}); await k.streamer.ready(a.x, a.z, 500); k.teleport(r.finishS - 70); const { createBot } = await import('/pb/ski/bot.js'); k.game.bot = createBot(k.game.piste); });      // a new bot: the old one's hint is back at the middle
-  for (let i = 0; i < 40; i++) {
-    const st = await ev(() => { const k = window.__ski, c = k.lastCourse, s = k.state; return { rem: c ? c.remaining : null, phase: k.game.phase, paused: k.game.paused, v: s.speed, crash: s.crash, bot: !!k.game.bot, s: k.game.run ? k.game.run.proj.s : null }; });
-    if (i % 5 === 0) console.log('arch wait', JSON.stringify(st));
+  // the picture as he comes up to the arch (< 45 m: the arch still in view), the HUD read once it says < 26 m
+  let shot = false;
+  for (let i = 0; i < 300; i++) {
+    const st = await ev(() => { const k = window.__ski, c = k.lastCourse, s = k.state; return { rem: c ? c.remaining : null, phase: k.game.phase, v: s.speed, s: k.game.run ? k.game.run.proj.s : null }; });
+    if (i % 25 === 0) console.log('arch wait', JSON.stringify(st));
+    if (!shot && st.rem !== null && st.rem < 45 && st.phase === 'running') { await shoot('course-finish'); shot = true; }
     if ((st.rem !== null && st.rem < 26) || st.phase === 'finished') break;
-    await settle(1500);
+    await settle(200);
   }
+  if (!shot) await shoot('course-finish');
   out.hudArch = await page.textContent('#cLeft');
   out.archRemaining = await ev(() => (window.__ski.lastCourse ? window.__ski.lastCourse.remaining : null));
   // freeze him there for the picture: no bot, hard brake
@@ -92,8 +96,6 @@ export default async function shots(page, { shoot }) {
     }
     return { n, worstFloat: +worstFloat.toFixed(2), worstTop: +worstTop.toFixed(2), bad: bad.slice(0, 12), nBad: bad.length };
   });
-  await settle(300);
-  await shoot('course-finish');
   await ev(() => window.__ski.setInput(null));
   // a teleport (free ride): the chase camera clear of the snow, the skier in view
   await ev(async () => { const k = window.__ski; k.game.bot = null; await k.firstLift(); });
@@ -112,7 +114,10 @@ export default async function shots(page, { shoot }) {
     a.triggerAvalanche(m.cellId(f.top.x, f.top.z), 7001, a.clock());
     return { face: `${Math.round(f.slope)}°/${Math.round(f.len)} m`, above: +v.above.toFixed(1), clear: v.clear };
   });
-  await settle(4800);
+  await settle(3000);
+  // the picture: aim at where the slab is now (the middle of its moving blocks), from the same clear spot
+  await ev(() => { const k = window.__ski, b = k.avalanches.blocks().filter((q) => q.moving); if (!b.length || !k.game.camPose) return; const x = b.reduce((m, q) => m + q.x, 0) / b.length, z = b.reduce((m, q) => m + q.z, 0) / b.length; k.game.camPose = { ...k.game.camPose, tx: x, tz: z, ty: k.surface.height(x, z) + 4 }; });
+  await settle(1800);
   out.avalanche.rumble = await ev(() => +window.__ski.avalanches.loudness(window.__ski.camera.position.x, window.__ski.camera.position.z).toFixed(2));
   out.avalanche.camAbove = await ev(() => { const k = window.__ski, c = k.camera.position; return +(c.y - k.surface.height(c.x, c.z)).toFixed(1); });
   await shoot('avalanche');

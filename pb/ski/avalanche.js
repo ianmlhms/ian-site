@@ -189,7 +189,7 @@ export function faceView(face, height, { dists = [200, 280, 360, 450, 560], ups 
         const sees = (q, qy, wide) => { for (let i = 1; i < 40; i++) { const t = i / 40; if (t > 0.92) break; const hx = x + (q.x - x) * t, hz = z + (q.z - z) * t; if (height(hx, hz) > y + (qy - y) * t - (wide ? Math.min(12, 2 + d * t * 0.05) : 2)) return false; } return true; };
         const all = (wide) => sees({ x: tx, z: tz }, ty, wide) && sees(crown, height(crown.x, crown.z) + 4, wide) && sees(low, height(low.x, low.z) + 4, wide);
         const clear = ring && all(false), open = clear && openRing && all(true);
-        const score = (clear ? 0 : 1000) + (open ? 0 : 150) + Math.abs(along - 0.45) * 50 + Math.abs(up - 45) * 0.2 + Math.abs(d - 380) * 0.03;
+        const score = (clear ? 0 : 1000) + (open ? 0 : 150) + Math.abs(along - 0.45) * 50 + Math.abs(up - 35) * 0.2 + Math.abs(d - 260) * 0.04;
         if (!best || score < best.score) best = { x, y, z, tx, ty, tz, clear, open, score, above: y - g, along };
       }
     }
