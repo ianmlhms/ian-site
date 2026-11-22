@@ -146,7 +146,7 @@ function chalet(w, row, seed, wd, style) {
   if (HEIGHT) {
     let low = Infinity;
     for (const [u, v] of [[-hl, -hw], [hl, -hw], [hl, hw], [-hl, hw], [0, -hw], [0, hw], [-hl, 0], [hl, 0]]) { const q = P(u, v, 0); low = Math.min(low, HEIGHT(q[0], q[2])); }
-    if (low < g0 + 0.2) box(w, P, -hl - 0.12, hl + 0.12, -hw - 0.12, hw + 0.12, low - 0.6, ground + 0.35, STONE, ground);
+    if (low < g0 + 0.2) box(w, P, -hl - 0.12, hl + 0.12, -hw - 0.12, hw + 0.12, low - 0.6, ground + 0.35 + h1(seed * 17.3) * 0.04, STONE, ground);   // R8d: no shared plane with a neighbour
   }
   // walls
   const corners = [[-hl, -hw], [hl, -hw], [hl, hw], [-hl, hw]];
@@ -301,7 +301,7 @@ function block(w, row, seed, wd, style, slopeDir) {
   // flat roof: snow cap and a parapet (lift-motor housings on the big ones)
   const last = tiers === 1 ? poly : null;
   const roofPoly = last || poly.map((p) => { const d = p[0] * downhill[0] + p[1] * downhill[1] - dmin; const m = d * (1 - (tiers - 1) * Math.min(0.24, 9 / Math.max(depth, 1)) - 1); return [p[0] + downhill[0] * m, p[1] + downhill[1] * m]; });
-  prism(w, roofPoly, top, top + 0.7, ground, STONE);
+  prism(w, roofPoly, top, top + 0.7 + h1(seed * 13.7) * 0.04, ground, STONE);        // R8d: neighbours' parapet caps never share a plane
   cap(w, roofPoly, top + 0.55, SNOW);
   if (wd && L * W > 500) {
     const P = frameOf(row);
