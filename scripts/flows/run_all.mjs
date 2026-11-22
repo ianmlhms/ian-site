@@ -1,13 +1,16 @@
 #!/usr/bin/env node
-/* Runs every flow (scripts/flows/*.mjs) against a local server with Supabase mocked,
- * and records one video per flow (see lib.mjs for where videos go).
+/* Runs every flow (scripts/flows/*.mjs) against a local server with Supabase mocked, in power mode (lib.mjs: no video, the
+ * headless shell on Metal, 3D flows at half pixels and 30 fps). A flow that fails is run once more at full quality with a
+ * video (see lib.mjs for where videos go); the summary shows both results.
  *
  *   node scripts/flows/run_all.mjs                 # all flows
  *   node scripts/flows/run_all.mjs friends slf     # only flows whose name contains one of the words
- *   FLOW_SHOTS_DIR=/tmp/shots node scripts/flows/run_all.mjs   # also save step screenshots
+ *   FLOW_SHOTS_DIR=/tmp/shots node scripts/flows/run_all.mjs   # also save step screenshots (at real pixels)
+ *   FLOW_POWER=0 node scripts/flows/run_all.mjs    # the setup from before: video of every flow, Chrome for Testing, full pixels
  *
- * Exit code 0 = every flow passed. */
-import { launchBrowser, runFlow, startServer, videoDir } from "./lib.mjs";
+ * Exit code 0 = every flow passed (a flow that failed only in power mode and passed at full quality counts as passed,
+ * with a warning in the summary). */
+import { launchBrowser, powerDefault, rerunFull, runFlow, startServer, summaryLines, videoDir } from "./lib.mjs";
 import { flow as newGroup } from "./messenger_new_group.mjs";
 import { flow as addMember } from "./messenger_add_member.mjs";
 import { flow as mediaCache } from "./messenger_media_cache.mjs";
@@ -100,17 +103,26 @@ const words = process.argv.slice(2);
 const flows = words.length ? ALL.filter((f) => words.some((w) => f.name.includes(w))) : ALL;
 if (!flows.length) { console.error(`No flow matches: ${words.join(", ")}\nAvailable: ${ALL.map((f) => f.name).join(", ")}`); process.exit(2); }
 
-const [browser, { server, origin }] = await Promise.all([launchBrowser({ fullChromium: flows.some(flow => flow.fullChromium) }), startServer()]);
+const power = powerDefault();
+const [browser, { server, origin }] = await Promise.all([launchBrowser({ fullChromium: flows.some(flow => flow.fullChromium), power }), startServer()]);
 const results = [];
 try {
-  for (const flow of flows) results.push(await runFlow(flow, { browser, origin }));
+  for (const flow of flows) results.push(await runFlow(flow, { browser, origin, power }));
 } finally {
   await browser.close();
   server.close();
 }
+// after the shared browser is closed (memory): each power-mode failure once more at full quality, with video
+for (const [i, r] of results.entries()) {
+  if (!r.ok && r.power) results[i] = await rerunFull(flows[i], r);
+}
 
 console.log("\n──────── flows ────────");
-for (const r of results) console.log(`${r.ok ? "PASS" : "FAIL"}  ${r.name}${r.ok ? "" : "\n        " + r.failures.join("\n        ")}`);
+for (const r of results) console.log(summaryLines(r).join("\n"));
 const failed = results.filter((r) => !r.ok).length;
-console.log(`${results.length - failed}/${results.length} passed · videos in ${videoDir()}`);
+const powerOnly = results.filter((r) => r.rerun && r.ok).map((r) => r.name);
+if (powerOnly.length) console.log(`WARN  failed only in power mode: ${powerOnly.join(", ")}`);
+const videos = results.filter((r) => r.video).length;
+const mode = power ? "power mode (FLOW_POWER=0 = video + full quality)" : "full quality";
+console.log(`${results.length - failed}/${results.length} passed · ${mode} · ${videos ? `${videos} video(s) in ${videoDir()}` : "no videos"}`);
 process.exit(failed ? 1 : 0);

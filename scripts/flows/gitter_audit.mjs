@@ -5,7 +5,7 @@ import { flow as shots } from "./gitter_shots.mjs";
 const PAGES = (process.env.GITTER_PAGES || "").split(",").filter(Boolean);
 const CLICK = (process.env.GITTER_CLICK || "").split("|").filter(Boolean);
 export const flow = {
-  name: "gitter-audit", backend: shots.backend,
+  name: "gitter-audit", backend: shots.backend, fullQuality: true,
   async run(h) {
     const { page } = h;
     if (process.env.GITTER_SIGNED === "1") await h.signIn();

@@ -16,6 +16,7 @@ const hideUi = args.includes("--hideui");
 const stops = (opt("--at", "") || "").split(",").filter(Boolean).map((s) => { const [name, m] = s.split(":"); return { name, m: Number(m) }; });
 const finishName = opt("--finish", "");
 fs.mkdirSync(outDir, { recursive: true });
+process.env.FLOW_FULL ??= "1";      // a screenshot tool: full pixels and frame rate, never power mode (flows/lib.mjs)
 const browser = await launchBrowser({ fullChromium: true });
 const { server, origin } = await startServer();
 try {

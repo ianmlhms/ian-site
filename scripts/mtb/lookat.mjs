@@ -12,6 +12,7 @@ const [nx, nz] = opt("--near", "1900,1520").split(",").map(Number);
 const dist = Number(opt("--dist", "9")), up = Number(opt("--up", "2"));
 const url = `/pb/mtb.html?debug=1&q=${opt("--q", "high")}&time=${opt("--time", "noon")}&weather=${opt("--weather", "clear")}&season=${opt("--season", "summer")}`;
 const [w, h] = opt("--size", "1280x720").split("x").map(Number);
+process.env.FLOW_FULL ??= "1";      // a screenshot tool: full pixels and frame rate, never power mode (flows/lib.mjs)
 const browser = await launchBrowser({ fullChromium: true });
 const { server, origin } = await startServer();
 try {

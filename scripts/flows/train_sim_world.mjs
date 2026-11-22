@@ -40,6 +40,7 @@ export const flow = {
     h.step('level crossings: every crossing has a real road on both sides, on the terrain');
     const crossingsSeen = [];
     for (const route of RAIL_ROUTES) {
+      await h.releaseMemory({ page: sim.page, blank: false });      // the last route's garbage now, not late (lib.mjs; power test 22 Nov 2026)
       await sim.start(route);
       const rep = await sim.evalGame(({ track, THREE, world }, args) => {
         const plan = track.crossingRoads;
@@ -168,6 +169,7 @@ export const flow = {
 
     h.step('hole detector: no hole, no pit, no missing terrain on west and east');
     for (const id of ['west', 'east']) {
+      await h.releaseMemory({ page: sim.page, blank: false });      // the last route's garbage now, not late (lib.mjs; power test 22 Nov 2026)
       const rep = await scanRoute(sim, id, { step: 500, rayStep: 90 });
       h.eq([rep.flaggedPoses.slice(0, 2), rep.rayFailures.slice(0, 2)], [[], []], `${id}: ${rep.poses} render poses and ${rep.rays} rays, no holes`);
     }

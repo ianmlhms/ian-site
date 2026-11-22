@@ -46,6 +46,7 @@ async function ride(page, seconds) {
 export const flow = {
   name: "mtb-smooth",
   fullChromium: true,
+  measuresFrames: true,        // p99 frame times: real pixels and frame rate even in power mode (lib.mjs)
   async run(h) {
     const { page } = h;
     await page.setViewportSize({ width: 1280, height: 720 });

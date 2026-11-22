@@ -12,6 +12,7 @@ const opt = (n, d) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] :
 const [w, h] = opt("--size", "1280x720").split("x").map(Number);
 const poses = args.slice(1).filter((a) => a.includes("=") && !a.startsWith("--")).map((a) => { const [name, v] = a.split("="); const n = v.split(",").map(Number); return { name, n }; });
 fs.mkdirSync(out, { recursive: true });
+process.env.FLOW_FULL ??= "1";      // a screenshot tool: full pixels and frame rate, never power mode (flows/lib.mjs)
 const browser = await launchBrowser({ fullChromium: true });
 const { server, origin } = await startServer();
 try {

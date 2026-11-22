@@ -13,6 +13,7 @@ if (!posesFile || !outDir) throw new Error('usage: shoot.mjs <poses.json> <outDi
 const poses = JSON.parse(fs.readFileSync(posesFile, 'utf8'));
 fs.mkdirSync(outDir, { recursive: true });
 const { server, origin } = await startServer();
+process.env.FLOW_FULL ??= "1";      // a screenshot tool: full pixels and frame rate, never power mode (flows/lib.mjs)
 const browser = await launchBrowser({ fullChromium: true });
 try {
   const page = await browser.newPage({ viewport: { width: Number(opt('w', 960)), height: Number(opt('h', 600)) }, deviceScaleFactor: 1 });

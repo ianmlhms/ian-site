@@ -41,6 +41,7 @@ const SPECS = [
     pose: { at: [740, 1940], up: 11, yaw: 270, pitch: -7, fov: 55 } },
 ];
 
+process.env.FLOW_FULL ??= "1";      // a screenshot tool: full pixels and frame rate, never power mode (flows/lib.mjs)
 const browser = await launchBrowser({ fullChromium: true });
 const { server, origin } = await startServer();
 try {

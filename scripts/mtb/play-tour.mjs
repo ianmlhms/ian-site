@@ -15,6 +15,7 @@ const trail = opt("--trail", "ernz-waldwee");
 const only = (opt("--only", "card,count,run,finish,menu,map,bikes") || "").split(",");
 const q = opt("--q", "medium");
 fs.mkdirSync(outDir, { recursive: true });
+process.env.FLOW_FULL ??= "1";      // a screenshot tool: full pixels and frame rate, never power mode (flows/lib.mjs)
 const browser = await launchBrowser({ fullChromium: true });
 const { server, origin } = await startServer();
 try {
