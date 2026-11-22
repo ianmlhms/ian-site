@@ -136,7 +136,9 @@ button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
 .modetabs button{flex:1 1 0;min-height:40px;font-weight:650}
 #mapScreen:not([data-mode="piste"]) .side > .list:not(.modelist){display:none}
 #mapScreen:not([data-mode="piste"]) :is(.pick > h2, #pkFacts, #pkStars, #pkBest, #pkStatus, #startBtn){display:none}
-.modelist{flex:1;overflow:auto;border-bottom:1px solid var(--ink)}
+.modelist{flex:1 1 150px;min-height:136px;overflow:auto;border-bottom:1px solid var(--ink)}
+/* R8b: the lift list keeps >= 3 rows (it was squeezed to one, showing the top lift while the card showed the picked one); the pane scrolls */
+#mapScreen[data-mode="freeride"] .side > .pick{flex:0 1 auto;min-height:0;overflow:auto}
 .modepane{display:flex;flex-direction:column;gap:8px}
 .modepane h2{margin:0;font-size:19px;font-weight:800;letter-spacing:-.02em;display:flex;align-items:center;gap:8px}
 .modepane .how{font-size:13px;color:var(--muted);line-height:1.35}

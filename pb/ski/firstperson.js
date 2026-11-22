@@ -62,11 +62,14 @@ export function createFirstPerson({ scene, overlay, look }) {
   for (const side of [-1, 1]) {
     const shaft = new THREE.CylinderGeometry(0.009, 0.009, 1.2, 6); shaft.translate(0, -0.6, 0);
     const grip = new THREE.CylinderGeometry(0.019, 0.017, 0.13, 8); grip.translate(0, 0.02, 0);
-    const glove = new THREE.BoxGeometry(0.06, 0.075, 0.08); glove.translate(0, 0.03, 0.01);
+    // R8b (QA: the gloves read as two black cubes): a rounded mitten round the grip, a thumb on top, a red cuff
+    const glove = new THREE.SphereGeometry(0.042, 12, 9); glove.scale(1.0, 1.25, 1.15); glove.translate(0, 0.02, 0.012);
+    const thumb = new THREE.SphereGeometry(0.017, 8, 6); thumb.scale(1, 1.6, 1); thumb.translate(-side * 0.022, 0.07, 0.0);
+    const cuff = new THREE.CylinderGeometry(0.04, 0.046, 0.06, 12); cuff.rotateX(Math.PI / 2); cuff.translate(0, 0.02, 0.07);
     const basket = new THREE.CylinderGeometry(0.045, 0.045, 0.012, 10); basket.translate(0, -1.08, 0);
-    for (const [g, hex] of [[shaft, 0x9aa3ad], [grip, 0x16171a], [glove, 0x1f2c45], [basket, 0x16171a]]) {
+    for (const [g, hex] of [[shaft, 0x9aa3ad], [grip, 0x16171a], [glove, 0x26324a], [thumb, 0x26324a], [cuff, 0xc8332a], [basket, 0x16171a]]) {
       g.rotateX(0.62); g.rotateZ(side * 0.2);                 // tilted forward-out, as held while skiing
-      g.translate(side * 0.34, -0.34, -0.55);
+      g.translate(side * 0.37, -0.4, -0.6);                   // R8b: lower and further out: the hands frame the picture, never fill it
       poleParts.push(coloured(g, hex));
     }
   }

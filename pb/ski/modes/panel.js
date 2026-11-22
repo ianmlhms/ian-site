@@ -78,7 +78,12 @@ export function attachModePanel(mapEl, { onMode, onParkStart, onFreeStart, onPic
         list.innerHTML = `<div class="grp">Bei e Lift (${sorted.length})</div>${sorted.map((l) => `<button type="button" class="prow lrow" data-lift="${l.id}"><span class="chip lift"></span><span class="n">${esc(listName(l))}</span><span class="m" title="uewen">↑ ${Math.round(l.top.y)} m</span></button>`).join('')}`;
         list.addEventListener('click', (e) => { const b = e.target.closest('[data-lift]'); if (b) onPickLift(lifts.byId.get(b.dataset.lift)); });
       }
-      list.querySelectorAll('.lrow').forEach((b) => { const on = selected && b.dataset.lift === selected.id; b.classList.toggle('sel', on); if (on) b.scrollIntoView({ block: 'nearest' }); });
+      // R8b: the picked lift's row in view (scrolled inside the list only, after the layout: scrollIntoView ran before it and scrolled nothing)
+      list.querySelectorAll('.lrow').forEach((b) => {
+        const on = !!selected && b.dataset.lift === selected.id;
+        b.classList.toggle('sel', on);
+        if (on) requestAnimationFrame(() => { const top = b.getBoundingClientRect().top - list.getBoundingClientRect().top + list.scrollTop; if (top < list.scrollTop || top + b.offsetHeight > list.scrollTop + list.clientHeight) list.scrollTop = Math.max(0, top - (list.clientHeight - b.offsetHeight) / 2); });
+      });
       pane.innerHTML = `<h2><span class="chip lift"></span>${selected ? esc(selected.name) : 'Fräi fueren'}</h2>
         <div class="facts">${selected ? `${kindName(selected.kind)} · ënnen ${Math.round(selected.bottom.y)} m · uewen ${Math.round(selected.top.y)} m · ${Math.round(selected.len)} m laang` : 'Tipp op e Lift op der Kaart oder an der Lëscht.'}</div>
         <div class="how">Keng Auer: fuer vu Pist zu Pist an och nieft de Pisten. Ënnen um Lift: <b>Astegen</b> (L / Enter). Op der Pist: e Startpaart = eng Challenge.</div>
