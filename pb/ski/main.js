@@ -210,7 +210,11 @@ async function boot() {
   function lookCam(cam, pivot, head) {
     applyLook(cam, pivot, look, head ? 'head' : 'orbit');
     if (!head) {
+      const full = Math.hypot(cam.x - pivot.x, cam.y - pivot.y, cam.z - pivot.z);
       camGuard.guard(cam, pivot, lookDt);
+      // R8 (early QA: the camera jammed 1 m behind him in the trees): pulled in, it also rises and looks down over the obstacle
+      const near = Math.hypot(cam.x - pivot.x, cam.y - pivot.y, cam.z - pivot.z);
+      if (near < full * 0.75) cam.y += Math.min(2.5, (full - near) * 0.6);
       // R8 (early QA: the free look put the camera under the street): never under the snow, whatever the guard's minimum distance did
       const gy = surface.height(cam.x, cam.z) + 0.45;
       if (cam.y < gy) cam.y = gy;
@@ -276,9 +280,10 @@ async function boot() {
   const startExtras = () => { if (!extrasStarted) { extrasStarted = true; extrasGo(); } };
   setTimeout(startExtras, 6000);
   extrasGate.then(() => loadExtras(core.root)).then(({ buildings, roads: streets }) => {
-    try { boxIndex = createBoxIndex(buildingBoxes(buildings)); } catch (error) { console.warn('[ski] building index failed', error); }
     // R7-B: the lift stations replace the OSM station buildings (and nothing stands in a lift lane); the exits keep clear of the rest
     const liftWorld = modes.lifts.setBuildings(buildings);
+    // the houses that are drawn (R7-B leaves out the ones in stations / lift paths): camera guard + skier collision (R8)
+    try { boxIndex = createBoxIndex(buildingBoxes(buildings.filter((_, i) => liftWorld.keepBuilding(i)))); } catch (error) { console.warn('[ski] building index failed', error); }
     village = createVillage({ scene, rows: buildings.filter((_, i) => liftWorld.keepBuilding(i)), env, height: (x, z) => field.baseHeight(x, z), level }); mark('village');
     roadRows = decodeRoads(streets); tryRoads();
   }).catch((error) => console.warn('[ski] buildings failed', error.message));
@@ -294,8 +299,20 @@ async function boot() {
     height: (x, z) => surface.height(x, z),
     normal: (x, z, out) => surface.normal(x, z, out),
     snow: (x, z) => Math.min(1, surface.info(x, z, 0) * 1.25),
-    hit: (x, z, r, y) => scatter.hit(x, z, r, y, quality.treeDensity) || modes.lifts.world.hit(x, z, r, y, (gx, gz) => surface.height(gx, gz)),     // R7-B: pylons + stations
+    hit: (x, z, r, y) => scatter.hit(x, z, r, y, quality.treeDensity) || modes.lifts.world.hit(x, z, r, y, (gx, gz) => surface.height(gx, gz)) || buildingHit(x, z, r, y),     // R7-B: pylons + stations; R8: houses
   };
+  /** R8 (early QA: he skied through chalets): the houses collide like the station walls: out by the nearest face of the footprint box. */
+  const houseHit = { nx: 0, nz: 0, pen: 0, kind: 'house' };
+  function buildingHit(x, z, r, y) {
+    if (!boxIndex) return null;
+    const b = boxIndex.hit(x, z, r);
+    if (!b || (y !== undefined && y > b[6])) return null;
+    const dx = x - b[0], dz = z - b[1], u = dx * b[2] + dz * b[3], v = -dx * b[3] + dz * b[2];
+    const pu = b[4] + r - Math.abs(u), pv = b[5] + r - Math.abs(v);
+    if (pu < pv) { const su = Math.sign(u) || 1; houseHit.nx = b[2] * su; houseHit.nz = b[3] * su; houseHit.pen = pu; }
+    else { const sv = Math.sign(v) || 1; houseHit.nx = -b[3] * sv; houseHit.nz = b[2] * sv; houseHit.pen = pv; }
+    return houseHit;
+  }
   const input = createInput({ root: document.getElementById('ui'), onAction });
   input.showTouch(false);
   const hud = ui.createHud({ onButton: onAction });

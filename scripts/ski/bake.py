@@ -62,7 +62,7 @@ GROOM_EDGE = 9.0                   # m of soft edge of the groomed band
 BENCH_EDGE = 11.0                  # m beyond a piste's edge over which the bench cut fades back into the slope
 BENCH_MAX = 8.0                    # m: never cut / fill more than this (a line that is off on the map must not dig a trench)
 BENCH_STRENGTH = 0.85
-FAR_QUANT = 1.0       # m height step of far.bin (round 7: was 0.25; -29 % bytes, the bicubic sampling hides the rounding)
+FAR_QUANT = 0.25      # m height step of far.bin (R8: back from 1 m: the 1 m steps drew contour stripes in the far lighting, QA Kronplatz)
 
 def credits(rid):
     """The credit lines of the DEM sources this resort's data came from (fetch_dem.py records them in dem/sources.json), then OSM."""

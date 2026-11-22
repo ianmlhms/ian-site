@@ -365,6 +365,7 @@ export function createEnv({ scene, noise, detail = null, params = {} }) {
   }
   /* save = false: a race sets the weather / time for everybody (pb/ski/net), the player's own stored choice stays */
   function setTime(mode, save = true) {
+    if (mode !== 'random' && !TIME_IDS.includes(mode)) mode = 'random';      // R8 (QA: a bad id threw + fetched shadow-.webp)
     timeMode = mode; if (save) writeChoice(STORE.time, mode);
     timeId = mode === 'random' ? pick(RANDOM_TIME) : mode;
     state.timeId = timeId; state.timeMode = mode;
@@ -372,6 +373,7 @@ export function createEnv({ scene, noise, detail = null, params = {} }) {
     loadShadow();
   }
   function setWeather(mode, save = true) {
+    if (mode !== 'random' && !WEATHER_IDS.includes(mode)) mode = 'random';
     weatherMode = mode; if (save) writeChoice(STORE.weather, mode);
     weatherId = mode === 'random' ? pick(RANDOM_WEATHER) : mode;
     state.weatherId = weatherId; state.weatherMode = mode;

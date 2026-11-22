@@ -22,7 +22,7 @@ const resorts = process.argv.slice(2).length ? process.argv.slice(2) : fs.readdi
 
 for (const rid of resorts) {
   const far = decodeGrid(new Uint8Array(fs.readFileSync(path.join(root, 'data', rid, 'far.bin'))));
-  ok(far.step === 1, `${rid}: far.bin height step ${far.step} m (round 7: 1 m)`);
+  ok(far.step === 0.25, `${rid}: far.bin height step ${far.step} m (R8: 0.25 m: 1 m striped the far lighting)`);
 }
 // ---- braking (A): a full stop that holds, the hockey stop, a placed skier waits
 {
