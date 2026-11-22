@@ -518,3 +518,36 @@ net/freeride.js, mp-games `mode`): the integration takes ONE per feature; the di
   differences, zigzag varints, base64; lossless; bake.py packs, the loader and every Node script that reads lines call `unpackResort`;
   old unpacked data still loads). 3 Vallées resort.json 1.20 -> 0.44 MB (gzip 440 -> 174 KB). The minimap's painted base loads 4 s after
   the free ride starts. INTEGRATION: any new Node script that reads resort.json lines must call `unpackResort` (R7-A / B / C scripts).
+- **Perf, all five resorts** (Mini, Chromium; first play = flow `ski-ipad-start` per resort, skiing in the free ride, cold cache, 20 Mbit,
+  CPU x4; draw calls = `scripts/ski/calls-sweep7d.mjs --gpu`: Niddreg, every piste start + every lift top, all tiles / village / lifts /
+  signs / landmarks in, max over 3 frames; the worst spot's calls by object in its log):
+
+  | Resort | first play MB (before) | skiing after | spots | worst draw calls (spot) | p95 | median |
+  |---|---|---|---|---|---|---|
+  | Killy | 2.39 (2.82) | 4.8 s | 305 | 154 (Colchique) | 147 | 133 |
+  | 3 Vallées | 3.70 (4.65) | 6.7 s | 617 | 158 (La Voie de la boucle) | 148 | 132 |
+  | Zermatt | 2.92 (3.29) | 5.5 s | 264 | 153 (Schweigmatten) | 146 | 134 |
+  | Arlberg | 3.44 (4.15) | 6.1 s | 444 | 157 (Pfannenbach) | 148 | 131 |
+  | Kronplatz | 2.44 (3.03) | 5.4 s | 97 | 158 (Rara Variante) | 148 | 131 |
+
+  A worst spot spends ~100 calls on terrain tiles, ~16 on the local skier (one call per bone group), 5-10 village, 7 lifts (instanced),
+  3-16 landmarks (Arlberg / Kronplatz). The margin to 160 is thin: each online friend in view adds 1 (his skinned figure). Next wins if
+  needed: the local skier as ONE skinned mesh like the remotes (remotes.js `createRemoteFigure`; skier-model.js is R7-A's IK area),
+  landmarks merged per material across landmarks. Face de Bellevarde (~245 in round 5 at another level / camera) is 140-150 now.
+  Logs: `~/Library/Caches/ski-work/round7d/perf/`.
+- **Tests**: `node scripts/ski/r7d-test.mjs` (Node: 400 random tag crowds never overlap / nearest 3 full / every tag counted; sign slots;
+  every resort's busiest sign radius fits the atlas; free-ride plan / host handover / side offsets; the wire's lift state; packed lines
+  round trip + every resort decodes): 1424 ok. Flow `ski-mp-freeride` (in run_all; `SKI_MPF_RESORTS=all`, `FLOW_BROWSER=webkit`): lobby
+  mode -> 3 players (one relay-only) side by side at the same lift on each resort -> sync (lag ~150 ms, 15 states / s) -> two ride the same
+  lift (each in his own carrier, within 5 m of the truth) -> a skip snaps -> fast travel appears -> «Bei e Frënd» -> tags (+6 bunched)
+  never overlap -> avalanche event -> host leaves (handover, weather follows) -> rejoin at his spot -> 0 console errors.
+  Shots: `~/Library/Caches/ski-work/round7d/mpf/` (+ `sheet-*.jpg`).
+- **vs R7-A** (for the integration): sign atlas: A = fixed 336-board atlases (2048 x 2016, one draw call + ~16 MB per atlas; 3 Vallées
+  two); D = one 2048 x 768 on-demand atlas (6 MB, one call at any size). Tags: same idea; D folds the rest into dots / "+N" (A hides them)
+  and keeps far friends' tags with the distance in the free ride. Free ride: A has `liftBottom` jump + avalanche by (x, z, seed); D adds
+  the teleport epoch / jump snap, host handover of weather / time / day clock, rejoin at the own spot, the peer clock reset, the long-session
+  relay budget, avalanches through R7-C's `onTrigger` / `triggerAvalanche`, and the 5-resort x 2-engine flow. mp-games: both add `mode`
+  (A without hiding piste / runs).
+- **Still wrong / open**: the 3 Vallées start lift (Ariondaz) puts the free-ride camera against a building in WebKit too (R7-A / C fix
+  the spawn; `host.startSpot` uses main.js `boardSpot`, so their fix applies); a remote friend's carrier on a lift uses MY device's lift
+  view (built early, before every tile is in: heights there may still be the far grid's); the relay pair sees friends ~0.6 s late.
