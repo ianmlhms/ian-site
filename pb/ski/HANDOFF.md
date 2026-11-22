@@ -541,13 +541,16 @@ net/freeride.js, mp-games `mode`): the integration takes ONE per feature; the di
   mode -> 3 players (one relay-only) side by side at the same lift on each resort -> sync (lag ~150 ms, 15 states / s) -> two ride the same
   lift (each in his own carrier, within 5 m of the truth) -> a skip snaps -> fast travel appears -> «Bei e Frënd» -> tags (+6 bunched)
   never overlap -> avalanche event -> host leaves (handover, weather follows) -> rejoin at his spot -> 0 console errors.
-  Shots: `~/Library/Caches/ski-work/round7d/mpf/` (+ `sheet-*.jpg`).
+  Results (22 Nov, after the Mini reboot): Chromium 130 / 130, WebKit 130 / 130 checks over the five resorts; remote lag 137-168 ms,
+  13.5-15 states / s, a friend on the same lift shown 3-5 m from where he really is.
+  Shots: `~/Library/Caches/ski-work/round7d/mpf/sheet-freeride-{chromium,webkit}.jpg` (start / lift / tags per resort).
 - **vs R7-A** (for the integration): sign atlas: A = fixed 336-board atlases (2048 x 2016, one draw call + ~16 MB per atlas; 3 Vallées
   two); D = one 2048 x 768 on-demand atlas (6 MB, one call at any size). Tags: same idea; D folds the rest into dots / "+N" (A hides them)
   and keeps far friends' tags with the distance in the free ride. Free ride: A has `liftBottom` jump + avalanche by (x, z, seed); D adds
   the teleport epoch / jump snap, host handover of weather / time / day clock, rejoin at the own spot, the peer clock reset, the long-session
   relay budget, avalanches through R7-C's `onTrigger` / `triggerAvalanche`, and the 5-resort x 2-engine flow. mp-games: both add `mode`
   (A without hiding piste / runs).
-- **Still wrong / open**: the 3 Vallées start lift (Ariondaz) puts the free-ride camera against a building in WebKit too (R7-A / C fix
+- **Still wrong / open**: the free-ride start spots of 3 Vallées (Ariondaz), Arlberg (Galzig) and Kronplatz look at a station / house wall, and Zermatt's
+  (Gornergrat Bahn) shows grey platform wedges, in both engines (R7-A / C fix
   the spawn; `host.startSpot` uses main.js `boardSpot`, so their fix applies); a remote friend's carrier on a lift uses MY device's lift
   view (built early, before every tile is in: heights there may still be the far grid's); the relay pair sees friends ~0.6 s late.
