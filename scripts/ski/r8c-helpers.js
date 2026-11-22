@@ -46,12 +46,12 @@ window.__r8 = {
     }
     return !S.ride;
   },
-  /** every village / hamlet centre of the resort (inside the field): stand there, chase camera, 4 headings: the scene + village triangles */
+  /** every village / town centre of the resort (inside the field): stand there, chase camera, 4 headings: the scene + village triangles */
   async sweep(rid) {
     const S = window.__ski, r = await (await fetch(`/pb/ski/data/${rid}/resort.json`)).json();
     const out = [];
     for (const p of r.places || []) {
-      if (!/village|hamlet|town/.test(p.kind) || p.x < 0 || p.z < 0 || p.x > S.field.width || p.z > S.field.depth) continue;
+      if (!/village|town/.test(p.kind) || p.x < 0 || p.z < 0 || p.x > S.field.width || p.z > S.field.depth) continue;
       let worst = { tris: 0 };
       for (let k = 0; k < 4; k++) {
         let st;
