@@ -1,5 +1,7 @@
 /* ian.lu homepage (Gitter look, Nov 2026): greeting + clock, the ⌘K search
  * button, who sees which entry, and the arcade's game of the week.
+ * While arcade-feature.js features a game (Ski Alpen from 23 Nov 2026), that game is the big arcade tile
+ * and the game of the week is drawn into the first small tile (#gtWeekTile) instead; both are kept current.
  *
  * Who sees what (Ian's decisions, 6 Nov 2026):
  *   everyone          Noten, Messenger, Frënn (tagged "Kont" when signed out), Bus & Zuch
@@ -209,12 +211,30 @@ function gameName(id) {
   return weeklyGameLabel(id).replace(/^[^\p{L}\p{N}]+/u, "") || id;
 }
 
+function setThumb(img, gameId) {
+  img.onerror = () => { img.onerror = null; img.removeAttribute("src"); };
+  img.src = `pb/thumbs/${gameId}.webp`;
+}
+
+/* The small tile the game of the week takes while a game is featured (hidden otherwise, by CSS). */
+function renderWeekTile(url) {
+  setThumb($("gtWeekTileImg"), weekly.gameId);
+  $("gtWeekTile").href = url;
+  $("gtWeekTileName").textContent = gameName(weekly.gameId);
+  $("gtWeekTileKick").removeAttribute("data-i18n");
+  $("gtWeekTileKick").textContent = `🏆 ${t("home.weekKick")}`;
+  $("gtWeekTile").title = countdownText(weekly.endsAt);
+}
+
+function markWeekLoaded() {
+  $("gtWeek").classList.remove("loading");
+  $("gtWeekTile").classList.remove("loading");
+}
+
 function renderWeek() {
   if (!weekly) return;
   const url = `pixelbreak.html?g=${encodeURIComponent(weekly.gameId)}`;
-  const img = $("gtWeekImg");
-  img.onerror = () => { img.onerror = null; img.removeAttribute("src"); };
-  img.src = `pb/thumbs/${weekly.gameId}.webp`;
+  setThumb($("gtWeekImg"), weekly.gameId);
   $("gtWeekShot").href = url;
   $("gtWeekPlay").href = url;
   $("gtWeekName").textContent = gameName(weekly.gameId);
@@ -222,6 +242,7 @@ function renderWeek() {
   $("gtWeekKick").textContent = t("home.weekKick");
   $("gtWeekMeta").removeAttribute("data-i18n");
   $("gtWeekMeta").textContent = countdownText(weekly.endsAt);
+  renderWeekTile(url);
 }
 
 function withTimeout(promise, ms) {
@@ -242,7 +263,7 @@ async function loadWeek(sbPromise) {
     // The cell already shows the train simulator as "My pick".
     console.warn("[home] game of the week unavailable, keeping the fallback", error);
   } finally {
-    $("gtWeek").classList.remove("loading");
+    markWeekLoaded();
   }
 }
 
@@ -271,7 +292,7 @@ function boot() {
   renderGreeting();
   renderAllGames();
   weekly = cachedWeekly();
-  if (weekly) { renderWeek(); $("gtWeek").classList.remove("loading"); }
+  if (weekly) { renderWeek(); markWeekLoaded(); }
   startClock();
   wireSearch();
 

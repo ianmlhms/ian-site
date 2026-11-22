@@ -181,6 +181,16 @@ html.auth-in .gt .kont { display: none; }
 .gt-play { background: var(--ink); color: var(--paper) !important; padding: 0 18px; min-height: 44px; display: inline-flex; align-items: center; font-weight: 600; text-decoration: none; }
 .gt-play:hover { background: var(--green); }
 .gt-week.loading .shot img, .gt-week.loading .body > * { opacity: 0; }
+/* featured game (arcade-feature.js): the big tile, with a "Nei" tag on the picture */
+.gt-week .shot { position: relative; }
+.gt-feat-big .shot img { object-position: 50% 62%; }
+.gt-feat-big h3 { font-size: 34px; letter-spacing: -0.03em; }
+.gt-feat-big .meta { font-size: 15px; }
+.gt-shot-tag {
+  position: absolute; left: 10px; top: 10px; z-index: 1; padding: 1px 7px; background: var(--paper); color: var(--ink);
+  border: 1px solid var(--ink); font: 500 11px/1.6 "Geist Mono", ui-monospace, monospace; white-space: nowrap;
+}
+.gt-feat-big .gt-shot-tag { background: var(--green); color: var(--on-green); border-color: var(--green); font-weight: 600; font-size: 12px; }
 .gt-week .shot img, .gt-week .body > * { transition: opacity .25s ease; }
 
 .gt-tiles { grid-column: span 3; display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; }
@@ -188,7 +198,10 @@ html.auth-in .gt .kont { display: none; }
   border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); min-width: 0;
   text-decoration: none; font-weight: 600; font-size: 15px; display: flex; flex-direction: column;
 }
-.gt-tiles .shot { flex: 1; min-height: 0; overflow: hidden; background: var(--tint); }
+.gt-tiles .shot { flex: 1; min-height: 0; overflow: hidden; background: var(--tint); position: relative; }
+.gt-tiles .gt-shot-tag { left: 8px; top: 8px; max-width: calc(100% - 16px); overflow: hidden; text-overflow: ellipsis; }
+.gt-tiles a.loading .shot img, .gt-tiles a.loading .gt-shot-tag, .gt-tiles a.loading .cap { opacity: 0; }
+.gt-tiles a .shot img, .gt-tiles a .gt-shot-tag, .gt-tiles a .cap { transition: opacity .25s ease; }
 .gt-tiles img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .gt-tiles .cap { display: block; padding: 8px 14px 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gt-tiles a:hover .cap { color: var(--green); }
@@ -258,13 +271,14 @@ html.auth-in .gt .kont { display: none; }
   .gt-search button { min-height: 60px; font-size: 16px; }
   .gt-index { grid-auto-flow: row; grid-template-columns: minmax(0, 1fr); }
   .gt-week h3 { font-size: 22px; }
+  .gt-feat-big h3 { font-size: 28px; }
   .gt-tiles .shot { aspect-ratio: 16 / 10; flex: none; }
   .gt-all { min-height: 76px; }
   .gt-all b { font-size: 24px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .gt-all .ic, .gt-week .shot img, .gt-week .body > * { transition: none; }
+  .gt-all .ic, .gt-week .shot img, .gt-week .body > *, .gt-tiles a .shot img, .gt-tiles a .gt-shot-tag, .gt-tiles a .cap { transition: none; }
 }
 
 /* 44px touch targets without changing the drawn layout: the extra height is

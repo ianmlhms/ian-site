@@ -23,6 +23,7 @@
 <script src="theme.js?v=36"></script>
 <script src="i18n-dict.js?v=56"></script>
 <script src="i18n.js?v=5"></script>
+<script src="arcade-feature.js?v=1"></script>
 <style>
 .skip{position:absolute;left:12px;top:-60px;z-index:3000;padding:12px 18px;background:var(--ink);color:var(--paper);font-weight:600;text-decoration:none}
 .skip:focus{top:12px}
@@ -97,6 +98,7 @@ body.gt .pb-save-hint__go{border-radius:0;background:var(--ink);color:var(--pape
 .tag.mp{border-color:var(--ink);color:var(--ink)}
 .tag.save{border-color:var(--ink);color:var(--ink)}
 .tag.weekly-badge{border-color:var(--green);color:var(--green)}
+.tag.new-badge{border-color:var(--green);background:var(--green);color:var(--on-green)}
 .ext{position:absolute;top:8px;right:8px;z-index:3;padding:1px 7px;background:var(--paper);color:var(--ink);font:500 11px/1.6 "Geist Mono",ui-monospace,monospace;border:1px solid var(--ink)}
 
 .arc-empty{align-items:flex-start;gap:6px!important;padding:32px 20px!important}
@@ -200,6 +202,7 @@ body.game-open main.gt-page,body.game-open .skip,body.game-open .arc-foot{visibi
     <symbol id="i-trophy" viewBox="0 0 256 256"><path d="M232,64H208V48a8,8,0,0,0-8-8H56a8,8,0,0,0-8,8V64H24A16,16,0,0,0,8,80V96a40,40,0,0,0,40,40h3.65A80.13,80.13,0,0,0,120,191.61V216H96a8,8,0,0,0,0,16h64a8,8,0,0,0,0-16H136V191.58c31.94-3.23,58.44-25.64,68.08-55.58H208a40,40,0,0,0,40-40V80A16,16,0,0,0,232,64ZM48,120A24,24,0,0,1,24,96V80H48v32q0,4,.39,8Zm144-8.9c0,35.52-29,64.64-64,64.9a64,64,0,0,1-64-64V56H192ZM232,96a24,24,0,0,1-24,24h-.5a81.81,81.81,0,0,0,.5-8.9V80h24Z"/></symbol>
     <symbol id="i-users-three" viewBox="0 0 256 256"><path d="M244.8,150.4a8,8,0,0,1-11.2-1.6A51.6,51.6,0,0,0,192,128a8,8,0,0,1-7.37-4.89,8,8,0,0,1,0-6.22A8,8,0,0,1,192,112a24,24,0,1,0-23.24-30,8,8,0,1,1-15.5-4A40,40,0,1,1,219,117.51a67.94,67.94,0,0,1,27.43,21.68A8,8,0,0,1,244.8,150.4ZM190.92,212a8,8,0,1,1-13.84,8,57,57,0,0,0-98.16,0,8,8,0,1,1-13.84-8,72.06,72.06,0,0,1,33.74-29.92,48,48,0,1,1,58.36,0A72.06,72.06,0,0,1,190.92,212ZM128,176a32,32,0,1,0-32-32A32,32,0,0,0,128,176ZM72,120a8,8,0,0,0-8-8A24,24,0,1,1,87.24,82a8,8,0,1,0,15.5-4A40,40,0,1,0,37,117.51,67.94,67.94,0,0,0,9.6,139.19a8,8,0,1,0,12.8,9.61A51.6,51.6,0,0,1,64,128,8,8,0,0,0,72,120Z"/></symbol>
     <symbol id="i-squares-four" viewBox="0 0 256 256"><path d="M104,40H56A16,16,0,0,0,40,56v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V56A16,16,0,0,0,104,40Zm0,64H56V56h48v48Zm96-64H152a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V56A16,16,0,0,0,200,40Zm0,64H152V56h48v48Zm-96,32H56a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V152A16,16,0,0,0,104,136Zm0,64H56V152h48v48Zm96-64H152a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V152A16,16,0,0,0,200,136Zm0,64H152V152h48v48Z"/></symbol>
+    <symbol id="i-arrow-right" viewBox="0 0 256 256"><path d="M221.66,133.66l-72,72a8,8,0,0,1-11.32-11.32L196.69,136H40a8,8,0,0,1,0-16H196.69L138.34,61.66a8,8,0,0,1,11.32-11.32l72,72A8,8,0,0,1,221.66,133.66Z"/></symbol>
     <symbol id="i-game-controller" viewBox="0 0 256 256"><path d="M176,112H152a8,8,0,0,1,0-16h24a8,8,0,0,1,0,16ZM104,96H96V88a8,8,0,0,0-16,0v8H72a8,8,0,0,0,0,16h8v8a8,8,0,0,0,16,0v-8h8a8,8,0,0,0,0-16ZM241.48,200.65a36,36,0,0,1-54.94,4.81c-.12-.12-.24-.24-.35-.37L146.48,160h-37L69.81,205.09l-.35.37A36.08,36.08,0,0,1,44,216,36,36,0,0,1,8.56,173.75a.68.68,0,0,1,0-.14L24.93,89.52A59.88,59.88,0,0,1,83.89,40H172a60.08,60.08,0,0,1,59,49.25c0,.06,0,.12,0,.18l16.37,84.17a.68.68,0,0,1,0,.14A35.74,35.74,0,0,1,241.48,200.65ZM172,144a44,44,0,0,0,0-88H83.89A43.9,43.9,0,0,0,40.68,92.37l0,.13L24.3,176.59A20,20,0,0,0,58,194.3l41.92-47.59a8,8,0,0,1,6-2.71Zm59.7,32.59-8.74-45A60,60,0,0,1,172,160h-4.2L198,194.31a20.09,20.09,0,0,0,17.46,5.39,20,20,0,0,0,16.23-23.11Z"/></symbol>
   </svg>
 <a class="skip" href="#main" data-i18n="arc.skip">Sprang zum Inhalt</a>
@@ -217,6 +220,12 @@ body.game-open main.gt-page,body.game-open .skip,body.game-open .arc-foot{visibi
 </div>
 </header>
 <div id="halloweenBanner" class="c full" hidden data-i18n="arc.halloweenBanner" style="background:var(--tint);font-size:14px"></div>
+<!-- featured game banner: only inside the arcade-feature.js window (or with ?featured=ski) -->
+<a class="c full arc-new arc-feat" id="arcNew" href="pixelbreak.html?g=ski" onclick="return openFeatured()">
+<span class="arc-new-tag" data-feat-text="new">Nei</span>
+<span class="arc-new-text"><b>Ski Alpen</b><span class="arc-new-line" data-feat-text="line">5 echt Skigebidder an 3D · Free Ride · Challenges · Online</span></span>
+<span class="arc-new-go"><span data-i18n="home.play">Spillen</span> <svg aria-hidden="true"><use href="#i-arrow-right"/></svg></span>
+</a>
 <section class="c full arc-hero">
 <p class="arc-kicker" data-i18n="arc.kicker">Spiller fir Pausen</p>
 <h1 class="arc-title">Arcade<span>.</span></h1>
@@ -406,6 +415,9 @@ function hashStr(s){var h=0;for(var i=0;i<s.length;i++)h=s.charCodeAt(i)+((h<<5)
 /* Halloween event window (same dates as pixelbreak-records.js halloweenVisible): Kart Lëtzebuerg's haunted track gets a 🎃 on its tile */
 function halloweenOn(){var p=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Luxembourg',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()),o={};p.forEach(function(x){o[x.type]=x.value});var d=o.year+'-'+o.month+'-'+o.day;return new URLSearchParams(location.search).get('halloween')==='1'||(d>='2026-10-24'&&d<='2026-11-02')}
 function isBigGame(g){return BIG_GAME_IDS.has(g.id)}
+/* the game arcade-feature.js features right now (banner + "Nei" tag on its card), none outside its window */
+function isFeaturedGame(id){var f=window.ArcadeFeature&&ArcadeFeature.current();return !!f&&f.id===id}
+function openFeatured(){var f=window.ArcadeFeature&&ArcadeFeature.current();var i=f?gameIdxById(f.id):-1;if(i<0)return true;openGame(i);return false}
 /* Big games in sub-sections (same names as the genre filters); a big game in no list lands in the last one */
 const BIG_GROUPS=[
 {key:"arc.bg.sim",ico:"🚆",ids:["train-sim","tram-sim","paket-express","bus-tycoon","park","burger"]},
@@ -429,6 +441,7 @@ return AUTHORED_ORDER_BY_ID[a.id]-AUTHORED_ORDER_BY_ID[b.id];
 }
 function cardHTML(g,isBig){
 var tagHTML='';   // every big game saves progress (the section says so), no badge per card
+if(isFeaturedGame(g.id))tagHTML+='<span class="tag new-badge">'+esc(ArcadeFeature.text('new'))+'<\/span>';
 if(window.__pbWeeklyGame===g.id)tagHTML+='<span class="tag weekly-badge">'+esc(tr('arc.weeklyBadge'))+'<\/span>';
 if(g.id==='kart-letzebuerg'&&halloweenOn())tagHTML+='<span class="tag" title="Geeschterschlass">🎃<\/span>';
 if(g.tags&&g.tags.indexOf('mp')>-1)tagHTML+='<span class="tag mp">'+esc(tr('arc.mp'))+'<\/span>';
@@ -789,6 +802,7 @@ var om=document.getElementById('om');
 if(om.classList.contains('open'))closeOnline();
 });
 else applyFilters();
+document.addEventListener('arcade-feature:change',applyFilters);   // the "Nei" tag comes and goes with the feature window
 loadPlayCounts();
 </script>
 <script src="pixelbreak-config.js"></script>
