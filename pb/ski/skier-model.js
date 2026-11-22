@@ -39,7 +39,7 @@ export function writeOutfit(id) {
   try { localStorage.setItem(OUTFIT_KEY, id); } catch (error) { console.warn('[ski] could not store the outfit', error); }
 }
 
-export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {}) {
+export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false, skinned = false } = {}) {
   let skiLookOf = null;                      // round 6: set once setSki exists (the outfit no longer picks the ski colour then)
   const mat = (color) => (ghost
     ? new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.38, depthWrite: false })
@@ -186,6 +186,50 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {})
     mesh.castShadow = !ghost; mesh.receiveShadow = !ghost; mesh.frustumCulled = false;
     g.add(mesh);
     merged.push(mesh);
+  }
+  // R8b (Niddreg draw calls, D's note): skinned = the per-bone meshes become ONE skinned mesh (bones = their groups, bind identity, like
+  // net/remotes.js createRemoteFigure): 1 draw call (+1 shadow) instead of ~16. A hidden group (poles in a cabin, the twin tips, first
+  // person: all but the gear) gets a zero bone matrix, so its vertices collapse (no fragments). The per-bone meshes stay for remotes.js.
+  let skin = null;
+  if (skinned && merged.length) {
+    const bones = merged.map((m) => m.parent);
+    const pos = [], nrm = [], si = [], sw = [], idx = [], slots = [];
+    let base = 0;
+    merged.forEach((m, bi) => {
+      const g = m.geometry, P = g.attributes.position, N = g.attributes.normal;
+      for (let i = 0; i < P.count; i++) { pos.push(P.getX(i), P.getY(i), P.getZ(i)); nrm.push(N.getX(i), N.getY(i), N.getZ(i)); si.push(bi, 0, 0, 0); sw.push(1, 0, 0, 0); slots.push(g.userData.slots[i]); }
+      for (let i = 0; i < g.index.count; i++) idx.push(g.index.getX(i) + base);
+      base += P.count;
+      m.visible = false;
+    });
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(slots.length * 3), 3));
+    geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4));
+    geo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4));
+    geo.setIndex(idx);
+    geo.userData.slots = Uint8Array.from(slots);
+    const I = new THREE.Matrix4();
+    const mesh = new THREE.SkinnedMesh(geo, shared);
+    mesh.name = ghost ? 'ski-ghost-figure' : 'ski-skier-figure';
+    const skeleton = new THREE.Skeleton(bones, bones.map(() => I.clone()));
+    mesh.bind(skeleton, I);
+    mesh.frustumCulled = false; mesh.castShadow = !ghost; mesh.receiveShadow = !ghost;
+    // a bone counts as hidden when it or any group above it (up to the root) is invisible, or (first person) it is not gear
+    const up = bones.map((b) => { const chain = []; for (let o = b; o && o !== root; o = o.parent) chain.push(o); return chain; });
+    const update = skeleton.update.bind(skeleton);
+    skeleton.update = () => {
+      update();
+      const M = skeleton.boneMatrices;
+      for (let i = 0; i < bones.length; i++) {
+        const hidden = (skin && skin.fp && !gearGroups.has(bones[i])) || up[i].some((o) => !o.visible);
+        if (hidden) M.fill(0, i * 16, i * 16 + 16);
+      }
+    };
+    root.add(mesh);
+    skin = { mesh, fp: false };
+    merged.push(mesh);                   // recolour() paints it too (the hidden per-bone meshes keep their colours as well)
   }
   function recolour() {
     for (const mesh of merged) {
@@ -481,7 +525,8 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {})
   let firstPerson = false;
   function setFirstPerson(on) {
     firstPerson = !!on;
-    for (const mesh of merged) mesh.visible = !firstPerson || gearGroups.has(mesh.parent);
+    if (skin) skin.fp = firstPerson;
+    else for (const mesh of merged) mesh.visible = !firstPerson || gearGroups.has(mesh.parent);
     if (firstPerson) blob.visible = false;
   }
   /** Round 7 (A), tests: the world tips and tails of both skis [{ tip: {x, y, z}, tail: {x, y, z} }] after the last pose. */

@@ -181,9 +181,9 @@ async function boot() {
   const farForest = createFarForest({ scene, env, classes: core.classes, resort, field, quality });
   const poles = createPoles({ scene, resort, height: (x, z) => field.height(x, z) });
   let outfit = readOutfit();
-  const skier = createSkierModel({ outfit });
+  const skier = createSkierModel({ outfit, skinned: true });                  // R8b: one skinned mesh (Niddreg draw calls)
   skier.setBlob(level === 'low');
-  const ghostModel = createSkierModel({ ghost: true, outfit });
+  const ghostModel = createSkierModel({ ghost: true, outfit, skinned: true });
   const setOutfit = (id) => { outfit = id; writeOutfit(id); skier.setOutfit(id); ghostModel.setOutfit(id); };
   scene.add(skier.root, ghostModel.root);
   ghostModel.setVisible(false);

@@ -260,21 +260,30 @@ export function createAvalanches({ scene, field, surface, pistes, hud, uiRoot, l
   const faces = findFaces(field, { width: field.width, depth: field.depth }, AV.faces, { minY: lowestPiste(pistes, far) });
   const flags = warningSpots(field, pistes, faces);
   // warning flags: one instanced mesh (post + checkered flag)
+  // R8b: flag + post in ONE instanced mesh (1 draw call): the post's UVs sit on a black square of the checkered texture
   const flagGeo = new THREE.PlaneGeometry(0.9, 0.9); flagGeo.translate(0.45, 2.2, 0);
-  const postGeo = new THREE.CylinderGeometry(0.04, 0.05, 2.7, 5); postGeo.translate(0, 1.35, 0);
+  const postGeo = new THREE.CylinderGeometry(0.04, 0.05, 2.7, 5).toNonIndexed(); postGeo.translate(0, 1.35, 0);
+  { const uv = postGeo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, 0.125, 0.125); }      // canvas square (0, 3) (flipY) = '#16171a'
+  const flagFlat = flagGeo.toNonIndexed();
+  const fpGeo = new THREE.BufferGeometry();
+  for (const name of ['position', 'normal', 'uv']) {
+    const a = flagFlat.attributes[name], b = postGeo.attributes[name];
+    const arr = new Float32Array(a.array.length + b.array.length); arr.set(a.array, 0); arr.set(b.array, a.array.length);
+    fpGeo.setAttribute(name, new THREE.BufferAttribute(arr, a.itemSize));
+  }
+  flagGeo.dispose(); flagFlat.dispose(); postGeo.dispose();
   const flagMat = new THREE.MeshLambertMaterial({ map: flagTexture(), side: THREE.DoubleSide });
-  const postMat = new THREE.MeshLambertMaterial({ color: 0x2b2f36 });
-  const flagMesh = new THREE.InstancedMesh(flagGeo, flagMat, Math.max(1, flags.length));
-  const postMesh = new THREE.InstancedMesh(postGeo, postMat, Math.max(1, flags.length));
-  flagMesh.name = 'ski-avalanche-flags'; postMesh.name = 'ski-avalanche-posts';
+  const flagMesh = new THREE.InstancedMesh(fpGeo, flagMat, Math.max(1, flags.length));
+  flagMesh.name = 'ski-avalanche-flags';
+  const postMesh = flagMesh;                 // (one mesh: the old two-mesh code paths below set it twice)
   const dummy = THREE ? new THREE.Object3D() : null;
   function seatFlags() {
-    flags.forEach((f, i) => { dummy.position.set(f.x, height(f.x, f.z) - 0.1, f.z); dummy.rotation.set(0, (i * 1.7) % 6.28, 0); dummy.updateMatrix(); flagMesh.setMatrixAt(i, dummy.matrix); postMesh.setMatrixAt(i, dummy.matrix); });
-    flagMesh.count = postMesh.count = flags.length;
-    flagMesh.instanceMatrix.needsUpdate = true; postMesh.instanceMatrix.needsUpdate = true;
+    flags.forEach((f, i) => { dummy.position.set(f.x, height(f.x, f.z) - 0.1, f.z); dummy.rotation.set(0, (i * 1.7) % 6.28, 0); dummy.updateMatrix(); flagMesh.setMatrixAt(i, dummy.matrix); });
+    flagMesh.count = flags.length;
+    flagMesh.instanceMatrix.needsUpdate = true;
   }
   seatFlags();
-  scene.add(flagMesh, postMesh);
+  scene.add(flagMesh);
   // the slab: tumbling blocks + the powder cloud (camera-facing quads)
   const MAXB = 120;
   const blockGeo = new THREE.IcosahedronGeometry(1, 0);
