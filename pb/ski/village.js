@@ -370,6 +370,7 @@ function material(env, cheap) {
   return new THREE.ShaderMaterial({
     uniforms: env.u,
     side: THREE.DoubleSide,
+    extensions: { derivatives: true },
     defines: cheap ? { CHEAP: 1 } : {},
     vertexShader: `
       attribute vec2 aUv; attribute vec4 aInfo;
@@ -397,7 +398,9 @@ function material(env, cheap) {
         } else if (part > 1.5 && part < 2.5) {                                          // soffit, balcony slab: wood
           col = wood * 0.85;
         } else if (part > 2.5 && part < 3.5) {                                          // balcony rail: vertical boards, dark gaps
-          float board = step(0.35, fract(vUv.x / 0.16));
+          // R8c (QA: railing moire at 30-50 m): the boards anti-aliased by their own pixel footprint, their average once sub-pixel
+          float bx = vUv.x / 0.16, bw = fwidth(bx);
+          float board = mix(smoothstep(0.35 - bw, 0.35 + bw, fract(bx)), 0.65, smoothstep(0.3, 0.6, bw));
           col = mix(wood * 0.45, wood * 1.05, mix(0.8, board, fadeFar));
           col = mix(col, vec3(0.93, 0.95, 1.0), step(0.86, vUv.y) * 0.85);              // snow on the handrail
         } else if (part > 3.5 && part < 4.5) {                                          // chimney, parapet: stone / concrete

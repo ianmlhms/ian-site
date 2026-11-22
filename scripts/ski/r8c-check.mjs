@@ -26,6 +26,7 @@ const { unpackResort } = await imp('linepack.js');
 const { farTreesOfBlock, BLOCK: FAR_BLOCK } = await imp('forest-far.js');
 const { houseOf, ALPINE_RESORTS, MAX_FLOORS } = await imp('village.js');
 const { gatesNear, placeLabels, LABEL_MARGIN, GATE_DRAW } = await imp('modes/markers.js');
+const { decodeRoads, gentleRoads, MAX_GRADE } = await imp('roads.js');
 
 let fails = 0, checks = 0;
 const ok = (cond, text) => { checks++; if (!cond) { fails++; if (fails < 200) console.log(`  FAIL ${text}`); } return cond; };
@@ -125,6 +126,15 @@ for (const rid of resorts) {
   });
   ok(aisleCards === 0, `${rid}: ${aisleCards} far tree cards where the lift guard forbids trees`);
   console.log(`  aisles: ${aisleCards} far cards in the lift aisles (${aisleChecked} cards within 4 m of a lift line, all allowed: high above the trees); ${rails} surface railways`);
+  // streets: no drawn piece steeper than MAX_GRADE (3V QA: 25-45 deg pieces, a street up a wall)
+  {
+    const roadsJson = fs.existsSync(path.join(dir, 'roads.json')) ? JSON.parse(fs.readFileSync(path.join(dir, 'roads.json'), 'utf8')) : null;
+    const raw = decodeRoads(roadsJson), H = (x, z) => field.height(x, z);
+    const steepOf = (list) => { let n = 0, worst = 0; for (const r of list) for (let k = 0; k + 1 < r.pts.length; k++) { const [ax, az] = r.pts[k], [bx, bz] = r.pts[k + 1]; const L = Math.hypot(bx - ax, bz - az); if (L < 1) continue; const m = Math.ceil(L / 5); for (let i = 0; i < m; i++) { const g = Math.abs(H(ax + (bx - ax) * (i + 1) / m, az + (bz - az) * (i + 1) / m) - H(ax + (bx - ax) * i / m, az + (bz - az) * i / m)) / (L / m); worst = Math.max(worst, g); if (g > 0.4663) { n++; break; } } } return [n, worst]; };
+    const [n0, w0] = steepOf(raw), kept = gentleRoads(raw, H), [n1, w1] = steepOf(kept);
+    ok(n1 === 0 && w1 <= MAX_GRADE + 1e-6, `${rid}: streets: ${n1} drawn segments over 25 deg, steepest ${(Math.atan(w1) * 180 / Math.PI).toFixed(1)} deg`);
+    console.log(`  streets: ${raw.length} -> ${kept.length} pieces; segments over 25 deg ${n0} -> ${n1}; steepest ${(Math.atan(w0) * 180 / Math.PI).toFixed(0)} -> ${(Math.atan(w1) * 180 / Math.PI).toFixed(1)} deg`);
+  }
   // gates near only
   const pts = resort.pistes.map((p) => ({ x: p.line[0], z: p.line[1] }));
   let worstGate = 0;

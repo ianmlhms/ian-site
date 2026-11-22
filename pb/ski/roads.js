@@ -24,6 +24,7 @@ function material(env) {
   return new THREE.ShaderMaterial({
     uniforms: env.u,
     polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4, side: THREE.DoubleSide,
+    transparent: true, depthWrite: false,          // R8c (3V QA: sawtooth street edges, faceted banks): the bank fades into the snow
     vertexShader: `
       attribute vec4 aSegA; attribute vec4 aSegB; attribute float aHw;
       varying vec4 vSegA; varying vec4 vSegB; varying float vHw; varying vec3 vW; varying vec3 vN; varying float vDist;
@@ -41,6 +42,7 @@ function material(env) {
         // its neighbour, the same for all of the cell's vertices), no longer interpolated between lattice nodes
         float a = min(segD(vW.xz, vSegA), segD(vW.xz, vSegB)) / vHw;      // 0 centre, 1 the edge, > 1 the snow bank
         if (a > 1.37) discard;                                  // round 7: the bank is a painted strip just past the edge
+        float edgeA = 1.0 - smoothstep(0.98, 1.36, a);           // R8c: soft, no hard lattice-stepped rim
         vec4 nz = texture2D(uNoise, vW.xz * 0.11);
         vec4 nl = texture2D(uNoise, vW.xz * 0.013 + 0.3);
         float fade = 1.0 - smoothstep(120.0, 600.0, vDist);   // tyre tracks blur into one grey far away
@@ -54,7 +56,7 @@ function material(env) {
         float lit = smoothstep(-0.1, 0.6, dot(N, uSunDir));
         vec3 amb = mix(uAmbGround, uAmbSky, 0.5 + 0.5 * N.y);
         vec3 c = col * (amb * 0.7 + uSunColor * lit * 0.72);
-        gl_FragColor = vec4(applyFog(c, vDist, uFogColor, uFogDensity), 1.0);
+        gl_FragColor = vec4(applyFog(c, vDist, uFogColor, uFogDensity), edgeA);
       }`,
   });
 }
@@ -136,9 +138,36 @@ function latticeCells(roads, lat, height, ground) {
   return cells;
 }
 
+/** R8c (3V QA: street pieces at 25-45 deg, a street climbing a wall at Brides): a street is drawn only where it runs gently with the
+ *  ground: segments steeper than MAX_GRADE (sampled every <= 5 m) are cut out, pieces shorter than MIN_PIECE m dropped. Pure. */
+export const MAX_GRADE = 0.3;          // ~17 deg
+const MIN_PIECE = 8;
+export function gentleRoads(roads, height) {
+  const out = [];
+  for (const r of roads) {
+    let cur = [];
+    const flush = () => { let L = 0; for (let i = 1; i < cur.length; i++) L += Math.hypot(cur[i][0] - cur[i - 1][0], cur[i][1] - cur[i - 1][1]); if (cur.length > 1 && L >= MIN_PIECE) out.push({ hw: r.hw, pts: cur }); cur = []; };
+    for (let k = 0; k + 1 < r.pts.length; k++) {
+      const [ax, az] = r.pts[k], [bx, bz] = r.pts[k + 1];
+      const L = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(L / 5));
+      let steep = false;
+      for (let i = 0; i < n && !steep; i++) {
+        const x0 = ax + (bx - ax) * (i / n), z0 = az + (bz - az) * (i / n), x1 = ax + (bx - ax) * ((i + 1) / n), z1 = az + (bz - az) * ((i + 1) / n);
+        steep = Math.abs(height(x1, z1) - height(x0, z0)) > MAX_GRADE * (L / n);
+      }
+      if (steep) { flush(); continue; }
+      if (!cur.length) cur.push([ax, az]);
+      cur.push([bx, bz]);
+    }
+    flush();
+  }
+  return out;
+}
+
 /** roads = decodeRoads(roads.json); height(x, z) = the PHYSICS ground (surface.height: exact at the lattice nodes); level = quality. */
 export function createRoads({ scene, roads, env, height, level = 'medium' }) {
-  const fine = latticeCells(roads, LAT, height, true), coarse = latticeCells(roads, LAT_FAR, height, false);
+  const gentle = gentleRoads(roads, height);
+  const fine = latticeCells(gentle, LAT, height, true), coarse = latticeCells(gentle, LAT_FAR, height, false);
   const mat = material(env);
   const group = new THREE.Group();
   group.name = 'ski-roads';
