@@ -16,7 +16,7 @@ const G = 9.81;
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const smoothstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 const approach = (v, target, rate, dt) => v + (target - v) * Math.min(1, rate * dt);
-const HOCKEY_MAX = 8;                 // R8: m/s2, the hockey stop's strongest deceleration
+const HOCKEY_MAX = 9.5;                 // R8: m/s2, the hockey stop's strongest deceleration
 const HOLD_COS = Math.cos(38 * Math.PI / 180);       // round 7: steeper than this a stop can not hold (side-slip)
 const wrapAngle = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
 
@@ -62,7 +62,7 @@ function groundStep(s, input, world, dt) {
   // round 7: the hockey stop: a player braking fast (or braking with a hard steer) swings both skis across the motion and digs the
   // edges in (strong deceleration, a big spray); slow, the brake stays the snowplough. Scripted input (bots, flows) never does it.
   const hockeyFrom = K.hockeyFrom || SKI.hockeyFrom || 7;
-  const wantStop = input.brake && input.hard && v > 1.5 && (v > hockeyFrom || (Math.abs(input.steer || 0) > 0.5 && v > 4) || (s.stop || 0) > 0.5) ? 1 : 0;      // R8: once across, it stays a hockey stop to the end
+  const wantStop = input.brake && input.hard && ((v > 1.5 && (v > hockeyFrom || (Math.abs(input.steer || 0) > 0.5 && v > 4))) || (s.stop || 0) > 0.5) ? 1 : 0;      // R8: held to the end and while he stands on the brake (skis stay parallel)      // R8: once across, it stays a hockey stop to the end
   if ((s.stop || 0) < 0.05 && wantStop) {
     const mh = Math.atan2(vz, vx), off = wrapAngle(s.heading - mh);
     s.stopSide = Math.sign(input.steer || 0) || Math.sign(off) || 1;

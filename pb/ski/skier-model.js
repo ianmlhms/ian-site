@@ -397,7 +397,7 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false } = {})
     smEdge += (clamp(state.edge, -1.1, 1.1) - smEdge) * k;
     const landing = state.landed > 0 ? Math.sin(Math.min(1, state.landed / 0.35) * Math.PI) : 0;
     smCrouch += (clamp(state.tuck * 0.95 + landing * 0.8 + smGrab + (state.stop || 0) * 0.25, 0, 1) - smCrouch) * k;
-    smPlough += (clamp(state.brake, 0, 1) * (1 - clamp(state.stop || 0, 0, 1)) - smPlough) * k;      // round 7: the hockey stop is no plough
+    smPlough += (clamp(state.brake, 0, 1) * (1 - clamp(state.stop || 0, 0, 1)) * (state.hold && state.speed < 0.3 ? 0 : 1) - smPlough) * k;      // R8: standing still (held) the skis are parallel, never a crossed V      // round 7: the hockey stop is no plough
     smAir += ((state.grounded ? 0 : Math.min(1, state.air * 2.5)) - smAir) * k;
     const edge = smEdge, crouch = smCrouch, plough = smPlough, air = smAir;
     // pole plant when the turn changes side at speed

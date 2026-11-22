@@ -672,3 +672,48 @@ net/freeride.js, mp-games `mode`): the integration takes ONE per feature; the di
   (Gornergrat Bahn) shows grey platform wedges, in both engines (R7-A / C fix
   the spawn; `host.startSpot` uses main.js `boardSpot`, so their fix applies); a remote friend's carrier on a lift uses MY device's lift
   view (built early, before every tile is in: heights there may still be the far grid's); the relay pair sees friends ~0.6 s late.
+
+## Round 8 integration (22 Nov 2026, branch `worktree-agent-ad3dbdaf238c036e7`): R7-B base + R7-A + R7-D look + R7-D, review + early-QA fixes
+**Base = R7-B** (369e7404: lifts, stations, boarding zones, rebaked data). Merged: R7-A (616a109e), R7-D look (77dd1650), R7-D (0afb689f).
+**One implementation per feature** (what was dropped stays on its branch):
+- R7-A kept: WebKit shader-error hook + `pictureCheck` safety steps (post.fallback), ground == physics streets (roads.js), leg IK /
+  plough / hockey poses, braking to 0 + hold (skier.js), camera rises with speed (camera.js), `look.js` free look + camera guard (wired
+  into R7-B's `window.__skiLook.apply` seam for the lift camera; the station colliders are R7-B's `world.hit` parts), late-tile re-snap,
+  `meshedAround` behind every fade, horizon / edge fade + whiter far rock (snow-shader FOG_GLSL `uFarEnd`), buildings/balconies (village.js),
+  houses + streets download after the first frames, debug orbit over the snow, tools (ground-check, pose-check, ski-webkit flow,
+  webkit-probe, calls-sweep, round7a-shots, far-quant). The building box index moved from A's modes/spawn.js into look.js.
+- R7-A dropped: modes/spawn.js (first-lift spawn, liftSpot, exitSpot, 12 m zone: B's zones/exits + C's FIRST_LIFT), tunnel.js and its
+  lift-path tunnels (B's portals/tube), carrier models + LOD in lifts.js (B's carriers.js), fpcam.js, effects.js spray/tracks,
+  modes/avalanche.js + Lawin (all C), net/freeride.js + lobby Modus + tags.js + props.js sign atlas (D's), park bodies + parkUniforms,
+  scatter-view firs, env evening ambient, strata AA, markers aTint (D-look's), FAR_QUANT 1 m (back to 0.25 m: the 1 m steps striped
+  the far lighting in the Kronplatz QA; D's packed lines keep first play <= 4 MB). round7-test.mjs trimmed to A's own checks (far step,
+  braking, hockey duration).
+- R7-D: resort.json = B's content packed with `scripts/ski/linepack.py` (lossless, == what bake.py now writes); every Node script reads
+  it through `unpackResort` (round7b-test added).
+**Coordinator review fixes**: shaded snow = light blue-grey at every time of day (snow-shader `shadeL2`, b/r ~1.4 instead of ~2);
+stations with detail (lift-site.js `det()` parts, never colliders, pruned like caps): drive housing with a red band over the bull-wheel
+(chair canopy, gondola roof), the gondola roof overhangs the platform + front with a dark fascia, a red line and the LIFT NAME (lifts.js
+name-sign layer: the 24 nearest within 450 m in one canvas atlas = 1 draw call), clad back wall (stone plinth, timber, battens, window
+band), mullions on the glazed side, lights under the roof, entry gates open at the boarding zone; cable-car terminal name sign; drag
+pylons: slim tube, boom, red cap, a sheave train per rope (one up + one return rope per lift; "4 ropes" in the old shot were twin lifts
+Termignon 1 + 2); clouds from their own gradient-noise texture (env.js `createCloudTexture`, 16 bit in r+g, blurred, softer edges, the
+fine tufts fade to the horizon).
+**Early QA fixes (Zermatt/Arlberg + Killy/Kronplatz, R7-A build)**: summit exits: lift-site.js exitOf prefers <= 25 deg, then <= 31,
+and turns off a fall line that drops > 35-39 deg within 40 m (traverse up to 75 deg off it) — round7b-test checks every exit: slope,
+drop ahead, 5 s standing still without input, push off + 6 s without crash; buildings whose roof reaches into a carrier's path are left
+out (Kronplatz/Killy "cabins through hotels"), round7b-test checks every carrier vs every kept building; streets drawn a hair (6 mm) over
+the ground and painted from the per-pixel distance to the cell's nearest segment (+ neighbour) — no zigzag bands, skis no longer under
+the street; houses collide (kept ones, main.js `buildingHit`); camera never under the snow, rises when the guard pulls it in, wider
+house margin; hockey stop locked across the travel direction at its start (no 140 deg spin), max 8 m/s2 (33 km/h -> 0 in ~1.7 s,
+round7-test), less squat; T-bar rider's hand at chest height; speedo on a lift = the lift's real speed; duplicate lift names numbered
+(`baseName` keeps the data name); empty HUD chip hidden; countdown under the top bar; T sets the day clock; env time/weather ids
+validated; the Funival tube starts at the portals and never pokes out of the hill; the Inuits pylon under the Altiport chairs dropped
+(lift_sites.py `drop_drag_pylons_under`, in bake.py).
+**Checks** (all green unless noted below): see the report numbers in the coordinator's log; `node scripts/ski/round7b-test.mjs` (5981),
+`round7-test.mjs` (30), `round6-test.mjs` (2307), `look7d-check.mjs` (68), `r7d-test.mjs` (1424), harness --all x 5; browser runs below.
+WebKit contact sheet: `node scripts/ski/round8-sheet.mjs [--engine webkit]` -> ~/Library/Caches/ski-work/round8/ (spawn, street, station,
+ride, carve, stop, drag per resort). Frame probe: `scripts/ski/frame-probe.mjs` (where long frames go, per wrapped upkeep call).
+**For C2**: take C's FIRST_LIFT/discovery/map/teleport/course/first person (firstperson.js)/spray.js/avalanche.js; drop C's 42 m boarding
+radius (freeride.js BOTTOM_RADIUS) — the spawn must land on B's zone `boardAt(firstLift)`; C's `!mp` avalanche guards -> `!isRace()`;
+C's Node scripts must `unpackResort`; re-run round7c-check. D's free ride already calls `window.__ski.avalanches.triggerAvalanche` when
+it exists.
