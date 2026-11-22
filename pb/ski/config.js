@@ -102,20 +102,31 @@ export const SKI = Object.freeze({
   parkHardLanding: 12.5,    // m/s into the ground: a fall (park landings are built steep, a little more forgiving)
 });
 
+/* The chase camera (camera.js): from above and behind. Heights / distances in m against the skier, speeds in m/s.
+ * After launch (Ian: "more from above, less straight from behind"): followHeight 2.3 -> 3.4, the height grows with the speed from the
+ * first metres (heightGain), the rise* numbers are bigger, the height follows the snow rising behind him (slope*), the view looks 8 m
+ * ahead (the skier sits below the middle of the picture, the piste ahead and the horizon above him). */
 export const CAMERA = Object.freeze({
   fov: 60,
   near: 0.3,
-  followDistance: 5.2,
-  followHeight: 2.3,
-  lookAhead: 7,
-  lookHeight: 0.9,
+  followDistance: 5.6,
+  followHeight: 3.4,
+  distGain: 0.08, distGainMax: 1.6,          // m back per m/s, up to distGainMax
+  heightGain: 0.1, heightGainMax: 1.4,      // m up per m/s, up to heightGainMax (reached at 50 km/h)
+  slopeGain: 0.5, slopeMax: 9, slopeEase: 2.5,      // share of the snow's rise behind him that the camera climbs with; its cap (m); 1/s
+  lineClearance: 0.9, liftMax: 7,            // m the line camera -> skier keeps over a crest; the most the camera climbs for it
+  yawRate: 2.6,                              // 1/s the view follows the direction of travel
+  lookAhead: 8,
+  lookHeight: 0.5,
+  skierLow: 0.7,                             // the skier never sits lower than this share of the half height below the middle
+  horizonMargin: 4,                          // degrees of sky side kept above the horizontal at the top edge
   minClearance: 0.6,
   fovGain: 16,
   fovFrom: 6,
   fovTo: 26,
   shake: 0.04,
   clearanceProbe: 6,
-  riseFrom: 9, riseTo: 26, riseUp: 2.6, riseBack: 2.2, riseLook: 0.7,      // round 7 (A): the chase camera climbs with the speed (m/s, m)
+  riseFrom: 6, riseTo: 26, riseUp: 2.4, riseBack: 2.2, riseLook: 0.7,      // round 7 (A): the chase camera climbs with the speed (m/s, m)
 });
 
 export const PLAY = Object.freeze({

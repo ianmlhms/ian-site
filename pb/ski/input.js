@@ -11,6 +11,17 @@ const KEYS = { left: ['KeyA', 'ArrowLeft'], right: ['KeyD', 'ArrowRight'], tuck:
 const ACTION_KEYS = { KeyR: 'reset', KeyG: 'weather', KeyT: 'time', KeyM: 'map', KeyN: 'mute', KeyL: 'lift', KeyV: 'view', KeyC: 'camera', Escape: 'menu', Enter: 'confirm' };      // R7-C: C = first person / chase
 const PAD_RADIUS = 60;
 const DEADZONE = 0.14;
+/* The steering pad's response (physics review after launch, iPad): the first TOUCH_DEADZONE of the throw (5 px) is rest, so a thumb
+ * that drifts a few pixels no longer turns him (it was linear from the first pixel: 6 px = 10 % steer = 11 degrees/s at 30 km/h), and
+ * the middle of the throw is a little finer (TOUCH_CURVE: half the throw = 39 % steer, the full throw is still full steer). */
+export const TOUCH_DEADZONE = 0.08;
+export const TOUCH_CURVE = 1.2;
+/** dx = the thumb's travel from where it touched down, as a share of the pad radius (any size) -> steer -1..1. */
+export function touchSteer(dx) {
+  const a = Math.min(1, Math.abs(dx));
+  if (a <= TOUCH_DEADZONE) return 0;
+  return Math.sign(dx) * ((a - TOUCH_DEADZONE) / (1 - TOUCH_DEADZONE)) ** TOUCH_CURVE;
+}
 
 export function createInput({ root, onAction }) {
   const down = new Set();
@@ -58,16 +69,16 @@ export function createInput({ root, onAction }) {
 
   function readTouch() {
     const t = { steer: 0, tuck: 0, brake: 0, jump: false, trick: false, pitch: 0 };
-    let padY = 0;
+    let padY = 0, padX = 0;                  // padX: the knob shows the thumb, not the curved steer
     for (const p of pointers.values()) {
-      if (p.kind === 'steer') { t.steer = Math.max(-1, Math.min(1, (p.x - p.x0) / PAD_RADIUS)); padY = Math.max(-1, Math.min(1, (p.y0 - p.y) / (PAD_RADIUS * 0.6))); }
+      if (p.kind === 'steer') { t.steer = touchSteer((p.x - p.x0) / PAD_RADIUS); padX = Math.max(-1, Math.min(1, (p.x - p.x0) / PAD_RADIUS)); padY = Math.max(-1, Math.min(1, (p.y0 - p.y) / (PAD_RADIUS * 0.6))); }
       else if (p.kind === 'tuck') t.tuck = 1;
       else if (p.kind === 'brake') t.brake = 1;
       else if (p.kind === 'jump') t.jump = true;
       else if (p.kind === 'trick') t.trick = true;
     }
     if (t.trick && Math.abs(padY) > 0.35) t.pitch = padY;                 // Trick held + the pad up / down: a flip
-    knob.style.transform = `translate(${t.steer * 40}px, ${t.trick ? -t.pitch * 14 : 0}px)`;
+    knob.style.transform = `translate(${padX * 40}px, ${t.trick ? -t.pitch * 14 : 0}px)`;
     return t;
   }
   function readPad() {

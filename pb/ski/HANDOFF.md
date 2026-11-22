@@ -1524,3 +1524,25 @@ the canvas centre; a tap on a piste in the free ride tab only asked to teleport 
 - Checks: map-memory (Killy, open / close x10): heap +0.75 MB, DOM nodes +0, listeners +0, 0 page errors. Chromium flows PASS:
   ski, ski-teleport, ski-freeride, ski-spawn (+ challenges, park, lift, skis, lifts-all, webkit-in-Chromium, look7d, mp-freeride,
   firstperson, avalanche). WebKit not run (hangs on the Mini).
+
+
+## After launch: camera from above + physics / input review (22 Nov 2026; Ian, iPad: "the camera should be more from ABOVE and less straight from behind")
+- **Camera** (camera.js, config CAMERA): higher at every speed (followHeight 2.3 -> 3.4, heightGain from the first metres, riseUp 2.4), the
+  height also follows the snow rising behind him on a slope (`slopeGain` 0.5: it used to sink to ~1 m over the snow behind him on a steep
+  black), looks 8 m ahead, the horizon is kept inside the picture (`horizonMargin`), a crest between camera and skier lifts the camera
+  (eased) instead of snapping the boom in, all easings are exp (15 fps = 60 fps). Lift views, first person, station framing unchanged.
+  Numbers (camera-check --table, before -> after): cruising 43-72 km/h pitch 17 -> 26 deg down, 4.4 -> 7.3 m over the skier, 2.9 -> 5.7 m
+  over its own snow, view meets the snow at 6 -> 15 deg; >= 94 km/h 27 -> 33 deg, 7.2 -> 10.3 m; walking pace 2.5 -> 4.3 m over him.
+  Sheets (GPU, iPad 1180 x 820 + portrait): `~/Library/Caches/ski-work/fable-review/sheet-camera-1..5.jpg`.
+- **Checks**: `node scripts/ski/camera-check.mjs [--table]` (pitch / height / distance bands by speed, horizon + skier in the picture,
+  portrait, never in the snow, turn smoothness, 15 fps); `scripts/ski/camera-shots.mjs OUT [--old DIR]` (browser: 12 scripted scenes,
+  shots + per-frame `camBlocked` at the camera: 0 frames inside a tree / house / pylon) + `camera_sheet.py`.
+- **Physics review** (numbers: `physics-probe.mjs` ideal planes, `ride-probe.mjs` real pistes). Changed: (1) plain airs: the skis stop
+  turning 1.15 rad off the flight line (steer held >= 1.3 s in an air ended in the "sideways" fall); (2) touch pad: 5 px rest zone +
+  slightly finer middle (`input.js touchSteer`; it was linear from pixel 1, a drifting thumb turned him). `review-check.mjs`.
+  NOT changed (recommendations for Ian to decide, see the report in the commit message / coordinator notes):
+  crests give no air (airStep lands anything within stickGap again: a 12 -> 30 deg break holds him down to 110 km/h; a 3-line fix exists
+  = 11-15 airs up to 1.4 s on the Face tucked, but he then flies out of bends: needs air control or a play test first); carving costs
+  ~15 % speed per 90 deg even inside the grip (edgeLock lag is taxed by skidLoss); full steer always over-rotates 10 % (carveGain 1.1:
+  slip grows to ~20 deg, 30 % speed per 90 deg); deep snow below ~10 deg is a slog (18 km/h); trunk >= 18 km/h = fall.
+- r8c-check: skips OSM lift stubs that are not drawn (it crashed on `createLiftPath` null since the stations commit; fixed upstream too). main.js?v=19.

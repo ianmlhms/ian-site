@@ -20,6 +20,7 @@ const approach = (v, target, rate, dt) => v + (target - v) * Math.min(1, rate * 
 const RISE_FULL = G * Math.sin(6 * Math.PI / 180), RISE_NONE = G * Math.sin(12 * Math.PI / 180);     // m/s2 of gravity against him: the assist's rise gate
 const LAUNCH_OVER = 1;                 // m/s over kick.to the launch lets him reach before it ends (a steep start)
 const HOCKEY_MAX = 9.5;                 // R8: m/s2, the hockey stop's strongest deceleration
+const AIR_STEER_MAX = 1.15;            // rad the skis may turn off the flight line in a plain air (the sideways fall starts at 1.45)
 const HOLD_COS = Math.cos(38 * Math.PI / 180);       // round 7: steeper than this a stop can not hold (side-slip)
 const wrapAngle = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
 
@@ -257,7 +258,14 @@ function airStep(s, input, world, dt) {
     if (Math.abs(pitch) < 0.15) { const r = wrapAngle(s.flip || 0); if (Math.abs(r) < 1.4) flipTurn = -Math.sign(r) * Math.min(Math.abs(r), K.flipSettle * dt); }
     s.flip = (s.flip || 0) + flipTurn;
     s.grab = input.trick ? (s.grab || 0) + dt : s.grab || 0;
-  } else s.heading = wrapAngle(s.heading + (input.steer || 0) * 1.1 * dt);      // style only: the skis turn in the air, the flight line does not
+  } else {
+    // style only: the skis turn in the air, the flight line does not. Physics review after launch: they stop turning AIR_STEER_MAX
+    // off the flight line (steering held through a long air, 1.3 s at full steer, used to end in the "sideways" fall at 1.45 rad)
+    const travel = Math.atan2(s.vz, s.vx), fast = Math.hypot(s.vx, s.vz) > 1;
+    const next = wrapAngle(s.heading + (input.steer || 0) * 1.1 * dt);
+    const offNow = Math.abs(wrapAngle(s.heading - travel)), offNext = Math.abs(wrapAngle(next - travel));
+    if (!fast || offNext <= AIR_STEER_MAX || offNext < offNow || offNow > Math.PI / 2) s.heading = next;
+  }
   s.x += s.vx * dt; s.y += s.vy * dt; s.z += s.vz * dt;
   s.edge = approach(s.edge, 0, 3, dt);
   const ground = world.height(s.x, s.z);
