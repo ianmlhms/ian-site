@@ -145,6 +145,7 @@ export function createCourse({ piste, startS = 2 }) {
     lastOff = cp.off;
     if (cp.s < startS + 4 || cp.s > finishS || st.crash > 0 || st.ride) return st;
     if (Math.abs(cp.off) <= wall || Math.abs(was) > wall + 1.5) return st;
+    if (Math.hypot(st.x - prev.x, st.z - prev.z) > 2) return st;          // put down elsewhere (place / teleport / respawn), not a crossing
     if (!st.grounded && st.air > 0.25) return st;                         // a real jump clears the net (it is 1.1 m high)
     piste.at(cp.s, ca);
     const side = Math.sign(cp.off), rx = -ca.dz * side, rz = ca.dx * side;     // the outward normal of this barrier
