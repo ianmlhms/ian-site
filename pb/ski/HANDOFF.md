@@ -1228,7 +1228,7 @@ load; Arlberg Mattunbahn footrest; Kronplatz Alpen Connecting framing; Glacier R
   green), WebKit 5/5; spawn on the ground, rays 6 mm, decks 0 cm, skis >= -4 mm, 0 terrain cracks.
 - pose-check: Chromium 5/5, WebKit 5/5 (incl. R8e's hockey end pose + plough).
 - Flows (one flow per browser, `scripts/ski/r8d-flows.sh <out> "flows-chromium flows-webkit sheets sonnenkopf"`, FLOWS="..." to pick):
-  Chromium so far: home-page, ski, ski-ipad-start PASS; ski-resorts and ski-mp KILLED by the 2.5 GB rule (ski-resorts at the 4th resort
+  Chromium so far: home-page, ski, ski-ipad-start, ski-challenges, ski-park, ski-freeride PASS; ski-resorts and ski-mp KILLED by the 2.5 GB rule (ski-resorts at the 4th resort
   of one page that reloads per resort; ski-mp = 3 game pages) -> these two need less memory per page (see below) or a per-flow
   exception. Earlier full Chromium run on the pre-R8e head (before the memory rule): PASS home-page, ski-ipad-start, ski-resorts,
   ski-challenges, ski-park, ski-freeride, ski-lift, ski-skis, ski-teleport, ski-spawn, ski-firstperson; FAIL ski (the "Face (Rout)" name:
@@ -1239,3 +1239,8 @@ load; Arlberg Mattunbahn footrest; Kronplatz Alpen Connecting framing; Glacier R
 - MEMORY per page is the open blocker for the long flows: JS heap at load 340-640 MB (killy..zermatt), 960-1050 MB after a 15-18 village
   tour (arlberg / kronplatz), village vertex arrays ~107 MB (kept in JS after upload), +10 three geometries / +25 MB heap per teleport
   (may be first uploads of new village / terrain cells = bounded; check by teleporting back and forth between two spots 10 x).
+- RESUME (next agent): `FLOWS="ski-lift ski-skis ski-lifts-all ski-webkit ski-look7d ski-mp-freeride ski-teleport ski-spawn ski-firstperson
+  ski-avalanche ski-course mp-lobby-connect4 mp-lobby-slf mp-lobby-quick-match mp-lobby-games mp-lobby-color mp-lobby-party mp-lobby-arcade
+  mp-lobby-roulette mp-lobby-blackjack arcade-pad" scripts/ski/r8d-flows.sh ~/Library/Caches/ski-work/round8d/final flows-chromium`, then
+  all flows in WebKit (`... flows-webkit` without FLOWS), then `... "sheets sonnenkopf"` (WebKit sheets per resort + the Sonnenkopf sheet
+  into round8d/final/sheet/; stack with look_sheet.py and LOOK at every shot). ski-resorts / ski-mp need the memory work first.
