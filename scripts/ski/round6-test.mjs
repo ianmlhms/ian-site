@@ -64,7 +64,8 @@ for (const rid of resorts) {
     const st = midState || {};
     ok(st.ride && st.rideLift === lift.index && st.rideKind === KIND_CODE[p.kind], `${rid} ${lift.name}: the ride state carries the lift`);
     const top = net.startAt(lift, h);
-    ok(Math.hypot(top.x - lift.top.x, top.z - lift.top.z) < 120, `${rid} ${lift.name}: off at the top (${Math.round(Math.hypot(top.x - lift.top.x, top.z - lift.top.z))} m from the station)`);
+    // R8d: a funitel / 3S station (R8e, 22 m long) on a cramped summit (Klein Matterhorn: 128 m to open snow) may put him a little farther
+    ok(Math.hypot(top.x - lift.top.x, top.z - lift.top.z) < (p.sub === 'funitel' ? 150 : 120), `${rid} ${lift.name}: off at the top (${Math.round(Math.hypot(top.x - lift.top.x, top.z - lift.top.z))} m from the station)`);
     rides++;
   }
   ok(worstJump < SKI.maxSpeed * RIDE.factor / 60 * 1.2 + 0.5, `${rid}: no jump along a ride (worst ${worstJump.toFixed(2)} m per frame)`);
