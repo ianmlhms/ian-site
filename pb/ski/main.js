@@ -28,7 +28,7 @@ import { seatRows, createVillage } from './village.js';
 import { createRoads, decodeRoads, housesOnStreets } from './roads.js';
 import { createLandmarks } from './landmarks.js';
 import { createPisteSet } from './pistes.js';
-import { createSkierState, stepSkier } from './skier.js';
+import { createSkierState, stepSkier, launchState } from './skier.js';
 import { frameSeconds, planSteps } from './clock.js';          // launch fix: real time down to 10 fps (was 20)
 import { createSkierModel, readOutfit, writeOutfit, OUTFITS } from './skier-model.js';
 import { createChaseCamera } from './camera.js';
@@ -1132,7 +1132,7 @@ async function boot() {
     if (!game.run || !game.piste || game.mode !== MODES.run) return;          // challenges only (the park has its own drop-in)
     const a = game.piste.at(game.run.startS || 2, {});
     const s = game.state;
-    game.state = { ...s, hold: 0, vx: a.dx * COURSE.push, vz: a.dz * COURSE.push, speed: COURSE.push, heading: Math.atan2(a.dz, a.dx) };      // R8b: out of the standing hold (R7-A), else the kick is zeroed until an input
+    game.state = launchState(s, a);      // R8b: out of the standing hold (R7-A), else the kick is zeroed until an input; launch follow-up: to 45 km/h
     document.documentElement.dataset.skiPush = String(COURSE.push);
   }
   let stuckFor = 0;

@@ -6,7 +6,7 @@
  *   - a low frame rate never makes the skier slower: 15 fps reaches the same speeds (+-3 %) and the game clock keeps real time
  *   - every black challenge not named as a link ("Verbindung ...", "Umfahrung ...") reaches 60 km/h tucked
  *   - launch follow-up (Ian: "accelerate faster to at least ~45 km/h"): 0 -> 45 km/h from a standstill on the longest blue (tucked,
- *     <= 4.5 s) and the flattest link (tucked / pushed, <= 6.5 s), at 60 and 15 fps;
+ *     <= 4.5 s) and the flattest link (tucked / pushed, <= 6.5 s), at 60 and 15 fps; 1.5 s after "0" every course start is at 40-50 km/h;
  *     Jardin Alpin (3 Vallées) and each resort's 5 slowest greens / blues average >= 40 km/h tucked
  *   - the hard cap (SKI.maxSpeed = PLAY.maxRunSpeed = the ski-v1.sql floors) is never passed
  *   node scripts/ski/speed-check.mjs            the checks above
@@ -45,6 +45,7 @@ const FPS_TOLERANCE = 0.03;
 const BLACK_MIN = 60;                        // km/h every black challenge reaches tucked (the survey: p10 of the blacks 91, median 111)
 const LINK_NAME = /^(Verbindung|Umfahrung)\b/i;
 const TO45 = { blue: 4.5, flat: 6.5 };       // s from a standstill to 45 km/h: a typical blue ~3-4 s, a near-flat link ~5-6 s (launch follow-up)
+const LAUNCH_AT15 = [40, 50];                // km/h 1.5 s after "0" on every course start
 const GENTLE_AVG = 40;                       // km/h a gentle green / blue course averages tucked
 const SAMPLE_S = 0.25;
 let failed = 0, passed = 0;
@@ -194,6 +195,15 @@ for (const rid of Object.keys(BLUE_PICK)) {
     const t = [60, 15].map((fps) => ride(R, st.p, { ...st.o, fps, start: 'stand', stopAt45: true, maxS: 30 }).to45);
     check(t.every((x) => x !== null && x <= st.max), `${st.label}: 0 -> 45 km/h in ${t.map((x) => (x === null ? 'never' : `${x.toFixed(1)} s`)).join(' @60 / ')} @15 fps (<= ${st.max} s)`);
   }
+  // the challenge launch: 1.5 s after "0" every course start is at 40-50 km/h (no input but the steering: the slowest case)
+  const off = [];
+  let lo = Infinity, hi = 0;
+  for (const p of R.pistes.list) {
+    const r = ride(R, p, { fps: 60, tuck: false, maxS: 1.6 });
+    lo = Math.min(lo, r.at15); hi = Math.max(hi, r.at15);
+    if (!(r.at15 >= LAUNCH_AT15[0] && r.at15 <= LAUNCH_AT15[1])) off.push(`${p.id} ${r.at15.toFixed(0)}`);
+  }
+  check(!off.length, `${R.pistes.list.length} course starts: 1.5 s after "0" at ${lo.toFixed(0)}-${hi.toFixed(0)} km/h (${LAUNCH_AT15.join('-')})${off.length ? `: ${off.slice(0, 8).join(', ')}` : ''}`);
   // no gentle course crawls: Jardin Alpin and the 5 slowest greens / blues of the resort, tucked, average >= GENTLE_AVG km/h
   const gentle = [];
   for (const p of R.pistes.list) if ((p.diff === 'green' || p.diff === 'blue') && !p.src.slalom) gentle.push({ p, r: ride(R, p, { fps: 60, tuck: true, maxS: 900 }) });

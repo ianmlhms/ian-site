@@ -186,6 +186,9 @@ export const AVALANCHE = Object.freeze({
 });
 export const COURSE = Object.freeze({
   push: 4.8,                // m/s (17 km/h) start kick down the fall line at "0"
+  launchTo: 12.5,           // launch follow-up (Ian: the start was too slow): from the kick the skier is launched to 45 km/h ...
+  launchTime: 1.2,          // ... over this many s (an S-curve of speed, skier.js state.kick), then the normal physics take over
+  launchMax: 12,            // m/s2: the most the launch adds
   gateSearch: 160,          // m along the piste the start gate may move to find open snow (at most 45 % of the piste; R7-C2: 90 -> 160)
   runIn: 60,
   bannerAlong: 10,          // R8e: m up / down the piste round a start banner where no OTHER piste's line may pass                // R8e: m below the start gate that must be clear of houses / stations (the push start runs into them)

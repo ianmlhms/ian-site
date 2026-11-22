@@ -11,13 +11,14 @@
  *   crashes: a trunk or rock hit above SKI.hitCrash m/s, a landing harder than SKI.hardLanding m/s -> state.crash counts down, then the
  *            caller respawns the skier on the piste
  * world = { height(x, z), normal(x, z, out), snow(x, z) -> 0..1 groomed, hit(x, z, r) -> { nx, nz, pen, kind } | null } */
-import { SKI } from './config.js';
+import { SKI, COURSE } from './config.js';
 
 const G = 9.81;
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const smoothstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 const approach = (v, target, rate, dt) => v + (target - v) * Math.min(1, rate * dt);
 const RISE_FULL = G * Math.sin(6 * Math.PI / 180), RISE_NONE = G * Math.sin(12 * Math.PI / 180);     // m/s2 of gravity against him: the assist's rise gate
+const LAUNCH_OVER = 1;                 // m/s over kick.to the launch lets him reach before it ends (a steep start)
 const HOCKEY_MAX = 9.5;                 // R8: m/s2, the hockey stop's strongest deceleration
 const HOLD_COS = Math.cos(38 * Math.PI / 180);       // round 7: steeper than this a stop can not hold (side-slip)
 const wrapAngle = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
@@ -29,6 +30,16 @@ export function createSkierState(x, z, heading, y) {
     // tricks (round 4A, world.tricks): rotation since the take-off (rad), grab time (s), landing judgement 0 clean / 1 sketchy, rail slid
     spin: 0, flip: 0, grab: 0, landQ: 0, rail: -1,
     hold: 1,                // round 7: standing still on the edges (a placed skier waits for input; braking to a stop holds there)
+    kick: null,             // launch follow-up: the challenge launch after "0" ({ t, from, to, dur, max }, main.js pushStart)
+  };
+}
+
+/** The challenge start at "0" (main.js pushStart, the same for every player and online race): out of the hold, the COURSE.push kick
+ *  down the piste direction (a = piste.at(start): dx, dz), then the launch to COURSE.launchTo m/s over COURSE.launchTime s. */
+export function launchState(s, a) {
+  return {
+    ...s, hold: 0, vx: a.dx * COURSE.push, vz: a.dz * COURSE.push, speed: COURSE.push, heading: Math.atan2(a.dz, a.dx),
+    kick: { t: 0, from: COURSE.push, to: COURSE.launchTo, dur: COURSE.launchTime, max: COURSE.launchMax },
   };
 }
 
@@ -156,7 +167,7 @@ function groundStep(s, input, world, dt) {
   // to a 6 degree rise, gone at 12: well inside the herringbone's ~20 degree climb limit; OSM links that climb through a dip were a
   // 100 m crawl at 8 km/h); never braking, in a stop or in the edge hold
   const quiet = !input.brake && s.brake < 0.05 && (s.stop || 0) < 0.02 && !s.hold;
-  if (quiet && (K.assistAccel || 0) > 0 && v < K.assistTo) {
+  if (quiet && !s.kick && (K.assistAccel || 0) > 0 && v < K.assistTo) {                 // the launch below has its own curve
     const moves = v > 1.2;
     const dx = moves ? vx / v : fx, dy = moves ? vy / v : fy, dz = moves ? vz / v : fz;
     const gAlong = -G * dy;                                               // m/s2 of gravity along that direction (< 0: uphill)
@@ -164,6 +175,24 @@ function groundStep(s, input, world, dt) {
     const gate = wants ? 1 - smoothstep(RISE_FULL, RISE_NONE, -gAlong) : smoothstep(0.05, 0.25, gAlong);
     const a = (K.assistAccel + (K.assistFlat || 0) * (1 - smoothstep(0, RISE_FULL, gAlong))) * gate * (1 - smoothstep(K.assistFull, K.assistTo, v));
     if (a > 0) { vx += dx * a * dt; vy += dy * a * dt; vz += dz * a * dt; }
+  }
+  // the challenge launch (main.js pushStart: state.kick = { t, from, to, dur, max }): the speed follows an S-curve from the push to
+  // kick.to over kick.dur s; only what gravity and the assist do not give is added (at most kick.max m/s2); braking ends it
+  if (s.kick) {
+    const k = s.kick, t = k.t + dt;
+    if (input.brake || s.hold || t > k.dur + 0.3) s.kick = null;
+    else {
+      s.kick = { ...k, t };
+      const want = k.from + (k.to - k.from) * smoothstep(0, k.dur, t);
+      const vNow = Math.hypot(vx, vy, vz);
+      if (vNow < want) {
+        const add = Math.min(want - vNow, k.max * dt);
+        const dx = vNow > 1e-3 ? vx / vNow : fx, dy = vNow > 1e-3 ? vy / vNow : fy, dz = vNow > 1e-3 ? vz / vNow : fz;
+        vx += dx * add; vy += dy * add; vz += dz * add;
+      } else if (vNow > k.to + LAUNCH_OVER) {           // a steep start: the same launch speed for everyone until the curve ends
+        const c = (k.to + LAUNCH_OVER) / vNow; vx *= c; vy *= c; vz *= c;
+      }
+    }
   }
   // keep the velocity in the slope plane, cap
   const vn = vx * n.x + vy * n.y + vz * n.z;

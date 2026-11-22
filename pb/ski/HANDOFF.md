@@ -1408,3 +1408,22 @@ there but nothing showed where it was.
   0.94 m, 25 deg 1.07 m, no crash. Flow ski-teleport: a real touch tap on Sprong -> airborne 130 ms later, 0.91 m (+ the minimap tap).
 - Node checks green (round6 2222, round7 38, round7b, round7c 120 incl. barriers, look7d 68 park, harness); flows ski-teleport,
   ski-park, ski-freeride PASS. main.js?v=14.
+
+## Launch follow-up: acceleration assist + challenge launch (22 Nov 2026)
+Ian: "at low speed (starting, flat bits) it's annoying, accelerate faster to at least ~45 km/h"; the start push (17 km/h) too slow;
+3 Vallées "Jardin Alpin" felt like a crawl.
+- **Assist** (skier.js groundStep, config SKI.assist*): +2.6 m/s2 forward (+0.9 more where gravity does not help) below 38 km/h, faded
+  smoothly to 0 at 50 km/h. Downhill (>= ~1 deg) on its own; with push / tuck held (W, Hocken, gamepad) also on flats and rises (full to
+  6 deg, gone at 12; the herringbone still climbs to ~20). Never braking / hockey stop / edge hold / air / lift / post-finish plough.
+- **Launch** (skier.js launchState + state.kick, main.js pushStart; config COURSE.launch*): at "0" the COURSE.push kick, then the speed
+  follows an S-curve to 45 km/h over 1.2 s (only what gravity does not give, <= 12 m/s2; a steep start is held at 48.6 km/h until the
+  curve ends; braking ends it). Online races start through the same pushStart. The star-2 target model (challenges.js profileRide)
+  includes the assist and the launch: bot / target median 0.95-1.03 per resort (3 Vallées --all: 0.97 over 472 pistes).
+- **Numbers** (speed-check.mjs, tucked; before = origin/main 29c6253d via SKI_ROOT): 0 -> 45 km/h on the longest blue 2.7-4.0 s (was
+  5.5-18.1); the flattest link 4.0-4.5 s tucked, 4.2-5.5 s pushed (never before); 1.5 s after "0": 45-49 km/h on all 1324 course starts
+  (was 9-51); Jardin Alpin average 52 km/h / 122 s (was 36 / 174); the 20 slowest courses before averaged 9-21 km/h, now 34-56 (e.g.
+  Killy mangard-blue 9.3 -> 51.3 km/h, 235 -> 43 s). Every green / blue course now averages >= 40 km/h tucked (582 of 582); 54 long ones
+  still take > 2 min. Slowest left: Couloir de Petite Balme (a 50-79 deg couloir) and Arlberg ski routes that climb 20-39 deg (OSM
+  routes with tours in them: Woster-Bockbachtal, Vorderes Maroital).
+- r8c-check crashes on origin/main since 3513fd60 (lift-path.js createLiftPath returns null for a lift: `p.len` at r8c-check.mjs:119),
+  not from this change.
