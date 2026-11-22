@@ -123,6 +123,10 @@ export function createSnowMaterial(env, { cheap = false, treeRadius = 400, fores
         float evK = smoothstep(0.72, 0.5, uSunColor.b / max(uSunColor.r, 1e-3)) * (1.0 - uOvercast);
         float shadeL = dot(shadeC, vec3(0.3, 0.59, 0.11));
         shadeC = mix(shadeC, shadeL * vec3(0.9, 0.975, 1.12) * 1.04, 0.62 * evK);
+        // R8 (coordinator review: big flat royal-blue patches in the shade, both engines, every time of day): sunny shade on snow is a
+        //    soft, light blue-grey. Lift it a little and take most of the saturation out (blue / red ~1.25 instead of ~2), hue kept.
+        float shadeL2 = dot(shadeC, vec3(0.3, 0.59, 0.11));
+        shadeC = mix(shadeC, shadeL2 * vec3(0.92, 0.985, 1.1) * 1.1, 0.66 * (1.0 - 0.5 * uOvercast));
         float top = max(shadeC.r, max(shadeC.g, shadeC.b));
         shadeC *= mix(1.0, 0.97 / top, smoothstep(0.9, 1.15, top));              // bright overcast light: a soft shoulder, hue kept, no cyan clip
         vec3 litC = max(shadeC * 1.02, shadeC * vec3(0.3, 0.28, 0.24) + uSunColor * vec3(0.775, 0.79, 0.815));   // a weak sun (fog, cloud) never makes the lit side darker than the shade

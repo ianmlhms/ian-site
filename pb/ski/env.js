@@ -71,6 +71,61 @@ export function createNoiseTexture() {
   return tex;
 }
 
+/** R8 (coordinator review: blotchy / pixely clouds in both engines): the sky's own cloud texture. Tileable GRADIENT noise (no value-noise
+ *  blobs on the lattice axes), six octaves summed in floats and only then stored (16 bit over two channels: no 8-bit contour steps when
+ *  the sky magnifies it), then one soft blur. r+g = the cloud body (hi / lo byte), b = fine tufts (its own fBm), a = unused. */
+export function createCloudTexture(N = 256) {
+  const grad = (cells, seed) => {
+    const g = new Float32Array(cells * cells * 2);
+    let s = seed >>> 0;
+    for (let i = 0; i < cells * cells; i++) { s = (s * 1664525 + 1013904223) >>> 0; const a = (s / 4294967296) * Math.PI * 2; g[i * 2] = Math.cos(a); g[i * 2 + 1] = Math.sin(a); }
+    return g;
+  };
+  const fade = (t) => t * t * t * (t * (t * 6 - 15) + 10);
+  /** One octave (cells a power of two) added into out with weight w: row by row, no allocation. */
+  function addOctave(out, g, cells, w) {
+    const m = cells - 1, k = cells / N;
+    for (let y = 0; y < N; y++) {
+      const fy = y * k, iy = Math.floor(fy), ty = fy - iy, v = fade(ty);
+      const r0 = (iy & m) * cells, r1 = ((iy + 1) & m) * cells;
+      for (let x = 0; x < N; x++) {
+        const fx = x * k, ix = Math.floor(fx), tx = fx - ix, u = fade(tx);
+        const c0 = ix & m, c1 = (ix + 1) & m;
+        const ga = (r0 + c0) * 2, gb = (r0 + c1) * 2, gc = (r1 + c0) * 2, gd = (r1 + c1) * 2;
+        const a = g[ga] * tx + g[ga + 1] * ty, b = g[gb] * (tx - 1) + g[gb + 1] * ty;
+        const c = g[gc] * tx + g[gc + 1] * (ty - 1), d = g[gd] * (tx - 1) + g[gd + 1] * (ty - 1);
+        const ab = a + (b - a) * u;
+        out[y * N + x] += w * (ab + (c + (d - c) * u - ab) * v);          // about -0.7 .. 0.7 per octave
+      }
+    }
+  }
+  const A = new Float32Array(N * N), B = new Float32Array(N * N);
+  [[4, 0.5], [8, 0.26], [16, 0.13], [32, 0.07], [64, 0.035], [128, 0.018]].forEach(([c, w], i) => addOctave(A, grad(c, 101 + i * 37), c, w));
+  [[16, 0.5], [32, 0.3], [64, 0.2]].forEach(([c, w], i) => addOctave(B, grad(c, 907 + i * 53), c, w));
+  const blur = (src) => {                                             // one 3 x 3 tent pass (wraps)
+    const out = new Float32Array(N * N);
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      let s = 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) s += src[((y + dy + N) % N) * N + ((x + dx + N) % N)] * (dx ? 1 : 2) * (dy ? 1 : 2);
+      out[y * N + x] = s / 16;
+    }
+    return out;
+  };
+  const A2 = blur(A), B2 = blur(B);
+  const data = new Uint8Array(N * N * 4);
+  for (let i = 0; i < N * N; i++) {
+    const a = Math.max(0, Math.min(65535, Math.round((A2[i] * 0.78 + 0.5) * 65535)));
+    data[i * 4] = a >> 8; data[i * 4 + 1] = a & 255;
+    data[i * 4 + 2] = Math.max(0, Math.min(255, Math.round((B2[i] * 0.85 + 0.5) * 255)));
+    data[i * 4 + 3] = 255;
+  }
+  const tex = new THREE.DataTexture(data, N, N, THREE.RGBAFormat);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearMipmapLinearFilter; tex.generateMipmaps = true;
+  tex.needsUpdate = true;
+  return tex;
+}
+
 /** Tileable value noise of one octave on an N x N raster (cells lattice cells across the tile), 0..1. */
 function octave(N, cells, seed) {
   const g = new Float32Array(cells * cells);
@@ -162,7 +217,7 @@ export function createEnv({ scene, noise, detail = null, params = {} }) {
   const u = {
     uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uSunColor: { value: V() }, uSkyTop: { value: V() }, uSkyHorizon: { value: V() },
     uAmbSky: { value: V() }, uAmbGround: { value: V() }, uFogColor: { value: V() }, uFogDensity: { value: 3e-5 },
-    uTime: { value: 0 }, uCloud: { value: 0 }, uSnowfall: { value: 0 }, uGlow: { value: 0 }, uOvercast: { value: 0 }, uNoise: { value: noise },
+    uTime: { value: 0 }, uCloud: { value: 0 }, uSnowfall: { value: 0 }, uGlow: { value: 0 }, uOvercast: { value: 0 }, uNoise: { value: noise }, uCloudTex: { value: createCloudTexture() },
     // round 5: fine ground detail, the far grid's normal map (same rectangle as uShadowRect), the weather's haze share
     uDetail: { value: detail || noise }, uFarN: { value: noise }, uFarNOn: { value: 0 }, uMilk: { value: 0 },
     // mountain shadows of the current time of day (baked, see scripts/ski/bake.py sun_shadows): a raster over the far grid
@@ -244,10 +299,13 @@ export function createEnv({ scene, noise, detail = null, params = {} }) {
     uniforms: u, side: THREE.BackSide, depthWrite: false, depthTest: false, fog: false,
     vertexShader: 'varying vec3 vDir; void main(){ vDir = position; vec4 p = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * p; gl_Position.z = gl_Position.w * 0.99999; }',
     fragmentShader: `
-      uniform vec3 uSunDir, uSunColor, uSkyTop, uSkyHorizon, uFogColor; uniform float uTime, uCloud, uGlow, uOvercast, uFogDensity, uMilk; uniform sampler2D uNoise;
+      uniform vec3 uSunDir, uSunColor, uSkyTop, uSkyHorizon, uFogColor; uniform float uTime, uCloud, uGlow, uOvercast, uFogDensity, uMilk; uniform sampler2D uNoise, uCloudTex;
       varying vec3 vDir;
       // four octaves in one read: the channels of the noise texture hold 8, 16, 32 and 64 lattice cells
-      float cloudField(vec2 p){ vec4 a = texture2D(uNoise, p); return a.r * 0.5 + a.g * 0.27 + a.b * 0.15 + a.a * 0.08; }
+      // R8: the cloud body from the sky's own gradient-noise texture (16 bit in r + g): smooth when magnified, no lattice blobs; a second
+      // read, rotated and scaled, breaks the tile's repeat
+      float cloudBody(vec2 p){ vec4 a = texture2D(uCloudTex, p); return a.r + a.g / 255.0; }
+      float cloudField(vec2 p){ return cloudBody(p) * 0.78 + cloudBody(mat2(0.8, -0.6, 0.6, 0.8) * p * 1.7 + 0.37) * 0.22; }
       void main(){
         vec3 d = normalize(vDir);
         float up = max(d.y, 0.0);
@@ -265,12 +323,13 @@ export function createEnv({ scene, noise, detail = null, params = {} }) {
         vec2 cp = d.xz / max(d.y + 0.1, 0.07);
         vec2 wind = vec2(uTime * 0.0032, uTime * 0.0011);
         vec2 q = cp * 0.085 + wind;
-        float fine = texture2D(uNoise, cp * 0.7 + wind * 4.0).g * 0.6 + texture2D(uNoise, cp * 2.9 + wind * 9.0).b * 0.4;     // small tufts: the edges are never the noise's own facets
-        float n = cloudField(q) * 0.87 + fine * 0.13;
-        float lo = 0.585 - uCloud * 0.36;
-        float cover = (smoothstep(lo, lo + 0.075, n) * 0.7 + smoothstep(lo, lo + 0.22, n) * 0.3) * smoothstep(0.0, 0.13, d.y);
+        // small tufts, faded out towards the horizon where they would shrink below a pixel and sparkle (R8)
+        float fine = texture2D(uCloudTex, cp * 0.55 + wind * 4.0).b * smoothstep(0.03, 0.25, d.y) + 0.5 * (1.0 - smoothstep(0.03, 0.25, d.y));
+        float n = cloudField(q) * 0.9 + fine * 0.1;
+        float lo = 0.55 - uCloud * 0.32;
+        float cover = (smoothstep(lo, lo + 0.12, n) * 0.65 + smoothstep(lo, lo + 0.26, n) * 0.35) * smoothstep(0.0, 0.13, d.y);
         vec2 toSun = uSunDir.xz / max(length(uSunDir.xz), 1e-3);
-        float n2 = cloudField(q + toSun * 0.022) * 0.87 + fine * 0.13;
+        float n2 = cloudField(q + toSun * 0.022) * 0.9 + fine * 0.1;
         float sunSide = clamp((n - n2) * 7.0 + 0.55, 0.0, 1.0);
         vec3 bright = mix(vec3(1.0, 0.995, 0.985), uSunColor, 0.35 * clear) * (0.93 + 0.07 * clear);
         vec3 belly = mix(uSkyHorizon * vec3(0.74, 0.78, 0.86), vec3(0.6, 0.66, 0.78), 0.45);

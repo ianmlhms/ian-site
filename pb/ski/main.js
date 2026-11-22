@@ -186,8 +186,7 @@ async function boot() {
     for (let i = 0; i < resort.lifts.length; i++) {
       const p = l.pathOf(i);
       if (!p) continue;
-      for (const sp of p.supports) if (sp.tower) { p.at(sp.s, q); out.push([q.x, q.z, sp.y + 1, 0.9]); }
-      for (const e of [0, p.len]) { p.at(e, q); out.push([q.x, q.z, field.height(q.x, q.z) + p.spec.station[1] + 2, p.spec.station[0] * 0.3]); }
+      for (const sp of p.supports) if (sp.tower) { p.at(sp.s, q); out.push([q.x, q.z, sp.y + 1, 0.9]); }      // (the stations: their own parts below)
     }
     const g = new Map();
     for (const o of out) { const k = Math.floor(o[0] / 20) * 100003 + Math.floor(o[1] / 20); let a = g.get(k); if (!a) g.set(k, (a = [])); a.push(o); }
@@ -201,6 +200,8 @@ async function boot() {
         if (a) for (const o of a) if (y < o[2] && Math.hypot(x - o[0], z - o[1]) < o[3] + 0.4) return true;
       }
     }
+    // R8: the stations by their real solid parts (lift-site.js: walls, posts, roofs, huts; a part within 1.8 m over the camera counts)
+    if (modes.lifts.world.hit(x, z, 0.3, y, (gx, gz) => surface.height(gx, gz))) return true;
     return !!scatter.hit(x, z, 1.1, y, quality.treeDensity);
   }
   const camGuard = createCameraGuard({ ground: (x, z) => surface.height(x, z), blocked: camBlocked });

@@ -24,7 +24,7 @@ export const AISLE = Object.freeze({ chair: 8, gondola: 9, cable: 12, drag: 7, r
 export const AISLE_HIGH = 15;                   // m between the carriers' lowest point and the treetops where the forest may stay
 export const TREE_TOP = 17;                     // m: the tallest tree of scatter-view.js (10 m x scale 1.65 + margin)
 const PYLON_R = 0.45;                           // m: a pylon column (collider and checks)
-const COL = Object.freeze({ concrete: 0xaeaba3, stone: 0x78706a, timber: 0x80563a, glass: 0x33424f, steel: 0x6b7585, wheel: 0x3e4249, snow: 0xf3f5fb, accent: 0xc8332a, deck: 0x8d8478, gate: 0xf2b21c, dark: 0x2b2f36, rubber: 0x23262b, light: 0xfff2c6 });
+const COL = Object.freeze({ concrete: 0xaeaba3, stone: 0x78706a, timber: 0x80563a, glass: 0x33424f, steel: 0x6b7585, wheel: 0x3e4249, snow: 0xf3f5fb, accent: 0xc8332a, deck: 0x8d8478, gate: 0xf2b21c, dark: 0x2b2f36, rubber: 0x23262b, light: 0xfff2c6, batten: 0x5b3d28, plinth: 0x8f8b84, housing: 0xd9dde2, housingDark: 0x5d6570, fascia: 0x23272e });
 export { COL as SITE_COLOURS };
 
 /** The station key of a path: the class, but rope tows have their own (smaller) layout. */
@@ -53,6 +53,19 @@ export function createLiftSite(path) {
     const parts = [];
     const add = (a0, a1, b0, b1, y0, y1, col, solid = true, extra = {}) => parts.push({ a0: Math.max(front, Math.min(a0, a1)), a1: Math.max(front + 0.3, Math.max(a0, a1)), b0: Math.min(b0, b1), b1: Math.max(b0, b1), y0, y1, col, solid, ...extra });
     const post = (a, b, y1, r = 0.2, col = COL.steel) => add(a - r, a + r, b - r, b + r, 0, y1, col, true, { post: true });
+    // R8 detail (coordinator review: 'plain grey box' stations): drawn only, never a collider, cut with a neighbour's carrier path like
+    // the caps; all of it lands in the same merged station chunk (no extra draw call)
+    const det = (a0, a1, b0, b1, y0, y1, col, extra = {}) => add(a0, a1, b0, b1, y0, y1, col, false, { cap: true, detail: true, ...extra });
+    /** The drive housing over a bull-wheel (centre a = 0, b = C) sitting on a roof at y: the motor house, its darker base, vents. */
+    const housing = (y, len, wid, high) => {
+      const ha0 = -Math.min(len, Math.max(1.6, R + 0.6)), ha1 = Math.min(len, Math.max(1.6, R + 0.6));
+      det(ha0, ha1, C - wid, C + wid, y, y + 0.35, COL.housingDark);
+      det(ha0 + 0.1, ha1 - 0.1, C - wid + 0.1, C + wid - 0.1, y + 0.35, y + high, COL.housing);
+      det(ha0 + 0.05, ha1 - 0.05, C - wid + 0.05, C + wid - 0.05, y + high, y + high + 0.18, COL.housingDark);
+      for (const db of [-wid + 0.6, wid - 0.6]) det(ha0 + 0.6, ha1 - 0.6, C + db - 0.25, C + db + 0.25, y + high * 0.55, y + high * 0.8, COL.dark);
+    };
+    /** A lift-name sign board (lifts.js writes the name on it): face = +1 / -1 along b, the board's centre a, its y. */
+    const nameSign = (a, b, y, w, h, face) => det(a - w / 2, a + w / 2, b - 0.06, b + 0.06, y - h / 2, y + h / 2, COL.fascia, { sign: { face, w, h } });
     const at = (board) => (which ? -unloadS : -boardS) + (board ? 0 : 0);
     const work = at(true);
     let type = 'hut';
@@ -63,6 +76,9 @@ export function createLiftSite(path) {
       add(-5, aBack + 1.2, bIn - 0.9, bOut + 0.9, roof, roof + 0.4, COL.steel, true, { roof: true });
       add(-5.2, aBack + 1.4, bIn - 1.1, bOut + 1.1, roof + 0.4, roof + 0.72, COL.snow, false, { cap: true });
       for (const a of [-4.6, aBack + 0.8]) for (const b of [bIn - 0.5, bOut + 0.5]) post(a, b, roof);
+      housing(roof + 0.72, aBack + 0.6, 1.25, 1.35);                                                     // R8: the drive on the canopy
+      det(-5, aBack + 1.2, bOut + 0.9, bOut + 1.0, roof - 0.35, roof + 0.4, COL.accent);                 // R8: a red fascia
+      nameSign(-0.6, bOut + 1.08, roof + 0.02, Math.min(4.6, aBack + 3.6), 0.62, 1);
       add(-4.4, -1.2, bIn - 4.4, bIn - 1.6, 0, 2.6, COL.timber, true, { hut: true });
       add(-4.6, -1.0, bIn - 4.6, bIn - 1.4, 2.6, 2.95, COL.snow, false, { cap: true });
       add(-4.3, -1.3, bIn - 1.58, bIn - 1.56, 1.2, 2.1, COL.glass, false);
@@ -84,6 +100,37 @@ export function createLiftSite(path) {
       for (const a of [a0 + 0.3, a1 - 1.0]) post(a, b1 - 0.4, roof, 0.25, COL.concrete);       // (the platform side stays open)
       post(a0 + 0.3, b0 + 0.3, roof, 0.25, COL.concrete);
       add(a1 - 0.6, a1 - 0.4, bOut + 1, bOut + 3.5, 2.2, 3.4, COL.accent, false);                    // a sign board on the back wall
+      // R8 detail: the roof reaches out over the platform and the front, a dark fascia with the lift's name on the platform side
+      det(a0 - 1.4, a1 + 0.2, b1, b1 + 1.6, roof + 0.1, roof + 0.55, COL.concrete);
+      det(a0 - 1.4, a0, b0, b1, roof + 0.1, roof + 0.55, COL.concrete);
+      det(a0 - 1.6, a1 + 0.4, b1, b1 + 1.8, roof + 0.55, roof + 0.85, COL.snow);
+      det(a0 - 1.6, a0, b0 - 0.2, b1, roof + 0.55, roof + 0.85, COL.snow);
+      det(a0 - 1.4, a1 + 0.2, b1 + 1.5, b1 + 1.62, roof - 0.5, roof + 0.55, COL.fascia);
+      det(a0 - 1.52, a0 - 1.4, b0, b1 + 1.62, roof - 0.5, roof + 0.55, COL.fascia);
+      det(a0 - 1.4, a1 + 0.2, b1 + 1.62, b1 + 1.66, roof - 0.14, roof - 0.06, COL.accent);              // a red line along it
+      nameSign((a0 + a1) / 2 - 1.5, b1 + 1.72, roof + 0.02, Math.min(9, (a1 - a0) * 0.55), 0.8, 1);
+      // the drive: the motor house on the roof over the bull-wheel, the shaft down to the wheel
+      housing(roof + 0.85, a1 - 0.6, 2.1, 2.2);
+      det(-0.22, 0.22, C - 0.22, C + 0.22, wheel + 0.2, roof, COL.dark);
+      // the back wall clad: a stone plinth, the upper part timber with dark battens, a window band (outside face, a = a1)
+      det(a1, a1 + 0.12, b0, b1, -0.2, 1.1, COL.plinth);
+      det(a1, a1 + 0.06, b0, b1, 1.1, roof, COL.timber);
+      for (let b = b0 + 0.55; b < b1 - 0.3; b += 1.1) det(a1 + 0.06, a1 + 0.13, b - 0.06, b + 0.06, 1.1, roof - 1.6, COL.batten);
+      det(a1 + 0.06, a1 + 0.1, b0 + 0.8, b1 - 0.8, roof - 1.55, roof - 0.5, COL.glass);
+      for (let b = b0 + 0.8; b <= b1 - 0.8 + 1e-6; b += Math.max(1.2, (b1 - b0 - 1.6) / 6)) det(a1 + 0.1, a1 + 0.16, b - 0.05, b + 0.05, roof - 1.55, roof - 0.5, COL.fascia);
+      // the glazed return side: mullions and a transom
+      for (let a = a0 + 4.3; a < a1 - 0.5; a += 2.2) det(a - 0.06, a + 0.06, b0 - 0.04, b0 + 0.44, roof * 0.42, roof, COL.fascia);
+      det(a0 + 4, a1 - 0.4, b0 - 0.04, b0 + 0.44, roof * 0.42 - 0.1, roof * 0.42 + 0.06, COL.fascia);
+      // lights under the roof along the platform
+      for (let a = a0 + 1.5; a < a1 - 1; a += 4) det(a - 0.45, a + 0.45, b1 - 0.9, b1 - 0.6, roof - 0.12, roof, COL.light);
+      if (!which) {             // the entry gates at the platform's outer edge, open where the boarding zone is
+        const za0 = -boardS - 2.6, za1 = -boardS + 2.6;
+        for (let a = -12; a <= -1; a += 1.1) {
+          if (a > za0 && a < za1) continue;
+          det(a - 0.05, a + 0.05, b1 - 0.35, b1 - 0.25, 0, 1.0, COL.dark);
+          if (a + 1.1 <= -1 && !(a + 1.1 > za0 && a + 1.1 < za1)) det(a, a + 1.1, b1 - 0.33, b1 - 0.27, 0.82, 0.9, COL.gate);
+        }
+      }
     } else if (key === 'cable') {
       type = 'terminal';
       const roof = wheel + 1.3, b0 = bIn - 3.6, b1 = bOut + 3.6;
@@ -95,6 +142,7 @@ export function createLiftSite(path) {
       add(1.0, 9, b0 + 1.2, b1 - 1.2, 0, roof + 3.5, COL.concrete, true, { wall: true, building: true });
       add(0.9, 9.1, b0 + 1.1, b1 - 1.1, roof + 3.5, roof + 3.9, COL.snow, false, { cap: true });
       add(0.95, 1.0, b0 + 1, b1 - 1, wheel - 1.2, wheel + 0.8, COL.glass, false);
+      nameSign(5, b1 - 1.1, roof + 2.4, 6.5, 0.9, 1);                                                    // R8
       for (const tr of [side, -back]) add(-0.2, 1.0, tr - 0.9, tr + 0.9, wheel - 0.6, wheel + 0.6, COL.wheel, false);
     } else if (key === 'drag' || key === 'rope') {
       type = 'hut';

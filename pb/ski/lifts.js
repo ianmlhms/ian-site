@@ -18,6 +18,9 @@ import { mergeParts } from './modes/views.js';
 const NEAR_R = 130;                    // m: carriers closer than this get the full model, the rest the far one
 const FAR_R = { chair: 1100, drag: 500, gondola: 1600, cable: 3000, train: 3000 };      // m: beyond this a carrier is below a pixel
 const DWELL = 8;                       // s a jig-back cabin / train waits at a station
+/* R8: the lift-name signs on the stations (lift-site.js `sign` parts): the nearest SIGN.slots signs within SIGN.radius get their name in
+ * one shared canvas atlas, one merged mesh = one draw call; re-chosen every SIGN.every s as the skier moves. */
+const SIGN = Object.freeze({ slots: 24, radius: 450, every: 0.6, slotW: 512, slotH: 64, cols: 2 });
 
 export function createLifts({ scene, resort, height }) {
   const lifts = [];
@@ -43,11 +46,20 @@ export function createLifts({ scene, resort, height }) {
   const boxAt = (w, h, d, x, y, z, fx, fz, colour) => parts.push([new THREE.BoxGeometry(w, h, d), colour, rot(fx, fz).setPosition(x, y, z)]);
   const cylAt = (r0, r1, h, x, y, z, colour, n = 8) => parts.push([new THREE.CylinderGeometry(r0, r1, h, n), colour, new THREE.Matrix4().makeTranslation(x, y, z)]);
   const tmpW = {};
+  const signSpots = [];                 // R8: { x, y, z, nx, nz, w, h, text } of every uncut name sign
   /** One station frame's parts in the world, seated on the ground (a part that touches the ground reaches down to its lowest point). */
-  function addFrame(f) {
+  function addFrame(f, l = null) {
     const g0 = height(f.x, f.z);
     for (const p of f.parts) {
       if (p.cut) continue;
+      if (p.sign && l) {
+        const name = String((l.src && l.src.name) || '').trim();
+        if (name) {
+          const face = p.sign.face, b = face > 0 ? p.b1 + 0.03 : p.b0 - 0.03;
+          const c = f.toWorld((p.a0 + p.a1) / 2, b, {});
+          signSpots.push({ x: c.x, y: g0 + (p.y0 + p.y1) / 2, z: c.z, nx: f.rx * face, nz: f.rz * face, w: p.a1 - p.a0, h: p.y1 - p.y0, text: name });
+        }
+      }
       const ca = (p.a0 + p.a1) / 2, cb = (p.b0 + p.b1) / 2;
       f.toWorld(ca, cb, tmpW);
       let y0 = g0 + p.y0;
@@ -79,12 +91,23 @@ export function createLifts({ scene, resort, height }) {
       if (!s.tower) continue;
       l.at(s.s, q);
       const g = height(q.x, q.z) - 0.5;
-      const top = s.y + 0.55 - g;
       const thin = l.sub === 'rope';
+      const top = s.y + (kind === 'drag' && !thin ? 0.9 : 0.55) - g;          // R8: a drag column reaches its boom and cap
       cylAt(thin ? 0.08 : 0.28, thin ? 0.1 : 0.42, top, q.x, g + top / 2, q.z, 0x8a9099, 6);
       const span = l.side + l.back + (thin ? 0.4 : 1.4), mid = l.sign * (l.side - l.back) / 2;
-      boxAt(0.5, thin ? 0.12 : 0.35, span, q.x - q.dz * mid, s.y + (thin ? 0.3 : 0.72), q.z + q.dx * mid, q.dx, q.dz, 0x343a44);
-      if (!thin) for (const lat of [l.side * l.sign, -l.back * l.sign]) boxAt(kind === 'drag' ? 1.0 : 1.8, 0.22, 0.26, q.x - q.dz * lat, s.y + 0.38, q.z + q.dx * lat, q.dx, q.dz, 0x2b2f36);
+      if (kind === 'drag' && !thin) {
+        // R8 (review: crude drag pylon heads): a slim boom over both ropes, a red cap on the column, and at each rope a sheave train
+        // (a frame with its rubber-lined wheels) the rope runs under: one up + one return rope per lift, both visibly held
+        boxAt(0.22, 0.24, span - 0.6, q.x - q.dz * mid, s.y + 0.78, q.z + q.dx * mid, q.dx, q.dz, 0x4a515c);
+        boxAt(0.5, 0.26, 0.5, q.x, s.y + 1.0, q.z, q.dx, q.dz, 0xc8332a);
+        for (const lat of [l.side * l.sign, -l.back * l.sign]) {
+          boxAt(1.25, 0.12, 0.16, q.x - q.dz * lat, s.y + 0.58, q.z + q.dx * lat, q.dx, q.dz, 0x2b2f36);
+          boxAt(0.95, 0.3, 0.09, q.x - q.dz * lat, s.y + 0.37, q.z + q.dx * lat, q.dx, q.dz, 0x1d2025);
+        }
+      } else {
+        boxAt(0.5, thin ? 0.12 : 0.35, span, q.x - q.dz * mid, s.y + (thin ? 0.3 : 0.72), q.z + q.dx * mid, q.dx, q.dz, 0x343a44);
+        if (!thin) for (const lat of [l.side * l.sign, -l.back * l.sign]) boxAt(1.8, 0.22, 0.26, q.x - q.dz * lat, s.y + 0.38, q.z + q.dx * lat, q.dx, q.dz, 0x2b2f36);
+      }
     }
     // ropes (with the sag) round the loop; trains: two tracks of two rails each
     if (kind === 'train') {
@@ -105,7 +128,7 @@ export function createLifts({ scene, resort, height }) {
       }
     }
     // the stations (and portals, stops)
-    for (const f of frames(l.site)) addFrame(f);
+    for (const f of frames(l.site)) addFrame(f, l);
     // the bull-wheels of the loop lifts: a ring at rope height round the turn
     if (!l.shuttle) {
       for (const which of [0, 1]) {
@@ -295,7 +318,102 @@ export function createLifts({ scene, resort, height }) {
     return { s: d1 - (u - 2 * DWELL - T) * l.spec.speed, up: false };
   }
 
+  // ---------------- R8: the name signs ----------------
+  const signs = (() => {
+    if (!signSpots.length || typeof document === 'undefined') return null;
+    const rows = Math.ceil(SIGN.slots / SIGN.cols);
+    const canvas = document.createElement('canvas');
+    canvas.width = SIGN.slotW * SIGN.cols; canvas.height = SIGN.slotH * rows;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter; tex.anisotropy = 4; tex.generateMipmaps = true;
+    const pos = new Float32Array(SIGN.slots * 4 * 3), uv = new Float32Array(SIGN.slots * 4 * 2), idx = [];
+    for (let i = 0; i < SIGN.slots; i++) { const a = i * 4; idx.push(a, a + 1, a + 2, a + 2, a + 1, a + 3); }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    geo.setIndex(idx);
+    geo.setDrawRange(0, 0);
+    const mat = new THREE.MeshBasicMaterial({ map: tex, color: 0xd8dade, fog: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.name = 'ski-lift-signs';
+    mesh.frustumCulled = false;
+    group.add(mesh);
+    disposables.push(geo, mat, tex);
+    let shown = [], wait = 0;
+    /** Paints one slot: the lift's name, white on the dark board, a thin red line under it. */
+    function paint(slot, text, aspect) {
+      const x0 = (slot % SIGN.cols) * SIGN.slotW, y0 = Math.floor(slot / SIGN.cols) * SIGN.slotH;
+      const w = Math.min(SIGN.slotW, Math.round(SIGN.slotH * aspect));
+      ctx.clearRect(x0, y0, SIGN.slotW, SIGN.slotH);
+      ctx.fillStyle = '#23272e'; ctx.fillRect(x0, y0, w, SIGN.slotH);
+      ctx.fillStyle = '#c8332a'; ctx.fillRect(x0 + 6, y0 + SIGN.slotH - 9, w - 12, 3);
+      ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      let size = 38;
+      ctx.font = `700 ${size}px system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif`;
+      while (size > 16 && ctx.measureText(text).width > w - 24) { size -= 2; ctx.font = `700 ${size}px system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif`; }
+      ctx.fillText(text, x0 + w / 2, y0 + SIGN.slotH / 2 - 3);
+      return w / SIGN.slotW;
+    }
+    function place(slot, sp, uMax) {
+      const ox = sp.nx * 0.02, oz = sp.nz * 0.02;
+      const tx = -sp.nz, tz = sp.nx;                                     // along the board, left to right seen from the front
+      const hw = sp.w / 2, hh = sp.h / 2;
+      const P = [[-hw, hh], [hw, hh], [-hw, -hh], [hw, -hh]];
+      for (let k = 0; k < 4; k++) {
+        const [a, b] = P[k];
+        pos.set([sp.x + ox + tx * a, sp.y + b, sp.z + oz + tz * a], (slot * 4 + k) * 3);
+      }
+      const u0 = (slot % SIGN.cols) / SIGN.cols, u1 = u0 + uMax / SIGN.cols;
+      const v1 = 1 - Math.floor(slot / SIGN.cols) / rows, v0 = v1 - 1 / rows;
+      uv.set([u0, v1, u1, v1, u0, v0, u1, v0], slot * 8);
+    }
+    return {
+      mesh,
+      update(dt, camX, camZ) {
+        wait -= dt;
+        if (wait > 0) return;
+        wait = SIGN.every;
+        const near = [];
+        for (const sp of signSpots) { const d = Math.hypot(sp.x - camX, sp.z - camZ); if (d < SIGN.radius) near.push([d, sp]); }
+        near.sort((a, b) => a[0] - b[0]);
+        const want = near.slice(0, SIGN.slots).map((n) => n[1]);
+        if (want.length === shown.length && want.every((sp, i) => sp === shown[i])) return;
+        // keep the slots of signs that stay, paint the new ones into the freed slots
+        const slotOf = new Map(shown.map((sp) => [sp, sp.slot]));
+        const next = new Array(want.length).fill(null), free = [];
+        for (let i = 0; i < SIGN.slots; i++) free.push(i);
+        const used = new Set();
+        for (const sp of want) if (slotOf.has(sp) && slotOf.get(sp) < SIGN.slots) used.add(slotOf.get(sp));
+        const freeSlots = free.filter((i) => !used.has(i));
+        let painted = false;
+        want.forEach((sp, i) => {
+          let slot = slotOf.get(sp);
+          if (slot === undefined) { slot = freeSlots.shift(); sp.uMax = paint(slot, sp.text, sp.w / sp.h); painted = true; }
+          next[i] = sp; sp.slot = slot;
+        });
+        // the quads in slot order (slot k of the atlas = quad k)
+        pos.fill(0);
+        let maxSlot = -1;
+        for (const sp of next) { place(sp.slot, sp, sp.uMax); maxSlot = Math.max(maxSlot, sp.slot); }
+        shown = next.map((sp) => sp);
+        const ordered = new Array(SIGN.slots).fill(null);
+        for (const sp of shown) ordered[sp.slot] = sp;
+        shown = ordered.filter(Boolean);
+        geo.setDrawRange(0, (maxSlot + 1) * 6);
+        geo.attributes.position.needsUpdate = true; geo.attributes.uv.needsUpdate = true;
+        geo.computeBoundingSphere();
+        if (painted) tex.needsUpdate = true;
+        mesh.visible = maxSlot >= 0;
+      },
+      get count() { return shown.length; },
+      spots: signSpots,
+    };
+  })();
+
   function update(t, camX, camZ, radius) {
+    if (signs) signs.update(lastT === null ? 0.6 : Math.max(0, t - lastT), camX, camZ);
     lastT = t;
     for (const c of chunks) c.mesh.visible = Math.hypot(c.cx - camX, c.cz - camZ) - CHUNK * 0.71 < radius;
     for (const p of pools.values()) { p.n = 0; p.nf = 0; }
@@ -381,6 +499,8 @@ export function createLifts({ scene, resort, height }) {
     /** The loop parameter of the carrier held for the player on lift `index` (null: none). */
     heldOf: (index) => (byIndex.get(index) ? byIndex.get(index).rideU : null),
     world,
+    /** R8 (tests / shots): the name signs shown now and every sign spot. */
+    get signs() { return signs ? { shown: signs.count, spots: signs.spots.length } : { shown: 0, spots: signSpots.length }; },
     /** Round 7-B (tests): the instanced carriers drawn now, per pool key. */
     poolCounts: () => Object.fromEntries([...pools].map(([k, p]) => [k, p.n + p.nf])),
   };
