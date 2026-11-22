@@ -40,17 +40,105 @@ button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
 .screen header h1{font-size:20px;font-weight:800;letter-spacing:-.03em;margin:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .screen header .sub{font-family:var(--mono);font-size:12px;color:var(--muted)}
 
-/* resort picker */
-.resorts{flex:1;overflow:auto;padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:0;align-content:start}
-.resort{border:1px solid var(--soft);margin:-1px 0 0 -1px;background:var(--white);padding:16px;text-align:left;min-height:150px;display:flex;flex-direction:column;gap:6px;position:relative}
-.resort b{font-size:18px;font-weight:800;letter-spacing:-.02em}
-.resort .c{font-family:var(--mono);font-size:12px;color:var(--muted)}
-.resort .meta{margin-top:auto;font-size:13px;color:var(--muted)}
-.resort.ready{border-color:var(--ink);z-index:1}
-.resort.ready .go{margin-top:auto;align-self:flex-start}
-.resort.soon{opacity:.55;cursor:default}
-.resort .tag{position:absolute;top:10px;right:10px;font-family:var(--mono);font-size:11px;border:1px solid var(--soft);padding:2px 6px}
-.intro{padding:16px 16px 0;color:var(--muted);font-size:14px;max-width:720px}
+/* resort picker (picker.js): the arcade's tile look (sharp, ink hairline seams, picture on top), the game's own picture of each
+   resort. iPad landscape: the last resort big on the left, the other four 2 x 2, no scroll. Portrait: the big one as a row on top,
+   2 x 2 below. Phone: one column, the small ones as rows. */
+.rp-scroll{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;display:flex;flex-direction:column}
+.rp-head{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px 20px;padding:18px 20px 16px}
+.rp-title{min-width:0;flex:1 1 320px}
+.rp-title h1{margin:0;font-size:30px;font-weight:800;letter-spacing:-.04em;line-height:1.05}
+.rp-title p{margin:6px 0 0;color:var(--muted);font-size:14px;line-height:1.45;max-width:60ch}
+.rp-acts{display:flex;gap:8px;flex:none}
+.rp-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--ink);border-top:1px solid var(--ink);border-bottom:1px solid var(--ink)}
+.rp-card{appearance:none;position:relative;display:flex;flex-direction:column;min-width:0;margin:0;padding:0;border:0;border-radius:0;background:var(--white);color:var(--ink);text-align:left;font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.rp-card:focus-visible{outline:none}
+.rp-card:focus-visible::after{content:"";position:absolute;inset:0;z-index:2;box-shadow:inset 0 0 0 3px var(--green);pointer-events:none}
+.rp-card:active{background:var(--paper)}
+.rp-card.soon{cursor:default;opacity:.55}
+.rp-pic{position:relative;display:block;aspect-ratio:16/10;overflow:hidden;background:linear-gradient(180deg,#8fb4e6 0%,#c9daef 50%,#e9eef3 51%,#f7f8f9 100%)}
+.rp-pic img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 62%;opacity:0;transition:opacity .45s ease,transform .7s cubic-bezier(.16,1,.3,1)}
+.rp-pic img.ok{opacity:1}
+.rp-pic img.failed{display:none}
+.rp-body{position:relative;display:flex;flex-direction:column;gap:3px;flex:1;padding:12px 40px 14px 14px;min-width:0}
+.rp-name{display:flex;align-items:baseline;gap:8px;min-width:0}
+.rp-name b{font-size:17px;font-weight:800;letter-spacing:-.02em;line-height:1.2;transition:color .15s}
+.rp-flag{flex:none;font-size:15px;line-height:1;letter-spacing:2px}
+.rp-places{font-size:13px;line-height:1.35;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rp-region{display:block;margin-top:2px;font-size:13px}
+.rp-facts{display:flex;flex-wrap:wrap;margin-top:6px;font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums}
+.rp-facts span+span{margin-left:8px;padding-left:8px;border-left:1px solid var(--soft)}
+.rp-prog{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:3px;font-size:12.5px;color:var(--muted)}
+.rp-stars{color:var(--green);font-weight:700}
+.rp-name .rp-stars{margin-left:auto;flex:none;align-self:center;font-size:12px;font-family:var(--mono);font-weight:500;border:1px solid var(--green);padding:0 6px;line-height:1.6}
+.rp-arrow{position:absolute;right:14px;bottom:12px;font-size:18px;line-height:1;transition:transform .2s,color .15s}
+.rp-card:hover .rp-name b,.rp-card:hover .rp-arrow{color:var(--green)}
+.rp-card:hover .rp-arrow{transform:translateX(3px)}
+.rp-card:hover .rp-pic img{transform:scale(1.035)}
+/* the big card */
+.rp-hero{grid-column:1/-1;flex-direction:row}
+.rp-hero .rp-pic{flex:1.4 1 0;aspect-ratio:auto;min-height:300px}
+.rp-hero .rp-body{flex:1 1 0;gap:5px;padding:20px 22px 22px}
+.rp-kicker{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--green);margin-bottom:2px}
+.rp-hero .rp-name{flex-wrap:wrap}
+.rp-hero .rp-name b{font-size:32px;letter-spacing:-.04em;line-height:1.02}
+.rp-hero .rp-flag{font-size:22px}
+.rp-hero .rp-places{font-size:15px;white-space:normal;color:var(--ink)}
+.rp-hero .rp-region{color:var(--muted)}
+.rp-stats{display:flex;flex-wrap:wrap;gap:10px 0;margin:12px 0 2px}
+.rp-stats>span{display:flex;flex-direction:column;padding-right:16px;margin-right:16px;border-right:1px solid var(--soft)}
+.rp-stats>span:last-child{padding-right:0;margin-right:0;border-right:0}
+.rp-stats b{font-size:26px;font-weight:800;letter-spacing:-.03em;line-height:1.1;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rp-stats b i{font-style:normal;font-size:.62em;font-weight:700;letter-spacing:0}
+.rp-stats small{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.rp-hero .rp-prog{font-size:14px;margin-top:6px}
+.rp-go{align-self:flex-start;gap:12px;pointer-events:none}
+.rp-sp{flex:1 0 16px}
+.rp-go i{font-style:normal;transition:transform .2s}
+.rp-card:hover .rp-go i{transform:translateX(3px)}
+.rp-hero:hover .rp-name b{color:var(--ink)}
+/* iPad / laptop landscape: one screen, the pictures take the height that is left */
+@media (min-width:900px) and (min-height:560px) and (orientation:landscape){
+  .rp-grid{flex:1 1 auto;min-height:500px;grid-template-columns:1.85fr 1fr 1fr;grid-template-rows:1fr 1fr}
+  .rp-hero{grid-column:auto;grid-row:1/3;flex-direction:column}
+  .rp-hero .rp-pic{flex:1 1 0;min-height:180px}
+  .rp-hero .rp-body{flex:none}
+  .rp-card:not(.rp-hero) .rp-pic{flex:1 1 0;min-height:100px;aspect-ratio:auto}
+  .rp-card:not(.rp-hero) .rp-body{flex:none}
+}
+/* tablet portrait: flatter pictures on the small cards, so the whole picker nearly fits */
+@media (min-width:600px) and (max-width:899px){
+  .rp-grid{flex:1 1 auto;grid-template-rows:auto 1fr 1fr}
+  .rp-card:not(.rp-hero) .rp-pic{flex:1 1 0;min-height:150px;aspect-ratio:auto}
+  .rp-card:not(.rp-hero) .rp-body{flex:none}
+}
+/* phone: one column, the small cards as rows */
+@media (max-width:599px){
+  .rp-head{padding:14px 16px 14px;align-items:flex-start}
+  .rp-title h1{font-size:25px}
+  .rp-title p{font-size:13px}
+  .rp-grid{grid-template-columns:1fr}
+  .rp-hero{flex-direction:column}
+  .rp-hero .rp-pic{flex:none;aspect-ratio:16/9;min-height:0}
+  .rp-hero .rp-body{padding:16px 16px 18px}
+  .rp-hero .rp-name b{font-size:27px}
+  .rp-stats b{font-size:22px}
+  .rp-stats>span{padding-right:12px;margin-right:12px}
+  .rp-hero .rp-go{align-self:stretch}
+  .rp-card:not(.rp-hero){flex-direction:row}
+  .rp-card:not(.rp-hero) .rp-pic{flex:0 0 36%;aspect-ratio:auto;min-height:96px}
+  .rp-card:not(.rp-hero) .rp-body{padding:10px 34px 10px 12px;justify-content:center}
+  .rp-card:not(.rp-hero) .rp-facts{margin-top:4px;font-size:11px}
+  .rp-card:not(.rp-hero) .rp-places{white-space:normal;font-size:12.5px}
+  .rp-card:not(.rp-hero) .rp-name{display:block}
+  .rp-card:not(.rp-hero) .rp-name b{font-size:16px}
+  .rp-card:not(.rp-hero) .rp-flag{margin-left:6px}
+  .rp-card:not(.rp-hero) .rp-name .rp-stars{display:inline-block;margin-left:8px;vertical-align:2px;font-size:11px}
+  .rp-hide-s{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  .rp-pic img{transition:none}
+  .rp-card:hover .rp-pic img,.rp-card:hover .rp-arrow,.rp-card:hover .rp-go i{transform:none}
+}
 
 /* piste map */
 .mapwrap{flex:1;display:flex;min-height:0}

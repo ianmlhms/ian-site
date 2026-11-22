@@ -1,7 +1,7 @@
 /* The screens and the HUD (DOM only; main.js owns the game). Plain Luxembourgish, short words.
  *   resort picker -> piste map (+ weather, time of day, Grafik) -> HUD while skiing -> finish card / pause menu */
 import { DIFF, DIFF_IDS } from './config.js';
-import { RESORTS } from './resort-data.js';
+import { showResorts } from './picker.js';
 import { TIME_IDS, WEATHER_IDS, TIME_LABEL, WEATHER_LABEL, WEATHER_ICON, TIME_ICON } from './env.js';
 import { formatTime, formatClock } from './progress.js';
 
@@ -26,23 +26,7 @@ export function createUi(root) {
   const api = {};
 
   /* ---------------- resort picker ---------------- */
-  api.showResorts = function showResorts({ onPick, current = null, onOnline = null }) {
-    const s = el(`<section class="screen" id="resortScreen" aria-label="Skigebitt wielen">
-      <header><h1>Ski Alpen</h1><span class="sub">Wiel e Skigebitt</span>${onOnline ? '<button type="button" class="btn" id="skiOnline">👥 Online-Rennen</button>' : ''}</header>
-      <p class="intro">Fuer fräi duerch richteg Skigebidder: op an nieft de Pisten, mat de richtege Liften erop, an d'Challengen um Bierg.</p>
-      <p class="intro small">Gelänn: IGN RGE ALTI (Etalab 2.0), Provënz Bozen - Südtirol (CC0), BEV Éisträich (CC BY 4.0), Copernicus DEM · Kaart: © OpenStreetMap-Mataarbechter (ODbL) · alles selwer gemoolt.</p>
-      <div class="resorts">${RESORTS.map((r) => `
-        <button type="button" class="resort ${r.ready ? 'ready' : 'soon'}" data-id="${r.id}" ${r.ready ? '' : 'disabled aria-disabled="true"'}>
-          ${r.ready ? '' : '<span class="tag">geschwënn</span>'}
-          <b>${esc(r.name)}</b><span class="c">${esc(r.short)} · ${r.country}</span>
-          ${r.ready ? `<span class="btn primary go">${r.id === current || !current ? 'Lass fueren' : 'Lueden'}</span>` : '<span class="meta">Kënnt an enger nächster Versioun.</span>'}
-        </button>`).join('')}</div>
-    </section>`);
-    s.querySelectorAll('.resort.ready').forEach((b) => b.addEventListener('click', () => onPick(b.dataset.id)));
-    if (onOnline) s.querySelector('#skiOnline').addEventListener('click', onOnline);
-    root.appendChild(s);
-    return { el: s, close() { s.remove(); } };
-  };
+  api.showResorts = (opts) => showResorts(root, opts);           // picker.js: cards with the game's own pictures of each resort
 
   /* ---------------- piste map ---------------- */
   api.showMap = function showMap({ resort, pistes, best, env, gfx, outfits = [], outfit = () => '', onOutfit = () => {}, outfitOpen = () => true, starsOf = null, lockedOf = () => false, onSelect, onStart, onBack, onResume = null }) {
