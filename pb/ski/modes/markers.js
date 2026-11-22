@@ -28,6 +28,16 @@ export function markerList(pistes, layout, startOf = () => 2) {      // R7-C: st
   return out;
 }
 
+/** R8e (3V QA "Lac des Creux": the prompt popped mid-run as he crossed a start at 61 km/h): may gate m ask "Start?" of skier state st?
+ *  Nearly stopped (< 3 m/s), or skiing into it from its start side: above the banner, between its posts (+1 m), along the piste. */
+export function promptable(m, st) {
+  if (st.speed < 3) return true;
+  const c = Math.cos(m.heading), sn = Math.sin(m.heading), dx = st.x - m.x, dz = st.z - m.z;
+  const u = dx * c + dz * sn, v = -dx * sn + dz * c;
+  const dir = Math.atan2(st.vz, st.vx), off = Math.abs(Math.atan2(Math.sin(dir - m.heading), Math.cos(dir - m.heading)));
+  return u > -MARKER.trigger && u < 1 && Math.abs(v) < MARKER.width / 2 + 1 && off < 0.9;
+}
+
 /** The gate the skier stands in (within MARKER.trigger m of its middle), or null. */
 export function markerAt(list, x, z, radius = MARKER.trigger) {
   let best = null, bd = radius;

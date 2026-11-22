@@ -46,7 +46,7 @@ import { attachModePanel, starRow, createRideHud, createChallengePrompt, showSki
 // round 6: lift rides, challenge gates on the mountain, ski types
 import { createRide, rideCamera, RIDE } from './modes/liftride.js';
 import { createCarrier } from './modes/carriers.js';
-import { createMarkers, markerList, MARKER } from './modes/markers.js';
+import { createMarkers, markerList, MARKER, promptable } from './modes/markers.js';
 import { SKI_BY_ID, DEFAULT_SKI, skiParams, addSkiStats, skiOpen } from './modes/skis.js';
 import { spawnLift, startHourFor } from './modes/freeride.js';
 import { createLook, applyLook, createCameraGuard, buildingBoxes, createBoxIndex } from './look.js';      // R7-A: free look + camera collision
@@ -287,6 +287,7 @@ async function boot() {
     if (lifts && ride) { liftsEarly = true; return lifts; }                 // riding: rebuilt when the ride ends
     if (lifts) lifts.dispose();
     lifts = createLifts({ scene, resort, height: (x, z) => field.height(x, z) });
+    if (game.freeLift && modes.liftAt === game.freeLift && game.phase !== 'lift') lifts.dockShuttle(game.freeLift.index);      // R8e: the spawn
     liftsEarly = !streamer.done();
     try { stationGrid = stationCells(lifts); } catch (error) { console.warn('[ski] station grid failed', error); }
     // R8b: the decks exist now: a skier standing in a station (the spawn) stands on its deck, not in it
@@ -377,7 +378,7 @@ async function boot() {
     hit: (x, z, r, y) => scatter.hit(x, z, r, y, quality.treeDensity) || modes.lifts.world.hit(x, z, r, y, (gx, gz) => surface.height(gx, gz)) || buildingHit(x, z, r, y),     // R7-B: pylons + stations; R8: houses
   };
   /** R8e: a station part / pylon / house at (x, z) (the scripted bot skis round it; window.__ski.blocked for the flows). */
-  const botBlocked = (x, z) => { const y = standHeight(x, z); return !!(modes.lifts.world.hit(x, z, 1, y, (gx, gz) => surface.height(gx, gz)) || buildingHit(x, z, 1, y)); };
+  const botBlocked = (x, z) => { const y = standHeight(x, z); return !!(modes.lifts.world.hit(x, z, 2.5, y, (gx, gz) => surface.height(gx, gz)) || buildingHit(x, z, 2.5, y)); };      // 2.5 m: he carves wide
   /** R8 (early QA: he skied through chalets): the houses collide like the station walls: out by the nearest face of the footprint box. */
   const houseHit = { nx: 0, nz: 0, pen: 0, kind: 'house' };
   function buildingHit(x, z, r, y) {
@@ -645,8 +646,9 @@ async function boot() {
     game.run = createRun({ piste: p, mode, startS: s0, finishS: f0 });
     const a = p.at(s0, {});
     if (mode === MODES.run) {
-      try { courseView = createCourseView({ scene, layout: courseLayout(p, s0, pistes, explore ? explore.obs : null, f0), height: (x, z) => surface.height(x, z) }); } catch (error) { console.warn('[ski] course view failed', error); }
-      course = createCourse({ piste: p, startS: s0, finishS: f0 });
+      let lay = null;
+      try { lay = courseLayout(p, s0, pistes, explore ? explore.obs : null, f0); courseView = createCourseView({ scene, layout: lay, height: (x, z) => surface.height(x, z) }); } catch (error) { console.warn('[ski] course view failed', error); }
+      course = createCourse({ piste: p, startS: s0, finishS: f0, open: lay ? lay.openAt : null });      // R8e: no net = no collision
       courseHud.show(true);
       document.documentElement.dataset.skiCourse = 'on';
     }
@@ -829,6 +831,7 @@ async function boot() {
     game.mode = MODES.freeride;
     game.resume = null;
     if (lift) game.freeLift = lift;
+    if (lift && lifts) lifts.dockShuttle(lift.index);                         // R8e: a cable car's cabin waits at the bottom (behind the fade)
     const spot = spotIn || boardSpot(lift);
     const near = pistes.nearest(spot.x, spot.z, 400);
     game.piste = near ? near.piste : game.piste;
@@ -869,9 +872,10 @@ async function boot() {
     // the next carrier of the lift's own loop that reaches the loading line at least 1.6 s from now picks him up
     const loadU = path.shuttle ? null : path.upU(Math.min(RIDE.enter[site.key], path.len * 0.2));
     const next = loadU === null ? null : view.nextCarrier(lift.index, loadU, path.spec.speed * 1.6);
-    ride = createRide({ lift, path, site, height, from: { x: st.x, z: st.z, heading: st.heading }, startU: next ? next.u : null,
+    ride = createRide({ lift, path, site, height, from: { x: st.x, z: st.z, heading: st.heading }, startU: next ? next.u : null, shuttle: path.shuttle ? view.shuttleBoard(lift.index) : null,
       exitAt: () => modes.lifts.world.exitOf(lift.index, height, (x, z) => !!scatter.hit(x, z, 0.4, -1e9, quality.treeDensity), pistes.list) });
     carrier = createCarrier({ scene, kind: path.kind, seats: path.seats, sub: path.sub });
+    if (path.shuttle) { const sw = view.shuttleBoard(lift.index); if (sw && sw.wait > 2) hud.toast(`D'Kabin kënnt (${Math.ceil(sw.wait)} s)`, 2200); }
     if (camMode === 'fp') { rideView = 'window'; rideCam = null; }          // R7-C: first person = the window view on a lift
     explore.rode(lift);
     modes.rideStart(lift);
@@ -1313,8 +1317,11 @@ async function boot() {
   /** Round 6 (HUD rate): the challenge gate the skier is in, the ski stats (off-piste metres, top speed) and the ski unlocks they bring. */
   let statT = 0, statTop = 0, statOff0 = 0;
   function freeTick(st) {
+    if (lifts && modes.liftAt && game.phase === 'running') lifts.holdShuttle(modes.liftAt.index);      // R8e: the docked cabin waits for him
     if (game.mode === MODES.freeride && game.phase === 'running' && !game.paused) {
-      const m = markers.at(st.x, st.z);
+      // R8e (3V QA "Lac des Creux": the prompt popped mid-run as he crossed a start at 61 km/h): only nearly stopped, or skiing into
+      // the gate from its start side (above the banner, within its posts, along the piste)
+      const m0 = markers.at(st.x, st.z), m = m0 && promptable(m0, st) ? m0 : null;
       if (dismissed && (!m || m.id !== dismissed)) { const d = markers.byId(dismissed); if (!d || Math.hypot(d.x - st.x, d.z - st.z) > MARKER.rearm) dismissed = null; }
       const show = m && m.id !== dismissed ? m : null;
       if (show !== chPrompt.current) chPrompt.show(show, show ? promptInfo(show) : undefined);
@@ -1364,7 +1371,7 @@ async function boot() {
     // round 4A
     modes, parkLayout, startPark, startFree: (id) => startFree(id ? modes.lifts.byId.get(id) : game.freeLift || modes.lifts.list[0]), rideUp, setMapMode,
     // round 6
-    goFree: (id) => goFree(id ? modes.lifts.byId.get(id) : spawn), boardLift, skipRide, toggleRideView, get ride() { return ride; }, get rideView() { return rideView; }, get spawn() { return spawn; },
+    goFree: (id) => goFree(id ? modes.lifts.byId.get(id) : spawn), boardLift, skipRide, toggleRideView, get ride() { return ride; }, get carrier() { return carrier; }, get rideView() { return rideView; }, get spawn() { return spawn; },
     get lifts() { return lifts; }, get signs() { return signs; }, markers, setSki, get skiType() { return skiType; }, get world() { return world; }, openSkiCard, resumeFree, acceptChallenge, showMap,
     place(x, z, heading) { placeAt(x, z, heading); },
     // R7-B (flows): stand still at (x, z) like after a lift (0 km/h until an input), the scatter for the tree checks

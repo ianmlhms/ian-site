@@ -85,7 +85,7 @@ export function attachModePanel(mapEl, { onMode, onParkStart, onFreeStart, onPic
         if (on) requestAnimationFrame(() => { const top = b.getBoundingClientRect().top - list.getBoundingClientRect().top + list.scrollTop; if (top < list.scrollTop || top + b.offsetHeight > list.scrollTop + list.clientHeight) list.scrollTop = Math.max(0, top - (list.clientHeight - b.offsetHeight) / 2); });
       });
       pane.innerHTML = `<h2><span class="chip lift"></span>${selected ? esc(selected.name) : 'Fräi fueren'}</h2>
-        <div class="facts">${selected ? `${kindName(selected.kind)} · ënnen ${Math.round(selected.bottom.y)} m · uewen ${Math.round(selected.top.y)} m · ${Math.round(selected.len)} m laang` : 'Tipp op e Lift op der Kaart oder an der Lëscht.'}</div>
+        <div class="facts">${selected ? `${kindName(selected.kind, selected.sub)} · ënnen ${Math.round(selected.bottom.y)} m · uewen ${Math.round(selected.top.y)} m · ${Math.round(selected.len)} m laang` : 'Tipp op e Lift op der Kaart oder an der Lëscht.'}</div>
         <div class="how">Keng Auer: fuer vu Pist zu Pist an och nieft de Pisten. Ënnen um Lift: <b>Astegen</b> (L / Enter). Op der Pist: e Startpaart = eng Challenge.</div>
         <div class="status" id="freeStatus">${selected ? (ready ? 'Prett.' : 'Gëtt gelueden …') : ''}</div>
         <button type="button" class="btn primary big" id="freeStart" ${selected && ready ? '' : 'disabled'}>Bei de Lift</button>`;
@@ -205,7 +205,7 @@ export function createRideHud(hudEl, { onSkip, onView }) {
   box.querySelector('#rSkip').addEventListener('click', (e) => { e.currentTarget.blur(); onSkip(); });
   box.querySelector('#rView').addEventListener('click', (e) => { e.currentTarget.blur(); onView(); });
   return {
-    show(lift) { box.hidden = !lift; if (lift) box.querySelector('#rName').textContent = `${kindName(lift.kind)} ${lift.name}`; },
+    show(lift) { box.hidden = !lift; if (lift) box.querySelector('#rName').textContent = `${kindName(lift.kind, lift.sub)} ${lift.name}`; },
     set({ left, share, view }) {
       const m = Math.floor(left / 60), sec = Math.ceil(left % 60);
       box.querySelector('#rLeft').textContent = left > 0.5 ? `nach ${m ? `${m} min ` : ''}${sec} s bis uewen · ${view === 'window' ? 'Fënster' : 'Vu baussen'}` : 'Uewen!';

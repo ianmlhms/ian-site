@@ -3,6 +3,7 @@
  * two thirds of resort.json. scripts/ski/linepack.py stores them as "lz" / "pz": decimetres, second differences (the lines are resampled
  * at a steady step, so these are tiny), zigzag varints, base64. Lossless at 0.1 m. 3 Vallées: resort.json 440 -> 178 KB gzipped.
  * unpackResort(r) turns them back into "line" / "p" in place; data without them (older bakes) passes through unchanged. */
+import { normaliseLifts } from './lift-path.js';
 
 const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 const B64_INDEX = (() => { const t = new Int16Array(128).fill(-1); for (let i = 0; i < 64; i++) t[B64.charCodeAt(i)] = i; return t; })();
@@ -60,5 +61,6 @@ export function packLine(arr) {
 export function unpackResort(r) {
   for (const p of r.pistes || []) if (typeof p.lz === 'string' && !p.line) { p.line = unpackLine(p.lz); delete p.lz; }
   for (const n of r.network || []) if (typeof n.pz === 'string' && !n.p) { n.p = unpackLine(n.pz); delete n.pz; }
+  normaliseLifts(r);                                                       // R8e: funitels / DMCs are twin-rope gondolas (lift-path.js)
   return r;
 }

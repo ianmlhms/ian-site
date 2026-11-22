@@ -287,7 +287,7 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false, skinne
       const ax = THIGH + SHIN * Math.sin(shin), ay = 0.1 - SHIN * Math.cos(shin);
       sk.g.position.set(ax, ay - ANKLE, L.side * 0.13);
       sk.g.rotation.set(0, 0, 0);
-      sk.edge.rotation.set(0, 0, -0.28 + swing);
+      sk.edge.rotation.set(0, 0, -0.02 + swing * 0.2);                // R8e: the skis lie on the chair's footrest bar (carriers.js), level
     }
     torso.position.set(-0.04, 0.1, 0);
     torso.rotation.set(0, 0, 0.08);
@@ -343,7 +343,21 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false, skinne
   /** Pulled up a drag lift (round 7): STANDING upright in the track, leaning back a little against the bar, both skis flat on the
    *  snow along the slope (the body does not tilt with the slope: that looked like sitting), knees soft, a small sideways wobble; one hand
    *  on the bar's pole, the poles in the other hand. slopePitch = the track's pitch (rad, + = climbing). */
-  function poseDrag(t, slopePitch) {
+  /** R8e: the arm A's hand on a world point (two-bone IK in the torso frame: the shoulder's roll picks the arm's plane, then the
+   *  shoulder and elbow bends in it; upper arm and forearm 0.3 m each). */
+  const ikV = new THREE.Vector3();
+  function reachHand(A, target) {
+    root.updateMatrixWorld(true);
+    ikV.set(target.x, target.y, target.z);
+    torso.worldToLocal(ikV);
+    const dx = ikV.x - A.sh.position.x, dy = ikV.y - A.sh.position.y, dz = ikV.z - A.sh.position.z;
+    const q = Math.hypot(dy, dz) || 1e-6, rx = Math.atan2(-dz, -dy);
+    const px = dx, py = -q, r = Math.min(0.595, Math.max(0.12, Math.hypot(px, py)));
+    const e = Math.acos(clamp((r * r - 0.18) / 0.18, -1, 1)), phi = Math.atan2(px, -py);
+    A.sh.rotation.set(rx, 0, phi - e / 2);
+    A.elbow.rotation.set(0, 0, e);
+  }
+  function poseDrag(t, slopePitch, hand = null) {
     tilt.rotation.set(0, 0, 0); tilt.position.set(0, 0, 0);
     lean.rotation.set(Math.sin(t * 1.7) * 0.03, 0, 0);
     for (let i = 0; i < 2; i++) {
@@ -366,6 +380,7 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false, skinne
     A.pole.rotation.set(0.1, 0, -1.6);
     const B = arms[0];
     B.sh.rotation.set(0.15, 0, 0.35); B.elbow.rotation.set(0, 0, 0.5); B.pole.rotation.set(-0.1, 0, -0.6);
+    if (hand) reachHand(A, hand);                            // R8e: the hand on the rod (liftride.js riderAt: hand)
   }
 
   /** Two-bone leg: hip at height h above the ankle; returns [hip angle (forward), knee bend, hip x offset]. */
@@ -533,7 +548,7 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false, skinne
     if (hideGear !== gearHidden) { gearHidden = hideGear; for (const p of poles) p.visible = !hideGear; }      // round 7: skis carried, poles away
     if (ride === 'sit') poseSit(t);
     else if (ride === 'stand') poseStand(t);
-    else if (ride === 'drag') poseDrag(t, Math.atan2(along, tmp.y));
+    else if (ride === 'drag') poseDrag(t, Math.atan2(along, tmp.y), state.dragHand);
     else if (ride === 'carry') poseCarry(t, state.walk || 0);         // R7-B ('skisdown' / 'clickin' / 'belt': the skis on the snow, standing)
     // round 7: both skis on the snow (carving, plough, tuck, landing, a traverse): the leg IK against the real terrain
     if (ground && state.grounded && state.crash <= 0 && !ride) plantSkis(ground, plough);
@@ -571,6 +586,19 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false, skinne
   }
   const r3 = (e) => [e.x, e.y, e.z].map((v) => +v.toFixed(2));
   const bwA = new THREE.Vector3(), bwB = new THREE.Vector3();
+  /** R8e, tests: world points of the gear after the last pose: { skis: [[x, y, z] x 12 per ski: the base corners + middle line], poles:
+   *  [[x, y, z] every 0.2 m down each shaft], hands: [[x, y, z]] }. */
+  function gearPoints() {
+    root.updateMatrixWorld(true);
+    const out = { skis: [], poles: [], hands: [] }, v = new THREE.Vector3();
+    for (const sk of skis) for (const x of [0.95, 0.8, 0.5, 0.2, 0, -0.3, -0.6, -0.78]) for (const z of [-0.04, 0.04]) { v.set(x, 0, z).applyMatrix4(sk.edge.matrixWorld); out.skis.push([v.x, v.y, v.z]); }
+    for (const p of poles) {
+      if (!p.visible) continue;
+      for (let y = 0.1; y <= 1.15; y += 0.2) { v.set(0, -y, 0).applyMatrix4(p.matrixWorld); out.poles.push([v.x, v.y, v.z]); }
+      p.getWorldPosition(v); out.hands.push([v.x, v.y, v.z]);
+    }
+    return out;
+  }
   /** R8e, tests: the largest distance (m) of a boot (ankle) from straight above its ski's binding, in the ski's frame, after the last pose. */
   function bootGap() {
     root.updateMatrixWorld(true);
@@ -578,5 +606,5 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false, skinne
     for (let i = 0; i < 2; i++) { legs[i].ankle.getWorldPosition(bwA); skis[i].g.worldToLocal(bwA); m = Math.max(m, Math.hypot(bwA.x, bwA.z)); }      // in the ski's own frame (above the binding)
     return m;
   }
-  return { root: group, pose, setOutfit, setSki, setFirstPerson, skiEnds, bootGap, debugSkis: () => skis.map((sk) => ({ g: r3(sk.g.rotation), gp: r3(sk.g.position), e: r3(sk.edge.rotation) })), get skiClearance() { return lastClear; }, get firstPerson() { return firstPerson; }, setBlob(on) { blob.visible = !!on && !ghost && !firstPerson; }, setVisible(v) { group.visible = v; } };
+  return { root: group, pose, setOutfit, setSki, setFirstPerson, skiEnds, bootGap, gearPoints, debugSkis: () => skis.map((sk) => ({ g: r3(sk.g.rotation), gp: r3(sk.g.position), e: r3(sk.edge.rotation) })), get skiClearance() { return lastClear; }, get firstPerson() { return firstPerson; }, setBlob(on) { blob.visible = !!on && !ghost && !firstPerson; }, setVisible(v) { group.visible = v; } };
 }

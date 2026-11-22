@@ -40,7 +40,8 @@ const { createSkierState, stepSkier } = await imp('skier.js');
 const { createBot } = await imp('bot.js');
 const { SKI, AVALANCHE, MODES, COURSE } = await imp('config.js');
 const { unpackResort } = await imp('linepack.js');                 // R8b: resort.json carries packed piste lines (R7-D)
-const { buildingBoxes, createBoxIndex } = await imp('look.js');     // R8e: the rides collide with the houses like main.js
+const { buildingBoxes, createBoxIndex } = await imp('look.js');
+const { markerList, markerAt, promptable } = await imp('modes/markers.js');      // R8e: the challenge prompt     // R8e: the rides collide with the houses like main.js
 
 const args = process.argv.slice(2);
 const RIDES = args.includes('--rides');
@@ -246,6 +247,22 @@ for (const rid of rids.length ? rids : ALL) {
       if (hitQ) { bannerBad++; bannerList.push(`${p.id}x${q.id}`); break; }
     }
   }
+  // R8e: the "Start?" prompt of every gate (markers.js promptable over markerList at the gates of courseGate): crossing it sideways at
+  // 61 km/h or skiing up through it never asks; skiing into it from above along the piste at 40 km/h and standing in it do
+  const mlist = markerList(pistes, null, (p) => gates.get(p.id) || { s: 2, lat: 0 }).filter((m) => !ONLY || ONLY.has(m.id));
+  let askBad = 0;
+  const askList = [];
+  for (const m of mlist) {
+    const c = Math.cos(m.heading), sn = Math.sin(m.heading);
+    const at = (u, v, dir, speed) => ({ x: m.x + u * c - v * sn, z: m.z + u * sn + v * c, vx: Math.cos(dir) * speed, vz: Math.sin(dir) * speed, speed });
+    const asks = (st) => { const g = markerAt(mlist, st.x, st.z); return !!g && g.id === m.id && promptable(g, st); };
+    const cross = [-6, -3, 0, 3, 6].some((v) => asks(at(0, v, m.heading + Math.PI / 2, 17)) || asks(at(0, v, m.heading - Math.PI / 2, 17)));
+    const up = asks(at(-2, 0, m.heading + Math.PI, 17)) || asks(at(0.5, 0, m.heading + Math.PI, 17));
+    const into = asks(at(-4, 0, m.heading, 11)), stand = asks(at(0, 0, m.heading, 0));
+    const near = mlist.some((o) => o !== m && Math.hypot(o.x - m.x, o.z - m.z) < 9);      // another gate this close may win markerAt
+    if (cross || up || (!near && (!into || !stand))) { askBad++; askList.push(`${m.id}${cross ? ' cross' : ''}${up ? ' up' : ''}${!into ? ' !into' : ''}${!stand ? ' !stand' : ''}`); }
+  }
+  check(askBad === 0, `challenge prompt: ${mlist.length - askBad}/${mlist.length} gates ask only when stopped or skied into from the start side (never crossing at 61 km/h)${askList.length ? `; bad: ${askList.slice(0, 6).join(', ')}` : ''}`);
   check(bannerBad === 0, `course: no other piste's line through any of the ${total} start banners (+-5.5 m across, +-${COURSE.bannerAlong} m along)${bannerList.length ? ` (${bannerBad} not: ${bannerList.slice(0, 8).join(', ')})` : ''}`);
   check(runInBad === 0, `course: the first 60 m below all ${total} start gates clear of stations / lift parts / houses${runInList.length ? ` (${runInBad} not: ${runInList.slice(0, 8).join(', ')})` : ''}`);
   let hold = 0, holdN = 0, through = 0, stopped = 0, minKeep = 1, missed = 0;
@@ -303,12 +320,12 @@ for (const rid of rids.length ? rids : ALL) {
       if (ONLY && !ONLY.has(p.id)) continue;
       const g = gates.get(p.id);
       const run = createRun({ piste: p, mode: MODES.run, startS: g.s, finishS: finishes.get(p.id) });
-      const course = createCourse({ piste: p, startS: g.s, finishS: finishes.get(p.id) });
+      const course = createCourse({ piste: p, startS: g.s, finishS: finishes.get(p.id), open: courseLayout(p, g.s, pistes, obs, finishes.get(p.id)).openAt });      // R8e: like main.js
       const a = p.at(g.s, {});
       const x0 = a.x - a.dz * (g.lat || 0), z0 = a.z + a.dx * (g.lat || 0);
       let s = createSkierState(x0, z0, Math.atan2(a.dz, a.dx), height(x0, z0));
       s = { ...s, hold: 0, vx: a.dx * COURSE.push, vz: a.dz * COURSE.push, speed: COURSE.push };      // the push start (main.js pushStart) ends the standing hold
-      const bot = createBot(p, { blocked: (x, z) => { const y = height(x, z); return !!(lifts.world.hit(x, z, 1, y, height) || houseHit(x, z, 1, y)); } });      // R8e: round a station on the line
+      const bot = createBot(p, { blocked: (x, z) => { const y = height(x, z); return !!(lifts.world.hit(x, z, 2.5, y, height) || houseHit(x, z, 2.5, y)); } });      // R8e: round a station / house on the line (2.5 m margin: he carves wide)
       let t = 0, done = false, low = Infinity, rise = 0, atFinish = null, lastRemain = null, fresh = true;
       const limit = 300 + p.length / 3;                       // long flat ski routes (Arlberg woster-bockbachtal: 8.2 km) take time
       while (t < limit && !done) {
@@ -316,7 +333,13 @@ for (const rid of rids.length ? rids : ALL) {
         const prev = s;
         s = stepSkier(s, bot(s), world);
         s = course.collide(prev, s);
-        if (was && s.crash === 0) { const r = run.respawnPoint(); s = createSkierState(r.x, r.z, r.heading, height(r.x, r.z)); fresh = true; course.rebase(); }
+        if (was && s.crash === 0) {
+          let r = run.respawnPoint();
+          // R8e: like main.js clearSpot: a respawn spot in a house / station part moves along the line to the nearest clear one
+          const stuckAt = (x, z) => !!(houseHit(x, z, 1.5) || lifts.world.hit(x, z, 1.5, height(x, z), height));
+          if (stuckAt(r.x, r.z)) for (const ds of [8, -8, 16, -16, 30]) { const a = p.at(Math.max(2, Math.min(p.length - 2, (r.s || run.progress) + ds)), {}); if (!stuckAt(a.x, a.z)) { r = { x: a.x, z: a.z, heading: Math.atan2(a.dz, a.dx), s: a.s }; break; } }
+          s = createSkierState(r.x, r.z, r.heading, height(r.x, r.z)); fresh = true; course.rebase();
+        }
         const c = course.update(s, SKI.dt);
         if (c.warn) warned++;
         // the HUD distance: falls along the ride (a crash puts him back up to 10 m: a new reference)

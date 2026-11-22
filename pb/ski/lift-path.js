@@ -39,10 +39,33 @@ export const LIFT_SPEC = Object.freeze({
   rope: { tower: 1.35, gap: 0, speed: 2.5, hang: 0, side: 1.35, back: 0.9, wheel: 1.05, sag: 0.0015, station: [3, 2.4, 3] },
   carpet: { tower: 0, gap: 0, speed: 1.4, hang: 0, side: 0, wheel: 0, sag: 0, station: [2, 1, 2] },
   train: { tower: 0, gap: 0, speed: 5, hang: 0, side: 2.1, wheel: 0, sag: 0, station: [24, 6, 9] },
+  // R8e: a funitel / DMC (gondola class, sub 'funitel'): big cabins on two haul ropes 3.2 m apart, a continuous loop, cabins far apart
+  funitel: { tower: 18, gap: 110, speed: 6, hang: 5.4, side: 4.1, wheel: 5.18, sag: 0.01, station: [22, 9, 12] },
 });
+/** R8e (3V QA: the "Funitel 3 Vallées" was drawn as a 2-cabin aerial tram): OSM maps funitels / DMCs / 3S as aerialway=cable_car or
+ *  gondola. Twin-rope lifts with big cabins on a loop: by name (Funitel, DMC = double monocable, Doppelseil, 3S, the Glacier Rides), a
+ *  gondola with >= 32 seats a cabin (Grand Fond, Péclet: 33), or a "cable car" whose hourly capacity (aerialway:capacity, `cap`) is far
+ *  beyond what two shuttling cabins of its size could carry in its ride time (`dur`, minutes): Thorens (40 seats, 1710 /h in 1.8 min). */
+export const FUNITEL_NAME = /\bfunitel\b|\bdmc\b|doppelseil|double[- ]monocable|\b3s\b|glacier ride/i;
+export function isFunitel(src) {
+  if (!src) return false;
+  if (src.type === 'funitel' || FUNITEL_NAME.test(src.name || '')) return true;
+  const cls = LIFT_CLASS[src.kind] || null, seats = Number(src.seats) || 0;
+  if (cls === 'gondola') return seats >= 32;
+  if (cls !== 'cable' || !seats || seats > 45 || !(src.cap > 0) || !(src.dur > 0)) return false;
+  const shuttleMax = 2 * seats * 3600 / (2 * (src.dur * 60 + 40));          // two cabins, ride time + 40 s at the stations, both ways
+  return src.cap > 1.4 * shuttleMax;
+}
+/** R8e: the resort's lifts with the funitels classed as twin-rope gondolas (kind 'gondola', type 'funitel'), in place; every loader
+ *  (linepack.js unpackResort) runs it, so the stations, the obstacles and the rides all see the same class. */
+export function normaliseLifts(resort) {
+  for (const l of (resort && resort.lifts) || []) if (isFunitel(l) && (liftClass(l.kind) === 'cable' || liftClass(l.kind) === 'gondola')) { l.kind = 'gondola'; l.type = 'funitel'; }
+  return resort;
+}
 /** Carrier half sizes (m): lateral, along the travel, the drop from the rope to its lowest point, the rise above the rope (the grip). */
 export function carrierBox(kind, seats = 4, sub = '') {
   if (kind === 'chair') { const W = chairWidth(seats); return { hw: W / 2 + 0.05, hl: 0.62, drop: 2.68, top: 0.12 }; }
+  if (kind === 'gondola' && sub === 'funitel') return { hw: 1.75, hl: 1.35, drop: 4.95, top: 0.15 };      // R8e: carriers.js funitel cabin
   if (kind === 'gondola') return { hw: 1.0, hl: 1.05, drop: 4.25, top: 0.12 };
   if (kind === 'cable') return { hw: 2.25, hl: 3.55, drop: 6.25, top: 0.2 };
   if (kind === 'drag') return sub === 'rope' ? { hw: 0.1, hl: 0.15, drop: 0.25, top: 0.1 } : { hw: sub === 'tbar' ? 0.55 : 0.3, hl: 0.2, drop: 1.5, top: 0.1 };
@@ -68,8 +91,8 @@ const TUNNEL_RAMP = 70;              // m over which the line dives from the sta
 export function createLiftPath(src, height) {
   const kind = liftClass(src.kind) || liftClass(src.type);
   if (!kind || !src.pts || src.pts.length < 4) return null;
-  const sub = kind === 'drag' ? dragType(src) : '';
-  const base = LIFT_SPEC[sub === 'rope' ? 'rope' : kind];
+  const sub = kind === 'drag' ? dragType(src) : kind === 'gondola' && isFunitel(src) ? 'funitel' : '';
+  const base = LIFT_SPEC[sub === 'rope' ? 'rope' : sub === 'funitel' ? 'funitel' : kind];
   const seats = Number(src.seats) || (kind === 'chair' ? 4 : kind === 'gondola' ? 8 : 0);
   const cb = carrierBox(kind, seats, sub);
   // a wide chair needs its rope farther out, or its inner seat would brush the pylon column

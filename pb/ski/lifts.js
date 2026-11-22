@@ -18,6 +18,9 @@ import { mergeParts } from './modes/views.js';
 const NEAR_R = 130;                    // m: carriers closer than this get the full model, the rest the far one
 const FAR_R = { chair: 1100, drag: 500, gondola: 1600, cable: 3000, train: 3000 };      // m: beyond this a carrier is below a pixel
 const DWELL = 8;                       // s a jig-back cabin / train waits at a station
+// R8e (3V QA: no cable car waiting at the bottom station): the jig-back pairs run at the ride's speed (liftride.js RIDE.factor), so the
+// one you ride and the ones you watch keep one schedule, and a wait for the next cabin stays short
+const SHUTTLE_FACTOR = 4;
 /* R8: the lift-name signs on the stations (lift-site.js `sign` parts): the nearest SIGN.slots signs within SIGN.radius get their name in
  * one shared canvas atlas, one merged mesh = one draw call; re-chosen every SIGN.every s as the skier moves. */
 const SIGN = Object.freeze({ slots: 12, radius: 320, every: 1.2, slotW: 512, slotH: 64, cols: 2 });      // (a small atlas: WebKit uploads it whole)
@@ -120,11 +123,15 @@ export function createLifts({ scene, resort, height }) {
       }
     } else if (kind !== 'carpet') {
       const steps = Math.max(8, Math.ceil(l.loopLen / 8));
-      let prev = null;
-      for (let k = 0; k <= steps; k++) {
-        const w = l.loopAt((k / steps) * l.loopLen, {});
-        if (prev && !(l.shuttle && Math.abs(w.s - prev.s) > l.len * 0.5)) cablePts.push(prev.x, prev.y, prev.z, w.x, w.y, w.z);
-        prev = w;
+      // R8e: a funitel runs on two haul ropes 3.2 m apart (the cabin's two grips, carriers.js)
+      for (const off of l.sub === 'funitel' ? [-1.6, 1.6] : [0]) {
+        let prev = null;
+        for (let k = 0; k <= steps; k++) {
+          const w = l.loopAt((k / steps) * l.loopLen, {});
+          if (off) { const ox = -Math.sin(w.heading) * off, oz = Math.cos(w.heading) * off; w.x += ox; w.z += oz; }
+          if (prev && !(l.shuttle && Math.abs(w.s - prev.s) > l.len * 0.5)) cablePts.push(prev.x, prev.y, prev.z, w.x, w.y, w.z);
+          prev = w;
+        }
       }
     }
     // the stations (and portals, stops)
@@ -280,7 +287,7 @@ export function createLifts({ scene, resort, height }) {
   const pools = new Map();               // key -> { near, far, glass, count }
   const glassMat = new THREE.MeshLambertMaterial({ color: 0xcfe2f0, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide });
   disposables.push(glassMat);
-  const variantOf = (l) => (l.kind === 'chair' ? `chair:${l.seats}` : l.kind === 'drag' ? `drag:${l.sub}` : l.kind);
+  const variantOf = (l) => (l.kind === 'chair' ? `chair:${l.seats}` : l.kind === 'drag' || l.sub === 'funitel' ? `${l.kind}:${l.sub}` : l.kind);      // R8e: funitel cabins
   const need = new Map();
   for (const l of lifts) {
     if (l.kind === 'carpet' || (l.kind === 'drag' && l.sub === 'rope')) continue;
@@ -289,7 +296,7 @@ export function createLifts({ scene, resort, height }) {
   }
   for (const [key, n] of need) {
     const [kind, v] = key.split(':');
-    const opts = { seats: kind === 'chair' ? Number(v) : 4, sub: kind === 'drag' ? v : '', barUp: true };
+    const opts = { seats: kind === 'chair' ? Number(v) : 4, sub: kind === 'drag' || v === 'funitel' ? v : '', barUp: true };
     const cap = Math.min(n, 2400);
     const mk = (geo, mat, shadow) => { const m = new THREE.InstancedMesh(geo, mat, cap); m.count = 0; m.frustumCulled = false; m.castShadow = shadow; m.visible = false; group.add(m); disposables.push(geo); return m; };
     const near = carrierGeometry(kind, { ...opts, lod: 'near' });
@@ -317,12 +324,12 @@ export function createLifts({ scene, resort, height }) {
   /** Where a jig-back pair is at time t (s along the line of the cabin on the up track; the other is at len - s). */
   function shuttleS(l, t) {
     const [d0, d1] = l.docks;
-    const T = (d1 - d0) / l.spec.speed, cycle = 2 * (T + DWELL);
+    const T = (d1 - d0) / (l.spec.speed * SHUTTLE_FACTOR), cycle = 2 * (T + DWELL);
     const u = (((t + l.offset) % cycle) + cycle) % cycle;
     if (u < DWELL) return { s: d0, up: true };
-    if (u < DWELL + T) return { s: d0 + (u - DWELL) * l.spec.speed, up: true };
+    if (u < DWELL + T) return { s: d0 + (u - DWELL) * l.spec.speed * SHUTTLE_FACTOR, up: true };
     if (u < 2 * DWELL + T) return { s: d1, up: false };
-    return { s: d1 - (u - 2 * DWELL - T) * l.spec.speed, up: false };
+    return { s: d1 - (u - 2 * DWELL - T) * l.spec.speed * SHUTTLE_FACTOR, up: false };
   }
 
   // ---------------- R8: the name signs ----------------
@@ -421,6 +428,9 @@ export function createLifts({ scene, resort, height }) {
 
   function update(t, camX, camZ, radius) {
     if (signs) signs.update(lastT === null ? 0.6 : Math.max(0, t - lastT), camX, camZ);
+    // R8e: a jig-back pair waits at its stations while the skier stands in the boarding zone and the up-track cabin is docked below
+    const dtU = Math.max(0, t - (lastT || t));
+    for (const l of lifts) if (l.shuttle && l.rideU === null && l.holdUntil > t && shuttlePhase(l, t) < DWELL) l.offset -= dtU;
     lastT = t;
     for (const c of chunks) c.mesh.visible = Math.hypot(c.cx - camX, c.cz - camZ) - CHUNK * 0.71 < radius;
     for (const p of pools.values()) { p.n = 0; p.nf = 0; }
@@ -462,7 +472,7 @@ export function createLifts({ scene, resort, height }) {
     if (u === null || u === undefined) {
       if (l.rideU !== null) {
         if (l.shuttle) {             // the pair goes on from where it stands (at a station: the dwell there)
-          const T = (l.docks[1] - l.docks[0]) / l.spec.speed;
+          const T = (l.docks[1] - l.docks[0]) / (l.spec.speed * SHUTTLE_FACTOR);
           const top = l.rideU > (l.docks[1] - l.docks[0]) / 2;
           l.offset = (top ? DWELL + T + 0.5 : 0.5) - lastT;
         } else { const gap = l.spec.gap; l.offset = (((l.rideU - lastT * l.spec.speed) % gap) + gap) % gap; }
@@ -470,6 +480,24 @@ export function createLifts({ scene, resort, height }) {
       l.rideU = null;
     } else l.rideU = u;
   }
+  /** R8e: the time into a jig-back pair's cycle (0 .. DWELL: the up-track cabin docked at the bottom) and the cycle length. */
+  function shuttlePhase(l, t) {
+    const T = (l.docks[1] - l.docks[0]) / (l.spec.speed * SHUTTLE_FACTOR), cycle = 2 * (T + DWELL);
+    return (((t + l.offset) % cycle) + cycle) % cycle;
+  }
+  /** R8e: boarding a jig-back cabin: { wait (s until the up-track cabin is docked at the bottom, 0 = it is), at(dt) = { s, up } of that
+   *  cabin dt s from now (docked once there) }. The schedule is the scenery's, so the cabin you wait for is the one coming down. */
+  function shuttleBoard(index) {
+    const l = byIndex.get(index);
+    if (!l || !l.shuttle) return null;
+    const t0 = lastT || 0, T = (l.docks[1] - l.docks[0]) / (l.spec.speed * SHUTTLE_FACTOR), cycle = 2 * (T + DWELL);
+    const u = shuttlePhase(l, t0), wait = u < DWELL ? 0 : cycle - u;
+    return { wait, at: (dt) => (dt >= wait ? { s: l.docks[0], up: true } : shuttleS(l, t0 + dt)) };
+  }
+  /** R8e: the skier waits in lift `index`'s boarding zone (called every frame): a docked up-track cabin stays docked. */
+  function holdShuttle(index) { const l = byIndex.get(index); if (l && l.shuttle) l.holdUntil = (lastT || 0) + 0.5; }
+  /** R8e: a fast travel / the spawn put him at lift `index` (behind the fade): its up-track cabin is docked at the bottom, just arrived. */
+  function dockShuttle(index) { const l = byIndex.get(index); if (l && l.shuttle && l.rideU === null) l.offset = 0.5 - (lastT || 0); }
   /** The loop parameter of the next carrier that will reach uTarget (the loading point) at least `minAhead` m away. */
   function nextCarrier(index, uTarget, minAhead = 0) {
     const l = byIndex.get(index);
@@ -500,7 +528,7 @@ export function createLifts({ scene, resort, height }) {
     for (const d of disposables) { try { d.dispose(); } catch (error) { /* already gone */ } }
   }
   return {
-    group, update, nearest, setRide, nextCarrier, dispose, count: lifts.length,
+    group, update, nearest, setRide, nextCarrier, shuttleBoard, holdShuttle, dockShuttle, dispose, count: lifts.length,
     pathOf: (index) => (byIndex.get(index) ? byIndex.get(index).path : null),
     siteOf: (index) => (byIndex.get(index) ? byIndex.get(index).site : null),
     /** The loop parameter of the carrier held for the player on lift `index` (null: none). */

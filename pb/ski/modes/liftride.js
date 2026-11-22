@@ -25,6 +25,8 @@ export const RIDE = Object.freeze({
   stepOut: 0.7, getIn: 0.55, clickIn: 1.3, barDrop: 0.9, getOut: 0.6, turn: 0.6,
   wait: 2.5,                 // s at most the rider waits for the next carrier (beyond that the lift catches up)
 });
+const DRAG_BACK = 1.8;                // R8e: m the rider of a platter / T-bar is pulled behind the spring box (the rod ~20 deg off the vertical)
+const FUNITEL_SEAT = -4.75;            // R8e: the rider's feet below the ropes in a funitel cabin (carriers.js: floor 4.8 m down)
 export const POSE_OF = Object.freeze({ chair: 'sit', gondola: 'carry', cable: 'carry', train: 'carry', drag: 'drag', carpet: 'belt' });
 export const KIND_CODE = Object.freeze({ chair: 1, gondola: 2, cable: 3, drag: 4, train: 5, carpet: 6 });
 export const KIND_OF_CODE = Object.freeze(Object.fromEntries(Object.entries(KIND_CODE).map(([k, v]) => [v, k])));
@@ -59,7 +61,14 @@ export function riderAt(path, s, height, out = {}) {
   else out.cy = c.y;
   if (k === 'drag') {
     const lat = path.sub === 'rope' ? -0.45 * path.sign : 0;       // a rope tow: the rope at his outer hand
-    out.x = c.x + rx * lat; out.z = c.z + rz * lat; out.y = height(out.x, out.z); out.hip = out.y + (path.sub === 'platter' ? 0.78 : 0.86);
+    // R8e (3V QA "Belvédère": the platter rod hung straight down behind him, not held): he is pulled 1 m behind the spring box, the rod
+    // runs from it down and back to the disc / T between his legs, his hand holds it ~0.55 m up from there (skier-model.js poseDrag)
+    const back = path.sub === 'rope' ? 0 : DRAG_BACK;
+    out.x = c.x + rx * lat - fx * back; out.z = c.z + rz * lat - fz * back; out.y = height(out.x, out.z); out.hip = out.y + (path.sub === 'platter' ? 0.78 : 0.86);
+    if (back) {
+      const bx = out.x + fx * 0.04, bz = out.z + fz * 0.04, ty = c.y - 0.65, dx = c.x - bx, dy = ty - out.hip, dz = c.z - bz, L = Math.hypot(dx, dy, dz) || 1;
+      out.hand = { x: bx + dx / L * 0.55, y: out.hip + dy / L * 0.55, z: bz + dz / L * 0.55 };
+    } else out.hand = null;
   } else if (k === 'carpet') { out.x = c.x; out.z = c.z; out.y = out.cy; }
   else if (k === 'chair') {
     const slot = Math.min(0.45, 0.25 * Math.max(1, (path.seats || 4) / 2 - 0.5));     // a seat left of the middle (towards the line)
@@ -67,7 +76,7 @@ export function riderAt(path, s, height, out = {}) {
   } else if (k === 'train') {
     const f = path.shuttleAt(Math.min(path.len, s + 3), 1, true, {});      // 3 m ahead in the carriage, on the line (smooth in the curves)
     out.x = f.x; out.z = f.z; out.y = f.y + RIDE.seat.train;
-  } else { out.x = c.x + fx * 0.35; out.z = c.z + fz * 0.35; out.y = c.y + RIDE.seat[k]; }
+  } else { out.x = c.x + fx * 0.35; out.z = c.z + fz * 0.35; out.y = c.y + (path.sub === 'funitel' ? FUNITEL_SEAT : RIDE.seat[k]); }
   return out;
 }
 
@@ -77,7 +86,9 @@ export function riderAt(path, s, height, out = {}) {
  * will pick him up (lifts.js nextCarrier; default: one line-speed approach behind the loading point), exitAt() = the exit spot at the
  * top ({ x, z, heading }; asked for when he gets off, so the tiles there are in).
  */
-export function createRide({ lift, path, site, height, factor = RIDE.factor, from = null, startU = null, exitAt = null }) {
+// R8e (3V QA: a cable car boarded with no cabin at the bottom station): shuttle = lifts.js shuttleBoard(): the boarding waits until the
+// scheduled up-track cabin has come down and docked (the cabin drawn coming in), never a cabin out of nowhere
+export function createRide({ lift, path, site, height, factor = RIDE.factor, from = null, startU = null, exitAt = null, shuttle = null }) {
   const k = path.kind;
   const [s0, s1] = rideSpan(path);
   const speed = path.spec.speed * factor;
@@ -90,13 +101,15 @@ export function createRide({ lift, path, site, height, factor = RIDE.factor, fro
   const moveD = Math.hypot(load.x - start.x, load.z - start.z);
   const tMove = Math.max(0.8, moveD / (carry ? RIDE.walk : RIDE.glide));
   const tIn = k === 'drag' ? (path.sub === 'rope' ? 0.4 : RIDE.barDrop) : k === 'carpet' ? 0.3 : RIDE.getIn;
-  const uLoad = path.shuttle ? s0 : path.upU(s0);
+  const sLoad = k === 'drag' && path.sub !== 'rope' ? Math.min(s1 - 1, s0 + DRAG_BACK) : s0;      // R8e: the bar's box 1 m ahead of him
+  const uLoad = path.shuttle ? s0 : path.upU(sLoad);
   const tNeed = tStep + tMove + tIn;
   let u0 = startU === null || !Number.isFinite(startU) ? uLoad - path.spec.speed * tNeed : startU;
   if (path.shuttle) u0 = uLoad;
   const approach = uLoad - u0;
-  const tArrive = path.shuttle ? tNeed : Math.max(tNeed, Math.min(approach / path.spec.speed, tNeed + RIDE.wait));
-  let phase = 'board', t = 0, s = s0, skipped = false, tRide = 0, alight = null;
+  const tArrive = path.shuttle ? Math.max(tNeed, shuttle ? shuttle.wait + tIn : 0) : Math.max(tNeed, Math.min(approach / path.spec.speed, tNeed + RIDE.wait));
+  const cabin = (tt) => (path.shuttle && shuttle ? shuttle.at(tt) : { s: s0, up: true });       // the jig-back cabin while he boards
+  let phase = 'board', t = 0, s = sLoad, skipped = false, tRide = 0, alight = null;
   const pose = { roll: 0 };
   const ride = {
     lift, path, site, kind: k, pose: POSE_OF[k], speed, carry,
@@ -108,7 +121,7 @@ export function createRide({ lift, path, site, height, factor = RIDE.factor, fro
     get left() { return phase === 'ride' ? Math.max(0, (s1 - s) / speed) : phase === 'board' ? rideSeconds(path, factor) : 0; },
     /** The loop parameter of the rider's own carrier while it holds him (lifts.js setRide), else null (the lift's own loop has it). */
     get carrierU() {
-      if (phase === 'board') return path.shuttle ? uLoad : u0 + approach * Math.min(1, t / tArrive);
+      if (phase === 'board') return path.shuttle ? path.upU(cabin(t).s) : u0 + approach * Math.min(1, t / tArrive);
       if (phase === 'ride') return path.upU(s);
       return null;
     },
@@ -136,6 +149,7 @@ export function createRide({ lift, path, site, height, factor = RIDE.factor, fro
       const moving = phase === 'ride' ? speed : 0;
       const st = { ...base, x: w.x, y: w.y, z: w.z, heading: w.heading, vx: Math.cos(w.heading) * moving, vz: Math.sin(w.heading) * moving, vy: 0, speed: k === 'drag' && phase === 'ride' ? speed : w.glide || 0,
         grounded: true, air: 0, crash: 0, tuck: 0, brake: 0, edge: 0, steer: 0, slip: 0, landed: 0, spin: 0, flip: 0, grab: 0, rail: -1, ride: w.pose, walk: w.walk || 0 };
+      st.dragHand = k === 'drag' && w.onCarrier && w.hand ? w.hand : null;      // R8e: the hand on the rod (skier-model.js poseDrag)
       if (w.onCarrier) { st.rideLift = lift.index; st.rideS = s; st.rideKind = KIND_CODE[k]; }
       else { delete st.rideLift; delete st.rideS; delete st.rideKind; }
       return st;
@@ -169,7 +183,7 @@ export function createRide({ lift, path, site, height, factor = RIDE.factor, fro
     if (phase === 'board') {
       // the carrier comes in; the rider steps out of his skis (cabins), walks / skates to the loading line, gets in as it arrives
       const cu = u0 + approach * Math.min(1, t / tArrive);
-      const c = path.shuttle ? path.shuttleAt(s0, 1, true, {}) : path.loopAt(cu, {});
+      const cb = cabin(t), c = path.shuttle ? path.shuttleAt(cb.s, 1, cb.up, {}) : path.loopAt(cu, {});
       w.cx = c.x; w.cz = c.z; w.cy = k === 'carpet' ? height(c.x, c.z) + 0.18 : c.y; w.heading = c.heading; w.pitch = k === 'train' ? Math.atan(path.slope(s0)) : 0;
       w.barDown = false;
       w.hip = undefined;
@@ -247,7 +261,7 @@ export function rideCamera(path, w, mode, ground) {
   } else if (mode === 'window') {
     // from the rider's eyes: a chair looks a little down (the safety bar and the chairs ahead); a cabin from just behind its front
     // window, eyes level with the glass (no ceiling band), skis on his shoulder; a drag lift up the track
-    const half = k === 'gondola' ? 1.0 : k === 'cable' ? 3.5 : k === 'train' ? 6.25 : 0;
+    const half = k === 'gondola' ? (path.sub === 'funitel' ? 1.3 : 1.0) : k === 'cable' ? 3.5 : k === 'train' ? 6.25 : 0;
     const eye = k === 'chair' ? 1.02 : k === 'drag' || k === 'carpet' ? 1.62 : 1.48;
     const ahead = k === 'chair' ? 0.08 : k === 'drag' ? 0.2 : k === 'carpet' ? 0.25 : k === 'train' ? half - 3.35 : half - 0.35 - 0.35;
     out.x = w.x + fx * ahead; out.z = w.z + fz * ahead; out.y = w.y + eye;
@@ -264,8 +278,9 @@ export function rideCamera(path, w, mode, ground) {
     out.inside = true;
     return out;
   } else {
-    const back = k === 'cable' ? 13 : k === 'gondola' ? 7.5 : k === 'train' ? 16 : k === 'drag' ? 5.5 : k === 'carpet' ? 5 : 5.2;
-    const side = k === 'cable' ? 6 : k === 'gondola' ? 3.6 : k === 'train' ? 5 : k === 'drag' ? 1.6 : k === 'carpet' ? 1.5 : 2.6;
+    const fun = path.sub === 'funitel';                                   // R8e: a funitel cabin is bigger: the camera farther out
+    const back = k === 'cable' ? 13 : k === 'gondola' ? (fun ? 9 : 7.5) : k === 'train' ? 16 : k === 'drag' ? 5.5 : k === 'carpet' ? 5 : 5.2;
+    const side = k === 'cable' ? 6 : k === 'gondola' ? (fun ? 4.8 : 3.6) : k === 'train' ? 5 : k === 'drag' ? 1.6 : k === 'carpet' ? 1.5 : 2.6;
     const up = k === 'cable' ? 2.5 : k === 'gondola' ? 1.9 : k === 'train' ? 4 : k === 'drag' ? 2.3 : k === 'carpet' ? 2.2 : 1.9;
     out.x = w.x - fx * back + rx * side; out.z = w.z - fz * back + rz * side;
     out.y = w.y + up + (k === 'chair' ? 0.4 : 0);

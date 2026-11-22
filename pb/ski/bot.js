@@ -39,6 +39,14 @@ export function createBot(piste, { speedScale = 1, blocked = null } = {}) {
         const ox = tx - p.dz * o, oz = tz + p.dx * o;
         if (!blocked(ox, oz) && pathClear(blocked, state.x, state.z, ox, oz)) { tx = ox; tz = oz; side = o; break; }
       }
+      // pressed against a wide house: nothing clear ahead, so first sideways along it (a few metres down the line), round its corner
+      if (!side) {
+        piste.at(proj.s, q);
+        for (const o of [...AVOID, 30, -30, 36, -36]) {
+          const ox = state.x - q.dz * o + q.dx * 4, oz = state.z + q.dx * o + q.dz * 4;
+          if (!blocked(ox, oz) && pathClear(blocked, state.x, state.z, ox, oz)) { tx = ox; tz = oz; side = o; break; }
+        }
+      }
     }
     const want = Math.atan2(tz - state.z, tx - state.x);
     const err = wrap(want - state.heading);
