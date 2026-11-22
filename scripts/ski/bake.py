@@ -1738,6 +1738,7 @@ def main():
         shown = display_name(r["name"], r["ref"], r["diff"])
         if len(colours_of.get(base_name(r["name"]), ())) > 1 and shown == r["name"]:
             shown = with_colour(shown, r["diff"])            # R8c: "Bouc Blanc" red and black -> "Bouc Blanc (Rout)", "... (Schwaarz)"
+        shown = cfg.get("names", {}).get(r["id"], shown)      # launch fix: RESORTS[rid]["names"] (a link OSM names after its piste)
         pistes.append({"id": r["id"], "name": shown, "ref": r["ref"], "diff": r["diff"], "len": round(r["len"]), "drop": round(r["drop"]),
                        "top": round(float(r["h"][0])), "bottom": round(float(r["h"][-1])), "hw": round(r["hw"], 1),
                        "slalom": bool(r.get("slalom")), "line": flat(q)})

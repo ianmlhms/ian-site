@@ -52,6 +52,11 @@ RESORTS = {
         "far": ["ign-rgealti", "copernicus-glo30"],
         # the box grew east in the data round (Le Fornet / Pays Désert / Montet were cut at 7.060): own cache folder, old tiles reused
         "work": "killy-r5", "work_from": ("killy", 999680.0, 6499840.0),
+        # launch fix (22 Nov 2026, Ian: "Face (Schwaarz)" tops out near 32 km/h): two short OSM ways named "Face" are LINKS onto the
+        # Face de Bellevarde (OSM way 30721500: off Fontaine Froide, 276 m, 34 m drop, its middle 2-4 degrees; way 52876769: from the
+        # Loyes Express link). As "Face (Schwaarz)" / "(Schwaarz 2)" they read as the famous steep run. Shown names by run id (the id,
+        # so the board and its ski-v1.sql floor, stay the same); bake.py applies them after the colour suffix.
+        "names": {"face-black": "Verbindung Fontaine Froide → Face de Bellevarde", "face-2": "Verbindung → Face de Bellevarde"},
         "villages": [                              # name, lon, lat, radius m [, "chalet": paint even big blocks as wood-and-stone chalets]
             ("Val d'Isère", 6.9797, 45.4486, 1300), ("La Daille", 6.9600, 45.4680, 450), ("Le Fornet", 7.0150, 45.4370, 400),
             ("Tignes le Lac", 6.9070, 45.4690, 700), ("Val Claret", 6.9030, 45.4560, 550), ("Le Lavachet", 6.9180, 45.4730, 350),

@@ -1344,3 +1344,22 @@ after all tiles are in (heap climbs ~100 MB before each GC).
   (x,z,above,tx,tz,above2,fov): killy 12300,9222,250,10017,8170,100,50 (Val d'Isère + Bellevarde); 3vallees 10407,17665,20,9072,19393,150,55
   (Val Thorens); zermatt 12300,6200,120,4568,7860,-300,45 (Matterhorn); arlberg 20336,18478,200,16879,15754,0,50 (St. Anton slopes);
   kronplatz 10246,5004,200,7929,7428,0,50 (the summit gondolas). First play unchanged (ski-ipad-start 2.81 MB to skiing).
+## Launch fix: "Face (Schwaarz)" speed + low-fps clock (22 Nov 2026)
+Ian (iPad 9, Safari, touch, in the Arcade): on Killy's "Face (Schwaarz)" "you can't get faster than like 32 km/h".
+- **Cause (data)**: "Face (Schwaarz)" (id `face-black`) is NOT the Face de Bellevarde: it is OSM way 30721500, a 276 m LINK named "Face"
+  from Fontaine Froide (s 249) onto the Face de Bellevarde (s 716), 2632 -> 2598 m (34 m drop, mean 7 deg, its middle 120 m at 2-4 deg).
+  Measured (Node, the challenge physics + course nets, straight tuck): 34-38 km/h through the flat middle, 56 km/h at the very end;
+  Chromium touch profile (real touch on Hocken, no steer): 22-40 km/h, tuck 1.00 / brake 0 / steer 0 / no hockey stop the whole run.
+  The real Face de Bellevarde (`face-de-bellevarde`, 2.8 km, 967 m drop) tops out at 119 km/h (the cap), 94 km/h average on >= 20 deg.
+  `face-2` ("Face (Schwaarz 2)", OSM way 52876769) is the same kind of link (from the Loyes Express link). Survey of every piste
+  (`speed-check.mjs --survey`, tucked): blacks top median 111 km/h, p10 91; only `face-black` (56) and Arlberg's `umfahrung-schuttboden`
+  (a bypass by name, 49) stay under 60. Physics, touch input, nets, snow type and the quality watchdog were all ruled out.
+- **Fix (data)**: shown names by id in `common.py RESORTS.killy.names` (bake.py applies them after the colour suffix), and the same two
+  strings patched into `data/killy/resort.json` (+ data-hashes.json): `face-black` = "Verbindung Fontaine Froide → Face de Bellevarde",
+  `face-2` = "Verbindung → Face de Bellevarde". Ids, boards and the ski-v1.sql floors unchanged (floors-check green).
+- **Fix (clock)**: main.js clamped a frame to 0.05 s and 6 physics steps, so below 20 fps the whole game ran slow (15 fps = 0.75 x real
+  time, measured in Chromium with rAF capped at 15 fps: 7.6 s game per 10 s real). New `clock.js` (frameSeconds / planSteps): real time down
+  to 10 fps (MAX_FRAME_S 0.1, up to 12 steps of 1/120 s a frame); at 15 fps now 18.9 s game per 19 s real, same speeds per metre.
+- **Check**: `node scripts/ski/speed-check.mjs` (~40 s): Face de Bellevarde tucked 80-119 km/h + >= 80 km/h on >= 20 deg; the longest
+  plain blue per resort upright p75 40-70 km/h, tucked under the cap; every black not named "Verbindung / Umfahrung ..." >= 60 km/h
+  tucked; 15 fps = 60 fps speeds (+-3 %) and the clock at real time; SKI.maxSpeed == PLAY.maxRunSpeed. Before the fix: 12 FAILs.

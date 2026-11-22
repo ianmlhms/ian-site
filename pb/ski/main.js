@@ -29,6 +29,7 @@ import { createRoads, decodeRoads, housesOnStreets } from './roads.js';
 import { createLandmarks } from './landmarks.js';
 import { createPisteSet } from './pistes.js';
 import { createSkierState, stepSkier } from './skier.js';
+import { frameSeconds, planSteps } from './clock.js';          // launch fix: real time down to 10 fps (was 20)
 import { createSkierModel, readOutfit, writeOutfit, OUTFITS } from './skier-model.js';
 import { createChaseCamera } from './camera.js';
 import { createInput } from './input.js';
@@ -64,7 +65,6 @@ const THREE = window.THREE;
 const LOAD = window.__skiLoad || { set() {}, done() {}, fail() {} };
 const mark = (name) => { try { performance.mark(`ski:${name}`); } catch (error) { /* no marks */ } };
 const DEFAULT_PISTE = 'diebold';
-const MAX_FRAME_S = 0.05;
 const HUD_EVERY = 0.1;
 
 function param(name) {
@@ -1224,7 +1224,7 @@ async function boot() {
     const frameStart = performance.now();
     frameTimes.push(rawDt * 1000); if (frameTimes.length > 240) frameTimes.shift();
     last = now;
-    const dt = Math.min(MAX_FRAME_S, rawDt);
+    const dt = frameSeconds(rawDt);
     time += dt;
     const s = game.state;
     if (mp) mp.frame(now);
@@ -1238,10 +1238,9 @@ async function boot() {
       }
       if (game.phase === 'lift' && ride) stepRide(dt * timescale);               // round 6: riding a lift
       if (game.phase === 'running' || game.phase === 'finished') {
-        acc += dt * timescale;
-        let steps = 0;
-        while (acc >= SKI.dt && steps < 6 * timescale) {
-          acc -= SKI.dt; steps++;
+        const plan = planSteps(acc, dt, timescale);
+        acc = plan.acc;
+        for (let step = 0; step < plan.steps; step++) {
           const inp = game.phase === 'finished' ? { steer: 0, tuck: 0, brake: 1, push: 0, jump: false }
             : game.override ? game.override : game.bot ? game.bot(game.state) : input.read();
           if (game.override || game.bot) game.assisted = true;
@@ -1273,7 +1272,6 @@ async function boot() {
             if (game.mode !== MODES.run && game.run.progress > game.piste.length - 15 && game.phase === 'running') finish(null);
           }
         }
-        if (acc > SKI.dt * 6 * timescale) acc = 0;
         if (course && game.phase === 'running' && game.run && game.run.timed) courseTick(dt);          // R7-C
       } else acc = 0;
     }
