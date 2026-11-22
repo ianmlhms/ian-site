@@ -217,7 +217,8 @@ try {
           let worst = 0, what = '';
           for (const [dx, dz] of [[0, 0], [0.4, 0], [-0.4, 0], [0, 0.4], [0, -0.4]]) {
             ray.set(new T.Vector3(st.x + dx, st.y + 3, st.z + dz), new T.Vector3(0, -1, 0)); ray.far = 8;
-            const hit = ray.intersectObjects(targets, true).find((h) => h.object.visible !== false && h.face && h.face.normal && Math.abs(h.face.normal.y) > 0.5);
+            // (a decal that writes no depth, the drag track, can never hide the skis: not counted)
+            const hit = ray.intersectObjects(targets, true).find((h) => h.object.visible !== false && h.face && h.face.normal && Math.abs(h.face.normal.y) > 0.5 && !(h.object.material && h.object.material.depthWrite === false));
             if (hit && hit.point.y - S.standHeight(st.x + dx, st.z + dz) > worst) { worst = hit.point.y - S.standHeight(st.x + dx, st.z + dz); what = hit.object.name || (hit.object.parent && hit.object.parent.name) || hit.object.type; }
           }
           out.push({ lift: l.name, deck: S.deckAt(st.x, st.z) > S.surface.height(st.x, st.z), over: +worst.toFixed(3), what, clear: +S.skierClear.toFixed(3) });

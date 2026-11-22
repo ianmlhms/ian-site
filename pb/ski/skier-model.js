@@ -216,6 +216,7 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false, skinne
     const skeleton = new THREE.Skeleton(bones, bones.map(() => I.clone()));
     mesh.bind(skeleton, I);
     mesh.frustumCulled = false; mesh.castShadow = !ghost; mesh.receiveShadow = !ghost;
+    if (!ghost) mesh.renderOrder = 2;                                     // after the snow decals (drag tracks)
     // a bone counts as hidden when it or any group above it (up to the root) is invisible, or (first person) it is not gear
     const up = bones.map((b) => { const chain = []; for (let o = b; o && o !== root; o = o.parent) chain.push(o); return chain; });
     const update = skeleton.update.bind(skeleton);

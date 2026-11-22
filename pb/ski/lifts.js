@@ -243,7 +243,10 @@ export function createLifts({ scene, resort, height }) {
   const trackMat = new THREE.MeshLambertMaterial({ color: 0xd3d9e2, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   disposables.push(trackMat);
   const trackMesh = meshFromRibbons(trackParts, trackMat);
-  if (trackMesh) trackMesh.name = 'ski-lift-tracks';
+  // R8b: the worn track is a decal on the snow: drawn after the ground, never writing depth, so skis standing in it are never hidden
+  // (the lift-path ground it follows differs from the drawn snow by a few cm)
+  trackMat.depthWrite = false;
+  if (trackMesh) { trackMesh.name = 'ski-lift-tracks'; trackMesh.renderOrder = 1; }
   // the belt: a dark rubber strip with cleats; its texture runs up the belt
   const beltTex = (() => {
     const c = document.createElement('canvas'); c.width = 8; c.height = 32;

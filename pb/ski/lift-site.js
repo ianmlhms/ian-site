@@ -157,7 +157,7 @@ export function createLiftSite(path) {
         add(hutA0 - 0.25, hutA1 + 0.25, hb0 - 0.25, hb1 + 0.25, big ? 2.6 : 2.1, big ? 2.95 : 2.4, COL.snow, false, { cap: true });
         add(hutA0 + 0.3, hutA1 - 0.3, hb0 - 0.03, hb0 - 0.01, 1.1, 1.9, COL.glass, false);
       }
-      if (!which) add(work - 0.6, work - 0.4, side - 1.2, side + 1.2, 0, 0.02, COL.accent, false);     // the start line on the snow
+      if (!which) add(work - 0.6, work - 0.4, side - 1.2, side + 1.2, 0, 0.02, COL.accent, false, { deck: true });     // the start line on the snow (R8b: stood on, like a deck)
     } else if (key === 'carpet') {
       type = 'belt';
       add(-0.4, 1.6, -0.7, 0.7, -0.2, 0.12, COL.steel, false, { deck: true });
