@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { unpackResort } from '../../pb/ski/linepack.js';      // R7-D: packed piste lines
 
 globalThis.window = globalThis.window || {};
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -23,7 +24,7 @@ const dry = process.argv.includes('--dry');
 if (!rid) { console.error('usage: node scripts/ski/park_site.mjs <rid> [--dry]'); process.exit(2); }
 const dir = path.join(repo, 'pb/ski/data', rid);
 const resortPath = path.join(dir, 'resort.json');
-const resort = JSON.parse(fs.readFileSync(resortPath, 'utf8'));
+const resort = unpackResort(JSON.parse(fs.readFileSync(resortPath, 'utf8')));      // R7-D: packed piste lines
 const far = decodeGrid(new Uint8Array(fs.readFileSync(path.join(dir, 'far.bin'))));
 const classes = decodeRle(new Uint8Array(fs.readFileSync(path.join(dir, 'classes.bin'))));
 const field = createField({ resort, far, classes, net: createPisteNet(resort.network) });

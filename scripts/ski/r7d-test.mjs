@@ -3,6 +3,7 @@
  *   node scripts/ski/r7d-test.mjs        exit 1 on a failure */
 import fs from "node:fs";
 import { layoutTags, tagWidth, tagLook, TAGS } from "../../pb/ski/net/tags.js";
+import { unpackResort, packLine, unpackLine } from "../../pb/ski/linepack.js";
 
 let fails = 0, oks = 0;
 const ok = (cond, msg) => { if (cond) oks++; else { fails++; console.log(`FAIL ${msg}`); } };
@@ -52,7 +53,7 @@ r = assignSlots(r.slots, ids(0, 900), cap);
 ok(r.slots.size === cap, `900 boards in range: the nearest ${cap} get a slot (the atlas never grows)`);
 // every resort: the boards within the radius of any piste start fit the atlas
 for (const rid of ["killy", "3vallees", "zermatt", "arlberg", "kronplatz"]) {
-  const res = JSON.parse(fs.readFileSync(new URL(`../../pb/ski/data/${rid}/resort.json`, import.meta.url)));
+  const res = unpackResort(JSON.parse(fs.readFileSync(new URL(`../../pb/ski/data/${rid}/resort.json`, import.meta.url))));
   const pts = res.pistes.filter((p) => p.line.length >= 4).map((p) => [p.line[0], p.line[1]]);
   let most = 0;
   for (const [x, z] of pts) most = Math.max(most, pts.filter(([a, b]) => Math.hypot(a - x, b - z) < SIGN.radius).length);
@@ -77,6 +78,21 @@ const { unpackState, packState } = await import("../../pb/ski/net/wire.js");
 const st = { x: 100, y: 10, z: 200, heading: 0, speed: 3, edge: 0, tuck: 0, brake: 0, grounded: true, vx: 3, vz: 0, vy: 0, ride: "sit", rideLift: 4, rideS: 120.5, rideKind: 1 };
 const back = unpackState(packState(st, 0, false));
 ok(back.rideLift === 4 && back.rideS === 120.5 && back.ride === "sit", "riding lift X at s survives the wire");
+
+// 5. packed piste lines (linepack.js <-> scripts/ski/linepack.py): lossless at 0.1 m, the JS packer writes what Python wrote
+for (let t = 0; t < 200; t++) {
+  const n = 2 * (1 + Math.floor(rnd() * 300)); let x = rnd() * 30000, z = rnd() * 30000;
+  const arr = []; for (let i = 0; i < n / 2; i++) { x += (rnd() - 0.5) * 30; z += (rnd() - 0.5) * 30; arr.push(Math.round(x * 10) / 10, Math.round(z * 10) / 10); }
+  const back = unpackLine(packLine(arr));
+  ok(back.length === arr.length && back.every((v, i) => Math.abs(v - arr[i]) < 1e-6), `line round trip ${t}`);
+}
+for (const rid of ["killy", "3vallees", "zermatt", "arlberg", "kronplatz"]) {
+  const raw = JSON.parse(fs.readFileSync(new URL(`../../pb/ski/data/${rid}/resort.json`, import.meta.url)));
+  const packed = raw.pistes.filter((p) => p.lz);
+  ok(packed.every((p) => packLine(unpackLine(p.lz)) === p.lz) && (raw.network || []).filter((n) => n.pz).every((n) => packLine(unpackLine(n.pz)) === n.pz), `${rid}: Python-packed lines decode and re-pack identically (${packed.length} packed)`);
+  const r = unpackResort(raw);
+  ok(r.pistes.every((p) => Array.isArray(p.line) && p.line.length >= 4 && p.line.every(Number.isFinite)) && r.network.every((n) => Array.isArray(n.p) && n.p.every(Number.isFinite)), `${rid}: every piste / network line decodes`);
+}
 
 console.log(`${fails ? "FAIL" : "PASS"} r7d-test: ${oks} ok, ${fails} failed`);
 process.exit(fails ? 1 : 0);
