@@ -544,6 +544,9 @@ net/freeride.js, mp-games `mode`): the integration takes ONE per feature; the di
   Results (22 Nov, after the Mini reboot): Chromium 130 / 130, WebKit 130 / 130 checks over the five resorts; remote lag 137-168 ms,
   13.5-15 states / s, a friend on the same lift shown 3-5 m from where he really is.
   Shots: `~/Library/Caches/ski-work/round7d/mpf/sheet-freeride-{chromium,webkit}.jpg` (start / lift / tags per resort).
+- **Suites (22 Nov, after the reboot)**: Chromium `run_all.mjs ski mp-lobby home-page arcade-pad` 22 / 22; WebKit ski-mp, ski-resorts,
+  ski-freeride, ski-mp-freeride (all 5) green (ski-mp / ski-mp-freeride drop only the old page's loads that WebKit logs as cancelled when
+  the flow reloads right at the start); Node: r7d-test 1424, look7d-check 68, round6-test 1927, mp-race-test, harness (--rides 12) x5.
 - **vs R7-A** (for the integration): sign atlas: A = fixed 336-board atlases (2048 x 2016, one draw call + ~16 MB per atlas; 3 Vallées
   two); D = one 2048 x 768 on-demand atlas (6 MB, one call at any size). Tags: same idea; D folds the rest into dots / "+N" (A hides them)
   and keeps far friends' tags with the distance in the free ride. Free ride: A has `liftBottom` jump + avalanche by (x, z, seed); D adds
