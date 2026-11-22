@@ -164,26 +164,33 @@ export function lineClear(height, ax, ay, az, bx, by, bz, margin = 1.5, skip = 0
   return true;
 }
 
-/** R7-C2: a camera spot that watches a Lawin face's flow from the side: >= 0.6 m above the snow (in practice 25-70 m), nothing of
- *  the terrain between it and the flow (no camera against / inside a rock face), the snow round it lower than the lens. Pure.
- *  Returns { x, y, z, tx, ty, tz, clear } (clear false = the least bad spot). */
-export function faceView(face, height, { dists = [150, 200, 260, 330], ups = [25, 40, 60, 85] } = {}) {
-  const p = face.path, k = Math.min(p.length / 2 - 1, Math.max(1, Math.round(p.length / 2 * 0.35)));
-  const tx = p[2 * k], tz = p[2 * k + 1], ty = height(tx, tz) + 6;
+/** R7-C2: a camera spot that watches a Lawin face's flow: in front of the face, down the slope and a little to the side (the slab
+ *  comes towards the lens), >= 0.6 m above the snow (in practice 15-50 m), a clear line to the crown, the middle and the lower part of
+ *  the flow (no camera against / inside a rock face, no ridge in between), the snow round the lens lower than it. Pure.
+ *  Returns { x, y, z, tx, ty, tz, clear, above } (clear false = the least bad spot). */
+export function faceView(face, height, { dists = [200, 280, 360, 450, 560], ups = [25, 45, 70, 100] } = {}) {
+  const p = face.path, n = p.length / 2;
+  const at = (share) => { const k = Math.min(n - 1, Math.max(0, Math.round((n - 1) * share))); return { x: p[2 * k], z: p[2 * k + 1] }; };
+  const mid = at(0.4), crown = at(0), low = at(0.8);
+  const tx = mid.x, tz = mid.z, ty = height(tx, tz) + 6;
   const fx = p[p.length - 2] - p[0], fz = p[p.length - 1] - p[1], fl = Math.hypot(fx, fz) || 1;
   const ux = fx / fl, uz = fz / fl;                                    // the flow direction (down the face)
   let best = null;
   for (let a = 0; a < 24; a++) {
     const ang = a / 24 * Math.PI * 2, cx = Math.cos(ang), cz = Math.sin(ang);
-    const along = cx * ux + cz * uz;                                    // 0 = from the side, -1 = from above the release
+    const along = cx * ux + cz * uz;                                    // 1 = straight down the fall line from the target, -1 = above it
     for (const d of dists) {
       for (const up of ups) {
         const x = tx + cx * d, z = tz + cz * d, g = height(x, z), y = g + up;
-        let ring = true;
-        for (let r = 0; r < 8 && ring; r++) { const q = r / 8 * Math.PI * 2; if (height(x + Math.cos(q) * 10, z + Math.sin(q) * 10) > y - 0.6) ring = false; }
-        const clear = ring && lineClear(height, x, y, z, tx, ty, tz);
-        const score = (clear ? 0 : 1000) + Math.abs(along) * 60 + (along > 0.5 ? 40 : 0) + up * 0.5 + d * 0.08;
-        if (!best || score < best.score) best = { x, y, z, tx, ty, tz, clear, score, above: y - g };
+        // the snow round the lens (25 m) clearly below it: no slope filling the foreground
+        let ring = true, openRing = true;
+        for (let r = 0; r < 12 && ring; r++) { const q = r / 12 * Math.PI * 2, gq = height(x + Math.cos(q) * 25, z + Math.sin(q) * 25); if (gq > y - 0.6) ring = false; if (gq > y - 6) openRing = false; }
+        // a widening margin under the line of sight: open air in front of the lens, not a grazing view along the slope
+        const sees = (q, qy, wide) => { for (let i = 1; i < 40; i++) { const t = i / 40; if (t > 0.92) break; const hx = x + (q.x - x) * t, hz = z + (q.z - z) * t; if (height(hx, hz) > y + (qy - y) * t - (wide ? Math.min(12, 2 + d * t * 0.05) : 2)) return false; } return true; };
+        const all = (wide) => sees({ x: tx, z: tz }, ty, wide) && sees(crown, height(crown.x, crown.z) + 4, wide) && sees(low, height(low.x, low.z) + 4, wide);
+        const clear = ring && all(false), open = clear && openRing && all(true);
+        const score = (clear ? 0 : 1000) + (open ? 0 : 150) + Math.abs(along - 0.45) * 50 + Math.abs(up - 45) * 0.2 + Math.abs(d - 380) * 0.03;
+        if (!best || score < best.score) best = { x, y, z, tx, ty, tz, clear, open, score, above: y - g, along };
       }
     }
   }

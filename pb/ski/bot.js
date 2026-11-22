@@ -11,6 +11,7 @@ export function createBot(piste, { speedScale = 1 } = {}) {
   let hint = 0;
   return function drive(state) {
     piste.project(state.x, state.z, hint, 120, proj);
+    if (proj.dist > 60) piste.project(state.x, state.z, null, 0, proj);     // R7-C2: put down somewhere else (a teleport): find the line again
     hint = proj.s;
     const v = Math.max(state.speed, 3);
     const look = 10 + v * 0.9;

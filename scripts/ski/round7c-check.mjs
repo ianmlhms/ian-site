@@ -115,7 +115,7 @@ for (const rid of rids.length ? rids : ALL) {
   }
   // R7-C2: the avalanche camera: a clear view of every face's flow, >= 0.6 m above the snow, nothing of the mountain in between
   const views = faces.map((f) => faceView(f, height));
-  check(views.every((v) => v && v.clear && v.above >= 0.6), `avalanche camera: ${views.filter((v) => v && v.clear).length}/${faces.length} faces watched from a clear spot (${views.map((v) => `${Math.round(v.above)} m up`).join(', ')}), never in the rock`);
+  check(views.every((v) => v && v.clear && v.above >= 0.6), `avalanche camera: ${views.filter((v) => v && v.clear).length}/${faces.length} faces watched from a clear spot (${views.map((v) => `${Math.round(v.above)} m up${v.open ? ', open foreground' : ''}`).join('; ')}), never in the rock`);
   let onPiste = 0;
   for (const p of pistes.list.slice(0, 200)) { const a = p.at(p.length / 2, {}); if (releasable(field, a.x, a.z, height)) onPiste++; }
   check(onPiste === 0, `avalanche: never releasable on a piste (${onPiste} of 200 piste middles)`);

@@ -38,8 +38,13 @@ export default async function shots(page, { shoot }) {
   out.hudMid = await page.textContent('#cLeft');
   await shoot('course-mid');
   // just before the arch: from 70 m out, the bot rides in; shoot when the HUD says < 30 m (the course is taken down at the finish)
-  await ev(async () => { const k = window.__ski, r = k.game.run, a = k.game.piste.at(r.finishS, {}); await k.streamer.ready(a.x, a.z, 500); k.teleport(r.finishS - 70); });
-  await page.waitForFunction(() => { const c = window.__ski.lastCourse; return (c && c.remaining < 26) || window.__ski.game.phase === 'finished'; }, null, { timeout: 30000 });
+  await ev(async () => { const k = window.__ski, r = k.game.run, a = k.game.piste.at(r.finishS, {}); await k.streamer.ready(a.x, a.z, 500); k.teleport(r.finishS - 70); const { createBot } = await import('/pb/ski/bot.js'); k.game.bot = createBot(k.game.piste); });      // a new bot: the old one's hint is back at the middle
+  for (let i = 0; i < 40; i++) {
+    const st = await ev(() => { const k = window.__ski, c = k.lastCourse, s = k.state; return { rem: c ? c.remaining : null, phase: k.game.phase, paused: k.game.paused, v: s.speed, crash: s.crash, bot: !!k.game.bot, s: k.game.run ? k.game.run.proj.s : null }; });
+    if (i % 5 === 0) console.log('arch wait', JSON.stringify(st));
+    if ((st.rem !== null && st.rem < 26) || st.phase === 'finished') break;
+    await settle(1500);
+  }
   out.hudArch = await page.textContent('#cLeft');
   out.archRemaining = await ev(() => (window.__ski.lastCourse ? window.__ski.lastCourse.remaining : null));
   // freeze him there for the picture: no bot, hard brake
@@ -91,7 +96,7 @@ export default async function shots(page, { shoot }) {
   await shoot('course-finish');
   await ev(() => window.__ski.setInput(null));
   // a teleport (free ride): the chase camera clear of the snow, the skier in view
-  await ev(async () => { const k = window.__ski; k.game.bot = null; const f = k.avalanches.faces[0]; await k.streamer.ready(f.top.x, f.top.z, 700); k.teleportTo({ x: f.top.x, z: f.top.z, heading: 0, kind: 'piste' }); });
+  await ev(async () => { const k = window.__ski; k.game.bot = null; await k.firstLift(); });
   await page.waitForFunction(() => window.__ski.game.mode === 'freeride' && window.__ski.game.phase === 'running', null, { timeout: 20000 }).catch(() => {});
   await settle(1500);
   out.teleportCam = await ev(async () => {
