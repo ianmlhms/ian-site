@@ -25,6 +25,39 @@ export const FOG_GLSL = `
     return mix(col, fogCol, clamp(max(max(f, aerial), farEnd), 0.0, 1.0));
   }`;
 
+/** Shared GLSL (streets round): the light on snow, one source for the ground and for everything painted ON the snow (roads.js): the soft
+ *  blue-grey shade and the warm lit side for a surface whose normal's y is nY, ao = -1 ridge .. 1 hollow. `shade` = the raw sky light.
+ *  Needs uSunColor, uAmbSky, uAmbGround, uOvercast. */
+export const SNOW_LIGHT_GLSL = `
+  float snowBand(float x){ return mix(x, floor(x * 4.0 + 0.5) / 4.0, 0.22); }
+  void snowLight(float nY, float ao, out vec3 shade, out vec3 shadeC, out vec3 litC){
+    float sky = 0.5 + 0.5 * nY;
+    shade = mix(uAmbGround, uAmbSky, sky) * (1.0 - 0.32 * max(ao, 0.0) + 0.09 * max(-ao, 0.0));
+    // snow: clear blue in the shade (the sky's light), warm white in the sun; never brighter than paper white
+    float blue = (0.72 + 0.25 * max(ao, 0.0)) * (1.0 - 0.6 * uOvercast);
+    shadeC = mix(vec3(0.8), vec3(0.79, 0.895, 1.04), blue) * (shade * 0.95 + 0.12);   // overcast light is whiter
+    // R7-D: under a low warm evening sun (its blue / red ratio, so morning and midday stay as they were) the sky light on the snow
+    //       is a cool blue-grey, not the saturated violet-blue of the doubled sky tint: keep the brightness, take out most of the colour
+    float evK = smoothstep(0.72, 0.5, uSunColor.b / max(uSunColor.r, 1e-3)) * (1.0 - uOvercast);
+    float shadeL = dot(shadeC, vec3(0.3, 0.59, 0.11));
+    shadeC = mix(shadeC, shadeL * vec3(0.9, 0.975, 1.12) * 1.04, 0.62 * evK);
+    // R8 (coordinator review: big flat royal-blue patches in the shade, both engines, every time of day): sunny shade on snow is a
+    //    soft, light blue-grey. Lift it a little and take most of the saturation out (blue / red ~1.25 instead of ~2), hue kept.
+    float shadeL2 = dot(shadeC, vec3(0.3, 0.59, 0.11));
+    shadeC = mix(shadeC, shadeL2 * vec3(0.92, 0.985, 1.1) * 1.1, 0.66 * (1.0 - 0.5 * uOvercast));
+    // R8f (Ian: evening shade still a fairly dark blue-grey, measured ~(135, 156, 197) on the screen): under the low evening sun the
+    //     shade is a light, soft blue-grey like midday's: ~1.3 x brighter, blue / red ~1.14 (the warm lit side keeps the contrast)
+    float shadeL3 = dot(shadeC, vec3(0.3, 0.59, 0.11));
+    shadeC = mix(shadeC, shadeL3 * vec3(0.93, 0.985, 1.06) * 1.32, evK);
+    float top = max(shadeC.r, max(shadeC.g, shadeC.b));
+    shadeC *= mix(1.0, 0.97 / top, smoothstep(0.9, 1.15, top));              // bright overcast light: a soft shoulder, hue kept, no cyan clip
+    litC = max(shadeC * 1.02, shadeC * vec3(0.3, 0.28, 0.24) + uSunColor * vec3(0.775, 0.79, 0.815));   // a weak sun (fog, cloud) never makes the lit side darker than the shade
+  }
+  // fog and haze: brighter towards the sun (light scattered forward), the same glow as the sky's horizon
+  vec3 snowFogColor(vec3 V){
+    return uFogColor + uSunColor * pow(max(dot(-V, uSunDir), 0.0), 5.0) * 0.14 + vec3(1.0, 0.985, 0.95) * uMilk * pow(max(dot(-V, uSunDir), 0.0), 10.0) * 0.1;
+  }`;
+
 export function createSnowMaterial(env, { cheap = false, treeRadius = 400, forest = null, lodScale = 1 } = {}) {
   return new THREE.ShaderMaterial({
     uniforms: {
@@ -51,7 +84,7 @@ export function createSnowMaterial(env, { cheap = false, treeRadius = 400, fores
       varying vec3 vWorld; varying vec3 vNormal; varying vec4 vInfo; varying vec4 vExtra; varying float vDist;
       ${cheap ? '' : SHADOW_GLSL}
       ${FOG_GLSL}
-      float band(float x){ return mix(x, floor(x * 4.0 + 0.5) / 4.0, 0.22); }
+      ${SNOW_LIGHT_GLSL}
       void main(){
         vec2 wp = vWorld.xz;
         vec3 V = normalize(cameraPosition - vWorld);
@@ -111,29 +144,10 @@ export function createSnowMaterial(env, { cheap = false, treeRadius = 400, fores
         #ifndef CHEAP
         sunVis = min(sunVis, sunMapShadow(vWorld, N));                                                         // trees, houses, the skier, small ridges
         #endif
-        float lit = band(smoothstep(-0.06 + (nA.a - 0.5) * 0.12, 0.6, nl) * sunVis);
-        float sky = 0.5 + 0.5 * Nb.y;
+        float lit = snowBand(smoothstep(-0.06 + (nA.a - 0.5) * 0.12, 0.6, nl) * sunVis);
         float ao = clamp(occ - relief * 0.9, -0.7, 1.0);
-        vec3 shade = mix(uAmbGround, uAmbSky, sky) * (1.0 - 0.32 * max(ao, 0.0) + 0.09 * max(-ao, 0.0));
-        // snow: clear blue in the shade (the sky's light), warm white in the sun; never brighter than paper white
-        float blue = (0.72 + 0.25 * max(ao, 0.0)) * (1.0 - 0.6 * uOvercast);
-        vec3 shadeC = mix(vec3(0.8), vec3(0.79, 0.895, 1.04), blue) * (shade * 0.95 + 0.12);   // overcast light is whiter
-        // R7-D: under a low warm evening sun (its blue / red ratio, so morning and midday stay as they were) the sky light on the snow
-        //       is a cool blue-grey, not the saturated violet-blue of the doubled sky tint: keep the brightness, take out most of the colour
-        float evK = smoothstep(0.72, 0.5, uSunColor.b / max(uSunColor.r, 1e-3)) * (1.0 - uOvercast);
-        float shadeL = dot(shadeC, vec3(0.3, 0.59, 0.11));
-        shadeC = mix(shadeC, shadeL * vec3(0.9, 0.975, 1.12) * 1.04, 0.62 * evK);
-        // R8 (coordinator review: big flat royal-blue patches in the shade, both engines, every time of day): sunny shade on snow is a
-        //    soft, light blue-grey. Lift it a little and take most of the saturation out (blue / red ~1.25 instead of ~2), hue kept.
-        float shadeL2 = dot(shadeC, vec3(0.3, 0.59, 0.11));
-        shadeC = mix(shadeC, shadeL2 * vec3(0.92, 0.985, 1.1) * 1.1, 0.66 * (1.0 - 0.5 * uOvercast));
-        // R8f (Ian: evening shade still a fairly dark blue-grey, measured ~(135, 156, 197) on the screen): under the low evening sun the
-        //     shade is a light, soft blue-grey like midday's: ~1.3 x brighter, blue / red ~1.14 (the warm lit side keeps the contrast)
-        float shadeL3 = dot(shadeC, vec3(0.3, 0.59, 0.11));
-        shadeC = mix(shadeC, shadeL3 * vec3(0.93, 0.985, 1.06) * 1.32, evK);
-        float top = max(shadeC.r, max(shadeC.g, shadeC.b));
-        shadeC *= mix(1.0, 0.97 / top, smoothstep(0.9, 1.15, top));              // bright overcast light: a soft shoulder, hue kept, no cyan clip
-        vec3 litC = max(shadeC * 1.02, shadeC * vec3(0.3, 0.28, 0.24) + uSunColor * vec3(0.775, 0.79, 0.815));   // a weak sun (fog, cloud) never makes the lit side darker than the shade
+        vec3 shade, shadeC, litC;
+        snowLight(Nb.y, ao, shade, shadeC, litC);
         vec3 snow = mix(shadeC, litC, lit);
         snow *= 0.955 + 0.05 * nA.b + 0.035 * (nL.r - 0.5);
         // ---- groomed: smooth, compact, a touch greyer-blue than powder, corduroy shading (lit ridges, shaded grooves), lane ridges,
@@ -195,7 +209,7 @@ export function createSnowMaterial(env, { cheap = false, treeRadius = 400, fores
         rockCol *= (0.9 + 0.2 * nL.b) * (0.84 + 0.3 * smoothstep(0.25, 0.8, crag));
         // rock is lit by its own rougher normal: the crags catch the sun and throw small shadows
         vec3 Nr = normalize(N + vec3(d3.r - 0.5, 0.0, d3.g - 0.5) * (0.5 + 0.4 * farK) + vec3(d2.r - 0.5, 0.0, d2.g - 0.5) * 0.7 * midK);
-        float rockLit = band(smoothstep(-0.2, 0.75, dot(Nr, uSunDir)) * sunVis);
+        float rockLit = snowBand(smoothstep(-0.2, 0.75, dot(Nr, uSunDir)) * sunVis);
         rockCol = rockCol * (shade * vec3(0.74, 0.8, 0.9) * (1.0 - 0.25 * max(ao, 0.0)) + uSunColor * rockLit * 0.95);
         // R8c: the line's edges anti-aliased by the layer's own pixel footprint (sFw), and only on real cliffs (>= ~50 deg): on the
         //      moderate rocky slopes the lines read as contour lines
@@ -237,8 +251,7 @@ export function createSnowMaterial(env, { cheap = false, treeRadius = 400, fores
         float spark = sA.b * pow(max(dot(gA, Hh), 0.0), 24.0) * 3.2 + sB.b * pow(max(dot(gB, Hh), 0.0), 24.0) * 2.2 * (1.0 - smoothstep(30.0, 90.0, vDist));
         col += vec3(1.0, 0.98, 0.94) * spark * clearSun * (1.0 - 0.45 * piste);
         #endif
-        // fog and haze: brighter towards the sun (light scattered forward), the same glow as the sky's horizon
-        vec3 fogC = uFogColor + uSunColor * pow(max(dot(-V, uSunDir), 0.0), 5.0) * 0.14 + vec3(1.0, 0.985, 0.95) * uMilk * pow(max(dot(-V, uSunDir), 0.0), 10.0) * 0.1;
+        vec3 fogC = snowFogColor(V);
         // round 7 (A): the far grid ends 14 km outside the resort: its last 3.5 km fade into the haze (never a cut edge)
         vec2 er = min(wp - uShadowRect.xy, uShadowRect.xy + uShadowRect.zw - wp);
         float edgeFade = 1.0 - smoothstep(0.0, 3500.0, min(er.x, er.y));

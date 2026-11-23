@@ -1863,3 +1863,26 @@ piste map looked at, traced or copied). The old plan from above stays one tap aw
   first), Lawin, park points, stars of the least-starred resorts. **After every bake / new resort run `node scripts/ski/piste_index.mjs`**
   (append-only, never reorder) and `python3 scripts/game_importmap.py`; a missing piste still saves (s2), `cloud-size-test.mjs` fails until the index is complete.
   Test: `node scripts/ski/cloud-size-test.mjs` (8 resorts all starred: 5.8 KB with fog + times offered; stars alone ~1.3 KB).
+
+## Streets round (23 Nov 2026): ploughed village roads instead of "bobsled channels"
+- **What was wrong**: the streets had a little light of their own (bluer / brighter than the field, no house shadows), a glowing white rim,
+  dark tyre bands at a share of the width, a ring of tyre marks round every dead end and shards where streets met (a cell knew 3 segments).
+- **`street-net.js`** (new, pure): OSM ways that meet end to end are joined (straightest pair, same width), rounded, cut where steep
+  (unchanged `gentleRoads`), every end is JOINED (ruts fade out there; a near miss <= 4.5 m is led on) or a DEAD END (strength 1 -> 0 over
+  15 m: narrower, no bank, no ruts, melts into the snow); loose stubs < 34 m are dropped; a trodden path (1.8 m) from the wall of every
+  house that faces a street within 10 m. All segments sit in ONE float texture (2 texels a segment; a coarse copy without paths and fine
+  bends for the 10 m lattice); a lattice cell carries its 4 segment numbers (`pickSegments`), 24 bytes a vertex (was 76).
+- **`roads.js` shader**: one signed distance to the street's edge (union with rounded corners at junctions) -> packed surface, bank, ruts.
+  The light is the ground's own: `SNOW_LIGHT_GLSL` moved out of the snow shader into a shared chunk + the mountain shadows + the sun's shadow
+  map. Bank (0.15-0.5 m, lumpy), ruts and crown are bent normals + a small parallax offset, NEVER geometry (skis stand on the physics grid,
+  ground-check rules unchanged). Dirt grows with the street's width, wet asphalt only on through roads, fresh snow covers it when it snows.
+- **Budgets**: FINE_RADIUS 150 / 360 / 650 -> 90 / 200 / 480 (the banks are wider), one fine cell built per frame.
+- **Checks**: `node scripts/ski/street-check.mjs` (joins, ends, the 4 segments vs all of them); shots `scripts/ski/street-shots.mjs`
+  (chase, eye, side, top, junction, deadend, path; --q --time --weather). Before / after: ~/Library/Caches/ski-work/streets/.
+- **Open**: streets still bank sideways where the 5 m terrain does (Courchevel): a flat road bed would need a bake change.
+- Numbers: street triangles before -> after (same spots, Mëttel) 3V 43.0k -> 38.6k, killy 39.4k -> 23.3k, arlberg 44.2k -> 35.6k, kronplatz
+  18.2k -> 17.4k, obertauern 29.7k -> ~15k; Niddreg scenes 315-405k triangles / 120-136 calls; vertex attributes 15-17 MB in all. The net is
+  built in 12-91 ms (`ground` = field.baseHeight; through surface.height it took up to 2.6 s: a physics block per house).
+- Results: node checks green; ground-check Chromium 6 / 7 (streets 6 mm everywhere); Obertauern's one crack after the jump to Kehrkopfbahn
+  (-1.5 m, terrain only) is the same on main before this round: OPEN. memory-check: only "switch #8 killy" (+66 MB vs the 50 MB limit; +62
+  noted on main before). WebKit not run.

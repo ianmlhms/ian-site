@@ -236,7 +236,7 @@ async function boot() {
   const chase = createChaseCamera(surface);
   // ---- round 7 (A): free 360 look (drag / right mouse / C + mouse) and the camera guard (never through ground, pylons, trees, houses) ----
   const look = createLook({ el: document.getElementById('shell'), accept: (e) => game.screen === 'ski' && !e.target.closest('button, a, input, .pad, #touchControls, .card, .minimap, .chprompt, .mp-bar, .mp-card, [role="dialog"]') });
-  let pylonGrid = null, boxIndex = null;                    // 20 m buckets of [x, z, topY, r] (pylons, the station halls); building boxes
+  let pylonGrid = null, boxIndex = null, streetBoxes = null;                    // 20 m buckets of [x, z, topY, r] (pylons, the station halls); building boxes
   function pylonsOf(l) {
     const out = [], q = {};
     for (let i = 0; i < resort.lifts.length; i++) {
@@ -325,7 +325,7 @@ async function boot() {
   // the village streets are draped on the 5 m ground: built once the extras and every height tile are in
   const tryRoads = () => {
     if (roads || !roadRows || !streamer.done()) return;
-    try { roads = createRoads({ scene, roads: roadRows, env, level, height: (x, z) => surface.height(x, z), upload: (o) => uploadNow(renderer, o, camera) }); mark('roads'); } catch (error) { console.warn('[ski] streets failed', error); roads = { update() {} }; }
+    try { roads = createRoads({ scene, roads: roadRows, env, level, boxes: streetBoxes, boxIndex, height: (x, z) => surface.height(x, z), ground: (x, z) => field.baseHeight(x, z), upload: (o) => uploadNow(renderer, o, camera) }); mark('roads'); } catch (error) { console.warn('[ski] streets failed', error); roads = { update() {} }; }
   };
 
   // streamed height tiles change the heights under them: drop every cache that read them
@@ -376,7 +376,7 @@ async function boot() {
     let drawn = buildings.filter((_, i) => liftWorld.keepBuilding(i) && !onStreet.has(i));
     try { drawn = seatRows(drawn, (x, z) => field.baseHeight(x, z)); } catch (error) { console.warn('[ski] seating the big houses failed', error); }   // R8d: big blocks not half buried
     // the houses that are drawn (R7-B leaves out the ones in stations / lift paths): camera guard + skier collision (R8)
-    try { boxIndex = createBoxIndex(buildingBoxes(drawn)); } catch (error) { console.warn('[ski] building index failed', error); }
+    try { streetBoxes = buildingBoxes(drawn); boxIndex = createBoxIndex(streetBoxes); } catch (error) { console.warn('[ski] building index failed', error); }
     if (crowd) { crowd.setBlocked(npcBlocked); crowd.setRoads(roadRows); }        // the other skiers keep out of the houses, walk the streets
     village = createVillage({ scene, rows: drawn, env, height: (x, z) => field.baseHeight(x, z), level, resort: rid, upload: (o) => uploadNow(renderer, o, camera) }); mark('village');      // R8c: Alpine villages; R8f: built per cell near the camera, straight to the GPU
     // R7-C: gates / teleport spots clear of the drawn houses (B's stations replace the dropped OSM station buildings)
@@ -1550,7 +1550,7 @@ async function boot() {
     get hold() { return !!game.hold; }, scatter, quality,
     // round 7 (A)
     get village() { return village; },                                      // R8f: buildNear(x, z, r) for checks after a jump
-    get skierClear() { return skier.skiClearance; }, skier, standHeight, deckAt, get roadRows() { return roadRows; }, get boxIndex() { return boxIndex; }, look, camGuard, camBlocked,
+    get skierClear() { return skier.skiClearance; }, skier, standHeight, deckAt, get roadRows() { return roadRows; }, get roads() { return roads; }, get boxIndex() { return boxIndex; }, look, camGuard, camBlocked,
     // R7-C
     npcs: { get crowd() { return crowd; }, get view() { return npcView; }, get on() { return npcOn; }, set: setNpcs, get live() { return npcLive; } },
     get explore() { return explore; }, get avalanches() { return avalanches; }, get course() { return course; }, get lastCourse() { return lastCourse; }, get spray() { return spray; },
