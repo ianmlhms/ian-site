@@ -218,7 +218,7 @@ export const DISCOVERY = Object.freeze({
   station: 220,             // m round a reached lift station
   spawn: 320,               // m round the first lift (always discovered)
 });
-export const FIRST_PERSON = Object.freeze({ eye: 1.62, eyeTuck: 1.15, back: 0.42, fov: 74, fovKick: 16, kickFrom: 5, kickTo: 24, streakFrom: 12, bob: 0.022, lean: 0.13, skiRoll: 0.3 });
+export const FIRST_PERSON = Object.freeze({ eye: 1.62, eyeTuck: 1.15, back: 0.42, fov: 74, fovKick: 16, kickFrom: 5, kickTo: 24, streakFrom: 12, bob: 0.022, lean: 0.13, headIn: 1.3, skiRoll: 0.4, yawRate: 8, motionLook: 0.45, motionMax: 0.2 });
 export const AVALANCHE = Object.freeze({
   slope: 35,                // degrees: release only on slopes at least this steep
   pisteGap: 45,             // m off the nearest piste line (never on groomed pistes)

@@ -1704,3 +1704,14 @@ turn him back in the air (R8g), now checked.
   aiguille-percee as in R8g), barrier-check 11, speed-check 94, review-check 37, cliff-check 9/9, camera-check 15, npc-check 79,
   floors-check 1324 + parks (unchanged), round6 2222, round7 38, round7b 11791, r8c 36302, r7d 1432, security-test. Chromium flows
   (FLOW_POWER) ski-course, ski-challenges, ski-freeride PASS. WebKit not run. main.js?v=23.
+
+## First person: the skis pointed out of the turn (Ian, 23 Nov 2026: "D: the skis point left, you go right")
+**Cause** (measured, scripts/ski/fp-steer-check.mjs): the yaw was right (tips 5 degrees towards the turn), but (1) the camera rolled
+8 degrees into the turn round the EYES, which stayed over the skis: the picture turned the skis 8 degrees to the outside (net 4 degrees the
+wrong way at 46 km/h, 98-100 % of the frames); (2) the edge roll had the wrong sign (`rotateX(-edge)`: the outside edges, third person
+`+edge`), and the pair rolled as one mesh, one ski in the snow.
+**Fix** (firstperson.js, FIRST_PERSON in config.js): the body leans round the boots (the head goes to the inside with the roll, `headIn`),
+each ski is its own mesh rolled `+edge * skiRoll` onto its edge and lifted by the sunken half width, the skis lie on the slope with exactly
+the heading's azimuth, the eyes follow the skis at `yawRate` and look a little along the motion (`motionLook`, at most `motionMax`).
+**Check**: fp-steer-check (real D / A keys, both cameras; carve, fast, skid, pivot, walking pace, reversal, hockey stop): 156 ok; the old
+files (`--old DIR`) fail 40. Shots ~/Library/Caches/ski-work/fp-steer/{before,after}-*.png. main.js?v=24.
