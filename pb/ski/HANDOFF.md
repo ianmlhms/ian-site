@@ -35,7 +35,9 @@ Venv: `~/Library/Caches/luxtram-work/.venv/bin/python`. Raw downloads cache in `
    of a piste / lift / village), classes raster (forest, scrub = open stands, rock, scree, water, built, piste area, glacier; derived larch
    stands below 2150 m on shady slopes / 2000 m on sunny ones where OSM has no forest), buildings (oriented boxes), lifts (+ mapped pylons),
    the painted map base `map.webp`, mountain-shadow rasters `shadow-<time>.webp` (sun of env.js TIMES, keep `SUNS` in step).
-4. `python3 scripts/ski/make_sql.py` (writes `scripts/ski-v1.sql` from all baked resorts) and `python3 scripts/gamedata_manifest.py`.
+4. `nice -n 10 ~/Library/Caches/luxtram-work/.venv/bin/python scripts/ski/panorama.py <rid>`: the printed piste map (`panorama.webp` +
+   resort.json `panorama`; ~30 s; works for a new resort without any setting, see "Printed piste map"); then `node scripts/ski/pano-check.mjs <rid>`.
+5. `python3 scripts/ski/make_sql.py` (writes `scripts/ski-v1.sql` from all baked resorts) and `python3 scripts/gamedata_manifest.py`.
 Killy: 114 of 168 tiles shipped, 7.2 MB in total (tiles 5.1 MB, far 1.0 MB, json 0.46 MB, map 0.26 MB, shadows 0.23 MB).
 
 ## Engine (pattern of MTB, copied and adapted, MTB untouched)
@@ -1816,3 +1818,38 @@ first lift `Sestriere - Fraiteve 1` (`config.js FIRST_LIFT`), snowpark Montgenè
   (`--rp-cols` / `--rp-rows`; an odd last card spans two columns), `pb/ski/img/obertauern-*.webp` (pose for shot.mjs: 5250,4750,130,
   4150,3500,-60,42 at 1200x810, header rows cropped).
 - mp-games v8 (Obertauern + 6 pistes in the lobby), UNLOCK {red 4, black 12}, flows / Node check lists.
+
+## Printed piste map (23 Nov 2026; Ian: "improve the big map, make it look like a printed ski map, on those you can see way more clearly where to go")
+The big map is now a hand-painted-looking panorama per resort with the pistes printed on it, drawn from our own data only (no published
+piste map looked at, traced or copied). The old plan from above stays one tap away ("2D" in the zoom column, per device in localStorage
+`pb_ski_mapview`) and is what a resort WITHOUT a panorama shows, so nothing breaks before panorama.py ran.
+- **Projection** (`pb/ski/pano.js` == `scripts/ski/pano_proj.py`, same table, same bicubic 40 m heights `field.farHeight`): a bent oblique
+  view. s = depth along the look direction, r = side: u = r R(s), v = F(s) + G(s)(y - y0); steep look-down in front (f0 ~0.78), flatter at
+  the back of the ski area (f1 ~0.56), nearly level behind (skyline). Pure: any piste / lift / skier point projects exactly; the way back
+  (taps) marches the column front to back. Camera numbers = resort.json `panorama.cam` (bake.py keeps the key; rerun panorama.py after a bake).
+- **Painter** `scripts/ski/panorama.py <rid> ... [--draft --lines --out DIR --data DIR]`: per pixel world point / height / normal / class,
+  then gouache: banded snow light with blue shade, rock and snow strokes dragged down the fall line (line integral convolution), conifers
+  and houses back to front, roads, frozen lakes, glacier, haze, sky. 4.2 Mpx, WebP <= 300 KB (quality, then size goes down: Kronplatz).
+  `CAMERAS[rid]` = only what differs (az, f0, f1, E); without an entry the look direction is picked by score (pistes facing the viewer,
+  nothing hidden, page shape): Obertauern (0 deg) and Via Lattea (105 deg) are picked that way. To tune: `--draft --lines` (5 s).
+- **map.js** (rewritten): a "sheet" object per view (to / from / geometry projected once), everything goes through it. Pistes: white edge,
+  downhill arrows, number discs where OSM has a `ref`, names along the line; undiscovered = softer ink + white disc, discovered = full
+  colour (`SOFT` in map-symbols.js, free ride tab only; the fog veil is gone). Lifts: pictogram badge per kind (chair, gondola, cable car,
+  drag = dashed, railway = sleepers, tunnel dashed), straight from bend to bend. Villages in caps, summits with altitude, park, race
+  (World Cup) and landmark signs, challenge flags, compass, title in the sky, print credits on the paper's edge. Labels: greedy, tiered, in
+  a collision grid, along-line names as oriented boxes. Legend = `<details>`: colours always, signs on tap.
+- **Base layer**: painting (+ crisp trees / houses `map-decor.js` from m >= 0.085 px/m, built in 7 ms slices, near pistes only, ridge
+  occlusion via pano.cover) on an offscreen layer 16 % larger than the view; panning blits it, repainted 130 ms after the last move.
+  Pan frame (Killy, iPad size @2, headless Metal): 122 ms (painting scaled every frame) -> 16.8 ms. Opening 55-130 ms of JS, panorama.webp
+  and buildings.json fetched only when the map opens; dispose frees image, layer, canvases.
+- **Taps**: the nearest wins (lift line / piste); a piste printed where a ridge hides it still gets its own ground (`groundAt`); sky and
+  paper = nothing. HIT_PX 22 -> 18. worldXY can be null now (sky). OPEN_SPAN 4.6 km (relief).
+- **Checks**: `node scripts/ski/pano-check.mjs [--python]`: 7 resorts, 100 % of the piste / lift points on the page, 99.0-100 % visible, taps
+  back within 0.1 m (pistes, stations in sight), python == js 0.0000 px. `scripts/ski/map-memory.mjs` (heap +0.55 MB, nodes / listeners +0).
+  `scripts/ski/pano-shots.mjs` (spawn, whole, valley, taps, challenges, 2D; frame times; portrait `--size 820x1180`), shots in
+  ~/Library/Caches/ski-work/map-print/. Flow ski-teleport: + panorama / 2D / legend by touch, lift tapped on its drawn line.
+- Memory (renderer + GPU, 3 opens, Killy / 3V): open 875 / 1059 MB, closed 833 / 995 (the old map: 864 / 989 open, 874 / 998 closed, its
+  GPU part grew with every open); after a GC the live heap is back where it was (129 -> 129 MB). Open it costs ~30 MB of live heap.
+  memory-check "switch #3 killy" +61 MB vs the 50 MB limit fails the same on main without this change (+62): open, not from the map.
+- Not done: WebKit (hangs on the Mini). French resorts have hardly any piste numbers in OSM (names instead). On a tall screen the whole
+  (wide) sheet is small: it opens on the skier, which fills the box. First play + ~55 KB (the new modules; no image).

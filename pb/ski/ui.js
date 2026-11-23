@@ -35,9 +35,10 @@ export function createUi(root) {
       <header><button type="button" class="btn ghost" data-act="back" aria-label="Zréck">←</button><h1>${esc(resort.name)}</h1><span class="sub">Pistekaart</span>${onResume ? '<button type="button" class="btn primary" data-act="resume" id="mapResume">Weiderfueren ✕</button>' : ''}<button type="button" class="btn ghost" data-act="credits" aria-label="Quellen">ⓘ</button></header>
       <div class="mapwrap">
         <div class="mapbox"><canvas id="mapCanvas" aria-label="Pistekaart: tipp op eng Pist"></canvas>
-          <div class="zoom"><button type="button" data-z="in" aria-label="Méi no">+</button><button type="button" data-z="out" aria-label="Méi wäit">−</button><button type="button" data-mz="me" id="mapMe" aria-label="Bei mech" title="Bei mech" hidden><i class="mzme"></i></button><button type="button" data-mz="fit" id="mapFit" aria-label="Ganzt Skigebitt" title="Ganzt Skigebitt">⤢</button></div>
-          <div class="legend" id="mapLegend"><div>${DIFF_IDS.map((d) => `<span><i style="background:${DIFF[d].css}"></i>${DIFF_LB[d]}</span>`).join('')}</div>
-            <div><span><i class="lg-lift"></i>Lift</span><span><i class="lg-park"></i>Snowpark</span><span class="lg-yourow"><i class="lg-you"></i>Du</span><span class="lg-fogrow"><i class="lg-fog"></i>Nach net entdeckt</span></div></div>
+          <div class="zoom"><button type="button" data-z="in" aria-label="Méi no">+</button><button type="button" data-z="out" aria-label="Méi wäit">−</button><button type="button" data-mz="me" id="mapMe" aria-label="Bei mech" title="Bei mech" hidden><i class="mzme"></i></button><button type="button" data-mz="fit" id="mapFit" aria-label="Ganzt Skigebitt" title="Ganzt Skigebitt">⤢</button><button type="button" data-mz="view" id="mapView" aria-label="Vun uewen" title="Vun uewen" hidden>2D</button></div>
+          <details class="legend" id="mapLegend"><summary>${DIFF_IDS.map((d) => `<span><i style="background:${DIFF[d].css}"></i>${DIFF_LB[d]}</span>`).join('')}<b>Legend</b></summary>
+            <div>${[['gondola', 'Gondel'], ['chair', 'Sesselbunn'], ['drag', 'Schlepplift'], ['cable', 'Seelbunn'], ['funicular', 'Standseelbunn'], ['train', 'Zuch'], ['park', 'Snowpark'], ['race', 'Course'], ['flag', 'Challenge'], ['view', 'Siicht'], ['peak', 'Spëtzt']].map(([k, l]) => `<span><canvas data-sign="${k}" aria-hidden="true"></canvas>${l}</span>`).join('')}
+            <span class="lg-yourow"><i class="lg-you"></i>Du</span><span class="lg-fogrow"><i class="lg-fog"></i>Nach net entdeckt</span></div></details>
         </div>
         <div class="side">
           <div class="list">${groups.map((g) => `<div class="grp">${DIFF_LB[g.d]} (${g.list.length})</div>${g.list.map((p) => `

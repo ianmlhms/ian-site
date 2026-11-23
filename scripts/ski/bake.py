@@ -1785,9 +1785,10 @@ def main():
     # when the terrain or the pistes around the park changed)
     try:
         with open(os.path.join(out, "resort.json"), encoding="utf-8") as fh:
-            old_park = json.load(fh).get("park")
-        if old_park:
-            resort["park"] = old_park
+            old = json.load(fh)
+        for key in ("park", "panorama"):                # panorama: the piste map's camera (scripts/ski/panorama.py; rerun it after a bake)
+            if old.get(key):
+                resort[key] = old[key]
     except (OSError, ValueError):
         pass
     pack_resort(resort)                     # R7-D: piste lines as "lz" / "pz" (linepack.py; the game decodes with pb/ski/linepack.js)

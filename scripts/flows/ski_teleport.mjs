@@ -23,8 +23,8 @@ export const flow = {
     const where = () => page.evaluate(() => { const s = window.__ski.state; return { x: s.x, z: s.z, y: s.y, ground: window.__ski.surface.height(s.x, s.z), heading: s.heading, phase: window.__ski.game.phase, mode: window.__ski.game.mode }; });
     const running = () => page.waitForFunction(() => window.__ski && window.__ski.game.mode === "freeride" && window.__ski.game.phase === "running" && document.documentElement.dataset.skiScreen === "ski", null, { timeout: 90000 });
     /** A real touch tap on the map at world (x, z). Returns the pin's world point (what the map understood). */
-    async function tapWorld(x, z) {
-      const [px, py] = await page.evaluate(([x, z]) => { const m = window.__ski.pisteMap; m.center(x, z, 4); return m.screenXY(x, z); }, [x, z]);
+    async function tapWorld(x, z, zoom = 4) {
+      const [px, py] = await page.evaluate(([x, z, q]) => { const m = window.__ski.pisteMap; m.center(x, z, q); return m.screenXY(x, z); }, [x, z, zoom]);
       const box = await page.locator("#mapCanvas").boundingBox();
       await page.touchscreen.tap(box.x + px, box.y + py);
       await h.pause(250);
@@ -99,7 +99,11 @@ export const flow = {
     const lift2 = await undiscovered([lift1.id], true);       // (a tap on a piste in this tab picks the piste)
     h.expect(!!lift2, `another undiscovered lift (${lift2 && lift2.name})`);
     await page.evaluate(() => { document.documentElement.dataset.skiTeleport = ""; });
-    await tapWorld(lift2.mx, lift2.mz);
+    // the middle of the line as it is drawn (a rope runs straight on the panorama)
+    const mid = await page.evaluate((id) => { const k = window.__ski, m = k.pisteMap, l = k.modes.lifts.byId.get(id); m.center((l.bottom.x + l.top.x) / 2, (l.bottom.z + l.top.z) / 2, 4); const a = m.screenXY(l.bottom.x, l.bottom.z), b = m.screenXY(l.top.x, l.top.z); return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; }, lift2.id);
+    const mbx = await page.locator("#mapCanvas").boundingBox();
+    await page.touchscreen.tap(mbx.x + mid[0], mbx.y + mid[1]);
+    await h.pause(250);
     await page.waitForFunction(() => document.documentElement.dataset.skiTeleport === "confirm", null, { timeout: 4000 }).catch(() => {});
     h.eq(await page.evaluate(() => document.documentElement.dataset.skiTeleport), "confirm", "the tap on the undiscovered lift asks to teleport");
     h.expect((await page.textContent("#tpWhere")).includes("Beim Lift"), `'${(await page.textContent("#tpWhere")).trim()}'`);
@@ -112,6 +116,23 @@ export const flow = {
     await page.keyboard.press("m");
     await page.waitForFunction(() => document.documentElement.dataset.skiScreen === "map", null, { timeout: 10000 });
     await page.evaluate(() => window.__ski.setMapMode("freeride"));
+
+    h.step("the printed piste map: the panorama, its picture in, the 2D plan and back (touch taps), the legend");
+    await page.waitForFunction(() => document.documentElement.dataset.skiScreen === "map", null, { timeout: 8000 });
+    h.eq(await page.evaluate(() => window.__ski.pisteMap.view), "relief", "the map is the panorama");
+    const trip = () => page.evaluate(() => { const m = window.__ski.pisteMap, l = window.__ski.spawn; m.center(l.bottom.x, l.bottom.z, 4); const [px, py] = m.screenXY(l.bottom.x, l.bottom.z), w = m.worldXY(px, py); return Math.hypot(w[0] - l.bottom.x, w[1] - l.bottom.z); });
+    h.expect((await trip()) < 20, "a station's spot on the panorama and back");
+    const tapEl = async (sel) => { const b = await page.locator(sel).boundingBox(); await page.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2); await h.pause(300); };
+    await h.shot("map-printed");
+    await tapEl("#mapView");
+    h.eq(await page.evaluate(() => window.__ski.pisteMap.view), "flat", "2D: the plan from above");
+    h.expect((await trip()) < 1, "a station's spot on the plan and back");
+    await tapEl("#mapView");
+    h.eq(await page.evaluate(() => window.__ski.pisteMap.view), "relief", "3D: the panorama again");
+    await tapEl("#mapLegend summary");
+    h.expect(await page.evaluate(() => document.getElementById("mapLegend").open), "a tap opens the legend");
+    await h.shot("map-legend");
+    await tapEl("#mapLegend summary");
 
     h.step("ski there (discover it), then back with 'Bei den éischte Lift'");
     await page.click("#mapResume");
@@ -133,8 +154,8 @@ export const flow = {
     await page.waitForFunction(() => document.documentElement.dataset.skiScreen === "map" && document.documentElement.dataset.skiMapMode === "freeride", null, { timeout: 10000 });
     const target = { x: far.x + 25, z: far.z - 15 };
     const pinAt = await tapWorld(target.x, target.z);
-    const zoomPx = await page.evaluate(() => { const m = window.__ski.pisteMap; const [a] = m.screenXY(0, 0), [b] = m.screenXY(100, 0); return (b - a) / 100; });
-    h.expect(Math.hypot(pinAt[0] - target.x, pinAt[1] - target.z) * zoomPx < 2, `the tap landed ${(Math.hypot(pinAt[0] - target.x, pinAt[1] - target.z)).toFixed(1)} m (${(Math.hypot(pinAt[0] - target.x, pinAt[1] - target.z) * zoomPx).toFixed(1)} px) from the aimed spot`);
+    const offPx = await page.evaluate(([a, b]) => { const m = window.__ski.pisteMap, [ax, ay] = m.screenXY(a[0], a[1]), [bx, by] = m.screenXY(b[0], b[1]); return Math.hypot(ax - bx, ay - by); }, [pinAt, [target.x, target.z]]);
+    h.expect(offPx < 2 && Math.hypot(pinAt[0] - target.x, pinAt[1] - target.z) < 20, `the tap landed ${(Math.hypot(pinAt[0] - target.x, pinAt[1] - target.z)).toFixed(1)} m (${offPx.toFixed(1)} px) from the aimed spot`);
     await page.waitForFunction(() => document.documentElement.dataset.skiTeleport === "confirm", null, { timeout: 4000 });
     h.eq((await page.textContent("#tpConfirm b")).trim(), "Hei hin teleportéieren?", "the question");
     await h.shot("map-teleport-confirm");
@@ -178,16 +199,17 @@ export const flow = {
     h.expect(!!empty, "a discovered spot off every piste");
     if (empty) {
       await page.evaluate(() => { const el = document.getElementById("tpToast"); if (el) el.hidden = true; document.documentElement.dataset.skiTeleport = ""; });
-      await tapWorld(empty.x, empty.z);
+      await tapWorld(empty.x, empty.z, 9);
       await page.waitForFunction(() => document.documentElement.dataset.skiTeleport === "confirm", null, { timeout: 4000 }).catch(() => {});
       h.eq(await page.evaluate(() => document.documentElement.dataset.skiTeleport), "confirm", "piste tab, empty discovered map: 'Hei hin teleportéieren?'");
       await h.shot("map-piste-tab-empty-tap");
       await page.click("#tpNo");
     }
-    const fog = await page.evaluate(() => { const k = window.__ski, e = k.explore; for (let i = 0; i < 4000; i++) { const x = 200 + (i * 7919) % 20000, z = 200 + (i * 104729) % 20000; if (x < k.field.width - 200 && z < k.field.depth - 200 && !e.disc.has(x, z) && !k.pistes.nearest(x, z, 150) && window.__liftDist(x, z) > 150) return { x, z }; } return null; });
+    const fog = await page.evaluate(() => { const k = window.__ski, e = k.explore; for (let i = 0; i < 4000; i++) { const x = 200 + (i * 7919) % 20000, z = 200 + (i * 104729) % 20000; if (x < k.field.width - 200 && z < k.field.depth - 200 && !e.disc.has(x, z) && !k.pistes.nearest(x, z, 150) && window.__liftDist(x, z) > 150) { k.pisteMap.center(x, z, 9); const [px, py] = k.pisteMap.screenXY(x, z), w = k.pisteMap.worldXY(px, py); if (w && Math.hypot(w[0] - x, w[1] - z) < 20) return { x, z }; } } return null; });      // (in sight on the panorama)
+    h.expect(!!fog, 'an undiscovered spot in sight');
     if (fog) {
       await page.evaluate(() => { document.documentElement.dataset.skiTeleport = ""; });
-      await tapWorld(fog.x, fog.z);
+      await tapWorld(fog.x, fog.z, 9);
       await page.waitForFunction(() => document.documentElement.dataset.skiTeleport === "refused", null, { timeout: 3000 }).catch(() => {});
       h.eq(await page.evaluate(() => document.documentElement.dataset.skiTeleport), "refused", "piste tab, the fog: 'Nach net entdeckt'");
     }
