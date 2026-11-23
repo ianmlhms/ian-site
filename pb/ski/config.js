@@ -63,7 +63,8 @@ export const SKI = Object.freeze({
   gripGroomed: 1.25,        // max lateral acceleration while carving, in g
   gripPowder: 0.85,
   pivotRate: 2.7,           // rad/s heading change at walking speed
-  carveGain: 1.1,           // heading rate at speed = carveGain * grip * g / v
+  carveGain: 1.0,           // heading rate at speed = carveGain * grip * g / v (1.1 until the physics review: full steer always out-turned the grip)
+  carveFree: 0.03,          // slip (sine, ~1.7 degrees) that a clean carve carries for free; only what is beyond it scrubs speed
   tuckSteer: 0.55,          // steering authority while tucked
   edgeLock: 9,              // 1/s: how fast the velocity follows the skis while the edges hold
   skidLoss: 0.9,            // share of the lateral speed that is scrubbed (not turned) when the skis skid
@@ -85,7 +86,12 @@ export const SKI = Object.freeze({
   climbMax: 4.6,            // m/s2: the steepest it climbs is about 20 degrees (40 %) on the piste
   leaveGround: 0.95,        // the ground falls away faster than this many g: the skier takes off
   stickGap: 0.06,           // m: closer than this to the ground counts as touching
+  crestLeave: 0.3,          // m/s away from the slope right after a take-off: faster than this he stays in the air (a real crest)
+  airSteer: 0.6,            // rad/s the steering bends the flight line in a plain air (no trick)
+  airMagnet: 0.5,           // rad/s the flight line bends back towards the groomed snow when it would end beside the piste
   hardLanding: 10.5,        // m/s into the ground at landing: a crash
+  softLanding: 16.5,        // ... after a normal air (at most softAir s in the air): crests throw him into run-outs, the legs take more
+  softAir: 2.6,             // s
   hitCrash: 5,              // m/s into a trunk or rock: a crash (slower: a bump that stops you)
   bodyRadius: 0.35,
   jumpPop: 4.2,             // m/s upward pop of the jump key (launch fix: 3.2 read as a crouch; 4.2 = ~0.9 m up, ~0.85 s in the air on the flat)

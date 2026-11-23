@@ -144,7 +144,8 @@ check(max(moving, (o) => Math.abs(o.side) / halfW(o, 820 / 1180)) < 0.8, `portra
 check(min(all, (o) => o.clear) >= CAMERA.minClearance - 0.02, `never in the snow: the camera stays ${min(all, (o) => o.clear).toFixed(2)} m over its ground at the least (>= ${CAMERA.minClearance})`);
 check(min(all, (o) => o.line) >= 0.2, `the line skier -> camera stays ${min(all, (o) => o.line).toFixed(2)} m over the snow at the least (>= 0.2)`);
 const turns = [...rides['blue weaving'], ...rides['red weaving tucked']];
-check(max(turns, (o) => Math.abs(o.rate)) < 75, `smooth in turns: the view turns at most ${max(turns, (o) => Math.abs(o.rate)).toFixed(0)} deg/s (< 75)`);
+const carving = turns.filter((o) => o.v >= 6);          // (slower he pivots on the spot, a hairpin taken too fast: the view follows up to yawRate)
+check(max(carving, (o) => Math.abs(o.rate)) < 75 && max(turns, (o) => Math.abs(o.rate)) < 120, `smooth in turns: the view turns at most ${max(carving, (o) => Math.abs(o.rate)).toFixed(0)} deg/s above 22 km/h (< 75), ${max(turns, (o) => Math.abs(o.rate)).toFixed(0)} deg/s at walking pace (< 120)`);
 check(p99(turns, (o) => o.jerk) < 400, `no snap in turns: p99 of the turn-rate change ${p99(turns, (o) => o.jerk).toFixed(0)} deg/s2 (< 400)`);
 const lo = band(20, 34, rides['black tucked 15 fps']), hi = band(20, 34, rides['black tucked']);
 check(Math.abs(m(lo, 'pitch') - m(hi, 'pitch')) < 2 && Math.abs(m(lo, 'up') - m(hi, 'up')) < 0.5, `15 fps frames the same view as 60 fps (pitch ${m(lo, 'pitch').toFixed(1)} vs ${m(hi, 'pitch').toFixed(1)} deg, height ${m(lo, 'up').toFixed(1)} vs ${m(hi, 'up').toFixed(1)} m)`);

@@ -1546,3 +1546,29 @@ the canvas centre; a tap on a piste in the free ride tab only asked to teleport 
   ~15 % speed per 90 deg even inside the grip (edgeLock lag is taxed by skidLoss); full steer always over-rotates 10 % (carveGain 1.1:
   slip grows to ~20 deg, 30 % speed per 90 deg); deep snow below ~10 deg is a slog (18 km/h); trunk >= 18 km/h = fall.
 - r8c-check: skips OSM lift stubs that are not drawn (it crashed on `createLiftPath` null since the stations commit; fixed upstream too). main.js?v=19.
+
+## Physics round 2 (22 Nov 2026; Ian said yes to the three recommendations of the review above)
+- **Crest airs** (skier.js airStep, config `crestLeave` 0.3 m/s): after a take-off he stays in the air while he still moves away from
+  the slope (the old check landed anything within `stickGap` the next step: 0.01 s "airs"). On the piste only where the piste goes on
+  straight ahead (groomed snow 0.5 s and 1 s down the flight line: a path across a hillside / a bend with a crest keeps him down);
+  off the piste every crest counts. **Air control**: `airSteer` 0.6 rad/s bends the flight line (speed kept); **piste magnet**
+  `airMagnet` 0.5 rad/s towards the groomed side when the flight would end beside the piste. **Landings**: a normal air (<= `softAir`
+  2.6 s) falls only above `softLanding` 16.5 m/s into the snow (crests throw him into run-outs / counter-slopes at 11-16 m/s); a longer
+  fall (cliffs) keeps `hardLanding` 10.5. The 33 m/s cap now also holds in the air. Sprong pop and the park (tricks) unchanged.
+- **Carving**: `carveGain` 1.1 -> 1.0 (full steer = the grip limit, slip no longer grows to ~21 deg), `carveFree` 0.03 (only slip
+  beyond ~1.7 deg scrubs; fades out with the brake / hockey stop). A clean 90 deg turn keeps 91-98 % of a straight line's speed
+  (was ~81-84 %); plough / hockey distances unchanged (56 / 32 m from 90 km/h on 12 deg).
+- **Deep snow**: nothing changed: the acceleration assist already lifts 8 deg deep snow from 18 to 43 km/h tucked (15 deg 46, 25 deg
+  56 and 35 deg 68 as before); review-check holds the band.
+- **Measured** (`ride-probe.mjs <resort> --json` / `--compare`, 93 rides: per resort 3 longest reds, 2 longest blacks, the longest blue,
+  + the Face; line upright / line tucked / S tucked; `~/Library/Caches/ski-work/fable-review/rides-compare.txt`): airs > 0.15 s per ride
+  0.9 -> 9.3; Face de Bellevarde upright 2 -> 8 airs (longest 1.15 s), tucked 0 -> 11 (1.33 s), S tucked 4 -> 16 (1.49 s); rides 9.4 s
+  faster on average; off the groomed <= 0.9 s in every ride. 84 rides outside three cliff routes: 0 crashes, 0 lose time, longest air
+  2.1 s. Killy col-pers (crashed before too: 4-6 s falls, 27-53 m), Arlberg woster-bockbachtal and kuhtali (ski routes, 2.4-3.1 s
+  falls of 6-16 m): 6 rides with 1-2 landing crashes; col-pers S tucked 23 s slower (2 crashes).
+- **Stars**: the target model (challenges.js, 1D profile ride + 10 %) is untouched; the careful bot vs target stays in band (harness).
+  Runs get ~3-4 % faster, so targets are a little easier, never harder. Floors / 33 m/s cap unchanged (floors-check green).
+- **Checks**: review-check.mjs 37 (crest / roller / slow / run-out landing / cliff / magnet / air control / carving / braking / deep
+  snow / touch); speed-check: its rider now brakes for a hairpin (line > 0.9 rad off the skis at > 43 km/h, not in the launch): with
+  cheap carving he no longer scrubs enough to make Arlberg's Hoppelweg hairpin and left down the neighbouring piste. `ride-trace.mjs
+  <resort> <piste> [tuck]` shows where a ride loses time. main.js?v=20.

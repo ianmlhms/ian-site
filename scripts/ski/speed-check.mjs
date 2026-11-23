@@ -100,7 +100,10 @@ function ride({ world, surface }, piste, { fps, tuck, push = false, start = 'lau
       best = Math.max(best, proj.s);
       piste.at(proj.s + 12 + s.speed * 0.9, q);
       const err = wrap(Math.atan2(q.z - s.z, q.x - s.x) - s.heading);
-      const input = { steer: Math.max(-1, Math.min(1, err * 2.4)), tuck: tuck ? 1 : 0, brake: 0, push: push || s.speed < 3 ? 1 : 0, jump: false };
+      // physics review (cheaper carving): turning no longer dumps the speed, so the rider brakes for a hairpin like a player (the line
+      // turns more than 0.9 rad off his skis at over 43 km/h); before, Arlberg's Hoppelweg hairpin sent him down the neighbouring piste
+      const hairpin = Math.abs(err) > 0.9 && s.speed > 12 && best > 80;            // (never in the launch)
+      const input = { steer: Math.max(-1, Math.min(1, err * 2.4)), tuck: tuck && !hairpin ? 1 : 0, brake: hairpin ? 1 : 0, push: push || s.speed < 3 ? 1 : 0, jump: false };
       const prev = s;
       s = course.collide(prev, stepSkier(prev, input, world));
       game += SKI.dt;

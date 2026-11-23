@@ -20,6 +20,7 @@ const approach = (v, target, rate, dt) => v + (target - v) * Math.min(1, rate * 
 const RISE_FULL = G * Math.sin(6 * Math.PI / 180), RISE_NONE = G * Math.sin(12 * Math.PI / 180);     // m/s2 of gravity against him: the assist's rise gate
 const LAUNCH_OVER = 1;                 // m/s over kick.to the launch lets him reach before it ends (a steep start)
 const HOCKEY_MAX = 9.5;                 // R8: m/s2, the hockey stop's strongest deceleration
+const AIR_LOOK = 0.7, AIR_FAN = 0.45;    // s ahead along the flight line the piste magnet looks; rad to each side it compares
 const AIR_STEER_MAX = 1.15;            // rad the skis may turn off the flight line in a plain air (the sideways fall starts at 1.45)
 const HOLD_COS = Math.cos(38 * Math.PI / 180);       // round 7: steeper than this a stop can not hold (side-slip)
 const wrapAngle = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
@@ -122,7 +123,11 @@ function groundStep(s, input, world, dt) {
     const turn = clamp(want, -maxTurn, maxTurn);
     const nt = theta - turn;
     slip = Math.abs(Math.sin(nt));
-    const scrub = K.skidLoss * slip * (0.6 + 1.4 * s.brake) * dt * 1.6 * (1 - 0.6 * (s.stop || 0));      // R8: a hockey stop scrubs over ~1.5 s, not a wall
+    // cheaper clean carving (physics review; Ian: yes): only the slip beyond carveFree (the sine of ~1.7 degrees) is scrubbed. The
+    // velocity follows the skis with a lag (edgeLock), so every clean turn carried 2-6 degrees of slip and paid ~15 % of the speed
+    // per 90 degrees; braking and the hockey stop scrub as before (the free part fades out with them).
+    const taxed = Math.max(0, slip - (K.carveFree ?? SKI.carveFree) * (1 - s.brake) * (1 - (s.stop || 0)));
+    const scrub = K.skidLoss * taxed * (0.6 + 1.4 * s.brake) * dt * 1.6 * (1 - 0.6 * (s.stop || 0));      // R8: a hockey stop scrubs over ~1.5 s, not a wall
     const sp = v * Math.max(0, 1 - scrub);
     const c = Math.cos(nt), si = Math.sin(nt);
     vx = (fx * c + lx * si) * sp; vy = (fy * c + ly * si) * sp; vz = (fz * c + lz * si) * sp;
@@ -241,7 +246,8 @@ function airStep(s, input, world, dt) {
   s.vy -= G * dt;
   const v = Math.hypot(s.vx, s.vy, s.vz);
   const cda = K.cdaUpright + (K.cdaTuck - K.cdaUpright) * s.tuck;
-  const k = Math.max(0, 1 - 0.5 * K.airDensity * cda * v / K.mass * dt);
+  let k = Math.max(0, 1 - 0.5 * K.airDensity * cda * v / K.mass * dt);
+  if (v * k > K.maxSpeed) k = K.maxSpeed / v;                 // the hard cap holds in the air too (a long crest air fell past it)
   s.vx *= k; s.vy *= k; s.vz *= k;
   // round 6: free ride = 'hold': the air turns into a trick only while the trick button is held (or a rotation is already going)
   const tricks = world.tricks === true || (world.tricks === 'hold' && (input.trick || Math.abs(s.spin || 0) > 0.05 || Math.abs(s.flip || 0) > 0.05));
@@ -265,6 +271,27 @@ function airStep(s, input, world, dt) {
     const next = wrapAngle(s.heading + (input.steer || 0) * 1.1 * dt);
     const offNow = Math.abs(wrapAngle(s.heading - travel)), offNext = Math.abs(wrapAngle(next - travel));
     if (!fast || offNext <= AIR_STEER_MAX || offNext < offNow || offNow > Math.PI / 2) s.heading = next;
+    // air control (with the crest airs): the steering bends the flight line a little (airSteer rad/s at full steer, the speed stays),
+    // and a mild piste magnet: he took off on the piste and the flight ends in deep snow -> the line bends towards the side that is
+    // still groomed (airMagnet rad/s). A bend with a crest in it no longer throws a run off the piste.
+    const hv = Math.hypot(s.vx, s.vz);
+    if (hv > 3) {
+      let turn = clamp(input.steer || 0, -1, 1) * (K.airSteer ?? SKI.airSteer);
+      const magnet = K.airMagnet ?? SKI.airMagnet;
+      if (magnet > 0 && s.snow > 0.5) {
+        const reach = hv * AIR_LOOK, a = Math.atan2(s.vz, s.vx);
+        if (world.snow(s.x + Math.cos(a) * reach, s.z + Math.sin(a) * reach) < 0.5) {
+          const left = world.snow(s.x + Math.cos(a + AIR_FAN) * reach, s.z + Math.sin(a + AIR_FAN) * reach);
+          const right = world.snow(s.x + Math.cos(a - AIR_FAN) * reach, s.z + Math.sin(a - AIR_FAN) * reach);
+          if (Math.abs(left - right) > 0.1) turn += Math.sign(left - right) * magnet;
+        }
+      }
+      if (turn !== 0) {
+        const c = Math.cos(turn * dt), si = Math.sin(turn * dt), vx = s.vx * c - s.vz * si, vz = s.vx * si + s.vz * c;
+        s.vx = vx; s.vz = vz;
+        s.heading = wrapAngle(s.heading + turn * dt);
+      }
+    }
   }
   s.x += s.vx * dt; s.y += s.vy * dt; s.z += s.vz * dt;
   s.edge = approach(s.edge, 0, 3, dt);
@@ -274,6 +301,18 @@ function airStep(s, input, world, dt) {
   let rising = false;
   if (s.air < 0.2 && s.jumpCd > (K.jumpCooldown ?? SKI.jumpCooldown) - 0.2) { world.normal(s.x, s.z, n); rising = s.vx * n.x + s.vy * n.y + s.vz * n.z > 0.5; }      // popped, moving away from the slope
   if (rising && s.y < ground) s.y = ground;
+  // crest air (physics review after launch; Ian: yes): he left the ground because it falls away faster than gravity (groundStep), but
+  // a step later he is still within stickGap of it and the old check landed him again at once: crests and rollers only ever gave
+  // 0.01 s "airs" (a 12 -> 30 degree break held him down up to 110 km/h). Still moving away from the slope faster than crestLeave he
+  // flies on; a gentle roller (slower than that) keeps him on the snow.
+  // On the piste a crest only throws him where the piste goes on straight ahead (groomed snow 0.5 and 1 s down the flight line): a
+  // path across a steep hillside or a bend with a crest in it keeps him on the snow, as before (Arlberg's Hoppelweg flew him 60 m
+  // down the hillside beside the path). Off the piste every crest counts.
+  if (!rising && s.y > ground && s.y <= ground + K.stickGap) {
+    world.normal(s.x, s.z, n);
+    rising = s.vx * n.x + s.vy * n.y + s.vz * n.z > (K.crestLeave ?? SKI.crestLeave)
+      && (s.snow < 0.5 || (world.snow(s.x + s.vx * 0.5, s.z + s.vz * 0.5) >= 0.5 && world.snow(s.x + s.vx, s.z + s.vz) >= 0.5));
+  }
   if (!rising && s.y <= ground + K.stickGap) {
     world.normal(s.x, s.z, n);
     const into = -(s.vx * n.x + s.vy * n.y + s.vz * n.z);
@@ -293,7 +332,10 @@ function airStep(s, input, world, dt) {
       s.speed = Math.hypot(s.vx, s.vy, s.vz);
       return collide(s, world);
     }
-    if (into > K.hardLanding || (off > 1.45 && off < Math.PI - 0.3 && hv > 9)) return startCrash(s, into > K.hardLanding ? 'landing' : 'sideways');
+    // with the crest airs: a normal air (up to softAir s) lands softer than a long fall. Crests throw him into run-outs and
+    // counter-slopes at speed (11-16 m/s into the snow after 0.7-2.5 s): the legs take up to softLanding; a fall off a cliff keeps hardLanding
+    const hard = s.air <= (K.softAir ?? SKI.softAir) ? Math.max(K.hardLanding, K.softLanding ?? SKI.softLanding) : K.hardLanding;
+    if (into > hard || (off > 1.45 && off < Math.PI - 0.3 && hv > 9)) return startCrash(s, into > hard ? 'landing' : 'sideways');
     if (off > Math.PI / 2) s.heading = wrapAngle(s.heading + Math.PI);  // landed backwards at low angle: turn the skis round (forgiving)
   }
   s.speed = Math.hypot(s.vx, s.vy, s.vz);

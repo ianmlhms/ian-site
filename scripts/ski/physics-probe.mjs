@@ -46,7 +46,8 @@ for (const v0 of [5, 10, 15, 20, 25, 30]) for (const [lab, inp] of [['upright', 
     return true;
   });
   const radius = t90 ? (v0 + v90) / 2 * t90 / (Math.PI / 2) : NaN;
-  console.log(`  ${kmh(v0).padStart(3)} km/h ${lab.padEnd(7)} 90 deg in ${(t90 || NaN).toFixed(2).padStart(5)} s  radius ~${radius.toFixed(0).padStart(3)} m  ${kmh(v90).padStart(3)} km/h after 90, ${kmh(v180).padStart(3)} after 180 (${t180 ? t180.toFixed(1) : '-'} s)  peak slip ${(Math.asin(Math.min(1, slip)) / DEG).toFixed(0)} deg`);
+  const coast = t90 ? run(w, start(w, v0), { ...inp, steer: 0 }, t90).speed : NaN;      // the same seconds straight ahead: what the turn itself cost
+  console.log(`  ${kmh(v0).padStart(3)} km/h ${lab.padEnd(7)} 90 deg in ${(t90 || NaN).toFixed(2).padStart(5)} s  radius ~${radius.toFixed(0).padStart(3)} m  ${kmh(v90).padStart(3)} km/h after 90 (keeps ${(v90 / coast * 100).toFixed(0)} % of a straight line's ${kmh(coast)}), ${kmh(v180).padStart(3)} after 180 (${t180 ? t180.toFixed(1) : '-'} s)  peak slip ${(Math.asin(Math.min(1, slip)) / DEG).toFixed(0)} deg`);
 }
 console.log('\n3 steering response: the heading rate (deg/s) 0.1 / 0.2 / 0.4 / 0.8 s after a step to full steer');
 for (const v0 of [3, 8, 15, 25]) {
