@@ -143,7 +143,15 @@ export function createFreeRun({ resort, pistes, lifts, start, stats: shared = nu
       if (state.x < EDGE || state.z < EDGE || state.x > resort.width - EDGE || state.z > resort.depth - EDGE) events.push({ type: 'offpiste' });
       return events;
     },
-    respawnPoint() { return { ...safe }; },
+    /** The last safe spot (every SAFE_EVERY s on the snow at speed); cleanup round: after a landing crash where he came to rest (he
+     *  flew down there: the safe spot before the drop would only send him over it again), facing the way he was going, unless that
+     *  is a wall steeper than 45 deg (slopeAt(x, z) in deg) or off the map. */
+    respawnPoint({ landed = false, at = null, slopeAt = null } = {}) {
+      if (landed && at && at.x > EDGE && at.z > EDGE && at.x < resort.width - EDGE && at.z < resort.depth - EDGE && (!slopeAt || slopeAt(at.x, at.z) < 45)) {
+        return { x: at.x, z: at.z, heading: Math.hypot(at.vx, at.vz) > 0.5 ? Math.atan2(at.vz, at.vx) : at.heading };
+      }
+      return { ...safe };
+    },
     /** Ride a lift: the counters, the respawn spot at the top; returns the start spot. */
     rideUp(lift, height) {
       stats.lifts += 1;

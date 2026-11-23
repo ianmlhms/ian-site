@@ -125,6 +125,8 @@ export const SKI = Object.freeze({
   jumpWind: 0.12,           // s of crouch before the pop (the model dips, then he takes off)
   jumpCooldown: 0.6,
   crashSeconds: 1.6,        // tumble before the respawn
+  landingCrashSeconds: 1.1, // cleanup round (cliff routes): a landing crash (not a park trick) tumbles shorter, the respawn is where he landed
+  respawnRoll: 6,           // m/s down the line after that respawn (he gets up and skis on: back to speed in ~1 s, never on top of the drop)
   offPisteLimit: 420,       // m from the nearest piste: beyond that the skier is sent back
   // tricks (round 4A: snow park and free ride, world.tricks)
   spinRate: 9,              // rad/s spin at full steer in the air (a 1080 takes about 2.1 s)

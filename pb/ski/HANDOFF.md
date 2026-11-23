@@ -1616,3 +1616,67 @@ the canvas centre; a tap on a piste in the free ride tab only asked to teleport 
 - memory-check (Niddreg, all resorts, tour 18, 10 switches, 3 pages): switch growth green (+45 / +21 / -27 / -4 / +31 MB), 3 pages
   2129 MB <= 2200; "after load" renderer 3V 482 / Arlberg 462 MB > 450 FAIL — the same with the other skiers OFF (3V 473-481, Arlberg
   448-465 in two runs): the baseline on today's main, not this change (the figures + pose textures are < 2 MB).
+
+## Cleanup round (23 Nov 2026): memory, online send rate, cliff landings, the others ahead
+**Memory** (`scripts/ski/memory-check.mjs`, Chromium 1180 x 820 @2, q=low, renderer MB "after load"). Bisecting the commits since
+R8f (2ef5ff94 -> 917a94ba, 3 Vallées + Arlberg at each) showed NO single feature: the same commit measured 405-476 MB (3V) in
+consecutive runs, R8f itself 435-438 MB today (its 401 was a lucky run). The spread came from GARBAGE: the renderer footprint is the
+JS heap's peak + the ArrayBuffers not yet swept when it is read. Measured with CDP sampling-heap profiles including collected objects
+(allocation per frame), memory-infra dumps (per allocator) and a typed-array tracer (who allocates the big buffers, which stay alive).
+Culprits and fixes (all resort-generic, no feature removed):
+- **main.js stationFrame** (R8e station framing): standing in a station it re-ran its whole search EVERY frame (16 spots x 28 rays x ~50
+  steps) because it compared the CAMERA spot (`frameAt.x`) with the skier instead of the searched-from spot (`sx`), and a search that
+  found nothing was not remembered. With lift-site.js `near()` building a Set per call: **270 MB/s of garbage at every spawn** (8 MB a
+  frame; the heap climbed to 300-360 MB between collections, the page ran at ~33 fps on the Mini). Now once per spot (0.5 m) and every
+  `FRAME_REFRESH` 1 s, found or not: 270 -> 39 MB/s, 268 -> 482 frames in 8 s (R8f had the same bug).
+- **lift-site.js near()**: no Set: a disc inside one 60 m cell returns that cell's list, else an array deduplicated by a per-call stamp.
+- **surface.js** block LRU: the last block is returned without the delete + set touch (0.5 MB/frame of Map churn).
+- **main.js pictureColours** (the WebKit picture check): `drawImage(WebGL canvas)` made the canvas keep a full-size 2D snapshot for
+  the page's life: **13.7 MB** in the renderer (memory-infra `canvas/ResourceProvider`). Now 12 one-pixel `readPixels` rows x 48 samples
+  right after the render (same verdict: distinct colours).
+- **props.js createPoles**: pole positions / colours and the net candidates in typed arrays (were plain arrays of numbers + colour
+  names + 7-element arrays: ~18 MB of JS heap at 3V); the shear Matrix4 no longer allocated per net panel.
+- **npc.js**: the full segment index over every piste (`createLineIndex(pistes.list, 100)`, ~4.5 MB heap) only answered "which pistes
+  are near": now `pisteGrid` (120 m cells -> pistes) + `pistesNear`. **modes/clear.js setPistes**: segments in one Float64Array + ids
+  (were [x, z, x, z, id] arrays, ~4.5 MB; Float64 so the course gates stay exactly where they were).
+- **codec.js decodeGrid**: a scratch Int32Array for tile-sized grids (each tile left 260 KB of garbage: ~43 MB per load).
+- **village.js writer finish()**: subarray views, not copies (the meshes are gpuOnly: the arrays go after the upload anyway).
+- **props.js sign atlas**: 64 slots (2048 x 384, was 128 / 2048 x 768 = 6 MB canvas + texture): the most boards within SIGN.radius of
+  ANY point (100 m grid) of the five resorts is 41 (Arlberg); r7d-test checks the grid now and keeps 25 % spare.
+Numbers (renderer MB after load; before = origin/main 917a94ba today, after = this round, two runs where noted):
+| resort | before | after (3 runs) |
+| killy | 358 | 316-324 |
+| 3vallees | 469 (spikes to 476-482) | 381-390 |
+| zermatt | 378 | 332-338 |
+| arlberg | 459-466 | 398-411 |
+| kronplatz | 349 | 304-308 |
+JS heap live after load (gc each 400 ms) Arlberg v8 39 -> 32 MB; renderer `canvas` 25.3 -> 9.1 MB. Final memory-check all green:
+tours <= 365 MB; 10 switches within -7..+43 MB of the first visit (a page reached by location.replace reads higher: Arlberg 432-434,
+3V 394-409); 3 Killy pages 1781 MB tree (was 2129). Tools used (scratch, not in the repo): CDP sampling-heap profile with collected
+objects, memory-infra dumps, a typed-array tracer with WeakRefs.
+**Online free ride send rate** (flow ski-mp-freeride "7-8 / s"): two causes. (1) The send was frame-tied: `now - lastSend >= period`
+with `lastSend = now` sent every 3rd frame whenever two 30 fps frames came < 64.7 ms apart (FLOW_POWER caps at 30 fps; 8-13 / s).
+Now `net/wire.js sendSlot` on the wall clock (the next slot is due one period after the last SLOT, catch-up at most half a slot): 15 / s
+at any frame rate >= 15 (r7d-test simulates 60 / 30 / 24 / 20 / 16 fps with jitter); the online race uses it too (12 / s). (2) The
+flow averaged emma's whole buffer, and she comes to a halt ~0.6 s into the window (speeds 5-6 m/s then 0): standing sends 4 / s by
+design. Now the flow measures the host's buffer over the stretch she moved (15.3 / s) and emma's own sends per second of her moving
+time (`__skiMp.info().movingSends / movingMs`).
+**Cliff landings** (Killy col-pers, Arlberg woster-bockbachtal / kuhtali: ski routes over DEM rock bands and steep pitches onto
+run-outs: 1.5-6 s falls of 13-38 m). Decision: crashing there stays (a 20 m drop onto the flat is a fall), but it is QUICK: a landing
+crash tumbles `SKI.landingCrashSeconds` 1.1 s (others 1.6), the respawn is on the line WHERE HE LANDED (game.js `respawnPoint({ landed,
+slopeAt })`, moved down the line off any wall > 45 deg, <= 40 m; the old one was 10 m behind the furthest point = back on top of the
+drop) and he skis on at `SKI.respawnRoll` 6 m/s (skier.js `rollOn`). Free ride: where he came to rest (not the safe spot above the
+cliff), unless that is a > 45 deg wall. Not in the park (tricks keep their own crash). Rerouting the lines was not done: the OSM routes
+are where people ski, the drops come from the 5 m DEM, a reroute would change courses / floors. `node scripts/ski/cliff-check.mjs`:
+a crash costs 2.5-3.8 s before -> 1.1 s now, never the same cliff twice, all 9 rides finish.
+**The others ahead** (`scripts/ski/npc-ahead-shots.mjs`, FLOW_FULL, GPU, dpr 2, Héich, 3V Boulevard du France with the bot): the
+figures are steady between frames (no shimmer: they are real meshes, 1/30 s bursts compared), the orange edge nets too. 19-24 others in
+the picture, 5-6 within 150 m ahead. A 1.35 x density raised that to only 6 and cost the ski-npc CPU budget (1.3 ms > 1 ms at CPU x4):
+reverted, the population is cap- and CPU-bound. Shots ~/Library/Caches/ski-work/cleanup/npc-ahead-{before,after}/.
+**Pre-existing, not from this round**: round7c-check --rides fails 3 on origin/main too (Killy joseray passes a net at s 1501 round the
+hotel; Zermatt stafelalp does not reach the ZIL, s 5704 / 5771).
+**Checks (23 Nov)**: Node round6 2222, round7 38, round7b 11791, round7c --rides 137/3 (the 3 pre-existing above), r8c 36302, speed-check
+94, review-check 37, camera-check 15, barrier-check 11, npc-check 79, floors-check 1324 + parks (unchanged), security-test, r7d-test 1432,
+look7d 68, cliff-check 9/9. Chromium flows (FLOW_POWER): ski, ski-freeride, ski-mp, ski-npc, ski-course, ski-ipad-start PASS;
+ski-mp-freeride PASS 3 x in a row (emma sends 14.7-15.3 / s, the host gets 14.8-15.1 / s, 121-186 ms behind). WebKit (FLOWS=ski-webkit)
+still hangs at startup on the Mini (Playwright.app 0 % CPU in mach_msg for 6 min, killed). main.js?v=22.

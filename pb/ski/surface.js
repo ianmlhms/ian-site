@@ -19,10 +19,14 @@ export function createSurface(field) {
   const key = (bx, bz) => bx * 100003 + bz;
   const attr = { piste: 0, forest: 0, rock: 0, built: 0, diff: 0, water: 0 };
 
+  // cleanup round (memory): the LRU touch (delete + set) on EVERY height read re-grew the Map's table (~0.5 MB of garbage a frame at a
+  // station); most reads in a row hit the same block: that one is returned without a touch
+  let lastK = NaN, lastB = null;
   function block(bx, bz) {
     const k = key(bx, bz);
+    if (k === lastK) return lastB;
     let b = blocks.get(k);
-    if (b) { blocks.delete(k); blocks.set(k, b); return b; }
+    if (b) { blocks.delete(k); blocks.set(k, b); lastK = k; lastB = b; return b; }
     const h = new Float32Array(SIDE * SIDE);
     const info = new Float32Array(SIDE * SIDE * ATTR);
     const x0 = bx * BLOCK, z0 = bz * BLOCK;
@@ -38,6 +42,7 @@ export function createSurface(field) {
     b = { bx, bz, x0, z0, h, info, side: SIDE, apron: APRON };
     blocks.set(k, b);
     if (blocks.size > MAX_BLOCKS) blocks.delete(blocks.keys().next().value);
+    lastK = k; lastB = b;
     return b;
   }
 
@@ -80,6 +85,7 @@ export function createSurface(field) {
 
   /** Drops every cached block that overlaps the world rectangle (a height tile arrived there). */
   function invalidate(x0, z0, x1, z1) {
+    lastK = NaN; lastB = null;
     for (const [k, b] of blocks) if (b.x0 <= x1 && b.x0 + BLOCK >= x0 && b.z0 <= z1 && b.z0 + BLOCK >= z0) blocks.delete(k);
   }
 

@@ -43,11 +43,12 @@ const { assignSlots, SIGN } = await import("../../pb/ski/props.js");
 let slots = new Map();
 const cap = SIGN.cols * SIGN.rows;
 const ids = (a, b) => Array.from({ length: b - a }, (_, i) => a + i);
-let r = assignSlots(slots, ids(0, 100), cap);
-ok(r.paint.length === 100 && new Set(r.slots.values()).size === 100, "100 boards: 100 distinct slots painted");
+const fill = Math.min(100, cap), half = Math.floor(fill / 2);
+let r = assignSlots(slots, ids(0, fill), cap);
+ok(r.paint.length === fill && new Set(r.slots.values()).size === fill, `${fill} boards: ${fill} distinct slots painted`);
 slots = r.slots;
-r = assignSlots(slots, ids(50, 150), cap);
-ok(r.paint.length === 50 && ids(50, 100).every((i) => r.slots.get(i) === slots.get(i)), "moving on: boards still in range keep their slot, only the 50 new ones are painted");
+r = assignSlots(slots, ids(half, half + fill), cap);
+ok(r.paint.length === half && ids(half, fill).every((i) => r.slots.get(i) === slots.get(i)), `moving on: boards still in range keep their slot, only the ${half} new ones are painted`);
 ok(new Set(r.slots.values()).size === r.slots.size && [...r.slots.values()].every((s) => s >= 0 && s < cap), "no slot used twice, all inside the atlas");
 r = assignSlots(r.slots, ids(0, 900), cap);
 ok(r.slots.size === cap, `900 boards in range: the nearest ${cap} get a slot (the atlas never grows)`);
@@ -57,7 +58,14 @@ for (const rid of ["killy", "3vallees", "zermatt", "arlberg", "kronplatz"]) {
   const pts = res.pistes.filter((p) => p.line.length >= 4).map((p) => [p.line[0], p.line[1]]);
   let most = 0;
   for (const [x, z] of pts) most = Math.max(most, pts.filter(([a, b]) => Math.hypot(a - x, b - z) < SIGN.radius).length);
-  ok(most <= cap, `${rid}: at most ${most} boards within ${SIGN.radius} m of a sign (atlas ${cap}); ${res.pistes.length} pistes in all`);
+  // (cleanup round: the atlas shrank to 64 slots, so also every point of a 100 m grid, the camera can stand anywhere)
+  const xs = pts.map((p) => p[0]), zs = pts.map((p) => p[1]);
+  for (let x = Math.min(...xs); x <= Math.max(...xs); x += 100) for (let z = Math.min(...zs); z <= Math.max(...zs); z += 100) {
+    let n = 0;
+    for (const [a, b] of pts) if (Math.hypot(a - x, b - z) < SIGN.radius) n++;
+    most = Math.max(most, n);
+  }
+  ok(most <= cap * 0.75, `${rid}: at most ${most} boards within ${SIGN.radius} m of a sign or any grid point (atlas ${cap}, 25 % spare); ${res.pistes.length} pistes in all`);
   console.log(`  ${rid}: ${res.pistes.length} pistes, the busiest sign sees ${most} boards within ${SIGN.radius} m (atlas ${cap} slots, ${SIGN.cols * SIGN.BW} x ${SIGN.rows * SIGN.BH} px)`);
 }
 
@@ -78,6 +86,24 @@ const { unpackState, packState } = await import("../../pb/ski/net/wire.js");
 const st = { x: 100, y: 10, z: 200, heading: 0, speed: 3, edge: 0, tuck: 0, brake: 0, grounded: true, vx: 3, vz: 0, vy: 0, ride: "sit", rideLift: 4, rideS: 120.5, rideKind: 1 };
 const back = unpackState(packState(st, 0, false));
 ok(back.rideLift === 4 && back.rideS === 120.5 && back.ride === "sit", "riding lift X at s survives the wire");
+
+// 4b. the send schedule (cleanup round): 15 states / s on the wall clock at any frame rate >= 15 (with jitter), never a burst
+{
+  const { sendSlot } = await import("../../pb/ski/net/wire.js");
+  let seed = 7;
+  const jr = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (const [fps, jit] of [[60, 2], [30, 0], [30, 5], [24, 6], [20, 6], [16, 3], [10, 0]]) {
+    let t = 1000, at = 0, n = 0, gapMin = Infinity, lastT = -1e9;
+    while (t < 21000) {
+      t += 1000 / fps + (jr() * 2 - 1) * jit;
+      const s = sendSlot(at, t, 15);
+      if (s !== null) { at = s; n++; gapMin = Math.min(gapMin, t - lastT); lastT = t; }
+    }
+    const rate = n / 20, want = Math.min(15, fps);
+    ok(rate >= want * 0.93 && rate <= 15.3 && gapMin > 1000 / 60 - 3, `send schedule at ${fps} fps +-${jit} ms: ${rate.toFixed(1)} / s (want ~${want}), closest two sends ${gapMin.toFixed(0)} ms`);
+  }
+  ok(sendSlot(0, 5000, 15) !== null && sendSlot(sendSlot(0, 5000, 15), 5001, 15) === null, "after a pause: one send, then the next one a slot later (no burst)");
+}
 
 // 5. packed piste lines (linepack.js <-> scripts/ski/linepack.py): lossless at 0.1 m, the JS packer writes what Python wrote
 for (let t = 0; t < 200; t++) {

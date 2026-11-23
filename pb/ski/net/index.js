@@ -7,6 +7,7 @@ import { matchSeed, resolveResort, resolveRuns } from './plan.js';
 import { createRace } from './race.js';
 import { createSession } from './session.js';
 import { createRemotes, packState, outfitOf, MEET_GAP_MS } from './remotes.js';
+import { sendSlot } from './wire.js';
 import { createMpHud, resText } from './hud.js';
 import { createFreeMp } from './freeride.js';
 import { minRunMs } from '../progress.js';
@@ -208,8 +209,9 @@ export function createMp({ ctx, host }) {
     // my state for the others
     const racing = game.phase === 'running';
     const hz = racing ? NET.SEND_HZ : NET.IDLE_HZ;
-    if (game.state && now - local.lastSend >= 1000 / hz) {
-      local.lastSend = now;
+    const slot = game.state ? sendSlot(local.lastSend, now, hz) : null;      // cleanup round: on the wall clock, not every n-th frame
+    if (slot !== null) {
+      local.lastSend = slot;
       session.broadcast({ k: 's', r: race.run, t: Math.round(now), a: packState(game.state, game.run ? game.run.progress : 0, game.phase === 'finished') }, false);
     }
     if (local.spectate) { const rem = remotes.get(local.spectate); if (!rem || !rem.state || rem.state.finished) nextSpectate(); }

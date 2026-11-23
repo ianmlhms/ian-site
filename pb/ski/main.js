@@ -28,7 +28,7 @@ import { seatRows, createVillage } from './village.js';
 import { createRoads, decodeRoads, housesOnStreets } from './roads.js';
 import { createLandmarks } from './landmarks.js';
 import { createPisteSet } from './pistes.js';
-import { createSkierState, stepSkier, launchState } from './skier.js';
+import { createSkierState, stepSkier, launchState, rollOn } from './skier.js';
 import { frameSeconds, planSteps } from './clock.js';          // launch fix: real time down to 10 fps (was 20)
 import { createSkierModel, readOutfit, writeOutfit, OUTFITS } from './skier-model.js';
 import { createChaseCamera } from './camera.js';
@@ -206,6 +206,7 @@ async function boot() {
   const parkLayout = parkLayoutOf(resort);                                   // round 4A: the snow park is part of the height function
   const field = createField({ resort, far: core.far, classes: core.classes, net, park: parkLayout });
   const surface = createSurface(field);
+  const surfaceAt = (gx, gz) => surface.height(gx, gz);                       // (one closure, not one per collision test: cleanup round)
   setRoot(resort.width, resort.depth);
   const streamer = createTileStreamer({ resort, field, root: core.root });
   streamer.hold(DATA.startRadius + 200);                    // first play: only the tiles around the start, the rest after Start is live
@@ -257,7 +258,7 @@ async function boot() {
     }
     // R8: the stations by their real solid parts (lift-site.js: walls, posts, roofs, huts), the camera as a 0.5 m box round its point
     // (only near a station end: the lift world's lookup allocates, and this runs ~20 times a frame)
-    if (nearStation(x, z) && modes.lifts.world.hit(x, z, 0.3, y - 0.25, (gx, gz) => surface.height(gx, gz), 0.5)) return true;
+    if (nearStation(x, z) && modes.lifts.world.hit(x, z, 0.3, y - 0.25, surfaceAt, 0.5)) return true;
     return !!scatter.hit(x, z, 1.1, y, quality.treeDensity) || !!scatter.inCrown(x, y, z, quality.treeDensity, 0.35);      // R8e: the crowns too
   }
   let stationGrid = null;                                   // R8: 50 m cells holding a station end (the camera guard's cheap pre-test)
@@ -408,13 +409,14 @@ async function boot() {
     height: standHeight,
     normal: standNormal,
     snow: (x, z) => Math.min(1, surface.info(x, z, 0) * 1.25),
-    hit: (x, z, r, y) => scatter.hit(x, z, r, y, quality.treeDensity) || modes.lifts.world.hit(x, z, r, y, (gx, gz) => surface.height(gx, gz)) || buildingHit(x, z, r, y),     // R7-B: pylons + stations; R8: houses
+    hit: (x, z, r, y) => scatter.hit(x, z, r, y, quality.treeDensity) || modes.lifts.world.hit(x, z, r, y, surfaceAt) || buildingHit(x, z, r, y),     // R7-B: pylons + stations; R8: houses
   };
   /* R8e (3V QA: at the spawn the station roof filled the top quarter of the screen): standing in a station (the spawn, a fast travel, a
    * lift exit) the chase camera is framed so the lift and the slope show: candidate spots round him (back / side / height) are judged
    * by rays through the top fifth of their view (roofShare: the share that hits a station part or a house within 40 m) and by a clear
    * line to him; the best one is eased in, the chase camera takes over again as soon as he moves. */
   const rayV = { x: 0, y: 0, z: 0 };
+  const underRoof = (x, y, z) => { if (!boxIndex) return false; const b = boxIndex.hit(x, z, 0); return !!b && y < b[6]; };
   function roofShare(cx, cy, cz, tx, ty, tz, fov, aspect = (canvas.clientWidth || 4) / (canvas.clientHeight || 3)) {
     let fx = tx - cx, fy = ty - cy, fz = tz - cz; const fl = Math.hypot(fx, fy, fz) || 1; fx /= fl; fy /= fl; fz /= fl;
     let rx = -fz, rz = fx; const rl = Math.hypot(rx, rz) || 1; rx /= rl; rz /= rl;                       // right (horizontal)
@@ -429,16 +431,23 @@ async function boot() {
         for (let d = 0.6; d <= 40; d += d < 10 ? 0.5 : 1) {
           const x = cx + rayV.x / l * d, y = cy + rayV.y / l * d, z = cz + rayV.z / l * d;
           if (y < surface.height(x, z)) break;                                                            // the slope: fine
-          if ((nearStation(x, z) && modes.lifts.world.hit(x, z, 0.15, y - 0.1, (gx, gz) => surface.height(gx, gz), 0.2)) || (boxIndex && (() => { const b = boxIndex.hit(x, z, 0); return b && y < b[6]; })())) { hit++; break; }
+          if ((nearStation(x, z) && modes.lifts.world.hit(x, z, 0.15, y - 0.1, surfaceAt, 0.2)) || underRoof(x, y, z)) { hit++; break; }
         }
       }
     }
     return hit / n;
   }
-  let frameAt = null, frameK = 0;
+  let frameAt = null, frameK = 0, frameMiss = null;
+  const FRAME_REFRESH = 1;
   function stationFrame(cam, view, dt) {
     const still = view.speed < 0.4 && view.grounded && !view.ride && view.crash === 0 && game.phase === 'running' && !!modes.lifts.world.inStation(view.x, view.z, 0.5);
-    if (still && (!frameAt || Math.hypot(frameAt.x - view.x, frameAt.z - view.z) > 0.5)) {
+    // cleanup round (memory): the search (16 spots x 28 rays x ~50 steps) ran EVERY frame while he stood in a station: it compared the
+    // CAMERA spot (frameAt.x) with him instead of where it was searched from (sx), and a search that found nothing was not remembered
+    // (~270 MB/s of garbage at the spawn, the heap climbed to 300+ MB between collections). Now once per spot (0.5 m), found or not,
+    // and again each FRAME_REFRESH s (the houses / stations / tiles still coming in at the spawn can change the best spot).
+    const searched = (f) => f && time - f.at < FRAME_REFRESH && Math.hypot(f.sx - view.x, f.sz - view.z) <= 0.5;
+    if (!still) frameMiss = null;
+    if (still && !searched(frameAt) && !searched(frameMiss)) {
       const fx = Math.cos(view.heading), fz = Math.sin(view.heading), rx = -fz, rz = fx, y0 = view.y;
       const tx = view.x + fx * 14, tz = view.z + fz * 14, ty = Math.max(y0 + 2.4, surface.height(tx, tz) + 1.8);       // him + the line up
       let best = null;
@@ -456,7 +465,8 @@ async function boot() {
         if (!best || score < best.score) best = { x: cx, y: cy, z: cz, tx, ty, tz, share, score };
         if (share === 0 && back === 5.2 && lat === 0) break;
       }
-      frameAt = best ? { ...best, sx: view.x, sz: view.z } : null;
+      frameAt = best ? { ...best, sx: view.x, sz: view.z, at: time } : null;
+      frameMiss = best ? null : { sx: view.x, sz: view.z, at: time };
       if (frameAt) { frameAt.x0 = view.x; frameAt.z0 = view.z; }
       document.documentElement.dataset.skiStationFrame = best ? best.share.toFixed(2) : '';
     }
@@ -468,7 +478,7 @@ async function boot() {
     return { ...cam, x: m(cam.x, frameAt.x), y: m(cam.y, frameAt.y), z: m(cam.z, frameAt.z), tx: m(cam.tx, frameAt.tx), ty: m(cam.ty, frameAt.ty), tz: m(cam.tz, frameAt.tz) };
   }
   /** R8e: a station part / pylon / house at (x, z) (the scripted bot skis round it; window.__ski.blocked for the flows). */
-  const botBlocked = (x, z) => { const y = standHeight(x, z); return !!(modes.lifts.world.hit(x, z, 2.5, y, (gx, gz) => surface.height(gx, gz)) || buildingHit(x, z, 2.5, y)); };      // 2.5 m: he carves wide
+  const botBlocked = (x, z) => { const y = standHeight(x, z); return !!(modes.lifts.world.hit(x, z, 2.5, y, surfaceAt) || buildingHit(x, z, 2.5, y)); };      // 2.5 m: he carves wide
   /** R8 (early QA: he skied through chalets): the houses collide like the station walls: out by the nearest face of the footprint box. */
   const houseHit = { nx: 0, nz: 0, pen: 0, kind: 'house' };
   function buildingHit(x, z, r, y) {
@@ -860,10 +870,14 @@ async function boot() {
     }
     return r;
   }
+  const slopeDeg = (x, z) => { const n = surface.normal(x, z, {}); return Math.acos(Math.min(1, n.y)) * 180 / Math.PI; };
   function respawn(text) {
     if (!game.run) return;
-    const r = clearSpot(game.run.respawnPoint());
+    // cleanup round (cliff routes): after a landing crash where he landed (below the drop), not back on top of it
+    const st = game.state, landed = !!(st && st.crashKind === 'landing' && !text && game.mode !== MODES.park);
+    const r = clearSpot(game.run.respawnPoint({ landed, at: st, slopeAt: slopeDeg }));
     placeAt(r.x, r.z, r.heading);
+    if (landed) game.state = rollOn(game.state);                            // he gets up and skis on (SKI.respawnRoll)
     if (course) course.rebase();                                             // R7-C2: the HUD distance from where he stands again
     if (text) hud.toast(text);
   }
@@ -1206,16 +1220,25 @@ async function boot() {
 
   // ---- round 7 (A): the picture check (WebKit / Safari safety net): a few seconds into the first ride, read the canvas back; a
   // one-colour picture or a shader error steps down: cheap snow (Niddreg shaders), then no MSAA, then no post pass ----
+  // cleanup round (memory): read back with readPixels, PICTURE_ROWS one-pixel rows right after the render (same task: no
+  // preserveDrawingBuffer needed), 48 samples each. The drawImage(WebGL canvas) of before made the canvas keep a full-size 2D snapshot
+  // for the page's life (13.7 MB in the renderer at 1180 x 820 @2).
+  const PICTURE_ROWS = 12, PICTURE_COLS = 48;
   function pictureColours() {
     try {
-      const k = document.createElement('canvas'); k.width = 48; k.height = 36;
-      const g = k.getContext('2d');
       post.render(scene, camera);
-      g.drawImage(canvas, 0, 0, 48, 36);
-      const d = g.getImageData(0, 0, 48, 36).data, set = new Set();
-      for (let i = 0; i < d.length; i += 4) set.add((d[i] >> 4) * 256 + (d[i + 1] >> 4) * 16 + (d[i + 2] >> 4));
+      const gl = renderer.getContext(), w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
+      if (!w || !h) return -1;
+      const row = new Uint8Array(w * 4), set = new Set();
+      for (let r = 0; r < PICTURE_ROWS; r++) {
+        gl.readPixels(0, Math.floor((r + 0.5) / PICTURE_ROWS * h), w, 1, gl.RGBA, gl.UNSIGNED_BYTE, row);
+        for (let c = 0; c < PICTURE_COLS; c++) {
+          const i = Math.floor((c + 0.5) / PICTURE_COLS * w) * 4;
+          set.add((row[i] >> 4) * 256 + (row[i + 1] >> 4) * 16 + (row[i + 2] >> 4));
+        }
+      }
       return set.size;
-    } catch (error) { return -1; }                                       // a tainted / unreadable canvas: no verdict
+    } catch (error) { return -1; }                                       // an unreadable picture: no verdict
   }
   let pictureChecks = 0;
   function pictureCheck() {

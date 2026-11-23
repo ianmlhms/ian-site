@@ -26,6 +26,16 @@ function netTexture() {
   return t;
 }
 const REBUILD = 45;
+const NET_STRIDE = 6;                 // a net candidate: ax, az, bx, bz, ox, oz (o = the outward unit vector)
+/** A growing Float32Array (pairs pushed, done() = an exact copy): the pole / net tables without plain JS number arrays. */
+class GrowF32 {
+  constructor() { this.a = new Float32Array(4096); this.n = 0; }
+  push(x, z) {
+    if (this.n + 2 > this.a.length) { const b = new Float32Array(this.a.length * 2); b.set(this.a); this.a = b; }
+    this.a[this.n++] = x; this.a[this.n++] = z;
+  }
+  done() { return this.a.slice(0, this.n); }
+}
 const DIFF_OF_LETTER = { g: 'green', b: 'blue', r: 'red', k: 'black' };
 
 function bannerTexture(text, bg, fg) {
@@ -62,11 +72,13 @@ export function createPoles({ scene, resort, height }) {
   const netPosts = new THREE.InstancedMesh(netPostGeo, new THREE.MeshLambertMaterial({ color: 0x2d3138 }), NET_CAP);
   netPosts.count = 0; netPosts.frustumCulled = false;
   scene.add(nets, netPosts);
-  // every pole position once (both edges of every line)
-  const all = [];
+  // every pole position once (both edges of every line). Cleanup round (memory): typed arrays (the plain arrays of numbers and colour
+  // names took ~18 MB of JS heap at 3 Vallees): x, z per pole + its colour's index, grown in one pass
+  const DIFFS = Object.keys(DIFF);
+  const poleXZ = new GrowF32(), poleDiff = [];
   for (const line of resort.network) {
     if (line.a) continue;
-    const p = line.p, hw = line.w + 1.2, diff = DIFF_OF_LETTER[line.d] || 'blue';
+    const p = line.p, hw = line.w + 1.2, di = Math.max(0, DIFFS.indexOf(DIFF_OF_LETTER[line.d] || 'blue'));
     let carry = POLE_GAP * 0.5;
     for (let k = 0; k + 3 < p.length; k += 2) {
       const ax = p[k], az = p[k + 1], dx = p[k + 2] - ax, dz = p[k + 3] - az, L = Math.hypot(dx, dz);
@@ -74,17 +86,20 @@ export function createPoles({ scene, resort, height }) {
       const ux = dx / L, uz = dz / L;
       for (let t = carry; t < L; t += POLE_GAP) {
         const x = ax + ux * t, z = az + uz * t;
-        all.push(x - uz * hw, z + ux * hw, diff, x + uz * hw, z - ux * hw, diff);
+        poleXZ.push(x - uz * hw, z + ux * hw); poleXZ.push(x + uz * hw, z - ux * hw);
+        poleDiff.push(di, di);
       }
       carry = (carry - L) % POLE_GAP; if (carry < 0) carry += POLE_GAP;
     }
   }
+  const poleAt = poleXZ.done(), poleCol = Uint8Array.from(poleDiff), poleCount = poleCol.length;
   const m = new THREE.Matrix4(), col = new THREE.Color();
-  const colours = Object.fromEntries(Object.entries(DIFF).map(([k, v]) => [k, new THREE.Color(v.hex)]));
+  const colours = DIFFS.map((k) => new THREE.Color(DIFF[k].hex));
   let last = { x: 1e9, z: 1e9 };
   // net candidates: consecutive pole positions on one edge, [ax, az, bx, bz, ox, oz] (o = outward unit vector); whether a segment gets a
   // net is decided from the heights when it first comes near (the height tiles may still be streaming at load)
-  const netSegs = [];
+  // (cleanup round: one Float32Array, NET_STRIDE numbers a segment, + its verdict in a byte: 255 = not judged yet)
+  const segBuf = new GrowF32();
   for (const line of resort.network) {
     if (line.a) continue;
     const p = line.p, hw = line.w + 0.6;
@@ -97,67 +112,70 @@ export function createPoles({ scene, resort, height }) {
         const t0 = i / parts * L, t1 = (i + 1) / parts * L;
         for (const side of [-1, 1]) {
           const ox = -uz * side, oz = ux * side;
-          netSegs.push([ax + ux * t0 + ox * hw, az + uz * t0 + oz * hw, ax + ux * t1 + ox * hw, az + uz * t1 + oz * hw, ox, oz, -1]);
+          segBuf.push(ax + ux * t0 + ox * hw, az + uz * t0 + oz * hw); segBuf.push(ax + ux * t1 + ox * hw, az + uz * t1 + oz * hw); segBuf.push(ox, oz);
         }
       }
     }
   }
+  const segs = segBuf.done(), segCount = segs.length / NET_STRIDE, segNet = new Uint8Array(segCount).fill(255);
   /** A net where, 10 m beyond the edge, the ground has dropped by more than ~0.9 m per 1 m (a steep fall-away: you would not stop). */
-  function needsNet(sg) {
-    if (sg[6] >= 0) return sg[6] === 1;
-    const mx = (sg[0] + sg[2]) / 2, mz = (sg[1] + sg[3]) / 2;
-    const h0 = height(mx, mz), h1 = height(mx + sg[4] * 10, mz + sg[5] * 10);
-    const along = Math.abs(height(sg[2], sg[3]) - height(sg[0], sg[1])) / Math.max(1, Math.hypot(sg[2] - sg[0], sg[3] - sg[1]));
-    sg[6] = h0 - h1 > 8.5 || (h0 - h1 > 5.5 && along > 0.35) ? 1 : 0;
-    return sg[6] === 1;
+  function needsNet(i) {
+    if (segNet[i] !== 255) return segNet[i] === 1;
+    const o = i * NET_STRIDE, ax = segs[o], az = segs[o + 1], bx = segs[o + 2], bz = segs[o + 3];
+    const mx = (ax + bx) / 2, mz = (az + bz) / 2;
+    const h0 = height(mx, mz), h1 = height(mx + segs[o + 4] * 10, mz + segs[o + 5] * 10);
+    const along = Math.abs(height(bx, bz) - height(ax, az)) / Math.max(1, Math.hypot(bx - ax, bz - az));
+    segNet[i] = h0 - h1 > 8.5 || (h0 - h1 > 5.5 && along > 0.35) ? 1 : 0;
+    return segNet[i] === 1;
   }
-  const q4 = new THREE.Quaternion(), v3 = new THREE.Vector3(), s3 = new THREE.Vector3(), yAxis = new THREE.Vector3(0, 1, 0);
+  const q4 = new THREE.Quaternion(), v3 = new THREE.Vector3(), s3 = new THREE.Vector3(), yAxis = new THREE.Vector3(0, 1, 0), shear = new THREE.Matrix4();
   function update(px, pz, radius) {
     if (Math.hypot(px - last.x, pz - last.z) < REBUILD) return;
     last = { x: px, z: pz };
     const r2 = radius * radius;
     let nn = 0, np = 0;
     const netR2 = Math.min(r2, NET_RADIUS * NET_RADIUS);
-    for (const sg of netSegs) {
+    for (let i = 0; i < segCount; i++) {
       if (nn >= NET_CAP) break;
-      const dx = sg[0] - px, dz = sg[1] - pz;
-      if (dx * dx + dz * dz > netR2 || !needsNet(sg)) continue;
-      const ya = height(sg[0], sg[1]), yb = height(sg[2], sg[3]);
-      const L = Math.hypot(sg[2] - sg[0], sg[3] - sg[1]);
+      const o = i * NET_STRIDE, ax = segs[o], az = segs[o + 1], bx = segs[o + 2], bz = segs[o + 3];
+      const dx = ax - px, dz = az - pz;
+      if (dx * dx + dz * dz > netR2 || !needsNet(i)) continue;
+      const ya = height(ax, az), yb = height(bx, bz);
+      const L = Math.hypot(bx - ax, bz - az);
       // a panel from a to b: rotate x onto the segment (yaw) and shear it down the slope by lifting the far end with the matrix
-      q4.setFromAxisAngle(yAxis, -Math.atan2(sg[3] - sg[1], sg[2] - sg[0]));
-      m.compose(v3.set(sg[0], ya, sg[1]), q4, s3.set(L, 1, 1));
-      const shear = new THREE.Matrix4().set(1, 0, 0, 0, (yb - ya), 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
-      m.multiply(shear);
+      q4.setFromAxisAngle(yAxis, -Math.atan2(bz - az, bx - ax));
+      m.compose(v3.set(ax, ya, az), q4, s3.set(L, 1, 1));
+      m.multiply(shear.set(1, 0, 0, 0, (yb - ya), 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1));
       nets.setMatrixAt(nn++, m);
-      if (np < NET_CAP) { m.makeTranslation(sg[0], ya, sg[1]); netPosts.setMatrixAt(np++, m); }
+      if (np < NET_CAP) { m.makeTranslation(ax, ya, az); netPosts.setMatrixAt(np++, m); }
     }
     nets.count = nn; netPosts.count = np;
     nets.instanceMatrix.needsUpdate = true; netPosts.instanceMatrix.needsUpdate = true;
     let n = 0;
-    for (let i = 0; i < all.length && n < CAP; i += 3) {
-      const x = all[i], z = all[i + 1];
+    for (let i = 0; i < poleCount && n < CAP; i++) {
+      const x = poleAt[i * 2], z = poleAt[i * 2 + 1];
       const dx = x - px, dz = z - pz;
       if (dx * dx + dz * dz > r2) continue;
       m.makeTranslation(x, height(x, z) - 0.15, z);
       poles.setMatrixAt(n, m); caps.setMatrixAt(n, m);
-      col.copy(colours[all[i + 2]]); poles.setColorAt(n, col);
+      col.copy(colours[poleCol[i]]); poles.setColorAt(n, col);
       n++;
     }
     poles.count = n; caps.count = n;
     poles.instanceMatrix.needsUpdate = true; caps.instanceMatrix.needsUpdate = true;
     if (poles.instanceColor) poles.instanceColor.needsUpdate = true;
   }
-  return { update, total: all.length / 3, mesh: poles, reset() { last = { x: 1e9, z: 1e9 }; } };
+  return { update, total: poleCount, mesh: poles, reset() { last = { x: 1e9, z: 1e9 }; } };
 }
 
 /** Signposts at the top of every piste (where it leaves the lift or the piste above: the junctions): a larch post with a board in the
  *  piste's colour, its name in white, readable from both sides, facing the skiers coming down. All boards share one painted atlas. */
-/* R7-D: the sign atlas scales. One 2048 x 768 atlas of 128 board slots (8 x 16, 256 x 48 px each) is filled ON DEMAND with the boards
+/* R7-D: the sign atlas scales. One 2048 x 384 atlas of 64 board slots (8 x 8, 256 x 48 px each; cleanup round: was 128 slots, 6 MB of
+ * canvas + texture: the most boards within SIGN.radius of ANY point of the five resorts is 41, Arlberg) is filled ON DEMAND with the boards
  * within SIGN.radius of the camera (a board is 1.9 m wide: unreadable much farther), nearest first; a board keeps its slot while it stays
  * in range, a freed slot is painted anew. Any number of pistes (Arlberg 356, 3 Vallées 480, ...) costs the same texture and still ONE
  * draw call for the boards (+ one for the posts); the merged board mesh is rebuilt only after the camera moved SIGN.move metres. */
-export const SIGN = Object.freeze({ BW: 256, BH: 48, cols: 8, rows: 16, radius: 1100, move: 120 });      // 128 slots: the busiest spot of all five resorts sees 39
+export const SIGN = Object.freeze({ BW: 256, BH: 48, cols: 8, rows: 8, radius: 1100, move: 120 });       // 64 slots: the busiest spot of all five resorts sees 41
 
 /** Pure (Node test): keep the slots of boards still wanted, free the others, give free slots to new boards (nearest first, they come
  * first in `wanted`). prev: Map id -> slot. Returns { slots: Map id -> slot, paint: [id, slot] newly placed }. */

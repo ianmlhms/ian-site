@@ -5,6 +5,9 @@
 import { PLAY, SKI, MODES, COURSE } from './config.js';
 import { minRunMs } from './progress.js';
 
+const RESPAWN_WALL = 45, RESPAWN_SKIP = 40;      // deg, m (respawnPoint after a landing crash)
+const xz = (p) => [p.x, p.z];
+
 export function createRun({ piste, mode = MODES.run, startS = 2, finishS: finishIn = null }) {      // R8b: finishS = clear.js courseFinish      // R7-C: startS = the start gate on open snow (clear.js courseGate)
   const timed = mode === MODES.run;
   const checkpoints = timed ? piste.checkpoints().map((s) => ({ s, passed: false })) : [];
@@ -68,11 +71,21 @@ export function createRun({ piste, mode = MODES.run, startS = 2, finishS: finish
     return events;
   };
 
-  /** Where to put the skier back after a crash or off-piste: on the line, a little behind the furthest point reached, facing down. */
-  run.respawnPoint = function respawnPoint() {
+  /** Where to put the skier back after a crash or off-piste: on the line, a little behind the furthest point reached, facing down.
+   *  Cleanup round (the cliff routes: Killy Col Pers, Arlberg Wöster-Bockbachtal / Kuhtäli): after a LANDING crash (a drop off a
+   *  rock band or a steep pitch onto its run-out) on the line where he landed, not 10 m back (that was on top of the drop again: up to
+   *  3.8 s to get going, a second crash at the same cliff), moved down the line off any wall steeper than RESPAWN_WALL deg (by at most
+   *  RESPAWN_SKIP m; slopeAt(x, z) = the slope in deg, optional). */
+  run.respawnPoint = function respawnPoint({ landed = false, slopeAt = null } = {}) {
     // R7-C: where the skier was when on the course (never far back to the start because the furthest point was lost)
     const here = proj.dist !== undefined && proj.dist < piste.halfWidth + 80 ? proj.s : best;
-    const p = piste.at(Math.max(startS, Math.min(best, here) - 10), {});
+    let s = Math.max(startS, Math.min(best, here) - 10);
+    if (landed) {
+      s = Math.max(startS, Math.min(Math.max(best, here), finishS - 5));
+      const end = Math.min(finishS - 5, s + RESPAWN_SKIP);
+      if (slopeAt) while (s < end && slopeAt(...xz(piste.at(s, tmp))) >= RESPAWN_WALL) s += 2;
+    }
+    const p = piste.at(s, {});
     return { x: p.x, z: p.z, heading: Math.atan2(p.dz, p.dx), s: p.s };
   };
   run.samples = () => samples;

@@ -45,7 +45,7 @@ const h1 = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x
 
 /* ---------------- geometry writer ---------------- */
 // R8f (memory): the vertices go straight into growing Float32Arrays (the plain JS number arrays of before took 8 bytes a number plus
-// their growth slack: ~400 MB at the peak of Kronplatz's build); finish() hands out exact-length copies for the mesh
+// their growth slack: ~400 MB at the peak of Kronplatz's build); finish() hands out exact-length views for the mesh
 const QUAD_ORDER = [0, 1, 2, 0, 2, 3], TRI_ORDER = [0, 1, 2];
 function writer() {
   let cap = 0, n = 0;
@@ -68,8 +68,10 @@ function writer() {
   };
   return {
     get count() { return n; },
-    /** { pos, nrm, uv, info }: exact-length Float32Arrays of everything written (the writer can be dropped afterwards) */
-    finish() { return { pos: pos.slice(0, n * 3), nrm: nrm.slice(0, n * 3), uv: uv.slice(0, n * 2), info: info.slice(0, n * 4) }; },
+    /** { pos, nrm, uv, info }: exact-length Float32Array views of everything written (the writer can be dropped afterwards) */
+    // cleanup round (memory): views, not copies: the meshes are gpuOnly (their arrays go right after the upload), so a copy was only
+    // garbage of the same size again (~40 MB over a 3 Vallees load)
+    finish() { return { pos: pos.subarray(0, n * 3), nrm: nrm.subarray(0, n * 3), uv: uv.subarray(0, n * 2), info: info.subarray(0, n * 4) }; },
     set(st, ev, sd) { style = st; eave = ev; seed = sd; },
     /** quad a b c d (counter-clockwise from the front), normal n, uvs [[u, v] x 4], part */
     quad(a, b, c, d, nv, uvs, part) {

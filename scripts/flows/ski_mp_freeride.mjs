@@ -120,19 +120,42 @@ export const flow = {
         await shot(emma, `${rid}.start`);
 
         h.step(`${rid}: emma skis: the host sees her where she is (interpolation, send rate)`);
-        await F.emma.evaluate(() => window.__ski.setInput({ steer: 0.15, tuck: 0.6, brake: 0, push: 1, jump: false }));
+        // (cleanup round: the spawn faces UP the lift line, so she used to push uphill and stop after ~0.6 s; now she turns to the fall
+        // line where she stands first, no move: no teleport)
+        await F.emma.evaluate(() => {
+          const S = window.__ski, s = S.state, n = S.surface.normal(s.x, s.z, {});
+          if (Math.hypot(n.x, n.z) > 0.02) S.placeHold(s.x, s.z, Math.atan2(n.z, n.x));
+          S.setInput({ steer: 0.05, tuck: 0.6, brake: 0, push: 1, jump: false });
+        });
         await sleep(1500);
+        // (cleanup round) emma's own sends while she moves, counted where they leave, per second of her moving time (standing she sends
+        // 4 / s by design; she may come to a halt in the window)
+        const send0 = await F.emma.evaluate(() => { const i = window.__skiMp.info(); return { n: i.movingSends, t: i.movingMs }; });
         const sync = [];
         for (let i = 0; i < 8; i++) {
           const [shown, real] = await Promise.all([seenBy(F.host, "Emma"), me(F.emma)]);
           if (shown && real) sync.push({ d: dist(shown, real), v: real.speed });
           await sleep(200);
         }
-        const hz = await F.host.evaluate(() => { const r = window.__skiMp.remotes.all().find((x) => x.name === "Emma"); const b = r.buf; return b.length > 4 ? (b.length - 1) / ((b[b.length - 1].t - b[0].t) / 1000) : 0; });
+        const send1 = await F.emma.evaluate(() => { const i = window.__skiMp.info(); return { n: i.movingSends, t: i.movingMs }; });
+        const movedMs = send1.t - send0.t, sendHz = movedMs > 400 ? (send1.n - send0.n) / (movedMs / 1000) : NaN;
+        // the host's rate: the states in its buffer while she was moving (> 0.4 m/s: a stop sends 4 / s by design, which the old
+        // whole-buffer average counted in: 7-9 / s when she came to a halt against the station fence)
+        const hz = await F.host.evaluate(() => {
+          const r = window.__skiMp.remotes.all().find((x) => x.name === "Emma"), b = r.buf;
+          let i = b.length - 1;
+          while (i > 0 && !(b[i].s.speed > 0.4)) i--;
+          const end = i;
+          while (i > 0 && b[i - 1].s.speed > 0.4) i--;
+          return end - i >= 4 ? (end - i) / ((b[end].t - b[i].t) / 1000) : 0;
+        });
+        // (cleanup round: the sender's frame times, so a low rate says whether the page ran slow or the schedule lost sends)
+        const frames = await F.emma.evaluate(() => window.__ski.frames());
         await F.emma.evaluate(() => window.__ski.setInput(null));
-        R.sync = { metres: sync.map((s) => +s.d.toFixed(1)), lagMs: sync.map((s) => Math.round(s.d / Math.max(1, s.v) * 1000)), hz: +hz.toFixed(1) };
+        R.sync = { metres: sync.map((s) => +s.d.toFixed(1)), lagMs: sync.map((s) => Math.round(s.d / Math.max(1, s.v) * 1000)), hz: +hz.toFixed(1), sendHz: Number.isNaN(sendHz) ? null : +sendHz.toFixed(1), movedMs: Math.round(movedMs), speeds: sync.map((s) => +s.v.toFixed(1)), frameP50: Math.round(frames.p50), frameP95: Math.round(frames.p95) };
         h.expect(sync.length >= 6 && Math.max(...R.sync.lagMs) < 900, `${rid}: the host sees emma ${Math.min(...R.sync.lagMs)}-${Math.max(...R.sync.lagMs)} ms behind (${R.sync.metres.join(", ")} m)`);
-        h.expect(hz >= 9, `${rid}: emma's states reach the host at ${hz.toFixed(1)} / s (free ride ~15 while moving)`);
+        h.expect(!(sendHz < 12), `${rid}: emma sends ${Number.isNaN(sendHz) ? "(moved < 0.4 s of the window)" : sendHz.toFixed(1)} states / s while moving, ${Math.round(movedMs)} ms of it (15 on the wall clock; her frames p50 ${R.sync.frameP50} / p95 ${R.sync.frameP95} ms)`);
+        h.expect(hz >= 11, `${rid}: emma's states reach the host at ${hz.toFixed(1)} / s while she moves (speeds ${R.sync.speeds.join(", ")} m/s)`);
 
         h.step(`${rid}: host + emma ride the lift together (lift id + metres, each in his own carrier)`);
         for (const p of [host, emma]) await F[p.label].evaluate(() => window.__ski.goFree());          // both back to the start lift (a teleport)

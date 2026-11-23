@@ -108,15 +108,23 @@ export function createObstacles({ resort, field, scatter = null, density = 1, li
   }
   // R8e (3V QA: the "Lac des Creux" start banner spanned the Creux piste, a skier rode through it at 61 km/h): the piste lines in 50 m
   // cells, so a challenge's start banner can keep clear of every OTHER piste (courseGate)
+  // (cleanup round, memory: the segments in one Float64Array (exact: the course gates depend on it) + the piste ids by index, the
+  // cells hold segment numbers: the arrays of [x, z, x, z, id] of before took ~4.5 MB of JS heap at 3 Vallees / Arlberg)
   const pisteCells = new Map();
+  let segXZ = new Float64Array(0), segId = [];
   function setPistes(list) {
     pisteCells.clear();
+    let total = 0;
+    for (const p of list) total += Math.max(0, p.n - 1);
+    segXZ = new Float64Array(total * 4); segId = new Array(total);
+    let k = 0;
     for (const p of list) {
-      for (let i = 0; i + 1 < p.n; i++) {
-        const seg = [p.x[i], p.z[i], p.x[i + 1], p.z[i + 1], p.id];
-        for (let cx = Math.floor(Math.min(seg[0], seg[2]) / 50); cx <= Math.floor(Math.max(seg[0], seg[2]) / 50); cx++) {
-          for (let cz = Math.floor(Math.min(seg[1], seg[3]) / 50); cz <= Math.floor(Math.max(seg[1], seg[3]) / 50); cz++) {
-            const k = cx * 100003 + cz; let a = pisteCells.get(k); if (!a) pisteCells.set(k, (a = [])); a.push(seg);
+      for (let i = 0; i + 1 < p.n; i++, k++) {
+        const x0 = p.x[i], z0 = p.z[i], x1 = p.x[i + 1], z1 = p.z[i + 1];
+        segXZ[k * 4] = x0; segXZ[k * 4 + 1] = z0; segXZ[k * 4 + 2] = x1; segXZ[k * 4 + 3] = z1; segId[k] = p.id;
+        for (let cx = Math.floor(Math.min(x0, x1) / 50); cx <= Math.floor(Math.max(x0, x1) / 50); cx++) {
+          for (let cz = Math.floor(Math.min(z0, z1) / 50); cz <= Math.floor(Math.max(z0, z1) / 50); cz++) {
+            const c = cx * 100003 + cz; let a = pisteCells.get(c); if (!a) pisteCells.set(c, (a = [])); a.push(k);
           }
         }
       }
@@ -130,18 +138,19 @@ export function createObstacles({ resort, field, scatter = null, density = 1, li
     for (let cx = Math.floor((x - r) / 50); cx <= Math.floor((x + r) / 50); cx++) {
       for (let cz = Math.floor((z - r) / 50); cz <= Math.floor((z + r) / 50); cz++) {
         for (const g of pisteCells.get(cx * 100003 + cz) || []) {
-          if (g[4] === selfId || seen.has(g)) continue;
+          if (segId[g] === selfId || seen.has(g)) continue;
           seen.add(g);
           // the segment in the rectangle's frame (a along, b across), clipped (Liang-Barsky)
-          const a0 = (g[0] - x) * ux + (g[1] - z) * uz, b0 = -(g[0] - x) * uz + (g[1] - z) * ux;
-          const a1 = (g[2] - x) * ux + (g[3] - z) * uz, b1 = -(g[2] - x) * uz + (g[3] - z) * ux;
+          const gx0 = segXZ[g * 4], gz0 = segXZ[g * 4 + 1], gx1 = segXZ[g * 4 + 2], gz1 = segXZ[g * 4 + 3];
+          const a0 = (gx0 - x) * ux + (gz0 - z) * uz, b0 = -(gx0 - x) * uz + (gz0 - z) * ux;
+          const a1 = (gx1 - x) * ux + (gz1 - z) * uz, b1 = -(gx1 - x) * uz + (gz1 - z) * ux;
           let t0 = 0, t1 = 1, ok = true;
           for (const [p, q] of [[-(a1 - a0), a0 + ha], [a1 - a0, ha - a0], [-(b1 - b0), b0 + hb], [b1 - b0, hb - b0]]) {
             if (Math.abs(p) < 1e-9) { if (q < 0) { ok = false; break; } continue; }
             const t = q / p;
             if (p < 0) { if (t > t1) { ok = false; break; } if (t > t0) t0 = t; } else { if (t < t0) { ok = false; break; } if (t < t1) t1 = t; }
           }
-          if (ok && t0 <= t1) return g[4];
+          if (ok && t0 <= t1) return segId[g];
         }
       }
     }

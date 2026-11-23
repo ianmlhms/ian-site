@@ -34,3 +34,17 @@ export function unpackState(a) {
   }
   return st;
 }
+
+/** When the next state goes out (cleanup round, 23 Nov: the free ride sent 7-8 states / s instead of 15 under load). The schedule runs
+ *  on the wall clock, not the frame clock: a send is due once `1000 / hz` ms have passed since the SLOT the last one was due at, so a
+ *  frame that comes a little late (30 fps: frames 30-36 ms apart) does not push every later send back by a frame. The old
+ *  `now - lastSend >= period` sent only every 3rd frame whenever two frames came < 64.7 ms apart (30 fps under load: 8-10 / s).
+ *  Now the rate is `hz` at any frame rate above it (and every frame below it: no new state exists between two frames). A clock that
+ *  fell behind (a pause, a long frame) catches up by at most half a slot, never with a burst.
+ *  at = the slot of the last send (ms, 0 = never sent). Returns the new slot when a state should go out now, else null. Pure. */
+export const SEND_SLACK_MS = 2;
+export function sendSlot(at, now, hz) {
+  const period = 1000 / hz;
+  if (now - at < period - SEND_SLACK_MS) return null;
+  return Math.max(at + period, now - period / 2);
+}

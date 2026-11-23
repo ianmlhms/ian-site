@@ -45,6 +45,13 @@ export function launchState(s, a) {
   };
 }
 
+/** Cleanup round (cliff routes): back on the snow after a landing crash, already skiing on at SKI.respawnRoll m/s along his heading
+ *  (out of the standing hold): a drop costs the tumble + ~0 s, not a stand-still start below it. Returns a new state. */
+export function rollOn(s) {
+  const v = SKI.respawnRoll;
+  return { ...s, hold: 0, vx: Math.cos(s.heading) * v, vz: Math.sin(s.heading) * v, vy: 0, speed: v };
+}
+
 /** A copy that is safe to send / store (numbers and strings only). */
 export const serialise = (s) => JSON.parse(JSON.stringify(s));
 
@@ -335,7 +342,7 @@ function airStep(s, input, world, dt) {
     // with the crest airs: a normal air (up to softAir s) lands softer than a long fall. Crests throw him into run-outs and
     // counter-slopes at speed (11-16 m/s into the snow after 0.7-2.5 s): the legs take up to softLanding; a fall off a cliff keeps hardLanding
     const hard = s.air <= (K.softAir ?? SKI.softAir) ? Math.max(K.hardLanding, K.softLanding ?? SKI.softLanding) : K.hardLanding;
-    if (into > hard || (off > 1.45 && off < Math.PI - 0.3 && hv > 9)) return startCrash(s, into > hard ? 'landing' : 'sideways');
+    if (into > hard || (off > 1.45 && off < Math.PI - 0.3 && hv > 9)) return into > hard ? startCrash(s, 'landing', SKI.landingCrashSeconds) : startCrash(s, 'sideways');
     if (off > Math.PI / 2) s.heading = wrapAngle(s.heading + Math.PI);  // landed backwards at low angle: turn the skis round (forgiving)
   }
   s.speed = Math.hypot(s.vx, s.vy, s.vz);
@@ -353,8 +360,8 @@ function collide(s, world) {
   return s;
 }
 
-function startCrash(s, kind) {
-  s.crash = SKI.crashSeconds; s.crashKind = kind;
+function startCrash(s, kind, seconds = SKI.crashSeconds) {
+  s.crash = seconds; s.crashKind = kind;
   return s;
 }
 

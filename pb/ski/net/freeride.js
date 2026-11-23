@@ -18,6 +18,7 @@ import { NET, FREE } from './config.js';
 import { WEATHERS, TIMES, freePlan, sideOffset, freeHost } from './plan.js';
 import { createSession } from './session.js';
 import { createRemotes, packState, outfitOf, MEET_GAP_MS } from './remotes.js';
+import { sendSlot } from './wire.js';
 import { createMpHud } from './hud.js';
 import { distText } from './tags.js';
 import { OUTFITS } from '../skier-model.js';
@@ -49,7 +50,7 @@ export function createFreeMp({ ctx, host }) {
   mpHud.el.appendChild(friendBtn);
   const remotes = createRemotes({ scene: host.scene, camera: host.camera, surface: host.surface, overlay: host.uiRoot, liftPath: (i) => host.liftPath(i), farTags: true });
   remotes.setShadows(host.level() !== 'low');
-  const local = { lastSend: 0, lastPos: 0, lastEnv: 0, epoch: 0, sent: null, sentAt: 0, follow: 0, lastAv: new Map(), envFrom: null, began: false };
+  const local = { lastSend: 0, lastPos: 0, lastEnv: 0, epoch: 0, sent: null, sentAt: 0, sends: 0, movingSends: 0, movingMs: 0, lastFrame: 0, follow: 0, lastAv: new Map(), envFrom: null, began: false };
   const root = document.documentElement;
   let session = null;
 
@@ -181,10 +182,13 @@ export function createFreeMp({ ctx, host }) {
     if (!st || !session) return;
     const moving = game.phase === 'lift' || (game.phase === 'running' && !game.paused && st.speed > FREE.MOVING);
     const hz = moving ? FREE.SEND_HZ : FREE.IDLE_HZ;
-    if (now - local.lastSend >= 1000 / hz - 2) {
+    if (moving && local.lastFrame) local.movingMs += Math.min(250, now - local.lastFrame);      // (the flow's send-rate check)
+    local.lastFrame = now;
+    const slot = sendSlot(local.lastSend, now, hz);              // cleanup round: on the wall clock (15 / s at any frame rate above it)
+    if (slot !== null) {
       // a teleport: farther than any skier gets between two sends (not while riding: the line can be long between skips)
       if (local.sent && !(st.ride && local.sent.ride && st.rideLift === local.sent.rideLift) && Math.hypot(st.x - local.sent.x, st.z - local.sent.z) > FREE.TELEPORT * Math.max(1, (now - local.sentAt) / 1000)) local.epoch++;
-      local.lastSend = now; local.sentAt = now;
+      local.lastSend = slot; local.sentAt = now; local.sends++; if (moving) local.movingSends++;
       local.sent = { x: st.x, z: st.z, ride: st.ride, rideLift: st.rideLift };
       session.broadcast({ k: 's', e: local.epoch, t: Math.round(now), p: game.screen === 'map' || game.paused ? 1 : 0, a: packState(st, 0, false) }, false);
       root.dataset.skiMpEpoch = String(local.epoch);
@@ -227,7 +231,7 @@ export function createFreeMp({ ctx, host }) {
     setInterval(refreshBoard, FREE.BOARD_MS);
     window.__skiMp = {
       kind: 'free', session, remotes, ctx, plan, toFriend, shareAvalanche, hostId, get epoch() { return local.epoch; },
-      info: () => ({ kind: 'free', host: hostId(), epoch: local.epoch, net: session.info(), env: envMsg(), seen: remotes.all().map((r) => ({ id: r.id, has: !!r.state, ride: r.state ? r.state.ride || '' : '', tag: r.tagMode || 'hidden', jumps: r.jumps })) }),
+      info: () => ({ kind: 'free', host: hostId(), epoch: local.epoch, sends: local.sends, movingSends: local.movingSends, movingMs: local.movingMs, net: session.info(), env: envMsg(), seen: remotes.all().map((r) => ({ id: r.id, has: !!r.state, ride: r.state ? r.state.ride || '' : '', tag: r.tagMode || 'hidden', jumps: r.jumps })) }),
     };
   }
 

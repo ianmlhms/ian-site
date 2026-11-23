@@ -61,12 +61,59 @@ export function dayShare(hour) {
   return 0.3;
 }
 
+/* Which pistes pass near a point (cleanup round, memory): a grid of PISTE_CELL m cells holding the pistes whose line crosses the cell
+ * (each once), not every segment (the segment index took ~4.5 MB of JS heap at 3 Vallees / Arlberg and only ever answered this). A
+ * piste is listed for the cells its line touches (vertices padded by its half width, long segments sampled every half cell); the
+ * query reads the cells of the box round the disc + half a cell, so every piste with a line point within R is found (a few beyond
+ * it too: their skiers are dropped by distance anyway). Pure. */
+const PISTE_CELL = 120;
+export function pisteGrid(list, cell) {
+  const grid = new Map();
+  for (const p of list) {
+    const pad = p.halfWidth;
+    for (let i = 0; i < p.n; i++) {
+      const i0 = Math.floor((p.x[i] - pad) / cell), i1 = Math.floor((p.x[i] + pad) / cell);
+      const j0 = Math.floor((p.z[i] - pad) / cell), j1 = Math.floor((p.z[i] + pad) / cell);
+      for (let gi = i0; gi <= i1; gi++) for (let gj = j0; gj <= j1; gj++) {
+        const k = gi * 65536 + gj;
+        let a = grid.get(k);
+        if (!a) grid.set(k, (a = []));
+        if (a[a.length - 1] !== p) a.push(p);
+      }
+      // a long segment: the cells between its two ends too
+      if (i + 1 < p.n) {
+        const L = Math.hypot(p.x[i + 1] - p.x[i], p.z[i + 1] - p.z[i]), steps = Math.floor(L / (cell * 0.5));
+        for (let k2 = 1; k2 <= steps; k2++) {
+          const t = k2 / (steps + 1), x = p.x[i] + (p.x[i + 1] - p.x[i]) * t, z = p.z[i] + (p.z[i + 1] - p.z[i]) * t;
+          const k = Math.floor(x / cell) * 65536 + Math.floor(z / cell);
+          let a = grid.get(k);
+          if (!a) grid.set(k, (a = []));
+          if (a[a.length - 1] !== p) a.push(p);
+        }
+      }
+    }
+  }
+  for (const [k, a] of grid) grid.set(k, [...new Set(a)]);
+  return grid;
+}
+/** The pistes listed in the cells of the box round (x, z) +- r (a Set). */
+export function pistesNear(grid, cell, x, z, r) {
+  const out = new Set();
+  for (let gi = Math.floor((x - r) / cell); gi <= Math.floor((x + r) / cell); gi++) {
+    for (let gj = Math.floor((z - r) / cell); gj <= Math.floor((z + r) / cell); gj++) {
+      const a = grid.get(gi * 65536 + gj);
+      if (a) for (const p of a) out.add(p);
+    }
+  }
+  return out;
+}
+
 /**
  * resort = resort.json (unpacked), pistes = createPisteSet, liftNet = modes/freeride.js createLiftNet (its world: stations, zones),
  * height(x, z) = the snow, standY(x, z) = where feet stand (decks), seed = an integer.
  */
 export function createCrowd({ resort, pistes, liftNet, height, standY = height, seed = 1 }) {
-  const lineIndex = createLineIndex(pistes.list, 100);
+  const pisteCells = pisteGrid(pistes.list, PISTE_CELL);
   const pIndex = new Map(pistes.list.map((p, i) => [p, i]));
   const pSeed = pistes.list.map((p) => strHash(p.id));
   const pops = new Map();                  // piste -> { skiers, T (time per unit speed), n }
@@ -439,8 +486,7 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
     // the cap goes to the ones in front of the camera first (behind it they count 2.5 x as far)
     const cfx = view.fx || 0, cfz = view.fz || 0;
     const rank = (x, z, d) => (cfx || cfz) && (x - fx) * cfx + (z - fz) * cfz < -8 ? d * 2.5 : d;
-    const nearP = new Set();
-    lineIndex.near(fx, fz, R, (seg) => nearP.add(seg.p));
+    const nearP = pistesNear(pisteCells, PISTE_CELL, fx, fz, R + PISTE_CELL / 2);       // (+ half a cell: a line between two samples)
     stats.pistes = nearP.size;
     const had = new Set(selected.map((c) => c.key));
     const cand = [];

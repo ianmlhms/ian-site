@@ -306,11 +306,19 @@ export function createLiftWorld(paths, opts = {}) {
       c.push(item);
     }
   };
+  /* the items within r of (x, z), each once. Cleanup round (memory): this ran ~100 000 times a second at a station (the camera framing,
+   * the skier's collision) and every call built a Set: ~4 MB of garbage a frame. Now a disc inside one grid cell (most calls) returns
+   * that cell's own list (read-only for the callers), else a fresh array deduplicated by a per-call stamp on the items (the grid's
+   * own objects; a nested call takes a new stamp, the outer array is complete by then). */
+  const EMPTY = Object.freeze([]);
+  let stamp = 0;
   const near = (x, z, r) => {
-    const out = new Set();
-    for (let j = Math.floor((z - r) / CELL); j <= Math.floor((z + r) / CELL); j++) for (let i = Math.floor((x - r) / CELL); i <= Math.floor((x + r) / CELL); i++) {
+    const i0 = Math.floor((x - r) / CELL), i1 = Math.floor((x + r) / CELL), j0 = Math.floor((z - r) / CELL), j1 = Math.floor((z + r) / CELL);
+    if (i0 === i1 && j0 === j1) return grid.get(key(i0, j0)) || EMPTY;
+    const out = [], s = ++stamp;
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
       const c = grid.get(key(i, j));
-      if (c) for (const it of c) out.add(it);
+      if (c) for (const it of c) if (it.seen !== s) { it.seen = s; out.push(it); }
     }
     return out;
   };
