@@ -12,7 +12,7 @@ import { createMpHud, resText } from './hud.js';
 import { createFreeMp } from './freeride.js';
 import { minRunMs } from '../progress.js';
 import { OUTFITS } from '../skier-model.js';
-import { sanitizeCfg } from '../../../mp-games.js?v=9';
+import { sanitizeCfg } from '../../../mp-games.js?v=10';
 
 const GAME = 'ski';
 const CTX_KEY = 'mpl.ctx';

@@ -1,6 +1,6 @@
 #!/bin/bash
 # R8c: the village sweep (every village / hamlet centre, 4 headings) per resort and level through the running r8c-drv.mjs (PORT).
-#   scripts/ski/r8c-sweeps.sh "low medium" "killy 3vallees zermatt arlberg kronplatz vialattea" <out dir>
+#   scripts/ski/r8c-sweeps.sh "low medium" "killy 3vallees zermatt arlberg kronplatz vialattea obertauern" <out dir>
 HERE="$(cd "$(dirname "$0")" && pwd)"
 P=${PORT:-8791}
 OUT=${3:-$HOME/Library/Caches/ski-work/round8c}

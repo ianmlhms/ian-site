@@ -110,7 +110,7 @@ export const flow = {
     h.step("homepage at 06:00: Ski Alpen featured");
     await at(h, LUX_06_00, "/index.html");
     await expectHome(h, true, "06:00");
-    h.eq((await page.textContent("#gtNew .arc-new-text")).trim(), "Ski Alpen6 echt Skigebidder an 3D · Free Ride · Challenges · Online", "banner text");
+    h.eq((await page.textContent("#gtNew .arc-new-text")).trim(), "Ski Alpen7 echt Skigebidder an 3D · Free Ride · Challenges · Online", "banner text");
     h.eq(await page.textContent("#gtNew .arc-new-tag"), "Nei", "banner tag says Nei");
     h.eq(await page.getAttribute("#gtNew", "href"), "pixelbreak.html?g=ski", "banner opens Ski Alpen");
     h.eq(await page.textContent("#gtFeat h3"), "Ski Alpen", "big tile is Ski Alpen");

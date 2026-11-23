@@ -113,9 +113,23 @@ for (const c of candidates) {
   }
   let len = Math.hypot(bottom[0] - top[0], bottom[1] - top[1]);
   if (len < 30) continue;
-  const ux = (bottom[0] - top[0]) / len, uz = (bottom[1] - top[1]) / len;
+  let ux = (bottom[0] - top[0]) / len, uz = (bottom[1] - top[1]) / len;
   len = Math.max(MIN_LEN, Math.min(MAX_LEN, len));
-  const ev = evaluate(top[0], top[1], ux, uz, len);
+  let ev = evaluate(top[0], top[1], ux, uz, len);
+  if (c.kind !== 'line') {
+    // Obertauern "The Spot": a long area across the fall line. Also try lines turned off the fall line (still downhill), each through
+    // the area's centre from its uphill edge in that direction; the best one wins
+    const cx = xs.reduce((a, b) => a + b, 0) / xs.length, cz = zs.reduce((a, b) => a + b, 0) / zs.length;
+    const [fx, fz] = fallDir(cx, cz, 40);
+    for (const deg of [-50, -35, -20, 20, 35, 50]) {
+      const a = deg * Math.PI / 180, vx = fx * Math.cos(a) - fz * Math.sin(a), vz = fx * Math.sin(a) + fz * Math.cos(a);
+      const us = xs.map((x, i) => (x - cx) * vx + (zs[i] - cz) * vz);
+      const u0 = Math.min(...us), u1 = Math.max(...us);
+      const l2 = Math.max(MIN_LEN, Math.min(MAX_LEN, u1 - u0));
+      const e2 = evaluate(cx + vx * u0, cz + vz * u0, vx, vz, l2);
+      if (e2 && (!ev || e2.score < ev.score)) { ev = e2; ux = vx; uz = vz; len = l2; top = [cx + vx * u0, cz + vz * u0]; }
+    }
+  }
   const named = /snow ?park|park/i.test(c.name) ? -2 : 0;
   if (ev) results.push({ ...ev, score: ev.score + named, name: c.name, src: `osm:${c.osm}`, top, ux, uz, len });
   console.log(`  candidate ${c.osm} ${c.name.padEnd(28)} ${ev ? `score ${(ev.score + named).toFixed(2)}  ${ev.meanDeg.toFixed(1)} deg (max ${ev.maxDeg.toFixed(1)})  rough ${ev.rough.toFixed(2)}  blocked ${(ev.share * 100).toFixed(0)} %  lift ${Math.round(ev.lift.d)} m` : 'unusable'}`);

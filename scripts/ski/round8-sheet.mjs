@@ -16,7 +16,7 @@ import { startServer, launchBrowser } from "../flows/lib.mjs";
 
 const args = process.argv.slice(2);
 const opt = (name, def) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : def; };
-const resorts = opt("--resorts", "killy,3vallees,zermatt,arlberg,kronplatz,vialattea").split(",");
+const resorts = opt("--resorts", "killy,3vallees,zermatt,arlberg,kronplatz,vialattea,obertauern").split(",");
 const engine = opt("--engine", "webkit");
 const out = opt("--out", path.join(process.env.HOME, "Library/Caches/ski-work/round8"));
 const only = opt("--only", "") ? opt("--only", "").split(",") : null;

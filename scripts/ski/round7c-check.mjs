@@ -50,7 +50,7 @@ const RIDES = args.includes('--rides');
 const onlyArg = args.indexOf('--only');
 const ONLY = onlyArg >= 0 ? new Set(args[onlyArg + 1].split(',')) : null;
 const rids = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--only');
-const ALL = ['killy', '3vallees', 'zermatt', 'arlberg', 'kronplatz', 'vialattea'];
+const ALL = ['killy', '3vallees', 'zermatt', 'arlberg', 'kronplatz', 'vialattea', 'obertauern'];
 let failed = 0, passed = 0;
 const check = (ok, msg) => { if (ok) passed++; else failed++; console.log(`${ok ? '  ok  ' : '  FAIL'} ${msg}`); return ok; };
 const report = [];

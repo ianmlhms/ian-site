@@ -9,9 +9,10 @@ import { launchBrowser, startServer } from "../flows/lib.mjs";
 
 const args = process.argv.slice(2);
 const opt = (name, def) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : def; };
-const resorts = opt("--resorts", "killy,3vallees,zermatt,arlberg,kronplatz,vialattea").split(",");
+const resorts = opt("--resorts", "killy,3vallees,zermatt,arlberg,kronplatz,vialattea,obertauern").split(",");
 const every = Number(opt("--every", "1"));
 const limit = Number(opt("--limit", "160"));
+const trisLimit = Number(opt("--tris", "450000"));
 const jsonOut = opt("--json", "");
 const gpu = args.includes("--gpu");
 
@@ -79,7 +80,10 @@ try {
     console.log(`${rid.padEnd(10)} ${n} spots: worst ${worst.calls} calls (${worst.kind} ${worst.name}, ${Math.round(worst.tris / 1000)}k tris), p95 ${p95}, median ${med}`);
     console.log(`           top: ${out[rid].top.join(" | ")}`);
     console.log(`           worst spot spends: ${tally.slice(0, 14).map(([k, v]) => `${k} ${v}`).join(", ")}`);
-    if (worst.calls > limit) failed = true;
+    const heavy = res.reduce((a, b) => (b.tris > a.tris ? b : a));            // the triangle budget is over ALL spots, not the worst-calls one
+    out[rid].maxTris = { kind: heavy.kind, name: heavy.name, tris: heavy.tris };
+    console.log(`           max triangles ${Math.round(heavy.tris / 1000)}k (${heavy.kind} ${heavy.name})`);
+    if (worst.calls > limit || heavy.tris > trisLimit) failed = true;
     await ctx.close();
   }
 } finally {

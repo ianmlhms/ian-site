@@ -36,7 +36,7 @@ const CHALET = 0, PLASTER = 1, SAVOY = 2, CONCRETE = 3, CHAPEL = 4, HUT = 5, MOD
 export const DETAIL_RADIUS = Object.freeze({ low: 150, medium: 380, high: 800 });
 const DCELL = 320;                   // m: the detail layer's merge cell
 /** R8c: resorts whose villages are Alpine (no 1960s-70s purpose-built blocks like Tignes / Val Claret / Les Menuires / Val Thorens) */
-export const ALPINE_RESORTS = Object.freeze(new Set(['zermatt', 'arlberg', 'kronplatz', 'vialattea']));
+export const ALPINE_RESORTS = Object.freeze(new Set(['zermatt', 'arlberg', 'kronplatz', 'vialattea', 'obertauern']));
 /** R8c: storeys under the eaves at most: Alpine houses (small / big), anywhere else (the tallest real Tignes blocks have ~10) */
 export const MAX_FLOORS = Object.freeze({ alpineSmall: 3, alpine: 4, other: 10 });
 const SMALL_AREA = 150;              // m2: a small house (3 storeys at most in the Alpine villages)
@@ -378,11 +378,17 @@ function styleOf(row, seed, alpine, piedmont = false) {
   return r < 0.6 ? SAVOY : PLASTER;
 }
 
+const SHED = Object.freeze({ area: 30, eave: 2.6, ridge: 3.8 });      // m2 / m: huts this small are sheds, one low storey
 /** R8c: a row as the village draws it: in an Alpine resort every block is a gabled house (kind 0) and no house is taller than
  *  MAX_FLOORS storeys under the eaves (the OSM levels capped); the "modern" summit buildings, chapels, huts and towers stay as they are.
  *  Returns a new row (the input is never changed). */
 export function tameRow(row, alpine) {
   const kind = row[8];
+  if (kind === 3 && row[2] * row[3] < SHED.area && row[5] > SHED.eave) {      // a 3.9 x 3.6 m shed with 6.4 m walls read as a tower
+    const out = row.slice();
+    out[5] = SHED.eave; out[6] = SHED.ridge;
+    return out;
+  }
   if (kind !== 0 && kind !== 1) return row;
   if (row[12] === 1) return row;                                     // a real tall building the bake keeps (the Sestriere towers)
   const floors = alpine ? (row[2] * row[3] < SMALL_AREA ? MAX_FLOORS.alpineSmall : MAX_FLOORS.alpine) : MAX_FLOORS.other;
@@ -443,7 +449,8 @@ function material(env, cheap) {
           col = mix(col, vec3(0.93, 0.95, 1.0), step(0.86, vUv.y) * 0.85);              // snow on the handrail
         } else if (part > 3.5 && part < 4.5) {                                          // chimney, parapet: stone / concrete
           col = style > 2.5 && style < 3.5 ? concrete : style > 5.5 && style < 6.5 ? vec3(0.2, 0.21, 0.23) : stone;
-          float course = step(0.88, fract(vUv.y / 0.45)) * fadeFar;
+          float cy = vUv.y / 0.45, cw = fwidth(cy);                                     // anti-aliased (a tall wall moired)
+          float course = mix(smoothstep(0.88 - cw, 0.88 + cw, fract(cy)), 0.12, smoothstep(0.3, 0.6, cw)) * fadeFar;
           col *= 1.0 - 0.12 * course;
         } else {
           // walls by style
@@ -545,6 +552,24 @@ let HEIGHT = null;                    // round 7 (A): the ground for the plinths
  *  of its walls stand in the ground at the highest corner; the stone plinth of chalet() / block() carries it down on the low side.
  *  rows = buildings.json rows, height(x, z) = the drawn ground. Returns new rows (the input is not changed). */
 const SEAT = Object.freeze({ area: 400, share: 0.4 });
+/** Obertauern: a house on a steep bank (a 60 x 26 m hotel on 30 m of slope) stood on a blank plinth up to 21 m high. Past DEEP.from m of
+ *  ground falling away below its ground floor it goes down by whole storeys instead (the same roof line; the lower floors get the
+ *  house's own windows and balconies), so at most one storey of plinth is left. Pure: returns a new row or the same one. */
+const DEEP = Object.freeze({ from: 6 });
+export function deepRow(row, height) {
+  if (!height || (row[8] !== 0 && row[8] !== 1) || !(row[5] > 0)) return row;
+  const c = Math.cos(row[4]), s = Math.sin(row[4]);
+  let low = Infinity;
+  for (const [u, v] of [[-1, -1], [1, -1], [1, 1], [-1, 1], [0, 1], [0, -1], [1, 0], [-1, 0]]) {
+    low = Math.min(low, height(row[0] + c * u * row[2] / 2 - s * v * row[3] / 2, row[1] + s * u * row[2] / 2 + c * v * row[3] / 2));
+  }
+  if (!(row[7] - low > DEEP.from)) return row;
+  const down = Math.floor((row[7] - low) / FLOOR) * FLOOR;
+  const out = row.slice();
+  out[5] += down; out[6] += down; out[7] -= down;
+  return out;
+}
+
 export function seatRows(rows, height) {
   return rows.map((b) => {
     if (b[2] * b[3] <= SEAT.area || !(b[5] > 0)) return b;
@@ -572,7 +597,7 @@ export function createVillage({ scene, rows, env, height, level = 'medium', reso
   const alpine = ALPINE_RESORTS.has(resort), piedmont = PIEDMONT_RESORTS.has(resort);
   const byCell = new Map();
   rows.forEach((row0, i) => {
-    const row = tameRow(row0, alpine);
+    const row = alpine ? deepRow(tameRow(row0, alpine), height) : tameRow(row0, alpine);
     const k = Math.floor(row[0] / CELL) + ',' + Math.floor(row[1] / CELL);
     let l = byCell.get(k);
     if (!l) byCell.set(k, (l = []));

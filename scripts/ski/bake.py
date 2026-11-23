@@ -295,6 +295,9 @@ def piste_ways(frame):
         if e["type"] == "way" and e.get("geometry"):
             ways[e["id"]] = (e["geometry"], e.get("tags", {}))
     keys = ("name", "piste:name", "ref", "piste:ref", "piste:difficulty", "piste:grooming", "piste:type")
+    # Obertauern: the "Tauernrunde Grün / Rot" circuit relations list the lifts of the circuit as members too; a lift way (aerialway /
+    # railway in the lifts layer) is never a piste line, unless it is itself tagged as a downhill piste
+    lift_ways = {e["id"] for e in load_osm(frame.rid, "lifts") if e["type"] == "way"} - set(ways)
     for e in els:
         if e["type"] != "relation":
             continue
@@ -307,6 +310,8 @@ def piste_ways(frame):
             continue
         rel = {k: t[k] for k in keys if k in t}
         for m in members:
+            if m["ref"] in lift_ways:
+                continue
             if m["ref"] not in ways:
                 ways[m["ref"]] = ([g for g in m["geometry"] if g], {})
             got = inherit.setdefault(m["ref"], {})
@@ -1420,7 +1425,8 @@ def build_lifts(frame, dem_raw):
                     row["name"] = best[2]
                 row["osm"] = [round(best[0], 1), round(best[1], 1)]       # the mapped station (node / building centre)
             return row
-        row = {"name": t.get("name", "") or t.get("ref", ""), "kind": kind, "seats": seats, "pts": flat(dp_simplify(p, 0.8)), "pylons": tow,
+        name = cfg.get("lift_names", {}).get(oid, t.get("name", "") or t.get("ref", ""))   # RESORTS[rid]["lift_names"]: OSM way id -> shown name
+        row = {"name": name, "kind": kind, "seats": seats, "pts": flat(dp_simplify(p, 0.8)), "pylons": tow,
                "len": round(length), "osm": oid, "type": raw, "rise": round(float(h[-1] - h[0])),
                "bottom": station(p[0], h[0]), "top": station(p[-1], h[-1])}
         if t.get("ref"):

@@ -130,7 +130,7 @@ function material(env, atlas) {
       varying vec2 vUv; varying float vDist; varying float vSide; varying float vSeed; varying vec2 vXZ;
       ${FOG_GLSL}
       void main(){
-        vec4 t = texture2D(uAtlas, vec2(vUv.x, 1.0 - vUv.y));
+        vec4 t = texture2D(uAtlas, vUv);                  // the canvas atlas is flipY (its top row = v 1): no second flip (the far trees stood on their tips, QA 23 Nov)
         // alpha sharpening: crisp silhouettes at every mip level (no fizzle, no thinning far away)
         float a = (t.a - 0.45) / max(fwidth(t.a), 1e-4) + 0.5;
         if (a < 0.03) discard;                            // round 5: the edge goes out as coverage (MSAA + alpha to coverage): smooth silhouettes

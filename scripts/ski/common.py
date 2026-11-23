@@ -218,6 +218,21 @@ RESORTS = {
         # the Sestriere towers (Torre Rossa: 13 storeys, the white tower: 17): the only really tall buildings, kept from OSM as they are
         "tall": [("Torri di Sestriere", 6.8780, 44.9560, 350)],
     },
+    # Obertauern (Salzburg): the ski ring round the Radstädter Tauern pass (1740 m), the hotel village on the pass in the middle, lifts up
+    # to Gamsleiten, Zehnerkar, Seekareck, Hundskogel, Grünwaldkopf, Plattenkar. Snow-sure bowl above the tree line. Austria: BEV 1 m DTM
+    # as Arlberg; frame ETRS89 / UTM 33N (13.56 E lies in zone 33: grid north = true north within 1 degree).
+    "obertauern": {
+        "name": "Obertauern", "short": "Tauernrunde", "country": "AT", "crs": "EPSG:25833",
+        "bbox": (47.222, 13.505, 47.275, 13.625),
+        "dem": ["at-dgm", "copernicus-glo30"], "far": ["copernicus-glo30"],
+        "tree_line": 1950.0, "derived_forest": 1800.0,       # the pass lies at 1740 m: larch / spruce only low down on the valley sides
+        # the Zehnerkarbahn is one gondola in two sections (OSM: two ways, valley -> middle station 2053 m -> Zehnerkar 2194 m): shown names
+        # by OSM way id (bake.py build_lifts), so the lift list does not show the same name twice
+        "lift_names": {23040142: "Zehnerkarbahn I", 1528325487: "Zehnerkarbahn II"},
+        "villages": [
+            ("Obertauern", 13.5590, 47.2495, 950, "chalet"),
+        ],
+    },
 }
 
 # Height tiles: TILE_CELLS cells of NEAR_STEP metres (the files hold TILE_CELLS + 1 nodes per side, neighbours share their edge).

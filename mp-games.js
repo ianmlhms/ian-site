@@ -33,7 +33,7 @@ const CASINO_CHIPS = Object.freeze([500, 1000, 2500, 5000].map((v) => Object.fre
 // Ski Alpen (live race on one piste, 2-8 players): resort + piste (a few named pistes per resort, or random of a colour), weather /
 // time of day (random by default), runs. The game resolves "random" itself from the lobby code + roster (pb/ski/net/plan.js), so every
 // player loads the same resort and piste without a server. Keep the piste ids in step with pb/ski/data/<resort>/resort.json.
-const SKI_RESORTS = Object.freeze([["killy", "Espace Killy"], ["3vallees", "Les 3 Vallées"], ["zermatt", "Zermatt"], ["arlberg", "St. Anton"], ["kronplatz", "Kronplatz"], ["vialattea", "Via Lattea"]]);
+const SKI_RESORTS = Object.freeze([["killy", "Espace Killy"], ["3vallees", "Les 3 Vallées"], ["zermatt", "Zermatt"], ["arlberg", "St. Anton"], ["kronplatz", "Kronplatz"], ["vialattea", "Via Lattea"], ["obertauern", "Obertauern"]]);
 const SKI_PISTES = Object.freeze([
   ["killy", "coupe-du-monde", "🔴 Coupe du Monde · 3.3 km"], ["killy", "face-de-bellevarde", "⚫ Face de Bellevarde · 2.5 km"], ["killy", "face", "🔴 Face · 1.1 km"],
   ["killy", "orange", "🔴 Orange · 1.6 km"], ["killy", "diebold", "🔵 Diebold · 2.2 km"], ["killy", "edelweiss", "🔵 Edelweiss · 1.7 km"], ["killy", "verte", "🟢 Verte · 2.2 km"],
@@ -47,6 +47,8 @@ const SKI_PISTES = Object.freeze([
   ["kronplatz", "ruipa", "🔵 Ruipa · 1.9 km"], ["kronplatz", "spitzhorn", "🔵 Spitzhorn · 1.6 km"], ["kronplatz", "col-toron", "🔴 Col Toron · 1.6 km"],
   ["vialattea", "kandahar-nasi", "⚫ Kandahar Nasi · 2.7 km"], ["vialattea", "pattemouche", "🔴 Pattemouche · 3.0 km"], ["vialattea", "12-bassa", "🔴 12 bassa · 2.6 km"],
   ["vialattea", "baisses", "🔵 Baïsses · 2.8 km"], ["vialattea", "les-poussins", "🔵 Les Poussins · 2.4 km"], ["vialattea", "le-lac", "🟢 Le Lac · 2.2 km"],
+  ["obertauern", "seekarspitz", "🔴 Seekarspitz · 2.0 km"], ["obertauern", "hundskogel", "🔴 Hundskogel · 1.8 km"], ["obertauern", "gamsleiten-2", "⚫ Gamsleiten 2 · 0.9 km"],
+  ["obertauern", "zehnerkar", "🔵 Zehnerkar · 1.9 km"], ["obertauern", "schaidberg", "🔵 Schaidberg · 2.0 km"], ["obertauern", "zehnerkar-red", "🔴 Zehnerkar · 1.1 km"],
 ]);
 const opt = (v, label, when) => Object.freeze(when ? { v, label, when } : { v, label });
 const SKI_SETTINGS = Object.freeze([

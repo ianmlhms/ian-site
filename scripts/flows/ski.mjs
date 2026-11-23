@@ -31,7 +31,7 @@ export const flow = {
     await h.goto(`/pb/ski.html?debug=1&bot=1&timescale=4&q=low`);
     await page.waitForFunction(() => document.documentElement.dataset.skiScreen === "picker" || document.documentElement.dataset.bootError, null, { timeout: 90000 });
     h.eq(await page.evaluate(() => document.documentElement.dataset.bootError || ""), "", "boots without an error");
-    h.eq(await page.$$eval(".resort", (b) => b.map((x) => (x.classList.contains("ready") ? x.dataset.id : "-"))), ["killy", "3vallees", "zermatt", "arlberg", "kronplatz", "vialattea"], "Val d'Isère · Tignes first, all five resorts ready");
+    h.eq(await page.$$eval(".resort", (b) => b.map((x) => (x.classList.contains("ready") ? x.dataset.id : "-"))), ["killy", "3vallees", "zermatt", "arlberg", "kronplatz", "vialattea", "obertauern"], "Val d'Isère · Tignes first, all five resorts ready");
     await h.shot("picker");
 
     h.step("pick the resort: the free ride starts at a village lift's bottom station");

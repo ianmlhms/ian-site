@@ -6,7 +6,7 @@
  * releases behind the skier. The HUD warning on the steep off-piste. FLOW_BROWSER=webkit for Safari's engine. */
 import { runIfMain } from "./lib.mjs";
 
-const RESORTS = (process.env.SKI_RESORTS || "killy,3vallees,zermatt,arlberg,kronplatz,vialattea").split(",");
+const RESORTS = (process.env.SKI_RESORTS || "killy,3vallees,zermatt,arlberg,kronplatz,vialattea,obertauern").split(",");
 
 export const flow = {
   name: "ski-avalanche",
@@ -33,11 +33,17 @@ export const flow = {
       await page.evaluate(() => { const a = window.__ski.avalanches; const t0 = performance.now(); a.setClock(() => (t0 + (performance.now() - t0) * 4) / 1000); });
 
       h.step(`${rid}: scripted trigger with the skier standing in the path: caught, then back on a piste`);
-      const mid = { x: f.path[Math.min(f.path.length - 2, 12)], z: f.path[Math.min(f.path.length - 1, 13)] };
-      await page.evaluate(({ x, z }) => window.__ski.streamer.ready(x, z, 500), mid);
-      await page.evaluate(({ x, z }) => { window.__ski.place(x, z, 0); window.__ski.setInput({ steer: 0, tuck: 0, brake: 1, push: 0, jump: false }); }, mid);
-      await h.pause(600);
-      const warn = await page.evaluate(() => document.documentElement.dataset.skiAvWarn === "1" && !document.getElementById("avWarn").hidden);
+      // a spot on the path steep enough for the warning (the path's 12th point is not in every resort: Obertauern's face flattens there)
+      let mid = { x: f.path[Math.min(f.path.length - 2, 12)], z: f.path[Math.min(f.path.length - 1, 13)] }, warn = false;
+      for (const k of [12, 8, 4, 16, 20]) {
+        const i = Math.min(f.path.length - 2, k);
+        mid = { x: f.path[i], z: f.path[i + 1] };
+        await page.evaluate(({ x, z }) => window.__ski.streamer.ready(x, z, 500), mid);
+        await page.evaluate(({ x, z }) => { window.__ski.place(x, z, 0); window.__ski.setInput({ steer: 0, tuck: 0, brake: 1, push: 0, jump: false }); }, mid);
+        await h.pause(600);
+        warn = await page.evaluate(() => document.documentElement.dataset.skiAvWarn === "1" && !document.getElementById("avWarn").hidden);
+        if (warn) break;
+      }
       const id = await page.evaluate(async (f) => { const m = await import("/pb/ski/avalanche.js"); window.__skiAv = m; const a = window.__ski.avalanches; const id = m.cellId(f.x, f.z); a.triggerAvalanche(id, 4242, a.clock()); return id; }, f);
       await page.waitForFunction(() => document.documentElement.dataset.skiAvalanche === "caught", null, { timeout: 60000 });
       const c = await page.evaluate(() => ({ crash: window.__ski.state.crash, kind: window.__ski.state.crashKind, flash: document.getElementById("avFlash").classList.contains("on"), toast: document.getElementById("hToast").textContent }));

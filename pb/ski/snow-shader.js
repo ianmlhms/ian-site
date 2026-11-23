@@ -218,10 +218,10 @@ export function createSnowMaterial(env, { cheap = false, treeRadius = 400, fores
         rockAmt = smoothstep(0.46 - rw, 0.46 + rw, rockAmt);
         vec3 col = mix(snow, rockCol, rockAmt);
         // ---- forests beyond the instanced trees: a dark underlay where the far tree cards stand (forest-far.js draws the trees)
-        // (beyond the box the raster's clamped edge texels were smeared outward: dark stripes down the mountains beside the resort)
-        vec2 fxy = wp / uForestSize;
-        float inBox = step(0.0, fxy.x) * step(0.0, fxy.y) * step(fxy.x, 1.0) * step(fxy.y, 1.0);
-        float fRaster = uForestOn > 0.5 ? texture2D(uForestTex, clamp(fxy, 0.0, 1.0)).r * inBox : forest;
+        // (beyond the box the raster's clamped edge texels were smeared outward: dark stripes down the mountains beside the resort;
+        //  faded out over the last 120 m inside the box, so no hard line stands at its edge)
+        vec2 fEdge = min(wp, uForestSize - wp);
+        float fRaster = uForestOn > 0.5 ? texture2D(uForestTex, wp / uForestSize).r * smoothstep(0.0, 120.0, min(fEdge.x, fEdge.y)) : forest;
         float canopy = fRaster * smoothstep(uTreeRadius * 0.7, uTreeRadius * 1.0, vDist) * (1.0 - piste);
         vec3 green = mix(vec3(0.11, 0.17, 0.16), vec3(0.2, 0.25, 0.24), nA.g);
         vec3 canopyCol = green * (shade * 0.75 + uSunColor * smoothstep(-0.2, 0.7, nl) * sunVis * 0.45);

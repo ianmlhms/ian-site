@@ -4,7 +4,7 @@
  * FLOW_BROWSER=webkit for Safari's engine. */
 import { runIfMain } from "./lib.mjs";
 
-const EXPECT = { killy: "Olympique", "3vallees": "Verdons", zermatt: "Matterhorn Express 1", arlberg: "Galzigbahn", kronplatz: "Kronplatz I - Plan de Corones I", vialattea: "Sestriere - Fraiteve 1" };
+const EXPECT = { killy: "Olympique", "3vallees": "Verdons", zermatt: "Matterhorn Express 1", arlberg: "Galzigbahn", kronplatz: "Kronplatz I - Plan de Corones I", vialattea: "Sestriere - Fraiteve 1", obertauern: "Zehnerkarbahn I" };
 const RESORTS = (process.env.SKI_RESORTS || Object.keys(EXPECT).join(",")).split(",");
 
 export const flow = {

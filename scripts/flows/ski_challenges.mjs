@@ -91,12 +91,12 @@ export const flow = {
     const outfitCount = await page.$$eval("#segOutfit button", (b) => b.length);
     h.expect(outfitLocks.length === 0 && outfitCount >= 10, `${outfitCount} outfits, none locked`);
 
-    h.step("cloud: the compact record fits game_saves with every star of all five resorts");
+    h.step("cloud: the compact record fits game_saves with 160 starred pistes per resort (NOT every real piste: see HANDOFF Obertauern, cloud save)");
     const sizes = await page.evaluate(async () => {
       const c = await import("/pb/ski/modes/cloud.js");
       const ch = await import("/pb/ski/modes/challenges.js");
       const stars = {};
-      const rids = ["killy", "3vallees", "zermatt", "arlberg", "kronplatz", "vialattea"];
+      const rids = ["killy", "3vallees", "zermatt", "arlberg", "kronplatz", "vialattea", "obertauern"];
       for (const rid of rids) for (let i = 0; i < 160; i++) stars[ch.starKey(rid, `piste-${i}`)] = 7;
       const bestHash = Object.fromEntries(Object.keys(stars).map((k) => [k, 123456]));
       const rec = c.encodeCloud({ stars, park: { killy: 12345 }, bestHash });

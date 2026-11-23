@@ -1782,3 +1782,37 @@ first lift `Sestriere - Fraiteve 1` (`config.js FIRST_LIFT`), snowpark Montgenè
   number of cards; taken over from the Obertauern branch so both merge cleanly).
 - Open: a Via Lattea player who stars nearly every piste everywhere passes the 7 KB cloud-save limit (pre-existing, grows per resort);
   Sestriere's house styles are guessed; no Olympic / village landmarks beyond the race nets, the towers and the pass sign.
+
+## Obertauern (23 Nov 2026): the 6th resort (Ian's choice: "Obertauern" + Via Lattea, agent a8011cda; the other in a064c2e8)
+- **Data** `obertauern` (common.py): box 47.222..47.275 N, 13.505..13.625 E = 10.2 x 7.7 km, 42 of 48 tiles, 3.2 MB in all. Heights
+  `at-dgm` (BEV 1 m, like Arlberg), far Copernicus; frame EPSG:25833 (UTM 33N: 13.56 E lies in zone 33; no other code cares about the
+  zone: the DEM fetch reprojects). OSM: Overpass was at capacity all afternoon (502 / 504 on 4 mirrors): new
+  `scripts/ski/fetch_osm_api.py` builds the same layer files from the OSM API 0.6 (`map` in chunks + `relation/<id>/full` for the
+  relations a layer keeps): the same filters as `fetch_osm.py`, the normal cache, works for any resort when Overpass is down.
+  Lifts checked against the 26 of skiresort.com's list (the resort's own page answered 404): all 26 in OSM; OSM has 28 = the 26 +
+  Zehnerkarbahn mapped as two sections + the ski school's rope tow. PISTES are NOT checked against an official list: OSM gives 63 km of run
+  centre lines (network 74 km), the resort advertises 100 km.
+- **Bake**: 100 pistes, 63 km of run centre lines (network 74 km), 28 lifts, slopes 4 slalom; 2200 m top - 1627 m low. Park `The Spot`
+  (OSM relation 13393799, three outer rings; `park_osm.py` now reads multipolygon parks ring by ring, `park_site.mjs` also tries lines
+  turned off the fall line for area parks): 284 m, by the Schrotteralm T-bar. First lift Zehnerkarbahn I (config FIRST_LIFT).
+- **Bake fixes (shared, generic)**: (1) `piste_ways` skipped nothing of a route relation's members: the "Tauernrunde Grün / Rot" circuit
+  relations list the circuit's LIFTS too, so the Seekarspitzbahn / Panoramabahn lines became pistes on top of the lifts (gates + courses
+  blocked by the lift line, 14 km too many): members that are aerialway / rail ways in the lifts layer are left out (the other five
+  resorts have no lift in any piste relation: checked, a re-bake of them does not change). (2) `lift_names` {OSM way id: shown name} (Zehnerkarbahn I / II).
+- **Shared look fixes (all resorts, found on the Obertauern shots)**: (1) far tree cards (`forest-far.js`) stood UPSIDE DOWN (the shader
+  flipped V although the canvas atlas is flipY; the line is from round 2C): `texture2D(uAtlas, vUv)`; before / after on Arlberg and
+  Obertauern. (2) grey / white STRIPES over the far mountains (Ian reported them on Bouc Blanc): the forest raster covers only the box
+  and its clamped edge texels smeared outwards (Via Lattea fixed the same with a hard cut; now faded over the last 120 m in the box, `snow-shader.js`). (3) `village.js deepRow` (Alpine resorts): a
+  house with > 6 m of ground falling away goes down by whole storeys instead of standing on a blank plinth (Obertauern's 60 x 26 m
+  hotel: 21 m). (4) huts < 30 m2 are sheds (2.6 m eaves, were 6.4 m "towers"). (5) stone courses anti-aliased.
+  The other five picker pictures still show the old far trees.
+- **Cloud save near its limit (OPEN, needs a decision)**: every star of every real piste = 8,692 bytes of JSON with 5 resorts + Obertauern
+  (the 5 alone: about 8.1 KB; Via Lattea adds 315 pistes, about 1.9 KB more); game_saves allows 8,192 (`pg_column_size`), cloud.js drops only times + map discovery, never stars. Past ~1,340
+  starred pistes the cloud upsert would be refused (the local save stays). Only a near-100 % player; each new resort lowers it.
+  ski-challenges checks 160 pistes per resort, which is fewer than the real 1,739.
+- **Flow edits**: ski-avalanche looks for a spot on the face's path that is steep enough for the warning (it took one fixed point, which
+  is too flat on Obertauern's first face); ski-challenges' count follows the number of resorts. calls-sweep7d now fails on triangles too.
+- **Picker**: cards from resort-data.js, the count word (`Fënnef` -> computed), layout columns from the number of small cards
+  (`--rp-cols` / `--rp-rows`; an odd last card spans two columns), `pb/ski/img/obertauern-*.webp` (pose for shot.mjs: 5250,4750,130,
+  4150,3500,-60,42 at 1200x810, header rows cropped).
+- mp-games v8 (Obertauern + 6 pistes in the lobby), UNLOCK {red 4, black 12}, flows / Node check lists.

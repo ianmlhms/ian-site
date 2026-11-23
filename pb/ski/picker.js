@@ -18,6 +18,7 @@ const INFO = Object.freeze({
   arlberg: { title: 'Ski Arlberg', places: 'St. Anton, Lech, Zürs, Warth, Sonnenkopf', flags: ['🇦🇹'], region: 'Tirol a Vorarlberg' },
   kronplatz: { title: 'Kronplatz', places: 'Plan de Corones, Bruneck', flags: ['🇮🇹'], region: 'Südtirol' },
   vialattea: { title: 'Via Lattea', places: "Sestriere, Sauze d'Oulx, Sansicario, Cesana, Claviere, Montgenèvre", flags: ['🇮🇹', '🇫🇷'], region: 'Piemont an Hautes-Alpes' },
+  obertauern: { title: 'Obertauern', places: 'Tauernrunde ronderëm de Pass', flags: ['🇦🇹'], region: 'Salzburger Land' },
 });
 
 /* the sources of all resorts (scripts/ski/common.py SOURCE_CREDITS + OSM_CREDIT); each resort's own list: its piste map ⓘ */
