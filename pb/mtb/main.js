@@ -104,7 +104,7 @@ const pixelRatioFor = (q) => Math.min(window.devicePixelRatio || 1, q.pixelRatio
 function buildMapsInWorker(data) {
   return new Promise((resolve, reject) => {
     let worker;
-    try { worker = new Worker(new URL('./world-map-worker.js', import.meta.url), { type: 'module' }); } catch (error) { reject(error); return; }
+    try { worker = new Worker(import.meta.resolve('./world-map-worker.js'), { type: 'module' }); } catch (error) { reject(error); return; }
     worker.onmessage = (event) => { worker.terminate(); if (event.data.ok) resolve(event.data.map); else reject(new Error(event.data.error)); };
     worker.onerror = (event) => { worker.terminate(); reject(new Error(event.message || 'worker error')); };
     worker.postMessage(mapInput(data));

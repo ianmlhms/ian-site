@@ -107,7 +107,7 @@ stale for returning visitors indefinitely. That includes files that only *import
 module: bump the importer too, all the way up the chain. A normal reload
 does **not** refetch JS — so after changing a `.js` file, **bump its `?v=N`** in the `<script>`
 tags that reference it (e.g. `messenger.js?v=4`), or the user keeps the old cached version.
-Exception: Ski Alpen and Tower Defense (`pb/ski/`, `pb/towerdefense/`) are versioned by content hash in a generated
+Exception: Ski Alpen, Tower Defense, MTB, Schueberfouer (+ old park.html) (`pb/ski/`, `pb/towerdefense/`, `pb/mtb/`, `pb/fouer/`, `pb/park/`) are versioned by content hash in a generated
 import map: run `python3 scripts/game_importmap.py` after every change **and every merge / rebase** (`check_site.py` fails otherwise).
 "Nothing changed after reload" = stale cache, not a bug. To test instantly: a **private window**.
 Current versions (23 Sep 2026): `theme.js?v=21`, `auth.js?v=16`, `i18n-dict.js?v=35` (same on ALL

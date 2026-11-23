@@ -17,8 +17,9 @@ Catches the classes of bug that are invisible until someone hits the page:
              pb/<game>/data-hashes.json changing: the service worker keeps these
              files on the device by hash, so a stale hash means players keep the
              old world (fix: python3 scripts/gamedata_manifest.py)
-  importmap  an ES module game (pb/ski.html, pb/towerdefense.html) whose import map does
-             not carry the current content hash of every module: after a deploy a
+  importmap  an ES module game (PAGES in scripts/game_importmap.py: ski, towerdefense, mtb,
+             fouer, park) whose import map, or the hashes in its worker's imports (MTB),
+             do not carry the current content hash of every module: after a deploy a
              browser could mix old and new modules (fix: python3 scripts/game_importmap.py)
   orphans    public pages nothing links to (how /kaart/ shipped unreachable)
   meta       pages missing title / description / canonical

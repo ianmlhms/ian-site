@@ -19,6 +19,8 @@ holds. File names and import statements stay as they are. The first HASH_LEN hex
 
 scripts/check_site.py (rule importmap) runs the check. After a merge conflict inside a block just run the command without
 --check: the whole block is generated (it replaces the conflict markers too).
+Module workers (MTB's world-map-worker.js): see WORKERS. This script keeps the relative import lines of the worker's graph at the hash
+of their targets (import maps do not reach workers) and the page starts it with new Worker(import.meta.resolve('./world-map-worker.js')).
 A new game: add it to PAGES, put an empty start / end marker pair at the top of <head> (before any module code) and start
 the game with import("/pb/<dir>/main.js") (no ?v=).
 """
@@ -37,6 +39,15 @@ HASH_LEN = 10
 PAGES = {
     "pb/ski.html": (("pb/ski",), "pb/ski/main.js"),
     "pb/towerdefense.html": (("pb/towerdefense",), "pb/towerdefense/main.js"),
+    "pb/mtb.html": (("pb/mtb",), "pb/mtb/main.js"),
+    "pb/fouer.html": (("pb/fouer", "pb/park"), "pb/fouer/main.js"),        # the Schueberfouer imports the frozen v1 kernel in pb/park computed (legacy.js)
+    "pb/park.html": (("pb/park",), "pb/park/main.js"),                      # the old Theme Park Tycoon page, same modules
+}
+# page -> module workers it starts. Import maps do NOT reach workers, so the worker and everything it imports (its whole graph) carry
+# the content hash in their own import lines instead (rewritten by this script); the page gets the worker URL from import.meta.resolve("./worker.js"),
+# which goes through the map. A hash covers the hashes of the modules below it, so one changed module is a new URL all the way up.
+WORKERS = {
+    "pb/mtb.html": ("pb/mtb/world-map-worker.js",),
 }
 SKIP_DIRS = {"data", "img"}
 NODE_ONLY = re.compile(r"^harness.*\.m?js$")      # Node test tools next to the modules, never loaded by a page
@@ -50,6 +61,9 @@ SPECIFIER = re.compile(r"""(?:^|[;\s}])(?:import|export)\s*(?:[\w*{}\s,$]*?\sfro
                        r"""|\bimport\(\s*["']([^"'\n]+)["']\s*\)""")
 COMMENTS = re.compile(r"/\*.*?\*/|(?<![:\"'`\\])//[^\n]*", re.S)
 WORKER = re.compile(r"\bnew\s+(?:Shared)?Worker\s*\(")
+RESOLVED = re.compile(r"""\bimport\.meta\.resolve\(\s*["']([^"'\n]+)["']\s*\)""")
+# the relative import lines of the worker graph that this script keeps at the hash of their target
+WORKER_IMPORT = re.compile(r"""(\b(?:from|import)\s*)(["'])(\.{1,2}/[^"'\n?]+)(?:\?v=[0-9a-f]+)?\2""")
 
 
 def read(path: str) -> str:
@@ -78,9 +92,61 @@ def specifiers(code: str) -> list:
     return [static or dynamic for static, dynamic in SPECIFIER.findall(code)]
 
 
+def resolve_relative(path: str, spec: str) -> str:
+    target = spec.partition("?")[0]
+    return target.lstrip("/") if target.startswith("/") else os.path.normpath(os.path.join(os.path.dirname(path), target)).replace(os.sep, "/")
+
+
+def worker_graph(entries: tuple, listed: set) -> tuple:
+    """(modules of the worker graph below its entries, dependencies first; problems)."""
+    order, problems, visiting, done = [], [], [], set()
+
+    def visit(path: str) -> None:
+        if path in done:
+            return
+        if path in visiting:
+            problems.append(f"{path}: import cycle inside a worker graph ({' -> '.join(visiting + [path])}): its versions cannot be generated")
+            return
+        if path not in listed:
+            problems.append(f"worker module {path} does not exist")
+            return
+        visiting.append(path)
+        code = COMMENTS.sub(" ", read(path))
+        if re.search(r"\bimport\s*\(", code):
+            problems.append(f"{path} (worker graph) uses import(): a worker's imports must be static relative lines")
+        for spec in specifiers(code):
+            if spec.startswith("."):
+                visit(resolve_relative(path, spec))
+            else:
+                problems.append(f"{path} (worker graph) imports {spec}: only relative imports can be versioned")
+        visiting.pop()
+        done.add(path)
+        order.append(path)
+
+    for entry in entries:
+        visit(entry)
+    return order, problems
+
+
+def worker_files(page: str) -> dict:
+    """path -> (content with every relative import at the hash of its target, hash) for the worker graphs of the page."""
+    folders, _ = PAGES[page]
+    listed = set(modules_of(folders))
+    order, _ = worker_graph(WORKERS.get(page, ()), listed)
+    found = {}
+    for path in order:
+        def line(match):
+            target = resolve_relative(path, match.group(3))
+            return f"{match.group(1)}{match.group(2)}{match.group(3)}?v={found[target][1]}{match.group(2)}" if target in found else match.group(0)
+        text = WORKER_IMPORT.sub(line, read(path))
+        found[path] = (text, hashlib.sha256(text.encode("utf-8")).hexdigest()[:HASH_LEN])
+    return found
+
+
 def render(page: str) -> str:
     folders, entry = PAGES[page]
-    versioned = {f"/{path}": f"/{path}?v={hash_file(path)}" for path in modules_of(folders)}
+    own = worker_files(page)
+    versioned = {f"/{path}": f"/{path}?v={own[path][1] if path in own else hash_file(path)}" for path in modules_of(folders)}
     lines = ",\n".join(f"{json.dumps(key)}:{json.dumps(value)}" for key, value in versioned.items())   # one module per line: readable diffs and merges
     preload = versioned.get(f"/{entry}", f"/{entry}")
     return (f'{START}\n<script type="importmap">\n{{"imports":{{\n{lines}\n}}}}\n</script>\n'
@@ -91,17 +157,25 @@ def module_problems(page: str) -> list:
     """What an import map cannot cover, found in the modules themselves."""
     folders, entry = PAGES[page]
     listed = set(modules_of(folders))
+    entries = WORKERS.get(page, ())
     problems = [] if entry in listed else [f"{page}: the entry module {entry} does not exist"]
+    graph, graph_problems = worker_graph(entries, listed)
+    problems += graph_problems
+    for path, (text, _hash) in worker_files(page).items():
+        if text != read(path):
+            problems.append(f"{path}: the versions in the imports of this worker module are stale: run python3 scripts/game_importmap.py")
     for path in sorted(listed):
         code = COMMENTS.sub(" ", read(path))
         if WORKER.search(code):
-            problems.append(f"{path} starts a worker: import maps do not reach into workers, its modules would load without a version")
+            started = [spec for spec in RESOLVED.findall(code) if resolve_relative(path, spec) in entries]
+            if not started:
+                problems.append(f"{path} starts a worker: import maps do not reach into workers; start it with new Worker(import.meta.resolve('./x.js')) and list x.js in WORKERS of scripts/game_importmap.py")
         for spec in specifiers(code):
             if not spec.startswith((".", "/")):
                 continue
-            target, _, query = spec.partition("?")
-            full = target.lstrip("/") if target.startswith("/") else os.path.normpath(os.path.join(os.path.dirname(path), target))
-            if full in listed and query:
+            query = spec.partition("?")[2]
+            full = resolve_relative(path, spec)
+            if full in listed and query and path not in graph:
                 problems.append(f"{path} imports {spec}: no ?v= on a module of the import map (the map versions it; the query makes a second copy)")
             elif full not in listed and not query:
                 where = "is not in the import map" if os.path.exists(os.path.join(REPO, full)) else "does not exist"
@@ -155,6 +229,11 @@ def write_all() -> list:
     """Rewrites the stale blocks; returns the pages that changed."""
     written = []
     for page in PAGES:
+        for path, (text, _hash) in worker_files(page).items():
+            if text != read(path):
+                with open(os.path.join(REPO, path), "w", encoding="utf-8") as handle:
+                    handle.write(text)
+                written.append(path)
         html = read(page)
         block = render(page)
         fresh, count = BLOCK.subn(lambda _match: block, html)

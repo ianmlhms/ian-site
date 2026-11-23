@@ -4,7 +4,7 @@
  *   - the far grid fills in everything outside the box and the border zone, blended with a smoothstep, so the function is defined and
  *     continuous on the whole plane and the distant hills share the same surface as the playable valley.
  * Pure functions, no THREE, so the Node harness and the browser use the very same code. */
-import { WORLD } from './config.js';
+import { WORLD } from './config.js?v=a2e99a90d6';
 
 const smoothstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 

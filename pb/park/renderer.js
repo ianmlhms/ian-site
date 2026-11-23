@@ -1,8 +1,8 @@
 import { TILE, PHASE, RULES } from "/pb/park/data.js";
 import { GRID, GATE, KINDS, isOwned, footprint } from "/pb/park/build.js";
 import { animateParkModel, createGuestGeometries, createModelLibrary, createParkModel,
-  createPathGeometry, disposeModelLibrary } from "/pb/park/models.js?v=1";
-import { createParkWorld } from "/pb/park/world.js?v=1";
+  createPathGeometry, disposeModelLibrary } from "/pb/park/models.js";
+import { createParkWorld } from "/pb/park/world.js";
 
 const THREE = window.THREE;
 const GUEST_CAPACITY = 256;

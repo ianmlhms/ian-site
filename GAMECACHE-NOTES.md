@@ -27,10 +27,12 @@ itself fetches the data with `?v=<hash>`, so even the browser's HTTP cache can o
 
 ## Code modules: import maps (23 Nov 2026)
 
-`pb/ski.html` and `pb/towerdefense.html` carry a generated import map: every module at `?v=<content hash>` (`scripts/game_importmap.py`, also run by
+`pb/ski.html`, `pb/towerdefense.html`, `pb/mtb.html`, `pb/fouer.html` and `pb/park.html` carry a generated import map: every module at `?v=<content hash>` (`scripts/game_importmap.py`, also run by
 `gamedata_manifest.py`; `check_site.py` rule `importmap`). Run it after every change and every merge. The code is still network-first in the worker; `sw.js` now also
-revalidates the game page itself (`cache: "no-cache"`). Other games that are ES module trees without versions (MTB, Lux Drive, Schueberfouer) are not mapped yet: one line in
-`PAGES` + the marker pair + an entry without `?v=`; MTB's module worker (`world-map-worker.js`) needs its own versioning first. Details: `pb/ski/HANDOFF.md`, top.
+revalidates the game page itself (`cache: "no-cache"`). Not mapped: Lux Drive (paused), and `pb/burger.html` / `pb/webcam.html` (small module trees with hand-bumped `?v=` imports): one line in
+`PAGES` + the marker pair + an entry without `?v=`. MTB's module worker (`world-map-worker.js`): import maps do not reach workers, so `WORKERS` in the generator keeps the
+`?v=<hash>` on the imports of the worker graph itself (config.js, base-field.js, world-map.js; a hash covers the hashes below it) and `main.js` starts it with
+`new Worker(import.meta.resolve('./world-map-worker.js'))`, which goes through the map. Flows `ski-modules`, `mtb-modules`, `fouer-modules`. Details: `pb/ski/HANDOFF.md`, top.
 
 ## Call sites touched in the games
 

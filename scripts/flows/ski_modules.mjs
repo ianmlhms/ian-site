@@ -4,14 +4,11 @@
  *      without a regenerated map the OLD config.js is used (the trap) and `game_importmap.py --check` says so; after the generator ran, the page
  *      asks the server for exactly the new config.js and gets the new content. The service worker must not be answered by the old page in the HTTP cache.
  * Own browser contexts without Playwright routes for A and C (a route switches the HTTP cache off); Supabase is unreachable there (chromiumArgs). */
-import crypto from "node:crypto";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
 import { REPO, runIfMain, startServer } from "./lib.mjs";
+import { copySite as sharedCopySite, sha } from "./modules_lib.mjs";
 
-const HASH_LEN = 10;
 const BOOT_TIMEOUT = 120000;
 const MIN_MODULES = 50;
 const CHANGED = "pb/ski/config.js";
@@ -21,22 +18,9 @@ const SW_PAGE = "/__sw.html";
 const SW_PAGE_HTML = "<!doctype html><title>sw</title><script>window.swReady=navigator.serviceWorker.register('/sw.js').then(()=>navigator.serviceWorker.ready).then(()=>true)</script>";
 const SUPABASE_OFF = "--host-resolver-rules=MAP *.supabase.co ~NOTFOUND";
 
-const sha = (body) => crypto.createHash("sha256").update(body).digest("hex").slice(0, HASH_LEN);
 const isModule = (pathname) => /^\/pb\/ski\/.+\.m?js$/.test(pathname);
 
-/** Copies the code of the games with an import map (no data) + the generator into a temporary site, where a "deploy" can be made up. */
-function copySite() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ski-modules-"));
-  const skip = (source) => !/\/pb\/[^/]+\/(?:data|img)(?:\/|$)/.test(source);
-  for (const rel of ["pb/ski", "pb/ski.html", "pb/towerdefense", "pb/towerdefense.html", "scripts/game_importmap.py"]) {
-    fs.cpSync(path.join(REPO, rel), path.join(root, rel), { recursive: true, filter: skip });
-  }
-  const generate = (...args) => {
-    const run = spawnSync("python3", [path.join(root, "scripts/game_importmap.py"), ...args], { encoding: "utf8" });
-    return { status: run.status, out: `${run.stdout}${run.stderr}` };
-  };
-  return { root, generate, read: (rel) => fs.readFileSync(path.join(root, rel)), write: (rel, body) => fs.writeFileSync(path.join(root, rel), body) };
-}
+const copySite = () => sharedCopySite("ski-modules");
 
 /** The module URLs a page asks for, as the browser sees them (also those its HTTP cache answers). */
 function watchModules(page) {

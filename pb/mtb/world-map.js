@@ -3,8 +3,8 @@
  *   cover  R grass (meadow 1, farmland .75)  G built-up  B water  A bare rock
  *   canopy R canopy cover 0..1  G canopy height / 45 m  B wetness (hollows, stream beds: moss)  A farmland flag
  * Pure data code (no THREE): the browser uploads both as textures, the forest placement samples them on the CPU. */
-import { WORLD } from './config.js';
-import { sampleBilinear } from './base-field.js';
+import { WORLD } from './config.js?v=a2e99a90d6';
+import { sampleBilinear } from './base-field.js?v=e59e8529be';
 
 export const MAP_CELL = 4;
 export const CLASS = Object.freeze({ unknown: 0, forest: 1, meadow: 2, farmland: 3, built: 4, water: 5, rock: 6, scrub: 7 });

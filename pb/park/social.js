@@ -1,4 +1,4 @@
-import { serializeSave, readLayout } from "./save.js?v=3";
+import { serializeSave, readLayout } from "./save.js";
 
 export const RPC_TIMEOUT = 8000;
 const LAYOUT_LIMIT = 8000;
