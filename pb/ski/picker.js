@@ -6,7 +6,7 @@ import { RESORTS } from './resort-data.js';
 import { PICKER_STATS } from './picker-stats.js';
 import { createStore } from './progress.js';
 
-const IMG_VERSION = 1;                     // bump when the pictures are rendered again (sw.js keeps ?v= files cache-first)
+const IMG_VERSION = 2;                    // bump when the pictures are rendered again (sw.js keeps ?v= files cache-first)
 const IMG_WIDTHS = [640, 1200];
 const IMG_RATIO = [16, 10];
 

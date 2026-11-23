@@ -1853,3 +1853,13 @@ piste map looked at, traced or copied). The old plan from above stays one tap aw
   memory-check "switch #3 killy" +61 MB vs the 50 MB limit fails the same on main without this change (+62): open, not from the map.
 - Not done: WebKit (hangs on the Mini). French resorts have hardly any piste numbers in OSM (names instead). On a tall screen the whole
   (wide) sheet is small: it opens on the skier, which fills the box. First play + ~55 KB (the new modules; no image).
+
+## Cleanup round (23 Nov 2026): picker pictures + compact cloud save
+- **Picker pictures**: killy / 3vallees / zermatt / arlberg / kronplatz / vialattea re-rendered with the upright far trees (same poses as above;
+  Via Lattea pose 16950,10550,12,16527,10196,42,58 = Sestriere towers + chairlift), WebP <= 80 KB, `IMG_VERSION` 2 in picker.js. Obertauern was already fine.
+- **Cloud save**: `modes/cloud.js` writes the old plain `s` while it fits LIMIT 7000; beyond that the stars go to `s3` (3-bit mask per position of
+  `modes/piste-index.js`, ~1.3 KB for all 1,739 real pistes) plus `s2` (Golomb-Rice packed hashes) for pistes the index lacks. decodeCloud reads s, s2, s3.
+  Degradation order (reported through `encodeCloud(progress, report)` + console.warn): best times, discovered map resort by resort (largest
+  first), Lawin, park points, stars of the least-starred resorts. **After every bake / new resort run `node scripts/ski/piste_index.mjs`**
+  (append-only, never reorder) and `python3 scripts/game_importmap.py`; a missing piste still saves (s2), `cloud-size-test.mjs` fails until the index is complete.
+  Test: `node scripts/ski/cloud-size-test.mjs` (8 resorts all starred: 5.8 KB with fog + times offered; stars alone ~1.3 KB).

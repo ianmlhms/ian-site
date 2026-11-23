@@ -4,12 +4,14 @@
  * limit of game_saves even with every star of all five resorts):
  *   { v: 1, tb: total stars (monotone: the game_saves_keep_progress trigger keeps the save with more), s: { <resort>: "hhhhhm..." }
  *     (5 characters of piste-id hash + the star mask digit per piste), p: { <resort>: best park points }, b: { <resort>: "hhhhhtttttt..." }
- *     (best times in ms, base 36, dropped first when the record would not fit), x: { o: metres off the piste, t: top speed in
+ *     (best times in ms, base 36, dropped first when the record would not fit)
+ *     round 9: s3: { <resort>: 3-bit masks by piste-index position } (+ s2: packed hashes of pistes the index lacks) replace s when the plain text would pass LIMIT; the order of what is dropped is in encodeCloud, x: { o: metres off the piste, t: top speed in
  *     0.1 m/s, k: the picked ski type } (round 6: the ski unlocks; an old game ignores it, an old record without it reads as zero) }
  * Merging is always a union: stars OR-ed, park points and times keep the better one. Nothing is ever taken away from a player.
  * Test mode (window.__pbTestMode): nothing is sent or applied (the arcade keeps test saves apart). Standalone: local only. */
 import { cleanMask, starCount, totalStars } from './challenges.js';
 import { mergeRle, rleIntervals } from './discovery.js';
+import { PISTE_INDEX } from './piste-index.js';
 
 export const CLOUD_VERSION = 1;
 const LIMIT = 7000;                 // bytes of JSON (game_saves: jsonb <= 8192)
@@ -17,8 +19,115 @@ const SAVE_DELAY_MS = 1500;
 const HASH = 5, TIME = 6;
 const isRecord = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 
-/** Compact cloud record of a progress (pure). */
-export function encodeCloud(progress) {
+
+/* ---------------- compact star packing (format "s2") ----------------
+ * The old text "hhhhhm" costs 6 bytes per starred piste: with every star of 8+ resorts (~1,700 pistes and growing) it passes the
+ * 8,192-byte jsonb limit of game_saves. s2 per resort = base64url of a bit stream: k (5 bits), count (Elias-gamma of count + 1), then the
+ * piste hashes sorted ascending as Golomb-Rice gaps (unary quotient, k low bits) and a mask (1 bit "all three stars", else 3 bits).
+ * Lossless, ~20 bits per piste instead of 48. Only written when the old text would not fit; decodeCloud reads both. */
+const HASH_SPACE = 36 ** HASH;                                  // hash5 values < 60,466,176
+const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+const MAX_PACKED_CHARS = 4000, MAX_PACKED_PISTES = 6000;
+
+function packStars(entries) {                                   // entries: [[hashInt, mask], ...] (any order)
+  const sorted = [...entries].sort((a, b) => a[0] - b[0]);
+  const gaps = sorted.map(([h], i) => h - (i ? sorted[i - 1][0] : -1) - 1);
+  let k = 0, best = Infinity;
+  for (let c = 0; c < 27; c++) {
+    const bits = gaps.reduce((n, g) => n + (g >> c) + 1 + c, 0);
+    if (bits < best) { best = bits; k = c; }
+  }
+  const bits = [];
+  const put = (value, width) => { for (let i = width - 1; i >= 0; i--) bits.push((value >> i) & 1); };
+  put(k, 5);
+  const n1 = sorted.length + 1, len = 31 - Math.clz32(n1);
+  put(0, len); put(n1, len + 1);                                // Elias-gamma
+  sorted.forEach(([, mask], i) => {
+    for (let q = gaps[i] >> k; q > 0; q--) bits.push(1);
+    bits.push(0);
+    put(gaps[i] & ((1 << k) - 1), k);
+    if (mask === 7) bits.push(1); else { bits.push(0); put(mask, 3); }
+  });
+  let out = '';
+  for (let i = 0; i < bits.length; i += 6) {
+    let v = 0;
+    for (let j = 0; j < 6; j++) v = (v << 1) | (bits[i + j] || 0);
+    out += B64[v];
+  }
+  return out;
+}
+
+/** [[hashInt, mask], ...] of a packed text, or null when it is malformed (bounded: text <= MAX_PACKED_CHARS, <= MAX_PACKED_PISTES). */
+function unpackStars(text) {
+  if (typeof text !== 'string' || !text || text.length > MAX_PACKED_CHARS) return null;
+  const bits = [];
+  for (const ch of text) {
+    const v = B64.indexOf(ch);
+    if (v < 0) return null;
+    for (let j = 5; j >= 0; j--) bits.push((v >> j) & 1);
+  }
+  let pos = 0;
+  const get = () => (pos < bits.length ? bits[pos++] : -1);
+  const read = (width) => { let v = 0; for (let i = 0; i < width; i++) { const b = get(); if (b < 0) return -1; v = (v << 1) | b; } return v; };
+  const k = read(5);
+  if (k < 0 || k > 26) return null;
+  let zeros = 0;
+  for (let b = get(); b === 0; b = get()) if (++zeros > 14) return null;
+  const n1 = zeros ? (1 << zeros) | read(zeros) : 1;
+  const count = n1 - 1;
+  if (count < 0 || count > MAX_PACKED_PISTES) return null;
+  const out = [];
+  let prev = -1;
+  for (let i = 0; i < count; i++) {
+    let q = 0, b = get();
+    for (; b === 1; b = get()) if (++q > HASH_SPACE >> k) return null;
+    if (b !== 0) return null;
+    const low = read(k);
+    if (low < 0) return null;
+    const h = prev + 1 + (q << k) + low;
+    const all = get();
+    const mask = all === 1 ? 7 : all === 0 ? read(3) : -1;
+    if (h >= HASH_SPACE || !(mask > 0 && mask < 8)) return null;
+    out.push([h, mask]);
+    prev = h;
+  }
+  return out;
+}
+
+/* ---------------- indexed stars (format "s3", the smallest) ----------------
+ * piste-index.js (append-only, scripts/ski/piste_index.mjs) lists every piste hash of a resort in a fixed order; s3 = per resort one 3-bit
+ * star mask per position, two positions per base64 character (~0.5 byte per piste: every star of 2,000 pistes = ~1 KB). Pistes that the
+ * index does not know yet (a new resort / bake before the generator ran) go to the packed s2 text instead. */
+const indexMaps = new Map();
+function indexOf(rid) {
+  if (!indexMaps.has(rid)) {
+    const text = PISTE_INDEX[rid] || '', map = new Map();
+    for (let i = 0; i + HASH <= text.length; i += HASH) map.set(text.slice(i, i + HASH), i / HASH);
+    indexMaps.set(rid, map);
+  }
+  return indexMaps.get(rid);
+}
+function indexedStars(rid, entries) {                           // entries: [[hash5, mask]] -> { text, rest }
+  const map = indexOf(rid), masks = [], rest = [];
+  for (const [h, m] of entries) { const pos = map.get(h); if (pos === undefined) rest.push([parseInt(h, 36), m]); else masks[pos] = m; }
+  let text = '';
+  for (let i = 0; i < masks.length; i += 2) text += B64[((masks[i] || 0) << 3) | (masks[i + 1] || 0)];
+  return { text, rest };
+}
+function unindexStars(rid, text) {                              // [[hash5, mask]] (unknown resort / positions past the index are skipped)
+  const index = PISTE_INDEX[rid];
+  if (typeof text !== 'string' || !index || text.length > MAX_PACKED_CHARS) return [];
+  const out = [];
+  for (let i = 0; i < text.length; i++) {
+    const v = B64.indexOf(text[i]);
+    if (v < 0) return [];
+    for (const [pos, m] of [[2 * i, v >> 3], [2 * i + 1, v & 7]]) if (m > 0 && (pos + 1) * HASH <= index.length) out.push([index.slice(pos * HASH, (pos + 1) * HASH), m]);
+  }
+  return out;
+}
+
+/** Compact cloud record of a progress (pure). `report` (optional array) receives what had to be dropped to stay under the limit. */
+export function encodeCloud(progress, report = []) {
   const s = {}, b = {}, p = {};
   for (const [k, v] of Object.entries(progress.stars || {})) {
     const m = cleanMask(v), cut = k.indexOf('/');
@@ -44,11 +153,36 @@ export function encodeCloud(progress) {
   for (const [rid, m] of Object.entries(progress.lawin || {})) if (Number.isInteger(m) && m > 0) w[rid] = m;
   if (Object.keys(d).length) rec.d = d;
   if (Object.keys(w).length) rec.w = w;
-  if (JSON.stringify(rec).length > LIMIT) delete rec.b;            // best times go first (the boards keep them anyway)
-  while (rec.d && JSON.stringify(rec).length > LIMIT) {
+  const size = () => JSON.stringify(rec).length;
+  // round 9: 1. too big -> the stars move to the packed format s2 (lossless; old games read v1 without `s`: no stars shown, nothing lost
+  // server-side because the keep-progress trigger compares `tb`). 2. best times (the boards keep them), 3. discovered cells resort by
+  // resort (largest first, the fog grid is the biggest part), 4. Lawin bits, 5. park points, 6. stars of the least-starred resorts.
+  if (size() > LIMIT) {
+    const s2 = {}, s3 = {};
+    for (const [rid, text] of Object.entries(s)) {
+      const entries = [];
+      for (let i = 0; i + HASH < text.length; i += HASH + 1) entries.push([text.slice(i, i + HASH), Number(text[i + HASH])]);
+      const { text: packed, rest } = indexedStars(rid, entries);
+      if (packed) s3[rid] = packed;
+      if (rest.length) s2[rid] = packStars(rest);
+    }
+    if (Object.keys(s3).length) rec.s3 = s3;
+    if (Object.keys(s2).length) rec.s2 = s2;
+    rec.s = {};
+  }
+  const drop = (what, fn) => { fn(); report.push(what); };
+  if (size() > LIMIT && rec.b) drop('best times', () => { delete rec.b; });
+  while (rec.d && size() > LIMIT) {
     const big = Object.keys(rec.d).sort((a, b) => rec.d[b].length - rec.d[a].length)[0];
-    delete rec.d[big];
+    drop(`discovered map of ${big}`, () => { delete rec.d[big]; });
     if (!Object.keys(rec.d).length) delete rec.d;
+  }
+  if (size() > LIMIT && rec.w) drop('Lawin wins', () => { delete rec.w; });
+  if (size() > LIMIT) drop('park points', () => { rec.p = {}; });
+  const starText = (rid) => ((rec.s3 || {})[rid] || '') + ((rec.s2 || {})[rid] || '');
+  while (size() > LIMIT && new Set([...Object.keys(rec.s3 || {}), ...Object.keys(rec.s2 || {})]).size) {
+    const least = [...new Set([...Object.keys(rec.s3 || {}), ...Object.keys(rec.s2 || {})])].sort((a, b) => starText(a).length - starText(b).length)[0];
+    drop(`stars of ${least}`, () => { if (rec.s3) delete rec.s3[least]; if (rec.s2) delete rec.s2[least]; });
   }
   return rec;
 }
@@ -65,6 +199,18 @@ export function decodeCloud(raw) {
       const m = Number(text[i + HASH]);
       if (Number.isInteger(m) && m > 0 && m < 8) stars[`${rid}/${text.slice(i, i + HASH)}`] = m;
     }
+  }
+  // s3 (indexed, round 9) and s2 (packed): at most 16 resorts each, bounded texts
+  for (const [rid, text] of Object.entries(isRecord(data.s3) ? data.s3 : {}).slice(0, 16)) {
+    if (!/^[a-z0-9]{1,16}$/.test(rid)) continue;
+    for (const [h, m] of unindexStars(rid, text)) stars[`${rid}/${h}`] = m;
+  }
+  // s2 (packed, round 9): at most 16 resorts, each bounded text; a malformed one is skipped
+  for (const [rid, text] of Object.entries(isRecord(data.s2) ? data.s2 : {}).slice(0, 16)) {
+    if (!/^[a-z0-9]{1,16}$/.test(rid)) continue;
+    const entries = unpackStars(text);
+    if (!entries) continue;
+    for (const [h, m] of entries) stars[`${rid}/${h.toString(36).padStart(HASH, '0')}`] = m;
   }
   for (const [rid, pts] of Object.entries(isRecord(data.p) ? data.p : {})) if (Number.isFinite(pts) && pts > 0) park[rid] = Math.round(pts);
   for (const [rid, text] of Object.entries(isRecord(data.b) ? data.b : {})) {
@@ -124,8 +270,10 @@ export function createCloudSave({ win = window, onIncoming }) {
   function send() {
     timer = 0;
     if (!pending || standalone || testMode()) return;
-    const rec = encodeCloud(pending);
+    const dropped = [];
+    const rec = encodeCloud(pending, dropped);
     pending = null;
+    if (dropped.length) console.warn('[ski] cloud save over the limit, not saved:', dropped.join(', '));
     const json = JSON.stringify(rec);
     if (json === lastJson) return;
     if (json.length > LIMIT) { console.warn('[ski] cloud save too large, not sent', json.length); return; }
