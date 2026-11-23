@@ -49,6 +49,33 @@ export const QUALITY = Object.freeze({
 // carries its shape), with village.js / roads.js / forest-far.js / markers.js budgets.
 export const FRAME_BUDGET_MS = Object.freeze({ low: 40, medium: 30, high: 24 });   // the watchdog steps the level down after 3 s above this
 
+/* The other skiers (npc.js, npc-view.js; Ian: "you're not alone in the whole ski area"). Per Grafik level: how many are drawn at most
+ * (skiers on the pistes, standing at the lifts, walking in the villages, riding the carriers), within which radius, how many of the
+ * nearest get the finer figure (and a shadow on Mëttel / Héich). The rest of the numbers shape them (m, s, m/s). */
+export const NPC = Object.freeze({
+  levels: Object.freeze({
+    low: { skiers: 18, queue: 6, walkers: 3, riders: 22, near: 3, radius: 380, queueRadius: 240, walkRadius: 220, riderRadius: 300 },
+    medium: { skiers: 32, queue: 10, walkers: 5, riders: 48, near: 6, radius: 560, queueRadius: 340, walkRadius: 300, riderRadius: 480 },
+    high: { skiers: 48, queue: 14, walkers: 8, riders: 84, near: 10, radius: 760, queueRadius: 460, walkRadius: 380, riderRadius: 680 },
+  }),
+  nearRadius: 70,             // m: the finer figure only this close
+  perMetre: Object.freeze({ green: 1 / 28, blue: 1 / 34, red: 1 / 50, black: 1 / 85 }),      // skiers per m of piste (busy day)
+  maxPerPiste: 90,
+  stopShare: 0.35,            // share of the skiers that stop once on their way down (at the side of the piste)
+  stopSeconds: [5, 16], restSeconds: [15, 70],
+  edgeMargin: 1.2,            // m inside the piste edge
+  bodyR: 0.45, playerR: 0.45, // m: their size and the player's for the bump
+  personal: 1.6,              // m: closer than 2 x this, the one behind moves aside
+  clearPlayer: 3.2,           // m: a skier passes the player at least this far (if the band lets him)
+  avoidRate: 2.4, avoidMax: 6, yieldSlow: 0.6, stepAside: 1.8,
+  queue: Object.freeze({ chair: 7, gondola: 6, cable: 8, drag: 3, rope: 2, train: 6 }),
+  occupancy: Object.freeze({ chair: 0.55, gondola: 0.55, cable: 0.95, drag: 0.5, train: 0.85 }),
+  walkNear: 320, walkPerRoad: 2,
+  selectEvery: 0.3, bandBudget: 64,
+  corridorMargin: 12,         // m beyond a running challenge's piste edge where nobody is drawn
+  fadeNear: 110,              // m: closer than this a skier who appears / goes grows / shrinks (no pop)
+});
+
 /* Skier physics (arcade, not a simulator). See skier.js for how each number is used. */
 export const SKI = Object.freeze({
   dt: 1 / 120,

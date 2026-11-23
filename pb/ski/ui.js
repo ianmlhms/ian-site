@@ -167,7 +167,7 @@ export function createUi(root) {
   };
 
   /* ---------------- pause menu ---------------- */
-  api.showMenu = function showMenu({ env, gfx, outfits = [], outfit = () => '', onOutfit = () => {}, outfitOpen = () => true, sound = null, againLabel = 'Nach eng Kéier', onResume, onAgain, onMap }) {
+  api.showMenu = function showMenu({ env, gfx, outfits = [], outfit = () => '', onOutfit = () => {}, outfitOpen = () => true, sound = null, npcs = null, againLabel = 'Nach eng Kéier', onResume, onAgain, onMap }) {
     const c = el(`<div class="card" id="menuCard" role="dialog" aria-label="Menü">
       <h2>Paus</h2>
       <div class="setrow"><span>Wieder</span><div class="seg" id="mWeather">${['random', ...WEATHER_IDS].map((w) => `<button type="button" data-v="${w}">${WEATHER_LABEL[w]}</button>`).join('')}</div></div>
@@ -175,6 +175,7 @@ export function createUi(root) {
       <div class="setrow"><span>${esc(gfx.LABELS.title)}</span><div class="seg" id="mGfx">${['auto', ...gfx.LEVELS].map((q) => `<button type="button" data-v="${q}">${esc(gfx.LABELS[q])}</button>`).join('')}</div></div>
       ${outfitRow(outfits, 'mOutfit', outfitOpen)}
       ${sound ? '<div class="setrow"><span>Toun</span><div class="seg" id="mSound"><button type="button" data-v="on">Un</button><button type="button" data-v="off">Aus</button></div></div>' : ''}
+      ${npcs ? '<div class="setrow"><span>Aner Skifuerer</span><div class="seg" id="mNpcs"><button type="button" data-v="on">Un</button><button type="button" data-v="off">Aus</button></div></div>' : ''}
       <div class="rows"><span>Steieren</span><span>A D / ◀ ▶</span><span>Hocken</span><span>Leerzeechen</span><span>Bremsen</span><span>S / ▼</span><span>Schreiden</span><span>W / ▲</span><span>Sprangen</span><span>E</span><span>Trick (Park)</span><span>F · W / S = Flip</span><span>Astegen / Iwwersprangen</span><span>L / Enter</span><span>Vue am Lift</span><span>V</span><span>Wieder / Zäit</span><span>G / T</span><span>Toun</span><span>N</span></div>
       <div class="acts"><button type="button" class="btn primary" data-a="resume">Weider</button>${againLabel ? `<button type="button" class="btn" data-a="again">${esc(againLabel)}</button>` : ''}<button type="button" class="btn ghost" data-a="map">Pistekaart</button></div>
     </div>`);
@@ -188,6 +189,8 @@ export function createUi(root) {
     bindOutfit(c.querySelector('#mOutfit'), outfit, onOutfit, setSeg);
     const S = c.querySelector('#mSound');
     if (S) { setSeg(S, sound.muted() ? 'off' : 'on'); S.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { sound.set(b.dataset.v === 'off'); setSeg(S, b.dataset.v); } }); }
+    const P = c.querySelector('#mNpcs');
+    if (P) { setSeg(P, npcs.on() ? 'on' : 'off'); P.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { npcs.set(b.dataset.v === 'on'); setSeg(P, b.dataset.v); } }); }
     const on = { resume: onResume, again: onAgain, map: onMap };
     c.querySelectorAll('[data-a]').forEach((b) => b.addEventListener('click', () => { c.remove(); on[b.dataset.a](); }));
     return { el: c, close() { c.remove(); } };

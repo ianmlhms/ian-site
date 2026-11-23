@@ -1572,3 +1572,47 @@ the canvas centre; a tap on a piste in the free ride tab only asked to teleport 
   snow / touch); speed-check: its rider now brakes for a hairpin (line > 0.9 rad off the skis at > 43 km/h, not in the launch): with
   cheap carving he no longer scrubs enough to make Arlberg's Hoppelweg hairpin and left down the neighbouring piste. `ride-trace.mjs
   <resort> <piste> [tuck]` shows where a ride loses time. main.js?v=20.
+
+## After launch: the other skiers, "Aner Skifuerer" (23 Nov 2026; Ian: "you're not alone in the whole ski area")
+- **npc.js** (pure; the Node check runs the same code): a population per piste (`NPC.perMetre` by colour x the day's share
+  `dayShare(hour)`, or morning 0.7 / midday 1 / evening 0.4 for a fixed time), each skier deterministic from (seed = strHash(rid),
+  piste id, i): skill (beginner in the plough on the greens, skidded turns, carvers, a few tucking), base speed, lane, turn width /
+  length, a stop at the side of the piste (35 %, 5-16 s, turned across the fall line), a rest after the bottom (15-70 s, not drawn).
+  Where he is at time t is ANALYTIC: a speed profile per piste (20 m samples, slower on flats, faster on steeps) and its inverse, so
+  the candidates cost a lookup. Every 0.3 s the nearest (in front of the camera first) up to the level's cap are listed; listed ones
+  get a little state: `av` (giving way sideways, eased), `lag` (slowed when the player blocks), the side of a house they pass on.
+  **Clear bands**: across every piste every 3 m (built on demand, <= 64 a frame) the stretches clear of trees, station parts, pylons,
+  houses (the drawn ones), the Kandahar race nets and every station footprint (decks, gates, belts, zones), each point tested with the
+  body + half a step; a listed skier's own spot is tested too where a band is not clear all the way. **Queues**: 2-8 per bottom station
+  (by kind) behind / beside the boarding zone (never in it, the gate, the belt or the carriers' lane), standing, stepping aside when
+  the player comes. **Walkers**: on the village streets near places (skis on the shoulder), only on lanes clear of houses at every metre.
+  **Riders**: `riders(lift, carrier id)` deterministic per carrier (chairs 0.55 occupied, 1..seats seated; cabins 1-4 / funitels -7 /
+  cable cars 4-12 / trains 3-9 standing; drag lifts 1); lifts.js reports every carrier on its way up with `carrierId(u, A, gap)`
+  (its lattice slot: constant from the bottom to the top, also while the player's own carrier leads: `heldShift`); the player's carrier
+  never has others in it. **Never**: two closer than their bodies (pairs pushed apart), inside the player (they step out; `collide()`
+  bumps the player out of them: a soft bump, most of the speed into them taken out, never a crash, no toast), in a running challenge's
+  corridor (`corridorOf`: line + half width + 12 m; that piste's own population off; checked after giving way), in the park mode or an
+  online race (on in the online free ride). Menu: "Aner Skifuerer: Un / Aus" (`pb_ski_npcs`, default on; `?npcs=0|1`).
+- **npc-view.js**: NOT skinned meshes: two InstancedMeshes (near = skier-model.js at the new `detail: 'mid'`, 1828 triangles; crowd =
+  `detail: 'low'`, 437 triangles); 11 poses (ski, carve L / R, tuck, plough, stand, sit, cabin, two walking steps, drag) baked from
+  skier-model.js pose() into a float texture, the vertex shader blends two per instance (aPose) and paints the outfit's colours (OUTFITS)
+  into the slots (uniform palette). 2 draw calls whatever the crowd (+ the shadow pass: near on Mëttel / Héich, crowd on Héich). Grow in /
+  shrink out (0.25 s) within 110 m, never inside a challenge's corridor. Caps per level `config.js NPC.levels` (Niddreg 18 skiers + 6
+  queue + 3 walkers + 22 riders within 380 m, 3 near; Mëttel 32 / 10 / 5 / 48; Héich 48 / 14 / 8 / 84).
+- skier-model.js `detail` ('full' default: unchanged); lifts.js `setRiderSink`, carrier ids; main.js `npcFrame`, `crowd.collide` in the
+  step loop; ui.js menu row. main.js?v=21.
+- Checks: `node scripts/ski/npc-check.mjs [rid] [--level]` (every resort, 10 spots x 20 s with a player skiing: on the piste, never in
+  a house / station / pylon / tree / net / zone / footprint, no overlap, nobody inside the player, carrier ids round the loop, riders
+  seated / deterministic, seed determinism, a challenge's corridor empty, ms per frame); flow `ski-npc` (Niddreg Killy spawn: counts,
+  calls on / off <= 160 / +3, triangles <= 450k, CPU x4 update + draw <= 1 ms, the menu switch remembered, nobody in a running
+  challenge's corridor). Shots: `scripts/ski/npc-shots.mjs OUT --resorts a,b --q low|medium --dpr 2` (village, piste, station, chair).
+- **Numbers** (GPU shots, Chromium 1180 x 820, `npc-shots.mjs`, off -> on at the same spot): Niddreg 3V Courchevel village 126 -> 128
+  calls, 380k -> 401k triangles; Zermatt village 124 -> 126 / 320k -> 330k; Arlberg 130 -> 132 / 343k -> 356k; Killy spawn (flow)
+  133 -> 135 / 370k -> 388k; stations / chair rides +2 calls, +5-20k. Mëttel: Killy village 146 -> 148 / 430k -> 453k, 3V Courchevel
+  158 -> 160 / 544k -> 582k (Mëttel has no 450k budget; its +1-3 calls). CPU x4 (flow ski-npc, Niddreg): update + draw 0.74 ms a frame
+  mean (p90 1.2 ms); Node unthrottled Héich 0.23-0.33 ms. Shots: ~/Library/Caches/ski-work/npc/{v1,v2-low,v3}/.
+- ski-mp-freeride fails "emma's states reach the host at 7-8 / s (>= 9)" on the Mini today WITH THE OTHER SKIERS OFF too (pb_ski_npcs=0
+  in all three pages): a load / timing matter of that flow, not this change. ski-mp passed on a re-run (relay pairing flake).
+- memory-check (Niddreg, all resorts, tour 18, 10 switches, 3 pages): switch growth green (+45 / +21 / -27 / -4 / +31 MB), 3 pages
+  2129 MB <= 2200; "after load" renderer 3V 482 / Arlberg 462 MB > 450 FAIL — the same with the other skiers OFF (3V 473-481, Arlberg
+  448-465 in two runs): the baseline on today's main, not this change (the figures + pose textures are < 2 MB).

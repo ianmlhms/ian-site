@@ -15,6 +15,7 @@ import { createLiftWorld, frames } from './lift-site.js';
 import { carrierGeometry, GLASS } from './modes/carriers.js';
 import { mergeParts } from './modes/views.js';
 import { gpuOnly } from './gpu-mem.js';
+import { carrierId } from './npc.js';
 
 const FINE = Object.freeze({ size: 2.1, cell: 1250, share: 0.25, max: 700 });     // R8d: small station parts within share x liftRadius (<= max m)
 const TRACK_R = 900;                   // R8d: m to a drag track cell's box within which its worn tracks are drawn (a 1.25 m strip)
@@ -392,7 +393,10 @@ export function createLifts({ scene, resort, height }) {
   const w0 = {};
   let lastT = 0;
   const SWING = { chair: 0.03, gondola: 0.022, cable: 0.006, drag: 0.05, train: 0 };
-  function put(pool, l, w, k, t, camX, camZ) {
+  // the other skiers (npc-view.js): every carrier on its way up is reported with its id (npc.js carrierId: the same chair keeps its
+  // riders from the bottom to the top) and its matrix; the player's own carrier never (he rides it alone)
+  let riderSink = null;
+  function put(pool, l, w, k, t, camX, camZ, id = null) {
     const dc = Math.hypot(w.x - camX, w.z - camZ);
     if (dc > FAR_R[l.kind]) return;
     const far = pool.far && dc > NEAR_R;
@@ -402,6 +406,7 @@ export function createLifts({ scene, resort, height }) {
     m4.compose(v3.set(w.x, w.y, w.z), q4, s3);
     if (far) { if (pool.nf < pool.cap) pool.far.setMatrixAt(pool.nf++, m4); }
     else if (pool.n < pool.cap) { pool.near.setMatrixAt(pool.n, m4); if (pool.glass) pool.glass.setMatrixAt(pool.n, m4); pool.n++; }
+    if (riderSink && id !== null && !w.turn && (w.up || l.shuttle)) riderSink(l, m4, id, dc, w);
   }
   /** Where a jig-back pair is at time t (s along the line of the cabin on the up track; the other is at len - s). */
   function shuttleS(l, t) {
@@ -534,20 +539,21 @@ export function createLifts({ scene, resort, height }) {
       if (!pool) continue;
       if (l.shuttle) {
         const [d0, d1] = l.docks;
-        if (l.rideU !== null) put(pool, l, l.shuttleAt(d1 - Math.min(d1 - d0, l.rideU), -1, false, w0), 1, t, camX, camZ);
+        if (l.rideU !== null) put(pool, l, l.shuttleAt(d1 - Math.min(d1 - d0, l.rideU), -1, false, w0), 1, t, camX, camZ, 1);
         else {
           const a = shuttleS(l, t);
-          put(pool, l, l.shuttleAt(a.s, 1, a.up, w0), 0, t, camX, camZ);
-          put(pool, l, l.shuttleAt(d0 + d1 - a.s, -1, !a.up, w0), 1, t, camX, camZ);
+          put(pool, l, l.shuttleAt(a.s, 1, a.up, w0), 0, t, camX, camZ, 0);
+          put(pool, l, l.shuttleAt(d0 + d1 - a.s, -1, !a.up, w0), 1, t, camX, camZ, 1);
         }
         continue;
       }
       const gap = l.spec.gap;
       const phase = l.rideU !== null ? ((l.rideU % gap) + gap) % gap : (((t * l.spec.speed + l.offset) % gap) + gap) % gap;
+      const A = l.rideU !== null ? l.rideU + (l.heldShift || 0) : t * l.spec.speed + l.offset;          // (npc.js carrierId)
       let k = 0;
       for (let u = phase; u < l.loopLen - 1e-6; u += gap, k++) {
         if (l.rideU !== null && Math.abs(u - (((l.rideU % l.loopLen) + l.loopLen) % l.loopLen)) < 1e-3) continue;        // the player's own
-        put(pool, l, l.loopAt(u, w0), k, t, camX, camZ);
+        put(pool, l, l.loopAt(u, w0), k, t, camX, camZ, carrierId(u, A, gap));
       }
     }
     for (const p of pools.values()) {
@@ -566,10 +572,14 @@ export function createLifts({ scene, resort, height }) {
           const T = (l.docks[1] - l.docks[0]) / (l.spec.speed * SHUTTLE_FACTOR);
           const top = l.rideU > (l.docks[1] - l.docks[0]) / 2;
           l.offset = (top ? DWELL + T + 0.5 : 0.5) - lastT;
-        } else { const gap = l.spec.gap; l.offset = (((l.rideU - lastT * l.spec.speed) % gap) + gap) % gap; }
-      }
+        } else { l.offset = l.rideU + (l.heldShift || 0) - lastT * l.spec.speed; }        // (the same as before modulo the gap; keeps the
+      }                                                                                    // carriers' ids for the riders, npc.js)
       l.rideU = null;
-    } else l.rideU = u;
+    } else {
+      // the first held step: the lattice shift that keeps every carrier's id (npc.js carrierId) while the player's carrier leads
+      if (l.rideU === null && !l.shuttle && l.spec.gap > 0) { const gap = l.spec.gap; l.heldShift = gap * Math.round((lastT * l.spec.speed + l.offset - u) / gap); }
+      l.rideU = u;
+    }
   }
   /** R8e: the time into a jig-back pair's cycle (0 .. DWELL: the up-track cabin docked at the bottom) and the cycle length. */
   function shuttlePhase(l, t) {
@@ -620,6 +630,8 @@ export function createLifts({ scene, resort, height }) {
   }
   return {
     group, update, nearest, setRide, setGate, nextCarrier, shuttleBoard, holdShuttle, dockShuttle, dispose, count: lifts.length,
+    /** The other skiers: sink(l, matrix, carrier id, distance to the camera, loop point) for each carrier on its way up (null = off). */
+    setRiderSink(fn) { riderSink = fn || null; },
     pathOf: (index) => (byIndex.get(index) ? byIndex.get(index).path : null),
     siteOf: (index) => (byIndex.get(index) ? byIndex.get(index).site : null),
     /** The loop parameter of the carrier held for the player on lift `index` (null: none). */

@@ -40,7 +40,10 @@ export function writeOutfit(id) {
   try { localStorage.setItem(OUTFIT_KEY, id); } catch (error) { console.warn('[ski] could not store the outfit', error); }
 }
 
-export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false, skinned = false } = {}) {
+/* detail (other skiers, npc-view.js): 'full' = the player's figure; 'mid' = fewer segments, no ski art / buckles (~1.1k triangles);
+ * 'low' = the crowd figure (~0.4k triangles: prisms for the limbs, the small parts left out). The bones and pose() are the same. */
+export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false, skinned = false, detail = 'full' } = {}) {
+  const LOW = detail === 'low', MID = detail === 'mid', FULL = !LOW && !MID;
   let skiLookOf = null;                      // round 6: set once setSki exists (the outfit no longer picks the ski colour then)
   const mat = (color) => (ghost
     ? new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.38, depthWrite: false })
@@ -53,8 +56,10 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false, skinne
   };
   const ART = { stripe: 'artStripe', chevron: 'artChevron', race: 'artRace', dots: 'artDots', zigzag: 'artZigzag' };
   const box = (w, h, d, m) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
-  const cap = (r, len, m) => new THREE.Mesh(new THREE.CapsuleGeometry(r, len, 4, 10), m);
-  const cyl = (r0, r1, h, m, seg = 10) => new THREE.Mesh(new THREE.CylinderGeometry(r0, r1, h, seg), m);
+  const cap = (r, len, m) => new THREE.Mesh(LOW ? new THREE.CylinderGeometry(r, r, len + r * 1.4, 5) : new THREE.CapsuleGeometry(r, len, MID ? 2 : 4, MID ? 6 : 10), m);
+  const cyl = (r0, r1, h, m, seg = 10) => new THREE.Mesh(new THREE.CylinderGeometry(r0, r1, h, LOW ? Math.min(seg, 4) : MID ? Math.min(seg, 8) : seg), m);
+  const sph = (r, w, h, ...rest) => new THREE.SphereGeometry(r, LOW ? 5 : MID ? Math.max(6, Math.round(w * 0.6)) : w, LOW ? 3 : MID ? Math.max(4, Math.round(h * 0.6)) : h, ...rest);
+  const only = (ok, ...meshes) => (ok ? meshes : []);              // parts a coarser detail leaves out
   const root = new THREE.Group();            // feet position, heading (+x forward, +z right, +y up)
   const tilt = new THREE.Group();            // slope pitch
   const lean = new THREE.Group();            // roll into the turn (whole body)
@@ -71,9 +76,9 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false, skinne
     const tail = box(0.1, 0.03, 0.08, M.ski); tail.position.set(-0.82, 0.03, 0); tail.rotation.z = -0.25;
     const bind = box(0.36, 0.05, 0.075, M.dark); bind.position.set(0.0, 0.045, 0);
     tip1.material = M.skiTip; tip2.material = M.skiTip;
-    edge.add(body, tip1, tip2, tail, bind);
+    edge.add(body, tip1, ...only(!LOW, tip2, tail, bind));
     // top-sheet patterns (round 6), a hair above the ski: only the ski type's own pattern is coloured, the rest blend into the base
-    const art = (w, d, m, x, z = 0, yaw = 0) => { const a = box(w, 0.004, d, m); a.position.set(x, 0.032, z); a.rotation.y = yaw; edge.add(a); };
+    const art = (w, d, m, x, z = 0, yaw = 0) => { if (!FULL) return; const a = box(w, 0.004, d, m); a.position.set(x, 0.032, z); a.rotation.y = yaw; edge.add(a); };
     art(1.05, 0.022, M.artStripe, -0.05);
     for (const x of [0.5, 0.3, -0.45, -0.65]) { art(0.11, 0.02, M.artChevron, x, 0.018, 0.7); art(0.11, 0.02, M.artChevron, x, -0.018, -0.7); }
     art(1.3, 0.012, M.artRace, 0.02, 0.03); art(1.3, 0.012, M.artRace, 0.02, -0.03); art(0.16, 0.06, M.artRace, 0.55);
@@ -83,7 +88,8 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false, skinne
     const twin = new THREE.Group();
     const tw1 = box(0.16, 0.03, 0.09, M.skiTip); tw1.position.set(-0.88, 0.04, 0); tw1.rotation.z = -0.35;
     const tw2 = box(0.1, 0.03, 0.08, M.skiTip); tw2.position.set(-0.97, 0.09, 0); tw2.rotation.z = -0.75;
-    twin.add(tw1, tw2); twin.visible = false;
+    if (FULL) twin.add(tw1, tw2);
+    twin.visible = false;
     edge.add(twin);
     g.add(edge);
     g.position.z = side * 0.13;
@@ -95,20 +101,20 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false, skinne
     const hip = new THREE.Group();
     const thigh = cap(0.088, THIGH - 0.1, M.trousers); thigh.position.y = -THIGH / 2;
     const knee = new THREE.Group(); knee.position.y = -THIGH;
-    const kneePad = new THREE.Mesh(new THREE.SphereGeometry(0.085, 8, 6), M.trousers);
+    const kneePad = new THREE.Mesh(sph(0.085, 8, 6), M.trousers);
     const shin = cap(0.078, SHIN - 0.14, M.trousers); shin.position.y = -SHIN / 2;
     const ankle = new THREE.Group(); ankle.position.y = -SHIN;
     const boot = box(0.29, 0.12, 0.115, M.boot); boot.position.set(0.04, -0.05, 0);
     const cuff = box(0.15, 0.18, 0.12, M.boot); cuff.position.set(-0.01, 0.06, 0);
     const b1 = box(0.018, 0.025, 0.124, M.buckle); b1.position.set(0.06, 0.0, 0);
     const b2 = box(0.018, 0.025, 0.124, M.buckle); b2.position.set(0.0, 0.1, 0);
-    ankle.add(boot, cuff, b1, b2);
-    knee.add(kneePad, shin, ankle); hip.add(thigh, knee);
+    ankle.add(boot, ...only(!LOW, cuff), ...only(FULL, b1, b2));
+    knee.add(...only(!LOW, kneePad), shin, ankle); hip.add(thigh, knee);
     lean.add(hip); legs.push({ hip, knee, ankle, side });
   }
   // ---- torso: pelvis, jacket (wider at the shoulders), stripe, zip, collar, helmet + goggles
   const torso = new THREE.Group();
-  const pelvis = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), M.trousers); pelvis.position.y = 0.04; pelvis.scale.set(0.15, 0.12, 0.18);
+  const pelvis = new THREE.Mesh(sph(1, 12, 8), M.trousers); pelvis.position.y = 0.04; pelvis.scale.set(0.15, 0.12, 0.18);
   const chest = cap(0.18, 0.3, M.jacket); chest.position.y = 0.32; chest.scale.set(0.82, 1, 1.18);
   const shoulders = box(0.22, 0.14, 0.5, M.jacket); shoulders.position.y = 0.5;
   const stripe = box(0.31, 0.05, 0.43, M.trousers); stripe.position.y = 0.36;
@@ -116,13 +122,13 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false, skinne
   const hem = box(0.3, 0.06, 0.4, M.jacket); hem.position.y = 0.1;
   const collar = cyl(0.11, 0.13, 0.1, M.accent); collar.position.y = 0.6;
   const neck = new THREE.Group(); neck.position.y = 0.62;
-  const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.155, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.62), M.helmet); helmet.position.y = 0.13;
+  const helmet = new THREE.Mesh(sph(0.155, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.62), M.helmet); helmet.position.y = 0.13;
   const shell = cyl(0.152, 0.15, 0.08, M.helmet, 14); shell.position.y = 0.1;
-  const face = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), M.skin); face.position.set(0.03, 0.06, 0);
+  const face = new THREE.Mesh(sph(0.12, 10, 8), M.skin); face.position.set(0.03, 0.06, 0);
   const strap = box(0.16, 0.045, 0.31, M.dark); strap.position.set(0.0, 0.13, 0);
   const lens = box(0.05, 0.075, 0.24, M.lens); lens.position.set(0.13, 0.13, 0);
-  neck.add(face, shell, helmet, strap, lens);
-  torso.add(pelvis, chest, shoulders, yoke, stripe, hem, collar, neck);
+  neck.add(face, ...only(!LOW, shell), helmet, ...only(!LOW, strap), lens);
+  torso.add(pelvis, chest, shoulders, yoke, stripe, ...only(!LOW, hem, collar), neck);
   // ---- arms: shoulder -> upper arm -> elbow -> forearm, glove, pole (grip, shaft, basket)
   const arms = [], poles = [];
   for (const side of [-1, 1]) {
@@ -131,14 +137,14 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false, skinne
     const elbow = new THREE.Group(); elbow.position.y = -0.3;
     const fore = cap(0.056, 0.17, M.jacket); fore.position.y = -0.13;
     const cuffA = cyl(0.064, 0.064, 0.05, M.accent); cuffA.position.y = -0.24;
-    const glove = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), M.accent); glove.position.y = -0.3; glove.scale.set(1, 1.15, 0.9);
+    const glove = new THREE.Mesh(sph(0.07, 8, 6), M.accent); glove.position.y = -0.3; glove.scale.set(1, 1.15, 0.9);
     const pole = new THREE.Group(); pole.position.y = -0.3;
     const grip = cyl(0.026, 0.026, 0.14, M.grip, 6);
     const shaft = cyl(0.011, 0.009, 1.12, M.pole, 5); shaft.position.y = -0.62;
     const basket = cyl(0.05, 0.05, 0.012, M.dark, 8); basket.position.y = -1.1;
-    pole.add(grip, shaft, basket);
+    pole.add(...only(!LOW, grip), shaft, ...only(!LOW, basket));
     poles.push(pole);
-    elbow.add(fore, cuffA, glove, pole); sh.add(upper, elbow);
+    elbow.add(fore, ...only(!LOW, cuffA), glove, pole); sh.add(upper, elbow);
     torso.add(sh); arms.push({ sh, elbow, pole, side });
   }
   lean.add(torso);

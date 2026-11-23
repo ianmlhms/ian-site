@@ -60,6 +60,9 @@ import { createCourse, createCourseView, createCourseHud, courseLayout, showCour
 import { createFirstPerson, readCamMode, writeCamMode } from './firstperson.js';
 import { createSnowSpray } from './spray.js';
 import { createAvalanches } from './avalanche.js';
+// the other skiers (Ian: "you're not alone in the whole ski area"): npc.js simulates, npc-view.js draws (2 instanced meshes)
+import { createCrowd, dayShare, corridorOf, strHash } from './npc.js';
+import { createNpcView } from './npc-view.js';
 
 const THREE = window.THREE;
 const LOAD = window.__skiLoad || { set() {}, done() {}, fail() {} };
@@ -82,6 +85,13 @@ function takeOpenMapFlag() {
     return v === '1' || v === 'free' ? v : null;
   } catch (error) { return null; }
 }
+/** "Aner Skifuerer" (the other skiers): on unless switched off in the menu (?npcs=0 / 1 for tests). */
+const NPC_KEY = 'pb_ski_npcs';
+function readNpcPref(param) {
+  if (param === '0' || param === '1') return param === '1';
+  try { return localStorage.getItem(NPC_KEY) !== '0'; } catch (error) { return true; }
+}
+function writeNpcPref(on) { try { localStorage.setItem(NPC_KEY, on ? '1' : '0'); } catch (error) { console.warn('[ski] could not store the other-skiers setting', error); } }
 const GFX = () => window.ArcadeGfx || { level: () => 'medium', choice: () => 'auto', set() {}, onChange() {}, LEVELS: ['low', 'medium', 'high'], LABELS: { auto: 'Automatesch', low: 'Niddreg', medium: 'Mëttel', high: 'Héich', title: 'Grafik' }, pixelRatio: () => 1 };
 
 async function boot() {
@@ -293,6 +303,7 @@ async function boot() {
   let spray = createSnowSpray({ scene, env, level, height: (x, z) => surface.height(x, z) });          // R7-C: spray.js
   let signs = null;                                                          // R7-D
   let lifts = null, village = null, landmarks = null, roads = null, roadRows = null, extrasBuilt = false, liftsEarly = false, markers = null;
+  let crowd = null, npcView = null, npcOn = readNpcPref(param('npcs')), npcCorridor = null, npcCorridorOf = null;
   /** Round 6: the lift view (lifts.js). Built once every tile is in; a ride before that builds it early on the heights there are, and it
    *  is built again (between rides) once all tiles are in. */
   function buildLifts() {
@@ -300,6 +311,7 @@ async function boot() {
     if (lifts && ride) { liftsEarly = true; return lifts; }                 // riding: rebuilt when the ride ends
     if (lifts) lifts.dispose();
     lifts = createLifts({ scene, resort, height: (x, z) => field.height(x, z) });
+    if (npcView) lifts.setRiderSink(npcView.addCarrier);                 // the other skiers ride the carriers
     uploadNow(renderer, lifts.group, camera);                            // R8f: the merged stations / pylons on the GPU, JS copies gone
     if (game.freeLift && modes.liftAt === game.freeLift && game.phase !== 'lift') lifts.dockShuttle(game.freeLift.index);      // R8e: the spawn
     liftsEarly = !streamer.done();
@@ -364,6 +376,7 @@ async function boot() {
     try { drawn = seatRows(drawn, (x, z) => field.baseHeight(x, z)); } catch (error) { console.warn('[ski] seating the big houses failed', error); }   // R8d: big blocks not half buried
     // the houses that are drawn (R7-B leaves out the ones in stations / lift paths): camera guard + skier collision (R8)
     try { boxIndex = createBoxIndex(buildingBoxes(drawn)); } catch (error) { console.warn('[ski] building index failed', error); }
+    if (crowd) { crowd.setBlocked(npcBlocked); crowd.setRoads(roadRows); }        // the other skiers keep out of the houses, walk the streets
     village = createVillage({ scene, rows: drawn, env, height: (x, z) => field.baseHeight(x, z), level, resort: rid, upload: (o) => uploadNow(renderer, o, camera) }); mark('village');      // R8c: Alpine villages; R8f: built per cell near the camera, straight to the GPU
     // R7-C: gates / teleport spots clear of the drawn houses (B's stations replace the dropped OSM station buildings)
     if (explore) { explore.setBuildings(drawn); gateS.clear(); finishS.clear(); if (markers) markers.regate(gateAt); }
@@ -1069,6 +1082,7 @@ async function boot() {
     input.setEnabled(false);
     menuCard = ui.showMenu({
       env, gfx: GFX(), outfits: OUTFITS, outfit: () => outfit, onOutfit: setOutfit, outfitOpen, sound: { muted: () => audio.isMuted(), set: (m) => audio.setMuted(m) },
+      npcs: { on: () => npcOn, set: (on) => setNpcs(on) },
       againLabel: game.mode === MODES.freeride ? '' : game.mode === MODES.park ? 'Park nach eng Kéier' : 'Nach eng Kéier',
       onResume: () => { menuCard = null; game.paused = false; input.setEnabled(game.phase === 'running' || game.phase === 'countdown'); },
       onAgain: () => { menuCard = null; game.paused = false; again(); },
@@ -1112,6 +1126,8 @@ async function boot() {
     if (village) village.setLevel(level);
     if (roads && roads.setLevel) roads.setLevel(level);                 // R8d: the fine streets radius per level (was always medium)
     skier.setBlob(level === 'low');
+    if (npcView) npcView.setLevel(level);
+    if (crowd) crowd.setBlocked(npcBlocked);                             // (the trees of this level)
     poles.reset();
     spray.dispose(); spray = createSnowSpray({ scene, env, level, height: (x, z) => surface.height(x, z) });     // R7-C: the spray budget
     mark(`quality ${level}`);
@@ -1230,6 +1246,7 @@ async function boot() {
     const dt = frameSeconds(rawDt);
     time += dt;
     const s = game.state;
+    npcLive = npcActive();
     if (mp) mp.frame(now);
     if (game.screen === 'ski' && !game.paused && s) {
       if (game.phase === 'countdown') {
@@ -1258,6 +1275,7 @@ async function boot() {
           const prevState = game.state;
           game.state = held ? prevState : modes.step(prevState, inp, game.mode);                // round 4A: rails / park tricks, else stepSkier
           if (course && game.phase === 'running') game.state = course.collide(prevState, game.state);     // R7-C2: the barriers hold him (soft)
+          if (npcLive && game.phase === 'running') game.state = crowd.collide(prevState, game.state);      // the other skiers: a bump, never a fall
           if (wasAir && game.state.grounded && game.state.crash === 0) audio.event('land', { impact: Math.min(1, Math.abs(vyAir) / 8) });
           if (!wasCrash && game.state.crash > 0) audio.event('crash');
           if (!wasCrash && game.state.crash > 0) hud.toast(game.state.crashKind === 'tree' ? 'Aua, e Bam!' : game.state.crashKind === 'rock' ? 'Aua, e Steen!' : 'Gefall!');
@@ -1338,6 +1356,7 @@ async function boot() {
       if (roads) roads.update(camera.position.x, camera.position.z, Math.min(quality.buildingRadius, level === 'low' ? 1000 : 2400));      // round 7 (A): streets near only (R8d: Niddreg 1300 -> 1000)
       modes.update(camera.position.x, camera.position.z, quality.buildingRadius);
     }
+    npcFrame(dt, st);
     env.update(dt, time, camera);
     snowfall.update(time, camera, pixelRatio());
     if (game.screen === 'ski') {
@@ -1435,6 +1454,50 @@ async function boot() {
     return 0.25 + 0.75 * (1 - shade);
   }
 
+  /* ---------------- the other skiers ---------------- */
+  let npcLive = false;
+  /** Where the other skiers must not be: trees, station parts and pylons (any height), the drawn houses. */
+  function npcBlocked(x, z, r) {
+    return !!(scatter.hit(x, z, r, -1e9, quality.treeDensity) || modes.lifts.world.hit(x, z, r) || (boxIndex && boxIndex.hit(x, z, r)));
+  }
+  /** On in the free ride, the lift rides, a challenge outside its corridor, the online free ride; never in an online race or the park. */
+  function npcActive() {
+    return !!(npcOn && crowd && game.screen === 'ski' && game.state && !isRace() && game.mode !== MODES.park);
+  }
+  function npcShare() {
+    if (env.state.timeMode && env.state.timeMode !== 'random') return env.state.timeId === 'evening' ? 0.4 : env.state.timeId === 'morning' ? 0.7 : 1;
+    return modes.clock ? dayShare(modes.clock.hour) : 1;
+  }
+  function npcFrame(dt, st) {
+    if (!npcLive) { if (npcView && npcView.enabled) { npcView.setEnabled(false); if (crowd) crowd.reset(); } return; }
+    if (!npcView) {
+      try { npcView = createNpcView({ scene, height: (x, z) => surface.height(x, z), level }); } catch (error) { console.warn('[ski] other skiers: view failed', error); npcOn = false; return; }
+      if (lifts) lifts.setRiderSink(npcView.addCarrier);
+      return;                                                             // (the carriers are reported from the next lifts.update)
+    }
+    if (!npcView.enabled) npcView.setEnabled(true);
+    // a running challenge: nobody in its corridor (and nobody skiing its piste)
+    if (course && game.piste) { if (npcCorridorOf !== course) { npcCorridorOf = course; npcCorridor = corridorOf(game.piste, course.startS, course.finishS); } }
+    else { npcCorridorOf = null; npcCorridor = null; }
+    const riding = !!(ride && game.phase === 'lift');
+    const share = npcShare();
+    const list = crowd.update(time, dt, {
+      x: camera.position.x, z: camera.position.z, fx: Math.cos(camYaw), fz: Math.sin(camYaw), level, share,
+      player: st && !riding && !st.ride ? st : null,
+      hidden: npcCorridor, skipPiste: npcCorridor ? game.piste : null,
+    });
+    npcView.draw(list, camera, crowd, { level, share, dt, fadeIn: !game.camPose, hidden: npcCorridor });
+  }
+  function setNpcs(on) {
+    npcOn = !!on;
+    writeNpcPref(npcOn);
+    document.documentElement.dataset.skiNpcs = npcOn ? '1' : '0';
+  }
+  crowd = createCrowd({ resort, pistes, liftNet: modes.lifts, height: (x, z) => surface.height(x, z), standY: standHeight, seed: strHash(rid) });
+  crowd.setBlocked(npcBlocked);
+  if (roadRows) crowd.setRoads(roadRows);
+  document.documentElement.dataset.skiNpcs = npcOn ? '1' : '0';
+
   // debug / flows
   window.__ski = {
     get game() { return game; }, get state() { return game.state; }, get level() { return level; }, renderer, scene, camera, env, pistes, get landmarks() { return landmarks; }, streamer, terrain, scatterView, field, surface,
@@ -1466,6 +1529,7 @@ async function boot() {
     get village() { return village; },                                      // R8f: buildNear(x, z, r) for checks after a jump
     get skierClear() { return skier.skiClearance; }, skier, standHeight, deckAt, get roadRows() { return roadRows; }, get boxIndex() { return boxIndex; }, look, camGuard, camBlocked,
     // R7-C
+    npcs: { get crowd() { return crowd; }, get view() { return npcView; }, get on() { return npcOn; }, set: setNpcs, get live() { return npcLive; } },
     get explore() { return explore; }, get avalanches() { return avalanches; }, get course() { return course; }, get lastCourse() { return lastCourse; }, get spray() { return spray; },
     get camMode() { return camMode; }, setCamMode, fp, gateOf, gateAt, startLawin, teleportTo: (spot) => goFree(null, spot), firstLift: () => goFree(spawn), get pisteMap() { return pisteMap; },
   };
