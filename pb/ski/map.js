@@ -27,7 +27,8 @@ const DECOR_M = [0.085, 0.13];     // px per metre: the crisp trees fade in
 const LAYER_PAD = 0.16, SETTLE_MS = 130;      // the painted layer reaches this much beyond the view; ms without movement = settled
 const NEAR_VILLAGE_M = 1500;        // villages this near a piste are printed at every zoom
 const HIDDEN_M = 90;               // a tap whose ground lies farther than this from the piste printed there: the piste is behind a ridge
-const EDGE_PX = 70;                // opened on the skier: at most this much beside the sheet
+const EDGE_PX = 30;                // opened on the skier: at most this much beside the sheet
+const MARGIN_PX = 24;              // dragged to the edge: at most this much beside the sheet
 const FOOT_PX = 46;                // the whole map keeps this much free at the bottom (the legend's line)
 const VIEW_KEY = 'pb_ski_mapview';
 const MINOR_NAME = /^Verbindung|\(Variante|^Raccordo|^Liaison|^Verbindungs/i;
@@ -231,10 +232,14 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
   /** The ground at a screen point [x, z]; null in the sky or beside the sheet. */
   const screenToWorld = (px, py, sz) => { const [X, Y] = toSheet(px, py, sz); return sheet.pano && !sheet.pano.inside(X, Y) ? null : sheet.from(X, Y); };
   const maxScale = () => Math.max(fitScale * 6, (size().w || 800) / (MIN_SPAN_M[sheet.id] * sheet.k));
-  const openScale = () => Math.max(fitScale * 1.2, (size().w || 800) / (OPEN_SPAN_M[sheet.id] * sheet.k));
+  // (Ian, 23 Nov: opened on the skier at the sheet's edge, grey showed under the panorama -> the sheet covers the box from top to bottom)
+  const openScale = () => { const { w, h } = size(); return Math.max(fitScale * 1.2, (w || 800) / (OPEN_SPAN_M[sheet.id] * sheet.k), sheet.id === 'relief' ? Math.max(0, (h || 0) - FOOT_PX) / sheet.h : 0); };
+  /** The view stays on the sheet: it may show at most MARGIN_PX beside it (the bottom FOOT_PX more, for the legend's line). */
   function clampView(v = view) {
     v.s = clamp(v.s, fitScale * 0.9, maxScale());
-    v.x = clamp(v.x, 0, sheet.w); v.z = clamp(v.z, 0, sheet.h);
+    const { w, h } = size(), hx = (w || 800) / 2 / v.s, hy = (h || 600) / 2 / v.s, mx = MARGIN_PX / v.s, my = (MARGIN_PX + FOOT_PX) / v.s;
+    v.x = sheet.w > 2 * (hx - mx) ? clamp(v.x, hx - mx, sheet.w - hx + mx) : sheet.w / 2;
+    v.z = sheet.h > 2 * hy - mx - my ? clamp(v.z, hy - mx, sheet.h - hy + my) : sheet.h / 2 + FOOT_PX / 2 / v.s;
     return v;
   }
 
