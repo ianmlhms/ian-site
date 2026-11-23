@@ -2,7 +2,7 @@
 # Round 5 look sheets: the same views of every resort at Niddreg and Héich, on the Mac's GPU at DPR 2 (an iPad's 2160 x 1620).
 #   scripts/ski/look-shots.sh OUT_DIR [ROOT] [resorts] [levels]      ROOT = another copy of the site (the "before" snapshot)
 # One browser per resort + level, each through the ski browser pool. Sheets: scripts/ski/look_sheet.py.
-OUT="$1"; ROOT="$2"; RESORTS="${3:-killy 3vallees zermatt arlberg kronplatz}"; LEVELS="${4:-low high}"
+OUT="$1"; ROOT="$2"; RESORTS="${3:-killy 3vallees zermatt arlberg kronplatz vialattea}"; LEVELS="${4:-low high}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 mkdir -p "$OUT"
 pose() {

@@ -11,6 +11,7 @@ export const RESORTS = Object.freeze([
   { id: 'zermatt', name: 'Zermatt · Cervinia', short: 'Matterhorn', country: 'CH', ready: true },
   { id: 'arlberg', name: 'St. Anton · Arlberg', short: 'Ski Arlberg', country: 'AT', ready: true },
   { id: 'kronplatz', name: 'Kronplatz', short: 'Plan de Corones', country: 'IT', ready: true },
+  { id: 'vialattea', name: 'Via Lattea', short: "Sestriere · Sauze d'Oulx · Montgenèvre", country: 'IT', ready: true },
 ]);
 
 const base = (rid) => new URL(`./data/${rid}/`, import.meta.url).href;

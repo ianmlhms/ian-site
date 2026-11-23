@@ -98,7 +98,9 @@ button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
 .rp-hero:hover .rp-name b{color:var(--ink)}
 /* iPad / laptop landscape: one screen, the pictures take the height that is left */
 @media (min-width:900px) and (min-height:560px) and (orientation:landscape){
-  .rp-grid{flex:1 1 auto;min-height:500px;grid-template-columns:1.85fr 1fr 1fr;grid-template-rows:1fr 1fr}
+  .rp-grid{flex:1 1 auto;min-height:500px;grid-template-columns:1.85fr repeat(var(--rp-cols,2),1fr);grid-template-rows:1fr 1fr}
+  .rp-odd .rp-card:last-child{grid-column:span 2}
+  .rp-card:not(.rp-hero) .rp-facts{font-size:11px}
   .rp-hero{grid-column:auto;grid-row:1/3;flex-direction:column}
   .rp-hero .rp-pic{flex:1 1 0;min-height:180px}
   .rp-hero .rp-body{flex:none}
@@ -107,7 +109,8 @@ button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
 }
 /* tablet portrait: flatter pictures on the small cards, so the whole picker nearly fits */
 @media (min-width:600px) and (max-width:899px){
-  .rp-grid{flex:1 1 auto;grid-template-rows:auto 1fr 1fr}
+  .rp-grid{flex:1 1 auto;grid-template-rows:auto repeat(var(--rp-rows,2),1fr)}
+  .rp-odd .rp-card:last-child{grid-column:1/-1}
   .rp-card:not(.rp-hero) .rp-pic{flex:1 1 0;min-height:150px;aspect-ratio:auto}
   .rp-card:not(.rp-hero) .rp-body{flex:none}
 }

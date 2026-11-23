@@ -1732,3 +1732,53 @@ each ski is its own mesh rolled `+edge * skiRoll` onto its edge and lifted by th
 the heading's azimuth, the eyes follow the skis at `yawRate` and look a little along the motion (`motionLook`, at most `motionMax`).
 **Check**: fp-steer-check (real D / A keys, both cameras; carve, fast, skid, pivot, walking pace, reversal, hockey stop): 156 ok; the old
 files (`--old DIR`) fail 40. Shots ~/Library/Caches/ski-work/fp-steer/{before,after}-*.png. main.js?v=24.
+
+## Via Lattea (23 Nov 2026): a sixth resort (Sestriere, Sauze d'Oulx, Sansicario, Cesana, Claviere + Montgenèvre)
+`vialattea`: the Italian Vialattea network + Montgenèvre (FR) over the border, one connected lift network. Box 21.8 x 19.2 km (17 x 15
+tiles, 112 shipped), frame ETRS89 / UTM 32N (EPSG:25832), 315 pistes / 254 km of runs (282 km of lines), 84 lifts, start piste Kandahar Nasi,
+first lift `Sestriere - Fraiteve 1` (`config.js FIRST_LIFT`), snowpark Montgenèvre (OSM), 7.1 MB.
+- **Heights** (`dem_merge.py`, new sources): `piemonte-dtm` = Regione Piemonte "Ripresa aerea ICE 2009-2011 DTM 5 m" (lidar, CC BY 4.0), WCS
+  1.0.0 of geomap.reteunitaria.piemonte.it (`wcs_ice_2009_2011_dtm`, coverage DTM, EPSG:32632, float TIFF, nodata -99) asked chunk by chunk
+  on the frame grid; `ign-rgealti` for frames that are NOT Lambert-93 (a BIL chunk in EPSG:2154 resampled onto the frame); `copernicus-glo30`
+  base. Priority Piemonte > IGN > GLO-30, merged with the round 2A offset + 260 m feather (`merge_sources`): the Piemonte edge (the border)
+  has a lower laplacian than elsewhere (p99 2.1 vs 3.8), no seam. Cached raw chunks are named by absolute origin (a bigger box keeps them).
+  `fetch_dem.py vialattea` picks the merged path because the resort lists `piemonte-dtm`. `ign_east` skips IGN requests deep in Italy.
+- **OSM**: the normal Overpass queries timed out (HTTP 502 / 504 all afternoon): the layers were fetched in 2 x 2 sub-boxes from
+  overpass-api.de and overpass.openstreetmap.fr (`scratch` tool, not in the repo), same layer files in `data-round/vialattea/osm/`.
+  Lifts / pistes closed in their NAME only ("(fermé)", "in disuso", "pista nera abbandono", "ex pista ...") are dropped (`CLOSED_NAME`,
+  bake.py). Bardonecchia (`exclude`) and Pragelato's own disused area drop out (tidy_network); the Pattemouche - Anfiteatro cable car stays.
+  Buildings: `"buildings": "villages"` (only the listed villages + near pistes), no house from an OSM footprint > 280 m long (Cesana Pariol bob track).
+  **Piste names**: 62 piste lines carry their number ("81 bassa", "72 media", "25", "51") only as `ref`: `"ref_names": True` (bake.py) makes
+  it the name (first bake: shown as "Verbindung -> ...", 88 nameless links; now 52). Every named OSM line inside the box is a run, except
+  closed ones and six stubs under 120 m / 12 m drop (27 bis, 90 bassa, Puffi alta, Minisportinia dx / sx, 3 Fourneous: drawn, no run).
+  Official names (montgenevre.com status pages, NOT vialattea.it: it answers 403; no list for Cesana / Pragelato):
+  ~/Library/Caches/ski-work/data-round/official/{vialattea,montgenevre}.json. Lifts 65 of 69 (missing: FV Pattemouche, SC La Motta, TP Club
+  Med, TP La Butte). Pistes: 174 of 316 carry exactly the official name; most others differ in spelling ("Poussins" / "Les Poussins")
+  or are connectors / variants OSM does not name (check_official.py's loose match is too generous with bare numbers, do not trust its count).
+- **SQL on production**: 315 rows were applied one bake too early (before `ref_names`). Production rows are never changed, so the 57 ids
+  whose row is stale are `reserved_ids` (never given to a run) and only new rows were added: 57 unused `ski-vialattea-*` rows stay
+  in `ski_board_floors` (no scores; harmless). Apply the floors only when the data is final.
+- **Villages**: `ALPINE_RESORTS` + `PIEDMONT_RESORTS` (village.js): Alpine shapes (gabled, <= 4 storeys) but the facades mix plaster,
+  stone + wood and some larch (Sestriere / Sauze are not Austrian hotels); long blocks (> 60 m) are plaster. The Sestriere towers are
+  real: `RESORTS["vialattea"]["tall"]` (OSM buildings with >= 10 levels within the circle) -> row field 12 = 1 -> straight plaster
+  towers from their footprint (block(), no stepping), r8c-check skips them.
+- **Olympics**: chain `Kandahar Nasi` (OSM "Kandahar Nasi alta" + "bassa", 2.7 km, 721 m drop): worldcup landmark (red race nets, start
+  house) and the start piste; `pass` landmark on the Col de Montgenèvre.
+- **Shader** (`snow-shader.js`): the painted forest raster was sampled clamped beyond the box (dark stripes down the mountains beside the
+  resort, e.g. Sauze d'Oulx looking north): outside the box it is 0 now (all resorts).
+- **Course nets** (`course.js` + `pistes.js cornerTurn`): in the outside wedge of a sharp corner of the line (17-34 degrees, the
+  projection pinned to the corner point) the wall uses the real distance (off stays short of it: a skier at 54 km/h slipped 14 cm
+  through a net on 97 tris); gentle bends and hairpins unchanged (every resort's rides re-checked).
+- Checks (23 Nov, final data, all green): round7c --rides 174 (Via Lattea 315/315 gates and rides, 0 through a net), round6 2647, round7 39,
+  round7b 14106, r7d 1435, look7d 82, r8c 36348, speed 112, cliff 9/9, review 37, camera 15, barrier 14, npc 95, floors 1639 + parks,
+  security, mp-race, harness --park x6; station-diag floating 0 / unheld 0 / 84 of 84 rideable, 3 shared ends without a roof (Fraiteve 1,
+  Garnel 1, Jouvenceaux - Sportinia 1 tops). Budgets: calls-sweep7d (399 spots, Niddreg) 139 calls / 403k triangles; village sweep
+  (10 places, before the last two bakes) 364k / 136; memory 345 MB renderer after load, 3 pages 1763 MB; first play 3.01 MB.
+  Chromium flows PASS: ski-modules, ski, ski-resorts, ski-spawn, ski-lift, ski-course, ski-challenges, ski-park, ski-freeride, ski-npc,
+  arcade-feature, home-page, arcade-pad; Via Lattea only: ski-lifts-all, ski-ipad-start, ski-mp-freeride, ski-avalanche, ski-firstperson
+  (the last two before the final bake). Chromium ground-check green (same). WebKit not run (hangs on the Mini).
+- Changed for this resort in shared code / checks: course.js (corner wedge), snow-shader.js, props.js (no piste poles on station decks or
+  in the park), r8c-check (the towers are exempt from the 4-storey rule), ski_challenges flow (counts the resorts), picker.js / ui.css (any
+  number of cards; taken over from the Obertauern branch so both merge cleanly).
+- Open: a Via Lattea player who stars nearly every piste everywhere passes the 7 KB cloud-save limit (pre-existing, grows per resort);
+  Sestriere's house styles are guessed; no Olympic / village landmarks beyond the race nets, the towers and the pass sign.

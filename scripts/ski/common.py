@@ -169,6 +169,55 @@ RESORTS = {
             {"kind": "worldcup", "name": "Kandahar", "piste": "Kandahar"},
         ],
     },
+    # Via Lattea (Vialattea): Sestriere / Borgata, Sauze d'Oulx, Sansicario, Cesana, Claviere (Piedmont, Italy) and Montgenèvre over the
+    # border (Hautes-Alpes, France), one connected lift network. ETRS89 / UTM 32N frame; heights: the Piedmont regional DTM on the
+    # Italian side, IGN RGE ALTI on the French side, merged without a seam (dem_merge.py), Copernicus GLO-30 only where neither has data.
+    "vialattea": {
+        "name": "Via Lattea", "short": "Sestriere · Sauze d'Oulx · Montgenèvre", "country": "IT", "crs": "EPSG:25832",
+        "bbox": (44.890, 6.675, 45.045, 6.940),
+        "dem": ["piemonte-dtm", "ign-rgealti", "copernicus-glo30"], "far": ["copernicus-glo30"],
+        "buildings": "villages",                   # the valley towns (Oulx, Beaulard, Pragelato) would pull in tiles and houses
+        "ign_east": 6.83,                          # IGN chunks only west of this (France ends at ~6.76 E here)
+        # piste ids never given to a run: their ski_board_floors rows on production (applied 23 Nov 2026, additive inserts only) are
+        # from an earlier bake with other lines (other floors), so a run that reused one would have its times dropped
+        "reserved_ids": (
+            "11-alta", "12-alta", "12-media", "13", "13-2", "25", "27-bassa", "29-bis", "3-bis", "76", "79-alta", "97",
+            "verbindung-1", "verbindung-11-alta", "verbindung-25-boulevard", "verbindung-29-alta", "verbindung-3-2",
+            "verbindung-3-red", "verbindung-32", "verbindung-32-32", "verbindung-68-alta", "verbindung-68-bassa",
+            "verbindung-71-bis-79-bassa", "verbindung-76", "verbindung-76-2", "verbindung-79-alta", "verbindung-79-bassa",
+            "verbindung-79-bassa-2", "verbindung-79-bassa-79-bassa", "verbindung-bimbo-alta", "verbindung-boulevard",
+            "verbindung-boulevard-golf", "verbindung-kandahar-agnelli", "verbindung-kandahar-agnelli-", "verbindung-la-blu",
+            "verbindung-la-blu-2", "verbindung-schlepplift-frait", "verbindung-schlepplift-orsie", "verbindung-schlepplift-orsie-2",
+            "verbindung-schlepplift-rio-n", "verbindung-schlepplift-sises", "verbindung-sessellift-baby-s",
+            "verbindung-sessellift-cit-ro", "verbindung-sessellift-cit-ro-2", "verbindung-sessellift-garnel",
+            "verbindung-sessellift-garnel-2", "verbindung-sessellift-jouven", "verbindung-sessellift-nube-d",
+            "verbindung-sessellift-rocce-", "verbindung-sessellift-trebia", "verbindung-standard", "verbindung-tsd4-ski-lodge-la",
+            "verbindung-tsd4-ski-lodge-la-2", "verbindung-tsd4-ski-lodge-la-3", "verbindung-tsd4-ski-lodge-la-4",
+            "verbindung-tsd4-soleil-boeuf", "verbindung-tsd4-soleil-boeuf-2",
+        ),
+        "ref_names": True,                         # 62 piste lines carry their number ("81 bassa", "72 alta") as ref, without a name
+        # Bardonecchia (Melezet / Chesal / Colomion) reaches into the north-west corner of the box: another ski area, not Via Lattea
+        "exclude": [("Bardonecchia", 6.6950, 45.0560, 3200)],
+        "tree_line": 2350.0, "derived_forest": 1950.0,       # larch and pine to ~2300 m, but the Sestriere plateau (2035 m) is open pasture
+        "villages": [
+            ("Sestriere", 6.8787, 44.9575, 900), ("Borgata", 6.8936, 44.9717, 350), ("Grangesises", 6.8694, 44.9424, 250),
+            ("Sauze di Cesana", 6.8590, 44.9405, 300), ("Champlas du Col", 6.8515, 44.9474, 250),
+            ("Sauze d'Oulx", 6.8583, 45.0270, 800), ("Jouvenceaux", 6.8469, 45.0240, 350), ("Sportinia", 6.8675, 45.0056, 250),
+            ("San Sicario", 6.8146, 44.9677, 500), ("San Sicario Borgo", 6.8059, 44.9583, 300), ("Cesana", 6.7943, 44.9524, 550),
+            ("Claviere", 6.7503, 44.9388, 500), ("Montgenèvre", 6.7218, 44.9312, 850),
+        ],
+        # the Olympic downhill (2006) above Sestriere: OSM has its upper and lower part as separate pistes, "alta" meets "bassa" end to start
+        "chains": [{"name": "Kandahar Nasi", "pistes": ["Kandahar Nasi alta", "Kandahar Nasi bassa"]}],
+        "start": "Kandahar Nasi",
+        "landmarks": [
+            # Olympic downhill: the red race nets where it is steep and the start house (the names are the OSM ones)
+            {"kind": "worldcup", "name": "Kandahar Nasi", "piste": "Kandahar Nasi"},
+            # Col de Montgenèvre (1851 m): the road over the border, sign and flags
+            {"kind": "pass", "name": "Col de Montgenèvre 1851 m", "lon": 6.72523, "lat": 44.93142, "face": 100},
+        ],
+        # the Sestriere towers (Torre Rossa: 13 storeys, the white tower: 17): the only really tall buildings, kept from OSM as they are
+        "tall": [("Torri di Sestriere", 6.8780, 44.9560, 350)],
+    },
 }
 
 # Height tiles: TILE_CELLS cells of NEAR_STEP metres (the files hold TILE_CELLS + 1 nodes per side, neighbours share their edge).
@@ -186,6 +235,7 @@ SOURCE_CREDITS = {
     "ign-rgealti": "Gelänn: IGN RGE ALTI® 5 m (© IGN, Licence Ouverte / Etalab 2.0), iwwer de Géoplateforme",
     "swissalti3d": "Gelänn Schwäiz: swissALTI3D 2 m (© swisstopo, Open Government Data, fräi Notzung mat Quellenugab)",
     "vda-dtm": "Gelänn Italien: DTM 2005/2008 Lidar 2 m (© Regione Autonoma Valle d'Aosta, CC BY 4.0)",
+    "piemonte-dtm": "Gelänn Italien: Ripresa aerea ICE 2009-2011 DTM 5 m, Lidar (© Regione Piemonte, CC BY 4.0)",
     "bz-dtm": "Gelänn: Digitaalt Terrainmodell 2,5 m vun der Autonomer Provënz Bozen - Südtirol (Open Data Südtirol, CC0 1.0)",
     "at-dgm": "Gelänn: ALS-DTM Éisträich 1 m (Datenquell: BEV - Bundesamt für Eich- und Vermessungswesen, aus de Laserscans vun de Bundesländer, CC BY 4.0)",
     "copernicus-glo30": "Bierger an der Distanz: Copernicus DEM GLO-30 (© DLR e.V. 2010-2014 an © Airbus Defence and Space GmbH 2014-2018, ënnert COPERNICUS vun der EU an der ESA)",

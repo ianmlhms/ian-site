@@ -76,6 +76,17 @@ export function createPiste(src) {
     return out;
   }
 
+  /** The turn of the line at its corner at arc length t (radians, + = to the right of travel), or 0 when t is not (within 2 cm) an inner
+   *  corner of the line: a projection pinned to a corner means the point stands in the outside wedge of that corner. */
+  function cornerTurn(t) {
+    let lo = 0, hi = n - 1;
+    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (s[m] <= t) lo = m; else hi = m; }
+    const i = t - s[lo] < 0.02 ? lo : s[hi] - t < 0.02 ? hi : -1;
+    if (i <= 0 || i >= n - 1) return 0;
+    const ax = x[i] - x[i - 1], az = z[i] - z[i - 1], bx = x[i + 1] - x[i], bz = z[i + 1] - z[i];
+    return Math.atan2(ax * bz - az * bx, ax * bx + az * bz);
+  }
+
   /** Checkpoints every PLAY.checkpointEvery m (not the first 60 m, always one 40 m before the end). */
   function checkpoints() {
     const list = [];
@@ -100,7 +111,7 @@ export function createPiste(src) {
     return gates;
   }
 
-  return { id: src.id, name: src.name, ref: src.ref, diff: src.diff, src, length, halfWidth, n, x, z, s, at, project, checkpoints, slalomGates, top: { x: x[0], z: z[0] }, bottom: { x: x[n - 1], z: z[n - 1] } };
+  return { id: src.id, name: src.name, ref: src.ref, diff: src.diff, src, length, halfWidth, n, x, z, s, at, project, cornerTurn, checkpoints, slalomGates, top: { x: x[0], z: z[0] }, bottom: { x: x[n - 1], z: z[n - 1] } };
 }
 
 /** R8g: a grid over the segments of some piste lines (or a stretch of one: { piste, s0, s1 }), for "how far is the nearest line from

@@ -205,6 +205,7 @@ export const FIRST_LIFT = Object.freeze({
   zermatt: ['Matterhorn Express 1', 'Zermatt - Furi'],     // Zermatt village: the Matterhorn Express from Schluhmatt
   arlberg: ['Galzigbahn', 'Nassereinbahn'],                // St. Anton: the Galzigbahn from the village centre
   kronplatz: ['Kronplatz I - Plan de Corones I', 'Ried'],  // Reischach / Riscone: Kronplatz I
+  vialattea: ['Sestriere - Fraiteve 1', 'Cit Roc'],        // Sestriere village: the Fraiteve gondola
 });
 // R8d (Ian): separate areas of a resort's pass, reached by the ski bus (no piste / lift links them): the valley station of each listed
 // lift is discovered from the start like the first lift, so the map teleport and the lift list reach it (Sonnenkopf: Klösterle, bus

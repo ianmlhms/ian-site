@@ -264,6 +264,108 @@ def vda_shift(frame, to_utm, smooth, west, north, cell, swiss):
     return float(best[1]), float(best[2])
 
 
+# ---------------------------------------------------------------- Piedmont regional DTM (Via Lattea)
+PIEMONTE_WCS = ("https://geomap.reteunitaria.piemonte.it/ws/taims/rp-01/taimsdtmwcs/wcs_ice_2009_2011_dtm?service=WCS&request=GetCoverage"
+                "&version=1.0.0&coverage=DTM&crs=EPSG:32632&bbox={x0:.1f},{y0:.1f},{x1:.1f},{y1:.1f}&width={w}&height={h}&format=image/tiff")
+CHUNK_NODES = 512          # nodes per side of one WCS / WMS request (2.56 km at 5 m)
+
+
+def chunked_mosaic(frame, rid, name, fetch_chunk):
+    """Whole-box node grid filled chunk by chunk: fetch_chunk(e0, n_top, nx, nz, cache_stem) -> grid (nz, nx) in the frame or None."""
+    e0, n_top, nx, nz = node_grid(frame)
+    out = np.full((nz, nx), np.nan, np.float32)
+    total = ((nx + CHUNK_NODES - 1) // CHUNK_NODES) * ((nz + CHUNK_NODES - 1) // CHUNK_NODES)
+    k = 0
+    for j0 in range(0, nz, CHUNK_NODES):
+        for i0 in range(0, nx, CHUNK_NODES):
+            k += 1
+            w, h = min(CHUNK_NODES, nx - i0), min(CHUNK_NODES, nz - j0)
+            part = fetch_chunk(e0 + i0 * NEAR_STEP, n_top - j0 * NEAR_STEP, w, h, os.path.join(work_dir(rid, "dem", "raw", name), "%d_%d_%d" % (e0 + i0 * NEAR_STEP, n_top - j0 * NEAR_STEP, w)))
+            if part is not None:
+                sub = out[j0:j0 + h, i0:i0 + w]
+                keep = np.isnan(sub) & ~np.isnan(part)
+                sub[keep] = part[keep]
+            if k % 10 == 0 or k == total:
+                log("%s chunk %d/%d, covered %.1f %%" % (name, k, total, 100 * float((~np.isnan(out)).mean())))
+    return out
+
+
+def piemonte_mosaic(frame, rid):
+    """Regione Piemonte, Ripresa aerea ICE 2009-2011 DTM 5 m (lidar, CC BY 4.0), WCS 1.0.0 of geomap.reteunitaria.piemonte.it in WGS 84 /
+    UTM 32N (EPSG:32632; the ETRS89 frame differs by well under a metre). Each request covers the frame chunk (+ 4 nodes) at 5 m;
+    nodata -99 outside the region (France: IGN fills in)."""
+    import rasterio
+    from rasterio.enums import Resampling
+
+    def chunk(e0, n_top, nx, nz, stem):
+        x0, y0, x1, y1 = frame_bounds_utm(frame, e0, n_top, nx, nz, 20.0)
+        w, h = int(round((x1 - x0) / NEAR_STEP)), int(round((y1 - y0) / NEAR_STEP))
+        path = stem + ".tif"
+        body = http_get(PIEMONTE_WCS.format(x0=x0, y0=y0, x1=x0 + w * NEAR_STEP, y1=y0 + h * NEAR_STEP, w=w, h=h), path, timeout=240, pause=0.6)
+        if body[:2] not in (b"II", b"MM"):
+            os.remove(path)
+            raise SystemExit("Piemonte WCS did not answer a GeoTIFF: %r" % body[:300])
+        part = np.full((nz, nx), np.nan, np.float32)
+        reproject_into(part, path, frame, e0, n_top, NEAR_STEP, Resampling.bilinear)
+        part[part < -50] = np.nan
+        return part
+    return chunked_mosaic(frame, rid, "piemonte-dtm", chunk)
+
+
+def frame_bounds_utm(frame, e0, n_top, nx, nz, pad, crs="EPSG:32632"):
+    from pyproj import Transformer
+    t = Transformer.from_crs(frame.crs, crs, always_xy=True)
+    xs, ys = t.transform([e0 - pad, e0 + (nx - 1) * NEAR_STEP + pad] * 2, [n_top + pad] * 2 + [n_top - (nz - 1) * NEAR_STEP - pad] * 2)
+    snap = NEAR_STEP
+    return (np.floor(min(xs) / snap) * snap, np.floor(min(ys) / snap) * snap, np.ceil(max(xs) / snap) * snap, np.ceil(max(ys) / snap) * snap)
+
+
+IGN_WMS_L93 = ("https://data.geopf.fr/wms-r/wms?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=RGEALTI-MNT_PYR-ZIP_FXX_LAMB93_WMS"
+               "&STYLES=&CRS=EPSG:2154&BBOX={x0},{y0},{x1},{y1}&WIDTH={w}&HEIGHT={h}&FORMAT=image/x-bil;bits=32")
+
+
+def ign_mosaic(frame, rid):
+    """IGN RGE ALTI 5 m (Licence Ouverte 2.0) for a frame that is NOT Lambert-93 (Via Lattea: Montgenèvre): per chunk a BIL in Lambert-93
+    covering the chunk (+ 20 m), resampled onto the frame nodes. Chunks whose middle lies east of RESORTS[rid]["ign_east"] (deep in Italy:
+    IGN has no data there) are not asked for. One request per second (the service's limit)."""
+    from pyproj import Transformer
+    from rasterio.enums import Resampling
+    from rasterio.io import MemoryFile
+    from rasterio.transform import from_origin
+    east_limit = RESORTS[rid].get("ign_east")
+    inv = Transformer.from_crs(frame.crs, "EPSG:4326", always_xy=True)
+
+    def chunk(e0, n_top, nx, nz, stem):
+        if east_limit is not None:
+            lons = [inv.transform(e0, n_top)[0], inv.transform(e0, n_top - (nz - 1) * NEAR_STEP)[0]]
+            if min(lons) > east_limit:
+                return None
+        x0, y0, x1, y1 = frame_bounds_utm(frame, e0, n_top, nx, nz, 20.0, "EPSG:2154")
+        w, h = int(round((x1 - x0) / NEAR_STEP)), int(round((y1 - y0) / NEAR_STEP))
+        half = NEAR_STEP / 2
+        path = stem + ".bil"
+        body = http_get(IGN_WMS_L93.format(x0=x0 - half, y0=y0 - half, x1=x0 + (w - 1) * NEAR_STEP + half, y1=y0 + (h - 1) * NEAR_STEP + half, w=w, h=h),
+                        path, pause=1.1)
+        a = np.frombuffer(body, "<f4").astype(np.float32)
+        if a.size != w * h:
+            os.remove(path)
+            raise SystemExit("IGN answer has %d values, expected %d (%r)" % (a.size, w * h, body[:200]))
+        a = a.reshape(h, w).copy()
+        a[a < -1000] = np.nan
+        if np.isnan(a).all():
+            return None
+        part = np.full((nz, nx), np.nan, np.float32)
+        profile = {"driver": "GTiff", "width": w, "height": h, "count": 1, "dtype": "float32", "crs": "EPSG:2154", "nodata": np.nan,
+                   "transform": from_origin(x0 - half, y0 + (h - 1) * NEAR_STEP + half, NEAR_STEP, NEAR_STEP)}
+        with MemoryFile() as mem:
+            with mem.open(**profile) as ds:
+                ds.write(a, 1)
+            with mem.open() as ds:
+                reproject_into(part, ds, frame, e0, n_top, NEAR_STEP, Resampling.bilinear)
+        return part
+    return chunked_mosaic(frame, rid, "ign-rgealti", chunk)
+
+
 # ---------------------------------------------------------------- Copernicus (whole box at once)
 def copernicus_mosaic(frame, rid):
     from fetch_dem import copernicus_grid
@@ -271,7 +373,8 @@ def copernicus_mosaic(frame, rid):
     return copernicus_grid(frame, e0, n_top, nx, nz, NEAR_STEP)
 
 
-SOURCES = {"swissalti3d": swiss_mosaic, "vda-dtm": vda_mosaic, "copernicus-glo30": copernicus_mosaic}
+SOURCES = {"swissalti3d": swiss_mosaic, "vda-dtm": vda_mosaic, "piemonte-dtm": piemonte_mosaic, "ign-rgealti": ign_mosaic,
+           "copernicus-glo30": copernicus_mosaic}
 
 
 # ---------------------------------------------------------------- merge

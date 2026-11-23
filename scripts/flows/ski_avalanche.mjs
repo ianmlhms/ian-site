@@ -6,7 +6,7 @@
  * releases behind the skier. The HUD warning on the steep off-piste. FLOW_BROWSER=webkit for Safari's engine. */
 import { runIfMain } from "./lib.mjs";
 
-const RESORTS = (process.env.SKI_RESORTS || "killy,3vallees,zermatt,arlberg,kronplatz").split(",");
+const RESORTS = (process.env.SKI_RESORTS || "killy,3vallees,zermatt,arlberg,kronplatz,vialattea").split(",");
 
 export const flow = {
   name: "ski-avalanche",

@@ -128,6 +128,9 @@ export function courseLayout(piste, startS = 2, pistes = null, obs = null, finis
 
 /** Where the skier is on the course (pure). update(state, dt) -> { s, remaining, share, dist, warn, abort, back {x, z}, next {x, z} }.
  *  R7-C2: collide(prev, state) -> the state deflected by the barriers (soft: pushed back inside along the barrier, slowed a little). */
+// the outside wedge of a corner (rad): only sharp corners (the OSM line's own kinks) need the radial distance; a gentle bend's 10 m
+// segments differ from it by centimetres and the scripted skiers ride those on purpose
+const FAN_TURN = 0.3, FAN_TURN_MAX = 0.6;      // sharper than 34 deg = a hairpin: the scripted riders run wide there (as before)
 export function createCourse({ piste, startS = 2, finishS: finishIn = null, open = null }) {      // R8e: open(s, side) = courseLayout().openAt
   const finishS = Math.max(startS + 30, finishIn !== null ? finishIn : piste.length - COURSE.finishBack);
   const proj = {}, nxt = {}, back = {}, full = {}, cp = {}, ca = {}, wp = {};
@@ -182,16 +185,24 @@ export function createCourse({ piste, startS = 2, finishS: finishIn = null, open
     cHint = cp.s;
     const wall = piste.halfWidth + 0.5 - COURSE.barrierBody;
     const was = lastOff;
-    lastOff = cp.off;
+    // 23 Nov 2026 (Via Lattea 97 tris): in the outside fan of a corner the projection stays on the line's corner, and off (measured to one
+    // of its two segments) stays short of the real distance: the net stands at the real distance (dist), so that is what counts here
+    const pinned = cp.dist > Math.abs(cp.off) + 0.02;
+    const turn = pinned ? piste.cornerTurn(cp.s) : 0;                     // the corner he is in the wedge of (0: none)
+    const fan = Math.abs(turn) > FAN_TURN && Math.abs(turn) < FAN_TURN_MAX && Math.sign(cp.off || 1) * turn < 0 && cp.dist < piste.halfWidth + 25;      // the outside of that turn
+    const off = fan ? Math.sign(cp.off || 1) * cp.dist : cp.off;
+    lastOff = off;
     if (cp.s < startS + 4 || cp.s > finishS || st.ride) return st;          // R8g: a crash slides into the net too (it catches him)
-    if (Math.abs(cp.off) <= wall || Math.abs(was) > wall + 1.5) return st;
+    if (Math.abs(off) <= wall || Math.abs(was) > wall + 1.5) return st;
     // put down elsewhere since the last step (place / teleport / respawn): not a crossing, he may ski back in from there
     if (moved || Math.hypot(st.x - prev.x, st.z - prev.z) > 2) return st;
     // R8g: no jump clears the net any more (it used to after 0.25 s of air: a hop off a bump at the edge flew him out of the course
     // and he skied back in through the net further down, Killy couloir-de-la-table-d-orient, Arlberg schweinstroge): in the air too
     // the net turns him back along the course
     piste.at(cp.s, ca);
-    const side = Math.sign(cp.off), rx = -ca.dz * side, rz = ca.dx * side;     // the outward normal of this barrier
+    const side = Math.sign(off) || 1;
+    // the outward normal of this barrier (in a corner's outside fan: away from the corner point, towards him)
+    const rx = fan ? (st.x - ca.x) / cp.dist : -ca.dz * side, rz = fan ? (st.z - ca.z) / cp.dist : ca.dx * side;
     if (open && open(cp.s, side)) return st;                               // R8e: the net is open here (a house reaches into the course)
     // no net here: the inside of a bend tighter than the net's offset is left open (courseLayout), so is the wall
     piste.project(ca.x + rx * (piste.halfWidth + 0.5), ca.z + rz * (piste.halfWidth + 0.5), cp.s, 40, wp);
@@ -205,7 +216,7 @@ export function createCourse({ piste, startS = 2, finishS: finishIn = null, open
     const bounce = Math.min(1.5, Math.max(0, vo) * COURSE.barrierBounce);
     const vx = vo > 0 ? ca.dx * dirT * along - rx * bounce : st.vx, vz = vo > 0 ? ca.dz * dirT * along - rz * bounce : st.vz;
     // pushed straight back in by how far he went past the wall (his progress along the course is kept: no snapping to a corner)
-    const pen = Math.abs(cp.off) - wall + 0.05;
+    const pen = Math.abs(off) - wall + 0.05;
     const x = st.x - rx * pen, z = st.z - rz * pen;
     // the skis turn along the barrier (no heading into the net)
     const hx = Math.cos(st.heading), hz = Math.sin(st.heading), ho = hx * rx + hz * rz;

@@ -52,6 +52,9 @@ CLASS_BITS = {"forest": 1, "scrub": 2, "rock": 4, "water": 8, "built": 16, "pist
 TREE_LINE = 2450.0                 # m: no forest above this, whatever the map says (per resort: RESORTS[rid]["tree_line"])
 DERIVED_FOREST = 2150.0            # m: open stands are added below this on shady slopes (150 m lower on sunny ones) where OSM maps no forest
                                    # (per resort: RESORTS[rid]["derived_forest"]; the north side of the Alps has a lower tree line)
+# Via Lattea: OSM marks some closed lifts / pistes only in their name ("Col Saurel (fermé)", "Trampolini (in disuso)", "Croce media
+# (pista nera abbandono)"): left out like disused=yes
+CLOSED_NAME = re.compile(r"\((ferm[ée]e?|in disuso|abbandon\w*|stillgelegt|closed)\)|\bin disuso\b|\babbandono\b|^ex pista\b", re.I)
 MIN_RUN_LENGTH = 120.0             # m: every mapped piste is a run (short links between pistes too), only stubs are left out
 MIN_RUN_DROP = 12.0
 SLALOM_COUNT = 4
@@ -522,7 +525,8 @@ def build_pistes(frame, dem, lifts=(), places=()):
     lines, areas = [], []
     skipped = {"abandoned": 0, "outside": 0}
     for wid, geom, t in ways:
-        if t.get("abandoned") or t.get("piste:abandoned") == "yes" or t.get("disused") == "yes" or wid in cfg.get("skip_ways", ()):
+        if (t.get("abandoned") or t.get("piste:abandoned") == "yes" or t.get("disused") == "yes" or wid in cfg.get("skip_ways", ())
+                or CLOSED_NAME.search(t.get("piste:name") or t.get("name") or "")):
             skipped["abandoned"] += 1
             continue
         if t.get("piste:type", "downhill") != "downhill" or len(geom) < 2:
@@ -531,6 +535,8 @@ def build_pistes(frame, dem, lifts=(), places=()):
         p = way_xz(frame, geom)
         closed = len(p) > 3 and math.hypot(*(p[0] - p[-1])) < 0.5
         name = (t.get("piste:name") or t.get("name") or "").strip()
+        if not name and cfg.get("ref_names"):                # Via Lattea: the piste's number is its name, often mapped as ref only ("81 bassa")
+            name = (t.get("piste:ref") or ("" if t.get("highway") else t.get("ref")) or "").strip()      # (a road's ref is the road's)
         if t.get("area") == "yes" or (closed and t.get("area") != "no" and polyline_len(p) < 4000 and not name):
             c = p.mean(axis=0)
             if 0 <= c[0] <= frame.width and 0 <= c[1] <= frame.depth:
@@ -625,7 +631,7 @@ def build_pistes(frame, dem, lifts=(), places=()):
     name_links(links, named, lifts, places)
     runs = named + links
     runs.sort(key=lambda r: (bool(r.get("link")), -r["drop"]))
-    used = set()
+    used = set(cfg.get("reserved_ids", ()))                    # ids (= boards) a resort must not give out (again)
     for r in runs:
         base = slug(r["name"])
         rid = base if base not in used else slug(r["name"] + "-" + r["diff"])
@@ -939,6 +945,9 @@ def build_buildings(frame, dem_raw):
     # villages flagged "modern" (the Kronplatz summit, Klein Matterhorn): today's mountain architecture, kind 4 (wood, glass, stone, flat
     # roofs, at most 2 floors unless OSM says more: the summit restaurants and stations sit low, the Concordia bell stands above them)
     modern = [(*frame.to_world(v[1], v[2]), v[3]) for v in RESORTS[frame.rid].get("villages", ()) if len(v) > 4 and v[4] == "modern"]
+    # real tall buildings an Alpine resort keeps as they are (RESORTS[rid]["tall"]: name, lon, lat, radius m; the Sestriere towers): row
+    # field 12 = 1, village.js tameRow leaves them their height and shape (every other house there is capped at 4 storeys)
+    tall = [(*frame.to_world(v[1], v[2]), v[3]) for v in RESORTS[frame.rid].get("tall", ())]
     for e in load_osm(frame.rid, "buildings"):
         if e["type"] != "way" or "geometry" not in e:
             continue
@@ -971,6 +980,8 @@ def build_buildings(frame, dem_raw):
             continue
         boxa, ang, u0, u1, v0, v1 = bestb
         L, W = u1 - u0, v1 - v0
+        if L > 280 and W > 40:
+            continue                                           # no house: a whole facility mapped as one building (the Cesana Pariol bob track)
         k = math.sqrt(min(1.0, area / max(boxa, 1)))          # an L-shaped block: a box of the same area
         L, W = L * k, W * k
         if W > L:
@@ -1009,8 +1020,12 @@ def build_buildings(frame, dem_raw):
         q = dp_simplify(p, 0.6) if len(p) > 4 else p          # open ring: first and last vertex are kept
         foot = [int(round(v * 10)) for xy in (q - np.array([cx, cz])) for v in xy]
         roof = ROOF_CODE.get(t.get("roof:shape", ""), -1)
-        out.append({"poly": p, "row": [round(cx, 1), round(cz, 1), round(L, 1), round(W, 1), round(ang % math.pi, 3), round(eave, 1), round(ridge, 1), round(ground, 1), kind,
-                                       foot, roof, int(round(levels))]})
+        row = [round(cx, 1), round(cz, 1), round(L, 1), round(W, 1), round(ang % math.pi, 3), round(eave, 1), round(ridge, 1), round(ground, 1), kind,
+               foot, roof, int(round(levels))]
+        if kind in (0, 1) and lv is not None and levels >= 10 and any(math.hypot(cx - vx, cz - vz) < vr for vx, vz, vr in tall):
+            row[8], row[10], row[6] = 1, 1, round(eave + 1.2, 1)  # a flat-roofed block from its real footprint
+            row.append(1)
+        out.append({"poly": p, "row": row})
     log("buildings", len(out))
     return out
 
@@ -1344,7 +1359,7 @@ def build_lifts(frame, dem_raw):
         if e["type"] != "way" or not e.get("geometry"):
             continue
         t = e.get("tags", {})
-        if t.get("disused") == "yes" or t.get("abandoned") == "yes" or t.get("construction"):
+        if t.get("disused") == "yes" or t.get("abandoned") == "yes" or t.get("construction") or CLOSED_NAME.search(t.get("name", "")):
             continue
         aw = t.get("aerialway", "")
         if aw in LIFT_KIND:

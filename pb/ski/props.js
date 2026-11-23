@@ -51,6 +51,7 @@ function bannerTexture(text, bg, fg) {
   return t;
 }
 
+const DECK_CLEAR = 9;                 // m: no piste pole this close to a lift's end (its station's deck)
 export function createPoles({ scene, resort, height }) {
   const geo = new THREE.CylinderGeometry(0.045, 0.05, 1.9, 5).translate(0, 0.95, 0);
   const capGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.32, 5).translate(0, 1.75, 0);
@@ -76,6 +77,17 @@ export function createPoles({ scene, resort, height }) {
   // names took ~18 MB of JS heap at 3 Vallees): x, z per pole + its colour's index, grown in one pass
   const DIFFS = Object.keys(DIFF);
   const poleXZ = new GrowF32(), poleDiff = [];
+  // (Via Lattea: poles stood on the platforms of lifts whose piste starts right at the station)
+  const decks = (resort.lifts || []).flatMap((l) => [l.bottom, l.top]).filter(Boolean);
+  const onDeck = (x, z) => decks.some((d) => Math.abs(d.x - x) < DECK_CLEAR && Math.abs(d.z - z) < DECK_CLEAR);
+  // nor inside the snow park's corridor (a pole in the halfpipe)
+  const park = resort.park && resort.park.line, parkHw = park ? (resort.park.hw || 18) + 3 : 0;
+  const inPark = (x, z) => {
+    if (!park) return false;
+    const dx = park[2] - park[0], dz = park[3] - park[1], L2 = dx * dx + dz * dz || 1;
+    const t = ((x - park[0]) * dx + (z - park[1]) * dz) / L2;
+    return t > -0.03 && t < 1.03 && Math.abs((x - park[0]) * dz - (z - park[1]) * dx) / Math.sqrt(L2) < parkHw;
+  };
   for (const line of resort.network) {
     if (line.a) continue;
     const p = line.p, hw = line.w + 1.2, di = Math.max(0, DIFFS.indexOf(DIFF_OF_LETTER[line.d] || 'blue'));
@@ -86,8 +98,12 @@ export function createPoles({ scene, resort, height }) {
       const ux = dx / L, uz = dz / L;
       for (let t = carry; t < L; t += POLE_GAP) {
         const x = ax + ux * t, z = az + uz * t;
-        poleXZ.push(x - uz * hw, z + ux * hw); poleXZ.push(x + uz * hw, z - ux * hw);
-        poleDiff.push(di, di);
+        for (const e of [1, -1]) {
+          const ex = x - uz * hw * e, ez = z + ux * hw * e;
+          if (onDeck(ex, ez) || inPark(ex, ez)) continue;
+          poleXZ.push(ex, ez);
+          poleDiff.push(di);
+        }
       }
       carry = (carry - L) % POLE_GAP; if (carry < 0) carry += POLE_GAP;
     }

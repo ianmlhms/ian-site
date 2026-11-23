@@ -36,7 +36,7 @@ const CHALET = 0, PLASTER = 1, SAVOY = 2, CONCRETE = 3, CHAPEL = 4, HUT = 5, MOD
 export const DETAIL_RADIUS = Object.freeze({ low: 150, medium: 380, high: 800 });
 const DCELL = 320;                   // m: the detail layer's merge cell
 /** R8c: resorts whose villages are Alpine (no 1960s-70s purpose-built blocks like Tignes / Val Claret / Les Menuires / Val Thorens) */
-export const ALPINE_RESORTS = Object.freeze(new Set(['zermatt', 'arlberg', 'kronplatz']));
+export const ALPINE_RESORTS = Object.freeze(new Set(['zermatt', 'arlberg', 'kronplatz', 'vialattea']));
 /** R8c: storeys under the eaves at most: Alpine houses (small / big), anywhere else (the tallest real Tignes blocks have ~10) */
 export const MAX_FLOORS = Object.freeze({ alpineSmall: 3, alpine: 4, other: 10 });
 const SMALL_AREA = 150;              // m2: a small house (3 storeys at most in the Alpine villages)
@@ -300,7 +300,7 @@ function block(w, row, seed, wd, style, slopeDir) {
     if (low < g0 + 0.2) prism(w, grown, low - 0.6, ground + 0.35, ground, STONE);
   }
   // terraces: a tall block on a slope steps back towards the uphill side, every 2-3 floors (the stepped profile of Val Claret)
-  const stepped = levels >= 5 && W >= 13 && !!slopeDir && h1(seed * 8.8) < 0.75;
+  const stepped = row[12] !== 1 && levels >= 5 && W >= 13 && !!slopeDir && h1(seed * 8.8) < 0.75;
   const tiers = stepped ? Math.min(4, Math.max(2, Math.floor(levels / 2.5))) : 1;
   let dmin = Infinity, dmax = -Infinity;
   for (const p of poly) { const d = p[0] * downhill[0] + p[1] * downhill[1]; dmin = Math.min(dmin, d); dmax = Math.max(dmax, d); }
@@ -352,13 +352,22 @@ function tower(w, row) {
   box(w, P, -0.35, 0.35, -0.35, 0.35, top, top + eave * 0.25, WALL, ground);
 }
 
-function styleOf(row, seed, alpine) {
+/** Via Lattea: Piedmont towns (Sestriere, Sauze d'Oulx, Cesana) are plaster and stone with some wood, not the Austrian larch hotels:
+ *  the Alpine shapes (gable roofs, at most 4 storeys), their own mix of facades. */
+export const PIEDMONT_RESORTS = Object.freeze(new Set(['vialattea']));
+function styleOf(row, seed, alpine, piedmont = false) {
   const kind = row[8];
   if (kind === 4) return MODERN;
   if (kind === 5) return TOWER;
   if (kind === 2) return CHAPEL;
   if (kind === 3) return HUT;
+  if (row[12] === 1) return PLASTER;                                 // the Sestriere towers: white plaster, no Alpine hotel dress
   // R8c: an Alpine village: the big houses are hotels, the rest chalets (wood above a stone or plaster base)
+  if (alpine && piedmont) {
+    const r = h1(seed * 21.3);
+    if (row[2] > 60) return r < 0.6 ? PLASTER : SAVOY;             // the long apartment blocks: plaster, not 100 m of larch
+    return row[2] * row[3] > 260 ? (r < 0.3 ? HOTEL : r < 0.65 ? SAVOY : PLASTER) : (r < 0.35 ? CHALET : r < 0.75 ? SAVOY : PLASTER);
+  }
   if (alpine) return row[2] * row[3] > 260 ? (kind === 0 && h1(seed * 21.3) < 0.4 ? SAVOY : HOTEL) : h1(seed * 21.3) < 0.75 ? CHALET : SAVOY;
   // round 7 (A): a big house flagged chalet (Méribel, Courchevel, Zermatt) was a giant wooden block: half of them get the Savoy mix
   // (stone and plaster below, wood above)
@@ -375,6 +384,7 @@ function styleOf(row, seed, alpine) {
 export function tameRow(row, alpine) {
   const kind = row[8];
   if (kind !== 0 && kind !== 1) return row;
+  if (row[12] === 1) return row;                                     // a real tall building the bake keeps (the Sestriere towers)
   const floors = alpine ? (row[2] * row[3] < SMALL_AREA ? MAX_FLOORS.alpineSmall : MAX_FLOORS.alpine) : MAX_FLOORS.other;
   const eaveMax = floors * FLOOR + 0.6;
   if (!alpine && row[5] <= eaveMax) return row;
@@ -559,7 +569,7 @@ export const LAZY = Object.freeze({ ahead: 500, keep: 1500, budget: 3, nearBudge
 
 export function createVillage({ scene, rows, env, height, level = 'medium', resort = '', upload = null }) {
   HEIGHT = height || null;
-  const alpine = ALPINE_RESORTS.has(resort);
+  const alpine = ALPINE_RESORTS.has(resort), piedmont = PIEDMONT_RESORTS.has(resort);
   const byCell = new Map();
   rows.forEach((row0, i) => {
     const row = tameRow(row0, alpine);
@@ -589,7 +599,7 @@ export function createVillage({ scene, rows, env, height, level = 'medium', reso
     let det = J.details.get(dk);
     if (!det) J.details.set(dk, (det = { w: writer(), x0: di * DCELL, z0: dj * DCELL }));
     const seed = (i * 0.618034) % 1;
-    const style = styleOf(row, seed, alpine);
+    const style = styleOf(row, seed, alpine, piedmont);
     let downhill = null;
     if (height && (row[8] === 1 || row[8] === 4)) {
       const d = 25, gx = height(row[0] + d, row[1]) - height(row[0] - d, row[1]), gz = height(row[0], row[1] + d) - height(row[0], row[1] - d);

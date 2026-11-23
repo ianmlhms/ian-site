@@ -10,7 +10,7 @@
  * the engines side by side. Frame rate is only printed. */
 import { runIfMain } from "./lib.mjs";
 
-const RESORTS = (process.env.SKI_RESORTS || "killy,3vallees,zermatt,arlberg,kronplatz").split(",");
+const RESORTS = (process.env.SKI_RESORTS || "killy,3vallees,zermatt,arlberg,kronplatz,vialattea").split(",");
 const MIN_COLOURS = 40;
 
 export const flow = {

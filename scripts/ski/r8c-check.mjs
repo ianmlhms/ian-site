@@ -52,17 +52,18 @@ for (const rid of resorts) {
   // villages
   const rows = JSON.parse(fs.readFileSync(path.join(dir, 'buildings.json'), 'utf8'));
   const alpine = ALPINE_RESORTS.has(rid);
-  let tall = 0, flat = 0, maxFloors = 0, hotels = 0;
+  let tall = 0, flat = 0, maxFloors = 0, hotels = 0, towers = 0;
   rows.forEach((row, i) => {
     const h = houseOf(row, i, alpine);
     if (h.row[8] > 1) return;                                           // chapels, huts, modern, towers
+    if (row[12] === 1) { towers++; return; }                            // the bake's tall list (the Sestriere towers) keeps its height
     maxFloors = Math.max(maxFloors, h.floors);
     if (alpine && h.floors > MAX_FLOORS.alpine) tall++;
     if (alpine && h.flat) flat++;
     if (h.style === 8) hotels++;
   });
   if (alpine) ok(tall === 0 && flat === 0, `${rid}: Alpine village: ${tall} houses over ${MAX_FLOORS.alpine} storeys, ${flat} flat roofs`);
-  console.log(`  villages: ${rows.length} houses, tallest ${maxFloors} storeys under the eaves${alpine ? `, ${hotels} Alpine hotels, ${flat} flat roofs` : ''}`);
+  console.log(`  villages: ${rows.length} houses, tallest ${maxFloors} storeys under the eaves${alpine ? `, ${hotels} Alpine hotels, ${flat} flat roofs, ${towers} real towers` : ''}`);
   // rails + lift aisles
   const far = decodeGrid(new Uint8Array(fs.readFileSync(path.join(dir, 'far.bin'))));
   const classes = decodeRle(new Uint8Array(fs.readFileSync(path.join(dir, 'classes.bin'))));

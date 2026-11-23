@@ -17,13 +17,15 @@ const INFO = Object.freeze({
   zermatt: { title: 'Zermatt · Cervinia', places: 'Ënnert dem Matterhorn', flags: ['🇨🇭', '🇮🇹'], region: 'Wallis an Aostatal' },
   arlberg: { title: 'Ski Arlberg', places: 'St. Anton, Lech, Zürs, Warth, Sonnenkopf', flags: ['🇦🇹'], region: 'Tirol a Vorarlberg' },
   kronplatz: { title: 'Kronplatz', places: 'Plan de Corones, Bruneck', flags: ['🇮🇹'], region: 'Südtirol' },
+  vialattea: { title: 'Via Lattea', places: "Sestriere, Sauze d'Oulx, Sansicario, Cesana, Claviere, Montgenèvre", flags: ['🇮🇹', '🇫🇷'], region: 'Piemont an Hautes-Alpes' },
 });
 
-/* the sources of all five resorts (scripts/ski/common.py SOURCE_CREDITS + OSM_CREDIT); each resort's own list: its piste map ⓘ */
+/* the sources of all resorts (scripts/ski/common.py SOURCE_CREDITS + OSM_CREDIT); each resort's own list: its piste map ⓘ */
 const CREDITS = [
   'Gelänn: IGN RGE ALTI® 5 m (© IGN, Licence Ouverte / Etalab 2.0), iwwer de Géoplateforme',
   'Gelänn Schwäiz: swissALTI3D 2 m (© swisstopo, Open Government Data, fräi Notzung mat Quellenugab)',
   "Gelänn Italien: DTM 2005/2008 Lidar 2 m (© Regione Autonoma Valle d'Aosta, CC BY 4.0)",
+  'Gelänn Italien: Ripresa aerea ICE 2009-2011 DTM 5 m, Lidar (© Regione Piemonte, CC BY 4.0)',
   'Gelänn: Digitaalt Terrainmodell 2,5 m vun der Autonomer Provënz Bozen - Südtirol (Open Data Südtirol, CC0 1.0)',
   'Gelänn: ALS-DTM Éisträich 1 m (Datenquell: BEV - Bundesamt für Eich- und Vermessungswesen, aus de Laserscans vun de Bundesländer, CC BY 4.0)',
   'Bierger an der Distanz: Copernicus DEM GLO-30 (© DLR e.V. 2010-2014 an © Airbus Defence and Space GmbH 2014-2018, ënnert COPERNICUS vun der EU an der ESA)',
@@ -34,6 +36,9 @@ const CREDITS = [
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const el = (html) => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild; };
 const imgUrl = (rid, width) => new URL(`./img/${rid}-${width}.webp?v=${IMG_VERSION}`, import.meta.url).href;
+/* the cards' headline count in Luxembourgish (a resort more = no text to touch) */
+const COUNT_LB = ['Null', 'Een', 'Zwee', 'Dräi', 'Véier', 'Fënnef', 'Sechs', 'Siwen', 'Aacht', 'Néng', 'Zéng'];
+const countWord = (n) => COUNT_LB[n] || String(n);
 const bits = (n) => { let c = 0; for (let v = n; v; v &= v - 1) c += 1; return c; };
 
 /** Stars and pistes skied per resort, read from the save (never written here). */
@@ -125,16 +130,17 @@ export function showResorts(root, { onPick, current = null, onOnline = null }) {
   const heroId = RESORTS.some((r) => r.id === current && r.ready) ? current : (RESORTS.find((r) => r.ready) || RESORTS[0]).id;
   const ordered = [...RESORTS.filter((r) => r.id === heroId), ...RESORTS.filter((r) => r.id !== heroId)];
   const kicker = last === heroId ? 'Zulescht gefuer' : 'Fir unzefänken';
+  const small = ordered.length - 1;          // the small cards: landscape = 2 rows of ceil(small / 2), an odd last card spans both rows
   const s = el(`<section class="screen rp" id="resortScreen" aria-label="Skigebitt wielen">
     <div class="rp-scroll">
       <div class="rp-head">
-        <div class="rp-title"><h1>Wiel e Skigebitt</h1><p>Fënnef richteg Skigebidder an 3D. Fuer fräi, mat de richtege Liften erop, an d'Challengen um Bierg.</p></div>
+        <div class="rp-title"><h1>Wiel e Skigebitt</h1><p>${countWord(RESORTS.filter((r) => r.ready).length)} richteg Skigebidder an 3D. Fuer fräi, mat de richtege Liften erop, an d'Challengen um Bierg.</p></div>
         <div class="rp-acts">
           ${onOnline ? '<button type="button" class="btn" id="skiOnline">👥 Online-Rennen</button>' : ''}
           <button type="button" class="btn ghost" id="skiCredits" aria-label="Quellen">ⓘ<span class="rp-hide-s"> Quellen</span></button>
         </div>
       </div>
-      <div class="resorts rp-grid">${ordered.map((r) => card(r, { isHero: r.id === heroId, isCurrent: r.id === current, kicker, progress })).join('')}</div>
+      <div class="resorts rp-grid${small % 2 ? ' rp-odd' : ''}" style="--rp-cols:${Math.max(2, Math.ceil(small / 2))};--rp-rows:${Math.max(2, Math.ceil(small / 2))}">${ordered.map((r) => card(r, { isHero: r.id === heroId, isCurrent: r.id === current, kicker, progress })).join('')}</div>
     </div>
   </section>`);
   s.querySelectorAll('.resort.ready').forEach((b) => b.addEventListener('click', () => onPick(b.dataset.id)));

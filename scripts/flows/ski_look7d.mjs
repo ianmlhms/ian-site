@@ -11,7 +11,7 @@
  * scripts/ski/look7d-check.mjs. */
 import { runIfMain } from "./lib.mjs";
 
-const RESORTS = ["killy", "3vallees", "zermatt", "arlberg", "kronplatz"];
+const RESORTS = ["killy", "3vallees", "zermatt", "arlberg", "kronplatz", "vialattea"];
 const BUDGET = { spruceNear: 308, larchNear: 380, spruceFar: 20, larchFar: 36 };
 
 export const flow = {

@@ -6,4 +6,5 @@ export const PICKER_STATS = Object.freeze({
   "zermatt": {"pistes": 194, "km": 218, "lifts": 61, "top": 3897, "low": 1558},
   "arlberg": {"pistes": 353, "km": 397, "lifts": 99, "top": 2806, "low": 995},
   "kronplatz": {"pistes": 71, "km": 76, "lifts": 27, "top": 2273, "low": 925},
+  "vialattea": {"pistes": 315, "km": 254, "lifts": 84, "top": 2797, "low": 1358},
 });

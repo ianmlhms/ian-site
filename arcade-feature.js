@@ -25,7 +25,7 @@
   var TEXTS = Object.freeze({
     new: { lb: "Nei", de: "Neu", en: "New" },
     kick: { lb: "Nei an der Arcade", de: "Neu in der Arcade", en: "New in the Arcade" },
-    line: { lb: "5 echt Skigebidder an 3D · Free Ride · Challenges · Online", de: "5 echte Skigebiete in 3D · Free Ride · Challenges · Online", en: "5 real ski areas in 3D · free ride · challenges · online" },
+    line: { lb: "6 echt Skigebidder an 3D · Free Ride · Challenges · Online", de: "6 echte Skigebiete in 3D · Free Ride · Challenges · Online", en: "6 real ski areas in 3D · free ride · challenges · online" },
   });
   var DEFAULT_LANG = "lb";
   var PREVIEW_PARAM = "featured";

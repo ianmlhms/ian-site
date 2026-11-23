@@ -22,7 +22,7 @@ const args = process.argv.slice(2);
 const opt = (name, def) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : def; };
 const ROOT = path.resolve(opt("--root", path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")));
 const THREE_FILE = opt("--three", path.join(os.homedir(), "Library/Caches/ski-work/power-test/three/three-0.160.0.min.js"));
-const resorts = opt("--resorts", "killy,3vallees,zermatt,arlberg,kronplatz").split(",");
+const resorts = opt("--resorts", "killy,3vallees,zermatt,arlberg,kronplatz,vialattea").split(",");
 const STREET_TOL = 0.06, LIFT = 0.006;
 const SAMPLES = [];                       // the first overlapping pairs (where, so a failure can be looked at)
 

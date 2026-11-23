@@ -15,7 +15,7 @@ const args = process.argv.slice(2);
 const opt = (name, def) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : def; };
 const ROOT = path.resolve(opt("--root", process.cwd()));
 const MODE = opt("--mode", "long");
-const CYCLE = opt("--cycle", "killy,3vallees,zermatt,arlberg,kronplatz,killy,3vallees,zermatt,arlberg,kronplatz").split(",");
+const CYCLE = opt("--cycle", "killy,3vallees,zermatt,arlberg,kronplatz,killy,3vallees,zermatt,arlberg,kronplatz,vialattea").split(",");
 const SETTLE_MS = Number(opt("--settle", "8000"));
 const GC = args.includes("--gc");
 const { launchBrowser, startServer } = await import(pathToFileURL(path.join(ROOT, "scripts/flows/lib.mjs")).href);

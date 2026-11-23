@@ -96,13 +96,14 @@ export const flow = {
       const c = await import("/pb/ski/modes/cloud.js");
       const ch = await import("/pb/ski/modes/challenges.js");
       const stars = {};
-      for (const rid of ["killy", "3vallees", "zermatt", "arlberg", "kronplatz"]) for (let i = 0; i < 160; i++) stars[ch.starKey(rid, `piste-${i}`)] = 7;
+      const rids = ["killy", "3vallees", "zermatt", "arlberg", "kronplatz", "vialattea"];
+      for (const rid of rids) for (let i = 0; i < 160; i++) stars[ch.starKey(rid, `piste-${i}`)] = 7;
       const bestHash = Object.fromEntries(Object.keys(stars).map((k) => [k, 123456]));
       const rec = c.encodeCloud({ stars, park: { killy: 12345 }, bestHash });
       const back = c.decodeCloud(JSON.parse(JSON.stringify(rec)));
-      return { bytes: JSON.stringify(rec).length, tb: rec.tb, stars: Object.keys(back.stars).length, park: back.park.killy, times: Object.keys(back.bestHash).length };
+      return { n: rids.length * 160, bytes: JSON.stringify(rec).length, tb: rec.tb, stars: Object.keys(back.stars).length, park: back.park.killy, times: Object.keys(back.bestHash).length };
     });
-    h.expect(sizes.bytes < 7000 && sizes.tb === 2400 && sizes.stars === 800 && sizes.park === 12345, `800 pistes x 3 stars: ${sizes.bytes} bytes, tb ${sizes.tb}, ${sizes.stars} stars back, park ${sizes.park}, ${sizes.times} times kept`);
+    h.expect(sizes.bytes < 7000 && sizes.tb === sizes.n * 3 && sizes.stars === sizes.n && sizes.park === 12345, `${sizes.n} pistes x 3 stars: ${sizes.bytes} bytes, tb ${sizes.tb}, ${sizes.stars} stars back, park ${sizes.park}, ${sizes.times} times kept`);
 
     h.step("cloud: inside a parent frame the game posts {__pbSave} and merges {__pbLoadSave}");
     await h.goto("/__ski_parent_frame__");                     // a blank same-origin page (404 text) to hold the game frame
