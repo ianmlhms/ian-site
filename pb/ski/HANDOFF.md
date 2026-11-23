@@ -1680,3 +1680,27 @@ hotel; Zermatt stafelalp does not reach the ZIL, s 5704 / 5771).
 look7d 68, cliff-check 9/9. Chromium flows (FLOW_POWER): ski, ski-freeride, ski-mp, ski-npc, ski-course, ski-ipad-start PASS;
 ski-mp-freeride PASS 3 x in a row (emma sends 14.7-15.3 / s, the host gets 14.8-15.1 / s, 121-186 ms behind). WebKit (FLOWS=ski-webkit)
 still hangs at startup on the Mini (Playwright.app 0 % CPU in mach_msg for 6 min, killed). main.js?v=22.
+
+## Course rides regression (23 Nov 2026): Killy joseray through a net, Zermatt stafelalp never at the ZIL
+`round7c-check --rides` failed 3 on origin/main (joseray through a net at s 1501; stafelalp not finished at s 5704 / 5771 + its HUD).
+**Culprit**: not physics round 2 / the other skiers / the cleanup. Bisect (Node, the two rides): e7462969 (R8g nets) ITSELF fails on
+main; with 36f8a483 + d8efc1d6 reverted on top of it the two ride clean. R8g was measured on a base without the **acceleration assist**
+(d8efc1d6, + the challenge launch 36f8a483 on it) and landed after them. The assist keeps the scripted skier at 40-50 km/h where he
+used to crawl: (1) joseray's line runs through a 33 x 31 m hotel; he went round it on the outside of the net line (the gap is open
+there), swung back in 7 m below the gap's end (INTRUDE_PAD 12 m) and passed through the net (outside the net there is no wall: "he may
+ski back in", R7-C2). Physics round 2 makes it worse (with the assist off it still crossed at s 1495, 7 m/s). (2) stafelalp's last 80 m
+run through a 2-4 m alley between Zermatt houses: he reached it at 13 m/s with full steer, hit a house above `hitCrash` 5 m/s, and after
+every respawn the assist pushed him into the same house at 5.6-8 m/s (a crash loop until the ride limit). Not airs: nets already
+turn him back in the air (R8g), now checked.
+- **bot.js careful player**: `blocked` given (round7c rides, main.js `?bot=1`, flows), a station / house on the line within his look-ahead
+  + 30 m, or while he aims beside the line round one: speed limit 6 m/s (22 km/h, a touch of a wall is a bump). joseray: round the
+  hotel at 6 m/s, back in at s 1484 inside the gap; stafelalp: through the alley at 6 m/s (one 3.6 m/s touch, no crash). The star
+  harness (harness.js, no `blocked`) is unchanged.
+- **course.js gap below a house** `INTRUDE_PAD_AFTER` 24 m (above it 12 as before): a PLAYER at the assist's 45 km/h who goes round
+  the hotel finds the gap open where he swings back in (the OLD bot at 11-13 m/s now rides joseray clean too). Edges left open
+  2.2 / 3.0 / 2.0 / 2.7 / 1.6 % -> 2.4 / 3.2 / 2.3 / 2.9 / 1.8 %.
+- **round7c-check** new: the 54 km/h net-aimed skiers again IN THE AIR (0.6 m up, rising 2.5 m/s): 534/534 held inside.
+- Results (23 Nov): round7c --rides 145/0 (1324/1324 finished, 0 through a net, 0 timeouts; stalls info: Killy vallee-perdue +
+  aiguille-percee as in R8g), barrier-check 11, speed-check 94, review-check 37, cliff-check 9/9, camera-check 15, npc-check 79,
+  floors-check 1324 + parks (unchanged), round6 2222, round7 38, round7b 11791, r8c 36302, r7d 1432, security-test. Chromium flows
+  (FLOW_POWER) ski-course, ski-challenges, ski-freeride PASS. WebKit not run. main.js?v=23.

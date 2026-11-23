@@ -13,7 +13,10 @@ const THREE = typeof window !== 'undefined' ? window.THREE : null;
 const ARROW_EVERY = 250;
 const NET_STEP = 0.5;               // m between the net ribbon's vertices
 const NET_H = 1.05;                 // m: the net's height over the snow
-const INTRUDE_PAD = 12;             // R8g: m the net stays open beyond a house / station hall reaching into the course
+const INTRUDE_PAD = 12;             // R8g: m the net stays open beyond a house / station hall reaching into the course (before it)
+// 23 Nov 2026 (round7c --rides, Killy joseray: since the acceleration assist he goes round the 33 m hotel at 40-50 km/h and came back
+// in 7 m below the gap, through the net): BELOW the house, where he swings back in, the gap reaches further
+const INTRUDE_PAD_AFTER = 24;
 const LINE_CLEAR = 0.2;             // R8g: m a net point stays beyond the half width from EVERY part of the course line
 const JUNCTION_GAP = 60;
 
@@ -65,12 +68,12 @@ export function courseLayout(piste, startS = 2, pistes = null, obs = null, finis
   for (const side of [-1, 1]) {
     // R8g: where a house / station hall opens the net, the gap reaches INTRUDE_PAD m further both ways: the skier (and the scripted
     // one, 2.5 m round it) goes round the house outside the net line and must find the gap open on his way back in too
-    const open = new Uint8Array(nS), pad = Math.round(INTRUDE_PAD / NET_STEP);
+    const open = new Uint8Array(nS), pad = Math.round(INTRUDE_PAD / NET_STEP), padAfter = Math.round(INTRUDE_PAD_AFTER / NET_STEP);
     for (let i = 0; i < nS; i++) {
       const s = startS + 4 + i * NET_STEP;
       piste.at(s, a);
       const x = a.x - a.dz * side * (hw + 0.5), z = a.z + a.dx * side * (hw + 0.5);
-      if (intrudes(x, z, s)) for (let j = Math.max(0, i - pad); j <= Math.min(nS - 1, i + pad); j++) open[j] = 1;
+      if (intrudes(x, z, s)) for (let j = Math.max(0, i - pad); j <= Math.min(nS - 1, i + padAfter); j++) open[j] = 1;
     }
     let run = [];
     const cut = () => { if (run.length >= 4) rails.push(run); run = []; };

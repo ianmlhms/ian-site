@@ -272,18 +272,44 @@ for (const rid of rids.length ? rids : ALL) {
   let hold = 0, holdN = 0, through = 0, stopped = 0, minKeep = 1, missed = 0;
   const holdBad = [];
   let openGap = 0;
+  // 23 Nov 2026: the same skiers once more in the AIR (a crest air: 0.6 m over the snow, rising 2.5 m/s): the net turns him back too
+  const air = { hold: 0, n: 0, through: 0, bad: [] };
   for (const [i, p] of pistes.list.entries()) {
     if (ONLY ? !ONLY.has(p.id) : i % 5) continue;
     const g = gates.get(p.id) || courseGate(p, obs);
-    for (const side of [-1, 1]) {
+    for (const side of [-1, 1]) for (const airborne of [false, true]) {
       const sA = Math.min(p.length - 40, g.s + 60 + (p.length - g.s) * 0.3);
       if (sA < g.s + 20) continue;
-      holdN++;
       const c = createCourse({ piste: p, startS: g.s });
       const a = p.at(sA, {});
       const h0 = Math.atan2(a.dz, a.dx) + side * 35 * Math.PI / 180;      // + = towards the right edge
       const x0 = a.x - a.dz * side * (p.halfWidth - 3), z0 = a.z + a.dx * side * (p.halfWidth - 3);
       let s = { ...createSkierState(x0, z0, h0, height(x0, z0)), hold: 0, vx: Math.cos(h0) * 15, vz: Math.sin(h0) * 15, speed: 15 };
+      if (airborne) {
+        s = { ...s, y: s.y + 0.6, vy: 2.5, grounded: false, air: 0.05 };
+        let maxUp = 0;
+        for (let w = g.s; w < sA; w += 20) { const q = p.at(w, {}); const st0 = createSkierState(q.x, q.z, 0, height(q.x, q.z)); c.collide(st0, st0); }
+        c.collide(s, s);
+        let worst = 0, flew = false;
+        for (let k = 0; k < 240; k++) {
+          const prev = s;
+          s = stepSkier(s, { steer: 0, tuck: 0, brake: 0, push: 0, jump: false }, world);
+          s = c.collide(prev, s);
+          const pr = p.project(s.x, s.z, sA, 120, {});
+          const out = Math.abs(pr.off) - (p.halfWidth + 0.5);
+          if (out > 0 && !s.grounded) flew = true;
+          maxUp = Math.max(maxUp, s.y - height(s.x, s.z));
+          worst = Math.max(worst, out);
+        }
+        if (!flew && worst <= 0.05) { air.n++; air.hold++; continue; }
+        const lay = courseLayout(p, g.s, pistes, obs, finishes.get(p.id));
+        let near = Infinity;
+        for (const r of lay.rails) for (let i = 0; i < r.length; i += 2) near = Math.min(near, Math.hypot(r[i] - s.x, r[i + 1] - s.z));
+        if (near > 4) continue;                                           // out through a gap left open at a house / station
+        air.n++; air.through++; air.bad.push(`${p.id} side ${side} ${worst.toFixed(2)} m out at s ${Math.round(sA)} (up to ${maxUp.toFixed(1)} m in the air)`);
+        continue;
+      }
+      holdN++;
       // R8d: the course follows the skier down from the gate (in the game he skis there): walk its projection hint down the line, so
       // a piste whose own legs lie side by side (arlberg stapf: two 45 m wide legs 90 m apart) is not read on the wrong leg
       for (let w = g.s; w < sA; w += 20) { const q = p.at(w, {}); const st0 = createSkierState(q.x, q.z, 0, height(q.x, q.z)); c.collide(st0, st0); }
@@ -328,6 +354,7 @@ for (const rid of rids.length ? rids : ALL) {
     if (Math.hypot(s.x - ox, s.z - oz) > 5) pulled++;
   }
   check(pulled === 0, `barriers: ${placedN - pulled}/${placedN} skiers put down outside the net stay there (no pull through it)`);
+  check(air.through === 0 && air.n > 0, `barriers: ${air.hold}/${air.n} skiers aimed at the net at 54 km/h IN THE AIR (0.6 m up, rising) held inside${air.bad.length ? `; bad: ${air.bad.slice(0, 6).join('; ')}` : ''}`);
   check(through === 0 && stopped === 0 && hold === holdN && holdN > 0, `barriers: ${hold}/${holdN} skiers aimed at the net at 54 km/h held inside (${through} through, ${stopped} stopped, ${missed} never reached it, ${openGap} out through a gap left open at a house / station), speed kept at the hit >= ${(minKeep * 100).toFixed(0)} %${holdBad.length ? `; bad: ${holdBad.slice(0, 6).join('; ')}` : ''}`);
   if (RIDES) {
     let fin = 0, resets = 0, warned = 0, hudBad = 0, hits = 0, outside = 0, timeouts = 0, crossed = 0, jumpedOver = 0, stalls = 0;

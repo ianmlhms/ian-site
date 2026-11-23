@@ -8,10 +8,22 @@ const wrap = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI)
  * (a station / pylon / house there; main.js window.__ski.blocked) the bot looks along its aim line and, when something is in the way,
  * aims beside the line instead (the smallest clear side offset), like a player skiing round the station. */
 const AVOID = [3, -3, 6, -6, 9, -9, 12, -12, 16, -16, 20, -20, 25, -25];
+/* Bot fix (23 Nov 2026, round7c --rides: Killy joseray / Zermatt stafelalp since the acceleration assist): like a careful player he
+ * slows down before something stands on the line ahead (a hotel the line runs through, a 2-4 m alley between village houses): at
+ * 45-50 km/h he went round joseray's hotel so wide that he came back in through the net, and hit stafelalp's alley at 13 m/s (a
+ * crash, again after every respawn). CAREFUL m/s from CAREFUL_AHEAD m before it (plus his look-ahead) until he is past it. */
+const CAREFUL = 6;                  // m/s (22 km/h): he can turn round a corner and a touch of a wall is a bump, not a crash
+const CAREFUL_AHEAD = 30;           // m: braking from ~50 km/h to CAREFUL (plough) with room to spare
+const CAREFUL_STEP = 3;             // m between the line samples tested
 function pathClear(blocked, x0, z0, x1, z1, from = 0) {        // from: m near him not tested (pressed against a wall: its margin)
   const d = Math.hypot(x1 - x0, z1 - z0), n = Math.max(1, Math.ceil(d / 2));
   for (let i = 1; i <= n; i++) if (d * i / n >= from && blocked(x0 + (x1 - x0) * i / n, z0 + (z1 - z0) * i / n)) return false;
   return true;
+}
+
+function lineBlocked(blocked, piste, s0, ahead, o) {
+  for (let d = 0; d <= ahead; d += CAREFUL_STEP) { piste.at(s0 + d, o); if (blocked(o.x, o.z)) return true; }
+  return false;
 }
 
 export function createBot(piste, { speedScale = 1, blocked = null } = {}) {
@@ -69,7 +81,9 @@ export function createBot(piste, { speedScale = 1, blocked = null } = {}) {
     // slow down before a sharp bend of the line (a hairpin overshot at full speed ends in the deep snow below it)
     piste.at(proj.s + look + 30, q);
     const bend = Math.abs(wrap(Math.atan2(q.dz, q.dx) - Math.atan2(p.dz, p.dx)));
-    const limit = (LIMIT[piste.diff] || 16) * speedScale * (bend > 0.5 ? Math.max(0.45, 1 - (bend - 0.5) * 0.7) : 1);
+    const open = (LIMIT[piste.diff] || 16) * speedScale * (bend > 0.5 ? Math.max(0.45, 1 - (bend - 0.5) * 0.7) : 1);
+    const careful = !!blocked && (side !== 0 || lineBlocked(blocked, piste, proj.s, look + CAREFUL_AHEAD, q));
+    const limit = careful ? Math.min(open, CAREFUL) : open;
     return { steer, tuck: Math.abs(err) < 0.12 && !side && state.speed < limit * 0.9 ? 1 : 0, brake: state.speed > limit ? 1 : 0, push: state.speed < 4 ? 1 : 0, jump: false };
   };
 }
