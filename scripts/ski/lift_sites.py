@@ -84,13 +84,16 @@ def at(p, s):
 TWIN_GAP = 10.0                   # m: twin drag lifts mapped (almost) on top of each other are set this far apart
 
 
-def separate_twins(lifts, log=print):
+def separate_twins(lifts, log=print, mixed=False):
     """Two drag lifts mapped within a few metres of each other along most of their length (OSM: "Rosolin I" / "Rosolin II" 1.6 m
     apart) are moved apart sideways to TWIN_GAP m, each half the way, so each gets its own track and return rope."""
-    drags = [i for i, lf in enumerate(lifts) if lf["kind"] == "drag"]
+    # mixed (Livigno: the chair "San Rocco I" and the drag "San Rocco II" 6 m apart, both ends on one spot): a drag next to a chair too
+    drags = [i for i, lf in enumerate(lifts) if lf["kind"] == "drag" or (mixed and lf["kind"] == "chair")]
     moved = 0
     for n, i in enumerate(drags):
         for j in drags[n + 1:]:
+            if lifts[i]["kind"] != "drag" and lifts[j]["kind"] != "drag":
+                continue
             p, q = pts_of(lifts[i]), pts_of(lifts[j])
             length = float(np.hypot(*(np.diff(p, axis=0).T)).sum())
             samples = np.arange(0, length, 10.0)
@@ -122,9 +125,9 @@ def separate_twins(lifts, log=print):
     log("twin drag lifts set apart: %d pairs" % moved)
 
 
-def arrange(lifts, log=print):
+def arrange(lifts, log=print, mixed_twins=False):
     """The drag lifts' track side and the pylons out of other lifts' lanes (in place on the baked rows, before they are written)."""
-    separate_twins(lifts, log)
+    separate_twins(lifts, log, mixed_twins)
     lines = [pts_of(lf) for lf in lifts]
     centres = [(p.mean(axis=0), float(np.hypot(*(np.diff(p, axis=0).T)).sum())) for p in lines]
     flipped = 0

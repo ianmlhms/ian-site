@@ -1426,6 +1426,8 @@ def build_lifts(frame, dem_raw):
                 row["osm"] = [round(best[0], 1), round(best[1], 1)]       # the mapped station (node / building centre)
             return row
         name = cfg.get("lift_names", {}).get(oid, t.get("name", "") or t.get("ref", ""))   # RESORTS[rid]["lift_names"]: OSM way id -> shown name
+        if cfg.get("lift_strip_numbers") and oid not in cfg.get("lift_names", {}):
+            name = re.sub(r"\s*\(\d+[ab]?\)$", "", name)      # Livigno: OSM names carry the number of the lift map ("Mottolino Gondola (3)")
         row = {"name": name, "kind": kind, "seats": seats, "pts": flat(dp_simplify(p, 0.8)), "pylons": tow,
                "len": round(length), "osm": oid, "type": raw, "rise": round(float(h[-1] - h[0])),
                "bottom": station(p[0], h[0]), "top": station(p[-1], h[-1])}
@@ -1632,7 +1634,7 @@ def main():
     raw, lake_levels, banks = apply_drawdown(frame, cfg, raw, load_osm(rid, "areas"))
     dem_raw = Dem(raw)
     lifts = build_lifts(frame, dem_raw)
-    arrange(lifts, log)                                       # round 7-B: drag tracks away from neighbours, pylons out of other lanes
+    arrange(lifts, log, bool(cfg.get("mixed_twins")))                                       # round 7-B: drag tracks away from neighbours, pylons out of other lanes
     drop_drag_pylons_under(lifts, log)                        # R8: a drag pylon left under an aerial lift's chairs goes
     peaks, places = build_poi(frame)
     lines, areas, runs = build_pistes(frame, dem_raw, lifts, places)

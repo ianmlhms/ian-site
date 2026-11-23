@@ -206,6 +206,7 @@ export const FIRST_LIFT = Object.freeze({
   arlberg: ['Galzigbahn', 'Nassereinbahn'],                // St. Anton: the Galzigbahn from the village centre
   kronplatz: ['Kronplatz I - Plan de Corones I', 'Ried'],  // Reischach / Riscone: Kronplatz I
   vialattea: ['Sestriere - Fraiteve 1', 'Cit Roc'],        // Sestriere village: the Fraiteve gondola
+  livigno: ['Mottolino Gondola', 'Livigno-Tagliede'],      // Livigno centre: the Mottolino gondola from the village
   obertauern: ['Zehnerkarbahn I', 'Grünwaldkopfbahn'],   // the west end of the pass village: the Zehnerkar gondola
 });
 // R8d (Ian): separate areas of a resort's pass, reached by the ski bus (no piste / lift links them): the valley station of each listed

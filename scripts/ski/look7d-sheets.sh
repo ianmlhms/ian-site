@@ -2,7 +2,7 @@
 # R7-D look sheets (phone-readable, one column, labelled) from look7d-shots.sh output:
 #   look7d-sheets.sh DIR    (DIR/before, DIR/after = Chromium GPU, DIR/webkit = WebKit)
 D="$1"; PY="${SKI_PY:-$HOME/Library/Caches/luxtram-work/.venv/bin/python}"; S="$(cd "$(dirname "$0")" && pwd)/look_sheet.py"
-R="killy 3vallees zermatt arlberg kronplatz vialattea obertauern"
+R="killy 3vallees zermatt arlberg kronplatz vialattea obertauern livigno"
 pair() {   # pair OUT shot...: before / after per resort (after only where no before exists)
   local out="$1"; shift; local args=()
   for r in $R; do for n in "$@"; do

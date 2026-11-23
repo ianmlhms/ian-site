@@ -5,7 +5,7 @@
 set -u
 BROWSERS=${BROWSERS:-gpu webkit}
 OUT=${1:-$HOME/Library/Caches/ski-work/round7c2}; shift || true
-RESORTS=${*:-killy 3vallees zermatt arlberg kronplatz vialattea obertauern}
+RESORTS=${*:-killy 3vallees zermatt arlberg kronplatz vialattea obertauern livigno}
 cd "$(dirname "$0")/../.."
 mkdir -p "$OUT/gpu" "$OUT/webkit"
 for rid in $RESORTS; do
@@ -20,7 +20,7 @@ for rid in $RESORTS; do
   done
 done
 PY=~/Library/Caches/luxtram-work/.venv/bin/python
-for rid in killy 3vallees zermatt arlberg kronplatz vialattea obertauern; do
+for rid in killy 3vallees zermatt arlberg kronplatz vialattea obertauern livigno; do
   args=()
   for s in course-start course-mid course-finish avalanche; do
     for b in gpu webkit; do [ -f "$OUT/$b/$rid-$s.png" ] && args+=("$rid · $s ($b)|$OUT/$b/$rid-$s.png"); done

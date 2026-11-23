@@ -49,6 +49,8 @@ const SKI_PISTES = Object.freeze([
   ["vialattea", "baisses", "🔵 Baïsses · 2.8 km"], ["vialattea", "les-poussins", "🔵 Les Poussins · 2.4 km"], ["vialattea", "le-lac", "🟢 Le Lac · 2.2 km"],
   ["obertauern", "seekarspitz", "🔴 Seekarspitz · 2.0 km"], ["obertauern", "hundskogel", "🔴 Hundskogel · 1.8 km"], ["obertauern", "gamsleiten-2", "⚫ Gamsleiten 2 · 0.9 km"],
   ["obertauern", "zehnerkar", "🔵 Zehnerkar · 1.9 km"], ["obertauern", "schaidberg", "🔵 Schaidberg · 2.0 km"], ["obertauern", "zehnerkar-red", "🔴 Zehnerkar · 1.1 km"],
+  ["livigno", "zuelli", "⚫ Zuelli · 2.6 km"], ["livigno", "centrale", "🔴 Centrale · 3.0 km"], ["livigno", "mottolino", "🔴 Mottolino · 2.0 km"],
+  ["livigno", "degli-amanti", "🔵 Degli Amanti · 2.7 km"], ["livigno", "delle-cime", "🔵 Delle Cime · 2.5 km"], ["livigno", "blesaccia", "🔴 Blesaccia · 3.0 km"],
 ]);
 const opt = (v, label, when) => Object.freeze(when ? { v, label, when } : { v, label });
 const SKI_SETTINGS = Object.freeze([

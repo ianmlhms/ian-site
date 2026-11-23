@@ -16,7 +16,7 @@ import { startServer, launchBrowser, REPO } from "../flows/lib.mjs";
 const args = process.argv.slice(2);
 const opt = (name, def) => { const i = args.indexOf(`--${name}`); return i >= 0 ? args[i + 1] : def; };
 const ENGINE = opt("engine", "chromium");
-const RESORTS = opt("resorts", "killy,3vallees,zermatt,arlberg,kronplatz,vialattea,obertauern").split(",").filter(Boolean);
+const RESORTS = opt("resorts", "killy,3vallees,zermatt,arlberg,kronplatz,vialattea,obertauern,livigno").split(",").filter(Boolean);
 const Q = opt("q", "low");
 const TOUR = Number(opt("tour", "18"));
 const SWITCHES = Number(opt("switches", "10"));

@@ -15,7 +15,7 @@
  * The "live game" signal: dataset.liveGame = "1" while a match / race runs, "0" (or removed) otherwise. A game inside an
  * iframe posts { __ianLive: true|false } to its shell (pixelbreak.html copies that into the flag). Arcade pages under
  * /pb/ that say nothing count as live. */
-import { gameInfo, gameName, joinUrl } from "./mp-games.js?v=10";
+import { gameInfo, gameName, joinUrl } from "./mp-games.js?v=11";
 
 const EXPIRY_MS = 12 * 3_600_000;        // my_game_invites() only returns the last 12 h
 const BANNER_MS = 8000;

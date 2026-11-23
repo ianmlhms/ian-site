@@ -28,6 +28,7 @@ export const UNLOCK = Object.freeze({
   kronplatz: { red: 4, black: 12 },    // 50 pistes in all
   vialattea: { red: 6, black: 18 },
   obertauern: { red: 4, black: 12 },   // 100 pistes, small area
+  livigno: { red: 4, black: 8 },       // 96 pistes, only 8 black
 });
 
 /* The 1D target ride (see targetFor) */

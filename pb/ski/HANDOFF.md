@@ -1886,3 +1886,25 @@ piste map looked at, traced or copied). The old plan from above stays one tap aw
 - Results: node checks green; ground-check Chromium 6 / 7 (streets 6 mm everywhere); Obertauern's one crack after the jump to Kehrkopfbahn
   (-1.5 m, terrain only) is the same on main before this round: OPEN. memory-check: only "switch #8 killy" (+66 MB vs the 50 MB limit; +62
   noted on main before). WebKit not run.
+
+## Livigno (23 Nov 2026): the 8th resort (Lombardy, Mottolino + Carosello 3000; stands alone, no Bormio / Santa Caterina)
+- **Data** `livigno` (common.py): box 46.490..46.562 N, 10.050..10.190 E = 11.5 x 10.2 km (9 x 8 tiles, 38 shipped), frame EPSG:25832, 2.6 MB.
+  Heights: NEW source `lombardia-dtm` (`dem_merge.py lombardia_mosaic`) = Regione Lombardia DTM 5 m through the ArcGIS ImageServer
+  `https://www.cartografia.servizirl.it/arcgis2/rest/services/BaseMap/DTM5_RL_img/ImageServer/exportImage` (F32 GeoTIFF, EPSG:32632, 512-node
+  chunks, nearest neighbour, CC BY 4.0). It covers 90.6 % of the box (the north-west corner is Switzerland, no pistes there); Copernicus GLO-30
+  fills the rest, merged like Via Lattea (`merge_sources`, offset median +0.6 m). Seam check: laplacian p99 4.8 on the edge vs 2.3 inside, and
+  the edge is 800+ m from the nearest piste (Federia, x > 2400 m): not visible. Far grid: Copernicus.
+- **OSM**: Overpass answered for pistes / lifts / buildings / areas, 502 from water on: `fetch_osm_api.py livigno` filled the rest. Result:
+  96 runs / 75 km (80 named, 4 variants, 16 links), network 81 km; 37 lifts = the 30 numbered lifts of the Livigno map + 7 carpets
+  (skiresort.com: 32 lifts and 115 km advertised; OSM has fewer km because pistes < 350 m / < 70 m drop are no runs). No official piste list
+  online (skiresort.com has totals only), so there is no official-name match count: piste names are the OSM ones (Mottolino, Zuelli, Blesaccia,
+  Centrale, Giorgio Rocca, Nera, Autostrada, Sponda FIS, Degli Amanti ...); the lift names match the ones skiresort.com shows.
+- **New generic knobs**: `lift_strip_numbers` (bake.py; OSM names carry the lift-map number, "Mottolino Gondola (3)"; `lift_names`
+  {204017643: "San Rocco I", 204017644: "San Rocco II"} for the one clash), `mixed_twins` (lift_sites.py; a chair + a drag mapped 6 m apart with
+  both ends on one spot, San Rocco 17a / 17b, are set apart like twin drags; before, round7b failed "the platform has its canopy" on San Rocco I),
+  `names` for OSM typos ("Pian Della Vlope 1", "femminile alta"). `lombardia-dtm` also triggers the merged DEM path in fetch_dem.py.
+- **Start / first lift / park**: start piste `mottolino` (2 km red from the top into the village), FIRST_LIFT `Mottolino Gondola`, park = the
+  mapped Mottolino fun area (OSM way 761530509, 420 m, Trepalle chairlift 16 m away; shown as "Snowpark Trepalle"). UNLOCK {red 4, black 8}
+  (only 8 black runs). Villages (all "chalet", `ALPINE_RESORTS`): Livigno (a long N-S strip), Santa Maria, Pemont, San Rocco, Borch, Florin,
+  Teola, Trepalle, Eira. No landmarks. Picker picture pb/ski/img/livigno-*.webp (GPU shot, 330 m up over the valley looking at Carosello).
+- **SQL**: `scripts/ski-v1.sql` regenerated (+97 boards: 96 pistes + the park), applied to production only after the piste list was final.

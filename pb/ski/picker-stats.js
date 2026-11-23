@@ -8,4 +8,5 @@ export const PICKER_STATS = Object.freeze({
   "kronplatz": {"pistes": 71, "km": 76, "lifts": 27, "top": 2273, "low": 925},
   "vialattea": {"pistes": 315, "km": 254, "lifts": 84, "top": 2797, "low": 1358},
   "obertauern": {"pistes": 100, "km": 63, "lifts": 28, "top": 2299, "low": 1627},
+  "livigno": {"pistes": 96, "km": 75, "lifts": 37, "top": 2791, "low": 1810},
 });

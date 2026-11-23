@@ -10,7 +10,7 @@
  * Zero page errors.  FLOW_SKI_RESORTS=killy,zermatt limits the resorts. */
 import { runIfMain } from "./lib.mjs";
 
-const RESORTS = (process.env.FLOW_SKI_RESORTS || "killy,3vallees,zermatt,arlberg,kronplatz,vialattea,obertauern").split(",");
+const RESORTS = (process.env.FLOW_SKI_RESORTS || "killy,3vallees,zermatt,arlberg,kronplatz,vialattea,obertauern,livigno").split(",");
 const TIMESCALE = 8;
 
 export const flow = {

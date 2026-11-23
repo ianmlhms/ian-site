@@ -233,6 +233,25 @@ RESORTS = {
             ("Obertauern", 13.5590, 47.2495, 950, "chalet"),
         ],
     },
+    # Livigno (Lombardy, Italy; duty-free valley, Mottolino on the east side of the valley, Carosello 3000 on the west): its own area, not
+    # linked to Bormio / Santa Caterina. Heights: Regione Lombardia DTM 5 m (ImageServer of cartografia.servizirl.it), Copernicus GLO-30
+    # only where it has no data. Frame ETRS89 / UTM 32N.
+    "livigno": {
+        "name": "Livigno", "short": "Mottolino · Carosello 3000", "country": "IT", "crs": "EPSG:25832",
+        "bbox": (46.490, 10.050, 46.562, 10.190),
+        "dem": ["lombardia-dtm", "copernicus-glo30"], "far": ["copernicus-glo30"],
+        "tree_line": 2200.0, "derived_forest": 2050.0,       # inner Alps, valley floor 1816 m: larch / arolla pine only on the shady lower slopes
+        "buildings": "villages",
+        "start": "Mottolino",                    # the long red from the Mottolino top station down into the village
+        "lift_strip_numbers": True, "mixed_twins": True,
+        "lift_names": {204017643: "San Rocco I", 204017644: "San Rocco II"},
+        "names": {"pian-della-vlope-1": "Pian della Volpe 1", "pian-della-volpe-2": "Pian della Volpe 2", "femminile-alta": "Femminile Alta"},
+        "villages": [
+            ("Livigno", 10.1352, 46.5385, 750, "chalet"), ("Santa Maria", 10.1417, 46.5456, 450, "chalet"), ("Pemont", 10.1450, 46.5495, 400, "chalet"),
+            ("San Rocco", 10.1268, 46.5245, 450, "chalet"), ("Borch", 10.1225, 46.5185, 380, "chalet"), ("Florin", 10.1205, 46.5110, 300, "chalet"),
+            ("Teola", 10.1398, 46.5317, 300, "chalet"), ("Trepalle", 10.1759, 46.5266, 380, "chalet"), ("Eira", 10.1665, 46.5384, 250, "chalet"),
+        ],
+    },
 }
 
 # Height tiles: TILE_CELLS cells of NEAR_STEP metres (the files hold TILE_CELLS + 1 nodes per side, neighbours share their edge).
@@ -250,6 +269,7 @@ SOURCE_CREDITS = {
     "ign-rgealti": "Gelänn: IGN RGE ALTI® 5 m (© IGN, Licence Ouverte / Etalab 2.0), iwwer de Géoplateforme",
     "swissalti3d": "Gelänn Schwäiz: swissALTI3D 2 m (© swisstopo, Open Government Data, fräi Notzung mat Quellenugab)",
     "vda-dtm": "Gelänn Italien: DTM 2005/2008 Lidar 2 m (© Regione Autonoma Valle d'Aosta, CC BY 4.0)",
+    "lombardia-dtm": "Gelänn Italien: DTM 5 m vun der Regione Lombardia (Open Data, Geoportale Lombardia, CC BY 4.0)",
     "piemonte-dtm": "Gelänn Italien: Ripresa aerea ICE 2009-2011 DTM 5 m, Lidar (© Regione Piemonte, CC BY 4.0)",
     "bz-dtm": "Gelänn: Digitaalt Terrainmodell 2,5 m vun der Autonomer Provënz Bozen - Südtirol (Open Data Südtirol, CC0 1.0)",
     "at-dgm": "Gelänn: ALS-DTM Éisträich 1 m (Datenquell: BEV - Bundesamt für Eich- und Vermessungswesen, aus de Laserscans vun de Bundesländer, CC BY 4.0)",

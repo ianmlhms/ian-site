@@ -312,6 +312,31 @@ def piemonte_mosaic(frame, rid):
     return chunked_mosaic(frame, rid, "piemonte-dtm", chunk)
 
 
+LOMBARDIA_IMG = ("https://www.cartografia.servizirl.it/arcgis2/rest/services/BaseMap/DTM5_RL_img/ImageServer/exportImage?bbox={x0:.1f},{y0:.1f},{x1:.1f},{y1:.1f}"
+                 "&bboxSR=32632&imageSR=32632&size={w},{h}&format=tiff&pixelType=F32&interpolation=RSP_NearestNeighbor&f=image")
+
+
+def lombardia_mosaic(frame, rid):
+    """Regione Lombardia DTM 5 m (Geoportale Lombardia, open data, CC BY 4.0): ImageServer BaseMap/DTM5_RL_img of cartografia.servizirl.it,
+    float32 GeoTIFF in WGS 84 / UTM 32N (EPSG:32632; the ETRS89 frame differs by well under a metre). The request covers the frame chunk
+    (+ 4 nodes) on the native 5 m grid (nearest neighbour: no smoothing of the lidar nodes); outside the region the server sends nodata."""
+    from rasterio.enums import Resampling
+
+    def chunk(e0, n_top, nx, nz, stem):
+        x0, y0, x1, y1 = frame_bounds_utm(frame, e0, n_top, nx, nz, 20.0)
+        w, h = int(round((x1 - x0) / NEAR_STEP)), int(round((y1 - y0) / NEAR_STEP))
+        path = stem + ".tif"
+        body = http_get(LOMBARDIA_IMG.format(x0=x0, y0=y0, x1=x0 + w * NEAR_STEP, y1=y0 + h * NEAR_STEP, w=w, h=h), path, timeout=240, pause=0.6)
+        if body[:2] not in (b"II", b"MM"):
+            os.remove(path)
+            raise SystemExit("Lombardia ImageServer did not answer a GeoTIFF: %r" % body[:300])
+        part = np.full((nz, nx), np.nan, np.float32)
+        reproject_into(part, path, frame, e0, n_top, NEAR_STEP, Resampling.bilinear)
+        part[part < -50] = np.nan
+        return part
+    return chunked_mosaic(frame, rid, "lombardia-dtm", chunk)
+
+
 def frame_bounds_utm(frame, e0, n_top, nx, nz, pad, crs="EPSG:32632"):
     from pyproj import Transformer
     t = Transformer.from_crs(frame.crs, crs, always_xy=True)
@@ -373,7 +398,7 @@ def copernicus_mosaic(frame, rid):
     return copernicus_grid(frame, e0, n_top, nx, nz, NEAR_STEP)
 
 
-SOURCES = {"swissalti3d": swiss_mosaic, "vda-dtm": vda_mosaic, "piemonte-dtm": piemonte_mosaic, "ign-rgealti": ign_mosaic,
+SOURCES = {"swissalti3d": swiss_mosaic, "vda-dtm": vda_mosaic, "piemonte-dtm": piemonte_mosaic, "lombardia-dtm": lombardia_mosaic, "ign-rgealti": ign_mosaic,
            "copernicus-glo30": copernicus_mosaic}
 
 

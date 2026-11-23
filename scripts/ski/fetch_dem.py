@@ -220,7 +220,7 @@ def adopt_old_tiles(rid, frame):
 def fetch_near(rid, frame):
     adopt_old_tiles(rid, frame)
     srcs = RESORTS[rid]["dem"]
-    if any(s in ("swissalti3d", "vda-dtm", "piemonte-dtm") for s in srcs):     # several DEMs across a border: whole-box mosaics merged (dem_merge.py)
+    if any(s in ("swissalti3d", "vda-dtm", "piemonte-dtm", "lombardia-dtm") for s in srcs):     # several DEMs across a border: whole-box mosaics merged (dem_merge.py)
         from dem_merge import fetch_near_merged
         if "--remerge" in sys.argv or not all(os.path.exists(os.path.join(work_dir(rid, "dem"), "near_%d_%d.npy" % (tx, tz)))
                                               for tz in range(frame.tiles_z) for tx in range(frame.tiles_x)):
