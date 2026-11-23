@@ -4,6 +4,23 @@ Arcade id `ski`, page `pb/ski.html`, code `pb/ski/`, pipeline `scripts/ski/`, da
 resort, Espace Killy (Val d'Isère + Tignes). The game must NOT go live before the other four resorts are in (3 Vallées, Zermatt-Cervinia,
 St. Anton, Kronplatz): Kronplatz and St. Anton are in since round 2B; the picker lists the rest as "geschwënn".
 
+## READ FIRST: module versions (23 Nov 2026), after EVERY change or merge run the generator
+**`python3 scripts/game_importmap.py`** (or `gamedata_manifest.py`, which runs it too), then commit `pb/ski.html` with your change. No more
+hand-bumped `main.js?v=N`. After a rebase / merge run it AGAIN: two branches that changed different modules merge without a conflict, but
+the hashes must match the merged files; a conflict inside the block of `pb/ski.html` is solved by running it (it replaces the markers),
+then `git add pb/ski.html`. `scripts/check_site.py` (rule `importmap`, error) fails until the map matches: run it before every push.
+- **Why**: main.js imports ~80 modules without a version and the host sends no Cache-Control: after a deploy a browser mixed old and new
+  modules (minimap handler, first person / config) until a reload.
+- **How**: the block `importmap:start … importmap:end` at the top of `<head>` maps every `/pb/ski/**.js` (harness*.js, data/, img/ aside) to
+  `?v=<first 10 hex of its SHA-256>`; `./config.js` from any module, the entry `import("/pb/ski/main.js")`, computed `import()`s and the
+  flows' `import("/pb/ski/bot.js")` all go through it, also in the arcade's srcdoc frame. File names and import lines stay as they are.
+- **Rules the check enforces**: the block comes before any module / external script; no `?v=` on an import of a mapped module; every
+  imported file exists; no `new Worker` in a mapped module (import maps do not reach into workers: version its graph first).
+  A new module needs nothing but the generator run. CSS (`ui.css?v=`, `net/net.css?v=`) is still bumped by hand.
+- `sw.js` revalidates `/pb/<game>.html` (`cache: "no-cache"`), so the page with the map is never an old copy of the HTTP cache. Browsers
+  without import maps (Safari < 16.4) load the modules unversioned, as before.
+- Flow `ski-modules`: every request carries the right hash (standalone + arcade), a deploy of one module against a full cache.
+
 ## Data pipeline (resort-generic, one `RESORTS` entry per resort in `scripts/ski/common.py`)
 Venv: `~/Library/Caches/luxtram-work/.venv/bin/python`. Raw downloads cache in `~/Library/Caches/ski-work/<resort>/`.
 1. `fetch_osm.py <rid> [layer ...]`: Overpass (pistes, lifts, buildings, land cover, water, roads, peaks / places); then `coverage.py <rid>`

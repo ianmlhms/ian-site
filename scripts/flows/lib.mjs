@@ -196,7 +196,7 @@ export async function launchBrowser({ fullChromium: wantsFull = false, args = []
 /* options.log       an array: every response is appended as { path, status, bytes } (bytes = body bytes sent), so a flow can assert what really crossed the network
  * options.overrides a Map of "/path" -> Buffer | string, served instead of the file on disk (a flow can "deploy" a changed file without touching the repo)
  * Both are read live, a flow may change them between page loads. */
-export function startServer(root = REPO, { log = null, overrides = null } = {}) {
+export function startServer(root = REPO, { log = null, overrides = null, headers = null } = {}) {
   // Restricted sandboxes may refuse even loopback sockets. Offline flows serve
   // these URLs through Playwright interception instead of opening a socket.
   if (process.env.FLOW_OFFLINE_SUPABASE) return Promise.resolve({ server: { close() {} }, origin: "http://127.0.0.1:8765" });
@@ -210,7 +210,8 @@ export function startServer(root = REPO, { log = null, overrides = null } = {}) 
     }
     res.setHeader("Content-Type", MIME[path.extname(file).slice(1)] || "application/octet-stream");
     const body = override !== undefined ? Buffer.from(override) : fs.readFileSync(file);
-    if (log) log.push({ path: rel, status: 200, bytes: body.length });
+    for (const [name, value] of Object.entries(headers ? headers(rel) : {})) res.setHeader(name, value);   // e.g. a Cache-Control the browser's HTTP cache obeys
+    if (log) log.push({ path: rel, url: req.url, status: 200, bytes: body.length });
     res.end(body);
   });
   return new Promise((resolve) => {

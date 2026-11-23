@@ -178,6 +178,12 @@ function refreshManifest(game) {
   return loadManifest(game);
 }
 
+/** A game page straight from the server (revalidated): its import map names the current hash of every module, and the host sends no Cache-Control, so the
+ *  browser's HTTP cache alone could keep an old page for hours after a deploy. The same request when the browser refuses to copy a navigation request. */
+function revalidated(req) {
+  try { return new Request(req, { cache: "no-cache" }); } catch (error) { return req; }
+}
+
 /** The reply for one data file: the stored copy when its hash is the manifest's, else the network (and a new stored copy). */
 async function serveGameData(event, game, relative) {
   const req = event.request;
@@ -244,7 +250,13 @@ self.addEventListener("fetch", (event) => {
    * player first loaded — it pinned the old 2D Road Rage after its 3D rebuild,
    * and fetch({cache:"no-cache"}) does not help because that flag only bypasses
    * the HTTP cache, not the service worker. Always go to the network here, and
-   * fall back to the cache only when offline. */
+   * fall back to the cache only when offline. The page itself is revalidated (it
+   * carries the import map, scripts/game_importmap.py): the HTTP cache must not
+   * answer with the page from before a deploy. */
+  if (gamePage) {
+    event.respondWith(fetch(revalidated(req)).catch(() => fetch(req)).catch(() => caches.match(req)));
+    return;
+  }
   if (url.pathname.startsWith("/pb/")) {
     event.respondWith(fetch(req).catch(() => caches.match(req)));
     return;

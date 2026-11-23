@@ -17,6 +17,9 @@ Catches the classes of bug that are invisible until someone hits the page:
              pb/<game>/data-hashes.json changing: the service worker keeps these
              files on the device by hash, so a stale hash means players keep the
              old world (fix: python3 scripts/gamedata_manifest.py)
+  importmap  an ES module game (pb/ski.html, pb/towerdefense.html) whose import map does
+             not carry the current content hash of every module: after a deploy a
+             browser could mix old and new modules (fix: python3 scripts/game_importmap.py)
   orphans    public pages nothing links to (how /kaart/ shipped unreachable)
   meta       pages missing title / description / canonical
 
@@ -465,6 +468,25 @@ def check_game_data_hashes(problems: list) -> None:
         problems.append(("error", "gamedata", message))
 
 
+def check_import_maps(problems: list) -> None:
+    """The import map of every ES module game must list each module with its current hash.
+
+    The modules import each other without ?v=; the map in the page is what gives
+    them a version. A stale map would ask for old URLs (browsers then mix cached
+    old files with new ones); run it after every change AND every merge / rebase.
+    """
+    sys.path.insert(0, os.path.join(REPO, "scripts"))
+    try:
+        import game_importmap
+    except ImportError as error:
+        problems.append(("error", "importmap", f"scripts/game_importmap.py not importable: {error}"))
+        return
+    finally:
+        sys.path.pop(0)
+    for message in game_importmap.check_all():
+        problems.append(("error", "importmap", message))
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--quiet", action="store_true", help="only print problems")
@@ -480,6 +502,7 @@ def main() -> None:
     check_trail_sitemaps(problems)
     check_cache_versions(problems)
     check_game_data_hashes(problems)
+    check_import_maps(problems)
     check_invisible_chars(problems)
     listed = check_sitemap(problems)
     check_meta(pages, problems)

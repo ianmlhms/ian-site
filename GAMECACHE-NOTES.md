@@ -25,6 +25,13 @@ The brief suggested `?v=<content hash>` on each data URL. The games request thei
 place that knows the version, no game file needs a call-site change, and a wrong hand-set `?v=` can no longer freeze data (the request's own `?v=` is ignored). The worker
 itself fetches the data with `?v=<hash>`, so even the browser's HTTP cache can only ever hold the right bytes under that URL.
 
+## Code modules: import maps (23 Nov 2026)
+
+`pb/ski.html` and `pb/towerdefense.html` carry a generated import map: every module at `?v=<content hash>` (`scripts/game_importmap.py`, also run by
+`gamedata_manifest.py`; `check_site.py` rule `importmap`). Run it after every change and every merge. The code is still network-first in the worker; `sw.js` now also
+revalidates the game page itself (`cache: "no-cache"`). Other games that are ES module trees without versions (MTB, Lux Drive, Schueberfouer) are not mapped yet: one line in
+`PAGES` + the marker pair + an entry without `?v=`; MTB's module worker (`world-map-worker.js`) needs its own versioning first. Details: `pb/ski/HANDOFF.md`, top.
+
 ## Call sites touched in the games
 
 Only one line each, a deferred script tag after `arcade-kit.js`:

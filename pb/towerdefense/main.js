@@ -4,7 +4,7 @@ import {
   starsForLives, startWave, tick, towerPrice, towerStats, upgradeCost, upgradeTower, useSkill,
 } from "./simulation.js";
 import { cleanProgress, completeLevel, isStrictlyMoreProgress, metaSummary, totalStars } from "./progress.js";
-import { BattlefieldView } from "./renderer.js?v=2";
+import { BattlefieldView } from "./renderer.js";
 
 const SAVE_INTERVAL_MS = 5000;
 const NOTICE_MS = 1700;

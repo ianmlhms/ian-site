@@ -17,6 +17,9 @@ not listed is never cached (the worker goes to the network for it).
     python3 scripts/gamedata_manifest.py            # rewrite the manifests
     python3 scripts/gamedata_manifest.py --check    # exit 1 when one is stale
 
+The same command refreshes the import maps of the ES module games (code instead of
+data: scripts/game_importmap.py), so one run after a change or a merge is enough.
+
 scripts/check_site.py runs the same check, so a data file that changed without
 its hash changing fails the pre-push check. After a merge conflict in a
 data-hashes.json, just run the command without --check: it is generated.
@@ -155,18 +158,28 @@ def write_all() -> list:
     return written
 
 
+def import_maps():
+    """scripts/game_importmap.py (it lies next to this file, whoever imports this one)."""
+    sys.path.insert(0, os.path.join(REPO, "scripts"))
+    try:
+        import game_importmap
+    finally:
+        sys.path.pop(0)
+    return game_importmap
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--check", action="store_true", help="only report stale manifests (exit 1)")
     args = parser.parse_args()
     if args.check:
-        problems = check_all()
+        problems = check_all() + import_maps().check_all()
         for line in problems:
             print(line)
-        print("game data hashes: " + ("STALE (%d)" % len(problems) if problems else "current"))
+        print("game data hashes and import maps: " + ("STALE (%d)" % len(problems) if problems else "current"))
         sys.exit(1 if problems else 0)
-    written = write_all()
-    print("updated: " + (", ".join(written) if written else "nothing (all manifests were current)"))
+    written = write_all() + import_maps().write_all()
+    print("updated: " + (", ".join(written) if written else "nothing (all manifests and import maps were current)"))
 
 
 if __name__ == "__main__":
