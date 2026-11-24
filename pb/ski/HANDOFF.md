@@ -1958,3 +1958,13 @@ piste map looked at, traced or copied). The old plan from above stays one tap aw
 - **SQL**: `scripts/ski-v1.sql` regenerated (+142 boards `ski-davos-*`, 1986 in all); applied to production only for `ski-davos-*` after the piste list was final.
 - Shared edits: bake.py (above), dem_merge.py (STAC pad), fp-steer-check.mjs (`SKI_RESORT` / `SKI_PISTE` env), cliff-check.mjs (davos routes in the default
   list), `scripts/ski/davos-node-checks.sh` (the Node checks that are not in r8c-node-all.sh), every per-resort list in scripts / flows / mp-games SKI_PISTES.
+
+### Davos printed map (24 Nov 2026, after launch)
+- Camera: `panorama.py CAMERAS["davos"] = {az 15, f0 .78, f1 .6}` (looking north up the valley from above Glaris: Rinerhorn and Jakobshorn in front, Davos and the
+  Parsenn in the middle, Klosters and Madrisa behind). The score pick (az 135) left the resort in the back with a third of the page out of the box. Tried
+  by `PANO_AZ=<deg> ... --draft --lines --out DIR` at 20 / 60 / 90 / 110 / 270 / 280 / 300 / 330: E-W views are 2:1 letterboxes, az 15 is page-shaped.
+  pano-check: 100 % on the page, 99.97 % visible (least hochroute-casanna-alp 96 %).
+- Painter (generic, `panorama.py`): outside the box the "forest floor" was the dark green floor colour with the brush-stroke term, which on steep
+  out-of-box slopes made green-grey fern streaks. Now a separate pale, light-driven snow-dusted valley tint (`ocol`, no strokes, 0.62). Only the Davos
+  panorama was re-rendered; the other eight keep their old images (re-render them with `panorama.py <rid>` if the streaks bother anyone: Zermatt / Arlberg
+  edges have them to a lesser degree). Shots: ~/Library/Caches/ski-work/davos/map/ (landscape + portrait, Zermatt for comparison).

@@ -45,6 +45,7 @@ CAMERAS = {
     "zermatt": {"az": 170, "f0": 0.72, "f1": 0.60},      # from above Täsch: the Matterhorn right, Cervinia behind the ridge
     "arlberg": {"az": 0, "f0": 0.76, "f1": 0.58},          # St. Anton in front, Lech and Warth behind, the Sonnenkopf left
     "kronplatz": {"az": 208},                              # from above Bruneck
+    "davos": {"az": 15, "f0": 0.78, "f1": 0.6},            # from above Glaris looking north up the valley: Rinerhorn and Jakobshorn in front, Davos and the Parsenn in the middle, Klosters and Madrisa behind
 }
 
 
@@ -340,9 +341,13 @@ def paint(rid, resort, far, cam, w, h, data_dir, classes, draft):
     scrub = cover("scrub", 1.2)
     tree_line = float(np.percentile(hgt[inbox & (forest > 0.5)], 97)) if (inbox & (forest > 0.5)).any() else 2000.0
     out_f = np.where(inbox | sky, 0, smooth(tree_line + 60, tree_line - 120, hgt + 60 * wide) * smooth(46, 36, slope) * smooth(-0.6, 0.6, wide + 0.4)).astype(np.float32)
-    floor = np.clip(forest * 1.15 + scrub * 0.35 + out_f * 0.9, 0, 1)
+    floor = np.clip(forest * 1.15 + scrub * 0.35, 0, 1)
     fcol = mix(np.broadcast_to(C(52, 82, 86), (H, W, 3)), C(124, 152, 118), np.clip(light * 1.1 + 0.06 * strokes, 0, 1)).astype(np.float32)
     col = mix(col, fcol, floor * 0.82)
+    # outside the box (no land cover there): a snow-dusted, pale forested valley instead of the dark green floor, which turned the brush
+    # strokes of the steep slopes into green-grey fern streaks (Davos, 24 Nov 2026); no stroke term, a soft light-driven tint
+    ocol = mix(np.broadcast_to(C(140, 168, 162), (H, W, 3)), C(222, 234, 232), np.clip(light * 1.1, 0, 1)).astype(np.float32)
+    col = mix(col, ocol, out_f * 0.62)
     built = cover("built", 2.2)
     col = mix(col, C(236, 226, 210) * (0.75 + 0.3 * light[..., None]), np.clip(built, 0, 1) * 0.55)
     water = cover("water", 0.8)
