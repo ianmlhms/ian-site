@@ -26,7 +26,7 @@ const { skiParams } = await imp('modes/skis.js');
 
 const RECOVER_MAX = 2;          // s from a cliff crash until he skis on below it (the tumble is SKI.landingCrashSeconds of that)
 const MAX_T = 1500;
-const DEFAULT = { killy: ['col-pers'], arlberg: ['woster-bockbachtal', 'kuhtali'] };
+const DEFAULT = { killy: ['col-pers'], arlberg: ['woster-bockbachtal', 'kuhtali'], davos: ['teufi', 'muli', 'gipfel-nord-kreuzweg'] };
 const wrap = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
 
 function load(rid) {

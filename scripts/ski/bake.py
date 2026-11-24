@@ -542,6 +542,14 @@ def build_pistes(frame, dem, lifts=(), places=()):
         name = (t.get("piste:name") or t.get("name") or "").strip()
         if not name and cfg.get("ref_names"):                # Via Lattea: the piste's number is its name, often mapped as ref only ("81 bassa")
             name = (t.get("piste:ref") or ("" if t.get("highway") else t.get("ref")) or "").strip()      # (a road's ref is the road's)
+        if name and cfg.get("ref_zones") and re.fullmatch(r"\d+[a-z]?", name):
+            # Davos Klosters: Madrisa and Rinerhorn both number their pistes 1..13: a number inside a zone gets the sector's name ("Madrisa 3")
+            c = way_xz(frame, geom)[len(geom) // 2]
+            for label, lo, la, rad in cfg["ref_zones"]:
+                zx, zz = frame.to_world(lo, la)
+                if math.hypot(c[0] - zx, c[1] - zz) <= rad:
+                    name = "%s %s" % (label, name)
+                    break
         if t.get("area") == "yes" or (closed and t.get("area") != "no" and polyline_len(p) < 4000 and not name):
             c = p.mean(axis=0)
             if 0 <= c[0] <= frame.width and 0 <= c[1] <= frame.depth:
@@ -1372,7 +1380,10 @@ def build_lifts(frame, dem_raw):
                 continue                                       # (no underground aerialways in these resorts)
             items.append((e["id"], LIFT_KIND[aw], aw, t, way_xz(frame, e["geometry"])))
         elif t.get("railway") == "funicular" and t.get("service") not in ("yard", "siding", "spur"):
-            rails.setdefault(("funicular", t.get("name") or e["id"]), []).append(e)    # (often several ways: surface part, tunnel, loop)
+            fname = t.get("name") or e["id"]
+            if cfg.get("funicular_by_ref") and t.get("ref"):
+                fname = "%s %s" % (fname, re.sub(r"\D", "", t["ref"]) or t["ref"])    # Davos: Parsennbahn E1 / E2 are two sections, "Parsennbahn 1" / "Parsennbahn 2"
+            rails.setdefault(("funicular", fname), []).append(e)    # (often several ways: surface part, tunnel, loop)
         elif t.get("railway") and t.get("service") not in ("yard", "siding", "spur", "crossover"):
             for rc in rails_cfg:
                 if all(t.get(k) == v for k, v in rc["match"].items()):
@@ -1382,7 +1393,7 @@ def build_lifts(frame, dem_raw):
         if p is None:
             continue
         t = dict(max(ways, key=lambda w: len(w["geometry"])).get("tags", {}))
-        if kind == "train":
+        if kind == "train" or cfg.get("funicular_by_ref"):
             t["name"] = key
         under = sum(len(w["geometry"]) for w in ways if w.get("tags", {}).get("tunnel") == "yes" or w.get("tags", {}).get("layer", "0").startswith("-"))
         t["tunnel"] = "yes" if under * 2 > sum(len(w["geometry"]) for w in ways) else "no"
@@ -1413,6 +1424,12 @@ def build_lifts(frame, dem_raw):
             n = max(1, int(length // PYLON_GAP[kind]))
             tow = [length * (i + 0.5) / n for i in range(n)] if n > 1 else [length / 2]
         tow = sorted(set(round(s, 1) for s in tow if 8 < s < length - 8))
+        if cfg.get("thin_pylons") and kind in ("chair", "gondola", "cable"):
+            thin = []                                         # Davos (Meierhofertäli): three mapped pylons within 36 m, a carrier touched one: one tower each 30 m at most,
+            for s in tow:                                     # none within 35 m of a station (Totalp: a mapped pylon 25 m before the top station)
+                if 35.0 < s < length - 35.0 and (not thin or s - thin[-1] >= 30.0):
+                    thin.append(s)
+            tow = thin
         seats = tag_number(t.get("aerialway:occupancy"))
         seats = int(seats) if seats else DEFAULT_SEATS[kind]
 

@@ -1927,3 +1927,34 @@ piste map looked at, traced or copied). The old plan from above stays one tap aw
   16 page lives); the cold first visit is only printed; the 50 MB limit holds between the mean of a resort's first two warm visits and the mean of its
   last two (a real leak grows on every revisit; noise does not) + GL counts (geometries +10, textures +3 vs the first visit). Every reading is the
   median of 3 samples (gc x 2, 0.5 s settle each). Result runs: see the commit message.
+
+## Davos Klosters (24 Nov 2026): the 9th resort (Graubünden; Parsenn + Jakobshorn, Rinerhorn and Madrisa by bus)
+- **Data** `davos` (common.py): box 46.715..46.940 N, 9.775..9.945 E = 14.1 x 25.6 km (11 x 20 tiles, 129 shipped), frame EPSG:2056 (LV95),
+  heights swissALTI3D 2 m (98.1 % of the box; Copernicus GLO-30 only in the north-east corner = Austria, no pistes there), far grid Copernicus.
+  **DEM seam fix (generic)**: `dem_merge.swiss_items` asked the STAC API for the WGS84 box only; the frame is an axis-aligned LV95 rectangle whose
+  west edge lies up to 0.01 deg outside it, so a 400 m strip of Rinerhorn was Copernicus (+-9 m). Now the query is padded 0.012 deg (Zermatt's cached
+  `items.json` is untouched). Merge offset p95 3.6 m, no visible seam.
+- **OSM**: Overpass answered (all layers), no API fallback needed. Result: **142 pistes / 173 km** of run centre lines (network 188 km), **56 lifts**,
+  park, 4 slalom pistes. Sectors (after `tidy_network` + `keep_areas`):
+  | Sector | lifts | pistes | reached by |
+  |---|---|---|---|
+  | Parsenn (Davos Dorf - Weissfluhjoch - Gotschna - Klosters, + Schatzalp / Strela) | 27 | 68 | the connected main network |
+  | Jakobshorn (Davos Platz) | 12 | 36 | BUS_AREAS `Jakobshornbahn Sektion 1` |
+  | Madrisa (Klosters Dorf) | 10 | 18 | BUS_AREAS `Madrisabahn` |
+  | Rinerhorn (Glaris) | 7 | 20 | BUS_AREAS `Rinerhornbahn` |
+  Left out: **Pischa** (OSM has ONE freeride line "Flüelameder" for the cable car: no experience), Gargellen / Schafberg (Austria, `exclude` circle),
+  the Küblis Heuberglift, Pany, Mottalift (kids' lift 1 km from the network), the Davos wakeboard lift (`exclude` circle, it was a "drag lift").
+  `keep_areas` + `BUS_AREAS` do the Sonnenkopf trick for the three bus sectors (their valley stations are discovered from the start; no fake lift links).
+- **New generic bake knobs** (all off unless a resort lists them): `ref_names` + `ref_zones` (Rinerhorn and Madrisa both number pistes 1..13 as `ref` only
+  / numeric `name`: inside a zone the number gets the sector name, "Rinerhorn 5", "Madrisa 3"; elsewhere "Rout 49"), `funicular_by_ref` (the Parsennbahn
+  is two OSM sections E1 / E2 with the same name: "Parsennbahn 1" Davos Dorf -> Höhenweg, "Parsennbahn 2" Höhenweg -> Weissfluhjoch, one lift each),
+  `thin_pylons` (mapped pylons in clusters / within 35 m of a station made carriers touch a pylon: Meierhofertäli, Totalp; round7b-test now 0 fails).
+- **Start / first lift**: start piste `kreuzweg-klosters` (Weissfluhjoch -> Klosters, red 7.2 km), FIRST_LIFT `Parsennbahn 1` (Davos Dorf funicular, red car
+  in the station), park = the mapped Snowpark at Jatz (OSM way 51511360, 278 m, Jatz Junior drag 42 m away; the mapped halfpipe / funpark lines are
+  unusable for the park picker). UNLOCK {red 5, black 14}. Villages (`ALPINE_RESORTS`): Davos Platz, Dorf, Wolfgang, Laret, Frauenkirch, Clavadel,
+  Schatzalp, Glaris, Klosters Platz / Dorf, Selfranga, Serneus, Saas, Schlappin. Davos' big flat-roofed hotels are drawn as gabled Alpine hotels (<= 4 storeys,
+  like Zermatt). No landmarks. Picker picture pb/ski/img/davos-*.webp (GPU shot over Davos Platz towards the Parsenn).
+- **Printed map**: panorama.py picked the camera by score (the Parsenn at the back, Davos town in the middle); pano-check 100 % on the page / visible.
+- **SQL**: `scripts/ski-v1.sql` regenerated (+142 boards `ski-davos-*`, 1986 in all); applied to production only for `ski-davos-*` after the piste list was final.
+- Shared edits: bake.py (above), dem_merge.py (STAC pad), fp-steer-check.mjs (`SKI_RESORT` / `SKI_PISTE` env), cliff-check.mjs (davos routes in the default
+  list), `scripts/ski/davos-node-checks.sh` (the Node checks that are not in r8c-node-all.sh), every per-resort list in scripts / flows / mp-games SKI_PISTES.

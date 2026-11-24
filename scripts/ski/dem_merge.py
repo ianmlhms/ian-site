@@ -89,7 +89,8 @@ def swiss_items(frame, rid):
         with open(cache, encoding="utf-8") as fh:
             return json.load(fh)
     s, w, n, e = RESORTS[rid]["bbox"]
-    url = STAC.format(w=w, s=s, e=e, n=n)
+    pad = 0.012      # deg: the frame is a rectangle in LV95, its edge is up to ~0.01 deg outside the WGS84 box (Davos: the west strip was missing)
+    url = STAC.format(w=w - pad, s=s - pad, e=e + pad, n=n + pad)
     best = {}
     pages = 0
     while url:

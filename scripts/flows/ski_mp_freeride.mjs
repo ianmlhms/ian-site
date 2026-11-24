@@ -15,7 +15,7 @@ import { runIfMain } from "./lib.mjs";
 import { createHub, createWorld, newPlayer, closePlayers, USERS, realErrors, lobbyCode, sleep } from "./mp_lobby_lib.mjs";
 
 const NAME = "ski-mp-freeride";
-const ALL_RESORTS = ["killy", "3vallees", "zermatt", "arlberg", "kronplatz", "vialattea", "obertauern", "livigno"];
+const ALL_RESORTS = ["killy", "3vallees", "zermatt", "arlberg", "kronplatz", "vialattea", "obertauern", "livigno", "davos"];
 const T = { timeout: 150000 };
 const CORS = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "GET, POST, OPTIONS" };
 const DEBUG_Q = "&debug=1&q=low&res=fixed";

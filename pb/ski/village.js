@@ -36,7 +36,7 @@ const CHALET = 0, PLASTER = 1, SAVOY = 2, CONCRETE = 3, CHAPEL = 4, HUT = 5, MOD
 export const DETAIL_RADIUS = Object.freeze({ low: 150, medium: 380, high: 800 });
 const DCELL = 320;                   // m: the detail layer's merge cell
 /** R8c: resorts whose villages are Alpine (no 1960s-70s purpose-built blocks like Tignes / Val Claret / Les Menuires / Val Thorens) */
-export const ALPINE_RESORTS = Object.freeze(new Set(['zermatt', 'arlberg', 'kronplatz', 'vialattea', 'obertauern', 'livigno']));
+export const ALPINE_RESORTS = Object.freeze(new Set(['zermatt', 'arlberg', 'kronplatz', 'vialattea', 'obertauern', 'livigno', 'davos']));
 /** R8c: storeys under the eaves at most: Alpine houses (small / big), anywhere else (the tallest real Tignes blocks have ~10) */
 export const MAX_FLOORS = Object.freeze({ alpineSmall: 3, alpine: 4, other: 10 });
 const SMALL_AREA = 150;              // m2: a small house (3 storeys at most in the Alpine villages)

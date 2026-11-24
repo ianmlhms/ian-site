@@ -252,6 +252,30 @@ RESORTS = {
             ("Teola", 10.1398, 46.5317, 300, "chalet"), ("Trepalle", 10.1759, 46.5266, 380, "chalet"), ("Eira", 10.1665, 46.5384, 250, "chalet"),
         ],
     },
+    # Davos Klosters (Graubünden, Switzerland): Parsenn (Davos Dorf - Weissfluhjoch - Gotschna - Klosters, one connected network) plus
+    # the separate areas Jakobshorn (Davos Platz), Rinerhorn (Glaris) and Madrisa (Klosters Dorf), each reached by the bus / train in
+    # reality (config.js BUS_AREAS, bake.py keep_areas). Pischa (one mapped freeride line) and Gargellen (Austria) are not in. Heights
+    # swissALTI3D 2 m (LV95), Copernicus GLO-30 where the Swiss tiles end (north of Madrisa).
+    "davos": {
+        "name": "Davos Klosters", "short": "Parsenn · Jakobshorn · Madrisa", "country": "CH", "crs": "EPSG:2056",
+        "bbox": (46.715, 9.775, 46.940, 9.945),
+        "dem": ["swissalti3d", "copernicus-glo30"], "far": ["copernicus-glo30"],
+        "tree_line": 2150.0, "derived_forest": 2000.0,       # inner Graubünden: larch and arolla pine up to ~2100 m, Davos valley floor 1560 m
+        "buildings": "villages",
+        "exclude": [("Gargellen", 9.905, 46.960, 2400), ("Wakeboard-Lift Davos", 9.8470, 46.8157, 160)],       # Montafon (Austria) over the Madrisa ridge: its own area
+        "keep_areas": ("Jakobshornbahn Sektion 1", "Rinerhornbahn", "Madrisabahn"),
+        "funicular_by_ref": True,   # Parsennbahn E1 / E2 (Davos Dorf - Höhenweg - Weissfluhjoch) are two sections
+        "thin_pylons": True,        # mapped pylons in clusters / next to stations (a carrier touched them)
+        "ref_names": True,        # Rinerhorn / Madrisa pistes are mostly mapped with their number only
+        "ref_zones": [("Rinerhorn", 9.800, 46.745, 3500), ("Madrisa", 9.870, 46.912, 3500)],
+        "villages": [
+            ("Davos Platz", 9.8225, 46.7945, 900, "chalet"), ("Davos Dorf", 9.8385, 46.8085, 800, "chalet"), ("Davos Wolfgang", 9.8536, 46.8337, 300, "chalet"),
+            ("Davos Laret", 9.8702, 46.8417, 220, "chalet"), ("Davos Frauenkirch", 9.8004, 46.7690, 280, "chalet"), ("Clavadel", 9.8156, 46.7679, 200, "chalet"),
+            ("Schatzalp", 9.8150, 46.8014, 220, "chalet"), ("Davos Glaris", 9.7775, 46.7417, 300, "chalet"),
+            ("Klosters Platz", 9.8822, 46.8683, 650, "chalet"), ("Klosters Dorf", 9.8751, 46.8829, 450, "chalet"), ("Selfranga", 9.8850, 46.8609, 250, "chalet"),
+            ("Serneus", 9.8388, 46.8897, 350, "chalet"), ("Saas", 9.8085, 46.9109, 300, "chalet"), ("Schlappin", 9.8997, 46.9108, 160, "chalet"),
+        ],
+    },
 }
 
 # Height tiles: TILE_CELLS cells of NEAR_STEP metres (the files hold TILE_CELLS + 1 nodes per side, neighbours share their edge).

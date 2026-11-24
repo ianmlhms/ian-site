@@ -6,7 +6,7 @@ set -u
 OUT="$1"; ENGINE="${2:-chromium}"
 cd "$(dirname "$0")/../.." || exit 1
 mkdir -p "$OUT"
-for r in killy 3vallees zermatt arlberg kronplatz vialattea obertauern livigno; do
+for r in killy 3vallees zermatt arlberg kronplatz vialattea obertauern livigno davos; do
   while [ "$(sysctl -n vm.loadavg | awk '{print int($2)}')" -ge 40 ]; do sleep 15; done
   if [ "$ENGINE" = webkit ]; then
     FLOW_BROWSER=webkit BROWSER_POOL=ski nice -n 10 python3 ~/Library/Caches/browser-slot.py node scripts/ski/shot.mjs "$OUT/$r" --dpr 2 --size 1180x820 --until ready \

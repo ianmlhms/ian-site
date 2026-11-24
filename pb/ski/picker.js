@@ -19,6 +19,7 @@ const INFO = Object.freeze({
   kronplatz: { title: 'Kronplatz', places: 'Plan de Corones, Bruneck', flags: ['🇮🇹'], region: 'Südtirol' },
   vialattea: { title: 'Via Lattea', places: "Sestriere, Sauze d'Oulx, Sansicario, Cesana, Claviere, Montgenèvre", flags: ['🇮🇹', '🇫🇷'], region: 'Piemont an Hautes-Alpes' },
   livigno: { title: 'Livigno', places: 'Mottolino a Carosello 3000', flags: ['🇮🇹'], region: 'Lombardei' },
+  davos: { title: 'Davos Klosters', places: 'Parsenn, Jakobshorn, Rinerhorn, Madrisa', flags: ['🇨🇭'], region: 'Graubünden' },
   obertauern: { title: 'Obertauern', places: 'Tauernrunde ronderëm de Pass', flags: ['🇦🇹'], region: 'Salzburger Land' },
 });
 

@@ -6,7 +6,7 @@
  * SKI_COURSES="rid:piste,..." to pick others. FLOW_BROWSER=webkit for Safari's engine. */
 import { runIfMain } from "./lib.mjs";
 
-const COURSES = (process.env.SKI_COURSES || "3vallees:bouc-blanc,killy:face,zermatt:riffelalp,arlberg:kandahar,kronplatz:sylvester,vialattea:kandahar-nasi,obertauern:seekarspitz,livigno:mottolino").split(",").map((s) => s.split(":"));
+const COURSES = (process.env.SKI_COURSES || "3vallees:bouc-blanc,killy:face,zermatt:riffelalp,arlberg:kandahar,kronplatz:sylvester,vialattea:kandahar-nasi,obertauern:seekarspitz,livigno:mottolino,davos:kreuzweg-klosters").split(",").map((s) => s.split(":"));
 
 export const flow = {
   name: "ski-course",

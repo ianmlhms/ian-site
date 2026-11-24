@@ -207,6 +207,7 @@ export const FIRST_LIFT = Object.freeze({
   kronplatz: ['Kronplatz I - Plan de Corones I', 'Ried'],  // Reischach / Riscone: Kronplatz I
   vialattea: ['Sestriere - Fraiteve 1', 'Cit Roc'],        // Sestriere village: the Fraiteve gondola
   livigno: ['Mottolino Gondola', 'Livigno-Tagliede'],      // Livigno centre: the Mottolino gondola from the village
+  davos: ['Parsennbahn 1', 'Klosters - Gotschnaboden'],    // Davos Dorf: the Parsenn funicular up to Weissfluhjoch
   obertauern: ['Zehnerkarbahn I', 'Grünwaldkopfbahn'],   // the west end of the pass village: the Zehnerkar gondola
 });
 // R8d (Ian): separate areas of a resort's pass, reached by the ski bus (no piste / lift links them): the valley station of each listed
@@ -214,6 +215,8 @@ export const FIRST_LIFT = Object.freeze({
 // from Stuben / Langen on the Ski Arlberg pass)
 export const BUS_AREAS = Object.freeze({
   arlberg: ['Sonnenkopfbahn'],
+  // Davos Klosters: Jakobshorn (Davos Platz), Rinerhorn (Glaris) and Madrisa (Klosters Dorf) are reached by bus / Rhaetian Railway
+  davos: ['Jakobshornbahn Sektion 1', 'Rinerhornbahn', 'Madrisabahn'],
 });
 export const DISCOVERY = Object.freeze({
   cell: 100,                // m: the discovery grid

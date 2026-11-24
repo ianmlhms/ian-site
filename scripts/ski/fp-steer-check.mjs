@@ -6,7 +6,7 @@
  *   edge   the skis' roll onto their edges relative to the slope (+ = the right edge down), third person = the reference
  *   snow   how far the first-person skis sit under / over the snow
  * D must give tips to the right and the right edge down, A the mirror, at 30-50 km/h on a blue and pivoting at walking pace.
- *   BROWSER_POOL=ski python3 ~/Library/Caches/browser-slot.py node scripts/ski/fp-steer-check.mjs OUT_DIR [--tag after] [--old DIR]
+ *   [SKI_RESORT=davos SKI_PISTE=jakobshorn-standard] BROWSER_POOL=ski python3 ~/Library/Caches/browser-slot.py node scripts/ski/fp-steer-check.mjs OUT_DIR [--tag after] [--old DIR]
  * --old DIR: DIR/firstperson.js and DIR/config.js instead of this checkout's (the "before" column). */
 import fs from "node:fs";
 import path from "node:path";
@@ -42,7 +42,7 @@ try {
   const page = await (await browser.newContext({ viewport: { width: 1180, height: 820 }, deviceScaleFactor: 1 })).newPage();
   page.on("pageerror", (e) => fails.push(`[pageerror] ${String(e).slice(0, 200)}`));
   await page.addInitScript(() => { try { localStorage.removeItem("pb_ski_cam"); } catch (error) { /* private mode */ } });
-  await page.goto(`${origin}/pb/ski.html?resort=killy&debug=1&q=medium&res=fixed&weather=sun&time=midday&piste=genepy&auto=1`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${origin}/pb/ski.html?resort=${process.env.SKI_RESORT || "killy"}&debug=1&q=medium&res=fixed&weather=sun&time=midday&piste=${process.env.SKI_PISTE || "genepy"}&auto=1`, { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => document.documentElement.dataset.skiRunning === "1" || !!document.documentElement.dataset.bootError, null, { timeout: 150000 });
   await page.evaluate(() => {
     const S = window.__ski, T = window.THREE, DEG = 180 / Math.PI;

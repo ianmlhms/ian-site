@@ -5,7 +5,7 @@
  * FLOW_BROWSER=webkit for Safari's engine. */
 import { runIfMain } from "./lib.mjs";
 
-const RESORTS = (process.env.SKI_RESORTS || "killy,3vallees,zermatt,arlberg,kronplatz,vialattea,obertauern,livigno").split(",");
+const RESORTS = (process.env.SKI_RESORTS || "killy,3vallees,zermatt,arlberg,kronplatz,vialattea,obertauern,livigno,davos").split(",");
 
 export const flow = {
   name: "ski-firstperson",
