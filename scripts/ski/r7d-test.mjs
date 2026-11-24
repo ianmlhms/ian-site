@@ -53,7 +53,7 @@ ok(new Set(r.slots.values()).size === r.slots.size && [...r.slots.values()].ever
 r = assignSlots(r.slots, ids(0, 900), cap);
 ok(r.slots.size === cap, `900 boards in range: the nearest ${cap} get a slot (the atlas never grows)`);
 // every resort: the boards within the radius of any piste start fit the atlas
-for (const rid of ["killy", "3vallees", "zermatt", "arlberg", "kronplatz", "vialattea", "obertauern", "livigno", "davos"]) {
+for (const rid of ["killy", "3vallees", "zermatt", "arlberg", "kronplatz", "vialattea", "obertauern", "livigno", "davos", "laax"]) {
   const res = unpackResort(JSON.parse(fs.readFileSync(new URL(`../../pb/ski/data/${rid}/resort.json`, import.meta.url))));
   const pts = res.pistes.filter((p) => p.line.length >= 4).map((p) => [p.line[0], p.line[1]]);
   let most = 0;
@@ -112,7 +112,7 @@ for (let t = 0; t < 200; t++) {
   const back = unpackLine(packLine(arr));
   ok(back.length === arr.length && back.every((v, i) => Math.abs(v - arr[i]) < 1e-6), `line round trip ${t}`);
 }
-for (const rid of ["killy", "3vallees", "zermatt", "arlberg", "kronplatz", "vialattea", "obertauern", "livigno", "davos"]) {
+for (const rid of ["killy", "3vallees", "zermatt", "arlberg", "kronplatz", "vialattea", "obertauern", "livigno", "davos", "laax"]) {
   const raw = JSON.parse(fs.readFileSync(new URL(`../../pb/ski/data/${rid}/resort.json`, import.meta.url)));
   const packed = raw.pistes.filter((p) => p.lz);
   ok(packed.every((p) => packLine(unpackLine(p.lz)) === p.lz) && (raw.network || []).filter((n) => n.pz).every((n) => packLine(unpackLine(n.pz)) === n.pz), `${rid}: Python-packed lines decode and re-pack identically (${packed.length} packed)`);

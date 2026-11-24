@@ -15,6 +15,7 @@ export const RESORTS = Object.freeze([
   { id: 'obertauern', name: 'Obertauern', short: 'Tauernrunde', country: 'AT', ready: true },
   { id: 'livigno', name: 'Livigno', short: 'Mottolino · Carosello 3000', country: 'IT', ready: true },
   { id: 'davos', name: 'Davos Klosters', short: 'Parsenn · Jakobshorn · Madrisa', country: 'CH', ready: true },
+  { id: 'laax', name: 'Laax', short: 'Flims · Laax · Falera', country: 'CH', ready: true },
 ]);
 
 const base = (rid) => new URL(`./data/${rid}/`, import.meta.url).href;

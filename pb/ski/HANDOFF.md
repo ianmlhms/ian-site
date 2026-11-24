@@ -1968,3 +1968,36 @@ piste map looked at, traced or copied). The old plan from above stays one tap aw
   out-of-box slopes made green-grey fern streaks. Now a separate pale, light-driven snow-dusted valley tint (`ocol`, no strokes, 0.62). Only the Davos
   panorama was re-rendered; the other eight keep their old images (re-render them with `panorama.py <rid>` if the streaks bother anyone: Zermatt / Arlberg
   edges have them to a lesser degree). Shots: ~/Library/Caches/ski-work/davos/map/ (landscape + portrait, Zermatt for comparison).
+
+## Laax (24 Nov 2026): the 10th resort (Flims - Laax - Falera, Graubünden)
+- **Data** `laax` (common.py): box 46.775..46.905 N, 9.140..9.345 E = 16.6 x 15.4 km (13 x 12 tiles, 83 shipped, 3.56 MB tiles), frame EPSG:2056, heights
+  swissALTI3D 2 m (100 % of the box, no Copernicus seam; the STAC pad of the Davos round is in), far grid Copernicus. Overpass answered 502 for minutes:
+  `fetch_osm_api.py laax` (OSM API 0.6, ~5 min) built the layers. Elm (north, Tschinglenbahn / Pleusbahn ...) and Obersaxen Mundaun (south-west) are
+  separate ski areas outside the box (coverage.py: only the Tschinglenbahn is cut); the private Milchseilbahn (Fidaz) is dropped as "a separate ski area".
+- **Bake**: **98 pistes / 146 km** of run centre lines (99 runs, network 153 km: 24 black, 35 red, 38 blue, 1 green; 4 slalom pistes), **37 lifts**
+  (the 29 of laax.com / skiresort.com's list incl. the new FlemXpress ropeway (Flims - Foppa - Startgels - Segnes - Cassons / Nagens Sura), Arena Express
+  Flims - Plaun - Scansinas - Nagens, Larnags, Vorab, Crap Masegn, Alp Dado, Curnius, Falera + the practice carpets / rope tows). Lift names: `lift_names`
+  renames three OSM ways to the resort's own names ("Laax Murschetg - Crap Sogn Gion", "Alp Dado - Crest la Siala", "Vorab Gletscher"). skiresort.com names only
+  7 of its 29 lifts on the page (FlemXpress Segnes-Cassons, Alp Dado-Crest la Siala, Crap Sogn Gion, Crap (J-bar), Curnius-Crap Sogn Gion, Falera,
+  FlemXpress Flims-Foppa): all 7 are in OSM and in the game; there is no official piste list online, so piste names are OSM's ("Crap Masegn - Plaun",
+  "Vorab Sattel - Lavandinas", "Rene's long way / langer weg" ...).
+- **Start / park**: start piste `curnius-laax` (red, Crap Sogn Gion -> Laax), FIRST_LIFT `Laax Murschetg - Crap Sogn Gion` (cable car; spawn 12 m from it),
+  second `Arena Express Flims - Plaun`. Park = `park_site.mjs` pick "Snowpark Ils Plauns" (OSM way 1102988552, 420 m, 12 deg, Ils Plauns II drag 7 m away). OSM also
+  maps "Snowpark Curnius", "Superpipe" and "MiniPipe" (areas by the Pipe Lift): the picker scores the Ils Plauns line best; the park mode builds its own
+  kickers / rails / halfpipe on the picked line (the mapped pipes are not used). UNLOCK {red 5, black 12}. Villages (all "chalet", `ALPINE_RESORTS`): Flims Dorf,
+  Flims Waldhaus, Fidaz, Laax, Laax Murschetg, Falera. No landmarks.
+- **Printed map**: `panorama.py laax` picked the camera by score (az 315); pano-check 100 % on the page / visible. Shots ~/Library/Caches/ski-work/laax/map/.
+- **Picker**: ten cards need five small columns on a 1180 px iPad; `rp-dense` (picker.js adds it from 9 small cards, ui.css v17 landscape block) gives the small
+  cards compact text and a wider hero. Phone / portrait unchanged (scroll). **mp-games.js `SKI_RESORTS` had only 7 resorts**: Livigno, Davos Klosters and Laax were
+  missing from the lobby's resort setting (their piste options hang on it); all three added (mp-games v13, friends v78, mp-lobby v26). Texts that said "7"
+  (Arcade tile, banner, pixelbreak.html descs x3 languages, arcade_feature flow) now say 10 + the list; arcade-feature.js v4.
+- **Checks (24 Nov, all green)**: r8c-node-all (round7b 18412, round7 43, round6 3457, look7d 134, r7d 1447, r8c 36531, round7c 250 + `--rides` 98/98 laax, 0 through a net,
+  speed 178, harness x10), review 37, camera 15, barrier 22 (laax 98 courses, 0 crossing), npc 157, cliff 18, floors 2075 (+ parks; 2085 SQL rows), security,
+  memory-check (laax 269-290 MB renderer after load, 1 page 763 MB tree), station-diag laax: floating 0, wheels unheld 0, 37 / 37 rideable, 4 shared gondola
+  ends without a roof (Laax-Larnags top, Fuorcla-Vorab bottom, FlemXpress Foppa-Startgels top, Arena Express Plaun-Scansinas top: chained sections like Via Lattea's),
+  fp-steer 156, pano-check 80, piste_index (+98), cloud-size-test 20, street-check, mp-race. ground-check Chromium laax green (streets 0, rays 6 mm, terrain cracks 0).
+  calls-sweep7d laax (135 spots): worst 130 calls / 363k triangles. First play (ski-ipad-start laax) 3.00 MB, picker 2.07 MB.
+  Flows Chromium PASS: ski-modules, ski, ski-resorts, ski-spawn, ski-lift, ski-course, ski-challenges, ski-park, ski-freeride, ski-npc, ski-teleport, ski-lifts-all,
+  ski-mp, ski-mp-freeride, arcade-feature, home-page, mp-lobby-games, ski-ipad-start. **WebKit worked today** (Mini rebooted): ski, ski-freeride, ski-webkit PASS.
+- **SQL**: `scripts/ski-v1.sql` regenerated (+99 boards `ski-laax-*` incl. `ski-laax-park`, 2085 in all); only the `ski-laax-*` rows applied to production.
+- New helper `scripts/ski/laax-node-checks.sh` (= davos-node-checks.sh with station-diag laax). `fp-steer-check.mjs` needs an OUT_DIR argument.

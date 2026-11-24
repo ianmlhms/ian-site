@@ -33,7 +33,7 @@ const CASINO_CHIPS = Object.freeze([500, 1000, 2500, 5000].map((v) => Object.fre
 // Ski Alpen (live race on one piste, 2-8 players): resort + piste (a few named pistes per resort, or random of a colour), weather /
 // time of day (random by default), runs. The game resolves "random" itself from the lobby code + roster (pb/ski/net/plan.js), so every
 // player loads the same resort and piste without a server. Keep the piste ids in step with pb/ski/data/<resort>/resort.json.
-const SKI_RESORTS = Object.freeze([["killy", "Espace Killy"], ["3vallees", "Les 3 Vallées"], ["zermatt", "Zermatt"], ["arlberg", "St. Anton"], ["kronplatz", "Kronplatz"], ["vialattea", "Via Lattea"], ["obertauern", "Obertauern"]]);
+const SKI_RESORTS = Object.freeze([["killy", "Espace Killy"], ["3vallees", "Les 3 Vallées"], ["zermatt", "Zermatt"], ["arlberg", "St. Anton"], ["kronplatz", "Kronplatz"], ["vialattea", "Via Lattea"], ["obertauern", "Obertauern"], ["livigno", "Livigno"], ["davos", "Davos Klosters"], ["laax", "Laax"]]);
 const SKI_PISTES = Object.freeze([
   ["killy", "coupe-du-monde", "🔴 Coupe du Monde · 3.3 km"], ["killy", "face-de-bellevarde", "⚫ Face de Bellevarde · 2.5 km"], ["killy", "face", "🔴 Face · 1.1 km"],
   ["killy", "orange", "🔴 Orange · 1.6 km"], ["killy", "diebold", "🔵 Diebold · 2.2 km"], ["killy", "edelweiss", "🔵 Edelweiss · 1.7 km"], ["killy", "verte", "🟢 Verte · 2.2 km"],
@@ -53,6 +53,8 @@ const SKI_PISTES = Object.freeze([
   ["livigno", "degli-amanti", "🔵 Degli Amanti · 2.7 km"], ["livigno", "delle-cime", "🔵 Delle Cime · 2.5 km"], ["livigno", "blesaccia", "🔴 Blesaccia · 3.0 km"],
   ["davos", "kreuzweg-klosters", "🔴 Kreuzweg - Klosters · 7.2 km"], ["davos", "teufi", "⚫ Teufi · 2.7 km"], ["davos", "jakobshorn-standard", "🔵 Jakobshorn Standard · 2.2 km"],
   ["davos", "schifer-kublis", "🔴 Schifer - Küblis · 5.5 km"], ["davos", "traverse", "🔵 Traverse · 3.0 km"], ["davos", "madrisa-4", "🔵 Madrisa 4 · 2.0 km"],
+  ["laax", "crap-masegn-plaun", "🔴 Crap Masegn - Plaun · 4.4 km"], ["laax", "curnius-laax", "🔴 Curnius - Laax · 2.7 km"], ["laax", "fuorcla-da-sagogn-sogn-marti", "🔵 Fuorcla da Sagogn - Sogn Martin · 4.2 km"],
+  ["laax", "vorab-sattel-lavandinas", "⚫ Vorab Sattel - Lavandinas · 4.6 km"], ["laax", "vorab-sogn-martin", "🔵 Vorab - Sogn Martin · 2.8 km"], ["laax", "viwalti", "⚫ Viwalti · 2.2 km"],
 ]);
 const opt = (v, label, when) => Object.freeze(when ? { v, label, when } : { v, label });
 const SKI_SETTINGS = Object.freeze([

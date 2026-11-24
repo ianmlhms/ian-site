@@ -276,6 +276,22 @@ RESORTS = {
             ("Serneus", 9.8388, 46.8897, 350, "chalet"), ("Saas", 9.8085, 46.9109, 300, "chalet"), ("Schlappin", 9.8997, 46.9108, 160, "chalet"),
         ],
     },
+    # Laax (Flims - Laax - Falera, Graubünden): Crap Sogn Gion, Crap Masegn, Vorab glacier, La Siala, Nagens, Cassons, Curnius. One connected
+    # network. Heights swissALTI3D 2 m (LV95). Elm (north) and Obersaxen Mundaun (south-west) are separate areas outside the box.
+    "laax": {
+        "name": "Laax", "short": "Flims · Laax · Falera", "country": "CH", "crs": "EPSG:2056",
+        "bbox": (46.775, 9.140, 46.905, 9.345),
+        "dem": ["swissalti3d", "copernicus-glo30"], "far": ["copernicus-glo30"],
+        "tree_line": 2150.0, "derived_forest": 2000.0,
+        "buildings": "villages",
+        "start": "Curnius - Laax",              # the first piste on the map: Crap Sogn Gion -> Laax
+        # OSM way id -> the resort's own lift name (laax.com / skiresort.com)
+        "lift_names": {174349172: "Laax Murschetg - Crap Sogn Gion", 29993409: "Alp Dado - Crest la Siala", 29996792: "Vorab Gletscher"},
+        "villages": [
+            ("Flims Dorf", 9.2877, 46.8368, 600, "chalet"), ("Flims Waldhaus", 9.2888, 46.8257, 600, "chalet"), ("Fidaz", 9.3097, 46.8410, 300, "chalet"),
+            ("Laax", 9.2581, 46.8064, 600, "chalet"), ("Laax Murschetg", 9.2643, 46.8193, 250, "chalet"), ("Falera", 9.2321, 46.8008, 400, "chalet"),
+        ],
+    },
 }
 
 # Height tiles: TILE_CELLS cells of NEAR_STEP metres (the files hold TILE_CELLS + 1 nodes per side, neighbours share their edge).

@@ -10,7 +10,7 @@ import os
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DATA = os.path.join(REPO, "pb", "ski", "data")
 OUT = os.path.join(REPO, "pb", "ski", "picker-stats.js")
-RESORTS = ("killy", "3vallees", "zermatt", "arlberg", "kronplatz", "vialattea", "obertauern", "livigno", "davos")
+RESORTS = ("killy", "3vallees", "zermatt", "arlberg", "kronplatz", "vialattea", "obertauern", "livigno", "davos", "laax")
 
 
 def stats(rid):

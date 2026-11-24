@@ -20,6 +20,7 @@ const INFO = Object.freeze({
   vialattea: { title: 'Via Lattea', places: "Sestriere, Sauze d'Oulx, Sansicario, Cesana, Claviere, Montgenèvre", flags: ['🇮🇹', '🇫🇷'], region: 'Piemont an Hautes-Alpes' },
   livigno: { title: 'Livigno', places: 'Mottolino a Carosello 3000', flags: ['🇮🇹'], region: 'Lombardei' },
   davos: { title: 'Davos Klosters', places: 'Parsenn, Jakobshorn, Rinerhorn, Madrisa', flags: ['🇨🇭'], region: 'Graubünden' },
+  laax: { title: 'Laax', places: 'Flims, Laax, Falera, Vorab-Gletscher', flags: ['🇨🇭'], region: 'Graubünden' },
   obertauern: { title: 'Obertauern', places: 'Tauernrunde ronderëm de Pass', flags: ['🇦🇹'], region: 'Salzburger Land' },
 });
 
@@ -144,7 +145,7 @@ export function showResorts(root, { onPick, current = null, onOnline = null }) {
           <button type="button" class="btn ghost" id="skiCredits" aria-label="Quellen">ⓘ<span class="rp-hide-s"> Quellen</span></button>
         </div>
       </div>
-      <div class="resorts rp-grid${small % 2 ? ' rp-odd' : ''}" style="--rp-cols:${Math.max(2, Math.ceil(small / 2))};--rp-rows:${Math.max(2, Math.ceil(small / 2))}">${ordered.map((r) => card(r, { isHero: r.id === heroId, isCurrent: r.id === current, kicker, progress })).join('')}</div>
+      <div class="resorts rp-grid${small % 2 ? ' rp-odd' : ''}${small >= 9 ? ' rp-dense' : ''}" style="--rp-cols:${Math.max(2, Math.ceil(small / 2))};--rp-rows:${Math.max(2, Math.ceil(small / 2))}">${ordered.map((r) => card(r, { isHero: r.id === heroId, isCurrent: r.id === current, kicker, progress })).join('')}</div>
     </div>
   </section>`);
   s.querySelectorAll('.resort.ready').forEach((b) => b.addEventListener('click', () => onPick(b.dataset.id)));

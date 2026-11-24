@@ -106,6 +106,21 @@ button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
   .rp-hero .rp-body{flex:none}
   .rp-card:not(.rp-hero) .rp-pic{flex:1 1 0;min-height:100px;aspect-ratio:auto}
   .rp-card:not(.rp-hero) .rp-body{flex:none}
+  /* ten resorts: five small columns on a 1180 px iPad, so the small cards get compact text (no stray dots, facts in one line) */
+  .rp-dense{grid-template-columns:1.5fr repeat(var(--rp-cols,2),1fr)}
+  .rp-dense .rp-hero .rp-body{padding:16px 16px 18px}
+  .rp-dense .rp-hero .rp-name b{font-size:28px}
+  .rp-dense .rp-stats b{font-size:21px}
+  .rp-dense .rp-stats>span{padding-right:9px;margin-right:9px}
+  .rp-dense .rp-stats small{font-size:10px}
+  .rp-dense .rp-card:not(.rp-hero) .rp-body{padding:9px 28px 10px 11px}
+  .rp-dense .rp-card:not(.rp-hero) .rp-name{gap:4px;flex-wrap:wrap}
+  .rp-dense .rp-card:not(.rp-hero) .rp-name b{font-size:15px;text-wrap:balance}
+  .rp-dense .rp-card:not(.rp-hero) .rp-flag{font-size:12px;letter-spacing:0}
+  .rp-dense .rp-card:not(.rp-hero) .rp-facts{font-size:10px;margin-top:4px}
+  .rp-dense .rp-card:not(.rp-hero) .rp-facts span+span{margin-left:5px;padding-left:5px}
+  .rp-dense .rp-card:not(.rp-hero) .rp-places{font-size:12px}
+  .rp-dense .rp-card:not(.rp-hero) .rp-arrow{right:9px;bottom:9px;font-size:15px}
 }
 /* tablet portrait: flatter pictures on the small cards, so the whole picker nearly fits */
 @media (min-width:600px) and (max-width:899px){

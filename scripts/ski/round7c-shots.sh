@@ -4,7 +4,7 @@
 set -u
 BROWSERS=${BROWSERS:-gpu webkit}      # BROWSERS="gpu" / "webkit" / "" (only the sheets)
 OUT=${1:-$HOME/Library/Caches/ski-work/round7c}; shift || true
-RESORTS=${*:-killy 3vallees zermatt arlberg kronplatz vialattea obertauern livigno davos}
+RESORTS=${*:-killy 3vallees zermatt arlberg kronplatz vialattea obertauern livigno davos laax}
 cd "$(dirname "$0")/../.."
 mkdir -p "$OUT/gpu" "$OUT/webkit"
 for rid in $RESORTS; do
@@ -17,9 +17,9 @@ done
 PY=~/Library/Caches/luxtram-work/.venv/bin/python
 for b in gpu webkit; do
   args=()
-  for rid in killy 3vallees zermatt arlberg kronplatz vialattea obertauern livigno davos; do [ -f "$OUT/$b/$rid-spawn.png" ] && args+=("$rid: spawn at the first lift ($b)|$OUT/$b/$rid-spawn.png"); done
+  for rid in killy 3vallees zermatt arlberg kronplatz vialattea obertauern livigno davos laax; do [ -f "$OUT/$b/$rid-spawn.png" ] && args+=("$rid: spawn at the first lift ($b)|$OUT/$b/$rid-spawn.png"); done
   $PY scripts/ski/look_sheet.py "$OUT/sheet-spawn-$b.jpg" ${args[@]+"${args[@]}"} --width 1200
-  for rid in killy 3vallees zermatt arlberg kronplatz vialattea obertauern livigno davos; do
+  for rid in killy 3vallees zermatt arlberg kronplatz vialattea obertauern livigno davos laax; do
     args=()
     for s in map-teleport firstperson spray-carve spray-powder avalanche course-start course-finish; do [ -f "$OUT/$b/$rid-$s.png" ] && args+=("$rid · $s ($b)|$OUT/$b/$rid-$s.png"); done
     $PY scripts/ski/look_sheet.py "$OUT/sheet-$rid-$b.jpg" ${args[@]+"${args[@]}"} --width 1200
