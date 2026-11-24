@@ -219,7 +219,7 @@ export function createEnv({ scene, noise, detail = null, params = {} }) {
     uAmbSky: { value: V() }, uAmbGround: { value: V() }, uFogColor: { value: V() }, uFogDensity: { value: 3e-5 },
     uTime: { value: 0 }, uCloud: { value: 0 }, uSnowfall: { value: 0 }, uGlow: { value: 0 }, uOvercast: { value: 0 }, uNoise: { value: noise }, uCloudTex: { value: createCloudTexture() },
     // round 5: fine ground detail, the far grid's normal map (same rectangle as uShadowRect), the weather's haze share
-    uDetail: { value: detail || noise }, uFarN: { value: noise }, uFarNOn: { value: 0 }, uMilk: { value: 0 },
+    uDetail: { value: detail || noise }, uFarN: { value: noise }, uFarNOn: { value: 0 }, uMilk: { value: 0 }, uForestOuter: { value: 1e9 },
     // mountain shadows of the current time of day (baked, see scripts/ski/bake.py sun_shadows): a raster over the far grid
     uShadow: { value: noise }, uShadowOn: { value: 0 }, uShadowRect: { value: new THREE.Vector4(0, 0, 1, 1) },
     ...shadowUniforms(),

@@ -79,7 +79,7 @@ export function createSnowMaterial(env, { cheap = false, treeRadius = 400, fores
       }`,
     fragmentShader: `
       #include <packing>
-      uniform vec3 uSunDir, uSunColor, uAmbSky, uAmbGround, uFogColor; uniform float uFogDensity, uTime, uOvercast, uSnowfall, uTreeRadius, uShadowOn, uFarNOn, uFarFrom, uMilk;
+      uniform vec3 uSunDir, uSunColor, uAmbSky, uAmbGround, uFogColor; uniform float uFogDensity, uTime, uOvercast, uSnowfall, uTreeRadius, uForestOuter, uShadowOn, uFarNOn, uFarFrom, uMilk;
       uniform sampler2D uNoise, uShadow, uForestTex, uDetail, uFarN; uniform vec4 uShadowRect; uniform vec2 uForestSize; uniform float uForestOn;
       varying vec3 vWorld; varying vec3 vNormal; varying vec4 vInfo; varying vec4 vExtra; varying float vDist;
       ${cheap ? '' : SHADOW_GLSL}
@@ -239,7 +239,12 @@ export function createSnowMaterial(env, { cheap = false, treeRadius = 400, fores
         float canopy = fRaster * smoothstep(uTreeRadius * 0.7, uTreeRadius * 1.0, vDist) * (1.0 - piste);
         vec3 green = mix(vec3(0.11, 0.17, 0.16), vec3(0.2, 0.25, 0.24), nA.g);
         vec3 canopyCol = green * (shade * 0.75 + uSunColor * smoothstep(-0.2, 0.7, nl) * sunVis * 0.45);
-        col = mix(col, canopyCol, canopy * 0.3);
+        // beyond the last tree cards the ground itself is the forest (24 Nov, Laax: every far wood was a pale grey stain on the snow)
+        float beyond = smoothstep(uForestOuter * 0.7, uForestOuter * 1.02, length(vWorld.xz - cameraPosition.xz));
+        // crowns and gaps: two noise sizes (~20 m and ~70 m), the gaps show the snow between the trees
+        float crowns = texture2D(uNoise, mat2(0.8, 0.6, -0.6, 0.8) * wp * 0.0063 + 0.31).g * 0.55 + texture2D(uNoise, wp * 0.0017 + 0.72).b * 0.45;   // turned and big: no visible tiles
+        vec3 farCol = canopyCol * mix(vec3(0.62, 0.74, 0.68), vec3(1.0), crowns);
+        col = mix(col, mix(canopyCol, farCol, beyond), canopy * mix(0.3, mix(0.9, 0.66, smoothstep(0.36, 0.72, crowns)), beyond));
         #ifndef CHEAP
         // sheen: packed and wind-polished snow shines towards a low sun; sparkle: single grains flash as the view moves over them
         float clearSun = lit * (1.0 - rockAmt) * (1.0 - uOvercast);

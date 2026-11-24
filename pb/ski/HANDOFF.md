@@ -2001,3 +2001,14 @@ piste map looked at, traced or copied). The old plan from above stays one tap aw
   ski-mp, ski-mp-freeride, arcade-feature, home-page, mp-lobby-games, ski-ipad-start. **WebKit worked today** (Mini rebooted): ski, ski-freeride, ski-webkit PASS.
 - **SQL**: `scripts/ski-v1.sql` regenerated (+99 boards `ski-laax-*` incl. `ski-laax-park`, 2085 in all); only the `ski-laax-*` rows applied to production.
 - New helper `scripts/ski/laax-node-checks.sh` (= davos-node-checks.sh with station-diag laax). `fp-steer-check.mjs` needs an OUT_DIR argument.
+
+## Far forests (24 Nov 2026, after Laax): no bare woods in the distance, in every resort
+- **What was wrong**: `forest-far.js` filled its cards block by block from the north until CAP (90,000). In a wooded area the ring asks for more, so
+  every forest south of that row had no trees, only the grey underlay (Laax: the whole Flimser Wald). Beyond the ring (1600 / 2500 / 4200 m) a wood was
+  a pale grey stain too (underlay x 0.3), very visible on Niddreg.
+- **Fix**: `rebuild` first adds up what the ring wants and thins the whole ring evenly (`stats.wanted`, `stats.thin`; cards grow a little); the cap, calls and
+  triangles stay the same. `snow-shader.js` paints the ground as forest (crowns and gaps, noise 160 m / 590 m tiles, turned: smaller tiles repeat visibly) from
+  0.7 x `uForestOuter` (env uniform, set by forest-far.js per quality) on.
+- Laax picker picture re-rendered (pose 11200,10700,420,9300,6000,-350,44; blurred 1.6 px before encoding, else > 80 KB), `IMG_VERSION` bumped. The other
+  resorts' pictures are older renders (their far woods look greyer there than in the game).
+- The printed map title counts lifts without carpets (Laax 34), the picker counts all (37).

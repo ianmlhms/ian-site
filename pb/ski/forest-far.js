@@ -193,6 +193,7 @@ export function createFarForest({ scene, env, classes, resort, field, quality })
   mesh.name = 'ski-far-forest';
   scene.add(mesh);
   let q = quality, ring = FAR_FOREST[quality.cheapSnow ? 'low' : quality.treeRadius < 450 ? 'medium' : 'high'];
+  env.u.uForestOuter.value = ring.outer;                  // the ground paints the forests beyond the cards (snow-shader.js)
   let last = { x: 1e9, z: 1e9 };
   const pending = [], pendingKeys = new Set(), stale = [];
   const stats = { cards: 0, blocks: 0 };
@@ -205,10 +206,13 @@ export function createFarForest({ scene, env, classes, resort, field, quality })
     return arr;
   }
 
+  const keepAt = (d) => ring.keep * (d < ring.thin ? 1 : Math.max(0.3, ring.thin / d));   // the share of the trees kept at d m
+
   function rebuild(px, pz) {
     pending.length = 0; pendingKeys.clear();
     const R = ring.outer, R2 = R * R, inner = q.treeRadius * 0.9, inner2 = inner * inner;
-    let n = 0;
+    let n = 0, wanted = 0;
+    const near = [];                                     // the blocks of this ring with trees ready
     const b0x = Math.floor((px - R) / BLOCK), b1x = Math.floor((px + R) / BLOCK), b0z = Math.floor((pz - R) / BLOCK), b1z = Math.floor((pz + R) / BLOCK);
     for (let bz = b0z; bz <= b1z; bz++) {
       for (let bx = b0x; bx <= b1x; bx++) {
@@ -218,21 +222,30 @@ export function createFarForest({ scene, env, classes, resort, field, quality })
         if (fx * fx + fz * fz < inner2) continue;            // the whole block lies inside the 3D trees
         const arr = blocks.get(key(bx, bz));
         if (!arr) { const k = key(bx, bz); if (!pendingKeys.has(k)) { pendingKeys.add(k); pending.push([bx, bz]); } continue; }
-        for (let i = 0; i < arr.length && n < CAP; i += 6) {
-          const dx = arr[i] - px, dz = arr[i + 2] - pz, d2 = dx * dx + dz * dz;
-          if (d2 < inner2 || d2 > R2) continue;
-          const d = Math.sqrt(d2);
-          const keep = ring.keep * (d < ring.thin ? 1 : Math.max(0.3, ring.thin / d));
-          if (arr[i + 5] > keep) continue;
-          inst[n * 4] = arr[i]; inst[n * 4 + 1] = arr[i + 1]; inst[n * 4 + 2] = arr[i + 2]; inst[n * 4 + 3] = arr[i + 3] / Math.sqrt(Math.max(0.35, keep / ring.keep));
-          kind[n * 2] = arr[i + 4]; kind[n * 2 + 1] = arr[i + 5];
-          n++;
-        }
+        if (!arr.length) continue;
+        near.push(arr);
+        // how many cards this block asks for (its middle's distance is close enough for the sum)
+        const mid = Math.hypot((bx + 0.5) * BLOCK - px, (bz + 0.5) * BLOCK - pz);
+        wanted += (arr.length / 6) * keepAt(Math.min(R, Math.max(inner, mid)));
+      }
+    }
+    // Laax (24 Nov): more trees in the ring than cards: the rows were filled from the north until CAP and every forest south of that stood
+    // bare (grey snow). Now the whole ring thins evenly (each card a little bigger), no forest goes missing.
+    const thin = Math.min(1, (CAP * 0.97) / Math.max(1, wanted));
+    for (const arr of near) {
+      for (let i = 0; i < arr.length && n < CAP; i += 6) {
+        const dx = arr[i] - px, dz = arr[i + 2] - pz, d2 = dx * dx + dz * dz;
+        if (d2 < inner2 || d2 > R2) continue;
+        const keep = keepAt(Math.sqrt(d2)) * thin;
+        if (arr[i + 5] > keep) continue;
+        inst[n * 4] = arr[i]; inst[n * 4 + 1] = arr[i + 1]; inst[n * 4 + 2] = arr[i + 2]; inst[n * 4 + 3] = arr[i + 3] / Math.sqrt(Math.max(0.35, keep / ring.keep));
+        kind[n * 2] = arr[i + 4]; kind[n * 2 + 1] = arr[i + 5];
+        n++;
       }
     }
     geo.instanceCount = n;
     geo.getAttribute('aInst').needsUpdate = true; geo.getAttribute('aKind').needsUpdate = true;
-    stats.cards = n; stats.blocks = blocks.size;
+    stats.cards = n; stats.wanted = Math.round(wanted); stats.thin = thin; stats.blocks = blocks.size;
     last = { x: px, z: pz };
   }
 
@@ -253,7 +266,7 @@ export function createFarForest({ scene, env, classes, resort, field, quality })
       if (!pending.length) rebuild(px, pz);
       else if (pending.length % 8 === 0) rebuild(px, pz);
     },
-    setQuality(next) { q = next; ring = FAR_FOREST[next.cheapSnow ? 'low' : next.treeRadius < 450 ? 'medium' : 'high']; last = { x: 1e9, z: 1e9 }; },
+    setQuality(next) { q = next; ring = FAR_FOREST[next.cheapSnow ? 'low' : next.treeRadius < 450 ? 'medium' : 'high']; env.u.uForestOuter.value = ring.outer; last = { x: 1e9, z: 1e9 }; },
     /** A height tile arrived: the blocks under it get their trees again (new ground heights). */
     invalidate(x0, z0, x1, z1) {
       for (let bz = Math.floor(z0 / BLOCK); bz <= Math.floor(z1 / BLOCK); bz++) {
