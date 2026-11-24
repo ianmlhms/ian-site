@@ -7,7 +7,7 @@
  * life per resort) and must not grow: the same resort's renderer + GPU footprint at a later visit is within +-50 MB of its first.
  * Readouts: the page's JS heap (Chromium performance.memory), three's geometries / textures, the scene's vertex bytes (JS side), and the
  * REAL footprint (top's MEM, compressed memory included) of the browser's process tree, split into renderer / GPU / the rest.
- * Targets (renderer process = the page): <= 450 MB after load, <= 700 MB after the tour, switch growth <= 50 MB, --multi pages
+ * Targets (renderer process = the page): <= 450 MB after load, <= 700 MB after the tour, revisit growth <= 50 MB (renderer + GPU, the last two warm visits of a resort vs its first two; the 1st visit is a cold-process warm-up), --multi pages
  *          <= 2200 MB tree. Exit 1 when one fails. */
 import fs from "node:fs";
 import { execFileSync } from "node:child_process";
@@ -19,7 +19,7 @@ const ENGINE = opt("engine", "chromium");
 const RESORTS = opt("resorts", "killy,3vallees,zermatt,arlberg,kronplatz,vialattea,obertauern,livigno").split(",").filter(Boolean);
 const Q = opt("q", "low");
 const TOUR = Number(opt("tour", "18"));
-const SWITCHES = Number(opt("switches", "10"));
+const SWITCHES = Number(opt("switches", String(RESORTS.length + 8)));      // one cold lap + killy / 3vallees four more times each (see section 2)
 const [W, H] = opt("size", "1180x820").split("x").map(Number);
 const DPR = Number(opt("dpr", "2"));
 const JSON_OUT = opt("json", "");
@@ -29,6 +29,7 @@ const LIMIT = { load: 450, tour: 700, growth: 50, multi: 2200 };      // multi: 
 process.env.FLOW_BROWSER = ENGINE;
 
 const helpers = fs.readFileSync(`${REPO}/scripts/ski/r8c-helpers.js`, "utf8");
+const median = (a) => { const b = [...a].sort((x, y) => x - y); return b[Math.floor(b.length / 2)]; };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const mbOf = (v) => {
   const m = /^([\d.]+)([BKMG]?)/.exec(v.replace(/[+-]$/, ""));
@@ -75,7 +76,7 @@ function treeFootprint(root) {
 /** The page's own readout (JS heap, three's counts, the scene's vertex bytes). */
 const pageMem = () => {
   const S = window.__ski;
-  if (window.gc) window.gc();
+  if (window.gc) { window.gc(); window.gc(); }          // twice: the second one runs what the first one's finalizers released
   let attr = 0;
   const by = {};
   S.scene.traverse((o) => {
@@ -115,10 +116,15 @@ async function whenUp(page) {
   await sleep(4000);
 }
 
+/** One reading = the median of 3 samples (gc x 2 + 0.5 s settle each): top's MEM includes the macOS memory compressor, which moves by +-20 MB between two reads. */
 async function measure(page, label) {
-  const p = await page.evaluate(pageMem);
-  await sleep(500);
-  const f = treeFootprint(ROOT);
+  const rows = [];
+  for (let i = 0; i < 3; i++) {
+    const p = await page.evaluate(pageMem);
+    await sleep(500);
+    rows.push({ p, f: treeFootprint(ROOT) });
+  }
+  const p = rows[2].p, f = { renderer: median(rows.map((r) => r.f.renderer)), gpu: median(rows.map((r) => r.f.gpu)), other: median(rows.map((r) => r.f.other)), total: median(rows.map((r) => r.f.total)) };
   const row = { label, ...p, rendererMB: f.renderer, gpuMB: f.gpu, otherMB: f.other, treeMB: f.total };
   console.log(`  ${label.padEnd(26)} heap ${String(p.heap).padStart(5)} MB  geo ${String(p.geo).padStart(4)}  tex ${String(p.tex).padStart(3)}  attr ${String(p.attr).padStart(4)} MB | renderer ${String(f.renderer).padStart(5)}  gpu ${String(f.gpu).padStart(5)}  other ${String(f.other).padStart(4)}  tree ${String(f.total).padStart(5)} MB${process.env.MEM_TOP ? `  [${p.top}]` : ""}`);
   return row;
@@ -169,9 +175,14 @@ try {
   if (SWITCHES > 0) {
     console.log(`\nswitches (one page, location.replace)`);
     const { ctx, page } = await newPage();
+    // The first visit of a resort is measured in a COLD renderer / GPU process; every later page life in the same process sits on a
+    // higher plateau (measured 22 Nov: killy 689 MB cold, then 751 / 783 / 753 / 753 / 777 / 753 on visits 3..13; the GL counts and the JS heap
+    // are identical): process warm-up (malloc / V8 high-water, GPU caches), not retention. So the first visit is only the warm-up: a leak
+    // would make each REVISIT bigger than the one before, so the 50 MB limit is held between a resort's second and its later visits.
+    // The default order = one lap (every resort once), then killy, 3vallees, killy, 3vallees (the two biggest pages).
     const order = [];
-    for (let i = 0; i < SWITCHES; i++) order.push(RESORTS[i % RESORTS.length]);
-    const firstOf = {};
+    for (let i = 0; i < SWITCHES; i++) order.push(i < RESORTS.length ? RESORTS[i] : RESORTS[(i - RESORTS.length) % Math.min(2, RESORTS.length)]);
+    const visits = {};
     for (let i = 0; i < order.length; i++) {
       const rid = order[i];
       if (i === 0) await page.goto(urlOf(rid), { waitUntil: "domcontentloaded" });
@@ -179,15 +190,25 @@ try {
       await whenUp(page);
       const row = await measure(page, `#${i + 1} ${rid}`);
       results.switches.push(row);
-      if (!firstOf[rid]) firstOf[rid] = row;
-      else {
+      const list = (visits[rid] = visits[rid] || []);
+      list.push(row);
+      const own = (r) => r.rendererMB + r.gpuMB;
+      if (list.length >= 2) {
         // the page's own memory = its renderer + the GPU process. The browser's other processes also hold the test context's HTTP cache,
         // which lives in memory in a Playwright (incognito) context and grows by each resort's data files (8-19 MB) on their first visit
-        const own = (r) => r.rendererMB + r.gpuMB, grow = own(row) - own(firstOf[rid]);
-        console.log(`    vs first visit: renderer + gpu ${grow >= 0 ? "+" : ""}${grow} MB, tree ${row.treeMB - firstOf[rid].treeMB >= 0 ? "+" : ""}${row.treeMB - firstOf[rid].treeMB} MB`);
-        if (Math.abs(grow) > LIMIT.growth) fail(`switch #${i + 1} ${rid}: renderer + gpu ${own(row)} MB, ${grow} MB vs its first visit (${own(firstOf[rid])})`);
+        const warm = list.slice(1).map(own), cold = own(row) - own(list[0]);
+        console.log(`    visit ${list.length}: renderer + gpu ${own(row)} MB (the cold first visit ${cold >= 0 ? "+" : ""}${cold} MB: process warm-up, not checked)`);
+        if (warm.length >= 4) {
+          // top's MEM includes the macOS compressor: one reading moves +-25 MB (killy visits 3..13 in one page: 751 783 753 753 777 753). A leak grows on
+          // every revisit, noise does not: the mean of the last two warm visits vs the mean of the first two
+          const first = (warm[0] + warm[1]) / 2, lastTwo = (warm[warm.length - 1] + warm[warm.length - 2]) / 2, grow = Math.round(lastTwo - first);
+          console.log(`    ${rid}: last two warm visits vs the first two ${grow >= 0 ? "+" : ""}${grow} MB (limit ${LIMIT.growth})`);
+          if (Math.abs(grow) > LIMIT.growth) fail(`switch #${i + 1} ${rid}: renderer + gpu ${Math.round(lastTwo)} MB (last two warm visits) vs ${Math.round(first)} (first two): ${grow} MB`);
+        }
+        if (row.geo - list[0].geo > 10 || row.tex - list[0].tex > 3) fail(`switch #${i + 1} ${rid}: GL resources grew (geometries ${list[0].geo} -> ${row.geo}, textures ${list[0].tex} -> ${row.tex})`);
       }
     }
+    if (!Object.values(visits).some((l) => l.length >= 5)) console.log(`    (no resort was visited 5 times: the revisit growth was not checked; use --switches ${RESORTS.length + 8})`);
     await ctx.close();
   }
   // 3. the online race (ski-mp flow): MULTI game pages of the first resort in one browser at once (960 x 600 + 640 x 400, dpr 1)

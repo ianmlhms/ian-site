@@ -1908,3 +1908,22 @@ piste map looked at, traced or copied). The old plan from above stays one tap aw
   (only 8 black runs). Villages (all "chalet", `ALPINE_RESORTS`): Livigno (a long N-S strip), Santa Maria, Pemont, San Rocco, Borch, Florin,
   Teola, Trepalle, Eira. No landmarks. Picker picture pb/ski/img/livigno-*.webp (GPU shot, 330 m up over the valley looking at Carosello).
 - **SQL**: `scripts/ski-v1.sql` regenerated (+97 boards: 96 pistes + the park), applied to production only after the piste list was final.
+
+## Obertauern "terrain crack" + memory-check flapping (24 Nov 2026): both were measurement artefacts, no game code changed
+- **The -1.5 m crack after the jump to the Kehrkopfbahn was not a terrain crack.** The one ray (2047 / 3397) lies inside the snow park (Obertauern's
+  park is 70 m from the arrival spot). Physics there = `park.solidAt` (the analytic kicker / ramp / pipe shape, `surface.height`), which the park's own
+  mesh `ski-park-snow` draws (0.01 m from physics); the terrain tile under it is the plain lattice (heights `fresh` = `block` = mesh, 1.1-1.8 m
+  UNDER the park body, no stale tile: `pendingLater` 0). ground-check only cast its terrain rays at the group `ski-terrain`, so it saw the lattice
+  under the park body. Fix in the check: the rays now hit `ski-terrain` + the visible `ski-park-snow` (the first visible drawn ground), and a new
+  `park` test walks the whole park footprint + 12 m (stations 120 m apart, each +-60 m, 1.5 x 2 m grid, ~6-9k rays) vs physics: Obertauern worst
+  0.04 m, Killy 0.05 m. (Coarse LOD tiles differ by up to 0.65 m from the 2.5 m lattice inside the park mask's blend on a 5 m tile (Killy, 100+ m away):
+  by design, the check only looks inside the 100 m full-detail ring.) `scripts/ski/crack-probe.mjs [resort] [lift] | park`: lists the rays off
+  by > 0.3 m after a fast travel (or over the park) with tile, mesh / lattice / block / far heights and every hit.
+- **memory-check "Killy second visit +55..71 MB" = cold-process baseline, not retention.** Alternating killy / 3vallees 14 times in one page
+  (renderer + GPU MB, top's MEM): killy 689 (cold, 1st) then 751, 783, 753, 753, 777, 753; 3vallees 820, 831, 837, 830, 832, 844, 845. JS heap, geometries
+  (313-315) and textures (19) are identical every visit; growth stops after the first revisit. The renderer / GPU process is warm after the first page
+  life (malloc / V8 high-water, GPU caches) and the first visit of the first resort was measured cold; top's MEM (compressor included) moves +-25 MB
+  per reading on top of that. Check now: section 2 = one cold lap, then killy / 3vallees four more times each (`--switches` default resorts + 8,
+  16 page lives); the cold first visit is only printed; the 50 MB limit holds between the mean of a resort's first two warm visits and the mean of its
+  last two (a real leak grows on every revisit; noise does not) + GL counts (geometries +10, textures +3 vs the first visit). Every reading is the
+  median of 3 samples (gc x 2, 0.5 s settle each). Result runs: see the commit message.

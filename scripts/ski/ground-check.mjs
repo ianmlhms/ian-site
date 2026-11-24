@@ -153,6 +153,7 @@ try {
         const spots = [{ name: 'spawn', x: S.state.x, z: S.state.z, h: S.state.heading }, ...pick.map(([p, at]) => { const a = p.at(Math.min(at, p.length - 5), {}); return { name: p.name, x: a.x, z: a.z, h: Math.atan2(a.dz, a.dx) }; })];
         const ray = new T.Raycaster();
         const grp = S.scene.getObjectByName('ski-terrain');
+        const drawn = () => [grp, S.scene.getObjectByName('ski-park-snow')].filter(Boolean);      // the snow park's body is drawn over the lattice where it lies (its physics = the analytic shape)
         for (const sp of spots) {
           S.place(sp.x, sp.z, sp.h);
           await S.streamer.ready(sp.x, sp.z, 300);
@@ -161,7 +162,7 @@ try {
           for (let gz = -10; gz <= 10; gz++) for (let gx = -10; gx <= 10; gx++) {
             const x = sp.x + gx * 10, z = sp.z + gz * 10, h = S.surface.height(x, z);
             ray.set(new T.Vector3(x, h + 60, z), new T.Vector3(0, -1, 0)); ray.far = 200;
-            const hit = ray.intersectObject(grp, true)[0];
+            const hit = ray.intersectObjects(drawn(), true).find((q) => q.object.visible !== false);        // the first visible drawn ground: terrain tiles + the snow park's snow body
             n++;
             const d = hit ? hit.point.y - h : -99;
             if (d < -0.5) cracks++; else if (d > 0.5) walls++;
@@ -175,6 +176,7 @@ try {
       // tiles, no skirt walls)
       const jumps = await page.evaluate(async () => {
         const S = window.__ski, T = window.THREE, ray = new T.Raycaster(), grp = S.scene.getObjectByName('ski-terrain');
+        const drawn = () => [grp, S.scene.getObjectByName('ski-park-snow')].filter(Boolean);
         const here = S.state, lifts = [...S.modes.lifts.list].sort((a, b) => Math.hypot(b.bottom.x - here.x, b.bottom.z - here.z) - Math.hypot(a.bottom.x - here.x, a.bottom.z - here.z));
         const out = [];
         for (const l of [lifts[0], lifts[Math.floor(lifts.length / 2)]]) {
@@ -188,7 +190,7 @@ try {
           for (let gz = -8; gz <= 8; gz++) for (let gx = -8; gx <= 8; gx++) {
             const x = st.x + gx * 8, z = st.z + gz * 8, h = S.surface.height(x, z);
             ray.set(new T.Vector3(x, h + 80, z), new T.Vector3(0, -1, 0)); ray.far = 300;
-            const hit = ray.intersectObject(grp, true)[0];
+            const hit = ray.intersectObjects(drawn(), true).find((q) => q.object.visible !== false);        // the first visible drawn ground: terrain tiles + the snow park's snow body
             const d = hit ? hit.point.y - h : -99;
             if (Math.abs(d) > 0.5) bad++;
             if (Math.abs(d) > Math.abs(worst)) worst = d;
@@ -197,6 +199,32 @@ try {
         }
         return out;
       });
+      // the snow park (kickers, ramps, the pipe): the drawn snow body + the lattice round it vs the physics (analytic shape) over the whole footprint + 12 m
+      const parkRes = await page.evaluate(async () => {
+        const S = window.__ski, T = window.THREE, P = S.surface.field.park;
+        if (!P) return null;
+        const ray = new T.Raycaster(), grp = S.scene.getObjectByName('ski-terrain');
+        let bad = 0, worst = 0, n = 0, where = null;
+        const drawn = () => [grp, S.scene.getObjectByName('ski-park-snow')].filter(Boolean);
+        // the full-detail ring is +-100 m: the park (400-800 m long) is walked in stations 120 m apart, each tested over +-60 m along it
+        for (let s0 = Math.min(60, P.len / 2); s0 < P.len + 60; s0 += 120) {
+          const mid = P.world(Math.min(s0, P.len), 0);
+          S.place(mid.x, mid.z, P.heading);
+          await S.streamer.ready(mid.x, mid.z, 400);
+          for (let i = 0; i < 80 && (S.terrain.stats.pending > 0 || i < 8); i++) await new Promise((r) => setTimeout(r, 100));
+          for (let s = Math.max(-12, s0 - 60); s <= Math.min(P.len + 12, s0 + 60); s += 2) for (let v = -P.hw - 12; v <= P.hw + 12; v += 1.5) {
+            const w = P.world(s, v), h = S.surface.height(w.x, w.z);
+            ray.set(new T.Vector3(w.x, h + 60, w.z), new T.Vector3(0, -1, 0)); ray.far = 200;
+            const hit = ray.intersectObjects(drawn(), true).find((q) => q.object.visible !== false);
+            const d = hit ? hit.point.y - h : -99;
+            n++;
+            if (Math.abs(d) > 0.5) bad++;
+            if (Math.abs(d) > Math.abs(worst)) { worst = d; where = [Math.round(s), Math.round(v)]; }
+          }
+        }
+        return { bad, worst: +worst.toFixed(2), where, n };
+      });
+      if (parkRes) terrain.push({ name: 'park', cracks: parkRes.bad, walls: 0, worst: parkRes.worst, where: parkRes.where, n: parkRes.n });
       for (const j of jumps) terrain.push({ name: `jump ${j.lift}`, cracks: j.bad, walls: 0, worst: j.worst, tiles: j.tiles, pending: j.pending, dist: j.dist });
       const cracks = terrain.reduce((m, t) => m + t.cracks + t.walls, 0);
       if (process.env.COP_DEBUG || cracks) console.log(JSON.stringify(terrain));
