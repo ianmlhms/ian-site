@@ -122,22 +122,37 @@ function pushUndo(){
 function undo(){
   const prev=undoStack.pop();
   if(!prev)return;
-  grid=prev;render();
+  grid=prev;render();persist();
 }
-function clearCanvas(){pushUndo();grid=newGrid();render()}
+function clearCanvas(){pushUndo();grid=newGrid();render();persist()}
 $('undo').addEventListener('click',undo);
 $('clear').addEventListener('click',clearCanvas);
 
 /* ---------- painting ---------- */
-function paint(e){
-  const b=toBoard(e);
-  const x=Math.floor(b.x/PX),y=Math.floor(b.y/PX);
-  if(x<0||x>=GRID||y<0||y>=GRID)return;
-  if(tool==='fill'){floodFill(x,y,grid[y][x],color);render();return}
+let lastCell=null;   // previous cell of the stroke, so a fast finger leaves a line and not dots
+function stamp(x,y){
   for(let dy=-brushSize+1;dy<brushSize;dy++)for(let dx=-brushSize+1;dx<brushSize;dx++){
     let nx=x+dx,ny=y+dy;
     if(nx>=0&&nx<GRID&&ny>=0&&ny<GRID)grid[ny][nx]=tool==='erase'?null:color;
   }
+}
+function paint(e){
+  const b=toBoard(e);
+  const x=Math.floor(b.x/PX),y=Math.floor(b.y/PX);
+  if(x<0||x>=GRID||y<0||y>=GRID)return;
+  if(tool==='fill'){if(!lastCell){lastCell={x,y};floodFill(x,y,grid[y][x],color);render()}return}
+  // Bresenham from the last cell to this one
+  let cx=lastCell?lastCell.x:x,cy=lastCell?lastCell.y:y;
+  const dx=Math.abs(x-cx),dy=-Math.abs(y-cy),sx=cx<x?1:-1,sy=cy<y?1:-1;
+  let err=dx+dy;
+  for(let guard=0;guard<GRID*3;guard++){
+    stamp(cx,cy);
+    if(cx===x&&cy===y)break;
+    const e2=2*err;
+    if(e2>=dy){err+=dy;cx+=sx}
+    if(e2<=dx){err+=dx;cy+=sy}
+  }
+  lastCell={x,y};
   render();
 }
 function floodFill(x,y,target,fill){
@@ -156,24 +171,42 @@ function render(){
   for(let y=0;y<GRID;y++)for(let x=0;x<GRID;x++){
     if(grid[y][x]){X.fillStyle=grid[y][x];X.fillRect(x*PX,y*PX,PX,PX)}
   }
-  X.strokeStyle='rgba(232,232,240,0.07)';X.lineWidth=0.5;
+  X.strokeStyle=COLOR.text;X.globalAlpha=0.09;X.lineWidth=0.5;
   X.beginPath();
   for(let i=0;i<=GRID;i++){X.moveTo(i*PX,0);X.lineTo(i*PX,H);X.moveTo(0,i*PX);X.lineTo(W,i*PX)}
-  X.stroke();
+  X.stroke();X.globalAlpha=1;
 }
 const onResize=render;
 
 C.addEventListener('pointerdown',e=>{
   if(activePointer!==null||e.button!==0)return;
   activePointer=e.pointerId;C.setPointerCapture(e.pointerId);
-  pushUndo();paint(e);
+  lastCell=null;pushUndo();paint(e);
 });
 C.addEventListener('pointermove',e=>{if(e.pointerId===activePointer)paint(e)});
-function endPaint(e){if(e.pointerId!==activePointer)return;activePointer=null;if(C.hasPointerCapture(e.pointerId))C.releasePointerCapture(e.pointerId)}
+function endPaint(e){if(e.pointerId!==activePointer)return;activePointer=null;lastCell=null;persist();if(C.hasPointerCapture(e.pointerId))C.releasePointerCapture(e.pointerId)}
 C.addEventListener('pointerup',endPaint);
 C.addEventListener('pointercancel',endPaint);
 C.addEventListener('lostpointercapture',endPaint);
 document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key==='z'){e.preventDefault();undo()}});
+/* the picture is kept: the arcade stores it as this game's save (one character per pixel: palette index in hex, '-' = empty) */
+function encodeGrid(){return grid.map(row=>row.map(c=>c===null?'-':PALETTE.indexOf(c).toString(16)).join('')).join('')}
+function decodeGrid(text){
+  if(typeof text!=='string'||text.length!==GRID*GRID||/[^-0-9a-f]/.test(text))return null;
+  const out=newGrid();
+  for(let i=0;i<text.length;i++){const ch=text[i];if(ch!=='-')out[Math.floor(i/GRID)][i%GRID]=PALETTE[parseInt(ch,16)]}
+  return out;
+}
+function persist(){
+  if(window.__pbTestMode===true||window.parent===window)return;
+  try{window.parent.postMessage({__pbSave:1,data:{v:1,g:encodeGrid()}},'*')}catch(error){console.warn('[Pixel Painter] save failed',error)}
+}
+function applySave(d){
+  const g=d&&d.v===1?decodeGrid(d.g):null;
+  if(g){grid=g;undoStack.length=0;render()}
+}
+applySave(window.__pbSave);
+window.addEventListener('message',e=>{const d=e.data;if(e.source===window.parent&&d&&d.__pbLoadSave===1&&!undoStack.length&&!grid.some(r=>r.some(Boolean)))applySave(d.data)});
 Arcade.onRestart(clearCanvas);
 fitCanvas();
 </script>

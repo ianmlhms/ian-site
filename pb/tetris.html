@@ -31,7 +31,7 @@ body{display:flex;flex-direction:column}
   <div class="arcade-overlay show" id="startOv" role="dialog" aria-modal="true" aria-labelledby="startTitle"><div class="arcade-panel">
     <h2 id="startTitle">Tetris</h2>
     <p>Stack the pieces and clear full lines. Left / right move, up rotates, down drops softly, Space drops hard.</p>
-    <p>On touch use the D-pad: up rotates, A drops hard.</p>
+    <p>On touch use the D-pad: hold left, right or down to keep moving, up rotates, A drops hard. P pauses.</p>
     <div class="arcade-actions"><button class="arcade-btn play" id="playBtn" type="button">Play</button></div>
   </div></div>
 
@@ -177,7 +177,7 @@ function finish(){
 }
 function setPaused(v){
   if(v===paused||(v&&state!=='playing'))return;
-  paused=v;lastTime=performance.now();$('pauseOv').classList.toggle('show',v);
+  stopRepeat();paused=v;lastTime=performance.now();$('pauseOv').classList.toggle('show',v);
   if(v)focusDialog('pauseOv');
 }
 let lastTime=0;
@@ -192,22 +192,41 @@ function loop(t){
   if(grid)draw();
   requestAnimationFrame(loop);
 }
+const DAS_DELAY=170,DAS_RATE=45,KICKS=[0,-1,1,-2,2]; // hold-to-repeat timing (ms), wall-kick offsets tried on rotate
+let heldKey='',repeatTimer=0;
+function stopRepeat(){clearTimeout(repeatTimer);repeatTimer=0;heldKey=''}
+function nudge(key){
+  if(key==='ArrowLeft'&&valid({...piece,x:piece.x-1}))piece.x--;
+  else if(key==='ArrowRight'&&valid({...piece,x:piece.x+1}))piece.x++;
+  else if(key==='ArrowDown'&&valid({...piece,y:piece.y+1})){piece.y++;score++;Arcade.score(score);$('sc').textContent=score}
+}
+function repeatStep(){
+  if(!heldKey||state!=='playing'||paused){stopRepeat();return}
+  nudge(heldKey);repeatTimer=setTimeout(repeatStep,DAS_RATE);
+}
+function rotate(){
+  for(const dx of KICKS){const t={...piece,rot:piece.rot+1,x:piece.x+dx};if(valid(t)){piece=t;return}}
+}
 function handleKey(e){
   if(e.target.closest&&e.target.closest('button'))return;
   if(state!=='playing'){
     if(e.key===' '||e.key==='Enter'){start();e.preventDefault()}
     return;
   }
-  if(paused)return;
-  if(e.key==='ArrowLeft'&&valid({...piece,x:piece.x-1}))piece.x--;
-  if(e.key==='ArrowRight'&&valid({...piece,x:piece.x+1}))piece.x++;
-  if(e.key==='ArrowDown'&&valid({...piece,y:piece.y+1})){piece.y++;score++;Arcade.score(score);$('sc').textContent=score}
-  if(e.key==='ArrowUp'){let t={...piece,rot:piece.rot+1};if(valid(t))piece.rot++}
+  if(e.key==='p'||e.key==='P'){if(!e.repeat)setPaused(!paused);return}
+  if(paused){if((e.key===' '||e.key==='Enter')&&!e.repeat){setPaused(false);e.preventDefault()}return}
+  if(e.repeat){if(['ArrowLeft','ArrowRight','ArrowDown','ArrowUp',' '].includes(e.key))e.preventDefault();return}
+  if(e.key==='ArrowLeft'||e.key==='ArrowRight'||e.key==='ArrowDown'){
+    stopRepeat();heldKey=e.key;nudge(e.key);repeatTimer=setTimeout(repeatStep,DAS_DELAY);
+  }
+  if(e.key==='ArrowUp')rotate();
   if(e.key===' '){while(valid({...piece,y:piece.y+1})){piece.y++;score+=2;Arcade.score(score)}$('sc').textContent=score;lock()}
   if(['ArrowLeft','ArrowRight','ArrowDown','ArrowUp',' '].includes(e.key))e.preventDefault();
 }
+document.addEventListener('keyup',e=>{if(e.key===heldKey)stopRepeat()});
+window.addEventListener('blur',stopRepeat);
 document.addEventListener('keydown',handleKey);
-document.addEventListener('visibilitychange',()=>{if(document.hidden)setPaused(true)});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){stopRepeat();setPaused(true)}});
 $('playBtn').onclick=start;$('againBtn').onclick=start;$('resumeBtn').onclick=()=>setPaused(false);
 start();state='idle';$('startOv').classList.add('show');
 requestAnimationFrame(loop);

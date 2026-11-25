@@ -26,6 +26,7 @@ body{display:flex;flex-direction:column}
 </style>
 <script src="/mp-gate.js?v=10" data-game="tank-wars" data-menu data-adopt="#hudMenu,#menuBtn,!#mHost" data-over="#overOv"></script>
 <script src="/pb/arcade-kit.js?v=57" data-arcade-id="tank-wars" data-arcade-title="Panzerschluechten"></script>
+<script src="/pb/duo-pad.js?v=1"></script>
 </head>
 <body>
 <main class="arcade-stage" id="stage">
@@ -39,7 +40,7 @@ body{display:flex;flex-direction:column}
 
   <div class="arcade-overlay show" id="menu" role="dialog" aria-modal="true" aria-labelledby="menuTitle"><div class="arcade-panel">
     <h2 id="menuTitle">Panzerschluechten</h2>
-    <p>Looss d'Schëss vun de Mauere sprangen an huel dem anere Panzer d'Panzerung ewech. Fuer mat WASD oder de Pfeiltaste, Space zum Schéissen; um Touchscreen mam D-Pad an dem A-Knäppchen.</p>
+    <p>Looss d'Schëss vun de Mauere sprangen an huel dem anere Panzer d'Panzerung ewech. Fuer mat WASD oder de Pfeiltaste, Space zum Schéissen; um Touchscreen mam D-Pad an dem A-Knäppchen. Zu zweet op engem Touchscreen huet jiddereen seng Tasten op senger Säit.</p>
     <div class="arcade-actions menu-actions">
       <button class="arcade-btn" id="mAI" type="button">Géint de Computer spillen</button>
       <button class="arcade-btn secondary" id="mLocal" type="button">Zu zweet, een Apparat</button>
@@ -71,6 +72,11 @@ function fit(){ // size the canvas to the stage, backing store at device resolut
 }
 new ResizeObserver(fit).observe(stage);fit();
 let keys={},bullets=[],walls=[],particles=[];
+/* two people on one touch screen: a control cluster per side (shown in "Zu zweet, een Apparat") */
+const TANK_BUTTONS=[
+  {k:'u',text:'▲',x:1,y:0,label:'Vir'},{k:'l',text:'◀',x:0,y:1,label:'Lénks'},{k:'d',text:'▼',x:1,y:1,label:'Zeréck'},{k:'r',text:'▶',x:2,y:1,label:'Riets'},
+  {k:'f',text:'Schéiss',x:3.3,y:0.2,w:1.7,h:1.7,primary:true,label:'Schéissen'}];
+const pad=DuoPad.mount(stage,{p1:{label:'P1',buttons:TANK_BUTTONS},p2:{label:'P2',buttons:TANK_BUTTONS}});
 let p1={x:100,y:275,angle:0,color:PAL.p1,hp:5,score:0,cooldown:0,name:'P1'};
 let p2={x:800,y:275,angle:Math.PI,color:PAL.p2,hp:5,score:0,cooldown:0,name:'P2'};
 
@@ -111,20 +117,20 @@ function names(){ // [left label, right label] for the current mode
 function setPaused(v){ // pause offline games when the tab is hidden; online rooms keep running
   if(v===paused||(v&&(!running||mode==='host'||mode==='guest')))return;
   paused=v;pauseOv.classList.toggle('show',v);
-  if(v)focusDialog('pauseOv');
+  if(v){pad.clear();focusDialog('pauseOv')}
 }
 document.addEventListener('visibilitychange',()=>{if(document.hidden)setPaused(true)});
 $('resumeBtn').onclick=()=>{lastT=0;setPaused(false)};
 $('hudMenu').onclick=()=>backToMenu();
 function begin(){
-  p1.score=0;p2.score=0;resetRoundNow();running=true;paused=false;menu.classList.remove('show');
+  p1.score=0;p2.score=0;resetRoundNow();running=true;paused=false;menu.classList.remove('show');pad.show(mode==='local');
   if(mode==='host')NET.send({t:'w',w:walls});
   const[n1,n2]=names();$('n1').textContent=n1;$('n2').textContent=n2;
   $('hint').textContent=
     mode==='local'?'P1: WASD + Space  ·  P2: Pfeiltaste + Enter':
     mode==='ai'?'WASD oder Pfeiltaste zum Fueren  ·  Space zum Schéissen':
     'Du bass '+(mode==='host'?'lénks (cyan)':'riets (amber)')+'  ·  WASD oder Pfeiltaste  ·  Space zum Schéissen';}
-function backToMenu(msg){running=false;paused=false;mode=null;parent.postMessage({__pbNet:{op:'close'}},'*');
+function backToMenu(msg){pad.show(false);running=false;paused=false;mode=null;parent.postMessage({__pbNet:{op:'close'}},'*');
   pauseOv.classList.remove('show');menu.classList.add('show');status(msg||'');$('mAI').focus({preventScroll:true})}
 document.getElementById('mLocal').onclick=()=>{mode='local';begin()};
 document.getElementById('mAI').onclick=()=>{mode='ai';begin()};
@@ -269,9 +275,10 @@ function loop(ts){
       if(++netFrame%5===0)sendKeys();
     }else{
       if(mode==='local'){
-        moveTank(p1,keys['w']||keys['W'],keys['s']||keys['S'],keys['a']||keys['A'],keys['d']||keys['D'],m);
-        moveTank(p2,keys['ArrowUp'],keys['ArrowDown'],keys['ArrowLeft'],keys['ArrowRight'],m);
-        shoot(p1,keys[' ']);shoot(p2,keys['Enter']);
+        const t1=pad.state.p1,t2=pad.state.p2;
+        moveTank(p1,keys['w']||keys['W']||t1.u,keys['s']||keys['S']||t1.d,keys['a']||keys['A']||t1.l,keys['d']||keys['D']||t1.r,m);
+        moveTank(p2,keys['ArrowUp']||t2.u,keys['ArrowDown']||t2.d,keys['ArrowLeft']||t2.l,keys['ArrowRight']||t2.r,m);
+        shoot(p1,keys[' ']||t1.f);shoot(p2,keys['Enter']||t2.f);
       }else{
         moveTank(p1,meU(),meD(),meL(),meR(),m);
         shoot(p1,meF());
@@ -297,7 +304,7 @@ function loop(ts){
           if(Math.hypot(b.x-target.x,b.y-target.y)<20){
             target.hp--;addParticles(b.x,b.y,target.color,15);dead=true;
             if(target.hp<=0){b.owner.score++;addParticles(target.x,target.y,target.color,40);
-              if(mode==='ai'&&b.owner===p1){window.score=Math.max(window.score||0,p1.score);Arcade.gameOver(window.score)}
+              if(mode==='ai'&&b.owner===p1){window.score=Math.max(window.score||0,p1.score);Arcade.score(window.score);Arcade.gameOver(window.score)}
               resetPending=true;setTimeout(resetRoundNow,1000)}
           }
         }

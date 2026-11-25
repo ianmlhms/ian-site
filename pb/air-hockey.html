@@ -37,7 +37,7 @@ canvas{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border),0 18px 48p
   <div class="arcade-overlay show" id="menu" role="dialog" aria-modal="true" aria-labelledby="menuTitle">
     <div class="arcade-panel menu-panel">
       <h2 id="menuTitle">Air Hockey</h2>
-      <p>Wien als éischt 7 Punkte huet, gewënnt. Beweeg däi Schläger mat WASD oder de Pfeiltaste, um Touchscreen mam Pad um Écran.</p>
+      <p>Wien als éischt 7 Punkte huet, gewënnt. Beweeg däi Schläger mat WASD oder de Pfeiltaste. Um Touchscreen beweegs du mam Fanger: ënnen fir Rout, uewen fir Blo (zu zweet mat zwee Fangeren).</p>
       <div class="arcade-actions">
         <button class="arcade-btn" id="mAI" type="button">Géint de Computer spillen</button>
         <button class="arcade-btn secondary" id="mLocal" type="button">Zu zweet, een Apparat</button>
@@ -141,7 +141,7 @@ window.addEventListener('resize',fitCanvas);
 
 
 const GOAL_W=140,SPD=5,WIN_SCORE=7,RINK_INSET=10,MALLET_R=28,PUCK_R=12;
-const RED=COLOR.danger,BLUE=COLOR.accent;
+const RED=COLOR.danger,BLUE=COLOR.cyan;   // cyan is the blue of the palette (the accent is green since the Gitter look)
 let keys={},puck,p1,p2,particles=[];
 function reset(){
   puck={x:W/2,y:H/2,vx:(Math.random()-0.5)*6,vy:(Math.random()>0.5?-3:3),r:PUCK_R,trail:[]};
@@ -168,12 +168,12 @@ window.addEventListener('message',e=>{const d=e.data;if(!d)return;
 const menu=$('menu'),mStatus=$('mStatus'),info=$('info');
 const status=(t)=>mStatus.textContent=t;
 const randCode=()=>Math.random().toString(36).replace(/[^a-z0-9]/g,'').slice(0,5).padEnd(5,'x');
-function begin(){p1=null;p2=null;reset();p1.score=0;p2.score=0;running=true;paused=false;matchShown=false;menu.classList.remove('show');hidePanel();
+function begin(){Arcade.startRun();targets[1]=targets[2]=null;fingers.clear();p1=null;p2=null;reset();p1.score=0;p2.score=0;running=true;paused=false;matchShown=false;menu.classList.remove('show');hidePanel();
   info.textContent=
     mode==='local'?'Rout: WASD · Blo: Pfeiltaste · Als éischt 7':
     mode==='ai'?'Du bass rout · WASD oder Pfeiltaste · Als éischt 7':
     'Du bass '+(mode==='host'?'rout (ennen)':'blo (uewen)')+' · WASD oder Pfeiltaste · Als éischt 7';}
-function backToMenu(msg){running=false;paused=false;matchShown=false;mode=null;parent.postMessage({__pbNet:{op:'close'}},'*');
+function backToMenu(msg){targets[1]=targets[2]=null;fingers.clear();running=false;paused=false;matchShown=false;mode=null;parent.postMessage({__pbNet:{op:'close'}},'*');
   hidePanel();info.textContent='';menu.classList.add('show');status(msg||'')}
 $('mCode').addEventListener('keydown',e=>{if(e.key==='Enter')$('mJoin').click()});
 $('mLocal').onclick=()=>{mode='local';begin()};
@@ -191,12 +191,15 @@ NET.onMsg=(r,d)=>{
   if(mode==='host'&&d&&d.t==='k')Object.assign(remoteKeys,d.k);
   if(mode==='guest'&&d&&d.t==='s')guestTarget=d;
 };
-const meU=()=>keys['w']||keys['W']||keys['ArrowUp'],meD=()=>keys['s']||keys['S']||keys['ArrowDown'],
-      meL=()=>keys['a']||keys['A']||keys['ArrowLeft'],meR=()=>keys['d']||keys['D']||keys['ArrowRight'];
+const guestTouch=()=>mode==='guest'&&targets[2]?targets[2]:null;   // a guest sends the host key flags, so a finger becomes "which way is the target"
+const meU=()=>keys['w']||keys['W']||keys['ArrowUp']||(guestTouch()&&guestTouch().y<p2.y-TOUCH_DEAD),
+      meD=()=>keys['s']||keys['S']||keys['ArrowDown']||(guestTouch()&&guestTouch().y>p2.y+TOUCH_DEAD),
+      meL=()=>keys['a']||keys['A']||keys['ArrowLeft']||(guestTouch()&&guestTouch().x<p2.x-TOUCH_DEAD),
+      meR=()=>keys['d']||keys['D']||keys['ArrowRight']||(guestTouch()&&guestTouch().x>p2.x+TOUCH_DEAD);
 function sendKeys(){NET.send({t:'k',k:{u:+!!meU(),d:+!!meD(),l:+!!meL(),r:+!!meR(),sp:+!!keys[' ']}})}
 
 /* ---------- match end + pause panels ---------- */
-function rematch(){hidePanel();p1.score=0;p2.score=0;matchShown=false;if(window.MPGate)MPGate.setOver(false);reset()}
+function rematch(){Arcade.startRun();hidePanel();p1.score=0;p2.score=0;matchShown=false;if(window.MPGate)MPGate.setOver(false);reset()}
 function showMatchEnd(){
   matchShown=true;
   if(window.MPGate)MPGate.setOver(true);   // lobby game: «‹ Lobby» is one tap now
@@ -233,11 +236,42 @@ function aiMove(m){
   p2.x=Math.max(p2.r+10,Math.min(W-p2.r-10,p2.x));
   p2.y=Math.max(p2.r+10,Math.min(H/2-p2.r-10,p2.y));
 }
-function movePad(p,u,d,l,r,topHalf,m){
-  if(u)p.y-=SPD*m;if(d)p.y+=SPD*m;if(l)p.x-=SPD*m;if(r)p.x+=SPD*m;
+function clampPad(p,topHalf){
   p.x=Math.max(p.r+10,Math.min(W-p.r-10,p.x));
   if(topHalf)p.y=Math.max(p.r+10,Math.min(H/2-p.r-10,p.y));
   else p.y=Math.max(H/2+p.r+10,Math.min(H-p.r-10,p.y));
+}
+function movePad(p,u,d,l,r,topHalf,m){
+  if(u)p.y-=SPD*m;if(d)p.y+=SPD*m;if(l)p.x-=SPD*m;if(r)p.x+=SPD*m;
+  clampPad(p,topHalf);
+}
+/* touch: drag a finger and the mallet follows it inside its own half. Local game on one device: a finger on the lower
+ * half steers red, one on the upper half steers blue, both at once. Against the computer / online: a finger anywhere
+ * steers my own mallet. */
+const TOUCH_SPEED=14,TOUCH_DEAD=6;
+const targets={1:null,2:null},fingers=new Map();   // fingers: pointerId -> mallet number
+function paddleFor(pt){
+  if(mode==='local')return pt.y>H/2?1:2;
+  return mode==='guest'?2:1;
+}
+function releaseFinger(e){
+  const side=fingers.get(e.pointerId);if(!side)return;
+  fingers.delete(e.pointerId);
+  if(![...fingers.values()].includes(side))targets[side]=null;
+}
+C.addEventListener('pointerdown',e=>{
+  if(!running||paused||e.button!==0||!mode)return;
+  const pt=toBoard(e),side=paddleFor(pt);fingers.set(e.pointerId,side);targets[side]=pt;
+  try{C.setPointerCapture(e.pointerId)}catch(error){console.warn('[Air Hockey] pointer capture failed',error)}
+});
+C.addEventListener('pointermove',e=>{const side=fingers.get(e.pointerId);if(side)targets[side]=toBoard(e)});
+C.addEventListener('pointerup',releaseFinger);C.addEventListener('pointercancel',releaseFinger);
+function seekPad(p,t,topHalf,m){ // false when no finger is down for this mallet
+  if(!t)return false;
+  const dx=t.x-p.x,dy=t.y-p.y,d=Math.hypot(dx,dy);
+  if(d>0){const s=Math.min(d,TOUCH_SPEED*m);p.x+=dx/d*s;p.y+=dy/d*s}
+  clampPad(p,topHalf);
+  return true;
 }
 
 function drawTable(){
@@ -275,10 +309,10 @@ function loop(ts){
       if(++netFrame%5===0)sendKeys();
     }else{
       if(mode==='local'){
-        movePad(p1,keys['w']||keys['W'],keys['s']||keys['S'],keys['a']||keys['A'],keys['d']||keys['D'],false,m);
-        movePad(p2,keys['ArrowUp'],keys['ArrowDown'],keys['ArrowLeft'],keys['ArrowRight'],true,m);
+        if(!seekPad(p1,targets[1],false,m))movePad(p1,keys['w']||keys['W'],keys['s']||keys['S'],keys['a']||keys['A'],keys['d']||keys['D'],false,m);
+        if(!seekPad(p2,targets[2],true,m))movePad(p2,keys['ArrowUp'],keys['ArrowDown'],keys['ArrowLeft'],keys['ArrowRight'],true,m);
       }else{
-        movePad(p1,meU(),meD(),meL(),meR(),false,m);
+        if(!seekPad(p1,targets[1],false,m))movePad(p1,meU(),meD(),meL(),meR(),false,m);
         if(mode==='ai')aiMove(m);
         else movePad(p2,remoteKeys.u,remoteKeys.d,remoteKeys.l,remoteKeys.r,true,m);
       }

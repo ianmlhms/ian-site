@@ -39,7 +39,7 @@ body{display:flex;flex-direction:column}
 
   <div class="arcade-overlay show" id="menu" role="dialog" aria-modal="true" aria-labelledby="menuTitle"><div class="arcade-panel">
     <h2 id="menuTitle">Pong</h2>
-    <p>Wien als éischt 10 Punkte huet, gewënnt. Beweeg mat W / S oder de Pfeiltaste; um Touchscreen mam D-Pad um Écran.</p>
+    <p>Wien als éischt 10 Punkte huet, gewënnt. Beweeg mat W / S oder de Pfeiltaste. Um Touchscreen beweegs du mam Fanger op der Säit vum Terrain: lénks fir Spiller 1, riets fir Spiller 2.</p>
     <div class="arcade-actions menu-actions">
       <button class="arcade-btn" id="mAI" type="button">Géint de Computer spillen</button>
       <button class="arcade-btn secondary" id="mLocal" type="button">Zu zweet, een Apparat</button>
@@ -108,13 +108,13 @@ function names(){ // [left label, right label] for the current mode
   if(mode==='guest')return['Géigner','Du'];
   return['P1','P2'];
 }
-function begin(){p1.score=0;p2.score=0;p1.y=250;p2.y=250;resetBall(1);running=true;paused=false;menu.classList.remove('show');
+function begin(){Arcade.startRun();targets[1]=targets[2]=null;fingers.clear();p1.score=0;p2.score=0;p1.y=250;p2.y=250;resetBall(1);running=true;paused=false;menu.classList.remove('show');
   const[n1,n2]=names();$('n1').textContent=n1;$('n2').textContent=n2;
   $('hint').textContent=
     mode==='local'?'Als éischt 10  ·  P1: W / S  ·  P2: ↑ / ↓':
     mode==='ai'?'Als éischt 10  ·  W / S oder ↑ / ↓ zum Beweegen':
     'Du bass '+(mode==='host'?'lénks (cyan)':'riets (amber)')+'  ·  als éischt 10';}
-function backToMenu(msg){running=false;paused=false;mode=null;parent.postMessage({__pbNet:{op:'close'}},'*');
+function backToMenu(msg){targets[1]=targets[2]=null;fingers.clear();running=false;paused=false;mode=null;parent.postMessage({__pbNet:{op:'close'}},'*');
   pauseOv.classList.remove('show');menu.classList.add('show');status(msg||'');$('mAI').focus({preventScroll:true})}
 function setPaused(v){ // pause offline games when the tab is hidden; online rooms keep running
   if(v===paused||(v&&(!running||mode==='host'||mode==='guest'||overShown)))return;
@@ -140,8 +140,35 @@ NET.onMsg=(r,d)=>{
   if(mode==='host'&&d&&d.t==='k'){remoteKeys.up=!!d.up;remoteKeys.down=!!d.down;remoteKeys.sp=!!d.sp}
   if(mode==='guest'&&d&&d.t==='s')guestTarget=d;
 };
-const meUp=()=>keys['w']||keys['W']||keys['ArrowUp'];
-const meDown=()=>keys['s']||keys['S']||keys['ArrowDown'];
+/* touch: a finger on the left half of the court steers the left paddle, one on the right half the right paddle
+ * (local game on one device); against the computer or online a finger anywhere steers my own paddle. */
+const TOUCH_SPEED=11,TOUCH_DEAD=5;
+const targets={1:null,2:null},fingers=new Map();   // fingers: pointerId -> paddle number
+function courtY(e){const r=C.getBoundingClientRect();return(e.clientY-r.top)*GH/r.height}
+function paddleFor(e){
+  if(mode==='local'){const r=C.getBoundingClientRect();return e.clientX-r.left<r.width/2?1:2}
+  return mode==='guest'?2:1;
+}
+function releaseFinger(e){
+  const side=fingers.get(e.pointerId);if(!side)return;
+  fingers.delete(e.pointerId);
+  if(![...fingers.values()].includes(side))targets[side]=null;
+}
+C.addEventListener('pointerdown',e=>{
+  if(!running||e.button!==0||!mode)return;
+  const side=paddleFor(e);fingers.set(e.pointerId,side);targets[side]=courtY(e);
+  try{C.setPointerCapture(e.pointerId)}catch(error){console.warn('[Pong] pointer capture failed',error)}
+});
+C.addEventListener('pointermove',e=>{const side=fingers.get(e.pointerId);if(side)targets[side]=courtY(e)});
+C.addEventListener('pointerup',releaseFinger);C.addEventListener('pointercancel',releaseFinger);
+function seek(p,target,m){ // moves a paddle towards a finger; false when no finger is down
+  if(target===null)return false;
+  const d=target-p.y;
+  p.y=Math.max(p.h/2,Math.min(GH-p.h/2,p.y+Math.sign(d)*Math.min(Math.abs(d),TOUCH_SPEED*m)));
+  return true;
+}
+const meUp=()=>keys['w']||keys['W']||keys['ArrowUp']||(mode==='guest'&&targets[2]!==null&&targets[2]<p2.y-TOUCH_DEAD);
+const meDown=()=>keys['s']||keys['S']||keys['ArrowDown']||(mode==='guest'&&targets[2]!==null&&targets[2]>p2.y+TOUCH_DEAD);
 function sendKeys(){NET.send({t:'k',up:!!meUp(),down:!!meDown(),sp:!!keys[' ']})}
 
 /* ---------- AI: predicts the intercept, then picks the return angle whose
@@ -173,6 +200,7 @@ function aiMove(){
   p2.y=Math.max(p2.h/2,Math.min(GH-p2.h/2,p2.y));
 }
 
+const MAX_VX=13,MAX_VY=9,clampVy=v=>Math.max(-MAX_VY,Math.min(MAX_VY,v));
 function resetBall(dir){
   ball.x=400;ball.y=250;ball.speed=5;
   ball.vx=dir*5;ball.vy=(Math.random()-0.5)*6;ball.trail=[];
@@ -205,23 +233,28 @@ function loop(ts){
       // I simulate (local / ai / host)
       const p1Up=mode==='local'?keys['w']||keys['W']:meUp();
       const p1Down=mode==='local'?keys['s']||keys['S']:meDown();
-      if(p1Up)p1.y=Math.max(p1.h/2,p1.y-6*m);
-      if(p1Down)p1.y=Math.min(GH-p1.h/2,p1.y+6*m);
+      if(!seek(p1,targets[1],m)){
+        if(p1Up)p1.y=Math.max(p1.h/2,p1.y-6*m);
+        if(p1Down)p1.y=Math.min(GH-p1.h/2,p1.y+6*m);
+      }
       if(mode==='ai')aiMove();
       else{
         const p2Up=mode==='host'?remoteKeys.up:keys['ArrowUp'];
         const p2Down=mode==='host'?remoteKeys.down:keys['ArrowDown'];
-        if(p2Up)p2.y=Math.max(p2.h/2,p2.y-6*m);
-        if(p2Down)p2.y=Math.min(GH-p2.h/2,p2.y+6*m);
+        if(mode==='local'&&seek(p2,targets[2],m)){/* finger on the right half */}
+        else{
+          if(p2Up)p2.y=Math.max(p2.h/2,p2.y-6*m);
+          if(p2Down)p2.y=Math.min(GH-p2.h/2,p2.y+6*m);
+        }
       }
       ball.trail.push({x:ball.x,y:ball.y});if(ball.trail.length>15)ball.trail.shift();
       ball.x+=ball.vx*m;ball.y+=ball.vy*m;
       if(ball.y<8||ball.y>GH-8){ball.vy*=-1;ball.y=Math.max(8,Math.min(GH-8,ball.y));addP(ball.x,ball.y,PAL.text,5)}
       if(ball.x-8<PX1+PW&&ball.y>p1.y-p1.h/2&&ball.y<p1.y+p1.h/2&&ball.vx<0){
-        ball.vx=Math.abs(ball.vx)*1.05;ball.vy+=(ball.y-p1.y)*0.1;addP(ball.x,ball.y,PAL.p1,10);
+        ball.vx=Math.min(MAX_VX,Math.abs(ball.vx)*1.05);ball.vy=clampVy(ball.vy+(ball.y-p1.y)*0.1);addP(ball.x,ball.y,PAL.p1,10);
       }
       if(ball.x+8>PX2&&ball.y>p2.y-p2.h/2&&ball.y<p2.y+p2.h/2&&ball.vx>0){
-        ball.vx=-Math.abs(ball.vx)*1.05;ball.vy+=(ball.y-p2.y)*0.1;addP(ball.x,ball.y,PAL.p2,10);
+        ball.vx=-Math.min(MAX_VX,Math.abs(ball.vx)*1.05);ball.vy=clampVy(ball.vy+(ball.y-p2.y)*0.1);addP(ball.x,ball.y,PAL.p2,10);
       }
       if(ball.x<0){p2.score++;addP(50,p1.y,PAL.hit,20);resetBall(1)}
       if(ball.x>GW){p1.score++;addP(GW-50,p2.y,PAL.hit,20);resetBall(-1);
@@ -263,11 +296,11 @@ function syncHud(over){ // DOM HUD + result overlay, touched only when something
   $('overTitle').textContent=name==='You'?'Du hues gewonnen':(name==='They'?'Géigner':name==='Computer'?'De Computer':name)+' huet gewonnen';
   $('overBig').textContent=p1.score+' - '+p2.score;
   $('overNote').textContent=mode==='guest'?'Waart drop, dass den Host eng Revanche start.':
-    mode==='ai'?'Siege an dëser Sessioun: '+(window.score||0):'Space oder Revanche, fir nach eng Kéier ze spillen.';
+    mode==='ai'?'Siegen an dëser Sessioun: '+(window.score||0):'Space oder Revanche, fir nach eng Kéier ze spillen.';
   $('rematchBtn').hidden=mode==='guest';
   focusDialog('overOv');
 }
-function rematch(){p1.score=0;p2.score=0;resetBall(1)}
+function rematch(){Arcade.startRun();p1.score=0;p2.score=0;resetBall(1)}
 $('rematchBtn').onclick=rematch;
 $('mCode').addEventListener('keydown',e=>{if(e.key==='Enter')$('mJoin').click()});
 document.addEventListener('keydown',e=>{keys[e.key]=true;

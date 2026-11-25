@@ -47,6 +47,7 @@ body{user-select:none;-webkit-user-select:none}
     <span class="arcade-pill">Score <b id="score">0</b></span>
     <span class="arcade-pill">Streak <b id="streak">0</b></span>
     <span class="arcade-pill">Level <b id="level">1</b></span>
+    <span class="arcade-pill">Lives <b id="lives">3</b></span>
   </div>
   <div class="arcade-overlay show" id="overlay" role="dialog" aria-modal="true" aria-labelledby="panelTitle">
     <div class="arcade-panel">
@@ -126,11 +127,27 @@ const COLORS=[
   {name:'YELLOW',hex:COLOR.amber},{name:'PURPLE',hex:COLOR.violet},{name:'ORANGE',hex:'#ff9a5c'},
   {name:'PINK',hex:'#ff7ac6'},{name:'CYAN',hex:COLOR.cyan}
 ];
-const TICK_MS=100,ROUND_PAUSE_MS=400,SLOW_PAUSE_MS=300,LOW_TIME=30,FULL_TIME=100;
-let score=0,streak=0,level=1,timeLeft=FULL_TIME,correct='',locked=false,state='ready',roundTimer=0,tickTimer=0;
+const START_LIVES=3,TICK_MS=100,ROUND_PAUSE_MS=400,SLOW_PAUSE_MS=300,LOW_TIME=30,FULL_TIME=100;
+let score=0,streak=0,level=1,lives=START_LIVES,timeLeft=FULL_TIME,correct='',locked=false,state='ready',roundTimer=0,tickTimer=0;
 
 function updateHud(){
-  $('score').textContent=score;$('streak').textContent=streak;$('level').textContent=level;
+  $('score').textContent=score;$('streak').textContent=streak;$('level').textContent=level;$('lives').textContent=lives;
+}
+/** Readable label colour on any button colour (the palette changes with the light / dark theme). */
+function inkOn(hex){
+  const m=/^#([0-9a-f]{6})$/i.exec(hex);
+  if(!m)return '#08101f';
+  const [r,g,b]=[0,2,4].map(i=>parseInt(m[1].slice(i,i+2),16)/255).map(v=>v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4));
+  return .2126*r+.7152*g+.0722*b>.3?'#08101f':'#ffffff';
+}
+function loseLife(){
+  lives--;
+  if(lives>0)return false;
+  state='over';locked=true;clearTimeout(roundTimer);roundTimer=0;
+  Arcade.gameOver(score);
+  const isBest=recordBest(score);
+  showPanel({title:'Game over',big:score,bestLine:isBest?'New best!':'Best '+bestText(),body:'You ran out of lives.',label:'Play again',action:startGame});
+  return true;
 }
 function setFeedback(kind,text){const f=$('feedback');f.className=kind;f.textContent=text}
 function newRound(){
@@ -147,7 +164,7 @@ function newRound(){
   opts.sort(()=>Math.random()-0.5);
   $('buttons').replaceChildren(...opts.map(o=>{
     const b=document.createElement('button');
-    b.type='button';b.className='opt';b.textContent=o.name;b.style.background=o.hex;
+    b.type='button';b.className='opt';b.textContent=o.name;b.style.background=o.hex;b.style.color=inkOn(o.hex);
     b.addEventListener('click',()=>answer(o.name));
     return b;
   }));
@@ -167,6 +184,7 @@ function answer(name){
   }else{
     streak=0;score=Math.max(0,score-5);Arcade.score(score);
     setFeedback('bad','It was '+correct.toLowerCase());
+    if(loseLife()){updateHud();return}
   }
   updateHud();
   nextRoundSoon(ROUND_PAUSE_MS);
@@ -177,8 +195,9 @@ function tick(){
   if(timeLeft<=0){
     streak=0;score=Math.max(0,score-3);Arcade.score(score);
     setFeedback('slow','Too slow!');
-    updateHud();
-    timeLeft=0;nextRoundSoon(SLOW_PAUSE_MS);
+    timeLeft=0;
+    if(loseLife()){updateHud();$('timerFill').style.width='0%';return}
+    updateHud();nextRoundSoon(SLOW_PAUSE_MS);
   }
   $('timerFill').style.width=timeLeft+'%';
   $('timerFill').classList.toggle('low',timeLeft<=LOW_TIME);
@@ -186,7 +205,7 @@ function tick(){
 function startGame(){
   hidePanel();
   clearTimeout(roundTimer);roundTimer=0;
-  score=0;streak=0;level=1;state='playing';
+  score=0;streak=0;level=1;lives=START_LIVES;state='playing';Arcade.startRun();
   Arcade.score(score);updateHud();setFeedback('','');
   newRound();
   if(!tickTimer)tickTimer=setInterval(tick,TICK_MS);
@@ -205,7 +224,7 @@ document.addEventListener('keydown',e=>{
 });
 Arcade.onRestart(startGame);
 newRound();updateHud();
-showPanel({title:'Colour Word Match',body:'Tap the button that matches the colour of the word - not what it says. Keys 1-6 work too.',label:'Play',action:startGame});
+showPanel({title:'Colour Word Match',body:'Tap the button that matches the colour of the word - not what it says. Keys 1-6 work too. A wrong or slow answer costs a life, you have three.',label:'Play',action:startGame});
 </script>
 </body>
 </html>

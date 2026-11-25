@@ -35,6 +35,7 @@ body{display:flex;flex-direction:column}
     <span class="arcade-pill">Score <b id="sc">0</b></span>
     <span class="arcade-pill">Streak <b id="st">0</b></span>
     <span class="arcade-pill">Level <b id="lv">1</b></span>
+    <span class="arcade-pill">Lives <b id="lives">3</b></span>
   </div>
   <div class="game">
     <div id="hint"></div>
@@ -53,8 +54,15 @@ body{display:flex;flex-direction:column}
 
   <div class="arcade-overlay show" id="startOv" role="dialog" aria-modal="true" aria-labelledby="startOvT"><div class="arcade-panel">
     <h2 id="startOvT">Word Unscramble</h2>
-    <p>Put the scrambled letters in the right order before the bar runs out. Streaks earn bonus points and speed things up. Type on a keyboard; on touch the on-screen keyboard opens when you press Play.</p>
+    <p>Put the scrambled letters in the right order before the bar runs out. Streaks earn bonus points and speed things up. Three timeouts end the game. Type on a keyboard; on touch the on-screen keyboard opens when you press Play.</p>
     <div class="arcade-actions"><button class="arcade-btn play" id="playBtn" type="button">Play</button></div>
+  </div></div>
+
+  <div class="arcade-overlay" id="overOv" role="dialog" aria-modal="true" aria-labelledby="overOvT"><div class="arcade-panel">
+    <h2 id="overOvT">Game over</h2>
+    <span class="arcade-big" id="overBig">0</span>
+    <p>Best <strong id="overBest">0</strong></p>
+    <div class="arcade-actions"><button class="arcade-btn play" id="againBtn" type="button">Play again</button></div>
   </div></div>
 
   <div class="arcade-overlay" id="pauseOv" role="dialog" aria-modal="true" aria-labelledby="pauseOvT"><div class="arcade-panel">
@@ -88,7 +96,7 @@ const WORDS_LB=[
   {w:'DANZEN',h:'Musek'},
   {w:'ZOCKER',h:'Séiss'},
   {w:'SCHLASS',h:'Buerg'},
-  {w:'KIRMES',h:'Fest'},
+  {w:'KIERMES',h:'Fest'},
   {w:'BRÉCK',h:'Struktur'},
 ];
 const WORDS=[
@@ -123,11 +131,11 @@ const WORDS=[
   {w:'CHICKEN',h:'Animal'},
   {w:'OCTOPUS',h:'Ocean'},
 ];
-const TIMER_TICK_MS=100,TIMER_FULL=100,TIMER_BASE_DRAIN=0.8,TIMER_LEVEL_DRAIN=0.2,LOW_TIME=25,SKIP_PENALTY=5;
+const START_LIVES=3,BEST_KEY='pb_best_word-scramble',TIMER_TICK_MS=100,TIMER_FULL=100,TIMER_BASE_DRAIN=0.8,TIMER_LEVEL_DRAIN=0.2,LOW_TIME=25,SKIP_PENALTY=5;
 const CORRECT_DELAY_MS=600,SKIP_DELAY_MS=1000,TIMEOUT_DELAY_MS=1200,BASE_POINTS=10,STREAK_BONUS=3,STREAK_PER_LEVEL=3;
 const $=id=>document.getElementById(id);
 function focusDialog(id){const p=$(id).firstElementChild;p.tabIndex=-1;p.style.outline='none';p.focus({preventScroll:true})}
-let score=0,streak=0,level=1,current,timeLeft=TIMER_FULL,used=new Set(),nextTimer=0;
+let score=0,streak=0,level=1,lives=START_LIVES,roundOpen=false,current,timeLeft=TIMER_FULL,used=new Set(),nextTimer=0;
 let state='idle',paused=false;
 const TEST_MODE=window.__pbTestMode===true; // arcade test mode: nothing is saved
 let lang=storageGet('pb_ws_lang')||'en';
@@ -150,7 +158,7 @@ function paintLang(){
 function setLang(nextLang){
   lang=nextLang;
   storageSet('pb_ws_lang',lang);
-  used.clear();paintLang();next();
+  clearTimeout(nextTimer);used.clear();paintLang();next();
   if(state==='playing')focusGuess();
 }
 function showFeedback(text,cls){
@@ -174,12 +182,26 @@ function next(){
   $('hint').textContent=(lang==='lb'?'Tipp: ':'Hint: ')+current.h+' ('+current.w.length+(lang==='lb'?' Buschtawen)':' letters)');
   $('guess').value='';
   showFeedback('');
-  timeLeft=TIMER_FULL;
+  timeLeft=TIMER_FULL;roundOpen=true;
   drawTimer();
 }
-function showStats(){$('sc').textContent=score;$('st').textContent=streak;$('lv').textContent=level}
+function showStats(){$('sc').textContent=score;$('st').textContent=streak;$('lv').textContent=level;$('lives').textContent=lives}
+function loadBest(){
+  if(TEST_MODE)return 0;
+  return Number(storageGet(BEST_KEY))||0;
+}
+function finish(){
+  state='over';roundOpen=false;clearTimeout(nextTimer);
+  Arcade.gameOver(score);
+  const best=Math.max(loadBest(),score);
+  storageSet(BEST_KEY,String(best));
+  $('overBig').textContent=score;$('overBest').textContent=best;
+  $('overOv').classList.add('show');focusDialog('overOv');
+  $('guess').blur();
+}
 function skip(){
-  if(state!=='playing'||paused)return;
+  if(state!=='playing'||paused||!roundOpen)return;
+  roundOpen=false;
   score=Math.max(0,score-SKIP_PENALTY);Arcade.score(score);streak=0;
   showFeedback('It was: '+current.w,'reveal');
   showStats();
@@ -190,8 +212,10 @@ function drawTimer(){
   $('timer-fill').style.background=timeLeft>LOW_TIME?'var(--good)':'var(--danger)';
 }
 function begin(){
-  state='playing';paused=false;
-  ['startOv','pauseOv'].forEach(id=>$(id).classList.remove('show'));
+  Arcade.startRun();
+  state='playing';paused=false;score=0;streak=0;level=1;lives=START_LIVES;used.clear();
+  ['startOv','pauseOv','overOv'].forEach(id=>$(id).classList.remove('show'));
+  Arcade.score(0);showStats();
   next();focusGuess();
 }
 function setPaused(v){
@@ -202,7 +226,8 @@ function setPaused(v){
 $('guess').addEventListener('input',e=>{
   if(state!=='playing'||paused){e.target.value='';return}
   let v=e.target.value.toUpperCase();
-  if(v===current.w){
+  if(roundOpen&&v===current.w){
+    roundOpen=false;
     score+=BASE_POINTS+streak*STREAK_BONUS;Arcade.score(score);streak++;level=Math.floor(streak/STREAK_PER_LEVEL)+1;
     showFeedback('Correct!','ok');
     showStats();
@@ -213,8 +238,9 @@ $('guess').addEventListener('input',e=>{
 setInterval(()=>{
   if(state!=='playing'||paused)return;
   timeLeft-=TIMER_BASE_DRAIN+level*TIMER_LEVEL_DRAIN;
-  if(timeLeft<=0){streak=0;$('st').textContent=0;
+  if(timeLeft<=0&&roundOpen){streak=0;lives--;roundOpen=false;showStats();
     showFeedback('Time! It was '+current.w,'bad');
+    if(lives<=0){timeLeft=0;drawTimer();setTimeout(finish,TIMEOUT_DELAY_MS);return}
     scheduleNext(TIMEOUT_DELAY_MS);timeLeft=TIMER_FULL}
   drawTimer();
 },TIMER_TICK_MS);
@@ -223,7 +249,7 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Enter'&&state!=='playing'){e.preventDefault();begin()}
 });
 document.addEventListener('visibilitychange',()=>{if(document.hidden)setPaused(true)});
-$('playBtn').onclick=begin;$('resumeBtn').onclick=()=>setPaused(false);$('skipBtn').onclick=skip;
+$('playBtn').onclick=begin;$('againBtn').onclick=begin;$('resumeBtn').onclick=()=>setPaused(false);$('skipBtn').onclick=skip;
 $('langEn').onclick=()=>setLang('en');$('langLb').onclick=()=>setLang('lb');
 paintLang();next();focusDialog('startOv');
 </script>

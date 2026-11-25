@@ -22,6 +22,8 @@ canvas{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border),0 18px 48p
   <canvas id="c" aria-label="Bubble Shooter arcade game"></canvas>
   <div class="arcade-hud">
     <span class="arcade-pill">Score <b id="score">0</b></span>
+    <span class="arcade-pill">Best <b id="bestHud">0</b></span>
+    <span class="arcade-pill">New row in <b id="rowIn">6</b></span>
   </div>
   <div class="arcade-overlay show" id="overlay" role="dialog" aria-modal="true" aria-labelledby="panelTitle">
     <div class="arcade-panel">
@@ -131,19 +133,38 @@ const R=18,COLS=13,MAX_ROWS=20,START_ROWS=5,SHOT_SPEED=10,AIM_LIMIT=0.15,AIM_KEY
 const LOSE_ROW=14;   // a bubble settling this low ends the round (the shooter sits around row 17)
 const SHOOTER_Y=H-40;
 const COLORS=[COLOR.danger,COLOR.accent,COLOR.good,COLOR.amber,COLOR.violet,'#ff9a5c'];
-let grid=[],shooter,nextColor,score=0,state='ready',aimAngle=-Math.PI/2,flying=null;
+let grid=[],shooter,nextColor,score=0,state='ready',aimAngle=-Math.PI/2,flying=null,parity=0,misses=0;
+const MISS_LIMIT=6;   // shots in a row that pop nothing, then a new row pushes in from the top
 
-const rowCols=row=>row%2===0?COLS:COLS-1;
-const randomColor=()=>COLORS[Math.floor(Math.random()*COLORS.length)];
-function updateHud(){$('score').textContent=score}
+const isLongRow=row=>(row+parity)%2===0;
+const rowCols=row=>isLongRow(row)?COLS:COLS-1;
+/** Only colours that are still on the board, so the shooter never hands out a colour that cannot be matched. */
+function randomColor(){
+  const present=COLORS.filter(col=>grid.some(row=>row&&row.includes(col)));
+  const pool=present.length?present:COLORS;
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+function updateHud(){
+  $('score').textContent=score;$('rowIn').textContent=Math.max(0,MISS_LIMIT-misses);
+  $('bestHud').textContent=best===null||score>best?score:best;
+}
+function randomRow(row){
+  const cells=[];
+  for(let c=0;c<rowCols(row);c++)cells[c]=COLORS[Math.floor(Math.random()*COLORS.length)];
+  return cells;
+}
 function fillRows(){
-  for(let row=0;row<START_ROWS;row++){
-    grid[row]=[];
-    for(let c=0;c<rowCols(row);c++)grid[row][c]=randomColor();
-  }
+  for(let row=0;row<START_ROWS;row++)grid[row]=randomRow(row);
+}
+/** Pushes one fresh row in at the top; flipping the parity keeps every old bubble in its place on the hex grid. */
+function pushRow(){
+  parity=1-parity;
+  grid.unshift(randomRow(0));
+  if(grid.length>MAX_ROWS+1)grid.length=MAX_ROWS+1;
+  misses=0;
 }
 function init(){
-  grid=[];score=0;flying=null;aimAngle=-Math.PI/2;
+  grid=[];score=0;flying=null;aimAngle=-Math.PI/2;parity=0;misses=0;
   fillRows();
   nextColor=randomColor();
   shooter={color:randomColor()};
@@ -162,7 +183,7 @@ function pauseGame(){
 }
 
 function getPos(row,col){
-  let x=col*R*2+R+(row%2===0?0:R);
+  let x=col*R*2+R+(isLongRow(row)?0:R);
   let y=row*R*1.73+R+20;
   return{x,y};
 }
@@ -181,7 +202,7 @@ function snap(x,y){
 }
 function getNeighbors(row,col){
   let n=[];
-  let even=row%2===0;
+  let even=isLongRow(row);
   let dirs=even?[[-1,-1],[-1,0],[0,-1],[0,1],[1,-1],[1,0]]:[[-1,0],[-1,1],[0,-1],[0,1],[1,0],[1,1]];
   for(let[dr,dc]of dirs){
     let r=row+dr,c=col+dc;
@@ -235,11 +256,18 @@ function settle(){
     for(const c of cluster)grid[c.row][c.col]=null;
     score+=cluster.length*10;
     score+=removeFloating()*15;
-    Arcade.score(score);updateHud();
-  }
+    Arcade.score(score);misses=0;
+  }else misses++;
   flying=null;
-  if(boardEmpty()){fillRows();score+=100;Arcade.score(score);updateHud();return}   // cleared: fresh wave plus a bonus
-  if(grid[s.row]&&grid[s.row][s.col]&&s.row>=LOSE_ROW)endGame();
+  if(boardEmpty()){fillRows();misses=0;score+=100;Arcade.score(score);updateHud();return}   // cleared: fresh wave plus a bonus
+  if(misses>=MISS_LIMIT)pushRow();
+  {
+    const stale=col=>!grid.some(row=>row&&row.includes(col));
+    if(stale(shooter.color))shooter.color=randomColor();
+    if(stale(nextColor))nextColor=randomColor();
+  }
+  updateHud();
+  if(grid.some((row,r)=>r>=LOSE_ROW&&row&&row.some(Boolean)))endGame();
 }
 
 function shoot(){

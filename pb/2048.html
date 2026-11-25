@@ -9,7 +9,9 @@
 body{display:flex;flex-direction:column}
 [hidden]{display:none!important}
 /* top padding keeps the board clear of the HUD pills */
-.arcade-stage{padding:52px 10px 12px}
+.arcade-stage{padding:64px 10px 12px}
+#undo{pointer-events:auto;cursor:pointer;min-height:44px;min-width:44px;justify-content:center;touch-action:manipulation}
+#undo[disabled]{opacity:.45;cursor:default}
 .arcade-hud b{text-transform:none}
 .arcade-panel p:empty{display:none}
 #panelExtra:not(:empty){margin:14px 0 2px}
@@ -33,6 +35,7 @@ body{display:flex;flex-direction:column}
   <div class="arcade-hud">
     <span class="arcade-pill">Score <b id="sc">0</b></span>
     <span class="arcade-pill">Best <b id="bestHud">0</b></span>
+    <button class="arcade-pill" id="undo" type="button" disabled aria-label="Undo the last move">Undo</button>
   </div>
   <div class="arcade-overlay show" id="overlay" role="dialog" aria-modal="true" aria-labelledby="panelTitle">
     <div class="arcade-panel">
@@ -125,7 +128,7 @@ const TILE_DARK={
 };
 const BEYOND_DARK=['#ececea','#121314'];
 const isDark=()=>document.documentElement.getAttribute('data-theme')==='dark';
-let grid,score=0,state='ready',won=false,newTile=null,swipeStart=null;
+let grid,score=0,state='ready',won=false,newTile=null,swipeStart=null,undoStep=null;
 
 function updateHud(){
   $('sc').textContent=score;
@@ -134,7 +137,7 @@ function updateHud(){
 function startGame(){Arcade.startRun();
   hidePanel();
   grid=Array.from({length:SIZE},()=>Array(SIZE).fill(0));
-  score=0;won=false;state='playing';
+  score=0;won=false;state='playing';undoStep=null;
   Arcade.score(score);
   addTile();addTile();render();
 }
@@ -154,12 +157,12 @@ function slide(row){
 }
 function move(dir){
   if(state!=='playing')return;
-  const prev=JSON.stringify(grid);
+  const prev=JSON.stringify(grid),prevScore=score;
   if(dir==='left')for(let r=0;r<SIZE;r++)grid[r]=slide(grid[r]);
   if(dir==='right')for(let r=0;r<SIZE;r++)grid[r]=slide(grid[r].reverse()).reverse();
   if(dir==='up'){for(let c=0;c<SIZE;c++){let col=slide([grid[0][c],grid[1][c],grid[2][c],grid[3][c]]);for(let r=0;r<SIZE;r++)grid[r][c]=col[r]}}
   if(dir==='down'){for(let c=0;c<SIZE;c++){let col=slide([grid[3][c],grid[2][c],grid[1][c],grid[0][c]]).reverse();for(let r=0;r<SIZE;r++)grid[r][c]=col[r]}}
-  if(JSON.stringify(grid)!==prev){addTile();render();checkState()}
+  if(JSON.stringify(grid)!==prev){undoStep={grid:JSON.parse(prev),score:prevScore};addTile();render();checkState();persist()}
 }
 function canMove(){
   for(let r=0;r<SIZE;r++)for(let c=0;c<SIZE;c++){
@@ -178,11 +181,33 @@ function checkState(){
   if(!canMove())endGame();
 }
 function endGame(){
-  state='over';Arcade.gameOver(score);
+  state='over';undoStep=null;Arcade.gameOver(score);persist();
   const isBest=recordBest(score);updateHud();
   showPanel({title:'Game over',big:score,bestLine:isBest?'New best!':'Best '+bestText(),label:'Play again',action:startGame});
 }
 
+function undo(){
+  if(state!=='playing'||!undoStep)return;
+  grid=undoStep.grid;score=undoStep.score;undoStep=null;newTile=null;render();persist();
+}
+/* resume: the hub injects the local save as window.__pbSave and may deliver a cloud copy later via __pbLoadSave */
+function persist(){
+  $('undo').disabled=state!=='playing'||!undoStep;
+  if(TEST_MODE||window.parent===window)return;
+  try{window.parent.postMessage({__pbSave:1,data:{v:1,over:state==='over',grid,score,won}},'*')}catch(err){console.warn('[2048] save failed',err)}
+}
+function validSave(d){
+  return d&&d.v===1&&!d.over&&Array.isArray(d.grid)&&d.grid.length===SIZE&&Number.isFinite(d.score)&&d.score>=0&&
+    d.grid.every(r=>Array.isArray(r)&&r.length===SIZE&&r.every(v=>v===0||(Number.isInteger(v)&&v>=2&&v<=1<<20&&(v&(v-1))===0)))&&d.grid.some(r=>r.some(v=>v));
+}
+function resumeSave(d){
+  grid=d.grid.map(r=>r.slice());score=d.score;won=!!d.won;state='playing';undoStep=null;
+  Arcade.startRun();Arcade.score(score);render();persist();
+}
+function offerResume(d){
+  if(state==='playing'||!validSave(d))return;
+  showPanel({title:'2048',body:'Your game is saved: score '+d.score+'.',label:'Continue',action:()=>resumeSave(d),label2:'New game',action2:startGame});
+}
 function render(){
   const board=$('board');
   const cells=board.children;
@@ -208,6 +233,7 @@ document.addEventListener('keydown',e=>{
   e.preventDefault();
   move(dir);
 });
+document.addEventListener('keydown',e=>{if((e.key==='u'||e.key==='z')&&!e.repeat&&!e.metaKey&&!e.ctrlKey)undo()});
 /* touch / mouse: swipe on the board */
 const boardEl=$('board');
 boardEl.addEventListener('pointerdown',e=>{swipeStart={x:e.clientX,y:e.clientY,id:e.pointerId}});
@@ -220,10 +246,13 @@ function endSwipe(e){
 }
 boardEl.addEventListener('pointerup',endSwipe);
 boardEl.addEventListener('pointercancel',()=>{swipeStart=null});
+$('undo').addEventListener('click',undo);
 Arcade.onRestart(startGame);
+window.addEventListener('message',e=>{const d=e.data;if(e.source===window.parent&&d&&d.__pbLoadSave===1&&state==='ready'&&validSave(d.data)&&(!validSave(window.__pbSave)||d.data.score>window.__pbSave.score))offerResume(d.data)});
 grid=Array.from({length:SIZE},()=>Array(SIZE).fill(0));
 addTile();addTile();render();updateHud();
-showPanel({title:'2048',body:'Swipe or use the arrow keys (or WASD) to slide the tiles. Equal numbers merge - reach 2048.',label:'Play',action:startGame});
+if(validSave(window.__pbSave))offerResume(window.__pbSave);
+else showPanel({title:'2048',body:'Swipe or use the arrow keys (or WASD) to slide the tiles. Equal numbers merge - reach 2048.',label:'Play',action:startGame});
 </script>
 </body>
 </html>
