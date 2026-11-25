@@ -69,8 +69,9 @@ html,body,button{font-family:"Geist",system-ui,-apple-system,"Segoe UI",Roboto,s
 <button id="restart" type="button" class="hidden" aria-label="Restart level" title="Restart level">↻</button>
 <div id="touch" class="hidden" data-arcade-touch-controls><div class="grp"><button id="brake" type="button" class="pedal" aria-label="Brake and reverse"><small aria-hidden="true">▼</small>BRAKE</button><button id="tiltL" type="button" class="pedal tilt" aria-label="Tilt back (nose up) without driving" title="Tilt back"><small aria-hidden="true">↺</small></button></div><div class="grp"><button id="tiltR" type="button" class="pedal tilt" aria-label="Tilt forward (nose down) without driving" title="Tilt forward"><small aria-hidden="true">↻</small></button><button id="gas" type="button" class="pedal" aria-label="Accelerate"><small aria-hidden="true">▲</small>GAS</button></div></div>
 <div id="overlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle"><div class="card"><h1 id="ovTitle">STUNT DRIVER</h1><h2>3D STUNT TRIALS</h2><p id="message">Balance the throttle, work the suspension, and survive twenty-four short obstacle courses.<br>WASD / arrows to drive and tilt. Touch pedals work anywhere on iPad.</p><div id="levels"></div><div id="gfx" role="group" aria-label="Grafik"></div><button id="play" type="button">DRIVE</button></div></div>
-<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js" integrity="sha384-qOkzR5Ke/XkQxuGVJ9hpFEpDlcoLtWwVYhnJf06cLIZa2vaIptSqaubivErzmD5O" crossorigin="anonymous"></script>
+<script src="/assets/vendor/three/three-0.160.0.min.js" integrity="sha384-qOkzR5Ke/XkQxuGVJ9hpFEpDlcoLtWwVYhnJf06cLIZa2vaIptSqaubivErzmD5O"></script>
+<script>window.THREE||document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js" integrity="sha384-qOkzR5Ke/XkQxuGVJ9hpFEpDlcoLtWwVYhnJf06cLIZa2vaIptSqaubivErzmD5O" crossorigin="anonymous"><\/script>')</script>
 <script src="/pb/drive-mad/core.js"></script>
-<script src="/pb/drive-mad/game.js?v=8"></script>
+<script src="/pb/drive-mad/game.js?v=9"></script>
 </body>
 </html>

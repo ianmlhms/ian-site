@@ -235,7 +235,9 @@ function fakeSession() {
 }
 
 const CORS = {
-  "access-control-allow-origin": "*", "access-control-allow-headers": "*",
+  "access-control-allow-origin": "*",
+  // WebKit does not accept "*" for Authorization: list the headers supabase-js sends
+  "access-control-allow-headers": "authorization, apikey, content-type, x-client-info, prefer, accept, accept-profile, content-profile, range, x-supabase-api-version, if-none-match, if-match, x-upsert, cache-control",
   "access-control-allow-methods": "GET,POST,PATCH,PUT,DELETE,OPTIONS", "access-control-expose-headers": "*",
 };
 
@@ -508,7 +510,10 @@ export async function runFlow(flow, { browser, origin, shotsDir = process.env.FL
   await mockRealtime(context, flow.realtime || {});
   const page = await context.newPage();
   const h = { page, context, origin: theOrigin, backend, failures: [], steps: [] };
-  page.on("pageerror", (error) => h.failures.push(`uncaught page error: ${error.message}`));
+  // WebKit words a fetch that the page navigation aborted as "... due to access control checks" and reports it as an uncaught error;
+  // Chromium stays silent. Only that message is ignored, and only in WebKit.
+  const abortedByNavigation = (message) => process.env.FLOW_BROWSER === "webkit" && /due to access control checks/.test(message);
+  page.on("pageerror", (error) => { if (!abortedByNavigation(error.message)) h.failures.push(`uncaught page error: ${error.message}`); });
 
   h.step = (label) => { h.steps.push(label); console.log(`  · ${label}`); };
   h.pause = (ms = 600) => page.waitForTimeout(ms);

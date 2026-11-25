@@ -251,8 +251,8 @@ window.addEventListener('keydown',event=>{
 });
 window.addEventListener('keyup',event=>{const mapped=keyMap[event.key];if(mapped){keys[mapped]=false;event.preventDefault();}});
 // a key released while the page was in the background never sends its keyup: do not keep driving
-window.addEventListener('blur',()=>{keys.up=keys.down=keys.left=keys.right=false;});
-window.addEventListener('blur',()=>{keys.up=keys.down=keys.left=keys.right=false;});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)keys.up=keys.down=keys.left=keys.right=false;});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)keys.up=keys.down=keys.left=keys.right=false;});
 function bindPedal(id,key,restarts=true){
   const element=$(id),release=event=>{keys[key]=false;element.classList.remove('on');if(element.hasPointerCapture&&element.hasPointerCapture(event.pointerId))element.releasePointerCapture(event.pointerId);};
   element.addEventListener('pointerdown',event=>{event.preventDefault();if(restarts&&state==='dead')startLevel(levelIndex);element.setPointerCapture(event.pointerId);keys[key]=true;element.classList.add('on');startAudio();});

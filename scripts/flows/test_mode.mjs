@@ -99,7 +99,7 @@ export const flow = {
     h.expect(normalStreaks >= 1, "normal mode touches the streak");
     const scoresBefore = scoreWrites(h), weeklyBefore = calls(h, "submit_weekly_score");
     await frameOf(h).evaluate(() => { Arcade.startRun(); Arcade.gameOver(321); });
-    await frameOf(h).evaluate(() => parent.postMessage({ __pbSave: 1, data: { real: 1 } }, "*"));
+        await frameOf(h).evaluate(() => parent.postMessage({ __pbSave: 1, data: { real: 1 } }, "*"));
     await h.pause(700);
     await page.evaluate(() => window.__pbFlushSave());
     h.expect(scoreWrites(h) > scoresBefore, "normal mode saves the score to scores");
@@ -111,7 +111,9 @@ export const flow = {
     await frameOf(h).evaluate(() => { window.__got = []; addEventListener("message", (e) => { if (e.data && e.data.__pbLoadSave) window.__got.push(e.data.data); }); });
     await frameOf(h).evaluate(() => parent.postMessage({ __pbWantSave: 1 }, "*"));
     await h.pause(500);
-    h.eq(await frameOf(h).evaluate(() => window.__got), [{ real: 1 }], "normal mode answers __pbWantSave with the cloud copy");
+    // the cloud copy as fetched comes first (a push made before the game asked must not hide better cloud progress), then what this
+    // session pushed (the answer must not be older than that); the game keeps the one with more progress
+    h.eq(await frameOf(h).evaluate(() => window.__got), [{ cloud: 1 }, { real: 1 }], "normal mode answers __pbWantSave with the cloud copy, then this session's newest push");
     await closeGame(h);
 
     h.step("owner is asked again on the next open; the last choice only sets the focus");

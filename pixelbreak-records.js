@@ -268,7 +268,7 @@ document.addEventListener("visibilitychange", () => { if (document.visibilitySta
  * delivered via {__pbLoadSave:1,data} — games keep whichever has more progress. */
 const SAVE_PREFIX = "pb_save_";
 let saveTimer = null, pendingSave = null, cloudSave;   // undefined = fetching, null = none
-let cloudAsked = false;   // the open game has sent {__pbWantSave}: it listens, so its later saves may refresh the cached cloud copy
+let lastPush = null;      // the newest save this game session pushed; delivered after the cloud copy (the game keeps whichever has more progress)
 
 const MAX_MESSAGE_SIZE = 256 * 1024, MAX_SAVE_DEPTH = 32;
 const MAX_SCORE = 1e300;   // any finite score up to 1e300 (scores.score is double precision); same limit in arcade-kit.js
@@ -314,14 +314,15 @@ window.addEventListener("message", (e) => {
     // Keep the cached cloud copy current: a game that reloads inside the frame asks again ({__pbWantSave})
     // and must get its latest progress, not the copy fetched when it was opened (its saves would then be
     // older than the server's and silently rejected by the keep-progress trigger).
-    // Only once the game has asked for the cloud save: a game that boots with its local save pushes that save BEFORE it asks, and when the
-    // cloud copy had already arrived (it can beat the game's boot) the push used to replace it, so the better cloud progress was never delivered.
-    if (cloudSave !== undefined && cloudAsked) cloudSave = d.data;
+    // The cached cloud copy stays as fetched. The game's own pushes are remembered next to it and handed back AFTER it: a game that boots with
+    // its local save pushes it before it asks, and replacing the cloud copy with that push hid better cloud progress; handing back only
+    // the cloud copy would on the other hand give a reloaded game something older than what this session already pushed. The games
+    // keep the one with more progress, whatever the order.
+    lastPush = d.data;
     savingGameId = g.id;
     updateSaveHint();
     if (sb && session && !saveTimer) saveTimer = setTimeout(flushSave, 3000);
   }
-  if (d && d.__pbWantSave === 1) cloudAsked = true;
   if (d && d.__pbWantSave === 1 && !testMode && cloudSave !== undefined) sendCloudSave();
   if (d.__pbResume === 1) onResumeMessage(g, d);
   if (d.__pbWantResume === 1 && !testMode && g.id === RESUME_GAME && resumeRows) sendCloudResume();
@@ -442,7 +443,10 @@ function netClose() {
 function sendCloudSave() {
   if (!cloudSave || !PB.current) return;
   const fr = document.getElementById("gf");
-  try { fr.contentWindow.postMessage({ __pbLoadSave: 1, data: cloudSave }, "*"); } catch {}
+  try {
+    fr.contentWindow.postMessage({ __pbLoadSave: 1, data: cloudSave }, "*");
+    if (lastPush && lastPush !== cloudSave) fr.contentWindow.postMessage({ __pbLoadSave: 1, data: lastPush }, "*");
+  } catch {}
 }
 
 async function flushSave() {
@@ -487,7 +491,7 @@ window.__pbFlushSave = async () => {
 async function loadCloudSave(g) {
   const seq = ++cloudLoadSeq;
   cloudSave = undefined;
-  cloudAsked = false;
+  lastPush = null;
   giftCloudSettled = false;
   if (testMode || !sb || !session) { cloudSave = null; return; }
   try {

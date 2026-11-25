@@ -45,6 +45,7 @@
   .key{flex:1;max-width:42px;height:50px;border:1px solid var(--ink);border-radius:0;background:var(--white);color:var(--ink);font-weight:600;font-size:15px;cursor:pointer;text-transform:uppercase;font-family:inherit;padding:0}
   .key.wide{max-width:64px;font-size:12px}
   /* iPad and wider: there is room for full 44 px keys (a phone cannot fit 11 of them in a row) */
+  @media (max-width:430px){.key.wide{font-size:10px;padding:0;letter-spacing:-.02em}}   /* "ENTER" must fit its key on a phone */
   @media (min-width:600px){.kb{max-width:590px}.key{max-width:48px}.key.wide{max-width:72px}}
   .key.correct{background:var(--green);border-color:var(--green);color:var(--on-green)} .key.present{background:var(--ink);color:var(--paper)} .key.absent{background:var(--tint);border-color:var(--soft);color:var(--muted)}
   .stats{display:flex;gap:18px;color:var(--muted);font-size:13px;margin-top:4px}
