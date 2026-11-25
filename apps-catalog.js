@@ -86,6 +86,8 @@ export const APPS = Object.freeze([
     keywords: ["shorts", "shortsfactory", "analytics", "video", "stats"] },
   { url: "admin.html", admin: true, name: "Admin", icon: "🛡", group: "grp.private", locked: false,
     keywords: ["moderation", "verwaltung", "manage", "users", "benotzer"] },
+  { url: "traffic.html", admin: true, name: "Traffic", icon: "📈", group: "grp.private", locked: false,
+    keywords: ["traffic", "besucher", "visitten", "stats", "statistik"] },
   { url: "ppt.html", name: "PPT Builder", icon: "▣", group: "grp.private", locked: false,
     keywords: ["powerpoint", "presentation", "présentation", "slides", "folien"] },
   { url: "doc.html", name: "Word Builder", icon: "📄", group: "grp.private", locked: false,
