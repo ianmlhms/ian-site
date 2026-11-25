@@ -128,7 +128,7 @@ function tick(ts){
 }
 
 
-const GRAVITY=0.35,MOVE_SPEED=5,JUMP_V=-10,SPRING_V=-15,PLATFORM_W=70,PLATFORM_H=12,PLATFORM_GAP=35;
+const GRAVITY=0.35,MOVE_SPEED=5,JUMP_V=-10,SPRING_V=-15,PLATFORM_W=70,PLATFORM_H=12,PLATFORM_GAP=35,MAX_EXTRA_GAP=30,GAP_GROWTH_DIV=25;
 const PLATFORM_COLORS={normal:COLOR.good,moving:COLOR.accent,breaking:'#ff9a5c',spring:COLOR.amber};
 let player,platforms=[],score=0,maxY=0,camY=0,state='ready',keys={},touchDir=0;
 
@@ -227,7 +227,7 @@ function update(){
   platforms=platforms.filter(p=>p.y<camY+H+80&&!p.broken);
   let topP=platforms.length?Math.min(...platforms.map(p=>p.y)):camY+H;
   while(topP>camY-60){
-    topP-=PLATFORM_GAP+Math.random()*25;
+    topP-=PLATFORM_GAP+Math.min(MAX_EXTRA_GAP,score/GAP_GROWTH_DIV)+Math.random()*25;   // platforms drift further apart as you climb
     platforms.unshift(genPlatform(topP));
   }
   if(player.y-camY>H+60)endGame();
@@ -257,8 +257,12 @@ function draw(){
 function runFrame(){update();draw()}
 
 const GAME_KEYS=new Set(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' ']);
-document.addEventListener('keydown',e=>{keys[e.key]=true;if(GAME_KEYS.has(e.key))e.preventDefault()});
-document.addEventListener('keyup',e=>{keys[e.key]=false});
+const keyName=e=>e.key.length===1?e.key.toLowerCase():e.key;   // Caps Lock / Shift must not break A and D
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'||e.key==='p'||e.key==='P'){pauseGame();return}
+  keys[keyName(e)]=true;if(GAME_KEYS.has(e.key))e.preventDefault()});
+document.addEventListener('keyup',e=>{keys[keyName(e)]=false});
+window.addEventListener('blur',()=>{keys={};touchDir=0});   // a key released in another window must not stay pressed
 /* touch: hold the left or right half of the board to steer */
 function steerFromPointer(e){touchDir=toBoard(e).x<W/2?-1:1}
 C.addEventListener('pointerdown',e=>{if(e.pointerType==='mouse')return;C.setPointerCapture(e.pointerId);steerFromPointer(e)});
