@@ -21,3 +21,5 @@ data/trails/official.geojson
 # Python bytecode cache
 __pycache__/
 *.pyc
+
+.wrangler/
