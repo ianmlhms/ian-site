@@ -24,6 +24,7 @@ body{display:flex;flex-direction:column}
   <div class="arcade-hud">
     <span class="arcade-pill">Score <b id="pts">0</b></span>
     <span class="arcade-pill">Wave <b id="wv">1</b></span>
+    <span class="arcade-pill">Best <b id="bestHud">0</b></span>
     <span class="arcade-pill lives" id="lives" role="img" aria-label="Lives: 3">♥♥♥</span>
   </div>
 
@@ -47,6 +48,7 @@ body{display:flex;flex-direction:column}
 </main>
 <script>
 const C=document.getElementById('c'),X=C.getContext('2d'),stage=document.getElementById('stage');
+const RESTART_LOCK_MS=600;
 const GW=600,GH=600,DPR_CAP=2,BEST_KEY='pb_best_space_invaders';
 const TEST_MODE=window.__pbTestMode===true; // arcade test mode: local best is neither read nor written
 const $=id=>document.getElementById(id);
@@ -55,7 +57,7 @@ const ROOT=getComputedStyle(document.documentElement),tok=n=>ROOT.getPropertyVal
 const FONT=tok('--font');
 const PAL={bg:tok('--bg2'),text:tok('--text'),ship:tok('--cyan'),shipDark:tok('--accent'),shot:tok('--cyan'),enemyShot:tok('--danger'),
   burst:[tok('--danger'),tok('--good'),tok('--accent')]};
-let state='idle',paused=false,best=loadBest();
+let state='idle',paused=false,overAt=0,best=loadBest();
 function loadBest(){
   if(TEST_MODE)return 0;
   try{return Number(localStorage.getItem(BEST_KEY))||0}
@@ -84,7 +86,7 @@ function start(){
   showHud();
 }
 function showHud(){
-  $('pts').textContent=score;$('wv').textContent=wave;
+  $('pts').textContent=score;$('wv').textContent=wave;$('bestHud').textContent=Math.max(best,score);
   $('lives').textContent=lives>0?'♥'.repeat(lives):'–';$('lives').setAttribute('aria-label','Lives: '+Math.max(0,lives));
 }
 function begin(){Arcade.startRun();
@@ -92,8 +94,9 @@ function begin(){Arcade.startRun();
   ['startOv','overOv','pauseOv'].forEach(id=>$(id).classList.remove('show'));
 }
 function finish(){
-  state='over';gameOver=true;
+  state='over';gameOver=true;overAt=performance.now();
   if(score>best){best=score;saveBest(best)}
+  showHud();
   $('overBig').textContent=score;$('overWave').textContent=wave;$('overBest').textContent=best;
   $('overOv').classList.add('show');
   focusDialog('overOv');
@@ -112,15 +115,17 @@ function spawnAliens(){
 }
 function addP(x,y,c,n){for(let i=0;i<n;i++){let a=Math.random()*Math.PI*2,s=1+Math.random()*4;particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:15+Math.random()*10,color:c})}}
 let keys={};
-function loop(){
-  X.setTransform(C.width/GW,0,0,C.height/GH,0,0);
-  X.fillStyle=PAL.bg;X.fillRect(0,0,GW,GH);
-  // Stars
-  X.fillStyle=PAL.text;
-  for(let i=0;i<60;i++){X.globalAlpha=0.1+Math.sin(Date.now()/800+i)*0.15;
-    X.fillRect((i*97)%GW,(i*53+Date.now()*0.02)%GH,1.5,1.5)}
-  X.globalAlpha=1;
-
+/* ---------- fixed 60 Hz stepping: same speed on 60 / 120 / 144 Hz displays ---------- */
+const FRAME_MS=1000/60,FRAME_SLACK_MS=2,MAX_CATCHUP_MS=FRAME_MS*2;
+let frameAcc=FRAME_MS,lastTs=0;
+function loop(ts){
+  requestAnimationFrame(loop);
+  frameAcc=Math.min(frameAcc+(lastTs?ts-lastTs:FRAME_MS),MAX_CATCHUP_MS);lastTs=ts;
+  if(frameAcc<FRAME_MS-FRAME_SLACK_MS)return;
+  frameAcc-=FRAME_MS;
+  update();draw();
+}
+function update(){
   if(state==='playing'&&!paused&&!gameOver){
     if(keys['ArrowLeft']||keys['a'])player.x=Math.max(20,player.x-5);
     if(keys['ArrowRight']||keys['d'])player.x=Math.min(GW-20,player.x+5);
@@ -157,7 +162,16 @@ function loop(){
     // Wave complete
     if(aliens.every(a=>!a.alive)){wave++;spawnAliens();showHud()}
   }
-
+  if(!paused)for(let i=particles.length-1;i>=0;i--){const p=particles[i];p.x+=p.vx;p.y+=p.vy;p.life--;if(p.life<=0)particles.splice(i,1)}
+}
+function draw(){
+  X.setTransform(C.width/GW,0,0,C.height/GH,0,0);
+  X.fillStyle=PAL.bg;X.fillRect(0,0,GW,GH);
+  // Stars
+  X.fillStyle=PAL.text;
+  for(let i=0;i<60;i++){X.globalAlpha=0.1+Math.sin(Date.now()/800+i)*0.15;
+    X.fillRect((i*97)%GW,(i*53+Date.now()*0.02)%GH,1.5,1.5)}
+  X.globalAlpha=1;
   // Draw aliens
   X.font='28px serif';X.textAlign='center';
   for(let a of aliens){if(!a.alive)continue;
@@ -173,20 +187,21 @@ function loop(){
   X.fillStyle=PAL.enemyShot;
   for(let b of alienBullets){X.fillRect(b.x-2,b.y,4,10)}
   // Particles
-  for(let i=particles.length-1;i>=0;i--){let p=particles[i];if(!paused){p.x+=p.vx;p.y+=p.vy;p.life--}
-    if(p.life<=0){particles.splice(i,1);continue}X.globalAlpha=p.life/25;X.fillStyle=p.color;
-    X.fillRect(p.x-2,p.y-2,4,4)}X.globalAlpha=1;
-  requestAnimationFrame(loop);
+  for(const p of particles){X.globalAlpha=Math.max(0,p.life/25);X.fillStyle=p.color;X.fillRect(p.x-2,p.y-2,4,4)}X.globalAlpha=1;
 }
+const keyName=e=>e.key.length===1?e.key.toLowerCase():e.key;   // Caps Lock must not break A and D
 document.addEventListener('keydown',e=>{
-  keys[e.key]=true;
+  keys[keyName(e)]=true;
+  if(e.key==='Escape'||e.key==='p'||e.key==='P'){if(state==='playing'||paused)setPaused(!paused);return}
   if(e.target.closest&&e.target.closest('button'))return;
-  if((e.key===' '||e.key==='Enter')&&state!=='playing'&&!e.repeat)begin();
+  // Space fires, so the tap that was still going when the last life went must not start the next run
+  if((e.key===' '||e.key==='Enter')&&state!=='playing'&&!e.repeat&&performance.now()-overAt>RESTART_LOCK_MS)begin();
   if(e.key===' ')e.preventDefault()});
-document.addEventListener('keyup',e=>{keys[e.key]=false});
+document.addEventListener('keyup',e=>{keys[keyName(e)]=false});
+window.addEventListener('blur',()=>{keys={}});
 document.addEventListener('visibilitychange',()=>{if(document.hidden)setPaused(true)});
 $('playBtn').onclick=begin;$('againBtn').onclick=begin;$('resumeBtn').onclick=()=>setPaused(false);
-start();loop();
+start();requestAnimationFrame(loop);
 </script>
 </body>
 </html>

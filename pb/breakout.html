@@ -24,6 +24,7 @@ canvas{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border),0 18px 48p
   <div class="arcade-hud">
     <span class="arcade-pill">Score <b id="score">0</b></span>
     <span class="arcade-pill">Level <b id="level">1</b></span>
+    <span class="arcade-pill">Best <b id="bestHud">0</b></span>
     <span class="arcade-pill lives">Lives <b id="lives">♥♥♥</b></span>
   </div>
   <div class="arcade-overlay show" id="overlay" role="dialog" aria-modal="true" aria-labelledby="panelTitle">
@@ -131,12 +132,13 @@ function tick(ts){
 
 
 const COLS=10,ROWS=6,BW=55,BH=20,BP=3,MAX_EXTRA_ROWS=4;
-const START_LIVES=3,PADDLE_KEY_SPEED=8,MAX_BALL_VX=8,LAUNCH_VX=3,LAUNCH_VY=-4,LAUNCH_Y=440;
+const SERVE_FRAMES=50,LEVEL_SPEEDUP=0.35,MAX_SPEEDUP_LEVELS=4,START_LIVES=3,PADDLE_KEY_SPEED=8,MAX_BALL_VX=8,LAUNCH_VX=3,LAUNCH_VY=-4,LAUNCH_Y=440;
 // brick rows: shared family colours (danger, orange, amber, good, accent, violet)
 const COLORS=[COLOR.danger,'#ff9a5c',COLOR.amber,COLOR.good,COLOR.accent,COLOR.violet];
 let paddle,ball,bricks=[],score=0,lives=START_LIVES,level=1,state='ready',particles=[],keys={};
 
 function updateHud(){
+  $('bestHud').textContent=Math.max(best===null?0:best,score);
   $('score').textContent=score;
   $('level').textContent=level;
   $('lives').textContent=lives>0?'♥'.repeat(lives):'-';
@@ -144,24 +146,28 @@ function updateHud(){
 function genBricks(){
   bricks=[];
   for(let r=0;r<ROWS+Math.min(level,MAX_EXTRA_ROWS);r++)for(let c=0;c<COLS;c++){
-    bricks.push({x:c*(BW+BP)+20,y:r*(BH+BP)+40,w:BW,h:BH,color:COLORS[r%COLORS.length],hp:r<2?2:1,alive:true});
+    bricks.push({x:c*(BW+BP)+Math.round((W-(COLS*(BW+BP)-BP))/2),y:r*(BH+BP)+40,w:BW,h:BH,color:COLORS[r%COLORS.length],hp:r<2?2:1,alive:true});
   }
 }
-function resetBall(x){ball={x,y:LAUNCH_Y,vx:LAUNCH_VX,vy:LAUNCH_VY,r:6}}
+let serveLeft=0;   // frames the ball rests on the paddle before it is served (start of a run, new life, new level)
+function resetBall(x){
+  const faster=Math.min(level-1,MAX_SPEEDUP_LEVELS)*LEVEL_SPEEDUP;   // each level is a little quicker
+  ball={x,y:LAUNCH_Y,vx:(Math.random()<.5?-1:1)*LAUNCH_VX,vy:LAUNCH_VY-faster,r:6};serveLeft=SERVE_FRAMES;
+}
 function resetWorld(){
   paddle={x:250,y:460,w:80,h:12};
-  resetBall(W/2);
   score=0;lives=START_LIVES;level=1;particles=[];keys={};
+  resetBall(paddle.x+paddle.w/2);
   genBricks();updateHud();Arcade.score(score);
 }
 function addP(x,y,c,n){
   if(REDUCED)return;
   for(let i=0;i<n;i++){let a=Math.random()*Math.PI*2,s=1+Math.random()*3;particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:15+Math.random()*10,color:c})}
 }
-function startGame(){hidePanel();resetWorld();state='playing'}
+function startGame(){Arcade.startRun();hidePanel();resetWorld();state='playing'}
 function endGame(){
   state='over';Arcade.gameOver(score);
-  const isBest=recordBest(score);
+  const isBest=recordBest(score);updateHud();
   showPanel({title:'Game over',big:score,bestLine:isBest?'New best!':'Best '+bestText(),body:'You reached level '+level+'.',label:'Play again',action:startGame});
 }
 function pauseGame(){
@@ -177,9 +183,11 @@ function update(){
   }
   if(keys['ArrowLeft']||keys['a'])paddle.x=Math.max(0,paddle.x-PADDLE_KEY_SPEED);
   if(keys['ArrowRight']||keys['d'])paddle.x=Math.min(W-paddle.w,paddle.x+PADDLE_KEY_SPEED);
+  if(serveLeft>0){serveLeft--;ball.x=paddle.x+paddle.w/2;ball.y=paddle.y-ball.r-4;if(serveLeft>0){updateParticles();return}}
   ball.x+=ball.vx;ball.y+=ball.vy;
-  if(ball.x<ball.r||ball.x>W-ball.r)ball.vx*=-1;
-  if(ball.y<ball.r)ball.vy*=-1;
+  if(ball.x<ball.r){ball.x=ball.r;ball.vx=Math.abs(ball.vx)}
+  if(ball.x>W-ball.r){ball.x=W-ball.r;ball.vx=-Math.abs(ball.vx)}
+  if(ball.y<ball.r){ball.y=ball.r;ball.vy=Math.abs(ball.vy)}
   if(ball.y+ball.r>paddle.y&&ball.y<paddle.y+paddle.h&&ball.x>paddle.x&&ball.x<paddle.x+paddle.w){
     ball.vy=-Math.abs(ball.vy);
     // the clamp stops repeated edge hits from building a speed the ball can tunnel through
@@ -194,13 +202,18 @@ function update(){
   for(let b of bricks){
     if(!b.alive)continue;
     if(ball.x+ball.r>b.x&&ball.x-ball.r<b.x+b.w&&ball.y+ball.r>b.y&&ball.y-ball.r<b.y+b.h){
-      ball.vy*=-1;b.hp--;
+      // bounce on the axis with the smaller overlap (side hit vs top/bottom hit) and break one brick per step
+      const overX=Math.min(ball.x+ball.r-b.x,b.x+b.w-(ball.x-ball.r)),overY=Math.min(ball.y+ball.r-b.y,b.y+b.h-(ball.y-ball.r));
+      if(overX<overY)ball.vx*=-1;else ball.vy*=-1;
+      b.hp--;
       if(b.hp<=0){b.alive=false;score+=10;Arcade.score(score);updateHud();addP(b.x+b.w/2,b.y+b.h/2,b.color,12)}
+      break;
     }
   }
-  if(bricks.every(b=>!b.alive)){level++;genBricks();resetBall(W/2);ball.y=LAUNCH_Y;updateHud()}
-  for(let i=particles.length-1;i>=0;i--){let p=particles[i];p.x+=p.vx;p.y+=p.vy;p.life--;if(p.life<=0)particles.splice(i,1)}
+  if(bricks.every(b=>!b.alive)){level++;genBricks();resetBall(paddle.x+paddle.w/2);updateHud()}
+  updateParticles();
 }
+function updateParticles(){for(let i=particles.length-1;i>=0;i--){let p=particles[i];p.x+=p.vx;p.y+=p.vy;p.life--;if(p.life<=0)particles.splice(i,1)}}
 
 function draw(){
   X.fillStyle=COLOR.bg;X.fillRect(0,0,W,H);
@@ -227,8 +240,12 @@ C.addEventListener('pointerup',endMove);
 C.addEventListener('pointercancel',endMove);
 C.addEventListener('lostpointercapture',endMove);
 const GAME_KEYS=new Set(['ArrowLeft','ArrowRight',' ']);
-document.addEventListener('keydown',e=>{keys[e.key]=true;if(GAME_KEYS.has(e.key))e.preventDefault()});
-document.addEventListener('keyup',e=>{keys[e.key]=false});
+const keyName=e=>e.key.length===1?e.key.toLowerCase():e.key;   // Caps Lock must not break A and D
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'||e.key==='p'||e.key==='P'){pauseGame();return}
+  keys[keyName(e)]=true;if(GAME_KEYS.has(e.key))e.preventDefault()});
+document.addEventListener('keyup',e=>{keys[keyName(e)]=false});
+window.addEventListener('blur',()=>{keys={}});
 Arcade.onRestart(startGame);
 resetWorld();
 fitCanvas();
