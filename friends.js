@@ -64,8 +64,11 @@ const classTag = (name) => {
 
 // The "invite to game" chooser: the games the old per-game invite (invite_game) knows, plus every game that has the shared lobby.
 // Names, pages and join links come from the registry (mp-games.js) — adding a game there is all it takes.
-const LEGACY_INVITE_IDS = ["connect4", "slf", "battleship", "color", "draw", "reversi", "dots", "tictactoe", "checkers", "maumau", "dice-duel"];
-const GAMES = Object.freeze(Object.fromEntries(Object.values(MP_GAMES).filter((g) => g.lobby || LEGACY_INVITE_IDS.includes(g.id)).map((g) => [g.id, g.name])));
+const LEGACY_INVITE_IDS = ["connect4", "slf", "battleship", "color", "draw", "dots", "checkers", "dice-duel"];
+// Out of the arcade since 25 Nov 2026 (nobody played them). Their pages, rooms and open invites still work, so they stay in mp-games.js;
+// they are only no longer offered here.
+const RETIRED_IDS = new Set(["tictactoe", "reversi", "maumau"]);
+const GAMES = Object.freeze(Object.fromEntries(Object.values(MP_GAMES).filter((g) => (g.lobby || LEGACY_INVITE_IDS.includes(g.id)) && !RETIRED_IDS.has(g.id)).map((g) => [g.id, g.name])));
 
 async function refresh() {
   const results = await Promise.all([
@@ -117,7 +120,7 @@ function renderActivity(list) {
   if (!list.length) { $("activity").innerHTML = `<div class="empty">${T("friends.noActivity")}</div>`; return; }
   $("activity").innerHTML = list.map((a) => {
     const who = a.is_me ? T("friends.you") : esc(a.username);
-    const game = esc(GAMES[a.game] || a.game);
+    const game = esc(gameName(a.game));
     const verb = VERB[a.result] ? T(VERB[a.result]) : esc(a.result);
     return `<div class="act-row"><span class="act-emoji" aria-hidden="true">${a.result === "win" ? "G" : a.result === "loss" ? "V" : "="}</span>` +
       `<span class="act-text"><b>${who}</b>${a.is_me ? "" : classTag(a.username)} ${verb} <b>${game}</b></span>` +

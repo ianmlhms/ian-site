@@ -1,7 +1,7 @@
 /* Flow — the dated Arcade feature (arcade-feature.js: Ski Alpen from Mon 23 Nov 2026 06:00 to Mon 7 Dec 2026 06:00,
  * Luxembourg). The clock is faked (Playwright clock.setFixedTime) before, inside and after the window:
- *   homepage   outside: today's arcade block (game of the week big, Schueberfouer · MTB · Kart · Tram small), no banner
- *              inside:  "Nei" banner, Ski Alpen big, the game of the week first of the 4 small tiles, Tram dropped
+ *   homepage   outside: the game of the week big, Wuertspill next to it, no banner, no "Nei" tag in the game wall
+ *              inside:  "Nei" banner, Ski Alpen big, the game of the week next to it, a "Nei" tag on Ski Alpen's tile in the wall
  *   hub        the "Nei: Ski Alpen" banner (keyboard: Enter opens the game) and a "Nei" tag on the Ski card
  * plus the ?featured=ski / ?featured=off preview, a page left open across 06:00, no horizontal scroll at iPad
  * landscape / portrait / phone, and no console errors.
@@ -18,8 +18,6 @@ const INSIDE = "2026-11-30T12:00:00Z";
 const LAST_SECOND = "2026-12-07T04:59:59Z";          // Mon 7 Dec, 05:59:59
 const AFTER = "2026-12-07T05:00:00Z";                // Mon 7 Dec, 06:00
 const ENDS_AT = "2026-11-30T00:00:00+01:00";
-const NORMAL_TILES = ["park", "mtb", "kart-letzebuerg", "tram-sim"];
-const FEATURED_TILES = ["tetris", "park", "mtb", "kart-letzebuerg"];
 const SIZES = [
   { name: "ipad-landscape", width: 1180, height: 820 },
   { name: "ipad-portrait", width: 820, height: 1180 },
@@ -27,8 +25,8 @@ const SIZES = [
 ];
 
 const visible = (page, selector) => page.$eval(selector, (el) => !!el.offsetParent || getComputedStyle(el).position === "fixed").catch(() => false);
-const tileGames = (page) => page.$$eval(".gt-tiles a", (links) => links.filter((a) => a.offsetParent)
-  .map((a) => new URL(a.href).searchParams.get("g")));
+const taggedTiles = (page) => page.$$eval("#gtWall .gw-tag", (tags) => tags.filter((tag) => tag.offsetParent)
+  .map((tag) => `${tag.closest("a").dataset.game}: ${tag.textContent}`));
 
 async function at(h, iso, url) {
   await h.page.clock.setFixedTime(new Date(iso));
@@ -46,7 +44,9 @@ async function expectHome(h, featured, label) {
   h.eq(await visible(page, "#gtNew"), featured, `${label}: "Nei" banner ${featured ? "shown" : "hidden"}`);
   h.eq(await visible(page, "#gtFeat"), featured, `${label}: Ski Alpen big tile ${featured ? "shown" : "hidden"}`);
   h.eq(await visible(page, "#gtWeek"), !featured, `${label}: game of the week big tile ${featured ? "hidden" : "shown"}`);
-  h.eq(await tileGames(page), featured ? FEATURED_TILES : NORMAL_TILES, `${label}: the four small tiles`);
+  h.eq(await visible(page, "#gtWeekTile"), featured, `${label}: the game of the week ${featured ? "stands next to it" : "is not a second time there"}`);
+  h.eq(await visible(page, "#gtWordTile"), !featured, `${label}: Wuertspill ${featured ? "makes room" : "stands next to the game of the week"}`);
+  h.eq(await taggedTiles(page), featured ? ["ski: Nei"] : [], `${label}: "Nei" tags in the game wall`);
 }
 
 async function noOverflow(h, label) {
@@ -75,7 +75,7 @@ async function shots(h, label, url, iso) {
       const name = `${label}-${scheme}-${size.name}`;
       await h.page.screenshot({ path: path.join(dir, `${name}-top.png`) });
       if (url.startsWith("/index.html")) {
-        await h.page.evaluate(() => document.querySelector(".gt-lbl a[href='pixelbreak.html']").scrollIntoView({ block: "start" }));
+        await h.page.evaluate(() => document.querySelector("#arcade").scrollIntoView({ block: "start" }));
         await h.pause(300);
         await h.page.screenshot({ path: path.join(dir, `${name}-arcade.png`) });
       }
@@ -116,9 +116,9 @@ export const flow = {
     h.eq(await page.textContent("#gtFeat h3"), "Ski Alpen", "big tile is Ski Alpen");
     h.eq(await page.getAttribute("#gtFeatPlay", "href"), "pixelbreak.html?g=ski", "big tile's Spillen opens Ski Alpen");
     h.expect(/zermatt-(640|1200)\.webp$/.test(await page.$eval("#gtFeat img", (img) => img.currentSrc || img.src)), "big tile shows the Zermatt picture");
-    h.eq(await page.textContent("#gtWeekTileKick"), "🏆 Spill vun der Woch", "first small tile keeps the game-of-the-week label");
-    h.eq(await page.textContent("#gtWeekTileName"), "Tetris", "first small tile is the game of the week");
-    h.eq(await page.getAttribute("#gtWeekTile", "href"), "pixelbreak.html?g=tetris", "first small tile opens the game of the week");
+    h.eq(await page.textContent("#gtWeekTileKick"), "Spill vun der Woch", "the tile next to it keeps the game-of-the-week label");
+    h.eq(await page.textContent("#gtWeekTileName"), "Tetris", "the tile next to it is the game of the week");
+    h.eq(await page.getAttribute("#gtWeekTile", "href"), "pixelbreak.html?g=tetris", "it opens the game of the week");
     await noOverflow(h, "home 06:00");
 
     h.step("keyboard: the banner and the big tile's Spillen are reachable with Tab");

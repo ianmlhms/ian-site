@@ -13,3 +13,7 @@ ops.html  # private owner-only Mac-mini control room; noindex, reached directly 
 haus/index.html  # private allow-listed Haus-Planer; gated, noindex, reached from the hub tile
 pro/  # private noindex client previews reached only by URL
 karttracker-ios-privacy.html  # privacy policy the KartTracker iOS App Store listing links to; reached from outside the site
+# out of the arcade since 25 Nov 2026 (no opens in 30 days); old links, running rooms and scores keep working
+tictactoe.html
+reversi.html
+maumau.html

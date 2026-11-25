@@ -108,7 +108,7 @@ def check_links(pages: list, problems: list) -> dict:
 
 
 def js_referenced(pages: list) -> set:
-    """Pages named inside JS strings, e.g. PixelBreak's GAMES/ONLINE arrays.
+    """Pages named inside JS strings, e.g. the arcade's GAMES (arcade-catalogue.js).
 
     These are real entry points even though no static href points at them, so
     they must not be reported as orphans.
@@ -121,6 +121,34 @@ def js_referenced(pages: list) -> set:
             if path and os.path.exists(os.path.join(REPO, path)):
                 found.add(path)
     return found
+
+
+ARCADE_CATALOGUE = "arcade-catalogue.js"
+
+
+def check_arcade_catalogue(problems: list) -> None:
+    """Every game of arcade-catalogue.js needs a group, texts, both pictures and its page (home page wall + arcade hub)."""
+    source = read(ARCADE_CATALOGUE)
+    groups = set(re.findall(r'\{id:"(\w+)",label:"games\.g\.', source))
+    games_part = source[source.index("var GAMES=["):source.index("var DESC_I18N=")]
+    texts = source[source.index("var DESC_I18N="):source.index("/* <usage>")]
+    for line in games_part.split("\n"):
+        game = re.match(r'\{id:"([^"]+)"', line)
+        if not game:
+            continue
+        game_id = game.group(1)
+        say = lambda msg, game_id=game_id: problems.append(("error", "arcade", f"{ARCADE_CATALOGUE}: {game_id}: {msg}"))
+        group = re.search(r'[,{]group:"([^"]+)"', line)
+        if not group or group.group(1) not in groups:
+            say("no valid group")
+        if f'"{game_id}":{{' not in texts:
+            say("no lb/de description in DESC_I18N")
+        for picture in (f"pb/thumbs/{game_id}.webp", f"pb/thumbs/s/{game_id}.webp"):
+            if not os.path.exists(os.path.join(REPO, picture)):
+                say(f"{picture} is missing (small ones: python3 scripts/make_small_thumbs.py)")
+        page = re.search(r'[,{](?:src|href|go):"([^"]+)"', line)
+        if not page or not os.path.exists(os.path.join(REPO, page.group(1))):
+            say("its page does not exist")
 
 
 def check_i18n(pages: list, problems: list) -> None:
@@ -516,6 +544,7 @@ def main() -> None:
 
     inbound = check_links(pages, problems)
     check_i18n(pages, problems)
+    check_arcade_catalogue(problems)
     check_jsonld(pages, problems)
     check_hreflang(problems)
     check_trail_sitemaps(problems)
@@ -526,7 +555,7 @@ def main() -> None:
     check_invisible_chars(problems)
     listed = check_sitemap(problems)
     check_meta(pages, problems)
-    check_orphans(pages, inbound, listed, js_referenced(pages), problems)
+    check_orphans(pages, inbound, listed, js_referenced(pages + [ARCADE_CATALOGUE]), problems)
 
     errors = [p for p in problems if p[0] == "error"]
     warns = [p for p in problems if p[0] == "warn"]
