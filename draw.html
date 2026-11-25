@@ -34,7 +34,7 @@
   .sw.on{border-color:var(--accent2-text)}
   .tools .sz{width:30px;height:30px;border-radius:0;border:1px solid var(--border);background:var(--card);color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center}
   .tools .sz.on{border-color:var(--accent2-text)}
-  .tools .clr{margin-left:auto;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:0;padding:6px 12px;cursor:pointer;font-weight:700}
+  .tools .clr{margin-left:auto;min-height:44px;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:0;padding:6px 14px;cursor:pointer;font-weight:700}
   .big{width:100%;background:var(--accent);color:var(--accent-foreground);border:none;border-radius:0;padding:13px;font-weight:800;font-size:15px;cursor:pointer;margin-top:6px}
   .big:disabled{opacity:.45;cursor:default}
   .choices{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:6px 0}
@@ -44,9 +44,9 @@
   .log .sys{color:var(--good);font-weight:700}
   .log .g b{color:var(--accent2-text)}
   .guessrow{display:flex;gap:8px}
-  .guessrow input{flex:1;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:0;padding:11px 15px;font-size:14px;outline:none}
+  .guessrow input{flex:1;min-height:44px;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:0;padding:11px 15px;font-size:16px;outline:none}
   .guessrow input:focus{border-color:var(--accent2-text)}
-  .guessrow button{background:var(--accent);color:var(--accent-foreground);border:none;border-radius:0;padding:0 18px;font-weight:800;cursor:pointer}
+  .guessrow button{background:var(--accent);color:var(--accent-foreground);border:none;border-radius:0;padding:0 18px;min-height:44px;font-weight:800;cursor:pointer}
   .tools{gap:8px}
   .sw{position:relative;width:28px;height:28px;min-height:0;padding:0;-webkit-appearance:none;appearance:none}
   .sw::before{content:"";position:absolute;inset:-8px}
@@ -191,10 +191,10 @@ function setupCanvas(){
   ctx.lineCap="round"; ctx.lineJoin="round"; ctx.fillStyle="#fff"; ctx.fillRect(0,0,600,600);
   if(phase!=="drawing" || !isDrawer()) return;
   const pos=(e)=>{ const r=cv.getBoundingClientRect(); const t=e.touches?e.touches[0]:e; return {x:(t.clientX-r.left)/r.width, y:(t.clientY-r.top)/r.height}; };
-  const down=(e)=>{ e.preventDefault(); drawing=true; last=pos(e); };
+  const down=(e)=>{ e.preventDefault(); drawing=true; last=pos(e); try{ cv.setPointerCapture(e.pointerId); }catch{} seg(last.x,last.y,last.x,last.y,curColor,curSize); sendBuf.push([last.x,last.y,last.x,last.y]); };   // a tap leaves a dot
   const move=(e)=>{ if(!drawing) return; e.preventDefault(); const p=pos(e); seg(last.x,last.y,p.x,p.y,curColor,curSize); sendBuf.push([last.x,last.y,p.x,p.y]); last=p; };
   const up=()=>{ drawing=false; last=null; flush(); };
-  cv.onpointerdown=down; cv.onpointermove=move; cv.onpointerup=up; cv.onpointerleave=up;
+  cv.onpointerdown=down; cv.onpointermove=move; cv.onpointerup=up; cv.onpointerleave=up; cv.onpointercancel=up;
 }
 function seg(x0,y0,x1,y1,color,size){ if(!ctx) return; ctx.strokeStyle=color; ctx.lineWidth=size; ctx.beginPath(); ctx.moveTo(x0*600,y0*600); ctx.lineTo(x1*600,y1*600); ctx.stroke(); }
 function flush(){ if(sendBuf.length){ ch.send({type:"broadcast",event:"seg",payload:{a:sendBuf,c:curColor,w:curSize}}); sendBuf=[]; } }

@@ -34,7 +34,7 @@
   .peekbar i{display:block;height:100%;width:100%;background:var(--accent);animation:peekshrink 3s linear forwards}
   @keyframes peekshrink{from{width:100%}to{width:0}}
   .modes{display:flex;gap:8px;justify-content:center;margin:0 0 14px}
-  .modebtn{flex:1;padding:10px 8px;border-radius:0;border:1px solid var(--border);background:var(--card2);color:var(--muted);font-weight:700;cursor:pointer;font-size:13px}
+  .modebtn{flex:1;min-height:44px;padding:10px 8px;border-radius:0;border:1px solid var(--border);background:var(--card2);color:var(--muted);font-weight:700;cursor:pointer;font-size:13px}
   .modebtn.on{border-color:var(--accent-border);color:var(--text)}
   .lbl{color:var(--muted);font-size:13px;text-transform:uppercase;letter-spacing:.6px;margin:18px 0 8px;text-align:center}
   .two{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:center;margin:8px 0 6px}
@@ -55,7 +55,7 @@
   .rounds{display:flex;align-items:center;gap:10px;justify-content:center;margin:14px 0}
   .srt{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
   @media (prefers-reduced-motion:reduce){.peekbar i{animation:none;width:100%}}
-  .rounds input{width:70px;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:0;padding:9px;font-size:15px;text-align:center}
+  .rounds input{width:70px;min-height:44px;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:0;padding:9px;font-size:16px;text-align:center}
 </style>
 <script data-goatcounter="https://ianm.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
@@ -146,7 +146,8 @@ function isMessage(event,p){
     case "round": return isRounds(p)&&isRgb(p.target)&&isMode(p.mode);
     case "guess": return isPlayer(p)&&isRgb(p.rgb);
     case "reveal": return isRounds(p)&&isRgb(p.target)&&isList(p.results,MAX_PLAYERS,isResult)&&new Set(p.results.map(r=>r.cid)).size===p.results.length&&(p.winner===null||isId(p.winner)&&p.results.some(r=>r.cid===p.winner))&&isMap(p.wins,x=>isInt(x,0,MAX_ROUNDS))&&isMap(p.distTot,x=>isNumber(x,0,MAX_ROUNDS*MAXD))&&typeof p.isFinal==="boolean";
-    case "reset": return Object.keys(p).length===0;
+    case "reset": case "need": return Object.keys(p).length===0;
+    case "sync": return isRounds(p)&&isRgb(p.target)&&isMode(p.mode);
     default: return false;
   }
 }
@@ -159,7 +160,7 @@ if(window.MPGate&&MPGate.ctx&&MPGate.ctx.cfg){
   if(c.mode==="visible"||c.mode==="flash") mode=c.mode;
 }
 let guess={r:128,g:128,b:128}, locked=false, guesses={}, results=null, winner=null, isFinal=false;
-let wins={}, distTot={}, peeking=false, peekTimer=null, recorded=false, hostHere=true;
+let wins={}, distTot={}, peeking=false, peekTimer=null, recorded=false, hostHere=true, lastReveal=null;
 // Colour Dial does not load game-common.js (only its stylesheet), so this stays
 // a local copy — kept identical to the shared helper in game-common.js.
 async function recordResult(game,result){
@@ -288,7 +289,7 @@ function beginPlay(){
   render();
 }
 function startRound(){
-  round++; target=randTarget(); guesses={}; locked=false; guess={r:128,g:128,b:128}; results=null; winner=null; isFinal=false;
+  round++; lastReveal=null; target=randTarget(); guesses={}; locked=false; guess={r:128,g:128,b:128}; results=null; winner=null; isFinal=false;
   if(!AI) ch.send({type:"broadcast",event:"round",payload:{round,target,rounds,mode}});
   beginPlay();
 }
@@ -311,6 +312,7 @@ function reveal(){
   if(win) wins[win]=(wins[win]||0)+1;
   const fin = round>=rounds;
   const payload={round,target,results:res,winner:win,wins,distTot,isFinal:fin,rounds};
+  lastReveal=payload;
   if(!AI) ch.send({type:"broadcast",event:"reveal",payload});
   applyReveal(payload);
 }
@@ -326,10 +328,10 @@ function applyReveal(p){
     recordResult("color", sorted[0] && sorted[0].cid===cid ? "win" : "loss");
   }
 }
-function resetAll(){ clearTimeout(peekTimer); peeking=false; recorded=false; phase="lobby"; round=0; wins={}; distTot={}; guesses={}; results=null; winner=null; isFinal=false; locked=false; }
+function resetAll(){ lastReveal=null; clearTimeout(peekTimer); peeking=false; recorded=false; phase="lobby"; round=0; wins={}; distTot={}; guesses={}; results=null; winner=null; isFinal=false; locked=false; }
 
 if(AI){
-  document.querySelector(".bar h1").textContent="Faarf roden – géint de Computer";
+  document.querySelector(".bar h1").textContent="Faarf roden · Computer";
   name = localStorage.getItem("playerName") || window.__pbAuth?.session?.user?.user_metadata?.username || "Du";
   mountDiff(); phase="lobby"; render();
 } else {
@@ -337,6 +339,17 @@ if(AI){
     .on("broadcast",{event:"round"},onMessage("round",payload=>{ round=payload.round; target=payload.target; rounds=payload.rounds; mode=payload.mode||mode; guesses={}; locked=false; guess={r:128,g:128,b:128}; results=null; winner=null; isFinal=false; beginPlay(); }))
     .on("broadcast",{event:"guess"},onMessage("guess",payload=>{ guesses={...guesses,[payload.cid]:{name:payload.name,rgb:{...payload.rgb}}}; if(phase==="play") render(); if(role==="host") maybeReveal(); }))
     .on("broadcast",{event:"reveal"},onMessage("reveal",payload=>applyReveal(payload)))
+    // a player who reloaded (or joined late) asks for the running round; the host answers with it. A blind rejoin in flash mode: no second look at the colour.
+    .on("broadcast",{event:"need"},onMessage("need",()=>{
+      if(role!=="host") return;
+      if(phase==="play") ch.send({type:"broadcast",event:"sync",payload:{round,rounds,target,mode}});
+      else if(phase==="results"&&lastReveal) ch.send({type:"broadcast",event:"reveal",payload:lastReveal});
+    }))
+    .on("broadcast",{event:"sync"},onMessage("sync",payload=>{
+      if(role==="host"||phase!=="lobby"||round!==0) return;
+      round=payload.round; target=payload.target; rounds=payload.rounds; mode=payload.mode; guesses={}; locked=false; guess={r:128,g:128,b:128};
+      phase="play"; peeking=false; render();
+    }))
     .on("broadcast",{event:"reset"},onMessage("reset",payload=>{ resetAll(); render(); }))
     .on("presence",{event:"sync"},()=>{
       const st=ch.presenceState();
@@ -360,6 +373,7 @@ if(AI){
   }
   if(!(window.MPGate&&window.MPGate.redirecting)){   // mp-gate.js sends a bare visit to the lobby (lobby.html)
     ch.subscribe(async (s)=>{ if(s==="SUBSCRIBED"){ name=await getName(); await ch.track({name,role}); render();
+      if(role!=="host") ch.send({type:"broadcast",event:"need",payload:{}});
       if(autoStartPending) autoStartTimer=setTimeout(fireAutoStart,AUTO_START_WAIT_MS); }});
   }
 }

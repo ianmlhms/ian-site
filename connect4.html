@@ -24,7 +24,7 @@
   .col{display:contents}
   .board.mine .cell{cursor:pointer}
   .colbtns{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;width:100%;max-width:498px;padding:0 12px}
-  .colbtns button{height:26px;border:none;border-radius:0;background:var(--card2);color:var(--muted);cursor:pointer;font-size:14px}
+  .colbtns button{height:44px;border:none;border-radius:0;background:var(--card2);color:var(--muted);cursor:pointer;font-size:14px;touch-action:manipulation}
   .colbtns button:hover:not([aria-disabled="true"]){background:var(--accent);color:var(--accent-foreground)}
   .colbtns button[aria-disabled="true"]{opacity:.3;cursor:default}
   .sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
@@ -35,6 +35,9 @@
   .cell{background:var(--soft);box-shadow:none}
   .cell.r{background:var(--red)}.cell.y{background:var(--yellow)}
   .colbtns button{border:1px solid var(--ink);background:transparent;color:var(--ink)}
+  .cell{position:relative}
+  .cell.last::after{content:"";position:absolute;left:50%;top:50%;width:26%;height:26%;margin:-13% 0 0 -13%;border-radius:50%;background:var(--paper,#f6f6f3)}
+  .cell.win{box-shadow:0 0 0 3px var(--paper,#f6f6f3),0 0 0 5px var(--ink)}
 </style>
 <script data-goatcounter="https://ianm.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
@@ -72,7 +75,7 @@ const GC = window.GameCommon;
 const { AI, room, role } = GC;
 const me = role === "host" ? 1 : 2;          // 1 = red (host, first), 2 = yellow
 const opp = me === 1 ? 2 : 1;
-let board = [], turn = 1, over = false, oppHere = false, recorded = false;
+let board = [], turn = 1, over = false, oppHere = false, recorded = false, starter = 1, lastMove = null;
 const recordResult = GC.recordResult;
 
 /* ---------- difficulty (AI mode) ---------- */
@@ -83,13 +86,29 @@ const blunder = () => Math.random() < BLUNDER[difficulty];
 const $ = (id) => document.getElementById(id);
 let ch = null;   // realtime channel (multiplayer only)
 
-function fresh() { board = Array.from({ length: ROWS }, () => Array(COLS).fill(0)); turn = 1; over = false; recorded = false; }
+function fresh() { board = Array.from({ length: ROWS }, () => Array(COLS).fill(0)); turn = starter; over = false; recorded = false; lastMove = null; }
+/* the four discs that won (found from the board alone, so a reloaded or resynced player sees them too) */
+function winLine(p) {
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    if (board[r][c] !== p) continue;
+    for (const [dr, dc] of [[0, 1], [1, 0], [1, 1], [1, -1]]) {
+      const cells = [[r, c]];
+      for (let k = 1; k < 4; k++) { const rr = r + dr * k, cc = c + dc * k; if (rr < 0 || rr >= ROWS || cc < 0 || cc >= COLS || board[rr][cc] !== p) break; cells.push([rr, cc]); }
+      if (cells.length === 4) return cells;
+    }
+  }
+  return [];
+}
+/* a rematch hands the first move to the other colour */
+function nextStarter() { starter = starter === 1 ? 2 : 1; }
 function render() {
   const b = $("board"); b.className = "board" + (turn === me && !over && oppHere ? " mine" : "");
   b.innerHTML = "";
+  const winCells = new Set(typeof over === "number" ? winLine(over).map(([r, c]) => r * COLS + c) : []);
   for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
     const d = document.createElement("div");
-    d.className = "cell" + (board[r][c] === 1 ? " r" : board[r][c] === 2 ? " y" : "");
+    d.className = "cell" + (board[r][c] === 1 ? " r" : board[r][c] === 2 ? " y" : "") + (winCells.has(r * COLS + c) ? " win" : "") + (lastMove && lastMove.r === r && lastMove.c === c && !over ? " last" : "");
+    d.dataset.c = c;
     b.appendChild(d);
   }
   let n1 = 0, n2 = 0;
@@ -111,6 +130,7 @@ function render() {
   }
   updateStatus();
 }
+$("board").addEventListener("click", (e) => { const cell = e.target.closest(".cell"); if (cell) play(+cell.dataset.c, me, true); });
 function updateStatus() {
   const mineColor = me === 1 ? "var(--red)" : "var(--yellow)";
   const dot = `<span class="me" style="background:${mineColor}" aria-hidden="true"></span>`;
@@ -133,6 +153,7 @@ function play(col, player, local) {
   if (local && (turn !== me || !oppHere)) return;
   const r = drop(col, player);
   if (r < 0) return;
+  lastMove = { r, c: col };
   if (wins(r, col, player)) over = player;
   else if (board[0].every(v => v !== 0)) over = "draw";
   else turn = player === 1 ? 2 : 1;
@@ -155,24 +176,24 @@ function wins(r, c, p) {
 }
 
 if (AI) {
-  document.querySelector(".bar h1").textContent = "Véier gewënnt – géint de Computer";
+  document.querySelector(".bar h1").textContent = "Véier gewënnt · Computer";
   GC.mountDifficulty(() => difficulty, (d) => { difficulty = d; });
   oppHere = true; fresh(); render();
 } else if (!(window.MPGate && window.MPGate.redirecting)) {   // mp-gate.js sends a bare visit to the lobby (lobby.html)
   ch = GC.createChannel("c4");
   ch.on("broadcast", { event: "move" }, ({ payload }) => play(payload.col, payload.player, false))
-    .on("broadcast", { event: "reset" }, () => { fresh(); $("rematch").style.display = "none"; if (window.MPGate) MPGate.setOver(false); render(); });
+    .on("broadcast", { event: "reset" }, () => { nextStarter(); fresh(); $("rematch").style.display = "none"; if (window.MPGate) MPGate.setOver(false); render(); });
   fresh(); render();
   GC.joinRoom(ch, {
-    getState: () => ({ board, turn, over }),
-    setState: (p) => { board = p.board; turn = p.turn; over = p.over; render(); if (over) { $("rematch").style.display = ""; if (window.MPGate) MPGate.setOver(true); } },
-    isStarted: () => over !== false || board.some((row) => row.some((v) => v)),
+    getState: () => ({ board, turn, over, starter }),
+    setState: (p) => { board = p.board; turn = p.turn; over = p.over; if (p.starter === 1 || p.starter === 2) starter = p.starter; render(); if (over) { $("rematch").style.display = ""; if (window.MPGate) MPGate.setOver(true); } },
+    isStarted: () => over !== false || starter !== 1 || board.some((row) => row.some((v) => v)),
     onPeers: (here) => { oppHere = here; render(); },
     onSeatTaken: () => { over = true; render(); setStatus("Plaz scho besat", `Dësen Raum huet schonn e(n) ${role} — trëtt mat der anerer Roll bäi oder maach en neie Raum op.`); },
   });
 }
 
-$("rematch").onclick = () => { fresh(); $("rematch").style.display = "none"; if (window.MPGate) MPGate.setOver(false); render(); if (!AI) ch.send({ type: "broadcast", event: "reset" }); };
+$("rematch").onclick = () => { nextStarter(); fresh(); $("rematch").style.display = "none"; if (window.MPGate) MPGate.setOver(false); render(); if (!AI) ch.send({ type: "broadcast", event: "reset" }); else if (turn === opp) setTimeout(aiMove, 450); };
 
 /* ---------- AI (minimax + alpha-beta), computer plays `opp` (=2) ---------- */
 function aiMove() {

@@ -19,7 +19,7 @@
   body{display:flex;flex-direction:column}
   .wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:16px}
   .board{display:grid;grid-template-columns:repeat(8,1fr);border:3px solid var(--border);border-radius:0;overflow:hidden;touch-action:manipulation}
-  .sq{width:min(11vw,52px);height:min(11vw,52px);display:flex;align-items:center;justify-content:center;background:var(--light)}
+  .sq{width:min(11.5vw,56px);height:min(11.5vw,56px);display:flex;align-items:center;justify-content:center;background:var(--light)}
   .sq.d{background:var(--dark)}
   .sq.sel{outline:3px solid var(--accent);outline-offset:-3px}
   .sq.tgt{cursor:pointer}
@@ -27,9 +27,11 @@
   .pc{width:78%;height:78%;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:min(5vw,24px);box-shadow:none}
   .pc.p1{background:var(--red)}
   .pc.p2{background:var(--cyan);border:2px solid #16171a;color:#16171a}
-  .pc.mine{cursor:pointer}
+  .pc.mine{cursor:pointer;position:relative}
+  .pc.mine::before{content:"";position:absolute;inset:-14%}   /* the tap area is the whole square, not just the disc */
   .sq[role=button],.pc[role=button]{min-height:0;min-width:0}
   .me{display:inline-block;width:14px;height:14px;border-radius:50%;vertical-align:-2px;margin:0 4px}
+  @media(max-width:480px){.wrap{padding:16px 10px}}
 </style>
 <script data-goatcounter="https://ianm.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
@@ -69,10 +71,11 @@ const { AI, room, role } = GC;
 const me = role === "host" ? 1 : 2;
 const opp = 3 - me;
 let board = [], turn = 1, over = false, lock = null, sel = null;
-let oppHere = false, recorded = false, moveCount = 0;
+let oppHere = false, recorded = false, moveCount = 0, quiet = 0;   // quiet = moves in a row with only kings moving and no capture
 const recordResult = GC.recordResult;
 
 let difficulty = GC.difficultyFromUrl();
+const QUIET_LIMIT = 40;
 const BLUNDER = { easy: 0.45, normal: 0.15, hard: 0 };
 const blunder = () => Math.random() < BLUNDER[difficulty];
 
@@ -88,7 +91,7 @@ function fresh() {
   board = Array.from({ length: 8 }, () => Array(8).fill(0));
   for (let r = 0; r < 3; r++) for (let c = 0; c < 8; c++) if ((r + c) % 2 === 1) board[r][c] = 2;
   for (let r = 5; r < 8; r++) for (let c = 0; c < 8; c++) if ((r + c) % 2 === 1) board[r][c] = 1;
-  turn = 1; over = false; lock = null; sel = null; recorded = false; moveCount = 0;
+  turn = 1; over = false; lock = null; sel = null; recorded = false; moveCount = 0; quiet = 0;
 }
 function pieceMoves(b, r, c) {
   const v = b[r][c], p = owner(v), out = { steps: [], jumps: [] };
@@ -128,19 +131,22 @@ function play(m, local) {
   if (over) return;
   if (local && (turn !== me || !oppHere)) return;
   const p = turn;
+  const wasKing = isKing(board[m.fr][m.fc]);
   const crowned = applyMove(board, m);
   moveCount++;
+  quiet = (wasKing && m.cr == null) ? quiet + 1 : 0;
   if (m.cr != null && !crowned && pieceMoves(board, m.tr, m.tc).jumps.length) {
     lock = { r: m.tr, c: m.tc };                 // chain continues, same player
     sel = turn === me ? { r: m.tr, c: m.tc } : null;
   } else {
     lock = null; sel = null; turn = 3 - p;
     if (!legalMoves(board, turn, null).length) over = p;
+    else if (quiet >= QUIET_LIMIT) over = "draw";     // 40 king moves in a row without a capture: nobody can make progress
   }
   render();
   if (over) {
     $("rematch").style.display = "";
-    if (!AI && !recorded) { recorded = true; recordResult("checkers", over === me ? "win" : "loss"); }
+    if (!AI && !recorded) { recorded = true; recordResult("checkers", over === "draw" ? "draw" : over === me ? "win" : "loss"); }
   }
   if (local && !AI) ch.send({ type: "broadcast", event: "move", payload: m });
   if (AI && !over && turn === opp) setTimeout(aiMove, 420);
@@ -187,6 +193,7 @@ function render() {
 }
 function updateStatus(legal) {
   const dot = `<span class="me" style="background:${me === 1 ? "var(--red)" : "var(--cyan)"}"></span>`;
+  if (over === "draw") return setStatus("Onentschidden.", "40 Zich hannereneen nëmme mat Kinneken, ouni ze schloen.");
   if (over) return setStatus(over === me ? "Du hues gewonn!" : "Du hues verluer.");
   if (!oppHere) return setStatus("Waart op de Géigner …", `Deel de Raumcode <code>${room}</code> oder invitéier iwwer Frënn.`);
   if (turn !== me) return setStatus(AI ? "De Computer denkt …" : "De Géigner ass drun");
@@ -197,7 +204,7 @@ function setStatus(h, sub = "") { $("status").innerHTML = h; $("sub").innerHTML 
 
 /* ---------- wiring ---------- */
 if (AI) {
-  document.querySelector(".bar h1").textContent = "Dammspill – géint de Computer";
+  document.querySelector(".bar h1").textContent = "Dammspill · Computer";
   GC.mountDifficulty(() => difficulty, (d) => { difficulty = d; });
   oppHere = true; fresh(); render();
 } else if (!(window.MPGate && window.MPGate.redirecting)) {   // mp-gate.js sends a bare visit to the lobby (lobby.html)
@@ -206,8 +213,8 @@ if (AI) {
     .on("broadcast", { event: "reset" }, () => { fresh(); $("rematch").style.display = "none"; render(); });
   fresh(); render();
   GC.joinRoom(ch, {
-    getState: () => ({ board, turn, over, lock, moveCount }),
-    setState: (p) => { board = p.board; turn = p.turn; over = p.over; lock = p.lock; moveCount = p.moveCount || 0; sel = null; render(); if (over) $("rematch").style.display = ""; },
+    getState: () => ({ board, turn, over, lock, moveCount, quiet }),
+    setState: (p) => { board = p.board; turn = p.turn; over = p.over; lock = p.lock; moveCount = p.moveCount || 0; quiet = Number.isInteger(p.quiet) ? p.quiet : 0; sel = null; render(); if (over) $("rematch").style.display = ""; },
     isStarted: () => moveCount > 0 || over !== false,
     onPeers: (here) => { oppHere = here; render(); },
     onSeatTaken: () => { over = true; render(); setStatus("Plaz scho besat", `Dësen Raum huet schonn e(n) ${role} — trëtt mat der anerer Roll bäi oder maach en neie Raum op.`); },

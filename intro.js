@@ -79,14 +79,19 @@
   /* Mobile browsers refuse to play until a real user gesture, so spend the
      first tap unlocking the element. Without this the first snippet is
      silently swallowed and the round looks broken. */
+  /* the arcade bar's «Toun aus» switch is stored here; the unlock trick below must not undo it */
+  function soundOff() {
+    try { return localStorage.getItem('pb_muted') === '1'; } catch (e) { return false; }
+  }
+
   function unlockAudio() {
     if (audioReady) return;
     audioReady = true;
     audio.muted = true;
     var p = audio.play();
-    if (p && p.then) p.then(function () { audio.pause(); audio.muted = false; })
-                      .catch(function () { audio.muted = false; });
-    else { audio.pause(); audio.muted = false; }
+    if (p && p.then) p.then(function () { audio.pause(); audio.muted = soundOff(); })
+                      .catch(function () { audio.muted = soundOff(); });
+    else { audio.pause(); audio.muted = soundOff(); }
   }
 
   function shouldPlayHere() {
@@ -99,6 +104,7 @@
     try {
       if (audio.src !== url) { audio.src = url; audio.load(); }
       audio.currentTime = 0;
+      audio.muted = soundOff();
       var p = audio.play();
       if (p && p.catch) p.catch(function () { /* blocked; the UI still works */ });
       stopTimer = setTimeout(function () { audio.pause(); }, secs * 1000);
@@ -106,6 +112,8 @@
   }
 
   function stopAudio() { clearTimeout(stopTimer); try { audio.pause(); } catch (e) {} }
+  /* a snippet must not keep playing in a hidden tab */
+  document.addEventListener('visibilitychange', function () { if (document.hidden) stopAudio(); });
 
   /* ---------- lobby ---------- */
 

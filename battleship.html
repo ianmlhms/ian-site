@@ -23,7 +23,7 @@
   .cell{aspect-ratio:1;border-radius:0;background:#fcfcfa;border:1px solid rgba(22,23,26,.14);display:flex;align-items:center;justify-content:center;font-size:16px}
   button.cell{border:0;padding:0;margin:0;font:inherit;font-size:16px;color:inherit;touch-action:manipulation}
   button.cell:focus-visible,.btn:focus-visible,.seg-b:focus-visible,.bar a:focus-visible{outline:3px solid var(--accent2);outline-offset:2px;position:relative;z-index:1}
-  .cell.ship{background:var(--ship)} .cell.hit{background:var(--hit)} .cell.miss{background:var(--miss);color:var(--muted)}
+  .cell.ship{background:var(--ship)} .cell.hit{background:var(--hit)} .cell.hit.sunk{background:#5c1010;box-shadow:inset 0 0 0 2px #fcfcfa} .cell.miss{background:var(--miss);color:var(--muted)}
   .grid.place .cell{cursor:pointer}
   .grid.fire .cell:not(.hit):not(.miss){cursor:pointer}
   .grid.fire .cell:not(.hit):not(.miss):hover{outline:2px solid var(--accent2)}
@@ -39,6 +39,9 @@
   .ship-pip.next{border-color:var(--accent-border);box-shadow:0 0 0 1px var(--accent)}
   .ship-pip.done{opacity:.35}
   .ship-pip i{width:11px;height:11px;border-radius:0;background:var(--ship);display:block}
+  .btn,.seg-b{min-height:44px}
+  /* phones: a bit less margin, so the 8 x 8 cells come close to 44 px */
+  @media(max-width:480px){.wrap{padding:14px 10px}.grid{padding:4px;gap:3px}}
 </style>
 <script data-goatcounter="https://ianm.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
@@ -101,7 +104,7 @@ let ch=null;   // realtime channel (multiplayer only)
 
 let own=empty(), enemy=empty(), placed=[], toPlace=[...SHIPS], orient="h";
 let myReady=false, oppReady=false, oppHere=false, turn="host", phase="setup", over=false;
-let aiBoard=null, aiHunt=[];   // AI mode: computer's hidden fleet + its hit-follow-up queue
+let aiBoard=null, aiHunt=[], aiShips=[], sunkEnemy=[], note="";   // AI mode: computer's hidden fleet + its hit-follow-up queue
 
 /* ---------- difficulty (AI mode) ---------- */
 let difficulty=GC.difficultyFromUrl();
@@ -115,13 +118,14 @@ const allPlaced=()=>toPlace.length===0;
  * lose them forever. Keep the whole local view in sessionStorage; the shared
  * facts (turn, over, opponent readiness) are re-synced from the peer on rejoin. */
 const storeKey="bs:"+room+":"+role;
-function persistLocal(){ if(AI) return; try{ sessionStorage.setItem(storeKey, JSON.stringify({own,enemy,placed,toPlace,orient,myReady,oppReady,phase,turn,over})); }catch{} }
+function persistLocal(){ if(AI) return; try{ sessionStorage.setItem(storeKey, JSON.stringify({own,enemy,placed,toPlace,orient,myReady,oppReady,phase,turn,over,sunkEnemy})); }catch{} }
 function restoreLocal(){
   if(AI) return false;
   try{
     const s=JSON.parse(sessionStorage.getItem(storeKey)||"null");
     if(!s) return false;
     ({own,enemy,placed,toPlace,orient,myReady,oppReady,phase,turn,over}=s);
+    sunkEnemy=Array.isArray(s.sunkEnemy)?s.sunkEnemy:[];
     return true;
   }catch{ return false; }
 }
@@ -133,6 +137,12 @@ function fits(r,c,len,o){
     if(rr<0||rr>=N||cc<0||cc>=N||own[rr][cc]!==0) return false; }
   return true;
 }
+/* the cells of the ship that has just been sunk (every cell hit), or null */
+function sunkShip(ships,board,r,c){
+  const ship=ships.find(sh=>sh.cells.some(([rr,cc])=>rr===r&&cc===c));
+  return ship&&ship.cells.every(([rr,cc])=>board[rr][cc]===2)?ship.cells:null;
+}
+const isCell=(r,c)=>Number.isInteger(r)&&Number.isInteger(c)&&r>=0&&r<N&&c>=0&&c<N;
 function tryPlace(r,c){
   if(!toPlace.length) return;
   const len=toPlace[0];
@@ -161,12 +171,12 @@ function clearAll(){ own=empty(); placed=[]; toPlace=[...SHIPS]; renderSetup(); 
 
 // ---------- rendering ----------
 const cellName=(r,c,v,reveal)=>String.fromCharCode(65+r)+(c+1)+": "+(v===2?"Treffer":v===3?"Dernieft":v===1&&reveal?"Schëff":"Waasser");
-function grid(el,board,reveal,onclick){
+function grid(el,board,reveal,onclick,sunk){
   const kids=Array.from(el.children), focusIdx=kids.indexOf(document.activeElement);
   el.innerHTML="";
   for(let r=0;r<N;r++)for(let c=0;c<N;c++){
     const d=document.createElement(onclick?"button":"div"); const v=board[r][c]; let cls="cell";
-    if(v===2)cls+=" hit"; else if(v===3)cls+=" miss"; else if(v===1&&reveal)cls+=" ship";
+    if(v===2)cls+=(sunk&&sunk.includes(r+","+c)?" hit sunk":" hit"); else if(v===3)cls+=" miss"; else if(v===1&&reveal)cls+=" ship";
     d.className=cls; d.textContent=v===2?"✶":v===3?"·":"";
     d.setAttribute("aria-label",cellName(r,c,v,reveal));
     if(onclick){ d.type="button"; d.onclick=()=>onclick(r,c); } else d.setAttribute("role","img");
@@ -199,10 +209,11 @@ function renderPlay(){
   persistLocal();
   $("setup").style.display="none"; $("play").style.display="flex";
   $("enemy").className="grid"+(turn===role&&!over?" fire":"");
-  grid($("enemy"),enemy,false,(r,c)=>fire(r,c));
+  grid($("enemy"),enemy,false,(r,c)=>fire(r,c),sunkEnemy);
   grid($("ownSmall"),own,true,null);
-  if(over) setStatus(over===role?"Du hues gewonn!":"Du hues verluer.","");
-  else setStatus(turn===role?"Du bass drun — schéiss!":(AI?"De Computer schéisst …":"De Géigner ass drun…"));
+  if(over) setStatus(over===role?"Du hues gewonn!":"Du hues verluer.",note);
+  else if(!AI&&!oppHere) setStatus("De Géigner ass fort …","Waart, bis e erëm do ass. D'Spill bleift stoen.");
+  else setStatus(turn===role?"Du bass drun — schéiss!":(AI?"De Computer schéisst …":"De Géigner ass drun…"),note);
   if(over && !AI && !recorded){ recorded=true; recordResult("battleship", over===role?"win":"loss"); }
   $("rematch").style.display=over?"":"none";
 }
@@ -210,12 +221,15 @@ function renderPlay(){
 // ---------- battle ----------
 function bothReady(){ if(myReady&&oppReady&&phase==="setup"){ phase="play"; turn="host"; enemy=empty(); renderPlay(); } }
 function fire(r,c){
-  if(over||turn!==role||phase!=="play") return;
+  if(over||turn!==role||phase!=="play"||(!AI&&!oppHere)) return;
   if(enemy[r][c]===2||enemy[r][c]===3) return;
   if(AI){
     const hit = aiBoard[r][c]===1 || aiBoard[r][c]===2;
     if(aiBoard[r][c]===1) aiBoard[r][c]=2;
     enemy[r][c]=hit?2:3;
+    const sunk=hit?sunkShip(aiShips,aiBoard,r,c):null;
+    if(sunk) sunkEnemy=[...sunkEnemy,...sunk.map(([a,b])=>a+","+b)];
+    note=sunk?"Schëff versenkt!":hit?"Treffer!":"Dernieft.";
     if(!aiBoard.flat().some(v=>v===1)){ over=role; renderPlay(); return; }   // sank them all
     turn=other; renderPlay();
     setTimeout(aiFire, 650);
@@ -233,11 +247,11 @@ function fitsOn(b,r,c,len,o){
   return true;
 }
 function aiPlace(){
-  aiBoard=empty(); aiHunt=[];
+  aiBoard=empty(); aiHunt=[]; aiShips=[];
   for(const len of SHIPS){ let ok=false,t=0;
     while(!ok&&t++<800){ const o=Math.random()<.5?"h":"v";
       const r=Math.floor(Math.random()*N), c=Math.floor(Math.random()*N);
-      if(fitsOn(aiBoard,r,c,len,o)){ for(let k=0;k<len;k++){const rr=r+(o==="v"?k:0),cc=c+(o==="h"?k:0); aiBoard[rr][cc]=1;} ok=true; } } }
+      if(fitsOn(aiBoard,r,c,len,o)){ const cells=[]; for(let k=0;k<len;k++){const rr=r+(o==="v"?k:0),cc=c+(o==="h"?k:0); aiBoard[rr][cc]=1; cells.push([rr,cc]);} aiShips.push({len,cells}); ok=true; } } }
 }
 const aiTried=(r,c)=> own[r][c]===2 || own[r][c]===3;   // computer already fired here
 function aiPickTarget(){
@@ -252,31 +266,42 @@ function aiFire(){
   const [r,c]=aiPickTarget();
   const hit = own[r][c]===1;
   own[r][c]= hit?2:3;
+  note=hit?(sunkShip(placed,own,r,c)?"De Computer huet däi Schëff versenkt!":"De Computer huet getraff."):"De Computer huet verfeelt.";
   if(hit){ for(const [dr,dc] of [[0,1],[0,-1],[1,0],[-1,0]]){ const rr=r+dr, cc=c+dc;
     if(rr>=0&&rr<N&&cc>=0&&cc<N&&!aiTried(rr,cc)) aiHunt.push([rr,cc]); } }
   if(!own.flat().some(v=>v===1)){ over=other; renderPlay(); return; }   // computer wins
   turn=role; renderPlay();
 }
 function onFire(r,c){
-  const hitShip=own[r][c]===1||own[r][c]===2;
+  if(!isCell(r,c)) return;
+  const hitShip=own[r][c]===1||own[r][c]===2;     // a shot that is repeated (lost answer) gets the same answer again
   own[r][c]=hitShip?2:3;
   const lost=!own.flat().some(v=>v===1);
-  ch.send({type:"broadcast",event:"result",payload:{r,c,hit:hitShip,lost}});
+  const sunk=hitShip?sunkShip(placed,own,r,c):null;
+  note=hitShip?(sunk?"De Géigner huet e Schëff versenkt!":"De Géigner huet getraff."):"De Géigner huet verfeelt.";
+  ch.send({type:"broadcast",event:"result",payload:{r,c,hit:hitShip,lost,sunk}});
   if(lost) over=other;
   turn=role;
   renderPlay();
 }
-function onResult(r,c,hit,lost){ enemy[r][c]=hit?2:3; if(lost) over=role; renderPlay(); }
+function onResult(r,c,hit,lost,sunk){
+  if(!isCell(r,c)) return;
+  enemy[r][c]=hit?2:3; if(lost) over=role;
+  const cells=Array.isArray(sunk)&&sunk.length<=4&&sunk.every(x=>Array.isArray(x)&&isCell(x[0],x[1]))?sunk.map(x=>x[0]+","+x[1]):[];
+  if(cells.length) sunkEnemy=[...sunkEnemy,...cells];
+  note=cells.length?"Schëff versenkt!":hit?"Treffer!":"Dernieft.";
+  renderPlay();
+}
 
 if(AI){
-  document.querySelector(".bar h1").textContent="Schëffer versenken – géint de Computer";
+  document.querySelector(".bar h1").textContent="Schëffer · Computer";
   GC.mountDifficulty(()=>difficulty,(d)=>{difficulty=d;});
   clearAll(); phase="setup"; oppHere=true; renderSetup();
 } else if (!(window.MPGate && window.MPGate.redirecting)) {   // mp-gate.js sends a bare visit to the lobby (lobby.html)
   ch=GC.createChannel("bs");
   ch.on("broadcast",{event:"ready"},()=>{ oppReady=true; bothReady(); if(phase==="setup")renderSetup(); })
     .on("broadcast",{event:"fire"},({payload})=>{ if(phase==="play") onFire(payload.r,payload.c); })
-    .on("broadcast",{event:"result"},({payload})=>onResult(payload.r,payload.c,payload.hit,payload.lost))
+    .on("broadcast",{event:"result"},({payload})=>onResult(payload.r,payload.c,payload.hit,payload.lost,payload.sunk))
     .on("broadcast",{event:"reset"},()=>resetGame(false));
   // A lobby start / rematch re-uses the same room code: only a reload may restore the previous fleet, a fresh visit begins clean.
   try{ if(window.MPGate&&MPGate.ctx&&performance.getEntriesByType("navigation")[0].type!=="reload") clearLocal(); }catch{}
@@ -294,7 +319,7 @@ if(AI){
     onPeers:(here)=>{
       oppHere=here;
       if(oppHere&&myReady&&phase==="setup") ch.send({type:"broadcast",event:"ready",payload:{}}); // re-announce for late joiners
-      if(phase==="setup") renderSetup();
+      if(phase==="setup") renderSetup(); else if(phase==="play"&&!over) renderPlay();
     },
     onSeatTaken:()=>setStatus("Plaz scho besat",`Dësen Raum huet schonn e(n) ${role} — trëtt mat der anerer Roll bäi oder maach en neie Raum op.`),
   });
@@ -307,7 +332,7 @@ $("clear").onclick=()=>{ if(!myReady) clearAll(); };
 $("ready").onclick=()=>{ if(myReady||!allPlaced())return; myReady=true;
   if(AI){ aiPlace(); oppReady=true; renderSetup(); bothReady(); return; }
   ch.send({type:"broadcast",event:"ready",payload:{}}); renderSetup(); bothReady(); };
-function resetGame(send){ over=false; recorded=false; myReady=false; oppReady=false; phase="setup"; turn="host"; clearLocal(); clearAll(); enemy=empty(); aiBoard=null; aiHunt=[]; renderSetup(); if(send&&!AI) ch.send({type:"broadcast",event:"reset",payload:{}}); }
+function resetGame(send){ sunkEnemy=[]; note=""; aiShips=[]; over=false; recorded=false; myReady=false; oppReady=false; phase="setup"; turn="host"; clearLocal(); clearAll(); enemy=empty(); aiBoard=null; aiHunt=[]; renderSetup(); if(send&&!AI) ch.send({type:"broadcast",event:"reset",payload:{}}); }
 $("rematch").onclick=()=>resetGame(true);
 </script>
   <script type="module" src="rtc-ring.js?v=41"></script>

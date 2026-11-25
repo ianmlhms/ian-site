@@ -39,6 +39,13 @@
   .box{display:flex;align-items:center;justify-content:center;font-weight:800;font-size:min(6vw,22px)}
   .me{display:inline-block;width:14px;height:14px;border-radius:0;vertical-align:-2px;margin:0 4px}
   .board{border:1px solid var(--ink)}
+  /* the drawn line is only 16 px thin: its tap area reaches 14 px past it on both sides (44 px) */
+  button.edge{position:relative}
+  button.edge.hedge::after{content:"";position:absolute;left:0;right:0;top:-14px;bottom:-14px}
+  button.edge.vedge::after{content:"";position:absolute;top:0;bottom:0;left:-14px;right:-14px}
+  .edge.last i{animation:dotsPop .5s ease-out}
+  @keyframes dotsPop{from{opacity:.15;transform:scale(1.5)}to{opacity:1;transform:none}}
+  @media(prefers-reduced-motion:reduce){.edge.last i{animation:none}}
 </style>
 <script data-goatcounter="https://ianm.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
@@ -77,7 +84,7 @@ const { AI, room, role } = GC;
 const me = role === "host" ? 1 : 2;          // 1 = blue (host, first), 2 = red
 const opp = me === 1 ? 2 : 1;
 const COL = { 1: "var(--p1)", 2: "var(--p2)" };
-let h = [], v = [], own = [], turn = 1, over = false, oppHere = false, recorded = false, kbIdx = null;
+let h = [], v = [], own = [], turn = 1, over = false, oppHere = false, recorded = false, kbIdx = null, lastEdge = "";
 const recordResult = GC.recordResult;
 
 /* ---------- difficulty (AI mode) ---------- */
@@ -90,7 +97,7 @@ function fresh() {
   h = Array.from({ length: N + 1 }, () => Array(N).fill(0));
   v = Array.from({ length: N }, () => Array(N + 1).fill(0));
   own = Array.from({ length: N }, () => Array(N).fill(0));
-  turn = 1; over = false; recorded = false;
+  turn = 1; over = false; recorded = false; lastEdge = "";
 }
 const boxComplete = (r, c) => h[r][c] && h[r + 1][c] && v[r][c] && v[r][c + 1];
 const currentSides = (r, c) => (h[r][c] ? 1 : 0) + (h[r + 1][c] ? 1 : 0) + (v[r][c] ? 1 : 0) + (v[r][c + 1] ? 1 : 0);
@@ -114,13 +121,13 @@ function render() {
     if (er && ec) { d.className = "dot"; }
     else if (er && !ec) {            // horizontal edge
       const i = gr / 2, j = (gc - 1) / 2, set = h[i][j];
-      d.className = "edge hedge " + (set ? "set" : (mine ? "open" : ""));
+      d.className = "edge hedge " + (set ? "set" : (mine ? "open" : "")) + (lastEdge === `h${i}.${j}` ? " last" : "");
       if (set) d.style.setProperty("--ec", COL[set]);
       d.innerHTML = "<i></i>";
       if (mine && !set) { d.onclick = () => play("h", i, j, me, true); d.setAttribute("aria-label", `Horizontal Linn, Rei ${i + 1}, Kolonn ${j + 1}`); }
     } else if (!er && ec) {          // vertical edge
       const i = (gr - 1) / 2, j = gc / 2, set = v[i][j];
-      d.className = "edge vedge " + (set ? "set" : (mine ? "open" : ""));
+      d.className = "edge vedge " + (set ? "set" : (mine ? "open" : "")) + (lastEdge === `v${i}.${j}` ? " last" : "");
       if (set) d.style.setProperty("--ec", COL[set]);
       d.innerHTML = "<i></i>";
       if (mine && !set) { d.onclick = () => play("v", i, j, me, true); d.setAttribute("aria-label", `Vertikal Linn, Rei ${i + 1}, Kolonn ${j + 1}`); }
@@ -161,6 +168,7 @@ function play(t, i, j, player, local) {
   if (local && (turn !== me || !oppHere)) return;
   if (t === "h" ? h[i][j] : v[i][j]) return;     // edge already drawn
   if (t === "h") h[i][j] = player; else v[i][j] = player;
+  lastEdge = `${t}${i}.${j}`;
   let got = 0;
   const boxes = t === "h" ? [[i - 1, j], [i, j]] : [[i, j - 1], [i, j]];
   for (const [r, c] of boxes) if (r >= 0 && r < N && c >= 0 && c < N && !own[r][c] && boxComplete(r, c)) { own[r][c] = player; got++; }
@@ -174,7 +182,7 @@ function play(t, i, j, player, local) {
 }
 
 if (AI) {
-  document.querySelector(".bar h1").innerHTML = "▦ Dots &amp; Boxes — géint de Computer";
+  document.querySelector(".bar h1").textContent = "Punkten · Computer";
   GC.mountDifficulty(() => difficulty, (d) => { difficulty = d; });
   oppHere = true; fresh(); render();
 } else if (!(window.MPGate && window.MPGate.redirecting)) {   // mp-gate.js sends a bare visit to the lobby (lobby.html)
