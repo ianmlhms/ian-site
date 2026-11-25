@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="gitter.css?v=13">
 <script src="theme.js?v=36"></script>
   <script data-goatcounter="https://ianm.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+  <script defer src="/count.js?v=1"></script>
   <meta name="theme-color" content="#f6f6f3" media="(prefers-color-scheme: light)" data-gt="light">
 <meta name="theme-color" content="#121314" media="(prefers-color-scheme: dark)" data-gt="dark">
   <link rel="manifest" href="site.webmanifest">
@@ -94,7 +95,7 @@
     <section data-lang="de" lang="de" hidden>
       <header class="p-head c full top">
         <h1 class="ui-title">Datenschutzerklärung</h1>
-        <p class="updated">Zuletzt aktualisiert: 2. August 2026</p>
+        <p class="updated">Zuletzt aktualisiert: 25. November 2026</p>
       </header>
       <p class="lead c full">ian.lu ist die private Website von Ian Mulheims aus Luxemburg. Sie ist ein Hobbyprojekt: eine Sammlung selbst gebauter Spiele, kleiner Werkzeuge und Wanderkarten. Diese Seite erklärt so genau wie möglich, welche Daten dabei verarbeitet werden, wer sie bekommt und was du dagegen tun kannst.</p>
       <div class="c full">
@@ -133,11 +134,20 @@
         <strong>keine Cookies</strong>, speichert keine IP-Adressen dauerhaft und erstellt kein Profil
         über dich. Erfasst werden nur aggregierte Angaben wie aufgerufene Seite, Herkunftsseite,
         ungefähres Land und Browsertyp.</p>
-        <p>Auf der Startseite und der Seite „Über mich“ wird einmal pro Browser-Sitzung geprüft, ob der Besuch aus dem
-        Netz einer <strong>Firma oder Organisation</strong> kommt. Dazu wird die gekürzte IP-Adresse im öffentlichen
-        Register des RIPE NCC nachgeschlagen. Gespeichert werden nur Name der Organisation bzw. des Internetanbieters,
-        Land, Seite, Herkunftsseite und Uhrzeit, <strong>nie die IP-Adresse</strong> und nie eine Person. Mit „Do Not Track“ oder
-        „Global Privacy Control“ findet das nicht statt.</p>
+        <p>Zusätzlich gibt es eine <strong>eigene Besucherstatistik</strong> auf allen Seiten, die bei <strong>Cloudflare</strong>
+        läuft (ein Worker mit eigener Datenbank, die so nah wie möglich in Westeuropa liegt). Beim Öffnen einer Seite
+        wird eine <strong>zufällige Kennung</strong> mitgeschickt, die nur im <code>sessionStorage</code> deines Browser-Tabs liegt und
+        mit dem Tab endet; sie ist kein Cookie, steht nirgends dauerhaft und lässt sich nicht mit einer Person oder einem
+        Konto verbinden. Gespeichert werden: Tag und Uhrzeit, aufgerufene Seiten in ihrer Reihenfolge, Seitentitel, Herkunftsseite
+        (nur der Host), Bildschirmgröße, Sprache und Zeitzone, Browser und Betriebssystem mit Version, Geräteklasse, ungefähres
+        Land und Region (nie die Stadt), der Name deines Internetanbieters sowie die Verweildauer (solange die Seite sichtbar ist,
+        meldet sie sich in großen Abständen kurz). Beim ersten Seitenaufruf eines Besuchs wird außerdem die gekürzte
+        IP-Adresse im öffentlichen Register des RIPE NCC nachgeschlagen, um den Namen einer <strong>Firma oder Organisation</strong> zu
+        erkennen; private Anschlüsse auf einen Personennamen werden verworfen. <strong>Die IP-Adresse und der vollständige
+        Browser-String werden nie gespeichert</strong> (Cloudflare sieht sie technisch beim Verbindungsaufbau, wie jeder Server).
+        Die Einzeldaten werden nach <strong>180 Tagen</strong> gelöscht, übrig bleiben nur Tagessummen. Mit „Do Not Track“ oder
+        „Global Privacy Control“, in automatisierten Browsern und in eingebetteten Spielen findet diese Zählung nicht statt. GoatCounter
+        läuft vorerst parallel weiter. Rechtsgrundlage: berechtigtes Interesse (Art. 6 Abs. 1 lit. f DSGVO).</p>
         <p>Bei angemeldeten Konten wird 180 Tage lang festgehalten, an welchem Tag welches Spiel gespielt wurde.
         Das sieht nur der Betreiber. Rechtsgrundlage: berechtigtes Interesse (Art. 6 Abs. 1 lit. f DSGVO).</p>
       </div>
@@ -150,6 +160,7 @@
           <tr><th scope="col">Dienst</th><th scope="col">Wofür</th></tr>
           <tr><td>Supabase</td><td>Konten, Datenbank, Dateien</td></tr>
           <tr><td>GoatCounter</td><td>anonyme Besucherstatistik</td></tr>
+          <tr><td>Cloudflare</td><td>eigene Besucherstatistik (Worker, Datenbank)</td></tr>
           <tr><td>RIPE NCC</td><td>Firmennetz erkennen (gekürzte IP)</td></tr>
           <tr><td>OpenStreetMap, geoportail.lu</td><td>Kartenkacheln in den Karten-Seiten</td></tr>
           <tr><td>Wikimedia Commons</td><td>Fotos auf den Wanderweg-Seiten</td></tr>
@@ -188,7 +199,7 @@
     <section data-lang="fr" lang="fr" hidden>
       <header class="p-head c full top">
         <h1 class="ui-title">Politique de confidentialité</h1>
-        <p class="updated">Dernière mise à jour : 2 août 2026</p>
+        <p class="updated">Dernière mise à jour : 25 novembre 2026</p>
       </header>
       <p class="lead c full">ian.lu est le site personnel d'Ian Mulheims, au Luxembourg. C'est un projet de loisir : des jeux, de petits outils et des cartes de randonnée développés par lui-même. Cette page explique aussi précisément que possible quelles données sont traitées, qui les reçoit et ce que tu peux faire.</p>
       <div class="c full">
@@ -226,11 +237,20 @@
         <strong>aucun cookie</strong>, ne conserve pas durablement les adresses IP et ne crée pas de
         profil. Seules des informations agrégées sont collectées : page consultée, site référent,
         pays approximatif, type de navigateur.</p>
-        <p>Sur la page d'accueil et la page « À propos », une fois par session de navigation, on vérifie si la visite vient du
-        réseau d'une <strong>entreprise ou organisation</strong>. L'adresse IP raccourcie est recherchée dans le registre
-        public du RIPE NCC. Seuls sont conservés le nom de l'organisation ou du fournisseur d'accès, le pays, la page, le site
-        référent et l'heure, <strong>jamais l'adresse IP</strong> ni une personne. Avec « Do Not Track » ou « Global Privacy
-        Control », rien n'est vérifié.</p>
+        <p>S'y ajoute une <strong>statistique de visites propre</strong> sur toutes les pages, qui tourne chez <strong>Cloudflare</strong>
+        (un Worker avec sa propre base de données, placée le plus près possible de l'Europe de l'Ouest). À l'ouverture d'une page,
+        un <strong>identifiant aléatoire</strong> est envoyé ; il ne vit que dans le <code>sessionStorage</code> de l'onglet et disparaît avec lui.
+        Ce n'est pas un cookie, il n'est conservé nulle part durablement et ne peut être relié ni à une personne ni à un compte.
+        Sont conservés : le jour et l'heure, les pages vues dans l'ordre, le titre de la page, le site référent (seulement l'hôte),
+        la taille d'écran, la langue et le fuseau horaire, le navigateur et le système avec leur version, la classe d'appareil,
+        le pays approximatif et la région (jamais la ville), le nom du fournisseur d'accès et la durée de visite (tant que la page est
+        visible, elle se signale brièvement à grands intervalles). À la première page d'une visite, l'adresse IP raccourcie est en outre
+        recherchée dans le registre public du RIPE NCC pour reconnaître le nom d'une <strong>entreprise ou organisation</strong> ; une ligne
+        privée enregistrée au nom d'une personne est écartée. <strong>L'adresse IP et la chaîne complète du navigateur ne sont jamais
+        conservées</strong> (Cloudflare les voit techniquement à la connexion, comme tout serveur). Les données détaillées sont supprimées
+        après <strong>180 jours</strong> ; il ne reste que les totaux par jour. Avec « Do Not Track » ou « Global Privacy Control », dans les
+        navigateurs automatisés et dans les jeux intégrés, rien n'est compté. GoatCounter continue à tourner en parallèle pour l'instant.
+        Base légale : intérêt légitime (art. 6, par. 1, point f) du RGPD).</p>
         <p>Pour les comptes connectés, le jour et le jeu joué sont conservés pendant 180 jours. Seul l'exploitant les voit.
         Base légale : intérêt légitime (art. 6, par. 1, point f) du RGPD).</p>
       </div>
@@ -243,6 +263,7 @@
           <tr><th scope="col">Service</th><th scope="col">Pour quoi</th></tr>
           <tr><td>Supabase</td><td>comptes, base de données, fichiers</td></tr>
           <tr><td>GoatCounter</td><td>statistiques de visite anonymes</td></tr>
+          <tr><td>Cloudflare</td><td>statistique de visites propre (Worker, base de données)</td></tr>
           <tr><td>RIPE NCC</td><td>reconnaître un réseau d'entreprise (IP raccourcie)</td></tr>
           <tr><td>OpenStreetMap, geoportail.lu</td><td>fonds de carte</td></tr>
           <tr><td>Wikimedia Commons</td><td>photos des pages de sentiers</td></tr>
@@ -281,7 +302,7 @@
     <section data-lang="en" lang="en">
       <header class="p-head c full top">
         <h1 class="ui-title">Privacy Policy</h1>
-        <p class="updated">Last updated: 2 August 2026</p>
+        <p class="updated">Last updated: 25 November 2026</p>
       </header>
       <p class="lead c full">ian.lu is the personal website of Ian Mulheims, a student in Luxembourg. It is a hobby project: self-built games, small tools and hiking maps. This page explains, as precisely as possible, what data is processed, who receives it, and what you can do about it.</p>
       <div class="c full">
@@ -317,10 +338,18 @@
         <p><strong>GoatCounter</strong> is used for analytics. It sets <strong>no cookies</strong>, does
         not store IP addresses permanently and does not build a profile of you. Only aggregated
         information is collected: page viewed, referring site, approximate country and browser type.</p>
-        <p>On the home page and the About page, once per browser session, the site checks whether the visit comes from the
-        network of a <strong>company or organisation</strong>. The shortened IP address is looked up in the public RIPE NCC
-        register. Only the name of the organisation or internet provider, country, page, referring site and time are kept,
-        <strong>never the IP address</strong> and never a person. With Do Not Track or Global Privacy Control this does not happen.</p>
+        <p>On top of that there is <strong>statistics of our own</strong> on every page, running on <strong>Cloudflare</strong> (a Worker with its own
+        database, placed as close to Western Europe as possible). When a page opens, a <strong>random id</strong> is sent that lives only in your
+        browser tab's <code>sessionStorage</code> and ends with the tab. It is not a cookie, it is not kept anywhere permanently, and it cannot be
+        linked to a person or an account. What is kept: day and time, the pages viewed in order, the page title, the referring site (host only),
+        screen size, language and time zone, browser and operating system with version, device class, approximate country and region (never the
+        city), the name of your internet provider, and how long you stay (while the page is visible it briefly checks in at long intervals). On the
+        first page of a visit the shortened IP address is also looked up in the public RIPE NCC register to recognise the name of a
+        <strong>company or organisation</strong>; a private line registered under a person's name is discarded. <strong>The IP address and the full
+        browser string are never stored</strong> (Cloudflare technically sees them when the connection is made, like any server). The detailed
+        rows are deleted after <strong>180 days</strong>; only daily totals remain. With Do Not Track or Global Privacy Control, in automated
+        browsers and in embedded games nothing is counted. GoatCounter keeps running in parallel for now. Legal basis: legitimate interest
+        (Art. 6(1)(f) GDPR).</p>
         <p>For signed-in accounts, the day and the game played are kept for 180 days. Only the operator sees this.
         Legal basis: legitimate interest (Art. 6(1)(f) GDPR).</p>
       </div>
@@ -333,6 +362,7 @@
           <tr><th scope="col">Service</th><th scope="col">What for</th></tr>
           <tr><td>Supabase</td><td>accounts, database, files</td></tr>
           <tr><td>GoatCounter</td><td>anonymous visitor statistics</td></tr>
+          <tr><td>Cloudflare</td><td>own visitor statistics (Worker, database)</td></tr>
           <tr><td>RIPE NCC</td><td>recognise company networks (shortened IP)</td></tr>
           <tr><td>OpenStreetMap, geoportail.lu</td><td>map tiles on the map pages</td></tr>
           <tr><td>Wikimedia Commons</td><td>photos on the trail pages</td></tr>

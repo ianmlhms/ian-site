@@ -442,3 +442,25 @@ All in `scripts/security-hardening-v3.sql` (applied live):
 - **Input abstraction:** games read `frame = {hands, pose, aspect}` from `Input` (display space, mirrored). `?fake=hands|pose` swaps the camera for a scripted source (`window.__wc.feed(...)`, `window.__wc.Synth.hand/pose`), `?speed=N` scales game time, `?seed=N` makes the RNG reproducible, `?delegate=cpu` skips the GPU delegate. The scripted source reports no scores (unless a test sets `window.__wcAllowReport`).
 - **Scores:** boards `webcam-balloons`, `webcam-rps-3`, `webcam-rps-5`, `webcam-wall`, `webcam-jump`, `webcam-draw` through `Arcade.setBoard`/`score`/`gameOver` (generic score path, no SQL, higher is better). Hand-Pong and free draw have no board. The anti-cheat trigger (new #1 > 1.5x) applies like everywhere else.
 - **Tests:** `node scripts/flows/run_all.mjs webcam` (scripted games, the Chromium fake camera against the real models, iPad portrait).
+
+## Own visitor counter `ian-count` (25 Nov 2026)
+
+Replaces GoatCounter as the SOURCE OF THE NUMBERS on traffic.html (GoatCounter still runs in parallel, `scripts/fetch_visitors.py` still fills `site_traffic`).
+- **Worker** `ian-count` -> https://ian-count.ianlu.workers.dev (account "Konto@ian.lu's Account", same workers.dev subdomain as `ianlu-inbox`). Source:
+  `cloudflare/ian-count/` (README-less: this section is it). **No D1**: the API token has no D1 permission, so ONE SQLite Durable Object `IanCount`
+  (name `main`, hint weur) is the database; schema = `schema.sql` (-> `src/schema.js` via `node scripts/make-schema.mjs`; a test checks they agree).
+  Deploy: `cd cloudflare/ian-count && set -a; . ~/.config/cloudflare/api.env; set +a; CLOUDFLARE_ACCOUNT_ID=138a23df534145202c94e3b39b1fdfcd npx wrangler@4.168.0 deploy`.
+  Tests: `npm test` there (node:test, 40 tests; store logic runs on node:sqlite). Local run: `wrangler dev --local --var TEST_ORIGINS:http://localhost:8123 --var SUPABASE_URL:<mock>`.
+  No secrets anywhere (admin check uses the public publishable key).
+- **Client** `count.js` (root, `?v=1` on every page next to the GoatCounter tag; `scripts/add_count_js.py` is the idempotent includer, also run over
+  `scripts/trails/templates/*.html`; `check_site.py` fails when a GoatCounter page lacks it). sid = random id in sessionStorage (one per tab session, no cookie, no localStorage).
+  Off with DNT/GPC, webdriver, non-ian.lu hosts, framed pages. The arcade hub calls `ianCount.view('/pixelbreak.html?g=<id>')` (next to the old goatcounter.count call).
+  Tests may set `window.__IAN_COUNT_TEST__ = {endpoint, sidPrefix}` (localhost only). Flow: `node scripts/flows/run_all.mjs "=count-js"`.
+  Pings: 22 max per page while visible (30 s for 2 min, 60 s to 10 min, 5 min to 1 h) + one on leave. **Bump `COUNT_VERSION` in add_count_js.py and re-run it when count.js changes.**
+- **Worker rules** (shared free limits with the Messenger!): validation, bot filter, origin allowlist and flood limits run BEFORE the object is touched; the object keeps a daily
+  write cap (`DAILY_WRITE_CAP`, 40 000 rows; then nothing is counted until midnight Lux, `/stats` says `capped: true`); no WebSockets/timers, the object can sleep. Finished days
+  are rolled into `daily` (kept forever); raw `sessions`/`hits` for 180 days (`RAW_DAYS`), purged by a daily alarm, which also deletes `test-` sessions (use a `test-` sid prefix for tests; `/stats` ignores them).
+- **/stats** (`GET ?from&to[&only=live]`): Bearer = Ian's Supabase token, checked with rpc `is_admin` (5 min verdict cache by SHA-256). traffic-details.js uses it for "Elo online", "Lescht Visitten"
+  and every day from the first FULL day the counter has data (`first_day + 1`); older days stay GoatCounter (`site_traffic`) and are marked so on the page. Worker down = old data only.
+- `visit-org.js` is gone (both includes removed). The Supabase function `visit-org` (+ `org_visits` table) is STILL DEPLOYED but unused; delete it when convenient. `org.ts` was ported to `src/org.js`.
+- Free-limit estimate and open points: see the commit message / report. Raw-retention deletes count as rows written: at ~10k views/day lower `RAW_DAYS` (e.g. 60).

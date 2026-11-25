@@ -488,6 +488,24 @@ def check_import_maps(problems: list) -> None:
         problems.append(("error", "importmap", message))
 
 
+def check_count_js(pages: list, problems: list) -> None:
+    """Every page with the GoatCounter tag also loads ian.lu's own counter (count.js), all with the same ?v=. Fix: scripts/add_count_js.py."""
+    versions = set()
+    for page in pages:
+        html = read(page)
+        has_count = re.search(r'src="/count\.js\?v=(\d+)"', html)
+        if has_count:
+            versions.add(has_count.group(1))
+        if "data-goatcounter" in html and not has_count:
+            problems.append(("error", "count.js", f"{page}: has GoatCounter but not /count.js (run scripts/add_count_js.py)"))
+        if "visit-org.js" in html:
+            problems.append(("error", "count.js", f"{page}: still loads visit-org.js (replaced by count.js)"))
+    if len(versions) > 1:
+        problems.append(("error", "count.js", f"pages load different count.js versions: {sorted(versions)}"))
+    if not os.path.exists(os.path.join(REPO, "count.js")):
+        problems.append(("error", "count.js", "count.js is missing"))
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--quiet", action="store_true", help="only print problems")
@@ -504,6 +522,7 @@ def main() -> None:
     check_cache_versions(problems)
     check_game_data_hashes(problems)
     check_import_maps(problems)
+    check_count_js(pages, problems)
     check_invisible_chars(problems)
     listed = check_sitemap(problems)
     check_meta(pages, problems)

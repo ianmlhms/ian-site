@@ -1,0 +1,10 @@
+{
+  "name": "ian-count",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "ian.lu's own visitor counter: Cloudflare Worker + one SQLite Durable Object (free plan)",
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  }
+}

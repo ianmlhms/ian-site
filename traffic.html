@@ -504,7 +504,7 @@
       <div class="traffic-intro">
         <div>
           <h2>Besucher-Iwwerbléck</h2>
-          <p>Eng Visitt ass ee Browser, deen op de Site kënnt, egal wéi vill Säiten en opmécht. iPaden am selwechte Schoulnetz kënnen zesummen als eng Visitt zielen, d'Zuel ass also éischter ze kleng.</p>
+          <p>Eng Visitt ass eng Browser-Sëtzung (een Tab), egal wéi vill Säiten en opmécht. Vun der eegener Zielung un zielt all Tab eleng; déi eeler Deeg (GoatCounter) hunn iPaden am selwechte Schoulnetz zesummegezielt, do ass d'Zuel also éischter ze kleng.</p>
         </div>
         <p id="freshness" class="freshness"></p>
       </div>
@@ -651,7 +651,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
   <script type="module">
     import * as auth from "./auth.js?v=47";
-    import { showTrafficDetails } from "./traffic-details.js?v=1";
+    import { showTrafficDetails, fetchOwnStats, applyOwn, luxDay } from "./traffic-details.js?v=2";
 
     const SCHOOL_START_DATE = "2026-09-17";
     const ADMIN_EMAILS = new Set(["konto@ian.lu"]);
@@ -1177,7 +1177,10 @@
         return;
       }
 
-      const rows = validateRows(data);
+      // Days from the first full day of our own counter come from it (the Worker); older days stay GoatCounter's. If the Worker is
+      // down, `own` is null and nothing changes.
+      const own = await fetchOwnStats(supabase);
+      const rows = validateRows(applyOwn(data, own, luxDay(0)).rows);
       if (rows.length === 0) {
         console.error("site_traffic contained no valid rows", data);
         showLoadError();

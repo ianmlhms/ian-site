@@ -193,6 +193,7 @@ body.game-open main.gt-page,body.game-open .skip,body.game-open .arc-foot{visibi
 </style>
 <script data-goatcounter="https://ianm.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
+<script defer src="/count.js?v=1"></script>
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
 </head>
@@ -589,6 +590,8 @@ document.title=g.name+' — Arcade';
 if(_cnEl)_cnEl.href='https://ian.lu/pixelbreak.html?g='+encodeURIComponent(g.id);
 if(_mdEl)_mdEl.content=g.name+' — play free in your browser in Arcade. '+(g.desc||'');
 if(!fromHistory&&window.goatcounter&&goatcounter.count)goatcounter.count({path:'/pixelbreak.html?g='+g.id});
+// ian.lu's own counter (count.js): every game opened from the hub is a view with the same path (games run in an iframe, which does not count itself)
+if(!fromHistory&&window.ianCount&&ianCount.view)ianCount.view('/pixelbreak.html?g='+encodeURIComponent(g.id),g.name);
 var frame=document.getElementById('gf');
 // Give the game keyboard focus as soon as it loads, so arrow/space keys work on
 // iPad (and desktop) without having to tap the canvas first to "activate" it.

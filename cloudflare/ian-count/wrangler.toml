@@ -1,0 +1,23 @@
+# ian.lu's own visitor counter. One SQLite-backed Durable Object ("main") is the database: the account's API token has no
+# D1 permission (same reason as ianlu-inbox). No secrets live here; the Worker needs none (the admin check uses the PUBLIC
+# Supabase publishable key). The free plan's limits are account-wide and shared with ianlu-inbox - see README.md.
+name = "ian-count"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+workers_dev = true
+
+[[durable_objects.bindings]]
+name = "COUNT"
+class_name = "IanCount"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["IanCount"]
+
+[vars]
+SUPABASE_URL = "https://lvksqmgfwkfbblfsozfk.supabase.co"
+SUPABASE_ANON_KEY = "sb_publishable_aqZ5h0dyxzgwqnpAv-oiuA_2O60dNH2"
+ALLOWED_ORIGINS = "https://ian.lu,https://www.ian.lu"
+RAW_DAYS = "180"
+DAILY_WRITE_CAP = "40000"
+# TEST_ORIGINS (e.g. http://localhost:8123) is NEVER set here: only `wrangler dev --var TEST_ORIGINS:...`.

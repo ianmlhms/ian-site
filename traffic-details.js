@@ -1,5 +1,11 @@
 /* traffic.html: everything the traffic log knows beyond the daily totals (site_traffic.details, game_players_daily,
- * game_activity(), org_visits). All of it is admin-read on the server; every value is written as text, never as HTML. */
+ * game_activity(), org_visits) and, since the own counter exists, the Worker's /stats (cloudflare/ian-count): live visitors, the last
+ * visits and every day from the first full day it has data. Older days stay GoatCounter's (site_traffic). All of it is admin-read on
+ * the server; every value is written as text, never as HTML. If the Worker is down the page shows the old data. */
+const OWN_STATS_URL = 'https://ian-count.ianlu.workers.dev/stats';
+const OWN_TIMEOUT_MS = 8000;
+const OWN_CACHE_MS = 20_000;
+const LIVE_POLL_MS = 30_000;
 const DAY_MS = 86_400_000;
 const PERIODS = [{ id: '1', label: 'Haut', days: 1 }, { id: '7', label: '7 Deeg', days: 7 }, { id: '30', label: '30 Deeg', days: 30 }];
 const SHORT_LIST = 10;
@@ -17,6 +23,12 @@ const LISTS = [
   { key: 'browser_versions', title: 'Browser-Versiounen' },
   { key: 'screens', title: 'Apparater' },
   { key: 'screen_sizes', title: 'Ecransgréissten' },
+  { key: 'devices', title: 'Typ vun Apparat', own: true },
+  { key: 'languages', title: 'Sproochen', own: true },
+  { key: 'timezones', title: 'Zäitzonen', own: true },
+  { key: 'event_names', title: 'Aktiounen (z. B. Spill gewonnen)', own: true },
+  { key: 'companies', title: 'Firmen (eegen Zielung)', own: true },
+  { key: 'providers', title: 'Internet-Provider (eegen Zielung)', own: true },
 ];
 const DURATION_ORDER = ['<10 s', '10-60 s', '1-5 min', '5-15 min', '15-60 min', '> 1 h'];
 const DEPTH_ORDER = ['1', '2', '3', '4', '5+'];
@@ -69,6 +81,111 @@ export function mergeHours(rows) {
     const part = isRecord(row.details) && Array.isArray(row.details.hours) ? row.details.hours[hour] : null;
     return Array.isArray(part) ? [views + count(part[0]), visits + count(part[1])] : [views, visits];
   }, [0, 0]));
+}
+
+/** The day after the own counter's first day (that day was only partly counted), or '' while there is none. Pure. */
+export function ownFromDay(own, today) {
+  const first = isRecord(own) && typeof own.first_day === 'string' ? own.first_day : '';
+  if (!first || first >= today) return '';
+  return new Date(Date.parse(`${first}T00:00:00Z`) + DAY_MS).toISOString().slice(0, 10);
+}
+
+const isOwnDay = (row) => isRecord(row) && typeof row.day === 'string' && Number.isFinite(row.visits) && Number.isFinite(row.views) && isRecord(row.details);
+
+/** site_traffic rows (raw table shape) with every day from ownFrom replaced by the own counter's numbers. Pure. */
+export function applyOwn(rows, own, today) {
+  const ownFrom = ownFromDay(own, today);
+  if (!ownFrom || !Array.isArray(own.days)) return { rows, ownFrom: '' };
+  const mine = own.days.filter((day) => isOwnDay(day) && day.day >= ownFrom);
+  const stamp = Number.isFinite(own.ts) ? new Date(own.ts).toISOString() : null;
+  const converted = mine.map((day) => ({
+    day: day.day, unique_visitors: day.visits, pageviews: day.views, updated_at: stamp, source: 'own',
+    top_pages: (Array.isArray(day.details.pages) ? day.details.pages : []).filter((p) => isRecord(p) && typeof p.path === 'string')
+      .sort((a, b) => count(b.views) - count(a.views)).slice(0, 10).map((p) => ({ path: p.path, views: count(p.views) })),
+    details: day.details,
+  }));
+  const taken = new Set(converted.map((row) => row.day));
+  // days from ownFrom on that the own counter has no row for had no visitors: GoatCounter's number for them is not mixed in
+  const older = rows.filter((row) => row.day < ownFrom).map((row) => ({ ...row, source: 'goatcounter' }));
+  return { rows: [...older, ...converted].sort((a, b) => a.day.localeCompare(b.day)), ownFrom, taken };
+}
+
+const ownCache = new Map();
+
+/** The Worker's answer, or null (down, slow, not signed in, odd answer). `only` = 'live' asks for just the live + recent lists. Never throws. */
+export async function fetchOwnStats(supabase, only = '') {
+  const cached = ownCache.get(only);
+  if (cached && Date.now() - cached.at < OWN_CACHE_MS) return cached.value;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), OWN_TIMEOUT_MS);
+  try {
+    const { data } = await supabase.auth.getSession();
+    const token = data?.session?.access_token;
+    if (!token) return null;
+    const query = new URLSearchParams({ from: luxDay(29), to: luxDay(0), ...(only ? { only } : {}) });
+    const response = await fetch(`${OWN_STATS_URL}?${query}`, { headers: { authorization: `Bearer ${token}` }, signal: controller.signal });
+    if (!response.ok) throw new Error(`own stats answered ${response.status}`);
+    const value = await response.json();
+    if (!isRecord(value) || !isRecord(value.live)) throw new Error('own stats answer has no live part');
+    ownCache.set(only, { at: Date.now(), value });
+    return value;
+  } catch (error) {
+    console.warn('own counter unavailable, showing GoatCounter data', error);
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function livePanel() {
+  const box = panel('Elo online', 'Op der Säit an de leschte 5 Minutten');
+  box.id = 'liveBox';
+  return box;
+}
+
+function recentPanel() {
+  const box = panel('Lescht Visitten', 'Déi lescht 100, ouni Numm an ouni IP');
+  box.classList.add('panel-wide');
+  box.id = 'recentBox';
+  return box;
+}
+
+const clock = (value) => new Intl.DateTimeFormat('de-LU', { dateStyle: 'short', timeStyle: 'medium', timeZone: 'Europe/Luxembourg' }).format(new Date(value));
+const stripPanelBody = (box) => { Array.from(box.children).slice(1).forEach((child) => child.remove()); };
+
+/** Fills the two live panels from /stats (values as text only). `own` null = the Worker did not answer. */
+export function fillLive(root, own) {
+  const live = root.querySelector('#liveBox');
+  const recent = root.querySelector('#recentBox');
+  if (live) {
+    stripPanelBody(live);
+    if (!own) live.append(el('p', 'empty-inline', 'D\'eegen Zielung äntwert net, déi al Zuele stinn drënner.'));
+    else {
+      const sessions = Array.isArray(own.live?.sessions) ? own.live.sessions : [];
+      live.append(el('p', 'td-facts', `${number.format(count(own.live?.count))} ${count(own.live?.count) === 1 ? 'Persoun' : 'Leit'} elo op der Säit`));
+      if (own.capped) live.append(el('p', 'empty-inline', 'Haut ass d\'Zielungs-Limit erreecht: et gëtt näischt méi gezielt bis Mëtternuecht.'));
+      if (sessions.length) {
+        barList(live, Array.from(sessions.reduce((map, s) => map.set(String(s.path), (map.get(String(s.path)) ?? 0) + 1), new Map()),
+          ([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value), (item) => number.format(item.value));
+      }
+    }
+  }
+  if (recent) {
+    stripPanelBody(recent);
+    const visits = Array.isArray(own?.recent) ? own.recent : [];
+    if (!visits.length) recent.append(el('p', 'empty-inline', own ? 'Nach keng Visitten.' : 'D\'eegen Zielung äntwert net.'));
+    else {
+      recent.append(table(['Wéini', 'Land', 'Apparat', 'Browser', 'Firma / Provider', 'Éischt Säit', 'Säiten', 'Sek.'],
+        visits.slice(0, 100).map((v) => [clock(v.time), v.country || '·', v.device || '·', v.browser || '·', v.who || '·', v.entry || '·',
+          Array.isArray(v.pages) ? v.pages.join(' › ') : '', count(v.seconds)])));
+    }
+  }
+}
+
+function sourceNote(ownFrom) {
+  return el('p', 'td-note', ownFrom
+    ? `Ab ${shortDay(ownFrom)} kommen d'Zuele vun der eegener Zielung (ian-count: eng zoufälleg ID nëmmen am Tab, keng Cookien, keng IP). Virdru ware se vu GoatCounter, wou iPaden am selwechte Netz zesummegezielt goufen.`
+    : 'Nach keng ganz Dag vun der eegener Zielung: all Zuele kommen elo nach vu GoatCounter.');
 }
 
 function panel(title, sub) {
@@ -204,7 +321,7 @@ async function load(supabase) {
   });
   if (traffic.error) throw traffic.error;
   return {
-    traffic: (traffic.data ?? []).map((row) => ({ day: row.day, visits: count(row.unique_visitors), views: count(row.pageviews), details: isRecord(row.details) ? row.details : {} })),
+    traffic: (traffic.data ?? []).map((row) => ({ day: row.day, unique_visitors: row.unique_visitors, pageviews: row.pageviews, details: isRecord(row.details) ? row.details : {} })),
     players: players.data ?? [], activity: activity.data ?? [], orgs: orgs.data ?? [],
   };
 }
@@ -213,6 +330,8 @@ function render(root, data, period) {
   const since = luxDay(period.days - 1);
   const inPeriod = (row) => row.day >= since;
   const rows = data.traffic.filter(inPeriod);
+  const goatOrgs = data.orgs.filter((row) => !data.ownFrom || row.day < data.ownFrom);       // the company log of the old Supabase function
+  const ownRows = rows.filter((row) => row.source === 'own');
   const days = Array.from({ length: Math.max(7, period.days) }, (_, i) => luxDay(i));
   const bar = el('div', 'td-periods');
   bar.setAttribute('role', 'group');
@@ -226,29 +345,52 @@ function render(root, data, period) {
   });
   const grid = el('div', 'dashboard-grid');
   grid.append(
-    orgPanel(data.orgs.filter(inPeriod), 'company', 'Firmen op der Homepage', 'Nëmmen d\'Firma, ni eng Persoun oder IP'),
+    livePanel(), recentPanel(),
+    orgPanel(goatOrgs.filter(inPeriod), 'company', 'Firmen op der Homepage (bis ' + (data.ownFrom ? shortDay(data.ownFrom) : 'elo') + ')', 'Nëmmen d\'Firma, ni eng Persoun oder IP'),
     playersPanel(data.players, days),
     activityPanel(data.activity.filter(inPeriod)),
     hoursPanel(rows), shapePanel(rows),
-    ...LISTS.map(({ key, title, label, countsVisits }) => {
+    ...LISTS.filter(({ own, key }) => !own || ownRows.some((row) => Array.isArray(row.details[key]) && row.details[key].length)).map(({ key, title, label, countsVisits }) => {
       const box = panel(title);
       barList(box, mergeLists(rows, key, label).map((item) => ({ ...item, value: item.visits || item.views })),
         (item) => (countsVisits ? number.format(item.visits) : `${number.format(item.visits)} / ${number.format(item.views)}`));
       return box;
     }),
-    orgPanel(data.orgs.filter(inPeriod), 'provider', 'Internet-Provider op der Homepage', 'Doheem, Handy a Schoul'),
+    orgPanel(goatOrgs.filter(inPeriod), 'provider', 'Internet-Provider op der Homepage (bis ' + (data.ownFrom ? shortDay(data.ownFrom) : 'elo') + ')', 'Doheem, Handy a Schoul'),
   );
-  root.replaceChildren(bar, el('p', 'td-note', 'Zuelen an de Lëschten: Visitten / Säitenopruffer. Eng Visitt gëtt an all Dag eemol gezielt.'), grid);
+  root.replaceChildren(bar, el('p', 'td-note', 'Zuelen an de Lëschten: Visitten / Säitenopruffer. Eng Visitt gëtt an all Dag eemol gezielt.'), sourceNote(data.ownFrom), grid);
+  fillLive(root, lastOwn ?? data.own);
 }
 
 let loaded = false;                                 // once per page view: the hourly refresh would fetch ~0.5 MB from Supabase each time
+let pollTimer = 0;
+let lastOwn = null;                                 // newest /stats answer, so a period switch does not redraw old live numbers
+
+/** Live panels refresh by themselves every 30 s while the tab is visible (a small answer from the Worker, never Supabase). */
+function startLivePolling(root, supabase) {
+  clearInterval(pollTimer);
+  pollTimer = setInterval(async () => {
+    if (document.visibilityState !== 'visible' || !root.isConnected) return;
+    lastOwn = (await fetchOwnStats(supabase, 'live')) ?? lastOwn;
+    fillLive(root, lastOwn);
+  }, LIVE_POLL_MS);
+}
 
 export async function showTrafficDetails(root, supabase) {
   if (loaded) return;
   loaded = true;
   try {
-    const data = await load(supabase);
+    const [data, own] = await Promise.all([load(supabase), fetchOwnStats(supabase)]);
+    const merged = applyOwn(data.traffic, own, luxDay(0));
+    data.traffic = merged.rows.map((row) => ({
+      day: row.day, visits: count(row.unique_visitors), views: count(row.pageviews),
+      details: isRecord(row.details) ? row.details : {}, source: row.source ?? 'goatcounter',
+    }));
+    data.ownFrom = merged.ownFrom;
+    data.own = own;
+    lastOwn = own;
     render(root, data, PERIODS[1]);
+    startLivePolling(root, supabase);
   } catch (error) {
     loaded = false;                                 // the next refresh tries again
     console.error('traffic details failed', error);
