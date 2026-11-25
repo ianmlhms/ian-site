@@ -24,6 +24,7 @@ canvas{cursor:crosshair}
   <canvas id="c" role="img" aria-label="Fruit Slicer arcade game"></canvas>
   <div class="arcade-hud">
     <span class="arcade-pill">Score <b id="score">0</b></span>
+    <span class="arcade-pill">Best <b id="bestHud">0</b></span>
     <span class="arcade-pill lives">Lives <b id="lives" role="img" aria-label="3 lives">♥♥♥</b></span>
   </div>
   <div class="arcade-overlay show" id="overlay" role="dialog" aria-modal="true" aria-labelledby="panelTitle">
@@ -131,21 +132,22 @@ function tick(ts){
 
 
 const FRUITS=['🍎','🍊','🍋','🍇','🍉','🍓','🥝','🍑'];
-const START_LIVES=3,SPAWN_EVERY=60,BOMB_CHANCE=0.1,GRAVITY=0.25,TRAIL_LIFE=10,FRUIT_R=25,SLICE_REACH=10,EMOJI_SIZE=40;
-let fruits=[],particles=[],score=0,lives=START_LIVES,state='ready',mouseTrail=[],frame=0;
+const START_LIVES=3,SPAWN_EVERY=60,MIN_SPAWN_EVERY=34,SPAWN_RAMP_SCORE=0.4,BOMB_CHANCE=0.1,MAX_EXTRA_BOMB_CHANCE=0.08,BOMB_RAMP_SCORE=250,GRAVITY=0.25,TRAIL_LIFE=10,FRUIT_R=25,SLICE_REACH=10,EMOJI_SIZE=40;
+let fruits=[],particles=[],score=0,lives=START_LIVES,state='ready',mouseTrail=[],frame=0,spawnIn=SPAWN_EVERY,lastPt=null;
 
 function updateHud(){
+  $('bestHud').textContent=Math.max(best===null?0:best,score);
   $('score').textContent=score;
   $('lives').textContent=lives>0?'♥'.repeat(lives):'-';$('lives').setAttribute('aria-label',lives+(lives===1?' life':' lives'));
 }
 function resetWorld(){
-  fruits=[];particles=[];mouseTrail=[];score=0;lives=START_LIVES;frame=0;
+  fruits=[];particles=[];mouseTrail=[];score=0;lives=START_LIVES;frame=0;spawnIn=SPAWN_EVERY;lastPt=null;
   updateHud();Arcade.score(score);
 }
 function startGame(){Arcade.startRun();hidePanel();resetWorld();state='playing'}
 function endGame(){
   state='over';mouseTrail=[];Arcade.gameOver(score);
-  const isBest=recordBest(score);
+  const isBest=recordBest(score);updateHud();
   showPanel({title:'Game over',big:score,bestLine:isBest?'New best!':'Best '+bestText(),label:'Play again',action:startGame});
 }
 function pauseGame(){
@@ -162,7 +164,7 @@ function loseLife(){
 function spawn(){
   let n=1+Math.floor(Math.random()*3);
   for(let i=0;i<n;i++){
-    let isBomb=Math.random()<BOMB_CHANCE;
+    let isBomb=Math.random()<BOMB_CHANCE+Math.min(MAX_EXTRA_BOMB_CHANCE,score*MAX_EXTRA_BOMB_CHANCE/BOMB_RAMP_SCORE);   // a few more bombs as the score climbs
     fruits.push({x:100+Math.random()*400,y:H+30,
       vx:(Math.random()-0.5)*4,vy:-12-Math.random()*5,
       emoji:isBomb?'💣':FRUITS[Math.floor(Math.random()*FRUITS.length)],
@@ -175,19 +177,26 @@ function addP(x,y,c,n){
     particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:20+Math.random()*15,color:c})}
 }
 
+function distToSegment(px,py,ax,ay,bx,by){
+  const dx=bx-ax,dy=by-ay,len2=dx*dx+dy*dy;
+  const t=len2?Math.max(0,Math.min(1,((px-ax)*dx+(py-ay)*dy)/len2)):0;
+  return Math.hypot(px-(ax+t*dx),py-(ay+t*dy));
+}
 let activePointer=null;
-C.addEventListener('pointerdown',e=>{if(activePointer!==null||e.button!==0)return;activePointer=e.pointerId;C.setPointerCapture(e.pointerId)});
-function endSlice(e){if(e.pointerId!==activePointer)return;activePointer=null;mouseTrail=[];if(C.hasPointerCapture(e.pointerId))C.releasePointerCapture(e.pointerId)}
+C.addEventListener('pointerdown',e=>{if(activePointer!==null||e.button!==0)return;activePointer=e.pointerId;lastPt=toBoard(e);C.setPointerCapture(e.pointerId)});
+function endSlice(e){if(e.pointerId!==activePointer)return;activePointer=null;lastPt=null;mouseTrail=[];if(C.hasPointerCapture(e.pointerId))C.releasePointerCapture(e.pointerId)}
 C.addEventListener('pointerup',endSlice);
 C.addEventListener('pointercancel',endSlice);
 C.addEventListener('lostpointercapture',endSlice);
 C.addEventListener('pointermove',e=>{
   if(e.pointerId!==activePointer||state!=='playing')return;
   const {x:mx,y:my}=toBoard(e);
+  const from=lastPt||{x:mx,y:my};lastPt={x:mx,y:my};
   mouseTrail.push({x:mx,y:my,life:TRAIL_LIFE});
   for(let f of fruits){
     if(f.sliced)continue;
-    if(Math.hypot(mx-f.x,my-f.y)<f.r+SLICE_REACH){
+    // distance from the fruit to the whole swipe segment, so a fast swipe cannot skip over it
+    if(distToSegment(f.x,f.y,from.x,from.y,mx,my)<f.r+SLICE_REACH){
       f.sliced=true;
       if(f.bomb){addP(f.x,f.y,COLOR.danger,20);loseLife()}
       else{score++;Arcade.score(score);updateHud();addP(f.x,f.y,COLOR.amber,15)}
@@ -198,7 +207,7 @@ C.addEventListener('pointermove',e=>{
 function update(){
   if(state==='paused')return;
   frame++;
-  if(state==='playing'&&frame%SPAWN_EVERY===0)spawn();
+  if(state==='playing'&&--spawnIn<=0){spawn();spawnIn=Math.max(MIN_SPAWN_EVERY,SPAWN_EVERY-score*SPAWN_RAMP_SCORE)}   // fruit comes faster with the score
   for(let i=fruits.length-1;i>=0;i--){
     let f=fruits[i];f.x+=f.vx;f.y+=f.vy;f.vy+=GRAVITY;f.rot+=f.rv;
     if(f.y>H+50){
@@ -227,6 +236,7 @@ function draw(){
 }
 function runFrame(){update();draw()}
 
+document.addEventListener('keydown',e=>{if(e.key==='Escape'||e.key==='p'||e.key==='P')pauseGame()});
 Arcade.onRestart(startGame);
 fitCanvas();
 updateHud();

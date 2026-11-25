@@ -35,6 +35,7 @@ body{display:flex;flex-direction:column}
     <span class="arcade-pill">WPM <b id="wpm">0</b></span>
     <span class="arcade-pill">Accuracy <b><span id="acc">100</span>%</b></span>
     <span class="arcade-pill">Time <b><span id="timer">0</span> s</b></span>
+    <span class="arcade-pill">Best <b><span id="bestHud">0</span> WPM</b></span>
   </div>
   <div class="typing">
     <div id="text-display" aria-live="off"></div>
@@ -79,6 +80,14 @@ const TEXTS_LB=[
   "De Fuuss leeft séier duerch de Bësch an d'Villercher fléien ewech",
   "Wien all Dag e bësse trainéiert gëtt ëmmer besser beim Tippen",
   "Mëttes iesse mir zesummen an duerno gi mir dobaussen spillen",
+  "Haut Moie sinn ech mam Vëlo an d'Schoul gefuer",
+  "Mir hunn e grousse Gaart mat ville schéine Blummen",
+  "No der Schoul treffen ech mech mat menge Frënn",
+  "Am Wanter fält zu Lëtzebuerg heiansdo vill Schnéi",
+  "Dem Papp säin Hond leeft all Moien duerch de Park",
+  "Um Weekend ginn mir am Bësch spadséieren",
+  "D'Mamm kacht haut Owend eng gutt Zopp fir eis all",
+  "Ech liesen all Owend e spannend Buch virum Schlofen",
 ];
 const TEXTS=[
   "The quick brown fox jumps over the lazy dog near the old wooden fence",
@@ -93,11 +102,17 @@ const TEXTS=[
   "Time flies when you are having fun with friends and good company",
   "A creative mind finds solutions where others only see problems ahead",
   "The best way to predict the future is to create it yourself today",
+  "A quiet morning walk through the forest clears your head before school",
+  "Practice a little every day and your fingers will soon fly across the keys",
+  "The old lighthouse stood alone on the cliff and guided ships through the storm",
+  "Fresh bread and warm soup taste best after a long day in the cold rain",
+  "Good friends share their lunch and laugh at the same silly jokes",
+  "A small step each day is still a lot further than standing still",
 ];
 const TICK_MS=200,WRONG_FLASH_MS=300,BEST_KEY='pb_best_typing',MS_PER_MIN=60000;
 const $=id=>document.getElementById(id);
 function focusDialog(id){const p=$(id).firstElementChild;p.tabIndex=-1;p.style.outline='none';p.focus({preventScroll:true})}
-let text,pos,errors,startTime,timerInt,done;
+let text,lastText='',pos,errors,startTime,timerInt,done;
 const TEST_MODE=window.__pbTestMode===true; // arcade test mode: nothing is saved
 let state='idle',paused=false,pausedAt=0,best=loadBest();
 let lang=storageGet('pb_typ_lang')||'en';
@@ -121,18 +136,19 @@ function focusInput(){try{$('inp').focus({preventScroll:true})}catch(error){cons
 function closeOverlays(){['startOv','overOv','pauseOv'].forEach(id=>$(id).classList.remove('show'))}
 function newTest(){
   const list=lang==='lb'?TEXTS_LB:TEXTS;
-  text=list[Math.floor(Math.random()*list.length)];
+  do{text=list[Math.floor(Math.random()*list.length)]}while(text===lastText&&list.length>1);   // never the same sentence twice in a row
+  lastText=text;
   pos=0;errors=0;done=false;startTime=null;paused=false;
   if(timerInt)clearInterval(timerInt);
   $('inp').value='';
   $('wpm').textContent='0';
   $('acc').textContent='100';
-  $('timer').textContent='0';
+  $('timer').textContent='0';$('bestHud').textContent=best;
   $('prog-fill').style.width='0%';
   renderText();
   if(state==='playing')focusInput();
 }
-function begin(){state='playing';closeOverlays();newTest();focusInput()}
+function begin(){Arcade.startRun();state='playing';closeOverlays();newTest();focusInput()}
 function renderText(){
   let h='';
   for(let i=0;i<text.length;i++){
@@ -153,6 +169,7 @@ function finish(acc){
   let wpm=Math.round((text.split(' ').length)/(secs/60));
   window.score=Math.max(window.score||0,wpm);Arcade.gameOver(wpm);
   if(wpm>best){best=wpm;storageSet(BEST_KEY,String(best))}
+  $('bestHud').textContent=best;
   $('overBig').textContent=wpm;$('overAcc').textContent=acc;$('overSecs').textContent=secs.toFixed(1);$('overBest').textContent=best;
   $('overOv').classList.add('show');focusDialog('overOv');
 }
@@ -187,6 +204,8 @@ $('inp').addEventListener('input',e=>{
   if(pos>=text.length)finish(acc);
 });
 document.addEventListener('keydown',e=>{
+  // a click on the text or a button must not leave the keyboard stranded: typing always goes to the field
+  if(state==='playing'&&!paused&&!done&&e.key.length===1&&!e.ctrlKey&&!e.metaKey&&document.activeElement!==$('inp'))focusInput();
   if(e.target.closest&&e.target.closest('button'))return;
   if(e.key==='Enter'&&state!=='playing'){e.preventDefault();begin()}
 });

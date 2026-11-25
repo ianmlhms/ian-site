@@ -68,6 +68,7 @@ function beginRound(){Arcade.startRun();
     state='ready';
     setPad('ready','Tap now!','');
     startTime=performance.now();
+    requestAnimationFrame(()=>{if(state==='ready')startTime=performance.now()});   // time from the first painted green frame, not from the DOM change
   },MIN_WAIT_MS+Math.random()*WAIT_SPREAD_MS);
 }
 function showResult(title,big,note){

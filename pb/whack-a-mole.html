@@ -6,7 +6,7 @@
 <title>Whack-a-Mole - Arcade</title>
 <link rel="stylesheet" href="/pb/arcade-ui.css?v=10">
 <style>
-:root{--hole:clamp(84px,min(27vw,21vh),150px)}
+:root{--hole:clamp(84px,min(27vw,24vh),190px)}
 body{display:flex;flex-direction:column}
 [hidden]{display:none!important}
 .arcade-stage{padding:64px 14px 14px}
@@ -37,7 +37,7 @@ body{display:flex;flex-direction:column}
 
   <div class="arcade-overlay show" id="startOv" role="dialog" aria-modal="true" aria-labelledby="startOvT"><div class="arcade-panel">
     <h2 id="startOvT">Whack-a-Mole</h2>
-    <p>Tap or click the moles as they pop up. Stars are worth 5, and a streak multiplies your points. You have 30 seconds.</p>
+    <p>Tap or click the moles as they pop up (or use the number keys like a keypad). Stars are worth 5, and a streak multiplies your points. You have 30 seconds.</p>
     <div class="arcade-actions"><button class="arcade-btn play" id="playBtn" type="button">Play</button></div>
   </div></div>
 
@@ -54,12 +54,12 @@ body{display:flex;flex-direction:column}
   </div></div>
 </main>
 <script>
-const ROUND_SECONDS=30,HOLES=9,POPUP_MS=800,VISIBLE_MS=1200,LATE_BONUS_MS=400,LATE_PHASE_SECONDS=15;
+const ROUND_SECONDS=30,HOLES=9,POPUP_MS=800,LATE_POPUP_MS=650,LATE_PHASE_SECONDS=15;
 const DOUBLE_CHANCE=0.3,STAR_CHANCE=0.1,STAR_POINTS=5,MAX_COMBO=5,HIT_LINGER_MS=200,BEST_KEY='pb_best_whack_a_mole';
 const TEST_MODE=window.__pbTestMode===true; // arcade test mode: local best is neither read nor written
 const $=id=>document.getElementById(id);
 function focusDialog(id){const p=$(id).firstElementChild;p.tabIndex=-1;p.style.outline='none';p.focus({preventScroll:true})}
-let score=0,timeLeft=ROUND_SECONDS,combo=0,moles=[],interval=0,timerInt=0,active=false;
+let score=0,timeLeft=ROUND_SECONDS,combo=0,moles=[],interval=0,timerInt=0,active=false,roundId=0;
 let state='idle',paused=false,best=loadBest();
 
 function loadBest(){
@@ -84,15 +84,20 @@ function init(){
 }
 function showCombo(){$('combo').textContent=combo}
 function startGame(){
+  Arcade.startRun();roundId++;
   init();score=0;timeLeft=ROUND_SECONDS;combo=0;active=true;paused=false;state='playing';
   $('score').textContent=0;
   $('timer').textContent=ROUND_SECONDS;
   showCombo();
   ['startOv','overOv','pauseOv'].forEach(id=>$(id).classList.remove('show'));
-  if(interval)clearInterval(interval);
+  clearTimeout(interval);
   if(timerInt)clearInterval(timerInt);
-  interval=setInterval(popup,POPUP_MS);
+  schedulePopup();
   timerInt=setInterval(tick,1000);
+}
+// the next mole comes a little faster in the second half of the round
+function schedulePopup(){
+  interval=setTimeout(()=>{popup();if(active)schedulePopup()},timeLeft<LATE_PHASE_SECONDS?LATE_POPUP_MS:POPUP_MS);
 }
 function tick(){
   if(paused)return;
@@ -100,7 +105,7 @@ function tick(){
   if(timeLeft<=0)endGame();
 }
 function endGame(){
-  clearInterval(interval);clearInterval(timerInt);active=false;state='over';
+  clearTimeout(interval);clearInterval(timerInt);active=false;state='over';
   Arcade.gameOver(score);
   if(score>best){best=score;saveBest(best)}
   $('overBig').textContent=score;$('overBest').textContent=best;
@@ -108,7 +113,8 @@ function endGame(){
 }
 function popup(){
   if(paused)return;
-  // Hide all first
+  // moles that are still up were not whacked in time: that ends the streak
+  if(moles.some(m=>m.up&&!m.hit)){combo=0;showCombo()}
   moles.forEach(m=>{m.el.className='mole';m.up=false;m.hit=false});
   // Show 1-2 moles
   let count=Math.random()<DOUBLE_CHANCE?2:1;
@@ -118,7 +124,6 @@ function popup(){
     // Golden mole
     moles[i].el.textContent=Math.random()<STAR_CHANCE?'⭐':'🐹';
   }
-  setTimeout(()=>{for(let i of indices){if(!moles[i].hit){moles[i].el.className='mole';moles[i].up=false;combo=0;showCombo()}}},VISIBLE_MS-Math.min(timeLeft<LATE_PHASE_SECONDS?LATE_BONUS_MS:0,LATE_BONUS_MS));
 }
 function whack(i){
   if(!active||paused||!moles[i].up||moles[i].hit)return;
@@ -129,14 +134,19 @@ function whack(i){
   $('score').textContent=score;
   showCombo();
   moles[i].el.textContent='💫';
-  setTimeout(()=>{moles[i].el.className='mole';moles[i].up=false},HIT_LINGER_MS);
+  const id=roundId;
+  setTimeout(()=>{if(id!==roundId)return;moles[i].el.className='mole';moles[i].up=false},HIT_LINGER_MS);
 }
 function setPaused(v){
   if(v===paused||(v&&state!=='playing'))return;
   paused=v;$('pauseOv').classList.toggle('show',v);
   if(v)focusDialog('pauseOv');
 }
+// number keys work like a keypad: 7 8 9 on the top row, 1 2 3 at the bottom
+const KEY_HOLE={7:0,8:1,9:2,4:3,5:4,6:5,1:6,2:7,3:8};
 document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'||e.key==='p'||e.key==='P'){if(state==='playing')setPaused(!paused);return}
+  if(state==='playing'&&!e.repeat&&e.key in KEY_HOLE&&e.key.length===1){whack(KEY_HOLE[e.key]);return}
   if(e.target.closest&&e.target.closest('button'))return;
   if((e.key===' '||e.key==='Enter')&&state!=='playing'&&!e.repeat){e.preventDefault();startGame()}
 });

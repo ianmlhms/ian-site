@@ -20,7 +20,7 @@ body{display:flex;flex-direction:column}
 <body>
 <main class="arcade-stage" id="stage">
   <canvas id="c" role="img" aria-label="Space tunnel runner playfield"></canvas>
-  <div class="arcade-hud"><span class="arcade-pill">Distance <b><span id="dist">0</span> m</b></span></div>
+  <div class="arcade-hud"><span class="arcade-pill">Distance <b><span id="dist">0</span> m</b></span><span class="arcade-pill">Best <b><span id="bestHud">0</span> m</b></span></div>
 
   <div class="arcade-overlay show" id="startOv" role="dialog" aria-modal="true" aria-labelledby="startTitle"><div class="arcade-panel">
     <h2 id="startTitle">Space Tunnel Runner</h2>
@@ -70,7 +70,8 @@ function fit(){ // size the canvas to the stage, backing store at device resolut
   C.width=Math.round(GW*k*dpr);C.height=Math.round(GH*k*dpr);
 }
 new ResizeObserver(fit).observe(stage);fit();
-let player,platforms,speed,dist,gameOver,started=false,keys={},gravity;
+const RESTART_LOCK_MS=600,PLATFORM_COUNT=1500;
+let player,platforms,speed,dist,gameOver,overAt=0,touchJump=false,started=false,keys={},gravity;
 
 class Player{
   constructor(){this.x=200;this.y=300;this.vx=0;this.vy=0;this.w=20;this.h=30;this.onGround=false;this.wall=0;this.jumping=false}
@@ -78,7 +79,7 @@ class Player{
     if(keys['ArrowLeft']||keys['a'])this.vx=-4;
     else if(keys['ArrowRight']||keys['d'])this.vx=4;
     else this.vx*=Math.pow(0.8,m);
-    if((keys['ArrowUp']||keys[' ']||keys['w'])&&(this.onGround)){this.vy=-10;this.jumping=true}
+    if((keys['ArrowUp']||keys[' ']||keys['w']||touchJump)&&(this.onGround)){this.vy=-10;this.jumping=true}
     this.vy+=0.45*m;
     this.x+=this.vx*m;
     this.y+=this.vy*m;
@@ -117,7 +118,7 @@ let cameraX=0;
 function generatePlatforms(){
   platforms=[];
   let x=0;
-  for(let i=0;i<500;i++){
+  for(let i=0;i<PLATFORM_COUNT;i++){
     let w=60+Math.random()*120;
     let gap=30+Math.random()*60+Math.min(i*0.5,40);
     let y=300+Math.sin(i*0.3)*80+(Math.random()-0.5)*60;
@@ -145,15 +146,15 @@ function drawStars(){
 
 function resetRun(){
   player=new Player();speed=3;dist=0;gameOver=false;cameraX=0;
-  generatePlatforms();$('dist').textContent=0;
+  generatePlatforms();$('dist').textContent=0;$('bestHud').textContent=best;touchJump=false;
 }
-function startGame(){
+function startGame(){Arcade.startRun();
   resetRun();started=true;state='playing';paused=false;
   ['startOv','overOv','pauseOv'].forEach(id=>$(id).classList.remove('show'));
 }
 function finish(){
-  state='over';
-  if(dist>best){best=dist;saveBest(best)}
+  state='over';overAt=performance.now();keys={};touchJump=false;
+  if(dist>best){best=dist;saveBest(best)}$('bestHud').textContent=best;
   $('overBig').textContent=dist;$('overBest').textContent=best;
   $('overOv').classList.add('show');
   focusDialog('overOv');
@@ -200,12 +201,20 @@ function loop(ts){
   
 }
 
+const GAME_KEYS=new Set(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Enter']);
+const keyName=e=>e.key.length===1?e.key.toLowerCase():e.key;   // Caps Lock must not break A, D and W
 document.addEventListener('keydown',e=>{
-  keys[e.key]=true;
+  if(e.key==='Escape'||e.key==='p'||e.key==='P'){if(state==='playing'||paused)setPaused(!paused);return}
+  keys[keyName(e)]=true;
   if(e.target.closest&&e.target.closest('button'))return;
-  if((e.key===' '||e.key==='Enter')&&state!=='playing'&&!e.repeat)startGame();
-  if(e.key!=='Tab'&&!e.metaKey&&!e.ctrlKey&&!e.altKey)e.preventDefault()});
-document.addEventListener('keyup',e=>{keys[e.key]=false});
+  // Space also jumps, so a tap that was still going when the run ended must not start the next one
+  if((e.key===' '||e.key==='Enter')&&state!=='playing'&&!e.repeat&&performance.now()-overAt>RESTART_LOCK_MS)startGame();
+  if(GAME_KEYS.has(e.key))e.preventDefault()});
+document.addEventListener('keyup',e=>{keys[keyName(e)]=false});
+window.addEventListener('blur',()=>{keys={};touchJump=false});
+// touch / mouse: press anywhere on the board to jump (the D-pad still steers)
+stage.addEventListener('pointerdown',e=>{if(e.button!==0||e.target.closest('button,.arcade-overlay.show'))return;touchJump=true});
+['pointerup','pointercancel'].forEach(t=>window.addEventListener(t,()=>{touchJump=false}));
 document.addEventListener('visibilitychange',()=>{if(document.hidden)setPaused(true)});
 $('playBtn').onclick=startGame;$('againBtn').onclick=startGame;$('resumeBtn').onclick=()=>setPaused(false);
 resetRun();loop();
