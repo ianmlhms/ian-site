@@ -453,6 +453,32 @@
     .chart-grid { stroke: var(--soft); }
     .chart-label { font-family: "Geist Mono", ui-monospace, monospace; }
     .accounts-intro { margin-top: 28px; }
+    /* details (traffic-details.js) */
+    .td-periods { display: flex; border: 1px solid var(--ink); width: max-content; }
+    .td-periods button { min-height: 44px; padding: 0 18px; border: 0; border-right: 1px solid var(--ink); background: transparent; color: inherit; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .td-periods button:last-child { border-right: 0; }
+    .td-periods button.on { background: var(--ink); color: var(--paper); }
+    .td-note, .td-facts { margin: 10px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .td-facts { margin: 0 0 12px; color: inherit; }
+    .td-list { list-style: none; margin: 0; padding: 0; }
+    .td-row { position: relative; display: flex; gap: 12px; justify-content: space-between; padding: 7px 8px; margin-bottom: 2px; font-size: 13px; }
+    .td-row[hidden] { display: none; }
+    .td-bar { position: absolute; inset: 0 auto 0 0; background: var(--tint); z-index: 0; }
+    .td-name { position: relative; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .td-num { position: relative; flex: none; font-family: "Geist Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+    .td-more { min-height: 44px; margin-top: 6px; padding: 0; border: 0; background: none; color: var(--green); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .td-hours { display: flex; align-items: flex-end; gap: 3px; height: 180px; }
+    .td-hour { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; text-align: center; }
+    .td-hour i { display: block; min-height: 1px; background: var(--green); }
+    .td-hour span { height: 18px; font-size: 11px; color: var(--muted); }
+    .td-table { overflow-x: auto; max-height: 460px; overflow-y: auto; }
+    .td-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .td-table th { position: sticky; top: 0; background: var(--white); text-align: left; font-weight: 600; color: var(--muted); }
+    .td-table th, .td-table td { padding: 7px 10px 7px 0; border-bottom: 1px solid var(--soft); vertical-align: top; }
+    .td-table td:first-child { white-space: nowrap; }
+    #trafficDetails .dashboard-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    #trafficDetails .panel { min-width: 0; }
+    @media (max-width: 720px) { #trafficDetails .dashboard-grid { grid-template-columns: minmax(0, 1fr); } }
     @media (max-width: 720px) { .accounts-grid, .summary-grid { grid-template-columns: minmax(0, 1fr); } .traffic-body { padding: 14px 14px 24px !important; } }
   </style>
   <meta name="mobile-web-app-capable" content="yes">
@@ -478,7 +504,7 @@
       <div class="traffic-intro">
         <div>
           <h2>Besucher-Iwwerbléck</h2>
-          <p>Eenzegaarteg Besucher stinn am Virdergrond; d'Säitenopruffer weisen d'Gesamtaktivitéit.</p>
+          <p>Eng Visitt ass ee Browser, deen op de Site kënnt, egal wéi vill Säiten en opmécht. iPaden am selwechte Schoulnetz kënnen zesummen als eng Visitt zielen, d'Zuel ass also éischter ze kleng.</p>
         </div>
         <p id="freshness" class="freshness"></p>
       </div>
@@ -487,19 +513,19 @@
         <article class="metric-card">
           <span class="metric-label">Haut</span>
           <strong id="todayVisitors" class="metric-primary">0</strong>
-          <span class="metric-kind">eenzegaarteg Besucher</span>
+          <span class="metric-kind">Visitten</span>
           <p class="metric-secondary"><strong id="todayPageviews">0</strong> Säitenopruffer</p>
         </article>
         <article class="metric-card">
           <span class="metric-label">Lescht 7 Deeg</span>
           <strong id="weekVisitors" class="metric-primary">0</strong>
-          <span class="metric-kind">eenzegaarteg Besucher</span>
+          <span class="metric-kind">Visitten</span>
           <p class="metric-secondary"><strong id="weekPageviews">0</strong> Säitenopruffer</p>
         </article>
         <article class="metric-card">
           <span class="metric-label">Lescht 30 Deeg</span>
           <strong id="monthVisitors" class="metric-primary">0</strong>
-          <span class="metric-kind">eenzegaarteg Besucher</span>
+          <span class="metric-kind">Visitten</span>
           <p class="metric-secondary"><strong id="monthPageviews">0</strong> Säitenopruffer</p>
         </article>
       </section>
@@ -512,7 +538,7 @@
               <h3 id="chartTitle">Trafic pro Dag</h3>
             </div>
             <div class="legend" aria-hidden="true">
-              <span><i class="visitors"></i>Eenzegaarteg Besucher</span>
+              <span><i class="visitors"></i>Visitten</span>
               <span><i class="pageviews"></i>Säitenopruffer</span>
             </div>
           </div>
@@ -541,19 +567,27 @@
             <div class="comparison-period">
               <span class="metric-label">Virum 17. Sep.</span>
               <strong id="beforeVisitors">—</strong>
-              <small>eenzegaarteg Besucher · <span id="beforePageviews">—</span> Säitenopruffer</small>
+              <small>Visitten · <span id="beforePageviews">—</span> Säitenopruffer</small>
             </div>
             <div class="comparison-arrow" aria-hidden="true">→</div>
             <div class="comparison-period">
               <span class="metric-label">Zënter dem 17. Sep.</span>
               <strong id="afterVisitors">—</strong>
-              <small>eenzegaarteg Besucher · <span id="afterPageviews">—</span> Säitenopruffer</small>
+              <small>Visitten · <span id="afterPageviews">—</span> Säitenopruffer</small>
               <span id="changeBadge" class="change-badge" hidden></span>
             </div>
           </div>
           <p id="comparisonNote" class="comparison-note"></p>
         </section>
       </div>
+
+      <div class="traffic-intro accounts-intro">
+        <div>
+          <h2>Alles am Detail</h2>
+          <p>Firmen, Spiller, Säiten, Stonnen, Apparater, Länner. Nëmme fir dech siichtbar.</p>
+        </div>
+      </div>
+      <div id="trafficDetails"></div>
 
       <div class="traffic-intro accounts-intro">
         <div>
@@ -617,6 +651,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
   <script type="module">
     import * as auth from "./auth.js?v=47";
+    import { showTrafficDetails } from "./traffic-details.js?v=1";
 
     const SCHOOL_START_DATE = "2026-09-17";
     const ADMIN_EMAILS = new Set(["konto@ian.lu"]);
@@ -964,12 +999,12 @@
           { key: "uniqueVisitors", className: "visitors" },
         ],
         table: [
-          { label: "Eenzegaarteg Besucher", key: "uniqueVisitors" },
+          { label: "Visitten", key: "uniqueVisitors" },
           { label: "Säitenopruffer", key: "pageviews" },
         ],
-        ariaLabel: "Linnendiagramm vun den eenzegaartege Besucher a Säitenopruffer vun de leschte 30 Deeg",
+        ariaLabel: "Linnendiagramm vun de Visitten a Säitenopruffer vun de leschte 30 Deeg",
         titleText: "Trafic pro Dag iwwer déi lescht 30 Deeg",
-        descText: "Schwaarz weist d'eenzegaartege Besucher a gréng d'Säitenopruffer.",
+        descText: "Schwaarz weist d'Visitten a gréng d'Säitenopruffer.",
       });
     }
 
@@ -1009,7 +1044,7 @@
       badge.hidden = !hasFactor;
       if (hasFactor) {
         const factor = after.uniqueVisitors / before.uniqueVisitors;
-        badge.textContent = `${averageFormatter.format(factor)}× eenzegaarteg Besucher`;
+        badge.textContent = `${averageFormatter.format(factor)}× Visitten`;
       }
 
       const beforeCount = before?.dayCount ?? 0;
@@ -1149,7 +1184,7 @@
         return;
       }
       renderDashboard(rows);
-      await loadAccountStats(supabase);
+      await Promise.all([loadAccountStats(supabase), showTrafficDetails(byId("trafficDetails"), supabase)]);
     }
 
     function queueLoad() {

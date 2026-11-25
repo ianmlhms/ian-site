@@ -1,17 +1,22 @@
 #!/usr/bin/env python3
 """Aggregate ian.lu's GoatCounter pageviews into public.site_traffic.
 
-/api/v0/stats/total and /stats/hits return a single `count` per day or path, and
-that count is **unique visitors**, not pageviews -- verified against the export
-on seven consecutive days, where it matched the first-visit count exactly and
-was about half the row count. So the figure the API hands back has always been
-visitors; what it gives no way to reach is the pageview total.
+site_traffic.unique_visitors holds real VISITS since 25 Nov 2026: the number of
+distinct GoatCounter sessions that day. A session is one browser's visit (it ends
+after some hours without a hit), however many pages it opens.
 
-The export carries both: each row is one pageview, and rows flagged FirstVisit
-are the unique visitors. That is why this runs off the export rather than the
-much cheaper stats endpoint.
+It used to hold the rows flagged FirstVisit, and that is NOT a count of people:
+GoatCounter sets the flag once per session AND PATH, so somebody opening three
+pages counted three times (/api/v0/stats/total is the same sum over all paths;
+verified 25 Nov 2026). The session id exists only in the export, which is why
+this runs off the export rather than the much cheaper stats endpoint.
 
-Only aggregates are stored. The raw export (which contains session ids, user
+Sessions are keyed on IP + user agent, so identical iPads behind one school IP
+can still merge into a single visit: read the figure as a lower bound.
+
+Only aggregates are stored: totals per page, hour, referrer host, browser, system,
+region, screen and the shape of the visits (entry, exit, steps, length). Never a
+session id or a user agent, so no single visitor can be followed. The raw export (which contains session ids, user
 agents and coarse locations) is written to a temporary file and deleted.
 
     python3 scripts/fetch_visitors.py
@@ -27,6 +32,7 @@ The token is read from ~/.config/goatcounter/.env and never printed or passed as
 an argument. Rows go to Postgres, not to a file under data/, because the site is
 static and public -- a committed file would make the private page cosmetic.
 """
+import collections
 import csv
 import glob
 import gzip
@@ -59,6 +65,15 @@ EXPORT_POLL_SECONDS = 4
 EXPORT_MAX_POLLS = 45
 REQUEST_TIMEOUT = 120
 TOP_PAGES_PER_DAY = 10
+MAX_PAGES_PER_DAY = 200
+MAX_LABELS_PER_DAY = 25
+MAX_LABEL = 160
+LABEL_LISTS = ("refs", "browsers", "browser_versions", "systems", "system_versions",
+               "countries", "regions", "screens", "screen_sizes", "entries", "exits", "steps")
+BREAKDOWNS = ("pages", "hours") + LABEL_LISTS
+DURATION_STEPS = ((10, "<10 s"), (60, "10-60 s"), (300, "1-5 min"), (900, "5-15 min"),
+                  (3600, "15-60 min"))
+SCREEN_CLASSES = ((600, "phone"), (1400, "tablet / small laptop"))
 SITE_TZ = ZoneInfo("Europe/Luxembourg")  # the day boundary traffic.html shows
 RATE_LIMITED_EXIT = 0   # a scheduled run that is rate limited is not a failure
 LOOP_DEFAULT_SECONDS = 3600  # GoatCounter's export limit; no point going faster
@@ -184,37 +199,166 @@ def local_day(stamp):
     return moment.astimezone(SITE_TZ).date().isoformat()
 
 
+def tally():
+    """label -> [views, sessions]; the two figures every breakdown carries."""
+    return collections.defaultdict(lambda: [0, set()])
+
+
+def hit_hour(stamp):
+    """UTC export timestamp -> Luxembourg hour 0-23, or None when unreadable."""
+    try:
+        moment = datetime.fromisoformat(stamp.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return moment.astimezone(SITE_TZ).hour
+
+
+def screen_class(value):
+    """'1180,820,2' -> a size class, so no odd screen can single anybody out."""
+    digits = "".join(ch if ch.isdigit() else " " for ch in str(value)).split()
+    width = int(digits[0]) if digits else 0
+    if not width:
+        return "?"
+    for limit, label in SCREEN_CLASSES:
+        if width < limit:
+            return label
+    return "desktop"
+
+
+def family(value):
+    """'iOS 18.6' -> 'iOS', 'Safari 18' -> 'Safari': versions are dropped."""
+    words = [w for w in str(value).split() if not any(ch.isdigit() for ch in w)]
+    return " ".join(words) or "?"
+
+
+def ref_host(value):
+    """A referrer reduced to its host, so no private link or query is stored."""
+    text = str(value).strip()
+    if not text:
+        return ""
+    host = urllib.parse.urlsplit(text if "//" in text else "//" + text).hostname or ""
+    return host.removeprefix("www.")[:80]
+
+
+def top_list(counts, key, limit):
+    """[{key, views, visits}] by visits; ties by label so runs are stable."""
+    ranked = sorted(counts.items(), key=lambda i: (-len(i[1][1]), -i[1][0], i[0]))
+    return [{key: label, "views": views, "visits": len(sessions) or None}
+            for label, (views, sessions) in ranked[:limit]]
+
+
+def seconds_between(first, last):
+    try:
+        return (datetime.fromisoformat(last.replace("Z", "+00:00"))
+                - datetime.fromisoformat(first.replace("Z", "+00:00"))).total_seconds()
+    except ValueError:
+        return 0
+
+
+def visit_figures(entry):
+    """Entry / exit pages, page-to-page steps, length and depth of the day's visits.
+
+    Works on the visits in memory and keeps totals only: no single visit is stored.
+    """
+    durations = collections.Counter()
+    depth = collections.Counter()
+    total_seconds = 0
+    for session, hits in entry["trails"].items():
+        hits = sorted(hits)
+        paths = [path for _, path in hits]
+        for name, label in (("entries", paths[0]), ("exits", paths[-1])):
+            entry[name][label][0] += 1
+            entry[name][label][1].add(session)
+        for before, after in zip(paths, paths[1:]):
+            if before != after:
+                step = entry["steps"]["%s -> %s" % (before[:70], after[:70])]
+                step[0] += 1
+                step[1].add(session)
+        seconds = seconds_between(hits[0][0], hits[-1][0])
+        total_seconds += seconds
+        depth["5+" if len(hits) > 4 else str(len(hits))] += 1
+        if len(hits) > 1:
+            durations[next((label for limit, label in DURATION_STEPS if seconds < limit),
+                           "> 1 h")] += 1
+    visits = len(entry["trails"])
+    return {
+        "pages_per_visit": round(entry["pageviews"] / visits, 2) if visits else 0,
+        "one_page_visits": depth["1"],
+        "average_seconds": round(total_seconds / visits) if visits else 0,
+        "durations": dict(durations),
+        "depth": dict(depth),
+    }
+
+
 def aggregate(rows):
-    """day -> {unique_visitors, pageviews, top_pages}."""
+    """day -> {unique_visitors (= visits), pageviews, top_pages, details}."""
     days = {}
     for row in rows:
         stamp = column(row, "Date", "date", "created_at")
         day = local_day(stamp)
         if not day:
             continue
+        entry = days.setdefault(day, {
+            "pageviews": 0, "sessions": set(), "first_visits": 0, "bots": 0, "events": 0, "trails": {},
+            **{name: tally() for name in BREAKDOWNS}})
         if is_true(column(row, "Bot", "bot")):
+            entry["bots"] += 1
             continue
-        entry = days.setdefault(day, {"pageviews": 0, "sessions": set(),
-                                      "first_visits": 0, "paths": {}})
         path = column(row, "Path", "path") or "/"
-        entry["pageviews"] += 1
-        entry["paths"][path] = entry["paths"].get(path, 0) + 1
         session = column(row, "Session", "session")
+        entry["pageviews"] += 1
+        entry["events"] += is_true(column(row, "Event"))
         if session:
             entry["sessions"].add(session)
+            entry["trails"].setdefault(session, []).append((stamp, path[:MAX_LABEL]))
         if is_true(column(row, "FirstVisit", "first_visit")):
             entry["first_visits"] += 1
+        labels = {
+            "pages": path[:MAX_LABEL],
+            "hours": hit_hour(stamp),
+            "refs": ref_host(column(row, "Referrer", "ref")),
+            "browsers": family(column(row, "Browser")),
+            "browser_versions": str(column(row, "Browser"))[:40],
+            "systems": family(column(row, "System")),
+            "system_versions": str(column(row, "System"))[:40],
+            "countries": str(column(row, "Location")).split("-")[0][:2] or "?",
+            "regions": str(column(row, "Location"))[:12],
+            "screens": screen_class(column(row, "Screen size", "size")),
+            "screen_sizes": str(column(row, "Screen size", "size"))[:20],
+        }
+        for name, label in labels.items():
+            if label in ("", None):
+                continue
+            entry[name][label][0] += 1
+            if session:
+                entry[name][label][1].add(session)
 
     result = {}
     for day, entry in days.items():
-        # FirstVisit is what the dashboard counts; distinct sessions is the
-        # fallback for exports that predate the flag.
-        unique = entry["first_visits"] or len(entry["sessions"])
-        top = sorted(entry["paths"].items(), key=lambda item: (-item[1], item[0]))
+        # One session = one visit. FirstVisit (once per session and path) is only
+        # the fallback for days without session ids.
+        unique = len(entry["sessions"]) or entry["first_visits"]
+        visit_totals = visit_figures(entry)
+        pages = top_list(entry["pages"], "path", MAX_PAGES_PER_DAY)
+        by_views = sorted(pages, key=lambda p: (-p["views"], p["path"]))
         result[day] = {
             "unique_visitors": unique,
             "pageviews": entry["pageviews"],
-            "top_pages": [{"path": p, "views": n} for p, n in top[:TOP_PAGES_PER_DAY]],
+            "top_pages": [{"path": p["path"], "views": p["views"]}
+                          for p in by_views[:TOP_PAGES_PER_DAY]],
+            "details": {
+                "page_visitors": entry["first_visits"],   # GoatCounter's own figure
+                "bots": entry["bots"],
+                "events": entry["events"],
+                **visit_totals,
+                "pages": pages,
+                "hours": [[entry["hours"][h][0], len(entry["hours"][h][1])]
+                          if h in entry["hours"] else [0, 0] for h in range(24)],
+                **{name: top_list(entry[name], "name", MAX_LABELS_PER_DAY)
+                   for name in LABEL_LISTS},
+            },
         }
     return result
 
@@ -228,15 +372,22 @@ def store(daily):
     payload = [{"day": day, **values} for day, values in sorted(daily.items())]
     statement = (
         "insert into public.site_traffic\n"
-        "  (day, unique_visitors, pageviews, top_pages, updated_at)\n"
+        "  (day, unique_visitors, pageviews, top_pages, details, updated_at)\n"
         "select (r->>'day')::date, (r->>'unique_visitors')::int,\n"
-        "       (r->>'pageviews')::int, r->'top_pages', now()\n"
+        "       (r->>'pageviews')::int, r->'top_pages', r->'details', now()\n"
         "from jsonb_array_elements($gcpayload$%s$gcpayload$::jsonb) as r\n"
         "on conflict (day) do update set\n"
         "  unique_visitors = excluded.unique_visitors,\n"
         "  pageviews = excluded.pageviews,\n"
         "  top_pages = excluded.top_pages,\n"
-        "  updated_at = now();\n" % json.dumps(payload)
+        "  details = excluded.details,\n"
+        "  updated_at = now()\n"
+        # Old days do not change: rewriting 144 rows every hour only made bloat.
+        "where (site_traffic.unique_visitors, site_traffic.pageviews,\n"
+        "       site_traffic.top_pages, site_traffic.details)\n"
+        "   is distinct from (excluded.unique_visitors, excluded.pageviews,\n"
+        "       excluded.top_pages, excluded.details)\n"
+        "   or site_traffic.day >= current_date - 1;\n" % json.dumps(payload)
     )
     with tempfile.NamedTemporaryFile("w", suffix=".sql", delete=False,
                                      encoding="utf-8") as handle:
@@ -278,7 +429,7 @@ def run_once():
         sys.exit("No dated rows in the export - refusing to overwrite.")
     store(daily)
     newest = max(daily)
-    print("Stored %d days from %d pageviews. Latest %s: %d unique, %d views."
+    print("Stored %d days from %d pageviews. Latest %s: %d visits, %d views."
           % (len(daily), len(rows), newest,
              daily[newest]["unique_visitors"], daily[newest]["pageviews"]))
     return 0
