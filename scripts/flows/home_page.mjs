@@ -160,7 +160,7 @@ export const flow = {
       { col: "mine", items: ["karts.html", "hotel.html", "me.html"] },
     ], "Ian: Tester, studios and the 'Mäin' column");
     h.expect(await page.isVisible(".gt-admin"), "Ian: admin row shown");
-    h.eq(await page.$$eval(".gt-admin a", (els) => els.map((e) => e.getAttribute("href"))), ["factory.html", "admin.html"], "admin row links");
+    h.eq(await page.$$eval(".gt-admin a", (els) => els.map((e) => e.getAttribute("href"))), ["factory.html", "admin.html", "traffic.html"], "admin row links");
     await shots(h, "ian");
 
     h.step("Ian again: cached gates show his entries on the first frame");
