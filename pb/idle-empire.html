@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="/pb/arcade-ui.css?v=10">
 <link rel="stylesheet" href="/pb/idle-extras.css?v=5">
 <link rel="stylesheet" href="/pb/idle-gitter.css?v=12">
-<script src="/pb/idle-extras.js?v=8"></script>
+<script src="/pb/idle-extras.js?v=9"></script>
 <style>
 :root{--ink:var(--text);--panel:var(--card);--panel2:var(--card2);--line:var(--border);--gold:var(--amber);--green:var(--good);--blue:var(--cyan)}
 *{box-sizing:border-box}
@@ -369,7 +369,7 @@ function gameTick(){
   const now=Date.now();
   if(TEST_MODE&&state.cash<TEST_CASH/2)state=testUnlockAll(state);
   settleProduction(now);
-  refreshAll(now);
+  if(!document.hidden)refreshAll(now);   // a hidden tab only needs the money to keep counting
   checkSoftcapNotice();
 }
 
@@ -384,11 +384,14 @@ function checkSoftcapNotice(){
   pushSave();
 }
 
+/* The same text written again still makes the browser re-layout: refreshAll runs 20 times a second, so only touch changed text. */
+function setText(el,text){if(el.textContent!==text)el.textContent=text}
+
 function refreshAll(now=Date.now()){
-  document.getElementById("cash").textContent="$"+format(state.cash);
-  document.getElementById("lifetime").textContent="$"+format(state.lifetime);
-  document.getElementById("income").textContent="$"+format(getAutomaticIncome());
-  document.getElementById("investors").textContent=`${format(state.investors)} · ${format(prestigeMultiplier())}×`;
+  setText(document.getElementById("cash"),"$"+format(state.cash));
+  setText(document.getElementById("lifetime"),"$"+format(state.lifetime));
+  setText(document.getElementById("income"),"$"+format(getAutomaticIncome()));
+  setText(document.getElementById("investors"),`${format(state.investors)} · ${format(prestigeMultiplier())}×`);
   BUSINESSES.forEach((business)=>refreshBusiness(business,now));
   rewards?.refresh();
 }
@@ -404,19 +407,19 @@ function refreshBusiness(business,now){
   const payout=getCyclePayout(business);
   const isRunning=cycle.endsAt>0;
   const progress=isRunning?Math.max(0,Math.min(1,(now-cycle.startedAt)/(cycle.endsAt-cycle.startedAt))):0;
-  refs.owned.textContent="×"+format(owned);
-  refs.meta.textContent=`Base $${format(business.payout)} · growth ${business.costGrowth.toFixed(3).replace(/0+$/,"")}×`;
+  setText(refs.owned,"×"+format(owned));
+  setText(refs.meta,`Base $${format(business.payout)} · growth ${business.costGrowth.toFixed(3).replace(/0+$/,"")}×`);
   refs.progressFill.style.width=(progress*100).toFixed(1)+"%";
-  refs.payout.textContent=`Payout: $${format(payout)}`;
-  refs.cycle.textContent=`Cycle: ${format(duration/MILLISECONDS_PER_SECOND)}s`;
-  refs.run.textContent=hasManager?"Automated":isRunning?"Running…":"Run cycle";
+  setText(refs.payout,`Payout: $${format(payout)}`);
+  setText(refs.cycle,`Cycle: ${format(duration/MILLISECONDS_PER_SECOND)}s`);
+  setText(refs.run,hasManager?"Automated":isRunning?"Running…":"Run cycle");
   refs.run.disabled=owned<=0||hasManager||isRunning;refs.run.setAttribute("aria-label",`${refs.run.textContent}: ${business.name}`);
-  refs.buy.textContent=`Buy 1 · $${format(cost)}`;
+  setText(refs.buy,`Buy 1 · $${format(cost)}`);
   refs.buy.disabled=state.cash<cost||owned>=MAX_OWNED;refs.buy.setAttribute("aria-label",`${refs.buy.textContent}: ${business.name}`);
-  refs.manager.textContent=hasManager?`✓ ${business.manager} is managing`:`Hire ${business.manager} · $${format(business.managerCost)}`;
+  setText(refs.manager,hasManager?`✓ ${business.manager} is managing`:`Hire ${business.manager} · $${format(business.managerCost)}`);
   refs.manager.disabled=hasManager||owned<=0||state.cash<business.managerCost;
   refs.manager.classList.toggle("hired",Boolean(hasManager));
-  refs.milestone.textContent=getMilestoneCopy(owned);
+  setText(refs.milestone,getMilestoneCopy(owned));
 }
 
 function getMilestoneCopy(owned){
@@ -611,6 +614,8 @@ window.addEventListener("message",(event)=>{
   applySave(data.data);
 });
 window.addEventListener("pagehide",pushSave);
+// iPad Safari often skips pagehide when the app goes to the background: save when the page is hidden, catch up when it is shown
+document.addEventListener("visibilitychange",()=>{if(!isBooted)return;if(document.hidden)pushSave();else gameTick()});
 document.addEventListener("DOMContentLoaded",boot,{once:true});
 document.getElementById("prestige-button").addEventListener("click",openPrestige);
 document.getElementById("prestige-cancel").addEventListener("click",closePrestige);

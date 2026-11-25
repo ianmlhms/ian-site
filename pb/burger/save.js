@@ -1,5 +1,5 @@
 import {VERSION} from "/pb/burger/data.js?v=1";
-import {createGameState} from "/pb/burger/sim.js?v=1";
+import {createGameState} from "/pb/burger/sim.js?v=2";
 
 const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 const cleanInteger = (value, fallback = 0) => {

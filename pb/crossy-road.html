@@ -362,12 +362,12 @@ function draw(ts){
 
 const GAME_KEYS=new Set(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ']);
 document.addEventListener('keydown',e=>{
-  const k=e.key;
+  const k=e.key.length===1?e.key.toLowerCase():e.key;   // Caps Lock must not break W A S D / M / N
   if(GAME_KEYS.has(k))e.preventDefault();
   if(state==='dead'||state==='win'){
     if(!panelReady())return;
-    if(k==='m'||k==='M'){hidePanel();toMenu()}
-    else if(state==='win'&&(k==='n'||k==='N')&&level<N_LEVELS){hidePanel();nextLevel()}
+    if(k==='m'){hidePanel();toMenu()}
+    else if(state==='win'&&k==='n'&&level<N_LEVELS){hidePanel();nextLevel()}
     return;
   }
   if(state!=='play')return;

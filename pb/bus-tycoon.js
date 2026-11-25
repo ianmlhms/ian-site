@@ -65,10 +65,11 @@
   function settle(now = Date.now()) {
     if (TEST_MODE && state.p < TEST_PASSENGERS / 2) state = testUnlockAll(state);
     const elapsed = Math.max(0, (now - lastTick) / 1000);
-    if (elapsed > 10) {
-      const result = IdleExtras.offline(state.st, lastTick, production(), now);
-      earn(result.credited); rewards?.notice(result);
-    } else earn(elapsed * production() * IdleExtras.activityRate(state.st));
+    // A tab that was hidden or frozen for a while (iPad Safari) catches up with the same rule as a live tick: full rate while the
+    // player was active in the last 15 minutes, the away rate after that, and never more than the away cap.
+    const seconds = IdleExtras.catchUpSeconds(state.st, now - lastTick);
+    if (elapsed > 10) rewards?.notice({ seconds, capHours: Math.round(IdleExtras.catchUpSeconds(state.st, Infinity) / 3600), credited: seconds * production() * IdleExtras.activityRate(state.st) });
+    earn(seconds * production() * IdleExtras.activityRate(state.st));
     lastTick = Math.max(now, lastTick);
   }
   function snapshot() {

@@ -14,8 +14,9 @@ import {
   tapGrill,
   tick,
   toggleTopping,
-} from "/pb/burger/sim.js?v=1";
-import {createPersistence, snapshot} from "/pb/burger/save.js?v=3";
+  gameNow, pauseClock,
+} from "/pb/burger/sim.js?v=2";
+import {createPersistence, snapshot} from "/pb/burger/save.js?v=4";
 import {createShop} from "/pb/burger/shop.js?v=1";
 
 const UI_REFRESH_MS = 100;
@@ -347,7 +348,7 @@ const renderDeco = () => {
 };
 
 function render() {
-  const nowMs = performance.now();
+  const nowMs = gameNow();
   renderDeco();
   renderCustomers(nowMs);
   renderTray();
@@ -392,7 +393,15 @@ nodes.plateButton.addEventListener("click", () => {
 });
 nodes.boostButton.addEventListener("click", () => setState(activateBoost(state)));
 
-const animationLoop = (nowMs) => {
+// the day's clock stands still while the page is hidden
+let hiddenAt = 0;
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) hiddenAt = performance.now();
+  else if (hiddenAt) { pauseClock(performance.now() - hiddenAt); hiddenAt = 0; }
+});
+
+const animationLoop = () => {
+  const nowMs = gameNow();
   const wasPlaying = state.screen === "playing";
   const next = testUnlockAll(tick(state, nowMs));
   const didFinish = wasPlaying && next.screen === "summary";
@@ -461,7 +470,7 @@ const runSelfTest = () => {
  * where it would be a ready-made cheat handle for the shared leaderboard. */
 if (testMode) window.__burgerTest = Object.freeze({
   getState:() => state,
-  start:(nowMs = performance.now()) => setState(startDay(state, nowMs)),
+  start:(nowMs = gameNow()) => setState(startDay(state, nowMs)),
   advance:(nowMs) => setState(tick(state, nowMs)),
   save:() => snapshot(state),
 });

@@ -11,6 +11,12 @@ import {
   VERSION,
 } from "/pb/burger/data.js?v=1";
 
+/* The day's clock stops while the page is hidden (iPad app switch, other tab): customers would otherwise lose their patience
+ * and the food burn with nobody looking. ui.js calls pauseClock(ms) with the time spent hidden. */
+let clockShiftMs = 0;
+export const gameNow = () => performance.now() - clockShiftMs;
+export const pauseClock = (ms) => { if (ms > 0) clockShiftMs += ms; };
+
 const EMPTY_ASSEMBLY = Object.freeze({patties:0, toppings:[]});
 const INITIAL_SEED = 0x45d9f3b;
 const FIRST_CUSTOMER_DELAY_FACTOR = 0.45;
@@ -72,7 +78,7 @@ const durationFor = (state, level) => (
 const emptySlot = (id) => ({id, state:"empty"});
 const makeSlots = (count, prefix) => Array.from({length:count}, (_, index) => emptySlot(`${prefix}-${index}`));
 
-export function startDay(state, nowMs = performance.now()) {
+export function startDay(state, nowMs = gameNow()) {
   const level = getLevel(state);
   const helperLevel = upgradeLevel(state, "prem", "helper");
   const durationMs = durationFor(state, level);
@@ -238,7 +244,7 @@ const runHelper = (state, nowMs) => {
   return matchIndex < 0 ? scheduled : serveTrayInternal(scheduled, matchIndex, nowMs);
 };
 
-export function tick(state, nowMs = performance.now()) {
+export function tick(state, nowMs = gameNow()) {
   if (state.screen !== "playing" || state.session?.status !== "playing") return state;
   const remainingMs = Math.max(0, state.session.endsAt - nowMs);
   let session = {...advanceStations(state, state.session, nowMs), remainingMs};
@@ -279,7 +285,7 @@ const startHeatItem = (slots, index, nowMs, cookMs, itemId) => slots.map((slot, 
   return {id:slot.id, itemId, state:"raw", cookingAt:nowMs + TIMING.rawStageMs, readyAt:nowMs + TIMING.rawStageMs + cookMs};
 });
 
-export function tapGrill(state, index, nowMs = performance.now()) {
+export function tapGrill(state, index, nowMs = gameNow()) {
   if (state.session?.status !== "playing") return state;
   const slot = state.session.grill[index];
   if (!slot) return state;
@@ -298,7 +304,7 @@ export function tapGrill(state, index, nowMs = performance.now()) {
   return {...state, session:{...state.session, grill}};
 }
 
-export function tapFryer(state, index, nowMs = performance.now()) {
+export function tapFryer(state, index, nowMs = gameNow()) {
   if (state.session?.status !== "playing") return state;
   const slot = state.session.fryer[index];
   if (!slot || state.day < UNLOCKS.fries) return state;
@@ -312,7 +318,7 @@ export function tapFryer(state, index, nowMs = performance.now()) {
   return {...state, session:{...state.session, fryer}};
 }
 
-export function tapDrink(state, index, itemId, nowMs = performance.now()) {
+export function tapDrink(state, index, itemId, nowMs = gameNow()) {
   if (state.session?.status !== "playing" || !isItemUnlocked(state.day, itemId)) return state;
   const slot = state.session.drinks[index];
   if (!slot) return state;
@@ -353,9 +359,9 @@ export function plateBurger(state) {
   return {...state, session:{...state.session, assembly:{...EMPTY_ASSEMBLY}, tray}};
 }
 
-export const serveTray = (state, itemIndex, nowMs = performance.now()) => serveTrayInternal(state, itemIndex, nowMs);
+export const serveTray = (state, itemIndex, nowMs = gameNow()) => serveTrayInternal(state, itemIndex, nowMs);
 
-export function activateBoost(state, nowMs = performance.now()) {
+export function activateBoost(state, nowMs = gameNow()) {
   const level = upgradeLevel(state, "prem", "instant");
   if (!level || state.session?.status !== "playing" || nowMs < state.session.boostReadyAt) return state;
   const durationMs = TIMING.boostDurationMs + (level - 1) * BOOST_LEVEL_STEP_MS;

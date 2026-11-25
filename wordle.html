@@ -133,6 +133,7 @@ const WORDS = {
 };
 const LABEL = { lb:"Lëtzebuergesch", de:"Deutsch" };
 const ROWS = 6, COLS = 5;
+const HOWTO = "Rot d'Wuert an 6 Versich. Gréng = richteg Plaz, däischter = am Wuert, aner Plaz, hell = net am Wuert.";
 const STATE_LABEL = { correct:"richteg Plaz", present:"am Wuert, aner Plaz", absent:"net am Wuert" };
 let lang = localStorage.getItem("wordleLang") || "lb";
 let answer = "", guesses = [], current = "", done = false;
@@ -172,6 +173,7 @@ function load(){
   $("share").style.display = done ? "" : "none";
   $("again").style.display = done ? "" : "none";
   if(done){ $("msg").textContent = guesses.includes(answer) ? "Gewonnen!" : "Léisung: "+answer; }
+  else if(!guesses.length){ $("msg").textContent = HOWTO; }   // a fresh board explains the colours
 }
 function startPractice(){
   practice = true;
@@ -247,7 +249,7 @@ function key(k){
     return;
   }
   if(k==="Backspace"){ current=current.slice(0,-1); render(); return; }
-  if(/^[A-ZÄÖÜËÉ]$/.test(k) && current.length<COLS){ current+=k; render(); }
+  if(/^[A-ZÄÖÜËÉ]$/.test(k) && current.length<COLS){ if($("msg").textContent===HOWTO) $("msg").textContent=""; current+=k; render(); }
 }
 function finish(won){
   $("msg").textContent = won ? ["Genial!","Super!","Gutt!","Net schlecht","Knapp!","Puh!"][guesses.length-1] : "Léisung: "+answer;

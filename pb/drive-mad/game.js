@@ -215,7 +215,9 @@ function startAudio(){
   if(audioContext){if(audioContext.state==='suspended')audioContext.resume().catch(()=>{});return;}
   try{audioContext=new(window.AudioContext||window.webkitAudioContext)();engineOsc=audioContext.createOscillator();engineGain=audioContext.createGain();const filter=audioContext.createBiquadFilter();engineOsc.type='sawtooth';filter.type='lowpass';filter.frequency.value=420;engineGain.gain.value=0;engineOsc.connect(filter);filter.connect(engineGain);engineGain.connect(audioContext.destination);engineOsc.start();}catch(error){audioContext=null;}
 }
-function updateAudio(){if(!audioContext||!engineOsc)return;engineOsc.frequency.value=58+Math.abs(car?car.wheels[0].omega:0)*2.4;engineGain.gain.value=state==='play'?(keys.up?.045:.018):0;}
+let soundMuted=false;
+if(window.Arcade&&Arcade.onMute)Arcade.onMute(muted=>{soundMuted=muted;});   // the arcade's sound switch also silences the engine
+function updateAudio(){if(!audioContext||!engineOsc)return;engineOsc.frequency.value=58+Math.abs(car?car.wheels[0].omega:0)*2.4;engineGain.gain.value=state==='play'&&!soundMuted?(keys.up?.045:.018):0;}
 
 function setPlayUI(active){$('hud').classList.toggle('hidden',!active);$('restart').classList.toggle('hidden',!active);$('touch').classList.toggle('hidden',!active);}
 function refreshLevels(){
@@ -248,6 +250,8 @@ window.addEventListener('keydown',event=>{
   if(event.key===' '){if(state==='dead')startLevel(levelIndex);else if(state==='won')levelIndex+1<C.LEVELS.length?startLevel(levelIndex+1):showMenu();else if(state==='menu')playButton.click();event.preventDefault();}
 });
 window.addEventListener('keyup',event=>{const mapped=keyMap[event.key];if(mapped){keys[mapped]=false;event.preventDefault();}});
+// a key released while the page was in the background never sends its keyup: do not keep driving
+window.addEventListener('blur',()=>{keys.up=keys.down=keys.left=keys.right=false;});
 window.addEventListener('blur',()=>{keys.up=keys.down=keys.left=keys.right=false;});
 function bindPedal(id,key,restarts=true){
   const element=$(id),release=event=>{keys[key]=false;element.classList.remove('on');if(element.hasPointerCapture&&element.hasPointerCapture(event.pointerId))element.releasePointerCapture(event.pointerId);};

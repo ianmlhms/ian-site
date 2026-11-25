@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="/pb/arcade-ui.css?v=10">
 <link rel="stylesheet" href="/pb/idle-extras.css?v=5">
 <link rel="stylesheet" href="/pb/idle-gitter.css?v=12">
-<script src="/pb/idle-extras.js?v=8"></script>
+<script src="/pb/idle-extras.js?v=9"></script>
 <style>
 body{display:flex;flex-direction:column}
 [hidden]{display:none!important}
@@ -69,7 +69,7 @@ const cssVar=(name,fallback)=>ROOT_STYLE.getPropertyValue(name).trim()||fallback
 const REDUCED=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const SCORE_LIMIT=1e300; // the leaderboard accepts any finite score up to 1e300
 const COOKIE_SIZE=250,COOKIE_R=95,MAX_DPR=3,FLOAT_MS=1000,TICK_MS=100,SAVE_EVERY_MS=5000,COST_GROWTH=1.15,SWAY=0.05;
-const REBIRTH_THRESHOLD=1e12;
+const REBIRTH_THRESHOLD=1e12,DRAW_MS=33;
 /* Arcade test mode: everything affordable, rebirth always ready. Saves go to the isolated test store (platform). */
 const TEST_MODE=window.__pbTestMode===true;
 const TEST_COOKIES=1e30;
@@ -122,19 +122,18 @@ const clickUpgrades=[
 
 function getCost(u){return Math.floor(u.baseCost*Math.pow(COST_GROWTH,u.count))}
 
+const SUFFIXES=[[1e33,'Dc'],[1e30,'No'],[1e27,'Oc'],[1e24,'Sp'],[1e21,'Sx'],[1e18,'Qi'],[1e15,'Qa'],[1e12,'T'],[1e9,'B'],[1e6,'M'],[1e3,'K']];
 function format(n){
+  if(!Number.isFinite(n))return n>0?'\u221e':'0';
   if(n>=1e36)return n.toExponential(2).replace('e+','e'); // beyond Dc: 1.23e45
-  if(n>=1e33)return(n/1e33).toFixed(1)+'Dc';
-  if(n>=1e30)return(n/1e30).toFixed(1)+'No';
-  if(n>=1e27)return(n/1e27).toFixed(1)+'Oc';
-  if(n>=1e24)return(n/1e24).toFixed(1)+'Sp';
-  if(n>=1e21)return(n/1e21).toFixed(1)+'Sx';
-  if(n>=1e18)return(n/1e18).toFixed(1)+'Qi';
-  if(n>=1e15)return(n/1e15).toFixed(1)+'Qa';
-  if(n>=1e12)return(n/1e12).toFixed(1)+'T';
-  if(n>=1e9)return(n/1e9).toFixed(1)+'B';
-  if(n>=1e6)return(n/1e6).toFixed(1)+'M';
-  if(n>=1e3)return(n/1e3).toFixed(1)+'K';
+  for(let i=0;i<SUFFIXES.length;i++){
+    const[unit,name]=SUFFIXES[i];
+    if(n<unit)continue;
+    const text=(n/unit).toFixed(1);
+    // 999.96K must not print as "1000.0K": it is 1.0M
+    if(text==='1000.0')return i>0?'1.0'+SUFFIXES[i-1][1]:n.toExponential(2).replace('e+','e');
+    return text+name;
+  }
   return Math.floor(n);
 }
 
@@ -190,6 +189,9 @@ function buildUpgrades(){
   });
 }
 
+/* Writing the same text again still makes the browser re-layout: only touch the DOM when the text changed (10 refreshes a second on an iPad). */
+function setText(el,text){if(el.textContent!==text)el.textContent=text}
+
 function refreshUpgrades(){
   document.querySelectorAll('#upgrades .upgrade').forEach(row=>{
     const u=row.dataset.type==='cps'?upgrades[+row.dataset.i]:clickUpgrades[+row.dataset.i];
@@ -198,15 +200,15 @@ function refreshUpgrades(){
     const locked=cookies<cost||eventLocked;
     row.classList.toggle('locked',locked);
     row.setAttribute('aria-disabled',String(locked));
-    row.querySelector('.cost').textContent=format(cost)+' 🍪';
-    row.querySelector('.name').textContent=`${u.icon} ${u.name} (${u.count})`;
-    if(row.dataset.type==='cps')row.querySelector('.desc').textContent=`${u.halloween?(eventLocked?'🎃 Halloween only':'Limited Halloween building'):u.desc} [${format(u.cps*u.count*IdleExtras.multiplier(stars))}/s]`;
+    setText(row.querySelector('.cost'),format(cost)+' 🍪');
+    setText(row.querySelector('.name'),`${u.icon} ${u.name} (${u.count})`);
+    if(row.dataset.type==='cps')setText(row.querySelector('.desc'),`${u.halloween?(eventLocked?'🎃 Halloween only':'Limited Halloween building'):u.desc} [${format(u.cps*u.count*IdleExtras.multiplier(stars))}/s]`);
   });
 }
 
 function updateUI(){
-  $('count').textContent=format(cookies)+' cookies';
-  $('persec').textContent='per second: '+format(cps)+' | click power: '+format(clickPower);
+  setText($('count'),format(cookies)+' cookies');
+  setText($('persec'),'per second: '+format(cps)+' | click power: '+format(clickPower));
   refreshUpgrades();
   rewards?.refresh();
 }
@@ -215,7 +217,11 @@ function updateUI(){
 const cc=$('cc'),cx=cc.getContext('2d');
 const dpr=Math.min(window.devicePixelRatio||1,MAX_DPR);
 cc.width=Math.round(COOKIE_SIZE*dpr);cc.height=Math.round(COOKIE_SIZE*dpr);
-function drawCookie(){
+let lastDraw=-DRAW_MS;
+function drawCookie(now){
+  requestAnimationFrame(drawCookie);
+  if(now-lastDraw<DRAW_MS)return;   // the sway is slow: 30 drawings a second are plenty (120 Hz iPads, battery)
+  lastDraw=now;
   cx.setTransform(cc.width/COOKIE_SIZE,0,0,cc.height/COOKIE_SIZE,0,0);
   cx.clearRect(0,0,COOKIE_SIZE,COOKIE_SIZE);
   let t=REDUCED?0:Date.now()/2000;
@@ -231,9 +237,8 @@ function drawCookie(){
   cx.beginPath();cx.ellipse(-20,-25,40,25,-0.5,0,Math.PI*2);cx.fill();
   cx.globalAlpha=1;
   cx.restore();
-  requestAnimationFrame(drawCookie);
 }
-drawCookie();
+drawCookie(0);
 
 /* ---------- persistence: local save injected by PixelBreak, cloud save arrives
  * via postMessage; whichever has more total cookies baked wins ---------- */
@@ -299,8 +304,17 @@ function applySave(sv){
 function pushSave(){try{parent.postMessage({__pbSave:1,data:snapshot()},'*')}catch(error){console.warn('[Cookie Clicker] Save failed',error)}}
 window.addEventListener('message',(e)=>{const d=e.data;if(e.source===parent&&d&&d.__pbLoadSave===1)applySave(d.data)});
 
-// Game loop
-setInterval(()=>{earnCookies(cps/10*IdleExtras.activityRate(stars));testRefill();reportScore();updateUI()},TICK_MS);
+// Game loop: production follows the clock, not the number of ticks, so a throttled or hidden tab (iPad Safari, background
+// tabs) still earns what it should. The span is capped like the offline credit.
+let lastTick=Date.now();
+function gameTick(){
+  const now=Date.now();
+  const seconds=IdleExtras.catchUpSeconds(stars,now-lastTick);
+  lastTick=now;
+  earnCookies(cps*seconds*IdleExtras.activityRate(stars));testRefill();reportScore();updateUI();
+}
+setInterval(gameTick,TICK_MS);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)pushSave();else gameTick()});
 buildUpgrades();testRefill();
 rewards=IdleExtras.mount({host:$('shop'),threshold:REBIRTH_THRESHOLD,read:()=>({rb:roundBaked,st:stars,gd:giftDay}),format,
   resets:'cookies, all buildings (including gifted Time Machines) except Haunted Ovens, click upgrades and round clicks.',

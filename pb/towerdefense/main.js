@@ -457,6 +457,12 @@ window.addEventListener("message", (event) => {
   if (event.source === window.parent && event.data?.__pbLoadSave === 1) applyIncomingSave(event.data.data);
 });
 window.addEventListener("pagehide", pushSave);
+// a wave must not run on while the page is in the background (iPad app switch): pause it, and save
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) return;
+  if (game && game.status === "wave" && !paused) { paused = true; updateUi(); }
+  pushSave();
+});
 
 applyIncomingSave(window.__pbSave);
 setTimeout(() => applyIncomingSave(window.__pbSave), 0);

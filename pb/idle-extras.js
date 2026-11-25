@@ -21,6 +21,8 @@
   // so leaving a tab running all night is no better than closing it.
   function awayRate(stars){return Math.min(1,AWAY_BASE_RATE+AWAY_STAR_RATE*stars)}
   function capHoursFor(stars){return Math.min(12,8+0.25*stars)}
+  /** Seconds of play a clock-based tick may add in one go (a hidden or throttled tab catches up, but never past the away cap). */
+  function catchUpSeconds(stars,ms){return Math.min(capHoursFor(stars)*HOUR,Math.max(0,ms/1000))}
   function offline(stars,savedAt,production,now=Date.now()){
     const capHours=capHoursFor(stars);
     const seconds=Number.isFinite(savedAt)?Math.min(capHours*HOUR,Math.max(0,(now-savedAt)/1000)):0;
@@ -328,5 +330,5 @@
     if(pending)offerUndo(pending.label,pending.snap,pending.until);
     refresh();return Object.freeze({refresh,notice,offerUndo});
   }
-  window.IdleExtras=Object.freeze({liveGifts,cleanGiftIds,day,halloween,multiplier,starBonus:STAR_BONUS,offline,awayRate,activityRate,isActive,mount,makeGuard,advise,duration,undoToast,undoRead,undoWrite,holdMs:HOLD_MS,lockMs:OPEN_LOCK_MS,undoMs:UNDO_MS,worthGain:WORTH_GAIN,smallShare:SMALL_SHARE});
+  window.IdleExtras=Object.freeze({catchUpSeconds,liveGifts,cleanGiftIds,day,halloween,multiplier,starBonus:STAR_BONUS,offline,awayRate,activityRate,isActive,mount,makeGuard,advise,duration,undoToast,undoRead,undoWrite,holdMs:HOLD_MS,lockMs:OPEN_LOCK_MS,undoMs:UNDO_MS,worthGain:WORTH_GAIN,smallShare:SMALL_SHARE});
 })();

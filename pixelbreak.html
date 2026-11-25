@@ -629,6 +629,8 @@ var g=GAMES[idx];
 if(!g||!g.go)return;
 var go=function(test){
 if(window.PB&&PB.setStandaloneTest)PB.setStandaloneTest(g.id,test===true);
+// these games open as their own page (which counts itself under its own path): also count the arcade view, like every framed game
+if(window.ianCount&&ianCount.view)ianCount.view('/pixelbreak.html?g='+encodeURIComponent(g.id),g.name);
 location.href=g.go;
 };
 if(window.PB&&PB.chooseMode)PB.chooseMode(g).then(function(test){if(test!==null)go(test)});
@@ -811,7 +813,7 @@ loadPlayCounts();
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script src="pb/arcade-kit.js?v=57"></script>
-<script type="module" src="pixelbreak-records.js?v=71"></script>
+<script type="module" src="pixelbreak-records.js?v=72"></script>
 <script>
 /* ---------- install as app (PWA) ---------- */
 (function(){
