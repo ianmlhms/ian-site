@@ -146,6 +146,45 @@ export const flow = {
       await col.guest.page.waitForSelector("table", WAIT);
       h.expect(true, "a guest reloading on the results screen gets the results back");
 
+      /* ---------------------------------------------------------------- against the computer */
+      h.step("dots: a whole game against the computer (easy), then the rematch button");
+      const solo = await newPlayer(h, world, { label: "solo", user: USERS.max }); players.push(solo);
+      await solo.page.goto(h.origin + "/dots.html?ai=1&diff=easy", { waitUntil: "domcontentloaded" });
+      await solo.page.waitForFunction(() => document.querySelectorAll("#board .dot").length === 25);
+      for (let i = 0; i < 80; i++) {
+        if (await solo.page.isVisible("#rematch")) break;
+        if (/Du bass drun/.test(await statusOf(solo.page)) && await solo.page.$(".edge.open")) await solo.page.click(".edge.open >> nth=0").catch(() => {});
+        else await solo.page.waitForTimeout(300);
+      }
+      h.expect(await solo.page.isVisible("#rematch"), `the game against the computer reaches its end (${await statusOf(solo.page)})`);
+      h.expect(/Du hues gewonn|Du hues verluer|Onentschidden/.test(await statusOf(solo.page)), "…and says who won");
+      await solo.page.click("#rematch");
+      h.eq(await solo.page.$$eval(".edge.set", (e) => e.length), 0, "the rematch starts from an empty board");
+
+      h.step("dice-duel: one turn against the computer, it answers with its own score");
+      await solo.page.goto(h.origin + "/dice-duel.html?ai=1", { waitUntil: "domcontentloaded" });
+      await solo.page.waitForSelector("#roll:not([disabled])", WAIT);
+      await solo.page.click("#roll");
+      await solo.page.waitForSelector("#card td.pick button", WAIT);
+      const rowTargets = await solo.page.$$eval("#card td.pick button", (bs) => bs.map((b) => Math.round(b.getBoundingClientRect().height)));
+      h.expect(rowTargets.every((v) => v >= 40), `score buttons are tall enough to tap (${Math.min(...rowTargets)} px)`);
+      await solo.page.click("#card td.pick button >> nth=0");
+      await solo.page.waitForFunction(() => /Du bass drun/.test(document.getElementById("status").textContent) && document.querySelectorAll("#card td.open").length > 0 && [...document.querySelectorAll("#card tr")].some((tr) => tr.cells[2] && /^\d+$/.test(tr.cells[2].textContent.trim())), null, { timeout: 40000 });
+      h.expect(true, "the computer scored a category and it is the player's turn again");
+
+      /* ---------------------------------------------------------------- Stadt-Land-Fluss: reload mid-round */
+      h.step("slf: host starts a round, the guest reloads and gets the same letter");
+      const slf = await pair(h, world, false); players.push(slf.host, slf.guest);
+      await slf.host.page.goto(h.origin + "/slf.html?room=slfplay&role=host", { waitUntil: "domcontentloaded" });
+      await slf.guest.page.goto(h.origin + "/slf.html?room=slfplay&role=guest", { waitUntil: "domcontentloaded" });
+      await slf.host.page.waitForFunction(() => { const b = document.getElementById("startBtn"); return b && !b.disabled; }, null, WAIT);
+      await slf.host.page.click("#startBtn");
+      await slf.guest.page.waitForSelector("#c0", WAIT);
+      const letterBefore = await text(slf.host.page, ".letter");
+      await slf.guest.page.reload({ waitUntil: "domcontentloaded" });
+      await slf.guest.page.waitForSelector("#c0", WAIT);
+      h.eq(await text(slf.guest.page, ".letter"), letterBefore, "the reloaded guest is back in the running round with the same letter");
+
       for (const p of players) h.eq(realErrors(p), [], `no console errors (${p.label})`);
     } finally {
       await closePlayers(players);

@@ -136,7 +136,8 @@ const isVerdictKey=(v)=>typeof v==="string"&&/^[a-z0-9]{1,8}\|[0-9]{1,2}$/.test(
 function isMessage(event,p){
   if(!isObject(p)) return false;
   switch(event){
-    case "start": return isInt(p.round,1,MAX_ROUND)&&isText(p.letter,1)&&p.letter.length===1&&LETTERS.includes(p.letter)&&isList(p.cats,CATALOG.length,isCategory)&&p.cats.length>=2&&new Set(p.cats).size===p.cats.length;
+    case "need": return Object.keys(p).length===0;
+    case "start": case "sync": return isInt(p.round,1,MAX_ROUND)&&isText(p.letter,1)&&p.letter.length===1&&LETTERS.includes(p.letter)&&isList(p.cats,CATALOG.length,isCategory)&&p.cats.length>=2&&new Set(p.cats).size===p.cats.length;
     case "stop": return Object.keys(p).length===0;
     case "answers": return isPlayer(p)&&isList(p.ans,CATALOG.length,x=>isText(x,MAX_ANSWER))&&p.ans.length===cats.length;
     case "verdicts": return isObject(p.v)&&Object.keys(p.v).length<=MAX_PLAYERS*CATALOG.length&&Object.entries(p.v).every(([k,v])=>isVerdictKey(k)&&typeof v==="boolean");
@@ -380,6 +381,12 @@ function overrideVerdict(key, send){
 ch.on("broadcast",{event:"start"},onMessage("start",payload=>{ round=payload.round; letter=payload.letter;
     cats=(Array.isArray(payload.cats)?payload.cats:DEFAULT_CATS).map(i=>CATALOG[i]).filter(Boolean); enterPlay(); }))
   .on("broadcast",{event:"stop"},onMessage("stop",payload=>doStop()))
+  // a player who reloaded (or came late) asks for the running round; the host answers with its letter. Only a fresh page takes it.
+  .on("broadcast",{event:"need"},onMessage("need",()=>{ if(role==="host"&&phase==="play") ch.send({type:"broadcast",event:"sync",payload:{round,letter,cats:selIdx}}); }))
+  .on("broadcast",{event:"sync"},onMessage("sync",payload=>{
+    if(role==="host"||phase!=="lobby"||round!==0) return;
+    round=payload.round; letter=payload.letter;
+    cats=payload.cats.map(i=>CATALOG[i]).filter(Boolean); enterPlay(); }))
   .on("broadcast",{event:"answers"},onMessage("answers",payload=>{ answers={...answers,[payload.cid]:{name:payload.name,ans:[...payload.ans]}}; if(stopped) checkComplete(); }))
   .on("broadcast",{event:"verdicts"},onMessage("verdicts",payload=>applyVerdicts(payload.v||{})))
   .on("broadcast",{event:"override"},onMessage("override",payload=>overrideVerdict(payload.key,false)))
@@ -405,6 +412,7 @@ function fireAutoStart(){
 }
 if(!(window.MPGate&&MPGate.redirecting)){
   ch.subscribe(async (s)=>{ if(s==="SUBSCRIBED"){ name=await getName(); await ch.track({name,role}); render();
+    if(role!=="host") ch.send({type:"broadcast",event:"need",payload:{}});
     if(autoStartPending) autoStartTimer=setTimeout(fireAutoStart,AUTO_START_WAIT_MS); }});
 }
 </script>
