@@ -37,6 +37,7 @@
     .langbar button.on{background:var(--accent);color:var(--accent-foreground);box-shadow:0 10px 24px -14px color-mix(in srgb,var(--accent) 75%,transparent)}
 
     /* ---- document (legal text keeps its DE/FR/EN switch) ---- */
+    .legal{display:contents}                        /* the sections' cards sit in the page grid */
     .legal section[data-lang]:not([hidden]){display:contents}
     .legal section[data-lang][hidden]{display:none}
     .langbar{flex-direction:row !important;justify-content:flex-start !important;flex-wrap:wrap;gap:8px !important}
@@ -47,7 +48,7 @@
     .updated{margin:0;color:var(--muted);font-size:14px}
     .lead{max-width:none;color:var(--muted);font-size:17px;text-wrap:pretty;display:block !important}
     h2.grp{display:flex !important;font-size:15px;font-weight:600;color:var(--muted)}
-    .legal .c{overflow-wrap:anywhere;display:block}
+    .legal .c{overflow-wrap:break-word;display:block}
     .legal .c h2,.legal .c h3{margin:0 0 12px;font:800 19px/1.25 "Geist",system-ui,sans-serif;letter-spacing:-.02em}
     .legal .ico{display:inline-grid;place-items:center;width:32px;height:32px;margin-right:10px;border:1px solid var(--ink);font:500 15px "Geist Mono",ui-monospace,monospace}
     .legal .c p{margin:0 0 12px;font-size:16px;text-wrap:pretty}
@@ -91,6 +92,7 @@
       <button type="button" data-l="en" lang="en" aria-pressed="false">English</button>
     </div>
 
+    <div class="legal">
     <!-- ==================== DEUTSCH ==================== -->
     <section data-lang="de" lang="de" hidden>
       <header class="p-head c full top">
@@ -396,6 +398,7 @@
       <aside class="c full note-card"><p>This statement describes the actual state of the website. If the services it uses change, it will be updated.</p>
       </aside>
     </section>
+    </div>
 
   </div>
 </main>
