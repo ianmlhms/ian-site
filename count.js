@@ -83,7 +83,7 @@
     }
     function leave() {
       clearTimeout(timer);
-      if (Date.now() - lastPing > 15000) ping(true);
+      if (Date.now() - lastPing > 2000) ping(true);            // a short visit gets its seconds too
     }
     doc.addEventListener('visibilitychange', function () {
       if (doc.visibilityState === 'hidden') { visibleBefore += Date.now() - shownAt; leave(); }

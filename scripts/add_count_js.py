@@ -13,7 +13,7 @@ import re
 import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-COUNT_VERSION = 1
+COUNT_VERSION = 2
 TAG = '<script defer src="/count.js?v=%d"></script>' % COUNT_VERSION
 SKIP_DIRS = {".git", "node_modules"}
 GOATCOUNTER = re.compile(r'([ \t]*)<script\b[^>]*data-goatcounter[^>]*>\s*</script>', re.S)
