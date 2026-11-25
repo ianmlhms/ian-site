@@ -68,6 +68,8 @@ const SHAPES=[
 ];
 let grid,piece,next,score,lines,level,gameOver,dropTimer,dropInterval;
 let state='idle',paused=false,best=loadBest();
+const LOCK_DELAY_MS=400,MAX_LOCK_RESETS=15;   // a landed piece can still be slid or turned for a moment
+let lockTimer=0,lockResets=0;
 
 function loadBest(){
   if(TEST_MODE)return 0;
@@ -92,6 +94,7 @@ function fit(){ // board fills the stage at device resolution; the next-piece ca
 new ResizeObserver(fit).observe(stage);fit();
 
 function newPiece(){
+  lockTimer=0;lockResets=0;
   piece={shape:next||SHAPES[Math.floor(Math.random()*7)],x:3,y:0,rot:0};
   next=SHAPES[Math.floor(Math.random()*7)];
   let blocks=getBlocks(piece);
@@ -185,8 +188,14 @@ function loop(t){
   let dt=Math.min(MAX_DT,t-lastTime);lastTime=t;
   if(state==='playing'&&!paused){
     if(gameOver)finish();
-    else{dropTimer+=dt;if(dropTimer>dropInterval){dropTimer=0;
-      if(valid({...piece,y:piece.y+1}))piece.y++;else lock()}
+    else{
+      if(valid({...piece,y:piece.y+1})){
+        lockTimer=0;dropTimer+=dt;
+        if(dropTimer>dropInterval){dropTimer=0;piece.y++}
+      }else{
+        dropTimer=0;lockTimer+=dt;
+        if(lockTimer>=LOCK_DELAY_MS)lock();
+      }
       if(gameOver)finish()}
   }
   if(grid)draw();
@@ -195,9 +204,10 @@ function loop(t){
 const DAS_DELAY=170,DAS_RATE=45,KICKS=[0,-1,1,-2,2]; // hold-to-repeat timing (ms), wall-kick offsets tried on rotate
 let heldKey='',repeatTimer=0;
 function stopRepeat(){clearTimeout(repeatTimer);repeatTimer=0;heldKey=''}
+function slid(){if(lockTimer>0&&lockResets<MAX_LOCK_RESETS){lockResets++;lockTimer=0}}   // moving a landed piece restarts its lock timer
 function nudge(key){
-  if(key==='ArrowLeft'&&valid({...piece,x:piece.x-1}))piece.x--;
-  else if(key==='ArrowRight'&&valid({...piece,x:piece.x+1}))piece.x++;
+  if(key==='ArrowLeft'&&valid({...piece,x:piece.x-1})){piece.x--;slid()}
+  else if(key==='ArrowRight'&&valid({...piece,x:piece.x+1})){piece.x++;slid()}
   else if(key==='ArrowDown'&&valid({...piece,y:piece.y+1})){piece.y++;score++;Arcade.score(score);$('sc').textContent=score}
 }
 function repeatStep(){
@@ -205,7 +215,7 @@ function repeatStep(){
   nudge(heldKey);repeatTimer=setTimeout(repeatStep,DAS_RATE);
 }
 function rotate(){
-  for(const dx of KICKS){const t={...piece,rot:piece.rot+1,x:piece.x+dx};if(valid(t)){piece=t;return}}
+  for(const dx of KICKS){const t={...piece,rot:piece.rot+1,x:piece.x+dx};if(valid(t)){piece=t;slid();return}}
 }
 function handleKey(e){
   if(e.target.closest&&e.target.closest('button'))return;

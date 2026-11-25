@@ -123,7 +123,7 @@ function names(){ // [left label, right label] for the current mode
   return['P1','P2'];
 }
 function begin(){p1=makePlayer(200,PAL.p1,'P1');p2=makePlayer(600,PAL.p2,'P2');
-  koPending=false;running=true;paused=false;menu.classList.remove('show');pad.show(mode==='local');
+  koPending=false;running=true;paused=false;menu.classList.remove('show');pad.show(mode==='local');$('hint').hidden=mode==='local'&&pad.touchScreen;
   const[n1,n2]=names();$('n1').textContent=n1;$('n2').textContent=n2;
   $('hint').textContent=
     mode==='local'?'P1: WASD + F / G  ·  P2: Pfeiltaste + K / L':

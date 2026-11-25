@@ -123,7 +123,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden)setPaused(t
 $('resumeBtn').onclick=()=>{lastT=0;setPaused(false)};
 $('hudMenu').onclick=()=>backToMenu();
 function begin(){
-  p1.score=0;p2.score=0;resetRoundNow();running=true;paused=false;menu.classList.remove('show');pad.show(mode==='local');
+  p1.score=0;p2.score=0;resetRoundNow();running=true;paused=false;menu.classList.remove('show');pad.show(mode==='local');$('hint').hidden=mode==='local'&&pad.touchScreen;
   if(mode==='host')NET.send({t:'w',w:walls});
   const[n1,n2]=names();$('n1').textContent=n1;$('n2').textContent=n2;
   $('hint').textContent=
