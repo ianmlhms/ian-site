@@ -140,6 +140,7 @@ export async function fetchOwnStats(supabase, only = '') {
 function livePanel() {
   const box = panel('Elo online', 'Op der Säit an de leschte 5 Minutten');
   box.id = 'liveBox';
+  box.classList.add('panel-wide');
   return box;
 }
 

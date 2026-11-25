@@ -197,7 +197,8 @@ export class Store {
     return this.run(`SELECT first_ts, last_ts, country, device, browser, org, org_kind, provider, entry, trail FROM sessions
                      WHERE ${NOT_TEST} ORDER BY id DESC LIMIT ${RECENT_VISITS}`).map((s) => ({
       time: s.first_ts, country: s.country, device: s.device, browser: s.browser,
-      who: s.org || s.provider || '', who_kind: s.org ? s.org_kind : (s.provider ? 'provider' : ''),
+      // a company by its register name, anybody else by the provider's plain name (the register's is "TANGO-BROADBAND-DYNAMIC-IP-POOL")
+      ...(s.org_kind === 'company' && s.org ? { who: s.org, who_kind: 'company' } : { who: s.provider || s.org || '', who_kind: s.provider || s.org ? 'provider' : '' }),
       entry: s.entry, pages: s.trail.split('\n').filter(Boolean).slice(0, 12), seconds: Math.round((s.last_ts - s.first_ts) / 1000),
     }));
   }
