@@ -65,3 +65,55 @@ resort.lifts.forEach((src, i) => {
   }
 });
 console.log(`${rid}: ${framesHit} station ends with cut parts, ${lost} parts cut, ${world.sites.size} lifts drawn, ${net.list.length} rideable`);
+// Station look (26 Nov 2026): no drawn part (solid or not; decks, gates, belts and marks aside) in the lift's OWN carriers' path round its
+// stations: the carrier box (grip to the bottom of the chair / cabin, with its swing) every 0.5 m of the loop within 40 m of an end
+let ownHits = 0;
+const hitList = [];
+for (const [i, site] of world.sites) {
+  const p = site.path;
+  if (p.kind === 'carpet' || (p.kind === 'drag' && p.sub === 'rope')) continue;
+  const cb = p.carrier, w = {}, l = {};
+  for (const f of site.ends) {
+    const g0 = p.ground(f.s);
+    const live = f.parts.filter((q) => !q.cut && !q.deck && !q.gateLeaf && !q.belt && !q.zoneMark);
+    const seen = new Set();
+    for (let u = 0; u < p.loopLen; u += 0.5) {
+      p.loopAt(u, w);
+      if ((f.which ? p.len - w.s : w.s) > 40) continue;
+      if (p.tunnel && p.ground(w.s) - w.y > 6) continue;
+      f.toLocal(w.x, w.z, l);
+      const c = Math.cos(w.heading), s = Math.sin(w.heading);
+      const ca = Math.abs(c * f.fx + s * f.fz), cr = Math.abs(c * f.rx + s * f.rz);
+      const hw = cb.hw + cb.drop * 0.035, ea = ca * cb.hl + cr * hw, eb = cr * cb.hl + ca * hw;
+      const yLo = p.kind === 'train' ? w.y : w.y - cb.drop, yHi = w.y + (p.kind === 'train' ? cb.top : cb.top);
+      for (const q of live) {
+        if (seen.has(q)) continue;
+        if (l.a + ea <= q.a0 || l.a - ea >= q.a1 || l.b + eb <= q.b0 || l.b - eb >= q.b1) continue;
+        if (yHi <= g0 + q.y0 || yLo >= g0 + q.y1) continue;
+        seen.add(q); ownHits++;
+        const tags = Object.keys(q).filter((k) => ['roof', 'post', 'hut', 'wall', 'cap', 'detail', 'sign', 'shape', 'near', 'building'].includes(k) && q[k]).join('+') || 'plain';
+        hitList.push(`#${i} ${resort.lifts[i].name} ${f.which ? 'top' : 'bottom'} ${tags} [${[q.a0, q.a1, q.b0, q.b1, q.y0, q.y1].map((v) => v.toFixed(2)).join(' ')}] at s ${w.s.toFixed(1)} y ${(yLo - g0).toFixed(2)}..${(yHi - g0).toFixed(2)}`);
+      }
+    }
+  }
+}
+for (const h of hitList.slice(0, 30)) console.log('  in own carriers\' path:', h);
+console.log(`drawn parts in the lift's own carriers' path: ${ownHits}`);
+// Station look: the part list of every frame must not depend on the heights (lift-site.js applyCuts repeats the first world's cuts by
+// part index): the type models + dressing laid out on the far grid and on the 5 m tiles have the same number of parts, the same kinds
+let countDiff = 0;
+{
+  const farPaths = new Map();
+  resort.lifts.forEach((src, i) => { const q = createLiftPath({ ...src }, (x, z) => field.farHeight(x, z)); if (q) farPaths.set(i, q); });
+  const farWorld = createLiftWorld(farPaths);
+  for (const [i, site] of world.sites) {
+    const other = farWorld.sites.get(i);
+    if (!other) continue;
+    const fa = [...site.ends, ...(site.portals || []), ...(site.stops || [])], fb = [...other.ends, ...(other.portals || []), ...(other.stops || [])];
+    fa.forEach((f, k) => {
+      const g = fb[k], na = f.parts.filter((p) => !p.added).length, nb = g ? g.parts.filter((p) => !p.added).length : -1;
+      if (na !== nb) { countDiff++; if (countDiff < 10) console.log(`  part count depends on the heights: #${i} ${resort.lifts[i].name} frame ${k}: ${na} vs ${nb}`); }
+    });
+  }
+}
+console.log(`frames whose part list depends on the heights: ${countDiff}`);

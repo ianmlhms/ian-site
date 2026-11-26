@@ -17,6 +17,7 @@
  *                              which buildings stand in a station or a lift lane (the village leaves them out), and where trees must
  *                              not stand (the lift aisles, the stations, the pylon bases). */
 import { liftClass, BOARD, UNLOAD, canRideDown } from './lift-path.js';
+import { dressEnd } from './stations.js';
 
 export { BOARD, UNLOAD };
 /** Half widths of the tree aisle along the line (m) and the height of the rope over the treetops above which trees may stay. */
@@ -24,7 +25,7 @@ export const AISLE = Object.freeze({ chair: 8, gondola: 9, cable: 12, drag: 7, r
 export const AISLE_HIGH = 15;                   // m between the carriers' lowest point and the treetops where the forest may stay
 export const TREE_TOP = 17;                     // m: the tallest tree of scatter-view.js (10 m x scale 1.65 + margin)
 const PYLON_R = 0.45;                           // m: a pylon column (collider and checks)
-const COL = Object.freeze({ concrete: 0xaeaba3, stone: 0x78706a, timber: 0x80563a, glass: 0x33424f, steel: 0x6b7585, wheel: 0x3e4249, snow: 0xf3f5fb, accent: 0xc8332a, deck: 0x8d8478, gate: 0xf2b21c, dark: 0x2b2f36, rubber: 0x23262b, light: 0xfff2c6, batten: 0x5b3d28, plinth: 0x8f8b84, housing: 0xd9dde2, housingDark: 0x5d6570, fascia: 0x23272e });
+const COL = Object.freeze({ concrete: 0xaeaba3, stone: 0x78706a, timber: 0x80563a, glass: 0x33424f, steel: 0x6b7585, wheel: 0x3e4249, snow: 0xf3f5fb, accent: 0xc8332a, deck: 0x8d8478, gate: 0xf2b21c, dark: 0x2b2f36, rubber: 0x23262b, light: 0xfff2c6, batten: 0x5b3d28, plinth: 0x8f8b84, housing: 0xd9dde2, housingDark: 0x5d6570, fascia: 0x23272e, roofWood: 0x5a3c27, roofSteel: 0x87909b, larch: 0x9a7452 });
 export { COL as SITE_COLOURS };
 
 /** The station key of a path: the class, but rope tows have their own (smaller) layout. */
@@ -60,6 +61,13 @@ export function createLiftSite(path) {
     const fx = which ? q.dx : -q.dx, fz = which ? q.dz : -q.dz;          // outward
     const rx = -q.dz * path.sign, rz = q.dx * path.sign;                  // the up lane's side (the same at both ends)
     const wheel = wheelOf(which);
+    /** Station look: the highest point of the carriers (over this end's ground) whose middle passes between frame a0 and a1 (a < 0 =
+     *  towards the line), their own length and swing included: where a front overhang may reach. */
+    const ropeTop = (from, to) => {
+      let m = -Infinity;
+      for (let a = from - cb.hl - 0.2; a <= to + cb.hl + 0.2 + 1e-6; a += 0.25) m = Math.max(m, path.cableY(which ? Math.max(0, Math.min(len, len + a)) : Math.max(0, Math.min(len, -a))));
+      return m - path.ground(s) + cb.top;
+    };
     const front = -Math.min(len * 0.42, 40);                              // the farthest a station reaches along the line
     const parts = [];
     const add = (a0, a1, b0, b1, y0, y1, col, solid = true, extra = {}) => parts.push({ a0: Math.max(front, Math.min(a0, a1)), a1: Math.max(front + 0.3, Math.max(a0, a1)), b0: Math.min(b0, b1), b1: Math.max(b0, b1), y0, y1, col, solid, ...extra });
@@ -86,13 +94,17 @@ export function createLiftSite(path) {
       const roof = wheel + 0.9;
       add(-9, aBack + 1.5, bIn - 1.6, bOut + 4.4, -0.35, 0.04, COL.deck, false, { deck: true });
       add(-5, aBack + 1.2, bIn - 0.9, bOut + 0.9, roof, roof + 0.4, COL.steel, true, { roof: true });
-      add(-5.2, aBack + 1.4, bIn - 1.1, bOut + 1.1, roof + 0.4, roof + 0.72, COL.snow, false, { cap: true });
+      // station look: the canopy is a low gable over the bull-wheel (steel, snow on it), the drive house sits on its ridge
+      const hw = (bOut - bIn + 2.3) / 2, rise = Math.min(1.1, hw * 0.2), bm = (bIn + bOut) / 2;
+      add(-5.25, aBack + 1.45, bIn - 1.15, bOut + 1.15, roof + 0.4, roof + 0.4 + rise, COL.roofSteel, false, { cap: true, shape: 'gableA' });
+      add(-5.2, aBack + 1.4, bIn - 1.1, bOut + 1.1, roof + 0.52, roof + 0.52 + rise, COL.snow, false, { cap: true, shape: 'gableA' });
       for (const a of [-4.6, aBack + 0.8]) for (const b of [bIn - 0.5, bOut + 0.5]) post(a, b, roof);
-      housing(roof + 0.72, aBack + 0.6, 1.25, 1.35);                                                     // R8: the drive on the canopy
+      housing(roof + 0.52 + rise * (1 - Math.min(1, (Math.abs(C - bm) + 1.25) / (hw - 0.05))), aBack + 0.6, 1.25, 1.35);     // R8: the drive on the canopy
       det(-5, aBack + 1.2, bOut + 0.9, bOut + 1.0, roof - 0.35, roof + 0.4, COL.accent);                 // R8: a red fascia
       nameSign(-0.6, bOut + 1.08, roof + 0.02, Math.min(4.6, aBack + 3.6), 0.62, 1);
       add(-4.4, -1.2, bIn - 4.4, bIn - 1.6, 0, 2.6, COL.timber, true, { hut: true });
-      add(-4.6, -1.0, bIn - 4.6, bIn - 1.4, 2.6, 2.95, COL.snow, false, { cap: true });
+      add(-4.68, -0.92, bIn - 4.68, bIn - 1.32, 2.6, 3.42, COL.roofWood, false, { cap: true, shape: 'gableA' });    // station look: a gable roof
+      add(-4.64, -0.96, bIn - 4.64, bIn - 1.36, 2.72, 3.54, COL.snow, false, { cap: true, shape: 'gableA' });
       add(-4.3, -1.3, bIn - 1.58, bIn - 1.56, 1.2, 2.1, COL.glass, false);
       if (!which) {           // the boarding fence: posts, yellow bars, a gate (two leaves, lifts.js swings them open) where he passes
         const g = chair.aGate, h = chair.gateHalf, bg = chair.bGate;
@@ -115,7 +127,14 @@ export function createLiftSite(path) {
       add(a0, a1, b0, b1, -0.35, 0.04, COL.deck, false, { deck: true });
       add(-11, -2, bOut + 0.2, bOut + 3.9, 0.04, 0.12, COL.concrete, false, { deck: true });          // the platform
       add(a0, a1 + 0.2, b0, b1, roof, roof + 0.55, COL.concrete, true, { roof: true });
-      add(a0 - 0.2, a1 + 0.4, b0 - 0.2, b1 + 0.2, roof + 0.55, roof + 0.9, COL.snow, false, { cap: true });
+      // station look: one gable roof over the hall, its platform overhang and its front (snow on it, the drive under it); the front
+      // overhang only as far out as the leaving cabins clear it (where the rope climbs out of the hall, fr < 1.4)
+      let fr = 1.4;
+      while (fr > 0.05 && ropeTop(a0 - fr - 0.3, a0) + 0.3 > roof - 0.5) fr -= 0.1;
+      const fb = Math.min(roof + 0.1, Math.max(roof - 0.5, ropeTop(a0 - fr - 0.12, a0 - fr) + 0.3));   // the front fascia's lower edge
+      const rise = Math.min(2.6, (b1 - b0 + 2) / 2 * 0.27);
+      add(a0 - fr - 0.3, a1 + 0.5, b0 - 0.3, b1 + 1.9, roof + 0.55, roof + 0.55 + rise, COL.roofWood, false, { cap: true, shape: 'gableA' });
+      add(a0 - fr - 0.22, a1 + 0.42, b0 - 0.22, b1 + 1.82, roof + 0.67, roof + 0.67 + rise, COL.snow, false, { cap: true, shape: 'gableA' });
       add(a1 - 0.4, a1, b0, b1, 0, roof, COL.concrete, true, { wall: true });                         // back wall
       add(a0 + 4, a1 - 0.4, b0, b0 + 0.4, 0, roof * 0.42, COL.timber, true, { wall: true });           // return side: low wall,
       add(a0 + 4, a1 - 0.4, b0 + 0.05, b0 + 0.35, roof * 0.42, roof, COL.glass, true, { wall: true });  // glazed above
@@ -123,16 +142,13 @@ export function createLiftSite(path) {
       post(a0 + 0.3, b0 + 0.3, roof, 0.25, COL.concrete);
       add(a1 - 0.6, a1 - 0.4, bOut + 1, bOut + 3.5, 2.2, 3.4, COL.accent, false);                    // a sign board on the back wall
       // R8 detail: the roof reaches out over the platform and the front, a dark fascia with the lift's name on the platform side
-      det(a0 - 1.4, a1 + 0.2, b1, b1 + 1.6, roof + 0.1, roof + 0.55, COL.concrete);
-      det(a0 - 1.4, a0, b0, b1, roof + 0.1, roof + 0.55, COL.concrete);
-      det(a0 - 1.6, a1 + 0.4, b1, b1 + 1.8, roof + 0.55, roof + 0.85, COL.snow);
-      det(a0 - 1.6, a0, b0 - 0.2, b1, roof + 0.55, roof + 0.85, COL.snow);
-      det(a0 - 1.4, a1 + 0.2, b1 + 1.5, b1 + 1.62, roof - 0.5, roof + 0.55, COL.fascia);
-      det(a0 - 1.52, a0 - 1.4, b0, b1 + 1.62, roof - 0.5, roof + 0.55, COL.fascia);
-      det(a0 - 1.4, a1 + 0.2, b1 + 1.62, b1 + 1.66, roof - 0.14, roof - 0.06, COL.accent);              // a red line along it
+      det(a0 - fr, a1 + 0.2, b1, b1 + 1.6, roof + 0.1, roof + 0.55, COL.concrete);
+      det(a0 - Math.max(fr, 0.1), a0, b0, b1, roof + 0.1, roof + 0.55, COL.concrete);     // (always: the part list may not depend on heights)
+      det(a0 - fr, a1 + 0.2, b1 + 1.5, b1 + 1.62, roof - 0.5, roof + 0.55, COL.fascia);
+      det(a0 - fr - 0.12, a0 - fr, b0, b1 + 1.62, fb, roof + 0.55, COL.fascia);
+      det(a0 - fr, a1 + 0.2, b1 + 1.62, b1 + 1.66, roof - 0.14, roof - 0.06, COL.accent);              // a red line along it
       nameSign((a0 + a1) / 2 - 1.5, b1 + 1.72, roof + 0.02, Math.min(9, (a1 - a0) * 0.55), 0.8, 1);
       // the drive: the motor house on the roof over the bull-wheel, the shaft down to the wheel
-      housing(roof + 0.85, a1 - 0.6, 2.1, 2.2);
       det(-0.22, 0.22, C - 0.22, C + 0.22, wheel + 0.2, roof, COL.dark);
       // the back wall clad: a stone plinth, the upper part timber with dark battens, a window band (outside face, a = a1)
       det(a1, a1 + 0.12, b0, b1, -0.2, 1.1, COL.plinth);
@@ -158,11 +174,13 @@ export function createLiftSite(path) {
       const roof = wheel + 1.3, b0 = bIn - 3.6, b1 = bOut + 3.6;
       add(-13.5, 1.0, b0, b1, -0.4, 0.04, COL.deck, false, { deck: true });
       add(-11.4, 1.0, b0, b1, roof, roof + 0.6, COL.steel, true, { roof: true });              // over the docked cabin only
-      add(-11.6, 1.2, b0 - 0.2, b1 + 0.2, roof + 0.6, roof + 0.95, COL.snow, false, { cap: true });
+      add(-11.6, 1.2, b0 - 0.2, b1 + 0.2, roof + 0.6, roof + 1.05, COL.snow, false, { cap: true, shape: 'bevel', inset: 0.5 });
       for (const b of [b0 + 0.3, b1 - 0.3, -0.0]) post(-11.1, b, roof, 0.3, COL.concrete);
       // the machine building behind the dock (the track ropes are anchored in it)
-      add(1.0, 9, b0 + 1.2, b1 - 1.2, 0, roof + 3.5, COL.concrete, true, { wall: true, building: true });
-      add(0.9, 9.1, b0 + 1.1, b1 - 1.1, roof + 3.5, roof + 3.9, COL.snow, false, { cap: true });
+      add(1.0, 9, b0 + 1.2, b1 - 1.2, 0, roof + 3.5, COL.larch, true, { wall: true, building: true });         // station look: larch clad
+      const riseM = 1.7;                                                                                 // station look: a gable roof
+      add(0.75, 9.25, b0 + 0.95, b1 - 0.95, roof + 3.5, roof + 3.5 + riseM, COL.roofWood, false, { cap: true, shape: 'gableB' });
+      add(0.82, 9.18, b0 + 1.02, b1 - 1.02, roof + 3.62, roof + 3.62 + riseM, COL.snow, false, { cap: true, shape: 'gableB' });
       add(0.95, 1.0, b0 + 1, b1 - 1, wheel - 1.2, wheel + 0.8, COL.glass, false);
       nameSign(5, b1 - 1.1, roof + 2.4, 6.5, 0.9, 1);                                                    // R8
       for (const tr of [side, -back]) add(-0.2, 1.0, tr - 0.9, tr + 0.9, wheel - 0.6, wheel + 0.6, COL.wheel, false);
@@ -175,7 +193,9 @@ export function createLiftSite(path) {
       if (big || !which) {
         const hb0 = side + (big ? 2.4 : 1.6), hb1 = hb0 + (big ? 2.8 : 1.8);
         add(hutA0, hutA1, hb0, hb1, 0, big ? 2.6 : 2.1, COL.timber, true, { hut: true });
-        add(hutA0 - 0.25, hutA1 + 0.25, hb0 - 0.25, hb1 + 0.25, big ? 2.6 : 2.1, big ? 2.95 : 2.4, COL.snow, false, { cap: true });
+        const eave = big ? 2.6 : 2.1, rise = big ? 0.85 : 0.6;                                         // station look: a gable roof
+        add(hutA0 - 0.28, hutA1 + 0.28, hb0 - 0.28, hb1 + 0.28, eave, eave + rise, COL.roofWood, false, { cap: true, shape: 'gableA' });
+        add(hutA0 - 0.24, hutA1 + 0.24, hb0 - 0.24, hb1 + 0.24, eave + 0.12, eave + 0.12 + rise, COL.snow, false, { cap: true, shape: 'gableA' });
         add(hutA0 + 0.3, hutA1 - 0.3, hb0 - 0.03, hb0 - 0.01, 1.1, 1.9, COL.glass, false);
       }
       if (!which) add(work - 0.6, work - 0.4, side - 1.2, side + 1.2, 0, 0.02, COL.accent, false, { deck: true });     // the start line on the snow (R8b: stood on, like a deck)
@@ -191,7 +211,9 @@ export function createLiftSite(path) {
       add(a0, 1.6, b0, b1, -0.4, 0.04, COL.deck, false, { deck: true });
       add(a0 + 2, -2, bOut + 0.1, b1 - 0.4, 0.04, 0.14, COL.concrete, false, { deck: true });         // the platform edge
       add(a0, 2.2, b0, b1, roof, roof + 0.45, COL.timber, true, { roof: true });
-      add(a0 - 0.2, 2.4, b0 - 0.2, b1 + 0.2, roof + 0.45, roof + 0.8, COL.snow, false, { cap: true });
+      const rise = Math.min(2.2, (b1 - b0) / 2 * 0.27);                                                    // station look: a gable roof
+      add(a0 - 0.35, 2.55, b0 - 0.35, b1 + 0.35, roof + 0.45, roof + 0.45 + rise, COL.roofWood, false, { cap: true, shape: 'gableA' });
+      add(a0 - 0.3, 2.5, b0 - 0.3, b1 + 0.3, roof + 0.57, roof + 0.57 + rise, COL.snow, false, { cap: true, shape: 'gableA' });
       add(1.6, 2.2, b0, b1, 0, roof, COL.stone, true, { wall: true });                                // buffer wall
       for (const a of [a0 + 0.3, (a0 + 1.6) / 2]) for (const b of [b0 + 0.3, b1 - 0.3]) post(a, b, roof, 0.25, COL.stone);
       add(0.6, 1.6, -side - 0.6, -side + 0.6, 0, 1.0, COL.accent, false);
@@ -201,6 +223,11 @@ export function createLiftSite(path) {
     let A0 = Infinity, A1 = -Infinity, B0 = Infinity, B1 = -Infinity;
     for (const p of parts) { A0 = Math.min(A0, p.a0); A1 = Math.max(A1, p.a1); B0 = Math.min(B0, p.b0); B1 = Math.max(B1, p.b1); }
     if (!parts.length) { A0 = -1; A1 = 1; B0 = -1; B1 = 1; }
+    // station look (stations.js): windows, doors, lamps, trims, glazing; drawn only, never outside the footprint above
+    const inside = (a0, a1, b0, b1) => Math.min(a0, a1) >= A0 - 0.15 && Math.max(a0, a1) <= A1 + 0.15 && Math.min(b0, b1) >= B0 - 0.15 && Math.max(b0, b1) <= B1 + 0.15;
+    dressEnd({ key, which, parts: parts.slice(), fresh: () => parts.slice(), ropeTop, side, back, bIn, bOut, aBack, C, R, wheel, sub: path.sub, len, COL,
+      det: (a0, a1, b0, b1, y0, y1, col, extra = {}) => { if (inside(a0, a1, b0, b1)) det(a0, a1, b0, b1, y0, y1, col, extra); },
+      nameSign: (a, b, y, w, h, face) => { if (inside(a - w / 2, a + w / 2, b - 0.06, b + 0.06)) nameSign(a, b, y, w, h, face); } });
     const end = {
       which, s, x: q.x, z: q.z, fx, fz, rx, rz, type, parts, rect: { a0: A0, a1: A1, b0: B0, b1: B1 },
       toWorld(a, b, out = {}) { out.x = q.x + fx * a + rx * b; out.z = q.z + fz * a + rz * b; return out; },
@@ -811,6 +838,10 @@ function pruneCrossings(sites) {
           const dy = ROOF_RAISE.find((d) => !near.some((q) => hits(f, g, { ...p, y0: p.y0 + d - 1.5, y1: p.y1 + d + 1.5 }, q)));
           if (dy) { raiseRoof(f, p, dy); continue; }
         }
+        if (p.shape && p.cap && p.y1 - p.y0 > 0.45) {      // station look: a gable the neighbour grazes stays as a flat roof (0.3 m) if it can
+          const low = { ...p, y1: p.y0 + 0.3 };
+          if (!near.some((q) => hits(f, g, low, q))) { shiftPart(p, 0, low.y1 - p.y1); continue; }
+        }
         p.cut = true; p.solid = false;
         for (const cp of f.parts) if (cp.cap && Math.abs(cp.y0 - p.y1) < 0.05 && cp.a0 < p.a1 && cp.a1 > p.a0 && cp.b0 < p.b1 && cp.b1 > p.b0) cp.cut = true;
       }
@@ -905,13 +936,17 @@ export function standingParts(f) {
 
 /** In a frame that lost parts: what no longer stands goes too (a hut's window, the drive housing on a cut canopy, the name sign). */
 function dropFloating(f) {
-  const ok = standingParts(f);
-  for (const p of f.parts) if (!p.cut && !ok.has(p)) { p.cut = true; p.solid = false; }
-  // a post that only held a part that is gone (a terminal's roof posts) goes too: no bare 8 m columns
   const top = (p, q) => Math.abs(q.y0 - p.y1) < TOUCH && p.a0 - TOUCH <= q.a1 && q.a0 - TOUCH <= p.a1 && p.b0 - TOUCH <= q.b1 && q.b0 - TOUCH <= p.b1;
-  for (const p of f.parts) {
-    if (p.cut || !p.post || p.mount || p.y1 < 2.5) continue;
-    if (f.parts.some((q) => q.cut && top(p, q)) && !f.parts.some((q) => !q.cut && q !== p && top(p, q))) { p.cut = true; p.solid = false; }
+  // station look: again after a post went (a fascia that hung on the roof's posts, stations.js)
+  for (let more = true; more;) {
+    more = false;
+    const ok = standingParts(f);
+    for (const p of f.parts) if (!p.cut && !ok.has(p)) { p.cut = true; p.solid = false; }
+    // a post that only held a part that is gone (a terminal's roof posts) goes too: no bare 8 m columns
+    for (const p of f.parts) {
+      if (p.cut || !p.post || p.mount || p.y1 < 2.5) continue;
+      if (f.parts.some((q) => q.cut && top(p, q)) && !f.parts.some((q) => !q.cut && q !== p && top(p, q))) { p.cut = true; p.solid = false; more = true; }
+    }
   }
 }
 

@@ -11,14 +11,26 @@
 const THREE = window.THREE;
 
 import { createLiftPath } from './lift-path.js';
-import { createLiftWorld, frames } from './lift-site.js';
+import { createLiftWorld, frames, SITE_COLOURS } from './lift-site.js';
 import { carrierGeometry, GLASS } from './modes/carriers.js';
 import { mergeParts } from './modes/views.js';
 import { gpuOnly } from './gpu-mem.js';
 import { carrierId } from './npc.js';
+import { shapeGeometry, mergeLit, stationMaterial } from './station-mesh.js';
 const DOWN_RIDERS = 1e6, DOWN_SHARE = 0.3;       // ride down: rider ids of the down lane, and how full it is against the up lane
+/* Station look: gondola cabins slow down in the halls (detached from the rope, as real ones) and catch up on the line: the pool draws
+ * the cabin of loop parameter u at hallWarp(u) (a monotone map of the loop onto itself: `speed` x line speed inside a hall (+ the bull-
+ * wheel turn), a `ramp` m smooth change, a little faster on the line; at most `stretch` x the line's own speed), anchored at the bottom
+ * loading point (a cabin is where the loop puts it when it picks a rider up). A lift the player rides eases back to the plain loop in
+ * `blend` s (his own cabin is drawn by the ride at its plain place: its neighbours keep their spacing to it, never closer than in a hall). */
+const HALL_SLOW = Object.freeze({ speed: 0.34, ramp: 10, stretch: 1.12, blend: 0.9 });
 
 const FINE = Object.freeze({ size: 2.1, cell: 1250, share: 0.25, max: 700 });     // R8d: small station parts within share x liftRadius (<= max m)
+// Station look (26 Nov 2026): the stations' near detail (window frames, doors, lamps, mullions, trims: parts flagged `near`) per NEAR_DETAIL.cell
+// m cell, drawn while the camera is within NEAR_DETAIL.radius m of the cell (the main volumes, roofs and snow stay in the chunks)
+const NEAR_DETAIL = Object.freeze({ cell: 640, radius: 250 });
+/** How a station part glows in the evening (station-mesh.js aGlow): its own `glow`, else lamps and windows by colour; snow = -1. */
+const glowOf = (p) => (p.glow !== undefined ? p.glow : p.col === SITE_COLOURS.light ? 1.1 : p.col === SITE_COLOURS.glass ? 0.45 : p.col === SITE_COLOURS.snow ? -1 : 0);
 const TRACK_R = 900;                   // R8d: m to a drag track cell's box within which its worn tracks are drawn (a 1.25 m strip)
 const NEAR_R = 130;                    // m: carriers closer than this get the full model, the rest the far one
 const FAR_R = { chair: 750, drag: 320, gondola: 1300, cable: 3000, train: 3000 };      // m: beyond this a carrier is ~2 px (R8c: chairs 1100 -> 750, gondolas 1600 -> 1300: Courchevel drew 159k triangles of carriers; R8d: drag bars 450 -> 320, 14k at Courchevel)
@@ -30,7 +42,7 @@ const SHUTTLE_FACTOR = 4;
  * one shared canvas atlas, one merged mesh = one draw call; re-chosen every SIGN.every s as the skier moves. */
 const SIGN = Object.freeze({ slots: 12, radius: 320, every: 1.2, slotW: 512, slotH: 64, cols: 2 });      // (a small atlas: WebKit uploads it whole)
 
-export function createLifts({ scene, resort, height }) {
+export function createLifts({ scene, resort, height, env = null }) {
   const lifts = [];
   const byIndex = new Map();
   const paths = new Map();
@@ -46,7 +58,8 @@ export function createLifts({ scene, resort, height }) {
   scene.add(group);
   const disposables = [];
   const vmat = new THREE.MeshLambertMaterial({ vertexColors: true });
-  disposables.push(vmat);
+  const smat = stationMaterial(env);                    // station look: the stations' chunks (lit windows / lamps, evening snow)
+  disposables.push(vmat, smat);
 
   // ---------------- static parts: pylons, ropes, stations, tracks, belts, tunnels ----------------
   const parts = [];                                     // [geometry, colour, matrix] merged into one mesh
@@ -54,9 +67,10 @@ export function createLifts({ scene, resort, height }) {
   // R8d (Niddreg budget: Courchevel drew ~68k triangles of stations / pylons): the small parts (rails, gates, lamps, sheave frames,
   // hubs: every side < FINE.size m) go into `fine` cells drawn only near the camera; the big ones stay in the 2.5 km chunks
   const fine = [];
-  const bin = (w, h, d) => (Math.max(w, h, d) < FINE.size ? fine : parts);
-  const boxAt = (w, h, d, x, y, z, fx, fz, colour) => bin(w, h, d).push([new THREE.BoxGeometry(w, h, d), colour, rot(fx, fz).setPosition(x, y, z)]);
-  const cylAt = (r0, r1, h, x, y, z, colour, n = 8) => bin(2 * Math.max(r0, r1), h, 2 * Math.max(r0, r1)).push([new THREE.CylinderGeometry(r0, r1, h, n), colour, new THREE.Matrix4().makeTranslation(x, y, z)]);
+  const nearParts = [];                 // station look: the near detail (NEAR_DETAIL)
+  const bin = (w, h, d, near = false) => (near ? nearParts : Math.max(w, h, d) < FINE.size ? fine : parts);
+  const boxAt = (w, h, d, x, y, z, fx, fz, colour, glow = 0, near = false, shape = null, inset = 0.4) => bin(w, h, d, near).push([shape ? shapeGeometry(shape, w, h, d, inset) : new THREE.BoxGeometry(w, h, d), colour, rot(fx, fz).setPosition(x, y, z), glow]);
+  const cylAt = (r0, r1, h, x, y, z, colour, n = 8, glow = 0, near = false) => bin(2 * Math.max(r0, r1), h, 2 * Math.max(r0, r1), near).push([new THREE.CylinderGeometry(r0, r1, h, n), colour, new THREE.Matrix4().makeTranslation(x, y, z), glow]);
   const tmpW = {};
   const signSpots = [];                 // R8: { x, y, z, nx, nz, w, h, text } of every uncut name sign
   /** One station frame's parts in the world, seated on the ground (a part that touches the ground reaches down to its lowest point). */
@@ -81,15 +95,26 @@ export function createLifts({ scene, resort, height }) {
         let low = Infinity;
         for (const [a, b] of [[p.a0, p.b0], [p.a1, p.b0], [p.a0, p.b1], [p.a1, p.b1], [ca, cb]]) { const w = f.toWorld(a, b, {}); low = Math.min(low, height(w.x, w.z)); }
         if (low - 0.3 < y0) {
-          if (p.deck && g0 + p.y0 - low > 0.2) boxAt(p.a1 - p.a0, g0 + p.y0 - low + 0.3, p.b1 - p.b0, tmpW.x, (g0 + p.y0 + low - 0.3) / 2, tmpW.z, f.fx, f.fz, 0x78706a);
+          if (p.deck && g0 + p.y0 - low > 0.2) foundation(p, g0, low, f);
           else if (!p.deck) y0 = low - 0.3;
         }
       }
       const h = g0 + p.y1 - y0;
       if (h <= 0.005) continue;
-      if (p.post && Math.abs(p.a1 - p.a0 - (p.b1 - p.b0)) < 1e-3) cylAt((p.a1 - p.a0) / 2, (p.a1 - p.a0) / 2, h, tmpW.x, y0 + h / 2, tmpW.z, p.col);
-      else boxAt(p.a1 - p.a0, h, p.b1 - p.b0, tmpW.x, y0 + h / 2, tmpW.z, f.fx, f.fz, p.col);
+      const glow = glowOf(p);
+      if (p.post && Math.abs(p.a1 - p.a0 - (p.b1 - p.b0)) < 1e-3) cylAt((p.a1 - p.a0) / 2, (p.a1 - p.a0) / 2, h, tmpW.x, y0 + h / 2, tmpW.z, p.col, 8, glow, !!p.near);
+      else boxAt(p.a1 - p.a0, h, p.b1 - p.b0, tmpW.x, y0 + h / 2, tmpW.z, f.fx, f.fz, p.col, glow, !!p.near, p.shape || null, p.inset);
     }
+  }
+  /** Station look: a deck standing above the snow (a summit on a slope) sits on a dressed stone foundation down to the lowest ground under
+   *  it: rough stone, a darker footing course, a concrete edge band under the deck (each reaching the ground: nothing floats). */
+  function foundation(p, g0, low, f) {
+    const top = g0 + p.y0, w = p.a1 - p.a0, d = p.b1 - p.b0;
+    const c = f.toWorld((p.a0 + p.a1) / 2, (p.b0 + p.b1) / 2, {});
+    const foot = Math.min(0.7, (top - low) * 0.3);
+    boxAt(w, top - low + 0.3, d, c.x, (top + low - 0.3) / 2, c.z, f.fx, f.fz, 0x7d746b);
+    boxAt(w + 0.16, foot + 0.3, d + 0.16, c.x, low - 0.3 + (foot + 0.3) / 2, c.z, f.fx, f.fz, 0x5f5953);
+    boxAt(w + 0.1, 0.32, d + 0.1, c.x, top - 0.16 + 0.02, c.z, f.fx, f.fz, 0xa9a59d);
   }
   const leaves = [];                    // after launch: the chair stations' gate leaves { l, f, p, g0 }
   /** A chair's loading belt: a flat quad on the deck in the frame (a0..a1 x b0..b1) at its top, the cleats running towards -a. */
@@ -162,6 +187,7 @@ export function createLifts({ scene, resort, height }) {
         const y = l.cableY(which ? l.len : 0);
         cylAt(l.wheelR + 0.12, l.wheelR + 0.12, 0.22, c.x, y + 0.08, c.z, 0x3e4249, 20);
         cylAt(0.35, 0.35, 0.5, c.x, y + 0.35, c.z, 0xc8332a, 10);
+        if (l.wheelR > 0.8) cylAt(l.wheelR * 0.78, l.wheelR * 0.78, 0.26, c.x, y + 0.08, c.z, 0x737b86, 16, 0, true);   // station look: the rim (near)
       }
     }
     // a drag lift's worn track: a packed, darker strip under the up rope
@@ -257,8 +283,8 @@ export function createLifts({ scene, resort, height }) {
     }
     for (const [k, list] of byCell) {
       const [i, j] = k.split(',').map(Number);
-      const geo = gpuOnly(mergeParts(list));                         // R8f: drawn only (ground-check: keep=1)
-      const st = new THREE.Mesh(geo, vmat);
+      const geo = gpuOnly(mergeLit(list));                           // R8f: drawn only (ground-check: keep=1)
+      const st = new THREE.Mesh(geo, smat);
       st.castShadow = true; st.receiveShadow = true; st.name = chunks.length ? 'ski-lift-stations-' + k : 'ski-lift-stations';
       group.add(st);
       disposables.push(geo);
@@ -276,12 +302,31 @@ export function createLifts({ scene, resort, height }) {
     }
     for (const [k, list] of byCell) {
       const [i, j] = k.split(',').map(Number);
-      const geo = gpuOnly(mergeParts(list));                         // R8f: drawn only (ground-check: keep=1)
-      const m = new THREE.Mesh(geo, vmat);
+      const geo = gpuOnly(mergeLit(list));                           // R8f: drawn only (ground-check: keep=1)
+      const m = new THREE.Mesh(geo, smat);
       m.castShadow = true; m.receiveShadow = true; m.name = 'ski-lift-fine-' + k; m.visible = false;
       group.add(m);
       disposables.push(geo);
       fineCells.push({ mesh: m, x0: i * FINE.cell, z0: j * FINE.cell });
+    }
+  }
+  // station look: the near detail per NEAR_DETAIL.cell m cell (no shadows: frames, lamps and trims too small to matter)
+  const nearCells = [];
+  if (nearParts.length) {
+    const byCell = new Map();
+    for (const part of nearParts) {
+      const e = part[2].elements, k = Math.floor(e[12] / NEAR_DETAIL.cell) + ',' + Math.floor(e[14] / NEAR_DETAIL.cell);
+      if (!byCell.has(k)) byCell.set(k, []);
+      byCell.get(k).push(part);
+    }
+    for (const [k, list] of byCell) {
+      const [i, j] = k.split(',').map(Number);
+      const geo = gpuOnly(mergeLit(list));
+      const m = new THREE.Mesh(geo, smat);
+      m.castShadow = false; m.receiveShadow = true; m.name = 'ski-lift-near-' + k; m.visible = false;
+      group.add(m);
+      disposables.push(geo);
+      nearCells.push({ mesh: m, x0: i * NEAR_DETAIL.cell, z0: j * NEAR_DETAIL.cell });
     }
   }
   const trackMat = new THREE.MeshLambertMaterial({ color: 0xd3d9e2, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
@@ -365,7 +410,7 @@ export function createLifts({ scene, resort, height }) {
   disposables.push(cg, cableMat);
   // R8f (memory): the source parts (thousands of BoxGeometry / CylinderGeometry, ribbons, rope points) are merged now; the closures
   // below keep this function's context alive for the page's life, so the lists are emptied (else every part stays in memory)
-  parts.length = 0; fine.length = 0; trackParts.length = 0; for (const lf of leaves) { lf.l = { index: lf.l.index }; } beltParts.length = 0; tunnelParts.length = 0; tunnelLamps.length = 0; cablePts.length = 0;
+  parts.length = 0; fine.length = 0; nearParts.length = 0; trackParts.length = 0; for (const lf of leaves) { lf.l = { index: lf.l.index }; } beltParts.length = 0; tunnelParts.length = 0; tunnelLamps.length = 0; cablePts.length = 0;
 
   // ---------------- carriers: instanced pools per model (near + far detail) ----------------
   const pools = new Map();               // key -> { near, far, glass, count }
@@ -516,8 +561,54 @@ export function createLifts({ scene, resort, height }) {
     };
   })();
 
+  /** Station look: the hall slow-down map of a gondola loop (HALL_SLOW), built the first time it is drawn; null = none. */
+  function hallWarp(l) {
+    if (l.warp !== undefined) return l.warp;
+    l.warp = null;
+    const roof = l.site && l.site.bottom.parts.find((p) => p.roof);
+    if (l.kind !== 'gondola' || l.shuttle || !roof || !(l.loopLen > 60)) return null;
+    const H = Math.min(-roof.a0, l.len * 0.3), L = l.loopLen, n = Math.ceil(L), w = {}, dist = new Float32Array(n + 1);
+    for (let k = 0; k <= n; k++) { l.loopAt((k / n) * L, w); dist[k] = Math.min(w.s, l.len - w.s); }
+    const smooth = (e0, e1, x) => { const v = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return v * v * (3 - 2 * v); };
+    // time (in line metres) to each sample; the slowest hall speed that keeps the line within `stretch` of its own speed
+    const tau = new Float64Array(n + 1);
+    let vs = HALL_SLOW.speed;
+    for (;;) {
+      for (let k = 1; k <= n; k++) {
+        const v = (d) => 1 - (1 - vs) * smooth(H + HALL_SLOW.ramp, H, d);
+        tau[k] = tau[k - 1] + (L / n) * 0.5 * (1 / v(dist[k - 1]) + 1 / v(dist[k]));
+      }
+      if (tau[n] / L <= HALL_SLOW.stretch || vs > 0.9) break;
+      vs += 0.06;
+    }
+    if (vs > 0.9) return null;
+    // the inverse: X at equal steps of time (u / L of the loop = the same share of the time round it)
+    const inv = new Float32Array(n + 1), T = tau[n];
+    for (let j = 0, k = 0; j <= n; j++) {
+      const target = (j / n) * T;
+      while (k < n && tau[k + 1] < target) k++;
+      const f = k < n ? (target - tau[k]) / Math.max(1e-9, tau[k + 1] - tau[k]) : 0;
+      inv[j] = ((k + Math.min(1, f)) / n) * L;
+    }
+    const uLoad = Math.min(l.site.boardS, l.len * 0.2), kl = (uLoad / L) * n, k0 = Math.floor(kl);
+    l.warp = { inv, n, L, T, uLoad, tauLoad: tau[k0] + (tau[Math.min(n, k0 + 1)] - tau[k0]) * (kl - k0), w: 1 };
+    return l.warp;
+  }
+  /** The drawn loop position of the pool's carrier of parameter u (the hall slow-down eased by its weight). */
+  function warpU(l, u) {
+    const W = l.warp;
+    if (!W || W.w <= 0) return u;
+    const uu = ((u % W.L) + W.L) % W.L;
+    const tq = (((W.tauLoad + (uu - W.uLoad) * W.T / W.L) % W.T) + W.T) % W.T;
+    const x = (tq / W.T) * W.n, k = Math.min(W.n - 1, Math.floor(x)), f = x - k;
+    let X = W.inv[k] + (W.inv[k + 1] - W.inv[k]) * f;
+    if (X - uu > W.L / 2) X -= W.L; else if (uu - X > W.L / 2) X += W.L;
+    return uu + (X - uu) * W.w;
+  }
+
   function update(t, camX, camZ, radius) {
     if (signs) signs.update(lastT === null ? 0.6 : Math.max(0, t - lastT), camX, camZ);
+    const dtW = Math.min(0.1, Math.max(0, t - (lastT || t)));
     // R8e: a jig-back pair waits at its stations while the skier stands in the boarding zone and the up-track cabin is docked below
     const dtU = Math.max(0, t - (lastT || t));
     for (const l of lifts) if (l.shuttle && l.rideU === null && l.holdUntil > t && shuttlePhase(l, t) < DWELL) l.offset -= dtU;
@@ -531,6 +622,10 @@ export function createLifts({ scene, resort, height }) {
     for (const c of fineCells) {
       const dx = Math.max(c.x0 - camX, 0, camX - c.x0 - FINE.cell), dz = Math.max(c.z0 - camZ, 0, camZ - c.z0 - FINE.cell);
       c.mesh.visible = Math.hypot(dx, dz) < fineR;
+    }
+    for (const c of nearCells) {
+      const dx = Math.max(c.x0 - camX, 0, camX - c.x0 - NEAR_DETAIL.cell), dz = Math.max(c.z0 - camZ, 0, camZ - c.z0 - NEAR_DETAIL.cell);
+      c.mesh.visible = Math.hypot(dx, dz) < Math.min(NEAR_DETAIL.radius, radius);
     }
     for (const p of pools.values()) { p.n = 0; p.nf = 0; }
     beltTex.offset.y = -(t * 1.4) / 2;
@@ -552,12 +647,14 @@ export function createLifts({ scene, resort, height }) {
         continue;
       }
       const gap = l.spec.gap;
+      const W = hallWarp(l);
+      if (W) W.w = Math.max(0, Math.min(1, W.w + (l.rideU === null ? 1 : -1) * dtW / HALL_SLOW.blend));
       const phase = l.rideU !== null ? ((l.rideU % gap) + gap) % gap : (((t * l.spec.speed + l.offset) % gap) + gap) % gap;
       const A = l.rideU !== null ? l.rideU + (l.heldShift || 0) : t * l.spec.speed + l.offset;          // (npc.js carrierId)
       let k = 0;
       for (let u = phase; u < l.loopLen - 1e-6; u += gap, k++) {
         if (l.rideU !== null && Math.abs(u - (((l.rideU % l.loopLen) + l.loopLen) % l.loopLen)) < 1e-3) continue;        // the player's own
-        put(pool, l, l.loopAt(u, w0), k, t, camX, camZ, carrierId(u, A, gap));
+        put(pool, l, l.loopAt(W ? warpU(l, u) : u, w0), k, t, camX, camZ, carrierId(u, A, gap));
       }
     }
     for (const p of pools.values()) {

@@ -311,7 +311,7 @@ async function boot() {
     if (lifts && !liftsEarly) return lifts;
     if (lifts && ride) { liftsEarly = true; return lifts; }                 // riding: rebuilt when the ride ends
     if (lifts) lifts.dispose();
-    lifts = createLifts({ scene, resort, height: (x, z) => field.height(x, z) });
+    lifts = createLifts({ scene, resort, height: (x, z) => field.height(x, z), env });      // station look: env = the evening glow
     if (npcView) lifts.setRiderSink(npcView.addCarrier);                 // the other skiers ride the carriers
     uploadNow(renderer, lifts.group, camera);                            // R8f: the merged stations / pylons on the GPU, JS copies gone
     if (game.freeLift && modes.liftAt === game.freeLift && !modes.liftDown && game.phase !== 'lift') lifts.dockShuttle(game.freeLift.index);      // R8e: the spawn
