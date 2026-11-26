@@ -1,4 +1,4 @@
-"""UI strings for the generated trail pages — DE / FR / EN / LB."""
+"""UI strings for the generated trail pages: DE / FR / EN / LB."""
 
 LANG_NAMES = {"de": "Deutsch", "fr": "Français", "en": "English", "lb": "Lëtzebuergesch"}
 
@@ -53,7 +53,7 @@ EXTRA = {
     "lb": {
         "fact_gain": "Héichtemeter",
         "photos_title": "Fotoe vum Wee",
-        "profile_title": "Héichteprofil",
+        "profile_title": "Profil vun den Héichten",
         "photo_via": "iwwer Wikimedia Commons",
         "dl_gpx": "GPX-Datei eroflueden",
         "open_komoot": "A Komoot plangen",
@@ -71,15 +71,13 @@ EXTRA = {
 UI_MTB = {
     "de": {
         "site_name": "MTB Trails Luxemburg",
-        "index_title": "MTB Trails Luxemburg — alle Mountainbike-Touren mit Karte, GPX & Busanreise",
+        "index_title": "MTB-Touren in Luxemburg: Karte, GPX und Anreise mit dem Bus",
         "index_meta": "Die ausgeschilderten Mountainbike-Touren in Luxemburg: interaktive Karte, Höhenprofil, GPX-Download und Anreise mit dem kostenlosen Bus zu jeder Tour.",
         "index_h1": "Mountainbike-Touren in Luxemburg",
         "index_intro": [
-            "Luxemburg hat ein dichtes Netz ausgeschilderter Mountainbike-Rundtouren: von den nationalen MTB-Strecken über die RedRock-Trails auf den alten Bergbauflächen des Südens bis zu lokalen Runden im Éislek und im Müllerthal. Die meisten sind dauerhaft beschildert und starten in Orten, die mit dem — landesweit kostenlosen — Bus erreichbar sind.",
+            "Luxemburg hat ein dichtes Netz ausgeschilderter Mountainbike-Rundtouren: von den nationalen MTB-Strecken über die RedRock-Trails auf den alten Bergbauflächen des Südens bis zu lokalen Runden im Éislek und im Müllerthal. Die meisten sind dauerhaft beschildert und starten in Orten, die mit dem Bus erreichbar sind, und der ist landesweit kostenlos.",
             "Diese Seite stellt die Touren einzeln vor: mit interaktiver Karte, Länge, Höhenprofil, ungefährer Fahrzeit, GPX-Download und den Haltestellen an der Strecke. Alle Streckendaten stammen aus OpenStreetMap, die Haltestellen aus den offiziellen Fahrplandaten Luxemburgs.",
         ],
-        "trail_title": "{name} — MTB-Tour {commune} | MTB Trails Luxemburg",
-        "trail_meta": "{name}: {length} km Mountainbike-Rundtour bei {commune} ({region}). Karte, Höhenprofil, GPX und Anreise mit dem Bus.",
         "photo_alt": "Eindruck von der Mountainbike-Tour {name} bei {commune}",
         "nearby_title": "Touren in der Nähe",
         "nearby_dist": "{d} km entfernt",
@@ -94,7 +92,7 @@ UI_MTB = {
         "duration_fmt": "ca. {} Std.",
         "highlights_title": "Highlights",
         "map_title": "Karte",
-        "map_note": "Streckenverlauf aus OpenStreetMap — kleine Abweichungen vor Ort sind möglich. Maßgeblich ist die MTB-Beschilderung an der Strecke.",
+        "map_note": "Streckenverlauf aus OpenStreetMap. Kleine Abweichungen vor Ort sind möglich. Maßgeblich ist die MTB-Beschilderung an der Strecke.",
         "bus_title": "Anreise mit dem Bus",
         "bus_intro": "Der öffentliche Verkehr ist in Luxemburg kostenlos. Diese Haltestellen liegen an der Strecke:",
         "bus_dist": "{} m von der Strecke",
@@ -110,15 +108,13 @@ UI_MTB = {
     },
     "fr": {
         "site_name": "MTB Trails Luxembourg",
-        "index_title": "MTB Trails Luxembourg — tous les circuits VTT avec carte, GPX et accès en bus",
+        "index_title": "Circuits VTT au Luxembourg : carte, GPX et accès en bus",
         "index_meta": "Les circuits VTT balisés du Luxembourg : carte interactive, profil altimétrique, GPX à télécharger et accès en bus gratuit pour chaque tour.",
         "index_h1": "Les circuits VTT du Luxembourg",
         "index_intro": [
-            "Le Luxembourg dispose d'un réseau dense de circuits VTT balisés : des tours nationaux aux trails RedRock sur les anciennes friches minières du sud, en passant par les boucles locales de l'Éislek et du Mullerthal. La plupart sont balisés en permanence et partent de localités accessibles en bus — gratuit dans tout le pays.",
+            "Le Luxembourg dispose d'un réseau dense de circuits VTT balisés : des tours nationaux aux trails RedRock sur les anciennes friches minières du sud, en passant par les boucles locales de l'Éislek et du Mullerthal. La plupart sont balisés en permanence et partent de localités accessibles en bus, gratuit dans tout le pays.",
             "Ce site présente les circuits un par un : carte interactive, distance, profil altimétrique, durée approximative, GPX à télécharger et arrêts de bus sur le parcours. Les tracés proviennent d'OpenStreetMap, les arrêts des données horaires officielles du Luxembourg.",
         ],
-        "trail_title": "{name} — circuit VTT à {commune} | MTB Trails Luxembourg",
-        "trail_meta": "{name} : circuit VTT de {length} km près de {commune} ({region}). Carte, profil, GPX et accès en bus.",
         "photo_alt": "Impression du circuit VTT {name} près de {commune}",
         "nearby_title": "Circuits à proximité",
         "nearby_dist": "à {d} km",
@@ -133,7 +129,7 @@ UI_MTB = {
         "duration_fmt": "env. {} h",
         "highlights_title": "Points forts",
         "map_title": "Carte",
-        "map_note": "Tracé issu d'OpenStreetMap — de petits écarts sur le terrain sont possibles. Le balisage VTT sur place fait foi.",
+        "map_note": "Tracé issu d'OpenStreetMap ; de petits écarts sur le terrain sont possibles. Le balisage VTT sur place fait foi.",
         "bus_title": "Y aller en bus",
         "bus_intro": "Les transports publics sont gratuits au Luxembourg. Ces arrêts se trouvent sur le parcours :",
         "bus_dist": "à {} m du parcours",
@@ -149,15 +145,13 @@ UI_MTB = {
     },
     "en": {
         "site_name": "MTB Trails Luxembourg",
-        "index_title": "MTB Trails Luxembourg — every marked mountain-bike loop with map, GPX & bus access",
+        "index_title": "Mountain-bike loops in Luxembourg: maps, GPX and bus access",
         "index_meta": "Luxembourg's waymarked mountain-bike loops: interactive map, elevation profile, GPX download and free-bus access for every tour.",
         "index_h1": "Luxembourg's mountain-bike loops",
         "index_intro": [
-            "Luxembourg has a dense network of waymarked mountain-bike loops: national MTB tours, the RedRock trails on the former mining land of the south, and local circuits in the Éislek and the Mullerthal. Most are permanently signposted and start in villages you can reach by bus — free of charge nationwide.",
+            "Luxembourg has a dense network of waymarked mountain-bike loops: national MTB tours, the RedRock trails on the former mining land of the south, and local circuits in the Éislek and the Mullerthal. Most are permanently signposted and start in villages you can reach by bus, which is free nationwide.",
             "This site presents the tours one by one: interactive map, distance, elevation profile, approximate riding time, GPX download and the bus stops on the route. Route data comes from OpenStreetMap, stop data from Luxembourg's official timetable feed.",
         ],
-        "trail_title": "{name} — MTB loop in {commune} | MTB Trails Luxembourg",
-        "trail_meta": "{name}: {length} km mountain-bike loop near {commune} ({region}). Map, elevation profile, GPX and how to get there by bus.",
         "photo_alt": "View from the {name} mountain-bike loop near {commune}",
         "nearby_title": "Rides nearby",
         "nearby_dist": "{d} km away",
@@ -172,7 +166,7 @@ UI_MTB = {
         "duration_fmt": "approx. {} h",
         "highlights_title": "Highlights",
         "map_title": "Map",
-        "map_note": "Route line from OpenStreetMap — small deviations on the ground are possible. The MTB signposts on site are authoritative.",
+        "map_note": "Route line from OpenStreetMap. Small deviations on the ground are possible. The MTB signposts on site are authoritative.",
         "bus_title": "Getting there by bus",
         "bus_intro": "Public transport is free in Luxembourg. These stops are on the route:",
         "bus_dist": "{} m from the route",
@@ -188,15 +182,13 @@ UI_MTB = {
     },
     "lb": {
         "site_name": "MTB Trails Lëtzebuerg",
-        "index_title": "MTB Trails Lëtzebuerg — all d’Touren mat Kaart, GPX an Urees mam Bus",
-        "index_meta": "Déi markéiert MTB-Touren zu Lëtzebuerg: eng interaktiv Kaart, Héichteprofil, GPX-Datei an Urees mam gratis Bus fir all Tour.",
+        "index_title": "MTB-Touren zu Lëtzebuerg: Kaart, GPX an Urees mam Bus",
+        "index_meta": "Déi markéiert MTB-Touren zu Lëtzebuerg: eng interaktiv Kaart, d’Profil vun den Héichten, eng GPX-Datei an Urees mam gratis Bus fir all Tour.",
         "index_h1": "MTB-Touren zu Lëtzebuerg",
         "index_intro": [
-            "Zu Lëtzebuerg gëtt et vill markéiert MTB-Ronnen: national Circuiten, RedRock-Trails op de fréieren Ofbaugebidder am Süden a lokal Ronnen am Éislek an am Mëllerdall. Déi meescht si permanent markéiert a fänken an Uertschaften un, déi mam Bus erreechbar sinn. De Bus ass am ganze Land gratis.",
-            "Op dëser Säit gëtt all Tour eenzel virgestallt: mat enger interaktiver Kaart, der Längt, dem Héichteprofil, der geschater Fuerzäit, enger GPX-Datei an de Busarrêten op der Streck. D’Streckendate kommen aus OpenStreetMap. D’Busarrête kommen aus den offizielle Fuerplangdate vu Lëtzebuerg."
+            "Zu Lëtzebuerg gëtt et vill markéiert MTB-Ronnen: national Circuiten, RedRock-Trails op de fréiere Minièren am Süden a lokal Ronnen am Éislek an am Mëllerdall. Déi meescht si permanent markéiert a fänken an Uertschaften un, déi mam Bus erreechbar sinn. De Bus ass am ganze Land gratis.",
+            "Op dëser Säit gëtt all Tour eenzel virgestallt: mat enger interaktiver Kaart, der Längt, dem Profil vun den Héichten, der geschater Fuerzäit, enger GPX-Datei an de Busarrêten op der Streck. D’Date vun de Strecke kommen aus OpenStreetMap. D’Busarrête kommen aus dem offizielle Fuerplang vu Lëtzebuerg."
         ],
-        "trail_title": "{name} — MTB-Tour ronderëm {commune} | MTB Trails Lëtzebuerg",
-        "trail_meta": "{name}: eng {length} km laang MTB-Ronn ronderëm {commune} ({region}). Kaart, Héichteprofil, GPX an Urees mam Bus.",
         "photo_alt": "Foto vun der MTB-Tour {name} bei {commune}",
         "nearby_title": "MTB-Touren an der Géigend",
         "nearby_dist": "{d} km ewech",
@@ -220,7 +212,7 @@ UI_MTB = {
         "bus_live": "Aktuell Departen op alle Busarrêten: ian.lu/bus",
         "all_trails": "All d’Touren",
         "filter_all": "All d’Regiounen",
-        "footer_note": "E Projet vun ian.lu · Streckendaten © OpenStreetMap-Mataarbechter · Fuerplangdaten: data.public.lu",
+        "footer_note": "E Projet vun ian.lu · Date vun de Strecken © OpenStreetMap-Mataarbechter · Fuerplang: data.public.lu",
         "breadcrumb_home": "MTB Trails",
         "lang_switch_label": "Sprooch",
         "card_cta": "Den Tour kucken"
@@ -230,15 +222,13 @@ UI_MTB = {
 UI = {
     "de": {
         "site_name": "Autopédestres Luxemburg",
-        "index_title": "Autopédestres Luxemburg — alle Rundwanderwege mit Karte & Busanreise",
+        "index_title": "Autopédestres in Luxemburg: alle Rundwege mit Karte und Bus",
         "index_meta": "Die Autopédestre-Rundwanderwege in Luxemburg: interaktive Karte, Länge, Dauer, Schwierigkeit und Anreise mit dem kostenlosen Bus zu jedem Weg.",
         "index_h1": "Autopédestre-Rundwanderwege in Luxemburg",
         "index_intro": [
-            "Die Autopédestres sind Luxemburgs klassische Rundwanderwege: {n} lokale Schleifen im ganzen Land, dauerhaft mit dem blauen Symbol markiert und so angelegt, dass man immer wieder am Ausgangspunkt ankommt. Viele wurden vor Jahrzehnten für Ausflügler mit dem Auto geschaffen — daher der Name — aber heute erreicht man die meisten bequem mit dem Bus, denn der öffentliche Verkehr ist in ganz Luxemburg kostenlos.",
-            "Diese Seite stellt die Wege einzeln vor — mit interaktiver Karte, Länge, ungefährer Gehzeit, Schwierigkeit und den Bushaltestellen direkt am Weg. Die Liste folgt dem offiziellen Verzeichnis auf geoportail.lu, das von 201 auf heute {n} Rundwege gekürzt wurde — was hier steht, ist also tatsächlich noch markiert. Die Streckendaten stammen aus OpenStreetMap und aus den offenen Daten der Kataster- und Topografieverwaltung, die Haltestellen aus den offiziellen Fahrplandaten Luxemburgs.",
+            "Die Autopédestres sind Luxemburgs klassische Rundwanderwege: {n} lokale Schleifen im ganzen Land, dauerhaft mit dem blauen Symbol markiert und so angelegt, dass man immer wieder am Ausgangspunkt ankommt. Viele wurden vor Jahrzehnten für Ausflügler mit dem Auto geschaffen, daher der Name. Heute erreicht man die meisten bequem mit dem Bus, denn der öffentliche Verkehr ist in ganz Luxemburg kostenlos.",
+            "Diese Seite stellt die Wege einzeln vor, mit interaktiver Karte, Länge, ungefährer Gehzeit, Schwierigkeit und den Bushaltestellen direkt am Weg. Die Liste folgt dem offiziellen Verzeichnis auf geoportail.lu, das von 201 auf heute {n} Rundwege gekürzt wurde. Was hier steht, ist also tatsächlich noch markiert. Die Streckendaten stammen aus OpenStreetMap und aus den offenen Daten der Kataster- und Topografieverwaltung, die Haltestellen aus den offiziellen Fahrplandaten Luxemburgs.",
         ],
-        "trail_title": "{name} — Rundwanderweg {commune} | Autopédestres Luxemburg",
-        "trail_meta": "{name}: {length} km Rundwanderweg bei {commune} ({region}). Karte, Gehzeit, Schwierigkeit und Anreise mit dem Bus.",
         "photo_alt": "Eindruck vom Wanderweg {name} bei {commune}",
         "nearby_title": "Wanderwege in der Nähe",
         "nearby_dist": "{d} km entfernt",
@@ -253,8 +243,8 @@ UI = {
         "duration_fmt": "ca. {} Std.",
         "highlights_title": "Highlights",
         "map_title": "Karte",
-        "map_note": "Streckenverlauf aus OpenStreetMap — kleine Abweichungen vor Ort sind möglich. Maßgeblich ist die blaue Markierung am Weg.",
-        "map_note_official": "Streckenverlauf aus den offenen Daten der Kataster- und Topografieverwaltung (data.public.lu / geoportail.lu, CC0) — kleine Abweichungen vor Ort sind möglich. Maßgeblich ist die blaue Markierung am Weg.",
+        "map_note": "Streckenverlauf aus OpenStreetMap. Kleine Abweichungen vor Ort sind möglich. Maßgeblich ist die blaue Markierung am Weg.",
+        "map_note_official": "Streckenverlauf aus den offenen Daten der Kataster- und Topografieverwaltung (data.public.lu / geoportail.lu, CC0). Kleine Abweichungen vor Ort sind möglich. Maßgeblich ist die blaue Markierung am Weg.",
         "bus_title": "Anreise mit dem Bus",
         "bus_intro": "Der öffentliche Verkehr ist in Luxemburg kostenlos. Diese Haltestellen liegen am Weg:",
         "bus_dist": "{} m vom Weg",
@@ -270,15 +260,13 @@ UI = {
     },
     "fr": {
         "site_name": "Auto-Pédestres Luxembourg",
-        "index_title": "Auto-Pédestres Luxembourg — toutes les boucles avec carte et accès en bus",
+        "index_title": "Auto-Pédestres au Luxembourg : toutes les boucles, carte et bus",
         "index_meta": "Les circuits Auto-Pédestre du Luxembourg : carte interactive, distance, durée, difficulté et accès en bus gratuit pour chaque boucle.",
         "index_h1": "Les circuits Auto-Pédestre du Luxembourg",
         "index_intro": [
-            "Les Auto-Pédestres sont les boucles de randonnée classiques du Luxembourg : {n} circuits locaux dans tout le pays, balisés en permanence du symbole bleu et conçus pour vous ramener toujours à votre point de départ. Beaucoup furent créés il y a des décennies pour les excursionnistes en voiture — d'où le nom — mais aujourd'hui la plupart s'atteignent facilement en bus, les transports publics étant gratuits dans tout le Luxembourg.",
-            "Ce site présente les circuits un par un — avec carte interactive, distance, durée approximative, difficulté et les arrêts de bus situés directement sur le parcours. La liste suit le répertoire officiel de geoportail.lu, ramené de 201 à {n} boucles — ce qui figure ici est donc encore balisé sur le terrain. Les tracés proviennent d'OpenStreetMap et des données ouvertes de l'Administration du cadastre et de la topographie, les arrêts des données horaires officielles du Luxembourg.",
+            "Les Auto-Pédestres sont les boucles de randonnée classiques du Luxembourg : {n} circuits locaux dans tout le pays, balisés en permanence du symbole bleu et conçus pour vous ramener toujours à votre point de départ. Beaucoup furent créés il y a des décennies pour les excursionnistes en voiture, d'où le nom. Aujourd'hui la plupart s'atteignent facilement en bus, les transports publics étant gratuits dans tout le Luxembourg.",
+            "Ce site présente les circuits un par un, avec carte interactive, distance, durée approximative, difficulté et les arrêts de bus situés directement sur le parcours. La liste suit le répertoire officiel de geoportail.lu, ramené de 201 à {n} boucles : ce qui figure ici est donc encore balisé sur le terrain. Les tracés proviennent d'OpenStreetMap et des données ouvertes de l'Administration du cadastre et de la topographie, les arrêts des données horaires officielles du Luxembourg.",
         ],
-        "trail_title": "{name} — boucle de randonnée à {commune} | Auto-Pédestres Luxembourg",
-        "trail_meta": "{name} : boucle de {length} km près de {commune} ({region}). Carte, durée, difficulté et accès en bus.",
         "photo_alt": "Impression du sentier {name} près de {commune}",
         "nearby_title": "Sentiers à proximité",
         "nearby_dist": "à {d} km",
@@ -293,8 +281,8 @@ UI = {
         "duration_fmt": "env. {} h",
         "highlights_title": "Points forts",
         "map_title": "Carte",
-        "map_note": "Tracé issu d'OpenStreetMap — de petits écarts sur le terrain sont possibles. Le balisage bleu sur place fait foi.",
-        "map_note_official": "Tracé issu des données ouvertes de l'Administration du cadastre et de la topographie (data.public.lu / geoportail.lu, CC0) — de petits écarts sur le terrain sont possibles. Le balisage bleu sur place fait foi.",
+        "map_note": "Tracé issu d'OpenStreetMap ; de petits écarts sur le terrain sont possibles. Le balisage bleu sur place fait foi.",
+        "map_note_official": "Tracé issu des données ouvertes de l'Administration du cadastre et de la topographie (data.public.lu / geoportail.lu, CC0) ; de petits écarts sur le terrain sont possibles. Le balisage bleu sur place fait foi.",
         "bus_title": "Y aller en bus",
         "bus_intro": "Les transports publics sont gratuits au Luxembourg. Ces arrêts se trouvent sur le parcours :",
         "bus_dist": "à {} m du sentier",
@@ -310,15 +298,13 @@ UI = {
     },
     "en": {
         "site_name": "Auto-Pédestres Luxembourg",
-        "index_title": "Auto-Pédestres Luxembourg — every loop trail with map & bus access",
+        "index_title": "Auto-Pédestres in Luxembourg: every loop walk, map and bus",
         "index_meta": "Luxembourg's Auto-Pédestre loop walks: interactive map, distance, duration, difficulty and free-bus access for every trail.",
         "index_h1": "Luxembourg's Auto-Pédestre loop trails",
         "index_intro": [
-            "The Auto-Pédestres are Luxembourg's classic circular walks: {n} local loops across the country, permanently waymarked with the blue symbol and always bringing you back to where you started. Many were laid out decades ago for day-trippers arriving by car — hence the name — but today most are easy to reach by bus, since public transport is free throughout Luxembourg.",
-            "This site presents the trails one by one — with an interactive map, distance, approximate walking time, difficulty and the bus stops right on the route. The list follows the official register on geoportail.lu, which was cut from 201 circuits to today's {n}, so everything here is still waymarked on the ground. Route lines come from OpenStreetMap and from the Land Registry and Topography Administration's open data, stop data from Luxembourg's official timetable feed.",
+            "The Auto-Pédestres are Luxembourg's classic circular walks: {n} local loops across the country, permanently waymarked with the blue symbol and always bringing you back to where you started. Many were laid out decades ago for day-trippers arriving by car, hence the name, but today most are easy to reach by bus, since public transport is free throughout Luxembourg.",
+            "This site presents the trails one by one, with an interactive map, distance, approximate walking time, difficulty and the bus stops right on the route. The list follows the official register on geoportail.lu, which was cut from 201 circuits to today's {n}, so everything here is still waymarked on the ground. Route lines come from OpenStreetMap and from the Land Registry and Topography Administration's open data, stop data from Luxembourg's official timetable feed.",
         ],
-        "trail_title": "{name} — loop walk in {commune} | Auto-Pédestres Luxembourg",
-        "trail_meta": "{name}: {length} km loop walk near {commune} ({region}). Map, walking time, difficulty and how to get there by bus.",
         "photo_alt": "View from the {name} trail near {commune}",
         "nearby_title": "Trails nearby",
         "nearby_dist": "{d} km away",
@@ -333,8 +319,8 @@ UI = {
         "duration_fmt": "approx. {} h",
         "highlights_title": "Highlights",
         "map_title": "Map",
-        "map_note": "Route line from OpenStreetMap — small deviations on the ground are possible. The blue waymarks on site are authoritative.",
-        "map_note_official": "Route line from the open data of Luxembourg's cadastre and topography administration (data.public.lu / geoportail.lu, CC0) — small deviations on the ground are possible. The blue waymarks on site are authoritative.",
+        "map_note": "Route line from OpenStreetMap. Small deviations on the ground are possible. The blue waymarks on site are authoritative.",
+        "map_note_official": "Route line from the open data of Luxembourg's cadastre and topography administration (data.public.lu / geoportail.lu, CC0). Small deviations on the ground are possible. The blue waymarks on site are authoritative.",
         "bus_title": "Getting there by bus",
         "bus_intro": "Public transport is free in Luxembourg. These stops are on the route:",
         "bus_dist": "{} m from the trail",
@@ -350,15 +336,13 @@ UI = {
     },
     "lb": {
         "site_name": "Auto-Pédestres Lëtzebuerg",
-        "index_title": "Auto-Pédestres Lëtzebuerg — all d’Ronne mat Kaart an Urees mam Bus",
+        "index_title": "Auto-Pédestres zu Lëtzebuerg: all d’Ronne mat Kaart a Bus",
         "index_meta": "D’Auto-Pédestre-Weeër zu Lëtzebuerg: eng interaktiv Kaart, Längt, Dauer, Schwieregkeet an Urees mam gratis Bus fir all Ronn.",
         "index_h1": "Auto-Pédestre-Weeër zu Lëtzebuerg",
         "index_intro": [
-            "D’Auto-Pédestres sinn déi klassesch Wanderweeër zu Lëtzebuerg: {n} Ronnen uechter d’Land, déi mat engem bloe Symbol markéiert sinn an ëmmer erëm op de Startpunkt zréckféieren. Vill dovu goufe viru Joerzéngte fir Leit ugeluecht, déi mam Auto wandere koumen — dohier den Numm. Haut kënnt ee bei déi meescht bequem mam Bus. Den ëffentlechen Transport ass am ganze Land gratis.",
-            "Op dëser Säit gëtt all Wee eenzel virgestallt: mat enger interaktiver Kaart, der Längt, der geschater Dauer, der Schwieregkeet an de Busarrêten direkt um Wee. D’Lëscht entsprécht dem offizielle Verzeechnes op geoportail.lu, dat vun 201 op {n} Ronne verkierzt gouf. D’Weeër op dëser Lëscht sinn also nach markéiert. D’Streckendate kommen aus OpenStreetMap an aus den oppenen Date vun der Kataster- an Topografieverwaltung. D’Busarrête kommen aus den offizielle Fuerplangdate vu Lëtzebuerg."
+            "D’Auto-Pédestres sinn déi klassesch Wanderweeër zu Lëtzebuerg: {n} Ronnen uechter d’Land, déi mat engem bloe Symbol markéiert sinn an ëmmer erëm op de Startpunkt zréckféieren. Vill dovu goufe viru Joerzéngte fir Leit ugeluecht, déi mam Auto wandere koumen. Dohier kënnt den Numm. Haut kënnt ee bei déi meescht bequeem mam Bus. Den ëffentlechen Transport ass am ganze Land gratis.",
+            "Op dëser Säit gëtt all Wee eenzel virgestallt: mat enger interaktiver Kaart, der Längt, der geschater Dauer, der Schwieregkeet an de Busarrêten direkt um Wee. D’Lëscht entsprécht dem offizielle Verzeechnes op geoportail.lu, dat vun 201 op {n} Ronne verkierzt gouf. D’Weeër op dëser Lëscht sinn also nach markéiert. D’Date vun de Strecke kommen aus OpenStreetMap an aus den oppenen Date vun der Kadaster- an Topografieverwaltung. D’Busarrête kommen aus dem offizielle Fuerplang vu Lëtzebuerg."
         ],
-        "trail_title": "{name} — Wanderung ronderëm {commune} | Auto-Pédestres Lëtzebuerg",
-        "trail_meta": "{name}: eng {length} km laang Ronn ronderëm {commune} ({region}). Kaart, Dauer, Schwieregkeet an Urees mam Bus.",
         "photo_alt": "Foto vum Wanderwee {name} bei {commune}",
         "nearby_title": "Wanderweeër an der Géigend",
         "nearby_dist": "{d} km ewech",
@@ -374,7 +358,7 @@ UI = {
         "highlights_title": "Wat et ënnerwee ze gesi gëtt",
         "map_title": "Kaart",
         "map_note": "De Verlaf vum Wee kënnt aus OpenStreetMap. Op der Plaz si kleng Ofwäichunge méiglech. Follegt de bloe Markéierungen um Wee.",
-        "map_note_official": "De Verlaf vum Wee kënnt aus den oppenen Date vun der Kataster- an Topografieverwaltung (data.public.lu / geoportail.lu, CC0). Op der Plaz si kleng Ofwäichunge méiglech. Follegt de bloe Markéierungen um Wee.",
+        "map_note_official": "De Verlaf vum Wee kënnt aus den oppenen Date vun der Kadaster- an Topografieverwaltung (data.public.lu / geoportail.lu, CC0). Op der Plaz si kleng Ofwäichunge méiglech. Follegt de bloe Markéierungen um Wee.",
         "bus_title": "Urees mam Bus",
         "bus_intro": "Den ëffentlechen Transport ass zu Lëtzebuerg gratis. Dës Busarrête leien um Wee:",
         "bus_dist": "{} m vum Wee",
@@ -383,7 +367,7 @@ UI = {
         "bus_live": "Aktuell Departen op alle Busarrêten: ian.lu/bus",
         "all_trails": "All d’Weeër",
         "filter_all": "All d’Regiounen",
-        "footer_note": "E Projet vun ian.lu · Streckendaten © OpenStreetMap-Mataarbechter · Fuerplangdaten: data.public.lu",
+        "footer_note": "E Projet vun ian.lu · Date vun de Strecken © OpenStreetMap-Mataarbechter · Fuerplang: data.public.lu",
         "breadcrumb_home": "Auto-Pédestres",
         "lang_switch_label": "Sprooch",
         "card_cta": "De Wee kucken"
@@ -391,3 +375,105 @@ UI = {
 }
 
 UI_BY_CAT = {"hiking": UI, "mtb": UI_MTB}
+
+
+# Words for titles, facts and the region pages (both categories).
+TITLE_NOUN = {
+    "hiking": {"de": "{l} km Rundwanderweg", "fr": "boucle de {l} km", "en": "{l} km loop walk", "lb": "{l} km Wanderung"},
+    "mtb": {"de": "{l} km MTB-Tour", "fr": "circuit VTT de {l} km", "en": "{l} km MTB loop", "lb": "{l} km MTB-Ronn"},
+}
+TITLE_SUFFIX = {"de": " | Luxemburg", "fr": " | Luxembourg", "en": " | Luxembourg", "lb": " | Lëtzebuerg"}
+FACT_LABELS = {
+    "de": {"high": "Höchster Punkt", "forest": "Waldanteil", "paved": "Asphalt"},
+    "fr": {"high": "Point culminant", "forest": "Part de forêt", "paved": "Goudron"},
+    "en": {"high": "Highest point", "forest": "Woodland", "paved": "Tarmac"},
+    "lb": {"high": "Héchste Punkt", "forest": "Bësch", "paved": "Asphalt"},
+}
+REGION_IN_SHORT = {
+    "de": {"eislek": "im Éislek", "mullerthal": "im Müllerthal", "moselle": "an der Mosel", "minett": "im Minett",
+           "center": "im Guttland"},
+    "fr": {"eislek": "dans l'Éislek", "mullerthal": "dans le Mullerthal", "moselle": "sur la Moselle",
+           "minett": "dans le Minett", "center": "dans le Guttland"},
+    "en": {"eislek": "in the Éislek", "mullerthal": "in the Mullerthal", "moselle": "on the Moselle",
+           "minett": "in the Minett", "center": "in the Guttland"},
+    "lb": {"eislek": "am Éislek", "mullerthal": "am Mëllerdall", "moselle": "un der Musel", "minett": "am Minett",
+           "center": "am Guttland"},
+}
+REGION_ABOUT = {
+    "eislek": {
+        "de": "Das Éislek ist der Norden Luxemburgs und gehört zu den Ardennen. Sauer, Our, Wiltz und Clerve haben hier tiefe Täler in die Hochfläche geschnitten.",
+        "fr": "L'Éislek est le nord du Luxembourg et fait partie des Ardennes. La Sûre, l'Our, la Wiltz et la Clerve y ont creusé des vallées profondes dans le plateau.",
+        "en": "The Éislek is the north of Luxembourg and part of the Ardennes. The Sûre, the Our, the Wiltz and the Clerve have cut deep valleys into the plateau.",
+        "lb": "Den Éislek ass den Norde vu Lëtzebuerg a gehéiert zu den Ardennen. D’Sauer, d’Our, d’Wolz an d’Clierf hunn hei déif Däller an d’Héichten geschnidden.",
+    },
+    "mullerthal": {
+        "de": "Die Region Müllerthal liegt im Osten an der Grenze zu Deutschland. Typisch sind Sandsteinfelsen und bewaldete Bachtäler, vor allem an der Weißen und der Schwarzen Ernz.",
+        "fr": "La région du Mullerthal se trouve à l'est, à la frontière allemande. Rochers de grès et vallons boisés la caractérisent, surtout le long de l'Ernz Blanche et de l'Ernz Noire.",
+        "en": "The Mullerthal region lies in the east, on the German border. It is known for sandstone rocks and wooded stream valleys, above all along the White and the Black Ernz.",
+        "lb": "De Mëllerdall läit am Osten un der Grenz mat Däitschland. Typesch si Fielsen aus Sandsteen a Bëscher an den Däller, virun allem laanscht déi Wäiss an déi Schwaarz Iernz.",
+    },
+    "moselle": {
+        "de": "Die Mosel bildet im Südosten die Grenze zu Deutschland. An ihren Hängen liegen die Weinberge des Landes.",
+        "fr": "Au sud-est, la Moselle forme la frontière avec l'Allemagne. Ses coteaux portent les vignobles du pays.",
+        "en": "In the south-east the Moselle forms the border with Germany. Its slopes carry the country's vineyards.",
+        "lb": "Am Südosten ass d’Musel d’Grenz mat Däitschland. Op hiren Häng leien d’Wéngerte vum Land.",
+    },
+    "minett": {
+        "de": "Der Minett im Süden ist das frühere Eisenerzrevier Luxemburgs. Ein Teil der alten Tagebauflächen ist heute Naturschutzgebiet.",
+        "fr": "Le Minett, au sud, est l'ancien bassin du minerai de fer luxembourgeois. Une partie des anciennes mines à ciel ouvert est aujourd'hui réserve naturelle.",
+        "en": "The Minett in the south is Luxembourg's former iron-ore district. Part of the old open-cast mining land is now nature reserve.",
+        "lb": "De Minett am Süden ass d’Regioun, wou fréier Eisenäerz ofgebaut gouf. En Deel vun de fréiere Minièren ass haut Naturschutzgebitt.",
+    },
+    "center": {
+        "de": "Das Guttland umfasst die Mitte und den Westen des Landes, mit Feldern, Wäldern und den Tälern von Alzette, Attert und Eisch.",
+        "fr": "Le Guttland couvre le centre et l'ouest du pays, avec des champs, des forêts et les vallées de l'Alzette, de l'Attert et de l'Eisch.",
+        "en": "The Guttland covers the centre and the west of the country, with fields, forests and the valleys of the Alzette, the Attert and the Eisch.",
+        "lb": "D’Guttland ass d’Mëtt an de Weste vum Land, mat Felder, Bëscher an den Däller vun der Uelzecht, der Atert an der Äisch.",
+    },
+}
+HUB = {
+    "hiking": {
+        "de": {"title": "Autopédestres {rin}: {n} Rundwege", "h1": "Autopédestres {rin}",
+               "stats": "{n} Rundwege von {min} bis {max} km, zusammen {sum} km. Bei {bus} davon liegt eine Bushaltestelle direkt am Weg.",
+               "meta": "{n} Autopédestre-Rundwege {rin}, {min} bis {max} km: Länge, Höhenmeter, Waldanteil und Bus für jeden Weg.",
+               "sorted": "Nach Länge sortiert:", "other": "Andere Regionen", "all": "Alle Regionen",
+               "row": "{l} km · {g} Hm · {d}", "forest": "{f} Wald", "more": "Alle Wege {rin}"},
+        "fr": {"title": "Auto-Pédestres {rin} : {n} boucles", "h1": "Auto-Pédestres {rin}",
+               "stats": "{n} boucles de {min} à {max} km, {sum} km au total. Pour {bus} d'entre elles, un arrêt de bus se trouve directement sur le parcours.",
+               "meta": "{n} circuits Auto-Pédestre {rin}, de {min} à {max} km : distance, dénivelé, part de forêt et bus pour chaque boucle.",
+               "sorted": "Classées par distance :", "other": "Autres régions", "all": "Toutes les régions",
+               "row": "{l} km · {g} m D+ · {d}", "forest": "{f} de forêt", "more": "Tous les circuits {rin}"},
+        "en": {"title": "Auto-Pédestres {rin}: {n} loop walks", "h1": "Auto-Pédestres {rin}",
+               "stats": "{n} loops from {min} to {max} km, {sum} km in total. {bus} of them have a bus stop right on the route.",
+               "meta": "{n} Auto-Pédestre loop walks {rin}, {min} to {max} km: distance, climbing, woodland share and bus for each one.",
+               "sorted": "Sorted by distance:", "other": "Other regions", "all": "All regions",
+               "row": "{l} km · {g} m climbing · {d}", "forest": "{f} woodland", "more": "All walks {rin}"},
+        "lb": {"title": "Auto-Pédestres {rin}: {n} Ronnen", "h1": "Auto-Pédestres {rin}",
+               "stats": "{n} Ronne vun {min} bis {max} km, am Ganze {sum} km. Bei {bus} dovu läit e Busarrêt direkt um Wee.",
+               "meta": "{n} Auto-Pédestre-Ronnen {rin}, {min} bis {max} km: Längt, Héichtemeter, Bësch a Bus fir all Ronn.",
+               "sorted": "No der Längt sortéiert:", "other": "Aner Regiounen", "all": "All d’Regiounen",
+               "row": "{l} km · {g} Héichtemeter · {d}", "forest": "{f} Bësch", "more": "All d’Weeër {rin}"},
+    },
+    "mtb": {
+        "de": {"title": "MTB-Touren {rin}: {n} Runden", "h1": "MTB-Touren {rin}",
+               "stats": "{n} Runden von {min} bis {max} km, zusammen {sum} km. Bei {bus} davon liegt eine Bushaltestelle direkt an der Strecke.",
+               "meta": "{n} MTB-Runden {rin}, {min} bis {max} km: Länge, Höhenmeter, Waldanteil und Bus für jede Tour.",
+               "sorted": "Nach Länge sortiert:", "other": "Andere Regionen", "all": "Alle Regionen",
+               "row": "{l} km · {g} Hm · {d}", "forest": "{f} Wald", "more": "Alle Touren {rin}"},
+        "fr": {"title": "Circuits VTT {rin} : {n} boucles", "h1": "Circuits VTT {rin}",
+               "stats": "{n} boucles de {min} à {max} km, {sum} km au total. Pour {bus} d'entre elles, un arrêt de bus se trouve directement sur le parcours.",
+               "meta": "{n} circuits VTT {rin}, de {min} à {max} km : distance, dénivelé, part de forêt et bus pour chaque boucle.",
+               "sorted": "Classés par distance :", "other": "Autres régions", "all": "Toutes les régions",
+               "row": "{l} km · {g} m D+ · {d}", "forest": "{f} de forêt", "more": "Tous les circuits VTT {rin}"},
+        "en": {"title": "MTB loops {rin}: {n} rides", "h1": "Mountain-bike loops {rin}",
+               "stats": "{n} loops from {min} to {max} km, {sum} km in total. {bus} of them have a bus stop right on the route.",
+               "meta": "{n} mountain-bike loops {rin}, {min} to {max} km: distance, climbing, woodland share and bus for each one.",
+               "sorted": "Sorted by distance:", "other": "Other regions", "all": "All regions",
+               "row": "{l} km · {g} m climbing · {d}", "forest": "{f} woodland", "more": "All MTB loops {rin}"},
+        "lb": {"title": "MTB-Touren {rin}: {n} Ronnen", "h1": "MTB-Touren {rin}",
+               "stats": "{n} Ronne vun {min} bis {max} km, am Ganze {sum} km. Bei {bus} dovu läit e Busarrêt direkt op der Streck.",
+               "meta": "{n} MTB-Ronnen {rin}, {min} bis {max} km: Längt, Héichtemeter, Bësch a Bus fir all Tour.",
+               "sorted": "No der Längt sortéiert:", "other": "Aner Regiounen", "all": "All d’Regiounen",
+               "row": "{l} km · {g} Héichtemeter · {d}", "forest": "{f} Bësch", "more": "All d’MTB-Touren {rin}"},
+    },
+}

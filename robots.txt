@@ -16,6 +16,6 @@ Disallow: /pb/
 # Crawling them leaks nothing: they are auth-gated and render almost no markup
 # to a signed-out crawler.
 
+# One sitemap index; it lists sitemap-pages.xml, sitemap-trails.xml and
+# sitemap-mtb.xml (scripts/sitemaps.py).
 Sitemap: https://ian.lu/sitemap.xml
-Sitemap: https://ian.lu/sitemap-trails.xml
-Sitemap: https://ian.lu/sitemap-mtb.xml

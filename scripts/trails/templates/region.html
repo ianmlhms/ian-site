@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="$lang">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="description" content="$meta_desc" />
+  <meta property="og:title" content="$h1" />
+  <meta property="og:description" content="$meta_desc" />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="https://ian.lu/apple-touch-icon.png" />
+  <link rel="canonical" href="$canonical" />
+$alternates
+  <title>$title</title>
+  <link rel="stylesheet" href="../trails.css?v=6" />
+  <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="../../apple-touch-icon.png">
+  <script data-goatcounter="https://ianm.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+  <script defer src="/count.js?v=2"></script>
+  <script type="application/ld+json">$jsonld</script>
+</head>
+<body>
+  <header class="site">
+    <a class="brand" href="./">$site_name</a>
+    <nav class="langs" aria-label="$lang_switch_label">$lang_links</nav>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumbs"><a href="./">$breadcrumb_home</a> <span>›</span> $region_label</nav>
+    <h1>$h1</h1>
+    <div class="intro">
+      <p>$about</p>
+      <p>$stats</p>
+    </div>
+
+    <p class="list-note">$sorted</p>
+    <ol class="hub-list">
+$rows_html
+    </ol>
+
+    <h2>$other_title</h2>
+    <nav class="region-links">$region_links</nav>
+    <p class="sister"><a href="./">$all_label</a></p>
+  </main>
+
+  <footer class="site-foot">$footer_note · <a href="https://ian.lu/" rel="noopener">ian.lu</a> · $privacy</footer>
+  <script>
+    document.querySelectorAll('.langs [data-lang]').forEach(function (a) {
+      a.addEventListener('click', function () {
+        try { localStorage.setItem('trails_lang', a.dataset.lang); } catch (e) { /* private mode */ }
+      });
+    });
+  </script>
+</body>
+</html>

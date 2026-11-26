@@ -191,12 +191,37 @@ def check_i18n(pages: list, problems: list) -> None:
                 problems.append(("error", "i18n", f"{page}: '{key}' missing from {label}"))
 
 
+def _sitemap_locs(name: str, seen: set) -> list:
+    """[(loc, sitemap file)] from sitemap.xml, following a sitemap index."""
+    path = os.path.join(REPO, name)
+    if name in seen or not os.path.exists(path):
+        return []
+    seen.add(name)
+    text = open(path, encoding="utf-8").read()
+    locs = re.findall(r"<loc>([^<]+)</loc>", text)
+    if "<sitemapindex" in text:
+        out = []
+        for loc in locs:
+            out.extend(_sitemap_locs(loc.replace("https://ian.lu/", ""), seen))
+        return out
+    return [(loc, name) for loc in locs]
+
+
 def check_sitemap(problems: list) -> set:
+    """Every sitemap URL: file exists, indexable, self-canonical, listed once.
+
+    Anything else in a sitemap is a URL Google is told to index and then
+    finds redirecting, noindexed or pointing elsewhere: exactly the "Seite
+    mit Weiterleitung" / "Duplikat" rows in Search Console.
+    """
     listed = set()
-    path = os.path.join(REPO, "sitemap.xml")
-    if not os.path.exists(path):
-        return listed
-    for loc in re.findall(r"<loc>([^<]+)</loc>", open(path, encoding="utf-8").read()):
+    seen_locs = {}
+    for loc, sitemap in _sitemap_locs("sitemap.xml", set()):
+        if loc in seen_locs:
+            problems.append(("error", "sitemap", f"{loc} is in {seen_locs[loc]} and {sitemap}"))
+        seen_locs[loc] = sitemap
+        if "?" in loc:
+            problems.append(("error", "sitemap", f"{loc}: query URLs do not belong in a sitemap"))
         rel = loc.replace("https://ian.lu/", "").split("?")[0]
         rel = rel or "index.html"
         if rel.endswith("/"):
@@ -205,8 +230,13 @@ def check_sitemap(problems: list) -> set:
         full = os.path.join(REPO, rel)
         if not os.path.exists(full):
             problems.append(("error", "sitemap", f"{loc} -> missing file {rel}"))
-        elif re.search(r'name=["\']robots["\'][^>]*noindex', read(rel), re.I):
+            continue
+        html = read(rel)
+        if re.search(r'name=["\']robots["\'][^>]*noindex', html, re.I):
             problems.append(("error", "sitemap", f"{loc} is in the sitemap but marked noindex"))
+        canon = re.search(r'rel=["\']canonical["\']\s+href=["\']([^"\']+)', html)
+        if canon and canon.group(1) != loc:
+            problems.append(("error", "sitemap", f"{loc}: canonical points to {canon.group(1)}"))
     return listed
 
 
@@ -271,7 +301,7 @@ TRAIL_SITES = (
     {"base": "trails", "sitemap": "sitemap-trails.xml"},
     {"base": "mtb", "sitemap": "sitemap-mtb.xml"},
 )
-TRAIL_LANGS = ("de", "fr", "en")
+TRAIL_LANGS = ("de", "fr", "en", "lb")
 
 
 def check_hreflang(problems: list) -> None:

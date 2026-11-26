@@ -108,7 +108,7 @@ Object.assign(window.I18N_DICT, {
 <main class="gt-page">
 <div class="gt-grid">
   <header class="c full gt-nav">
-    <div class="gt-nav-l"><a class="gt-back" href="index.html">‹ Heem</a><h1 class="gt-page-title">KartTracker</h1></div>
+    <div class="gt-nav-l"><a class="gt-back" href="/">‹ Heem</a><h1 class="gt-page-title">KartTracker</h1></div>
     <div class="gt-navr"></div>
   </header>
   <div class="c full kp">
@@ -236,7 +236,7 @@ function renderSession(){
       <h2 class="sec">${esc(T("kart.lapTimes"))}</h2>
       ${lapHtml ? `<div class="laps" role="list">${lapHtml}</div>` : `<p class="no-laps">${esc(T("kart.noLaps"))}</p>`}
     </section>
-    <footer>${esc(T("kart.recorded"))} <b>KartTracker</b> · <a href="index.html">ian.lu</a></footer>`;
+    <footer>${esc(T("kart.recorded"))} <b>KartTracker</b> · <a href="/">ian.lu</a></footer>`;
 
   const canvas = $("map");
   redrawMap = () => drawMap(canvas, row.track);

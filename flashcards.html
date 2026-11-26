@@ -124,7 +124,7 @@ const gate=(ico,title,sub,extra)=>`<div class="gate ui-card"><div class="gate-ic
 
 async function boot(){
   sb=await auth.client();
-  $("back").onclick=()=>{ if(deck){deck=null;location.search="";} else history.length>1?history.back():location.href="index.html"; };
+  $("back").onclick=()=>{ if(deck){deck=null;location.search="";} else history.length>1?history.back():location.href="/"; };
   if(!auth.session()){
     $("wrap").innerHTML=gate("🃏","Mell dech un, fir Kaarten ze léieren.","Deng Këschten sinn un däi Konto gebonnen.",`<button type="button" class="gt-btn" id="si">Umellen</button>`);
     $("si").onclick=auth.openAuthModal;return;

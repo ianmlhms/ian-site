@@ -11,7 +11,7 @@
   <link rel="canonical" href="$canonical" />
 $alternates
   <title>$title</title>
-  <link rel="stylesheet" href="../trails.css?v=5" />
+  <link rel="stylesheet" href="../trails.css?v=6" />
   <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="../../apple-touch-icon.png">
   <script data-goatcounter="https://ianm.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
@@ -27,7 +27,7 @@ $alternates
   </header>
 
   <main class="wrap">
-    <nav class="crumbs"><a href="./">$breadcrumb_home</a> <span>›</span> $name</nav>
+    <nav class="crumbs"><a href="./">$breadcrumb_home</a> <span>›</span> <a href="$region_href">$region_label</a> <span>›</span> $name</nav>
     <h1>$name</h1>
     <p class="sub">$region_label · $commune</p>
 
@@ -36,7 +36,7 @@ $alternates
       <div class="fact"><span class="k">$fact_duration</span><span class="v">$duration</span></div>
       <div class="fact"><span class="k">$fact_difficulty</span><span class="v">$difficulty</span></div>
       <div class="fact"><span class="k">$fact_commune</span><span class="v">$commune</span></div>
-$gain_fact
+$extra_facts
       <div class="fact"><span class="k">$fact_type</span><span class="v">$fact_type_value</span></div>
     </section>
 
@@ -48,7 +48,7 @@ $profile_html
     <article class="desc">
 $description_html
     </article>
-
+$sections_html
     <section class="highlights">
       <h2>$highlights_title</h2>
       <ul>
@@ -59,13 +59,15 @@ $highlights_html
 $gallery_html
     <section class="bus">
       <h2>$bus_title</h2>
-      <p>$bus_intro</p>
+      <p>$bus_intro $bus_text</p>
       <ul class="stops">
 $bus_html
       </ul>
       <p class="bus-live"><a href="https://ian.lu/bus.html" rel="noopener">$bus_live</a></p>
     </section>
-$nearby_html$gear_html
+$nearby_html
+    <p class="sister"><a href="$region_href">$region_more</a></p>
+$gear_html
   </main>
 
   <footer class="site-foot">$footer_note · <a href="https://ian.lu/" rel="noopener">ian.lu</a> · $privacy</footer>

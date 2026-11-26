@@ -227,3 +227,25 @@ footer.site-foot {
 .near-list li:last-child { border-bottom: 0; }
 .near-list a { font-weight: 600; text-decoration: none; }
 .near-meta { color: var(--muted); font-size: 14px; margin-left: 6px; }
+
+/* measured-detail sections, region pages */
+.detail p { margin: 10px 0; }
+.region-links { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 4px; }
+.region-links a {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--ink);
+}
+.region-links a:hover { border-color: var(--accent); }
+.list-note { color: var(--muted); font-weight: 600; margin: 22px 0 4px; }
+.hub-list { padding-left: 1.4em; margin: 8px 0 0; }
+.hub-list li { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.hub-list li:last-child { border-bottom: 0; }
+.hub-list a { font-weight: 700; text-decoration: none; }
+.hub-meta { display: block; color: var(--muted); font-size: 14px; }
+.gallery img { height: auto; }

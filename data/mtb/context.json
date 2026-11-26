@@ -1,0 +1,5423 @@
+{
+ "bavigne-boulaide": {
+  "amenities": {
+   "bench": 37,
+   "drinking_water": 1,
+   "picnic": 16,
+   "playground": 2,
+   "shelter": 5,
+   "toilets": 2
+  },
+  "churches": [
+   {
+    "kind": "church",
+    "km": 6.9,
+    "names": {
+     "de": "Sacré-Coeur",
+     "en": "Sacré-Coeur",
+     "fr": "Sacré-Coeur",
+     "lb": "Sacré-Coeur",
+     "name": "Sacré-Coeur"
+    }
+   },
+   {
+    "kind": "church",
+    "km": 15.8,
+    "names": {
+     "de": "Sacré-Cœur",
+     "en": "Sacré-Cœur",
+     "fr": "Sacré-Cœur",
+     "lb": "Sacré-Cœur",
+     "name": "Sacré-Cœur"
+    }
+   },
+   {
+    "kind": "church",
+    "km": 28.6,
+    "names": {
+     "de": "Saint-Lambert",
+     "en": "Saint-Lambert",
+     "fr": "Saint-Lambert",
+     "lb": "Saint-Lambert",
+     "name": "Saint-Lambert"
+    }
+   },
+   {
+    "kind": "chapel",
+    "km": 34.2,
+    "names": {
+     "de": "Chapelle Fatima",
+     "en": "Chapelle Fatima",
+     "fr": "Chapelle Fatima",
+     "lb": "Chapelle Fatima",
+     "name": "Chapelle Fatima"
+    }
+   },
+   {
+    "kind": "church",
+    "km": 39.2,
+    "names": {
+     "de": "Saint-Martin",
+     "en": "Saint-Martin",
+     "fr": "Saint-Martin",
+     "lb": "Saint-Martin",
+     "name": "Saint-Martin"
+    }
+   }
+  ],
+  "food": [
+   {
+    "dist_m": 58,
+    "kind": "restaurant",
+    "km": 0.0,
+    "name": "L'Auberge du Lac"
+   },
+   {
+    "dist_m": 15,
+    "kind": "restaurant",
+    "km": 15.7,
+    "name": "Bauschelter Stuff"
+   }
+  ],
+  "forest_pct": 46,
+  "open_pct": 23,
+  "orchard_pct": 0,
+  "samples": 1487,
+  "steps": 0,
+  "surface": {
+   "path": 0,
+   "paved": 52,
+   "track": 48,
+   "unknown": 0
+  },
+  "version": 1,
+  "villages": [
+   {
+    "dist_m": 51,
+    "km": 0.0,
+    "names": {
+     "de": "Böwen",
+     "en": "Bavigne",
+     "fr": "Bavigne",
+     "lb": "Béiwen",
+     "name": "Bavigne"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 237,
+    "km": 5.5,
+    "names": {
+     "de": "Poteau de Harlange",
+     "en": "Poteau de Harlange",
+     "fr": "Poteau de Harlange",
+     "lb": "Hareler Poteau",
+     "name": "Poteau de Harlange"
+    },
+    "type": "hamlet"
+   },
+   {
+    "dist_m": 37,
+    "km": 6.6,
+    "names": {
+     "de": "Baschleiden",
+     "en": "Baschleiden",
+     "fr": "Baschleiden",
+     "lb": "Baschelt",
+     "name": "Baschleiden"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 51,
+    "km": 15.6,
+    "names": {
+     "de": "Bauschleiden",
+     "en": "Boulaide",
+     "fr": "Boulaide",
+     "lb": "Bauschelt",
+     "name": "Boulaide"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 119,
+    "km": 24.8,
+    "names": {
+     "de": "Flebour",
+     "en": "Flebour",
+     "fr": "Flebour",
+     "lb": "Fléiber",
+     "name": "Flebour"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 4,
+    "km": 28.6,
+    "names": {
+     "de": "Syr",
+     "en": "Surré",
+     "fr": "Surré",
+     "lb": "Sir",
+     "name": "Surré"
+    },
+    "type": "village"
+   }
+  ],
+  "vineyard_pct": 0,
+  "waters": [
+   {
+    "along_km": 1.0,
+    "first_km": 27.4,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Syrbaach",
+     "en": "Syrbaach",
+     "fr": "Syrbaach",
+     "lb": "Syrbaach",
+     "name": "Syrbaach"
+    }
+   },
+   {
+    "along_km": 1.0,
+    "first_km": 31.0,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Harelerbaach",
+     "en": "Harelerbaach",
+     "fr": "Harelerbaach",
+     "lb": "Harelerbaach",
+     "name": "Harelerbaach"
+    }
+   },
+   {
+    "along_km": 0.5,
+    "first_km": 22.5,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Hämicht",
+     "en": "Hämicht",
+     "fr": "Hämicht",
+     "lb": "Hämicht",
+     "name": "Hämicht"
+    }
+   },
+   {
+    "along_km": 0.2,
+    "first_km": 0.0,
+    "follows": false,
+    "kind": "river",
+    "names": {
+     "de": "Béiwenerbaach",
+     "en": "Béiwenerbaach",
+     "fr": "Béiwenerbaach",
+     "lb": "Béiwenerbaach",
+     "name": "Béiwenerbaach"
+    }
+   },
+   {
+    "along_km": 0.2,
+    "first_km": 39.0,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Dirbaach",
+     "en": "Dirbaach",
+     "fr": "Dirbaach",
+     "lb": "Dirbaach",
+     "name": "Dirbaach"
+    }
+   },
+   {
+    "along_km": 0.1,
+    "first_km": 16.7,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Bëllerbaach",
+     "en": "Bëllerbaach",
+     "fr": "Bëllerbaach",
+     "lb": "Bëllerbaach",
+     "name": "Bëllerbaach"
+    }
+   }
+  ]
+ },
+ "beaufort-berdorf": {
+  "amenities": {
+   "bench": 65,
+   "drinking_water": 2,
+   "picnic": 19,
+   "playground": 5,
+   "shelter": 2,
+   "toilets": 7
+  },
+  "churches": [
+   {
+    "kind": "church",
+    "km": 4.1,
+    "names": {
+     "de": "Saint-Jean",
+     "en": "Saint-Jean",
+     "fr": "Saint-Jean",
+     "lb": "Saint-Jean",
+     "name": "Saint-Jean"
+    }
+   },
+   {
+    "kind": "chapel",
+    "km": 6.1,
+    "names": {
+     "de": "Maria",
+     "en": "Maria",
+     "fr": "Maria",
+     "lb": "Maria",
+     "name": "Maria"
+    }
+   },
+   {
+    "kind": "chapel",
+    "km": 7.6,
+    "names": {
+     "de": "Beau Lis de notre vallée",
+     "en": "Beau Lis de notre vallée",
+     "fr": "Beau Lis de notre vallée",
+     "lb": "Beau Lis de notre vallée",
+     "name": "Beau Lis de notre vallée"
+    }
+   },
+   {
+    "kind": "chapel",
+    "km": 19.2,
+    "names": {
+     "de": "Bäertreffer Bildchen",
+     "en": "Bäertreffer Bildchen",
+     "fr": "Bäertreffer Bildchen",
+     "lb": "Bäertreffer Bildchen",
+     "name": "Bäertreffer Bildchen"
+    }
+   },
+   {
+    "kind": "church",
+    "km": 25.8,
+    "names": {
+     "de": "Méchelskierch",
+     "en": "Méchelskierch",
+     "fr": "Saint-Michel",
+     "lb": "Méchelskierch",
+     "name": "Méchelskierch"
+    }
+   }
+  ],
+  "food": [
+   {
+    "dist_m": 26,
+    "kind": "restaurant",
+    "km": 3.2,
+    "name": "Bistro Martbusch"
+   },
+   {
+    "dist_m": 10,
+    "kind": "restaurant",
+    "km": 25.7,
+    "name": "Chez Pala"
+   },
+   {
+    "dist_m": 14,
+    "kind": "restaurant",
+    "km": 25.8,
+    "name": "Oishi Sushi"
+   },
+   {
+    "dist_m": 5,
+    "kind": "restaurant",
+    "km": 26.2,
+    "name": "Auberge Rustique"
+   },
+   {
+    "dist_m": 91,
+    "kind": "restaurant",
+    "km": 26.5,
+    "name": "Le Phénix"
+   }
+  ],
+  "forest_pct": 75,
+  "open_pct": 14,
+  "orchard_pct": 0,
+  "samples": 1558,
+  "steps": 2,
+  "surface": {
+   "path": 12,
+   "paved": 21,
+   "track": 67,
+   "unknown": 0
+  },
+  "version": 1,
+  "villages": [
+   {
+    "dist_m": 112,
+    "km": 0.5,
+    "names": {
+     "de": "Grundhof",
+     "en": "Grundhof",
+     "fr": "Grundhof",
+     "lb": "Grondhaff",
+     "name": "Grundhof"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 159,
+    "km": 4.0,
+    "names": {
+     "de": "Berdorf",
+     "en": "Berdorf",
+     "fr": "Berdorf",
+     "lb": "Bäerdref",
+     "name": "Berdorf"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 251,
+    "km": 5.2,
+    "names": {
+     "de": "Heisbich",
+     "en": "Heisbich",
+     "fr": "Heisbich",
+     "lb": "Heeschbech",
+     "name": "Heisbich"
+    },
+    "type": "hamlet"
+   },
+   {
+    "dist_m": 120,
+    "km": 8.9,
+    "names": {
+     "de": "Birkelt",
+     "en": "Birkelt",
+     "fr": "Birkelt",
+     "lb": "Bierkelt",
+     "name": "Birkelt"
+    },
+    "type": "hamlet"
+   },
+   {
+    "dist_m": 278,
+    "km": 11.0,
+    "names": {
+     "de": "Weilerbach",
+     "en": "Weilerbach",
+     "fr": "Weilerbach",
+     "lb": "Weilerbaach",
+     "name": "Weilerbach"
+    },
+    "type": "hamlet"
+   },
+   {
+    "dist_m": 429,
+    "km": 12.0,
+    "names": {
+     "de": "Lafewier",
+     "en": "Lafewier",
+     "fr": "Lafewier",
+     "lb": "Lafewier",
+     "name": "Lafewier"
+    },
+    "type": "hamlet"
+   },
+   {
+    "dist_m": 91,
+    "km": 25.8,
+    "names": {
+     "de": "Befort",
+     "en": "Beaufort",
+     "fr": "Beaufort",
+     "lb": "Beefort",
+     "name": "Beaufort"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 129,
+    "km": 38.7,
+    "names": {
+     "de": "Cloosbierg",
+     "en": "Cloosbierg",
+     "fr": "Cloosbierg",
+     "lb": "Cloosbierg",
+     "name": "Cloosbierg"
+    },
+    "type": "hamlet"
+   }
+  ],
+  "vineyard_pct": 0,
+  "waters": [
+   {
+    "along_km": 1.5,
+    "first_km": 0.6,
+    "follows": true,
+    "kind": "river",
+    "names": {
+     "de": "Schwarze Ernz",
+     "en": "Schwaarz Iernz",
+     "fr": "Ernz noire",
+     "lb": "Schwaarz Iernz",
+     "name": "Schwaarz Iernz"
+    }
+   },
+   {
+    "along_km": 1.4,
+    "first_km": 23.9,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Haupeschbaach",
+     "en": "Haupeschbaach",
+     "fr": "Haupeschbaach",
+     "lb": "Haupeschbaach",
+     "name": "Haupeschbaach"
+    }
+   },
+   {
+    "along_km": 1.2,
+    "first_km": 22.5,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Hallerbaach",
+     "en": "Hallerbaach",
+     "fr": "Hallerbaach",
+     "lb": "Hallerbaach",
+     "name": "Hallerbaach"
+    }
+   },
+   {
+    "along_km": 0.8,
+    "first_km": 7.6,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Halsbaach",
+     "en": "Halsbaach",
+     "fr": "Halsbaach",
+     "lb": "Halsbaach",
+     "name": "Halsbaach"
+    }
+   },
+   {
+    "along_km": 0.7,
+    "first_km": 35.1,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Birkbach",
+     "en": "Birkbach",
+     "fr": "Birkbach",
+     "lb": "Birkbach",
+     "name": "Birkbach"
+    }
+   },
+   {
+    "along_km": 0.5,
+    "first_km": 32.1,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Millebaach",
+     "en": "Millebaach",
+     "fr": "Millebaach",
+     "lb": "Millebaach",
+     "name": "Millebaach"
+    }
+   }
+  ]
+ },
+ "bech": {
+  "amenities": {
+   "bench": 13,
+   "drinking_water": 0,
+   "picnic": 10,
+   "playground": 2,
+   "shelter": 7,
+   "toilets": 0
+  },
+  "churches": [
+   {
+    "kind": "church",
+    "km": 2.3,
+    "names": {
+     "de": "Saint-Matthieu",
+     "en": "Saint-Matthieu",
+     "fr": "Saint-Matthieu",
+     "lb": "Saint-Matthieu",
+     "name": "Saint-Matthieu"
+    }
+   }
+  ],
+  "food": [
+   {
+    "dist_m": 19,
+    "kind": "restaurant",
+    "km": 0.0,
+    "name": "Becher Gare"
+   }
+  ],
+  "forest_pct": 59,
+  "open_pct": 14,
+  "orchard_pct": 0,
+  "samples": 532,
+  "steps": 0,
+  "surface": {
+   "path": 16,
+   "paved": 51,
+   "track": 33,
+   "unknown": 0
+  },
+  "version": 1,
+  "villages": [
+   {
+    "dist_m": 118,
+    "km": 2.2,
+    "names": {
+     "de": "Altrier",
+     "en": "Altrier",
+     "fr": "Altrier",
+     "lb": "Schanz (op der)",
+     "name": "Altrier"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 444,
+    "km": 4.0,
+    "names": {
+     "de": "Rippig",
+     "en": "Rippig",
+     "fr": "Rippig",
+     "lb": "Rippeg",
+     "name": "Rippig"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 154,
+    "km": 8.7,
+    "names": {
+     "de": "Wolper",
+     "en": "Wolper",
+     "fr": "Wolper",
+     "lb": "Wuelper",
+     "name": "Wolper"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 242,
+    "km": 13.3,
+    "names": {
+     "de": "Hersberg",
+     "en": "Hersberg",
+     "fr": "Hersberg",
+     "lb": "Heeschbrech",
+     "name": "Hersberg"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 22,
+    "km": 14.8,
+    "names": {
+     "de": "Kobenbour",
+     "en": "Kobenbour",
+     "fr": "Kobenbour",
+     "lb": "Kuebebur",
+     "name": "Kobenbour"
+    },
+    "type": "hamlet"
+   }
+  ],
+  "vineyard_pct": 0,
+  "waters": [
+   {
+    "along_km": 1.8,
+    "first_km": 11.6,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Haerdbach",
+     "en": "Haerdbach",
+     "fr": "Haerdbach",
+     "lb": "Haerdbach",
+     "name": "Haerdbach"
+    }
+   },
+   {
+    "along_km": 0.1,
+    "first_km": 12.4,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Steebaach",
+     "en": "Steebaach",
+     "fr": "Steebaach",
+     "lb": "Steebaach",
+     "name": "Steebaach"
+    }
+   }
+  ]
+ },
+ "beckerich": {
+  "amenities": {
+   "bench": 17,
+   "drinking_water": 1,
+   "picnic": 6,
+   "playground": 2,
+   "shelter": 3,
+   "toilets": 0
+  },
+  "churches": [
+   {
+    "kind": "chapel",
+    "km": 23.3,
+    "names": {
+     "de": "Kapell Kuelebierg",
+     "en": "Kapell Kuelebierg",
+     "fr": "chapelle \"Kahlenberg\"",
+     "lb": "Kapell Kuelebierg",
+     "name": "Kapell Kuelebierg"
+    }
+   }
+  ],
+  "food": [],
+  "forest_pct": 61,
+  "open_pct": 17,
+  "orchard_pct": 0,
+  "samples": 954,
+  "steps": 0,
+  "surface": {
+   "path": 17,
+   "paved": 26,
+   "track": 34,
+   "unknown": 23
+  },
+  "version": 1,
+  "villages": [
+   {
+    "dist_m": 325,
+    "km": 23.0,
+    "names": {
+     "de": "Beckerich",
+     "en": "Beckerich",
+     "fr": "Beckerich",
+     "lb": "Biekerech",
+     "name": "Beckerich"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 205,
+    "km": 25.5,
+    "names": {
+     "de": "Hovelingen",
+     "en": "Hovelange",
+     "fr": "Hovelange",
+     "lb": "Huewel",
+     "name": "Hovelange"
+    },
+    "type": "village"
+   }
+  ],
+  "vineyard_pct": 0,
+  "waters": [
+   {
+    "along_km": 0.1,
+    "first_km": 5.9,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Haardebach",
+     "en": "Haardebach",
+     "fr": "Haardebach",
+     "lb": "Haardebach",
+     "name": "Haardebach"
+    }
+   }
+  ]
+ },
+ "bettendorf-reisdorf": {
+  "amenities": {
+   "bench": 27,
+   "drinking_water": 0,
+   "picnic": 7,
+   "playground": 3,
+   "shelter": 5,
+   "toilets": 1
+  },
+  "churches": [
+   {
+    "kind": "church",
+    "km": 0.3,
+    "names": {
+     "de": "Saint-Barthélemy",
+     "en": "Saint-Barthélemy",
+     "fr": "Saint-Barthélemy",
+     "lb": "Saint-Barthélemy",
+     "name": "Saint-Barthélemy"
+    }
+   },
+   {
+    "kind": "chapel",
+    "km": 21.7,
+    "names": {
+     "de": "Nikloskapell",
+     "en": "Nikloskapell",
+     "fr": "Nikloskapell",
+     "lb": "Nikloskapell",
+     "name": "Nikloskapell"
+    }
+   },
+   {
+    "kind": "chapel",
+    "km": 26.0,
+    "names": {
+     "de": "Antoniuskapell",
+     "en": "Antoniuskapell",
+     "fr": "Chapelle Saint-Antoine",
+     "lb": "Antoniuskapell",
+     "name": "Antoniuskapell"
+    }
+   }
+  ],
+  "food": [
+   {
+    "dist_m": 20,
+    "kind": "cafe",
+    "km": 0.2,
+    "name": "Marques"
+   },
+   {
+    "dist_m": 18,
+    "kind": "cafe",
+    "km": 7.4,
+    "name": "Flower Power"
+   }
+  ],
+  "forest_pct": 57,
+  "open_pct": 8,
+  "orchard_pct": 0,
+  "samples": 888,
+  "steps": 0,
+  "surface": {
+   "path": 3,
+   "paved": 46,
+   "track": 51,
+   "unknown": 0
+  },
+  "version": 1,
+  "villages": [
+   {
+    "dist_m": 29,
+    "km": 0.3,
+    "names": {
+     "de": "Reisdorf",
+     "en": "Reisdorf",
+     "fr": "Reisdorf",
+     "lb": "Reisduerf",
+     "name": "Reisdorf"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 55,
+    "km": 5.5,
+    "names": {
+     "de": "Möstroff",
+     "en": "Moestroff",
+     "fr": "Moestroff",
+     "lb": "Méischtref",
+     "name": "Moestroff"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 112,
+    "km": 7.7,
+    "names": {
+     "de": "Bettendorf",
+     "en": "Bettendorf",
+     "fr": "Bettendorf",
+     "lb": "Bettenduerf",
+     "name": "Bettendorf"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 94,
+    "km": 21.7,
+    "names": {
+     "de": "Hoesdorf",
+     "en": "Hoesdorf",
+     "fr": "Hoesdorf",
+     "lb": "Héischdref",
+     "name": "Hoesdorf"
+    },
+    "type": "village"
+   }
+  ],
+  "vineyard_pct": 0,
+  "waters": [
+   {
+    "along_km": 0.5,
+    "first_km": 0.0,
+    "follows": true,
+    "kind": "river",
+    "names": {
+     "de": "Sauer",
+     "en": "Sûre",
+     "fr": "Sûre",
+     "lb": "Sauer",
+     "name": "Sûre"
+    }
+   },
+   {
+    "along_km": 0.4,
+    "first_km": 0.3,
+    "follows": false,
+    "kind": "river",
+    "names": {
+     "de": "Weiße Ernz",
+     "en": "Ernz Blanche",
+     "fr": "Ernz Blanche",
+     "lb": "Wäiss Iernz",
+     "name": "Ernz Blanche"
+    }
+   }
+  ]
+ },
+ "clervaux": {
+  "amenities": {
+   "bench": 27,
+   "drinking_water": 0,
+   "picnic": 9,
+   "playground": 2,
+   "shelter": 2,
+   "toilets": 2
+  },
+  "churches": [
+   {
+    "kind": "church",
+    "km": 4.1,
+    "names": {
+     "de": "Saints-Côme-et-Damien",
+     "en": "Saints-Côme-et-Damien",
+     "fr": "Saints-Côme-et-Damien",
+     "lb": "Saints-Côme-et-Damien",
+     "name": "Saints-Côme-et-Damien"
+    }
+   },
+   {
+    "kind": "chapel",
+    "km": 5.9,
+    "names": {
+     "de": "Loretto Kapell",
+     "en": "Loretto Kapell",
+     "fr": "Chapelle Notre-Dame de Lorette",
+     "lb": "Loretto Kapell",
+     "name": "Loretto Kapell"
+    }
+   },
+   {
+    "kind": "church",
+    "km": 22.8,
+    "names": {
+     "de": "Saint-Maurice",
+     "en": "Saint-Maurice",
+     "fr": "Saint-Maurice",
+     "lb": "Saint-Maurice",
+     "name": "Saint-Maurice"
+    }
+   }
+  ],
+  "food": [
+   {
+    "dist_m": 11,
+    "kind": "restaurant",
+    "km": 4.3,
+    "name": "La Table de Clervaux"
+   },
+   {
+    "dist_m": 9,
+    "kind": "restaurant",
+    "km": 4.3,
+    "name": "Kebab Nord"
+   },
+   {
+    "dist_m": 68,
+    "kind": "restaurant",
+    "km": 4.7,
+    "name": "Openrice"
+   },
+   {
+    "dist_m": 26,
+    "kind": "restaurant",
+    "km": 5.0,
+    "name": "Les écuries du parc"
+   },
+   {
+    "dist_m": 101,
+    "kind": "restaurant",
+    "km": 21.7,
+    "name": "Bistrot des Nations"
+   }
+  ],
+  "forest_pct": 44,
+  "open_pct": 6,
+  "orchard_pct": 0,
+  "samples": 1000,
+  "steps": 1,
+  "surface": {
+   "path": 3,
+   "paved": 62,
+   "track": 35,
+   "unknown": 0
+  },
+  "version": 1,
+  "villages": [
+   {
+    "dist_m": 8,
+    "km": 1.2,
+    "names": {
+     "de": "Mecher",
+     "en": "Mecher",
+     "fr": "Mecher",
+     "lb": "Mecher",
+     "name": "Mecher"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 39,
+    "km": 4.1,
+    "names": {
+     "de": "Clerf",
+     "en": "Clervaux",
+     "fr": "Clervaux",
+     "lb": "Klierf",
+     "name": "Clervaux"
+    },
+    "type": "town"
+   },
+   {
+    "dist_m": 400,
+    "km": 5.4,
+    "names": {
+     "de": "Reuler",
+     "en": "Reuler",
+     "fr": "Reuler",
+     "lb": "Reiler",
+     "name": "Reuler"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 227,
+    "km": 10.5,
+    "names": {
+     "de": "Urspelt",
+     "en": "Urspelt",
+     "fr": "Urspelt",
+     "lb": "Uerspelt",
+     "name": "Urspelt"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 19,
+    "km": 15.9,
+    "names": {
+     "de": "Maulusmühle",
+     "en": "Maulesmillen",
+     "fr": "Maulusmuehle",
+     "lb": "Maulesmillen",
+     "name": "Maulesmillen"
+    },
+    "type": "hamlet"
+   }
+  ],
+  "vineyard_pct": 0,
+  "waters": [
+   {
+    "along_km": 3.1,
+    "first_km": 0.0,
+    "follows": true,
+    "kind": "river",
+    "names": {
+     "de": "Clerve",
+     "en": "Clerve",
+     "fr": "Clerve",
+     "lb": "Clierf",
+     "name": "Clerve"
+    }
+   },
+   {
+    "along_km": 1.7,
+    "first_km": 8.1,
+    "follows": true,
+    "kind": "river",
+    "names": {
+     "de": "Woltz",
+     "en": "Woltz",
+     "fr": "Woltz",
+     "lb": "Woltz",
+     "name": "Woltz"
+    }
+   },
+   {
+    "along_km": 0.6,
+    "first_km": 0.0,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Botteschbaach",
+     "en": "Botteschbaach",
+     "fr": "Botteschbaach",
+     "lb": "Botteschbaach",
+     "name": "Botteschbaach"
+    }
+   },
+   {
+    "along_km": 0.6,
+    "first_km": 21.6,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Bréisbich",
+     "en": "Bréisbich",
+     "fr": "Bréisbich",
+     "lb": "Bréisbich",
+     "name": "Bréisbich"
+    }
+   },
+   {
+    "along_km": 0.5,
+    "first_km": 7.6,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Baach",
+     "en": "Baach",
+     "fr": "Baach",
+     "lb": "Baach",
+     "name": "Baach"
+    }
+   },
+   {
+    "along_km": 0.5,
+    "first_km": 15.4,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Wemperbach",
+     "en": "Wemperbach",
+     "fr": "Wemperbach",
+     "lb": "Wemperbach",
+     "name": "Wemperbach"
+    }
+   }
+  ]
+ },
+ "dalheim": {
+  "amenities": {
+   "bench": 11,
+   "drinking_water": 0,
+   "picnic": 1,
+   "playground": 0,
+   "shelter": 1,
+   "toilets": 0
+  },
+  "churches": [
+   {
+    "kind": "church",
+    "km": 14.0,
+    "names": {
+     "de": "Saints-Pierre-et-Paul",
+     "en": "Saints-Pierre-et-Paul",
+     "fr": "Saints-Pierre-et-Paul",
+     "lb": "Saints-Pierre-et-Paul",
+     "name": "Saints-Pierre-et-Paul"
+    }
+   }
+  ],
+  "food": [
+   {
+    "dist_m": 36,
+    "kind": "restaurant",
+    "km": 10.2,
+    "name": "A Schmatten"
+   },
+   {
+    "dist_m": 8,
+    "kind": "restaurant",
+    "km": 14.2,
+    "name": "Jin Yang Guang"
+   },
+   {
+    "dist_m": 10,
+    "kind": "cafe",
+    "km": 14.5,
+    "name": "Café du Centre"
+   }
+  ],
+  "forest_pct": 36,
+  "open_pct": 10,
+  "orchard_pct": 0,
+  "samples": 907,
+  "steps": 0,
+  "surface": {
+   "path": 10,
+   "paved": 52,
+   "track": 39,
+   "unknown": 0
+  },
+  "version": 1,
+  "villages": [
+   {
+    "dist_m": 169,
+    "km": 4.8,
+    "names": {
+     "de": "Filsdorf",
+     "en": "Filsdorf",
+     "fr": "Filsdorf",
+     "lb": "Fëlschdref",
+     "name": "Filsdorf"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 89,
+    "km": 10.2,
+    "names": {
+     "de": "Welfringen",
+     "en": "Welfrange",
+     "fr": "Welfrange",
+     "lb": "Welfreng",
+     "name": "Welfrange"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 44,
+    "km": 14.5,
+    "names": {
+     "de": "Dalheim",
+     "en": "Dalheim",
+     "fr": "Dalheim",
+     "lb": "Duelem",
+     "name": "Dalheim"
+    },
+    "type": "village"
+   }
+  ],
+  "vineyard_pct": 0,
+  "waters": []
+ },
+ "dragon": {
+  "amenities": {
+   "bench": 0,
+   "drinking_water": 0,
+   "picnic": 0,
+   "playground": 0,
+   "shelter": 0,
+   "toilets": 0
+  },
+  "churches": [],
+  "food": [],
+  "forest_pct": 100,
+  "open_pct": 0,
+  "orchard_pct": 0,
+  "samples": 21,
+  "steps": 1,
+  "surface": {
+   "path": 81,
+   "paved": 19,
+   "track": 0,
+   "unknown": 0
+  },
+  "version": 1,
+  "villages": [],
+  "vineyard_pct": 0,
+  "waters": []
+ },
+ "erpeldange": {
+  "amenities": {
+   "bench": 21,
+   "drinking_water": 1,
+   "picnic": 5,
+   "playground": 2,
+   "shelter": 4,
+   "toilets": 0
+  },
+  "churches": [
+   {
+    "kind": "church",
+    "km": 0.7,
+    "names": {
+     "de": "Conversion-de-Saint-Paul",
+     "en": "Conversion-de-Saint-Paul",
+     "fr": "Conversion-de-Saint-Paul",
+     "lb": "Conversion-de-Saint-Paul",
+     "name": "Conversion-de-Saint-Paul"
+    }
+   },
+   {
+    "kind": "church",
+    "km": 15.9,
+    "names": {
+     "de": "Saint-Wendelin",
+     "en": "Saint-Wendelin",
+     "fr": "Saint-Wendelin",
+     "lb": "Saint-Wendelin",
+     "name": "Saint-Wendelin"
+    }
+   },
+   {
+    "kind": "church",
+    "km": 18.8,
+    "names": {
+     "de": "Haupeschkierch",
+     "en": "Haupeschkierch",
+     "fr": "Saint-Hubert",
+     "lb": "Haupeschkierch",
+     "name": "Haupeschkierch"
+    }
+   }
+  ],
+  "food": [
+   {
+    "dist_m": 38,
+    "kind": "cafe",
+    "km": 0.4,
+    "name": "Buvette F.C 72 Erpeldange"
+   },
+   {
+    "dist_m": 120,
+    "kind": "restaurant",
+    "km": 0.8,
+    "name": "Cafe Barros"
+   },
+   {
+    "dist_m": 60,
+    "kind": "restaurant",
+    "km": 2.3,
+    "name": "Beim Goldknapp (HMC)"
+   },
+   {
+    "dist_m": 33,
+    "kind": "restaurant",
+    "km": 32.5,
+    "name": "Ierpeldenger Weier"
+   }
+  ],
+  "forest_pct": 41,
+  "open_pct": 9,
+  "orchard_pct": 0,
+  "samples": 923,
+  "steps": 0,
+  "surface": {
+   "path": 6,
+   "paved": 63,
+   "track": 30,
+   "unknown": 1
+  },
+  "version": 1,
+  "villages": [
+   {
+    "dist_m": 102,
+    "km": 0.8,
+    "names": {
+     "de": "Erpeldingen an der Sauer",
+     "en": "Erpeldange-sur-Sûre",
+     "fr": "Erpeldange-sur-Sûre",
+     "lb": "Ierpeldeng op der Sauer",
+     "name": "Erpeldange-sur-Sûre"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 143,
+    "km": 10.3,
+    "names": {
+     "de": "Fridhaff",
+     "en": "Fridhaff",
+     "fr": "Fridhaff",
+     "lb": "Fridhaff",
+     "name": "Fridhaff"
+    },
+    "type": "hamlet"
+   },
+   {
+    "dist_m": 35,
+    "km": 12.8,
+    "names": {
+     "de": "Closdelt",
+     "en": "Closdelt",
+     "fr": "Closdelt",
+     "lb": "Closdellt",
+     "name": "Closdelt"
+    },
+    "type": "hamlet"
+   },
+   {
+    "dist_m": 212,
+    "km": 15.9,
+    "names": {
+     "de": "Michelau",
+     "en": "Michelau",
+     "fr": "Michelau",
+     "lb": "Méchela",
+     "name": "Michelau"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 18,
+    "km": 18.8,
+    "names": {
+     "de": "Bürden",
+     "en": "Burden",
+     "fr": "Burden",
+     "lb": "Bierden",
+     "name": "Burden"
+    },
+    "type": "village"
+   }
+  ],
+  "vineyard_pct": 0,
+  "waters": [
+   {
+    "along_km": 0.9,
+    "first_km": 0.9,
+    "follows": true,
+    "kind": "river",
+    "names": {
+     "de": "Sauer",
+     "en": "Sûre",
+     "fr": "Sûre",
+     "lb": "Sauer",
+     "name": "Sûre"
+    }
+   },
+   {
+    "along_km": 0.7,
+    "first_km": 20.3,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Schwärzerbaach",
+     "en": "Schwärzerbaach",
+     "fr": "Schwärzerbaach",
+     "lb": "Schwärzerbaach",
+     "name": "Schwärzerbaach"
+    }
+   },
+   {
+    "along_km": 0.6,
+    "first_km": 30.5,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Mëchelbaach",
+     "en": "Mëchelbaach",
+     "fr": "Mëchelbaach",
+     "lb": "Mëchelbaach",
+     "name": "Mëchelbaach"
+    }
+   },
+   {
+    "along_km": 0.4,
+    "first_km": 16.6,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Wëlschterbaach",
+     "en": "Wëlschterbaach",
+     "fr": "Wëlschterbaach",
+     "lb": "Wëlschterbaach",
+     "name": "Wëlschterbaach"
+    }
+   },
+   {
+    "along_km": 0.2,
+    "first_km": 5.4,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Homichtbaach",
+     "en": "Homichtbaach",
+     "fr": "Homichtbaach",
+     "lb": "Homichtbaach",
+     "name": "Homichtbaach"
+    }
+   },
+   {
+    "along_km": 0.2,
+    "first_km": 14.1,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Heemicht",
+     "en": "Heemicht",
+     "fr": "Heemicht",
+     "lb": "Heemicht",
+     "name": "Heemicht"
+    }
+   }
+  ]
+ },
+ "goesdorf": {
+  "amenities": {
+   "bench": 6,
+   "drinking_water": 0,
+   "picnic": 5,
+   "playground": 0,
+   "shelter": 4,
+   "toilets": 0
+  },
+  "churches": [
+   {
+    "kind": "church",
+    "km": 9.3,
+    "names": {
+     "de": "Saint-Remigius",
+     "en": "Saint-Remigius",
+     "fr": "Saint-Remigius",
+     "lb": "Saint-Remigius",
+     "name": "Saint-Remigius"
+    }
+   },
+   {
+    "kind": "church",
+    "km": 10.7,
+    "names": {
+     "de": "Thérèse de Lisieux",
+     "en": "Thérèse de Lisieux",
+     "fr": "Thérèse de Lisieux",
+     "lb": "Thérèse de Lisieux",
+     "name": "Thérèse de Lisieux"
+    }
+   },
+   {
+    "kind": "chapel",
+    "km": 10.9,
+    "names": {
+     "de": "Saint-Donat",
+     "en": "Saint-Donat",
+     "fr": "Saint-Donat",
+     "lb": "Saint-Donat",
+     "name": "Saint-Donat"
+    }
+   },
+   {
+    "kind": "church",
+    "km": 11.1,
+    "names": {
+     "de": "Saint-Vincent",
+     "en": "Saint-Vincent",
+     "fr": "Saint-Vincent",
+     "lb": "Saint-Vincent",
+     "name": "Saint-Vincent"
+    }
+   },
+   {
+    "kind": "church",
+    "km": 14.4,
+    "names": {
+     "de": "Saint-Valentin",
+     "en": "Saint-Valentin",
+     "fr": "Saint-Valentin",
+     "lb": "Saint-Valentin",
+     "name": "Saint-Valentin"
+    }
+   },
+   {
+    "kind": "church",
+    "km": 21.0,
+    "names": {
+     "de": "Exaltation-de-la-Sainte-Croix",
+     "en": "Exaltation-de-la-Sainte-Croix",
+     "fr": "Exaltation-de-la-Sainte-Croix",
+     "lb": "Exaltation-de-la-Sainte-Croix",
+     "name": "Exaltation-de-la-Sainte-Croix"
+    }
+   }
+  ],
+  "food": [
+   {
+    "dist_m": 15,
+    "kind": "restaurant",
+    "km": 10.7,
+    "name": "Deeler Bistro"
+   }
+  ],
+  "forest_pct": 45,
+  "open_pct": 15,
+  "orchard_pct": 0,
+  "samples": 1423,
+  "steps": 0,
+  "surface": {
+   "path": 2,
+   "paved": 36,
+   "track": 62,
+   "unknown": 0
+  },
+  "version": 1,
+  "villages": [
+   {
+    "dist_m": 12,
+    "km": 2.4,
+    "names": {
+     "de": "Nocher-Route",
+     "en": "Nocher-Route",
+     "fr": "Nocher-Route",
+     "lb": "Nocher-Route",
+     "name": "Nocher-Route"
+    },
+    "type": "hamlet"
+   },
+   {
+    "dist_m": 89,
+    "km": 9.3,
+    "names": {
+     "de": "Nocher",
+     "en": "Nocher",
+     "fr": "Nocher",
+     "lb": "Nacher",
+     "name": "Nocher"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 79,
+    "km": 10.8,
+    "names": {
+     "de": "Dahl",
+     "en": "Dahl",
+     "fr": "Dahl",
+     "lb": "Dol",
+     "name": "Dahl"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 10,
+    "km": 14.2,
+    "names": {
+     "de": "Bockholtz",
+     "en": "Bockholtz",
+     "fr": "Bockholtz",
+     "lb": "Boukels",
+     "name": "Bockholtz"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 146,
+    "km": 15.9,
+    "names": {
+     "de": "Toodlermillen",
+     "en": "Toodlermillen",
+     "fr": "Toodlermillen",
+     "lb": "Toodlermillen",
+     "name": "Toodlermillen"
+    },
+    "type": "hamlet"
+   },
+   {
+    "dist_m": 407,
+    "km": 16.3,
+    "names": {
+     "de": "Tadler",
+     "en": "Tadler",
+     "fr": "Tadler",
+     "lb": "Toodler",
+     "name": "Tadler"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 15,
+    "km": 21.0,
+    "names": {
+     "de": "Goesdorf",
+     "en": "Goesdorf",
+     "fr": "Goesdorf",
+     "lb": "Géisdref",
+     "name": "Goesdorf"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 311,
+    "km": 22.9,
+    "names": {
+     "de": "Heiderscheidergrund",
+     "en": "Heiderscheidergrund",
+     "fr": "Fond de Heiderscheid",
+     "lb": "Heischtergronn",
+     "name": "Heiderscheidergrund"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 287,
+    "km": 33.3,
+    "names": {
+     "de": "Büderscheid",
+     "en": "Büderscheid",
+     "fr": "Buderscheid",
+     "lb": "Bidscht",
+     "name": "Büderscheid"
+    },
+    "type": "village"
+   }
+  ],
+  "vineyard_pct": 0,
+  "waters": [
+   {
+    "along_km": 1.8,
+    "first_km": 7.4,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Nacherbaach",
+     "en": "Nacherbaach",
+     "fr": "Nacherbaach",
+     "lb": "Nacherbaach",
+     "name": "Nacherbaach"
+    }
+   },
+   {
+    "along_km": 1.4,
+    "first_km": 11.3,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Delerbaach",
+     "en": "Delerbaach",
+     "fr": "Delerbaach",
+     "lb": "Delerbaach",
+     "name": "Delerbaach"
+    }
+   },
+   {
+    "along_km": 0.9,
+    "first_km": 16.2,
+    "follows": true,
+    "kind": "river",
+    "names": {
+     "de": "Sauer",
+     "en": "Sûre",
+     "fr": "Sûre",
+     "lb": "Sauer",
+     "name": "Sûre"
+    }
+   },
+   {
+    "along_km": 0.6,
+    "first_km": 32.7,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Schlirbësch",
+     "en": "Schlirbësch",
+     "fr": "Schlirbësch",
+     "lb": "Schlirbësch",
+     "name": "Schlirbësch"
+    }
+   },
+   {
+    "along_km": 0.5,
+    "first_km": 13.2,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Rollbaach",
+     "en": "Rollbaach",
+     "fr": "Rollbaach",
+     "lb": "Rollbaach",
+     "name": "Rollbaach"
+    }
+   },
+   {
+    "along_km": 0.5,
+    "first_km": 34.4,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Fassbich",
+     "en": "Fassbich",
+     "fr": "Fassbich",
+     "lb": "Fassbich",
+     "name": "Fassbich"
+    }
+   }
+  ]
+ },
+ "greiveldange": {
+  "amenities": {
+   "bench": 20,
+   "drinking_water": 0,
+   "picnic": 4,
+   "playground": 2,
+   "shelter": 4,
+   "toilets": 0
+  },
+  "churches": [
+   {
+    "kind": "church",
+    "km": 2.3,
+    "names": {
+     "de": "Saint-Thomas",
+     "en": "Saint-Thomas",
+     "fr": "Saint-Thomas",
+     "lb": "Saint-Thomas",
+     "name": "Saint-Thomas"
+    }
+   },
+   {
+    "kind": "church",
+    "km": 6.4,
+    "names": {
+     "de": "Jakobuskierch",
+     "en": "Jakobuskierch",
+     "fr": "Saint-Jacques-le-Majeur",
+     "lb": "Jakobuskierch",
+     "name": "Jakobuskierch"
+    }
+   }
+  ],
+  "food": [
+   {
+    "dist_m": 38,
+    "kind": "restaurant",
+    "km": 1.7,
+    "name": "An der Tourelle"
+   }
+  ],
+  "forest_pct": 40,
+  "open_pct": 9,
+  "orchard_pct": 2,
+  "samples": 888,
+  "steps": 0,
+  "surface": {
+   "path": 8,
+   "paved": 54,
+   "track": 39,
+   "unknown": 0
+  },
+  "version": 1,
+  "villages": [
+   {
+    "dist_m": 29,
+    "km": 2.2,
+    "names": {
+     "de": "Stadtbredimus",
+     "en": "Stadtbredimus",
+     "fr": "Stadtbredimus",
+     "lb": "Briedemes",
+     "name": "Stadtbredimus"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 9,
+    "km": 6.5,
+    "names": {
+     "de": "Greiweldingen",
+     "en": "Greiveldange",
+     "fr": "Greiveldange",
+     "lb": "Greiweldeng",
+     "name": "Greiveldange"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 124,
+    "km": 7.4,
+    "names": {
+     "de": "Hüttermühle",
+     "en": "Hëttermillen",
+     "fr": "Hëttermillen",
+     "lb": "Hëttermillen",
+     "name": "Hëttermillen"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 249,
+    "km": 9.8,
+    "names": {
+     "de": "Lenningen",
+     "en": "Lenningen",
+     "fr": "Lenningen",
+     "lb": "Lennéng",
+     "name": "Lenningen"
+    },
+    "type": "village"
+   }
+  ],
+  "vineyard_pct": 6,
+  "waters": [
+   {
+    "along_km": 1.4,
+    "first_km": 0.0,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Aalbaach",
+     "en": "Aalbaach",
+     "fr": "Aalbaach",
+     "lb": "Aalbaach",
+     "name": "Aalbaach"
+    }
+   },
+   {
+    "along_km": 1.1,
+    "first_km": 0.2,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Bouser Baach",
+     "en": "Bouser Baach",
+     "fr": "Bouser Baach",
+     "lb": "Bouser Baach",
+     "name": "Bouser Baach"
+    }
+   },
+   {
+    "along_km": 0.1,
+    "first_km": 0.8,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Troterbaach",
+     "en": "Troterbaach",
+     "fr": "Troterbaach",
+     "lb": "Troterbaach",
+     "name": "Troterbaach"
+    }
+   }
+  ]
+ },
+ "grengewald": {
+  "amenities": {
+   "bench": 31,
+   "drinking_water": 0,
+   "picnic": 4,
+   "playground": 1,
+   "shelter": 4,
+   "toilets": 0
+  },
+  "churches": [
+   {
+    "kind": "chapel",
+    "km": 7.0,
+    "names": {
+     "de": "Schetzel",
+     "en": "Schetzel",
+     "fr": "Schetzel",
+     "lb": "Schetzel",
+     "name": "Schetzel"
+    }
+   }
+  ],
+  "food": [
+   {
+    "dist_m": 54,
+    "kind": "cafe",
+    "km": 21.9,
+    "name": "Café de la Gare"
+   },
+   {
+    "dist_m": 97,
+    "kind": "cafe",
+    "km": 21.9,
+    "name": "Café da Mota"
+   },
+   {
+    "dist_m": 36,
+    "kind": "restaurant",
+    "km": 22.5,
+    "name": "Hostellerie Stafelter"
+   }
+  ],
+  "forest_pct": 65,
+  "open_pct": 19,
+  "orchard_pct": 0,
+  "samples": 917,
+  "steps": 0,
+  "surface": {
+   "path": 0,
+   "paved": 33,
+   "track": 67,
+   "unknown": 0
+  },
+  "version": 1,
+  "villages": [
+   {
+    "dist_m": 319,
+    "km": 5.5,
+    "names": {
+     "de": "Staffelstein",
+     "en": "Stafelter",
+     "fr": "Stafelter",
+     "lb": "Stafelter",
+     "name": "Stafelter"
+    },
+    "type": "hamlet"
+   },
+   {
+    "dist_m": 17,
+    "km": 14.1,
+    "names": {
+     "de": "Asselscheuer",
+     "en": "Asselscheuer",
+     "fr": "Asselscheuer",
+     "lb": "Aasselscheier",
+     "name": "Asselscheuer"
+    },
+    "type": "hamlet"
+   },
+   {
+    "dist_m": 418,
+    "km": 16.8,
+    "names": {
+     "de": "Bofferdingen",
+     "en": "Bofferdange",
+     "fr": "Bofferdange",
+     "lb": "Boufer",
+     "name": "Bofferdange"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 52,
+    "km": 21.0,
+    "names": {
+     "de": "Heisdorf",
+     "en": "Heisdorf",
+     "fr": "Heisdorf",
+     "lb": "Heeschdref",
+     "name": "Heisdorf"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 10,
+    "km": 21.9,
+    "names": {
+     "de": "Helmsingen",
+     "en": "Helmsange",
+     "fr": "Helmsange",
+     "lb": "Helsem",
+     "name": "Helmsange"
+    },
+    "type": "village"
+   }
+  ],
+  "vineyard_pct": 0,
+  "waters": [
+   {
+    "along_km": 0.7,
+    "first_km": 5.0,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Ditgesbaach",
+     "en": "Ditgesbaach",
+     "fr": "Ditgesbaach",
+     "lb": "Ditgesbaach",
+     "name": "Ditgesbaach"
+    }
+   },
+   {
+    "along_km": 0.2,
+    "first_km": 3.6,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Réngelbaach",
+     "en": "Réngelbaach",
+     "fr": "Réngelbaach",
+     "lb": "Réngelbaach",
+     "name": "Réngelbaach"
+    }
+   },
+   {
+    "along_km": 0.2,
+    "first_km": 6.7,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Schetzelbach",
+     "en": "Schetzelbach",
+     "fr": "Schetzelbach",
+     "lb": "Schetzelbach",
+     "name": "Schetzelbach"
+    }
+   },
+   {
+    "along_km": 0.1,
+    "first_km": 6.8,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Weissen Ernz",
+     "en": "Ernz Blanche",
+     "fr": "Ernz Blanche",
+     "lb": "Ernz Blanche",
+     "name": "Ernz Blanche"
+    }
+   },
+   {
+    "along_km": 0.1,
+    "first_km": 12.9,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Wäiss Iernz",
+     "en": "Wäiss Iernz",
+     "fr": "Wäiss Iernz",
+     "lb": "Wäiss Iernz",
+     "name": "Wäiss Iernz"
+    }
+   },
+   {
+    "along_km": 0.1,
+    "first_km": 17.3,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Wäissbaach",
+     "en": "Wäissbaach",
+     "fr": "Wäissbaach",
+     "lb": "Wäissbaach",
+     "name": "Wäissbaach"
+    }
+   }
+  ]
+ },
+ "grevenmacher": {
+  "amenities": {
+   "bench": 4,
+   "drinking_water": 0,
+   "picnic": 2,
+   "playground": 0,
+   "shelter": 0,
+   "toilets": 0
+  },
+  "churches": [],
+  "food": [
+   {
+    "dist_m": 79,
+    "kind": "restaurant",
+    "km": 11.4,
+    "name": "Le Chesnoy"
+   },
+   {
+    "dist_m": 46,
+    "kind": "restaurant",
+    "km": 13.9,
+    "name": "L'Etage"
+   }
+  ],
+  "forest_pct": 26,
+  "open_pct": 14,
+  "orchard_pct": 1,
+  "samples": 576,
+  "steps": 0,
+  "surface": {
+   "path": 0,
+   "paved": 68,
+   "track": 32,
+   "unknown": 0
+  },
+  "version": 1,
+  "villages": [
+   {
+    "dist_m": 48,
+    "km": 17.9,
+    "names": {
+     "de": "Oberdonven",
+     "en": "Oberdonven",
+     "fr": "Oberdonven",
+     "lb": "Uewerdonwen",
+     "name": "Oberdonven"
+    },
+    "type": "village"
+   }
+  ],
+  "vineyard_pct": 4,
+  "waters": [
+   {
+    "along_km": 0.9,
+    "first_km": 2.6,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Donwerbach",
+     "en": "Donwerbach",
+     "fr": "Donwerbach",
+     "lb": "Donwerbach",
+     "name": "Donwerbach"
+    }
+   },
+   {
+    "along_km": 0.3,
+    "first_km": 11.1,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Gehaansbaach",
+     "en": "Gehaansbaach",
+     "fr": "Gehaansbaach",
+     "lb": "Gehaansbaach",
+     "name": "Gehaansbaach"
+    }
+   },
+   {
+    "along_km": 0.2,
+    "first_km": 8.4,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Kelsbaach",
+     "en": "Kelsbaach",
+     "fr": "Kelsbaach",
+     "lb": "Kelsbaach",
+     "name": "Kelsbaach"
+    }
+   }
+  ]
+ },
+ "hoscheid": {
+  "amenities": {
+   "bench": 29,
+   "drinking_water": 1,
+   "picnic": 2,
+   "playground": 2,
+   "shelter": 4,
+   "toilets": 1
+  },
+  "churches": [
+   {
+    "kind": "church",
+    "km": 11.4,
+    "names": {
+     "de": "Saint-Bernard",
+     "en": "Saint-Bernard",
+     "fr": "Saint-Bernard",
+     "lb": "Saint-Bernard",
+     "name": "Saint-Bernard"
+    }
+   },
+   {
+    "kind": "church",
+    "km": 23.9,
+    "names": {
+     "de": "Kirche Hoscheid",
+     "en": "Kierch Houschent",
+     "fr": "Église de Hoscheid",
+     "lb": "Kierch Houschent",
+     "name": "Kierch Houschent"
+    }
+   }
+  ],
+  "food": [
+   {
+    "dist_m": 96,
+    "kind": "restaurant",
+    "km": 11.4,
+    "name": "Huberty"
+   }
+  ],
+  "forest_pct": 46,
+  "open_pct": 10,
+  "orchard_pct": 0,
+  "samples": 1000,
+  "steps": 0,
+  "surface": {
+   "path": 2,
+   "paved": 48,
+   "track": 50,
+   "unknown": 0
+  },
+  "version": 1,
+  "villages": [
+   {
+    "dist_m": 112,
+    "km": 11.4,
+    "names": {
+     "de": "Kautenbach",
+     "en": "Kautenbach",
+     "fr": "Kautenbach",
+     "lb": "Kautebaach",
+     "name": "Kautenbach"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 155,
+    "km": 19.8,
+    "names": {
+     "de": "Schlindermanderscheid",
+     "en": "Schlindermanderscheid",
+     "fr": "Schlindermanderscheid",
+     "lb": "Schlënnermanescht",
+     "name": "Schlindermanderscheid"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 155,
+    "km": 22.3,
+    "names": {
+     "de": "Unterschlinder",
+     "en": "Unterschlinder",
+     "fr": "Unterschlinder",
+     "lb": "Ënnerschlënner",
+     "name": "Unterschlinder"
+    },
+    "type": "hamlet"
+   },
+   {
+    "dist_m": 32,
+    "km": 24.4,
+    "names": {
+     "de": "Hoscheid",
+     "en": "Hoscheid",
+     "fr": "Hoscheid",
+     "lb": "Houschent",
+     "name": "Hoscheid"
+    },
+    "type": "village"
+   }
+  ],
+  "vineyard_pct": 0,
+  "waters": [
+   {
+    "along_km": 1.4,
+    "first_km": 2.7,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Schlënner",
+     "en": "Schlënner",
+     "fr": "Schlënner",
+     "lb": "Schlënner",
+     "name": "Schlënner"
+    }
+   },
+   {
+    "along_km": 1.0,
+    "first_km": 11.7,
+    "follows": true,
+    "kind": "river",
+    "names": {
+     "de": "Wiltz",
+     "en": "Wiltz",
+     "fr": "Wiltz",
+     "lb": "Wiltz",
+     "name": "Wiltz"
+    }
+   },
+   {
+    "along_km": 1.0,
+    "first_km": 14.5,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Geisterbach",
+     "en": "Girschelterbaach",
+     "fr": "Girschelterbaach",
+     "lb": "Girschelterbaach",
+     "name": "Girschelterbaach"
+    }
+   },
+   {
+    "along_km": 0.6,
+    "first_km": 3.2,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Kirebur",
+     "en": "Kirebur",
+     "fr": "Kirebur",
+     "lb": "Kirebur",
+     "name": "Kirebur"
+    }
+   },
+   {
+    "along_km": 0.2,
+    "first_km": 11.3,
+    "follows": false,
+    "kind": "river",
+    "names": {
+     "de": "Clerve",
+     "en": "Clerve",
+     "fr": "Clerve",
+     "lb": "Clierf",
+     "name": "Clerve"
+    }
+   },
+   {
+    "along_km": 0.2,
+    "first_km": 13.2,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Héschelterbaach",
+     "en": "Héschelterbaach",
+     "fr": "Héschelterbaach",
+     "lb": "Héschelterbaach",
+     "name": "Héschelterbaach"
+    }
+   }
+  ]
+ },
+ "hosingen": {
+  "amenities": {
+   "bench": 8,
+   "drinking_water": 1,
+   "picnic": 7,
+   "playground": 3,
+   "shelter": 5,
+   "toilets": 0
+  },
+  "churches": [
+   {
+    "kind": "chapel",
+    "km": 12.7,
+    "names": {
+     "de": "Schmärzensmuttergottes-Kapell",
+     "en": "Schmärzensmuttergottes-Kapell",
+     "fr": "Chapelle Notre-Dame des Douleurs",
+     "lb": "Schmärzensmuttergottes-Kapell",
+     "name": "Schmärzensmuttergottes-Kapell"
+    }
+   }
+  ],
+  "food": [],
+  "forest_pct": 64,
+  "open_pct": 4,
+  "orchard_pct": 0,
+  "samples": 492,
+  "steps": 0,
+  "surface": {
+   "path": 0,
+   "paved": 35,
+   "track": 65,
+   "unknown": 0
+  },
+  "version": 1,
+  "villages": [
+   {
+    "dist_m": 206,
+    "km": 0.2,
+    "names": {
+     "de": "Hosingen",
+     "en": "Hosingen",
+     "fr": "Hosingen",
+     "lb": "Housen",
+     "name": "Hosingen"
+    },
+    "type": "village"
+   }
+  ],
+  "vineyard_pct": 0,
+  "waters": [
+   {
+    "along_km": 3.2,
+    "first_km": 0.6,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Huschterbaach",
+     "en": "Huschterbaach",
+     "fr": "Huschterbaach",
+     "lb": "Huschterbaach",
+     "name": "Huschterbaach"
+    }
+   },
+   {
+    "along_km": 0.6,
+    "first_km": 4.3,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Bollertsbaach",
+     "en": "Bollertsbaach",
+     "fr": "Bollertsbaach",
+     "lb": "Bollertsbaach",
+     "name": "Bollertsbaach"
+    }
+   },
+   {
+    "along_km": 0.1,
+    "first_km": 5.0,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Burbaach",
+     "en": "Burbaach",
+     "fr": "Burbaach",
+     "lb": "Burbaach",
+     "name": "Burbaach"
+    }
+   }
+  ]
+ },
+ "hosingen-lellingen": {
+  "amenities": {
+   "bench": 8,
+   "drinking_water": 1,
+   "picnic": 5,
+   "playground": 3,
+   "shelter": 5,
+   "toilets": 0
+  },
+  "churches": [
+   {
+    "kind": "church",
+    "km": 14.3,
+    "names": {
+     "de": "Sankt Maximin",
+     "en": "Saint-Maximin",
+     "fr": "Saint-Maximin",
+     "lb": "Saint-Maximin",
+     "name": "Saint-Maximin"
+    }
+   },
+   {
+    "kind": "chapel",
+    "km": 15.5,
+    "names": {
+     "de": "Chapelle Saint-Pierre",
+     "en": "Chapelle Saint-Pierre",
+     "fr": "Chapelle Saint-Pierre",
+     "lb": "Chapelle Saint-Pierre",
+     "name": "Chapelle Saint-Pierre"
+    }
+   },
+   {
+    "kind": "chapel",
+    "km": 29.7,
+    "names": {
+     "de": "Schmärzensmuttergottes-Kapell",
+     "en": "Schmärzensmuttergottes-Kapell",
+     "fr": "Chapelle Notre-Dame des Douleurs",
+     "lb": "Schmärzensmuttergottes-Kapell",
+     "name": "Schmärzensmuttergottes-Kapell"
+    }
+   }
+  ],
+  "food": [
+   {
+    "dist_m": 103,
+    "kind": "restaurant",
+    "km": 29.9,
+    "name": "Dragon de Chine"
+   },
+   {
+    "dist_m": 38,
+    "kind": "restaurant",
+    "km": 29.9,
+    "name": "M.M Restaurant"
+   }
+  ],
+  "forest_pct": 47,
+  "open_pct": 8,
+  "orchard_pct": 0,
+  "samples": 860,
+  "steps": 0,
+  "surface": {
+   "path": 0,
+   "paved": 59,
+   "track": 41,
+   "unknown": 0
+  },
+  "version": 1,
+  "villages": [
+   {
+    "dist_m": 312,
+    "km": 7.7,
+    "names": {
+     "de": "Bockholtz",
+     "en": "Bockholtz",
+     "fr": "Bockholtz",
+     "lb": "Buckels",
+     "name": "Bockholtz"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 89,
+    "km": 14.3,
+    "names": {
+     "de": "Pintsch",
+     "en": "Pintsch",
+     "fr": "Pintsch",
+     "lb": "Pënsch",
+     "name": "Pintsch"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 29,
+    "km": 15.6,
+    "names": {
+     "de": "Lellingen",
+     "en": "Lellingen",
+     "fr": "Lellingen",
+     "lb": "Lëllgen",
+     "name": "Lellingen"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 80,
+    "km": 29.9,
+    "names": {
+     "de": "Hosingen",
+     "en": "Hosingen",
+     "fr": "Hosingen",
+     "lb": "Housen",
+     "name": "Hosingen"
+    },
+    "type": "village"
+   }
+  ],
+  "vineyard_pct": 0,
+  "waters": [
+   {
+    "along_km": 2.5,
+    "first_km": 15.5,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Lëllgerbaach",
+     "en": "Lëllgerbaach",
+     "fr": "Lëllgerbaach",
+     "lb": "Lëllgerbaach",
+     "name": "Lëllgerbaach"
+    }
+   },
+   {
+    "along_km": 0.8,
+    "first_km": 14.1,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Pëntsch",
+     "en": "Pëntsch",
+     "fr": "Pëntsch",
+     "lb": "Pëntsch",
+     "name": "Pëntsch"
+    }
+   },
+   {
+    "along_km": 0.2,
+    "first_km": 0.0,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Weschbichsbaach",
+     "en": "Weschbichsbaach",
+     "fr": "Weschbichsbaach",
+     "lb": "Weschbichsbaach",
+     "name": "Weschbichsbaach"
+    }
+   },
+   {
+    "along_km": 0.1,
+    "first_km": 15.4,
+    "follows": false,
+    "kind": "river",
+    "names": {
+     "de": "Clerve",
+     "en": "Clerve",
+     "fr": "Clerve",
+     "lb": "Clierf",
+     "name": "Clerve"
+    }
+   },
+   {
+    "along_km": 0.1,
+    "first_km": 16.1,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Helbichbaach",
+     "en": "Helbichbaach",
+     "fr": "Helbichbaach",
+     "lb": "Helbichbaach",
+     "name": "Helbichbaach"
+    }
+   }
+  ]
+ },
+ "ingeldorf-ettelbruck": {
+  "amenities": {
+   "bench": 16,
+   "drinking_water": 0,
+   "picnic": 6,
+   "playground": 1,
+   "shelter": 3,
+   "toilets": 0
+  },
+  "churches": [
+   {
+    "kind": "church",
+    "km": 0.0,
+    "names": {
+     "de": "Saint-Celse",
+     "en": "Saint-Celse",
+     "fr": "Saint-Celse",
+     "lb": "Saint-Celse",
+     "name": "Saint-Celse"
+    }
+   }
+  ],
+  "food": [
+   {
+    "dist_m": 14,
+    "kind": "cafe",
+    "km": 6.6,
+    "name": "Camping Gritt"
+   },
+   {
+    "dist_m": 59,
+    "kind": "restaurant",
+    "km": 16.6,
+    "name": "Go Sushi"
+   }
+  ],
+  "forest_pct": 44,
+  "open_pct": 5,
+  "orchard_pct": 0,
+  "samples": 775,
+  "steps": 0,
+  "surface": {
+   "path": 2,
+   "paved": 58,
+   "track": 40,
+   "unknown": 0
+  },
+  "version": 1,
+  "villages": [
+   {
+    "dist_m": 449,
+    "km": 2.0,
+    "names": {
+     "de": "Ettelbrück",
+     "en": "Ettelbruck",
+     "fr": "Ettelbruck",
+     "lb": "Ettelbréck",
+     "name": "Ettelbruck"
+    },
+    "type": "town"
+   },
+   {
+    "dist_m": 197,
+    "km": 13.5,
+    "names": {
+     "de": "Broderbour",
+     "en": "Broderbour",
+     "fr": "Broderbour",
+     "lb": "Brouderbuer",
+     "name": "Broderbour"
+    },
+    "type": "hamlet"
+   },
+   {
+    "dist_m": 281,
+    "km": 21.4,
+    "names": {
+     "de": "Ingeldorf",
+     "en": "Ingeldorf",
+     "fr": "Ingeldorf",
+     "lb": "Angelduerf",
+     "name": "Ingeldorf"
+    },
+    "type": "village"
+   }
+  ],
+  "vineyard_pct": 0,
+  "waters": [
+   {
+    "along_km": 1.6,
+    "first_km": 0.0,
+    "follows": true,
+    "kind": "river",
+    "names": {
+     "de": "Sauer",
+     "en": "Sûre",
+     "fr": "Sûre",
+     "lb": "Sauer",
+     "name": "Sûre"
+    }
+   },
+   {
+    "along_km": 0.8,
+    "first_km": 12.2,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Tirelbach",
+     "en": "Tirelbach",
+     "fr": "Tirelbach",
+     "lb": "Tirelbach",
+     "name": "Tirelbach"
+    }
+   },
+   {
+    "along_km": 0.7,
+    "first_km": 1.1,
+    "follows": true,
+    "kind": "river",
+    "names": {
+     "de": "Alzette",
+     "en": "Alzette",
+     "fr": "Alzette",
+     "lb": "Uelzecht",
+     "name": "Alzette"
+    }
+   },
+   {
+    "along_km": 0.4,
+    "first_km": 11.4,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Saasselbaach",
+     "en": "Saasselbaach",
+     "fr": "Saasselbaach",
+     "lb": "Saasselbaach",
+     "name": "Saasselbaach"
+    }
+   },
+   {
+    "along_km": 0.1,
+    "first_km": 1.6,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Wark",
+     "en": "Wark",
+     "fr": "Wark",
+     "lb": "Waark",
+     "name": "Wark"
+    }
+   },
+   {
+    "along_km": 0.1,
+    "first_km": 16.1,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Sturmbaach",
+     "en": "Sturmbaach",
+     "fr": "Sturmbaach",
+     "lb": "Sturmbaach",
+     "name": "Sturmbaach"
+    }
+   }
+  ]
+ },
+ "larochette": {
+  "amenities": {
+   "bench": 31,
+   "drinking_water": 0,
+   "picnic": 15,
+   "playground": 4,
+   "shelter": 3,
+   "toilets": 0
+  },
+  "churches": [
+   {
+    "kind": "church",
+    "km": 19.5,
+    "names": {
+     "de": "Saint-Donat",
+     "en": "Saint-Donat",
+     "fr": "Saint-Donat",
+     "lb": "Saint-Donat",
+     "name": "Saint-Donat"
+    }
+   },
+   {
+    "kind": "chapel",
+    "km": 25.4,
+    "names": {
+     "de": "Grotte de Lourdes",
+     "en": "Grotte de Lourdes",
+     "fr": "Grotte de Lourdes",
+     "lb": "Grotte de Lourdes",
+     "name": "Grotte de Lourdes"
+    }
+   },
+   {
+    "kind": "chapel",
+    "km": 25.4,
+    "names": {
+     "de": "Rochuskapell",
+     "en": "Rochuskapell",
+     "fr": "Rochuskapell",
+     "lb": "Rochuskapell",
+     "name": "Rochuskapell"
+    }
+   }
+  ],
+  "food": [
+   {
+    "dist_m": 97,
+    "kind": "cafe",
+    "km": 9.2,
+    "name": "Pool Bar"
+   },
+   {
+    "dist_m": 76,
+    "kind": "cafe",
+    "km": 19.5,
+    "name": "Café de la Place"
+   },
+   {
+    "dist_m": 76,
+    "kind": "restaurant",
+    "km": 21.9,
+    "name": "Ginza"
+   },
+   {
+    "dist_m": 111,
+    "kind": "restaurant",
+    "km": 22.0,
+    "name": "D'Fielser Stuff"
+   }
+  ],
+  "forest_pct": 85,
+  "open_pct": 7,
+  "orchard_pct": 0,
+  "samples": 1158,
+  "steps": 4,
+  "surface": {
+   "path": 22,
+   "paved": 13,
+   "track": 64,
+   "unknown": 2
+  },
+  "version": 1,
+  "villages": [
+   {
+    "dist_m": 237,
+    "km": 0.6,
+    "names": {
+     "de": "Uelegsmillen",
+     "en": "Uelegsmillen",
+     "fr": "Uelegsmillen",
+     "lb": "Uelegsmillen",
+     "name": "Uelegsmillen"
+    },
+    "type": "hamlet"
+   },
+   {
+    "dist_m": 450,
+    "km": 3.1,
+    "names": {
+     "de": "Eichelbour",
+     "en": "Eichelbour",
+     "fr": "Eichelbour",
+     "lb": "Eechelbur",
+     "name": "Eichelbour"
+    },
+    "type": "hamlet"
+   },
+   {
+    "dist_m": 256,
+    "km": 13.5,
+    "names": {
+     "de": "Meysembourg",
+     "en": "Meysembourg",
+     "fr": "Meysembourg",
+     "lb": "Meesebuerg",
+     "name": "Meysembourg"
+    },
+    "type": "hamlet"
+   },
+   {
+    "dist_m": 127,
+    "km": 16.7,
+    "names": {
+     "de": "Ernzen",
+     "en": "Ernzen",
+     "fr": "Ernzen",
+     "lb": "Iernzen",
+     "name": "Ernzen"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 66,
+    "km": 22.2,
+    "names": {
+     "de": "Fels",
+     "en": "Larochette",
+     "fr": "Larochette",
+     "lb": "An der Fiels",
+     "name": "Larochette"
+    },
+    "type": "village"
+   }
+  ],
+  "vineyard_pct": 0,
+  "waters": [
+   {
+    "along_km": 3.4,
+    "first_km": 12.3,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Manzebaach",
+     "en": "Manzebaach",
+     "fr": "Manzebaach",
+     "lb": "Manzebaach",
+     "name": "Manzebaach"
+    }
+   },
+   {
+    "along_km": 1.6,
+    "first_km": 15.9,
+    "follows": true,
+    "kind": "river",
+    "names": {
+     "de": "Weiße Ernz",
+     "en": "Wäiss Iernz",
+     "fr": "Ernz blanche",
+     "lb": "Wäiss Iernz",
+     "name": "Wäiss Iernz"
+    }
+   },
+   {
+    "along_km": 0.8,
+    "first_km": 11.4,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Goldbaach",
+     "en": "Goldbaach",
+     "fr": "Goldbaach",
+     "lb": "Goldbaach",
+     "name": "Goldbaach"
+    }
+   },
+   {
+    "along_km": 0.1,
+    "first_km": 13.4,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Wisebaach",
+     "en": "Wisebaach",
+     "fr": "Wisebaach",
+     "lb": "Wisebaach",
+     "name": "Wisebaach"
+    }
+   },
+   {
+    "along_km": 0.1,
+    "first_km": 22.2,
+    "follows": false,
+    "kind": "river",
+    "names": {
+     "de": "Weiße Ernz",
+     "en": "Ernz Blanche",
+     "fr": "Ernz Blanche",
+     "lb": "Wäiss Iernz",
+     "name": "Ernz Blanche"
+    }
+   }
+  ]
+ },
+ "manternach": {
+  "amenities": {
+   "bench": 8,
+   "drinking_water": 1,
+   "picnic": 0,
+   "playground": 1,
+   "shelter": 4,
+   "toilets": 0
+  },
+  "churches": [
+   {
+    "kind": "church",
+    "km": 7.8,
+    "names": {
+     "de": "Saint-Antoine-l'Ermite",
+     "en": "Saint-Antoine-l'Ermite",
+     "fr": "Saint-Antoine-l'Ermite",
+     "lb": "Saint-Antoine-l'Ermite",
+     "name": "Saint-Antoine-l'Ermite"
+    }
+   },
+   {
+    "kind": "church",
+    "km": 12.6,
+    "names": {
+     "de": "Saint-Brice",
+     "en": "Saint-Brice",
+     "fr": "Saint-Brice",
+     "lb": "Saint-Brice",
+     "name": "Saint-Brice"
+    }
+   },
+   {
+    "kind": "chapel",
+    "km": 15.2,
+    "names": {
+     "de": "Chapelle Saint-Jacques-le-Majeur",
+     "en": "Chapelle Saint-Jacques-le-Majeur",
+     "fr": "Chapelle Saint-Jacques-le-Majeur",
+     "lb": "Chapelle Saint-Jacques-le-Majeur",
+     "name": "Chapelle Saint-Jacques-le-Majeur"
+    }
+   }
+  ],
+  "food": [
+   {
+    "dist_m": 65,
+    "kind": "restaurant",
+    "km": 0.4,
+    "name": "Trois-Quarts"
+   },
+   {
+    "dist_m": 12,
+    "kind": "cafe",
+    "km": 12.5,
+    "name": "Manternacher Stuff"
+   },
+   {
+    "dist_m": 9,
+    "kind": "restaurant",
+    "km": 12.7,
+    "name": "Belleville"
+   }
+  ],
+  "forest_pct": 23,
+  "open_pct": 12,
+  "orchard_pct": 1,
+  "samples": 744,
+  "steps": 0,
+  "surface": {
+   "path": 2,
+   "paved": 69,
+   "track": 29,
+   "unknown": 0
+  },
+  "version": 1,
+  "villages": [
+   {
+    "dist_m": 43,
+    "km": 8.2,
+    "names": {
+     "de": "Lellig",
+     "en": "Lellig",
+     "fr": "Lellig",
+     "lb": "Lelleg",
+     "name": "Lellig"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 31,
+    "km": 12.6,
+    "names": {
+     "de": "Manternach",
+     "en": "Manternach",
+     "fr": "Manternach",
+     "lb": "Manternach",
+     "name": "Manternach"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 195,
+    "km": 15.2,
+    "names": {
+     "de": "Münschecker",
+     "en": "Münschecker",
+     "fr": "Munschecker",
+     "lb": "Mënjecker",
+     "name": "Münschecker"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 200,
+    "km": 17.1,
+    "names": {
+     "de": "Fausermühle",
+     "en": "Fausermillen",
+     "fr": "Fausermillen",
+     "lb": "Fausermillen",
+     "name": "Fausermillen"
+    },
+    "type": "hamlet"
+   }
+  ],
+  "vineyard_pct": 0,
+  "waters": [
+   {
+    "along_km": 1.5,
+    "first_km": 10.3,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Wuelbertsbach",
+     "en": "Wuelbertsbach",
+     "fr": "Wuelbertsbach",
+     "lb": "Wuelbertsbach",
+     "name": "Wuelbertsbach"
+    }
+   },
+   {
+    "along_km": 0.6,
+    "first_km": 12.8,
+    "follows": true,
+    "kind": "river",
+    "names": {
+     "de": "Syr",
+     "en": "Syre",
+     "fr": "Syre",
+     "lb": "Sir",
+     "name": "Syre"
+    }
+   },
+   {
+    "along_km": 0.3,
+    "first_km": 1.5,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Foolgruet",
+     "en": "Foolgruet",
+     "fr": "Foolgruet",
+     "lb": "Foolgruet",
+     "name": "Foolgruet"
+    }
+   },
+   {
+    "along_km": 0.3,
+    "first_km": 6.6,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Schlammbaach",
+     "en": "Schlammbaach",
+     "fr": "Schlammbaach",
+     "lb": "Schlammbaach",
+     "name": "Schlammbaach"
+    }
+   },
+   {
+    "along_km": 0.1,
+    "first_km": 6.7,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Lelligerbach",
+     "en": "Lelligerbach",
+     "fr": "Lelligerbach",
+     "lb": "Lelligerbach",
+     "name": "Lelligerbach"
+    }
+   }
+  ]
+ },
+ "mini-bike": {
+  "amenities": {
+   "bench": 2,
+   "drinking_water": 0,
+   "picnic": 1,
+   "playground": 0,
+   "shelter": 1,
+   "toilets": 0
+  },
+  "churches": [],
+  "food": [
+   {
+    "dist_m": 91,
+    "kind": "restaurant",
+    "km": 0.2,
+    "name": "Becher Gare"
+   }
+  ],
+  "forest_pct": 97,
+  "open_pct": 3,
+  "orchard_pct": 0,
+  "samples": 66,
+  "steps": 0,
+  "surface": {
+   "path": 73,
+   "paved": 0,
+   "track": 27,
+   "unknown": 0
+  },
+  "version": 1,
+  "villages": [],
+  "vineyard_pct": 0,
+  "waters": []
+ },
+ "park-kelbech": {
+  "amenities": {
+   "bench": 0,
+   "drinking_water": 0,
+   "picnic": 0,
+   "playground": 0,
+   "shelter": 0,
+   "toilets": 0
+  },
+  "churches": [],
+  "food": [],
+  "forest_pct": 98,
+  "open_pct": 0,
+  "orchard_pct": 0,
+  "samples": 56,
+  "steps": 0,
+  "surface": {
+   "path": 0,
+   "paved": 0,
+   "track": 100,
+   "unknown": 0
+  },
+  "version": 1,
+  "villages": [
+   {
+    "dist_m": 399,
+    "km": 0.0,
+    "names": {
+     "de": "Schléiwenhaff",
+     "en": "Schléiwenhaff",
+     "fr": "Schléiwenhaff",
+     "lb": "Schléiwenhaff",
+     "name": "Schléiwenhaff"
+    },
+    "type": "hamlet"
+   }
+  ],
+  "vineyard_pct": 0,
+  "waters": []
+ },
+ "preizerdaul": {
+  "amenities": {
+   "bench": 21,
+   "drinking_water": 1,
+   "picnic": 3,
+   "playground": 1,
+   "shelter": 4,
+   "toilets": 1
+  },
+  "churches": [
+   {
+    "kind": "church",
+    "km": 2.7,
+    "names": {
+     "de": "Visitation de la Bienheureuse-Vierge-Marie",
+     "en": "Visitation de la Bienheureuse-Vierge-Marie",
+     "fr": "Visitation de la Bienheureuse-Vierge-Marie",
+     "lb": "Visitation de la Bienheureuse-Vierge-Marie",
+     "name": "Visitation de la Bienheureuse-Vierge-Marie"
+    }
+   },
+   {
+    "kind": "church",
+    "km": 35.9,
+    "names": {
+     "de": "Saint-Luc",
+     "en": "Saint-Luc",
+     "fr": "Saint-Luc",
+     "lb": "Saint-Luc",
+     "name": "Saint-Luc"
+    }
+   }
+  ],
+  "food": [],
+  "forest_pct": 38,
+  "open_pct": 13,
+  "orchard_pct": 0,
+  "samples": 1330,
+  "steps": 0,
+  "surface": {
+   "path": 1,
+   "paved": 29,
+   "track": 70,
+   "unknown": 0
+  },
+  "version": 1,
+  "villages": [
+   {
+    "dist_m": 37,
+    "km": 2.1,
+    "names": {
+     "de": "Platen",
+     "en": "Platen",
+     "fr": "Platen",
+     "lb": "Platen",
+     "name": "Platen"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 43,
+    "km": 2.6,
+    "names": {
+     "de": "Bettborn",
+     "en": "Bettborn",
+     "fr": "Bettborn",
+     "lb": "Bieberech",
+     "name": "Bettborn"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 84,
+    "km": 3.6,
+    "names": {
+     "de": "Reimberg",
+     "en": "Reimberg",
+     "fr": "Reimberg",
+     "lb": "Rëmmereg",
+     "name": "Reimberg"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 217,
+    "km": 9.5,
+    "names": {
+     "de": "Buschrodt",
+     "en": "Buschrodt",
+     "fr": "Buschrodt",
+     "lb": "Bëschrued",
+     "name": "Buschrodt"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 120,
+    "km": 22.9,
+    "names": {
+     "de": "Horas",
+     "en": "Horas",
+     "fr": "Horas",
+     "lb": "Horass",
+     "name": "Horas"
+    },
+    "type": "hamlet"
+   },
+   {
+    "dist_m": 321,
+    "km": 26.9,
+    "names": {
+     "de": "Wahl",
+     "en": "Wahl",
+     "fr": "Wahl",
+     "lb": "Wal",
+     "name": "Wahl"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 274,
+    "km": 32.5,
+    "names": {
+     "de": "Heispelt",
+     "en": "Heispelt",
+     "fr": "Heispelt",
+     "lb": "Heeschpelt",
+     "name": "Heispelt"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 32,
+    "km": 35.7,
+    "names": {
+     "de": "Kuborn",
+     "en": "Kuborn",
+     "fr": "Kuborn",
+     "lb": "Kéiber",
+     "name": "Kuborn"
+    },
+    "type": "village"
+   }
+  ],
+  "vineyard_pct": 0,
+  "waters": [
+   {
+    "along_km": 1.3,
+    "first_km": 36.5,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Dirbech",
+     "en": "Dirbech",
+     "fr": "Dirbech",
+     "lb": "Dirbech",
+     "name": "Dirbech"
+    }
+   },
+   {
+    "along_km": 0.3,
+    "first_km": 2.2,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Roudbaach",
+     "en": "Roudbaach",
+     "fr": "Roudbaach",
+     "lb": "Roudbaach",
+     "name": "Roudbaach"
+    }
+   },
+   {
+    "along_km": 0.3,
+    "first_km": 34.3,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Mechelbaach",
+     "en": "Mechelbaach",
+     "fr": "Mechelbaach",
+     "lb": "Mechelbaach",
+     "name": "Mechelbaach"
+    }
+   },
+   {
+    "along_km": 0.2,
+    "first_km": 23.2,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Breschterbaach",
+     "en": "Breschterbaach",
+     "fr": "Breschterbaach",
+     "lb": "Breschterbaach",
+     "name": "Breschterbaach"
+    }
+   },
+   {
+    "along_km": 0.1,
+    "first_km": 11.8,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Wark",
+     "en": "Wark",
+     "fr": "Wark",
+     "lb": "Wark",
+     "name": "Wark"
+    }
+   },
+   {
+    "along_km": 0.1,
+    "first_km": 11.9,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Waark",
+     "en": "Waark",
+     "fr": "Waark",
+     "lb": "Waark",
+     "name": "Waark"
+    }
+   }
+  ]
+ },
+ "rambrouch": {
+  "amenities": {
+   "bench": 10,
+   "drinking_water": 0,
+   "picnic": 5,
+   "playground": 1,
+   "shelter": 2,
+   "toilets": 0
+  },
+  "churches": [
+   {
+    "kind": "church",
+    "km": 0.3,
+    "names": {
+     "de": "Saint-Gilles",
+     "en": "Saint-Gilles",
+     "fr": "Saint-Gilles",
+     "lb": "Saint-Gilles",
+     "name": "Saint-Gilles"
+    }
+   },
+   {
+    "kind": "church",
+    "km": 20.2,
+    "names": {
+     "de": "Notre-Dame",
+     "en": "Notre-Dame",
+     "fr": "Notre-Dame",
+     "lb": "Notre-Dame",
+     "name": "Notre-Dame"
+    }
+   },
+   {
+    "kind": "church",
+    "km": 20.3,
+    "names": {
+     "de": "Saint-Lambert",
+     "en": "Saint-Lambert",
+     "fr": "Saint-Lambert",
+     "lb": "Saint-Lambert",
+     "name": "Saint-Lambert"
+    }
+   }
+  ],
+  "food": [
+   {
+    "dist_m": 8,
+    "kind": "restaurant",
+    "km": 0.2,
+    "name": "Restaurant 2008"
+   },
+   {
+    "dist_m": 9,
+    "kind": "restaurant",
+    "km": 0.4,
+    "name": "Jardin de Pekin"
+   },
+   {
+    "dist_m": 78,
+    "kind": "cafe",
+    "km": 0.4,
+    "name": "Café Fox"
+   },
+   {
+    "dist_m": 51,
+    "kind": "restaurant",
+    "km": 20.3,
+    "name": "Nizart Piazza"
+   }
+  ],
+  "forest_pct": 75,
+  "open_pct": 6,
+  "orchard_pct": 0,
+  "samples": 1235,
+  "steps": 0,
+  "surface": {
+   "path": 0,
+   "paved": 19,
+   "track": 80,
+   "unknown": 0
+  },
+  "version": 1,
+  "villages": [
+   {
+    "dist_m": 77,
+    "km": 0.4,
+    "names": {
+     "de": "Rambruch",
+     "en": "Rambrouch",
+     "fr": "Rambrouch",
+     "lb": "Rammerech",
+     "name": "Rambrouch"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 14,
+    "km": 20.3,
+    "names": {
+     "de": "Perl",
+     "en": "Perlé",
+     "fr": "Perlé",
+     "lb": "Pärel",
+     "name": "Perlé"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 374,
+    "km": 27.9,
+    "names": {
+     "de": "Holtz",
+     "en": "Holtz",
+     "fr": "Holtz",
+     "lb": "Holz",
+     "name": "Holtz"
+    },
+    "type": "village"
+   }
+  ],
+  "vineyard_pct": 0,
+  "waters": [
+   {
+    "along_km": 6.0,
+    "first_km": 8.5,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Koulbich",
+     "en": "Koulbich",
+     "fr": "Koulbich",
+     "lb": "Koulbich",
+     "name": "Koulbich"
+    }
+   },
+   {
+    "along_km": 2.3,
+    "first_km": 23.9,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "La Nothomb",
+     "en": "La Nothomb",
+     "fr": "La Nothomb",
+     "lb": "La Nothomb",
+     "name": "La Nothomb"
+    }
+   },
+   {
+    "along_km": 1.9,
+    "first_km": 5.5,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Rennbaach",
+     "en": "Rennbaach",
+     "fr": "Rennbaach",
+     "lb": "Rennbaach",
+     "name": "Rennbaach"
+    }
+   },
+   {
+    "along_km": 1.3,
+    "first_km": 21.6,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Kakebaach",
+     "en": "Kakebaach",
+     "fr": "Kakebaach",
+     "lb": "Kakebaach",
+     "name": "Kakebaach"
+    }
+   },
+   {
+    "along_km": 1.1,
+    "first_km": 17.4,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Rébich",
+     "en": "Rébich",
+     "fr": "Rébich",
+     "lb": "Rébich",
+     "name": "Rébich"
+    }
+   },
+   {
+    "along_km": 0.3,
+    "first_km": 26.7,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Huelbaach",
+     "en": "Huelbaach",
+     "fr": "Huelbaach",
+     "lb": "Huelbaach",
+     "name": "Huelbaach"
+    }
+   }
+  ]
+ },
+ "redrock-belvaux-differdange": {
+  "amenities": {
+   "bench": 76,
+   "drinking_water": 0,
+   "picnic": 24,
+   "playground": 8,
+   "shelter": 7,
+   "toilets": 0
+  },
+  "churches": [
+   {
+    "kind": "chapel",
+    "km": 12.1,
+    "names": {
+     "de": "1954",
+     "en": "1954",
+     "fr": "1954",
+     "lb": "1954",
+     "name": "1954"
+    }
+   }
+  ],
+  "food": [
+   {
+    "dist_m": 85,
+    "kind": "restaurant",
+    "km": 0.1,
+    "name": "Bei der Giedel Fond-de-Gras"
+   }
+  ],
+  "forest_pct": 77,
+  "open_pct": 22,
+  "orchard_pct": 0,
+  "samples": 1204,
+  "steps": 0,
+  "surface": {
+   "path": 35,
+   "paved": 11,
+   "track": 53,
+   "unknown": 0
+  },
+  "version": 1,
+  "villages": [
+   {
+    "dist_m": 107,
+    "km": 0.1,
+    "names": {
+     "de": "Fond-de-Gras",
+     "en": "Fond-de-Gras",
+     "fr": "Fond-de-Gras",
+     "lb": "Fond-de-Gras",
+     "name": "Fond-de-Gras"
+    },
+    "type": "hamlet"
+   },
+   {
+    "dist_m": 303,
+    "km": 5.5,
+    "names": {
+     "de": "Bache Jang",
+     "en": "Bache Jang",
+     "fr": "Bache Jang",
+     "lb": "Bache Jang",
+     "name": "Bache Jang"
+    },
+    "type": "hamlet"
+   }
+  ],
+  "vineyard_pct": 0,
+  "waters": []
+ },
+ "redrock-ellergrond": {
+  "amenities": {
+   "bench": 67,
+   "drinking_water": 1,
+   "picnic": 13,
+   "playground": 2,
+   "shelter": 6,
+   "toilets": 0
+  },
+  "churches": [
+   {
+    "kind": "church",
+    "km": 14.3,
+    "names": {
+     "de": "Notre-Dame des Mineurs",
+     "en": "Notre-Dame des Mineurs",
+     "fr": "Notre-Dame des Mineurs",
+     "lb": "Notre-Dame des Mineurs",
+     "name": "Notre-Dame des Mineurs"
+    }
+   }
+  ],
+  "food": [
+   {
+    "dist_m": 40,
+    "kind": "restaurant",
+    "km": 4.4,
+    "name": "Centre d'accueil Ellergronn"
+   },
+   {
+    "dist_m": 45,
+    "kind": "restaurant",
+    "km": 4.4,
+    "name": "An der Schmedd"
+   },
+   {
+    "dist_m": 33,
+    "kind": "restaurant",
+    "km": 4.7,
+    "name": "Zum Zechenhaus"
+   },
+   {
+    "dist_m": 86,
+    "kind": "restaurant",
+    "km": 8.3,
+    "name": "Fevi Bosque"
+   }
+  ],
+  "forest_pct": 64,
+  "open_pct": 29,
+  "orchard_pct": 1,
+  "samples": 1149,
+  "steps": 0,
+  "surface": {
+   "path": 19,
+   "paved": 22,
+   "track": 58,
+   "unknown": 0
+  },
+  "version": 1,
+  "villages": [],
+  "vineyard_pct": 0,
+  "waters": []
+ },
+ "redrock-haard-black": {
+  "amenities": {
+   "bench": 42,
+   "drinking_water": 0,
+   "picnic": 6,
+   "playground": 1,
+   "shelter": 5,
+   "toilets": 0
+  },
+  "churches": [],
+  "food": [
+   {
+    "dist_m": 55,
+    "kind": "restaurant",
+    "km": 0.9,
+    "name": "Auberge La Paella"
+   },
+   {
+    "dist_m": 90,
+    "kind": "cafe",
+    "km": 0.9,
+    "name": "Bienvenue"
+   }
+  ],
+  "forest_pct": 78,
+  "open_pct": 18,
+  "orchard_pct": 0,
+  "samples": 1152,
+  "steps": 5,
+  "surface": {
+   "path": 45,
+   "paved": 7,
+   "track": 47,
+   "unknown": 1
+  },
+  "version": 1,
+  "villages": [
+   {
+    "dist_m": 233,
+    "km": 18.1,
+    "names": {
+     "de": "Tetingen",
+     "en": "Tétange",
+     "fr": "Tétange",
+     "lb": "Téiteng",
+     "name": "Tétange"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 265,
+    "km": 20.5,
+    "names": {
+     "de": "Rümelingen",
+     "en": "Rumelange",
+     "fr": "Rumelange",
+     "lb": "Rëmeleng",
+     "name": "Rumelange"
+    },
+    "type": "village"
+   }
+  ],
+  "vineyard_pct": 0,
+  "waters": []
+ },
+ "redrock-lallenger-gaalgebierg": {
+  "amenities": {
+   "bench": 63,
+   "drinking_water": 0,
+   "picnic": 9,
+   "playground": 2,
+   "shelter": 6,
+   "toilets": 0
+  },
+  "churches": [],
+  "food": [
+   {
+    "dist_m": 40,
+    "kind": "restaurant",
+    "km": 22.2,
+    "name": "Centre d'accueil Ellergronn"
+   },
+   {
+    "dist_m": 45,
+    "kind": "restaurant",
+    "km": 22.2,
+    "name": "An der Schmedd"
+   },
+   {
+    "dist_m": 32,
+    "kind": "restaurant",
+    "km": 22.5,
+    "name": "Zum Zechenhaus"
+   },
+   {
+    "dist_m": 34,
+    "kind": "restaurant",
+    "km": 27.7,
+    "name": "Il Belvedere"
+   }
+  ],
+  "forest_pct": 71,
+  "open_pct": 25,
+  "orchard_pct": 0,
+  "samples": 1274,
+  "steps": 0,
+  "surface": {
+   "path": 37,
+   "paved": 17,
+   "track": 47,
+   "unknown": 0
+  },
+  "version": 1,
+  "villages": [
+   {
+    "dist_m": 449,
+    "km": 6.1,
+    "names": {
+     "de": "Schifflingen",
+     "en": "Schifflange",
+     "fr": "Schifflange",
+     "lb": "Schëffleng",
+     "name": "Schifflange"
+    },
+    "type": "town"
+   }
+  ],
+  "vineyard_pct": 0,
+  "waters": []
+ },
+ "saeul": {
+  "amenities": {
+   "bench": 10,
+   "drinking_water": 0,
+   "picnic": 2,
+   "playground": 0,
+   "shelter": 2,
+   "toilets": 0
+  },
+  "churches": [],
+  "food": [],
+  "forest_pct": 99,
+  "open_pct": 1,
+  "orchard_pct": 0,
+  "samples": 316,
+  "steps": 0,
+  "surface": {
+   "path": 9,
+   "paved": 0,
+   "track": 91,
+   "unknown": 0
+  },
+  "version": 1,
+  "villages": [
+   {
+    "dist_m": 416,
+    "km": 3.8,
+    "names": {
+     "de": "Calmus",
+     "en": "Calmus",
+     "fr": "Calmus",
+     "lb": "Kaalmes",
+     "name": "Calmus"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 188,
+    "km": 7.7,
+    "names": {
+     "de": "Saeul",
+     "en": "Saeul",
+     "fr": "Saeul",
+     "lb": "Sëll",
+     "name": "Saeul"
+    },
+    "type": "village"
+   }
+  ],
+  "vineyard_pct": 0,
+  "waters": []
+ },
+ "saeul-2": {
+  "amenities": {
+   "bench": 22,
+   "drinking_water": 0,
+   "picnic": 6,
+   "playground": 1,
+   "shelter": 3,
+   "toilets": 0
+  },
+  "churches": [],
+  "food": [],
+  "forest_pct": 62,
+  "open_pct": 19,
+  "orchard_pct": 0,
+  "samples": 744,
+  "steps": 0,
+  "surface": {
+   "path": 2,
+   "paved": 26,
+   "track": 71,
+   "unknown": 0
+  },
+  "version": 1,
+  "villages": [
+   {
+    "dist_m": 152,
+    "km": 18.2,
+    "names": {
+     "de": "Saeul",
+     "en": "Saeul",
+     "fr": "Saeul",
+     "lb": "Sëll",
+     "name": "Saeul"
+    },
+    "type": "village"
+   }
+  ],
+  "vineyard_pct": 0,
+  "waters": [
+   {
+    "along_km": 1.8,
+    "first_km": 5.9,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Mandelbaach",
+     "en": "Mandelbaach",
+     "fr": "Mandelbaach",
+     "lb": "Mandelbaach",
+     "name": "Mandelbaach"
+    }
+   },
+   {
+    "along_km": 0.2,
+    "first_km": 9.8,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Kalbaach",
+     "en": "Kalbaach",
+     "fr": "Kalbaach",
+     "lb": "Kalbaach",
+     "name": "Kalbaach"
+    }
+   },
+   {
+    "along_km": 0.1,
+    "first_km": 2.7,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Aeschbech",
+     "en": "Aeschbech",
+     "fr": "Aeschbech",
+     "lb": "Aeschbech",
+     "name": "Aeschbech"
+    }
+   }
+  ]
+ },
+ "steinsel-1": {
+  "amenities": {
+   "bench": 0,
+   "drinking_water": 0,
+   "picnic": 0,
+   "playground": 0,
+   "shelter": 0,
+   "toilets": 0
+  },
+  "churches": [],
+  "food": [],
+  "forest_pct": 100,
+  "open_pct": 0,
+  "orchard_pct": 0,
+  "samples": 17,
+  "steps": 0,
+  "surface": {
+   "path": 65,
+   "paved": 0,
+   "track": 35,
+   "unknown": 0
+  },
+  "version": 1,
+  "villages": [],
+  "vineyard_pct": 0,
+  "waters": []
+ },
+ "steinsel-2": {
+  "amenities": {
+   "bench": 0,
+   "drinking_water": 0,
+   "picnic": 1,
+   "playground": 0,
+   "shelter": 0,
+   "toilets": 0
+  },
+  "churches": [],
+  "food": [],
+  "forest_pct": 85,
+  "open_pct": 15,
+  "orchard_pct": 0,
+  "samples": 26,
+  "steps": 0,
+  "surface": {
+   "path": 69,
+   "paved": 0,
+   "track": 23,
+   "unknown": 8
+  },
+  "version": 1,
+  "villages": [],
+  "vineyard_pct": 0,
+  "waters": []
+ },
+ "strecke": {
+  "amenities": {
+   "bench": 4,
+   "drinking_water": 0,
+   "picnic": 1,
+   "playground": 0,
+   "shelter": 0,
+   "toilets": 0
+  },
+  "churches": [],
+  "food": [],
+  "forest_pct": 60,
+  "open_pct": 7,
+  "orchard_pct": 0,
+  "samples": 271,
+  "steps": 0,
+  "surface": {
+   "path": 3,
+   "paved": 41,
+   "track": 57,
+   "unknown": 0
+  },
+  "version": 1,
+  "villages": [],
+  "vineyard_pct": 0,
+  "waters": [
+   {
+    "along_km": 2.7,
+    "first_km": 0.3,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Fallbech",
+     "en": "Fallbech",
+     "fr": "Fallbech",
+     "lb": "Fallbech",
+     "name": "Fallbech"
+    }
+   },
+   {
+    "along_km": 0.1,
+    "first_km": 3.0,
+    "follows": false,
+    "kind": "river",
+    "names": {
+     "de": "Our",
+     "en": "Our",
+     "fr": "Our",
+     "lb": "Our",
+     "name": "Our"
+    }
+   }
+  ]
+ },
+ "transardennaise-vtt": {
+  "amenities": {
+   "bench": 1,
+   "drinking_water": 0,
+   "picnic": 1,
+   "playground": 0,
+   "shelter": 0,
+   "toilets": 0
+  },
+  "churches": [],
+  "food": [],
+  "forest_pct": 0,
+  "open_pct": 0,
+  "orchard_pct": 0,
+  "samples": 10302,
+  "steps": 0,
+  "surface": {
+   "path": 1,
+   "paved": 0,
+   "track": 1,
+   "unknown": 98
+  },
+  "version": 1,
+  "villages": [],
+  "vineyard_pct": 0,
+  "waters": [
+   {
+    "along_km": 0.4,
+    "first_km": 46.5,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Le Pihon",
+     "en": "Le Pihon",
+     "fr": "Le Pihon",
+     "lb": "Le Pihon",
+     "name": "Le Pihon"
+    }
+   },
+   {
+    "along_km": 0.1,
+    "first_km": 47.6,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Fooschtbaach",
+     "en": "Fooschtbaach",
+     "fr": "Fooschtbaach",
+     "lb": "Fooschtbaach",
+     "name": "Fooschtbaach"
+    }
+   }
+  ]
+ },
+ "vianden": {
+  "amenities": {
+   "bench": 37,
+   "drinking_water": 0,
+   "picnic": 15,
+   "playground": 0,
+   "shelter": 7,
+   "toilets": 3
+  },
+  "churches": [
+   {
+    "kind": "chapel",
+    "km": 11.2,
+    "names": {
+     "de": "Gehaanskapell vu Waalsdref",
+     "en": "Gehaanskapell vu Waalsdref",
+     "fr": "Chapelle Saint-Jean-Évangéliste",
+     "lb": "Gehaanskapell",
+     "name": "Gehaanskapell vu Waalsdref"
+    }
+   },
+   {
+    "kind": "church",
+    "km": 17.9,
+    "names": {
+     "de": "Sacré-Coeur",
+     "en": "Sacré-Coeur",
+     "fr": "Sacré-Coeur",
+     "lb": "Sacré-Coeur",
+     "name": "Sacré-Coeur"
+    }
+   },
+   {
+    "kind": "church",
+    "km": 20.3,
+    "names": {
+     "de": "Veianer Bildchen",
+     "en": "Veianer Bildchen",
+     "fr": "Chapelle Notre-Dame",
+     "lb": "Veianer Bildchen",
+     "name": "Veianer Bildchen"
+    }
+   },
+   {
+    "kind": "church",
+    "km": 22.1,
+    "names": {
+     "de": "Trinitarierkirche",
+     "en": "Trinitaire",
+     "fr": "Église Trinitaire",
+     "lb": "Trinitarierkierch",
+     "name": "Trinitaire"
+    }
+   },
+   {
+    "kind": "chapel",
+    "km": 22.1,
+    "names": {
+     "de": "Sodalitätskapelle",
+     "en": "Sodality chapel",
+     "fr": "Chapelle de la Sodalité",
+     "lb": "Sodalitéitskapell",
+     "name": "Sodalitéitskapell"
+    }
+   },
+   {
+    "kind": "chapel",
+    "km": 22.4,
+    "names": {
+     "de": "Sankt Nikolaus Kapelle",
+     "en": "Saint-Nicolas",
+     "fr": "Saint-Nicolas",
+     "lb": "Nikloskapell",
+     "name": "Saint-Nicolas"
+    }
+   }
+  ],
+  "food": [
+   {
+    "dist_m": 15,
+    "kind": "restaurant",
+    "km": 0.9,
+    "name": "Nagel"
+   },
+   {
+    "dist_m": 17,
+    "kind": "restaurant",
+    "km": 19.0,
+    "name": "Moulin de Bivels"
+   },
+   {
+    "dist_m": 14,
+    "kind": "restaurant",
+    "km": 21.8,
+    "name": "Auberge Aal Veianen"
+   },
+   {
+    "dist_m": 11,
+    "kind": "restaurant",
+    "km": 21.9,
+    "name": "Auberge du Musée"
+   },
+   {
+    "dist_m": 10,
+    "kind": "cafe",
+    "km": 22.0,
+    "name": "Collette Coffee Craft - Café & Roastery"
+   },
+   {
+    "dist_m": 70,
+    "kind": "restaurant",
+    "km": 22.2,
+    "name": "Petit Restaurant / City Corner"
+   }
+  ],
+  "forest_pct": 55,
+  "open_pct": 8,
+  "orchard_pct": 0,
+  "samples": 910,
+  "steps": 1,
+  "surface": {
+   "path": 8,
+   "paved": 60,
+   "track": 31,
+   "unknown": 0
+  },
+  "version": 1,
+  "villages": [
+   {
+    "dist_m": 399,
+    "km": 2.4,
+    "names": {
+     "de": "Bettel",
+     "en": "Bettel",
+     "fr": "Bettel",
+     "lb": "Bëttel",
+     "name": "Bettel"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 121,
+    "km": 5.3,
+    "names": {
+     "de": "Fuhren",
+     "en": "Fouhren",
+     "fr": "Fouhren",
+     "lb": "Furen",
+     "name": "Fouhren"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 19,
+    "km": 11.3,
+    "names": {
+     "de": "Walsdorf",
+     "en": "Walsdorf",
+     "fr": "Walsdorf",
+     "lb": "Waalsdref",
+     "name": "Walsdorf"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 40,
+    "km": 17.7,
+    "names": {
+     "de": "Bivels",
+     "en": "Bivels",
+     "fr": "Bivels",
+     "lb": "Biwels",
+     "name": "Bivels"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 39,
+    "km": 22.3,
+    "names": {
+     "de": "Vianden",
+     "en": "Vianden",
+     "fr": "Vianden",
+     "lb": "Veianen",
+     "name": "Vianden"
+    },
+    "type": "town"
+   }
+  ],
+  "vineyard_pct": 0,
+  "waters": [
+   {
+    "along_km": 1.6,
+    "first_km": 8.6,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Houschterbaach",
+     "en": "Houschterbaach",
+     "fr": "Houschterbaach",
+     "lb": "Houschterbaach",
+     "name": "Houschterbaach"
+    }
+   },
+   {
+    "along_km": 1.0,
+    "first_km": 0.6,
+    "follows": true,
+    "kind": "river",
+    "names": {
+     "de": "Our",
+     "en": "Our",
+     "fr": "Our",
+     "lb": "Our",
+     "name": "Our"
+    }
+   },
+   {
+    "along_km": 0.3,
+    "first_km": 2.4,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Hinkelsbaach",
+     "en": "Hinkelsbaach",
+     "fr": "Hinkelsbaach",
+     "lb": "Hinkelsbaach",
+     "name": "Hinkelsbaach"
+    }
+   },
+   {
+    "along_km": 0.2,
+    "first_km": 9.0,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Igelsbaach",
+     "en": "Igelsbaach",
+     "fr": "Igelsbaach",
+     "lb": "Igelsbaach",
+     "name": "Igelsbaach"
+    }
+   },
+   {
+    "along_km": 0.1,
+    "first_km": 1.0,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Kënzebaach",
+     "en": "Kënzebaach",
+     "fr": "Kënzebaach",
+     "lb": "Kënzebaach",
+     "name": "Kënzebaach"
+    }
+   },
+   {
+    "along_km": 0.1,
+    "first_km": 1.4,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Schmitbaach",
+     "en": "Schmitbaach",
+     "fr": "Schmitbaach",
+     "lb": "Schmitbaach",
+     "name": "Schmitbaach"
+    }
+   }
+  ]
+ },
+ "weiler-la-tour": {
+  "amenities": {
+   "bench": 10,
+   "drinking_water": 0,
+   "picnic": 4,
+   "playground": 2,
+   "shelter": 2,
+   "toilets": 1
+  },
+  "churches": [
+   {
+    "kind": "church",
+    "km": 6.9,
+    "names": {
+     "de": "Saint-Sébastien",
+     "en": "Saint-Sébastien",
+     "fr": "Saint-Sébastien",
+     "lb": "Saint-Sébastien",
+     "name": "Saint-Sébastien"
+    }
+   },
+   {
+    "kind": "chapel",
+    "km": 18.4,
+    "names": {
+     "de": "Donatuskapelle",
+     "en": "Donatuskapelle",
+     "fr": "Donatuskapelle",
+     "lb": "Donatuskapelle",
+     "name": "Donatuskapelle"
+    }
+   }
+  ],
+  "food": [
+   {
+    "dist_m": 54,
+    "kind": "restaurant",
+    "km": 7.2,
+    "name": "Sportheim"
+   }
+  ],
+  "forest_pct": 32,
+  "open_pct": 2,
+  "orchard_pct": 0,
+  "samples": 850,
+  "steps": 0,
+  "surface": {
+   "path": 0,
+   "paved": 56,
+   "track": 44,
+   "unknown": 0
+  },
+  "version": 1,
+  "villages": [
+   {
+    "dist_m": 362,
+    "km": 3.4,
+    "names": {
+     "de": "Aspelt",
+     "en": "Aspelt",
+     "fr": "Aspelt",
+     "lb": "Uespelt",
+     "name": "Aspelt"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 296,
+    "km": 6.9,
+    "names": {
+     "de": "Weiler zum Turm",
+     "en": "Weiler-la-Tour",
+     "fr": "Weiler-la-Tour",
+     "lb": "Weiler zum Tuer",
+     "name": "Weiler-la-Tour"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 10,
+    "km": 17.3,
+    "names": {
+     "de": "Brichermillen",
+     "en": "Brichermillen",
+     "fr": "Bruchermuhle",
+     "lb": "Brichermillen",
+     "name": "Brichermillen"
+    },
+    "type": "hamlet"
+   },
+   {
+    "dist_m": 221,
+    "km": 18.4,
+    "names": {
+     "de": "Syren",
+     "en": "Syren",
+     "fr": "Syren",
+     "lb": "Siren",
+     "name": "Syren"
+    },
+    "type": "village"
+   }
+  ],
+  "vineyard_pct": 0,
+  "waters": [
+   {
+    "along_km": 0.9,
+    "first_km": 13.4,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Trudlerbaach",
+     "en": "Trudlerbaach",
+     "fr": "Trudlerbaach",
+     "lb": "Trudlerbaach",
+     "name": "Trudlerbaach"
+    }
+   },
+   {
+    "along_km": 0.6,
+    "first_km": 3.0,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Gässelbaach",
+     "en": "Gässelbaach",
+     "fr": "Gässelbaach",
+     "lb": "Gässelbaach",
+     "name": "Gässelbaach"
+    }
+   },
+   {
+    "along_km": 0.6,
+    "first_km": 9.1,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Déflbaach",
+     "en": "Déflbaach",
+     "fr": "Déflbaach",
+     "lb": "Déflbaach",
+     "name": "Déflbaach"
+    }
+   },
+   {
+    "along_km": 0.5,
+    "first_km": 17.2,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Syr",
+     "en": "Syre",
+     "fr": "Syre",
+     "lb": "Sir",
+     "name": "Syre"
+    }
+   },
+   {
+    "along_km": 0.2,
+    "first_km": 4.2,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Brichemsbaach",
+     "en": "Brichemsbaach",
+     "fr": "Brichemsbaach",
+     "lb": "Brichemsbaach",
+     "name": "Brichemsbaach"
+    }
+   },
+   {
+    "along_km": 0.1,
+    "first_km": 6.3,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Haasselerbaach",
+     "en": "Haasselerbaach",
+     "fr": "Haasselerbaach",
+     "lb": "Haasselerbaach",
+     "name": "Haasselerbaach"
+    }
+   }
+  ]
+ },
+ "weiswampach-troisvierges": {
+  "amenities": {
+   "bench": 0,
+   "drinking_water": 0,
+   "picnic": 1,
+   "playground": 0,
+   "shelter": 0,
+   "toilets": 0
+  },
+  "churches": [],
+  "food": [],
+  "forest_pct": 0,
+  "open_pct": 0,
+  "orchard_pct": 0,
+  "samples": 2,
+  "steps": 0,
+  "surface": {
+   "path": 0,
+   "paved": 50,
+   "track": 50,
+   "unknown": 0
+  },
+  "version": 1,
+  "villages": [],
+  "vineyard_pct": 0,
+  "waters": []
+ },
+ "wiltz-1": {
+  "amenities": {
+   "bench": 19,
+   "drinking_water": 0,
+   "picnic": 1,
+   "playground": 1,
+   "shelter": 5,
+   "toilets": 1
+  },
+  "churches": [
+   {
+    "kind": "chapel",
+    "km": 2.7,
+    "names": {
+     "de": "Appoloniakapell",
+     "en": "Appoloniakapell",
+     "fr": "Sainte-Appoline",
+     "lb": "Appoloniakapell",
+     "name": "Appoloniakapell"
+    }
+   },
+   {
+    "kind": "church",
+    "km": 16.0,
+    "names": {
+     "de": "Saint-Eloi",
+     "en": "Saint-Eloi",
+     "fr": "Saint-Eloi",
+     "lb": "Saint-Eloi",
+     "name": "Saint-Eloi"
+    }
+   }
+  ],
+  "food": [
+   {
+    "dist_m": 73,
+    "kind": "cafe",
+    "km": 21.5,
+    "name": "A Tasquinha"
+   },
+   {
+    "dist_m": 14,
+    "kind": "restaurant",
+    "km": 22.2,
+    "name": "Chez Zhou"
+   }
+  ],
+  "forest_pct": 41,
+  "open_pct": 10,
+  "orchard_pct": 0,
+  "samples": 964,
+  "steps": 0,
+  "surface": {
+   "path": 5,
+   "paved": 50,
+   "track": 45,
+   "unknown": 0
+  },
+  "version": 1,
+  "villages": [
+   {
+    "dist_m": 11,
+    "km": 2.7,
+    "names": {
+     "de": "Rullingen",
+     "en": "Roullingen",
+     "fr": "Roullingen",
+     "lb": "Rulljen",
+     "name": "Roullingen"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 103,
+    "km": 6.6,
+    "names": {
+     "de": "Nocher-Route",
+     "en": "Nocher-Route",
+     "fr": "Nocher-Route",
+     "lb": "Nocher-Route",
+     "name": "Nocher-Route"
+    },
+    "type": "hamlet"
+   },
+   {
+    "dist_m": 84,
+    "km": 16.0,
+    "names": {
+     "de": "Erpeldingen",
+     "en": "Erpeldange",
+     "fr": "Erpeldange",
+     "lb": "Ierpeldeng",
+     "name": "Erpeldange"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 23,
+    "km": 18.1,
+    "names": {
+     "de": "Weidingen",
+     "en": "Weidingen",
+     "fr": "Weidingen",
+     "lb": "Wegdichen",
+     "name": "Weidingen"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 63,
+    "km": 21.9,
+    "names": {
+     "de": "Wiltz",
+     "en": "Wiltz",
+     "fr": "Wiltz",
+     "lb": "Wolz",
+     "name": "Wiltz"
+    },
+    "type": "town"
+   },
+   {
+    "dist_m": 88,
+    "km": 24.1,
+    "names": {
+     "de": "Lameschmillen",
+     "en": "Lameschmillen",
+     "fr": "Lameschmillen",
+     "lb": "Lameschmillen",
+     "name": "Lameschmillen"
+    },
+    "type": "hamlet"
+   }
+  ],
+  "vineyard_pct": 0,
+  "waters": [
+   {
+    "along_km": 2.4,
+    "first_km": 9.1,
+    "follows": true,
+    "kind": "river",
+    "names": {
+     "de": "Wiltz",
+     "en": "Wiltz",
+     "fr": "Wiltz",
+     "lb": "Wiltz",
+     "name": "Wiltz"
+    }
+   },
+   {
+    "along_km": 2.3,
+    "first_km": 10.2,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Kirel",
+     "en": "Kirel",
+     "fr": "Kirel",
+     "lb": "Kirel",
+     "name": "Kirel"
+    }
+   },
+   {
+    "along_km": 1.2,
+    "first_km": 9.3,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Himmelbaach",
+     "en": "Himmelbaach",
+     "fr": "Himmelbaach",
+     "lb": "Himmelbaach",
+     "name": "Himmelbaach"
+    }
+   },
+   {
+    "along_km": 0.6,
+    "first_km": 4.3,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Hermeschterbaach",
+     "en": "Hermeschterbaach",
+     "fr": "Hermeschterbaach",
+     "lb": "Hermeschterbaach",
+     "name": "Hermeschterbaach"
+    }
+   },
+   {
+    "along_km": 0.3,
+    "first_km": 10.6,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Réisterbaach",
+     "en": "Réisterbaach",
+     "fr": "Réisterbaach",
+     "lb": "Réisterbaach",
+     "name": "Réisterbaach"
+    }
+   },
+   {
+    "along_km": 0.2,
+    "first_km": 2.8,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Schlirbëch",
+     "en": "Schlirbëch",
+     "fr": "Schlirbëch",
+     "lb": "Schlirbëch",
+     "name": "Schlirbëch"
+    }
+   }
+  ]
+ },
+ "wiltz-2": {
+  "amenities": {
+   "bench": 13,
+   "drinking_water": 0,
+   "picnic": 8,
+   "playground": 3,
+   "shelter": 2,
+   "toilets": 0
+  },
+  "churches": [
+   {
+    "kind": "chapel",
+    "km": 4.9,
+    "names": {
+     "de": "Saint-Quirin",
+     "en": "Saint-Quirin",
+     "fr": "Saint-Quirin",
+     "lb": "Saint-Quirin",
+     "name": "Saint-Quirin"
+    }
+   },
+   {
+    "kind": "church",
+    "km": 10.4,
+    "names": {
+     "de": "Saints-Pierre-et-Paul",
+     "en": "Saints-Pierre-et-Paul",
+     "fr": "Saints-Pierre-et-Paul",
+     "lb": "Saints-Pierre-et-Paul",
+     "name": "Saints-Pierre-et-Paul"
+    }
+   }
+  ],
+  "food": [
+   {
+    "dist_m": 53,
+    "kind": "restaurant",
+    "km": 0.3,
+    "name": "Aux Tanneries de Wiltz"
+   }
+  ],
+  "forest_pct": 36,
+  "open_pct": 14,
+  "orchard_pct": 0,
+  "samples": 421,
+  "steps": 0,
+  "surface": {
+   "path": 0,
+   "paved": 73,
+   "track": 27,
+   "unknown": 0
+  },
+  "version": 1,
+  "villages": [
+   {
+    "dist_m": 14,
+    "km": 4.9,
+    "names": {
+     "de": "Nörtringen",
+     "en": "Noertrange",
+     "fr": "Noertrange",
+     "lb": "Näertrech",
+     "name": "Noertrange"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 159,
+    "km": 7.0,
+    "names": {
+     "de": "Winseler",
+     "en": "Winseler",
+     "fr": "Winseler",
+     "lb": "Wanseler",
+     "name": "Winseler"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 48,
+    "km": 8.2,
+    "names": {
+     "de": "Lameschmillen",
+     "en": "Lameschmillen",
+     "fr": "Lameschmillen",
+     "lb": "Lameschmillen",
+     "name": "Lameschmillen"
+    },
+    "type": "hamlet"
+   },
+   {
+    "dist_m": 238,
+    "km": 10.2,
+    "names": {
+     "de": "Niederwiltz",
+     "en": "Niederwiltz",
+     "fr": "Niederwiltz",
+     "lb": "Niederwiltz",
+     "name": "Niederwiltz"
+    },
+    "type": "hamlet"
+   },
+   {
+    "dist_m": 298,
+    "km": 10.5,
+    "names": {
+     "de": "Wiltz",
+     "en": "Wiltz",
+     "fr": "Wiltz",
+     "lb": "Wolz",
+     "name": "Wiltz"
+    },
+    "type": "town"
+   }
+  ],
+  "vineyard_pct": 0,
+  "waters": [
+   {
+    "along_km": 2.4,
+    "first_km": 0.0,
+    "follows": true,
+    "kind": "river",
+    "names": {
+     "de": "Wiltz",
+     "en": "Wiltz",
+     "fr": "Wiltz",
+     "lb": "Wiltz",
+     "name": "Wiltz"
+    }
+   },
+   {
+    "along_km": 0.1,
+    "first_km": 0.9,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Honselerbaach",
+     "en": "Honselerbaach",
+     "fr": "Honselerbaach",
+     "lb": "Honselerbaach",
+     "name": "Honselerbaach"
+    }
+   }
+  ]
+ },
+ "winseler": {
+  "amenities": {
+   "bench": 5,
+   "drinking_water": 0,
+   "picnic": 5,
+   "playground": 1,
+   "shelter": 3,
+   "toilets": 0
+  },
+  "churches": [
+   {
+    "kind": "church",
+    "km": 13.1,
+    "names": {
+     "de": "Saint-Thomas",
+     "en": "Saint-Thomas",
+     "fr": "Saint-Thomas",
+     "lb": "Saint-Thomas",
+     "name": "Saint-Thomas"
+    }
+   },
+   {
+    "kind": "church",
+    "km": 17.6,
+    "names": {
+     "de": "Saint-Luc",
+     "en": "Saint-Luc",
+     "fr": "Saint-Luc",
+     "lb": "Saint-Luc",
+     "name": "Saint-Luc"
+    }
+   }
+  ],
+  "food": [
+   {
+    "dist_m": 97,
+    "kind": "restaurant",
+    "km": 3.5,
+    "name": "Pommerloch"
+   },
+   {
+    "dist_m": 19,
+    "kind": "restaurant",
+    "km": 9.2,
+    "name": "An der Schleef"
+   }
+  ],
+  "forest_pct": 45,
+  "open_pct": 13,
+  "orchard_pct": 0,
+  "samples": 735,
+  "steps": 0,
+  "surface": {
+   "path": 0,
+   "paved": 35,
+   "track": 64,
+   "unknown": 0
+  },
+  "version": 1,
+  "villages": [
+   {
+    "dist_m": 143,
+    "km": 3.5,
+    "names": {
+     "de": "Pommerloch",
+     "en": "Pommerloch",
+     "fr": "Pommerloch",
+     "lb": "Pommerlach",
+     "name": "Pommerloch"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 18,
+    "km": 9.2,
+    "names": {
+     "de": "Schleif",
+     "en": "Schleif",
+     "fr": "Schleif",
+     "lb": "Schleef",
+     "name": "Schleif"
+    },
+    "type": "hamlet"
+   },
+   {
+    "dist_m": 23,
+    "km": 13.2,
+    "names": {
+     "de": "Grümelscheid",
+     "en": "Grümelscheid",
+     "fr": "Grummelscheid",
+     "lb": "Grëmmelescht",
+     "name": "Grümelscheid"
+    },
+    "type": "village"
+   },
+   {
+    "dist_m": 17,
+    "km": 17.5,
+    "names": {
+     "de": "Winseler",
+     "en": "Winseler",
+     "fr": "Winseler",
+     "lb": "Wanseler",
+     "name": "Winseler"
+    },
+    "type": "village"
+   }
+  ],
+  "vineyard_pct": 0,
+  "waters": [
+   {
+    "along_km": 1.6,
+    "first_km": 0.0,
+    "follows": true,
+    "kind": "river",
+    "names": {
+     "de": "Wiltz",
+     "en": "Wiltz",
+     "fr": "Wiltz",
+     "lb": "Wiltz",
+     "name": "Wiltz"
+    }
+   },
+   {
+    "along_km": 0.9,
+    "first_km": 9.6,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Sunsbech",
+     "en": "Sunsbech",
+     "fr": "Sunsbech",
+     "lb": "Sunsbech",
+     "name": "Sunsbech"
+    }
+   },
+   {
+    "along_km": 0.8,
+    "first_km": 7.9,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Sporbech",
+     "en": "Sporbech",
+     "fr": "Sporbech",
+     "lb": "Sporbech",
+     "name": "Sporbech"
+    }
+   },
+   {
+    "along_km": 0.7,
+    "first_km": 1.8,
+    "follows": true,
+    "kind": "stream",
+    "names": {
+     "de": "Fischbaach",
+     "en": "Fischbaach",
+     "fr": "Fischbaach",
+     "lb": "Fischbaach",
+     "name": "Fischbaach"
+    }
+   }
+  ]
+ },
+ "wormeldange": {
+  "amenities": {
+   "bench": 8,
+   "drinking_water": 0,
+   "picnic": 2,
+   "playground": 0,
+   "shelter": 1,
+   "toilets": 0
+  },
+  "churches": [
+   {
+    "kind": "church",
+    "km": 21.7,
+    "names": {
+     "de": "Erasmuskierch",
+     "en": "Erasmuskierch",
+     "fr": "Église Saint-Érasme",
+     "lb": "Erasmuskierch",
+     "name": "Erasmuskierch"
+    }
+   }
+  ],
+  "food": [],
+  "forest_pct": 57,
+  "open_pct": 7,
+  "orchard_pct": 0,
+  "samples": 842,
+  "steps": 0,
+  "surface": {
+   "path": 0,
+   "paved": 42,
+   "track": 58,
+   "unknown": 0
+  },
+  "version": 1,
+  "villages": [
+   {
+    "dist_m": 7,
+    "km": 9.2,
+    "names": {
+     "de": "Kapenacker",
+     "en": "Kapenacker",
+     "fr": "Kapenacker",
+     "lb": "Kapenaker",
+     "name": "Kapenacker"
+    },
+    "type": "hamlet"
+   },
+   {
+    "dist_m": 35,
+    "km": 21.6,
+    "names": {
+     "de": "Beyren",
+     "en": "Beyren",
+     "fr": "Beyren",
+     "lb": "Beyren",
+     "name": "Beyren"
+    },
+    "type": "village"
+   }
+  ],
+  "vineyard_pct": 0,
+  "waters": [
+   {
+    "along_km": 0.1,
+    "first_km": 10.3,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Weissbaach",
+     "en": "Weissbaach",
+     "fr": "Weissbaach",
+     "lb": "Weissbaach",
+     "name": "Weissbaach"
+    }
+   },
+   {
+    "along_km": 0.1,
+    "first_km": 12.1,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Donwerbach",
+     "en": "Donwerbach",
+     "fr": "Donwerbach",
+     "lb": "Donwerbach",
+     "name": "Donwerbach"
+    }
+   },
+   {
+    "along_km": 0.1,
+    "first_km": 21.6,
+    "follows": false,
+    "kind": "stream",
+    "names": {
+     "de": "Beyrenerbach",
+     "en": "Beyrenerbach",
+     "fr": "Beyrenerbach",
+     "lb": "Beyrenerbach",
+     "name": "Beyrenerbach"
+    }
+   }
+  ]
+ }
+}

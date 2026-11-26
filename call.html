@@ -172,7 +172,7 @@ function setStatus(s){ $("status").textContent=s; $("centerSub").textContent=s; 
 async function boot(){
   if(!auth.authConfigured){ fatal(T("call.signin")); return; }
   sb=await auth.client();
-  if(!auth.session()){ fatal(`${T("call.signin")} <a class="home-link" href="index.html">${T("nav.home")}</a>`); return; }
+  if(!auth.session()){ fatal(`${T("call.signin")} <a class="home-link" href="/">${T("nav.home")}</a>`); return; }
   if(!isUserId(peerId)||!isText(peerName,MAX_NAME)){ fatal(T("call.badLink")); return; }
   me=auth.session().user.id; myName=auth.username()||"?";
   callId=isCallee ? (q.get("call")||"") : (crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random());
