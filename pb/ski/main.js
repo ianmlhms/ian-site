@@ -992,7 +992,7 @@ async function boot() {
     const line = !down && !!(crowd && crowd.lineOf(lift.index) && npcLive);
     const Lw = line ? Math.max(0, L - 2.2) : L;
     const d1 = Math.min(BOARDING.MAX_S, Math.max(0.5, Lw / BOARDING.WALK));
-    approach = { lift, down, way, cum, L, Lw, line, t: 0, d1, waited: 0, t3: null, d3: line ? Math.max(0.7, (L - Lw) / (BOARDING.WALK * 0.75)) : 0, h0: st.heading, h1: way[way.length - 1].heading };
+    approach = { lift, down, way, cum, L, Lw, line, t: 0, d1, waited: 0, t3: null, d3: line ? Math.max(0.7, (L - Lw) / (BOARDING.WALK * 0.75)) : 0, h0: st.heading, h1: Number.isFinite(way[way.length - 1].heading) ? way[way.length - 1].heading : st.heading };
     game.phase = 'approach'; game.hold = false;
     input.setEnabled(false);
     document.documentElement.dataset.skiApproach = '1';
@@ -1067,7 +1067,7 @@ async function boot() {
       ride = createRide({ lift, path, site, height, from: { x: st.x, z: st.z, heading: st.heading }, startU: next ? next.u : null, shuttle: path.shuttle ? view.shuttleBoard(lift.index) : null,
         exitAt: () => modes.lifts.world.exitOf(lift.index, height, tree, pistes.list) });
     }
-    carrier = createCarrier({ scene, kind: path.kind, seats: path.seats, sub: path.sub });
+    carrier = createCarrier({ scene, kind: path.kind, seats: path.seats, sub: path.sub, doorSide: path.sign });      // (the door on the boarding side)
     if (path.shuttle && !down) { const sw = view.shuttleBoard(lift.index); if (sw && sw.wait > 2) hud.toast(`D'Kabin kënnt (${Math.ceil(sw.wait)} s)`, 2200); }
     if (camMode === 'fp') { rideView = 'window'; rideCam = null; }          // R7-C: first person = the window view on a lift
     explore.rode(lift);
@@ -1099,11 +1099,21 @@ async function boot() {
   function rideCamera1(dt) {
     const w = ride.where();
     const want = rideCamera(ride.path, w, rideView, (x, z) => surface.height(x, z));
+    // lift lines round (a T-bar's boarding camera stood in its hut: a black screen): off the carrier, a camera in a station part or a house
+    // goes to the other side of him, else halfway in
+    if (!w.onCarrier && rideView !== 'window' && camBlocked(want.x, want.y, want.z)) {
+      const hx = Math.cos(w.heading), hz = Math.sin(w.heading), dx = want.x - w.x, dz = want.z - w.z, lat = -hz * dx + hx * dz;
+      const mx = want.x + hz * 2 * lat, mz = want.z - hx * 2 * lat;
+      if (!camBlocked(mx, want.y, mz)) { want.x = mx; want.z = mz; } else { want.x = (want.x + w.x) / 2; want.z = (want.z + w.z) / 2; }
+    }
     // chase: the camera rides with the carrier (no lag at x4); only its offset round the rider eases (a bend of the line turns it softly)
     const off = { x: want.x - w.x, y: want.y - w.y, z: want.z - w.z, tx: want.tx - w.x, ty: want.ty - w.y, tz: want.tz - w.z, fov: want.fov };
     // (after launch: a chair's boarding camera eases into the ride camera as he sits down, no cut)
-    if (rideView === 'window' || !rideCam || (rideCam.onCarrier !== w.onCarrier && ride.kind !== 'chair')) rideCam = { off, onCarrier: w.onCarrier };
-    else { const k = 1 - Math.exp(-dt * 3); for (const key of Object.keys(off)) rideCam.off[key] += (off[key] - rideCam.off[key]) * k; }
+    // (lift lines round: a cabin's door view eases into the ride camera too, no cut)
+    if (rideView === 'window' || !rideCam || (rideCam.onCarrier !== w.onCarrier && ride.kind !== 'chair' && !w.doorCam && !rideCam.door)) rideCam = { off, onCarrier: w.onCarrier, door: !!w.doorCam };
+    else rideCam.door = !!w.doorCam;
+    if (w.doorCam && rideView !== 'window') rideCam.off = off;                // (the door view stands still on the platform)
+    else if (rideCam.off !== off) { const k = 1 - Math.exp(-dt * 3); for (const key of Object.keys(off)) rideCam.off[key] += (off[key] - rideCam.off[key]) * k; }
     const o = rideCam.off;
     const out = { x: w.x + o.x, y: w.y + o.y, z: w.z + o.z, tx: w.x + o.tx, ty: w.y + o.ty, tz: w.z + o.tz, fov: o.fov };
     if (rideView !== 'window' && !want.inside) out.y = Math.max(out.y, surface.height(out.x, out.z) + 0.8);

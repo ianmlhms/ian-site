@@ -132,13 +132,13 @@ export function createLiftNet(resort, heightAt, pistes = null) {
     if (clear(from, to)) return [{ x: from.x, z: from.z }, { ...to }];
     /** From `from` to T straight or round one corner (points `radii` m from T), the shortest clear way, or null. */
     const leg = (T, radii) => {
-      if (clear(from, T)) return [{ x: from.x, z: from.z }, { x: T.x, z: T.z }];
+      if (clear(from, T)) return [{ x: from.x, z: from.z }, { ...T }];
       let best = null, bl = Infinity;
       for (const r of radii) for (let k = 0; k < 16; k++) {
         const a = (k / 16) * Math.PI * 2, P = { x: T.x + Math.cos(a) * r, z: T.z + Math.sin(a) * r };
         const L = Math.hypot(P.x - from.x, P.z - from.z) + r;
         if (L >= bl || world.hit(P.x, P.z, 0.3, height(P.x, P.z), ground) || world.inBuilding(P.x, P.z, 0.2) || (tree && tree(P.x, P.z))) continue;
-        if (clear(from, P) && clear(P, T)) { best = [{ x: from.x, z: from.z }, P, { x: T.x, z: T.z }]; bl = L; }
+        if (clear(from, P) && clear(P, T)) { best = [{ x: from.x, z: from.z }, P, { ...T }]; bl = L; }
       }
       return best;
     };

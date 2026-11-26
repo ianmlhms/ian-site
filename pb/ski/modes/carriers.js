@@ -49,23 +49,39 @@ function chairParts(seats, lod, barUp) {
     P.push([box(0.5, 0.07, W / n - 0.06), c, at(0.0, -2.02, z)]);
     P.push([box(0.06, 0.5, W / n - 0.06), c, at(-0.31, -1.66, z)]);
   }
+  if (barUp === 'none') return { parts: P, glass: [] };          // (the player's chair: the bar is its own part, it swings)
   if (barUp) {                     // the safety bar raised over the riders' heads, the footrest with it
     P.push([box(0.06, 0.06, W), COL.bar, at(-0.02, -0.66, 0)]);
     for (const z of [-W / 2 - 0.02, W / 2 + 0.02]) P.push([box(0.06, 0.82, 0.06), COL.bar, atRot(-0.17, -1.05, z, 0, 0, -0.35)]);
     P.push([box(0.05, 0.24, W * 0.9), COL.bar, at(0.1, -0.86, 0)]);
   } else {
-    P.push([box(0.06, 0.06, W), COL.bar, at(0.42, -1.58, 0)]);
-    for (const z of [-W / 2 - 0.02, W / 2 + 0.02]) P.push([box(0.78, 0.06, 0.06), COL.bar, at(0.04, -1.5, z)]);
-    // R8e (3V QA "Bouc Blanc": skis and poles through the footrest): the footrest bar right under the seated riders' boots (their skis
-    // rest on it: skier-model.js poseSit, ski bases 2.46 m under the rope), its two struts at the bar's ends, outside every seat
-    P.push([box(0.3, 0.05, W * 0.92), COL.bar, at(0.6, -2.495, 0)]);
-    for (const z of [-W * 0.47, W * 0.47]) P.push([box(0.05, 0.93, 0.05), COL.bar, at(0.5, -2.02, z)]);
+    P.push(...barDownParts(W));
   }
   return { parts: P, glass: [] };
 }
+/** Lift lines round: the chair's safety bar + footrest, lowered (the instanced chairs; the player's chair swings it round BAR.pivot). */
+const BAR = Object.freeze({ pivot: [-0.33, -1.5], up: 1.72 });
+function barDownParts(W) {
+  const P = [];
+  P.push([box(0.06, 0.06, W), COL.bar, at(0.42, -1.58, 0)]);
+  for (const z of [-W / 2 - 0.02, W / 2 + 0.02]) P.push([box(0.78, 0.06, 0.06), COL.bar, at(0.04, -1.5, z)]);
+  // R8e (3V QA "Bouc Blanc": skis and poles through the footrest): the footrest bar right under the seated riders' boots (their skis
+  // rest on it: skier-model.js poseSit, ski bases 2.46 m under the rope), its two struts at the bar's ends, outside every seat
+  P.push([box(0.3, 0.05, W * 0.92), COL.bar, at(0.6, -2.495, 0)]);
+  for (const z of [-W * 0.47, W * 0.47]) P.push([box(0.05, 0.93, 0.05), COL.bar, at(0.5, -2.02, z)]);
+  return P;
+}
 
-function cabinParts(L, Wd, H, floor, colour, dark, arms, lod) {
+function cabinParts(L, Wd, H, floor, colour, dark, arms, lod, door = null) {
   const P = [], G = [];
+  // lift lines round (the player's cabin): a door gap in the wall on door.side (+1 / -1 = +z / -z), door.w wide in the middle
+  const gapAt = (sz) => (door && sz === door.side ? door.w / 2 : 0);
+  /** A wall piece along x at z (sz = its side), split round the door gap on the door's side. */
+  const wallX = (list, h, d, y, sz, col, z) => {
+    const g = gapAt(sz);
+    if (!g) { list.push([box(L, h, d), col, at(0, y, z)]); return; }
+    for (const sx of [-1, 1]) list.push([box(L / 2 - g, h, d), col, at(sx * (g + (L / 2 - g) / 2), y, z)]);
+  };
   const roof = floor + H, mid = (floor + roof) / 2;
   if (lod === 'far') {
     // R8d (Niddreg budget): a far cabin = per arm one hanger from the rope, the roof, the coloured lower body and the window band:
@@ -85,8 +101,8 @@ function cabinParts(L, Wd, H, floor, colour, dark, arms, lod) {
   P.push([box(L, 0.12, Wd), COL.floor, at(0, floor - 0.06, 0)]);
   // R8c (QA: the cable car's window view = a blank slate-blue panel over the lower third): the big cabins are glazed down to ~0.85 m
   const low = H > 3 ? 0.85 : H * 0.36;
-  P.push([box(L, low, 0.06), colour, at(0, floor + low / 2, Wd / 2)]);
-  P.push([box(L, low, 0.06), colour, at(0, floor + low / 2, -Wd / 2)]);
+  wallX(P, low, 0.06, floor + low / 2, 1, colour, Wd / 2);
+  wallX(P, low, 0.06, floor + low / 2, -1, colour, -Wd / 2);
   P.push([box(0.06, low, Wd), colour, at(L / 2, floor + low / 2, 0)]);
   P.push([box(0.06, low, Wd), colour, at(-L / 2, floor + low / 2, 0)]);
   P.push([box(L + 0.04, 0.1, Wd + 0.04), dark, at(0, floor + low, 0)]);
@@ -97,20 +113,33 @@ function cabinParts(L, Wd, H, floor, colour, dark, arms, lod) {
   const n = H > 3 ? 3 : 2, mh = H - low - 0.06, my = floor + low + mh / 2;
   for (let i = 1; i < n; i++) {
     const x = -L / 2 + (L * i) / n, z = -Wd / 2 + (Wd * i) / n;
-    for (const sz of [-1, 1]) P.push([box(0.06, mh, 0.05), dark, at(x, my, sz * (Wd / 2 + 0.01))]);
+    for (const sz of [-1, 1]) if (Math.abs(x) > gapAt(sz) + 0.05) P.push([box(0.06, mh, 0.05), dark, at(x, my, sz * (Wd / 2 + 0.01))]);
     for (const sx of [-1, 1]) P.push([box(0.05, mh, 0.06), dark, at(sx * (L / 2 + 0.01), my, z)]);
   }
   P.push([box(L - 0.02, 0.2, Wd - 0.02), dark, at(0, roof - 0.22, 0)]);          // the head band (the inside of the roof edge)
   P.push([box(L - 0.2, 0.06, Wd - 0.2), 0x2b2f36, at(0, roof - 0.1, 0)]);
   const rail = floor + Math.min(1.0, low + 0.12);
-  for (const sz of [-1, 1]) P.push([box(L - 0.3, 0.04, 0.04), COL.steel, at(0, rail, sz * (Wd / 2 - 0.12))]);
+  for (const sz of [-1, 1]) {
+    const g = gapAt(sz);
+    if (!g) P.push([box(L - 0.3, 0.04, 0.04), COL.steel, at(0, rail, sz * (Wd / 2 - 0.12))]);
+    else for (const sx of [-1, 1]) P.push([box(L / 2 - 0.15 - g, 0.04, 0.04), COL.steel, at(sx * (g + (L / 2 - 0.15 - g) / 2), rail, sz * (Wd / 2 - 0.12))]);
+  }
   for (const sx of [-1, 1]) P.push([box(0.04, 0.04, Wd - 0.3), COL.steel, at(sx * (L / 2 - 0.12), rail, 0)]);
   P.push([box(L - 0.3, 0.02, Wd - 0.3), 0x3a3f48, at(0, floor + 0.01, 0)]);      // floor mat
   if (H <= 3) for (const sx of [-1, 1]) P.push([box(0.42, 0.42, Wd - 0.16), 0x4a4f58, at(sx * (L / 2 - 0.27), floor + 0.21, 0)]);   // gondola benches
   const gh = H - low - 0.12, gy = floor + low + gh / 2 + 0.05;
-  G.push([box(L - 0.1, gh, 0.02), 0xffffff, at(0, gy, Wd / 2)], [box(L - 0.1, gh, 0.02), 0xffffff, at(0, gy, -Wd / 2)]);
+  for (const sz of [-1, 1]) {
+    const g = gapAt(sz);
+    if (!g) G.push([box(L - 0.1, gh, 0.02), 0xffffff, at(0, gy, sz * Wd / 2)]);
+    else for (const sx of [-1, 1]) G.push([box(L / 2 - 0.05 - g, gh, 0.02), 0xffffff, at(sx * (g + (L / 2 - 0.05 - g) / 2), gy, sz * Wd / 2)]);
+  }
   G.push([box(0.02, gh, Wd - 0.1), 0xffffff, at(L / 2, gy, 0)], [box(0.02, gh, Wd - 0.1), 0xffffff, at(-L / 2, gy, 0)]);
-  return { parts: P, glass: G };
+  if (door) {
+    // the two sliding leaves (createCarrier moves them): each a coloured lower panel, glass above, a dark frame, just outside the wall
+    const lw = door.w / 2, z = door.side * (Wd / 2 + 0.045);
+    door.leaf = { w: door.w, frame: [[box(lw, low, 0.04), colour, at(0, floor + low / 2, z)], [box(lw, 0.06, 0.05), dark, at(0, roof - 0.12, z)], [box(0.05, H - 0.15, 0.05), dark, at(lw / 2 - 0.025, floor + (H - 0.15) / 2, z)], [box(0.05, H - 0.15, 0.05), dark, at(-lw / 2 + 0.025, floor + (H - 0.15) / 2, z)]], glass: [[box(lw - 0.08, gh, 0.02), 0xffffff, at(0, gy, z)]] };
+  }
+  return { parts: P, glass: G, leaf: door ? door.leaf : null };
 }
 
 function trainParts(lod) {
@@ -179,12 +208,13 @@ function dragEnd(sub, y) {
 }
 
 /** The parts of one carrier. */
-export function carrierParts(kind, { seats = 4, sub = '', lod = 'near', barUp = true } = {}) {
+export function carrierParts(kind, { seats = 4, sub = '', lod = 'near', barUp = true, door = null } = {}) {
   if (kind === 'chair') return chairParts(seats, lod, barUp);
   // R8e: a funitel cabin: big and wide (across the travel), hung from the two haul ropes 3.2 m apart by two grips (lift-path.js carrierBox)
-  if (kind === 'gondola' && sub === 'funitel') return cabinParts(2.6, 3.4, 2.3, -4.8, COL.cabin, COL.cabinDark, [-1.6, 1.6], lod);
-  if (kind === 'gondola') return cabinParts(2.0, 1.9, 2.15, -4.1, COL.cabin, COL.cabinDark, [0], lod);
-  if (kind === 'cable') return cabinParts(7.0, 4.4, 3.2, -6.1, 0xd9dde3, 0x5a616c, [-1.2, 1.2], lod);
+  // (door: lift lines round, the player's cabin: { side } -> a gap + door.leaf parts; the width by the cabin)
+  if (kind === 'gondola' && sub === 'funitel') return cabinParts(2.6, 3.4, 2.3, -4.8, COL.cabin, COL.cabinDark, [-1.6, 1.6], lod, door && { ...door, w: 1.2 });
+  if (kind === 'gondola') return cabinParts(2.0, 1.9, 2.15, -4.1, COL.cabin, COL.cabinDark, [0], lod, door && { ...door, w: 0.95 });
+  if (kind === 'cable') return cabinParts(7.0, 4.4, 3.2, -6.1, 0xd9dde3, 0x5a616c, [-1.2, 1.2], lod, door && { ...door, w: 1.8 });
   if (kind === 'train') return trainParts(lod);
   if (kind === 'drag') return dragParts(sub);
   return { parts: [[box(0.3, 0.3, 0.3), COL.steel, at(0, -0.15, 0)]], glass: [] };
@@ -198,7 +228,7 @@ export function carrierGeometry(kind, opts) {
 /** kind = lift-path.js class; seats / sub from the data. place(w) with w = liftride.js riderAt(): { cx, cy, cz, heading, pitch, roll,
  *  barDown, hip (drag: the rider's hip height, the pole reaches down to it) }. */
 const DOWN = new THREE.Vector3(0, -1, 0), rodV = new THREE.Vector3(), rodD = new THREE.Vector3();
-export function createCarrier({ scene, kind, seats = 4, sub = '' }) {
+export function createCarrier({ scene, kind, seats = 4, sub = '', doorSide = 1 }) {
   const group = new THREE.Group();
   group.name = `ski-ride-${kind}`;
   group.rotation.order = 'YZX';
@@ -206,12 +236,15 @@ export function createCarrier({ scene, kind, seats = 4, sub = '' }) {
   const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
   disposables.push(mat);
   const mesh = (geo) => { const m = new THREE.Mesh(geo, mat); m.castShadow = true; m.frustumCulled = false; group.add(m); disposables.push(geo); return m; };
-  let barUp = null, barDown = null, pole = null, end = null;
+  let bar = null, pole = null, end = null, leaves = null;
   if (kind === 'chair') {
-    // two meshes: the chair with the bar up (boarding, getting off) and down (riding)
-    barUp = mesh(carrierGeometry('chair', { seats, barUp: true }).frame);
-    barDown = mesh(carrierGeometry('chair', { seats, barUp: false }).frame);
-    barDown.visible = false;
+    // lift lines round: the chair, and its bar on a pivot (swung down after the station, up before the top: w.barK 1 = up .. 0 = down)
+    mesh(carrierGeometry('chair', { seats, barUp: 'none' }).frame);
+    bar = new THREE.Group();
+    bar.position.set(BAR.pivot[0], BAR.pivot[1], 0);
+    const bg = mergeParts(barDownParts(chairWidth(seats))).translate(-BAR.pivot[0], -BAR.pivot[1], 0);
+    const bm = new THREE.Mesh(bg, mat); bm.castShadow = true; bm.frustumCulled = false;
+    bar.add(bm); group.add(bar); disposables.push(bg);
   } else if (kind === 'drag') {
     if (sub !== 'rope') {
       mesh(mergeParts(dragParts(sub, 0).parts));
@@ -222,14 +255,23 @@ export function createCarrier({ scene, kind, seats = 4, sub = '' }) {
       disposables.push(pole.geometry, pmat, end.geometry);
     }
   } else {
-    const g = carrierGeometry(kind, { seats, sub });                     // R8e: a funitel cabin
-    mesh(g.frame);
-    if (g.glass) {
-      const gmat = new THREE.MeshLambertMaterial({ color: GLASS.color, transparent: true, opacity: GLASS.opacity, depthWrite: false, side: THREE.DoubleSide });
-      const glass = new THREE.Mesh(g.glass, gmat);
-      glass.renderOrder = 4; glass.frustumCulled = false;
-      group.add(glass);
-      disposables.push(g.glass, gmat);
+    // lift lines round: a cabin's boarding side has a door (two leaves sliding apart: w.doorK 0 shut .. 1 open); trains have none
+    const door = kind === 'gondola' || kind === 'cable' ? { side: doorSide >= 0 ? 1 : -1 } : null;
+    const p = carrierParts(kind, { seats, sub, door });                  // R8e: a funitel cabin
+    mesh(mergeParts(p.parts));
+    const gmat = new THREE.MeshLambertMaterial({ color: GLASS.color, transparent: true, opacity: GLASS.opacity, depthWrite: false, side: THREE.DoubleSide });
+    disposables.push(gmat);
+    const glassMesh = (parts) => { const g = mergeParts(parts), m = new THREE.Mesh(g, gmat); m.renderOrder = 4; m.frustumCulled = false; disposables.push(g); return m; };
+    if (p.glass.length) group.add(glassMesh(p.glass));
+    if (p.leaf) {
+      const leaf = p.leaf;
+      leaves = [-1, 1].map((sx) => {
+        const lg = new THREE.Group();
+        const fm = new THREE.Mesh(mergeParts(leaf.frame), mat); fm.castShadow = true; fm.frustumCulled = false; disposables.push(fm.geometry);
+        lg.add(fm, glassMesh(leaf.glass));
+        group.add(lg);
+        return { g: lg, sx, w: leaf.w / 2 };
+      });
     }
   }
   scene.add(group);
@@ -238,7 +280,8 @@ export function createCarrier({ scene, kind, seats = 4, sub = '' }) {
     place(w) {
       group.position.set(w.cx, w.cy, w.cz);
       group.rotation.set(w.roll || 0, -w.heading, kind === 'train' ? w.pitch || 0 : 0);
-      if (barUp) { const down = !!w.barDown; barUp.visible = !down; barDown.visible = down; }
+      if (bar) bar.rotation.z = (w.barK !== undefined ? w.barK : w.barDown ? 0 : 1) * BAR.up;
+      if (leaves) { const k = Math.max(0, Math.min(1, w.doorK || 0)); for (const l of leaves) l.g.position.x = l.sx * (l.w / 2 + l.w * 0.98 * k); }
       if (pole) {
         // the spring line reels out to the rider's hips (the bar behind his thighs); an empty bar hangs retracted
         const hip = w.hip !== undefined ? w.hip : w.cy - 1.4;
