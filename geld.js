@@ -24,6 +24,9 @@ const MONTHS = ["Januar", "Februar", "Mäerz", "Abrëll", "Mee", "Juni", "Juli",
 const MONTHS_SHORT = ["Jan", "Feb", "Mäe", "Abr", "Mee", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
 const BANK_FUNCTION = "geld";
 const BANKS = { bcee: "Spuerkeess", bdl: "BDL", tr: "Trade Republic" };
+/* Trade Republic offers PSD2 access only with its "current account", which is not
+ * available in Luxembourg yet (26 Nov 2026) — keep the button hidden until it is. */
+const CONNECTABLE = ["bcee", "bdl"];
 const EXPIRY_WARNING_DAYS = 14;
 const DAY_MS = 86400000;
 const TR_ACCOUNT = "Trade Republic";
@@ -315,7 +318,7 @@ function accountRow(a) {
 
 function accountsSection() {
   const busy = state.bankBusy;
-  const connect = Object.entries(BANKS).map(([id, name]) =>
+  const connect = Object.entries(BANKS).filter(([id]) => CONNECTABLE.includes(id)).map(([id, name]) =>
     `<button type="button" class="g-ghost" data-connect="${id}" ${busy ? "disabled" : ""}>${esc(name)} verbannen</button>`).join("");
   return `<h2 class="g-h2">Konten</h2>
     <div class="g-card" id="accounts">${state.accounts.length ? state.accounts.map(accountRow).join("") : '<div class="g-hint">Nach keng Bank verbonnen.</div>'}
