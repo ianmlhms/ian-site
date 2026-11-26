@@ -108,7 +108,7 @@ var DESC_I18N={
 "chill-drive":{"lb":"Richteg 3D-Cruisen: 3 endlos Welten + 20 Level","de":"Echtes 3D-Cruisen: 3 Endlos-Welten + 20 Level"},
 "cookie-clicker":{"lb":"Bau en Cookie-Räich duerch Klicken a Verbesserungen kafen — 24 Produktiounsstufen bis Cookie Infinity, Klick-Upgrades a Rebirth","de":"Baue ein Cookie-Imperium durch Klicken und Upgrades — 24 Produktionsstufen bis Cookie Infinity, Klick-Upgrades und Rebirth"},
 "crossy-road":{"lb":"20 Level + endlos: weich Autoen, Zich a Flëss aus","de":"20 Level + endlos: weiche Autos, Zügen und Flüssen aus"},
-"burger":{"lb":"Kach, servéier a verbessert däi Burger-Restaurant","de":"Koche, serviere und verbessere dein Burger-Restaurant"},
+"burger":{"lb":"Kach, zerwéier a verbessert däi Burger-Restaurant","de":"Koche, serviere und verbessere dein Burger-Restaurant"},
 "towerdefense":{"lb":"Bau Tierm, kommandéier en Held a stoh 15 Level vu Wellen duer","de":"Baue Türme, befehlige einen Helden und überstehe 15 Level voller Wellen"},
 "idle-empire":{"lb":"Business-Tycoon-Idle-Spill: 18 Betriber vum Limonadestand bis zur Galaktescher Bourse, Manager, Etappen, Prestige","de":"Business-Tycoon-Idle-Spiel: 18 Unternehmen vom Limonadenstand bis zur Galaktischen Börse, Manager, Meilensteine, Prestige"},
 "tictactoe":{"lb":"Dräi an enger Rei: spill géint de Computer (Einfach, Mëttel, Onméiglech) oder géint e Frënd um selwechte Schierm","de":"Drei in einer Reihe: spiel gegen den Computer (Leicht, Mittel, Unmöglich) oder gegen einen Freund am selben Bildschirm"},
