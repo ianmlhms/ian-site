@@ -8,7 +8,7 @@ import { MODES, SKI } from '../config.js';
 import { stepSkier } from '../skier.js';
 import { starKey, challengeFor, createTracker, addStars, resortStars, totalStars, lockState, pisteStars, migrateStars, outfitOpen, thresholds } from './challenges.js';
 import { createParkLayout, stepPark, createTrickJudge, parkBoardId, parkBoardName, parkScoreOf, validParkPoints } from './park.js';
-import { createLiftNet, createFreeRun, createDayClock, startHourFor, DAY, downPhrase } from './freeride.js';
+import { createLiftNet, createFreeRun, createDayClock, startHourFor, DAY } from './freeride.js';
 import { createFlagsView, createParkView } from './views.js';
 import { createMinimap } from './minimap.js';
 import { createCloudSave, mergeCloud, cloudGain } from './cloud.js';
@@ -165,9 +165,8 @@ export function createModeHost(ctx) {
     freeEvent(ev) {
       if (ev.type === 'lift' && ev.near) { if (!liftAt) hud.toast(`${ev.near.name}: op déi giel Plaz fueren fir anzesteigen`, 2600); return; }
       if (ev.type === 'lift') {
-        const was = liftAt;
         liftAt = ev.lift; liftDown = !!(ev.lift && ev.down); liftFast = !!ev.fast; freeHud.lift(ev.lift, liftDown);
-        if (ev.lift && ev.lift !== was) hud.toast(liftDown ? `${downPhrase(ev.lift)}: ${ev.lift.name}` : `Lift: ${ev.lift.name} (L / Enter)`, liftDown ? 2000 : 1400);
+        // (one prompt: the Astegen / Erof button names the lift and the key; no toast beside it any more)
       }
     },
     /** HUD tick (10 Hz): the park score / the free ride block and minimap and light. */

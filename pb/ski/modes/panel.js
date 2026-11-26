@@ -133,7 +133,7 @@ export function showParkFinish(root, { name, points, best, improved, tricks, ass
 export function createFreeHud(hudEl, { onLift, onSkis = null }) {
   const box = el('<div class="freehud" id="freeHud" hidden><div class="day" id="fDay"></div><div class="fstats" id="fStats"></div></div>');
   hudEl.querySelector('.tl').appendChild(box);
-  const lift = el('<button type="button" class="liftbtn" id="liftBtn" hidden>⬆ <span></span></button>');
+  const lift = el('<button type="button" class="liftbtn" id="liftBtn" hidden>⬆ <span></span><kbd class="key">L</kbd></button>');
   hudEl.appendChild(lift);
   lift.addEventListener('click', (e) => { e.currentTarget.blur(); onLift(); });
   // round 6: at a lift station the skis can be changed (a small card)

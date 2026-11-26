@@ -966,7 +966,7 @@ async function boot() {
     game.phase = 'running'; hud.count('');
     game.hold = !!lift;                                     // R7-B: in the boarding zone he stands still until he moves
     document.documentElement.dataset.skiRunning = '1';
-    hud.toast(lift ? (down ? `${lift.name}: Erof mat L / Enter` : `${lift.name}: Astegen mat L / Enter`) : 'Fräi fueren');
+    if (!lift) hud.toast('Fräi fueren');                                // (at a lift the Astegen / Erof button is the one prompt)
     if (window.Arcade && window.Arcade.startRun) window.Arcade.startRun();
     canvas.focus({ preventScroll: true });
     mark('free');
@@ -1483,7 +1483,7 @@ async function boot() {
       if (game.screen === 'map') updateStartStatus();
       if (game.screen === 'ski' && st) {
         // R8 (early QA: 43 km/h on the speedo while dragged up a T-bar at x4): on a lift the speedo shows the lift's real line speed
-        hud.setSpeed(ride ? (ride.phase === 'ride' ? ride.path.spec.speed * 3.6 : 0) : st.speed * 3.6);
+        hud.setSpeed(approach ? 0 : ride ? (ride.phase === 'ride' ? ride.path.spec.speed * 3.6 : 0) : st.speed * 3.6);      // (walked in: 0, not the walk's pace)
         hud.setEnv(env.state.weatherId, env.state.timeId);
         if (game.run && game.run.timed && game.phase !== 'countdown') {
           hud.setClock(game.run.ms, game.run.penalty);
