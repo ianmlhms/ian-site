@@ -2157,3 +2157,10 @@ are where they were (every new part is drawn only, never solid, inside the end's
   overlaps, riders = the group, the gate, deterministic, a hold), `scripts/ski/queues-node-checks.sh` (queue / npc / round7b / deadend /
   review / camera / station-diag), `scripts/ski/queues-flows.sh chromium|webkit <flows>`; shots `scripts/ski/queue-shots.mjs`
   (mazes with people) and `scripts/ski/board-shots.mjs` (chair / gondola / drag boarding contact sheets) -> ~/Library/Caches/ski-work/queues/.
+- **Results** (after the rebase onto the station look 6c7ec132): queue-check all OK (306 mazes), npc-check 157 / 0, round7b 24601 / 24601,
+  deadend / review / camera green; Chromium flows ski, ski-lift, ski-boarding, ski-ride-down, ski-npc, ski-freeride, ski-mp-freeride PASS;
+  WebKit ski, ski-webkit, ski-lift, ski-boarding PASS; calls-sweep7d (Niddreg) worst 146 calls (Killy Village), max 447k triangles
+  (3V Epicea top), all <= 160 / 450k; memory-check all green. Shots ~/Library/Caches/ski-work/queues/{final (midday / evening sheets),
+  board4 (gondola / drag), board1 (chair)}. station-diag now lists "drawn parts in the lift's own carriers' path" (3V 11, Zermatt 2, Arlberg
+  3, Kronplatz 1, Obertauern 1): the station look round's own check, not the lines (the maze is not a part of the station ends).
+  Real iPad untested.
