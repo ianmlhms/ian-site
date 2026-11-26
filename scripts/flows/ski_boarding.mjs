@@ -87,7 +87,8 @@ export const flow = {
         if (kind === "chair") {
           // skip: a second press during the walk goes straight to the spot; fast: no boarding
           await page.evaluate((s) => window.__ski.placeHold(s.x, s.z, s.heading), spot);
-          await page.waitForFunction(() => !document.getElementById("liftBtn").hidden, null, { timeout: 8000 });
+          // (this lift's button: right after the fast travel to the spawn the spawn lift's button may still show)
+          await page.waitForFunction((id) => window.__ski.modes.liftAt && window.__ski.modes.liftAt.id === id && !document.getElementById("liftBtn").hidden, id, { timeout: 8000 });
           // (the walk lasts ~1.5 s at the test's x2: the second press goes in straight from the page, the first starts the walk)
           const skip = await page.evaluate(() => { const S = window.__ski; S.boardLift(); const a = S.game.phase; S.boardLift(); return { first: a, second: S.game.phase }; });
           h.expect(skip.first === "approach" && skip.second === "lift", `${rid} chair: a second press skips the walk in (${skip.first} -> ${skip.second})`);

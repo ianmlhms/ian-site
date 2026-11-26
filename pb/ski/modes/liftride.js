@@ -65,7 +65,7 @@ export function rideSeconds(path, factor = RIDE.factor) {
   const D = Math.max(0, s1 - s0), v = path.spec.speed * factor;
   if (path.kind !== 'chair') {
     // lift lines round: a cabin pulls away and stops over CABIN.accel s each, a drag bar pulls him up to speed over PULL s
-    const T = (CARRY.has(path.kind) && path.kind !== 'train' ? CABIN.accel : 0) * 2 + (path.kind === 'drag' && path.sub !== 'rope' ? PULL : 0);
+    const T = (CARRY.has(path.kind) && path.kind !== 'train' ? CABIN.accel * (path.shuttle ? 1 : 2) : 0) + (path.kind === 'drag' && path.sub !== 'rope' ? PULL : 0);
     return D >= v * T / 2 ? D / v + T / 2 : D / v;
   }
   // after launch: a chair speeds up from the station crawl over CHAIR.accel s (liftride step): A (v + vs) / 2 m in that time
@@ -199,7 +199,8 @@ export function createRide({ lift, path, site, height, factor = RIDE.factor, fro
         // after launch: a chair leaves the loading line at the station's crawl and speeds up to the ride speed over CHAIR.accel s;
         // lift lines round: a cabin pulls away (and slows into the top station), a drag bar pulls him up to speed
         let v = CP ? CP.vs + (speed - CP.vs) * ease(tRide / CHAIR.accel) : speed;
-        if (cab && k !== 'train') v = Math.min(speed * Math.max(0.03, ease(tRide / CABIN.accel)), Math.max(0.9, Math.sqrt(2 * (speed / CABIN.accel) * Math.max(0, s1 - s))));
+        // (a jig-back cable car keeps its old arrival: slowed, its roof clips the top terminal's roof edge at Cime Caron (3V, round7b))
+        if (cab && k !== 'train') v = Math.min(speed * Math.max(0.03, ease(tRide / CABIN.accel)), path.shuttle ? speed : Math.max(0.9, Math.sqrt(2 * (speed / CABIN.accel) * Math.max(0, s1 - s))));
         else if (k === 'drag' && path.sub !== 'rope') v = speed * Math.max(0.03, ease(tRide / PULL));
         s = Math.min(s1, s + v * dt);
         if (s >= s1 && tRide >= (skipped ? RIDE.minRide * 0.5 : 0)) beginAlight();
