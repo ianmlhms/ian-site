@@ -2164,3 +2164,44 @@ are where they were (every new part is drawn only, never solid, inside the end's
   board4 (gondola / drag), board1 (chair)}. station-diag now lists "drawn parts in the lift's own carriers' path" (3V 11, Zermatt 2, Arlberg
   3, Kronplatz 1, Obertauern 1): the station look round's own check, not the lines (the maze is not a part of the station ends).
   Real iPad untested.
+## Chairs round (26 Nov 2026, branch `ski-chairs`; Ian: "yes redo the chairs": the chair stations still looked like before)
+Only the chairlift stations / chairs changed (visual). Boarding zones, mats, gates, belts, the queue mazes, exits and carrier paths are
+where they were; every new part is drawn only (det, never solid) and inside the end's old footprint; station-diag unchanged.
+- **Look per lift** (`lift-site.js chairLook(src, seats)`, also on `site.chair.look`): data flags first (`detachable`, `bubble`,
+  `heated`), else the name (TSD = detachable, TSF = fixed; "Express" / "Jet" = detachable), else 4+ seats = detachable (the belt rule
+  `chair.detach` is untouched: a fixed 4-seat keeps its belt). `band` = one of 5 colours by the name's hash; `body` light, a bubble lift's
+  dark. Our own painted type models, no maker's design.
+- **Detachable terminal**: the old canopy slab (`roof`, solid) and the posts stay the colliders but are `hide` (lifts.js does not draw
+  them); drawn: square steel columns, ONE long shell (`station-mesh.js` shape `shell`: a slab rounded round the bull-wheel at the back,
+  the top chamfered, a sloped nose where the chairs come in; its front reaches out as far as the rope stays under it, `ropeTop`), a
+  colour band, the dark underside (glows warm in the evening), snow on top, the name sign on the outer flank, the wheel's shaft. Details
+  (`stations.js dressChair`, near): the station rail just over the grips (straight under both lanes + `halfRing` round the wheel), the
+  tyre conveyor on it, hangers, lit strips under both long edges (chunk: seen from afar at dusk), downlights over the platform, the
+  operator's glass cabin (light panels, wide panes on 3 sides, flat roof + snow).
+- **Fixed grip**: a steel frame on the 4 posts (snow on the long beams), a round coloured bonnet (`shell` round 2) over the bull-wheel
+  under it, at the bottom a larch machine house with a snowy gable roof and a lit window, at the top a snowy grating; the name board
+  hangs from the outer beam with 2 lamps; the timber hut as before.
+- **Both**: the bull-wheel is an open rim (`rim` shape, 12 steps) + 3 spokes (near) + the red hub (all loop lifts); at the top a timber
+  wind fence behind the hut and the **unloading ramp**: the top deck's outer strip (bOut + 0.9 .. + 4.4) is a snow `wedge` falling
+  RAMP = 0.5 m outward, with edge boards; `deckTop` stands the skier on the slope (`ramp` deck flag), `off` stays where it was.
+- **Chairs** (`modes/carriers.js`): detachable = the grip carriage with running wheels + pads; fixed = a small clamp + bare slats (pool
+  key `chair:<seats>:d|f`, the player's own chair the same via `createCarrier({ src })`). **Bubbles**: one instanced tinted hood mesh
+  for all bubble lifts (`BUBBLE`, +1 draw call where one is within 170 m), down on the line, raised within 9-22 m of a station; the
+  player's own bubble chair has its hood raised. Heated: no visual difference.
+- **Slow on the rail** (lifts.js `CHAIR_SLOW`, the gondola `hallWarp` reused): a detachable chair rolls at 0.24 x line speed under the
+  shell (bull-wheel, loading / unloading line), 8 m ramps; anchored at the loading point (the lines' lattice / NPC riders unchanged); a
+  lift the player rides eases back to the plain loop (his own chair crosses at line speed, as the gondolas).
+- **Checks**: `node scripts/ski/shape-check.mjs` (every shape wound outward, inside its box); shots `scripts/ski/chair-look-shots.mjs`
+  (views zone / approach / side / top, midday + evening) -> `~/Library/Caches/ski-work/chairs/{before,final}/sheet-<rid>-<lift>.jpg`.
+- **Results** (26 Nov): station-diag all 10 resorts unchanged (floating 0, unheld 0, essential parts, own-carrier-path 3V 11 / Zermatt 2 /
+  Arlberg 3 / Kronplatz 1 / Obertauern 1 as before, height-independent 0; more neighbour cuts where a bigger shell meets another lift:
+  Vialattea 222 -> 247 parts); queue-check OK (306 mazes), npc 157 / 0, round7b 24601, round7c 250 + --rides 290, deadend / review 37 /
+  camera 15 green. calls-sweep7d (Niddreg, --gpu; old tree vs new, same machine): Arlberg 143 -> 146 calls / 418k -> 418k, Laax 133 ->
+  135 / 363k, Livigno 141 -> 140 / 397k -> 402k, Obertauern 138 / 369k -> 371k, Killy 146 / 414k, 3V 144 / 446.6k (Epicea: unchanged),
+  Zermatt 133 / 354k (the +calls: the bubble mesh and a 2nd chair pool where fixed and detachable chairs of one size meet). JS +6.5 KB
+  gzip. memory-check all green. Chromium ski, ski-lift, ski-boarding, ski-ride-down PASS; ski-lifts-all PASS at full quality (power mode:
+  3V Pralong 0.254 m exit drift at q=low, the known flake; its exit spot is identical to before and on no deck); WebKit ski-lift,
+  ski-webkit PASS, ski PASS on the rerun (first runs: the random weather picked fog again / a 0.05 rad steer step, both away from lifts).
+- **Still open**: a shell grazed by a neighbour's chairs is flattened to 0.3 m by the old gable rule (Killy Bollin / Fresse top reads as a
+  flat canopy); the terminals are as long as the old footprint allows (-9 m), real ones are longer; heated chairs look like the others;
+  the player's own chair crosses the rail at line speed; real iPad untested.
