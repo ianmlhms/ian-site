@@ -1,199 +1,93 @@
 <!doctype html>
-<html lang="en">
+<html lang="lb">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Burger Restaurant</title>
+<title>Burger-Restaurant</title>
 <link rel="stylesheet" href="/pb/arcade-ui.css?v=10">
-<style>
-:root{--ink:var(--text);--panel:var(--card);--panel-2:var(--card2);--line:var(--border);--red:var(--danger);--gold:var(--amber);--green:var(--good);--blue:var(--cyan);--tap:44px;--counter-top:64%}
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{display:flex;flex-direction:column;touch-action:manipulation}
-button{min-width:var(--tap);min-height:var(--tap);border:1px solid var(--border);border-radius:0;background:var(--card2);color:var(--ink);font:750 14px/1.1 var(--font);letter-spacing:.01em;cursor:pointer;transition:transform .18s var(--spring),filter .18s ease,background .18s ease}
-button:hover:not(:disabled){filter:brightness(1.12)}
-button:active:not(:disabled){transform:scale(.95)}
-button:focus-visible{outline:3px solid var(--cyan);outline-offset:2px}
-button:disabled{cursor:not-allowed;filter:grayscale(.75);opacity:.48}
-[hidden]{display:none!important}
-.game-shell{width:min(100%,760px);flex:1;min-height:0;margin:0 auto;display:flex;flex-direction:column;padding:max(6px,env(safe-area-inset-top)) 6px max(6px,env(safe-area-inset-bottom));gap:6px}
-.brand{height:32px;display:flex;align-items:center;justify-content:space-between;padding:0 4px}
-.brand h1{margin:0;font:750 19px/1.1 var(--font-display);letter-spacing:-.02em}
-.brand-balance{display:flex;gap:12px;font-weight:800;color:var(--gold);font-variant-numeric:tabular-nums}
-
-/* ---- the restaurant, drawn back to front ---- */
-.stage{position:relative;flex:1;min-height:0;display:grid;grid-template-rows:minmax(0,1fr) auto;border:1px solid var(--border);border-radius:var(--radius-l);overflow:hidden;background:var(--card)}
-.scene{position:relative;min-height:0;overflow:hidden}
-.layer{position:absolute;display:block;pointer-events:none}
-.scene-room{inset:0;width:100%;height:100%;object-fit:cover}
-.scene-guests{left:2%;width:46%;bottom:40%;opacity:.95}
-/* The counter art is a 1268x253 band stretched to 104% of the scene WIDTH, so its
-   height follows the scene's width and has nothing to do with the scene's height.
-   The customers and the tray used to sit at a percentage of the scene HEIGHT
-   (bottom:22% / bottom:8%), so on a short, wide scene the counter grew past both:
-   the customers ended up behind it with only a sliver of hair showing, and the tray
-   landed on the wood front panel instead of the counter top. Everything that has to
-   line up with the counter now lives inside this band, whose aspect-ratio keeps it
-   exactly as tall as the art at every size. min-height stops the counter becoming a
-   sliver on a narrow phone; object-fit:cover then crops the band's ends, which are
-   off-screen anyway at 104%, instead of stretching the art. */
-.counter-band{position:absolute;left:-2%;width:104%;bottom:0;aspect-ratio:1268/253;min-height:124px;z-index:3;pointer-events:none}
-.scene-counter{inset:0;width:100%;height:100%;object-fit:cover;object-position:center top;z-index:2}
-.deco-layer{position:absolute;pointer-events:none}
-.deco-plants{left:1%;bottom:25%;width:14%}
-.deco-chairs{right:21%;bottom:26%;width:13%}
-.deco-tv{left:41%;top:5%;width:16%}
-.deco-neon{left:20%;top:3%;width:13%}
-.deco-music{right:2%;bottom:26%;width:14%}
-.scene-floor{left:0;right:0;bottom:22%;height:18%;width:100%;object-fit:cover;opacity:.55;mix-blend-mode:multiply}
-
-/* Customers stand behind the counter: their feet are hidden by it and the top edge
-   of the art crosses them at 82% of the counter's height, so head and torso always
-   read, on a tall desktop scene and a short phone one alike. */
-.customers{position:absolute;left:5%;right:5%;bottom:82%;z-index:1;min-height:70px;display:grid;grid-template-columns:repeat(var(--counter-slots,3),minmax(0,1fr));gap:4px;align-items:end}
-.customer{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;min-height:0}
-.customer.empty{visibility:hidden}
-/* Qualified with .customer on purpose: the generic .sprite rule further down the
-   sheet sets 46px at the same specificity, and being later it used to win, so the
-   customers were rendered at sprite size on every phone. */
-.customer .customer-art{width:min(96px,22vw);height:min(96px,22vw);filter:drop-shadow(0 4px 5px rgba(0,0,0,.45))}
-.order-bubble{order:-1;min-height:34px;display:flex;align-items:center;justify-content:center;gap:1px;padding:3px 5px;margin-bottom:2px;border:2px solid #d8b98a;border-radius:11px;background:#fffdf5;color:#251d2d;box-shadow:0 3px 6px rgba(0,0,0,.35)}
-.order-item{width:28px;height:28px;display:grid;place-items:center}
-.order-bubble .sprite{width:26px;height:26px}
-.order-bubble .burger-stack{width:28px;height:26px}
-.patience{width:min(66px,15vw);height:7px;margin-bottom:2px;order:-2;border-radius:9px;background:#00000055;overflow:hidden;box-shadow:0 1px 2px #0006}
-.patience-fill{height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--red),var(--gold),var(--green));transform-origin:left}
-
-/* The cream counter top is the upper 92 of the art's 253 rows (36%); below that is
-   the wood front. Anchoring the tray to the band's top keeps it on the cream. */
-.tray-zone{position:absolute;left:8%;right:8%;top:1%;z-index:3;pointer-events:auto}
-.tray{min-height:50px;display:grid;grid-template-columns:repeat(var(--tray-slots,2),minmax(46px,1fr));gap:5px}
-.tray-slot,.station-slot{position:relative;display:grid;place-items:center;min-width:var(--tap);min-height:44px;border:2px dashed rgba(136,136,170,.45);border-radius:0;background:#ffffff1f}
-.tray-slot.filled{border-style:solid;border-color:var(--amber);background:rgba(245,185,66,.18);animation:pop .18s ease-out}
-.tray-slot.shake{animation:shake .32s linear}
-.scene-status{position:absolute;z-index:5;top:5px;left:8px;right:8px;display:flex;align-items:center;justify-content:space-between;color:#fff3d8;font-size:10px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;text-shadow:0 2px 3px #000b}
-
-/* ---- the kitchen the player works in ---- */
-.kitchen{position:relative;min-height:0;padding:7px 6px 6px;background:var(--card);border-top:1px solid var(--border);overflow:auto}
-.kitchen::before{content:"";position:absolute;inset:0;background:url("/pb/burger/art/floor.webp?v=3") repeat;background-size:84px;opacity:.16;pointer-events:none}
-.stations{position:relative;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
-.station{min-height:124px;padding:6px;display:flex;flex-direction:column;gap:5px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg2)}
-.station-title{display:flex;align-items:center;gap:5px;min-height:26px;font-size:13px;font-weight:800;letter-spacing:.01em}
-.station-title .sprite{width:30px;height:30px}
-/* One column per slot that actually exists. A hardcoded 2 left a single-slot grill,
-   fryer or drink tap filling half its station, which read as a broken empty panel. */
-.station-slots{display:grid;grid-template-columns:repeat(var(--slot-count,2),minmax(44px,1fr));gap:5px;flex:1}
-.station-slot{border-style:solid;border-color:var(--border);overflow:hidden}
-.station-slot .state-label{position:absolute;right:3px;bottom:2px;padding:1px 4px;border-radius:0;background:rgba(10,8,14,.78);font-size:9px;text-transform:uppercase}
-.station-slot.ready{border-color:var(--green);box-shadow:none}
-.station-slot.burnt{border-color:var(--red);background:rgba(255,102,133,.14)}
-.station-slot.locked{opacity:.42}
-.drink-options,.toppings{display:flex;flex-wrap:wrap;gap:5px}
-.drink-choice,.topping{flex:1;padding:3px;min-width:44px;font-size:11px}
-.drink-choice.active,.topping.active{border-color:var(--gold);background:rgba(245,185,66,.22)}
-.assembly{display:grid;grid-template-columns:minmax(62px,1fr) minmax(62px,1fr);gap:5px;flex:1}
-.assembly-preview{min-height:60px;display:grid;place-items:center;border:2px dashed rgba(136,136,170,.45);border-radius:0;background:#00000026}
-.assembly-actions{display:flex;flex-direction:column;gap:5px}
-.plate-button{flex:1;background:var(--accent);border-color:transparent;color:#08101f}
-.sprite{position:relative;width:46px;height:46px;display:block;background-position:center;background-repeat:no-repeat;background-size:contain;pointer-events:none}
-.burger-stack{position:relative;width:50px;height:46px}
-.burger-layer{position:absolute;inset:0;background-position:center;background-repeat:no-repeat;background-size:contain}
-
-.hud{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;padding:6px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card)}
-.hud-cell{min-width:0;text-align:center}
-.hud-label{display:block;color:var(--muted);font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
-.hud-value{display:block;overflow:hidden;text-overflow:ellipsis;font-size:14px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
-.boost-button{grid-column:1/-1;min-height:44px;border-color:transparent;background:var(--violet);color:#14092a}
-.modal-layer,.shop-layer{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:14px;background:var(--g-veil)}
-.modal{width:min(94vw,430px);padding:20px;border:1px solid var(--g-ink);border-radius:0;background:var(--g-white);color:var(--g-ink);box-shadow:none;text-align:center;animation:arcade-rise .32s var(--spring)}
-.modal h2{margin:0 0 8px;font:750 clamp(24px,5vw,30px)/1.08 var(--font-display);letter-spacing:-.02em}
-.modal p{margin:6px 0;color:var(--muted)}
-.modal-stars{min-height:42px;color:var(--gold);font-size:34px;letter-spacing:4px}
-.modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px}
-.modal-actions .primary{background:var(--accent);border-color:transparent;color:#08101f}
-.shop-layer{display:block;overflow:auto;padding:max(12px,env(safe-area-inset-top)) 10px max(12px,env(safe-area-inset-bottom))}
-.shop{width:min(100%,620px);min-height:calc(100svh - 24px);margin:auto;padding:12px;border:1px solid var(--border);border-radius:var(--radius-l);background:var(--card)}
-.shop-header{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
-.shop-title{margin:0;font-size:22px}
-.shop-balance{grid-column:1/-1;color:var(--gold);font-size:13px;font-weight:800}
-.shop-close{grid-column:2;grid-row:1}
-.shop-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:12px 0}
-.shop-tab.active{border-color:var(--gold);background:rgba(245,185,66,.22)}
-.shop-panel{display:flex;flex-direction:column;gap:7px}
-.upgrade-row{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;padding:10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card2)}
-.upgrade-name{margin:0 0 2px;font-size:15px}
-.upgrade-description{margin:0;color:var(--muted);font-size:12px}
-.upgrade-level{display:block;margin-top:4px;color:var(--blue);font-size:11px;font-weight:800}
-.upgrade-buy{min-width:72px}
-.toast{position:fixed;z-index:40;left:50%;bottom:calc(82px + env(safe-area-inset-bottom));max-width:90vw;transform:translate(-50%,12px);padding:9px 14px;border-radius:0;background:var(--card2);border:1px solid var(--border);color:var(--text);box-shadow:none;opacity:0;transition:.18s;pointer-events:none;text-align:center;font-weight:800}
-.toast.show{opacity:1;transform:translate(-50%,0)}
-.boot-error{margin:auto;padding:18px;color:var(--danger);text-align:center}
-@keyframes pop{0%{transform:scale(.75)}100%{transform:scale(1)}}
-@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
-@media(min-width:600px){.stations{grid-template-columns:repeat(4,minmax(0,1fr))}.station{min-height:168px}.customer .customer-art{width:82px;height:82px}.hud-value{font-size:16px}}
-@media(max-height:670px){.brand{display:none}.station{min-height:116px}.game-shell{gap:5px}}
-@media(prefers-reduced-motion:reduce){.modal{animation:none}*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
-</style>
-<script src="/pb/arcade-kit.js?v=57" data-arcade-id="burger" data-arcade-title="Burger Restaurant"></script>
+<link rel="stylesheet" href="/pb/burger/burger.css?v=1">
+<script src="/pb/arcade-kit.js?v=57" data-arcade-id="burger" data-arcade-title="Burger-Restaurant"></script>
 </head>
 <body>
-<main class="game-shell" id="game">
-  <header class="brand"><h1>🍔 Burger Restaurant</h1><div class="brand-balance"><span id="coinBalance">🪙 0</span><span id="starBalance">⭐ 0</span></div></header>
-  <div class="stage">
-    <div class="scene">
-      <img class="layer scene-room" src="/pb/burger/art/room-back.webp?v=3" alt="" decoding="async">
-      <img class="layer scene-floor" id="sceneFloor" src="/pb/burger/art/deco-floor.webp?v=3" alt="" decoding="async" hidden>
-      <img class="layer scene-guests" src="/pb/burger/art/guests-seated.webp?v=3" alt="" decoding="async">
-      <div class="deco" id="deco"></div>
-      <div class="counter-band">
-        <div class="customers" id="customers"></div>
-        <img class="layer scene-counter" src="/pb/burger/art/counter-persp.webp?v=3" alt="" decoding="async">
-        <div class="tray-zone"><div class="tray" id="tray"></div></div>
+<main class="game" id="game">
+  <header class="hud" aria-label="Den Dag">
+    <div class="hud-cell"><span class="hud-label">Dag</span><span class="hud-value" id="hudDay">1</span></div>
+    <div class="hud-cell hud-goal"><span class="hud-label">Zil</span><span class="goal-bar"><span class="goal-fill" id="goalFill"></span><span class="goal-text" id="goalText">0 / 70</span></span></div>
+    <div class="hud-cell"><span class="hud-label">Zäit</span><span class="hud-value" id="hudTime">1:00</span></div>
+    <div class="hud-cell hud-combo" id="comboCell"><span class="hud-label">Combo</span><span class="hud-value" id="hudCombo">×1</span></div>
+    <div class="hud-cell"><span class="hud-label">Mënzen</span><span class="hud-value"><span class="coin" aria-hidden="true"></span><span id="hudCoins">0</span></span></div>
+    <button class="hud-button" id="boostButton" type="button" data-act="boost" hidden><span id="boostLabel">Turbo</span><kbd>B</kbd></button>
+    <button class="hud-button hud-pause" id="pauseButton" type="button" data-act="pause" aria-label="Paus"><span class="pause-icon" aria-hidden="true"></span><kbd>P</kbd></button>
+  </header>
+
+  <section class="scene" id="scene" aria-label="Restaurant">
+    <img class="scene-room" src="/pb/burger/art/room-back.webp?v=3" alt="" decoding="async">
+    <div class="deco" id="deco" aria-hidden="true"></div>
+    <div class="customers" id="customers"></div>
+    <div class="counter" aria-hidden="false">
+      <div class="counter-top"><div class="tray" id="tray" aria-label="Plateau"></div></div>
+      <div class="counter-front" aria-hidden="true"></div>
+    </div>
+    <p class="hint" id="hint" hidden></p>
+    <div class="pops" id="pops" aria-hidden="true"></div>
+  </section>
+
+  <section class="kitchen" aria-label="Kichen">
+    <article class="station" id="grillStation">
+      <h2 class="station-title"><span class="sprite" data-art="grill"></span>Grill<kbd>G</kbd></h2>
+      <div class="slots" id="grill"></div>
+    </article>
+    <article class="station" id="fryerStation">
+      <h2 class="station-title"><span class="sprite" data-art="fryer"></span>Friteuse<kbd>F</kbd></h2>
+      <div class="slots" id="fryer"></div>
+      <p class="station-lock" id="fryerLock" hidden></p>
+    </article>
+    <article class="station" id="drinkStation">
+      <h2 class="station-title"><span class="sprite" data-art="drink-machine"></span>Gedrénks<kbd>D</kbd></h2>
+      <div class="drink-buttons" id="drinkButtons"></div>
+      <div class="slots" id="drinks"></div>
+      <p class="station-lock" id="drinkLock" hidden></p>
+    </article>
+    <article class="station station-burger" id="burgerStation">
+      <h2 class="station-title"><span class="sprite" data-art="bun-top"></span>Burger</h2>
+      <div class="board-row">
+        <div class="board" id="board" aria-live="polite"></div>
+        <div class="toppings" id="toppings"></div>
       </div>
-      <div class="scene-status"><span id="queueStatus">Get ready!</span><span id="trayStatus">0 / 2</span></div>
-    </div>
-    <div class="kitchen">
-      <section class="stations" aria-label="Kitchen stations">
-        <article class="station"><div class="station-title" id="grillTitle"></div><div class="station-slots" id="grill"></div></article>
-        <article class="station"><div class="station-title" id="fryerTitle"></div><div class="station-slots" id="fryer"></div></article>
-        <article class="station"><div class="station-title" id="drinksTitle"></div><div class="drink-options" id="drinkOptions"></div><div class="station-slots" id="drinks"></div></article>
-        <article class="station"><div class="station-title" id="toppingsTitle"></div><div class="toppings" id="toppings"></div><div class="assembly"><div class="assembly-preview" id="assembly"></div><div class="assembly-actions"><button class="plate-button" id="plateButton" type="button">Plate burger</button></div></div></article>
-      </section>
-    </div>
-  </div>
-  <footer class="hud" aria-label="Day status">
-    <div class="hud-cell"><span class="hud-label">Day</span><span class="hud-value" id="hudDay">1</span></div>
-    <div class="hud-cell"><span class="hud-label">Goal</span><span class="hud-value" id="hudGoal">🪙 70</span></div>
-    <div class="hud-cell"><span class="hud-label">Time</span><span class="hud-value" id="hudTime">60</span></div>
-    <div class="hud-cell"><span class="hud-label">Combo</span><span class="hud-value" id="hudCombo">×1</span></div>
-    <div class="hud-cell"><span class="hud-label">Today</span><span class="hud-value" id="hudCoins">🪙 0</span></div>
-    <button class="boost-button" id="boostButton" type="button" hidden>⚡ Instant cook</button>
-  </footer>
+      <div class="board-actions">
+        <button class="trash-button" id="trashButton" type="button" data-act="trash">Ewech<kbd>X</kbd></button>
+        <button class="plate-button" id="plateButton" type="button" data-act="plate"><span id="plateLabel">Op de Plateau</span><kbd>↵</kbd></button>
+      </div>
+    </article>
+  </section>
 </main>
-<div class="modal-layer" id="modalLayer">
-  <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-    <h2 id="modalTitle">Burger Restaurant</h2><div class="modal-stars" id="modalStars">🍔</div><p id="modalMessage">Cook fast, serve happy customers, and grow your restaurant.</p><p id="modalDetail"></p>
-    <div class="modal-actions"><button id="shopButton" type="button">Shop</button><button class="primary" id="startButton" type="button">Start day 1</button></div>
+
+<div class="arcade-overlay show" id="overlay">
+  <section class="arcade-panel burger-panel" role="dialog" aria-modal="true" aria-labelledby="panelTitle">
+    <h2 id="panelTitle">Burger-Restaurant</h2>
+    <div class="panel-stars" id="panelStars" aria-hidden="true"></div>
+    <p id="panelMessage">Kach, zerwéier a bau däi Restaurant aus.</p>
+    <p id="panelDetail"></p>
+    <ol class="howto" id="howto">
+      <li>Tipp op de <strong>Grill</strong>, fir Fleesch ze broden.</li>
+      <li>Wann et fäerdeg ass, tipp drop: et kënnt op de <strong>Burger</strong>.</li>
+      <li>Tipp op <strong>Zerwéieren</strong>: de Client kritt säi Burger an du d'Suen.</li>
+    </ol>
+    <div class="arcade-actions">
+      <button class="arcade-btn secondary" id="shopButton" type="button" data-act="shop">Buttek</button>
+      <button class="arcade-btn" id="startButton" type="button" data-act="start">Ufänken</button>
+    </div>
   </section>
 </div>
-<div class="shop-layer" id="shopLayer" hidden><section class="shop" id="shop" role="dialog" aria-modal="true" aria-label="Shop"></section></div>
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
-<div class="boot-error" id="bootError" role="alert" hidden>Could not start Burger Restaurant. Reload the game and try again.</div>
+<div class="shop-layer" id="shopLayer" hidden><section class="shop" id="shop" role="dialog" aria-modal="true" aria-label="Buttek"></section></div>
+<div class="arcade-toast burger-toast" id="toast" role="status" aria-live="polite" hidden></div>
+<p class="boot-error" id="bootError" role="alert" hidden>De Burger-Restaurant konnt net starten. Lued d'Spill nei.</p>
 <script>
-(function(){
-  function showBootError(event){
-    console.error("[Burger Rush] Unhandled error.",event.error||event.reason||event.message||event);
-    var error=document.getElementById("bootError"),game=document.getElementById("game");
-    if(error)error.hidden=false;
-    if(game)game.hidden=true;
-    if(new URL(document.baseURI).searchParams.get("burgerTest")==="1"){
-      document.title="BR_TEST_FAIL console-error";
-      try{if(parent!==window)parent.document.title=document.title}catch(ignore){}
-    }
-  }
-  window.addEventListener("error",showBootError);
-  window.addEventListener("unhandledrejection",showBootError);
-})();
+window.addEventListener("error", function (event) {
+  console.error("[Burger] error", event.error || event.message);
+  if (!window.__burgerBooted) { var e = document.getElementById("bootError"); if (e) e.hidden = false; }
+});
 </script>
-<script type="module" src="/pb/burger/ui.js?v=8"></script>
+<script type="module" src="/pb/burger/main.js?v=1"></script>
 </body>
 </html>

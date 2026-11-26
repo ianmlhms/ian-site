@@ -1,406 +1,495 @@
+/* Burger-Restaurant simulation: pure functions over ONE state object, no DOM, no timers, no clock of its own.
+ * main.js advances it with step(state, TIMING.stepMs) from a fixed-step loop, so the game plays the same at 30, 60 or 120 Hz
+ * and stops dead while paused or hidden (no step is taken). Every function returns a new state and never changes its input.
+ *
+ * state = {
+ *   progress: {day, coins, lifetimeCoins, stars, kit, int, prem}   the saved part (save.js)
+ *   screen:   "intro" | "playing" | "paused" | "summary"
+ *   session:  null | the running day (time `t` in ms since the day started)
+ *   events:   things that just happened, for sounds / pop-ups; main.js takes them out after each frame
+ * } */
 import {
-  DAYS,
-  GAME_LIMITS,
-  INTERIOR_UPGRADES,
-  ITEMS,
-  KITCHEN_UPGRADES,
-  PREMIUM_UPGRADES,
-  RECIPES,
-  TIMING,
-  UNLOCKS,
-  VERSION,
-} from "/pb/burger/data.js?v=1";
+  DAYS, GAME_LIMITS, INTERIOR_UPGRADES, ITEMS, RECIPES, TIMING, UNLOCKS, UPGRADE_TABLES,
+} from "/pb/burger/data.js?v=2";
 
-/* The day's clock stops while the page is hidden (iPad app switch, other tab): customers would otherwise lose their patience
- * and the food burn with nobody looking. ui.js calls pauseClock(ms) with the time spent hidden. */
-let clockShiftMs = 0;
-export const gameNow = () => performance.now() - clockShiftMs;
-export const pauseClock = (ms) => { if (ms > 0) clockShiftMs += ms; };
-
-const EMPTY_ASSEMBLY = Object.freeze({patties:0, toppings:[]});
-const INITIAL_SEED = 0x45d9f3b;
-const FIRST_CUSTOMER_DELAY_FACTOR = 0.45;
+const CUSTOMER_ART_COUNT = 6;
 const BASE_TIP_RATE = 0.05;
 const PATIENCE_TIP_RATE = 0.25;
-const TWO_STAR_FACTOR = 1.3;
-const THREE_STAR_FACTOR = 1.7;
-const MILLISECONDS_PER_SECOND = 1_000;
-const MAX_SANITIZED_LEVEL = 99;
-const RANDOM_MULTIPLIER = 1_664_525;
-const RANDOM_INCREMENT = 1_013_904_223;
-const RANDOM_DIVISOR = 4_294_967_296;
-const DAY_SEED_MULTIPLIER = 2_654_435_761;
-const CUSTOMER_ART_COUNT = 6;
+const TWO_STAR_FACTOR = 1.25;
+const THREE_STAR_FACTOR = 1.5;
 const ARRIVAL_JITTER_BASE = 0.82;
 const ARRIVAL_JITTER_RANGE = 0.36;
-const MINIMUM_HELPER_INTERVAL_MS = 1_800;
-const BOOST_LEVEL_STEP_MS = 2_000;
-const MAX_ASSEMBLY_PATTIES = 2;
+const NO_ARRIVAL_BEFORE_END_MS = 4_000;
+const NEW_ITEM_CHANCE = 0.3;
+const INITIAL_SEED = 0x45d9f3b;
+const DAY_SEED_MULTIPLIER = 2_654_435_761;
 
-const clampInteger = (value, minimum, maximum) => {
-  const number = Number.isFinite(Number(value)) ? Math.floor(Number(value)) : minimum;
-  return Math.max(minimum, Math.min(maximum, number));
+/* ---------- progress ---------- */
+const clampInt = (value, min, max) => {
+  const number = Math.floor(Number(value));
+  return Number.isFinite(number) ? Math.max(min, Math.min(max, number)) : min;
 };
 
-const cleanLevels = (levels) => levels && typeof levels === "object" ? {...levels} : {};
+const findUpgrade = (category, id) => UPGRADE_TABLES[category]?.find((entry) => entry.id === id) || null;
 
-export function createGameState(progress = {}) {
-  return {
-    v:VERSION,
-    day:clampInteger(progress.day, 1, GAME_LIMITS.maxDay),
-    coins:clampInteger(progress.coins, 0, Number.MAX_SAFE_INTEGER),
-    lifetimeCoins:clampInteger(progress.lifetimeCoins, 0, Number.MAX_SAFE_INTEGER),
-    stars:clampInteger(progress.stars, 0, Number.MAX_SAFE_INTEGER),
-    kit:cleanLevels(progress.kit),
-    int:cleanLevels(progress.int),
-    prem:cleanLevels(progress.prem),
-    screen:"between",
-    session:null,
-  };
-}
-
-export const getLevel = (state) => DAYS[state.day - 1] || DAYS[DAYS.length - 1];
-
-const upgradeLevel = (state, category, id) => clampInteger(state[category]?.[id], 0, MAX_SANITIZED_LEVEL);
-const kitchenValue = (state, id) => {
-  const upgrade = KITCHEN_UPGRADES.find((entry) => entry.id === id);
-  return (upgrade?.base || 0) + upgradeLevel(state, "kit", id);
+export const upgradeLevel = (progress, category, id) => {
+  const upgrade = findUpgrade(category, id);
+  return upgrade ? clampInt(progress[category]?.[id], 0, upgrade.max) : 0;
 };
 
-const interiorBonus = (state, field) => INTERIOR_UPGRADES.reduce((total, upgrade) => (
-  total + upgradeLevel(state, "int", upgrade.id) * upgrade[field]
-), 0);
+const kitchenValue = (progress, id) => (findUpgrade("kit", id)?.base || 0) + upgradeLevel(progress, "kit", id);
+export const stationCapacity = kitchenValue;
 
-const durationFor = (state, level) => (
-  level.durationSeconds * MILLISECONDS_PER_SECOND + upgradeLevel(state, "prem", "extraTime") * TIMING.extraDayMs
+const interiorBonus = (progress, field) => INTERIOR_UPGRADES.reduce(
+  (total, upgrade) => total + upgradeLevel(progress, "int", upgrade.id) * upgrade[field], 0);
+
+export const levelFor = (day) => DAYS[clampInt(day, 1, DAYS.length) - 1];
+export const dayDurationMs = (progress, day = progress.day) => (
+  levelFor(day).durationSeconds * 1000 + upgradeLevel(progress, "prem", "extraTime") * TIMING.extraDayMs
 );
 
-const emptySlot = (id) => ({id, state:"empty"});
-const makeSlots = (count, prefix) => Array.from({length:count}, (_, index) => emptySlot(`${prefix}-${index}`));
+export const isUnlocked = (day, id) => {
+  const recipe = RECIPES.find((entry) => entry.id === id);
+  if (recipe) return day >= recipe.day;
+  return day >= (UNLOCKS[id] ?? Infinity);
+};
 
-export function startDay(state, nowMs = gameNow()) {
-  const level = getLevel(state);
-  const helperLevel = upgradeLevel(state, "prem", "helper");
-  const durationMs = durationFor(state, level);
-  const session = {
-    status:"playing",
-    startedAt:nowMs,
-    endsAt:nowMs + durationMs,
-    remainingMs:durationMs,
-    earnedCoins:0,
-    walkouts:0,
-    combo:1,
-    lastCompletedAt:null,
-    customers:[],
-    nextCustomerId:1,
-    nextArrivalAt:nowMs + level.arrivalMs * FIRST_CUSTOMER_DELAY_FACTOR,
-    seed:(INITIAL_SEED ^ (state.day * DAY_SEED_MULTIPLIER) ^ state.lifetimeCoins) >>> 0,
-    grill:makeSlots(kitchenValue(state, "grillSlots"), "grill"),
-    fryer:makeSlots(kitchenValue(state, "fryerBaskets"), "fryer"),
-    drinks:makeSlots(kitchenValue(state, "drinkTaps"), "drink"),
-    assembly:{...EMPTY_ASSEMBLY},
-    tray:[],
-    boostUntil:0,
-    boostReadyAt:nowMs,
-    nextHelperAt:helperLevel ? nowMs + TIMING.helperIntervalMs : null,
-    result:null,
-  };
-  return {...state, screen:"playing", session};
-}
+/* The coins and stars spent on upgrades: a purchase leaves lifetimeCoins alone, so save.js uses this to rank two saves
+ * with the same lifetime (the one with more bought upgrades has more progress). */
+export const spentOn = (progress, currency) => Object.entries(UPGRADE_TABLES).reduce((total, [category, upgrades]) => {
+  if ((category === "prem") !== (currency === "stars")) return total;
+  return total + upgrades.reduce((sum, upgrade) => {
+    const level = upgradeLevel(progress, category, upgrade.id);
+    return sum + upgrade.costs.slice(0, level).reduce((a, b) => a + b, 0);
+  }, 0);
+}, 0);
+
+/* ---------- state ---------- */
+export const createState = (progress) => ({progress, screen:"intro", session:null, events:[]});
+
+const withEvent = (state, event) => ({...state, events:[...state.events, event]});
+const refuse = (state, reason) => withEvent(state, {type:"refused", reason});
+export const takeEvents = (state) => [state.events, state.events.length ? {...state, events:[]} : state];
+
+/* A better save arrived (cloud copy, another device): take its progress, keep a running day running. */
+export const adoptProgress = (state, progress) => ({...state, progress});
 
 const nextRandom = (seed) => {
-  const nextSeed = (Math.imul(seed, RANDOM_MULTIPLIER) + RANDOM_INCREMENT) >>> 0;
-  return {value:nextSeed / RANDOM_DIVISOR, seed:nextSeed};
+  const next = (Math.imul(seed, 1_664_525) + 1_013_904_223) >>> 0;
+  return {value:next / 4_294_967_296, seed:next};
 };
 
-const availableOrderIds = (day) => [
-  ...RECIPES.filter((recipe) => recipe.day <= day).map((recipe) => recipe.id),
-  ...(day >= UNLOCKS.fries ? ["fries"] : []),
-  ...(day >= UNLOCKS.cola ? ["cola"] : []),
-  ...(day >= UNLOCKS.lemonade ? ["lemonade"] : []),
-  ...(day >= UNLOCKS.shake ? ["shake"] : []),
-];
+const emptySlot = () => ({state:"empty"});
+const makeSlots = (count) => Array.from({length:count}, emptySlot);
 
-const createOrder = (day, maximumLength, seed) => {
-  const choices = availableOrderIds(day);
-  const lengthRoll = nextRandom(seed);
-  const orderLength = 1 + Math.floor(lengthRoll.value * maximumLength);
-  return Array.from({length:orderLength}).reduce((result) => {
-    const roll = nextRandom(result.seed);
-    const itemId = choices[Math.floor(roll.value * choices.length)] || "burger";
-    return {order:[...result.order, itemId], seed:roll.seed};
-  }, {order:[], seed:lengthRoll.seed});
-};
-
-const addCustomer = (state, session, nowMs) => {
-  const capacity = kitchenValue(state, "counterPositions");
-  if (session.customers.length >= capacity || nowMs < session.nextArrivalAt) return session;
-  const level = getLevel(state);
-  const orderResult = createOrder(state.day, level.maxOrder, session.seed);
-  const patienceMs = Math.round(level.patienceMs * (1 + interiorBonus(state, "patience")));
-  const customer = {
-    id:session.nextCustomerId,
-    artId:`customer-${((session.nextCustomerId - 1) % CUSTOMER_ART_COUNT) + 1}`,
-    order:orderResult.order,
-    remaining:orderResult.order,
-    arrivedAt:nowMs,
-    patienceMs,
-    expiresAt:nowMs + patienceMs,
+export function startDay(state) {
+  if (state.screen === "playing" || state.screen === "paused") return state;
+  const {progress} = state;
+  const level = levelFor(progress.day);
+  const helperLevel = upgradeLevel(progress, "prem", "helper");
+  const session = {
+    day:level.day,
+    goal:level.goal,
+    durationMs:dayDurationMs(progress, level.day),
+    t:0,
+    earned:0,
+    served:0,
+    walkouts:0,
+    combo:1,
+    lastCompleteAt:-Infinity,
+    capacity:kitchenValue(progress, "counterPositions"),
+    trayCapacity:kitchenValue(progress, "traySlots"),
+    customers:[],
+    nextCustomerId:1,
+    nextArrivalAt:TIMING.firstCustomerMs,
+    seed:(INITIAL_SEED ^ Math.imul(level.day, DAY_SEED_MULTIPLIER) ^ progress.lifetimeCoins) >>> 0,
+    grill:makeSlots(kitchenValue(progress, "grillSlots")),
+    fryer:makeSlots(kitchenValue(progress, "fryerBaskets")),
+    drinks:makeSlots(kitchenValue(progress, "drinkTaps")),
+    board:{patties:0, toppings:[]},
+    tray:[],
+    nextKey:1,
+    discard:null,
+    boostUntil:-1,
+    boostReadyAt:0,
+    nextHelperAt:helperLevel ? TIMING.helperIntervalMs : null,
+    result:null,
   };
-  const arrivalRoll = nextRandom(orderResult.seed);
-  const jitter = ARRIVAL_JITTER_BASE + arrivalRoll.value * ARRIVAL_JITTER_RANGE;
-  return {
-    ...session,
-    customers:[...session.customers, customer],
-    nextCustomerId:session.nextCustomerId + 1,
-    nextArrivalAt:nowMs + level.arrivalMs * jitter,
-    seed:arrivalRoll.seed,
-  };
-};
-
-const advanceHeatSlot = (slot, nowMs, readyWindowMs, isBoostActive) => {
-  if (slot.state === "empty" || slot.state === "burnt") return slot;
-  if (slot.state === "raw" && nowMs < slot.cookingAt) return slot;
-  const burnAt = slot.burnAt || slot.readyAt + readyWindowMs;
-  if (!isBoostActive && nowMs >= burnAt) return {...slot, state:"burnt", burnAt};
-  if (slot.state === "raw" && !isBoostActive && nowMs < slot.readyAt) return {...slot, state:"cooking", burnAt};
-  if (slot.state === "raw") {
-    const readyAt = isBoostActive ? nowMs : slot.readyAt;
-    return {...slot, state:"ready", readyAt, burnAt:isBoostActive ? readyAt + readyWindowMs : burnAt};
-  }
-  if (slot.state === "cooking" && !isBoostActive && nowMs < slot.readyAt) return slot;
-  if (slot.state === "cooking") {
-    const readyAt = isBoostActive ? nowMs : slot.readyAt;
-    return {...slot, state:"ready", readyAt, burnAt:isBoostActive ? readyAt + readyWindowMs : burnAt};
-  }
-  if (slot.state === "ready" && nowMs >= slot.burnAt) return {...slot, state:"burnt"};
-  return slot;
-};
-
-const advanceStations = (state, session, nowMs) => {
-  const guardMs = TIMING.grillReadyMs + upgradeLevel(state, "kit", "burnGuard") * TIMING.grillGuardStepMs;
-  const isBoostActive = nowMs < session.boostUntil;
-  const grill = session.grill.map((slot) => advanceHeatSlot(slot, nowMs, guardMs, isBoostActive));
-  const fryer = session.fryer.map((slot) => advanceHeatSlot(slot, nowMs, TIMING.fryerReadyMs, isBoostActive));
-  const drinks = session.drinks.map((slot) => {
-    if (slot.state !== "filling" || (!isBoostActive && nowMs < slot.readyAt)) return slot;
-    return {...slot, state:"ready"};
-  });
-  return {...session, grill, fryer, drinks};
-};
-
-const removeWalkouts = (session, nowMs) => {
-  const customers = session.customers.filter((customer) => customer.expiresAt > nowMs);
-  return {...session, customers, walkouts:session.walkouts + session.customers.length - customers.length};
-};
-
-const trayCapacity = (state) => kitchenValue(state, "traySlots");
-
-const remainingPatience = (customer, nowMs) => (
-  Math.max(0, customer.expiresAt - nowMs) / customer.patienceMs
-);
-
-const serveTrayInternal = (state, itemIndex, nowMs) => {
-  const session = state.session;
-  const item = session?.tray[itemIndex];
-  if (!item) return state;
-  const customerIndex = session.customers.findIndex((customer) => customer.remaining.includes(item.id));
-  if (customerIndex < 0) return state;
-  const customer = session.customers[customerIndex];
-  const wantedIndex = customer.remaining.indexOf(item.id);
-  const remaining = customer.remaining.filter((_, index) => index !== wantedIndex);
-  const isComplete = remaining.length === 0;
-  const isCombo = isComplete && session.lastCompletedAt !== null && nowMs - session.lastCompletedAt <= GAME_LIMITS.comboWindowMs;
-  const combo = isComplete ? (isCombo ? Math.min(GAME_LIMITS.maxCombo, session.combo + 1) : 1) : session.combo;
-  const tipRate = BASE_TIP_RATE + remainingPatience(customer, nowMs) * PATIENCE_TIP_RATE + interiorBonus(state, "tip");
-  const saleValue = Math.round((ITEMS[item.id]?.value || 0) * (1 + tipRate) * combo);
-  const nextCustomer = {...customer, remaining};
-  const customers = isComplete
-    ? session.customers.filter((_, index) => index !== customerIndex)
-    : session.customers.map((entry, index) => index === customerIndex ? nextCustomer : entry);
-  const tray = session.tray.filter((_, index) => index !== itemIndex);
-  return {
-    ...state,
-    coins:state.coins + saleValue,
-    lifetimeCoins:state.lifetimeCoins + saleValue,
-    session:{
-      ...session,
-      tray,
-      customers,
-      combo,
-      lastCompletedAt:isComplete ? nowMs : session.lastCompletedAt,
-      earnedCoins:session.earnedCoins + saleValue,
-    },
-  };
-};
-
-const runHelper = (state, nowMs) => {
-  const helperLevel = upgradeLevel(state, "prem", "helper");
-  const session = state.session;
-  if (!helperLevel || session.nextHelperAt === null || nowMs < session.nextHelperAt) return state;
-  const matchIndex = session.tray.findIndex((item) => session.customers.some((customer) => customer.remaining.includes(item.id)));
-  const interval = Math.max(MINIMUM_HELPER_INTERVAL_MS, TIMING.helperIntervalMs - (helperLevel - 1) * TIMING.helperStepMs);
-  const scheduled = {...state, session:{...session, nextHelperAt:nowMs + interval}};
-  return matchIndex < 0 ? scheduled : serveTrayInternal(scheduled, matchIndex, nowMs);
-};
-
-export function tick(state, nowMs = gameNow()) {
-  if (state.screen !== "playing" || state.session?.status !== "playing") return state;
-  const remainingMs = Math.max(0, state.session.endsAt - nowMs);
-  let session = {...advanceStations(state, state.session, nowMs), remainingMs};
-  session = removeWalkouts(session, nowMs);
-  if (remainingMs > 0) session = addCustomer(state, session, nowMs);
-  let nextState = {...state, session};
-  nextState = runHelper(nextState, nowMs);
-  if (remainingMs > 0) return nextState;
-  return finishDay({...nextState, session:{...nextState.session, status:"ended"}});
+  return {...state, screen:"playing", session, events:[]};
 }
 
-const starRating = (earnedCoins, goal, walkouts) => {
-  if (earnedCoins < goal) return 0;
-  if (earnedCoins >= goal * THREE_STAR_FACTOR && walkouts === 0) return 3;
-  if (earnedCoins >= goal * TWO_STAR_FACTOR) return 2;
+export const pauseDay = (state) => state.screen === "playing" ? {...state, screen:"paused"} : state;
+export const resumeDay = (state) => state.screen === "paused" ? {...state, screen:"playing"} : state;
+/* The arcade's restart button: drop the running day (its coins are already in progress) and show the day's start again. */
+export const abandonDay = (state) => (state.screen === "playing" || state.screen === "paused")
+  ? {...state, screen:"intro", session:null, events:[]}
+  : {...state, screen:"intro", session:null};
+
+/* ---------- orders and guests ---------- */
+const orderChoices = (day) => [
+  ...RECIPES.filter((recipe) => recipe.day <= day).map((recipe) => recipe.id),
+  ...["fries", "cola", "lemonade", "shake"].filter((id) => isUnlocked(day, id)),
+];
+const newestItems = (day) => orderChoices(day).filter((id) => (RECIPES.find((r) => r.id === id)?.day ?? UNLOCKS[id]) === day && day > 1);
+
+function createOrder(day, maxOrder, seed) {
+  const choices = orderChoices(day);
+  const fresh = newestItems(day);
+  const lengthRoll = nextRandom(seed);
+  const length = 1 + Math.floor(lengthRoll.value * maxOrder);
+  const freshRoll = nextRandom(lengthRoll.seed);
+  let rolling = freshRoll.seed;
+  const order = Array.from({length}, (_, index) => {
+    if (index === 0 && fresh.length && freshRoll.value < NEW_ITEM_CHANCE) return fresh[0];
+    const roll = nextRandom(rolling);
+    rolling = roll.seed;
+    return choices[Math.floor(roll.value * choices.length)] || "burger";
+  });
+  return {order, seed:rolling};
+}
+
+const freeSlots = (session) => Array.from({length:session.capacity}, (_, slot) => slot)
+  .filter((slot) => !session.customers.some((customer) => customer.slot === slot));
+
+function arrive(state) {
+  const {session, progress} = state;
+  const remaining = session.durationMs - session.t;
+  const free = freeSlots(session);
+  if (session.t < session.nextArrivalAt || !free.length || remaining < NO_ARRIVAL_BEFORE_END_MS) return state;
+  const level = levelFor(session.day);
+  const {order, seed} = createOrder(session.day, level.maxOrder, session.seed);
+  const slotRoll = nextRandom(seed);
+  const gapRoll = nextRandom(slotRoll.seed);
+  const customer = {
+    id:session.nextCustomerId,
+    art:((session.nextCustomerId - 1) % CUSTOMER_ART_COUNT) + 1,
+    slot:free[Math.floor(slotRoll.value * free.length)],
+    order,
+    left:order,
+    arrivedAt:session.t,
+    patienceMs:Math.round(level.patienceMs * (1 + interiorBonus(progress, "patience"))),
+  };
+  const gap = level.arrivalMs * (ARRIVAL_JITTER_BASE + gapRoll.value * ARRIVAL_JITTER_RANGE);
+  return {
+    ...state,
+    session:{
+      ...session,
+      customers:[...session.customers, customer],
+      nextCustomerId:session.nextCustomerId + 1,
+      nextArrivalAt:session.t + gap,
+      seed:gapRoll.seed,
+    },
+  };
+}
+
+/* An empty counter never waits long, and a freed place is filled again after a short beat (no dead time). */
+function keepGuestsComing(session) {
+  const soonest = session.customers.length ? session.nextArrivalAt : Math.min(session.nextArrivalAt, session.t + TIMING.emptyCounterMs);
+  return soonest === session.nextArrivalAt ? session : {...session, nextArrivalAt:soonest};
+}
+
+const patienceLeft = (customer, t) => Math.max(0, customer.arrivedAt + customer.patienceMs - t) / customer.patienceMs;
+export const patienceRatio = patienceLeft;
+
+function walkOut(state) {
+  const {session} = state;
+  const leaving = session.customers.filter((customer) => patienceLeft(customer, session.t) <= 0);
+  if (!leaving.length) return state;
+  const customers = session.customers.filter((customer) => !leaving.includes(customer));
+  const next = {
+    ...state,
+    session:{...session, customers, walkouts:session.walkouts + leaving.length,
+      nextArrivalAt:Math.max(session.nextArrivalAt, session.t + TIMING.freedSlotMs)},
+  };
+  return leaving.reduce((acc, customer) => withEvent(acc, {type:"walkout", slot:customer.slot, id:customer.id}), next);
+}
+
+/* ---------- stations ---------- */
+const burnWindow = (progress, station) => station === "grill"
+  ? TIMING.grillReadyMs + upgradeLevel(progress, "kit", "burnGuard") * TIMING.grillGuardStepMs
+  : TIMING.fryerReadyMs;
+
+function advanceHeat(state, station) {
+  const {session, progress} = state;
+  const boosted = session.t < session.boostUntil;
+  const window = burnWindow(progress, station);
+  let events = [];
+  const slots = session[station].map((slot, index) => {
+    if (slot.state === "cooking" && (boosted || session.t >= slot.readyAt)) {
+      const readyAt = Math.min(session.t, slot.readyAt);
+      events = [...events, {type:"ready", station, index}];
+      return {state:"ready", item:slot.item, readyAt, burnAt:Math.max(readyAt, boosted ? session.boostUntil : readyAt) + window};
+    }
+    if (slot.state === "ready" && !boosted && session.t >= slot.burnAt) {
+      events = [...events, {type:"burnt", station, index}];
+      return {state:"burnt", item:slot.item};
+    }
+    return slot;
+  });
+  if (!events.length) return state;
+  return {...state, session:{...session, [station]:slots}, events:[...state.events, ...events]};
+}
+
+function advanceDrinks(state) {
+  const {session} = state;
+  const boosted = session.t < session.boostUntil;
+  if (!session.drinks.some((slot) => slot.state === "filling" && (boosted || session.t >= slot.readyAt))) return state;
+  const drinks = session.drinks.map((slot) => slot.state === "filling" && (boosted || session.t >= slot.readyAt)
+    ? {state:"ready", item:slot.item} : slot);
+  return withEvent({...state, session:{...session, drinks}}, {type:"ready", station:"drinks"});
+}
+
+const cookTime = (base, step, minimum, level) => Math.max(minimum, base - level * step);
+const grillCookMs = (progress) => cookTime(TIMING.grillCookMs, TIMING.grillSpeedStepMs, TIMING.grillMinimumMs, upgradeLevel(progress, "kit", "grillSpeed"));
+const fryerCookMs = (progress) => cookTime(TIMING.fryerCookMs, TIMING.fryerSpeedStepMs, TIMING.fryerMinimumMs, upgradeLevel(progress, "kit", "fryerSpeed"));
+
+const isPlaying = (state) => state.screen === "playing" && !!state.session;
+const setSlot = (slots, index, slot) => slots.map((entry, i) => (i === index ? slot : entry));
+const maxPatties = (day) => Math.max(...RECIPES.filter((recipe) => recipe.day <= day).map((recipe) => recipe.patties));
+
+function addToTray(state, itemId) {
+  const {session} = state;
+  if (session.tray.length >= session.trayCapacity) return null;
+  return {...session, tray:[...session.tray, {id:itemId, key:session.nextKey}], nextKey:session.nextKey + 1};
+}
+
+export function tapGrill(state, index) {
+  if (!isPlaying(state)) return state;
+  const {session} = state;
+  const slot = session.grill[index];
+  if (!slot) return state;
+  if (slot.state === "empty") {
+    const cooking = {state:"cooking", item:"patty", startAt:session.t, readyAt:session.t + grillCookMs(state.progress)};
+    return withEvent({...state, session:{...session, grill:setSlot(session.grill, index, cooking)}}, {type:"start", station:"grill", index});
+  }
+  if (slot.state === "burnt") {
+    return withEvent({...state, session:{...session, grill:setSlot(session.grill, index, emptySlot())}}, {type:"toss", station:"grill", index});
+  }
+  if (slot.state === "ready") {
+    if (session.board.patties >= maxPatties(session.day)) return refuse(state, "board-full");
+    const board = {...session.board, patties:session.board.patties + 1};
+    return withEvent({...state, session:{...session, board, grill:setSlot(session.grill, index, emptySlot())}}, {type:"board", station:"grill", index});
+  }
+  return refuse(state, "cooking");
+}
+
+export function tapFryer(state, index) {
+  if (!isPlaying(state)) return state;
+  const {session} = state;
+  const slot = session.fryer[index];
+  if (!slot) return state;
+  if (!isUnlocked(session.day, "fries")) return refuse(state, "locked");
+  if (slot.state === "empty") {
+    const cooking = {state:"cooking", item:"fries", startAt:session.t, readyAt:session.t + fryerCookMs(state.progress)};
+    return withEvent({...state, session:{...session, fryer:setSlot(session.fryer, index, cooking)}}, {type:"start", station:"fryer", index});
+  }
+  if (slot.state === "burnt") {
+    return withEvent({...state, session:{...session, fryer:setSlot(session.fryer, index, emptySlot())}}, {type:"toss", station:"fryer", index});
+  }
+  if (slot.state === "ready") return handOver(state, "fries", (current) => ({...current, fryer:setSlot(current.fryer, index, emptySlot())}));
+  return refuse(state, "cooking");
+}
+
+/* A drink button pours that drink into the first free tap. */
+export function pourDrink(state, itemId) {
+  if (!isPlaying(state)) return state;
+  const {session} = state;
+  if (!ITEMS[itemId] || ITEMS[itemId].kind !== "drink" || !isUnlocked(session.day, itemId)) return refuse(state, "locked");
+  const index = session.drinks.findIndex((slot) => slot.state === "empty");
+  if (index < 0) return refuse(state, "taps-busy");
+  const filling = {state:"filling", item:itemId, startAt:session.t, readyAt:session.t + TIMING.drinkFillMs};
+  return withEvent({...state, session:{...session, drinks:setSlot(session.drinks, index, filling)}}, {type:"start", station:"drinks", index});
+}
+
+export function tapDrink(state, index) {
+  if (!isPlaying(state)) return state;
+  const {session} = state;
+  const slot = session.drinks[index];
+  if (!slot || slot.state !== "ready") return slot?.state === "filling" ? refuse(state, "cooking") : state;
+  return handOver(state, slot.item, (current) => ({...current, drinks:setSlot(current.drinks, index, emptySlot())}));
+}
+
+export function toggleTopping(state, topping) {
+  if (!isPlaying(state)) return state;
+  const {session} = state;
+  if (!isUnlocked(session.day, topping)) return refuse(state, "locked");
+  const has = session.board.toppings.includes(topping);
+  const toppings = has ? session.board.toppings.filter((entry) => entry !== topping) : [...session.board.toppings, topping];
+  return withEvent({...state, session:{...session, board:{...session.board, toppings}}}, {type:has ? "untop" : "top", topping});
+}
+
+const sameSet = (left, right) => left.length === right.length && left.every((entry) => right.includes(entry));
+export const recipeOnBoard = (session) => (session.board.patties
+  ? RECIPES.find((recipe) => recipe.day <= session.day && recipe.patties === session.board.patties && sameSet(recipe.toppings, session.board.toppings)) || null
+  : null);
+
+export function plateBurger(state) {
+  if (!isPlaying(state)) return state;
+  const {session} = state;
+  if (!session.board.patties) return refuse(state, "no-patty");
+  const recipe = recipeOnBoard(session);
+  if (!recipe) return refuse(state, "no-recipe");
+  return handOver(state, recipe.id, (current) => ({...current, board:{patties:0, toppings:[]}}));
+}
+
+export function trashBoard(state) {
+  if (!isPlaying(state)) return state;
+  const {session} = state;
+  if (!session.board.patties && !session.board.toppings.length) return state;
+  return withEvent({...state, session:{...session, board:{patties:0, toppings:[]}}}, {type:"toss", station:"board"});
+}
+
+/* ---------- serving ---------- */
+/* The guest who wants this and is closest to walking out gets it. */
+const mostUrgentFor = (session, itemId) => session.customers
+  .filter((customer) => customer.left.includes(itemId))
+  .sort((a, b) => patienceLeft(a, session.t) - patienceLeft(b, session.t))[0] || null;
+export const isWanted = (session, itemId) => !!mostUrgentFor(session, itemId);
+
+function payFor(state, itemId, customerId) {
+  const {session, progress} = state;
+  const customer = session.customers.find((entry) => entry.id === customerId);
+  const wantedAt = customer ? customer.left.indexOf(itemId) : -1;
+  if (wantedAt < 0) return state;
+  const left = customer.left.filter((_, index) => index !== wantedAt);
+  const isComplete = left.length === 0;
+  const inWindow = session.t - session.lastCompleteAt <= GAME_LIMITS.comboWindowMs;
+  const combo = isComplete ? (inWindow ? Math.min(GAME_LIMITS.maxCombo, session.combo + 1) : 1) : 1;
+  const tipRate = BASE_TIP_RATE + patienceLeft(customer, session.t) * PATIENCE_TIP_RATE + interiorBonus(progress, "tip");
+  const amount = Math.round(ITEMS[itemId].value * (1 + tipRate) * combo);
+  const customers = isComplete
+    ? session.customers.filter((entry) => entry.id !== customerId)
+    : session.customers.map((entry) => (entry.id === customerId ? {...entry, left} : entry));
+  const nextSession = {
+    ...session,
+    customers,
+    combo:isComplete ? combo : session.combo,
+    lastCompleteAt:isComplete ? session.t : session.lastCompleteAt,
+    earned:session.earned + amount,
+    served:session.served + (isComplete ? 1 : 0),
+    nextArrivalAt:isComplete ? Math.max(session.nextArrivalAt, session.t + TIMING.freedSlotMs) : session.nextArrivalAt,
+  };
+  return withEvent({
+    ...state,
+    progress:{...progress, coins:progress.coins + amount, lifetimeCoins:progress.lifetimeCoins + amount},
+    session:nextSession,
+  }, {type:"served", slot:customer.slot, id:customer.id, item:itemId, amount, combo, isComplete});
+}
+
+const serveFromTray = (state, trayIndex, customerId) => {
+  const {session} = state;
+  const item = session.tray[trayIndex];
+  const without = {...state, session:{...session, tray:session.tray.filter((_, index) => index !== trayIndex), discard:null}};
+  return payFor(without, item.id, customerId);
+};
+
+/* Something is finished (a plated burger, fries, a drink): a guest who waits for it gets it at once, otherwise it waits
+ * on the tray. clearSource empties the place it came from. */
+function handOver(state, itemId, clearSource) {
+  const base = {...state, session:clearSource(state.session)};
+  const customer = mostUrgentFor(base.session, itemId);
+  if (customer) return payFor(base, itemId, customer.id);
+  const session = addToTray(base, itemId);
+  if (!session) return refuse(state, "tray-full");
+  return withEvent({...base, session}, {type:"tray", item:itemId});
+}
+
+export function tapTray(state, index) {
+  if (!isPlaying(state)) return state;
+  const {session} = state;
+  const item = session.tray[index];
+  if (!item) return state;
+  const customer = mostUrgentFor(session, item.id);
+  if (customer) return serveFromTray(state, index, customer.id);
+  if (session.discard && session.discard.key === item.key && session.t <= session.discard.until) {
+    const tray = session.tray.filter((_, i) => i !== index);
+    return withEvent({...state, session:{...session, tray, discard:null}}, {type:"toss", station:"tray"});
+  }
+  return refuse({...state, session:{...session, discard:{key:item.key, until:session.t + TIMING.discardWindowMs}}}, "unwanted");
+}
+
+/* Tapping a guest hands over everything on the tray that this guest ordered. */
+export function tapCustomer(state, slot) {
+  if (!isPlaying(state)) return state;
+  const customer = state.session.customers.find((entry) => entry.slot === slot);
+  if (!customer) return state;
+  let next = state;
+  for (;;) {
+    const current = next.session.customers.find((entry) => entry.id === customer.id);
+    const trayIndex = current ? next.session.tray.findIndex((item) => current.left.includes(item.id)) : -1;
+    if (trayIndex < 0) break;
+    next = serveFromTray(next, trayIndex, customer.id);
+  }
+  return next === state ? refuse(state, "nothing-ready") : next;
+}
+
+function runHelper(state) {
+  const {session, progress} = state;
+  if (session.nextHelperAt === null || session.t < session.nextHelperAt) return state;
+  const level = upgradeLevel(progress, "prem", "helper");
+  const interval = Math.max(TIMING.helperMinimumMs, TIMING.helperIntervalMs - (level - 1) * TIMING.helperStepMs);
+  const scheduled = {...state, session:{...session, nextHelperAt:session.t + interval}};
+  const trayIndex = session.tray.findIndex((item) => mostUrgentFor(session, item.id));
+  if (trayIndex < 0) return scheduled;
+  return serveFromTray(scheduled, trayIndex, mostUrgentFor(session, session.tray[trayIndex].id).id);
+}
+
+export function activateBoost(state) {
+  if (!isPlaying(state)) return state;
+  const {session, progress} = state;
+  const level = upgradeLevel(progress, "prem", "instant");
+  if (!level) return state;
+  if (session.t < session.boostReadyAt) return refuse(state, "boost-cooldown");
+  const boostUntil = session.t + TIMING.boostDurationMs + (level - 1) * TIMING.boostLevelStepMs;
+  return withEvent({...state, session:{...session, boostUntil, boostReadyAt:session.t + TIMING.boostCooldownMs}}, {type:"boost"});
+}
+
+/* ---------- the clock ---------- */
+const starRating = (earned, goal, walkouts) => {
+  if (earned < goal) return 0;
+  if (earned >= goal * THREE_STAR_FACTOR && walkouts === 0) return 3;
+  if (earned >= goal * TWO_STAR_FACTOR) return 2;
   return 1;
 };
 
-export function finishDay(state) {
-  if (!state.session || state.session.result) return state;
-  const level = getLevel(state);
-  const rating = starRating(state.session.earnedCoins, level.goal, state.session.walkouts);
+function finishDay(state) {
+  const {session, progress} = state;
+  const rating = starRating(session.earned, session.goal, session.walkouts);
   const hasPassed = rating > 0;
-  const nextDay = hasPassed ? Math.min(GAME_LIMITS.maxDay, state.day + 1) : state.day;
-  const result = {rating, hasPassed, goal:level.goal, earnedCoins:state.session.earnedCoins, walkouts:state.session.walkouts};
-  return {
+  const day = hasPassed ? Math.max(progress.day, Math.min(GAME_LIMITS.maxDay, session.day + 1)) : progress.day;
+  const result = {rating, hasPassed, goal:session.goal, earned:session.earned, served:session.served, walkouts:session.walkouts, day:session.day};
+  return withEvent({
     ...state,
-    day:nextDay,
-    stars:state.stars + (rating === 3 ? 1 : 0),
+    progress:{...progress, day, stars:progress.stars + (rating === 3 ? 1 : 0)},
     screen:"summary",
-    session:{...state.session, status:"ended", remainingMs:0, result},
-  };
+    session:{...session, t:session.durationMs, customers:[], result},
+  }, {type:"dayEnd", result});
 }
 
-const heatDuration = (baseMs, stepMs, minimumMs, level) => Math.max(minimumMs, baseMs - level * stepMs);
-const startHeatItem = (slots, index, nowMs, cookMs, itemId) => slots.map((slot, slotIndex) => {
-  if (slotIndex !== index || slot.state !== "empty") return slot;
-  return {id:slot.id, itemId, state:"raw", cookingAt:nowMs + TIMING.rawStageMs, readyAt:nowMs + TIMING.rawStageMs + cookMs};
-});
-
-export function tapGrill(state, index, nowMs = gameNow()) {
-  if (state.session?.status !== "playing") return state;
-  const slot = state.session.grill[index];
-  if (!slot) return state;
-  if (slot.state === "burnt") {
-    const grill = state.session.grill.map((entry, slotIndex) => slotIndex === index ? emptySlot(entry.id) : entry);
-    return {...state, session:{...state.session, grill}};
-  }
-  if (slot.state === "ready") {
-    if (state.session.assembly.patties >= MAX_ASSEMBLY_PATTIES) return state;
-    const grill = state.session.grill.map((entry, slotIndex) => slotIndex === index ? emptySlot(entry.id) : entry);
-    const assembly = {...state.session.assembly, patties:state.session.assembly.patties + 1};
-    return {...state, session:{...state.session, grill, assembly}};
-  }
-  const cookMs = heatDuration(TIMING.grillCookMs, TIMING.grillSpeedStepMs, TIMING.grillMinimumMs, upgradeLevel(state, "kit", "grillSpeed"));
-  const grill = startHeatItem(state.session.grill, index, nowMs, cookMs, "patty");
-  return {...state, session:{...state.session, grill}};
+export function step(state, dtMs) {
+  if (!isPlaying(state)) return state;
+  let next = {...state, session:keepGuestsComing({...state.session, t:state.session.t + dtMs})};
+  next = advanceHeat(next, "grill");
+  next = advanceHeat(next, "fryer");
+  next = advanceDrinks(next);
+  next = walkOut(next);
+  next = arrive(next);
+  next = runHelper(next);
+  if (next.session.discard && next.session.t > next.session.discard.until) next = {...next, session:{...next.session, discard:null}};
+  return next.session.t >= next.session.durationMs ? finishDay(next) : next;
 }
 
-export function tapFryer(state, index, nowMs = gameNow()) {
-  if (state.session?.status !== "playing") return state;
-  const slot = state.session.fryer[index];
-  if (!slot || state.day < UNLOCKS.fries) return state;
-  if (slot.state === "burnt") {
-    const fryer = state.session.fryer.map((entry, slotIndex) => slotIndex === index ? emptySlot(entry.id) : entry);
-    return {...state, session:{...state.session, fryer}};
-  }
-  if (slot.state === "ready") return collectReadyItem(state, "fryer", index, "fries");
-  const cookMs = heatDuration(TIMING.fryerCookMs, TIMING.fryerSpeedStepMs, TIMING.fryerMinimumMs, upgradeLevel(state, "kit", "fryerSpeed"));
-  const fryer = startHeatItem(state.session.fryer, index, nowMs, cookMs, "fries");
-  return {...state, session:{...state.session, fryer}};
-}
-
-export function tapDrink(state, index, itemId, nowMs = gameNow()) {
-  if (state.session?.status !== "playing" || !isItemUnlocked(state.day, itemId)) return state;
-  const slot = state.session.drinks[index];
-  if (!slot) return state;
-  if (slot.state === "ready") return collectReadyItem(state, "drinks", index, slot.itemId);
-  if (slot.state !== "empty") return state;
-  const fillMs = heatDuration(TIMING.drinkFillMs, TIMING.drinkSpeedStepMs, TIMING.drinkMinimumMs, upgradeLevel(state, "kit", "drinkTaps"));
-  const drinks = state.session.drinks.map((entry, slotIndex) => slotIndex === index
-    ? {id:entry.id, itemId, state:"filling", readyAt:nowMs + fillMs}
-    : entry);
-  return {...state, session:{...state.session, drinks}};
-}
-
-const collectReadyItem = (state, station, index, itemId) => {
-  if (state.session.tray.length >= trayCapacity(state)) return state;
-  const slots = state.session[station].map((entry, slotIndex) => slotIndex === index ? emptySlot(entry.id) : entry);
-  const tray = [...state.session.tray, {id:itemId, key:`${itemId}-${state.session.startedAt}-${index}-${state.session.tray.length}`}];
-  return {...state, session:{...state.session, [station]:slots, tray}};
-};
-
-export function toggleTopping(state, topping) {
-  if (state.session?.status !== "playing" || state.day < (UNLOCKS[topping] || Infinity)) return state;
-  const toppings = state.session.assembly.toppings.includes(topping)
-    ? state.session.assembly.toppings.filter((entry) => entry !== topping)
-    : [...state.session.assembly.toppings, topping];
-  return {...state, session:{...state.session, assembly:{...state.session.assembly, toppings}}};
-}
-
-const sameToppings = (left, right) => (
-  left.length === right.length && [...left].sort().every((entry, index) => entry === [...right].sort()[index])
-);
-
-export function plateBurger(state) {
-  if (state.session?.status !== "playing" || state.session.tray.length >= trayCapacity(state)) return state;
-  const assembly = state.session.assembly;
-  const recipe = RECIPES.find((entry) => entry.day <= state.day && entry.patties === assembly.patties && sameToppings(entry.toppings, assembly.toppings));
-  if (!recipe) return state;
-  const tray = [...state.session.tray, {id:recipe.id, key:`${recipe.id}-${state.session.startedAt}-${state.session.tray.length}`}];
-  return {...state, session:{...state.session, assembly:{...EMPTY_ASSEMBLY}, tray}};
-}
-
-export const serveTray = (state, itemIndex, nowMs = gameNow()) => serveTrayInternal(state, itemIndex, nowMs);
-
-export function activateBoost(state, nowMs = gameNow()) {
-  const level = upgradeLevel(state, "prem", "instant");
-  if (!level || state.session?.status !== "playing" || nowMs < state.session.boostReadyAt) return state;
-  const durationMs = TIMING.boostDurationMs + (level - 1) * BOOST_LEVEL_STEP_MS;
-  const boostUntil = nowMs + durationMs;
-  const grill = state.session.grill.map((slot) => slot.state === "raw" || slot.state === "cooking"
-    ? {...slot, state:"ready", readyAt:nowMs, burnAt:nowMs + TIMING.grillReadyMs}
-    : slot);
-  const fryer = state.session.fryer.map((slot) => slot.state === "raw" || slot.state === "cooking"
-    ? {...slot, state:"ready", readyAt:nowMs, burnAt:nowMs + TIMING.fryerReadyMs}
-    : slot);
-  const drinks = state.session.drinks.map((slot) => slot.state === "filling" ? {...slot, state:"ready"} : slot);
-  const session = {...state.session, grill, fryer, drinks, boostUntil, boostReadyAt:nowMs + TIMING.boostCooldownMs};
-  return {...state, session};
-}
-
-export const isItemUnlocked = (day, itemId) => {
-  if (RECIPES.some((recipe) => recipe.id === itemId && recipe.day <= day)) return true;
-  return day >= (UNLOCKS[itemId] || Infinity);
-};
-
+/* ---------- shop ---------- */
 export function buyUpgrade(state, category, id) {
-  if (state.screen === "playing") return state;
-  const tables = {kit:KITCHEN_UPGRADES, int:INTERIOR_UPGRADES, prem:PREMIUM_UPGRADES};
-  const upgrade = tables[category]?.find((entry) => entry.id === id);
+  if (state.screen === "playing" || state.screen === "paused") return refuse(state, "busy");
+  const upgrade = findUpgrade(category, id);
   if (!upgrade) return state;
-  const level = upgradeLevel(state, category, id);
-  if (level >= upgrade.max) return state;
+  const level = upgradeLevel(state.progress, category, id);
+  if (level >= upgrade.max) return refuse(state, "max");
   const cost = upgrade.costs[level];
   const currency = category === "prem" ? "stars" : "coins";
-  if (!Number.isFinite(cost) || state[currency] < cost) return state;
-  return {
-    ...state,
-    [currency]:state[currency] - cost,
-    [category]:{...state[category], [id]:level + 1},
-  };
+  if (state.progress[currency] < cost) return refuse(state, currency === "stars" ? "no-stars" : "no-coins");
+  const progress = {...state.progress, [currency]:state.progress[currency] - cost, [category]:{...state.progress[category], [id]:level + 1}};
+  return withEvent({...state, progress}, {type:"bought", category, id});
 }
 
-export const stationCapacity = (state, id) => kitchenValue(state, id);
-export const getInteriorBonus = (state) => ({
-  patience:interiorBonus(state, "patience"),
-  tip:interiorBonus(state, "tip"),
-});

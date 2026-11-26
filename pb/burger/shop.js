@@ -1,99 +1,100 @@
-import {
-  INTERIOR_UPGRADES,
-  KITCHEN_UPGRADES,
-  PREMIUM_UPGRADES,
-} from "/pb/burger/data.js?v=1";
+/* Burger-Restaurant shop: built once, refresh() updates prices, levels and buttons. Buttons carry data-act="buy" for main.js. */
+import {INTERIOR_UPGRADES, KITCHEN_UPGRADES, PREMIUM_UPGRADES} from "/pb/burger/data.js?v=2";
+import {upgradeLevel} from "/pb/burger/sim.js?v=3";
 
 const TABS = Object.freeze([
-  {id:"kit", label:"Kitchen", upgrades:KITCHEN_UPGRADES, currency:"coins"},
-  {id:"int", label:"Interior", upgrades:INTERIOR_UPGRADES, currency:"coins"},
-  {id:"prem", label:"⭐", upgrades:PREMIUM_UPGRADES, currency:"stars"},
+  {id:"kit", label:"Kichen", upgrades:KITCHEN_UPGRADES, currency:"coins"},
+  {id:"int", label:"Restaurant", upgrades:INTERIOR_UPGRADES, currency:"coins"},
+  {id:"prem", label:"Stären", upgrades:PREMIUM_UPGRADES, currency:"stars", note:"Stäre gëtt et nëmme fir en Dag mat 3 Stären."},
 ]);
 
-const element = (tagName, className, text) => {
-  const node = document.createElement(tagName);
+const el = (tag, className, text) => {
+  const node = document.createElement(tag);
   if (className) node.className = className;
   if (text !== undefined) node.textContent = text;
   return node;
 };
+const icon = (currency) => el("i", currency === "stars" ? "star" : "coin");
 
-const displayLevel = (upgrade, purchasedLevel) => {
-  const base = upgrade.base || 0;
-  return `${base + purchasedLevel}/${base + upgrade.max}`;
-};
-
-export function createShop(container, {getState, onPurchase, onClose}) {
-  if (!(container instanceof HTMLElement)) throw new TypeError("Burger shop needs a container element.");
+export function createShop(container) {
   let activeTab = TABS[0].id;
-  const rows = new Map();
+  const rows = [];
   const panels = new Map();
   const tabButtons = new Map();
 
-  const header = element("div", "shop-header");
-  header.append(element("h2", "shop-title", "Restaurant Shop"));
-  const balance = element("div", "shop-balance");
-  const closeButton = element("button", "shop-close", "Done");
+  const header = el("div", "shop-header");
+  const closeButton = el("button", "arcade-btn secondary", "Zou");
   closeButton.type = "button";
-  closeButton.addEventListener("click", onClose);
-  header.append(balance, closeButton);
+  closeButton.dataset.act = "shop-close";
+  header.append(el("h2", "shop-title", "Buttek"), closeButton);
+  const coinBalance = el("span");
+  const starBalance = el("span");
+  const balance = el("p", "shop-balance");
+  balance.append(coinBalance, starBalance);
+  const tabBar = el("div", "shop-tabs");
+  tabBar.setAttribute("role", "tablist");
 
-  const tabBar = element("div", "shop-tabs");
-  const content = element("div", "shop-content");
+  TABS.forEach((tab) => {
+    const tabButton = el("button", "shop-tab", tab.label);
+    tabButton.type = "button";
+    tabButton.dataset.act = "shop-tab";
+    tabButton.dataset.item = tab.id;
+    tabButton.setAttribute("role", "tab");
+    tabButtons.set(tab.id, tabButton);
+    tabBar.append(tabButton);
+    const panel = el("div", "shop-panel");
+    if (tab.note) panel.append(el("p", "shop-note", tab.note));
+    tab.upgrades.forEach((upgrade) => {
+      const row = el("article", "upgrade");
+      const copy = el("div");
+      const pips = el("div", "upgrade-level");
+      const pipList = Array.from({length:upgrade.max}, () => el("i"));
+      pips.append(...pipList);
+      pips.setAttribute("aria-hidden", "true");
+      copy.append(el("h3", "", upgrade.name), el("p", "", upgrade.description), pips);
+      const buy = el("button", "arcade-btn upgrade-buy");
+      buy.type = "button";
+      buy.dataset.act = "buy";
+      buy.dataset.item = `${tab.id}:${upgrade.id}`;
+      row.append(copy, buy);
+      panel.append(row);
+      rows.push({tab, upgrade, pipList, buy, key:""});
+    });
+    panels.set(tab.id, panel);
+  });
+  container.replaceChildren(header, balance, tabBar, ...panels.values());
 
-  const showTab = (tabId) => {
+  function showTab(tabId) {
     if (!panels.has(tabId)) return;
     activeTab = tabId;
     panels.forEach((panel, id) => { panel.hidden = id !== tabId; });
-    tabButtons.forEach((button, id) => button.classList.toggle("active", id === tabId));
-    refresh();
-  };
-
-  TABS.forEach((tab) => {
-    const tabButton = element("button", "shop-tab", tab.label);
-    tabButton.type = "button";
-    tabButton.addEventListener("click", () => showTab(tab.id));
-    tabButtons.set(tab.id, tabButton);
-    tabBar.append(tabButton);
-
-    const panel = element("div", "shop-panel");
-    panel.dataset.tab = tab.id;
-    tab.upgrades.forEach((upgrade) => {
-      const row = element("article", "upgrade-row");
-      const copy = element("div", "upgrade-copy");
-      const title = element("h3", "upgrade-name", upgrade.name);
-      const description = element("p", "upgrade-description", upgrade.description);
-      const level = element("span", "upgrade-level");
-      copy.append(title, description, level);
-      const buyButton = element("button", "upgrade-buy");
-      buyButton.type = "button";
-      buyButton.addEventListener("click", () => onPurchase(tab.id, upgrade.id));
-      row.append(copy, buyButton);
-      panel.append(row);
-      rows.set(`${tab.id}:${upgrade.id}`, {tab, upgrade, level, buyButton});
+    tabButtons.forEach((button, id) => {
+      button.classList.toggle("active", id === tabId);
+      button.setAttribute("aria-selected", String(id === tabId));
     });
-    panels.set(tab.id, panel);
-    content.append(panel);
-  });
+  }
 
-  container.append(header, tabBar, content);
-
-  function refresh() {
-    const state = getState();
-    balance.textContent = `🪙 ${state.coins}   ⭐ ${state.stars}`;
-    rows.forEach(({tab, upgrade, level, buyButton}) => {
-      const purchasedLevel = Number(state[tab.id]?.[upgrade.id] || 0);
-      const isMaximum = purchasedLevel >= upgrade.max;
-      const cost = upgrade.costs[purchasedLevel];
-      const symbol = tab.currency === "stars" ? "⭐" : "🪙";
-      level.textContent = `Level ${displayLevel(upgrade, purchasedLevel)}`;
-      buyButton.textContent = isMaximum ? "Max" : `${symbol} ${cost}`;
-      buyButton.disabled = isMaximum || state[tab.currency] < cost;
-      buyButton.setAttribute("aria-label", isMaximum ? `${upgrade.name} maxed` : `Buy ${upgrade.name} for ${cost}`);
+  function refresh(progress) {
+    const coinKey = `${progress.coins}:${progress.stars}`;
+    if (balance.dataset.key !== coinKey) {
+      balance.dataset.key = coinKey;
+      coinBalance.replaceChildren(icon("coins"), document.createTextNode(String(progress.coins)));
+      starBalance.replaceChildren(icon("stars"), document.createTextNode(String(progress.stars)));
+    }
+    rows.forEach((row) => {
+      const level = upgradeLevel(progress, row.tab.id, row.upgrade.id);
+      const isMax = level >= row.upgrade.max;
+      const cost = row.upgrade.costs[level];
+      const key = `${level}:${isMax || progress[row.tab.currency] >= cost}`;
+      if (row.key === key) return;
+      row.key = key;
+      row.pipList.forEach((pip, index) => pip.classList.toggle("on", index < level));
+      row.buy.replaceChildren(...(isMax ? [document.createTextNode("Max")] : [icon(row.tab.currency), document.createTextNode(String(cost))]));
+      row.buy.disabled = isMax || progress[row.tab.currency] < cost;
+      row.buy.setAttribute("aria-label", isMax ? `${row.upgrade.name}: maximal` : `${row.upgrade.name} fir ${cost} kafen`);
     });
-    const tab = TABS.find((entry) => entry.id === activeTab);
-    if (tab?.id === "prem") balance.textContent += " · Stars come only from 3-star days";
   }
 
   showTab(activeTab);
-  return {refresh, showTab};
+  return {refresh, showTab, focusClose:() => closeButton.focus()};
 }
